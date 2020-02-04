@@ -47,10 +47,10 @@ extern enum arm64_bus arm64_bus_method;
 
 void dbg_init(void);
 void initarm(struct arm64_bootparams *);
-extern void (*pagezero)(void *);
-vm_offset_t linux_parse_boot_param(struct arm64_bootparams *);
-#ifdef LINUX_BOOT_ABI
-void parse_bootargs(vm_offset_t *, struct arm64_bootparams *);
+vm_offset_t parse_boot_param(struct arm64_bootparams *abp);
+#ifdef FDT
+void parse_fdt_bootargs(void);
 #endif
+extern void (*pagezero)(void *);
 
 #endif /* _MACHINE_MACHDEP_H_ */

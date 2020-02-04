@@ -107,12 +107,8 @@ struct mdthread {
 #define	COP2_OWNER_KERNEL	0x0001		/* Kernel owns COP2 */
 	int		md_cop2owner;
 #endif
-#ifdef CPU_CHERI
-	void * __capability	md_tls_cap;
+#ifdef	CPU_CHERI
 	vaddr_t		md_scb;
-#ifdef COMPAT_CHERIABI
-	void * __capability	md_cheri_mmap_cap;
-#endif
 #endif
 };
 

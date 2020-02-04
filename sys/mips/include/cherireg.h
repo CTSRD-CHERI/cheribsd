@@ -65,6 +65,7 @@
 #define	CHERI_PERM_CCALL			(1 << 8)	/* 0x00000100 */
 #define	CHERI_PERM_UNSEAL			(1 << 9)	/* 0x00000200 */
 #define	CHERI_PERM_SYSTEM_REGS			(1 << 10)	/* 0x00000400 */
+#define	CHERI_PERM_SET_CID			(1 << 11)	/* 0x00000800 */
 
 /*
  * User-defined permission bits.
@@ -119,24 +120,6 @@
 #endif /* (!(CHERICAP_SIZE == 32)) */
 
 /*
- * The kernel snags one for the software-defined permissions for the purposes
- * of authorising system calls from $pcc.  This is a bit of an oddity:
- * normally, we check permissions on data capabilities, not code capabilities,
- * but aligns with 'privilege' checks: e.g., $epcc access.  We may wish to
- * switch to another model, such as having userspace register one or more
- * class capabilities as suitable for system-call use.
- */
-#define	CHERI_PERM_SYSCALL			CHERI_PERM_SW0
-
-/*
- * Use another software-defined permission to restrict the ability to change
- * the page mapping underlying a capability.  This can't be the same
- * permission bit as CHERI_PERM_SYSCALL because $pcc should not confer the
- * right rewrite or remap executable memory.
- */
-#define	CHERI_PERM_CHERIABI_VMMAP		CHERI_PERM_SW1
-
-/*
  * Macros defining initial permission sets for various scenarios; details
  * depend on the permissions available on 256-bit or 128-bit CHERI:
  *
@@ -162,7 +145,7 @@
 	CHERI_PERM_LOAD | CHERI_PERM_STORE | CHERI_PERM_LOAD_CAP |	\
 	CHERI_PERM_STORE_CAP | CHERI_PERM_STORE_LOCAL_CAP |		\
 	CHERI_PERM_SEAL | CHERI_PERM_CCALL | CHERI_PERM_UNSEAL |	\
-	CHERI_PERM_SYSTEM_REGS)
+	CHERI_PERM_SYSTEM_REGS | CHERI_PERM_SET_CID)
 
 /*
  * Root "object-type" capability for the kernel.  This can be used neither as
@@ -175,6 +158,10 @@
  * Basic userspace permission mask; CHERI_PERM_EXECUTE will be added for
  * executable capabilities ($pcc); CHERI_PERM_STORE, CHERI_PERM_STORE_CAP,
  * and CHERI_PERM_STORE_LOCAL_CAP will be added for data permissions ($c0).
+ *
+ * All user software permissions are included along with
+ * CHERI_PERM_SYSCALL.  CHERI_PERM_CHERIABI_VMMAP will be added for
+ * permissions returned from mmap().
  *
  * No variation required between 256-bit and 128-bit CHERI.
  */
@@ -191,8 +178,8 @@
 /*
  * _DATA includes _VMMAP so that we can derive the MMAP cap from it.
  *
- * XXX: Should it include "unallocated" user permissions so
- * userspace can use them?
+ * XXX: We may not want to include VMMAP here and instead only in
+ * CHERI_CAP_USER_MMAP_PERMS
  */
 #define	CHERI_PERMS_USERSPACE_DATA					\
 				(CHERI_PERMS_USERSPACE |		\
@@ -222,17 +209,17 @@
 /*
  * The CHERI object-type space is split between userspace and kernel,
  * permitting kernel object references to be delegated to userspace (if
- * desired).  Currently, we provide 23 bits of namespace to each, with the top
+ * desired).  Currently, we provide 17 bits of namespace to each, with the top
  * bit set for kernel object types, but it is easy to imagine other splits.
  * User and kernel software should be written so as to not place assumptions
  * about the specific values used here, as they may change.
  */
+#define	CHERI_OTYPE_BITS	(18)
 #define	CHERI_OTYPE_USER_MIN	(0)
-#define	CHERI_OTYPE_USER_MAX	((1 << 23) - 1)
-#define	CHERI_OTYPE_KERN_MIN	(1 << 23)
-#define	CHERI_OTYPE_KERN_MAX	((1 << 24) - 1)
-
-#define	CHERI_OTYPE_KERN_FLAG	(1 << 23)
+#define	CHERI_OTYPE_USER_MAX	((1 << (CHERI_OTYPE_BITS - 1)) - 1)
+#define	CHERI_OTYPE_KERN_MIN	(1 << (CHERI_OTYPE_BITS - 1))
+#define	CHERI_OTYPE_KERN_MAX	((1 << CHERI_OTYPE_BITS) - 1)
+#define	CHERI_OTYPE_KERN_FLAG	(1 << (CHERI_OTYPE_BITS - 1))
 #define	CHERI_OTYPE_ISKERN(x)	(((x) & CHERI_OTYPE_KERN_FLAG) != 0)
 #define	CHERI_OTYPE_ISUSER(x)	(!(CHERI_OTYPE_ISKERN(x)))
 
@@ -243,7 +230,7 @@
  * bit set -- combined with a suitable selector on the CCall instruction to
  * ensure that this behaviour is intended.
  */
-#define	CHERI_OTYPE_LOCALOK_SHIFT	(22)
+#define	CHERI_OTYPE_LOCALOK_SHIFT	(CHERI_OTYPE_BITS - 2)
 #define	CHERI_OTYPE_LOCALOK_FLAG	(1 << CHERI_OTYPE_LOCALOK_SHIFT
 #define	CHERI_OTYPE_IS_LOCALOK(x)	(((x) & CHERI_OTYPE_LOCALOK_FLAG) != 0)
 
@@ -257,66 +244,6 @@
 #define	CHERI_CAP_KERN_BASE		0x0
 #define	CHERI_CAP_KERN_LENGTH		0xffffffffffffffff
 #define	CHERI_CAP_KERN_OFFSET		0x0
-
-/*
- * Definition for userspace "unprivileged" capability able to name the user
- * portion of the address space.
- */
-#define	CHERI_CAP_USER_CODE_PERMS	CHERI_PERMS_USERSPACE_CODE
-#define	CHERI_CAP_USER_CODE_BASE	VM_MINUSER_ADDRESS
-#define	CHERI_CAP_USER_CODE_LENGTH	(VM_MAXUSER_ADDRESS - VM_MINUSER_ADDRESS)
-#define	CHERI_CAP_USER_CODE_OFFSET	0x0
-
-#define	CHERI_CAP_USER_DATA_PERMS	CHERI_PERMS_USERSPACE_DATA
-#define	CHERI_CAP_USER_DATA_BASE	VM_MINUSER_ADDRESS
-#define	CHERI_CAP_USER_DATA_LENGTH	(VM_MAXUSER_ADDRESS - VM_MINUSER_ADDRESS)
-#define	CHERI_CAP_USER_DATA_OFFSET	0x0
-
-#define	CHERI_CAP_USER_MMAP_PERMS					\
-	(CHERI_PERMS_USERSPACE_DATA | CHERI_PERMS_USERSPACE_CODE |	\
-	CHERI_PERM_CHERIABI_VMMAP)
-/* Start at 256MB to avoid low PC values in sandboxes */
-#define	CHERI_CAP_USER_MMAP_BASE	(VM_MINUSER_ADDRESS + 0x10000000)
-#define	CHERI_CAP_USER_MMAP_LENGTH					\
-    (VM_MAXUSER_ADDRESS - CHERI_CAP_USER_MMAP_BASE)
-#define	CHERI_CAP_USER_MMAP_OFFSET	0x0
-
-/*
- * Root sealing capability for all userspace object capabilities.  This is
- * made available to userspace via a sysarch(2).
- */
-#define	CHERI_SEALCAP_USERSPACE_PERMS	CHERI_PERMS_USERSPACE_SEALCAP
-#define	CHERI_SEALCAP_USERSPACE_BASE	CHERI_OTYPE_USER_MIN
-#define	CHERI_SEALCAP_USERSPACE_LENGTH	\
-    (CHERI_OTYPE_USER_MAX - CHERI_OTYPE_USER_MIN + 1)
-#define	CHERI_SEALCAP_USERSPACE_OFFSET	0x0
-
-/*
- * Root sealing capability for kernel managed objects.
- */
-#define	CHERI_SEALCAP_KERNEL_PERMS	CHERI_PERMS_KERNEL_SEALCAP
-#define CHERI_SEALCAP_KERNEL_BASE	CHERI_OTYPE_KERN_MIN
-#define	CHERI_SEALCAP_KERNEL_LENGTH	\
-    (CHERI_OTYPE_KERN_MAX - CHERI_OTYPE_KERN_MIN + 1)
-#define	CHERI_SEALCAP_KERNEL_OFFSET	0x0
-
-/*
- * Sealing capability for capability pairs returned by cosetup(2).
- */
-#define	CHERI_SEALCAP_SWITCHER_PERMS	CHERI_PERMS_KERNEL_SEALCAP
-#define	CHERI_SEALCAP_SWITCHER_BASE	(CHERI_OTYPE_USER_MIN + 1)
-#define	CHERI_SEALCAP_SWITCHER_LENGTH	\
-    (CHERI_OTYPE_USER_MAX - CHERI_OTYPE_USER_MIN + 1)
-#define	CHERI_SEALCAP_SWITCHER_OFFSET	0x0
-
-/*
- * Sealing capability for capabilities returned by coregister(2)/colookup(2).
- */
-#define	CHERI_SEALCAP_SWITCHER2_PERMS	CHERI_PERMS_KERNEL_SEALCAP
-#define	CHERI_SEALCAP_SWITCHER2_BASE	(CHERI_OTYPE_USER_MIN + 1)
-#define	CHERI_SEALCAP_SWITCHER2_LENGTH	\
-    (CHERI_OTYPE_USER_MAX - CHERI_OTYPE_USER_MIN + 2)
-#define	CHERI_SEALCAP_SWITCHER2_OFFSET	0x0
 
 /*
  * A blend of hardware and software allocation of capability registers.
@@ -385,7 +312,8 @@
 #define	CHERI_EXCCODE_UNDERFLOW		0x07
 #define	CHERI_EXCCODE_USER_PERM		0x08
 #define	CHERI_EXCCODE_PERM_USER		CHERI_EXCCODE_USER_PERM
-#define	CHERI_EXCCODE_TLBSTORE		0x09
+#define	CHERI_EXCCODE_MMUSTORE		0x09
+#define	CHERI_EXCCODE_TLBSTORE		CHERI_EXCCODE_MMUSTORE
 #define	CHERI_EXCCODE_IMPRECISE		0x0a
 #define	_CHERI_EXCCODE_RESERVED0b	0x0b
 #define	_CHERI_EXCCODE_RESERVED0c	0x0c
@@ -404,7 +332,7 @@
 #define	CHERI_EXCCODE_PERM_CCALL	0x19
 #define	CHERI_EXCCODE_CCALL_IDC		0x1a
 #define	CHERI_EXCCODE_PERM_UNSEAL	0x1b
-#define	_CHERI_EXCCODE_RESERVED1c	0x1c
+#define	CHERI_EXCCODE_PERM_SET_CID	0x1c
 #define	_CHERI_EXCCODE_RESERVED1d	0x1d
 #define	_CHERI_EXCCODE_RESERVED1e	0x1e
 #define	_CHERI_EXCCODE_RESERVED1f	0x1f
@@ -431,71 +359,15 @@
  */
 #define	CHERI_CCALL_EXC_VEC	((intptr_t)(int32_t)0x80000280)
 
-#if CHERICAP_SIZE == 32
+#if CHERICAP_SIZE == 16
 /*
- * XXXAR: __builtin_cheri_round_representable_length and
- * __builtin_cheri_representable_alignment_mask are currently not constant
- * evaluated by the compiler for CHERI256 so we use different macros here
- * instead.
- *
- * CHERI256 capabilities are precise so we can return the length unchanged
- * and use a mask of all ones.
+ * CHERI_BASELEN_BITS is used in cheritest_cheriabi.c.  The others are
+ * unused.
  */
-#define CHERI_REPRESENTABLE_LENGTH(len) (len)
-#define CHERI_REPRESENTABLE_ALIGNMENT_MASK(len) UINT64_MAX
-
-#else /* (!(CHERICAP_SIZE == 32)) */
-
 #define	CHERI_BASELEN_BITS	10
 #define	CHERI_SEAL_BASELEN_BITS	5
 #define	CHERI_ADDR_BITS		64
 #define	CHERI_SEAL_MIN_ALIGN	12
-
-#if !__has_builtin(__builtin_cheri_round_representable_length)
-#error "__builtin_cheri_round_representable_length() missing. Please update LLVM"
 #endif
-
-#define CHERI_REPRESENTABLE_LENGTH(len) \
-	__builtin_cheri_round_representable_length(len)
-#define CHERI_REPRESENTABLE_ALIGNMENT_MASK(len) \
-	__builtin_cheri_representable_alignment_mask(len)
-#endif /* (!(CHERICAP_SIZE == 32)) */
-
-/* Provide macros to make it easier to work with the raw CRAM/CRRL results: */
-#define CHERI_REPRESENTABLE_ALIGNMENT(len) \
-	(~CHERI_REPRESENTABLE_ALIGNMENT_MASK(len) + 1)
-#define CHERI_REPRESENTABLE_BASE(base, len) \
-	((base) & CHERI_REPRESENTABLE_ALIGNMENT_MASK(len))
-/*
- * In the current encoding sealed and unsealed capabilities have the same
- * alignemnt constraints.
- */
-#define CHERI_SEALABLE_LENGTH(len)	\
-	CHERI_REPRESENTABLE_LENGTH(len)
-#define CHERI_SEALABLE_ALIGNMENT_MASK(len)	\
-	CHERI_REPRESENTABLE_ALIGNMENT_MASK(len)
-#define CHERI_SEALABLE_ALIGNMENT(len)	\
-	CHERI_REPRESENTABLE_ALIGNMENT(len)
-#define CHERI_SEALABLE_BASE(base, len)	\
-	CHERI_REPRESENTABLE_BASE(base, len)
-
-/* A mask for the lower bits, i.e. the negated alignment mask */
-#define	CHERI_SEAL_ALIGN_MASK(l)	~(CHERI_SEALABLE_ALIGNMENT_MASK(l))
-#define	CHERI_ALIGN_MASK(l)		~(CHERI_REPRESENTABLE_ALIGNMENT_MASK(l))
-
-#if CHERICAP_SIZE == 32
-#define	CHERI_ALIGN_SHIFT(l)	0ULL
-#define	CHERI_SEAL_ALIGN_SHIFT(l)	0ULL
-#else
-/*
- * TODO: avoid using these since count leading/trailing zeroes is expensive on
- * BERI/CHERI
- */
-#define	CHERI_ALIGN_SHIFT(l)	\
-	__builtin_ctzll(CHERI_REPRESENTABLE_ALIGNMENT_MASK(l))
-#define CHERI_SEAL_ALIGN_SHIFT(l)	\
-	__builtin_ctzll(CHERI_SEALABLE_ALIGNMENT_MASK(l))
-#endif
-
 
 #endif /* _MIPS_INCLUDE_CHERIREG_H_ */

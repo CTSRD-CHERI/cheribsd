@@ -308,12 +308,14 @@ esp_input(struct mbuf *m, struct secasvar *sav, int skip, int protoff)
 		goto bad;
 	}
 
-	m = m_pullup(m, skip + sizeof(*esp));
-	if (m == NULL) {
-		DPRINTF(("%s: cannot pullup header\n", __func__));
-		ESPSTAT_INC(esps_hdrops);	/*XXX*/
-		error = ENOBUFS;
-		goto bad;
+	if (m->m_len < skip + sizeof(*esp)) {
+		m = m_pullup(m, skip + sizeof(*esp));
+		if (m == NULL) {
+			DPRINTF(("%s: cannot pullup header\n", __func__));
+			ESPSTAT_INC(esps_hdrops);	/*XXX*/
+			error = ENOBUFS;
+			goto bad;
+		}
 	}
 	esp = (struct newesp *)(mtod(m, caddr_t) + skip);
 
@@ -613,6 +615,13 @@ esp_input_cb(struct cryptop *crp)
 			goto bad;
 		}
 	}
+
+	/*
+	 * RFC4303 2.6:
+	 * Silently drop packet if next header field is IPPROTO_NONE.
+	 */
+	if (lastthree[2] == IPPROTO_NONE)
+		goto bad;
 
 	/* Trim the mbuf chain to remove trailing authenticator and padding */
 	m_adj(m, -(lastthree[1] + 2));

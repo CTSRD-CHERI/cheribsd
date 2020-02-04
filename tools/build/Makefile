@@ -4,18 +4,18 @@
 
 LIB=		egacy
 SRC=
-INCSGROUPS=	INCS SYSINCS CASPERINC
-INCSGROUPS+=	MACHINESYSINCS UFSINCS FFSINCS MSDOSFSINCS X86INCS RPCINCS DISKINCS
+INCSGROUPS=	INCS SYSINCS CASPERINC UFSINCS FFSINCS MSDOSFSINCS DISKINCS
+INCSGROUPS+=	MACHINESYSINCS X86INCS RPCINCS
 INCS=
 
 SYSINCSDIR=	${INCLUDEDIR}/sys
 CASPERINCDIR=	${INCLUDEDIR}/casper
-MACHINESYSINCSDIR=	${INCLUDEDIR}/machine
+# Also add ufs/ffs/msdosfs/disk headers to allow building makefs as a bootstrap tool
 UFSINCSDIR=	${INCLUDEDIR}/ufs/ufs
 FFSINCSDIR=	${INCLUDEDIR}/ufs/ffs
-# Also add msdosfs+sys/disk headers to allow building makefs as a bootstrap tool
 MSDOSFSINCSDIR=	${INCLUDEDIR}/fs/msdosfs
 DISKINCSDIR=	${INCLUDEDIR}/sys/disk
+MACHINESYSINCSDIR=	${INCLUDEDIR}/machine
 X86INCSDIR=	${INCLUDEDIR}/x86
 
 BOOTSTRAPPING?=	0
@@ -78,7 +78,14 @@ SYSINCS+=	cdefs.h
 
 _WITH_EXPLICIT_BZERO!= grep -c explicit_bzero ${HOST_INCLUDE_ROOT}/strings.h || true
 .if ${_WITH_EXPLICIT_BZERO} == 0
-.PATH: ${SRCTOP}/sys/libkern
+# .PATH: ${SRCTOP}/sys/libkern
+# Adding sys/libkern to .PATH breaks building the cross-build compat library
+# since that attempts to build strlcpy.c from libc and adding libkern here will
+# cause it to pick the file from libkern instead (which won't compile).
+# Avoid modifying .PATH by creating a copy in the build directory instead.
+explicit_bzero.c: ${SRCTOP}/sys/libkern/explicit_bzero.c
+	cp ${.ALLSRC} ${.TARGET}
+CLEANFILES+=	explicit_bzero.c
 INCS+=		strings.h
 SRCS+=		explicit_bzero.c
 .endif
@@ -105,51 +112,7 @@ RPCINCS+=	${SRCTOP}/sys/rpc/types.h
 # don't copy stdlib.h when cross-building since it will cause
 # conflicts with the host system's headers
 INCS:=	${INCS:Nstdlib.h}
-SYSINCS+=	${SRCTOP}/sys/sys/md5.h
-SYSINCS+=	${SRCTOP}/sys/sys/sbuf.h
-SYSINCS+=	${SRCTOP}/sys/sys/elf32.h
-SYSINCS+=	${SRCTOP}/sys/sys/elf64.h
-SYSINCS+=	${SRCTOP}/sys/sys/elf_common.h
-SYSINCS+=	${SRCTOP}/sys/sys/elf_generic.h
-SYSINCS+=	${SRCTOP}/sys/sys/tree.h
-
-_host_arch=${MACHINE}
-.if ${_host_arch} == "x86_64"
-# bmake on Linux/mac often prints that instead of amd64
-_host_arch=amd64
-.endif
-.if ${_host_arch} == "unknown"
-# HACK: If MACHINE is unknown, assume we are building on x86
-_host_arch=amd64
-.endif
-MACHINESYSINCS+=	${SRCTOP}/sys/${_host_arch}/include/elf.h
-.if ${_host_arch} == "amd64" || ${_host_arch} == "i386"
-X86INCS+=	${SRCTOP}/sys/x86/include/elf.h
-.endif
-
-# needed for btxld:
-MACHINESYSINCS+=	${SRCTOP}/sys/${_host_arch}/include/exec.h
-MACHINESYSINCS+=	${SRCTOP}/sys/${_host_arch}/include/reloc.h
-INCS+=	${SRCTOP}/include/a.out.h
-SYSINCS+=	${SRCTOP}/sys/sys/imgact_aout.h
-
-# For mkscrfil.c:
-SYSINCS+=	${SRCTOP}/sys/sys/consio.h
-
-# for gencat:
-INCS+=	${SRCTOP}/include/nl_types.h
-
-# for vtfontcvt:
-SYSINCS+=	${SRCTOP}/sys/sys/fnv_hash.h
-
-# opensolaris stuff
-INCS+=	${SRCTOP}/include/elf.h
-
-# We need to build a FreeBSD compatible libdb for tools like tsort, etc.
-# I believe the db routines shipped with MacOS are compatible but on Linux they
-# definitelty aren't. To avoid any surprises let's just always build it when
-# we are crossbuilding.
-SUBDIR+=	cross-build/libfreebsd
+.include "cross-build/libfreebsd/Makefile.inc"
 .endif
 
 CASPERINC+=	${SRCTOP}/lib/libcasper/services/cap_fileargs/cap_fileargs.h

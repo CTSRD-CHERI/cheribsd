@@ -309,7 +309,6 @@ int	 rpmatch(const char *);
 void	 setprogname(const char *);
 int	 sradixsort(const unsigned char **, int, const unsigned char *,
 	    unsigned);
-void	 sranddev(void);
 void	 srandomdev(void);
 long long
 	strtonum(const char *, long long, long long, const char **);
@@ -348,6 +347,11 @@ extern char *suboptarg;			/* getsubopt(3) external variable */
 
 #if __EXT1_VISIBLE
 
+#ifndef _RSIZE_T_DEFINED
+#define _RSIZE_T_DEFINED
+typedef size_t rsize_t;
+#endif
+
 #ifndef _ERRNO_T_DEFINED
 #define _ERRNO_T_DEFINED
 typedef int errno_t;
@@ -363,6 +367,9 @@ _Noreturn void abort_handler_s(const char * __restrict, void * __restrict,
     errno_t);
 /* K3.6.1.3 */
 void ignore_handler_s(const char * __restrict, void * __restrict, errno_t);
+/* K.3.6.3.2 */
+errno_t	 qsort_s(void *, rsize_t, rsize_t,
+    int (*)(const void *, const void *, void *), void *);
 #endif /* __EXT1_VISIBLE */
 
 __END_DECLS

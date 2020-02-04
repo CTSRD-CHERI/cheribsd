@@ -101,13 +101,13 @@ extern struct sysent linux32_sysent[LINUX32_SYS_MAXSYSCALL];
 
 SET_DECLARE(linux_ioctl_handler_set, struct linux_ioctl_handler);
 
-static int	linux_fixup_elf(register_t **stack_base,
+static int	linux_fixup_elf(uintptr_t *stack_base,
 		    struct image_params *iparams);
 static int	linux_copyout_strings(struct image_params *imgp,
-		    register_t **stack_base);
+		    uintptr_t *stack_base);
 static void     linux_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask);
 static void	linux_exec_setregs(struct thread *td,
-				   struct image_params *imgp, u_long stack);
+				   struct image_params *imgp, uintptr_t stack);
 static void	linux32_fixlimit(struct rlimit *rl, int which);
 static bool	linux32_trans_osrel(const Elf_Note *note, int32_t *osrel);
 static void	linux_vdso_install(void *param);
@@ -187,11 +187,10 @@ linux_translate_traps(int signal, int trap_code)
 }
 
 static int
-linux_copyout_auxargs(struct image_params *imgp, u_long *base)
+linux_copyout_auxargs(struct image_params *imgp, uintptr_t base)
 {
 	Elf32_Auxargs *args;
 	Elf32_Auxinfo *argarray, *pos;
-	u_long auxlen;
 	int error, issetugid;
 
 	args = (Elf32_Auxargs *)imgp->auxargs;
@@ -238,15 +237,14 @@ linux_copyout_auxargs(struct image_params *imgp, u_long *base)
 	imgp->auxargs = NULL;
 	KASSERT(pos - argarray <= LINUX_AT_COUNT, ("Too many auxargs"));
 
-	auxlen = sizeof(*argarray) * (pos - argarray);
-	*base -= auxlen;
-	error = copyout(argarray, (void *)*base, auxlen);
+	error = copyout(argarray, (void *)base,
+	    sizeof(*argarray) * LINUX_AT_COUNT);
 	free(argarray, M_TEMP);
 	return (error);
 }
 
 static int
-linux_fixup_elf(register_t **stack_base, struct image_params *imgp)
+linux_fixup_elf(uintptr_t *stack_base, struct image_params *imgp)
 {
 	Elf32_Addr *base;
 
@@ -254,7 +252,7 @@ linux_fixup_elf(register_t **stack_base, struct image_params *imgp)
 	base--;
 	if (suword32(base, (uint32_t)imgp->args->argc) == -1)
 		return (EFAULT);
-	*stack_base = (register_t *)base;
+	*stack_base = (uintptr_t)base;
 	return (0);
 }
 
@@ -677,7 +675,8 @@ linux32_fetch_syscall_args(struct thread *td)
  * XXX copied from ia32_signal.c.
  */
 static void
-linux_exec_setregs(struct thread *td, struct image_params *imgp, u_long stack)
+linux_exec_setregs(struct thread *td, struct image_params *imgp,
+    uintptr_t stack)
 {
 	struct trapframe *regs = td->td_frame;
 	struct pcb *pcb = td->td_pcb;
@@ -721,11 +720,12 @@ linux_exec_setregs(struct thread *td, struct image_params *imgp, u_long stack)
  * XXX copied from ia32_sysvec.c.
  */
 static int
-linux_copyout_strings(struct image_params *imgp, register_t **stack_base)
+linux_copyout_strings(struct image_params *imgp, uintptr_t *stack_base)
 {
 	int argc, envc, error;
 	u_int32_t *vectp;
-	char *stringp, *destp;
+	char *stringp;
+	uintptr_t destp, ustringp;
 	struct linux32_ps_strings *arginfo;
 	char canary[LINUX_AT_RANDOM_LEN];
 	size_t execpath_len;
@@ -737,35 +737,40 @@ linux_copyout_strings(struct image_params *imgp, register_t **stack_base)
 		execpath_len = 0;
 
 	arginfo = (struct linux32_ps_strings *)LINUX32_PS_STRINGS;
-	destp =	(caddr_t)arginfo - SPARE_USRSPACE -
-	    roundup(sizeof(canary), sizeof(char *)) -
-	    roundup(execpath_len, sizeof(char *)) -
-	    roundup(ARG_MAX - imgp->args->stringspace, sizeof(char *));
+	destp = (uintptr_t)arginfo;
 
 	if (execpath_len != 0) {
-		imgp->execpathp = (uintptr_t)arginfo - execpath_len;
-		error = copyout(imgp->execpath, (void *)imgp->execpathp,
-		    execpath_len);
+		destp -= execpath_len;
+		destp = rounddown2(destp, sizeof(uint32_t));
+		imgp->execpathp = destp;
+		error = copyout(imgp->execpath, (void *)destp, execpath_len);
 		if (error != 0)
 			return (error);
 	}
 
 	/* Prepare the canary for SSP. */
 	arc4rand(canary, sizeof(canary), 0);
-	imgp->canary = (uintptr_t)arginfo -
-	    roundup(execpath_len, sizeof(char *)) -
-	    roundup(sizeof(canary), sizeof(char *));
-	error = copyout(canary, (void *)imgp->canary, sizeof(canary));
+	destp -= roundup(sizeof(canary), sizeof(uint32_t));
+	imgp->canary = destp;
+	error = copyout(canary, (void *)destp, sizeof(canary));
 	if (error != 0)
 		return (error);
 
-	vectp = (uint32_t *)destp;
+	/* Allocate room for the argument and environment strings. */
+	destp -= ARG_MAX - imgp->args->stringspace;
+	destp = rounddown2(destp, sizeof(uint32_t));
+	ustringp = destp;
+
 	if (imgp->auxargs) {
-		error = imgp->sysent->sv_copyout_auxargs(imgp,
-		    (u_long *)&vectp);
-		if (error != 0)
-			return (error);
+		/*
+		 * Allocate room on the stack for the ELF auxargs
+		 * array.  It has LINUX_AT_COUNT entries.
+		 */
+		destp -= LINUX_AT_COUNT * sizeof(Elf32_Auxinfo);
+		destp = rounddown2(destp, sizeof(uint32_t));
 	}
+
+	vectp = (uint32_t *)destp;
 
 	/*
 	 * Allocate room for the argv[] and env vectors including the
@@ -774,13 +779,15 @@ linux_copyout_strings(struct image_params *imgp, register_t **stack_base)
 	vectp -= imgp->args->argc + 1 + imgp->args->envc + 1;
 
 	/* vectp also becomes our initial stack base. */
-	*stack_base = (register_t *)vectp;
+	*stack_base = (uintptr_t)vectp;
 
 	stringp = imgp->args->begin_argv;
 	argc = imgp->args->argc;
 	envc = imgp->args->envc;
+
 	/* Copy out strings - arguments and environment. */
-	error = copyout(stringp, destp, ARG_MAX - imgp->args->stringspace);
+	error = copyout(stringp, (void *)ustringp,
+	    ARG_MAX - imgp->args->stringspace);
 	if (error != 0)
 		return (error);
 
@@ -791,11 +798,11 @@ linux_copyout_strings(struct image_params *imgp, register_t **stack_base)
 
 	/* Fill in argument portion of vector table. */
 	for (; argc > 0; --argc) {
-		if (suword32(vectp++, (uint32_t)(intptr_t)destp) != 0)
+		if (suword32(vectp++, ustringp) != 0)
 			return (EFAULT);
 		while (*stringp++ != 0)
-			destp++;
-		destp++;
+			ustringp++;
+		ustringp++;
 	}
 
 	/* A null vector table pointer separates the argp's from the envp's. */
@@ -808,16 +815,24 @@ linux_copyout_strings(struct image_params *imgp, register_t **stack_base)
 
 	/* Fill in environment portion of vector table. */
 	for (; envc > 0; --envc) {
-		if (suword32(vectp++, (uint32_t)(intptr_t)destp) != 0)
+		if (suword32(vectp++, ustringp) != 0)
 			return (EFAULT);
 		while (*stringp++ != 0)
-			destp++;
-		destp++;
+			ustringp++;
+		ustringp++;
 	}
 
 	/* The end of the vector table is a null pointer. */
 	if (suword32(vectp, 0) != 0)
 		return (EFAULT);
+
+	if (imgp->auxargs) {
+		vectp++;
+		error = imgp->sysent->sv_copyout_auxargs(imgp,
+		    (uintptr_t)vectp);
+		if (error != 0)
+			return (error);
+	}
 
 	return (0);
 }
@@ -977,7 +992,7 @@ static Elf32_Brandinfo linux_brand = {
 	.brand		= ELFOSABI_LINUX,
 	.machine	= EM_386,
 	.compat_3_brand	= "Linux",
-	.emul_path	= "/compat/linux",
+	.emul_path	= linux_emul_path,
 	.interp_path	= "/lib/ld-linux.so.1",
 	.sysvec		= &elf_linux_sysvec,
 	.interp_newpath	= NULL,
@@ -989,7 +1004,7 @@ static Elf32_Brandinfo linux_glibc2brand = {
 	.brand		= ELFOSABI_LINUX,
 	.machine	= EM_386,
 	.compat_3_brand	= "Linux",
-	.emul_path	= "/compat/linux",
+	.emul_path	= linux_emul_path,
 	.interp_path	= "/lib/ld-linux.so.2",
 	.sysvec		= &elf_linux_sysvec,
 	.interp_newpath	= NULL,
@@ -1001,7 +1016,7 @@ static Elf32_Brandinfo linux_muslbrand = {
 	.brand		= ELFOSABI_LINUX,
 	.machine	= EM_386,
 	.compat_3_brand	= "Linux",
-	.emul_path	= "/compat/linux",
+	.emul_path	= linux_emul_path,
 	.interp_path	= "/lib/ld-musl-i386.so.1",
 	.sysvec		= &elf_linux_sysvec,
 	.interp_newpath	= NULL,

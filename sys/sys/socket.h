@@ -437,26 +437,17 @@ struct msghdr {
 	int		 msg_flags;		/* flags on received message */
 };
 #ifdef _KERNEL
-#if __has_feature(capabilities)
+#ifdef COMPAT_FREEBSD64
 struct msghdr64 {
 	void		*msg_name;		/* optional address */
 	socklen_t	 msg_namelen;		/* size of address */
-	struct iovec_native	*msg_iov;	/* scatter/gather array */
+	struct iovec64	*msg_iov;		/* scatter/gather array */
 	int		 msg_iovlen;		/* # elements in msg_iov */
 	void		*msg_control;		/* ancillary data, see below */
 	socklen_t	 msg_controllen;	/* ancillary data buffer len */
 	int		 msg_flags;		/* flags on received message */
 };
 #endif
-struct msghdr_native {
-	void		*msg_name;		/* optional address */
-	socklen_t	 msg_namelen;		/* size of address */
-	struct iovec_native	*msg_iov;	/* scatter/gather array */
-	int		 msg_iovlen;		/* # elements in msg_iov */
-	void		*msg_control;		/* ancillary data, see below */
-	socklen_t	 msg_controllen;	/* ancillary data buffer len */
-	int		 msg_flags;		/* flags on received message */
-};
 #endif	/* _KERNEL */
 
 #define	MSG_OOB		 0x00000001	/* process out-of-band data */
@@ -635,11 +626,11 @@ struct osockaddr {
  * 4.3-compat message header (move to compat file later).
  */
 struct omsghdr {
-	char	*msg_name;		/* optional address */
+	char * __kerncap msg_name;	/* optional address */
 	int	msg_namelen;		/* size of address */
-	struct	iovec_native *msg_iov;		/* scatter/gather array */
+	struct iovec * __kerncap msg_iov; /* scatter/gather array */
 	int	msg_iovlen;		/* # elements in msg_iov */
-	char	*msg_accrights;		/* access rights sent/received */
+	char * __kerncap msg_accrights;	/* access rights sent/received */
 	int	msg_accrightslen;
 };
 #endif
@@ -671,12 +662,6 @@ struct sf_hdtr {
 	int trl_cnt;		/* number of trailer iovec's */
 };
 #ifdef _KERNEL
-struct sf_hdtr_native {
-	struct iovec_native *headers;	/* pointer to an array of header struct iovec's */
-	int hdr_cnt;		/* number of header iovec's */
-	struct iovec_native *trailers;	/* pointer to an array of trailer struct iovec's */
-	int trl_cnt;		/* number of trailer iovec's */
-};
 typedef	int copyin_hdtr_t(const void * __capability hdtrp, struct sf_hdtr *hdtr);
 #endif /* _KERNEL */
 
@@ -702,12 +687,6 @@ struct mmsghdr {
 	struct msghdr	msg_hdr;		/* message header */
 	ssize_t		msg_len;		/* message length */
 };
-#ifdef _KERNEL
-struct mmsghdr_native {
-	struct msghdr_native	msg_hdr;		/* message header */
-	ssize_t		msg_len;		/* message length */
-};
-#endif /* _KERNEL */
 #endif /* __BSD_VISIBLE */
 
 #ifndef	_KERNEL

@@ -3,7 +3,6 @@
 
 PACKAGE=	clibs
 SHLIBDIR?= /lib
-WANT_CHERI=	variables
 
 .include <src.opts.mk>
 
@@ -119,7 +118,11 @@ NOASM=
 SRCS+=	interposing_table.c
 CFLAGS+=	-DNO_SYSCALLS
 .endif
+
+.if ! ${MACHINE_ARCH:Mmips*c*}
+# stack-protector is useless when we have CHERI
 .include "${LIBC_SRCTOP}/secure/Makefile.inc"
+.endif
 .include "${LIBC_SRCTOP}/rpc/Makefile.inc"
 .include "${LIBC_SRCTOP}/uuid/Makefile.inc"
 .include "${LIBC_SRCTOP}/xdr/Makefile.inc"

@@ -406,10 +406,16 @@ cpu_identify(void)
 	}
 	printf(" processor v%d.%d\n", cpuinfo.cpu_rev, cpuinfo.cpu_impl);
 
+#ifdef CPU_CHERI
+	const int min_cpu_rev = 5;
+	if (cpuinfo.cpu_rev < min_cpu_rev)
 #ifdef CPU_QEMU_MALTA
-	if (cpuinfo.cpu_rev < 4)
 		panic("%s: QEMU-CHERI is too old to run this kernel. Update "
 		    "QEMU before rebooting or comment out this check!", __func__);
+#else
+		panic("%s: Bitfile is too old to run this kernel. CPU revision "
+		    "must be at least %d", __func__, min_cpu_rev);
+#endif
 #endif
 
 	printf("  MMU: ");

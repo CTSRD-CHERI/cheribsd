@@ -880,13 +880,13 @@ kern_auditctl(struct thread *td, const char * __capability path)
 	vp = nd.ni_vp;
 #ifdef MAC
 	error = mac_system_check_auditctl(td->td_ucred, vp);
-	VOP_UNLOCK(vp, 0);
+	VOP_UNLOCK(vp);
 	if (error) {
 		vn_close(vp, AUDIT_CLOSE_FLAGS, td->td_ucred, td);
 		return (error);
 	}
 #else
-	VOP_UNLOCK(vp, 0);
+	VOP_UNLOCK(vp);
 #endif
 	NDFREE(&nd, NDF_ONLY_PNBUF);
 	if (vp->v_type != VREG) {

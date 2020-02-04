@@ -1906,7 +1906,7 @@ moea_remove_all(mmu_t mmu, vm_page_t m)
 		moea_pvo_remove(pvo, -1);
 		PMAP_UNLOCK(pmap);
 	}
-	if ((m->aflags & PGA_WRITEABLE) && moea_query_bit(m, PTE_CHG)) {
+	if ((m->a.flags & PGA_WRITEABLE) && moea_query_bit(m, PTE_CHG)) {
 		moea_attr_clear(m, PTE_CHG);
 		vm_page_dirty(m);
 	}
@@ -2684,7 +2684,7 @@ moea_sync_icache(mmu_t mmu, pmap_t pm, vm_offset_t va, vm_size_t sz)
 
 	PMAP_LOCK(pm);
 	while (sz > 0) {
-		lim = round_page(va);
+		lim = round_page(va + 1);
 		len = MIN(lim - va, sz);
 		pvo = moea_pvo_find_va(pm, va & ~ADDR_POFF, NULL);
 		if (pvo != NULL) {

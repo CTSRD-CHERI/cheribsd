@@ -5,6 +5,19 @@
 #
 
 # Arch dependent files
+mips/cheri/cheri.c			optional cpu_cheri
+mips/cheri/cheri_coaccept.S		optional cpu_cheri
+mips/cheri/cheri_cocall.S		optional cpu_cheri
+mips/cheri/cheri_colocation.c		optional cpu_cheri
+mips/cheri/cheri_debug.c		optional cpu_cheri
+mips/cheri/cheri_exception.c		optional cpu_cheri
+mips/cheri/cheri_ktrace.c		optional cpu_cheri ktrace
+mips/cheri/cheri_memcpy_c.S		optional cpu_cheri
+mips/cheri/cheri_sealcap.c		optional cpu_cheri
+mips/cheri/cheri_signal.c		optional cpu_cheri
+mips/cheri/cheriabi_machdep.c		optional cpu_cheri compat_cheriabi
+mips/cheri/copystr_c.S			optional cpu_cheri
+mips/cheri/hybridabi_machdep.c		optional cpu_cheri
 mips/mips/autoconf.c			standard
 mips/mips/bus_space_generic.c		standard
 mips/mips/busdma_machdep.c		standard
@@ -39,7 +52,6 @@ mips/mips/stack_machdep.c		optional	ddb | stack
 mips/mips/stdatomic.c			standard \
 	compile-with "${NORMAL_C:N-Wmissing-prototypes}"
 mips/mips/support.S			standard
-mips/mips/bcopy.S			standard
 mips/mips/swtch.S			standard
 mips/mips/sys_machdep.c			standard
 mips/mips/tlb.c				standard
@@ -51,6 +63,7 @@ mips/mips/vm_machdep.c			standard
 # misc opt-in bits
 kern/kern_clocksource.c			standard
 kern/link_elf_obj.c			standard
+kern/subr_atomic64.c			optional	mips | mipsel | mipshf | mipselhf
 kern/subr_busdma_bufalloc.c		standard
 kern/subr_dummy_vdso_tc.c		standard
 kern/subr_sfbuf.c			optional	mips | mipsel | mipsn32
@@ -67,6 +80,7 @@ libkern/ucmpdi2.c			optional	mips | mipshf | mipsel | mipselhf
 libkern/ashldi3.c			standard
 libkern/ashrdi3.c			standard
 libkern/memcmp.c			standard
+libkern/bcopy.c				standard
 
 # cfe support
 dev/cfe/cfe_api.c			optional	cfe

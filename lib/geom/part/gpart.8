@@ -24,7 +24,7 @@
 .\"
 .\" $FreeBSD$
 .\"
-.Dd September 3, 2019
+.Dd December 23, 2019
 .Dt GPART 8
 .Os
 .Sh NAME
@@ -863,6 +863,7 @@ In the GPT this type is the equivalent to partition types
 and
 .Cm ntfs
 in MBR.
+This type is used for GPT exFAT partitions.
 The scheme-specific type is
 .Qq Li "!ebd0a0a2-b9e5-4433-87c0-68b6b72699c7"
 for GPT.
@@ -1260,6 +1261,14 @@ If this variable is set to a non-zero value, the module will automatically
 recalculate the user-specified offset and size for alignment with the CHS
 geometry.
 Otherwise the values will be left unchanged.
+.It Va kern.geom.part.separator : No ""
+Specify an optional separator that will be inserted between the GEOM name
+and partition name.
+This variable is a
+.Xr loader 8
+tunable.
+Note that setting this variable may break software which assumes a particular
+naming scheme.
 .El
 .Sh EXIT STATUS
 Exit status is 0 on success, and 1 if the command fails.

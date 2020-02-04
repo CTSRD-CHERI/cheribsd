@@ -544,7 +544,7 @@ linux_semctl(struct thread *td, struct linux_semctl_args *args)
 	struct l_semid64_ds linux_semid64;
 	struct l_seminfo linux_seminfo;
 	struct semid_ds semid;
-	ksemun_t semun;
+	struct semun_t semun;
 	register_t rval;
 	int cmd, error;
 

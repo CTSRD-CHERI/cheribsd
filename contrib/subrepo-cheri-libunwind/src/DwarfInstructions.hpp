@@ -32,6 +32,7 @@ class DwarfInstructions {
 public:
   typedef typename A::pint_t pint_t;
   typedef typename A::sint_t sint_t;
+  typedef typename A::addr_t addr_t;
   typedef typename A::pc_t pc_t;
   typedef typename A::capability_t capability_t;
 
@@ -108,7 +109,8 @@ DwarfInstructions<A, R>::getSavedRegister(int reg, A &addressSpace,
         getSavedCapabilityRegister(addressSpace, registers, cfa, savedReg));
   switch (savedReg.location) {
   case CFI_Parser<A>::kRegisterInCFA:
-    return (pint_t)addressSpace.getRegister(cfa + (pint_t)savedReg.value);
+    return (pint_t)addressSpace.getRegister(cfa +
+                                            _pint_to_addr(savedReg.value));
 
   case CFI_Parser<A>::kRegisterAtExpression:
     return (pint_t)addressSpace.getRegister(evaluateExpression(
@@ -135,7 +137,7 @@ typename A::capability_t DwarfInstructions<A, R>::getSavedCapabilityRegister(
     const RegisterLocation &savedReg) {
   switch (savedReg.location) {
   case CFI_Parser<A>::kRegisterInCFA:
-    return addressSpace.getCapability(cfa + (pint_t)savedReg.value);
+    return addressSpace.getCapability(cfa + _pint_to_addr(savedReg.value));
 
   case CFI_Parser<A>::kRegisterAtExpression:
     return addressSpace.getCapability(evaluateExpression(
@@ -166,7 +168,7 @@ double DwarfInstructions<A, R>::getSavedFloatRegister(
     const RegisterLocation &savedReg) {
   switch (savedReg.location) {
   case CFI_Parser<A>::kRegisterInCFA:
-    return addressSpace.getDouble(cfa + (pint_t)savedReg.value);
+    return addressSpace.getDouble(cfa + _pint_to_addr(savedReg.value));
 
   case CFI_Parser<A>::kRegisterAtExpression:
     return addressSpace.getDouble(
@@ -189,7 +191,7 @@ v128 DwarfInstructions<A, R>::getSavedVectorRegister(
     const RegisterLocation &savedReg) {
   switch (savedReg.location) {
   case CFI_Parser<A>::kRegisterInCFA:
-    return addressSpace.getVector(cfa + (pint_t)savedReg.value);
+    return addressSpace.getVector(cfa + _pint_to_addr(savedReg.value));
 
   case CFI_Parser<A>::kRegisterAtExpression:
     return addressSpace.getVector(
@@ -358,7 +360,7 @@ DwarfInstructions<A, R>::evaluateExpression(pint_t expression, A &addressSpace,
   const bool log = true;
   pint_t p = expression;
   pint_t expressionEnd = expression + 20; // temp, until len read
-  pint_t length = (pint_t)addressSpace.getULEB128(p, expressionEnd);
+  uint64_t length = (uint64_t)addressSpace.getULEB128(p, expressionEnd);
   expressionEnd = p + length;
   if (log)
     fprintf(stderr, "evaluateExpression(): length=%" PRIu64 "\n",
@@ -588,7 +590,7 @@ DwarfInstructions<A, R>::evaluateExpression(pint_t expression, A &addressSpace,
     case DW_OP_mul:
       svalue = (sint_t)(*sp--);
       svalue2 = (sint_t)*sp;
-      *sp = (pint_t)(svalue2 * svalue);
+      *sp = (pint_t)(_pint_to_addr(svalue2) * _pint_to_addr(svalue));
       if (log)
         fprintf(stderr, "mul\n");
       break;
@@ -659,7 +661,7 @@ DwarfInstructions<A, R>::evaluateExpression(pint_t expression, A &addressSpace,
     case DW_OP_skip:
       svalue = (int16_t) addressSpace.get16(p);
       p += 2;
-      p = (pint_t)((sint_t)p + svalue);
+      p = (pint_t)((sint_t)p + (int16_t)svalue);
       if (log)
         fprintf(stderr, "skip %" PRIu64 "\n", (uint64_t)svalue);
       break;
@@ -668,7 +670,7 @@ DwarfInstructions<A, R>::evaluateExpression(pint_t expression, A &addressSpace,
       svalue = (int16_t) addressSpace.get16(p);
       p += 2;
       if (*sp--)
-        p = (pint_t)((sint_t)p + svalue);
+        p = (pint_t)((sint_t)p + (int16_t)svalue);
       if (log)
         fprintf(stderr, "bra %" PRIu64 "\n", (uint64_t)svalue);
       break;

@@ -223,11 +223,13 @@ udp6_input(struct mbuf **mp, int *offp, int proto)
 
 	ifp = m->m_pkthdr.rcvif;
 
-	m = m_pullup(m, off + sizeof(struct udphdr));
-	if (m == NULL) {
-		IP6STAT_INC(ip6s_exthdrtoolong);
-		*mp = NULL;
-		return (IPPROTO_DONE);
+	if (m->m_len < off + sizeof(struct udphdr)) {
+		m = m_pullup(m, off + sizeof(struct udphdr));
+		if (m == NULL) {
+			IP6STAT_INC(ip6s_exthdrtoolong);
+			*mp = NULL;
+			return (IPPROTO_DONE);
+		}
 	}
 	ip6 = mtod(m, struct ip6_hdr *);
 	uh = (struct udphdr *)((caddr_t)ip6 + off);
@@ -479,7 +481,7 @@ udp6_input(struct mbuf **mp, int *offp, int proto)
 		    INPLOOKUP_WILDCARD | INPLOOKUP_RLOCKPCB,
 		    m->m_pkthdr.rcvif, m);
 	if (inp == NULL) {
-		if (udp_log_in_vain) {
+		if (V_udp_log_in_vain) {
 			char ip6bufs[INET6_ADDRSTRLEN];
 			char ip6bufd[INET6_ADDRSTRLEN];
 
@@ -526,8 +528,7 @@ udp6_input(struct mbuf **mp, int *offp, int proto)
 	return (IPPROTO_DONE);
 
 badunlocked:
-	if (m)
-		m_freem(m);
+	m_freem(m);
 	*mp = NULL;
 	return (IPPROTO_DONE);
 }

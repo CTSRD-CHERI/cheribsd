@@ -177,17 +177,17 @@ void	kassert_panic(const char *fmt, ...)  __printflike(1, 2);
  * sentinel values to work.
  */
 #define ___USER_CFROMPTR(ptr, cap)					\
-    ((ptr) == NULL ? NULL :						\
+    ((void *)(uintptr_t)(ptr) == NULL ? NULL :				\
      ((vm_offset_t)(ptr) < 4096 ||					\
       (vm_offset_t)(ptr) > VM_MAXUSER_ADDRESS) ?			\
 	__builtin_cheri_offset_set(NULL, (vaddr_t)(ptr)) :		\
 	__builtin_cheri_offset_set((cap), (vaddr_t)(ptr)))
 
 #define	__USER_CAP_UNBOUND(ptr)						\
-    ___USER_CFROMPTR((ptr), curthread->td_pcb->pcb_regs.ddc)
+	___USER_CFROMPTR((ptr), __USER_DDC)
 
 #define	__USER_CODE_CAP(ptr)						\
-     ___USER_CFROMPTR((ptr), curthread->td_pcb->pcb_regs.pcc)
+	___USER_CFROMPTR((ptr), __USER_PCC)
 
 #define	__USER_CAP(ptr, len)						\
 ({									\
@@ -391,9 +391,9 @@ int	bcmp(const void *b1, const void *b2, size_t len);
 void	*memset(void * _Nonnull buf, int c, size_t len);
 void	*memcpy(void * _Nonnull to, const void * _Nonnull from, size_t len);
 #if __has_feature(capabilities)
-void	*memcpy_c(void * _Nonnull __capability to,
+void	* __capability memcpy_c(void * _Nonnull __capability to,
 	    const void * _Nonnull __capability from, size_t len);
-void	*memcpynocap_c(void * _Nonnull __capability to,
+void	* __capability memcpynocap_c(void * _Nonnull __capability to,
 	    const void * _Nonnull __capability from, size_t len);
 void	*cheri_memcpy(void *dst, const void *src, size_t len);
 #else
@@ -402,9 +402,9 @@ void	*cheri_memcpy(void *dst, const void *src, size_t len);
 #endif
 void	*memmove(void * _Nonnull dest, const void * _Nonnull src, size_t n);
 #if __has_feature(capabilities)
-void	*memmove_c(void * _Nonnull __capability dest,
+void	* __capability memmove_c(void * _Nonnull __capability dest,
 	    const void * _Nonnull __capability src, size_t n);
-void	*memmovenocap_c(void * _Nonnull __capability dest,
+void	* __capability memmovenocap_c(void * _Nonnull __capability dest,
 	    const void * _Nonnull __capability src, size_t n);
 #endif
 
@@ -594,6 +594,7 @@ int	suword_c(volatile void * __capability base, long word);
 int	suword16_c(volatile void * __capability base, int word);
 int	suword32_c(volatile void * __capability base, int32_t word);
 int	suword64_c(volatile void * __capability base, int64_t word);
+int	sucap(volatile const void * __capability base, intcap_t val);
 uint32_t casuword32_c(volatile uint32_t * __capability base, uint32_t oldval,
 	    uint32_t newval);
 u_long	casuword_c(volatile u_long * __capability base, u_long oldval,
@@ -615,6 +616,7 @@ int	casueword32_c(volatile uint32_t * __capability base, uint32_t oldval,
 #define	suword16_c	suword16
 #define	suword32_c	suword32
 #define	suword64_c	suword64
+#define	sucap		suword
 #define	casuword32_c	casuword32
 #define	casuword_c	casuword
 #define	casueword32_c	casueword32
@@ -688,15 +690,6 @@ void	usrinfoinit(void);
 void	kern_reboot(int) __dead2;
 void	shutdown_nice(int);
 
-/* Timeouts */
-typedef void timeout_t(void *);	/* timeout function type */
-#define CALLOUT_HANDLE_INITIALIZER(handle)	\
-	{ NULL }
-
-void	callout_handle_init(struct callout_handle *);
-struct	callout_handle timeout(timeout_t *, void *, int);
-void	untimeout(timeout_t *, void *, struct callout_handle);
-
 /* Stubs for obsolete functions that used to be for interrupt management */
 static __inline intrmask_t	splbio(void)		{ return 0; }
 static __inline intrmask_t	splcam(void)		{ return 0; }
@@ -711,7 +704,7 @@ static __inline void		splx(intrmask_t ipl __unused)	{ return; }
  * Common `proc' functions are declared here so that proc.h can be included
  * less often.
  */
-int	_sleep(void * _Nonnull chan, struct lock_object *lock, int pri,
+int	_sleep(const void * _Nonnull chan, struct lock_object *lock, int pri,
 	   const char *wmesg, sbintime_t sbt, sbintime_t pr, int flags);
 #define	msleep(chan, mtx, pri, wmesg, timo)				\
 	_sleep((chan), &(mtx)->lock_object, (pri), (wmesg),		\
@@ -719,7 +712,7 @@ int	_sleep(void * _Nonnull chan, struct lock_object *lock, int pri,
 #define	msleep_sbt(chan, mtx, pri, wmesg, bt, pr, flags)		\
 	_sleep((chan), &(mtx)->lock_object, (pri), (wmesg), (bt), (pr),	\
 	    (flags))
-int	msleep_spin_sbt(void * _Nonnull chan, struct mtx *mtx,
+int	msleep_spin_sbt(const void * _Nonnull chan, struct mtx *mtx,
 	    const char *wmesg, sbintime_t sbt, sbintime_t pr, int flags);
 #define	msleep_spin(chan, mtx, wmesg, timo)				\
 	msleep_spin_sbt((chan), (mtx), (wmesg), tick_sbt * (timo),	\
@@ -735,9 +728,9 @@ int	pause_sbt(const char *wmesg, sbintime_t sbt, sbintime_t pr,
 	    0, C_HARDCLOCK)
 #define	tsleep_sbt(chan, pri, wmesg, bt, pr, flags)			\
 	_sleep((chan), NULL, (pri), (wmesg), (bt), (pr), (flags))
-void	wakeup(void * chan);
-void	wakeup_one(void * chan);
-void	wakeup_any(void * chan);
+void	wakeup(const void *chan);
+void	wakeup_one(const void *chan);
+void	wakeup_any(const void *chan);
 
 /*
  * Common `struct cdev *' stuff are declared here to avoid #include poisoning
@@ -824,7 +817,7 @@ void _gone_in_dev(struct device *dev, int major, const char *msg);
 #ifdef NO_OBSOLETE_CODE
 #define __gone_ok(m, msg)					 \
 	_Static_assert(m < P_OSREL_MAJOR(__FreeBSD_version)),	 \
-	    "Obsolete code" msg);
+	    "Obsolete code: " msg);
 #else
 #define	__gone_ok(m, msg)
 #endif

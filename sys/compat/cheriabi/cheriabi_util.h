@@ -104,14 +104,15 @@ int    cheriabi_syscall_helper_register(struct syscall_helper_data *sd, int flag
 int    cheriabi_syscall_helper_unregister(struct syscall_helper_data *sd);
 
 struct iovec_c;
+int	cheriabi_copyout_auxargs(struct image_params *imgp, uintcap_t base);
 int	cheriabi_copyout_strings(struct image_params *imgp,
-	    register_t **stack_base);
+	    uintptr_t *stack_base);
 int	cheriabi_copyiniov(struct iovec_c * __capability iovp, u_int iovcnt,
 	    struct iovec **iov, int error);
 int	cheriabi_copyinuio(struct iovec_c * __capability iovp, u_int iovcnt,
 	    struct uio **uiop);
 
-int	cheriabi_elf_fixup(register_t **stack_base, struct image_params *imgp);
+int	cheriabi_elf_fixup(uintptr_t *stack_base, struct image_params *imgp);
 
 void	cheriabi_fetch_syscall_arg(struct thread *td, void * __capability *arg,
 	    int argnum, int ptrmask);
@@ -119,9 +120,8 @@ void	cheriabi_fetch_syscall_arg(struct thread *td, void * __capability *arg,
 void * __capability	cheriabi_mmap_retcap(struct thread *td,
 	    vm_offset_t addr, const struct mmap_req *mrp);
 
-int	cheriabi_get_mcontext(struct thread *td, mcontext_c_t *mcp, int flags);
-int	cheriabi_set_mcontext(struct thread *td, mcontext_c_t *mcp);
+int	cheriabi_get_mcontext(struct thread *td, mcontext_t *mcp, int flags);
+int	cheriabi_set_mcontext(struct thread *td, mcontext_t *mcp);
 void	cheriabi_set_threadregs(struct thread *td, struct thr_param_c *param);
-int	cheriabi_set_user_tls(struct thread *td, void * __capability tls_base);
 
 #endif /* !_COMPAT_CHERIABI_CHERIABI_UTIL_H_ */

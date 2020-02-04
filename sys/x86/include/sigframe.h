@@ -67,11 +67,7 @@ struct sigframe {
 		__sighandler_t		*sf_handler;
 	} sf_ahu;
 	ucontext_t	sf_uc;		/* = *sf_ucontext */
-#ifdef _KERNEL
-	struct siginfo_native sf_si;	/* = *sf_siginfo (SA_SIGINFO case) */
-#else
 	siginfo_t	sf_si;		/* = *sf_siginfo (SA_SIGINFO case) */
-#endif
 };
 #endif /* __amd64__ */
 

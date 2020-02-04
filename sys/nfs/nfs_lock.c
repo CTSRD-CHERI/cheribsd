@@ -89,6 +89,7 @@ nfslock_open(struct cdev *dev, int oflags, int devtype, struct thread *td)
 {
 	int error;
 
+	gone_in(13, "uses Giant; replace with NFSLOCKD/nfslockd.ko");
 	error = priv_check(td, PRIV_NFS_LOCKD);
 	if (error)
 		return (error);
@@ -256,7 +257,7 @@ nfs_dolock(struct vop_advlock_args *ap)
 
 	nmp->nm_getinfo(vp, msg.lm_fh, &msg.lm_fh_len, &msg.lm_addr,
 	    &msg.lm_nfsv3, NULL, NULL);
-	VOP_UNLOCK(vp, 0);
+	VOP_UNLOCK(vp);
 
 	/*
 	 * the NLM protocol doesn't allow the server to return an error

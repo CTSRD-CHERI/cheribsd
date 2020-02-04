@@ -61,11 +61,17 @@ CWARNEXTRA+=	-Wno-error=misleading-indentation		\
 		-Wno-error=shift-overflow			\
 		-Wno-error=tautological-compare
 .endif
+.if ${COMPILER_VERSION} >= 70100
+CWARNEXTRA+=	-Wno-error=stringop-overflow
+.endif
 .if ${COMPILER_VERSION} >= 70200
 CWARNEXTRA+=	-Wno-error=memset-elt-size
 .endif
 .if ${COMPILER_VERSION} >= 80000
 CWARNEXTRA+=	-Wno-error=packed-not-aligned
+.endif
+.if ${COMPILER_VERSION} >= 90100
+CWARNEXTRA+=	-Wno-address-of-packed-member
 .endif
 .else
 # For gcc 4.2, eliminate the too-often-wrong warnings about uninitialized vars.
@@ -137,10 +143,24 @@ INLINE_LIMIT?=	8000
 # respectively.
 #
 .if ${MACHINE_CPUARCH} == "riscv"
-CFLAGS+=	-march=rv64imafdc -mabi=lp64
+RISCV_MARCH=	rv64imafdc
+.if ${MACHINE_CPU:Mcheri}
+RISCV_MARCH:=	${RISCV_MARCH}xcheri
+.endif
+
+RISCV_ABI=	lp64
+.if ${MACHINE_ARCH:Mriscv*c*}
+RISCV_ABI=	l64pc128
+.endif
+
+CFLAGS+=	-march=${RISCV_MARCH} -mabi=${RISCV_ABI}
 CFLAGS.clang+=	-mcmodel=medium
 CFLAGS.gcc+=	-mcmodel=medany
 INLINE_LIMIT?=	8000
+
+.if ${LINKER_FEATURES:Mriscv-relaxations} == ""
+CFLAGS+=	-mno-relax
+.endif
 .endif
 
 #

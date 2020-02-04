@@ -166,30 +166,18 @@ struct md_page {
 	int			pat_mode;
 };
 
-#define	PMAP_EXTERN_FIELDS						\
-	cpuset_t		pm_active;	/* active on cpus */	\
-	struct mtx		pm_mtx;					\
-	struct pmap_statistics	pm_stats;	/* pmap statistics */
-
-struct pmap_KBI {
-	PMAP_EXTERN_FIELDS
-	int32_t			pm_fill[32];
-};
-
-#ifdef PMTYPE
 struct pmap {
-	PMAP_EXTERN_FIELDS
-	pd_entry_t		*pm_pdir;	/* KVA of page directory */
+	cpuset_t		pm_active;	/* active on cpus */
+	struct mtx		pm_mtx;
+	struct pmap_statistics	pm_stats;	/* pmap statistics */
+	uint32_t		*pm_pdir_nopae;	/* KVA of page directory */
+	uint64_t		*pm_pdir_pae;
 	TAILQ_HEAD(,pv_chunk)	pm_pvchunk;	/* list of mappings in pmap */
 	LIST_ENTRY(pmap) 	pm_list;	/* List of all pmaps */
-	pdpt_entry_t		*pm_pdpt;	/* KVA of page directory pointer
-						   table */
+	uint64_t		*pm_pdpt_pae;
 	struct vm_radix		pm_root;	/* spare page table pages */
-	vm_page_t		pm_ptdpg[NPGPTD];
+	vm_page_t		pm_ptdpg[4];	/* PAE NPGPTD */
 };
-#else
-#define	pmap	pmap_KBI
-#endif
 
 typedef struct pmap	*pmap_t;
 
@@ -239,7 +227,7 @@ extern vm_offset_t virtual_avail;
 extern vm_offset_t virtual_end;
 
 #define	pmap_page_get_memattr(m)	((vm_memattr_t)(m)->md.pat_mode)
-#define	pmap_page_is_write_mapped(m)	(((m)->aflags & PGA_WRITEABLE) != 0)
+#define	pmap_page_is_write_mapped(m)	(((m)->a.flags & PGA_WRITEABLE) != 0)
 #define	pmap_unmapbios(va, sz)	pmap_unmapdev((va), (sz))
 
 static inline int

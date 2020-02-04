@@ -94,7 +94,7 @@
 #include <machine/cpuregs.h>
 #include <machine/pcb.h>
 #ifdef CPU_CHERI
-#include <machine/cherireg.h>
+#include <cheri/cherireg.h>
 #endif
 
 /* Always build normal userspace access functions for non-CHERI */
@@ -717,6 +717,20 @@ XLEAF(suword_c)
 	j	ra
 	move	v0, zero
 END(suword64_c)
+
+LEAF(sucap)
+	PTR_LA	v0, fswberr
+	cgetbase	t0, $c3
+	blt	t0, zero, fswberr	# make sure address is in user space
+	nop
+	GET_CPU_PCPU(v1)
+	PTR_L	v1, PC_CURPCB(v1)
+	PTR_S	v0, U_PCB_ONFAULT(v1)
+	csc	$c4, zero, 0($c3)	# store cap
+	PTR_S	zero, U_PCB_ONFAULT(v1)
+	j	ra
+	move	v0, zero
+END(sucap)
 
 /*
  * casueword_c(9)

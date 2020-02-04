@@ -3,7 +3,7 @@
 # The include file <src.libnames.mk> define library names suitable
 # for INTERNALLIB and PRIVATELIB definition
 
-.if !target(__<bsd.init.mk>__)
+.if !target(__<bsd.init.mk>__) && !target(__<Makefile.libcompat>__)
 .error src.libnames.mk cannot be included directly.
 .endif
 
@@ -35,15 +35,10 @@ _PRIVATELIBS+=	png
 
 _INTERNALLIBS=	\
 		amu \
-		bfd \
-		binutils \
-		bsnmptools \
 		c_nossp_pic \
 		cron \
 		elftc \
 		fifolog \
-		gdb \
-		iberty \
 		ifconfig \
 		ipf \
 		lpr \
@@ -62,6 +57,13 @@ _INTERNALLIBS=	\
 		smutil \
 		telnet \
 		vers
+
+.if ${MK_BSNMP} == "yes"
+_INTERNALLIBS+=	bsnmptools
+.endif
+.if ${MK_BINUTILS} == "yes"
+_INTERNALLIBS+=	bfd binutils iberty
+.endif
 
 _LIBRARIES=	\
 		${_PRIVATELIBS} \
@@ -604,8 +606,8 @@ LIBDIALOGDIR=	${_LIB_OBJTOP}/gnu/lib/libdialog
 LIBGCOVDIR=	${_LIB_OBJTOP}/gnu/lib/libgcov
 LIBGOMPDIR=	${_LIB_OBJTOP}/gnu/lib/libgomp
 LIBGNUREGEXDIR=	${_LIB_OBJTOP}/gnu/lib/libregex
-LIBSSPDIR=	${_LIB_OBJTOP}/gnu/lib/libssp
-LIBSSP_NONSHAREDDIR=	${_LIB_OBJTOP}/gnu/lib/libssp/libssp_nonshared
+LIBSSPDIR=	${_LIB_OBJTOP}/lib/libssp
+LIBSSP_NONSHAREDDIR=	${_LIB_OBJTOP}/lib/libssp_nonshared
 LIBSUPCPLUSPLUSDIR=	${_LIB_OBJTOP}/gnu/lib/libsupc++
 LIBASN1DIR=	${_LIB_OBJTOP}/kerberos5/lib/libasn1
 LIBGSSAPI_KRB5DIR=	${_LIB_OBJTOP}/kerberos5/lib/libgssapi_krb5

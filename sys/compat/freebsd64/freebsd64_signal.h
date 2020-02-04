@@ -36,25 +36,17 @@
 #define _COMPAT_FREEBSD64_FREEBSD64_SIGNAL_H_
 
 struct sigaction64 {
-	union {
-		void    (*__sa_handler)(int);
-		void    (*__sa_sigaction)(int, struct __siginfo *, void *);
-	} __sigaction_u;		/* signal handler */
+	uint64_t sa_u;
 	int	sa_flags;		/* see signal options below */
 	sigset_t sa_mask;		/* signal mask to apply */
 };
 
 struct sigaltstack64 {
-	void		*ss_sp;		/* signal stack base */
+	uint64_t	ss_sp;		/* (void *) signal stack base */
 	size_t		ss_size;	/* signal stack length */
 	int		ss_flags;	/* SS_DISABLE and/or SS_ONSTACK */
 };
 typedef struct sigaltstack64 freebsd64_stack_t;
-
-union sigval64 {
-	int	sival_int;
-	void	*sival_ptr;
-};
 
 struct sigevent64 {
 	int	sigev_notify;
@@ -63,15 +55,18 @@ struct sigevent64 {
 	union {
 		__lwpid_t	_threadid;
 		struct {
-			void (*_function)(union sigval64);
-			struct pthread_attr **_attribute;
+			/* void (*_function)(union sigval64); */
+			uint64_t _function;
+			/* struct pthread_attr **_attribute; */
+			uint64_t _attribute;
 		} _sigev_thread;
 		unsigned short _kevent_flags;
 		long __spare__[8];
 	} _sigev_un;
 };
 
-void	siginfo_to_siginfo64(const _siginfo_t *si, struct siginfo64 *si64);
-int	convert_sigevent64(const struct sigevent64 *sig64, ksigevent_t *sig);
+void	siginfo_to_siginfo64(const siginfo_t *si, struct siginfo64 *si64);
+int	convert_sigevent64(const struct sigevent64 *sig64,
+	    struct sigevent *sig);
 
 #endif /* _COMPAT_FREEBSD64_FREEBSD64_SIGNAL_H_ */

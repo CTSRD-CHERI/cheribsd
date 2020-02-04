@@ -94,6 +94,9 @@ CWARNFLAGS.clang+=	-Wno-unused-local-typedef
 .if ${COMPILER_TYPE} == "clang" && ${COMPILER_VERSION} >= 40000
 CWARNFLAGS.clang+=	-Wno-address-of-packed-member
 .endif
+.if ${COMPILER_TYPE} == "gcc" && ${COMPILER_VERSION} >= 90100
+CWARNFLAGS.gcc+=	-Wno-address-of-packed-member
+.endif
 .if ${COMPILER_TYPE} == "clang" && ${COMPILER_VERSION} >= 70000 && \
     ${MACHINE_CPUARCH} == "arm" && !${MACHINE_ARCH:Marmv[67]*}
 CWARNFLAGS.clang+=	-Wno-atomic-alignment
@@ -189,6 +192,12 @@ CWARNFLAGS+=	-Wno-error=aggressive-loop-optimizations	\
 # Ignore unaligned memcpy() calls. This is just a missed optimization
 # so it should not cause the build to fail.
 CWARNFLAGS+=	-Wno-error=pass-failed
+.endif
+
+.if ${COMPILER_TYPE} == "clang" && ${COMPILER_VERSION} >= 100000
+CWARNFLAGS+=	-Wno-error=misleading-indentation
+# CXXWARNFLAGS+=	-Wno-error=deprecated-copy
+CXXWARNFLAGS+=	-Wno-deprecated-copy
 .endif
 
 # How to handle FreeBSD custom printf format specifiers.

@@ -13,7 +13,7 @@ HAS_TESTS=
 SUBDIR.${MK_TESTS}+= tests
 .endif
 
-.if ${MACHINE_ARCH:Mmips*c*} || ${MK_CHERI} == "yes"
+.if ${MK_LIBCHERI} == "yes"
 SUBDIR+=	libcheri
 .endif
 

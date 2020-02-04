@@ -51,79 +51,19 @@ __FBSDID("$FreeBSD$");
 #include <machine/md_var.h>
 #include <machine/cache.h>
 
+static struct sysentvec elf_freebsd_sysvec = {
+	.sv_size	= SYS_MAXSYSCALL,
+	.sv_table	= sysent,
+	.sv_errsize	= 0,
+	.sv_errtbl	= NULL,
+	.sv_transtrap	= NULL,
+	.sv_fixup	= __elfN(freebsd_fixup),
+	.sv_sendsig	= sendsig,
+	.sv_sigcode	= sigcode,
+	.sv_szsigcode	= &szsigcode,
 #if __has_feature(capabilities)
-static struct sysentvec elf_freebsd_sysvec = {
-	.sv_size	= SYS_MAXSYSCALL,
-	.sv_table	= sysent,
-	.sv_errsize	= 0,
-	.sv_errtbl	= NULL,
-	.sv_transtrap	= NULL,
-/* XXX: TODO */
-#if 1
-	.sv_fixup	= __elfN(freebsd_fixup),
-	.sv_sendsig	= sendsig,
-	.sv_sigcode	= sigcode,
-	.sv_szsigcode	= &szsigcode,
-#else
-	.sv_fixup	= cheriabi_elf_fixup,
-	.sv_sendsig	= cheriabi_sendsig,
-	.sv_sigcode	= cheri_sigcode,
-	.sv_szsigcode	= &szcheri_sigcode,
-#endif
 	.sv_name	= "FreeBSD ELF64C",	/* CheriABI */
-	.sv_coredump	= __elfN(coredump),
-	.sv_imgact_try	= NULL,
-	.sv_minsigstksz	= MINSIGSTKSZ,	/* XXXBD: or something bigger? */
-	.sv_minuser	= PAGE_SIZE,	/* Disallow mapping at NULL */
-	.sv_maxuser	= VM_MAXUSER_ADDRESS,
-	.sv_usrstack	= USRSTACK,
-	.sv_psstrings	= PS_STRINGS,
-	.sv_stackprot	= VM_PROT_READ | VM_PROT_WRITE,
-	.sv_copyout_auxargs = __elfN(freebsd_copyout_auxargs),
-	.sv_copyout_strings = exec_copyout_strings,
-/* XXX: TODO */
-#if 1
-	.sv_setregs	= exec_setregs,
-#else
-	.sv_setregs	= cheriabi_exec_setregs,
-#endif
-	.sv_fixlimit	= NULL,
-	.sv_maxssiz	= NULL,
-	.sv_flags	= SV_ABI_FREEBSD | SV_LP64 | SV_CHERI |
-#ifdef MIPS_SHAREDPAGE
-			    SV_SHP,
-#else
-			    0,
-#endif
-/* XXX: TODO */
-#if 1
-	.sv_set_syscall_retval = cpu_set_syscall_retval,
-	.sv_fetch_syscall_args = cpu_fetch_syscall_args,
-#else
-	.sv_set_syscall_retval = cheriabi_set_syscall_retval,
-	.sv_fetch_syscall_args = cheriabi_fetch_syscall_args,
-#endif
-	.sv_syscallnames = syscallnames,
-#ifdef MIPS_SHAREDPAGE
-	.sv_shared_page_base = SHAREDPAGE,
-	.sv_shared_page_len = PAGE_SIZE,
-#endif
-	.sv_schedtail	= NULL,
-	.sv_thread_detach = NULL,
-	.sv_trap	= NULL,
-};
-#else
-static struct sysentvec elf_freebsd_sysvec = {
-	.sv_size	= SYS_MAXSYSCALL,
-	.sv_table	= sysent,
-	.sv_errsize	= 0,
-	.sv_errtbl	= NULL,
-	.sv_transtrap	= NULL,
-	.sv_fixup	= __elfN(freebsd_fixup),
-	.sv_sendsig	= sendsig,
-	.sv_sigcode	= sigcode,
-	.sv_szsigcode	= &szsigcode,
-#ifdef __mips_n64
+#elif defined(__mips_n64)
 	.sv_name	= "FreeBSD ELF64",
 #else
 	.sv_name	= "FreeBSD ELF32",
@@ -131,17 +71,27 @@ static struct sysentvec elf_freebsd_sysvec = {
 	.sv_coredump	= __elfN(coredump),
 	.sv_imgact_try	= NULL,
 	.sv_minsigstksz	= MINSIGSTKSZ,
+#if __has_feature(capabilities)
+	.sv_minuser	= PAGE_SIZE,	/* Disallow mapping at NULL */
+#else
 	.sv_minuser	= VM_MIN_ADDRESS,
+#endif
 	.sv_maxuser	= VM_MAXUSER_ADDRESS,
 	.sv_usrstack	= USRSTACK,
 	.sv_psstrings	= PS_STRINGS,
+#if __has_feature(capabilities)
+	.sv_stackprot	= VM_PROT_READ | VM_PROT_WRITE,
+#else
 	.sv_stackprot	= VM_PROT_ALL,
+#endif
 	.sv_copyout_auxargs = __elfN(freebsd_copyout_auxargs),
 	.sv_copyout_strings = exec_copyout_strings,
 	.sv_setregs	= exec_setregs,
 	.sv_fixlimit	= NULL,
 	.sv_maxssiz	= NULL,
-#ifdef __mips_n64
+#if __has_feature(capabilities)
+	.sv_flags	= SV_ABI_FREEBSD | SV_LP64 | SV_CHERI |
+#elif defined(__mips_n64)
 	.sv_flags	= SV_ABI_FREEBSD | SV_LP64 | SV_ASLR |
 #else
 	.sv_flags	= SV_ABI_FREEBSD | SV_ILP32 | SV_ASLR |
@@ -152,7 +102,11 @@ static struct sysentvec elf_freebsd_sysvec = {
 			    0,
 #endif
 	.sv_set_syscall_retval = cpu_set_syscall_retval,
+#if __has_feature(capabilities)
+	.sv_fetch_syscall_args = cheriabi_fetch_syscall_args,
+#else
 	.sv_fetch_syscall_args = cpu_fetch_syscall_args,
+#endif
 	.sv_syscallnames = syscallnames,
 #ifdef MIPS_SHAREDPAGE
 	.sv_shared_page_base = SHAREDPAGE,
@@ -162,7 +116,6 @@ static struct sysentvec elf_freebsd_sysvec = {
 	.sv_thread_detach = NULL,
 	.sv_trap	= NULL,
 };
-#endif
 INIT_SYSENTVEC(elf_sysvec, &elf_freebsd_sysvec);
 
 #if __has_feature(capabilities)
@@ -610,6 +563,13 @@ elf_cpu_load_file(linker_file_t lf __unused)
 
 int
 elf_cpu_unload_file(linker_file_t lf __unused)
+{
+
+	return (0);
+}
+
+int
+elf_cpu_parse_dynamic(linker_file_t lf __unused, Elf_Dyn *dynamic __unused)
 {
 
 	return (0);

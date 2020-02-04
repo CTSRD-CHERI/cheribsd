@@ -448,6 +448,34 @@ atomic_swap_64(volatile uint64_t *p, uint64_t val)
 	return (ret);
 }
 
+static __inline uint8_t
+atomic_load_acq_8(volatile uint8_t *p)
+{
+	uint8_t ret;
+
+	__asm __volatile(
+	    "ldarb	%w0, [%1] \n"
+	    : "=&r" (ret)
+	    : "r" (p)
+	    : "memory");
+
+	return (ret);
+}
+
+static __inline uint16_t
+atomic_load_acq_16(volatile uint16_t *p)
+{
+	uint16_t ret;
+
+	__asm __volatile(
+	    "ldarh	%w0, [%1] \n"
+	    : "=&r" (ret)
+	    : "r" (p)
+	    : "memory");
+
+	return (ret);
+}
+
 static __inline uint32_t
 atomic_load_acq_32(volatile uint32_t *p)
 {
@@ -477,6 +505,28 @@ atomic_load_acq_64(volatile uint64_t *p)
 }
 
 static __inline void
+atomic_store_rel_8(volatile uint8_t *p, uint8_t val)
+{
+
+	__asm __volatile(
+	    "stlrb	%w0, [%1] \n"
+	    :
+	    : "r" (val), "r" (p)
+	    : "memory");
+}
+
+static __inline void
+atomic_store_rel_16(volatile uint16_t *p, uint16_t val)
+{
+
+	__asm __volatile(
+	    "stlrh	%w0, [%1] \n"
+	    :
+	    : "r" (val), "r" (p)
+	    : "memory");
+}
+
+static __inline void
 atomic_store_rel_32(volatile uint32_t *p, uint32_t val)
 {
 
@@ -498,6 +548,86 @@ atomic_store_rel_64(volatile uint64_t *p, uint64_t val)
 	    : "memory");
 }
 
+static __inline int
+atomic_testandclear_32(volatile uint32_t *p, u_int val)
+{
+	uint32_t mask, old, tmp;
+	int res;
+
+	mask = 1u << (val & 0x1f);
+	__asm __volatile(
+	    "1: ldxr	%w2, [%3]      \n"
+	    "   bic	%w0, %w2, %w4  \n"
+	    "   stxr	%w1, %w0, [%3] \n"
+            "   cbnz	%w1, 1b        \n"
+	    : "=&r"(tmp), "=&r"(res), "=&r"(old)
+	    : "r" (p), "r" (mask)
+	    : "memory"
+	);
+
+	return ((old & mask) != 0);
+}
+
+static __inline int
+atomic_testandclear_64(volatile uint64_t *p, u_int val)
+{
+	uint64_t mask, old, tmp;
+	int res;
+
+	mask = 1ul << (val & 0x1f);
+	__asm __volatile(
+	    "1: ldxr	%2, [%3]       \n"
+	    "   bic	%0, %2, %4     \n"
+	    "   stxr	%w1, %0, [%3]  \n"
+            "   cbnz	%w1, 1b        \n"
+	    : "=&r"(tmp), "=&r"(res), "=&r"(old)
+	    : "r" (p), "r" (mask)
+	    : "memory"
+	);
+
+	return ((old & mask) != 0);
+}
+
+static __inline int
+atomic_testandset_32(volatile uint32_t *p, u_int val)
+{
+	uint32_t mask, old, tmp;
+	int res;
+
+	mask = 1u << (val & 0x1f);
+	__asm __volatile(
+	    "1: ldxr	%w2, [%3]      \n"
+	    "   orr	%w0, %w2, %w4  \n"
+	    "   stxr	%w1, %w0, [%3] \n"
+            "   cbnz	%w1, 1b        \n"
+	    : "=&r"(tmp), "=&r"(res), "=&r"(old)
+	    : "r" (p), "r" (mask)
+	    : "memory"
+	);
+
+	return ((old & mask) != 0);
+}
+
+static __inline int
+atomic_testandset_64(volatile uint64_t *p, u_int val)
+{
+	uint64_t mask, old, tmp;
+	int res;
+
+	mask = 1ul << (val & 0x1f);
+	__asm __volatile(
+	    "1: ldxr	%2, [%3]       \n"
+	    "   orr	%0, %2, %4     \n"
+	    "   stxr	%w1, %0, [%3]  \n"
+            "   cbnz	%w1, 1b        \n"
+	    : "=&r"(tmp), "=&r"(res), "=&r"(old)
+	    : "r" (p), "r" (mask)
+	    : "memory"
+	);
+
+	return ((old & mask) != 0);
+}
+
 
 #define	atomic_add_int			atomic_add_32
 #define	atomic_fcmpset_int		atomic_fcmpset_32
@@ -508,6 +638,8 @@ atomic_store_rel_64(volatile uint64_t *p, uint64_t val)
 #define	atomic_set_int			atomic_set_32
 #define	atomic_swap_int			atomic_swap_32
 #define	atomic_subtract_int		atomic_subtract_32
+#define	atomic_testandclear_int		atomic_testandclear_32
+#define	atomic_testandset_int		atomic_testandset_32
 
 #define	atomic_add_acq_int		atomic_add_acq_32
 #define	atomic_fcmpset_acq_int		atomic_fcmpset_acq_32
@@ -534,6 +666,8 @@ atomic_store_rel_64(volatile uint64_t *p, uint64_t val)
 #define	atomic_set_long			atomic_set_64
 #define	atomic_swap_long		atomic_swap_64
 #define	atomic_subtract_long		atomic_subtract_64
+#define	atomic_testandclear_long	atomic_testandclear_64
+#define	atomic_testandset_long		atomic_testandset_64
 
 #define	atomic_add_ptr			atomic_add_64
 #define	atomic_fcmpset_ptr		atomic_fcmpset_64

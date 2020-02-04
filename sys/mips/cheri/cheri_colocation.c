@@ -217,7 +217,7 @@ colocation_unborrow(struct thread *td, struct trapframe **trapframep)
 	struct thread *peertd;
 	struct trapframe peertrapframe;
 	struct syscall_args peersa;
-	register_t peertpc;
+	trapf_pc_t peertpc;
 	bool borrowing;
 
 	borrowing = colocation_fetch_scb(td, &scb);

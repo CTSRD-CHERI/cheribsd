@@ -292,11 +292,12 @@ map_object(int fd, const char *path, const struct stat *sb, const char* main_pat
 	    segs[i]->p_flags, data_addr, data_vlimit);
 
 	size_t data_len = data_vlimit - data_vaddr;
-	if (mmap(data_addr, data_len, data_prot,
-	  data_flags | MAP_PREFAULT_READ, fd, data_offset) == (caddr_t) -1) {
-	    _rtld_error("%s: mmap of data failed: %s", path,
-		rtld_strerror(errno));
-	    goto error1;
+	if (data_len != 0 &&
+	    mmap(data_addr, data_len, data_prot,
+	    data_flags | MAP_PREFAULT_READ, fd, data_offset) == MAP_FAILED) {
+		_rtld_error("%s: mmap of data failed: %s", path,
+		    rtld_strerror(errno));
+		goto error1;
 	}
 
 	/* Do BSS setup */
@@ -331,7 +332,7 @@ map_object(int fd, const char *path, const struct stat *sb, const char* main_pat
 	    size_t bss_len = bss_vlimit - bss_vaddr;
 	    if (bss_vlimit > bss_vaddr) {	/* There is something to do */
 		if (mmap(bss_addr, bss_len, data_prot,
-		    data_flags | MAP_ANON, -1, 0) == (caddr_t)-1) {
+		    data_flags | MAP_ANON, -1, 0) == MAP_FAILED) {
 		    _rtld_error("%s: mmap of bss failed: %s", path,
 			rtld_strerror(errno));
 		    goto error1;
@@ -434,7 +435,7 @@ get_elf_header(int fd, const char *path, const struct stat *sbp, const char* mai
 
 	hdr = mmap(NULL, PAGE_SIZE, PROT_READ, MAP_PRIVATE | MAP_PREFAULT_READ,
 	    fd, 0);
-	if (hdr == (Elf_Ehdr *)MAP_FAILED) {
+	if (hdr == MAP_FAILED) {
 		_rtld_error("%s: read error: %s", path, rtld_strerror(errno));
 		return (NULL);
 	}

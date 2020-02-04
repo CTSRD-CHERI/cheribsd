@@ -16,7 +16,7 @@
 #include <cassert>
 
 #include "test_macros.h"
-#include "archetypes.hpp"
+#include "archetypes.h"
 
 using std::optional;
 
@@ -30,6 +30,7 @@ struct X
         if (throw_now)
             TEST_THROW(6);
     }
+    X& operator=(X const&) = default;
 };
 
 bool X::throw_now = false;

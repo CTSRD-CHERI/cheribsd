@@ -97,8 +97,11 @@ __FBSDID("$FreeBSD$");
 #include <sys/sysproto.h>
 #include <sys/jail.h>
 
-#ifdef COMPAT_CHERIABI
+#if __has_feature(capabilities)
 #include <cheri/cheric.h>
+#endif
+
+#ifdef COMPAT_CHERIABI
 #include <sys/user.h>
 #include <compat/cheriabi/cheriabi_proto.h>
 #include <compat/cheriabi/cheriabi_syscall.h>
@@ -544,7 +547,7 @@ kern_shmat_locked(struct thread *td, int shmid,
 			find_space = CHERI_REPRESENTABLE_ALIGNMENT(size) < (1UL << 12) ?
 			    VMFS_OPTIMAL_SPACE :
 			    VMFS_ALIGNED_SPACE(CHERI_ALIGN_SHIFT(size));
-			shmaddr = td->td_md.md_cheri_mmap_cap;
+			shmaddr = td->td_cheri_mmap_cap;
 			attach_va = cheri_getbase(shmaddr);
 		} else
 #endif
@@ -1145,6 +1148,7 @@ static struct syscall_helper_data shm32_syscalls[] = {
 #endif
 
 #ifdef COMPAT_FREEBSD64
+#include <compat/freebsd64/freebsd64.h>
 #include <compat/freebsd64/freebsd64_proto.h>
 #include <compat/freebsd64/freebsd64_syscall.h>
 #include <compat/freebsd64/freebsd64_util.h>
@@ -2164,8 +2168,7 @@ freebsd7_shmctl(struct thread *td, struct freebsd7_shmctl_args *uap)
 
 	/* IPC_SET needs to copyin the buffer before calling kern_shmctl */
 	if (uap->cmd == IPC_SET) {
-		if ((error = copyin(__USER_CAP_OBJ(uap->buf), &old,
-		    sizeof(old))))
+		if ((error = copyincap(uap->buf, &old, sizeof(old))))
 			goto done;
 		ipcperm_old2new(&old.shm_perm, &buf.shm_perm);
 		CP(old, buf, shm_segsz);
@@ -2200,7 +2203,7 @@ freebsd7_shmctl(struct thread *td, struct freebsd7_shmctl_args *uap)
 		CP(buf, old, shm_dtime);
 		CP(buf, old, shm_ctime);
 		old.shm_internal = NULL;
-		error = copyout(&old, __USER_CAP_OBJ(uap->buf), sizeof(old));
+		error = copyoutcap(&old, uap->buf, sizeof(old));
 		break;
 	}
 

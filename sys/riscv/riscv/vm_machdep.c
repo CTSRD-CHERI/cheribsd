@@ -178,6 +178,7 @@ cpu_copy_thread(struct thread *td, struct thread *td0)
  * Set that machine state for performing an upcall that starts
  * the entry function with the given argument.
  */
+/* XXX: CHERI TODO: Update once trapframe holds capabilities. */
 void
 cpu_set_upcall(struct thread *td, void (*entry)(void *), void *arg,
 	stack_t *stack)
@@ -186,23 +187,24 @@ cpu_set_upcall(struct thread *td, void (*entry)(void *), void *arg,
 
 	tf = td->td_frame;
 
-	tf->tf_sp = STACKALIGN((uintptr_t)stack->ss_sp + stack->ss_size);
+	tf->tf_sp = STACKALIGN((__cheri_addr uintptr_t)stack->ss_sp + stack->ss_size);
 	tf->tf_sepc = (register_t)entry;
 	tf->tf_a[0] = (register_t)arg;
 }
 
+/* XXX: CHERI TODO: Update once trapframe holds capabilities. */
 int
-cpu_set_user_tls(struct thread *td, void *tls_base)
+cpu_set_user_tls(struct thread *td, void * __capability tls_base)
 {
 
-	if ((uintptr_t)tls_base >= VM_MAXUSER_ADDRESS)
+	if ((__cheri_addr uintptr_t)tls_base >= VM_MAXUSER_ADDRESS)
 		return (EINVAL);
 
 	/*
 	 * The user TLS is set by modifying the trapframe's tp value, which
 	 * will be restored when returning to userspace.
 	 */
-	td->td_frame->tf_tp = (register_t)tls_base + TP_OFFSET;
+	td->td_frame->tf_tp = (__cheri_addr register_t)tls_base + TP_OFFSET;
 
 	return (0);
 }

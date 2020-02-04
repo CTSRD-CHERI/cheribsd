@@ -28,6 +28,8 @@ __FBSDID("$FreeBSD$");
 #include "opt_platform.h"
 #include "opt_spi.h"
 
+#define EXPLICIT_USER_ACCESS
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>

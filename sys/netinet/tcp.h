@@ -71,8 +71,9 @@ struct tcphdr {
 #define	TH_URG	0x20
 #define	TH_ECE	0x40
 #define	TH_CWR	0x80
+#define	TH_AE	0x100			/* maps into th_x2 */
 #define	TH_FLAGS	(TH_FIN|TH_SYN|TH_RST|TH_PUSH|TH_ACK|TH_URG|TH_ECE|TH_CWR)
-#define	PRINT_TH_FLAGS	"\20\1FIN\2SYN\3RST\4PUSH\5ACK\6URG\7ECE\10CWR"
+#define	PRINT_TH_FLAGS	"\20\1FIN\2SYN\3RST\4PUSH\5ACK\6URG\7ECE\10CWR\11AE"
 
 	u_short	th_win;			/* window */
 	u_short	th_sum;			/* checksum */
@@ -168,6 +169,7 @@ struct tcphdr {
 #define TCP_NOOPT	8	/* don't use TCP options */
 #define TCP_MD5SIG	16	/* use MD5 digests (RFC2385) */
 #define	TCP_INFO	32	/* retrieve tcp_info structure */
+#define	TCP_STATS	33	/* retrieve stats blob structure */
 #define	TCP_LOG		34	/* configure event logging for connection */
 #define	TCP_LOGBUF	35	/* retrieve event log for connection */
 #define	TCP_LOGID	36	/* configure log ID to correlate connections */
@@ -363,5 +365,19 @@ struct tcp_function_set {
  * TCP Control message types
  */
 #define	TLS_SET_RECORD_TYPE	1
+
+/*
+ * TCP specific variables of interest for tp->t_stats stats(9) accounting.
+ */
+#define	VOI_TCP_TXPB		0 /* Transmit payload bytes */
+#define	VOI_TCP_RETXPB		1 /* Retransmit payload bytes */
+#define	VOI_TCP_FRWIN		2 /* Foreign receive window */
+#define	VOI_TCP_LCWIN		3 /* Local congesiton window */
+#define	VOI_TCP_RTT		4 /* Round trip time */
+#define	VOI_TCP_CSIG		5 /* Congestion signal */
+#define	VOI_TCP_GPUT		6 /* Goodput */
+#define	VOI_TCP_CALCFRWINDIFF	7 /* Congestion avoidance LCWIN - FRWIN */
+#define	VOI_TCP_GPUT_ND		8 /* Goodput normalised delta */
+#define	VOI_TCP_ACKLEN		9 /* Average ACKed bytes per ACK */
 
 #endif /* !_NETINET_TCP_H_ */

@@ -13,7 +13,7 @@ unix		?=	We run FreeBSD, not UNIX.
 # and/or endian.  This is called MACHINE_CPU in NetBSD, but that's used
 # for something different in FreeBSD.
 #
-__TO_CPUARCH=C/mips(n32|64)?(el)?(hf)?(c(128|256))?/mips/:C/arm(v[67])?(eb)?/arm/:C/powerpc(64|spe)/powerpc/:C/riscv64(sf)?/riscv/
+__TO_CPUARCH=C/mips(n32|64)?(el)?(hf)?(c(128|256))?/mips/:C/arm(v[67])?(eb)?/arm/:C/powerpc(64|spe)/powerpc/:C/riscv64(sf)?c?/riscv/
 MACHINE_CPUARCH=${MACHINE_ARCH:${__TO_CPUARCH}}
 .endif
 
@@ -154,7 +154,9 @@ ARFLAGS		?=	-crD
 .endif
 RANLIB		?=	ranlib
 .if !defined(%POSIX)
-RANLIBFLAGS	?=	-D
+# elftoolchain and llvm ranlib default to deterministic and llvm-ranlib
+# doesn't currently support -D (https://bugs.llvm.org/show_bug.cgi?id=41707)
+#RANLIBFLAGS	?=	-D
 .endif
 
 AS		?=	as

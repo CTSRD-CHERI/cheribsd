@@ -30,7 +30,7 @@
  * SUCH DAMAGE.
  */
 
-#include <machine/cherireg.h>
+#include <cheri/cherireg.h>
 #include "SYS.h"
 
 .macro fail_if_eq reg, imm

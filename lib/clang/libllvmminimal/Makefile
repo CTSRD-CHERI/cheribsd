@@ -5,11 +5,12 @@
 LIB=		llvmminimal
 INTERNALLIB=
 
-SRCDIR=		lib
+SRCDIR=		llvm/lib
 SRCS+=		Demangle/ItaniumDemangle.cpp
 SRCS+=		Support/APFloat.cpp
 SRCS+=		Support/APInt.cpp
 SRCS+=		Support/ARMTargetParser.cpp
+SRCS+=		Support/Atomic.cpp
 SRCS+=		Support/CodeGenCoverage.cpp
 SRCS+=		Support/CommandLine.cpp
 SRCS+=		Support/ConvertUTF.cpp

@@ -32,6 +32,7 @@
  * $FreeBSD$
  */
 
+#include "opt_bpf.h"
 #include "opt_inet6.h"
 #include "opt_inet.h"
 
@@ -123,6 +124,13 @@ struct ifgroupreq_c {
 	} ifgr_ifgru;
 };
 
+#define	_CASE_IOC_IFGROUPREQ_C(cmd)				\
+    _IOC_NEWTYPE((cmd), struct ifgroupreq_c): case
+#else
+#define _CASE_IOC_IFGROUPREQ_C(cmd)
+#endif
+
+#if defined(COMPAT_FREEBSD64)
 struct ifmediareq64 {
 	char	ifm_name[IFNAMSIZ];
 	int	ifm_current;
@@ -134,11 +142,6 @@ struct ifmediareq64 {
 };
 #define	SIOCGIFMEDIA64	_IOC_NEWTYPE(SIOCGIFMEDIA, struct ifmediareq64)
 #define	SIOCGIFXMEDIA64	_IOC_NEWTYPE(SIOCGIFXMEDIA, struct ifmediareq64)
-
-#define	_CASE_IOC_IFGROUPREQ_C(cmd)				\
-    _IOC_NEWTYPE((cmd), struct ifgroupreq_c): case
-#else
-#define _CASE_IOC_IFGROUPREQ_C(cmd)
 #endif
 
 #ifdef COMPAT_FREEBSD32
@@ -310,7 +313,7 @@ static void	if_attach_internal(struct ifnet *, int, struct if_clone *);
 static int	if_detach_internal(struct ifnet *, int, struct if_clone **);
 static void	if_siocaddmulti(void *, int);
 #ifdef VIMAGE
-static void	if_vmove(struct ifnet *, struct vnet *);
+static int	if_vmove(struct ifnet *, struct vnet *);
 #endif
 
 #ifdef INET6
@@ -1293,20 +1296,24 @@ finish_vnet_shutdown:
  * unused if_index in target vnet and calls if_grow() if necessary,
  * and finally find an unused if_xname for the target vnet.
  */
-static void
+static int
 if_vmove(struct ifnet *ifp, struct vnet *new_vnet)
 {
 	struct if_clone *ifc;
+#ifdef DEV_BPF
 	u_int bif_dlt, bif_hdrlen;
+#endif
 	void *old;
 	int rc;
 
+#ifdef DEV_BPF
  	/*
 	 * if_detach_internal() will call the eventhandler to notify
 	 * interface departure.  That will detach if_bpf.  We need to
 	 * safe the dlt and hdrlen so we can re-attach it later.
 	 */
 	bpf_get_bp_params(ifp->if_bpf, &bif_dlt, &bif_hdrlen);
+#endif
 
 	/*
 	 * Detach from current vnet, but preserve LLADDR info, do not
@@ -1315,7 +1322,7 @@ if_vmove(struct ifnet *ifp, struct vnet *new_vnet)
 	 */
 	rc = if_detach_internal(ifp, 1, &ifc);
 	if (rc != 0)
-		return;
+		return (rc);
 
 	/*
 	 * Unlink the ifnet from ifindex_table[] in current vnet, and shrink
@@ -1353,10 +1360,13 @@ if_vmove(struct ifnet *ifp, struct vnet *new_vnet)
 
 	if_attach_internal(ifp, 1, ifc);
 
+#ifdef DEV_BPF
 	if (ifp->if_bpf == NULL)
 		bpfattach(ifp, bif_dlt, bif_hdrlen);
+#endif
 
 	CURVNET_RESTORE();
+	return (0);
 }
 
 /*
@@ -1367,6 +1377,7 @@ if_vmove_loan(struct thread *td, struct ifnet *ifp, char *ifname, int jid)
 {
 	struct prison *pr;
 	struct ifnet *difp;
+	int error;
 
 	/* Try to find the prison within our visibility. */
 	sx_slock(&allprison_lock);
@@ -1402,13 +1413,14 @@ if_vmove_loan(struct thread *td, struct ifnet *ifp, char *ifname, int jid)
 	CURVNET_RESTORE();
 
 	/* Move the interface into the child jail/vnet. */
-	if_vmove(ifp, pr->pr_vnet);
+	error = if_vmove(ifp, pr->pr_vnet);
 
-	/* Report the new if_xname back to the userland. */
-	sprintf(ifname, "%s", ifp->if_xname);
+	/* Report the new if_xname back to the userland on success. */
+	if (error == 0)
+		sprintf(ifname, "%s", ifp->if_xname);
 
 	prison_free(pr);
-	return (0);
+	return (error);
 }
 
 static int
@@ -1417,6 +1429,7 @@ if_vmove_reclaim(struct thread *td, char *ifname, int jid)
 	struct prison *pr;
 	struct vnet *vnet_dst;
 	struct ifnet *ifp;
+	int error;
 
 	/* Try to find the prison within our visibility. */
 	sx_slock(&allprison_lock);
@@ -1452,14 +1465,15 @@ if_vmove_reclaim(struct thread *td, char *ifname, int jid)
 	}
 
 	/* Get interface back from child jail/vnet. */
-	if_vmove(ifp, vnet_dst);
+	error = if_vmove(ifp, vnet_dst);
 	CURVNET_RESTORE();
 
-	/* Report the new if_xname back to the userland. */
-	sprintf(ifname, "%s", ifp->if_xname);
+	/* Report the new if_xname back to the userland on success. */
+	if (error == 0)
+		sprintf(ifname, "%s", ifp->if_xname);
 
 	prison_free(pr);
-	return (0);
+	return (error);
 }
 #endif /* VIMAGE */
 
@@ -1485,14 +1499,12 @@ if_addgroup(struct ifnet *ifp, const char *groupname)
 			return (EEXIST);
 		}
 
-	if ((ifgl = (struct ifg_list *)malloc(sizeof(struct ifg_list), M_TEMP,
-	    M_NOWAIT)) == NULL) {
+	if ((ifgl = malloc(sizeof(*ifgl), M_TEMP, M_NOWAIT)) == NULL) {
 	    	IFNET_WUNLOCK();
 		return (ENOMEM);
 	}
 
-	if ((ifgm = (struct ifg_member *)malloc(sizeof(struct ifg_member),
-	    M_TEMP, M_NOWAIT)) == NULL) {
+	if ((ifgm = malloc(sizeof(*ifgm), M_TEMP, M_NOWAIT)) == NULL) {
 		free(ifgl, M_TEMP);
 		IFNET_WUNLOCK();
 		return (ENOMEM);
@@ -1503,8 +1515,7 @@ if_addgroup(struct ifnet *ifp, const char *groupname)
 			break;
 
 	if (ifg == NULL) {
-		if ((ifg = (struct ifg_group *)malloc(sizeof(struct ifg_group),
-		    M_TEMP, M_NOWAIT)) == NULL) {
+		if ((ifg = malloc(sizeof(*ifg), M_TEMP, M_NOWAIT)) == NULL) {
 			free(ifgl, M_TEMP);
 			free(ifgm, M_TEMP);
 			IFNET_WUNLOCK();
@@ -1536,39 +1547,36 @@ if_addgroup(struct ifnet *ifp, const char *groupname)
 }
 
 /*
- * Remove a group from an interface
+ * Helper function to remove a group out of an interface.  Expects the global
+ * ifnet lock to be write-locked, and drops it before returning.
  */
-int
-if_delgroup(struct ifnet *ifp, const char *groupname)
+static void
+_if_delgroup_locked(struct ifnet *ifp, struct ifg_list *ifgl,
+    const char *groupname)
 {
-	struct ifg_list		*ifgl;
-	struct ifg_member	*ifgm;
-	int freeifgl;
+	struct ifg_member *ifgm;
+	bool freeifgl;
 
-	IFNET_WLOCK();
-	CK_STAILQ_FOREACH(ifgl, &ifp->if_groups, ifgl_next)
-		if (!strcmp(ifgl->ifgl_group->ifg_group, groupname))
-			break;
-	if (ifgl == NULL) {
-		IFNET_WUNLOCK();
-		return (ENOENT);
-	}
+	IFNET_WLOCK_ASSERT();
 
-	freeifgl = 0;
 	IF_ADDR_WLOCK(ifp);
 	CK_STAILQ_REMOVE(&ifp->if_groups, ifgl, ifg_list, ifgl_next);
 	IF_ADDR_WUNLOCK(ifp);
 
-	CK_STAILQ_FOREACH(ifgm, &ifgl->ifgl_group->ifg_members, ifgm_next)
-		if (ifgm->ifgm_ifp == ifp)
+	CK_STAILQ_FOREACH(ifgm, &ifgl->ifgl_group->ifg_members, ifgm_next) {
+		if (ifgm->ifgm_ifp == ifp) {
+			CK_STAILQ_REMOVE(&ifgl->ifgl_group->ifg_members, ifgm,
+			    ifg_member, ifgm_next);
 			break;
-
-	if (ifgm != NULL)
-		CK_STAILQ_REMOVE(&ifgl->ifgl_group->ifg_members, ifgm, ifg_member, ifgm_next);
+		}
+	}
 
 	if (--ifgl->ifgl_group->ifg_refcnt == 0) {
-		CK_STAILQ_REMOVE(&V_ifg_head, ifgl->ifgl_group, ifg_group, ifg_next);
-		freeifgl = 1;
+		CK_STAILQ_REMOVE(&V_ifg_head, ifgl->ifgl_group, ifg_group,
+		    ifg_next);
+		freeifgl = true;
+	} else {
+		freeifgl = false;
 	}
 	IFNET_WUNLOCK();
 
@@ -1581,6 +1589,26 @@ if_delgroup(struct ifnet *ifp, const char *groupname)
 	free(ifgl, M_TEMP);
 
 	EVENTHANDLER_INVOKE(group_change_event, groupname);
+}
+
+/*
+ * Remove a group from an interface
+ */
+int
+if_delgroup(struct ifnet *ifp, const char *groupname)
+{
+	struct ifg_list *ifgl;
+
+	IFNET_WLOCK();
+	CK_STAILQ_FOREACH(ifgl, &ifp->if_groups, ifgl_next)
+		if (strcmp(ifgl->ifgl_group->ifg_group, groupname) == 0)
+			break;
+	if (ifgl == NULL) {
+		IFNET_WUNLOCK();
+		return (ENOENT);
+	}
+
+	_if_delgroup_locked(ifp, ifgl, groupname);
 
 	return (0);
 }
@@ -1591,44 +1619,13 @@ if_delgroup(struct ifnet *ifp, const char *groupname)
 static void
 if_delgroups(struct ifnet *ifp)
 {
-	struct ifg_list		*ifgl;
-	struct ifg_member	*ifgm;
+	struct ifg_list *ifgl;
 	char groupname[IFNAMSIZ];
-	int ifglfree;
 
 	IFNET_WLOCK();
-	while (!CK_STAILQ_EMPTY(&ifp->if_groups)) {
-		ifgl = CK_STAILQ_FIRST(&ifp->if_groups);
-
+	while ((ifgl = CK_STAILQ_FIRST(&ifp->if_groups)) != NULL) {
 		strlcpy(groupname, ifgl->ifgl_group->ifg_group, IFNAMSIZ);
-
-		IF_ADDR_WLOCK(ifp);
-		CK_STAILQ_REMOVE(&ifp->if_groups, ifgl, ifg_list, ifgl_next);
-		IF_ADDR_WUNLOCK(ifp);
-
-		CK_STAILQ_FOREACH(ifgm, &ifgl->ifgl_group->ifg_members, ifgm_next)
-			if (ifgm->ifgm_ifp == ifp)
-				break;
-
-		if (ifgm != NULL)
-			CK_STAILQ_REMOVE(&ifgl->ifgl_group->ifg_members, ifgm, ifg_member,
-			    ifgm_next);
-		ifglfree = 0;
-		if (--ifgl->ifgl_group->ifg_refcnt == 0) {
-			CK_STAILQ_REMOVE(&V_ifg_head, ifgl->ifgl_group, ifg_group, ifg_next);
-			ifglfree = 1;
-		}
-
-		IFNET_WUNLOCK();
-		epoch_wait_preempt(net_epoch_preempt);
-		free(ifgm, M_TEMP);
-		if (ifglfree) {
-			EVENTHANDLER_INVOKE(group_detach_event,
-								ifgl->ifgl_group);
-			free(ifgl->ifgl_group, M_TEMP);
-		}
-		EVENTHANDLER_INVOKE(group_change_event, groupname);
-
+		_if_delgroup_locked(ifp, ifgl, groupname);
 		IFNET_WLOCK();
 	}
 	IFNET_WUNLOCK();
@@ -1720,7 +1717,7 @@ if_getgroupmembers(struct ifgroupreq *ifgr)
 
 	IFNET_RLOCK();
 	CK_STAILQ_FOREACH(ifg, &V_ifg_head, ifg_next)
-		if (!strcmp(ifg->ifg_group, ifgr->ifgr_name))
+		if (strcmp(ifg->ifg_group, ifgr->ifgr_name) == 0)
 			break;
 	if (ifg == NULL) {
 		IFNET_RUNLOCK();
@@ -1893,6 +1890,7 @@ ifa_maintain_loopback_route(int cmd, const char *otype, struct ifaddr *ifa,
 	struct rt_addrinfo info;
 	struct sockaddr_dl null_sdl;
 	struct ifnet *ifp;
+	struct ifaddr *rti_ifa = NULL;
 
 	ifp = ifa->ifa_ifp;
 
@@ -1903,9 +1901,10 @@ ifa_maintain_loopback_route(int cmd, const char *otype, struct ifaddr *ifa,
 		/* explicitly specify (loopback) ifa */
 		if (info.rti_ifp != NULL) {
 			NET_EPOCH_ENTER(et);
-			info.rti_ifa = ifaof_ifpforaddr(ifa->ifa_addr, info.rti_ifp);
-			if (info.rti_ifa != NULL)
-				ifa_ref(info.rti_ifa);
+			rti_ifa = ifaof_ifpforaddr(ifa->ifa_addr, info.rti_ifp);
+			if (rti_ifa != NULL)
+				ifa_ref(rti_ifa);
+			info.rti_ifa = rti_ifa;
 			NET_EPOCH_EXIT(et);
 		}
 	}
@@ -1915,6 +1914,9 @@ ifa_maintain_loopback_route(int cmd, const char *otype, struct ifaddr *ifa,
 	link_init_sdl(ifp, (struct sockaddr *)&null_sdl, ifp->if_type);
 
 	error = rtrequest1_fib(cmd, &info, NULL, ifp->if_fib);
+
+	if (rti_ifa != NULL)
+		ifa_free(rti_ifa);
 
 	if (error != 0 &&
 	    !(cmd == RTM_ADD && error == EEXIST) &&
@@ -3333,16 +3335,13 @@ struct ifconf32 {
 #define	SIOCGIFCONF32	_IOWR('i', 36, struct ifconf32)
 #endif
 #ifdef COMPAT_FREEBSD64
-_Pragma("pointer_interpretation push")
-_Pragma("pointer_interpretation integer")
 struct ifconf64 {
 	int	ifc_len;
 	union {
-		char		*ifcu_buf;
-		struct ifreq	*ifcu_req;
+		uint64_t	ifcu_buf;
+		uint64_t	ifcu_req;
 	} ifc_ifcu;
 };
-_Pragma("pointer_interpretation pop")
 #define	SIOCGIFCONF64	_IOC_NEWTYPE(SIOCGIFCONF, struct ifconf64)
 #endif
 
@@ -3428,7 +3427,7 @@ ifmr_update(const struct ifmediareq *ifmr, caddr_t data)
 int
 ifioctl(struct socket *so, u_long cmd, caddr_t data, struct thread *td)
 {
-#if defined(COMPAT_FREEBSD32) || defined(COMPAT_CHERIABI)
+#if defined(COMPAT_FREEBSD32) || defined(COMPAT_CHERIABI) || defined(COMPAT_FREEBSD64)
 	caddr_t saved_data = NULL;
 	struct ifmediareq ifmr;
 	struct ifmediareq *ifmrp = NULL;
@@ -3476,7 +3475,7 @@ ifioctl(struct socket *so, u_long cmd, caddr_t data, struct thread *td)
 	case SIOCGIFCONF64:
 		ifc64 = (struct ifconf64 *)data;
 		ifc.ifc_len = ifc64->ifc_len;
-		ifc.ifc_buf = __USER_CAP(ifc64->ifc_buf, ifc64->ifc_len);
+		ifc.ifc_buf = __USER_CAP((void *)ifc64->ifc_buf, ifc64->ifc_len);
 
 		error = ifconf(SIOCGIFCONF, (void *)&ifc);
 		if (error == 0)
@@ -3599,7 +3598,7 @@ ifioctl(struct socket *so, u_long cmd, caddr_t data, struct thread *td)
 out_ref:
 	if_rele(ifp);
 out_noref:
-#if defined(COMPAT_FREEBSD32) || defined(COMPAT_CHERIABI)
+#if defined(COMPAT_FREEBSD32) || defined(COMPAT_CHERIABI) || defined(COMPAT_FREEBSD64)
 	if (ifmrp != NULL) {
 		KASSERT((cmd == SIOCGIFMEDIA || cmd == SIOCGIFXMEDIA),
 		    ("ifmrp non-NULL, but cmd is not an ifmedia req 0x%lx",

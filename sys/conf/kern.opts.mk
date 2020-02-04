@@ -63,11 +63,6 @@ __DEFAULT_NO_OPTIONS = \
 # Kernel config files are unaffected, though some targets can be
 # affected by KERNEL_SYMBOLS, FORMAT_EXTENSIONS, CTF and SSP.
 
-.if ${.MAKE.OS} != "FreeBSD"
-# The cddl bootstrap tools still need some changes in order to compile
-BROKEN_OPTIONS+=CDDL ZFS
-.endif
-
 # Things that don't work based on the CPU
 .if ${MACHINE_CPUARCH} == "arm"
 . if ${MACHINE_ARCH:Marmv[67]*} == ""

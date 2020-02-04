@@ -332,7 +332,10 @@ SendBootRepl(struct rmp_packet *req, RMPCONN *rconn, char *filelist[])
 	 *  stripped file name and spoof the client into thinking that it
 	 *  really got what it wanted.
 	 */
-	filename = (filename = strrchr(filepath,'/'))? ++filename: filepath;
+	if ((filename = strrchr(filepath,'/')))
+		++filename;
+	else
+		filename = filepath;
 
 	/*
 	 *  Check that this is a valid boot file name.

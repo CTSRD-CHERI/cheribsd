@@ -1,0 +1,15 @@
+#NO_UNIVERSE
+
+include "GENERIC"
+
+ident SPIKE
+
+options 	HZ=100
+
+options 	MD_ROOT
+options 	ROOTDEVNAME=\"ufs:/dev/md0\"
+
+makeoptions 	NO_MODULES=yes
+
+options 	BREAK_TO_DEBUGGER
+options 	ALT_BREAK_TO_DEBUGGER

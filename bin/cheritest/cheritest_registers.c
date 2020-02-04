@@ -40,17 +40,13 @@
 #include <sys/sysctl.h>
 #include <sys/time.h>
 
-#include <machine/cherireg.h>
 #include <machine/cpuregs.h>
 #include <machine/pte.h>
 #include <machine/vmparam.h>
 
 #include <cheri/cheri.h>
 #include <cheri/cheric.h>
-#include <cheri/libcheri_fd.h>
-#include <cheri/libcheri_sandbox.h>
 
-#include <cheritest-helper.h>
 #include <err.h>
 #include <fcntl.h>
 #include <inttypes.h>

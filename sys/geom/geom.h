@@ -218,7 +218,8 @@ struct g_provider {
 	off_t			stripesize;
 	off_t			stripeoffset;
 	struct devstat		*stat;
-	u_int			nstart, nend;
+	u_int			spare1;
+	u_int			spare2;
 	u_int			flags;
 #define G_PF_WITHER		0x2
 #define G_PF_ORPHAN		0x4
@@ -229,17 +230,6 @@ struct g_provider {
 	/* Two fields for the implementing class to use */
 	void			*private;
 	u_int			index;
-};
-
-/*
- * Descriptor of a classifier. We can register a function and
- * an argument, which is called by g_io_request() on bio's
- * that are not previously classified.
- */
-struct g_classifier_hook {
-	TAILQ_ENTRY(g_classifier_hook) link;
-	int			(*func)(void *arg, struct bio *bp);
-	void			*arg;
 };
 
 /* BIO_GETATTR("GEOM::setstate") argument values. */
@@ -255,11 +245,18 @@ void g_dev_physpath_changed(void);
 struct g_provider *g_dev_getprovider(struct cdev *dev);
 
 /* geom_dump.c */
-void g_trace(int level, const char *, ...);
-#	define G_T_TOPOLOGY	1
-#	define G_T_BIO		2
-#	define G_T_ACCESS	4
-
+void (g_trace)(int level, const char *, ...) __printflike(2, 3);
+#define	G_T_TOPOLOGY		0x01
+#define	G_T_BIO			0x02
+#define	G_T_ACCESS		0x04
+extern int g_debugflags;
+#define	G_F_FOOTSHOOTING	0x10
+#define	G_F_DISKIOCTL		0x40
+#define	G_F_CTLDUMP		0x80
+#define	g_trace(level, fmt, ...) do {				\
+	if (__predict_false(g_debugflags & (level)))		\
+		(g_trace)(level, fmt, ## __VA_ARGS__);		\
+} while (0)
 
 /* geom_event.c */
 typedef void g_event_t(void *, int flag);
@@ -336,8 +333,7 @@ void g_io_deliver(struct bio *bp, int error);
 int g_io_getattr(const char *attr, struct g_consumer *cp, int *len, void *ptr);
 int g_io_zonecmd(struct disk_zone_args *zone_args, struct g_consumer *cp);
 int g_io_flush(struct g_consumer *cp);
-int g_register_classifier(struct g_classifier_hook *hook);
-void g_unregister_classifier(struct g_classifier_hook *hook);
+int g_io_speedup(size_t shortage, u_int flags, size_t *resid, struct g_consumer *cp);
 void g_io_request(struct bio *bp, struct g_consumer *cp);
 struct bio *g_new_bio(void);
 struct bio *g_alloc_bio(void);

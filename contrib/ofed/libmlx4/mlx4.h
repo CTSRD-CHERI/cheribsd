@@ -113,7 +113,7 @@ enum {
 };
 
 struct mlx4_device {
-	struct verbs_device		verbs_dev;
+	struct verbs_device		verbs_dev __subobject_use_container_bounds;
 	int				page_size;
 	int				abi_version;
 };
@@ -191,7 +191,7 @@ struct mlx4_cq {
 };
 
 struct mlx4_srq {
-	struct verbs_srq		verbs_srq;
+	struct verbs_srq		verbs_srq __subobject_use_container_bounds;
 	struct mlx4_buf			buf;
 	pthread_spinlock_t		lock;
 	uint64_t		       *wrid;
@@ -219,7 +219,7 @@ struct mlx4_wq {
 };
 
 struct mlx4_qp {
-	struct verbs_qp			verbs_qp;
+	struct verbs_qp			verbs_qp __subobject_use_container_bounds;
 	struct mlx4_buf			buf;
 	int				max_inline_data;
 	int				buf_size;

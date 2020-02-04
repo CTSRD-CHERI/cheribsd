@@ -2,7 +2,6 @@
  * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
  *
  * Copyright (c) 2018 Emmanuel Vadot <manu@freebsd.org>
- * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -54,8 +53,6 @@ struct rk_clk_pll_sc {
 
 	struct rk_clk_pll_rate	*rates;
 	struct rk_clk_pll_rate	*frac_rates;
-
-	bool			normal_mode;
 };
 
 #define	WRITE4(_clk, off, val)						\
@@ -346,18 +343,8 @@ static int
 rk3399_clk_pll_init(struct clknode *clk, device_t dev)
 {
 	struct rk_clk_pll_sc *sc;
-	uint32_t reg;
 
 	sc = clknode_get_softc(clk);
-
-	if (sc->normal_mode) {
-		/* Setting to normal mode */
-		reg = RK3399_CLK_PLL_MODE_NORMAL << RK3399_CLK_PLL_MODE_SHIFT;
-		reg |= RK3399_CLK_PLL_MODE_MASK << RK_CLK_PLL_MASK_SHIFT;
-		WRITE4(clk, sc->base_offset + RK3399_CLK_PLL_MODE_OFFSET,
-		    reg | RK3399_CLK_PLL_WRITE_MASK);
-	}
-
 	clknode_init_parent_idx(clk, 0);
 
 	return (0);
@@ -549,7 +536,6 @@ rk3399_clk_pll_register(struct clkdom *clkdom, struct rk_clk_pll_def *clkdef)
 	sc->flags = clkdef->flags;
 	sc->rates = clkdef->rates;
 	sc->frac_rates = clkdef->frac_rates;
-	sc->normal_mode = clkdef->normal_mode;
 
 	clknode_register(clkdom, clk);
 

@@ -8,7 +8,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2019, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2020, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -413,7 +413,7 @@ Cleanup:
  * FUNCTION:    AcpiDsGetFieldNames
  *
  * PARAMETERS:  Info            - CreateField info structure
- *  `           WalkState       - Current method state
+ *              WalkState       - Current method state
  *              Arg             - First parser arg for the field name list
  *
  * RETURN:      Status

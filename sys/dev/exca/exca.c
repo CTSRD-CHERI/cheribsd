@@ -1,7 +1,7 @@
 /*-
  * SPDX-License-Identifier: BSD-4-Clause AND BSD-2-Clause-FreeBSD
  *
- * Copyright (c) 2002-2005 M. Warner Losh.
+ * Copyright (c) 2002-2005 M. Warner Losh <imp@FreeBSD.org>
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -646,6 +646,11 @@ exca_init(struct exca_softc *sc, device_t dev,
 	sc->flags = 0;
 	sc->getb = exca_mem_getb;
 	sc->putb = exca_mem_putb;
+	sc->pccarddev = device_add_child(dev, "pccard", -1);
+	if (sc->pccarddev == NULL)
+		DEVPRINTF(brdev, "WARNING: cannot add pccard bus.\n");
+	else if (device_probe_and_attach(sc->pccarddev) != 0)
+		DEVPRINTF(brdev, "WARNING: cannot attach pccard bus.\n");
 }
 
 /*
@@ -742,6 +747,8 @@ exca_valid_slot(struct exca_softc *exca)
 		 *	Intel i82365sl-DF step or maybe a vlsi 82c146
 		 * we detected the vlsi case earlier, so if the controller
 		 * isn't set, we know it is a i82365sl step D.
+		 * XXXX Except we didn't -- this is a regression but VLSI
+		 * controllers are super hard to find these days for testing.
 		 */
 		exca->chipset = EXCA_I82365SL_DF;
 		break;

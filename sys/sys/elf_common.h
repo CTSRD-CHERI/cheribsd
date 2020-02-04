@@ -381,6 +381,8 @@ typedef struct {
 #define	EF_RISCV_FLOAT_ABI_QUAD	0x00000006
 #define	EF_RISCV_RVE		0x00000008
 #define	EF_RISCV_TSO		0x00000010
+#define	EF_RISCV_CHERIABI	0x00010000
+#define	EF_RISCV_CAPMODE	0x00020000
 
 #define	EF_SPARC_EXT_MASK	0x00ffff00
 #define	EF_SPARC_32PLUS		0x00000100
@@ -960,7 +962,6 @@ enum MipsCheriFlags {
 #define	AT_NOTELF	10	/* Program is not ELF ?? */
 #define	AT_UID		11	/* Real uid. */
 #define	AT_EUID		12	/* Effective uid. */
-#ifndef __powerpc__
 #define	AT_GID		13	/* Real gid. */
 #define	AT_EGID		14	/* Effective gid. */
 #define	AT_EXECPATH	15	/* Path to the executable. */
@@ -970,20 +971,8 @@ enum MipsCheriFlags {
 #define	AT_NCPUS	19	/* Number of CPUs. */
 #define	AT_PAGESIZES	20	/* Pagesizes. */
 #define	AT_PAGESIZESLEN	21	/* Number of pagesizes. */
-#else /* defined(__powerpc__) */
-#define	AT_EXECPATH	13
-#define	AT_CANARY	14
-#define	AT_CANARYLEN	15
-#define	AT_OSRELDATE	16
-#define	AT_NCPUS	17
-#define	AT_PAGESIZES	18
-#define	AT_PAGESIZESLEN	19
-#define	AT_STACKPROT	21
-#endif /* defined(__powerpc__) */
 #define	AT_TIMEKEEP	22	/* Pointer to timehands. */
-#ifndef __powerpc__
 #define	AT_STACKPROT	23	/* Initial stack protection. */
-#endif
 #define	AT_EHDRFLAGS	24	/* e_flags field from elf hdr */
 #define	AT_HWCAP	25	/* CPU feature flags. */
 #define	AT_HWCAP2	26	/* CPU feature flags 2. */
@@ -1042,6 +1031,10 @@ enum MipsCheriFlags {
 #define	R_AARCH64_PREL64	260	/* PC relative */
 #define	R_AARCH64_PREL32	261	/* PC relative, 32-bit overflow check */
 #define	R_AARCH64_PREL16	262	/* PC relative, 16-bit overflow check */
+#define	R_AARCH64_TSTBR14	279	/* TBZ/TBNZ immediate */
+#define	R_AARCH64_CONDBR19	280	/* Conditional branch immediate */
+#define	R_AARCH64_JUMP26	282	/* Branch immediate */
+#define	R_AARCH64_CALL26	283	/* Call immediate */
 #define	R_AARCH64_COPY		1024	/* Copy data from shared object */
 #define	R_AARCH64_GLOB_DAT	1025	/* Set GOT entry to data address */
 #define	R_AARCH64_JUMP_SLOT	1026	/* Set GOT entry to code address */

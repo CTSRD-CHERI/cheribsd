@@ -1,6 +1,6 @@
 # $FreeBSD$
 
-.include <bsd.own.mk>
+.include <src.opts.mk>
 
 PROG=	cheri_bench
 SRCS=	cheri_bench.c
@@ -14,7 +14,7 @@ NO_WERROR=	YES
 
 LIBADD+= pthread
 
-.if ${MACHINE_ARCH:Mmips*c*} || ${MK_CHERI} != "no"
+.if ${MACHINE_ARCH:Mmips*c*} || ${MK_LIBCHERI} == "yes"
 LIBADD+=  cheri
 .ifdef CLANG_CLEARREGS
 CFLAGS+= -mllvm -cheri-use-clearregs

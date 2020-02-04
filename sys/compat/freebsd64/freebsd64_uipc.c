@@ -42,6 +42,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/socketvar.h>
 #include <sys/syscallsubr.h>
 
+#include <compat/freebsd64/freebsd64.h>
 #include <compat/freebsd64/freebsd64_proto.h>
 #include <compat/freebsd64/freebsd64_util.h>
 
@@ -381,7 +382,7 @@ freebsd12_freebsd64_shm_open(struct thread *td,
 {
 
 	return (kern_shm_open(td, __USER_CAP_STR(uap->path),
-	    uap->flags | O_CLOEXEC, uap->mode, NULL, F_SEAL_SEAL));
+	    uap->flags | O_CLOEXEC, uap->mode, NULL));
 }
 #endif
 
@@ -390,7 +391,7 @@ freebsd64_shm_open2(struct thread *td, struct freebsd64_shm_open2_args *uap)
 {
 
 	return (kern_shm_open2(td, __USER_CAP_STR(uap->path), uap->flags,
-	    uap->mode, uap->shmflags, __USER_CAP_STR(uap->name)));
+	    uap->mode, uap->shmflags, NULL, __USER_CAP_STR(uap->name)));
 }
 
 int

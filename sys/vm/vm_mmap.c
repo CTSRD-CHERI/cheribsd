@@ -132,11 +132,18 @@ static int abandon_on_munmap = 1;
 SYSCTL_INT(_debug, OID_AUTO, abandon_on_munmap, CTLFLAG_RWTUN, &abandon_on_munmap, 0,
     "Add abandoned vm entries on munmap(2)");
 #if __has_feature(capabilities)
-SYSCTL_DECL(_compat_cheriabi_mmap);
+SYSCTL_DECL(_security_cheri);
+SYSCTL_NODE(_security_cheri, OID_AUTO, mmap, CTLFLAG_RW, 0, "mmap");
 static int cheriabi_mmap_precise_bounds = 1;
-SYSCTL_INT(_compat_cheriabi_mmap, OID_AUTO, precise_bounds,
+SYSCTL_INT(_security_cheri_mmap, OID_AUTO, precise_bounds,
     CTLFLAG_RWTUN, &cheriabi_mmap_precise_bounds, 0,
     "Require that bounds on returned capabilities be precise.");
+#ifdef COMPAT_CHERIABI
+SYSCTL_DECL(_compat_cheriabi_mmap);
+SYSCTL_INT(_compat_cheriabi_mmap, OID_AUTO, precise_bounds,
+     CTLFLAG_RWTUN, &cheriabi_mmap_precise_bounds, 0,
+     "Require that bounds on returned capabilities be precise.");
+#endif
 #endif
 
 #ifdef MAP_32BIT
@@ -379,10 +386,10 @@ sys_mmap(struct thread *td, struct mmap_args *uap)
 		}
 
 		/* Allocate from the per-thread capability. */
-		source_cap = td->td_md.md_cheri_mmap_cap;
+		source_cap = td->td_cheri_mmap_cap;
 	}
 	KASSERT(cheri_gettag(source_cap),
-	    ("td->td_md.md_cheri_mmap_cap is untagged!"));
+	    ("td->td_cheri_mmap_cap is untagged!"));
 
 	/*
 	 * If MAP_FIXED is specified, make sure that that the reqested
@@ -428,7 +435,7 @@ sys_mmap(struct thread *td, struct mmap_args *uap)
 	case MAP_ALIGNED_CHERI_SEAL:
 		break;
 	case MAP_ALIGNED_SUPER:
-#ifdef __mips_n64
+#if VM_NRESERVLEVEL > 0
 		/*
 		 * pmap_align_superpage() is a no-op for allocations
 		 * less than a super page so request data alignment
@@ -437,13 +444,11 @@ sys_mmap(struct thread *td, struct mmap_args *uap)
 		 * In practice this is a no-op as super-pages are
 		 * precisely representable.
 		 */
-		if (uap->len < PDRSIZE &&
+		if (uap->len < (1UL << (VM_LEVEL_0_ORDER + PAGE_SHIFT)) &&
 		    CHERI_REPRESENTABLE_ALIGNMENT(uap->len) > (1UL << PAGE_SHIFT)) {
 			flags &= ~MAP_ALIGNMENT_MASK;
 			flags |= MAP_ALIGNED_CHERI;
 		}
-#else
-#error	MAP_ALIGNED_SUPER handling unimplemented for this architecture
 #endif
 		break;
 	default:
@@ -496,8 +501,20 @@ sys_mmap(struct thread *td, struct mmap_args *uap)
 }
 
 int
-kern_mmap(struct thread *td, uintptr_t addr0, size_t len, int prot,
-    int flags, int fd, off_t pos)
+kern_mmap(struct thread *td, uintptr_t addr0, size_t len, int prot, int flags,
+    int fd, off_t pos)
+{
+
+	return (kern_mmap_fpcheck(td, addr0, len, prot, flags, fd, pos, NULL));
+}
+
+/*
+ * When mmap'ing a file, check_fp_fn may be used for the caller to do any
+ * last-minute validation based on the referenced file in a non-racy way.
+ */
+int
+kern_mmap_fpcheck(struct thread *td, uintptr_t addr0, size_t len, int prot,
+    int flags, int fd, off_t pos, mmap_check_fp_fn check_fp_fn)
 {
 	struct mmap_req	mr = {
 		.mr_hint = addr0,
@@ -505,7 +522,8 @@ kern_mmap(struct thread *td, uintptr_t addr0, size_t len, int prot,
 		.mr_prot = prot,
 		.mr_flags = flags,
 		.mr_fd = fd,
-		.mr_pos = pos
+		.mr_pos = pos,
+		.mr_check_fp_fn = check_fp_fn
 	};
 
 	return (kern_mmap_req(td, &mr));
@@ -541,6 +559,7 @@ kern_mmap_req(struct thread *td, const struct mmap_req *mrp)
 	vm_prot_t cap_maxprot;
 	int align, error, fd, flags, max_prot, prot;
 	cap_rights_t rights;
+	mmap_check_fp_fn check_fp_fn;
 
 	addr = mrp->mr_hint;
 	max_addr = mrp->mr_max_addr;
@@ -549,6 +568,7 @@ kern_mmap_req(struct thread *td, const struct mmap_req *mrp)
 	flags = mrp->mr_flags;
 	fd = mrp->mr_fd;
 	pos = mrp->mr_pos;
+	check_fp_fn = mrp->mr_check_fp_fn;
 
 	p = td->td_proc;
 
@@ -855,6 +875,12 @@ kern_mmap_req(struct thread *td, const struct mmap_req *mrp)
 			    "requested maximum permissions", __func__);
 			error = EINVAL;
 			goto done;
+		}
+		if (check_fp_fn != NULL) {
+			error = check_fp_fn(fp, prot, max_prot & cap_maxprot,
+			    flags);
+			if (error != 0)
+				goto done;
 		}
 		/* This relies on VM_PROT_* matching PROT_*. */
 		error = fo_mmap(fp, &vms->vm_map, &addr, max_addr, size,
@@ -1463,9 +1489,9 @@ retry:
 				 * and set PGA_REFERENCED before the call to
 				 * pmap_is_referenced(). 
 				 */
-				if ((m->aflags & PGA_REFERENCED) != 0 ||
+				if ((m->a.flags & PGA_REFERENCED) != 0 ||
 				    pmap_is_referenced(m) ||
-				    (m->aflags & PGA_REFERENCED) != 0)
+				    (m->a.flags & PGA_REFERENCED) != 0)
 					mincoreinfo |= MINCORE_REFERENCED_OTHER;
 			}
 			if (object != NULL)
@@ -1867,12 +1893,14 @@ vm_mmap_vnode(struct thread *td, vm_size_t objsize,
 	} else {
 		KASSERT(obj->type == OBJT_DEFAULT || obj->type == OBJT_SWAP,
 		    ("wrong object type"));
-		VM_OBJECT_WLOCK(obj);
-		vm_object_reference_locked(obj);
+		vm_object_reference(obj);
 #if VM_NRESERVLEVEL > 0
-		vm_object_color(obj, 0);
+		if ((obj->flags & OBJ_COLORED) == 0) {
+			VM_OBJECT_WLOCK(obj);
+			vm_object_color(obj, 0);
+			VM_OBJECT_WUNLOCK(obj);
+		}
 #endif
-		VM_OBJECT_WUNLOCK(obj);
 	}
 	*objp = obj;
 	*flagsp = flags;

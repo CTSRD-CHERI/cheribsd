@@ -221,7 +221,7 @@ dtrace_trap(struct trapframe *frame, u_int type)
 				    (intmax_t)frame->pc, (intmax_t)frame->badvaddr);
 			}
 			else
-				frame->pc += sizeof(int);
+ 				TRAPF_PC_INCREMENT(frame, sizeof(int));
 			return (1);
 		default:
 			/* Handle all other traps in the usual way. */
@@ -250,18 +250,18 @@ dtrace_invop_start(struct trapframe *frame)
 	int16_t offs;
 	int invop;
 
-	invop = dtrace_invop(frame->pc, frame, frame->pc);
+	invop = dtrace_invop(TRAPF_PC(frame), frame, TRAPF_PC(frame));
 	offs = (invop & LDSD_DATA_MASK);
 	sp = (register_t *)((uint8_t *)frame->sp + offs);
 
 	switch (invop & LDSD_RA_SP_MASK) {
 	case LD_RA_SP:
 		frame->ra = *sp;
-		frame->pc += INSN_SIZE;
+		TRAPF_PC_INCREMENT(frame, INSN_SIZE);
 		break;
 	case SD_RA_SP:
 		*(sp) = frame->ra;
-		frame->pc += INSN_SIZE;
+		TRAPF_PC_INCREMENT(frame, INSN_SIZE);
 		break;
 	default:
 		printf("%s: 0x%x undefined\n", __func__, invop);

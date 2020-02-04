@@ -10,6 +10,8 @@ FILESDIR=       ${LIBDIR}
 CLEANFILES=	${FILES}
 CFLAGS+=-mxgot -mllvm -mxmxgot
 CFLAGS+=	-DCRT_IRELOC_SUPPRESS
+# Purecap code requires crt_init_globals to be called before using jump tables
+CFLAGS+=	-fno-jump-tables
 
 NEED_CHERI=	pure
 

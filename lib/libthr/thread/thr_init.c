@@ -477,10 +477,13 @@ init_main_thread(struct pthread *thread)
 static void
 init_private(void)
 {
+#ifndef __CHERI_PURE_CAPABILITY__
 	struct rlimit rlim;
 	size_t len;
 	int mib[2];
-	char *env, *env_bigstack, *env_splitstack;
+	char *env_bigstack, *env_splitstack;
+#endif
+	char *env;
 
 	_thr_umutex_init(&_mutex_static_lock);
 	_thr_umutex_init(&_cond_static_lock);
@@ -504,6 +507,7 @@ init_private(void)
 		__thr_pshared_init();
 		__thr_malloc_init();
 		/* Find the stack top */
+#ifndef __CHERI_PURE_CAPABILITY__
 		mib[0] = CTL_KERN;
 		mib[1] = KERN_USRSTACK;
 		/*
@@ -520,6 +524,18 @@ init_private(void)
 				PANIC("Cannot get stack rlimit");
 			_thr_stack_initial = rlim.rlim_cur;
 		}
+#else
+		/*
+		 * In the CheriABI world, the maximum possible stack's
+		 * address space has already been allocated (and has
+		 * leaked onto the stack in the form of stored stack
+		 * frames) so we leave the whole thing for the initial
+		 * thread and take our values from there.
+		 */
+		_thr_stack_initial = cheri_getlen(cheri_getstack());
+		_usrstack = cheri_getbase(cheri_getstack()) +
+		    _thr_stack_initial;
+#endif
 		_thr_is_smp = sysconf(_SC_NPROCESSORS_CONF);
 		if (_thr_is_smp == -1)
 			PANIC("Cannot get _SC_NPROCESSORS_CONF");

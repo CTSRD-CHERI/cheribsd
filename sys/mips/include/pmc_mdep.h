@@ -54,7 +54,7 @@ union pmc_md_pmc {
 	uint32_t	pm_mips_evsel;
 };
 
-#define	PMC_TRAPFRAME_TO_PC(TF)	((TF)->pc)
+#define	PMC_TRAPFRAME_TO_PC(TF)	TRAPF_PC((TF))
 
 extern const struct mips_event_code_map mips_event_codes[];
 extern const int mips_event_codes_size;

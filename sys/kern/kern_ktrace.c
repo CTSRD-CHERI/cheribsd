@@ -479,7 +479,7 @@ ktrsyscall(int code, int narg, syscallarg_t args[])
 	buflen = sizeof(register_t) * narg;
 	if (buflen > 0) {
 		buf = malloc(buflen, M_KTRACE, M_WAITOK);
-#ifdef CPU_CHERI
+#if __has_feature(capabilities)
 		for (int i = 0; i < narg; i++)
 			buf[i] = (register_t)args[i];
 #else
@@ -1064,7 +1064,7 @@ kern_ktrace(struct thread *td, const char * __capability fname, int uops,
 		}
 		NDFREE(&nd, NDF_ONLY_PNBUF);
 		vp = nd.ni_vp;
-		VOP_UNLOCK(vp, 0);
+		VOP_UNLOCK(vp);
 		if (vp->v_type != VREG) {
 			(void) vn_close(vp, FREAD|FWRITE, td->td_ucred, td);
 			ktrace_exit(td);
@@ -1368,7 +1368,7 @@ ktr_writerequest(struct thread *td, struct ktr_request *req)
 	if (error == 0)
 #endif
 		error = VOP_WRITE(vp, &auio, IO_UNIT | IO_APPEND, cred);
-	VOP_UNLOCK(vp, 0);
+	VOP_UNLOCK(vp);
 	vn_finished_write(mp);
 	crfree(cred);
 	if (!error) {

@@ -165,13 +165,37 @@ static int last_swapin;
 static void swapclear(struct proc *);
 static int swapout(struct proc *);
 static void vm_swapout_map_deactivate_pages(vm_map_t, long);
-static void vm_swapout_object_deactivate_pages(pmap_t, vm_object_t, long);
+static void vm_swapout_object_deactivate(pmap_t, vm_object_t, long);
 static void swapout_procs(int action);
 static void vm_req_vmdaemon(int req);
 static void vm_thread_swapout(struct thread *td);
 
+static void
+vm_swapout_object_deactivate_page(pmap_t pmap, vm_page_t m, bool unmap)
+{
+
+	/*
+	 * Ignore unreclaimable wired pages.  Repeat the check after busying
+	 * since a busy holder may wire the page.
+	 */
+	if (vm_page_wired(m) || !vm_page_tryxbusy(m))
+		return;
+
+	if (vm_page_wired(m) || !pmap_page_exists_quick(pmap, m)) {
+		vm_page_xunbusy(m);
+		return;
+	}
+	if (!pmap_is_referenced(m)) {
+		if (!vm_page_active(m))
+			(void)vm_page_try_remove_all(m);
+		else if (unmap && vm_page_try_remove_all(m))
+			vm_page_deactivate(m);
+	}
+	vm_page_xunbusy(m);
+}
+
 /*
- *	vm_swapout_object_deactivate_pages
+ *	vm_swapout_object_deactivate
  *
  *	Deactivate enough pages to satisfy the inactive target
  *	requirements.
@@ -179,12 +203,12 @@ static void vm_thread_swapout(struct thread *td);
  *	The object and map must be locked.
  */
 static void
-vm_swapout_object_deactivate_pages(pmap_t pmap, vm_object_t first_object,
+vm_swapout_object_deactivate(pmap_t pmap, vm_object_t first_object,
     long desired)
 {
 	vm_object_t backing_object, object;
-	vm_page_t p;
-	int act_delta, remove_mode;
+	vm_page_t m;
+	bool unmap;
 
 	VM_OBJECT_ASSERT_LOCKED(first_object);
 	if ((first_object->flags & OBJ_FICTITIOUS) != 0)
@@ -197,63 +221,19 @@ vm_swapout_object_deactivate_pages(pmap_t pmap, vm_object_t first_object,
 		    REFCOUNT_COUNT(object->paging_in_progress) > 0)
 			goto unlock_return;
 
-		remove_mode = 0;
+		unmap = true;
 		if (object->shadow_count > 1)
-			remove_mode = 1;
+			unmap = false;
+
 		/*
 		 * Scan the object's entire memory queue.
 		 */
-		TAILQ_FOREACH(p, &object->memq, listq) {
+		TAILQ_FOREACH(m, &object->memq, listq) {
 			if (pmap_resident_count(pmap) <= desired)
 				goto unlock_return;
 			if (should_yield())
 				goto unlock_return;
-			if (vm_page_tryxbusy(p) == 0)
-				continue;
-			VM_CNT_INC(v_pdpages);
-
-			/*
-			 * The page may acquire a wiring after this check.
-			 * The page daemon handles wired pages, so there is
-			 * no harm done if a wiring appears while we are
-			 * attempting to deactivate the page.
-			 */
-			if (vm_page_wired(p) || !pmap_page_exists_quick(pmap, p)) {
-				vm_page_xunbusy(p);
-				continue;
-			}
-			act_delta = pmap_ts_referenced(p);
-			vm_page_lock(p);
-			if ((p->aflags & PGA_REFERENCED) != 0) {
-				if (act_delta == 0)
-					act_delta = 1;
-				vm_page_aflag_clear(p, PGA_REFERENCED);
-			}
-			if (!vm_page_active(p) && act_delta != 0) {
-				vm_page_activate(p);
-				p->act_count += act_delta;
-			} else if (vm_page_active(p)) {
-				/*
-				 * The page daemon does not requeue pages
-				 * after modifying their activation count.
-				 */
-				if (act_delta == 0) {
-					p->act_count -= min(p->act_count,
-					    ACT_DECLINE);
-					if (!remove_mode && p->act_count == 0) {
-						(void)vm_page_try_remove_all(p);
-						vm_page_deactivate(p);
-					}
-				} else {
-					vm_page_activate(p);
-					if (p->act_count < ACT_MAX -
-					    ACT_ADVANCE)
-						p->act_count += ACT_ADVANCE;
-				}
-			} else if (vm_page_inactive(p))
-				(void)vm_page_try_remove_all(p);
-			vm_page_unlock(p);
-			vm_page_xunbusy(p);
+			vm_swapout_object_deactivate_page(pmap, m, unmap);
 		}
 		if ((backing_object = object->backing_object) == NULL)
 			goto unlock_return;
@@ -307,7 +287,7 @@ vm_swapout_map_deactivate_pages(vm_map_t map, long desired)
 	}
 
 	if (bigobj != NULL) {
-		vm_swapout_object_deactivate_pages(map->pmap, bigobj, desired);
+		vm_swapout_object_deactivate(map->pmap, bigobj, desired);
 		VM_OBJECT_RUNLOCK(bigobj);
 	}
 	/*
@@ -321,8 +301,8 @@ vm_swapout_map_deactivate_pages(vm_map_t map, long desired)
 			obj = tmpe->object.vm_object;
 			if (obj != NULL) {
 				VM_OBJECT_RLOCK(obj);
-				vm_swapout_object_deactivate_pages(map->pmap,
-				    obj, desired);
+				vm_swapout_object_deactivate(map->pmap, obj,
+				    desired);
 				VM_OBJECT_RUNLOCK(obj);
 			}
 		}
@@ -894,8 +874,8 @@ swapclear(struct proc *p)
 		td->td_flags |= TDF_INMEM;
 		td->td_flags &= ~TDF_SWAPINREQ;
 		TD_CLR_SWAPPED(td);
-		if (TD_CAN_RUN(td))
-			if (setrunnable(td)) {
+		if (TD_CAN_RUN(td)) {
+			if (setrunnable(td, 0)) {
 #ifdef INVARIANTS
 				/*
 				 * XXX: We just cleared TDI_SWAPPED
@@ -905,7 +885,8 @@ swapclear(struct proc *p)
 				panic("not waking up swapper");
 #endif
 			}
-		thread_unlock(td);
+		} else
+			thread_unlock(td);
 	}
 	p->p_flag &= ~(P_SWAPPINGIN | P_SWAPPINGOUT);
 	p->p_flag |= P_INMEM;

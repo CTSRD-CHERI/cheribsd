@@ -232,14 +232,10 @@ uma_zone_t uma_zcache_create(char *name, int size, uma_ctor ctor, uma_dtor dtor,
  * Definitions for uma_zcreate flags
  *
  * These flags share space with UMA_ZFLAGs in uma_int.h.  Be careful not to
- * overlap when adding new features.  0xff000000 is in use by uma_int.h.
+ * overlap when adding new features.
  */
-#define UMA_ZONE_PAGEABLE	0x0001	/* Return items not fully backed by
-					   physical memory XXX Not yet */
 #define UMA_ZONE_ZINIT		0x0002	/* Initialize with zeros */
-#define UMA_ZONE_STATIC		0x0004	/* Statically sized zone */
-#define UMA_ZONE_OFFPAGE	0x0008	/* Force the slab structure allocation
-					   off of the real memory */
+#define UMA_ZONE_NOTOUCH	0x0008	/* UMA may not access the memory */
 #define UMA_ZONE_MALLOC		0x0010	/* For use by malloc(9) only! */
 #define UMA_ZONE_NOFREE		0x0020	/* Do not free slabs of this type! */
 #define UMA_ZONE_MTXCLASS	0x0040	/* Create a new lock class */
@@ -247,20 +243,17 @@ uma_zone_t uma_zcache_create(char *name, int size, uma_ctor ctor, uma_dtor dtor,
 					 * Used for internal vm datastructures
 					 * only.
 					 */
-#define	UMA_ZONE_HASH		0x0100	/*
-					 * Use a hash table instead of caching
-					 * information in the vm_page.
-					 */
+#define	UMA_ZONE_NOTPAGE	0x0100	/* allocf memory not vm pages */
 #define	UMA_ZONE_SECONDARY	0x0200	/* Zone is a Secondary Zone */
 #define	UMA_ZONE_NOBUCKET	0x0400	/* Do not use buckets. */
 #define	UMA_ZONE_MAXBUCKET	0x0800	/* Use largest buckets. */
-#define	UMA_ZONE_CACHESPREAD	0x1000	/*
+#define	UMA_ZONE_MINBUCKET	0x1000	/* Use smallest buckets. */
+#define	UMA_ZONE_CACHESPREAD	0x2000	/*
 					 * Spread memory start locations across
 					 * all possible cache lines.  May
 					 * require many virtually contiguous
 					 * backend pages and can fail early.
 					 */
-#define	UMA_ZONE_VTOSLAB	0x2000	/* Zone uses vtoslab for lookup. */
 #define	UMA_ZONE_NODUMP		0x4000	/*
 					 * Zone's pages will not be included in
 					 * mini-dumps.
@@ -268,11 +261,9 @@ uma_zone_t uma_zcache_create(char *name, int size, uma_ctor ctor, uma_dtor dtor,
 #define	UMA_ZONE_PCPU		0x8000	/*
 					 * Allocates mp_maxid + 1 slabs of PAGE_SIZE
 					 */
-#define	UMA_ZONE_NUMA		0x10000	/*
-					 * NUMA aware Zone.  Implements a best
-					 * effort first-touch policy.
-					 */
-#define	UMA_ZONE_MINBUCKET	0x20000	/* Use smallest buckets. */
+#define	UMA_ZONE_FIRSTTOUCH	0x10000	/* First touch NUMA policy */
+#define	UMA_ZONE_ROUNDROBIN	0x20000	/* Round-robin NUMA policy. */
+/* In use by UMA_ZFLAGs:	0xffe00000 */
 
 /*
  * These flags are shared between the keg and zone.  In zones wishing to add
@@ -280,8 +271,9 @@ uma_zone_t uma_zcache_create(char *name, int size, uma_ctor ctor, uma_dtor dtor,
  * physical parameters of the request and may not be provided by the consumer.
  */
 #define	UMA_ZONE_INHERIT						\
-    (UMA_ZONE_OFFPAGE | UMA_ZONE_MALLOC | UMA_ZONE_NOFREE |		\
-    UMA_ZONE_HASH | UMA_ZONE_VTOSLAB | UMA_ZONE_PCPU | UMA_ZONE_NUMA)
+    (UMA_ZONE_NOTOUCH | UMA_ZONE_MALLOC | UMA_ZONE_NOFREE |		\
+     UMA_ZONE_NOTPAGE | UMA_ZONE_PCPU | UMA_ZONE_FIRSTTOUCH |		\
+     UMA_ZONE_ROUNDROBIN)
 
 /* Definitions for align */
 #define UMA_ALIGN_PTR	(sizeof(void * __capability) - 1) /* Align for ptr */
@@ -615,7 +607,6 @@ void uma_zone_set_freef(uma_zone_t zone, uma_free freef);
 #define UMA_SLAB_KERNEL	0x04		/* Slab alloced from kmem */
 #define UMA_SLAB_PRIV	0x08		/* Slab alloced from priv allocator */
 #define UMA_SLAB_OFFP	0x10		/* Slab is managed separately  */
-#define UMA_SLAB_MALLOC	0x20		/* Slab is a large malloc slab */
 /* 0x02, 0x40, and 0x80 are available */
 
 /*
@@ -642,7 +633,6 @@ void uma_prealloc(uma_zone_t zone, int itemcnt);
  *	Non-zero if zone is exhausted.
  */
 int uma_zone_exhausted(uma_zone_t zone);
-int uma_zone_exhausted_nolock(uma_zone_t zone);
 
 /*
  * Common UMA_ZONE_PCPU zones.

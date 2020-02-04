@@ -103,9 +103,9 @@ MTX_SYSINIT(kq_global, &kq_global, "kqueue order", MTX_DEF);
 
 TASKQUEUE_DEFINE_THREAD(kqueue_ctx);
 
-static int	kevent_copyout(void *arg, kkevent_t *kevp, int count);
-static int	kevent_copyin(void *arg, kkevent_t *kevp, int count);
-static int	kqueue_register(struct kqueue *kq, kkevent_t *kev,
+static int	kevent_copyout(void *arg, struct kevent *kevp, int count);
+static int	kevent_copyin(void *arg, struct kevent *kevp, int count);
+static int	kqueue_register(struct kqueue *kq, struct kevent *kev,
 		    struct thread *td, int mflag);
 static int	kqueue_acquire(struct file *fp, struct kqueue **kqp);
 static void	kqueue_release(struct kqueue *kq, int locked);
@@ -117,7 +117,7 @@ static void	kqueue_task(void *arg, int pending);
 static int	kqueue_scan(struct kqueue *kq, int maxevents,
 		    struct kevent_copyops *k_ops,
 		    const struct timespec *timeout,
-		    kkevent_t *keva, struct thread *td);
+		    struct kevent *keva, struct thread *td);
 static void 	kqueue_wakeup(struct kqueue *kq);
 static struct filterops *kqueue_fo_find(int filt);
 static void	kqueue_fo_release(int filt);
@@ -163,14 +163,14 @@ static void	filt_timerexpire(void *knx);
 static int	filt_timerattach(struct knote *kn);
 static void	filt_timerdetach(struct knote *kn);
 static void	filt_timerstart(struct knote *kn, sbintime_t to);
-static void	filt_timertouch(struct knote *kn, kkevent_t *kev,
+static void	filt_timertouch(struct knote *kn, struct kevent *kev,
 		    u_long type);
 static int	filt_timervalidate(struct knote *kn, sbintime_t *to);
 static int	filt_timer(struct knote *kn, long hint);
 static int	filt_userattach(struct knote *kn);
 static void	filt_userdetach(struct knote *kn);
 static int	filt_user(struct knote *kn, long hint);
-static void	filt_usertouch(struct knote *kn, kkevent_t *kev,
+static void	filt_usertouch(struct knote *kn, struct kevent *kev,
 		    u_long type);
 
 static struct filterops file_filtops = {
@@ -530,7 +530,7 @@ knote_fork(struct knlist *list, int pid)
 {
 	struct kqueue *kq;
 	struct knote *kn;
-	kkevent_t kev;
+	struct kevent kev;
 	int error;
 
 	MPASS(list != NULL);
@@ -790,7 +790,7 @@ filt_timerdetach(struct knote *kn)
 }
 
 static void
-filt_timertouch(struct knote *kn, kkevent_t *kev, u_long type)
+filt_timertouch(struct knote *kn, struct kevent *kev, u_long type)
 {
 	struct kq_timer_cb_data *kc;	
 	struct kqueue *kq;
@@ -895,7 +895,7 @@ filt_user(struct knote *kn, __unused long hint)
 }
 
 static void
-filt_usertouch(struct knote *kn, kkevent_t *kev, u_long type)
+filt_usertouch(struct knote *kn, struct kevent *kev, u_long type)
 {
 	u_int ffctrl;
 
@@ -1012,7 +1012,7 @@ sys_kevent(struct thread *td, struct kevent_args *uap)
 		.arg = uap,
 		.k_copyout = kevent_copyout,
 		.k_copyin = kevent_copyin,
-		.kevent_size = sizeof(struct kevent_native),
+		.kevent_size = sizeof(struct kevent),
 	};
 	struct g_kevent_args gk_args = {
 		.fd = uap->fd,
@@ -1058,38 +1058,20 @@ kern_kevent_generic(struct thread *td, struct g_kevent_args *uap,
 
 	return (error);
 }
-	struct kevent_native kev_n[KQ_NEVENTS];
 
 /*
  * Copy 'count' items into the destination list pointed to by uap->eventlist.
  */
 static int
-kevent_copyout(void *arg, kkevent_t *kevp, int count)
+kevent_copyout(void *arg, struct kevent *kevp, int count)
 {
 	struct kevent_args *uap;
-#if __has_feature(capabilities)
-	struct kevent_native ks_n[KQ_NEVENTS];
-	int i;
-#endif
 	int error;
 
 	KASSERT(count <= KQ_NEVENTS, ("count (%d) > KQ_NEVENTS", count));
 	uap = (struct kevent_args *)arg;
 
-#if !__has_feature(capabilities)
-	error = copyout(kevp, uap->eventlist, count * sizeof *kevp);
-#else
-	for (i = 0; i < count; i++) {
-		ks_n[i].ident = kevp[i].ident;
-		ks_n[i].filter = kevp[i].filter;
-		ks_n[i].flags = kevp[i].flags;
-		ks_n[i].fflags = kevp[i].fflags;
-		ks_n[i].data = kevp[i].data;
-		ks_n[i].udata = (void *)(__cheri_addr vaddr_t)kevp[i].udata;
-		memcpy(&ks_n[i].ext[0], &kevp->ext[0], sizeof(kevp->ext));
-	}
-	error = copyout(ks_n, uap->eventlist, count * sizeof(*ks_n));
-#endif
+	error = copyoutcap(kevp, uap->eventlist, count * sizeof(*kevp));
 	if (error == 0)
 		uap->eventlist += count;
 	return (error);
@@ -1099,35 +1081,15 @@ kevent_copyout(void *arg, kkevent_t *kevp, int count)
  * Copy 'count' items from the list pointed to by uap->changelist.
  */
 static int
-kevent_copyin(void *arg, kkevent_t *kevp, int count)
+kevent_copyin(void *arg, struct kevent *kevp, int count)
 {
 	struct kevent_args *uap;
-#if __has_feature(capabilities)
-	struct kevent_native ks_n[KQ_NEVENTS];
-	int i;
-#endif
 	int error;
 
 	KASSERT(count <= KQ_NEVENTS, ("count (%d) > KQ_NEVENTS", count));
 	uap = (struct kevent_args *)arg;
 
-#if !__has_feature(capabilities)
-	error = copyin(uap->changelist, kevp, count * sizeof *kevp);
-#else
-	error = copyin(uap->changelist, ks_n, count * sizeof(*ks_n));
-	if (error != 0)
-		return (error);
-	for (i = 0; i < count; i++) {
-		kevp[i].ident = ks_n[i].ident;
-		kevp[i].filter = ks_n[i].filter;
-		kevp[i].flags = ks_n[i].flags;
-		kevp[i].fflags = ks_n[i].fflags;
-		kevp[i].data = ks_n[i].data;
-		/* Store untagged. */
-		kevp[i].udata = (void * __capability)(intcap_t)ks_n[i].udata;
-		memcpy(&kevp[i].ext[0], &ks_n->ext[0], sizeof(ks_n->ext));
-	}
-#endif
+	error = copyincap(uap->changelist, kevp, count * sizeof(*kevp));
 	if (error == 0)
 		uap->changelist += count;
 	return (error);
@@ -1135,7 +1097,7 @@ kevent_copyin(void *arg, kkevent_t *kevp, int count)
 
 #ifdef COMPAT_FREEBSD11
 static int
-kevent11_copyout(void *arg, kkevent_t *kevp, int count)
+kevent11_copyout(void *arg, struct kevent *kevp, int count)
 {
 	struct freebsd11_kevent_args *uap;
 	struct kevent_freebsd11 kev11;
@@ -1150,8 +1112,8 @@ kevent11_copyout(void *arg, kkevent_t *kevp, int count)
 		kev11.flags = kevp->flags;
 		kev11.fflags = kevp->fflags;
 		kev11.data = kevp->data;
-		kev11.udata = (void *)(__cheri_addr vaddr_t)kevp->udata;
-		error = copyout(&kev11, uap->eventlist, sizeof(kev11));
+		kev11.udata = kevp->udata;
+		error = copyoutcap(&kev11, uap->eventlist, sizeof(kev11));
 		if (error != 0)
 			break;
 		uap->eventlist++;
@@ -1164,7 +1126,7 @@ kevent11_copyout(void *arg, kkevent_t *kevp, int count)
  * Copy 'count' items from the list pointed to by uap->changelist.
  */
 static int
-kevent11_copyin(void *arg, kkevent_t *kevp, int count)
+kevent11_copyin(void *arg, struct kevent *kevp, int count)
 {
 	struct freebsd11_kevent_args *uap;
 	struct kevent_freebsd11 kev11;
@@ -1174,7 +1136,7 @@ kevent11_copyin(void *arg, kkevent_t *kevp, int count)
 	uap = (struct freebsd11_kevent_args *)arg;
 
 	for (i = 0; i < count; i++) {
-		error = copyin(uap->changelist, &kev11, sizeof(kev11));
+		error = copyincap(uap->changelist, &kev11, sizeof(kev11));
 		if (error != 0)
 			break;
 		kevp->ident = kev11.ident;
@@ -1182,7 +1144,7 @@ kevent11_copyin(void *arg, kkevent_t *kevp, int count)
 		kevp->flags = kev11.flags;
 		kevp->fflags = kev11.fflags;
 		kevp->data = (uintptr_t)kev11.data;
-		kevp->udata = (void * __capability)(uintcap_t)kev11.udata;
+		kevp->udata = kev11.udata;
 		bzero(&kevp->ext, sizeof(kevp->ext));
 		uap->changelist++;
 		kevp++;
@@ -1239,8 +1201,8 @@ static int
 kqueue_kevent(struct kqueue *kq, struct thread *td, int nchanges, int nevents,
     struct kevent_copyops *k_ops, const struct timespec *timeout)
 {
-	kkevent_t keva[KQ_NEVENTS];
-	kkevent_t *kevp, *changes;
+	struct kevent keva[KQ_NEVENTS];
+	struct kevent *kevp, *changes;
 	int i, n, nerrors, error;
 
 	nerrors = 0;
@@ -1399,7 +1361,7 @@ kqueue_fo_release(int filt)
  * A ref to kq (obtained via kqueue_acquire) must be held.
  */
 static int
-kqueue_register(struct kqueue *kq, kkevent_t *kev, struct thread *td,
+kqueue_register(struct kqueue *kq, struct kevent *kev, struct thread *td,
     int mflag)
 {
 	struct filterops *fops;
@@ -1820,9 +1782,9 @@ kqueue_task(void *arg, int pending)
  */
 static int
 kqueue_scan(struct kqueue *kq, int maxevents, struct kevent_copyops *k_ops,
-    const struct timespec *tsp, kkevent_t *keva, struct thread *td)
+    const struct timespec *tsp, struct kevent *keva, struct thread *td)
 {
-	kkevent_t *kevp;
+	struct kevent *kevp;
 	struct knote *kn, *marker;
 	struct knlist *knl;
 	sbintime_t asbt, rsbt;
@@ -2752,7 +2714,7 @@ knote_free(struct knote *kn)
  * Register the kev w/ the kq specified by fd.
  */
 int 
-kqfd_register(int fd, kkevent_t *kev, struct thread *td, int mflag)
+kqfd_register(int fd, struct kevent *kev, struct thread *td, int mflag)
 {
 	struct kqueue *kq;
 	struct file *fp;

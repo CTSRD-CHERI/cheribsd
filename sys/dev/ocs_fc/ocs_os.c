@@ -45,7 +45,7 @@ static MALLOC_DEFINE(M_OCS, "OCS", "OneCore Storage data");
 
 #include <machine/bus.h>
 
-timeout_t	__ocs_callout;
+callout_func_t	__ocs_callout;
 
 uint32_t
 ocs_config_read32(ocs_os_handle_t os, uint32_t reg)
@@ -659,6 +659,8 @@ ocs_thread_create(ocs_os_handle_t os, ocs_thread_t *thread, ocs_thread_fctn fctn
 
 int32_t ocs_thread_start(ocs_thread_t *thread)
 {
+
+	thread_lock(thread->tcb);
 	sched_add(thread->tcb, SRQ_BORING);
 	return 0;
 }

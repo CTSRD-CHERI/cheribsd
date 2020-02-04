@@ -378,10 +378,6 @@ struct tmpfs_mount {
 	/* All node lock to protect the node list and tmp_pages_used. */
 	struct mtx		tm_allnode_lock;
 
-	/* Zones used to store file system meta data, per tmpfs mount. */
-	uma_zone_t		tm_dirent_pool;
-	uma_zone_t		tm_node_pool;
-
 	/* Read-only status. */
 	bool			tm_ronly;
 	/* Do not use namecache. */
@@ -493,10 +489,9 @@ struct tmpfs_dirent *tmpfs_dir_next(struct tmpfs_node *dnode,
 #endif
 
 size_t tmpfs_mem_avail(void);
-
 size_t tmpfs_pages_used(struct tmpfs_mount *tmp);
-
-#endif
+void tmpfs_subr_init(void);
+void tmpfs_subr_uninit(void);
 
 /*
  * Macros/functions to convert from generic data structures to tmpfs
@@ -539,5 +534,6 @@ tmpfs_use_nc(struct vnode *vp)
 
 	return (!(VFS_TO_TMPFS(vp->v_mount)->tm_nonc));
 }
+#endif /* _KERNEL */
 
 #endif /* _FS_TMPFS_TMPFS_H_ */

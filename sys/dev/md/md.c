@@ -258,7 +258,6 @@ struct md_s {
 	LIST_ENTRY(md_s) list;
 	struct bio_queue_head bio_queue;
 	struct mtx queue_mtx;
-	struct mtx stat_mtx;
 	struct cdev *dev;
 	enum md_types type;
 	off_t mediasize;
@@ -488,9 +487,7 @@ g_md_start(struct bio *bp)
 
 	sc = bp->bio_to->geom->softc;
 	if ((bp->bio_cmd == BIO_READ) || (bp->bio_cmd == BIO_WRITE)) {
-		mtx_lock(&sc->stat_mtx);
 		devstat_start_transaction_bio(sc->devstat, bp);
-		mtx_unlock(&sc->stat_mtx);
 	}
 	mtx_lock(&sc->queue_mtx);
 	bioq_disksort(&sc->bio_queue, bp);
@@ -929,7 +926,7 @@ mdstart_vnode(struct md_s *sc, struct bio *bp)
 		(void) vn_start_write(vp, &mp, V_WAIT);
 		vn_lock(vp, LK_EXCLUSIVE | LK_RETRY);
 		error = VOP_FSYNC(vp, MNT_WAIT, td);
-		VOP_UNLOCK(vp, 0);
+		VOP_UNLOCK(vp);
 		vn_finished_write(mp);
 		return (error);
 	}
@@ -996,13 +993,13 @@ unmapped_step:
 	if (auio.uio_rw == UIO_READ) {
 		vn_lock(vp, LK_EXCLUSIVE | LK_RETRY);
 		error = VOP_READ(vp, &auio, 0, sc->cred);
-		VOP_UNLOCK(vp, 0);
+		VOP_UNLOCK(vp);
 	} else {
 		(void) vn_start_write(vp, &mp, V_WAIT);
 		vn_lock(vp, LK_EXCLUSIVE | LK_RETRY);
 		error = VOP_WRITE(vp, &auio, sc->flags & MD_ASYNC ? 0 : IO_SYNC,
 		    sc->cred);
-		VOP_UNLOCK(vp, 0);
+		VOP_UNLOCK(vp);
 		vn_finished_write(mp);
 		if (error == 0)
 			sc->flags &= ~MD_VERIFY;
@@ -1029,14 +1026,6 @@ unmapped_step:
 	if (pb == NULL)
 		bp->bio_resid = auio.uio_resid;
 	return (error);
-}
-
-static void
-md_swap_page_free(vm_page_t m)
-{
-
-	vm_page_xunbusy(m);
-	vm_page_free(m);
 }
 
 static int
@@ -1087,7 +1076,7 @@ mdstart_swap(struct md_s *sc, struct bio *bp)
 				rv = vm_pager_get_pages(sc->object, &m, 1,
 				    NULL, NULL);
 			if (rv == VM_PAGER_ERROR) {
-				md_swap_page_free(m);
+				vm_page_free(m);
 				break;
 			} else if (rv == VM_PAGER_FAIL) {
 				/*
@@ -1117,7 +1106,7 @@ mdstart_swap(struct md_s *sc, struct bio *bp)
 				rv = vm_pager_get_pages(sc->object, &m, 1,
 				    NULL, NULL);
 			if (rv == VM_PAGER_ERROR) {
-				md_swap_page_free(m);
+				vm_page_free(m);
 				break;
 			} else if (rv == VM_PAGER_FAIL)
 				pmap_zero_page(m);
@@ -1133,10 +1122,7 @@ mdstart_swap(struct md_s *sc, struct bio *bp)
 			}
 
 			vm_page_valid(m);
-			if (m->dirty != VM_PAGE_BITS_ALL) {
-				vm_page_dirty(m);
-				vm_pager_page_unswapped(m);
-			}
+			vm_page_set_dirty(m);
 		} else if (bp->bio_cmd == BIO_DELETE) {
 			if (len == PAGE_SIZE || vm_page_all_valid(m))
 				rv = VM_PAGER_OK;
@@ -1144,34 +1130,35 @@ mdstart_swap(struct md_s *sc, struct bio *bp)
 				rv = vm_pager_get_pages(sc->object, &m, 1,
 				    NULL, NULL);
 			if (rv == VM_PAGER_ERROR) {
-				md_swap_page_free(m);
+				vm_page_free(m);
 				break;
 			} else if (rv == VM_PAGER_FAIL) {
-				md_swap_page_free(m);
+				vm_page_free(m);
 				m = NULL;
 			} else {
 				/* Page is valid. */
 				if (len != PAGE_SIZE) {
 					pmap_zero_page_area(m, offs, len);
-					if (m->dirty != VM_PAGE_BITS_ALL) {
-						vm_page_dirty(m);
-						vm_pager_page_unswapped(m);
-					}
+					vm_page_set_dirty(m);
 				} else {
 					vm_pager_page_unswapped(m);
-					md_swap_page_free(m);
+					vm_page_free(m);
 					m = NULL;
 				}
 			}
 		}
 		if (m != NULL) {
 			vm_page_xunbusy(m);
-			vm_page_lock(m);
+
+			/*
+			 * The page may be deactivated prior to setting
+			 * PGA_REFERENCED, but in this case it will be
+			 * reactivated by the page daemon.
+			 */
 			if (vm_page_active(m))
 				vm_page_reference(m);
 			else
 				vm_page_activate(m);
-			vm_page_unlock(m);
 		}
 
 		/* Actions on further pages start at offset 0 */
@@ -1300,7 +1287,6 @@ mdnew(int unit, int *errp, enum md_types type)
 	sc->type = type;
 	bioq_init(&sc->bio_queue);
 	mtx_init(&sc->queue_mtx, "md bio queue", NULL, MTX_DEF);
-	mtx_init(&sc->stat_mtx, "md stat", NULL, MTX_DEF);
 	sc->unit = unit;
 	sprintf(sc->name, "md%d", unit);
 	LIST_INSERT_HEAD(&md_softc_list, sc, list);
@@ -1308,7 +1294,6 @@ mdnew(int unit, int *errp, enum md_types type)
 	if (error == 0)
 		return (sc);
 	LIST_REMOVE(sc, list);
-	mtx_destroy(&sc->stat_mtx);
 	mtx_destroy(&sc->queue_mtx);
 	free_unr(md_uh, sc->unit);
 	free(sc, M_MD);
@@ -1326,6 +1311,8 @@ mdinit(struct md_s *sc)
 	gp = g_new_geomf(&g_md_class, "md%d", sc->unit);
 	gp->softc = sc;
 	pp = g_new_providerf(gp, "md%d", sc->unit);
+	devstat_remove_entry(pp->stat);
+	pp->stat = NULL;
 	pp->flags |= G_PF_DIRECT_SEND | G_PF_DIRECT_RECEIVE;
 	pp->mediasize = sc->mediasize;
 	pp->sectorsize = sc->sectorsize;
@@ -1341,10 +1328,11 @@ mdinit(struct md_s *sc)
 	}
 	sc->gp = gp;
 	sc->pp = pp;
-	g_error_provider(pp, 0);
-	g_topology_unlock();
 	sc->devstat = devstat_new_entry("md", sc->unit, sc->sectorsize,
 	    DEVSTAT_ALL_SUPPORTED, DEVSTAT_TYPE_DIRECT, DEVSTAT_PRIORITY_MAX);
+	sc->devstat->id = pp;
+	g_error_provider(pp, 0);
+	g_topology_unlock();
 }
 
 static int
@@ -1423,7 +1411,7 @@ mdsetcred(struct md_s *sc, struct ucred *cred)
 		auio.uio_resid = aiov.iov_len;
 		vn_lock(sc->vnode, LK_EXCLUSIVE | LK_RETRY);
 		error = VOP_READ(sc->vnode, &auio, 0, sc->cred);
-		VOP_UNLOCK(sc->vnode, 0);
+		VOP_UNLOCK(sc->vnode);
 		free(tmpbuf, M_TEMP);
 	}
 	return (error);
@@ -1468,14 +1456,14 @@ mdcreate_vnode(struct md_s *sc, struct md_req *mdr, struct thread *td)
 		goto bad;
 	if (VOP_ISLOCKED(nd.ni_vp) != LK_EXCLUSIVE) {
 		vn_lock(nd.ni_vp, LK_UPGRADE | LK_RETRY);
-		if (nd.ni_vp->v_iflag & VI_DOOMED) {
+		if (VN_IS_DOOMED(nd.ni_vp)) {
 			/* Forced unmount. */
 			error = EBADF;
 			goto bad;
 		}
 	}
 	nd.ni_vp->v_vflag |= VV_MD;
-	VOP_UNLOCK(nd.ni_vp, 0);
+	VOP_UNLOCK(nd.ni_vp);
 
 	if (mdr->md_fwsectors != 0)
 		sc->fwsectors = mdr->md_fwsectors;
@@ -1498,7 +1486,7 @@ mdcreate_vnode(struct md_s *sc, struct md_req *mdr, struct thread *td)
 	}
 	return (0);
 bad:
-	VOP_UNLOCK(nd.ni_vp, 0);
+	VOP_UNLOCK(nd.ni_vp);
 	(void)vn_close(nd.ni_vp, flags, td->td_ucred, td);
 	return (error);
 }
@@ -1538,12 +1526,11 @@ mddestroy(struct md_s *sc, struct thread *td)
 	while (!(sc->flags & MD_EXITING))
 		msleep(sc->procp, &sc->queue_mtx, PRIBIO, "mddestroy", hz / 10);
 	mtx_unlock(&sc->queue_mtx);
-	mtx_destroy(&sc->stat_mtx);
 	mtx_destroy(&sc->queue_mtx);
 	if (sc->vnode != NULL) {
 		vn_lock(sc->vnode, LK_EXCLUSIVE | LK_RETRY);
 		sc->vnode->v_vflag &= ~VV_MD;
-		VOP_UNLOCK(sc->vnode, 0);
+		VOP_UNLOCK(sc->vnode);
 		(void)vn_close(sc->vnode, sc->flags & MD_READONLY ?
 		    FREAD : (FREAD|FWRITE), sc->cred, td);
 	}

@@ -26,6 +26,58 @@ NOTE TO PEOPLE WHO THINK THAT FreeBSD 13.x IS SLOW:
 	disable the most expensive debugging functionality run
 	"ln -s 'abort:false,junk:false' /etc/malloc.conf".)
 
+20200108:
+	Clang/LLVM is now the default compiler and LLD the default
+	linker for riscv64.
+
+20200107:
+	make universe no longer uses GCC 4.2.1 on any architectures.
+	Architectures not supported by in-tree Clang/LLVM require an
+	external toolchain package.
+
+20200104:
+	GCC 4.2.1 is now not built by default, as part of the GCC 4.2.1
+	retirement plan.  Specifically, the GCC, GCC_BOOTSTRAP, and GNUCXX
+	options default to off for all supported CPU architectures.  As a
+	short-term transition aid they may be enabled via WITH_* options.
+	GCC 4.2.1 is expected to be removed from the tree on 2020-03-31.
+
+20200102:
+	Support for armv5 has been disconnected and is being removed. The
+	machine combination MACHINE=arm MACHINE_ARCH=arm is no longer valid.
+	You must now use a MACHINE_ARCH of armv6 or armv7. The default
+	MACHINE_ARCH for MACHINE=arm is now armv7.
+
+20191226:
+	Clang/LLVM is now the default compiler for all powerpc architectures.
+	LLD is now the default linker for powerpc64.  The change for powerpc64
+	also includes a change to the ELFv2 ABI, incompatible with the existing
+	ABI.
+
+20191226:
+	Kernel-loadable random(4) modules are no longer unloadable.
+
+20191222:
+	Clang, llvm, lld, lldb, compiler-rt, libc++, libunwind and openmp have
+	been upgraded to 9.0.1.  Please see the 20141231 entry below for
+	information about prerequisites and upgrading, if you are not already
+	using clang 3.5.0 or higher.
+
+20191212:
+	r355677 has modified the internal interface used between the
+	NFS modules in the kernel. As such, they must all be upgraded
+	simultaneously. I will do a version bump for this.
+
+20191205:
+	The root certificates of the Mozilla CA Certificate Store have been
+	imported into the base system and can be managed with the certctl(8)
+	utility.  If you have installed the security/ca_root_nss port or package
+	with the ETCSYMLINK option (the default), be advised that there may be
+	differences between those included in the port and those included in
+	base due to differences in nss branch used as well as general update
+	frequency.  Note also that certctl(8) cannot manage certs in the
+	format used by the security/ca_root_nss port.
+
 20191120:
 	The amd(8) automount daemon has been disabled by default, and will be
 	removed in the future.  As of FreeBSD 10.1 the autofs(5) is available
@@ -1919,19 +1971,14 @@ COMMON ITEMS:
 
 	General Notes
 	-------------
-	Avoid using make -j when upgrading.  While generally safe, there are
-	sometimes problems using -j to upgrade.  If your upgrade fails with
-	-j, please try again without -j.  From time to time in the past there
-	have been problems using -j with buildworld and/or installworld.  This
-	is especially true when upgrading between "distant" versions (eg one
-	that cross a major release boundary or several minor releases, or when
-	several months have passed on the -current branch).
-
 	Sometimes, obscure build problems are the result of environment
 	poisoning.  This can happen because the make utility reads its
 	environment when searching for values for global variables.  To run
 	your build attempts in an "environmental clean room", prefix all make
 	commands with 'env -i '.  See the env(1) manual page for more details.
+	Occasionally a build failure will occur with "make -j" due to a race
+	condition.  If this happens try building again without -j, and please
+	report a bug if it happens consistently.
 
 	When upgrading from one major version to another it is generally best to
 	upgrade to the latest code in the currently installed branch first, then
@@ -2120,7 +2167,7 @@ to fetch an UPDATING file from an older FreeBSD release.
 
 Copyright information:
 
-Copyright 1998-2009 M. Warner Losh.
+Copyright 1998-2009 M. Warner Losh <imp@FreeBSD.org>
 
 Redistribution, publication, translation and use, with or without
 modification, in full or in part, in any form or format of this

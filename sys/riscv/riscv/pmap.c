@@ -157,6 +157,10 @@ __FBSDID("$FreeBSD$");
 #include <machine/pcb.h>
 #include <machine/sbi.h>
 
+#if __has_feature(capabilities)
+#include <cheri/cheric.h>
+#endif
+
 #define	NUL1E		(Ln_ENTRIES * Ln_ENTRIES)
 #define	NUL2E		(Ln_ENTRIES * NUL1E)
 
@@ -325,6 +329,21 @@ pagecopy(void *s, void *d)
 
 	memcpy(d, s, PAGE_SIZE);
 }
+
+#if __has_feature(capabilities)
+static __inline void
+pagecopy_cleartags(void *s, void *d)
+{
+	void * __capability *dst;
+	void * __capability *src;
+	u_int i;
+
+	dst = d;
+	src = s;
+	for (i = 0; i < PAGE_SIZE / sizeof(*dst); i++)
+		*dst++ = cheri_cleartag(*src++);
+}
+#endif
 
 static __inline void
 pagezero(void *p)
@@ -2832,7 +2851,7 @@ pmap_enter(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot,
 			    ("pmap_enter: no PV entry for %#lx", va));
 			if ((new_l3 & PTE_SW_MANAGED) == 0)
 				free_pv_entry(pmap, pv);
-			if ((om->aflags & PGA_WRITEABLE) != 0 &&
+			if ((om->a.flags & PGA_WRITEABLE) != 0 &&
 			    TAILQ_EMPTY(&om->md.pv_list) &&
 			    ((om->flags & PG_FICTITIOUS) != 0 ||
 			    TAILQ_EMPTY(&pa_to_pvh(opa)->pv_list)))
@@ -3374,6 +3393,13 @@ pmap_zero_page_area(vm_page_t m, int off, int size)
  *	page by mapping the page into virtual memory and using
  *	bcopy to copy the page, one machine dependent page at a
  *	time.
+ *
+ *	With CHERI, it is sometimes desirable to explicitly propagate
+ *	tags between pages (e.g., during copy-on-write), but not other
+ *	times (e.g., copying data from VM to buffer cache).  There is
+ *	more playing out here yet to do (e.g., if any filesystems
+ *	learn to preserve tags) but these KPIs allow us to capture
+ *	that difference in the mean time.
  */
 void
 pmap_copy_page(vm_page_t msrc, vm_page_t mdst)
@@ -3381,6 +3407,17 @@ pmap_copy_page(vm_page_t msrc, vm_page_t mdst)
 	vm_offset_t src = PHYS_TO_DMAP(VM_PAGE_TO_PHYS(msrc));
 	vm_offset_t dst = PHYS_TO_DMAP(VM_PAGE_TO_PHYS(mdst));
 
+#if __has_feature(capabilities)
+	pagecopy_cleartags((void *)src, (void *)dst);
+}
+
+void
+pmap_copy_page_tags(vm_page_t msrc, vm_page_t mdst)
+{
+	vm_offset_t src = PHYS_TO_DMAP(VM_PAGE_TO_PHYS(msrc));
+	vm_offset_t dst = PHYS_TO_DMAP(VM_PAGE_TO_PHYS(mdst));
+
+#endif
 	pagecopy((void *)src, (void *)dst);
 }
 
@@ -3586,7 +3623,7 @@ pmap_remove_pages_pv(pmap_t pmap, vm_page_t m, pv_entry_t pv,
 		if (TAILQ_EMPTY(&pvh->pv_list)) {
 			for (mt = m; mt < &m[Ln_ENTRIES]; mt++)
 				if (TAILQ_EMPTY(&mt->md.pv_list) &&
-				    (mt->aflags & PGA_WRITEABLE) != 0)
+				    (mt->a.flags & PGA_WRITEABLE) != 0)
 					vm_page_aflag_clear(mt, PGA_WRITEABLE);
 		}
 		mpte = pmap_remove_pt_page(pmap, pv->pv_va);
@@ -3604,7 +3641,7 @@ pmap_remove_pages_pv(pmap_t pmap, vm_page_t m, pv_entry_t pv,
 		TAILQ_REMOVE(&m->md.pv_list, pv, pv_next);
 		m->md.pv_gen++;
 		if (TAILQ_EMPTY(&m->md.pv_list) &&
-		    (m->aflags & PGA_WRITEABLE) != 0) {
+		    (m->a.flags & PGA_WRITEABLE) != 0) {
 			pvh = pa_to_pvh(m->phys_addr);
 			if (TAILQ_EMPTY(&pvh->pv_list))
 				vm_page_aflag_clear(m, PGA_WRITEABLE);
@@ -4138,7 +4175,7 @@ pmap_clear_modify(vm_page_t m)
 	 * If the object containing the page is locked and the page is not
 	 * exclusive busied, then PGA_WRITEABLE cannot be concurrently set.
 	 */
-	if ((m->aflags & PGA_WRITEABLE) == 0)
+	if ((m->a.flags & PGA_WRITEABLE) == 0)
 		return;
 	pvh = (m->flags & PG_FICTITIOUS) != 0 ? &pv_dummy :
 	    pa_to_pvh(VM_PAGE_TO_PHYS(m));

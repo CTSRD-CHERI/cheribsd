@@ -32,9 +32,6 @@
 #ifndef _MIPS_INCLUDE_CHERI_H_
 #define	_MIPS_INCLUDE_CHERI_H_
 
-#include <sys/types.h>
-#include <machine/cherireg.h>
-
 /*
  * In the past, struct cheri_frame was the in-kernel and kernel<->user
  * structure holding CHERI register state for context switching.  It is now a
@@ -93,10 +90,10 @@ struct cheri_frame {
 	 * XXXRW: The comment below on only updating for CP2 exceptions is
 	 * incorrect, but should be made correct.
 	 */
-	register_t	cf_capcause;	/* Updated only on CP2 exceptions. */
-	register_t	cf_capvalid;
+	__register_t	cf_capcause;	/* Updated only on CP2 exceptions. */
+	__register_t	cf_capvalid;
 #if (defined(CPU_CHERI) && !defined(CPU_CHERI128)) || (defined(_MIPS_SZCAP) && (_MIPS_SZCAP == 256))
-	register_t	_cf_pad1[2];
+	__register_t	_cf_pad1[2];
 #endif
 };
 
@@ -116,6 +113,10 @@ struct cheri_kframe {
 	void * __capability	ckf_c24;
 };
 
+/* Return userspace DDC and PCC of current thread. */
+#define	__USER_DDC		(curthread->td_pcb->pcb_regs.ddc)
+#define	__USER_PCC		(curthread->td_pcb->pcb_regs.pcc)
+
 /*
  * CHERI-MIPS-specific kernel utility functions.
  */
@@ -124,6 +125,9 @@ void	cheri_capability_set_user_sealcap(void *__capability *);
 void	cheri_capability_set_user_sigcode(void *__capability *,
 	    const struct sysentvec *);
 int	cheri_capcause_to_sicode(register_t capcause);
+
+int	cheriabi_fetch_syscall_args(struct thread *td);
+void	cheriabi_newthread_init(struct thread *td);
 
 void	hybridabi_exec_setregs(struct thread *td, unsigned long entry_addr);
 void	hybridabi_newthread_setregs(struct thread *td,
@@ -134,10 +138,10 @@ void	hybridabi_newthread_setregs(struct thread *td,
  * Routines for measuring time -- depends on a later MIPS userspace cycle
  * counter.
  */
-static __inline uint32_t
+static __inline __uint32_t
 cheri_get_cyclecount(void)
 {
-	uint64_t _time;
+	__uint64_t _time;
 
 	__asm__ __volatile__ (
 	    ".set push\n"
