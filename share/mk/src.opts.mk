@@ -386,6 +386,12 @@ BROKEN_OPTIONS+=LIBSOFT
 .if ${__T:Mmips*}
 BROKEN_OPTIONS+=SSP
 .endif
+
+# Stack protector does not make sense for CHERI purecap
+.if ${__T:Mmips64*c*} || ${__T:Mriscv*c*}
+BROKEN_OPTIONS+=SSP
+.endif
+
 # EFI doesn't exist on mips, powerpc, sparc or riscv.
 .if ${__T:Mmips*} || ${__T:Mpowerpc*} || ${__T:Msparc64} || ${__T:Mriscv*}
 BROKEN_OPTIONS+=EFI
