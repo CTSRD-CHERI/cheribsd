@@ -36,8 +36,12 @@
 __FBSDID("$FreeBSD$");
 
 ENTRY(_ctx_start)
+#ifdef __CHERI_PURE_CAPABILITY__
+#pragma message("TODO: RISCV-PURECAP implement")
+#else
 	jalr	s0		/* Call func from makecontext */
 	mv	a0, s1		/* Load ucp saved in makecontext */
 	call	_C_LABEL(ctx_done)
 	call	_C_LABEL(abort)
+#endif
 END(_ctx_start)

@@ -38,6 +38,9 @@ __FBSDID("$FreeBSD$");
 #include <machine/setjmp.h>
 
 ENTRY(_setjmp)
+#ifdef __CHERI_PURE_CAPABILITY__
+#pragma message("TODO: RISCV-PURECAP implement _setjmp")
+#else
 	/* Store the magic value and stack pointer */
 	ld	t0, .Lmagic
 	sd	t0, (0 * 8)(a0)
@@ -83,9 +86,13 @@ ENTRY(_setjmp)
 	.align	3
 .Lmagic:
 	.quad	_JB_MAGIC__SETJMP
+#endif
 END(_setjmp)
 
 ENTRY(_longjmp)
+#ifdef __CHERI_PURE_CAPABILITY__
+#pragma message("TODO: RISCV-PURECAP implement _longjmp")
+#else
 	/* Check the magic value */
 	ld	t0, 0(a0)
 	ld	t1, .Lmagic
@@ -139,5 +146,6 @@ botch:
 #else
 	call	_C_LABEL(longjmperror)
 	call	_C_LABEL(abort)
+#endif
 #endif
 END(_longjmp)

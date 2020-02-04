@@ -38,13 +38,20 @@ __FBSDID("$FreeBSD$");
 #include <machine/setjmp.h>
 
 ENTRY(sigsetjmp)
+#ifdef __CHERI_PURE_CAPABILITY__
+#pragma message("TODO: RISCV-PURECAP implement sigsetjmp")
+#else
 	beqz	a1, 1f
 	tail	_C_LABEL(setjmp)
 1:
 	tail	_C_LABEL(_setjmp)
+#endif
 END(sigsetjmp)
 
 ENTRY(siglongjmp)
+#ifdef __CHERI_PURE_CAPABILITY__
+#pragma message("TODO: RISCV-PURECAP implement siglongjmp")
+#else
 	/* Load the _setjmp magic */
 	ld	a2, .Lmagic
 	ld	a3, 0(a0)
@@ -58,4 +65,5 @@ ENTRY(siglongjmp)
 	.align	3
 .Lmagic:
 	.quad	_JB_MAGIC__SETJMP
+#endif
 END(siglongjmp)
