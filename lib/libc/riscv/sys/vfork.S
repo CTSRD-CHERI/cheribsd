@@ -48,6 +48,5 @@ ENTRY(__sys_vfork)
 	mv	ra, a2
 
 	ret
-1:	la	t1, cerror
-	jr	t1
+1:	ASM_TAILCALL(cerror)
 END(__sys_vfork)
