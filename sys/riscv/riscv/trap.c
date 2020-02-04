@@ -261,15 +261,13 @@ void
 do_trap_supervisor(struct trapframe *frame)
 {
 	uint64_t exception;
-	uint64_t sstatus;
 #if __has_feature(capabilities)
 	uint64_t sccsr;
 #endif
 
 	/* Ensure we came from supervisor mode, interrupts disabled */
-	__asm __volatile("csrr %0, sstatus" : "=&r" (sstatus));
-	KASSERT((sstatus & (SSTATUS_SPP | SSTATUS_SIE)) == SSTATUS_SPP,
-			("We must came from S mode with interrupts disabled"));
+	KASSERT((csr_read(sstatus) & (SSTATUS_SPP | SSTATUS_SIE)) ==
+	    SSTATUS_SPP, ("Came from S mode with interrupts enabled"));
 
 	exception = (frame->tf_scause & EXCP_MASK);
 	if (frame->tf_scause & EXCP_INTR) {
@@ -334,7 +332,6 @@ do_trap_user(struct trapframe *frame)
 {
 	uint64_t exception;
 	struct thread *td;
-	uint64_t sstatus;
 	struct pcb *pcb;
 
 	td = curthread;
@@ -342,9 +339,8 @@ do_trap_user(struct trapframe *frame)
 	pcb = td->td_pcb;
 
 	/* Ensure we came from usermode, interrupts disabled */
-	__asm __volatile("csrr %0, sstatus" : "=&r" (sstatus));
-	KASSERT((sstatus & (SSTATUS_SPP | SSTATUS_SIE)) == 0,
-			("We must came from U mode with interrupts disabled"));
+	KASSERT((csr_read(sstatus) & (SSTATUS_SPP | SSTATUS_SIE)) == 0,
+	    ("Came from U mode with interrupts enabled"));
 
 	exception = (frame->tf_scause & EXCP_MASK);
 	if (frame->tf_scause & EXCP_INTR) {
