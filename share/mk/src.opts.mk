@@ -387,9 +387,12 @@ BROKEN_OPTIONS+=LIBSOFT
 BROKEN_OPTIONS+=SSP
 .endif
 
-# Stack protector does not make sense for CHERI purecap
 .if ${__T:Mmips64*c*} || ${__T:Mriscv*c*}
+# Stack protector does not make sense for CHERI purecap
 BROKEN_OPTIONS+=SSP
+# nscd(8) caching depends on marshaling pointers to the daemon and back
+# and can't work without a rewrite.
+BROKEN_OPTIONS+=NS_CACHINE
 .endif
 
 # EFI doesn't exist on mips, powerpc, sparc or riscv.
