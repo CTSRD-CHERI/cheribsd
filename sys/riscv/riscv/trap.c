@@ -234,7 +234,12 @@ data_abort(struct trapframe *frame, int usermode)
 		} else {
 			if (pcb->pcb_onfault != 0) {
 				frame->tf_a[0] = error;
+#if __has_feature(capabilities)
+				frame->tf_sepc = (uintcap_t)cheri_setaddress(
+				    cheri_getpcc(), pcb->pcb_onfault);
+#else
 				frame->tf_sepc = pcb->pcb_onfault;
+#endif
 				return;
 			}
 			goto fatal;
