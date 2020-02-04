@@ -40,7 +40,7 @@ SRCS+=	\
 
 SRCS+= getdents.c lstat.c mknod.c stat.c
 
-.if ! ${MACHINE_ARCH:Mmips*c*}
+.if (!${MACHINE_ARCH:Mmips*c*} && !${MACHINE_ARCH:Mriscv*c*})
 SRCS+= brk.c
 .endif
 SRCS+= pipe.c
