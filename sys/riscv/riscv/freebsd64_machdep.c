@@ -238,7 +238,7 @@ freebsd64_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	PROC_UNLOCK(td->td_proc);
 
 	/* Copy the sigframe out to the user's stack. */
-	if (copyout(&frame, __USER_CAP_OBJ(fp), sizeof(*fp)) != 0) {
+	if (copyoutcap(&frame, __USER_CAP_OBJ(fp), sizeof(*fp)) != 0) {
 		/* Process has trashed its stack. Kill it. */
 		CTR2(KTR_SIG, "sendsig: sigexit td=%p fp=%p", td, fp);
 		PROC_LOCK(p);
@@ -272,7 +272,7 @@ freebsd64_sigreturn(struct thread *td, struct freebsd64_sigreturn_args *uap)
 	ucontext64_t uc;
 	int error;
 
-	error = copyin(__USER_CAP_OBJ(uap->sigcntxp), &uc, sizeof(uc));
+	error = copyincap(__USER_CAP_OBJ(uap->sigcntxp), &uc, sizeof(uc));
 	if (error != 0)
 		return (error);
 
