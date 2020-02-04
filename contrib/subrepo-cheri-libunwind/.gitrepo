@@ -6,7 +6,7 @@
 [subrepo]
 	remote = https://github.com/CTSRD-CHERI/libunwind.git
 	branch = monorepo-mirror
-	commit = d3500c3ef46306c8b3f50b3587a2584efd85f336
-	parent = 4d1495208e99a5e3f33ce1a95399507c8a86b3f6
+	commit = 0a28e93557eef703b11bb8ac806cc430674efdc3
+	parent = a679c912adc0733d38d287748f4f0ccc5cadaa90
 	method = rebase
 	cmdver = 0.4.1
