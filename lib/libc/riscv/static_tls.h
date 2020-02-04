@@ -38,7 +38,12 @@ _libc_get_static_tls_base(size_t offset)
 {
 	uintptr_t tlsbase;
 
+#ifdef __CHERI_PURE_CAPABILITY__
+	__asm __volatile("cmove %0, ctp" : "=C"(tlsbase));
+#else
 	__asm __volatile("mv %0, tp" : "=r"(tlsbase));
+#endif
+
 	tlsbase += offset;
 	return (tlsbase);
 }
