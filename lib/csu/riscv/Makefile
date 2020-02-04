@@ -2,7 +2,11 @@
 
 .PATH: ${.CURDIR:H}/common
 
-SRCS=		crt1.c crti.S crtn.S
+SRCS=		crt1.c
+.if !${MACHINE_ARCH:Mriscv*c*}
+# .init and .fini sections are not supported for purecap
+SRCS+=	crtn.S crti.S
+.endif
 OBJS=		${SRCS:N*.h:R:S/$/.o/g}
 OBJS+=		Scrt1.o gcrt1.o
 CFLAGS+=	-I${.CURDIR:H}/common \

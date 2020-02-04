@@ -52,7 +52,15 @@ extern int etext;
 #endif
 
 void __start(int argc, char **argv, char **env, void (*cleanup)(void));
-
+#ifdef __CHERI_PURE_CAPABILITY__
+#pragma message("FIXME: implement real purecap crtbegin")
+__asm("	.text			\n"
+"	.align 0		\n"
+"	.globl _start		\n"
+"	_start:			\n"
+"	cllc cra, __start	\n"
+"	cjalr cra, cra");
+#else
 /* The entry function. */
 __asm("	.text			\n"
 "	.align 0		\n"
@@ -69,6 +77,7 @@ __asm("	.text			\n"
 "	lla	gp, __global_pointer$\n"
 "	.option pop		\n"
 "	call	__start");
+#endif
 
 void
 __start(int argc, char **argv, char **env, void (*cleanup)(void))
