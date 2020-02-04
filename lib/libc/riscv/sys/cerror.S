@@ -36,6 +36,10 @@
 __FBSDID("$FreeBSD$");
 
 ENTRY(cerror)
+#ifdef __CHERI_PURE_CAPABILITY__
+#pragma message("TODO: RISCV-PURECAP implement cerror")
+	cret
+#else
 	addi	sp, sp, -16
 	sd	a0, 0(sp)
 	sd	ra, 8(sp)
@@ -47,4 +51,5 @@ ENTRY(cerror)
 	li	a1, -1
 	addi	sp, sp, 16
 	ret
+#endif
 END(cerror)
