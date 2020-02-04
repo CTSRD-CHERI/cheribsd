@@ -54,7 +54,7 @@ __FBSDID("$FreeBSD$");
 	 * A purecap kernel would have proper bounds on csp already.
 	 */
 	cspecialw sscratchc, ct0
-	cspecialr ct0, ddc
+	cspecialr ct0, stdc
 	csetaddr ct0, ct0, sp
 	cmove	csp, ct0
 	cspecialr ct0, sscratchc
