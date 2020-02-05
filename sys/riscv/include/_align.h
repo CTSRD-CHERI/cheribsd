@@ -35,10 +35,9 @@
 
 /*
  * Round p (pointer or byte index) up to a correctly-aligned value
- * for all data types (int, long, ...).   The result is unsigned int
- * and must be cast to any desired pointer type.
+ * for all data types (int, long, ...).  The builtin is type-preserving.
  */
-#define	_ALIGNBYTES	(sizeof(long long) - 1)
-#define	_ALIGN(p)	(((u_long)(p) + _ALIGNBYTES) & ~_ALIGNBYTES)
+#define	_ALIGNBYTES	(sizeof(void *) - 1)
+#define	_ALIGN(p)	__builtin_align_up((p), _ALIGNBYTES + 1)
 
 #endif /* !_MACHINE__ALIGN_H_ */

@@ -485,7 +485,7 @@ SUBDIR+=	${_DIR}
 .endif
 
 # Finally build cheribsdbox if requested
-.if ${MK_CHERIBSDBOX} != "no" && !defined(SYSROOT_ONLY)
+.if ${MK_CHERIBSDBOX} != "no" && !defined(SYSROOT_ONLY) && !${TARGET_ARCH:Mmips*c*}
 SUBDIR+=	tools/cheribsdbox
 .endif
 
@@ -846,7 +846,8 @@ KTMAKE=		\
 WMAKEENV=	${CROSSENV} \
 		INSTALL="sh ${.CURDIR}/tools/install.sh" \
 		PATH=${TMPPATH} \
-		SYSROOT=${WORLDTMP}
+		SYSROOT=${WORLDTMP} \
+		WORLDTMP=${WORLDTMP}
 
 # make hierarchy
 HMAKE=		PATH=${TMPPATH} ${MAKE} LOCAL_MTREE=${LOCAL_MTREE:Q}

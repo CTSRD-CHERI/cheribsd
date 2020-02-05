@@ -3,16 +3,19 @@
 .include <src.opts.mk>
 
 COMPILERRTDIR=	${SRCTOP}/contrib/llvm-project/compiler-rt
+
+_USE_CHERI_LIBUNWIND=0
 .if ${MK_CHERI} != "no"
 WANT_CHERI?=	hybrid
-UNWINDINCDIR=	${SRCTOP}/contrib/subrepo-cheri-libunwind/include
-UNWINDSRCDIR=	${SRCTOP}/contrib/subrepo-cheri-libunwind/src
-.elif ${MACHINE_ARCH:Mmips*}
+_USE_CHERI_LIBUNWIND=1
+.elif (${MACHINE_ARCH:Mmips*} || ${MACHINE_ARCH:Mmips*c*} || ${MACHINE_ARCH:Mriscv*c*})
+_USE_CHERI_LIBUNWIND=1
+.endif
+
+.if ${_USE_CHERI_LIBUNWIND}
 UNWINDINCDIR=	${SRCTOP}/contrib/subrepo-cheri-libunwind/include
 UNWINDSRCDIR=	${SRCTOP}/contrib/subrepo-cheri-libunwind/src
 .else
-UNWINDINCDIR=	${SRCTOP}/contrib/libunwind/include
-UNWINDSRCDIR=	${SRCTOP}/contrib/libunwind/src
 UNWINDINCDIR=	${SRCTOP}/contrib/llvm-project/libunwind/include
 UNWINDSRCDIR=	${SRCTOP}/contrib/llvm-project/libunwind/src
 .endif
@@ -46,7 +49,7 @@ STATIC_CXXFLAGS+= -fvisibility=hidden -fPIC
 # Probably need to just move this earlier or use CXXFLAGS
 .if ${MK_DIRDEPS_BUILD} == "yes"
 # Avoid dependency on lib/libc++
-.if ${MK_CHERI} != "no" || ${MACHINE_ARCH:Mmips*}
+.if ${_USE_CHERI_LIBUNWIND}
 CFLAGS+=	-isystem ${SRCTOP}/contrib/subrepo-cheri-libc++/include -nostdinc++
 .else
 CFLAGS+=	-isystem ${SRCTOP}/contrib/llvm-project/libcxx/include -nostdinc++

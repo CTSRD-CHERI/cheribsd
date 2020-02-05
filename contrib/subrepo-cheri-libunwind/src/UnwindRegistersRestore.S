@@ -126,7 +126,7 @@ DEFINE_LIBUNWIND_FUNCTION(_ZN9libunwind16Registers_x86_646jumptoEv)
   movq  56(%rdi), %rsp  # cut back rsp to new location
   pop    %rdi      # rdi was saved here earlier
   ret            # rip was saved here
-#elif defined(__CHERI_PURE_CAPABILITY__)
+#elif defined(__mips64) && defined(__CHERI_PURE_CAPABILITY__)
 .set noreorder
 
 DEFINE_LIBUNWIND_FUNCTION(_ZN9libunwind20Registers_mips_cheri6jumptoEv)
@@ -1137,75 +1137,94 @@ DEFINE_LIBUNWIND_FUNCTION(_ZN9libunwind15Registers_sparc6jumptoEv)
   .p2align 2
 DEFINE_LIBUNWIND_FUNCTION(_ZN9libunwind15Registers_riscv6jumptoEv)
 #if defined(__riscv_flen) && __riscv_flen == 64
-  fld    f0, (8 * 32 + 8 * 0)(a0)
-  fld    f1, (8 * 32 + 8 * 1)(a0)
-  fld    f2, (8 * 32 + 8 * 2)(a0)
-  fld    f3, (8 * 32 + 8 * 3)(a0)
-  fld    f4, (8 * 32 + 8 * 4)(a0)
-  fld    f5, (8 * 32 + 8 * 5)(a0)
-  fld    f6, (8 * 32 + 8 * 6)(a0)
-  fld    f7, (8 * 32 + 8 * 7)(a0)
-  fld    f8, (8 * 32 + 8 * 8)(a0)
-  fld    f9, (8 * 32 + 8 * 9)(a0)
-  fld    f10, (8 * 32 + 8 * 10)(a0)
-  fld    f11, (8 * 32 + 8 * 11)(a0)
-  fld    f12, (8 * 32 + 8 * 12)(a0)
-  fld    f13, (8 * 32 + 8 * 13)(a0)
-  fld    f14, (8 * 32 + 8 * 14)(a0)
-  fld    f15, (8 * 32 + 8 * 15)(a0)
-  fld    f16, (8 * 32 + 8 * 16)(a0)
-  fld    f17, (8 * 32 + 8 * 17)(a0)
-  fld    f18, (8 * 32 + 8 * 18)(a0)
-  fld    f19, (8 * 32 + 8 * 19)(a0)
-  fld    f20, (8 * 32 + 8 * 20)(a0)
-  fld    f21, (8 * 32 + 8 * 21)(a0)
-  fld    f22, (8 * 32 + 8 * 22)(a0)
-  fld    f23, (8 * 32 + 8 * 23)(a0)
-  fld    f24, (8 * 32 + 8 * 24)(a0)
-  fld    f25, (8 * 32 + 8 * 25)(a0)
-  fld    f26, (8 * 32 + 8 * 26)(a0)
-  fld    f27, (8 * 32 + 8 * 27)(a0)
-  fld    f28, (8 * 32 + 8 * 28)(a0)
-  fld    f29, (8 * 32 + 8 * 29)(a0)
-  fld    f30, (8 * 32 + 8 * 30)(a0)
-  fld    f31, (8 * 32 + 8 * 31)(a0)
+.macro restore_fpr num
+#ifdef __CHERI_PURE_CAPABILITY__
+  cfld    f\num, (__SIZEOF_CHERI_CAPABILITY__ * 32 + 8 * \num)(ca0)
+#else
+  fld    f\num, (8 * 32 + 8 * \num)(a0)
+#endif
+.endm
+
+.macro restore_gpr num
+#ifdef __CHERI_PURE_CAPABILITY__
+  clc   c\num, (__SIZEOF_CHERI_CAPABILITY__ * \num)(ca0)
+#else
+  ld    x\num, (8 * \num)(a0)
+#endif
+.endm
+
+   restore_fpr 0
+   restore_fpr 1
+   restore_fpr 2
+   restore_fpr 3
+   restore_fpr 4
+   restore_fpr 5
+   restore_fpr 6
+   restore_fpr 7
+   restore_fpr 8
+   restore_fpr 9
+   restore_fpr 10
+   restore_fpr 11
+   restore_fpr 12
+   restore_fpr 13
+   restore_fpr 14
+   restore_fpr 15
+   restore_fpr 16
+   restore_fpr 17
+   restore_fpr 18
+   restore_fpr 19
+   restore_fpr 20
+   restore_fpr 21
+   restore_fpr 22
+   restore_fpr 23
+   restore_fpr 24
+   restore_fpr 25
+   restore_fpr 26
+   restore_fpr 27
+   restore_fpr 28
+   restore_fpr 29
+   restore_fpr 30
+   restore_fpr 31
 #endif
 
+#ifdef __CHERI_PURE_CAPABILITY__
+#pragma message("TODO: restore $ddc")
+#endif
   // x0 is zero
-  ld    x1, (8 * 1)(a0)
-  ld    x2, (8 * 2)(a0)
-  ld    x3, (8 * 3)(a0)
-  ld    x4, (8 * 4)(a0)
-  ld    x5, (8 * 5)(a0)
-  ld    x6, (8 * 6)(a0)
-  ld    x7, (8 * 7)(a0)
-  ld    x8, (8 * 8)(a0)
-  ld    x9, (8 * 9)(a0)
+  restore_gpr 1
+  restore_gpr 2
+  restore_gpr 3
+  restore_gpr 4
+  restore_gpr 5
+  restore_gpr 6
+  restore_gpr 7
+  restore_gpr 8
+  restore_gpr 9
   // skip a0 for now
-  ld    x11, (8 * 11)(a0)
-  ld    x12, (8 * 12)(a0)
-  ld    x13, (8 * 13)(a0)
-  ld    x14, (8 * 14)(a0)
-  ld    x15, (8 * 15)(a0)
-  ld    x16, (8 * 16)(a0)
-  ld    x17, (8 * 17)(a0)
-  ld    x18, (8 * 18)(a0)
-  ld    x19, (8 * 19)(a0)
-  ld    x20, (8 * 20)(a0)
-  ld    x21, (8 * 21)(a0)
-  ld    x22, (8 * 22)(a0)
-  ld    x23, (8 * 23)(a0)
-  ld    x24, (8 * 24)(a0)
-  ld    x25, (8 * 25)(a0)
-  ld    x26, (8 * 26)(a0)
-  ld    x27, (8 * 27)(a0)
-  ld    x28, (8 * 28)(a0)
-  ld    x29, (8 * 29)(a0)
-  ld    x30, (8 * 30)(a0)
-  ld    x31, (8 * 31)(a0)
-  ld    x10, (8 * 10)(a0)   // restore a0
+  restore_gpr 11
+  restore_gpr 12
+  restore_gpr 13
+  restore_gpr 14
+  restore_gpr 15
+  restore_gpr 16
+  restore_gpr 17
+  restore_gpr 18
+  restore_gpr 19
+  restore_gpr 20
+  restore_gpr 21
+  restore_gpr 22
+  restore_gpr 23
+  restore_gpr 24
+  restore_gpr 25
+  restore_gpr 26
+  restore_gpr 27
+  restore_gpr 28
+  restore_gpr 29
+  restore_gpr 30
+  restore_gpr 31
+  restore_gpr 10   // restore a0
 
-  ret                       // jump to ra
+  ret              // jump to ra
 
 #endif
 

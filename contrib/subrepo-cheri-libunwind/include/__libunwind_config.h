@@ -146,8 +146,18 @@
 # elif defined(__riscv)
 #  if __riscv_xlen == 64
 #    define _LIBUNWIND_TARGET_RISCV 1
-#    define _LIBUNWIND_CONTEXT_SIZE 64
-#    define _LIBUNWIND_CURSOR_SIZE 76
+/* #    define _LIBUNWIND_CONTEXT_SIZE 64 */
+/*
+ * Note: We define _LIBUNWIND_CONTEXT_SIZE so that CHERI registers can always
+ * fit in unw_context_t even when compiling without CHERI support.
+ * Note: Assumes merged register file
+ */
+#    define _LIBUNWIND_CONTEXT_SIZE 96
+#    ifdef __CHERI_PURE_CAPABILITY__
+#      define _LIBUNWIND_CURSOR_SIZE 120
+#    else
+#      define _LIBUNWIND_CURSOR_SIZE 108
+#    endif
 #  else
 #    error "Unsupported RISC-V ABI"
 #  endif

@@ -386,6 +386,15 @@ BROKEN_OPTIONS+=LIBSOFT
 .if ${__T:Mmips*}
 BROKEN_OPTIONS+=SSP
 .endif
+
+.if ${__T:Mmips64*c*} || ${__T:Mriscv*c*}
+# Stack protector does not make sense for CHERI purecap
+BROKEN_OPTIONS+=SSP
+# nscd(8) caching depends on marshaling pointers to the daemon and back
+# and can't work without a rewrite.
+BROKEN_OPTIONS+=NS_CACHINE
+.endif
+
 # EFI doesn't exist on mips, powerpc, sparc or riscv.
 .if ${__T:Mmips*} || ${__T:Mpowerpc*} || ${__T:Msparc64} || ${__T:Mriscv*}
 BROKEN_OPTIONS+=EFI
@@ -421,7 +430,7 @@ __DEFAULT_YES_OPTIONS+=PIE
 __DEFAULT_NO_OPTIONS+=PIE
 .endif
 
-.if ${__T} != "mips64"
+.if ${__T} != "mips64" && (${__TT} != "riscv" || ${__T:Mriscv*64*c})
 BROKEN_OPTIONS+=COMPAT_CHERIABI
 .endif
 
@@ -631,8 +640,8 @@ MK_LLVM_COV:= no
 MK_LOADER_VERIEXEC_PASS_MANIFEST := no
 .endif
 
-# COMPAT_CHERIABI and LIBCHERI depend on CHERI support.
-.if ${MK_CHERI} == "no"
+# COMPAT_CHERIABI and LIBCHERI depend on CHERI support on mips.
+.if ${MK_CHERI} == "no" && ${__TT} == "mips"
 MK_LIBCHERI:=	no
 MK_COMPAT_CHERIABI:=	no
 .endif

@@ -935,6 +935,11 @@ enum {
   UNW_RISCV_F29 = 61,
   UNW_RISCV_F30 = 62,
   UNW_RISCV_F31 = 63,
+#if __has_feature(capabilities)
+  UNW_RISCV_DDC = 64
+  // FIXME: should use a different number?
+  // 3072 - 4095 Reserved for custom extensions
+#endif
 };
 
 #endif
