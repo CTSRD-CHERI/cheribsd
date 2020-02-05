@@ -2416,16 +2416,10 @@ static bool
 vm_map_mergeable_neighbors(vm_map_entry_t prev, vm_map_entry_t entry)
 {
 
-#ifdef notyet
 	KASSERT((prev->eflags & MAP_ENTRY_NOMERGE_MASK) == 0 ||
 	    (entry->eflags & MAP_ENTRY_NOMERGE_MASK) == 0,
 	    ("vm_map_mergeable_neighbors: neither %p nor %p are mergeable",
 	    prev, entry));
-#else
-	if ((prev->eflags & MAP_ENTRY_NOMERGE_MASK) != 0 &&
-	    (entry->eflags & MAP_ENTRY_NOMERGE_MASK) != 0)
-		return (false);
-#endif
 	return (prev->end == entry->start &&
 	    prev->object.vm_object == entry->object.vm_object &&
 	    (prev->object.vm_object == NULL ||
@@ -2476,15 +2470,17 @@ vm_map_try_merge_entries(vm_map_t map, vm_map_entry_t prev_entry,
 
 	VM_MAP_ASSERT_LOCKED(map);
 
-	if ((entry->eflags & (MAP_ENTRY_GROWS_UP |
-	    MAP_ENTRY_IN_TRANSITION | MAP_ENTRY_IS_SUB_MAP)) != 0)
+	/*
+	 * Try to merge abandoned stacks.
+	 */
+	if ((entry->eflags & MAP_ENTRY_GROWS_DOWN) &&
+	    vm_map_entry_abandoned(entry) &&
+	    vm_map_entry_abandoned(prev_entry) &&
+	    prev_entry->end == entry->start) {
+		vm_map_entry_unlink(map, prev_entry, UNLINK_MERGE_NEXT);
+		vm_map_merged_neighbor_dispose(map, prev_entry);
 		return;
-
-	if ((entry->eflags & MAP_ENTRY_GROWS_DOWN) != 0 &&
-           (entry->object.vm_object != NULL ||
-	    entry->protection != PROT_NONE ||
-	    entry->owner != 0))
-		return;
+	}
 
 	if ((entry->eflags & MAP_ENTRY_NOMERGE_MASK) == 0 &&
 	    vm_map_mergeable_neighbors(prev_entry, entry)) {
@@ -4935,8 +4931,8 @@ retry:
 	 * If this is the main process stack, see if we're over the stack
 	 * limit.
 	 */
-	is_procstack = (addr >= (vm_offset_t)vm->vm_maxsaddr &&
-	    addr < p->p_usrstack) ? 1 : 0;
+	is_procstack = addr >= (vm_offset_t)vm->vm_maxsaddr &&
+	    addr < p->p_usrstack;
 	if (is_procstack && (ctob(vm->vm_ssize) + grow_amount > stacklim))
 		return (KERN_NO_SPACE);
 
