@@ -420,6 +420,16 @@ SYSCTL_INT(_debug, OID_AUTO, coexecve_cleanup_margin_down, CTLFLAG_RWTUN,
     &coexecve_cleanup_margin_down, 0,
     "Maximum hole size for segments growing down when cleaning up after colocated processes");
 
+static bool
+vm_map_entry_abandoned(vm_map_entry_t entry)
+{
+	if (entry->object.vm_object == NULL &&
+	    entry->protection == PROT_NONE && entry->owner == 0)
+		return (true);
+
+	return (false);
+}
+
 static void
 vm_map_entry_abandon(vm_map_t map, vm_map_entry_t old_entry)
 {
@@ -460,8 +470,7 @@ vm_map_entry_abandon(vm_map_t map, vm_map_entry_t old_entry)
 	 * threshold for stacks.
 	 */
 #ifdef notyet
-	if (prev != &map->header && prev->object.vm_object == NULL &&
-	    prev->protection == PROT_NONE && prev->owner == 0 &&
+	if (prev != &map->header && vm_map_entry_abandoned(prev) &&
 	    start > prev->end && start - prev->end <=
 	    ((grown_down != 0) ?
 	    coexecve_cleanup_margin_down : coexecve_cleanup_margin_up)) {
@@ -469,8 +478,7 @@ vm_map_entry_abandon(vm_map_t map, vm_map_entry_t old_entry)
 	}
 #endif
 
-	if (next != &map->header && next->object.vm_object == NULL &&
-	    next->protection == PROT_NONE && next->owner == 0 &&
+	if (next != &map->header && vm_map_entry_abandoned(next) &&
 	    end < next->start && next->start - end <=
 	    (((next->eflags & MAP_ENTRY_GROWS_DOWN) != 0) ?
 	    coexecve_cleanup_margin_down : coexecve_cleanup_margin_up)) {
