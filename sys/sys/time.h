@@ -55,7 +55,7 @@ struct timezone {
 struct bintime {
 #ifdef __LP64__
 	/* XXXAR: hack to avoid memcpy() dep in libsyscalls */
-	_Alignas(sizeof(void*))
+	_Alignas(sizeof(void * __capability))
 #endif
 	time_t	sec;
 	uint64_t frac;
