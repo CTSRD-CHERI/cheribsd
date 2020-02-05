@@ -122,8 +122,6 @@ struct cheri_kframe {
  */
 struct sysentvec;
 void	cheri_capability_set_user_sealcap(void * __capability *);
-void	cheri_capability_set_user_sigcode(void * __capability *,
-	    struct sysentvec *);
 int	cheri_capcause_to_sicode(register_t capcause);
 
 int	cheriabi_fetch_syscall_args(struct thread *td);

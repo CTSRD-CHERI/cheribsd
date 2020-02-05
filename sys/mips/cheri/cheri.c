@@ -147,28 +147,6 @@ SYSINIT(cheri_cpu_startup, SI_SUB_CPU, SI_ORDER_FIRST, cheri_cpu_startup,
     NULL);
 
 void
-cheri_capability_set_user_sigcode(void * __capability *cp,
-    struct sysentvec *se)
-{
-	uintptr_t base;
-	int szsigcode = *se->sv_szsigcode;
-
-	if (se->sv_sigcode_base != 0) {
-		base = se->sv_sigcode_base;
-	} else {
-		/*
-		 * XXX: true for mips64 and mip64-cheriabi without shared-page
-		 * support...
-		 */
-		base = (uintptr_t)se->sv_psstrings - szsigcode;
-		base = rounddown2(base, sizeof(void * __capability));
-	}
-
-	*cp = cheri_capability_build_user_code(CHERI_CAP_USER_CODE_PERMS,
-	    base, szsigcode, 0);
-}
-
-void
 cheri_capability_set_user_sealcap(void * __capability *cp)
 {
 

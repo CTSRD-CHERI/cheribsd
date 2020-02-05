@@ -95,10 +95,23 @@ void * __capability	_cheri_capability_build_user_rwx(uint32_t perms,
 	    __func__, __LINE__)
 
 /*
+ * Functions to create capabilities used in exec.
+ */
+struct image_params;
+struct thread;
+void * __capability cheri_auxv_capability(struct image_params *imgp,
+	    uintcap_t stack);
+void * __capability cheri_exec_pcc(struct image_params *imgp);
+void * __capability cheri_exec_stack_pointer(struct image_params *imgp,
+	    uintcap_t stack);
+void	cheri_set_mmap_capability(struct thread *td, struct image_params *imgp,
+	    void * __capability csp);
+void * __capability cheri_sigcode_capability(struct thread *td);
+
+/*
  * CHERI context management functions.
  */
 struct cheri_frame;
-struct thread;
 struct trapframe;
 const char	*cheri_exccode_string(uint8_t exccode);
 void	cheri_exec_setregs(struct thread *td, u_long entry_addr);

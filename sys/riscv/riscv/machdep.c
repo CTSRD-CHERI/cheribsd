@@ -380,7 +380,6 @@ ptrace_clear_single_step(struct thread *td)
 	return (EOPNOTSUPP);
 }
 
-/* XXX: CHERI TODO: Set cap registers. */
 void
 exec_setregs(struct thread *td, struct image_params *imgp, uintcap_t stack)
 {
@@ -392,13 +391,25 @@ exec_setregs(struct thread *td, struct image_params *imgp, uintcap_t stack)
 
 	memset(tf, 0, sizeof(struct trapframe));
 
-	tf->tf_a[0] = (__cheri_addr uintptr_t)stack;
-	tf->tf_sp = STACKALIGN((__cheri_addr uintptr_t)stack);
 #if __has_feature(capabilities)
-	hybridabi_thread_setregs(td, imgp->entry_addr);
-#else
-	tf->tf_sepc = imgp->entry_addr;
+	if (SV_PROC_FLAG(td->td_proc, SV_CHERI)) {
+		tf->tf_a[0] = (uintcap_t)cheri_auxv_capability(imgp, stack);
+		tf->tf_sp = (uintcap_t)cheri_exec_stack_pointer(imgp, stack);
+		cheri_set_mmap_capability(td, imgp,
+		    (void * __capability)tf->tf_sp);
+		tf->tf_sepc = (uintcap_t)cheri_exec_pcc(imgp);
+		td->td_proc->p_md.md_sigcode = cheri_sigcode_capability(td);
+	} else
 #endif
+	{
+		tf->tf_a[0] = (__cheri_addr uintptr_t)stack;
+		tf->tf_sp = STACKALIGN((__cheri_addr uintptr_t)stack);
+#if __has_feature(capabilities)
+		hybridabi_thread_setregs(td, imgp->entry_addr);
+#else
+		tf->tf_sepc = imgp->entry_addr;
+#endif
+	}
 	tf->tf_ra = tf->tf_sepc;
 
 	pcb->pcb_fpflags &= ~PCB_FP_STARTED;
@@ -781,14 +792,14 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 
 	sysent = p->p_sysent;
 #if __has_feature(capabilities)
-	/* XXX: CHERI TODO: Save proper bounds for sigcode. */
-	tf->tf_ra = 0;
-#endif
+	tf->tf_ra = (uintcap_t)p->p_md.md_sigcode;
+#else
 	if (sysent->sv_sigcode_base != 0)
 		tf->tf_ra = (register_t)sysent->sv_sigcode_base;
 	else
 		tf->tf_ra = (register_t)(sysent->sv_psstrings -
 		    *(sysent->sv_szsigcode));
+#endif
 
 	CTR3(KTR_SIG, "sendsig: return td=%p pc=%#x sp=%#x", td, tf->tf_sepc,
 	    tf->tf_sp);

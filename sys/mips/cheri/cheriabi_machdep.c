@@ -708,8 +708,7 @@ cheriabi_newthread_init(struct thread *td)
 	csigp = &td->td_pcb->pcb_cherisignal;
 	bzero(csigp, sizeof(*csigp));
 	/* Note: csig_{ddc,idc,pcc} are set to NULL in the pure-capability abi */
-	cheri_capability_set_user_sigcode(&csigp->csig_sigcode,
-	    td->td_proc->p_sysent);
+	csigp->csig_sigcode = cheri_sigcode_capability(td);
 
 	/*
 	 * Set up root for the userspace object-type sealing capability tree.
