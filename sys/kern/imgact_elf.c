@@ -506,14 +506,19 @@ __elfN(map_partial)(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
     vm_offset_t start, vm_offset_t end, vm_prot_t prot)
 {
 	struct sf_buf *sf;
-	int error;
+	int error, rv;
 	vm_offset_t off;
 
 	/*
 	 * Create the page if it doesn't exist yet. Ignore errors.
 	 */
-	vm_map_fixed(map, NULL, 0, trunc_page(start), round_page(end) -
-	    trunc_page(start), VM_PROT_ALL, VM_PROT_ALL, 0);
+	rv = vm_map_fixed(map, NULL, 0, trunc_page(start), round_page(end) -
+	    trunc_page(start), VM_PROT_ALL, VM_PROT_ALL, MAP_CHECK_EXCL);
+	if (rv != KERN_SUCCESS) {
+		printf("%s: unaligned vm_map_fixed failed, rv %d; ignoring\n",
+		    __func__, rv);
+		return (rv);
+	}
 
 	/*
 	 * Find the page from the underlying object.
@@ -566,7 +571,7 @@ __elfN(map_insert)(struct image_params *imgp, vm_map_t map, vm_object_t object,
 		 * to copy the data.
 		 */
 		rv = vm_map_fixed(map, NULL, 0, start, end - start,
-		    prot | VM_PROT_WRITE, VM_PROT_ALL, 0);
+		    prot | VM_PROT_WRITE, VM_PROT_ALL, MAP_CHECK_EXCL);
 		if (rv != KERN_SUCCESS) {
 			printf("%s: unaligned vm_map_fixed failed, rv %d\n",
 			    __func__, rv);
@@ -592,7 +597,8 @@ __elfN(map_insert)(struct image_params *imgp, vm_map_t map, vm_object_t object,
 	} else {
 		vm_object_reference(object);
 		rv = vm_map_fixed(map, object, offset, start, end - start,
-		    prot, VM_PROT_ALL, cow);
+		    prot, VM_PROT_ALL, cow |
+		    (object != NULL ? MAP_VN_EXEC : 0));
 		if (rv != KERN_SUCCESS) {
 			printf("%s: vm_map_fixed failed, rv %d\n",
 			    __func__, rv);
