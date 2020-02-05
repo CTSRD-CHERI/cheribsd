@@ -152,6 +152,7 @@ static int vm_map_stack_locked(vm_map_t map, vm_offset_t addrbos,
 static void vm_map_wire_entry_failure(vm_map_t map, vm_map_entry_t entry,
     vm_offset_t failed_addr);
 static vm_map_entry_t vm_map_entry_create(vm_map_t map);
+static inline vm_map_entry_t vm_map_entry_pred(vm_map_entry_t entry);
 
 #define	ENTRY_CHARGED(e) ((e)->cred != NULL || \
     ((e)->object.vm_object != NULL && (e)->object.vm_object->cred != NULL && \
@@ -433,15 +434,13 @@ vm_map_entry_abandoned(vm_map_entry_t entry)
 static void
 vm_map_entry_abandon(vm_map_t map, vm_map_entry_t old_entry)
 {
-	vm_map_entry_t entry, next;
+	vm_map_entry_t entry, prev, next;
 	vm_offset_t start, end;
 	boolean_t found, grown_down;
 	int rv;
 
-#ifdef notyet
-	prev = entry->prev;
-#endif
 	next = vm_map_entry_succ(old_entry);
+	prev = vm_map_entry_pred(old_entry);
 	start = old_entry->start;
 	end = old_entry->end;
 	grown_down = old_entry->eflags & MAP_ENTRY_GROWS_DOWN;
@@ -469,14 +468,12 @@ vm_map_entry_abandon(vm_map_t map, vm_map_entry_t old_entry)
 	 * vm_map_try_merge_entries() can coalesce them.  Use much larger
 	 * threshold for stacks.
 	 */
-#ifdef notyet
 	if (prev != &map->header && vm_map_entry_abandoned(prev) &&
 	    start > prev->end && start - prev->end <=
 	    ((grown_down != 0) ?
 	    coexecve_cleanup_margin_down : coexecve_cleanup_margin_up)) {
 		start = prev->end;
 	}
-#endif
 
 	if (next != &map->header && vm_map_entry_abandoned(next) &&
 	    end < next->start && next->start - end <=
@@ -516,6 +513,7 @@ vm_map_entry_abandon(vm_map_t map, vm_map_entry_t old_entry)
 	/*
 	 * We need to call it again after setting the owner to 0.
 	 */
+	vm_map_try_merge_entries(map, prev, entry);
 	vm_map_try_merge_entries(map, entry, next);
 }
 
