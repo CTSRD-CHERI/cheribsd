@@ -505,12 +505,10 @@ vm_map_entry_abandon(vm_map_t map, vm_map_entry_t old_entry)
 		entry->eflags |= MAP_ENTRY_GROWS_DOWN;
 	entry->owner = 0;
 
-#ifdef notyet
 	/*
 	 * We need to call it again after setting the owner to 0.
 	 */
-	vm_map_try_merge_entries(map, prev, entry);
-#endif
+	vm_map_try_merge_entries(map, entry, next);
 }
 
 void
