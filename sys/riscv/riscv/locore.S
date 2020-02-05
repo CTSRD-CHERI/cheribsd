@@ -245,8 +245,12 @@ initstack:
 initstack_end:
 
 ENTRY(sigcode)
+#if __has_feature(capabilities)
+	cincoffset ca0, csp, SF_UC
+#else
 	mv	a0, sp
 	addi	a0, a0, SF_UC
+#endif
 
 1:
 	li	t0, SYS_sigreturn
