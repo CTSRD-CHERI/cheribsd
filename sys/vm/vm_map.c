@@ -4928,8 +4928,8 @@ retry:
 	 * If this is the main process stack, see if we're over the stack
 	 * limit.
 	 */
-	is_procstack = (addr >= (vm_offset_t)vm->vm_maxsaddr &&
-	    addr < p->p_usrstack) ? 1 : 0;
+	is_procstack = addr >= (vm_offset_t)vm->vm_maxsaddr &&
+	    addr < p->p_usrstack;
 	if (is_procstack && (ctob(vm->vm_ssize) + grow_amount > stacklim))
 		return (KERN_NO_SPACE);
 
