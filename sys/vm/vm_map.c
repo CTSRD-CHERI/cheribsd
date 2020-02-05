@@ -2469,10 +2469,6 @@ vm_map_try_merge_entries(vm_map_t map, vm_map_entry_t prev_entry,
 
 	VM_MAP_ASSERT_LOCKED(map);
 
-	if ((entry->eflags & (MAP_ENTRY_GROWS_UP |
-	    MAP_ENTRY_IN_TRANSITION | MAP_ENTRY_IS_SUB_MAP)) != 0)
-		return;
-
 	if ((entry->eflags & MAP_ENTRY_GROWS_DOWN) != 0 &&
            (entry->object.vm_object != NULL ||
 	    entry->protection != PROT_NONE ||
