@@ -511,9 +511,13 @@ __elfN(map_partial)(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 
 	/*
 	 * Create the page if it doesn't exist yet. Ignore errors.
+	 *
+	 * The MAP_CHECK_EXCL is missing, because we're replacing temporary
+	 * mapping created by reserve_space().  Upstream doesn't need those
+	 * temporary mappings, so MAP_CHECK_EXCL makes sense there.
 	 */
 	rv = vm_map_fixed(map, NULL, 0, trunc_page(start), round_page(end) -
-	    trunc_page(start), VM_PROT_ALL, VM_PROT_ALL, MAP_CHECK_EXCL);
+	    trunc_page(start), VM_PROT_ALL, VM_PROT_ALL, 0);
 	if (rv != KERN_SUCCESS) {
 		printf("%s: unaligned vm_map_fixed failed, rv %d; ignoring\n",
 		    __func__, rv);
@@ -571,7 +575,7 @@ __elfN(map_insert)(struct image_params *imgp, vm_map_t map, vm_object_t object,
 		 * to copy the data.
 		 */
 		rv = vm_map_fixed(map, NULL, 0, start, end - start,
-		    prot | VM_PROT_WRITE, VM_PROT_ALL, MAP_CHECK_EXCL);
+		    prot | VM_PROT_WRITE, VM_PROT_ALL, 0);
 		if (rv != KERN_SUCCESS) {
 			printf("%s: unaligned vm_map_fixed failed, rv %d\n",
 			    __func__, rv);
@@ -600,8 +604,8 @@ __elfN(map_insert)(struct image_params *imgp, vm_map_t map, vm_object_t object,
 		    prot, VM_PROT_ALL, cow |
 		    (object != NULL ? MAP_VN_EXEC : 0));
 		if (rv != KERN_SUCCESS) {
-			printf("%s: vm_map_fixed failed, rv %d\n",
-			    __func__, rv);
+			printf("%s: vm_map_fixed failed, range [%lx, %lx], rv %d\n",
+			    __func__, start, end, rv);
 			locked = VOP_ISLOCKED(imgp->vp);
 			VOP_UNLOCK(imgp->vp);
 			vm_object_deallocate(object);
@@ -720,6 +724,11 @@ __elfN(load_section)(struct image_params *imgp, vm_ooffset_t offset,
 	return (0);
 }
 
+/*
+ * Libraries can be loaded anywhere, but their mappings have to be
+ * at fixed offsets relative to one another.  We don't start with a clean
+ * address space, so carve out large enough chunk of virtual memory upfront.
+ */
 static int
 __elfN(reserve_space)(const struct image_params *imgp, const Elf_Ehdr *hdr,
     const Elf_Phdr *phdr, vm_offset_t *addrp)
@@ -769,6 +778,10 @@ again:
 		printf("%s: vm_map_fixed failed, rv %d\n", __func__, rv);
 		goto again;
 	}
+
+#if 0
+	printf("%s: reserved range [%lx, %lx]\n", __func__, addr, addr + size);
+#endif
 
 	*addrp = addr;
 	return (0);
