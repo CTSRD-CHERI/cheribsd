@@ -2463,6 +2463,18 @@ vm_map_try_merge_entries(vm_map_t map, vm_map_entry_t prev_entry,
 
 	VM_MAP_ASSERT_LOCKED(map);
 
+	/*
+	 * Try to merge abandoned stacks.
+	 */
+	if ((entry->eflags & MAP_ENTRY_GROWS_DOWN) &&
+	    vm_map_entry_abandoned(entry) &&
+	    vm_map_entry_abandoned(prev_entry) &&
+	    prev_entry->end == entry->start) {
+		vm_map_entry_unlink(map, prev_entry, UNLINK_MERGE_NEXT);
+		vm_map_merged_neighbor_dispose(map, prev_entry);
+		return;
+	}
+
 	if ((entry->eflags & MAP_ENTRY_NOMERGE_MASK) == 0 &&
 	    vm_map_mergeable_neighbors(prev_entry, entry)) {
 		vm_map_entry_unlink(map, prev_entry, UNLINK_MERGE_NEXT);
