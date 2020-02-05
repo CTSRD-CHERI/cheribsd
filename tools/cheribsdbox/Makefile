@@ -11,8 +11,11 @@ PROG=	cheribsdbox
 CHERIBSDBOX_DIR?=	/bin
 BINDIR?=${CHERIBSDBOX_DIR}
 # We want to build all these tools as statically linked MIPS binaries to save size
+# We don't want to build this as purecap yet (it generates a captable that is
+# too large to link).
+WANT_COMPAT=	64
 WANT_CHERI=		none
-CRUNCH_BUILDOPTS+=	WANT_CHERI=none -DWITHOUT_TESTS MK_TESTS=no
+CRUNCH_BUILDOPTS+=	WANT_CHERI=none WANT_COMPAT=64 -DWITHOUT_TESTS MK_TESTS=no
 # Avoid linking against libcasper for tcpdump/traceroute/kdump:
 CRUNCH_BUILDOPTS+=	-DWITHOUT_CASPER MK_CASPER=no
 # Try to reduce size by avoiding locale support
@@ -479,5 +482,6 @@ all: check_crunchgen
 # the crunchgen build environment
 .include <bsd.crunchgen.mk>
 
+.include <bsd.compat.mk>
 # and since it creates a program..
 .include <bsd.prog.mk>
