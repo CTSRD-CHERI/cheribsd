@@ -204,7 +204,7 @@ int
 cheriabi_fetch_syscall_args(struct thread *td)
 {
 	struct trapframe *locr0 = td->td_frame;	 /* aka td->td_pcb->pcv_regs */
-	const struct sysentvec *se;
+	struct sysentvec *se;
 	struct syscall_args *sa;
 	int error, i, ptrmask;
 

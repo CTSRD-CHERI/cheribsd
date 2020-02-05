@@ -158,7 +158,7 @@ SYSINIT(cheri_cpu_startup, SI_SUB_CPU, SI_ORDER_FIRST, cheri_cpu_startup,
 
 void
 cheri_capability_set_user_sigcode(void * __capability *cp,
-    const struct sysentvec *se)
+    struct sysentvec *se)
 {
 	uintptr_t base;
 	int szsigcode = *se->sv_szsigcode;
