@@ -395,6 +395,13 @@ BROKEN_OPTIONS+=SSP
 BROKEN_OPTIONS+=NS_CACHINE
 .endif
 
+.if ${__T:Mriscv*c*}
+# Compiler crash:
+# Skip until https://github.com/CTSRD-CHERI/llvm-project/issues/379 is fixed.
+BROKEN_OPTIONS+=LIBCPLUSPLUS
+.endif
+
+
 # EFI doesn't exist on mips, powerpc, sparc or riscv.
 .if ${__T:Mmips*} || ${__T:Mpowerpc*} || ${__T:Msparc64} || ${__T:Mriscv*}
 BROKEN_OPTIONS+=EFI
