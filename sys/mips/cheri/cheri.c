@@ -116,6 +116,8 @@ extern Elf64_Capreloc __stop___cap_relocs;
 /* Defined in linker script, mark the end of .text and kernel image */
 extern char etext[], end[];
 
+extern void * __capability userspace_cap;
+
 /*
  * Global capabilities for various address-space segments.
  */
@@ -236,6 +238,10 @@ cheri_init_capabilities(void * __capability kroot)
 	    cheri_setoffset(kroot, CHERI_SEALCAP_USERSPACE_BASE),
 	    CHERI_SEALCAP_USERSPACE_LENGTH,
 	    CHERI_SEALCAP_USERSPACE_PERMS);
+	userspace_cap = cheri_ptrperm(
+	    cheri_setoffset(kroot, CHERI_CAP_USER_DATA_BASE),
+	    CHERI_CAP_USER_DATA_LENGTH,
+	    CHERI_CAP_USER_DATA_PERMS | CHERI_CAP_USER_CODE_PERMS);
 
 #ifdef CHERI_PURECAP_KERNEL
 	/*
