@@ -47,12 +47,15 @@
 #define _CALL_FNPTR(fnptr)	jalr fnptr
 #define _TAILCALL_FNPTR(fnptr)	jr fnptr
 #define _CALL_TMPREG	t1
+#define _RETURN	ret
 #else
 #define _GET_FNPTR(outreg, function)	clgc outreg, _C_LABEL(function)
 #define _CALL_FNPTR(fnptr)	cjalr fnptr
 #define _TAILCALL_FNPTR(fnptr)	cjr fnptr
 #define _CALL_TMPREG	ct1
+#define _RETURN	cret
 #endif
+
 #define ASM_TAILCALL(function)					\
 	_GET_FNPTR(_CALL_TMPREG, function);			\
 	_TAILCALL_FNPTR(_CALL_TMPREG)
@@ -65,7 +68,7 @@ ENTRY(__sys_##name);						\
 	WEAK_REFERENCE(__sys_##name, name);			\
 	WEAK_REFERENCE(__sys_##name, _##name);			\
 	_SYSCALL(name);						\
-	ret;							\
+	_RETURN;						\
 END(__sys_##name)
 
 #define	PSEUDO(name)						\
@@ -73,7 +76,7 @@ ENTRY(__sys_##name);						\
 	WEAK_REFERENCE(__sys_##name, _##name);			\
 	_SYSCALL(name);						\
 	bnez	t0, 1f; 					\
-	ret;							\
+	_RETURN;						\
 1:	ASM_TAILCALL(cerror);					\
 END(__sys_##name)
 
@@ -83,6 +86,6 @@ ENTRY(__sys_##name);						\
 	WEAK_REFERENCE(__sys_##name, _##name);			\
 	_SYSCALL(name);						\
 	bnez	t0, 1f; 					\
-	ret;							\
+	_RETURN;						\
 1:	ASM_TAILCALL(cerror);					\
 END(__sys_##name)
