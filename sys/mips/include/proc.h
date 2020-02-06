@@ -86,6 +86,9 @@ struct mdthread {
 
 struct mdproc {
 	size_t		md_tls_tcb_offset;	/* TCB offset */
+#if __has_feature(capabilities)
+	void * __capability md_sigcode;
+#endif
 };
 
 #define	MAXARGS		8

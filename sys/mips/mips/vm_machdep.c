@@ -160,6 +160,10 @@ cpu_fork(struct thread *td1, struct proc *p2, struct thread *td2, int flags)
 	td2->td_md.md_flags |= td1->td_md.md_flags & MDTD_QTRACE;
 #endif
 
+#if __has_feature(capabilities)
+	p2->p_md.md_sigcode = td1->td_proc->p_md.md_sigcode;
+#endif
+
 	/*
 	 * Set up return-value registers as fork() libc stub expects.
 	 */

@@ -307,7 +307,7 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	regs->pc = (trapf_pc_t)catcher;
 	regs->c12 = regs->pc;
 	regs->csp = sfp;
-	regs->c17 = td->td_pcb->pcb_cherisignal.csig_sigcode;
+	regs->c17 = p->p_md.md_sigcode;
 
 	/*
 	 * For now only change IDC if we were sandboxed. This makes cap-table
@@ -638,6 +638,7 @@ exec_setregs(struct thread *td, struct image_params *imgp, uintcap_t stack)
 		td->td_frame->csp = (void * __capability)stack;
 		td->td_frame->pcc = cheri_exec_pcc(td, imgp);
 		td->td_frame->c12 = td->td_frame->pc;
+		td->td_proc->p_md.md_sigcode = cheri_sigcode_capability(td);
 
 		/*
 		 * Set up CHERI-related state: most register state,
