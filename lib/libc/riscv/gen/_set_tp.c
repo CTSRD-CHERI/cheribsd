@@ -38,9 +38,10 @@ __FBSDID("$FreeBSD$");
 #include <string.h>
 #include <sys/types.h>
 
-#include <machine/sysarch.h>
-
 #include <stdlib.h>
+
+/* NB: size of 'struct tcb'. */
+#define	TP_OFFSET	(sizeof(void *) * 2)
 
 void
 _set_tp(void *tp)
@@ -50,6 +51,6 @@ _set_tp(void *tp)
 #pragma message("FIXME: is the 0x10 correct?")
 	__asm __volatile("cmove ctp, %0" :: "C"((char*)tp + 0x10));
 #else
-	__asm __volatile("mv  tp, %0" :: "r"((char*)tp + 0x10));
+	__asm __volatile("addi  tp, %0, %1" :: "r" (tp), "I" (TP_OFFSET));
 #endif
 }
