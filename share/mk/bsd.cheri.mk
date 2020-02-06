@@ -76,7 +76,7 @@ CFLAGS+=	-mstack-alignment=16
 .if ${MK_CHERI} != "no" && defined(WANT_CHERI) && ${WANT_CHERI} != "none"
 _CHERI_COMMON_FLAGS=	-integrated-as --target=cheri-unknown-freebsd \
 			-msoft-float \
-			-cheri-uintcap=${CHERI_UINTCAP_MODE:Uoffset}
+			-cheri-uintcap=${CHERI_UINTCAP_MODE:Uaddr}
 .ifdef WANT_AFL_FUZZ
 # Build binaries static when fuzzing
 .if defined(__BSD_PROG_MK)
