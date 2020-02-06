@@ -31,14 +31,10 @@ CFLAGS+=-DNO__SCCSID -DNO__RCSID
 
 LIB?=c
 SHLIB_MAJOR= 7
-.if ${MACHINE_ARCH:Mmips*c*}
-SHLIB_LDSCRIPT=libc-cheri.ldscript
-.else
 .if ${MK_SSP} != "no"
 SHLIB_LDSCRIPT=libc.ldscript
 .else
 SHLIB_LDSCRIPT=libc_nossp.ldscript
-.endif
 .endif
 SHLIB_LDSCRIPT_LINKS=libxnet.so
 WARNS?=	2
