@@ -278,42 +278,50 @@ colocation_unborrow(struct thread *td, struct trapframe **trapframep)
 	    ("%s: td_sa.code %d != %d\n", __func__, td->td_sa.code, SYS_copark));
 }
 
+/*
+ * Setup the per-thread switcher control block.
+ */
 static int
-cosetup(struct thread *td)
+setup_scb(struct thread *td)
 {
 	struct switchercb scb;
 	vm_map_t map;
 	vm_map_entry_t entry;
 	vm_offset_t addr;
 	boolean_t found;
-	int error;
+	int error, rv;
 
 	KASSERT(td->td_md.md_scb == 0, ("%s: already initialized\n", __func__));
 
 	map = &td->td_proc->p_vmspace->vm_map;
 
-	/*
-	 * XXX: Race between this and setting the owner.  If we moved the lock
-	 * 	earlier, we'd die on:
-	 *
-	 * 	panic: _sx_xlock_hard: recursed on non-recursive sx vm map (user) @ /usr/home/en322/cheri/cheribsd/sys/vm/vm_map.c:1746
-	 */
-	error = vm_mmap_object(map, &addr, 0, PAGE_SIZE,
-	    VM_PROT_READ | VM_PROT_WRITE, VM_PROT_ALL,
-	    MAP_PRIVATE | MAP_ANON, NULL, 0, FALSE, td);
-	if (error != 0) {
-		printf("%s: vm_mmap_object() failed with error %d\n",
-		    __func__, error);
-		return (error);
-	}
-	td->td_md.md_scb = addr;
-
 	vm_map_lock(map);
+
+	addr = vm_map_findspace(map, vm_map_min(map), PAGE_SIZE);
+	if (addr + PAGE_SIZE > vm_map_max(map)) {
+		printf("%s: vm_map_findspace() failed\n", __func__);
+		vm_map_unlock(map);
+		return (ENOMEM);
+	}
+
+	rv = vm_map_insert(map, NULL, 0, addr, addr + PAGE_SIZE,
+	    VM_PROT_READ | VM_PROT_WRITE, VM_PROT_READ | VM_PROT_WRITE,
+	    MAP_DISABLE_COREDUMP);
+	if (rv != KERN_SUCCESS) {
+		printf("%s: vm_map_insert() failed with rv %d\n",
+		    __func__, rv);
+		vm_map_unlock(map);
+		return (ENOMEM);
+	}
+
 	found = vm_map_lookup_entry(map, addr, &entry);
 	KASSERT(found == TRUE,
 	    ("%s: vm_map_lookup_entry() returned false\n", __func__));
 	entry->owner = 0;
+
 	vm_map_unlock(map);
+
+	td->td_md.md_scb = addr;
 
 	//printf("%s: scb at %p, td %p\n", __func__, (void *)addr, td);
 	scb.scb_unsealcap = switcher_sealcap2;
@@ -347,12 +355,9 @@ kern_cosetup(struct thread *td, int what,
 	int error;
 
 	if (td->td_md.md_scb == 0) {
-		error = cosetup(td);
-		if (error != 0) {
-			printf("%s: cosetup() failed with error %d\n",
-			    __func__, error);
+		error = setup_scb(td);
+		if (error != 0)
 			return (error);
-		}
 	}
 
 	addr = td->td_md.md_scb;
@@ -424,7 +429,7 @@ kern_coregister(struct thread *td, const char * __capability namep,
 		return (ENAMETOOLONG);
 
 	if (td->td_md.md_scb == 0) {
-		error = cosetup(td);
+		error = setup_scb(td);
 		if (error != 0)
 			return (error);
 	}
