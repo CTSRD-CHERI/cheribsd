@@ -42,6 +42,7 @@
 #endif
 
 #if !defined(__LP64__) && !defined(__mips_n32) && \
+    !defined(__CHERI_PURE_CAPABILITY__) && \
     !defined(ARM_HAVE_ATOMIC64) && !defined(I386_HAVE_ATOMIC64) && \
     !defined(HAS_EMULATED_ATOMIC64)
 extern void atomic_add_64(volatile uint64_t *target, int64_t delta);
@@ -110,6 +111,7 @@ atomic_cas_32(volatile uint32_t *target, uint32_t cmp, uint32_t newval)
 #endif
 
 #if defined(__LP64__) || defined(__mips_n32) || defined(__mips_n64) || \
+    defined(__CHERI_PURE_CAPABILITY__) || \
     defined(ARM_HAVE_ATOMIC64) || defined(I386_HAVE_ATOMIC64) || \
     defined(HAS_EMULATED_ATOMIC64)
 static __inline void
