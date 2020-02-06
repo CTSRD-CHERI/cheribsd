@@ -67,6 +67,9 @@
 #include <ucontext.h>
 #include <sys/thr.h>
 #include <pthread.h>
+#ifdef __CHERI_PURE_CAPABILITY__
+#include <cheri/cheric.h>
+#endif
 
 __NULLABILITY_PRAGMA_PUSH
 
