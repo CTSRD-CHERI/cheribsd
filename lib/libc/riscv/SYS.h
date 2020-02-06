@@ -43,6 +43,7 @@
 	ecall
 
 #ifndef __CHERI_PURE_CAPABILITY__
+#define _GET_LOCAL_FNPTR(outreg, function)	lla outreg, _C_LABEL(function)
 #define _GET_FNPTR(outreg, function)	la outreg, _C_LABEL(function)
 #define _CALL_FNPTR(fnptr)	jalr fnptr
 #define _TAILCALL_FNPTR(fnptr)	jr fnptr
@@ -50,17 +51,18 @@
 #define _RETURN	ret
 #else
 #define _GET_FNPTR(outreg, function)	clgc outreg, _C_LABEL(function)
+#define _GET_LOCAL_FNPTR(outreg, function)	cllc outreg, _C_LABEL(function)
 #define _CALL_FNPTR(fnptr)	cjalr fnptr
 #define _TAILCALL_FNPTR(fnptr)	cjr fnptr
 #define _CALL_TMPREG	ct1
 #define _RETURN	cret
 #endif
 
-#define ASM_TAILCALL(function)					\
-	_GET_FNPTR(_CALL_TMPREG, function);			\
+#define ASM_LOCAL_TAILCALL(function)				\
+	_GET_LOCAL_FNPTR(_CALL_TMPREG, function);		\
 	_TAILCALL_FNPTR(_CALL_TMPREG)
-#define ASM_CALL(function)					\
-	_GET_FNPTR(_CALL_TMPREG, function);			\
+#define ASM_LOCAL_CALL(function)				\
+	_GET_LOCAL_FNPTR(_CALL_TMPREG, function);		\
 	_CALL_FNPTR(_CALL_TMPREG)
 
 #define	SYSCALL(name)						\
@@ -77,7 +79,7 @@ ENTRY(__sys_##name);						\
 	_SYSCALL(name);						\
 	bnez	t0, 1f; 					\
 	_RETURN;						\
-1:	ASM_TAILCALL(cerror);					\
+1:	ASM_LOCAL_TAILCALL(cerror);				\
 END(__sys_##name)
 
 #define	RSYSCALL(name)						\
@@ -87,7 +89,7 @@ ENTRY(__sys_##name);						\
 	_SYSCALL(name);						\
 	bnez	t0, 1f; 					\
 	_RETURN;						\
-1:	ASM_TAILCALL(cerror);					\
+1:	ASM_LOCAL_TAILCALL(cerror);				\
 END(__sys_##name)
 
 /* Do a system call where the _x() is also custom (e.g. fcntl, ioctl) */
@@ -96,5 +98,5 @@ ENTRY(__sys_##name);						\
 	_SYSCALL(name);						\
 	bnez	t0, 1f; 					\
 	_RETURN;						\
-1:	ASM_TAILCALL(cerror);					\
+1:	ASM_LOCAL_TAILCALL(cerror);				\
 END(__sys_##name)
