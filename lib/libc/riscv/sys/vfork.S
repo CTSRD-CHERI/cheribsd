@@ -47,6 +47,6 @@ ENTRY(__sys_vfork)
 	and	a0, a0, a1
 	mv	ra, a2
 
-	ret
-1:	ASM_TAILCALL(cerror)
+	_RETURN
+1:	ASM_LOCAL_TAILCALL(cerror)
 END(__sys_vfork)
