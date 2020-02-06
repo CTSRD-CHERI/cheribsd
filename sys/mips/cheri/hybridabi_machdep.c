@@ -124,16 +124,12 @@ hybridabi_thread_init(struct thread *td, unsigned long entry_addr)
 	    __func__));
 
 	/*
-	 * XXXRW: Experimental CheriABI initialises $ddc with full user
-	 * privilege, and all other user-accessible capability registers with
-	 * no rights at all.  The runtime linker/compiler/application can
-	 * propagate around rights as required.
+	 * Hybrid processes use $ddc and $pcc with full user
+	 * privilege, and all other user-accessible capability
+	 * registers with no rights at all.
 	 */
 	hybridabi_capability_set_user_ddc(&frame->ddc);
-	hybridabi_capability_set_user_csp(&frame->csp);
-	hybridabi_capability_set_user_idc(&frame->idc);
 	hybridabi_capability_set_user_entry(td, (void * __capability *)&frame->pc, entry_addr);
-	hybridabi_capability_set_user_entry(td, &frame->c12, entry_addr);
 
 	/*
 	 * Initialise signal-handling state; this can't yet be modified
@@ -148,7 +144,6 @@ hybridabi_thread_init(struct thread *td, unsigned long entry_addr)
 	hybridabi_capability_set_user_csp(&csigp->csig_default_stack);
 	hybridabi_capability_set_user_idc(&csigp->csig_idc);
 	hybridabi_capability_set_user_pcc(td, &csigp->csig_pcc);
-	csigp->csig_sigcode = cheri_sigcode_capability(td);
 }
 
 /*

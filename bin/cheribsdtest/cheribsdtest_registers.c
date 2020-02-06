@@ -518,7 +518,7 @@ CHERIBSDTEST(test_initregs_idc,
 {
 
 #ifndef __CHERI_PURE_CAPABILITY__
-	check_initreg_data_full_addrspace(cheri_getidc());
+	CHERIBSDTEST_CHECK_EQ_CAP(cheri_getidc(), NULL);
 #else
 	void* __capability cgp = __builtin_mips_cheri_get_captable();
 	uintmax_t perms = cheri_getperm(cgp);
