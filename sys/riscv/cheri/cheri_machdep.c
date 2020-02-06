@@ -35,6 +35,7 @@
 #include <sys/proc.h>
 
 #include <cheri/cheri.h>
+#include <cheri/cheric.h>
 
 #include <machine/frame.h>
 #include <machine/riscvreg.h>
@@ -68,4 +69,25 @@ hybridabi_thread_setregs(struct thread *td, unsigned long entry_addr)
 	tf->tf_sepc = (uintcap_t)cheri_capability_build_user_code(
 	    CHERI_CAP_USER_CODE_PERMS, CHERI_CAP_USER_CODE_BASE,
 	    CHERI_CAP_USER_CODE_LENGTH, entry_addr);
+}
+
+/*
+ * As with system calls, handling signal delivery connotes special authority
+ * in the runtime environment.  In the signal delivery code, we need to
+ * determine whether to trust the executing thread to have valid stack state,
+ * and use this function to query whether the execution environment is
+ * suitable for direct handler execution, or if (in effect) a security-domain
+ * transition is required first.
+ */
+int
+cheri_signal_sandboxed(struct thread *td)
+{
+	uintmax_t c_perms;
+
+	c_perms = cheri_getperm((void * __capability)td->td_frame->tf_sepc);
+	if ((c_perms & CHERI_PERM_SYSCALL) == 0) {
+		atomic_add_int(&security_cheri_sandboxed_signals, 1);
+		return (ECAPMODE);
+	}
+	return (0);
 }
