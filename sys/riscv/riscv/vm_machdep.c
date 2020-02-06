@@ -193,22 +193,23 @@ cpu_copy_thread(struct thread *td, struct thread *td0)
  * Set that machine state for performing an upcall that starts
  * the entry function with the given argument.
  */
-/* XXX: CHERI TODO: Update once trapframe holds capabilities. */
 void
-cpu_set_upcall(struct thread *td, void (*entry)(void *), void *arg,
-	stack_t *stack)
+cpu_set_upcall(struct thread *td, void (* __capability entry)(void *),
+    void * __capability arg, stack_t *stack)
 {
 	struct trapframe *tf;
 
 	tf = td->td_frame;
 
-	tf->tf_sp = STACKALIGN((__cheri_addr uintptr_t)stack->ss_sp + stack->ss_size);
+	tf->tf_sp = STACKALIGN((uintcap_t)stack->ss_sp + stack->ss_size);
 #if __has_feature(capabilities)
-	hybridabi_thread_setregs(td, (__cheri_addr unsigned long)entry);
-#else
-	tf->tf_sepc = (register_t)entry;
+	if (SV_PROC_FLAG(td->td_proc, SV_CHERI) == 0) {
+		tf->tf_sp = (uintcap_t)(__cheri_addr vaddr_t)tf->tf_sp;
+		hybridabi_thread_setregs(td, (__cheri_addr unsigned long)entry);
+	} else
 #endif
-	tf->tf_a[0] = (register_t)arg;
+		tf->tf_sepc = (uintcap_t)entry;
+	tf->tf_a[0] = (uintcap_t)arg;
 }
 
 int

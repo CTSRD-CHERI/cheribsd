@@ -1522,10 +1522,11 @@ freebsd64_thr_new_initthr(struct thread *td, void *thunk)
 		return (EFAULT);
 	stack.ss_sp = __USER_CAP_UNBOUND(param->stack_base);
 	stack.ss_size = param->stack_size;
-	/* XXX-AM: we should be building capabilities for cpu_set_upcall. */
-	cpu_set_upcall(td, (void (*)(void *))param->start_func,
-	    (void *)param->arg, &stack);
-	return (cpu_set_user_tls(td, __USER_CAP_UNBOUND(param->tls_base)));
+	cpu_set_upcall(td,
+	    (void (* __capability)(void *))(uintcap_t)param->start_func,
+	    (void * __capability)(uintcap_t)param->arg, &stack);
+	return (cpu_set_user_tls(td,
+		(void * __capability)(uintcap_t)param->tls_base));
 }
 
 int
