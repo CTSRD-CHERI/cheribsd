@@ -85,6 +85,10 @@ cpu_fork(struct thread *td1, struct proc *p2, struct thread *td2, int flags)
 	td2->td_pcb = pcb2;
 	bcopy(td1->td_pcb, pcb2, sizeof(*pcb2));
 
+#if __has_feature(capabilities)
+	p2->p_md.md_sigcode = td1->td_proc->p_md.md_sigcode;
+#endif
+
 	/*
 	 * The "top-most" trapframe uses a "hole" between the pcb and
 	 * trapframe to save the kernel's tp register used for per-CPU
