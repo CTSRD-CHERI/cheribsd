@@ -41,6 +41,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/proc.h>
 #include <sys/sf_buf.h>
 #include <sys/signal.h>
+#include <sys/sysent.h>
 #include <sys/unistd.h>
 
 #include <vm/vm.h>
@@ -55,8 +56,10 @@ __FBSDID("$FreeBSD$");
 #include <machine/frame.h>
 #include <machine/sbi.h>
 
-#if __riscv_xlen == 64
-#define	TP_OFFSET	16	/* sizeof(struct tcb) */
+/* sizeof(struct tcb) */
+#define	TP_OFFSET	(2 * sizeof(void * __capability))
+#ifdef COMPAT_FREEBSD64
+#define	TP_OFFSET64	(2 * sizeof(uint64_t))
 #endif
 
 /*
@@ -208,19 +211,24 @@ cpu_set_upcall(struct thread *td, void (*entry)(void *), void *arg,
 	tf->tf_a[0] = (register_t)arg;
 }
 
-/* XXX: CHERI TODO: Update once trapframe holds capabilities. */
 int
 cpu_set_user_tls(struct thread *td, void * __capability tls_base)
 {
 
-	if ((__cheri_addr uintptr_t)tls_base >= VM_MAXUSER_ADDRESS)
+	if ((__cheri_addr vaddr_t)tls_base >= VM_MAXUSER_ADDRESS)
 		return (EINVAL);
 
 	/*
 	 * The user TLS is set by modifying the trapframe's tp value, which
 	 * will be restored when returning to userspace.
 	 */
-	td->td_frame->tf_tp = (__cheri_addr register_t)tls_base + TP_OFFSET;
+#ifdef COMPAT_FREEBSD64
+	if (SV_PROC_FLAG(td->td_proc, SV_CHERI | SV_LP64) == SV_LP64)
+		td->td_frame->tf_tp = (__cheri_addr vaddr_t)tls_base +
+		    TP_OFFSET64;
+	else
+#endif
+		td->td_frame->tf_tp = (uintcap_t)tls_base + TP_OFFSET;
 
 	return (0);
 }
