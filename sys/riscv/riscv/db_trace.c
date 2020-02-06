@@ -2,6 +2,7 @@
  * Copyright (c) 2015 The FreeBSD Foundation
  * Copyright (c) 2016 Ruslan Bukin <br@bsdpad.com>
  * All rights reserved.
+ * Copyright (c) 2020 John Baldwin <jhb@FreeBSD.org>
  *
  * Portions of this software were developed by Semihalf under
  * the sponsorship of the FreeBSD Foundation.
@@ -38,15 +39,18 @@
 
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
+
 #include <sys/param.h>
-#include <sys/proc.h>
 #include <sys/kdb.h>
-#include <machine/pcb.h>
+#include <sys/proc.h>
+
 #include <ddb/ddb.h>
 #include <ddb/db_sym.h>
 
+#include <machine/pcb.h>
 #include <machine/riscvreg.h>
 #include <machine/stack.h>
+#include <machine/vmparam.h>
 
 void
 db_md_list_watchpoints()
@@ -98,15 +102,15 @@ db_stack_trace_cmd(struct unwind_state *frame)
 			tf = (struct trapframe *)(uintptr_t)frame->sp;
 
 			if (tf->tf_scause & EXCP_INTR)
-				db_printf("--- interrupt %d\n",
+				db_printf("--- interrupt %ld\n",
 				    tf->tf_scause & EXCP_MASK);
 			else
-				db_printf("--- exception %d, tval = %#lx\n",
+				db_printf("--- exception %ld, tval = %#lx\n",
 				    tf->tf_scause & EXCP_MASK,
 				    tf->tf_stval);
-			frame->sp = (__cheri_addr uint64_t)tf->tf_sp;
-			frame->fp = (__cheri_addr uint64_t)tf->tf_s[0];
-			frame->pc = (__cheri_addr uint64_t)tf->tf_sepc;
+			frame->sp = (uint64_t)tf->tf_sp;
+			frame->fp = (uint64_t)tf->tf_s[0];
+			frame->pc = (uint64_t)tf->tf_sepc;
 			if (!INKERNEL(frame->fp))
 				break;
 			continue;
