@@ -43,27 +43,29 @@
 	ecall
 
 #ifndef __CHERI_PURE_CAPABILITY__
-#define _GET_LOCAL_FNPTR(outreg, function)	lla outreg, _C_LABEL(function)
-#define _GET_FNPTR(outreg, function)	la outreg, _C_LABEL(function)
-#define _CALL_FNPTR(fnptr)	jalr fnptr
-#define _TAILCALL_FNPTR(fnptr)	jr fnptr
-#define _CALL_TMPREG	t1
+#define _GET_LOCAL_FNPTR(outreg, function)	\
+	lla outreg, _C_LABEL(function)
+#define _GET_FNPTR(outreg, function)	\
+	la outreg, _C_LABEL(function)
+#define _CALL_FNPTR(reg)	jalr reg
+#define _TAILCALL_FNPTR(reg)	jr reg
 #define _RETURN	ret
 #else
-#define _GET_FNPTR(outreg, function)	clgc outreg, _C_LABEL(function)
-#define _GET_LOCAL_FNPTR(outreg, function)	cllc outreg, _C_LABEL(function)
-#define _CALL_FNPTR(fnptr)	cjalr fnptr
-#define _TAILCALL_FNPTR(fnptr)	cjr fnptr
-#define _CALL_TMPREG	ct1
+#define _GET_FNPTR(outreg, function)	\
+	clgc CAPABILITY_REG(outreg), _C_LABEL(function)
+#define _GET_LOCAL_FNPTR(outreg, function)	\
+	cllc CAPABILITY_REG(outreg), _C_LABEL(function)
+#define _CALL_FNPTR(reg)	cjalr CAPABILITY_REG(reg)
+#define _TAILCALL_FNPTR(reg)	cjr CAPABILITY_REG(reg)
 #define _RETURN	cret
 #endif
 
 #define ASM_LOCAL_TAILCALL(function)				\
-	_GET_LOCAL_FNPTR(_CALL_TMPREG, function);		\
-	_TAILCALL_FNPTR(_CALL_TMPREG)
+	_GET_LOCAL_FNPTR(t1, function);				\
+	_TAILCALL_FNPTR(t1)
 #define ASM_LOCAL_CALL(function)				\
-	_GET_LOCAL_FNPTR(_CALL_TMPREG, function);		\
-	_CALL_FNPTR(_CALL_TMPREG)
+	_GET_LOCAL_FNPTR(t1, function);				\
+	_CALL_FNPTR(t1)
 
 #define	SYSCALL(name)						\
 ENTRY(__sys_##name);						\
