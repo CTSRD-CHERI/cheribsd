@@ -235,17 +235,6 @@
 #define	CHERI_OTYPE_IS_LOCALOK(x)	(((x) & CHERI_OTYPE_LOCALOK_FLAG) != 0)
 
 /*
- * Definition for a highly privileged kernel capability able to name the
- * entire address space, and suitable to derive all other kernel-related
- * capabilities from, including sealing capabilities.
- */
-#define	CHERI_CAP_KERN_PERMS						\
-	(CHERI_PERMS_SWALL | CHERI_PERMS_HWALL)
-#define	CHERI_CAP_KERN_BASE		0x0
-#define	CHERI_CAP_KERN_LENGTH		0xffffffffffffffff
-#define	CHERI_CAP_KERN_OFFSET		0x0
-
-/*
  * A blend of hardware and software allocation of capability registers.
  * Ideally, this list wouldn't exist here, but be purely in the assembler.
  */

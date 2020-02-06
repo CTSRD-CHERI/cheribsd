@@ -18,7 +18,4 @@ SRCS+=	_setjmp.S setjmp.S
 
 .if ${MK_CHERI} == "yes"
 SRCS+=	coaccept.S cocall.S
-# XXX-BD: clang currently miscompiles these.  See CHERI-LLVM bug #125.
-#CC.setjmp.S=      ${_CHERI_CC}
-#CC._setjmp.S=      ${_CHERI_CC}
 .endif

@@ -158,8 +158,6 @@ struct ktr_ccall;
 struct ktr_creturn;
 struct ktr_cexception;
 struct thr_param_c;
-void	cheriabi_thr_new_md(struct thread *parent_td,
-	    struct thr_param_c *param);
 void	colocation_get_peer(struct thread *td, struct thread **peertdp);
 void	colocation_thread_exit(struct thread *td);
 void	colocation_unborrow(struct thread *td, struct trapframe **trapframep);

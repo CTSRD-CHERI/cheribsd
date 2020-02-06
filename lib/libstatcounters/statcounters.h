@@ -114,6 +114,7 @@ const char *statcounters_get_next_name (const char *name);
 int statcounters_id_from_name (const char *name);
 uint64_t statcounters_sample_by_id (int id);
 
+
 __END_DECLS
 
 #endif

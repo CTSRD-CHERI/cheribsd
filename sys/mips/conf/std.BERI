@@ -33,11 +33,8 @@ options 	CAPABILITIES
 
 options 	COMPAT_FREEBSD10
 options 	COMPAT_FREEBSD11
-<<<<<<< HEAD
-options 	MIPS_SHAREDPAGE		# Enable shared page support
-=======
 options 	COMPAT_FREEBSD12
->>>>>>> coexecve
+options 	MIPS_SHAREDPAGE		# Enable shared page support
 
 options 	INTRNG
 options 	SCHED_ULE
