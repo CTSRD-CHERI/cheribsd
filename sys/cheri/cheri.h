@@ -67,7 +67,6 @@ struct cheri_signal {
 	void * __capability	csig_csp;
 	void * __capability	csig_idc;
 	void * __capability	csig_default_stack;
-	void * __capability	csig_sigcode;
 };
 
 #ifdef _KERNEL
