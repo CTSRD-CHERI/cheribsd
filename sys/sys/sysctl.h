@@ -105,8 +105,15 @@ struct ctlname {
 #define	CTLFLAG_STATS	0x00002000	/* Statistics, not a tuneable */
 #define	CTLFLAG_NOFETCH	0x00001000	/* Don't fetch tunable from getenv() */
 #define	CTLFLAG_CAPRW	(CTLFLAG_CAPRD|CTLFLAG_CAPWR)
-#define	CTLFLAG_PTRIN	0x00000800	/* Copy in pointers */
-#define	CTLFLAG_PTROUT	0x00000400	/* Copy out pointers */
+/*
+ * This is transient flag to be used until all sysctl handlers are converted
+ * to not lock Giant.
+ * One, and only one of CTLFLAG_MPSAFE or CTLFLAG_NEEDGIANT is required
+ * for SYSCTL_PROC and SYSCTL_NODE.
+ */
+#define	CTLFLAG_NEEDGIANT 0x00000800	/* Handler require Giant */
+#define	CTLFLAG_PTRIN	0x00000400	/* Copy in pointers */
+#define	CTLFLAG_PTROUT	0x00000200	/* Copy out pointers */
 #define	CTLFLAG_PTR	(CTLFLAG_PTRIN|CTLFLAG_PTROUT)
 
 /*
@@ -269,6 +276,14 @@ TAILQ_HEAD(sysctl_ctx_list, sysctl_ctx_entry);
 #define	__DESCR(d) ""
 #endif
 
+#ifdef notyet
+#define	SYSCTL_ENFORCE_FLAGS(x)						\
+    _Static_assert(((CTLFLAG_MPSAFE ^ CTLFLAG_NEEDGIANT) & (x)),	\
+        "Has to be either CTLFLAG_MPSAFE or CTLFLAG_NEEDGIANT")
+#else
+#define	SYSCTL_ENFORCE_FLAGS(x)
+#endif
+
 /* This macro is only for internal use */
 #define	SYSCTL_OID_RAW(id, parent_child_head, nbr, name, kind, a1, a2, handler, fmt, descr, label) \
 	struct sysctl_oid id = {					\
@@ -284,7 +299,8 @@ TAILQ_HEAD(sysctl_ctx_list, sysctl_ctx_entry);
 		.oid_descr = __DESCR(descr),				\
 		.oid_label = (label),					\
 	};								\
-	DATA_SET(sysctl_set, id)
+	DATA_SET(sysctl_set, id);					\
+	SYSCTL_ENFORCE_FLAGS(kind)
 
 /* This constructs a static "raw" MIB oid. */
 #define	SYSCTL_OID(parent, nbr, name, kind, a1, a2, handler, fmt, descr) \
@@ -303,7 +319,11 @@ TAILQ_HEAD(sysctl_ctx_list, sysctl_ctx_entry);
 	nbr, #name, kind, a1, a2, handler, fmt, descr, label)
 
 #define	SYSCTL_ADD_OID(ctx, parent, nbr, name, kind, a1, a2, handler, fmt, descr) \
-	sysctl_add_oid(ctx, parent, nbr, name, kind, a1, a2, handler, fmt, __DESCR(descr), NULL)
+({									\
+	SYSCTL_ENFORCE_FLAGS(kind);					\
+	sysctl_add_oid(ctx, parent, nbr, name, kind, a1, a2,handler,	\
+	    fmt, __DESCR(descr), NULL);					\
+})
 
 /* This constructs a root node from which other nodes can hang. */
 #define	SYSCTL_ROOT_NODE(nbr, name, access, handler, descr)	\
@@ -331,6 +351,7 @@ TAILQ_HEAD(sysctl_ctx_list, sysctl_ctx_entry);
 ({									\
 	CTASSERT(((access) & CTLTYPE) == 0 ||				\
 	    ((access) & SYSCTL_CT_ASSERT_MASK) == CTLTYPE_NODE);	\
+	SYSCTL_ENFORCE_FLAGS(access);					\
 	sysctl_add_oid(ctx, parent, nbr, name, CTLTYPE_NODE|(access),	\
 	    NULL, 0, handler, "N", __DESCR(descr), label);		\
 })
@@ -339,6 +360,7 @@ TAILQ_HEAD(sysctl_ctx_list, sysctl_ctx_entry);
 ({									\
 	CTASSERT(((access) & CTLTYPE) == 0 ||				\
 	    ((access) & SYSCTL_CT_ASSERT_MASK) == CTLTYPE_NODE);	\
+	SYSCTL_ENFORCE_FLAGS(access);					\
 	sysctl_add_oid(ctx, &sysctl__children, nbr, name,		\
 	    CTLTYPE_NODE|(access),					\
 	    NULL, 0, handler, "N", __DESCR(descr), NULL);		\
@@ -346,7 +368,8 @@ TAILQ_HEAD(sysctl_ctx_list, sysctl_ctx_entry);
 
 /* Oid for a string.  len can be 0 to indicate '\0' termination. */
 #define	SYSCTL_STRING(parent, nbr, name, access, arg, len, descr)	\
-	SYSCTL_OID(parent, nbr, name, CTLTYPE_STRING|(access),		\
+	SYSCTL_OID(parent, nbr, name,					\
+	    CTLTYPE_STRING | CTLFLAG_MPSAFE | (access),			\
 	    arg, len, sysctl_handle_string, "A", descr);		\
 	CTASSERT(((access) & CTLTYPE) == 0 ||				\
 	    ((access) & SYSCTL_CT_ASSERT_MASK) == CTLTYPE_STRING)
@@ -356,7 +379,8 @@ TAILQ_HEAD(sysctl_ctx_list, sysctl_ctx_entry);
 	char *__arg = (arg);						\
 	CTASSERT(((access) & CTLTYPE) == 0 ||				\
 	    ((access) & SYSCTL_CT_ASSERT_MASK) == CTLTYPE_STRING);	\
-	sysctl_add_oid(ctx, parent, nbr, name, CTLTYPE_STRING|(access),	\
+	sysctl_add_oid(ctx, parent, nbr, name,				\
+	    CTLTYPE_STRING | CTLFLAG_MPSAFE | (access),			\
 	    __arg, len, sysctl_handle_string, "A", __DESCR(descr),	\
 	    NULL); \
 })
@@ -747,7 +771,8 @@ TAILQ_HEAD(sysctl_ctx_list, sysctl_ctx_entry);
 
 /* Oid for an opaque object.  Specified by a pointer and a length. */
 #define	SYSCTL_OPAQUE(parent, nbr, name, access, ptr, len, fmt, descr)	\
-	SYSCTL_OID(parent, nbr, name, CTLTYPE_OPAQUE|(access),		\
+	SYSCTL_OID(parent, nbr, name,					\
+	    CTLTYPE_OPAQUE | CTLFLAG_MPSAFE | (access),			\
 	    ptr, len, sysctl_handle_opaque, fmt, descr);		\
 	CTASSERT(((access) & CTLTYPE) == 0 ||				\
 	    ((access) & SYSCTL_CT_ASSERT_MASK) == CTLTYPE_OPAQUE)
@@ -756,13 +781,15 @@ TAILQ_HEAD(sysctl_ctx_list, sysctl_ctx_entry);
 ({									\
 	CTASSERT(((access) & CTLTYPE) == 0 ||				\
 	    ((access) & SYSCTL_CT_ASSERT_MASK) == CTLTYPE_OPAQUE);	\
-	sysctl_add_oid(ctx, parent, nbr, name, CTLTYPE_OPAQUE|(access),	\
+	sysctl_add_oid(ctx, parent, nbr, name,				\
+	    CTLTYPE_OPAQUE | CTLFLAG_MPSAFE | (access),			\
 	    ptr, len, sysctl_handle_opaque, fmt, __DESCR(descr), NULL);	\
 })
 
 /* Oid for a struct.  Specified by a pointer and a type. */
 #define	SYSCTL_STRUCT(parent, nbr, name, access, ptr, type, descr)	\
-	SYSCTL_OID(parent, nbr, name, CTLTYPE_OPAQUE|(access),		\
+	SYSCTL_OID(parent, nbr, name,					\
+	    CTLTYPE_OPAQUE | CTLFLAG_MPSAFE | (access),			\
 	    ptr, sizeof(struct type), sysctl_handle_opaque,		\
 	    "S," #type, descr);						\
 	CTASSERT(((access) & CTLTYPE) == 0 ||				\
@@ -772,7 +799,8 @@ TAILQ_HEAD(sysctl_ctx_list, sysctl_ctx_entry);
 ({									\
 	CTASSERT(((access) & CTLTYPE) == 0 ||				\
 	    ((access) & SYSCTL_CT_ASSERT_MASK) == CTLTYPE_OPAQUE);	\
-	sysctl_add_oid(ctx, parent, nbr, name, CTLTYPE_OPAQUE|(access),	\
+	sysctl_add_oid(ctx, parent, nbr, name,				\
+	    CTLTYPE_OPAQUE | CTLFLAG_MPSAFE | (access),			\
 	    (ptr), sizeof(struct type),					\
 	    sysctl_handle_opaque, "S," #type, __DESCR(descr), NULL);	\
 })
@@ -786,6 +814,7 @@ TAILQ_HEAD(sysctl_ctx_list, sysctl_ctx_entry);
 #define	SYSCTL_ADD_PROC(ctx, parent, nbr, name, access, ptr, arg, handler, fmt, descr) \
 ({									\
 	CTASSERT(((access) & CTLTYPE) != 0);				\
+	SYSCTL_ENFORCE_FLAGS(access);					\
 	sysctl_add_oid(ctx, parent, nbr, name, (access),		\
 	    (ptr), (arg), (handler), (fmt), __DESCR(descr), NULL);	\
 })
