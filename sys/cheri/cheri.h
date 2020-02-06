@@ -112,8 +112,6 @@ void * __capability cheri_sigcode_capability(struct thread *td);
  * CHERI context management functions.
  */
 const char	*cheri_exccode_string(uint8_t exccode);
-void	cheri_exec_setregs(struct thread *td, u_long entry_addr);
-void	cheri_newthread_setregs(struct thread *td, u_long entry_addr);
 int	cheri_syscall_authorize(struct thread *td, u_int code,
 	    int nargs, syscallarg_t *args);
 int	cheri_signal_sandboxed(struct thread *td);
@@ -157,7 +155,6 @@ extern u_int	security_cheri_bound_legacy_capabilities;
 struct ktr_ccall;
 struct ktr_creturn;
 struct ktr_cexception;
-struct thr_param_c;
 struct trapframe;
 void	ktrccall_mdfill(struct pcb *pcb, struct ktr_ccall *kc);
 void	ktrcreturn_mdfill(struct pcb *pcb, struct ktr_creturn *kr);
