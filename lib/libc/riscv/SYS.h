@@ -89,3 +89,12 @@ ENTRY(__sys_##name);						\
 	_RETURN;						\
 1:	ASM_TAILCALL(cerror);					\
 END(__sys_##name)
+
+/* Do a system call where the _x() is also custom (e.g. fcntl, ioctl) */
+#define NO_UNDERSCORE(name)					\
+ENTRY(__sys_##name);						\
+	_SYSCALL(name);						\
+	bnez	t0, 1f; 					\
+	_RETURN;						\
+1:	ASM_TAILCALL(cerror);					\
+END(__sys_##name)
