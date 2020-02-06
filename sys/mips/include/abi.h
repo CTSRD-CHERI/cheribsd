@@ -105,9 +105,9 @@
 #define	CALLFRAME_SIZ	(4*(_MIPS_SZCAP / 8))
 
 #define	CALLFRAME_CRA	(0*(_MIPS_SZCAP / 8))
-#define	CALLFRAME_CGP	(1*(_MIPS_SZCAP / 8))
-#define CALLFRAME_CSP	(2*(_MIPS_SZCAP / 8))
-#define CALLFRAME_S0	(3*(_MIPS_SZCAP / 8))
+#define	CALLFRAME_CSP	(1*(_MIPS_SZCAP / 8))
+#define	CALLFRAME_CGP	(2*(_MIPS_SZCAP / 8))
+#define	CALLFRAME_S0	(3*(_MIPS_SZCAP / 8))
 
 /* XXX-AM: these should never be used in purecap */
 #define CALLFRAME_RA    CALLFRAME_CRA
