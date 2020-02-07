@@ -40,9 +40,6 @@
 #include <machine/vmparam.h>
 
 static void	hybridabi_capability_set_user_ddc(void * __capability *);
-static void	hybridabi_capability_set_user_csp(void * __capability *);
-static void	hybridabi_capability_set_user_pcc(struct thread *td,
-		    void * __capability *);
 static void	hybridabi_capability_set_user_entry(struct thread *td,
 		    void * __capability *, unsigned long);
 static void	hybridabi_thread_init(struct thread *td, unsigned long);
@@ -58,18 +55,6 @@ hybridabi_capability_set_user_ddc(void * __capability *cp)
 }
 
 static void
-hybridabi_capability_set_user_csp(void * __capability *cp)
-{
-
-	/*
-	 * For now, initialise stack as ambient with identical rights as $ddc.
-	 * In the future, we will may want to change this to be local
-	 * (non-global).
-	 */
-	hybridabi_capability_set_user_ddc(cp);
-}
-
-static void
 hybridabi_capability_set_user_idc(void * __capability *cp)
 {
 
@@ -77,15 +62,6 @@ hybridabi_capability_set_user_idc(void * __capability *cp)
 	 * The default invoked data capability is also identical to $ddc.
 	 */
 	hybridabi_capability_set_user_ddc(cp);
-}
-
-static void
-hybridabi_capability_set_user_pcc(struct thread *td, void * __capability *cp)
-{
-
-	*cp = cheri_capability_build_user_code(td, CHERI_CAP_USER_CODE_PERMS,
-	    CHERI_CAP_USER_CODE_BASE, CHERI_CAP_USER_CODE_LENGTH,
-	    CHERI_CAP_USER_CODE_OFFSET);
 }
 
 static void
@@ -140,10 +116,7 @@ hybridabi_thread_init(struct thread *td, unsigned long entry_addr)
 	csigp = &td->td_pcb->pcb_cherisignal;
 	bzero(csigp, sizeof(*csigp));
 	hybridabi_capability_set_user_ddc(&csigp->csig_ddc);
-	hybridabi_capability_set_user_csp(&csigp->csig_csp);
-	hybridabi_capability_set_user_csp(&csigp->csig_default_stack);
 	hybridabi_capability_set_user_idc(&csigp->csig_idc);
-	hybridabi_capability_set_user_pcc(td, &csigp->csig_pcc);
 }
 
 /*

@@ -177,5 +177,5 @@ cheriabi_newthread_init(struct thread *td)
 	 */
 	csigp = &td->td_pcb->pcb_cherisignal;
 	bzero(csigp, sizeof(*csigp));
-	/* Note: csig_{ddc,idc,pcc} are set to NULL in the pure-capability abi */
+	/* Note: csig_{ddc,idc} are set to NULL in the pure-capability abi */
 }
