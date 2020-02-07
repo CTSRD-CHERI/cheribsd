@@ -631,8 +631,6 @@ exec_setregs(struct thread *td, struct image_params *imgp, uintcap_t stack)
 
 #if __has_feature(capabilities)
 	if (SV_PROC_FLAG(td->td_proc, SV_CHERI)) {
-		struct cheri_signal *csigp;
-
 		td->td_frame->csp = (void * __capability)stack;
 		td->td_frame->pcc = cheri_exec_pcc(td, imgp);
 		td->td_frame->c12 = td->td_frame->pc;
@@ -649,18 +647,6 @@ exec_setregs(struct thread *td, struct image_params *imgp, uintcap_t stack)
 		 * Pass a pointer to the ELF auxiliary argument vector.
 		 */
 		td->td_frame->c3 = imgp->auxv;
-		/*
-		 * Update privileged signal-delivery environment for
-		 * actual stack.
-		 *
-		 * XXXRW: Not entirely clear whether we want an offset
-		 * of 'stacklen' for csig_csp here.  Maybe we don't
-		 * want to use csig_csp at all?  Possibly csig_csp
-		 * should default to NULL...?
-		 */
-		csigp = &td->td_pcb->pcb_cherisignal;
-		csigp->csig_csp = td->td_frame->csp;
-		csigp->csig_default_stack = csigp->csig_csp;
 	} else
 #endif
 	{

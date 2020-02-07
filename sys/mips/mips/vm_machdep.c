@@ -512,8 +512,6 @@ cpu_set_upcall(struct thread *td, void (* __capability entry)(void *),
 
 #if __has_feature(capabilities)
 	if (SV_PROC_FLAG(td->td_proc, SV_CHERI)) {
-		struct cheri_signal *csigp;
-
 		tf->pcc = (void * __capability)entry;
 		tf->c12 = entry;
 		tf->c3 = arg;
@@ -542,19 +540,6 @@ cpu_set_upcall(struct thread *td, void (* __capability entry)(void *),
 		 * if they are bogus.
 		 */
 		tf->csp = (char * __capability)stack->ss_sp + stack->ss_size;
-
-		/*
-		 * Update privileged signal-delivery environment for
-		 * actual stack.
-		 *
-		 * XXXRW: Not entirely clear whether we want an offset
-		 * of 'stacklen' for csig_csp here.  Maybe we don't
-		 * want to use csig_csp at all?  Possibly csig_csp
-		 * should default to NULL...?
-		 */
-		csigp = &td->td_pcb->pcb_cherisignal;
-		csigp->csig_csp = td->td_frame->csp;
-		csigp->csig_default_stack = csigp->csig_csp;
 	} else
 #endif
 	{

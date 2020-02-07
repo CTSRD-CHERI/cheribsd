@@ -62,11 +62,8 @@ struct cheri_object {
  * pointer should (presumably) be relative to the $ddc/$csp defined here.
  */
 struct cheri_signal {
-	void * __capability	csig_pcc;
 	void * __capability	csig_ddc;
-	void * __capability	csig_csp;
 	void * __capability	csig_idc;
-	void * __capability	csig_default_stack;
 };
 
 #ifdef _KERNEL
