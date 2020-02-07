@@ -55,16 +55,6 @@ hybridabi_capability_set_user_ddc(void * __capability *cp)
 }
 
 static void
-hybridabi_capability_set_user_idc(void * __capability *cp)
-{
-
-	/*
-	 * The default invoked data capability is also identical to $ddc.
-	 */
-	hybridabi_capability_set_user_ddc(cp);
-}
-
-static void
 hybridabi_capability_set_user_entry(struct thread *td,
     void * __capability *cp, unsigned long entry_addr)
 {
@@ -116,7 +106,6 @@ hybridabi_thread_init(struct thread *td, unsigned long entry_addr)
 	csigp = &td->td_pcb->pcb_cherisignal;
 	bzero(csigp, sizeof(*csigp));
 	hybridabi_capability_set_user_ddc(&csigp->csig_ddc);
-	hybridabi_capability_set_user_idc(&csigp->csig_idc);
 }
 
 /*
