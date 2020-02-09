@@ -551,6 +551,7 @@ MK_CLANG:=	no
 MK_GNUCXX:=	no
 MK_GOOGLETEST:=	no
 MK_TESTS:=	no
+MK_PMC:=	no
 .endif
 
 .if ${MK_DIALOG} == "no"
