@@ -485,7 +485,7 @@ SUBDIR+=	${_DIR}
 .endif
 
 # Finally build cheribsdbox if requested
-.if ${MK_CHERIBSDBOX} != "no" && !defined(SYSROOT_ONLY) && !${TARGET_ARCH:Mmips*c*}
+.if ${MK_CHERIBSDBOX} != "no" && !defined(SYSROOT_ONLY)
 SUBDIR+=	tools/cheribsdbox
 .endif
 
