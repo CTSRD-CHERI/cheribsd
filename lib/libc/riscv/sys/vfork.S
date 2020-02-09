@@ -48,5 +48,5 @@ ENTRY(__sys_vfork)
 	MOVE_REG(ra, a2)
 
 	_RETURN
-1:	ASM_LOCAL_TAILCALL(cerror)
+1:	ASM_LOCAL_TAILCALL(t1, cerror)
 END(__sys_vfork)
