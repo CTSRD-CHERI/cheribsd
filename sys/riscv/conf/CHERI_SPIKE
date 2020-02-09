@@ -4,3 +4,5 @@ include "SPIKE"
 include "std.CHERI"
 
 ident CHERI_SPIKE
+# We have to run in the 0xc0000 memory region
+makeoptions	KERNEL_LMA=0xc0200000
