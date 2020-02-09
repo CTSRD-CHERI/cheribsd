@@ -2,7 +2,7 @@
 
 TESTSDIR=	${TESTSBASE}/libexec/rtld-cheri-elf/abi-mismatch
 
-.if !${MACHINE_ARCH:Mmips*c*}
+.if !${MACHINE_ABI:Mpurecap}
 # Disable when building a pure-cap world as we don't support
 # bsd.cheri.mk hacks there.  Alternative workaround needed.
 SUBDIR+=	basic_nocheri_lib basic_hybrid_lib basic_purecap_lib
@@ -15,7 +15,7 @@ SUBDIR+=	wrong_size_purecap_lib wrong_size_hybrid_lib
 #CFLAGS.option-domain-search_test+=	-I${.CURDIR:H}
 #LIBADD.option-domain-search_test=	util
 
-.if !${MACHINE_ARCH:Mmips*c*}
+.if !${MACHINE_ABI:Mpurecap}
 TESTS_SUBDIRS+=	dlopen-hybrid
 .endif
 TESTS_SUBDIRS+=	dlopen-purecap

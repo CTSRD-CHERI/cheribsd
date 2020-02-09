@@ -6,11 +6,11 @@
 
 # Include the generated makefile containing the *complete* list
 # of syscall names in MIASM.
-.if ! ${MACHINE_ARCH:Mmips*c*}
-.include "${SRCTOP}/sys/sys/syscall.mk"
-.else
+.if ${MACHINE_ABI:Mpurecap}
 .include "${SRCTOP}/sys/compat/cheriabi/cheriabi_syscall.mk"
 MIASM:=	${MIASM:S/^cheriabi_//}
+.else
+.include "${SRCTOP}/sys/sys/syscall.mk"
 .endif
 
 # Include machine dependent definitions.
@@ -40,7 +40,7 @@ SRCS+=	\
 
 SRCS+= getdents.c lstat.c mknod.c stat.c
 
-.if (!${MACHINE_ARCH:Mmips*c*} && !${MACHINE_ARCH:Mriscv*c*})
+.if !${MACHINE_ABI:Mpurecap}
 SRCS+= brk.c
 .endif
 SRCS+= pipe.c
@@ -95,7 +95,8 @@ NOASM+=	sigaction.o
 INTERPOSED+= sigaction
 .endif
 
-.if ${MACHINE_ARCH:Mmips*c*}
+.if ${MACHINE_ABI:Mpurecap}
+# Var-args calling convention different for purecap
 NO_UNDERSCORE=	fcntl ioctl open
 .for _nu in ${NO_UNDERSCORE}
 INTERPOSED:=	${INTERPOSED:N${_nu}}

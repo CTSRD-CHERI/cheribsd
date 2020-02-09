@@ -115,8 +115,10 @@ SRCS+=	interposing_table.c
 CFLAGS+=	-DNO_SYSCALLS
 .endif
 
-.if ! ${MACHINE_ARCH:Mmips*c*}
-# stack-protector is useless when we have CHERI
+.if ${MK_SSP} != "no"
+.if ${MACHINE_ABI:Mpurecap}
+.error "stack-protector is useless when we have CHERI, MK_SSP should not be set"
+.endif
 .include "${LIBC_SRCTOP}/secure/Makefile.inc"
 .endif
 .include "${LIBC_SRCTOP}/rpc/Makefile.inc"

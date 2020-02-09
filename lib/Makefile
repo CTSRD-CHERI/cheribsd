@@ -187,9 +187,9 @@ SUBDIR.${MK_STATS}+=	libstats
     ${MACHINE_CPUARCH} == "arm" || ${MACHINE_CPUARCH} == "i386" || \
     ${MACHINE_CPUARCH} == "powerpc" || \
     ${MACHINE_ARCH:Mmips64*}) && \
-    ! ${MACHINE_ARCH:Mmips*c*}
+    !${MACHINE_ABI:Mpurecap}
 _libclang_rt=	libclang_rt
-.elif ! ${MACHINE_ARCH:Mmips*c*} && ${MACHINE_ARCH} != "mips" && \
+.elif !${MACHINE_ABI:Mpurecap} && ${MACHINE_ARCH} != "mips" && \
     ! ${MACHINE_ARCH:Mriscv*}
 .error "NOT BUILDING libclang_rt for ${MACHINE_ARCH}"
 .endif
@@ -265,8 +265,10 @@ SUBDIR_PARALLEL=
 SUBDIR:=	${SUBDIR:Nlibc++experimental}
 .endif
 
-.if ${MACHINE_ARCH:Mmips*c*}
+.if ${MACHINE_ABI:Mpurecap}
 SUBDIR+=	libmalloc_simple
+.endif
+.if ${MK_LIBCHERI} == "yes"
 SUBDIR.${MK_LIBCHERI}+=	libcheri_syscalls
 SUBDIR.${MK_LIBCHERI}+=	libcheri_support
 .endif
