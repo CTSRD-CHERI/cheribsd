@@ -65,45 +65,44 @@ atomic_##NAME##_rel_##WIDTH(__volatile uint##WIDTH##_t *p, uint##WIDTH##_t v)\
 	atomic_##NAME##_##WIDTH(p, v);					\
 }
 
-#define	ATOMIC_CMPSET_ACQ_REL(WIDTH)					\
+#define	ATOMIC_CMPSET_ORDER(WIDTH, SUFFIX, ORDER)			\
 static __inline  int							\
-atomic_cmpset_acq_##WIDTH(__volatile uint##WIDTH##_t *p,		\
+atomic_cmpset##SUFFIX##WIDTH(__volatile uint##WIDTH##_t *p,		\
     uint##WIDTH##_t cmpval, uint##WIDTH##_t newval)			\
 {									\
-	int retval;							\
 									\
-	retval = atomic_cmpset_##WIDTH(p, cmpval, newval);		\
-	fence();							\
-	return (retval);						\
-}									\
-									\
-static __inline  int							\
-atomic_cmpset_rel_##WIDTH(__volatile uint##WIDTH##_t *p,		\
-    uint##WIDTH##_t cmpval, uint##WIDTH##_t newval)			\
-{									\
-	fence();							\
-	return (atomic_cmpset_##WIDTH(p, cmpval, newval));		\
+	/* Return 1 on success, 0 on failure */				\
+	return (__atomic_compare_exchange_n(				\
+	    p, &cmpval, newval, 0, ORDER, ORDER));			\
 }
 
-#define	ATOMIC_FCMPSET_ACQ_REL(WIDTH)					\
+#define	ATOMIC_FCMPSET_ORDER(WIDTH, SUFFIX, ORDER)			\
 static __inline  int							\
-atomic_fcmpset_acq_##WIDTH(__volatile uint##WIDTH##_t *p,		\
-    uint##WIDTH##_t *cmpval, uint##WIDTH##_t newval)			\
+atomic_fcmpset##SUFFIX##WIDTH(__volatile uint##WIDTH##_t *p,		\
+    uint##WIDTH##_t* cmpval, uint##WIDTH##_t newval)			\
 {									\
-	int retval;							\
 									\
-	retval = atomic_fcmpset_##WIDTH(p, cmpval, newval);		\
-	fence();							\
-	return (retval);						\
-}									\
-									\
-static __inline  int							\
-atomic_fcmpset_rel_##WIDTH(__volatile uint##WIDTH##_t *p,		\
-    uint##WIDTH##_t *cmpval, uint##WIDTH##_t newval)			\
-{									\
-	fence();							\
-	return (atomic_fcmpset_##WIDTH(p, cmpval, newval));		\
+	/* fcmpset updates cmpval on failure and uses weak cmpxchg */	\
+	return (__atomic_compare_exchange_n(				\
+	    p, cmpval, newval, 1, ORDER, ORDER));			\
 }
+
+
+#define	ATOMIC_CMPSET_ACQ_REL(WIDTH)					\
+	ATOMIC_CMPSET_ORDER(WIDTH, _acq_, __ATOMIC_ACQUIRE)		\
+	ATOMIC_CMPSET_ORDER(WIDTH, _rel_, __ATOMIC_RELEASE)
+
+#define	ATOMIC_CMPSET(WIDTH)						\
+	ATOMIC_CMPSET_ORDER(WIDTH, _, __ATOMIC_RELAXED)			\
+	ATOMIC_CMPSET_ACQ_REL(WIDTH)
+
+#define	ATOMIC_FCMPSET_ACQ_REL(WIDTH)					\
+	ATOMIC_FCMPSET_ORDER(WIDTH, _acq_, __ATOMIC_ACQUIRE)		\
+	ATOMIC_FCMPSET_ORDER(WIDTH, _rel_, __ATOMIC_RELEASE)
+
+#define	ATOMIC_FCMPSET(WIDTH)						\
+	ATOMIC_FCMPSET_ORDER(WIDTH, _, __ATOMIC_RELAXED)		\
+	ATOMIC_FCMPSET_ACQ_REL(WIDTH)					\
 
 ATOMIC_CMPSET_ACQ_REL(8);
 ATOMIC_FCMPSET_ACQ_REL(8);
@@ -154,24 +153,6 @@ atomic_clear_32(volatile uint32_t *p, uint32_t val)
 	(void)__atomic_and_fetch(p, ~val, __ATOMIC_RELAXED);
 }
 
-static __inline int
-atomic_cmpset_32(volatile uint32_t *p, uint32_t cmpval, uint32_t newval)
-{
-
-	/* Return 1 on success, 0 on failure */
-	return (__atomic_compare_exchange_n(
-	    p, &cmpval, newval, 0, __ATOMIC_RELAXED, __ATOMIC_RELAXED));
-}
-
-static __inline int
-atomic_fcmpset_32(volatile uint32_t *p, uint32_t *cmpval, uint32_t newval)
-{
-
-	/* This updates cmpval on failure and uses weak cmpxchg */
-	return (__atomic_compare_exchange_n(
-	    p, cmpval, newval, 1, __ATOMIC_RELAXED, __ATOMIC_RELAXED));
-}
-
 static __inline uint32_t
 atomic_fetchadd_32(volatile uint32_t *p, uint32_t val)
 {
@@ -200,8 +181,8 @@ ATOMIC_ACQ_REL(clear, 32)
 ATOMIC_ACQ_REL(add, 32)
 ATOMIC_ACQ_REL(subtract, 32)
 
-ATOMIC_CMPSET_ACQ_REL(32);
-ATOMIC_FCMPSET_ACQ_REL(32);
+ATOMIC_CMPSET(32)
+ATOMIC_FCMPSET(32)
 
 static __inline uint32_t
 atomic_load_acq_32(volatile uint32_t *p)
@@ -262,24 +243,6 @@ atomic_clear_64(volatile uint64_t *p, uint64_t val)
 	(void)__atomic_and_fetch(p, ~val, __ATOMIC_RELAXED);
 }
 
-static __inline int
-atomic_cmpset_64(volatile uint64_t *p, uint64_t cmpval, uint64_t newval)
-{
-
-	/* Return 1 on success, 0 on failure */
-	return (__atomic_compare_exchange_n(
-	    p, &cmpval, newval, 0, __ATOMIC_RELAXED, __ATOMIC_RELAXED));
-}
-
-static __inline int
-atomic_fcmpset_64(volatile uint64_t *p, uint64_t *cmpval, uint64_t newval)
-{
-
-	/* This updates cmpval on failure and uses weak cmpxchg */
-	return (__atomic_compare_exchange_n(
-	    p, cmpval, newval, 1, __ATOMIC_RELAXED, __ATOMIC_RELAXED));
-}
-
 static __inline uint64_t
 atomic_fetchadd_64(volatile uint64_t *p, uint64_t val)
 {
@@ -335,8 +298,8 @@ ATOMIC_ACQ_REL(clear, 64)
 ATOMIC_ACQ_REL(add, 64)
 ATOMIC_ACQ_REL(subtract, 64)
 
-ATOMIC_CMPSET_ACQ_REL(64);
-ATOMIC_FCMPSET_ACQ_REL(64);
+ATOMIC_CMPSET(64)
+ATOMIC_FCMPSET(64)
 
 static __inline uint64_t
 atomic_load_acq_64(volatile uint64_t *p)
