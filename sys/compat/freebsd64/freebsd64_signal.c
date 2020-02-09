@@ -235,3 +235,10 @@ freebsd64_sigqueue(struct thread *td, struct freebsd64_sigqueue_args *uap)
 
 	return (kern_sigqueue(td, uap->pid, uap->signum, &sv));
 }
+
+int freebsd64_sigfastblock(struct thread *td,
+    struct freebsd64_sigfastblock_args *uap)
+{
+
+	return (kern_sigfastblock(td, uap->cmd, __USER_CAP_OBJ(uap->ptr)));
+}

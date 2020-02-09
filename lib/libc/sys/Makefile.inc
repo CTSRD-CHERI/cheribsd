@@ -335,6 +335,7 @@ MAN+=	sctp_generic_recvmsg.2 \
 	shutdown.2 \
 	sigaction.2 \
 	sigaltstack.2 \
+	sigfastblock.2 \
 	sigpending.2 \
 	sigprocmask.2 \
 	sigqueue.2 \
