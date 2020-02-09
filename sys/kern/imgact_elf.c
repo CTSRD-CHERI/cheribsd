@@ -204,6 +204,18 @@ SYSCTL_INT(ASLR_NODE_OID, OID_AUTO, stack_gap, CTLFLAG_RW,
     ELF_ABI_NAME
     ": maximum percentage of main stack to waste on a random gap");
 
+#ifdef __ELF_CHERI
+static int __elfN(sigfastblock) = 0;
+SYSCTL_INT(__CONCAT(__CONCAT(_kern_elf, __ELF_WORD_SIZE),c), OID_AUTO,
+    sigfastblock, CTLFLAG_RWTUN, &__elfN(sigfastblock), 0,
+    "enable sigfastblock for new processes");
+#else
+static int __elfN(sigfastblock) = 1;
+SYSCTL_INT(__CONCAT(_kern_elf, __ELF_WORD_SIZE), OID_AUTO, sigfastblock,
+    CTLFLAG_RWTUN, &__elfN(sigfastblock), 0,
+    "enable sigfastblock for new processes");
+#endif
+
 static Elf_Brandinfo *elf_brand_list[MAX_BRANDS];
 
 #define	aligned(a, t)	(rounddown2((u_long)(a), sizeof(t)) == (u_long)(a))
@@ -1520,6 +1532,8 @@ __elfN(freebsd_copyout_auxargs)(struct image_params *imgp, uintcap_t base)
 		AUXARGS_ENTRY(pos, AT_HWCAP, *imgp->sysent->sv_hwcap);
 	if (imgp->sysent->sv_hwcap2 != NULL)
 		AUXARGS_ENTRY(pos, AT_HWCAP2, *imgp->sysent->sv_hwcap2);
+	AUXARGS_ENTRY(pos, AT_BSDFLAGS, __elfN(sigfastblock) ?
+	    ELF_BSDF_SIGFASTBLK : 0);
 	AUXARGS_ENTRY(pos, AT_ARGC, imgp->args->argc);
 	AUXARGS_ENTRY_PTR(pos, AT_ARGV, imgp->argv);
 	AUXARGS_ENTRY(pos, AT_ENVC, imgp->args->envc);
