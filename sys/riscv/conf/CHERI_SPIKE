@@ -2,6 +2,8 @@
 
 include "SPIKE"
 include "std.CHERI"
+# Spike does not have a disk device so we need a MFS root
+include "std.MFS_ROOT"
 
 ident CHERI_SPIKE
 # We have to run in the 0xc0000 memory region
