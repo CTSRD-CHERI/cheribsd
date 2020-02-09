@@ -60,12 +60,12 @@
 #define _RETURN	cret
 #endif
 
-#define ASM_LOCAL_TAILCALL(function)				\
-	_GET_LOCAL_FNPTR(t1, function);				\
-	_TAILCALL_FNPTR(t1)
-#define ASM_LOCAL_CALL(function)				\
-	_GET_LOCAL_FNPTR(t1, function);				\
-	_CALL_FNPTR(t1)
+#define ASM_LOCAL_TAILCALL(tmpreg, function)				\
+	_GET_LOCAL_FNPTR(tmpreg, function);				\
+	_TAILCALL_FNPTR(tmpreg)
+#define ASM_LOCAL_CALL(tmpreg, function)				\
+	_GET_LOCAL_FNPTR(tmpreg, function);				\
+	_CALL_FNPTR(tmpreg)
 
 #define	SYSCALL(name)						\
 ENTRY(__sys_##name);						\
@@ -81,7 +81,7 @@ ENTRY(__sys_##name);						\
 	_SYSCALL(name);						\
 	bnez	t0, 1f; 					\
 	_RETURN;						\
-1:	ASM_LOCAL_TAILCALL(cerror);				\
+1:	ASM_LOCAL_TAILCALL(t1, cerror);				\
 END(__sys_##name)
 
 #define	RSYSCALL(name)						\
@@ -91,7 +91,7 @@ ENTRY(__sys_##name);						\
 	_SYSCALL(name);						\
 	bnez	t0, 1f; 					\
 	_RETURN;						\
-1:	ASM_LOCAL_TAILCALL(cerror);				\
+1:	ASM_LOCAL_TAILCALL(t1, cerror);				\
 END(__sys_##name)
 
 /* Do a system call where the _x() is also custom (e.g. fcntl, ioctl) */
@@ -100,5 +100,5 @@ ENTRY(__sys_##name);						\
 	_SYSCALL(name);						\
 	bnez	t0, 1f; 					\
 	_RETURN;						\
-1:	ASM_LOCAL_TAILCALL(cerror);				\
+1:	ASM_LOCAL_TAILCALL(t1, cerror);				\
 END(__sys_##name)
