@@ -403,6 +403,11 @@ __DEFAULT_NO_OPTIONS+=CHERIBSDBOX
 # Compiler crash:
 # Skip until https://github.com/CTSRD-CHERI/llvm-project/issues/379 is fixed.
 BROKEN_OPTIONS+=LIBCPLUSPLUS GNUCXX CXX
+# Crash in ZFS code. TODO: investigate
+BROKEN_OPTIONS+=CDDL
+
+# Some compilation failure: TODO: investigate
+BROKEN_OPTIONS+=SVN SVNLITE
 .endif
 
 
