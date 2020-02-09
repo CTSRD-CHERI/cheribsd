@@ -42,15 +42,7 @@
 	li	t0, SYS_ ## name;				\
 	ecall
 
-#ifndef __CHERI_PURE_CAPABILITY__
-#define _GET_LOCAL_FNPTR(outreg, function)	\
-	lla outreg, _C_LABEL(function)
-#define _GET_FNPTR(outreg, function)	\
-	la outreg, _C_LABEL(function)
-#define _CALL_FNPTR(reg)	jalr reg
-#define _TAILCALL_FNPTR(reg)	jr reg
-#define _RETURN	ret
-#else
+#ifdef __CHERI_PURE_CAPABILITY__
 #define _GET_FNPTR(outreg, function)	\
 	clgc CAPABILITY_REG(outreg), _C_LABEL(function)
 #define _GET_LOCAL_FNPTR(outreg, function)	\
@@ -58,6 +50,14 @@
 #define _CALL_FNPTR(reg)	cjalr CAPABILITY_REG(reg)
 #define _TAILCALL_FNPTR(reg)	cjr CAPABILITY_REG(reg)
 #define _RETURN	cret
+#else
+#define _GET_LOCAL_FNPTR(outreg, function)	\
+	lla outreg, _C_LABEL(function)
+#define _GET_FNPTR(outreg, function)	\
+	la outreg, _C_LABEL(function)
+#define _CALL_FNPTR(reg)	jalr reg
+#define _TAILCALL_FNPTR(reg)	jr reg
+#define _RETURN	ret
 #endif
 
 #define ASM_LOCAL_TAILCALL(tmpreg, function)				\
