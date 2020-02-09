@@ -39,12 +39,12 @@ CFLAGS+=-DRTLD_SUPPORT_PER_FUNCTION_CAPTABLE=1
 CFLAGS+=-DRTLD_SUPPORT_PER_FUNCTION_CAPTABLE=0
 .endif
 
-.if ${MACHINE_ARCH:Mmips*c*}
+.if ${MACHINE_ABI:Mpurecap}
 PROG?=		ld-elf.so.1
 .else
 PROG?=		ld-cheri-elf.so.1
 .endif
-.if ${MACHINE_ARCH:Mmips*c*} && ${PROG} == ld-elf.so.1
+.if ${MACHINE_ABI:Mpurecap} && ${PROG} == ld-elf.so.1
 LINKS=		${BINDIR}/ld-elf.so.1 ${BINDIR}/ld-cheri-elf.so.1
 .endif
 SRCS=		rtld_start.S reloc.c rtld.c heap.c malloc.c cheri_reloc.c
