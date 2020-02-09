@@ -392,7 +392,7 @@ BROKEN_OPTIONS+=SSP
 BROKEN_OPTIONS+=SSP
 # nscd(8) caching depends on marshaling pointers to the daemon and back
 # and can't work without a rewrite.
-BROKEN_OPTIONS+=NS_CACHINE
+BROKEN_OPTIONS+=NS_CACHING
 # cheribsdbox is a useful recovery tool
 __DEFAULT_YES_OPTIONS+=CHERIBSDBOX
 .else
