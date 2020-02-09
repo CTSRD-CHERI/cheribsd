@@ -385,4 +385,5 @@ MIASM =  \
 	cheriabi_copy_file_range.o \
 	cheriabi___sysctlbyname.o \
 	cheriabi_shm_open2.o \
-	cheriabi_shm_rename.o
+	cheriabi_shm_rename.o \
+	cheriabi_sigfastblock.o

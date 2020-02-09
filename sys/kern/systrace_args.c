@@ -3357,6 +3357,14 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 3;
 		break;
 	}
+	/* sigfastblock */
+	case 573: {
+		struct sigfastblock_args *p = params;
+		iarg[0] = p->cmd; /* int */
+		uarg[1] = (intptr_t) p->ptr; /* uint32_t * __capability */
+		*n_args = 2;
+		break;
+	}
 	default:
 		*n_args = 0;
 		break;
@@ -8975,6 +8983,19 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
+	/* sigfastblock */
+	case 573:
+		switch(ndx) {
+		case 0:
+			p = "int";
+			break;
+		case 1:
+			p = "userland uint32_t * __capability";
+			break;
+		default:
+			break;
+		};
+		break;
 	default:
 		break;
 	};
@@ -10893,6 +10914,11 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		break;
 	/* shm_rename */
 	case 572:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* sigfastblock */
+	case 573:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;

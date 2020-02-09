@@ -3729,3 +3729,13 @@ SYS_STUB(572, int, shm_rename,
     /* _localcheck */ {if (!(cheri_getperm(path_from) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} if (!(cheri_getperm(path_to) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} }
 )
 
+SYS_STUB(573, int, sigfastblock,
+    /* _protoargs */ (int cmd, uint32_t *  ptr),
+    /* _protoargs_chk */ (int *retp , int * __capability stub_errno, int cmd, uint32_t * __capability   ptr),
+    /* _protoargs_err */ (int * __capability stub_errno, int cmd, uint32_t * __capability   ptr),
+    /* _callargs */ (cmd, (__cheri_fromcap uint32_t * )ptr),
+    /* _callargs_chk */ (&ret, stub_errno, cmd, ptr),
+    /* _callargs_err */ (&errno, cmd, (uint32_t * )ptr),
+    /* _localcheck */ {if (!(cheri_getperm(ptr) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} }
+)
+
