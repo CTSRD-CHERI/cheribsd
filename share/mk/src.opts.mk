@@ -398,7 +398,7 @@ BROKEN_OPTIONS+=NS_CACHINE
 .if ${__T:Mriscv*c*}
 # Compiler crash:
 # Skip until https://github.com/CTSRD-CHERI/llvm-project/issues/379 is fixed.
-BROKEN_OPTIONS+=LIBCPLUSPLUS
+BROKEN_OPTIONS+=LIBCPLUSPLUS GNUCXX CXX
 .endif
 
 
