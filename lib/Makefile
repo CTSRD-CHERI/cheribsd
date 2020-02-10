@@ -93,6 +93,7 @@ SUBDIR=	${SUBDIR_BOOTSTRAP} \
 	libstdthreads \
 	libsysdecode \
 	libtacplus \
+	libthread_db \
 	libucl \
 	libufs \
 	libugidfw \
@@ -105,11 +106,6 @@ SUBDIR=	${SUBDIR_BOOTSTRAP} \
 	libz \
 	libzstd \
 	ncurses
-
-.if !${MACHINE_ABI:Mpurecap}
-# Needs changes to be useful for purecap and not used by anything (yet)
-SUBDIR+=	libthread_db
-.endif
 
 # Inter-library dependencies.  When the makefile for a library contains LDADD
 # libraries, those libraries should be listed as build order dependencies here.
