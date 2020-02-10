@@ -35,8 +35,10 @@
 #define CHERI_INIT_GLOBALS_GDC_ONLY
 #include <cheri_init_globals.h>
 
-/* Avoid adding an unncessary crt_init_globals() export from crt1.o for a
- * function that the compiler will inline anyway: */
+/*
+ * Avoid adding an unnecessary crt_init_globals() export from crt1.o for a
+ * function that the compiler will inline anyway:
+ */
 #ifndef DONT_EXPORT_CRT_INIT_GLOBALS
 #define CRT_INIT_GLOBALS_STATIC
 #else

@@ -99,6 +99,13 @@ asm(
 /*
  * The entry function, C part. This performs the bulk of program initialisation
  * before handing off to main().
+ *
+ * It is important to note that function calls and global variable accesses
+ * can only be made after do_crt_init_globals() has completed (as this
+ * initializes the capabilities to globals and functions in the captable, which
+ * is used for all function calls). This restriction only applies to statically
+ * linked binaries since the dynamic linker takes care of initialization
+ * otherwise.
  */
 static void
 _start(void *auxv,
@@ -155,6 +162,8 @@ _start(void *auxv,
 	 */
 	do_crt_init_globals(at_phdr, at_phnum);
 #endif
+	/* We can access global variables/make function calls now. */
+
 	__auxargs = auxv;
 
 	handle_argv(argc, argv, env);
