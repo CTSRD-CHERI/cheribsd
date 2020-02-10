@@ -40,22 +40,19 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: head/lib/csu/mips/crt1_c.c 245133 2013-01-07 17:58:27Z kib $");
-
-#ifndef __GNUC__
-#error "GCC is needed to compile this file"
-#endif
+__FBSDID("$FreeBSD$");
 
 #include <sys/types.h>
-
 #include <machine/elf.h>
-
 #include <stdbool.h>
 #include <stdlib.h>
 #include "libc_private.h"
 #include "crtbrand.c"
 #include "ignore_init.c"
-/* For -pie executables rtld will initialize the __cap_relocs */
+/*
+ * For -pie executables rtld will process the __cap_relocs, so we don't need
+ * to include the code here.
+ */
 #ifndef POSITION_INDEPENDENT_STARTUP
 #define DONT_EXPORT_CRT_INIT_GLOBALS
 #define CRT_INIT_GLOBALS_GDC_ONLY
