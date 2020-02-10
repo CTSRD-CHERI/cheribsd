@@ -96,15 +96,9 @@ asm(
 	"nop\n\t");
 #endif
 
-/* The entry function, C part. This performs the bulk of program initialisation
- * before handing off to main(). It is called by __start, which is defined in
- * crt1_s.s, and necessarily written in raw assembly so that it can re-align
- * the stack before setting up the first stack frame and calling _start1().
- *
- * It would be nice to be able to hide the _start1 symbol, but that's not
- * possible, since it must be present in the GOT in order to be resolvable by
- * the position independent code in __start.
- * See: http://stackoverflow.com/questions/8095531/mips-elf-and-partial-linking
+/*
+ * The entry function, C part. This performs the bulk of program initialisation
+ * before handing off to main().
  */
 static void
 _start(void *auxv,
