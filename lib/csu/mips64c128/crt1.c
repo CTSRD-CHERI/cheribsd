@@ -117,23 +117,17 @@ _start(void *auxv,
 	char **argv = NULL;
 	char **env = NULL;
 	const bool has_dynamic_linker = obj != NULL && cleanup != NULL;
-#ifdef POSITION_INDEPENDENT_STARTUP
-	if (!has_dynamic_linker)
-		__builtin_trap();
-#else
+#ifndef POSITION_INDEPENDENT_STARTUP
 	const Elf_Phdr *at_phdr = NULL;
 	long at_phnum = 0;
+#else
+
+	if (!has_dynamic_linker)
+		__builtin_trap(); /* RTLD missing? Wrong *crt1.o linked? */
 #endif
 
-	/*
-	 * XXX: Clear DDC. Eventually the kernel should stop setting it in the
-	 * first place.
-	 */
-#ifdef __CHERI_CAPABILITY_TABLE__
-	__asm__ __volatile__ ("csetdefault %0" : : "C" (NULL));
-#else
-#pragma message("Not clearing $ddc since it is required for the legacy ABI")
-#endif
+	if (cheri_getdefault() != NULL)
+		__builtin_trap(); /* $ddc should be NULL */
 
 	/*
 	 * Digest the auxiliary vector for local use.
