@@ -69,10 +69,7 @@ extern void crt_call_constructors(void);
 
 #ifdef GCRT
 /* Profiling support. */
-extern void _mcleanup(void);
-extern void monstartup(void *, void *);
-extern int eprol;
-extern int etext;
+#error "GCRT should not be defined for purecap"
 #endif
 
 Elf_Auxinfo *__auxargs;
@@ -179,20 +176,6 @@ _start(void *auxv,
 	 * binaries. TODO: remove for statically linked ones too
 	 */
 	crt_call_constructors();
-#endif
-
-#ifdef GCRT
-	/* Set up profiling support for the program, if we're being compiled
-	 * with profiling support enabled (-DGCRT).
-	 * See: http://sourceware.org/binutils/docs/gprof/Implementation.html
-	 */
-	atexit(_mcleanup);
-	monstartup(&eprol, &etext);
-
-	/* Create an 'eprol' (end of prologue?) label which delimits the start
-	 * of the .text section covered by profiling. This must be before
-	 * main(). */
-__asm__("eprol:");
 #endif
 
 #if defined(__CHERI_CAPABILITY_TABLE__) && __CHERI_CAPABILITY_TABLE__ != 3
