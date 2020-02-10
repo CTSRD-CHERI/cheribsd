@@ -51,9 +51,7 @@ __FBSDID("$FreeBSD$");
 #endif
 
 struct Struct_Obj_Entry;
-
-static void _start(void *, void (*)(void), struct Struct_Obj_Entry *) __used;
-extern void crt_call_constructors(void);
+void _start(void *, void (*)(void), struct Struct_Obj_Entry *) __exported;
 
 #ifdef GCRT
 /* Profiling support. */
@@ -73,7 +71,7 @@ Elf_Auxinfo *__auxargs;
  * This restriction only applies to statically linked binaries since the dynamic
  * linker takes care of initialization otherwise.
  */
-static void
+void
 _start(void *auxv,
 	void (*cleanup)(void),			/* from shared loader */
 	struct Struct_Obj_Entry *obj)		/* from shared loader */
