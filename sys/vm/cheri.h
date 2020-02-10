@@ -44,7 +44,7 @@
 #include <machine/cherireg.h>
 
 /* Check that a capability is dereferenceable */
-#define CHERI_VM_ASSERT_VALID(ptr)					\
+#define	CHERI_VM_ASSERT_VALID(ptr)					\
 	KASSERT(cheri_gettag((void *)(ptr)),				\
 		("VM expect valid capability %s %s:%d", __func__,	\
 		 __FILE__, __LINE__))
@@ -53,7 +53,7 @@
  * This is useful to detect when someone is passing a vm_offset_t* when
  * we want a uintptr_t*
  */
-#define CHERI_VM_ASSERT_FIT_PTR(ptr) do {				\
+#define	CHERI_VM_ASSERT_FIT_PTR(ptr) do {				\
 		CHERI_VM_ASSERT_VALID(ptr);				\
 		KASSERT(cheri_getlen((void *)ptr) >= sizeof(void *),	\
 			("Cheri can not store a pointer here %p, "	\
@@ -66,7 +66,7 @@
  * Check whether the bounds on a pointer have been set correctly
  * by an allocator
  */
-#define CHERI_VM_ASSERT_BOUNDS(ptr, expect) do {			\
+#define	CHERI_VM_ASSERT_BOUNDS(ptr, expect) do {			\
 		CHERI_VM_ASSERT_VALID(ptr);				\
 		KASSERT(cheri_getlen((void *)ptr) == expect,		\
 			("Invalid bounds on pointer in %s %s:%d "	\
@@ -80,7 +80,7 @@
  * Check that the bounds on a pointers are matching the expected length.
  * This is used to ensure exact bounds.
  */
-#define CHERI_VM_ASSERT_EXACT(ptr, len) do {				\
+#define	CHERI_VM_ASSERT_EXACT(ptr, len) do {				\
 		KASSERT(cheri_getlen((void *)ptr) == len,		\
 			("Inexact bounds on pointer in %s %s:%d "	\
 			"expected %lx, found %lx",			\
@@ -88,14 +88,15 @@
 			(u_long)len, cheri_getlen((void *)ptr)));	\
 	} while (0)
 
-#define cheri_vm_representable_len(l)		\
+#define	cheri_vm_representable_len(l)		\
 	CHERI_REPRESENTABLE_LENGTH(l)
 
 #else /* ! CHERI_PURECAP_KERNEL */
-#define CHERI_VM_ASSERT_VALID(ptr)
-#define CHERI_VM_ASSERT_FIT_PTR(ptr)
-#define CHERI_VM_ASSERT_BOUNDS(ptr, expect)
-#define cheri_vm_representable_len(l) (l)
+#define	CHERI_VM_ASSERT_VALID(ptr)
+#define	CHERI_VM_ASSERT_FIT_PTR(ptr)
+#define	CHERI_VM_ASSERT_BOUNDS(ptr, expect)
+#define	CHERI_VM_ASSERT_EXACT(ptr, len)
+#define	cheri_vm_representable_len(l) (l)
 #endif /* ! CHERI_PURECAP_KERNEL*/
 
 #endif /* _VM_CHERI_H_ */

@@ -64,7 +64,9 @@ __FBSDID("$FreeBSD$");
 #include <vm/uma.h>
 #include <vm/uma_dbg.h>
 
+#ifdef CHERI_PURECAP_KERNEL
 #include <cheri/cheric.h>
+#endif
 
 /*
  * In FreeBSD, Mbufs and Mbuf Clusters are allocated from UMA
@@ -736,7 +738,11 @@ mb_ctor_clust(void *mem, int size, void *arg, int how)
 
 	m = (struct mbuf *)arg;
 	if (m != NULL) {
+#ifdef CHERI_PURECAP_KERNEL
 		m->m_ext.ext_buf = cheri_csetbounds((char *)mem, size);
+#else
+		m->m_ext.ext_buf = mem;
+#endif
 		m->m_data = m->m_ext.ext_buf;
 		m->m_flags |= M_EXT;
 		m->m_ext.ext_free = NULL;
@@ -1547,7 +1553,11 @@ m_extadd(struct mbuf *mb, char *buf, u_int size, m_ext_free_t freef,
 	KASSERT(type != EXT_CLUSTER, ("%s: EXT_CLUSTER not allowed", __func__));
 
 	mb->m_flags |= (M_EXT | flags);
+#ifdef CHERI_PURECAP_KERNEL
 	mb->m_ext.ext_buf = cheri_csetbounds(buf, size);
+#else
+	mb->m_ext.ext_buf = buf;
+#endif
 	mb->m_data = mb->m_ext.ext_buf;
 	mb->m_ext.ext_size = size;
 	mb->m_ext.ext_free = freef;

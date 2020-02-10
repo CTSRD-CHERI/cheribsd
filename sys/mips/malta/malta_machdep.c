@@ -356,7 +356,7 @@ platform_argv_ptr(int32_t argv)
 
 #else
 static void
-platform_clear_bss(void * __capability kroot)
+platform_clear_bss()
 {
 	vm_offset_t kernend;
 
@@ -384,7 +384,11 @@ platform_start(__register_t a0, __intptr_t a1,  __intptr_t a2,
 	int i;
 
 	/* Clear the BSS and SBSS segments */
+#ifdef CHERI_PURECAP_KERNEL
 	platform_clear_bss(cheri_kdata_capability);
+#else
+        platform_clear_bss();
+#endif
 
 	mips_postboot_fixup();
 

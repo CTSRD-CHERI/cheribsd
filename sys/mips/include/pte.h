@@ -42,7 +42,8 @@ typedef	uint64_t pt_entry_t;
 typedef	uint32_t pt_entry_t;
 #endif
 
-#if defined(_KERNEL) && (defined(CHERI_PURECAP_KERNEL) || !defined(__CHERI_PURE_CAPABILITY__))
+#ifdef _KERNEL
+#ifdef CHERI_PURECAP_KERNEL
 /*
  * The pointer to the second-level page table entry can is a capability
  * in the purecap kernel.
@@ -60,14 +61,27 @@ pde_page_bound(vm_ptr_t ptr)
 	    CHERI_PERM_LOAD_CAP | CHERI_PERM_STORE_CAP |
 	    CHERI_PERM_STORE_LOCAL_CAP));
 }
+#else /* ! CHERI_PURECAP_KERNEL */
+
+#define	pde_page_bound(ptr) (pd_entry_t)(ptr)
+#if !defined(__CHERI_PURE_CAPABILITY__)
+typedef	pt_entry_t *pd_entry_t;
 #else
 /*
  * XXX: used in the kernel to set VM system paramaters.  Only used for
  * the parameter macros (which use its size) in usespace.
  */
 typedef uint64_t pd_entry_t;
-#define pde_page_bound(ptr) (pd_entry_t)(ptr)
 #endif
+
+#endif /* ! CHERI_PURECAP_KERNEL */
+#else /* ! _KERNEL */
+/*
+ * XXX: used in the kernel to set VM system paramaters.  Only used for
+ * the parameter macros (which use its size) in usespace.
+ */
+typedef uint64_t pd_entry_t;
+#endif /* ! _KERNEL */
 #endif /* ! _LOCORE */
 
 /*

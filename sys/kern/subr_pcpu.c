@@ -104,7 +104,7 @@ dpcpu_init(void *dpcpu, int cpuid)
 
 	pcpu = pcpu_find(cpuid);
 #ifndef CHERI_PURECAP_KERNEL
-	pcpu->pc_dynamic = (uintptr_t)dpcpu - DPCPU_START;
+	pcpu->pc_dynamic = (uintptr_t)dpcpu - (uintptr_t)DPCPU_START;
 #else
 	/*
 	 * We can't subtract the linker set start address

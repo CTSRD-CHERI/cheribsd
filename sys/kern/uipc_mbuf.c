@@ -55,7 +55,9 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_pageout.h>
 #include <vm/vm_page.h>
 
+#ifdef CHERI_PURECAP_KERNEL
 #include <cheri/cheric.h>
+#endif
 
 SDT_PROBE_DEFINE5_XLATE(sdt, , , m__init,
     "struct mbuf *", "mbufinfo_t *",
@@ -354,7 +356,11 @@ m_pkthdr_init(struct mbuf *m, int how)
 #ifdef MAC
 	int error;
 #endif
+#ifdef CHERI_PURECAP_KERNEL
 	m->m_data = cheri_csetbounds(m->m_pktdat, MHLEN);
+#else
+        m->m_data = m->m_pktdat;
+#endif
 	bzero(&m->m_pkthdr, sizeof(m->m_pkthdr));
 #ifdef NUMA
 	m->m_pkthdr.numa_domain = M_NODOM;
@@ -394,7 +400,11 @@ m_move_pkthdr(struct mbuf *to, struct mbuf *from)
 	to->m_flags = (from->m_flags & M_COPYFLAGS) |
 	    (to->m_flags & (M_EXT | M_NOMAP));
 	if ((to->m_flags & M_EXT) == 0)
+#ifdef CHERI_PURECAP_KERNEL
 		to->m_data = cheri_csetbounds(to->m_pktdat, MHLEN);
+#else
+		to->m_data = to->m_pktdat;
+#endif
 	to->m_pkthdr = from->m_pkthdr;		/* especially tags */
 	SLIST_INIT(&from->m_pkthdr.tags);	/* purge tags from src */
 	from->m_flags &= ~M_PKTHDR;
@@ -433,7 +443,11 @@ m_dup_pkthdr(struct mbuf *to, const struct mbuf *from, int how)
 	to->m_flags = (from->m_flags & M_COPYFLAGS) |
 	    (to->m_flags & (M_EXT | M_NOMAP));
 	if ((to->m_flags & M_EXT) == 0)
+#ifdef CHERI_PURECAP_KERNEL
 		to->m_data = cheri_csetbounds(to->m_pktdat, MHLEN);
+#else
+		to->m_data = to->m_pktdat;
+#endif
 	to->m_pkthdr = from->m_pkthdr;
 	if (from->m_pkthdr.csum_flags & CSUM_SND_TAG)
 		m_snd_tag_ref(from->m_pkthdr.snd_tag);
@@ -567,8 +581,12 @@ m_copypacket(struct mbuf *m, int how)
 		n->m_data = m->m_data;
 		mb_dupcl(n, m);
 	} else {
+#ifdef CHERI_PURECAP_KERNEL
 		n->m_data = (char *)cheri_csetbounds(n->m_pktdat, MHLEN) +
 		    (m->m_data - m->m_pktdat );
+#else
+		n->m_data = (char *)n->m_pktdat + (m->m_data - m->m_pktdat);
+#endif
 		bcopy(mtod(m, char *), mtod(n, char *), n->m_len);
 	}
 

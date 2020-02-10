@@ -185,6 +185,12 @@
 	clc	creg, base, (U_PCB_REGS + (SZREG * offs)) (CHERI_REG_KDC)
 #endif
 
+#define	SAVE_U_PCB_CONTEXT(reg, offs, base)			\
+	REG_S	reg, (U_PCB_CONTEXT + (SZREG * offs)) (base)
+
+#define	RESTORE_U_PCB_CONTEXT(reg, offs, base)			\
+	REG_L	reg, (U_PCB_CONTEXT + (SZREG * offs)) (base)
+
 #else /* CHERI_PURECAP_KERNEL */
 
 /*

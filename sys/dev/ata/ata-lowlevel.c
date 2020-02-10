@@ -852,7 +852,7 @@ ata_pio_read(struct ata_request *request, int length)
 #ifdef CHERI_PURECAP_KERNEL
 				addr = cheri_csetbounds((void *)(page + moff), size);
 #else
-				addr = page + moff;
+				addr = (uint8_t *)page + moff;
 #endif
 			}
 		} else
@@ -942,7 +942,7 @@ ata_pio_write(struct ata_request *request, int length)
 #ifdef CHERI_PURECAP_KERNEL
 				addr = cheri_csetbounds((void *)(page + moff), size);
 #else
-				addr = page + moff;
+				addr = (uint8_t *)page + moff;
 #endif
 			}
 		} else

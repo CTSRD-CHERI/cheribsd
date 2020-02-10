@@ -73,7 +73,6 @@ static_hints_to_env(void *data __unused)
 
 		i = strlen(cp);
 		line = malloc(i + 1, M_TEMP, M_WAITOK);
-		CHERI_PRINT_PTR(line);
 		strcpy(line, cp);
 		line[eqidx] = line[i] = '\0';
 		/*

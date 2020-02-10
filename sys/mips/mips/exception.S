@@ -733,7 +733,7 @@ NESTED_NOPROFILE(MipsUserGenException, CALLFRAME_SIZ, ra)
 	 */
 	RESTORE_CREGS_FROM_PCB(k1, t0)
 #endif
-	RESTORE_REGS_FROM_PCB(k1)
+	RESTORE_REGS_FROM_PCB(k1, t0)
 
 	mtc0	k0, MIPS_COP_0_STATUS	# still exception level
 	ITLBNOPFIX
@@ -1492,36 +1492,6 @@ FPReturn:
 	.set pop
 END(MipsFPTrap)
 #endif /* CPU_HAVEFPU */
-
-#ifndef INTRNG
-/*
- * Interrupt counters for vmstat.
- */
-	.data
-	.globl intrcnt
-	.globl sintrcnt
-	.globl intrnames
-	.globl sintrnames
-intrnames:
-	.space  INTRCNT_COUNT * (MAXCOMLEN + 1) * 2
-sintrnames:
-#ifdef __mips_n64
-	.quad  INTRCNT_COUNT * (MAXCOMLEN + 1) * 2
-#else
-	.int  INTRCNT_COUNT * (MAXCOMLEN + 1) * 2
-#endif
-
-	.align	(_MIPS_SZLONG / 8)
-intrcnt:
-	.space  INTRCNT_COUNT * (_MIPS_SZLONG / 8) * 2
-sintrcnt:
-#ifdef __mips_n64
-	.quad  INTRCNT_COUNT * (_MIPS_SZLONG / 8) * 2
-#else
-	.int  INTRCNT_COUNT * (_MIPS_SZLONG / 8) * 2
-#endif
-#endif /* INTRNG */
-
 
 /*
  * Vector to real handler in KSEG1.

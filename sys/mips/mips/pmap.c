@@ -3311,7 +3311,7 @@ pmap_mapdev_attr(vm_paddr_t pa, vm_size_t size, vm_memattr_t ma)
 	 * pa > 0x20000000 we should make proper mapping * using pmap_kenter.
 	 */
 	if (MIPS_DIRECT_MAPPABLE(pa + size - 1) && ma == VM_MEMATTR_UNCACHEABLE) {
-		va = MIPS_PHYS_TO_DIRECT_UNCACHED(pa);
+		va = (caddr_t)MIPS_PHYS_TO_DIRECT_UNCACHED(pa);
 #ifdef CHERI_PURECAP_KERNEL
 		/* Device memory should never contain capabilities (for now) */
 		va = cheri_csetbounds(va, size);
