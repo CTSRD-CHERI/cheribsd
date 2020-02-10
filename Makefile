@@ -143,7 +143,9 @@ TGTS=	all all-man buildenv buildenvvars buildkernel buildworld \
 	build32 distribute32 install32 \
 	build64 distribute64 install64 \
 	buildsoft distributesoft installsoft \
-	buildcheri distributecheri libcheribuildenv libcheribuildenvvars \
+	buildcheri distributecheri \
+	libcheribuildenv libcheribuildenvvars \
+	lib64buildenv lib64buildenvvars lib32buildenv lib32buildenvvars \
 	builddtb xdev xdev-build xdev-install \
 	xdev-links native-xtools native-xtools-install stageworld stagekernel \
 	stage-packages stage-packages-kernel stage-packages-world \
