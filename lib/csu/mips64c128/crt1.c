@@ -96,6 +96,61 @@ asm(
 	"nop\n\t");
 #endif
 
+
+static __always_inline bool
+has_dynamic_linker(void) {
+#ifdef PCREL_SYMBOL_ADDRESSES_WORK
+	void* _pcc_after_daddui = 0;
+	int64_t _dynamic_pcrel = 0;
+	/*
+	 * We can't get the address of _DYNAMIC in the purecap ABI before globals
+	 * are initialized so we need to use dla here. If _DYNAMIC exists
+	 * then the runtime-linker will have done the __cap_relocs already
+	 * so we should be processing them here. Furthermore it will also have
+	 * enforced relro so we will probably crash when attempting to write
+	 * const pointers that are initialized to global addresses.
+	 *
+	 * TODO: Maybe clang should provide a __builtin_symbol_address() that is
+	 * always filled in a static link time...
+	 */
+	__asm__ volatile(".global _DYNAMIC\n\t"
+	    /*
+	     * XXXAR: For some reason the attribute weak above is ignored if we
+	     * don't also include it in the inline assembly
+	     */
+	    ".weak _DYNAMIC\n\t"
+	    "lui %0, %%pcrel_hi(_DYNAMIC - 8)\n\t"
+	    "daddiu %0, %0, %%pcrel_lo(_DYNAMIC - 4)\n\t"
+	    "cgetpcc %1\n\t"
+	    : "+r"(_dynamic_pcrel), "+C"(_pcc_after_daddui));
+
+	/*
+	 * If the address of _DYNAMIC is non-zero then we are dynamically linked
+	 * and RTLD will be responsible for processing the capability relocs
+	 * FIXME: MIPS only has 32-bit pcrelative relocations so this overflows
+	 * For now just assume that if the pcrel value is greater than INT_MAX
+	 * the value of _DYNAMIC is zero
+	 */
+	if ((vaddr_t)_pcc_after_daddui + _dynamic_pcrel != 0 &&
+	    labs(_dynamic_pcrel) <= (int64_t)INT32_MAX)
+		return true;
+#else
+	/*
+	 * XXXAR: Since the MIPS %pcrel doesn't appear to work to get the value
+	 * of _DYNAMIC without a text relocation I changed LLD to emit a symbol
+	 * _HAS__DYNAMIC instead. This also has the advantage that it only needs
+	 * a single instruction to load rather than the full dla/pcrel sequence.
+	 */
+	int64_t _has__DYNAMIC;
+	__asm__ volatile("ori %0, $zero, %%lo(_HAS__DYNAMIC)\n\t"
+	: "+r"(_has__DYNAMIC));
+	/* If we are dynamically linked, the runtime linker takes care of this */
+	if (_has__DYNAMIC)
+		return true;
+#endif
+	return false;
+}
+
 /*
  * The entry function, C part. This performs the bulk of program initialisation
  * before handing off to main().
@@ -136,7 +191,7 @@ _start(void *auxv,
 	 * Note: this file must be compile with -fno-jump-tables to avoid use
 	 * of the captable before do_crt_init_globals() has been called.
 	 */
-	for (Elf_Auxinfo *auxp = auxv;  auxp->a_type != AT_NULL;  auxp++) {
+	for (Elf_Auxinfo *auxp = auxv; auxp->a_type != AT_NULL;  auxp++) {
 		if (auxp->a_type == AT_ARGV) {
 			argv = (char **)auxp->a_un.a_ptr;
 		} else if (auxp->a_type == AT_ENVV) {
@@ -160,7 +215,8 @@ _start(void *auxv,
 	 * Note: We parse the phdrs to ensure that the global data cap does
 	 * not span the readonly segment or text segment.
 	 */
-	do_crt_init_globals(at_phdr, at_phnum);
+	if (!has_dynamic_linker())
+		do_crt_init_globals(at_phdr, at_phnum);
 #endif
 	/* We can access global variables/make function calls now. */
 

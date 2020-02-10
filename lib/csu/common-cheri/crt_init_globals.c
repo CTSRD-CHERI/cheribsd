@@ -34,6 +34,9 @@
 
 #define CHERI_INIT_GLOBALS_GDC_ONLY
 #include <cheri_init_globals.h>
+#ifndef CHERI_INIT_GLOBALS_SUPPORTS_CONSTANT_FLAG
+#error "cheri_init_globals.h is outdated. Please update LLVM"
+#endif
 
 /*
  * Avoid adding an unnecessary crt_init_globals() export from crt1.o for a
@@ -56,55 +59,6 @@ __attribute__((weak)) extern int _DYNAMIC __no_subobject_bounds;
 CRT_INIT_GLOBALS_STATIC void
 crt_init_globals_3(void *data_cap, const void *code_cap, const void *rodata_cap)
 {
-#ifdef PCREL_SYMBOL_ADDRESSES_WORK
-	void* _pcc_after_daddui = 0;
-	int64_t _dynamic_pcrel = 0;
-	/*
-	 * We can't get the address of _DYNAMIC in the purecap ABI before globals
-	 * are initialized so we need to use dla here. If _DYNAMIC exists
-	 * then the runtime-linker will have done the __cap_relocs already
-	 * so we should be processing them here. Furthermore it will also have
-	 * enforced relro so we will probably crash when attempting to write
-	 * const pointers that are initialized to global addresses.
-	 *
-	 * TODO: Maybe clang should provide a __builtin_symbol_address() that is
-	 * always filled in a static link time...
-	 */
-	__asm__ volatile(".global _DYNAMIC\n\t"
-	    /*
-	     * XXXAR: For some reason the attribute weak above is ignored if we
-	     * don't also include it in the inline assembly
-	     */
-	    ".weak _DYNAMIC\n\t"
-	    "lui %0, %%pcrel_hi(_DYNAMIC - 8)\n\t"
-	    "daddiu %0, %0, %%pcrel_lo(_DYNAMIC - 4)\n\t"
-	    "cgetpcc %1\n\t"
-	    : "+r"(_dynamic_pcrel), "+C"(_pcc_after_daddui));
-
-	/*
-	 * If the address of _DYNAMIC is non-zero then we are dynamically linked
-	 * and RTLD will be responsible for processing the capability relocs
-	 * FIXME: MIPS only has 32-bit pcrelative relocations so this overflows
-	 * For now just assume that if the pcrel value is greater than INT_MAX
-	 * the value of _DYNAMIC is zero
-	 */
-	if ((vaddr_t)_pcc_after_daddui + _dynamic_pcrel != 0 &&
-	    labs(_dynamic_pcrel) <= (int64_t)INT32_MAX)
-		return;
-#else
-	/*
-	 * XXXAR: Since the MIPS %pcrel doesn't appear to work to get the value
-	 * of _DYNAMIC without a text relocation I changed LLD to emit a symbol
-	 * _HAS__DYNAMIC instead. This also has the advantage that it only needs
-	 * a single instruction to load rather than the full dla/pcrel sequence.
-	 */
-	int64_t _has__DYNAMIC;
-	__asm__ volatile("ori %0, $zero, %%lo(_HAS__DYNAMIC)\n\t"
-			 : "+r"(_has__DYNAMIC));
-	/* If we are dynamically linked, the runtime linker takes care of this */
-	if (_has__DYNAMIC)
-		return;
-#endif
 	/* Otherwise we need to initialize globals manually */
 	cheri_init_globals_3(data_cap, code_cap, rodata_cap);
 }
@@ -221,19 +175,6 @@ do_crt_init_globals(const Elf_Phdr *phdr, long phnum)
 			/* TODO: should we allow a single RWX segment? */
 			__builtin_trap();
 		}
-#ifndef CHERI_INIT_GLOBALS_SUPPORTS_CONSTANT_FLAG
-		#pragma message("Warning: cheri_init_globals.h is outdated. Please update LLVM")
-		/*
-		 * For backwards compat support the old cheri_init_globals.
-		 * In this case we must include the rodata segment in the
-		 * RW cap since we don't yet have a flag in __cap_relocs for
-		 * writable vs readonly data.
-		 *
-		 * TODO: remove this in a few days/weeks
-		 */
-		writable_start = MIN(writable_start, readonly_start);
-		writable_end = MAX(writable_end, readonly_end);
-#endif
 		data_cap = cheri_setaddress(phdr, writable_start);
 		/* Bound the result and clear execute permissions. */
 		data_cap = cheri_clearperm(data_cap, CHERI_PERM_EXECUTE);
