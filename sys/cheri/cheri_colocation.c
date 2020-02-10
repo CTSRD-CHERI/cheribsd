@@ -87,23 +87,8 @@ colocation_fetch_scb(struct thread *td, struct switchercb *scbp)
 
 	error = copyincap(___USER_CFROMPTR((const void *)addr, userspace_cap),
 	    &(*scbp), sizeof(*scbp));
-#if 1
 	KASSERT(error == 0, ("%s: copyincap from %p failed with error %d\n",
 	    __func__, (void *)addr, error));
-#else
-	if (error != 0) {
-		printf("%s: copyincap from %p failed with error %d\n",
-		    __func__, (void *)addr, error);
-		return (false);
-	}
-#endif
-
-	if (scbp->scb_borrower_td == NULL) {
-		/*
-		 * Nothing borrowed yet.
-		 */
-		return (false);
-	}
 
 	return (true);
 }
@@ -146,10 +131,15 @@ void
 colocation_get_peer(struct thread *td, struct thread **peertdp)
 {
 	struct switchercb scb;
-	bool borrowing;
+	bool have_scb;
 
-	borrowing = colocation_fetch_scb(td, &scb);
-	if (borrowing)
+	have_scb = colocation_fetch_scb(td, &scb);
+	if (!have_scb) {
+		*peertdp = NULL;
+		return;
+	}
+
+	if (scb.scb_peer_scb != NULL)
 		*peertdp = scb.scb_borrower_td;
 	else
 		*peertdp = NULL;
@@ -160,16 +150,18 @@ colocation_thread_exit(struct thread *td)
 {
 	struct switchercb scb, *peerscb;
 	vaddr_t addr;
-	bool borrowing;
+	bool have_scb;
 	int error;
 
-	borrowing = colocation_fetch_scb(td, &scb);
-	if (!borrowing)
+	have_scb = colocation_fetch_scb(td, &scb);
+	if (!have_scb)
 		return;
 
-	addr = td->td_md.md_scb;
-	peerscb = (__cheri_fromcap struct switchercb *)scb.scb_peer_scb;
-	//printf("%s: terminating thread %p, peer scb %p\n", __func__, td, peerscb);
+	if (scb.scb_peer_scb != NULL)
+		peerscb = (__cheri_fromcap struct switchercb *)scb.scb_peer_scb;
+	else
+		peerscb = NULL;
+	//printf("%s: terminating thread %p, scb %p, peer scb %p\n", __func__, td, (void *)td->td_md.md_scb, peerscb);
 
 	/*
 	 * Set scb_peer_scb to a special "null" capability, so that cocall(2)
@@ -179,6 +171,8 @@ colocation_thread_exit(struct thread *td)
 	scb.scb_td = NULL;
 	scb.scb_borrower_td = NULL;
 
+	addr = td->td_md.md_scb;
+	td->td_md.md_scb = 0;
 	error = copyoutcap(&scb, ___USER_CFROMPTR((void *)addr, userspace_cap), sizeof(scb));
 	if (error != 0) {
 		printf("%s: copyoutcap to %p failed with error %d\n",
@@ -218,10 +212,10 @@ colocation_unborrow(struct thread *td, struct trapframe **trapframep)
 	struct trapframe peertrapframe;
 	struct syscall_args peersa;
 	trapf_pc_t peertpc;
-	bool borrowing;
+	bool have_scb;
 
-	borrowing = colocation_fetch_scb(td, &scb);
-	if (!borrowing)
+	have_scb = colocation_fetch_scb(td, &scb);
+	if (!have_scb)
 		return;
 
 	peertd = scb.scb_borrower_td;
