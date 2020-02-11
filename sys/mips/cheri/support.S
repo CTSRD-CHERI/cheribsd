@@ -41,8 +41,9 @@
 #include <machine/regnum.h>
 #include <machine/cpuregs.h>
 #include <machine/pcb.h>
-#include <machine/cherireg.h>
 #include <machine/cheriasm.h>
+
+#include <cheri/cherireg.h>
 
 #include "assym.inc"
 
@@ -69,9 +70,7 @@
 NESTED(copyinstr, CALLFRAME_SIZ, ra)
 XNESTED(copyinstr_c)
 	cincoffset	CHERI_REG_STC, CHERI_REG_STC, -CALLFRAME_SIZ
-	csc		$c24, zero, CALLFRAME_CSP(CHERI_REG_STC)
 	csc		$c17, zero, CALLFRAME_CRA(CHERI_REG_STC)
-	cincoffset	$c24, CHERI_REG_STC, zero
 
 	cgetbase	t0, $c3 # make sure source is in userspace
 	bge	t0, zero, 1f
@@ -93,9 +92,7 @@ XNESTED(copyinstr_c)
 	CHERI_NULL($c2)
 	csc	$c2, zero, U_PCB_ONFAULT($c1)
 
-	cincoffset	CHERI_REG_STC, $c24, zero
 	clc		$c17, zero, CALLFRAME_CRA(CHERI_REG_STC)
-	clc		$c24, zero, CALLFRAME_CSP(CHERI_REG_STC)
 	/* Propagate v0 return value from copyinstr */
 	cjr	$c17
 	cincoffset	CHERI_REG_STC, CHERI_REG_STC, CALLFRAME_SIZ
@@ -116,7 +113,6 @@ END(copyinstr)
 NESTED(copyoutstr, CALLFRAME_SIZ, ra)
 XNESTED(copyoutstr_c)
 	cincoffset	CHERI_REG_STC, CHERI_REG_STC, -CALLFRAME_SIZ
-	csc		$c24, zero, CALLFRAME_CSP(CHERI_REG_STC)
 	csc		$c17, zero, CALLFRAME_CRA(CHERI_REG_STC)
 
 	cgetbase	t0, $c4 # make sure destination is in userspace
@@ -139,9 +135,7 @@ XNESTED(copyoutstr_c)
 	CHERI_NULL($c2)
 	csc	$c2, zero, U_PCB_ONFAULT($c1)
 
-	cincoffset	CHERI_REG_STC, $c24, zero
 	clc		$c17, zero, CALLFRAME_CRA(CHERI_REG_STC)
-	clc		$c24, zero, CALLFRAME_CSP(CHERI_REG_STC)
 	/* Propagate v0 return value from copyoutstr */
 	cjr	$c17
 	cincoffset	CHERI_REG_STC, CHERI_REG_STC, CALLFRAME_SIZ
@@ -159,9 +153,7 @@ END(copyoutstr)
 NESTED(copyin, CALLFRAME_SIZ, ra)
 XNESTED(copyin_c)
 	cincoffset	CHERI_REG_STC, CHERI_REG_STC, -CALLFRAME_SIZ
-	csc		$c24, zero, CALLFRAME_CSP(CHERI_REG_STC)
 	csc		$c17, zero, CALLFRAME_CRA(CHERI_REG_STC)
-	cincoffset	$c24, CHERI_REG_STC, zero
 
 	cgetbase t0, $c3	# make sure source is in userspace
 	bge	t0, zero, 1f
@@ -183,10 +175,9 @@ XNESTED(copyin_c)
 	CHERI_NULL($c2)
 	csc	$c2, zero, U_PCB_ONFAULT($c1)
 
-	cincoffset	CHERI_REG_STC, $c24, zero
 	clc		$c17, zero, CALLFRAME_CRA(CHERI_REG_STC)
-	clc		$c24, zero, CALLFRAME_CSP(CHERI_REG_STC)
 	/* Propagate v0 return value from cheri_bcopy */
+	li	v0, 0
 	cjr	$c17
 	cincoffset	CHERI_REG_STC, CHERI_REG_STC, CALLFRAME_SIZ
 XEND(copyin_c)
@@ -204,9 +195,7 @@ END(copyin)
 NESTED(copyincap, CALLFRAME_SIZ, ra)
 XNESTED(copyincap_c)
 	cincoffset	CHERI_REG_STC, CHERI_REG_STC, -CALLFRAME_SIZ
-	csc		$c24, zero, CALLFRAME_CSP(CHERI_REG_STC)
 	csc		$c17, zero, CALLFRAME_CRA(CHERI_REG_STC)
-	cincoffset	$c24, CHERI_REG_STC, zero
 
 	cgetbase t0, $c3	# make sure source is in userspace
 	bge	t0, zero, 1f
@@ -228,10 +217,9 @@ XNESTED(copyincap_c)
 	CHERI_NULL($c2)
 	csc	$c2, zero, U_PCB_ONFAULT($c1)
 
-	cincoffset	CHERI_REG_STC, $c24, zero
 	clc		$c17, zero, CALLFRAME_CRA(CHERI_REG_STC)
-	clc		$c24, zero, CALLFRAME_CSP(CHERI_REG_STC)
 	/* Propagate v0 return value from cheri_bcopy */
+	li	v0, 0
 	cjr	$c17
 	cincoffset	CHERI_REG_STC, CHERI_REG_STC, CALLFRAME_SIZ
 XEND(copyincap_c)
@@ -248,9 +236,7 @@ END(copyincap)
 NESTED(copyout, CALLFRAME_SIZ, ra)
 XNESTED(copyout_c)
 	cincoffset	CHERI_REG_STC, CHERI_REG_STC, -CALLFRAME_SIZ
-	csc		$c24, zero, CALLFRAME_CSP(CHERI_REG_STC)
 	csc		$c17, zero, CALLFRAME_CRA(CHERI_REG_STC)
-	cincoffset	$c24, CHERI_REG_STC, zero
 
 	cgetbase t0, $c4	# make sure source is in userspace
 	bge	t0, zero, 1f
@@ -272,10 +258,9 @@ XNESTED(copyout_c)
 	CHERI_NULL($c2)
 	csc	$c2, zero, U_PCB_ONFAULT($c1)
 
-	cincoffset	CHERI_REG_STC, $c24, zero
 	clc		$c17, zero, CALLFRAME_CRA(CHERI_REG_STC)
-	clc		$c24, zero, CALLFRAME_CSP(CHERI_REG_STC)
 	/* Propagate v0 return value from cheri_bcopy */
+	li	v0, 0
 	cjr	$c17
 	cincoffset	CHERI_REG_STC, CHERI_REG_STC, CALLFRAME_SIZ
 XEND(copyout_c)
@@ -293,9 +278,7 @@ END(copyout)
 NESTED(copyoutcap, CALLFRAME_SIZ, ra)
 XNESTED(copyoutcap_c)
 	cincoffset	CHERI_REG_STC, CHERI_REG_STC, -CALLFRAME_SIZ
-	csc		$c24, zero, CALLFRAME_CSP(CHERI_REG_STC)
 	csc		$c17, zero, CALLFRAME_CRA(CHERI_REG_STC)
-	cincoffset	$c24, CHERI_REG_STC, zero
 
 	cgetbase t0, $c4	# make sure source is in userspace
 	bge	t0, zero, 1f
@@ -317,24 +300,18 @@ XNESTED(copyoutcap_c)
 	CHERI_NULL($c2)
 	csc	$c2, zero, U_PCB_ONFAULT($c1)
 
-	cincoffset	CHERI_REG_STC, $c24, zero
 	clc		$c17, zero, CALLFRAME_CRA(CHERI_REG_STC)
-	clc		$c24, zero, CALLFRAME_CSP(CHERI_REG_STC)
 	/* Propagate v0 return value from cheri_bcopy */
+	li	v0, 0
 	cjr	$c17
 	cincoffset	CHERI_REG_STC, CHERI_REG_STC, CALLFRAME_SIZ
 XEND(copyoutcap_c)
 END(copyoutcap)
 
 LEAF(copyerr)
+	// ori	zero, zero, 0xbeef
 	clc	$c17, zero, CALLFRAME_CRA(CHERI_REG_STC)
-	/*
-	 * Skip to previous frame.
-	 * XXX-AM: This assumes that the position of c24 is stable.
-	 * This is (mostly?) true if we get the fault in a leaf function.
-	 */
-	clc	$c24, zero, CALLFRAME_CSP(CHERI_REG_STC)
-	cmove	CHERI_REG_STC, $c24
+	cincoffset	CHERI_REG_STC, CHERI_REG_STC, CALLFRAME_SIZ
 	cjr	$c17
 	li	v0, EFAULT			# return error
 END(copyerr)
