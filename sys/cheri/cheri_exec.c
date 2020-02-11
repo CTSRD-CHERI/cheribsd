@@ -78,7 +78,8 @@ cheri_exec_stack_pointer(struct image_params *imgp, uintcap_t stack)
 	stacklen = rounddown2(stacklen,
 	    CHERI_REPRESENTABLE_ALIGNMENT(stacklen));
 	KASSERT(stackbase == CHERI_REPRESENTABLE_BASE(stackbase, stacklen),
-	    ("%s: rounded base != base", __func__));
+	    ("%s: rounded base (0x%zx) != base (0x%zx)", __func__,
+		CHERI_REPRESENTABLE_BASE(stackbase, stacklen), stackbase));
 	csp = cheri_setaddress((void * __capability)stack, stackbase);
 	csp = cheri_csetbounds(csp, stacklen);
 	return (csp + stacklen);
