@@ -58,7 +58,7 @@ cheri_exec_stack_pointer(struct image_params *imgp, uintcap_t stack)
 	size_t stacklen;
 	char * __capability csp;
 
-	KASSERT((__cheri_addr vaddr_t)stack % sizeof(void * __capability) == 0,
+	KASSERT(__builtin_is_aligned(stack, sizeof(void * __capability)),
 	    ("CheriABI stack pointer not properly aligned"));
 
 	/*
