@@ -48,7 +48,7 @@ static void
 usage(void)
 {
 
-	fprintf(stderr, "usage: copong [-v] service-name\n");
+	fprintf(stderr, "usage: copong [-xv] service-name\n");
 	exit(0);
 }
 
@@ -59,11 +59,14 @@ main(int argc, char **argv)
 	void * __capability switcher_data;
 	void * __capability cookie;
 	uint64_t *halfcookie;
-	bool vflag = false;
+	bool vflag = false, xflag = false;
 	int ch, error;
 
-	while ((ch = getopt(argc, argv, "v")) != -1) {
+	while ((ch = getopt(argc, argv, "xv")) != -1) {
 		switch (ch) {
+		case 'x':
+			xflag = true;
+			break;
 		case 'v':
 			vflag = true;
 			break;
@@ -103,5 +106,7 @@ main(int argc, char **argv)
 			    getpid(), halfcookie[0], halfcookie[1], buf[0]);
 		}
 		buf[0]++;
+		if (xflag)
+			abort();
 	}
 }
