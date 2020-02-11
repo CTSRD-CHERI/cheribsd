@@ -506,6 +506,9 @@ DB_SHOW_COMMAND(thread, db_show_thread)
 		db_printf(" last involuntary switch: %u.%03u s ago\n",
 		    delta / hz, (delta % hz) * 1000 / hz);
 	}
+#ifdef CPU_CHERI
+	db_print_scb_td(td);
+#endif
 }
 
 DB_SHOW_COMMAND(proc, db_show_proc)

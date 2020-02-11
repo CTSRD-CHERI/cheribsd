@@ -165,6 +165,7 @@ void	ktrccall_mdfill(struct pcb *pcb, struct ktr_ccall *kc);
 void	ktrcreturn_mdfill(struct pcb *pcb, struct ktr_creturn *kr);
 void	ktrcexception_mdfill(struct trapframe *frame,
 	    struct ktr_cexception *ke);
+void	db_print_scb_td(struct thread *td);
 #endif /* !_KERNEL */
 
 /*

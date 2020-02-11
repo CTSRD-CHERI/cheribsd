@@ -28,6 +28,11 @@
  * SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD$");
+
+#include "opt_ddb.h"
+
 #include <sys/param.h>
 #include <sys/kernel.h>
 #include <sys/mman.h>
@@ -47,6 +52,10 @@
 #include <vm/vm_page.h>
 #include <vm/vm_pageout.h>
 #include <vm/vm_map.h>
+
+#ifdef DDB
+#include <ddb/ddb.h>
+#endif
 
 extern void * __capability	userspace_cap;
 
@@ -555,3 +564,47 @@ kern_copark(struct thread *td)
 
 	return (error);
 }
+
+#ifdef DDB
+static void
+db_print_scb(struct switchercb *scb)
+{
+
+	db_printf("    scb_peer_cb:	%p\n", (__cheri_fromcap void *)scb->scb_peer_scb);
+	db_printf("    scb_td:		%p\n", scb->scb_td);
+	db_printf("    scb_borrower_td:	%p\n", scb->scb_borrower_td);
+}
+
+void
+db_print_scb_td(struct thread *td)
+{
+	struct switchercb scb;
+	bool have_scb;
+
+	db_printf(" switcher control block: %p\n", (void *)td->td_md.md_scb);
+
+	have_scb = colocation_fetch_scb(td, &scb);
+	if (!have_scb)
+		return;
+
+	db_print_scb(&scb);
+}
+
+DB_SHOW_COMMAND(scb, db_show_scb)
+{
+	struct switchercb scb;
+	int error;
+
+	if (have_addr) {
+		error = copyincap(___USER_CFROMPTR((const void *)addr, userspace_cap),
+		    &scb, sizeof(scb));
+		if (error != 0) {
+			db_printf("%s: copyincap failed, error %d\n", __func__, error);
+			return;
+		}
+		db_print_scb(&scb);
+	} else {
+		db_print_scb_td(curthread);
+	}
+}
+#endif /* DDB */
