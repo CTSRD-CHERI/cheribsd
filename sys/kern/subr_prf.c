@@ -176,8 +176,13 @@ uprintf(const char *fmt, ...)
 	int retval;
 
 	td = curthread;
-	if (TD_IS_IDLETHREAD(td))
+	if (TD_IS_IDLETHREAD(td)) {
+		/* XXXAR: for debugging early boot failures */
+		va_start(ap, fmt);
+		retval = vprintf(fmt, ap);
+		va_end(ap);
 		return (0);
+	}
 
 	sx_slock(&proctree_lock);
 	p = td->td_proc;
@@ -185,6 +190,10 @@ uprintf(const char *fmt, ...)
 	if ((p->p_flag & P_CONTROLT) == 0) {
 		PROC_UNLOCK(p);
 		sx_sunlock(&proctree_lock);
+		/* XXXAR: for debugging early boot failures */
+		va_start(ap, fmt);
+		retval = vprintf(fmt, ap);
+		va_end(ap);
 		return (0);
 	}
 	SESS_LOCK(p->p_session);
