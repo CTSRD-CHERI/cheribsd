@@ -55,7 +55,7 @@ void
 cheri_sealcap_copy(struct proc *dst, struct proc *src)
 {
 
-	cheri_memcpy(&dst->p_md.md_cheri_sealcap, &src->p_md.md_cheri_sealcap,
+	memcpy(&dst->p_md.md_cheri_sealcap, &src->p_md.md_cheri_sealcap,
 	    sizeof(dst->p_md.md_cheri_sealcap));
 }
 

@@ -5392,7 +5392,7 @@ umtx_read_rb_list(struct thread *td, struct umutex *m, uintcap_t *rb_list)
 
 #ifdef COMPAT_CHERIABI
 	if (SV_PROC_FLAG(td->td_proc, SV_CHERI)) {
-		cheri_memcpy(&m_c, m, sizeof(m_c));
+		memcpy(&m_c, m, sizeof(m_c));
 		*rb_list = m_c.m_rb_lnk;
 	} else
 #endif

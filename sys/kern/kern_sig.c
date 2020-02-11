@@ -3989,7 +3989,7 @@ sigacts_copy(struct sigacts *dest, struct sigacts *src)
 
 	KASSERT(dest->ps_refcnt == 1, ("sigacts_copy to shared dest"));
 	mtx_lock(&src->ps_mtx);
-	cheri_memcpy(dest, src, offsetof(struct sigacts, ps_refcnt));
+	memcpy(dest, src, offsetof(struct sigacts, ps_refcnt));
 	mtx_unlock(&src->ps_mtx);
 }
 

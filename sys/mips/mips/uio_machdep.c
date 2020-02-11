@@ -127,20 +127,6 @@ uiomove_fromphys(vm_page_t ma[], vm_offset_t offset, int n, struct uio *uio)
 			}
 			break;
 		case UIO_SYSSPACE:
-#ifdef CPU_CHERI
-			if (CAP_ALIGNED((vaddr_t)cp) &&
-			    CAP_ALIGNED((__cheri_addr vaddr_t)iov->iov_base) &&
-			    CAP_ALIGNED(cnt)) {
-				if (uio->uio_rw == UIO_READ)
-					cheri_bcopy(cp,
-					    (__cheri_fromcap void *)
-					    iov->iov_base, cnt);
-				else
-					cheri_bcopy(
-					    (__cheri_fromcap void *)
-					    iov->iov_base, cp, cnt);
-			} else
-#endif
 			if (uio->uio_rw == UIO_READ)
 				bcopy(cp,
 				    (__cheri_fromcap void *)iov->iov_base,

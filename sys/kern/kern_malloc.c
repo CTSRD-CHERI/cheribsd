@@ -916,14 +916,8 @@ realloc(void *addr, size_t size, struct malloc_type *mtp, int flags)
 		return (NULL);
 
 	/* Copy over original contents */
-#if __has_feature(capabilities)
-	if (size >= CHERICAP_SIZE && alloc >= CHERICAP_SIZE &&
-	    ((uintptr_t)addr & (CHERICAP_SIZE-1)) == 0 &&
-	    ((uintptr_t)newaddr & (CHERICAP_SIZE-1)) == 0)
-		cheri_bcopy(addr, newaddr, min(size, alloc));
-	else
-#endif
-		bcopy(addr, newaddr, min(size, alloc));
+        bcopy(addr, newaddr, min(size, alloc));
+
 	free(addr, mtp);
 	return (newaddr);
 }
