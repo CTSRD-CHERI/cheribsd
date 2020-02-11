@@ -203,8 +203,8 @@ META_TGT_WHITELIST+= \
 
 PATH=	/sbin:/bin:/usr/sbin:/usr/bin
 MAKEOBJDIRPREFIX?=	/usr/obj
-_MAKEOBJDIRPREFIX!= /usr/bin/env -i PATH=${PATH} ${MAKE} MK_AUTO_OBJ=no \
-    ${.MAKEFLAGS:MMAKEOBJDIRPREFIX=*} __MAKE_CONF=${__MAKE_CONF} \
+_MAKEOBJDIRPREFIX!= /usr/bin/env -i PATH=${PATH} `command -v ${MAKE}` -m ${.CURDIR}/share/mk \
+    MK_AUTO_OBJ=no ${.MAKEFLAGS:MMAKEOBJDIRPREFIX=*} __MAKE_CONF=${__MAKE_CONF} \
     SRCCONF=${SRCCONF} SRC_ENV_CONF= \
     -f /dev/null -V MAKEOBJDIRPREFIX dummy
 .if !empty(_MAKEOBJDIRPREFIX)
