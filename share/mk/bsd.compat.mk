@@ -181,10 +181,6 @@ LIBCHERICPUFLAGS+=	-march=${COMPAT_RISCV_MARCH} -mabi=${COMPAT_RISCV_ABI}
 .if defined(HAS_COMPAT) && ${HAS_COMPAT:MCHERI}
 LIBCHERICFLAGS+=	-DCOMPAT_CHERI
 LIBCHERIWMAKEFLAGS+=	LIBCHERI=yes
-# Forward the cross linker and binutils
-.for BINUTIL in ${XBINUTILS}
-LIBCHERIWMAKEFLAGS+=	${BINUTIL}="${X${BINUTIL}}"
-.endfor
 .endif
 
 # -------------------------------------------------------------------
@@ -246,7 +242,10 @@ LIBCOMPATWMAKEENV+=	MACHINE=${LIBCOMPAT_MACHINE}
 LIBCOMPATWMAKEENV+=	MACHINE_ARCH=${LIBCOMPAT_MACHINE_ARCH}
 LIBCOMPATWMAKEENV+=	TARGET=${LIBCOMPAT_MACHINE}
 LIBCOMPATWMAKEENV+=	TARGET_ARCH=${LIBCOMPAT_MACHINE_ARCH}
-
+# Forward the cross linker and binutils
+.for BINUTIL in ${XBINUTILS}
+LIBCOMPATWMAKEENV+=	${BINUTIL}="${X${BINUTIL}}"
+.endfor
 # -B is needed to find /usr/lib32/crti.o for GCC and /usr/libsoft/crti.o for
 # Clang/GCC.
 LIBCOMPATCFLAGS+=	-B${WORLDTMP}/usr/lib${libcompat}
