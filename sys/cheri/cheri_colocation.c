@@ -570,7 +570,7 @@ static void
 db_print_scb(struct switchercb *scb)
 {
 
-	db_printf("    scb_peer_cb:	%p\n", (__cheri_fromcap void *)scb->scb_peer_scb);
+	db_printf("    scb_peer_scb:	%p\n", (__cheri_fromcap void *)scb->scb_peer_scb);
 	db_printf("    scb_td:		%p\n", scb->scb_td);
 	db_printf("    scb_borrower_td:	%p\n", scb->scb_borrower_td);
 }
