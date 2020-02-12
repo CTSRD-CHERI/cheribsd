@@ -137,28 +137,42 @@ cpu_fetch_syscall_args(struct thread *td)
 static void
 dump_regs(struct trapframe *frame)
 {
-	int n;
-	int i;
+	u_int i;
 
-	n = (sizeof(frame->tf_t) / sizeof(frame->tf_t[0]));
-	for (i = 0; i < n; i++)
+	for (i = 0; i < nitems(frame->tf_t); i++)
+#if __has_feature(capabilities)
+		printf("t[%d] = " _CHERI_PRINTF_CAP_FMT "\n", i,
+		    _CHERI_PRINTF_CAP_ARG((void * __capability)frame->tf_t[i]));
+#else
 		printf("t[%d] == 0x%016lx\n", i, frame->tf_t[i]);
+#endif
 
-	n = (sizeof(frame->tf_s) / sizeof(frame->tf_s[0]));
-	for (i = 0; i < n; i++)
+	for (i = 0; i < nitems(frame->tf_s); i++)
+#if __has_feature(capabilities)
+		printf("s[%d] = " _CHERI_PRINTF_CAP_FMT "\n", i,
+		    _CHERI_PRINTF_CAP_ARG((void * __capability)frame->tf_s[i]));
+#else
 		printf("s[%d] == 0x%016lx\n", i, frame->tf_s[i]);
+#endif
 
-	n = (sizeof(frame->tf_a) / sizeof(frame->tf_a[0]));
-	for (i = 0; i < n; i++)
+	for (i = 0; i < nitems(frame->tf_a); i++)
+#if __has_feature(capabilities)
+		printf("a[%d] = " _CHERI_PRINTF_CAP_FMT "\n", i,
+		    _CHERI_PRINTF_CAP_ARG((void * __capability)frame->tf_a[i]));
+#else
 		printf("a[%d] == 0x%016lx\n", i, frame->tf_a[i]);
+#endif
 
 #if __has_feature(capabilities)
 	printf("sepcc = " _CHERI_PRINTF_CAP_FMT "\n",
 	    _CHERI_PRINTF_CAP_ARG((void * __capability)frame->tf_sepc));
+	printf("ddc = " _CHERI_PRINTF_CAP_FMT "\n",
+	    _CHERI_PRINTF_CAP_ARG((void * __capability)frame->tf_ddc));
 #else
 	printf("sepc == 0x%016lx\n", frame->tf_sepc);
 #endif
 	printf("sstatus == 0x%016lx\n", frame->tf_sstatus);
+	printf("stval == 0x%016lx\n", frame->tf_stval);
 }
 
 static void
