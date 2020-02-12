@@ -443,10 +443,7 @@ int	kcsan_memcmp(const void *, const void *, size_t);
 #define bzero(buf, len) __builtin_memset((buf), 0, (len))
 #define bcmp(b1, b2, len) __builtin_memcmp((b1), (b2), (len))
 #define memset(buf, c, len) __builtin_memset((buf), (c), (len))
-//#if !__has_feature(capabilities)
-///* Causes a compiler crash. */
 #define memcpy(to, from, len) __builtin_memcpy((to), (from), (len))
-//#endif
 #define memmove(dest, src, n) __builtin_memmove((dest), (src), (n))
 #define memcmp(b1, b2, len) __builtin_memcmp((b1), (b2), (len))
 #endif
