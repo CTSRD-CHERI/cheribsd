@@ -11,3 +11,8 @@ options 	ROOTDEVNAME=\"ufs:/dev/md0\"
 nooptions	MD_ROOT_SIZE
 makeoptions	MFS_IMAGE=/you/must/set/MFS_IMAGE/on/make/cmdline.img
 
+# Don't build kernel modules
+makeoptions 	NO_MODULES=yes
+
+# Use tmpfs for /tmp and /var
+options 	TMPFS
