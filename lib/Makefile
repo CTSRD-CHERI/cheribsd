@@ -79,13 +79,13 @@ SUBDIR=	${SUBDIR_BOOTSTRAP} \
 	libpcap \
 	libpjdlog \
 	libpng \
-	${_libproc} \
+	libproc \
 	libprocstat \
 	libregex \
 	librpcsvc \
 	librss \
 	librt \
-	${_librtld_db} \
+	librtld_db \
 	libsbuf \
 	libsmb \
 	libsqlite3 \
@@ -233,11 +233,6 @@ SUBDIR.${MK_BHYVE}+=	libvmmapi
 
 .if ${MACHINE_ARCH:Mmips64*}
 _libstatcounters=	libstatcounters
-.endif
-
-.if ${MACHINE_CPUARCH} != "sparc64"
-_libproc=	libproc
-_librtld_db=	librtld_db
 .endif
 
 .if ${MACHINE_ARCH} != "powerpc"
