@@ -37,12 +37,13 @@
  * }
  * CHERI CHANGES END
  */
-#ifndef __LIBARCHIVE_BUILD
-#error This header is only to be used internally to libarchive.
-#endif
 
 #ifndef ARCHIVE_READ_DISK_PRIVATE_H_INCLUDED
 #define ARCHIVE_READ_DISK_PRIVATE_H_INCLUDED
+
+#ifndef __LIBARCHIVE_BUILD
+#error This header is only to be used internally to libarchive.
+#endif
 
 #include "archive_platform_acl.h"
 
