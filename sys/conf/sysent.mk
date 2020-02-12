@@ -3,6 +3,9 @@
 # Don't use an OBJDIR
 .OBJDIR: ${.CURDIR}
 
+# Don't try to figure out what compiler we're using.
+_NO_INCLUDE_COMPILERMK=
+
 .include <bsd.sysdir.mk>
 .include <src.lua.mk>
 
