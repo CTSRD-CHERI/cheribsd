@@ -913,13 +913,22 @@ vm_fault_cow(struct faultstate *fs)
 			VM_OBJECT_WUNLOCK(fs->first_object);
 		/*
 		 * Oh, well, lets copy it.
-		 *
+		 */
+#if __has_feature(capabilities)
+		/*
 		 * XXXRW: Worth pondering this further; in general,
 		 * copy-on-write should propagate any tags present in the
 		 * underlying page -- at least, if the top object is
 		 * anonymously backed.  But is this always true?
+		 * XXX-AM: We must at least propagate tags for
+		 * anonymously backed objects.
 		 */
-		pmap_copy_page(fs->m, fs->first_m);
+		if (fs->first_object->flags & OBJ_ANON)
+			pmap_copy_page_tags(fs->m, fs->first_m);
+		else
+#endif
+			pmap_copy_page(fs->m, fs->first_m);
+
 		vm_page_valid(fs->first_m);
 		if (fs->wired && (fs->fault_flags & VM_FAULT_WIRE) == 0) {
 			vm_page_wire(fs->first_m);
@@ -933,7 +942,7 @@ vm_fault_cow(struct faultstate *fs)
 		fs->m = NULL;
 	}
 	/*
-	 * fs->object != fs->first_object due to above 
+	 * fs->object != fs->first_object due to above
 	 * conditional
 	 */
 	vm_object_pip_wakeup(fs->object);
