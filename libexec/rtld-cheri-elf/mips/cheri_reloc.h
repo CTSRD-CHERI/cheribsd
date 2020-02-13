@@ -36,7 +36,7 @@ extern bool add_cheri_plt_stub(const Obj_Entry *obj, const Obj_Entry *rtldobj,
 
 static inline int
 process_r_cheri_capability(Obj_Entry *obj, Elf_Word r_symndx,
-    RtldLockState *lockstate, int flags, void *where)
+    RtldLockState *lockstate, int flags, void *where, Elf_Sword addend)
 {
 	const Obj_Entry *defobj;
 	const Elf_Sym *def =
@@ -55,11 +55,6 @@ process_r_cheri_capability(Obj_Entry *obj, Elf_Word r_symndx,
 
 	const void *symval = NULL;
 	bool is_undef_weak = false;
-	/*
-	 * The first 8 bytes of the target location contains the added since
-	 * we are using Elf_Rel and not Elf_Rela.
-	 */
-	uint64_t addend = load_ptr(where, sizeof(uint64_t));
 	if (def->st_shndx == SHN_UNDEF) {
 		/* Verify that we are resolving a weak symbol */
 #ifdef DEBUG
