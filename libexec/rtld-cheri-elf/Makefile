@@ -10,7 +10,7 @@ MK_SSP=		no
 RTLD_CHERI_ELF_DIR=${SRCTOP}/libexec/rtld-cheri-elf
 RTLD_ELF_DIR=${SRCTOP}/libexec/rtld-elf
 
-.PATH: ${RTLD_CHERI_ELF_DIR}/../../lib/libmalloc_simple
+.PATH: ${RTLD_CHERI_ELF_DIR} ${RTLD_CHERI_ELF_DIR}/../../lib/libmalloc_simple
 
 # Disable DEBUG to get a fair performance comparison to rtld-elf
 # DEBUG=-DDEBUG
