@@ -327,6 +327,14 @@ reloc_iresolve(Obj_Entry *obj __unused, struct Struct_RtldLockState *lockstate _
 	return (0);
 }
 
+static inline int
+reloc_iresolve_nonplt(Obj_Entry *obj __unused,
+    struct Struct_RtldLockState *lockstate __unused)
+{
+	_rtld_error("%s: not implemented!", __func__);
+	return (0);
+}
+
 static inline  int
 reloc_gnu_ifunc(Obj_Entry *obj __unused, int flags __unused,
     struct Struct_RtldLockState *lockstate __unused)
