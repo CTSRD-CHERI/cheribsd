@@ -166,10 +166,7 @@ colocation_thread_exit(struct thread *td)
 	if (!have_scb)
 		return;
 
-	if (scb.scb_peer_scb != NULL)
-		peerscb = (__cheri_fromcap struct switchercb *)scb.scb_peer_scb;
-	else
-		peerscb = NULL;
+	peerscb = (__cheri_fromcap struct switchercb *)scb.scb_peer_scb;
 	//printf("%s: terminating thread %p, scb %p, peer scb %p\n", __func__, td, (void *)td->td_md.md_scb, peerscb);
 
 	/*
@@ -279,6 +276,22 @@ colocation_unborrow(struct thread *td, struct trapframe **trapframep)
 	 */
 	KASSERT(td->td_sa.code == SYS_copark,
 	    ("%s: td_sa.code %d != %d\n", __func__, td->td_sa.code, SYS_copark));
+}
+
+bool
+colocation_trap_in_switcher(struct thread *td, struct trapframe *trapframe)
+{
+	const struct sysentvec *sv;
+	vm_offset_t addr;
+
+	sv = td->td_proc->p_sysent;
+	addr = (__cheri_addr vaddr_t)trapframe->pc;
+
+	if (addr >= sv->sv_cocall_base && addr < sv->sv_cocall_base + sv->sv_cocall_len)
+		return (true);
+	if (addr >= sv->sv_coaccept_base && addr < sv->sv_coaccept_base + sv->sv_coaccept_len)
+		return (true);
+	return (false);
 }
 
 /*

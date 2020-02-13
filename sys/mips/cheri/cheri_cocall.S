@@ -85,6 +85,10 @@
  * Zero before calling the callee: at, v0, v1, t4-t6, s0-s7, t8, t9, gp, sp, s8, ra, hi, lo
  *
  * XXX: Floating point
+ *
+ * Note that this code executes while ignoring all the signals - a trapping
+ * instruction will just get skipped over.
+ *
  */
 .text
 .globl _C_LABEL(switcher_cocall)

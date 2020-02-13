@@ -161,6 +161,7 @@ struct thr_param_c;
 void	colocation_get_peer(struct thread *td, struct thread **peertdp);
 void	colocation_thread_exit(struct thread *td);
 void	colocation_unborrow(struct thread *td, struct trapframe **trapframep);
+bool	colocation_trap_in_switcher(struct thread *td, struct trapframe *trapframe);
 void	ktrccall_mdfill(struct pcb *pcb, struct ktr_ccall *kc);
 void	ktrcreturn_mdfill(struct pcb *pcb, struct ktr_creturn *kr);
 void	ktrcexception_mdfill(struct trapframe *frame,

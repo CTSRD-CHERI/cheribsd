@@ -101,6 +101,9 @@
  *
  * Zero before calling the callee: at, v0, v1, t4-t7, s0-s7, t8, t9, gp, sp, s8, ra, hi, lo
  *
+ * Note that this code executes while ignoring all the signals - a trapping
+ * instruction will just get skipped over.
+ *
  * XXX: Floating point
  */
 .text
