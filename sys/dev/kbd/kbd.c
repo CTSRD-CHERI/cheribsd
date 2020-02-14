@@ -850,12 +850,12 @@ genkbd_commonioctl(keyboard_t *kbd, u_long cmd, caddr_t arg)
 		break;
 
 	case GIO_KEYMAP:	/* get keyboard translation table */
-#ifdef COMPAT_CHERIABI
-			if (SV_CURPROC_FLAG(SV_CHERI))
-				data = *(void * __capability *)arg;
+#ifdef __has_feature(capabilities)
+			if (!SV_CURPROC_FLAG(SV_CHERI))
+				data = __USER_CAP_UNBOUND(*(uint64_t *)arg);
 			else
 #endif
-				data = __USER_CAP_UNBOUND(*(void **)arg);
+				data = *(void * __capability *)arg;
 		error = copyout(kbd->kb_keymap, data, sizeof(keymap_t));
 		splx(s);
 		return (error);
@@ -886,12 +886,12 @@ genkbd_commonioctl(keyboard_t *kbd, u_long cmd, caddr_t arg)
 				mapp->key[i].flgs = omapp->key[i].flgs;
 			}
 		} else {
-#ifdef COMPAT_CHERIABI
-			if (SV_CURPROC_FLAG(SV_CHERI))
-				data = *(void * __capability *)arg;
+#if __has_feature(capabilities)
+			if (!SV_CURPROC_FLAG(SV_CHERI))
+				data = __USER_CAP_UNBOUND(*(uint64_t *)arg);
 			else
 #endif
-				data = __USER_CAP_UNBOUND(*(void **)arg);
+				data = *(void * __capability *)arg;
 			error = copyin(data, mapp, sizeof *mapp);
 			if (error != 0) {
 				splx(s);
