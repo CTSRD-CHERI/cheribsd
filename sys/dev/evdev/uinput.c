@@ -598,12 +598,12 @@ uinput_ioctl_sub(struct uinput_cdev_state *state, u_long cmd, caddr_t data)
 	case UI_SET_PHYS: {
 		void * __capability cap;
 
-#ifdef COMPAT_CHERIABI
-		if (SV_CURPROC_FLAG(SV_CHERI))
-			cap = *(void * __capability *)data;
+#if __has_feature(capabilities)
+		if (!SV_CURPROC_FLAG(SV_CHERI))
+			cap = __USER_CAP_STR(*(uint64_t *)data);
 		else
 #endif
-			cap = __USER_CAP_STR(*(void **)data);
+			cap = *(void * __capability *)data;
 		if (state->ucs_state == UINPUT_RUNNING)
 			return (EINVAL);
 		ret = copyinstr_c(cap, buf, sizeof(buf), NULL);
@@ -620,12 +620,12 @@ uinput_ioctl_sub(struct uinput_cdev_state *state, u_long cmd, caddr_t data)
 		void * __capability cap;
 		if (state->ucs_state == UINPUT_RUNNING)
 			return (EINVAL);
-#ifdef COMPAT_CHERIABI
-		if (SV_CURPROC_FLAG(SV_CHERI))
-			cap = *(void * __capability *)data;
+#if __has_feature(capabilities)
+		if (!SV_CURPROC_FLAG(SV_CHERI))
+			cap = __USER_CAP_STR(*(uint64_t *)data);
 		else
 #endif
-			cap = __USER_CAP_STR(*(void **)data);
+			cap = *(void * __capability *)data;
 		ret = copyinstr(cap, buf, sizeof(buf), NULL);
 		if (ret != 0)
 			return (ret);
