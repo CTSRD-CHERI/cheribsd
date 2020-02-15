@@ -1389,7 +1389,7 @@ freebsd64___sysctl(struct thread *td, struct freebsd64___sysctl_args *uap)
 	return (kern_sysctl(td, __USER_CAP_ARRAY(uap->name, uap->namelen),
 	    uap->namelen, __USER_CAP(uap->old, oldlen),
 	    __USER_CAP_OBJ(uap->oldlenp), __USER_CAP(uap->new, uap->newlen),
-	    uap->newlen, 0));
+	    uap->newlen, SCTL_MASK64));
 }
 
 int
