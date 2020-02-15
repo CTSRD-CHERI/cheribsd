@@ -97,10 +97,6 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_kern.h>
 #include <vm/uma.h>
 
-#ifdef COMPAT_CHERIABI
-#include <cheri/cheri.h>
-#endif
-
 #ifdef DDB
 #include <ddb/ddb.h>
 #endif
@@ -4442,23 +4438,22 @@ vfsconf2x32(struct sysctl_req *req, struct vfsconf *vfsp)
 }
 #endif
 
-#ifdef COMPAT_CHERIABI
-struct xvfsconf_c {
-	void * __capability vfc_vfsops;		/* struct vfsops * */
+#ifdef COMPAT_FREEBSD64
+struct xvfsconf64 {
+	uint64_t	vfc_vfsops;
 	char		vfc_name[MFSNAMELEN];
-	int		vfc_typenum;
-	int		vfc_refcount;
-	int		vfc_flags;
-	void * __capability vfc_next;		/* struct vfsconf * */
+	int32_t		vfc_typenum;
+	int32_t		vfc_refcount;
+	int32_t		vfc_flags;
+	uint64_t	vfc_next;
 };
 
 static int
-vfsconf2x_c(struct sysctl_req *req, struct vfsconf *vfsp)
+vfsconf2x64(struct sysctl_req *req, struct vfsconf *vfsp)
 {
-	struct xvfsconf_c xvfsp;
+	struct xvfsconf64 xvfsp;
 
-	memset(&xvfsp, 0, sizeof(xvfsp));
-	/* Rely on zeroing for vfc_vfsops and vfc_next */
+	bzero(&xvfsp, sizeof(xvfsp));
 	strcpy(xvfsp.vfc_name, vfsp->vfc_name);
 	xvfsp.vfc_typenum = vfsp->vfc_typenum;
 	xvfsp.vfc_refcount = vfsp->vfc_refcount;
@@ -4484,9 +4479,9 @@ sysctl_vfs_conflist(SYSCTL_HANDLER_ARGS)
 			error = vfsconf2x32(req, vfsp);
 		else
 #endif
-#ifdef COMPAT_CHERIABI
-		if (req->flags & SCTL_CHERIABI)
-			error = vfsconf2x_c(req, vfsp);
+#ifdef COMPAT_FREEBSD64
+		if (req->flags & SCTL_MASK64)
+			error = vfsconf2x64(req, vfsp);
 		else
 #endif
 			error = vfsconf2x(req, vfsp);
@@ -4541,9 +4536,9 @@ vfs_sysctl(SYSCTL_HANDLER_ARGS)
 			return (vfsconf2x32(req, vfsp));
 		else
 #endif
-#ifdef COMPAT_CHERIABI
-		if (req->flags & SCTL_CHERIABI)
-			return (vfsconf2x_c(req, vfsp));
+#ifdef COMPAT_FREEBSD64
+		if (req->flags & SCTL_MASK64)
+			return (vfsconf2x64(req, vfsp));
 		else
 #endif
 			return (vfsconf2x(req, vfsp));

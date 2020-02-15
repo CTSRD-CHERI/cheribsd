@@ -1415,7 +1415,7 @@ cheriabi___sysctl(struct thread *td, struct cheriabi___sysctl_args *uap)
 {
 
 	return (kern_sysctl(td, uap->name, uap->namelen, uap->old,
-	    uap->oldlenp, uap->new, uap->newlen, SCTL_CHERIABI));
+	    uap->oldlenp, uap->new, uap->newlen, 0));
 }
 
 int

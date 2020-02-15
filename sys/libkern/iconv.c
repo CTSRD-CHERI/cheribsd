@@ -403,17 +403,6 @@ iconv_add(const char *converter, const char *to, const char *from)
 	return iconv_register_cspair(to, from, dcp, NULL, &csp);
 }
 
-#ifdef COMPAT_CHERIABI
-struct iconv_add_c {
-	int	ia_version;
-	char	ia_converter[ICONV_CNVNMAXLEN];
-	char	ia_to[ICONV_CSNMAXLEN];
-	char	ia_from[ICONV_CSNMAXLEN];
-	int	ia_datalen;
-	const void * __capability ia_data;
-};
-#endif
-
 #ifdef COMPAT_FREEBSD32
 struct iconv_add32 {
 	int	ia_version;
@@ -422,6 +411,17 @@ struct iconv_add32 {
 	char	ia_from[ICONV_CSNMAXLEN];
 	int	ia_datalen;
 	uint32_t ia_data;
+};
+#endif
+
+#ifdef COMPAT_FREEBSD64
+struct iconv_add64 {
+	int	ia_version;
+	char	ia_converter[ICONV_CNVNMAXLEN];
+	char	ia_to[ICONV_CSNMAXLEN];
+	char	ia_from[ICONV_CSNMAXLEN];
+	int	ia_datalen;
+	uint64_t ia_data;
 };
 #endif
 
@@ -435,23 +435,17 @@ iconv_sysctl_add(SYSCTL_HANDLER_ARGS)
 	struct iconv_cspair *csp;
 	union {
 		struct iconv_add_in din;
-#ifdef COMPAT_CHERIABI
-		struct iconv_add_c din_c;
-#endif
 #ifdef COMPAT_FREEBSD32
 		struct iconv_add32 din32;
+#endif
+#ifdef COMPAT_FREEBSD64
+		struct iconv_add64 din64;
 #endif
 	} du;
 	const void * __capability ia_data;
 	struct iconv_add_out dout;
 	int error;
 
-#ifdef COMPAT_CHERIABI
-	if (req->flags & SCTL_CHERIABI) {
-		error = SYSCTL_IN(req, &du.din_c, sizeof(du.din_c));
-		ia_data = du.din_c.ia_data;
-	} else
-#endif
 #ifdef COMPAT_FREEBSD32
 	if (req->flags & SCTL_MASK32) {
 		error = SYSCTL_IN(req, &du.din32, sizeof(du.din32));
@@ -459,9 +453,16 @@ iconv_sysctl_add(SYSCTL_HANDLER_ARGS)
 		    du.din32.ia_datalen);
 	} else
 #endif
+#ifdef COMPAT_FREEBSD64
+	if (req->flags & SCTL_MASK64) {
+		error = SYSCTL_IN(req, &du.din64, sizeof(du.din64));
+		ia_data = __USER_CAP((void*)(uintptr_t)du.din64.ia_data,
+		    du.din64.ia_datalen);
+	} else
+#endif
 	{
 		error = SYSCTL_IN(req, &du.din, sizeof(du.din));
-		ia_data = __USER_CAP(du.din.ia_data, du.din.ia_datalen);
+		ia_data = du.din.ia_data;
 	}
 	if (error)
 		return error;

@@ -162,7 +162,9 @@ struct ctlname {
 #ifdef COMPAT_FREEBSD32
 #define	SCTL_MASK32	1	/* 32 bit emulation */
 #endif
-#define	SCTL_CHERIABI	2	/* CheriABI support */
+#if COMPAT_FREEBSD64
+#define	SCTL_MASK64	2	/* 64 bit emulation (on CHERI) */
+#endif
 #define	SCTL_PTRIN	4
 #define	SCTL_PTROUT	8
 
