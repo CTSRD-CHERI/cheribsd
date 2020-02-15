@@ -446,7 +446,7 @@ namei(struct nameidata *ndp)
 		} else {
 			vrefact(ndp->ni_rootdir);
 			rights = ndp->ni_rightsneeded;
-			cap_rights_set(&rights, CAP_LOOKUP);
+			cap_rights_set_one(&rights, CAP_LOOKUP);
 
 			if (cnp->cn_flags & AUDITVNODE1)
 				AUDIT_ARG_ATFD1(ndp->ni_dirfd);
@@ -499,7 +499,7 @@ namei(struct nameidata *ndp)
 			vrefact(ndp->ni_beneath_latch);
 		} else {
 			rights = ndp->ni_rightsneeded;
-			cap_rights_set(&rights, CAP_LOOKUP);
+			cap_rights_set_one(&rights, CAP_LOOKUP);
 			error = fgetvp_rights(td, ndp->ni_dirfd, &rights,
 			    &dirfd_caps, &ndp->ni_beneath_latch);
 			if (error == 0 && dp->v_type != VDIR) {
@@ -1360,7 +1360,7 @@ NDINIT_ALL_C(struct nameidata *ndp, u_long op, u_long flags, enum uio_seg segflg
 	if (rightsp != NULL)
 		ndp->ni_rightsneeded = *rightsp;
 	else
-		cap_rights_init(&ndp->ni_rightsneeded);
+		cap_rights_init_zero(&ndp->ni_rightsneeded);
 }
 
 /*
