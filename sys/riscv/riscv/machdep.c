@@ -398,7 +398,15 @@ exec_setregs(struct thread *td, struct image_params *imgp, uintcap_t stack)
 		tf->tf_sp = (uintcap_t)cheri_exec_stack_pointer(imgp, stack);
 		cheri_set_mmap_capability(td, imgp,
 		    (void * __capability)tf->tf_sp);
-		tf->tf_sepc = (uintcap_t)cheri_exec_pcc(imgp);
+
+		/*
+		 * XXX: RISC-V needs purecap mode enabled in flags.
+		 * Our current set of macros from <machine/cherireg.h>
+		 * don't provide a way to handle this, so fix it up
+		 * here.
+		 */
+		tf->tf_sepc = (uintcap_t)cheri_setflags(cheri_exec_pcc(imgp),
+		    CHERI_FLAGS_CAP_MODE);
 		td->td_proc->p_md.md_sigcode = cheri_sigcode_capability(td);
 	} else
 #endif
