@@ -850,15 +850,15 @@ kern_mmap_req(struct thread *td, const struct mmap_req *mrp)
 		 * rights, but also return the maximum rights to be combined
 		 * with maxprot later.
 		 */
-		cap_rights_init(&rights, CAP_MMAP);
+		cap_rights_init_one(&rights, CAP_MMAP);
 		if (max_prot & PROT_READ)
-			cap_rights_set(&rights, CAP_MMAP_R);
+			cap_rights_set_one(&rights, CAP_MMAP_R);
 		if ((flags & MAP_SHARED) != 0) {
 			if (max_prot & PROT_WRITE)
-				cap_rights_set(&rights, CAP_MMAP_W);
+				cap_rights_set_one(&rights, CAP_MMAP_W);
 		}
 		if (max_prot & PROT_EXEC)
-			cap_rights_set(&rights, CAP_MMAP_X);
+			cap_rights_set_one(&rights, CAP_MMAP_X);
 		error = fget_mmap(td, fd, &rights, &cap_maxprot, &fp);
 		if (error != 0)
 			goto done;
