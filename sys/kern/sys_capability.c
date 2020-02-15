@@ -284,7 +284,7 @@ user_cap_rights_limit(struct thread *td, int fd,
 	cap_rights_t rights;
 	int error, version;
 
-	cap_rights_init(&rights);
+	cap_rights_init_zero(&rights);
 
 	error = copyin(rightsp, &rights, sizeof(rights.cr_rights[0]));
 	if (error != 0)
