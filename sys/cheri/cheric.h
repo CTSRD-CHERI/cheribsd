@@ -46,6 +46,7 @@
 #define	cheri_getbase(x)	__builtin_cheri_base_get((x))
 #define	cheri_getoffset(x)	__builtin_cheri_offset_get((x))
 #define	cheri_getaddress(x)	__builtin_cheri_address_get((x))
+#define	cheri_getflags(x)	__builtin_cheri_flags_get((x))
 #define	cheri_getperm(x)	__builtin_cheri_perms_get((x))
 #define	cheri_getsealed(x)	__builtin_cheri_sealed_get((x))
 #define	cheri_gettag(x)		__builtin_cheri_tag_get((x))
@@ -57,6 +58,7 @@
 #define	cheri_incoffset(x, y)	__builtin_cheri_offset_increment((x), (y))
 #define	cheri_setoffset(x, y)	__builtin_cheri_offset_set((x), (y))
 #define	cheri_setaddress(x, y)	__builtin_cheri_address_set((x), (y))
+#define	cheri_setflags(x, y)	__builtin_cheri_flags_set((x), (y))
 
 #define	cheri_seal(x, y)	__builtin_cheri_seal((x), (y))
 #define	cheri_unseal(x, y)	__builtin_cheri_unseal((x), (y))
