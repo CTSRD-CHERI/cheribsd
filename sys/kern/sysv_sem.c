@@ -706,10 +706,11 @@ sem_remove(int semidx, struct ucred *cred)
 	    ("semidx out of bounds"));
 	mtx_assert(&sem_mtx, MA_OWNED);
 	semakptr = &sema[semidx];
-	KASSERT(semakptr->u.__sem_base - sem + semakptr->u.sem_nsems <= semtot,
+	KASSERT((__cheri_fromcap struct sem *)semakptr->u.__sem_base -
+	    sem + semakptr->u.sem_nsems <= semtot,
 	    ("sem_remove: sema %d corrupted sem pointer %p %p %d %d",
-	    semidx, semakptr->u.__sem_base, sem, semakptr->u.sem_nsems,
-	    semtot));
+	    semidx, (__cheri_fromcap struct sem *)semakptr->u.__sem_base,
+	    sem, semakptr->u.sem_nsems, semtot));
 
 	semakptr->u.sem_perm.cuid = cred ? cred->cr_uid : 0;
 	semakptr->u.sem_perm.uid = cred ? cred->cr_uid : 0;
@@ -729,8 +730,9 @@ sem_remove(int semidx, struct ucred *cred)
 		    sema[i].u.__sem_base > semakptr->u.__sem_base)
 			mtx_lock_flags(&sema_mtx[i], LOP_DUPOK);
 	}
-	for (i = (__cheri_fromcap struct sem *)semakptr->u.__sem_base - sem; i < semtot; i++)
-		sem[i] = sem[i + semakptr->u.sem_nsems];
+	for (i = (__cheri_fromcap struct sem *)semakptr->u.__sem_base -
+	    sem + semakptr->u.sem_nsems; i < semtot; i++)
+		sem[i - semakptr->u.sem_nsems] = sem[i];
 	for (i = 0; i < seminfo.semmni; i++) {
 		if ((sema[i].u.sem_perm.mode & SEM_ALLOC) &&
 		    sema[i].u.__sem_base > semakptr->u.__sem_base) {
