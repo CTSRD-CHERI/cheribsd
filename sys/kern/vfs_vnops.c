@@ -1640,13 +1640,6 @@ vn_closefile(struct file *fp, struct thread *td)
 	return (error);
 }
 
-static bool
-vn_suspendable(struct mount *mp)
-{
-
-	return (mp->mnt_op->vfs_susp_clean != NULL);
-}
-
 /*
  * Preparing to start a filesystem write operation. If the operation is
  * permitted, then we bump the count of operations in progress and
@@ -1726,12 +1719,6 @@ vn_start_write(struct vnode *vp, struct mount **mpp, int flags)
 	if ((mp = *mpp) == NULL)
 		return (0);
 
-	if (!vn_suspendable(mp)) {
-		if (vp != NULL || (flags & V_MNTREF) != 0)
-			vfs_rel(mp);
-		return (0);
-	}
-
 	/*
 	 * VOP_GETWRITEMOUNT() returns with the mp refcount held through
 	 * a vfs_ref().
@@ -1777,12 +1764,6 @@ vn_start_secondary_write(struct vnode *vp, struct mount **mpp, int flags)
 	if ((mp = *mpp) == NULL)
 		return (0);
 
-	if (!vn_suspendable(mp)) {
-		if (vp != NULL || (flags & V_MNTREF) != 0)
-			vfs_rel(mp);
-		return (0);
-	}
-
 	/*
 	 * VOP_GETWRITEMOUNT() returns with the mp refcount held through
 	 * a vfs_ref().
@@ -1826,7 +1807,7 @@ vn_finished_write(struct mount *mp)
 {
 	int c;
 
-	if (mp == NULL || !vn_suspendable(mp))
+	if (mp == NULL)
 		return;
 
 	if (vfs_op_thread_enter(mp)) {
@@ -1860,7 +1841,7 @@ vn_finished_write(struct mount *mp)
 void
 vn_finished_secondary_write(struct mount *mp)
 {
-	if (mp == NULL || !vn_suspendable(mp))
+	if (mp == NULL)
 		return;
 	MNT_ILOCK(mp);
 	MNT_REL(mp);
@@ -1880,8 +1861,6 @@ int
 vfs_write_suspend(struct mount *mp, int flags)
 {
 	int error;
-
-	MPASS(vn_suspendable(mp));
 
 	vfs_op_enter(mp);
 
@@ -1931,8 +1910,6 @@ void
 vfs_write_resume(struct mount *mp, int flags)
 {
 
-	MPASS(vn_suspendable(mp));
-
 	MNT_ILOCK(mp);
 	if ((mp->mnt_kern_flag & MNTK_SUSPEND) != 0) {
 		KASSERT(mp->mnt_susp_owner == curthread, ("mnt_susp_owner"));
@@ -1967,7 +1944,6 @@ vfs_write_suspend_umnt(struct mount *mp)
 {
 	int error;
 
-	MPASS(vn_suspendable(mp));
 	KASSERT((curthread->td_pflags & TDP_IGNSUSP) == 0,
 	    ("vfs_write_suspend_umnt: recursed"));
 
