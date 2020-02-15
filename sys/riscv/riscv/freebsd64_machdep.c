@@ -132,33 +132,37 @@ SYSINIT(freebsd64, SI_SUB_EXEC, SI_ORDER_ANY,
  */
 #define	CONTEXT64_GPREGS	(offsetof(struct gpregs, gp_sepc) / sizeof(register_t))
 
+static void
+mcontext_to_mcontext64(mcontext_t *mc, mcontext64_t *mc64)
+{
+	const uintcap_t *creg;
+	register_t *greg;
+	u_int i;
+
+	memset(mc64, 0, sizeof(*mc64));
+	creg = (uintcap_t *)&mc->mc_capregs;
+	greg = (register_t *)&mc64->mc_gpregs;
+	for (i = 0; i < CONTEXT64_GPREGS; i++)
+		greg[i] = (__cheri_addr register_t)creg[i];
+	mc64->mc_gpregs.gp_sepc =
+	    (__cheri_offset register_t)mc->mc_capregs.cp_sepcc;
+	mc64->mc_gpregs.gp_sstatus = mc->mc_capregs.cp_sstatus;
+	mc64->mc_flags = mc->mc_flags;
+	if (mc->mc_flags & _MC_FP_VALID)
+		mc64->mc_fpregs = mc->mc_fpregs;
+}
+
 int
 freebsd64_get_mcontext(struct thread *td, mcontext64_t *mcp, int flags)
 {
 	mcontext_t mc;
-	const uintcap_t *creg;
-	register_t *greg;
 	int error;
-	u_int i;
 
 	error = get_mcontext(td, &mc, flags);
 	if (error != 0)
 		return (error);
 
-	memset(mcp, 0, sizeof(*mcp));
-	creg = (uintcap_t *)&mc.mc_capregs;
-	greg = (register_t *)&mcp->mc_gpregs;
-	for (i = 0; i < CONTEXT64_GPREGS; i++)
-		greg[i] = (__cheri_addr register_t)creg[i];
-	mcp->mc_gpregs.gp_sepc =
-	    (__cheri_offset register_t)mc.mc_capregs.cp_sepcc;
-	mcp->mc_sepcc = mc.mc_capregs.cp_sepcc;
-	mcp->mc_ddc = mc.mc_capregs.cp_ddc;
-	mcp->mc_gpregs.gp_sstatus = mc.mc_capregs.cp_sstatus;
-	mcp->mc_flags = mc.mc_flags;
-	if (mc.mc_flags & _MC_FP_VALID)
-		mcp->mc_fpregs = mc.mc_fpregs;
-
+	mcontext_to_mcontext64(&mc, mcp);
 	return (0);
 }
 
@@ -168,18 +172,37 @@ freebsd64_set_mcontext(struct thread *td, mcontext64_t *mcp)
 	mcontext_t mc;
 	uintcap_t *creg;
 	const register_t *greg;
+	int error;
 	u_int i;
 
 	memset(&mc, 0, sizeof(mc));
-	creg = (uintcap_t *)&mc.mc_capregs;
-	greg = (register_t *)&mcp->mc_gpregs;
-	for (i = 0; i < CONTEXT64_GPREGS; i++)
-		creg[i] = (uintcap_t)greg[i];
-	mc.mc_capregs.cp_sepcc = (uintcap_t)cheri_setoffset(
-	    (void * __capability)mcp->mc_sepcc, mcp->mc_gpregs.gp_sepc);
-	mc.mc_capregs.cp_ddc = mcp->mc_ddc;
-	mc.mc_capregs.cp_sstatus = mcp->mc_gpregs.gp_sstatus;
-	mc.mc_flags = mcp->mc_flags;
+	if (mcp->mc_flags & _MC_CAP_VALID) {
+		error = copyincap(__USER_CAP(mcp->mc_capregs,
+		    sizeof(mc.mc_capregs)), &mc.mc_capregs,
+		    sizeof(mc.mc_capregs));
+		if (error)
+			return (error);
+
+		/* XXX: Permit userland to change GPRs for sigreturn? */
+
+		/* Honor 64-bit PC. */
+		mc.mc_capregs.cp_sepcc = (uintcap_t)cheri_setoffset(
+		    (void * __capability)mc.mc_capregs.cp_sepcc,
+		    mcp->mc_gpregs.gp_sepc);
+	} else {
+		creg = (uintcap_t *)&mc.mc_capregs;
+		greg = (register_t *)&mcp->mc_gpregs;
+		for (i = 0; i < CONTEXT64_GPREGS; i++)
+			creg[i] = (uintcap_t)greg[i];
+
+		mc.mc_capregs.cp_sepcc = (uintcap_t)cheri_setoffset(
+		    (void * __capability)td->td_frame->tf_sepc,
+		    mcp->mc_gpregs.gp_sepc);
+		mc.mc_capregs.cp_ddc = td->td_frame->tf_ddc;
+		mc.mc_capregs.cp_sstatus = mcp->mc_gpregs.gp_sstatus;
+	}
+
+	mc.mc_flags = mcp->mc_flags & ~_MC_CAP_VALID;
 	if (mcp->mc_flags & _MC_FP_VALID)
 		mc.mc_fpregs = mcp->mc_fpregs;
 
@@ -190,11 +213,13 @@ static void
 freebsd64_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 {
 	struct sigframe64 *fp, frame;
+	mcontext_t mc;
 	struct sysentvec *sysent;
 	struct trapframe *tf;
 	struct sigacts *psp;
 	struct thread *td;
 	struct proc *p;
+	vm_offset_t sp, capregs;
 	int onstack;
 	int sig;
 
@@ -215,19 +240,28 @@ freebsd64_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	/* Allocate and validate space for the signal handler context. */
 	if ((td->td_pflags & TDP_ALTSTACK) != 0 && !onstack &&
 	    SIGISMEMBER(psp->ps_sigonstack, sig)) {
-		fp = (struct sigframe64 *)((__cheri_addr uintptr_t)td->td_sigstk.ss_sp +
+		sp = ((__cheri_addr uintptr_t)td->td_sigstk.ss_sp +
 		    td->td_sigstk.ss_size);
 	} else {
-		fp = (struct sigframe64 *)(__cheri_addr uintptr_t)td->td_frame->tf_sp;
+		sp = (__cheri_addr uintptr_t)td->td_frame->tf_sp;
 	}
 
+	/* Allocate room for the capability register context. */
+	sp -= sizeof(mc.mc_capregs);
+	sp = rounddown2(sp, sizeof(uintcap_t));
+	capregs = sp;
+
 	/* Make room, keeping the stack aligned */
-	fp--;
-	fp = (struct sigframe64 *)STACKALIGN(fp);
+	sp -= sizeof(*fp);
+	sp = STACKALIGN(sp);
+	fp = (struct sigframe64 *)sp;
 
 	/* Fill in the frame to copy out */
 	bzero(&frame, sizeof(frame));
-	freebsd64_get_mcontext(td, &frame.sf_uc.uc_mcontext, 0);
+	get_mcontext(td, &mc, 0);
+	mcontext_to_mcontext64(&mc, &frame.sf_uc.uc_mcontext);
+	frame.sf_uc.uc_mcontext.mc_flags |= _MC_CAP_VALID;
+	frame.sf_uc.uc_mcontext.mc_capregs = capregs;
 	siginfo_to_siginfo64(&ksi->ksi_info, &frame.sf_si);
 	frame.sf_uc.uc_sigmask = *mask;
 	frame.sf_uc.uc_stack.ss_sp = (__cheri_addr uintptr_t)td->td_sigstk.ss_sp;
@@ -236,6 +270,16 @@ freebsd64_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	    (onstack ? SS_ONSTACK : 0) : SS_DISABLE;
 	mtx_unlock(&psp->ps_mtx);
 	PROC_UNLOCK(td->td_proc);
+
+	/* Copy the capability registers out to the user's stack. */
+	if (copyoutcap(&mc.mc_capregs, __USER_CAP(capregs,
+	    sizeof(mc.mc_capregs)), sizeof(mc.mc_capregs)) != 0) {
+		PROC_LOCK(p);
+		printf("pid %d, tid %d: could not copy out cap registers\n",
+		    td->td_proc->p_pid, td->td_tid);
+		sigexit(td, SIGILL);
+		/* NOTREACHED */
+	}
 
 	/* Copy the sigframe out to the user's stack. */
 	if (copyoutcap(&frame, __USER_CAP_OBJ(fp), sizeof(*fp)) != 0) {

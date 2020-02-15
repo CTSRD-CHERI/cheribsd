@@ -82,14 +82,14 @@ struct __mcontext {
 	struct fpregs	mc_fpregs;
 	int		mc_flags;
 #define	_MC_FP_VALID	0x1		/* Set when mc_fpregs has valid data */
+#define	_MC_CAP_VALID	0x2		/* Set when mc_capregs has valid data */
 	int		mc_pad;
 #if (defined(_KERNEL) && __has_feature(capabilities)) || \
     defined(__CHERI_PURE_CAPABILITY__)
 	__uint64_t	mc_spare[8];
 #else
-	__uintcap_t	mc_sepcc;
-	__uintcap_t	mc_ddc;
-	__uint64_t	mc_spare[4];	/* Space for expansion */
+	__uint64_t	mc_capregs;
+	__uint64_t	mc_spare[7];	/* Space for expansion */
 #endif
 };
 
@@ -103,9 +103,8 @@ typedef struct	__mcontext64 {
 	struct fpregs	mc_fpregs;
 	int		mc_flags;
 	int		mc_pad;
-	__uintcap_t	mc_sepcc;
-	__uintcap_t	mc_ddc;
-	__uint64_t	mc_spare[4];
+	__uint64_t	mc_capregs;
+	__uint64_t	mc_spare[7];
 } mcontext64_t;
 
 typedef struct __ucontext64 {
