@@ -232,7 +232,7 @@ cheri_bytes_remaining(const void * __capability cap)
 #define cheri_cap_to_typed_ptr(cap, type)				\
 	(type *)cheri_cap_to_ptr(cap, sizeof(type))
 
-#define _CHERI_PRINTF_CAP_FMT  "v:%lu s:%lu p:%08lx f:%01x b:%016jx l:%016zx o:%jx t:%ld"
+#define _CHERI_PRINTF_CAP_FMT  "v:%lu s:%lu p:%08lx f:%01lx b:%016jx l:%016zx o:%jx t:%ld"
 #define _CHERI_PRINTF_CAP_ARG(ptr)					\
 	    (unsigned long)cheri_gettag((const void * __capability)(ptr)),		\
 	    (unsigned long)cheri_getsealed((const void * __capability)(ptr)),		\
