@@ -361,6 +361,11 @@ SX_SYSINIT_FLAGS(ifnet_sx, &ifnet_sxlock, "ifnet_sx", SX_RECURSE);
  */
 #define	IFNET_HOLD	(void *)(uintptr_t)(-1)
 
+#ifdef VIMAGE
+#define	VNET_IS_SHUTTING_DOWN(_vnet)					\
+    ((_vnet)->vnet_shutdown && (_vnet)->vnet_state < SI_SUB_VNET_DONE)
+#endif
+
 static	if_com_alloc_t *if_com_alloc[256];
 static	if_com_free_t *if_com_free[256];
 
@@ -1119,7 +1124,7 @@ if_detach_internal(struct ifnet *ifp, int vmove, struct if_clone **ifcp)
 #ifdef VIMAGE
 	bool shutdown;
 
-	shutdown = ifp->if_vnet->vnet_shutdown;
+	shutdown = VNET_IS_SHUTTING_DOWN(ifp->if_vnet);
 #endif
 	IFNET_WLOCK();
 	CK_STAILQ_FOREACH(iter, &V_ifnet, if_link)
@@ -1378,6 +1383,7 @@ if_vmove_loan(struct thread *td, struct ifnet *ifp, char *ifname, int jid)
 	struct prison *pr;
 	struct ifnet *difp;
 	int error;
+	bool shutdown;
 
 	/* Try to find the prison within our visibility. */
 	sx_slock(&allprison_lock);
@@ -1405,7 +1411,8 @@ if_vmove_loan(struct thread *td, struct ifnet *ifp, char *ifname, int jid)
 	}
 
 	/* Make sure the VNET is stable. */
-	if (ifp->if_vnet->vnet_shutdown) {
+	shutdown = VNET_IS_SHUTTING_DOWN(ifp->if_vnet);
+	if (shutdown) {
 		CURVNET_RESTORE();
 		prison_free(pr);
 		return (EBUSY);
@@ -1430,6 +1437,7 @@ if_vmove_reclaim(struct thread *td, char *ifname, int jid)
 	struct vnet *vnet_dst;
 	struct ifnet *ifp;
 	int error;
+ 	bool shutdown;
 
 	/* Try to find the prison within our visibility. */
 	sx_slock(&allprison_lock);
@@ -1458,7 +1466,8 @@ if_vmove_reclaim(struct thread *td, char *ifname, int jid)
 	}
 
 	/* Make sure the VNET is stable. */
-	if (ifp->if_vnet->vnet_shutdown) {
+	shutdown = VNET_IS_SHUTTING_DOWN(ifp->if_vnet);
+	if (shutdown) {
 		CURVNET_RESTORE();
 		prison_free(pr);
 		return (EBUSY);
@@ -3446,11 +3455,15 @@ ifioctl(struct socket *so, u_long cmd, caddr_t data, struct thread *td)
 	struct ifreq *ifr;
 	int error;
 	int oif_flags;
+#ifdef VIMAGE
+	bool shutdown;
+#endif
 
 	CURVNET_SET(so->so_vnet);
 #ifdef VIMAGE
 	/* Make sure the VNET is stable. */
-	if (so->so_vnet->vnet_shutdown) {
+	shutdown = VNET_IS_SHUTTING_DOWN(so->so_vnet);
+	if (shutdown) {
 		CURVNET_RESTORE();
 		return (EBUSY);
 	}
