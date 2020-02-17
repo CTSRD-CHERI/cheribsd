@@ -359,9 +359,11 @@ ptrace_set_pc(struct thread *td, u_long addr)
 	    !cheri_is_address_inbounds(
 	    (void * __capability)td->td_frame->tf_sepc, addr))
 		return (EINVAL);
-#endif
 	td->td_frame->tf_sepc = (uintcap_t)cheri_setaddress(
 	    (void * __capability)td->td_frame->tf_sepc, addr);
+#else
+	td->td_frame->tf_sepc = addr;
+#endif
 	return (0);
 }
 
