@@ -121,18 +121,6 @@ LIB64WMAKEFLAGS= LD="${XLD} -m ${_EMULATION}"
 LIB64LDFLAGS=	-Wl,-m${_EMULATION}
 .endif
 
-.if ${COMPAT_ARCH:Mriscv*}
-# See bsd.cpu.mk
-COMPAT_RISCV_MARCH=	rv64ima
-.if !${COMPAT_ARCH:Mriscv*sf*}
-COMPAT_RISCV_MARCH:=	${COMPAT_RISCV_MARCH}fd
-.endif
-COMPAT_RISCV_MARCH:=	${COMPAT_RISCV_MARCH}c
-.if ${COMPAT_ARCH:Mriscv*c*}
-COMPAT_RISCV_MARCH:=	${COMPAT_RISCV_MARCH}xcheri
-.endif
-.endif
-
 .if ${COMPAT_ARCH:Mriscv*c*}
 HAS_COMPAT=64
 COMPAT_RISCV_ABI=	lp64
@@ -176,6 +164,18 @@ COMPAT_RISCV_ABI:=	${COMPAT_RISCV_ABI}d
 .endif
 LIBCHERICPUFLAGS+=	-march=${COMPAT_RISCV_MARCH} -mabi=${COMPAT_RISCV_ABI}
 .endif	# ${COMPAT_ARCH:Mriscv64*}
+
+.if ${COMPAT_ARCH:Mriscv*}
+# See bsd.cpu.mk
+COMPAT_RISCV_MARCH=	rv64ima
+.if !${COMPAT_ARCH:Mriscv*sf*}
+COMPAT_RISCV_MARCH:=	${COMPAT_RISCV_MARCH}fd
+.endif
+COMPAT_RISCV_MARCH:=	${COMPAT_RISCV_MARCH}c
+.if ${COMPAT_ARCH:Mriscv*c*} || (defined(HAS_COMPAT) && ${HAS_COMPAT:MCHERI})
+COMPAT_RISCV_MARCH:=	${COMPAT_RISCV_MARCH}xcheri
+.endif
+.endif
 
 # Common CHERI flags
 .if defined(HAS_COMPAT) && ${HAS_COMPAT:MCHERI}
