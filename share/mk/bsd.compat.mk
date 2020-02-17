@@ -180,7 +180,7 @@ COMPAT_RISCV_MARCH:=	${COMPAT_RISCV_MARCH}xcheri
 # Common CHERI flags
 .if defined(HAS_COMPAT) && ${HAS_COMPAT:MCHERI}
 LIBCHERICFLAGS+=	-DCOMPAT_CHERI
-LIBCHERIWMAKEFLAGS+=	LIBCHERI=yes
+LIBCHERIWMAKEFLAGS+=	COMPAT_CHERI=yes
 .endif
 
 # -------------------------------------------------------------------
