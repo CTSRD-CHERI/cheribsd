@@ -157,6 +157,7 @@ colocation_get_peer(struct thread *td, struct thread **peertdp)
 void
 colocation_thread_exit(struct thread *td)
 {
+	
 	struct switchercb scb, *peerscb;
 	vaddr_t addr;
 	bool have_scb;
@@ -426,9 +427,10 @@ kern_coregister(struct thread *td, const char * __capability namep,
     void * __capability * __capability capp)
 {
 	struct vmspace *vmspace;
-	struct coname *con;
+	struct coname *con,*con_temp;
 	char name[PATH_MAX];
 	void * __capability cap;
+	struct switchercb * __capability existing_scb_cap;
 	vaddr_t addr;
 	int error;
 
@@ -453,10 +455,26 @@ kern_coregister(struct thread *td, const char * __capability namep,
 	addr = td->td_md.md_scb;
 
 	vm_map_lock(&vmspace->vm_map);
-	LIST_FOREACH(con, &vmspace->vm_conames, c_next) {
+	LIST_FOREACH_SAFE(con, &vmspace->vm_conames, c_next, con_temp) {
+		/*
+		 * XXX-PBB:_SAFE might not be needed since we only remove an item from 
+		 * the list before breaking out of the loop. 
+		 */
 		if (strcmp(name, con->c_name) == 0) {
-			vm_map_unlock(&vmspace->vm_map);
-			return (EEXIST);
+			/*
+			 * NOTE-PBB:If the name exists, but the thread that registered it  
+			 * has since exited, allow the name to be registered again by a  
+			 * new thread.
+			 */
+			existing_scb_cap=cheri_unseal(con->c_value,switcher_sealcap2);
+			if(existing_scb_cap->scb_td==NULL) {
+				LIST_REMOVE(con,c_next);
+				break;
+			}
+			else {
+				vm_map_unlock(&vmspace->vm_map);
+				return (EEXIST);
+			}
 		}
 	}
 
