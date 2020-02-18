@@ -181,9 +181,9 @@ vop_setattr {
 };
 
 
-%% markatime	vp	L L L
+%% mmapped	vp	L L L
 
-vop_markatime {
+vop_mmapped {
 	IN struct vnode *vp;
 };
 
@@ -386,7 +386,6 @@ vop_lock1 {
 
 
 %! unlock	pre	vop_unlock_pre
-%! unlock	post	vop_unlock_post
 
 vop_unlock {
 	IN struct vnode *vp;
@@ -640,7 +639,7 @@ vop_vptocnp {
 	OUT struct vnode **vpp;
 	IN struct ucred *cred;
 	INOUT char *buf;
-	INOUT int *buflen;
+	INOUT size_t *buflen;
 };
 
 

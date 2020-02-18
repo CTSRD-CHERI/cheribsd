@@ -326,6 +326,7 @@ void	ktrprocexit(struct thread *);
 void	ktrprocfork(struct proc *, struct proc *);
 void	ktruserret(struct thread *);
 void	ktrstruct(const char *, const void *, size_t);
+void	ktrstruct_error(const char *, const void *, size_t, int);
 void	ktrstructarray(const char *, enum uio_seg, const void * __capability,
 	    int, size_t);
 void	ktrcapfail(enum ktr_cap_fail_type, const cap_rights_t *,
@@ -343,7 +344,8 @@ void	ktrcreturn(struct pcb *);
 void	ktrcexception(struct trapframe *);
 void	ktrsyserrcause(const char *format, ...) __printflike(1, 2);
 
-extern u_int ktr_geniosize;
+#define ktrstat_error(s, error) \
+	ktrstruct_error("stat", (s), sizeof(struct stat), error)
 
 #ifdef KTRACE
 #define SYSERRCAUSE(fmt, ...) \

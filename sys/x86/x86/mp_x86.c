@@ -31,10 +31,12 @@ __FBSDID("$FreeBSD$");
 #include "opt_apic.h"
 #endif
 #include "opt_cpu.h"
+#include "opt_ddb.h"
 #include "opt_kstack_pages.h"
 #include "opt_pmap.h"
 #include "opt_sched.h"
 #include "opt_smp.h"
+#include "opt_stack.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -75,6 +77,7 @@ __FBSDID("$FreeBSD$");
 #include <machine/psl.h>
 #include <machine/smp.h>
 #include <machine/specialreg.h>
+#include <machine/stack.h>
 #include <x86/ucode.h>
 
 static MALLOC_DEFINE(M_CPUS, "cpus", "CPU items");
@@ -515,7 +518,8 @@ topo_probe(void)
 
 	if (mp_ncpus <= 1)
 		; /* nothing */
-	else if (cpu_vendor_id == CPU_VENDOR_AMD)
+	else if (cpu_vendor_id == CPU_VENDOR_AMD ||
+	    cpu_vendor_id == CPU_VENDOR_HYGON)
 		topo_probe_amd();
 	else if (cpu_vendor_id == CPU_VENDOR_INTEL)
 		topo_probe_intel();
@@ -1083,6 +1087,11 @@ init_secondary_tail(void)
 
 	kcsan_cpu_init(cpuid);
 
+	/*
+	 * Assert that smp_after_idle_runnable condition is reasonable.
+	 */
+	MPASS(PCPU_GET(curpcb) == NULL);
+
 	sched_throw(NULL);
 
 	panic("scheduler returned us to %s", __func__);
@@ -1092,13 +1101,12 @@ init_secondary_tail(void)
 static void
 smp_after_idle_runnable(void *arg __unused)
 {
-	struct thread *idle_td;
+	struct pcpu *pc;
 	int cpu;
 
 	for (cpu = 1; cpu < mp_ncpus; cpu++) {
-		idle_td = pcpu_find(cpu)->pc_idlethread;
-		while (atomic_load_int(&idle_td->td_lastcpu) == NOCPU &&
-		    atomic_load_int(&idle_td->td_oncpu) == NOCPU)
+		pc = pcpu_find(cpu);
+		while (atomic_load_ptr(&pc->pc_curpcb) == (uintptr_t)NULL)
 			cpu_spinwait();
 		kmem_free((vm_offset_t)bootstacks[cpu], kstack_pages *
 		    PAGE_SIZE);
@@ -1233,7 +1241,8 @@ ipi_send_cpu(int cpu, u_int ipi)
 	u_int bitmap, old, new;
 	u_int *cpu_bitmap;
 
-	KASSERT(cpu_apic_ids[cpu] != -1, ("IPI to non-existent CPU %d", cpu));
+	KASSERT((u_int)cpu < MAXCPU && cpu_apic_ids[cpu] != -1,
+	    ("IPI to non-existent CPU %d", cpu));
 
 	if (IPI_IS_BITMAPED(ipi)) {
 		bitmap = 1 << ipi;
@@ -1278,6 +1287,10 @@ ipi_bitmap_handler(struct trapframe frame)
 	td->td_intr_nesting_level++;
 	oldframe = td->td_intr_frame;
 	td->td_intr_frame = &frame;
+#if defined(STACK) || defined(DDB)
+	if (ipi_bitmap & (1 << IPI_TRACE))
+		stack_capture_intr();
+#endif
 	if (ipi_bitmap & (1 << IPI_PREEMPT)) {
 #ifdef COUNT_IPIS
 		(*ipi_preempt_counts[cpu])++;
@@ -1459,7 +1472,7 @@ cpustop_handler(void)
 		 * again, and might as well save power / release resources
 		 * (e.g., overprovisioned VM infrastructure).
 		 */
-		while (__predict_false(!IS_BSP() && panicstr != NULL))
+		while (__predict_false(!IS_BSP() && KERNEL_PANICKED()))
 			halt();
 	}
 
@@ -1672,7 +1685,7 @@ smp_targeted_tlb_shootdown(cpuset_t mask, u_int vector, pmap_t pmap,
 	int cpu;
 
 	/* It is not necessary to signal other CPUs while in the debugger. */
-	if (kdb_active || panicstr != NULL)
+	if (kdb_active || KERNEL_PANICKED())
 		return;
 
 	/*

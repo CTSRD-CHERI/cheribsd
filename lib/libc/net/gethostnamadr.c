@@ -268,6 +268,8 @@ host_marshal_func(char *buffer, size_t *buffer_size, void *retval, va_list ap,
 	size_t desired_size, aliases_size, addr_size, size;
 	char *p, **iter;
 
+	buffer = __builtin_assume_aligned(buffer, _Alignof(struct hostent));
+
 	switch ((enum nss_lookup_type)cache_mdata) {
 	case nss_lt_name:
 		str = va_arg(ap, char *);
@@ -374,6 +376,8 @@ host_unmarshal_func(char *buffer, size_t buffer_size, void *retval, va_list ap,
 	char **iter;
 	char *orig_buf;
 	size_t orig_buf_size;
+
+	buffer = __builtin_assume_aligned(buffer, _Alignof(struct hostent));
 
 	switch ((enum nss_lookup_type)cache_mdata) {
 	case nss_lt_name:

@@ -24,7 +24,7 @@ WARNS?=	2
 CFLAGS+=-DSTATIC_GEOM_CLASSES
 .else
 .if ${MK_CHERI_PURE} == "yes"
-LIBCHERI=	hack to set GEOM_CLASS_DIR
+COMPAT_CHERI=	hack to set GEOM_CLASS_DIR
 .endif
 .include "${SRCTOP}/lib/geom/Makefile.classes"
 LINKS=		${GEOM_CLASSES:S|^|${BINDIR}/geom ${BINDIR}/g|}

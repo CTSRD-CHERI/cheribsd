@@ -120,11 +120,22 @@ struct cheri_kframe {
 /*
  * CHERI-MIPS-specific kernel utility functions.
  */
+struct cheri_frame;
 struct sysentvec;
+struct trapframe;
 void	cheri_capability_set_user_sealcap(void * __capability *);
-void	cheri_capability_set_user_sigcode(void * __capability *,
-	    struct sysentvec *);
 int	cheri_capcause_to_sicode(register_t capcause);
+void	cheri_log_cheri_frame(struct trapframe *frame);
+void	cheri_log_exception(struct trapframe *frame, int trap_type);
+void	cheri_log_exception_registers(struct trapframe *frame);
+void	cheri_trapframe_from_cheriframe(struct trapframe *frame,
+	    struct cheri_frame *cfp);
+void	_cheri_trapframe_to_cheriframe(struct trapframe *frame,
+	    struct cheri_frame *cfp, bool strip_tags);
+#define	cheri_trapframe_to_cheriframe(tf, cf)			\
+	_cheri_trapframe_to_cheriframe((tf), (cf), false)
+#define	cheri_trapframe_to_cheriframe_strip(tf, cf)		\
+	_cheri_trapframe_to_cheriframe((tf), (cf), true)
 
 int	cheriabi_fetch_syscall_args(struct thread *td);
 void	cheriabi_newthread_init(struct thread *td);

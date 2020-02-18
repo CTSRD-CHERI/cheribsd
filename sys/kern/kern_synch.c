@@ -381,15 +381,21 @@ refcount_release_last(volatile u_int *count, u_int n, u_int old)
  * a precise answer should use refcount_wait().
  */
 void
-refcount_sleep(volatile u_int *count, const char *wmesg, int pri)
+_refcount_sleep(volatile u_int *count, struct lock_object *lock,
+    const char *wmesg, int pri)
 {
 	void *wchan;
 	u_int old;
 
-	if (REFCOUNT_COUNT(*count) == 0)
+	if (REFCOUNT_COUNT(*count) == 0) {
+		if (lock != NULL)
+			LOCK_CLASS(lock)->lc_unlock(lock);
 		return;
+	}
 	wchan = __DEVOLATILE(void *, count);
 	sleepq_lock(wchan);
+	if (lock != NULL)
+		LOCK_CLASS(lock)->lc_unlock(lock);
 	old = *count;
 	for (;;) {
 		if (REFCOUNT_COUNT(old) == 0) {
@@ -480,8 +486,8 @@ mi_switch(int flags)
 	if (!TD_ON_LOCK(td) && !TD_IS_RUNNING(td))
 		mtx_assert(&Giant, MA_NOTOWNED);
 #endif
-	KASSERT(td->td_critnest == 1 || panicstr,
-	    ("mi_switch: switch in a critical section"));
+	KASSERT(td->td_critnest == 1 || KERNEL_PANICKED(),
+		("mi_switch: switch in a critical section"));
 	KASSERT((flags & (SW_INVOL | SW_VOL)) != 0,
 	    ("mi_switch: switch must be voluntary or involuntary"));
 

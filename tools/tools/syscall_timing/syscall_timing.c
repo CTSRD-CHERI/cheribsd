@@ -81,7 +81,7 @@ static int *raw_numbers = NULL; /* Array of deltas between last and current */
 #define	RAW_NUMBER(iteration, counter)	raw_numbers[iteration * raw_len + counter]
 #define	RAW_PREV(counter)		raw_prevs[counter]
 #endif
-#ifdef __CHERI__
+#ifdef CHERI_START_TRACE
 static volatile int trace;
 #endif
 static volatile int alarm_fired;
@@ -106,7 +106,7 @@ benchmark_start(void)
 	error = clock_gettime(CLOCK_REALTIME, &ts_start);
 	assert(error == 0);
 
-#ifdef __CHERI__
+#ifdef CHERI_START_TRACE
 	if (trace)
 		CHERI_START_TRACE;
 #endif
@@ -117,7 +117,7 @@ benchmark_stop(void)
 {
 	int error;
 
-#ifdef __CHERI__
+#ifdef CHERI_STOP_TRACE
 	if (trace)
 		CHERI_STOP_TRACE;
 #endif
@@ -1177,7 +1177,7 @@ main(int argc, char *argv[])
 	alarm_timeout = 1;
 	iterations = 0;
 	loops = 10;
-#ifdef __CHERI__
+#ifdef CHERI_START_TRACE
 	trace = 0;
 #endif
 	name = NULL;
@@ -1239,7 +1239,7 @@ main(int argc, char *argv[])
 			break;
 
 		case 't':
-#ifdef __CHERI__
+#ifdef CHERI_START_TRACE
 			trace = 1;
 #else
 			errx(1, "compiled without __CHERI__");

@@ -1290,7 +1290,6 @@ vn_io_fault_pgmove(vm_page_t ma[], vm_offset_t offset, int xfersize,
 	return (0);
 }
 
-
 /*
  * File table truncate routine.
  */
@@ -1604,8 +1603,9 @@ _vn_lock(struct vnode *vp, int flags, char *file, int line)
 {
 	int error;
 
-	VNASSERT((flags & LK_TYPE_MASK) != 0, vp, ("vn_lock: no locktype"));
-	VNASSERT(vp->v_holdcnt != 0, vp, ("vn_lock: zero hold count"));
+	VNASSERT((flags & LK_TYPE_MASK) != 0, vp,
+	    ("vn_lock: no locktype (%d passed)", flags));
+	VNPASS(vp->v_holdcnt > 0, vp);
 	error = VOP_LOCK1(vp, flags, file, line);
 	if (__predict_false(error != 0 || VN_IS_DOOMED(vp)))
 		return (_vn_lock_fallback(vp, flags, file, line, error));
@@ -1852,7 +1852,6 @@ vn_finished_write(struct mount *mp)
 	MNT_IUNLOCK(mp);
 }
 
-
 /*
  * Filesystem secondary write operation has completed. If we are
  * suspending and this operation is the last one, notify the suspender
@@ -1873,8 +1872,6 @@ vn_finished_secondary_write(struct mount *mp)
 		wakeup(&mp->mnt_secondary_writes);
 	MNT_IUNLOCK(mp);
 }
-
-
 
 /*
  * Request a filesystem to suspend write operations.

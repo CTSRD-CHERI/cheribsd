@@ -188,7 +188,16 @@
 
 #define	KERNBASE		(VM_MIN_KERNEL_ADDRESS)
 #define	SHAREDPAGE		(VM_MAXUSER_ADDRESS - PAGE_SIZE)
+
+#if __has_feature(capabilities)
+/*
+ * To ensure that the stack base address that is sufficiently aligned to create
+ * a precisely bounded capability we must round down by 256 pages (0x3ffff00000).
+ */
+#define	USRSTACK		(SHAREDPAGE - (255 * PAGE_SIZE))
+#else
 #define	USRSTACK		SHAREDPAGE
+#endif
 
 #define	KERNENTRY		(0)
 

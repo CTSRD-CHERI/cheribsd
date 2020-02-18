@@ -113,6 +113,9 @@ static vop_fsync_t	ffs_fsync;
 static vop_getpages_t	ffs_getpages;
 static vop_getpages_async_t	ffs_getpages_async;
 static vop_lock1_t	ffs_lock;
+#ifdef INVARIANTS
+static vop_unlock_t	ffs_unlock_debug;
+#endif
 static vop_read_t	ffs_read;
 static vop_write_t	ffs_write;
 static int	ffs_extread(struct vnode *vp, struct uio *uio, int ioflag);
@@ -135,6 +138,9 @@ struct vop_vector ffs_vnodeops1 = {
 	.vop_getpages =		ffs_getpages,
 	.vop_getpages_async =	ffs_getpages_async,
 	.vop_lock1 =		ffs_lock,
+#ifdef INVARIANTS
+	.vop_unlock =		ffs_unlock_debug,
+#endif
 	.vop_read =		ffs_read,
 	.vop_reallocblks =	ffs_reallocblks,
 	.vop_write =		ffs_write,
@@ -147,6 +153,9 @@ struct vop_vector ffs_fifoops1 = {
 	.vop_fsync =		ffs_fsync,
 	.vop_fdatasync =	ffs_fdatasync,
 	.vop_lock1 =		ffs_lock,
+#ifdef INVARIANTS
+	.vop_unlock =		ffs_unlock_debug,
+#endif
 	.vop_vptofh =		ffs_vptofh,
 };
 VFS_VOP_VECTOR_REGISTER(ffs_fifoops1);
@@ -159,6 +168,9 @@ struct vop_vector ffs_vnodeops2 = {
 	.vop_getpages =		ffs_getpages,
 	.vop_getpages_async =	ffs_getpages_async,
 	.vop_lock1 =		ffs_lock,
+#ifdef INVARIANTS
+	.vop_unlock =		ffs_unlock_debug,
+#endif
 	.vop_read =		ffs_read,
 	.vop_reallocblks =	ffs_reallocblks,
 	.vop_write =		ffs_write,
@@ -177,6 +189,9 @@ struct vop_vector ffs_fifoops2 = {
 	.vop_fsync =		ffs_fsync,
 	.vop_fdatasync =	ffs_fdatasync,
 	.vop_lock1 =		ffs_lock,
+#ifdef INVARIANTS
+	.vop_unlock =		ffs_unlock_debug,
+#endif
 	.vop_reallocblks =	ffs_reallocblks,
 	.vop_strategy =		ffsext_strategy,
 	.vop_closeextattr =	ffs_closeextattr,
@@ -426,8 +441,7 @@ ffs_lock(ap)
 		flags = ap->a_flags;
 		for (;;) {
 #ifdef DEBUG_VFS_LOCKS
-			KASSERT(vp->v_holdcnt != 0,
-			    ("ffs_lock %p: zero hold count", vp));
+			VNPASS(vp->v_holdcnt != 0, vp);
 #endif
 			lkp = vp->v_vnlock;
 			result = _lockmgr_args(lkp, flags, VI_MTX(vp),
@@ -462,6 +476,26 @@ ffs_lock(ap)
 	return (VOP_LOCK1_APV(&ufs_vnodeops, ap));
 #endif
 }
+
+#ifdef INVARIANTS
+static int
+ffs_unlock_debug(struct vop_unlock_args *ap)
+{
+	struct vnode *vp = ap->a_vp;
+	struct inode *ip = VTOI(vp);
+
+	if (ip->i_flag & UFS_INODE_FLAG_LAZY_MASK_ASSERTABLE) {
+		if ((vp->v_mflag & VMP_LAZYLIST) == 0) {
+			VI_LOCK(vp);
+			VNASSERT((vp->v_mflag & VMP_LAZYLIST), vp,
+			    ("%s: modified vnode (%x) not on lazy list",
+			    __func__, ip->i_flag));
+			VI_UNLOCK(vp);
+		}
+	}
+	return (VOP_UNLOCK_APV(&ufs_vnodeops, ap));
+}
+#endif
 
 static int
 ffs_read_hole(struct uio *uio, long xfersize, long *size)
@@ -665,12 +699,8 @@ ffs_read(ap)
 		vfs_bio_brelse(bp, ioflag);
 
 	if ((error == 0 || uio->uio_resid != orig_resid) &&
-	    (vp->v_mount->mnt_flag & (MNT_NOATIME | MNT_RDONLY)) == 0 &&
-	    (ip->i_flag & IN_ACCESS) == 0) {
-		VI_LOCK(vp);
-		ip->i_flag |= IN_ACCESS;
-		VI_UNLOCK(vp);
-	}
+	    (vp->v_mount->mnt_flag & (MNT_NOATIME | MNT_RDONLY)) == 0)
+		UFS_INODE_SET_FLAG_SHARED(ip, IN_ACCESS);
 	return (error);
 }
 
@@ -853,7 +883,7 @@ ffs_write(ap)
 		}
 		if (error || xfersize == 0)
 			break;
-		ip->i_flag |= IN_CHANGE | IN_UPDATE;
+		UFS_INODE_SET_FLAG(ip, IN_CHANGE | IN_UPDATE);
 	}
 	/*
 	 * If we successfully wrote any data, and we are not the superuser
@@ -1096,7 +1126,7 @@ ffs_extwrite(struct vnode *vp, struct uio *uio, int ioflag, struct ucred *ucred)
 			bdwrite(bp);
 		if (error || xfersize == 0)
 			break;
-		ip->i_flag |= IN_CHANGE;
+		UFS_INODE_SET_FLAG(ip, IN_CHANGE);
 	}
 	/*
 	 * If we successfully wrote any data, and we are not the superuser
@@ -1202,11 +1232,11 @@ ffs_lock_ea(struct vnode *vp)
 	ip = VTOI(vp);
 	VI_LOCK(vp);
 	while (ip->i_flag & IN_EA_LOCKED) {
-		ip->i_flag |= IN_EA_LOCKWAIT;
+		UFS_INODE_SET_FLAG(ip, IN_EA_LOCKWAIT);
 		msleep(&ip->i_ea_refs, &vp->v_interlock, PINOD + 2, "ufs_ea",
 		    0);
 	}
-	ip->i_flag |= IN_EA_LOCKED;
+	UFS_INODE_SET_FLAG(ip, IN_EA_LOCKED);
 	VI_UNLOCK(vp);
 }
 

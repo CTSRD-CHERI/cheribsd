@@ -403,7 +403,7 @@ MACHINE_CPU += armv7
 # armv6 and armv7 are a hybrid. It can use the softfp ABI, but doesn't emulate
 # floating point in the general case, so don't define softfp for it at this
 # time. arm is pure softfp, so define it for them.
-. if ${MACHINE_ARCH:Marmv[67]*} == ""
+. if !${MACHINE_ARCH:Marmv[67]*}
 MACHINE_CPU += softfp
 . endif
 # Normally armv6 and armv7 are hard float ABI from FreeBSD 11 onwards. However
@@ -432,7 +432,7 @@ CFLAGS.gcc+= -mabi=spe -mfloat-gprs=double -Wa,-me500
 
 .if ${MACHINE_CPUARCH} == "riscv"
 RISCV_MARCH=	rv64ima
-.if ${MACHINE_ARCH:Mriscv*sf*} == ""
+.if !${MACHINE_ARCH:Mriscv*sf*}
 RISCV_MARCH:=	${RISCV_MARCH}fd
 .endif
 RISCV_MARCH:=	${RISCV_MARCH}c
@@ -445,11 +445,12 @@ RISCV_ABI=	l64pc128
 .else
 RISCV_ABI=	lp64
 .endif
-.if ${MACHINE_ARCH:Mriscv*sf} == ""
+.if !${MACHINE_ARCH:Mriscv*sf}
 RISCV_ABI:=	${RISCV_ABI}d
 .endif
 
 CFLAGS += -march=${RISCV_MARCH} -mabi=${RISCV_ABI}
+LDFLAGS += -march=${RISCV_MARCH} -mabi=${RISCV_ABI}
 .endif
 
 # NB: COPTFLAGS is handled in /usr/src/sys/conf/kern.pre.mk

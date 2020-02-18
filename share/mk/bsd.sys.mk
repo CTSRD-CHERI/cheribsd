@@ -111,6 +111,11 @@ CWARNFLAGS.clang+=	-Wno-parentheses
 .if defined(NO_WARRAY_BOUNDS)
 CWARNFLAGS.clang+=	-Wno-array-bounds
 .endif # NO_WARRAY_BOUNDS
+.if defined(NO_WMISLEADING_INDENTATION) && \
+    ((${COMPILER_TYPE} == "clang" && ${COMPILER_VERSION} >= 100000) || \
+     (${COMPILER_TYPE} == "gcc" && ${COMPILER_VERSION} >= 60100))
+CWARNFLAGS+=		-Wno-misleading-indentation
+.endif # NO_WMISLEADING_INDENTATION
 .endif # WARNS
 
 .if defined(FORMAT_AUDIT)
@@ -154,8 +159,7 @@ CWARNFLAGS+=	-Wno-error=address			\
 
 # GCC 6.1.0
 .if ${COMPILER_TYPE} == "gcc" && ${COMPILER_VERSION} >= 60100
-CWARNFLAGS+=	-Wno-error=misleading-indentation	\
-		-Wno-error=nonnull-compare		\
+CWARNFLAGS+=	-Wno-error=nonnull-compare		\
 		-Wno-error=shift-negative-value		\
 		-Wno-error=tautological-compare		\
 		-Wno-error=unused-const-variable
@@ -188,7 +192,7 @@ CWARNFLAGS+=	-Wno-error=aggressive-loop-optimizations	\
 		-Wno-error=stringop-truncation
 .endif
 
-.ifdef LIBCHERI
+.if ${MACHINE_ABI:Mpurecap}
 # Ignore unaligned memcpy() calls. This is just a missed optimization
 # so it should not cause the build to fail.
 CWARNFLAGS+=	-Wno-error=pass-failed

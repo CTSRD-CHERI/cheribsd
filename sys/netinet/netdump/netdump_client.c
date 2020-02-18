@@ -277,7 +277,7 @@ netdump_dumper(void *priv __unused, void *virtual,
 }
 
 /*
- * Perform any initalization needed prior to transmitting the kernel core.
+ * Perform any initialization needed prior to transmitting the kernel core.
  */
 static int
 netdump_start(struct dumperinfo *di)
@@ -293,7 +293,7 @@ netdump_start(struct dumperinfo *di)
 	if (!netdump_enabled())
 		return (EINVAL);
 
-	if (panicstr == NULL) {
+	if (!KERNEL_PANICKED()) {
 		printf(
 		    "netdump_start: netdump may only be used after a panic\n");
 		return (EINVAL);

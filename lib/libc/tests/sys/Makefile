@@ -5,7 +5,7 @@ PACKAGE=			tests
 .include <bsd.own.mk>
 
 .if ${MACHINE_CPUARCH} != "aarch64" && ${MACHINE_CPUARCH} != "riscv" && \
-    ! ${MACHINE_ARCH:Mmips*c*}
+    !${MACHINE_ABI:Mpurecap}
 ATF_TESTS_C+=			brk_test
 .endif
 ATF_TESTS_C+=			queue_test

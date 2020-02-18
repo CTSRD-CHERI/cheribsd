@@ -40,7 +40,7 @@
 #include <machine/_align.h>
 
 #define	STACKALIGNBYTES	(16 - 1)
-#define	STACKALIGN(p)	((uint64_t)(p) & ~STACKALIGNBYTES)
+#define	STACKALIGN(p)	((uintptr_t)(p) & ~STACKALIGNBYTES)
 
 #ifndef MACHINE
 #define	MACHINE		"riscv"
@@ -49,13 +49,13 @@
 #define	MACHINE_ARCH	"riscv64"
 #endif
 
-#if defined(SMP) || defined(KLD_MODULE)
+#ifdef SMP
 #ifndef MAXCPU
 #define	MAXCPU		16
 #endif
 #else
 #define	MAXCPU		1
-#endif /* SMP || KLD_MODULE */
+#endif
 
 #ifndef MAXMEMDOM
 #define	MAXMEMDOM	1

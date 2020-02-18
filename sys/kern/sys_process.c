@@ -1008,7 +1008,6 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 			}
 		}
 
-
 		/* OK */
 		break;
 

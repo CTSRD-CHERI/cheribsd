@@ -77,8 +77,6 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_pagequeue.h>
 #include <vm/uma_int.h>
 
-int	vmem_startup_count(void);
-
 #define	VMEM_OPTORDER		5
 #define	VMEM_OPTVALUE		(1 << VMEM_OPTORDER)
 #define	VMEM_MAXORDER						\
@@ -202,7 +200,6 @@ static uma_zone_t vmem_zone;
 #define	VMEM_CONDVAR_DESTROY(vm)	cv_destroy(&vm->vm_cv)
 #define	VMEM_CONDVAR_WAIT(vm)		cv_wait(&vm->vm_cv, &vm->vm_lock)
 #define	VMEM_CONDVAR_BROADCAST(vm)	cv_broadcast(&vm->vm_cv)
-
 
 #define	VMEM_LOCK(vm)		mtx_lock(&vm->vm_lock)
 #define	VMEM_TRYLOCK(vm)	mtx_trylock(&vm->vm_lock)
@@ -661,17 +658,6 @@ vmem_bt_alloc(uma_zone_t zone, vm_size_t bytes, int domain, uint8_t *pflag,
 		pause("btalloc", 1);
 
 	return (NULL);
-}
-
-/*
- * How many pages do we need to startup_alloc.
- */
-int
-vmem_startup_count(void)
-{
-
-	return (howmany(BT_MAXALLOC, slab_ipers(sizeof(struct vmem_btag),
-	    UMA_ALIGN_PTR)));
 }
 #endif
 

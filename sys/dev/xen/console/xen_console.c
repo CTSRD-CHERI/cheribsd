@@ -44,6 +44,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/cons.h>
 #include <sys/kdb.h>
 #include <sys/proc.h>
+#include <sys/reboot.h>
 
 #include <machine/stdarg.h>
 
@@ -199,7 +200,7 @@ xc_printf(const char *fmt, ...)
 static inline void xencons_lock(struct xencons_priv *cons)
 {
 
-	if (panicstr == NULL)
+	if (!KERNEL_PANICKED())
 		mtx_lock_spin(&cons->mtx);
 
 }
@@ -207,7 +208,7 @@ static inline void xencons_lock(struct xencons_priv *cons)
 static inline void xencons_unlock(struct xencons_priv *cons)
 {
 
-	if (panicstr == NULL)
+	if (!KERNEL_PANICKED())
 		mtx_unlock_spin(&cons->mtx);
 }
 
@@ -590,7 +591,7 @@ xencons_cnprobe(struct consdev *cp)
 	if (!xen_domain())
 		return;
 
-	cp->cn_pri = CN_REMOTE;
+	cp->cn_pri = (boothowto & RB_SERIAL) ? CN_REMOTE : CN_NORMAL;
 	sprintf(cp->cn_name, "%s0", driver_name);
 }
 

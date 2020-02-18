@@ -278,6 +278,8 @@ pwd_marshal_func(char *buffer, size_t *buffer_size, void *retval, va_list ap,
 	size_t desired_size, size;
 	char *p;
 
+	buffer = __builtin_assume_aligned(buffer, _Alignof(struct passwd));
+
 	switch ((enum nss_lookup_type)cache_mdata) {
 	case nss_lt_name:
 		name = va_arg(ap, char *);
@@ -380,6 +382,8 @@ pwd_unmarshal_func(char *buffer, size_t buffer_size, void *retval, va_list ap,
 	int *ret_errno;
 
 	char *p;
+
+	buffer = __builtin_assume_aligned(buffer, _Alignof(struct passwd));
 
 	switch ((enum nss_lookup_type)cache_mdata) {
 	case nss_lt_name:

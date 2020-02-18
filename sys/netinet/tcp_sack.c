@@ -165,11 +165,6 @@ tcp_update_dsack_list(struct tcpcb *tp, tcp_seq rcv_start, tcp_seq rcv_end)
 
 	KASSERT(SEQ_LT(rcv_start, rcv_end), ("rcv_start < rcv_end"));
 
-	if (tp->t_inpcb->inp_socket->so_options & SO_DEBUG) {
-		log(LOG_DEBUG, "\nDSACK update: %d..%d, rcv_nxt: %u\n",
-		rcv_start, rcv_end, tp->rcv_nxt);
-	}
-
 	if (SEQ_LT(rcv_end, tp->rcv_nxt) ||
 	    ((rcv_end == tp->rcv_nxt) &&
 	     (tp->rcv_numsacks > 0 ) &&
@@ -243,7 +238,7 @@ tcp_update_dsack_list(struct tcpcb *tp, tcp_seq rcv_start, tcp_seq rcv_end)
 	}
 	j = 0;
 	for (i = 0; i < n; i++) {
-		/* we can end up with a stale inital entry */
+		/* we can end up with a stale initial entry */
 		if (SEQ_LT(saved_blks[i].start, saved_blks[i].end)) {
 			tp->sackblks[j++] = saved_blks[i];
 		}

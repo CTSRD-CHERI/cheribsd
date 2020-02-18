@@ -229,7 +229,7 @@ sbuf_tty_drain(void *a, const char *d, int len)
 		cnputsn(d, len);
 		return (len);
 	}
-	if (tp != NULL && panicstr == NULL) {
+	if (tp != NULL && !KERNEL_PANICKED()) {
 		rc = tty_putstrn(tp, d, len);
 		if (rc != 0)
 			return (-ENXIO);
@@ -340,12 +340,8 @@ tty_info(struct tty *tp)
 	if (tty_info_kstacks) {
 		if (TD_IS_SWAPPED(td))
 			sterr = ENOENT;
-		else if (TD_IS_RUNNING(td))
-			sterr = stack_save_td_running(&stack, td);
-		else {
-			stack_save_td(&stack, td);
-			sterr = 0;
-		}
+		else
+			sterr = stack_save_td(&stack, td);
 	}
 #endif
 	thread_unlock(td);

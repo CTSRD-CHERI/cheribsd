@@ -113,12 +113,8 @@ static __ElfN(Brandinfo) freebsd_brand_info = {
 	.interp_path	= "/libexec/ld-elf.so.1",
 	.sysvec		= &elf_freebsd_sysvec,
 	.interp_newpath	= NULL,
-#if __has_feature(capabilities)
-	.flags		= BI_CAN_EXEC_DYN
-#else
 	.brand_note	= &__elfN(freebsd_brandnote),
 	.flags		= BI_CAN_EXEC_DYN | BI_BRAND_NOTE
-#endif
 };
 
 SYSINIT(elf, SI_SUB_EXEC, SI_ORDER_FIRST,

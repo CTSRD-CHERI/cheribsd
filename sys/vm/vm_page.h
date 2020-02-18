@@ -325,6 +325,9 @@ struct vm_page {
 
 #define	VPB_UNBUSIED		VPB_SHARERS_WORD(0)
 
+/* Freed lock blocks both shared and exclusive. */
+#define	VPB_FREED		(0xffffffff - VPB_BIT_SHARED)
+
 #define	PQ_NONE		255
 #define	PQ_INACTIVE	0
 #define	PQ_ACTIVE	1
@@ -609,7 +612,6 @@ vm_page_t vm_page_alloc_freelist(int, int);
 vm_page_t vm_page_alloc_freelist_domain(int, int, int);
 void vm_page_bits_set(vm_page_t m, vm_page_bits_t *bits, vm_page_bits_t set);
 bool vm_page_blacklist_add(vm_paddr_t pa, bool verbose);
-void vm_page_change_lock(vm_page_t m, struct mtx **mtx);
 vm_page_t vm_page_grab (vm_object_t, vm_pindex_t, int);
 int vm_page_grab_pages(vm_object_t object, vm_pindex_t pindex, int allocflags,
     vm_page_t *ma, int count);
@@ -701,9 +703,11 @@ void vm_page_lock_assert_KBI(vm_page_t m, int a, const char *file, int line);
 	    (m), __FILE__, __LINE__))
 
 #define	vm_page_assert_unbusied(m)					\
-	KASSERT(!vm_page_busied(m),					\
-	    ("vm_page_assert_unbusied: page %p busy @ %s:%d",		\
-	    (m), __FILE__, __LINE__))
+	KASSERT((m->busy_lock & ~VPB_BIT_WAITERS) != 			\
+	    VPB_CURTHREAD_EXCLUSIVE,					\
+	    ("vm_page_assert_xbusied: page %p busy_lock %#x owned"	\
+            " by me @ %s:%d",						\
+	    (m), (m)->busy_lock, __FILE__, __LINE__));			\
 
 #define	vm_page_assert_xbusied_unchecked(m) do {			\
 	KASSERT(vm_page_xbusied(m),					\
@@ -730,6 +734,9 @@ void vm_page_lock_assert_KBI(vm_page_t m, int a, const char *file, int line);
 
 #define	vm_page_xbusied(m)						\
 	(((m)->busy_lock & VPB_SINGLE_EXCLUSIVE) != 0)
+
+#define	vm_page_busy_freed(m)						\
+	((m)->busy_lock == VPB_FREED)
 
 #define	vm_page_xbusy(m) do {						\
 	if (!vm_page_tryxbusy(m))					\

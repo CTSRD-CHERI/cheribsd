@@ -63,14 +63,12 @@ __DEFAULT_YES_OPTIONS = \
     AUTOFS \
     BHYVE \
     BINUTILS \
-    BINUTILS_BOOTSTRAP \
     BLACKLIST \
     BLUETOOTH \
     BOOT \
     BOOTPARAMD \
     BOOTPD \
     BSD_CPIO \
-    BSD_CRTBEGIN \
     BSDINSTALL \
     BSNMP \
     BZIP2 \
@@ -208,7 +206,6 @@ __DEFAULT_NO_OPTIONS = \
     GNU_GREP_COMPAT \
     GPL_DTC \
     HESIOD \
-    HTTPD \
     LIBSOFT \
     LOADER_FIREWIRE \
     LOADER_FORCE_LE \
@@ -339,6 +336,11 @@ __DEFAULT_NO_OPTIONS+=CLANG CLANG_BOOTSTRAP CLANG_IS_CC LLD
 .if ${__T} == "aarch64" || ${__T:Mriscv*} != ""
 BROKEN_OPTIONS+=BINUTILS BINUTILS_BOOTSTRAP GCC GCC_BOOTSTRAP GDB
 .endif
+.if ${__T} == "amd64" || ${__T} == "i386" || ${__T:Mpowerpc*}
+__DEFAULT_YES_OPTIONS+=BINUTILS_BOOTSTRAP
+.else
+__DEFAULT_NO_OPTIONS+=BINUTILS_BOOTSTRAP
+.endif
 .if ${__T:Mriscv*} != ""
 BROKEN_OPTIONS+=OFED
 .endif
@@ -382,6 +384,31 @@ BROKEN_OPTIONS+=LIBSOFT
 .if ${__T:Mmips*}
 BROKEN_OPTIONS+=SSP
 .endif
+
+.if ${__T:Mmips64*c*} || ${__T:Mriscv*c*}
+# Stack protector does not make sense for CHERI purecap
+BROKEN_OPTIONS+=SSP
+# nscd(8) caching depends on marshaling pointers to the daemon and back
+# and can't work without a rewrite.
+BROKEN_OPTIONS+=NS_CACHING
+# cheribsdbox is a useful recovery tool
+__DEFAULT_YES_OPTIONS+=CHERIBSDBOX
+.else
+__DEFAULT_NO_OPTIONS+=CHERIBSDBOX
+.endif
+
+.if ${__T:Mriscv*c*}
+# Compiler crash:
+# Skip until https://github.com/CTSRD-CHERI/llvm-project/issues/379 is fixed.
+BROKEN_OPTIONS+=LIBCPLUSPLUS GNUCXX CXX
+# Crash in ZFS code. TODO: investigate
+BROKEN_OPTIONS+=CDDL
+
+# Some compilation failure: TODO: investigate
+BROKEN_OPTIONS+=SVN SVNLITE
+.endif
+
+
 # EFI doesn't exist on mips, powerpc, sparc or riscv.
 .if ${__T:Mmips*} || ${__T:Mpowerpc*} || ${__T:Msparc64} || ${__T:Mriscv*}
 BROKEN_OPTIONS+=EFI
@@ -417,7 +444,7 @@ __DEFAULT_YES_OPTIONS+=PIE
 __DEFAULT_NO_OPTIONS+=PIE
 .endif
 
-.if ${__T} != "mips64"
+.if ${__T} != "mips64" && (${__TT} != "riscv" || ${__T:Mriscv*64*c})
 BROKEN_OPTIONS+=COMPAT_CHERIABI
 .endif
 
@@ -438,8 +465,6 @@ BROKEN_OPTIONS+=NVME
 .endif
 
 .if ${__T:Msparc64}
-# Sparc64 need extra crt*.o files - PR 239851
-BROKEN_OPTIONS+=BSD_CRTBEGIN
 # PR 233405
 BROKEN_OPTIONS+=LLVM_LIBUNWIND
 .endif
@@ -531,6 +556,7 @@ MK_CLANG:=	no
 MK_GNUCXX:=	no
 MK_GOOGLETEST:=	no
 MK_TESTS:=	no
+MK_PMC:=	no
 .endif
 
 .if ${MK_DIALOG} == "no"
@@ -561,6 +587,7 @@ MK_NLS_CATALOGS:= no
 .endif
 
 .if ${MK_OPENSSL} == "no"
+MK_DMAGENT:=	no
 MK_OPENSSH:=	no
 MK_KERBEROS:=	no
 MK_KERBEROS_SUPPORT:=	no
@@ -626,8 +653,8 @@ MK_LLVM_COV:= no
 MK_LOADER_VERIEXEC_PASS_MANIFEST := no
 .endif
 
-# COMPAT_CHERIABI and LIBCHERI depend on CHERI support.
-.if ${MK_CHERI} == "no"
+# COMPAT_CHERIABI and LIBCHERI depend on CHERI support on mips.
+.if ${MK_CHERI} == "no" && ${__TT} == "mips"
 MK_LIBCHERI:=	no
 MK_COMPAT_CHERIABI:=	no
 .endif

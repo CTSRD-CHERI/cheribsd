@@ -37,6 +37,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/kernel.h>
 #include <sys/kthread.h>
 #include <sys/proc.h>
+#include <sys/epoch.h>
 #include <sys/eventhandler.h>
 #include <sys/resourcevar.h>
 #include <sys/socket.h>			/* needed by net/if.h		*/
@@ -246,7 +247,6 @@ static uint32_t idlepoll_sleeping; /* idlepoll is sleeping */
 SYSCTL_UINT(_kern_polling, OID_AUTO, idlepoll_sleeping, CTLFLAG_RD,
 	&idlepoll_sleeping, 0, "idlepoll is sleeping");
 
-
 #define POLL_LIST_LEN  128
 struct pollrec {
 	poll_handler_t	*handler;
@@ -271,7 +271,6 @@ init_device_poll(void)
 	    SHUTDOWN_PRI_LAST);
 }
 SYSINIT(device_poll, SI_SUB_SOFTINTR, SI_ORDER_MIDDLE, init_device_poll, NULL);
-
 
 /*
  * Hook from hardclock. Tries to schedule a netisr, but keeps track
@@ -332,6 +331,7 @@ hardclock_device_poll(void)
 static void
 ether_poll(int count)
 {
+	struct epoch_tracker et;
 	int i;
 
 	mtx_lock(&poll_mtx);
@@ -339,8 +339,10 @@ ether_poll(int count)
 	if (count > poll_each_burst)
 		count = poll_each_burst;
 
+	NET_EPOCH_ENTER(et);
 	for (i = 0 ; i < poll_handlers ; i++)
 		pr[i].handler(pr[i].ifp, POLL_ONLY, count);
+	NET_EPOCH_EXIT(et);
 
 	mtx_unlock(&poll_mtx);
 }
@@ -428,6 +430,8 @@ netisr_poll(void)
 {
 	int i, cycles;
 	enum poll_cmd arg = POLL_ONLY;
+
+	NET_EPOCH_ASSERT();
 
 	if (poll_handlers == 0)
 		return;

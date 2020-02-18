@@ -223,6 +223,7 @@ exit1(struct thread *td, int rval, int signo)
 	 * XXX in case we're rebooting we just let init die in order to
 	 * work around an unsolved stack overflow seen very late during
 	 * shutdown on sparc64 when the gmirror worker process exists.
+	 * XXX what to do now that sparc64 is gone... remove if?
 	 */
 	if (p == initproc && rebooting == 0) {
 		printf("init died (signal %d, exit %d)\n", signo, rval);
@@ -696,7 +697,6 @@ exit1(struct thread *td, int rval, int signo)
 	thread_exit();
 }
 
-
 #ifndef _SYS_SYSPROTO_H_
 struct abort2_args {
 	char *why;
@@ -799,7 +799,6 @@ out:
 	exit1(td, 0, sig);
 	return (0);
 }
-
 
 #ifdef COMPAT_43
 /*

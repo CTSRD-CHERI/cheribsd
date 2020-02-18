@@ -154,9 +154,9 @@ TARGET_ABI=	gnueabihf
 TARGET_ABI=	gnueabi
 .endif
 .endif
-MACHINE_ABI?=	unknown
+_MACHINE_ABI?=	unknown
 MACHINE_MACHINE=${MACHINE_ARCH:S/amd64/x86_64/:C/[hs]f$//:S/mipsn32/mips64/:C/mips.*c.*/cheri/:S/riscv64c/riscv64/}
-MACHINE_TRIPLE?=${MACHINE_MACHINE}-${MACHINE_ABI}-freebsd13.0
+MACHINE_TRIPLE?=${MACHINE_MACHINE}-${_MACHINE_ABI}-freebsd13.0
 TARGET_ABI?=	unknown
 TARGET_MACHINE=	${TARGET_ARCH:S/amd64/x86_64/:C/[hs]f$//:S/mipsn32/mips64/:C/mips.*c.*/cheri/:S/riscv64c/riscv64/}
 TARGET_TRIPLE?=	${TARGET_MACHINE}-${TARGET_ABI}-freebsd13.0
@@ -183,8 +183,7 @@ KNOWN_ARCHES?=	aarch64/arm64 \
 		riscv64/riscv \
 		riscv64sf/riscv \
 		riscv64c/riscv \
-		riscv64sfc/riscv \
-		sparc64
+		riscv64sfc/riscv
 
 .if ${TARGET} == ${TARGET_ARCH}
 _t=		${TARGET}
@@ -209,24 +208,6 @@ MK_SYSTEM_LINKER=	no
 # Handle external binutils.
 .if defined(CROSS_TOOLCHAIN_PREFIX)
 CROSS_BINUTILS_PREFIX?=${CROSS_TOOLCHAIN_PREFIX}
-.endif
-# If we do not have a bootstrap binutils (because the in-tree one does not
-# support the target architecture), provide a default cross-binutils prefix.
-# This allows riscv64 builds, for example, to automatically use the
-# riscv64-binutils port or package.
-.if !make(showconfig) && !defined(_NO_INCLUDE_COMPILERMK)
-.if !empty(BROKEN_OPTIONS:MBINUTILS_BOOTSTRAP) && \
-    ${MK_LLD_BOOTSTRAP} == "no" && \
-    !defined(CROSS_BINUTILS_PREFIX)
-CROSS_BINUTILS_PREFIX=/usr/local/${TARGET_TRIPLE}/bin/
-.if !exists(${CROSS_BINUTILS_PREFIX})
-.if !empty(BROKEN_OPTIONS:MGCC_BOOTSTRAP) && ${MK_CLANG_BOOTSTRAP} == "no"
-.error In-tree toolchain does not support the ${TARGET_ARCH} architecture. Install the ${TARGET_ARCH}-xtoolchain-gcc port or package or set CROSS_TOOLCHAIN_PREFIX.
-.else
-.error In-tree binutils does not support the ${TARGET_ARCH} architecture. Install the ${TARGET_ARCH}-binutils port or package or set CROSS_BINUTILS_PREFIX.
-.endif
-.endif
-.endif
 .endif
 XBINUTILS=	AS AR LD NM OBJCOPY RANLIB SIZE STRINGS
 .for BINUTIL in ${XBINUTILS}
@@ -668,8 +649,8 @@ BUILD_ARCH!=	uname -p
 .endif
 .endif
 WORLDTMP?=	${OBJTOP}/tmp
-BPATH=		${CCACHE_WRAPPER_PATH_PFX}${WORLDTMP}/legacy/usr/sbin:${WORLDTMP}/legacy/usr/bin:${WORLDTMP}/legacy/bin
-XPATH=		${WORLDTMP}/bin:${WORLDTMP}/usr/sbin:${WORLDTMP}/usr/bin
+BPATH=		${CCACHE_WRAPPER_PATH_PFX}${WORLDTMP}/legacy/usr/sbin:${WORLDTMP}/legacy/usr/bin:${WORLDTMP}/legacy/bin:${WORLDTMP}/legacy/usr/libexec
+XPATH=		${WORLDTMP}/usr/sbin:${WORLDTMP}/usr/bin
 
 # When building we want to find the cross tools before the host tools in ${BPATH}.
 # We also need to add UNIVERSE_TOOLCHAIN_PATH so that we can find the shared
@@ -864,7 +845,8 @@ KTMAKE=		\
 WMAKEENV=	${CROSSENV} \
 		INSTALL="sh ${.CURDIR}/tools/install.sh" \
 		PATH=${TMPPATH} \
-		SYSROOT=${WORLDTMP}
+		SYSROOT=${WORLDTMP} \
+		WORLDTMP=${WORLDTMP}
 
 # make hierarchy
 HMAKE=		PATH=${TMPPATH} ${MAKE} LOCAL_MTREE=${LOCAL_MTREE:Q}
@@ -1668,11 +1650,11 @@ makeman: .PHONY
 	${_+_}cd ${.CURDIR}/tools/build/options; sh makeman > \
 	    ${.CURDIR}/share/man/man5/src.conf.5
 
-.if make(sysent)
-.include <src.lua.mk>
-.endif
-
-_sysent_PATH=	${WORLDTMP}/legacy/usr/libexec:/usr/libexec:${PATH}
+# We can't assume here that ${TMPPATH} will include ${PATH} or /usr/libexec
+# because we may be building with a STRICTTMPPATH, so we explicitly include
+# /usr/libexec here for flua.  ${TMPPATH} still usefully includes anything else
+# we may need to function.
+_sysent_PATH=	${TMPPATH}:/usr/libexec
 _sysent_dirs=	sys/kern
 _sysent_dirs+=	sys/compat/freebsd32
 _sysent_dirs+=	sys/compat/freebsd64
@@ -1687,8 +1669,7 @@ _sysent_dirs+=	sys/amd64/linux		\
 sysent: .PHONY
 .for _dir in ${_sysent_dirs}
 	@echo "${MAKE} -C ${.CURDIR}/${_dir} sysent"
-	${_+_}@env PATH=${_sysent_PATH} LUA=${LUA_CMD} \
-	    ${MAKE} -C ${.CURDIR}/${_dir} sysent
+	${_+_}@env PATH=${_sysent_PATH} ${MAKE} -C ${.CURDIR}/${_dir} sysent
 .endfor
 
 #
@@ -2033,6 +2014,7 @@ PORTSDIR?=	/usr/ports
 WSTAGEDIR?=	${OBJTOP}/worldstage
 KSTAGEDIR?=	${OBJTOP}/kernelstage
 REPODIR?=	${OBJROOT}repo
+PKG_FORMAT?=	txz
 PKGSIGNKEY?=	# empty
 
 .ORDER:		stage-packages create-packages
@@ -2105,6 +2087,10 @@ create-world-packages:	_pkgbootstrap .PHONY
 .include "${WSTAGEDIR}/packages.mk"
 .endif
 
+.if make(create-world-packages-jobs) || make(create-kernel-packages*)
+PKG_ABI!=${PKG_CMD} -o ABI_FILE=${WSTAGEDIR}/usr/bin/uname config ABI
+.endif
+
 create-world-packages-jobs: .PHONY
 .for pkgname in ${_PKGS}
 create-world-packages-jobs: create-world-package-${pkgname}
@@ -2119,10 +2105,10 @@ create-world-package-${pkgname}: .PHONY
 		sed -i '' -e "s/%VCS_REVISION%/${VCS_REVISION}/" ${WSTAGEDIR}/${pkgname}.ucl ; \
 	fi
 	${PKG_CMD} -o ABI_FILE=${WSTAGEDIR}/usr/bin/uname -o ALLOW_BASE_SHLIBS=yes \
-		create -M ${WSTAGEDIR}/${pkgname}.ucl \
+		create -f ${PKG_FORMAT} -M ${WSTAGEDIR}/${pkgname}.ucl \
 		-p ${WSTAGEDIR}/${pkgname}.plist \
 		-r ${WSTAGEDIR} \
-		-o ${REPODIR}/$$(${PKG_CMD} -o ABI_FILE=${WSTAGEDIR}/usr/bin/uname config ABI)/${PKG_VERSION}
+		-o ${REPODIR}/${PKG_ABI}/${PKG_VERSION}
 .endfor
 
 _default_flavor=	-default
@@ -2151,10 +2137,11 @@ create-kernel-packages-flavor${flavor:C,^""$,${_default_flavor},}: _pkgbootstrap
 		/version/ {print $$2; next } ' \
 		${KSTAGEDIR}/${DISTDIR}/kernel.${INSTALLKERNEL}${flavor}.ucl ; \
 	${PKG_CMD} -o ABI_FILE=${WSTAGEDIR}/usr/bin/uname -o ALLOW_BASE_SHLIBS=yes \
-		create -M ${KSTAGEDIR}/${DISTDIR}/kernel.${INSTALLKERNEL}${flavor}.ucl \
+		create -f ${PKG_FORMAT} \
+		-M ${KSTAGEDIR}/${DISTDIR}/kernel.${INSTALLKERNEL}${flavor}.ucl \
 		-p ${KSTAGEDIR}/${DISTDIR}/kernel.${INSTALLKERNEL}${flavor}.plist \
 		-r ${KSTAGEDIR}/${DISTDIR} \
-		-o ${REPODIR}/$$(${PKG_CMD} -o ABI_FILE=${WSTAGEDIR}/usr/bin/uname config ABI)/${PKG_VERSION}
+		-o ${REPODIR}/${PKG_ABI}/${PKG_VERSION}
 . endfor
 .endif
 .if ${BUILDKERNELS:[#]} > 1 && ${NO_INSTALLEXTRAKERNELS} != "yes"
@@ -2183,19 +2170,22 @@ create-kernel-packages-extra-flavor${flavor:C,^""$,${_default_flavor},}-${_kerne
 		/version/ {print $$2; next } ' \
 		${KSTAGEDIR}/kernel.${_kernel}/kernel.${_kernel}${flavor}.ucl ; \
 	${PKG_CMD} -o ABI_FILE=${WSTAGEDIR}/usr/bin/uname -o ALLOW_BASE_SHLIBS=yes \
-		create -M ${KSTAGEDIR}/kernel.${_kernel}/kernel.${_kernel}${flavor}.ucl \
+		create -f ${PKG_FORMAT} \
+		-M ${KSTAGEDIR}/kernel.${_kernel}/kernel.${_kernel}${flavor}.ucl \
 		-p ${KSTAGEDIR}/kernel.${_kernel}/kernel.${_kernel}${flavor}.plist \
 		-r ${KSTAGEDIR}/kernel.${_kernel} \
-		-o ${REPODIR}/$$(${PKG_CMD} -o ABI_FILE=${WSTAGEDIR}/usr/bin/uname config ABI)/${PKG_VERSION}
+		-o ${REPODIR}/${PKG_ABI}/${PKG_VERSION}
 .   endfor
 .  endif
 . endfor
 .endif
 
 sign-packages:	_pkgbootstrap .PHONY
+	printf "version = 2;\npacking_format = \"${PKG_FORMAT}\";\n" > ${WSTAGEDIR}/meta
 	@[ -L "${REPODIR}/$$(${PKG_CMD} -o ABI_FILE=${WSTAGEDIR}/usr/bin/uname config ABI)/latest" ] && \
 		unlink ${REPODIR}/$$(${PKG_CMD} -o ABI_FILE=${WSTAGEDIR}/usr/bin/uname config ABI)/latest ; \
 	${PKG_CMD} -o ABI_FILE=${WSTAGEDIR}/usr/bin/uname repo \
+		-m ${WSTAGEDIR}/meta \
 		-o ${REPODIR}/$$(${PKG_CMD} -o ABI_FILE=${WSTAGEDIR}/usr/bin/uname config ABI)/${PKG_VERSION} \
 		${REPODIR}/$$(${PKG_CMD} -o ABI_FILE=${WSTAGEDIR}/usr/bin/uname config ABI)/${PKG_VERSION} \
 		${PKGSIGNKEY} ; \
@@ -2501,8 +2491,6 @@ _basic_bootstrap_tools+=usr.bin/awk usr.bin/cut bin/expr usr.bin/gencat \
 # /bin/sh can behave differently when crossbuilding on Linux/macOS
 # TODO: also build /bin/sh
 # _basic_bootstrap_tools+=bin/sh
-# elf2aout is required for sparc64 build
-_basic_bootstrap_tools+=usr.bin/elf2aout
 # file2c is required for building usr.sbin/config:
 _basic_bootstrap_tools+=usr.bin/file2c
 # uuencode/uudecode required for share/tabset
@@ -3015,13 +3003,10 @@ _prereq_libs+= lib/libssp_nonshared
 
 # These dependencies are not automatically generated:
 #
-# gnu/lib/csu, gnu/lib/libgcc, lib/csu and lib/libc must be built before
+# gnu/lib/libgcc, lib/csu and lib/libc must be built before
 # all shared libraries for ELF.
 #
 _startup_libs=	lib/csu
-.if ${MK_BSD_CRTBEGIN} == "no"
-_startup_libs+=	gnu/lib/csu
-.endif
 .if ${MK_LIBCHERI} != "no"
 _startup_libs+= lib/libc_cheri
 .endif
@@ -3168,14 +3153,11 @@ cddl/lib/libctf__L: lib/libgcc_s__L
 cddl/lib/libuutil__L: cddl/lib/libnvpair__L
 cddl/lib/libzfs_core__L: cddl/lib/libnvpair__L
 .endif
-# cddl/lib/libdtrace requires lib/libproc and lib/librtld_db; it's only built
-# on select architectures though (see cddl/lib/Makefile)
-.if ${MACHINE_CPUARCH} != "sparc64"
+# cddl/lib/libdtrace requires lib/libproc and lib/librtld_db
 _prebuild_libs+=	lib/libprocstat lib/libproc lib/librtld_db
 lib/libprocstat__L: lib/libelf__L lib/libkvm__L lib/libutil__L
 lib/libproc__L: lib/libprocstat__L
 lib/librtld_db__L: lib/libprocstat__L
-.endif
 
 .if ${MK_CRYPT} != "no"
 .if ${MK_OPENSSL} != "no"

@@ -53,6 +53,12 @@
 	.text
 	.globl _start
 _start:
+	/* Set the global pointer */
+.option push
+.option norelax
+	lla	gp, __global_pointer$
+.option pop
+
 	/* Get the physical address kernel loaded to */
 	lla	t0, virt_map
 	ld	t1, 0(t0)
@@ -168,20 +174,33 @@ _start:
 
 	.align 2
 va:
+	/* Set the global pointer again, this time with the virtual address. */
+.option push
+.option norelax
+	lla	gp, __global_pointer$
+.option pop
 
 	/* Setup supervisor trap vector */
 	la	t0, cpu_exception_handler
+#if __has_feature(capabilities)
+	cspecialr ct1, pcc
+	csetaddr ct1, ct1, t0
+	li	t0, 1
+	csetflags ct1, ct1, t0
+	cspecialw stcc, ct1
+	cspecialr ct1, ddc
+	cspecialw stdc, ct1
+#else
 	csrw	stvec, t0
+#endif
 
 	/* Ensure sscratch is zero */
+#if __has_feature(capabilities)
+	cspecialw sscratchc, cnull
+#else
 	li	t0, 0
 	csrw	sscratch, t0
-
-	/* Set the global pointer */
-.option push
-.option norelax
-	la	gp, __global_pointer$
-.option pop
+#endif
 
 	/* Initialize stack pointer */
 	la	s3, initstack_end
@@ -226,8 +245,12 @@ initstack:
 initstack_end:
 
 ENTRY(sigcode)
+#if __has_feature(capabilities)
+	cincoffset ca0, csp, SF_UC
+#else
 	mv	a0, sp
 	addi	a0, a0, SF_UC
+#endif
 
 1:
 	li	t0, SYS_sigreturn
@@ -312,7 +335,7 @@ ENTRY(mpentry)
 	li	t1, 4
 	mulw	t1, t1, a0
 	/* Get the pointer */
-	la	t0, __riscv_boot_ap
+	lla	t0, __riscv_boot_ap
 	add	t0, t0, t1
 
 1:
@@ -321,7 +344,7 @@ ENTRY(mpentry)
 	beqz	t1, 1b
 
 	/* Setup stack pointer */
-	la	t0, secondary_stacks
+	lla	t0, secondary_stacks
 	li	t1, (PAGE_SIZE * KSTACK_PAGES)
 	mulw	t2, t1, a0
 	add	t0, t0, t2
@@ -331,14 +354,14 @@ ENTRY(mpentry)
 	add	sp, t0, t1
 
 	/* Setup supervisor trap vector */
-	la	t0, mpva
+	lla	t0, mpva
 	sub	t0, t0, s9
 	li	t1, KERNBASE
 	add	t0, t0, t1
 	csrw	stvec, t0
 
 	/* Set page tables base register */
-	la	s2, pagetable_l1
+	lla	s2, pagetable_l1
 	srli	s2, s2, PAGE_SHIFT
 	li	t0, SATP_MODE_SV39
 	or	s2, s2, t0
@@ -347,19 +370,29 @@ ENTRY(mpentry)
 
 	.align 2
 mpva:
+	/* Set the global pointer again, this time with the virtual address. */
+.option push
+.option norelax
+	lla	gp, __global_pointer$
+.option pop
+
 	/* Setup supervisor trap vector */
 	la	t0, cpu_exception_handler
+#if __has_feature(capabilities)
+	cspecialr ct1, pcc
+	csetaddr ct1, ct1, t0
+	li	t0, 1
+	csetflags ct1, ct1, t0
+	cspecialw stcc, ct1
+	cspecialr ct1, ddc
+	cspecialw stdc, ct1
+#else
 	csrw	stvec, t0
+#endif
 
 	/* Ensure sscratch is zero */
 	li	t0, 0
 	csrw	sscratch, t0
-
-	/* Set the global pointer */
-.option push
-.option norelax
-	la	gp, __global_pointer$
-.option pop
 
 	call	init_secondary
 END(mpentry)

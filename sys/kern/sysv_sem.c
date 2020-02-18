@@ -1376,7 +1376,7 @@ kern_semop(struct thread *td, int usemid, struct sembuf * __capability usops,
 		    (__cheri_fromcap struct sembuf *)usops, sops,
 		    nsops * sizeof(sops[0])));
 		if (sops != small_sops)
-			free(sops, M_SEM);
+			free(sops, M_TEMP);
 		return (error);
 	}
 
@@ -1627,7 +1627,7 @@ done:
 done2:
 	mtx_unlock(sema_mtxp);
 	if (sops != small_sops)
-		free(sops, M_SEM);
+		free(sops, M_TEMP);
 	return (error);
 }
 

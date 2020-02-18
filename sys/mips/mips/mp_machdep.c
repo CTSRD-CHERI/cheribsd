@@ -286,6 +286,12 @@ smp_init_secondary(u_int32_t cpuid)
 		mips_wr_hwrena(mips_rd_hwrena() | MIPS_HWRENA_UL);
 
 	/* TLB */
+#ifdef BERI_LARGE_TLB
+	/* If extended TLB entries is implemented then enable it. */
+#define	BERI_CP5_LTLB_SUPPORTED	0x1
+	if (mips_rd_config5() & BERI_CP5_LTLB_SUPPORTED)
+		mips_wr_config6(mips_rd_config6() | 0x4);
+#endif
 	mips_wr_wired(0);
 	tlb_invalidate_all();
 	mips_wr_wired(VMWIRED_ENTRIES);

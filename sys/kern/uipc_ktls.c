@@ -54,6 +54,8 @@ __FBSDID("$FreeBSD$");
 #include <machine/pcb.h>
 #endif
 #include <machine/vmparam.h>
+#include <net/if.h>
+#include <net/if_var.h>
 #ifdef RSS
 #include <net/netisr.h>
 #include <net/rss_config.h>
@@ -1139,7 +1141,9 @@ ktls_reset_send_tag(void *context, int pending)
 			if (!(inp->inp_flags & INP_TIMEWAIT) &&
 			    !(inp->inp_flags & INP_DROPPED)) {
 				tp = intotcpcb(inp);
+				CURVNET_SET(tp->t_vnet);
 				tp = tcp_drop(tp, ECONNABORTED);
+				CURVNET_RESTORE();
 				if (tp != NULL)
 					INP_WUNLOCK(inp);
 				counter_u64_add(ktls_ifnet_reset_dropped, 1);

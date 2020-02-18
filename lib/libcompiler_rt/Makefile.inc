@@ -205,15 +205,6 @@ CFLAGS+=	-DEMIT_SYNC_ATOMICS
 SRCF+=		stdatomic
 .endif
 
-.if ${MACHINE_ARCH:Mmips*c*}
-# -Wcapabilities warning while trying to decode a string to a pointer.
-# Easy to suppress, but the result is unlikely to work so leave the symbol
-# unimplemented for now.
-SRCF:=  ${SRCF:Ngcc_personality_v0}
-# Currently needed for capability atomic load/swap
-SRCF+=		atomic
-.endif
-
 .if "${COMPILER_TYPE}" == "clang" && \
     (${MACHINE_ARCH} == "powerpc" || ${MACHINE_ARCH} == "powerpcspe")
 SRCS+=          atomic.c

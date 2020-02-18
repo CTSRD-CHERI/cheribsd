@@ -1470,7 +1470,7 @@ zfs_lookup_lock(vnode_t *dvp, vnode_t *vp, const char *name, int lkflags)
 /* ARGSUSED */
 static int
 zfs_lookup(vnode_t *dvp, char *nm, vnode_t **vpp, struct componentname *cnp,
-    int nameiop, cred_t *cr, kthread_t *td, int flags)
+    int nameiop, cred_t *cr, kthread_t *td, int flags, boolean_t cached)
 {
 	znode_t *zdp = VTOZ(dvp);
 	znode_t *zp;
@@ -1542,9 +1542,16 @@ zfs_lookup(vnode_t *dvp, char *nm, vnode_t **vpp, struct componentname *cnp,
 	/*
 	 * Check accessibility of directory.
 	 */
-	if (error = zfs_zaccess(zdp, ACE_EXECUTE, 0, B_FALSE, cr)) {
-		ZFS_EXIT(zfsvfs);
-		return (error);
+	if (!cached) {
+		if ((cnp->cn_flags & NOEXECCHECK) != 0) {
+			cnp->cn_flags &= ~NOEXECCHECK;
+		} else {
+			error = zfs_zaccess(zdp, ACE_EXECUTE, 0, B_FALSE, cr);
+			if (error != 0) {
+				ZFS_EXIT(zfsvfs);
+				return (error);
+			}
+		}
 	}
 
 	if (zfsvfs->z_utf8 && u8_validate(nm, strlen(nm),
@@ -1800,7 +1807,7 @@ zfs_create(vnode_t *dvp, char *name, vattr_t *vap, int excl, int mode,
 		goto out;
 	}
 
-	getnewvnode_reserve(1);
+	getnewvnode_reserve();
 
 	tx = dmu_tx_create(os);
 
@@ -2092,7 +2099,7 @@ zfs_mkdir(vnode_t *dvp, char *dirname, vattr_t *vap, vnode_t **vpp, cred_t *cr)
 	/*
 	 * Add a new entry to the directory.
 	 */
-	getnewvnode_reserve(1);
+	getnewvnode_reserve();
 	tx = dmu_tx_create(zfsvfs->z_os);
 	dmu_tx_hold_zap(tx, dzp->z_id, TRUE, dirname);
 	dmu_tx_hold_zap(tx, DMU_NEW_OBJECT, FALSE, NULL);
@@ -4002,7 +4009,7 @@ zfs_symlink(vnode_t *dvp, vnode_t **vpp, char *name, vattr_t *vap, char *link,
 		return (SET_ERROR(EDQUOT));
 	}
 
-	getnewvnode_reserve(1);
+	getnewvnode_reserve();
 	tx = dmu_tx_create(zfsvfs->z_os);
 	fuid_dirtied = zfsvfs->z_fuid_dirty;
 	dmu_tx_hold_write(tx, DMU_NEW_OBJECT, 0, MAX(1, len));
@@ -4246,13 +4253,13 @@ zfs_inactive(vnode_t *vp, cred_t *cr, caller_context_t *ct)
 	zfsvfs_t *zfsvfs = zp->z_zfsvfs;
 	int error;
 
-	rw_enter(&zfsvfs->z_teardown_inactive_lock, RW_READER);
+	ZFS_RLOCK_TEARDOWN_INACTIVE(zfsvfs);
 	if (zp->z_sa_hdl == NULL) {
 		/*
 		 * The fs has been unmounted, or we did a
 		 * suspend/resume and this file no longer exists.
 		 */
-		rw_exit(&zfsvfs->z_teardown_inactive_lock);
+		ZFS_RUNLOCK_TEARDOWN_INACTIVE(zfsvfs);
 		vrecycle(vp);
 		return;
 	}
@@ -4261,7 +4268,7 @@ zfs_inactive(vnode_t *vp, cred_t *cr, caller_context_t *ct)
 		/*
 		 * Fast path to recycle a vnode of a removed file.
 		 */
-		rw_exit(&zfsvfs->z_teardown_inactive_lock);
+		ZFS_RUNLOCK_TEARDOWN_INACTIVE(zfsvfs);
 		vrecycle(vp);
 		return;
 	}
@@ -4281,7 +4288,7 @@ zfs_inactive(vnode_t *vp, cred_t *cr, caller_context_t *ct)
 			dmu_tx_commit(tx);
 		}
 	}
-	rw_exit(&zfsvfs->z_teardown_inactive_lock);
+	ZFS_RUNLOCK_TEARDOWN_INACTIVE(zfsvfs);
 }
 
 
@@ -4857,6 +4864,11 @@ zfs_freebsd_access(ap)
 	accmode_t accmode;
 	int error = 0;
 
+	if (ap->a_accmode == VEXEC) {
+		if (zfs_freebsd_fastaccesschk_execute(ap->a_vp, ap->a_cred) == 0)
+			return (0);
+	}
+
 	/*
 	 * ZFS itself only knowns about VREAD, VWRITE, VEXEC and VAPPEND,
 	 */
@@ -4888,12 +4900,7 @@ zfs_freebsd_access(ap)
 }
 
 static int
-zfs_freebsd_lookup(ap)
-	struct vop_lookup_args /* {
-		struct vnode *a_dvp;
-		struct vnode **a_vpp;
-		struct componentname *a_cnp;
-	} */ *ap;
+zfs_freebsd_lookup(struct vop_lookup_args *ap, boolean_t cached)
 {
 	struct componentname *cnp = ap->a_cnp;
 	char nm[NAME_MAX + 1];
@@ -4902,7 +4909,14 @@ zfs_freebsd_lookup(ap)
 	strlcpy(nm, cnp->cn_nameptr, MIN(cnp->cn_namelen + 1, sizeof(nm)));
 
 	return (zfs_lookup(ap->a_dvp, nm, ap->a_vpp, cnp, cnp->cn_nameiop,
-	    cnp->cn_cred, cnp->cn_thread, 0));
+	    cnp->cn_cred, cnp->cn_thread, 0, cached));
+}
+
+static int
+zfs_freebsd_cachedlookup(struct vop_cachedlookup_args *ap)
+{
+
+	return (zfs_freebsd_lookup((struct vop_lookup_args *)ap, B_TRUE));
 }
 
 static int
@@ -4919,7 +4933,7 @@ zfs_cache_lookup(ap)
 	if (zfsvfs->z_use_namecache)
 		return (vfs_cache_lookup(ap));
 	else
-		return (zfs_freebsd_lookup(ap));
+		return (zfs_freebsd_lookup(ap, B_FALSE));
 }
 
 static int
@@ -5313,6 +5327,29 @@ zfs_freebsd_inactive(ap)
 }
 
 static int
+zfs_freebsd_need_inactive(ap)
+	struct vop_need_inactive_args /* {
+		struct vnode *a_vp;
+		struct thread *a_td;
+	} */ *ap;
+{
+	vnode_t *vp = ap->a_vp;
+	znode_t	*zp = VTOZ(vp);
+	zfsvfs_t *zfsvfs = zp->z_zfsvfs;
+	int need;
+
+	if (vn_need_pageq_flush(vp))
+		return (1);
+
+	if (!ZFS_TRYRLOCK_TEARDOWN_INACTIVE(zfsvfs))
+		return (1);
+	need = (zp->z_sa_hdl == NULL || zp->z_unlinked || zp->z_atime_dirty);
+	ZFS_RUNLOCK_TEARDOWN_INACTIVE(zfsvfs);
+
+	return (need);
+}
+
+static int
 zfs_freebsd_reclaim(ap)
 	struct vop_reclaim_args /* {
 		struct vnode *a_vp;
@@ -5330,12 +5367,12 @@ zfs_freebsd_reclaim(ap)
 	 * zfs_znode_dmu_fini in zfsvfs_teardown during
 	 * force unmount.
 	 */
-	rw_enter(&zfsvfs->z_teardown_inactive_lock, RW_READER);
+	ZFS_RLOCK_TEARDOWN_INACTIVE(zfsvfs);
 	if (zp->z_sa_hdl == NULL)
 		zfs_znode_free(zp);
 	else
 		zfs_zinactive(zp);
-	rw_exit(&zfsvfs->z_teardown_inactive_lock);
+	ZFS_RUNLOCK_TEARDOWN_INACTIVE(zfsvfs);
 
 	vp->v_data = NULL;
 	return (0);
@@ -5478,7 +5515,7 @@ vop_getextattr {
 	ZFS_ENTER(zfsvfs);
 
 	error = zfs_lookup(ap->a_vp, NULL, &xvp, NULL, 0, ap->a_cred, td,
-	    LOOKUP_XATTR);
+	    LOOKUP_XATTR, B_FALSE);
 	if (error != 0) {
 		ZFS_EXIT(zfsvfs);
 		return (error);
@@ -5547,7 +5584,7 @@ vop_deleteextattr {
 	ZFS_ENTER(zfsvfs);
 
 	error = zfs_lookup(ap->a_vp, NULL, &xvp, NULL, 0, ap->a_cred, td,
-	    LOOKUP_XATTR);
+	    LOOKUP_XATTR, B_FALSE);
 	if (error != 0) {
 		ZFS_EXIT(zfsvfs);
 		return (error);
@@ -5615,7 +5652,7 @@ vop_setextattr {
 	ZFS_ENTER(zfsvfs);
 
 	error = zfs_lookup(ap->a_vp, NULL, &xvp, NULL, 0, ap->a_cred, td,
-	    LOOKUP_XATTR | CREATE_XATTR_DIR);
+	    LOOKUP_XATTR | CREATE_XATTR_DIR, B_FALSE);
 	if (error != 0) {
 		ZFS_EXIT(zfsvfs);
 		return (error);
@@ -5692,7 +5729,7 @@ vop_listextattr {
 		*sizep = 0;
 
 	error = zfs_lookup(ap->a_vp, NULL, &xvp, NULL, 0, ap->a_cred, td,
-	    LOOKUP_XATTR);
+	    LOOKUP_XATTR, B_FALSE);
 	if (error != 0) {
 		ZFS_EXIT(zfsvfs);
 		/*
@@ -5947,11 +5984,12 @@ struct vop_vector zfs_shareops;
 struct vop_vector zfs_vnodeops = {
 	.vop_default =		&default_vnodeops,
 	.vop_inactive =		zfs_freebsd_inactive,
+	.vop_need_inactive =	zfs_freebsd_need_inactive,
 	.vop_reclaim =		zfs_freebsd_reclaim,
 	.vop_access =		zfs_freebsd_access,
 	.vop_allocate =		VOP_EINVAL,
 	.vop_lookup =		zfs_cache_lookup,
-	.vop_cachedlookup =	zfs_freebsd_lookup,
+	.vop_cachedlookup =	zfs_freebsd_cachedlookup,
 	.vop_getattr =		zfs_freebsd_getattr,
 	.vop_setattr =		zfs_freebsd_setattr,
 	.vop_create =		zfs_freebsd_create,

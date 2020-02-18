@@ -38,6 +38,10 @@ __FBSDID("$FreeBSD$");
 #include <machine/setjmp.h>
 
 ENTRY(setjmp)
+#ifdef __CHERI_PURE_CAPABILITY__
+#pragma message("TODO: RISCV-PURECAP implement setjmp")
+	cret
+#else
 	addi	sp, sp, -(2 * 8)
 	sd	a0, 0(sp)
 	sd	ra, 8(sp)
@@ -97,9 +101,14 @@ ENTRY(setjmp)
 	.align	3
 .Lmagic:
 	.quad	_JB_MAGIC_SETJMP
+#endif
 END(setjmp)
 
 ENTRY(longjmp)
+#ifdef __CHERI_PURE_CAPABILITY__
+#pragma message("TODO: RISCV-PURECAP implement longjmp")
+	cret
+#else
 	addi	sp, sp, -(4 * 8)
 	sd	a0, (0 * 8)(sp)
 	sd	ra, (1 * 8)(sp)
@@ -166,4 +175,5 @@ ENTRY(longjmp)
 botch:
 	call	_C_LABEL(longjmperror)
 	call	_C_LABEL(abort)
+#endif
 END(longjmp)

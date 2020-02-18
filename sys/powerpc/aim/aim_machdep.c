@@ -251,8 +251,25 @@ aim_cpu_init(vm_offset_t toc)
 	psl_userset32 = psl_userset & ~PSL_SF;
 #endif
 
-	/* Bits that users aren't allowed to change */
-	psl_userstatic = ~(PSL_VEC | PSL_FP | PSL_FE0 | PSL_FE1);
+	/*
+	 * Zeroed bits in this variable signify that the value of the bit
+	 * in its position is allowed to vary between userspace contexts.
+	 *
+	 * All other bits are required to be identical for every userspace
+	 * context. The actual *value* of the bit is determined by
+	 * psl_userset and/or psl_userset32, and is not allowed to change.
+	 *
+	 * Remember to update this set when implementing support for
+	 * *conditionally* enabling a processor facility. Failing to do
+	 * this will cause swapcontext() in userspace to break when a
+	 * process uses a conditionally-enabled facility.
+	 *
+	 * When *unconditionally* implementing support for a processor
+	 * facility, update psl_userset / psl_userset32 instead.
+	 *
+	 * See the access control check in set_mcontext().
+	 */
+	psl_userstatic = ~(PSL_VSX | PSL_VEC | PSL_FP | PSL_FE0 | PSL_FE1);
 	/*
 	 * Mask bits from the SRR1 that aren't really the MSR:
 	 * Bits 1-4, 10-15 (ppc32), 33-36, 42-47 (ppc64)
@@ -388,16 +405,18 @@ aim_cpu_init(vm_offset_t toc)
 	bcopy(&dsitrap,  (void *)(EXC_DSI + trap_offset),  (size_t)&dsiend -
 	    (size_t)&dsitrap);
 
+	/* Set address of generictrap for self-reloc calculations */
+	*((void **)TRAP_GENTRAP) = &generictrap;
 	#ifdef __powerpc64__
 	/* Set TOC base so that the interrupt code can get at it */
-	*((void **)TRAP_GENTRAP) = &generictrap;
+	*((void **)TRAP_ENTRY) = &generictrap;
 	*((register_t *)TRAP_TOCBASE) = toc;
 	#else
 	/* Set branch address for trap code */
 	if (cpu_features & PPC_FEATURE_64)
-		*((void **)TRAP_GENTRAP) = &generictrap64;
+		*((void **)TRAP_ENTRY) = &generictrap64;
 	else
-		*((void **)TRAP_GENTRAP) = &generictrap;
+		*((void **)TRAP_ENTRY) = &generictrap;
 	*((void **)TRAP_TOCBASE) = _GLOBAL_OFFSET_TABLE_;
 
 	/* G2-specific TLB miss helper handlers */
