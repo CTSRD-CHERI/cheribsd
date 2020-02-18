@@ -94,6 +94,12 @@ void test_setup(void);
 #define __DEQUALIFY(type, var)	((type)(uintptr_t)(const volatile void *)(var))
 #endif
 
+#if !defined(__DECONST_CAP) && __has_feature(capabilities)
+#define	__DECONST_CAP(type, var)	((type)(__uintcap_t)(const void * __capability)(var))
+#define	__DEVOLATILE_CAP(type, var)	((type)(__uintcap_t)(volatile void * __capability)(var))
+#define	__DEQUALIFY_CAP(type, var)	((type)(__uintcap_t)(const volatile void * __capability)(var))
+#endif
+
 #ifndef __noinline
 #define __noinline __attribute__((noinline))
 #endif

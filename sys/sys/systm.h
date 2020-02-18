@@ -62,6 +62,8 @@ extern int cold;		/* nonzero if we are doing a cold boot */
 extern int suspend_blocked;	/* block suspend due to pending shutdown */
 extern int rebooting;		/* kern_reboot() has been called. */
 extern const char *panicstr;	/* panic message */
+extern bool panicked;
+#define	KERNEL_PANICKED()	__predict_false(panicked)
 extern char version[];		/* system version */
 extern char compiler_version[];	/* compiler version */
 extern char copyright[];	/* system copyright */
@@ -114,15 +116,23 @@ void	kassert_panic(const char *fmt, ...)  __printflike(1, 2);
 } while (0)
 #define	VNASSERT(exp, vp, msg) do {					\
 	if (__predict_false(!(exp))) {					\
-		vn_printf(vp, "VNASSERT failed\n");			\
+		vn_printf(vp, "VNASSERT failed: %s not true at %s:%d (%s)\n",\
+		   #exp, __FILE__, __LINE__, __func__);	 		\
 		kassert_panic msg;					\
 	}								\
+} while (0)
+#define	VNPASS(exp, vp)	do {						\
+	const char *_exp = #exp;					\
+	VNASSERT(exp, vp, ("condition %s not met at %s:%d (%s)",	\
+	    _exp, __FILE__, __LINE__, __func__));			\
 } while (0)
 #else
 #define	KASSERT(exp,msg) do { \
 } while (0)
 
 #define	VNASSERT(exp, vp, msg) do { \
+} while (0)
+#define	VNPASS(exp, vp) do { \
 } while (0)
 #endif
 
@@ -433,10 +443,7 @@ int	kcsan_memcmp(const void *, const void *, size_t);
 #define bzero(buf, len) __builtin_memset((buf), 0, (len))
 #define bcmp(b1, b2, len) __builtin_memcmp((b1), (b2), (len))
 #define memset(buf, c, len) __builtin_memset((buf), (c), (len))
-//#if !__has_feature(capabilities)
-///* Causes a compiler crash. */
 #define memcpy(to, from, len) __builtin_memcpy((to), (from), (len))
-//#endif
 #define memmove(dest, src, n) __builtin_memmove((dest), (src), (n))
 #define memcmp(b1, b2, len) __builtin_memcmp((b1), (b2), (len))
 #endif

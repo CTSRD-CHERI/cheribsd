@@ -77,6 +77,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/sched.h>
 #include <sys/sleepqueue.h>
 #include <sys/smp.h>
+#include <sys/smr.h>
 #include <sys/taskqueue.h>
 #include <sys/vmmeter.h>
 
@@ -101,14 +102,35 @@ __FBSDID("$FreeBSD$");
 #include <vm/memguard.h>
 #endif
 
+#include <machine/md_var.h>
+
+#ifdef INVARIANTS
+#define	UMA_ALWAYS_CTORDTOR	1
+#else
+#define	UMA_ALWAYS_CTORDTOR	0
+#endif
+
 /*
  * This is the zone and keg from which all zones are spawned.
  */
 static uma_zone_t kegs;
 static uma_zone_t zones;
 
-/* This is the zone from which all offpage uma_slab_ts are allocated. */
-static uma_zone_t slabzone;
+/*
+ * These are the two zones from which all offpage uma_slab_ts are allocated.
+ *
+ * One zone is for slab headers that can represent a larger number of items,
+ * making the slabs themselves more efficient, and the other zone is for
+ * headers that are smaller and represent fewer items, making the headers more
+ * efficient.
+ */
+#define	SLABZONE_SIZE(setsize)					\
+    (sizeof(struct uma_hash_slab) + BITSET_SIZE(setsize) * SLAB_BITSETS)
+#define	SLABZONE0_SETSIZE	(PAGE_SIZE / 16)
+#define	SLABZONE1_SETSIZE	SLAB_MAX_SETSIZE
+#define	SLABZONE0_SIZE	SLABZONE_SIZE(SLABZONE0_SETSIZE)
+#define	SLABZONE1_SIZE	SLABZONE_SIZE(SLABZONE1_SETSIZE)
+static uma_zone_t slabzones[2];
 
 /*
  * The initial hash tables come out of this zone so they can be allocated
@@ -138,11 +160,10 @@ static LIST_HEAD(,uma_zone) uma_cachezones =
 static struct rwlock_padalign __exclusive_cache_line uma_rwlock;
 
 /*
- * Pointer and counter to pool of pages, that is preallocated at
- * startup to bootstrap UMA.
+ * First available virual address for boot time allocations.
  */
-static char *bootmem;
-static int boot_pages;
+static vm_offset_t bootstart;
+static vm_offset_t bootmem;
 
 static struct sx uma_reclaim_lock;
 
@@ -160,9 +181,7 @@ SYSCTL_ULONG(_vm, OID_AUTO, uma_kmem_total, CTLFLAG_RD, &uma_kmem_total, 0,
 /* Is the VM done starting up? */
 static enum {
 	BOOT_COLD,
-	BOOT_STRAPPED,
-	BOOT_PAGEALLOC,
-	BOOT_BUCKETS,
+	BOOT_KVA,
 	BOOT_RUNNING,
 	BOOT_SHUTDOWN,
 } booted = BOOT_COLD;
@@ -217,14 +236,15 @@ struct uma_bucket_zone {
     (((sizeof(void *) * (n)) - sizeof(struct uma_bucket)) / sizeof(void *))
 
 #define	BUCKET_MAX	BUCKET_SIZE(256)
-#define	BUCKET_MIN	BUCKET_SIZE(4)
+#define	BUCKET_MIN	2
 
 struct uma_bucket_zone bucket_zones[] = {
-	{ NULL, "4 Bucket", BUCKET_SIZE(4), 4096 },
-	{ NULL, "6 Bucket", BUCKET_SIZE(6), 3072 },
-	{ NULL, "8 Bucket", BUCKET_SIZE(8), 2048 },
-	{ NULL, "12 Bucket", BUCKET_SIZE(12), 1536 },
-	{ NULL, "16 Bucket", BUCKET_SIZE(16), 1024 },
+	/* Literal bucket sizes. */
+	{ NULL, "2 Bucket", 2, 4096 },
+	{ NULL, "4 Bucket", 4, 3072 },
+	{ NULL, "8 Bucket", 8, 2048 },
+	{ NULL, "16 Bucket", 16, 1024 },
+	/* Rounded down power of 2 sizes for efficiency. */
 	{ NULL, "32 Bucket", BUCKET_SIZE(32), 512 },
 	{ NULL, "64 Bucket", BUCKET_SIZE(64), 256 },
 	{ NULL, "128 Bucket", BUCKET_SIZE(128), 128 },
@@ -244,15 +264,14 @@ enum zfreeskip {
 
 /* Prototypes.. */
 
-int	uma_startup_count(int);
-void	uma_startup(void *, int);
-void	uma_startup1(void);
+void	uma_startup1(vm_offset_t);
 void	uma_startup2(void);
 
 static void *noobj_alloc(uma_zone_t, vm_size_t, int, uint8_t *, int);
 static void *page_alloc(uma_zone_t, vm_size_t, int, uint8_t *, int);
 static void *pcpu_page_alloc(uma_zone_t, vm_size_t, int, uint8_t *, int);
 static void *startup_alloc(uma_zone_t, vm_size_t, int, uint8_t *, int);
+static void *contig_alloc(uma_zone_t, vm_size_t, int, uint8_t *, int);
 static void page_free(void *, vm_size_t, uint8_t);
 static void pcpu_page_free(void *, vm_size_t, uint8_t);
 static uma_slab_t keg_alloc_slab(uma_keg_t, uma_zone_t, int, int, int);
@@ -263,8 +282,11 @@ static int keg_ctor(void *, int, void *, int);
 static void keg_dtor(void *, int, void *);
 static int zone_ctor(void *, int, void *, int);
 static void zone_dtor(void *, int, void *);
+static inline void item_dtor(uma_zone_t zone, void *item, int size,
+    void *udata, enum zfreeskip skip);
 static int zero_init(void *, int, int);
 static void zone_foreach(void (*zfunc)(uma_zone_t, void *), void *);
+static void zone_foreach_unlocked(void (*zfunc)(uma_zone_t, void *), void *);
 static void zone_timeout(uma_zone_t zone, void *);
 static int hash_alloc(struct uma_hash *, u_int);
 static int hash_expand(struct uma_hash *, struct uma_hash *);
@@ -301,6 +323,9 @@ static int sysctl_handle_uma_zone_items(SYSCTL_HANDLER_ARGS);
 
 static uint64_t uma_zone_get_allocs(uma_zone_t zone);
 
+static SYSCTL_NODE(_vm, OID_AUTO, debug, CTLFLAG_RD, 0,
+    "Memory allocation debugging");
+
 #ifdef INVARIANTS
 static uint64_t uma_keg_get_allocs(uma_keg_t zone);
 static inline struct noslabbits *slab_dbg_bits(uma_slab_t slab, uma_keg_t keg);
@@ -309,9 +334,6 @@ static bool uma_dbg_kskip(uma_keg_t keg, void *mem);
 static bool uma_dbg_zskip(uma_zone_t zone, void *mem);
 static void uma_dbg_free(uma_zone_t zone, uma_slab_t slab, void *item);
 static void uma_dbg_alloc(uma_zone_t zone, uma_slab_t slab, void *item);
-
-static SYSCTL_NODE(_vm, OID_AUTO, debug, CTLFLAG_RD, 0,
-    "Memory allocation debugging");
 
 static u_int dbg_divisor = 1;
 SYSCTL_UINT(_vm_debug, OID_AUTO, divisor,
@@ -330,15 +352,31 @@ SYSINIT(uma_startup3, SI_SUB_VM_CONF, SI_ORDER_SECOND, uma_startup3, NULL);
 
 SYSCTL_NODE(_vm, OID_AUTO, uma, CTLFLAG_RW, 0, "Universal Memory Allocator");
 
-SYSCTL_PROC(_vm, OID_AUTO, zone_count, CTLFLAG_RD|CTLTYPE_INT,
+SYSCTL_PROC(_vm, OID_AUTO, zone_count, CTLFLAG_RD|CTLFLAG_MPSAFE|CTLTYPE_INT,
     0, 0, sysctl_vm_zone_count, "I", "Number of UMA zones");
 
-SYSCTL_PROC(_vm, OID_AUTO, zone_stats, CTLFLAG_RD|CTLTYPE_STRUCT,
+SYSCTL_PROC(_vm, OID_AUTO, zone_stats, CTLFLAG_RD|CTLFLAG_MPSAFE|CTLTYPE_STRUCT,
     0, 0, sysctl_vm_zone_stats, "s,struct uma_type_header", "Zone Stats");
 
 static int zone_warnings = 1;
 SYSCTL_INT(_vm, OID_AUTO, zone_warnings, CTLFLAG_RWTUN, &zone_warnings, 0,
     "Warn when UMA zones becomes full");
+
+static int multipage_slabs = 1;
+TUNABLE_INT("vm.debug.uma_multipage_slabs", &multipage_slabs);
+SYSCTL_INT(_vm_debug, OID_AUTO, uma_multipage_slabs,
+    CTLFLAG_RDTUN | CTLFLAG_NOFETCH, &multipage_slabs, 0,
+    "UMA may choose larger slab sizes for better efficiency");
+
+/*
+ * Select the slab zone for an offpage slab with the given maximum item count.
+ */
+static inline uma_zone_t
+slabzone(int ipers)
+{
+
+	return (slabzones[ipers > SLABZONE0_SETSIZE]);
+}
 
 /*
  * This routine checks to see whether or not it's safe to enable buckets.
@@ -347,7 +385,7 @@ static void
 bucket_enable(void)
 {
 
-	KASSERT(booted >= BOOT_BUCKETS, ("Bucket enable before init"));
+	KASSERT(booted >= BOOT_KVA, ("Bucket enable before init"));
 	bucketdisable = vm_page_count_min();
 }
 
@@ -433,13 +471,11 @@ bucket_alloc(uma_zone_t zone, void *udata, int flags)
 	uma_bucket_t bucket;
 
 	/*
-	 * This is to stop us from allocating per cpu buckets while we're
-	 * running out of vm.boot_pages.  Otherwise, we would exhaust the
-	 * boot pages.  This also prevents us from allocating buckets in
-	 * low memory situations.
+	 * Don't allocate buckets early in boot.
 	 */
-	if (bucketdisable)
+	if (__predict_false(booted < BOOT_KVA))
 		return (NULL);
+
 	/*
 	 * To limit bucket recursion we store the original zone flags
 	 * in a cookie passed via zalloc_arg/zfree_arg.  This allows the
@@ -457,7 +493,7 @@ bucket_alloc(uma_zone_t zone, void *udata, int flags)
 			return (NULL);
 		udata = (void *)((uintptr_t)udata | UMA_ZFLAG_BUCKET);
 	}
-	if ((uintptr_t)udata & UMA_ZFLAG_CACHEONLY)
+	if (((uintptr_t)udata & UMA_ZONE_VM) != 0)
 		flags |= M_NOVM;
 	ubz = bucket_zone_lookup(zone->uz_bucket_size);
 	if (ubz->ubz_zone == zone && (ubz + 1)->ubz_entries != 0)
@@ -469,6 +505,9 @@ bucket_alloc(uma_zone_t zone, void *udata, int flags)
 #endif
 		bucket->ub_cnt = 0;
 		bucket->ub_entries = ubz->ubz_entries;
+		bucket->ub_seq = SMR_SEQ_INVALID;
+		CTR3(KTR_UMA, "bucket_alloc: zone %s(%p) allocated bucket %p",
+		    zone->uz_name, zone, bucket);
 	}
 
 	return (bucket);
@@ -481,6 +520,8 @@ bucket_free(uma_zone_t zone, uma_bucket_t bucket, void *udata)
 
 	KASSERT(bucket->ub_cnt == 0,
 	    ("bucket_free: Freeing a non free bucket."));
+	KASSERT(bucket->ub_seq == SMR_SEQ_INVALID,
+	    ("bucket_free: Freeing an SMR bucket."));
 	if ((zone->uz_flags & UMA_ZFLAG_BUCKET) == 0)
 		udata = (void *)(uintptr_t)zone->uz_flags;
 	ubz = bucket_zone_lookup(bucket->ub_entries);
@@ -498,23 +539,39 @@ bucket_zone_drain(void)
 
 /*
  * Attempt to satisfy an allocation by retrieving a full bucket from one of the
- * zone's caches.
+ * zone's caches.  If a bucket is found the zone is not locked on return.
  */
 static uma_bucket_t
 zone_fetch_bucket(uma_zone_t zone, uma_zone_domain_t zdom)
 {
 	uma_bucket_t bucket;
+	int i;
+	bool dtor = false;
 
 	ZONE_LOCK_ASSERT(zone);
 
-	if ((bucket = TAILQ_FIRST(&zdom->uzd_buckets)) != NULL) {
-		MPASS(zdom->uzd_nitems >= bucket->ub_cnt);
-		TAILQ_REMOVE(&zdom->uzd_buckets, bucket, ub_link);
-		zdom->uzd_nitems -= bucket->ub_cnt;
-		if (zdom->uzd_imin > zdom->uzd_nitems)
-			zdom->uzd_imin = zdom->uzd_nitems;
-		zone->uz_bkt_count -= bucket->ub_cnt;
+	if ((bucket = STAILQ_FIRST(&zdom->uzd_buckets)) == NULL)
+		return (NULL);
+
+	if ((zone->uz_flags & UMA_ZONE_SMR) != 0 &&
+	    bucket->ub_seq != SMR_SEQ_INVALID) {
+		if (!smr_poll(zone->uz_smr, bucket->ub_seq, false))
+			return (NULL);
+		bucket->ub_seq = SMR_SEQ_INVALID;
+		dtor = (zone->uz_dtor != NULL) | UMA_ALWAYS_CTORDTOR;
 	}
+	MPASS(zdom->uzd_nitems >= bucket->ub_cnt);
+	STAILQ_REMOVE_HEAD(&zdom->uzd_buckets, ub_link);
+	zdom->uzd_nitems -= bucket->ub_cnt;
+	if (zdom->uzd_imin > zdom->uzd_nitems)
+		zdom->uzd_imin = zdom->uzd_nitems;
+	zone->uz_bkt_count -= bucket->ub_cnt;
+	ZONE_UNLOCK(zone);
+	if (dtor)
+		for (i = 0; i < bucket->ub_cnt; i++)
+			item_dtor(zone, bucket->ub_bucket[i], zone->uz_size,
+			    NULL, SKIP_NONE);
+
 	return (bucket);
 }
 
@@ -532,10 +589,7 @@ zone_put_bucket(uma_zone_t zone, uma_zone_domain_t zdom, uma_bucket_t bucket,
 	KASSERT(!ws || zone->uz_bkt_count < zone->uz_bkt_max,
 	    ("%s: zone %p overflow", __func__, zone));
 
-	if (ws)
-		TAILQ_INSERT_HEAD(&zdom->uzd_buckets, bucket, ub_link);
-	else
-		TAILQ_INSERT_TAIL(&zdom->uzd_buckets, bucket, ub_link);
+	STAILQ_INSERT_TAIL(&zdom->uzd_buckets, bucket, ub_link);
 	zdom->uzd_nitems += bucket->ub_cnt;
 	if (ws && zdom->uzd_imax < zdom->uzd_nitems)
 		zdom->uzd_imax = zdom->uzd_nitems;
@@ -922,12 +976,23 @@ bucket_drain(uma_zone_t zone, uma_bucket_t bucket)
 	if (bucket == NULL || bucket->ub_cnt == 0)
 		return;
 
+	if ((zone->uz_flags & UMA_ZONE_SMR) != 0 &&
+	    bucket->ub_seq != SMR_SEQ_INVALID) {
+		smr_wait(zone->uz_smr, bucket->ub_seq);
+		for (i = 0; i < bucket->ub_cnt; i++)
+			item_dtor(zone, bucket->ub_bucket[i],
+			    zone->uz_size, NULL, SKIP_NONE);
+		bucket->ub_seq = SMR_SEQ_INVALID;
+	}
 	if (zone->uz_fini)
 		for (i = 0; i < bucket->ub_cnt; i++) 
 			zone->uz_fini(bucket->ub_bucket[i], zone->uz_size);
 	zone->uz_release(zone->uz_arg, bucket->ub_bucket, bucket->ub_cnt);
 	if (zone->uz_max_items > 0)
 		zone_free_limit(zone, bucket->ub_cnt);
+#ifdef INVARIANTS
+	bzero(bucket->ub_bucket, sizeof(void *) * bucket->ub_cnt);
+#endif
 	bucket->ub_cnt = 0;
 }
 
@@ -1016,12 +1081,21 @@ cache_drain_safe_cpu(uma_zone_t zone, void *unused)
 		zone_put_bucket(zone, &zone->uz_domain[domain], b1, false);
 		b1 = NULL;
 	}
+
+	/*
+	 * Don't flush SMR zone buckets.  This leaves the zone without a
+	 * bucket and forces every free to synchronize().
+	 */
+	if ((zone->uz_flags & UMA_ZONE_SMR) != 0)
+		goto out;
 	b2 = cache_bucket_unload_free(cache);
 	if (b2 != NULL && b2->ub_cnt != 0) {
 		zone_put_bucket(zone, &zone->uz_domain[domain], b2, false);
 		b2 = NULL;
 	}
 	b3 = cache_bucket_unload_cross(cache);
+
+out:
 	critical_exit();
 	ZONE_UNLOCK(zone);
 	if (b1)
@@ -1116,11 +1190,11 @@ bucket_cache_reclaim(uma_zone_t zone, bool drain)
 		target = drain ? 0 : lmax(zdom->uzd_wss, zdom->uzd_nitems -
 		    zdom->uzd_imin);
 		while (zdom->uzd_nitems > target) {
-			bucket = TAILQ_LAST(&zdom->uzd_buckets, uma_bucketlist);
+			bucket = STAILQ_FIRST(&zdom->uzd_buckets);
 			if (bucket == NULL)
 				break;
 			tofree = bucket->ub_cnt;
-			TAILQ_REMOVE(&zdom->uzd_buckets, bucket, ub_link);
+			STAILQ_REMOVE_HEAD(&zdom->uzd_buckets, ub_link);
 			zdom->uzd_nitems -= tofree;
 
 			/*
@@ -1169,7 +1243,8 @@ keg_free_slab(uma_keg_t keg, uma_slab_t slab, int start)
 			keg->uk_fini(slab_item(slab, keg, i), keg->uk_size);
 	}
 	if (keg->uk_flags & UMA_ZFLAG_OFFPAGE)
-		zone_free_item(keg->uk_slabzone, slab, NULL, SKIP_NONE);
+		zone_free_item(slabzone(keg->uk_ipers), slab_tohashslab(slab),
+		    NULL, SKIP_NONE);
 	keg->uk_freef(mem, PAGE_SIZE * keg->uk_ppera, flags);
 	uma_total_dec(PAGE_SIZE * keg->uk_ppera);
 }
@@ -1202,9 +1277,6 @@ keg_drain(uma_keg_t keg)
 		dom = &keg->uk_domain[i];
 		KEG_LOCK(keg, i);
 		LIST_FOREACH_SAFE(slab, &dom->ud_free_slab, us_link, tmp) {
-			/* We have nowhere to free these to. */
-			if (slab->us_flags & UMA_SLAB_BOOT)
-				continue;
 			if (keg->uk_flags & UMA_ZFLAG_HASH)
 				UMA_HASH_REMOVE(&keg->uk_hash, slab);
 			n++;
@@ -1302,9 +1374,12 @@ keg_alloc_slab(uma_keg_t keg, uma_zone_t zone, int domain, int flags,
 	slab = NULL;
 	mem = NULL;
 	if (keg->uk_flags & UMA_ZFLAG_OFFPAGE) {
-		slab = zone_alloc_item(keg->uk_slabzone, NULL, domain, aflags);
-		if (slab == NULL)
+		uma_hash_slab_t hslab;
+		hslab = zone_alloc_item(slabzone(keg->uk_ipers), NULL,
+		    domain, aflags);
+		if (hslab == NULL)
 			goto fail;
+		slab = &hslab->uhs_slab;
 	}
 
 	/*
@@ -1327,7 +1402,8 @@ keg_alloc_slab(uma_keg_t keg, uma_zone_t zone, int domain, int flags,
 	mem = allocf(zone, size, domain, &sflags, aflags);
 	if (mem == NULL) {
 		if (keg->uk_flags & UMA_ZFLAG_OFFPAGE)
-			zone_free_item(keg->uk_slabzone, slab, NULL, SKIP_NONE);
+			zone_free_item(slabzone(keg->uk_ipers),
+			    slab_tohashslab(slab), NULL, SKIP_NONE);
 		goto fail;
 	}
 	uma_total_inc(size);
@@ -1340,7 +1416,7 @@ keg_alloc_slab(uma_keg_t keg, uma_zone_t zone, int domain, int flags,
 	if (!(keg->uk_flags & UMA_ZFLAG_OFFPAGE))
 		slab = (uma_slab_t )(mem + keg->uk_pgoff);
 	else
-		((uma_hash_slab_t)slab)->uhs_data = mem;
+		slab_tohashslab(slab)->uhs_data = mem;
 
 	if (keg->uk_flags & UMA_ZFLAG_VTOSLAB)
 		for (i = 0; i < keg->uk_ppera; i++)
@@ -1399,49 +1475,56 @@ static void *
 startup_alloc(uma_zone_t zone, vm_size_t bytes, int domain, uint8_t *pflag,
     int wait)
 {
-	uma_keg_t keg;
+	vm_paddr_t pa;
+	vm_page_t m;
 	void *mem;
 	int pages;
+	int i;
 
-	keg = zone->uz_keg;
-	/*
-	 * If we are in BOOT_BUCKETS or higher, than switch to real
-	 * allocator.  Zones with page sized slabs switch at BOOT_PAGEALLOC.
-	 */
-	switch (booted) {
-		case BOOT_COLD:
-		case BOOT_STRAPPED:
-			break;
-		case BOOT_PAGEALLOC:
-			if (keg->uk_ppera > 1)
-				break;
-		default:
-#ifdef UMA_MD_SMALL_ALLOC
-			keg->uk_allocf = (keg->uk_ppera > 1) ?
-			    page_alloc : uma_small_alloc;
-#else
-			keg->uk_allocf = page_alloc;
-#endif
-			return keg->uk_allocf(zone, bytes, domain, pflag, wait);
-	}
-
-	/*
-	 * Check our small startup cache to see if it has pages remaining.
-	 */
 	pages = howmany(bytes, PAGE_SIZE);
 	KASSERT(pages > 0, ("%s can't reserve 0 pages", __func__));
-	if (pages > boot_pages)
-		panic("UMA zone \"%s\": Increase vm.boot_pages", zone->uz_name);
-#ifdef DIAGNOSTIC
-	printf("%s from \"%s\", %d boot pages left\n", __func__, zone->uz_name,
-	    boot_pages);
-#endif
-	mem = bootmem;
-	boot_pages -= pages;
-	bootmem += pages * PAGE_SIZE;
-	*pflag = UMA_SLAB_BOOT;
 
-	return (mem);
+	*pflag = UMA_SLAB_BOOT;
+	m = vm_page_alloc_contig_domain(NULL, 0, domain,
+	    malloc2vm_flags(wait) | VM_ALLOC_NOOBJ | VM_ALLOC_WIRED, pages, 
+	    (vm_paddr_t)0, ~(vm_paddr_t)0, 1, 0, VM_MEMATTR_DEFAULT);
+	if (m == NULL)
+		return (NULL);
+
+	pa = VM_PAGE_TO_PHYS(m);
+	for (i = 0; i < pages; i++, pa += PAGE_SIZE) {
+#if defined(__aarch64__) || defined(__amd64__) || defined(__mips__) || \
+    defined(__riscv) || defined(__powerpc64__)
+		if ((wait & M_NODUMP) == 0)
+			dump_add_page(pa);
+#endif
+	}
+	/* Allocate KVA and indirectly advance bootmem. */
+	mem = (void *)pmap_map(&bootmem, m->phys_addr,
+	    m->phys_addr + (pages * PAGE_SIZE), VM_PROT_READ | VM_PROT_WRITE);
+        if ((wait & M_ZERO) != 0)
+                bzero(mem, pages * PAGE_SIZE);
+
+        return (mem);
+}
+
+static void
+startup_free(void *mem, vm_size_t bytes)
+{
+	vm_offset_t va;
+	vm_page_t m;
+
+	va = (vm_offset_t)mem;
+	m = PHYS_TO_VM_PAGE(pmap_kextract(va));
+	pmap_remove(kernel_pmap, va, va + bytes);
+	for (; bytes != 0; bytes -= PAGE_SIZE, m++) {
+#if defined(__aarch64__) || defined(__amd64__) || defined(__mips__) || \
+    defined(__riscv) || defined(__powerpc64__)
+		dump_drop_page(VM_PAGE_TO_PHYS(m));
+#endif
+		vm_page_unwire_noq(m);
+		vm_page_free(m);
+	}
 }
 
 /*
@@ -1493,7 +1576,11 @@ pcpu_page_alloc(uma_zone_t zone, vm_size_t bytes, int domain, uint8_t *pflag,
 			p = vm_page_alloc(NULL, 0, flags);
 #else
 			pc = pcpu_find(cpu);
-			p = vm_page_alloc_domain(NULL, 0, pc->pc_domain, flags);
+			if (__predict_false(VM_DOMAIN_EMPTY(pc->pc_domain)))
+				p = NULL;
+			else
+				p = vm_page_alloc_domain(NULL, 0,
+				    pc->pc_domain, flags);
 			if (__predict_false(p == NULL))
 				p = vm_page_alloc(NULL, 0, flags);
 #endif
@@ -1580,6 +1667,19 @@ noobj_alloc(uma_zone_t zone, vm_size_t bytes, int domain, uint8_t *flags,
 }
 
 /*
+ * Allocate physically contiguous pages.
+ */
+static void *
+contig_alloc(uma_zone_t zone, vm_size_t bytes, int domain, uint8_t *pflag,
+    int wait)
+{
+
+	*pflag = UMA_SLAB_KERNEL;
+	return ((void *)kmem_alloc_contig_domainset(DOMAINSET_FIXED(domain),
+	    bytes, wait, 0, ~(vm_paddr_t)0, 1, 0, VM_MEMATTR_DEFAULT));
+}
+
+/*
  * Frees a number of pages to the system
  *
  * Arguments:
@@ -1594,8 +1694,13 @@ static void
 page_free(void *mem, vm_size_t size, uint8_t flags)
 {
 
-	if ((flags & UMA_SLAB_KERNEL) == 0)
-		panic("UMA: page_free used with invalid flags %x", flags);
+	if ((flags & UMA_SLAB_BOOT) != 0) {
+		startup_free(mem, size);
+		return;
+	}
+
+	KASSERT((flags & UMA_SLAB_KERNEL) != 0,
+	    ("UMA: page_free used with invalid flags %x", flags));
 
 	kmem_free((vm_offset_t)mem, size);
 }
@@ -1619,6 +1724,12 @@ pcpu_page_free(void *mem, vm_size_t size, uint8_t flags)
 	vm_page_t m;
 
 	MPASS(size == (mp_maxid+1)*PAGE_SIZE);
+
+	if ((flags & UMA_SLAB_BOOT) != 0) {
+		startup_free(mem, size);
+		return;
+	}
+
 	sva = (vm_offset_t)mem;
 	for (curva = sva; curva < sva + size; curva += PAGE_SIZE) {
 		paddr = pmap_kextract(curva);
@@ -1725,6 +1836,39 @@ slab_ipers(size_t size, int align)
 	return (slab_ipers_hdr(size, rsize, UMA_SLAB_SIZE, true));
 }
 
+struct keg_layout_result {
+	u_int format;
+	u_int slabsize;
+	u_int ipers;
+	u_int eff;
+};
+
+static void
+keg_layout_one(uma_keg_t keg, u_int rsize, u_int slabsize, u_int fmt,
+    struct keg_layout_result *kl)
+{
+	u_int total;
+
+	kl->format = fmt;
+	kl->slabsize = slabsize;
+
+	/* Handle INTERNAL as inline with an extra page. */
+	if ((fmt & UMA_ZFLAG_INTERNAL) != 0) {
+		kl->format &= ~UMA_ZFLAG_INTERNAL;
+		kl->slabsize += PAGE_SIZE;
+	}
+
+	kl->ipers = slab_ipers_hdr(keg->uk_size, rsize, kl->slabsize,
+	    (fmt & UMA_ZFLAG_OFFPAGE) == 0);
+
+	/* Account for memory used by an offpage slab header. */
+	total = kl->slabsize;
+	if ((fmt & UMA_ZFLAG_OFFPAGE) != 0)
+		total += slabzone(kl->ipers)->uz_keg->uk_rsize;
+
+	kl->eff = UMA_FRAC_FIXPT(kl->ipers * rsize, total);
+}
+
 /*
  * Determine the format of a uma keg.  This determines where the slab header
  * will be placed (inline or offpage) and calculates ipers, rsize, and ppera.
@@ -1738,15 +1882,14 @@ slab_ipers(size_t size, int align)
 static void
 keg_layout(uma_keg_t keg)
 {
+	struct keg_layout_result kl = {}, kl_tmp;
+	u_int fmts[2];
 	u_int alignsize;
-	u_int eff;
-	u_int eff_offpage;
-	u_int format;
-	u_int ipers;
-	u_int ipers_offpage;
+	u_int nfmt;
 	u_int pages;
 	u_int rsize;
 	u_int slabsize;
+	u_int i, j;
 
 	KASSERT((keg->uk_flags & UMA_ZONE_PCPU) == 0 ||
 	    (keg->uk_size <= UMA_PCPU_ALLOC_SIZE &&
@@ -1754,28 +1897,22 @@ keg_layout(uma_keg_t keg)
 	    ("%s: cannot configure for PCPU: keg=%s, size=%u, flags=0x%b",
 	     __func__, keg->uk_name, keg->uk_size, keg->uk_flags,
 	     PRINT_UMA_ZFLAGS));
-	KASSERT((keg->uk_flags &
-	    (UMA_ZFLAG_INTERNAL | UMA_ZFLAG_CACHEONLY)) == 0 ||
+	KASSERT((keg->uk_flags & (UMA_ZFLAG_INTERNAL | UMA_ZONE_VM)) == 0 ||
 	    (keg->uk_flags & (UMA_ZONE_NOTOUCH | UMA_ZONE_PCPU)) == 0,
 	    ("%s: incompatible flags 0x%b", __func__, keg->uk_flags,
 	     PRINT_UMA_ZFLAGS));
 
 	alignsize = keg->uk_align + 1;
-	format = 0;
-	ipers = 0;
 
 	/*
 	 * Calculate the size of each allocation (rsize) according to
 	 * alignment.  If the requested size is smaller than we have
 	 * allocation bits for we round it up.
 	 */
-	rsize = MAX(keg->uk_size, UMA_SLAB_SIZE / SLAB_MAX_SETSIZE);
+	rsize = MAX(keg->uk_size, UMA_SMALLEST_UNIT);
 	rsize = roundup2(rsize, alignsize);
 
-	if ((keg->uk_flags & UMA_ZONE_PCPU) != 0) {
-		slabsize = UMA_PCPU_ALLOC_SIZE;
-		pages = mp_maxid + 1;
-	} else if ((keg->uk_flags & UMA_ZONE_CACHESPREAD) != 0) {
+	if ((keg->uk_flags & UMA_ZONE_CACHESPREAD) != 0) {
 		/*
 		 * We want one item to start on every align boundary in a page.
 		 * To do this we will span pages.  We will also extend the item
@@ -1787,90 +1924,115 @@ keg_layout(uma_keg_t keg)
 		slabsize = rsize * (PAGE_SIZE / alignsize);
 		slabsize = MIN(slabsize, rsize * SLAB_MAX_SETSIZE);
 		slabsize = MIN(slabsize, UMA_CACHESPREAD_MAX_SIZE);
-		pages = howmany(slabsize, PAGE_SIZE);
-		slabsize = ptoa(pages);
+		slabsize = round_page(slabsize);
 	} else {
 		/*
-		 * Choose a slab size of as many pages as it takes to represent
-		 * a single item.  We will then try to fit as many additional
-		 * items into the slab as possible.  At some point, we may want
-		 * to increase the slab size for awkward item sizes in order to
-		 * increase efficiency.
+		 * Start with a slab size of as many pages as it takes to
+		 * represent a single item.  We will try to fit as many
+		 * additional items into the slab as possible.
 		 */
-		pages = howmany(keg->uk_size, PAGE_SIZE);
-		slabsize = ptoa(pages);
+		slabsize = round_page(keg->uk_size);
 	}
+
+	/* Build a list of all of the available formats for this keg. */
+	nfmt = 0;
 
 	/* Evaluate an inline slab layout. */
 	if ((keg->uk_flags & (UMA_ZONE_NOTOUCH | UMA_ZONE_PCPU)) == 0)
-		ipers = slab_ipers_hdr(keg->uk_size, rsize, slabsize, true);
+		fmts[nfmt++] = 0;
 
 	/* TODO: vm_page-embedded slab. */
 
 	/*
 	 * We can't do OFFPAGE if we're internal or if we've been
 	 * asked to not go to the VM for buckets.  If we do this we
-	 * may end up going to the VM  for slabs which we do not
-	 * want to do if we're UMA_ZFLAG_CACHEONLY as a result
-	 * of UMA_ZONE_VM, which clearly forbids it.
+	 * may end up going to the VM for slabs which we do not want
+	 * to do if we're UMA_ZONE_VM, which clearly forbids it.
+	 * In those cases, evaluate a pseudo-format called INTERNAL
+	 * which has an inline slab header and one extra page to
+	 * guarantee that it fits.
+	 *
+	 * Otherwise, see if using an OFFPAGE slab will improve our
+	 * efficiency.
 	 */
-	if ((keg->uk_flags &
-	    (UMA_ZFLAG_INTERNAL | UMA_ZFLAG_CACHEONLY)) != 0) {
-		if (ipers == 0) {
-			/* We need an extra page for the slab header. */
-			pages++;
-			slabsize = ptoa(pages);
-			ipers = slab_ipers_hdr(keg->uk_size, rsize, slabsize,
-			    true);
-		}
-		goto out;
-	}
+	if ((keg->uk_flags & (UMA_ZFLAG_INTERNAL | UMA_ZONE_VM)) != 0)
+		fmts[nfmt++] = UMA_ZFLAG_INTERNAL;
+	else
+		fmts[nfmt++] = UMA_ZFLAG_OFFPAGE;
 
 	/*
-	 * See if using an OFFPAGE slab will improve our efficiency.
-	 * Only do this if we are below our efficiency threshold.
+	 * Choose a slab size and format which satisfy the minimum efficiency.
+	 * Prefer the smallest slab size that meets the constraints.
 	 *
-	 * XXX We could try growing slabsize to limit max waste as well.
-	 * Historically this was not done because the VM could not
-	 * efficiently handle contiguous allocations.
+	 * Start with a minimum slab size, to accommodate CACHESPREAD.  Then,
+	 * for small items (up to PAGE_SIZE), the iteration increment is one
+	 * page; and for large items, the increment is one item.
 	 */
-	eff = UMA_FRAC_FIXPT(ipers * rsize, slabsize);
-	ipers_offpage = slab_ipers_hdr(keg->uk_size, rsize, slabsize, false);
-	eff_offpage = UMA_FRAC_FIXPT(ipers_offpage * rsize,
-	    slabsize + slab_sizeof(SLAB_MAX_SETSIZE));
-	if (ipers == 0 || (eff < UMA_MIN_EFF && eff < eff_offpage)) {
-		CTR5(KTR_UMA, "UMA decided we need offpage slab headers for "
-		    "keg: %s(%p), minimum efficiency allowed = %u%%, "
-		    "old efficiency = %u%%, offpage efficiency = %u%%\n",
-		    keg->uk_name, keg, UMA_FIXPT_PCT(UMA_MIN_EFF),
-		    UMA_FIXPT_PCT(eff), UMA_FIXPT_PCT(eff_offpage));
-		format = UMA_ZFLAG_OFFPAGE;
-		ipers = ipers_offpage;
+	i = (slabsize + rsize - keg->uk_size) / MAX(PAGE_SIZE, rsize);
+	KASSERT(i >= 1, ("keg %s(%p) flags=0x%b slabsize=%u, rsize=%u, i=%u",
+	    keg->uk_name, keg, keg->uk_flags, PRINT_UMA_ZFLAGS, slabsize,
+	    rsize, i));
+	for ( ; ; i++) {
+		slabsize = (rsize <= PAGE_SIZE) ? ptoa(i) :
+		    round_page(rsize * (i - 1) + keg->uk_size);
+
+		for (j = 0; j < nfmt; j++) {
+			/* Only if we have no viable format yet. */
+			if ((fmts[j] & UMA_ZFLAG_INTERNAL) != 0 &&
+			    kl.ipers > 0)
+				continue;
+
+			keg_layout_one(keg, rsize, slabsize, fmts[j], &kl_tmp);
+			if (kl_tmp.eff <= kl.eff)
+				continue;
+
+			kl = kl_tmp;
+
+			CTR6(KTR_UMA, "keg %s layout: format %#x "
+			    "(ipers %u * rsize %u) / slabsize %#x = %u%% eff",
+			    keg->uk_name, kl.format, kl.ipers, rsize,
+			    kl.slabsize, UMA_FIXPT_PCT(kl.eff));
+
+			/* Stop when we reach the minimum efficiency. */
+			if (kl.eff >= UMA_MIN_EFF)
+				break;
+		}
+
+		if (kl.eff >= UMA_MIN_EFF || !multipage_slabs ||
+		    slabsize >= SLAB_MAX_SETSIZE * rsize ||
+		    (keg->uk_flags & (UMA_ZONE_PCPU | UMA_ZONE_CONTIG)) != 0)
+			break;
 	}
 
-out:
+	pages = atop(kl.slabsize);
+	if ((keg->uk_flags & UMA_ZONE_PCPU) != 0)
+		pages *= mp_maxid + 1;
+
+	keg->uk_rsize = rsize;
+	keg->uk_ipers = kl.ipers;
+	keg->uk_ppera = pages;
+	keg->uk_flags |= kl.format;
+
 	/*
 	 * How do we find the slab header if it is offpage or if not all item
 	 * start addresses are in the same page?  We could solve the latter
 	 * case with vaddr alignment, but we don't.
 	 */
-	if ((format & UMA_ZFLAG_OFFPAGE) != 0 ||
-	    (ipers - 1) * rsize >= PAGE_SIZE) {
+	if ((keg->uk_flags & UMA_ZFLAG_OFFPAGE) != 0 ||
+	    (keg->uk_ipers - 1) * rsize >= PAGE_SIZE) {
 		if ((keg->uk_flags & UMA_ZONE_NOTPAGE) != 0)
-			format |= UMA_ZFLAG_HASH;
+			keg->uk_flags |= UMA_ZFLAG_HASH;
 		else
-			format |= UMA_ZFLAG_VTOSLAB;
+			keg->uk_flags |= UMA_ZFLAG_VTOSLAB;
 	}
-	keg->uk_ipers = ipers;
-	keg->uk_rsize = rsize;
-	keg->uk_flags |= format;
-	keg->uk_ppera = pages;
-	CTR6(KTR_UMA, "%s: keg=%s, flags=%#x, rsize=%u, ipers=%u, ppera=%u\n",
-	    __func__, keg->uk_name, keg->uk_flags, rsize, ipers, pages);
+
+	CTR6(KTR_UMA, "%s: keg=%s, flags=%#x, rsize=%u, ipers=%u, ppera=%u",
+	    __func__, keg->uk_name, keg->uk_flags, rsize, keg->uk_ipers,
+	    pages);
 	KASSERT(keg->uk_ipers > 0 && keg->uk_ipers <= SLAB_MAX_SETSIZE,
 	    ("%s: keg=%s, flags=0x%b, rsize=%u, ipers=%u, ppera=%u", __func__,
-	     keg->uk_name, keg->uk_flags, PRINT_UMA_ZFLAGS, rsize, ipers,
-	     pages));
+	     keg->uk_name, keg->uk_flags, PRINT_UMA_ZFLAGS, rsize,
+	     keg->uk_ipers, pages));
 }
 
 /*
@@ -1895,7 +2057,6 @@ keg_ctor(void *mem, int size, void *udata, int flags)
 	keg->uk_align = arg->align;
 	keg->uk_reserve = 0;
 	keg->uk_flags = arg->flags;
-	keg->uk_slabzone = NULL;
 
 	/*
 	 * We use a global round-robin policy by default.  Zones with
@@ -1910,9 +2071,6 @@ keg_ctor(void *mem, int size, void *udata, int flags)
 	 */
 	zone = arg->zone;
 	keg->uk_name = zone->uz_name;
-
-	if (arg->flags & UMA_ZONE_VM)
-		keg->uk_flags |= UMA_ZFLAG_CACHEONLY;
 
 	if (arg->flags & UMA_ZONE_ZINIT)
 		keg->uk_init = zero_init;
@@ -1941,21 +2099,21 @@ keg_ctor(void *mem, int size, void *udata, int flags)
 		keg->uk_flags |= UMA_ZONE_ROUNDROBIN;
 #endif
 
-	if (keg->uk_flags & UMA_ZFLAG_OFFPAGE)
-		keg->uk_slabzone = slabzone;
-
 	/*
 	 * If we haven't booted yet we need allocations to go through the
 	 * startup cache until the vm is ready.
 	 */
-	if (booted < BOOT_PAGEALLOC)
-		keg->uk_allocf = startup_alloc;
 #ifdef UMA_MD_SMALL_ALLOC
-	else if (keg->uk_ppera == 1)
+	if (keg->uk_ppera == 1)
 		keg->uk_allocf = uma_small_alloc;
+	else
 #endif
+	if (booted < BOOT_KVA)
+		keg->uk_allocf = startup_alloc;
 	else if (keg->uk_flags & UMA_ZONE_PCPU)
 		keg->uk_allocf = pcpu_page_alloc;
+	else if ((keg->uk_flags & UMA_ZONE_CONTIG) != 0 && keg->uk_ppera > 1)
+		keg->uk_allocf = contig_alloc;
 	else
 		keg->uk_allocf = page_alloc;
 #ifdef UMA_MD_SMALL_ALLOC
@@ -1999,7 +2157,7 @@ keg_ctor(void *mem, int size, void *udata, int flags)
 	if (keg->uk_flags & UMA_ZFLAG_HASH)
 		hash_alloc(&keg->uk_hash, 0);
 
-	CTR3(KTR_UMA, "keg_ctor %p zone %s(%p)\n", keg, zone->uz_name, zone);
+	CTR3(KTR_UMA, "keg_ctor %p zone %s(%p)", keg, zone->uz_name, zone);
 
 	LIST_INSERT_HEAD(&keg->uk_zones, zone, uz_link);
 
@@ -2007,6 +2165,27 @@ keg_ctor(void *mem, int size, void *udata, int flags)
 	LIST_INSERT_HEAD(&uma_kegs, keg, uk_link);
 	rw_wunlock(&uma_rwlock);
 	return (0);
+}
+
+static void
+zone_kva_available(uma_zone_t zone, void *unused)
+{
+	uma_keg_t keg;
+
+	if ((zone->uz_flags & UMA_ZFLAG_CACHE) != 0)
+		return;
+	KEG_GET(zone, keg);
+
+	if (keg->uk_allocf == startup_alloc) {
+		/* Switch to the real allocator. */
+		if (keg->uk_flags & UMA_ZONE_PCPU)
+			keg->uk_allocf = pcpu_page_alloc;
+		else if ((keg->uk_flags & UMA_ZONE_CONTIG) != 0 &&
+		    keg->uk_ppera > 1)
+			keg->uk_allocf = contig_alloc;
+		else
+			keg->uk_allocf = page_alloc;
+	}
 }
 
 static void
@@ -2248,10 +2427,11 @@ zone_ctor(void *mem, int size, void *udata, int flags)
 	zone->uz_bucket_size = 0;
 	zone->uz_bucket_size_min = 0;
 	zone->uz_bucket_size_max = BUCKET_MAX;
-	zone->uz_flags = 0;
+	zone->uz_flags = (arg->flags & UMA_ZONE_SMR);
 	zone->uz_warning = NULL;
 	/* The domain structures follow the cpu structures. */
-	zone->uz_domain = (struct uma_zone_domain *)&zone->uz_cpu[mp_ncpus];
+	zone->uz_domain =
+	    (struct uma_zone_domain *)&zone->uz_cpu[mp_maxid + 1];
 	zone->uz_bkt_max = ULONG_MAX;
 	timevalclear(&zone->uz_ratecheck);
 
@@ -2264,7 +2444,7 @@ zone_ctor(void *mem, int size, void *udata, int flags)
 	ZONE_CROSS_LOCK_INIT(zone);
 
 	for (i = 0; i < vm_ndomains; i++)
-		TAILQ_INIT(&zone->uz_domain[i].uzd_buckets);
+		STAILQ_INIT(&zone->uz_domain[i].uzd_buckets);
 
 #ifdef INVARIANTS
 	if (arg->uminit == trash_init && arg->fini == trash_fini)
@@ -2277,8 +2457,6 @@ zone_ctor(void *mem, int size, void *udata, int flags)
 	if (arg->import) {
 		KASSERT((arg->flags & UMA_ZFLAG_CACHE) != 0,
 		    ("zone_ctor: Import specified for non-cache zone."));
-		if (arg->flags & UMA_ZONE_VM)
-			arg->flags |= UMA_ZFLAG_CACHEONLY;
 		zone->uz_flags = arg->flags;
 		zone->uz_size = arg->size;
 		zone->uz_import = arg->import;
@@ -2328,7 +2506,7 @@ zone_ctor(void *mem, int size, void *udata, int flags)
 		karg.uminit = arg->uminit;
 		karg.fini = arg->fini;
 		karg.align = arg->align;
-		karg.flags = arg->flags;
+		karg.flags = (arg->flags & ~UMA_ZONE_SMR);
 		karg.zone = zone;
 		error = keg_ctor(arg->keg, sizeof(struct uma_keg), &karg,
 		    flags);
@@ -2351,6 +2529,10 @@ out:
 		zone->uz_frees = EARLY_COUNTER;
 		zone->uz_fails = EARLY_COUNTER;
 	}
+
+	/* Caller requests a private SMR context. */
+	if ((zone->uz_flags & UMA_ZONE_SMR) != 0)
+		zone->uz_smr = smr_create(zone->uz_name);
 
 	KASSERT((arg->flags & (UMA_ZONE_MAXBUCKET | UMA_ZONE_NOBUCKET)) !=
 	    (UMA_ZONE_MAXBUCKET | UMA_ZONE_NOBUCKET),
@@ -2394,11 +2576,11 @@ keg_dtor(void *arg, int size, void *udata)
 		pages += keg->uk_domain[i].ud_pages;
 		KEG_LOCK_FINI(keg, i);
 	}
-	if (free != 0)
+	if (pages != 0)
 		printf("Freed UMA keg (%s) was not empty (%u items). "
 		    " Lost %u pages of memory.\n",
 		    keg->uk_name ? keg->uk_name : "",
-		    free, pages);
+		    pages / keg->uk_ppera * keg->uk_ipers - free, pages);
 
 	hash_free(&keg->uk_hash);
 }
@@ -2450,6 +2632,20 @@ zone_dtor(void *arg, int size, void *udata)
 	ZONE_CROSS_LOCK_FINI(zone);
 }
 
+static void
+zone_foreach_unlocked(void (*zfunc)(uma_zone_t, void *arg), void *arg)
+{
+	uma_keg_t keg;
+	uma_zone_t zone;
+
+	LIST_FOREACH(keg, &uma_kegs, uk_link) {
+		LIST_FOREACH(zone, &keg->uk_zones, uz_link)
+			zfunc(zone, arg);
+	}
+	LIST_FOREACH(zone, &uma_cachezones, uz_link)
+		zfunc(zone, arg);
+}
+
 /*
  * Traverses every zone in the system and calls a callback
  *
@@ -2463,41 +2659,29 @@ zone_dtor(void *arg, int size, void *udata)
 static void
 zone_foreach(void (*zfunc)(uma_zone_t, void *arg), void *arg)
 {
-	uma_keg_t keg;
-	uma_zone_t zone;
 
-	/*
-	 * Before BOOT_RUNNING we are guaranteed to be single
-	 * threaded, so locking isn't needed. Startup functions
-	 * are allowed to use M_WAITOK.
-	 */
-	if (__predict_true(booted >= BOOT_RUNNING))
-		rw_rlock(&uma_rwlock);
-	LIST_FOREACH(keg, &uma_kegs, uk_link) {
-		LIST_FOREACH(zone, &keg->uk_zones, uz_link)
-			zfunc(zone, arg);
-	}
-	LIST_FOREACH(zone, &uma_cachezones, uz_link)
-		zfunc(zone, arg);
-	if (__predict_true(booted >= BOOT_RUNNING))
-		rw_runlock(&uma_rwlock);
+	rw_rlock(&uma_rwlock);
+	zone_foreach_unlocked(zfunc, arg);
+	rw_runlock(&uma_rwlock);
 }
 
 /*
- * Count how many pages do we need to bootstrap.  VM supplies
- * its need in early zones in the argument, we add up our zones,
- * which consist of the UMA Slabs, UMA Hash and 9 Bucket zones.  The
- * zone of zones and zone of kegs are accounted separately.
+ * Initialize the kernel memory allocator.  This is done after pages can be
+ * allocated but before general KVA is available.
  */
-#define	UMA_BOOT_ZONES	11
-static int zsize, ksize;
-int
-uma_startup_count(int vm_zones)
+void
+uma_startup1(vm_offset_t virtual_avail)
 {
-	int zones, pages;
-	u_int zppera, zipers;
-	u_int kppera, kipers;
-	size_t space, size;
+	struct uma_zctor_args args;
+	size_t ksize, zsize, size;
+	uma_keg_t masterkeg;
+	uintptr_t m;
+	uint8_t pflag;
+
+	bootstart = bootmem = virtual_avail;
+
+	rw_init(&uma_rwlock, "UMA lock");
+	sx_init(&uma_reclaim_lock, "umareclaim");
 
 	ksize = sizeof(struct uma_keg) +
 	    (sizeof(struct uma_domain) * vm_ndomains);
@@ -2507,78 +2691,14 @@ uma_startup_count(int vm_zones)
 	    (sizeof(struct uma_zone_domain) * vm_ndomains);
 	zsize = roundup(zsize, UMA_SUPER_ALIGN);
 
-	/*
-	 * Memory for the zone of kegs and its keg, and for zone
-	 * of zones.  Allocated directly in uma_startup().
-	 */
-	pages = howmany(zsize * 2 + ksize, PAGE_SIZE);
-
-#ifdef	UMA_MD_SMALL_ALLOC
-	zones = UMA_BOOT_ZONES;
-#else
-	zones = UMA_BOOT_ZONES + vm_zones;
-	vm_zones = 0;
-#endif
-	size = slab_sizeof(SLAB_MAX_SETSIZE);
-	space = slab_space(SLAB_MAX_SETSIZE);
-
-	/* Memory for the rest of startup zones, UMA and VM, ... */
-	if (zsize > space) {
-		/* See keg_large_init(). */
-		zppera = howmany(zsize + slab_sizeof(1), PAGE_SIZE);
-		zipers = 1;
-		zones += vm_zones;
-	} else {
-		zppera = 1;
-		zipers = space / zsize;
-	}
-	pages += howmany(zones, zipers) * zppera;
-
-	/* ... and their kegs. Note that zone of zones allocates a keg! */
-	if (ksize > space) {
-		/* See keg_large_init(). */
-		kppera = howmany(ksize + slab_sizeof(1), PAGE_SIZE);
-		kipers = 1;
-	} else {
-		kppera = 1;
-		kipers = space / ksize;
-	}
-	pages += howmany(zones + 1, kipers) * kppera;
-
-	/*
-	 * Allocate an additional slab for zones and kegs on NUMA
-	 * systems.  The round-robin allocation policy will populate at
-	 * least one slab per-domain.
-	 */
-	pages += (vm_ndomains - 1) * (zppera + kppera);
-
-	return (pages);
-}
-
-void
-uma_startup(void *mem, int npages)
-{
-	struct uma_zctor_args args;
-	uma_keg_t masterkeg;
-	uintptr_t m;
-
-#ifdef DIAGNOSTIC
-	printf("Entering %s with %d boot pages configured\n", __func__, npages);
-#endif
-
-	rw_init(&uma_rwlock, "UMA lock");
-
-	/* Use bootpages memory for the zone of zones and zone of kegs. */
-	m = (uintptr_t)mem;
+	/* Allocate the zone of zones, zone of kegs, and zone of zones keg. */
+	size = (zsize * 2) + ksize;
+	m = (uintptr_t)startup_alloc(NULL, size, 0, &pflag, M_NOWAIT | M_ZERO);
 	zones = (uma_zone_t)m;
 	m += zsize;
 	kegs = (uma_zone_t)m;
 	m += zsize;
 	masterkeg = (uma_keg_t)m;
-	m += ksize;
-	m = roundup(m, PAGE_SIZE);
-	npages -= (m - (uintptr_t)mem) / PAGE_SIZE;
-	mem = (void *)m;
 
 	/* "manually" create the initial zone */
 	memset(&args, 0, sizeof(args));
@@ -2593,9 +2713,6 @@ uma_startup(void *mem, int npages)
 	args.flags = UMA_ZFLAG_INTERNAL;
 	zone_ctor(kegs, zsize, &args, M_WAITOK);
 
-	bootmem = mem;
-	boot_pages = npages;
-
 	args.name = "UMA Zones";
 	args.size = zsize;
 	args.ctor = zone_ctor;
@@ -2607,40 +2724,53 @@ uma_startup(void *mem, int npages)
 	args.flags = UMA_ZFLAG_INTERNAL;
 	zone_ctor(zones, zsize, &args, M_WAITOK);
 
-	/* Now make a zone for slab headers */
-	slabzone = uma_zcreate("UMA Slabs", sizeof(struct uma_hash_slab),
+	/* Now make zones for slab headers */
+	slabzones[0] = uma_zcreate("UMA Slabs 0", SLABZONE0_SIZE,
+	    NULL, NULL, NULL, NULL, UMA_ALIGN_PTR, UMA_ZFLAG_INTERNAL);
+	slabzones[1] = uma_zcreate("UMA Slabs 1", SLABZONE1_SIZE,
 	    NULL, NULL, NULL, NULL, UMA_ALIGN_PTR, UMA_ZFLAG_INTERNAL);
 
 	hashzone = uma_zcreate("UMA Hash",
 	    sizeof(struct slabhead *) * UMA_HASH_SIZE_INIT,
 	    NULL, NULL, NULL, NULL, UMA_ALIGN_PTR, UMA_ZFLAG_INTERNAL);
 
-	booted = BOOT_STRAPPED;
+	bucket_init();
+	smr_init();
 }
 
-void
-uma_startup1(void)
-{
-
-#ifdef DIAGNOSTIC
-	printf("Entering %s with %d boot pages left\n", __func__, boot_pages);
+#ifndef UMA_MD_SMALL_ALLOC
+extern void vm_radix_reserve_kva(void);
 #endif
-	booted = BOOT_PAGEALLOC;
-}
 
+/*
+ * Advertise the availability of normal kva allocations and switch to
+ * the default back-end allocator.  Marks the KVA we consumed on startup
+ * as used in the map.
+ */
 void
 uma_startup2(void)
 {
 
-#ifdef DIAGNOSTIC
-	printf("Entering %s with %d boot pages left\n", __func__, boot_pages);
+	if (bootstart != bootmem) {
+		vm_map_lock(kernel_map);
+		(void)vm_map_insert(kernel_map, NULL, 0, bootstart, bootmem,
+		    VM_PROT_RW, VM_PROT_RW, MAP_NOFAULT);
+		vm_map_unlock(kernel_map);
+	}
+
+#ifndef UMA_MD_SMALL_ALLOC
+	/* Set up radix zone to use noobj_alloc. */
+	vm_radix_reserve_kva();
 #endif
-	sx_init(&uma_reclaim_lock, "umareclaim");
-	bucket_init();
-	booted = BOOT_BUCKETS;
+
+	booted = BOOT_KVA;
+	zone_foreach_unlocked(zone_kva_available, NULL);
 	bucket_enable();
 }
 
+/*
+ * Finish our initialization steps.
+ */
 static void
 uma_startup3(void)
 {
@@ -2650,8 +2780,8 @@ uma_startup3(void)
 	uma_dbg_cnt = counter_u64_alloc(M_WAITOK);
 	uma_skip_cnt = counter_u64_alloc(M_WAITOK);
 #endif
-	zone_foreach(zone_alloc_counters, NULL);
-	zone_foreach(zone_alloc_sysctl, NULL);
+	zone_foreach_unlocked(zone_alloc_counters, NULL);
+	zone_foreach_unlocked(zone_alloc_sysctl, NULL);
 	callout_init(&uma_callout, 1);
 	callout_reset(&uma_callout, UMA_TIMEOUT * hz, uma_timeout, NULL);
 	booted = BOOT_RUNNING;
@@ -2700,7 +2830,6 @@ uma_zcreate(const char *name, size_t size, uma_ctor ctor, uma_dtor dtor,
 {
 	struct uma_zctor_args args;
 	uma_zone_t res;
-	bool locked;
 
 	KASSERT(powerof2(align + 1), ("invalid zone alignment %d for \"%s\"",
 	    align, name));
@@ -2732,15 +2861,10 @@ uma_zcreate(const char *name, size_t size, uma_ctor ctor, uma_dtor dtor,
 	args.flags = flags;
 	args.keg = NULL;
 
-	if (booted < BOOT_BUCKETS) {
-		locked = false;
-	} else {
-		sx_slock(&uma_reclaim_lock);
-		locked = true;
-	}
+	sx_slock(&uma_reclaim_lock);
 	res = zone_alloc_item(zones, &args, UMA_ANYDOMAIN, M_WAITOK);
-	if (locked)
-		sx_sunlock(&uma_reclaim_lock);
+	sx_sunlock(&uma_reclaim_lock);
+
 	return (res);
 }
 
@@ -2752,7 +2876,6 @@ uma_zsecond_create(char *name, uma_ctor ctor, uma_dtor dtor,
 	struct uma_zctor_args args;
 	uma_keg_t keg;
 	uma_zone_t res;
-	bool locked;
 
 	keg = master->uz_keg;
 	memset(&args, 0, sizeof(args));
@@ -2766,16 +2889,10 @@ uma_zsecond_create(char *name, uma_ctor ctor, uma_dtor dtor,
 	args.flags = keg->uk_flags | UMA_ZONE_SECONDARY;
 	args.keg = keg;
 
-	if (booted < BOOT_BUCKETS) {
-		locked = false;
-	} else {
-		sx_slock(&uma_reclaim_lock);
-		locked = true;
-	}
-	/* XXX Attaches only one keg of potentially many. */
+	sx_slock(&uma_reclaim_lock);
 	res = zone_alloc_item(zones, &args, UMA_ANYDOMAIN, M_WAITOK);
-	if (locked)
-		sx_sunlock(&uma_reclaim_lock);
+	sx_sunlock(&uma_reclaim_lock);
+
 	return (res);
 }
 
@@ -2863,14 +2980,9 @@ uma_zfree_pcpu_arg(uma_zone_t zone, void *item, void *udata)
 	uma_zfree_arg(zone, item, udata);
 }
 
-#ifdef INVARIANTS
-#define	UMA_ALWAYS_CTORDTOR	1
-#else
-#define	UMA_ALWAYS_CTORDTOR	0
-#endif
-
-static void *
-item_ctor(uma_zone_t zone, int size, void *udata, int flags, void *item)
+static inline void *
+item_ctor(uma_zone_t zone, int uz_flags, int size, void *udata, int flags,
+    void *item)
 {
 #ifdef INVARIANTS
 	bool skipdbg;
@@ -2880,7 +2992,9 @@ item_ctor(uma_zone_t zone, int size, void *udata, int flags, void *item)
 	    zone->uz_ctor != trash_ctor)
 		trash_ctor(item, size, udata, flags);
 #endif
-	if (__predict_false(zone->uz_ctor != NULL) &&
+	/* Check flags before loading ctor pointer. */
+	if (__predict_false((uz_flags & UMA_ZFLAG_CTORDTOR) != 0) &&
+	    __predict_false(zone->uz_ctor != NULL) &&
 	    zone->uz_ctor(item, size, udata, flags) != 0) {
 		counter_u64_add(zone->uz_fails, 1);
 		zone_free_item(zone, item, udata, SKIP_DTOR | SKIP_CNT);
@@ -2922,6 +3036,127 @@ item_dtor(uma_zone_t zone, void *item, int size, void *udata,
 	}
 }
 
+#if defined(INVARIANTS) || defined(DEBUG_MEMGUARD) || defined(WITNESS)
+#define	UMA_ZALLOC_DEBUG
+static int
+uma_zalloc_debug(uma_zone_t zone, void **itemp, void *udata, int flags)
+{
+	int error;
+
+	error = 0;
+#ifdef WITNESS
+	if (flags & M_WAITOK) {
+		WITNESS_WARN(WARN_GIANTOK | WARN_SLEEPOK, NULL,
+		    "uma_zalloc_debug: zone \"%s\"", zone->uz_name);
+	}
+#endif
+
+#ifdef INVARIANTS
+	KASSERT((flags & M_EXEC) == 0,
+	    ("uma_zalloc_debug: called with M_EXEC"));
+	KASSERT(curthread->td_critnest == 0 || SCHEDULER_STOPPED(),
+	    ("uma_zalloc_debug: called within spinlock or critical section"));
+	KASSERT((zone->uz_flags & UMA_ZONE_PCPU) == 0 || (flags & M_ZERO) == 0,
+	    ("uma_zalloc_debug: allocating from a pcpu zone with M_ZERO"));
+#endif
+
+#ifdef DEBUG_MEMGUARD
+	if ((zone->uz_flags & UMA_ZONE_SMR) == 0 && memguard_cmp_zone(zone)) {
+		void *item;
+		item = memguard_alloc(zone->uz_size, flags);
+		if (item != NULL) {
+			error = EJUSTRETURN;
+			if (zone->uz_init != NULL &&
+			    zone->uz_init(item, zone->uz_size, flags) != 0) {
+				*itemp = NULL;
+				return (error);
+			}
+			if (zone->uz_ctor != NULL &&
+			    zone->uz_ctor(item, zone->uz_size, udata,
+			    flags) != 0) {
+				counter_u64_add(zone->uz_fails, 1);
+			    	zone->uz_fini(item, zone->uz_size);
+				*itemp = NULL;
+				return (error);
+			}
+			*itemp = item;
+			return (error);
+		}
+		/* This is unfortunate but should not be fatal. */
+	}
+#endif
+	return (error);
+}
+
+static int
+uma_zfree_debug(uma_zone_t zone, void *item, void *udata)
+{
+	KASSERT(curthread->td_critnest == 0 || SCHEDULER_STOPPED(),
+	    ("uma_zfree_debug: called with spinlock or critical section held"));
+
+#ifdef DEBUG_MEMGUARD
+	if ((zone->uz_flags & UMA_ZONE_SMR) == 0 && is_memguard_addr(item)) {
+		if (zone->uz_dtor != NULL)
+			zone->uz_dtor(item, zone->uz_size, udata);
+		if (zone->uz_fini != NULL)
+			zone->uz_fini(item, zone->uz_size);
+		memguard_free(item);
+		return (EJUSTRETURN);
+	}
+#endif
+	return (0);
+}
+#endif
+
+static __noinline void *
+uma_zalloc_single(uma_zone_t zone, void *udata, int flags)
+{
+	int domain;
+
+	/*
+	 * We can not get a bucket so try to return a single item.
+	 */
+	if (zone->uz_flags & UMA_ZONE_FIRSTTOUCH)
+		domain = PCPU_GET(domain);
+	else
+		domain = UMA_ANYDOMAIN;
+	return (zone_alloc_item(zone, udata, domain, flags));
+}
+
+/* See uma.h */
+void *
+uma_zalloc_smr(uma_zone_t zone, int flags)
+{
+	uma_cache_bucket_t bucket;
+	uma_cache_t cache;
+	void *item;
+	int size, uz_flags;
+
+#ifdef UMA_ZALLOC_DEBUG
+	KASSERT((zone->uz_flags & UMA_ZONE_SMR) != 0,
+	    ("uma_zalloc_arg: called with non-SMR zone.\n"));
+	if (uma_zalloc_debug(zone, &item, NULL, flags) == EJUSTRETURN)
+		return (item);
+#endif
+
+	critical_enter();
+	do {
+		cache = &zone->uz_cpu[curcpu];
+		bucket = &cache->uc_allocbucket;
+		size = cache_uz_size(cache);
+		uz_flags = cache_uz_flags(cache);
+		if (__predict_true(bucket->ucb_cnt != 0)) {
+			item = cache_bucket_pop(cache, bucket);
+			critical_exit();
+			return (item_ctor(zone, uz_flags, size, NULL, flags,
+			    item));
+		}
+	} while (cache_alloc(zone, cache, NULL, flags));
+	critical_exit();
+
+	return (uma_zalloc_single(zone, NULL, flags));
+}
+
 /* See uma.h */
 void *
 uma_zalloc_arg(uma_zone_t zone, void *udata, int flags)
@@ -2929,50 +3164,22 @@ uma_zalloc_arg(uma_zone_t zone, void *udata, int flags)
 	uma_cache_bucket_t bucket;
 	uma_cache_t cache;
 	void *item;
-	int domain, size, uz_flags;
+	int size, uz_flags;
 
 	/* Enable entropy collection for RANDOM_ENABLE_UMA kernel option */
 	random_harvest_fast_uma(&zone, sizeof(zone), RANDOM_UMA);
 
 	/* This is the fast path allocation */
-	CTR4(KTR_UMA, "uma_zalloc_arg thread %x zone %s(%p) flags %d",
-	    curthread, zone->uz_name, zone, flags);
+	CTR3(KTR_UMA, "uma_zalloc_arg zone %s(%p) flags %d", zone->uz_name,
+	    zone, flags);
 
-#ifdef WITNESS
-	if (flags & M_WAITOK) {
-		WITNESS_WARN(WARN_GIANTOK | WARN_SLEEPOK, NULL,
-		    "uma_zalloc_arg: zone \"%s\"", zone->uz_name);
-	}
+#ifdef UMA_ZALLOC_DEBUG
+	KASSERT((zone->uz_flags & UMA_ZONE_SMR) == 0,
+	    ("uma_zalloc_arg: called with SMR zone.\n"));
+	if (uma_zalloc_debug(zone, &item, udata, flags) == EJUSTRETURN)
+		return (item);
 #endif
 
-#ifdef INVARIANTS
-	KASSERT((flags & M_EXEC) == 0, ("uma_zalloc_arg: called with M_EXEC"));
-	KASSERT(curthread->td_critnest == 0 || SCHEDULER_STOPPED(),
-	    ("uma_zalloc_arg: called with spinlock or critical section held"));
-	if (zone->uz_flags & UMA_ZONE_PCPU)
-		KASSERT((flags & M_ZERO) == 0, ("allocating from a pcpu zone "
-		    "with M_ZERO passed"));
-#endif
-
-#ifdef DEBUG_MEMGUARD
-	if (memguard_cmp_zone(zone)) {
-		item = memguard_alloc(zone->uz_size, flags);
-		if (item != NULL) {
-			if (zone->uz_init != NULL &&
-			    zone->uz_init(item, zone->uz_size, flags) != 0)
-				return (NULL);
-			if (zone->uz_ctor != NULL &&
-			    zone->uz_ctor(item, zone->uz_size, udata,
-			    flags) != 0) {
-				counter_u64_add(zone->uz_fails, 1);
-			    	zone->uz_fini(item, zone->uz_size);
-				return (NULL);
-			}
-			return (item);
-		}
-		/* This is unfortunate but should not be fatal. */
-	}
-#endif
 	/*
 	 * If possible, allocate from the per-CPU cache.  There are two
 	 * requirements for safe access to the per-CPU cache: (1) the thread
@@ -2993,24 +3200,13 @@ uma_zalloc_arg(uma_zone_t zone, void *udata, int flags)
 		if (__predict_true(bucket->ucb_cnt != 0)) {
 			item = cache_bucket_pop(cache, bucket);
 			critical_exit();
-			if (__predict_false((uz_flags & UMA_ZFLAG_CTORDTOR) != 0 ||
-			    UMA_ALWAYS_CTORDTOR))
-				return (item_ctor(zone, size, udata, flags, item));
-			if (flags & M_ZERO)
-				bzero(item, size);
-			return (item);
+			return (item_ctor(zone, uz_flags, size, udata, flags,
+			    item));
 		}
 	} while (cache_alloc(zone, cache, udata, flags));
 	critical_exit();
 
-	/*
-	 * We can not get a bucket so try to return a single item.
-	 */
-	if (uz_flags & UMA_ZONE_FIRSTTOUCH)
-		domain = PCPU_GET(domain);
-	else
-		domain = UMA_ANYDOMAIN;
-	return (zone_alloc_item(zone, udata, domain, flags));
+	return (uma_zalloc_single(zone, udata, flags));
 }
 
 /*
@@ -3033,9 +3229,14 @@ cache_alloc(uma_zone_t zone, uma_cache_t cache, void *udata, int flags)
 	/*
 	 * If we have run out of items in our alloc bucket see
 	 * if we can switch with the free bucket.
+	 *
+	 * SMR Zones can't re-use the free bucket until the sequence has
+	 * expired.
 	 */
-	if (cache->uc_freebucket.ucb_cnt != 0) {
-		cache_bucket_swap(&cache->uc_freebucket, &cache->uc_allocbucket);
+	if ((zone->uz_flags & UMA_ZONE_SMR) == 0 &&
+	    cache->uc_freebucket.ucb_cnt != 0) {
+		cache_bucket_swap(&cache->uc_freebucket,
+		    &cache->uc_allocbucket);
 		return (true);
 	}
 
@@ -3089,7 +3290,6 @@ cache_alloc(uma_zone_t zone, uma_cache_t cache, void *udata, int flags)
 	}
 
 	if ((bucket = zone_fetch_bucket(zone, zdom)) != NULL) {
-		ZONE_UNLOCK(zone);
 		KASSERT(bucket->ub_cnt != 0,
 		    ("uma_zalloc_arg: Returning an empty bucket."));
 		cache_bucket_load_alloc(cache, bucket);
@@ -3151,9 +3351,8 @@ uma_zalloc_domain(uma_zone_t zone, void *udata, int domain, int flags)
 	random_harvest_fast_uma(&zone, sizeof(zone), RANDOM_UMA);
 
 	/* This is the fast path allocation */
-	CTR5(KTR_UMA,
-	    "uma_zalloc_domain thread %x zone %s(%p) domain %d flags %d",
-	    curthread, zone->uz_name, zone, domain, flags);
+	CTR4(KTR_UMA, "uma_zalloc_domain zone %s(%p) domain %d flags %d",
+	    zone->uz_name, zone, domain, flags);
 
 	if (flags & M_WAITOK) {
 		WITNESS_WARN(WARN_GIANTOK | WARN_SLEEPOK, NULL,
@@ -3294,7 +3493,7 @@ slab_alloc_item(uma_keg_t keg, uma_slab_t slab)
 {
 	uma_domain_t dom;
 	void *item;
-	uint8_t freei;
+	int freei;
 
 	KEG_LOCK_ASSERT(keg, slab->us_domain);
 
@@ -3523,7 +3722,8 @@ zone_alloc_bucket(uma_zone_t zone, void *udata, int domain, int flags)
 	uma_bucket_t bucket;
 	int maxbucket, cnt;
 
-	CTR1(KTR_UMA, "zone_alloc:_bucket domain %d)", domain);
+	CTR3(KTR_UMA, "zone_alloc_bucket zone %s(%p) domain %d", zone->uz_name,
+	    zone, domain);
 
 	/* Avoid allocs targeting empty domains. */
 	if (domain != UMA_ANYDOMAIN && VM_DOMAIN_EMPTY(domain))
@@ -3626,7 +3826,8 @@ zone_alloc_item(uma_zone_t zone, void *udata, int domain, int flags)
 			goto fail_cnt;
 		}
 	}
-	item = item_ctor(zone, zone->uz_size, udata, flags, item);
+	item = item_ctor(zone, zone->uz_flags, zone->uz_size, udata, flags,
+	    item);
 	if (item == NULL)
 		goto fail;
 
@@ -3649,6 +3850,54 @@ fail:
 
 /* See uma.h */
 void
+uma_zfree_smr(uma_zone_t zone, void *item)
+{
+	uma_cache_t cache;
+	uma_cache_bucket_t bucket;
+	int domain, itemdomain, uz_flags;
+
+#ifdef UMA_ZALLOC_DEBUG
+	KASSERT((zone->uz_flags & UMA_ZONE_SMR) != 0,
+	    ("uma_zfree_smr: called with non-SMR zone.\n"));
+	KASSERT(item != NULL, ("uma_zfree_smr: Called with NULL pointer."));
+	if (uma_zfree_debug(zone, item, NULL) == EJUSTRETURN)
+		return;
+#endif
+	cache = &zone->uz_cpu[curcpu];
+	uz_flags = cache_uz_flags(cache);
+	domain = itemdomain = 0;
+#ifdef NUMA
+	if ((uz_flags & UMA_ZONE_FIRSTTOUCH) != 0)
+		itemdomain = _vm_phys_domain(pmap_kextract((vm_offset_t)item));
+#endif
+	critical_enter();
+	do {
+		cache = &zone->uz_cpu[curcpu];
+		/* SMR Zones must free to the free bucket. */
+		bucket = &cache->uc_freebucket;
+#ifdef NUMA
+		domain = PCPU_GET(domain);
+		if ((uz_flags & UMA_ZONE_FIRSTTOUCH) != 0 &&
+		    domain != itemdomain) {
+			bucket = &cache->uc_crossbucket;
+		}
+#endif
+		if (__predict_true(bucket->ucb_cnt < bucket->ucb_entries)) {
+			cache_bucket_push(cache, bucket, item);
+			critical_exit();
+			return;
+		}
+	} while (cache_free(zone, cache, NULL, item, itemdomain));
+	critical_exit();
+
+	/*
+	 * If nothing else caught this, we'll just do an internal free.
+	 */
+	zone_free_item(zone, item, NULL, SKIP_NONE);
+}
+
+/* See uma.h */
+void
 uma_zfree_arg(uma_zone_t zone, void *item, void *udata)
 {
 	uma_cache_t cache;
@@ -3658,25 +3907,17 @@ uma_zfree_arg(uma_zone_t zone, void *item, void *udata)
 	/* Enable entropy collection for RANDOM_ENABLE_UMA kernel option */
 	random_harvest_fast_uma(&zone, sizeof(zone), RANDOM_UMA);
 
-	CTR2(KTR_UMA, "uma_zfree_arg thread %x zone %s", curthread,
-	    zone->uz_name);
+	CTR2(KTR_UMA, "uma_zfree_arg zone %s(%p)", zone->uz_name, zone);
 
-	KASSERT(curthread->td_critnest == 0 || SCHEDULER_STOPPED(),
-	    ("uma_zfree_arg: called with spinlock or critical section held"));
-
+#ifdef UMA_ZALLOC_DEBUG
+	KASSERT((zone->uz_flags & UMA_ZONE_SMR) == 0,
+	    ("uma_zfree_arg: called with SMR zone.\n"));
+	if (uma_zfree_debug(zone, item, udata) == EJUSTRETURN)
+		return;
+#endif
         /* uma_zfree(..., NULL) does nothing, to match free(9). */
         if (item == NULL)
                 return;
-#ifdef DEBUG_MEMGUARD
-	if (is_memguard_addr(item)) {
-		if (zone->uz_dtor != NULL)
-			zone->uz_dtor(item, zone->uz_size, udata);
-		if (zone->uz_fini != NULL)
-			zone->uz_fini(item, zone->uz_size);
-		memguard_free(item);
-		return;
-	}
-#endif
 
 	/*
 	 * We are accessing the per-cpu cache without a critical section to
@@ -3685,8 +3926,8 @@ uma_zfree_arg(uma_zone_t zone, void *item, void *udata)
 	 */
 	cache = &zone->uz_cpu[curcpu];
 	uz_flags = cache_uz_flags(cache);
-	if (__predict_false((uz_flags & UMA_ZFLAG_CTORDTOR) != 0 ||
-	    UMA_ALWAYS_CTORDTOR))
+	if (UMA_ALWAYS_CTORDTOR ||
+	    __predict_false((uz_flags & UMA_ZFLAG_CTORDTOR) != 0))
 		item_dtor(zone, item, cache_uz_size(cache), udata, SKIP_NONE);
 
 	/*
@@ -3717,6 +3958,13 @@ uma_zfree_arg(uma_zone_t zone, void *item, void *udata)
 	critical_enter();
 	do {
 		cache = &zone->uz_cpu[curcpu];
+		/*
+		 * Try to free into the allocbucket first to give LIFO
+		 * ordering for cache-hot datastructures.  Spill over
+		 * into the freebucket if necessary.  Alloc will swap
+		 * them if one runs dry.
+		 */
+		bucket = &cache->uc_allocbucket;
 #ifdef NUMA
 		domain = PCPU_GET(domain);
 		if ((uz_flags & UMA_ZONE_FIRSTTOUCH) != 0 &&
@@ -3724,18 +3972,8 @@ uma_zfree_arg(uma_zone_t zone, void *item, void *udata)
 			bucket = &cache->uc_crossbucket;
 		} else
 #endif
-		{
-			/*
-			 * Try to free into the allocbucket first to give LIFO
-			 * ordering for cache-hot datastructures.  Spill over
-			 * into the freebucket if necessary.  Alloc will swap
-			 * them if one runs dry.
-			 */
-			bucket = &cache->uc_allocbucket;
-			if (__predict_false(bucket->ucb_cnt >=
-			    bucket->ucb_entries))
-				bucket = &cache->uc_freebucket;
-		}
+		if (bucket->ucb_cnt >= bucket->ucb_entries)
+			bucket = &cache->uc_freebucket;
 		if (__predict_true(bucket->ucb_cnt < bucket->ucb_entries)) {
 			cache_bucket_push(cache, bucket, item);
 			critical_exit();
@@ -3769,7 +4007,7 @@ zone_free_cross(uma_zone_t zone, uma_bucket_t bucket, void *udata)
 	    "uma_zfree: zone %s(%p) draining cross bucket %p",
 	    zone->uz_name, zone, bucket);
 
-	TAILQ_INIT(&fullbuckets);
+	STAILQ_INIT(&fullbuckets);
 
 	/*
 	 * To avoid having ndomain * ndomain buckets for sorting we have a
@@ -3788,17 +4026,19 @@ zone_free_cross(uma_zone_t zone, uma_bucket_t bucket, void *udata)
 		}
 		zdom->uzd_cross->ub_bucket[zdom->uzd_cross->ub_cnt++] = item;
 		if (zdom->uzd_cross->ub_cnt == zdom->uzd_cross->ub_entries) {
-			TAILQ_INSERT_HEAD(&fullbuckets, zdom->uzd_cross,
+			STAILQ_INSERT_HEAD(&fullbuckets, zdom->uzd_cross,
 			    ub_link);
 			zdom->uzd_cross = NULL;
 		}
 		bucket->ub_cnt--;
 	}
 	ZONE_CROSS_UNLOCK(zone);
-	if (!TAILQ_EMPTY(&fullbuckets)) {
+	if (!STAILQ_EMPTY(&fullbuckets)) {
 		ZONE_LOCK(zone);
-		while ((b = TAILQ_FIRST(&fullbuckets)) != NULL) {
-			TAILQ_REMOVE(&fullbuckets, b, ub_link);
+		while ((b = STAILQ_FIRST(&fullbuckets)) != NULL) {
+			if ((zone->uz_flags & UMA_ZONE_SMR) != 0)
+				bucket->ub_seq = smr_current(zone->uz_smr);
+			STAILQ_REMOVE_HEAD(&fullbuckets, ub_link);
 			if (zone->uz_bkt_count >= zone->uz_bkt_max) {
 				ZONE_UNLOCK(zone);
 				bucket_drain(zone, b);
@@ -3816,6 +4056,7 @@ zone_free_cross(uma_zone_t zone, uma_bucket_t bucket, void *udata)
 	}
 	if (bucket->ub_cnt != 0)
 		bucket_drain(zone, bucket);
+	bucket->ub_seq = SMR_SEQ_INVALID;
 	bucket_free(zone, bucket, udata);
 }
 #endif
@@ -3882,15 +4123,16 @@ cache_free(uma_zone_t zone, uma_cache_t cache, void *udata, void *item,
     int itemdomain)
 {
 	uma_cache_bucket_t cbucket;
-	uma_bucket_t bucket;
+	uma_bucket_t newbucket, bucket;
 	int domain;
 
 	CRITICAL_ASSERT(curthread);
 
-	if (zone->uz_bucket_size == 0 || bucketdisable)
+	if (zone->uz_bucket_size == 0)
 		return false;
 
 	cache = &zone->uz_cpu[curcpu];
+	newbucket = NULL;
 
 	/*
 	 * FIRSTTOUCH domains need to free to the correct zdom.  When
@@ -3915,14 +4157,29 @@ cache_free(uma_zone_t zone, uma_cache_t cache, void *udata, void *item,
 	/* We are no longer associated with this CPU. */
 	critical_exit();
 
+	/*
+	 * Don't let SMR zones operate without a free bucket.  Force
+	 * a synchronize and re-use this one.  We will only degrade
+	 * to a synchronize every bucket_size items rather than every
+	 * item if we fail to allocate a bucket.
+	 */
+	if ((zone->uz_flags & UMA_ZONE_SMR) != 0) {
+		if (bucket != NULL)
+			bucket->ub_seq = smr_advance(zone->uz_smr);
+		newbucket = bucket_alloc(zone, udata, M_NOWAIT);
+		if (newbucket == NULL && bucket != NULL) {
+			bucket_drain(zone, bucket);
+			newbucket = bucket;
+			bucket = NULL;
+		}
+	} else if (!bucketdisable)
+		newbucket = bucket_alloc(zone, udata, M_NOWAIT);
+
 	if (bucket != NULL)
 		zone_free_bucket(zone, bucket, udata, domain, itemdomain);
 
-	bucket = bucket_alloc(zone, udata, M_NOWAIT);
-	CTR3(KTR_UMA, "uma_zfree: zone %s(%p) allocated bucket %p",
-	    zone->uz_name, zone, bucket);
 	critical_enter();
-	if (bucket == NULL)
+	if ((bucket = newbucket) == NULL)
 		return (false);
 	cache = &zone->uz_cpu[curcpu];
 #ifdef NUMA
@@ -3960,8 +4217,7 @@ uma_zfree_domain(uma_zone_t zone, void *item, void *udata)
 	/* Enable entropy collection for RANDOM_ENABLE_UMA kernel option */
 	random_harvest_fast_uma(&zone, sizeof(zone), RANDOM_UMA);
 
-	CTR2(KTR_UMA, "uma_zfree_domain thread %x zone %s", curthread,
-	    zone->uz_name);
+	CTR2(KTR_UMA, "uma_zfree_domain zone %s(%p)", zone->uz_name, zone);
 
 	KASSERT(curthread->td_critnest == 0 || SCHEDULER_STOPPED(),
 	    ("uma_zfree_domain: called with spinlock or critical section held"));
@@ -3977,7 +4233,7 @@ slab_free_item(uma_zone_t zone, uma_slab_t slab, void *item)
 {
 	uma_keg_t keg;
 	uma_domain_t dom;
-	uint8_t freei;
+	int freei;
 
 	keg = zone->uz_keg;
 	KEG_LOCK_ASSERT(keg, slab->us_domain);
@@ -4051,6 +4307,15 @@ zone_release(void *arg, void **bucket, int cnt)
 static void
 zone_free_item(uma_zone_t zone, void *item, void *udata, enum zfreeskip skip)
 {
+
+	/*
+	 * If a free is sent directly to an SMR zone we have to
+	 * synchronize immediately because the item can instantly
+	 * be reallocated. This should only happen in degenerate
+	 * cases when no memory is available for per-cpu caches.
+	 */
+	if ((zone->uz_flags & UMA_ZONE_SMR) != 0 && skip == SKIP_NONE)
+		smr_synchronize(zone->uz_smr);
 
 	item_dtor(zone, item, zone->uz_size, udata, skip);
 
@@ -4278,6 +4543,25 @@ uma_zone_set_allocf(uma_zone_t zone, uma_alloc allocf)
 
 /* See uma.h */
 void
+uma_zone_set_smr(uma_zone_t zone, smr_t smr)
+{
+
+	ZONE_ASSERT_COLD(zone);
+
+	zone->uz_flags |= UMA_ZONE_SMR;
+	zone->uz_smr = smr;
+	zone_update_caches(zone);
+}
+
+smr_t
+uma_zone_get_smr(uma_zone_t zone)
+{
+
+	return (zone->uz_smr);
+}
+
+/* See uma.h */
+void
 uma_zone_reserve(uma_zone_t zone, int items)
 {
 	uma_keg_t keg;
@@ -4393,7 +4677,8 @@ uma_reclaim(int req)
 	 * we visit again so that we can free pages that are empty once other
 	 * zones are drained.  We have to do the same for buckets.
 	 */
-	zone_drain(slabzone, NULL);
+	zone_drain(slabzones[0], NULL);
+	zone_drain(slabzones[1], NULL);
 	bucket_zone_drain();
 	sx_xunlock(&uma_reclaim_lock);
 }
@@ -4765,7 +5050,7 @@ sysctl_handle_uma_slab_efficiency(SYSCTL_HANDLER_ARGS)
 
 	total = keg->uk_ppera * PAGE_SIZE;
 	if ((keg->uk_flags & UMA_ZFLAG_OFFPAGE) != 0)
-		total += slab_sizeof(SLAB_MAX_SETSIZE);
+		total += slabzone(keg->uk_ipers)->uz_keg->uk_rsize;
 	/*
 	 * We consider the client's requested size and alignment here, not the
 	 * real size determination uk_rsize, because we also adjust the real

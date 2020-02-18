@@ -34,12 +34,11 @@ WANT_CHERI?=	pure
 .endif
 .endif
 
-.if (${MACHINE_ARCH:Mmips64*} && ! ${MACHINE_ARCH:Mmips*c*}) || \
-    defined(LIBCHERI)
+.if ${MACHINE_ARCH:Mmips*} && (!${MACHINE_ARCH:Mmips*c*} || defined(COMPAT_CHERI))
 .if !${.TARGETS:Mbuild-tools} && !defined(BOOTSTRAPPING)
 .if defined(NEED_CHERI)
 .if ${MK_CHERI} == "no"
-.error NEED_CHERI defined, but CHERI is not enabled
+.error NEED_CHERI defined, but CHERI is not enabled (MACHINE_ARCH=${MACHINE_ARCH})
 .endif
 .if ${NEED_CHERI} != "hybrid" && ${NEED_CHERI} != "pure" && ${NEED_CHERI} != "sandbox"
 .error NEED_CHERI must be 'hybrid', 'pure', or 'sandbox'
@@ -76,7 +75,7 @@ CFLAGS+=	-mstack-alignment=16
 .if ${MK_CHERI} != "no" && defined(WANT_CHERI) && ${WANT_CHERI} != "none"
 _CHERI_COMMON_FLAGS=	-integrated-as --target=cheri-unknown-freebsd \
 			-msoft-float \
-			-cheri-uintcap=${CHERI_UINTCAP_MODE:Uoffset}
+			-cheri-uintcap=${CHERI_UINTCAP_MODE:Uaddr}
 .ifdef WANT_AFL_FUZZ
 # Build binaries static when fuzzing
 .if defined(__BSD_PROG_MK)

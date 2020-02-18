@@ -34,6 +34,8 @@
  * SUCH DAMAGE.
  */
 
+#define EXPLICIT_USER_ACCESS 1
+
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
@@ -96,7 +98,7 @@ freebsd64_sigaction(struct thread *td, struct freebsd64_sigaction_args *uap)
 	actp = (uap->act != NULL) ? &act : NULL;
 	oactp = (uap->oact != NULL) ? &oact : NULL;
 	if (actp) {
-		error = copyin(uap->act, &act64, sizeof(act64));
+		error = copyin(__USER_CAP_OBJ(uap->act), &act64, sizeof(act64));
 		if (error)
 			return (error);
 		if (is_magic_sighandler_constant(act64.sa_u))
@@ -112,7 +114,8 @@ freebsd64_sigaction(struct thread *td, struct freebsd64_sigaction_args *uap)
 		oact64.sa_u = (__cheri_addr vaddr_t)oactp->sa_handler;
 		oact64.sa_flags = oactp->sa_flags;
 		oact64.sa_mask = oactp->sa_mask;
-		error = copyout(&oact64, uap->oact, sizeof(oact64));
+		error = copyout(&oact64, __USER_CAP_OBJ(uap->oact),
+		    sizeof(oact64));
 	}
 	return (error);
 }
@@ -197,7 +200,7 @@ freebsd64_sigaltstack(struct thread *td,
 	int error;
 
 	if (uap->ss != NULL) {
-		error = copyin(uap->ss, &ss64, sizeof(ss64));
+		error = copyin(__USER_CAP_OBJ(uap->ss), &ss64, sizeof(ss64));
 		if (error != 0)
 			return (error);
 		ss.ss_sp = __USER_CAP_UNBOUND(ss64.ss_sp);
@@ -213,7 +216,7 @@ freebsd64_sigaltstack(struct thread *td,
 		ss64.ss_sp = (__cheri_addr uint64_t)oss.ss_sp;
 		ss64.ss_size = oss.ss_size;
 		ss64.ss_flags = oss.ss_flags;
-		error = copyout(&ss64, uap->oss, sizeof(ss64));
+		error = copyout(&ss64, __USER_CAP_OBJ(uap->oss), sizeof(ss64));
 	}
 	return (error);
 }

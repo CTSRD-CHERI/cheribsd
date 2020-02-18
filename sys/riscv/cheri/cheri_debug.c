@@ -55,6 +55,23 @@ db_print_cap(const char* msg, void * __capability cap)
 	    _CHERI_PRINTF_CAP_ARG(cap));
 }
 
+static const char *scr_names[] = {
+	[0] = "pcc",
+	[1] = "ddc",
+	[4] = "utcc",
+	[5] = "utdc",
+	[6] = "uscratchc",
+	[7] = "uepcc",
+	[12] = "stcc",
+	[13] = "stdc",
+	[14] = "sscratchc",
+	[15] = "sepcc",
+	[28] = "mtcc",
+	[29] = "mtdc",
+	[30] = "mscratchc",
+	[31] = "mepcc"
+};
+
 /*
  * Show the special capability registers that aren't GPRs.
  */
@@ -71,8 +88,9 @@ DB_SHOW_COMMAND(scr, ddb_dump_scr)
 	    cause);
 	if (cap_idx < 32)
 		db_printf("reg: c%d ", cap_idx);
-	else if (cap_idx == 255)
-		db_printf("reg: pcc ");
+	else if (cap_idx - 32 < nitems(scr_names) &&
+	    scr_names[cap_idx - 32] != NULL)
+		db_printf("reg: %s ", scr_names[cap_idx - 32]);
 	else
 		db_printf("reg: invalid (%d) ", cap_idx);
 	db_printf("(%s)\n", cheri_exccode_string(cause));

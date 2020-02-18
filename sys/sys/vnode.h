@@ -147,7 +147,8 @@ struct vnode {
 	/*
 	 * The machinery of being a vnode
 	 */
-	TAILQ_ENTRY(vnode) v_actfreelist;	/* l vnode active/free lists */
+	TAILQ_ENTRY(vnode) v_vnodelist;		/* l vnode lists */
+	TAILQ_ENTRY(vnode) v_lazylist;		/* l vnode lazy list */
 	struct bufobj	v_bufobj;		/* * Buffer cache object */
 
 	/*
@@ -170,7 +171,8 @@ struct vnode {
 	u_int	v_usecount;			/* I ref count of users */
 	u_int	v_iflag;			/* i vnode flags (see below) */
 	u_int	v_vflag;			/* v vnode flags */
-	u_int	v_mflag;			/* l mnt-specific vnode flags */
+	u_short	v_mflag;			/* l mnt-specific vnode flags */
+	short	v_dbatchcpu;			/* i LRU requeue deferral batch */
 	int	v_writecount;			/* I ref count of writers or
 						   (negative) text users */
 	u_int	v_hash;
@@ -238,8 +240,6 @@ struct xvnode {
 
 #define	VI_TEXT_REF	0x0001	/* Text ref grabbed use ref */
 #define	VI_MOUNT	0x0020	/* Mount in progress */
-#define	VI_FREE		0x0100	/* This vnode is on the freelist */
-#define	VI_ACTIVE	0x0200	/* This vnode is on the active list */
 #define	VI_DOINGINACT	0x0800	/* VOP_INACTIVE is in progress */
 #define	VI_OWEINACT	0x1000	/* Need to call inactive */
 #define	VI_DEFINACT	0x2000	/* deferred inactive */
@@ -259,7 +259,7 @@ struct xvnode {
 #define	VV_FORCEINSMQ	0x1000	/* force the insmntque to succeed */
 #define	VV_READLINK	0x2000	/* fdescfs linux vnode */
 
-#define	VMP_TMPMNTFREELIST	0x0001	/* Vnode is on mnt's tmp free list */
+#define	VMP_LAZYLIST	0x0001	/* Vnode is on mnt's lazy list */
 
 /*
  * Vnode attributes.  A field value of VNOVAL represents a field whose value
@@ -434,7 +434,7 @@ extern int		vttoif_tab[];
  */
 extern	struct vnode *rootvnode;	/* root (i.e. "/") vnode */
 extern	struct mount *rootdevmp;	/* "/dev" mount */
-extern	int desiredvnodes;		/* number of vnodes desired */
+extern	u_long desiredvnodes;		/* number of vnodes desired */
 extern	struct uma_zone *namei_zone;
 extern	struct vattr va_null;		/* predefined null vattr structure */
 
@@ -463,8 +463,6 @@ extern	struct vattr va_null;		/* predefined null vattr structure */
 #define	VDESC_VP1_WILLRELE	0x0002
 #define	VDESC_VP2_WILLRELE	0x0004
 #define	VDESC_VP3_WILLRELE	0x0008
-#define	VDESC_NOMAP_VPP		0x0100
-#define	VDESC_VPP_WILLRELE	0x0200
 
 /*
  * A generic structure.
@@ -607,7 +605,7 @@ typedef int (*vn_get_ino_t)(struct mount *, void *, int, struct vnode **);
 int	bnoreuselist(struct bufv *bufv, struct bufobj *bo, daddr_t startn,
 	    daddr_t endn);
 /* cache_* may belong in namei.h. */
-void	cache_changesize(int newhashsize);
+void	cache_changesize(u_long newhashsize);
 #define	cache_enter(dvp, vp, cnp)					\
 	cache_enter_time(dvp, vp, cnp, NULL, NULL)
 void	cache_enter_time(struct vnode *dvp, struct vnode *vp,
@@ -624,7 +622,7 @@ void	freebsd11_cvtnstat(struct stat *sb, struct nstat *nsb);
 int	freebsd11_cvtstat(struct stat *st, struct freebsd11_stat *ost);
 int	getnewvnode(const char *tag, struct mount *mp, struct vop_vector *vops,
 	    struct vnode **vpp);
-void	getnewvnode_reserve(u_int count);
+void	getnewvnode_reserve(void);
 void	getnewvnode_drop_reserve(void);
 int	insmntque1(struct vnode *vp, struct mount *mp,
 	    void (*dtr)(struct vnode *, void *), void *dtr_arg);
@@ -632,7 +630,8 @@ int	insmntque(struct vnode *vp, struct mount *mp);
 u_quad_t init_va_filerev(void);
 int	speedup_syncer(void);
 int	vn_vptocnp(struct vnode **vp, struct ucred *cred, char *buf,
-	    u_int *buflen);
+	    size_t *buflen);
+int	vn_getcwd(struct thread *td, char *buf, char **retbuf, size_t *buflen);
 int	vn_fullpath(struct thread *td, struct vnode *vn,
 	    char **retbuf, char **freebuf);
 int	vn_fullpath_global(struct thread *td, struct vnode *vn,
@@ -653,6 +652,7 @@ int	vaccess_acl_posix1e(enum vtype type, uid_t file_uid,
 	    struct ucred *cred, int *privused);
 void	vattr_null(struct vattr *vap);
 int	vcount(struct vnode *vp);
+void	vlazy(struct vnode *);
 void	vdrop(struct vnode *);
 void	vdropl(struct vnode *);
 int	vflush(struct mount *mp, int rootrefs, int flags, struct thread *td);
@@ -824,7 +824,6 @@ void	vop_strategy_pre(void *a);
 void	vop_lock_pre(void *a);
 void	vop_lock_post(void *a, int rc);
 void	vop_unlock_pre(void *a);
-void	vop_unlock_post(void *a, int rc);
 void	vop_need_inactive_pre(void *a);
 void	vop_need_inactive_post(void *a, int rc);
 #else
@@ -832,7 +831,6 @@ void	vop_need_inactive_post(void *a, int rc);
 #define	vop_lock_pre(x)		do { } while (0)
 #define	vop_lock_post(x, y)	do { } while (0)
 #define	vop_unlock_pre(x)	do { } while (0)
-#define	vop_unlock_post(x, y)	do { } while (0)
 #define	vop_need_inactive_pre(x)	do { } while (0)
 #define	vop_need_inactive_post(x, y)	do { } while (0)
 #endif
@@ -900,6 +898,7 @@ void	vrele(struct vnode *vp);
 void	vref(struct vnode *vp);
 void	vrefl(struct vnode *vp);
 void	vrefact(struct vnode *vp);
+void	vrefactn(struct vnode *vp, u_int n);
 int	vrefcnt(struct vnode *vp);
 void 	v_addpollinfo(struct vnode *vp);
 
@@ -924,7 +923,7 @@ int	fifo_printinfo(struct vnode *);
 /* vfs_hash.c */
 typedef int vfs_hash_cmp_t(struct vnode *vp, void *arg);
 
-void vfs_hash_changesize(int newhashsize);
+void vfs_hash_changesize(u_long newhashsize);
 int vfs_hash_get(const struct mount *mp, u_int hash, int flags,
     struct thread *td, struct vnode **vpp, vfs_hash_cmp_t *fn, void *arg);
 u_int vfs_hash_index(struct vnode *vp);
@@ -936,7 +935,6 @@ void vfs_hash_rehash(struct vnode *vp, u_int hash);
 void vfs_hash_remove(struct vnode *vp);
 
 int vfs_kqfilter(struct vop_kqfilter_args *);
-void vfs_mark_atime(struct vnode *vp, struct ucred *cred);
 struct dirent;
 int vfs_read_dirent(struct vop_readdir_args *ap, struct dirent *dp, off_t off);
 int vfs_emptydir(struct vnode *vp);
@@ -954,6 +952,8 @@ int vn_chown(struct file *fp, uid_t uid, gid_t gid, struct ucred *active_cred,
     struct thread *td);
 
 void vn_fsid(struct vnode *vp, struct vattr *va);
+
+int vn_dir_check_exec(struct vnode *vp, struct componentname *cnp);
 
 #define VOP_UNLOCK_FLAGS(vp, flags)	({				\
 	struct vnode *_vp = (vp);					\

@@ -23,6 +23,10 @@
 /* For uint32_t and uint64_t */
 #include <stdint.h>
 
+#ifdef __CHERI_PURE_CAPABILITY__
+#error "Should not be used!"
+#endif
+
 /**
  * ARM-specific unwind definitions.  These are taken from the ARM EHABI
  * specification.

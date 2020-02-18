@@ -997,7 +997,7 @@ interpret:
 	/* Set values passed into the program in registers. */
 	(*p->p_sysent->sv_setregs)(td, imgp, stack_base);
 
-	vfs_mark_atime(imgp->vp, td->td_ucred);
+	VOP_MMAPPED(imgp->vp);
 
 	SDT_PROBE1(proc, , , exec__success, args->fname);
 
@@ -1740,8 +1740,6 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	size_t ssiz;
 #endif
 	char * __capability destp, * __capability ustringp;
-	/* XXX: Temporary */
-	uintptr_t uptr, uptr_old;
 	struct ps_strings * __capability arginfo;
 	struct proc *p;
 	size_t execpath_len, len;
@@ -1868,9 +1866,7 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 #endif
 
 	if (imgp->sysent->sv_stackgap != NULL) {
-		uptr_old = uptr = (__cheri_addr uintptr_t)destp;
-		imgp->sysent->sv_stackgap(imgp, &uptr);
-		destp -= (uptr_old - uptr);
+		imgp->sysent->sv_stackgap(imgp, (uintcap_t *)&destp);
 	}
 
 	if (imgp->auxargs) {

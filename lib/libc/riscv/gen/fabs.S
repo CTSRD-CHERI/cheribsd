@@ -38,6 +38,10 @@ __FBSDID("$FreeBSD$");
 #ifdef __riscv_float_abi_double
 ENTRY(fabs)
 	fabs.d	fa0, fa0
+#ifdef __CHERI_PURE_CAPABILITY__
+	cret
+#else
 	ret
+#endif
 END(fabs)
 #endif

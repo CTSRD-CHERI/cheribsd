@@ -13,8 +13,6 @@ INCSDIR=	${INCLUDEDIR}/cheri
 
 NEED_CHERI?=hybrid
 
-.ifndef LIBCHERI
 SUBDIR=	compartment
-.endif
 
 .include <bsd.lib.mk>

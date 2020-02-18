@@ -5,7 +5,9 @@
 .include <bsd.init.mk>
 .include <bsd.compiler.mk>
 .include <bsd.linker.mk>
-
+.if defined(_CRUNCHGEN)
+.include <bsd.compat.mk>
+.endif
 .include <bsd.cheri.mk>
 
 .if defined(LIB_CXX) || defined(SHLIB_CXX)
@@ -318,10 +320,6 @@ CLEANFILES+=	${SOBJS}
 .if defined(SHLIB_NAME)
 _LIBS+=		${SHLIB_NAME_INSTALL}
 
-.if ${CFLAGS:M-fexceptions} || defined(SHLIB_CXX) || defined(LIB_CXX)
-ALLOW_MIPS_SHARED_TEXTREL=
-.endif
-
 SOLINKOPTS+=	-shared -Wl,-x
 .if !defined(ALLOW_SHARED_TEXTREL)
 .if defined(LD_FATAL_WARNINGS) && ${LD_FATAL_WARNINGS} == "no"
@@ -331,15 +329,6 @@ SOLINKOPTS+=	-Wl,--fatal-warnings
 .endif
 SOLINKOPTS+=	-Wl,--warn-shared-textrel
 .elif ${ALLOW_SHARED_TEXTREL} != "no"
-SOLINKOPTS+=	-Wl,-z,notext
-.endif
-
-.if defined(ALLOW_MIPS_SHARED_TEXTREL) && ${MACHINE_CPUARCH:Mmips} && !${MACHINE_ARCH:Mmips*c*}
-# Check if we should be defining ALLOW_SHARED_TEXTREL... basically, C++
-# or -fexceptions in CFLAGS on MIPS.  This works around clang/lld attempting
-# to generate text relocations in read-only .eh_frame.  A future version of
-# clang/lld should instead transform them into relative references at link
-# time, and then we can stop doing this.
 SOLINKOPTS+=	-Wl,-z,notext
 .endif
 
@@ -486,7 +475,7 @@ _libinstall:
 	    ${_INSTALLFLAGS} lib${LIB_PRIVATE}${LIB}.a ${DESTDIR}${_LIBDIR}/
 .endif
 .if ${MK_PROFILE} != "no" && defined(LIB) && !empty(LIB)
-	${INSTALL} ${TAG_ARGS:D${TAG_ARGS},profile} -C -o ${LIBOWN} -g ${LIBGRP} -m ${LIBMODE} \
+	${INSTALL} ${TAG_ARGS:D${TAG_ARGS},development} -C -o ${LIBOWN} -g ${LIBGRP} -m ${LIBMODE} \
 	    ${_INSTALLFLAGS} lib${LIB_PRIVATE}${LIB}_p.a ${DESTDIR}${_LIBDIR}/
 .endif
 .if defined(SHLIB_NAME)

@@ -125,7 +125,7 @@ CFLAGS.gcc.ioctl.c+= -Wno-redundant-decls
 
 CFLAGS.gcc+=	${CFLAGS.gcc.${.IMPSRC}}
 
-.if ${MACHINE_ARCH:Mmips*c*}
+.if ${MACHINE_ABI:Mpurecap}
 # Work around packed struct in cissio.h
 CFLAGS.ioctl.c+=	-Wno-error-cheri-capability-misuse
 .endif

@@ -166,14 +166,12 @@
 #define	UMA_ZFLAG_BUCKET	0x10000000	/* Bucket zone. */
 #define	UMA_ZFLAG_INTERNAL	0x20000000	/* No offpage no PCPU. */
 #define	UMA_ZFLAG_TRASH		0x40000000	/* Add trash ctor/dtor. */
-#define	UMA_ZFLAG_CACHEONLY	0x80000000	/* Don't ask VM for buckets. */
 
 #define	UMA_ZFLAG_INHERIT						\
     (UMA_ZFLAG_OFFPAGE | UMA_ZFLAG_HASH | UMA_ZFLAG_VTOSLAB |		\
-     UMA_ZFLAG_BUCKET | UMA_ZFLAG_INTERNAL | UMA_ZFLAG_CACHEONLY)
+     UMA_ZFLAG_BUCKET | UMA_ZFLAG_INTERNAL)
 
 #define	PRINT_UMA_ZFLAGS	"\20"	\
-    "\40CACHEONLY"			\
     "\37TRASH"				\
     "\36INTERNAL"			\
     "\35BUCKET"				\
@@ -184,6 +182,7 @@
     "\30VTOSLAB"			\
     "\27HASH"				\
     "\26OFFPAGE"			\
+    "\23SMR"				\
     "\22ROUNDROBIN"			\
     "\21FIRSTTOUCH"			\
     "\20PCPU"				\
@@ -199,6 +198,7 @@
     "\6NOFREE"				\
     "\5MALLOC"				\
     "\4NOTOUCH"				\
+    "\3CONTIG"				\
     "\2ZINIT"
 
 /*
@@ -213,10 +213,10 @@
 
 #define UMA_HASH_INSERT(h, s, mem)					\
 	LIST_INSERT_HEAD(&(h)->uh_slab_hash[UMA_HASH((h),		\
-	    (mem))], (uma_hash_slab_t)(s), uhs_hlink)
+	    (mem))], slab_tohashslab(s), uhs_hlink)
 
 #define UMA_HASH_REMOVE(h, s)						\
-	LIST_REMOVE((uma_hash_slab_t)(s), uhs_hlink)
+	LIST_REMOVE(slab_tohashslab(s), uhs_hlink)
 
 LIST_HEAD(slabhashhead, uma_hash_slab);
 
@@ -244,10 +244,11 @@ struct uma_hash {
  * for use.
  */
 struct uma_bucket {
-	TAILQ_ENTRY(uma_bucket)	ub_link;	/* Link into the zone */
-	int16_t	ub_cnt;				/* Count of items in bucket. */
-	int16_t	ub_entries;			/* Max items. */
-	void	*ub_bucket[];			/* actual allocation storage */
+	STAILQ_ENTRY(uma_bucket)	ub_link; /* Link into the zone */
+	int16_t		ub_cnt;			/* Count of items in bucket. */
+	int16_t		ub_entries;		/* Max items. */
+	smr_seq_t	ub_seq;			/* SMR sequence number. */
+	void		*ub_bucket[];		/* actual allocation storage */
 };
 
 typedef struct uma_bucket * uma_bucket_t;
@@ -351,7 +352,6 @@ struct uma_keg {
 
 	u_long		uk_offset;	/* Next free offset from base KVA */
 	vm_offset_t	uk_kva;		/* Zone base KVA */
-	uma_zone_t	uk_slabzone;	/* Slab zone backing us, if OFFPAGE */
 
 	uint32_t	uk_pgoff;	/* Offset to uma_slab struct */
 	uint16_t	uk_ppera;	/* pages per allocation from backend */
@@ -377,7 +377,6 @@ typedef struct uma_keg	* uma_keg_t;
  */
 #define	SLAB_MAX_SETSIZE	(PAGE_SIZE / UMA_SMALLEST_UNIT)
 #define	SLAB_MIN_SETSIZE	_BITSET_BITS
-BITSET_DEFINE(slabbits, SLAB_MAX_SETSIZE);
 BITSET_DEFINE(noslabbits, 0);
 
 /*
@@ -419,16 +418,19 @@ int slab_ipers(size_t size, int align);
  * HASH and OFFPAGE zones.
  */
 struct uma_hash_slab {
-	struct uma_slab		uhs_slab;	/* Must be first. */
-	struct slabbits		uhs_bits1;	/* Must be second. */
-#ifdef INVARIANTS
-	struct slabbits		uhs_bits2;	/* Must be third. */
-#endif
 	LIST_ENTRY(uma_hash_slab) uhs_hlink;	/* Link for hash table */
 	uint8_t			*uhs_data;	/* First item */
+	struct uma_slab		uhs_slab;	/* Must be last. */
 };
 
 typedef struct uma_hash_slab * uma_hash_slab_t;
+
+static inline uma_hash_slab_t
+slab_tohashslab(uma_slab_t slab)
+{
+
+	return (__containerof(slab, struct uma_hash_slab, uhs_slab));
+}
 
 static inline void *
 slab_data(uma_slab_t slab, uma_keg_t keg)
@@ -437,7 +439,7 @@ slab_data(uma_slab_t slab, uma_keg_t keg)
 	if ((keg->uk_flags & UMA_ZFLAG_OFFPAGE) == 0)
 		return ((void *)((uintptr_t)slab - keg->uk_pgoff));
 	else
-		return (((uma_hash_slab_t)slab)->uhs_data);
+		return (slab_tohashslab(slab)->uhs_data);
 }
 
 static inline void *
@@ -459,7 +461,7 @@ slab_item_index(uma_slab_t slab, uma_keg_t keg, void *item)
 }
 #endif /* _KERNEL */
 
-TAILQ_HEAD(uma_bucketlist, uma_bucket);
+STAILQ_HEAD(uma_bucketlist, uma_bucket);
 
 struct uma_zone_domain {
 	struct uma_bucketlist uzd_buckets; /* full buckets */
@@ -483,7 +485,7 @@ struct uma_zone {
 	uint32_t	uz_size;	/* Size inherited from kegs */
 	uma_ctor	uz_ctor;	/* Constructor for each allocation */
 	uma_dtor	uz_dtor;	/* Destructor */
-	uint64_t	uz_spare0;
+	smr_t		uz_smr;		/* Safe memory reclaim context. */
 	uint64_t	uz_max_items;	/* Maximum number of items to alloc */
 	uint32_t	uz_sleepers;	/* Threads sleeping on limit */
 	uint16_t	uz_bucket_size;	/* Number of items in full bucket */

@@ -668,6 +668,8 @@ rpc_marshal_func(char *buffer, size_t *buffer_size, void *retval, va_list ap,
 	char *p;
 	char **alias;
 
+	buffer = __builtin_assume_aligned(buffer, _Alignof(struct rpcent));
+
 	switch ((enum nss_lookup_type)cache_mdata) {
 	case nss_lt_name:
 		name = va_arg(ap, char *);
@@ -753,6 +755,8 @@ rpc_unmarshal_func(char *buffer, size_t buffer_size, void *retval, va_list ap,
 
 	char *p;
 	char **alias;
+
+	buffer = __builtin_assume_aligned(buffer, _Alignof(struct rpcent));
 
 	switch ((enum nss_lookup_type)cache_mdata) {
 	case nss_lt_name:

@@ -42,6 +42,7 @@
  * CHERI-RISC-V-specific kernel utility functions.
  */
 int	cheri_sccsr_to_sicode(register_t sccsr);
+void	hybridabi_thread_setregs(struct thread *td, unsigned long entry_addr);
 #endif
 
 #endif /* !_MACHINE_CHERI_H_ */

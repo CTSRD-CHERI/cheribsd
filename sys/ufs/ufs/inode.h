@@ -138,6 +138,40 @@ struct inode {
 	"\14b12\13is_ufs2\12truncated\11ea_lockwait\10ea_locked" \
 	"\7lazyaccess\6lazymod\5needsync\4modified\3update\2change\1access"
 
+#define UFS_INODE_FLAG_LAZY_MASK	\
+	(IN_ACCESS | IN_CHANGE | IN_MODIFIED | IN_UPDATE | IN_LAZYMOD | IN_LAZYACCESS)
+/*
+ * Some flags can persist a vnode transitioning to 0 hold count and being tkaen
+ * off the list.
+ */
+#define UFS_INODE_FLAG_LAZY_MASK_ASSERTABLE \
+	(UFS_INODE_FLAG_LAZY_MASK & ~(IN_LAZYMOD | IN_LAZYACCESS))
+
+#define UFS_INODE_SET_FLAG(ip, flags) do {			\
+	struct inode *_ip = (ip);				\
+	struct vnode *_vp = ITOV(_ip);				\
+	int _flags = (flags);					\
+								\
+	_ip->i_flag |= _flags;					\
+	if (_flags & UFS_INODE_FLAG_LAZY_MASK)			\
+		vlazy(_vp);					\
+} while (0)
+
+#define UFS_INODE_SET_FLAG_SHARED(ip, flags) do {		\
+	struct inode *_ip = (ip);				\
+	struct vnode *_vp = ITOV(_ip);				\
+	int _flags = (flags);					\
+								\
+	ASSERT_VI_UNLOCKED(_vp, __func__);			\
+	if ((_ip->i_flag & (_flags)) != _flags) {		\
+		VI_LOCK(_vp);					\
+		_ip->i_flag |= _flags;				\
+		if (_flags & UFS_INODE_FLAG_LAZY_MASK)		\
+			vlazy(_vp);				\
+		VI_UNLOCK(_vp);					\
+	}							\
+} while (0)
+
 #define	i_dirhash i_un.dirhash
 #define	i_snapblklist i_un.snapblklist
 #define	i_din1 dinode_u.din1

@@ -8,6 +8,8 @@ PACKAGE=	runtime
 
 LIBXOSRC=	${SRCTOP}/contrib/libxo
 
+.if !defined(NO_SHARED)
 SUBDIR = csv
+.endif
 
 .include <bsd.subdir.mk>

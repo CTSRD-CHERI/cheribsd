@@ -143,6 +143,8 @@ void * __capability
 void * __capability
 	 memmove_c(void * __capability __restrict,
 	    const void * __capability __restrict, size_t);
+void * __capability
+	memset_c(void * __capability, int, size_t);
 #endif
 
 int	 timingsafe_bcmp(const void *, const void *, size_t);

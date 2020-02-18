@@ -513,10 +513,8 @@ vfs_mount_alloc(struct vnode *vp, struct vfsconf *vfsp, const char *fspath,
 	    __rangeof(struct mount, mnt_startzero, mnt_endzero));
 	TAILQ_INIT(&mp->mnt_nvnodelist);
 	mp->mnt_nvnodelistsize = 0;
-	TAILQ_INIT(&mp->mnt_activevnodelist);
-	mp->mnt_activevnodelistsize = 0;
-	TAILQ_INIT(&mp->mnt_tmpfreevnodelist);
-	mp->mnt_tmpfreevnodelistsize = 0;
+	TAILQ_INIT(&mp->mnt_lazyvnodelist);
+	mp->mnt_lazyvnodelistsize = 0;
 	if (mp->mnt_ref != 0 || mp->mnt_lockref != 0 ||
 	    mp->mnt_writeopcount != 0)
 		panic("%s: non-zero counters on new mp %p\n", __func__, mp);
@@ -582,10 +580,8 @@ vfs_mount_destroy(struct mount *mp)
 	KASSERT(TAILQ_EMPTY(&mp->mnt_uppers), ("mnt_uppers"));
 	if (mp->mnt_nvnodelistsize != 0)
 		panic("vfs_mount_destroy: nonzero nvnodelistsize");
-	if (mp->mnt_activevnodelistsize != 0)
-		panic("vfs_mount_destroy: nonzero activevnodelistsize");
-	if (mp->mnt_tmpfreevnodelistsize != 0)
-		panic("vfs_mount_destroy: nonzero tmpfreevnodelistsize");
+	if (mp->mnt_lazyvnodelistsize != 0)
+		panic("vfs_mount_destroy: nonzero lazyvnodelistsize");
 	if (mp->mnt_lockref != 0)
 		panic("vfs_mount_destroy: nonzero lock refcount");
 	MNT_IUNLOCK(mp);
@@ -1282,8 +1278,7 @@ vfs_domount(
 		pathbuf = malloc(MNAMELEN, M_TEMP, M_WAITOK);
 		strcpy(pathbuf, fspath);
 		error = vn_path_to_global_path(td, vp, pathbuf, MNAMELEN);
-		/* debug.disablefullpath == 1 results in ENODEV */
-		if (error == 0 || error == ENODEV) {
+		if (error == 0) {
 			error = vfs_domount_first(td, vfsp, pathbuf, vp,
 			    fsflags, optlist);
 		}
@@ -1362,7 +1357,7 @@ kern_unmount(struct thread *td, const char * __capability path, int flags)
 			NDFREE(&nd, NDF_ONLY_PNBUF);
 			error = vn_path_to_global_path(td, nd.ni_vp, pathbuf,
 			    MNAMELEN);
-			if (error == 0 || error == ENODEV)
+			if (error == 0)
 				vput(nd.ni_vp);
 		}
 		mtx_lock(&mountlist_mtx);
@@ -1719,9 +1714,7 @@ dounmount(struct mount *mp, int flags, struct thread *td)
 	MNT_IUNLOCK(mp);
 	cache_purgevfs(mp, false); /* remove cache entries for this file sys */
 	vfs_deallocate_syncvnode(mp);
-	if ((mp->mnt_flag & MNT_RDONLY) != 0 || (flags & MNT_FORCE) != 0 ||
-	    (error = VFS_SYNC(mp, MNT_WAIT)) == 0)
-		error = VFS_UNMOUNT(mp, flags);
+	error = VFS_UNMOUNT(mp, flags);
 	vn_finished_write(mp);
 	/*
 	 * If we failed to flush the dirty blocks for this mount point,

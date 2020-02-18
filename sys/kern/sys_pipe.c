@@ -1613,7 +1613,6 @@ pipeclose(struct pipe *cpipe)
 		pipelock(cpipe, 0);
 	}
 
-
 	/*
 	 * Disconnect from peer, if any.
 	 */

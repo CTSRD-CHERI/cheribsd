@@ -1796,7 +1796,7 @@ daclose(struct disk *dp)
 	}
 
 	/*
-	 * If we've got removeable media, mark the blocksize as
+	 * If we've got removable media, mark the blocksize as
 	 * unavailable, since it could change when new media is
 	 * inserted.
 	 */
@@ -3381,6 +3381,10 @@ more:
 			}
 			break;
 		}
+		default:
+			biofinish(bp, NULL, EOPNOTSUPP);
+			xpt_release_ccb(start_ccb);
+			return;
 		}
 		start_ccb->ccb_h.ccb_state = DA_CCB_BUFFER_IO;
 		start_ccb->ccb_h.flags |= CAM_UNLOCKED;

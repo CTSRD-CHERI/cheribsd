@@ -33,6 +33,11 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  */
 extern "C" {
 #endif
 
+#ifdef __CHERI_PURE_CAPABILITY__
+#error "Should not be used!"
+#endif
+
+
 /* Minimal interface as per C++ ABI draft standard:
 
 	http://www.codesourcery.com/cxx-abi/abi-eh.html */

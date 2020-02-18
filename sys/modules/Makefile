@@ -57,7 +57,6 @@ SUBDIR=	\
 	ath_rate \
 	ath_pci \
 	${_autofs} \
-	${_auxio} \
 	${_bce} \
 	${_bcm283x_clkman} \
 	${_bcm283x_pwm} \
@@ -110,7 +109,6 @@ SUBDIR=	\
 	${_efirt} \
 	${_em} \
 	${_ena} \
-	${_epic} \
 	esp \
 	${_et} \
 	evdev \
@@ -372,7 +370,6 @@ SUBDIR=	\
 	${_vmd} \
 	${_vmm} \
 	${_vmware} \
-	${_vpo} \
 	vr \
 	vte \
 	${_wbwd} \
@@ -403,8 +400,7 @@ _autofs=	autofs
 
 .if ${MK_CDDL} != "no" || defined(ALL_MODULES)
 .if (${MACHINE_CPUARCH} != "arm" || ${MACHINE_ARCH:Marmv[67]*} != "") && \
-	${MACHINE_CPUARCH} != "mips" && \
-	${MACHINE_CPUARCH} != "sparc64"
+	${MACHINE_CPUARCH} != "mips"
 SUBDIR+=	dtrace
 .endif
 SUBDIR+=	opensolaris
@@ -567,7 +563,6 @@ _hwpmc_mips74k=	hwpmc_mips74k
 	${MACHINE_CPUARCH} != "mips" && ${MACHINE_CPUARCH} != "powerpc" && \
 	${MACHINE_CPUARCH} != "riscv"
 _syscons=	syscons
-_vpo=		vpo
 .endif
 
 .if ${MACHINE_CPUARCH} != "mips"
@@ -736,7 +731,7 @@ _vmm=		vmm
 _3dfx=		3dfx
 _3dfx_linux=	3dfx_linux
 _apm=		apm
-.if ${MK_SOURCELESS_UCODE} != "no"
+.if ${MK_SOURCELESS_HOST} != "no"
 _ce=		ce
 .endif
 .if ${MK_SOURCELESS_UCODE} != "no"
@@ -770,6 +765,7 @@ _nvd=		nvd
 _nvme=		nvme
 _pccard=	pccard
 _wi=		wi
+_virtio=	virtio
 .endif
 
 .if ${MACHINE_ARCH} == "powerpc64"
@@ -779,12 +775,6 @@ _nvram=		opal_nvram
 .if ${MACHINE_ARCH} == "powerpc64" || ${MACHINE_ARCH} == "powerpc"
 # Don't build powermac_nvram for powerpcspe, it's never supported.
 _nvram+=	powermac_nvram
-.endif
-
-.if ${MACHINE_CPUARCH} == "sparc64"
-_auxio=		auxio
-_em=		em
-_epic=		epic
 .endif
 
 .if (${MACHINE_CPUARCH} == "aarch64" || ${MACHINE_CPUARCH} == "amd64" || \

@@ -108,7 +108,6 @@ _Static_assert(sizeof(((struct ifreq *)0)->ifr_name) ==
     offsetof(struct ifreq, ifr_ifru), "gap between ifr_name and ifr_ifru");
 
 __read_mostly epoch_t net_epoch_preempt;
-__read_mostly epoch_t net_epoch;
 #ifdef COMPAT_FREEBSD32
 #include <sys/mount.h>
 #include <compat/freebsd32/freebsd32.h>
@@ -586,6 +585,8 @@ if_alloc_domain(u_char type, int numa_domain)
 #ifdef VIMAGE
 	ifp->if_vnet = curvnet;
 #endif
+	/* XXX */
+	ifp->if_flags |= IFF_NEEDSEPOCH;
 	if (if_com_alloc[type] != NULL) {
 		ifp->if_l2com = if_com_alloc[type](type, ifp);
 		if (ifp->if_l2com == NULL) {
@@ -694,7 +695,7 @@ if_free(struct ifnet *ifp)
 	IFNET_WUNLOCK();
 
 	if (refcount_release(&ifp->if_refcount))
-		epoch_call(net_epoch_preempt, &ifp->if_epoch_ctx, if_destroy);
+		NET_EPOCH_CALL(if_destroy, &ifp->if_epoch_ctx);
 	CURVNET_RESTORE();
 }
 
@@ -717,7 +718,7 @@ if_rele(struct ifnet *ifp)
 
 	if (!refcount_release(&ifp->if_refcount))
 		return;
-	epoch_call(net_epoch_preempt, &ifp->if_epoch_ctx, if_destroy);
+	NET_EPOCH_CALL(if_destroy, &ifp->if_epoch_ctx);
 }
 
 void
@@ -971,7 +972,6 @@ if_epochalloc(void *dummy __unused)
 {
 
 	net_epoch_preempt = epoch_alloc("Net preemptible", EPOCH_PREEMPT);
-	net_epoch = epoch_alloc("Net", 0);
 }
 SYSINIT(ifepochalloc, SI_SUB_EPOCH, SI_ORDER_ANY, if_epochalloc, NULL);
 
@@ -1877,7 +1877,7 @@ ifa_free(struct ifaddr *ifa)
 {
 
 	if (refcount_release(&ifa->ifa_refcnt))
-		epoch_call(net_epoch_preempt, &ifa->ifa_epoch_ctx, ifa_destroy);
+		NET_EPOCH_CALL(ifa_destroy, &ifa->ifa_epoch_ctx);
 }
 
 
@@ -1918,10 +1918,13 @@ ifa_maintain_loopback_route(int cmd, const char *otype, struct ifaddr *ifa,
 	if (rti_ifa != NULL)
 		ifa_free(rti_ifa);
 
-	if (error != 0 &&
-	    !(cmd == RTM_ADD && error == EEXIST) &&
-	    !(cmd == RTM_DELETE && error == ENOENT))
-		if_printf(ifp, "%s failed: %d\n", otype, error);
+	if (error == 0 ||
+	    (cmd == RTM_ADD && error == EEXIST) ||
+	    (cmd == RTM_DELETE && (error == ENOENT || error == ESRCH)))
+		return (error);
+
+	log(LOG_DEBUG, "%s: %s failed for interface %s: %u\n",
+		__func__, otype, if_name(ifp), error);
 
 	return (error);
 }
@@ -2015,7 +2018,7 @@ ifa_ifwithbroadaddr(const struct sockaddr *addr, int fibnum)
 	struct ifnet *ifp;
 	struct ifaddr *ifa;
 
-	MPASS(in_epoch(net_epoch_preempt));
+	NET_EPOCH_ASSERT();
 	CK_STAILQ_FOREACH(ifp, &V_ifnet, if_link) {
 		if ((fibnum != RT_ALL_FIBS) && (ifp->if_fib != fibnum))
 			continue;
@@ -2045,7 +2048,7 @@ ifa_ifwithdstaddr(const struct sockaddr *addr, int fibnum)
 	struct ifnet *ifp;
 	struct ifaddr *ifa;
 
-	MPASS(in_epoch(net_epoch_preempt));
+	NET_EPOCH_ASSERT();
 	CK_STAILQ_FOREACH(ifp, &V_ifnet, if_link) {
 		if ((ifp->if_flags & IFF_POINTOPOINT) == 0)
 			continue;
@@ -2078,7 +2081,7 @@ ifa_ifwithnet(const struct sockaddr *addr, int ignore_ptp, int fibnum)
 	u_int af = addr->sa_family;
 	const char *addr_data = addr->sa_data, *cplim;
 
-	MPASS(in_epoch(net_epoch_preempt));
+	NET_EPOCH_ASSERT();
 	/*
 	 * AF_LINK addresses can be looked up directly by their index number,
 	 * so do that if we can.
@@ -2172,7 +2175,7 @@ ifaof_ifpforaddr(const struct sockaddr *addr, struct ifnet *ifp)
 	if (af >= AF_MAX)
 		return (NULL);
 
-	MPASS(in_epoch(net_epoch_preempt));
+	NET_EPOCH_ASSERT();
 	CK_STAILQ_FOREACH(ifa, &ifp->if_addrhead, ifa_link) {
 		if (ifa->ifa_addr->sa_family != af)
 			continue;
@@ -3345,18 +3348,19 @@ struct ifconf64 {
 #define	SIOCGIFCONF64	_IOC_NEWTYPE(SIOCGIFCONF, struct ifconf64)
 #endif
 
+#if defined(COMPAT_FREEBSD32) || defined(COMPAT_FREEBSD64)
 static void
 ifmr_init(struct ifmediareq *ifmr, caddr_t data)
 {
-#ifdef COMPAT_CHERIABI
+#ifdef COMPAT_FREEBSD64
 	struct ifmediareq64 *ifmr64;
 #endif
 #ifdef COMPAT_FREEBSD32
 	struct ifmediareq32 *ifmr32;
 #endif
 
-#ifdef COMPAT_CHERIABI
-	if (SV_CURPROC_FLAG(SV_LP64) && !SV_CURPROC_FLAG(SV_CHERI)) {
+#ifdef COMPAT_FREEBSD64
+	if (SV_CURPROC_FLAG(SV_CHERI | SV_LP64) == SV_LP64) {
 		ifmr64 = (struct ifmediareq64 *)data;
 		memcpy(ifmr->ifm_name, ifmr64->ifm_name,
 		    sizeof(ifmr->ifm_name));
@@ -3368,7 +3372,7 @@ ifmr_init(struct ifmediareq *ifmr, caddr_t data)
 		ifmr->ifm_ulist =
 		    __USER_CAP(ifmr64->ifm_ulist,
 			ifmr64->ifm_count * sizeof(int));
-	} else
+	}
 #endif
 #ifdef COMPAT_FREEBSD32
 	if (SV_CURPROC_FLAG(SV_ILP32)) {
@@ -3383,30 +3387,29 @@ ifmr_init(struct ifmediareq *ifmr, caddr_t data)
 		ifmr->ifm_ulist =
 		    __USER_CAP((int *)(uintptr_t)ifmr32->ifm_ulist,
 			ifrm32->ifm_count * sizeof(int));
-	} else
+	}
 #endif
-		cheri_memcpy(ifmr, data, sizeof(struct ifmediareq));
 }
 
 static void
 ifmr_update(const struct ifmediareq *ifmr, caddr_t data)
 {
-#ifdef COMPAT_CHERIABI
+#ifdef COMPAT_FREEBSD64
 	struct ifmediareq64 *ifmr64;
 #endif
 #ifdef COMPAT_FREEBSD32
 	struct ifmediareq32 *ifmr32;
 #endif
 
-#ifdef COMPAT_CHERIABI
-	if (SV_CURPROC_FLAG(SV_LP64) && !SV_CURPROC_FLAG(SV_CHERI)) {
+#ifdef COMPAT_FREEBSD64
+	if (SV_CURPROC_FLAG(SV_CHERI | SV_LP64) == SV_LP64) {
 		ifmr64 = (struct ifmediareq64 *)data;
 		ifmr64->ifm_current = ifmr->ifm_current;
 		ifmr64->ifm_mask = ifmr->ifm_mask;
 		ifmr64->ifm_status = ifmr->ifm_status;
 		ifmr64->ifm_active = ifmr->ifm_active;
 		ifmr64->ifm_count = ifmr->ifm_count;
-	} else
+	}
 #endif
 #ifdef COMPAT_FREEBSD32
 	if (SV_CURPROC_FLAG(SV_ILP32)) {
@@ -3416,10 +3419,10 @@ ifmr_update(const struct ifmediareq *ifmr, caddr_t data)
 		ifmr32->ifm_status = ifmr->ifm_status;
 		ifmr32->ifm_active = ifmr->ifm_active;
 		ifmr32->ifm_count = ifmr->ifm_count;
-	} else
+	}
 #endif
-		cheri_memcpy(data, ifmr, sizeof(struct ifmediareq));
 }
+#endif
 
 /*
  * Interface ioctls.
@@ -3427,7 +3430,7 @@ ifmr_update(const struct ifmediareq *ifmr, caddr_t data)
 int
 ifioctl(struct socket *so, u_long cmd, caddr_t data, struct thread *td)
 {
-#if defined(COMPAT_FREEBSD32) || defined(COMPAT_CHERIABI) || defined(COMPAT_FREEBSD64)
+#if defined(COMPAT_FREEBSD32) || defined(COMPAT_FREEBSD64)
 	caddr_t saved_data = NULL;
 	struct ifmediareq ifmr;
 	struct ifmediareq *ifmrp = NULL;
@@ -3598,7 +3601,7 @@ ifioctl(struct socket *so, u_long cmd, caddr_t data, struct thread *td)
 out_ref:
 	if_rele(ifp);
 out_noref:
-#if defined(COMPAT_FREEBSD32) || defined(COMPAT_CHERIABI) || defined(COMPAT_FREEBSD64)
+#if defined(COMPAT_FREEBSD32) || defined(COMPAT_FREEBSD64)
 	if (ifmrp != NULL) {
 		KASSERT((cmd == SIOCGIFMEDIA || cmd == SIOCGIFXMEDIA),
 		    ("ifmrp non-NULL, but cmd is not an ifmedia req 0x%lx",
@@ -3932,7 +3935,7 @@ if_freemulti(struct ifmultiaddr *ifma)
 	KASSERT(ifma->ifma_refcount == 0, ("if_freemulti_epoch: refcount %d",
 	    ifma->ifma_refcount));
 
-	epoch_call(net_epoch_preempt, &ifma->ifma_epoch_ctx, if_destroymulti);
+	NET_EPOCH_CALL(if_destroymulti, &ifma->ifma_epoch_ctx);
 }
 
 
@@ -4671,7 +4674,8 @@ if_setdrvflags(if_t ifp, int flags)
 int
 if_setflags(if_t ifp, int flags)
 {
-	((struct ifnet *)ifp)->if_flags = flags;
+	/* XXX Temporary */
+	((struct ifnet *)ifp)->if_flags = flags | IFF_NEEDSEPOCH;
 	return (0);
 }
 

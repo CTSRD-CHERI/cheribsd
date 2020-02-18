@@ -377,7 +377,7 @@ pfs_vptocnp(struct vop_vptocnp_args *ap)
 	struct pfs_node *pn;
 	struct mount *mp;
 	char *buf = ap->a_buf;
-	int *buflen = ap->a_buflen;
+	size_t *buflen = ap->a_buflen;
 	char pidbuf[PFS_NAMELEN];
 	pid_t pid = pvd->pvd_pid;
 	int len, i, error, locked;
@@ -465,10 +465,6 @@ pfs_lookup(struct vop_cachedlookup_args *va)
 	if (vn->v_type != VDIR)
 		PFS_RETURN (ENOTDIR);
 	KASSERT_PN_IS_DIR(pd);
-
-	error = VOP_ACCESS(vn, VEXEC, cnp->cn_cred, cnp->cn_thread);
-	if (error)
-		PFS_RETURN (error);
 
 	/*
 	 * Don't support DELETE or RENAME.  CREATE is supported so

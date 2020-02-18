@@ -1686,7 +1686,8 @@ devclass_alloc_unit(devclass_t dc, device_t dev, int *unitp)
 		int newsize;
 
 		oldlist = dc->devices;
-		newsize = roundup((unit + 1), MINALLOCSIZE / sizeof(device_t));
+		newsize = roundup((unit + 1),
+		    MAX(1, MINALLOCSIZE / sizeof(device_t)));
 		newlist = malloc(sizeof(device_t) * newsize, M_BUS, M_NOWAIT);
 		if (!newlist)
 			return (ENOMEM);
@@ -3590,7 +3591,6 @@ resource_list_release_active(struct resource_list *rl, device_t bus,
 	return (retval);
 }
 
-
 /**
  * @brief Fully release a reserved resource
  *
@@ -3905,7 +3905,6 @@ bus_generic_resume(device_t dev)
 	}
 	return (0);
 }
-
 
 /**
  * @brief Helper function for implementing BUS_RESET_POST

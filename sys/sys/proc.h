@@ -297,7 +297,7 @@ struct thread {
 	struct osd	td_osd;		/* (k) Object specific data. */
 	struct vm_map_entry *td_map_def_user; /* (k) Deferred entries. */
 	pid_t		td_dbg_forked;	/* (c) Child pid for debugger. */
-	u_int		td_vp_reserv;	/* (k) Count of reserved vnodes. */
+	struct vnode	*td_vp_reserved;/* (k) Prealloated vnode. */
 	u_int		td_no_sleeping;	/* (k) Sleeping disabled count. */
 	void		*td_su;		/* (k) FFS SU private */
 	sbintime_t	td_sleeptimo;	/* (t) Sleep timeout. */
@@ -1144,8 +1144,8 @@ void	cpu_fork_kthread_handler(struct thread *, void (*)(void *), void *);
 int	cpu_procctl(struct thread *td, int idtype, id_t id, int com,
 	    void * __capability data);
 void	cpu_set_syscall_retval(struct thread *, int);
-void	cpu_set_upcall(struct thread *, void (*)(void *), void *,
-	    stack_t *);
+void	cpu_set_upcall(struct thread *, void (* __capability)(void *),
+	    void * __capability, stack_t *);
 int	cpu_set_user_tls(struct thread *, void * __capability tls_base);
 void	cpu_thread_alloc(struct thread *);
 void	cpu_thread_clean(struct thread *);

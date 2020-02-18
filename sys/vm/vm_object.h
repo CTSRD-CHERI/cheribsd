@@ -190,6 +190,8 @@ struct vm_object {
 #define	OBJ_SIZEVNLOCK	0x0040		/* lock vnode to check obj size */
 #define	OBJ_PG_DTOR	0x0080		/* dont reset object, leave that for dtor */
 #define	OBJ_TMPFS_NODE	0x0200		/* object belongs to tmpfs VREG node */
+#define	OBJ_SPLIT	0x0400		/* object is being split */
+#define	OBJ_COLLAPSING	0x0800		/* Parent of collapse. */
 #define	OBJ_COLORED	0x1000		/* pg_color is defined */
 #define	OBJ_ONEMAPPING	0x2000		/* One USE (a single, non-forked) mapping flag */
 #define	OBJ_SHADOWLIST	0x4000		/* Object is on the shadow list. */
@@ -266,6 +268,13 @@ extern struct vm_object kernel_object_store;
 #define	VM_OBJECT_PICKUP(object, state)					\
 	lock_class_rw.lc_lock(&(object)->lock.lock_object, (state))
 
+#define	VM_OBJECT_ASSERT_PAGING(object)					\
+	KASSERT((object)->paging_in_progress != 0,			\
+	    ("vm_object %p is not paging", object))
+#define	VM_OBJECT_ASSERT_REFERENCE(object)				\
+	KASSERT((object)->reference_count != 0,				\
+	    ("vm_object %p is not referenced", object))
+
 struct vnode;
 
 /*
@@ -317,8 +326,15 @@ static __inline bool
 vm_object_mightbedirty(vm_object_t object)
 {
 
-	return (object->type == OBJT_VNODE &&
-	    object->generation != object->cleangeneration);
+	if (object->type != OBJT_VNODE) {
+		if ((object->flags & OBJ_TMPFS_NODE) == 0)
+			return (false);
+#ifdef KASSERT
+		KASSERT(object->type == OBJT_SWAP,
+		    ("TMPFS_NODE obj %p is not swap", object));
+#endif
+	}
+	return (object->generation != object->cleangeneration);
 }
 
 void vm_object_clear_flag(vm_object_t object, u_short bits);

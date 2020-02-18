@@ -216,6 +216,8 @@ class CheriBSDRemoteTI(DefaultTargetInfo):
 
         flags += ['-lc', '-lm', '-fuse-ld=lld',
                   '-B' + self.full_config.get_lit_conf('sysroot') + '/../bin']
+        if self.full_config.lit_config.run_with_debugger:
+            flags += ['-Wl,--gdb-index']
         if self.full_config.get_lit_conf('target_triple').startswith("cheri-"):
             assert '-mabi=purecap' in explicit_flags, explicit_flags
 

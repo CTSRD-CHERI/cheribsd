@@ -41,6 +41,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/types.h>
 
 #include <limits.h>
+#include "cheri_private.h"
 
 #define	wsize	sizeof(u_int)
 #define	wmask	(wsize - 1)
@@ -61,15 +62,15 @@ bzero(void *dst0, size_t length)
 #define	VAL	c0
 #define	WIDEVAL	c
 
-void *
-memset(void *dst0, int c0, size_t length)
+void * __CAP
+__CAPSUFFIX(memset)(void * __CAP dst0, int c0, size_t length)
 #endif
 {
 	size_t t;
 #ifndef BZERO
 	u_int c;
 #endif
-	u_char *dst;
+	u_char * __CAP dst;
 
 	dst = dst0;
 	/*
@@ -105,7 +106,7 @@ memset(void *dst0, int c0, size_t length)
 	}
 #endif
 	/* Align destination by filling in bytes. */
-	if ((t = (long)dst & wmask) != 0) {
+	if ((t = (__cheri_addr long)dst & wmask) != 0) {
 		t = wsize - t;
 		length -= t;
 		do {
@@ -116,7 +117,7 @@ memset(void *dst0, int c0, size_t length)
 	/* Fill words.  Length was >= 2*words so we know t >= 1 here. */
 	t = length / wsize;
 	do {
-		*(u_int *)dst = WIDEVAL;
+		*(u_int * __CAP)(void * __CAP)dst = WIDEVAL;
 		dst += wsize;
 	} while (--t != 0);
 

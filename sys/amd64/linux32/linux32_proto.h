@@ -583,13 +583,15 @@ struct linux_pread_args {
 	char fd_l_[PADL_(l_uint)]; l_uint fd; char fd_r_[PADR_(l_uint)];
 	char buf_l_[PADL_(char *)]; char * buf; char buf_r_[PADR_(char *)];
 	char nbyte_l_[PADL_(l_size_t)]; l_size_t nbyte; char nbyte_r_[PADR_(l_size_t)];
-	char offset_l_[PADL_(l_loff_t)]; l_loff_t offset; char offset_r_[PADR_(l_loff_t)];
+	char offset1_l_[PADL_(uint32_t)]; uint32_t offset1; char offset1_r_[PADR_(uint32_t)];
+	char offset2_l_[PADL_(uint32_t)]; uint32_t offset2; char offset2_r_[PADR_(uint32_t)];
 };
 struct linux_pwrite_args {
 	char fd_l_[PADL_(l_uint)]; l_uint fd; char fd_r_[PADR_(l_uint)];
 	char buf_l_[PADL_(char *)]; char * buf; char buf_r_[PADR_(char *)];
 	char nbyte_l_[PADL_(l_size_t)]; l_size_t nbyte; char nbyte_r_[PADR_(l_size_t)];
-	char offset_l_[PADL_(l_loff_t)]; l_loff_t offset; char offset_r_[PADR_(l_loff_t)];
+	char offset1_l_[PADL_(uint32_t)]; uint32_t offset1; char offset1_r_[PADR_(uint32_t)];
+	char offset2_l_[PADL_(uint32_t)]; uint32_t offset2; char offset2_r_[PADR_(uint32_t)];
 };
 struct linux_chown16_args {
 	char path_l_[PADL_(char *)]; char * path; char path_r_[PADR_(char *)];
@@ -613,7 +615,10 @@ struct linux_sigaltstack_args {
 	char uoss_l_[PADL_(l_stack_t *)]; l_stack_t * uoss; char uoss_r_[PADR_(l_stack_t *)];
 };
 struct linux_sendfile_args {
-	register_t dummy;
+	char out_l_[PADL_(l_int)]; l_int out; char out_r_[PADR_(l_int)];
+	char in_l_[PADL_(l_int)]; l_int in; char in_r_[PADR_(l_int)];
+	char offset_l_[PADL_(l_long *)]; l_long * offset; char offset_r_[PADR_(l_long *)];
+	char count_l_[PADL_(l_size_t)]; l_size_t count; char count_r_[PADR_(l_size_t)];
 };
 struct linux_vfork_args {
 	register_t dummy;
@@ -632,11 +637,13 @@ struct linux_mmap2_args {
 };
 struct linux_truncate64_args {
 	char path_l_[PADL_(char *)]; char * path; char path_r_[PADR_(char *)];
-	char length_l_[PADL_(l_loff_t)]; l_loff_t length; char length_r_[PADR_(l_loff_t)];
+	char length1_l_[PADL_(uint32_t)]; uint32_t length1; char length1_r_[PADR_(uint32_t)];
+	char length2_l_[PADL_(uint32_t)]; uint32_t length2; char length2_r_[PADR_(uint32_t)];
 };
 struct linux_ftruncate64_args {
 	char fd_l_[PADL_(l_uint)]; l_uint fd; char fd_r_[PADR_(l_uint)];
-	char length_l_[PADL_(l_loff_t)]; l_loff_t length; char length_r_[PADR_(l_loff_t)];
+	char length1_l_[PADL_(uint32_t)]; uint32_t length1; char length1_r_[PADR_(uint32_t)];
+	char length2_l_[PADL_(uint32_t)]; uint32_t length2; char length2_r_[PADR_(uint32_t)];
 };
 struct linux_stat64_args {
 	char filename_l_[PADL_(const char *)]; const char * filename; char filename_r_[PADR_(const char *)];
@@ -742,6 +749,12 @@ struct linux_tkill_args {
 	char tid_l_[PADL_(int)]; int tid; char tid_r_[PADR_(int)];
 	char sig_l_[PADL_(int)]; int sig; char sig_r_[PADR_(int)];
 };
+struct linux_sendfile64_args {
+	char out_l_[PADL_(l_int)]; l_int out; char out_r_[PADR_(l_int)];
+	char in_l_[PADL_(l_int)]; l_int in; char in_r_[PADR_(l_int)];
+	char offset_l_[PADL_(l_loff_t *)]; l_loff_t * offset; char offset_r_[PADR_(l_loff_t *)];
+	char count_l_[PADL_(l_size_t)]; l_size_t count; char count_r_[PADR_(l_size_t)];
+};
 struct linux_sys_futex_args {
 	char uaddr_l_[PADL_(void *)]; void * uaddr; char uaddr_r_[PADR_(void *)];
 	char op_l_[PADL_(int)]; int op; char op_r_[PADR_(int)];
@@ -765,7 +778,8 @@ struct linux_set_thread_area_args {
 };
 struct linux_fadvise64_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char offset_l_[PADL_(l_loff_t)]; l_loff_t offset; char offset_r_[PADR_(l_loff_t)];
+	char offset1_l_[PADL_(uint32_t)]; uint32_t offset1; char offset1_r_[PADR_(uint32_t)];
+	char offset2_l_[PADL_(uint32_t)]; uint32_t offset2; char offset2_r_[PADR_(uint32_t)];
 	char len_l_[PADL_(l_size_t)]; l_size_t len; char len_r_[PADR_(l_size_t)];
 	char advice_l_[PADL_(int)]; int advice; char advice_r_[PADR_(int)];
 };
@@ -856,8 +870,10 @@ struct linux_utimes_args {
 };
 struct linux_fadvise64_64_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char offset_l_[PADL_(l_loff_t)]; l_loff_t offset; char offset_r_[PADR_(l_loff_t)];
-	char len_l_[PADL_(l_loff_t)]; l_loff_t len; char len_r_[PADR_(l_loff_t)];
+	char offset1_l_[PADL_(uint32_t)]; uint32_t offset1; char offset1_r_[PADR_(uint32_t)];
+	char offset2_l_[PADL_(uint32_t)]; uint32_t offset2; char offset2_r_[PADR_(uint32_t)];
+	char len1_l_[PADL_(uint32_t)]; uint32_t len1; char len1_r_[PADR_(uint32_t)];
+	char len2_l_[PADL_(uint32_t)]; uint32_t len2; char len2_r_[PADR_(uint32_t)];
 	char advice_l_[PADL_(int)]; int advice; char advice_r_[PADR_(int)];
 };
 struct linux_mbind_args {
@@ -1030,8 +1046,10 @@ struct linux_splice_args {
 };
 struct linux_sync_file_range_args {
 	char fd_l_[PADL_(l_int)]; l_int fd; char fd_r_[PADR_(l_int)];
-	char offset_l_[PADL_(l_loff_t)]; l_loff_t offset; char offset_r_[PADR_(l_loff_t)];
-	char nbytes_l_[PADL_(l_loff_t)]; l_loff_t nbytes; char nbytes_r_[PADR_(l_loff_t)];
+	char offset1_l_[PADL_(uint32_t)]; uint32_t offset1; char offset1_r_[PADR_(uint32_t)];
+	char offset2_l_[PADL_(uint32_t)]; uint32_t offset2; char offset2_r_[PADR_(uint32_t)];
+	char nbytes1_l_[PADL_(uint32_t)]; uint32_t nbytes1; char nbytes1_r_[PADR_(uint32_t)];
+	char nbytes2_l_[PADL_(uint32_t)]; uint32_t nbytes2; char nbytes2_r_[PADR_(uint32_t)];
 	char flags_l_[PADL_(unsigned int)]; unsigned int flags; char flags_r_[PADR_(unsigned int)];
 };
 struct linux_tee_args {
@@ -1075,8 +1093,10 @@ struct linux_eventfd_args {
 struct linux_fallocate_args {
 	char fd_l_[PADL_(l_int)]; l_int fd; char fd_r_[PADR_(l_int)];
 	char mode_l_[PADL_(l_int)]; l_int mode; char mode_r_[PADR_(l_int)];
-	char offset_l_[PADL_(l_loff_t)]; l_loff_t offset; char offset_r_[PADR_(l_loff_t)];
-	char len_l_[PADL_(l_loff_t)]; l_loff_t len; char len_r_[PADR_(l_loff_t)];
+	char offset1_l_[PADL_(uint32_t)]; uint32_t offset1; char offset1_r_[PADR_(uint32_t)];
+	char offset2_l_[PADL_(uint32_t)]; uint32_t offset2; char offset2_r_[PADR_(uint32_t)];
+	char len1_l_[PADL_(uint32_t)]; uint32_t len1; char len1_r_[PADR_(uint32_t)];
+	char len2_l_[PADL_(uint32_t)]; uint32_t len2; char len2_r_[PADR_(uint32_t)];
 };
 struct linux_timerfd_settime_args {
 	char fd_l_[PADL_(l_int)]; l_int fd; char fd_r_[PADR_(l_int)];
@@ -1696,6 +1716,7 @@ int	linux_removexattr(struct thread *, struct linux_removexattr_args *);
 int	linux_lremovexattr(struct thread *, struct linux_lremovexattr_args *);
 int	linux_fremovexattr(struct thread *, struct linux_fremovexattr_args *);
 int	linux_tkill(struct thread *, struct linux_tkill_args *);
+int	linux_sendfile64(struct thread *, struct linux_sendfile64_args *);
 int	linux_sys_futex(struct thread *, struct linux_sys_futex_args *);
 int	linux_sched_setaffinity(struct thread *, struct linux_sched_setaffinity_args *);
 int	linux_sched_getaffinity(struct thread *, struct linux_sched_getaffinity_args *);
@@ -2090,6 +2111,7 @@ int	linux_io_uring_register(struct thread *, struct linux_io_uring_register_args
 #define	LINUX32_SYS_AUE_linux_lremovexattr	AUE_NULL
 #define	LINUX32_SYS_AUE_linux_fremovexattr	AUE_NULL
 #define	LINUX32_SYS_AUE_linux_tkill	AUE_NULL
+#define	LINUX32_SYS_AUE_linux_sendfile64	AUE_SENDFILE
 #define	LINUX32_SYS_AUE_linux_sys_futex	AUE_NULL
 #define	LINUX32_SYS_AUE_linux_sched_setaffinity	AUE_NULL
 #define	LINUX32_SYS_AUE_linux_sched_getaffinity	AUE_NULL

@@ -4,7 +4,7 @@ MDSRCS+= \
 	ffs.S \
 	strlen.S
 
-.if ! ${MACHINE_ARCH:Mmips*c*}
+.if ! ${MACHINE_ABI:Mpurecap}
 MDSRCS+= \
 	bcmp.S \
 	bzero.S \
@@ -14,10 +14,11 @@ MDSRCS+= \
 	strrchr.S
 .endif
 
-.if ${MACHINE_ARCH:Mmips*c*} || ${MK_CHERI} == "yes"
+.if ${MACHINE_ABI:Mpurecap} || ${MK_CHERI} == "yes"
 CHERI_MDSRCS=	\
 		memcpy_c.c \
-		memmove_c.c
+		memmove_c.c \
+		memset_c.c
 CHERI_MISRCS=	\
 		bcopy.c \
 		memcpy.c \
@@ -25,7 +26,7 @@ CHERI_MISRCS=	\
 
 MDSRCS+=	${CHERI_MDSRCS}
 
-.if ! ${MACHINE_ARCH:Mmips*c*}
+.if ! ${MACHINE_ABI:Mpurecap}
 .if ${MK_CHERI128} == "yes"
 _CHERIBITS=128
 .else

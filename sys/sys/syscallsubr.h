@@ -88,7 +88,7 @@ int	kern___acl_set_fd(struct thread *td, int filedes, acl_type_t type,
 int	kern___acl_set_path(struct thread *td, const char *__capability path,
 	    acl_type_t type, const struct acl * __capability aclp, int follow);
 int	kern___getcwd(struct thread *td, char * __capability buf,
-	    enum uio_seg bufseg, size_t buflen, size_t path_max);
+	    size_t buflen);
 int	kern_abort2(struct thread *td, const char * __capability why,
             int nargs, void * __capability *uargs);
 int	kern_accept(struct thread *td, int s, struct sockaddr **name,
@@ -135,6 +135,8 @@ int	kern_clock_nanosleep(struct thread *td, clockid_t clock_id, int flags,
 	    const struct timespec *rqtp, struct timespec *rmtp);
 int	kern_clock_settime(struct thread *td, clockid_t clock_id,
 	    struct timespec *ats);
+void	kern_thread_cputime(struct thread *targettd, struct timespec *ats);
+void	kern_process_cputime(struct proc *targetp, struct timespec *ats);
 int	kern_close(struct thread *td, int fd);
 int	kern_connectat(struct thread *td, int dirfd, int fd,
 	    struct sockaddr *sa);
@@ -237,6 +239,7 @@ int	kern_getloginclass(struct thread *td, char * __capability namebuf,
 int	kern_getppid(struct thread *);
 int	kern_getpeername(struct thread *td, int fd, struct sockaddr **sa,
 	    socklen_t *alen);
+int	kern_getpriority(struct thread *td, int which, int who);
 int	kern_getrandom(struct thread *td, void * __capability user_buf,
 	    size_t buflen, unsigned int flags);
 int	kern_getresgid(struct thread *td, gid_t * __capability rgid,
@@ -447,6 +450,7 @@ int	kern_sendit(struct thread *td, int s, struct msghdr *mp, int flags,
 int	kern_setgroups(struct thread *td, u_int ngrp, gid_t *groups);
 int	kern_setitimer(struct thread *, u_int, struct itimerval *,
 	    struct itimerval *);
+int	kern_setpriority(struct thread *td, int which, int who, int prio);
 int	kern_setrlimit(struct thread *, u_int, struct rlimit *);
 int	kern_setsockopt(struct thread *td, int s, int level, int name,
 	    const void * __capability val, enum uio_seg valseg,
@@ -513,8 +517,6 @@ int	kern_truncate(struct thread *td, const char * __capability path,
 	    enum uio_seg pathseg, off_t length);
 int	kern_undelete(struct thread *td, const char * __capability path,
 	    enum uio_seg pathseg);
-int	kern_unmount(struct thread *td, const char * __capability path,
-	    int flags);
 int	kern_funlinkat(struct thread *td, int dfd,
 	    const char * __capability path, int fd, enum uio_seg pathseg,
 	    int flag, ino_t oldinum);
@@ -543,6 +545,8 @@ int	kern_write(struct thread *td, int fd, const void * __capability buf,
 int	kern_writev(struct thread *td, int fd, struct uio *auio);
 int	kern_socketpair(struct thread *td, int domain, int type, int protocol,
 	    int *rsv);
+int	kern_unmount(struct thread *td, const char * __capability path,
+	    int flags);
 
 int	user_accept(struct thread *td, int s,
 	    struct sockaddr * __capability uname,

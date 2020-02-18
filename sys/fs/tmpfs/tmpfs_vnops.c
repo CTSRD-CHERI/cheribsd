@@ -90,7 +90,7 @@ tmpfs_lookup1(struct vnode *dvp, struct vnode **vpp, struct componentname *cnp)
 	*vpp = NULLVP;
 
 	/* Check accessibility of requested node as a first step. */
-	error = VOP_ACCESS(dvp, VEXEC, cnp->cn_cred, cnp->cn_thread);
+	error = vn_dir_check_exec(dvp, cnp);
 	if (error != 0)
 		goto out;
 
@@ -387,7 +387,7 @@ tmpfs_getattr(struct vop_getattr_args *v)
 
 	node = VP_TO_TMPFS_NODE(vp);
 
-	tmpfs_update(vp);
+	tmpfs_update_getattr(vp);
 
 	vap->va_type = vp->v_type;
 	vap->va_mode = node->tn_mode;
@@ -1491,7 +1491,7 @@ tmpfs_vptocnp_dir(struct tmpfs_node *tn, struct tmpfs_node *tnp,
 
 static int
 tmpfs_vptocnp_fill(struct vnode *vp, struct tmpfs_node *tn,
-    struct tmpfs_node *tnp, char *buf, int *buflen, struct vnode **dvp)
+    struct tmpfs_node *tnp, char *buf, size_t *buflen, struct vnode **dvp)
 {
 	struct tmpfs_dirent *de;
 	int error, i;
@@ -1531,7 +1531,7 @@ tmpfs_vptocnp(struct vop_vptocnp_args *ap)
 	struct tmpfs_dirent *de;
 	struct tmpfs_mount *tm;
 	char *buf;
-	int *buflen;
+	size_t *buflen;
 	int error;
 
 	vp = ap->a_vp;

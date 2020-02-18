@@ -24,6 +24,7 @@
 #define _LIBUNWIND_HIGHEST_DWARF_REGISTER_MIPS      65
 #define _LIBUNWIND_HIGHEST_DWARF_REGISTER_MIPS_CHERI 103
 #define _LIBUNWIND_HIGHEST_DWARF_REGISTER_SPARC     31
+#define _LIBUNWIND_HIGHEST_DWARF_REGISTER_RISCV     64
 
 #define _LIBUNWIND_MAX_CONTEXT_SIZE 200
 #define _LIBUNWIND_MAX_CURSOR_SIZE 248
@@ -142,6 +143,25 @@
   #define _LIBUNWIND_HIGHEST_DWARF_REGISTER _LIBUNWIND_HIGHEST_DWARF_REGISTER_SPARC
   #define _LIBUNWIND_CONTEXT_SIZE 16
   #define _LIBUNWIND_CURSOR_SIZE 23
+# elif defined(__riscv)
+#  if __riscv_xlen == 64
+#    define _LIBUNWIND_TARGET_RISCV 1
+/* #    define _LIBUNWIND_CONTEXT_SIZE 64 */
+/*
+ * Note: We define _LIBUNWIND_CONTEXT_SIZE so that CHERI registers can always
+ * fit in unw_context_t even when compiling without CHERI support.
+ * Note: Assumes merged register file
+ */
+#    define _LIBUNWIND_CONTEXT_SIZE 96
+#    ifdef __CHERI_PURE_CAPABILITY__
+#      define _LIBUNWIND_CURSOR_SIZE 120
+#    else
+#      define _LIBUNWIND_CURSOR_SIZE 108
+#    endif
+#  else
+#    error "Unsupported RISC-V ABI"
+#  endif
+# define _LIBUNWIND_HIGHEST_DWARF_REGISTER _LIBUNWIND_HIGHEST_DWARF_REGISTER_RISCV
 # else
 #  error "Unsupported architecture."
 # endif
@@ -157,6 +177,7 @@
 # define _LIBUNWIND_TARGET_MIPS_O32 1
 # define _LIBUNWIND_TARGET_MIPS_NEWABI 1
 # define _LIBUNWIND_TARGET_SPARC 1
+# define _LIBUNWIND_TARGET_RISCV 1
 # define _LIBUNWIND_CONTEXT_SIZE _LIBUNWIND_MAX_CONTEXT_SIZE
 # define _LIBUNWIND_CURSOR_SIZE _LIBUNWIND_MAX_CURSOR_SIZE
 # define _LIBUNWIND_HIGHEST_DWARF_REGISTER 287
