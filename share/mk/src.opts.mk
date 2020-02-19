@@ -102,7 +102,6 @@ __DEFAULT_YES_OPTIONS = \
     FREEBSD_UPDATE \
     FTP \
     GAMES \
-    GCOV \
     GDB \
     GNU_DIFF \
     GNU_GREP \
@@ -202,6 +201,7 @@ __DEFAULT_NO_OPTIONS = \
     EXPERIMENTAL \
     GCC \
     GCC_BOOTSTRAP \
+    GCOV \
     GNUCXX \
     GNU_GREP_COMPAT \
     GPL_DTC \
