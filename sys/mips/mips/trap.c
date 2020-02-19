@@ -1477,7 +1477,8 @@ MipsEmulateBranch(struct trapframe *framePtr, trapf_pc_t _instPC, int fpcCSR,
 	/* Cast to uint8_t* for pointer arithmetic */
 	uint8_t * __capability instPC = (uint8_t * __capability) _instPC;
 #if __has_feature(capabilities)
-	void * __capability *capRegsPtr = &framePtr->ddc;
+	void * __capability *capRegsPtr = __bounded_addressof(framePtr->ddc,
+	    sizeof(void * __capability) * 32);
 #endif
 	uint8_t * __capability retAddr = NULL;
 	int condition;
@@ -2059,12 +2060,6 @@ mips_unaligned_load_store(struct trapframe *frame, int mode, register_t addr, ui
 #endif
 	src_regno = MIPS_INST_RT(inst);
 
-#ifdef CHERI_PURECAP_KERNEL
-	uaddr = (uintptr_t)cheri_setoffset(frame->ddc, addr);
-#else
-	uaddr = addr;
-#endif
-
 	/*
 	 * ADDR_ERR faults have higher priority than TLB
 	 * Miss faults.  Therefore, it is necessary to
@@ -2159,6 +2154,13 @@ mips_unaligned_load_store(struct trapframe *frame, int mode, register_t addr, ui
 	if ((op_type < MIPS_LD_ACCESS) && sign_extend)
 		op_type++;
 
+#ifdef CHERI_PURECAP_KERNEL
+	uaddr = (uintptr_t)cheri_capability_build_user_data(
+	    CHERI_CAP_USER_DATA_PERMS, (vaddr_t)addr, size, 0);
+#else
+	uaddr = addr;
+#endif
+	
 	if (is_store) {
 		value = reg[src_regno];
 		/*
@@ -2275,7 +2277,8 @@ emulate_unaligned_access(struct trapframe *frame, int mode)
 //   "changes_purecap": [
 //     "support",
 //     "kdb",
-//     "uintptr_interp_offset"
+//     "uintptr_interp_offset",
+//     "subobject_bounds"
 //   ],
 //   "change_comment": ""
 // }

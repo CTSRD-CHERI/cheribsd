@@ -749,7 +749,7 @@ copyout_implicit_cap(const void *kaddr, void *uaddr, size_t len)
 	    cheri_capability_build_user_data(CHERI_CAP_USER_DATA_PERMS,
 	    (vaddr_t)uaddr, len, 0), len));
 }
-#else /* !( __has_feature(capabilities) && !defined(CHERI_IMPLICIT_USER_DDC) && !defined(CHERI_PURECAP_KERNEL)) */
+#else /* !__has_feature(capabilities) || defined(CHERI_IMPLICIT_USER_DDC) || defined(CHERI_PURECAP_KERNEL) */
 int
 copyin_implicit_cap(const void *uaddr, void *kaddr, size_t len)
 {
