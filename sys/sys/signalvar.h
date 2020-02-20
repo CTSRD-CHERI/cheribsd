@@ -283,6 +283,7 @@ int __sys_sigfastblock(int cmd, void *ptr);
 
 #ifdef _KERNEL
 extern sigset_t fastblock_mask;
+extern bool sigfastblock_fetch_always;
 
 /* Return nonzero if process p has an unmasked pending signal. */
 #define	SIGPENDING(td)							\
@@ -402,8 +403,6 @@ sigallowstop(int prev)
 
 int	cursig(struct thread *td);
 void	execsigs(struct proc *p);
-void	fetch_sigfastblock(struct thread *td);
-void	fetch_sigfastblock_failed(struct thread *td, bool write);
 void	gsignal(int pgid, int sig, ksiginfo_t *ksi);
 void	killproc(struct proc *p, char *why);
 ksiginfo_t * ksiginfo_alloc(int wait);
@@ -425,6 +424,9 @@ void	sig_drop_caught(struct proc *p);
 void	sigexit(struct thread *td, int sig) __dead2;
 int	sigev_findtd(struct proc *p, struct sigevent *sigev, struct thread **);
 int	sig_ffs(sigset_t *set);
+void	sigfastblock_clear(struct thread *td);
+void	sigfastblock_fetch(struct thread *td);
+void	sigfastblock_setpend(struct thread *td);
 void	siginit(struct proc *p);
 void	signotify(struct thread *td);
 int	sigprop(int sig);
