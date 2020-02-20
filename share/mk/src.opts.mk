@@ -259,20 +259,13 @@ __DEFAULT_DEPENDENT_OPTIONS+= ${var}_SUPPORT/${var}
 # to allow defaults for some things like clang to vary by target architecture.
 # Additional, per-target behavior should be rarely added only after much
 # gnashing of teeth and grinding of gears.
-# We also have to handle LIBCOMPAT_MACHINE_ARCH and LIBCOMPAT_MACHINE for the
-# bsd.compat.mk case where the compat ABI has different choices from the
-# TARGET_ARCH (e.g. CHERI purecap disables SSP, but RISCV enables it)
 #
-.if defined(LIBCOMPAT_MACHINE_ARCH)
-__T=${LIBCOMPAT_MACHINE_ARCH}
-.elif defined(TARGET_ARCH)
+.if defined(TARGET_ARCH)
 __T=${TARGET_ARCH}
 .else
 __T=${MACHINE_ARCH}
 .endif
-.if defined(LIBCOMPAT_MACHINE)
-__TT=${LIBCOMPAT_MACHINE}
-.elif defined(TARGET)
+.if defined(TARGET)
 __TT=${TARGET}
 .else
 __TT=${MACHINE}
