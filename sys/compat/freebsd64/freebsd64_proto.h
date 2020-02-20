@@ -1493,6 +1493,13 @@ struct freebsd64_sigfastblock_args {
 	char cmd_l_[PADL_(int)]; int cmd; char cmd_r_[PADR_(int)];
 	char ptr_l_[PADL_(uint32_t *)]; uint32_t * ptr; char ptr_r_[PADR_(uint32_t *)];
 };
+struct freebsd64___realpathat_args {
+	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
+	char path_l_[PADL_(const char *)]; const char * path; char path_r_[PADR_(const char *)];
+	char buf_l_[PADL_(char *)]; char * buf; char buf_r_[PADR_(char *)];
+	char size_l_[PADL_(size_t)]; size_t size; char size_r_[PADR_(size_t)];
+	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
+};
 int	freebsd64_read(struct thread *, struct freebsd64_read_args *);
 int	freebsd64_write(struct thread *, struct freebsd64_write_args *);
 int	freebsd64_open(struct thread *, struct freebsd64_open_args *);
@@ -1791,6 +1798,7 @@ int	freebsd64___sysctlbyname(struct thread *, struct freebsd64___sysctlbyname_ar
 int	freebsd64_shm_open2(struct thread *, struct freebsd64_shm_open2_args *);
 int	freebsd64_shm_rename(struct thread *, struct freebsd64_shm_rename_args *);
 int	freebsd64_sigfastblock(struct thread *, struct freebsd64_sigfastblock_args *);
+int	freebsd64___realpathat(struct thread *, struct freebsd64___realpathat_args *);
 
 #ifdef COMPAT_43
 
@@ -2329,6 +2337,7 @@ int	freebsd12_freebsd64_shm_open(struct thread *, struct freebsd12_freebsd64_shm
 #define	FREEBSD64_SYS_AUE_freebsd64_shm_open2	AUE_SHMOPEN
 #define	FREEBSD64_SYS_AUE_freebsd64_shm_rename	AUE_SHMRENAME
 #define	FREEBSD64_SYS_AUE_freebsd64_sigfastblock	AUE_NULL
+#define	FREEBSD64_SYS_AUE_freebsd64___realpathat	AUE_REALPATHAT
 
 #undef PAD_
 #undef PADL_
