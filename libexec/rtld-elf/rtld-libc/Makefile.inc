@@ -49,10 +49,9 @@ _libc_other_objects=sigsetjmp lstat stat fstat fstatat fstatfs syscall \
     sysarch __sysctl issetugid __getcwd utrace \
     thr_self thr_kill pread mmap lseek _exit \
     getdirentries _close _fcntl _open _openat _read \
-    __sysctlbyname _sigprocmask _write readlink _setjmp setjmp setjmperr
+    __sysctlbyname _sigprocmask _write readlink __realpathat _setjmp setjmp setjmperr
 
 # XXX: which architectures include _fstat _fstatat _fstatfs _getdirentries?
-
 
 # Finally add additional architecture-dependent libc dependencies
 .if ${LIBC_ARCH} == "arm"
