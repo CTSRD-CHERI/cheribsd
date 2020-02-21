@@ -71,6 +71,7 @@
 	u_int32_t	pc_asid_generation;	/* current ASID generation */ \
 	u_int		pc_pending_ipis;	/* IPIs pending to this CPU */ \
 	struct	pcpu	*pc_self;		/* globally-uniqe self pointer */\
+	u_int		pc_kern_unaligned_emul; /* currently emulating an unaligned load/store in the kernel? */\
 	PCPU_MD_CAPABILITY_FIELDS
 
 #ifdef	__mips_n64

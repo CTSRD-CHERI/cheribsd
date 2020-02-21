@@ -324,6 +324,7 @@ struct trapdebug trapdebug[TRAPSIZE], *trp = trapdebug;
 #endif
 
 #define	KERNLAND(x)	((vm_offset_t)(x) >= VM_MIN_KERNEL_ADDRESS && (vm_offset_t)(x) < VM_MAX_KERNEL_ADDRESS)
+#define	USERLAND(x)	((vm_offset_t)(x) < VM_MAXUSER_ADDRESS)
 #define	DELAYBRANCH(x)	((x) & MIPS_CR_BR_DELAY)
 
 /*
@@ -439,10 +440,8 @@ fetch_instr_near_pc(struct trapframe *frame, register_t offset_from_pc, int32_t 
 {
 	void * __capability bad_inst_ptr;
 
-	/* Should only be called from user mode */
-	/* TODO: if KERNLAND() */
-#ifdef CPU_CHERI
-	bad_inst_ptr = (char * __capability)frame->pcc + offset_from_pc;
+	bad_inst_ptr = (char * __capability)frame->pc + offset_from_pc;
+#if __has_feature(capabilities)
 	if (!cheri_gettag(bad_inst_ptr)) {
 		struct thread *td = curthread;
 		struct proc *p = td->td_proc;
@@ -454,18 +453,21 @@ fetch_instr_near_pc(struct trapframe *frame, register_t offset_from_pc, int32_t 
 		*instr = -1;
 		return (bad_inst_ptr);
 	}
-#else
-	bad_inst_ptr = __USER_CODE_CAP((uint8_t*)(frame->pc) + offset_from_pc);
 #endif
-	if (fueword32_c(bad_inst_ptr, instr) != 0) {
-		struct thread *td = curthread;
-		struct proc *p = td->td_proc;
-		log(LOG_ERR, "%s: pid %d tid %ld (%s), uid %d: Could not fetch "
-		    "faulting instruction from %p\n",  __func__, p->p_pid,
-		    (long)td->td_tid, p->p_comm,
-		    p->p_ucred ? p->p_ucred->cr_uid : -1,
-		    (void*)(uintptr_t)(__cheri_addr vaddr_t)(bad_inst_ptr));
-		*instr = -1;
+	if (USERLAND(frame->badvaddr)) {
+		if (fueword32_c(bad_inst_ptr, instr) != 0) {
+			struct thread *td = curthread;
+			struct proc *p = td->td_proc;
+			log(LOG_ERR, "%s: pid %d tid %ld (%s), uid %d: Could not fetch "
+			    "faulting instruction from %p\n",  __func__, p->p_pid,
+			    (long)td->td_tid, p->p_comm,
+			    p->p_ucred ? p->p_ucred->cr_uid : -1,
+			    (void*)(uintptr_t)(__cheri_addr vaddr_t)(bad_inst_ptr));
+			*instr = -1;
+		}
+	}
+	else {
+		*instr = *(int32_t *)bad_inst_ptr;
 	}
 	/* Should this be a kerncap instead instead of being indirected by $pcc? */
 	return bad_inst_ptr;
@@ -481,6 +483,7 @@ fetch_bad_branch_instr(struct trapframe *frame)
 {
 	KASSERT(DELAYBRANCH(frame->cause),
 	    ("%s called when not in delay branch", __func__));
+
 	/*
 	 * In a trap the pc will point to the branch instruction so we fetch
 	 * at offset 0 from the pc.
@@ -1325,8 +1328,7 @@ dofault:
 		}
 #endif
 		/* Only allow emulation on a user address */
-		if (allow_unaligned_acc &&
-		    ((vm_offset_t)trapframe->badvaddr < VM_MAXUSER_ADDRESS)) {
+		if (allow_unaligned_acc) {
 			int mode;
 
 			if (type == T_ADDR_ERR_LD)
@@ -1334,10 +1336,27 @@ dofault:
 			else
 				mode = VM_PROT_WRITE;
 
-			access_type = emulate_unaligned_access(trapframe, mode);
+			if (!USERLAND(trapframe->badvaddr)) {
+				/*
+				 * Kernel unaligned access.
+				 * Note that we want to prevent recursing here
+				 * if another unaligned access happens while
+				 * handling this one.
+				 */
+				if (PCPU_GET(kern_unaligned_emul))
+					panic("Recursive kernel unaligned access");
+				PCPU_SET(kern_unaligned_emul, 1);
+			}
+			access_type = emulate_unaligned_access(
+			    trapframe, mode);
+			PCPU_SET(kern_unaligned_emul, 0);
 			if (access_type != 0)
 				return (trapframe->pc);
 		}
+		printf("capcause = 0x%x, badaddr = %#jx, pc = %#jx, ra = %p, "
+		    "sp = %p, sr = %jx\n", trapframe->capcause,
+		    (intmax_t)trapframe->badvaddr, (intmax_t)trapframe->pc,
+		    trapframe->c17, trapframe->csp, (intmax_t)trapframe->sr);
 		/* FALLTHROUGH */
 
 	case T_BUS_ERR_LD_ST:	/* BERR asserted to cpu */
@@ -2037,6 +2056,7 @@ log_c2e_exception(const char *msg, struct trapframe *frame, int trap_type)
 
 /*
  * Unaligned load/store emulation
+ * XXX-AM: possibly use __has_feature(capabilities) instead of CPU_CHERI
  */
 static int
 mips_unaligned_load_store(struct trapframe *frame, int mode, register_t addr, uint32_t inst)
@@ -2048,7 +2068,16 @@ mips_unaligned_load_store(struct trapframe *frame, int mode, register_t addr, ui
 	int op_type = 0;
 	int is_store = 0;
 	int sign_extend = 0;
-	uintptr_t uaddr;
+	uintptr_t dst_addr;
+	int err;
+	char * __capability kaddr;
+#ifdef CPU_CHERI
+	void * __capability *cap_regs = __bounded_addressof(frame->ddc,
+	    sizeof(void * __capability) * 32);
+	int dst_regno;
+	void * __capability dest;
+#endif
+
 #ifdef CPU_CHERI
 	/**
 	 * XXX: There is a potential race condition here for CHERI.  We rely on the
@@ -2057,7 +2086,17 @@ mips_unaligned_load_store(struct trapframe *frame, int mode, register_t addr, ui
 	 * succeeded, but a malicious program could generate an alignment trap and
 	 * then substitute a different instruction...
 	 */
+
+	/*
+	 * Default to use DDC as base to emulate accesses.
+	 * For user accesses this will be used for all implicity capability
+	 * load/stores. In the hybrid kernel this will be the kernel DDC.
+	 * In the purecap kernel this will be a NULL capability as it should
+	 * never end up being used.
+	 */
+	dest = frame->ddc;
 #endif
+
 	src_regno = MIPS_INST_RT(inst);
 
 	/*
@@ -2094,6 +2133,10 @@ mips_unaligned_load_store(struct trapframe *frame, int mode, register_t addr, ui
 		u_int32_t size_field = inst & 3;
 		KASSERT((size_field != 0),
 			("Unaligned byte loads or stores should be impossible"));
+		/* Fetch the intended destination capability register */
+		dst_regno = MIPS_INST_RT(inst);
+		dest = cap_regs[dst_regno];
+
 		/*
 		 * If this is a load-linked / store-conditional then we can't
 		 * safely emulate it.
@@ -2154,40 +2197,45 @@ mips_unaligned_load_store(struct trapframe *frame, int mode, register_t addr, ui
 	if ((op_type < MIPS_LD_ACCESS) && sign_extend)
 		op_type++;
 
-#ifdef CHERI_PURECAP_KERNEL
-	uaddr = (uintptr_t)cheri_capability_build_user_data(
-	    CHERI_CAP_USER_DATA_PERMS, (vaddr_t)addr, size, 0);
+	kaddr = (char * __capability)&value;
+	/*
+	 * Stores don't have signed / unsigned variants, so just copy
+	 * the data from the register to memory.  Less-than-doubleword
+	 * stores store the low bits, so adjust the kernel pointer to
+	 * the correct offset within the word first.
+	 */
+#if _BYTE_ORDER == _BIG_ENDIAN
+	kaddr += sizeof(register_t) - size;
+#endif
+
+#ifdef CPU_CHERI
+	dst_addr = (uintptr_t)cheri_setaddress(dest, addr);
 #else
-	uaddr = addr;
+	dst_addr = addr;
 #endif
 	
 	if (is_store) {
 		value = reg[src_regno];
-		/*
-		 * Stores don't have signed / unsigned variants, so just copy
-		 * the data from the register to memory.  Less-than-doubleword
-		 * stores store the low bits, so adjust the kernel pointer to
-		 * the correct offset within the word first.
-		 */
-		char *kaddr = (char*)&value;
-#if _BYTE_ORDER == _BIG_ENDIAN
-		kaddr += sizeof(register_t) - size;
-#endif
-		int err;
-		if ((err = copyout_implicit_cap(kaddr, (void*)uaddr, size))) {
-			return (0);
+		if (USERLAND(frame->badvaddr)) {
+			if ((err = copyout_implicit_cap(kaddr,
+			    (void *)dst_addr, size)))
+				return (0);
 		}
+		else {
+			memcpy_c((void * __capability)dst_addr, kaddr, size);
+		}
+
 		return (op_type);
 	} else {
 		/* Get the value as a zero-extended version */
 		value = 0;
-		char *kaddr = (char*)&value;
-#if _BYTE_ORDER == _BIG_ENDIAN
-		kaddr += sizeof(register_t) - size;
-#endif
-		int err;
-		if ((err = copyin_implicit_cap((void*)uaddr, kaddr, size))) {
-			return (0);
+		if (USERLAND(frame->badvaddr)) {
+			if ((err = copyin_implicit_cap((void*)dst_addr,
+			    kaddr, size)))
+				return (0);
+		}
+		else {
+			memcpy_c(kaddr, (void * __capability)dst_addr, size);
 		}
 		/* If we need to sign extend it, then shift it so that the sign
 		 * bit is in the correct place and then shift it back. */
