@@ -142,8 +142,8 @@ lib${libcompat}buildenv: .PHONY
 	# otherwise src.opts.mk will pick the wrong MK_FOO values.
 	@cd ${BUILDENV_DIR} && \
 	    env ${LIBCOMPATWMAKEENV} ${LIBCOMPAT_COMPILERS} BUILDENV=1 \
-	    TARGET=${LIBCOMPAT_MACHINE} TARGET_ARCH=${LIBCOMPAT_MACHINE_ARCH}
-	    "MAKEFLAGS=${MAKEFLAGS:NTARGET*}" ${BUILDENV_SHELL} || true
+	    TARGET=${LIBCOMPAT_MACHINE} TARGET_ARCH=${LIBCOMPAT_MACHINE_ARCH} \
+	    "MAKEFLAGS=${MAKEFLAGS:NTARGET*:Q}" ${BUILDENV_SHELL} || true
 .endif
 
 .endif # !targets(__<${_this:T}>__)
