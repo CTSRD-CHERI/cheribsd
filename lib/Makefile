@@ -249,7 +249,7 @@ SUBDIR.${MK_RADIUS_SUPPORT}+=	libradius
 SUBDIR.${MK_SENDMAIL}+=	libmilter libsm libsmdb libsmutil
 SUBDIR.${MK_TELNET}+=	libtelnet
 
-.if ${MK_TESTS_SUPPORT} != "no" || defined(COMPAT_CHERI)
+.if ${MK_TESTS_SUPPORT} != "no" || ${MK_TESTS} != "no"
 SUBDIR+=		atf
 .endif
 
