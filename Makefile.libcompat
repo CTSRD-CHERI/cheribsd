@@ -143,7 +143,7 @@ lib${libcompat}buildenv: .PHONY
 	@cd ${BUILDENV_DIR} && \
 	    env ${LIBCOMPATWMAKEENV} ${LIBCOMPAT_COMPILERS} BUILDENV=1 \
 	    TARGET=${LIBCOMPAT_MACHINE} TARGET_ARCH=${LIBCOMPAT_MACHINE_ARCH} \
-	    "MAKEFLAGS=${MAKEFLAGS:NTARGET*:Q}" ${BUILDENV_SHELL} || true
+	    "MAKEFLAGS=${MAKEFLAGS:NTARGET*}" ${BUILDENV_SHELL} || true
 .endif
 
 .endif # !targets(__<${_this:T}>__)
