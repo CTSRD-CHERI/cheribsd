@@ -82,12 +82,6 @@ _libc_other_objects+=timsort
 # Instead of setjmp/_setjmp we use setjmp_c/_setjmp_c
 _libc_other_objects:=${_libc_other_objects:Nsetjmp:N_setjmp} setjmp_c _setjmp_c
 .endif
-.elif ${LIBC_ARCH} == "sparc64"
-# reloc.c uses __sparc_utrap which needs a lot of other object files
-_libc_other_objects+=__sparc_utrap __sparc_utrap_fp_disabled __sparc_utrap_gen \
-    __sparc_utrap_setup __sparc_utrap_align __sparc_utrap_emul kill getpid \
-    fpu fpu_explode fpu_div fpu_reg fpu_sqrt fpu_implode fpu_subr fpu_add \
-    fpu_compare fpu_mul
 .endif
 
 .ifdef BUILDING_RTLD_CHERI_ELF
