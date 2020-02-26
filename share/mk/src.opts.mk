@@ -406,6 +406,9 @@ BROKEN_OPTIONS+=CDDL
 
 # Some compilation failure: TODO: investigate
 BROKEN_OPTIONS+=SVN SVNLITE
+
+# libcheri has not been ported to RISCV
+BROKEN_OPTIONS+=LIBCHERI
 .endif
 
 
