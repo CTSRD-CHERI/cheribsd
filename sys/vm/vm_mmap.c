@@ -581,7 +581,7 @@ kern_mmap_req(struct thread *td, const struct mmap_req *mrp)
 		SYSERRCAUSE(
 		    "%s: requested page permissions exceed requesed maximum",
 		    __func__);
-		return (EINVAL);
+		return (ENOTSUP);
 	}
 	if ((prot & (PROT_WRITE | PROT_EXEC)) == (PROT_WRITE | PROT_EXEC) &&
 	    (error = vm_wxcheck(p, "mmap")))
@@ -1165,7 +1165,7 @@ kern_mprotect(struct thread *td, uintptr_t addr0, size_t size, int prot)
 	vm_error = KERN_SUCCESS;
 	if (max_prot != 0) {
 		if ((max_prot & prot) != prot)
-			return (EINVAL);
+			return (ENOTSUP);
 		vm_error = vm_map_protect(&td->td_proc->p_vmspace->vm_map,
 		    addr, addr + size, max_prot, TRUE);
 	}
