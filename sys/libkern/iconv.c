@@ -46,7 +46,8 @@ __FBSDID("$FreeBSD$");
 
 SYSCTL_DECL(_kern_iconv);
 
-SYSCTL_NODE(_kern, OID_AUTO, iconv, CTLFLAG_RW, NULL, "kernel iconv interface");
+SYSCTL_NODE(_kern, OID_AUTO, iconv, CTLFLAG_RW | CTLFLAG_MPSAFE, NULL,
+    "kernel iconv interface");
 
 MALLOC_DEFINE(M_ICONV, "iconv", "ICONV structures");
 static MALLOC_DEFINE(M_ICONVDATA, "iconv_data", "ICONV data");
@@ -352,8 +353,10 @@ iconv_sysctl_drvlist(SYSCTL_HANDLER_ARGS)
 	return error;
 }
 
-SYSCTL_PROC(_kern_iconv, OID_AUTO, drvlist, CTLFLAG_RD | CTLTYPE_OPAQUE,
-	    NULL, 0, iconv_sysctl_drvlist, "S,xlat", "registered converters");
+SYSCTL_PROC(_kern_iconv, OID_AUTO, drvlist,
+    CTLFLAG_RD | CTLTYPE_OPAQUE | CTLFLAG_MPSAFE, NULL, 0,
+    iconv_sysctl_drvlist, "S,xlat",
+    "registered converters");
 
 /*
  * List all available charset pairs.
@@ -383,8 +386,10 @@ iconv_sysctl_cslist(SYSCTL_HANDLER_ARGS)
 	return error;
 }
 
-SYSCTL_PROC(_kern_iconv, OID_AUTO, cslist, CTLFLAG_RD | CTLTYPE_OPAQUE,
-	    NULL, 0, iconv_sysctl_cslist, "S,xlat", "registered charset pairs");
+SYSCTL_PROC(_kern_iconv, OID_AUTO, cslist,
+    CTLFLAG_RD | CTLTYPE_OPAQUE | CTLFLAG_MPSAFE, NULL, 0,
+    iconv_sysctl_cslist, "S,xlat",
+    "registered charset pairs");
 
 int
 iconv_add(const char *converter, const char *to, const char *from)
@@ -500,8 +505,9 @@ bad:
 }
 
 SYSCTL_PROC(_kern_iconv, OID_AUTO, add,
-    CTLFLAG_RW | CTLTYPE_OPAQUE | CTLFLAG_PTRIN,
-    NULL, 0, iconv_sysctl_add, "S,xlat", "register charset pair");
+    CTLFLAG_RW | CTLTYPE_OPAQUE | CTLFLAG_MPSAFE | CTLFLAG_PTRIN, NULL, 0,
+    iconv_sysctl_add, "S,xlat",
+    "register charset pair");
 
 /*
  * Default stubs for converters
