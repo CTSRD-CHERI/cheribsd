@@ -562,14 +562,10 @@ END(MipsFPID)
  * This code is copied the user's stack for returning from signal handlers
  * (see sendsig() and sigreturn()). We have to compute the address
  * of the sigcontext struct for the sigreturn call.
-*/
-/*
- * XXX-AM: TODO merge cheriabi and normal sigcode for purecap kernel.
- * Now this distinction is useless since cheriABI is the default ABI.
  */
 	.globl	_C_LABEL(sigcode)
 _C_LABEL(sigcode):
-	PTR_ADDU	a0, sp, SIGF_UC		# address of ucontext
+	cincoffsetimm	$c3, $c11, SIGF_UC	# address of ucontext
 	li		v0, SYS_sigreturn
 # sigreturn (ucp)
 	syscall
@@ -586,7 +582,7 @@ szsigcode:
 #if defined(__mips_n64) && defined(COMPAT_FREEBSD64)
 	.globl	_C_LABEL(freebsd64_sigcode)
 _C_LABEL(freebsd64_sigcode):
-	PTR_ADDU	a0, sp, SIGF_UC		# address of ucontext
+	PTR_ADDU	a0, sp, SIGF64_UC		# address of ucontext
 	li		v0, SYS_sigreturn
 # sigreturn (ucp)
 	syscall
@@ -618,32 +614,11 @@ szsigcode32:
 	.long	esigcode32-sigcode32
 	.text
 #endif
-
-/*
- * Always build the CheriABI sigcode symbols since this file is only ever
- * compiled with capability support.
- */
-	.globl	_C_LABEL(cheri_sigcode)
-_C_LABEL(cheri_sigcode):
-	dli		t0, SIGF_UC
-	cincoffset	$c3, $c11, t0		# In the hybrid ABI named $c11,
-	li		v0, SYS_sigreturn	# but we really mean $csp.
-# sigreturn (ucp)
-	syscall
-	break	0				# just in case sigreturn fails
-	.globl	_C_LABEL(echeri_sigcode)
-_C_LABEL(echeri_sigcode):
-
-	.data
-	.globl	szcheri_sigcode
-szcheri_sigcode:
-	.long	echeri_sigcode-cheri_sigcode
-	.text
 // CHERI CHANGES START
 // {
-//   "updated": 20190514,
+//   "updated": 20200227,
 //   "target_type": "header",
-//   "changes": [
+//   "changes_purecap": [
 //     "support"
 //   ],
 //   "change_comment": ""
