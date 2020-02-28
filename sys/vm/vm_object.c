@@ -496,7 +496,6 @@ vm_object_allocate_anon(vm_pindex_t size, vm_object_t backing_object,
 static void
 vm_object_reference_vnode(vm_object_t object)
 {
-	struct vnode *vp;
 	u_int old;
 
 	/*
@@ -506,10 +505,8 @@ vm_object_reference_vnode(vm_object_t object)
 	if (!refcount_acquire_if_gt(&object->ref_count, 0)) {
 		VM_OBJECT_RLOCK(object);
 		old = refcount_acquire(&object->ref_count);
-		if (object->type == OBJT_VNODE && old == 0) {
-			vp = object->handle;
-			vref(vp);
-		}
+		if (object->type == OBJT_VNODE && old == 0)
+			vref(object->handle);
 		VM_OBJECT_RUNLOCK(object);
 	}
 }
@@ -544,13 +541,12 @@ vm_object_reference(vm_object_t object)
 void
 vm_object_reference_locked(vm_object_t object)
 {
-	struct vnode *vp;
 	u_int old;
 
 	VM_OBJECT_ASSERT_LOCKED(object);
 	old = refcount_acquire(&object->ref_count);
-	if (object->type == OBJT_VNODE && old == 0) {
-		vp = object->handle; vref(vp); }
+	if (object->type == OBJT_VNODE && old == 0)
+		vref(object->handle);
 	KASSERT((object->flags & OBJ_DEAD) == 0,
 	    ("vm_object_reference: Referenced dead object."));
 }
