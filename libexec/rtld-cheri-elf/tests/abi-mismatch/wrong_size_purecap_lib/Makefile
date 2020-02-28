@@ -1,6 +1,7 @@
 # $FreeBSD$
 
-NEED_CHERI=	pure
+NEED_COMPAT=	CHERI
+.include <bsd.compat.mk>
 SHLIB=		wrong_size_purecap
 .include <src.opts.mk>
 # Invert the CHERI bits MK_ flags to build a library for the wrong target:
