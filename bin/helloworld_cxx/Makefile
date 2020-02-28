@@ -5,7 +5,8 @@
 PROG_CXX=	helloworld_cxx
 
 MAN=
-NEED_CHERI=	pure
+NEED_COMPAT=	CHERI
+.include <bsd.compat.mk>
 
 CXXFLAGS+=	-std=c++11
 

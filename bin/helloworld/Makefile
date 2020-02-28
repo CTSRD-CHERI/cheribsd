@@ -5,7 +5,8 @@
 PROG=	helloworld
 
 MAN=
-NEED_CHERI=	pure
+NEED_COMPAT=	CHERI
+.include <bsd.compat.mk>
 
 NO_WERROR=	YES
 
