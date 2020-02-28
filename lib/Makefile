@@ -156,7 +156,9 @@ SUBDIR.${MK_BLUETOOTH}+=libbluetooth libsdp
 SUBDIR.${MK_BSNMP}+=	libbsnmp
 
 SUBDIR.${MK_LIBCHERI}+=	libhelloworld
-SUBDIR.${MK_CHERI}+=	libsyscalls
+.if ${MACHINE_ABI:Mpurecap}
+SUBDIR+=	libsyscalls
+.endif
 
 .if ${MK_LIBCHERI} == "yes" && ${MACHINE_ARCH} != "mips"
 _libc_cheri=	libc_cheri
