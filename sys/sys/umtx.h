@@ -117,9 +117,15 @@
 #define	UMTX_SHM_ALIVE		0x0008
 
 struct umtx_robust_lists_params {
+#if __has_feature(capabilities) && defined(_KERNEL)
+	uintcap_t	robust_list_offset;
+	uintcap_t	robust_priv_list_offset;
+	uintcap_t	robust_inact_offset;
+#else
 	uintptr_t	robust_list_offset;
 	uintptr_t	robust_priv_list_offset;
 	uintptr_t	robust_inact_offset;
+#endif
 };
 
 #ifndef _KERNEL
