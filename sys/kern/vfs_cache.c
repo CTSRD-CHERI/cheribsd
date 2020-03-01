@@ -2203,20 +2203,12 @@ kern___getcwd(struct thread *td, char * __capability ubuf, size_t buflen)
 int
 vn_getcwd(struct thread *td, char *buf, char **retbuf, size_t *buflen)
 {
-	struct filedesc *fdp;
-	struct vnode *cdir, *rdir;
+	struct pwd *pwd;
 	int error;
 
-	fdp = td->td_proc->p_fd;
-	FILEDESC_SLOCK(fdp);
-	cdir = fdp->fd_cdir;
-	vrefact(cdir);
-	rdir = fdp->fd_rdir;
-	vrefact(rdir);
-	FILEDESC_SUNLOCK(fdp);
-	error = vn_fullpath_any(td, cdir, rdir, buf, retbuf, buflen);
-	vrele(rdir);
-	vrele(cdir);
+	pwd = pwd_hold(td);
+	error = vn_fullpath_any(td, pwd->pwd_cdir, pwd->pwd_rdir, buf, retbuf, buflen);
+	pwd_drop(pwd);
 
 #ifdef KTRACE
 	if (KTRPOINT(curthread, KTR_NAMEI) && error == 0)
@@ -2264,9 +2256,8 @@ sys___realpathat(struct thread *td, struct __realpathat_args *uap)
 int
 vn_fullpath(struct thread *td, struct vnode *vn, char **retbuf, char **freebuf)
 {
+	struct pwd *pwd;
 	char *buf;
-	struct filedesc *fdp;
-	struct vnode *rdir;
 	size_t buflen;
 	int error;
 
@@ -2275,13 +2266,9 @@ vn_fullpath(struct thread *td, struct vnode *vn, char **retbuf, char **freebuf)
 
 	buflen = MAXPATHLEN;
 	buf = malloc(buflen, M_TEMP, M_WAITOK);
-	fdp = td->td_proc->p_fd;
-	FILEDESC_SLOCK(fdp);
-	rdir = fdp->fd_rdir;
-	vrefact(rdir);
-	FILEDESC_SUNLOCK(fdp);
-	error = vn_fullpath_any(td, vn, rdir, buf, retbuf, &buflen);
-	vrele(rdir);
+	pwd = pwd_hold(td);
+	error = vn_fullpath_any(td, vn, pwd->pwd_rdir, buf, retbuf, &buflen);
+	pwd_drop(pwd);
 
 	if (!error)
 		*freebuf = buf;
@@ -2549,8 +2536,7 @@ vn_fullpath_hardlink(struct thread *td, struct nameidata *ndp, char **retbuf,
     char **freebuf, size_t *buflen)
 {
 	char *buf, *tmpbuf;
-	struct filedesc *fdp;
-	struct vnode *rdir;
+	struct pwd *pwd;
 	struct componentname *cnp;
 	struct vnode *vp;
 	size_t addend;
@@ -2565,11 +2551,7 @@ vn_fullpath_hardlink(struct thread *td, struct nameidata *ndp, char **retbuf,
 	slash_prefixed = false;
 
 	buf = malloc(*buflen, M_TEMP, M_WAITOK);
-	fdp = td->td_proc->p_fd;
-	FILEDESC_SLOCK(fdp);
-	rdir = fdp->fd_rdir;
-	vrefact(rdir);
-	FILEDESC_SUNLOCK(fdp);
+	pwd = pwd_hold(td);
 
 	addend = 0;
 	vp = ndp->ni_vp;
@@ -2590,16 +2572,17 @@ vn_fullpath_hardlink(struct thread *td, struct nameidata *ndp, char **retbuf,
 	}
 
 	vref(vp);
-	error = vn_fullpath_dir(td, vp, rdir, buf, retbuf, buflen, slash_prefixed, addend);
+	error = vn_fullpath_dir(td, vp, pwd->pwd_rdir, buf, retbuf, buflen,
+	    slash_prefixed, addend);
 	if (error != 0)
 		goto out_bad;
 
-	vrele(rdir);
+	pwd_drop(pwd);
 	*freebuf = buf;
 
 	return (0);
 out_bad:
-	vrele(rdir);
+	pwd_drop(pwd);
 	free(buf, M_TEMP);
 	return (error);
 }
