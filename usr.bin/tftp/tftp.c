@@ -152,15 +152,15 @@ xmitfile(int peer, char *port, int fd, char *name, char *mode)
 		parse_options(peer, rp->th_stuff, n + 2);
 	}
 
-	if (read_init(fd, NULL, mode) < 0) {
-		warn("read_init()");
+	if (tftp_read_init(fd, NULL, mode) < 0) {
+		warn("tftp_read_init()");
 		return;
 	}
 
 	block = 1;
 	tftp_send(peer, &block, &tftp_stats);
 
-	read_close();
+	tftp_read_close();
 	if (tftp_stats.amount > 0)
 		printstats("Sent", verbose, &tftp_stats);
 
