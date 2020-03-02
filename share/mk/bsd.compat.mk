@@ -195,10 +195,15 @@ LIBSOFTWMAKEENV= CPUTYPE=soft
 LIBSOFTWMAKEFLAGS=        -DCOMPAT_SOFTFP
 .endif
 
+.if defined(NEED_COMPAT) && ${NEED_COMPAT:MCHERI} && ${MACHINE_ABI:Mpurecap}
+.info "NEED_COMPAT=CHERI with default ABI == purecap, ignoring for ${.CURDIR}"
+.undef NEED_COMPAT
+.endif
+
 # -------------------------------------------------------------------
 # In the program linking case, select LIBCOMPAT
 .if defined(NEED_COMPAT)
-.ifndef HAS_COMPAT
+.if !defined(HAS_COMPAT)
 .warning NEED_COMPAT defined, but no LIBCOMPAT is available (COMPAT_ARCH == ${COMPAT_ARCH})
 .elif !${HAS_COMPAT:M${NEED_COMPAT}} && ${NEED_COMPAT} != "any"
 .error NEED_COMPAT (${NEED_COMPAT}) defined, but not in HAS_COMPAT (${HAS_COMPAT})
