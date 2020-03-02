@@ -366,7 +366,7 @@ STATNODE_COUNTER(numposhits, "Number of cache hits (positive)");
 STATNODE_COUNTER(numnegzaps,
     "Number of cache hits (negative) we do not want to cache");
 STATNODE_COUNTER(numneghits, "Number of cache hits (negative)");
-/* These count for kern___getcwd(), too. */
+/* These count for vn_getcwd(), too. */
 STATNODE_COUNTER(numfullpathcalls, "Number of fullpath search calls");
 STATNODE_COUNTER(numfullpathfail1, "Number of fullpath search errors (ENOTDIR)");
 STATNODE_COUNTER(numfullpathfail2,
@@ -390,7 +390,7 @@ STATNODE_COUNTER(shrinking_skipped,
 
 static void cache_zap_locked(struct namecache *ncp, bool neg_locked);
 static int vn_fullpath1(struct thread *td, struct vnode *vp, struct vnode *rdir,
-    char *buf, char **retbuf, u_int buflen);
+    char *buf, char **retbuf, size_t *buflen);
 
 static MALLOC_DEFINE(M_VFSCACHE, "vfscache", "VFS name cache entries");
 
@@ -2143,9 +2143,7 @@ vfs_cache_lookup(struct vop_lookup_args *ap)
 	int error;
 	struct vnode **vpp = ap->a_vpp;
 	struct componentname *cnp = ap->a_cnp;
-	struct ucred *cred = cnp->cn_cred;
 	int flags = cnp->cn_flags;
-	struct thread *td = cnp->cn_thread;
 
 	*vpp = NULL;
 	dvp = ap->a_dvp;
@@ -2157,8 +2155,8 @@ vfs_cache_lookup(struct vop_lookup_args *ap)
 	    (cnp->cn_nameiop == DELETE || cnp->cn_nameiop == RENAME))
 		return (EROFS);
 
-	error = VOP_ACCESS(dvp, VEXEC, cred, td);
-	if (error)
+	error = vn_dir_check_exec(dvp, cnp);
+	if (error != 0)
 		return (error);
 
 	error = cache_lookup(dvp, vpp, cnp, NULL, NULL);
@@ -2169,39 +2167,40 @@ vfs_cache_lookup(struct vop_lookup_args *ap)
 	return (error);
 }
 
-/*
- * XXX All of these sysctls would probably be more productive dead.
- */
-static int __read_mostly disablecwd;
-SYSCTL_INT(_debug, OID_AUTO, disablecwd, CTLFLAG_RW, &disablecwd, 0,
-   "Disable the getcwd syscall");
-
 /* Implementation of the getcwd syscall. */
 int
 sys___getcwd(struct thread *td, struct __getcwd_args *uap)
 {
 
-	return (kern___getcwd(td, uap->buf, UIO_USERSPACE, uap->buflen,
-	    MAXPATHLEN));
+	return (kern___getcwd(td, uap->buf, uap->buflen));
 }
 
 int
-kern___getcwd(struct thread *td, char * __capability buf, enum uio_seg bufseg,
-    size_t buflen, size_t path_max)
+kern___getcwd(struct thread *td, char * __capability ubuf, size_t buflen)
 {
-	char *bp, *tmpbuf;
+	char *buf, *retbuf;
+	int error;
+
+	if (__predict_false(buflen < 2))
+		return (EINVAL);
+	if (buflen > MAXPATHLEN)
+		buflen = MAXPATHLEN;
+
+	buf = malloc(buflen, M_TEMP, M_WAITOK);
+	error = vn_getcwd(td, buf, &retbuf, &buflen);
+	if (error == 0)
+		error = copyout(retbuf, ubuf, buflen);
+	free(buf, M_TEMP);
+	return (error);
+}
+
+int
+vn_getcwd(struct thread *td, char *buf, char **retbuf, size_t *buflen)
+{
 	struct filedesc *fdp;
 	struct vnode *cdir, *rdir;
 	int error;
 
-	if (__predict_false(disablecwd))
-		return (ENODEV);
-	if (__predict_false(buflen < 2))
-		return (EINVAL);
-	if (buflen > path_max)
-		buflen = path_max;
-
-	tmpbuf = malloc(buflen, M_TEMP, M_WAITOK);
 	fdp = td->td_proc->p_fd;
 	FILEDESC_SLOCK(fdp);
 	cdir = fdp->fd_cdir;
@@ -2209,31 +2208,16 @@ kern___getcwd(struct thread *td, char * __capability buf, enum uio_seg bufseg,
 	rdir = fdp->fd_rdir;
 	vrefact(rdir);
 	FILEDESC_SUNLOCK(fdp);
-	error = vn_fullpath1(td, cdir, rdir, tmpbuf, &bp, buflen);
+	error = vn_fullpath1(td, cdir, rdir, buf, retbuf, buflen);
 	vrele(rdir);
 	vrele(cdir);
 
-	if (!error) {
-		if (bufseg == UIO_SYSSPACE)
-			bcopy(bp, (__cheri_fromcap char *)buf, strlen(bp) + 1);
-		else
-			error = copyout(bp, buf, strlen(bp) + 1);
 #ifdef KTRACE
-	if (KTRPOINT(curthread, KTR_NAMEI))
-		ktrnamei(bp);
+	if (KTRPOINT(curthread, KTR_NAMEI) && error == 0)
+		ktrnamei(*retbuf);
 #endif
-	}
-	free(tmpbuf, M_TEMP);
 	return (error);
 }
-
-/*
- * Thus begins the fullpath magic.
- */
-
-static int __read_mostly disablefullpath;
-SYSCTL_INT(_debug, OID_AUTO, disablefullpath, CTLFLAG_RW, &disablefullpath, 0,
-    "Disable the vn_fullpath function");
 
 /*
  * Retrieve the full filesystem path that correspond to a vnode from the name
@@ -2245,20 +2229,20 @@ vn_fullpath(struct thread *td, struct vnode *vn, char **retbuf, char **freebuf)
 	char *buf;
 	struct filedesc *fdp;
 	struct vnode *rdir;
+	size_t buflen;
 	int error;
 
-	if (__predict_false(disablefullpath))
-		return (ENODEV);
 	if (__predict_false(vn == NULL))
 		return (EINVAL);
 
-	buf = malloc(MAXPATHLEN, M_TEMP, M_WAITOK);
+	buflen = MAXPATHLEN;
+	buf = malloc(buflen, M_TEMP, M_WAITOK);
 	fdp = td->td_proc->p_fd;
 	FILEDESC_SLOCK(fdp);
 	rdir = fdp->fd_rdir;
 	vrefact(rdir);
 	FILEDESC_SUNLOCK(fdp);
-	error = vn_fullpath1(td, vn, rdir, buf, retbuf, MAXPATHLEN);
+	error = vn_fullpath1(td, vn, rdir, buf, retbuf, &buflen);
 	vrele(rdir);
 
 	if (!error)
@@ -2279,14 +2263,14 @@ vn_fullpath_global(struct thread *td, struct vnode *vn,
     char **retbuf, char **freebuf)
 {
 	char *buf;
+	size_t buflen;
 	int error;
 
-	if (__predict_false(disablefullpath))
-		return (ENODEV);
 	if (__predict_false(vn == NULL))
 		return (EINVAL);
-	buf = malloc(MAXPATHLEN, M_TEMP, M_WAITOK);
-	error = vn_fullpath1(td, vn, rootvnode, buf, retbuf, MAXPATHLEN);
+	buflen = MAXPATHLEN;
+	buf = malloc(buflen, M_TEMP, M_WAITOK);
+	error = vn_fullpath1(td, vn, rootvnode, buf, retbuf, &buflen);
 	if (!error)
 		*freebuf = buf;
 	else
@@ -2295,7 +2279,7 @@ vn_fullpath_global(struct thread *td, struct vnode *vn,
 }
 
 int
-vn_vptocnp(struct vnode **vp, struct ucred *cred, char *buf, u_int *buflen)
+vn_vptocnp(struct vnode **vp, struct ucred *cred, char *buf, size_t *buflen)
 {
 	struct vnode *dvp;
 	struct namecache *ncp;
@@ -2357,17 +2341,20 @@ vn_vptocnp(struct vnode **vp, struct ucred *cred, char *buf, u_int *buflen)
 }
 
 /*
- * The magic behind kern___getcwd() and vn_fullpath().
+ * The magic behind vn_getcwd() and vn_fullpath().
  */
 static int
 vn_fullpath1(struct thread *td, struct vnode *vp, struct vnode *rdir,
-    char *buf, char **retbuf, u_int buflen)
+    char *buf, char **retbuf, size_t *len)
 {
 	int error, slash_prefixed;
 #ifdef KDTRACE_HOOKS
 	struct vnode *startvp = vp;
 #endif
 	struct vnode *vp1;
+	size_t buflen;
+
+	buflen = *len;
 
 	buflen--;
 	buf[buflen] = '\0';
@@ -2459,6 +2446,7 @@ vn_fullpath1(struct thread *td, struct vnode *vp, struct vnode *rdir,
 
 	SDT_PROBE3(vfs, namecache, fullpath, return, 0, startvp, buf + buflen);
 	*retbuf = buf + buflen;
+	*len -= buflen;
 	return (0);
 }
 
@@ -2517,9 +2505,6 @@ vn_commname(struct vnode *vp, char *buf, u_int buflen)
  * Requires a locked, referenced vnode.
  * Vnode is re-locked on success or ENODEV, otherwise unlocked.
  *
- * If sysctl debug.disablefullpath is set, ENODEV is returned,
- * vnode is left locked and path remain untouched.
- *
  * If vp is a directory, the call to vn_fullpath_global() always succeeds
  * because it falls back to the ".." lookup if the namecache lookup fails.
  */
@@ -2533,10 +2518,6 @@ vn_path_to_global_path(struct thread *td, struct vnode *vp, char *path,
 	int error;
 
 	ASSERT_VOP_ELOCKED(vp, __func__);
-
-	/* Return ENODEV if sysctl debug.disablefullpath==1 */
-	if (__predict_false(disablefullpath))
-		return (ENODEV);
 
 	/* Construct global filesystem path from vp. */
 	VOP_UNLOCK(vp);

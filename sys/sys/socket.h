@@ -441,7 +441,7 @@ struct msghdr {
 struct msghdr64 {
 	uint64_t	msg_name;	/* (void *) optional address */
 	socklen_t	msg_namelen;	/* size of address */
-	uint64_t	msg_iov;	/* (struct iovec_native *) scatter/gather array */
+	uint64_t	msg_iov;	/* (struct iovec64 *) scatter/gather array */
 	int		msg_iovlen;	/* # elements in msg_iov */
 	uint64_t	msg_control;	/* (void *) ancillary data, see below */
 	socklen_t	msg_controllen;	/* ancillary data buffer len */
@@ -540,7 +540,7 @@ struct sockcred {
 #endif /* __BSD_VISIBLE */
 
 /*
- * We should not need to align align for capabilities in CheriABI. Sending them makes little
+ * We should not need to align for capabilities in CheriABI. Sending them makes little
  * sense and would be a major potential security hole.
  * However within the kernel control messages may contain pointers (see SCM_RIGHTS),
  * therefore we need to align to pointer size within the kernel.

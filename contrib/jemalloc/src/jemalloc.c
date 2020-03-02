@@ -91,6 +91,7 @@ bool	opt_utrace = false;
 bool	opt_xmalloc = false;
 bool	opt_zero = false;
 unsigned	opt_narenas = 0;
+
 unsigned	ncpus;
 
 /* Protects arenas initialization. */
@@ -2413,6 +2414,7 @@ je_realloc(void *ptr, size_t size) {
 	}
 	UTRACE(ptr, size, ret);
 	check_entry_exit_locking(tsdn);
+
 	LOG("core.realloc.exit", "result: %p", ret);
 	return (BOUND_PTR(ret, size));
 }

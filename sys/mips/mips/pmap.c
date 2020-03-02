@@ -2681,10 +2681,9 @@ pmap_copy_page_internal(vm_page_t src, vm_page_t dst, int flags)
 		    (vm_offset_t)MIPS_PHYS_TO_DIRECT(phys_dst), PAGE_SIZE);
 		va_src = (vm_ptr_t)MIPS_PHYS_TO_DIRECT(phys_src);
 		va_dst = (vm_ptr_t)MIPS_PHYS_TO_DIRECT(phys_dst);
-#ifdef CPU_CHERI
-		if (flags & PMAP_COPY_TAGS)
-			cheri_bcopy((caddr_t)va_src, (caddr_t)va_dst,
-			    PAGE_SIZE);
+#if __has_feature(capabilities)
+		if ((flags & PMAP_COPY_TAGS) == 0)
+			bcopynocap((caddr_t)va_src, (caddr_t)va_dst, PAGE_SIZE);
 		else
 #endif
 			bcopy((caddr_t)va_src, (caddr_t)va_dst, PAGE_SIZE);
@@ -2712,7 +2711,7 @@ pmap_copy_page(vm_page_t src, vm_page_t dst)
 	pmap_copy_page_internal(src, dst, 0);
 }
 
-#ifdef CPU_CHERI
+#if __has_feature(capabilities)
 void
 pmap_copy_page_tags(vm_page_t src, vm_page_t dst)
 {
@@ -2723,9 +2722,12 @@ pmap_copy_page_tags(vm_page_t src, vm_page_t dst)
 
 int unmapped_buf_allowed;
 
-static void
-pmap_copy_pages_internal(vm_page_t ma[], vm_offset_t a_offset, vm_page_t mb[],
-    vm_offset_t b_offset, int xfersize, int flags)
+/*
+ * As with pmap_copy_page(), CHERI strips tags in this case.
+ */
+void
+pmap_copy_pages(vm_page_t ma[], vm_offset_t a_offset, vm_page_t mb[],
+    vm_offset_t b_offset, int xfersize)
 {
 	char *a_cp, *b_cp;
 	vm_page_t a_m, b_m;
@@ -2752,24 +2754,14 @@ pmap_copy_pages_internal(vm_page_t ma[], vm_offset_t a_offset, vm_page_t mb[],
 			    a_pg_offset;
 			b_cp = (char *)MIPS_PHYS_TO_DIRECT(b_phys) +
 			    b_pg_offset;
-#ifdef CPU_CHERI
-			if (flags & PMAP_COPY_TAGS)
-				cheri_bcopy(a_cp, b_cp, cnt);
-			else
-#endif
-				bcopy(a_cp, b_cp, cnt);
+                        bcopynocap(a_cp, b_cp, cnt);
 			mips_dcache_wbinv_range((vm_offset_t)b_cp, cnt);
 		} else {
 			a_cp = (char *)pmap_lmem_map2(a_phys, b_phys);
 			b_cp = (char *)a_cp + PAGE_SIZE;
 			a_cp += a_pg_offset;
 			b_cp += b_pg_offset;
-#ifdef CPU_CHERI
-			if (flags & PMAP_COPY_TAGS)
-				cheri_bcopy(a_cp, b_cp, cnt);
-			else
-#endif
-				bcopy(a_cp, b_cp, cnt);
+                        bcopynocap(a_cp, b_cp, cnt);
 			mips_dcache_wbinv_range((vm_offset_t)b_cp, cnt);
 			pmap_lmem_unmap();
 		}
@@ -2779,28 +2771,7 @@ pmap_copy_pages_internal(vm_page_t ma[], vm_offset_t a_offset, vm_page_t mb[],
 	}
 }
 
-/*
- * As with pmap_copy_page(), CHERI requires tagged and non-tagged versions
- * depending on the circumstances.
- */
-void
-pmap_copy_pages(vm_page_t ma[], vm_offset_t a_offset, vm_page_t mb[],
-    vm_offset_t b_offset, int xfersize)
-{
 
-	pmap_copy_pages_internal(ma, a_offset, mb, b_offset, xfersize, 0);
-}
-
-#ifdef CPU_CHERI
-void
-pmap_copy_pages_tags(vm_page_t ma[], vm_offset_t a_offset, vm_page_t mb[],
-    vm_offset_t b_offset, int xfersize)
-{
-
-	pmap_copy_pages_internal(ma, a_offset, mb, b_offset, xfersize,
-	    PMAP_COPY_TAGS);
-}
-#endif
 
 vm_ptr_t
 pmap_quick_enter_page(vm_page_t m)

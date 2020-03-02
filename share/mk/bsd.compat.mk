@@ -121,6 +121,20 @@ LIB64WMAKEFLAGS= LD="${XLD} -m ${_EMULATION}"
 LIB64LDFLAGS=	-Wl,-m${_EMULATION}
 .endif
 
+.if ${COMPAT_ARCH:Mriscv*c*}
+HAS_COMPAT=64
+COMPAT_RISCV_ABI=	lp64
+.if !${COMPAT_ARCH:Mriscv*sf}
+COMPAT_RISCV_ABI:=	${COMPAT_RISCV_ABI}d
+.endif
+LIB64_MACHINE=	riscv
+LIB64_MACHINE_ARCH=riscv64
+LIB64WMAKEFLAGS= LD="${XLD}"
+# XXX: clang specific
+LIB64CPUFLAGS=	-target riscv64-unknown-freebsd13.0
+LIB64CPUFLAGS+=	-march=${COMPAT_RISCV_MARCH} -mabi=${COMPAT_RISCV_ABI}
+.endif
+
 LIB64WMAKEFLAGS+= NM="${XNM}" OBJCOPY="${XOBJCOPY}"
 
 LIB64CFLAGS=	-DCOMPAT_64BIT
@@ -144,27 +158,29 @@ LIBCHERI_MACHINE=	riscv
 LIBCHERI_MACHINE_ARCH=	${COMPAT_ARCH}c
 LIBCHERIWMAKEFLAGS=	CPUTYPE=cheri
 LIBCHERICPUFLAGS=	-target riscv64-unknown-freebsd13.0
-#RISCV_MARCH=	rv64ima
-#.if !${COMPAT_ARCH:Mriscv*sf*}
-#RISCV_MARCH:=	${RISCV_MARCH}fd
-#.endif
-#RISCV_MARCH:=	${RISCV_MARCH}c
-#RISCV_MARCH:=	${RISCV_MARCH}xcheri
-#RISCV_ABI=	l64pc128
-#.if !${COMPAT_ARCH:Mriscv*sf*}
-#RISCV_ABI:=	${RISCV_ABI}d
-#.endif
-#LIBCHERICPUFLAGS+=	-march=${RISCV_MARCH} -mabi=${RISCV_ABI}
+COMPAT_RISCV_ABI=	l64pc128
+.if !${MACHINE_ARCH:Mriscv*sf}
+COMPAT_RISCV_ABI:=	${COMPAT_RISCV_ABI}d
+.endif
+LIBCHERICPUFLAGS+=	-march=${COMPAT_RISCV_MARCH} -mabi=${COMPAT_RISCV_ABI}
 .endif	# ${COMPAT_ARCH:Mriscv64*}
 
+.if ${COMPAT_ARCH:Mriscv*}
+# See bsd.cpu.mk
+COMPAT_RISCV_MARCH=	rv64ima
+.if !${COMPAT_ARCH:Mriscv*sf*}
+COMPAT_RISCV_MARCH:=	${COMPAT_RISCV_MARCH}fd
+.endif
+COMPAT_RISCV_MARCH:=	${COMPAT_RISCV_MARCH}c
+.if ${COMPAT_ARCH:Mriscv*c*} || (defined(HAS_COMPAT) && ${HAS_COMPAT:MCHERI})
+COMPAT_RISCV_MARCH:=	${COMPAT_RISCV_MARCH}xcheri
+.endif
+.endif
+
 # Common CHERI flags
-.if ${HAS_COMPAT:MCHERI}
+.if defined(HAS_COMPAT) && ${HAS_COMPAT:MCHERI}
 LIBCHERICFLAGS+=	-DCOMPAT_CHERI
-LIBCHERIWMAKEFLAGS+=	LIBCHERI=yes
-# Forward the cross linker and binutils
-.for BINUTIL in ${XBINUTILS}
-LIBCHERIWMAKEFLAGS+=	${BINUTIL}="${X${BINUTIL}}"
-.endfor
+LIBCHERIWMAKEFLAGS+=	COMPAT_CHERI=yes
 .endif
 
 # -------------------------------------------------------------------
@@ -183,7 +199,7 @@ LIBSOFTWMAKEFLAGS=        -DCOMPAT_SOFTFP
 # In the program linking case, select LIBCOMPAT
 .if defined(NEED_COMPAT)
 .ifndef HAS_COMPAT
-.warning NEED_COMPAT defined, but no LIBCOMPAT is available (COMPAT_ARCH == ${COMPAT_ARCH}
+.warning NEED_COMPAT defined, but no LIBCOMPAT is available (COMPAT_ARCH == ${COMPAT_ARCH})
 .elif !${HAS_COMPAT:M${NEED_COMPAT}} && ${NEED_COMPAT} != "any"
 .error NEED_COMPAT (${NEED_COMPAT}) defined, but not in HAS_COMPAT (${HAS_COMPAT})
 .elif ${NEED_COMPAT} == "any"
@@ -224,9 +240,14 @@ LIBCOMPATCFLAGS+=	${LIBCOMPATCPUFLAGS} \
 
 LIBCOMPATWMAKEENV+=	MACHINE=${LIBCOMPAT_MACHINE}
 LIBCOMPATWMAKEENV+=	MACHINE_ARCH=${LIBCOMPAT_MACHINE_ARCH}
-LIBCOMPATWMAKEENV+=	TARGET=${LIBCOMPAT_MACHINE}
-LIBCOMPATWMAKEENV+=	TARGET_ARCH=${LIBCOMPAT_MACHINE_ARCH}
-
+# Note: TARGET and TARGET_ARCH must be set on the command line to override
+# previous assignments
+LIBCOMPATWMAKEFLAGS+=	TARGET=${LIBCOMPAT_MACHINE}
+LIBCOMPATWMAKEFLAGS+=	TARGET_ARCH=${LIBCOMPAT_MACHINE_ARCH}
+# Forward the cross linker and binutils
+.for BINUTIL in ${XBINUTILS}
+LIBCOMPATWMAKEENV+=	${BINUTIL}="${X${BINUTIL}}"
+.endfor
 # -B is needed to find /usr/lib32/crti.o for GCC and /usr/libsoft/crti.o for
 # Clang/GCC.
 LIBCOMPATCFLAGS+=	-B${WORLDTMP}/usr/lib${libcompat}

@@ -62,14 +62,7 @@
  *
  * memcpy has inverted source/destination pointers and returns dest.
  */
-#ifdef CHERI_PURECAP_KERNEL
-LEAF(FUNC_PREFIX(memcpy))
-XLEAF(FUNC_PREFIX(memcpy_c))
-XLEAF(FUNC_PREFIX(cheri_memcpy))
-XLEAF(FUNC_PREFIX(memmove))
-#else
 LEAF(FUNC_PREFIX(memcpy_c))
-#endif
 XLEAF(FUNC_PREFIX(memmove_c))
 	cmove	$c1, $c3
 	cmove	$c3, $c4
@@ -85,10 +78,6 @@ XLEAF(FUNC_PREFIX(bcopynocap_c))
 	beqz		a0, .L.return	/* return immediately if zero-length */
 	li	t0, ~CHERI_PERM_LOAD_CAP
 	candperm	$c3, $c3, t0	/* strip LOAD_CAP from dst */
-#ifdef CHERI_PURECAP_KERNEL
-XLEAF(FUNC_PREFIX(cheri_bcopy))
-XLEAF(FUNC_PREFIX(bcopy))
-#endif
 XLEAF(FUNC_PREFIX(bcopy_c))
 	beqz		a0, .L.return	/* return immediately if zero-length */
 	cltu		t0, $c3, $c4	/* forward or backward copy? */
@@ -353,15 +342,7 @@ XEND(FUNC_PREFIX(bcopynocap_c))
 XEND(FUNC_PREFIX(memmovenocap_c))
 XEND(FUNC_PREFIX(memcpynocap_c))
 XEND(FUNC_PREFIX(memmove_c))
-#ifdef CHERI_PURECAP_KERNEL
-XEND(FUNC_PREFIX(bcopy))
-XEND(FUNC_PREFIX(cheri_bcopy))
-XEND(FUNC_PREFIX(memcpy_c))
-XEND(FUNC_PREFIX(cheri_memcpy))
-END(FUNC_PREFIX(memcpy))
-#else
 END(FUNC_PREFIX(memcpy_c))
-#endif
 
 // CHERI CHANGES START
 // {

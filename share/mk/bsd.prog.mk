@@ -7,6 +7,9 @@ __BSD_PROG_MK=yes
 .include <bsd.cheri.mk>
 .include <bsd.compiler.mk>
 .include <bsd.linker.mk>
+.if defined(_CRUNCHGEN)
+.include <bsd.compat.mk>
+.endif
 
 .SUFFIXES: .out .o .bc .c .cc .cpp .cxx .C .m .y .l .ll .ln .s .S .asm
 

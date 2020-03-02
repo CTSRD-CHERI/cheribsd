@@ -685,7 +685,6 @@ __elfN(load_section)(struct image_params *imgp, vm_ooffset_t offset,
 			return (0);
 	}
 
-
 	/*
 	 * We have to get the remaining bit of the file into the first part
 	 * of the oversized map segment.  This is normally because the .data
@@ -2972,7 +2971,7 @@ __elfN(untrans_prot)(vm_prot_t prot)
 }
 
 void
-__elfN(stackgap)(struct image_params *imgp, uintptr_t *stack_base)
+__elfN(stackgap)(struct image_params *imgp, uintcap_t *stack_base)
 {
 	uintptr_t rbase;
 	vm_offset_t range, gap;

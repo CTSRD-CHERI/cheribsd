@@ -154,9 +154,9 @@ TARGET_ABI=	gnueabihf
 TARGET_ABI=	gnueabi
 .endif
 .endif
-MACHINE_ABI?=	unknown
+_MACHINE_ABI?=	unknown
 MACHINE_MACHINE=${MACHINE_ARCH:S/amd64/x86_64/:C/[hs]f$//:S/mipsn32/mips64/:C/mips.*c.*/cheri/:S/riscv64c/riscv64/}
-MACHINE_TRIPLE?=${MACHINE_MACHINE}-${MACHINE_ABI}-freebsd13.0
+MACHINE_TRIPLE?=${MACHINE_MACHINE}-${_MACHINE_ABI}-freebsd13.0
 TARGET_ABI?=	unknown
 TARGET_MACHINE=	${TARGET_ARCH:S/amd64/x86_64/:C/[hs]f$//:S/mipsn32/mips64/:C/mips.*c.*/cheri/:S/riscv64c/riscv64/}
 TARGET_TRIPLE?=	${TARGET_MACHINE}-${TARGET_ABI}-freebsd13.0
@@ -183,8 +183,7 @@ KNOWN_ARCHES?=	aarch64/arm64 \
 		riscv64/riscv \
 		riscv64sf/riscv \
 		riscv64c/riscv \
-		riscv64sfc/riscv \
-		sparc64
+		riscv64sfc/riscv
 
 .if ${TARGET} == ${TARGET_ARCH}
 _t=		${TARGET}
@@ -485,7 +484,7 @@ SUBDIR+=	${_DIR}
 .endif
 
 # Finally build cheribsdbox if requested
-.if ${MK_CHERIBSDBOX} != "no" && !defined(SYSROOT_ONLY) && !${TARGET_ARCH:Mmips*c*}
+.if ${MK_CHERIBSDBOX} != "no" && !defined(SYSROOT_ONLY)
 SUBDIR+=	tools/cheribsdbox
 .endif
 
@@ -2492,8 +2491,6 @@ _basic_bootstrap_tools+=usr.bin/awk usr.bin/cut bin/expr usr.bin/gencat \
 # /bin/sh can behave differently when crossbuilding on Linux/macOS
 # TODO: also build /bin/sh
 # _basic_bootstrap_tools+=bin/sh
-# elf2aout is required for sparc64 build
-_basic_bootstrap_tools+=usr.bin/elf2aout
 # file2c is required for building usr.sbin/config:
 _basic_bootstrap_tools+=usr.bin/file2c
 # uuencode/uudecode required for share/tabset
@@ -3006,13 +3003,10 @@ _prereq_libs+= lib/libssp_nonshared
 
 # These dependencies are not automatically generated:
 #
-# gnu/lib/csu, gnu/lib/libgcc, lib/csu and lib/libc must be built before
+# gnu/lib/libgcc, lib/csu and lib/libc must be built before
 # all shared libraries for ELF.
 #
 _startup_libs=	lib/csu
-.if ${MK_BSD_CRTBEGIN} == "no"
-_startup_libs+=	gnu/lib/csu
-.endif
 .if ${MK_LIBCHERI} != "no"
 _startup_libs+= lib/libc_cheri
 .endif
@@ -3159,14 +3153,11 @@ cddl/lib/libctf__L: lib/libgcc_s__L
 cddl/lib/libuutil__L: cddl/lib/libnvpair__L
 cddl/lib/libzfs_core__L: cddl/lib/libnvpair__L
 .endif
-# cddl/lib/libdtrace requires lib/libproc and lib/librtld_db; it's only built
-# on select architectures though (see cddl/lib/Makefile)
-.if ${MACHINE_CPUARCH} != "sparc64"
+# cddl/lib/libdtrace requires lib/libproc and lib/librtld_db
 _prebuild_libs+=	lib/libprocstat lib/libproc lib/librtld_db
 lib/libprocstat__L: lib/libelf__L lib/libkvm__L lib/libutil__L
 lib/libproc__L: lib/libprocstat__L
 lib/librtld_db__L: lib/libprocstat__L
-.endif
 
 .if ${MK_CRYPT} != "no"
 .if ${MK_OPENSSL} != "no"

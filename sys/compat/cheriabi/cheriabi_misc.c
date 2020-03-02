@@ -1473,13 +1473,16 @@ static int
 cheriabi_thr_new_initthr(struct thread *td, void *thunk)
 {
 	struct thr_param_c *param = thunk;
+	stack_t stack;
 
 	if ((param->child_tid != NULL &&
 	    suword(param->child_tid, td->td_tid)) ||
 	    (param->parent_tid != NULL &&
 	    suword(param->parent_tid, td->td_tid)))
 		return (EFAULT);
-	cheriabi_set_threadregs(td, param);
+	stack.ss_sp = param->stack_base;
+	stack.ss_size = param->stack_size;
+	cpu_set_upcall(td, param->start_func, param->arg, &stack);
 	return (cpu_set_user_tls(td, param->tls_base));
 }
 

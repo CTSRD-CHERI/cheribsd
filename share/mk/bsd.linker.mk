@@ -92,7 +92,7 @@ _ld_version!=	(${${ld}} -v 2>&1 || echo none) | sed -n 1p
 .if ${_ld_version:[1..2]} == "GNU ld"
 ${X_}LINKER_TYPE=	bfd
 ${X_}LINKER_FREEBSD_VERSION=	0
-_v=	${_ld_version:M[1-9].[0-9]*:[1]}
+_v=	${_ld_version:M[1-9]*.[0-9]*:[1]}
 .elif ${_ld_version:[1]} == "LLD"
 ${X_}LINKER_TYPE=	lld
 _v=	${_ld_version:[2]}

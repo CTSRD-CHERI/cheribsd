@@ -50,6 +50,7 @@
 #define	cheri_getbase(x)	__builtin_cheri_base_get((x))
 #define	cheri_getoffset(x)	__builtin_cheri_offset_get((x))
 #define	cheri_getaddress(x)	__builtin_cheri_address_get((x))
+#define	cheri_getflags(x)	__builtin_cheri_flags_get((x))
 #define	cheri_getperm(x)	__builtin_cheri_perms_get((x))
 #define	cheri_getsealed(x)	__builtin_cheri_sealed_get((x))
 #define	cheri_gettag(x)		__builtin_cheri_tag_get((x))
@@ -61,23 +62,15 @@
 #define	cheri_incoffset(x, y)	__builtin_cheri_offset_increment((x), (y))
 #define	cheri_setoffset(x, y)	__builtin_cheri_offset_set((x), (y))
 #define	cheri_setaddress(x, y)	__builtin_cheri_address_set((x), (y))
+#define	cheri_setflags(x, y)	__builtin_cheri_flags_set((x), (y))
 
 #define	cheri_seal(x, y)	__builtin_cheri_seal((x), (y))
 #define	cheri_unseal(x, y)	__builtin_cheri_unseal((x), (y))
-
-#define	cheri_getcause()	__builtin_mips_cheri_get_cause()
-#define	cheri_setcause(x)	__builtin_mips_cheri_set_cause(x)
 
 #define	cheri_ccheckperm(c, p)	__builtin_cheri_perms_check((c), (p))
 #define	cheri_cchecktype(c, t)	__builtin_cheri_type_check((c), (t))
 
 #define	cheri_getdefault()	__builtin_cheri_global_data_get()
-#define	cheri_getidc()		__builtin_mips_cheri_get_invoke_data_cap()
-#define	cheri_getkr1c()		__builtin_mips_cheri_get_kernel_cap1()
-#define	cheri_getkr2c()		__builtin_mips_cheri_get_kernel_cap2()
-#define	cheri_getkcc()		__builtin_mips_cheri_get_kernel_code_cap()
-#define	cheri_getkdc()		__builtin_mips_cheri_get_kernel_data_cap()
-#define	cheri_getepcc()		__builtin_mips_cheri_get_exception_program_counter_cap()
 #define	cheri_getpcc()		__builtin_cheri_program_counter_get()
 #define	cheri_getstack()	__builtin_cheri_stack_get()
 
@@ -265,11 +258,12 @@ cheri_bytes_remaining(const void * __capability cap)
 #define cheri_cap_to_typed_ptr(cap, type)				\
 	(type *)cheri_cap_to_ptr(cap, sizeof(type))
 
-#define _CHERI_PRINTF_CAP_FMT  "v:%lu s:%lu p:%08lx b:%016jx l:%016zx o:%jx t:%ld"
+#define _CHERI_PRINTF_CAP_FMT  "v:%lu s:%lu p:%08lx f:%01lx b:%016jx l:%016zx o:%jx t:%ld"
 #define _CHERI_PRINTF_CAP_ARG(ptr)					\
 	    (unsigned long)cheri_gettag((const void * __capability)(ptr)),		\
 	    (unsigned long)cheri_getsealed((const void * __capability)(ptr)),		\
 	    cheri_getperm((const void * __capability)(ptr)),		\
+	    cheri_getflags((const void * __capability)(ptr)),		\
 	    cheri_getbase((const void * __capability)(ptr)),		\
 	    cheri_getlen((const void * __capability)(ptr)),		\
 	    cheri_getoffset((const void * __capability)(ptr)),		\

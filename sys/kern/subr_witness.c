@@ -657,10 +657,6 @@ static struct witness_order_list_entry order_lists[] = {
 #ifdef __i386__
 	{ "cy", &lock_class_mtx_spin },
 #endif
-#ifdef __sparc64__
-	{ "pcib_mtx", &lock_class_mtx_spin },
-	{ "rtc_mtx", &lock_class_mtx_spin },
-#endif
 	{ "scc_hwmtx", &lock_class_mtx_spin },
 	{ "uart_hwmtx", &lock_class_mtx_spin },
 	{ "fast_taskqueue", &lock_class_mtx_spin },
@@ -692,9 +688,6 @@ static struct witness_order_list_entry order_lists[] = {
 	 */
 	{ "intrcnt", &lock_class_mtx_spin },
 	{ "icu", &lock_class_mtx_spin },
-#if defined(SMP) && defined(__sparc64__)
-	{ "ipi", &lock_class_mtx_spin },
-#endif
 #ifdef __i386__
 	{ "allpmaps", &lock_class_mtx_spin },
 	{ "descriptor tables", &lock_class_mtx_spin },
@@ -1915,7 +1908,6 @@ depart(struct witness *w)
 	witness_increment_graph_generation();
 }
 
-
 static void
 adopt(struct witness *parent, struct witness *child)
 {
@@ -2893,7 +2885,6 @@ witness_hash_djb2(const uint8_t *key, uint32_t size)
 	return (hash);
 }
 
-
 /*
  * Initializes the two witness hash tables. Called exactly once from
  * witness_initialize().
@@ -2965,7 +2956,6 @@ witness_hash_put(struct witness *w)
 	w_hash.wh_array[hash] = w;
 	w_hash.wh_count++;
 }
-
 
 static struct witness_lock_order_data *
 witness_lock_order_get(struct witness *parent, struct witness *child)

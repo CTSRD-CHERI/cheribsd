@@ -32,6 +32,8 @@
  * SUCH DAMAGE.
  */
 
+#define	EXPLICIT_USER_ACCESS 1
+
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
@@ -116,12 +118,13 @@ freebsd64_sendto(struct thread *td, struct freebsd64_sendto_args *uap)
 }
 
 static int
-freebsd64_copyinmsghdr(struct msghdr64 *msg64, struct msghdr *msg, struct msghdr64 *m64)
+freebsd64_copyinmsghdr(struct msghdr64 * __capability umsg, struct msghdr *msg,
+    struct msghdr64 *m64)
 {
 	struct iovec *iov;
 	int error;
 
-	error = copyin(msg64, m64, sizeof(*m64));
+	error = copyin(umsg, m64, sizeof(*m64));
 	if (error)
 		return (error);
 	msg->msg_name = __USER_CAP(m64->msg_name, m64->msg_namelen);
@@ -129,8 +132,8 @@ freebsd64_copyinmsghdr(struct msghdr64 *msg64, struct msghdr *msg, struct msghdr
 
 	msg->msg_iov = NULL;
 	error = freebsd64_copyiniov(
-	    __USER_CAP_ARRAY((struct iovec64 *)(uintptr_t)m64->msg_iov,
-	    m64->msg_iovlen), m64->msg_iovlen, &iov, EMSGSIZE);
+            __USER_CAP_ARRAY((struct iovec64 *)m64->msg_iov, m64->msg_iovlen),
+	    m64->msg_iovlen, &iov, EMSGSIZE);
 	if (error)
 		return (error);
 	msg->msg_iov = (__cheri_tocap struct iovec * __capability)iov;
@@ -142,25 +145,30 @@ freebsd64_copyinmsghdr(struct msghdr64 *msg64, struct msghdr *msg, struct msghdr
 	return (0);
 }
 
+/*
+ * Note that we modify the lengths only, all the pointers provided by
+ * userspace are left untouched.
+ */
 static int
-freebsd64_copyoutmsghdr(struct msghdr64 *m64, struct msghdr *msg, struct msghdr64 *msg64)
+freebsd64_copyoutmsghdr(struct msghdr64 *m64, struct msghdr *msg,
+    struct msghdr64 * __capability umsg)
 {
 	int error;
-	/* Leave pointers untouched */
+
 	m64->msg_namelen = msg->msg_namelen;
 	m64->msg_iovlen = msg->msg_iovlen;
 	m64->msg_controllen = msg->msg_controllen;
 	m64->msg_flags = msg->msg_flags;
-	error = copyout(m64, msg64, sizeof(*m64));
+	error = copyout(m64, umsg, sizeof(*m64));
 	return (error);
 }
 
-#define FREEBSD64_ALIGN(p) roundup2((p), sizeof(long))
+#define	FREEBSD64_ALIGN(p) roundup2((p), sizeof(long))
 #define	FREEBSD64_CMSG_SPACE(l)						\
     (FREEBSD64_ALIGN(sizeof(struct cmsghdr)) + FREEBSD64_ALIGN(l))
-#define FREEBSD64_CMSG_LEN(l)				\
+#define	FREEBSD64_CMSG_LEN(l)				\
     (FREEBSD64_ALIGN(sizeof(struct cmsghdr)) + (l))
-#define FREEBSD64_CMSG_DATA(cmsg)				\
+#define	FREEBSD64_CMSG_DATA(cmsg)				\
     ((char *)(cmsg) + FREEBSD64_ALIGN(sizeof(struct cmsghdr)))
 
 static int
@@ -251,7 +259,8 @@ exit:
 }
 
 static int
-freebsd64_copyin_control(struct mbuf **mp, char * __capability buf, u_int buflen)
+freebsd64_copyin_control(struct mbuf **mp, char * __capability buf,
+    u_int buflen)
 {
 	int error;
 	struct cmsghdr *cmsg;
@@ -270,12 +279,12 @@ freebsd64_copyin_control(struct mbuf **mp, char * __capability buf, u_int buflen
 	idx = 0;
 	newlen = 0;
 	while (idx < buflen) {
-		cmsg = (struct cmsghdr *)(buf + idx);
-		msglen = fuword32(&cmsg->cmsg_len);
+		cmsg = (struct cmsghdr *)((__cheri_fromcap char *)buf + idx);
+		msglen = fuword32(__USER_CAP_OBJ(&cmsg->cmsg_len));
 		if (msglen < sizeof(struct cmsghdr) ||
 		    idx + FREEBSD64_ALIGN(msglen) > buflen)
 			return (EINVAL);
-		datalen = (caddr_t)cmsg + msglen - FREEBSD64_CMSG_DATA(cmsg);
+		datalen = (char *)cmsg + msglen - FREEBSD64_CMSG_DATA(cmsg);
 		idx += FREEBSD64_CMSG_SPACE(datalen);
 		newlen += CMSG_SPACE(datalen);
 	}
@@ -293,7 +302,8 @@ freebsd64_copyin_control(struct mbuf **mp, char * __capability buf, u_int buflen
 		if (error)
 			break;
 		cmsg = (struct cmsghdr *)md;
-		datalen = buf + cmsg->cmsg_len - FREEBSD64_CMSG_DATA(buf);
+		datalen = (__cheri_fromcap char *)buf + cmsg->cmsg_len -
+		    FREEBSD64_CMSG_DATA((__cheri_fromcap char *)buf);
 		buf += FREEBSD64_ALIGN(sizeof(struct cmsghdr));
 		md += CMSG_ALIGN(sizeof(struct cmsghdr));
 
@@ -325,8 +335,7 @@ freebsd64_sendmsg(struct thread *td, struct freebsd64_sendmsg_args *uap)
 	struct sockaddr *to = NULL;
 	int error;
 
-	error = freebsd64_copyinmsghdr(PURECAP_KERNEL_USER_CAP_OBJ(uap->msg),
-	    &msg, &umsg64);
+	error = freebsd64_copyinmsghdr(__USER_CAP_OBJ(uap->msg), &msg, &umsg64);
 	if (error)
 		return (error);
 
@@ -338,7 +347,7 @@ freebsd64_sendmsg(struct thread *td, struct freebsd64_sendmsg_args *uap)
 		error = getsockaddr(&to, msg.msg_name, msg.msg_namelen);
 		if (error)
 			goto out;
-		msg.msg_name = to;
+		msg.msg_name = (__cheri_tocap struct sockaddr * __capability)to;
 	}
 
 	/* No COMPAT_OLDSOCK support, no 64-bit 43BSD binaries should exist. */
@@ -362,7 +371,7 @@ out:
 	if (to)
 		free(to, M_SONAME);
 	if (msg.msg_iov != NULL)
-		free(msg.msg_iov, M_IOV);
+		free((__cheri_fromcap struct iovec *)msg.msg_iov, M_IOV);
 	return (error);
 }
 
@@ -383,7 +392,7 @@ freebsd64_recvmsg(struct thread *td, struct freebsd64_recvmsg_args *uap)
 	struct mbuf *control = NULL;
 	struct mbuf **controlp;
 	int error;
-	struct msghdr64 *umsg = PURECAP_KERNEL_USER_CAP_OBJ(uap->msg);
+	struct msghdr64 * __capability umsg = __USER_CAP_OBJ(uap->msg);
 
 	error = freebsd64_copyinmsghdr(umsg, &msg, &umsg64);
 	if (error != 0)
@@ -401,7 +410,7 @@ freebsd64_recvmsg(struct thread *td, struct freebsd64_recvmsg_args *uap)
 		if (error == 0)
 			error = freebsd64_copyoutmsghdr(&umsg64, &msg, umsg);
 	}
-	free(msg.msg_iov, M_IOV);
+	free((__cheri_fromcap struct iovec *)msg.msg_iov, M_IOV);
 
 	if (control != NULL) {
 		if (error != 0)

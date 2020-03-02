@@ -40,6 +40,7 @@
 
 #include <sys/param.h>		/* For NULL */
 #include <sys/malloc.h>		/* For M_* */
+#include <sys/_smr.h>
 
 /* User visible parameters */
 #define	UMA_SMALLEST_UNIT	8 /* Smallest item allocated */
@@ -235,6 +236,10 @@ uma_zone_t uma_zcache_create(char *name, int size, uma_ctor ctor, uma_dtor dtor,
  * overlap when adding new features.
  */
 #define UMA_ZONE_ZINIT		0x0002	/* Initialize with zeros */
+#define UMA_ZONE_CONTIG		0x0004	/*
+					 * Physical memory underlying an object
+					 * must be contiguous.
+					 */
 #define UMA_ZONE_NOTOUCH	0x0008	/* UMA may not access the memory */
 #define UMA_ZONE_MALLOC		0x0010	/* For use by malloc(9) only! */
 #define UMA_ZONE_NOFREE		0x0020	/* Do not free slabs of this type! */
@@ -259,21 +264,32 @@ uma_zone_t uma_zcache_create(char *name, int size, uma_ctor ctor, uma_dtor dtor,
 					 * mini-dumps.
 					 */
 #define	UMA_ZONE_PCPU		0x8000	/*
-					 * Allocates mp_maxid + 1 slabs of PAGE_SIZE
+					 * Allocates mp_maxid + 1 slabs of
+					 * PAGE_SIZE
 					 */
 #define	UMA_ZONE_FIRSTTOUCH	0x10000	/* First touch NUMA policy */
 #define	UMA_ZONE_ROUNDROBIN	0x20000	/* Round-robin NUMA policy. */
+#define	UMA_ZONE_SMR		0x40000 /*
+					 * Safe memory reclamation defers
+					 * frees until all read sections
+					 * have exited.  This flag creates
+					 * a unique SMR context for this
+					 * zone.  To share contexts see
+					 * uma_zone_set_smr() below.
+					 *
+					 * See sys/smr.h for more details.
+					 */
 /* In use by UMA_ZFLAGs:	0xffe00000 */
 
 /*
- * These flags are shared between the keg and zone.  In zones wishing to add
- * new kegs these flags must be compatible.  Some are determined based on
- * physical parameters of the request and may not be provided by the consumer.
+ * These flags are shared between the keg and zone.  Some are determined
+ * based on physical parameters of the request and may not be provided by
+ * the consumer.
  */
 #define	UMA_ZONE_INHERIT						\
     (UMA_ZONE_NOTOUCH | UMA_ZONE_MALLOC | UMA_ZONE_NOFREE |		\
-     UMA_ZONE_NOTPAGE | UMA_ZONE_PCPU | UMA_ZONE_FIRSTTOUCH |		\
-     UMA_ZONE_ROUNDROBIN)
+     UMA_ZONE_VM | UMA_ZONE_NOTPAGE | UMA_ZONE_PCPU |			\
+     UMA_ZONE_FIRSTTOUCH | UMA_ZONE_ROUNDROBIN)
 
 /* Definitions for align */
 #define UMA_ALIGN_PTR	(sizeof(void * __capability) - 1) /* Align for ptr */
@@ -310,7 +326,12 @@ void uma_zdestroy(uma_zone_t zone);
  */
 
 void *uma_zalloc_arg(uma_zone_t zone, void *arg, int flags);
+
+/* Allocate per-cpu data.  Access the correct data with zpcpu_get(). */
 void *uma_zalloc_pcpu_arg(uma_zone_t zone, void *arg, int flags);
+
+/* Use with SMR zones. */
+void *uma_zalloc_smr(uma_zone_t zone, int flags);
 
 /*
  * Allocate an item from a specific NUMA domain.  This uses a slow path in
@@ -359,7 +380,12 @@ uma_zalloc_pcpu(uma_zone_t zone, int flags)
  */
 
 void uma_zfree_arg(uma_zone_t zone, void *item, void *arg);
+
+/* Use with PCPU zones. */
 void uma_zfree_pcpu_arg(uma_zone_t zone, void *item, void *arg);
+
+/* Use with SMR zones. */
+void uma_zfree_smr(uma_zone_t zone, void *item);
 
 /*
  * Frees an item back to the specified zone's domain specific pool.
@@ -601,13 +627,23 @@ void uma_zone_set_allocf(uma_zone_t zone, uma_alloc allocf);
 void uma_zone_set_freef(uma_zone_t zone, uma_free freef);
 
 /*
+ * Associate a zone with a smr context that is allocated after creation
+ * so that multiple zones may share the same context.
+ */
+void uma_zone_set_smr(uma_zone_t zone, smr_t smr);
+
+/*
+ * Fetch the smr context that was set or made in uma_zcreate().
+ */
+smr_t uma_zone_get_smr(uma_zone_t zone);
+
+/*
  * These flags are setable in the allocf and visible in the freef.
  */
 #define UMA_SLAB_BOOT	0x01		/* Slab alloced from boot pages */
 #define UMA_SLAB_KERNEL	0x04		/* Slab alloced from kmem */
 #define UMA_SLAB_PRIV	0x08		/* Slab alloced from priv allocator */
-#define UMA_SLAB_OFFP	0x10		/* Slab is managed separately  */
-/* 0x02, 0x40, and 0x80 are available */
+/* 0x02, 0x10, 0x40, and 0x80 are available */
 
 /*
  * Used to pre-fill a zone with some number of items

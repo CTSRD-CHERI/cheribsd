@@ -49,9 +49,6 @@
 #define	_PTHREAD_MD_H_
 
 #include <sys/types.h>
-#ifdef __CHERI_PURE_CAPABILITY__
-#include <cheri/cheric.h>
-#endif
 #include <machine/sysarch.h>
 #include <machine/tls.h>
 #include <stddef.h>

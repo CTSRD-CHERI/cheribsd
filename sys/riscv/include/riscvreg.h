@@ -37,8 +37,7 @@
 #ifndef _MACHINE_RISCVREG_H_
 #define	_MACHINE_RISCVREG_H_
 
-#define	EXCP_SHIFT			0
-#define	EXCP_MASK			(0xf << EXCP_SHIFT)
+#define	EXCP_MASK			(~EXCP_INTR)
 #define	EXCP_MISALIGNED_FETCH		0
 #define	EXCP_FAULT_FETCH		1
 #define	EXCP_ILLEGAL_INSTRUCTION	2
@@ -76,7 +75,7 @@
 #define	SSTATUS_XS_MASK			(0x3 << SSTATUS_XS_SHIFT)
 #define	SSTATUS_SUM			(1 << 18)
 #if __riscv_xlen == 64
-#define	SSTATUS_SD			(1 << 63)
+#define	SSTATUS_SD			(1ul << 63)
 #else
 #define	SSTATUS_SD			(1 << 31)
 #endif
@@ -113,8 +112,11 @@
 #define	 MSTATUS_VM_SV48		10
 #define	 MSTATUS_VM_SV57		11
 #define	 MSTATUS_VM_SV64		12
-#define	MSTATUS32_SD			(1 << 63)
-#define	MSTATUS64_SD			(1 << 31)
+#if __riscv_xlen == 64
+#define	MSTATUS_SD			(1ul << 63)
+#else
+#define	MSTATUS_SD			(1 << 31)
+#endif
 
 #define	MSTATUS_PRV_U			0	/* user */
 #define	MSTATUS_PRV_S			1	/* supervisor */

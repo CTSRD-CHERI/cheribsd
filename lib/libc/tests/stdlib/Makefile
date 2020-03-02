@@ -12,9 +12,7 @@ ATF_TESTS_C+=		qsort_s_test
 ATF_TESTS_C+=		set_constraint_handler_s_test
 ATF_TESTS_C+=		strfmon_test
 ATF_TESTS_C+=		tsearch_test
-.if ${COMPILER_FEATURES:Mc++11} && \
-    ! ${MACHINE_ARCH:Mmips*c*}
-# CHERI: compiler crashes
+.if ${COMPILER_FEATURES:Mc++11}
 ATF_TESTS_CXX+=		cxa_thread_atexit_test
 ATF_TESTS_CXX+=		cxa_thread_atexit_nothr_test
 .endif

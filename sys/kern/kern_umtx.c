@@ -743,7 +743,6 @@ umtxq_signal_queue(struct umtx_key *key, int n_wake, int q)
 	return (ret);
 }
 
-
 /*
  * Wake up specified thread.
  */
@@ -1616,7 +1615,6 @@ umtx_pi_setowner(struct umtx_pi *pi, struct thread *owner)
 	pi->pi_owner = owner;
 	TAILQ_INSERT_TAIL(&uq_owner->uq_pi_contested, pi, pi_link);
 }
-
 
 /*
  * Disown a PI mutex, and remove it from the owned list.
@@ -5394,7 +5392,7 @@ umtx_read_rb_list(struct thread *td, struct umutex *m, uintcap_t *rb_list)
 
 #ifdef COMPAT_CHERIABI
 	if (SV_PROC_FLAG(td->td_proc, SV_CHERI)) {
-		cheri_memcpy(&m_c, m, sizeof(m_c));
+		memcpy(&m_c, m, sizeof(m_c));
 		*rb_list = m_c.m_rb_lnk;
 	} else
 #endif

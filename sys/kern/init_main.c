@@ -117,7 +117,6 @@ linux_alloc_current_noop(struct thread *td __unused, int flags __unused)
 }
 int (*lkpi_alloc_current)(struct thread *, int) = linux_alloc_current_noop;
 
-
 #ifndef BOOTHOWTO
 #define	BOOTHOWTO	0
 #endif

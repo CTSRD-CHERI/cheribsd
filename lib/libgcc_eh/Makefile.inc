@@ -8,7 +8,7 @@ _USE_CHERI_LIBUNWIND=0
 .if ${MK_CHERI} != "no"
 WANT_CHERI?=	hybrid
 _USE_CHERI_LIBUNWIND=1
-.elif (${MACHINE_ARCH:Mmips*} || ${MACHINE_ARCH:Mmips*c*} || ${MACHINE_ARCH:Mriscv*c*})
+.elif (${MACHINE_ARCH:Mmips*} || ${MACHINE_ABI:Mpurecap})
 _USE_CHERI_LIBUNWIND=1
 .endif
 

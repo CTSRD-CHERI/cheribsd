@@ -34,6 +34,10 @@ feeder_rate_gen.h		optional sound				   \
 	compile-with	"${AWK} -f $S/tools/sound/feeder_rate_mkfilter.awk -- ${FEEDER_RATE_PRESETS} > feeder_rate_gen.h" \
 	no-obj no-implicit-rule before-depend				   \
 	clean		"feeder_rate_gen.h"
+font.h				optional	sc_dflt_font		\
+	compile-with	"uudecode < ${SRCTOP}/share/syscons/fonts/${SC_DFLT_FONT}-8x16.fnt && file2c 'u_char dflt_font_16[16*256] = {' '};' < ${SC_DFLT_FONT}-8x16 > font.h && uudecode < ${SRCTOP}/share/syscons/fonts/${SC_DFLT_FONT}-8x14.fnt && file2c 'u_char dflt_font_14[14*256] = {' '};' < ${SC_DFLT_FONT}-8x14 >> font.h && uudecode < ${SRCTOP}/share/syscons/fonts/${SC_DFLT_FONT}-8x8.fnt && file2c 'u_char dflt_font_8[8*256] = {' '};' < ${SC_DFLT_FONT}-8x8 >> font.h"									\
+	no-obj no-implicit-rule before-depend				\
+	clean		"font.h ${SC_DFLT_FONT}-8x14 ${SC_DFLT_FONT}-8x16 ${SC_DFLT_FONT}-8x8"
 snd_fxdiv_gen.h			optional sound				   \
 	dependency	"$S/tools/sound/snd_fxdiv_gen.awk"		   \
 	compile-with	"${AWK} -f $S/tools/sound/snd_fxdiv_gen.awk -- > snd_fxdiv_gen.h" \
@@ -50,7 +54,7 @@ pccarddevs.h			standard				   \
 	no-obj no-implicit-rule before-depend				   \
 	clean		"pccarddevs.h"
 kbdmuxmap.h			optional	kbdmux_dflt_keymap 	   \
-	compile-with	"kbdcontrol -P ${S:S/sys$/share/}/vt/keymaps -P ${S:S/sys$/share/}/syscons/keymaps -L ${KBDMUX_DFLT_KEYMAP} | sed -e 's/^static keymap_t.* = /static keymap_t key_map = /' -e 's/^static accentmap_t.* = /static accentmap_t accent_map = /' > kbdmuxmap.h" \
+	compile-with	"${KEYMAP} -L ${KBDMUX_DFLT_KEYMAP} | ${KEYMAP_FIX} > ${.TARGET}" \
 	no-obj no-implicit-rule before-depend				\
 	clean		"kbdmuxmap.h"
 teken_state.h		optional sc | vt				   \
@@ -59,7 +63,7 @@ teken_state.h		optional sc | vt				   \
 	no-obj no-implicit-rule before-depend				   \
 	clean		"teken_state.h"
 ukbdmap.h			optional	ukbd_dflt_keymap	\
-	compile-with	"kbdcontrol -P ${S:S/sys$/share/}/vt/keymaps -P ${S:S/sys$/share/}/syscons/keymaps -L ${UKBD_DFLT_KEYMAP} | sed -e 's/^static keymap_t.* = /static keymap_t key_map = /' -e 's/^static accentmap_t.* = /static accentmap_t accent_map = /' > ukbdmap.h"			\
+	compile-with	"${KEYMAP} -L ${UKBD_DFLT_KEYMAP} | ${KEYMAP_FIX} > ${.TARGET}" \
 	no-obj no-implicit-rule before-depend				\
 	clean		"ukbdmap.h"
 usbdevs.h			optional usb				   \
@@ -310,6 +314,7 @@ cddl/contrib/opensolaris/uts/common/fs/zfs/lua/lzio.c			optional zfs compile-wit
 
 # CHERI and CHERI-compat related files
 cheri/cheri_asserts.c			optional cpu_cheri
+cheri/cheri_exec.c			optional cpu_cheri
 cheri/cheri_sysctl.c			optional cpu_cheri
 cheri/cheri_otype.c			optional cpu_cheri
 cheri/cheri_syscall.c			optional cpu_cheri
@@ -1773,7 +1778,6 @@ dev/fxp/if_fxp.c		optional fxp
 dev/fxp/inphy.c			optional fxp
 dev/gem/if_gem.c		optional gem
 dev/gem/if_gem_pci.c		optional gem pci
-dev/gem/if_gem_sbus.c		optional gem sbus
 dev/gpio/dwgpio/dwgpio.c	optional gpio dwgpio fdt
 dev/gpio/dwgpio/dwgpio_bus.c	optional gpio dwgpio fdt
 dev/gpio/dwgpio/dwgpio_if.m	optional gpio dwgpio fdt
@@ -1799,7 +1803,6 @@ dev/gpio/ofw_gpiobus.c		optional fdt gpio
 dev/hifn/hifn7751.c		optional hifn
 dev/hme/if_hme.c		optional hme
 dev/hme/if_hme_pci.c		optional hme pci
-dev/hme/if_hme_sbus.c		optional hme sbus
 dev/hptiop/hptiop.c		optional hptiop scbus
 dev/hwpmc/hwpmc_logging.c	optional hwpmc
 dev/hwpmc/hwpmc_mod.c		optional hwpmc
@@ -1915,7 +1918,6 @@ dev/isp/isp.c			optional isp
 dev/isp/isp_freebsd.c		optional isp
 dev/isp/isp_library.c		optional isp
 dev/isp/isp_pci.c		optional isp pci
-dev/isp/isp_sbus.c		optional isp sbus
 dev/isp/isp_target.c		optional isp
 dev/ispfw/ispfw.c		optional ispfw
 dev/iwi/if_iwi.c		optional iwi
@@ -2706,7 +2708,6 @@ dev/pms/RefTisa/tisa/sassata/sata/host/ossasat.c	optional pmspcv \
 dev/pms/RefTisa/tisa/sassata/sata/host/sathw.c		optional pmspcv \
 	compile-with "${NORMAL_C} -Wunused-variable -Woverflow -Wparentheses -w"
 dev/ppbus/if_plip.c		optional plip
-dev/ppbus/immio.c		optional vpo
 dev/ppbus/lpbb.c		optional lpbb
 dev/ppbus/lpt.c			optional lpt
 dev/ppbus/pcfclock.c		optional pcfclock
@@ -2717,8 +2718,6 @@ dev/ppbus/ppbconf.c		optional ppbus
 dev/ppbus/ppbus_if.m		optional ppbus
 dev/ppbus/ppi.c			optional ppi
 dev/ppbus/pps.c			optional pps
-dev/ppbus/vpo.c			optional vpo
-dev/ppbus/vpoio.c		optional vpo
 dev/ppc/ppc.c			optional ppc
 dev/ppc/ppc_acpi.c		optional ppc acpi
 dev/ppc/ppc_isa.c		optional ppc isa
@@ -3042,9 +3041,7 @@ rtwn-rtl8821aufw.fw		optional rtwn-rtl8821aufw | rtwnfw	\
 	clean		"rtwn-rtl8821aufw.fw"
 dev/safe/safe.c			optional safe
 dev/scc/scc_if.m		optional scc
-dev/scc/scc_bfe_ebus.c		optional scc ebus
 dev/scc/scc_bfe_quicc.c		optional scc quicc
-dev/scc/scc_bfe_sbus.c		optional scc fhc | scc sbus
 dev/scc/scc_core.c		optional scc
 dev/scc/scc_dev_quicc.c		optional scc quicc
 dev/scc/scc_dev_sab82532.c	optional scc
@@ -3204,7 +3201,6 @@ dev/tws/tws_hdm.c		optional tws
 dev/tws/tws_services.c		optional tws
 dev/tws/tws_user.c		optional tws
 dev/uart/uart_bus_acpi.c	optional uart acpi
-dev/uart/uart_bus_ebus.c	optional uart ebus
 dev/uart/uart_bus_fdt.c		optional uart fdt
 dev/uart/uart_bus_isa.c		optional uart isa
 dev/uart/uart_bus_pccard.c	optional uart pccard
@@ -3883,6 +3879,7 @@ kern/subr_scanf.c		standard
 kern/subr_sglist.c		standard
 kern/subr_sleepqueue.c		standard
 kern/subr_smp.c			standard
+kern/subr_smr.c			standard
 kern/subr_stack.c		optional ddb | stack | ktr
 kern/subr_stats.c		optional stats
 kern/subr_taskqueue.c		standard

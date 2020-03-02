@@ -5,7 +5,9 @@
 .include <bsd.init.mk>
 .include <bsd.compiler.mk>
 .include <bsd.linker.mk>
-
+.if defined(_CRUNCHGEN)
+.include <bsd.compat.mk>
+.endif
 .include <bsd.cheri.mk>
 
 .if defined(LIB_CXX) || defined(SHLIB_CXX)

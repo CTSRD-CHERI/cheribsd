@@ -93,7 +93,6 @@ SUBDIR=	${SUBDIR_BOOTSTRAP} \
 	libstdthreads \
 	libsysdecode \
 	libtacplus \
-	libthread_db \
 	libucl \
 	libufs \
 	libugidfw \
@@ -106,6 +105,11 @@ SUBDIR=	${SUBDIR_BOOTSTRAP} \
 	libz \
 	libzstd \
 	ncurses
+
+.if !${MACHINE_ABI:Mpurecap}
+# Needs changes to be useful for purecap and not used by anything (yet)
+SUBDIR+=	libthread_db
+.endif
 
 # Inter-library dependencies.  When the makefile for a library contains LDADD
 # libraries, those libraries should be listed as build order dependencies here.
@@ -187,9 +191,9 @@ SUBDIR.${MK_STATS}+=	libstats
     ${MACHINE_CPUARCH} == "arm" || ${MACHINE_CPUARCH} == "i386" || \
     ${MACHINE_CPUARCH} == "powerpc" || \
     ${MACHINE_ARCH:Mmips64*}) && \
-    ! ${MACHINE_ARCH:Mmips*c*}
+    !${MACHINE_ABI:Mpurecap}
 _libclang_rt=	libclang_rt
-.elif ! ${MACHINE_ARCH:Mmips*c*} && ${MACHINE_ARCH} != "mips" && \
+.elif !${MACHINE_ABI:Mpurecap} && ${MACHINE_ARCH} != "mips" && \
     ! ${MACHINE_ARCH:Mriscv*}
 .error "NOT BUILDING libclang_rt for ${MACHINE_ARCH}"
 .endif
@@ -245,7 +249,7 @@ SUBDIR.${MK_RADIUS_SUPPORT}+=	libradius
 SUBDIR.${MK_SENDMAIL}+=	libmilter libsm libsmdb libsmutil
 SUBDIR.${MK_TELNET}+=	libtelnet
 
-.if ${MK_TESTS_SUPPORT} != "no" || defined(LIBCHERI)
+.if ${MK_TESTS_SUPPORT} != "no" || ${MK_TESTS} != "no"
 SUBDIR+=		atf
 .endif
 
@@ -265,8 +269,10 @@ SUBDIR_PARALLEL=
 SUBDIR:=	${SUBDIR:Nlibc++experimental}
 .endif
 
-.if ${MACHINE_ARCH:Mmips*c*}
+.if ${MACHINE_ABI:Mpurecap}
 SUBDIR+=	libmalloc_simple
+.endif
+.if ${MK_LIBCHERI} == "yes"
 SUBDIR.${MK_LIBCHERI}+=	libcheri_syscalls
 SUBDIR.${MK_LIBCHERI}+=	libcheri_support
 .endif

@@ -71,4 +71,13 @@
 	li	tmp, SSTATUS_SUM;					\
 	csrc	sstatus, tmp
 
+#ifdef __CHERI_PURE_CAPABILITY__
+#define CAPABILITY_REG(reg)	c##reg
+#define MOVE_REG(dst, src)	cmove CAPABILITY_REG(dst), CAPABILITY_REG(src)
+#define RETURN	cret
+#else
+#define MOVE_REG(dst, src)	mv dst, src
+#define RETURN	ret
+#endif
+
 #endif /* _MACHINE_ASM_H_ */

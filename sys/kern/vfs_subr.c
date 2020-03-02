@@ -364,7 +364,7 @@ sysctl_maxvnodes(SYSCTL_HANDLER_ARGS)
 
 SYSCTL_PROC(_kern, KERN_MAXVNODES, maxvnodes,
     CTLTYPE_ULONG | CTLFLAG_MPSAFE | CTLFLAG_RW, NULL, 0, sysctl_maxvnodes,
-    "UL", "Target for maximum number of vnodes");
+    "LU", "Target for maximum number of vnodes");
 
 static int
 sysctl_wantfreevnodes(SYSCTL_HANDLER_ARGS)
@@ -388,7 +388,7 @@ sysctl_wantfreevnodes(SYSCTL_HANDLER_ARGS)
 
 SYSCTL_PROC(_vfs, OID_AUTO, wantfreevnodes,
     CTLTYPE_ULONG | CTLFLAG_MPSAFE | CTLFLAG_RW, NULL, 0, sysctl_wantfreevnodes,
-    "UL", "Target for minimum number of \"free\" vnodes");
+    "LU", "Target for minimum number of \"free\" vnodes");
 
 SYSCTL_ULONG(_kern, OID_AUTO, minvnodes, CTLFLAG_RW,
     &wantfreevnodes, 0, "Old name for vfs.wantfreevnodes (legacy)");
@@ -702,7 +702,6 @@ vntblinit(void *dummy __unused)
 	}
 }
 SYSINIT(vfs, SI_SUB_VFS, SI_ORDER_FIRST, vntblinit, NULL);
-
 
 /*
  * Mark a mount point as busy. Used to synchronize access and to delay
@@ -1809,20 +1808,13 @@ delmntque(struct vnode *vp)
 {
 	struct mount *mp;
 
+	VNPASS((vp->v_mflag & VMP_LAZYLIST) == 0, vp);
+
 	mp = vp->v_mount;
 	if (mp == NULL)
 		return;
 	MNT_ILOCK(mp);
 	VI_LOCK(vp);
-	if (vp->v_mflag & VMP_LAZYLIST) {
-		mtx_lock(&mp->mnt_listmtx);
-		if (vp->v_mflag & VMP_LAZYLIST) {
-			vp->v_mflag &= ~VMP_LAZYLIST;
-			TAILQ_REMOVE(&mp->mnt_lazyvnodelist, vp, v_lazylist);
-			mp->mnt_lazyvnodelistsize--;
-		}
-		mtx_unlock(&mp->mnt_listmtx);
-	}
 	vp->v_mount = NULL;
 	VI_UNLOCK(vp);
 	VNASSERT(mp->mnt_nvnodelistsize > 0, vp,
@@ -2901,19 +2893,12 @@ vget_finish(struct vnode *vp, int flags, enum vgetstate vs)
 {
 	int error, old;
 
-	VNASSERT((flags & LK_TYPE_MASK) != 0, vp,
-	    ("%s: invalid lock operation", __func__));
-
 	if ((flags & LK_INTERLOCK) != 0)
 		ASSERT_VI_LOCKED(vp, __func__);
 	else
 		ASSERT_VI_UNLOCKED(vp, __func__);
-	VNASSERT(vp->v_holdcnt > 0, vp, ("%s: vnode not held", __func__));
-	if (vs == VGET_USECOUNT) {
-		VNASSERT(vp->v_usecount > 0, vp,
-		    ("%s: vnode without usecount when VGET_USECOUNT was passed",
-		    __func__));
-	}
+	VNPASS(vp->v_holdcnt > 0, vp);
+	VNPASS(vs == VGET_HOLDCNT || vp->v_usecount > 0, vp);
 
 	error = vn_lock(vp, flags);
 	if (__predict_false(error != 0)) {
@@ -2926,9 +2911,8 @@ vget_finish(struct vnode *vp, int flags, enum vgetstate vs)
 		return (error);
 	}
 
-	if (vs == VGET_USECOUNT) {
+	if (vs == VGET_USECOUNT)
 		return (0);
-	}
 
 	if (__predict_false(vp->v_type == VCHR))
 		return (vget_finish_vchr(vp));
@@ -3058,6 +3042,19 @@ vrefact(struct vnode *vp)
 #endif
 }
 
+void
+vrefactn(struct vnode *vp, u_int n)
+{
+
+	CTR2(KTR_VFS, "%s: vp %p", __func__, vp);
+#ifdef INVARIANTS
+	int old = atomic_fetchadd_int(&vp->v_usecount, n);
+	VNASSERT(old > 0, vp, ("%s: wrong use count %d", __func__, old));
+#else
+	atomic_add_int(&vp->v_usecount, n);
+#endif
+}
+
 /*
  * Return reference count of a vnode.
  *
@@ -3083,6 +3080,11 @@ vlazy(struct vnode *vp)
 
 	if ((vp->v_mflag & VMP_LAZYLIST) != 0)
 		return;
+	/*
+	 * We may get here for inactive routines after the vnode got doomed.
+	 */
+	if (VN_IS_DOOMED(vp))
+		return;
 	mp = vp->v_mount;
 	mtx_lock(&mp->mnt_listmtx);
 	if ((vp->v_mflag & VMP_LAZYLIST) == 0) {
@@ -3091,6 +3093,30 @@ vlazy(struct vnode *vp)
 		mp->mnt_lazyvnodelistsize++;
 	}
 	mtx_unlock(&mp->mnt_listmtx);
+}
+
+/*
+ * This routine is only meant to be called from vgonel prior to dooming
+ * the vnode.
+ */
+static void
+vunlazy_gone(struct vnode *vp)
+{
+	struct mount *mp;
+
+	ASSERT_VOP_ELOCKED(vp, __func__);
+	ASSERT_VI_LOCKED(vp, __func__);
+	VNPASS(!VN_IS_DOOMED(vp), vp);
+
+	if (vp->v_mflag & VMP_LAZYLIST) {
+		mp = vp->v_mount;
+		mtx_lock(&mp->mnt_listmtx);
+		VNPASS(vp->v_mflag & VMP_LAZYLIST, vp);
+		vp->v_mflag &= ~VMP_LAZYLIST;
+		TAILQ_REMOVE(&mp->mnt_lazyvnodelist, vp, v_lazylist);
+		mp->mnt_lazyvnodelistsize--;
+		mtx_unlock(&mp->mnt_listmtx);
+	}
 }
 
 static void
@@ -3812,6 +3838,7 @@ vgonel(struct vnode *vp)
 	 */
 	if (vp->v_irflag & VIRF_DOOMED)
 		return;
+	vunlazy_gone(vp);
 	vp->v_irflag |= VIRF_DOOMED;
 
 	/*
@@ -5389,12 +5416,6 @@ vop_unlock_pre(void *ap)
 }
 
 void
-vop_unlock_post(void *ap, int rc)
-{
-	return;
-}
-
-void
 vop_need_inactive_pre(void *ap)
 {
 	struct vop_need_inactive_args *a = ap;
@@ -5959,23 +5980,6 @@ vfs_read_dirent(struct vop_readdir_args *ap, struct dirent *dp, off_t off)
 }
 
 /*
- * Mark for update the access time of the file if the filesystem
- * supports VOP_MARKATIME.  This functionality is used by execve and
- * mmap, so we want to avoid the I/O implied by directly setting
- * va_atime for the sake of efficiency.
- */
-void
-vfs_mark_atime(struct vnode *vp, struct ucred *cred)
-{
-	struct mount *mp;
-
-	mp = vp->v_mount;
-	ASSERT_VOP_LOCKED(vp, "vfs_mark_atime");
-	if (mp != NULL && (mp->mnt_flag & (MNT_NOATIME | MNT_RDONLY)) == 0)
-		(void)VOP_MARKATIME(vp);
-}
-
-/*
  * The purpose of this routine is to remove granularity from accmode_t,
  * reducing it into standard unix access bits - VEXEC, VREAD, VWRITE,
  * VADMIN and VAPPEND.
@@ -6144,7 +6148,6 @@ vfs_cache_root_set(struct mount *mp, struct vnode *vp)
  * This interface replaces MNT_VNODE_FOREACH.
  */
 
-
 struct vnode *
 __mnt_vnode_next_all(struct vnode **mvp, struct mount *mp)
 {
@@ -6259,8 +6262,6 @@ static bool
 mnt_vnode_next_lazy_relock(struct vnode *mvp, struct mount *mp,
     struct vnode *vp)
 {
-	const struct vnode *tmp;
-	bool held, ret;
 
 	VNASSERT(mvp->v_mount == mp && mvp->v_type == VMARKER &&
 	    TAILQ_NEXT(mvp, v_lazylist) != NULL, mvp,
@@ -6270,65 +6271,37 @@ mnt_vnode_next_lazy_relock(struct vnode *mvp, struct mount *mp,
 	ASSERT_VI_UNLOCKED(vp, __func__);
 	mtx_assert(&mp->mnt_listmtx, MA_OWNED);
 
-	ret = false;
-
 	TAILQ_REMOVE(&mp->mnt_lazyvnodelist, mvp, v_lazylist);
 	TAILQ_INSERT_BEFORE(vp, mvp, v_lazylist);
 
-	/*
-	 * Use a hold to prevent vp from disappearing while the mount vnode
-	 * list lock is dropped and reacquired.  Normally a hold would be
-	 * acquired with vhold(), but that might try to acquire the vnode
-	 * interlock, which would be a LOR with the mount vnode list lock.
-	 */
-	held = refcount_acquire_if_not_zero(&vp->v_holdcnt);
+	vholdnz(vp);
 	mtx_unlock(&mp->mnt_listmtx);
-	if (!held)
-		goto abort;
 	VI_LOCK(vp);
-	if (!refcount_release_if_not_last(&vp->v_holdcnt)) {
-		vdropl(vp);
-		goto abort;
+	if (VN_IS_DOOMED(vp)) {
+		VNPASS((vp->v_mflag & VMP_LAZYLIST) == 0, vp);
+		goto out_lost;
 	}
-	mtx_lock(&mp->mnt_listmtx);
-
+	VNPASS(vp->v_mflag & VMP_LAZYLIST, vp);
 	/*
-	 * Determine whether the vnode is still the next one after the marker,
-	 * excepting any other markers.  If the vnode has not been doomed by
-	 * vgone() then the hold should have ensured that it remained on the
-	 * lazy list.  If it has been doomed but is still on the lazy list,
-	 * don't abort, but rather skip over it (avoid spinning on doomed
-	 * vnodes).
+	 * Since we had a period with no locks held we may be the last
+	 * remaining user, in which case there is nothing to do.
 	 */
-	tmp = mvp;
-	do {
-		tmp = TAILQ_NEXT(tmp, v_lazylist);
-	} while (tmp != NULL && tmp->v_type == VMARKER);
-	if (tmp != vp) {
-		mtx_unlock(&mp->mnt_listmtx);
-		VI_UNLOCK(vp);
-		goto abort;
-	}
-
-	ret = true;
-	goto out;
-abort:
+	if (!refcount_release_if_not_last(&vp->v_holdcnt))
+		goto out_lost;
+	mtx_lock(&mp->mnt_listmtx);
+	return (true);
+out_lost:
+	vdropl(vp);
 	maybe_yield();
 	mtx_lock(&mp->mnt_listmtx);
-out:
-	if (ret)
-		ASSERT_VI_LOCKED(vp, __func__);
-	else
-		ASSERT_VI_UNLOCKED(vp, __func__);
-	mtx_assert(&mp->mnt_listmtx, MA_OWNED);
-	return (ret);
+	return (false);
 }
 
 static struct vnode *
 mnt_vnode_next_lazy(struct vnode **mvp, struct mount *mp, mnt_lazy_cb_t *cb,
     void *cbarg)
 {
-	struct vnode *vp, *nvp;
+	struct vnode *vp;
 
 	mtx_assert(&mp->mnt_listmtx, MA_OWNED);
 	KASSERT((*mvp)->v_mount == mp, ("marker vnode mount list mismatch"));
@@ -6344,7 +6317,8 @@ restart:
 		 * long string of vnodes we don't care about and hog the list
 		 * as a result. Check for it and requeue the marker.
 		 */
-		if (VN_IS_DOOMED(vp) || !cb(vp, cbarg)) {
+		VNPASS(!VN_IS_DOOMED(vp), vp);
+		if (!cb(vp, cbarg)) {
 			if (!should_yield()) {
 				vp = TAILQ_NEXT(vp, v_lazylist);
 				continue;
@@ -6359,9 +6333,7 @@ restart:
 			goto restart;
 		}
 		/*
-		 * Try-lock because this is the wrong lock order.  If that does
-		 * not succeed, drop the mount vnode list lock and try to
-		 * reacquire it and the vnode interlock in the right order.
+		 * Try-lock because this is the wrong lock order.
 		 */
 		if (!VI_TRYLOCK(vp) &&
 		    !mnt_vnode_next_lazy_relock(*mvp, mp, vp))
@@ -6369,11 +6341,9 @@ restart:
 		KASSERT(vp->v_type != VMARKER, ("locked marker %p", vp));
 		KASSERT(vp->v_mount == mp || vp->v_mount == NULL,
 		    ("alien vnode on the lazy list %p %p", vp, mp));
-		if (vp->v_mount == mp && !VN_IS_DOOMED(vp))
-			break;
-		nvp = TAILQ_NEXT(vp, v_lazylist);
-		VI_UNLOCK(vp);
-		vp = nvp;
+		VNPASS(vp->v_mount == mp, vp);
+		VNPASS(!VN_IS_DOOMED(vp), vp);
+		break;
 	}
 	TAILQ_REMOVE(&mp->mnt_lazyvnodelist, *mvp, v_lazylist);
 
@@ -6436,6 +6406,18 @@ __mnt_vnode_markerfree_lazy(struct vnode **mvp, struct mount *mp)
 	TAILQ_REMOVE(&mp->mnt_lazyvnodelist, *mvp, v_lazylist);
 	mtx_unlock(&mp->mnt_listmtx);
 	mnt_vnode_markerfree_lazy(mvp, mp);
+}
+
+int
+vn_dir_check_exec(struct vnode *vp, struct componentname *cnp)
+{
+
+	if ((cnp->cn_flags & NOEXECCHECK) != 0) {
+		cnp->cn_flags &= ~NOEXECCHECK;
+		return (0);
+	}
+
+	return (VOP_ACCESS(vp, VEXEC, cnp->cn_cred, cnp->cn_thread));
 }
 // CHERI CHANGES START
 // {

@@ -1298,7 +1298,7 @@ pstats_fork(struct pstats *src, struct pstats *dst)
 
 	bzero(&dst->pstat_startzero,
 	    __rangeof(struct pstats, pstat_startzero, pstat_endzero));
-	cheri_bcopy(&src->pstat_startcopy, &dst->pstat_startcopy,
+	bcopy(&src->pstat_startcopy, &dst->pstat_startcopy,
 	    __rangeof(struct pstats, pstat_startcopy, pstat_endcopy));
 }
 
@@ -2898,17 +2898,12 @@ sysctl_kern_proc_kstack(SYSCTL_HANDLER_ARGS)
 		    sizeof(kkstp->kkst_trace), SBUF_FIXEDLEN);
 		thread_lock(td);
 		kkstp->kkst_tid = td->td_tid;
-		if (TD_IS_SWAPPED(td)) {
+		if (TD_IS_SWAPPED(td))
 			kkstp->kkst_state = KKST_STATE_SWAPPED;
-		} else if (TD_IS_RUNNING(td)) {
-			if (stack_save_td_running(st, td) == 0)
-				kkstp->kkst_state = KKST_STATE_STACKOK;
-			else
-				kkstp->kkst_state = KKST_STATE_RUNNING;
-		} else {
+		else if (stack_save_td(st, td) == 0)
 			kkstp->kkst_state = KKST_STATE_STACKOK;
-			stack_save_td(st, td);
-		}
+		else
+			kkstp->kkst_state = KKST_STATE_RUNNING;
 		thread_unlock(td);
 		PROC_UNLOCK(p);
 		stack_sbuf_print(&sb, st);

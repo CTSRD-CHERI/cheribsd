@@ -146,8 +146,7 @@ hybridabi_thread_init(struct thread *td, unsigned long entry_addr)
 	hybridabi_capability_set_user_csp(&csigp->csig_default_stack);
 	hybridabi_capability_set_user_idc(&csigp->csig_idc);
 	hybridabi_capability_set_user_pcc(&csigp->csig_pcc);
-	cheri_capability_set_user_sigcode(&csigp->csig_sigcode,
-	    td->td_proc->p_sysent);
+	csigp->csig_sigcode = cheri_sigcode_capability(td);
 
         /*
          * Set up root for the userspace object-type sealing capability tree.

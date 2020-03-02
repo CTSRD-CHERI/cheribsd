@@ -31,6 +31,8 @@ __FBSDID("$FreeBSD$");
 
 #include <sys/types.h>
 #include <sys/systm.h>
+#include <sys/lock.h>
+#include <sys/mutex.h>
 #include <sys/param.h>
 #include <sys/proc.h>
 #include <sys/stack.h>
@@ -199,20 +201,23 @@ stack_capture(struct stack *st, uintptr_t pc, uintptr_t sp)
 	return;
 }
 
-void
+int
 stack_save_td(struct stack *st, struct thread *td)
 {
 	uintptr_t pc, sp;
 
-	if (TD_IS_SWAPPED(td))
-		panic("stack_save_td: swapped");
+	THREAD_LOCK_ASSERT(td, MA_OWNED);
+	KASSERT(!TD_IS_SWAPPED(td),
+	    ("stack_save_td: thread %p is swapped", td));
+        
 	if (TD_IS_RUNNING(td))
-		panic("stack_save_td: running");
+                return (EOPNOTSUPP);
 
 	/* XXX-AM: get thread pc and sp instead. */
 	pc = (uintptr_t)cheri_getpcc();
 	sp = (uintptr_t)cheri_getstack();
 	stack_capture(st, pc, sp);
+        return (0);
 }
 
 int

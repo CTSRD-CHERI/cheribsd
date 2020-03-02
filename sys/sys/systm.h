@@ -408,11 +408,11 @@ void	bcopy_c(const void * _Nonnull __capability from,
 	    void * _Nonnull __capability to, size_t len);
 void	bcopynocap_c(const void * _Nonnull __capability from,
 	    void * _Nonnull __capability to, size_t len);
-void	cheri_bcopy(const void *src, void *dst, size_t len);
+void	bcopynocap(const void *src0, void *dst0, size_t length);
 #else
 #define	bcopy_c		bcopy
 #define	bcopynocap_c	bcopy
-#define	cheri_bcopy	bcopy
+#define	bcopynocap	bcopy
 #endif
 void	bzero(void * _Nonnull buf, size_t len);
 void	explicit_bzero(void * _Nonnull, size_t);
@@ -425,10 +425,8 @@ void	* __capability memcpy_c(void * _Nonnull __capability to,
 	    const void * _Nonnull __capability from, size_t len);
 void	* __capability memcpynocap_c(void * _Nonnull __capability to,
 	    const void * _Nonnull __capability from, size_t len);
-void	*cheri_memcpy(void *dst, const void *src, size_t len);
 #else
 #define	memcpy_c	memcpy
-#define	cheri_memcpy	memcpy
 #endif
 void	*memmove(void * _Nonnull dest, const void * _Nonnull src, size_t n);
 #if __has_feature(capabilities)
@@ -463,10 +461,7 @@ int	kcsan_memcmp(const void *, const void *, size_t);
 #define bzero(buf, len) __builtin_memset((buf), 0, (len))
 #define bcmp(b1, b2, len) __builtin_memcmp((b1), (b2), (len))
 #define memset(buf, c, len) __builtin_memset((buf), (c), (len))
-//#if !__has_feature(capabilities)
-///* Causes a compiler crash. */
 #define memcpy(to, from, len) __builtin_memcpy((to), (from), (len))
-//#endif
 #define memmove(dest, src, n) __builtin_memmove((dest), (src), (n))
 #define memcmp(b1, b2, len) __builtin_memcmp((b1), (b2), (len))
 #endif

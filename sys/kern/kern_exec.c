@@ -891,7 +891,7 @@ interpret:
 	/* Set values passed into the program in registers. */
 	(*p->p_sysent->sv_setregs)(td, imgp, stack_base);
 
-	vfs_mark_atime(imgp->vp, td->td_ucred);
+	VOP_MMAPPED(imgp->vp);
 
 	SDT_PROBE1(proc, , , exec__success, args->fname);
 
@@ -1728,8 +1728,9 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	ustringp = destp;
 #endif
 
-	if (imgp->sysent->sv_stackgap != NULL)
-		imgp->sysent->sv_stackgap(imgp, (uintptr_t *)&destp);
+	if (imgp->sysent->sv_stackgap != NULL) {
+		imgp->sysent->sv_stackgap(imgp, (uintcap_t *)&destp);
+	}
 
 	if (imgp->auxargs) {
 		/*

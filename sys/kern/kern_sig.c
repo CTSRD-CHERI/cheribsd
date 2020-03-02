@@ -874,7 +874,6 @@ freebsd4_sigaction(struct thread *td, struct freebsd4_sigaction_args *uap)
 	struct sigaction *actp, *oactp;
 	int error;
 
-
 	actp = (uap->act != NULL) ? &act : NULL;
 	oactp = (uap->oact != NULL) ? &oact : NULL;
 	if (actp) {
@@ -2049,7 +2048,6 @@ pgsignal(struct pgrp *pgrp, int sig, int checkctty, ksiginfo_t *ksi)
 	}
 }
 
-
 /*
  * Recalculate the signal mask and reset the signal disposition after
  * usermode frame for delivery is formed.  Should be called after
@@ -2071,7 +2069,6 @@ postsig_done(int sig, struct thread *td, struct sigacts *ps)
 	if (SIGISMEMBER(ps->ps_sigreset, sig))
 		sigdflt(ps, sig);
 }
-
 
 /*
  * Send a signal caused by a trap to the current thread.  If it will be
@@ -3713,6 +3710,7 @@ coredump(struct thread *td)
 	struct vnode *vp;
 	struct flock lf;
 	struct vattr vattr;
+	size_t fullpathsize;
 	int error, error1, locked;
 	char *name;			/* name of corefile */
 	void *rl_cookie;
@@ -3816,15 +3814,14 @@ coredump(struct thread *td)
 	 * if the path of the core is relative, add the current dir in front if it.
 	 */
 	if (name[0] != '/') {
-		fullpath = malloc(MAXPATHLEN, M_TEMP, M_WAITOK);
-		if (kern___getcwd(td,
-		    (__cheri_tocap char * __capability)fullpath,
-		    UIO_SYSSPACE, MAXPATHLEN, MAXPATHLEN) != 0) {
-			free(fullpath, M_TEMP);
+		fullpathsize = MAXPATHLEN;
+		freepath = malloc(fullpathsize, M_TEMP, M_WAITOK);
+		if (vn_getcwd(td, freepath, &fullpath, &fullpathsize) != 0) {
+			free(freepath, M_TEMP);
 			goto out2;
 		}
 		devctl_safe_quote_sb(sb, fullpath);
-		free(fullpath, M_TEMP);
+		free(freepath, M_TEMP);
 		sbuf_putc(sb, '/');
 	}
 	devctl_safe_quote_sb(sb, name);
@@ -3992,7 +3989,7 @@ sigacts_copy(struct sigacts *dest, struct sigacts *src)
 
 	KASSERT(dest->ps_refcnt == 1, ("sigacts_copy to shared dest"));
 	mtx_lock(&src->ps_mtx);
-	cheri_memcpy(dest, src, offsetof(struct sigacts, ps_refcnt));
+	memcpy(dest, src, offsetof(struct sigacts, ps_refcnt));
 	mtx_unlock(&src->ps_mtx);
 }
 

@@ -1811,7 +1811,7 @@ addrinfo_marshal_func(char *buffer, size_t *buffer_size, void *retval,
 
 	ai = *((struct addrinfo **)retval);
 
-	desired_size = sizeof(size_t);
+	desired_size = roundup2(sizeof(size_t), _ALIGNBYTES + 1);
 	ai_size = 0;
 	for (cai = ai; cai != NULL; cai = cai->ai_next) {
 		desired_size += sizeof(struct addrinfo) + cai->ai_addrlen;
@@ -1819,6 +1819,7 @@ addrinfo_marshal_func(char *buffer, size_t *buffer_size, void *retval,
 			desired_size += sizeof(size_t) +
 			    strlen(cai->ai_canonname);
 		++ai_size;
+		roundup2(desired_size, _ALIGNBYTES + 1);
 	}
 
 	if (desired_size > *buffer_size) {
@@ -1833,6 +1834,7 @@ addrinfo_marshal_func(char *buffer, size_t *buffer_size, void *retval,
 
 	memcpy(p, &ai_size, sizeof(size_t));
 	p += sizeof(size_t);
+	p = _ALIGN(p);
 	for (cai = ai; cai != NULL; cai = cai->ai_next) {
 		memcpy(p, cai, sizeof(struct addrinfo));
 		p += sizeof(struct addrinfo);
@@ -1848,6 +1850,7 @@ addrinfo_marshal_func(char *buffer, size_t *buffer_size, void *retval,
 			memcpy(p, cai->ai_canonname, size);
 			p += size;
 		}
+		p = _ALIGN(p);
 	}
 
 	return (NS_SUCCESS);
@@ -1865,6 +1868,7 @@ addrinfo_unmarshal_func(char *buffer, size_t buffer_size, void *retval,
 	p = buffer;
 	memcpy(&ai_size, p, sizeof(size_t));
 	p += sizeof(size_t);
+	p = _ALIGN(p);
 
 	result = NULL;
 	lasts = NULL;
@@ -1900,6 +1904,7 @@ addrinfo_unmarshal_func(char *buffer, size_t buffer_size, void *retval,
 			lasts->ai_next = sentinel;
 			lasts = sentinel;
 		}
+		p = _ALIGN(p);
 	}
 
 	*((struct addrinfo **)retval) = result;

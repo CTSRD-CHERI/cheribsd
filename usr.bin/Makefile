@@ -31,7 +31,6 @@ SUBDIR=	alias \
 	diff \
 	dirname \
 	du \
-	elf2aout \
 	elfdump \
 	enigma \
 	env \
@@ -219,7 +218,7 @@ SUBDIR.${MK_GAMES}+=	number
 SUBDIR.${MK_GAMES}+=	pom
 SUBDIR.${MK_GAMES}+=	primes
 SUBDIR.${MK_GAMES}+=	random
-.if ${MK_GPL_DTC} != "yes"
+.if ${MK_GPL_DTC} != "yes" && ${MK_CXX} == "yes"
 .if ${COMPILER_FEATURES:Mc++11}
 SUBDIR+=	dtc
 .endif

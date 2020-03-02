@@ -83,7 +83,7 @@ XNESTED(copyinstr_c)
 	GET_CPU_PCPU($c1)	# clobbers at
 	clc	$c1, zero, PC_CURPCB($c1)
 	CAPTABLE_LOAD($c2, copyerr)	# prepare the onfault jump point
-	CAPCALL_LOAD($c12, copystr)
+	CAPCALL_LOAD($c12, copystr_c)
 	cjalr	$c12, $c17
 	csc	$c2, zero, U_PCB_ONFAULT($c1)
 
@@ -126,7 +126,7 @@ XNESTED(copyoutstr_c)
 	GET_CPU_PCPU($c1)	# clobbers at
 	clc	$c1, zero, PC_CURPCB($c1)
 	CAPTABLE_LOAD($c2, copyerr)	# prepare the onfault jump point
-	CAPCALL_LOAD($c12, copystr)
+	CAPCALL_LOAD($c12, copystr_c)
 	cjalr	$c12, $c17
 	csc	$c2, zero, U_PCB_ONFAULT($c1)
 
@@ -166,7 +166,7 @@ XNESTED(copyin_c)
 	GET_CPU_PCPU($c1)	# clobbers at
 	clc	$c1, zero, PC_CURPCB($c1)
 	CAPTABLE_LOAD($c2, copyerr)	# prepare the onfault jump point
-	CAPCALL_LOAD($c12, bcopy)
+	CAPCALL_LOAD($c12, bcopynocap_c)
 	cjalr	$c12, $c17
 	csc	$c2, zero, U_PCB_ONFAULT($c1)
 
@@ -208,7 +208,7 @@ XNESTED(copyincap_c)
 	GET_CPU_PCPU($c1)	# clobbers at
 	clc	$c1, zero, PC_CURPCB($c1)
 	CAPTABLE_LOAD($c2, copyerr)	# prepare the onfault jump point
-	CAPCALL_LOAD($c12, cheri_bcopy)
+	CAPCALL_LOAD($c12, bcopy_c)
 	cjalr	$c12, $c17
 	csc	$c2, zero, U_PCB_ONFAULT($c1)
 
@@ -249,7 +249,7 @@ XNESTED(copyout_c)
 	GET_CPU_PCPU($c1)	# clobbers at
 	clc	$c1, zero, PC_CURPCB($c1)
 	CAPTABLE_LOAD($c2, copyerr)	# prepare the onfault jump point
-	CAPCALL_LOAD($c12, bcopy)
+	CAPCALL_LOAD($c12, bcopynocap_c)
 	cjalr	$c12, $c17
 	csc	$c2, zero, U_PCB_ONFAULT($c1)
 
@@ -291,7 +291,7 @@ XNESTED(copyoutcap_c)
 	GET_CPU_PCPU($c1)	# clobbers at
 	clc	$c1, zero, PC_CURPCB($c1)
 	CAPTABLE_LOAD($c2, copyerr)	# prepare the onfault jump point
-	CAPCALL_LOAD($c12, cheri_bcopy)
+	CAPCALL_LOAD($c12, bcopy_c)
 	cjalr	$c12, $c17
 	csc	$c2, zero, U_PCB_ONFAULT($c1)
 

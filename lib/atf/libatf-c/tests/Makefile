@@ -30,7 +30,7 @@ SRCS.${_T}=	${_T}.c test_helpers.c
 		check_test \
 		macros_test
 
-.if ${CC} == "cc" && !defined(LIBCHERI)
+.if ${CC} == "cc"
 # These tests are broken when using a cross toolchain (they embed ${CC}
 # and try to compile with it).
 ATF_TESTS_C:=	${ATF_TESTS_C:N${_T}}

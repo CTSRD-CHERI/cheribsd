@@ -4,8 +4,10 @@
 # machine-independent gen sources
 .PATH: ${LIBC_SRCTOP}/${LIBC_ARCH}/gen ${LIBC_SRCTOP}/gen ${SRCTOP}/etc
 
-.if ${MACHINE_ARCH:Mmips*c*}
+.if ${MACHINE_ABI:Mpurecap}
 CFLAGS+=	-DNO_COMPAT7
+.endif
+.if ${MACHINE_ARCH:Mmips*c*}
 CFLAGS.getpwent.c=	-mxgot
 .endif
 
@@ -162,8 +164,7 @@ SRCS+=	__getosreldate.c \
 	waitpid.c \
 	waitid.c \
 	wordexp.c
-.if ${MK_SYMVER} == yes && \
-    ! ${MACHINE_ARCH:Mmips*c*}
+.if ${MK_SYMVER} == yes && !${MACHINE_ABI:Mpurecap}
 SRCS+=	devname-compat11.c \
 	fts-compat.c \
 	fts-compat11.c \

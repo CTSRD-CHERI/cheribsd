@@ -232,6 +232,8 @@ grp_marshal_func(char *buffer, size_t *buffer_size, void *retval, va_list ap,
 	size_t desired_size, size, mem_size;
 	char *p, **mem;
 
+	buffer = __builtin_assume_aligned(buffer, _Alignof(struct group));
+
 	switch ((enum nss_lookup_type)cache_mdata) {
 	case nss_lt_name:
 		name = va_arg(ap, char *);
@@ -326,6 +328,8 @@ grp_unmarshal_func(char *buffer, size_t buffer_size, void *retval, va_list ap,
 
 	char *p;
 	char **mem;
+
+	buffer = __builtin_assume_aligned(buffer, _Alignof(struct group));
 
 	switch ((enum nss_lookup_type)cache_mdata) {
 	case nss_lt_name:

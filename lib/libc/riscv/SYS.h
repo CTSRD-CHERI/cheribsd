@@ -42,12 +42,35 @@
 	li	t0, SYS_ ## name;				\
 	ecall
 
+#ifdef __CHERI_PURE_CAPABILITY__
+#define _GET_FNPTR(outreg, function)	\
+	clgc CAPABILITY_REG(outreg), _C_LABEL(function)
+#define _GET_LOCAL_FNPTR(outreg, function)	\
+	cllc CAPABILITY_REG(outreg), _C_LABEL(function)
+#define _CALL_FNPTR(reg)	cjalr CAPABILITY_REG(reg)
+#define _TAILCALL_FNPTR(reg)	cjr CAPABILITY_REG(reg)
+#else
+#define _GET_LOCAL_FNPTR(outreg, function)	\
+	lla outreg, _C_LABEL(function)
+#define _GET_FNPTR(outreg, function)	\
+	la outreg, _C_LABEL(function)
+#define _CALL_FNPTR(reg)	jalr reg
+#define _TAILCALL_FNPTR(reg)	jr reg
+#endif
+
+#define ASM_LOCAL_TAILCALL(tmpreg, function)				\
+	_GET_LOCAL_FNPTR(tmpreg, function);				\
+	_TAILCALL_FNPTR(tmpreg)
+#define ASM_LOCAL_CALL(tmpreg, function)				\
+	_GET_LOCAL_FNPTR(tmpreg, function);				\
+	_CALL_FNPTR(tmpreg)
+
 #define	SYSCALL(name)						\
 ENTRY(__sys_##name);						\
 	WEAK_REFERENCE(__sys_##name, name);			\
 	WEAK_REFERENCE(__sys_##name, _##name);			\
 	_SYSCALL(name);						\
-	ret;							\
+	RETURN;							\
 END(__sys_##name)
 
 #define	PSEUDO(name)						\
@@ -55,9 +78,8 @@ ENTRY(__sys_##name);						\
 	WEAK_REFERENCE(__sys_##name, _##name);			\
 	_SYSCALL(name);						\
 	bnez	t0, 1f; 					\
-	ret;							\
-1:	la	t1, cerror;					\
-	jr	t1;						\
+	RETURN;							\
+1:	ASM_LOCAL_TAILCALL(t1, cerror);				\
 END(__sys_##name)
 
 #define	RSYSCALL(name)						\
@@ -66,7 +88,15 @@ ENTRY(__sys_##name);						\
 	WEAK_REFERENCE(__sys_##name, _##name);			\
 	_SYSCALL(name);						\
 	bnez	t0, 1f; 					\
-	ret;							\
-1:	la	t1, cerror;					\
-	jr	t1;						\
+	RETURN;							\
+1:	ASM_LOCAL_TAILCALL(t1, cerror);				\
+END(__sys_##name)
+
+/* Do a system call where the _x() is also custom (e.g. fcntl, ioctl) */
+#define NO_UNDERSCORE(name)					\
+ENTRY(__sys_##name);						\
+	_SYSCALL(name);						\
+	bnez	t0, 1f; 					\
+	RETURN;							\
+1:	ASM_LOCAL_TAILCALL(t1, cerror);				\
 END(__sys_##name)

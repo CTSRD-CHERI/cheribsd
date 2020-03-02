@@ -182,11 +182,25 @@ va:
 
 	/* Setup supervisor trap vector */
 	la	t0, cpu_exception_handler
+#if __has_feature(capabilities)
+	cspecialr ct1, pcc
+	csetaddr ct1, ct1, t0
+	li	t0, 1
+	csetflags ct1, ct1, t0
+	cspecialw stcc, ct1
+	cspecialr ct1, ddc
+	cspecialw stdc, ct1
+#else
 	csrw	stvec, t0
+#endif
 
 	/* Ensure sscratch is zero */
+#if __has_feature(capabilities)
+	cspecialw sscratchc, cnull
+#else
 	li	t0, 0
 	csrw	sscratch, t0
+#endif
 
 	/* Initialize stack pointer */
 	la	s3, initstack_end
@@ -231,8 +245,12 @@ initstack:
 initstack_end:
 
 ENTRY(sigcode)
+#if __has_feature(capabilities)
+	cincoffset ca0, csp, SF_UC
+#else
 	mv	a0, sp
 	addi	a0, a0, SF_UC
+#endif
 
 1:
 	li	t0, SYS_sigreturn
@@ -360,7 +378,17 @@ mpva:
 
 	/* Setup supervisor trap vector */
 	la	t0, cpu_exception_handler
+#if __has_feature(capabilities)
+	cspecialr ct1, pcc
+	csetaddr ct1, ct1, t0
+	li	t0, 1
+	csetflags ct1, ct1, t0
+	cspecialw stcc, ct1
+	cspecialr ct1, ddc
+	cspecialw stdc, ct1
+#else
 	csrw	stvec, t0
+#endif
 
 	/* Ensure sscratch is zero */
 	li	t0, 0

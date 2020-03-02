@@ -95,11 +95,6 @@ CXXSTD?=	c++11
 
 LIBADD+=	cxxrt
 
-.ifdef LIBCHERI
-# XXXAR: why is this needed?
-LDFLAGS+=	-L../libcxxrt
-.endif
-
 INCSGROUPS=	STD EXP EXT
 
 STD_HEADERS+=	__bit_reference

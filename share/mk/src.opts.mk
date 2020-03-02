@@ -69,7 +69,6 @@ __DEFAULT_YES_OPTIONS = \
     BOOTPARAMD \
     BOOTPD \
     BSD_CPIO \
-    BSD_CRTBEGIN \
     BSDINSTALL \
     BSNMP \
     BZIP2 \
@@ -207,7 +206,6 @@ __DEFAULT_NO_OPTIONS = \
     GNU_GREP_COMPAT \
     GPL_DTC \
     HESIOD \
-    HTTPD \
     LIBSOFT \
     LOADER_FIREWIRE \
     LOADER_FORCE_LE \
@@ -392,8 +390,27 @@ BROKEN_OPTIONS+=SSP
 BROKEN_OPTIONS+=SSP
 # nscd(8) caching depends on marshaling pointers to the daemon and back
 # and can't work without a rewrite.
-BROKEN_OPTIONS+=NS_CACHINE
+BROKEN_OPTIONS+=NS_CACHING
+# cheribsdbox is a useful recovery tool
+__DEFAULT_YES_OPTIONS+=CHERIBSDBOX
+.else
+__DEFAULT_NO_OPTIONS+=CHERIBSDBOX
 .endif
+
+.if ${__T:Mriscv*c*}
+# Compiler crash:
+# Skip until https://github.com/CTSRD-CHERI/llvm-project/issues/379 is fixed.
+BROKEN_OPTIONS+=LIBCPLUSPLUS GNUCXX CXX
+# Crash in ZFS code. TODO: investigate
+BROKEN_OPTIONS+=CDDL
+
+# Some compilation failure: TODO: investigate
+BROKEN_OPTIONS+=SVN SVNLITE
+
+# libcheri has not been ported to RISCV
+BROKEN_OPTIONS+=LIBCHERI
+.endif
+
 
 # EFI doesn't exist on mips, powerpc, sparc or riscv.
 .if ${__T:Mmips*} || ${__T:Mpowerpc*} || ${__T:Msparc64} || ${__T:Mriscv*}
@@ -451,8 +468,6 @@ BROKEN_OPTIONS+=NVME
 .endif
 
 .if ${__T:Msparc64}
-# Sparc64 need extra crt*.o files - PR 239851
-BROKEN_OPTIONS+=BSD_CRTBEGIN
 # PR 233405
 BROKEN_OPTIONS+=LLVM_LIBUNWIND
 .endif
@@ -544,6 +559,7 @@ MK_CLANG:=	no
 MK_GNUCXX:=	no
 MK_GOOGLETEST:=	no
 MK_TESTS:=	no
+MK_PMC:=	no
 .endif
 
 .if ${MK_DIALOG} == "no"

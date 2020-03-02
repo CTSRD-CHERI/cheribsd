@@ -115,10 +115,8 @@ cpu_fork(struct thread *td1, struct proc *p2, struct thread *td2, int flags)
 	 * of the td_frame, for us that's not needed any
 	 * longer (this copy does them both) 
 	 */
-#ifndef CPU_CHERI
 	bcopy(td1->td_pcb, pcb2, sizeof(*pcb2));
-#else
-	cheri_bcopy(td1->td_pcb, pcb2, sizeof(*pcb2));
+#ifdef CPU_CHERI
 	cheri_signal_copy(pcb2, td1->td_pcb);
 	cheri_sealcap_copy(p2, td1->td_proc);
 #endif
@@ -509,10 +507,8 @@ cpu_copy_thread(struct thread *td, struct thread *td0)
 	 * and gets copied when we copy the PCB. No separate copy
 	 * is needed.
 	 */
-#ifndef CPU_CHERI
 	bcopy(td0->td_pcb, pcb2, sizeof(*pcb2));
-#else
-	cheri_bcopy(td0->td_pcb, pcb2, sizeof(*pcb2));
+#ifdef CPU_CHERI
 	cheri_signal_copy(pcb2, td0->td_pcb);
 #endif
 
@@ -579,8 +575,8 @@ cpu_copy_thread(struct thread *td, struct thread *td0)
  * the entry function with the given argument.
  */
 void
-cpu_set_upcall(struct thread *td, void (*entry)(void *), void *arg,
-    stack_t *stack)
+cpu_set_upcall(struct thread *td, void (* __capability entry)(void *),
+    void * __capability arg, stack_t *stack)
 {
 	struct trapframe *tf;
 	register_t sp, sr;
@@ -599,21 +595,76 @@ cpu_set_upcall(struct thread *td, void (*entry)(void *), void *arg,
 	tf->sr = sr;
 
 #if __has_feature(capabilities)
-	/*
-	 * For the MIPS ABI, we can derive any required CHERI state from
-	 * the completed MIPS trapframe and existing process state.
-	 */
-	hybridabi_newthread_setregs(td, (uintptr_t)entry);
-#else
-	/* For CHERI $pcc is set by hybridabi_newthread_setregs() */
-	TRAPF_PC_SET_ADDR(tf, (vaddr_t)(intptr_t)entry);
+	if (SV_PROC_FLAG(td->td_proc, SV_CHERI)) {
+		struct cheri_signal *csigp;
+
+		tf->pcc = (void * __capability)entry;
+		tf->c12 = entry;
+		tf->c3 = arg;
+
+		/*
+		 * Copy the $cgp for the current thread to the new
+		 * one. This will work both if the target function is
+		 * in the current shared object (so the $cgp value
+		 * will be the same) or in a different one (in which
+		 * case it will point to a PLT stub that loads $cgp).
+		 *
+		 * XXXAR: could this break anything if sandboxes
+		 * create threads?
+		 */
+		tf->idc = curthread->td_frame->idc;
+
+		/*
+		 * Set up CHERI-related state: register state, signal
+		 * delivery, sealing capabilities, trusted stack.
+		 */
+		cheriabi_newthread_init(td);
+
+		/*
+		 * We don't perform validation on the new pcc or stack
+		 * capabilities and just let the caller fail on return
+		 * if they are bogus.
+		 */
+		tf->csp = (char * __capability)stack->ss_sp + stack->ss_size;
+
+		/*
+		 * Update privileged signal-delivery environment for
+		 * actual stack.
+		 *
+		 * XXXRW: Not entirely clear whether we want an offset
+		 * of 'stacklen' for csig_csp here.  Maybe we don't
+		 * want to use csig_csp at all?  Possibly csig_csp
+		 * should default to NULL...?
+		 */
+		csigp = &td->td_pcb->pcb_cherisignal;
+		csigp->csig_csp = td->td_frame->csp;
+		csigp->csig_default_stack = csigp->csig_csp;
+#ifdef CHERIABI_LEGACY_SUPPORT
+		/* Setup $ddc when targeting the legacy ABI */
+		tf->ddc = curthread->td_frame->ddc;
+		csigp->csig_ddc = tf->ddc;
 #endif
-	/* 
-	 * MIPS ABI requires T9 to be the same as PC 
-	 * in subroutine entry point
-	 */
-	tf->t9 = TRAPF_PC_OFFSET(tf);
-	tf->a0 = (register_t)(intptr_t)arg;
+	} else
+#endif
+	{
+#if __has_feature(capabilities)
+		/*
+		 * For the MIPS ABI, we can derive any required CHERI state from
+		 * the completed MIPS trapframe and existing process state.
+		 */
+		hybridabi_newthread_setregs(td, (__cheri_addr vaddr_t)entry);
+#else
+		/* For CHERI $pcc is set by hybridabi_newthread_setregs() */
+		TRAPF_PC_SET_ADDR(tf, (vaddr_t)(intptr_t)entry);
+#endif
+
+		/*
+		 * MIPS ABI requires T9 to be the same as PC
+		 * in subroutine entry point
+		 */
+		tf->t9 = TRAPF_PC_OFFSET(tf);
+		tf->a0 = (register_t)(__cheri_addr vaddr_t)arg;
+	}
 
 	/*
 	 * FREEBSD_DEVELOPERS_FIXME:

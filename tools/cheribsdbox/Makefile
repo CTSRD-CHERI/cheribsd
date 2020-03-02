@@ -10,12 +10,16 @@ MK_PIE=	no
 PROG=	cheribsdbox
 CHERIBSDBOX_DIR?=	/bin
 BINDIR?=${CHERIBSDBOX_DIR}
-# We want to build all these tools as statically linked MIPS binaries to save size
-# We don't want to build this as purecap yet (it generates a captable that is
-# too large to link).
-WANT_COMPAT=	64
+
+.if ${MK_LIB64} == "yes"
+# We want to build all these tools as statically linked 64-bit binaries.
+# For MIPS we don't want to build this as purecap yet (it generates a captable
+# that is too large to link).
+NEED_COMPAT=	64
 WANT_CHERI=		none
-CRUNCH_BUILDOPTS+=	WANT_CHERI=none WANT_COMPAT=64 -DWITHOUT_TESTS MK_TESTS=no
+CRUNCH_BUILDOPTS+=	WANT_CHERI=none NEED_COMPAT=64
+.endif
+CRUNCH_BUILDOPTS+=	-DWITHOUT_TESTS MK_TESTS=no -D_CRUNCHGEN
 # Avoid linking against libcasper for tcpdump/traceroute/kdump:
 CRUNCH_BUILDOPTS+=	-DWITHOUT_CASPER MK_CASPER=no
 # Try to reduce size by avoiding locale support

@@ -1324,7 +1324,7 @@ static __inline int
 getselfd_cap(struct filedesc *fdp, int fd, struct file **fpp)
 {
 
-	return (fget_unlocked(fdp, fd, &cap_event_rights, fpp, NULL));
+	return (fget_unlocked(fdp, fd, &cap_event_rights, fpp));
 }
 
 /*
@@ -1620,7 +1620,6 @@ pollrescan(struct thread *td)
 	td->td_retval[0] = n;
 	return (0);
 }
-
 
 static int
 pollout(struct thread *td, struct pollfd *fds,

@@ -36,6 +36,17 @@
 #   xargs -n1 | sort | uniq -d;
 # done
 
+# 20200206: Remove elf2aout
+OLD_FILES+=usr/bin/elf2aout
+OLD_FILES+=usr/share/man/man1/elf2aout.1.gz
+
+# 20200204: simple_httpd removed
+OLD_FILES+=usr/sbin/simple_httpd
+
+# 20200127: vpo removed
+OLD_FILES+=usr/share/man/man4/imm.4.gz
+OLD_FILES+=usr/share/man/man4/vpo.4.gz
+
 # 20200104: gcc libssp removed
 OLD_FILES+=usr/include/ssp/ssp.h
 OLD_FILES+=usr/include/ssp/stdio.h
