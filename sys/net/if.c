@@ -129,20 +129,6 @@ struct ifgroupreq_c {
 #define _CASE_IOC_IFGROUPREQ_C(cmd)
 #endif
 
-#if defined(COMPAT_FREEBSD64)
-struct ifmediareq64 {
-	char	ifm_name[IFNAMSIZ];
-	int	ifm_current;
-	int	ifm_mask;
-	int	ifm_status;
-	int	ifm_active;
-	int	ifm_count;
-	int	*ifm_ulist;
-};
-#define	SIOCGIFMEDIA64	_IOC_NEWTYPE(SIOCGIFMEDIA, struct ifmediareq64)
-#define	SIOCGIFXMEDIA64	_IOC_NEWTYPE(SIOCGIFXMEDIA, struct ifmediareq64)
-#endif
-
 #ifdef COMPAT_FREEBSD32
 struct ifreq_buffer32 {
 	uint32_t	length;		/* (size_t) */
@@ -205,6 +191,20 @@ struct ifmediareq32 {
 #else /* !COMPAT_FREEBSD32 */
 #define _CASE_IOC_IFGROUPREQ_32(cmd)
 #endif /* !COMPAT_FREEBSD32 */
+
+#ifdef COMPAT_FREEBSD64
+struct ifmediareq64 {
+	char	ifm_name[IFNAMSIZ];
+	int	ifm_current;
+	int	ifm_mask;
+	int	ifm_status;
+	int	ifm_active;
+	int	ifm_count;
+	int	*ifm_ulist;
+};
+#define	SIOCGIFMEDIA64	_IOC_NEWTYPE(SIOCGIFMEDIA, struct ifmediareq64)
+#define	SIOCGIFXMEDIA64	_IOC_NEWTYPE(SIOCGIFXMEDIA, struct ifmediareq64)
+#endif /* COMPAT_FREEBSD64 */
 
 #define CASE_IOC_IFGROUPREQ(cmd)	\
     _CASE_IOC_IFGROUPREQ_32(cmd)	\
