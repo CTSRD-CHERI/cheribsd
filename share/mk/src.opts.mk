@@ -394,6 +394,9 @@ BROKEN_OPTIONS+=SVN SVNLITE
 
 # libcheri has not been ported to RISCV
 BROKEN_OPTIONS+=LIBCHERI
+
+# No RTLD yet
+BROKEN_OPTIONS+=CASPER DYNAMICROOT
 .endif
 
 # EFI doesn't exist on mips, powerpc or riscv.
