@@ -137,26 +137,6 @@ struct bpf_program_buffer {
 #define	SIZEOF_BPF_HDR(type)	\
     (offsetof(type, bh_hdrlen) + sizeof(((type *)0)->bh_hdrlen))
 
-#ifdef COMPAT_CHERIABI
-
-struct bpf_program_c {
-	u_int bf_len;
-	struct bpf_insn * __capability bf_insns;
-};
-struct bpf_dltlist_c {
-	u_int bfl_len;
-	u_int * __capability bfl_list;
-};
-
-#define	_CASE_IOC_BPF_DLTLIST_C(cmd)				\
-    _IOC_NEWTYPE((cmd), struct bpf_dltlist_c): case
-#define	_CASE_IOC_BPF_PROGRAM_C(cmd)				\
-    _IOC_NEWTYPE((cmd), struct bpf_program_c): case
-#else /* !COMPAT_CHERIABI */
-#define	_CASE_IOC_BPF_DLTLIST_C(cmd)
-#define	_CASE_IOC_BPF_PROGRAM_C(cmd)
-#endif /* !COMPAT_CHERIABI */
-
 #ifdef COMPAT_FREEBSD32
 #include <sys/mount.h>
 #include <compat/freebsd32/freebsd32.h>
@@ -198,13 +178,36 @@ struct bpf_dltlist32 {
 #define	_CASE_IOC_BPF_PROGRAM32(cmd)
 #endif /* !COMPAT_FREEBSD32 */
 
+#ifdef COMPAT_FREEBSD64
+#include <sys/mount.h>
+#include <compat/freebsd64/freebsd64.h>
+
+struct bpf_program64 {
+	u_int bf_len;
+	uint64_t bf_insns;		/* (struct bpf_insn *) */
+};
+
+struct bpf_dltlist64 {
+	u_int		bfl_len;
+	uint64_t	bfl_list;	/* (u_int *) */
+};
+
+#define	_CASE_IOC_BPF_DLTLIST64(cmd)				\
+    _IOC_NEWTYPE((cmd), struct bpf_dltlist64): case
+#define	_CASE_IOC_BPF_PROGRAM64(cmd)				\
+    _IOC_NEWTYPE((cmd), struct bpf_program64): case
+#else /* !COMPAT_FREEBSD64 */
+#define	_CASE_IOC_BPF_DLTLIST64(cmd)
+#define	_CASE_IOC_BPF_PROGRAM64(cmd)
+#endif /* !COMPAT_FREEBSD64 */
+
 #define	CASE_IOC_BPF_DLTLIST(cmd)				\
-    _CASE_IOC_BPF_DLTLIST_C(cmd)				\
     _CASE_IOC_BPF_DLTLIST32(cmd)				\
+    _CASE_IOC_BPF_DLTLIST64(cmd)				\
     (cmd)
 #define	CASE_IOC_BPF_PROGRAM(cmd)				\
-    _CASE_IOC_BPF_PROGRAM_C(cmd)				\
     _CASE_IOC_BPF_PROGRAM32(cmd)				\
+    _CASE_IOC_BPF_PROGRAM64(cmd)				\
     (cmd)
 
 #define BPF_LOCK()	   sx_xlock(&bpf_sx)
@@ -1906,27 +1909,28 @@ bf_insns_get_ptr(void *fpp)
 {
 	union {
 		struct bpf_program fp;
-#ifdef COMPAT_CHERIABI
-		struct bpf_program_c fp_c;
-#endif
 #ifdef COMPAT_FREEBSD32
 		struct bpf_program32 fp32;
+#endif
+#ifdef COMPAT_FREEBSD64
+		struct bpf_program64 fp64;
 #endif
 	} *fpup;
 
 	fpup = fpp;
-#ifdef COMPAT_CHERIABI
-	if (SV_CURPROC_FLAG(SV_CHERI))
-		return (fpup->fp_c.bf_insns);
-#endif
 #ifdef COMPAT_FREEBSD32
 	if (SV_CURPROC_FLAG(SV_ILP32))
 		return (__USER_CAP(
 		    (struct bpf_insn *)(uintptr_t)fpup->fp32.bf_insns,
 		    fpup->fp32.bf_len * sizeof(struct bpf_insn)));
 #endif
-	return (__USER_CAP(fpup->fp.bf_insns,
-	    fpup->fp.bf_len * sizeof(struct bpf_insn)));
+#ifdef COMPAT_FREEBSD64
+	if (!SV_CURPROC_FLAG(SV_CHERI))
+		return (__USER_CAP(
+		    (struct bpf_insn *)(uintptr_t)fpup->fp64.bf_insns,
+		    fpup->fp64.bf_len * sizeof(struct bpf_insn)));
+#endif
+	return (fpup->fp.bf_insns);
 }
 
 /*
@@ -2777,26 +2781,26 @@ bfl_list_get_ptr(void *bflp)
 {
 	union {
 		struct bpf_dltlist bfl;
-#ifdef COMPAT_CHERIABI
-		struct bpf_dltlist_c bfl_c;
-#endif
 #ifdef COMPAT_FREEBSD32
 		struct bpf_dltlist32 bfl32;
+#endif
+#ifdef COMPAT_FREEBSD64
+		struct bpf_dltlist64 bfl64;
 #endif
 	} *bflup;
 
 	bflup = bflp;
-#ifdef COMPAT_CHERIABI
-	if (SV_CURPROC_FLAG(SV_CHERI))
-		return (bflup->bfl_c.bfl_list);
-#endif
 #ifdef COMPAT_FREEBSD32
 	if (SV_CURPROC_FLAG(SV_ILP32))
 		return (__USER_CAP((u_int *)(uintptr_t)bflup->bfl32.bfl_list,
 		    bflup->bfl32.bfl_len * sizeof(u_int)));
 #endif
-	return (__USER_CAP(bflup->bfl.bfl_list,
-	    bflup->bfl.bfl_len * sizeof(u_int)));
+#ifdef COMPAT_FREEBSD64
+	if (!SV_CURPROC_FLAG(SV_CHERI))
+		return (__USER_CAP((u_int *)(uintptr_t)bflup->bfl64.bfl_list,
+		    bflup->bfl64.bfl_len * sizeof(u_int)));
+#endif
+	return (bflup->bfl.bfl_list);
 }
 
 /*
