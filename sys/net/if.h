@@ -382,7 +382,7 @@ struct if_announcemsghdr {
  */
 struct ifreq_buffer {
 	size_t	length;
-	void	*buffer;
+	void * __kerncap buffer;
 };
 
 /*
@@ -405,7 +405,7 @@ struct	ifreq {
 		int	ifru_mtu;
 		int	ifru_phys;
 		int	ifru_media;
-		caddr_t	ifru_data;
+		char * __kerncap ifru_data;
 		int	ifru_cap[2];
 		u_int	ifru_fib;
 		u_char	ifru_vlan_pcp;
@@ -435,34 +435,6 @@ struct	ifreq {
 #define	ifr_vlan_pcp	ifr_ifru.ifru_vlan_pcp	/* VLAN priority */
 #define	ifr_lan_pcp	ifr_ifru.ifru_vlan_pcp	/* VLAN priority */
 #endif /* !defined(_KERNEL) */
-
-#if defined(_KERNEL) && __has_feature(capabilities)
-struct ifreq_buffer_c {
-	size_t			length;		/* (size_t) */
-	void * __capability	buffer;		/* (void *) */
-};
-
-struct ifreq_c {
-	char	ifr_name[IFNAMSIZ];		/* if name, e.g. "en0" */
-	union {
-		struct sockaddr	ifru_addr;
-		struct sockaddr	ifru_dstaddr;
-		struct sockaddr	ifru_broadaddr;
-		struct ifreq_buffer_c ifru_buffer;
-		short		ifru_flags[2];
-		short		ifru_index;
-		int		ifru_jid;
-		int		ifru_metric;
-		int		ifru_mtu;
-		int		ifru_phys;
-		int		ifru_media;
-		void * __capability ifru_data;
-		int		ifru_cap[2];
-		u_int		ifru_fib;
-		u_char		ifru_vlan_pcp;
-	} ifr_ifru;
-};
-#endif /* defined(_KERNEL) && __has_feature(capabilities) */
 
 #define	_SIZEOF_ADDR_IFREQ(ifr) \
 	((ifr).ifr_addr.sa_len > sizeof(struct sockaddr) ? \
@@ -556,7 +528,7 @@ struct ifgroupreq {
 	u_int	ifgr_len;
 	union {
 		char	ifgru_group[IFNAMSIZ];
-		struct	ifg_req *ifgru_groups;
+		struct ifg_req * __kerncap ifgru_groups;
 	} ifgr_ifgru;
 #ifndef _KERNEL
 #define ifgr_group	ifgr_ifgru.ifgru_group
