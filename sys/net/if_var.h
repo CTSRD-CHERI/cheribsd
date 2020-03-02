@@ -782,15 +782,47 @@ int drbr_enqueue_drv(if_t ifp, struct buf_ring *br, struct mbuf *m);
 void if_hw_tsomax_common(if_t ifp, struct ifnet_hw_tsomax *);
 int if_hw_tsomax_update(if_t ifp, struct ifnet_hw_tsomax *);
 
+#ifdef COMPAT_FREEBSD64
+struct ifreq_buffer64 {
+	uint64_t	length;		/* (size_t) */
+	uint64_t	buffer;		/* (void *) */
+};
+
+/*
+ * Interface request structure used for socket
+ * ioctl's.  All interface ioctl's must have parameter
+ * definitions which begin with ifr_name.  The
+ * remainder may be interface specific.
+ */
+struct ifreq64 {
+	char	ifr_name[IFNAMSIZ];		/* if name, e.g. "en0" */
+	union {
+		struct sockaddr	ifru_addr;
+		struct sockaddr	ifru_dstaddr;
+		struct sockaddr	ifru_broadaddr;
+		struct ifreq_buffer64 ifru_buffer;
+		short		ifru_flags[2];
+		short		ifru_index;
+		int		ifru_jid;
+		int		ifru_metric;
+		int		ifru_mtu;
+		int		ifru_phys;
+		int		ifru_media;
+		uint64_t	ifru_data;
+		int		ifru_cap[2];
+		u_int		ifru_fib;
+		u_char		ifru_vlan_pcp;
+	} ifr_ifru;
+};
+
 /* Helper macro for struct ifreq ioctls */
-#if __has_feature(capabilities)
 #define	CASE_IOC_IFREQ(cmd)					\
     (cmd):							\
-    case _IOC_NEWTYPE((cmd), struct ifreq_c)
-#else
+    case _IOC_NEWTYPE((cmd), struct ifreq64)
+#else /* !COMPAT_FREEBSD64 */
 #define	CASE_IOC_IFREQ(cmd)					\
     (cmd)
-#endif
+#endif /* !COMPAT_FREEBSD64 */
 
 /* accessors for struct ifreq */
 char *ifr_addr_get_data(void *ifrp);
