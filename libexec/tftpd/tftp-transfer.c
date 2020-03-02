@@ -81,7 +81,7 @@ read_block:
 
 		window[windowblock].offset = tell_file();
 		window[windowblock].block = *block;
-		size = read_file(sendbuffer, segsize);
+		size = tftp_read_file(sendbuffer, segsize);
 		if (size < 0) {
 			tftp_log(LOG_ERR, "read_file returned %d", size);
 			send_error(peer, errno + 100);
@@ -343,7 +343,7 @@ tftp_receive(int peer, uint16_t *block, struct tftp_stats *ts,
 					retry = 0;
 					continue;
 				}
-						
+
 				tftp_log(LOG_WARNING,
 				    "Expected DATA block %d, got block %d",
 				    *block, rp->th_block);
