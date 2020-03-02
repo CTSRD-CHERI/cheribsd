@@ -46,11 +46,16 @@ SUBDIR.${MK_LIBCHERI}+=	cheri_bench
 .endif
 
 # Small cheri programs
+# No RTLD for RISCV purecap yet
+.if !(${MACHINE_ABI:Mpurecap} && ${MACHINE_ARCH:Mriscv*})
 SUBDIR.${MK_CHERI}+=	cheri_minimal_dynamic_exe
 SUBDIR.${MK_CHERI}+=	cheri_minimal_pie_exe
+.endif
 SUBDIR.${MK_CHERI}+=	cheri_pthreads
 SUBDIR.${MK_CHERI}+=	helloworld
+.if ${MK_CXX} != "no"
 SUBDIR.${MK_CHERI}+=	helloworld_cxx
+.endif
 SUBDIR.${MK_CHERI}+=	helloworld_static
 
 # Consumers of libhelloworld
@@ -58,6 +63,7 @@ SUBDIR.${MK_LIBCHERI}+=	cheri_helloworld
 SUBDIR.${MK_LIBCHERI}+=	cheriabi_helloworld
 
 # cheritest
+.if ${MACHINE_ARCH:Mmips*}
 SUBDIR.${MK_CHERI}+=	cheriabitest
 SUBDIR.${MK_CHERI}+=	cheriabitest-dynamic
 SUBDIR.${MK_CHERI}+=	cheriabitest-dynamic-mt
@@ -66,6 +72,9 @@ SUBDIR.${MK_CHERI}+=	cheritest
 SUBDIR.${MK_CHERI}+=	cheritest-dynamic
 SUBDIR.${MK_CHERI}+=	cheritest-dynamic-mt
 SUBDIR.${MK_CHERI}+=	cheritest-mt
+.else
+.warn "TODO: port cheritest to RISCV"
+.endif
 
 .include <bsd.arch.inc.mk>
 
