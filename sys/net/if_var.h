@@ -797,6 +797,8 @@ char *ifr_addr_get_data(void *ifrp);
 sa_family_t ifr_addr_get_family(void *ifrp);
 unsigned char ifr_addr_get_len(void *ifrp);
 struct sockaddr *ifr_addr_get_sa(void *ifrp);
+void * __capability ifr_buffer_get_buffer(void *data);
+size_t ifr_buffer_get_length(void *data);
 void * __capability ifr_data_get_ptr(void *ifrp);
 u_int ifr_fib_get(void *ifrp);
 void ifr_fib_set(void *ifrp, u_int fib);
