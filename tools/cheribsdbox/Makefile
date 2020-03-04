@@ -278,7 +278,7 @@ CRUNCH_ALIAS_hexdump=	hd od
 CRUNCH_ALIAS_w=	uptime
 CRUNCH_PROGS_usr.bin+=su
 
-.if ${MK_CHERI} != "no"
+.if ${MACHINE_ARCH:Mmips64*}
 CRUNCH_PROGS_usr.bin+=	qtrace
 .endif
 .if ${MACHINE_ARCH:Mmips64*}
