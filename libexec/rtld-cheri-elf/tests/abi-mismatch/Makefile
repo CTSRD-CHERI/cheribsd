@@ -6,7 +6,6 @@ TESTSDIR=	${TESTSBASE}/libexec/rtld-cheri-elf/abi-mismatch
 # Disable when building a pure-cap world as we don't support
 # bsd.cheri.mk hacks there.  Alternative workaround needed.
 SUBDIR+=	basic_nocheri_lib basic_hybrid_lib basic_purecap_lib
-SUBDIR+=	wrong_size_purecap_lib wrong_size_hybrid_lib
 .endif
 
 #PLAIN_TESTS_C=				option-domain-search_test
