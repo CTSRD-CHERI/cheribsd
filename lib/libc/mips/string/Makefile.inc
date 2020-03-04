@@ -14,7 +14,7 @@ MDSRCS+= \
 	strrchr.S
 .endif
 
-.if ${MACHINE_ABI:Mpurecap} || ${MK_CHERI} == "yes"
+.if ${MACHINE_CPU:Mcheri}
 CHERI_MDSRCS=	\
 		memcpy_c.c \
 		memmove_c.c \
