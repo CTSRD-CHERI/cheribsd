@@ -202,8 +202,12 @@ SUBDIR.${MK_ATM}+=	atm
 SUBDIR.${MK_BLUETOOTH}+=	bluetooth
 SUBDIR.${MK_BSD_CPIO}+=	cpio
 SUBDIR.${MK_CALENDAR}+=	calendar
-SUBDIR.${MK_CHERI}+=	capsize \
-			qtrace
+
+# Tracing currently only implemented for MIPS
+.if ${MACHINE_ARCH:Mmips*}
+SUBDIR.${MK_CHERI}+=	qtrace
+.endif
+
 SUBDIR.${MK_CLANG}+=	clang
 SUBDIR.${MK_DIALOG}+=	dpv
 SUBDIR.${MK_EE}+=	ee
