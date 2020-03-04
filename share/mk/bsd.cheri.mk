@@ -68,11 +68,7 @@ LDFLAGS+=	-stdlib=libc++
 .if ${COMPILER_TYPE} == "clang"
 # GCC doesn't support -mstack-alignment but I think it has been patched
 # to use 32 bytes anyway
-.if ${MK_CHERI256} == "yes"
-CFLAGS+=	-mstack-alignment=32
-.else
 CFLAGS+=	-mstack-alignment=16
-.endif
 .endif # $COMPILER_TYPE == clang
 .endif # MIPS, not hybrid (adjust stack alignment)
 
@@ -146,11 +142,7 @@ _LIB_OBJTOP=	${ROOTOBJDIR}
 STATIC_CFLAGS+= -ftls-model=local-exec # MIPS/hybrid case
 .endif
 
-.if ${MK_CHERI128} == "yes"
 _CHERI_COMMON_FLAGS+=	-cheri=128
-.else
-_CHERI_COMMON_FLAGS+=	-cheri=256
-.endif
 
 CFLAGS+=	${CHERI_OPTIMIZATION_FLAGS:U-O2}
 # We now need LLD to link any code that uses capabilities:
