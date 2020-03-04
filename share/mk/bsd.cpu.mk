@@ -15,7 +15,10 @@ MACHINE_CPU = arm
 . elif ${MACHINE_CPUARCH} == "i386"
 MACHINE_CPU = i486
 . elif ${MACHINE_CPUARCH} == "mips"
-MACHINE_CPU = mips
+.  if ${MACHINE_ARCH:Mmips64*c*}
+MACHINE_CPU = cheri
+.   endif
+MACHINE_CPU += mips
 . elif ${MACHINE_CPUARCH} == "powerpc"
 MACHINE_CPU = aim
 . elif ${MACHINE_CPUARCH} == "riscv"
@@ -147,6 +150,8 @@ _CPUCFLAGS = -mcpu=${CPUTYPE}
 .  if ${CPUTYPE:Mmips32*} != "" || ${CPUTYPE:Mmips64*} != "" || \
 	${CPUTYPE:Mmips[1234]} != ""
 _CPUCFLAGS = -march=${CPUTYPE}
+. elif ${CPUTYPE} == "cheri"
+# XXX: assume we're getting the right flags already.
 . else
 # Default -march to the CPUTYPE passed in, with mips stripped off so we
 # accept either mips4kc or 4kc, mostly for historical reasons
@@ -292,7 +297,10 @@ MACHINE_CPU = sse3
 MACHINE_CPU += amd64 sse2 sse mmx
 ########## Mips
 . elif ${MACHINE_CPUARCH} == "mips"
-MACHINE_CPU = mips
+.  if ${CPUTYPE} == "cheri"
+MACHINE_CPU = cheri
+.  endif
+MACHINE_CPU += mips
 ########## powerpc
 . elif ${MACHINE_ARCH} == "powerpc"
 .  if ${CPUTYPE} == "e500"
