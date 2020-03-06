@@ -1441,16 +1441,7 @@ vfs_op_enter(struct mount *mp)
 		MNT_IUNLOCK(mp);
 		return;
 	}
-	/*
-	 * Paired with a fence in vfs_op_thread_enter(). See the comment
-	 * above it for details.
-	 */
-	atomic_thread_fence_seq_cst();
 	vfs_op_barrier_wait(mp);
-	/*
-	 * Paired with a fence in vfs_op_thread_exit().
-	 */
-	atomic_thread_fence_acq();
 	CPU_FOREACH(cpu) {
 		mp->mnt_ref +=
 		    zpcpu_replace_cpu(mp->mnt_ref_pcpu, 0, cpu);
@@ -1484,20 +1475,52 @@ vfs_op_exit(struct mount *mp)
 	MNT_IUNLOCK(mp);
 }
 
-/*
- * It is assumed the caller already posted at least an acquire barrier.
- */
+struct vfs_op_barrier_ipi {
+	struct mount *mp;
+	struct smp_rendezvous_cpus_retry_arg srcra;
+};
+
+static void
+vfs_op_action_func(void *arg)
+{
+	struct vfs_op_barrier_ipi *vfsopipi;
+	struct mount *mp;
+
+	vfsopipi = __containerof(arg, struct vfs_op_barrier_ipi, srcra);
+	mp = vfsopipi->mp;
+
+	if (!vfs_op_thread_entered(mp))
+		smp_rendezvous_cpus_done(arg);
+}
+
+static void
+vfs_op_wait_func(void *arg, int cpu)
+{
+	struct vfs_op_barrier_ipi *vfsopipi;
+	struct mount *mp;
+	int *in_op;
+
+	vfsopipi = __containerof(arg, struct vfs_op_barrier_ipi, srcra);
+	mp = vfsopipi->mp;
+
+	in_op = zpcpu_get_cpu(mp->mnt_thread_in_ops_pcpu, cpu);
+	while (atomic_load_int(in_op))
+		cpu_spinwait();
+}
+
 void
 vfs_op_barrier_wait(struct mount *mp)
 {
-	int *in_op;
-	int cpu;
+	struct vfs_op_barrier_ipi vfsopipi;
 
-	CPU_FOREACH(cpu) {
-		in_op = zpcpu_get_cpu(mp->mnt_thread_in_ops_pcpu, cpu);
-		while (atomic_load_int(in_op))
-			cpu_spinwait();
-	}
+	vfsopipi.mp = mp;
+
+	smp_rendezvous_cpus_retry(all_cpus,
+	    smp_no_rendezvous_barrier,
+	    vfs_op_action_func,
+	    smp_no_rendezvous_barrier,
+	    vfs_op_wait_func,
+	    &vfsopipi.srcra);
 }
 
 #ifdef DIAGNOSTIC
@@ -1510,9 +1533,9 @@ vfs_assert_mount_counters(struct mount *mp)
 		return;
 
 	CPU_FOREACH(cpu) {
-		if (*(int *)zpcpu_get_cpu(mp->mnt_ref_pcpu, cpu) != 0 ||
-		    *(int *)zpcpu_get_cpu(mp->mnt_lockref_pcpu, cpu) != 0 ||
-		    *(int *)zpcpu_get_cpu(mp->mnt_writeopcount_pcpu, cpu) != 0)
+		if (*zpcpu_get_cpu(mp->mnt_ref_pcpu, cpu) != 0 ||
+		    *zpcpu_get_cpu(mp->mnt_lockref_pcpu, cpu) != 0 ||
+		    *zpcpu_get_cpu(mp->mnt_writeopcount_pcpu, cpu) != 0)
 			vfs_dump_mount_counters(mp);
 	}
 }
@@ -1582,7 +1605,7 @@ vfs_mount_fetch_counter(struct mount *mp, enum mount_counter which)
 
 	sum = *base;
 	CPU_FOREACH(cpu) {
-		sum += *(int *)zpcpu_get_cpu(pcpu, cpu);
+		sum += *zpcpu_get_cpu(pcpu, cpu);
 	}
 	return (sum);
 }

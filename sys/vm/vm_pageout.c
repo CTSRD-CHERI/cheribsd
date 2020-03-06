@@ -158,7 +158,7 @@ static int vm_panic_on_oom = 0;
 
 SYSCTL_INT(_vm, OID_AUTO, panic_on_oom,
 	CTLFLAG_RWTUN, &vm_panic_on_oom, 0,
-	"panic on out of memory instead of killing the largest process");
+	"Panic on the given number of out-of-memory errors instead of killing the largest process");
 
 SYSCTL_INT(_vm, OID_AUTO, pageout_update_period,
 	CTLFLAG_RWTUN, &vm_pageout_update_period, 0,
@@ -767,7 +767,7 @@ scan:
 		if (object == NULL || object != m->object) {
 			if (object != NULL)
 				VM_OBJECT_WUNLOCK(object);
-			object = (vm_object_t)atomic_load_ptr(&m->object);
+			object = atomic_load_ptr(&m->object);
 			if (__predict_false(object == NULL))
 				/* The page is being freed by another thread. */
 				continue;
@@ -1238,7 +1238,7 @@ act_scan:
 		 * A page's object pointer may be set to NULL before
 		 * the object lock is acquired.
 		 */
-		object = (vm_object_t)atomic_load_ptr(&m->object);
+		object = atomic_load_ptr(&m->object);
 		if (__predict_false(object == NULL))
 			/*
 			 * The page has been removed from its object.
@@ -1481,7 +1481,7 @@ vm_pageout_scan_inactive(struct vm_domain *vmd, int shortage,
 		if (object == NULL || object != m->object) {
 			if (object != NULL)
 				VM_OBJECT_WUNLOCK(object);
-			object = (vm_object_t)atomic_load_ptr(&m->object);
+			object = atomic_load_ptr(&m->object);
 			if (__predict_false(object == NULL))
 				/* The page is being freed by another thread. */
 				continue;
@@ -1933,7 +1933,7 @@ vm_pageout_oom(int shortage)
 	}
 	sx_sunlock(&allproc_lock);
 	if (bigproc != NULL) {
-		if (vm_panic_on_oom != 0)
+		if (vm_panic_on_oom != 0 && --vm_panic_on_oom == 0)
 			panic("out of swap space");
 		PROC_LOCK(bigproc);
 		killproc(bigproc, "out of swap space");
