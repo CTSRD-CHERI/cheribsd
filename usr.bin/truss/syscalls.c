@@ -115,6 +115,9 @@ static struct syscall decoded_syscalls[] = {
 	  .args = { { Int, 0 }, { Int, 1 }, { CapRights | OUT, 2 } } },
 	{ .name = "__getcwd", .ret_type = 1, .nargs = 2,
 	  .args = { { Name | OUT, 0 }, { Int, 1 } } },
+	{ .name = "__realpathat", .ret_type = 1, .nargs = 5,
+	  .args = { { Atfd, 0 }, { Name | IN, 1 }, { Name | OUT, 2 },
+		    { Sizet, 3 }, { Int, 4} } },
 	{ .name = "_umtx_op", .ret_type = 1, .nargs = 5,
 	  .args = { { Ptr, 0 }, { Umtxop, 1 }, { LongHex, 2 }, { Ptr, 3 },
 		    { Ptr, 4 } } },
@@ -471,6 +474,9 @@ static struct syscall decoded_syscalls[] = {
 		    { Ptr | IN, 3 }, { Socklent, 4 } } },
 	{ .name = "shm_open", .ret_type = 1, .nargs = 3,
 	  .args = { { ShmName | IN, 0 }, { Open, 1 }, { Octal, 2 } } },
+	{ .name = "shm_open2", .ret_type = 1, .nargs = 5,
+	  .args = { { ShmName | IN, 0 }, { Open, 1 }, { Octal, 2 },
+		    { ShmFlags, 3 }, { Name | IN, 4 } } },
 	{ .name = "shm_rename", .ret_type = 1, .nargs = 3,
 	  .args = { { Name | IN, 0 }, { Name | IN, 1 }, { Hex, 2 } } },
 	{ .name = "shm_unlink", .ret_type = 1, .nargs = 1,
@@ -2008,6 +2014,9 @@ print_arg(struct syscall_args *sc, unsigned long *args, register_t *retval,
 		break;
 	case Whence:
 		print_integer_arg(sysdecode_whence, fp, args[sc->offset]);
+		break;
+	case ShmFlags:
+		print_mask_arg(sysdecode_shmflags, fp, args[sc->offset]);
 		break;
 	case Sockdomain:
 		print_integer_arg(sysdecode_socketdomain, fp, args[sc->offset]);
