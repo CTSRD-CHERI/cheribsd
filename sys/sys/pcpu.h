@@ -112,37 +112,32 @@ extern uintptr_t dpcpu_off[];
 /*
  * Accessors with a given base.
  */
+#ifndef CHERI_PURECAP_KERNEL
 #define	_DPCPU_PTR(b, n)					\
     (__typeof(DPCPU_NAME(n))*)((b) + (vaddr_t)&DPCPU_NAME(n))
+#else /* CHERI_PURECAP_KERNEL */
+/*
+ * The pcpu dynamic field in the CHERI kernel is not preliminarly
+ * subtracted the DPCPU_START, so we do it now.
+ */
+#define	_DPCPU_PTR(b, n)					\
+    (__typeof(DPCPU_NAME(n))*)((b) +                            \
+        ((vaddr_t)&DPCPU_NAME(n) - (vaddr_t)DPCPU_START))
+#endif /* CHERI_PURECAP_KERNEL */
 #define	_DPCPU_GET(b, n)	(*_DPCPU_PTR(b, n))
 #define	_DPCPU_SET(b, n, v)	(*_DPCPU_PTR(b, n) = v)
 
 /*
  * Accessors for the current cpu.
  */
-#ifndef CHERI_PURECAP_KERNEL
 #define	DPCPU_PTR(n)		_DPCPU_PTR(PCPU_GET(dynamic), n)
-#else /* CHERI_PURECAP_KERNEL */
-/*
- * The pcpu dynamic field in the CHERI kernel is not preliminarly
- * subtracted the DPCPU_START, so we do it now.
- */
-#define	DPCPU_PTR(n)				\
-    _DPCPU_PTR(PCPU_GET(dynamic) - (vaddr_t)DPCPU_START, n)
-#endif /* CHERI_PURECAP_KERNEL */
 #define	DPCPU_GET(n)		(*DPCPU_PTR(n))
 #define	DPCPU_SET(n, v)		(*DPCPU_PTR(n) = v)
 
 /*
  * Accessors for remote cpus.
  */
-#ifndef CHERI_PURECAP_KERNEL
 #define	DPCPU_ID_PTR(i, n)	_DPCPU_PTR(dpcpu_off[(i)], n)
-#else /* CHERI_PURECAP_KERNEL */
-/* see DPCPU_PTR() */
-#define	DPCPU_ID_PTR(i, n)					\
-    _DPCPU_PTR(dpcpu_off[(i)] - (vaddr_t)DPCPU_START, n)
-#endif /* CHERI_PURECAP_KERNEL */
 #define	DPCPU_ID_GET(i, n)	(*DPCPU_ID_PTR(i, n))
 #define	DPCPU_ID_SET(i, n, v)	(*DPCPU_ID_PTR(i, n) = v)
 
