@@ -40,7 +40,7 @@ __FBSDID("$FreeBSD$");
 
 /* Wrappers to call into non-purecap ABI YAMON routines */
 
-inline int
+int
 _yamon_syscon_read(t_yamon_syscon_id id, void *param, uint32_t size)
 {
 	/* Build a PCC that we can use to call yamon. */
