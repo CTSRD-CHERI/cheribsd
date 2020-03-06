@@ -2698,16 +2698,22 @@ ifr_addr_get_sa(void *ifrp)
 	union ifreq_union *ifrup;
 
 	ifrup = ifrp;
+
+        /*
+         * In the purecap kernel we do not enforce subobject bounds on the
+         * ifru_addr members. This is because this accessor is used both for
+         * in6_ifreq and ifreq.
+         */
 #if __has_feature(capabilities)
 	if (SV_CURPROC_FLAG(SV_CHERI))
-		return (&ifrup->ifr.ifr_ifru.ifru_addr);
+		return (__unbounded_addressof(ifrup->ifr.ifr_ifru.ifru_addr));
 #endif
 #ifdef COMPAT_FREEBSD32
 	if (SV_CURPROC_FLAG(SV_ILP32))
-		return (&ifrup->ifr32.ifr_ifru.ifru_addr);
+		return (__unbounded_addressof(ifrup->ifr32.ifr_ifru.ifru_addr));
 #endif
 #ifdef COMPAT_FREEBSD64
-	return (&ifrup->ifr64.ifr_ifru.ifru_addr);
+	return (__unbounded_addressof(ifrup->ifr64.ifr_ifru.ifru_addr));
 #else
 	return (&ifrup->ifr.ifr_ifru.ifru_addr);
 #endif
