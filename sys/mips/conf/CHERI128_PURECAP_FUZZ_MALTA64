@@ -46,6 +46,7 @@ options 	KDB
 options		KDB_TRACE # stacktrace on panic
 nooptions	DDB
 
+options		INVARIANTS
 #options		DIAGNOSTIC
 #options		VERBOSE_SYSINIT
 #options		BOOTVERBOSE=1
