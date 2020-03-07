@@ -156,8 +156,7 @@ struct ctlname {
 #define	REQ_WIRED	2
 
 /* definitions for sysctl_req 'flags' member */
-#if defined(__aarch64__) || defined(__amd64__) || defined(__powerpc64__) ||\
-    (defined(__mips__) && defined(__mips_n64))
+#ifdef COMPAT_FREEBSD32
 #define	SCTL_MASK32	1	/* 32 bit emulation */
 #endif
 
@@ -334,6 +333,7 @@ TAILQ_HEAD(sysctl_ctx_list, sysctl_ctx_entry);
 #define	SYSCTL_NODE_WITH_LABEL(parent, nbr, name, access, handler, descr, label) \
 	SYSCTL_OID_GLOBAL(parent, nbr, name, CTLTYPE_NODE|(access),	\
 	    NULL, 0, handler, "N", descr, label);			\
+	SYSCTL_ENFORCE_FLAGS(access);					\
 	CTASSERT(((access) & CTLTYPE) == 0 ||				\
 	    ((access) & SYSCTL_CT_ASSERT_MASK) == CTLTYPE_NODE)
 

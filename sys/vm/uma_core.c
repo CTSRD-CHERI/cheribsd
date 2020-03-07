@@ -223,7 +223,7 @@ struct uma_kctor_args {
 
 struct uma_bucket_zone {
 	uma_zone_t	ubz_zone;
-	char		*ubz_name;
+	const char	*ubz_name;
 	int		ubz_entries;	/* Number of items it can hold. */
 	int		ubz_maxsize;	/* Maximum allocation size per-item. */
 };
@@ -325,7 +325,7 @@ static int sysctl_handle_uma_zone_items(SYSCTL_HANDLER_ARGS);
 
 static uint64_t uma_zone_get_allocs(uma_zone_t zone);
 
-static SYSCTL_NODE(_vm, OID_AUTO, debug, CTLFLAG_RD, 0,
+static SYSCTL_NODE(_vm, OID_AUTO, debug, CTLFLAG_RD | CTLFLAG_MPSAFE, 0,
     "Memory allocation debugging");
 
 #ifdef INVARIANTS
@@ -352,7 +352,8 @@ SYSCTL_COUNTER_U64(_vm_debug, OID_AUTO, skipped, CTLFLAG_RD,
 
 SYSINIT(uma_startup3, SI_SUB_VM_CONF, SI_ORDER_SECOND, uma_startup3, NULL);
 
-SYSCTL_NODE(_vm, OID_AUTO, uma, CTLFLAG_RW, 0, "Universal Memory Allocator");
+SYSCTL_NODE(_vm, OID_AUTO, uma, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
+    "Universal Memory Allocator");
 
 SYSCTL_PROC(_vm, OID_AUTO, zone_count, CTLFLAG_RD|CTLFLAG_MPSAFE|CTLTYPE_INT,
     0, 0, sysctl_vm_zone_count, "I", "Number of UMA zones");
@@ -563,26 +564,29 @@ zone_domain_lock(uma_zone_t zone, int domain)
 }
 
 /*
- * Search for the domain with the least cached items and return it, breaking
- * ties with a preferred domain by returning it.
+ * Search for the domain with the least cached items and return it if it
+ * is out of balance with the preferred domain.
  */
 static __noinline int
 zone_domain_lowest(uma_zone_t zone, int pref)
 {
-	long least, nitems;
+	long least, nitems, prefitems;
 	int domain;
 	int i;
 
-	least = LONG_MAX;
+	prefitems = least = LONG_MAX;
 	domain = 0;
 	for (i = 0; i < vm_ndomains; i++) {
 		nitems = ZDOM_GET(zone, i)->uzd_nitems;
 		if (nitems < least) {
 			domain = i;
 			least = nitems;
-		} else if (nitems == least && (i == pref || domain == pref))
-			domain = pref;
+		}
+		if (domain == pref)
+			prefitems = nitems;
 	}
+	if (prefitems < least * 2)
+		return (pref);
 
 	return (domain);
 }
@@ -1140,7 +1144,6 @@ hash_free(struct uma_hash *hash)
  * Returns:
  *	Nothing
  */
-
 static void
 bucket_drain(uma_zone_t zone, uma_bucket_t bucket)
 {
@@ -1200,7 +1203,7 @@ cache_drain(uma_zone_t zone)
 	 */
 	seq = SMR_SEQ_INVALID;
 	if ((zone->uz_flags & UMA_ZONE_SMR) != 0)
-		seq = smr_current(zone->uz_smr);
+		seq = smr_advance(zone->uz_smr);
 	CPU_FOREACH(cpu) {
 		cache = &zone->uz_cpu[cpu];
 		bucket = cache_bucket_unload_alloc(cache);
@@ -1329,7 +1332,7 @@ bucket_cache_reclaim(uma_zone_t zone, bool drain)
 		 * the item count.  Reclaim it individually here.
 		 */
 		zdom = ZDOM_GET(zone, i);
-		if ((zone->uz_flags & UMA_ZONE_SMR) == 0) {
+		if ((zone->uz_flags & UMA_ZONE_SMR) == 0 || drain) {
 			ZONE_CROSS_LOCK(zone);
 			bucket = zdom->uzd_cross;
 			zdom->uzd_cross = NULL;
@@ -2374,7 +2377,7 @@ zone_alloc_sysctl(uma_zone_t zone, void *unused)
 	 * Basic parameters at the root.
 	 */
 	zone->uz_oid = SYSCTL_ADD_NODE(NULL, SYSCTL_STATIC_CHILDREN(_vm_uma),
-	    OID_AUTO, zone->uz_ctlname, CTLFLAG_RD, NULL, "");
+	    OID_AUTO, zone->uz_ctlname, CTLFLAG_RD | CTLFLAG_MPSAFE, NULL, "");
 	oid = zone->uz_oid;
 	SYSCTL_ADD_U32(NULL, SYSCTL_CHILDREN(oid), OID_AUTO,
 	    "size", CTLFLAG_RD, &zone->uz_size, 0, "Allocation size");
@@ -2397,7 +2400,7 @@ zone_alloc_sysctl(uma_zone_t zone, void *unused)
 	else
 		domains = 1;
 	oid = SYSCTL_ADD_NODE(NULL, SYSCTL_CHILDREN(zone->uz_oid), OID_AUTO,
-	    "keg", CTLFLAG_RD, NULL, "");
+	    "keg", CTLFLAG_RD | CTLFLAG_MPSAFE, NULL, "");
 	keg = zone->uz_keg;
 	if ((zone->uz_flags & UMA_ZFLAG_CACHE) == 0) {
 		SYSCTL_ADD_CONST_STRING(NULL, SYSCTL_CHILDREN(oid), OID_AUTO,
@@ -2419,12 +2422,12 @@ zone_alloc_sysctl(uma_zone_t zone, void *unused)
 		    keg, 0, sysctl_handle_uma_slab_efficiency, "I",
 		    "Slab utilization (100 - internal fragmentation %)");
 		domainoid = SYSCTL_ADD_NODE(NULL, SYSCTL_CHILDREN(oid),
-		    OID_AUTO, "domain", CTLFLAG_RD, NULL, "");
+		    OID_AUTO, "domain", CTLFLAG_RD | CTLFLAG_MPSAFE, NULL, "");
 		for (i = 0; i < domains; i++) {
 			dom = &keg->uk_domain[i];
 			oid = SYSCTL_ADD_NODE(NULL, SYSCTL_CHILDREN(domainoid),
-			    OID_AUTO, VM_DOMAIN(i)->vmd_name, CTLFLAG_RD,
-			    NULL, "");
+			    OID_AUTO, VM_DOMAIN(i)->vmd_name,
+			    CTLFLAG_RD | CTLFLAG_MPSAFE, NULL, "");
 			SYSCTL_ADD_U32(NULL, SYSCTL_CHILDREN(oid), OID_AUTO,
 			    "pages", CTLFLAG_RD, &dom->ud_pages, 0,
 			    "Total pages currently allocated from VM");
@@ -2440,7 +2443,7 @@ zone_alloc_sysctl(uma_zone_t zone, void *unused)
 	 * Information about zone limits.
 	 */
 	oid = SYSCTL_ADD_NODE(NULL, SYSCTL_CHILDREN(zone->uz_oid), OID_AUTO,
-	    "limit", CTLFLAG_RD, NULL, "");
+	    "limit", CTLFLAG_RD | CTLFLAG_MPSAFE, NULL, "");
 	SYSCTL_ADD_PROC(NULL, SYSCTL_CHILDREN(oid), OID_AUTO,
 	    "items", CTLFLAG_RD | CTLTYPE_U64 | CTLFLAG_MPSAFE,
 	    zone, 0, sysctl_handle_uma_zone_items, "QU",
@@ -2462,11 +2465,12 @@ zone_alloc_sysctl(uma_zone_t zone, void *unused)
 	 * Per-domain zone information.
 	 */
 	domainoid = SYSCTL_ADD_NODE(NULL, SYSCTL_CHILDREN(zone->uz_oid),
-	    OID_AUTO, "domain", CTLFLAG_RD, NULL, "");
+	    OID_AUTO, "domain", CTLFLAG_RD | CTLFLAG_MPSAFE, NULL, "");
 	for (i = 0; i < domains; i++) {
 		zdom = ZDOM_GET(zone, i);
 		oid = SYSCTL_ADD_NODE(NULL, SYSCTL_CHILDREN(domainoid),
-		    OID_AUTO, VM_DOMAIN(i)->vmd_name, CTLFLAG_RD, NULL, "");
+		    OID_AUTO, VM_DOMAIN(i)->vmd_name,
+		    CTLFLAG_RD | CTLFLAG_MPSAFE, NULL, "");
 		SYSCTL_ADD_LONG(NULL, SYSCTL_CHILDREN(oid), OID_AUTO,
 		    "nitems", CTLFLAG_RD, &zdom->uzd_nitems,
 		    "number of items in this domain");
@@ -2485,7 +2489,7 @@ zone_alloc_sysctl(uma_zone_t zone, void *unused)
 	 * General statistics.
 	 */
 	oid = SYSCTL_ADD_NODE(NULL, SYSCTL_CHILDREN(zone->uz_oid), OID_AUTO,
-	    "stats", CTLFLAG_RD, NULL, "");
+	    "stats", CTLFLAG_RD | CTLFLAG_MPSAFE, NULL, "");
 	SYSCTL_ADD_PROC(NULL, SYSCTL_CHILDREN(oid), OID_AUTO,
 	    "current", CTLFLAG_RD | CTLTYPE_INT | CTLFLAG_MPSAFE,
 	    zone, 1, sysctl_handle_uma_zone_cur, "I",
@@ -2679,7 +2683,7 @@ out:
 
 	/* Caller requests a private SMR context. */
 	if ((zone->uz_flags & UMA_ZONE_SMR) != 0)
-		zone->uz_smr = smr_create(zone->uz_name);
+		zone->uz_smr = smr_create(zone->uz_name, 0, 0);
 
 	KASSERT((arg->flags & (UMA_ZONE_MAXBUCKET | UMA_ZONE_NOBUCKET)) !=
 	    (UMA_ZONE_MAXBUCKET | UMA_ZONE_NOBUCKET),
@@ -3015,8 +3019,8 @@ uma_zcreate(const char *name, size_t size, uma_ctor ctor, uma_dtor dtor,
 
 /* See uma.h */
 uma_zone_t
-uma_zsecond_create(char *name, uma_ctor ctor, uma_dtor dtor,
-		    uma_init zinit, uma_fini zfini, uma_zone_t master)
+uma_zsecond_create(const char *name, uma_ctor ctor, uma_dtor dtor,
+    uma_init zinit, uma_fini zfini, uma_zone_t master)
 {
 	struct uma_zctor_args args;
 	uma_keg_t keg;
@@ -3043,9 +3047,9 @@ uma_zsecond_create(char *name, uma_ctor ctor, uma_dtor dtor,
 
 /* See uma.h */
 uma_zone_t
-uma_zcache_create(char *name, int size, uma_ctor ctor, uma_dtor dtor,
-		    uma_init zinit, uma_fini zfini, uma_import zimport,
-		    uma_release zrelease, void *arg, int flags)
+uma_zcache_create(const char *name, int size, uma_ctor ctor, uma_dtor dtor,
+    uma_init zinit, uma_fini zfini, uma_import zimport, uma_release zrelease,
+    void *arg, int flags)
 {
 	struct uma_zctor_args args;
 
@@ -4101,8 +4105,11 @@ uma_zfree_arg(uma_zone_t zone, void *item, void *udata)
 			bucket = &cache->uc_crossbucket;
 		} else
 #endif
-		if (bucket->ucb_cnt >= bucket->ucb_entries)
-			bucket = &cache->uc_freebucket;
+		if (bucket->ucb_cnt == bucket->ucb_entries &&
+		   cache->uc_freebucket.ucb_cnt <
+		   cache->uc_freebucket.ucb_entries)
+			cache_bucket_swap(&cache->uc_freebucket,
+			    &cache->uc_allocbucket);
 		if (__predict_true(bucket->ucb_cnt < bucket->ucb_entries)) {
 			cache_bucket_push(cache, bucket, item);
 			critical_exit();
@@ -4137,22 +4144,21 @@ zone_free_cross(uma_zone_t zone, uma_bucket_t bucket, void *udata)
 	    "uma_zfree: zone %s(%p) draining cross bucket %p",
 	    zone->uz_name, zone, bucket);
 
-	STAILQ_INIT(&fullbuckets);
-
-	/*
-	 * To avoid having ndomain * ndomain buckets for sorting we have a
-	 * lock on the current crossfree bucket.  A full matrix with
-	 * per-domain locking could be used if necessary.
-	 */
-	ZONE_CROSS_LOCK(zone);
-
 	/*
 	 * It is possible for buckets to arrive here out of order so we fetch
 	 * the current smr seq rather than accepting the bucket's.
 	 */
 	seq = SMR_SEQ_INVALID;
 	if ((zone->uz_flags & UMA_ZONE_SMR) != 0)
-		seq = smr_current(zone->uz_smr);
+		seq = smr_advance(zone->uz_smr);
+
+	/*
+	 * To avoid having ndomain * ndomain buckets for sorting we have a
+	 * lock on the current crossfree bucket.  A full matrix with
+	 * per-domain locking could be used if necessary.
+	 */
+	STAILQ_INIT(&fullbuckets);
+	ZONE_CROSS_LOCK(zone);
 	while (bucket->ub_cnt > 0) {
 		item = bucket->ub_bucket[bucket->ub_cnt - 1];
 		domain = _vm_phys_domain(pmap_kextract((vm_offset_t)item));
