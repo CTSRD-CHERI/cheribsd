@@ -1,0 +1,41 @@
+# CHERI128_DTRACE -- 64-bit kernel config for with DTrace support
+#
+# $FreeBSD$
+
+ident           CHERI128_DTRACE
+
+include         "std.MALTA"
+include         "std.CHERI128"
+
+machine         mips mips64     # Malta supports both, so it isn't in std.malta
+
+makeoptions     KERNLOADADDR=0xffffffff80100000
+
+makeoptions     DEBUG="-g"
+makeoptions     WITH_CTF=1
+
+options         KTRACE
+
+#
+# Features required for CHERI CPU and CheriBSD support.
+#
+options         KSTACK_LARGE_PAGE
+options         TMPFS
+
+#
+# Qemu-CHERI tracing is permitted per thread, not just globally.
+#
+options         CPU_QEMU_MALTA
+
+options         KDTRACE_FRAME
+options         KDTRACE_HOOKS
+options DDB_CTF
+
+device       dtrace
+device       dtrace_systrace
+device       dtrace_sdt
+device       dtrace_prototype
+device       dtrace_fbt
+device       dtrace_profile
+device        dtraceall
+
