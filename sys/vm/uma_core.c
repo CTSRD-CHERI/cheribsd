@@ -716,9 +716,6 @@ zone_put_bucket(uma_zone_t zone, int domain, uma_bucket_t bucket, void *udata,
 		goto out;
 	zdom = zone_domain_lock(zone, domain);
 
-	KASSERT(!ws || zdom->uzd_nitems < zone->uz_bucket_max,
-	    ("%s: zone %p overflow", __func__, zone));
-
 	/*
 	 * Conditionally set the maximum number of items.
 	 */
@@ -4659,6 +4656,9 @@ uma_zone_set_smr(uma_zone_t zone, smr_t smr)
 
 	ZONE_ASSERT_COLD(zone);
 
+	KASSERT(smr != NULL, ("Got NULL smr"));
+	KASSERT((zone->uz_flags & UMA_ZONE_SMR) == 0,
+	    ("zone %p (%s) already uses SMR", zone, zone->uz_name));
 	zone->uz_flags |= UMA_ZONE_SMR;
 	zone->uz_smr = smr;
 	zone_update_caches(zone);

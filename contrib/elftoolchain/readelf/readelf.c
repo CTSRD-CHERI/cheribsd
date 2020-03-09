@@ -1283,6 +1283,7 @@ note_type_xen(unsigned int nt)
 	case 15: return "XEN_ELFNOTE_INIT_P2M";
 	case 16: return "XEN_ELFNOTE_MOD_START_PFN";
 	case 17: return "XEN_ELFNOTE_SUPPORTED_FEATURES";
+	case 18: return "XEN_ELFNOTE_PHYS32_ENTRY";
 	default: return (note_type_unknown(nt));
 	}
 }
@@ -3669,8 +3670,38 @@ dump_notes(struct readelf *re)
 
 static struct flag_desc note_feature_ctl_flags[] = {
 	{ NT_FREEBSD_FCTL_ASLR_DISABLE,		"ASLR_DISABLE" },
+	{ NT_FREEBSD_FCTL_PROTMAX_DISABLE,	"PROTMAX_DISABLE" },
+	{ NT_FREEBSD_FCTL_STKGAP_DISABLE,	"STKGAP_DISABLE" },
+	{ NT_FREEBSD_FCTL_WXNEEDED,		"WXNEEDED" },
 	{ 0, NULL }
 };
+
+static void
+dump_note_string(const char *description, const char *s, size_t len)
+{
+	size_t i;
+	int printable = 1;
+
+	if (len == 0 || s[--len] != '\0') {
+		printable = 0;
+	} else {
+		for (i = 0; i < len; i++) {
+			if (!isprint(s[i])) {
+				printable = 0;
+				break;
+			}
+		}
+	}
+
+	if (printable) {
+		printf("   %s: %s\n", description, s);
+	} else {
+		printf("   description data:");
+		for (i = 0; i < len; i++)
+			printf(" %02x", (unsigned char)s[i]);
+		printf("\n");
+	}
+}
 
 static void
 dump_notes_data(struct readelf *re, const char *name, uint32_t type,
@@ -3711,6 +3742,36 @@ dump_notes_data(struct readelf *re, const char *name, uint32_t type,
 		case NT_GNU_PROPERTY_TYPE_0:
 			dump_gnu_property_type_0(re, buf, sz);
 			return;
+		case NT_GNU_BUILD_ID:
+			printf("   Build ID: ");
+			for (i = 0; i < sz; i++)
+				printf("%02x", (unsigned char)buf[i]);
+			printf("\n");
+			return;
+		}
+	} else if (strcmp(name, "Xen") == 0) {
+		switch (type) {
+		case 5:
+			dump_note_string("Xen version", buf, sz);
+			return;
+		case 6:
+			dump_note_string("Guest OS", buf, sz);
+			return;
+		case 7:
+			dump_note_string("Guest version", buf, sz);
+			return;
+		case 8:
+			dump_note_string("Loader", buf, sz);
+			return;
+		case 9:
+			dump_note_string("PAE mode", buf, sz);
+			return;
+		case 10:
+			dump_note_string("Features", buf, sz);
+			return;
+		case 11:
+			dump_note_string("BSD symtab", buf, sz);
+			return;
 		}
 	}
 unknown:
@@ -3725,6 +3786,7 @@ dump_notes_content(struct readelf *re, const char *buf, size_t sz, off_t off)
 {
 	Elf_Note *note;
 	const char *end, *name;
+	uint32_t namesz, descsz;
 
 	printf("\nNotes at offset %#010jx with length %#010jx:\n",
 	    (uintmax_t) off, (uintmax_t) sz);
@@ -3736,9 +3798,16 @@ dump_notes_content(struct readelf *re, const char *buf, size_t sz, off_t off)
 			return;
 		}
 		note = (Elf_Note *)(uintptr_t) buf;
+		namesz = roundup2(note->n_namesz, 4);
+		descsz = roundup2(note->n_descsz, 4);
+		if (namesz < note->n_namesz || descsz < note->n_descsz ||
+		    buf + namesz + descsz > end) {
+			warnx("invalid note header");
+			return;
+		}
 		buf += sizeof(Elf_Note);
 		name = buf;
-		buf += roundup2(note->n_namesz, 4);
+		buf += namesz;
 		/*
 		 * The name field is required to be nul-terminated, and
 		 * n_namesz includes the terminating nul in observed
@@ -3757,7 +3826,7 @@ dump_notes_content(struct readelf *re, const char *buf, size_t sz, off_t off)
 		printf("      %s\n", note_type(name, re->ehdr.e_type,
 		    note->n_type));
 		dump_notes_data(re, name, note->n_type, buf, note->n_descsz);
-		buf += roundup2(note->n_descsz, 4);
+		buf += descsz;
 	}
 }
 
