@@ -29,6 +29,8 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
+#define EXPLICIT_USER_ACCESS
+
 #include <sys/param.h>
 #include <sys/socket.h>
 #include <sys/kernel.h>
@@ -1650,7 +1652,7 @@ bnxt_priv_ioctl(if_ctx_t ctx, u_long command, caddr_t data)
 {
 	struct bnxt_softc *softc = iflib_get_softc(ctx);
 	struct ifreq *ifr = (struct ifreq *)data;
-	struct bnxt_ioctl_header *ioh;
+	struct bnxt_ioctl_header * __capability ioh;
 	size_t iol;
 	int rc = ENOTSUP;
 	struct bnxt_ioctl_data iod_storage, *iod = &iod_storage;
