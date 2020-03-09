@@ -2498,11 +2498,6 @@ _other_bootstrap_tools+=tools/build/cross-build/fake_sysctl
 # mkfifo is used by sys/conf/newvers.sh
 _basic_bootstrap_tools+=usr.bin/mkfifo
 
-.if ${MK_AMD} != "no"
-# unifdef is only used by usr.sbin/amd/libamu/Makefile
-_basic_bootstrap_tools+=usr.bin/unifdef
-.endif
-
 .if ${MK_BOOT} != "no"
 # xz/unxz is used by EFI
 _basic_bootstrap_tools_multilink+=usr.bin/xz xz,unxz
