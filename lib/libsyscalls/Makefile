@@ -1,3 +1,6 @@
+.include <src.opts.mk>
+MK_SSP=	no
+
 LIB=syscalls
 
 LIBC_SRCTOP=	${.CURDIR}/../libc/
