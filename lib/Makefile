@@ -163,7 +163,7 @@ _libc_cheri=	libc_cheri
 _libcheri=	libcheri
 .endif
 
-.if ${MACHINE_CPUARCH} == mips
+.if ${MACHINE_CPUARCH} == "mips" || ${MACHINE_CPUARCH} == "riscv"
 SUBDIR+= libsimple_printf
 .endif
 
