@@ -57,7 +57,7 @@ __FBSDID("$FreeBSD$");
 
 #include <net/if.h>
 #include <net/if_var.h>
-#include <net/netisr.h> 
+#include <net/netisr.h>
 
 #include <netinet/in.h>
 #include <netinet/in_pcb.h>
@@ -252,10 +252,10 @@ divert_packet(struct mbuf *m, bool incoming)
 	 */
 	if (m->m_pkthdr.rcvif) {
 		/*
-		 * Hide the actual interface name in there in the 
+		 * Hide the actual interface name in there in the
 		 * sin_zero array. XXX This needs to be moved to a
 		 * different sockaddr type for divert, e.g.
-		 * sockaddr_div with multiple fields like 
+		 * sockaddr_div with multiple fields like
 		 * sockaddr_dl. Presently we have only 7 bytes
 		 * but that will do for now as most interfaces
 		 * are 4 or less + 2 or less bytes for unit.
@@ -268,7 +268,7 @@ divert_packet(struct mbuf *m, bool incoming)
 		 * and re-uses the sockaddr_in as suggested in the man pages,
 		 * this iface name will come along for the ride.
 		 * (see div_output for the other half of this.)
-		 */ 
+		 */
 		strlcpy(divsrc.sin_zero, m->m_pkthdr.rcvif->if_xname,
 		    sizeof(divsrc.sin_zero));
 	}
@@ -737,10 +737,13 @@ div_pcblist(SYSCTL_HANDLER_ARGS)
 }
 
 #ifdef SYSCTL_NODE
-static SYSCTL_NODE(_net_inet, IPPROTO_DIVERT, divert, CTLFLAG_RW, 0,
+static SYSCTL_NODE(_net_inet, IPPROTO_DIVERT, divert,
+    CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
     "IPDIVERT");
-SYSCTL_PROC(_net_inet_divert, OID_AUTO, pcblist, CTLTYPE_OPAQUE | CTLFLAG_RD,
-    NULL, 0, div_pcblist, "S,xinpcb", "List of active divert sockets");
+SYSCTL_PROC(_net_inet_divert, OID_AUTO, pcblist,
+   CTLTYPE_OPAQUE | CTLFLAG_RD | CTLFLAG_MPSAFE,
+    NULL, 0, div_pcblist, "S,xinpcb",
+    "List of active divert sockets");
 #endif
 
 struct pr_usrreqs div_usrreqs = {

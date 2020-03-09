@@ -45,18 +45,27 @@
  * Modular arithmetic for comparing sequence numbers that have
  * potentially wrapped.  Copied from tcp_seq.h.
  */
-#define	SMR_SEQ_LT(a, b)	((int32_t)((a)-(b)) < 0)
-#define	SMR_SEQ_LEQ(a, b)	((int32_t)((a)-(b)) <= 0)
-#define	SMR_SEQ_GT(a, b)	((int32_t)((a)-(b)) > 0)
-#define	SMR_SEQ_GEQ(a, b)	((int32_t)((a)-(b)) >= 0)
-#define	SMR_SEQ_DELTA(a, b)	((int32_t)((a)-(b)))
+#define	SMR_SEQ_LT(a, b)	((smr_delta_t)((a)-(b)) < 0)
+#define	SMR_SEQ_LEQ(a, b)	((smr_delta_t)((a)-(b)) <= 0)
+#define	SMR_SEQ_GT(a, b)	((smr_delta_t)((a)-(b)) > 0)
+#define	SMR_SEQ_GEQ(a, b)	((smr_delta_t)((a)-(b)) >= 0)
+#define	SMR_SEQ_DELTA(a, b)	((smr_delta_t)((a)-(b)))
+#define	SMR_SEQ_MIN(a, b)	(SMR_SEQ_LT((a), (b)) ? (a) : (b))
+#define	SMR_SEQ_MAX(a, b)	(SMR_SEQ_GT((a), (b)) ? (a) : (b))
 
 #define	SMR_SEQ_INVALID		0
 
 /* Shared SMR state. */
+union s_wr {
+	struct {
+		smr_seq_t	seq;	/* Current write sequence #. */
+		int		ticks;	/* tick of last update (LAZY) */
+	};
+	uint64_t	_pair;
+};
 struct smr_shared {
 	const char	*s_name;	/* Name for debugging/reporting. */
-	smr_seq_t	s_wr_seq;	/* Current write sequence #. */
+	union s_wr	s_wr;		/* Write sequence */
 	smr_seq_t	s_rd_seq;	/* Minimum observed read sequence. */
 };
 typedef struct smr_shared *smr_shared_t;
@@ -66,16 +75,128 @@ struct smr {
 	smr_seq_t	c_seq;		/* Current observed sequence. */
 	smr_shared_t	c_shared;	/* Shared SMR state. */
 	int		c_deferred;	/* Deferred advance counter. */
+	int		c_limit;	/* Deferred advance limit. */
+	int		c_flags;	/* SMR Configuration */
 };
 
+#define	SMR_LAZY	0x0001		/* Higher latency write, fast read. */
+#define	SMR_DEFERRED	0x0002		/* Aggregate updates to wr_seq. */
+
+#define	SMR_ENTERED(smr)						\
+    (curthread->td_critnest != 0 && zpcpu_get((smr))->c_seq != SMR_SEQ_INVALID)
+
+#define	SMR_ASSERT_ENTERED(smr)						\
+    KASSERT(SMR_ENTERED(smr), ("Not in smr section"))
+
+#define	SMR_ASSERT_NOT_ENTERED(smr)					\
+    KASSERT(!SMR_ENTERED(smr), ("In smr section."));
+
+#define SMR_ASSERT(ex, fn)						\
+    KASSERT((ex), (fn ": Assertion " #ex " failed at %s:%d", __FILE__, __LINE__))
+
 /*
- * Return the current write sequence number.
+ * SMR Accessors are meant to provide safe access to SMR protected
+ * pointers and prevent misuse and accidental access.
+ *
+ * Accessors are grouped by type:
+ * entered	- Use while in a read section (between smr_enter/smr_exit())
+ * serialized 	- Use while holding a lock that serializes writers.   Updates
+ *		  are synchronized with readers via included barriers.
+ * unserialized	- Use after the memory is out of scope and not visible to
+ *		  readers.
+ *
+ * All acceses include a parameter for an assert to verify the required
+ * synchronization.  For example, a writer might use:
+ *
+ * smr_serialized_store(pointer, value, mtx_owned(&writelock));
+ *
+ * These are only enabled in INVARIANTS kernels.
+ */
+
+/* Type restricting pointer access to force smr accessors. */
+#define	SMR_TYPE_DECLARE(smrtype, type)					\
+typedef struct {							\
+	type	__ptr;		/* Do not access directly */		\
+} smrtype
+
+/*
+ * Read from an SMR protected pointer while in a read section.
+ */
+#define	smr_entered_load(p, smr) ({					\
+	SMR_ASSERT(SMR_ENTERED((smr)), "smr_entered_load");		\
+	(__typeof((p)->__ptr))atomic_load_acq_ptr((uintptr_t *)&(p)->__ptr); \
+})
+
+/*
+ * Read from an SMR protected pointer while serialized by an
+ * external mechanism.  'ex' should contain an assert that the
+ * external mechanism is held.  i.e. mtx_owned()
+ */
+#define	smr_serialized_load(p, ex) ({					\
+	SMR_ASSERT(ex, "smr_serialized_load");				\
+	(__typeof((p)->__ptr))atomic_load_ptr(&(p)->__ptr);		\
+})
+
+/*
+ * Store 'v' to an SMR protected pointer while serialized by an
+ * external mechanism.  'ex' should contain an assert that the
+ * external mechanism is held.  i.e. mtx_owned()
+ *
+ * Writers that are serialized with mutual exclusion or on a single
+ * thread should use smr_serialized_store() rather than swap.
+ */
+#define	smr_serialized_store(p, v, ex) do {				\
+	SMR_ASSERT(ex, "smr_serialized_store");				\
+	__typeof((p)->__ptr) _v = (v);					\
+	atomic_store_rel_ptr((uintptr_t *)&(p)->__ptr, (uintptr_t)_v);	\
+} while (0)
+
+/*
+ * swap 'v' with an SMR protected pointer and return the old value
+ * while serialized by an external mechanism.  'ex' should contain
+ * an assert that the external mechanism is provided.  i.e. mtx_owned()
+ *
+ * Swap permits multiple writers to update a pointer concurrently.
+ */
+#define	smr_serialized_swap(p, v, ex) ({				\
+	SMR_ASSERT(ex, "smr_serialized_swap");				\
+	__typeof((p)->__ptr) _v = (v);					\
+	/* Release barrier guarantees contents are visible to reader */ \
+	atomic_thread_fence_rel();					\
+	(__typeof((p)->__ptr))atomic_swap_ptr(				\
+	    (uintptr_t *)&(p)->__ptr, (uintptr_t)_v);			\
+})
+
+/*
+ * Read from an SMR protected pointer when no serialization is required
+ * such as in the destructor callback or when the caller guarantees other
+ * synchronization.
+ */
+#define	smr_unserialized_load(p, ex) ({					\
+	SMR_ASSERT(ex, "smr_unserialized_load");			\
+	(__typeof((p)->__ptr))atomic_load_ptr(&(p)->__ptr);		\
+})
+
+/*
+ * Store to an SMR protected pointer when no serialiation is required
+ * such as in the destructor callback or when the caller guarantees other
+ * synchronization.
+ */
+#define	smr_unserialized_store(p, v, ex) do {				\
+	SMR_ASSERT(ex, "smr_unserialized_store");			\
+	__typeof((p)->__ptr) _v = (v);					\
+	atomic_store_ptr((uintptr_t *)&(p)->__ptr, (uintptr_t)_v);	\
+} while (0)
+
+/*
+ * Return the current write sequence number.  This is not the same as the
+ * current goal which may be in the future.
  */
 static inline smr_seq_t
 smr_shared_current(smr_shared_t s)
 {
 
-	return (atomic_load_int(&s->s_wr_seq));
+	return (atomic_load_int(&s->s_wr.seq));
 }
 
 static inline smr_seq_t
@@ -94,6 +215,8 @@ smr_enter(smr_t smr)
 
 	critical_enter();
 	smr = zpcpu_get(smr);
+	KASSERT((smr->c_flags & SMR_LAZY) == 0,
+	    ("smr_enter(%s) lazy smr.", smr->c_shared->s_name));
 	KASSERT(smr->c_seq == 0,
 	    ("smr_enter(%s) does not support recursion.",
 	    smr->c_shared->s_name));
@@ -127,6 +250,8 @@ smr_exit(smr_t smr)
 
 	smr = zpcpu_get(smr);
 	CRITICAL_ASSERT(curthread);
+	KASSERT((smr->c_flags & SMR_LAZY) == 0,
+	    ("smr_exit(%s) lazy smr.", smr->c_shared->s_name));
 	KASSERT(smr->c_seq != SMR_SEQ_INVALID,
 	    ("smr_exit(%s) not in a smr section.", smr->c_shared->s_name));
 
@@ -142,17 +267,61 @@ smr_exit(smr_t smr)
 }
 
 /*
+ * Enter a lazy smr section.  This is used for read-mostly state that
+ * can tolerate a high free latency.
+ */
+static inline void
+smr_lazy_enter(smr_t smr)
+{
+
+	critical_enter();
+	smr = zpcpu_get(smr);
+	KASSERT((smr->c_flags & SMR_LAZY) != 0,
+	    ("smr_lazy_enter(%s) non-lazy smr.", smr->c_shared->s_name));
+	KASSERT(smr->c_seq == 0,
+	    ("smr_lazy_enter(%s) does not support recursion.",
+	    smr->c_shared->s_name));
+
+	/*
+	 * This needs no serialization.  If an interrupt occurs before we
+	 * assign sr_seq to c_seq any speculative loads will be discarded.
+	 * If we assign a stale wr_seq value due to interrupt we use the
+	 * same algorithm that renders smr_enter() safe.
+	 */
+	atomic_store_int(&smr->c_seq, smr_shared_current(smr->c_shared));
+}
+
+/*
+ * Exit a lazy smr section.  This is used for read-mostly state that
+ * can tolerate a high free latency.
+ */
+static inline void
+smr_lazy_exit(smr_t smr)
+{
+
+	smr = zpcpu_get(smr);
+	CRITICAL_ASSERT(curthread);
+	KASSERT((smr->c_flags & SMR_LAZY) != 0,
+	    ("smr_lazy_enter(%s) non-lazy smr.", smr->c_shared->s_name));
+	KASSERT(smr->c_seq != SMR_SEQ_INVALID,
+	    ("smr_lazy_exit(%s) not in a smr section.", smr->c_shared->s_name));
+
+	/*
+	 * All loads/stores must be retired before the sequence becomes
+	 * visible.  The fence compiles away on amd64.  Another
+	 * alternative would be to omit the fence but store the exit
+	 * time and wait 1 tick longer.
+	 */
+	atomic_thread_fence_rel();
+	atomic_store_int(&smr->c_seq, SMR_SEQ_INVALID);
+	critical_exit();
+}
+
+/*
  * Advances the write sequence number.  Returns the sequence number
  * required to ensure that all modifications are visible to readers.
  */
 smr_seq_t smr_advance(smr_t smr);
-
-/*
- * Advances the write sequence number only after N calls.  Returns
- * the correct goal for a wr_seq that has not yet occurred.  Used to
- * minimize shared cacheline invalidations for frequent writers.
- */
-smr_seq_t smr_advance_deferred(smr_t smr, int limit);
 
 /*
  * Returns true if a goal sequence has been reached.  If
@@ -161,7 +330,9 @@ smr_seq_t smr_advance_deferred(smr_t smr, int limit);
 bool smr_poll(smr_t smr, smr_seq_t goal, bool wait);
 
 /* Create a new SMR context. */
-smr_t smr_create(const char *name);
+smr_t smr_create(const char *name, int limit, int flags);
+
+/* Destroy the context. */
 void smr_destroy(smr_t smr);
 
 /*

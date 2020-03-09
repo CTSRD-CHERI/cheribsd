@@ -98,7 +98,7 @@ __FBSDID("$FreeBSD$");
 
 #include "gpio_if.h"
 
-static SYSCTL_NODE(_hw, OID_AUTO, bwn, CTLFLAG_RD, 0,
+static SYSCTL_NODE(_hw, OID_AUTO, bwn, CTLFLAG_RD | CTLFLAG_MPSAFE, 0,
     "Broadcom driver parameters");
 
 /*
@@ -621,7 +621,7 @@ bwn_attach(device_t dev)
 		mac->mac_flags |= BWN_MAC_FLAG_BADFRAME_PREEMP;
 
 	TASK_INIT(&mac->mac_hwreset, 0, bwn_hwreset, mac);
-	TASK_INIT(&mac->mac_intrtask, 0, bwn_intrtask, mac);
+	NET_TASK_INIT(&mac->mac_intrtask, 0, bwn_intrtask, mac);
 	TASK_INIT(&mac->mac_txpower, 0, bwn_txpwr, mac);
 
 	error = bwn_attach_core(mac);

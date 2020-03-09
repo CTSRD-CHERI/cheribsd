@@ -113,7 +113,7 @@ SYSCTL_DECL(_p1003_1b);
 static MALLOC_DEFINE(M_LIO, "lio", "listio aio control block list");
 static MALLOC_DEFINE(M_AIOS, "aios", "aio_suspend aio control block list");
 
-static SYSCTL_NODE(_vfs, OID_AUTO, aio, CTLFLAG_RW, 0,
+static SYSCTL_NODE(_vfs, OID_AUTO, aio, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
     "Async IO management");
 
 static int enable_aio_unsafe = 0;
@@ -3650,7 +3650,7 @@ aiocb_c_save_aiocb(struct kaiocb *kjob, const void *ujobptrp)
 	if (ujobptrp == NULL)
 		memset(&kjob->ujobptr, 0, sizeof(kjob->ujobptr));
 	else
-		cheri_memcpy(&kjob->ujobptr, ujobptrp, sizeof(__intcap_t));
+		memcpy(&kjob->ujobptr, ujobptrp, sizeof(__intcap_t));
 }
 
 static int
@@ -3661,7 +3661,7 @@ aiocb_c_store_aiocb(struct aiocb ** __capability ujobp, struct kaiocb *kjob)
 	if (kjob == NULL)
 		ujob = 0;	/* XXXBD: is this sufficent? */
 	else
-		cheri_memcpy(&ujob, &kjob->ujobptr, sizeof(__intcap_t));
+		memcpy(&ujob, &kjob->ujobptr, sizeof(__intcap_t));
 
 	return (sucap(ujobp, ujob));
 }

@@ -79,13 +79,13 @@ SUBDIR=	${SUBDIR_BOOTSTRAP} \
 	libpcap \
 	libpjdlog \
 	libpng \
-	${_libproc} \
+	libproc \
 	libprocstat \
 	libregex \
 	librpcsvc \
 	librss \
 	librt \
-	${_librtld_db} \
+	librtld_db \
 	libsbuf \
 	libsmb \
 	libsqlite3 \
@@ -235,11 +235,6 @@ SUBDIR.${MK_BHYVE}+=	libvmmapi
 _libstatcounters=	libstatcounters
 .endif
 
-.if ${MACHINE_CPUARCH} != "sparc64"
-_libproc=	libproc
-_librtld_db=	librtld_db
-.endif
-
 .if ${MACHINE_ARCH} != "powerpc"
 SUBDIR.${MK_OPENMP}+=	libomp
 .endif
@@ -249,7 +244,7 @@ SUBDIR.${MK_RADIUS_SUPPORT}+=	libradius
 SUBDIR.${MK_SENDMAIL}+=	libmilter libsm libsmdb libsmutil
 SUBDIR.${MK_TELNET}+=	libtelnet
 
-.if ${MK_TESTS_SUPPORT} != "no" || defined(COMPAT_CHERI)
+.if ${MK_TESTS_SUPPORT} != "no" || ${MK_TESTS} != "no"
 SUBDIR+=		atf
 .endif
 

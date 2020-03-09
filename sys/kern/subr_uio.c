@@ -505,7 +505,7 @@ cloneuio(struct uio *uiop)
 	uio = malloc(iovlen + sizeof *uio, M_IOV, M_WAITOK);
 	*uio = *uiop;
 	uio->uio_iov = (struct iovec *)(uio + 1);
-	cheri_bcopy(uiop->uio_iov, uio->uio_iov, iovlen);
+	bcopy(uiop->uio_iov, uio->uio_iov, iovlen);
 	return (uio);
 }
 

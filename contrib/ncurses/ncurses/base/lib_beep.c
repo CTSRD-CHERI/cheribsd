@@ -1,5 +1,6 @@
 /****************************************************************************
- * Copyright (c) 1998-2009,2013 Free Software Foundation, Inc.              *
+ * Copyright 2020 Thomas E. Dickey                                          *
+ * Copyright 1998-2013,2014 Free Software Foundation, Inc.                  *
  *                                                                          *
  * Permission is hereby granted, free of charge, to any person obtaining a  *
  * copy of this software and associated documentation files (the            *
@@ -46,7 +47,7 @@
 #define CUR SP_TERMTYPE
 #endif
 
-MODULE_ID("$Id: lib_beep.c,v 1.16 2013/01/12 17:26:25 tom Exp $")
+MODULE_ID("$Id: lib_beep.c,v 1.18 2020/02/02 23:34:34 tom Exp $")
 
 /*
  *	beep()
@@ -65,7 +66,7 @@ NCURSES_SP_NAME(beep) (NCURSES_SP_DCL0)
 
 #ifdef USE_TERM_DRIVER
     if (SP_PARM != 0)
-	res = CallDriver_1(SP_PARM, doBeepOrFlash, TRUE);
+	res = CallDriver_1(SP_PARM, td_doBeepOrFlash, TRUE);
 #else
     /* FIXME: should make sure that we are not in altchar mode */
     if (cur_term == 0) {

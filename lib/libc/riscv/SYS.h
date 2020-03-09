@@ -49,7 +49,6 @@
 	cllc CAPABILITY_REG(outreg), _C_LABEL(function)
 #define _CALL_FNPTR(reg)	cjalr CAPABILITY_REG(reg)
 #define _TAILCALL_FNPTR(reg)	cjr CAPABILITY_REG(reg)
-#define _RETURN	cret
 #else
 #define _GET_LOCAL_FNPTR(outreg, function)	\
 	lla outreg, _C_LABEL(function)
@@ -57,7 +56,6 @@
 	la outreg, _C_LABEL(function)
 #define _CALL_FNPTR(reg)	jalr reg
 #define _TAILCALL_FNPTR(reg)	jr reg
-#define _RETURN	ret
 #endif
 
 #define ASM_LOCAL_TAILCALL(tmpreg, function)				\
@@ -72,7 +70,7 @@ ENTRY(__sys_##name);						\
 	WEAK_REFERENCE(__sys_##name, name);			\
 	WEAK_REFERENCE(__sys_##name, _##name);			\
 	_SYSCALL(name);						\
-	_RETURN;						\
+	RETURN;							\
 END(__sys_##name)
 
 #define	PSEUDO(name)						\
@@ -80,7 +78,7 @@ ENTRY(__sys_##name);						\
 	WEAK_REFERENCE(__sys_##name, _##name);			\
 	_SYSCALL(name);						\
 	bnez	t0, 1f; 					\
-	_RETURN;						\
+	RETURN;							\
 1:	ASM_LOCAL_TAILCALL(t1, cerror);				\
 END(__sys_##name)
 
@@ -90,7 +88,7 @@ ENTRY(__sys_##name);						\
 	WEAK_REFERENCE(__sys_##name, _##name);			\
 	_SYSCALL(name);						\
 	bnez	t0, 1f; 					\
-	_RETURN;						\
+	RETURN;							\
 1:	ASM_LOCAL_TAILCALL(t1, cerror);				\
 END(__sys_##name)
 
@@ -99,6 +97,6 @@ END(__sys_##name)
 ENTRY(__sys_##name);						\
 	_SYSCALL(name);						\
 	bnez	t0, 1f; 					\
-	_RETURN;						\
+	RETURN;							\
 1:	ASM_LOCAL_TAILCALL(t1, cerror);				\
 END(__sys_##name)

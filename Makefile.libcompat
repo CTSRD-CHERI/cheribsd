@@ -33,7 +33,7 @@ LIBCOMPATWMAKEFLAGS+= \
 		-DNO_CPU_CFLAGS \
 		MK_CTF=no \
 		-DNO_LINT \
-		MK_TESTS=no \
+		MK_TESTS=no MK_TESTS_SUPPORT=${MK_TESTS} \
 		WORLDTMP_MTREE="${WORLDTMP_MTREE}"
 # Avoid re-computing COMPILER_VERSION, etc. values:
 # $CC is different in the libcompat case compared to the non-compat value.
@@ -138,9 +138,12 @@ lib${libcompat}buildenv: .PHONY
 .if ${BUILDENV_SHELL:M*zsh*}
 	@echo For ZSH you must run: export CPUTYPE=${TARGET_CPUTYPE}
 .endif
+	# Note: we have to remove TARGET and TARGET_ARCH from MAKEFLAGS since
+	# otherwise src.opts.mk will pick the wrong MK_FOO values.
 	@cd ${BUILDENV_DIR} && \
 	    env ${LIBCOMPATWMAKEENV} ${LIBCOMPAT_COMPILERS} BUILDENV=1 \
-	    ${BUILDENV_SHELL} || true
+	    TARGET=${LIBCOMPAT_MACHINE} TARGET_ARCH=${LIBCOMPAT_MACHINE_ARCH} \
+	    "MAKEFLAGS=${MAKEFLAGS:NTARGET*}" ${BUILDENV_SHELL} || true
 .endif
 
 .endif # !targets(__<${_this:T}>__)

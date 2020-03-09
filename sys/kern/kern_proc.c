@@ -1303,7 +1303,7 @@ pstats_fork(struct pstats *src, struct pstats *dst)
 
 	bzero(&dst->pstat_startzero,
 	    __rangeof(struct pstats, pstat_startzero, pstat_endzero));
-	cheri_bcopy(&src->pstat_startcopy, &dst->pstat_startcopy,
+	bcopy(&src->pstat_startcopy, &dst->pstat_startcopy,
 	    __rangeof(struct pstats, pstat_startcopy, pstat_endcopy));
 }
 
@@ -3197,273 +3197,100 @@ sysctl_kern_proc_sigtramp(SYSCTL_HANDLER_ARGS)
 	return (error);
 }
 
-/*
- * These sysctls allow a process to inspect the (self-reported) set of sandbox
- * class, method, and object metadata present in another process.
- *
- * NB: Although it is used today only for CHERI, there's no reason it couldn't
- * also be used for Capsicum.  In that case we'd want to be sure to provide
- * PIDs for object instances.
- */
-enum proc_sbmetadata_type {
-	PROC_SBCLASSES,
-	PROC_SBMETHODS,
-	PROC_SBOBJECTS,
-};
-
 static int
-proc_get_sbmetadata_ptrlen(struct thread *td, struct proc *p,
-    enum proc_sbmetadata_type type, vm_offset_t *ptrp, size_t *lenp)
+sysctl_kern_proc_sigfastblk(SYSCTL_HANDLER_ARGS)
 {
-
+	int *name = (int *)arg1;
+	u_int namelen = arg2;
+	pid_t pid;
+	struct proc *p;
+	struct thread *td1;
+	uintptr_t addr;
 #ifdef COMPAT_FREEBSD32
-	struct freebsd32_ps_strings pss32;
+	uint32_t addr32;
 #endif
+#if __has_feature(capabilities)
+	uintcap_t addrcap;
 #ifdef COMPAT_FREEBSD64
-	struct freebsd64_ps_strings pss64;
+	uint64_t addr64;
 #endif
-	struct ps_strings pss;
-	vm_offset_t ptr;
-	size_t len;
+#endif
+	int error;
 
+	if (namelen != 1 || req->newptr != NULL)
+		return (EINVAL);
+
+	pid = (pid_t)name[0];
+	error = pget(pid, PGET_HOLD | PGET_NOTWEXIT | PGET_CANDEBUG, &p);
+	if (error != 0)
+		return (error);
+
+	PROC_LOCK(p);
+#ifdef COMPAT_FREEBSD32
+	if (SV_CURPROC_FLAG(SV_ILP32)) {
+		if (!SV_PROC_FLAG(p, SV_ILP32)) {
+			error = EINVAL;
+			goto errlocked;
+		}
+	}
+#endif
+	if (pid <= PID_MAX) {
+		td1 = FIRST_THREAD_IN_PROC(p);
+	} else {
+		FOREACH_THREAD_IN_PROC(p, td1) {
+			if (td1->td_tid == pid)
+				break;
+		}
+	}
+	if (td1 == NULL) {
+		error = ESRCH;
+		goto errlocked;
+	}
 	/*
-	 * Read in the ps_strings structure from the target process, which
-	 * contains pointers/lengths for the process's sandbox state.
-	 *
-	 * NB: Although CHERI is 64-bit only, provide 32-bit interfaces that
-	 * might be used for Capsicum.
+	 * The access to the private thread flags.  It is fine as far
+	 * as no out-of-thin-air values are read from td_pflags, and
+	 * usermode read of the td_sigblock_ptr is racy inherently,
+	 * since target process might have already changed it
+	 * meantime.
 	 */
+	if ((td1->td_pflags & TDP_SIGFASTBLOCK) != 0)
+		addr = (uintptr_t)(__cheri_addr vaddr_t)td1->td_sigblock_ptr;
+	else
+		error = ENOTTY;
+
+errlocked:
+	_PRELE(p);
+	PROC_UNLOCK(p);
+	if (error != 0)
+		return (error);
+
 #ifdef COMPAT_FREEBSD32
-	if (SV_PROC_FLAG(p, SV_ILP32) != 0) {
-		if (proc_readmem(td, p,
-		    (vm_offset_t)p->p_psstrings, &pss32,
-		    sizeof(pss32)) != sizeof(pss32));
-			return (ENOMEM);
-
-		/*
-		 * NB: Only copy exactly the pss fields we might need here.
-		 */
-		pss.ps_sbclasses =
-		    (void * __capability)(uintcap_t)pss32.ps_sbclasses;
-		pss.ps_sbclasseslen = (size_t)pss32.ps_sbclasseslen;
-		pss.ps_sbmethods =
-		    (void * __capability)(uintcap_t)pss32.ps_sbmethods;
-		pss.ps_sbmethodslen = (size_t)pss32.ps_sbmethodslen;
-		pss.ps_sbobjects =
-		    (void * __capability)(uintcap_t)pss32.ps_sbobjects;
-		pss.ps_sbobjectslen = (size_t)pss32.ps_sbobjectslen;
-	} else
-#endif
-#ifdef COMPAT_FREEBSD64
-	if (SV_PROC_FLAG(p, SV_LP64 | SV_CHERI) == SV_LP64) {
-		if (proc_readmem(td, p,
-		    (vm_offset_t)p->p_sysent->sv_psstrings, &pss64,
-		    sizeof(pss64)) != sizeof(pss64))
-			return (ENOMEM);
-
-		/*
-		 * NB: Only copy exactly the pss fields we might need here.
-		 */
-		pss.ps_sbclasses =
-		    (void * __capability)(uintcap_t)pss64.ps_sbclasses;
-		pss.ps_sbclasseslen = (size_t)pss64.ps_sbclasseslen;
-		pss.ps_sbmethods =
-		    (void * __capability)(uintcap_t)pss64.ps_sbmethods;
-		pss.ps_sbmethodslen = (size_t)pss64.ps_sbmethodslen;
-		pss.ps_sbobjects =
-		    (void * __capability)(uintcap_t)pss64.ps_sbobjects;
-		pss.ps_sbobjectslen = (size_t)pss64.ps_sbobjectslen;
+	if (SV_CURPROC_FLAG(SV_ILP32)) {
+		addr32 = addr;
+		error = SYSCTL_OUT(req, &addr32, sizeof(addr32));
 	} else
 #endif
 	{
-		if (proc_readmem(td, p,
-		    (vm_offset_t)(p->p_psstrings), &pss,
-		    sizeof(pss)) != sizeof(pss))
-			return (ENOMEM);
+#if __has_feature(capabilities)
+#ifdef COMPAT_FREEBSD64
+		if (!SV_CURPROC_FLAG(SV_CHERI)) {
+			addr64 = addr;
+			error = SYSCTL_OUT(req, &addr64, sizeof(addr64));
+		} else
+#endif
+		{
+			addrcap = addr;
+			error = SYSCTL_OUT(req, &addrcap, sizeof(addrcap));
+		}
+#else
+		error = SYSCTL_OUT(req, &addr, sizeof(addr));
+#endif
 	}
-
-	/*
-	 * Select dptr/dlen values based on requested metadata type.
-	 */
-	switch (type) {
-	case PROC_SBCLASSES:
-		ptr = (__cheri_addr vm_offset_t)pss.ps_sbclasses;
-		len = pss.ps_sbclasseslen;
-		break;
-
-	case PROC_SBMETHODS:
-		ptr = (__cheri_addr vm_offset_t)pss.ps_sbmethods;
-		len = pss.ps_sbmethodslen;
-		break;
-
-	case PROC_SBOBJECTS:
-		ptr = (__cheri_addr vm_offset_t)pss.ps_sbobjects;
-		len = pss.ps_sbobjectslen;
-		break;
-
-	default:
-		panic("%s: invalid type %d", __func__, type);
-	}
-
-	/*
-	 * XXXRW: impose a length limit here...?  Unfortunately, it is not as
-	 * simple as bounding to the caller process buffer, as we need to
-	 * expose the full actual length to the consumer.
-	 */
-	if (ptrp != NULL)
-		*ptrp = ptr;
-	if (lenp != NULL)
-		*lenp = len;
-	return (0);
+	return (error);
 }
 
-static int
-proc_get_sbmetadata(struct thread *td, struct proc *p, size_t maxlen,
-    struct sbuf *sbp, enum proc_sbmetadata_type type)
-{
-	char sbdata[GET_PS_STRINGS_CHUNK_SZ];
-	vm_offset_t dptr, ptr;
-	size_t dlen, len;
-	int error;
-
-	error = proc_get_sbmetadata_ptrlen(td, p, type, &dptr, &dlen);
-	if (error != 0)
-		return (error);
-
-	/*
-	 * The process may not (yet) have initialised its sandbox metadata.
-	 */
-	if (dptr == 0 || dlen == 0)
-		return (0);
-
-	/*
-	 * We seperately handle length-only queries in the caller, so OK to
-	 * truncate here.
-	 */
-	dlen = min(dlen, maxlen);
-
-	/*
-	 * Copy in (and out) the requested metadata chunk by chunk.
-	 */
-	ptr = dptr;
-	for (ptr = dptr; dlen > 0; dlen -= len, ptr += len) {
-		len = min(dlen, sizeof(sbdata));
-		if (proc_readmem(td, p, ptr, sbdata, len) != len)
-			return (ENOMEM);
-		sbuf_bcat(sbp, sbdata, len);
-	}
-	return (0);
-}
-
-static int
-sysctl_kern_proc_sbclasses(SYSCTL_HANDLER_ARGS)
-{
-	struct sbuf sb;
-	struct proc *p;
-	int *name = (int *)arg1;
-	u_int namelen = arg2;
-	int error, error2;
-	size_t len;
-
-	if (namelen != 1)
-		return (EINVAL);
-	error = pget((pid_t)name[0], PGET_WANTREAD, &p);
-	if (error != 0)
-		return (error);
-	if ((p->p_flag & P_SYSTEM) != 0) {
-		PRELE(p);
-		return (0);
-	}
-	if (req->oldptr == NULL) {
-		error = proc_get_sbmetadata_ptrlen(curthread, p,
-		    PROC_SBCLASSES, NULL, &len);
-		PRELE(p);
-		if (error != 0)
-			return (error);
-		return (SYSCTL_OUT(req, NULL, len));
-	}
-	sbuf_new_for_sysctl(&sb, NULL, GET_PS_STRINGS_CHUNK_SZ, req);
-	error = proc_get_sbmetadata(curthread, p, req->oldlen, &sb,
-	    PROC_SBCLASSES);
-	error2 = sbuf_finish(&sb);
-	PRELE(p);
-	sbuf_delete(&sb);
-	return (error != 0 ? error : error2);
-}
-
-static int
-sysctl_kern_proc_sbmethods(SYSCTL_HANDLER_ARGS)
-{
-	struct sbuf sb;
-	struct proc *p;
-	int *name = (int *)arg1;
-	u_int namelen = arg2;
-	int error, error2;
-	size_t len;
-
-	if (namelen != 1)
-		return (EINVAL);
-	error = pget((pid_t)name[0], PGET_WANTREAD, &p);
-	if (error != 0)
-		return (error);
-	if ((p->p_flag & P_SYSTEM) != 0) {
-		PRELE(p);
-		return (0);
-	}
-	if (req->oldptr == NULL) {
-		error = proc_get_sbmetadata_ptrlen(curthread, p,
-		    PROC_SBMETHODS, NULL, &len);
-		PRELE(p);
-		if (error != 0)
-			return (error);
-		return (SYSCTL_OUT(req, NULL, len));
-	}
-	sbuf_new_for_sysctl(&sb, NULL, GET_PS_STRINGS_CHUNK_SZ, req);
-	error = proc_get_sbmetadata(curthread, p, req->oldlen, &sb,
-	    PROC_SBMETHODS);
-	error2 = sbuf_finish(&sb);
-	PRELE(p);
-	sbuf_delete(&sb);
-	return (error != 0 ? error : error2);
-}
-
-static int
-sysctl_kern_proc_sbobjects(SYSCTL_HANDLER_ARGS)
-{
-	struct sbuf sb;
-	struct proc *p;
-	int *name = (int *)arg1;
-	u_int namelen = arg2;
-	int error, error2;
-	size_t len;
-
-	if (namelen != 1)
-		return (EINVAL);
-	error = pget((pid_t)name[0], PGET_WANTREAD, &p);
-	if (error != 0)
-		return (error);
-	if ((p->p_flag & P_SYSTEM) != 0) {
-		PRELE(p);
-		return (0);
-	}
-	if (req->oldptr == NULL) {
-		error = proc_get_sbmetadata_ptrlen(curthread, p,
-		    PROC_SBOBJECTS, NULL, &len);
-		PRELE(p);
-		if (error != 0)
-			return (error);
-		return (SYSCTL_OUT(req, NULL, len));
-	}
-	sbuf_new_for_sysctl(&sb, NULL, GET_PS_STRINGS_CHUNK_SZ, req);
-	error = proc_get_sbmetadata(curthread, p, req->oldlen, &sb,
-	    PROC_SBOBJECTS);
-	error2 = sbuf_finish(&sb);
-	PRELE(p);
-	sbuf_delete(&sb);
-	return (error != 0 ? error : error2);
-}
-
-SYSCTL_NODE(_kern, KERN_PROC, proc, CTLFLAG_RD,  0, "Process table");
+SYSCTL_NODE(_kern, KERN_PROC, proc, CTLFLAG_RD | CTLFLAG_MPSAFE,  0,
+    "Process table");
 
 SYSCTL_PROC(_kern_proc, KERN_PROC_ALL, all, CTLFLAG_RD|CTLTYPE_STRUCT|
 	CTLFLAG_MPSAFE, 0, 0, sysctl_kern_proc, "S,proc",
@@ -3576,14 +3403,9 @@ static SYSCTL_NODE(_kern_proc, KERN_PROC_SIGTRAMP, sigtramp, CTLFLAG_RD |
 	CTLFLAG_MPSAFE, sysctl_kern_proc_sigtramp,
 	"Process signal trampoline location");
 
-static SYSCTL_NODE(_kern_proc, KERN_PROC_SBCLASSES, sbclasses, CTLFLAG_RD |
-	CTLFLAG_MPSAFE, sysctl_kern_proc_sbclasses, "Process sandbox classes");
-
-static SYSCTL_NODE(_kern_proc, KERN_PROC_SBMETHODS, sbmethods, CTLFLAG_RD |
-	CTLFLAG_MPSAFE, sysctl_kern_proc_sbmethods, "Process sandbox methods");
-
-static SYSCTL_NODE(_kern_proc, KERN_PROC_SBOBJECTS, sbobjects, CTLFLAG_RD |
-	CTLFLAG_MPSAFE, sysctl_kern_proc_sbobjects, "Process sandbox objects");
+static SYSCTL_NODE(_kern_proc, KERN_PROC_SIGFASTBLK, sigfastblk, CTLFLAG_RD |
+	CTLFLAG_ANYBODY | CTLFLAG_MPSAFE, sysctl_kern_proc_sigfastblk,
+	"Thread sigfastblock address");
 
 int allproc_gen;
 

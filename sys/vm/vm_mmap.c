@@ -584,7 +584,7 @@ kern_mmap_req(struct thread *td, const struct mmap_req *mrp)
 		SYSERRCAUSE(
 		    "%s: requested page permissions exceed requesed maximum",
 		    __func__);
-		return (EINVAL);
+		return (ENOTSUP);
 	}
 	if ((prot & (PROT_WRITE | PROT_EXEC)) == (PROT_WRITE | PROT_EXEC) &&
 	    (error = vm_wxcheck(p, "mmap")))
@@ -853,15 +853,15 @@ kern_mmap_req(struct thread *td, const struct mmap_req *mrp)
 		 * rights, but also return the maximum rights to be combined
 		 * with maxprot later.
 		 */
-		cap_rights_init(&rights, CAP_MMAP);
+		cap_rights_init_one(&rights, CAP_MMAP);
 		if (max_prot & PROT_READ)
-			cap_rights_set(&rights, CAP_MMAP_R);
+			cap_rights_set_one(&rights, CAP_MMAP_R);
 		if ((flags & MAP_SHARED) != 0) {
 			if (max_prot & PROT_WRITE)
-				cap_rights_set(&rights, CAP_MMAP_W);
+				cap_rights_set_one(&rights, CAP_MMAP_W);
 		}
 		if (max_prot & PROT_EXEC)
-			cap_rights_set(&rights, CAP_MMAP_X);
+			cap_rights_set_one(&rights, CAP_MMAP_X);
 		error = fget_mmap(td, fd, &rights, &cap_maxprot, &fp);
 		if (error != 0)
 			goto done;
@@ -1185,7 +1185,7 @@ kern_mprotect(struct thread *td, uintptr_t addr0, size_t size, int prot)
 	vm_error = KERN_SUCCESS;
 	if (max_prot != 0) {
 		if ((max_prot & prot) != prot)
-			return (EINVAL);
+			return (ENOTSUP);
 		vm_error = vm_map_protect(&td->td_proc->p_vmspace->vm_map,
 		    addr, addr + size, max_prot, TRUE);
 	}
@@ -1436,8 +1436,7 @@ retry:
 				while (object == NULL || m->object != object) {
 					if (object != NULL)
 						VM_OBJECT_WUNLOCK(object);
-					object = (vm_object_t)atomic_load_ptr(
-					    &m->object);
+					object = atomic_load_ptr(&m->object);
 					if (object == NULL)
 						goto retry;
 					VM_OBJECT_WLOCK(object);

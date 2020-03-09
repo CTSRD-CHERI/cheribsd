@@ -1656,7 +1656,7 @@ re_attach(device_t dev)
 	ifp->if_snd.ifq_drv_maxlen = RL_IFQ_MAXLEN;
 	IFQ_SET_READY(&ifp->if_snd);
 
-	TASK_INIT(&sc->rl_inttask, 0, re_int_task, sc);
+	NET_TASK_INIT(&sc->rl_inttask, 0, re_int_task, sc);
 
 #define	RE_PHYAD_INTERNAL	 0
 
@@ -2576,7 +2576,6 @@ re_intr(void *arg)
 static void
 re_int_task(void *arg, int npending)
 {
-	struct epoch_tracker	et;
 	struct rl_softc		*sc;
 	struct ifnet		*ifp;
 	u_int16_t		status;
@@ -2603,11 +2602,8 @@ re_int_task(void *arg, int npending)
 	}
 #endif
 
-	if (status & (RL_ISR_RX_OK|RL_ISR_RX_ERR|RL_ISR_FIFO_OFLOW)) {
-		NET_EPOCH_ENTER(et);
+	if (status & (RL_ISR_RX_OK|RL_ISR_RX_ERR|RL_ISR_FIFO_OFLOW))
 		rval = re_rxeof(sc, NULL);
-		NET_EPOCH_EXIT(et);
-	}
 
 	/*
 	 * Some chips will ignore a second TX request issued
@@ -3973,14 +3969,15 @@ re_add_sysctls(struct rl_softc *sc)
 	children = SYSCTL_CHILDREN(device_get_sysctl_tree(sc->rl_dev));
 
 	SYSCTL_ADD_PROC(ctx, children, OID_AUTO, "stats",
-	    CTLTYPE_INT | CTLFLAG_RW, sc, 0, re_sysctl_stats, "I",
-	    "Statistics Information");
+	    CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_NEEDGIANT, sc, 0,
+	    re_sysctl_stats, "I", "Statistics Information");
 	if ((sc->rl_flags & (RL_FLAG_MSI | RL_FLAG_MSIX)) == 0)
 		return;
 
 	SYSCTL_ADD_PROC(ctx, children, OID_AUTO, "int_rx_mod",
-	    CTLTYPE_INT | CTLFLAG_RW, &sc->rl_int_rx_mod, 0,
-	    sysctl_hw_re_int_mod, "I", "re RX interrupt moderation");
+	    CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_NEEDGIANT,
+	    &sc->rl_int_rx_mod, 0, sysctl_hw_re_int_mod, "I",
+	    "re RX interrupt moderation");
 	/* Pull in device tunables. */
 	sc->rl_int_rx_mod = RL_TIMER_DEFAULT;
 	error = resource_int_value(device_get_name(sc->rl_dev),

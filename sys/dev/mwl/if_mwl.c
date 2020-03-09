@@ -190,7 +190,8 @@ static int	mwl_getchannels(struct mwl_softc *);
 static void	mwl_sysctlattach(struct mwl_softc *);
 static void	mwl_announce(struct mwl_softc *);
 
-SYSCTL_NODE(_hw, OID_AUTO, mwl, CTLFLAG_RD, 0, "Marvell driver parameters");
+SYSCTL_NODE(_hw, OID_AUTO, mwl, CTLFLAG_RD | CTLFLAG_MPSAFE, 0,
+    "Marvell driver parameters");
 
 static	int mwl_rxdesc = MWL_RXDESC;		/* # rx desc's to allocate */
 SYSCTL_INT(_hw_mwl, OID_AUTO, rxdesc, CTLFLAG_RW, &mwl_rxdesc,
@@ -362,7 +363,7 @@ mwl_attach(uint16_t devid, struct mwl_softc *sc)
 	taskqueue_start_threads(&sc->sc_tq, 1, PI_NET,
 		"%s taskq", device_get_nameunit(sc->sc_dev));
 
-	TASK_INIT(&sc->sc_rxtask, 0, mwl_rx_proc, sc);
+	NET_TASK_INIT(&sc->sc_rxtask, 0, mwl_rx_proc, sc);
 	TASK_INIT(&sc->sc_radartask, 0, mwl_radar_proc, sc);
 	TASK_INIT(&sc->sc_chanswitchtask, 0, mwl_chanswitch_proc, sc);
 	TASK_INIT(&sc->sc_bawatchdogtask, 0, mwl_bawatchdog_proc, sc);
@@ -4789,9 +4790,9 @@ mwl_sysctlattach(struct mwl_softc *sc)
 	struct sysctl_oid *tree = device_get_sysctl_tree(sc->sc_dev);
 
 	sc->sc_debug = mwl_debug;
-	SYSCTL_ADD_PROC(ctx, SYSCTL_CHILDREN(tree), OID_AUTO,
-		"debug", CTLTYPE_INT | CTLFLAG_RW, sc, 0,
-		mwl_sysctl_debug, "I", "control debugging printfs");
+	SYSCTL_ADD_PROC(ctx, SYSCTL_CHILDREN(tree), OID_AUTO, "debug",
+	    CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_NEEDGIANT, sc, 0,
+	    mwl_sysctl_debug, "I", "control debugging printfs");
 #endif
 }
 

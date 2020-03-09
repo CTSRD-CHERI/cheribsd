@@ -409,14 +409,6 @@ namei(struct nameidata *ndp)
 	ndp->ni_rootdir = fdp->fd_rdir;
 	ndp->ni_topdir = fdp->fd_jdir;
 
-	/*
-	 * If we are auditing the kernel pathname, save the user pathname.
-	 */
-	if (cnp->cn_flags & AUDITVNODE1)
-		AUDIT_ARG_UPATH1(td, ndp->ni_dirfd, cnp->cn_pnbuf);
-	if (cnp->cn_flags & AUDITVNODE2)
-		AUDIT_ARG_UPATH2(td, ndp->ni_dirfd, cnp->cn_pnbuf);
-
 	startdir_used = 0;
 	dp = NULL;
 	cnp->cn_nameptr = cnp->cn_pnbuf;
@@ -446,7 +438,7 @@ namei(struct nameidata *ndp)
 		} else {
 			vrefact(ndp->ni_rootdir);
 			rights = ndp->ni_rightsneeded;
-			cap_rights_set(&rights, CAP_LOOKUP);
+			cap_rights_set_one(&rights, CAP_LOOKUP);
 
 			if (cnp->cn_flags & AUDITVNODE1)
 				AUDIT_ARG_ATFD1(ndp->ni_dirfd);
@@ -499,7 +491,7 @@ namei(struct nameidata *ndp)
 			vrefact(ndp->ni_beneath_latch);
 		} else {
 			rights = ndp->ni_rightsneeded;
-			cap_rights_set(&rights, CAP_LOOKUP);
+			cap_rights_set_one(&rights, CAP_LOOKUP);
 			error = fgetvp_rights(td, ndp->ni_dirfd, &rights,
 			    &dirfd_caps, &ndp->ni_beneath_latch);
 			if (error == 0 && dp->v_type != VDIR) {
@@ -511,6 +503,13 @@ namei(struct nameidata *ndp)
 			ndp->ni_lcf |= NI_LCF_LATCH;
 	}
 	FILEDESC_SUNLOCK(fdp);
+	/*
+	 * If we are auditing the kernel pathname, save the user pathname.
+	 */
+	if (cnp->cn_flags & AUDITVNODE1)
+		AUDIT_ARG_UPATH1_VP(td, ndp->ni_rootdir, dp, cnp->cn_pnbuf);
+	if (cnp->cn_flags & AUDITVNODE2)
+		AUDIT_ARG_UPATH2_VP(td, ndp->ni_rootdir, dp, cnp->cn_pnbuf);
 	if (ndp->ni_startdir != NULL && !startdir_used)
 		vrele(ndp->ni_startdir);
 	if (error != 0) {
@@ -937,12 +936,9 @@ dirloop:
 	 */
 unionlookup:
 #ifdef MAC
-	if ((cnp->cn_flags & NOMACCHECK) == 0) {
-		error = mac_vnode_check_lookup(cnp->cn_thread->td_ucred, dp,
-		    cnp);
-		if (error)
-			goto bad;
-	}
+	error = mac_vnode_check_lookup(cnp->cn_thread->td_ucred, dp, cnp);
+	if (error)
+		goto bad;
 #endif
 	ndp->ni_dvp = dp;
 	ndp->ni_vp = NULL;
@@ -1363,7 +1359,7 @@ NDINIT_ALL_C(struct nameidata *ndp, u_long op, u_long flags, enum uio_seg segflg
 	if (rightsp != NULL)
 		ndp->ni_rightsneeded = *rightsp;
 	else
-		cap_rights_init(&ndp->ni_rightsneeded);
+		cap_rights_init_zero(&ndp->ni_rightsneeded);
 }
 
 /*
