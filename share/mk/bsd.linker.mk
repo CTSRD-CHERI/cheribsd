@@ -82,6 +82,7 @@ _v=	${_ld_version:[2]}
 ${X_}LINKER_FREEBSD_VERSION:=	${_ld_version:[4]:C/.*-(.*)\)/\1/}
 .else
 ${X_}LINKER_FREEBSD_VERSION=	0
+.endif
 .elif ${_ld_version:[1]} == "@(\#)PROGRAM:ld"
 # bootstrap linker on MacOS
 ${X_}LINKER_TYPE=        mac
