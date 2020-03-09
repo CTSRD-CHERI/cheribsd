@@ -39,14 +39,7 @@ struct vdso_timehands {
 	uint64_t	th_scale;
 	uint32_t 	th_offset_count;
 	uint32_t	th_counter_mask;
-#ifdef __LP64__
-	/* XXXAR: temporary workaround to avoid memcpy */
-	_Alignas(sizeof(void * __capability))
-#endif
 	struct bintime	th_offset;
-#ifdef __LP64__
-	_Alignas(sizeof(void * __capability))
-#endif
 	struct bintime	th_boottime;
 	VDSO_TIMEHANDS_MD
 };
