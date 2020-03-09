@@ -54,9 +54,15 @@ typedef	void	(*systrace_probe_func_t)(struct syscall_args *,
 typedef	void	(*systrace_args_func_t)(int, void *, uint64_t *, int *);
 
 #ifdef _KERNEL
-extern bool			systrace_enabled;
-#endif
 extern systrace_probe_func_t	systrace_probe_func;
+extern bool			systrace_enabled;
+
+#ifdef KDTRACE_HOOKS
+#define	SYSTRACE_ENABLED()	(systrace_enabled)
+#else
+#define SYSTRACE_ENABLED()	(0)
+#endif
+#endif /* _KERNEL */
 
 struct sysent {			/* system call table */
 	int	sy_narg;	/* number of arguments */

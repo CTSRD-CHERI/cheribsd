@@ -172,27 +172,34 @@ sysctl_net_ipport_check(SYSCTL_HANDLER_ARGS)
 
 #undef RANGECHK
 
-static SYSCTL_NODE(_net_inet_ip, IPPROTO_IP, portrange, CTLFLAG_RW, 0,
+static SYSCTL_NODE(_net_inet_ip, IPPROTO_IP, portrange,
+    CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
     "IP Ports");
 
 SYSCTL_PROC(_net_inet_ip_portrange, OID_AUTO, lowfirst,
-	CTLFLAG_VNET | CTLTYPE_INT | CTLFLAG_RW,
-	&VNET_NAME(ipport_lowfirstauto), 0, &sysctl_net_ipport_check, "I", "");
+    CTLFLAG_VNET | CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_NEEDGIANT,
+    &VNET_NAME(ipport_lowfirstauto), 0, &sysctl_net_ipport_check, "I",
+    "");
 SYSCTL_PROC(_net_inet_ip_portrange, OID_AUTO, lowlast,
-	CTLFLAG_VNET | CTLTYPE_INT | CTLFLAG_RW,
-	&VNET_NAME(ipport_lowlastauto), 0, &sysctl_net_ipport_check, "I", "");
+    CTLFLAG_VNET | CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_NEEDGIANT,
+    &VNET_NAME(ipport_lowlastauto), 0, &sysctl_net_ipport_check, "I",
+    "");
 SYSCTL_PROC(_net_inet_ip_portrange, OID_AUTO, first,
-	CTLFLAG_VNET | CTLTYPE_INT | CTLFLAG_RW,
-	&VNET_NAME(ipport_firstauto), 0, &sysctl_net_ipport_check, "I", "");
+    CTLFLAG_VNET | CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_NEEDGIANT,
+    &VNET_NAME(ipport_firstauto), 0, &sysctl_net_ipport_check, "I",
+    "");
 SYSCTL_PROC(_net_inet_ip_portrange, OID_AUTO, last,
-	CTLFLAG_VNET | CTLTYPE_INT | CTLFLAG_RW,
-	&VNET_NAME(ipport_lastauto), 0, &sysctl_net_ipport_check, "I", "");
+    CTLFLAG_VNET | CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_NEEDGIANT,
+    &VNET_NAME(ipport_lastauto), 0, &sysctl_net_ipport_check, "I",
+    "");
 SYSCTL_PROC(_net_inet_ip_portrange, OID_AUTO, hifirst,
-	CTLFLAG_VNET | CTLTYPE_INT | CTLFLAG_RW,
-	&VNET_NAME(ipport_hifirstauto), 0, &sysctl_net_ipport_check, "I", "");
+    CTLFLAG_VNET | CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_NEEDGIANT,
+    &VNET_NAME(ipport_hifirstauto), 0, &sysctl_net_ipport_check, "I",
+    "");
 SYSCTL_PROC(_net_inet_ip_portrange, OID_AUTO, hilast,
-	CTLFLAG_VNET | CTLTYPE_INT | CTLFLAG_RW,
-	&VNET_NAME(ipport_hilastauto), 0, &sysctl_net_ipport_check, "I", "");
+    CTLFLAG_VNET | CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_NEEDGIANT,
+    &VNET_NAME(ipport_hilastauto), 0, &sysctl_net_ipport_check, "I",
+    "");
 SYSCTL_INT(_net_inet_ip_portrange, OID_AUTO, reservedhigh,
 	CTLFLAG_VNET | CTLFLAG_RW | CTLFLAG_SECURE,
 	&VNET_NAME(ipport_reservedhigh), 0, "");
@@ -216,7 +223,7 @@ counter_u64_t rate_limit_active;
 counter_u64_t rate_limit_alloc_fail;
 counter_u64_t rate_limit_set_ok;
 
-static SYSCTL_NODE(_net_inet_ip, OID_AUTO, rl, CTLFLAG_RD, 0,
+static SYSCTL_NODE(_net_inet_ip, OID_AUTO, rl, CTLFLAG_RD | CTLFLAG_MPSAFE, 0,
     "IP Rate Limiting");
 SYSCTL_COUNTER_U64(_net_inet_ip_rl, OID_AUTO, active, CTLFLAG_RD,
     &rate_limit_active, "Active rate limited connections");
@@ -1059,7 +1066,7 @@ in_pcbladdr(struct inpcb *inp, struct in_addr *faddr, struct in_addr *laddr,
 	/*
 	 * If we found a route, use the address corresponding to
 	 * the outgoing interface.
-	 * 
+	 *
 	 * Otherwise assume faddr is reachable on a directly connected
 	 * network and try to find a corresponding interface to take
 	 * the source address from.
@@ -1454,13 +1461,13 @@ in_pcbrele_rlocked(struct inpcb *inp)
 		}
 		return (0);
 	}
-	
+
 	KASSERT(inp->inp_socket == NULL, ("%s: inp_socket != NULL", __func__));
 #ifdef TCPHPTS
 	if (inp->inp_in_hpts || inp->inp_in_input) {
 		struct tcp_hpts_entry *hpts;
 		/*
-		 * We should not be on the hpts at 
+		 * We should not be on the hpts at
 		 * this point in any form. we must
 		 * get the lock to be sure.
 		 */
@@ -1470,7 +1477,7 @@ in_pcbrele_rlocked(struct inpcb *inp)
 			      hpts, inp);
 		mtx_unlock(&hpts->p_mtx);
 		hpts = tcp_input_lock(inp);
-		if (inp->inp_in_input) 
+		if (inp->inp_in_input)
 			panic("Hpts:%p inp:%p at free still on input hpts",
 			      hpts, inp);
 		mtx_unlock(&hpts->p_mtx);
@@ -1508,7 +1515,7 @@ in_pcbrele_wlocked(struct inpcb *inp)
 	if (inp->inp_in_hpts || inp->inp_in_input) {
 		struct tcp_hpts_entry *hpts;
 		/*
-		 * We should not be on the hpts at 
+		 * We should not be on the hpts at
 		 * this point in any form. we must
 		 * get the lock to be sure.
 		 */
@@ -1518,7 +1525,7 @@ in_pcbrele_wlocked(struct inpcb *inp)
 			      hpts, inp);
 		mtx_unlock(&hpts->p_mtx);
 		hpts = tcp_input_lock(inp);
-		if (inp->inp_in_input) 
+		if (inp->inp_in_input)
 			panic("Hpts:%p inp:%p at free still on input hpts",
 			      hpts, inp);
 		mtx_unlock(&hpts->p_mtx);
@@ -1612,7 +1619,7 @@ in_pcbfree_deferred(epoch_context_t ctx)
 #endif
 #ifdef INET
 	inp_freemoptions(imo);
-#endif	
+#endif
 	CURVNET_RESTORE();
 }
 
@@ -2731,7 +2738,7 @@ ip_fini(void *xtp)
 	callout_stop(&ipport_tick_callout);
 }
 
-/* 
+/*
  * The ipport_callout should start running at about the time we attach the
  * inet or inet6 domains.
  */
@@ -2745,7 +2752,7 @@ ipport_tick_init(const void *unused __unused)
 	EVENTHANDLER_REGISTER(shutdown_pre_sync, ip_fini, NULL,
 		SHUTDOWN_PRI_DEFAULT);
 }
-SYSINIT(ipport_tick_init, SI_SUB_PROTO_DOMAIN, SI_ORDER_MIDDLE, 
+SYSINIT(ipport_tick_init, SI_SUB_PROTO_DOMAIN, SI_ORDER_MIDDLE,
     ipport_tick_init, NULL);
 
 void

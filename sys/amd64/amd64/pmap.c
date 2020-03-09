@@ -390,7 +390,8 @@ vm_paddr_t dmaplimit;
 vm_offset_t kernel_vm_end = VM_MIN_KERNEL_ADDRESS;
 pt_entry_t pg_nx;
 
-static SYSCTL_NODE(_vm, OID_AUTO, pmap, CTLFLAG_RD, 0, "VM/pmap parameters");
+static SYSCTL_NODE(_vm, OID_AUTO, pmap, CTLFLAG_RD | CTLFLAG_MPSAFE, 0,
+    "VM/pmap parameters");
 
 static int pg_ps_enabled = 1;
 SYSCTL_INT(_vm_pmap, OID_AUTO, pg_ps_enabled, CTLFLAG_RDTUN | CTLFLAG_NOFETCH,
@@ -713,8 +714,8 @@ pmap_di_load_invl(struct pmap_invl_gen *ptr, struct pmap_invl_gen *out)
 	old_low = new_low = 0;
 	old_high = new_high = (uintptr_t)0;
 
-	__asm volatile("lock;cmpxchg16b\t%1;sete\t%0"
-	    : "=r" (res), "+m" (*ptr), "+a" (old_low), "+d" (old_high)
+	__asm volatile("lock;cmpxchg16b\t%1"
+	    : "=@cce" (res), "+m" (*ptr), "+a" (old_low), "+d" (old_high)
 	    : "b"(new_low), "c" (new_high)
 	    : "memory", "cc");
 	if (res == 0) {
@@ -741,8 +742,8 @@ pmap_di_store_invl(struct pmap_invl_gen *ptr, struct pmap_invl_gen *old_val,
 	old_low = old_val->gen;
 	old_high = (uintptr_t)old_val->next;
 
-	__asm volatile("lock;cmpxchg16b\t%1;sete\t%0"
-	    : "=r" (res), "+m" (*ptr), "+a" (old_low), "+d" (old_high)
+	__asm volatile("lock;cmpxchg16b\t%1"
+	    : "=@cce" (res), "+m" (*ptr), "+a" (old_low), "+d" (old_high)
 	    : "b"(new_low), "c" (new_high)
 	    : "memory", "cc");
 	return (res);
@@ -796,7 +797,7 @@ again:
 	PV_STAT(i = 0);
 	for (p = &pmap_invl_gen_head;; p = prev.next) {
 		PV_STAT(i++);
-		prevl = atomic_load_ptr(&p->next);
+		prevl = (uintptr_t)atomic_load_ptr(&p->next);
 		if ((prevl & PMAP_INVL_GEN_NEXT_INVALID) != 0) {
 			PV_STAT(atomic_add_long(&invl_start_restart, 1));
 			lock_delay(&lda);
@@ -903,7 +904,7 @@ pmap_delayed_invl_finish_u(void)
 
 again:
 	for (p = &pmap_invl_gen_head; p != NULL; p = (void *)prevl) {
-		prevl = atomic_load_ptr(&p->next);
+		prevl = (uintptr_t)atomic_load_ptr(&p->next);
 		if ((prevl & PMAP_INVL_GEN_NEXT_INVALID) != 0) {
 			PV_STAT(atomic_add_long(&invl_finish_restart, 1));
 			lock_delay(&lda);
@@ -954,7 +955,7 @@ DB_SHOW_COMMAND(di_queue, pmap_di_queue)
 
 	for (p = &pmap_invl_gen_head, first = true; p != NULL; p = pn,
 	    first = false) {
-		nextl = atomic_load_ptr(&p->next);
+		nextl = (uintptr_t)atomic_load_ptr(&p->next);
 		pn = (void *)(nextl & ~PMAP_INVL_GEN_NEXT_INVALID);
 		td = first ? NULL : __containerof(p, struct thread,
 		    td_md.md_invl_gen);
@@ -2196,7 +2197,7 @@ SYSCTL_UINT(_vm_pmap, OID_AUTO, large_map_pml4_entries,
     "Maximum number of PML4 entries for use by large map (tunable).  "
     "Each entry corresponds to 512GB of address space.");
 
-static SYSCTL_NODE(_vm_pmap, OID_AUTO, pde, CTLFLAG_RD, 0,
+static SYSCTL_NODE(_vm_pmap, OID_AUTO, pde, CTLFLAG_RD | CTLFLAG_MPSAFE, 0,
     "2MB page mapping counters");
 
 static u_long pmap_pde_demotions;
@@ -2215,7 +2216,7 @@ static u_long pmap_pde_promotions;
 SYSCTL_ULONG(_vm_pmap_pde, OID_AUTO, promotions, CTLFLAG_RD,
     &pmap_pde_promotions, 0, "2MB page promotions");
 
-static SYSCTL_NODE(_vm_pmap, OID_AUTO, pdpe, CTLFLAG_RD, 0,
+static SYSCTL_NODE(_vm_pmap, OID_AUTO, pdpe, CTLFLAG_RD | CTLFLAG_MPSAFE, 0,
     "1GB page mapping counters");
 
 static u_long pmap_pdpe_demotions;
@@ -4298,7 +4299,7 @@ reclaim_pv_chunk_domain(pmap_t locked_pmap, struct rwlock **lockp, int domain)
 	struct spglist free;
 	uint64_t inuse;
 	int bit, field, freed;
-	bool start_di;
+	bool start_di, restart;
 
 	PMAP_LOCK_ASSERT(locked_pmap, MA_OWNED);
 	KASSERT(lockp != NULL, ("reclaim_pv_chunk: lockp is NULL"));
@@ -4343,6 +4344,7 @@ reclaim_pv_chunk_domain(pmap_t locked_pmap, struct rwlock **lockp, int domain)
 		 * corresponding pmap is locked.
 		 */
 		if (pmap != next_pmap) {
+			restart = false;
 			reclaim_pv_chunk_leave_pmap(pmap, locked_pmap,
 			    start_di);
 			pmap = next_pmap;
@@ -4353,13 +4355,13 @@ reclaim_pv_chunk_domain(pmap_t locked_pmap, struct rwlock **lockp, int domain)
 				if (start_di)
 					pmap_delayed_invl_start();
 				mtx_lock(&pvc->pvc_lock);
-				continue;
+				restart = true;
 			} else if (pmap != locked_pmap) {
 				if (PMAP_TRYLOCK(pmap)) {
 					if (start_di)
 						pmap_delayed_invl_start();
 					mtx_lock(&pvc->pvc_lock);
-					continue;
+					restart = true;
 				} else {
 					pmap = NULL; /* pmap is not locked */
 					mtx_lock(&pvc->pvc_lock);
@@ -4375,6 +4377,8 @@ reclaim_pv_chunk_domain(pmap_t locked_pmap, struct rwlock **lockp, int domain)
 			PG_A = pmap_accessed_bit(pmap);
 			PG_M = pmap_modified_bit(pmap);
 			PG_RW = pmap_rw_bit(pmap);
+			if (restart)
+				continue;
 		}
 
 		/*

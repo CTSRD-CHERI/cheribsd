@@ -364,7 +364,7 @@ htcp_post_recovery(struct cc_var *ccv)
 			pipe = tcp_compute_pipe(ccv->ccvc.tcp);
 		else
 			pipe = CCV(ccv, snd_max) - ccv->curack;
-		
+
 		if (pipe < CCV(ccv, snd_ssthresh))
 			/*
 			 * Ensure that cwnd down not collape to 1 MSS under
@@ -520,8 +520,8 @@ htcp_ssthresh_update(struct cc_var *ccv)
 
 
 SYSCTL_DECL(_net_inet_tcp_cc_htcp);
-SYSCTL_NODE(_net_inet_tcp_cc, OID_AUTO, htcp, CTLFLAG_RW,
-    NULL, "H-TCP related settings");
+SYSCTL_NODE(_net_inet_tcp_cc, OID_AUTO, htcp, CTLFLAG_RW | CTLFLAG_MPSAFE, NULL,
+    "H-TCP related settings");
 SYSCTL_UINT(_net_inet_tcp_cc_htcp, OID_AUTO, adaptive_backoff,
     CTLFLAG_VNET | CTLFLAG_RW, &VNET_NAME(htcp_adaptive_backoff), 0,
     "enable H-TCP adaptive backoff");

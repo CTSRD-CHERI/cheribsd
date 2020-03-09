@@ -31,7 +31,7 @@
 #define TEST_EXPECTED_FAULTS 1
 #include "cheri_c_test.h"
 
-static int foo(__input int* x)
+static int foo(__cheri_input int* x)
 {
 	// Check that we can read from the variable
 	int y = *(int*)x;

@@ -174,3 +174,11 @@ cheriabi_sigqueue(struct thread *td, struct cheriabi_sigqueue_args *uap)
 	}
 	return (kern_sigqueue(td, uap->pid, uap->signum, &sv));
 }
+
+int
+cheriabi_sigfastblock(struct thread *td,
+    struct cheriabi_sigfastblock_args *uap)
+{
+
+	return (kern_sigfastblock(td, uap->cmd, uap->ptr));
+}

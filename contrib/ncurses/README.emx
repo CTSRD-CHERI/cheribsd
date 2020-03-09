@@ -1,5 +1,6 @@
 -------------------------------------------------------------------------------
--- Copyright (c) 1998-2005,2006 Free Software Foundation, Inc.               --
+-- Copyright 2020 Thomas E. Dickey                                           --
+-- Copyright 1998-2006,2018 Free Software Foundation, Inc.                   --
 --                                                                           --
 -- Permission is hereby granted, free of charge, to any person obtaining a   --
 -- copy of this software and associated documentation files (the             --
@@ -25,7 +26,7 @@
 -- sale, use or other dealings in this Software without prior written        --
 -- authorization.                                                            --
 -------------------------------------------------------------------------------
--- $Id: README.emx,v 1.8 2006/04/22 22:19:37 tom Exp $
+-- $Id: README.emx,v 1.11 2020/02/02 23:34:34 tom Exp $
 -- Author: Thomas Dickey
 -------------------------------------------------------------------------------
 
@@ -43,8 +44,8 @@ the EMX development tools, of course.  Get these programs to start:
 
 Apply the autoconf patches from
 
-	http://invisible-island.net/autoconf
-	ftp://invisible-island.net/autoconf
+	https://invisible-island.net/autoconf
+	ftp://ftp.invisible-island.net/autoconf
 
 These are ordered by date:
 

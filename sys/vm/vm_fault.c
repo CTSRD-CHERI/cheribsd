@@ -384,7 +384,7 @@ vm_fault_restore_map_lock(struct faultstate *fs)
 {
 
 	VM_OBJECT_ASSERT_WLOCKED(fs->first_object);
-	MPASS(REFCOUNT_COUNT(fs->first_object->paging_in_progress) > 0);
+	MPASS(blockcount_read(&fs->first_object->paging_in_progress) > 0);
 
 	if (!vm_map_trylock_read(fs->map)) {
 		VM_OBJECT_WUNLOCK(fs->first_object);
@@ -435,7 +435,7 @@ vm_fault_populate(struct faultstate *fs)
 
 	MPASS(fs->object == fs->first_object);
 	VM_OBJECT_ASSERT_WLOCKED(fs->first_object);
-	MPASS(REFCOUNT_COUNT(fs->first_object->paging_in_progress) > 0);
+	MPASS(blockcount_read(&fs->first_object->paging_in_progress) > 0);
 	MPASS(fs->first_object->backing_object == NULL);
 	MPASS(fs->lookup_still_valid);
 
@@ -913,13 +913,22 @@ vm_fault_cow(struct faultstate *fs)
 			VM_OBJECT_WUNLOCK(fs->first_object);
 		/*
 		 * Oh, well, lets copy it.
-		 *
+		 */
+#if __has_feature(capabilities)
+		/*
 		 * XXXRW: Worth pondering this further; in general,
 		 * copy-on-write should propagate any tags present in the
 		 * underlying page -- at least, if the top object is
 		 * anonymously backed.  But is this always true?
+		 * XXX-AM: We must at least propagate tags for
+		 * anonymously backed objects.
 		 */
-		pmap_copy_page(fs->m, fs->first_m);
+		if (fs->first_object->flags & OBJ_ANON)
+			pmap_copy_page_tags(fs->m, fs->first_m);
+		else
+#endif
+			pmap_copy_page(fs->m, fs->first_m);
+
 		vm_page_valid(fs->first_m);
 		if (fs->wired && (fs->fault_flags & VM_FAULT_WIRE) == 0) {
 			vm_page_wire(fs->first_m);
@@ -933,7 +942,7 @@ vm_fault_cow(struct faultstate *fs)
 		fs->m = NULL;
 	}
 	/*
-	 * fs->object != fs->first_object due to above 
+	 * fs->object != fs->first_object due to above
 	 * conditional
 	 */
 	vm_object_pip_wakeup(fs->object);

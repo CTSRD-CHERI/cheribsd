@@ -177,7 +177,8 @@ static int	inp_set_multicast_if(struct inpcb *, struct sockopt *);
 static int	inp_set_source_filters(struct inpcb *, struct sockopt *);
 static int	sysctl_ip_mcast_filters(SYSCTL_HANDLER_ARGS);
 
-static SYSCTL_NODE(_net_inet_ip, OID_AUTO, mcast, CTLFLAG_RW, 0,
+static SYSCTL_NODE(_net_inet_ip, OID_AUTO, mcast,
+    CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
     "IPv4 multicast");
 
 static u_long in_mcast_maxgrpsrc = IP_MAX_GROUP_SRC_FILTER;
@@ -526,7 +527,7 @@ in_getmulti(struct ifnet *ifp, const struct in_addr *group,
 	IN_MULTI_LIST_UNLOCK();
 	if (inm != NULL)
 		return (0);
-	
+
 	memset(&gsin, 0, sizeof(gsin));
 	gsin.sin_family = AF_INET;
 	gsin.sin_len = sizeof(struct sockaddr_in);
@@ -2207,7 +2208,7 @@ inp_join_group(struct inpcb *inp, struct sockopt *sopt)
 			goto out_inp_unlocked;
 		}
 		if (error) {
-                        CTR1(KTR_IGMPV3, "%s: in_joingroup_locked failed", 
+                        CTR1(KTR_IGMPV3, "%s: in_joingroup_locked failed",
                             __func__);
 			goto out_inp_locked;
 		}
@@ -2627,7 +2628,7 @@ inp_set_source_filters(struct inpcb *inp, struct sockopt *sopt)
 		int			 i;
 
 		INP_WUNLOCK(inp);
- 
+
 		CTR2(KTR_IGMPV3, "%s: loading %lu source list entries",
 		    __func__, (unsigned long)msfr.msfr_nsrcs);
 		kss = malloc(sizeof(struct sockaddr_storage) * msfr.msfr_nsrcs,

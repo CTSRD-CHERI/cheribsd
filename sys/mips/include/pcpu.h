@@ -69,7 +69,7 @@
 	vm_offset_t	pc_cmap2_addr;		/* KVA page for copy window 2 */ \
 	vm_offset_t	pc_qmap_addr;		/* KVA page for temporary mappings */ \
 	pt_entry_t	*pc_qmap_ptep;		/* PTE for temporary mapping KVA */ \
-	char		__pad[(101 - (PCPU_NUM_EXC_CNTRS * 4))]
+	char		__pad[(97 - (PCPU_NUM_EXC_CNTRS * 4))]
 #endif
 
 #ifdef	__mips_n64

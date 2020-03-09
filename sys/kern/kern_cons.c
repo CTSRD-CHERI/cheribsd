@@ -98,7 +98,7 @@ static char *consbuf;			/* buffer used by `consmsgbuf' */
 static struct callout conscallout;	/* callout for outputting to constty */
 struct msgbuf consmsgbuf;		/* message buffer for console tty */
 static u_char console_pausing;		/* pause after each line during probe */
-static char *console_pausestr=
+static const char console_pausestr[] =
 "<pause; press any key to proceed to next line or '.' to end pause mode>";
 struct tty *constty;			/* pointer to console "window" tty */
 static struct mtx cnputs_mtx;		/* Mutex for cnputs(). */
@@ -360,8 +360,10 @@ sysctl_kern_console(SYSCTL_HANDLER_ARGS)
 	return (error);
 }
 
-SYSCTL_PROC(_kern, OID_AUTO, console, CTLTYPE_STRING|CTLFLAG_RW,
-	0, 0, sysctl_kern_console, "A", "Console device control");
+SYSCTL_PROC(_kern, OID_AUTO, console,
+    CTLTYPE_STRING | CTLFLAG_RW | CTLFLAG_NEEDGIANT, 0, 0,
+    sysctl_kern_console, "A",
+    "Console device control");
 
 /*
  * User has changed the state of the console muting.
@@ -378,9 +380,10 @@ sysctl_kern_consmute(SYSCTL_HANDLER_ARGS)
 	return (error);
 }
 
-SYSCTL_PROC(_kern, OID_AUTO, consmute, CTLTYPE_INT|CTLFLAG_RW,
-	0, sizeof(cn_mute), sysctl_kern_consmute, "I",
-	"State of the console muting");
+SYSCTL_PROC(_kern, OID_AUTO, consmute,
+    CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_NEEDGIANT, 0, sizeof(cn_mute),
+    sysctl_kern_consmute, "I",
+    "State of the console muting");
 
 void
 cngrab()
@@ -510,7 +513,7 @@ cnputc(int c)
 {
 	struct cn_device *cnd;
 	struct consdev *cn;
-	char *cp;
+	const char *cp;
 
 #ifdef EARLY_PRINTF
 	if (early_putc != NULL) {
@@ -571,7 +574,7 @@ cnputsn(const char *p, size_t n)
 }
 
 void
-cnputs(char *p)
+cnputs(const char *p)
 {
 	cnputsn(p, strlen(p));
 }

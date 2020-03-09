@@ -1509,7 +1509,7 @@ t4fw.fwo		optional cxgbe					\
 	no-implicit-rule						\
 	clean		"t4fw.fwo"
 t4fw.fw			optional cxgbe					\
-	dependency	"$S/dev/cxgbe/firmware/t4fw-1.24.11.0.bin"	\
+	dependency	"$S/dev/cxgbe/firmware/t4fw-1.24.12.0.bin"	\
 	compile-with	"${CP} ${.ALLSRC} ${.TARGET}"			\
 	no-obj no-implicit-rule						\
 	clean		"t4fw.fw"
@@ -1543,7 +1543,7 @@ t5fw.fwo		optional cxgbe					\
 	no-implicit-rule						\
 	clean		"t5fw.fwo"
 t5fw.fw			optional cxgbe					\
-	dependency	"$S/dev/cxgbe/firmware/t5fw-1.24.11.0.bin"	\
+	dependency	"$S/dev/cxgbe/firmware/t5fw-1.24.12.0.bin"	\
 	compile-with	"${CP} ${.ALLSRC} ${.TARGET}"			\
 	no-obj no-implicit-rule						\
 	clean		"t5fw.fw"
@@ -1577,7 +1577,7 @@ t6fw.fwo		optional cxgbe					\
 	no-implicit-rule						\
 	clean		"t6fw.fwo"
 t6fw.fw			optional cxgbe					\
-	dependency	"$S/dev/cxgbe/firmware/t6fw-1.24.11.0.bin"	\
+	dependency	"$S/dev/cxgbe/firmware/t6fw-1.24.12.0.bin"	\
 	compile-with	"${CP} ${.ALLSRC} ${.TARGET}"			\
 	no-obj no-implicit-rule						\
 	clean		"t6fw.fw"
@@ -4514,6 +4514,8 @@ compat/linuxkpi/common/src/linux_rcu.c		optional compat_linuxkpi \
 	compile-with "${LINUXKPI_C} -I$S/contrib/ck/include"
 compat/linuxkpi/common/src/linux_schedule.c	optional compat_linuxkpi \
 	compile-with "${LINUXKPI_C}"
+compat/linuxkpi/common/src/linux_shmemfs.c	optional compat_linuxkpi \
+	compile-with "${LINUXKPI_C}"
 compat/linuxkpi/common/src/linux_slab.c		optional compat_linuxkpi \
 	compile-with "${LINUXKPI_C}"
 compat/linuxkpi/common/src/linux_usb.c		optional compat_linuxkpi usb \
@@ -4862,6 +4864,23 @@ crypto/libsodium/randombytes.c	optional crypto \
 	compile-with "${NORMAL_C} -I$S/contrib/libsodium/src/libsodium/include -I$S/crypto/libsodium"
 crypto/libsodium/utils.c	optional crypto \
 	compile-with "${NORMAL_C} -I$S/contrib/libsodium/src/libsodium/include -I$S/crypto/libsodium"
+contrib/libsodium/src/libsodium/crypto_core/hchacha20/core_hchacha20.c \
+	optional crypto \
+	compile-with "${NORMAL_C} -I$S/contrib/libsodium/src/libsodium/include/sodium -I$S/crypto/libsodium"
+contrib/libsodium/src/libsodium/crypto_stream/chacha20/stream_chacha20.c \
+	optional crypto \
+	compile-with "${NORMAL_C} -I$S/contrib/libsodium/src/libsodium/include/sodium -I$S/crypto/libsodium"
+contrib/libsodium/src/libsodium/crypto_stream/chacha20/ref/chacha20_ref.c \
+	optional crypto \
+	compile-with "${NORMAL_C} -I$S/contrib/libsodium/src/libsodium/include/sodium -I$S/crypto/libsodium"
+contrib/libsodium/src/libsodium/crypto_aead/chacha20poly1305/sodium/aead_chacha20poly1305.c \
+	optional crypto \
+	compile-with "${NORMAL_C} -I$S/contrib/libsodium/src/libsodium/include/sodium -I$S/crypto/libsodium"
+contrib/libsodium/src/libsodium/crypto_aead/xchacha20poly1305/sodium/aead_xchacha20poly1305.c \
+	optional crypto \
+	compile-with "${NORMAL_C} -I$S/contrib/libsodium/src/libsodium/include/sodium -I$S/crypto/libsodium"
+
+
 opencrypto/cbc_mac.c		optional crypto
 opencrypto/xform_cbc_mac.c	optional crypto
 rpc/auth_none.c			optional krpc | nfslockd | nfscl | nfsd

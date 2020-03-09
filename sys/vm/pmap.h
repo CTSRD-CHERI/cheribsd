@@ -135,10 +135,6 @@ void		 pmap_copy_page_tags(vm_page_t, vm_page_t);
 #endif
 void		 pmap_copy_pages(vm_page_t ma[], vm_offset_t a_offset,
 		    vm_page_t mb[], vm_offset_t b_offset, int xfersize);
-#if __has_feature(capabilities)
-void		 pmap_copy_pages_tags(vm_page_t ma[], vm_offset_t a_offset,
-		    vm_page_t mb[], vm_offset_t b_offset, int xfersize);
-#endif
 int		 pmap_enter(pmap_t pmap, vm_offset_t va, vm_page_t m,
 		    vm_prot_t prot, u_int flags, int8_t psind);
 void		 pmap_enter_object(pmap_t pmap, vm_offset_t start,
@@ -189,8 +185,6 @@ void		 pmap_zero_page_area(vm_page_t, int off, int size);
  */
 #if !__has_feature(capabilities)
 #define	pmap_copy_page_tags(src, dst)	pmap_copy_page((src), (dst))
-#define	pmap_copy_pages_tags(ma, a_offset, mb, b_offset, xfersize)	\
-	    pmap_copy_pages(ma, a_offset, mb, b_offset, xfersize)
 #endif
 
 #endif /* _KERNEL */

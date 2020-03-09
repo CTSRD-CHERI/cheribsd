@@ -508,7 +508,9 @@ SYSCTL_INT(_net_key, KEYCTL_AH_KEYMIN, ah_keymin,
 SYSCTL_INT(_net_key, KEYCTL_PREFERED_OLDSA, preferred_oldsa,
 	CTLFLAG_VNET | CTLFLAG_RW, &VNET_NAME(key_preferred_oldsa), 0, "");
 
-static SYSCTL_NODE(_net_key, OID_AUTO, spdcache, CTLFLAG_RW, 0, "SPD cache");
+static SYSCTL_NODE(_net_key, OID_AUTO, spdcache,
+    CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
+    "SPD cache");
 
 SYSCTL_UINT(_net_key_spdcache, OID_AUTO, maxentries,
 	CTLFLAG_VNET | CTLFLAG_RDTUN, &VNET_NAME(key_spdcache_maxentries), 0,
@@ -3128,7 +3130,7 @@ key_delsav(struct secasvar *sav)
 	if ((sav->flags & SADB_X_EXT_F_CLONED) == 0) {
 		mtx_destroy(sav->lock);
 		free(sav->lock, M_IPSEC_MISC);
-		uma_zfree(V_key_lft_zone, sav->lft_c);
+		uma_zfree_pcpu(V_key_lft_zone, sav->lft_c);
 	}
 	free(sav, M_IPSEC_SA);
 }

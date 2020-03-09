@@ -115,10 +115,8 @@ cpu_fork(struct thread *td1, struct proc *p2, struct thread *td2, int flags)
 	 * of the td_frame, for us that's not needed any
 	 * longer (this copy does them both) 
 	 */
-#ifndef CPU_CHERI
 	bcopy(td1->td_pcb, pcb2, sizeof(*pcb2));
-#else
-	cheri_bcopy(td1->td_pcb, pcb2, sizeof(*pcb2));
+#ifdef CPU_CHERI
 	cheri_signal_copy(pcb2, td1->td_pcb);
 	cheri_sealcap_copy(p2, td1->td_proc);
 #endif
@@ -440,10 +438,8 @@ cpu_copy_thread(struct thread *td, struct thread *td0)
 	 * and gets copied when we copy the PCB. No separate copy
 	 * is needed.
 	 */
-#ifndef CPU_CHERI
 	bcopy(td0->td_pcb, pcb2, sizeof(*pcb2));
-#else
-	cheri_bcopy(td0->td_pcb, pcb2, sizeof(*pcb2));
+#ifdef CPU_CHERI
 	cheri_signal_copy(pcb2, td0->td_pcb);
 #endif
 

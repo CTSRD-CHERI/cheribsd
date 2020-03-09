@@ -64,7 +64,7 @@ __FBSDID("$FreeBSD$");
 
 #include <dev/malo/if_malo.h>
 
-SYSCTL_NODE(_hw, OID_AUTO, malo, CTLFLAG_RD, 0,
+SYSCTL_NODE(_hw, OID_AUTO, malo, CTLFLAG_RD | CTLFLAG_MPSAFE, 0,
     "Marvell 88w8335 driver parameters");
 
 static	int malo_txcoalesce = 8;	/* # tx pkts to q before poking f/w*/
@@ -253,7 +253,7 @@ malo_attach(uint16_t devid, struct malo_softc *sc)
 	taskqueue_start_threads(&sc->malo_tq, 1, PI_NET,
 		"%s taskq", device_get_nameunit(sc->malo_dev));
 
-	TASK_INIT(&sc->malo_rxtask, 0, malo_rx_proc, sc);
+	NET_TASK_INIT(&sc->malo_rxtask, 0, malo_rx_proc, sc);
 	TASK_INIT(&sc->malo_txtask, 0, malo_tx_proc, sc);
 
 	ic->ic_softc = sc;

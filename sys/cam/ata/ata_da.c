@@ -50,6 +50,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/proc.h>
 #include <sys/reboot.h>
 #include <sys/sbuf.h>
+#include <geom/geom.h>
 #include <geom/geom_disk.h>
 #endif /* _KERNEL */
 
@@ -785,6 +786,11 @@ static struct ada_quirk_entry ada_quirk_table[] =
 		/*quirks*/ADA_Q_SMR_DM
 	},
 	{
+		/* WD Green SSD */
+		{ T_DIRECT, SIP_MEDIA_FIXED, "*", "WDC WDS?????G0*", "*" },
+		/*quirks*/ADA_Q_4K | ADA_Q_NCQ_TRIM_BROKEN
+	},
+	{
 		/* Default */
 		{
 		  T_ANY, SIP_MEDIA_REMOVABLE|SIP_MEDIA_FIXED,
@@ -878,9 +884,10 @@ static int ada_spindown_shutdown = ADA_DEFAULT_SPINDOWN_SHUTDOWN;
 static int ada_spindown_suspend = ADA_DEFAULT_SPINDOWN_SUSPEND;
 static int ada_read_ahead = ADA_DEFAULT_READ_AHEAD;
 static int ada_write_cache = ADA_DEFAULT_WRITE_CACHE;
+static int ada_enable_biospeedup = 1;
 
-static SYSCTL_NODE(_kern_cam, OID_AUTO, ada, CTLFLAG_RD, 0,
-            "CAM Direct Access Disk driver");
+static SYSCTL_NODE(_kern_cam, OID_AUTO, ada, CTLFLAG_RD | CTLFLAG_MPSAFE, 0,
+    "CAM Direct Access Disk driver");
 SYSCTL_INT(_kern_cam_ada, OID_AUTO, retry_count, CTLFLAG_RWTUN,
            &ada_retry_count, 0, "Normal I/O retry count");
 SYSCTL_INT(_kern_cam_ada, OID_AUTO, default_timeout, CTLFLAG_RWTUN,
@@ -895,6 +902,8 @@ SYSCTL_INT(_kern_cam_ada, OID_AUTO, read_ahead, CTLFLAG_RWTUN,
            &ada_read_ahead, 0, "Enable disk read-ahead");
 SYSCTL_INT(_kern_cam_ada, OID_AUTO, write_cache, CTLFLAG_RWTUN,
            &ada_write_cache, 0, "Enable disk write cache");
+SYSCTL_INT(_kern_cam_ada, OID_AUTO, enable_biospeedup, CTLFLAG_RDTUN,
+	   &ada_enable_biospeedup, 0, "Enable BIO_SPEEDUP processing");
 
 /*
  * ADA_ORDEREDTAG_INTERVAL determines how often, relative
@@ -1451,7 +1460,7 @@ adasysctlinit(void *context, int pending)
 	softc->flags |= ADA_FLAG_SCTX_INIT;
 	softc->sysctl_tree = SYSCTL_ADD_NODE_WITH_LABEL(&softc->sysctl_ctx,
 		SYSCTL_STATIC_CHILDREN(_kern_cam_ada), OID_AUTO, tmpstr2,
-		CTLFLAG_RD, 0, tmpstr, "device_index");
+		CTLFLAG_RD | CTLFLAG_MPSAFE, 0, tmpstr, "device_index");
 	if (softc->sysctl_tree == NULL) {
 		printf("adasysctlinit: unable to allocate sysctl tree\n");
 		cam_periph_release(periph);
@@ -1459,7 +1468,8 @@ adasysctlinit(void *context, int pending)
 	}
 
 	SYSCTL_ADD_PROC(&softc->sysctl_ctx, SYSCTL_CHILDREN(softc->sysctl_tree),
-		OID_AUTO, "delete_method", CTLTYPE_STRING | CTLFLAG_RW,
+		OID_AUTO, "delete_method",
+		CTLTYPE_STRING | CTLFLAG_RW | CTLFLAG_NEEDGIANT,
 		softc, 0, adadeletemethodsysctl, "A",
 		"BIO_DELETE execution method");
 	SYSCTL_ADD_UQUAD(&softc->sysctl_ctx,
@@ -1487,11 +1497,13 @@ adasysctlinit(void *context, int pending)
 		OID_AUTO, "rotating", CTLFLAG_RD | CTLFLAG_MPSAFE,
 		&softc->rotating, 0, "Rotating media");
 	SYSCTL_ADD_PROC(&softc->sysctl_ctx, SYSCTL_CHILDREN(softc->sysctl_tree),
-		OID_AUTO, "zone_mode", CTLTYPE_STRING | CTLFLAG_RD,
+		OID_AUTO, "zone_mode",
+		CTLTYPE_STRING | CTLFLAG_RD | CTLFLAG_NEEDGIANT,
 		softc, 0, adazonemodesysctl, "A",
 		"Zone Mode");
 	SYSCTL_ADD_PROC(&softc->sysctl_ctx, SYSCTL_CHILDREN(softc->sysctl_tree),
-		OID_AUTO, "zone_support", CTLTYPE_STRING | CTLFLAG_RD,
+		OID_AUTO, "zone_support",
+		CTLTYPE_STRING | CTLFLAG_RD | CTLFLAG_NEEDGIANT,
 		softc, 0, adazonesupsysctl, "A",
 		"Zone Support");
 	SYSCTL_ADD_UQUAD(&softc->sysctl_ctx,
@@ -1536,7 +1548,7 @@ adasysctlinit(void *context, int pending)
 #ifdef CAM_IO_STATS
 	softc->sysctl_stats_tree = SYSCTL_ADD_NODE(&softc->sysctl_stats_ctx,
 		SYSCTL_CHILDREN(softc->sysctl_tree), OID_AUTO, "stats",
-		CTLFLAG_RD, 0, "Statistics");
+		CTLFLAG_RD | CTLFLAG_MPSAFE, 0, "Statistics");
 	SYSCTL_ADD_INT(&softc->sysctl_stats_ctx,
 		SYSCTL_CHILDREN(softc->sysctl_stats_tree),
 		OID_AUTO, "timeouts", CTLFLAG_RD | CTLFLAG_MPSAFE,
@@ -1565,6 +1577,9 @@ adagetattr(struct bio *bp)
 {
 	int ret;
 	struct cam_periph *periph;
+
+	if (g_handleattr_int(bp, "GEOM::canspeedup", ada_enable_biospeedup))
+		return (EJUSTRETURN);
 
 	periph = (struct cam_periph *)bp->bio_disk->d_drv1;
 	cam_periph_lock(periph);

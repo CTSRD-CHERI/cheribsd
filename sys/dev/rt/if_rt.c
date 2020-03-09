@@ -184,7 +184,8 @@ static int	rt_miibus_writereg(device_t, int, int, int);
 static int	rt_ifmedia_upd(struct ifnet *);
 static void	rt_ifmedia_sts(struct ifnet *, struct ifmediareq *);
 
-static SYSCTL_NODE(_hw, OID_AUTO, rt, CTLFLAG_RD, 0, "RT driver parameters");
+static SYSCTL_NODE(_hw, OID_AUTO, rt, CTLFLAG_RD | CTLFLAG_MPSAFE, 0,
+    "RT driver parameters");
 #ifdef IF_RT_DEBUG
 static int rt_debug = 0;
 SYSCTL_INT(_hw_rt, OID_AUTO, debug, CTLFLAG_RWTUN, &rt_debug, 0,
@@ -552,7 +553,7 @@ rt_attach(device_t dev)
 	ifp->if_capenable |= IFCAP_RXCSUM|IFCAP_TXCSUM;
 
 	/* init task queue */
-	TASK_INIT(&sc->rx_done_task, 0, rt_rx_done_task, sc);
+	NET_TASK_INIT(&sc->rx_done_task, 0, rt_rx_done_task, sc);
 	TASK_INIT(&sc->tx_done_task, 0, rt_tx_done_task, sc);
 	TASK_INIT(&sc->periodic_task, 0, rt_periodic_task, sc);
 
@@ -2581,7 +2582,7 @@ rt_sysctl_attach(struct rt_softc *sc)
 
 	/* statistic counters */
 	stats = SYSCTL_ADD_NODE(ctx, SYSCTL_CHILDREN(tree), OID_AUTO,
-	    "stats", CTLFLAG_RD, 0, "statistic");
+	    "stats", CTLFLAG_RD | CTLFLAG_MPSAFE, 0, "statistic");
 
 	SYSCTL_ADD_ULONG(ctx, SYSCTL_CHILDREN(stats), OID_AUTO,
 	    "interrupts", CTLFLAG_RD, &sc->interrupts,

@@ -140,7 +140,8 @@ VNET_DEFINE(int, tcp_v6mssdflt) = TCP6_MSS;
 
 #ifdef NETFLIX_EXP_DETECTION
 /*  Sack attack detection thresholds and such */
-SYSCTL_NODE(_net_inet_tcp, OID_AUTO, sack_attack, CTLFLAG_RW, 0,
+SYSCTL_NODE(_net_inet_tcp, OID_AUTO, sack_attack,
+    CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
     "Sack Attack detection thresholds");
 int32_t tcp_force_detection = 0;
 SYSCTL_INT(_net_inet_tcp_sack_attack, OID_AUTO, force_detection,
@@ -209,8 +210,8 @@ sysctl_net_inet_tcp_mss_check(SYSCTL_HANDLER_ARGS)
 }
 
 SYSCTL_PROC(_net_inet_tcp, TCPCTL_MSSDFLT, mssdflt,
-    CTLFLAG_VNET | CTLTYPE_INT | CTLFLAG_RW, &VNET_NAME(tcp_mssdflt), 0,
-    &sysctl_net_inet_tcp_mss_check, "I",
+    CTLFLAG_VNET | CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_NEEDGIANT,
+    &VNET_NAME(tcp_mssdflt), 0, &sysctl_net_inet_tcp_mss_check, "I",
     "Default TCP Maximum Segment Size");
 
 #ifdef INET6
@@ -231,8 +232,8 @@ sysctl_net_inet_tcp_mss_v6_check(SYSCTL_HANDLER_ARGS)
 }
 
 SYSCTL_PROC(_net_inet_tcp, TCPCTL_V6MSSDFLT, v6mssdflt,
-    CTLFLAG_VNET | CTLTYPE_INT | CTLFLAG_RW, &VNET_NAME(tcp_v6mssdflt), 0,
-    &sysctl_net_inet_tcp_mss_v6_check, "I",
+    CTLFLAG_VNET | CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_NEEDGIANT,
+    &VNET_NAME(tcp_v6mssdflt), 0, &sysctl_net_inet_tcp_mss_v6_check, "I",
    "Default TCP Maximum Segment Size for IPv6");
 #endif /* INET6 */
 
@@ -311,7 +312,7 @@ sysctl_net_inet_tcp_map_limit_check(SYSCTL_HANDLER_ARGS)
 	return (error);
 }
 SYSCTL_PROC(_net_inet_tcp, OID_AUTO, map_limit,
-    CTLFLAG_VNET | CTLTYPE_UINT | CTLFLAG_RW,
+    CTLFLAG_VNET | CTLTYPE_UINT | CTLFLAG_RW | CTLFLAG_NEEDGIANT,
     &VNET_NAME(tcp_map_entries_limit), 0,
     &sysctl_net_inet_tcp_map_limit_check, "IU",
     "Total sendmap entries limit");
@@ -390,11 +391,11 @@ struct tcp_function_block *
 find_and_ref_tcp_functions(struct tcp_function_set *fs)
 {
 	struct tcp_function_block *blk;
-	
-	rw_rlock(&tcp_function_lock);	
+
+	rw_rlock(&tcp_function_lock);
 	blk = find_tcp_functions_locked(fs);
 	if (blk)
-		refcount_acquire(&blk->tfb_refcnt); 
+		refcount_acquire(&blk->tfb_refcnt);
 	rw_runlock(&tcp_function_lock);
 	return(blk);
 }
@@ -403,10 +404,10 @@ struct tcp_function_block *
 find_and_ref_tcp_fb(struct tcp_function_block *blk)
 {
 	struct tcp_function_block *rblk;
-	
-	rw_rlock(&tcp_function_lock);	
+
+	rw_rlock(&tcp_function_lock);
 	rblk = find_tcp_fb_locked(blk, NULL);
-	if (rblk) 
+	if (rblk)
 		refcount_acquire(&rblk->tfb_refcnt);
 	rw_runlock(&tcp_function_lock);
 	return(rblk);
@@ -510,7 +511,7 @@ sysctl_net_inet_default_tcp_functions(SYSCTL_HANDLER_ARGS)
 		strcpy(fs.function_set_name, blk->tfb_tcp_block_name);
 		fs.pcbcnt = blk->tfb_refcnt;
 	}
-	rw_runlock(&tcp_function_lock);	
+	rw_runlock(&tcp_function_lock);
 	error = sysctl_handle_string(oidp, fs.function_set_name,
 				     sizeof(fs.function_set_name), req);
 
@@ -521,8 +522,8 @@ sysctl_net_inet_default_tcp_functions(SYSCTL_HANDLER_ARGS)
 	rw_wlock(&tcp_function_lock);
 	blk = find_tcp_functions_locked(&fs);
 	if ((blk == NULL) ||
-	    (blk->tfb_flags & TCP_FUNC_BEING_REMOVED)) { 
-		error = ENOENT; 
+	    (blk->tfb_flags & TCP_FUNC_BEING_REMOVED)) {
+		error = ENOENT;
 		goto done;
 	}
 	tcp_func_set_ptr = blk;
@@ -532,9 +533,9 @@ done:
 }
 
 SYSCTL_PROC(_net_inet_tcp, OID_AUTO, functions_default,
-	    CTLTYPE_STRING | CTLFLAG_RW,
-	    NULL, 0, sysctl_net_inet_default_tcp_functions, "A",
-	    "Set/get the default TCP functions");
+    CTLTYPE_STRING | CTLFLAG_RW | CTLFLAG_NEEDGIANT,
+    NULL, 0, sysctl_net_inet_default_tcp_functions, "A",
+    "Set/get the default TCP functions");
 
 static int
 sysctl_net_inet_list_available(SYSCTL_HANDLER_ARGS)
@@ -564,7 +565,7 @@ sysctl_net_inet_list_available(SYSCTL_HANDLER_ARGS)
 	bufsz -= linesz;
 	outsz = linesz;
 
-	rw_rlock(&tcp_function_lock);	
+	rw_rlock(&tcp_function_lock);
 	TAILQ_FOREACH(f, &t_functions, tf_next) {
 		alias = (f->tf_name != f->tf_fb->tfb_tcp_block_name);
 		linesz = snprintf(cp, bufsz, "%-32s%c %-32s %u\n",
@@ -588,9 +589,9 @@ sysctl_net_inet_list_available(SYSCTL_HANDLER_ARGS)
 }
 
 SYSCTL_PROC(_net_inet_tcp, OID_AUTO, functions_available,
-	    CTLTYPE_STRING|CTLFLAG_RD,
-	    NULL, 0, sysctl_net_inet_list_available, "A",
-	    "list available TCP Function sets");
+    CTLTYPE_STRING | CTLFLAG_RD | CTLFLAG_NEEDGIANT,
+    NULL, 0, sysctl_net_inet_list_available, "A",
+    "list available TCP Function sets");
 
 /*
  * Exports one (struct tcp_function_info) for each alias/name.
@@ -866,7 +867,7 @@ register_tcp_functions_as_names(struct tcp_function_block *blk, int wait,
 	    (blk->tfb_tcp_do_segment == NULL) ||
 	    (blk->tfb_tcp_ctloutput == NULL) ||
 	    (strlen(blk->tfb_tcp_block_name) == 0)) {
-		/* 
+		/*
 		 * These functions are required and you
 		 * need a name.
 		 */
@@ -878,7 +879,7 @@ register_tcp_functions_as_names(struct tcp_function_block *blk, int wait,
 	    blk->tfb_tcp_timer_active ||
 	    blk->tfb_tcp_timer_stop) {
 		/*
-		 * If you define one timer function you 
+		 * If you define one timer function you
 		 * must have them all.
 		 */
 		if ((blk->tfb_tcp_timer_stop_all == NULL) ||
@@ -1481,7 +1482,7 @@ tcp_respond(struct tcpcb *tp, void *ipgen, struct tcphdr *th, struct mbuf *m,
 		m = n;
 	} else {
 		/*
-		 *  reuse the mbuf. 
+		 *  reuse the mbuf.
 		 * XXX MRT We inherit the FIB, which is lucky.
 		 */
 		m_freem(m->m_next);
@@ -1914,12 +1915,12 @@ tcp_discardcb(struct tcpcb *tp)
 	tcp_timer_stop(tp, TT_2MSL);
 	tcp_timer_stop(tp, TT_DELACK);
 	if (tp->t_fb->tfb_tcp_timer_stop_all) {
-		/* 
-		 * Call the stop-all function of the methods, 
+		/*
+		 * Call the stop-all function of the methods,
 		 * this function should call the tcp_timer_stop()
 		 * method with each of the function specific timeouts.
 		 * That stop will be called via the tfb_tcp_timer_stop()
-		 * which should use the async drain function of the 
+		 * which should use the async drain function of the
 		 * callout system (see tcp_var.h).
 		 */
 		tp->t_fb->tfb_tcp_timer_stop_all(tp);
@@ -1989,7 +1990,7 @@ tcp_discardcb(struct tcpcb *tp)
 	if (tp->t_flags & TF_TOE)
 		tcp_offload_detach(tp);
 #endif
-		
+
 	tcp_free_sackholes(tp);
 
 #ifdef TCPPCAP
@@ -2035,7 +2036,7 @@ tcp_timer_discard(void *ptp)
 	struct inpcb *inp;
 	struct tcpcb *tp;
 	struct epoch_tracker et;
-	
+
 	tp = (struct tcpcb *)ptp;
 	CURVNET_SET(tp->t_vnet);
 	NET_EPOCH_ENTER(et);
@@ -2315,8 +2316,9 @@ tcp_pcblist(SYSCTL_HANDLER_ARGS)
 }
 
 SYSCTL_PROC(_net_inet_tcp, TCPCTL_PCBLIST, pcblist,
-    CTLTYPE_OPAQUE | CTLFLAG_RD, NULL, 0,
-    tcp_pcblist, "S,xtcpcb", "List of active TCP connections");
+    CTLTYPE_OPAQUE | CTLFLAG_RD | CTLFLAG_NEEDGIANT,
+    NULL, 0, tcp_pcblist, "S,xtcpcb",
+    "List of active TCP connections");
 
 #ifdef INET
 static int
@@ -2354,8 +2356,9 @@ tcp_getcred(SYSCTL_HANDLER_ARGS)
 }
 
 SYSCTL_PROC(_net_inet_tcp, OID_AUTO, getcred,
-    CTLTYPE_OPAQUE|CTLFLAG_RW|CTLFLAG_PRISON, 0, 0,
-    tcp_getcred, "S,xucred", "Get the xucred of a TCP connection");
+    CTLTYPE_OPAQUE | CTLFLAG_RW | CTLFLAG_PRISON | CTLFLAG_NEEDGIANT,
+    0, 0, tcp_getcred, "S,xucred",
+    "Get the xucred of a TCP connection");
 #endif /* INET */
 
 #ifdef INET6
@@ -2421,8 +2424,9 @@ tcp6_getcred(SYSCTL_HANDLER_ARGS)
 }
 
 SYSCTL_PROC(_net_inet6_tcp6, OID_AUTO, getcred,
-    CTLTYPE_OPAQUE|CTLFLAG_RW|CTLFLAG_PRISON, 0, 0,
-    tcp6_getcred, "S,xucred", "Get the xucred of a TCP6 connection");
+    CTLTYPE_OPAQUE | CTLFLAG_RW | CTLFLAG_PRISON | CTLFLAG_NEEDGIANT,
+    0, 0, tcp6_getcred, "S,xucred",
+    "Get the xucred of a TCP6 connection");
 #endif /* INET6 */
 
 
@@ -2448,7 +2452,7 @@ tcp_ctlinput(int cmd, struct sockaddr *sa, void *vip)
 	if (cmd == PRC_MSGSIZE)
 		notify = tcp_mtudisc_notify;
 	else if (V_icmp_may_rst && (cmd == PRC_UNREACH_ADMIN_PROHIB ||
-		cmd == PRC_UNREACH_PORT || cmd == PRC_UNREACH_PROTOCOL || 
+		cmd == PRC_UNREACH_PORT || cmd == PRC_UNREACH_PROTOCOL ||
 		cmd == PRC_TIMXCEED_INTRANS) && ip)
 		notify = tcp_drop_syn_sent;
 
@@ -2582,7 +2586,7 @@ tcp6_ctlinput(int cmd, struct sockaddr *sa, void *d)
 	if (cmd == PRC_MSGSIZE)
 		notify = tcp_mtudisc_notify;
 	else if (V_icmp_may_rst && (cmd == PRC_UNREACH_ADMIN_PROHIB ||
-		cmd == PRC_UNREACH_PORT || cmd == PRC_UNREACH_PROTOCOL || 
+		cmd == PRC_UNREACH_PORT || cmd == PRC_UNREACH_PROTOCOL ||
 		cmd == PRC_TIMXCEED_INTRANS) && ip6 != NULL)
 		notify = tcp_drop_syn_sent;
 
@@ -2850,7 +2854,7 @@ tcp_drop_syn_sent(struct inpcb *inp, int errno)
 
 	if (IS_FASTOPEN(tp->t_flags))
 		tcp_fastopen_disable_path(tp);
-	
+
 	tp = tcp_drop(tp, errno);
 	if (tp != NULL)
 		return (inp);
@@ -2887,7 +2891,7 @@ tcp_mtudisc(struct inpcb *inp, int mtuoffer)
 	KASSERT(tp != NULL, ("tcp_mtudisc: tp == NULL"));
 
 	tcp_mss_update(tp, -1, mtuoffer, NULL, NULL);
-  
+
 	so = inp->inp_socket;
 	SOCKBUF_LOCK(&so->so_snd);
 	/* If the mss is larger than the socket buffer, decrease the mss. */
@@ -3153,8 +3157,9 @@ sysctl_drop(SYSCTL_HANDLER_ARGS)
 }
 
 SYSCTL_PROC(_net_inet_tcp, TCPCTL_DROP, drop,
-    CTLFLAG_VNET | CTLTYPE_STRUCT | CTLFLAG_WR | CTLFLAG_SKIP, NULL,
-    0, sysctl_drop, "", "Drop TCP connection");
+    CTLFLAG_VNET | CTLTYPE_STRUCT | CTLFLAG_WR | CTLFLAG_SKIP |
+    CTLFLAG_NEEDGIANT, NULL, 0, sysctl_drop, "",
+    "Drop TCP connection");
 
 #ifdef KERN_TLS
 static int
@@ -3248,7 +3253,7 @@ sysctl_switch_tls(SYSCTL_HANDLER_ARGS)
 			INP_WUNLOCK(inp);
 		} else {
 			struct socket *so;
-	
+
 			so = inp->inp_socket;
 			soref(so);
 			error = ktls_set_tx_mode(so,
@@ -3263,11 +3268,13 @@ sysctl_switch_tls(SYSCTL_HANDLER_ARGS)
 }
 
 SYSCTL_PROC(_net_inet_tcp, OID_AUTO, switch_to_sw_tls,
-    CTLFLAG_VNET | CTLTYPE_STRUCT | CTLFLAG_WR | CTLFLAG_SKIP, NULL,
-    0, sysctl_switch_tls, "", "Switch TCP connection to SW TLS");
+    CTLFLAG_VNET | CTLTYPE_STRUCT | CTLFLAG_WR | CTLFLAG_SKIP |
+    CTLFLAG_NEEDGIANT, NULL, 0, sysctl_switch_tls, "",
+    "Switch TCP connection to SW TLS");
 SYSCTL_PROC(_net_inet_tcp, OID_AUTO, switch_to_ifnet_tls,
-    CTLFLAG_VNET | CTLTYPE_STRUCT | CTLFLAG_WR | CTLFLAG_SKIP, NULL,
-    1, sysctl_switch_tls, "", "Switch TCP connection to ifnet TLS");
+    CTLFLAG_VNET | CTLTYPE_STRUCT | CTLFLAG_WR | CTLFLAG_SKIP |
+    CTLFLAG_NEEDGIANT, NULL, 1, sysctl_switch_tls, "",
+    "Switch TCP connection to ifnet TLS");
 #endif
 
 /*

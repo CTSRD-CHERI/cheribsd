@@ -255,15 +255,15 @@ colocation_unborrow(struct thread *td, struct trapframe **trapframep)
 	    __func__, peertd->td_frame, &peertd->td_pcb->pcb_regs, peertd));
 
 	peersa = peertd->td_sa;
-	cheri_memcpy(&peertrapframe, peertd->td_sa.trapframe, sizeof(struct trapframe));
+	memcpy(&peertrapframe, peertd->td_sa.trapframe, sizeof(struct trapframe));
 	peertpc = peertd->td_pcb->pcb_tpc;
 
 	peertd->td_sa = td->td_sa;
-	cheri_memcpy(peertd->td_frame, *trapframep, sizeof(struct trapframe));
+	memcpy(peertd->td_frame, *trapframep, sizeof(struct trapframe));
 	peertd->td_pcb->pcb_tpc = td->td_pcb->pcb_tpc;
 
 	td->td_sa = peersa;
-	cheri_memcpy(td->td_frame, &peertrapframe, sizeof(struct trapframe));
+	memcpy(td->td_frame, &peertrapframe, sizeof(struct trapframe));
 	td->td_pcb->pcb_tpc = peertpc;
 
 	*trapframep = td->td_frame;
