@@ -11,9 +11,6 @@ _LIBCXXRTDIR=   ${SRCTOP}/contrib/subrepo-cheri-libcxxrt/src
 HDRDIR=         ${SRCTOP}/contrib/subrepo-cheri-libc++/include
 SRCDIR=         ${SRCTOP}/contrib/subrepo-cheri-libc++/src
 CXXINCLUDEDIR=	${INCLUDEDIR}/c++/v${SHLIB_MAJOR}
-.if ${MACHINE_CPUARCH} == "arm"
-STATIC_CXXFLAGS+= -mlong-calls
-.endif
 
 .PATH: ${SRCDIR}
 
