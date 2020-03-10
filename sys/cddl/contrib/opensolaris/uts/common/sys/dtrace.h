@@ -1304,7 +1304,7 @@ typedef struct dtrace_providerdesc {
 #define	DTRACEIOC_PROBEMATCH	_IOWR('x',5,dtrace_probedesc_t)
 							/* match probes */
 typedef struct {
-	void	*dof;		/* DOF userland address written to driver. */
+	void  * __kerncap dof;		/* DOF userland address written to driver. */
 	int	n_matched;	/* # matches returned by driver. */
 } dtrace_enable_io_t;
 #define	DTRACEIOC_ENABLE	_IOWR('x',6,dtrace_enable_io_t)
