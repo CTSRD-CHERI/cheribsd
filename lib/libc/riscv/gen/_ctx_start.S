@@ -36,7 +36,7 @@
 __FBSDID("$FreeBSD$");
 
 ENTRY(_ctx_start)
-#if !__has_feature(capabilities)
+#if !__CHERI_PURE_CAPABILITY__
 	jalr	s0		/* Call func from makecontext */
 	mv	a0, s1		/* Load ucp saved in makecontext */
 	call	_C_LABEL(ctx_done)
