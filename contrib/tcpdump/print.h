@@ -27,7 +27,10 @@
 
 #include <sys/cdefs.h>
 
-#if !__has_feature(capabilities)
+#if !__has_feature(capabilities) || !defined(__mips__)
+#ifdef __capability
+#undef __capability
+#endif
 #define	__capability
 #endif
 
