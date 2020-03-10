@@ -119,6 +119,7 @@ static int	coredump(struct thread *);
 static int	killpg1(struct thread *td, int sig, int pgid, int all,
 		    ksiginfo_t *ksi);
 static int	issignal(struct thread *td);
+static void	reschedule_signals(struct proc *p, sigset_t block, int flags);
 static void	tdsigwakeup(struct thread *, int, sig_t, int);
 static int	sig_suspend_threads(struct thread *, struct proc *, int);
 static int	filt_sigattach(struct knote *kn);
@@ -2769,7 +2770,7 @@ stopme:
 	return (td->td_xsig);
 }
 
-void
+static void
 reschedule_signals(struct proc *p, sigset_t block, int flags)
 {
 	struct sigacts *ps;
@@ -4233,8 +4234,8 @@ sigfastblock_fetch(struct thread *td)
 	(void)sigfastblock_fetch_sig(td, true, &val);
 }
 
-void
-sigfastblock_setpend(struct thread *td)
+static void
+sigfastblock_setpend1(struct thread *td)
 {
 	int res;
 	uint32_t oldval;
@@ -4261,6 +4262,20 @@ sigfastblock_setpend(struct thread *td)
 		MPASS(res == 1);
 		if (thread_check_susp(td, false) != 0)
 			break;
+	}
+}
+
+void
+sigfastblock_setpend(struct thread *td, bool resched)
+{
+	struct proc *p;
+
+	sigfastblock_setpend1(td);
+	if (resched) {
+		p = td->td_proc;
+		PROC_LOCK(p);
+		reschedule_signals(p, fastblock_mask, SIGPROCMASK_FASTBLK);
+		PROC_UNLOCK(p);
 	}
 }
 // CHERI CHANGES START
