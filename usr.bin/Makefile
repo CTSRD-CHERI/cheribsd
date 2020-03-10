@@ -192,6 +192,7 @@ SUBDIR=	alias \
 
 .if ${MACHINE_ARCH:Mmips64*}
 SUBDIR+=	beri_count_stats
+SUBDIR+=	slowtrace
 .endif
 
 # NB: keep these sorted by MK_* knobs
