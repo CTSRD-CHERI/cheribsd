@@ -110,8 +110,6 @@ MK_CLANG:=	no
 # We want to use libc++ for CHERI (even when targeting MIPS)
 MK_GNUCXX:=	no
 MK_LIBCPLUSPLUS:=yes
-# LLVM libunwind is needed for libc++
-MK_LLVM_LIBUNWIND:=	yes
 # Build cheribsdbox by default so that we have a emergency MIPS tool if the
 # CHERI world is broken
 .if !defined(WITHOUT_CHERIBSDBOX)

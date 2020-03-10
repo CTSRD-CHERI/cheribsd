@@ -18,7 +18,8 @@ SUBDIR_BOOTSTRAP= \
 	${_libc_cheri} \
 	${_libcheri} \
 	${_libclang_rt} \
-	${_libunwind} \
+	libgcc_eh \
+	libgcc_s \
 	${_libcplusplus} \
 	${_libcxxrt} \
 	libelf \
@@ -58,8 +59,6 @@ SUBDIR=	${SUBDIR_BOOTSTRAP} \
 	libexpat \
 	libfetch \
 	libfigpar \
-	libgcc_eh \
-	libgcc_s \
 	libgeom \
 	libifconfig \
 	libipsec \
@@ -205,13 +204,6 @@ _libclang_rt=	libclang_rt
 _libcxxrt=	libcxxrt
 _libcplusplus=	libc++
 _libcplusplus+=	libc++experimental
-.endif
-
-.if ${MK_LLVM_LIBUNWIND} != "no"
-# When building with LLVM libunwind we must build libgcc_s/libgcc_eh as part
-# of SUBDIR_BOOTSTRAP to avoid build failures due to other libraries linking
-# against -lgcc_s
-_libunwind=	libgcc_s libgcc_eh
 .endif
 
 SUBDIR.${MK_EFI}+=	libefivar
