@@ -110,7 +110,12 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 
 	switch (cmd) {
 	case DTRACEIOC_AGGDESC: {
-		dtrace_aggdesc_t **paggdesc = (dtrace_aggdesc_t **) addr;
+		//TODO(nicomazz): handle the case userspace is not purecap.
+		// in that case, use something like
+		// `user_aggdesc = __USER_CAP(*((uint64_t)addr), size_of_dtrace_aggdesc)`
+		// to convert the userspace address to a capability
+		dtrace_aggdesc_t * __capability * paggdesc = (dtrace_aggdesc_t *__capability*) addr;
+
 		dtrace_aggdesc_t aggdesc;
 		dtrace_action_t *act;
 		dtrace_aggregation_t *agg;
@@ -122,8 +127,7 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 		uintptr_t dest;
 
 		DTRACE_IOCTL_PRINTF("%s(%d): DTRACEIOC_AGGDESC\n",__func__,__LINE__);
-
-		if (copyin((void *) *paggdesc, &aggdesc, sizeof (aggdesc)) != 0)
+		if (copyin_c(*paggdesc, &aggdesc, sizeof (aggdesc)) != 0)
 			return (EFAULT);
 
 		mutex_enter(&dtrace_lock);
@@ -205,7 +209,7 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 
 		mutex_exit(&dtrace_lock);
 
-		if (copyout(buf, (void *) *paggdesc, dest - (uintptr_t)buf) != 0) {
+		if (copyout_c(buf, (void * __capability) *paggdesc, dest - (uintptr_t)buf) != 0) {
 			kmem_free(buf, size);
 			return (EFAULT);
 		}
@@ -215,14 +219,15 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 	}
 	case DTRACEIOC_AGGSNAP:
 	case DTRACEIOC_BUFSNAP: {
-		dtrace_bufdesc_t **pdesc = (dtrace_bufdesc_t **) addr;
+		//TODO(nicomazz): fix when userspace is not purecap
+		dtrace_bufdesc_t * __capability * pdesc = (dtrace_bufdesc_t * __capability *) addr;
 		dtrace_bufdesc_t desc;
 		caddr_t cached;
 		dtrace_buffer_t *buf;
 
 		dtrace_debug_output();
 
-		if (copyin((void *) *pdesc, &desc, sizeof (desc)) != 0)
+		if (copyin_c( *pdesc, &desc, sizeof (desc)) != 0)
 			return (EFAULT);
 
 		DTRACE_IOCTL_PRINTF("%s(%d): %s curcpu %d cpu %d\n",
@@ -264,7 +269,7 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 				desc.dtbd_oldest = 0;
 				sz = sizeof (desc);
 
-				if (copyout(&desc, (void *) *pdesc, sz) != 0)
+				if (copyout_c(&desc,*pdesc, sz) != 0)
 					return (EFAULT);
 
 				return (0);
@@ -279,7 +284,7 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 				sz = buf->dtb_size;
 			}
 
-			if (copyout(buf->dtb_tomax, desc.dtbd_data, sz) != 0) {
+			if (copyout_c(buf->dtb_tomax, desc.dtbd_data, sz) != 0) {
 				mutex_exit(&dtrace_lock);
 				return (EFAULT);
 			}
@@ -292,7 +297,7 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 
 			mutex_exit(&dtrace_lock);
 
-			if (copyout(&desc, (void *) *pdesc, sizeof (desc)) != 0)
+			if (copyout_c(&desc,  *pdesc, sizeof (desc)) != 0)
 				return (EFAULT);
 
 			buf->dtb_flags |= DTRACEBUF_CONSUMED;
@@ -333,7 +338,7 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 		/*
 		 * We have our snapshot; now copy it out.
 		 */
-		if (copyout(buf->dtb_xamot, desc.dtbd_data,
+		if (copyout_c(buf->dtb_xamot, desc.dtbd_data,
 		    buf->dtb_xamot_offset) != 0) {
 			mutex_exit(&dtrace_lock);
 			return (EFAULT);
@@ -352,7 +357,7 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 		/*
 		 * Finally, copy out the buffer description.
 		 */
-		if (copyout(&desc, (void *) *pdesc, sizeof (desc)) != 0)
+		if (copyout_c(&desc, *pdesc, sizeof (desc)) != 0)
 			return (EFAULT);
 
 		return (0);
@@ -373,23 +378,25 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 		return (0);
 	}
 	case DTRACEIOC_DOFGET: {
-		dof_hdr_t **pdof = (dof_hdr_t **) addr;
-		dof_hdr_t hdr, *dof = *pdof;
+		//TODO(nicomazz): fix when userspace is not purecap
+		dof_hdr_t *__capability*pdof = (dof_hdr_t *__capability*) addr;
+		dof_hdr_t hdr, *__capability dof = *pdof;
 		int rval;
 		uint64_t len;
 
 		DTRACE_IOCTL_PRINTF("%s(%d): DTRACEIOC_DOFGET\n",__func__,__LINE__);
 
-		if (copyin((void *)dof, &hdr, sizeof (hdr)) != 0)
+		if (copyin_c(dof, &hdr, sizeof (hdr)) != 0)
 			return (EFAULT);
 
 		mutex_enter(&dtrace_lock);
-		dof = dtrace_dof_create(state);
+		dof = (__cheri_tocap  dof_hdr_t * __capability) dtrace_dof_create(state);
 		mutex_exit(&dtrace_lock);
 
 		len = MIN(hdr.dofh_loadsz, dof->dofh_loadsz);
-		rval = copyout(dof, (void *) *pdof, len);
-		dtrace_dof_destroy(dof);
+
+		rval = copyout_c((__cheri_fromcap const void *) dof, *pdof, len);
+		dtrace_dof_destroy((__cheri_fromcap dof_hdr_t *)dof);
 
 		return (rval == 0 ? 0 : EFAULT);
 	}
@@ -413,6 +420,7 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 			return (0);
 		}
 
+		//TODO(nicomazz): fix when userspace is not purecap
 		if ((dof = dtrace_dof_copyin((uintcap_t) p->dof, &rval)) == NULL)
 			return (EINVAL);
 
@@ -456,7 +464,8 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 		return (err);
 	}
 	case DTRACEIOC_EPROBE: {
-		dtrace_eprobedesc_t **pepdesc = (dtrace_eprobedesc_t **) addr;
+		//TODO(nicomazz): fix when userspace is not purecap
+		dtrace_eprobedesc_t * __capability *pepdesc = (dtrace_eprobedesc_t *__capability*) addr;
 		dtrace_eprobedesc_t epdesc;
 		dtrace_ecb_t *ecb;
 		dtrace_action_t *act;
@@ -467,7 +476,7 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 
 		DTRACE_IOCTL_PRINTF("%s(%d): DTRACEIOC_EPROBE\n",__func__,__LINE__);
 
-		if (copyin((void *)*pepdesc, &epdesc, sizeof (epdesc)) != 0)
+		if (copyin_c(*pepdesc, &epdesc, sizeof (epdesc)) != 0)
 			return (EFAULT);
 
 		mutex_enter(&dtrace_lock);
@@ -524,7 +533,7 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 
 		mutex_exit(&dtrace_lock);
 
-		if (copyout(buf, (void *) *pepdesc, dest - (uintptr_t)buf) != 0) {
+		if (copyout_c(buf, *pepdesc, dest - (uintptr_t)buf) != 0) {
 			kmem_free(buf, size);
 			return (EFAULT);
 		}
@@ -562,7 +571,7 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 		if (len > fmt->dtfd_length) {
 			fmt->dtfd_length = len;
 		} else {
-			if (copyout(str, fmt->dtfd_string, len) != 0) {
+			if (copyout_c(str, fmt->dtfd_string, len) != 0) {
 				mutex_exit(&dtrace_lock);
 				return (EINVAL);
 			}

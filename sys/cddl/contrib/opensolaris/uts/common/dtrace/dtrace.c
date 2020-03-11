@@ -13236,7 +13236,7 @@ dtrace_dof_create(dtrace_state_t *state)
 }
 
 static dof_hdr_t *
-dtrace_dof_copyin(uintptr_t uarg, int *errp)
+dtrace_dof_copyin(uintcap_t uarg, int *errp)
 {
 	dof_hdr_t hdr, *dof;
 
@@ -13245,7 +13245,8 @@ dtrace_dof_copyin(uintptr_t uarg, int *errp)
 	/*
 	 * First, we're going to copyin() the sizeof (dof_hdr_t).
 	 */
-	if (copyin((void *)uarg, &hdr, sizeof (hdr)) != 0) {
+	// TODO(nicomazz): handle non-purecap userspace case
+	if (copyin_c((void * __capability) uarg, &hdr, sizeof (hdr)) != 0) {
 		dtrace_dof_error(NULL, "failed to copyin DOF header");
 		*errp = EFAULT;
 		return (NULL);
@@ -13269,7 +13270,8 @@ dtrace_dof_copyin(uintptr_t uarg, int *errp)
 
 	dof = kmem_alloc(hdr.dofh_loadsz, KM_SLEEP);
 
-	if (copyin((void *)uarg, dof, hdr.dofh_loadsz) != 0 ||
+	// TODO(nicomazz): handle non-purecap userspace case
+	if (copyin_c((void * __capability)uarg, dof, hdr.dofh_loadsz) != 0 ||
 	    dof->dofh_loadsz != hdr.dofh_loadsz) {
 		kmem_free(dof, hdr.dofh_loadsz);
 		*errp = EFAULT;
