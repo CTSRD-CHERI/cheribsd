@@ -11,14 +11,6 @@ SUBDIR.${MK_TESTS}+=	tests
 SUBDIR+=		libregex
 .endif
 
-.if ${MACHINE_ARCH:Mmips*c*}
-# Don't use csu for CheriABI
-SUBDIR:=	${SUBDIR:Ncsu}
-# We'll be using the libunwind based libgcc_eh and libgcc_eh when the time
-# comes.
-SUBDIR:=	${SUBDIR:Nlibgcc}
-.endif
-
 SUBDIR_PARALLEL=
 
 .include <bsd.subdir.mk>
