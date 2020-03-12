@@ -1311,7 +1311,7 @@ typedef struct {
 							/* enable probes */
 #define	DTRACEIOC_AGGSNAP	_IOW('x',7,dtrace_bufdesc_t * __kerncap)
 							/* snapshot agg. */
-#define	DTRACEIOC_EPROBE	_IOW('x',8,dtrace_eprobedesc_t)
+#define	DTRACEIOC_EPROBE	_IOW('x',8,dtrace_eprobedesc_t * __kerncap)
 							/* get eprobe desc. */
 #define	DTRACEIOC_PROBEARG	_IOWR('x',9,dtrace_argdesc_t)
 							/* get probe arg */
