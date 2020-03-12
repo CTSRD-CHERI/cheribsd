@@ -10,6 +10,8 @@
 #ifndef _LIBCPP_BITSET
 #define _LIBCPP_BITSET
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-copy"
 /*
     bitset synopsis
 
@@ -1105,5 +1107,7 @@ operator<<(basic_ostream<_CharT, _Traits>& __os, const bitset<_Size>& __x);
 _LIBCPP_END_NAMESPACE_STD
 
 _LIBCPP_POP_MACROS
+
+#pragma clang diagnostic pop
 
 #endif  // _LIBCPP_BITSET
