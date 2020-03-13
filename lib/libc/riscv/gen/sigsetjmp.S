@@ -52,7 +52,7 @@ END(sigsetjmp)
 ENTRY(siglongjmp)
 #ifdef __CHERI_PURE_CAPABILITY__
 #pragma message("TODO: RISCV-PURECAP implement siglongjmp")
-	cret
+	unimp
 #else
 	/* Load the _setjmp magic */
 	ld	a2, .Lmagic

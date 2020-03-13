@@ -61,6 +61,11 @@ FN_RET FN_NAME_VSX FN_PARAMS;
 
 DEFINE_UIFUNC(, FN_RET, FN_NAME, FN_PARAMS)
 {
+	/* VSX instructions were added in POWER ISA 2.06,
+	 * however it requires data to be word-aligned.
+	 * Since POWER ISA 2.07B this is solved transparently
+	 * by the hardware
+	 */
 	if (cpu_features & PPC_FEATURE_HAS_VSX)
 		return (FN_NAME_VSX);
 	else

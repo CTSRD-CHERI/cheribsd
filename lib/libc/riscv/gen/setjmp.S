@@ -107,7 +107,7 @@ END(setjmp)
 ENTRY(longjmp)
 #ifdef __CHERI_PURE_CAPABILITY__
 #pragma message("TODO: RISCV-PURECAP implement longjmp")
-	cret
+	unimp
 #else
 	addi	sp, sp, -(4 * 8)
 	sd	a0, (0 * 8)(sp)

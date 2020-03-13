@@ -219,7 +219,6 @@ static int
 ngc_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *addr,
 	 struct mbuf *control, struct thread *td)
 {
-	struct epoch_tracker et;
 	struct ngpcb *const pcbp = sotongpcb(so);
 	struct ngsock *const priv = NG_NODE_PRIVATE(pcbp->sockdata->node);
 	struct sockaddr_ng *const sap = (struct sockaddr_ng *) addr;
@@ -338,9 +337,7 @@ ngc_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *addr,
 	item->apply = &apply;
 	priv->error = -1;
 
-	NET_EPOCH_ENTER(et);
 	error = ng_snd_item(item, 0);
-	NET_EPOCH_EXIT(et);
 
 	mtx_lock(&priv->mtx);
 	if (priv->error == -1)
@@ -413,6 +410,7 @@ ngd_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *addr,
 	struct sockaddr_ng *const sap = (struct sockaddr_ng *) addr;
 	int	len, error;
 	hook_p  hook = NULL;
+	item_p	item;
 	char	hookname[NG_HOOKSIZ];
 
 	if ((pcbp == NULL) || (control != NULL)) {
@@ -465,8 +463,10 @@ ngd_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *addr,
 	}
 
 	/* Send data. */
+	item = ng_package_data(m, NG_WAITOK);
+	m = NULL;
 	NET_EPOCH_ENTER(et);
-	NG_SEND_DATA_FLAGS(error, hook, m, NG_WAITOK);
+	NG_FWD_ITEM_HOOK(error, item, hook);
 	NET_EPOCH_EXIT(et);
 
 release:
@@ -1208,8 +1208,10 @@ ngs_mod_event(module_t mod, int event, void *data)
 VNET_DOMAIN_SET(ng);
 
 SYSCTL_INT(_net_graph, OID_AUTO, family, CTLFLAG_RD, SYSCTL_NULL_INT_PTR, AF_NETGRAPH, "");
-static SYSCTL_NODE(_net_graph, OID_AUTO, data, CTLFLAG_RW, 0, "DATA");
+static SYSCTL_NODE(_net_graph, OID_AUTO, data, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
+    "DATA");
 SYSCTL_INT(_net_graph_data, OID_AUTO, proto, CTLFLAG_RD, SYSCTL_NULL_INT_PTR, NG_DATA, "");
-static SYSCTL_NODE(_net_graph, OID_AUTO, control, CTLFLAG_RW, 0, "CONTROL");
+static SYSCTL_NODE(_net_graph, OID_AUTO, control, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
+    "CONTROL");
 SYSCTL_INT(_net_graph_control, OID_AUTO, proto, CTLFLAG_RD, SYSCTL_NULL_INT_PTR, NG_CONTROL, "");
 

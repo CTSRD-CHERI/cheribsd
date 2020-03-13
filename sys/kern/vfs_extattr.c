@@ -255,7 +255,7 @@ kern_extattr_set_fd(struct thread *td, int fd, int attrnamespace,
 	AUDIT_ARG_TEXT(attrname);
 
 	error = getvnode(td, fd,
-	    cap_rights_init(&rights, CAP_EXTATTR_SET), &fp);
+	    cap_rights_init_one(&rights, CAP_EXTATTR_SET), &fp);
 	if (error)
 		return (error);
 
@@ -433,7 +433,7 @@ kern_extattr_get_fd(struct thread *td, int fd, int attrnamespace,
 	AUDIT_ARG_TEXT(attrname);
 
 	error = getvnode(td, fd,
-	    cap_rights_init(&rights, CAP_EXTATTR_GET), &fp);
+	    cap_rights_init_one(&rights, CAP_EXTATTR_GET), &fp);
 	if (error)
 		return (error);
 
@@ -578,7 +578,7 @@ kern_extattr_delete_fd(struct thread *td, int fd, int attrnamespace,
 	AUDIT_ARG_TEXT(attrname);
 
 	error = getvnode(td, fd,
-	    cap_rights_init(&rights, CAP_EXTATTR_DELETE), &fp);
+	    cap_rights_init_one(&rights, CAP_EXTATTR_DELETE), &fp);
 	if (error)
 		return (error);
 
@@ -732,7 +732,7 @@ kern_extattr_list_fd(struct thread *td, int fd, int attrnamespace,
 	AUDIT_ARG_FD(fd);
 	AUDIT_ARG_VALUE(attrnamespace);
 	error = getvnode(td, fd,
-	    cap_rights_init(&rights, CAP_EXTATTR_LIST), &fp);
+	    cap_rights_init_one(&rights, CAP_EXTATTR_LIST), &fp);
 	if (error)
 		return (error);
 

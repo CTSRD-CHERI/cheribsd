@@ -510,4 +510,5 @@
 #define	CHERIABI_SYS_cheriabi_shm_open2	571
 #define	CHERIABI_SYS_cheriabi_shm_rename	572
 #define	CHERIABI_SYS_cheriabi_sigfastblock	573
-#define	CHERIABI_SYS_MAXSYSCALL	574
+#define	CHERIABI_SYS_cheriabi___realpathat	574
+#define	CHERIABI_SYS_MAXSYSCALL	575

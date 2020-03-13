@@ -1,4 +1,8 @@
 # $FreeBSD$
+
+.include <src.opts.mk>
+MK_SSP=	no
+
 PACKAGE=lib${LIB}
 SHLIB_NAME=	libsimple_printf.so.1
 MK_CHERI_SHARED=yes

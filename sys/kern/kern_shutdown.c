@@ -158,7 +158,7 @@ static bool powercycle_on_panic = 0;
 SYSCTL_BOOL(_kern, OID_AUTO, powercycle_on_panic, CTLFLAG_RWTUN,
 	&powercycle_on_panic, 0, "Do a power cycle instead of a reboot on a panic");
 
-static SYSCTL_NODE(_kern, OID_AUTO, shutdown, CTLFLAG_RW, 0,
+static SYSCTL_NODE(_kern, OID_AUTO, shutdown, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
     "Shutdown environment");
 
 #ifndef DIAGNOSTIC
@@ -167,7 +167,8 @@ static int show_busybufs;
 static int show_busybufs = 1;
 #endif
 SYSCTL_INT(_kern_shutdown, OID_AUTO, show_busybufs, CTLFLAG_RW,
-	&show_busybufs, 0, "");
+    &show_busybufs, 0,
+    "Show busy buffers during shutdown");
 
 int suspend_blocked = 0;
 SYSCTL_INT(_kern, OID_AUTO, suspend_blocked, CTLFLAG_RW,
@@ -693,7 +694,8 @@ static int kassert_log_panic_at = 0;
 static int kassert_suppress_in_panic = 0;
 static int kassert_warnings = 0;
 
-SYSCTL_NODE(_debug, OID_AUTO, kassert, CTLFLAG_RW, NULL, "kassert options");
+SYSCTL_NODE(_debug, OID_AUTO, kassert, CTLFLAG_RW | CTLFLAG_MPSAFE, NULL,
+    "kassert options");
 
 #ifdef KASSERT_PANIC_OPTIONAL
 #define KASSERT_RWTUN	CTLFLAG_RWTUN
@@ -740,8 +742,9 @@ SYSCTL_INT(_debug_kassert, OID_AUTO, suppress_in_panic, KASSERT_RWTUN,
 static int kassert_sysctl_kassert(SYSCTL_HANDLER_ARGS);
 
 SYSCTL_PROC(_debug_kassert, OID_AUTO, kassert,
-    CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_SECURE, NULL, 0,
-    kassert_sysctl_kassert, "I", "set to trigger a test kassert");
+    CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_SECURE | CTLFLAG_NEEDGIANT, NULL, 0,
+    kassert_sysctl_kassert, "I",
+    "set to trigger a test kassert");
 
 static int
 kassert_sysctl_kassert(SYSCTL_HANDLER_ARGS)
@@ -1029,8 +1032,9 @@ dumpdevname_sysctl_handler(SYSCTL_HANDLER_ARGS)
 	sbuf_delete(&sb);
 	return (error);
 }
-SYSCTL_PROC(_kern_shutdown, OID_AUTO, dumpdevname, CTLTYPE_STRING | CTLFLAG_RD,
-    &dumper_configs, 0, dumpdevname_sysctl_handler, "A",
+SYSCTL_PROC(_kern_shutdown, OID_AUTO, dumpdevname,
+    CTLTYPE_STRING | CTLFLAG_RD | CTLFLAG_NEEDGIANT, &dumper_configs, 0,
+    dumpdevname_sysctl_handler, "A",
     "Device(s) for kernel dumps");
 
 static int	_dump_append(struct dumperinfo *di, void *virtual,
@@ -1732,7 +1736,7 @@ dump_finish(struct dumperinfo *di, struct kerneldumpheader *kdh)
 
 void
 dump_init_header(const struct dumperinfo *di, struct kerneldumpheader *kdh,
-    char *magic, uint32_t archver, uint64_t dumplen)
+    const char *magic, uint32_t archver, uint64_t dumplen)
 {
 	size_t dstsize;
 

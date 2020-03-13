@@ -60,7 +60,8 @@ static struct linux_prison lprison0 = {
 
 static unsigned linux_osd_jail_slot;
 
-SYSCTL_NODE(_compat, OID_AUTO, linux, CTLFLAG_RW, 0, "Linux mode");
+SYSCTL_NODE(_compat, OID_AUTO, linux, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
+    "Linux mode");
 
 int linux_ignore_ip_recverr = 1;
 SYSCTL_INT(_compat_linux, OID_AUTO, ignore_ip_recverr, CTLFLAG_RWTUN,
@@ -69,6 +70,11 @@ SYSCTL_INT(_compat_linux, OID_AUTO, ignore_ip_recverr, CTLFLAG_RWTUN,
 int linux_preserve_vstatus = 0;
 SYSCTL_INT(_compat_linux, OID_AUTO, preserve_vstatus, CTLFLAG_RWTUN,
     &linux_preserve_vstatus, 0, "Preserve VSTATUS termios(4) flag");
+
+bool linux_map_sched_prio = true;
+SYSCTL_BOOL(_compat_linux, OID_AUTO, map_sched_prio, CTLFLAG_RDTUN,
+    &linux_map_sched_prio, 0, "Map scheduler priorities to Linux priorities "
+    "(not POSIX compliant)");
 
 static int	linux_set_osname(struct thread *td, char *osname);
 static int	linux_set_osrelease(struct thread *td, char *osrelease);

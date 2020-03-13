@@ -127,7 +127,7 @@ The Regents of the University of California.  All rights reserved.\n";
 
 #include "print.h"
 
-#if __has_feature(capabilities)
+#if __has_feature(capabilities) && defined(__mips__)
 #include <cheri/cheri.h>
 #include <cheri/cheric.h>
 #define cheri_string(str)	cheri_ptr((str), strlen(str) + 1)

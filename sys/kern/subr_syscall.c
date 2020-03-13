@@ -146,16 +146,17 @@ syscallenter(struct thread *td)
 	}
 
 	/*
-	 * Fetch fast sigblock value at the time of syscall
-	 * entry because sleepqueue primitives might call
-	 * cursig().
+	 * Fetch fast sigblock value at the time of syscall entry to
+	 * handle sleepqueue primitives which might call cursig().
 	 */
-	fetch_sigfastblock(td);
+	if (__predict_false(sigfastblock_fetch_always))
+		(void)sigfastblock_fetch(td);
 
 	/* Let system calls set td_errno directly. */
 	td->td_pflags &= ~TDP_NERRNO;
 
-	if (__predict_false(systrace_enabled || AUDIT_SYSCALL_ENTER(sa->code, td))) {
+	if (__predict_false(SYSTRACE_ENABLED() ||
+	    AUDIT_SYSCALL_ENTER(sa->code, td))) {
 #ifdef KDTRACE_HOOKS
 		/* Give the syscall:::entry DTrace probe a chance to fire. */
 		if (__predict_false(sa->callp->sy_entry != 0))

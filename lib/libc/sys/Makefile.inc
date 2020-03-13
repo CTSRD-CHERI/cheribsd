@@ -77,6 +77,7 @@ INTERPOSED = \
 	sendmsg \
 	sendto \
 	setcontext \
+	sigaction \
 	sigprocmask \
 	sigsuspend \
 	sigtimedwait \
@@ -87,13 +88,6 @@ INTERPOSED = \
 	wait6 \
 	write \
 	writev
-
-.if ${MACHINE_CPUARCH} == "sparc64"
-SRCS+=	sigaction.c
-NOASM+=	sigaction.o
-.else
-INTERPOSED+= sigaction
-.endif
 
 .if ${MACHINE_ABI:Mpurecap}
 # Var-args calling convention different for purecap

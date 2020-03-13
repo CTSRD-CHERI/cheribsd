@@ -399,6 +399,7 @@ static int sysargmask[] = {
 	[SYS_shm_open2] = (0x0 | 0x1 | 0x10),
 	[SYS_shm_rename] = (0x0 | 0x1 | 0x2),
 	[SYS_sigfastblock] = (0x0 | 0x2),
+	[SYS___realpathat] = (0x0 | 0x2 | 0x4),
 };
 
 #endif /* !_SYSARGMAP_H_ */

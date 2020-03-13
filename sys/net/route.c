@@ -179,8 +179,10 @@ sysctl_my_fibnum(SYSCTL_HANDLER_ARGS)
         return (error);
 }
 
-SYSCTL_PROC(_net, OID_AUTO, my_fibnum, CTLTYPE_INT|CTLFLAG_RD,
-            NULL, 0, &sysctl_my_fibnum, "I", "default FIB of caller");
+SYSCTL_PROC(_net, OID_AUTO, my_fibnum,
+    CTLTYPE_INT | CTLFLAG_RD | CTLFLAG_MPSAFE, NULL, 0,
+    &sysctl_my_fibnum, "I",
+    "default FIB of caller");
 
 static __inline struct rib_head **
 rt_tables_get_rnh_ptr(int table, int fam)
@@ -630,7 +632,7 @@ rib_add_redirect(u_int fibnum, struct sockaddr *dst, struct sockaddr *gateway,
 	info.rti_info[RTAX_GATEWAY] = gateway;
 	info.rti_ifa = ifa;
 	info.rti_ifp = ifp;
-	info.rti_flags = flags | RTF_DYNAMIC;
+	info.rti_flags = flags | RTF_HOST | RTF_DYNAMIC;
 
 	/* Setup route metrics to define expire time. */
 	bzero(&rti_rmx, sizeof(rti_rmx));

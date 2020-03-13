@@ -675,7 +675,7 @@ vntblinit(void *dummy __unused)
 	 */
 	buf_trie_zone = uma_zcreate("BUF TRIE", pctrie_node_size(),
 	    NULL, NULL, pctrie_zone_init, NULL, UMA_ALIGN_PTR, 
-	    UMA_ZONE_NOFREE | UMA_ZONE_VM);
+	    UMA_ZONE_NOFREE);
 	uma_prealloc(buf_trie_zone, nbuf);
 
 	vnodes_created = counter_u64_alloc(M_WAITOK);
@@ -1104,6 +1104,7 @@ vlrureclaim(bool reclaim_nc_src, int trigger, u_long target)
 {
 	struct vnode *vp, *mvp;
 	struct mount *mp;
+	struct vm_object *object;
 	u_long done;
 	bool retried;
 
@@ -1141,12 +1142,17 @@ restart:
 
 		if (vp->v_usecount > 0 || vp->v_holdcnt == 0 ||
 		    (!reclaim_nc_src && !LIST_EMPTY(&vp->v_cache_src)) ||
-		    vp->v_type == VBAD || vp->v_type == VNON ||
-		    (vp->v_object != NULL &&
-		    vp->v_object->resident_page_count > trigger)) {
+		    VN_IS_DOOMED(vp) || vp->v_type == VNON) {
 			VI_UNLOCK(vp);
 			goto next_iter;
 		}
+
+		object = atomic_load_ptr(&vp->v_object);
+		if (object == NULL || object->resident_page_count > trigger) {
+			VI_UNLOCK(vp);
+			goto next_iter;
+		}
+
 		vholdl(vp);
 		VI_UNLOCK(vp);
 		TAILQ_REMOVE(&vnode_list, mvp, v_vnodelist);
@@ -2287,6 +2293,8 @@ buf_vlist_add(struct buf *bp, struct bufobj *bo, b_xflags_t xflags)
 	int error;
 
 	ASSERT_BO_WLOCKED(bo);
+	KASSERT((bo->bo_flag & BO_NOBUFS) == 0,
+	    ("buf_vlist_add: bo %p does not allow bufs", bo));
 	KASSERT((xflags & BX_VNDIRTY) == 0 || (bo->bo_flag & BO_DEAD) == 0,
 	    ("dead bo %p", bo));
 	KASSERT((bp->b_xflags & (BX_VNDIRTY|BX_VNCLEAN)) == 0,
@@ -3212,7 +3220,7 @@ vput_final(struct vnode *vp, enum vput_op func)
 	VNPASS(vp->v_holdcnt > 0, vp);
 
 	VI_LOCK(vp);
-	if (func != VRELE)
+	if (__predict_false(vp->v_type == VCHR && func != VRELE))
 		v_decr_devcount(vp);
 
 	/*
@@ -4038,7 +4046,7 @@ vcount(struct vnode *vp)
 /*
  * Print out a description of a vnode.
  */
-static char *typename[] =
+static const char * const typename[] =
 {"VNON", "VREG", "VDIR", "VBLK", "VCHR", "VLNK", "VSOCK", "VFIFO", "VBAD",
  "VMARKER"};
 

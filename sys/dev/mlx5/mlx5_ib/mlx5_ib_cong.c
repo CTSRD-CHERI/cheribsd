@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2013-2015, Mellanox Technologies, Ltd.  All rights reserved.
+ * Copyright (c) 2013-2020, Mellanox Technologies, Ltd.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -37,7 +37,9 @@ static const char *mlx5_ib_cong_stats_desc[] = {
 	MLX5_IB_CONG_STATS(MLX5_IB_STATS_DESC)
 };
 
-#define	MLX5_IB_INDEX(field) (__offsetof(struct mlx5_ib_congestion, field) / sizeof(u64))
+#define	MLX5_IB_INDEX(field) ( \
+    (__offsetof(struct mlx5_ib_congestion, field) - \
+     __offsetof(struct mlx5_ib_congestion, arg[0])) / sizeof(u64))
 #define	MLX5_IB_FLD_MAX(type, field) ((1ULL << __mlx5_bit_sz(type, field)) - 1ULL)
 #define	MLX5_IB_SET_CLIPPED(type, ptr, field, var) do { \
   /* rangecheck */					\
@@ -421,12 +423,14 @@ mlx5_ib_init_congestion(struct mlx5_ib_dev *dev)
 		return (err);
 
 	parent = SYSCTL_ADD_NODE(ctx, SYSCTL_CHILDREN(dev->ib_dev.dev.kobj.oidp),
-	    OID_AUTO, "cong", CTLFLAG_RW, NULL, "Congestion control");
+	    OID_AUTO, "cong", CTLFLAG_RW | CTLFLAG_MPSAFE, NULL,
+	    "Congestion control");
 	if (parent == NULL)
 		return (-ENOMEM);
 
 	node = SYSCTL_ADD_NODE(ctx, SYSCTL_CHILDREN(parent),
-	    OID_AUTO, "conf", CTLFLAG_RW, NULL, "Configuration");
+	    OID_AUTO, "conf", CTLFLAG_RW | CTLFLAG_MPSAFE, NULL,
+	    "Configuration");
 	if (node == NULL) {
 		sysctl_ctx_free(&dev->congestion.ctx);
 		return (-ENOMEM);
@@ -442,7 +446,8 @@ mlx5_ib_init_congestion(struct mlx5_ib_dev *dev)
 	}
 
 	node = SYSCTL_ADD_NODE(ctx, SYSCTL_CHILDREN(parent),
-	    OID_AUTO, "stats", CTLFLAG_RD, NULL, "Statistics");
+	    OID_AUTO, "stats", CTLFLAG_RD | CTLFLAG_MPSAFE, NULL,
+	    "Statistics");
 	if (node == NULL) {
 		sysctl_ctx_free(&dev->congestion.ctx);
 		return (-ENOMEM);
