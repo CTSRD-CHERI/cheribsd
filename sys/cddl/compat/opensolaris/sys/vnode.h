@@ -268,8 +268,11 @@ vn_rename(char *from, char *to, enum uio_seg seg)
 
 	ASSERT(seg == UIO_SYSSPACE);
 
-    return (kern_renameat(curthread, AT_FDCWD, (__cheri_tocap const char * __capability) from, AT_FDCWD,
-                          (__cheri_tocap const char * __capability) to, seg));
+    return (kern_renameat(curthread, AT_FDCWD,
+    		(__cheri_tocap const char * __capability) from,
+    		AT_FDCWD,
+    		(__cheri_tocap const char * __capability) to,
+    		seg));
 }
 
 static __inline int

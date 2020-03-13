@@ -110,12 +110,7 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 
 	switch (cmd) {
 	case DTRACEIOC_AGGDESC: {
-		//TODO(nicomazz): handle the case userspace is not purecap.
-		// in that case, use something like
-		// `user_aggdesc = __USER_CAP(*((uint64_t)addr), size_of_dtrace_aggdesc)`
-		// to convert the userspace address to a capability
-		dtrace_aggdesc_t * __capability * paggdesc = (dtrace_aggdesc_t *__capability*) addr;
-
+		dtrace_aggdesc_t *__capability * paggdesc = (dtrace_aggdesc_t *__capability *) addr;
 		dtrace_aggdesc_t aggdesc;
 		dtrace_action_t *act;
 		dtrace_aggregation_t *agg;
@@ -127,6 +122,7 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 		uintptr_t dest;
 
 		DTRACE_IOCTL_PRINTF("%s(%d): DTRACEIOC_AGGDESC\n",__func__,__LINE__);
+
 		if (copyincap(*paggdesc, &aggdesc, sizeof (aggdesc)) != 0)
 			return (EFAULT);
 
