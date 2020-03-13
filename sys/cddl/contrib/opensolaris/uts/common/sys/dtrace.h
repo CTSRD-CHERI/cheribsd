@@ -557,16 +557,16 @@ typedef struct dtrace_difv {
 #define	DTRACE_USTACK_STRSIZE(x)	(uint32_t)((x) >> 32)
 #define	DTRACE_USTACK_ARG(x, y)		\
 	((((uint64_t)(y)) << 32) | ((x) & UINT32_MAX))
-//not sure about commenting that. Should be needed to think better about this.
-//#ifndef _LP64
-//#if BYTE_ORDER == _BIG_ENDIAN
-//#define	DTRACE_PTR(type, name)	uint32_t name##pad; type *name
-//#else
-//#define	DTRACE_PTR(type, name)	type *name; uint32_t name##pad
-//#endif
-//#else
+
+#if !defined(_LP64) && !__has_feature(capabilities)
+#if BYTE_ORDER == _BIG_ENDIAN
+#define	DTRACE_PTR(type, name)	uint32_t name##pad; type *name
+#else
+#define	DTRACE_PTR(type, name)	type *name; uint32_t name##pad
+#endif
+#else
 #define	DTRACE_PTR(type, name)	type * __kerncap name
-//#endif
+#endif
 
 /*
  * DTrace Object Format (DOF)
