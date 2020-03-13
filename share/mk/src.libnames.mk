@@ -43,6 +43,7 @@ _INTERNALLIBS=	\
 		ipf \
 		lpr \
 		lua \
+		lutok \
 		netbsd \
 		ntp \
 		ntpevent \
@@ -316,6 +317,7 @@ _DP_magic=	z
 _DP_mt=		sbuf bsdxml
 _DP_ldns=	ssl crypto
 _DP_lua=	m
+_DP_lutok=	lua
 .if ${MK_OPENSSL} != "no"
 _DP_fetch=	ssl crypto
 .else
@@ -498,6 +500,9 @@ LIBELFTC?=	${LIBELFTCDIR}/libelftc${PIE_SUFFIX}.a
 
 LIBLUADIR=	${_LIB_OBJTOP}/lib/liblua
 LIBLUA?=	${LIBLUADIR}/liblua${PIE_SUFFIX}.a
+
+LIBLUTOKDIR=	${_LIB_OBJTOP}/lib/liblutok
+LIBLUTOK?=	${LIBLUTOKDIR}/liblutok${PIE_SUFFIX}.a
 
 LIBPEDIR=	${_LIB_OBJTOP}/lib/libpe
 LIBPE?=		${LIBPEDIR}/libpe${PIE_SUFFIX}.a
