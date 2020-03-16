@@ -66,6 +66,7 @@ SUBDIR=	${SUBDIR_BOOTSTRAP} \
 	libjpeg \
 	libkiconv \
 	libkvm \
+	liblua \
 	liblzma \
 	libmemstat \
 	${_libstatcounters} \
