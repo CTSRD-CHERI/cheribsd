@@ -247,13 +247,13 @@ _thread_exitf(const char *fname, int lineno, const char *fmt, ...)
 	va_list ap;
 
 	/* Write an error message to the standard error file descriptor: */
-	_thread_printf(STDERR_FILENO, "Fatal error '");
+	_thread_fdprintf(STDERR_FILENO, "Fatal error '");
 
 	va_start(ap, fmt);
-	_thread_vprintf(STDERR_FILENO, fmt, ap);
+	_thread_vfdprintf(STDERR_FILENO, fmt, ap);
 	va_end(ap);
 
-	_thread_printf(STDERR_FILENO, "' at line %d in file %s (errno = %d)\n",
+	_thread_fdprintf(STDERR_FILENO, "' at line %d in file %s (errno = %d)\n",
 	    lineno, fname, errno);
 
 	abort();
@@ -312,7 +312,7 @@ _pthread_exit_mask(void *status, sigset_t *mask)
 		if (curthread->unwind_disabled) {
 			if (message_printed == 0) {
 				message_printed = 1;
-				_thread_printf(2, "Warning: old _pthread_cleanup_push was called, "
+				_thread_fdprintf(STDERR_FILENO, "Warning: old _pthread_cleanup_push was called, "
 				  	"stack unwinding is disabled.\n");
 			}
 			goto cleanup;
