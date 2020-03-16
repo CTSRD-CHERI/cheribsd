@@ -309,6 +309,8 @@
                     ..
                 ..
             ..
+            kyua
+            ..
             libusb20
             ..
             libvgl
@@ -446,6 +448,12 @@
                 ..
             ..
         ..
+        kyua
+        ..
+            misc
+            ..
+            store
+            ..
         locale
             af_ZA.ISO8859-1
             ..

@@ -242,6 +242,7 @@ SUBDIR.${MK_TELNET}+=	libtelnet
 .if ${MK_TESTS_SUPPORT} != "no" || ${MK_TESTS} != "no"
 SUBDIR+=		atf
 .if ${MK_CXX} != "no"
+SUBDIR+=		kyua
 SUBDIR+=		liblutok
 .endif
 .endif
