@@ -164,7 +164,7 @@ process::exec_unsafe(const fs::path& program, const args_vector& args)
         argv[1 + args.size()] = NULL;
 
         const int ret = ::execv(program.c_str(),
-                                (char* const*)(unsigned long)(const void*)argv);
+                                (char* const*)(uintptr_t)(const void*)argv);
         original_errno = errno;
         INV(ret == -1);
         std::cerr << "Failed to execute " << program << ": "

@@ -51,7 +51,7 @@
 ///
 /// \param type The target type of the conversion.
 /// \param ptr The pointer to be unconstified.
-#define UTILS_UNCONST(type, ptr) ((type*)(unsigned long)(const void*)(ptr))
+#define UTILS_UNCONST(type, ptr) ((type*)(uintptr_t)(const void*)(ptr))
 
 
 /// Macro to mark a parameter as unused.
