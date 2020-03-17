@@ -314,12 +314,19 @@ proc_rwmem(struct proc *p, struct uio *uio)
 		 */
 		len = min(PAGE_SIZE - page_offset, uio->uio_resid);
 
-		vm_map_lock(map);
-		error = vm_map_check_owner_proc(map, pageno, pageno + len, p);
-		vm_map_unlock(map);
-		if (error != KERN_SUCCESS) {
-			error = EFAULT;
-			break;
+		/*
+		 * XXX: Might want to use p_candebug(9) instead.  Need to think
+		 *      some more about the security model.
+		 */
+		error = priv_check(uio->uio_td, PRIV_DEBUG_DIFFCRED);
+		if (error != 0) {
+			vm_map_lock(map);
+			error = vm_map_check_owner_proc(map, pageno, pageno + len, p);
+			vm_map_unlock(map);
+			if (error != KERN_SUCCESS) {
+				error = EFAULT;
+				break;
+			}
 		}
 
 		/*
