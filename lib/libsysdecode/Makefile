@@ -125,6 +125,9 @@ CFLAGS.gcc.ioctl.c+= -Wno-redundant-decls
 
 CFLAGS.gcc+=	${CFLAGS.gcc.${.IMPSRC}}
 
+# Ignore deprecation warning in <sys/pioctl.h>
+CFLAGS.ioctl.c+= -Wno-\#warnings
+
 .if ${MACHINE_ABI:Mpurecap}
 # Work around packed struct in cissio.h
 CFLAGS.ioctl.c+=	-Wno-error-cheri-capability-misuse
