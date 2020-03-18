@@ -142,7 +142,7 @@ cpu_fetch_syscall_args(struct thread *td)
 	printf(name "[%d] = " _CHERI_PRINTF_CAP_FMT "\n", n,	\
 	    _CHERI_PRINTF_CAP_ARG((void *__capability)(array)[n]));
 #else
-#define PRINT_REG(name, value)	printf(name "[%d] = 0x%016lx\n", value)
+#define PRINT_REG(name, value)	printf(name " = 0x%016lx\n", value)
 #define PRINT_REG_N(name, n, array)	\
 	printf(name "[%d] = 0x%016lx\n", n, (array)[n])
 #endif
