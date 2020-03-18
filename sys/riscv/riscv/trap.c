@@ -136,42 +136,43 @@ cpu_fetch_syscall_args(struct thread *td)
 
 #include "../../kern/subr_syscall.c"
 
+#if __has_feature(capabilities)
+#define PRINT_REG(name, value)					\
+	printf(name " = " _CHERI_PRINTF_CAP_FMT "\n",		\
+	    _CHERI_PRINTF_CAP_ARG((void *__capability)value));
+#define PRINT_REG_N(name, n, array)				\
+	printf(name "[%d] = " _CHERI_PRINTF_CAP_FMT "\n", n,	\
+	    _CHERI_PRINTF_CAP_ARG((void *__capability)(array)[n]));
+#else
+#define PRINT_REG(name, value)	printf(name " = 0x%016lx\n", value)
+#define PRINT_REG_N(name, n, array)	\
+	printf(name "[%d] = 0x%016lx\n", n, (array)[n])
+#endif
+
 static void
 dump_regs(struct trapframe *frame)
 {
 	u_int i;
 
+	PRINT_REG("ra", frame->tf_ra);
+	PRINT_REG("sp", frame->tf_sp);
+	PRINT_REG("gp", frame->tf_gp);
+	PRINT_REG("tp", frame->tf_tp);
+
 	for (i = 0; i < nitems(frame->tf_t); i++)
-#if __has_feature(capabilities)
-		printf("t[%d] = " _CHERI_PRINTF_CAP_FMT "\n", i,
-		    _CHERI_PRINTF_CAP_ARG((void * __capability)frame->tf_t[i]));
-#else
-		printf("t[%d] == 0x%016lx\n", i, frame->tf_t[i]);
-#endif
+		PRINT_REG_N("t", i, frame->tf_t);
 
 	for (i = 0; i < nitems(frame->tf_s); i++)
-#if __has_feature(capabilities)
-		printf("s[%d] = " _CHERI_PRINTF_CAP_FMT "\n", i,
-		    _CHERI_PRINTF_CAP_ARG((void * __capability)frame->tf_s[i]));
-#else
-		printf("s[%d] == 0x%016lx\n", i, frame->tf_s[i]);
-#endif
+		PRINT_REG_N("s", i, frame->tf_s);
+
 
 	for (i = 0; i < nitems(frame->tf_a); i++)
-#if __has_feature(capabilities)
-		printf("a[%d] = " _CHERI_PRINTF_CAP_FMT "\n", i,
-		    _CHERI_PRINTF_CAP_ARG((void * __capability)frame->tf_a[i]));
-#else
-		printf("a[%d] == 0x%016lx\n", i, frame->tf_a[i]);
-#endif
+		PRINT_REG_N("a", i, frame->tf_a);
 
+
+	PRINT_REG("sepc", frame->tf_sepc);
 #if __has_feature(capabilities)
-	printf("sepcc = " _CHERI_PRINTF_CAP_FMT "\n",
-	    _CHERI_PRINTF_CAP_ARG((void * __capability)frame->tf_sepc));
-	printf("ddc = " _CHERI_PRINTF_CAP_FMT "\n",
-	    _CHERI_PRINTF_CAP_ARG((void * __capability)frame->tf_ddc));
-#else
-	printf("sepc == 0x%016lx\n", frame->tf_sepc);
+	PRINT_REG("ddc", frame->tf_ddc);
 #endif
 	printf("sstatus == 0x%016lx\n", frame->tf_sstatus);
 	printf("stval == 0x%016lx\n", frame->tf_stval);
