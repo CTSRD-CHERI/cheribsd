@@ -374,7 +374,7 @@ enc_ioctl(struct cdev *dev, u_long cmd, caddr_t arg_addr, int flag,
 	if (SV_PROC_FLAG(td->td_proc, SV_ILP32))
 		return (ENOTTY);
 #endif
-#if __has_feature(capabilities) && defined (COMPAT_FREEBSD64)
+#if defined (COMPAT_FREEBSD64)
 	if (!SV_PROC_FLAG(td->td_proc, SV_CHERI))
 		return (ENOTTY);
 #endif
