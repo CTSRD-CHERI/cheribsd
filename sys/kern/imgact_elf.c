@@ -206,15 +206,12 @@ SYSCTL_INT(ASLR_NODE_OID, OID_AUTO, stack_gap, CTLFLAG_RW,
 
 #ifdef __ELF_CHERI
 static int __elfN(sigfastblock) = 0;
-SYSCTL_INT(__CONCAT(__CONCAT(_kern_elf, __ELF_WORD_SIZE),c), OID_AUTO,
-    sigfastblock, CTLFLAG_RWTUN, &__elfN(sigfastblock), 0,
-    "enable sigfastblock for new processes");
 #else
 static int __elfN(sigfastblock) = 1;
-SYSCTL_INT(__CONCAT(_kern_elf, __ELF_WORD_SIZE), OID_AUTO, sigfastblock,
+#endif
+SYSCTL_INT(ELF_NODE_OID, OID_AUTO, sigfastblock,
     CTLFLAG_RWTUN, &__elfN(sigfastblock), 0,
     "enable sigfastblock for new processes");
-#endif
 
 static Elf_Brandinfo *elf_brand_list[MAX_BRANDS];
 
