@@ -2283,6 +2283,17 @@ typedef struct thrmisc32 elf_thrmisc_t;
 #define ELF_KERN_PROC_MASK	KERN_PROC_MASK32
 typedef struct kinfo_proc32 elf_kinfo_proc_t;
 typedef uint32_t elf_ps_strings_t;
+#elif defined(COMPAT_FREEBSD64) && __ELF_WORD_SIZE == 64 && !defined(__ELF_CHERI)
+#include <compat/freebsd64/freebsd64.h>
+typedef prstatus_t elf_prstatus_t;
+typedef prpsinfo_t elf_prpsinfo_t;
+typedef prfpregset_t elf_prfpregset_t;
+typedef prfpregset_t elf_fpregset_t;
+typedef gregset_t elf_gregset_t;
+typedef thrmisc_t elf_thrmisc_t;
+#define ELF_KERN_PROC_MASK	KERN_PROC_MASK64
+typedef struct kinfo_proc64 elf_kinfo_proc_t;
+typedef vm_offset_t elf_ps_strings_t;
 #else
 typedef prstatus_t elf_prstatus_t;
 typedef prpsinfo_t elf_prpsinfo_t;
