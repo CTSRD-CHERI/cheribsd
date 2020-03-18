@@ -48,12 +48,43 @@ file(WRITE ${CMAKE_BINARY_DIR}/kern_opt/opt_ktrace.h "#define KTRACE 1\n")
 file(WRITE ${CMAKE_BINARY_DIR}/kern_opt/opt_global.h "#define KDB 1
 // #define COMPAT_FREEBSD11 1
 #define COMPAT_CHERIABI 1
+#define COMPAT_FREEBSD32
+#define COMPAT_FREEBSD64
 #define CPU_CHERI 1
 // #define INVARIANT_SUPPORT 1
 #define CPU_MALTA 1
 // #define COMPAT_FREEBSD32 1
 #define TICK_USE_YAMON_FREQ defined
 #define YAMON 1
+// Pretend that we have capabilities
+#define __CHERI__
+#define __has_feature(x) __fake_has_feature_##x
+#define __fake_has_feature_capabilities 1
+// But we don't really so define __capability to nothing
+#define __capability
+// And provide the builtins for code completion
+long __builtin_cheri_length_get(void* __capability);
+long __builtin_cheri_base_get(void* __capability);
+long __builtin_cheri_offset_get(void* __capability);
+long __builtin_cheri_address_get(void* __capability);
+long __builtin_cheri_flags_get(void* __capability);
+long __builtin_cheri_perms_get(void* __capability);
+long __builtin_cheri_sealed_get(void* __capability);
+long __builtin_cheri_tag_get(void* __capability);
+long __builtin_cheri_type_get(void* __capability));
+void* __capability __builtin_cheri_perms_and(void* __capability, long);
+void* __capability __builtin_cheri_tag_clear(void* __capability);
+void* __capability __builtin_cheri_offset_increment(void* __capability, long);
+void* __capability __builtin_cheri_offset_set(void* __capability, long);
+void* __capability __builtin_cheri_address_set(void* __capability, long);
+void* __capability __builtin_cheri_flags_set(void* __capability, long);
+void* __capability __builtin_cheri_seal(void* __capability, void* __capability);
+void* __capability __builtin_cheri_unseal(void* __capability, void* __capability);
+void __builtin_cheri_perms_check(void* __capability, long);
+void __builtin_cheri_type_check(void* __capability, void* __capability);
+void* __capability __builtin_cheri_global_data_get(void);
+void* __capability __builtin_cheri_program_counter_get(void);
+void* __capability __builtin_cheri_stack_get(void);
 // #define INVARIANTS 1
 // #define MAC 1
 // #define AUDIT 1")
