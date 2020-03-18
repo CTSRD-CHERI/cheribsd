@@ -40,7 +40,11 @@
 #include <sys/cdefs.h>
 
 #define	_JBLEN		63	/* sp, ra, [f]s0-11, magic val, sigmask */
+#ifdef __CHERI_PURE_CAPABILITY__
+#define	_JB_SIGMASK	44
+#else
 #define	_JB_SIGMASK	27
+#endif
 
 #ifdef	__ASSEMBLER__
 #define	_JB_MAGIC__SETJMP	0xbe87fd8a2910af00
