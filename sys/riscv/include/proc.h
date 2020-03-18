@@ -47,7 +47,7 @@ struct mdproc {
 };
 
 #if __has_feature(capabilities)
-#define	KINFO_PROC_SIZE		1568
+#define	KINFO_PROC_SIZE		1248
 #define	KINFO_PROC64_SIZE	1088
 #else
 #define	KINFO_PROC_SIZE	1088
