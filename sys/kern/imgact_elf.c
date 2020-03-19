@@ -123,7 +123,7 @@ static Elf_Word __elfN(untrans_prot)(vm_prot_t);
 static int __elfN(copyout)(vm_map_t map, caddr_t kaddr, vm_offset_t uaddr,
     size_t sz);
 
-SYSCTL_NODE(_kern, OID_AUTO, ELF_ABI_ID, CTLFLAG_RW, 0,
+SYSCTL_NODE(_kern, OID_AUTO, ELF_ABI_ID, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
     "");
 
 #define	CORE_BUF_SIZE	(16 * 1024)
@@ -179,7 +179,7 @@ SYSCTL_PROC(ELF_NODE_OID, OID_AUTO, pie_base,
     sysctl_pie_base, "LU",
     "PIE load base without randomization");
 
-SYSCTL_NODE(ELF_NODE_OID, OID_AUTO, aslr, CTLFLAG_RW, 0,
+SYSCTL_NODE(ELF_NODE_OID, OID_AUTO, aslr, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
     "");
 #define	ASLR_NODE_OID	__CONCAT(ELF_NODE_OID, _aslr)
 
@@ -205,6 +205,18 @@ SYSCTL_INT(ASLR_NODE_OID, OID_AUTO, stack_gap, CTLFLAG_RW,
     &__elfN(aslr_stack_gap), 0,
     ELF_ABI_NAME
     ": maximum percentage of main stack to waste on a random gap");
+
+#ifdef __ELF_CHERI
+static int __elfN(sigfastblock) = 0;
+SYSCTL_INT(__CONCAT(__CONCAT(_kern_elf, __ELF_WORD_SIZE),c), OID_AUTO,
+    sigfastblock, CTLFLAG_RWTUN, &__elfN(sigfastblock), 0,
+    "enable sigfastblock for new processes");
+#else
+static int __elfN(sigfastblock) = 1;
+SYSCTL_INT(__CONCAT(_kern_elf, __ELF_WORD_SIZE), OID_AUTO, sigfastblock,
+    CTLFLAG_RWTUN, &__elfN(sigfastblock), 0,
+    "enable sigfastblock for new processes");
+#endif
 
 static Elf_Brandinfo *elf_brand_list[MAX_BRANDS];
 
@@ -1545,6 +1557,8 @@ __elfN(freebsd_copyout_auxargs)(struct image_params *imgp, uintcap_t base)
 		AUXARGS_ENTRY(pos, AT_HWCAP, *imgp->sysent->sv_hwcap);
 	if (imgp->sysent->sv_hwcap2 != NULL)
 		AUXARGS_ENTRY(pos, AT_HWCAP2, *imgp->sysent->sv_hwcap2);
+	AUXARGS_ENTRY(pos, AT_BSDFLAGS, __elfN(sigfastblock) ?
+	    ELF_BSDF_SIGFASTBLK : 0);
 	AUXARGS_ENTRY(pos, AT_ARGC, imgp->args->argc);
 	AUXARGS_ENTRY_PTR(pos, AT_ARGV, imgp->argv);
 	AUXARGS_ENTRY(pos, AT_ENVC, imgp->args->envc);
@@ -2522,10 +2536,6 @@ __elfN(note_threadmd)(void *arg, struct sbuf *sb, size_t *sizep)
 	free(buf, M_TEMP);
 	*sizep = size;
 }
-
-#ifdef KINFO_PROC_SIZE
-CTASSERT(sizeof(struct kinfo_proc) == KINFO_PROC_SIZE);
-#endif
 
 static void
 __elfN(note_procstat_proc)(void *arg, struct sbuf *sb, size_t *sizep)

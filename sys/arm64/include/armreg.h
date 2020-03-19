@@ -73,6 +73,11 @@
 #define	CNTHCTL_EL1PCEN		(1 << 1) /* Allow EL0/1 physical timer access */
 #define	CNTHCTL_EL1PCTEN	(1 << 0) /*Allow EL0/1 physical counter access*/
 
+/* CNTP_CTL_EL0 - Counter-timer Physical Timer Control register */
+#define	CNTP_CTL_ENABLE		(1 << 0)
+#define	CNTP_CTL_IMASK		(1 << 1)
+#define	CNTP_CTL_ISTATUS	(1 << 2)
+
 /* CPACR_EL1 */
 #define	CPACR_FPEN_MASK		(0x3 << 20)
 #define	 CPACR_FPEN_TRAP_ALL1	(0x0 << 20) /* Traps from EL0 and EL1 */
@@ -82,12 +87,39 @@
 #define	CPACR_TTA		(0x1 << 28)
 
 /* CTR_EL0 - Cache Type Register */
+#define	CTR_RES1		(1 << 31)
+#define	CTR_TminLine_SHIFT	32
+#define	CTR_TminLine_MASK	(UL(0x3f) << CTR_TminLine_SHIFT)
+#define	CTR_TminLine_VAL(reg)	((reg) & CTR_TminLine_MASK)
+#define	CTR_DIC_SHIFT		29
+#define	CTR_DIC_MASK		(0x1 << CTR_DIC_SHIFT)
+#define	CTR_DIC_VAL(reg)	((reg) & CTR_DIC_MASK)
+#define	CTR_IDC_SHIFT		28
+#define	CTR_IDC_MASK		(0x1 << CTR_IDC_SHIFT)
+#define	CTR_IDC_VAL(reg)	((reg) & CTR_IDC_MASK)
+#define	CTR_CWG_SHIFT		24
+#define	CTR_CWG_MASK		(0xf << CTR_CWG_SHIFT)
+#define	CTR_CWG_VAL(reg)	((reg) & CTR_CWG_MASK)
+#define	CTR_CWG_SIZE(reg)	(4 << (CTR_CWG_VAL(reg) >> CTR_CWG_SHIFT))
+#define	CTR_ERG_SHIFT		20
+#define	CTR_ERG_MASK		(0xf << CTR_ERG_SHIFT)
+#define	CTR_ERG_VAL(reg)	((reg) & CTR_ERG_MASK)
+#define	CTR_ERG_SIZE(reg)	(4 << (CTR_ERG_VAL(reg) >> CTR_ERG_SHIFT))
 #define	CTR_DLINE_SHIFT		16
 #define	CTR_DLINE_MASK		(0xf << CTR_DLINE_SHIFT)
-#define	CTR_DLINE_SIZE(reg)	(((reg) & CTR_DLINE_MASK) >> CTR_DLINE_SHIFT)
+#define	CTR_DLINE_VAL(reg)	((reg) & CTR_DLINE_MASK)
+#define	CTR_DLINE_SIZE(reg)	(4 << (CTR_DLINE_VAL(reg) >> CTR_DLINE_SHIFT))
+#define	CTR_L1IP_SHIFT		14
+#define	CTR_L1IP_MASK		(0x3 << CTR_L1IP_SHIFT)
+#define	CTR_L1IP_VAL(reg)	((reg) & CTR_L1IP_MASK)
+#define	 CTR_L1IP_VPIPT		(0 << CTR_L1IP_SHIFT)
+#define	 CTR_L1IP_AIVIVT	(1 << CTR_L1IP_SHIFT)
+#define	 CTR_L1IP_VIPT		(2 << CTR_L1IP_SHIFT)
+#define	 CTR_L1IP_PIPT		(3 << CTR_L1IP_SHIFT)
 #define	CTR_ILINE_SHIFT		0
 #define	CTR_ILINE_MASK		(0xf << CTR_ILINE_SHIFT)
-#define	CTR_ILINE_SIZE(reg)	(((reg) & CTR_ILINE_MASK) >> CTR_ILINE_SHIFT)
+#define	CTR_ILINE_VAL(reg)	((reg) & CTR_ILINE_MASK)
+#define	CTR_ILINE_SIZE(reg)	(4 << (CTR_ILINE_VAL(reg) >> CTR_ILINE_SHIFT))
 
 /* DAIF - Interrupt Mask Bits */
 #define	DAIF_D_MASKED		(1 << 9)
@@ -102,22 +134,53 @@
 #define	DCZID_BS_SIZE(reg)	(((reg) & DCZID_BS_MASK) >> DCZID_BS_SHIFT)
 
 /* ESR_ELx */
-#define	ESR_ELx_ISS_MASK	0x00ffffff
+#define	ESR_ELx_ISS_MASK	0x01ffffff
 #define	 ISS_INSN_FnV		(0x01 << 10)
 #define	 ISS_INSN_EA		(0x01 << 9)
 #define	 ISS_INSN_S1PTW		(0x01 << 7)
 #define	 ISS_INSN_IFSC_MASK	(0x1f << 0)
-#define	 ISS_DATA_ISV		(0x01 << 24)
-#define	 ISS_DATA_SAS_MASK	(0x03 << 22)
-#define	 ISS_DATA_SSE		(0x01 << 21)
-#define	 ISS_DATA_SRT_MASK	(0x1f << 16)
+
+#define	 ISS_MSR_DIR_SHIFT	0
+#define	 ISS_MSR_DIR		(0x01 << ISS_MSR_DIR_SHIFT)
+#define	 ISS_MSR_Rt_SHIFT	5
+#define	 ISS_MSR_Rt_MASK	(0x1f << ISS_MSR_Rt_SHIFT)
+#define	 ISS_MSR_Rt(x)		(((x) & ISS_MSR_Rt_MASK) >> ISS_MSR_Rt_SHIFT)
+#define	 ISS_MSR_CRm_SHIFT	1
+#define	 ISS_MSR_CRm_MASK	(0xf << ISS_MSR_CRm_SHIFT)
+#define	 ISS_MSR_CRm(x)		(((x) & ISS_MSR_CRm_MASK) >> ISS_MSR_CRm_SHIFT)
+#define	 ISS_MSR_CRn_SHIFT	10
+#define	 ISS_MSR_CRn_MASK	(0xf << ISS_MSR_CRn_SHIFT)
+#define	 ISS_MSR_CRn(x)		(((x) & ISS_MSR_CRn_MASK) >> ISS_MSR_CRn_SHIFT)
+#define	 ISS_MSR_OP1_SHIFT	14
+#define	 ISS_MSR_OP1_MASK	(0x7 << ISS_MSR_OP1_SHIFT)
+#define	 ISS_MSR_OP1(x)		(((x) & ISS_MSR_OP1_MASK) >> ISS_MSR_OP1_SHIFT)
+#define	 ISS_MSR_OP2_SHIFT	17
+#define	 ISS_MSR_OP2_MASK	(0x7 << ISS_MSR_OP2_SHIFT)
+#define	 ISS_MSR_OP2(x)		(((x) & ISS_MSR_OP2_MASK) >> ISS_MSR_OP2_SHIFT)
+#define	 ISS_MSR_OP0_SHIFT	20
+#define	 ISS_MSR_OP0_MASK	(0x3 << ISS_MSR_OP0_SHIFT)
+#define	 ISS_MSR_OP0(x)		(((x) & ISS_MSR_OP0_MASK) >> ISS_MSR_OP0_SHIFT)
+#define	 ISS_MSR_REG_MASK	\
+    (ISS_MSR_OP0_MASK | ISS_MSR_OP2_MASK | ISS_MSR_OP1_MASK | 	\
+     ISS_MSR_CRn_MASK | ISS_MSR_CRm_MASK)
+
+
+#define	 ISS_DATA_ISV_SHIFT	24
+#define	 ISS_DATA_ISV		(0x01 << ISS_DATA_ISV_SHIFT)
+#define	 ISS_DATA_SAS_SHIFT	22
+#define	 ISS_DATA_SAS_MASK	(0x03 << ISS_DATA_SAS_SHIFT)
+#define	 ISS_DATA_SSE_SHIFT	21
+#define	 ISS_DATA_SSE		(0x01 << ISS_DATA_SSE_SHIFT)
+#define	 ISS_DATA_SRT_SHIFT	16
+#define	 ISS_DATA_SRT_MASK	(0x1f << ISS_DATA_SRT_SHIFT)
 #define	 ISS_DATA_SF		(0x01 << 15)
 #define	 ISS_DATA_AR		(0x01 << 14)
 #define	 ISS_DATA_FnV		(0x01 << 10)
 #define	 ISS_DATA_EA		(0x01 << 9)
 #define	 ISS_DATA_CM		(0x01 << 8)
 #define	 ISS_DATA_S1PTW		(0x01 << 7)
-#define	 ISS_DATA_WnR		(0x01 << 6)
+#define	 ISS_DATA_WnR_SHIFT	6
+#define	 ISS_DATA_WnR		(0x01 << ISS_DATA_WnR_SHIFT)
 #define	 ISS_DATA_DFSC_MASK	(0x3f << 0)
 #define	 ISS_DATA_DFSC_ASF_L0	(0x00 << 0)
 #define	 ISS_DATA_DFSC_ASF_L1	(0x01 << 0)
@@ -150,10 +213,12 @@
 #define	ESR_ELx_EC_MASK		(0x3f << 26)
 #define	ESR_ELx_EXCEPTION(esr)	(((esr) & ESR_ELx_EC_MASK) >> ESR_ELx_EC_SHIFT)
 #define	 EXCP_UNKNOWN		0x00	/* Unkwn exception */
+#define	 EXCP_TRAP_WFI_WFE	0x01	/* Trapped WFI or WFE */
 #define	 EXCP_FP_SIMD		0x07	/* VFP/SIMD trap */
 #define	 EXCP_ILL_STATE		0x0e	/* Illegal execution state */
 #define	 EXCP_SVC32		0x11	/* SVC trap for AArch32 */
 #define	 EXCP_SVC64		0x15	/* SVC trap for AArch64 */
+#define	 EXCP_HVC		0x16	/* HVC trap */
 #define	 EXCP_MSR		0x18	/* MSR/MRS trap */
 #define	 EXCP_INSN_ABORT_L	0x20	/* Instruction abort, from lower EL */
 #define	 EXCP_INSN_ABORT	0x21	/* Instruction abort, from same EL */ 
@@ -192,10 +257,6 @@
 
 /* ICC_SRE_EL1 */
 #define	ICC_SRE_EL1_SRE		(1U << 0)
-
-/* ICC_SRE_EL2 */
-#define	ICC_SRE_EL2_SRE		(1U << 0)
-#define	ICC_SRE_EL2_EN		(1U << 3)
 
 /* ID_AA64DFR0_EL1 */
 #define	ID_AA64DFR0_EL1			MRS_REG(3, 0, 0, 5, 0)
@@ -698,6 +759,8 @@
 #define	TCR_TG1_4K	(2 << TCR_TG1_SHIFT)
 #define	TCR_TG1_64K	(3 << TCR_TG1_SHIFT)
 
+#define	TCR_TG0_MASK	0x000000000000c000
+
 #define	TCR_SH1_SHIFT	28
 #define	TCR_SH1_IS	(0x3UL << TCR_SH1_SHIFT)
 #define	TCR_ORGN1_SHIFT	26
@@ -724,6 +787,7 @@
 
 #define	TCR_T1SZ_SHIFT	16
 #define	TCR_T0SZ_SHIFT	0
+#define	TCR_T0SZ_MASK	0x3f
 #define	TCR_T1SZ(x)	((x) << TCR_T1SZ_SHIFT)
 #define	TCR_T0SZ(x)	((x) << TCR_T0SZ_SHIFT)
 #define	TCR_TxSZ(x)	(TCR_T1SZ(x) | TCR_T0SZ(x))

@@ -647,7 +647,6 @@ ath_rx_pkt(struct ath_softc *sc, struct ath_rx_status *rs, HAL_STATUS status,
     uint64_t tsf, int nf, HAL_RX_QUEUE qtype, struct ath_buf *bf,
     struct mbuf *m)
 {
-	struct epoch_tracker et;
 	uint64_t rstamp;
 	/* XXX TODO: make this an mbuf tag? */
 	struct ieee80211_rx_stats rxs;
@@ -656,6 +655,8 @@ ath_rx_pkt(struct ath_softc *sc, struct ath_rx_status *rs, HAL_STATUS status,
 	struct ieee80211_node *ni;
 	int is_good = 0;
 	struct ath_rx_edma *re = &sc->sc_rxedma[qtype];
+
+	NET_EPOCH_ASSERT();
 
 	/*
 	 * Calculate the correct 64 bit TSF given
@@ -942,7 +943,6 @@ rx_accept:
 		rxs.c_nf_ext[i] = nf;
 	}
 
-	NET_EPOCH_ENTER(et);
 	if (ni != NULL) {
 		/*
 		 * Only punt packets for ampdu reorder processing for
@@ -988,7 +988,6 @@ rx_accept:
 		type = ieee80211_input_mimo_all(ic, m);
 		m = NULL;
 	}
-	NET_EPOCH_EXIT(et);
 
 	/*
 	 * At this point we have passed the frame up the stack; thus
@@ -1076,6 +1075,8 @@ ath_rx_proc(struct ath_softc *sc, int resched)
 	int npkts = 0;
 	int kickpcu = 0;
 	int ret;
+
+	NET_EPOCH_ASSERT();
 
 	/* XXX we must not hold the ATH_LOCK here */
 	ATH_UNLOCK_ASSERT(sc);
@@ -1296,6 +1297,7 @@ static void
 ath_legacy_rx_tasklet(void *arg, int npending)
 {
 	struct ath_softc *sc = arg;
+	struct epoch_tracker et;
 
 	ATH_KTR(sc, ATH_KTR_RXPROC, 1, "ath_rx_proc: pending=%d", npending);
 	DPRINTF(sc, ATH_DEBUG_RX_PROC, "%s: pending %u\n", __func__, npending);
@@ -1308,14 +1310,18 @@ ath_legacy_rx_tasklet(void *arg, int npending)
 	}
 	ATH_PCU_UNLOCK(sc);
 
+	NET_EPOCH_ENTER(et);
 	ath_rx_proc(sc, 1);
+	NET_EPOCH_EXIT(et);
 }
 
 static void
 ath_legacy_flushrecv(struct ath_softc *sc)
 {
-
+	struct epoch_tracker et;
+	NET_EPOCH_ENTER(et);
 	ath_rx_proc(sc, 0);
+	NET_EPOCH_EXIT(et);
 }
 
 static void

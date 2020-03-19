@@ -285,11 +285,11 @@ ptsdev_ioctl(struct file *fp, u_long cmd, void *data,
 		tty_unlock(tp);
 		return (0);
 	case FIODGNAME:
-#ifdef COMPAT_FREEBSD64
-	case FIODGNAME_64:
-#endif
 #ifdef COMPAT_FREEBSD32
 	case FIODGNAME_32:
+#endif
+#ifdef COMPAT_FREEBSD64
+	case FIODGNAME_64:
 #endif
 	{
 		struct fiodgname_arg *fgn;

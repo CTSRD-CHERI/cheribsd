@@ -1066,9 +1066,7 @@ mdstart_swap(struct md_s *sc, struct bio *bp)
 	vm_object_pip_add(sc->object, 1);
 	for (i = bp->bio_offset / PAGE_SIZE; i <= lastp; i++) {
 		len = ((i == lastp) ? lastend : PAGE_SIZE) - offs;
-		VM_OBJECT_WLOCK(sc->object);
-		m = vm_page_grab(sc->object, i, VM_ALLOC_SYSTEM);
-		VM_OBJECT_WUNLOCK(sc->object);
+		m = vm_page_grab_unlocked(sc->object, i, VM_ALLOC_SYSTEM);
 		if (bp->bio_cmd == BIO_READ) {
 			if (vm_page_all_valid(m))
 				rv = VM_PAGER_OK;
@@ -1919,25 +1917,20 @@ mdctlioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 			return (EINVAL);
 		MD_IOCTL2REQ(mdio, &mdr);
 		/* If the file is adjacent to the md_ioctl it's in kernel. */
-		if ((void *)mdio->md_file == (void *)(mdio + 1)) {
-			mdr.md_file =
-			    (__cheri_tocap char * __capability)mdio->md_file;
+		if ((__cheri_addr vaddr_t)mdio->md_file == (vaddr_t)(mdio + 1))
 			mdr.md_file_seg = UIO_SYSSPACE;
-		} else {
-			mdr.md_file = mdio->md_file;
+		else
 			mdr.md_file_seg = UIO_USERSPACE;
-			mdr.md_file = __USER_CAP_STR(mdio->md_file);
-			mdr.md_file_seg = UIO_USERSPACE;
-		}
+		mdr.md_file = mdio->md_file;
 		mdr.md_label = mdio->md_label;
 		break;
 	}
-#ifdef COMPAT_FREEBSD64
-	case MDIOCATTACH_64:
-	case MDIOCDETACH_64:
-	case MDIOCRESIZE_64:
-	case MDIOCQUERY_64: {
-		struct md_ioctl64 *mdio = (struct md_ioctl64 *)addr;
+#ifdef COMPAT_FREEBSD32
+	case MDIOCATTACH_32:
+	case MDIOCDETACH_32:
+	case MDIOCRESIZE_32:
+	case MDIOCQUERY_32: {
+		struct md_ioctl32 *mdio = (struct md_ioctl32 *)addr;
 		if (mdio->md_version != MDIOVERSION)
 			return (EINVAL);
 		MD_IOCTL2REQ(mdio, &mdr);
@@ -1948,12 +1941,12 @@ mdctlioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 		break;
 	}
 #endif
-#ifdef COMPAT_FREEBSD32
-	case MDIOCATTACH_32:
-	case MDIOCDETACH_32:
-	case MDIOCRESIZE_32:
-	case MDIOCQUERY_32: {
-		struct md_ioctl32 *mdio = (struct md_ioctl32 *)addr;
+#ifdef COMPAT_FREEBSD64
+	case MDIOCATTACH_64:
+	case MDIOCDETACH_64:
+	case MDIOCRESIZE_64:
+	case MDIOCQUERY_64: {
+		struct md_ioctl64 *mdio = (struct md_ioctl64 *)addr;
 		if (mdio->md_version != MDIOVERSION)
 			return (EINVAL);
 		MD_IOCTL2REQ(mdio, &mdr);
@@ -1972,38 +1965,38 @@ mdctlioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 	error = 0;
 	switch (cmd) {
 	case MDIOCATTACH:
-#ifdef COMPAT_FREEBSD64
-	case MDIOCATTACH_64:
-#endif
 #ifdef COMPAT_FREEBSD32
 	case MDIOCATTACH_32:
+#endif
+#ifdef COMPAT_FREEBSD64
+	case MDIOCATTACH_64:
 #endif
 		error = kern_mdattach(td, &mdr);
 		break;
 	case MDIOCDETACH:
-#ifdef COMPAT_FREEBSD64
-	case MDIOCDETACH_64:
-#endif
 #ifdef COMPAT_FREEBSD32
 	case MDIOCDETACH_32:
+#endif
+#ifdef COMPAT_FREEBSD64
+	case MDIOCDETACH_64:
 #endif
 		error = kern_mddetach(td, &mdr);
 		break;
 	case MDIOCRESIZE:
-#ifdef COMPAT_FREEBSD64
-	case MDIOCRESIZE_64:
-#endif
 #ifdef COMPAT_FREEBSD32
 	case MDIOCRESIZE_32:
+#endif
+#ifdef COMPAT_FREEBSD64
+	case MDIOCRESIZE_64:
 #endif
 		error = kern_mdresize(&mdr);
 		break;
 	case MDIOCQUERY:
-#ifdef COMPAT_FREEBSD64
-	case MDIOCQUERY_64:
-#endif
 #ifdef COMPAT_FREEBSD32
 	case MDIOCQUERY_32:
+#endif
+#ifdef COMPAT_FREEBSD64
+	case MDIOCQUERY_64:
 #endif
 		error = kern_mdquery(&mdr);
 		break;
@@ -2018,18 +2011,18 @@ mdctlioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 		MD_REQ2IOCTL(&mdr, mdio);
 		break;
 	}
-#ifdef COMPAT_FREEBSD64
-	case MDIOCATTACH_64:
-	case MDIOCQUERY_64: {
-		struct md_ioctl64 *mdio = (struct md_ioctl64 *)addr;
-		MD_REQ2IOCTL(&mdr, mdio);
-		break;
-	}
-#endif
 #ifdef COMPAT_FREEBSD32
 	case MDIOCATTACH_32:
 	case MDIOCQUERY_32: {
 		struct md_ioctl32 *mdio = (struct md_ioctl32 *)addr;
+		MD_REQ2IOCTL(&mdr, mdio);
+		break;
+	}
+#endif
+#ifdef COMPAT_FREEBSD64
+	case MDIOCATTACH_64:
+	case MDIOCQUERY_64: {
+		struct md_ioctl64 *mdio = (struct md_ioctl64 *)addr;
 		MD_REQ2IOCTL(&mdr, mdio);
 		break;
 	}

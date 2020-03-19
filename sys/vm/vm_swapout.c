@@ -218,7 +218,7 @@ vm_swapout_object_deactivate(pmap_t pmap, vm_object_t first_object,
 			goto unlock_return;
 		VM_OBJECT_ASSERT_LOCKED(object);
 		if ((object->flags & OBJ_UNMANAGED) != 0 ||
-		    REFCOUNT_COUNT(object->paging_in_progress) > 0)
+		    blockcount_read(&object->paging_in_progress) > 0)
 			goto unlock_return;
 
 		unmap = true;
@@ -540,6 +540,7 @@ vm_thread_swapout(struct thread *td)
 		if (m == NULL)
 			panic("vm_thread_swapout: kstack already missing?");
 		vm_page_dirty(m);
+		vm_page_xunbusy_unchecked(m);
 		vm_page_unwire(m, PQ_LAUNDRY);
 	}
 	VM_OBJECT_WUNLOCK(ksobj);
@@ -564,7 +565,6 @@ vm_thread_swapin(struct thread *td, int oom_alloc)
 	for (i = 0; i < pages;) {
 		vm_page_assert_xbusied(ma[i]);
 		if (vm_page_all_valid(ma[i])) {
-			vm_page_xunbusy(ma[i]);
 			i++;
 			continue;
 		}
@@ -581,8 +581,6 @@ vm_thread_swapin(struct thread *td, int oom_alloc)
 		KASSERT(rv == VM_PAGER_OK, ("%s: cannot get kstack for proc %d",
 		    __func__, td->td_proc->p_pid));
 		vm_object_pip_wakeup(ksobj);
-		for (j = i; j < i + count; j++)
-			vm_page_xunbusy(ma[j]);
 		i += count;
 	}
 	pmap_qenter(td->td_kstack, ma, pages);

@@ -50,7 +50,8 @@ __FBSDID("$FreeBSD$");
 #include "x86.h"
 
 SYSCTL_DECL(_hw_vmm);
-static SYSCTL_NODE(_hw_vmm, OID_AUTO, topology, CTLFLAG_RD, 0, NULL);
+static SYSCTL_NODE(_hw_vmm, OID_AUTO, topology, CTLFLAG_RD | CTLFLAG_MPSAFE, 0,
+    NULL);
 
 #define	CPUID_VM_HIGH		0x40000000
 
@@ -135,7 +136,7 @@ x86_emulate_cpuid(struct vm *vm, int vcpu_id,
 			break;
 		case CPUID_8000_0008:
 			cpuid_count(*eax, *ecx, regs);
-			if (vmm_is_amd()) {
+			if (vmm_is_svm()) {
 				/*
 				 * As on Intel (0000_0007:0, EDX), mask out
 				 * unsupported or unsafe AMD extended features
@@ -234,7 +235,7 @@ x86_emulate_cpuid(struct vm *vm, int vcpu_id,
 
 		case CPUID_8000_001D:
 			/* AMD Cache topology, like 0000_0004 for Intel. */
-			if (!vmm_is_amd())
+			if (!vmm_is_svm())
 				goto default_leaf;
 
 			/*
@@ -276,8 +277,11 @@ x86_emulate_cpuid(struct vm *vm, int vcpu_id,
 			break;
 
 		case CPUID_8000_001E:
-			/* AMD Family 16h+ additional identifiers */
-			if (!vmm_is_amd() || CPUID_TO_FAMILY(cpu_id) < 0x16)
+			/*
+			 * AMD Family 16h+ and Hygon Family 18h additional
+			 * identifiers.
+			 */
+			if (!vmm_is_svm() || CPUID_TO_FAMILY(cpu_id) < 0x16)
 				goto default_leaf;
 
 			vm_get_topology(vm, &sockets, &cores, &threads,

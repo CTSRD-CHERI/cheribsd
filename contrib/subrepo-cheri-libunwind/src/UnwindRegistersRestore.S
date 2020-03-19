@@ -1225,9 +1225,9 @@ DEFINE_LIBUNWIND_FUNCTION(_ZN9libunwind15Registers_riscv6jumptoEv)
   restore_gpr 10   // restore a0
 
 #ifdef __CHERI_PURE_CAPABILITY__
-  ret           // jump to ra
-#else
   cret          // jump to cra
+#else
+  ret           // jump to ra
 #endif
 END_LIBUNWIND_FUNCTION(_ZN9libunwind15Registers_riscv6jumptoEv)
 

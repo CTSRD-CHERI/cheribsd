@@ -215,7 +215,8 @@ static MALLOC_DEFINE(M_VM, "vm", "vm");
 /* statistics */
 static VMM_STAT(VCPU_TOTAL_RUNTIME, "vcpu total runtime");
 
-SYSCTL_NODE(_hw, OID_AUTO, vmm, CTLFLAG_RW, NULL, NULL);
+SYSCTL_NODE(_hw, OID_AUTO, vmm, CTLFLAG_RW | CTLFLAG_MPSAFE, NULL,
+    NULL);
 
 /*
  * Halt the guest if all vcpus are executing a HLT instruction with
@@ -347,7 +348,7 @@ vmm_init(void)
 	
 	if (vmm_is_intel())
 		ops = &vmm_ops_intel;
-	else if (vmm_is_amd())
+	else if (vmm_is_svm())
 		ops = &vmm_ops_amd;
 	else
 		return (ENXIO);

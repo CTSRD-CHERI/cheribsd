@@ -107,11 +107,6 @@ WITH_CHERI256:=	yes
 .if ${MK_CHERI128} == "yes" || ${MK_CHERI256} == "yes"
 MK_CHERI:=	yes
 MK_CLANG:=	no
-# We want to use libc++ for CHERI (even when targeting MIPS)
-MK_GNUCXX:=	no
-MK_LIBCPLUSPLUS:=yes
-# LLVM libunwind is needed for libc++
-MK_LLVM_LIBUNWIND:=	yes
 # Build cheribsdbox by default so that we have a emergency MIPS tool if the
 # CHERI world is broken
 .if !defined(WITHOUT_CHERIBSDBOX)
@@ -135,7 +130,7 @@ MK_CHERI:=	no
     PROFILE \
     WARNS
 .if defined(NO_${var})
-.warning "NO_${var} is defined, but deprecated. Please use MK_${var}=no instead."
+.error "NO_${var} is defined, but deprecated. Please use MK_${var}=no instead."
 MK_${var}:=no
 .endif
 .endfor

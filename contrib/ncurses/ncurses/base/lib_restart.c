@@ -1,5 +1,6 @@
 /****************************************************************************
- * Copyright (c) 1998-2011,2012 Free Software Foundation, Inc.              *
+ * Copyright 2020 Thomas E. Dickey                                          *
+ * Copyright 1998-2012,2015 Free Software Foundation, Inc.                  *
  *                                                                          *
  * Permission is hereby granted, free of charge, to any person obtaining a  *
  * copy of this software and associated documentation files (the            *
@@ -41,7 +42,7 @@
 
 #include <curses.priv.h>
 
-MODULE_ID("$Id: lib_restart.c,v 1.15 2012/12/08 20:40:06 tom Exp $")
+MODULE_ID("$Id: lib_restart.c,v 1.17 2020/02/02 23:34:34 tom Exp $")
 
 NCURSES_EXPORT(int)
 NCURSES_SP_NAME(restartterm) (NCURSES_SP_DCLx
@@ -54,6 +55,7 @@ NCURSES_SP_NAME(restartterm) (NCURSES_SP_DCLx
     TERMINAL *new_term = 0;
 #endif
 
+    START_TRACE();
     T((T_CALLED("restartterm(%p,%s,%d,%p)"),
        (void *) SP_PARM,
        termp,
@@ -110,6 +112,7 @@ NCURSES_SP_NAME(restartterm) (NCURSES_SP_DCLx
 NCURSES_EXPORT(int)
 restartterm(NCURSES_CONST char *termp, int filenum, int *errret)
 {
+    START_TRACE();
     return NCURSES_SP_NAME(restartterm) (CURRENT_SCREEN, termp, filenum, errret);
 }
 #endif

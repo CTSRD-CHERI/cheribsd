@@ -476,7 +476,8 @@ nospace:
  * allocation will be used.
  */
 
-SYSCTL_NODE(_vfs, OID_AUTO, ffs, CTLFLAG_RW, 0, "FFS filesystem");
+SYSCTL_NODE(_vfs, OID_AUTO, ffs, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
+    "FFS filesystem");
 
 static int doasyncfree = 1;
 SYSCTL_INT(_vfs_ffs, OID_AUTO, doasyncfree, CTLFLAG_RW, &doasyncfree, 0,
@@ -3101,56 +3102,74 @@ ffs_fserr(fs, inum, cp)
 
 static int sysctl_ffs_fsck(SYSCTL_HANDLER_ARGS);
 
-SYSCTL_PROC(_vfs_ffs, FFS_ADJ_REFCNT, adjrefcnt, CTLFLAG_WR|CTLTYPE_STRUCT,
-	0, 0, sysctl_ffs_fsck, "S,fsck", "Adjust Inode Reference Count");
+SYSCTL_PROC(_vfs_ffs, FFS_ADJ_REFCNT, adjrefcnt,
+    CTLFLAG_WR | CTLTYPE_STRUCT | CTLFLAG_NEEDGIANT,
+    0, 0, sysctl_ffs_fsck, "S,fsck",
+    "Adjust Inode Reference Count");
 
-static SYSCTL_NODE(_vfs_ffs, FFS_ADJ_BLKCNT, adjblkcnt, CTLFLAG_WR,
-	sysctl_ffs_fsck, "Adjust Inode Used Blocks Count");
+static SYSCTL_NODE(_vfs_ffs, FFS_ADJ_BLKCNT, adjblkcnt,
+    CTLFLAG_WR | CTLFLAG_NEEDGIANT, sysctl_ffs_fsck,
+    "Adjust Inode Used Blocks Count");
 
-static SYSCTL_NODE(_vfs_ffs, FFS_SET_SIZE, setsize, CTLFLAG_WR,
-	sysctl_ffs_fsck, "Set the inode size");
+static SYSCTL_NODE(_vfs_ffs, FFS_SET_SIZE, setsize,
+    CTLFLAG_WR | CTLFLAG_NEEDGIANT, sysctl_ffs_fsck,
+    "Set the inode size");
 
-static SYSCTL_NODE(_vfs_ffs, FFS_ADJ_NDIR, adjndir, CTLFLAG_WR,
-	sysctl_ffs_fsck, "Adjust number of directories");
+static SYSCTL_NODE(_vfs_ffs, FFS_ADJ_NDIR, adjndir,
+    CTLFLAG_WR | CTLFLAG_NEEDGIANT, sysctl_ffs_fsck,
+    "Adjust number of directories");
 
-static SYSCTL_NODE(_vfs_ffs, FFS_ADJ_NBFREE, adjnbfree, CTLFLAG_WR,
-	sysctl_ffs_fsck, "Adjust number of free blocks");
+static SYSCTL_NODE(_vfs_ffs, FFS_ADJ_NBFREE, adjnbfree,
+    CTLFLAG_WR | CTLFLAG_NEEDGIANT, sysctl_ffs_fsck,
+    "Adjust number of free blocks");
 
-static SYSCTL_NODE(_vfs_ffs, FFS_ADJ_NIFREE, adjnifree, CTLFLAG_WR,
-	sysctl_ffs_fsck, "Adjust number of free inodes");
+static SYSCTL_NODE(_vfs_ffs, FFS_ADJ_NIFREE, adjnifree,
+    CTLFLAG_WR | CTLFLAG_NEEDGIANT, sysctl_ffs_fsck,
+    "Adjust number of free inodes");
 
-static SYSCTL_NODE(_vfs_ffs, FFS_ADJ_NFFREE, adjnffree, CTLFLAG_WR,
-	sysctl_ffs_fsck, "Adjust number of free frags");
+static SYSCTL_NODE(_vfs_ffs, FFS_ADJ_NFFREE, adjnffree,
+    CTLFLAG_WR | CTLFLAG_NEEDGIANT, sysctl_ffs_fsck,
+    "Adjust number of free frags");
 
-static SYSCTL_NODE(_vfs_ffs, FFS_ADJ_NUMCLUSTERS, adjnumclusters, CTLFLAG_WR,
-	sysctl_ffs_fsck, "Adjust number of free clusters");
+static SYSCTL_NODE(_vfs_ffs, FFS_ADJ_NUMCLUSTERS, adjnumclusters,
+    CTLFLAG_WR | CTLFLAG_NEEDGIANT, sysctl_ffs_fsck,
+    "Adjust number of free clusters");
 
-static SYSCTL_NODE(_vfs_ffs, FFS_DIR_FREE, freedirs, CTLFLAG_WR,
-	sysctl_ffs_fsck, "Free Range of Directory Inodes");
+static SYSCTL_NODE(_vfs_ffs, FFS_DIR_FREE, freedirs,
+    CTLFLAG_WR | CTLFLAG_NEEDGIANT, sysctl_ffs_fsck,
+    "Free Range of Directory Inodes");
 
-static SYSCTL_NODE(_vfs_ffs, FFS_FILE_FREE, freefiles, CTLFLAG_WR,
-	sysctl_ffs_fsck, "Free Range of File Inodes");
+static SYSCTL_NODE(_vfs_ffs, FFS_FILE_FREE, freefiles,
+    CTLFLAG_WR | CTLFLAG_NEEDGIANT, sysctl_ffs_fsck,
+    "Free Range of File Inodes");
 
-static SYSCTL_NODE(_vfs_ffs, FFS_BLK_FREE, freeblks, CTLFLAG_WR,
-	sysctl_ffs_fsck, "Free Range of Blocks");
+static SYSCTL_NODE(_vfs_ffs, FFS_BLK_FREE, freeblks,
+    CTLFLAG_WR | CTLFLAG_NEEDGIANT, sysctl_ffs_fsck,
+    "Free Range of Blocks");
 
-static SYSCTL_NODE(_vfs_ffs, FFS_SET_FLAGS, setflags, CTLFLAG_WR,
-	sysctl_ffs_fsck, "Change Filesystem Flags");
+static SYSCTL_NODE(_vfs_ffs, FFS_SET_FLAGS, setflags,
+    CTLFLAG_WR | CTLFLAG_NEEDGIANT, sysctl_ffs_fsck,
+    "Change Filesystem Flags");
 
-static SYSCTL_NODE(_vfs_ffs, FFS_SET_CWD, setcwd, CTLFLAG_WR,
-	sysctl_ffs_fsck, "Set Current Working Directory");
+static SYSCTL_NODE(_vfs_ffs, FFS_SET_CWD, setcwd,
+    CTLFLAG_WR | CTLFLAG_NEEDGIANT, sysctl_ffs_fsck,
+    "Set Current Working Directory");
 
-static SYSCTL_NODE(_vfs_ffs, FFS_SET_DOTDOT, setdotdot, CTLFLAG_WR,
-	sysctl_ffs_fsck, "Change Value of .. Entry");
+static SYSCTL_NODE(_vfs_ffs, FFS_SET_DOTDOT, setdotdot,
+    CTLFLAG_WR | CTLFLAG_NEEDGIANT, sysctl_ffs_fsck,
+    "Change Value of .. Entry");
 
-static SYSCTL_NODE(_vfs_ffs, FFS_UNLINK, unlink, CTLFLAG_WR,
-	sysctl_ffs_fsck, "Unlink a Duplicate Name");
+static SYSCTL_NODE(_vfs_ffs, FFS_UNLINK, unlink,
+    CTLFLAG_WR | CTLFLAG_NEEDGIANT, sysctl_ffs_fsck,
+    "Unlink a Duplicate Name");
 
-static SYSCTL_NODE(_vfs_ffs, FFS_SET_INODE, setinode, CTLFLAG_WR,
-	sysctl_ffs_fsck, "Update an On-Disk Inode");
+static SYSCTL_NODE(_vfs_ffs, FFS_SET_INODE, setinode,
+    CTLFLAG_WR | CTLFLAG_NEEDGIANT, sysctl_ffs_fsck,
+    "Update an On-Disk Inode");
 
-static SYSCTL_NODE(_vfs_ffs, FFS_SET_BUFOUTPUT, setbufoutput, CTLFLAG_WR,
-	sysctl_ffs_fsck, "Set Buffered Writing for Descriptor");
+static SYSCTL_NODE(_vfs_ffs, FFS_SET_BUFOUTPUT, setbufoutput,
+    CTLFLAG_WR | CTLFLAG_NEEDGIANT, sysctl_ffs_fsck,
+    "Set Buffered Writing for Descriptor");
 
 #ifdef DIAGNOSTIC
 static int fsckcmds = 0;
@@ -3171,6 +3190,7 @@ sysctl_ffs_fsck(SYSCTL_HANDLER_ARGS)
 	struct inode *ip, *dp;
 	struct mount *mp;
 	struct fs *fs;
+	struct pwd *pwd;
 	ufs2_daddr_t blkno;
 	long blkcnt, blksize;
 	u_long key;
@@ -3429,11 +3449,11 @@ sysctl_ffs_fsck(SYSCTL_HANDLER_ARGS)
 		/*
 		 * Now we get and lock the child directory containing "..".
 		 */
-		FILEDESC_SLOCK(td->td_proc->p_fd);
-		dvp = td->td_proc->p_fd->fd_cdir;
-		FILEDESC_SUNLOCK(td->td_proc->p_fd);
+		pwd = pwd_hold(td);
+		dvp = pwd->pwd_cdir;
 		if ((error = vget(dvp, LK_EXCLUSIVE, td)) != 0) {
 			vput(fdvp);
+			pwd_drop(pwd);
 			break;
 		}
 		dp = VTOI(dvp);
@@ -3444,6 +3464,7 @@ sysctl_ffs_fsck(SYSCTL_HANDLER_ARGS)
 		cache_purge(dvp);
 		vput(dvp);
 		vput(fdvp);
+		pwd_drop(pwd);
 		break;
 
 	case FFS_UNLINK:
@@ -3573,6 +3594,7 @@ buffered_write(fp, uio, active_cred, flags, td)
 	struct inode *ip;
 	struct buf *bp;
 	struct fs *fs;
+	struct ufsmount *ump;
 	struct filedesc *fdp;
 	int error;
 	daddr_t lbn;
@@ -3588,7 +3610,7 @@ buffered_write(fp, uio, active_cred, flags, td)
 		return (EINVAL);
 	fdp = td->td_proc->p_fd;
 	FILEDESC_SLOCK(fdp);
-	vp = fdp->fd_cdir;
+	vp = fdp->fd_pwd->pwd_cdir;
 	vref(vp);
 	FILEDESC_SUNLOCK(fdp);
 	vn_lock(vp, LK_SHARED | LK_RETRY);
@@ -3601,10 +3623,12 @@ buffered_write(fp, uio, active_cred, flags, td)
 		return (EINVAL);
 	}
 	ip = VTOI(vp);
-	if (ITODEVVP(ip) != devvp) {
+	ump = ip->i_ump;
+	if (ump->um_odevvp != devvp) {
 		vput(vp);
 		return (EINVAL);
 	}
+	devvp = ump->um_devvp;
 	fs = ITOFS(ip);
 	vput(vp);
 	foffset_lock_uio(fp, uio, flags);

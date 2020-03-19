@@ -327,6 +327,12 @@ do_trap_supervisor(struct trapframe *frame)
 		break;
 #if __has_feature(capabilities)
 	case EXCP_CHERI:
+		if (curthread->td_pcb->pcb_onfault != 0) {
+			frame->tf_a[0] = EPROT;
+			frame->tf_sepc = (uintcap_t)cheri_setaddress(
+			    cheri_getpcc(), curthread->td_pcb->pcb_onfault);
+			break;
+		}
 		dump_regs(frame);
 		sccsr = csr_read(sccsr);
 		panic("CHERI exception %#x at 0x%016lx\n",

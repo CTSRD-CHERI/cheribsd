@@ -112,6 +112,7 @@ struct cpu_desc {
 	uint64_t	id_aa64mmfr2;
 	uint64_t	id_aa64pfr0;
 	uint64_t	id_aa64pfr1;
+	uint64_t	ctr;
 };
 
 static struct cpu_desc cpu_desc[MAXCPU];
@@ -128,6 +129,7 @@ static u_int cpu_print_regs;
 #define	PRINT_ID_AA64_MMFR2	0x00004000
 #define	PRINT_ID_AA64_PFR0	0x00010000
 #define	PRINT_ID_AA64_PFR1	0x00020000
+#define	PRINT_CTR_EL0		0x10000000
 
 struct cpu_parts {
 	u_int		part_id;
@@ -963,6 +965,13 @@ update_user_regs(u_int cpu)
 extern u_long elf_hwcap;
 bool __read_frequently lse_supported = false;
 
+bool __read_frequently icache_aliasing = false;
+bool __read_frequently icache_vmid = false;
+
+int64_t dcache_line_size;	/* The minimum D cache line size */
+int64_t icache_line_size;	/* The minimum I cache line size */
+int64_t idcache_line_size;	/* The minimum cache line size */
+
 static void
 identify_cpu_sysinit(void *dummy __unused)
 {
@@ -1089,13 +1098,65 @@ parse_cpu_features_hwcap(u_int cpu)
 }
 
 static void
-print_id_register(struct sbuf *sb, const char *reg_name, uint64_t reg,
-    struct mrs_field *fields)
+print_ctr_fields(struct sbuf *sb, uint64_t reg, void *arg)
 {
-	struct mrs_field_value *fv;
-	int field, i, j, printed;
+
+	sbuf_printf(sb, "%u byte D-cacheline,", CTR_DLINE_SIZE(reg));
+	sbuf_printf(sb, "%u byte I-cacheline,", CTR_ILINE_SIZE(reg));
+	reg &= ~(CTR_DLINE_MASK | CTR_ILINE_MASK);
+
+	switch(CTR_L1IP_VAL(reg)) {
+	case CTR_L1IP_VPIPT:
+		sbuf_printf(sb, "VPIPT");
+		break;
+	case CTR_L1IP_AIVIVT:
+		sbuf_printf(sb, "AIVIVT");
+		break;
+	case CTR_L1IP_VIPT:
+		sbuf_printf(sb, "VIPT");
+		break;
+	case CTR_L1IP_PIPT:
+		sbuf_printf(sb, "PIPT");
+		break;
+	}
+	sbuf_printf(sb, " ICache,");
+	reg &= ~CTR_L1IP_MASK;
+
+	sbuf_printf(sb, "%d byte ERG,", CTR_ERG_SIZE(reg));
+	sbuf_printf(sb, "%d byte CWG", CTR_CWG_SIZE(reg));
+	reg &= ~(CTR_ERG_MASK | CTR_CWG_MASK);
+
+	if (CTR_IDC_VAL(reg) != 0)
+		sbuf_printf(sb, ",IDC");
+	if (CTR_DIC_VAL(reg) != 0)
+		sbuf_printf(sb, ",DIC");
+	reg &= ~(CTR_IDC_MASK | CTR_DIC_MASK);
+	reg &= ~CTR_RES1;
+
+	if (reg != 0)
+		sbuf_printf(sb, ",%lx", reg);
+}
+
+static void
+print_register(struct sbuf *sb, const char *reg_name, uint64_t reg,
+    void (*print_fields)(struct sbuf *, uint64_t, void *), void *arg)
+{
 
 	sbuf_printf(sb, "%29s = <", reg_name);
+
+	print_fields(sb, reg, arg);
+
+	sbuf_finish(sb);
+	printf("%s>\n", sbuf_data(sb));
+	sbuf_clear(sb);
+}
+
+static void
+print_id_fields(struct sbuf *sb, uint64_t reg, void *arg)
+{
+	struct mrs_field *fields = arg;
+	struct mrs_field_value *fv;
+	int field, i, j, printed;
 
 #define SEP_STR	((printed++) == 0) ? "" : ","
 	printed = 0;
@@ -1113,7 +1174,7 @@ print_id_register(struct sbuf *sb, const char *reg_name, uint64_t reg,
 
 			if (fv[j].desc[0] != '\0')
 				sbuf_printf(sb, "%s%s", SEP_STR, fv[j].desc);
-				break;
+			break;
 		}
 		if (fv[j].desc == NULL)
 			sbuf_printf(sb, "%sUnknown %s(%x)", SEP_STR,
@@ -1125,10 +1186,14 @@ print_id_register(struct sbuf *sb, const char *reg_name, uint64_t reg,
 	if (reg != 0)
 		sbuf_printf(sb, "%s%#lx", SEP_STR, reg);
 #undef SEP_STR
+}
 
-	sbuf_finish(sb);
-	printf("%s>\n", sbuf_data(sb));
-	sbuf_clear(sb);
+static void
+print_id_register(struct sbuf *sb, const char *reg_name, uint64_t reg,
+    struct mrs_field *fields)
+{
+
+	print_register(sb, reg_name, reg, print_id_fields, fields);
 }
 
 static void
@@ -1183,6 +1248,12 @@ print_cpu_features(u_int cpu)
 		printf("WARNING: ThunderX Pass 1.1 detected.\nThis has known "
 		    "hardware bugs that may cause the incorrect operation of "
 		    "atomic operations.\n");
+
+	/* Cache Type Register */
+	if (cpu == 0 || (cpu_print_regs & PRINT_CTR_EL0) != 0) {
+		print_register(sb, "Cache Type",
+		    cpu_desc[cpu].ctr, print_ctr_fields, NULL);
+	}
 
 	/* AArch64 Instruction Set Attribute Register 0 */
 	if (cpu == 0 || (cpu_print_regs & PRINT_ID_AA64_ISAR0) != 0)
@@ -1245,6 +1316,46 @@ print_cpu_features(u_int cpu)
 }
 
 void
+identify_cache(uint64_t ctr)
+{
+
+	/* Identify the L1 cache type */
+	switch (CTR_L1IP_VAL(ctr)) {
+	case CTR_L1IP_PIPT:
+		break;
+	case CTR_L1IP_VPIPT:
+		icache_vmid = true;
+		break;
+	default:
+	case CTR_L1IP_VIPT:
+		icache_aliasing = true;
+		break;
+	}
+
+	if (dcache_line_size == 0) {
+		KASSERT(icache_line_size == 0, ("%s: i-cacheline size set: %ld",
+		    __func__, icache_line_size));
+
+		/* Get the D cache line size */
+		dcache_line_size = CTR_DLINE_SIZE(ctr);
+		/* And the same for the I cache */
+		icache_line_size = CTR_ILINE_SIZE(ctr);
+
+		idcache_line_size = MIN(dcache_line_size, icache_line_size);
+	}
+
+	if (dcache_line_size != CTR_DLINE_SIZE(ctr)) {
+		printf("WARNING: D-cacheline size mismatch %ld != %d\n",
+		    dcache_line_size, CTR_DLINE_SIZE(ctr));
+	}
+
+	if (icache_line_size != CTR_ILINE_SIZE(ctr)) {
+		printf("WARNING: I-cacheline size mismatch %ld != %d\n",
+		    icache_line_size, CTR_ILINE_SIZE(ctr));
+	}
+}
+
+void
 identify_cpu(void)
 {
 	u_int midr;
@@ -1295,6 +1406,7 @@ identify_cpu(void)
 	cpu_desc[cpu].mpidr = get_mpidr();
 	CPU_AFFINITY(cpu) = cpu_desc[cpu].mpidr & CPU_AFF_MASK;
 
+	cpu_desc[cpu].ctr = READ_SPECIALREG(ctr_el0);
 	cpu_desc[cpu].id_aa64dfr0 = READ_SPECIALREG(id_aa64dfr0_el1);
 	cpu_desc[cpu].id_aa64dfr1 = READ_SPECIALREG(id_aa64dfr1_el1);
 	cpu_desc[cpu].id_aa64isar0 = READ_SPECIALREG(id_aa64isar0_el1);
@@ -1363,6 +1475,15 @@ identify_cpu(void)
 			cpu_print_regs |= PRINT_ID_AA64_PFR0;
 		if (cpu_desc[cpu].id_aa64pfr1 != cpu_desc[0].id_aa64pfr1)
 			cpu_print_regs |= PRINT_ID_AA64_PFR1;
+
+		if (cpu_desc[cpu].ctr != cpu_desc[0].ctr) {
+			/*
+			 * If the cache type register is different we may
+			 * have a different l1 cache type.
+			 */
+			identify_cache(cpu_desc[cpu].ctr);
+			cpu_print_regs |= PRINT_CTR_EL0;
+		}
 
 		/* Wake up the other CPUs */
 		atomic_store_rel_int(&ident_lock, 0);

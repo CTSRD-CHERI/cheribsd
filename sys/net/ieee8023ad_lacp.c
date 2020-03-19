@@ -197,7 +197,8 @@ static void	lacp_dprintf(const struct lacp_port *, const char *, ...)
 
 VNET_DEFINE_STATIC(int, lacp_debug);
 #define	V_lacp_debug	VNET(lacp_debug)
-SYSCTL_NODE(_net_link_lagg, OID_AUTO, lacp, CTLFLAG_RD, 0, "ieee802.3ad");
+SYSCTL_NODE(_net_link_lagg, OID_AUTO, lacp, CTLFLAG_RD | CTLFLAG_MPSAFE, 0,
+    "ieee802.3ad");
 SYSCTL_INT(_net_link_lagg_lacp, OID_AUTO, debug, CTLFLAG_RWTUN | CTLFLAG_VNET,
     &VNET_NAME(lacp_debug), 0, "Enable LACP debug logging (1=debug, 2=trace)");
 
@@ -1194,6 +1195,7 @@ lacp_compose_key(struct lacp_port *lp)
 		case IFM_50G_PCIE:
 		case IFM_50G_CR2:
 		case IFM_50G_KR2:
+		case IFM_50G_KR4:
 		case IFM_50G_SR2:
 		case IFM_50G_LR2:
 		case IFM_50G_LAUI2_AC:

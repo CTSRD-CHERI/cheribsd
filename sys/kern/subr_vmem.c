@@ -563,8 +563,7 @@ qc_init(vmem_t *vm, vmem_size_t qcache_max)
 		qc->qc_vmem = vm;
 		qc->qc_size = size;
 		qc->qc_cache = uma_zcache_create(qc->qc_name, size,
-		    NULL, NULL, NULL, NULL, qc_import, qc_release, qc,
-		    UMA_ZONE_VM);
+		    NULL, NULL, NULL, NULL, qc_import, qc_release, qc, 0);
 		MPASS(qc->qc_cache);
 	}
 }
@@ -607,7 +606,7 @@ static struct mtx_padalign __exclusive_cache_line vmem_bt_lock;
  * page of kva.  We dip into this reserve by specifying M_USE_RESERVE only
  * when allocating the page to hold new boundary tags.  In this way the
  * reserve is automatically filled by the allocation that uses the reserve.
- * 
+ *
  * We still have to guarantee that the new tags are allocated atomically since
  * many threads may try concurrently.  The bt_lock provides this guarantee.
  * We convert WAITOK allocations to NOWAIT and then handle the blocking here
@@ -670,10 +669,10 @@ vmem_startup(void)
 	mtx_init(&vmem_list_lock, "vmem list lock", NULL, MTX_DEF);
 	vmem_zone = uma_zcreate("vmem",
 	    sizeof(struct vmem), NULL, NULL, NULL, NULL,
-	    UMA_ALIGN_PTR, UMA_ZONE_VM);
+	    UMA_ALIGN_PTR, 0);
 	vmem_bt_zone = uma_zcreate("vmem btag",
 	    sizeof(struct vmem_btag), NULL, NULL, NULL, NULL,
-	    UMA_ALIGN_PTR, UMA_ZONE_VM | UMA_ZONE_NOFREE);
+	    UMA_ALIGN_PTR, UMA_ZONE_VM);
 #ifndef UMA_MD_SMALL_ALLOC
 	mtx_init(&vmem_bt_lock, "btag lock", NULL, MTX_DEF);
 	uma_prealloc(vmem_bt_zone, BT_MAXALLOC);
@@ -927,7 +926,7 @@ vmem_fit(const bt_t *bt, vmem_size_t size, vmem_size_t align,
 	 */
 	CHERI_VM_ASSERT_VALID(start);
 	CHERI_VM_ASSERT_VALID(end);
-	if (start > end) 
+	if (start > end)
 		return (ENOMEM);
 
 	start = VMEM_ALIGNUP(start - phase, align) + phase;
@@ -1492,9 +1491,6 @@ vmem_xfree(vmem_t *vm, vmem_addr_t addr, vmem_size_t size)
 		VMEM_CONDVAR_BROADCAST(vm);
 		bt_freetrim(vm, BT_MAXFREE);
 	}
-#ifdef CHERI_PURECAP_KERNEL
-	MPASS(cheri_getlen((void *)t->bt_start) >= bt->bt_size);
-#endif
 }
 
 /*

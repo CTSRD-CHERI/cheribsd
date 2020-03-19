@@ -308,10 +308,10 @@ struct port_info {
  	struct port_stats stats;
 	u_int tnl_cong_drops;
 	u_int tx_parse_error;
-	u_long	tx_tls_records;
-	u_long	tx_tls_octets;
-	u_long	rx_tls_records;
-	u_long	rx_tls_octets;
+	u_long	tx_toe_tls_records;
+	u_long	tx_toe_tls_octets;
+	u_long	rx_toe_tls_records;
+	u_long	rx_toe_tls_octets;
 
 	struct callout tick;
 };
@@ -574,7 +574,6 @@ struct sge_txq {
 	uint64_t txpkts0_pkts;	/* # of frames in type0 coalesced tx WRs */
 	uint64_t txpkts1_pkts;	/* # of frames in type1 coalesced tx WRs */
 	uint64_t raw_wrs;	/* # of raw work requests (alloc_wr_mbuf) */
-	uint64_t tls_wrs;	/* # of TLS work requests */
 
 	uint64_t kern_tls_records;
 	uint64_t kern_tls_short;

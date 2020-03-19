@@ -780,18 +780,66 @@ sctp_audit_log(uint8_t ev, uint8_t fd)
 void
 sctp_stop_timers_for_shutdown(struct sctp_tcb *stcb)
 {
-	struct sctp_association *asoc;
+	struct sctp_inpcb *inp;
 	struct sctp_nets *net;
 
-	asoc = &stcb->asoc;
+	inp = stcb->sctp_ep;
 
-	(void)SCTP_OS_TIMER_STOP(&asoc->dack_timer.timer);
-	(void)SCTP_OS_TIMER_STOP(&asoc->strreset_timer.timer);
-	(void)SCTP_OS_TIMER_STOP(&asoc->asconf_timer.timer);
-	(void)SCTP_OS_TIMER_STOP(&asoc->autoclose_timer.timer);
-	TAILQ_FOREACH(net, &asoc->nets, sctp_next) {
-		(void)SCTP_OS_TIMER_STOP(&net->pmtu_timer.timer);
-		(void)SCTP_OS_TIMER_STOP(&net->hb_timer.timer);
+	sctp_timer_stop(SCTP_TIMER_TYPE_RECV, inp, stcb, NULL,
+	    SCTP_FROM_SCTPUTIL + SCTP_LOC_12);
+	sctp_timer_stop(SCTP_TIMER_TYPE_STRRESET, inp, stcb, NULL,
+	    SCTP_FROM_SCTPUTIL + SCTP_LOC_13);
+	sctp_timer_stop(SCTP_TIMER_TYPE_ASCONF, inp, stcb, NULL,
+	    SCTP_FROM_SCTPUTIL + SCTP_LOC_14);
+	sctp_timer_stop(SCTP_TIMER_TYPE_AUTOCLOSE, inp, stcb, NULL,
+	    SCTP_FROM_SCTPUTIL + SCTP_LOC_15);
+	TAILQ_FOREACH(net, &stcb->asoc.nets, sctp_next) {
+		sctp_timer_stop(SCTP_TIMER_TYPE_PATHMTURAISE, inp, stcb, net,
+		    SCTP_FROM_SCTPUTIL + SCTP_LOC_16);
+		sctp_timer_stop(SCTP_TIMER_TYPE_HEARTBEAT, inp, stcb, net,
+		    SCTP_FROM_SCTPUTIL + SCTP_LOC_17);
+	}
+}
+
+void
+sctp_stop_association_timers(struct sctp_tcb *stcb, bool stop_assoc_kill_timer)
+{
+	struct sctp_inpcb *inp;
+	struct sctp_nets *net;
+
+	inp = stcb->sctp_ep;
+	sctp_timer_stop(SCTP_TIMER_TYPE_RECV, inp, stcb, NULL,
+	    SCTP_FROM_SCTPUTIL + SCTP_LOC_18);
+	sctp_timer_stop(SCTP_TIMER_TYPE_STRRESET, inp, stcb, NULL,
+	    SCTP_FROM_SCTPUTIL + SCTP_LOC_19);
+	if (stop_assoc_kill_timer) {
+		sctp_timer_stop(SCTP_TIMER_TYPE_ASOCKILL, inp, stcb, NULL,
+		    SCTP_FROM_SCTPUTIL + SCTP_LOC_20);
+	}
+	sctp_timer_stop(SCTP_TIMER_TYPE_ASCONF, inp, stcb, NULL,
+	    SCTP_FROM_SCTPUTIL + SCTP_LOC_21);
+	sctp_timer_stop(SCTP_TIMER_TYPE_AUTOCLOSE, inp, stcb, NULL,
+	    SCTP_FROM_SCTPUTIL + SCTP_LOC_22);
+	sctp_timer_stop(SCTP_TIMER_TYPE_SHUTDOWNGUARD, inp, stcb, NULL,
+	    SCTP_FROM_SCTPUTIL + SCTP_LOC_23);
+	/* Mobility adaptation */
+	sctp_timer_stop(SCTP_TIMER_TYPE_PRIM_DELETED, inp, stcb, NULL,
+	    SCTP_FROM_SCTPUTIL + SCTP_LOC_24);
+	TAILQ_FOREACH(net, &stcb->asoc.nets, sctp_next) {
+		sctp_timer_stop(SCTP_TIMER_TYPE_SEND, inp, stcb, net,
+		    SCTP_FROM_SCTPUTIL + SCTP_LOC_25);
+		sctp_timer_stop(SCTP_TIMER_TYPE_INIT, inp, stcb, net,
+		    SCTP_FROM_SCTPUTIL + SCTP_LOC_26);
+		sctp_timer_stop(SCTP_TIMER_TYPE_SHUTDOWN, inp, stcb, net,
+		    SCTP_FROM_SCTPUTIL + SCTP_LOC_27);
+		sctp_timer_stop(SCTP_TIMER_TYPE_COOKIE, inp, stcb, net,
+		    SCTP_FROM_SCTPUTIL + SCTP_LOC_28);
+		sctp_timer_stop(SCTP_TIMER_TYPE_SHUTDOWNACK, inp, stcb, net,
+		    SCTP_FROM_SCTPUTIL + SCTP_LOC_29);
+		sctp_timer_stop(SCTP_TIMER_TYPE_PATHMTURAISE, inp, stcb, net,
+		    SCTP_FROM_SCTPUTIL + SCTP_LOC_30);
+		sctp_timer_stop(SCTP_TIMER_TYPE_HEARTBEAT, inp, stcb, net,
+		    SCTP_FROM_SCTPUTIL + SCTP_LOC_31);
 	}
 }
 
@@ -1323,11 +1371,13 @@ sctp_expand_mapping_array(struct sctp_association *asoc, uint32_t needed)
 static void
 sctp_iterator_work(struct sctp_iterator *it)
 {
+	struct epoch_tracker et;
+	struct sctp_inpcb *tinp;
 	int iteration_count = 0;
 	int inp_skip = 0;
 	int first_in = 1;
-	struct sctp_inpcb *tinp;
 
+	NET_EPOCH_ENTER(et);
 	SCTP_INP_INFO_RLOCK();
 	SCTP_ITERATOR_LOCK();
 	sctp_it_ctl.cur_it = it;
@@ -1345,6 +1395,7 @@ done_with_iterator:
 			(*it->function_atend) (it->pointer, it->val);
 		}
 		SCTP_FREE(it, SCTP_M_ITER);
+		NET_EPOCH_EXIT(et);
 		return;
 	}
 select_a_new_ep:
@@ -1553,6 +1604,7 @@ sctp_handle_addr_wq(void)
 void
 sctp_timeout_handler(void *t)
 {
+	struct epoch_tracker et;
 	struct sctp_inpcb *inp;
 	struct sctp_tcb *stcb;
 	struct sctp_nets *net;
@@ -1668,6 +1720,7 @@ sctp_timeout_handler(void *t)
 	/* record in stopped what t-o occurred */
 	tmr->stopped_from = type;
 
+	NET_EPOCH_ENTER(et);
 	/* mark as being serviced now */
 	if (SCTP_OS_TIMER_PENDING(&tmr->timer)) {
 		/*
@@ -1862,7 +1915,6 @@ sctp_timeout_handler(void *t)
 		sctp_abort_an_association(inp, stcb, op_err, SCTP_SO_NOT_LOCKED);
 		/* no need to unlock on tcb its gone */
 		goto out_decr;
-
 	case SCTP_TIMER_TYPE_STRRESET:
 		if ((stcb == NULL) || (inp == NULL)) {
 			break;
@@ -1895,7 +1947,6 @@ sctp_timeout_handler(void *t)
 		sctp_delete_prim_timer(inp, stcb, net);
 		SCTP_STAT_INCR(sctps_timodelprim);
 		break;
-
 	case SCTP_TIMER_TYPE_AUTOCLOSE:
 		if ((stcb == NULL) || (inp == NULL)) {
 			break;
@@ -1986,6 +2037,7 @@ out_decr:
 out_no_decr:
 	SCTPDBG(SCTP_DEBUG_TIMER1, "Timer now complete (type = %d)\n", type);
 	CURVNET_RESTORE();
+	NET_EPOCH_EXIT(et);
 }
 
 void
@@ -2001,6 +2053,10 @@ sctp_timer_start(int t_type, struct sctp_inpcb *inp, struct sctp_tcb *stcb,
 	tmr = NULL;
 	if (stcb) {
 		SCTP_TCB_LOCK_ASSERT(stcb);
+	}
+	/* Don't restart timer on net that's been removed. */
+	if (net != NULL && (net->dest_state & SCTP_ADDR_BEING_DELETED)) {
+		return;
 	}
 	switch (t_type) {
 	case SCTP_TIMER_TYPE_ADDR_WQ:
@@ -5132,6 +5188,7 @@ sctp_user_rcvd(struct sctp_tcb *stcb, uint32_t *freed_so_far, int hold_rlock,
     uint32_t rwnd_req)
 {
 	/* User pulled some data, do we need a rwnd update? */
+	struct epoch_tracker et;
 	int r_unlocked = 0;
 	uint32_t dif, rwnd;
 	struct socket *so = NULL;
@@ -5187,11 +5244,13 @@ sctp_user_rcvd(struct sctp_tcb *stcb, uint32_t *freed_so_far, int hold_rlock,
 			goto out;
 		}
 		SCTP_STAT_INCR(sctps_wu_sacks_sent);
+		NET_EPOCH_ENTER(et);
 		sctp_send_sack(stcb, SCTP_SO_LOCKED);
 
 		sctp_chunk_output(stcb->sctp_ep, stcb,
 		    SCTP_OUTPUT_FROM_USR_RCVD, SCTP_SO_LOCKED);
 		/* make sure no timer is running */
+		NET_EPOCH_EXIT(et);
 		sctp_timer_stop(SCTP_TIMER_TYPE_RECV, stcb->sctp_ep, stcb, NULL,
 		    SCTP_FROM_SCTPUTIL + SCTP_LOC_6);
 		SCTP_TCB_UNLOCK(stcb);

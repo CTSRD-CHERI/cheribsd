@@ -48,6 +48,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/cons.h>
 #include <sys/proc.h>
 #include <sys/reboot.h>
+#include <geom/geom.h>
 #include <geom/geom_disk.h>
 #endif /* _KERNEL */
 
@@ -167,16 +168,19 @@ static void		ndasuspend(void *arg);
 #define NDA_MAX_TRIM_ENTRIES  (NVME_MAX_DSM_TRIM / sizeof(struct nvme_dsm_range))/* Number of DSM trims to use, max 256 */
 #endif
 
-static SYSCTL_NODE(_kern_cam, OID_AUTO, nda, CTLFLAG_RD, 0,
-            "CAM Direct Access Disk driver");
+static SYSCTL_NODE(_kern_cam, OID_AUTO, nda, CTLFLAG_RD | CTLFLAG_MPSAFE, 0,
+    "CAM Direct Access Disk driver");
 
 //static int nda_retry_count = NDA_DEFAULT_RETRY;
 static int nda_send_ordered = NDA_DEFAULT_SEND_ORDERED;
 static int nda_default_timeout = NDA_DEFAULT_TIMEOUT;
 static int nda_max_trim_entries = NDA_MAX_TRIM_ENTRIES;
+static int nda_enable_biospeedup = 1;
 SYSCTL_INT(_kern_cam_nda, OID_AUTO, max_trim, CTLFLAG_RDTUN,
     &nda_max_trim_entries, NDA_MAX_TRIM_ENTRIES,
     "Maximum number of BIO_DELETE to send down as a DSM TRIM.");
+SYSCTL_INT(_kern_cam_nda, OID_AUTO, enable_biospeedup, CTLFLAG_RDTUN,
+    &nda_enable_biospeedup, 0, "Enable BIO_SPEEDUP processing");
 
 /*
  * All NVMe media is non-rotational, so all nvme device instances
@@ -623,7 +627,7 @@ ndasysctlinit(void *context, int pending)
 	softc->flags |= NDA_FLAG_SCTX_INIT;
 	softc->sysctl_tree = SYSCTL_ADD_NODE_WITH_LABEL(&softc->sysctl_ctx,
 		SYSCTL_STATIC_CHILDREN(_kern_cam_nda), OID_AUTO, tmpstr2,
-		CTLFLAG_RD, 0, tmpstr, "device_index");
+		CTLFLAG_RD | CTLFLAG_MPSAFE, 0, tmpstr, "device_index");
 	if (softc->sysctl_tree == NULL) {
 		printf("ndasysctlinit: unable to allocate sysctl tree\n");
 		cam_periph_release(periph);
@@ -658,7 +662,7 @@ ndasysctlinit(void *context, int pending)
 #ifdef CAM_IO_STATS
 	softc->sysctl_stats_tree = SYSCTL_ADD_NODE(&softc->sysctl_stats_ctx,
 		SYSCTL_CHILDREN(softc->sysctl_tree), OID_AUTO, "stats",
-		CTLFLAG_RD, 0, "Statistics");
+		CTLFLAG_RD | CTLFLAG_MPSAFE, 0, "Statistics");
 	if (softc->sysctl_stats_tree == NULL) {
 		printf("ndasysctlinit: unable to allocate sysctl tree for stats\n");
 		cam_periph_release(periph);
@@ -699,6 +703,9 @@ ndagetattr(struct bio *bp)
 {
 	int ret;
 	struct cam_periph *periph;
+
+	if (g_handleattr_int(bp, "GEOM::canspeedup", nda_enable_biospeedup))
+		return (EJUSTRETURN);
 
 	periph = (struct cam_periph *)bp->bio_disk->d_drv1;
 	cam_periph_lock(periph);

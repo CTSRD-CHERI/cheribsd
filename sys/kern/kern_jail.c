@@ -2840,16 +2840,6 @@ prison_ischild(struct prison *pr1, struct prison *pr2)
 }
 
 /*
- * Return 1 if the passed credential is in a jail, otherwise 0.
- */
-int
-jailed(struct ucred *cred)
-{
-
-	return (cred->cr_prison != &prison0);
-}
-
-/*
  * Return 1 if the passed credential is in a jail and that jail does not
  * have its own virtual network stack, otherwise 0.
  */
@@ -3026,6 +3016,16 @@ prison_enforce_statfs(struct ucred *cred, struct mount *mp, struct statfs *sp)
 int
 prison_priv_check(struct ucred *cred, int priv)
 {
+
+	/*
+	 * Some policies have custom handlers. This routine should not be
+	 * called for them. See priv_check_cred().
+	 */
+	switch (priv) {
+	case PRIV_VFS_GENERATION:
+		KASSERT(0, ("prison_priv_check instead of a custom handler "
+		    "called for %d\n", priv));
+	}
 
 	if (!jailed(cred))
 		return (0);
@@ -3423,7 +3423,7 @@ prison_path(struct prison *pr1, struct prison *pr2)
 /*
  * Jail-related sysctls.
  */
-static SYSCTL_NODE(_security, OID_AUTO, jail, CTLFLAG_RW, 0,
+static SYSCTL_NODE(_security, OID_AUTO, jail, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
     "Jails");
 
 static int
@@ -3662,7 +3662,7 @@ SYSCTL_PROC(_security_jail, OID_AUTO, devfs_ruleset,
  * is returned in the string itself, and the other parameters exist merely
  * to make themselves and their types known.
  */
-SYSCTL_NODE(_security_jail, OID_AUTO, param, CTLFLAG_RW, 0,
+SYSCTL_NODE(_security_jail, OID_AUTO, param, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
     "Jail parameters");
 
 int
@@ -3872,7 +3872,7 @@ prison_add_allow(const char *prefix, const char *name, const char *prefix_descr,
 	parent = prefix
 	    ? SYSCTL_ADD_NODE(NULL,
 		  SYSCTL_CHILDREN(&sysctl___security_jail_param_allow),
-		  OID_AUTO, prefix, 0, 0, prefix_descr)
+		  OID_AUTO, prefix, CTLFLAG_MPSAFE, 0, prefix_descr)
 	    : &sysctl___security_jail_param_allow;
 	(void)SYSCTL_ADD_PROC(NULL, SYSCTL_CHILDREN(parent), OID_AUTO,
 	    name, CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_MPSAFE,

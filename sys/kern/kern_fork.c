@@ -246,8 +246,10 @@ sysctl_kern_randompid(SYSCTL_HANDLER_ARGS)
 	return (error);
 }
 
-SYSCTL_PROC(_kern, OID_AUTO, randompid, CTLTYPE_INT|CTLFLAG_RW,
-    0, 0, sysctl_kern_randompid, "I", "Random PID modulus. Special values: 0: disable, 1: choose random value");
+SYSCTL_PROC(_kern, OID_AUTO, randompid,
+    CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_MPSAFE, 0, 0,
+    sysctl_kern_randompid, "I",
+    "Random PID modulus. Special values: 0: disable, 1: choose random value");
 
 extern bitstr_t proc_id_pidmap __no_subobject_bounds;
 extern bitstr_t proc_id_grpidmap __no_subobject_bounds;
@@ -576,7 +578,8 @@ do_fork(struct thread *td, struct fork_req *fr, struct proc *p2, struct thread *
 	 * been preserved.
 	 */
 	p2->p_flag |= p1->p_flag & P_SUGID;
-	td2->td_pflags |= (td->td_pflags & TDP_ALTSTACK) | TDP_FORKING;
+	td2->td_pflags |= (td->td_pflags & (TDP_ALTSTACK |
+	    TDP_SIGFASTBLOCK)) | TDP_FORKING;
 	SESS_LOCK(p1->p_session);
 	if (p1->p_session->s_ttyvp != NULL && p1->p_flag & P_CONTROLT)
 		p2->p_flag |= P_CONTROLT;

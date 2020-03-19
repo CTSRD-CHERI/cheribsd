@@ -176,10 +176,9 @@ qla_add_sysctls(qla_host_t *ha)
                 ha->fw_ver_str, 0, "firmware version");
 
         SYSCTL_ADD_PROC(device_get_sysctl_ctx(dev),
-                SYSCTL_CHILDREN(device_get_sysctl_tree(dev)),
-                OID_AUTO, "link_status", CTLTYPE_INT | CTLFLAG_RW,
-                (void *)ha, 0,
-                qla_sysctl_get_link_status, "I", "Link Status");
+            SYSCTL_CHILDREN(device_get_sysctl_tree(dev)), OID_AUTO,
+	    "link_status", CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_NEEDGIANT, 
+	    (void *)ha, 0, qla_sysctl_get_link_status, "I", "Link Status");
 
 	ha->dbg_level = 0;
         SYSCTL_ADD_UINT(device_get_sysctl_ctx(dev),
@@ -1543,7 +1542,7 @@ qla_create_fp_taskqueues(qla_host_t *ha)
                 bzero(tq_name, sizeof (tq_name));
                 snprintf(tq_name, sizeof (tq_name), "ql_fp_tq_%d", i);
 
-                TASK_INIT(&fp->fp_task, 0, qla_fp_taskqueue, fp);
+                NET_TASK_INIT(&fp->fp_task, 0, qla_fp_taskqueue, fp);
 
                 fp->fp_taskqueue = taskqueue_create_fast(tq_name, M_NOWAIT,
                                         taskqueue_thread_enqueue,

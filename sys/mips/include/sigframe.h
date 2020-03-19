@@ -8,7 +8,7 @@
  * modification, are permitted provided that the following conditions
  * are met:
  * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer 
+ *    notice, this list of conditions and the following disclaimer
  *    in this position and unchanged.
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
@@ -76,31 +76,4 @@ struct sigframe64 {
 };
 #endif
 
-#ifdef COMPAT_CHERIABI
-#include <compat/cheriabi/cheriabi_signal.h>
-
-struct sigframe_c {
-	register_t	sf_signum;
-	register_t	sf_siginfo;	/* code or pointer to sf_si */
-	register_t	sf_ucontext;	/* points to sf_uc */
-	register_t	sf_addr;	/* undocumented 4th arg */
-	ucontext_t	sf_uc;		/* = *sf_ucontext */
-	struct siginfo_c	sf_si;	/* = *sf_siginfo (SA_SIGINFO case) */
-	unsigned long	__spare__[2];
-};
-#endif
-
 #endif /* !_MACHINE_SIGFRAME_H_ */
-// CHERI CHANGES START
-// {
-//   "updated": 20190604,
-//   "target_type": "header",
-//   "changes": [
-//     "user_capabilities"
-//   ],
-//   "changes_purecap": [
-//     "user_capabilities"
-//   ],
-//   "change_comment": "struct sigframe64"
-// }
-// CHERI CHANGES END

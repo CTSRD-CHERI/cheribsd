@@ -3303,6 +3303,25 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 3;
 		break;
 	}
+	/* cheriabi_sigfastblock */
+	case 573: {
+		struct cheriabi_sigfastblock_args *p = params;
+		iarg[0] = p->cmd; /* int */
+		uarg[1] = (__cheri_addr intptr_t) p->ptr; /* uint32_t * __capability */
+		*n_args = 2;
+		break;
+	}
+	/* cheriabi___realpathat */
+	case 574: {
+		struct cheriabi___realpathat_args *p = params;
+		iarg[0] = p->fd; /* int */
+		uarg[1] = (__cheri_addr intptr_t) p->path; /* const char * __capability */
+		uarg[2] = (__cheri_addr intptr_t) p->buf; /* char * __capability */
+		uarg[3] = p->size; /* size_t */
+		iarg[4] = p->flags; /* int */
+		*n_args = 5;
+		break;
+	}
 	default:
 		*n_args = 0;
 		break;
@@ -8825,6 +8844,41 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
+	/* cheriabi_sigfastblock */
+	case 573:
+		switch(ndx) {
+		case 0:
+			p = "int";
+			break;
+		case 1:
+			p = "userland uint32_t * __capability";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* cheriabi___realpathat */
+	case 574:
+		switch(ndx) {
+		case 0:
+			p = "int";
+			break;
+		case 1:
+			p = "userland const char * __capability";
+			break;
+		case 2:
+			p = "userland char * __capability";
+			break;
+		case 3:
+			p = "size_t";
+			break;
+		case 4:
+			p = "int";
+			break;
+		default:
+			break;
+		};
+		break;
 	default:
 		break;
 	};
@@ -10713,6 +10767,16 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		break;
 	/* cheriabi_shm_rename */
 	case 572:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* cheriabi_sigfastblock */
+	case 573:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* cheriabi___realpathat */
+	case 574:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;

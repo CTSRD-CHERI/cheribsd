@@ -37,6 +37,9 @@ CWARNEXTRA+=	-Wno-error-shift-negative-value
 .if ${COMPILER_VERSION} >= 40000
 CWARNEXTRA+=	-Wno-address-of-packed-member
 .endif
+.if ${COMPILER_VERSION} >= 100000
+NO_WMISLEADING_INDENTATION=	-Wno-misleading-indentation
+.endif
 .endif
 
 .if ${COMPILER_TYPE} == "gcc"
@@ -136,14 +139,22 @@ INLINE_LIMIT?=	8000
 
 #
 # For RISC-V we specify the soft-float ABI (lp64) to avoid the use of floating
-# point registers within the kernel. We also specify the "medium" code model,
-# which generates code suitable for a 2GiB addressing range located at any
-# offset, allowing modules to be located anywhere in the 64-bit address space.
-# Note that clang and GCC refer to this code model as "medium" and "medany"
-# respectively.
+# point registers within the kernel. However, for kernels supporting hardware
+# float (FPE), we have to include that in the march so we can have limited
+# floating point support in context switching needed for that. This is different
+# than userland where we use a hard-float ABI (lp64d).
+#
+# We also specify the "medium" code model, which generates code suitable for a
+# 2GiB addressing range located at any offset, allowing modules to be located
+# anywhere in the 64-bit address space.  Note that clang and GCC refer to this
+# code model as "medium" and "medany" respectively.
 #
 .if ${MACHINE_CPUARCH} == "riscv"
+.if ${MACHINE_ARCH:Mriscv*sf}
+RISCV_MARCH=	rv64imac
+.else
 RISCV_MARCH=	rv64imafdc
+.endif
 .if ${MACHINE_CPU:Mcheri}
 RISCV_MARCH:=	${RISCV_MARCH}xcheri
 .endif
@@ -333,4 +344,5 @@ LD_EMULATION_powerpc= elf32ppc_fbsd
 LD_EMULATION_powerpcspe= elf32ppc_fbsd
 LD_EMULATION_powerpc64= elf64ppc_fbsd
 LD_EMULATION_riscv64= elf64lriscv
+LD_EMULATION_riscv64sf= elf64lriscv
 LD_EMULATION=${LD_EMULATION_${MACHINE_ARCH}${CHERI_LD_TARGET}}

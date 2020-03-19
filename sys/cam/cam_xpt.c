@@ -248,7 +248,6 @@ static void	 xpt_run_allocq(struct cam_periph *periph, int sleep);
 static void	 xpt_run_allocq_task(void *context, int pending);
 static void	 xpt_run_devq(struct cam_devq *devq);
 static callout_func_t xpt_release_devq_timeout;
-static void	 xpt_release_simq_timeout(void *arg) __unused;
 static void	 xpt_acquire_bus(struct cam_eb *bus);
 static void	 xpt_release_bus(struct cam_eb *bus);
 static uint32_t	 xpt_freeze_devq_device(struct cam_ed *dev, u_int count);
@@ -2687,11 +2686,8 @@ xpt_action_default(union ccb *start_ccb)
 			start_ccb->ataio.resid = 0;
 		/* FALLTHROUGH */
 	case XPT_NVME_IO:
-		/* FALLTHROUGH */
 	case XPT_NVME_ADMIN:
-		/* FALLTHROUGH */
 	case XPT_MMC_IO:
-		/* XXX just like nmve_io? */
 	case XPT_RESET_DEV:
 	case XPT_ENG_EXEC:
 	case XPT_SMP_IO:
@@ -3157,6 +3153,10 @@ call_sim:
 		break;
 	case XPT_REPROBE_LUN:
 		xpt_async(AC_INQ_CHANGED, path, NULL);
+		start_ccb->ccb_h.status = CAM_REQ_CMP;
+		xpt_done(start_ccb);
+		break;
+	case XPT_ASYNC:
 		start_ccb->ccb_h.status = CAM_REQ_CMP;
 		xpt_done(start_ccb);
 		break;
@@ -4451,7 +4451,7 @@ xpt_async(u_int32_t async_code, struct cam_path *path, void *async_arg)
 		xpt_freeze_devq(path, 1);
 	else
 		xpt_freeze_simq(path->bus->sim, 1);
-	xpt_done(ccb);
+	xpt_action(ccb);
 }
 
 static void
@@ -4619,18 +4619,6 @@ xpt_release_simq(struct cam_sim *sim, int run_queue)
 		}
 	}
 	mtx_unlock(&devq->send_mtx);
-}
-
-/*
- * XXX Appears to be unused.
- */
-static void
-xpt_release_simq_timeout(void *arg)
-{
-	struct cam_sim *sim;
-
-	sim = (struct cam_sim *)arg;
-	xpt_release_simq(sim, /* run_queue */ TRUE);
 }
 
 void
@@ -5338,14 +5326,13 @@ xptaction(struct cam_sim *sim, union ccb *work_ccb)
 		cpi->transport = XPORT_UNSPECIFIED;
 		cpi->transport_version = XPORT_VERSION_UNSPECIFIED;
 		cpi->ccb_h.status = CAM_REQ_CMP;
-		xpt_done(work_ccb);
 		break;
 	}
 	default:
 		work_ccb->ccb_h.status = CAM_REQ_INVALID;
-		xpt_done(work_ccb);
 		break;
 	}
+	xpt_done(work_ccb);
 }
 
 /*

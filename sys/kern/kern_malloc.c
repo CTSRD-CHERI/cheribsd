@@ -161,7 +161,7 @@ static int numzones = MALLOC_DEBUG_MAXZONES;
  */
 struct {
 	int kz_size;
-	char *kz_name;
+	const char *kz_name;
 	uma_zone_t kz_zone[MALLOC_DEBUG_MAXZONES];
 } kmemzones[] = {
 	{16, "16", },
@@ -240,7 +240,7 @@ static int sysctl_kern_malloc_stats(SYSCTL_HANDLER_ARGS);
 static time_t t_malloc_fail;
 
 #if defined(MALLOC_MAKE_FAILURES) || (MALLOC_DEBUG_MAXZONES > 1)
-static SYSCTL_NODE(_debug, OID_AUTO, malloc, CTLFLAG_RD, 0,
+static SYSCTL_NODE(_debug, OID_AUTO, malloc, CTLFLAG_RD | CTLFLAG_MPSAFE, 0,
     "Kernel malloc debugging options");
 #endif
 
@@ -845,6 +845,48 @@ free(void *addr, struct malloc_type *mtp)
 	malloc_type_freed(mtp, size);
 }
 
+/*
+ *	zfree:
+ *
+ *	Zero then free a block of memory allocated by malloc.
+ *
+ *	This routine may not block.
+ */
+void
+zfree(void *addr, struct malloc_type *mtp)
+{
+	uma_zone_t zone;
+	uma_slab_t slab;
+	u_long size;
+
+#ifdef MALLOC_DEBUG
+	if (free_dbg(&addr, mtp) != 0)
+		return;
+#endif
+	/* free(NULL, ...) does nothing */
+	if (addr == NULL)
+		return;
+
+	vtozoneslab((vm_offset_t)addr & (~UMA_SLAB_MASK), &zone, &slab);
+	if (slab == NULL)
+		panic("free: address %p(%p) has not been allocated.\n",
+		    addr, (void *)((u_long)addr & (~UMA_SLAB_MASK)));
+
+	if (__predict_true(!malloc_large_slab(slab))) {
+		size = zone->uz_size;
+#ifdef INVARIANTS
+		free_save_type(addr, mtp, size);
+#endif
+		explicit_bzero(addr, size);
+		uma_zfree_arg(zone, addr, slab);
+	} else {
+		size = malloc_large_size(slab);
+		explicit_bzero(addr, size);
+		free_large(addr, size);
+	}
+	malloc_type_freed(mtp, size);
+}
+
 void
 free_domain(void *addr, struct malloc_type *mtp)
 {
@@ -1071,7 +1113,7 @@ mallocinit(void *dummy)
 	    NULL, NULL, NULL, NULL, UMA_ALIGN_PTR, UMA_ZONE_MALLOC);
 	for (i = 0, indx = 0; kmemzones[indx].kz_size != 0; indx++) {
 		int size = kmemzones[indx].kz_size;
-		char *name = kmemzones[indx].kz_name;
+		const char *name = kmemzones[indx].kz_name;
 		int subzone;
 
 		for (subzone = 0; subzone < numzones; subzone++) {
@@ -1246,8 +1288,9 @@ sysctl_kern_malloc_stats(SYSCTL_HANDLER_ARGS)
 	return (error);
 }
 
-SYSCTL_PROC(_kern, OID_AUTO, malloc_stats, CTLFLAG_RD|CTLTYPE_STRUCT,
-    0, 0, sysctl_kern_malloc_stats, "s,malloc_type_ustats",
+SYSCTL_PROC(_kern, OID_AUTO, malloc_stats,
+    CTLFLAG_RD | CTLTYPE_STRUCT | CTLFLAG_MPSAFE, 0, 0,
+    sysctl_kern_malloc_stats, "s,malloc_type_ustats",
     "Return malloc types");
 
 SYSCTL_INT(_kern, OID_AUTO, malloc_count, CTLFLAG_RD, &kmemcount, 0,
@@ -1451,8 +1494,10 @@ sysctl_kern_mprof(SYSCTL_HANDLER_ARGS)
 	return (error);
 }
 
-SYSCTL_OID(_kern, OID_AUTO, mprof, CTLTYPE_STRING|CTLFLAG_RD,
-    NULL, 0, sysctl_kern_mprof, "A", "Malloc Profiling");
+SYSCTL_OID(_kern, OID_AUTO, mprof,
+    CTLTYPE_STRING | CTLFLAG_RD | CTLFLAG_NEEDGIANT, NULL, 0,
+    sysctl_kern_mprof, "A",
+    "Malloc Profiling");
 #endif /* MALLOC_PROFILE */
 // CHERI CHANGES START
 // {

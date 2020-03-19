@@ -82,9 +82,9 @@ _Static_assert(offsetof(struct thread, td_flags) == 0xfc,
     "struct thread KBI td_flags");
 _Static_assert(offsetof(struct thread, td_pflags) == 0x104,
     "struct thread KBI td_pflags");
-_Static_assert(offsetof(struct thread, td_frame) == 0x480,
+_Static_assert(offsetof(struct thread, td_frame) == 0x498,
     "struct thread KBI td_frame");
-_Static_assert(offsetof(struct thread, td_emuldata) == 0x690,
+_Static_assert(offsetof(struct thread, td_emuldata) == 0x6b0,
     "struct thread KBI td_emuldata");
 _Static_assert(offsetof(struct proc, p_flag) == 0xb0,
     "struct proc KBI p_flag");
@@ -102,9 +102,9 @@ _Static_assert(offsetof(struct thread, td_flags) == 0x98,
     "struct thread KBI td_flags");
 _Static_assert(offsetof(struct thread, td_pflags) == 0xa0,
     "struct thread KBI td_pflags");
-_Static_assert(offsetof(struct thread, td_frame) == 0x2f0,
+_Static_assert(offsetof(struct thread, td_frame) == 0x2fc,
     "struct thread KBI td_frame");
-_Static_assert(offsetof(struct thread, td_emuldata) == 0x338,
+_Static_assert(offsetof(struct thread, td_emuldata) == 0x344,
     "struct thread KBI td_emuldata");
 _Static_assert(offsetof(struct proc, p_flag) == 0x68,
     "struct proc KBI p_flag");
@@ -331,6 +331,7 @@ proc_linkup(struct proc *p, struct thread *td)
 void
 threadinit(void)
 {
+	uint32_t flags;
 
 	mtx_init(&tid_lock, "TID lock", NULL, MTX_DEF);
 
@@ -340,9 +341,20 @@ threadinit(void)
 	 */
 	tid_unrhdr = new_unrhdr(PID_MAX + 2, INT_MAX, &tid_lock);
 
+	flags = UMA_ZONE_NOFREE;
+#ifdef __aarch64__
+	/*
+	 * Force thread structures to be allocated from the direct map.
+	 * Otherwise, superpage promotions and demotions may temporarily
+	 * invalidate thread structure mappings.  For most dynamically allocated
+	 * structures this is not a problem, but translation faults cannot be
+	 * handled without accessing curthread.
+	 */
+	flags |= UMA_ZONE_CONTIG;
+#endif
 	thread_zone = uma_zcreate("THREAD", sched_sizeof_thread(),
 	    thread_ctor, thread_dtor, thread_init, thread_fini,
-	    MAX(32 - 1, UMA_ALIGN_PTR), UMA_ZONE_NOFREE);
+	    MAX(32 - 1, UMA_ALIGN_PTR), flags);
 	tidhashtbl = hashinit(maxproc / 2, M_TIDHASH, &tidhash);
 	rw_init(&tidhash_lock, "tidhash");
 }

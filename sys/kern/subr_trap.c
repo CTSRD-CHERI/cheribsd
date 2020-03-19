@@ -116,12 +116,16 @@ userret(struct thread *td, struct trapframe *frame)
 	if (p->p_numthreads == 1) {
 		PROC_LOCK(p);
 		thread_lock(td);
-		if ((p->p_flag & P_PPWAIT) == 0) {
-			KASSERT(!SIGPENDING(td) || (td->td_flags &
-			    (TDF_NEEDSIGCHK | TDF_ASTPENDING)) ==
-			    (TDF_NEEDSIGCHK | TDF_ASTPENDING),
-			    ("failed to set signal flags for ast p %p "
-			    "td %p fl %x", p, td, td->td_flags));
+		if ((p->p_flag & P_PPWAIT) == 0 &&
+		    (td->td_pflags & TDP_SIGFASTBLOCK) == 0) {
+			if (SIGPENDING(td) && (td->td_flags &
+			    (TDF_NEEDSIGCHK | TDF_ASTPENDING)) !=
+			    (TDF_NEEDSIGCHK | TDF_ASTPENDING)) {
+				thread_unlock(td);
+				panic(
+	"failed to set signal flags for ast p %p td %p fl %x",
+				    p, td, td->td_flags);
+			}
 		}
 		thread_unlock(td);
 		PROC_UNLOCK(p);
@@ -130,6 +134,7 @@ userret(struct thread *td, struct trapframe *frame)
 #ifdef KTRACE
 	KTRUSERRET(td);
 #endif
+
 	td_softdep_cleanup(td);
 	MPASS(td->td_su == NULL);
 
@@ -137,13 +142,13 @@ userret(struct thread *td, struct trapframe *frame)
 	 * If this thread tickled GEOM, we need to wait for the giggling to
 	 * stop before we return to userland
 	 */
-	if (td->td_pflags & TDP_GEOM)
+	if (__predict_false(td->td_pflags & TDP_GEOM))
 		g_waitidle();
 
 	/*
 	 * Charge system time if profiling.
 	 */
-	if (p->p_flag & P_PROFIL)
+	if (__predict_false(p->p_flag & P_PROFIL))
 		addupc_task(td, TRAPF_PC(frame), td->td_pticks * psratio);
 
 #ifdef HWPMC_HOOKS
@@ -218,8 +223,7 @@ ast(struct trapframe *framep)
 {
 	struct thread *td;
 	struct proc *p;
-	int flags;
-	int sig;
+	int flags, sig;
 
 	td = curthread;
 	p = td->td_proc;
@@ -298,12 +302,16 @@ ast(struct trapframe *framep)
 		 * the reason for looping check for AST condition.
 		 * See comment in userret() about P_PPWAIT.
 		 */
-		if ((p->p_flag & P_PPWAIT) == 0) {
-			KASSERT(!SIGPENDING(td) || (td->td_flags &
-			    (TDF_NEEDSIGCHK | TDF_ASTPENDING)) ==
-			    (TDF_NEEDSIGCHK | TDF_ASTPENDING),
-			    ("failed2 to set signal flags for ast p %p td %p "
-			    "fl %x %x", p, td, flags, td->td_flags));
+		if ((p->p_flag & P_PPWAIT) == 0 &&
+		    (td->td_pflags & TDP_SIGFASTBLOCK) == 0) {
+			if (SIGPENDING(td) && (td->td_flags &
+			    (TDF_NEEDSIGCHK | TDF_ASTPENDING)) !=
+			    (TDF_NEEDSIGCHK | TDF_ASTPENDING)) {
+				thread_unlock(td); /* fix dumps */
+				panic(
+	"failed2 to set signal flags for ast p %p td %p fl %x %x",
+				    p, td, flags, td->td_flags);
+			}
 		}
 		thread_unlock(td);
 		PROC_UNLOCK(p);
@@ -317,15 +325,33 @@ ast(struct trapframe *framep)
 	 */
 	if (flags & TDF_NEEDSIGCHK || p->p_pendingcnt > 0 ||
 	    !SIGISEMPTY(p->p_siglist)) {
-		PROC_LOCK(p);
-		mtx_lock(&p->p_sigacts->ps_mtx);
-		while ((sig = cursig(td)) != 0) {
-			KASSERT(sig >= 0, ("sig %d", sig));
-			postsig(sig);
+		sigfastblock_fetch(td);
+		if ((td->td_pflags & TDP_SIGFASTBLOCK) != 0 &&
+		    td->td_sigblock_val != 0) {
+			sigfastblock_setpend(td);
+			PROC_LOCK(p);
+			reschedule_signals(p, fastblock_mask,
+			    SIGPROCMASK_FASTBLK);
+			PROC_UNLOCK(p);
+		} else {
+			PROC_LOCK(p);
+			mtx_lock(&p->p_sigacts->ps_mtx);
+			while ((sig = cursig(td)) != 0) {
+				KASSERT(sig >= 0, ("sig %d", sig));
+				postsig(sig);
+			}
+			mtx_unlock(&p->p_sigacts->ps_mtx);
+			PROC_UNLOCK(p);
 		}
-		mtx_unlock(&p->p_sigacts->ps_mtx);
-		PROC_UNLOCK(p);
 	}
+
+	/*
+	 * Handle deferred update of the fast sigblock value, after
+	 * the postsig() loop was performed.
+	 */
+	if (td->td_pflags & TDP_SIGFASTPENDING)
+		sigfastblock_setpend(td);
+
 	/*
 	 * We need to check to see if we have to exit or wait due to a
 	 * single threading requirement or some other STOP condition.

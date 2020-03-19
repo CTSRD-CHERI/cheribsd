@@ -509,4 +509,6 @@
 #define	FREEBSD64_SYS_freebsd64___sysctlbyname	570
 #define	FREEBSD64_SYS_freebsd64_shm_open2	571
 #define	FREEBSD64_SYS_freebsd64_shm_rename	572
-#define	FREEBSD64_SYS_MAXSYSCALL	573
+#define	FREEBSD64_SYS_freebsd64_sigfastblock	573
+#define	FREEBSD64_SYS_freebsd64___realpathat	574
+#define	FREEBSD64_SYS_MAXSYSCALL	575

@@ -252,6 +252,7 @@ union if_snd_tag_query_params {
 					 */
 #define RT_IS_FIXED_TABLE 0x00000004	/* A fixed table is attached */
 #define RT_IS_UNUSABLE	  0x00000008	/* It is not usable for this */
+#define RT_IS_SETUP_REQ	  0x00000010	/* The interface setup must be called before use */
 
 struct if_ratelimit_query_results {
 	const uint64_t *rate_table;	/* Pointer to table if present */
@@ -268,7 +269,7 @@ typedef int (if_snd_tag_query_t)(struct m_snd_tag *, union if_snd_tag_query_para
 typedef void (if_snd_tag_free_t)(struct m_snd_tag *);
 typedef void (if_ratelimit_query_t)(struct ifnet *,
     struct if_ratelimit_query_results *);
-
+typedef int (if_ratelimit_setup_t)(struct ifnet *, uint64_t, uint32_t);
 
 /*
  * Structure defining a network interface.
@@ -368,7 +369,7 @@ struct ifnet {
 	if_init_fn_t	if_init;	/* Init routine */
 	int	(*if_resolvemulti)	/* validate/resolve multicast */
 		(struct ifnet *, struct sockaddr **, struct sockaddr *);
-	if_qflush_fn_t	if_qflush;	/* flush any queue */	
+	if_qflush_fn_t	if_qflush;	/* flush any queue */
 	if_transmit_fn_t if_transmit;   /* initiate output routine */
 
 	void	(*if_reassign)		/* reassign to vnet routine */
@@ -411,6 +412,7 @@ struct ifnet {
 	if_snd_tag_query_t *if_snd_tag_query;
 	if_snd_tag_free_t *if_snd_tag_free;
 	if_ratelimit_query_t *if_ratelimit_query;
+	if_ratelimit_setup_t *if_ratelimit_setup;
 
 	/* Ethernet PCP */
 	uint8_t if_pcp;
@@ -555,7 +557,7 @@ struct ifaddr {
 	u_int	ifa_refcnt;		/* references to this structure */
 
 	counter_u64_t	ifa_ipackets;
-	counter_u64_t	ifa_opackets;	 
+	counter_u64_t	ifa_opackets;
 	counter_u64_t	ifa_ibytes;
 	counter_u64_t	ifa_obytes;
 	struct	epoch_context	ifa_epoch_ctx __subobject_use_container_bounds;
@@ -769,7 +771,7 @@ void if_setstartfn(if_t ifp, void (*)(if_t));
 void if_settransmitfn(if_t ifp, if_transmit_fn_t);
 void if_setqflushfn(if_t ifp, if_qflush_fn_t);
 void if_setgetcounterfn(if_t ifp, if_get_counter_t);
- 
+
 /* Revisit the below. These are inline functions originally */
 int drbr_inuse_drv(if_t ifp, struct buf_ring *br);
 struct mbuf* drbr_dequeue_drv(if_t ifp, struct buf_ring *br);
@@ -780,38 +782,55 @@ int drbr_enqueue_drv(if_t ifp, struct buf_ring *br, struct mbuf *m);
 void if_hw_tsomax_common(if_t ifp, struct ifnet_hw_tsomax *);
 int if_hw_tsomax_update(if_t ifp, struct ifnet_hw_tsomax *);
 
-/* Helper macro for struct ifreq ioctls */
 #ifdef COMPAT_FREEBSD64
-#define CASE_IOC_IFREQ64(cmd)                   \
-	(cmd):					\
-	case _IOC_NEWTYPE((cmd), struct ifreq64)
-#else
-#define CASE_IOC_IFREQ64(cmd)			\
-	(cmd)
-#endif
+struct ifreq_buffer64 {
+	uint64_t	length;		/* (size_t) */
+	uint64_t	buffer;		/* (void *) */
+};
 
-#ifdef COMPAT_CHERIABI
-#define CASE_IOC_IFREQ_C(cmd)			\
-	(cmd):					\
-	case _IOC_NEWTYPE((cmd), struct ifreq_c)
-#else
-#define CASE_IOC_IFREQ_C(cmd)			\
-	(cmd)
-#endif
+/*
+ * Interface request structure used for socket
+ * ioctl's.  All interface ioctl's must have parameter
+ * definitions which begin with ifr_name.  The
+ * remainder may be interface specific.
+ */
+struct ifreq64 {
+	char	ifr_name[IFNAMSIZ];		/* if name, e.g. "en0" */
+	union {
+		struct sockaddr	ifru_addr;
+		struct sockaddr	ifru_dstaddr;
+		struct sockaddr	ifru_broadaddr;
+		struct ifreq_buffer64 ifru_buffer;
+		short		ifru_flags[2];
+		short		ifru_index;
+		int		ifru_jid;
+		int		ifru_metric;
+		int		ifru_mtu;
+		int		ifru_phys;
+		int		ifru_media;
+		uint64_t	ifru_data;
+		int		ifru_cap[2];
+		u_int		ifru_fib;
+		u_char		ifru_vlan_pcp;
+	} ifr_ifru;
+};
 
-#ifdef CHERI_PURECAP_KERNEL
-#define CASE_IOC_IFREQ(cmd)			\
-	CASE_IOC_IFREQ64(cmd)
-#else
-#define CASE_IOC_IFREQ(cmd)			\
-	CASE_IOC_IFREQ_C(cmd)
-#endif
+/* Helper macro for struct ifreq ioctls */
+#define	CASE_IOC_IFREQ(cmd)					\
+    (cmd):							\
+    case _IOC_NEWTYPE((cmd), struct ifreq64)
+#else /* !COMPAT_FREEBSD64 */
+#define	CASE_IOC_IFREQ(cmd)					\
+    (cmd)
+#endif /* !COMPAT_FREEBSD64 */
 
 /* accessors for struct ifreq */
 char *ifr_addr_get_data(void *ifrp);
 sa_family_t ifr_addr_get_family(void *ifrp);
 unsigned char ifr_addr_get_len(void *ifrp);
 struct sockaddr *ifr_addr_get_sa(void *ifrp);
+void * __capability ifr_buffer_get_buffer(void *data);
+size_t ifr_buffer_get_length(void *data);
 void * __capability ifr_data_get_ptr(void *ifrp);
 u_int ifr_fib_get(void *ifrp);
 void ifr_fib_set(void *ifrp, u_int fib);

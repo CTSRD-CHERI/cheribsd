@@ -159,11 +159,12 @@ struct ctlname {
 #define	REQ_WIRED	2
 
 /* definitions for sysctl_req 'flags' member */
-#if defined(__aarch64__) || defined(__amd64__) || defined(__powerpc64__) ||\
-    (defined(__mips__) && defined(__mips_n64))
+#ifdef COMPAT_FREEBSD32
 #define	SCTL_MASK32	1	/* 32 bit emulation */
 #endif
-#define	SCTL_CHERIABI	2	/* CheriABI support */
+#if COMPAT_FREEBSD64
+#define	SCTL_MASK64	2	/* 64 bit emulation (on CHERI) */
+#endif
 #define	SCTL_PTRIN	4
 #define	SCTL_PTROUT	8
 
@@ -276,9 +277,9 @@ TAILQ_HEAD(sysctl_ctx_list, sysctl_ctx_entry);
 #define	__DESCR(d) ""
 #endif
 
-#ifdef notyet
+#ifdef	notyet
 #define	SYSCTL_ENFORCE_FLAGS(x)						\
-    _Static_assert(((CTLFLAG_MPSAFE ^ CTLFLAG_NEEDGIANT) & (x)),	\
+    _Static_assert((((x) & CTLFLAG_MPSAFE) != 0) ^ (((x) & CTLFLAG_NEEDGIANT) != 0), \
         "Has to be either CTLFLAG_MPSAFE or CTLFLAG_NEEDGIANT")
 #else
 #define	SYSCTL_ENFORCE_FLAGS(x)
@@ -340,6 +341,7 @@ TAILQ_HEAD(sysctl_ctx_list, sysctl_ctx_entry);
 #define	SYSCTL_NODE_WITH_LABEL(parent, nbr, name, access, handler, descr, label) \
 	SYSCTL_OID_GLOBAL(parent, nbr, name, CTLTYPE_NODE|(access),	\
 	    NULL, 0, handler, "N", descr, label);			\
+	SYSCTL_ENFORCE_FLAGS(access);					\
 	CTASSERT(((access) & CTLTYPE) == 0 ||				\
 	    ((access) & SYSCTL_CT_ASSERT_MASK) == CTLTYPE_NODE)
 
@@ -1023,9 +1025,7 @@ TAILQ_HEAD(sysctl_ctx_list, sysctl_ctx_entry);
 #define	KERN_PROC_SIGTRAMP	41	/* signal trampoline location */
 #define	KERN_PROC_CWD		42	/* process current working directory */
 #define	KERN_PROC_NFDS		43	/* number of open file descriptors */
-#define	KERN_PROC_SBCLASSES	44	/* get sandbox classes */
-#define	KERN_PROC_SBMETHODS	45	/* get sandbox methods */
-#define	KERN_PROC_SBOBJECTS	46	/* get sandbox objects */
+#define	KERN_PROC_SIGFASTBLK	44	/* address of fastsigblk magic word */
 
 /*
  * KERN_IPC identifiers

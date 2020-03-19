@@ -105,24 +105,20 @@ struct syscall_args {
 };
 
 #ifdef __mips_n64
-#ifdef CHERI_PURECAP_KERNEL
-/**
- * XXX KINFO_PROC32_SIZE is not defined for purecap
- * because it is not clear how the 32bit compat layer would look like.
- */
+#if __has_feature(capabilities)
 #ifdef CPU_CHERI128
 #define KINFO_PROC_SIZE 1248
 #else /* CHERI256 */
 #define KINFO_PROC_SIZE 1568
 #endif
-#else /* ! CHERI_PURECAP_KERNEL */
+#define	KINFO_PROC64_SIZE 1088
+#else /* !__has_feature(capabilities) */
 #define	KINFO_PROC_SIZE 1088
-#endif /* ! CHERI_PURECAP_KERNEL */
-
+#endif /* !__has_feature(capabilities) */
 #define	KINFO_PROC32_SIZE 816
-#else
+#else /* !__mips_n64 */
 #define	KINFO_PROC_SIZE 816
-#endif
+#endif /* !__mips_n64 */
 
 #endif	/* !_MACHINE_PROC_H_ */
 // CHERI CHANGES START

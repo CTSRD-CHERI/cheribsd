@@ -78,8 +78,8 @@ static  periph_dtor_t   enc_dtor;
 static void enc_async(void *, uint32_t, struct cam_path *, void *);
 static enctyp enc_type(struct ccb_getdev *);
 
-SYSCTL_NODE(_kern_cam, OID_AUTO, enc, CTLFLAG_RD, 0,
-            "CAM Enclosure Services driver");
+SYSCTL_NODE(_kern_cam, OID_AUTO, enc, CTLFLAG_RD | CTLFLAG_MPSAFE, 0,
+    "CAM Enclosure Services driver");
 
 #if defined(DEBUG) || defined(ENC_DEBUG)
 int enc_verbose = 1;
@@ -370,12 +370,12 @@ enc_ioctl(struct cdev *dev, u_long cmd, caddr_t arg_addr, int flag,
 	void *addr;
 	int error, i;
 
-#ifdef	COMPAT_CHERIABI
-	if (SV_PROC_FLAG(td->td_proc, SV_CHERI))
-		return (ENOTTY);
-#endif
 #ifdef	COMPAT_FREEBSD32
 	if (SV_PROC_FLAG(td->td_proc, SV_ILP32))
+		return (ENOTTY);
+#endif
+#if __has_feature(capabilities) && defined (COMPAT_FREEBSD64)
+	if (!SV_PROC_FLAG(td->td_proc, SV_CHERI))
 		return (ENOTTY);
 #endif
 

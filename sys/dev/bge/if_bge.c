@@ -546,7 +546,8 @@ DRIVER_MODULE(miibus, bge, miibus_driver, miibus_devclass, 0, 0);
 
 static int bge_allow_asf = 1;
 
-static SYSCTL_NODE(_hw, OID_AUTO, bge, CTLFLAG_RD, 0, "BGE driver parameters");
+static SYSCTL_NODE(_hw, OID_AUTO, bge, CTLFLAG_RD | CTLFLAG_MPSAFE, 0,
+    "BGE driver parameters");
 SYSCTL_INT(_hw_bge, OID_AUTO, allow_asf, CTLFLAG_RDTUN, &bge_allow_asf, 0,
 	"Allow ASF mode if available");
 
@@ -3306,7 +3307,7 @@ bge_attach(device_t dev)
 	sc->bge_dev = dev;
 
 	BGE_LOCK_INIT(sc, device_get_nameunit(dev));
-	TASK_INIT(&sc->bge_intr_task, 0, bge_intr_task, sc);
+	NET_TASK_INIT(&sc->bge_intr_task, 0, bge_intr_task, sc);
 	callout_init_mtx(&sc->bge_stat_ch, &sc->bge_mtx, 0);
 
 	pci_enable_busmaster(dev);
@@ -4601,7 +4602,6 @@ bge_msi_intr(void *arg)
 static void
 bge_intr_task(void *arg, int pending)
 {
-	struct epoch_tracker et;
 	struct bge_softc *sc;
 	if_t ifp;
 	uint32_t status, status_tag;
@@ -4644,9 +4644,7 @@ bge_intr_task(void *arg, int pending)
 	    sc->bge_rx_saved_considx != rx_prod) {
 		/* Check RX return ring producer/consumer. */
 		BGE_UNLOCK(sc);
-		NET_EPOCH_ENTER(et);
 		bge_rxeof(sc, rx_prod, 0);
-		NET_EPOCH_EXIT(et);
 		BGE_LOCK(sc);
 	}
 	if (if_getdrvflags(ifp) & IFF_DRV_RUNNING) {
@@ -6250,20 +6248,20 @@ bge_add_sysctls(struct bge_softc *sc)
 
 #ifdef BGE_REGISTER_DEBUG
 	SYSCTL_ADD_PROC(ctx, children, OID_AUTO, "debug_info",
-	    CTLTYPE_INT | CTLFLAG_RW, sc, 0, bge_sysctl_debug_info, "I",
-	    "Debug Information");
+	    CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_NEEDGIANT, sc, 0,
+	    bge_sysctl_debug_info, "I", "Debug Information");
 
 	SYSCTL_ADD_PROC(ctx, children, OID_AUTO, "reg_read",
-	    CTLTYPE_INT | CTLFLAG_RW, sc, 0, bge_sysctl_reg_read, "I",
-	    "MAC Register Read");
+	    CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_NEEDGIANT, sc, 0,
+	    bge_sysctl_reg_read, "I", "MAC Register Read");
 
 	SYSCTL_ADD_PROC(ctx, children, OID_AUTO, "ape_read",
-	    CTLTYPE_INT | CTLFLAG_RW, sc, 0, bge_sysctl_ape_read, "I",
-	    "APE Register Read");
+	    CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_NEEDGIANT, sc, 0,
+	    bge_sysctl_ape_read, "I", "APE Register Read");
 
 	SYSCTL_ADD_PROC(ctx, children, OID_AUTO, "mem_read",
-	    CTLTYPE_INT | CTLFLAG_RW, sc, 0, bge_sysctl_mem_read, "I",
-	    "Memory Read");
+	    CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_NEEDGIANT, sc, 0,
+	    bge_sysctl_mem_read, "I", "Memory Read");
 
 #endif
 
@@ -6313,9 +6311,9 @@ bge_add_sysctls(struct bge_softc *sc)
 }
 
 #define BGE_SYSCTL_STAT(sc, ctx, desc, parent, node, oid) \
-	SYSCTL_ADD_PROC(ctx, parent, OID_AUTO, oid, CTLTYPE_UINT|CTLFLAG_RD, \
-	    sc, offsetof(struct bge_stats, node), bge_sysctl_stats, "IU", \
-	    desc)
+    SYSCTL_ADD_PROC(ctx, parent, OID_AUTO, oid, \
+        CTLTYPE_UINT | CTLFLAG_RD | CTLFLAG_NEEDGIANT, sc, \
+	offsetof(struct bge_stats, node), bge_sysctl_stats, "IU", desc)
 
 static void
 bge_add_sysctl_stats(struct bge_softc *sc, struct sysctl_ctx_list *ctx,
@@ -6324,8 +6322,8 @@ bge_add_sysctl_stats(struct bge_softc *sc, struct sysctl_ctx_list *ctx,
 	struct sysctl_oid *tree;
 	struct sysctl_oid_list *children, *schildren;
 
-	tree = SYSCTL_ADD_NODE(ctx, parent, OID_AUTO, "stats", CTLFLAG_RD,
-	    NULL, "BGE Statistics");
+	tree = SYSCTL_ADD_NODE(ctx, parent, OID_AUTO, "stats",
+	    CTLFLAG_RD | CTLFLAG_MPSAFE, NULL, "BGE Statistics");
 	schildren = children = SYSCTL_CHILDREN(tree);
 	BGE_SYSCTL_STAT(sc, ctx, "Frames Dropped Due To Filters",
 	    children, COSFramesDroppedDueToFilters,
@@ -6359,8 +6357,8 @@ bge_add_sysctl_stats(struct bge_softc *sc, struct sysctl_ctx_list *ctx,
 	BGE_SYSCTL_STAT(sc, ctx, "NIC Send Threshold Hit",
 	    children, nicSendThresholdHit, "SendThresholdHit");
 
-	tree = SYSCTL_ADD_NODE(ctx, schildren, OID_AUTO, "rx", CTLFLAG_RD,
-	    NULL, "BGE RX Statistics");
+	tree = SYSCTL_ADD_NODE(ctx, schildren, OID_AUTO, "rx",
+	    CTLFLAG_RD | CTLFLAG_MPSAFE, NULL, "BGE RX Statistics");
 	children = SYSCTL_CHILDREN(tree);
 	BGE_SYSCTL_STAT(sc, ctx, "Inbound Octets",
 	    children, rxstats.ifHCInOctets, "ifHCInOctets");
@@ -6395,8 +6393,8 @@ bge_add_sysctl_stats(struct bge_softc *sc, struct sysctl_ctx_list *ctx,
 	BGE_SYSCTL_STAT(sc, ctx, "Outbound Range Length Errors",
 	    children, rxstats.outRangeLengthError, "outRangeLengthError");
 
-	tree = SYSCTL_ADD_NODE(ctx, schildren, OID_AUTO, "tx", CTLFLAG_RD,
-	    NULL, "BGE TX Statistics");
+	tree = SYSCTL_ADD_NODE(ctx, schildren, OID_AUTO, "tx",
+	    CTLFLAG_RD | CTLFLAG_MPSAFE, NULL, "BGE TX Statistics");
 	children = SYSCTL_CHILDREN(tree);
 	BGE_SYSCTL_STAT(sc, ctx, "Outbound Octets",
 	    children, txstats.ifHCOutOctets, "ifHCOutOctets");
@@ -6455,8 +6453,8 @@ bge_add_sysctl_stats_regs(struct bge_softc *sc, struct sysctl_ctx_list *ctx,
 	struct bge_mac_stats *stats;
 
 	stats = &sc->bge_mac_stats;
-	tree = SYSCTL_ADD_NODE(ctx, parent, OID_AUTO, "stats", CTLFLAG_RD,
-	    NULL, "BGE Statistics");
+	tree = SYSCTL_ADD_NODE(ctx, parent, OID_AUTO, "stats",
+	    CTLFLAG_RD | CTLFLAG_MPSAFE, NULL, "BGE Statistics");
 	schild = child = SYSCTL_CHILDREN(tree);
 	BGE_SYSCTL_STAT_ADD64(ctx, child, "FramesDroppedDueToFilters",
 	    &stats->FramesDroppedDueToFilters, "Frames Dropped Due to Filters");
@@ -6474,8 +6472,8 @@ bge_add_sysctl_stats_regs(struct bge_softc *sc, struct sysctl_ctx_list *ctx,
 	BGE_SYSCTL_STAT_ADD64(ctx, child, "RecvThresholdHit",
 	    &stats->RecvThresholdHit, "NIC Recv Threshold Hit");
 
-	tree = SYSCTL_ADD_NODE(ctx, schild, OID_AUTO, "rx", CTLFLAG_RD,
-	    NULL, "BGE RX Statistics");
+	tree = SYSCTL_ADD_NODE(ctx, schild, OID_AUTO, "rx",
+	    CTLFLAG_RD | CTLFLAG_MPSAFE, NULL, "BGE RX Statistics");
 	child = SYSCTL_CHILDREN(tree);
 	BGE_SYSCTL_STAT_ADD64(ctx, child, "ifHCInOctets",
 	    &stats->ifHCInOctets, "Inbound Octets");
@@ -6506,8 +6504,8 @@ bge_add_sysctl_stats_regs(struct bge_softc *sc, struct sysctl_ctx_list *ctx,
 	BGE_SYSCTL_STAT_ADD64(ctx, child, "UndersizePkts",
 	    &stats->etherStatsUndersizePkts, "Undersized Packets");
 
-	tree = SYSCTL_ADD_NODE(ctx, schild, OID_AUTO, "tx", CTLFLAG_RD,
-	    NULL, "BGE TX Statistics");
+	tree = SYSCTL_ADD_NODE(ctx, schild, OID_AUTO, "tx",
+	    CTLFLAG_RD | CTLFLAG_MPSAFE, NULL, "BGE TX Statistics");
 	child = SYSCTL_CHILDREN(tree);
 	BGE_SYSCTL_STAT_ADD64(ctx, child, "ifHCOutOctets",
 	    &stats->ifHCOutOctets, "Outbound Octets");

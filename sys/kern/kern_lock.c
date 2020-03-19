@@ -364,7 +364,7 @@ retry_sleepq:
 				    SLEEPQ_LK, 0, SQ_EXCLUSIVE_QUEUE);
 				queue = SQ_SHARED_QUEUE;
 			}
-				
+
 		} else {
 
 			/*
@@ -945,7 +945,7 @@ out:
 }
 
 int
-lockmgr_lock_fast_path(struct lock *lk, u_int flags, struct lock_object *ilk,
+lockmgr_lock_flags(struct lock *lk, u_int flags, struct lock_object *ilk,
     const char *file, int line)
 {
 	struct lock_class *class;
@@ -1126,46 +1126,6 @@ out:
 	return (0);
 }
 
-int
-lockmgr_unlock_fast_path(struct lock *lk, u_int flags, struct lock_object *ilk)
-{
-	struct lock_class *class;
-	uintptr_t x, tid;
-	const char *file;
-	int line;
-
-	if (KERNEL_PANICKED())
-		return (0);
-
-	file = __FILE__;
-	line = __LINE__;
-
-	_lockmgr_assert(lk, KA_LOCKED, file, line);
-	x = lk->lk_lock;
-	if (__predict_true(cheri_get_low_ptr_bits(x, LK_SHARE)) != 0) {
-		lockmgr_note_shared_release(lk, file, line);
-		if (lockmgr_sunlock_try(lk, &x)) {
-			LOCKSTAT_PROFILE_RELEASE_RWLOCK(lockmgr__release, lk, LOCKSTAT_READER);
-		} else {
-			return (lockmgr_sunlock_hard(lk, x, flags, ilk, file, line));
-		}
-	} else {
-		tid = (uintptr_t)curthread;
-		lockmgr_note_exclusive_release(lk, file, line);
-		if (!lockmgr_recursed(lk) &&
-		    atomic_cmpset_rel_ptr(&lk->lk_lock, tid, LK_UNLOCKED)) {
-			LOCKSTAT_PROFILE_RELEASE_RWLOCK(lockmgr__release, lk, LOCKSTAT_WRITER);
-		} else {
-			return (lockmgr_xunlock_hard(lk, x, flags, ilk, file, line));
-		}
-	}
-	if (__predict_false(flags & LK_INTERLOCK)) {
-		class = LOCK_CLASS(ilk);
-		class->lc_unlock(ilk);
-	}
-	return (0);
-}
-
 /*
  * Lightweight entry points for common operations.
  *
@@ -1175,7 +1135,7 @@ lockmgr_unlock_fast_path(struct lock *lk, u_int flags, struct lock_object *ilk)
  * 2. returning with an error after sleep
  * 3. unlocking the interlock
  *
- * If in doubt, use lockmgr_*_fast_path.
+ * If in doubt, use lockmgr_lock_flags.
  */
 int
 lockmgr_slock(struct lock *lk, u_int flags, const char *file, int line)

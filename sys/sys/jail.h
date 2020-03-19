@@ -353,9 +353,11 @@ SYSCTL_DECL(_security_jail_param);
 	CTLTYPE_STRUCT | CTLFLAG_MPSAFE | (access), NULL, len,		\
 	sysctl_jail_param, fmt, descr)
 #define	SYSCTL_JAIL_PARAM_NODE(module, descr)				\
-    SYSCTL_NODE(_security_jail_param, OID_AUTO, module, 0, 0, descr)
+    SYSCTL_NODE(_security_jail_param, OID_AUTO, module, CTLFLAG_MPSAFE,	\
+        0, descr)
 #define	SYSCTL_JAIL_PARAM_SUBNODE(parent, module, descr)		\
-    SYSCTL_NODE(_security_jail_param_##parent, OID_AUTO, module, 0, 0, descr)
+    SYSCTL_NODE(_security_jail_param_##parent, OID_AUTO, module, 	\
+        CTLFLAG_MPSAFE, 0, descr)
 #define	SYSCTL_JAIL_PARAM_SYS_NODE(module, access, descr)		\
     SYSCTL_JAIL_PARAM_NODE(module, descr);				\
     SYSCTL_JAIL_PARAM(_##module, , CTLTYPE_INT | (access), "E,jailsys",	\
@@ -369,7 +371,12 @@ struct mount;
 struct sockaddr;
 struct statfs;
 struct vfsconf;
-int jailed(struct ucred *cred);
+
+/*
+ * Return 1 if the passed credential is in a jail, otherwise 0.
+ */
+#define jailed(cred)	(cred->cr_prison != &prison0)
+
 int jailed_without_vnet(struct ucred *);
 void getcredhostname(struct ucred *, char *, size_t);
 void getcreddomainname(struct ucred *, char *, size_t);

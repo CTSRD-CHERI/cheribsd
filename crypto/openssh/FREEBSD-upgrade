@@ -5,7 +5,7 @@
     pretty fast once you're done with this checklist.
 
 01) Download the latest OpenSSH-portable tarball and signature from
-    OpenBSD (ftp://ftp.openbsd.org/pub/OpenBSD/OpenSSH/portable/).
+    OpenBSD (https://ftp.openbsd.org/pub/OpenBSD/OpenSSH/portable/).
 
 02) Verify the signature:
 
@@ -46,6 +46,11 @@
 
     $ svn merge -cNNNNNN \^/vendor-crypto/openssh/dist .
 
+    A number of files have been deleted from FreeBSD's copy of ssh,
+    including rendered man pages (which have a .0 extension).  When
+    svn prompts for these deleted files during the merge, choose 'r'
+    (leaving them deleted).
+
 0A) Resolve conflicts.  Remember to bump the version addendum in
     version.h, and update the default value in ssh{,d}_config and
     ssh{,d}_config.5.
@@ -70,6 +75,9 @@
     $ sh freebsd-configure.sh
 
 0E) Review changes to config.h very carefully.
+
+    Note that libwrap should not be defined in config.h; as of
+    r311585 it is conditional on MK_TCP_WRAPPERS.
 
 0F) If source files have been added or removed, update the appropriate
     makefiles to reflect changes in the vendor's Makefile.in.
@@ -138,6 +146,9 @@
 
    Support for TCP wrappers was removed in upstream 6.7p1.  We've
    added it back by porting the 6.6p1 code forward.
+
+   TCP wrappers support in sshd will be disabled in HEAD and will
+   be removed from FreeBSD in the future.
 
 6) Agent client reference counting
 

@@ -384,7 +384,7 @@ vm_fault_restore_map_lock(struct faultstate *fs)
 {
 
 	VM_OBJECT_ASSERT_WLOCKED(fs->first_object);
-	MPASS(REFCOUNT_COUNT(fs->first_object->paging_in_progress) > 0);
+	MPASS(blockcount_read(&fs->first_object->paging_in_progress) > 0);
 
 	if (!vm_map_trylock_read(fs->map)) {
 		VM_OBJECT_WUNLOCK(fs->first_object);
@@ -435,7 +435,7 @@ vm_fault_populate(struct faultstate *fs)
 
 	MPASS(fs->object == fs->first_object);
 	VM_OBJECT_ASSERT_WLOCKED(fs->first_object);
-	MPASS(REFCOUNT_COUNT(fs->first_object->paging_in_progress) > 0);
+	MPASS(blockcount_read(&fs->first_object->paging_in_progress) > 0);
 	MPASS(fs->first_object->backing_object == NULL);
 	MPASS(fs->lookup_still_valid);
 

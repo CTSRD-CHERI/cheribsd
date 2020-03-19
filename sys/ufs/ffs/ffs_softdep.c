@@ -613,15 +613,19 @@ softdep_freework(wkhd)
 
 FEATURE(softupdates, "FFS soft-updates support");
 
-static SYSCTL_NODE(_debug, OID_AUTO, softdep, CTLFLAG_RW, 0,
+static SYSCTL_NODE(_debug, OID_AUTO, softdep, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
     "soft updates stats");
-static SYSCTL_NODE(_debug_softdep, OID_AUTO, total, CTLFLAG_RW, 0,
+static SYSCTL_NODE(_debug_softdep, OID_AUTO, total,
+    CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
     "total dependencies allocated");
-static SYSCTL_NODE(_debug_softdep, OID_AUTO, highuse, CTLFLAG_RW, 0,
+static SYSCTL_NODE(_debug_softdep, OID_AUTO, highuse,
+    CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
     "high use dependencies allocated");
-static SYSCTL_NODE(_debug_softdep, OID_AUTO, current, CTLFLAG_RW, 0,
+static SYSCTL_NODE(_debug_softdep, OID_AUTO, current,
+    CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
     "current dependencies allocated");
-static SYSCTL_NODE(_debug_softdep, OID_AUTO, write, CTLFLAG_RW, 0,
+static SYSCTL_NODE(_debug_softdep, OID_AUTO, write,
+    CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
     "current dependencies written");
 
 unsigned long dep_current[D_LAST + 1];
@@ -1463,6 +1467,9 @@ static void
 softdep_send_speedup(struct ufsmount *ump, size_t shortage, u_int flags)
 {
 	struct buf *bp;
+
+	if ((ump->um_flags & UM_CANSPEEDUP) == 0)
+		return;
 
 	bp = malloc(sizeof(*bp), M_TRIM, M_WAITOK | M_ZERO);
 	bp->b_iocmd = BIO_SPEEDUP;
@@ -8221,8 +8228,13 @@ indir_trunc(freework, dbn, lbn)
 		 * If we're goingaway, free the indirdep.  Otherwise it will
 		 * linger until the write completes.
 		 */
-		if (goingaway)
+		if (goingaway) {
+			KASSERT(indirdep->ir_savebp == bp,
+			    ("indir_trunc: losing ir_savebp %p",
+			    indirdep->ir_savebp));
+			indirdep->ir_savebp = NULL;
 			free_indirdep(indirdep);
+		}
 	}
 	FREE_LOCK(ump);
 	/* Initialize pointers depending on block size. */
@@ -10736,6 +10748,8 @@ free_indirdep(indirdep)
 	    ("free_indirdep: %p still on newblk list.", indirdep));
 	KASSERT(indirdep->ir_saveddata == NULL,
 	    ("free_indirdep: %p still has saved data.", indirdep));
+	KASSERT(indirdep->ir_savebp == NULL,
+	    ("free_indirdep: %p still has savebp buffer.", indirdep));
 	if (indirdep->ir_state & ONWORKLIST)
 		WORKLIST_REMOVE(&indirdep->ir_list);
 	WORKITEM_FREE(indirdep, D_INDIRDEP);

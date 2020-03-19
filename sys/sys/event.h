@@ -81,11 +81,7 @@
 #endif
 
 struct kevent {
-#ifdef _KERNEL
-	__uintcap_t	ident;		/* identifier for this event */
-#else
-	__uintptr_t	ident;		/* identifier for this event */
-#endif
+	kuintcap_t	ident;		/* identifier for this event */
 	short		filter;		/* filter for event */
 	unsigned short	flags;		/* action flags for kqueue */
 	unsigned int	fflags;		/* filter flag value */
@@ -120,11 +116,7 @@ struct g_kevent_args {
 #if defined(_WANT_FREEBSD11_KEVENT)
 /* Older structure used in FreeBSD 11.x and older. */
 struct kevent_freebsd11 {
-#ifdef _KERNEL
-	__uintcap_t	ident;		/* identifier for this event */
-#else
-	__uintptr_t	ident;		/* identifier for this event */
-#endif
+	kuintcap_t	ident;		/* identifier for this event */
 	short		filter;		/* filter for event */
 	unsigned short	flags;
 	unsigned int	fflags;
@@ -296,7 +288,7 @@ struct knlist {
 #define NOTE_SIGNAL	0x08000000
 
 /*
- * Hint values for the optional f_touch event filter.  If f_touch is not set 
+ * Hint values for the optional f_touch event filter.  If f_touch is not set
  * to NULL and f_isfd is zero the f_touch filter will be called with the type
  * argument set to EVENT_REGISTER during a kevent() system call.  It is also
  * called under the same conditions with the type argument set to EVENT_PROCESS

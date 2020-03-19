@@ -72,6 +72,23 @@ struct timex;
 struct uio;
 struct uuid;
 
+typedef int (*mmap_check_fp_fn)(struct file *, int, int, int);
+
+struct mmap_req {
+	vm_offset_t		mr_hint;
+	vm_offset_t		mr_max_addr;
+	vm_size_t		mr_len;
+	int			mr_prot;
+	int			mr_flags;
+	int			mr_fd;
+	int			_int_pad;
+	off_t			mr_pos;
+	mmap_check_fp_fn	mr_check_fp_fn;
+#if __has_feature(capabilities)
+	void * __capability mr_source_cap;
+#endif
+};
+
 int	kern___acl_aclcheck_fd(struct thread *td, int filedes, acl_type_t type,
 	    const struct acl * __capability aclp);
 int	kern___acl_aclcheck_path(struct thread *td,
@@ -89,6 +106,9 @@ int	kern___acl_set_path(struct thread *td, const char *__capability path,
 	    acl_type_t type, const struct acl * __capability aclp, int follow);
 int	kern___getcwd(struct thread *td, char * __capability buf,
 	    size_t buflen);
+int	kern___realpathat(struct thread *td, int fd,
+	    const char * __capability path, char * __capability buf,
+	    size_t size, int flags, enum uio_seg pathseg);
 int	kern_abort2(struct thread *td, const char * __capability why,
             int nargs, void * __capability *uargs);
 int	kern_accept(struct thread *td, int s, struct sockaddr **name,
@@ -319,9 +339,7 @@ int	kern_mlock(struct proc *proc, struct ucred *cred, uintptr_t addr,
 	    size_t len);
 int	kern_mmap(struct thread *td, uintptr_t addr, size_t len, int prot,
 	    int flags, int fd, off_t pos);
-int	kern_mmap_fpcheck(struct thread *td, uintptr_t addr, size_t len,
-	    int prot, int flags, int fd, off_t pos,
-	    mmap_check_fp_fn check_fp_fn);
+int	kern_mmap_req(struct thread *td, const struct mmap_req *mrp);
 int	kern_mmap_maxprot(struct proc *p, int prot);
 int	kern_mmap_req(struct thread *td, const struct mmap_req *mrp);
 int	kern_modfind(struct thread *td, const char * __capability uname);
@@ -473,6 +491,8 @@ int	kern_sigaction_cap(struct thread *td, int sig,
 	    const struct sigaction *act, struct sigaction *oact, int flags,
 	    void * __capability *cap);
 int	kern_sigaltstack(struct thread *td, stack_t *ss, stack_t *oss);
+int	kern_sigfastblock(struct thread *td, int cmd,
+	    uint32_t * __capability ptr);
 int	kern_sigpending(struct thread *td, sigset_t * __capability set);
 int	kern_sigprocmask(struct thread *td, int how,
 	    sigset_t *set, sigset_t *oset, int flags);

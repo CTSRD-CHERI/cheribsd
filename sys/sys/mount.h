@@ -543,12 +543,12 @@ struct vfsconf {
 
 /* Userland version of the struct vfsconf. */
 struct xvfsconf {
-	struct	vfsops *vfc_vfsops;	/* filesystem operations vector */
+	struct vfsops * __kerncap vfc_vfsops;	/* filesystem operations vector */
 	char	vfc_name[MFSNAMELEN];	/* filesystem type name */
 	int	vfc_typenum;		/* historic filesystem type number */
 	int	vfc_refcount;		/* number mounted of this type */
 	int	vfc_flags;		/* permanent flags */
-	struct	vfsconf *vfc_next;	/* next in list */
+	struct vfsconf * __kerncap vfc_next;	/* next in list */
 };
 
 #ifndef BURN_BRIDGES
@@ -941,6 +941,8 @@ extern	struct sx vfsconf_sx;
 #define	vfsconf_unlock()	sx_xunlock(&vfsconf_sx)
 #define	vfsconf_slock()		sx_slock(&vfsconf_sx)
 #define	vfsconf_sunlock()	sx_sunlock(&vfsconf_sx)
+struct vnode *mntfs_allocvp(struct mount *, struct vnode *);
+void   mntfs_freevp(struct vnode *);
 
 /*
  * Declarations for these vfs default operations are located in
@@ -984,13 +986,8 @@ enum mount_counter { MNT_COUNT_REF, MNT_COUNT_LOCKREF, MNT_COUNT_WRITEOPCOUNT };
 int	vfs_mount_fetch_counter(struct mount *, enum mount_counter);
 
 /*
- * We mark ourselves as entering the section and post a sequentially consistent
- * fence, meaning the store is completed before we get into the section and
- * mnt_vfs_ops is only read afterwards.
- *
- * Any thread transitioning the ops counter 0->1 does things in the opposite
- * order - first bumps the count, posts a sequentially consistent fence and
- * observes all CPUs not executing within the section.
+ * Code transitioning mnt_vfs_ops to > 0 issues IPIs until it observes
+ * all CPUs not executing code enclosed by mnt_thread_in_ops_pcpu.
  *
  * This provides an invariant that by the time the last CPU is observed not
  * executing, everyone else entering will see the counter > 0 and exit.
@@ -1010,7 +1007,7 @@ int	vfs_mount_fetch_counter(struct mount *, enum mount_counter);
 	critical_enter();					\
 	MPASS(!vfs_op_thread_entered(mp));			\
 	zpcpu_set_protected(mp->mnt_thread_in_ops_pcpu, 1);	\
-	atomic_thread_fence_seq_cst();				\
+	__compiler_membar();					\
 	if (__predict_false(mp->mnt_vfs_ops > 0)) {		\
 		vfs_op_thread_exit(mp);				\
 		_retval = false;				\
@@ -1020,7 +1017,7 @@ int	vfs_mount_fetch_counter(struct mount *, enum mount_counter);
 
 #define vfs_op_thread_exit(mp) do {				\
 	MPASS(vfs_op_thread_entered(mp));			\
-	atomic_thread_fence_rel();				\
+	__compiler_membar();					\
 	zpcpu_set_protected(mp->mnt_thread_in_ops_pcpu, 0);	\
 	critical_exit();					\
 } while (0)

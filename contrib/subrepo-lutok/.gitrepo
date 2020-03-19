@@ -1,0 +1,12 @@
+; DO NOT EDIT (unless you know what you are doing)
+;
+; This subdirectory is a git "subrepo", and this file is maintained by the
+; git-subrepo command. See https://github.com/git-commands/git-subrepo#readme
+;
+[subrepo]
+	remote = https://github.com/jmmv/lutok.git
+	branch = master
+	commit = 8f8eaefe8b7c76e286b96fcbe2e860af98de29ea
+	parent = 1f66e4b5b1946bf07cc04343100a3e932a86d088
+	method = merge
+	cmdver = 0.4.0

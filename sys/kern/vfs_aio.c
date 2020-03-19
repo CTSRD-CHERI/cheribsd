@@ -113,7 +113,7 @@ SYSCTL_DECL(_p1003_1b);
 static MALLOC_DEFINE(M_LIO, "lio", "listio aio control block list");
 static MALLOC_DEFINE(M_AIOS, "aios", "aio_suspend aio control block list");
 
-static SYSCTL_NODE(_vfs, OID_AUTO, aio, CTLFLAG_RW, 0,
+static SYSCTL_NODE(_vfs, OID_AUTO, aio, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
     "Async IO management");
 
 static int enable_aio_unsafe = 0;
@@ -3589,140 +3589,18 @@ freebsd64_lio_listio(struct thread *td, struct freebsd64_lio_listio_args *uap)
 #include <compat/cheriabi/cheriabi_syscall.h>
 #include <compat/cheriabi/cheriabi_util.h>
 
-static int
-aiocb_c_copyin(void * __capability ujob, struct aiocb *kjob)
-{
-
-	return (copyincap(ujob, kjob, sizeof(*kjob)));
-}
-
-static long
-aiocb_c_fetch_status(void * __capability ujob)
-{
-	struct aiocb_c * __capability ujob_c;
-
-	ujob_c = (struct aiocb_c * __capability)ujob;
-	return (fuword(&ujob_c->_aiocb_private.status));
-}
-
-static long
-aiocb_c_fetch_error(void * __capability ujob)
-{
-	struct aiocb_c * __capability ujob_c;
-
-	ujob_c = (struct aiocb_c * __capability)ujob;
-	return (fuword(&ujob_c->_aiocb_private.error));
-}
-
-static void
-aiocb_c_free_kaiocb(struct kaiocb *kjob)
-{
-
-	uma_zfree(aiocb_zone, kjob);
-}
-
-static int
-aiocb_c_store_status(void * __capability ujob, long status)
-{
-	struct aiocb_c * __capability ujob_c;
-
-	ujob_c = (struct aiocb_c * __capability)ujob;
-	return (suword(&ujob_c->_aiocb_private.status, status));
-}
-
-static int
-aiocb_c_store_error(void * __capability ujob, long error)
-{
-	struct aiocb_c * __capability ujob_c;
-
-	ujob_c = (struct aiocb_c * __capability)ujob;
-	return (suword(&ujob_c->_aiocb_private.error, error));
-}
-
-static int
-aiocb_c_store_kernelinfo(void * __capability ujob, long jobref)
-{
-
-	/* Nothing uses kernelinfo so we don't update it */
-	return (0);
-}
-
-static void
-aiocb_c_save_aiocb(struct kaiocb *kjob, const void *ujobptrp)
-{
-
-	if (ujobptrp == NULL)
-		memset(&kjob->ujobptr, 0, sizeof(kjob->ujobptr));
-	else
-		memcpy(&kjob->ujobptr, ujobptrp, sizeof(__intcap_t));
-}
-
-static int
-aiocb_c_store_aiocb(struct aiocb ** __capability ujobp, struct kaiocb *kjob)
-{
-	intcap_t ujob;
-
-	if (kjob == NULL)
-		ujob = 0;	/* XXXBD: is this sufficent? */
-	else
-		memcpy(&ujob, &kjob->ujobptr, sizeof(__intcap_t));
-
-	return (sucap(ujobp, ujob));
-}
-
-static size_t
-aiocb_c_size(void)
-{
-
-	return (sizeof(struct aiocb_c));
-}
-
-static struct aiocb_ops aiocb_c_ops = {
-	.aio_copyin = aiocb_c_copyin,
-	.fetch_status = aiocb_c_fetch_status,
-	.fetch_error = aiocb_c_fetch_error,
-	.free_kaiocb = aiocb_c_free_kaiocb,
-	.store_status = aiocb_c_store_status,
-	.store_error = aiocb_c_store_error,
-	.store_kernelinfo = aiocb_c_store_kernelinfo,
-	.save_aiocb = aiocb_c_save_aiocb,
-	.store_aiocb = aiocb_c_store_aiocb,
-	.size = aiocb_c_size,
-};
-
 int
 cheriabi_aio_return(struct thread *td, struct cheriabi_aio_return_args *uap)
 {
 
-	return (kern_aio_return(td, uap->aiocbp, &aiocb_c_ops));
+	return (kern_aio_return(td, uap->aiocbp, &aiocb_ops));
 }
 
 int
 cheriabi_aio_suspend(struct thread *td, struct cheriabi_aio_suspend_args *uap)
 {
-	struct timespec ts, *tsp;
-	struct aiocb_c * __capability *ujoblist;
-	int error;
 
-	if (uap->nent < 0 || uap->nent > max_aio_queue_per_proc)
-		return (EINVAL);
-
-	if (uap->timeout) {
-		/* Get timespec struct. */
-		if ((error = copyin(uap->timeout, &ts, sizeof(ts))) != 0)
-			return (error);
-		tsp = &ts;
-	} else
-		tsp = NULL;
-
-	ujoblist = malloc(uap->nent * sizeof(ujoblist[0]), M_AIOS, M_WAITOK);
-	error = copyincap(uap->aiocbp, ujoblist,
-	    uap->nent * sizeof(*ujoblist));
-	if (error == 0)
-		error = kern_aio_suspend(td, uap->nent,
-		    (struct aiocb * __capability *)ujoblist, tsp);
-	free(ujoblist, M_AIOS);
-	return (error);
+	return (sys_aio_suspend(td, (struct aio_suspend_args *)uap));
 }
 
 /*
@@ -3734,7 +3612,7 @@ cheriabi_aio_cancel(struct thread *td, struct cheriabi_aio_cancel_args *uap)
 {
 
 	return(kern_aio_cancel(td, uap->fd,
-	    (struct aiocb * __capability)uap->aiocbp, &aiocb_c_ops));
+	    (struct aiocb * __capability)uap->aiocbp, &aiocb_ops));
 }
 
 int
@@ -3743,7 +3621,7 @@ cheriabi_aio_error(struct thread *td, struct cheriabi_aio_error_args *uap)
 
 	return (kern_aio_error(td,
 	    (struct aiocb * __capability)uap->aiocbp,
-	    &aiocb_c_ops));
+	    &aiocb_ops));
 }
 
 int
@@ -3752,7 +3630,7 @@ cheriabi_aio_read(struct thread *td, struct cheriabi_aio_read_args *uap)
 
 	return (aio_aqueue(td,
 	    (struct aiocb * __capability)uap->aiocbp,
-	    &uap->aiocbp, NULL, LIO_READ, &aiocb_c_ops));
+	    &uap->aiocbp, NULL, LIO_READ, &aiocb_ops));
 }
 
 int
@@ -3761,7 +3639,7 @@ cheriabi_aio_write(struct thread *td, struct cheriabi_aio_write_args *uap)
 
 	return (aio_aqueue(td,
 	    (struct aiocb * __capability)uap->aiocbp,
-	    &uap->aiocbp, NULL, LIO_WRITE, &aiocb_c_ops));
+	    &uap->aiocbp, NULL, LIO_WRITE, &aiocb_ops));
 }
 
 int
@@ -3770,7 +3648,7 @@ cheriabi_aio_mlock(struct thread *td, struct cheriabi_aio_mlock_args *uap)
 
 	return (aio_aqueue(td,
 	    (struct aiocb * __capability)uap->aiocbp,
-	    &uap->aiocbp, NULL, LIO_MLOCK, &aiocb_c_ops));
+	    &uap->aiocbp, NULL, LIO_MLOCK, &aiocb_ops));
 }
 
 int
@@ -3791,7 +3669,7 @@ cheriabi_aio_waitcomplete(struct thread *td,
 
 	return (kern_aio_waitcomplete(td,
 	    (struct aiocb ** __capability)uap->aiocbp, tsp,
-	    &aiocb_c_ops));
+	    &aiocb_ops));
 }
 
 int
@@ -3800,41 +3678,14 @@ cheriabi_aio_fsync(struct thread *td, struct cheriabi_aio_fsync_args *uap)
 
 	return (kern_aio_fsync(td, uap->op,
 	    (struct aiocb * __capability)uap->aiocbp,
-	    &uap->aiocbp, &aiocb_c_ops));
+	    &uap->aiocbp, &aiocb_ops));
 }
 
 int
 cheriabi_lio_listio(struct thread *td, struct cheriabi_lio_listio_args *uap)
 {
-	struct aiocb * __capability *acb_list;
-	struct sigevent *sigp, sig;
-	int error, nent;
 
-	if ((uap->mode != LIO_NOWAIT) && (uap->mode != LIO_WAIT))
-		return (EINVAL);
-
-	nent = uap->nent;
-	if (nent < 0 || nent > max_aio_queue_per_proc)
-		return (EINVAL);
-
-	if (uap->sig && (uap->mode == LIO_NOWAIT)) {
-		error = copyincap(uap->sig, &sig, sizeof(sig));
-		if (error)
-			return (error);
-		sigp = &sig;
-	} else
-		sigp = NULL;
-	acb_list = malloc(sizeof(struct aiocb *) * nent, M_LIO, M_WAITOK);
-	error = copyincap(uap->acb_list, acb_list, nent * sizeof(*acb_list));
-	if (error) {
-		free(acb_list, M_LIO);
-		return (error);
-	}
-
-	error = kern_lio_listio(td, uap->mode, (intcap_t)(__cheri_addr vaddr_t)uap->acb_list,
-	    acb_list, nent, sigp, &aiocb_c_ops);
-	free(acb_list, M_LIO);
-	return (error);
+	return (sys_lio_listio(td, (struct lio_listio_args *)uap));
 }
 #endif /* COMPAT_CHERIABI */
 // CHERI CHANGES START

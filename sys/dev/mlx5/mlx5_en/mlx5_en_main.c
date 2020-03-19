@@ -33,6 +33,8 @@
 #include <sys/sockio.h>
 #include <machine/atomic.h>
 
+#include <net/debugnet.h>
+
 #ifndef ETH_DRIVER_VERSION
 #define	ETH_DRIVER_VERSION	"3.5.2"
 #endif
@@ -167,6 +169,10 @@ static const struct media mlx5e_mode_table[MLX5E_LINK_SPEEDS_NUMBER][MLX5E_LINK_
 	},
 	[MLX5E_50GBASE_KR2][MLX5E_KR2] = {
 		.subtype = IFM_50G_KR2,
+		.baudrate = IF_Gbps(50ULL),
+	},
+	[MLX5E_50GBASE_KR4][MLX5E_KR4] = {
+		.subtype = IFM_50G_KR4,
 		.baudrate = IF_Gbps(50ULL),
 	},
 };
@@ -317,6 +323,10 @@ static const struct media mlx5e_ext_mode_table[MLX5E_EXT_LINK_SPEEDS_NUMBER][MLX
 		.subtype = IFM_50G_KR2,
 		.baudrate = IF_Gbps(50ULL),
 	},
+	[MLX5E_50GAUI_2_LAUI_2_50GBASE_CR2_KR2][MLX5E_KR4] = {
+		.subtype = IFM_50G_KR4,
+		.baudrate = IF_Gbps(50ULL),
+	},
 	[MLX5E_50GAUI_2_LAUI_2_50GBASE_CR2_KR2][MLX5E_SR2] = {
 		.subtype = IFM_50G_SR2,
 		.baudrate = IF_Gbps(50ULL),
@@ -398,6 +408,8 @@ static const struct media mlx5e_ext_mode_table[MLX5E_EXT_LINK_SPEEDS_NUMBER][MLX
 		.baudrate = IF_Gbps(200ULL),
 	},
 };
+
+DEBUGNET_DEFINE(mlx5_en);
 
 MALLOC_DEFINE(M_MLX5EN, "MLX5EN", "MLX5 Ethernet");
 
@@ -1104,7 +1116,7 @@ static int mlx5e_calibration_duration = 20;
 static int mlx5e_fast_calibration = 1;
 static int mlx5e_normal_calibration = 30;
 
-static SYSCTL_NODE(_hw_mlx5, OID_AUTO, calibr, CTLFLAG_RW, 0,
+static SYSCTL_NODE(_hw_mlx5, OID_AUTO, calibr, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
     "MLX5 timestamp calibration parameteres");
 
 SYSCTL_INT(_hw_mlx5_calibr, OID_AUTO, duration, CTLFLAG_RWTUN,
@@ -3839,8 +3851,8 @@ static void
 mlx5e_add_hw_stats(struct mlx5e_priv *priv)
 {
 	SYSCTL_ADD_PROC(&priv->sysctl_ctx, SYSCTL_CHILDREN(priv->sysctl_hw),
-	    OID_AUTO, "fw_version", CTLTYPE_STRING | CTLFLAG_RD, priv, 0,
-	    sysctl_firmware, "A", "HCA firmware version");
+	    OID_AUTO, "fw_version", CTLTYPE_STRING | CTLFLAG_RD | CTLFLAG_MPSAFE,
+	    priv, 0, sysctl_firmware, "A", "HCA firmware version");
 
 	SYSCTL_ADD_STRING(&priv->sysctl_ctx, SYSCTL_CHILDREN(priv->sysctl_hw),
 	    OID_AUTO, "board_id", CTLFLAG_RD, priv->mdev->board_id, 0,
@@ -4271,7 +4283,8 @@ mlx5e_create_ifp(struct mlx5_core_dev *mdev)
 	if_initname(ifp, "mce", device_get_unit(mdev->pdev->dev.bsddev));
 	ifp->if_mtu = ETHERMTU;
 	ifp->if_init = mlx5e_open;
-	ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST;
+	ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST |
+	    IFF_KNOWSEPOCH;
 	ifp->if_ioctl = mlx5e_ioctl;
 	ifp->if_transmit = mlx5e_xmit;
 	ifp->if_qflush = if_qflush;
@@ -4316,14 +4329,16 @@ mlx5e_create_ifp(struct mlx5_core_dev *mdev)
 	/* ifnet sysctl tree */
 	sysctl_ctx_init(&priv->sysctl_ctx);
 	priv->sysctl_ifnet = SYSCTL_ADD_NODE(&priv->sysctl_ctx, SYSCTL_STATIC_CHILDREN(_dev),
-	    OID_AUTO, ifp->if_dname, CTLFLAG_RD, 0, "MLX5 ethernet - interface name");
+	    OID_AUTO, ifp->if_dname, CTLFLAG_RD | CTLFLAG_MPSAFE, 0,
+	    "MLX5 ethernet - interface name");
 	if (priv->sysctl_ifnet == NULL) {
 		mlx5_core_err(mdev, "SYSCTL_ADD_NODE() failed\n");
 		goto err_free_sysctl;
 	}
 	snprintf(unit, sizeof(unit), "%d", ifp->if_dunit);
 	priv->sysctl_ifnet = SYSCTL_ADD_NODE(&priv->sysctl_ctx, SYSCTL_CHILDREN(priv->sysctl_ifnet),
-	    OID_AUTO, unit, CTLFLAG_RD, 0, "MLX5 ethernet - interface unit");
+	    OID_AUTO, unit, CTLFLAG_RD | CTLFLAG_MPSAFE, 0,
+	    "MLX5 ethernet - interface unit");
 	if (priv->sysctl_ifnet == NULL) {
 		mlx5_core_err(mdev, "SYSCTL_ADD_NODE() failed\n");
 		goto err_free_sysctl;
@@ -4332,7 +4347,8 @@ mlx5e_create_ifp(struct mlx5_core_dev *mdev)
 	/* HW sysctl tree */
 	child = SYSCTL_CHILDREN(device_get_sysctl_tree(mdev->pdev->dev.bsddev));
 	priv->sysctl_hw = SYSCTL_ADD_NODE(&priv->sysctl_ctx, child,
-	    OID_AUTO, "hw", CTLFLAG_RD, 0, "MLX5 ethernet dev hw");
+	    OID_AUTO, "hw", CTLFLAG_RD | CTLFLAG_MPSAFE, 0,
+	    "MLX5 ethernet dev hw");
 	if (priv->sysctl_hw == NULL) {
 		mlx5_core_err(mdev, "SYSCTL_ADD_NODE() failed\n");
 		goto err_free_sysctl;
@@ -4444,6 +4460,9 @@ mlx5e_create_ifp(struct mlx5_core_dev *mdev)
 	/* Set autoselect by default */
 	ifmedia_set(&priv->media, IFM_ETHER | IFM_AUTO | IFM_FDX |
 	    IFM_ETH_RXPAUSE | IFM_ETH_TXPAUSE);
+
+	DEBUGNET_SET(ifp, mlx5_en);
+
 	ether_ifattach(ifp, dev_addr);
 
 	/* Register for VLAN events */
@@ -4590,6 +4609,71 @@ mlx5e_destroy_ifp(struct mlx5_core_dev *mdev, void *vpriv)
 	if_free(ifp);
 	free(priv, M_MLX5EN);
 }
+
+#ifdef DEBUGNET
+static void
+mlx5_en_debugnet_init(struct ifnet *dev, int *nrxr, int *ncl, int *clsize)
+{
+	struct mlx5e_priv *priv = if_getsoftc(dev);
+
+	PRIV_LOCK(priv);
+	*nrxr = priv->params.num_channels;
+	*ncl = DEBUGNET_MAX_IN_FLIGHT;
+	*clsize = MLX5E_MAX_RX_BYTES;
+	PRIV_UNLOCK(priv);
+}
+
+static void
+mlx5_en_debugnet_event(struct ifnet *dev, enum debugnet_ev event)
+{
+}
+
+static int
+mlx5_en_debugnet_transmit(struct ifnet *dev, struct mbuf *m)
+{
+	struct mlx5e_priv *priv = if_getsoftc(dev);
+	struct mlx5e_sq *sq;
+	int err;
+
+	if ((if_getdrvflags(dev) & (IFF_DRV_RUNNING | IFF_DRV_OACTIVE)) !=
+	    IFF_DRV_RUNNING || (priv->media_status_last & IFM_ACTIVE) == 0)
+		return (ENOENT);
+
+	sq = &priv->channel[0].sq[0];
+
+	if (sq->running == 0) {
+		m_freem(m);
+		return (ENOENT);
+	}
+
+	if (mlx5e_sq_xmit(sq, &m) != 0) {
+		m_freem(m);
+		err = ENOBUFS;
+	} else {
+		err = 0;
+	}
+
+	if (likely(sq->doorbell.d64 != 0)) {
+		mlx5e_tx_notify_hw(sq, sq->doorbell.d32, 0);
+		sq->doorbell.d64 = 0;
+	}
+	return (err);
+}
+
+static int
+mlx5_en_debugnet_poll(struct ifnet *dev, int count)
+{
+	struct mlx5e_priv *priv = if_getsoftc(dev);
+
+	if ((if_getdrvflags(dev) & IFF_DRV_RUNNING) == 0 ||
+	    (priv->media_status_last & IFM_ACTIVE) == 0)
+		return (ENOENT);
+
+	mlx5_poll_interrupts(priv->mdev);
+
+	return (0);
+}
+#endif /* DEBUGNET */
 
 static void *
 mlx5e_get_ifp(void *vpriv)

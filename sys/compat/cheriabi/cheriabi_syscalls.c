@@ -579,4 +579,6 @@ const char *cheriabi_syscallnames[] = {
 	"cheriabi___sysctlbyname",			/* 570 = cheriabi___sysctlbyname */
 	"cheriabi_shm_open2",			/* 571 = cheriabi_shm_open2 */
 	"cheriabi_shm_rename",			/* 572 = cheriabi_shm_rename */
+	"cheriabi_sigfastblock",			/* 573 = cheriabi_sigfastblock */
+	"cheriabi___realpathat",			/* 574 = cheriabi___realpathat */
 };

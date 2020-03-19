@@ -1370,13 +1370,6 @@ dev/bhnd/siba/siba_bhndb.c		optional siba bhnd bhndb
 dev/bhnd/siba/siba_erom.c		optional siba bhnd
 dev/bhnd/siba/siba_subr.c		optional siba bhnd
 #
-dev/bktr/bktr_audio.c		optional bktr pci
-dev/bktr/bktr_card.c		optional bktr pci
-dev/bktr/bktr_core.c		optional bktr pci
-dev/bktr/bktr_i2c.c		optional bktr pci smbus
-dev/bktr/bktr_os.c		optional bktr pci
-dev/bktr/bktr_tuner.c		optional bktr pci
-dev/bktr/msp34xx.c		optional bktr pci
 dev/bnxt/bnxt_hwrm.c		optional bnxt iflib pci
 dev/bnxt/bnxt_sysctl.c		optional bnxt iflib pci
 dev/bnxt/bnxt_txrx.c		optional bnxt iflib pci
@@ -1508,7 +1501,7 @@ t4fw.fwo		optional cxgbe					\
 	no-implicit-rule						\
 	clean		"t4fw.fwo"
 t4fw.fw			optional cxgbe					\
-	dependency	"$S/dev/cxgbe/firmware/t4fw-1.24.11.0.bin"	\
+	dependency	"$S/dev/cxgbe/firmware/t4fw-1.24.12.0.bin"	\
 	compile-with	"${CP} ${.ALLSRC} ${.TARGET}"			\
 	no-obj no-implicit-rule						\
 	clean		"t4fw.fw"
@@ -1542,7 +1535,7 @@ t5fw.fwo		optional cxgbe					\
 	no-implicit-rule						\
 	clean		"t5fw.fwo"
 t5fw.fw			optional cxgbe					\
-	dependency	"$S/dev/cxgbe/firmware/t5fw-1.24.11.0.bin"	\
+	dependency	"$S/dev/cxgbe/firmware/t5fw-1.24.12.0.bin"	\
 	compile-with	"${CP} ${.ALLSRC} ${.TARGET}"			\
 	no-obj no-implicit-rule						\
 	clean		"t5fw.fw"
@@ -1576,7 +1569,7 @@ t6fw.fwo		optional cxgbe					\
 	no-implicit-rule						\
 	clean		"t6fw.fwo"
 t6fw.fw			optional cxgbe					\
-	dependency	"$S/dev/cxgbe/firmware/t6fw-1.24.11.0.bin"	\
+	dependency	"$S/dev/cxgbe/firmware/t6fw-1.24.12.0.bin"	\
 	compile-with	"${CP} ${.ALLSRC} ${.TARGET}"			\
 	no-obj no-implicit-rule						\
 	clean		"t6fw.fw"
@@ -3521,6 +3514,7 @@ fs/fuse/fuse_main.c		optional fusefs
 fs/fuse/fuse_node.c		optional fusefs
 fs/fuse/fuse_vfsops.c		optional fusefs
 fs/fuse/fuse_vnops.c		optional fusefs
+fs/mntfs/mntfs_vnops.c		standard
 fs/msdosfs/msdosfs_conv.c	optional msdosfs
 fs/msdosfs/msdosfs_denode.c	optional msdosfs
 fs/msdosfs/msdosfs_fat.c	optional msdosfs
@@ -4513,6 +4507,8 @@ compat/linuxkpi/common/src/linux_rcu.c		optional compat_linuxkpi \
 	compile-with "${LINUXKPI_C} -I$S/contrib/ck/include"
 compat/linuxkpi/common/src/linux_schedule.c	optional compat_linuxkpi \
 	compile-with "${LINUXKPI_C}"
+compat/linuxkpi/common/src/linux_shmemfs.c	optional compat_linuxkpi \
+	compile-with "${LINUXKPI_C}"
 compat/linuxkpi/common/src/linux_slab.c		optional compat_linuxkpi \
 	compile-with "${LINUXKPI_C}"
 compat/linuxkpi/common/src/linux_usb.c		optional compat_linuxkpi usb \
@@ -4861,6 +4857,23 @@ crypto/libsodium/randombytes.c	optional crypto \
 	compile-with "${NORMAL_C} -I$S/contrib/libsodium/src/libsodium/include -I$S/crypto/libsodium"
 crypto/libsodium/utils.c	optional crypto \
 	compile-with "${NORMAL_C} -I$S/contrib/libsodium/src/libsodium/include -I$S/crypto/libsodium"
+contrib/libsodium/src/libsodium/crypto_core/hchacha20/core_hchacha20.c \
+	optional crypto \
+	compile-with "${NORMAL_C} -I$S/contrib/libsodium/src/libsodium/include/sodium -I$S/crypto/libsodium"
+contrib/libsodium/src/libsodium/crypto_stream/chacha20/stream_chacha20.c \
+	optional crypto \
+	compile-with "${NORMAL_C} -I$S/contrib/libsodium/src/libsodium/include/sodium -I$S/crypto/libsodium"
+contrib/libsodium/src/libsodium/crypto_stream/chacha20/ref/chacha20_ref.c \
+	optional crypto \
+	compile-with "${NORMAL_C} -I$S/contrib/libsodium/src/libsodium/include/sodium -I$S/crypto/libsodium"
+contrib/libsodium/src/libsodium/crypto_aead/chacha20poly1305/sodium/aead_chacha20poly1305.c \
+	optional crypto \
+	compile-with "${NORMAL_C} -I$S/contrib/libsodium/src/libsodium/include/sodium -I$S/crypto/libsodium"
+contrib/libsodium/src/libsodium/crypto_aead/xchacha20poly1305/sodium/aead_xchacha20poly1305.c \
+	optional crypto \
+	compile-with "${NORMAL_C} -I$S/contrib/libsodium/src/libsodium/include/sodium -I$S/crypto/libsodium"
+
+
 opencrypto/cbc_mac.c		optional crypto
 opencrypto/xform_cbc_mac.c	optional crypto
 rpc/auth_none.c			optional krpc | nfslockd | nfscl | nfsd

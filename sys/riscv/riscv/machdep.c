@@ -334,6 +334,8 @@ fill_capregs(struct thread *td, struct capreg *regs)
 	memcpy(regs->ct, frame->tf_t, sizeof(regs->ct));
 	memcpy(regs->cs, frame->tf_s, sizeof(regs->cs));
 	memcpy(regs->ca, frame->tf_a, sizeof(regs->ca));
+	regs->sepcc = frame->tf_sepc;
+	regs->ddc = frame->tf_ddc;
 	pcap = (uintcap_t *)regs;
 	for (i = 0; i < NCAPREGS; i++) {
 		if (cheri_gettag((void * __capability)pcap[i]))

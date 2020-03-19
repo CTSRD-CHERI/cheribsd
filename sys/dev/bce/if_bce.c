@@ -535,7 +535,8 @@ MODULE_PNP_INFO("U16:vendor;U16:device;U16:#;U16:#;D:#", pci, bce,
 /****************************************************************************/
 /* Tunable device values                                                    */
 /****************************************************************************/
-static SYSCTL_NODE(_hw, OID_AUTO, bce, CTLFLAG_RD, 0, "bce driver parameters");
+static SYSCTL_NODE(_hw, OID_AUTO, bce, CTLFLAG_RD | CTLFLAG_MPSAFE, 0,
+    "bce driver parameters");
 
 /* Allowable values are TRUE or FALSE */
 static int bce_verbose = TRUE;
@@ -1406,14 +1407,8 @@ bce_attach(device_t dev)
 		ifp->if_capabilities = BCE_IF_CAPABILITIES;
 	}
 
-#if __FreeBSD_version >= 800505
-	/*
-	 * Introducing IFCAP_LINKSTATE didn't bump __FreeBSD_version
-	 * so it's approximate value.
-	 */
 	if ((sc->bce_phy_flags & BCE_PHY_REMOTE_CAP_FLAG) != 0)
 		ifp->if_capabilities |= IFCAP_LINKSTATE;
-#endif
 
 	ifp->if_capenable = ifp->if_capabilities;
 
@@ -1489,13 +1484,8 @@ bce_attach(device_t dev)
 	/* Attach to the Ethernet interface list. */
 	ether_ifattach(ifp, sc->eaddr);
 
-#if __FreeBSD_version < 500000
-	callout_init(&sc->bce_tick_callout);
-	callout_init(&sc->bce_pulse_callout);
-#else
 	callout_init_mtx(&sc->bce_tick_callout, &sc->bce_mtx, 0);
 	callout_init_mtx(&sc->bce_pulse_callout, &sc->bce_mtx, 0);
-#endif
 
 	/* Hookup IRQ last. */
 	rc = bus_setup_intr(dev, sc->bce_res_irq, INTR_TYPE_NET | INTR_MPSAFE,
@@ -6800,14 +6790,9 @@ bce_rx_intr(struct bce_softc *sc)
 			DBRUN(sc->vlan_tagged_frames_rcvd++);
 			if (ifp->if_capenable & IFCAP_VLAN_HWTAGGING) {
 				DBRUN(sc->vlan_tagged_frames_stripped++);
-#if __FreeBSD_version < 700000
-				VLAN_INPUT_TAG(ifp, m0,
-				    l2fhdr->l2_fhdr_vlan_tag, continue);
-#else
 				m0->m_pkthdr.ether_vtag =
 				    l2fhdr->l2_fhdr_vlan_tag;
 				m0->m_flags |= M_VLANTAG;
-#endif
 			} else {
 				/*
 				 * bce(4) controllers can't disable VLAN
@@ -9299,13 +9284,13 @@ bce_add_sysctls(struct bce_softc *sc)
 	}
 
 	SYSCTL_ADD_PROC(ctx, children, OID_AUTO,
-	    "nvram_dump", CTLTYPE_OPAQUE | CTLFLAG_RD,
+	    "nvram_dump", CTLTYPE_OPAQUE | CTLFLAG_RD | CTLFLAG_NEEDGIANT,
 	    (void *)sc, 0,
 	    bce_sysctl_nvram_dump, "S", "");
 
 #ifdef BCE_NVRAM_WRITE_SUPPORT
 	SYSCTL_ADD_PROC(ctx, children, OID_AUTO,
-	    "nvram_write", CTLTYPE_OPAQUE | CTLFLAG_WR,
+	    "nvram_write", CTLTYPE_OPAQUE | CTLFLAG_WR | CTLFLAG_NEEDGIANT,
 	    (void *)sc, 0,
 	    bce_sysctl_nvram_write, "S", "");
 #endif
@@ -9590,84 +9575,85 @@ bce_add_sysctls(struct bce_softc *sc)
 
 #ifdef BCE_DEBUG
 	SYSCTL_ADD_PROC(ctx, children, OID_AUTO,
-	    "driver_state", CTLTYPE_INT | CTLFLAG_RW,
+	    "driver_state", CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_NEEDGIANT,
 	    (void *)sc, 0,
 	    bce_sysctl_driver_state, "I", "Drive state information");
 
 	SYSCTL_ADD_PROC(ctx, children, OID_AUTO,
-	    "hw_state", CTLTYPE_INT | CTLFLAG_RW,
+	    "hw_state", CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_NEEDGIANT,
 	    (void *)sc, 0,
 	    bce_sysctl_hw_state, "I", "Hardware state information");
 
 	SYSCTL_ADD_PROC(ctx, children, OID_AUTO,
-	    "status_block", CTLTYPE_INT | CTLFLAG_RW,
+	    "status_block", CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_NEEDGIANT,
 	    (void *)sc, 0,
 	    bce_sysctl_status_block, "I", "Dump status block");
 
 	SYSCTL_ADD_PROC(ctx, children, OID_AUTO,
-	    "stats_block", CTLTYPE_INT | CTLFLAG_RW,
+	    "stats_block", CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_NEEDGIANT,
 	    (void *)sc, 0,
 	    bce_sysctl_stats_block, "I", "Dump statistics block");
 
 	SYSCTL_ADD_PROC(ctx, children, OID_AUTO,
-	    "stats_clear", CTLTYPE_INT | CTLFLAG_RW,
+	    "stats_clear", CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_NEEDGIANT,
 	    (void *)sc, 0,
 	    bce_sysctl_stats_clear, "I", "Clear statistics block");
 
 	SYSCTL_ADD_PROC(ctx, children, OID_AUTO,
-	    "shmem_state", CTLTYPE_INT | CTLFLAG_RW,
+	    "shmem_state", CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_NEEDGIANT,
 	    (void *)sc, 0,
 	    bce_sysctl_shmem_state, "I", "Shared memory state information");
 
 	SYSCTL_ADD_PROC(ctx, children, OID_AUTO,
-	    "bc_state", CTLTYPE_INT | CTLFLAG_RW,
+	    "bc_state", CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_NEEDGIANT,
 	    (void *)sc, 0,
 	    bce_sysctl_bc_state, "I", "Bootcode state information");
 
 	SYSCTL_ADD_PROC(ctx, children, OID_AUTO,
-	    "dump_rx_bd_chain", CTLTYPE_INT | CTLFLAG_RW,
+	    "dump_rx_bd_chain", CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_NEEDGIANT,
 	    (void *)sc, 0,
 	    bce_sysctl_dump_rx_bd_chain, "I", "Dump RX BD chain");
 
 	SYSCTL_ADD_PROC(ctx, children, OID_AUTO,
-	    "dump_rx_mbuf_chain", CTLTYPE_INT | CTLFLAG_RW,
+	    "dump_rx_mbuf_chain", CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_NEEDGIANT,
 	    (void *)sc, 0,
 	    bce_sysctl_dump_rx_mbuf_chain, "I", "Dump RX MBUF chain");
 
 	SYSCTL_ADD_PROC(ctx, children, OID_AUTO,
-	    "dump_tx_chain", CTLTYPE_INT | CTLFLAG_RW,
+	    "dump_tx_chain", CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_NEEDGIANT,
 	    (void *)sc, 0,
 	    bce_sysctl_dump_tx_chain, "I", "Dump tx_bd chain");
 
 	if (bce_hdr_split == TRUE) {
 		SYSCTL_ADD_PROC(ctx, children, OID_AUTO,
-		    "dump_pg_chain", CTLTYPE_INT | CTLFLAG_RW,
+		    "dump_pg_chain",
+		    CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_NEEDGIANT,
 		    (void *)sc, 0,
 		    bce_sysctl_dump_pg_chain, "I", "Dump page chain");
 	}
 
 	SYSCTL_ADD_PROC(ctx, children, OID_AUTO,
-	    "dump_ctx", CTLTYPE_INT | CTLFLAG_RW,
+	    "dump_ctx", CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_NEEDGIANT,
 	    (void *)sc, 0,
 	    bce_sysctl_dump_ctx, "I", "Dump context memory");
 
 	SYSCTL_ADD_PROC(ctx, children, OID_AUTO,
-	    "breakpoint", CTLTYPE_INT | CTLFLAG_RW,
+	    "breakpoint", CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_NEEDGIANT,
 	    (void *)sc, 0,
 	    bce_sysctl_breakpoint, "I", "Driver breakpoint");
 
 	SYSCTL_ADD_PROC(ctx, children, OID_AUTO,
-	    "reg_read", CTLTYPE_INT | CTLFLAG_RW,
+	    "reg_read", CTLTYPE_INT | CTLFLAG_RW| CTLFLAG_NEEDGIANT,
 	    (void *)sc, 0,
 	    bce_sysctl_reg_read, "I", "Register read");
 
 	SYSCTL_ADD_PROC(ctx, children, OID_AUTO,
-	    "nvram_read", CTLTYPE_INT | CTLFLAG_RW,
+	    "nvram_read", CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_NEEDGIANT,
 	    (void *)sc, 0,
 	    bce_sysctl_nvram_read, "I", "NVRAM read");
 
 	SYSCTL_ADD_PROC(ctx, children, OID_AUTO,
-	    "phy_read", CTLTYPE_INT | CTLFLAG_RW,
+	    "phy_read", CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_NEEDGIANT,
 	    (void *)sc, 0,
 	    bce_sysctl_phy_read, "I", "PHY register read");
 

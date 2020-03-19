@@ -502,26 +502,13 @@ int
 kern_mmap(struct thread *td, uintptr_t addr0, size_t len, int prot, int flags,
     int fd, off_t pos)
 {
-
-	return (kern_mmap_fpcheck(td, addr0, len, prot, flags, fd, pos, NULL));
-}
-
-/*
- * When mmap'ing a file, check_fp_fn may be used for the caller to do any
- * last-minute validation based on the referenced file in a non-racy way.
- */
-int
-kern_mmap_fpcheck(struct thread *td, uintptr_t addr0, size_t len, int prot,
-    int flags, int fd, off_t pos, mmap_check_fp_fn check_fp_fn)
-{
-	struct mmap_req	mr = {
+	struct mmap_req mr = {
 		.mr_hint = addr0,
 		.mr_len = len,
 		.mr_prot = prot,
 		.mr_flags = flags,
 		.mr_fd = fd,
-		.mr_pos = pos,
-		.mr_check_fp_fn = check_fp_fn
+		.mr_pos = pos
 	};
 
 	return (kern_mmap_req(td, &mr));
@@ -583,7 +570,7 @@ kern_mmap_req(struct thread *td, const struct mmap_req *mrp)
 		SYSERRCAUSE(
 		    "%s: requested page permissions exceed requesed maximum",
 		    __func__);
-		return (EINVAL);
+		return (ENOTSUP);
 	}
 	if ((prot & (PROT_WRITE | PROT_EXEC)) == (PROT_WRITE | PROT_EXEC) &&
 	    (error = vm_wxcheck(p, "mmap")))
@@ -852,15 +839,15 @@ kern_mmap_req(struct thread *td, const struct mmap_req *mrp)
 		 * rights, but also return the maximum rights to be combined
 		 * with maxprot later.
 		 */
-		cap_rights_init(&rights, CAP_MMAP);
+		cap_rights_init_one(&rights, CAP_MMAP);
 		if (max_prot & PROT_READ)
-			cap_rights_set(&rights, CAP_MMAP_R);
+			cap_rights_set_one(&rights, CAP_MMAP_R);
 		if ((flags & MAP_SHARED) != 0) {
 			if (max_prot & PROT_WRITE)
-				cap_rights_set(&rights, CAP_MMAP_W);
+				cap_rights_set_one(&rights, CAP_MMAP_W);
 		}
 		if (max_prot & PROT_EXEC)
-			cap_rights_set(&rights, CAP_MMAP_X);
+			cap_rights_set_one(&rights, CAP_MMAP_X);
 		error = fget_mmap(td, fd, &rights, &cap_maxprot, &fp);
 		if (error != 0)
 			goto done;
@@ -1167,7 +1154,7 @@ kern_mprotect(struct thread *td, uintptr_t addr0, size_t size, int prot)
 	vm_error = KERN_SUCCESS;
 	if (max_prot != 0) {
 		if ((max_prot & prot) != prot)
-			return (EINVAL);
+			return (ENOTSUP);
 		vm_error = vm_map_protect(&td->td_proc->p_vmspace->vm_map,
 		    addr, addr + size, max_prot, TRUE);
 	}
@@ -1418,8 +1405,7 @@ retry:
 				while (object == NULL || m->object != object) {
 					if (object != NULL)
 						VM_OBJECT_WUNLOCK(object);
-					object = (vm_object_t)atomic_load_ptr(
-					    &m->object);
+					object = atomic_load_ptr(&m->object);
 					if (object == NULL)
 						goto retry;
 					VM_OBJECT_WLOCK(object);

@@ -1,5 +1,6 @@
 /****************************************************************************
- * Copyright (c) 1998-2010,2012 Free Software Foundation, Inc.              *
+ * Copyright 2018,2020 Thomas E. Dickey                                     *
+ * Copyright 1998-2012,2015 Free Software Foundation, Inc.                  *
  *                                                                          *
  * Permission is hereby granted, free of charge, to any person obtaining a  *
  * copy of this software and associated documentation files (the            *
@@ -34,10 +35,17 @@
 
 #include "form.priv.h"
 
-MODULE_ID("$Id: fty_regex.c,v 1.25 2012/10/27 20:12:53 tom Exp $")
+MODULE_ID("$Id: fty_regex.c,v 1.28 2020/02/02 23:34:34 tom Exp $")
 
-#if HAVE_REGEX_H_FUNCS		/* We prefer POSIX regex */
+#if HAVE_REGEX_H_FUNCS || HAVE_LIB_PCRE2	/* We prefer POSIX regex */
+
+#if HAVE_PCRE2_POSIX_H
+#include <pcre2-posix.h>
+#elif HAVE_PCREPOSIX_H
+#include <pcreposix.h>
+#else
 #include <regex.h>
+#endif
 
 typedef struct
   {
@@ -113,7 +121,7 @@ Generic_RegularExpression_Type(void *arg MAYBE_UNUSED)
 
   if (rx)
     {
-      preg = typeMalloc(RegExp_Arg, 1);
+      preg = typeCalloc(RegExp_Arg, 1);
 
       if (preg)
 	{
@@ -264,6 +272,7 @@ Free_RegularExpression_Type(void *argp MAYBE_UNUSED)
 	    {
 	      free(ap->refCount);
 	      regfree(ap->pRegExp);
+	      free(ap->pRegExp);
 	    }
 #elif HAVE_REGEXP_H_FUNCS | HAVE_REGEXPR_H_FUNCS
 	  if (ap->compiled_expression)

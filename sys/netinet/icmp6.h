@@ -344,7 +344,7 @@ struct nd_opt_mtu {		/* MTU option */
 #define	ND_OPT_NONCE_LEN	((1 * 8) - 2)
 #if ((ND_OPT_NONCE_LEN + 2) % 8) != 0
 #error "(ND_OPT_NONCE_LEN + 2) must be a multiple of 8."
-#endif 
+#endif
 struct nd_opt_nonce {		/* nonce option */
 	u_int8_t	nd_opt_nonce_type;
 	u_int8_t	nd_opt_nonce_len;
@@ -607,7 +607,7 @@ struct icmp6stat {
 	 * for netinet6 code, it is already available in icp6s_outhist[].
 	 */
 	uint64_t icp6s_reflect;
-	uint64_t icp6s_inhist[256];	
+	uint64_t icp6s_inhist[256];
 	uint64_t icp6s_nd_toomanyopt;	/* too many ND options */
 	struct icmp6errstat icp6s_outerrhist;
 #define icp6s_odst_unreach_noroute \
@@ -635,6 +635,10 @@ struct icmp6stat {
 	uint64_t icp6s_badrs;		/* bad router solicitation */
 	uint64_t icp6s_badra;		/* bad router advertisement */
 	uint64_t icp6s_badredirect;	/* bad redirect message */
+	uint64_t icp6s_overflowdefrtr;	/* Too many default routers. */
+	uint64_t icp6s_overflowprfx;	/* Too many prefixes. */
+	uint64_t icp6s_overflownndp;	/* Too many neighbour entries. */
+	uint64_t icp6s_overflowredirect;/* Too many redirects. */
 };
 
 #ifdef _KERNEL

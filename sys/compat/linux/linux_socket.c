@@ -752,25 +752,19 @@ linux_getpeername(struct thread *td, struct linux_getpeername_args *args)
 int
 linux_socketpair(struct thread *td, struct linux_socketpair_args *args)
 {
-	struct socketpair_args /* {
-		int domain;
-		int type;
-		int protocol;
-		int *rsv;
-	} */ bsd_args;
-	int error;
+	int domain, error, sv[2], type;
 
-	bsd_args.domain = linux_to_bsd_domain(args->domain);
-	if (bsd_args.domain != PF_LOCAL)
+	domain = linux_to_bsd_domain(args->domain);
+	if (domain != PF_LOCAL)
 		return (EAFNOSUPPORT);
-	bsd_args.type = args->type & LINUX_SOCK_TYPE_MASK;
-	if (bsd_args.type < 0 || bsd_args.type > LINUX_SOCK_MAX)
+	type = args->type & LINUX_SOCK_TYPE_MASK;
+	if (type < 0 || type > LINUX_SOCK_MAX)
 		return (EINVAL);
 	error = linux_set_socket_flags(args->type & ~LINUX_SOCK_TYPE_MASK,
-		&bsd_args.type);
+	    &type);
 	if (error != 0)
 		return (error);
-	if (args->protocol != 0 && args->protocol != PF_UNIX)
+	if (args->protocol != 0 && args->protocol != PF_UNIX) {
 
 		/*
 		 * Use of PF_UNIX as protocol argument is not right,
@@ -779,10 +773,16 @@ linux_socketpair(struct thread *td, struct linux_socketpair_args *args)
 		 * to FreeBSD one.
 		 */
 		return (EPROTONOSUPPORT);
-	else
-		bsd_args.protocol = 0;
-	bsd_args.rsv = (int *)PTRIN(args->rsv);
-	return (sys_socketpair(td, &bsd_args));
+	}
+	error = kern_socketpair(td, domain, type, 0, sv);
+	if (error != 0)
+                return (error);
+        error = copyout(sv, PTRIN(args->rsv), 2 * sizeof(int));
+        if (error != 0) {
+                (void)kern_close(td, sv[0]);
+                (void)kern_close(td, sv[1]);
+        }
+	return (error);
 }
 
 #if defined(__i386__) || (defined(__amd64__) && defined(COMPAT_LINUX32))
@@ -1448,9 +1448,12 @@ linux_setsockopt(struct thread *td, struct linux_setsockopt_args *args)
 		name = -1;
 		break;
 	}
-	if (name == -1)
+	if (name == -1) {
+		linux_msg(curthread,
+		    "unsupported setsockopt level %d optname %d",
+		    args->level, args->optname);
 		return (ENOPROTOOPT);
-
+	}
 
 	if (name == IPV6_NEXTHOP) {
 		len = args->optlen;
@@ -1543,8 +1546,12 @@ linux_getsockopt(struct thread *td, struct linux_getsockopt_args *args)
 		name = -1;
 		break;
 	}
-	if (name == -1)
+	if (name == -1) {
+		linux_msg(curthread,
+		    "unsupported getsockopt level %d optname %d",
+		    args->level, args->optname);
 		return (EINVAL);
+	}
 
 	if (name == IPV6_NEXTHOP) {
 		error = copyin(PTRIN(args->optlen), &len, sizeof(len));
