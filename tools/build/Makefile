@@ -90,6 +90,7 @@ INCS+=		strings.h
 SRCS+=		explicit_bzero.c
 .endif
 
+
 .if exists(${HOST_INCLUDE_ROOT}/capsicum_helpers.h)
 _WITH_CAPH_ENTER!= grep -c caph_enter ${HOST_INCLUDE_ROOT}/capsicum_helpers.h || true
 _WITH_CAPH_RIGHTS_LIMIT!= grep -c caph_rights_limit ${HOST_INCLUDE_ROOT}/capsicum_helpers.h || true
@@ -171,11 +172,6 @@ _make_abs!=	which "${MAKE}"
 _host_abs_tools_to_symlink=	${_make_abs}:make ${_make_abs}:bmake
 
 .if ${.MAKE.OS} != "FreeBSD"
-# can we bootstrap this instead?
-.if ${MK_GCC} != "no" && ${MK_CXX} != "no"
-_host_tools_to_symlink+=gperf
-.endif
-
 _py3_abs=${PYTHON3_BINARY}
 .if empty(_py3_abs)
 _py3_abs!=	which python3 2>/dev/null || echo "/invalid/path/to/python3"

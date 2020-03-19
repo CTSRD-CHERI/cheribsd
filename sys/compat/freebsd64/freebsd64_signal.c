@@ -147,6 +147,9 @@ siginfo_to_siginfo64(const siginfo_t *si, struct siginfo64 *si64)
 	si64->si_status = si->si_status;
 	si64->si_addr = (__cheri_addr uint64_t)si->si_addr;
 	si64->si_value.sival_ptr = (__cheri_addr uint64_t)si->si_value.sival_ptr;
+	_Static_assert(sizeof(si64->_reason) == sizeof(si->_reason),
+	    "siginfo _reason size mismatch");
+	memcpy(&si64->_reason, &si->_reason, sizeof(si64->_reason));
 }
 
 static int

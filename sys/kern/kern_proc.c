@@ -98,11 +98,6 @@ __FBSDID("$FreeBSD$");
 #include <compat/freebsd64/freebsd64_util.h>
 #endif
 
-#ifdef COMPAT_CHERIABI
-#include <compat/cheriabi/cheriabi.h>
-#include <compat/cheriabi/cheriabi_util.h>
-#endif
-
 #if __has_feature(capabilities)
 #include <cheri/cheric.h>
 #endif
@@ -179,10 +174,8 @@ CTASSERT(sizeof(struct kinfo_proc) == KINFO_PROC_SIZE);
 #ifdef COMPAT_FREEBSD32
 CTASSERT(sizeof(struct kinfo_proc32) == KINFO_PROC32_SIZE);
 #endif
-#ifdef COMPAT_CHERIABI
-#ifdef NOTYET
-CTASSERT(sizeof(struct kinfo_proc_c) == KINFO_PROC_C_SIZE);
-#endif
+#ifdef COMPAT_FREEBSD64
+CTASSERT(sizeof(struct kinfo_proc64) == KINFO_PROC64_SIZE);
 #endif
 
 /*
@@ -1001,6 +994,8 @@ fill_kinfo_aggregate(struct proc *p, struct kinfo_proc *kp)
 	}
 }
 
+#define	EXPORT_KPTR(p) ((void * __capability)(intcap_t)(intptr_t)(p))
+
 /*
  * Clear kinfo_proc and fill in any information that is common
  * to all threads in the process.
@@ -1020,16 +1015,16 @@ fill_kinfo_proc_only(struct proc *p, struct kinfo_proc *kp)
 	bzero(kp, sizeof(*kp));
 
 	kp->ki_structsize = sizeof(*kp);
-	kp->ki_paddr = p;
+	kp->ki_paddr = EXPORT_KPTR(p);
 	kp->ki_addr =/* p->p_addr; */0; /* XXX */
-	kp->ki_args = p->p_args;
-	kp->ki_textvp = p->p_textvp;
+	kp->ki_args = EXPORT_KPTR(p->p_args);
+	kp->ki_textvp = EXPORT_KPTR(p->p_textvp);
 #ifdef KTRACE
-	kp->ki_tracep = p->p_tracevp;
+	kp->ki_tracep = EXPORT_KPTR(p->p_tracevp);
 	kp->ki_traceflag = p->p_traceflag;
 #endif
-	kp->ki_fd = p->p_fd;
-	kp->ki_vmspace = p->p_vmspace;
+	kp->ki_fd = EXPORT_KPTR(p->p_fd);
+	kp->ki_vmspace = EXPORT_KPTR(p->p_vmspace);
 	kp->ki_flag = p->p_flag;
 	kp->ki_flag2 = p->p_flag2;
 	cred = p->p_ucred;
@@ -1167,7 +1162,7 @@ fill_kinfo_thread(struct thread *td, struct kinfo_proc *kp, int preferthread)
 	struct proc *p;
 
 	p = td->td_proc;
-	kp->ki_tdaddr = td;
+	kp->ki_tdaddr = EXPORT_KPTR(td);
 	PROC_LOCK_ASSERT(p, MA_OWNED);
 
 	if (preferthread)
@@ -1215,7 +1210,7 @@ fill_kinfo_thread(struct thread *td, struct kinfo_proc *kp, int preferthread)
 	}
 
 	/* Things in the thread */
-	kp->ki_wchan = td->td_wchan;
+	kp->ki_wchan = EXPORT_KPTR(td->td_wchan);
 	kp->ki_pri.pri_level = td->td_priority;
 	kp->ki_pri.pri_native = td->td_base_pri;
 
@@ -1242,8 +1237,8 @@ fill_kinfo_thread(struct thread *td, struct kinfo_proc *kp, int preferthread)
 	kp->ki_tdflags = td->td_flags;
 	kp->ki_tid = td->td_tid;
 	kp->ki_numthreads = p->p_numthreads;
-	kp->ki_pcb = td->td_pcb;
-	kp->ki_kstack = (void *)td->td_kstack;
+	kp->ki_pcb = EXPORT_KPTR(td->td_pcb);
+	kp->ki_kstack = EXPORT_KPTR((void *)td->td_kstack);
 	kp->ki_slptime = (ticks - td->td_slptick) / hz;
 	kp->ki_pri.pri_class = td->td_pri_class;
 	kp->ki_pri.pri_user = td->td_user_pri;
@@ -1316,7 +1311,7 @@ pstats_free(struct pstats *ps)
  * it can be replaced by assignment of zero.
  */
 static inline uint32_t
-ptr32_trim(const void *ptr)
+ptr32_trim(const void * __capability ptr)
 {
 	uintptr_t uptr;
 
@@ -1419,111 +1414,121 @@ freebsd32_kinfo_proc_out(const struct kinfo_proc *ki, struct kinfo_proc32 *ki32)
 	CP(*ki, *ki32, ki_sflag);
 	CP(*ki, *ki32, ki_tdflags);
 }
+
+#undef PTRTRIM_CP
 #endif	/* COMPAT_FREEBSD32 */
 
-#ifdef COMPAT_CHERIABI
+#ifdef COMPAT_FREEBSD64
+
 /*
- * Convert pointers to NULL capabilities with the offset of the
- * virtual address to avoid leaking kernel capbilities.  One
- * alternative to consider is sealed capabilities, but would seem
- * to complicate attempts to impose hardware enforced flow control.
+ * This function is typically used to copy out the kernel address, so
+ * it can be replaced by assignment of zero.
  */
-#define PTREXPAND_CP(src,dst,fld) \
-	do { (dst).fld = (void * __capability)(__intcap_t)(src).fld; } while (0)
+static inline uint64_t
+ptr64_trim(const void * __capability ptr)
+{
+
+	return ((__cheri_addr uint64_t)ptr);
+}
+
+#define PTRTRIM_CP(src,dst,fld) \
+	do { (dst).fld = ptr64_trim((src).fld); } while (0)
 
 static void
-cheriabi_kinfo_proc_out(const struct kinfo_proc *ki, struct kinfo_proc_c *ki_c)
+freebsd64_kinfo_proc_out(const struct kinfo_proc *ki, struct kinfo_proc64 *ki64)
 {
 	int i;
 
-	bzero(ki_c, sizeof(struct kinfo_proc_c));
-	ki_c->ki_structsize = sizeof(struct kinfo_proc_c);
-	CP(*ki, *ki_c, ki_layout);
-	PTREXPAND_CP(*ki, *ki_c, ki_args);
-	PTREXPAND_CP(*ki, *ki_c, ki_paddr);
-	PTREXPAND_CP(*ki, *ki_c, ki_addr);
-	PTREXPAND_CP(*ki, *ki_c, ki_tracep);
-	PTREXPAND_CP(*ki, *ki_c, ki_textvp);
-	PTREXPAND_CP(*ki, *ki_c, ki_fd);
-	PTREXPAND_CP(*ki, *ki_c, ki_vmspace);
-	PTREXPAND_CP(*ki, *ki_c, ki_wchan);
-	CP(*ki, *ki_c, ki_pid);
-	CP(*ki, *ki_c, ki_ppid);
-	CP(*ki, *ki_c, ki_pgid);
-	CP(*ki, *ki_c, ki_tpgid);
-	CP(*ki, *ki_c, ki_sid);
-	CP(*ki, *ki_c, ki_tsid);
-	CP(*ki, *ki_c, ki_jobc);
-	CP(*ki, *ki_c, ki_tdev);
-	CP(*ki, *ki_c, ki_tdev_freebsd11);
-	CP(*ki, *ki_c, ki_siglist);
-	CP(*ki, *ki_c, ki_sigmask);
-	CP(*ki, *ki_c, ki_sigignore);
-	CP(*ki, *ki_c, ki_sigcatch);
-	CP(*ki, *ki_c, ki_uid);
-	CP(*ki, *ki_c, ki_ruid);
-	CP(*ki, *ki_c, ki_svuid);
-	CP(*ki, *ki_c, ki_rgid);
-	CP(*ki, *ki_c, ki_svgid);
-	CP(*ki, *ki_c, ki_ngroups);
+	bzero(ki64, sizeof(struct kinfo_proc64));
+	ki64->ki_structsize = sizeof(struct kinfo_proc64);
+	CP(*ki, *ki64, ki_layout);
+	PTRTRIM_CP(*ki, *ki64, ki_args);
+	PTRTRIM_CP(*ki, *ki64, ki_paddr);
+	PTRTRIM_CP(*ki, *ki64, ki_addr);
+	PTRTRIM_CP(*ki, *ki64, ki_tracep);
+	PTRTRIM_CP(*ki, *ki64, ki_textvp);
+	PTRTRIM_CP(*ki, *ki64, ki_fd);
+	PTRTRIM_CP(*ki, *ki64, ki_vmspace);
+	PTRTRIM_CP(*ki, *ki64, ki_wchan);
+	CP(*ki, *ki64, ki_pid);
+	CP(*ki, *ki64, ki_ppid);
+	CP(*ki, *ki64, ki_pgid);
+	CP(*ki, *ki64, ki_tpgid);
+	CP(*ki, *ki64, ki_sid);
+	CP(*ki, *ki64, ki_tsid);
+	CP(*ki, *ki64, ki_jobc);
+	CP(*ki, *ki64, ki_tdev);
+	CP(*ki, *ki64, ki_tdev_freebsd11);
+	CP(*ki, *ki64, ki_siglist);
+	CP(*ki, *ki64, ki_sigmask);
+	CP(*ki, *ki64, ki_sigignore);
+	CP(*ki, *ki64, ki_sigcatch);
+	CP(*ki, *ki64, ki_uid);
+	CP(*ki, *ki64, ki_ruid);
+	CP(*ki, *ki64, ki_svuid);
+	CP(*ki, *ki64, ki_rgid);
+	CP(*ki, *ki64, ki_svgid);
+	CP(*ki, *ki64, ki_ngroups);
 	for (i = 0; i < KI_NGROUPS; i++)
-		CP(*ki, *ki_c, ki_groups[i]);
-	CP(*ki, *ki_c, ki_size);
-	CP(*ki, *ki_c, ki_rssize);
-	CP(*ki, *ki_c, ki_swrss);
-	CP(*ki, *ki_c, ki_tsize);
-	CP(*ki, *ki_c, ki_dsize);
-	CP(*ki, *ki_c, ki_ssize);
-	CP(*ki, *ki_c, ki_xstat);
-	CP(*ki, *ki_c, ki_acflag);
-	CP(*ki, *ki_c, ki_pctcpu);
-	CP(*ki, *ki_c, ki_estcpu);
-	CP(*ki, *ki_c, ki_slptime);
-	CP(*ki, *ki_c, ki_swtime);
-	CP(*ki, *ki_c, ki_cow);
-	CP(*ki, *ki_c, ki_runtime);
-	CP(*ki, *ki_c, ki_start);
-	CP(*ki, *ki_c, ki_childtime);
-	CP(*ki, *ki_c, ki_flag);
-	CP(*ki, *ki_c, ki_kiflag);
-	CP(*ki, *ki_c, ki_traceflag);
-	CP(*ki, *ki_c, ki_stat);
-	CP(*ki, *ki_c, ki_nice);
-	CP(*ki, *ki_c, ki_lock);
-	CP(*ki, *ki_c, ki_rqindex);
-	CP(*ki, *ki_c, ki_oncpu);
-	CP(*ki, *ki_c, ki_lastcpu);
+		CP(*ki, *ki64, ki_groups[i]);
+	CP(*ki, *ki64, ki_size);
+	CP(*ki, *ki64, ki_rssize);
+	CP(*ki, *ki64, ki_swrss);
+	CP(*ki, *ki64, ki_tsize);
+	CP(*ki, *ki64, ki_dsize);
+	CP(*ki, *ki64, ki_ssize);
+	CP(*ki, *ki64, ki_xstat);
+	CP(*ki, *ki64, ki_acflag);
+	CP(*ki, *ki64, ki_pctcpu);
+	CP(*ki, *ki64, ki_estcpu);
+	CP(*ki, *ki64, ki_slptime);
+	CP(*ki, *ki64, ki_swtime);
+	CP(*ki, *ki64, ki_cow);
+	CP(*ki, *ki64, ki_runtime);
+	CP(*ki, *ki64, ki_start);
+	CP(*ki, *ki64, ki_childtime);
+	CP(*ki, *ki64, ki_flag);
+	CP(*ki, *ki64, ki_kiflag);
+	CP(*ki, *ki64, ki_traceflag);
+	CP(*ki, *ki64, ki_stat);
+	CP(*ki, *ki64, ki_nice);
+	CP(*ki, *ki64, ki_lock);
+	CP(*ki, *ki64, ki_rqindex);
+	CP(*ki, *ki64, ki_oncpu);
+	CP(*ki, *ki64, ki_lastcpu);
 
 	/* XXX TODO: wrap cpu value as appropriate */
-	CP(*ki, *ki_c, ki_oncpu_old);
-	CP(*ki, *ki_c, ki_lastcpu_old);
+	CP(*ki, *ki64, ki_oncpu_old);
+	CP(*ki, *ki64, ki_lastcpu_old);
 
-	bcopy(ki->ki_tdname, ki_c->ki_tdname, TDNAMLEN + 1);
-	bcopy(ki->ki_wmesg, ki_c->ki_wmesg, WMESGLEN + 1);
-	bcopy(ki->ki_login, ki_c->ki_login, LOGNAMELEN + 1);
-	bcopy(ki->ki_lockname, ki_c->ki_lockname, LOCKNAMELEN + 1);
-	bcopy(ki->ki_comm, ki_c->ki_comm, COMMLEN + 1);
-	bcopy(ki->ki_emul, ki_c->ki_emul, KI_EMULNAMELEN + 1);
-	bcopy(ki->ki_loginclass, ki_c->ki_loginclass, LOGINCLASSLEN + 1);
-	bcopy(ki->ki_moretdname, ki_c->ki_moretdname, MAXCOMLEN - TDNAMLEN + 1);
-	CP(*ki, *ki_c, ki_tracer);
-	CP(*ki, *ki_c, ki_flag2);
-	CP(*ki, *ki_c, ki_fibnum);
-	CP(*ki, *ki_c, ki_cr_flags);
-	CP(*ki, *ki_c, ki_jid);
-	CP(*ki, *ki_c, ki_numthreads);
-	CP(*ki, *ki_c, ki_tid);
-	CP(*ki, *ki_c, ki_pri);
-	CP(*ki, *ki_c, ki_rusage);
-	CP(*ki, *ki_c, ki_rusage_ch);
-	PTREXPAND_CP(*ki, *ki_c, ki_pcb);
-	PTREXPAND_CP(*ki, *ki_c, ki_kstack);
-	PTREXPAND_CP(*ki, *ki_c, ki_udata);
-	PTREXPAND_CP(*ki, *ki_c, ki_tdaddr);
-	CP(*ki, *ki_c, ki_sflag);
-	CP(*ki, *ki_c, ki_tdflags);
+	bcopy(ki->ki_tdname, ki64->ki_tdname, TDNAMLEN + 1);
+	bcopy(ki->ki_wmesg, ki64->ki_wmesg, WMESGLEN + 1);
+	bcopy(ki->ki_login, ki64->ki_login, LOGNAMELEN + 1);
+	bcopy(ki->ki_lockname, ki64->ki_lockname, LOCKNAMELEN + 1);
+	bcopy(ki->ki_comm, ki64->ki_comm, COMMLEN + 1);
+	bcopy(ki->ki_emul, ki64->ki_emul, KI_EMULNAMELEN + 1);
+	bcopy(ki->ki_loginclass, ki64->ki_loginclass, LOGINCLASSLEN + 1);
+	bcopy(ki->ki_moretdname, ki64->ki_moretdname, MAXCOMLEN - TDNAMLEN + 1);
+	CP(*ki, *ki64, ki_tracer);
+	CP(*ki, *ki64, ki_flag2);
+	CP(*ki, *ki64, ki_fibnum);
+	CP(*ki, *ki64, ki_cr_flags);
+	CP(*ki, *ki64, ki_jid);
+	CP(*ki, *ki64, ki_numthreads);
+	CP(*ki, *ki64, ki_tid);
+	CP(*ki, *ki64, ki_pri);
+	CP(*ki, *ki64, ki_rusage);
+	CP(*ki, *ki64, ki_rusage_ch);
+	PTRTRIM_CP(*ki, *ki64, ki_pcb);
+	PTRTRIM_CP(*ki, *ki64, ki_kstack);
+	PTRTRIM_CP(*ki, *ki64, ki_udata);
+	PTRTRIM_CP(*ki, *ki64, ki_tdaddr);
+	CP(*ki, *ki64, ki_sflag);
+	CP(*ki, *ki64, ki_tdflags);
 }
-#endif	/* COMPAT_CHERIABI */
+
+#undef PTRTRIM_CP
+#endif	/* COMPAT_FREEBSD32 */
 
 static ssize_t
 kern_proc_out_size(struct proc *p, int flags)
@@ -1538,11 +1543,21 @@ kern_proc_out_size(struct proc *p, int flags)
 			size += sizeof(struct kinfo_proc32);
 		} else
 #endif
+#ifdef COMPAT_FREEBSD64
+		if ((flags & KERN_PROC_MASK64) != 0) {
+			size += sizeof(struct kinfo_proc64);
+		} else
+#endif
 			size += sizeof(struct kinfo_proc);
 	} else {
 #ifdef COMPAT_FREEBSD32
 		if ((flags & KERN_PROC_MASK32) != 0)
 			size += sizeof(struct kinfo_proc32) * p->p_numthreads;
+		else
+#endif
+#ifdef COMPAT_FREEBSD64
+		if ((flags & KERN_PROC_MASK64) != 0)
+			size += sizeof(struct kinfo_proc64) * p->p_numthreads;
 		else
 #endif
 			size += sizeof(struct kinfo_proc) * p->p_numthreads;
@@ -1559,8 +1574,8 @@ kern_proc_out(struct proc *p, struct sbuf *sb, int flags)
 #ifdef COMPAT_FREEBSD32
 	struct kinfo_proc32 ki32;
 #endif
-#ifdef COMPAT_CHERIABI
-	struct kinfo_proc_c ki_c;
+#ifdef COMPAT_FREEBSD64
+	struct kinfo_proc64 ki64;
 #endif
 	int error;
 
@@ -1577,10 +1592,10 @@ kern_proc_out(struct proc *p, struct sbuf *sb, int flags)
 				error = ENOMEM;
 		} else
 #endif
-#ifdef COMPAT_CHERIABI
-		if ((flags & KERN_PROC_CHERIABI) != 0) {
-			cheriabi_kinfo_proc_out(&ki, &ki_c);
-			if (sbuf_bcat(sb, &ki_c, sizeof(ki_c)) != 0)
+#ifdef COMPAT_FREEBSD64
+		if ((flags & KERN_PROC_MASK64) != 0) {
+			freebsd64_kinfo_proc_out(&ki, &ki64);
+			if (sbuf_bcat(sb, &ki64, sizeof(ki64)) != 0)
 				error = ENOMEM;
 		} else
 #endif
@@ -1596,10 +1611,10 @@ kern_proc_out(struct proc *p, struct sbuf *sb, int flags)
 					error = ENOMEM;
 			} else
 #endif
-#ifdef COMPAT_CHERIABI
-			if ((flags & KERN_PROC_CHERIABI) != 0) {
-				cheriabi_kinfo_proc_out(&ki, &ki_c);
-				if (sbuf_bcat(sb, &ki_c, sizeof(ki_c)) != 0)
+#ifdef COMPAT_FREEBSD64
+			if ((flags & KERN_PROC_MASK64) != 0) {
+				freebsd64_kinfo_proc_out(&ki, &ki64);
+				if (sbuf_bcat(sb, &ki64, sizeof(ki64)) != 0)
 					error = ENOMEM;
 			} else
 #endif
@@ -1777,9 +1792,9 @@ sysctl_kern_proc(SYSCTL_HANDLER_ARGS)
 	if (req->flags & SCTL_MASK32)
 		flags |= KERN_PROC_MASK32;
 #endif
-#ifdef COMPAT_CHERIABI
-	if (req->flags & SCTL_CHERIABI)
-		flags |= KERN_PROC_CHERIABI;
+#ifdef COMPAT_FREEBSD64
+	if (req->flags & SCTL_MASK64)
+		flags |= KERN_PROC_MASK64;
 #endif
 	if (oid_number == KERN_PROC_PID) {
 		if (namelen != 1)
@@ -3031,6 +3046,9 @@ sysctl_kern_proc_ps_strings(SYSCTL_HANDLER_ARGS)
 #ifdef COMPAT_FREEBSD32
 	uint32_t ps_strings32;
 #endif
+#ifdef COMPAT_FREEBSD64
+	uint64_t ps_strings64;
+#endif
 
 	if (namelen != 1)
 		return (EINVAL);
@@ -3051,8 +3069,22 @@ sysctl_kern_proc_ps_strings(SYSCTL_HANDLER_ARGS)
 		return (error);
 	}
 #endif
+#ifdef COMPAT_FREEBSD64
+	if ((req->flags & SCTL_MASK64) != 0) {
+		/*
+		 * We return 0 if the 64 bit emulation request is for a CHERI
+		 * process.
+		 */
+		ps_strings64 = SV_PROC_FLAG(p, SV_CHERI) != 0 ?
+		    (uintptr_t)(p->p_sysent->sv_psstrings) : 0;
+		PROC_UNLOCK(p);
+		error = SYSCTL_OUT(req, &ps_strings64, sizeof(ps_strings64));
+		return (error);
+	}
+#endif
 	ps_strings = p->p_sysent->sv_psstrings;
 	PROC_UNLOCK(p);
+	/* XXX-CHERI: we can now export capabilities, should we? */
 	error = SYSCTL_OUT(req, &ps_strings, sizeof(ps_strings));
 	return (error);
 }
@@ -3149,6 +3181,9 @@ sysctl_kern_proc_sigtramp(SYSCTL_HANDLER_ARGS)
 #ifdef COMPAT_FREEBSD32
 	struct kinfo_sigtramp32 kst32;
 #endif
+#ifdef COMPAT_FREEBSD64
+	struct kinfo_sigtramp64 kst64;
+#endif
 
 	if (namelen != 1)
 		return (EINVAL);
@@ -3176,17 +3211,37 @@ sysctl_kern_proc_sigtramp(SYSCTL_HANDLER_ARGS)
 		return (error);
 	}
 #endif
+#ifdef COMPAT_FREEBSD64
+	if ((req->flags & SCTL_MASK64) != 0) {
+		bzero(&kst64, sizeof(kst64));
+		if (!SV_PROC_FLAG(p, SV_CHERI)) {
+			if (sv->sv_sigcode_base != 0) {
+				kst64.ksigtramp_start = sv->sv_sigcode_base;
+				kst64.ksigtramp_end = sv->sv_sigcode_base +
+				    *sv->sv_szsigcode;
+			} else {
+				kst64.ksigtramp_start = sv->sv_psstrings -
+				    *sv->sv_szsigcode;
+				kst64.ksigtramp_end = sv->sv_psstrings;
+			}
+		}
+		PROC_UNLOCK(p);
+		error = SYSCTL_OUT(req, &kst64, sizeof(kst64));
+		return (error);
+	}
+#endif
 	bzero(&kst, sizeof(kst));
 	if (sv->sv_sigcode_base != 0) {
-		kst.ksigtramp_start = (char *)sv->sv_sigcode_base;
-		kst.ksigtramp_end = (char *)sv->sv_sigcode_base +
-		    *sv->sv_szsigcode;
+		kst.ksigtramp_start = EXPORT_KPTR((char *)sv->sv_sigcode_base);
+		kst.ksigtramp_end = EXPORT_KPTR((char *)sv->sv_sigcode_base +
+		    *sv->sv_szsigcode);
 	} else {
-		kst.ksigtramp_start = (char *)sv->sv_psstrings -
-		    *sv->sv_szsigcode;
-		kst.ksigtramp_end = (char *)sv->sv_psstrings;
+		kst.ksigtramp_start = EXPORT_KPTR((char *)sv->sv_psstrings -
+		    *sv->sv_szsigcode);
+		kst.ksigtramp_end = EXPORT_KPTR((char *)sv->sv_psstrings);
 	}
 	PROC_UNLOCK(p);
+	/* NB CHERI: this strips tags... */
 	error = SYSCTL_OUT(req, &kst, sizeof(kst));
 	return (error);
 }

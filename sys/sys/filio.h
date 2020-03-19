@@ -54,8 +54,8 @@
 #define	FIODTYPE	_IOR('f', 122, int)	/* get d_flags type part */
 #define	FIOGETLBA	_IOR('f', 121, int)	/* get start blk # */
 struct fiodgname_arg {
-	int	len;
-	void	*buf;
+	int		len;
+	void * __kerncap buf;
 };
 #define	FIODGNAME	_IOW('f', 120, struct fiodgname_arg) /* get dev. name */
 #define	FIONWRITE	_IOR('f', 119, int)	/* get # bytes (yet) to write */
@@ -72,20 +72,20 @@ struct fiobmap2_arg {
 #define	FIOBMAP2	_IOWR('f', 99, struct fiobmap2_arg)
 
 #ifdef _KERNEL
-#ifdef COMPAT_CHERIABI
-struct fiodgname_arg_c {
-	int		len;
-	void * __capability buf;
-};
-#define FIODGNAME_C	_IOC_NEWTYPE(FIODGNAME, struct fiodgname_arg_c)
-#endif
-
 #ifdef COMPAT_FREEBSD32
 struct fiodgname_arg32 {
 	int		len;
 	uint32_t	buf;	/* (void *) */
 };
 #define	FIODGNAME_32	_IOC_NEWTYPE(FIODGNAME, struct fiodgname_arg32)
+#endif
+
+#ifdef COMPAT_FREEBSD64
+struct fiodgname_arg64 {
+	int		len;
+	uint64_t	buf;	/* (void *) */
+};
+#define	FIODGNAME_64	_IOC_NEWTYPE(FIODGNAME, struct fiodgname_arg64)
 #endif
 
 void * __capability fiodgname_buf_get_ptr(void *fgnp, u_long com);

@@ -167,6 +167,13 @@ struct kinfo_proc64 {
 	long	ki_tdflags;
 };
 
+struct kinfo_sigtramp64 {
+	uint64_t ksigtramp_start;
+	uint64_t ksigtramp_end;
+	uint64_t ksigtramp_spare[4];
+};
+
+
 struct kld_file_stat64 {
     int		version;	/* set to sizeof(struct kld_file_stat64) */
     char        name[MAXPATHLEN];

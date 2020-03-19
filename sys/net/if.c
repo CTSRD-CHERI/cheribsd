@@ -113,36 +113,6 @@ __read_mostly epoch_t net_epoch_preempt;
 #include <compat/freebsd32/freebsd32.h>
 #endif
 
-#ifdef COMPAT_CHERIABI
-struct ifgroupreq_c {
-	char	ifgr_name[IFNAMSIZ];
-	u_int	ifgr_len;
-	union {
-		char		ifgru_group[IFNAMSIZ];
-		struct ifg_req * __capability ifgru_groups;
-	} ifgr_ifgru;
-};
-
-#define	_CASE_IOC_IFGROUPREQ_C(cmd)				\
-    _IOC_NEWTYPE((cmd), struct ifgroupreq_c): case
-#else
-#define _CASE_IOC_IFGROUPREQ_C(cmd)
-#endif
-
-#if defined(COMPAT_FREEBSD64)
-struct ifmediareq64 {
-	char	ifm_name[IFNAMSIZ];
-	int	ifm_current;
-	int	ifm_mask;
-	int	ifm_status;
-	int	ifm_active;
-	int	ifm_count;
-	int	*ifm_ulist;
-};
-#define	SIOCGIFMEDIA64	_IOC_NEWTYPE(SIOCGIFMEDIA, struct ifmediareq64)
-#define	SIOCGIFXMEDIA64	_IOC_NEWTYPE(SIOCGIFXMEDIA, struct ifmediareq64)
-#endif
-
 #ifdef COMPAT_FREEBSD32
 struct ifreq_buffer32 {
 	uint32_t	length;		/* (size_t) */
@@ -175,7 +145,12 @@ struct ifreq32 {
 		u_char		ifru_vlan_pcp;
 	} ifr_ifru;
 };
+#if !__has_feature(capabilities)
 CTASSERT(sizeof(struct ifreq) == sizeof(struct ifreq32));
+#endif
+#ifdef COMPAT_FREEBSD64
+CTASSERT(sizeof(struct ifreq64) == sizeof(struct ifreq32));
+#endif
 CTASSERT(__offsetof(struct ifreq, ifr_ifru) ==
     __offsetof(struct ifreq32, ifr_ifru));
 
@@ -206,28 +181,56 @@ struct ifmediareq32 {
 #define _CASE_IOC_IFGROUPREQ_32(cmd)
 #endif /* !COMPAT_FREEBSD32 */
 
+#ifdef COMPAT_FREEBSD64
+struct ifgroupreq64 {
+	char	ifgr_name[IFNAMSIZ];
+	u_int	ifgr_len;
+	union {
+		char		ifgru_group[IFNAMSIZ];
+		uint64_t	ifgru_groups;
+	} ifgr_ifgru;
+};
+
+struct ifmediareq64 {
+	char	ifm_name[IFNAMSIZ];
+	int	ifm_current;
+	int	ifm_mask;
+	int	ifm_status;
+	int	ifm_active;
+	int	ifm_count;
+	int	*ifm_ulist;
+};
+#define	SIOCGIFMEDIA64	_IOC_NEWTYPE(SIOCGIFMEDIA, struct ifmediareq64)
+#define	SIOCGIFXMEDIA64	_IOC_NEWTYPE(SIOCGIFXMEDIA, struct ifmediareq64)
+
+#define	_CASE_IOC_IFGROUPREQ_64(cmd)				\
+    _IOC_NEWTYPE((cmd), struct ifgroupreq64): case
+#else /* !COMPAT_FREEBSD64 */
+#define _CASE_IOC_IFGROUPREQ_64(cmd)
+#endif /* !COMPAT_FREEBSD64 */
+
 #define CASE_IOC_IFGROUPREQ(cmd)	\
     _CASE_IOC_IFGROUPREQ_32(cmd)	\
-    _CASE_IOC_IFGROUPREQ_C(cmd)		\
+    _CASE_IOC_IFGROUPREQ_64(cmd)	\
     (cmd)
 
 union ifreq_union {
 	struct ifreq	ifr;
-#ifdef COMPAT_CHERIABI
-	struct ifreq_c	ifr_c;
-#endif
 #ifdef COMPAT_FREEBSD32
 	struct ifreq32	ifr32;
+#endif
+#ifdef COMPAT_FREEBSD64
+	struct ifreq64	ifr64;
 #endif
 };
 
 union ifgroupreq_union {
 	struct ifgroupreq ifgr;
-#ifdef COMPAT_CHERIABI
-	struct ifgroupreq_c ifgr_c;
-#endif
 #ifdef COMPAT_FREEBSD32
 	struct ifgroupreq32 ifgr32;
+#endif
+#ifdef COMPAT_FREEBSD64
+	struct ifgroupreq64 ifgr64;
 #endif
 };
 
@@ -1646,13 +1649,13 @@ ifgr_group_get(void *ifgrp)
 	union ifgroupreq_union *ifgrup;
 
 	ifgrup = ifgrp;
-#ifdef COMPAT_CHERIABI
-	if (SV_CURPROC_FLAG(SV_CHERI))
-		return (&ifgrup->ifgr_c.ifgr_ifgru.ifgru_group[0]);
-#endif
 #ifdef COMPAT_FREEBSD32
 	if (SV_CURPROC_FLAG(SV_ILP32))
 		return (&ifgrup->ifgr32.ifgr_ifgru.ifgru_group[0]);
+#endif
+#ifdef COMPAT_FREEBSD64
+	if (!SV_CURPROC_FLAG(SV_CHERI))
+		return (&ifgrup->ifgr64.ifgr_ifgru.ifgru_group[0]);
 #endif
 	return (&ifgrup->ifgr.ifgr_ifgru.ifgru_group[0]);
 }
@@ -1663,18 +1666,19 @@ ifgr_groups_get(void *ifgrp)
 	union ifgroupreq_union *ifgrup;
 
 	ifgrup = ifgrp;
-#ifdef COMPAT_CHERIABI
-	if (SV_CURPROC_FLAG(SV_CHERI))
-		return (ifgrup->ifgr_c.ifgr_ifgru.ifgru_groups);
-#endif
 #ifdef COMPAT_FREEBSD32
 	if (SV_CURPROC_FLAG(SV_ILP32))
 		return (__USER_CAP((struct ifg_req *)(uintptr_t)
 		    ifgrup->ifgr32.ifgr_ifgru.ifgru_groups,
 		    ifgrup->ifgr32.ifgr_len));
 #endif
-	return (__USER_CAP(ifgrup->ifgr.ifgr_ifgru.ifgru_groups,
-	    ifgrup->ifgr.ifgr_len));
+#ifdef COMPAT_FREEBSD64
+	if (!SV_CURPROC_FLAG(SV_CHERI))
+		return (__USER_CAP((struct ifg_req *)(uintptr_t)
+		    ifgrup->ifgr64.ifgr_ifgru.ifgru_groups,
+		    ifgrup->ifgr64.ifgr_len));
+#endif
+	return (ifgrup->ifgr.ifgr_ifgru.ifgru_groups);
 }
 
 /*
@@ -2469,13 +2473,13 @@ ifr__int0_get(void *ifrp)
 	union ifreq_union *ifrup;
 
 	ifrup = ifrp;
-#ifdef COMPAT_CHERIABI
-	if (SV_CURPROC_FLAG(SV_CHERI))
-		return (ifrup->ifr_c.ifr_ifru.ifru_cap[0]);
-#endif
 #ifdef COMPAT_FREEBSD32
 	if (SV_CURPROC_FLAG(SV_ILP32))
 		return (ifrup->ifr32.ifr_ifru.ifru_cap[0]);
+#endif
+#ifdef COMPAT_FREEBSD64
+	if (!SV_CURPROC_FLAG(SV_CHERI))
+		return (ifrup->ifr64.ifr_ifru.ifru_cap[0]);
 #endif
 	return (ifrup->ifr.ifr_ifru.ifru_cap[0]);
 }
@@ -2486,14 +2490,14 @@ ifr__int0_set(void *ifrp, int val)
 	union ifreq_union *ifrup;
 
 	ifrup = ifrp;
-#ifdef COMPAT_CHERIABI
-	if (SV_CURPROC_FLAG(SV_CHERI))
-		ifrup->ifr_c.ifr_ifru.ifru_cap[0] = val;
-	else
-#endif
 #ifdef COMPAT_FREEBSD32
 	if (SV_CURPROC_FLAG(SV_ILP32))
 		ifrup->ifr32.ifr_ifru.ifru_cap[0] = val;
+	else
+#endif
+#ifdef COMPAT_FREEBSD64
+	if (!SV_CURPROC_FLAG(SV_CHERI))
+		ifrup->ifr64.ifr_ifru.ifru_cap[0] = val;
 	else
 #endif
 		ifrup->ifr.ifr_ifru.ifru_cap[0] = val;
@@ -2505,14 +2509,14 @@ ifr__int1_set(void *ifrp, int val)
 	union ifreq_union *ifrup;
 
 	ifrup = ifrp;
-#ifdef COMPAT_CHERIABI
-	if (SV_CURPROC_FLAG(SV_CHERI))
-		ifrup->ifr_c.ifr_ifru.ifru_cap[1] = val;
-	else
-#endif
 #ifdef COMPAT_FREEBSD32
 	if (SV_CURPROC_FLAG(SV_ILP32))
 		ifrup->ifr32.ifr_ifru.ifru_cap[1] = val;
+	else
+#endif
+#ifdef COMPAT_FREEBSD64
+	if (!SV_CURPROC_FLAG(SV_CHERI))
+		ifrup->ifr64.ifr_ifru.ifru_cap[1] = val;
 	else
 #endif
 		ifrup->ifr.ifr_ifru.ifru_cap[1] = val;
@@ -2524,13 +2528,13 @@ ifr__short0_get(void *ifrp)
 	union ifreq_union *ifrup;
 
 	ifrup = ifrp;
-#ifdef COMPAT_CHERIABI
-	if (SV_CURPROC_FLAG(SV_CHERI))
-		return (ifrup->ifr_c.ifr_ifru.ifru_flags[0]);
-#endif
 #ifdef COMPAT_FREEBSD32
 	if (SV_CURPROC_FLAG(SV_ILP32))
 		return (ifrup->ifr32.ifr_ifru.ifru_flags[0]);
+#endif
+#ifdef COMPAT_FREEBSD64
+	if (!SV_CURPROC_FLAG(SV_CHERI))
+		return (ifrup->ifr64.ifr_ifru.ifru_flags[0]);
 #endif
 	return (ifrup->ifr.ifr_ifru.ifru_flags[0]);
 }
@@ -2541,14 +2545,14 @@ ifr__short0_set(void *ifrp, short val)
 	union ifreq_union *ifrup;
 
 	ifrup = ifrp;
-#ifdef COMPAT_CHERIABI
-	if (SV_CURPROC_FLAG(SV_CHERI))
-		ifrup->ifr_c.ifr_ifru.ifru_flags[0] = val;
-	else
-#endif
 #ifdef COMPAT_FREEBSD32
 	if (SV_CURPROC_FLAG(SV_ILP32))
 		ifrup->ifr32.ifr_ifru.ifru_flags[0] = val;
+	else
+#endif
+#ifdef COMPAT_FREEBSD64
+	if (!SV_CURPROC_FLAG(SV_CHERI))
+		ifrup->ifr64.ifr_ifru.ifru_flags[0] = val;
 	else
 #endif
 		ifrup->ifr.ifr_ifru.ifru_flags[0] = val;
@@ -2560,13 +2564,9 @@ ifr__short1_get(void *ifrp)
 	union ifreq_union *ifrup;
 
 	ifrup = ifrp;
-#ifdef COMPAT_CHERIABI
-	if (SV_CURPROC_FLAG(SV_CHERI))
-		return (ifrup->ifr_c.ifr_ifru.ifru_flags[1]);
-#endif
-#ifdef COMPAT_FREEBSD32
-	if (SV_CURPROC_FLAG(SV_ILP32))
-		return (ifrup->ifr32.ifr_ifru.ifru_flags[1]);
+#ifdef COMPAT_FREEBSD64
+	if (!SV_CURPROC_FLAG(SV_CHERI))
+		return (ifrup->ifr64.ifr_ifru.ifru_flags[1]);
 #endif
 	return (ifrup->ifr.ifr_ifru.ifru_flags[1]);
 }
@@ -2577,14 +2577,14 @@ ifr__short1_set(void *ifrp, short val)
 	union ifreq_union *ifrup;
 
 	ifrup = ifrp;
-#ifdef COMPAT_CHERIABI
-	if (SV_CURPROC_FLAG(SV_CHERI))
-		ifrup->ifr_c.ifr_ifru.ifru_flags[1] = val;
-	else
-#endif
 #ifdef COMPAT_FREEBSD32
 	if (SV_CURPROC_FLAG(SV_ILP32))
 		ifrup->ifr32.ifr_ifru.ifru_flags[1] = val;
+	else
+#endif
+#ifdef COMPAT_FREEBSD63
+	if (!SV_CURPROC_FLAG(SV_CHERI))
+		ifrup->ifr63.ifr_ifru.ifru_flags[1] = val;
 	else
 #endif
 		ifrup->ifr.ifr_ifru.ifru_flags[1] = val;
@@ -2596,13 +2596,13 @@ ifr__u_char_get(void *ifrp)
 	union ifreq_union *ifrup;
 
 	ifrup = ifrp;
-#ifdef COMPAT_CHERIABI
-	if (SV_CURPROC_FLAG(SV_CHERI))
-		return (ifrup->ifr_c.ifr_ifru.ifru_vlan_pcp);
-#endif
 #ifdef COMPAT_FREEBSD32
 	if (SV_CURPROC_FLAG(SV_ILP32))
 		return (ifrup->ifr32.ifr_ifru.ifru_vlan_pcp);
+#endif
+#ifdef COMPAT_FREEBSD64
+	if (!SV_CURPROC_FLAG(SV_CHERI))
+		return (ifrup->ifr64.ifr_ifru.ifru_vlan_pcp);
 #endif
 	return (ifrup->ifr.ifr_ifru.ifru_vlan_pcp);
 }
@@ -2613,14 +2613,14 @@ ifr__u_char_set(void *ifrp, u_char val)
 	union ifreq_union *ifrup;
 
 	ifrup = ifrp;
-#ifdef COMPAT_CHERIABI
-	if (SV_CURPROC_FLAG(SV_CHERI))
-		ifrup->ifr_c.ifr_ifru.ifru_vlan_pcp = val;
-	else
-#endif
 #ifdef COMPAT_FREEBSD32
 	if (SV_CURPROC_FLAG(SV_ILP32))
 		ifrup->ifr32.ifr_ifru.ifru_vlan_pcp = val;
+	else
+#endif
+#ifdef COMPAT_FREEBSD64
+	if (!SV_CURPROC_FLAG(SV_CHERI))
+		ifrup->ifr64.ifr_ifru.ifru_vlan_pcp = val;
 	else
 #endif
 		ifrup->ifr.ifr_ifru.ifru_vlan_pcp = val;
@@ -2653,13 +2653,13 @@ ifr_addr_get_sa(void *ifrp)
 	union ifreq_union *ifrup;
 
 	ifrup = ifrp;
-#ifdef COMPAT_CHERIABI
-	if (SV_CURPROC_FLAG(SV_CHERI))
-		return (&ifrup->ifr_c.ifr_ifru.ifru_addr);
-#endif
 #ifdef COMPAT_FREEBSD32
 	if (SV_CURPROC_FLAG(SV_ILP32))
 		return (&ifrup->ifr32.ifr_ifru.ifru_addr);
+#endif
+#ifdef COMPAT_FREEBSD64
+	if (!SV_CURPROC_FLAG(SV_CHERI))
+		return (&ifrup->ifr64.ifr_ifru.ifru_addr);
 #endif
 	return (&ifrup->ifr.ifr_ifru.ifru_addr);
 }
@@ -2670,11 +2670,6 @@ ifr_buffer_get_buffer(void *data)
 	union ifreq_union *ifrup;
 
 	ifrup = data;
-#ifdef COMPAT_CHERIABI
-	if (SV_CURPROC_FLAG(SV_CHERI))
-		return (ifrup->ifr_c.ifr_ifru.ifru_buffer.buffer);
-	else
-#endif
 #ifdef COMPAT_FREEBSD32
 	if (SV_CURPROC_FLAG(SV_ILP32))
 		return (__USER_CAP((void *)(uintptr_t)
@@ -2682,8 +2677,14 @@ ifr_buffer_get_buffer(void *data)
 		    ifrup->ifr32.ifr_ifru.ifru_buffer.length));
 	else
 #endif
-		return (__USER_CAP(ifrup->ifr.ifr_ifru.ifru_buffer.buffer,
-		    ifrup->ifr.ifr_ifru.ifru_buffer.length));
+#ifdef COMPAT_FREEBSD64
+	if (!SV_CURPROC_FLAG(SV_CHERI))
+		return (__USER_CAP((void *)(uintptr_t)
+		    ifrup->ifr64.ifr_ifru.ifru_buffer.buffer,
+		    ifrup->ifr64.ifr_ifru.ifru_buffer.length));
+	else
+#endif
+		return (ifrup->ifr.ifr_ifru.ifru_buffer.buffer);
 }
 
 static void
@@ -2692,14 +2693,14 @@ ifr_buffer_set_buffer_null(void *data)
 	union ifreq_union *ifrup;
 
 	ifrup = data;
-#ifdef COMPAT_CHERIABI
-	if (SV_CURPROC_FLAG(SV_CHERI))
-		ifrup->ifr_c.ifr_ifru.ifru_buffer.buffer = NULL;
-	else
-#endif
 #ifdef COMPAT_FREEBSD32
 	if (SV_CURPROC_FLAG(SV_ILP32))
 		ifrup->ifr32.ifr_ifru.ifru_buffer.buffer = 0;
+	else
+#endif
+#ifdef COMPAT_FREEBSD64
+	if (!SV_CURPROC_FLAG(SV_CHERI))
+		ifrup->ifr64.ifr_ifru.ifru_buffer.buffer = 0;
 	else
 #endif
 		ifrup->ifr.ifr_ifru.ifru_buffer.buffer = NULL;
@@ -2711,14 +2712,14 @@ ifr_buffer_get_length(void *data)
 	union ifreq_union *ifrup;
 
 	ifrup = data;
-#ifdef COMPAT_CHERIABI
-	if (SV_CURPROC_FLAG(SV_CHERI))
-		return (ifrup->ifr_c.ifr_ifru.ifru_buffer.length);
-	else
-#endif
 #ifdef COMPAT_FREEBSD32
 	if (SV_CURPROC_FLAG(SV_ILP32))
 		return (ifrup->ifr32.ifr_ifru.ifru_buffer.length);
+	else
+#endif
+#ifdef COMPAT_FREEBSD64
+	if (!SV_CURPROC_FLAG(SV_CHERI))
+		return (ifrup->ifr64.ifr_ifru.ifru_buffer.length);
 	else
 #endif
 		return (ifrup->ifr.ifr_ifru.ifru_buffer.length);
@@ -2730,14 +2731,14 @@ ifr_buffer_set_length(void *data, size_t len)
 	union ifreq_union *ifrup;
 
 	ifrup = data;
-#ifdef COMPAT_CHERIABI
-	if (SV_CURPROC_FLAG(SV_CHERI))
-		ifrup->ifr_c.ifr_ifru.ifru_buffer.length = len;
-	else
-#endif
 #ifdef COMPAT_FREEBSD32
 	if (SV_CURPROC_FLAG(SV_ILP32))
 		ifrup->ifr32.ifr_ifru.ifru_buffer.length = len;
+	else
+#endif
+#ifdef COMPAT_FREEBSD64
+	if (!SV_CURPROC_FLAG(SV_CHERI))
+		ifrup->ifr64.ifr_ifru.ifru_buffer.length = len;
 	else
 #endif
 		ifrup->ifr.ifr_ifru.ifru_buffer.length = len;
@@ -2757,16 +2758,17 @@ ifr_data_get_ptr(void *ifrp)
 	union ifreq_union *ifrup;
 
 	ifrup = ifrp;
-#ifdef COMPAT_CHERIABI
-	if (SV_CURPROC_FLAG(SV_CHERI))
-		return (ifrup->ifr_c.ifr_ifru.ifru_data);
-#endif
 #ifdef COMPAT_FREEBSD32
 	if (SV_CURPROC_FLAG(SV_ILP32))
 		return (__USER_CAP_UNBOUND((void *)(uintptr_t)
 		    ifrup->ifr32.ifr_ifru.ifru_data));
 #endif
-		return (__USER_CAP_UNBOUND(ifrup->ifr.ifr_ifru.ifru_data));
+#ifdef COMPAT_FREEBSD64
+	if (!SV_CURPROC_FLAG(SV_CHERI))
+		return (__USER_CAP_UNBOUND((void *)(uintptr_t)
+		    ifrup->ifr64.ifr_ifru.ifru_data));
+#endif
+		return (ifrup->ifr.ifr_ifru.ifru_data);
 }
 
 u_int
