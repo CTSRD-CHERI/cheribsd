@@ -10992,7 +10992,7 @@ dtrace_predicate_release(dtrace_predicate_t *pred, dtrace_vstate_t *vstate)
  */
 static dtrace_actdesc_t *
 dtrace_actdesc_create(dtrace_actkind_t kind, uint32_t ntuple,
-    uint64_t uarg, uint64_t arg)
+    uintcap_t uarg, uintcap_t arg)
 {
 	dtrace_actdesc_t *act;
 
@@ -13269,7 +13269,7 @@ dtrace_dof_copyin(uintcap_t uarg, int *errp)
 
 	dof = kmem_alloc(hdr.dofh_loadsz, KM_SLEEP);
 
-	if (copyin_c((void * __capability)uarg, dof, hdr.dofh_loadsz) != 0 ||
+	if (copyincap((void * __capability)uarg, dof, hdr.dofh_loadsz) != 0 ||
 	    dof->dofh_loadsz != hdr.dofh_loadsz) {
 		kmem_free(dof, hdr.dofh_loadsz);
 		*errp = EFAULT;
@@ -13800,7 +13800,7 @@ dtrace_dof_actdesc(dof_hdr_t *dof, dof_sec_t *sec, dtrace_vstate_t *vstate,
 		return (NULL);
 	}
 
-	if (sec->dofs_align != sizeof (uint64_t)) {
+	if (sec->dofs_align != sizeof (kuintcap_t)) {
 		dtrace_dof_error(dof, "bad alignment in action description");
 		return (NULL);
 	}
@@ -13924,8 +13924,7 @@ dtrace_dof_ecbdesc(dof_hdr_t *dof, dof_sec_t *sec, dtrace_vstate_t *vstate,
 		dtrace_dof_error(dof, "truncated ECB description");
 		return (NULL);
 	}
-
-	if (sec->dofs_align != sizeof (uint64_t)) {
+	if (sec->dofs_align != sizeof (kuintcap_t)) {
 		dtrace_dof_error(dof, "bad alignment in ECB description");
 		return (NULL);
 	}

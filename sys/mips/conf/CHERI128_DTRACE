@@ -46,3 +46,9 @@ device       dtrace_fbt
 device       dtrace_profile
 device        dtraceall
 
+
+# Access host files on QEMU
+options 	SMBFS
+options 	NETSMB			# Seems to be needed by SMBFS
+options 	LIBMCHAIN		# Also seems to be needed by SMBFS
+options 	LIBICONV		# Also seems to be needed by SMBFS

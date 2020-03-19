@@ -798,7 +798,7 @@ dtrace_dof_create(dtrace_hdl_t *dtp, dtrace_prog_t *pgp, uint_t flags)
 
 		if (i > 0) {
 			actsec = dof_add_lsect(ddo, dofa, DOF_SECT_ACTDESC,
-			    sizeof (uint64_t), 0, sizeof (dof_actdesc_t),
+			    sizeof (uintptr_t), 0, sizeof (dof_actdesc_t),
 			    sizeof (dof_actdesc_t) * i);
 		}
 
@@ -813,7 +813,7 @@ dtrace_dof_create(dtrace_hdl_t *dtp, dtrace_prog_t *pgp, uint_t flags)
 		dofe.dofe_uarg = edp->dted_uarg;
 
 		(void) dof_add_lsect(ddo, &dofe, DOF_SECT_ECBDESC,
-		    sizeof (uint64_t), 0, 0, sizeof (dof_ecbdesc_t));
+		    sizeof (uintptr_t), 0, 0, sizeof (dof_ecbdesc_t));
 	}
 
 	/*
@@ -918,7 +918,7 @@ dtrace_getopt_dof(dtrace_hdl_t *dtp)
 	dof_sec_t *sec;
 	dof_optdesc_t *dofo;
 	int i, nopts = 0, len = sizeof (dof_hdr_t) +
-	    roundup(sizeof (dof_sec_t), sizeof (uint64_t));
+	    roundup(sizeof (dof_sec_t), sizeof (uintptr_t));
 
 	for (i = 0; i < DTRACEOPT_MAX; i++) {
 		if (dtp->dt_options[i] != DTRACEOPT_UNSET)
