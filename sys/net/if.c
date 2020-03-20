@@ -2564,6 +2564,11 @@ ifr__short1_get(void *ifrp)
 	union ifreq_union *ifrup;
 
 	ifrup = ifrp;
+#ifdef COMPAT_FREEBSD32
+	if (SV_CURPROC_FLAG(SV_ILP32))
+		return (ifrup->ifr32.ifr_ifru.ifru_flags[1]);
+	else
+#endif
 #ifdef COMPAT_FREEBSD64
 	if (!SV_CURPROC_FLAG(SV_CHERI))
 		return (ifrup->ifr64.ifr_ifru.ifru_flags[1]);
@@ -2582,9 +2587,9 @@ ifr__short1_set(void *ifrp, short val)
 		ifrup->ifr32.ifr_ifru.ifru_flags[1] = val;
 	else
 #endif
-#ifdef COMPAT_FREEBSD63
+#ifdef COMPAT_FREEBSD64
 	if (!SV_CURPROC_FLAG(SV_CHERI))
-		ifrup->ifr63.ifr_ifru.ifru_flags[1] = val;
+		ifrup->ifr64.ifr_ifru.ifru_flags[1] = val;
 	else
 #endif
 		ifrup->ifr.ifr_ifru.ifru_flags[1] = val;
