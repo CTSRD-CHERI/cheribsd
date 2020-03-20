@@ -267,11 +267,6 @@ __T=${TARGET_ARCH}
 .else
 __T=${MACHINE_ARCH}
 .endif
-.if defined(TARGET) && !defined(WANT_COMPAT)
-__TT=${TARGET}
-.else
-__TT=${MACHINE}
-.endif
 
 # All supported backends for LLVM_TARGET_XXX
 __LLVM_TARGETS= \
@@ -281,13 +276,13 @@ __LLVM_TARGETS= \
 		powerpc \
 		riscv \
 		x86
-__LLVM_TARGET_FILT=	C/(amd64|i386)/x86/:S/arm64/aarch64/:S/powerpc64/powerpc/
+__LLVM_TARGET_FILT=	C/(amd64|i386)/x86/:S/powerpc64/powerpc/:S/powerpcspe/powerpc/
 .for __llt in ${__LLVM_TARGETS}
 # Default enable the given TARGET's LLVM_TARGET support
-.if ${__TT:${__LLVM_TARGET_FILT}} == ${__llt}
+.if ${__T:${__LLVM_TARGET_FILT}} == ${__llt}
 __DEFAULT_YES_OPTIONS+=	LLVM_TARGET_${__llt:${__LLVM_TARGET_FILT}:tu}
 # aarch64 needs arm for -m32 support.
-.elif ${__TT} == "arm64" && ${__llt} == "arm"
+.elif ${__T} == "aarch64" && ${__llt:Marm*} != ""
 __DEFAULT_DEPENDENT_OPTIONS+=	LLVM_TARGET_ARM/LLVM_TARGET_AARCH64
 # Default the rest of the LLVM_TARGETs to the value of MK_LLVM_TARGET_ALL.
 .else
@@ -316,7 +311,7 @@ BROKEN_OPTIONS+=OFED
 BROKEN_OPTIONS+=LIB32
 .endif
 
-.if ${__TT} != "mips"
+.if ${__T:Mmips*} == ""
 # Clang is installed as the default /usr/bin/cc.
 __DEFAULT_YES_OPTIONS+=CLANG_BOOTSTRAP CLANG_IS_CC
 .else
@@ -335,7 +330,7 @@ __DEFAULT_NO_OPTIONS+=BINUTILS_BOOTSTRAP
 .if ${__T:Mriscv*} != ""
 BROKEN_OPTIONS+=OFED
 .endif
-.if ${__TT} != "mips" && ${__T} != "powerpc" && ${__T} != "powerpcspe"
+.if ${__T:Mmips*} != "mips" && ${__T} != "powerpc" && ${__T} != "powerpcspe"
 __DEFAULT_YES_OPTIONS+=LLD_BOOTSTRAP LLD_IS_LD
 .else
 __DEFAULT_NO_OPTIONS+=LLD_BOOTSTRAP LLD_IS_LD
@@ -433,7 +428,7 @@ __DEFAULT_YES_OPTIONS+=PIE
 __DEFAULT_NO_OPTIONS+=PIE
 .endif
 
-.if ${__T} != "mips64" && (${__TT} != "riscv" || ${__T:Mriscv*64*c})
+.if ${__T} != "mips64" && (!${__T:Mriscv*} || ${__T:Mriscv*64*c})
 BROKEN_OPTIONS+=COMPAT_CHERIABI
 .endif
 
