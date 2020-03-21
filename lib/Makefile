@@ -40,6 +40,7 @@ SUBDIR=	${SUBDIR_BOOTSTRAP} \
 	libbsdstat \
 	libbsm \
 	libbz2 \
+	libc_nosyscalls \
 	libcalendar \
 	libcam \
 	libcapsicum \
@@ -155,11 +156,7 @@ SUBDIR.${MK_BLUETOOTH}+=libbluetooth libsdp
 SUBDIR.${MK_BSNMP}+=	libbsnmp
 
 SUBDIR.${MK_LIBCHERI}+=	libhelloworld
-.if ${MACHINE_ABI:Mpurecap}
-SUBDIR+=	libsyscalls
-# Not used yet:
-# SUBDIR+=	libc_nosyscalls
-.endif
+SUBDIR.${MK_CHERI}+=	libsyscalls
 
 .if ${MK_LIBCHERI} == "yes" && ${MACHINE_ARCH} != "mips"
 _libc_cheri=	libc_cheri

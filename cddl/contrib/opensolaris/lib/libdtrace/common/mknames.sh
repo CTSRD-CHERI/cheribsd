@@ -27,30 +27,30 @@
 #ident	"%Z%%M%	%I%	%E% SMI"
 set -e
 
-printf "%s" "
-/*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
+BSDECHO=-e
 
-#pragma ident\t\"%Z%%M%\t%I%\t%E% SMI\"
-
-#include <dtrace.h>
-
+echo ${BSDECHO} "\
+/*\n\
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.\n\
+ * Use is subject to license terms.\n\
+ */\n\
+\n\
+#pragma ident\t\"%Z%%M%\t%I%\t%E% SMI\"\n\
+\n\
+#include <dtrace.h>\n\
+\n\
 /*ARGSUSED*/
-const char *
-dtrace_subrstr(dtrace_hdl_t *dtp, int subr)
-{
-	switch (subr) {
-"
+const char *\n\
+dtrace_subrstr(dtrace_hdl_t *dtp, int subr)\n\
+{\n\
+	switch (subr) {"
 
 nawk '
 /^#define[ 	]*DIF_SUBR_/ && $2 != "DIF_SUBR_MAX" {
 	printf("\tcase %s: return (\"%s\");\n", $2, tolower(substr($2, 10)));
 }'
 
-printf "%s" "
-	default: return (\"unknown\");
-	}
-}
-"
+echo ${BSDECHO} "\
+	default: return (\"unknown\");\n\
+	}\n\
+}"
