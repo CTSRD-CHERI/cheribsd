@@ -107,11 +107,6 @@ WITH_CHERI256:=	yes
 .if ${MK_CHERI128} == "yes" || ${MK_CHERI256} == "yes"
 MK_CHERI:=	yes
 MK_CLANG:=	no
-# Build cheribsdbox by default so that we have a emergency MIPS tool if the
-# CHERI world is broken
-.if !defined(WITHOUT_CHERIBSDBOX)
-MK_CHERIBSDBOX:=	yes
-.endif
 .else
 MK_CHERI:=	no
 .endif
