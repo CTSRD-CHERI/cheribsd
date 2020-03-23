@@ -2619,6 +2619,19 @@ pmap_promote_l2(pmap_t pmap, pd_entry_t *l2, vm_offset_t va,
 }
 #endif
 
+#if __has_feature(capabilities)
+static inline uint64_t
+cheri_pte_sc(vm_page_t m)
+{
+	if ((m->oflags & VPO_CAPSTORE) != 0) {
+		// Until we get to cap-dirtying, possibility implies permission
+		return PTE_SC;
+	}
+	// Cap stores forbidden: don't set PTE_SC
+	return 0;
+}
+#endif
+
 /*
  *	Insert the given physical page (p) at
  *	the specified virtual address (v) in the
@@ -2665,8 +2678,11 @@ pmap_enter(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot,
 #if __has_feature(capabilities)
 	if ((flags & PMAP_ENTER_NOLOADTAGS) == 0)
 		new_l3 |= PTE_LC;
-	if ((flags & PMAP_ENTER_NOSTORETAGS) == 0)
-		new_l3 |= PTE_SC;
+	KASSERT(((flags & VM_PROT_WRITE) == 0) ||
+		(!!(flags & PMAP_ENTER_NOSTORETAGS) ==
+		    !(m->oflags & VPO_CAPSTORE)),
+	    ("ENTER_NOSTORETAGS vs VPO_CAPSTORE"));
+	new_l3 |= cheri_pte_sc(m);
 #endif
 
 	new_l3 |= (pn << PTE_PPN0_S);
@@ -2934,8 +2950,10 @@ pmap_enter_2mpage(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot,
 #if __has_feature(capabilities)
 	if ((flags & PMAP_ENTER_NOLOADTAGS) == 0)
 		new_l2 |= PTE_LC;
-	if ((flags & PMAP_ENTER_NOSTORETAGS) == 0)
-		new_l2 |= PTE_SC;
+	KASSERT(
+	    !!(flags & PMAP_ENTER_NOSTORETAGS) == !(m->oflags & VPO_CAPSTORE),
+	    ("ENTER_NOSTORETAGS vs VPO_CAPSTORE"));
+	new_l2 |= cheri_pte_sc(m);
 #endif
 	return (pmap_enter_l2(pmap, va, new_l2, PMAP_ENTER_NOSLEEP |
 	    PMAP_ENTER_NOREPLACE | PMAP_ENTER_NORECLAIM, NULL, lockp) ==
@@ -3228,7 +3246,11 @@ pmap_enter_quick_locked(pmap_t pmap, vm_offset_t va, vm_page_t m,
 #if __has_feature(capabilities)
 	if ((flags & PMAP_ENTER_NOLOADTAGS) == 0)
 		newl3 |= PTE_LC;
-	if ((flags & PMAP_ENTER_NOSTORETAGS) == 0)
+	KASSERT(((flags & VM_PROT_WRITE) == 0) ||
+		(!!(flags & PMAP_ENTER_NOSTORETAGS) ==
+		    !(m->oflags & VPO_CAPSTORE)),
+	    ("ENTER_NOSTORETAGS vs VPO_CAPSTORE"));
+	if ((m->oflags & VPO_CAPSTORE) != 0)
 		newl3 |= PTE_SC;
 #endif
 
