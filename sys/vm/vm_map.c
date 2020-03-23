@@ -2645,8 +2645,6 @@ vm_map_pmap_enter(vm_map_t map, vm_offset_t addr, vm_prot_t prot,
 #if __has_feature(capabilities)
 	if (object->flags & OBJ_NOLOADTAGS)
 		pmap_flags |= PMAP_ENTER_NOLOADTAGS;
-	if (object->flags & OBJ_NOSTORETAGS)
-		pmap_flags |= PMAP_ENTER_NOSTORETAGS;
 #endif
 
 	p = vm_page_find_least(object, pindex);
