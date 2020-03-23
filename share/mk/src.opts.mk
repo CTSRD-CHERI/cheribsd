@@ -257,12 +257,15 @@ __DEFAULT_DEPENDENT_OPTIONS+= ${var}_SUPPORT/${var}
 # Additional, per-target behavior should be rarely added only after much
 # gnashing of teeth and grinding of gears.
 #
-.if defined(TARGET_ARCH)
+# Note: we have to use MACHINE_ARCH in the bsd.compat.mk case (WANT_COMPAT)
+# since TARGET_ARCH is generally set on the make commandline and cannot be
+# overriden by bsd.compat.mk.
+.if defined(TARGET_ARCH) && !defined(WANT_COMPAT)
 __T=${TARGET_ARCH}
 .else
 __T=${MACHINE_ARCH}
 .endif
-.if defined(TARGET)
+.if defined(TARGET) && !defined(WANT_COMPAT)
 __TT=${TARGET}
 .else
 __TT=${MACHINE}
