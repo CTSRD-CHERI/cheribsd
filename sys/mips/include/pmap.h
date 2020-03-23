@@ -184,6 +184,9 @@ void *pmap_kenter_temporary(vm_paddr_t pa, int i);
 void pmap_kenter_temporary_free(vm_paddr_t pa);
 void pmap_flush_pvcache(vm_page_t m);
 int pmap_emulate_modified(pmap_t pmap, vm_offset_t va);
+#ifdef CPU_CHERI
+int pmap_emulate_capdirty(pmap_t pmap, vm_offset_t va);
+#endif
 void pmap_page_set_memattr(vm_page_t, vm_memattr_t);
 int pmap_change_attr(vm_offset_t, vm_size_t, vm_memattr_t);
 
