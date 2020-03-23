@@ -44,7 +44,8 @@ _blacklistd-helper+=	blacklistd-helper
 SUBDIR+=	bootpd
 .endif
 
-.if !defined(NO_PIC) && !defined(NO_RTLD) && (${MACHINE_ABI:Mpurecap} || ${MK_CHERI} != "no")
+# Not ported to RISCV yet
+.if !defined(NO_PIC) && !defined(NO_RTLD) && (${MACHINE_ABI:Mpurecap} || ${MK_CHERI} != "no") && !${MACHINE_ARCH:Mriscv*}
 SUBDIR+=	rtld-cheri-elf rtld-cheri-elf-debug
 .endif
 
