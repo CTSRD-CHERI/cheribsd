@@ -1,6 +1,6 @@
 # $FreeBSD$
 
-KYUALIB=	model
+KYUA_LIB=	model
 
 SRCS=	context.cpp		\
 	exceptions.cpp		\

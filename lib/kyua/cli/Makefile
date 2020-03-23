@@ -1,9 +1,9 @@
 # $FreeBSD$
 
-KYUALIB=	cli
+KYUA_LIB=	cli
 INTERNALLIB=
 CFLAGS+=	-DKYUA_CONFDIR=\"${KYUA_CONFDIR}\"		\
-		-DKYUA_DOCDIR=\"${KYUA_DOCDIR}\"		\
+		-DKYUA_DOCDIR=\"${KYUA_CONFDIR}\"		\
 		-DKYUA_MISCDIR=\"${KYUA_MISCDIR}\"		\
 		-DPACKAGE=\"kyua\"				\
 		-DPACKAGE_NAME=\"Kyua\"				\

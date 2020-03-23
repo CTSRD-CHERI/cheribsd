@@ -1,15 +1,8 @@
 # $FreeBSD$
 
-KYUA_SRCDIR=	${SRCTOP}/contrib/subrepo-kyua
-.PATH: ${KYUA_SRCDIR}
+.include "${SRCTOP}/lib/kyua/Makefile.kyua"
 
-.if ${MACHINE_ARCH} != "mips64"
-# FIXME: doesn't work as a purecap binary yet
-WANT_COMPAT=	64
-.include <bsd.compat.mk>
-.else
-WANT_CHERI=none
-.endif
+.PATH: ${KYUA_SRCDIR}
 
 PROG_CXX=	kyua
 SRCS=		main.cpp
@@ -56,10 +49,10 @@ STOREDIR=	${KYUA_STOREDIR}
 .PATH:		${KYUA_SRCDIR}/store
 
 CLEANFILES+=	${MAN}
-.PATH: ${SRCTOP}/contrib/subrepo-kyua/doc
+.PATH: ${KYUA_SRCDIR}/doc
 .for man in ${MAN}
 ${man}: ${man}.in
-	sh ${KYUA_SRCDIR}/doc/manbuild.sh \
+	${SHELL} ${KYUA_SRCDIR}/doc/manbuild.sh \
 	    -v "CONFDIR=${KYUA_CONFDIR}" \
 	    -v "DOCDIR=${KYUA_DOCDIR}" \
 	    -v "EGDIR=${KYUA_EGDIR}" \
@@ -71,5 +64,4 @@ ${man}: ${man}.in
 	    ${.ALLSRC} ${.TARGET}
 .endfor
 
-.include "${SRCTOP}/lib/kyua/Makefile.kyua"
 .include <bsd.prog.mk>

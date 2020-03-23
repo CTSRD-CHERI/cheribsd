@@ -1,6 +1,6 @@
 # $FreeBSD$
 
-KYUALIB=	engine
+KYUA_LIB=	engine
 CFLAGS=		-DKYUA_ARCHITECTURE=\"${MACHINE_ARCH}\"	\
 		-DKYUA_PLATFORM=\"${MACHINE}\"
 

@@ -1,6 +1,6 @@
 # $FreeBSD$
 
-KYUALIB=	drivers
+KYUA_LIB=	drivers
 
 SRCS=	debug_test.cpp		\
 	list_tests.cpp		\

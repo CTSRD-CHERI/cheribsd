@@ -1,6 +1,6 @@
 # $FreeBSD$
 
-KYUALIB=	store
+KYUA_LIB=	store
 
 CFLAGS+=	-DKYUA_STOREDIR=\"${KYUA_STOREDIR}\"
 

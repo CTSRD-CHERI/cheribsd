@@ -1,6 +1,6 @@
 # $FreeBSD$
 
-KYUALIB=	utils
+KYUA_LIB=	utils
 
 CFLAGS+=	-I${SRCTOP}/contrib/sqlite3
 CFLAGS+=	-DGDB=\"/usr/local/bin/gdb\"
