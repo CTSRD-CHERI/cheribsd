@@ -433,6 +433,21 @@ extern struct mtx_padalign pa_lock[];
  * PGA_SWAP_FREE is used to defer freeing swap space to the pageout daemon
  * when the context that dirties the page does not have the object write lock
  * held.
+ *
+ * PGA_CAPSTORE right now reflects the object's capability store permission.
+ * In the future it will play a role in the capability revocation state machine
+ * as part of the transition path from CAPDIRTY back to cap-clean.
+ *
+ * PGA_CAPDIRTY indicates that a capability was written to this page since the
+ * last time this bit (and the underlying architectural permission) was
+ * cleared.  Setting this bit happens without the page lock held, but clearing
+ * it requires synchronization.  Specifically, this bit may be cleared only if
+ * either 1) the page is xbusy and the clearer subsequently measures all tag
+ * bits on the page or 2) the page is being recycled through the laundry.  In
+ * general, if PGA_CAPDIRTY is set, so will be PGA_CAPSTORE.  If both
+ * PGA_CAPSTORE and PGA_CAPDIRTY are clear, the pmap must ensure that
+ * capability stores cause traps visible to the VM so that it may begin
+ * tracking capability presence.
  */
 #define	PGA_WRITEABLE	0x0001		/* page may be mapped writeable */
 #define	PGA_REFERENCED	0x0002		/* page has been referenced */
@@ -444,6 +459,8 @@ extern struct mtx_padalign pa_lock[];
 #define	PGA_NOSYNC	0x0080		/* do not collect for syncer */
 #define	PGA_SWAP_FREE	0x0100		/* page with swap space was dirtied */
 #define	PGA_SWAP_SPACE	0x0200		/* page has allocated swap space */
+#define	PGA_CAPSTORE 	0x2000		/* Fast-path capdirty */
+#define	PGA_CAPDIRTY	0x4000		/* page targeted by cap store */
 
 #define	PGA_QUEUE_OP_MASK	(PGA_DEQUEUE | PGA_REQUEUE | PGA_REQUEUE_HEAD)
 #define	PGA_QUEUE_STATE_MASK	(PGA_ENQUEUED | PGA_QUEUE_OP_MASK)
@@ -887,6 +904,19 @@ vm_page_dirty(vm_page_t m)
 #else
 	m->dirty = VM_PAGE_BITS_ALL;
 #endif
+}
+
+static __inline void
+vm_page_capdirty(vm_page_t m)
+{
+	vm_page_astate_t mas = vm_page_astate_load(m);
+
+	KASSERT(mas.flags & PGA_CAPSTORE,
+		("vm_page_capdirty w/o PGA_CAPSTORE m=%p", m));
+
+	if ((mas.flags & PGA_CAPDIRTY) == 0) {
+		vm_page_aflag_set(m, PGA_CAPDIRTY);
+	}
 }
 
 /*
