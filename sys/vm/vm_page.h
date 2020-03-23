@@ -290,11 +290,22 @@ struct vm_page {
  * 	 object/vm_page_t because there is no knowledge of their pte
  * 	 mappings, and such pages are also not on any PQ queue.
  *
+ * VPO_CAPSTORE right now reflects the object's capability store permission,
+ * OBJ_NOSTORETAGS.  In the future it will play a role in the capability
+ * revocation state machine as part of the transition path from CAPDIRTY back
+ * to cap-clean.
+ *
+ * In general, if PGA_CAPDIRTY is set, so will be VPO_CAPSTORE.
+ *
+ * If both VPO_CAPSTORE and PGA_CAPDIRTY are clear, the pmap must ensure that
+ * capability stores cause traps visible to the VM so that it may begin
+ * tracking capability presence.
  */
 #define	VPO_KMEM_EXEC	0x01		/* kmem mapping allows execution */
 #define	VPO_SWAPSLEEP	0x02		/* waiting for swap to finish */
 #define	VPO_UNMANAGED	0x04		/* no PV management for page */
 #define	VPO_SWAPINPROG	0x08		/* swap I/O in progress on page */
+#define	VPO_CAPSTORE 	0x10		/* Fast-path capdirty */
 
 /*
  * Busy page implementation details.
@@ -434,6 +445,13 @@ extern struct mtx_padalign pa_lock[];
  * PGA_SWAP_FREE is used to defer freeing swap space to the pageout daemon
  * when the context that dirties the page does not have the object write lock
  * held.
+ *
+ * PGA_CAPDIRTY indicates that a capability was written to this page since the
+ * last time this bit (and the underlying architectural permission) was
+ * cleared.  Setting this bit happens without the page lock held, but clearing
+ * it requires synchronization.  Specifically, this bit may be cleared only if
+ * the page is xbusy and the clearer subsequently measures all tag bits on the
+ * page or the page is being recycled through the laundry.
  */
 #define	PGA_WRITEABLE	0x0001		/* page may be mapped writeable */
 #define	PGA_REFERENCED	0x0002		/* page has been referenced */
@@ -445,6 +463,7 @@ extern struct mtx_padalign pa_lock[];
 #define	PGA_NOSYNC	0x0080		/* do not collect for syncer */
 #define	PGA_SWAP_FREE	0x0100		/* page with swap space was dirtied */
 #define	PGA_SWAP_SPACE	0x0200		/* page has allocated swap space */
+#define	PGA_CAPDIRTY	0x0400		/* page targeted by cap store */
 
 #define	PGA_QUEUE_OP_MASK	(PGA_DEQUEUE | PGA_REQUEUE | PGA_REQUEUE_HEAD)
 #define	PGA_QUEUE_STATE_MASK	(PGA_ENQUEUED | PGA_QUEUE_OP_MASK)
@@ -873,6 +892,14 @@ vm_page_dirty(vm_page_t m)
 #else
 	m->dirty = VM_PAGE_BITS_ALL;
 #endif
+}
+
+static __inline void
+vm_page_capdirty(vm_page_t m)
+{
+	if ((vm_page_astate_load(m).flags & PGA_CAPDIRTY) == 0) {
+		vm_page_aflag_set(m, PGA_CAPDIRTY);
+	}
 }
 
 /*
