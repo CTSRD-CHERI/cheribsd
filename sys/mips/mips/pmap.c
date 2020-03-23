@@ -2154,8 +2154,10 @@ pmap_enter(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot,
 #ifdef CPU_CHERI
 	if ((flags & PMAP_ENTER_NOLOADTAGS) != 0)
 		newpte |= PTE_LCN;
-	if ((flags & PMAP_ENTER_NOSTORETAGS) != 0)
-		newpte |= PTE_SCN;
+	KASSERT(((flags & VM_PROT_WRITE) == 0) ||
+		(!!(flags & PMAP_ENTER_NOSTORETAGS) ==
+		!(m->oflags & VPO_CAPSTORE)),
+		("ENTER_NOSTORETAGS vs VPO_CAPSTORE"));
 #endif
 	if ((m->oflags & VPO_UNMANAGED) == 0)
 		newpte |= PTE_MANAGED;
@@ -2434,8 +2436,7 @@ pmap_enter_quick_locked(pmap_t pmap, vm_offset_t va, vm_page_t m,
 #ifdef CPU_CHERI
 	if ((flags & PMAP_ENTER_NOLOADTAGS) != 0)
 		npte |= PTE_LCN;
-	if ((flags & PMAP_ENTER_NOSTORETAGS) != 0)
-		npte |= PTE_SCN;
+	/* No real necessity to set PTE_SCN (cap store inhibit), since PTE_RO */
 #endif
 	if ((m->oflags & VPO_UNMANAGED) == 0)
 		npte |= PTE_MANAGED;
@@ -3559,6 +3560,10 @@ init_pte_prot(vm_page_t m, vm_prot_t access, vm_prot_t prot)
 			rw = PTE_V | PTE_D;
 		else
 			rw = PTE_V;
+
+		if ((m->oflags & VPO_CAPSTORE) == 0) {
+			rw |= PTE_SCN;
+		}
 	} else
 		/* Needn't emulate a modified bit for unmanaged pages. */
 		rw = PTE_V | PTE_D;

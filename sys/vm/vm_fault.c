@@ -935,6 +935,8 @@ vm_fault_cow(struct faultstate *fs)
 		 * anonymously backed.  But is this always true?
 		 * XXX-AM: We must at least propagate tags for
 		 * anonymously backed objects.
+		 *
+		 * XXXNWF: OBJ_NOSTORETAGS instead of OBJ_ANON?
 		 */
 		if (fs->first_object->flags & OBJ_ANON)
 			pmap_copy_page_tags(fs->m, fs->first_m);
@@ -1119,6 +1121,16 @@ vm_fault_allocate(struct faultstate *fs)
 			fs->oom = 0;
 		}
 		return (KERN_RESOURCE_SHORTAGE);
+	} else {
+#ifdef OBJ_NOSTORETAGS
+		if ((fs->object->flags & OBJ_NOSTORETAGS) == 0) {
+			/*
+			 * XXXNWF: CAPSTORE parallels permission until
+			 * cap load gens arrive.
+			 */
+			fs->m->oflags |= VPO_CAPSTORE;
+		}
+#endif
 	}
 	fs->oom = 0;
 
@@ -1972,11 +1984,24 @@ again:
 				VM_OBJECT_WLOCK(dst_object);
 				goto again;
 			}
+#ifdef OBJ_NOSTORETAGS
+			if ((dst_object->flags & OBJ_NOSTORETAGS) == 0) {
+				/*
+				 * XXXNWF: CAPSTORE parallels permission
+				 * until cap load gens arrive.
+				 */
+				dst_m->oflags |= VPO_CAPSTORE;
 
-			/*
-			 * XXXRW: VM preserves tags across copy-on-write.
-			 */
-			pmap_copy_page_tags(src_m, dst_m);
+				/* VM preserves tags */
+				pmap_copy_page_tags(src_m, dst_m);
+			} else {
+				/* VM strips tags on copy */
+				pmap_copy_page(src_m, dst_m);
+			}
+#else
+			pmap_copy_page(src_m, dst_m);
+#endif
+
 			VM_OBJECT_RUNLOCK(object);
 			dst_m->dirty = dst_m->valid = src_m->valid;
 		} else {

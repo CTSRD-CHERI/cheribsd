@@ -241,6 +241,8 @@ kmem_alloc_attr_domain(int domain, vm_size_t size, int flags, vm_paddr_t low,
 		if ((flags & M_ZERO) && (m->flags & PG_ZERO) == 0)
 			pmap_zero_page(m);
 		vm_page_valid(m);
+		m->oflags |= VPO_CAPSTORE;
+		m->a.flags |= PGA_CAPDIRTY;
 		pmap_enter(kernel_pmap, addr + i, m, prot,
 		    prot | PMAP_ENTER_WIRED, 0);
 	}
@@ -321,6 +323,8 @@ kmem_alloc_contig_domain(int domain, vm_size_t size, int flags, vm_paddr_t low,
 		if ((flags & M_ZERO) && (m->flags & PG_ZERO) == 0)
 			pmap_zero_page(m);
 		vm_page_valid(m);
+		m->oflags |= VPO_CAPSTORE;
+		m->a.flags |= PGA_CAPDIRTY;
 		pmap_enter(kernel_pmap, tmp, m, VM_PROT_RW,
 		    VM_PROT_RW | PMAP_ENTER_WIRED, 0);
 		tmp += PAGE_SIZE;
@@ -500,6 +504,8 @@ retry:
 		KASSERT((m->oflags & VPO_UNMANAGED) != 0,
 		    ("kmem_malloc: page %p is managed", m));
 		vm_page_valid(m);
+		m->oflags |= VPO_CAPSTORE;
+		m->a.flags |= PGA_CAPDIRTY;
 		pmap_enter(kernel_pmap, addr + i, m, prot,
 		    prot | PMAP_ENTER_WIRED, 0);
 		if (__predict_false((prot & VM_PROT_EXECUTE) != 0))
