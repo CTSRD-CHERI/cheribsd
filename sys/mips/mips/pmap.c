@@ -1507,8 +1507,13 @@ pmap_pv_reclaim(pmap_t locked_pmap)
 				else
 					*pte = 0;
 				m = PHYS_TO_VM_PAGE(TLBLO_PTE_TO_PA(oldpte));
-				if (pte_test(&oldpte, PTE_D))
+				if (pte_test(&oldpte, PTE_D)) {
 					vm_page_dirty(m);
+#ifdef CPU_CHERI
+					if (!pte_test(&oldpte, PTE_SCN))
+						vm_page_capdirty(m);
+#endif
+				}
 				if (m->md.pv_flags & PV_TABLE_REF)
 					vm_page_aflag_set(m, PGA_REFERENCED);
 				m->md.pv_flags &= ~PV_TABLE_REF;
@@ -1806,6 +1811,10 @@ pmap_remove_pte(struct pmap *pmap, pt_entry_t *ptq, vm_offset_t va,
 			    ("%s: modified page not writable: va: %p, pte: %#jx",
 			    __func__, (void *)va, (uintmax_t)oldpte));
 			vm_page_dirty(m);
+#ifdef CPU_CHERI
+			if (!pte_test(&oldpte, PTE_SCN))
+				vm_page_capdirty(m);
+#endif
 		}
 		if (m->md.pv_flags & PV_TABLE_REF)
 			vm_page_aflag_set(m, PGA_REFERENCED);
@@ -2012,6 +2021,10 @@ pmap_remove_all(vm_page_t m)
 			    ("%s: modified page not writable: va: %p, pte: %#jx",
 			    __func__, (void *)pv->pv_va, (uintmax_t)tpte));
 			vm_page_dirty(m);
+#ifdef CPU_CHERI
+			if (!pte_test(&tpte, PTE_SCN))
+				vm_page_capdirty(m);
+#endif
 		}
 
 		if (!pmap_unuse_pt(pmap, pv->pv_va, *pde))
@@ -2093,6 +2106,15 @@ pmap_protect(pmap_t pmap, vm_offset_t sva, vm_offset_t eva, vm_prot_t prot)
 					pa = TLBLO_PTE_TO_PA(pbits);
 					m = PHYS_TO_VM_PAGE(pa);
 					vm_page_dirty(m);
+
+#ifdef CPU_CHERI
+					/* Leave PTE_SCN clear, but update MI */
+					if (!pte_test(&pbits, PTE_SCN)) {
+						pa = TLBLO_PTE_TO_PA(pbits);
+						m = PHYS_TO_VM_PAGE(pa);
+						vm_page_capdirty(m);
+					}
+#endif
 				}
 				if (va == va_next)
 					va = sva;
@@ -2195,6 +2217,12 @@ pmap_enter(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot,
 	KASSERT(!pte_test(&origpte, PTE_D | PTE_RO | PTE_V),
 	    ("pmap_enter: modified page not writable: va: %p, pte: %#jx",
 	    (void *)va, (uintmax_t)origpte));
+#ifdef CPU_CHERI
+	KASSERT(
+	    !pte_test(&origpte, PTE_CRO | PTE_V) || pte_test(&origpte, PTE_SCN),
+	    ("pmap_enter: capdirty with CRO set: va: %p, pte: %#jx", (void *)va,
+		(uintmax_t)origpte));
+#endif
 	opa = TLBLO_PTE_TO_PA(origpte);
 
 	/*
@@ -2244,6 +2272,10 @@ pmap_enter(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot,
 			om = PHYS_TO_VM_PAGE(opa);
 			if (pte_test(&origpte, PTE_D))
 				vm_page_dirty(om);
+#ifdef CPU_CHERI
+			if (!pte_test(&origpte, PTE_SCN))
+				vm_page_capdirty(m);
+#endif
 			if ((om->md.pv_flags & PV_TABLE_REF) != 0) {
 				om->md.pv_flags &= ~PV_TABLE_REF;
 				vm_page_aflag_set(om, PGA_REFERENCED);
@@ -2309,6 +2341,12 @@ validate:
 				if (pte_test(&origpte, PTE_MANAGED))
 					vm_page_dirty(m);
 			}
+#ifdef CPU_CHERI
+			if (!pte_test(&origpte, PTE_SCN)) {
+				if (pte_test(&origpte, PTE_MANAGED))
+					vm_page_capdirty(m);
+			}
+#endif
 			pmap_update_page(pmap, va, newpte);
 		}
 	}
@@ -2335,6 +2373,12 @@ validate:
  * 3. Read access.
  * 4. No page table pages.
  * but is *MUCH* faster than pmap_enter...
+ *
+ * CHERI: We rely on a CSC triggering a TLB Modified fault in preference to
+ * a CP2 "MMU prohibits store capability" fault, so that an attempt to store
+ * a capability to this page will first go through the normal, slow fault
+ * path to be made writable before anything about capabilities comes into
+ * play.
  */
 
 void
@@ -2526,6 +2570,9 @@ pmap_kenter_temporary_free(vm_paddr_t pa)
  * virtual address end.  Not every virtual page between start and end
  * is mapped; only those for which a resident page exists with the
  * corresponding offset from m_start are mapped.
+ *
+ * This function has the same assumptions, and the same interaction with
+ * CHERI, as pmap_enter_quick, above.
  */
 void
 pmap_enter_object(pmap_t pmap, vm_offset_t start, vm_offset_t end,
@@ -2691,6 +2738,14 @@ pmap_copy_page_internal(vm_page_t src, vm_page_t dst, int flags)
 	vm_paddr_t phys_src = VM_PAGE_TO_PHYS(src);
 	vm_paddr_t phys_dst = VM_PAGE_TO_PHYS(dst);
 
+	/*
+	 * Copy across capability tracking flags since we might bypass the
+	 * TLB's capdirty emulation.  Count this as a dirtying event for
+	 * the target page.
+	 */
+	if ((src->a.flags & PGA_CAPDIRTY) || (src->oflags & VPO_CAPSTORE))
+		vm_page_capdirty(dst);
+
 	if (MIPS_DIRECT_MAPPABLE(phys_src) && MIPS_DIRECT_MAPPABLE(phys_dst)) {
 		/* easy case, all can be accessed via KSEG0 */
 		/*
@@ -2741,6 +2796,10 @@ pmap_copy_page(vm_page_t src, vm_page_t dst)
 void
 pmap_copy_page_tags(vm_page_t src, vm_page_t dst)
 {
+
+	// XXX CHERI capdirty: should we assert that dst is CAPSTORE or
+	// something?  Do we always call this in a way where not having that
+	// property is safe?
 
 	pmap_copy_page_internal(src, dst, PMAP_COPY_TAGS);
 }
@@ -2956,6 +3015,10 @@ pmap_remove_pages(pmap_t pmap)
 				 */
 				if (pte_test(&tpte, PTE_D))
 					vm_page_dirty(m);
+#ifdef CPU_CHERI
+				if (!pte_test(&tpte, PTE_SCN))
+					vm_page_capdirty(m);
+#endif
 
 				/* Mark free */
 				PV_STAT(pv_entry_frees++);
@@ -2988,7 +3051,7 @@ pmap_remove_pages(pmap_t pmap)
  * pmap_testbit tests bits in pte's
  */
 static boolean_t
-pmap_testbit(vm_page_t m, int bit)
+pmap_testbit(vm_page_t m, pt_entry_t bit)
 {
 	pv_entry_t pv;
 	pmap_t pmap;
@@ -3069,6 +3132,11 @@ pmap_remove_write(vm_page_t m)
 			pte_clear(&pbits, PTE_D);
 			vm_page_dirty(m);
 		}
+#ifdef CPU_CHERI
+		/* Leave PTE_SCN clear, but update MI */
+		if (!pte_test(&pbits, PTE_SCN))
+			vm_page_capdirty(m);
+#endif
 		pte_set(&pbits, PTE_RO);
 		if (pbits != *pte) {
 			*pte = pbits;
@@ -3222,6 +3290,7 @@ pmap_advise(pmap_t pmap, vm_offset_t sva, vm_offset_t eva, int advice)
 					if (va == va_next)
 						va = sva;
 				}
+				/* capdirty: no need to change anything here */
 			} else {
 				/*
 				 * Unless PTE_D is set, any TLB entries
@@ -3565,12 +3634,35 @@ init_pte_prot(vm_page_t m, vm_prot_t access, vm_prot_t prot)
 		else
 			rw = PTE_V;
 
+#ifdef CPU_CHERI
+		/*
+		 * Capdirty tracking.
+		 *
+		 * If the page isn't writable, then these bits being set or
+		 * clear doesn't much matter.
+		 *
+		 * If the page is not CAPSTORE, then consider it to be
+		 * capability-read-only so that pmap_emulate_capdirty bails out
+		 * and we take a full fault.
+		 *
+		 * If the page is CAPSTORE but not also CAPDIRTY, set the
+		 * storecap inhibit, which will cause us to land in, and
+		 * successfully exit from, pmap_emulate_capdirty.
+		 *
+		 * If the page is CAPSTORE and CAPDIRTY, then CRO and SC
+		 * are both clear and we'll never land in
+		 * pmap_emulate_capdirty.
+		 */
 		if ((m->oflags & VPO_CAPSTORE) == 0) {
+			rw |= PTE_SCN | PTE_CRO;
+		} else if ((vm_page_astate_load(m).flags & PGA_CAPDIRTY) == 0) {
 			rw |= PTE_SCN;
 		}
-	} else
+#endif
+	} else {
 		/* Needn't emulate a modified bit for unmanaged pages. */
 		rw = PTE_V | PTE_D;
+	}
 	return (rw);
 }
 
@@ -3656,6 +3748,46 @@ pmap_emulate_modified(pmap_t pmap, vm_offset_t va)
 
 	return (0);
 }
+
+#ifdef CPU_CHERI
+/* XREF pmap_emulate_modified */
+int
+pmap_emulate_capdirty(pmap_t pmap, vm_offset_t va)
+{
+	pt_entry_t *pte;
+
+	PMAP_LOCK(pmap);
+	pte = pmap_pte(pmap, va);
+	if (pte == NULL) {
+		PMAP_UNLOCK(pmap);
+		return (1);
+	}
+
+	if (!pte_test(pte, PTE_V) || !pte_test(pte, PTE_D)) {
+		PMAP_UNLOCK(pmap);
+		return (1);
+	}
+
+	if (!pte_test(pte, PTE_SCN)) {
+		tlb_update(pmap, va, *pte);
+		PMAP_UNLOCK(pmap);
+		return (0);
+	}
+
+	if (pte_test(pte, PTE_RO) || pte_test(pte, PTE_CRO)) {
+		PMAP_UNLOCK(pmap);
+		return (1);
+	}
+
+	if (!pte_test(pte, PTE_MANAGED))
+		panic("pmap_emulate_capdirty: unmanaged page");
+
+	pte_clear(pte, PTE_SCN);
+	tlb_update(pmap, va, *pte);
+	PMAP_UNLOCK(pmap);
+	return 0;
+}
+#endif
 
 /*
  *	Routine:	pmap_kextract
