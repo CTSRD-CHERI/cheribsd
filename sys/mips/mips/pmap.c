@@ -1507,8 +1507,13 @@ pmap_pv_reclaim(pmap_t locked_pmap)
 				else
 					*pte = 0;
 				m = PHYS_TO_VM_PAGE(TLBLO_PTE_TO_PA(oldpte));
-				if (pte_test(&oldpte, PTE_D))
+				if (pte_test(&oldpte, PTE_D)) {
 					vm_page_dirty(m);
+#ifdef CPU_CHERI
+					if (!pte_test(&oldpte, PTE_SCI))
+						vm_page_capdirty(m);
+#endif
+				}
 				if (m->md.pv_flags & PV_TABLE_REF)
 					vm_page_aflag_set(m, PGA_REFERENCED);
 				m->md.pv_flags &= ~PV_TABLE_REF;
@@ -1806,6 +1811,10 @@ pmap_remove_pte(struct pmap *pmap, pt_entry_t *ptq, vm_offset_t va,
 			    ("%s: modified page not writable: va: %p, pte: %#jx",
 			    __func__, (void *)va, (uintmax_t)oldpte));
 			vm_page_dirty(m);
+#ifdef CPU_CHERI
+			if (!pte_test(&oldpte, PTE_SCI))
+				vm_page_capdirty(m);
+#endif
 		}
 		if (m->md.pv_flags & PV_TABLE_REF)
 			vm_page_aflag_set(m, PGA_REFERENCED);
@@ -2011,6 +2020,10 @@ pmap_remove_all(vm_page_t m)
 			    ("%s: modified page not writable: va: %p, pte: %#jx",
 			    __func__, (void *)pv->pv_va, (uintmax_t)tpte));
 			vm_page_dirty(m);
+#ifdef CPU_CHERI
+			if (!pte_test(&tpte, PTE_SCI))
+				vm_page_capdirty(m);
+#endif
 		}
 
 		if (!pmap_unuse_pt(pmap, pv->pv_va, *pde))
@@ -2092,6 +2105,15 @@ pmap_protect(pmap_t pmap, vm_offset_t sva, vm_offset_t eva, vm_prot_t prot)
 					pa = TLBLO_PTE_TO_PA(pbits);
 					m = PHYS_TO_VM_PAGE(pa);
 					vm_page_dirty(m);
+
+#ifdef CPU_CHERI
+					/* Leave PTE_SCI clear, but update MI */
+					if (!pte_test(&pbits, PTE_SCI)) {
+						pa = TLBLO_PTE_TO_PA(pbits);
+						m = PHYS_TO_VM_PAGE(pa);
+						vm_page_capdirty(m);
+					}
+#endif
 				}
 				if (va == va_next)
 					va = sva;
@@ -2186,6 +2208,12 @@ pmap_enter(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot,
 	KASSERT(!pte_test(&origpte, PTE_D | PTE_RO | PTE_V),
 	    ("pmap_enter: modified page not writable: va: %p, pte: %#jx",
 	    (void *)va, (uintmax_t)origpte));
+#ifdef CPU_CHERI
+	KASSERT(
+	    !pte_test(&origpte, PTE_CRO | PTE_V) || pte_test(&origpte, PTE_SCI),
+	    ("pmap_enter: capdirty with CRO set: va: %p, pte: %#jx", (void *)va,
+		(uintmax_t)origpte));
+#endif
 	opa = TLBLO_PTE_TO_PA(origpte);
 
 	/*
@@ -2235,6 +2263,10 @@ pmap_enter(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot,
 			om = PHYS_TO_VM_PAGE(opa);
 			if (pte_test(&origpte, PTE_D))
 				vm_page_dirty(om);
+#ifdef CPU_CHERI
+			if (!pte_test(&origpte, PTE_SCI))
+				vm_page_capdirty(m);
+#endif
 			if ((om->md.pv_flags & PV_TABLE_REF) != 0) {
 				om->md.pv_flags &= ~PV_TABLE_REF;
 				vm_page_aflag_set(om, PGA_REFERENCED);
@@ -2300,6 +2332,12 @@ validate:
 				if (pte_test(&origpte, PTE_MANAGED))
 					vm_page_dirty(m);
 			}
+#ifdef CPU_CHERI
+			if (!pte_test(&origpte, PTE_SCI)) {
+				if (pte_test(&origpte, PTE_MANAGED))
+					vm_page_capdirty(m);
+			}
+#endif
 			pmap_update_page(pmap, va, newpte);
 		}
 	}
@@ -2512,6 +2550,8 @@ pmap_kenter_temporary_free(vm_paddr_t pa)
  * virtual address end.  Not every virtual page between start and end
  * is mapped; only those for which a resident page exists with the
  * corresponding offset from m_start are mapped.
+ *
+ * This function has the same assumptions as pmap_enter_quick, above.
  */
 void
 pmap_enter_object(pmap_t pmap, vm_offset_t start, vm_offset_t end,
@@ -2676,6 +2716,24 @@ pmap_copy_page_internal(vm_page_t src, vm_page_t dst, int flags)
 	vm_offset_t va_src, va_dst;
 	vm_paddr_t phys_src = VM_PAGE_TO_PHYS(src);
 	vm_paddr_t phys_dst = VM_PAGE_TO_PHYS(dst);
+
+#if defined(INVARIANTS)
+	/*
+	 * Ensure that, if we are copying from a CAPSTORE msrc, mdst is also
+	 * considered CAPSTORE.  Similarly for CAPDIRTY.
+	 */
+	if (flags & PMAP_COPY_TAGS) {
+		vm_page_astate_t msrca = vm_page_astate_load(src);
+		vm_page_astate_t mdsta = vm_page_astate_load(dst);
+
+		KASSERT(!(msrca.flags & PGA_CAPSTORE)
+		    || (mdsta.flags & PGA_CAPSTORE),
+		    ("pmap_copy_page_internal CAPSTORE src & !dst"));
+		KASSERT(!(msrca.flags & PGA_CAPDIRTY)
+		    || (mdsta.flags & PGA_CAPDIRTY),
+		    ("pmap_copy_page_internal CAPDIRTY src & !dst"));
+	}
+#endif
 
 	if (MIPS_DIRECT_MAPPABLE(phys_src) && MIPS_DIRECT_MAPPABLE(phys_dst)) {
 		/* easy case, all can be accessed via KSEG0 */
@@ -2942,6 +3000,10 @@ pmap_remove_pages(pmap_t pmap)
 				 */
 				if (pte_test(&tpte, PTE_D))
 					vm_page_dirty(m);
+#ifdef CPU_CHERI
+				if (!pte_test(&tpte, PTE_SCI))
+					vm_page_capdirty(m);
+#endif
 
 				/* Mark free */
 				PV_STAT(pv_entry_frees++);
@@ -2974,7 +3036,7 @@ pmap_remove_pages(pmap_t pmap)
  * pmap_testbit tests bits in pte's
  */
 static boolean_t
-pmap_testbit(vm_page_t m, int bit)
+pmap_testbit(vm_page_t m, pt_entry_t bit)
 {
 	pv_entry_t pv;
 	pmap_t pmap;
@@ -3055,6 +3117,11 @@ pmap_remove_write(vm_page_t m)
 			pte_clear(&pbits, PTE_D);
 			vm_page_dirty(m);
 		}
+#ifdef CPU_CHERI
+		/* Leave PTE_SCI clear, but update MI */
+		if (!pte_test(&pbits, PTE_SCI))
+			vm_page_capdirty(m);
+#endif
 		pte_set(&pbits, PTE_RO);
 		if (pbits != *pte) {
 			*pte = pbits;
@@ -3208,6 +3275,13 @@ pmap_advise(pmap_t pmap, vm_offset_t sva, vm_offset_t eva, int advice)
 					if (va == va_next)
 						va = sva;
 				}
+				/*
+				 * Despite possibly changing PTE_D, preserve
+				 * capstore permission (PTE_CRO) and capdirty
+				 * status (PTE_SCI).  Either the page will be
+				 * laundered or will come back into service in
+				 * situ and with preserved contents.
+				 */
 			} else {
 				/*
 				 * Unless PTE_D is set, any TLB entries
@@ -3544,21 +3618,70 @@ init_pte_prot(vm_page_t m, vm_prot_t access, vm_prot_t prot)
 {
 	pt_entry_t rw;
 
-	if (!(prot & VM_PROT_WRITE))
+	if (!(prot & VM_PROT_WRITE)) {
 		rw = PTE_V | PTE_RO;
-	else if ((m->oflags & VPO_UNMANAGED) == 0) {
+#ifdef CPU_CHERI
+		rw |= PTE_CRO | PTE_SCI;
+#endif
+	} else if ((m->oflags & VPO_UNMANAGED) == 0) {
 		if ((access & VM_PROT_WRITE) != 0)
 			rw = PTE_V | PTE_D;
 		else
 			rw = PTE_V;
-	} else
+
+#ifdef CPU_CHERI
+		vm_page_astate_t mas = vm_page_astate_load(m);
+
+		KASSERT(!(mas.flags & PGA_CAPDIRTY) ||
+		    (mas.flags & PGA_CAPSTORE),
+		    ("pmap inserting CAPDIRTY w/o CAPSTORE m=%p", m));
+
+		if ((prot & VM_PROT_WRITE_CAP) != 0 &&
+		    (mas.flags & PGA_CAPSTORE) != 0) {
+			/*
+			 * The page is CAPSTORE and this mapping is
+			 * VM_PROT_WRITE_CAP.  Leave PTE_CRO clear, and...
+			 */
+
+			if ((mas.flags & PGA_CAPDIRTY) == 0 &&
+			    (access & VM_PROT_WRITE_CAP) == 0) {
+				/*
+				 * The page is not CAPDIRTY and this mapping is
+				 * not being created in response to a cap-write:
+				 * leave the mapping merely cap-dirtyable.
+				 */
+				rw |= PTE_SCI;
+			} else {
+				/*
+				 * Set no inhibits and install the page as
+				 * capdirty.
+				 */
+			}
+		} else {
+			/*
+			 * The page is not writable OR the mapping is not
+			 * VM_PROT_WRITE_CAP OR the page is not CAPSTORE:
+			 * set both inhibits.
+			 */
+			rw |= PTE_SCI | PTE_CRO;
+		}
+#endif
+	} else {
 		/* Needn't emulate a modified bit for unmanaged pages. */
 		rw = PTE_V | PTE_D;
+
+#ifdef CPU_CHERI
+		if ((prot & VM_PROT_WRITE_CAP) == 0)
+			rw |= PTE_SCI | PTE_CRO;
+		else
+			KASSERT(vm_page_astate_load(m).flags & PGA_CAPSTORE,
+			    ("pmap_enter UNMANAGED WRITE_CAP w/o CAPSTORE"));
+#endif
+	}
+
 #ifdef CPU_CHERI
 	if ((prot & VM_PROT_READ_CAP) == 0)
 		rw |= PTE_LCI;
-	if ((prot & VM_PROT_WRITE_CAP) == 0)
-		rw |= PTE_SCI;
 #endif
 	return (rw);
 }
@@ -3645,6 +3768,46 @@ pmap_emulate_modified(pmap_t pmap, vm_offset_t va)
 
 	return (0);
 }
+
+#ifdef CPU_CHERI
+/* XREF pmap_emulate_modified */
+int
+pmap_emulate_capdirty(pmap_t pmap, vm_offset_t va)
+{
+	pt_entry_t *pte;
+
+	PMAP_LOCK(pmap);
+	pte = pmap_pte(pmap, va);
+	if (pte == NULL) {
+		PMAP_UNLOCK(pmap);
+		return (1);
+	}
+
+	if (!pte_test(pte, PTE_V) || !pte_test(pte, PTE_D)) {
+		PMAP_UNLOCK(pmap);
+		return (1);
+	}
+
+	if (!pte_test(pte, PTE_SCI)) {
+		tlb_update(pmap, va, *pte);
+		PMAP_UNLOCK(pmap);
+		return (0);
+	}
+
+	if (pte_test(pte, PTE_RO) || pte_test(pte, PTE_CRO)) {
+		PMAP_UNLOCK(pmap);
+		return (1);
+	}
+
+	if (!pte_test(pte, PTE_MANAGED))
+		panic("pmap_emulate_capdirty: unmanaged page");
+
+	pte_clear(pte, PTE_SCI);
+	tlb_update(pmap, va, *pte);
+	PMAP_UNLOCK(pmap);
+	return (0);
+}
+#endif
 
 /*
  *	Routine:	pmap_kextract
