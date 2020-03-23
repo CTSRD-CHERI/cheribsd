@@ -46,8 +46,9 @@ SUBDIR.${MK_LIBCHERI}+=	cheri_bench
 .endif
 
 # Small cheri programs
+.if ${MACHINE_ABI:Mpurecap} || ${MK_COMPAT_CHERIABI} == "yes"
 # No RTLD for RISCV purecap yet
-.if !(${MACHINE_ABI:Mpurecap} && ${MACHINE_ARCH:Mriscv*})
+.if !${MACHINE_ARCH:Mriscv*}
 SUBDIR.${MK_CHERI}+=	cheri_minimal_dynamic_exe
 SUBDIR.${MK_CHERI}+=	cheri_minimal_pie_exe
 .endif
@@ -75,6 +76,8 @@ SUBDIR.${MK_CHERI}+=	cheritest-mt
 .else
 .warn "TODO: port cheritest to RISCV"
 .endif
+.endif  # ${MACHINE_ABI:Mpurecap} || ${MK_COMPAT_CHERIABI} == "yes"
+
 
 .include <bsd.arch.inc.mk>
 
