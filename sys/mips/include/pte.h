@@ -210,10 +210,10 @@ pde_page_bound(vm_pointer_t ptr)
  *
  * Upper bits of a 64 bit PTE:
  *
- *   63-62   61-----59   58 -- 56    55   54   53
- *   ---------------------------------------------
- *  |  RG  |           | PG SZ IDX | MN | W  | RO |
- *   ---------------------------------------------
+ *   63-62   61-60    59   58 -- 56    55   54   53
+ *   ------------------------------------------------
+ *  |  RG  |       | CRO | PG SZ IDX | MN | W  | RO |
+ *   ------------------------------------------------
  *
  * VM flags managed in software:
  *
@@ -240,6 +240,10 @@ pde_page_bound(vm_pointer_t ptr)
  *
  *  W:  Wired.  ???
  *
+ *  CRO: CHERI-only.  Capability read only.  Never clear PTE_SCI on this
+ *       entry, and fail attempts to store capabilities to it.  The negation
+ *       of PGA_CAPSTORE.
+ *
  *  RO: Read only.  Never set PTE_D on this page, and don't
  *      listen to requests to write to it.
  *
@@ -258,6 +262,9 @@ pde_page_bound(vm_pointer_t ptr)
 #define	PTE_PS_16M		((pt_entry_t)0x30 << TLBLO_SWBITS_SHIFT)
 #define	PTE_PS_64M		((pt_entry_t)0x38 << TLBLO_SWBITS_SHIFT)
 #define	PTE_PS_IDX_MASK		((pt_entry_t)0x38 << TLBLO_SWBITS_SHIFT)
+#if defined(CPU_CHERI)
+#define	PTE_CRO			((pt_entry_t)0x40 << TLBLO_SWBITS_SHIFT)
+#endif
 #endif
 
 #ifdef CPU_CHERI
