@@ -691,6 +691,49 @@ cpu_fetch_syscall_args(struct thread *td)
 #define __FBSDID(x)
 #include "../../kern/subr_syscall.c"
 
+#ifdef CPU_CHERI
+/*
+ * Some CHERI faults are (or may be) used transparently and don't (or may not)
+ * count as real faults.  This function returns true if it has handled the fault
+ * and no further work is to be done.  If the function returns false, it will
+ * have set *ftype to the appropriate fault code to pass to the VM subsystem for
+ * it to try hiding the fault.
+ *
+ * At the moment, there's just the one, CHERI_EXCCODE_TLBSTORE, which we hook
+ * to emulate capdirty tracking.  If the PTE for badvaddr permits transparent
+ * upgrade to capdirty, then we do so and squash the rest of the fault handling;
+ * otherwise, we indicate that this is a write fault that also needs to set a
+ * capability tag.  This logic is identical to the TLB_MOD paths through trap(),
+ * which call pmap_emulate_modified().
+ *
+ * In the future, this function will also hook capability load generation faults
+ * and call into the revoker to check all the capabilities on the target page.
+ */
+static inline bool
+c2e_fixup_fault(struct trapframe *trapframe, bool is_kernel,
+    struct vmspace *uvms, vm_prot_t *ftype)
+{
+	vm_offset_t va = trapframe->badvaddr;
+	register_t cause = trapframe->capcause;
+
+	cause &= CHERI_CAPCAUSE_EXCCODE_MASK;
+	cause >>= CHERI_CAPCAUSE_EXCCODE_SHIFT;
+
+	if (cause == CHERI_EXCCODE_TLBSTORE) {
+		*ftype = VM_PROT_WRITE | VM_PROT_WRITE_CAP;
+
+		if (KERNLAND(va)) {
+			return (is_kernel &&
+			    !pmap_emulate_capdirty(kernel_pmap, va));
+		} else {
+			pmap_t upmap = vmspace_pmap(uvms);
+			return (!pmap_emulate_capdirty(upmap, va));
+		}
+	}
+
+	return (false);
+}
+#endif
 
 /*
  * Handle an exception.
@@ -1165,6 +1208,18 @@ dofault:
 		break;
 #ifdef CPU_CHERI
 	case T_C2E:
+		ftype = 0;
+
+		if (c2e_fixup_fault(trapframe, true, p->p_vmspace, &ftype))
+			return (trapframe->pc);
+
+		if (ftype != 0) {
+			if (KERNLAND(trapframe->badvaddr))
+				goto kernel_fault;
+			else
+				goto dofault;
+		}
+
 		if (td->td_pcb->pcb_onfault != NULL) {
 			pc = trapf_pc_from_kernel_code_ptr(td->td_pcb->pcb_onfault);
 			td->td_pcb->pcb_onfault = NULL;
@@ -1180,6 +1235,14 @@ dofault:
 
 	case T_C2E + T_USER:
 		msg = "USER_CHERI_EXCEPTION";
+		ftype = 0;
+
+		if (c2e_fixup_fault(trapframe, false, p->p_vmspace, &ftype))
+			goto out;
+
+		if (ftype != 0)
+			goto dofault;
+
 		fetch_bad_instr(trapframe);
 		if (log_user_cheri_exceptions)
 			log_c2e_exception(msg, trapframe, type);
