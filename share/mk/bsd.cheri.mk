@@ -34,6 +34,10 @@ WANT_CHERI?=	pure
 .endif
 .endif
 
+.if defined(NEED_COMPAT) && ${NEED_COMPAT:MCHERI}
+NEED_CHERI=	pure
+.endif
+
 .if ${MACHINE_ARCH:Mmips*} && (!${MACHINE_ARCH:Mmips*c*} || defined(COMPAT_CHERI))
 .if !${.TARGETS:Mbuild-tools} && !defined(BOOTSTRAPPING)
 .if defined(NEED_CHERI)

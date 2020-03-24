@@ -3,6 +3,10 @@
 KYUA_SRCDIR=	${SRCTOP}/contrib/subrepo-kyua
 .PATH: ${KYUA_SRCDIR}
 
+# FIXME: doesn't work as a purecap binary yet
+WANT_COMPAT=	64
+.include <bsd.compat.mk>
+
 PROG_CXX=	kyua
 SRCS=		main.cpp
 LIBADD=		kyua_cli kyua_drivers kyua_engine kyua_model kyua_store
