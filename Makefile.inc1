@@ -414,7 +414,8 @@ _REDUNDANT_LIB_DIRS+=    ${LOCAL_LIB_DIRS:M${_DIR}*}
 SUBDIR+=	${_DIR}
 .endif
 .endfor
-.if !defined(NO_ROOT) && (make(installworld) || make(installsysroot) || make(install))
+.if !defined(NO_ROOT) && \
+    (make(installworld) || make(installsysroot) || make(install))
 # Ensure libraries are installed before progressing.
 SUBDIR+=.WAIT
 .endif
@@ -431,7 +432,7 @@ SUBDIR+= secure/lib
 .if ${MK_KERBEROS} != "no"
 SUBDIR+=kerberos5/lib
 .endif
-.else # !defined(SYSROOT_ONLY)
+.else	# !defined(SYSROOT_ONLY)
 SUBDIR+=bin
 .if ${MK_CDDL} != "no"
 SUBDIR+=cddl
@@ -457,7 +458,7 @@ SUBDIR+=sys usr.bin usr.sbin
 .if ${MK_TESTS} != "no"
 SUBDIR+=	tests
 .endif
-.endif # !defined(SYSROOT_ONLY)
+.endif	# !defined(SYSROOT_ONLY)
 
 # Local directories are built in parallel with the base system directories.
 # Users may insert a .WAIT directive at the beginning or elsewhere within
