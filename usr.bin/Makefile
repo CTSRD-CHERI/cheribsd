@@ -205,7 +205,7 @@ SUBDIR.${MK_CALENDAR}+=	calendar
 
 # Tracing currently only implemented for MIPS
 .if ${MACHINE_ARCH:Mmips*}
-SUBDIR.${MK_CHERI}+=	qtrace
+SUBDIR+=	qtrace
 .endif
 
 SUBDIR.${MK_CLANG}+=	clang
