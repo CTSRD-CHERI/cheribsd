@@ -102,7 +102,7 @@ static const struct procstat_cmd cmd_table[] = {
 	    PS_CMP_PLURAL },
 	{ "tsignal", "thread_signals", "[-n]", &procstat_threads_sigs,
 	    &cmdopt_signals, PS_CMP_PLURAL | PS_CMP_SUBSTR },
-	{ "vm", "vm", NULL, &procstat_vm, &cmdopt_none, PS_CMP_NORMAL }
+	{ "vm", "vm", NULL, &procstat_vm, &cmdopt_verbose, PS_CMP_NORMAL }
 };
 
 static void

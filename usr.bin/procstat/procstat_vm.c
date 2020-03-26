@@ -51,11 +51,22 @@ procstat_vm(struct procstat *procstat, struct kinfo_proc *kipp)
 	int i, cnt;
 	const char *str, *lstr;
 
+#ifdef __CHERI_PURE_CAPABILITY__
+	ptrwidth = 2*sizeof(kvaddr_t) + 2;
+#else
 	ptrwidth = 2*sizeof(void *) + 2;
-	if ((procstat_opts & PS_OPT_NOHEADER) == 0)
-		xo_emit("{T:/%5s %*s %*s %3s %4s %4s %3s %3s %-5s %-2s %-s}\n",
-		    "PID", ptrwidth, "START", ptrwidth, "END", "PRT", "RES",
-		    "PRES", "REF", "SHD", "FLAG", "TP", "PATH");
+#endif
+	if ((procstat_opts & PS_OPT_NOHEADER) == 0) {
+		if ((procstat_opts & PS_OPT_VERBOSE) == 0)
+			xo_emit("{T:/%5s %*s %*s %3s %4s %4s %3s %3s %-5s %-2s %-s}\n",
+			    "PID", ptrwidth, "START", ptrwidth, "END", "PRT",
+			    "RES", "PRES", "REF", "SHD", "FLAG", "TP", "PATH");
+		else
+			xo_emit("{T:/%5s %*s %*s %*s %3s %4s %4s %3s %3s %-5s %-2s %-s}\n",
+			    "PID", ptrwidth, "START", ptrwidth, "END",
+			    ptrwidth, "RESERV", "PRT",
+			    "RES", "PRES", "REF", "SHD", "FLAG", "TP", "PATH");
+	}
 
 	xo_emit("{ek:process_id/%d}", kipp->ki_pid);
 
@@ -71,8 +82,13 @@ procstat_vm(struct procstat *procstat, struct kinfo_proc *kipp)
 		    (uintmax_t)kve->kve_start);
 		xo_emit("{d:kve_end/%#*jx} ", ptrwidth,
 		    (uintmax_t)kve->kve_end);
+		if ((procstat_opts & PS_OPT_VERBOSE) != 0)
+			xo_emit("{d:kve_reservation/%#*jx} ", ptrwidth,
+			    (uintmax_t)kve->kve_reservation);
 		xo_emit("{e:kve_start/%#jx}", (uintmax_t)kve->kve_start);
 		xo_emit("{e:kve_end/%#jx}", (uintmax_t)kve->kve_end);
+		xo_emit("{e:kve_reservation/%#jx}",
+		    (uintmax_t)kve->kve_reservation);
 		xo_emit("{d:read/%s}", kve->kve_protection & KVME_PROT_READ ?
 		    "r" : "-");
 		xo_emit("{d:write/%s}", kve->kve_protection & KVME_PROT_WRITE ?
@@ -92,8 +108,18 @@ procstat_vm(struct procstat *procstat, struct kinfo_proc *kipp)
 		    kve->kve_private_resident);
 		xo_emit("{:kve_ref_count/%3d/%d} ", kve->kve_ref_count);
 		xo_emit("{:kve_shadow_count/%3d/%d} ", kve->kve_shadow_count);
-		xo_emit("{d:copy_on_write/%-1s}", kve->kve_flags &
-		    KVME_FLAG_COW ? "C" : "-");
+		/*
+		 * Reuse the copy-on-write location for guard and
+		 * unmapped pages.  This is a bit gross.
+		 */
+		if (kve->kve_flags & KVME_FLAG_COW)
+			xo_emit("{d:copy_on_write/%-1s}", "C");
+		else if (kve->kve_flags & KVME_FLAG_GUARD)
+			xo_emit("{d:is_guard/%-1s}", "G");
+		else if (kve->kve_flags & KVME_FLAG_UNMAPPED)
+			xo_emit("{d:is_unmapped/%-1s}", "-");
+		else
+			xo_emit("{d:copy_on_write/%-1s}", "-");
 		xo_emit("{d:need_copy/%-1s}", kve->kve_flags &
 		    KVME_FLAG_NEEDS_COPY ? "N" : "-");
 		xo_emit("{d:super_pages/%-1s}", kve->kve_flags &
@@ -106,6 +132,10 @@ procstat_vm(struct procstat *procstat, struct kinfo_proc *kipp)
 		xo_open_container("kve_flags");
 		xo_emit("{en:copy_on_write/%s}", kve->kve_flags &
 		    KVME_FLAG_COW ? "true" : "false");
+		xo_emit("{en:is_guard/%s}", kve->kve_flags &
+		    KVME_FLAG_GUARD ? "true" : "false");
+		xo_emit("{en:is_unmapped/%s}", kve->kve_flags &
+		    KVME_FLAG_UNMAPPED ? "true" : "false");
 		xo_emit("{en:needs_copy/%s}", kve->kve_flags &
 		    KVME_FLAG_NEEDS_COPY ? "true" : "false");
 		xo_emit("{en:super_pages/%s}", kve->kve_flags &

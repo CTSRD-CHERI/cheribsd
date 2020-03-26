@@ -194,6 +194,10 @@ Display the cpuset information for the thread.
 Display thread information for the process.
 .It Ar vm | Fl v
 Display virtual memory mappings for the process.
+.Pp
+If the
+.Fl v
+flag is passed then extra information is shown.
 .It Ar auxv | Fl x
 Display ELF auxiliary vector for the process.
 .El
@@ -598,6 +602,8 @@ process ID
 starting address of mapping
 .It END
 ending address of mapping
+.It RESERV
+starting address of the reservation this entry belongs to
 .It PRT
 protection flags
 .It RES
@@ -654,6 +660,10 @@ The following mapping flags may be displayed:
 .Bl -tag -width X -compact
 .It C
 copy-on-write
+.It G
+guard mapping
+.It u
+unmapped addresses in a reservation
 .It N
 needs copy
 .It S
