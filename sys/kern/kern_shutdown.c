@@ -941,7 +941,7 @@ vpanic(const char *fmt, va_list ap)
 #ifndef POWEROFF_DELAY
 # define POWEROFF_DELAY 5000
 #endif
-static int poweroff_delay = POWEROFF_DELAY;
+int poweroff_delay = POWEROFF_DELAY;
 
 SYSCTL_INT(_kern_shutdown, OID_AUTO, poweroff_delay, CTLFLAG_RW,
     &poweroff_delay, 0, "Delay before poweroff to write disk caches (msec)");

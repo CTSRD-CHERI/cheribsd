@@ -61,6 +61,7 @@ __NULLABILITY_PRAGMA_PUSH
 extern int cold;		/* nonzero if we are doing a cold boot */
 extern int suspend_blocked;	/* block suspend due to pending shutdown */
 extern int rebooting;		/* kern_reboot() has been called. */
+extern int poweroff_delay;	/* Delay (in msec) before poweroff. */
 extern const char *panicstr;	/* panic message */
 extern bool panicked;
 #define	KERNEL_PANICKED()	__predict_false(panicked)
