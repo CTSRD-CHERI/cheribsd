@@ -195,3 +195,85 @@ exclude EXFAIL common/usdt/tst.user.ksh
 
 # Triggers a lock assertion by using the raise() action from a profile probe.
 exclude SKIP common/ustack/tst.spin.ksh
+
+####
+# The followings cause instability, make the system stuck, or timeout on CHERI.
+# With time, they should work
+####
+# json gives problem
+exclude SKIP common/json/usdt.d
+
+# fbt not ready yet
+exclude SKIP common/fbtprovider/err.D_PDESC_ZERO.notreturn.d
+exclude SKIP common/fbtprovider/tst.basic.d
+exclude SKIP common/fbtprovider/tst.functionentry.d
+exclude SKIP common/fbtprovider/tst.functionreturnvalue.d
+exclude SKIP common/fbtprovider/tst.ioctlargs.d
+exclude SKIP common/fbtprovider/tst.offset.d
+exclude SKIP common/fbtprovider/tst.offsetzero.d
+exclude SKIP common/fbtprovider/tst.return.d
+exclude SKIP common/fbtprovider/tst.return0.d
+exclude SKIP common/fbtprovider/tst.tailcall.d
+
+# timeout for some reason
+exclude SKIP builtinvar/t_dtrace_contrib:tst_arg1to8clause_d
+exclude SKIP builtinvar/t_dtrace_contrib:tst_arg0clause_d
+
+# causes core dump
+exclude SKIP bitfields/t_dtrace_contrib:tst_SizeofBitField_d
+
+# usdt not ready
+exclude SKIP common/usdt/argmap.d
+exclude SKIP common/usdt/args.d
+exclude SKIP common/usdt/forker.d
+exclude SKIP common/usdt/prov.d
+exclude SKIP common/usdt/prov.h
+exclude SKIP common/usdt/tst.andpid.ksh
+exclude SKIP common/usdt/tst.argmap.c
+exclude SKIP common/usdt/tst.argmap.d
+exclude SKIP common/usdt/tst.args.c
+exclude SKIP common/usdt/tst.args.d
+exclude SKIP common/usdt/tst.badguess.ksh
+exclude SKIP common/usdt/tst.corruptenv.ksh
+exclude SKIP common/usdt/tst.dlclose1.ksh
+exclude SKIP common/usdt/tst.dlclose1.ksh.out
+exclude SKIP common/usdt/tst.dlclose2.ksh
+exclude SKIP common/usdt/tst.dlclose2.ksh.out
+exclude SKIP common/usdt/tst.dlclose3.ksh
+exclude SKIP common/usdt/tst.eliminate.ksh
+exclude SKIP common/usdt/tst.enabled.ksh
+exclude SKIP common/usdt/tst.enabled.ksh.out
+exclude SKIP common/usdt/tst.enabled2.ksh
+exclude SKIP common/usdt/tst.enabled2.ksh.out
+exclude SKIP common/usdt/tst.entryreturn.ksh
+exclude SKIP common/usdt/tst.entryreturn.ksh.out
+exclude SKIP common/usdt/tst.fork.ksh
+exclude SKIP common/usdt/tst.fork.ksh.out
+exclude SKIP common/usdt/tst.forker.c
+exclude SKIP common/usdt/tst.forker.ksh
+exclude SKIP common/usdt/tst.guess32.ksh
+exclude SKIP common/usdt/tst.guess64.ksh
+exclude SKIP common/usdt/tst.header.ksh
+exclude SKIP common/usdt/tst.include.ksh
+exclude SKIP common/usdt/tst.linkpriv.ksh
+exclude SKIP common/usdt/tst.linkunpriv.ksh
+exclude SKIP common/usdt/tst.multiple.ksh
+exclude SKIP common/usdt/tst.multiple.ksh.out
+exclude SKIP common/usdt/tst.multiprov.ksh
+exclude SKIP common/usdt/tst.multiprov.ksh.out
+exclude SKIP common/usdt/tst.nodtrace.ksh
+exclude SKIP common/usdt/tst.noprobes.ksh
+exclude SKIP common/usdt/tst.noreap.ksh
+exclude SKIP common/usdt/tst.noreapring.ksh
+exclude SKIP common/usdt/tst.onlyenabled.ksh
+exclude SKIP common/usdt/tst.reap.ksh
+exclude SKIP common/usdt/tst.reeval.ksh
+exclude SKIP common/usdt/tst.sameprovmulti.ksh
+exclude SKIP common/usdt/tst.sameprovmulti.ksh.out
+exclude SKIP common/usdt/tst.static.ksh
+exclude SKIP common/usdt/tst.static.ksh.out
+exclude SKIP common/usdt/tst.static2.ksh
+exclude SKIP common/usdt/tst.static2.ksh.out
+exclude SKIP common/usdt/tst.user.ksh
+exclude SKIP common/usdt/tst.user.ksh.out
+

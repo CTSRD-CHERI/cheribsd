@@ -53,7 +53,9 @@ runtest()
             dflags="$dflags ${pid}"
         fi
 
-        dtrace -C -s "${TFILE}" $dflags >$STDOUT 2>$STDERR
+#       dtrace -C -s "${TFILE}" $dflags >$STDOUT 2>$STDERR
+# There are problems with -C and cheri.. probably because there is no c preprocessor available
+        dtrace -s "${TFILE}" $dflags >$STDOUT 2>$STDERR
         status=$?
 
         if [ $status -ne $exstatus ]; then
@@ -102,7 +104,8 @@ readonly STDOUT=$(mktemp)
 readonly TFILE=$(basename $1)
 readonly EXOUT=${TFILE}.out
 
-kldstat -q -m dtrace_test || kldload dtrace_test
+# I can't manage to make the dtrace_test module to work with cheri, so far.
+# kldstat -q -m dtrace_test || kldload dtrace_test
 cd $(dirname $1)
 runtest
 RESULT=$?
