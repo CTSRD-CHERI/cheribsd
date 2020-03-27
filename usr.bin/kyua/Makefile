@@ -59,7 +59,7 @@ CLEANFILES+=	${MAN}
 .PATH: ${SRCTOP}/contrib/subrepo-kyua/doc
 .for man in ${MAN}
 ${man}: ${man}.in
-	${SH} ${KYUA_SRCDIR}/doc/manbuild.sh \
+	sh ${KYUA_SRCDIR}/doc/manbuild.sh \
 	    -v "CONFDIR=${KYUA_CONFDIR}" \
 	    -v "DOCDIR=${KYUA_DOCDIR}" \
 	    -v "EGDIR=${KYUA_EGDIR}" \
