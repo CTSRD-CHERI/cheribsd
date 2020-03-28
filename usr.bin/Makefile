@@ -224,7 +224,7 @@ SUBDIR.${MK_GAMES}+=	pom
 SUBDIR.${MK_GAMES}+=	primes
 SUBDIR.${MK_GAMES}+=	random
 .if ${COMPILER_FEATURES:Mc++11}
-SUBDIR+=	dtc
+SUBDIR.${MK_CXX}+=	dtc
 .endif
 SUBDIR.${MK_HESIOD}+=	hesinfo
 SUBDIR.${MK_ICONV}+=	iconv
