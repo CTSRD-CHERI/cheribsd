@@ -152,7 +152,7 @@ struct mfi_linux_ioc_packet {
 		struct mfi_frame_header hdr;
 	} lioc_frame;
 
-#if defined(__amd64__) /* Assume amd64 wants 32 bit Linux */
+#if defined(COMPAT_FREEBSD32) && defined(amd64)
 	struct iovec32 lioc_sgl[MAX_LINUX_IOCTL_SGE];
 #else
 	struct iovec lioc_sgl[MAX_LINUX_IOCTL_SGE];
