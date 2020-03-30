@@ -299,11 +299,11 @@ ktls_crypto_backend_deregister(struct ktls_crypto_backend *be)
 }
 
 #if defined(INET) || defined(INET6)
-static uint16_t
+static u_int
 ktls_get_cpu(struct socket *so)
 {
 	struct inpcb *inp;
-	uint16_t cpuid;
+	u_int cpuid;
 
 	inp = sotoinpcb(so);
 #ifdef RSS
@@ -800,6 +800,7 @@ ktls_alloc_snd_tag(struct inpcb *inp, struct ktls_session *tls, bool force,
 	params.hdr.type = IF_SND_TAG_TYPE_TLS;
 	params.hdr.flowid = inp->inp_flowid;
 	params.hdr.flowtype = inp->inp_flowtype;
+	params.hdr.numa_domain = inp->inp_numa_domain;
 	params.tls.inp = inp;
 	params.tls.tls = tls;
 	INP_RUNLOCK(inp);

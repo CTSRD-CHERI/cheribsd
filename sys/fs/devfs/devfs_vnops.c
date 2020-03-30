@@ -765,26 +765,27 @@ fiodgname_buf_get_ptr(void *fgnp, u_long com)
 {
 	union {
 		struct fiodgname_arg	fgn;
-#ifdef COMPAT_CHERIABI
-		struct fiodgname_arg_c	fgn_c;
-#endif
 #ifdef COMPAT_FREEBSD32
 		struct fiodgname_arg32	fgn32;
+#endif
+#ifdef COMPAT_FREEBSD64
+		struct fiodgname_arg64	fgn64;
 #endif
 	} *fgnup;
 
 	fgnup = fgnp;
 	switch (com) {
 	case FIODGNAME:
-		return (__USER_CAP(fgnup->fgn.buf, fgnup->fgn.len));
-#ifdef COMPAT_CHERIABI
-	case FIODGNAME_C:
-		return (fgnup->fgn_c.buf);
-#endif
+		return (fgnup->fgn.buf);
 #ifdef COMPAT_FREEBSD32
 	case FIODGNAME_32:
 		return (__USER_CAP((void *)(uintptr_t)fgnup->fgn32.buf,
 		    fgnup->fgn32.len));
+#endif
+#ifdef COMPAT_FREEBSD64
+	case FIODGNAME_64:
+		return (__USER_CAP((void *)(uintptr_t)fgnup->fgn64.buf,
+		    fgnup->fgn64.len));
 #endif
 	default:
 		panic("Unhandled ioctl command %ld", com);
@@ -819,11 +820,11 @@ devfs_ioctl(struct vop_ioctl_args *ap)
 		error = 0;
 		break;
 	case FIODGNAME:
-#ifdef COMPAT_CHERIABI
-	case FIODGNAME_C:
-#endif
 #ifdef	COMPAT_FREEBSD32
 	case FIODGNAME_32:
+#endif
+#ifdef	COMPAT_FREEBSD64
+	case FIODGNAME_64:
 #endif
 		fgn = ap->a_data;
 		p = devtoname(dev);

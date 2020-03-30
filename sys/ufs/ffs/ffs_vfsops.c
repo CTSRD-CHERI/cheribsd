@@ -153,7 +153,7 @@ static const char *ffs_opts[] = { "acls", "async", "noatime", "noclusterr",
 static int
 ffs_mount(struct mount *mp)
 {
-	struct vnode *devvp;
+	struct vnode *devvp, *odevvp;
 	struct thread *td;
 	struct ufsmount *ump = NULL;
 	struct fs *fs;
@@ -248,6 +248,7 @@ ffs_mount(struct mount *mp)
 	if (mp->mnt_flag & MNT_UPDATE) {
 		ump = VFSTOUFS(mp);
 		fs = ump->um_fs;
+		odevvp = ump->um_odevvp;
 		devvp = ump->um_devvp;
 		if (fsckpid == -1 && ump->um_fsckpid > 0) {
 			if ((error = ffs_flushfiles(mp, WRITECLOSE, td)) != 0 ||
@@ -339,16 +340,15 @@ ffs_mount(struct mount *mp)
 			 * If upgrade to read-write by non-root, then verify
 			 * that user has necessary permissions on the device.
 			 */
-			vn_lock(devvp, LK_EXCLUSIVE | LK_RETRY);
-			error = VOP_ACCESS(devvp, VREAD | VWRITE,
+			vn_lock(odevvp, LK_EXCLUSIVE | LK_RETRY);
+			error = VOP_ACCESS(odevvp, VREAD | VWRITE,
 			    td->td_ucred, td);
 			if (error)
 				error = priv_check(td, PRIV_VFS_MOUNT_PERM);
+			VOP_UNLOCK(odevvp);
 			if (error) {
-				VOP_UNLOCK(devvp);
 				return (error);
 			}
-			VOP_UNLOCK(devvp);
 			fs->fs_flags &= ~FS_UNCLEAN;
 			if (fs->fs_clean == 0) {
 				fs->fs_flags |= FS_UNCLEAN;
@@ -784,8 +784,8 @@ loop:
  * Common code for mount and mountroot
  */
 static int
-ffs_mountfs(devvp, mp, td)
-	struct vnode *devvp;
+ffs_mountfs(odevvp, mp, td)
+	struct vnode *odevvp;
 	struct mount *mp;
 	struct thread *td;
 {
@@ -796,6 +796,7 @@ ffs_mountfs(devvp, mp, td)
 	struct ucred *cred;
 	struct g_consumer *cp;
 	struct mount *nmp;
+	struct vnode *devvp;
 	int candelete, canspeedup;
 	off_t loc;
 
@@ -804,11 +805,13 @@ ffs_mountfs(devvp, mp, td)
 	cred = td ? td->td_ucred : NOCRED;
 	ronly = (mp->mnt_flag & MNT_RDONLY) != 0;
 
+	devvp = mntfs_allocvp(mp, odevvp);
+	VOP_UNLOCK(odevvp);
 	KASSERT(devvp->v_type == VCHR, ("reclaimed devvp"));
 	dev = devvp->v_rdev;
 	if (atomic_cmpset_acq_ptr((uintptr_t *)&dev->si_mountpt, 0,
 	    (uintptr_t)mp) == 0) {
-		VOP_UNLOCK(devvp);
+		mntfs_freevp(devvp);
 		return (EBUSY);
 	}
 	g_topology_lock();
@@ -816,12 +819,14 @@ ffs_mountfs(devvp, mp, td)
 	g_topology_unlock();
 	if (error != 0) {
 		atomic_store_rel_ptr((uintptr_t *)&dev->si_mountpt, 0);
-		VOP_UNLOCK(devvp);
+		mntfs_freevp(devvp);
 		return (error);
 	}
 	dev_ref(dev);
 	devvp->v_bufobj.bo_ops = &ffs_ops;
-	VOP_UNLOCK(devvp);
+	BO_LOCK(&odevvp->v_bufobj);
+	odevvp->v_bufobj.bo_flag |= BO_NOBUFS;
+	BO_UNLOCK(&odevvp->v_bufobj);
 	if (dev->si_iosize_max != 0)
 		mp->mnt_iosize_max = dev->si_iosize_max;
 	if (mp->mnt_iosize_max > MAXPHYS)
@@ -1022,6 +1027,7 @@ ffs_mountfs(devvp, mp, td)
 	ump->um_mountp = mp;
 	ump->um_dev = dev;
 	ump->um_devvp = devvp;
+	ump->um_odevvp = odevvp;
 	ump->um_nindir = fs->fs_nindir;
 	ump->um_bptrtodb = fs->fs_fsbtodb;
 	ump->um_seqinc = fs->fs_frag;
@@ -1101,7 +1107,11 @@ out:
 		free(ump, M_UFSMNT);
 		mp->mnt_data = NULL;
 	}
+	BO_LOCK(&odevvp->v_bufobj);
+	odevvp->v_bufobj.bo_flag &= ~BO_NOBUFS;
+	BO_UNLOCK(&odevvp->v_bufobj);
 	atomic_store_rel_ptr((uintptr_t *)&dev->si_mountpt, 0);
+	mntfs_freevp(devvp);
 	dev_rel(dev);
 	return (error);
 }
@@ -1306,8 +1316,12 @@ ffs_unmount(mp, mntflags)
 	}
 	g_vfs_close(ump->um_cp);
 	g_topology_unlock();
+	BO_LOCK(&ump->um_odevvp->v_bufobj);
+	ump->um_odevvp->v_bufobj.bo_flag &= ~BO_NOBUFS;
+	BO_UNLOCK(&ump->um_odevvp->v_bufobj);
 	atomic_store_rel_ptr((uintptr_t *)&ump->um_dev->si_mountpt, 0);
-	vrele(ump->um_devvp);
+	mntfs_freevp(ump->um_devvp);
+	vrele(ump->um_odevvp);
 	dev_rel(ump->um_dev);
 	mtx_destroy(UFS_MTX(ump));
 	if (mp->mnt_gjprovider != NULL) {
@@ -2295,7 +2309,19 @@ ffs_geom_strategy(struct bufobj *bo, struct buf *bp)
 	struct buf *tbp;
 	int error, nocopy;
 
+	/*
+	 * This is the bufobj strategy for the private VCHR vnodes
+	 * used by FFS to access the underlying storage device.
+	 * We override the default bufobj strategy and thus bypass
+	 * VOP_STRATEGY() for these vnodes.
+	 */
 	vp = bo2vnode(bo);
+	KASSERT(bp->b_vp == NULL || bp->b_vp->v_type != VCHR ||
+	    bp->b_vp->v_rdev == NULL ||
+	    bp->b_vp->v_rdev->si_mountpt == NULL ||
+	    VFSTOUFS(bp->b_vp->v_rdev->si_mountpt) == NULL ||
+	    vp == VFSTOUFS(bp->b_vp->v_rdev->si_mountpt)->um_devvp,
+	    ("ffs_geom_strategy() with wrong vp"));
 	if (bp->b_iocmd == BIO_WRITE) {
 		if ((bp->b_flags & B_VALIDSUSPWRT) == 0 &&
 		    bp->b_vp != NULL && bp->b_vp->v_mount != NULL &&

@@ -7,7 +7,8 @@ PROG=	helloworld_static
 SRCS=	helloworld.c
 
 MAN=
-NEED_CHERI=	pure
+NEED_COMPAT=	CHERI
+.include <bsd.compat.mk>
 
 NO_SHARED=yes
 

@@ -64,7 +64,7 @@ static void	pstr(int fd, const char *s);
  *	%p	-> unsigned int (base 16)
  */
 void
-_thread_printf(int fd, const char *fmt, ...)
+_thread_fdprintf(int fd, const char *fmt, ...)
 {
 	va_list	ap;
 
@@ -74,7 +74,7 @@ _thread_printf(int fd, const char *fmt, ...)
 }
 
 void
-_thread_vprintf(int fd, const char *fmt, va_list ap)
+_thread_vfdprintf(int fd, const char *fmt, va_list ap)
 {
 	static const char digits[16] = "0123456789abcdef";
 	/* XXX_AR: we should print capabilities not vaddr_t -> increase size */
@@ -171,3 +171,4 @@ pstr(int fd, const char *s)
 	__sys_write(fd, s, strlen(s));
 }
 
+#error "Should no longer be used"

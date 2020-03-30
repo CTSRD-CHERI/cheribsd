@@ -46,7 +46,12 @@ struct mdproc {
 	int dummy;
 };
 
+#if __has_feature(capabilities)
+#define	KINFO_PROC_SIZE		1248
+#define	KINFO_PROC64_SIZE	1088
+#else
 #define	KINFO_PROC_SIZE	1088
+#endif
 
 #define	MAXARGS		8
 struct syscall_args {

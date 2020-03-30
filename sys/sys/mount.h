@@ -543,12 +543,12 @@ struct vfsconf {
 
 /* Userland version of the struct vfsconf. */
 struct xvfsconf {
-	struct	vfsops *vfc_vfsops;	/* filesystem operations vector */
+	struct vfsops * __kerncap vfc_vfsops;	/* filesystem operations vector */
 	char	vfc_name[MFSNAMELEN];	/* filesystem type name */
 	int	vfc_typenum;		/* historic filesystem type number */
 	int	vfc_refcount;		/* number mounted of this type */
 	int	vfc_flags;		/* permanent flags */
-	struct	vfsconf *vfc_next;	/* next in list */
+	struct vfsconf * __kerncap vfc_next;	/* next in list */
 };
 
 #ifndef BURN_BRIDGES
@@ -941,6 +941,8 @@ extern	struct sx vfsconf_sx;
 #define	vfsconf_unlock()	sx_xunlock(&vfsconf_sx)
 #define	vfsconf_slock()		sx_slock(&vfsconf_sx)
 #define	vfsconf_sunlock()	sx_sunlock(&vfsconf_sx)
+struct vnode *mntfs_allocvp(struct mount *, struct vnode *);
+void   mntfs_freevp(struct vnode *);
 
 /*
  * Declarations for these vfs default operations are located in

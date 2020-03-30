@@ -38,6 +38,8 @@ OUTMK=	${PROG}.mk
 OUTC=	${PROG}.c
 OUTPUTS=${OUTMK} ${OUTC} ${PROG}.cache
 CRUNCHOBJS= ${.OBJDIR}
+# For custom libraries
+CRUNCH_LIBS+=-L${CRUNCHOBJS}/tmp/lib -L${CRUNCHOBJS}/tmp/usr/lib
 CRUNCH_GENERATE_LINKS?= yes
 # Don't let the prog.mk use MK_AUTO_OBJ, but do let the component builds use
 # it.
@@ -152,6 +154,20 @@ build-tools-${_tool}:
 build-tools: build-tools-${_tool}
 .endfor
 
+.for _lib in ${CRUNCH_CUSTOM_LIBS}
+custom_lib_installdirs:
+	mkdir -p ${CRUNCHOBJS}/tmp/usr/lib
+custom-lib-${_lib}: custom_lib_installdirs
+	${_+_}cd ${.CURDIR}/../../${_lib}; \
+	    if [ "${MK_AUTO_OBJ}" = "no" ]; then \
+	        ${CRUNCHENV} MAKEOBJDIRPREFIX=${CRUNCHOBJS} ${MAKE} ${CRUNCHARGS} \
+	        DIRPRFX=${DIRPRFX}lib/${_lib}/ ${CRUNCH_BUILDOPTS} ${CRUNCH_BUILDOPTS_${lib}} obj; \
+	    fi; \
+	    ${CRUNCHENV} DESTDIR=${CRUNCHOBJS}/tmp MAKEOBJDIRPREFIX=${CRUNCHOBJS} ${MAKE} \
+	    DIRPRFX=${DIRPRFX}${_lib}/ ${CRUNCH_BUILDOPTS} ${CRUNCH_BUILDOPTS_${_lib}} MK_INCLUDES=no all install
+${PROG}: custom-lib-${_lib}
+.endfor
+
 # Use a separate build tree to hold files compiled for this crunchgen binary
 # Yes, this does seem to partly duplicate bsd.subdir.mk, but I can't
 # get that to cooperate with bsd.prog.mk.  Besides, many of the standard
@@ -175,6 +191,7 @@ ${__target}: ${__target}_crunchdir_${P}
 
 clean:
 	rm -f ${CLEANFILES}
+	rm -rf ${CRUNCHOBJS}${SRCTOP}
 	${_+_}if [ -e ${.OBJDIR}/${OUTMK} ]; then			\
 		${CRUNCHENV} MAKEOBJDIRPREFIX=${CRUNCHOBJS} ${MAKE} 	\
 		-f ${OUTMK} clean;					\

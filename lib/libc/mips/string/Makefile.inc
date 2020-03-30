@@ -14,7 +14,7 @@ MDSRCS+= \
 	strrchr.S
 .endif
 
-.if ${MACHINE_ABI:Mpurecap} || ${MK_CHERI} == "yes"
+.if ${MACHINE_CPU:Mcheri}
 CHERI_MDSRCS=	\
 		memcpy_c.c \
 		memmove_c.c \
@@ -27,13 +27,8 @@ CHERI_MISRCS=	\
 MDSRCS+=	${CHERI_MDSRCS}
 
 .if ! ${MACHINE_ABI:Mpurecap}
-.if ${MK_CHERI128} == "yes"
-_CHERIBITS=128
-.else
-_CHERIBITS=256
-.endif
 .for src in ${CHERI_MDSRCS} ${CHERI_MISRCS}
-CC.${src}=	${CC} -target cheri-unknown-freebsd -cheri=${_CHERIBITS}
+CC.${src}=	${CC} -target cheri-unknown-freebsd -cheri=128
 .endfor
 .endif
 

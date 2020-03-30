@@ -446,12 +446,12 @@ ispioctl(struct cdev *dev, u_long c, caddr_t addr, int flags, struct thread *td)
 
 	case ISP_RESCAN:
 		if (IS_FC(isp)) {
-#ifdef COMPAT_CHERIABI
-			if (SV_PROC_FLAG(td->td_proc, SV_CHERI))
-				chan =  *(intcap_t *)addr;
+#if __has_feature(capabilities)
+			if (!SV_PROC_FLAG(td->td_proc, SV_CHERI))
+				chan = *(uint64_t *)addr;
 			else
 #endif
-				chan = *(intptr_t *)addr;
+				chan =  *(intcap_t *)addr;
 			if (chan < 0 || chan >= isp->isp_nchan) {
 				retval = -ENXIO;
 				break;
@@ -468,12 +468,12 @@ ispioctl(struct cdev *dev, u_long c, caddr_t addr, int flags, struct thread *td)
 
 	case ISP_FC_LIP:
 		if (IS_FC(isp)) {
-#ifdef COMPAT_CHERIABI
-			if (SV_PROC_FLAG(td->td_proc, SV_CHERI))
-				chan =  *(intcap_t *)addr;
+#if __has_feature(capabilities)
+			if (!SV_PROC_FLAG(td->td_proc, SV_CHERI))
+				chan = *(uint64_t *)addr;
 			else
 #endif
-				chan = *(intptr_t *)addr;
+				chan =  *(intcap_t *)addr;
 			if (chan < 0 || chan >= isp->isp_nchan) {
 				retval = -ENXIO;
 				break;

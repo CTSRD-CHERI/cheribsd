@@ -26,7 +26,7 @@
 .\"
 .\" $FreeBSD$
 .\"
-.Dd January 8, 2020
+.Dd March 8, 2020
 .Dt ARCH 7
 .Os
 .Sh NAME
@@ -69,7 +69,6 @@ and
 should be avoided.
 .Pp
 On some architectures, e.g.,
-.Dv sparc64 ,
 .Dv powerpc
 and AIM variants of
 .Dv powerpc64 ,
@@ -88,7 +87,7 @@ This table shows the first
 release to support each architecture, and, for discontinued
 architectures, the final release.
 .Pp
-.Bl -column -offset indent "Sy Architecture" "Sy Initial Release" "Sy Final Release"
+.Bl -column -offset indent "Architecture" "Initial Release" "Final Release"
 .It Sy Architecture Ta Sy Initial Release Ta Sy Final Release
 .It aarch64     Ta 11.0
 .It alpha       Ta 3.2   Ta 6.4
@@ -151,7 +150,7 @@ execution environment is accompanied by the
 .Dv ILP32
 environment, which was the historical 32-bit predecessor for 64-bit evolution.
 Examples are:
-.Bl -column -offset indent "Dv powerpc64" "Sy ILP32 counterpart"
+.Bl -column -offset indent "powerpc64" "ILP32 counterpart"
 .It Sy LP64        Ta Sy ILP32 counterpart
 .It Dv amd64       Ta Dv i386
 .It Dv powerpc64   Ta Dv powerpc
@@ -189,7 +188,7 @@ Most ILP32 ABIs, except
 require only 4-byte alignment for 64-bit integers.
 .Pp
 Machine-dependent type sizes:
-.Bl -column -offset indent "Sy Architecture" "Sy void *" "Sy long double" "Sy time_t"
+.Bl -column -offset indent "Architecture" "void *" "long double" "time_t"
 .It Sy Architecture Ta Sy void * Ta Sy long double Ta Sy time_t
 .It aarch64     Ta 8 Ta 16 Ta 8
 .It amd64       Ta 8 Ta 16 Ta 8
@@ -210,13 +209,12 @@ Machine-dependent type sizes:
 .It powerpc64   Ta 8 Ta  8 Ta 8
 .It riscv64     Ta 8 Ta 16 Ta 8
 .It riscv64sf   Ta 8 Ta 16 Ta 8
-.It sparc64     Ta 8 Ta 16 Ta 8
 .El
 .Pp
 .Sy time_t
 is 8 bytes on all supported architectures except i386.
 .Ss Endianness and Char Signedness
-.Bl -column -offset indent "Sy Architecture" "Sy Endianness" "Sy char Signedness"
+.Bl -column -offset indent "Architecture" "Endianness" "char Signedness"
 .It Sy Architecture Ta Sy Endianness Ta Sy char Signedness
 .It aarch64     Ta little Ta unsigned
 .It amd64       Ta little Ta   signed
@@ -237,10 +235,9 @@ is 8 bytes on all supported architectures except i386.
 .It powerpc64   Ta big    Ta unsigned
 .It riscv64     Ta little Ta   signed
 .It riscv64sf   Ta little Ta   signed
-.It sparc64     Ta big    Ta   signed
 .El
 .Ss Page Size
-.Bl -column -offset indent "Sy Architecture" "Sy Page Sizes"
+.Bl -column -offset indent "Architecture" "Page Sizes"
 .It Sy Architecture Ta Sy Page Sizes
 .It aarch64     Ta 4K, 2M, 1G
 .It amd64       Ta 4K, 2M, 1G
@@ -261,10 +258,9 @@ is 8 bytes on all supported architectures except i386.
 .It powerpc64   Ta 4K
 .It riscv64     Ta 4K
 .It riscv64sf   Ta 4K
-.It sparc64     Ta 8K
 .El
 .Ss Floating Point
-.Bl -column -offset indent "Sy Architecture" "Sy float, double" "Sy long double"
+.Bl -column -offset indent "Architecture" "float, double" "long double"
 .It Sy Architecture Ta Sy float, double Ta Sy long double
 .It aarch64     Ta hard Ta soft, quad precision
 .It amd64       Ta hard Ta hard, 80 bit
@@ -285,7 +281,6 @@ is 8 bytes on all supported architectures except i386.
 .It powerpc64   Ta hard Ta hard, double precision
 .It riscv64     Ta hard Ta hard, double precision
 .It riscv64sf   Ta soft Ta soft, double precision
-.It sparc64     Ta hard Ta hard, quad precision
 .El
 .Ss Default Tool Chain
 .Fx uses a variety of tool chain components for the supported CPU
@@ -300,7 +295,7 @@ and Binutils
 .Xr ld 1 ,
 or an external toolchain compiler and linker provided by a port or package.
 This table shows the default tool chain for each architecture.
-.Bl -column -offset indent "Sy Architecture" "Sy Compiler" "Sy Linker"
+.Bl -column -offset indent "Architecture" "Compiler" "Linker"
 .It Sy Architecture Ta Sy Compiler Ta Sy Linker
 .It aarch64     Ta Clang     Ta lld
 .It amd64       Ta Clang     Ta lld
@@ -321,18 +316,9 @@ This table shows the default tool chain for each architecture.
 .It powerpc64   Ta Clang     Ta lld
 .It riscv64     Ta Clang     Ta lld
 .It riscv64sf   Ta Clang     Ta lld
-.It sparc64     Ta GCC(1)    Ta GNU ld(1)
 .El
 .Pp
 (1) External toolchain provided by ports/packages.
-.Pp
-Note that GCC 4.2.1 is deprecated, and scheduled for removal on 2020-03-31.
-Any CPU architectures not migrated by then
-(to either base system Clang or external toolchain)
-may be removed from the tree after that date.
-make universe will not build mips or sparc64
-architectures unless the xtoolchain binaries have been installed for
-the architecture.
 .Ss MACHINE_ARCH vs MACHINE_CPUARCH vs MACHINE
 .Dv MACHINE_CPUARCH
 should be preferred in Makefiles when the generic
@@ -353,7 +339,6 @@ or similar things like boot sequences.
 .It mips Ta mips Ta mips, mipsel, mips64, mips64el, mipshf, mipselhf, mips64elhf, mipsn32
 .It powerpc Ta powerpc Ta powerpc, powerpcspe, powerpc64
 .It riscv Ta riscv Ta riscv64, riscv64sf
-.It sparc64 Ta sparc64 Ta sparc64
 .El
 .Ss Predefined Macros
 The compiler provides a number of predefined macros.
@@ -367,7 +352,7 @@ cc -x c -dM -E /dev/null
 .Ed
 .Pp
 Common type size and endianness macros:
-.Bl -column -offset indent "BYTE_ORDER" "Sy Meaning"
+.Bl -column -offset indent "BYTE_ORDER" "Meaning"
 .It Sy Macro Ta Sy Meaning
 .It Dv __LP64__ Ta 64-bit (8-byte) long and pointer, 32-bit (4-byte) int
 .It Dv __ILP32__ Ta 32-bit (4-byte) int, long and pointer
@@ -378,7 +363,7 @@ is not used on
 .El
 .Pp
 Architecture-specific macros:
-.Bl -column -offset indent "Sy Architecture" "Sy Predefined macros"
+.Bl -column -offset indent "Architecture" "Predefined macros"
 .It Sy Architecture Ta Sy Predefined macros
 .It aarch64     Ta Dv __aarch64__
 .It amd64       Ta Dv __amd64__, Dv __x86_64__
@@ -399,7 +384,6 @@ Architecture-specific macros:
 .It powerpc64   Ta Dv __powerpc__, Dv __powerpc64__
 .It riscv64     Ta Dv __riscv, Dv __riscv_xlen == 64
 .It riscv64sf   Ta Dv __riscv, Dv __riscv_xlen == 64
-.It sparc64     Ta Dv __sparc64__
 .El
 .Pp
 Compilers may define additional variants of architecture-specific macros.

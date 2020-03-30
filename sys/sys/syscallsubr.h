@@ -72,6 +72,23 @@ struct timex;
 struct uio;
 struct uuid;
 
+typedef int (*mmap_check_fp_fn)(struct file *, int, int, int);
+
+struct mmap_req {
+	vm_offset_t		mr_hint;
+	vm_offset_t		mr_max_addr;
+	vm_size_t		mr_len;
+	int			mr_prot;
+	int			mr_flags;
+	int			mr_fd;
+	int			_int_pad;
+	off_t			mr_pos;
+	mmap_check_fp_fn	mr_check_fp_fn;
+#if __has_feature(capabilities)
+	void * __capability mr_source_cap;
+#endif
+};
+
 int	kern___acl_aclcheck_fd(struct thread *td, int filedes, acl_type_t type,
 	    const struct acl * __capability aclp);
 int	kern___acl_aclcheck_path(struct thread *td,
@@ -324,9 +341,7 @@ int	kern_mlock(struct proc *proc, struct ucred *cred, uintptr_t addr,
 	    size_t len);
 int	kern_mmap(struct thread *td, uintptr_t addr, size_t len, int prot,
 	    int flags, int fd, off_t pos);
-int	kern_mmap_fpcheck(struct thread *td, uintptr_t addr, size_t len,
-	    int prot, int flags, int fd, off_t pos,
-	    mmap_check_fp_fn check_fp_fn);
+int	kern_mmap_req(struct thread *td, const struct mmap_req *mrp);
 int	kern_mmap_maxprot(struct proc *p, int prot);
 int	kern_mmap_req(struct thread *td, const struct mmap_req *mrp);
 int	kern_modfind(struct thread *td, const char * __capability uname);

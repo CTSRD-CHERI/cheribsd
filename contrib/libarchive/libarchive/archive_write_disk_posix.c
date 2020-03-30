@@ -1867,8 +1867,9 @@ finish_metadata:
 		if (a->tmpname) {
 			if (rename(a->tmpname, a->name) == -1) {
 				archive_set_error(&a->archive, errno,
-				    "rename failed");
-				ret = ARCHIVE_FATAL;
+				    "Failed to rename temporary file");
+				ret = ARCHIVE_FAILED;
+				unlink(a->tmpname);
 			}
 			a->tmpname = NULL;
 		}
@@ -2155,8 +2156,11 @@ restore_entry(struct archive_write_disk *a)
 			if ((a->flags & ARCHIVE_EXTRACT_SAFE_WRITES) &&
 			    S_ISREG(a->st.st_mode)) {
 				/* Use a temporary file to extract */
-				if ((a->fd = la_mktemp(a)) == -1)
+				if ((a->fd = la_mktemp(a)) == -1) {
+					archive_set_error(&a->archive, errno,
+					    "Can't create temporary file");
 					return ARCHIVE_FAILED;
+				}
 				a->pst = NULL;
 				en = 0;
 			} else {

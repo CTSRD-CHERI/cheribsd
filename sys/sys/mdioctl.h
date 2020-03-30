@@ -58,14 +58,14 @@ struct md_ioctl {
 	unsigned	md_version;	/* Structure layout version */
 	unsigned	md_unit;	/* unit number */
 	enum md_types	md_type ;	/* type of disk */
-	char		*md_file;	/* pathname of file to mount */
+	char * __kerncap md_file;	/* pathname of file to mount */
 	off_t		md_mediasize;	/* size of disk in bytes */
 	unsigned	md_sectorsize;	/* sectorsize */
 	unsigned	md_options;	/* options */
 	u_int64_t	md_base;	/* base address */
 	int		md_fwheads;	/* firmware heads */
 	int		md_fwsectors;	/* firmware sectors */
-	char		*md_label;	/* label of the device */
+	char * __kerncap md_label;	/* label of the device */
 	int		md_pad[MDNPAD];	/* padding */
 };
 

@@ -125,7 +125,7 @@
 .include "targets/Makefile"
 .else
 
-TGTS=	all all-man buildenv buildenvvars buildkernel buildworld \
+TGTS=	all all-man buildenv buildenvvars buildkernel buildsysroot buildworld \
 	check check-old check-old-dirs check-old-files check-old-libs \
 	checkdpadd checkworld clean cleandepend cleandir cleanworld \
 	cleanuniverse \
@@ -135,7 +135,7 @@ TGTS=	all all-man buildenv buildenvvars buildkernel buildworld \
 	everything hier hierarchy install installcheck installkernel \
 	installkernel.debug packagekernel packageworld \
 	reinstallkernel reinstallkernel.debug \
-	installworld kernel-toolchain libraries maninstall \
+	installsysroot installworld kernel-toolchain libraries maninstall \
 	obj objlink showconfig tags toolchain update \
 	makeman sysent \
 	_worldtmp _legacy _bootstrap-tools _cleanobj _obj \
@@ -151,8 +151,7 @@ TGTS=	all all-man buildenv buildenvvars buildkernel buildworld \
 	stage-packages stage-packages-kernel stage-packages-world \
 	create-packages-world create-packages-kernel create-packages \
 	packages installconfig real-packages sign-packages package-pkg \
-	print-dir test-system-compiler test-system-linker \
-	buildsysroot installsysroot
+	print-dir test-system-compiler test-system-linker
 
 # These targets require a TARGET and TARGET_ARCH be defined.
 XTGTS=	native-xtools native-xtools-install xdev xdev-build xdev-install \

@@ -323,7 +323,6 @@ static xpt_devicefunc_t	xptsetasyncfunc;
 static xpt_busfunc_t	xptsetasyncbusfunc;
 static cam_status	xptregister(struct cam_periph *periph,
 				    void *arg);
-static __inline int device_is_queued(struct cam_ed *device);
 
 static __inline int
 xpt_schedule_devq(struct cam_devq *devq, struct cam_ed *dev)
@@ -803,7 +802,8 @@ static void
 xpt_scanner_thread(void *dummy)
 {
 	union ccb	*ccb;
-	struct cam_path	 path;
+	struct mtx	*mtx;
+	struct cam_ed	*device;
 
 	xpt_lock_buses();
 	for (;;) {
@@ -815,15 +815,22 @@ xpt_scanner_thread(void *dummy)
 			xpt_unlock_buses();
 
 			/*
-			 * Since lock can be dropped inside and path freed
-			 * by completion callback even before return here,
-			 * take our own path copy for reference.
+			 * We need to lock the device's mutex which we use as
+			 * the path mutex. We can't do it directly because the
+			 * cam_path in the ccb may wind up going away because
+			 * the path lock may be dropped and the path retired in
+			 * the completion callback. We do this directly to keep
+			 * the reference counts in cam_path sane. We also have
+			 * to copy the device pointer because ccb_h.path may
+			 * be freed in the callback.
 			 */
-			xpt_copy_path(&path, ccb->ccb_h.path);
-			xpt_path_lock(&path);
+			mtx = xpt_path_mtx(ccb->ccb_h.path);
+			device = ccb->ccb_h.path->device;
+			xpt_acquire_device(device);
+			mtx_lock(mtx);
 			xpt_action(ccb);
-			xpt_path_unlock(&path);
-			xpt_release_path(&path);
+			mtx_unlock(mtx);
+			xpt_release_device(device);
 
 			xpt_lock_buses();
 		}
@@ -2686,11 +2693,8 @@ xpt_action_default(union ccb *start_ccb)
 			start_ccb->ataio.resid = 0;
 		/* FALLTHROUGH */
 	case XPT_NVME_IO:
-		/* FALLTHROUGH */
 	case XPT_NVME_ADMIN:
-		/* FALLTHROUGH */
 	case XPT_MMC_IO:
-		/* FALLTHROUGH */
 	case XPT_RESET_DEV:
 	case XPT_ENG_EXEC:
 	case XPT_SMP_IO:
@@ -3156,6 +3160,10 @@ call_sim:
 		break;
 	case XPT_REPROBE_LUN:
 		xpt_async(AC_INQ_CHANGED, path, NULL);
+		start_ccb->ccb_h.status = CAM_REQ_CMP;
+		xpt_done(start_ccb);
+		break;
+	case XPT_ASYNC:
 		start_ccb->ccb_h.status = CAM_REQ_CMP;
 		xpt_done(start_ccb);
 		break;
@@ -3685,15 +3693,6 @@ xpt_clone_path(struct cam_path **new_path_ptr, struct cam_path *path)
 	new_path = (struct cam_path *)malloc(sizeof(*path), M_CAMPATH, M_NOWAIT);
 	if (new_path == NULL)
 		return(CAM_RESRC_UNAVAIL);
-	xpt_copy_path(new_path, path);
-	*new_path_ptr = new_path;
-	return (CAM_REQ_CMP);
-}
-
-void
-xpt_copy_path(struct cam_path *new_path, struct cam_path *path)
-{
-
 	*new_path = *path;
 	if (path->bus != NULL)
 		xpt_acquire_bus(path->bus);
@@ -3701,6 +3700,8 @@ xpt_copy_path(struct cam_path *new_path, struct cam_path *path)
 		xpt_acquire_target(path->target);
 	if (path->device != NULL)
 		xpt_acquire_device(path->device);
+	*new_path_ptr = new_path;
+	return (CAM_REQ_CMP);
 }
 
 void
@@ -4450,7 +4451,7 @@ xpt_async(u_int32_t async_code, struct cam_path *path, void *async_arg)
 		xpt_freeze_devq(path, 1);
 	else
 		xpt_freeze_simq(path->bus->sim, 1);
-	xpt_done(ccb);
+	xpt_action(ccb);
 }
 
 static void
@@ -5325,14 +5326,13 @@ xptaction(struct cam_sim *sim, union ccb *work_ccb)
 		cpi->transport = XPORT_UNSPECIFIED;
 		cpi->transport_version = XPORT_VERSION_UNSPECIFIED;
 		cpi->ccb_h.status = CAM_REQ_CMP;
-		xpt_done(work_ccb);
 		break;
 	}
 	default:
 		work_ccb->ccb_h.status = CAM_REQ_INVALID;
-		xpt_done(work_ccb);
 		break;
 	}
+	xpt_done(work_ccb);
 }
 
 /*
@@ -5435,7 +5435,8 @@ xpt_done_process(struct ccb_hdr *ccb_h)
 
 		if (sim)
 			devq = sim->devq;
-		KASSERT(devq, ("Periph disappeared with request pending."));
+		KASSERT(devq, ("Periph disappeared with CCB %p %s request pending.",
+			ccb_h, xpt_action_name(ccb_h->func_code)));
 
 		mtx_lock(&devq->send_mtx);
 		devq->send_active--;
