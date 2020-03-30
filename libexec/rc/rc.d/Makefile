@@ -142,12 +142,6 @@ ACPIPACKAGE=	acpi
 CONFS+=		powerd
 .endif
 
-.if ${MK_AMD} != "no"
-CONFGROUPS+=	AMD
-AMD+=		amd
-AMDPACKAGE=	amd
-.endif
-
 .if ${MK_APM} != "no"
 CONFGROUPS+=	APM
 APM+=		apm

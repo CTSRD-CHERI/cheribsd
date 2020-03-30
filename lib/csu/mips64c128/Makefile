@@ -13,7 +13,8 @@ CFLAGS+=	-DCRT_IRELOC_SUPPRESS
 # Purecap code requires crt_init_globals to be called before using jump tables
 CFLAGS+=	-fno-jump-tables
 
-NEED_CHERI=	pure
+NEED_COMPAT=	CHERI
+.include <bsd.compat.mk>
 
 NO_BSD_CRTBEGIN=	yes
 .PATH:	${.CURDIR}/../common-cheri

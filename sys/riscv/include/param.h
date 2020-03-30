@@ -103,6 +103,16 @@
 #define	PCPU_PAGES		1
 
 /*
+ * CHERI specific define required by SysV shared memory.  Depends
+ * on physically addressable memory.
+ *
+ * XXX-JHB: Just copied from MIPS
+ */
+/* 1MB allows all sizes for 40-bit address spaces with ISA v5 128-bit caps. */
+/* XXX-BD: only increase for compressed capabilities? */
+#define	CHERI_SHMLBA	(1 << 20)
+
+/*
  * Mach derived conversion macros
  */
 #define	round_page(x)		(((unsigned long)(x) + PAGE_MASK) & ~PAGE_MASK)

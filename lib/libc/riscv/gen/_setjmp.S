@@ -93,7 +93,7 @@ END(_setjmp)
 ENTRY(_longjmp)
 #ifdef __CHERI_PURE_CAPABILITY__
 #pragma message("TODO: RISCV-PURECAP implement _longjmp")
-	cret
+	unimp
 #else
 	/* Check the magic value */
 	ld	t0, 0(a0)

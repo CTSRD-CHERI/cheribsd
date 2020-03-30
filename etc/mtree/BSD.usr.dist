@@ -39,15 +39,21 @@
         aout
         ..
         clang
-            9.0.1
+            10.0.0
                 include
                     cuda_wrappers
+                    ..
+                    fuzzer
                     ..
                     openmp_wrappers
                     ..
                     ppc_wrappers
                     ..
+                    profile
+                    ..
                     sanitizer
+                    ..
+                    xray
                     ..
                 ..
                 lib
@@ -215,6 +221,8 @@
             ..
             atf
             ..
+            kyua
+            ..
             legal
             ..
             llvm
@@ -310,6 +318,8 @@
                     test
                     ..
                 ..
+            ..
+            kyua
             ..
             libusb20
             ..
@@ -446,6 +456,12 @@
                 ..
                 trusted tags=package=runtime
                 ..
+            ..
+        ..
+        kyua
+            misc
+            ..
+            store
             ..
         ..
         locale

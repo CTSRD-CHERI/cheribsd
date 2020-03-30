@@ -32,6 +32,7 @@ SUBDIR=	alias \
 	diff \
 	dirname \
 	du \
+	elfctl \
 	elfdump \
 	enigma \
 	env \
@@ -202,8 +203,12 @@ SUBDIR.${MK_ATM}+=	atm
 SUBDIR.${MK_BLUETOOTH}+=	bluetooth
 SUBDIR.${MK_BSD_CPIO}+=	cpio
 SUBDIR.${MK_CALENDAR}+=	calendar
-SUBDIR.${MK_CHERI}+=	capsize \
-			qtrace
+
+# Tracing currently only implemented for MIPS
+.if ${MACHINE_ARCH:Mmips*}
+SUBDIR+=	qtrace
+.endif
+
 SUBDIR.${MK_CLANG}+=	clang
 SUBDIR.${MK_DIALOG}+=	dpv
 SUBDIR.${MK_EE}+=	ee
@@ -219,10 +224,8 @@ SUBDIR.${MK_GAMES}+=	number
 SUBDIR.${MK_GAMES}+=	pom
 SUBDIR.${MK_GAMES}+=	primes
 SUBDIR.${MK_GAMES}+=	random
-.if ${MK_GPL_DTC} != "yes" && ${MK_CXX} == "yes"
 .if ${COMPILER_FEATURES:Mc++11}
-SUBDIR+=	dtc
-.endif
+SUBDIR.${MK_CXX}+=	dtc
 .endif
 SUBDIR.${MK_HESIOD}+=	hesinfo
 SUBDIR.${MK_ICONV}+=	iconv
@@ -257,6 +260,7 @@ SUBDIR.${MK_QUOTAS}+=	quota
 SUBDIR.${MK_SENDMAIL}+=	vacation
 SUBDIR.${MK_TALK}+=	talk
 SUBDIR.${MK_TELNET}+=	telnet
+SUBDIR.${MK_TESTS}.${MK_CXX}+=	kyua
 SUBDIR.${MK_TESTS}+=	tests
 SUBDIR.${MK_TEXTPROC}+=	ul
 SUBDIR.${MK_TFTP}+=	tftp

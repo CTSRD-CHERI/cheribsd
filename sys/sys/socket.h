@@ -547,7 +547,7 @@ struct sockcred {
  * Aligning to capability size should remove the need for realignment in the hybrid kernel/
  * purecap userspace combination.
  */
-#if __has_feature(capabilities)
+#if __has_feature(capabilities) && defined(_KERNEL)
 #define	_CMSG_ALIGN(n)	__builtin_align_up((n), sizeof(void * __capability))
 #else
 #define	_CMSG_ALIGN(n)	_ALIGN(n)

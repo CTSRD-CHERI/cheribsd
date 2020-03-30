@@ -454,6 +454,7 @@ sendfile_swapin(vm_object_t obj, struct sf_io *sfio, int *nios, off_t off,
 				    __func__, pa, j));
 				vm_page_unwire(pa[j], PQ_INACTIVE);
 			}
+			refcount_release(&sfio->nios);
 			return (EIO);
 		}
 
@@ -573,6 +574,12 @@ sendfile_getsock(struct thread *td, int s, struct file **sock_fp,
 		return (error);
 	*so = (*sock_fp)->f_data;
 	if ((*so)->so_type != SOCK_STREAM)
+		return (EINVAL);
+	/*
+	 * SCTP one-to-one style sockets currently don't work with
+	 * sendfile(). So indicate EINVAL for now.
+	 */
+	if ((*so)->so_proto->pr_protocol == IPPROTO_SCTP)
 		return (EINVAL);
 	if (SOLISTENING(*so))
 		return (ENOTCONN);

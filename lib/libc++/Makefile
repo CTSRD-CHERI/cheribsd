@@ -5,20 +5,12 @@
 PACKAGE=	clibs
 .if ${MK_CHERI} != "no"
 WANT_CHERI?=	hybrid
+.endif
 LIBCXX_VERSION=10
 _LIBCXXRTDIR=   ${SRCTOP}/contrib/subrepo-cheri-libcxxrt/src
 HDRDIR=         ${SRCTOP}/contrib/subrepo-cheri-libc++/include
 SRCDIR=         ${SRCTOP}/contrib/subrepo-cheri-libc++/src
-.else
-LIBCXX_VERSION=10
-_LIBCXXRTDIR=	${SRCTOP}/contrib/subrepo-cheri-libcxxrt/src
-HDRDIR=		${SRCTOP}/contrib/subrepo-cheri-libc++/include
-SRCDIR=		${SRCTOP}/contrib/subrepo-cheri-libc++/src
-.endif
 CXXINCLUDEDIR=	${INCLUDEDIR}/c++/v${SHLIB_MAJOR}
-.if ${MACHINE_CPUARCH} == "arm"
-STATIC_CXXFLAGS+= -mlong-calls
-.endif
 
 .PATH: ${SRCDIR}
 
@@ -91,7 +83,9 @@ CFLAGS+=	-nostdinc++
 CFLAGS+=	-nostdlib
 CFLAGS+=	-D_LIBCPP_BUILDING_LIBRARY
 CFLAGS+=	-DLIBCXXRT
-CXXSTD?=	c++11
+CFLAGS+=	-ffunction-sections
+CFLAGS+=	-fdata-sections
+CXXSTD?=	c++14
 
 LIBADD+=	cxxrt
 

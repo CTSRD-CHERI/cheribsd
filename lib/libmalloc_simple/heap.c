@@ -62,7 +62,7 @@ static char *rcsid = "$FreeBSD$";
 #define	error_printf(...)	rtld_fdprintf(STDERR_FILENO, __VA_ARGS__)
 #elif defined(IN_LIBTHR)
 #include "thr_private.h"
-#define	error_printf(...)	_thread_printf(STDERR_FILENO, __VA_ARGS__)
+#define	error_printf(...)	_thread_fdprintf(STDERR_FILENO, __VA_ARGS__)
 #else
 #include <stdio.h>
 #define	error_printf(...)	fprintf(stderr, __VA_ARGS__)

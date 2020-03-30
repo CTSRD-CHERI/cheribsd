@@ -1190,9 +1190,9 @@ DEFINE_LIBUNWIND_FUNCTION(__unw_getcontext)
 
   li     a0, 0  // return UNW_ESUCCESS
 #ifdef __CHERI_PURE_CAPABILITY__
-  ret           // jump to ra
-#else
   cret          // jump to cra
+#else
+  ret           // jump to ra
 #endif
 END_LIBUNWIND_FUNCTION(__unw_getcontext)
 

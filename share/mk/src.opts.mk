@@ -78,6 +78,7 @@ __DEFAULT_YES_OPTIONS = \
     CASPER \
     CCD \
     CDDL \
+    CLANG \
     CPP \
     CROSS_COMPILER \
     CRYPT \
@@ -126,8 +127,8 @@ __DEFAULT_YES_OPTIONS = \
     LEGACY_CONSOLE \
     LIBPTHREAD \
     LIBTHR \
+    LLD \
     LLVM_COV \
-    LLVM_LIBUNWIND \
     LLVM_TARGET_ALL \
     LOADER_GELI \
     LOADER_LUA \
@@ -194,18 +195,12 @@ __DEFAULT_YES_OPTIONS = \
     ZONEINFO
 
 __DEFAULT_NO_OPTIONS = \
-    AMD \
     BEARSSL \
     BSD_GREP \
     CLANG_EXTRAS \
     DTRACE_TESTS \
     EXPERIMENTAL \
-    GCC \
-    GCC_BOOTSTRAP \
-    GCOV \
-    GNUCXX \
     GNU_GREP_COMPAT \
-    GPL_DTC \
     HESIOD \
     LIBSOFT \
     LOADER_FIREWIRE \
@@ -225,7 +220,8 @@ __DEFAULT_NO_OPTIONS+= \
     LIBCHERI
 
 __DEFAULT_YES_OPTIONS+=	\
-	COMPAT_CHERIABI
+	COMPAT_CHERIABI \
+	CHERIBSDBOX
 
 # LEFT/RIGHT. Left options which default to "yes" unless their corresponding
 # RIGHT option is disabled.
@@ -233,6 +229,7 @@ __DEFAULT_DEPENDENT_OPTIONS= \
 	CLANG_FULL/CLANG \
 	LOADER_VERIEXEC/BEARSSL \
 	LOADER_EFI_SECUREBOOT/LOADER_VERIEXEC \
+	LOADER_VERIEXEC_VECTX/LOADER_VERIEXEC \
 	VERIEXEC/BEARSSL \
 
 # MK_*_SUPPORT options which default to "yes" unless their corresponding
@@ -261,12 +258,15 @@ __DEFAULT_DEPENDENT_OPTIONS+= ${var}_SUPPORT/${var}
 # Additional, per-target behavior should be rarely added only after much
 # gnashing of teeth and grinding of gears.
 #
-.if defined(TARGET_ARCH)
+# Note: we have to use MACHINE_ARCH in the bsd.compat.mk case (WANT_COMPAT)
+# since TARGET_ARCH is generally set on the make commandline and cannot be
+# overriden by bsd.compat.mk.
+.if defined(TARGET_ARCH) && !defined(WANT_COMPAT)
 __T=${TARGET_ARCH}
 .else
 __T=${MACHINE_ARCH}
 .endif
-.if defined(TARGET)
+.if defined(TARGET) && !defined(WANT_COMPAT)
 __TT=${TARGET}
 .else
 __TT=${MACHINE}
@@ -299,26 +299,11 @@ MK_LLVM_TARGET_SPARC:=no
 __DEFAULT_NO_OPTIONS+=LLVM_TARGET_BPF
 
 .include <bsd.compiler.mk>
-# If the compiler is not C++11 capable, disable Clang.  External toolchain will
-# be required.
-
-.if ${COMPILER_FEATURES:Mc++11} && (${__TT} != "mips")
-# Clang is enabled, and will be installed as the default /usr/bin/cc.
-__DEFAULT_YES_OPTIONS+=CLANG CLANG_BOOTSTRAP CLANG_IS_CC LLD
-.elif ${COMPILER_FEATURES:Mc++11} && !${__T:Mmips*c*}
-# If an external compiler that supports C++11 is used as ${CC} and Clang
-# supports the target, then Clang is enabled but we still require an external
-# toolchain.
-# default /usr/bin/cc.
-__DEFAULT_YES_OPTIONS+=CLANG LLD
-__DEFAULT_NO_OPTIONS+=CLANG_BOOTSTRAP CLANG_IS_CC
-.elif ${COMPILER_FEATURES:Mc++11} && ${__T:Mmips*c*}
-# CHERI pure-capability targets always use libc++
+.if ${__T:Mmips*c*}
 # Don't build CLANG for now
 __DEFAULT_NO_OPTIONS+=CLANG CLANG_IS_CC
 # Don't bootstrap clang, it isn't the version we want
 __DEFAULT_NO_OPTIONS+=CLANG_BOOTSTRAP
-__DEFAULT_NO_OPTIONS+=GPL_DTC
 __DEFAULT_NO_OPTIONS+=LLD
 # stand/libsa required -fno-pic which can't work with CHERI
 # XXXBD: we should build mips*c* as mips here, but punt for now
@@ -330,13 +315,18 @@ BROKEN_OPTIONS+=OFED
 # lib32 could probalby be made to work, but makes little sense
 # Must be broken for LIB64 to work while we can have only one LIBCOMPAT
 BROKEN_OPTIONS+=LIB32
+.endif
+
+.if ${__TT} != "mips"
+# Clang is installed as the default /usr/bin/cc.
+__DEFAULT_YES_OPTIONS+=CLANG_BOOTSTRAP CLANG_IS_CC
 .else
-# Everything else disables Clang, and uses GCC instead.
-__DEFAULT_NO_OPTIONS+=CLANG CLANG_BOOTSTRAP CLANG_IS_CC LLD
+# Clang is enabled but we still require an external toolchain.
+__DEFAULT_NO_OPTIONS+=CLANG_BOOTSTRAP CLANG_IS_CC
 .endif
 # In-tree binutils/gcc are older versions without modern architecture support.
 .if ${__T} == "aarch64" || ${__T:Mriscv*} != ""
-BROKEN_OPTIONS+=BINUTILS BINUTILS_BOOTSTRAP GCC GCC_BOOTSTRAP GDB
+BROKEN_OPTIONS+=BINUTILS BINUTILS_BOOTSTRAP GDB
 .endif
 .if ${__T} == "amd64" || ${__T} == "i386" || ${__T:Mpowerpc*}
 __DEFAULT_YES_OPTIONS+=BINUTILS_BOOTSTRAP
@@ -390,16 +380,12 @@ BROKEN_OPTIONS+=SSP
 # nscd(8) caching depends on marshaling pointers to the daemon and back
 # and can't work without a rewrite.
 BROKEN_OPTIONS+=NS_CACHING
-# cheribsdbox is a useful recovery tool
-__DEFAULT_YES_OPTIONS+=CHERIBSDBOX
-.else
-__DEFAULT_NO_OPTIONS+=CHERIBSDBOX
 .endif
 
 .if ${__T:Mriscv*c*}
 # Compiler crash:
 # Skip until https://github.com/CTSRD-CHERI/llvm-project/issues/379 is fixed.
-BROKEN_OPTIONS+=LIBCPLUSPLUS GNUCXX CXX
+BROKEN_OPTIONS+=LIBCPLUSPLUS CXX
 # Crash in ZFS code. TODO: investigate
 BROKEN_OPTIONS+=CDDL
 
@@ -408,6 +394,9 @@ BROKEN_OPTIONS+=SVN SVNLITE
 
 # libcheri has not been ported to RISCV
 BROKEN_OPTIONS+=LIBCHERI
+
+# No RTLD yet
+BROKEN_OPTIONS+=CASPER DYNAMICROOT
 .endif
 
 # EFI doesn't exist on mips, powerpc or riscv.
@@ -518,7 +507,6 @@ MK_${var}:=	no
 #
 .if !${COMPILER_FEATURES:Mc++11}
 MK_GOOGLETEST:=	no
-MK_LLVM_LIBUNWIND:=	no
 .endif
 
 .if ${MK_CAPSICUM} == "no"
@@ -549,7 +537,6 @@ MK_KERBEROS_SUPPORT:=	no
 
 .if ${MK_CXX} == "no"
 MK_CLANG:=	no
-MK_GNUCXX:=	no
 MK_GOOGLETEST:=	no
 MK_TESTS:=	no
 MK_PMC:=	no
@@ -621,14 +608,12 @@ MK_ZONEINFO_OLD_TIMEZONES_SUPPORT:= no
 MK_BINUTILS_BOOTSTRAP:= no
 MK_CLANG_BOOTSTRAP:= no
 MK_ELFTOOLCHAIN_BOOTSTRAP:= no
-MK_GCC_BOOTSTRAP:= no
 MK_LLD_BOOTSTRAP:= no
 .endif
 
 .if ${MK_TOOLCHAIN} == "no"
 MK_BINUTILS:=	no
 MK_CLANG:=	no
-MK_GCC:=	no
 MK_GDB:=	no
 MK_INCLUDES:=	no
 MK_LLD:=	no
@@ -672,17 +657,6 @@ MK_${vv:H}:=	${MK_${vv:T}}
 
 .if !${COMPILER_FEATURES:Mc++11}
 MK_LLDB:=	no
-.endif
-
-# gcc 4.8 and newer supports libc++, so suppress gnuc++ in that case.
-# while in theory we could build it with that, we don't want to do
-# that since it creates too much confusion for too little gain.
-# XXX: This is incomplete and needs X_COMPILER_TYPE/VERSION checks too
-#      to prevent Makefile.inc1 from bootstrapping unneeded dependencies
-#      and to support 'make delete-old' when supplying an external toolchain.
-.if ${COMPILER_TYPE} == "gcc" && ${COMPILER_VERSION} >= 40800
-MK_GNUCXX:=no
-MK_GCC:=no
 .endif
 
 .endif #  !target(__<src.opts.mk>__)

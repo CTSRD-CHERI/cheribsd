@@ -504,26 +504,13 @@ int
 kern_mmap(struct thread *td, uintptr_t addr0, size_t len, int prot, int flags,
     int fd, off_t pos)
 {
-
-	return (kern_mmap_fpcheck(td, addr0, len, prot, flags, fd, pos, NULL));
-}
-
-/*
- * When mmap'ing a file, check_fp_fn may be used for the caller to do any
- * last-minute validation based on the referenced file in a non-racy way.
- */
-int
-kern_mmap_fpcheck(struct thread *td, uintptr_t addr0, size_t len, int prot,
-    int flags, int fd, off_t pos, mmap_check_fp_fn check_fp_fn)
-{
-	struct mmap_req	mr = {
+	struct mmap_req mr = {
 		.mr_hint = addr0,
 		.mr_len = len,
 		.mr_prot = prot,
 		.mr_flags = flags,
 		.mr_fd = fd,
-		.mr_pos = pos,
-		.mr_check_fp_fn = check_fp_fn
+		.mr_pos = pos
 	};
 
 	return (kern_mmap_req(td, &mr));

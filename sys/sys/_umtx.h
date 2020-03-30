@@ -39,7 +39,11 @@ struct umutex {
 	volatile __lwpid_t	m_owner;	/* Owner of the mutex */
 	__uint32_t		m_flags;	/* Flags of the mutex */
 	__uint32_t		m_ceilings[2];	/* Priority protect ceiling */
+#if __has_feature(capabilities) && defined(_KERNEL)
+	__uintcap_t		m_rb_lnk;	/* Robust linkage */
+#else
 	__uintptr_t		m_rb_lnk;	/* Robust linkage */
+#endif
 #ifndef __LP64__
 	__uint32_t		m_pad;
 #endif

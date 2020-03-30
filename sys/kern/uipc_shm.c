@@ -972,7 +972,7 @@ kern_shm_unlink(struct thread *td, const char * __capability userpath)
 	sx_xlock(&shm_dict_lock);
 	error = shm_remove(path, fnv, td->td_ucred);
 	sx_xunlock(&shm_dict_lock);
-	free(path, M_TEMP);
+	free(path, M_SHMFD);
 
 	return (error);
 }
