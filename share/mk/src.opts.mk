@@ -125,6 +125,7 @@ __DEFAULT_YES_OPTIONS = \
     LDNS \
     LDNS_UTILS \
     LEGACY_CONSOLE \
+    LIBCPLUSPLUS \
     LIBPTHREAD \
     LIBTHR \
     LLD \
@@ -282,8 +283,6 @@ __DEFAULT_DEPENDENT_OPTIONS+=	LLVM_TARGET_ARM/LLVM_TARGET_AARCH64
 __DEFAULT_DEPENDENT_OPTIONS+=	LLVM_TARGET_${__llt:${__LLVM_TARGET_FILT}:tu}/LLVM_TARGET_ALL
 .endif
 .endfor
-# until we can unwind clang + sparc
-MK_LLVM_TARGET_SPARC:=no
 
 __DEFAULT_NO_OPTIONS+=LLVM_TARGET_BPF
 
@@ -400,8 +399,7 @@ BROKEN_OPTIONS+=GCC_BOOTSTRAP BINUTILS_BOOTSTRAP
 .endif
 
 
-.if ${COMPILER_FEATURES:Mc++11} && \
-    (${__T} == "amd64" || ${__T} == "i386" || ${__T} == "powerpc64")
+.if ${__T} == "amd64" || ${__T} == "i386" || ${__T} == "powerpc64"
 __DEFAULT_YES_OPTIONS+=OPENMP
 .else
 __DEFAULT_NO_OPTIONS+=OPENMP
@@ -410,35 +408,9 @@ __DEFAULT_NO_OPTIONS+=OPENMP
 .include <bsd.mkopt.mk>
 
 #
-# MK_* options that default to "yes" if the compiler is a C++11 compiler.
-#
-.for var in \
-    LIBCPLUSPLUS
-.if !defined(MK_${var})
-.if ${COMPILER_FEATURES:Mc++11}
-.if defined(WITHOUT_${var})
-MK_${var}:=	no
-.else
-MK_${var}:=	yes
-.endif
-.else
-.if defined(WITH_${var})
-MK_${var}:=	yes
-.else
-MK_${var}:=	no
-.endif
-.endif
-.endif
-.endfor
-
-#
 # Force some options off if their dependencies are off.
 # Order is somewhat important.
 #
-.if !${COMPILER_FEATURES:Mc++11}
-MK_GOOGLETEST:=	no
-.endif
-
 .if ${MK_CAPSICUM} == "no"
 MK_CASPER:=	no
 .endif
@@ -577,9 +549,5 @@ MK_${vv:H}:=	${MK_${vv:T}}
 #
 # Set defaults for the MK_*_SUPPORT variables.
 #
-
-.if !${COMPILER_FEATURES:Mc++11}
-MK_LLDB:=	no
-.endif
 
 .endif #  !target(__<src.opts.mk>__)

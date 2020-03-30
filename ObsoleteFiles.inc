@@ -36,6 +36,14 @@
 #   xargs -n1 | sort | uniq -d;
 # done
 
+# 20200320: cx and ctau drivers retired
+OLD_FILES+=usr/share/man/man4/ctau.4.gz
+OLD_FILES+=usr/share/man/man4/cx.4.gz
+
+# 20200318: host.conf was deprecated a long time ago.
+OLD_FILES+=etc/host.conf
+OLD_FILES+=etc/rc.d/nsswitch
+
 # 20200310: new clang import which bumps version from 9.0.1 to 10.0.0.
 OLD_FILES+=usr/lib/clang/9.0.1/include/cuda_wrappers/algorithm
 OLD_FILES+=usr/lib/clang/9.0.1/include/cuda_wrappers/complex
@@ -295,6 +303,7 @@ OLD_FILES+=usr/share/man/man8/fsinfo.8.gz
 OLD_FILES+=usr/share/man/man8/hlfsd.8.gz
 OLD_FILES+=usr/share/man/man8/mk-amd-map.8.gz
 OLD_FILES+=usr/share/man/man8/wire-test.8.gz
+
 # 20200301: bktr removed
 OLD_DIRS+=usr/include/dev/bktr
 OLD_FILES+=usr/include/dev/bktr/ioctl_bktr.h
@@ -305,6 +314,7 @@ OLD_FILES+=usr/include/machine/ioctl_bktr.h
 OLD_FILES+=usr/include/machine/ioctl_meteor.h
 .endif
 OLD_FILES+=usr/share/man/man4/bktr.4.gz
+
 # 20200229: GCC 4.2.1 removed
 .if !defined(WITH_PORT_BASE_GCC)
 OLD_FILES+=usr/bin/g++
@@ -9805,49 +9815,6 @@ OLD_FILES+=usr/bin/miniperl
 OLD_FILES+=usr/bin/sperl
 # 200001XX
 OLD_FILES+=usr/sbin/apmconf
-# 199911XX
-OLD_FILES+=usr/sbin/ipfstat
-OLD_FILES+=usr/sbin/ipmon
-OLD_FILES+=usr/sbin/ipnat
-OLD_FILES+=usr/sbin/bad144
-OLD_FILES+=usr/sbin/wormcontrol
-OLD_FILES+=usr/sbin/named-bootconf
-OLD_FILES+=usr/sbin/kvm_mkdb
-OLD_FILES+=usr/sbin/keyadmin
-# 199909XX
-OLD_FILES+=usr/lib/libdesrypt_p.a
-OLD_FILES+=sbin/ft
-# 199903XX
-OLD_FILES+=sbin/modload
-OLD_FILES+=sbin/modunload
-OLD_FILES+=usr/sbin/natd
-# 199812XX
-OLD_FILES+=sbin/dset
-# 199809XX
-OLD_FILES+=sbin/scsi
-OLD_FILES+=sbin/scsiformat
-OLD_FILES+=usr/sbin/ncrcontrol
-OLD_FILES+=usr/sbin/tickadj
-# 199806XX
-OLD_FILES+=usr/sbin/mkdosfs
-# 199801XX
-OLD_FILES+=sbin/mount_lfs
-OLD_FILES+=sbin/newlfs
-OLD_FILES+=sbin/dumplfs
-OLD_FILES+=usr/sbin/qcamcontrol
-OLD_FILES+=usr/sbin/supscan
-# 1997XXXX
-OLD_FILES+=usr/sbin/sysctl
-OLD_FILES+=usr/sbin/ctm_scan
-OLD_FILES+=usr/sbin/addgroup
-OLD_FILES+=usr/sbin/rmgroup
-# 1996XXXX
-OLD_FILES+=sbin/rdisc
-OLD_FILES+=usr/sbin/cdplay
-OLD_FILES+=usr/sbin/supfilesrv
-OLD_FILES+=usr/sbin/routed
-OLD_FILES+=usr/sbin/lsdev
-OLD_FILES+=usr/sbin/yppasswdd
 ## unsorted
 # do we still support aout builds?
 #OLD_FILES+=usr/lib/aout/c++rt0.o
@@ -10794,10 +10761,6 @@ OLD_LIBS+=usr/lib/libtermcap.so.2
 OLD_LIBS+=usr/lib/libutil.so.2
 OLD_LIBS+=usr/lib/libvgl.so.1
 OLD_LIBS+=usr/lib/libwrap.so.2
-# 19991216
-OLD_FILES+=usr/sbin/xntpdc
-# 199909XX
-OLD_LIBS+=usr/lib/libc_r.so.3
 # ???
 OLD_LIBS+=usr/lib/libarchive.so.2
 OLD_LIBS+=usr/lib/libbsnmp.so.1
