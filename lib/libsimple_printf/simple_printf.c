@@ -44,7 +44,9 @@
 #include <unistd.h>
 #include "simple_printf.h"
 
+#if __has_feature(capabilities)
 #include <cheri/cheric.h>
+#endif
 
 #ifndef SIMPLE_PRINTF_WRITE_FUNC
 #error "You must define SIMPLE_PRINTF_WRITE_FUNC"
