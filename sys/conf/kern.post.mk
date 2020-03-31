@@ -202,10 +202,6 @@ ${FULLKERNEL}: ${SYSTEM_DEP} vers.o
 	${OBJCOPY} --strip-debug ${.TARGET}
 .endif
 	${SYSTEM_LD_TAIL}
-.if defined(EMBED_CHERITEST_LIST)
-	sh ${S}/tools/embed_cheritest_list.sh ${FULLKERNEL}
-	sh ${S}/tools/embed_cheriabitest_list.sh ${FULLKERNEL}
-.endif
 
 OBJS_DEPEND_GUESS+=	offset.inc assym.inc vnode_if.h ${BEFORE_DEPEND:M*.h} \
 			${MFILES:T:S/.m$/.h/}
