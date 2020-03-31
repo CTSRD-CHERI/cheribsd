@@ -40,8 +40,15 @@ _INTERNALLIBS=	\
 		fifolog \
 		ifconfig \
 		ipf \
+		kyua_cli \
+		kyua_drivers \
+		kyua_engine \
+		kyua_model \
+		kyua_store \
+		kyua_utils \
 		lpr \
 		lua \
+		lutok \
 		netbsd \
 		ntp \
 		ntpevent \
@@ -256,6 +263,12 @@ _DP_bsnmp=	crypto
 _DP_geom=	bsdxml sbuf
 _DP_cam=	sbuf
 _DP_kvm=	elf
+_DP_kyua_cli=		kyua_drivers kyua_engine kyua_model kyua_store kyua_utils
+_DP_kyua_drivers=	kyua_model kyua_engine kyua_store
+_DP_kyua_engine=	lutok kyua_utils
+_DP_kyua_model=		lutok
+_DP_kyua_utils=		lutok
+_DP_kyua_store=		kyua_model kyua_utils sqlite3
 _DP_casper=	nv
 _DP_cap_dns=	nv
 _DP_cap_fileargs=	nv
@@ -295,6 +308,7 @@ _DP_magic=	z
 _DP_mt=		sbuf bsdxml
 _DP_ldns=	ssl crypto
 _DP_lua=	m
+_DP_lutok=	lua
 .if ${MK_OPENSSL} != "no"
 _DP_fetch=	ssl crypto
 .else
@@ -470,8 +484,29 @@ _LIB_OBJTOP?=	${OBJTOP}
 LIBELFTCDIR=	${_LIB_OBJTOP}/lib/libelftc
 LIBELFTC?=	${LIBELFTCDIR}/libelftc${PIE_SUFFIX}.a
 
+LIBKYUA_CLIDIR=	${_LIB_OBJTOP}/lib/kyua/cli
+LIBKYUA_CLI?=	${LIBKYUA_CLIDIR}/libkyua_cli${PIE_SUFFIX}.a
+
+LIBKYUA_DRIVERSDIR=	${_LIB_OBJTOP}/lib/kyua/drivers
+LIBKYUA_DRIVERS?=	${LIBKYUA_DRIVERSDIR}/libkyua_drivers${PIE_SUFFIX}.a
+
+LIBKYUA_ENGINEDIR=	${_LIB_OBJTOP}/lib/kyua/engine
+LIBKYUA_ENGINE?=	${LIBKYUA_ENGINEDIR}/libkyua_engine${PIE_SUFFIX}.a
+
+LIBKYUA_MODELDIR=	${_LIB_OBJTOP}/lib/kyua/model
+LIBKYUA_MODEL?=		${LIBKYUA_MODELDIR}/libkyua_model${PIE_SUFFIX}.a
+
+LIBKYUA_STOREDIR=	${_LIB_OBJTOP}/lib/kyua/store
+LIBKYUA_STORE?=		${LIBKYUA_STOREDIR}/libkyua_store${PIE_SUFFIX}.a
+
+LIBKYUA_UTILSDIR=	${_LIB_OBJTOP}/lib/kyua/utils
+LIBKYUA_UTILS?=		${LIBKYUA_UTILSDIR}/libkyua_utils${PIE_SUFFIX}.a
+
 LIBLUADIR=	${_LIB_OBJTOP}/lib/liblua
 LIBLUA?=	${LIBLUADIR}/liblua${PIE_SUFFIX}.a
+
+LIBLUTOKDIR=	${_LIB_OBJTOP}/lib/liblutok
+LIBLUTOK?=	${LIBLUTOKDIR}/liblutok${PIE_SUFFIX}.a
 
 LIBPEDIR=	${_LIB_OBJTOP}/lib/libpe
 LIBPE?=		${LIBPEDIR}/libpe${PIE_SUFFIX}.a

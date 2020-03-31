@@ -947,7 +947,8 @@ IMAKEENV+=	PATH=${TMPPATH}:${INSTALLTMP}
 
 # When generating install media, do not allow user and group information from
 # the build host to affect the contents of the distribution.
-.if make(distributeworld) || make(distrib-dirs) || make(distribution)
+.if make(distributeworld) || make(distrib-dirs) || make(distribution) || \
+    make(stageworld)
 DB_FROM_SRC=	yes
 .endif
 
@@ -1057,9 +1058,8 @@ _cleanobj_fast_depend_hack: .PHONY
 	fi
 .endif
 .endfor
-# 20180604  r334626  brk sbrk
 # 20190916  r352703  shm_open
-.for f in brk sbrk shm_open
+.for f in shm_open
 	@if [ -e "${OBJTOP}/lib/libc/.depend.${f}.o" ] && \
 	    egrep -qw '${f}\.[sS]' ${OBJTOP}/lib/libc/.depend.${f}.o; then \
 		echo "Removing stale dependencies for ${f} syscall wrappers"; \
@@ -1067,37 +1067,6 @@ _cleanobj_fast_depend_hack: .PHONY
 		   ${_LIBCOMPAT:D${LIBCOMPAT_OBJTOP}/lib/libc/.depend.${f}.*}; \
 	fi
 .endfor
-# 20181013  r339348  bcopy reimplemented as .c
-.for f in bcopy memcpy memmove
-	@if [ -e "${OBJTOP}/lib/libc/.depend.${f}.o" ] && \
-	    egrep -qw 'bcopy\.[sS]' ${OBJTOP}/lib/libc/.depend.${f}.o; then \
-		echo "Removing stale dependencies for bcopy"; \
-		rm -f ${OBJTOP}/lib/libc/.depend.${f}.* \
-		   ${_LIBCOMPAT:D${LIBCOMPAT_OBJTOP}/lib/libc/.depend.${f}.*}; \
-	fi
-.endfor
-# 20181115  r340463  bzero reimplemented as .c
-	@if [ -e "${OBJTOP}/lib/libc/.depend.bzero.o" ] && \
-	    egrep -qw 'bzero\.[sS]' ${OBJTOP}/lib/libc/.depend.bzero.o; then \
-		echo "Removing stale dependencies for bzero"; \
-		rm -f ${OBJTOP}/lib/libc/.depend.bzero.* \
-		   ${_LIBCOMPAT:D${LIBCOMPAT_OBJTOP}/lib/libc/.depend.bzero.*}; \
-	fi
-# 20181009 track migration from ntp's embedded libevent to updated one
-	@if [ -e "${OBJTOP}/usr.sbin/ntp/libntpevent/.depend.bufferevent_openssl.o" ] && \
-	    egrep -q 'contrib/ntp/sntp/libevent/bufferevent_openssl.c' \
-	    ${OBJTOP}/usr.sbin/ntp/libntpevent/.depend.bufferevent_openssl.o ; then \
-		echo "Removing stale libevent dependencies"; \
-		rm -f ${OBJTOP}/usr.sbin/ntp/libntpevent/.depend.*; \
-	fi
-
-# 20181209  r341759 track migration across wpa update
-	@if [ -e "${OBJTOP}/usr.sbin/wpa/wpa_supplicant/.depend.rrm.o" ] && \
-	    egrep -q 'src/ap/rrm.c' \
-	    ${OBJTOP}/usr.sbin/wpa/wpa_supplicant/.depend.rrm.o; then \
-		echo "Removing stale wpa dependencies"; \
-		rm -f ${OBJTOP}/usr.sbin/wpa/*/.depend*; \
-	fi
 
 _worldtmp: .PHONY
 	@echo
@@ -1228,7 +1197,8 @@ _libraries:
 	@echo "--------------------------------------------------------------"
 	${_+_}cd ${.CURDIR}; \
 	    ${WMAKE} -DNO_FSCHG MK_HTML=no -DNO_LINT MK_MAN=no \
-	    MK_PROFILE=no MK_TESTS=no MK_TESTS_SUPPORT=${MK_TESTS} libraries
+	    MK_PROFILE=no MK_TESTS=no MK_TESTS_SUPPORT=${MK_TESTS_SUPPORT} \
+	    libraries
 everything: .PHONY
 	@echo
 	@echo "--------------------------------------------------------------"
@@ -2207,9 +2177,9 @@ update: .PHONY
 _host_bootstrap_libs=	lib/libmd lib/libsbuf
 .endif
 
-# libnv and libl are both requirements for config(8), which is an unconditional
+# libnv is a requirement for config(8), which is an unconditional
 # bootstrap-tool.
-_config_deps= lib/libnv usr.bin/lex/lib
+_config_deps= lib/libnv
 
 legacy: .PHONY
 .if ${BOOTSTRAPPING} < ${MINIMUM_SUPPORTED_OSREL} && ${BOOTSTRAPPING} != 0
@@ -2367,10 +2337,7 @@ _bootstrap_tools_links+=kbdcontrol
 .endif
 .endif
 
-_yacc=		lib/liby \
-		usr.bin/yacc
-
-${_bt}-usr.bin/yacc: ${_bt}-lib/liby
+_yacc=		usr.bin/yacc
 
 .if ${MK_BSNMP} != "no"
 _gensnmptree=	usr.sbin/bsnmpd/gensnmptree
@@ -2858,6 +2825,7 @@ NXBMAKE+=	XCC="${NXBOBJTOP}/tmp/usr/bin/cc" \
 		XCPP="${NXBOBJTOP}/tmp/usr/bin/cpp"
 .endif
 NXBMAKE+=	${NXBMAKEENV} ${MAKE} -f Makefile.inc1 ${NXBMAKEARGS} \
+		MACHINE=${MACHINE} MACHINE_ARCH=${MACHINE_ARCH} \
 		TARGET=${NXB_TARGET} TARGET_ARCH=${NXB_TARGET_ARCH} \
 		TARGET_TRIPLE=${MACHINE_TRIPLE:Q}
 # NXBDIRS is improperly based on MACHINE rather than NXB_TARGET.  Need to
@@ -3016,7 +2984,7 @@ lib/libcasper__L: lib/libnv__L
 lib/liblzma__L: lib/libthr__L
 lib/libzstd__L: lib/libthr__L
 
-_generic_libs=	${_cddl_lib} gnu/lib ${_kerberos5_lib} lib ${_secure_lib} usr.bin/lex/lib
+_generic_libs=	${_cddl_lib} gnu/lib ${_kerberos5_lib} lib ${_secure_lib}
 .if ${MK_IPFILTER} != "no"
 _generic_libs+=	sbin/ipf/libipf
 .endif

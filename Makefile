@@ -483,16 +483,17 @@ worlds: .PHONY
 .if make(universe) || make(universe_kernels) || make(tinderbox) || \
     make(targets) || make(universe-toolchain)
 #
-# Always build architectures supported by clang.  Only build architectures
-# only supported by GCC if a suitable toolchain is present or enabled.
-# In all cases, if the user specifies TARGETS on the command line,
-# honor that most of all.
+# Don't build rarely used architectures unless requested.
 #
+.if defined(EXTRA_TARGETS)
+EXTRA_ARCHES_mips=	mipsel mipshf mipselhf mips64el mips64hf mips64elhf
+EXTRA_ARCHES_mips+=	mipsn32
+.endif
 TARGETS?=amd64 arm arm64 i386 mips powerpc riscv
 _UNIVERSE_TARGETS=	${TARGETS}
 TARGET_ARCHES_arm?=	armv6 armv7
 TARGET_ARCHES_arm64?=	aarch64
-TARGET_ARCHES_mips?=	mipsel mips mips64el mips64 mipsn32 mipselhf mipshf mips64elhf mips64hf
+TARGET_ARCHES_mips?=	mips mips64 ${EXTRA_ARCHES_mips}
 # powerpcspe excluded until clang fixed
 TARGET_ARCHES_powerpc?=	powerpc powerpc64
 TARGET_ARCHES_riscv?=	riscv64 riscv64sf
@@ -500,13 +501,13 @@ TARGET_ARCHES_riscv?=	riscv64 riscv64sf
 TARGET_ARCHES_${target}?= ${target}
 .endfor
 
-MAKE_PARAMS_mips?=	CROSS_TOOLCHAIN=mips-gcc6
-
-TOOLCHAINS_mips=	mips-gcc6
-
 # Remove architectures only supported by external toolchain from
 # universe if required toolchain packages are missing.
-.for target in mips
+# Note: We no longer have targets that require an external toolchain, but for
+# now keep this block in case a new non-LLVM architecture is added and to reuse
+# it for a future extenal GCC make universe variant.
+_external_toolchain_targets=
+.for target in ${_external_toolchain_targets}
 .if ${_UNIVERSE_TARGETS:M${target}}
 .for toolchain in ${TOOLCHAINS_${target}}
 .if !exists(/usr/local/share/toolchains/${toolchain}.mk)

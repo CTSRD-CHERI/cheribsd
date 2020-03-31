@@ -36,6 +36,16 @@
 #   xargs -n1 | sort | uniq -d;
 # done
 
+# 20200327: OCF refactoring
+OLD_FILES+=usr/share/man/man9/crypto_find_driver.9
+OLD_FILES+=usr/share/man/man9/crypto_register.9
+OLD_FILES+=usr/share/man/man9/crypto_unregister.9
+
+# 20200323: INTERNALLIB don't install headers anymore
+OLD_FILES+=usr/include/libelftc.h
+OLD_FILES+=usr/include/libifconfig.h
+OLD_FILES+=usr/include/libpmcstat.h
+
 # 20200320: cx and ctau drivers retired
 OLD_FILES+=usr/share/man/man4/ctau.4.gz
 OLD_FILES+=usr/share/man/man4/cx.4.gz
