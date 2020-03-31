@@ -109,7 +109,9 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 	}
 
 	switch (cmd) {
+	case DTRACEIOC_AGGDESC_CAP:
 	case DTRACEIOC_AGGDESC: {
+		//TODO(nicomazz): fix when userspace is not purecap
 		dtrace_aggdesc_t *__capability * paggdesc = (dtrace_aggdesc_t *__capability *) addr;
 		dtrace_aggdesc_t aggdesc;
 		dtrace_action_t *act;
@@ -373,6 +375,7 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 
 		return (0);
 	}
+	case DTRACEIOC_DOFGET_CAP:
 	case DTRACEIOC_DOFGET: {
 		//TODO(nicomazz): fix when userspace is not purecap
 		dof_hdr_t *__capability*pdof = (dof_hdr_t *__capability*) addr;
@@ -396,13 +399,27 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 
 		return (rval == 0 ? 0 : EFAULT);
 	}
+	case DTRACEIOC_ENABLE_CAP:
 	case DTRACEIOC_ENABLE: {
 		dof_hdr_t *dof = NULL;
 		dtrace_enabling_t *enab = NULL;
 		dtrace_vstate_t *vstate;
 		int err = 0;
 		int rval;
-		dtrace_enable_io_t *p = (dtrace_enable_io_t *) addr;
+
+		void * __capability dof_ptr;
+		int *n_matched;
+
+		if (!SV_CURPROC_FLAG(SV_CHERI)) {
+			dtrace_enable_io_t *p = (dtrace_enable_io_t *) addr;
+			dof_ptr = __USER_CAP_OBJ(p->dof);
+			n_matched = &p->n_matched;
+		}
+		else {
+			dtrace_enable_io_t_cap *p = (dtrace_enable_io_t_cap *) addr;
+			dof_ptr = p->dof;
+			n_matched = &p->n_matched;
+		}
 
 		DTRACE_IOCTL_PRINTF("%s(%d): DTRACEIOC_ENABLE\n",__func__,__LINE__);
 
@@ -410,14 +427,13 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 		 * If a NULL argument has been passed, we take this as our
 		 * cue to reevaluate our enablings.
 		 */
-		if (p->dof == NULL) {
+		if (dof_ptr == NULL) {
 			dtrace_enabling_matchall();
 
 			return (0);
 		}
 
-		//TODO(nicomazz): fix when userspace is not purecap
-		if ((dof = dtrace_dof_copyin((uintcap_t) p->dof, &rval)) == NULL)
+		if ((dof = dtrace_dof_copyin((intcap_t)dof_ptr, &rval)) == NULL)
 			return (EINVAL);
 
 		mutex_enter(&cpu_lock);
@@ -447,7 +463,7 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 			return (rval);
 		}
 
-		if ((err = dtrace_enabling_match(enab, &p->n_matched)) == 0) {
+		if ((err = dtrace_enabling_match(enab, n_matched) == 0)) {
 			err = dtrace_enabling_retain(enab);
 		} else {
 			dtrace_enabling_destroy(enab);
@@ -459,8 +475,8 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 
 		return (err);
 	}
+	case DTRACEIOC_EPROBE_CAP:
 	case DTRACEIOC_EPROBE: {
-		//TODO(nicomazz): fix when userspace is not purecap
 		dtrace_eprobedesc_t * __capability *pepdesc = (dtrace_eprobedesc_t *__capability*) addr;
 		dtrace_eprobedesc_t epdesc;
 		dtrace_ecb_t *ecb;
@@ -472,7 +488,13 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 
 		DTRACE_IOCTL_PRINTF("%s(%d): DTRACEIOC_EPROBE\n",__func__,__LINE__);
 
-		if (copyincap(*pepdesc, &epdesc, sizeof (epdesc)) != 0)
+		dtrace_eprobedesc_t * __capability pepdesc_ptr;
+		if (!SV_CURPROC_FLAG(SV_CHERI))
+			pepdesc_ptr = __USER_CAP_OBJ(*(dtrace_eprobedesc_t **)addr);
+		else
+			pepdesc_ptr = *pepdesc;
+
+		if (copyincap(pepdesc_ptr, &epdesc, sizeof (epdesc)) != 0)
 			return (EFAULT);
 
 		mutex_enter(&dtrace_lock);
@@ -529,7 +551,7 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 
 		mutex_exit(&dtrace_lock);
 
-		if (copyoutcap(buf, *pepdesc, dest - (uintptr_t)buf) != 0) {
+		if (copyoutcap(buf, pepdesc_ptr, dest - (uintptr_t)buf) != 0) {
 			kmem_free(buf, size);
 			return (EFAULT);
 		}
