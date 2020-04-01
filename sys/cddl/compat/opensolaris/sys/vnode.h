@@ -263,12 +263,16 @@ zfs_vop_close(vnode_t *vp, int flag, int count, offset_t offset, cred_t *cr)
 	zfs_vop_close((vp), (oflags), (count), (offset), (cr))
 
 static __inline int
-vn_rename(char * __capability from, char * __capability to, enum uio_seg seg)
+vn_rename(char *from, char *to, enum uio_seg seg)
 {
 
 	ASSERT(seg == UIO_SYSSPACE);
 
-	return (kern_renameat(curthread, AT_FDCWD, from, AT_FDCWD, to, seg));
+    return (kern_renameat(curthread, AT_FDCWD,
+    		(__cheri_tocap const char * __capability) from,
+    		AT_FDCWD,
+    		(__cheri_tocap const char * __capability) to,
+    		seg));
 }
 
 static __inline int
