@@ -2799,10 +2799,12 @@ sooptcopyin(struct sockopt *sopt, void *buf, size_t len, size_t minlen)
 		sopt->sopt_valsize = valsize = len;
 
 	if (sopt->sopt_td != NULL) {
+#if __has_feature(capabilities)
 		if (sopt->sopt_dir == SOPT_SETCAP ||
 		    sopt->sopt_dir == SOPT_GETCAP)
 			return (copyincap(sopt->sopt_val, buf, valsize));
 		else
+#endif
 			return (copyin(sopt->sopt_val, buf, valsize));
 	}
 
@@ -3002,10 +3004,14 @@ sosetopt(struct socket *so, struct sockopt *sopt)
 			} else
 #endif
 			{
+#if __has_feature(capabilities)
 				sopt->sopt_dir = SOPT_SETCAP;
+#endif
 				error = sooptcopyin(sopt, &extmac,
 				    sizeof extmac, sizeof extmac);
+#if __has_feature(capabilities)
 				sopt->sopt_dir = SOPT_SET;
+#endif
 			}
 			if (error)
 				goto bad;
@@ -3075,9 +3081,11 @@ sooptcopyout(struct sockopt *sopt, const void *buf, size_t len)
 	sopt->sopt_valsize = valsize;
 	if (sopt->sopt_val != NULL) {
 		if (sopt->sopt_td != NULL) {
+#if __has_feature(capabilities)
 			KASSERT(sopt->sopt_dir != SOPT_GETCAP &&
 			   sopt->sopt_dir != SOPT_SETCAP,
 			   ("exporting capabilities not supproted"));
+#endif
 			error = copyout(buf, sopt->sopt_val, valsize);
 		} else
 			bcopy(buf, (__cheri_fromcap void *)sopt->sopt_val,
@@ -3210,10 +3218,14 @@ integer:
 			} else
 #endif
 			{
+#if __has_feature(capabilities)
 				sopt->sopt_dir = SOPT_GETCAP;
+#endif
 				error = sooptcopyin(sopt, &extmac,
 				    sizeof extmac, sizeof extmac);
+#if __has_feature(capabilities)
 				sopt->sopt_dir = SOPT_GET;
+#endif
 			}
 			if (error)
 				goto bad;
@@ -3245,10 +3257,14 @@ integer:
 			} else
 #endif
 			{
+#if __has_feature(capabilities)
 				sopt->sopt_dir = SOPT_GETCAP;
+#endif
 				error = sooptcopyin(sopt, &extmac,
 				    sizeof extmac, sizeof extmac);
+#if __has_feature(capabilities)
 				sopt->sopt_dir = SOPT_GET;
+#endif
 			}
 			if (error)
 				goto bad;
