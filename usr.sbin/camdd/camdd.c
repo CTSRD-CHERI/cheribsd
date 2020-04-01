@@ -726,7 +726,7 @@ camdd_release_buf(struct camdd_buf *buf)
 			if (data->extra_buf != 0) {
 				void *extra_buf;
 
-				extra_buf = (void *)
+				extra_buf = (void *)(uintptr_t)
 				    data->segs[data->sg_count - 1].ds_addr;
 				free(extra_buf);
 				data->extra_buf = 0;

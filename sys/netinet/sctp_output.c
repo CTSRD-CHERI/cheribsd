@@ -6735,7 +6735,7 @@ sctp_sendall_iterator(struct sctp_inpcb *inp, struct sctp_tcb *stcb, void *ptr,
 					sctp_timer_start(SCTP_TIMER_TYPE_SHUTDOWN, stcb->sctp_ep, stcb,
 					    net);
 					sctp_timer_start(SCTP_TIMER_TYPE_SHUTDOWNGUARD, stcb->sctp_ep, stcb,
-					    asoc->primary_destination);
+					    NULL);
 					added_control = 1;
 					do_chunk_output = 0;
 				}
@@ -6775,7 +6775,7 @@ sctp_sendall_iterator(struct sctp_inpcb *inp, struct sctp_tcb *stcb, void *ptr,
 						goto no_chunk_output;
 					}
 					sctp_timer_start(SCTP_TIMER_TYPE_SHUTDOWNGUARD, stcb->sctp_ep, stcb,
-					    asoc->primary_destination);
+					    NULL);
 				}
 			}
 
@@ -8447,7 +8447,7 @@ again_one_more_time:
 						/* turn off the timer */
 						if (SCTP_OS_TIMER_PENDING(&stcb->asoc.dack_timer.timer)) {
 							sctp_timer_stop(SCTP_TIMER_TYPE_RECV,
-							    inp, stcb, net,
+							    inp, stcb, NULL,
 							    SCTP_FROM_SCTP_OUTPUT + SCTP_LOC_1);
 						}
 					}
@@ -13577,7 +13577,7 @@ dataless_eof:
 				sctp_timer_start(SCTP_TIMER_TYPE_SHUTDOWN, stcb->sctp_ep, stcb,
 				    netp);
 				sctp_timer_start(SCTP_TIMER_TYPE_SHUTDOWNGUARD, stcb->sctp_ep, stcb,
-				    asoc->primary_destination);
+				    NULL);
 			}
 		} else {
 			/*-
@@ -13629,7 +13629,7 @@ dataless_eof:
 					goto out;
 				}
 				sctp_timer_start(SCTP_TIMER_TYPE_SHUTDOWNGUARD, stcb->sctp_ep, stcb,
-				    asoc->primary_destination);
+				    NULL);
 				sctp_feature_off(inp, SCTP_PCB_FLAGS_NODELAY);
 			}
 		}
@@ -13647,7 +13647,9 @@ skip_out_eof:
 			/* a collision took us forward? */
 			queue_only = 0;
 		} else {
+			NET_EPOCH_ENTER(et);
 			sctp_send_initiate(inp, stcb, SCTP_SO_LOCKED);
+			NET_EPOCH_EXIT(et);
 			SCTP_SET_STATE(stcb, SCTP_STATE_COOKIE_WAIT);
 			queue_only = 1;
 		}

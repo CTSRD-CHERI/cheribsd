@@ -44,7 +44,15 @@
 #include <unistd.h>
 #include "simple_printf.h"
 
+#if __has_feature(capabilities)
 #include <cheri/cheric.h>
+#endif
+
+#ifndef SIMPLE_PRINTF_WRITE_FUNC
+#error "You must define SIMPLE_PRINTF_WRITE_FUNC"
+#endif
+extern ssize_t SIMPLE_PRINTF_WRITE_FUNC(int fd, const void *buf, size_t count);
+
 
 #define MAXNBUF	(sizeof(intmax_t) * NBBY + 1)
 
@@ -76,7 +84,7 @@ printf_out(struct snprintf_arg *info)
 
 	if (info->remain == info->buf_total)
 		return;
-	SIMPLE_PRINTF_FN(write)(info->fd, info->buf, info->buf_total - info->remain);
+	SIMPLE_PRINTF_WRITE_FUNC(info->fd, info->buf, info->buf_total - info->remain);
 	info->str = info->buf;
 	info->remain = info->buf_total;
 }
@@ -587,6 +595,13 @@ SIMPLE_PRINTF_FN(vfdprintf)(int fd, const char *fmt, va_list ap)
 }
 
 int
+SIMPLE_PRINTF_FN(vprintf)(const char *fmt, va_list ap)
+{
+
+	return (SIMPLE_PRINTF_FN(vfdprintf)(STDOUT_FILENO, fmt, ap));
+}
+
+int
 SIMPLE_PRINTF_FN(fdprintf)(int fd, const char *fmt, ...)
 {
 	va_list ap;
@@ -615,7 +630,7 @@ void
 SIMPLE_PRINTF_FN(fdputstr)(int fd, const char *str)
 {
 
-	SIMPLE_PRINTF_FN(write)(fd, str, simple_strlen(str));
+	SIMPLE_PRINTF_WRITE_FUNC(fd, str, simple_strlen(str));
 }
 
 void
@@ -630,7 +645,7 @@ SIMPLE_PRINTF_FN(fdputchar)(int fd, int c)
 {
 	char c1 = c;
 
-	SIMPLE_PRINTF_FN(write)(fd, &c1, 1);
+	SIMPLE_PRINTF_WRITE_FUNC(fd, &c1, 1);
 }
 
 void
@@ -638,4 +653,11 @@ SIMPLE_PRINTF_FN(putchar)(int c)
 {
 
 	SIMPLE_PRINTF_FN(fdputchar(STDOUT_FILENO, c));
+}
+
+ssize_t
+SIMPLE_PRINTF_FN(write)(int fd, const void *buf, size_t count)
+{
+
+	return SIMPLE_PRINTF_WRITE_FUNC(fd, buf, count);
 }

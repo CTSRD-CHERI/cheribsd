@@ -191,10 +191,10 @@ MACHINE_CPU = 3dnow mmx k6 k5 i586
 MACHINE_CPU = mmx k6 k5 i586
 .  elif ${CPUTYPE} == "k5"
 MACHINE_CPU = k5 i586
-.  elif ${CPUTYPE} == "cooperlake" || ${CPUTYPE} == "cascadelake" || \
-    ${CPUTYPE} == "icelake-server" || ${CPUTYPE} == "icelake-client" || \
-    ${CPUTYPE} == "cannonlake" || ${CPUTYPE} == "knm" || \
-    ${CPUTYPE} == "skylake-avx512" || ${CPUTYPE} == "knl"
+.  elif ${CPUTYPE} == "tigerlake" || ${CPUTYPE} == "cooperlake" || \
+    ${CPUTYPE} == "cascadelake" || ${CPUTYPE} == "icelake-server" || \
+    ${CPUTYPE} == "icelake-client" || ${CPUTYPE} == "cannonlake" || \
+    ${CPUTYPE} == "knm" || ${CPUTYPE} == "skylake-avx512" || ${CPUTYPE} == "knl"
 MACHINE_CPU = avx512 avx2 avx sse42 sse41 ssse3 sse3 sse2 sse i686 mmx i586
 .  elif ${CPUTYPE} == "skylake" || ${CPUTYPE} == "broadwell" || \
     ${CPUTYPE} == "haswell"
@@ -257,10 +257,10 @@ MACHINE_CPU = k8 3dnow sse3
 .  elif ${CPUTYPE} == "opteron" || ${CPUTYPE} == "athlon64" || \
     ${CPUTYPE} == "athlon-fx" || ${CPUTYPE} == "k8"
 MACHINE_CPU = k8 3dnow
-.  elif ${CPUTYPE} == "cooperlake" || ${CPUTYPE} == "cascadelake" || \
-    ${CPUTYPE} == "icelake-server" || ${CPUTYPE} == "icelake-client" || \
-    ${CPUTYPE} == "cannonlake" || ${CPUTYPE} == "knm" || \
-    ${CPUTYPE} == "skylake-avx512" || ${CPUTYPE} == "knl"
+.  elif ${CPUTYPE} == "tigerlake" || ${CPUTYPE} == "cooperlake" || \
+    ${CPUTYPE} == "cascadelake" || ${CPUTYPE} == "icelake-server" || \
+    ${CPUTYPE} == "icelake-client" || ${CPUTYPE} == "cannonlake" || \
+    ${CPUTYPE} == "knm" || ${CPUTYPE} == "skylake-avx512" || ${CPUTYPE} == "knl"
 MACHINE_CPU = avx512 avx2 avx sse42 sse41 ssse3 sse3
 .  elif ${CPUTYPE} == "skylake" || ${CPUTYPE} == "broadwell" || \
     ${CPUTYPE} == "haswell"
@@ -467,17 +467,4 @@ CFLAGS_NO_SIMD += ${CFLAGS_NO_SIMD.${COMPILER_TYPE}}
 # These come from make.conf or the command line or the environment.
 CFLAGS += ${CFLAGS.${MACHINE_ARCH}}
 CXXFLAGS += ${CXXFLAGS.${MACHINE_ARCH}}
-
-
-# Defines a variable for Binutils linker, to be used to workaround some
-# issue with LLVM LLD (i.e. support for PowerPC32 bit on PowerPC64)
-#
-# This is an unavoidable cross coupling with Makefile.inc1 and
-# normal builds works when CROSS_BINUTILS_PREFIX and could be removed
-# when LLD PowerPC 32 bit support is completed
-.if defined(CROSS_BINUTILS_PREFIX)
-LD_BFD=${LOCALBASE}/bin/${CROSS_BINUTILS_PREFIX}-ld.bfd
-.else
-LD_BFD=${OBJTOP}/tmp/usr/bin/ld.bfd
-.endif
 

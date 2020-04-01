@@ -112,8 +112,8 @@ CLEANFILES= ioctl.c ioctl.c.tmp tables.h
 CPP+=	-m32
 .endif
 
-.if ${MK_CHERI} != "no" && !defined(NEED_CHERI)
-NEED_CHERI=	hybrid
+.if ${MK_CHERI} != "no"
+NEED_CHERI?=	hybrid
 .endif
 
 .if ${MK_PF} != "no"
@@ -123,6 +123,11 @@ CFLAGS+=-DPF
 # Workaround duplicate declarations in <netinet/ip_compat.h>
 CFLAGS.gcc.ioctl.c+= -Wno-redundant-decls
 
+# Ignore deprecation warning in <sys/pioctl.h>
+CFLAGS.clang.ioctl.c+= -Wno-\#warnings
+CFLAGS.gcc.ioctl.c+= -Wno-cpp
+
+CFLAGS.clang+=	${CFLAGS.clang.${.IMPSRC}}
 CFLAGS.gcc+=	${CFLAGS.gcc.${.IMPSRC}}
 
 .if ${MACHINE_ABI:Mpurecap}

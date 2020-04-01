@@ -368,11 +368,6 @@ struct uma_keg {
 };
 typedef struct uma_keg	* uma_keg_t;
 
-#ifdef _KERNEL
-#define	KEG_ASSERT_COLD(k)						\
-	KASSERT(uma_keg_get_allocs((k)) == 0,				\
-	    ("keg %s initialization after use.", (k)->uk_name))
-
 /*
  * Free bits per-slab.
  */
@@ -391,28 +386,15 @@ struct uma_slab {
 	uint8_t		us_domain;		/* Backing NUMA domain. */
 	struct noslabbits us_free;		/* Free bitmask, flexible. */
 };
-_Static_assert(sizeof(struct uma_slab) == offsetof(struct uma_slab, us_free),
+#ifndef __CHERI_PURE_CAPABILITY__
+/* XXX-CHERI: this seems to fail in CheriABI userspace. */
+_Static_assert(sizeof(struct uma_slab) == __offsetof(struct uma_slab, us_free),
     "us_free field must be last");
-#if MAXMEMDOM >= 255
-#error "Slab domain type insufficient"
 #endif
+_Static_assert(MAXMEMDOM < 255,
+    "us_domain field is not wide enough");
 
 typedef struct uma_slab * uma_slab_t;
-
-/*
- * On INVARIANTS builds, the slab contains a second bitset of the same size,
- * "dbg_bits", which is laid out immediately after us_free.
- */
-#ifdef INVARIANTS
-#define	SLAB_BITSETS	2
-#else
-#define	SLAB_BITSETS	1
-#endif
-
-/* These three functions are for embedded (!OFFPAGE) use only. */
-size_t slab_sizeof(int nitems);
-size_t slab_space(int nitems);
-int slab_ipers(size_t size, int align);
 
 /*
  * Slab structure with a full sized bitset and hash link for both
@@ -460,7 +442,6 @@ slab_item_index(uma_slab_t slab, uma_keg_t keg, void *item)
 	data = (uintptr_t)slab_data(slab, keg);
 	return (((uintptr_t)item - data) / keg->uk_rsize);
 }
-#endif /* _KERNEL */
 
 STAILQ_HEAD(uma_bucketlist, uma_bucket);
 
@@ -578,6 +559,10 @@ static __inline uma_slab_t hash_sfind(struct uma_hash *hash, uint8_t *data);
 	KASSERT((void *)(keg) != NULL,				\
 	    ("%s: Invalid zone %p type", __func__, (zone)));	\
 	} while (0)
+
+#define	KEG_ASSERT_COLD(k)						\
+	KASSERT(uma_keg_get_allocs((k)) == 0,				\
+	    ("keg %s initialization after use.", (k)->uk_name))
 
 /* Domains are contiguous after the last CPU */
 #define	ZDOM_GET(z, n)							\

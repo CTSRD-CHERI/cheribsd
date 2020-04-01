@@ -11,14 +11,13 @@ CFLAGS+=	-I${.OBJDIR}
 .if ${MK_LLVM_TARGET_AARCH64} == "no" && ${MK_LLVM_TARGET_ARM} == "no" && \
     ${MK_LLVM_TARGET_BPF} == "no" && ${MK_LLVM_TARGET_MIPS} == "no" && \
     ${MK_LLVM_TARGET_POWERPC} == "no" && ${MK_LLVM_TARGET_RISCV} == "no" && \
-    ${MK_LLVM_TARGET_SPARC} == "no" && ${MK_LLVM_TARGET_X86} == "no"
+    ${MK_LLVM_TARGET_X86} == "no"
 .error Please enable at least one of: MK_LLVM_TARGET_AARCH64,\
  MK_LLVM_TARGET_ARM, MK_LLVM_TARGET_BPF, MK_LLVM_TARGET_MIPS, \
- MK_LLVM_TARGET_POWERPC, MK_LLVM_TARGET_RISCV, MK_LLVM_TARGET_SPARC, \
- or MK_LLVM_TARGET_X86
+ MK_LLVM_TARGET_POWERPC, MK_LLVM_TARGET_RISCV, or MK_LLVM_TARGET_X86
 .endif
 
-.for arch in AArch64 ARM BPF Mips PowerPC RISCV Sparc X86
+.for arch in AArch64 ARM BPF Mips PowerPC RISCV X86
 . if ${MK_LLVM_TARGET_${arch:tu}} != "no"
 CFLAGS+=	-I${LLVM_SRCS}/lib/Target/${arch}
 . endif
@@ -60,9 +59,11 @@ SRCS_MIN+=	Analysis/CmpInstAnalysis.cpp
 SRCS_MIN+=	Analysis/CodeMetrics.cpp
 SRCS_MIN+=	Analysis/ConstantFolding.cpp
 SRCS_MIN+=	Analysis/CostModel.cpp
+SRCS_MIN+=	Analysis/DDG.cpp
 SRCS_MIN+=	Analysis/Delinearization.cpp
 SRCS_MIN+=	Analysis/DemandedBits.cpp
 SRCS_MIN+=	Analysis/DependenceAnalysis.cpp
+SRCS_MIN+=	Analysis/DependenceGraphBuilder.cpp
 SRCS_MIN+=	Analysis/DivergenceAnalysis.cpp
 SRCS_MIN+=	Analysis/DomPrinter.cpp
 SRCS_MIN+=	Analysis/DomTreeUpdater.cpp
@@ -88,6 +89,7 @@ SRCS_MIN+=	Analysis/Lint.cpp
 SRCS_MIN+=	Analysis/Loads.cpp
 SRCS_MIN+=	Analysis/LoopAccessAnalysis.cpp
 SRCS_MIN+=	Analysis/LoopAnalysisManager.cpp
+SRCS_MIN+=	Analysis/LoopCacheAnalysis.cpp
 SRCS_MIN+=	Analysis/LoopInfo.cpp
 SRCS_MIN+=	Analysis/LoopPass.cpp
 SRCS_MIN+=	Analysis/LoopUnrollAnalyzer.cpp
@@ -127,6 +129,7 @@ SRCS_MIN+=	Analysis/TargetLibraryInfo.cpp
 SRCS_MIN+=	Analysis/TargetTransformInfo.cpp
 SRCS_MIN+=	Analysis/TypeBasedAliasAnalysis.cpp
 SRCS_MIN+=	Analysis/TypeMetadataUtils.cpp
+SRCS_MIN+=	Analysis/VFABIDemangling.cpp
 SRCS_MIN+=	Analysis/ValueLattice.cpp
 SRCS_MIN+=	Analysis/ValueLatticeUtils.cpp
 SRCS_MIN+=	Analysis/ValueTracking.cpp
@@ -137,6 +140,7 @@ SRCS_MIN+=	AsmParser/Parser.cpp
 SRCS_MIN+=	BinaryFormat/Dwarf.cpp
 SRCS_MIN+=	BinaryFormat/Magic.cpp
 SRCS_MIN+=	BinaryFormat/Wasm.cpp
+SRCS_MIN+=	BinaryFormat/XCOFF.cpp
 SRCS_MIN+=	Bitcode/Reader/BitReader.cpp
 SRCS_EXT+=	Bitcode/Reader/BitcodeAnalyzer.cpp
 SRCS_MIN+=	Bitcode/Reader/BitcodeReader.cpp
@@ -180,6 +184,7 @@ SRCS_MIN+=	CodeGen/BranchFolding.cpp
 SRCS_MIN+=	CodeGen/BranchRelaxation.cpp
 SRCS_MIN+=	CodeGen/BreakFalseDeps.cpp
 SRCS_EXT+=	CodeGen/BuiltinGCs.cpp
+SRCS_MIN+=	CodeGen/CFGuardLongjmp.cpp
 SRCS_MIN+=	CodeGen/CFIInstrInserter.cpp
 SRCS_MIN+=	CodeGen/CalcSpillWeights.cpp
 SRCS_MIN+=	CodeGen/CallingConvLower.cpp
@@ -210,6 +215,7 @@ SRCS_MIN+=	CodeGen/GlobalISel/Combiner.cpp
 SRCS_MIN+=	CodeGen/GlobalISel/CombinerHelper.cpp
 SRCS_MIN+=	CodeGen/GlobalISel/CallLowering.cpp
 SRCS_MIN+=	CodeGen/GlobalISel/GISelChangeObserver.cpp
+SRCS_MIN+=	CodeGen/GlobalISel/GISelKnownBits.cpp
 SRCS_MIN+=	CodeGen/GlobalISel/GlobalISel.cpp
 SRCS_MIN+=	CodeGen/GlobalISel/IRTranslator.cpp
 SRCS_MIN+=	CodeGen/GlobalISel/InstructionSelect.cpp
@@ -257,11 +263,13 @@ SRCS_MIN+=	CodeGen/LoopTraversal.cpp
 SRCS_MIN+=	CodeGen/LowLevelType.cpp
 SRCS_MIN+=	CodeGen/LowerEmuTLS.cpp
 SRCS_MIN+=	CodeGen/MIRCanonicalizerPass.cpp
+SRCS_MIN+=	CodeGen/MIRNamerPass.cpp
 SRCS_EXT+=	CodeGen/MIRParser/MILexer.cpp
 SRCS_EXT+=	CodeGen/MIRParser/MIParser.cpp
 SRCS_EXT+=	CodeGen/MIRParser/MIRParser.cpp
 SRCS_MIN+=	CodeGen/MIRPrinter.cpp
 SRCS_MIN+=	CodeGen/MIRPrintingPass.cpp
+SRCS_MIN+=	CodeGen/MIRVRegNamerUtils.cpp
 SRCS_MIN+=	CodeGen/MachineBasicBlock.cpp
 SRCS_MIN+=	CodeGen/MachineBlockFrequencyInfo.cpp
 SRCS_MIN+=	CodeGen/MachineBlockPlacement.cpp
@@ -279,6 +287,7 @@ SRCS_MIN+=	CodeGen/MachineInstr.cpp
 SRCS_MIN+=	CodeGen/MachineInstrBundle.cpp
 SRCS_MIN+=	CodeGen/MachineLICM.cpp
 SRCS_MIN+=	CodeGen/MachineLoopInfo.cpp
+SRCS_MIN+=	CodeGen/MachineLoopUtils.cpp
 SRCS_MIN+=	CodeGen/MachineModuleInfo.cpp
 SRCS_MIN+=	CodeGen/MachineModuleInfoImpls.cpp
 SRCS_MIN+=	CodeGen/MachineOperand.cpp
@@ -291,9 +300,11 @@ SRCS_MIN+=	CodeGen/MachineRegisterInfo.cpp
 SRCS_MIN+=	CodeGen/MachineSSAUpdater.cpp
 SRCS_MIN+=	CodeGen/MachineScheduler.cpp
 SRCS_MIN+=	CodeGen/MachineSink.cpp
+SRCS_MIN+=	CodeGen/MachineSizeOpts.cpp
 SRCS_MIN+=	CodeGen/MachineTraceMetrics.cpp
 SRCS_MIN+=	CodeGen/MachineVerifier.cpp
 SRCS_MIN+=	CodeGen/MacroFusion.cpp
+SRCS_MIN+=	CodeGen/ModuloSchedule.cpp
 SRCS_MIN+=	CodeGen/OptimizePHIs.cpp
 SRCS_MIN+=	CodeGen/PHIElimination.cpp
 SRCS_MIN+=	CodeGen/PHIEliminationUtils.cpp
@@ -379,6 +390,7 @@ SRCS_MIN+=	CodeGen/TargetRegisterInfo.cpp
 SRCS_MIN+=	CodeGen/TargetSchedule.cpp
 SRCS_MIN+=	CodeGen/TargetSubtargetInfo.cpp
 SRCS_MIN+=	CodeGen/TwoAddressInstructionPass.cpp
+SRCS_MIN+=	CodeGen/TypePromotion.cpp
 SRCS_MIN+=	CodeGen/UnreachableBlockElim.cpp
 SRCS_MIN+=	CodeGen/ValueTypes.cpp
 SRCS_MIN+=	CodeGen/VirtRegMap.cpp
@@ -551,6 +563,14 @@ SRCS_XDB+=	ExecutionEngine/GDBRegistrationListener.cpp
 SRCS_XDB+=	ExecutionEngine/Interpreter/Execution.cpp
 SRCS_XDB+=	ExecutionEngine/Interpreter/ExternalFunctions.cpp
 SRCS_XDB+=	ExecutionEngine/Interpreter/Interpreter.cpp
+SRCS_EXT+=	ExecutionEngine/JITLink/EHFrameSupport.cpp
+SRCS_EXT+=	ExecutionEngine/JITLink/JITLink.cpp
+SRCS_EXT+=	ExecutionEngine/JITLink/JITLinkGeneric.cpp
+SRCS_EXT+=	ExecutionEngine/JITLink/JITLinkMemoryManager.cpp
+SRCS_EXT+=	ExecutionEngine/JITLink/MachO.cpp
+SRCS_EXT+=	ExecutionEngine/JITLink/MachOLinkGraphBuilder.cpp
+SRCS_EXT+=	ExecutionEngine/JITLink/MachO_arm64.cpp
+SRCS_EXT+=	ExecutionEngine/JITLink/MachO_x86_64.cpp
 SRCS_XDB+=	ExecutionEngine/MCJIT/MCJIT.cpp
 SRCS_EXT+=	ExecutionEngine/Orc/CompileOnDemandLayer.cpp
 SRCS_EXT+=	ExecutionEngine/Orc/CompileUtils.cpp
@@ -565,13 +585,16 @@ SRCS_EXT+=	ExecutionEngine/Orc/Layer.cpp
 SRCS_EXT+=	ExecutionEngine/Orc/LazyReexports.cpp
 SRCS_EXT+=	ExecutionEngine/Orc/Legacy.cpp
 SRCS_EXT+=	ExecutionEngine/Orc/NullResolver.cpp
+SRCS_EXT+=	ExecutionEngine/Orc/ObjectLinkingLayer.cpp
+SRCS_EXT+=	ExecutionEngine/Orc/ObjectTransformLayer.cpp
 SRCS_EXT+=	ExecutionEngine/Orc/OrcABISupport.cpp
 SRCS_EXT+=	ExecutionEngine/Orc/OrcCBindings.cpp
-SRCS_EXT+=	ExecutionEngine/Orc/OrcError.cpp
 SRCS_EXT+=	ExecutionEngine/Orc/OrcMCJITReplacement.cpp
-SRCS_EXT+=	ExecutionEngine/Orc/RPCUtils.cpp
 SRCS_EXT+=	ExecutionEngine/Orc/RTDyldObjectLinkingLayer.cpp
+SRCS_EXT+=	ExecutionEngine/Orc/Speculation.cpp
 SRCS_EXT+=	ExecutionEngine/Orc/ThreadSafeModule.cpp
+SRCS_EXT+=	ExecutionEngine/OrcError/OrcError.cpp
+SRCS_EXT+=	ExecutionEngine/OrcError/RPCError.cpp
 SRCS_XDB+=	ExecutionEngine/RuntimeDyld/JITSymbol.cpp
 SRCS_XDB+=	ExecutionEngine/RuntimeDyld/RTDyldMemoryManager.cpp
 SRCS_XDB+=	ExecutionEngine/RuntimeDyld/RuntimeDyld.cpp
@@ -582,6 +605,8 @@ SRCS_XDB+=	ExecutionEngine/RuntimeDyld/RuntimeDyldMachO.cpp
 SRCS_XDB+=	ExecutionEngine/RuntimeDyld/Targets/RuntimeDyldELFMips.cpp
 SRCS_XDB+=	ExecutionEngine/SectionMemoryManager.cpp
 SRCS_XDB+=	ExecutionEngine/TargetSelect.cpp
+SRCS_MIN+=	Frontend/OpenMP/OMPConstants.cpp
+SRCS_MIN+=	Frontend/OpenMP/OMPIRBuilder.cpp
 SRCS_MIN+=	IR/AbstractCallSite.cpp
 SRCS_MIN+=	IR/AsmWriter.cpp
 SRCS_MIN+=	IR/Attributes.cpp
@@ -601,6 +626,7 @@ SRCS_MIN+=	IR/DiagnosticHandler.cpp
 SRCS_MIN+=	IR/DiagnosticInfo.cpp
 SRCS_MIN+=	IR/DiagnosticPrinter.cpp
 SRCS_MIN+=	IR/Dominators.cpp
+SRCS_MIN+=	IR/FPEnv.cpp
 SRCS_MIN+=	IR/Function.cpp
 SRCS_MIN+=	IR/GVMaterializer.cpp
 SRCS_MIN+=	IR/Globals.cpp
@@ -660,7 +686,6 @@ SRCS_MIN+=	MC/MCAsmMacro.cpp
 SRCS_MIN+=	MC/MCAsmStreamer.cpp
 SRCS_MIN+=	MC/MCAssembler.cpp
 SRCS_MIN+=	MC/MCCodeEmitter.cpp
-SRCS_MIN+=	MC/MCCodePadder.cpp
 SRCS_MIN+=	MC/MCCodeView.cpp
 SRCS_MIN+=	MC/MCContext.cpp
 SRCS_XDL+=	MC/MCDisassembler/Disassembler.cpp
@@ -720,6 +745,7 @@ SRCS_MIN+=	MC/SubtargetFeature.cpp
 SRCS_MIN+=	MC/WasmObjectWriter.cpp
 SRCS_MIN+=	MC/WinCOFFObjectWriter.cpp
 SRCS_MIN+=	MC/XCOFFObjectWriter.cpp
+SRCS_EXT+=	MCA/CodeEmitter.cpp
 SRCS_EXT+=	MCA/Context.cpp
 SRCS_EXT+=	MCA/HWEventListener.cpp
 SRCS_EXT+=	MCA/HardwareUnits/HardwareUnit.cpp
@@ -761,6 +787,7 @@ SRCS_MIN+=	Object/RecordStreamer.cpp
 SRCS_MIW+=	Object/RelocationResolver.cpp
 SRCS_MIW+=	Object/SymbolSize.cpp
 SRCS_MIN+=	Object/SymbolicFile.cpp
+SRCS_MIW+=	Object/TapiUniversal.cpp
 SRCS_MIN+=	Object/WasmObjectFile.cpp
 SRCS_MIW+=	Object/WindowsMachineFlag.cpp
 SRCS_MIN+=	Object/WindowsResource.cpp
@@ -779,7 +806,7 @@ SRCS_MIN+=	Option/OptTable.cpp
 SRCS_MIN+=	Option/Option.cpp
 SRCS_MIN+=	Passes/PassBuilder.cpp
 SRCS_MIN+=	Passes/PassPlugin.cpp
-SRCS_EXT+=	Passes/StandardInstrumentations.cpp
+SRCS_MIN+=	Passes/StandardInstrumentations.cpp
 SRCS_MIN+=	ProfileData/Coverage/CoverageMapping.cpp
 SRCS_MIN+=	ProfileData/Coverage/CoverageMappingReader.cpp
 SRCS_MIN+=	ProfileData/Coverage/CoverageMappingWriter.cpp
@@ -791,10 +818,13 @@ SRCS_MIN+=	ProfileData/ProfileSummaryBuilder.cpp
 SRCS_MIN+=	ProfileData/SampleProf.cpp
 SRCS_MIN+=	ProfileData/SampleProfReader.cpp
 SRCS_MIN+=	ProfileData/SampleProfWriter.cpp
+SRCS_MIN+=	Remarks/BitstreamRemarkSerializer.cpp
 SRCS_MIN+=	Remarks/RemarkFormat.cpp
+SRCS_MIN+=	Remarks/RemarkSerializer.cpp
 SRCS_MIN+=	Remarks/RemarkStringTable.cpp
 SRCS_MIN+=	Remarks/YAMLRemarkSerializer.cpp
 SRCS_MIN+=	Support/AArch64TargetParser.cpp
+SRCS_MIN+=	Support/ABIBreak.cpp
 SRCS_MIN+=	Support/APFloat.cpp
 SRCS_MIN+=	Support/APInt.cpp
 SRCS_MIN+=	Support/APSInt.cpp
@@ -811,7 +841,7 @@ SRCS_MIN+=	Support/BranchProbability.cpp
 SRCS_MIN+=	Support/BuryPointer.cpp
 SRCS_MIN+=	Support/CachePruning.cpp
 SRCS_MIW+=	Support/COM.cpp
-SRCS_MIW+=	Support/CRC.cpp
+SRCS_MIN+=	Support/CRC.cpp
 SRCS_MIN+=	Support/Chrono.cpp
 SRCS_MIN+=	Support/CodeGenCoverage.cpp
 SRCS_MIN+=	Support/CommandLine.cpp
@@ -829,8 +859,9 @@ SRCS_MIN+=	Support/DynamicLibrary.cpp
 SRCS_MIN+=	Support/Errno.cpp
 SRCS_MIN+=	Support/Error.cpp
 SRCS_MIN+=	Support/ErrorHandling.cpp
+SRCS_XDB+=	Support/FileCollector.cpp
 SRCS_EXL+=	Support/FileOutputBuffer.cpp
-SRCS_EXT+=	Support/FileUtilities.cpp
+SRCS_MIN+=	Support/FileUtilities.cpp
 SRCS_MIN+=	Support/FoldingSet.cpp
 SRCS_MIN+=	Support/FormatVariadic.cpp
 SRCS_MIN+=	Support/FormattedStream.cpp
@@ -843,7 +874,6 @@ SRCS_MIN+=	Support/IntEqClasses.cpp
 SRCS_MIN+=	Support/IntervalMap.cpp
 SRCS_MIN+=	Support/ItaniumManglingCanonicalizer.cpp
 SRCS_MIN+=	Support/JSON.cpp
-SRCS_MIN+=	Support/JamCRC.cpp
 SRCS_MIN+=	Support/KnownBits.cpp
 SRCS_MIN+=	Support/LEB128.cpp
 SRCS_MIN+=	Support/LineIterator.cpp
@@ -855,7 +885,6 @@ SRCS_MIN+=	Support/ManagedStatic.cpp
 SRCS_MIN+=	Support/MathExtras.cpp
 SRCS_XDL+=	Support/Memory.cpp
 SRCS_MIN+=	Support/MemoryBuffer.cpp
-SRCS_MIN+=	Support/Mutex.cpp
 SRCS_MIN+=	Support/NativeFormatting.cpp
 SRCS_MIN+=	Support/Optional.cpp
 SRCS_LLD+=	Support/Parallel.cpp
@@ -961,6 +990,7 @@ SRCS_MIN+=	Target/AArch64/AArch64SIMDInstrOpt.cpp
 SRCS_MIN+=	Target/AArch64/AArch64SelectionDAGInfo.cpp
 SRCS_MIN+=	Target/AArch64/AArch64SpeculationHardening.cpp
 SRCS_MIN+=	Target/AArch64/AArch64StackTagging.cpp
+SRCS_MIN+=	Target/AArch64/AArch64StackTaggingPreRA.cpp
 SRCS_MIN+=	Target/AArch64/AArch64StorePairSuppress.cpp
 SRCS_MIN+=	Target/AArch64/AArch64Subtarget.cpp
 SRCS_MIN+=	Target/AArch64/AArch64TargetMachine.cpp
@@ -992,7 +1022,6 @@ SRCS_MIN+=	Target/ARM/ARMBaseRegisterInfo.cpp
 SRCS_MIN+=	Target/ARM/ARMBasicBlockInfo.cpp
 SRCS_MIN+=	Target/ARM/ARMCallLowering.cpp
 SRCS_MIN+=	Target/ARM/ARMCallingConv.cpp
-SRCS_MIN+=	Target/ARM/ARMCodeGenPrepare.cpp
 SRCS_MIN+=	Target/ARM/ARMConstantIslandPass.cpp
 SRCS_MIN+=	Target/ARM/ARMConstantPoolValue.cpp
 SRCS_MIN+=	Target/ARM/ARMExpandPseudoInsts.cpp
@@ -1035,6 +1064,9 @@ SRCS_MIN+=	Target/ARM/MCTargetDesc/ARMUnwindOpAsm.cpp
 SRCS_MIN+=	Target/ARM/MCTargetDesc/ARMWinCOFFObjectWriter.cpp
 SRCS_MIN+=	Target/ARM/MCTargetDesc/ARMWinCOFFStreamer.cpp
 SRCS_MIN+=	Target/ARM/MLxExpansionPass.cpp
+SRCS_MIN+=	Target/ARM/MVEGatherScatterLowering.cpp
+SRCS_MIN+=	Target/ARM/MVETailPredication.cpp
+SRCS_MIN+=	Target/ARM/MVEVPTBlockPass.cpp
 SRCS_MIN+=	Target/ARM/TargetInfo/ARMTargetInfo.cpp
 SRCS_MIN+=	Target/ARM/Thumb1FrameLowering.cpp
 SRCS_MIN+=	Target/ARM/Thumb1InstrInfo.cpp
@@ -1154,7 +1186,8 @@ SRCS_MIN+=	Target/PowerPC/PPCHazardRecognizers.cpp
 SRCS_MIN+=	Target/PowerPC/PPCISelDAGToDAG.cpp
 SRCS_MIN+=	Target/PowerPC/PPCISelLowering.cpp
 SRCS_MIN+=	Target/PowerPC/PPCInstrInfo.cpp
-SRCS_MIN+=	Target/PowerPC/PPCLoopPreIncPrep.cpp
+SRCS_MIN+=	Target/PowerPC/PPCLoopInstrFormPrep.cpp
+SRCS_MIN+=	Target/PowerPC/PPCLowerMASSVEntries.cpp
 SRCS_MIN+=	Target/PowerPC/PPCMCInstLower.cpp
 SRCS_MIN+=	Target/PowerPC/PPCMIPeephole.cpp
 SRCS_MIN+=	Target/PowerPC/PPCMachineFunctionInfo.cpp
@@ -1187,13 +1220,17 @@ SRCS_MIN+=	Target/RISCV/MCTargetDesc/RISCVMCExpr.cpp
 SRCS_MIN+=	Target/RISCV/MCTargetDesc/RISCVMCTargetDesc.cpp
 SRCS_MIN+=	Target/RISCV/MCTargetDesc/RISCVTargetStreamer.cpp
 SRCS_MIN+=	Target/RISCV/RISCVAsmPrinter.cpp
+SRCS_MIN+=	Target/RISCV/RISCVCallLowering.cpp
 SRCS_MIN+=	Target/RISCV/RISCVExpandPseudoInsts.cpp
 SRCS_MIN+=	Target/RISCV/RISCVFrameLowering.cpp
 SRCS_MIN+=	Target/RISCV/RISCVInstrInfo.cpp
+SRCS_MIN+=	Target/RISCV/RISCVInstructionSelector.cpp
 SRCS_MIN+=	Target/RISCV/RISCVISelDAGToDAG.cpp
 SRCS_MIN+=	Target/RISCV/RISCVISelLowering.cpp
+SRCS_MIN+=	Target/RISCV/RISCVLegalizerInfo.cpp
 SRCS_MIN+=	Target/RISCV/RISCVMCInstLower.cpp
 SRCS_MIN+=	Target/RISCV/RISCVMergeBaseOffset.cpp
+SRCS_MIN+=	Target/RISCV/RISCVRegisterBankInfo.cpp
 SRCS_MIN+=	Target/RISCV/RISCVRegisterInfo.cpp
 SRCS_MIN+=	Target/RISCV/RISCVSubtarget.cpp
 SRCS_MIN+=	Target/RISCV/RISCVTargetMachine.cpp
@@ -1203,32 +1240,6 @@ SRCS_MIN+=	Target/RISCV/TargetInfo/RISCVTargetInfo.cpp
 SRCS_MIN+=	Target/RISCV/Utils/RISCVBaseInfo.cpp
 SRCS_MIN+=	Target/RISCV/Utils/RISCVMatInt.cpp
 .endif # MK_LLVM_TARGET_RISCV
-.if ${MK_LLVM_TARGET_SPARC} != "no"
-SRCS_MIN+=	Target/Sparc/AsmParser/SparcAsmParser.cpp
-SRCS_MIN+=	Target/Sparc/DelaySlotFiller.cpp
-SRCS_XDW+=	Target/Sparc/Disassembler/SparcDisassembler.cpp
-SRCS_MIN+=	Target/Sparc/LeonPasses.cpp
-SRCS_MIN+=	Target/Sparc/MCTargetDesc/SparcAsmBackend.cpp
-SRCS_MIN+=	Target/Sparc/MCTargetDesc/SparcELFObjectWriter.cpp
-SRCS_MIN+=	Target/Sparc/MCTargetDesc/SparcInstPrinter.cpp
-SRCS_MIN+=	Target/Sparc/MCTargetDesc/SparcMCAsmInfo.cpp
-SRCS_MIN+=	Target/Sparc/MCTargetDesc/SparcMCCodeEmitter.cpp
-SRCS_MIN+=	Target/Sparc/MCTargetDesc/SparcMCExpr.cpp
-SRCS_MIN+=	Target/Sparc/MCTargetDesc/SparcMCTargetDesc.cpp
-SRCS_MIN+=	Target/Sparc/MCTargetDesc/SparcTargetStreamer.cpp
-SRCS_MIN+=	Target/Sparc/SparcAsmPrinter.cpp
-SRCS_MIN+=	Target/Sparc/SparcFrameLowering.cpp
-SRCS_MIN+=	Target/Sparc/SparcISelDAGToDAG.cpp
-SRCS_MIN+=	Target/Sparc/SparcISelLowering.cpp
-SRCS_MIN+=	Target/Sparc/SparcInstrInfo.cpp
-SRCS_MIN+=	Target/Sparc/SparcMCInstLower.cpp
-SRCS_MIN+=	Target/Sparc/SparcMachineFunctionInfo.cpp
-SRCS_MIN+=	Target/Sparc/SparcRegisterInfo.cpp
-SRCS_MIN+=	Target/Sparc/SparcSubtarget.cpp
-SRCS_MIN+=	Target/Sparc/SparcTargetMachine.cpp
-SRCS_MIN+=	Target/Sparc/SparcTargetObjectFile.cpp
-SRCS_MIN+=	Target/Sparc/TargetInfo/SparcTargetInfo.cpp
-.endif # MK_LLVM_TARGET_SPARC
 SRCS_MIN+=	Target/Target.cpp
 SRCS_MIN+=	Target/TargetLoweringObjectFile.cpp
 SRCS_MIN+=	Target/TargetMachine.cpp
@@ -1236,7 +1247,6 @@ SRCS_MIN+=	Target/TargetMachineC.cpp
 .if ${MK_LLVM_TARGET_X86} != "no"
 SRCS_MIN+=	Target/X86/AsmParser/X86AsmParser.cpp
 SRCS_XDW+=	Target/X86/Disassembler/X86Disassembler.cpp
-SRCS_XDW+=	Target/X86/Disassembler/X86DisassemblerDecoder.cpp
 SRCS_MIN+=	Target/X86/MCTargetDesc/X86ATTInstPrinter.cpp
 SRCS_MIN+=	Target/X86/MCTargetDesc/X86AsmBackend.cpp
 SRCS_MIN+=	Target/X86/MCTargetDesc/X86ELFObjectWriter.cpp
@@ -1254,6 +1264,7 @@ SRCS_MIN+=	Target/X86/TargetInfo/X86TargetInfo.cpp
 SRCS_MIN+=	Target/X86/Utils/X86ShuffleDecode.cpp
 SRCS_MIN+=	Target/X86/X86AsmPrinter.cpp
 SRCS_MIN+=	Target/X86/X86AvoidStoreForwardingBlocks.cpp
+SRCS_MIN+=	Target/X86/X86AvoidTrailingCall.cpp
 SRCS_MIN+=	Target/X86/X86CallFrameOptimization.cpp
 SRCS_MIN+=	Target/X86/X86CallLowering.cpp
 SRCS_MIN+=	Target/X86/X86CallingConv.cpp
@@ -1299,10 +1310,19 @@ SRCS_MIN+=	Target/X86/X86VZeroUpper.cpp
 SRCS_MIN+=	Target/X86/X86WinAllocaExpander.cpp
 SRCS_MIN+=	Target/X86/X86WinEHState.cpp
 .endif # MK_LLVM_TARGET_X86
+SRCS_MIW+=	TextAPI/MachO/Architecture.cpp
+SRCS_MIW+=	TextAPI/MachO/ArchitectureSet.cpp
+SRCS_MIW+=	TextAPI/MachO/InterfaceFile.cpp
+SRCS_MIW+=	TextAPI/MachO/PackedVersion.cpp
+SRCS_MIW+=	TextAPI/MachO/Platform.cpp
+SRCS_MIW+=	TextAPI/MachO/Target.cpp
+SRCS_MIW+=	TextAPI/MachO/TextStub.cpp
+SRCS_MIW+=	TextAPI/MachO/TextStubCommon.cpp
 SRCS_MIN+=	ToolDrivers/llvm-dlltool/DlltoolDriver.cpp
 SRCS_MIW+=	ToolDrivers/llvm-lib/LibDriver.cpp
 SRCS_MIN+=	Transforms/AggressiveInstCombine/AggressiveInstCombine.cpp
 SRCS_MIN+=	Transforms/AggressiveInstCombine/TruncInstCombine.cpp
+SRCS_MIN+=	Transforms/CFGuard/CFGuard.cpp
 SRCS_MIN+=	Transforms/Coroutines/CoroCleanup.cpp
 SRCS_MIN+=	Transforms/Coroutines/CoroEarly.cpp
 SRCS_MIN+=	Transforms/Coroutines/CoroElide.cpp
@@ -1377,6 +1397,7 @@ SRCS_MIN+=	Transforms/Instrumentation/PGOMemOPSizeOpt.cpp
 SRCS_MIN+=	Transforms/Instrumentation/PoisonChecking.cpp
 SRCS_MIN+=	Transforms/Instrumentation/SanitizerCoverage.cpp
 SRCS_MIN+=	Transforms/Instrumentation/ThreadSanitizer.cpp
+SRCS_MIN+=	Transforms/Instrumentation/ValueProfileCollector.cpp
 SRCS_MIN+=	Transforms/ObjCARC/DependencyAnalysis.cpp
 SRCS_EXT+=	Transforms/ObjCARC/ObjCARC.cpp
 SRCS_MIN+=	Transforms/ObjCARC/ObjCARCAPElim.cpp
@@ -1431,8 +1452,10 @@ SRCS_MIN+=	Transforms/Scalar/LoopUnrollAndJamPass.cpp
 SRCS_MIN+=	Transforms/Scalar/LoopUnswitch.cpp
 SRCS_MIN+=	Transforms/Scalar/LoopVersioningLICM.cpp
 SRCS_MIN+=	Transforms/Scalar/LowerAtomic.cpp
+SRCS_MIN+=	Transforms/Scalar/LowerConstantIntrinsics.cpp
 SRCS_MIN+=	Transforms/Scalar/LowerExpectIntrinsic.cpp
 SRCS_MIN+=	Transforms/Scalar/LowerGuardIntrinsic.cpp
+SRCS_MIN+=	Transforms/Scalar/LowerMatrixIntrinsics.cpp
 SRCS_MIN+=	Transforms/Scalar/LowerWidenableCondition.cpp
 SRCS_MIN+=	Transforms/Scalar/MakeGuardsExplicit.cpp
 SRCS_MIN+=	Transforms/Scalar/MemCpyOptimizer.cpp
@@ -1470,7 +1493,9 @@ SRCS_MIN+=	Transforms/Utils/CanonicalizeAliases.cpp
 SRCS_MIN+=	Transforms/Utils/CloneFunction.cpp
 SRCS_MIN+=	Transforms/Utils/CloneModule.cpp
 SRCS_MIN+=	Transforms/Utils/CodeExtractor.cpp
+SRCS_MIN+=	Transforms/Utils/CodeMoverUtils.cpp
 SRCS_MIN+=	Transforms/Utils/CtorUtils.cpp
+SRCS_EXT+=	Transforms/Utils/Debugify.cpp
 SRCS_MIN+=	Transforms/Utils/DemoteRegToStack.cpp
 SRCS_MIN+=	Transforms/Utils/EntryExitInstrumenter.cpp
 SRCS_MIN+=	Transforms/Utils/EscapeEnumerator.cpp
@@ -1481,6 +1506,7 @@ SRCS_MIN+=	Transforms/Utils/FunctionImportUtils.cpp
 SRCS_MIN+=	Transforms/Utils/GlobalStatus.cpp
 SRCS_MIN+=	Transforms/Utils/GuardUtils.cpp
 SRCS_MIN+=	Transforms/Utils/ImportedFunctionsInliningStatistics.cpp
+SRCS_MIN+=	Transforms/Utils/InjectTLIMappings.cpp
 SRCS_MIN+=	Transforms/Utils/InlineFunction.cpp
 SRCS_MIN+=	Transforms/Utils/InstructionNamer.cpp
 SRCS_MIN+=	Transforms/Utils/IntegerDivision.cpp
@@ -1499,6 +1525,7 @@ SRCS_MIN+=	Transforms/Utils/LowerInvoke.cpp
 SRCS_MIN+=	Transforms/Utils/LowerSwitch.cpp
 SRCS_MIN+=	Transforms/Utils/Mem2Reg.cpp
 SRCS_MIN+=	Transforms/Utils/MetaRenamer.cpp
+SRCS_MIN+=	Transforms/Utils/MisExpect.cpp
 SRCS_MIN+=	Transforms/Utils/ModuleUtils.cpp
 SRCS_MIN+=	Transforms/Utils/NameAnonGlobals.cpp
 SRCS_MIN+=	Transforms/Utils/PredicateInfo.cpp
@@ -1523,8 +1550,8 @@ SRCS_MIN+=	Transforms/Vectorize/LoopVectorize.cpp
 SRCS_MIN+=	Transforms/Vectorize/SLPVectorizer.cpp
 SRCS_MIN+=	Transforms/Vectorize/VPlan.cpp
 SRCS_MIN+=	Transforms/Vectorize/VPlanHCFGBuilder.cpp
-SRCS_MIN+=	Transforms/Vectorize/VPlanHCFGTransforms.cpp
 SRCS_MIN+=	Transforms/Vectorize/VPlanPredicator.cpp
+SRCS_MIN+=	Transforms/Vectorize/VPlanTransforms.cpp
 SRCS_MIN+=	Transforms/Vectorize/VPlanVerifier.cpp
 SRCS_EXT+=	Transforms/Vectorize/Vectorize.cpp
 SRCS_EXT+=	XRay/BlockIndexer.cpp
@@ -1586,6 +1613,17 @@ llvm/IR/IntrinsicImpl.inc: ${LLVM_SRCS}/include/llvm/IR/Intrinsics.td
 	    ${LLVM_SRCS}/include/llvm/IR/Intrinsics.td
 TGHDRS+=	llvm/IR/IntrinsicImpl.inc
 
+.for arch in \
+	AArch64/aarch64 AMDGPU/amdgcn ARM/arm BPF/bpf Hexagon/hexagon \
+	Mips/mips NVPTX/nvvm PowerPC/ppc R600/r600 RISCV/riscv S390/s390 \
+	WebAssembly/wasm X86/x86 XCore/xcore
+llvm/IR/Intrinsics${arch:H}.h: ${LLVM_SRCS}/include/llvm/IR/Intrinsics.td
+	${LLVM_TBLGEN} -gen-intrinsic-enums -intrinsic-prefix=${arch:T} \
+	    -I ${LLVM_SRCS}/include -d ${.TARGET}.d -o ${.TARGET} \
+	    ${LLVM_SRCS}/include/llvm/IR/Intrinsics.td
+TGHDRS+=	llvm/IR/Intrinsics${arch:H}.h
+.endfor
+
 AttributesCompatFunc.inc: ${LLVM_SRCS}/lib/IR/AttributesCompatFunc.td
 	${LLVM_TBLGEN} -gen-attrs \
 	    -I ${LLVM_SRCS}/include -d ${.TARGET}.d -o ${.TARGET} \
@@ -1624,8 +1662,8 @@ beforebuild:
 
 # Note: some rules are superfluous, not every combination is valid.
 .for arch in \
-	AArch64/AArch64 ARM/ARM BPF/BPF Mips/Mips PowerPC/PPC Sparc/Sparc \
-	RISCV/RISCV X86/X86
+	AArch64/AArch64 ARM/ARM BPF/BPF Mips/Mips PowerPC/PPC RISCV/RISCV \
+	X86/X86
 . for hdr in \
 	AsmMatcher/-gen-asm-matcher \
 	AsmWriter1/-gen-asm-writer,-asmwriternum=1 \
@@ -1637,6 +1675,7 @@ beforebuild:
 	DisassemblerTables/-gen-disassembler \
 	EVEX2VEXTables/-gen-x86-EVEX2VEX-tables \
 	FastISel/-gen-fast-isel \
+	GICombiner/-gen-global-isel-combiner,-combiners=${arch:H}PreLegalizerCombinerHelper \
 	GlobalISel/-gen-global-isel \
 	InstrInfo/-gen-instr-info \
 	MCCodeEmitter/-gen-emitter \
@@ -1661,6 +1700,7 @@ TGHDRS+=	AArch64GenCallingConv.inc
 TGHDRS+=	AArch64GenDAGISel.inc
 TGHDRS+=	AArch64GenDisassemblerTables.inc
 TGHDRS+=	AArch64GenFastISel.inc
+TGHDRS+=	AArch64GenGICombiner.inc
 TGHDRS+=	AArch64GenGlobalISel.inc
 TGHDRS+=	AArch64GenInstrInfo.inc
 TGHDRS+=	AArch64GenMCCodeEmitter.inc
@@ -1732,24 +1772,15 @@ TGHDRS+=	RISCVGenCompressInstEmitter.inc
 TGHDRS+=	RISCVGenDAGISel.inc
 TGHDRS+=	RISCVGenDisassemblerTables.inc
 TGHDRS+=	RISCVGenDAGISel.inc
+TGHDRS+=	RISCVGenGlobalISel.inc
 TGHDRS+=	RISCVGenInstrInfo.inc
 TGHDRS+=	RISCVGenMCCodeEmitter.inc
 TGHDRS+=	RISCVGenMCPseudoLowering.inc
+TGHDRS+=	RISCVGenRegisterBank.inc
 TGHDRS+=	RISCVGenRegisterInfo.inc
 TGHDRS+=	RISCVGenSubtargetInfo.inc
 TGHDRS+=	RISCVGenSystemOperands.inc
 .endif # MK_LLVM_TARGET_RISCV
-.if ${MK_LLVM_TARGET_SPARC} != "no"
-TGHDRS+=	SparcGenAsmMatcher.inc
-TGHDRS+=	SparcGenAsmWriter.inc
-TGHDRS+=	SparcGenCallingConv.inc
-TGHDRS+=	SparcGenDAGISel.inc
-TGHDRS+=	SparcGenDisassemblerTables.inc
-TGHDRS+=	SparcGenInstrInfo.inc
-TGHDRS+=	SparcGenMCCodeEmitter.inc
-TGHDRS+=	SparcGenRegisterInfo.inc
-TGHDRS+=	SparcGenSubtargetInfo.inc
-.endif # MK_LLVM_TARGET_SPARC
 .if ${MK_LLVM_TARGET_X86} != "no"
 TGHDRS+=	X86GenAsmMatcher.inc
 TGHDRS+=	X86GenAsmWriter.inc

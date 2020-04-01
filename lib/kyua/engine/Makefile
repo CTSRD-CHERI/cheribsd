@@ -1,6 +1,7 @@
 # $FreeBSD$
 
-KYUALIB=	engine
+KYUA_LIB=	engine
+LIBADD=		lutok kyua_utils
 CFLAGS=		-DKYUA_ARCHITECTURE=\"${MACHINE_ARCH}\"	\
 		-DKYUA_PLATFORM=\"${MACHINE}\"
 

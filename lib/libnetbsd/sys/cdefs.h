@@ -73,11 +73,9 @@
  * from gcc -Wcast-qual; it should be used with caution because it
  * can hide valid errors; in particular most valid uses are in
  * situations where the API requires it, not to cast away string
- * constants. We don't use *intptr_t on purpose here and we are
- * explicit about unsigned long so that we don't have additional
- * dependencies.
+ * constants.
  */
-#define __UNCONST(a)	((void *)(uintptr_t)(const void *)(a))
+#define __UNCONST(a)	((void *)(__uintptr_t)(const void *)(a))
 
 /*
  * Return the number of elements in a statically-allocated array,

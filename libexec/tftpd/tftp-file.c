@@ -229,7 +229,7 @@ seek_file(off_t offset)
 }
 
 int
-read_init(int fd, FILE *f, const char *mode)
+tftp_read_init(int fd, FILE *f, const char *mode)
 {
 
 	convert_to_net(NULL, 0, 1);
@@ -248,7 +248,7 @@ read_init(int fd, FILE *f, const char *mode)
 }
 
 size_t
-read_file(char *buffer, int count)
+tftp_read_file(char *buffer, int count)
 {
 
 	if (convert == 0)
@@ -258,7 +258,7 @@ read_file(char *buffer, int count)
 }
 
 int
-read_close(void)
+tftp_read_close(void)
 {
 
 	if (fclose(file) != 0) {

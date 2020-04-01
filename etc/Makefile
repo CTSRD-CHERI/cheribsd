@@ -93,7 +93,7 @@ distribution:
 .if ${MK_BOOT} != "no"
 .if exists(${SRCTOP}/sys/${MACHINE}/conf/GENERIC.hints)
 	${INSTALL} -o ${BINOWN} -g ${BINGRP} -m 444 \
-	    -T "package=runtime" \
+	    -T "package=bootloader,config" \
 	    ${SRCTOP}/sys/${MACHINE}/conf/GENERIC.hints \
 	    ${DESTDIR}/boot/device.hints
 .endif
@@ -106,7 +106,7 @@ MTREES=		mtree/BSD.root.dist		/		\
 		mtree/BSD.usr.dist		/usr		\
 		mtree/BSD.include.dist		/usr/include	\
 		mtree/BSD.debug.dist		/usr/lib
-.if ${MK_CHERI} != "no" || ${MK_COMPAT_CHERIABI} != "no"
+.if ${MK_COMPAT_CHERIABI} != "no"
 MTREES+=	mtree/BSD.libcheri.dist		/usr
 MTREES+=	mtree/BSD.libcheri.dist		/usr/lib/debug/usr
 .endif
@@ -125,7 +125,7 @@ MTREES+=	mtree/BSD.libsoft.dist		/usr/lib/debug/usr
 .if ${MK_TESTS} != "no"
 MTREES+=	mtree/BSD.tests.dist		${TESTSBASE}
 MTREES+=	mtree/BSD.tests.dist		/usr/lib/debug/${TESTSBASE}
-.if ${MK_CHERI} != "no" || ${MK_COMPAT_CHERIABI} != "no"
+.if ${MK_COMPAT_CHERIABI} != "no"
 MTREES+=	mtree/BSD.tests.dist		${TESTSBASE}/cheri
 MTREES+=	mtree/BSD.tests.dist		/usr/lib/debug/${TESTSBASE}/cheri
 .endif

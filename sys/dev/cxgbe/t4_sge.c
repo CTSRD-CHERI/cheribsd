@@ -3655,6 +3655,7 @@ alloc_nm_rxq(struct vi_info *vi, struct sge_nm_rxq *nm_rxq, int intr_idx,
 	nm_rxq->iq_gen = F_RSPD_GEN;
 	nm_rxq->fl_pidx = nm_rxq->fl_cidx = 0;
 	nm_rxq->fl_sidx = na->num_rx_desc;
+	nm_rxq->fl_sidx2 = nm_rxq->fl_sidx;	/* copy for rxsync cacheline */
 	nm_rxq->intr_idx = intr_idx;
 	nm_rxq->iq_cntxt_id = INVALID_NM_RXQ_CNTXT_ID;
 
@@ -4382,10 +4383,12 @@ refill_fl(struct adapter *sc, struct sge_fl *fl, int n)
 		MPASS(sd->cl == NULL);
 		rxb = &sc->sge.rx_buf_info[fl->zidx];
 		cl = uma_zalloc(rxb->zone, M_NOWAIT);
-		if (__predict_false(cl == NULL) && fl->zidx != fl->safe_zidx) {
-			rxb = &sc->sge.rx_buf_info[fl->safe_zidx];
-			cl = uma_zalloc(rxb->zone, M_NOWAIT);
-			if (__predict_false(cl == NULL))
+		if (__predict_false(cl == NULL)) {
+			if (fl->zidx != fl->safe_zidx) {
+				rxb = &sc->sge.rx_buf_info[fl->safe_zidx];
+				cl = uma_zalloc(rxb->zone, M_NOWAIT);
+			}
+			if (cl == NULL)
 				break;
 		}
 		fl->cl_allocated++;

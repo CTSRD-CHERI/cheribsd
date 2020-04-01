@@ -48,8 +48,8 @@ file(WRITE ${CMAKE_BINARY_DIR}/kern_opt/opt_ktrace.h "#define KTRACE 1\n")
 file(WRITE ${CMAKE_BINARY_DIR}/kern_opt/opt_global.h "#define KDB 1
 // #define COMPAT_FREEBSD11 1
 #define COMPAT_CHERIABI 1
-#define COMPAT_FREEBSD32
-#define COMPAT_FREEBSD64
+#define COMPAT_FREEBSD32 1
+#define COMPAT_FREEBSD64 1
 #define CPU_CHERI 1
 // #define INVARIANT_SUPPORT 1
 #define CPU_MALTA 1

@@ -71,6 +71,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/sbuf.h>
 #include <sys/signalvar.h>
 #include <sys/kdb.h>
+#include <sys/smr.h>
 #include <sys/stat.h>
 #include <sys/sx.h>
 #include <sys/syscallsubr.h>
@@ -103,6 +104,8 @@ MALLOC_DECLARE(M_FADVISE);
 
 static __read_mostly uma_zone_t file_zone;
 static __read_mostly uma_zone_t filedesc0_zone;
+static __read_mostly uma_zone_t pwd_zone;
+static __read_mostly smr_t pwd_smr;
 
 static int	closefp(struct filedesc *fdp, int fd, struct file *fp,
 		    struct thread *td, int holdleaders);
@@ -967,7 +970,6 @@ kern_dup(struct thread *td, u_int mode, int flags, int old, int new)
 	newfde = &fdp->fd_ofiles[new];
 	delfp = newfde->fde_file;
 
-	oioctls = filecaps_free_prep(&newfde->fde_caps);
 	nioctls = filecaps_copy_prep(&oldfde->fde_caps);
 
 	/*
@@ -976,6 +978,7 @@ kern_dup(struct thread *td, u_int mode, int flags, int old, int new)
 #ifdef CAPABILITIES
 	seqc_write_begin(&newfde->fde_seqc);
 #endif
+	oioctls = filecaps_free_prep(&newfde->fde_caps);
 	memcpy(newfde, oldfde, fde_change_size);
 	filecaps_copy_finish(&oldfde->fde_caps, &newfde->fde_caps,
 	    nioctls);
@@ -1994,6 +1997,7 @@ fdinit(struct filedesc *fdp, bool prepfiles)
 {
 	struct filedesc0 *newfdp0;
 	struct filedesc *newfdp;
+	struct pwd *newpwd;
 
 	newfdp0 = uma_zalloc(filedesc0_zone, M_WAITOK | M_ZERO);
 	newfdp = &newfdp0->fd_fd;
@@ -2009,7 +2013,8 @@ fdinit(struct filedesc *fdp, bool prepfiles)
 	newfdp->fd_files->fdt_nfiles = NDFILE;
 
 	if (fdp == NULL) {
-		newfdp->fd_pwd = pwd_alloc();
+		newpwd = pwd_alloc();
+		smr_serialized_store(&newfdp->fd_pwd, newpwd, true);
 		return (newfdp);
 	}
 
@@ -2017,7 +2022,8 @@ fdinit(struct filedesc *fdp, bool prepfiles)
 		fdgrowtable(newfdp, fdp->fd_lastfile + 1);
 
 	FILEDESC_SLOCK(fdp);
-	newfdp->fd_pwd = pwd_hold_filedesc(fdp);
+	newpwd = pwd_hold_filedesc(fdp);
+	smr_serialized_store(&newfdp->fd_pwd, newpwd, true);
 
 	if (!prepfiles) {
 		FILEDESC_SUNLOCK(fdp);
@@ -2337,7 +2343,7 @@ fdescfree(struct thread *td)
 		return;
 
 	FILEDESC_XLOCK(fdp);
-	pwd = fdp->fd_pwd;
+	pwd = FILEDESC_XLOCKED_LOAD_PWD(fdp);
 	pwd_set(fdp, NULL);
 	FILEDESC_XUNLOCK(fdp);
 
@@ -2350,7 +2356,7 @@ void
 fdescfree_remapped(struct filedesc *fdp)
 {
 
-	pwd_drop(fdp->fd_pwd);
+	pwd_drop(smr_serialized_load(&fdp->fd_pwd, true));
 	fdescfree_fds(curthread, fdp, 0);
 }
 
@@ -3286,7 +3292,7 @@ pwd_hold_filedesc(struct filedesc *fdp)
 	struct pwd *pwd;
 
 	FILEDESC_LOCK_ASSERT(fdp);
-	pwd = fdp->fd_pwd;
+	pwd = FILEDESC_LOCKED_LOAD_PWD(fdp);
 	if (pwd != NULL)
 		refcount_acquire(&pwd->pwd_refcount);
 	return (pwd);
@@ -3300,11 +3306,14 @@ pwd_hold(struct thread *td)
 
 	fdp = td->td_proc->p_fd;
 
-	FILEDESC_SLOCK(fdp);
-	pwd = fdp->fd_pwd;
-	MPASS(pwd != NULL);
-	refcount_acquire(&pwd->pwd_refcount);
-	FILEDESC_SUNLOCK(fdp);
+	smr_enter(pwd_smr);
+	for (;;) {
+		pwd = smr_entered_load(&fdp->fd_pwd, pwd_smr);
+		MPASS(pwd != NULL);
+		if (refcount_acquire_if_not_zero(&pwd->pwd_refcount))
+			break;
+	}
+	smr_exit(pwd_smr);
 	return (pwd);
 }
 
@@ -3313,7 +3322,8 @@ pwd_alloc(void)
 {
 	struct pwd *pwd;
 
-	pwd = malloc(sizeof(*pwd), M_PWD, M_WAITOK | M_ZERO);
+	pwd = uma_zalloc_smr(pwd_zone, M_WAITOK);
+	bzero(pwd, sizeof(*pwd));
 	refcount_init(&pwd->pwd_refcount, 1);
 	return (pwd);
 }
@@ -3331,7 +3341,7 @@ pwd_drop(struct pwd *pwd)
 		vrele(pwd->pwd_rdir);
 	if (pwd->pwd_jdir != NULL)
 		vrele(pwd->pwd_jdir);
-	free(pwd, M_PWD);
+	uma_zfree_smr(pwd_zone, pwd);
 }
 
 /*
@@ -3349,7 +3359,7 @@ pwd_chroot(struct thread *td, struct vnode *vp)
 	fdp = td->td_proc->p_fd;
 	newpwd = pwd_alloc();
 	FILEDESC_XLOCK(fdp);
-	oldpwd = fdp->fd_pwd;
+	oldpwd = FILEDESC_XLOCKED_LOAD_PWD(fdp);
 	if (chroot_allow_open_directories == 0 ||
 	    (chroot_allow_open_directories == 1 &&
 	    oldpwd->pwd_rdir != rootvnode)) {
@@ -3385,7 +3395,7 @@ pwd_chdir(struct thread *td, struct vnode *vp)
 	newpwd = pwd_alloc();
 	fdp = td->td_proc->p_fd;
 	FILEDESC_XLOCK(fdp);
-	oldpwd = fdp->fd_pwd;
+	oldpwd = FILEDESC_XLOCKED_LOAD_PWD(fdp);
 	newpwd->pwd_cdir = vp;
 	pwd_fill(oldpwd, newpwd);
 	pwd_set(fdp, newpwd);
@@ -3401,7 +3411,7 @@ pwd_ensure_dirs(void)
 
 	fdp = curproc->p_fd;
 	FILEDESC_XLOCK(fdp);
-	oldpwd = fdp->fd_pwd;
+	oldpwd = FILEDESC_XLOCKED_LOAD_PWD(fdp);
 	if (oldpwd->pwd_cdir != NULL && oldpwd->pwd_rdir != NULL) {
 		FILEDESC_XUNLOCK(fdp);
 		return;
@@ -3410,7 +3420,7 @@ pwd_ensure_dirs(void)
 
 	newpwd = pwd_alloc();
 	FILEDESC_XLOCK(fdp);
-	oldpwd = fdp->fd_pwd;
+	oldpwd = FILEDESC_XLOCKED_LOAD_PWD(fdp);
 	pwd_fill(oldpwd, newpwd);
 	if (newpwd->pwd_cdir == NULL) {
 		vrefact(rootvnode);
@@ -3450,7 +3460,7 @@ mountcheckdirs(struct vnode *olddp, struct vnode *newdp)
 		if (fdp == NULL)
 			continue;
 		FILEDESC_XLOCK(fdp);
-		oldpwd = fdp->fd_pwd;
+		oldpwd = FILEDESC_XLOCKED_LOAD_PWD(fdp);
 		if (oldpwd == NULL ||
 		    (oldpwd->pwd_cdir != olddp &&
 		    oldpwd->pwd_rdir != olddp &&
@@ -4083,6 +4093,7 @@ int
 kern_proc_cwd_out(struct proc *p,  struct sbuf *sb, ssize_t maxlen)
 {
 	struct filedesc *fdp;
+	struct pwd *pwd;
 	struct export_fd_buf *efbuf;
 	struct vnode *cdir;
 	int error;
@@ -4100,7 +4111,8 @@ kern_proc_cwd_out(struct proc *p,  struct sbuf *sb, ssize_t maxlen)
 	efbuf->remainder = maxlen;
 
 	FILEDESC_SLOCK(fdp);
-	cdir = fdp->fd_pwd->pwd_cdir;
+	pwd = FILEDESC_LOCKED_LOAD_PWD(fdp);
+	cdir = pwd->pwd_cdir;
 	if (cdir == NULL) {
 		error = EINVAL;
 	} else {
@@ -4288,6 +4300,9 @@ filelistinit(void *dummy)
 	    NULL, NULL, UMA_ALIGN_PTR, UMA_ZONE_NOFREE);
 	filedesc0_zone = uma_zcreate("filedesc0", sizeof(struct filedesc0),
 	    NULL, NULL, NULL, NULL, UMA_ALIGN_PTR, 0);
+	pwd_zone = uma_zcreate("PWD", sizeof(struct pwd), NULL, NULL,
+	    NULL, NULL, UMA_ALIGN_PTR, UMA_ZONE_SMR);
+	pwd_smr = uma_zone_get_smr(pwd_zone);
 	mtx_init(&sigio_lock, "sigio lock", NULL, MTX_DEF);
 }
 SYSINIT(select, SI_SUB_LOCK, SI_ORDER_FIRST, filelistinit, NULL);

@@ -1006,6 +1006,7 @@ rt_find_real_interface(struct ifnet *ifp, struct inpcb *inp, int *error)
 	union if_snd_tag_alloc_params params = {
 		.rate_limit.hdr.type = IF_SND_TAG_TYPE_RATE_LIMIT,
 		.rate_limit.hdr.flowid = 1,
+		.rate_limit.hdr.numa_domain = inp->inp_numa_domain,
 		.rate_limit.max_rate = COMMON_RATE,
 		.rate_limit.flags = M_NOWAIT,
 	};
@@ -1484,7 +1485,7 @@ tcp_rs_init(void *st __unused)
 {
 	CK_LIST_INIT(&int_rs);
 	rs_number_alive = 0;
-	rs_number_dead = 0;;
+	rs_number_dead = 0;
 	mtx_init(&rs_mtx, "tcp_rs_mtx", "rsmtx", MTX_DEF);
 	rl_ifnet_departs = EVENTHANDLER_REGISTER(ifnet_departure_event,
 	    tcp_rl_ifnet_departure,

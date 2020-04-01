@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2018 James Clarke
+ * Copyright (c) 2018 Jessica Clarke
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of

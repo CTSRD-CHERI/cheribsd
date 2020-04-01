@@ -98,7 +98,6 @@ SUBDIR=	\
 	${_cpufreq} \
 	${_crypto} \
 	${_cryptodev} \
-	${_ctau} \
 	ctl \
 	${_cxgb} \
 	${_cxgbe} \
@@ -746,9 +745,6 @@ _glxsb=		glxsb
 _pcfclock=	pcfclock
 _pst=		pst
 _sbni=		sbni
-.if ${MK_SOURCELESS_UCODE} != "no"
-_ctau=		ctau
-.endif
 .endif
 
 .if ${MACHINE_CPUARCH} == "arm"
@@ -775,6 +771,7 @@ _virtio=	virtio
 
 .if ${MACHINE_ARCH} == "powerpc64"
 _ipmi=		ipmi
+_ixl=		ixl
 _nvram=		opal_nvram
 .endif
 .if ${MACHINE_ARCH} == "powerpc64" || ${MACHINE_ARCH} == "powerpc"

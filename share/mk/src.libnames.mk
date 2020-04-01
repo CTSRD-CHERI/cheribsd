@@ -283,8 +283,12 @@ _DP_bsnmp=	crypto
 _DP_geom=	bsdxml sbuf
 _DP_cam=	sbuf
 _DP_kvm=	elf
-_DP_kyua_cli=	lutok kyua_utils
-_DP_kyua_store=	sqlite3
+_DP_kyua_cli=		kyua_drivers kyua_engine kyua_model kyua_store kyua_utils
+_DP_kyua_drivers=	kyua_model kyua_engine kyua_store
+_DP_kyua_engine=	lutok kyua_utils
+_DP_kyua_model=		lutok
+_DP_kyua_utils=		lutok
+_DP_kyua_store=		kyua_model kyua_utils sqlite3
 _DP_casper=	nv
 _DP_cap_dns=	nv
 _DP_cap_fileargs=	nv
@@ -381,6 +385,7 @@ _DP_c_nosyscalls=		compiler_rt
 .if ${MK_SSP} != "no" && \
     (${MACHINE_ARCH} == "i386" || ${MACHINE_ARCH:Mpower*} != "")
 _DP_c+=		ssp_nonshared
+_DP_c_nosyscalls+=		ssp_nonshared
 .endif
 _DP_stats=	sbuf pthread
 _DP_stdthreads=	pthread

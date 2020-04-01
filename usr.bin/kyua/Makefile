@@ -1,11 +1,8 @@
 # $FreeBSD$
 
-KYUA_SRCDIR=	${SRCTOP}/contrib/subrepo-kyua
-.PATH: ${KYUA_SRCDIR}
+.include "${SRCTOP}/lib/kyua/Makefile.kyua"
 
-# FIXME: doesn't work as a purecap binary yet
-WANT_COMPAT=	64
-.include <bsd.compat.mk>
+.PATH: ${KYUA_SRCDIR}
 
 PROG_CXX=	kyua
 SRCS=		main.cpp
@@ -31,10 +28,13 @@ CFLAGS+=	-I${KYUA_SRCDIR}
 # kyua uses auto_ptr
 CFLAGS+=	-Wno-deprecated-declarations
 
-FILESGROUPS=	EXAMPLES MISC STORE
+FILESGROUPS=	DOCS EXAMPLES MISC STORE
 
 CONFS=		kyua.conf
 CONFSDIR=	${KYUA_CONFDIR}
+
+DOCS=		AUTHORS CONTRIBUTORS LICENSE
+DOCSDIR=	${KYUA_DOCDIR}
 
 EXAMPLES=	Kyuafile.top kyua.conf
 EXAMPLESDIR=	${KYUA_EGDIR}
@@ -49,10 +49,10 @@ STOREDIR=	${KYUA_STOREDIR}
 .PATH:		${KYUA_SRCDIR}/store
 
 CLEANFILES+=	${MAN}
-.PATH: ${SRCTOP}/contrib/subrepo-kyua/doc
+.PATH: ${KYUA_SRCDIR}/doc
 .for man in ${MAN}
 ${man}: ${man}.in
-	${SH} ${KYUA_SRCDIR}/doc/manbuild.sh \
+	${SHELL} ${KYUA_SRCDIR}/doc/manbuild.sh \
 	    -v "CONFDIR=${KYUA_CONFDIR}" \
 	    -v "DOCDIR=${KYUA_DOCDIR}" \
 	    -v "EGDIR=${KYUA_EGDIR}" \
@@ -64,5 +64,4 @@ ${man}: ${man}.in
 	    ${.ALLSRC} ${.TARGET}
 .endfor
 
-.include "${SRCTOP}/lib/kyua/Makefile.kyua"
 .include <bsd.prog.mk>

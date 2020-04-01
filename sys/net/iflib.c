@@ -453,7 +453,6 @@ struct iflib_rxq {
 typedef struct if_rxsd {
 	caddr_t *ifsd_cl;
 	iflib_fl_t ifsd_fl;
-	qidx_t ifsd_cidx;
 } *if_rxsd_t;
 
 /* multiple of word size */
@@ -710,6 +709,7 @@ static int iflib_altq_if_transmit(if_t ifp, struct mbuf *m);
 static int iflib_register(if_ctx_t);
 static void iflib_deregister(if_ctx_t);
 static void iflib_unregister_vlan_handlers(if_ctx_t ctx);
+static uint16_t iflib_get_mbuf_size_for(unsigned int size);
 static void iflib_init_locked(if_ctx_t ctx);
 static void iflib_add_device_sysctl_pre(if_ctx_t ctx);
 static void iflib_add_device_sysctl_post(if_ctx_t ctx);
@@ -2074,13 +2074,15 @@ _iflib_fl_refill(if_ctx_t ctx, iflib_fl_t fl, int count)
 	bus_dmamap_sync(fl->ifl_ifdi->idi_tag, fl->ifl_ifdi->idi_map,
 	    BUS_DMASYNC_PREREAD | BUS_DMASYNC_PREWRITE);
 	ctx->isc_rxd_flush(ctx->ifc_softc, fl->ifl_rxq->ifr_id, fl->ifl_id, pidx);
-	fl->ifl_fragidx = frag_idx;
+	fl->ifl_fragidx = frag_idx + 1;
+	if (fl->ifl_fragidx == fl->ifl_size)
+		fl->ifl_fragidx = 0;
 
 	return (n == -1 ? 0 : IFLIB_RXEOF_EMPTY);
 }
 
 static __inline uint8_t
-__iflib_fl_refill_lt(if_ctx_t ctx, iflib_fl_t fl, int max)
+__iflib_fl_refill_all(if_ctx_t ctx, iflib_fl_t fl)
 {
 	/* we avoid allowing pidx to catch up with cidx as it confuses ixl */
 	int32_t reclaimable = fl->ifl_size - fl->ifl_credits - 1;
@@ -2092,7 +2094,7 @@ __iflib_fl_refill_lt(if_ctx_t ctx, iflib_fl_t fl, int max)
 	MPASS(reclaimable == delta);
 
 	if (reclaimable > 0)
-		return (_iflib_fl_refill(ctx, fl, min(max, reclaimable)));
+		return (_iflib_fl_refill(ctx, fl, reclaimable));
 	return (0);
 }
 
@@ -2163,6 +2165,8 @@ iflib_fl_setup(iflib_fl_t fl)
 {
 	iflib_rxq_t rxq = fl->ifl_rxq;
 	if_ctx_t ctx = rxq->ifr_ctx;
+	if_softc_ctx_t scctx = &ctx->ifc_softc_ctx;
+	int qidx;
 
 	bit_nclear(fl->ifl_rx_bitmap, 0, fl->ifl_size - 1);
 	/*
@@ -2171,7 +2175,16 @@ iflib_fl_setup(iflib_fl_t fl)
 	iflib_fl_bufs_free(fl);
 	/* Now replenish the mbufs */
 	MPASS(fl->ifl_credits == 0);
-	fl->ifl_buf_size = ctx->ifc_rx_mbuf_sz;
+	qidx = rxq->ifr_fl_offset + fl->ifl_id;
+	if (scctx->isc_rxd_buf_size[qidx] != 0)
+		fl->ifl_buf_size = scctx->isc_rxd_buf_size[qidx];
+	else
+		fl->ifl_buf_size = ctx->ifc_rx_mbuf_sz;
+	/*
+	 * ifl_buf_size may be a driver-supplied value, so pull it up
+	 * to the selected mbuf size.
+	 */
+	fl->ifl_buf_size = iflib_get_mbuf_size_for(fl->ifl_buf_size);
 	if (fl->ifl_buf_size > ctx->ifc_max_fl_buf_size)
 		ctx->ifc_max_fl_buf_size = fl->ifl_buf_size;
 	fl->ifl_cltype = m_gettype(fl->ifl_buf_size);
@@ -2303,6 +2316,16 @@ iflib_timer(void *arg)
 	STATE_UNLOCK(ctx);
 }
 
+static uint16_t
+iflib_get_mbuf_size_for(unsigned int size)
+{
+
+	if (size <= MCLBYTES)
+		return (MCLBYTES);
+	else
+		return (MJUMPAGESIZE);
+}
+
 static void
 iflib_calc_rx_mbuf_sz(if_ctx_t ctx)
 {
@@ -2312,10 +2335,8 @@ iflib_calc_rx_mbuf_sz(if_ctx_t ctx)
 	 * XXX don't set the max_frame_size to larger
 	 * than the hardware can handle
 	 */
-	if (sctx->isc_max_frame_size <= MCLBYTES)
-		ctx->ifc_rx_mbuf_sz = MCLBYTES;
-	else
-		ctx->ifc_rx_mbuf_sz = MJUMPAGESIZE;
+	ctx->ifc_rx_mbuf_sz =
+	    iflib_get_mbuf_size_for(sctx->isc_max_frame_size);
 }
 
 uint32_t
@@ -2532,7 +2553,6 @@ rxd_frag_to_sd(iflib_rxq_t rxq, if_rxd_frag_t irf, bool unload, if_rxsd_t sd,
 	cidx = irf->irf_idx;
 	fl = &rxq->ifr_fl[flid];
 	sd->ifsd_fl = fl;
-	sd->ifsd_cidx = cidx;
 	m = fl->ifl_sds.ifsd_m[cidx];
 	sd->ifsd_cl = &fl->ifl_sds.ifsd_cl[cidx];
 	fl->ifl_credits--;
@@ -2544,13 +2564,11 @@ rxd_frag_to_sd(iflib_rxq_t rxq, if_rxd_frag_t irf, bool unload, if_rxsd_t sd,
 	next = (cidx + CACHE_PTR_INCREMENT) & (fl->ifl_size-1);
 	prefetch(&fl->ifl_sds.ifsd_map[next]);
 	map = fl->ifl_sds.ifsd_map[cidx];
-	next = (cidx + CACHE_LINE_SIZE) & (fl->ifl_size-1);
 
-	/* not valid assert if bxe really does SGE from non-contiguous elements */
-	MPASS(fl->ifl_cidx == cidx);
 	bus_dmamap_sync(fl->ifl_buf_tag, map, BUS_DMASYNC_POSTREAD);
 
-	if (rxq->pfil != NULL && PFIL_HOOKED_IN(rxq->pfil) && pf_rv != NULL) {
+	if (rxq->pfil != NULL && PFIL_HOOKED_IN(rxq->pfil) && pf_rv != NULL &&
+	    irf->irf_len != 0) {
 		payload  = *sd->ifsd_cl;
 		payload +=  ri->iri_pad;
 		len = ri->iri_len - ri->iri_pad;
@@ -2587,7 +2605,7 @@ rxd_frag_to_sd(iflib_rxq_t rxq, if_rxd_frag_t irf, bool unload, if_rxsd_t sd,
 		*pf_rv = PFIL_PASS;
 	}
 
-	if (unload)
+	if (unload && irf->irf_len != 0)
 		bus_dmamap_unload(fl->ifl_buf_tag, map);
 	fl->ifl_cidx = (fl->ifl_cidx + 1) & (fl->ifl_size-1);
 	if (__predict_false(fl->ifl_cidx == 0))
@@ -2672,6 +2690,7 @@ iflib_rxd_pkt_get(iflib_rxq_t rxq, if_rxd_info_t ri)
 
 	/* should I merge this back in now that the two paths are basically duplicated? */
 	if (ri->iri_nfrags == 1 &&
+	    ri->iri_frags[0].irf_len != 0 &&
 	    ri->iri_frags[0].irf_len <= MIN(IFLIB_RX_COPY_THRESH, MHLEN)) {
 		m = rxd_frag_to_sd(rxq, &ri->iri_frags[0], false, &sd,
 		    &pf_rv, ri);
@@ -2688,6 +2707,8 @@ iflib_rxd_pkt_get(iflib_rxq_t rxq, if_rxd_info_t ri)
 		}
 	} else {
 		m = assemble_segments(rxq, ri, &sd, &pf_rv);
+		if (m == NULL)
+			return (NULL);
 		if (pf_rv != PFIL_PASS && pf_rv != PFIL_REALLOCED)
 			return (m);
 	}
@@ -2790,7 +2811,7 @@ iflib_rxeof(iflib_rxq_t rxq, qidx_t budget)
 		cidxp = &rxq->ifr_fl[0].ifl_cidx;
 	if ((avail = iflib_rxd_avail(ctx, rxq, *cidxp, budget)) == 0) {
 		for (i = 0, fl = &rxq->ifr_fl[0]; i < sctx->isc_nfl; i++, fl++)
-			retval |= __iflib_fl_refill_lt(ctx, fl, budget + 8);
+			retval |= __iflib_fl_refill_all(ctx, fl);
 		DBG_COUNTER_INC(rx_unavail);
 		return (retval);
 	}
@@ -2850,7 +2871,7 @@ iflib_rxeof(iflib_rxq_t rxq, qidx_t budget)
 	CURVNET_RESTORE();
 	/* make sure that we can refill faster than drain */
 	for (i = 0, fl = &rxq->ifr_fl[0]; i < sctx->isc_nfl; i++, fl++)
-		retval |= __iflib_fl_refill_lt(ctx, fl, budget + 8);
+		retval |= __iflib_fl_refill_all(ctx, fl);
 
 	lro_enabled = (if_getcapenable(ifp) & IFCAP_LRO);
 	if (lro_enabled)
@@ -6174,13 +6195,8 @@ iflib_rx_intr_deferred(if_ctx_t ctx, int rxqid)
 void
 iflib_admin_intr_deferred(if_ctx_t ctx)
 {
-#ifdef INVARIANTS
-	struct grouptask *gtask;
 
-	gtask = &ctx->ifc_admin_task;
-	MPASS(gtask != NULL && gtask->gt_taskqueue != NULL);
-#endif
-
+	MPASS(ctx->ifc_admin_task.gt_taskqueue != NULL);
 	GROUPTASK_ENQUEUE(&ctx->ifc_admin_task);
 }
 
@@ -6722,6 +6738,9 @@ iflib_add_device_sysctl_post(if_ctx_t ctx)
 			SYSCTL_ADD_U16(ctx_list, fl_list, OID_AUTO, "credits",
 				       CTLFLAG_RD,
 				       &fl->ifl_credits, 1, "credits available");
+			SYSCTL_ADD_U16(ctx_list, fl_list, OID_AUTO, "buf_size",
+				       CTLFLAG_RD,
+				       &fl->ifl_buf_size, 1, "buffer size");
 #if MEMORY_LOGGING
 			SYSCTL_ADD_QUAD(ctx_list, fl_list, OID_AUTO, "fl_m_enqueued",
 					CTLFLAG_RD,

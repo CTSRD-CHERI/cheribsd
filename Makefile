@@ -125,7 +125,7 @@
 .include "targets/Makefile"
 .else
 
-TGTS=	all all-man buildenv buildenvvars buildkernel buildworld \
+TGTS=	all all-man buildenv buildenvvars buildkernel buildsysroot buildworld \
 	check check-old check-old-dirs check-old-files check-old-libs \
 	checkdpadd checkworld clean cleandepend cleandir cleanworld \
 	cleanuniverse \
@@ -135,7 +135,7 @@ TGTS=	all all-man buildenv buildenvvars buildkernel buildworld \
 	everything hier hierarchy install installcheck installkernel \
 	installkernel.debug packagekernel packageworld \
 	reinstallkernel reinstallkernel.debug \
-	installworld kernel-toolchain libraries maninstall \
+	installsysroot installworld kernel-toolchain libraries maninstall \
 	obj objlink showconfig tags toolchain update \
 	makeman sysent \
 	_worldtmp _legacy _bootstrap-tools _cleanobj _obj \
@@ -151,8 +151,7 @@ TGTS=	all all-man buildenv buildenvvars buildkernel buildworld \
 	stage-packages stage-packages-kernel stage-packages-world \
 	create-packages-world create-packages-kernel create-packages \
 	packages installconfig real-packages sign-packages package-pkg \
-	print-dir test-system-compiler test-system-linker \
-	buildsysroot installsysroot
+	print-dir test-system-compiler test-system-linker
 
 # These targets require a TARGET and TARGET_ARCH be defined.
 XTGTS=	native-xtools native-xtools-install xdev xdev-build xdev-install \
@@ -514,16 +513,17 @@ worlds: .PHONY
 .if make(universe) || make(universe_kernels) || make(tinderbox) || \
     make(targets) || make(universe-toolchain)
 #
-# Always build architectures supported by clang.  Only build architectures
-# only supported by GCC if a suitable toolchain is present or enabled.
-# In all cases, if the user specifies TARGETS on the command line,
-# honor that most of all.
+# Don't build rarely used architectures unless requested.
 #
+.if defined(EXTRA_TARGETS)
+EXTRA_ARCHES_mips=	mipsel mipshf mipselhf mips64el mips64hf mips64elhf
+EXTRA_ARCHES_mips+=	mipsn32
+.endif
 TARGETS?=amd64 arm arm64 i386 mips powerpc riscv
 _UNIVERSE_TARGETS=	${TARGETS}
 TARGET_ARCHES_arm?=	armv6 armv7
 TARGET_ARCHES_arm64?=	aarch64
-TARGET_ARCHES_mips?=	mipsel mips mips64el mips64 mipsn32 mipselhf mipshf mips64elhf mips64hf
+TARGET_ARCHES_mips?=	mips mips64 ${EXTRA_ARCHES_mips}
 # powerpcspe excluded until clang fixed
 TARGET_ARCHES_powerpc?=	powerpc powerpc64
 TARGET_ARCHES_riscv?=	riscv64 riscv64sf
@@ -531,13 +531,13 @@ TARGET_ARCHES_riscv?=	riscv64 riscv64sf
 TARGET_ARCHES_${target}?= ${target}
 .endfor
 
-MAKE_PARAMS_mips?=	CROSS_TOOLCHAIN=mips-gcc6
-
-TOOLCHAINS_mips=	mips-gcc6
-
 # Remove architectures only supported by external toolchain from
 # universe if required toolchain packages are missing.
-.for target in mips
+# Note: We no longer have targets that require an external toolchain, but for
+# now keep this block in case a new non-LLVM architecture is added and to reuse
+# it for a future extenal GCC make universe variant.
+_external_toolchain_targets=
+.for target in ${_external_toolchain_targets}
 .if ${_UNIVERSE_TARGETS:M${target}}
 .for toolchain in ${TOOLCHAINS_${target}}
 .if !exists(/usr/local/share/toolchains/${toolchain}.mk)

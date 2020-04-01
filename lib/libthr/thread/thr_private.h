@@ -93,7 +93,7 @@ extern struct pthread	*_thr_initial __hidden;
 #include "pthread_md.h"
 #include "thr_umtx.h"
 #include "thread_db.h"
-
+#include "simple_printf.h"
 #ifdef _PTHREAD_FORCED_UNWIND
 #define _BSD_SOURCE
 #include <unwind.h>
@@ -112,8 +112,8 @@ TAILQ_HEAD(mutex_queue, pthread_mutex);
 #define PANIC(args...)		_thread_exitf(__FILE__, __LINE__, ##args)
 
 /* Output debug messages like this: */
-#define stdout_debug(args...)	_thread_printf(STDOUT_FILENO, ##args)
-#define stderr_debug(args...)	_thread_printf(STDERR_FILENO, ##args)
+#define stdout_debug(args...)	_thread_fdprintf(STDOUT_FILENO, ##args)
+#define stderr_debug(args...)	_thread_fdprintf(STDERR_FILENO, ##args)
 
 #ifdef _PTHREADS_INVARIANTS
 #define THR_ASSERT(cond, msg) do {	\
@@ -823,8 +823,6 @@ void	_thr_stack_free(struct pthread_attr *) __hidden;
 void	_thr_free(struct pthread *, struct pthread *) __hidden;
 void	_thr_gc(struct pthread *) __hidden;
 void    _thread_cleanupspecific(void) __hidden;
-void	_thread_printf(int, const char *, ...) __hidden __printflike(2, 3);
-void	_thread_vprintf(int, const char *, va_list) __hidden;
 void	_thr_spinlock_init(void) __hidden;
 void	_thr_cancel_enter(struct pthread *) __hidden;
 void	_thr_cancel_enter2(struct pthread *, int) __hidden;
