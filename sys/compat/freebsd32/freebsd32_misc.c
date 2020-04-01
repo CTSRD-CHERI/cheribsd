@@ -421,8 +421,8 @@ freebsd6_freebsd32_mmap(struct thread *td,
 		prot |= PROT_EXEC;
 #endif
 
-	return (kern_mmap(td, (uintptr_t)uap->addr, 0,
-	    uap->len, PROT_MAX(_PROT_ALL) | prot, uap->flags, uap->fd,
+	return (kern_mmap(td, (uintptr_t)uap->addr, uap->len,
+	    PROT_MAX(_PROT_ALL) | prot, uap->flags, uap->fd,
 	    PAIR32TO64(off_t, uap->pos)));
 }
 #endif
@@ -1746,7 +1746,7 @@ freebsd4_freebsd32_sendfile(struct thread *td,
     struct freebsd4_freebsd32_sendfile_args *uap)
 {
 
-	return (return (kern_sendfile(td, uap->fd, uap->s,
+	return (kern_sendfile(td, uap->fd, uap->s,
 	    PAIR32TO64(off_t, uap->offset), uap->nbytes,
 	    __USER_CAP_OBJ(uap->hdtr), __USER_CAP_OBJ(uap->sbytes),
 	    uap->flags, 1, (copyin_hdtr_t *)freebsd32_copyin_hdtr,
