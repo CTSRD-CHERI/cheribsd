@@ -272,7 +272,7 @@ vn_rename(char *from, char *to, enum uio_seg seg)
 }
 
 static __inline int
-vn_remove(char * fnamep, enum uio_seg seg, enum rm dirflag)
+vn_remove(char *fnamep, enum uio_seg seg, enum rm dirflag)
 {
 
 	ASSERT(seg == UIO_SYSSPACE);
