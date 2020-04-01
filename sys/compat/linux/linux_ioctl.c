@@ -2207,9 +2207,10 @@ again:
 			struct sockaddr *sa = ifa->ifa_addr;
 
 			if (sa->sa_family == AF_INET) {
-				ifr.ifr_addr.sa_family = LINUX_AF_INET;
-				memcpy(ifr.ifr_addr.sa_data, sa->sa_data,
-				    sizeof(ifr.ifr_addr.sa_data));
+				ifr_addr_get_sa(&ifr)->sa_family =
+				    LINUX_AF_INET;
+				memcpy(ifr_addr_get_data(&ifr), sa->sa_data,
+				    sizeof(sa->sa_data));
 				sbuf_bcat(sb, &ifr, sizeof(ifr));
 				max_len += sizeof(ifr);
 				addrs++;
@@ -2219,7 +2220,7 @@ again:
 				valid_len = sbuf_len(sb);
 		}
 		if (addrs == 0) {
-			bzero((caddr_t)&ifr.ifr_addr, sizeof(ifr.ifr_addr));
+			bzero(&ifr.ifr_ifru.ifru_addr, sizeof(ifr.ifr_ifru.ifru_addr));
 			sbuf_bcat(sb, &ifr, sizeof(ifr));
 			max_len += sizeof(ifr);
 
@@ -2282,7 +2283,7 @@ bsd_to_linux_ifreq(struct ifreq *arg)
 	if ((error = copyin(arg, &ifr, ifr_len)))
 		return (error);
 
-	*(u_short *)&ifr.ifr_addr = ifr.ifr_addr.sa_family;
+	*(u_short *)ifr_addr_get_sa(&ifr) = ifr_addr_get_family(&ifr);
 
 	error = copyout(&ifr, arg, ifr_len);
 
