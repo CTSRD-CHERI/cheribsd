@@ -268,7 +268,7 @@ vn_rename(char *from, char *to, enum uio_seg seg)
 
 	ASSERT(seg == UIO_SYSSPACE);
 
-	return (kern_renameat(curthread, AT_FDCWD, cheri_ptr(from,strlen(from)), AT_FDCWD, cheri_ptr(to,strlen(to)), seg));
+	return (kern_renameat(curthread, AT_FDCWD, cheri_ptr(from, strlen(from) + 1), AT_FDCWD, cheri_ptr(to, strlen(to) + 1), seg));
 }
 
 static __inline int
@@ -278,7 +278,7 @@ vn_remove(char *fnamep, enum uio_seg seg, enum rm dirflag)
 	ASSERT(seg == UIO_SYSSPACE);
 	ASSERT(dirflag == RMFILE);
 
-	return (kern_funlinkat(curthread, AT_FDCWD, cheri_ptr(fnamep, strlen(fnamep)), FD_NONE, seg, 0,
+	return (kern_funlinkat(curthread, AT_FDCWD, cheri_ptr(fnamep, strlen(fnamep) + 1), FD_NONE, seg, 0,
 	    0));
 }
 
