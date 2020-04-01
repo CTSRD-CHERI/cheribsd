@@ -123,11 +123,6 @@ CFLAGS+=-DPF
 # Workaround duplicate declarations in <netinet/ip_compat.h>
 CFLAGS.gcc.ioctl.c+= -Wno-redundant-decls
 
-# Ignore deprecation warning in <sys/pioctl.h>
-CFLAGS.clang.ioctl.c+= -Wno-\#warnings
-CFLAGS.gcc.ioctl.c+= -Wno-cpp
-
-CFLAGS.clang+=	${CFLAGS.clang.${.IMPSRC}}
 CFLAGS.gcc+=	${CFLAGS.gcc.${.IMPSRC}}
 
 .if ${MACHINE_ABI:Mpurecap}
