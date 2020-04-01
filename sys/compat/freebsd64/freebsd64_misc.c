@@ -1401,8 +1401,9 @@ freebsd64___sysctlbyname(struct thread *td, struct
 
 	/*
 	 * Fetch the oldlen so we can bound the old capability.
-	 * This avoids a race between here and kern_sysctl's use, if the
-	 * caller increases the value at uap->oldlenp between now its later use.
+	 * While there is a race between here and kern_sysctl's use,
+	 * the caller will get what they deserve if they increase the
+	 * value at uap->oldlenp between now its later use.
 	 */
 	if (uap->oldlenp == NULL)
 		oldlen = 0;
@@ -1412,8 +1413,8 @@ freebsd64___sysctlbyname(struct thread *td, struct
 
 	error = kern___sysctlbyname(td, __USER_CAP(uap->name, uap->namelen),
 	    uap->namelen, __USER_CAP(uap->old, oldlen),
-	    &oldlen, __USER_CAP(uap->new, uap->newlen),
-	    uap->newlen, &rv, SCTL_MASK64, 1);
+	    __USER_CAP_OBJ(uap->oldlenp), __USER_CAP(uap->new, uap->newlen),
+	    uap->newlen, &rv, 0, 0);
 	if (error != 0)
 		return (error);
 	if (uap->oldlenp != NULL)
