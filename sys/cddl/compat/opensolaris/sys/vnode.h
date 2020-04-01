@@ -271,7 +271,8 @@ vn_rename(char *from, char *to, enum uio_seg seg)
 	return (kern_renameat(curthread, 
 			      AT_FDCWD, 
 			      cheri_ptr(from, strlen(from) + 1), 
-			      AT_FDCWD, cheri_ptr(to, strlen(to) + 1), 
+			      AT_FDCWD, 
+			      cheri_ptr(to, strlen(to) + 1), 
 			      seg));
 }
 
