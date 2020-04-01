@@ -31,6 +31,7 @@ __FBSDID("$FreeBSD$");
 
 #include <dev/mfi/mfireg.h>
 #ifdef COMPAT_FREEBSD32
+#include <sys/mount.h>
 #include <compat/freebsd32/freebsd32.h>
 #endif
 #ifdef COMPAT_FREEBSD64
