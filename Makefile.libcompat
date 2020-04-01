@@ -59,7 +59,10 @@ LIBCOMPATIMAKE+=	${LIBCOMPATWMAKE:NINSTALL=*:NDESTDIR=*} \
 
 _LC_LIBDIRS.yes=		lib
 _LC_LIBDIRS.yes+=		gnu/lib
+# XXX: See src.opts.mk hack
+.if ${MK_COMPAT_CHERIABI} != "yes" || !${TARGET_ARCH:Mriscv64*}
 _LC_LIBDIRS.${MK_CDDL:tl}+=	cddl/lib
+.endif
 _LC_LIBDIRS.${MK_CRYPT:tl}+=	secure/lib
 _LC_LIBDIRS.${MK_KERBEROS:tl}+=	kerberos5/lib
 

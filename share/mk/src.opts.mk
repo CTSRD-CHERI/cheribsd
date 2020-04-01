@@ -373,6 +373,7 @@ BROKEN_OPTIONS+=NS_CACHING
 # Skip until https://github.com/CTSRD-CHERI/llvm-project/issues/379 is fixed.
 BROKEN_OPTIONS+=LIBCPLUSPLUS CXX
 # Crash in ZFS code. TODO: investigate
+# Remove corresponding hack in Makefile.libcompat when removing
 BROKEN_OPTIONS+=CDDL
 
 # Some compilation failure: TODO: investigate
