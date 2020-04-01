@@ -13800,6 +13800,8 @@ dtrace_dof_actdesc(dof_hdr_t *dof, dof_sec_t *sec, dtrace_vstate_t *vstate,
 		return (NULL);
 	}
 
+	// TODO(nicomazz): 	the allignment will be different depending on the userspace type.
+	//					Here is probably needed to differentiate
 	if (sec->dofs_align != sizeof (kuintcap_t)) {
 		dtrace_dof_error(dof, "bad alignment in action description");
 		return (NULL);
