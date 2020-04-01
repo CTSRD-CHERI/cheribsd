@@ -168,7 +168,7 @@ spa_config_write(spa_config_dirent_t *dp, nvlist_t *nvl)
 	char *buf;
 	vnode_t *vp;
 	int oflags = FWRITE | FTRUNC | FCREAT | FOFFMAX;
-	char *temp;
+	char * __capability temp;
 	int err;
 
 	/*
@@ -183,7 +183,7 @@ spa_config_write(spa_config_dirent_t *dp, nvlist_t *nvl)
 	 * Pack the configuration into a buffer.
 	 */
 	buf = fnvlist_pack(nvl, &buflen);
-	temp = kmem_zalloc(MAXPATHLEN, KM_SLEEP);
+	temp = cheri_ptr(kmem_zalloc(MAXPATHLEN, KM_SLEEP), MAXPATHLEN);
 
 	/*
 	 * Write the configuration to disk.  We need to do the traditional
@@ -198,8 +198,10 @@ spa_config_write(spa_config_dirent_t *dp, nvlist_t *nvl)
 		    0, RLIM64_INFINITY, kcred, NULL);
 		if (err == 0)
 			err = VOP_FSYNC(vp, FSYNC, kcred, NULL);
-		if (err == 0)
-			err = vn_rename(temp, dp->scd_path, UIO_SYSSPACE);
+		if (err == 0){
+			char * __capability dp_scd_path = cheri_ptr(dp->scd_path, strlen(dp->scd_path));
+			err = vn_rename(temp, dp_scd_path, UIO_SYSSPACE);
+		}
 		(void) VOP_CLOSE(vp, oflags, 1, 0, kcred, NULL);
 	}
 
