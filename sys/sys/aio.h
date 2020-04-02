@@ -77,6 +77,16 @@
 #endif
 
 /*
+ * Private members for aiocb -- don't access
+ * directly.
+ */
+struct __aiocb_private {
+	long	status;
+	long	error;
+	void	* __kerncap kernelinfo;
+};
+
+/*
  * I/O control block
  */
 typedef struct aiocb {
@@ -88,11 +98,7 @@ typedef struct aiocb {
 	void	* __kerncap __spare2__;
 	int	aio_lio_opcode;		/* LIO opcode */
 	int	aio_reqprio;		/* Request priority -- ignored */
-	struct {
-		long	status;
-		long	error;
-		void	* __kerncap kernelinfo;
-	} _aiocb_private;
+	struct __aiocb_private _aiocb_private;
 	struct	sigevent aio_sigevent;	/* Signal to deliver */
 } aiocb_t;
 
