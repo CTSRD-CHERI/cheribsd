@@ -13235,6 +13235,7 @@ dtrace_dof_create(dtrace_state_t *state)
 	return (dof);
 }
 
+// TODO(nicomazz): Make sure that this is always called with a capability
 static dof_hdr_t *
 dtrace_dof_copyin(uintcap_t uarg, int *errp)
 {
@@ -13269,7 +13270,7 @@ dtrace_dof_copyin(uintcap_t uarg, int *errp)
 
 	dof = kmem_alloc(hdr.dofh_loadsz, KM_SLEEP);
 
-	if (copyincap((void * __capability)uarg, dof, hdr.dofh_loadsz) != 0 ||
+	if (copyincap((void *__capability)uarg, dof, hdr.dofh_loadsz) != 0 ||
 	    dof->dofh_loadsz != hdr.dofh_loadsz) {
 		kmem_free(dof, hdr.dofh_loadsz);
 		*errp = EFAULT;
@@ -13800,9 +13801,9 @@ dtrace_dof_actdesc(dof_hdr_t *dof, dof_sec_t *sec, dtrace_vstate_t *vstate,
 		return (NULL);
 	}
 
-	// TODO(nicomazz): 	the allignment will be different depending on the userspace type.
-	//					Here is probably needed to differentiate
-	if (sec->dofs_align != sizeof (kuintcap_t)) {
+	// TODO(nicomazz): 	the allignment will be different depending on
+	// the userspace type.Here is probably needed to differentiate
+	if (sec->dofs_align != sizeof(kuintcap_t)) {
 		dtrace_dof_error(dof, "bad alignment in action description");
 		return (NULL);
 	}

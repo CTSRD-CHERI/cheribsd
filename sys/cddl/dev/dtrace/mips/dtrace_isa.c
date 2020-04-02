@@ -155,7 +155,7 @@ dtrace_getupcstack(uint64_t *pcstack, int pcstack_limit)
 	sp = (uintcap_t)tf->sp;
 	ra = (uintcap_t)tf->ra;
 	*pcstack++ = TRAPF_PC(tf);
-	
+
 	/*
 	 * Unwind, and unwind, and unwind
 	 */

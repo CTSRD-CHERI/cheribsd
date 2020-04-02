@@ -748,6 +748,14 @@ typedef struct dof_ecbdesc {
 	kuintcap_t dofe_uarg;		/* user-supplied library argument */
 } dof_ecbdesc_t;
 
+typedef struct dof_ecbdesc_64 {
+	dof_secidx_t dofe_probes;	/* link to DOF_SECT_PROBEDESC */
+	dof_secidx_t dofe_pred;		/* link to DOF_SECT_DIFOHDR */
+	dof_secidx_t dofe_actions;	/* link to DOF_SECT_ACTDESC */
+	uint32_t dofe_pad;		/* reserved for future use */
+	uintptr_t dofe_uarg;		/* user-supplied library argument */
+} dof_ecbdesc_64_t;
+
 typedef struct dof_probedesc {
 	dof_secidx_t dofp_strtab;	/* link to DOF_SECT_STRTAB section */
 	dof_stridx_t dofp_provider;	/* provider string */
@@ -1001,7 +1009,7 @@ typedef struct dtrace_fmtdesc {
 } dtrace_fmtdesc_t;
 
 typedef struct dtrace_aggdesc_64 {
-	char *dtagd_name;		/* not filled in by kernel */
+	char *dtagd_name;			/* not filled in by kernel */
 	dtrace_aggvarid_t dtagd_varid;		/* not filled in by kernel */
 	int dtagd_flags;			/* not filled in by kernel */
 	dtrace_aggid_t dtagd_id;		/* aggregation ID */
@@ -1018,7 +1026,7 @@ union dtrace_aggdesc_union {
 };
 
 typedef struct dtrace_fmtdesc_64 {
-	char *dtfd_string;		/* format string */
+	char *dtfd_string;			/* format string */
 	int dtfd_length;			/* length of format string */
 	uint16_t dtfd_format;			/* format identifier */
 } dtrace_fmtdesc_64_t;
@@ -1343,12 +1351,12 @@ typedef struct dtrace_providerdesc {
 #define	DTRACEIOC_PROBEMATCH	_IOWR('x',5,dtrace_probedesc_t)
 							/* match probes */
 typedef struct {
-	void * __kerncap dof;		/* DOF userland address written to driver. */
-	int	n_matched;	/* # matches returned by driver. */
+	void *__kerncap dof; /* DOF userland address written to driver. */
+	int n_matched; /* # matches returned by driver. */
 } dtrace_enable_io_t;
 typedef struct {
-	void * dof;		/* DOF userland address written to driver. */
-	int	n_matched;	/* # matches returned by driver. */
+	void *dof; /* DOF userland address written to driver. */
+	int n_matched; /* # matches returned by driver. */
 } dtrace_enable_io_64_t;
 #define	DTRACEIOC_ENABLE	_IOWR('x',6,dtrace_enable_io_t)
 							/* enable probes */
@@ -1375,21 +1383,18 @@ typedef struct {
 #define	DTRACEIOC_REPLICATE	_IOW('x',18,dtrace_repldesc_t)	
 							/* replicate enab */
 
-
-#define    DTRACEIOC_BUFSNAP_64 \
-    _IOC_NEWTYPE(DTRACEIOC_BUFSNAP,dtrace_bufdesc_64_t *)
-#define    DTRACEIOC_ENABLE_64 \
-    _IOC_NEWTYPE(DTRACEIOC_ENABLE, dtrace_enable_io_64_t)
-#define    DTRACEIOC_AGGSNAP_64 \
-    _IOC_NEWTYPE(DTRACEIOC_AGGSNAP,dtrace_bufdesc_64 *)
-#define    DTRACEIOC_EPROBE_64 \
-    _IOC_NEWTYPE(DTRACEIOC_EPROBE,dtrace_eprobedesc_t *)
-#define    DTRACEIOC_AGGDESC_64 \
-    _IOC_NEWTYPE(DTRACEIOC_AGGDESC, dtrace_aggdesc_64_t *)
-#define    DTRACEIOC_FORMAT_64 \
-    _IOC_NEWTYPE(DTRACEIOC_FORMAT, dtrace_fmtdesc_64_t)
-#define    DTRACEIOC_DOFGET_64 \
-    _IOC_NEWTYPE(DTRACEIOC_DOFGET,dof_hdr_t *)
+#define DTRACEIOC_BUFSNAP_64 \
+	_IOC_NEWTYPE(DTRACEIOC_BUFSNAP, dtrace_bufdesc_64_t *)
+#define DTRACEIOC_ENABLE_64 \
+	_IOC_NEWTYPE(DTRACEIOC_ENABLE, dtrace_enable_io_64_t)
+#define DTRACEIOC_AGGSNAP_64 \
+	_IOC_NEWTYPE(DTRACEIOC_AGGSNAP, dtrace_bufdesc_64 *)
+#define DTRACEIOC_EPROBE_64 \
+	_IOC_NEWTYPE(DTRACEIOC_EPROBE, dtrace_eprobedesc_t *)
+#define DTRACEIOC_AGGDESC_64 \
+	_IOC_NEWTYPE(DTRACEIOC_AGGDESC, dtrace_aggdesc_64_t *)
+#define DTRACEIOC_FORMAT_64 _IOC_NEWTYPE(DTRACEIOC_FORMAT, dtrace_fmtdesc_64_t)
+#define DTRACEIOC_DOFGET_64 _IOC_NEWTYPE(DTRACEIOC_DOFGET, dof_hdr_t *)
 
 #endif
 

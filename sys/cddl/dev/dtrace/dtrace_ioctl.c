@@ -26,11 +26,13 @@ static int dtrace_verbose_ioctl;
 SYSCTL_INT(_debug_dtrace, OID_AUTO, verbose_ioctl, CTLFLAG_RW,
     &dtrace_verbose_ioctl, 0, "log DTrace ioctls");
 
-#define DTRACE_IOCTL_PRINTF(fmt, ...)	if (dtrace_verbose_ioctl) printf(fmt, ## __VA_ARGS__ )
+#define DTRACE_IOCTL_PRINTF(fmt, ...) \
+	if (dtrace_verbose_ioctl)     \
+	printf(fmt, ##__VA_ARGS__)
 
 #define CAP_USPACE SV_CURPROC_FLAG(SV_CHERI)
-#define CORRECT_CAP_VERSION(BASE, VAR) (CAP_USPACE ? 	&BASE.BASE.VAR : \
-														&BASE.BASE##_64.VAR)
+#define CORRECT_CAP_VERSION(BASE, VAR) \
+	(CAP_USPACE ? &BASE.BASE.VAR : &BASE.BASE##_64.VAR)
 
 static int
 dtrace_ioctl_helper(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
@@ -117,8 +119,8 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 	switch (cmd) {
 	case DTRACEIOC_AGGDESC_64:
 	case DTRACEIOC_AGGDESC: {
-		dtrace_aggdesc_t *__capability * paggdesc =
-				(dtrace_aggdesc_t *__capability *) addr;
+		dtrace_aggdesc_t *__capability *paggdesc =
+		    (dtrace_aggdesc_t * __capability *)addr;
 		union dtrace_aggdesc_union aggdesc;
 		dtrace_action_t *act;
 		dtrace_aggregation_t *agg;
@@ -129,19 +131,22 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 		size_t size;
 		uintptr_t dest;
 
-		DTRACE_IOCTL_PRINTF("%s(%d): DTRACEIOC_AGGDESC\n",__func__,__LINE__);
+		DTRACE_IOCTL_PRINTF(
+		    "%s(%d): DTRACEIOC_AGGDESC\n", __func__, __LINE__);
 
-		dtrace_aggdesc_t *__capability paggdesc_cap =
-				CAP_USPACE ? *paggdesc : __USER_CAP_OBJ(
-						*(dtrace_aggdesc_t **) addr);
+		dtrace_aggdesc_t *__capability paggdesc_cap = CAP_USPACE ?
+		    *paggdesc :
+		    __USER_CAP_OBJ(*(dtrace_aggdesc_t **)addr);
 
-		if (copyincap(paggdesc_cap, &aggdesc, sizeof (aggdesc)) != 0)
+		if (copyincap(paggdesc_cap, &aggdesc, sizeof(aggdesc)) != 0)
 			return (EFAULT);
 
 		mutex_enter(&dtrace_lock);
 
-		dtrace_aggid_t *dtagd_id = CORRECT_CAP_VERSION(aggdesc, dtagd_id);
-		dtrace_epid_t *dtagd_epid = CORRECT_CAP_VERSION(aggdesc, dtagd_epid);
+		dtrace_aggid_t *dtagd_id =
+		    CORRECT_CAP_VERSION(aggdesc, dtagd_id);
+		dtrace_epid_t *dtagd_epid =
+		    CORRECT_CAP_VERSION(aggdesc, dtagd_epid);
 		int *dtagd_nrecs = CORRECT_CAP_VERSION(aggdesc, dtagd_nrecs);
 		uint32_t *dtagd_size = CORRECT_CAP_VERSION(aggdesc, dtagd_size);
 
@@ -189,16 +194,18 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 		 * across the copyout(), below.
 		 */
 		size_t sizeof_aggdesc = CAP_USPACE ?
-								sizeof(dtrace_aggdesc_t)
-										   : sizeof(dtrace_aggdesc_64_t);
-		size = sizeof_aggdesc + (*dtagd_nrecs * sizeof(dtrace_recdesc_t));
+		    sizeof(dtrace_aggdesc_t) :
+		    sizeof(dtrace_aggdesc_64_t);
+		size =
+		    sizeof_aggdesc + (*dtagd_nrecs * sizeof(dtrace_recdesc_t));
 
 		buf = kmem_alloc(size, KM_SLEEP);
 		dest = (uintptr_t)buf;
 
-		bcopy(&aggdesc, (void *) dest, sizeof_aggdesc);
-		dest += CAP_USPACE ? offsetof(dtrace_aggdesc_t, dtagd_rec[0])
-						   : offsetof(dtrace_aggdesc_64_t, dtagd_rec[0]);
+		bcopy(&aggdesc, (void *)dest, sizeof_aggdesc);
+		dest += CAP_USPACE ?
+		    offsetof(dtrace_aggdesc_t, dtagd_rec[0]) :
+		    offsetof(dtrace_aggdesc_64_t, dtagd_rec[0]);
 
 		for (act = agg->dtag_first; ; act = act->dta_next) {
 			dtrace_recdesc_t rec = act->dta_rec;
@@ -236,18 +243,19 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 	case DTRACEIOC_AGGSNAP:
 	case DTRACEIOC_BUFSNAP:
 	case DTRACEIOC_BUFSNAP_64: {
-		dtrace_bufdesc_t *__capability *pdesc = (dtrace_bufdesc_t *__capability *) addr;
+		dtrace_bufdesc_t *__capability *pdesc =
+		    (dtrace_bufdesc_t * __capability *)addr;
 		union dtrace_bufdesc_union desc;
 		caddr_t cached;
 		dtrace_buffer_t *buf;
 
 		dtrace_debug_output();
 
-		dtrace_bufdesc_t *__capability pdesc_cap =
-				CAP_USPACE ? *pdesc
-						   : __USER_CAP_OBJ(*(dtrace_bufdesc_t **) addr);
-		size_t sizeof_bufdesc = CAP_USPACE ? sizeof(desc.desc)
-										   : sizeof(desc.desc_64);
+		dtrace_bufdesc_t *__capability pdesc_cap = CAP_USPACE ?
+		    *pdesc :
+		    __USER_CAP_OBJ(*(dtrace_bufdesc_t **)addr);
+		size_t sizeof_bufdesc =
+		    CAP_USPACE ? sizeof(desc.desc) : sizeof(desc.desc_64);
 		if (copyincap(pdesc_cap, &desc, sizeof_bufdesc) != 0)
 			return (EFAULT);
 
@@ -256,12 +264,12 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 		uint32_t *dtbd_errors = CORRECT_CAP_VERSION(desc, dtbd_errors);
 		uint64_t *dtbd_drops = CORRECT_CAP_VERSION(desc, dtbd_drops);
 		uint64_t *dtbd_oldest = CORRECT_CAP_VERSION(desc, dtbd_oldest);
-		uint64_t *dtbd_timestamp = CORRECT_CAP_VERSION(desc, dtbd_timestamp);
+		uint64_t *dtbd_timestamp =
+		    CORRECT_CAP_VERSION(desc, dtbd_timestamp);
 
 		char *__capability desc_dtbd_data = CAP_USPACE ?
-											desc.desc.dtbd_data
-													   : __USER_CAP_STR(
-													desc.desc_64.dtbd_data);
+		    desc.desc.dtbd_data :
+		    __USER_CAP_STR(desc.desc_64.dtbd_data);
 
 		DTRACE_IOCTL_PRINTF("%s(%d): %s curcpu %d cpu %d\n",
 		    __func__,__LINE__,
@@ -317,7 +325,8 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 				sz = buf->dtb_size;
 			}
 
-			if (copyout_c(buf->dtb_tomax, desc_dtbd_data, sz) != 0) {
+			if (copyout_c(buf->dtb_tomax, desc_dtbd_data, sz) !=
+			    0) {
 				mutex_exit(&dtrace_lock);
 				return (EFAULT);
 			}
@@ -412,7 +421,8 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 	}
 	case DTRACEIOC_DOFGET_64:
 	case DTRACEIOC_DOFGET: {
-		dof_hdr_t * __capability * pdof = (dof_hdr_t *__capability*) addr;
+		dof_hdr_t *__capability *pdof =
+		    (dof_hdr_t * __capability *)addr;
 		dof_hdr_t hdr, *dof;
 		int rval;
 		uint64_t len;
@@ -420,9 +430,9 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 		DTRACE_IOCTL_PRINTF("%s(%d): DTRACEIOC_DOFGET\n",__func__,__LINE__);
 
 		dof_hdr_t *__capability pdof_cap =
-				CAP_USPACE ? *pdof : __USER_CAP_OBJ(*(dof_hdr_t **) addr);
+		    CAP_USPACE ? *pdof : __USER_CAP_OBJ(*(dof_hdr_t **)addr);
 
-		if (copyincap(pdof_cap, &hdr, sizeof (hdr)) != 0)
+		if (copyincap(pdof_cap, &hdr, sizeof(hdr)) != 0)
 			return (EFAULT);
 
 		mutex_enter(&dtrace_lock);
@@ -444,16 +454,16 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 		int err = 0;
 		int rval;
 
-		void * __capability dof_ptr;
+		void *__capability dof_ptr;
 		int *n_matched;
 
 		if (!CAP_USPACE) {
-			dtrace_enable_io_64_t *p = (dtrace_enable_io_64_t *) addr;
+			dtrace_enable_io_64_t *p =
+			    (dtrace_enable_io_64_t *)addr;
 			dof_ptr = __USER_CAP_OBJ(p->dof);
 			n_matched = &p->n_matched;
-		}
-		else {
-			dtrace_enable_io_t *p = (dtrace_enable_io_t *) addr;
+		} else {
+			dtrace_enable_io_t *p = (dtrace_enable_io_t *)addr;
 			dof_ptr = p->dof;
 			n_matched = &p->n_matched;
 		}
@@ -514,7 +524,8 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 	}
 	case DTRACEIOC_EPROBE_64:
 	case DTRACEIOC_EPROBE: {
-		dtrace_eprobedesc_t * __capability *pepdesc = (dtrace_eprobedesc_t *__capability*) addr;
+		dtrace_eprobedesc_t *__capability *pepdesc =
+		    (dtrace_eprobedesc_t * __capability *)addr;
 		dtrace_eprobedesc_t epdesc;
 		dtrace_ecb_t *ecb;
 		dtrace_action_t *act;
@@ -525,9 +536,10 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 
 		DTRACE_IOCTL_PRINTF("%s(%d): DTRACEIOC_EPROBE\n",__func__,__LINE__);
 
-		dtrace_eprobedesc_t * __capability pepdesc_cap = CAP_USPACE ?
-				*pepdesc : __USER_CAP_OBJ(*(dtrace_eprobedesc_t **)addr);
-		if (copyincap(pepdesc_cap, &epdesc, sizeof (epdesc)) != 0)
+		dtrace_eprobedesc_t *__capability pepdesc_cap = CAP_USPACE ?
+		    *pepdesc :
+		    __USER_CAP_OBJ(*(dtrace_eprobedesc_t **)addr);
+		if (copyincap(pepdesc_cap, &epdesc, sizeof(epdesc)) != 0)
 			return (EFAULT);
 
 		mutex_enter(&dtrace_lock);
@@ -604,13 +616,13 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 		int *dtfd_length;
 
 		if (!CAP_USPACE) {
-			dtrace_fmtdesc_64_t *fmt = (dtrace_fmtdesc_64_t *) addr;
+			dtrace_fmtdesc_64_t *fmt = (dtrace_fmtdesc_64_t *)addr;
 
 			dtfd_string = __USER_CAP_STR(fmt->dtfd_string);
 			dtfd_format = &fmt->dtfd_format;
 			dtfd_length = &fmt->dtfd_length;
 		} else {
-			dtrace_fmtdesc_t *fmt_c = (dtrace_fmtdesc_t *) addr;
+			dtrace_fmtdesc_t *fmt_c = (dtrace_fmtdesc_t *)addr;
 
 			dtfd_string = fmt_c->dtfd_string;
 			dtfd_format = &fmt_c->dtfd_format;
@@ -619,8 +631,7 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 
 		mutex_enter(&dtrace_lock);
 
-		if (*dtfd_format == 0 ||
-		    *dtfd_format > state->dts_nformats) {
+		if (*dtfd_format == 0 || *dtfd_format > state->dts_nformats) {
 			mutex_exit(&dtrace_lock);
 			return (EINVAL);
 		}
