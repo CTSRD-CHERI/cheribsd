@@ -4,7 +4,7 @@ properties([disableConcurrentBuilds(),
             disableResume(),
             [$class: 'GithubProjectProperty', displayName: '', projectUrlStr: 'https://github.com/CTSRD-CHERI/cheribsd/'],
             [$class: 'CopyArtifactPermissionProperty', projectNames: '*'],
-            [$class: 'JobPropertyImpl', throttle: [count: 2, durationName: 'hour', userBoost: true]],
+            rateLimitBuilds([count: 1, durationName: 'hour', userBoost: true]),
             durabilityHint('PERFORMANCE_OPTIMIZED'),
             pipelineTriggers([githubPush()])
 ])
