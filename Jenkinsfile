@@ -16,7 +16,7 @@ for (i in ["mips-nocheri", "cheri", "purecap"]) {
     String name = "cheribsd-${suffix}"
     jobs[name] = { ->
         cheribuildProject(target: "cheribsd-${suffix}", cpu: suffix == 'mips-nocheri' ? 'mips': 'cheri128',
-            extraArgs: '--cheribsd/build-options=-s --cheribsd/no-debug-info -p',
+            extraArgs: '--cheribsd/build-options=-s --cheribsd/no-debug-info',
             skipArchiving: true,
             customGitCheckoutDir: 'cheribsd',
             runTests: false, /* TODO: run cheritest */)
