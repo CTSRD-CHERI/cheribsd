@@ -18,6 +18,7 @@ for (i in ["mips-nocheri", "cheri", "purecap", "riscv64", "riscv64-hybrid", "ris
         cheribuildProject(target: "cheribsd-${suffix}",
             extraArgs: '--cheribsd/build-options=-s --cheribsd/no-debug-info',
             skipArchiving: true,
+            sdkCompilerOnly: true, // We only need clang not the CheriBSD sysroot since we are building that.
             customGitCheckoutDir: 'cheribsd',
             gitHubStatusContext: "ci/${suffix}",
             runTests: false, /* TODO: run cheritest */)
