@@ -38,6 +38,8 @@ CFLAGS+=	-Wno-deprecated-declarations
 
 FILESGROUPS=	DOCS EXAMPLES MISC STORE
 
+# Install a minimal default config that uses the 'tests' user.
+# The examples config is not appropriate for general use.
 CONFS=		kyua.conf-default
 CONFSDIR=	${KYUA_CONFDIR}
 CONFSNAME=	kyua.conf
