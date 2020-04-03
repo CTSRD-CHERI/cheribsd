@@ -9,25 +9,28 @@ properties([disableConcurrentBuilds(),
             pipelineTriggers([githubPush()])
 ])
 
-jobs = []
+jobs = [:]
 
 for (i in ["mips-nocheri", "cheri", "purecap"]) {
     String suffix = "${i}" // work around stupid groovy lambda captures
     String name = "cheribsd-${suffix}"
-    jobs[name] = cheribuildProject(target: "cheribsd-${suffix}", cpu: suffix == 'mips-nocheri' ? 'mips': 'cheri128',
+    jobs[name] = { ->
+        cheribuildProject(target: "cheribsd-${suffix}", cpu: suffix == 'mips-nocheri' ? 'mips': 'cheri128',
             extraArgs: '--cheribsd/build-options=-s --cheribsd/no-debug-info',
             skipArchiving: true,
             customGitCheckoutDir: 'cheribsd',
             runTests: false, /* TODO: run cheritest */)
+    }
 }
 
 boolean runParallel = true;
+echo("Running jobs in parallel: ${runParallel}")
 if (runParallel) {
     jobs.failFast = true
     parallel jobs
 } else {
     jobs.each { key, value ->
-        echo("RUNNING $key")
+        echo("RUNNING ${key}")
         value();
     }
 }
