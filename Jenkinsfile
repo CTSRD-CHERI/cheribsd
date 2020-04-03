@@ -20,6 +20,7 @@ for (i in ["mips-nocheri", "cheri", "purecap", "riscv64", "riscv64-hybrid", "ris
             skipArchiving: true,
             sdkCompilerOnly: true, // We only need clang not the CheriBSD sysroot since we are building that.
             customGitCheckoutDir: 'cheribsd',
+            stageSuffix: "${suffix}",
             gitHubStatusContext: "ci/${suffix}",
             runTests: false, /* TODO: run cheritest */)
     }
