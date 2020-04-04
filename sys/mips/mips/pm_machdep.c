@@ -766,6 +766,7 @@ exec_setregs(struct thread *td, struct image_params *imgp, uintcap_t stack)
 	    PCPU_SET(fpcurthread, (struct thread *)0);
 	td->td_md.md_ss_addr = 0;
 
+	td->td_md.md_tls = NULL;
 #ifdef COMPAT_FREEBSD32
 	if (SV_PROC_FLAG(td->td_proc, SV_ILP32))
 		td->td_md.md_tls_tcb_offset = TLS_TP_OFFSET32 + TLS_TCB_SIZE32;
