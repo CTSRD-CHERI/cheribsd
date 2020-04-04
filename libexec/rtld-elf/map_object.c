@@ -400,6 +400,7 @@ map_object(int fd, const char *path, const struct stat *sb, const char* main_pat
 	obj->tlsindex = ++tls_max_index;
 	obj->tlssize = phtls->p_memsz;
 	obj->tlsalign = phtls->p_align;
+	obj->tlspoffset = phtls->p_offset;
 	obj->tlsinitsize = phtls->p_filesz;
 	obj->tlsinit = mapbase + phtls->p_vaddr;
     }
