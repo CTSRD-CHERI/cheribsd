@@ -228,7 +228,7 @@ skip_start:
 		if (len < mlen)
 			mlen = len;
 
-		if ((clen ^ (uintptr_t)addr) & 1)
+		if ((clen ^ (vaddr_t)addr) & 1)
 			sum += in_cksumdata(addr, mlen) << 8;
 		else
 			sum += in_cksumdata(addr, mlen);
@@ -250,7 +250,7 @@ u_int in_cksum_hdr(const struct ip *ip)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20200123,
+//   "updated": 20200402,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "pointer_alignment",

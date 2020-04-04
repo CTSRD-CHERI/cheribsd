@@ -937,7 +937,7 @@ vmem_fit(const bt_t *bt, vmem_size_t size, vmem_size_t align,
 		start = VMEM_ALIGNUP(start - phase, nocross) + phase;
 	}
 	if (start <= end && (vaddr_t)end - (vaddr_t)start >= size - 1) {
-		MPASS((start & (align - 1)) == phase);
+		MPASS(((vaddr_t)start & (align - 1)) == phase);
 		MPASS(!VMEM_CROSS_P(start, start + size - 1, nocross));
 		MPASS(minaddr <= start);
 		MPASS(maxaddr == 0 || start + size - 1 <= maxaddr);
@@ -1802,12 +1802,13 @@ vmem_check(vmem_t *vm)
 #endif /* defined(DIAGNOSTIC) */
 // CHERI CHANGES START
 // {
-//   "updated": 20200123,
+//   "updated": 20200402,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "uintptr_interp_offset",
 //     "pointer_shape",
-//     "support"
+//     "support",
+//     "pointer_alignment"
 //   ]
 // }
 // CHERI CHANGES END

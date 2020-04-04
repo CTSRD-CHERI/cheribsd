@@ -870,9 +870,9 @@ ata_pio_read(struct ata_request *request, int length)
 		/* Process main part of data. */
 		resid = size % 2;
 		if (__predict_false((ch->flags & ATA_USE_16BIT) ||
-		    (size % 4) != 0 || ((uintptr_t)addr % 4) != 0)) {
+		    (size % 4) != 0 || is_aligned(addr, 4) != 0)) {
 #ifndef __NO_STRICT_ALIGNMENT
-			if (__predict_false((uintptr_t)addr % 2)) {
+			if (__predict_false(is_aligned(addr, 2))) {
 				for (i = 0; i + 1 < size; i += 2) {
 					*(uint16_t *)&buf =
 					    ATA_IDX_INW_STRM(ch, ATA_DATA);
@@ -961,9 +961,9 @@ ata_pio_write(struct ata_request *request, int length)
 		/* Process main part of data. */
 		resid = size % 2;
 		if (__predict_false((ch->flags & ATA_USE_16BIT) ||
-		    (size % 4) != 0 || ((uintptr_t)addr % 4) != 0)) {
+		    (size % 4) != 0 || is_aligned(addr, 4) != 0)) {
 #ifndef __NO_STRICT_ALIGNMENT
-			if (__predict_false((uintptr_t)addr % 2)) {
+			if (__predict_false(is_aligned(addr, 2))) {
 				for (i = 0; i + 1 < size; i += 2) {
 					buf[0] = addr[i];
 					buf[1] = addr[i + 1];
@@ -1005,11 +1005,12 @@ ata_pio_write(struct ata_request *request, int length)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20200123,
+//   "updated": 20200402,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "uintptr_interp_offset",
-//     "pointer_as_integer"
+//     "pointer_as_integer",
+//     "pointer_alignment"
 //   ]
 // }
 // CHERI CHANGES END
