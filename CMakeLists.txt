@@ -85,6 +85,8 @@ void __builtin_cheri_type_check(void* __capability, void* __capability);
 void* __capability __builtin_cheri_global_data_get(void);
 void* __capability __builtin_cheri_program_counter_get(void);
 void* __capability __builtin_cheri_stack_get(void);
+void* __capability __builtin_cheri_bounds_set(void* __capability, long);
+void* __capability __builtin_cheri_bounds_set_exact(void* __capability, long);
 // #define INVARIANTS 1
 // #define MAC 1
 // #define AUDIT 1")
