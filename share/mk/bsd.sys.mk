@@ -213,6 +213,8 @@ CWARNFLAGS+=	-Wno-error=void-pointer-to-enum-cast
 .if ${COMPILER_TYPE} == "clang" && ${COMPILER_VERSION} == 110000
 CWARNFLAGS+=	-Wno-unknown-warning-option
 .endif
+# XXXAR: Build with -fcommon until we have merged all upstream build fixes
+CFLAGS.clang+=	-fcommon
 .endif
 
 # How to handle FreeBSD custom printf format specifiers.
