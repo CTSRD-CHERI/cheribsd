@@ -462,14 +462,17 @@ test_unaligned_capability_copy_memcpy(const struct cheri_test *ctp __unused)
 	cheritest_memcpy(dest_buffer + 1 /* unaligned! */, src_buffer, sizeof(src_buffer));
 	/* TODO: verify the contents of the buffer? */
 
-	/* Now place a valid capability in buffer[1] and check that it causes a fault */
+	/* Even if we have a valid cap and operate misaligned, we should not fault. */
 	src_buffer[1] = (__cheri_tocap void* __capability)&strcpy;
 	CHERITEST_VERIFY(!cheri_gettag(src_buffer[0]));
 	CHERITEST_VERIFY(cheri_gettag(src_buffer[1]));
 
 	cheritest_memcpy(dest_buffer + 1 /* unaligned! */, src_buffer, sizeof(src_buffer));
-	/* should have aborted: */
-	cheritest_failure_errx("memcpy() of an unaligned capability succeeded unexpectedly");
+	CHERITEST_VERIFY(!cheri_gettag(((void * __capability *)dest_buffer)[0]));
+	CHERITEST_VERIFY(!cheri_gettag(((void * __capability *)dest_buffer)[1]));
+	/* TODO: verify the contents of the buffer? */
+
+	cheritest_success();
 }
 
 void
@@ -492,14 +495,17 @@ test_unaligned_capability_copy_memmove(const struct cheri_test *ctp __unused)
 	cheritest_memmove(dest_buffer + 1 /* unaligned! */, src_buffer, sizeof(src_buffer));
 	/* TODO: verify the contents of the buffer? */
 
-	/* Now place a valid capability in buffer[1] and check that it causes a fault */
+	/* Even if we have a valid cap and operate misaligned, we should not fault. */
 	src_buffer[1] =  (__cheri_tocap void* __capability)&strcpy;
 	CHERITEST_VERIFY(!cheri_gettag(src_buffer[0]));
 	CHERITEST_VERIFY(cheri_gettag(src_buffer[1]));
 
 	cheritest_memmove(dest_buffer + 1 /* unaligned! */, src_buffer, sizeof(src_buffer));
-	/* should have aborted: */
-	cheritest_failure_errx("memmove() of an unaligned capability succeeded unexpectedly");
+	CHERITEST_VERIFY(!cheri_gettag(((void * __capability *)dest_buffer)[0]));
+	CHERITEST_VERIFY(!cheri_gettag(((void * __capability *)dest_buffer)[1]));
+	/* TODO: verify the contents of the buffer? */
+
+	cheritest_success();
 }
 
 #ifdef KERNEL_MEMCPY_TESTS
