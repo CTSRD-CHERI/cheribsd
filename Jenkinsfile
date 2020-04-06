@@ -11,9 +11,7 @@ properties([disableConcurrentBuilds(),
 
 jobs = [:]
 
-// TODO: enable all targets once native build works
-// ["mips-nocheri", "cheri", "purecap", "riscv64", "riscv64-hybrid", "riscv64-purecap", "native"].each { suffix ->
-["purecap", "riscv64-purecap"].each { suffix ->
+["mips-nocheri", "cheri", "purecap", "riscv64", "riscv64-hybrid", "riscv64-purecap", "native"].each { suffix ->
     String name = "cheribsd-${suffix}"
     jobs[name] = { ->
         cheribuildProject(target: "cheribsd", architecture: suffix,
