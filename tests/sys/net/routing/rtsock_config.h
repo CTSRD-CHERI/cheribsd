@@ -30,6 +30,12 @@
 #ifndef _NET_ROUTING_RTSOCK_CONFIG_H_
 #define _NET_ROUTING_RTSOCK_CONFIG_H_
 
+#include "params.h"
+
+struct rtsock_config_options {
+	int num_interfaces;	/* number of interfaces to create */
+};
+
 struct rtsock_test_config {
 	int ifindex;
 	char net4_str[INET_ADDRSTRLEN];
@@ -46,30 +52,29 @@ struct rtsock_test_config {
 	int plen6;
 	char *remote_lladdr;
 	char *ifname;
+	char **ifnames;
 	bool autocreated_interface;
 	int rtsock_fd;
+	int num_interfaces;
 };
 
 struct rtsock_test_config *
-config_setup_base(const atf_tc_t *tc)
+config_setup(const atf_tc_t *tc, struct rtsock_config_options *co)
 {
-	struct rtsock_test_config *c;
-
-	c = calloc(1, sizeof(struct rtsock_test_config));
-	c->rtsock_fd = -1;
-
-	return c;
-}
-
-struct rtsock_test_config *
-config_setup(const atf_tc_t *tc)
-{
+	struct rtsock_config_options default_co;
 	struct rtsock_test_config *c;
 	char buf[64], *s;
 	const char *key;
 	int mask;
 
-	c = config_setup_base(tc);
+	if (co == NULL) {
+		bzero(&default_co, sizeof(default_co));
+		co = &default_co;
+		co->num_interfaces = 1;
+	}
+
+	c = calloc(1, sizeof(struct rtsock_test_config));
+	c->rtsock_fd = -1;
 
 	key = atf_tc_get_config_var_wd(tc, "rtsock.v4prefix", "192.0.2.0/24");
 	strlcpy(buf, key, sizeof(buf));
@@ -121,20 +126,17 @@ config_setup(const atf_tc_t *tc)
 	inet_ntop(AF_INET6, &c->net6.sin6_addr, c->net6_str, INET6_ADDRSTRLEN);
 	inet_ntop(AF_INET6, &c->addr6.sin6_addr, c->addr6_str, INET6_ADDRSTRLEN);
 
-	c->ifname = strdup(atf_tc_get_config_var_wd(tc, "rtsock.ifname", "tap4242"));
-	c->autocreated_interface = atf_tc_get_config_var_as_bool_wd(tc, "rtsock.create_interface", true);
+	if (co->num_interfaces > 0) {
+		c->ifnames = calloc(co->num_interfaces, sizeof(char *));
+		for (int i = 0; i < co->num_interfaces; i++)
+			c->ifnames[i] = iface_create("epair");
 
-	if (c->autocreated_interface && (if_nametoindex(c->ifname) == 0))
-       	{
-		/* create our own interface */
-		char new_ifname[IFNAMSIZ];
-		strlcpy(new_ifname, c->ifname, sizeof(new_ifname));
-		int ret = iface_create_cloned(new_ifname);
-		ATF_REQUIRE_MSG(ret != 0, "tap interface creation failed: %s", strerror(errno));
-		c->ifname = strdup(new_ifname);
+		c->ifname = c->ifnames[0];
+		c->ifindex = if_nametoindex(c->ifname);
+		ATF_REQUIRE_MSG(c->ifindex != 0, "interface %s not found",
+		    c->ifname);
 	}
-	c->ifindex = if_nametoindex(c->ifname);
-	ATF_REQUIRE_MSG(c->ifindex != 0, "inteface %s not found", c->ifname);
+	c->num_interfaces = co->num_interfaces;
 
 	c->remote_lladdr = strdup(atf_tc_get_config_var_wd(tc,
 	    "rtsock.remote_lladdr", "00:00:5E:00:53:42"));
@@ -143,13 +145,18 @@ config_setup(const atf_tc_t *tc)
 }
 
 void
-config_generic_cleanup(struct rtsock_test_config *c)
+config_generic_cleanup(const atf_tc_t *tc)
 {
-	if (c->ifname != NULL && c->autocreated_interface) {
-		iface_destroy(c->ifname);
-		free(c->ifname);
-		c->ifname = NULL;
-	}
+	const char *srcdir = atf_tc_get_config_var(tc, "srcdir");
+	char cmd[512];
+	int ret;
+
+	/* XXX: sleep 100ms to avoid epair qflush panic */
+	usleep(1000 * 100);
+	snprintf(cmd, sizeof(cmd), "%s/generic_cleanup.sh", srcdir);
+	ret = system(cmd);
+	if (ret != 0)
+		RLOG("'%s' failed, error %d", cmd, ret);
 }
 
 void
