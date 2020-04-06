@@ -334,8 +334,21 @@ test_initregs_default(const struct cheri_test *ctp __unused)
  */
 #ifdef __CHERI_PURE_CAPABILITY__
 
-#define CHERI_STACK_OFFSET_MAX 0x7fffff
-#define CHERI_STACK_OFFSET_MIN 0x7fc000
+/*
+ * Following along in kern_exec.c, ...
+ *
+ * 1. We don't specify the size of the stack in the GNU_STACK program header,
+ * 2. At least on CHERI-MIPS, sv_maxssiz == NULL
+ * 3. maxssiz is set by sysctl (sys/kern/subr_param.c),
+ *    but on CHERI-MIPS defaults to 64MiB (see MAXSSIZ in
+ *    sys/mips/include/vmparam.h).
+ *
+ * So, require our stack offset to be somewhere in the first 256KiB.  That
+ * should be plenty of room for the aux vector and args and all that.
+ */
+
+#define CHERI_STACK_OFFSET_MAX 0x4000000
+#define CHERI_STACK_OFFSET_MIN 0x3fc0000
 
 void
 test_initregs_stack_user_perms(const struct cheri_test *ctp __unused)

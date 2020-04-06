@@ -708,7 +708,7 @@ linux_exec_setregs(struct thread *td, struct image_params *imgp,
 	regs->tf_ss = _udatasel;
 	regs->tf_flags = TF_HASSEGS;
 	regs->tf_cs = _ucode32sel;
-	regs->tf_rbx = imgp->ps_strings;
+	regs->tf_rbx = (register_t)imgp->ps_strings;
 
 	fpstate_drop(td);
 
@@ -742,7 +742,7 @@ linux_copyout_strings(struct image_params *imgp, uintptr_t *stack_base)
 	if (execpath_len != 0) {
 		destp -= execpath_len;
 		destp = rounddown2(destp, sizeof(uint32_t));
-		imgp->execpathp = destp;
+		imgp->execpathp = (void *)destp;
 		error = copyout(imgp->execpath, (void *)destp, execpath_len);
 		if (error != 0)
 			return (error);
@@ -751,7 +751,7 @@ linux_copyout_strings(struct image_params *imgp, uintptr_t *stack_base)
 	/* Prepare the canary for SSP. */
 	arc4rand(canary, sizeof(canary), 0);
 	destp -= roundup(sizeof(canary), sizeof(uint32_t));
-	imgp->canary = destp;
+	imgp->canary = (void *)destp;
 	error = copyout(canary, (void *)destp, sizeof(canary));
 	if (error != 0)
 		return (error);
