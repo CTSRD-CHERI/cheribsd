@@ -1788,12 +1788,12 @@ usage(void)
 "    -f  -- Only include \"fast\" tests\n"
 "    -c  -- Enable core dumps\n"
 "    -d  -- Attach debugger before running test\n"
-"    -j  -- Output JUnit XML format\n"
 "    -s  -- Sleep one second after each test\n"
 "    -q  -- Enable qemu tracing in test process\n"
 "    -Q  -- Enable qemu tracing in test process (user-mode only)\n"
 "    -u  -- Only include unsandboxed tests\n"
 "    -v  -- Increase verbosity\n"
+"    -x  -- Output JUnit XML format\n"
 	     );
 	exit(EX_USAGE);
 }
@@ -2335,7 +2335,7 @@ main(int argc, char *argv[])
 	argc = xo_parse_args(argc, argv);
 	if (argc < 0)
 		errx(1, "xo_parse_args failed\n");
-	while ((opt = getopt(argc, argv, "acdfgjlQqsuv")) != -1) {
+	while ((opt = getopt(argc, argv, "acdfglQqsuvx")) != -1) {
 		switch (opt) {
 		case 'a':
 			run_all = 1;
@@ -2351,11 +2351,6 @@ main(int argc, char *argv[])
 			break;
 		case 'g':
 			glob = 1;
-			break;
-		case 'j': /* JUnit XML output */
-			/* XXX: allow an argument to specify output file? */
-			xo_set_style(NULL, XO_STYLE_XML);
-			xo_set_flags(NULL, XOF_PRETTY);
 			break;
 		case 'l':
 			list = 1;
@@ -2383,6 +2378,11 @@ main(int argc, char *argv[])
 			break;
 		case 'v':
 			verbose++;
+			break;
+		case 'x': /* JUnit XML output */
+			/* XXX: allow an argument to specify output file? */
+			xo_set_style(NULL, XO_STYLE_XML);
+			xo_set_flags(NULL, XOF_PRETTY);
 			break;
 		default:
 			warnx("unknown argument %c\n", opt);
