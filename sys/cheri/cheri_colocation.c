@@ -71,6 +71,10 @@ void * __capability	switcher_sealcap2 = (void * __capability)-1;
 
 struct mtx		switcher_lock;
 
+static int colocation_debug;
+SYSCTL_INT(_debug, OID_AUTO, colocation_debug, CTLFLAG_RWTUN,
+    &colocation_debug, 0, "Enable process colocation debugging");
+
 static void
 colocation_startup(void)
 {
@@ -235,12 +239,16 @@ colocation_unborrow(struct thread *td, struct trapframe **trapframep)
 	KASSERT(peertd != td,
 	    ("%s: peertd %p == td %p\n", __func__, peertd, td));
 
-#if 0
-	printf("%s: replacing current td %p, switchercb %#lx, md_tls %p, md_tls_tcb_offset %zd, "
-	    "with td %p, switchercb %#lx, md_tls %p, md_tls_tcb_offset %zd\n", __func__,
-	    td, td->td_md.md_scb, (__cheri_fromcap void *)td->td_md.md_tls, td->td_md.md_tls_tcb_offset,
-	    peertd, peertd->td_md.md_scb, (__cheri_fromcap void *)peertd->td_md.md_tls, peertd->td_md.md_tls_tcb_offset);
-#endif
+	if (colocation_debug) {
+		printf("%s: replacing current td %p, pid %d (%s), switchercb %#lx, "
+		    "md_tls %p, md_tls_tcb_offset %zd, "
+		    "with td %p, pid %d (%s), switchercb %#lx, "
+		    "md_tls %p, md_tls_tcb_offset %zd\n", __func__,
+		    td, td->td_proc->p_pid, td->td_proc->p_comm, td->td_md.md_scb,
+		    (__cheri_fromcap void *)td->td_md.md_tls, td->td_md.md_tls_tcb_offset,
+		    peertd, peertd->td_proc->p_pid, peertd->td_proc->p_comm, peertd->td_md.md_scb,
+		    (__cheri_fromcap void *)peertd->td_md.md_tls, peertd->td_md.md_tls_tcb_offset);
+	}
 
 	/*
 	 * Assign our trapframe (userspace context) to the thread waiting
