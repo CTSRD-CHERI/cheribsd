@@ -4,6 +4,10 @@ PACKAGE=			tests
 
 .include <bsd.own.mk>
 
+.if ${MACHINE_ABI:Mpurecap}
+ATF_TESTS_C+=			coexecve_test
+.endif
+
 .if ${MACHINE_CPUARCH} != "aarch64" && ${MACHINE_CPUARCH} != "riscv" && \
     !${MACHINE_ABI:Mpurecap}
 ATF_TESTS_C+=			brk_test
