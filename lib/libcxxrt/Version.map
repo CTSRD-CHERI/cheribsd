@@ -315,6 +315,14 @@ CXXRT_1.0 {
     __cxa_increment_exception_refcount;
     __cxa_rethrow_primary_exception;
 
+    /*
+     * HACK: also include the type_info values capabilities (U3cap) mangling
+     * Note: this is the wrong version but it seems we can't add wildcards for
+     * mangled names.
+     */
+    _ZNKSt9type_info*U3cap*;
+    _ZTIU3cap*;
+    _ZTSU3cap*;
 } CXXABI_1.3.6;
 
 
