@@ -29,6 +29,8 @@ endif()
 
 include_directories(${CMAKE_SOURCE_DIR}/include)
 include_directories(${CMAKE_SOURCE_DIR}/sys)
+include_directories(${CMAKE_SOURCE_DIR}/contrib/libxo)
+include_directories(${CMAKE_SOURCE_DIR}/contrib/libc-vis)
 
 set(TMPSYSROOT ${CMAKE_BINARY_DIR}/sysroot/usr)
 add_compile_options(--sysroot=${CMAKE_BINARY_DIR}/sysroot/)
@@ -99,6 +101,7 @@ enable_language(C)
 enable_language(CXX)
 
 # Ensure that we can find the clang builtin headers
+add_compile_options(-nostdinc)
 add_compile_options(-nobuiltininc)
 add_compile_options(-v)
 execute_process(COMMAND ${CMAKE_C_COMPILER} -print-resource-dir OUTPUT_VARIABLE BUILTIN_HEADERS_DIR OUTPUT_STRIP_TRAILING_WHITESPACE)
