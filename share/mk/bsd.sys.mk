@@ -205,6 +205,7 @@ CXXWARNFLAGS+=	-Wno-error=deprecated-copy
 
 .if ${COMPILER_TYPE} == "clang" && ${COMPILER_VERSION} >= 110000
 CWARNFLAGS+=	-Wno-error=void-pointer-to-enum-cast
+CXXWARNFLAGS+=	-Wno-error=non-c-typedef-for-linkage
 # The void-pointer-to-enum-cast was introduced after first post-10.0 release
 # upstream merge, so to allow compilation to succeed with a compiler based on
 # the first merge and also those based on later merges, we have to ignore the
