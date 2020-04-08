@@ -7,6 +7,7 @@ PACKAGE=			tests
 .if ${MACHINE_ABI:Mpurecap}
 ATF_TESTS_C+=			coexecve_test
 ATF_TESTS_C+=			cosetup_test
+ATF_TESTS_C+=			coregister_test
 .endif
 
 .if ${MACHINE_CPUARCH} != "aarch64" && ${MACHINE_CPUARCH} != "riscv" && \
