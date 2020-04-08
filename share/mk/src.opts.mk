@@ -315,6 +315,12 @@ BROKEN_OPTIONS+=OFED
 BROKEN_OPTIONS+=LIB32
 .endif
 
+.ifdef COMPAT_64BIT
+# ofed needs to be part of the default build for headers to be available.
+# Since it isn't yet working under purecap, disable it here.
+BROKEN_OPTIONS+=OFED
+.endif
+
 # In-tree binutils/gcc are older versions without modern architecture support.
 .if ${__T} == "aarch64" || ${__T:Mriscv*} != ""
 BROKEN_OPTIONS+=BINUTILS BINUTILS_BOOTSTRAP GDB
