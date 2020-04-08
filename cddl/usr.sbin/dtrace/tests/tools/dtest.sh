@@ -74,7 +74,9 @@ runtest()
     err.*.ksh|tst.*.ksh)
         expr "$TFILE" : 'err.*' >/dev/null && exstatus=1
 
-        tst=$TFILE ksh "$TFILE" /usr/sbin/dtrace >$STDOUT 2>$STDERR
+        # TODO(nicomazz): here we should use ksh instead of sh for some test. It
+        #  should be changed when I find a way to install ksh
+        tst=$TFILE sh "$TFILE" /usr/sbin/dtrace >$STDOUT 2>$STDERR
         status=$?
 
         if [ $status -ne $exstatus ]; then
@@ -90,7 +92,8 @@ runtest()
 
     if [ $retval -eq 0 ] && \
         head -n 1 $STDOUT | grep -q -E '^#!/.*ksh$'; then
-        ksh $STDOUT
+        # TODO(nicomazz): here we should use ksh instead of sh for some test
+        sh $STDOUT
         retval=$?
     fi
 

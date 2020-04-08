@@ -13,6 +13,7 @@ makeoptions     KERNLOADADDR=0xffffffff80100000
 
 makeoptions     DEBUG="-g"
 makeoptions     WITH_CTF=1
+makeoptions     MODULES_OVERRIDE="dtrace/dtrace_test dtrace/dtraceall"
 
 options         KTRACE
 
@@ -44,7 +45,7 @@ device       dtrace_sdt
 device       dtrace_prototype
 device       dtrace_fbt
 device       dtrace_profile
-device        dtraceall
+device       dtraceall
 
 
 # Access host files on QEMU

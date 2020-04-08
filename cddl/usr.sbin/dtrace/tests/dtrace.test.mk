@@ -12,7 +12,9 @@ ${TESTGROUP}EXEPACKAGE=	${PACKAGE}
 
 TESTWRAPPER=	t_dtrace_contrib
 ATF_TESTS_SH+=	${TESTWRAPPER}
-TEST_METADATA.t_dtrace_contrib+= required_files="/usr/local/bin/ksh"
+# TODO(nicomazz): This is a temporary workaround. When ksh will be installed,
+# this should be decommented
+# TEST_METADATA.t_dtrace_contrib+= required_files="/usr/local/bin/ksh"
 TEST_METADATA.t_dtrace_contrib+= required_user="root"
 
 GENTEST?=	${.CURDIR:H:H}/tools/gentest.sh

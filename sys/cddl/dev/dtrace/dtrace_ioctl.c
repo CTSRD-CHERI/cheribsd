@@ -21,6 +21,9 @@
  * $FreeBSD$
  *
  */
+#include <sys/sysent.h>
+#include <cddl/contrib/opensolaris/uts/common/sys/dtrace.h>
+#include <sys/systm.h>
 
 static int dtrace_verbose_ioctl;
 SYSCTL_INT(_debug_dtrace, OID_AUTO, verbose_ioctl, CTLFLAG_RW,
@@ -53,8 +56,11 @@ dtrace_ioctl_helper(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 		dhp = (dof_helper_t *)addr;
 		addr = (caddr_t)(uintptr_t)dhp->dofhp_dof;
 		p = curproc;
+		dof_hdr_t *__capability dof_addr_cap =
+		    __USER_CAP_OBJ((dof_helper_t *)addr);
+
 		if (p->p_pid == dhp->dofhp_pid) {
-			dof = dtrace_dof_copyin((uintptr_t)addr, &rval);
+			dof = dtrace_dof_copyin((uintcap_t)dof_addr_cap, &rval);
 		} else {
 			p = pfind(dhp->dofhp_pid);
 			if (p == NULL)

@@ -29,6 +29,7 @@ atf_test_case $tcase
 ${tcase}_head()
 {
     atf_set 'descr' 'DTrace test ${CATEGORY}/${tfile}'
+    atf_set 'timeout' 20
 }
 ${tcase}_body()
 {

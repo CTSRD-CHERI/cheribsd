@@ -740,21 +740,21 @@ typedef struct dof_sec {
 	((x) == DOF_SECT_XLEXPORT) ||  ((x) == DOF_SECT_PREXPORT) || 	\
 	((x) == DOF_SECT_PRENOFFS))
 
+#if __has_feature(capabilities)
+typedef uintcap_t dtrace_uarg_t;
+#else
+typedef __uint128_t dtrace_uarg_t;
+#endif
+
 typedef struct dof_ecbdesc {
 	dof_secidx_t dofe_probes;	/* link to DOF_SECT_PROBEDESC */
 	dof_secidx_t dofe_pred;		/* link to DOF_SECT_DIFOHDR */
 	dof_secidx_t dofe_actions;	/* link to DOF_SECT_ACTDESC */
 	uint32_t dofe_pad;		/* reserved for future use */
-	kuintcap_t dofe_uarg;		/* user-supplied library argument */
+	dtrace_uarg_t dofe_uarg;		/* user-supplied library argument */
 } dof_ecbdesc_t;
 
-typedef struct dof_ecbdesc_64 {
-	dof_secidx_t dofe_probes;	/* link to DOF_SECT_PROBEDESC */
-	dof_secidx_t dofe_pred;		/* link to DOF_SECT_DIFOHDR */
-	dof_secidx_t dofe_actions;	/* link to DOF_SECT_ACTDESC */
-	uint32_t dofe_pad;		/* reserved for future use */
-	uintptr_t dofe_uarg;		/* user-supplied library argument */
-} dof_ecbdesc_64_t;
+_Static_assert(sizeof(dof_ecbdesc_t) == 32, "dof_ecbdesc_t has the wrong size");
 
 typedef struct dof_probedesc {
 	dof_secidx_t dofp_strtab;	/* link to DOF_SECT_STRTAB section */
@@ -771,8 +771,10 @@ typedef struct dof_actdesc {
 	uint32_t dofa_kind;		/* action kind (DTRACEACT_* constant) */
 	uint32_t dofa_ntuple;		/* number of subsequent tuple actions */
 	uint64_t dofa_arg;		/* kind-specific argument */
-	kuintcap_t dofa_uarg;
+	dtrace_uarg_t dofa_uarg;
 } dof_actdesc_t;
+
+_Static_assert(sizeof(dof_actdesc_t) == 48, "dof_actdesc_t has thewrong size");
 
 typedef struct dof_difohdr {
 	dtrace_diftype_t dofd_rtype;	/* return type for this fragment */
@@ -941,7 +943,7 @@ typedef struct dtrace_actdesc {
 	dtrace_actkind_t dtad_kind;		/* kind of action */
 	uint32_t dtad_ntuple;			/* number in tuple */
 	uint64_t dtad_arg;			/* action argument */
-	kuintcap_t dtad_uarg;			/* user argument */
+	dtrace_uarg_t dtad_uarg;			/* user argument */
 	int dtad_refcnt;			/* reference count */
 } dtrace_actdesc_t;
 
@@ -949,7 +951,7 @@ typedef struct dtrace_ecbdesc {
 	dtrace_actdesc_t *dted_action;		/* action description(s) */
 	dtrace_preddesc_t dted_pred;		/* predicate description */
 	dtrace_probedesc_t dted_probe;		/* probe description */
-	kuintcap_t dted_uarg;			/* library argument */
+	dtrace_uarg_t dted_uarg;			/* library argument */
 	int dted_refcnt;			/* reference count */
 } dtrace_ecbdesc_t;
 
@@ -977,14 +979,13 @@ typedef struct dtrace_recdesc {
 	uint16_t dtrd_alignment;		/* required alignment */
 	uint16_t dtrd_format;			/* format, if any */
 	uint64_t dtrd_arg;			/* action argument */
-	kuintcap_t dtrd_uarg;			/* user argument */
+	dtrace_uarg_t dtrd_uarg;			/* user argument */
 } dtrace_recdesc_t;
 
 typedef struct dtrace_eprobedesc {
 	dtrace_epid_t dtepd_epid;		/* enabled probe ID */
 	dtrace_id_t dtepd_probeid;		/* probe ID */
-	// TODO(nicomazz): differentiate between the two userspaces
-	kuintcap_t dtepd_uarg;			/* library argument */
+	dtrace_uarg_t dtepd_uarg;			/* library argument */
 	uint32_t dtepd_size;			/* total size */
 	int dtepd_nrecs;			/* number of records */
 	dtrace_recdesc_t dtepd_rec[1];		/* records themselves */
@@ -1002,12 +1003,6 @@ typedef struct dtrace_aggdesc {
 	dtrace_recdesc_t dtagd_rec[1];		/* record descriptions */
 } dtrace_aggdesc_t;
 
-typedef struct dtrace_fmtdesc {
-	DTRACE_PTR(char, dtfd_string);		/* format string */
-	int dtfd_length;			/* length of format string */
-	uint16_t dtfd_format;			/* format identifier */
-} dtrace_fmtdesc_t;
-
 typedef struct dtrace_aggdesc_64 {
 	char *dtagd_name;			/* not filled in by kernel */
 	dtrace_aggvarid_t dtagd_varid;		/* not filled in by kernel */
@@ -1024,6 +1019,12 @@ union dtrace_aggdesc_union {
 	dtrace_aggdesc_t aggdesc;
 	dtrace_aggdesc_64_t aggdesc_64;
 };
+
+typedef struct dtrace_fmtdesc {
+	DTRACE_PTR(char, dtfd_string);		/* format string */
+	int dtfd_length;			/* length of format string */
+	uint16_t dtfd_format;			/* format identifier */
+} dtrace_fmtdesc_t;
 
 typedef struct dtrace_fmtdesc_64 {
 	char *dtfd_string;			/* format string */

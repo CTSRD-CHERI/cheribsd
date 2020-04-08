@@ -81,6 +81,7 @@ $special
 .include "../../dtrace.test.mk"
 __EOF__
 
+    mkdir -p ${ORIGINDIR}/../${class}/${group}/
     mv -f $makefile ${ORIGINDIR}/../${class}/${group}/Makefile
 }
 

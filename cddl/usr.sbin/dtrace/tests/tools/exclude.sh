@@ -197,9 +197,11 @@ exclude EXFAIL common/usdt/tst.user.ksh
 exclude SKIP common/ustack/tst.spin.ksh
 
 ####
+# CHERI SPECIFIC EXCLUDE
 # The followings cause instability, make the system stuck, or timeout on CHERI.
 # With time, they should work
 ####
+
 # json gives problem
 exclude SKIP common/json/usdt.d
 
@@ -221,6 +223,130 @@ exclude SKIP builtinvar/t_dtrace_contrib:tst_arg0clause_d
 
 # causes core dump
 exclude SKIP bitfields/t_dtrace_contrib:tst_SizeofBitField_d
+
+# Some of them cause the system to stuck:
+exclude SKIP common/dtraceUtil/err.D_PDESC_ZERO.InvalidDescription1.d
+exclude SKIP common/dtraceUtil/man.AddSearchPath.d
+exclude SKIP common/dtraceUtil/man.APIVersion.d
+exclude SKIP common/dtraceUtil/man.CoalesceTrace.d
+exclude SKIP common/dtraceUtil/man.ELFGeneration.d
+exclude SKIP common/dtraceUtil/man.IncludedFilePath.d
+exclude SKIP common/dtraceUtil/man.ListProbesWithFunctions
+exclude SKIP common/dtraceUtil/man.ListProbesWithIDs
+exclude SKIP common/dtraceUtil/man.ListProbesWithModules
+exclude SKIP common/dtraceUtil/man.ListProbesWithNames
+exclude SKIP common/dtraceUtil/man.ListProbesWithProviders
+exclude SKIP common/dtraceUtil/man.ShowCompilerCode.d
+exclude SKIP common/dtraceUtil/man.TraceFunctions
+exclude SKIP common/dtraceUtil/man.TraceIDs
+exclude SKIP common/dtraceUtil/man.TraceModule
+exclude SKIP common/dtraceUtil/man.TraceNames
+exclude SKIP common/dtraceUtil/man.TraceProvider
+exclude SKIP common/dtraceUtil/man.VerboseStabilityReport.d
+exclude SKIP common/dtraceUtil/tst.AddSearchPath.d.ksh
+exclude SKIP common/dtraceUtil/tst.BufsizeGiga.d.ksh
+exclude SKIP common/dtraceUtil/tst.BufsizeKilo.d.ksh
+exclude SKIP common/dtraceUtil/tst.BufsizeMega.d.ksh
+exclude SKIP common/dtraceUtil/tst.BufsizeTera.d.ksh
+exclude SKIP common/dtraceUtil/tst.DataModel32.d.ksh
+exclude SKIP common/dtraceUtil/tst.DataModel64.d.ksh
+exclude SKIP common/dtraceUtil/tst.DefineNameWithCPP.d.ksh
+exclude SKIP common/dtraceUtil/tst.DefineNameWithCPP.d.ksh.out
+exclude SKIP common/dtraceUtil/tst.DestructWithFunction.d.ksh
+exclude SKIP common/dtraceUtil/tst.DestructWithFunction.d.ksh.out
+exclude SKIP common/dtraceUtil/tst.DestructWithID.d.ksh
+exclude SKIP common/dtraceUtil/tst.DestructWithID.d.ksh.out
+exclude SKIP common/dtraceUtil/tst.DestructWithModule.d.ksh
+exclude SKIP common/dtraceUtil/tst.DestructWithModule.d.ksh.out
+exclude SKIP common/dtraceUtil/tst.DestructWithName.d.ksh
+exclude SKIP common/dtraceUtil/tst.DestructWithName.d.ksh.out
+exclude SKIP common/dtraceUtil/tst.DestructWithoutW.d.ksh
+exclude SKIP common/dtraceUtil/tst.DestructWithProvider.d.ksh
+exclude SKIP common/dtraceUtil/tst.DestructWithProvider.d.ksh.out
+exclude SKIP common/dtraceUtil/tst.ELFGenerationOut.d.ksh
+exclude SKIP common/dtraceUtil/tst.ELFGenerationWithO.d.ksh
+exclude SKIP common/dtraceUtil/tst.ExitStatus1.d.ksh
+exclude SKIP common/dtraceUtil/tst.ExitStatus2.d.ksh
+exclude SKIP common/dtraceUtil/tst.ExtraneousProbeIds.d.ksh
+exclude SKIP common/dtraceUtil/tst.InvalidFuncName1.d.ksh
+exclude SKIP common/dtraceUtil/tst.InvalidFuncName2.d.ksh
+exclude SKIP common/dtraceUtil/tst.InvalidId1.d.ksh
+exclude SKIP common/dtraceUtil/tst.InvalidId2.d.ksh
+exclude SKIP common/dtraceUtil/tst.InvalidId3.d.ksh
+exclude SKIP common/dtraceUtil/tst.InvalidModule1.d.ksh
+exclude SKIP common/dtraceUtil/tst.InvalidModule2.d.ksh
+exclude SKIP common/dtraceUtil/tst.InvalidModule3.d.ksh
+exclude SKIP common/dtraceUtil/tst.InvalidModule4.d.ksh
+exclude SKIP common/dtraceUtil/tst.InvalidProbeIdentifier.d.ksh
+exclude SKIP common/dtraceUtil/tst.InvalidProvider1.d.ksh
+exclude SKIP common/dtraceUtil/tst.InvalidProvider2.d.ksh
+exclude SKIP common/dtraceUtil/tst.InvalidProvider3.d.ksh
+exclude SKIP common/dtraceUtil/tst.InvalidProvider4.d.ksh
+exclude SKIP common/dtraceUtil/tst.InvalidTraceFunc1.d.ksh
+exclude SKIP common/dtraceUtil/tst.InvalidTraceFunc2.d.ksh
+exclude SKIP common/dtraceUtil/tst.InvalidTraceFunc3.d.ksh
+exclude SKIP common/dtraceUtil/tst.InvalidTraceFunc4.d.ksh
+exclude SKIP common/dtraceUtil/tst.InvalidTraceFunc5.d.ksh
+exclude SKIP common/dtraceUtil/tst.InvalidTraceFunc6.d.ksh
+exclude SKIP common/dtraceUtil/tst.InvalidTraceFunc7.d.ksh
+exclude SKIP common/dtraceUtil/tst.InvalidTraceFunc8.d.ksh
+exclude SKIP common/dtraceUtil/tst.InvalidTraceFunc9.d.ksh
+exclude SKIP common/dtraceUtil/tst.InvalidTraceID1.d.ksh
+exclude SKIP common/dtraceUtil/tst.InvalidTraceID2.d.ksh
+exclude SKIP common/dtraceUtil/tst.InvalidTraceID3.d.ksh
+exclude SKIP common/dtraceUtil/tst.InvalidTraceID4.d.ksh
+exclude SKIP common/dtraceUtil/tst.InvalidTraceID5.d.ksh
+exclude SKIP common/dtraceUtil/tst.InvalidTraceID6.d.ksh
+exclude SKIP common/dtraceUtil/tst.InvalidTraceID7.d.ksh
+exclude SKIP common/dtraceUtil/tst.InvalidTraceModule1.d.ksh
+exclude SKIP common/dtraceUtil/tst.InvalidTraceModule2.d.ksh
+exclude SKIP common/dtraceUtil/tst.InvalidTraceModule3.d.ksh
+exclude SKIP common/dtraceUtil/tst.InvalidTraceModule4.d.ksh
+exclude SKIP common/dtraceUtil/tst.InvalidTraceModule5.d.ksh
+exclude SKIP common/dtraceUtil/tst.InvalidTraceModule6.d.ksh
+exclude SKIP common/dtraceUtil/tst.InvalidTraceModule7.d.ksh
+exclude SKIP common/dtraceUtil/tst.InvalidTraceModule8.d.ksh
+exclude SKIP common/dtraceUtil/tst.InvalidTraceName1.d.ksh
+exclude SKIP common/dtraceUtil/tst.InvalidTraceName2.d.ksh
+exclude SKIP common/dtraceUtil/tst.InvalidTraceName3.d.ksh
+exclude SKIP common/dtraceUtil/tst.InvalidTraceName4.d.ksh
+exclude SKIP common/dtraceUtil/tst.InvalidTraceName5.d.ksh
+exclude SKIP common/dtraceUtil/tst.InvalidTraceName6.d.ksh
+exclude SKIP common/dtraceUtil/tst.InvalidTraceName7.d.ksh
+exclude SKIP common/dtraceUtil/tst.InvalidTraceName8.d.ksh
+exclude SKIP common/dtraceUtil/tst.InvalidTraceName9.d.ksh
+exclude SKIP common/dtraceUtil/tst.InvalidTraceProvider1.d.ksh
+exclude SKIP common/dtraceUtil/tst.InvalidTraceProvider2.d.ksh
+exclude SKIP common/dtraceUtil/tst.InvalidTraceProvider3.d.ksh
+exclude SKIP common/dtraceUtil/tst.InvalidTraceProvider4.d.ksh
+exclude SKIP common/dtraceUtil/tst.InvalidTraceProvider5.d.ksh
+exclude SKIP common/dtraceUtil/tst.MultipleInvalidProbeId.d.ksh
+exclude SKIP common/dtraceUtil/tst.PreprocessorStatement.d.ksh
+exclude SKIP common/dtraceUtil/tst.QuietMode.d.ksh
+exclude SKIP common/dtraceUtil/tst.QuietMode.d.ksh.out
+exclude SKIP common/dtraceUtil/tst.TestCompile.d.ksh
+exclude SKIP common/dtraceUtil/tst.TestCompile.d.ksh.out
+exclude SKIP common/dtraceUtil/tst.UnDefineNameWithCPP.d.ksh
+exclude SKIP common/dtraceUtil/tst.ZeroFunctionProbes.d.ksh
+exclude SKIP common/dtraceUtil/tst.ZeroFunctionProbes.d.ksh.out
+exclude SKIP common/dtraceUtil/tst.ZeroModuleProbes.d.ksh
+exclude SKIP common/dtraceUtil/tst.ZeroModuleProbes.d.ksh.out
+exclude SKIP common/dtraceUtil/tst.ZeroNameProbes.d.ksh
+exclude SKIP common/dtraceUtil/tst.ZeroNameProbes.d.ksh.out
+exclude SKIP common/dtraceUtil/tst.ZeroProbeIdentfier.d.ksh
+exclude SKIP common/dtraceUtil/tst.ZeroProbesWithoutZ.d.ksh
+exclude SKIP common/dtraceUtil/tst.ZeroProviderProbes.d.ksh
+exclude SKIP common/dtraceUtil/tst.ZeroProviderProbes.d.ksh.out
+
+# stuck
+exclude SKIP common/buffering/tst.alignring.d
+exclude SKIP common/pid/tst.args1.d
+
+# ksh dependency
+exclude SKIP common/env/tst.setenv1.ksh
+exclude SKIP common/env/tst.setenv2.ksh
+exclude SKIP common/env/tst.setenv3.ksh
+exclude SKIP common/env/tst.unsetenv1.ksh
 
 # usdt not ready
 exclude SKIP common/usdt/argmap.d

@@ -73,6 +73,7 @@
 #include <sys/stat.h>
 #include <sys/modctl.h>
 #include <sys/conf.h>
+#include <sys/sysent.h>
 #include <sys/systm.h>
 #ifdef illumos
 #include <sys/ddi.h>
@@ -10991,8 +10992,8 @@ dtrace_predicate_release(dtrace_predicate_t *pred, dtrace_vstate_t *vstate)
  * DTrace Action Description Functions
  */
 static dtrace_actdesc_t *
-dtrace_actdesc_create(dtrace_actkind_t kind, uint32_t ntuple,
-    uintcap_t uarg, uintcap_t arg)
+dtrace_actdesc_create(
+    dtrace_actkind_t kind, uint32_t ntuple, dtrace_uarg_t uarg, uint64_t arg)
 {
 	dtrace_actdesc_t *act;
 
@@ -13237,7 +13238,7 @@ dtrace_dof_create(dtrace_state_t *state)
 
 // TODO(nicomazz): Make sure that this is always called with a capability
 static dof_hdr_t *
-dtrace_dof_copyin(uintcap_t uarg, int *errp)
+dtrace_dof_copyin(dtrace_uarg_t uarg, int *errp)
 {
 	dof_hdr_t hdr, *dof;
 
@@ -13801,9 +13802,7 @@ dtrace_dof_actdesc(dof_hdr_t *dof, dof_sec_t *sec, dtrace_vstate_t *vstate,
 		return (NULL);
 	}
 
-	// TODO(nicomazz): 	the allignment will be different depending on
-	// the userspace type.Here is probably needed to differentiate
-	if (sec->dofs_align != sizeof(kuintcap_t)) {
+	if (sec->dofs_align != sizeof(dtrace_uarg_t)) {
 		dtrace_dof_error(dof, "bad alignment in action description");
 		return (NULL);
 	}
@@ -13927,7 +13926,7 @@ dtrace_dof_ecbdesc(dof_hdr_t *dof, dof_sec_t *sec, dtrace_vstate_t *vstate,
 		dtrace_dof_error(dof, "truncated ECB description");
 		return (NULL);
 	}
-	if (sec->dofs_align != sizeof (kuintcap_t)) {
+	if (sec->dofs_align != sizeof (dtrace_uarg_t)) {
 		dtrace_dof_error(dof, "bad alignment in ECB description");
 		return (NULL);
 	}
