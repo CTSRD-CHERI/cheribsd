@@ -3,6 +3,7 @@ set(CMAKE_SYSTEM_NAME FreeBSD)
 set(CMAKE_TRY_COMPILE_TARGET_TYPE STATIC_LIBRARY)
 cmake_minimum_required(VERSION 3.8)
 project(CheriBSD LANGUAGES NONE)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 set(TARGET "" CACHE STRING "Target machine.")
 set(TARGET_ARCH "" CACHE STRING "Target machine arch.")
@@ -33,7 +34,7 @@ include_directories(${CMAKE_SOURCE_DIR}/contrib/libxo)
 include_directories(${CMAKE_SOURCE_DIR}/contrib/libc-vis)
 
 set(TMPSYSROOT ${CMAKE_BINARY_DIR}/sysroot/usr)
-add_compile_options(--sysroot=${CMAKE_BINARY_DIR}/sysroot/)
+file(MAKE_DIRECTORY ${TMPSYSROOT}/include/)
 
 # Create symlinks
 execute_process(COMMAND ${CMAKE_COMMAND} -E create_symlink ${MACHINE_HEADERS} ${TMPSYSROOT}/include/machine)
@@ -101,7 +102,6 @@ enable_language(C)
 enable_language(CXX)
 
 # Ensure that we can find the clang builtin headers
-add_compile_options(-nostdinc)
 add_compile_options(-nobuiltininc)
 add_compile_options(-v)
 execute_process(COMMAND ${CMAKE_C_COMPILER} -print-resource-dir OUTPUT_VARIABLE BUILTIN_HEADERS_DIR OUTPUT_STRIP_TRAILING_WHITESPACE)
@@ -117,6 +117,6 @@ file(GLOB_RECURSE FAKE_KERNEL_SRCS_KERN sys/kern "*.c")
 file(GLOB_RECURSE FAKE_KERNEL_SRCS_LIBKERN sys/libkern "*.c")
 add_library(fake_kernel STATIC ${FAKE_KERNEL_SRCS_MIPS} ${FAKE_KERNEL_SRCS_DDB} ${FAKE_KERNEL_SRCS_CHERI} ${FAKE_KERNEL_SRCS_CHERIABI} ${FAKE_KERNEL_SRCS_KERN} ${FAKE_KERNEL_SRCS_LIBKERN})
 target_compile_definitions(fake_kernel PRIVATE _KERNEL=1)
-target_include_directories(fake_kernel PRIVATE ${CMAKE_SOURCE_DIR}/sys)
 target_include_directories(fake_kernel PRIVATE ${CMAKE_BINARY_DIR}/kern_opt)
+target_include_directories(fake_kernel PRIVATE ${CMAKE_SOURCE_DIR}/sys/contrib/ck/include)
 target_compile_options(fake_kernel PRIVATE -include ${CMAKE_BINARY_DIR}/kern_opt/opt_global.h)
