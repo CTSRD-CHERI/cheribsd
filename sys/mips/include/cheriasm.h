@@ -91,18 +91,6 @@
 #define	CHERI_REG_CCALLDATA	$c2
 
 /*
- * Macro to abstract use of cmove in kernel assembly, used as a temporary
- * workaround for cmove generating CIncBase instructions on 128-bit CHERI.
- * This will be removed once all live bitfiles and toolchain have been
- * updated.
- */
-#if (defined(CPU_CHERI) && !defined(CPU_CHERI128))
-#define	CHERI_ASM_CMOVE(cd, cb)		cmove cd, cb
-#else
-#define	CHERI_ASM_CMOVE(cd, cb)		cincoffset cd, cb, zero
-#endif
-
-/*
  * Assembly code to be used in CHERI exception handling and context switching.
  *
  * When entering an exception handler from userspace, conditionally save the
