@@ -63,9 +63,6 @@ getpoints(char *s)
 		case 'c':
 			facs |= KTRFAC_SYSCALL | KTRFAC_SYSRET;
 			break;
-		case 'e':
-			facs |= KTRFAC_CEXCEPTION;
-			break;
 		case 'i':
 			facs |= KTRFAC_GENIO;
 			break;

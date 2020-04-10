@@ -33,7 +33,6 @@ libkern/memcmp.c		standard
 libkern/memset.c		standard
 riscv/cheri/cheri_debug.c	optional	cpu_cheri ddb
 riscv/cheri/cheri_exception.c	optional	cpu_cheri
-riscv/cheri/cheri_ktrace.c	optional	cpu_cheri
 riscv/cheri/cheri_machdep.c	optional	cpu_cheri
 riscv/riscv/autoconf.c		standard
 riscv/riscv/bus_machdep.c	standard

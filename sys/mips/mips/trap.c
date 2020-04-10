@@ -1150,10 +1150,6 @@ dofault:
 
 	case T_C2E + T_USER:
 		msg = "USER_CHERI_EXCEPTION";
-#ifdef KTRACE
-		if (KTRPOINT(td, KTR_CEXCEPTION))
-			ktrcexception(trapframe);
-#endif
 		fetch_bad_instr(trapframe);
 		log_c2e_exception(msg, trapframe, type);
 		i = SIGPROT;
