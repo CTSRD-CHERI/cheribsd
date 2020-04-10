@@ -144,15 +144,6 @@ extern u_int	security_cheri_debugger_on_sigprot;
 extern u_int	security_cheri_sandboxed_signals;
 extern u_int	security_cheri_syscall_violations;
 extern u_int	security_cheri_bound_legacy_capabilities;
-
-/*
- * Functions exposed to machine-independent code that must interact with
- * CHERI-specific features; e.g., ktrace.
- */
-struct ktr_cexception;
-struct trapframe;
-void	ktrcexception_mdfill(struct trapframe *frame,
-	    struct ktr_cexception *ke);
 #endif /* !_KERNEL */
 
 /*
