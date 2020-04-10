@@ -68,11 +68,6 @@ CTASSERT(sizeof(struct cheri_frame) == (34 * CHERICAP_SIZE));
  * call, and reload them afterwards.
  */
 
-static union {
-	void * __capability	ct_cap;
-	uint8_t			ct_bytes[32];
-} cheri_testunion __aligned(32);
-
 /*
  * A set of compile-time assertions to ensure suitable alignment for
  * capabilities embedded within other MIPS data structures.  Otherwise changes
@@ -86,15 +81,9 @@ CTASSERT(offsetof(struct thread, td_cheri_mmap_cap) % CHERICAP_SIZE == 0);
  * kernel configuration on the size of a capability, and that we are compiling
  * for the hybrid ABI.
  */
-#ifdef CPU_CHERI128
 CTASSERT(sizeof(void *) == 8);
 CTASSERT(sizeof(void * __capability) == 16);
 CTASSERT(sizeof(struct cheri_object) == 32);
-#else
-CTASSERT(sizeof(void *) == 8);
-CTASSERT(sizeof(void * __capability) == 32);
-CTASSERT(sizeof(struct cheri_object) == 64);
-#endif
 
 /* Set to -1 to prevent it from being zeroed with the rest of BSS */
 void * __capability user_sealcap = (void * __capability)(intcap_t)-1;
@@ -107,24 +96,6 @@ void * __capability user_sealcap = (void * __capability)(intcap_t)-1;
 static void
 cheri_cpu_startup(void)
 {
-
-	/*
-	 * The pragmatic way to test that the kernel we're booting has a
-	 * capability size matching the CPU we're booting on is to store a
-	 * capability in memory and then check what its footprint was.  Panic
-	 * early if our assumptions are wrong.
-	 */
-	memset(&cheri_testunion, 0xff, sizeof(cheri_testunion));
-	cheri_testunion.ct_cap = NULL;
-#ifdef CPU_CHERI128
-	printf("CHERI: compiled for 128-bit capabilities\n");
-	if (cheri_testunion.ct_bytes[16] == 0)
-		panic("CPU implements 256-bit capabilities");
-#else
-	printf("CHERI: compiled for 256-bit capabilities\n");
-	if (cheri_testunion.ct_bytes[16] != 0)
-		panic("CPU implements 128-bit capabilities");
-#endif
 
 	/*
 	 * Documentary assertions for userspace_cap.  Default data and
@@ -157,15 +128,9 @@ void
 cheri_serialize(struct cheri_serial *csp, void * __capability cap)
 {
 
-#if CHERICAP_SIZE == 16
 	csp->cs_storage = 3;
 	csp->cs_typebits = 16;
 	csp->cs_permbits = 23;
-#else /* CHERICAP_SIZE == 32 */
-	csp->cs_storage = 4;
-	csp->cs_typebits = 24;
-	csp->cs_permbits = 31;
-#endif
 
 	KASSERT(csp != NULL, ("Can't serialize to a NULL pointer"));
 	if (cap == NULL) {

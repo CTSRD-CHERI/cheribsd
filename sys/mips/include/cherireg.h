@@ -35,17 +35,12 @@
  * The size of in-memory capabilities in bytes; minimum alignment is also
  * assumed to be this size.
  */
-#if defined(_MIPS_SZCAP) && (_MIPS_SZCAP != 128) && (_MIPS_SZCAP != 256)
-#error "_MIPS_SZCAP defined but neither 128 nor 256"
+#if defined(_MIPS_SZCAP) && (_MIPS_SZCAP != 128)
+#error "_MIPS_SZCAP defined but is not 128"
 #endif
 
-#if defined(CPU_CHERI128) || (defined(_MIPS_SZCAP) && (_MIPS_SZCAP == 128))
 #define	CHERICAP_SIZE   16
 #define	CHERICAP_SHIFT	4
-#else
-#define	CHERICAP_SIZE   32
-#define	CHERICAP_SHIFT	5
-#endif
 
 /*
  * CHERI ISA-defined constants for capabilities -- suitable for inclusion from
@@ -67,57 +62,11 @@
 #define	CHERI_PERM_SYSTEM_REGS			(1 << 10)	/* 0x00000400 */
 #define	CHERI_PERM_SET_CID			(1 << 11)	/* 0x00000800 */
 
-/*
- * User-defined permission bits.
- *
- * 256-bit CHERI has a substantially larger number of software-defined
- * permissions.
- */
-#define	CHERI256_PERM_SW0			(1 << 15)	/* 0x00008000 */
-#define	CHERI256_PERM_SW1			(1 << 16)	/* 0x00010000 */
-#define	CHERI256_PERM_SW2			(1 << 17)	/* 0x00020000 */
-#define	CHERI256_PERM_SW3			(1 << 18)	/* 0x00040000 */
-#define	CHERI256_PERM_SW4			(1 << 19)	/* 0x00080000 */
-#define	CHERI256_PERM_SW5			(1 << 20)	/* 0x00100000 */
-#define	CHERI256_PERM_SW6			(1 << 21)	/* 0x00200000 */
-#define	CHERI256_PERM_SW7			(1 << 22)	/* 0x00400000 */
-#define	CHERI256_PERM_SW8			(1 << 23)	/* 0x00800000 */
-#define	CHERI256_PERM_SW9			(1 << 24)	/* 0x01000000 */
-#define	CHERI256_PERM_SW10			(1 << 25)	/* 0x02000000 */
-#define	CHERI256_PERM_SW11			(1 << 26)	/* 0x04000000 */
-#define	CHERI256_PERM_SW12			(1 << 27)	/* 0x08000000 */
-#define	CHERI256_PERM_SW13			(1 << 28)	/* 0x10000000 */
-#define	CHERI256_PERM_SW14			(1 << 29)	/* 0x20000000 */
-#define	CHERI256_PERM_SW15			(1 << 30)	/* 0x40000000 */
-
-#define	CHERI128_PERM_SW0			(1 << 15)	/* 0x00008000 */
-#define	CHERI128_PERM_SW1			(1 << 16)	/* 0x00010000 */
-#define	CHERI128_PERM_SW2			(1 << 17)	/* 0x00020000 */
-#define	CHERI128_PERM_SW3			(1 << 18)	/* 0x00040000 */
-
-#if (CHERICAP_SIZE == 32)
-#define	CHERI_PERM_SW0		CHERI256_PERM_SW0
-#define	CHERI_PERM_SW1		CHERI256_PERM_SW1
-#define	CHERI_PERM_SW2		CHERI256_PERM_SW2
-#define	CHERI_PERM_SW3		CHERI256_PERM_SW3
-#define	CHERI_PERM_SW4		CHERI256_PERM_SW4
-#define	CHERI_PERM_SW5		CHERI256_PERM_SW5
-#define	CHERI_PERM_SW6		CHERI256_PERM_SW6
-#define	CHERI_PERM_SW7		CHERI256_PERM_SW7
-#define	CHERI_PERM_SW8		CHERI256_PERM_SW8
-#define	CHERI_PERM_SW9		CHERI256_PERM_SW9
-#define	CHERI_PERM_SW10		CHERI256_PERM_SW10
-#define	CHERI_PERM_SW11		CHERI256_PERM_SW11
-#define	CHERI_PERM_SW12		CHERI256_PERM_SW12
-#define	CHERI_PERM_SW13		CHERI256_PERM_SW13
-#define	CHERI_PERM_SW14		CHERI256_PERM_SW14
-#define	CHERI_PERM_SW15		CHERI256_PERM_SW15
-#else /* (!(CHERICAP_SIZE == 32)) */
-#define	CHERI_PERM_SW0		CHERI128_PERM_SW0
-#define	CHERI_PERM_SW1		CHERI128_PERM_SW1
-#define	CHERI_PERM_SW2		CHERI128_PERM_SW2
-#define	CHERI_PERM_SW3		CHERI128_PERM_SW3
-#endif /* (!(CHERICAP_SIZE == 32)) */
+/* User-defined permission bits. */
+#define	CHERI_PERM_SW0			(1 << 15)	/* 0x00008000 */
+#define	CHERI_PERM_SW1			(1 << 16)	/* 0x00010000 */
+#define	CHERI_PERM_SW2			(1 << 17)	/* 0x00020000 */
+#define	CHERI_PERM_SW3			(1 << 18)	/* 0x00040000 */
 
 /*
  * Macros defining initial permission sets for various scenarios; details
@@ -126,19 +75,9 @@
  * CHERI_PERMS_SWALL: Mask of all available software-defined permissions
  * CHERI_PERMS_HWALL: Mask of all available hardware-defined permissions
  */
-#if (CHERICAP_SIZE == 32)
-#define	CHERI_PERMS_SWALL						\
-	(CHERI_PERM_SW0 | CHERI_PERM_SW1 | CHERI_PERM_SW2 |		\
-	CHERI_PERM_SW3 | CHERI_PERM_SW4 | CHERI_PERM_SW5 |		\
-	CHERI_PERM_SW6 | CHERI_PERM_SW7 | CHERI_PERM_SW8 |		\
-	CHERI_PERM_SW9 | CHERI_PERM_SW10 | CHERI_PERM_SW11 |		\
-	CHERI_PERM_SW12 | CHERI_PERM_SW13 | CHERI_PERM_SW14 |		\
-	CHERI_PERM_SW15)
-#else /* (!(CHERICAP_SIZE == 32)) */
 #define	CHERI_PERMS_SWALL						\
 	(CHERI_PERM_SW0 | CHERI_PERM_SW1 | CHERI_PERM_SW2 |		\
 	CHERI_PERM_SW3)
-#endif /* (!(CHERICAP_SIZE == 32)) */
 
 #define	CHERI_PERMS_HWALL						\
 	(CHERI_PERM_GLOBAL | CHERI_PERM_EXECUTE |			\
@@ -348,7 +287,6 @@
  */
 #define	CHERI_CCALL_EXC_VEC	((intptr_t)(int32_t)0x80000280)
 
-#if CHERICAP_SIZE == 16
 /*
  * CHERI_BASELEN_BITS is used in cheritest_cheriabi.c.  The others are
  * unused.
@@ -357,6 +295,5 @@
 #define	CHERI_SEAL_BASELEN_BITS	5
 #define	CHERI_ADDR_BITS		64
 #define	CHERI_SEAL_MIN_ALIGN	12
-#endif
 
 #endif /* _MIPS_INCLUDE_CHERIREG_H_ */
