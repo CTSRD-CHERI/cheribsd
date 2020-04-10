@@ -149,23 +149,6 @@ SYSINIT(cheriabi, SI_SUB_EXEC, SI_ORDER_ANY,
     (sysinit_cfunc_t) elf64c_insert_brand_entry,
     &freebsd_cheriabi_brand_info);
 
-
-static __inline boolean_t
-cheriabi_check_cpu_compatible(uint32_t bits, const char *execpath)
-{
-	static struct timeval lastfail;
-	static int curfail;
-	const uint32_t expected = CHERICAP_SIZE * 8;
-
-	if (bits == expected)
-		return TRUE;
-	if (ppsratecheck(&lastfail, &curfail, 1))
-		printf("warning: attempting to execute %d-bit CheriABI "
-		    "binary '%s' on a %d-bit kernel\n", bits, execpath,
-		    expected);
-	return FALSE;
-}
-
 static int allow_cheriabi_version_mismatch = 0;
 SYSCTL_DECL(_compat_cheriabi);
 SYSCTL_INT(_compat_cheriabi, OID_AUTO, allow_abi_version_mismatch,
@@ -191,9 +174,7 @@ cheriabi_elf_header_supported(struct image_params *imgp)
 	}
 
 	if (machine == EF_MIPS_MACH_CHERI128)
-		return cheriabi_check_cpu_compatible(128, imgp->execpath);
-	else if (machine == EF_MIPS_MACH_CHERI256)
-		return cheriabi_check_cpu_compatible(256, imgp->execpath);
+		return TRUE;
 	return FALSE;
 }
 
