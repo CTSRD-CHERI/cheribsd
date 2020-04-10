@@ -122,8 +122,6 @@ struct ktr_request {
 		struct	ktr_faultend ktr_faultend;
 		struct  ktr_struct_array ktr_struct_array;
 #ifdef CPU_CHERI
-		struct	ktr_ccall ktr_ccall;
-		struct	ktr_creturn ktr_creturn;
 		struct	ktr_cexception ktr_cexception;
 #endif
 	} ktr_data;
@@ -147,8 +145,6 @@ static int data_lengths[] = {
 	[KTR_FAULTEND] = sizeof(struct ktr_faultend),
 	[KTR_STRUCT_ARRAY] = sizeof(struct ktr_struct_array),
 #ifdef CPU_CHERI
-	[KTR_CCALL] = sizeof(struct ktr_ccall),
-	[KTR_CRETURN] = sizeof(struct ktr_creturn),
 	[KTR_CEXCEPTION] = sizeof(struct ktr_cexception),
 #endif
 	[KTR_SYSERRCAUSE] = 0,
@@ -936,42 +932,6 @@ ktrfaultend(int result)
 }
 
 #ifdef CPU_CHERI
-void
-ktrccall(struct pcb *pcb)
-{
-	struct thread *td = curthread;
-	struct ktr_request *req;
-	struct ktr_ccall *kc;
-
-	if (!KTRPOINT(td, KTR_CCALL))
-		return;
-	req = ktr_getrequest(KTR_CCALL);
-	if (req == NULL)
-		return;
-	kc = &req->ktr_data.ktr_ccall;
-	ktrccall_mdfill(pcb, kc);
-	ktr_enqueuerequest(td, req);
-	ktrace_exit(td);
-}
-
-void
-ktrcreturn(struct pcb *pcb)
-{
-	struct thread *td = curthread;
-	struct ktr_request *req;
-	struct ktr_creturn *kr;
-
-	if (!KTRPOINT(td, KTR_CRETURN))
-		return;
-	req = ktr_getrequest(KTR_CRETURN);
-	if (req == NULL)
-		return;
-	kr = &req->ktr_data.ktr_creturn;
-	ktrcreturn_mdfill(pcb, kr);
-	ktr_enqueuerequest(td, req);
-	ktrace_exit(td);
-}
-
 void
 ktrcexception(struct trapframe *frame)
 {

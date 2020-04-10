@@ -124,8 +124,6 @@ void ktrfault(struct ktr_fault *);
 void ktrfaultend(struct ktr_faultend *);
 void ktrkevent(struct kevent *);
 void ktrstructarray(struct ktr_struct_array *, size_t);
-void ktrccall(struct ktr_ccall *);
-void ktrcreturn(struct ktr_creturn *);
 void ktrcexception(struct ktr_cexception *);
 void usage(void);
 
@@ -538,12 +536,6 @@ main(int argc, char *argv[])
 		case KTR_STRUCT_ARRAY:
 			ktrstructarray((struct ktr_struct_array *)m, ktrlen);
 			break;
-		case KTR_CCALL:
-			ktrccall((struct ktr_ccall *)m);
-			break;
-		case KTR_CRETURN:
-			ktrcreturn((struct ktr_creturn *)m);
-			break;
 		case KTR_CEXCEPTION:
 			ktrcexception((struct ktr_cexception *)m);
 			break;
@@ -667,12 +659,6 @@ dumpheader(struct ktr_header *kth, u_int sv_flags)
 		break;
 	case KTR_FAULTEND:
 		type = "PRET";
-		break;
-	case KTR_CCALL:
-		type = "CCAL";
-		break;
-	case KTR_CRETURN:
-		type = "CRET";
 		break;
 	case KTR_CEXCEPTION:
 		type = "CEXC";
@@ -2131,23 +2117,6 @@ printcap(const char *name, struct cheri_serial *cap)
 		printf("\n");
 		hexdump(cap->cs_data, cap->cs_storage * 8, screenwidth);
 	}
-}
-
-void
-ktrccall(struct ktr_ccall *ktr)
-{
-
-	printf("method 0x%jx\n", ktr->ktr_method);
-	printcap("PCC", &ktr->ktr_pcc);
-	printcap("IDC", &ktr->ktr_idc);
-}
-
-void
-ktrcreturn(struct ktr_creturn *ktr)
-{
-
-	printf("integer return: %jd\n", (intmax_t)ktr->ktr_iret);
-	printcap("capability return", &ktr->ktr_cret);
 }
 
 void
