@@ -36,6 +36,9 @@
 #   xargs -n1 | sort | uniq -d;
 # done
 
+# 20200410 CHERI: cheri_serial.h removed
+OLD_FILES+=usr/include/cheri/cheri_serial.h
+
 # 20200401: Remove procfs-based process debugging
 OLD_FILES+=usr/include/sys/pioctl.h
 

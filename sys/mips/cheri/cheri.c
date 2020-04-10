@@ -41,7 +41,6 @@
 
 #include <cheri/cheri.h>
 #include <cheri/cheric.h>
-#include <cheri/cheri_serial.h>
 
 #include <machine/atomic.h>
 #include <machine/pcb.h>
@@ -122,30 +121,4 @@ cheri_capability_set_user_sealcap(void * __capability *cp)
 {
 
 	*cp = user_sealcap;
-}
-
-void
-cheri_serialize(struct cheri_serial *csp, void * __capability cap)
-{
-
-	csp->cs_storage = 3;
-	csp->cs_typebits = 16;
-	csp->cs_permbits = 23;
-
-	KASSERT(csp != NULL, ("Can't serialize to a NULL pointer"));
-	if (cap == NULL) {
-		memset(csp, 0, sizeof(*csp));
-		return;
-	}
-
-	csp->cs_tag = __builtin_cheri_tag_get(cap);
-	if (csp->cs_tag) {
-		csp->cs_type = __builtin_cheri_type_get(cap);
-		csp->cs_perms = __builtin_cheri_perms_get(cap);
-		csp->cs_sealed = __builtin_cheri_sealed_get(cap);
-		csp->cs_base = __builtin_cheri_base_get(cap);
-		csp->cs_length = __builtin_cheri_length_get(cap);
-		csp->cs_offset = __builtin_cheri_offset_get(cap);
-	} else
-		memcpy(&csp->cs_data, &cap, CHERICAP_SIZE);
 }
