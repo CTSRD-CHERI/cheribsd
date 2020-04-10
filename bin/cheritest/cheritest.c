@@ -1793,6 +1793,7 @@ usage(void)
 "    -Q  -- Enable qemu tracing in test process (user-mode only)\n"
 "    -u  -- Only include unsandboxed tests\n"
 "    -v  -- Increase verbosity\n"
+"    -x  -- Output JUnit XML format\n"
 	     );
 	exit(EX_USAGE);
 }
@@ -1804,7 +1805,7 @@ list_tests(void)
 	const char *xfail_reason;
 
 	xo_open_container("testsuite");
-	xo_open_list("test");
+	xo_open_list("testcase");
 	for (i = 0; i < cheri_tests_len; i++) {
 		if (fast_tests_only &&
 		    (cheri_tests[i].ct_flags & CT_FLAG_SLOW))
@@ -1812,7 +1813,7 @@ list_tests(void)
 		if (unsandboxed_tests_only &&
 		    (cheri_tests[i].ct_flags & CT_FLAG_SANDBOX))
 			continue;
-		xo_open_instance("test");
+		xo_open_instance("testcase");
 		if (verbose)
 			xo_emit("{cw:name/%s}{:description/%s}",
 			    cheri_tests[i].ct_name,
@@ -1832,9 +1833,9 @@ list_tests(void)
 		if (cheri_tests[i].ct_flags & CT_FLAG_SLOW)
 			xo_emit("{e:timeout/%s}", "LONG");
 		xo_emit("\n");
-		xo_close_instance("test");
+		xo_close_instance("testcase");
 	}
-	xo_close_list("test");
+	xo_close_list("testcase");
 	xo_close_container("testsuite");
 	xo_finish();
 
@@ -1962,19 +1963,18 @@ cheritest_run_test(const struct cheri_test *ctp)
 	char* failure_message;
 	register_t cp2_exccode, mips_exccode;
 	ssize_t len;
-
-	xo_open_instance("test");
+	xo_attr("classname", "%s", ctp->ct_name);
+	xo_attr("name", "%s", ctp->ct_desc);
+	xo_open_instance("testcase");
 	bzero(ccsp, sizeof(*ccsp));
-	xo_emit("TEST: {:name/%s}: {:description/%s}\n",
-	   ctp->ct_name, ctp->ct_desc);
+	xo_emit("TEST: {d:name/%s}: {d:description/%s}\n", ctp->ct_name,
+		    ctp->ct_desc);
 
 	if (ctp->ct_check_xfail != NULL)
 		xfail_reason = ctp->ct_check_xfail(ctp->ct_name);
 	else
 		xfail_reason = ctp->ct_xfail_reason;
 	if (xfail_reason != NULL) {
-		xo_emit("{e:expected-failure-reason/%s}",
-		    xfail_reason);
 		expected_failures++;
 	}
 
@@ -2205,18 +2205,18 @@ cheritest_run_test(const struct cheri_test *ctp)
 	 */
 	len = read(pipefd_stdout[0], buffer, sizeof(buffer) - 1);
 	if (len < 0) {
-		xo_attr("error", strerror(errno));
-		xo_emit("{e:stdout/%s}", "");
+		xo_attr("message", "%s", strerror(errno));
+		xo_attr("type", "%d", errno);
+		xo_emit("{e:error/%s}", "read() failed");
 	} else {
 		buffer[len] = '\0';
 		if (len > 0) {
 			if (ctp->ct_flags & CT_FLAG_STDOUT_IGNORE)
 				xo_attr("ignored", "true");
-			xo_emit("{e:stdout/%s}", buffer);
+			xo_emit("{e:system-out/%s}", buffer);
 		}
 	}
 	if (ctp->ct_flags & CT_FLAG_STDOUT_STRING) {
-		xo_emit("{e:expected-stdout/%s}", ctp->ct_stdout_string);
 		if (len < 0) {
 			snprintf(reason, sizeof(reason),
 			    "read() on test stdout failed with -1 (%d)",
@@ -2251,17 +2251,16 @@ cheritest_run_test(const struct cheri_test *ctp)
 
 pass:
 	if (xfail_reason == NULL)
-		xo_emit("{:status/%s}: {d:name/%s}\n", "PASS", ctp->ct_name);
+		xo_emit("{d:status/%s}: {d:name/%s}\n", "PASS", ctp->ct_name);
 	else {
-		xo_attr("expected", "false");
-		xo_emit("{:status/%s}: {d:name/%s} (Expected failure due to "
-		    "{d:expected-failure-reason/%s})\n",
-		    "PASS", ctp->ct_name, xfail_reason);
+		xo_emit("XPASS: {d:name/%s} (Expected failure due to "
+		    "{d:reason/%s}) {e:failure/XPASS: %s}\n", ctp->ct_name,
+		    xfail_reason, xfail_reason);
 	}
 	tests_passed++;
 	close(pipefd_stdin[1]);
 	close(pipefd_stdout[0]);
-	xo_close_instance("test");
+	xo_close_instance("testcase");
 	xo_flush();
 	return;
 
@@ -2272,19 +2271,24 @@ fail:
 	strnvis(visreason, sizeof(visreason), reason, VIS_TAB);
 	asprintf(&failure_message, "%s: %s", ctp->ct_name, visreason);
 	if (xfail_reason == NULL) {
-		xo_emit("{:status/%s}: {d:name/%s}: {:failure-reason/%s}\n",
-		    "FAIL", ctp->ct_name, visreason);
+		xo_emit("FAIL: {d:name/%s}: {:failure/%s}\n",
+		    ctp->ct_name, visreason);
 		sl_add(cheri_failed_tests, failure_message);
 	} else {
-		xo_attr("expected", "true");
-		xo_emit("{d:/%s}{:status/%s}: {d:name/%s}: "
-		    "{:failure-reason/%s} ({d:expected-failure-reason/%s})\n",
-		    "X", "FAIL", ctp->ct_name, visreason, xfail_reason);
+		if (xo_get_style(NULL) == XO_STYLE_XML) {
+			xo_attr("message", "%s", xfail_reason);
+			xo_emit("{e:skipped/%s}", "");
+		} else {
+			xo_emit(
+			    "{d:status/%s}: {d:name/%s}: "
+			    "{:failure-reason/%s} ({d:expected-failure-reason/%s})\n",
+			    "XFAIL", ctp->ct_name, visreason, xfail_reason);
+		}
 		tests_xfailed++;
 		sl_add(cheri_xfailed_tests, failure_message);
 	}
 	tests_failed++;
-	xo_close_instance("test");
+	xo_close_instance("testcase");
 	xo_flush();
 	close(pipefd_stdin[1]);
 	close(pipefd_stdout[0]);
@@ -2331,7 +2335,7 @@ main(int argc, char *argv[])
 	argc = xo_parse_args(argc, argv);
 	if (argc < 0)
 		errx(1, "xo_parse_args failed\n");
-	while ((opt = getopt(argc, argv, "acdfglQqsuv")) != -1) {
+	while ((opt = getopt(argc, argv, "acdfglQqsuvx")) != -1) {
 		switch (opt) {
 		case 'a':
 			run_all = 1;
@@ -2374,6 +2378,11 @@ main(int argc, char *argv[])
 			break;
 		case 'v':
 			verbose++;
+			break;
+		case 'x': /* JUnit XML output */
+			/* XXX: allow an argument to specify output file? */
+			xo_set_style(NULL, XO_STYLE_XML);
+			xo_set_flags(NULL, XOF_PRETTY);
 			break;
 		default:
 			warnx("unknown argument %c\n", opt);
@@ -2465,6 +2474,8 @@ main(int argc, char *argv[])
 			err(EX_SOFTWARE, "cheritest_libcheri_setup");
 	}
 #endif
+	xo_open_container("testsuites");
+	xo_attr("name", "%s", "cheritest");
 	xo_open_container("testsuite");
 	xo_open_list("test");
 	if (run_all) {
@@ -2509,34 +2520,33 @@ main(int argc, char *argv[])
 	}
 	xo_close_list("test");
 	xo_close_container("testsuite");
+	xo_close_container("testsuites");
 	xo_finish();
 
 	/* print a summary which tests failed */
-	/* XXXAR: use xo_emit? */
 	if (tests_xfailed > 0) {
-		fprintf(stderr, "Expected failures:\n");
+		xo_emit("Expected failures:\n");
 		for (i = 0; (size_t)i < cheri_xfailed_tests->sl_cur; i++)
-			fprintf(stderr, "  %s\n",
+			xo_emit("  {d:%s}\n",
 			    cheri_xfailed_tests->sl_str[i]);
 		sl_free(cheri_xfailed_tests, true);
 	}
 	if (tests_failed > tests_xfailed) {
-		fprintf(stderr, "Unexpected failures:\n");
+		xo_emit("Unexpected failures:\n");
 		for (i = 0; (size_t)i < cheri_failed_tests->sl_cur; i++)
-			fprintf(stderr, "  %s\n",
-			    cheri_failed_tests->sl_str[i]);
+			xo_emit("  {d:%s}\n", cheri_failed_tests->sl_str[i]);
 		sl_free(cheri_failed_tests, true);
 	}
 	if (tests_passed + tests_failed > 1) {
 		if (expected_failures == 0)
-			fprintf(stderr, "SUMMARY: passed %d failed %d\n",
+			xo_emit("SUMMARY: passed %d failed %d\n",
 			    tests_passed, tests_failed);
 		else if (expected_failures == tests_xfailed)
-			fprintf(stderr, "SUMMARY: passed %d failed %d "
+			xo_emit("SUMMARY: passed %d failed %d "
 			    "(%d expected)\n",
 			    tests_passed, tests_failed, expected_failures);
 		else
-			fprintf(stderr, "SUMMARY: passed %d failed %d "
+			xo_emit("SUMMARY: passed %d failed %d "
 			    "(%d expected) (%d unexpected passes)\n",
 			    tests_passed, tests_failed, tests_xfailed,
 			    expected_failures - tests_xfailed);

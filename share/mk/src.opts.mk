@@ -106,7 +106,6 @@ __DEFAULT_YES_OPTIONS = \
     FTP \
     GAMES \
     GDB \
-    GDB_LIBEXEC \
     GNU_DIFF \
     GNU_GREP \
     GOOGLETEST \
@@ -133,6 +132,7 @@ __DEFAULT_YES_OPTIONS = \
     LLD \
     LLD_BOOTSTRAP \
     LLD_IS_LD \
+    LLVM_ASSERTIONS \
     LLVM_COV \
     LLVM_TARGET_ALL \
     LOADER_GELI \
@@ -315,6 +315,12 @@ BROKEN_OPTIONS+=OFED
 BROKEN_OPTIONS+=LIB32
 .endif
 
+.ifdef COMPAT_64BIT
+# ofed needs to be part of the default build for headers to be available.
+# Since it isn't yet working under purecap, disable it here.
+BROKEN_OPTIONS+=OFED
+.endif
+
 # In-tree binutils/gcc are older versions without modern architecture support.
 .if ${__T} == "aarch64" || ${__T:Mriscv*} != ""
 BROKEN_OPTIONS+=BINUTILS BINUTILS_BOOTSTRAP GDB
@@ -384,6 +390,8 @@ BROKEN_OPTIONS+=LIBCHERI
 
 # No RTLD yet
 BROKEN_OPTIONS+=CASPER DYNAMICROOT
+# kerberos causes linker errors when linking statically due to -fno-common
+BROKEN_OPTIONS+=KERBEROS KERBEROS_SUPPORT
 .endif
 
 # EFI doesn't exist on mips, powerpc or riscv.

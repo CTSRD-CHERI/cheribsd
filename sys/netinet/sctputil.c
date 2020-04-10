@@ -773,6 +773,80 @@ sctp_audit_log(uint8_t ev, uint8_t fd)
 #endif
 
 /*
+ * The conversion from time to ticks and vice versa is done by rounding
+ * upwards. This way we can test in the code the time to be positive and
+ * know that this corresponds to a positive number of ticks.
+ */
+
+uint32_t
+sctp_msecs_to_ticks(uint32_t msecs)
+{
+	uint64_t temp;
+	uint32_t ticks;
+
+	if (hz == 1000) {
+		ticks = msecs;
+	} else {
+		temp = (((uint64_t)msecs * hz) + 999) / 1000;
+		if (temp > UINT32_MAX) {
+			ticks = UINT32_MAX;
+		} else {
+			ticks = (uint32_t)temp;
+		}
+	}
+	return (ticks);
+}
+
+uint32_t
+sctp_ticks_to_msecs(uint32_t ticks)
+{
+	uint64_t temp;
+	uint32_t msecs;
+
+	if (hz == 1000) {
+		msecs = ticks;
+	} else {
+		temp = (((uint64_t)ticks * 1000) + (hz - 1)) / hz;
+		if (temp > UINT32_MAX) {
+			msecs = UINT32_MAX;
+		} else {
+			msecs = (uint32_t)temp;
+		}
+	}
+	return (msecs);
+}
+
+uint32_t
+sctp_secs_to_ticks(uint32_t secs)
+{
+	uint64_t temp;
+	uint32_t ticks;
+
+	temp = (uint64_t)secs * hz;
+	if (temp > UINT32_MAX) {
+		ticks = UINT32_MAX;
+	} else {
+		ticks = (uint32_t)temp;
+	}
+	return (ticks);
+}
+
+uint32_t
+sctp_ticks_to_secs(uint32_t ticks)
+{
+	uint64_t temp;
+	uint32_t secs;
+
+	temp = ((uint64_t)ticks + (hz - 1)) / hz;
+	if (temp > UINT32_MAX) {
+		secs = UINT32_MAX;
+	} else {
+		secs = (uint32_t)temp;
+	}
+	return (secs);
+}
+
+/*
  * sctp_stop_timers_for_shutdown() should be called
  * when entering the SHUTDOWN_SENT or SHUTDOWN_ACK_SENT
  * state to make sure that all timers are stopped.
@@ -1065,7 +1139,7 @@ sctp_init_asoc(struct sctp_inpcb *inp, struct sctp_tcb *stcb,
 	SCTP_SET_STATE(stcb, SCTP_STATE_INUSE);
 	asoc->max_burst = inp->sctp_ep.max_burst;
 	asoc->fr_max_burst = inp->sctp_ep.fr_max_burst;
-	asoc->heart_beat_delay = TICKS_TO_MSEC(inp->sctp_ep.sctp_timeoutticks[SCTP_TIMER_HEARTBEAT]);
+	asoc->heart_beat_delay = sctp_ticks_to_msecs(inp->sctp_ep.sctp_timeoutticks[SCTP_TIMER_HEARTBEAT]);
 	asoc->cookie_life = inp->sctp_ep.def_cookie_life;
 	asoc->sctp_cmt_on_off = inp->sctp_cmt_on_off;
 	asoc->ecn_supported = inp->ecn_supported;
@@ -1151,7 +1225,7 @@ sctp_init_asoc(struct sctp_inpcb *inp, struct sctp_tcb *stcb,
 	asoc->context = inp->sctp_context;
 	asoc->local_strreset_support = inp->local_strreset_support;
 	asoc->def_send = inp->def_send;
-	asoc->delayed_ack = TICKS_TO_MSEC(inp->sctp_ep.sctp_timeoutticks[SCTP_TIMER_RECV]);
+	asoc->delayed_ack = sctp_ticks_to_msecs(inp->sctp_ep.sctp_timeoutticks[SCTP_TIMER_RECV]);
 	asoc->sack_freq = inp->sctp_ep.sctp_sack_freq;
 	asoc->pr_sctp_cnt = 0;
 	asoc->total_output_queue_size = 0;
@@ -1656,9 +1730,14 @@ sctp_timeout_handler(void *t)
 #endif
 
 	/* sanity checks... */
-	KASSERT(tmr->self == tmr, ("tmr->self corrupted"));
-	KASSERT(SCTP_IS_TIMER_TYPE_VALID(tmr->type), ("Invalid timer type %d", tmr->type));
+	KASSERT(tmr->self == tmr,
+	    ("sctp_timeout_handler: tmr->self corrupted"));
+	KASSERT(SCTP_IS_TIMER_TYPE_VALID(tmr->type),
+	    ("sctp_timeout_handler: invalid timer type %d", tmr->type));
 	type = tmr->type;
+	KASSERT(stcb == NULL || stcb->sctp_ep == inp,
+	    ("sctp_timeout_handler of type %d: inp = %p, stcb->sctp_ep %p",
+	    type, stcb, stcb->sctp_ep));
 	if (inp) {
 		SCTP_INP_INCR_REF(inp);
 	}
@@ -2073,6 +2152,9 @@ sctp_timer_start(int t_type, struct sctp_inpcb *inp, struct sctp_tcb *stcb,
 	uint32_t to_ticks;
 	uint32_t rndval, jitter;
 
+	KASSERT(stcb == NULL || stcb->sctp_ep == inp,
+	    ("sctp_timer_start of type %d: inp = %p, stcb->sctp_ep %p",
+	    t_type, stcb, stcb->sctp_ep));
 	tmr = NULL;
 	to_ticks = 0;
 	if (stcb != NULL) {
@@ -2115,9 +2197,9 @@ sctp_timer_start(int t_type, struct sctp_inpcb *inp, struct sctp_tcb *stcb,
 		}
 		tmr = &net->rxt_timer;
 		if (net->RTO == 0) {
-			to_ticks = MSEC_TO_TICKS(stcb->asoc.initial_rto);
+			to_ticks = sctp_msecs_to_ticks(stcb->asoc.initial_rto);
 		} else {
-			to_ticks = MSEC_TO_TICKS(net->RTO);
+			to_ticks = sctp_msecs_to_ticks(net->RTO);
 		}
 		break;
 	case SCTP_TIMER_TYPE_INIT:
@@ -2135,9 +2217,9 @@ sctp_timer_start(int t_type, struct sctp_inpcb *inp, struct sctp_tcb *stcb,
 		}
 		tmr = &net->rxt_timer;
 		if (net->RTO == 0) {
-			to_ticks = MSEC_TO_TICKS(stcb->asoc.initial_rto);
+			to_ticks = sctp_msecs_to_ticks(stcb->asoc.initial_rto);
 		} else {
-			to_ticks = MSEC_TO_TICKS(net->RTO);
+			to_ticks = sctp_msecs_to_ticks(net->RTO);
 		}
 		break;
 	case SCTP_TIMER_TYPE_RECV:
@@ -2154,7 +2236,7 @@ sctp_timer_start(int t_type, struct sctp_inpcb *inp, struct sctp_tcb *stcb,
 #endif
 		}
 		tmr = &stcb->asoc.dack_timer;
-		to_ticks = MSEC_TO_TICKS(stcb->asoc.delayed_ack);
+		to_ticks = sctp_msecs_to_ticks(stcb->asoc.delayed_ack);
 		break;
 	case SCTP_TIMER_TYPE_SHUTDOWN:
 		/* Here we use the RTO of the destination. */
@@ -2168,9 +2250,9 @@ sctp_timer_start(int t_type, struct sctp_inpcb *inp, struct sctp_tcb *stcb,
 		}
 		tmr = &net->rxt_timer;
 		if (net->RTO == 0) {
-			to_ticks = MSEC_TO_TICKS(stcb->asoc.initial_rto);
+			to_ticks = sctp_msecs_to_ticks(stcb->asoc.initial_rto);
 		} else {
-			to_ticks = MSEC_TO_TICKS(net->RTO);
+			to_ticks = sctp_msecs_to_ticks(net->RTO);
 		}
 		break;
 	case SCTP_TIMER_TYPE_HEARTBEAT:
@@ -2215,7 +2297,7 @@ sctp_timer_start(int t_type, struct sctp_inpcb *inp, struct sctp_tcb *stcb,
 		 * Now we must convert the to_ticks that are now in ms to
 		 * ticks.
 		 */
-		to_ticks = MSEC_TO_TICKS(to_ticks);
+		to_ticks = sctp_msecs_to_ticks(to_ticks);
 		break;
 	case SCTP_TIMER_TYPE_COOKIE:
 		/*
@@ -2233,9 +2315,9 @@ sctp_timer_start(int t_type, struct sctp_inpcb *inp, struct sctp_tcb *stcb,
 		}
 		tmr = &net->rxt_timer;
 		if (net->RTO == 0) {
-			to_ticks = MSEC_TO_TICKS(stcb->asoc.initial_rto);
+			to_ticks = sctp_msecs_to_ticks(stcb->asoc.initial_rto);
 		} else {
-			to_ticks = MSEC_TO_TICKS(net->RTO);
+			to_ticks = sctp_msecs_to_ticks(net->RTO);
 		}
 		break;
 	case SCTP_TIMER_TYPE_NEWCOOKIE:
@@ -2288,9 +2370,9 @@ sctp_timer_start(int t_type, struct sctp_inpcb *inp, struct sctp_tcb *stcb,
 		}
 		tmr = &net->rxt_timer;
 		if (net->RTO == 0) {
-			to_ticks = MSEC_TO_TICKS(stcb->asoc.initial_rto);
+			to_ticks = sctp_msecs_to_ticks(stcb->asoc.initial_rto);
 		} else {
-			to_ticks = MSEC_TO_TICKS(net->RTO);
+			to_ticks = sctp_msecs_to_ticks(net->RTO);
 		}
 		break;
 	case SCTP_TIMER_TYPE_ASCONF:
@@ -2308,9 +2390,9 @@ sctp_timer_start(int t_type, struct sctp_inpcb *inp, struct sctp_tcb *stcb,
 		}
 		tmr = &stcb->asoc.asconf_timer;
 		if (net->RTO == 0) {
-			to_ticks = MSEC_TO_TICKS(stcb->asoc.initial_rto);
+			to_ticks = sctp_msecs_to_ticks(stcb->asoc.initial_rto);
 		} else {
-			to_ticks = MSEC_TO_TICKS(net->RTO);
+			to_ticks = sctp_msecs_to_ticks(net->RTO);
 		}
 		break;
 	case SCTP_TIMER_TYPE_SHUTDOWNGUARD:
@@ -2328,7 +2410,11 @@ sctp_timer_start(int t_type, struct sctp_inpcb *inp, struct sctp_tcb *stcb,
 		}
 		tmr = &stcb->asoc.shut_guard_timer;
 		if (inp->sctp_ep.sctp_timeoutticks[SCTP_TIMER_MAXSHUTDOWN] == 0) {
-			to_ticks = 5 * MSEC_TO_TICKS(stcb->asoc.maxrto);
+			if (stcb->asoc.maxrto < UINT32_MAX / 5) {
+				to_ticks = sctp_msecs_to_ticks(5 * stcb->asoc.maxrto);
+			} else {
+				to_ticks = sctp_msecs_to_ticks(UINT32_MAX);
+			}
 		} else {
 			to_ticks = inp->sctp_ep.sctp_timeoutticks[SCTP_TIMER_MAXSHUTDOWN];
 		}
@@ -2360,9 +2446,9 @@ sctp_timer_start(int t_type, struct sctp_inpcb *inp, struct sctp_tcb *stcb,
 		}
 		tmr = &stcb->asoc.strreset_timer;
 		if (net->RTO == 0) {
-			to_ticks = MSEC_TO_TICKS(stcb->asoc.initial_rto);
+			to_ticks = sctp_msecs_to_ticks(stcb->asoc.initial_rto);
 		} else {
-			to_ticks = MSEC_TO_TICKS(net->RTO);
+			to_ticks = sctp_msecs_to_ticks(net->RTO);
 		}
 		break;
 	case SCTP_TIMER_TYPE_INPKILL:
@@ -2380,7 +2466,7 @@ sctp_timer_start(int t_type, struct sctp_inpcb *inp, struct sctp_tcb *stcb,
 #endif
 		}
 		tmr = &inp->sctp_ep.signature_change;
-		to_ticks = MSEC_TO_TICKS(SCTP_INP_KILL_TIMEOUT);
+		to_ticks = sctp_msecs_to_ticks(SCTP_INP_KILL_TIMEOUT);
 		break;
 	case SCTP_TIMER_TYPE_ASOCKILL:
 		if ((inp == NULL) || (stcb == NULL) || (net != NULL)) {
@@ -2392,7 +2478,7 @@ sctp_timer_start(int t_type, struct sctp_inpcb *inp, struct sctp_tcb *stcb,
 #endif
 		}
 		tmr = &stcb->asoc.strreset_timer;
-		to_ticks = MSEC_TO_TICKS(SCTP_ASOC_KILL_TIMEOUT);
+		to_ticks = sctp_msecs_to_ticks(SCTP_ASOC_KILL_TIMEOUT);
 		break;
 	case SCTP_TIMER_TYPE_ADDR_WQ:
 		if ((inp != NULL) || (stcb != NULL) || (net != NULL)) {
@@ -2417,7 +2503,7 @@ sctp_timer_start(int t_type, struct sctp_inpcb *inp, struct sctp_tcb *stcb,
 #endif
 		}
 		tmr = &stcb->asoc.delete_prim_timer;
-		to_ticks = MSEC_TO_TICKS(stcb->asoc.initial_rto);
+		to_ticks = sctp_msecs_to_ticks(stcb->asoc.initial_rto);
 		break;
 	default:
 #ifdef INVARIANTS
@@ -2503,6 +2589,9 @@ sctp_timer_stop(int t_type, struct sctp_inpcb *inp, struct sctp_tcb *stcb,
 {
 	struct sctp_timer *tmr;
 
+	KASSERT(stcb == NULL || stcb->sctp_ep == inp,
+	    ("sctp_timer_stop of type %d: inp = %p, stcb->sctp_ep %p",
+	    t_type, stcb, stcb->sctp_ep));
 	if (stcb != NULL) {
 		SCTP_TCB_LOCK_ASSERT(stcb);
 	} else if (inp != NULL) {

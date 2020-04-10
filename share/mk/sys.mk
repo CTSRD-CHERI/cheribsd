@@ -245,7 +245,7 @@ FFLAGS		?=	-O
 .endif
 EFLAGS		?=
 
-INSTALL		?=	install
+INSTALL		?=	${INSTALL_CMD:Uinstall}
 
 LEX		?=	lex
 LFLAGS		?=

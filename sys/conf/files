@@ -1386,6 +1386,7 @@ dev/bwn/if_bwn_phy_g.c		optional bwn bhnd
 dev/bwn/if_bwn_phy_lp.c		optional bwn bhnd
 dev/bwn/if_bwn_phy_n.c		optional bwn bhnd
 dev/bwn/if_bwn_util.c		optional bwn bhnd
+dev/cadence/if_cgem.c		optional cgem fdt
 dev/cardbus/cardbus.c		optional cardbus
 dev/cardbus/cardbus_cis.c	optional cardbus
 dev/cardbus/cardbus_device.c	optional cardbus
@@ -3552,7 +3553,6 @@ fs/nullfs/null_vnops.c		optional nullfs
 fs/procfs/procfs.c		optional procfs
 fs/procfs/procfs_dbregs.c	optional procfs
 fs/procfs/procfs_fpregs.c	optional procfs
-fs/procfs/procfs_ioctl.c	optional procfs
 fs/procfs/procfs_map.c		optional procfs
 fs/procfs/procfs_mem.c		optional procfs
 fs/procfs/procfs_note.c		optional procfs

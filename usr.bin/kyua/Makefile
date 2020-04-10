@@ -38,6 +38,8 @@ CFLAGS+=	-Wno-deprecated-declarations
 
 FILESGROUPS=	DOCS EXAMPLES MISC STORE
 
+# Install a minimal default config that uses the 'tests' user.
+# The examples config is not appropriate for general use.
 CONFS=		kyua.conf-default
 CONFSDIR=	${KYUA_CONFDIR}
 CONFSNAME=	kyua.conf
@@ -61,7 +63,7 @@ CLEANFILES+=	${MAN}
 .PATH: ${KYUA_SRCDIR}/doc
 .for man in ${MAN}
 ${man}: ${man}.in
-	${SHELL} ${KYUA_SRCDIR}/doc/manbuild.sh \
+	sh ${KYUA_SRCDIR}/doc/manbuild.sh \
 	    -v "CONFDIR=${KYUA_CONFDIR}" \
 	    -v "DOCDIR=${KYUA_DOCDIR}" \
 	    -v "EGDIR=${KYUA_EGDIR}" \

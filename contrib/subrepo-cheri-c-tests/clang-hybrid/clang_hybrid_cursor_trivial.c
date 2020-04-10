@@ -27,7 +27,8 @@
 #define TEST_EXPECTED_FAULTS 2
 #include "cheri_c_test.h"
 
-int buffer[42];
+// Mark as used so that the compiler can't optimize it away.
+__attribute__((used)) static int buffer[42];
 
 BEGIN_TEST(clang_hybrid_cursor_trivial)
 	int * __capability b = (__cheri_tocap int * __capability)&buffer[0];
