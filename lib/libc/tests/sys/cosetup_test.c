@@ -46,7 +46,6 @@ ATF_TC_BODY(cosetup_cocall, tc)
 {
 	void * __capability switcher_code;
 	void * __capability switcher_data;
-
 	pid_t pid;
 	int error;
 
@@ -65,7 +64,6 @@ ATF_TC_BODY(cosetup_coaccept, tc)
 {
 	void * __capability switcher_code;
 	void * __capability switcher_data;
-
 	pid_t pid;
 	int error;
 

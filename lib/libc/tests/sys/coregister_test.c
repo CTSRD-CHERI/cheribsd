@@ -79,7 +79,7 @@ coexec_helper(pid_t pid, char *name, char *arg)
 	helper_argv[1] = name;
 	helper_argv[2] = NULL;
 
-	error = setenv("COCALL_TEST_HELPER_ARG", arg, 1);
+	error = setenv("COREGISTER_TEST_HELPER_ARG", arg, 1);
 	ATF_REQUIRE_EQ(error, 0);
 
 	error = coexecve(pid, path, helper_argv, environ);
@@ -92,7 +92,7 @@ random_string(void)
 {
 	char *str = NULL;
 
-	asprintf(&str, "cocall_test_%u", arc4random());
+	asprintf(&str, "coregister_test_%u", arc4random());
 	return (str);
 }
 
@@ -150,7 +150,7 @@ ATF_TC_BODY(coregister_colookup_other_proc_h, tc)
 	char *arg;
 	int error;
 
-	arg = getenv("COCALL_TEST_HELPER_ARG");
+	arg = getenv("COREGISTER_TEST_HELPER_ARG");
 	if (arg == NULL)
 		atf_tc_skip("helper testcase, not supposed to be run directly");
 
@@ -195,7 +195,7 @@ ATF_TC_BODY(coreregister_other_proc_h, tc)
 	char *arg;
 	int error;
 
-	arg = getenv("COCALL_TEST_HELPER_ARG");
+	arg = getenv("COREGISTER_TEST_HELPER_ARG");
 	if (arg == NULL)
 		atf_tc_skip("helper testcase, not supposed to be run directly");
 
