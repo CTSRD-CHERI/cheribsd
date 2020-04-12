@@ -217,9 +217,14 @@ WANT_COMPAT:=	${NEED_COMPAT}
 .if defined(HAS_COMPAT) && defined(WANT_COMPAT)
 .if ${WANT_COMPAT} == "any"
 _LIBCOMPAT:=	${HAS_COMPAT:[1]}
+.elif !${HAS_COMPAT:M${WANT_COMPAT}}
+.warning WANT_COMPAT (${WANT_COMPAT}) defined, but not in HAS_COMPAT (${HAS_COMPAT})
+.undef WANT_COMPAT
 .else
 _LIBCOMPAT:=	${WANT_COMPAT}
 .endif
+.else # defined(HAS_COMPAT) && defined(WANT_COMPAT)
+.undef WANT_COMPAT
 .endif
 
 # -------------------------------------------------------------------
