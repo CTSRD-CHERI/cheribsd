@@ -581,4 +581,5 @@ const char *freebsd64_syscallnames[] = {
 	"freebsd64_shm_rename",			/* 572 = freebsd64_shm_rename */
 	"freebsd64_sigfastblock",			/* 573 = freebsd64_sigfastblock */
 	"freebsd64___realpathat",			/* 574 = freebsd64___realpathat */
+	"close_range",			/* 575 = close_range */
 };

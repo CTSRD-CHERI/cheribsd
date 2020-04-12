@@ -3749,3 +3749,13 @@ SYS_STUB(574, int, __realpathat,
     /* _localcheck */ {if (!(cheri_getperm(path) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} if (!(cheri_getperm(buf) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} }
 )
 
+SYS_STUB(575, int, close_range,
+    /* _protoargs */ (u_int lowfd, u_int highfd, int flags),
+    /* _protoargs_chk */ (int *retp , int * __capability stub_errno, u_int lowfd, u_int highfd, int flags),
+    /* _protoargs_err */ (int * __capability stub_errno, u_int lowfd, u_int highfd, int flags),
+    /* _callargs */ (lowfd, highfd, flags),
+    /* _callargs_chk */ (&ret, stub_errno, lowfd, highfd, flags),
+    /* _callargs_err */ (&errno, lowfd, highfd, flags),
+    /* _localcheck */ {}
+)
+

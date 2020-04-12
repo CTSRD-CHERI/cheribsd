@@ -581,4 +581,5 @@ const char *cheriabi_syscallnames[] = {
 	"cheriabi_shm_rename",			/* 572 = cheriabi_shm_rename */
 	"cheriabi_sigfastblock",			/* 573 = cheriabi_sigfastblock */
 	"cheriabi___realpathat",			/* 574 = cheriabi___realpathat */
+	"close_range",			/* 575 = close_range */
 };
