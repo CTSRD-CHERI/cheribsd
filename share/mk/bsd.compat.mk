@@ -6,6 +6,8 @@
 .if !targets(__<${_this:T}>__)
 __<${_this:T}>__:
 
+.include <src.opts.mk>
+
 .if defined(_LIBCOMPAT)
 COMPAT_ARCH?=	${TARGET_ARCH}
 COMPAT_CPUTYPE?= ${CPUTYPE_${_LIBCOMPAT}}
@@ -24,7 +26,7 @@ COMPAT_COMPILER_TYPE=${COMPILER_TYPE}
 
 # -------------------------------------------------------------------
 # 32 bit world
-.if ${COMPAT_ARCH} == "amd64"
+.if ${COMPAT_ARCH} == "amd64" && ${MK_LIB32} != "no"
 HAS_COMPAT=32
 .if empty(COMPAT_CPUTYPE)
 LIB32CPUFLAGS=	-march=i686 -mmmx -msse -msse2
@@ -43,7 +45,7 @@ LIB32WMAKEFLAGS=	\
 		AS="${XAS} --32" \
 		LD="${XLD} -m elf_i386_fbsd -L${WORLDTMP}/usr/lib32"
 
-.elif ${COMPAT_ARCH} == "powerpc64"
+.elif ${COMPAT_ARCH} == "powerpc64" && ${MK_LIB32} != "no"
 HAS_COMPAT=32
 .if empty(COMPAT_CPUTYPE)
 LIB32CPUFLAGS=	-mcpu=powerpc
@@ -62,7 +64,7 @@ LIB32_MACHINE_ARCH=	powerpc
 LIB32WMAKEFLAGS=	\
 		LD="${XLD} -m elf32ppc_fbsd"
 
-.elif ${COMPAT_ARCH:Mmips64*}
+.elif ${COMPAT_ARCH:Mmips64*} && ${MK_LIB32} != "no"
 HAS_COMPAT=32
 .if ${COMPAT_COMPILER_TYPE} == gcc
 .if empty(COMPAT_CPUTYPE)
@@ -98,7 +100,7 @@ LIB32WMAKEFLAGS+=	-DCOMPAT_32BIT
 
 # -------------------------------------------------------------------
 # 64 bit world
-.if ${COMPAT_ARCH:Mmips64*c*}
+.if ${COMPAT_ARCH:Mmips64*c*} && ${MK_LIB64} != "no"
 HAS_COMPAT=64
 # XXX: clang specific
 .if ${COMPAT_ARCH:Mmips64el*}
@@ -118,7 +120,7 @@ LIB64WMAKEFLAGS= LD="${XLD} -m ${_EMULATION}"
 LIB64LDFLAGS=	-Wl,-m${_EMULATION}
 .endif
 
-.if ${COMPAT_ARCH:Mriscv*c*}
+.if ${COMPAT_ARCH:Mriscv*c*} && ${MK_LIB64} != "no"
 HAS_COMPAT=64
 COMPAT_RISCV_ABI=	lp64
 .if !${COMPAT_ARCH:Mriscv*sf}
@@ -140,7 +142,7 @@ LIB64WMAKEFLAGS+=	-DCOMPAT_64BIT
 
 # -------------------------------------------------------------------
 # CHERI world
-.if ${COMPAT_ARCH:Mmips64*} && !${COMPAT_ARCH:Mmips64*c*}
+.if ${COMPAT_ARCH:Mmips64*} && !${COMPAT_ARCH:Mmips64*c*} && ${MK_COMPAT_CHERIABI} != "no"
 .if ${COMPAT_ARCH:Mmips*el*}
 .error No little endian CHERI
 .endif
@@ -149,7 +151,7 @@ LIBCHERICPUFLAGS=  -target cheri-unknown-freebsd13.0 -mabi=purecap
 LIBCHERI_MACHINE=	mips
 LIBCHERI_MACHINE_ARCH=	mips64c128
 
-.elif ${COMPAT_ARCH:Mriscv64*} && !${COMPAT_ARCH:Mriscv64*c*}
+.elif ${COMPAT_ARCH:Mriscv64*} && !${COMPAT_ARCH:Mriscv64*c*} && ${MK_COMPAT_CHERIABI} != "no"
 HAS_COMPAT+=CHERI
 LIBCHERI_MACHINE=	riscv
 LIBCHERI_MACHINE_ARCH=	${COMPAT_ARCH}c
