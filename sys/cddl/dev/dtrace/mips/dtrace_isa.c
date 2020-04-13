@@ -405,7 +405,7 @@ dtrace_next_frame(register_t *pc, register_t *sp,
 				more = 2;	/* stop after next instruction */
 			};
 			break;
-
+		// TODO(nicomazz): Look for cheribsd specific instructions
 		case OP_SW:
 			/* look for saved registers on the stack */
 			if (i.IType.rs != 29)
