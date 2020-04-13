@@ -166,7 +166,7 @@
  */
 struct nfsd_addsock_args {
 	int	sock;		/* Socket to serve */
-	caddr_t	name;		/* Client addr for connection based sockets */
+	char * __kerncap name;	/* Client addr for connection based sockets */
 	int	namelen;	/* Length of name */
 };
 
@@ -220,12 +220,12 @@ struct nfsd_nfsd_oargs {
  * Arguments for use by the callback daemon.
  */
 struct nfsd_nfscbd_args {
-	const char *principal;	/* GSS-API service principal name */
+	const char * __kerncap principal; /* GSS-API service principal name */
 };
 
 struct nfscbd_args {
 	int	sock;		/* Socket to serve */
-	caddr_t	name;		/* Client addr for connection based sockets */
+	char * __kerncap name;	/* Client addr for connection based sockets */
 	int	namelen;	/* Length of name */
 	u_short	port;		/* Port# for callbacks */
 };
@@ -236,9 +236,9 @@ struct nfsd_idargs {
 	gid_t		nid_gid;
 	int		nid_usermax;	/* Upper bound on user name cache */
 	int		nid_usertimeout;/* User name timeout (minutes) */
-	u_char		*nid_name;	/* Name */
+	u_char 	* __kerncap nid_name;	/* Name */
 	int		nid_namelen;	/* and its length */
-	gid_t		*nid_grps;	/* and the list */
+	gid_t 	* __kerncap nid_grps;	/* and the list */
 	int		nid_ngroup;	/* Size of groups list */
 };
 
@@ -248,7 +248,7 @@ struct nfsd_oidargs {
 	gid_t		nid_gid;
 	int		nid_usermax;	/* Upper bound on user name cache */
 	int		nid_usertimeout;/* User name timeout (minutes) */
-	u_char		*nid_name;	/* Name */
+	u_char 	* __kerncap nid_name;	/* Name */
 	int		nid_namelen;	/* and its length */
 };
 

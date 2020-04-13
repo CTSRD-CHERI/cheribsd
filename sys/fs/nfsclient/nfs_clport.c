@@ -1234,7 +1234,7 @@ nfssvc_nfscl(struct thread *td, struct nfssvc_args *uap)
 	struct nfsmount *nmp;
 
 	if (uap->flag & NFSSVC_CBADDSOCK) {
-		error = copyin(uap->argp, (caddr_t)&nfscbdarg, sizeof(nfscbdarg));
+		error = copyincap(uap->argp, &nfscbdarg, sizeof(nfscbdarg));
 		if (error)
 			return (error);
 		/*
@@ -1259,8 +1259,7 @@ nfssvc_nfscl(struct thread *td, struct nfssvc_args *uap)
 	} else if (uap->flag & NFSSVC_NFSCBD) {
 		if (uap->argp == NULL) 
 			return (EINVAL);
-		error = copyin(uap->argp, (caddr_t)&nfscbdarg2,
-		    sizeof(nfscbdarg2));
+		error = copyincap(uap->argp, &nfscbdarg2, sizeof(nfscbdarg2));
 		if (error)
 			return (error);
 		error = nfscbd_nfsd(td, &nfscbdarg2);

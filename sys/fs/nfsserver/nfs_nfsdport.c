@@ -3461,7 +3461,7 @@ nfssvc_nfsd(struct thread *td, struct nfssvc_args *uap)
 	char fname[PNFS_FILENAME_LEN + 1];
 
 	if (uap->flag & NFSSVC_NFSDADDSOCK) {
-		error = copyin(uap->argp, (caddr_t)&sockarg, sizeof (sockarg));
+		error = copyincap(uap->argp, &sockarg, sizeof(sockarg));
 		if (error)
 			goto out;
 		/*
