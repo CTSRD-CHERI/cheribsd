@@ -389,19 +389,20 @@ SlowFault:
 	csetbounds	CHERI_REG_KSCRATCH, CHERI_REG_KSCRATCH, k1;	\
 	/* go to the top of kstack */					\
 	cincoffset	CHERI_REG_KSCRATCH, CHERI_REG_KSCRATCH, k1;	\
-	/* XXX may want to save context before for the debugger */	\
-	/* stop the ddb backtrace here */				\
 	PTR_SUBU	k0, zero, KERN_EXC_FRAME_SIZE;			\
 	cincoffset	CHERI_REG_KSCRATCH, CHERI_REG_KSCRATCH, k0;	\
 	/* Save the overflowed STC in KR2C for later use; */		\
 	csetkr2c	CHERI_REG_STC;					\
 	cmove	CHERI_REG_STC, CHERI_REG_KSCRATCH;			\
-	CHERI_NULL(CHERI_REG_KSCRATCH);					\
-	csc	CHERI_REG_KSCRATCH, zero, CALLFRAME_RA(CHERI_REG_STC);	\
-	csc	CHERI_REG_KSCRATCH, zero, CALLFRAME_SP(CHERI_REG_STC);	\
 	/* SAVE_CPU will save KSCRATCH as STC so we put the overflowed STC here */\
 	cgetkr2c	CHERI_REG_KSCRATCH;				\
 	SAVE_CPU;							\
+	/* Fill frame info for debugger backtrace */			\
+	RESTORE_CREG($c24, STC);					\
+	csc	$c24, zero, CALLFRAME_CSP(CHERI_REG_STC);		\
+	RESTORE_CREG($c17, PCC);					\
+	csc	$c17, zero, CALLFRAME_CRA(CHERI_REG_STC);		\
+	cmove $c24, CHERI_REG_STC;					\
 	PANIC("Kernel stack overflow")
 
 /*
