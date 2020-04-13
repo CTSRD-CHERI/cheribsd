@@ -603,11 +603,6 @@ MK_LLVM_COV:= no
 MK_LOADER_VERIEXEC_PASS_MANIFEST := no
 .endif
 
-# COMPAT_CHERIABI and LIBCHERI depend on CHERI support on mips.
-.if ${MK_CHERI} == "no" && ${__TT} == "mips"
-MK_LIBCHERI:=	no
-.endif
-
 #
 # MK_* options whose default value depends on another option.
 #
