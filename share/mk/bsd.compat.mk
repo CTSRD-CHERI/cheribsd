@@ -26,7 +26,8 @@ COMPAT_COMPILER_TYPE=${COMPILER_TYPE}
 
 # -------------------------------------------------------------------
 # 32 bit world
-.if ${COMPAT_ARCH} == "amd64" && ${MK_LIB32} != "no"
+.if ${MK_LIB32} != "no"
+.if ${COMPAT_ARCH} == "amd64"
 HAS_COMPAT=32
 .if empty(COMPAT_CPUTYPE)
 LIB32CPUFLAGS=	-march=i686 -mmmx -msse -msse2
@@ -45,7 +46,7 @@ LIB32WMAKEFLAGS=	\
 		AS="${XAS} --32" \
 		LD="${XLD} -m elf_i386_fbsd -L${WORLDTMP}/usr/lib32"
 
-.elif ${COMPAT_ARCH} == "powerpc64" && ${MK_LIB32} != "no"
+.elif ${COMPAT_ARCH} == "powerpc64"
 HAS_COMPAT=32
 .if empty(COMPAT_CPUTYPE)
 LIB32CPUFLAGS=	-mcpu=powerpc
@@ -64,7 +65,7 @@ LIB32_MACHINE_ARCH=	powerpc
 LIB32WMAKEFLAGS=	\
 		LD="${XLD} -m elf32ppc_fbsd"
 
-.elif ${COMPAT_ARCH:Mmips64*} && ${MK_LIB32} != "no"
+.elif ${COMPAT_ARCH:Mmips64*}
 HAS_COMPAT=32
 .if ${COMPAT_COMPILER_TYPE} == gcc
 .if empty(COMPAT_CPUTYPE)
@@ -97,10 +98,12 @@ LIB32WMAKEFLAGS+= OBJCOPY="${XOBJCOPY}"
 LIB32CFLAGS=	-DCOMPAT_32BIT
 LIB32DTRACE=	${DTRACE} -32
 LIB32WMAKEFLAGS+=	-DCOMPAT_32BIT
+.endif # ${MK_LIB32} != "no"
 
 # -------------------------------------------------------------------
 # 64 bit world
-.if ${COMPAT_ARCH:Mmips64*c*} && ${MK_LIB64} != "no"
+.if ${MK_LIB64} != "no"
+.if ${COMPAT_ARCH:Mmips64*c*}
 HAS_COMPAT=64
 # XXX: clang specific
 .if ${COMPAT_ARCH:Mmips64el*}
@@ -120,7 +123,7 @@ LIB64WMAKEFLAGS= LD="${XLD} -m ${_EMULATION}"
 LIB64LDFLAGS=	-Wl,-m${_EMULATION}
 .endif
 
-.if ${COMPAT_ARCH:Mriscv*c*} && ${MK_LIB64} != "no"
+.if ${COMPAT_ARCH:Mriscv*c*}
 HAS_COMPAT=64
 COMPAT_RISCV_ABI=	lp64
 .if !${COMPAT_ARCH:Mriscv*sf}
@@ -139,10 +142,12 @@ LIB64WMAKEFLAGS+= NM="${XNM}" OBJCOPY="${XOBJCOPY}"
 LIB64CFLAGS=	-DCOMPAT_64BIT
 LIB64DTRACE=	${DTRACE} -64
 LIB64WMAKEFLAGS+=	-DCOMPAT_64BIT
+.endif # ${MK_LIB64} != "no"
 
 # -------------------------------------------------------------------
 # CHERI world
-.if ${COMPAT_ARCH:Mmips64*} && !${COMPAT_ARCH:Mmips64*c*} && ${MK_COMPAT_CHERIABI} != "no"
+.if ${MK_COMPAT_CHERIABI} != "no"
+.if ${COMPAT_ARCH:Mmips64*} && !${COMPAT_ARCH:Mmips64*c*}
 .if ${COMPAT_ARCH:Mmips*el*}
 .error No little endian CHERI
 .endif
@@ -151,7 +156,7 @@ LIBCHERICPUFLAGS=  -target cheri-unknown-freebsd13.0 -mabi=purecap
 LIBCHERI_MACHINE=	mips
 LIBCHERI_MACHINE_ARCH=	mips64c128
 
-.elif ${COMPAT_ARCH:Mriscv64*} && !${COMPAT_ARCH:Mriscv64*c*} && ${MK_COMPAT_CHERIABI} != "no"
+.elif ${COMPAT_ARCH:Mriscv64*} && !${COMPAT_ARCH:Mriscv64*c*}
 HAS_COMPAT+=CHERI
 LIBCHERI_MACHINE=	riscv
 LIBCHERI_MACHINE_ARCH=	${COMPAT_ARCH}c
@@ -163,6 +168,7 @@ COMPAT_RISCV_ABI:=	${COMPAT_RISCV_ABI}d
 .endif
 LIBCHERICPUFLAGS+=	-march=${COMPAT_RISCV_MARCH} -mabi=${COMPAT_RISCV_ABI}
 .endif	# ${COMPAT_ARCH:Mriscv64*}
+.endif # ${MK_COMPAT_CHERIABI} != "no"
 
 .if ${COMPAT_ARCH:Mriscv*}
 # See bsd.cpu.mk
