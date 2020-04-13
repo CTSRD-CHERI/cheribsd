@@ -51,7 +51,7 @@ mips/mips/stdatomic.c			standard \
 mips/mips/support.S			optional	!cheri_purecap_kernel
 mips/mips/swtch.S			optional	!cheri_purecap_kernel
 mips/mips/sys_machdep.c			standard
-mips/mips/tlb.c				standard
+mips/mips/tlb.c				standard compile-with ${NOCOV_C}
 mips/mips/trap.c			standard
 mips/mips/uio_machdep.c			standard
 mips/mips/uma_machdep.c			standard
