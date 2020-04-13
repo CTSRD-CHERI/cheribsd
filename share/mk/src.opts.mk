@@ -268,8 +268,10 @@ __DEFAULT_DEPENDENT_OPTIONS+= ${var}_SUPPORT/${var}
 # overriden by bsd.compat.mk.
 .if defined(TARGET_ARCH) && !defined(WANT_COMPAT)
 __T=${TARGET_ARCH}
+__C=${TARGET_CPUTYPE}
 .else
 __T=${MACHINE_ARCH}
+__C=${CPUTYPE}
 .endif
 
 # All supported backends for LLVM_TARGET_XXX
@@ -429,7 +431,10 @@ __DEFAULT_YES_OPTIONS+=PIE
 __DEFAULT_NO_OPTIONS+=PIE
 .endif
 
-.if ${__T} != "mips64" && (!${__T:Mriscv*} || ${__T:Mriscv*64*c})
+# We'd really like this to be:
+#    !${MACHINE_CPU:Mcheri} || ${MACHINE_ABI:Mpurecap}
+# but that logic doesn't work in Makefile.inc1...
+.if ${__C} != "cheri" || (${__T:Mmips64*c*} || ${__C:Mriscv64*c*})
 BROKEN_OPTIONS+=COMPAT_CHERIABI
 .endif
 
@@ -601,7 +606,6 @@ MK_LOADER_VERIEXEC_PASS_MANIFEST := no
 # COMPAT_CHERIABI and LIBCHERI depend on CHERI support on mips.
 .if ${MK_CHERI} == "no" && ${__TT} == "mips"
 MK_LIBCHERI:=	no
-MK_COMPAT_CHERIABI:=	no
 .endif
 
 #
