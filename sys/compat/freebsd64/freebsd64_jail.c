@@ -28,6 +28,8 @@
  * SUCH DAMAGE.
  */
 
+#define	EXPLICIT_USER_ACCESS
+
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
@@ -69,7 +71,8 @@ freebsd64_jail(struct thread *td, struct freebsd64_jail_args *uap)
 	int error;
 	void *jail = uap->jailp;
 
-	error = copyin(jail, &version, sizeof(version));
+	error = copyin(__USER_CAP(jail, sizeof(version)), &version,
+	    sizeof(version));
 	if (error)
 		return (error);
 
@@ -79,7 +82,7 @@ freebsd64_jail(struct thread *td, struct freebsd64_jail_args *uap)
 		struct in_addr ip4;
 
 		/* FreeBSD single IPv4 jails. */
-		error = copyin(jail, &j0, sizeof(struct jail64_v0));
+		error = copyin(__USER_CAP(jail, sizeof(j0)), &j0, sizeof(j0));
 		if (error)
 			return (error);
 		/* jail_v0 is host order */
@@ -98,7 +101,7 @@ freebsd64_jail(struct thread *td, struct freebsd64_jail_args *uap)
 	case 2:	{ /* JAIL_API_VERSION */
 		struct jail64 j;
 		/* FreeBSD multi-IPv4/IPv6,noIP jails. */
-		error = copyin(jail, &j, sizeof(struct jail64));
+		error = copyin(__USER_CAP(jail, sizeof(j)), &j, sizeof(j));
 		if (error)
 			return (error);
 		return (kern_jail(td, __USER_CAP_STR(j.path),
