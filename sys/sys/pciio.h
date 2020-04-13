@@ -135,7 +135,7 @@ struct pci_vpd_element {
 struct pci_list_vpd_io {
 	struct pcisel	plvi_sel;	/* device to operate on */
 	size_t		plvi_len;	/* size of the data area */
-	struct pci_vpd_element *plvi_data;
+	struct pci_vpd_element * __kerncap plvi_data;
 };
 
 struct pci_bar_mmap {
