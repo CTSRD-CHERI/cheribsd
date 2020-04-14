@@ -43,6 +43,7 @@ SRCS+= getdents.c lstat.c mknod.c stat.c
 .if !${MACHINE_ABI:Mpurecap}
 SRCS+= brk.c
 .endif
+SRCS+= closefrom.c
 SRCS+= pipe.c
 SRCS+= shm_open.c
 SRCS+= vadvise.c
