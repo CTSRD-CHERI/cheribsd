@@ -68,7 +68,8 @@
  */
 #define	CHERI_VM_ASSERT_BOUNDS(ptr, expect) do {			\
 		CHERI_VM_ASSERT_VALID(ptr);				\
-		KASSERT(cheri_getlen((void *)ptr) == expect,		\
+		KASSERT(cheri_getlen((void *)ptr) <=			\
+			CHERI_REPRESENTABLE_LENGTH(expect),		\
 			("Invalid bounds on pointer in %s %s:%d "	\
 			 "expected %lx, found %lx",			\
 			 __func__, __FILE__, __LINE__,			\
@@ -88,21 +89,17 @@
 			(u_long)len, cheri_getlen((void *)ptr)));	\
 	} while (0)
 
-#define	cheri_vm_representable_len(l)		\
-	CHERI_REPRESENTABLE_LENGTH(l)
-
 #else /* ! CHERI_PURECAP_KERNEL */
 #define	CHERI_VM_ASSERT_VALID(ptr)
 #define	CHERI_VM_ASSERT_FIT_PTR(ptr)
 #define	CHERI_VM_ASSERT_BOUNDS(ptr, expect)
 #define	CHERI_VM_ASSERT_EXACT(ptr, len)
-#define	cheri_vm_representable_len(l) (l)
 #endif /* ! CHERI_PURECAP_KERNEL*/
 
 #endif /* _VM_CHERI_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20190619,
+//   "updated": 20200414,
 //   "target_type": "header",
 //   "changes_purecap": [
 //     "support"

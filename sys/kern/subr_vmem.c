@@ -1148,9 +1148,11 @@ retry:
 
 out:
 	VMEM_UNLOCK(vm);
+#ifdef CHERI_PURECAP_KERNEL
 	CHERI_VM_ASSERT_VALID(*addrp);
-	*addrp = (vmem_addr_t)cheri_bound((void *)*addrp, size);
+	*addrp = (vmem_addr_t)cheri_csetboundsexact((void *)*addrp, size);
 	CHERI_VM_ASSERT_EXACT(*addrp, size);
+#endif
 	return (error);
 }
 
@@ -1279,14 +1281,21 @@ vmem_roundup_size(vmem_t *vm, vmem_size_t size)
 
 /*
  * vmem_alloc: allocate resource from the arena.
+ * Note: In the purecap kernel we need to be sure that the quantum
+ * taken from the cache is able to accommodate the representable
+ * size of the requested allocation and protect against loss of precision
+ * due to insufficient alignment of the quantum base.
+ * This is implicitly done by filling the quantum cache zones from
+ * vmem_xalloc(), which enforces those invariants.
+ * The quantum size may exceed the intended size, this
+ * is fine as the whole quantum is allocated and we do not have security
+ * implications.
  */
 int
 vmem_alloc(vmem_t *vm, vmem_size_t size, int flags, vmem_addr_t *addrp)
 {
 	const int strat __unused = flags & VMEM_FITMASK;
 	qcache_t *qc;
-
-	size = cheri_vm_representable_len(size);
 
 	flags &= VMEM_FLAGS;
 	MPASS(size > 0);
@@ -1304,8 +1313,12 @@ vmem_alloc(vmem_t *vm, vmem_size_t size, int flags, vmem_addr_t *addrp)
 		*addrp = (vmem_addr_t)uma_zalloc(qc->qc_cache,
 		    (flags & ~M_WAITOK) | M_NOWAIT);
 		if (__predict_true(*addrp != 0)) {
+#ifdef CHERI_PURECAP_KERNEL
 			CHERI_VM_ASSERT_VALID(*addrp);
-			*addrp = (vm_ptr_t)cheri_bound((void *)*addrp, size);
+			*addrp = (vmem_addr_t)cheri_csetbounds(
+			    (void *)*addrp, size);
+			CHERI_VM_ASSERT_BOUNDS(*addrp, size);
+#endif
 			return (0);
 		}
 	}
@@ -1314,14 +1327,30 @@ vmem_alloc(vmem_t *vm, vmem_size_t size, int flags, vmem_addr_t *addrp)
 	    flags, addrp));
 }
 
+/*
+ * Note: In the purecap kernel we need to be sure that the allocation
+ * is representable by the capability we return.
+ * This requires:
+ * - Increasing allocation alignment to avoid truncation of the base
+ *  due to low precision.
+ * - Rounding up the requested size to a representable boundary.
+ * The requested size is always rounded up to a quantum size, we
+ * need to round to the representable length first in case we
+ * end up require one extra quantum. Increases in alignment are also
+ * rounded up to quantum sizes.
+ */
 int
 vmem_xalloc(vmem_t *vm, const vmem_size_t size0, vmem_size_t align,
     const vmem_size_t phase, const vmem_size_t nocross,
     const vmem_addr_t minaddr, const vmem_addr_t maxaddr, int flags,
     vmem_addr_t *addrp)
 {
-	const vmem_size_t size = vmem_roundup_size(
-	    vm, cheri_vm_representable_len(size0));
+#ifdef CHERI_PURECAP_KERNEL
+	const vmem_size_t size = vmem_roundup_size(vm,
+	    CHERI_REPRESENTABLE_LENGTH(size0));
+#else
+	const vmem_size_t size = vmem_roundup_size(vm, size0);
+#endif
 	struct vmem_freelist *list;
 	struct vmem_freelist *first;
 	struct vmem_freelist *end;
@@ -1354,14 +1383,24 @@ vmem_xalloc(vmem_t *vm, const vmem_size_t size0, vmem_size_t align,
 
 	if (align == 0)
 		align = vm->vm_quantum_mask + 1;
+#ifdef CHERI_PURECAP_KERNEL
+	if (CHERI_REPRESENTABLE_ALIGNMENT(size) > align)
+		align = vmem_roundup_size(vm,
+		    CHERI_REPRESENTABLE_ALIGNMENT(size));
+#endif
 	*addrp = 0;
 
 	/*
 	 * Next-fit allocations don't use the freelists.
 	 */
 	if (strat == M_NEXTFIT)
+#ifdef CHERI_PURECAP_KERNEL
+		return (vmem_xalloc_nextfit(vm, size, align, phase, nocross,
+		    flags, addrp));
+#else
 		return (vmem_xalloc_nextfit(vm, size0, align, phase, nocross,
 		    flags, addrp));
+#endif
 
 	end = &vm->vm_freelist[VMEM_MAXORDER];
 	/*
@@ -1425,9 +1464,11 @@ out:
 	VMEM_UNLOCK(vm);
 	if (error != 0 && (flags & M_NOWAIT) == 0)
 		panic("failed to allocate waiting allocation\n");
+#ifdef CHERI_PURECAP_KERNEL
 	CHERI_VM_ASSERT_VALID(*addrp);
-	*addrp = (vm_ptr_t)cheri_bound((void *)*addrp, size);
+	*addrp = (vmem_addr_t)cheri_csetboundsexact((void *)*addrp, size);
 	CHERI_VM_ASSERT_EXACT(*addrp, size);
+#endif
 
 	return (error);
 }
@@ -1802,7 +1843,7 @@ vmem_check(vmem_t *vm)
 #endif /* defined(DIAGNOSTIC) */
 // CHERI CHANGES START
 // {
-//   "updated": 20200402,
+//   "updated": 20200414,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "uintptr_interp_offset",

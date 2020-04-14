@@ -3690,6 +3690,9 @@ slab_alloc_item(uma_keg_t keg, uma_slab_t slab)
 		LIST_REMOVE(slab, us_link);
 		LIST_INSERT_HEAD(&dom->ud_full_slab, slab, us_link);
 	}
+#ifdef CHERI_PURECAP_KERNEL
+        item = cheri_csetbounds(item, keg->uk_size);
+#endif
 
 	return (item);
 }

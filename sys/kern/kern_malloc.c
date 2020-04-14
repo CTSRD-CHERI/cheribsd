@@ -597,6 +597,7 @@ malloc_large(size_t *size, struct domainset *policy, int flags)
 		vsetzoneslab(va, NULL, (void *)(uintptr_t)((sz << 1) | 1));
 		uma_total_inc(sz);
 		*size = sz;
+		CHERI_VM_ASSERT_BOUNDS(va, sz);
 	}
 	return ((caddr_t)va);
 }
@@ -657,6 +658,7 @@ void *
 	if (va != NULL)
 		va = redzone_setup(va, osize);
 #endif
+	CHERI_VM_ASSERT_BOUNDS(va, size);
 	return ((void *) va);
 }
 

@@ -217,8 +217,12 @@ again:
 	 * Note that on CHERI we need to separately align each region
 	 * for representability.
 	 */
-	size = cheri_vm_representable_len((long)nbuf * BKVASIZE) +
-	    cheri_vm_representable_len((long)bio_transient_maxcnt * MAXPHYS);
+#ifdef CHERI_PURECAP_KERNEL
+	size = CHERI_REPRESENTABLE_LENGTH((long)nbuf * BKVASIZE) +
+	    CHERI_REPRESENTABLE_LENGTH((long)bio_transient_maxcnt * MAXPHYS);
+#else
+	size = (long)nbuf * BKVASIZE + (long)bio_transient_maxcnt * MAXPHYS;
+#endif
 	firstaddr = (caddr_t)kva_alloc(size);
 	kmi->clean_sva = (vm_offset_t)firstaddr;
 	kmi->clean_eva = kmi->clean_sva + size;
@@ -229,9 +233,14 @@ again:
 	 * Enable the quantum cache if we have more than 4 cpus.  This
 	 * avoids lock contention at the expense of some fragmentation.
 	 */
-	size = cheri_vm_representable_len((long)nbuf * BKVASIZE);
-	tmpaddr = cheri_bound(firstaddr, size);
+#ifdef CHERI_PURECAP_KERNEL
+	size = CHERI_REPRESENTABLE_LENGTH((long)nbuf * BKVASIZE);
+	tmpaddr = cheri_csetbounds(firstaddr, size);
 	CHERI_VM_ASSERT_EXACT(tmpaddr, size);
+#else
+	size = (long)nbuf * BKVASIZE;
+	tmpaddr = firstaddr;
+#endif
 	kmi->buffer_sva = (vm_offset_t)tmpaddr;
 	kmi->buffer_eva = kmi->buffer_sva + size;
 	vmem_init(buffer_arena, "buffer arena", (vm_ptr_t)tmpaddr, size,
@@ -242,10 +251,15 @@ again:
 	 * And optionally transient bio space.
 	 */
 	if (bio_transient_maxcnt != 0) {
-		size = cheri_vm_representable_len(
+#ifdef CHERI_PURECAP_KERNEL
+		size = CHERI_REPRESENTABLE_LENGTH(
 		    (long)bio_transient_maxcnt * MAXPHYS);
-		tmpaddr = cheri_bound(firstaddr, size);
+		tmpaddr = cheri_csetbounds(firstaddr, size);
 		CHERI_VM_ASSERT_EXACT(tmpaddr, size);
+#else
+		size = (long)bio_transient_maxcnt * MAXPHYS;
+		tmpaddr = firstaddr;
+#endif
 		vmem_init(transient_arena, "transient arena",
 		    (vm_ptr_t)tmpaddr, size, PAGE_SIZE, 0, 0);
 		firstaddr += size;
