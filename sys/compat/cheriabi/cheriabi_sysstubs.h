@@ -3149,16 +3149,6 @@ SYS_STUB(508, int, jail_remove,
     /* _localcheck */ {}
 )
 
-SYS_STUB(509, int, closefrom,
-    /* _protoargs */ (int lowfd),
-    /* _protoargs_chk */ (int *retp , int * __capability stub_errno, int lowfd),
-    /* _protoargs_err */ (int * __capability stub_errno, int lowfd),
-    /* _callargs */ (lowfd),
-    /* _callargs_chk */ (&ret, stub_errno, lowfd),
-    /* _callargs_err */ (&errno, lowfd),
-    /* _localcheck */ {}
-)
-
 SYS_STUB_ARGHASPTRS(510, int, __semctl,
     /* _protoargs */ (int semid, int semnum, int cmd, union semun*  arg),
     /* _protoargs_chk */ (int *retp , int * __capability stub_errno, int semid, int semnum, int cmd, union semun* __capability   arg),

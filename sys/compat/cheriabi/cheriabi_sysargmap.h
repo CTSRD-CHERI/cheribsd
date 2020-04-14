@@ -314,7 +314,6 @@ int cheriabi_sysargmask[] = {
  [CHERIABI_SYS_cheriabi_jail_get] = (0x0 | 0x1),
  [CHERIABI_SYS_cheriabi_jail_set] = (0x0 | 0x1),
  [CHERIABI_SYS_jail_remove] = (0x0),
- [CHERIABI_SYS_closefrom] = (0x0),
  [CHERIABI_SYS_cheriabi___semctl] = (0x0 | 0x8),
  [CHERIABI_SYS_cheriabi_msgctl] = (0x0 | 0x4),
  [CHERIABI_SYS_cheriabi_shmctl] = (0x0 | 0x4),

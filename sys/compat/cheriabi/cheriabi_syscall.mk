@@ -327,7 +327,7 @@ MIASM =  \
 	cheriabi_jail_get.o \
 	cheriabi_jail_set.o \
 	jail_remove.o \
-	closefrom.o \
+	freebsd12_closefrom.o \
 	cheriabi___semctl.o \
 	cheriabi_msgctl.o \
 	cheriabi_shmctl.o \

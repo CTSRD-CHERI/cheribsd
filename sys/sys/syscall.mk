@@ -355,7 +355,7 @@ MIASM =  \
 	jail_get.o \
 	jail_set.o \
 	jail_remove.o \
-	closefrom.o \
+	freebsd12_closefrom.o \
 	__semctl.o \
 	msgctl.o \
 	shmctl.o \

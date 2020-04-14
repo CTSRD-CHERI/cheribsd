@@ -446,7 +446,7 @@
 #define	CHERIABI_SYS_cheriabi_jail_get	506
 #define	CHERIABI_SYS_cheriabi_jail_set	507
 #define	CHERIABI_SYS_jail_remove	508
-#define	CHERIABI_SYS_closefrom	509
+#define	CHERIABI_SYS_freebsd12_closefrom	509
 #define	CHERIABI_SYS_cheriabi___semctl	510
 #define	CHERIABI_SYS_cheriabi_msgctl	511
 #define	CHERIABI_SYS_cheriabi_shmctl	512

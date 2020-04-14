@@ -2805,13 +2805,6 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 1;
 		break;
 	}
-	/* closefrom */
-	case 509: {
-		struct closefrom_args *p = params;
-		iarg[0] = p->lowfd; /* int */
-		*n_args = 1;
-		break;
-	}
 	/* freebsd64___semctl */
 	case 510: {
 		struct freebsd64___semctl_args *p = params;
@@ -8008,16 +8001,6 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* closefrom */
-	case 509:
-		switch(ndx) {
-		case 0:
-			p = "int";
-			break;
-		default:
-			break;
-		};
-		break;
 	/* freebsd64___semctl */
 	case 510:
 		switch(ndx) {
@@ -10675,11 +10658,6 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		break;
 	/* jail_remove */
 	case 508:
-		if (ndx == 0 || ndx == 1)
-			p = "int";
-		break;
-	/* closefrom */
-	case 509:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
