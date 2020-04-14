@@ -234,6 +234,15 @@ union ifgroupreq_union {
 #endif
 };
 
+#ifdef COMPAT_FREEBSD64
+struct if_clonereq64 {
+	int	ifcr_total;
+	int	ifcr_count;
+	uint64_t ifcr_buffer;
+};
+#define	SIOCIFGCLONERS64 _IOC_NEWTYPE(SIOCIFGCLONERS, struct if_clonereq64)
+#endif
+
 SYSCTL_NODE(_net, PF_LINK, link, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
     "Link layers");
 SYSCTL_NODE(_net_link, 0, generic, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
@@ -3554,6 +3563,24 @@ ifioctl(struct socket *so, u_long cmd, caddr_t data, struct thread *td)
 		if (error == 0)
 			error = if_clone_destroy(ifr->ifr_name);
 		goto out_noref;
+
+#ifdef COMPAT_FREEBSD64
+	case SIOCIFGCLONERS64:
+	{
+		struct if_clonereq64 *ifcr64;
+		struct if_clonereq ifcr;
+
+		ifcr64 = (struct if_clonereq64 *)data;
+		ifcr.ifcr_total = ifcr64->ifcr_total;
+		ifcr.ifcr_count = ifcr64->ifcr_count;
+		ifcr.ifcr_buffer = __USER_CAP(ifcr64->ifcr_buffer,
+		    ifcr64->ifcr_count * IFNAMSIZ);
+		error = if_clone_list(&ifcr);
+		if (error == 0)
+			ifcr64->ifcr_total = ifcr.ifcr_total;
+		goto out_noref;
+	}
+#endif
 
 	case SIOCIFGCLONERS:
 		error = if_clone_list((struct if_clonereq *)data);
