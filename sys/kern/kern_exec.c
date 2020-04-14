@@ -26,6 +26,8 @@
  * SUCH DAMAGE.
  */
 
+#define	EXPLICIT_USER_ACCESS
+
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
@@ -1271,7 +1273,8 @@ err_exit:
 
 int
 exec_copyin_data_fds(struct thread *td, struct image_args *args,
-    const void *data, size_t datalen, const int *fds, size_t fdslen)
+    const void * __capability data, size_t datalen,
+    const int * __capability fds, size_t fdslen)
 {
 	struct filedesc *ofdp;
 	const char *p;
