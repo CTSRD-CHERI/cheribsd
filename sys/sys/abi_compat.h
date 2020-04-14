@@ -29,38 +29,47 @@
  */
 
 #ifndef _COMPAT_H_
-#define _COMPAT_H_
+#define	_COMPAT_H_
 
 /*
  * Helper macros for translating objects between different ABIs.
  */
 
-#define PTRIN(v)	(void *)(uintptr_t) (v)
-#define PTROUT(v)	(uintptr_t) (v)
+#define	PTRIN(v)	(void *)(uintptr_t)(v)
+#define	PTROUT(v)	(uintptr_t)(v)
 
-#define CP(src,dst,fld) do { (dst).fld = (src).fld; } while (0)
-#define	CP2(src,dst,sfld,dfld) do { (dst).dfld = (src).sfld; } while (0)
-#define PTRIN_CP(src,dst,fld) \
-	do { (dst).fld = PTRIN((src).fld); } while (0)
-#define PTROUT_CP(src,dst,fld) \
-	do { (dst).fld = PTROUT((src).fld); } while (0)
-
-#define TV_CP(src,dst,fld) do {			\
-	CP((src).fld,(dst).fld,tv_sec);		\
-	CP((src).fld,(dst).fld,tv_usec);	\
+#define	CP(src, dst, fld) do {			\
+	(dst).fld = (src).fld;			\
 } while (0)
 
-#define TS_CP(src,dst,fld) do {			\
-	CP((src).fld,(dst).fld,tv_sec);		\
-	CP((src).fld,(dst).fld,tv_nsec);	\
+#define	CP2(src, dst, sfld, dfld) do {		\
+	(dst).dfld = (src).sfld;		\
 } while (0)
 
-#define ITS_CP(src, dst) do {			\
+#define	PTRIN_CP(src, dst, fld) do {		\
+	(dst).fld = PTRIN((src).fld);		\
+} while (0)
+
+#define	PTROUT_CP(src, dst, fld) do {		\
+	(dst).fld = PTROUT((src).fld);		\
+} while (0)
+
+#define	TV_CP(src, dst, fld) do {		\
+	CP((src).fld, (dst).fld, tv_sec);	\
+	CP((src).fld, (dst).fld, tv_usec);	\
+} while (0)
+
+#define	TS_CP(src, dst, fld) do {		\
+	CP((src).fld, (dst).fld, tv_sec);	\
+	CP((src).fld, (dst).fld, tv_nsec);	\
+} while (0)
+
+#define	ITS_CP(src, dst) do {			\
 	TS_CP((src), (dst), it_interval);	\
 	TS_CP((src), (dst), it_value);		\
 } while (0)
 
-#define BT_CP(src, dst, fld) do {				\
+#define	BT_CP(src, dst, fld) do {				\
 	CP((src).fld, (dst).fld, sec);				\
 	*(uint64_t *)&(dst).fld.frac[0] = (src).fld.frac;	\
 } while (0)
