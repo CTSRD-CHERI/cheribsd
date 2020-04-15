@@ -140,15 +140,6 @@ cheri_exec_pcc(struct image_params *imgp)
 	vm_offset_t code_start, code_end;
 	size_t code_length;
 
-#ifdef CHERIABI_LEGACY_SUPPORT
-#pragma message("Warning: Building kernel with LEGACY ABI support!")
-	/*
-	 * The legacy ABI needs a full address space $pcc (with base
-	 * == 0) to create code capabilities using cgetpccsetoffset
-	 */
-	code_start = CHERI_CAP_USER_CODE_BASE;
-	code_end = CHERI_CAP_USER_CODE_LENGTH;
-#else
 	/*
 	 * If we are executing a static binary we use end_addr as the
 	 * end of the text segment. If $pcc is the start of rtld we
@@ -170,7 +161,6 @@ cheri_exec_pcc(struct image_params *imgp)
 		code_start = imgp->reloc_base;
 	else
 		code_start = 0;
-#endif
 
 	/* Ensure CHERI128 representability */
 	code_length = code_end - code_start;
