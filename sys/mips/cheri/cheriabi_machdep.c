@@ -90,10 +90,6 @@
 #define	DELAYBRANCH(x)	((int)(x) < 0)
 #define	UCONTEXT_MAGIC	0xACEDBADE
 
-#ifdef CHERIABI_LEGACY_SUPPORT
-static void	cheriabi_capability_set_user_ddc(void * __capability *,
-		    size_t);
-#endif
 static void	cheriabi_set_syscall_retval(struct thread *td, int error);
 static __inline boolean_t cheriabi_check_cpu_compatible(uint32_t, const char *);
 static boolean_t cheriabi_elf_header_supported(struct image_params *);
@@ -367,16 +363,6 @@ cheriabi_set_mcontext(struct thread *td, mcontext_t *mcp)
 
 	return (0);
 }
-
-#ifdef CHERIABI_LEGACY_SUPPORT
-static void
-cheriabi_capability_set_user_ddc(void * __capability *cp, size_t length)
-{
-
-	*cp = cheri_capability_build_user_data(CHERI_CAP_USER_DATA_PERMS,
-	    CHERI_CAP_USER_DATA_BASE, length, CHERI_CAP_USER_DATA_OFFSET);
-}
-#endif
 
 /*
  * Common per-thread CHERI state initialisation across execve(2) and
