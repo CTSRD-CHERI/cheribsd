@@ -1012,7 +1012,7 @@ allocate_initial_tls(Obj_Entry *objs)
 void *
 _mips_get_tls(void)
 {
-#ifdef __CHERI_CAPABILITY_TLS__
+#ifdef __CHERI_PURE_CAPABILITY__
 	uintcap_t _rv;
 
 	__asm__ __volatile__ (
@@ -1040,10 +1040,8 @@ _mips_get_tls(void)
 
 #ifndef __CHERI_PURE_CAPABILITY__
 	return (void *)_rv;
-#elif defined(__CHERI_CAPABILITY_TLS__)
-	return (void *)_rv;
 #else
-	return cheri_setaddress(cheri_getdefault(), _rv);
+	return (void *)_rv;
 #endif
 }
 
