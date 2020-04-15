@@ -31,6 +31,8 @@
  * SUCH DAMAGE.
  */
 
+#define	EXPLICIT_USER_ACCESS 1
+
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
@@ -80,8 +82,8 @@ struct ptrace_args {
 #endif
 
 #define	BZERO(a, s)		bzero(a, s)
-#define	COPYIN(u, k, s)		copyin(u, k, s)
-#define	COPYOUT(k, u, s)	copyout(k, u, s)
+#define	COPYIN(u, k, s)		copyin(__USER_CAP(u, s), k, s)
+#define	COPYOUT(k, u, s)	copyout(k, __USER_CAP(u, s), s)
 int
 freebsd64_ptrace(struct thread *td, struct freebsd64_ptrace_args *uap)
 {
@@ -147,7 +149,7 @@ freebsd64_ptrace(struct thread *td, struct freebsd64_ptrace_args *uap)
 		if (uap->data != sizeof(r.ptevents))
 			error = EINVAL;
 		else
-			error = copyin(uap->addr, &r.ptevents, uap->data);
+			error = COPYIN(uap->addr, &r.ptevents, uap->data);
 		break;
 	case PT_IO:
 		error = COPYIN(uap->addr, &r.piod, sizeof r.piod);
@@ -209,18 +211,18 @@ freebsd64_ptrace(struct thread *td, struct freebsd64_ptrace_args *uap)
 #endif
 	case PT_GET_EVENT_MASK:
 		/* NB: The size in uap->data is validated in kern_ptrace(). */
-		error = copyout(&r.ptevents, uap->addr, uap->data);
+		error = COPYOUT(&r.ptevents, uap->addr, uap->data);
 		break;
 	case PT_LWPINFO:
 		/* NB: The size in uap->data is validated in kern_ptrace(). */
-		error = copyout(&r.pl, uap->addr, uap->data);
+		error = COPYOUT(&r.pl, uap->addr, uap->data);
 		break;
 	case PT_GET_SC_ARGS:
-		error = copyout(r.args, uap->addr, MIN(uap->data,
+		error = COPYOUT(r.args, uap->addr, MIN(uap->data,
 		    sizeof(r.args)));
 		break;
 	case PT_GET_SC_RET:
-		error = copyout(&r.psr, uap->addr, MIN(uap->data,
+		error = COPYOUT(&r.psr, uap->addr, MIN(uap->data,
 		    sizeof(r.psr)));
 		break;
 	}
@@ -230,4 +232,3 @@ freebsd64_ptrace(struct thread *td, struct freebsd64_ptrace_args *uap)
 #undef COPYIN
 #undef COPYOUT
 #undef BZERO
-
