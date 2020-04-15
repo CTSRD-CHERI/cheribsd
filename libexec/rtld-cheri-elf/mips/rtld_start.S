@@ -58,16 +58,12 @@
  */
 LEAF(rtld_start)
 	// .cfi_startproc
-#ifdef __CHERI_CAPABILITY_TABLE__
 	/*
 	 * XXX: Clear DDC. Eventually the kernel should stop setting it in the
 	 * first place.
 	 */
 	cgetnull	$c5
 	csetdefault	$c5
-#else
-#pragma message("Not clearing $ddc since it is required for the legacy ABI")
-#endif
 	/*
 	 * XXX: Assume the kernel aligned the stack correctly.
 	 */
@@ -110,7 +106,7 @@ LEAF(rtld_start)
 	cjalr $c12, $c17; /* _rtld_do___caprelocs_self(&__start___cap_relocs, &__stop___cap_relocs, relocbase, flags) */
 	move	a0, v0 /* move flags to argument registers (delay slot) */
 
-#if defined(__CHERI_CAPABILITY_TABLE__) && __CHERI_CAPABILITY_TABLE__ != 3
+#if __CHERI_CAPABILITY_TABLE__ != 3
 	/* For the non-pc-relative case set up $cgp now */
 	PCREL_LOAD_CODE_PTR($cgp, t0, __cap_table_start)
 	/* Use $c3 as the temporary register to get size of .captable */
