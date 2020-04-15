@@ -1821,7 +1821,7 @@ log_illegal_instruction(const char *msg, struct trapframe *frame)
 	pt_entry_t *ptep;
 	pd_entry_t *pdep;
 #ifndef CPU_CHERI
-	unsigned int *addr;
+	unsigned int *addr, instr[4];
 #endif
 	struct thread *td;
 	struct proc *p;
@@ -1856,21 +1856,17 @@ log_illegal_instruction(const char *msg, struct trapframe *frame)
 	 *
 	 * XXXRW: Temporarily disabled in CHERI as this doesn't properly
 	 * indirect through $c0 / $pcc.
-	 *
-	 * XXXRW: Arguably, this is also incorrect for non-CHERI: it should be
-	 * using copyin() to access user addresses!
 	 */
-	if (!(pc & 3) &&
-	    useracc((caddr_t)(intptr_t)pc, sizeof(int) * 4, VM_PROT_READ)) {
+	addr = (unsigned int *)(intptr_t)pc;
+	if ((pc & 3) == 0 && copyin(addr, instr, sizeof(instr)) == 0) {
 		/* dump page table entry for faulting instruction */
 		log(LOG_ERR, "Page table info for pc address %#jx: pde = %p, pte = %#jx\n",
 		    (intmax_t)pc, (void *)(intptr_t)*pdep, (uintmax_t)(ptep ? *ptep : 0));
 
-		addr = (unsigned int *)(intptr_t)pc;
 		log(LOG_ERR, "Dumping 4 words starting at pc address %p: \n",
 		    addr);
 		log(LOG_ERR, "%08x %08x %08x %08x\n",
-		    addr[0], addr[1], addr[2], addr[3]);
+		    instr[0], instr[1], instr[2], instr[3]);
 	} else {
 		log(LOG_ERR, "pc address %#jx is inaccessible, pde = %p, pte = %#jx\n",
 		    (intmax_t)pc, (void *)(intptr_t)*pdep, (uintmax_t)(ptep ? *ptep : 0));
@@ -1884,7 +1880,7 @@ log_bad_page_fault(char *msg, struct trapframe *frame, int trap_type)
 	pt_entry_t *ptep;
 	pd_entry_t *pdep;
 #ifndef CPU_CHERI
-	unsigned int *addr;
+	unsigned int *addr, instr[4];
 #endif
 	struct thread *td;
 	struct proc *p;
@@ -1944,22 +1940,19 @@ log_bad_page_fault(char *msg, struct trapframe *frame, int trap_type)
 	 *
 	 * XXXRW: Temporarily disabled in CHERI as this doesn't properly
 	 * indirect through $c0 / $pcc.
-	 *
-	 * XXXRW: Arguably, this is also incorrect for non-CHERI: it should be
-	 * using copyin() to access user addresses!
 	 */
-	if (!(pc & 3) && (pc != frame->badvaddr) &&
-	    (trap_type != T_BUS_ERR_IFETCH) &&
-	    useracc((caddr_t)(intptr_t)pc, sizeof(int) * 4, VM_PROT_READ)) {
+	addr = (unsigned int *)(intptr_t)pc;
+	if ((pc & 3) == 0 && pc != frame->badvaddr &&
+	    trap_type != T_BUS_ERR_IFETCH &&
+	    copyin((caddr_t)(intptr_t)pc, instr, sizeof(instr)) == 0) {
 		/* dump page table entry for faulting instruction */
 		log(LOG_ERR, "Page table info for pc address %#jx: pde = %p, pte = %#jx\n",
 		    (intmax_t)pc, (void *)(intptr_t)*pdep, (uintmax_t)(ptep ? *ptep : 0));
 
-		addr = (unsigned int *)(intptr_t)pc;
 		log(LOG_ERR, "Dumping 4 words starting at pc address %p: \n",
 		    addr);
 		log(LOG_ERR, "%08x %08x %08x %08x\n",
-		    addr[0], addr[1], addr[2], addr[3]);
+		    instr[0], instr[1], instr[2], instr[3]);
 	} else {
 		log(LOG_ERR, "pc address %#jx is inaccessible, pde = %p, pte = %#jx\n",
 		    (intmax_t)pc, (void *)(intptr_t)*pdep, (uintmax_t)(ptep ? *ptep : 0));
