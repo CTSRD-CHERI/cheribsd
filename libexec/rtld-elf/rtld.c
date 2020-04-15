@@ -924,14 +924,6 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 
     lock_release(rtld_bind_lock, &lockstate);
 
-#if defined(__CHERI_PURE_CAPABILITY__) && !defined(__CHERI_CAPABILITY_TABLE__)
-    // In the legacy ABI we don't shrink the bounds at all since
-    // we use cgetsetoffset to call into other libraries ...
-    dbg("Increasing bounds on obj_main->entry in legacy ABI:");
-    dbg("\tbefore: " PTR_FMT, obj_main->entry);
-    obj_main->entry = cheri_copyaddress(cheri_getpcc(), obj_main->entry);
-    dbg("\tafter: " PTR_FMT, obj_main->entry);
-#endif
     dbg("transferring control to program entry point = " PTR_FMT, obj_main->entry);
 
     /* Return the exit procedure and the program entry point. */
@@ -1671,21 +1663,6 @@ digest_dynamic2(Obj_Entry *obj, const Elf_Dyn *dyn_rpath,
 			    "sensible bounds on text/rodata -> using full DSO"
 			    ": " PTR_FMT, obj->path, obj->text_rodata_cap);
 		}
-	} else if (obj->cheri_captable_abi == DF_MIPS_CHERI_ABI_LEGACY) {
-#ifdef __CHERI_CAPABILITY_TABLE__
-		rtld_fatal("Cannot load legacy object %s with captable RTLD "
-		    "because it needs an unbounded $pcc. If the program is "
-		    "actually cap-table please update your toolchain so that "
-		    "the output binaries have the correct DT_MIPS_CHERI_FLAGS",
-		    obj->path);
-#endif
-		// In the legacy ABI we don't shrink the bounds at all since
-		// we use cgetsetoffset to call into other libraries ...
-		dbg("Increasing bounds text_rodata_cap in legacy ABI:");
-		dbg("\tbefore: " PTR_FMT, obj->text_rodata_cap);
-		obj->text_rodata_cap = cheri_copyaddress(cheri_getpcc(),
-		    obj->text_rodata_cap);
-		dbg("\tafter: " PTR_FMT, obj->text_rodata_cap);
 	} else {
 		// tight bounds on text_rodata possible since $cgp is live-in
 		obj->text_rodata_cap += obj->text_rodata_start;
