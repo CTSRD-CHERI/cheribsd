@@ -21,6 +21,9 @@ jobs = [:]
                 customGitCheckoutDir: 'cheribsd',
                 gitHubStatusContext: "ci/${suffix}",
                 runTests: false, /* TODO: run cheritest */)
+         if (env.CHANGE_ID) {
+             deleteDir() // Avoid using up all Jenkins disk space
+         }
     }
 }
 
@@ -34,4 +37,7 @@ if (runParallel) {
         echo("RUNNING ${key}")
         value();
     }
+}
+if (env.CHANGE_ID) {
+    deleteDir() // Avoid using up all Jenkins disk space
 }
