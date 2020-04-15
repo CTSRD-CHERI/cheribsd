@@ -215,111 +215,15 @@ check_initreg_code(void * __capability c)
 	cheritest_success();
 }
 
-#ifndef __CHERI_CAPABILITY_TABLE__
-static void
-check_initreg_data(void * __capability c)
-{
-	uintmax_t v;
-
-	/* Base. */
-	v = cheri_getbase(c);
-	if (v != CHERI_CAP_USER_DATA_BASE)
-		cheritest_failure_errx("base %jx (expected %jx)", v,
-		    (uintmax_t)CHERI_CAP_USER_DATA_BASE);
-
-	/* Length. */
-	v = cheri_getlen(c);
-	if (v > CHERI_CAP_USER_DATA_LENGTH)
-		cheritest_failure_errx("length 0x%jx (expected <= 0x%jx)", v,
-		    CHERI_CAP_USER_DATA_LENGTH);
-
-	/* Offset. */
-	v = cheri_getoffset(c);
-	if (v != CHERI_CAP_USER_DATA_OFFSET)
-		cheritest_failure_errx("offset %jx (expected %jx)", v,
-		    (uintmax_t)CHERI_CAP_USER_DATA_OFFSET);
-
-	/* Type -- should be (-1) for an unsealed capability. */
-	v = cheri_gettype(c);
-	if (v != 0xffffffffffffffff)
-		cheritest_failure_errx("otype %jx (expected %jx)", v,
-		    (uintmax_t)0xffffffffffffffff);
-
-	/* Permissions. */
-	v = cheri_getperm(c);
-	if (v != CHERI_CAP_USER_DATA_PERMS)
-		cheritest_failure_errx("perms %jx (expected %jx)", v,
-		    (uintmax_t)CHERI_CAP_USER_DATA_PERMS);
-
-	/*
-	 * More overt tests for permissions that should -- or should not -- be
-	 * there, regardless of consistency with the kernel headers.
-	 */
-	if ((v & CHERI_PERM_GLOBAL) == 0)
-		cheritest_failure_errx("perms %jx (global missing)", v);
-
-	if ((v & CHERI_PERM_EXECUTE) != 0)
-		cheritest_failure_errx("perms %jx (execute present)", v);
-
-	if ((v & CHERI_PERM_LOAD) == 0)
-		cheritest_failure_errx("perms %jx (load missing)", v);
-
-	if ((v & CHERI_PERM_STORE) == 0)
-		cheritest_failure_errx("perms %jx (store missing)", v);
-
-	if ((v & CHERI_PERM_LOAD_CAP) == 0)
-		cheritest_failure_errx("perms %jx (loadcap missing)", v);
-
-	if ((v & CHERI_PERM_STORE_CAP) == 0)
-		cheritest_failure_errx("perms %jx (storecap missing)", v);
-
-	if ((v & CHERI_PERM_STORE_LOCAL_CAP) == 0)
-		cheritest_failure_errx("perms %jx (store_local_cap missing)",
-		    v);
-
-	if ((v & CHERI_PERM_SEAL) != 0)
-		cheritest_failure_errx("perms %jx (seal present)", v);
-
-	if ((v & CHERI_PERM_CCALL) == 0)
-		cheritest_failure_errx("perms %jx (ccall missing)", v);
-
-	if ((v & CHERI_PERM_UNSEAL) != 0)
-		cheritest_failure_errx("perms %jx (unseal present)", v);
-
-	if ((v & CHERI_PERM_SYSTEM_REGS) != 0)
-		cheritest_failure_errx("perms %jx (system_regs present)", v);
-
-	if ((v & CHERI_PERMS_SWALL) != CHERI_PERMS_SWALL)
-		cheritest_failure_errx("perms %jx (expected swperms %x)", v,
-		    CHERI_PERMS_SWALL);
-
-	/* Sealed bit. */
-	v = cheri_getsealed(c);
-	if (v != 0)
-		cheritest_failure_errx("sealed %jx (expected 0)", v);
-
-	/* Tag bit. */
-	v = cheri_gettag(c);
-	if (v != 1)
-		cheritest_failure_errx("tag %jx (expected 1)", v);
-	cheritest_success();
-}
-#endif
-
 void
 test_initregs_default(const struct cheri_test *ctp __unused)
 {
 
-#ifdef __CHERI_CAPABILITY_TABLE__
 	if (cheri_getdefault() == NULL)
 		cheritest_success();
 	else
 		cheritest_failure_errx("Expected NULL $ddc but was %-#p",
 		    cheri_getdefault());
-
-#else
-	check_initreg_data(cheri_getdefault());
-#endif
 }
 
 /*
