@@ -584,7 +584,7 @@ struct sysent freebsd32_sysent[] = {
 	{ AS(freebsd32_jail_get_args), (sy_call_t *)freebsd32_jail_get, AUE_JAIL_GET, NULL, 0, 0, 0, SY_THR_STATIC },	/* 506 = freebsd32_jail_get */
 	{ AS(freebsd32_jail_set_args), (sy_call_t *)freebsd32_jail_set, AUE_JAIL_SET, NULL, 0, 0, 0, SY_THR_STATIC },	/* 507 = freebsd32_jail_set */
 	{ AS(jail_remove_args), (sy_call_t *)sys_jail_remove, AUE_JAIL_REMOVE, NULL, 0, 0, 0, SY_THR_STATIC },	/* 508 = jail_remove */
-	{ AS(closefrom_args), (sy_call_t *)sys_closefrom, AUE_CLOSEFROM, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 509 = closefrom */
+	{ compat12(AS(freebsd12_closefrom_args),closefrom), AUE_CLOSEFROM, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 509 = freebsd12 closefrom */
 	{ AS(freebsd32_semctl_args), (sy_call_t *)lkmressys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },	/* 510 = freebsd32_semctl */
 	{ AS(freebsd32_msgctl_args), (sy_call_t *)lkmressys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },	/* 511 = freebsd32_msgctl */
 	{ AS(freebsd32_shmctl_args), (sy_call_t *)lkmressys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },	/* 512 = freebsd32_shmctl */
@@ -664,4 +664,5 @@ struct sysent freebsd32_sysent[] = {
 	{ AS(shm_rename_args), (sy_call_t *)sys_shm_rename, AUE_SHMRENAME, NULL, 0, 0, 0, SY_THR_STATIC },	/* 572 = shm_rename */
 	{ AS(sigfastblock_args), (sy_call_t *)sys_sigfastblock, AUE_NULL, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 573 = sigfastblock */
 	{ AS(__realpathat_args), (sy_call_t *)sys___realpathat, AUE_REALPATHAT, NULL, 0, 0, 0, SY_THR_STATIC },	/* 574 = __realpathat */
+	{ AS(close_range_args), (sy_call_t *)sys_close_range, AUE_NULL, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 575 = close_range */
 };

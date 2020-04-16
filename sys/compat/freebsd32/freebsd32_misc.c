@@ -2651,7 +2651,7 @@ freebsd32_user_clock_nanosleep(struct thread *td, clockid_t clock_id,
 {
 	struct timespec32 rmt32, rqt32;
 	struct timespec rmt, rqt;
-	int error;
+	int error, error2;
 
 	error = copyin(ua_rqtp, &rqt32, sizeof(rqt32));
 	if (error)
@@ -2660,18 +2660,13 @@ freebsd32_user_clock_nanosleep(struct thread *td, clockid_t clock_id,
 	CP(rqt32, rqt, tv_sec);
 	CP(rqt32, rqt, tv_nsec);
 
-	if (ua_rmtp != NULL && (flags & TIMER_ABSTIME) == 0 &&
-	    !useracc(ua_rmtp, sizeof(rmt32), VM_PROT_WRITE))
-		return (EFAULT);
 	error = kern_clock_nanosleep(td, clock_id, flags, &rqt, &rmt);
 	if (error == EINTR && ua_rmtp != NULL && (flags & TIMER_ABSTIME) == 0) {
-		int error2;
-
 		CP(rmt, rmt32, tv_sec);
 		CP(rmt, rmt32, tv_nsec);
 
 		error2 = copyout(&rmt32, ua_rmtp, sizeof(rmt32));
-		if (error2)
+		if (error2 != 0)
 			error = error2;
 	}
 	return (error);
@@ -3142,6 +3137,7 @@ freebsd32_copyout_strings(struct image_params *imgp, uintptr_t *stack_base)
 		execpath_len = 0;
 	arginfo = (struct freebsd32_ps_strings *)curproc->p_sysent->
 	    sv_psstrings;
+	imgp->ps_strings = arginfo;
 	if (imgp->proc->p_sysent->sv_sigcode_base == 0)
 		szsigcode = *(imgp->proc->p_sysent->sv_szsigcode);
 	else
@@ -3241,6 +3237,7 @@ freebsd32_copyout_strings(struct image_params *imgp, uintptr_t *stack_base)
 	/*
 	 * Fill in "ps_strings" struct for ps, w, etc.
 	 */
+	imgp->argv = vectp;
 	if (suword32(&arginfo->ps_argvstr, (u_int32_t)(intptr_t)vectp) != 0 ||
 	    suword32(&arginfo->ps_nargvstr, argc) != 0)
 		return (EFAULT);
@@ -3260,6 +3257,7 @@ freebsd32_copyout_strings(struct image_params *imgp, uintptr_t *stack_base)
 	if (suword32(vectp++, 0) != 0)
 		return (EFAULT);
 
+	imgp->envv = vectp;
 	if (suword32(&arginfo->ps_envstr, (u_int32_t)(intptr_t)vectp) != 0 ||
 	    suword32(&arginfo->ps_nenvstr, envc) != 0)
 		return (EFAULT);

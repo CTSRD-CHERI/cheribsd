@@ -515,7 +515,7 @@ const char *syscallnames[] = {
 	"jail_get",			/* 506 = jail_get */
 	"jail_set",			/* 507 = jail_set */
 	"jail_remove",			/* 508 = jail_remove */
-	"closefrom",			/* 509 = closefrom */
+	"compat12.closefrom",		/* 509 = freebsd12 closefrom */
 	"__semctl",			/* 510 = __semctl */
 	"msgctl",			/* 511 = msgctl */
 	"shmctl",			/* 512 = shmctl */
@@ -581,4 +581,5 @@ const char *syscallnames[] = {
 	"shm_rename",			/* 572 = shm_rename */
 	"sigfastblock",			/* 573 = sigfastblock */
 	"__realpathat",			/* 574 = __realpathat */
+	"close_range",			/* 575 = close_range */
 };

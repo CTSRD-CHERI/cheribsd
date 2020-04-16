@@ -445,7 +445,7 @@
 #define	SYS_jail_get	506
 #define	SYS_jail_set	507
 #define	SYS_jail_remove	508
-#define	SYS_closefrom	509
+#define	SYS_freebsd12_closefrom	509
 #define	SYS___semctl	510
 #define	SYS_msgctl	511
 #define	SYS_shmctl	512
@@ -510,4 +510,5 @@
 #define	SYS_shm_rename	572
 #define	SYS_sigfastblock	573
 #define	SYS___realpathat	574
-#define	SYS_MAXSYSCALL	575
+#define	SYS_close_range	575
+#define	SYS_MAXSYSCALL	576

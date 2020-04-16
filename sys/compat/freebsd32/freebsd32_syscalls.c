@@ -531,7 +531,7 @@ const char *freebsd32_syscallnames[] = {
 	"freebsd32_jail_get",			/* 506 = freebsd32_jail_get */
 	"freebsd32_jail_set",			/* 507 = freebsd32_jail_set */
 	"jail_remove",			/* 508 = jail_remove */
-	"closefrom",			/* 509 = closefrom */
+	"compat12.closefrom",		/* 509 = freebsd12 closefrom */
 	"freebsd32_semctl",			/* 510 = freebsd32_semctl */
 	"freebsd32_msgctl",			/* 511 = freebsd32_msgctl */
 	"freebsd32_shmctl",			/* 512 = freebsd32_shmctl */
@@ -611,4 +611,5 @@ const char *freebsd32_syscallnames[] = {
 	"shm_rename",			/* 572 = shm_rename */
 	"sigfastblock",			/* 573 = sigfastblock */
 	"__realpathat",			/* 574 = __realpathat */
+	"close_range",			/* 575 = close_range */
 };

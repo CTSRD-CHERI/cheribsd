@@ -903,18 +903,18 @@ nfsrv_createiovecw(int retlen, struct mbuf *m, char *cp, struct iovec **ivpp,
 	cnt = 0;
 	len = retlen;
 	mp = m;
-	i = mtod(mp, caddr_t) + mbuf_len(mp) - cp;
+	i = mtod(mp, caddr_t) + mp->m_len - cp;
 	while (len > 0) {
 		if (i > 0) {
 			len -= i;
 			cnt++;
 		}
-		mp = mbuf_next(mp);
+		mp = mp->m_next;
 		if (!mp) {
 			if (len > 0)
 				return (EBADRPC);
 		} else
-			i = mbuf_len(mp);
+			i = mp->m_len;
 	}
 
 	/* Now, create the iovec. */
@@ -6159,8 +6159,14 @@ nfsvno_getxattr(struct vnode *vp, char *name, uint32_t maxresp,
 		return (NFSERR_XATTR2BIG);
 	len = siz;
 	tlen = NFSM_RNDUP(len);
-	uiop->uio_iovcnt = nfsrv_createiovec(tlen, &m, &m2, &iv);
-	uiop->uio_iov = iv;
+	if (tlen > 0) {
+		uiop->uio_iovcnt = nfsrv_createiovec(tlen, &m, &m2, &iv);
+		uiop->uio_iov = iv;
+	} else {
+		uiop->uio_iovcnt = 0;
+		uiop->uio_iov = iv = NULL;
+		m = m2 = NULL;
+	}
 	uiop->uio_offset = 0;
 	uiop->uio_resid = tlen;
 	uiop->uio_rw = UIO_READ;
@@ -6173,8 +6179,9 @@ nfsvno_getxattr(struct vnode *vp, char *name, uint32_t maxresp,
 		goto out;
 #endif
 
-	error = VOP_GETEXTATTR(vp, EXTATTR_NAMESPACE_USER, name, uiop, NULL,
-	    cred, p);
+	if (tlen > 0)
+		error = VOP_GETEXTATTR(vp, EXTATTR_NAMESPACE_USER, name, uiop,
+		    NULL, cred, p);
 	if (error != 0)
 		goto out;
 	if (uiop->uio_resid > 0) {
@@ -6191,7 +6198,8 @@ nfsvno_getxattr(struct vnode *vp, char *name, uint32_t maxresp,
 
 out:
 	if (error != 0) {
-		m_freem(m);
+		if (m != NULL)
+			m_freem(m);
 		*lenp = 0;
 	}
 	free(iv, M_TEMP);
@@ -6223,9 +6231,14 @@ nfsvno_setxattr(struct vnode *vp, char *name, int len, struct mbuf *m,
 	uiop->uio_td = p;
 	uiop->uio_offset = 0;
 	uiop->uio_resid = len;
-	error = nfsrv_createiovecw(len, m, cp, &iv, &cnt);
-	uiop->uio_iov = iv;
-	uiop->uio_iovcnt = cnt;
+	if (len > 0) {
+		error = nfsrv_createiovecw(len, m, cp, &iv, &cnt);
+		uiop->uio_iov = iv;
+		uiop->uio_iovcnt = cnt;
+	} else {
+		uiop->uio_iov = iv = NULL;
+		uiop->uio_iovcnt = 0;
+	}
 	if (error == 0) {
 		error = VOP_SETEXTATTR(vp, EXTATTR_NAMESPACE_USER, name, uiop,
 		    cred, p);
@@ -6443,7 +6456,6 @@ DECLARE_MODULE(nfsd, nfsd_mod, SI_SUB_VFS, SI_ORDER_ANY);
 /* So that loader and kldload(2) can find us, wherever we are.. */
 MODULE_VERSION(nfsd, 1);
 MODULE_DEPEND(nfsd, nfscommon, 1, 1, 1);
-MODULE_DEPEND(nfsd, nfslock, 1, 1, 1);
 MODULE_DEPEND(nfsd, nfslockd, 1, 1, 1);
 MODULE_DEPEND(nfsd, krpc, 1, 1, 1);
 MODULE_DEPEND(nfsd, nfssvc, 1, 1, 1);
