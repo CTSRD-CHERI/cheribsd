@@ -419,7 +419,7 @@
 #define	CHERIABI_SYS_cheriabi_truncate	479
 #define	CHERIABI_SYS_ftruncate	480
 #define	CHERIABI_SYS_thr_kill2	481
-				/* 482 is obsolete freebsd12_shm_open */
+#define	CHERIABI_SYS_freebsd12_cheriabi_shm_open	482
 #define	CHERIABI_SYS_cheriabi_shm_unlink	483
 #define	CHERIABI_SYS_cheriabi_cpuset	484
 #define	CHERIABI_SYS_cpuset_setid	485

@@ -8,7 +8,7 @@
 # of syscall names in MIASM.
 .if ${MACHINE_ABI:Mpurecap}
 .include "${SRCTOP}/sys/compat/cheriabi/cheriabi_syscall.mk"
-MIASM:=	${MIASM:S/^cheriabi_//}
+MIASM:=	${MIASM:S/cheriabi_//}
 .else
 .include "${SRCTOP}/sys/sys/syscall.mk"
 .endif
