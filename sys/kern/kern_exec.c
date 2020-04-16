@@ -1688,7 +1688,7 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 #else
 		imgp->execpathp = destp;
 #endif
-		error = copyout_c(imgp->execpath, destp, execpath_len);
+		error = copyout_c(imgp->execpath, imgp->execpathp, execpath_len);
 		if (error != 0)
 			return (error);
 	}
@@ -1703,7 +1703,7 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 #else
 	imgp->canary = destp;
 #endif
-	error = copyout_c(canary, destp, sizeof(canary));
+	error = copyout_c(canary, imgp->canary, sizeof(canary));
 	if (error != 0)
 		return (error);
 	imgp->canarylen = sizeof(canary);
@@ -1718,7 +1718,7 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 #else
 	imgp->pagesizes = destp;
 #endif
-	error = copyout_c(pagesizes, destp, szps);
+	error = copyout_c(pagesizes, imgp->pagesizes, szps);
 	if (error != 0)
 		return (error);
 	imgp->pagesizeslen = szps;
