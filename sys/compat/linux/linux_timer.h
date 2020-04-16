@@ -33,7 +33,7 @@
 #ifndef	_LINUX_TIMER_H
 #define	_LINUX_TIMER_H
 
-#include <sys/compat.h>
+#include <sys/abi_compat.h>
 
 #ifndef	__LINUX_ARCH_SIGEV_PREAMBLE_SIZE
 #define	__LINUX_ARCH_SIGEV_PREAMBLE_SIZE	\

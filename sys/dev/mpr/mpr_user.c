@@ -75,7 +75,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/conf.h>
 #include <sys/bio.h>
 #ifdef COMPAT_FREEBSD32
-#include <sys/compat.h>
+#include <sys/abi_compat.h>
 #endif
 #include <sys/malloc.h>
 #include <sys/uio.h>

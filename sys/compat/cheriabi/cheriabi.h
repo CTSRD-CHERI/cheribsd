@@ -35,7 +35,7 @@
 #define _COMPAT_CHERIABI_CHERIABI_H_
 
 #include "opt_ktrace.h"
-#include <sys/compat.h>
+#include <sys/abi_compat.h>
 #include <sys/uio.h>
 #include <sys/ktrace.h>
 #include <sys/proc.h>

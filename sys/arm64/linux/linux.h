@@ -31,7 +31,7 @@
 #ifndef _ARM64_LINUX_H_
 #define	_ARM64_LINUX_H_
 
-#include <sys/compat.h>
+#include <sys/abi_compat.h>
 
 #include <compat/linux/linux.h>
 #include <arm64/linux/linux_syscall.h>

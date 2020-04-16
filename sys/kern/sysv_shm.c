@@ -77,7 +77,7 @@ __FBSDID("$FreeBSD$");
 
 #include <sys/param.h>
 #include <sys/systm.h>
-#include <sys/compat.h>
+#include <sys/abi_compat.h>
 #include <sys/kernel.h>
 #include <sys/limits.h>
 #include <sys/lock.h>
