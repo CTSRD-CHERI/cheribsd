@@ -16,7 +16,7 @@ jobs = [:]
     jobs[name] = { ->
         cheribuildProject(target: "cheribsd-${suffix}", architecture: suffix,
                 extraArgs: '--cheribsd/build-options=-s --cheribsd/no-debug-info',
-                skipArchiving: true,
+                skipArchiving: true, skipTarball: true,
                 sdkCompilerOnly: true, // We only need clang not the CheriBSD sysroot since we are building that.
                 customGitCheckoutDir: 'cheribsd',
                 gitHubStatusContext: "ci/${suffix}",
