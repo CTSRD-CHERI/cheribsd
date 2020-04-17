@@ -2539,15 +2539,15 @@ main(int argc, char *argv[])
 	}
 	if (tests_passed + tests_failed > 1) {
 		if (expected_failures == 0)
-			xo_emit("SUMMARY: passed %d failed %d\n",
+			xo_emit("SUMMARY: passed {d:/%d} failed %d\n",
 			    tests_passed, tests_failed);
 		else if (expected_failures == tests_xfailed)
-			xo_emit("SUMMARY: passed %d failed %d "
-			    "(%d expected)\n",
+			xo_emit("SUMMARY: passed {d:/%d} failed {d:/%d} "
+			    "({d:/%d} expected)\n",
 			    tests_passed, tests_failed, expected_failures);
 		else
-			xo_emit("SUMMARY: passed %d failed %d "
-			    "(%d expected) (%d unexpected passes)\n",
+			xo_emit("SUMMARY: passed {d:/%d} failed {d:/%d} "
+			    "({d:/%d} expected) ({d:/%d} unexpected passes)\n",
 			    tests_passed, tests_failed, tests_xfailed,
 			    expected_failures - tests_xfailed);
 	}
