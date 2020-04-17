@@ -433,7 +433,7 @@ __DEFAULT_NO_OPTIONS+=PIE
 # We'd really like this to be:
 #    !${MACHINE_CPU:Mcheri} || ${MACHINE_ABI:Mpurecap}
 # but that logic doesn't work in Makefile.inc1...
-.if ${__C} != "cheri" || (${__T:Mmips64*c*} || ${__C:Mriscv64*c*})
+.if ${__C} != "cheri" || (${__T:Mmips64*c*} || ${__T:Mriscv64*c*})
 BROKEN_OPTIONS+=COMPAT_CHERIABI
 .endif
 
