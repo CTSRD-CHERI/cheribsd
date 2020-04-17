@@ -303,7 +303,7 @@ static int	bridge_transmit(struct ifnet *, struct mbuf *);
 static void	bridge_qflush(struct ifnet *);
 static struct mbuf *bridge_input(struct ifnet *, struct mbuf *);
 static int	bridge_output(struct ifnet *, struct mbuf *, struct sockaddr *,
-		    struct route *);
+		    struct rtentry *);
 static int	bridge_enqueue(struct bridge_softc *, struct ifnet *,
 		    struct mbuf *);
 static void	bridge_rtdelete(struct bridge_softc *, struct ifnet *ifp, int);
@@ -2062,7 +2062,7 @@ bridge_dummynet(struct mbuf *m, struct ifnet *ifp)
  */
 static int
 bridge_output(struct ifnet *ifp, struct mbuf *m, struct sockaddr *sa,
-    struct route *ro __unused)
+    struct rtentry *rt)
 {
 	struct ether_header *eh;
 	struct ifnet *bifp, *dst_if;
