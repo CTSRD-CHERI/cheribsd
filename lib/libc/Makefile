@@ -20,6 +20,9 @@ LIBC_ARCH=${MACHINE_ARCH}
 .else
 LIBC_ARCH=${MACHINE_CPUARCH}
 .endif
+.if empty(LIBC_ARCH)
+.error LIBC_ARCH is empty
+.endif
 
 # All library objects contain FreeBSD revision strings by default; they may be
 # excluded as a space-saving measure.  To produce a library that does
