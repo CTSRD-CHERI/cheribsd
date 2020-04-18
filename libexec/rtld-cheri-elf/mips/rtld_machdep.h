@@ -222,14 +222,6 @@ static inline const void* target_cgp_for_func(const struct Struct_Obj_Entry *obj
 	return obj->_target_cgp;
 }
 
-static inline dlfunc_t
-vaddr_to_code_pointer(const struct Struct_Obj_Entry *obj, vaddr_t code_addr) {
-	const void* text = get_codesegment(obj);
-	dbg_assert(code_addr >= (vaddr_t)text);
-	dbg_assert(code_addr < (vaddr_t)text + cheri_getlen(text));
-	return (dlfunc_t)cheri_copyaddress(text, cheri_fromint(code_addr));
-}
-
 #define set_bounds_if_nonnull(ptr, size)	\
 	do { if (ptr) { ptr = cheri_csetbounds_sametype(ptr, size); } } while(0)
 
@@ -237,9 +229,9 @@ vaddr_to_code_pointer(const struct Struct_Obj_Entry *obj, vaddr_t code_addr) {
 #define call_initfini_pointer(obj, target) rtld_fatal("%s: _init or _fini used!", obj->path)
 
 static inline void
-_call_init_fini_array_pointer(const struct Struct_Obj_Entry *obj, vaddr_t target, int argc, char** argv, char** env) {
+_call_init_fini_array_pointer(const struct Struct_Obj_Entry *obj, InitArrayEntry entry, int argc, char** argv, char** env) {
 
-	InitArrFunc func = (InitArrFunc)vaddr_to_code_pointer(obj, target);
+	InitArrFunc func = (InitArrFunc)entry.value;
 	/* Set the target object $cgp when calling the pointer:
 	 * Note: we use target_cgp_for_func() to support per-function captable */
 	const void *init_fini_cgp = target_cgp_for_func(obj, (dlfunc_t)func);

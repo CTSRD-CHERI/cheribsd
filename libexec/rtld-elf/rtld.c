@@ -1374,19 +1374,19 @@ digest_dynamic1(Obj_Entry *obj, int early, const Elf_Dyn **dyn_rpath,
 	    break;
 
 	case DT_PREINIT_ARRAY:
-	    obj->preinit_array_ptr = (Elf_Addr *)(obj->relocbase + dynp->d_un.d_ptr);
+	    obj->preinit_array_ptr = (InitArrayEntry *)(obj->relocbase + dynp->d_un.d_ptr);
 	    break;
 
 	case DT_PREINIT_ARRAYSZ:
-	    obj->preinit_array_num = dynp->d_un.d_val / sizeof(Elf_Addr);
+	    obj->preinit_array_num = dynp->d_un.d_val / sizeof(InitArrayEntry);
 	    break;
 
 	case DT_INIT_ARRAY:
-	    obj->init_array_ptr = (Elf_Addr *)(obj->relocbase + dynp->d_un.d_ptr);
+	    obj->init_array_ptr = (InitArrayEntry *)(obj->relocbase + dynp->d_un.d_ptr);
 	    break;
 
 	case DT_INIT_ARRAYSZ:
-	    obj->init_array_num = dynp->d_un.d_val / sizeof(Elf_Addr);
+	    obj->init_array_num = dynp->d_un.d_val / sizeof(InitArrayEntry);
 	    break;
 
 	case DT_FINI:
@@ -1394,11 +1394,11 @@ digest_dynamic1(Obj_Entry *obj, int early, const Elf_Dyn **dyn_rpath,
 	    break;
 
 	case DT_FINI_ARRAY:
-	    obj->fini_array_ptr = (Elf_Addr *)(obj->relocbase + dynp->d_un.d_ptr);
+	    obj->fini_array_ptr = (InitArrayEntry *)(obj->relocbase + dynp->d_un.d_ptr);
 	    break;
 
 	case DT_FINI_ARRAYSZ:
-	    obj->fini_array_num = dynp->d_un.d_val / sizeof(Elf_Addr);
+	    obj->fini_array_num = dynp->d_un.d_val / sizeof(InitArrayEntry);
 	    break;
 
 #ifdef __CHERI_PURE_CAPABILITY__
@@ -1628,9 +1628,12 @@ digest_dynamic2(Obj_Entry *obj, const Elf_Dyn *dyn_rpath,
 	set_bounds_if_nonnull(obj->strtab, obj->strsize);
 	set_bounds_if_nonnull(obj->phdr, obj->phsize);
 
-	set_bounds_if_nonnull(obj->preinit_array_ptr, obj->preinit_array_num * sizeof(Elf_Addr));
-	set_bounds_if_nonnull(obj->init_array_ptr, obj->init_array_num * sizeof(Elf_Addr));
-	set_bounds_if_nonnull(obj->fini_array_ptr, obj->fini_array_num * sizeof(Elf_Addr));
+	set_bounds_if_nonnull(obj->preinit_array_ptr,
+	    obj->preinit_array_num * sizeof(InitArrayEntry));
+	set_bounds_if_nonnull(
+	    obj->init_array_ptr, obj->init_array_num * sizeof(InitArrayEntry));
+	set_bounds_if_nonnull(
+	    obj->fini_array_ptr, obj->fini_array_num * sizeof(InitArrayEntry));
 
 	set_bounds_if_nonnull(obj->cap_relocs, obj->cap_relocs_size);
 	set_bounds_if_nonnull(obj->writable_captable, obj->captable_size);
@@ -2967,7 +2970,7 @@ obj_from_addr(const void *addr)
 static void
 preinit_main(void)
 {
-    Elf_Addr *preinit_addr;
+    InitArrayEntry *preinit_addr;
     int index;
 
     preinit_addr = obj_main->preinit_array_ptr;
@@ -2975,11 +2978,11 @@ preinit_main(void)
 	return;
 
     for (index = 0; index < obj_main->preinit_array_num; index++) {
-	if (preinit_addr[index] != 0 && preinit_addr[index] != 1) {
-	    dbg("calling preinit function for %s at %lx", obj_main->path,
-		preinit_addr[index]);
+	if (preinit_addr[index].value != 0 && preinit_addr[index].value != 1) {
+	    dbg("calling preinit function for %s at %p", obj_main->path,
+		(void*)(uintptr_t)preinit_addr[index].value);
 	    LD_UTRACE(UTRACE_INIT_CALL, obj_main,
-	      (void *)(intptr_t)preinit_addr[index], 0, 0, obj_main->path);
+	      (void *)(intptr_t)preinit_addr[index].value, 0, 0, obj_main->path);
 	    call_init_array_pointer(obj_main, preinit_addr[index]);
 	}
     }
@@ -2997,7 +3000,7 @@ objlist_call_fini(Objlist *list, Obj_Entry *root, RtldLockState *lockstate)
 {
     Objlist_Entry *elm;
     char *saved_msg;
-    Elf_Addr *fini_addr;
+    InitArrayEntry *fini_addr;
     int index;
 
     assert(root == NULL || root->refcount == 1);
@@ -3031,11 +3034,11 @@ objlist_call_fini(Objlist *list, Obj_Entry *root, RtldLockState *lockstate)
 	    if (fini_addr != NULL && elm->obj->fini_array_num > 0) {
 		for (index = elm->obj->fini_array_num - 1; index >= 0;
 		  index--) {
-		    if (fini_addr[index] != 0 && fini_addr[index] != 1) {
-			dbg("calling fini_array function for %s at %lx",
-			    elm->obj->path, fini_addr[index]);
+		    if (fini_addr[index].value != 0 && fini_addr[index].value != 1) {
+			dbg("calling fini_array function for %s at %p",
+			    elm->obj->path, (void*)(uintptr_t)fini_addr[index].value);
 			LD_UTRACE(UTRACE_FINI_CALL, elm->obj,
-			    (void *)(intptr_t)fini_addr[index], 0, 0, elm->obj->path);
+			    (void *)(intptr_t)fini_addr[index].value, 0, 0, elm->obj->path);
 			call_fini_array_pointer(elm->obj, fini_addr[index]);
 		    }
 		}
@@ -3074,7 +3077,7 @@ objlist_call_init(Objlist *list, RtldLockState *lockstate)
     Objlist_Entry *elm;
     Obj_Entry *obj;
     char *saved_msg;
-    Elf_Addr *init_addr;
+    InitArrayEntry *init_addr;
     void (*reg)(void (*)(void));
     int index;
 
@@ -3135,11 +3138,11 @@ objlist_call_init(Objlist *list, RtldLockState *lockstate)
 	init_addr = elm->obj->init_array_ptr;
 	if (init_addr != NULL) {
 	    for (index = 0; index < elm->obj->init_array_num; index++) {
-		if (init_addr[index] != 0 && init_addr[index] != 1) {
+		if (init_addr[index].value != 0 && init_addr[index].value != 1) {
 		    dbg("calling init array function for %s at %p", elm->obj->path,
-			(void *)(uintptr_t)init_addr[index]);
+			(void *)(uintptr_t)init_addr[index].value);
 		    LD_UTRACE(UTRACE_INIT_CALL, elm->obj,
-			(void *)(uintptr_t)init_addr[index], 0, 0, elm->obj->path);
+			(void *)(uintptr_t)init_addr[index].value, 0, 0, elm->obj->path);
 		    call_init_array_pointer(elm->obj, init_addr[index]);
 		}
 	    }
