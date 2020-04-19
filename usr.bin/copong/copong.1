@@ -38,6 +38,7 @@
 .Sh SYNOPSIS
 .Nm
 .Op Fl v
+.Op Fl x
 .Ar target-name
 .Sh DESCRIPTION
 The
@@ -51,6 +52,10 @@ The following options are available:
 .Bl -tag -width ".Fl v"
 .It Fl v
 Be verbose.
+.It Fl x
+Call
+.Xr abort 3
+at an unfortunate moment.
 .El
 .Sh EXIT STATUS
 The
