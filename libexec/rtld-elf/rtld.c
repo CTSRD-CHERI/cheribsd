@@ -1659,7 +1659,7 @@ digest_dynamic2(Obj_Entry *obj, const Elf_Dyn *dyn_rpath,
 			    (vaddr_t)(((char*)obj->writable_captable +
 			    cheri_getlen(obj->writable_captable)) - obj->text_rodata_cap));
 			obj->text_rodata_cap += start;
-			obj->text_rodata_cap = cheri_csetbounds_sametype(
+			obj->text_rodata_cap = cheri_setbounds_sametype(
 			    obj->text_rodata_cap, end - start);
 		} else {
 			dbg("%s: missing DT_CHERI_CAPTABLE so can't set "
@@ -1672,7 +1672,7 @@ digest_dynamic2(Obj_Entry *obj, const Elf_Dyn *dyn_rpath,
 		// TODO: data-only .so files? Possibly used by icu4c? For now
 		// I'll keep this assertion until we hit an error
 		rtld_require(obj->text_rodata_end != 0, "No text segment in %s?", obj->path);
-		obj->text_rodata_cap = cheri_csetbounds_sametype(
+		obj->text_rodata_cap = cheri_setbounds_sametype(
 		   obj->text_rodata_cap, obj->text_rodata_end - obj->text_rodata_start);
 	}
 	dbg("%s: tightened bounds of text/rodata cap: " PTR_FMT, obj->path,
@@ -1715,7 +1715,7 @@ digest_phdr(const Elf_Phdr *phdr, int phnum, dlfunc_t entry, const char *path)
 
 	obj->phsize = ph->p_memsz;
 #ifdef __CHERI_PURE_CAPABILITY__
-	obj->phdr = cheri_csetbounds(phdr, ph->p_memsz);
+	obj->phdr = cheri_setbounds(phdr, ph->p_memsz);
 #else
 	obj->phdr = phdr;
 #endif
@@ -1812,7 +1812,7 @@ digest_phdr(const Elf_Phdr *phdr, int phnum, dlfunc_t entry, const char *path)
     }
 
 #ifdef __CHERI_PURE_CAPABILITY__
-   obj->relocbase = cheri_csetbounds(obj->relocbase, obj->mapsize);
+   obj->relocbase = cheri_setbounds(obj->relocbase, obj->mapsize);
     /*
      * Derive text_rodata cap from AT_ENTRY (but set the address to the beginning
      * of the object). Note: csetbounds is done after parsing .dynamic

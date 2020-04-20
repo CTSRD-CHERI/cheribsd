@@ -471,7 +471,7 @@ _init_tls(void)
 #ifndef __CHERI_PURE_CAPABILITY__
 			tls_init = (void*) phdr[i].p_vaddr;
 #else
-			tls_init = cheri_csetbounds(cheri_setaddress(phdr,
+			tls_init = cheri_setbounds(cheri_setaddress(phdr,
 			    phdr[i].p_vaddr), tls_init_size);
 #endif
 			break;

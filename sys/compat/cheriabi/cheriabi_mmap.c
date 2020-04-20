@@ -422,7 +422,7 @@ cheriabi_mmap_retcap(struct thread *td, vm_offset_t addr,
 		/* Set offset to vaddr of page */
 		newcap = cheri_setoffset(newcap,
 		    rounddown2(addr, PAGE_SIZE) - cap_base);
-		newcap = cheri_csetbounds(newcap,
+		newcap = cheri_setbounds(newcap,
 		    roundup2(mrp->mr_len + (addr - rounddown2(addr, PAGE_SIZE)),
 		    PAGE_SIZE));
 		/* Shift offset up if required */
@@ -438,7 +438,7 @@ cheriabi_mmap_retcap(struct thread *td, vm_offset_t addr,
 		    cap_base, cap_base + cap_len));
 		newcap = cheri_setoffset(newcap, addr - cap_base);
 		if (cheriabi_mmap_setbounds)
-			newcap = cheri_csetbounds(newcap,
+			newcap = cheri_setbounds(newcap,
 			    roundup2(mrp->mr_len, PAGE_SIZE));
 	}
 

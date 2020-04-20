@@ -230,7 +230,7 @@ dl_init_phdr_info(void)
 #ifndef __CHERI_PURE_CAPABILITY__
 			    (void*)phdr_info.dlpi_phdr[i].p_vaddr;
 #else
-			    cheri_csetbounds(cheri_setaddress(phdr_info.dlpi_phdr,
+			    cheri_setbounds(cheri_setaddress(phdr_info.dlpi_phdr,
 				phdr_info.dlpi_phdr[i].p_vaddr),
 				phdr_info.dlpi_phdr[i].p_filesz);
 

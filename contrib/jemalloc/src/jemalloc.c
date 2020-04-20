@@ -209,7 +209,7 @@ typedef struct {
 #else
 #define	BOUND_PTR(ptr, size)	\
     ((config_cheri_setbounds && ptr != NULL) ? \
-    cheri_andperm(cheri_csetbounds((ptr), (size)), \
+    cheri_andperm(cheri_setbounds((ptr), (size)), \
 	CHERI_PERMS_USERSPACE_DATA & ~CHERI_PERM_CHERIABI_VMMAP) : \
     (ptr))
 #define roundup2(x, y)	(((x)+((y)-1))&(~((y)-1)))

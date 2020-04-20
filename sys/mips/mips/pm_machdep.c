@@ -252,7 +252,7 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	/* Build the argument list for the signal handler. */
 	regs->a0 = sig;
 #if __has_feature(capabilities)
-	regs->c3 = cheri_csetbounds(&sfp->sf_uc, sizeof(sfp->sf_uc));
+	regs->c3 = cheri_setbounds(&sfp->sf_uc, sizeof(sfp->sf_uc));
 #else
 	regs->a2 = (register_t)(intptr_t)&sfp->sf_uc;
 #endif
@@ -260,7 +260,7 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 		/* Signal handler installed with SA_SIGINFO. */
 #if __has_feature(capabilities)
 		regs->c4 = regs->c3;
-		regs->c3 = cheri_csetbounds(&sfp->sf_si, sizeof(sfp->sf_si));
+		regs->c3 = cheri_setbounds(&sfp->sf_si, sizeof(sfp->sf_si));
 #else
 		regs->a1 = (register_t)(intptr_t)&sfp->sf_si;
 #endif

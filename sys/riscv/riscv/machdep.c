@@ -869,9 +869,9 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 
 	tf->tf_a[0] = sig;
 #if __has_feature(capabilities)
-	tf->tf_a[1] = (uintcap_t)cheri_csetbounds(&fp->sf_si,
+	tf->tf_a[1] = (uintcap_t)cheri_setbounds(&fp->sf_si,
 	    sizeof(fp->sf_si));
-	tf->tf_a[2] = (uintcap_t)cheri_csetbounds(&fp->sf_uc,
+	tf->tf_a[2] = (uintcap_t)cheri_setbounds(&fp->sf_uc,
 	    sizeof(fp->sf_uc));
 #else
 	tf->tf_a[1] = (register_t)&fp->sf_si;

@@ -155,7 +155,7 @@ make_code_pointer(const Elf_Sym *def, const struct Struct_Obj_Entry *defobj,
 	dbg_assert(defobj->cheri_captable_abi != DF_MIPS_CHERI_ABI_LEGACY);
 	if (tight_bounds) {
 		dbg_assert(defobj->cheri_captable_abi != DF_MIPS_CHERI_ABI_PCREL);
-		ret = cheri_csetbounds(ret, def->st_size);
+		ret = cheri_setbounds(ret, def->st_size);
 	} else {
 		/* PC-relative ABI needs full DSO bounds */
 		dbg_assert(defobj->cheri_captable_abi == DF_MIPS_CHERI_ABI_PCREL);
@@ -201,7 +201,7 @@ make_data_pointer(const Elf_Sym* def, const struct Struct_Obj_Entry *defobj)
 	/* Remove execute and seal permissions */
 	ret = cheri_clearperm(ret, DATA_PTR_REMOVE_PERMS);
 	/* TODO: can we always set bounds here or does it break compat? */
-	ret = cheri_csetbounds(ret, def->st_size);
+	ret = cheri_setbounds(ret, def->st_size);
 	return ret;
 }
 
@@ -223,7 +223,7 @@ static inline const void* target_cgp_for_func(const struct Struct_Obj_Entry *obj
 }
 
 #define set_bounds_if_nonnull(ptr, size)	\
-	do { if (ptr) { ptr = cheri_csetbounds_sametype(ptr, size); } } while(0)
+	do { if (ptr) { ptr = cheri_setbounds_sametype(ptr, size); } } while(0)
 
 // ignore _init/_fini
 #define call_initfini_pointer(obj, target) rtld_fatal("%s: _init or _fini used!", obj->path)

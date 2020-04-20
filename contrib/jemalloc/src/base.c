@@ -488,7 +488,7 @@ base_alloc_extent(tsdn_t *tsdn, base_t *base) {
 	extent_esn_set(extent, esn);
 #ifdef __CHERI_PURE_CAPABILITY__
 	/* Ensure we return an extent with offset zero for rtree packing */
-	extent = cheri_csetboundsexact(extent, sizeof(*extent));
+	extent = cheri_setboundsexact(extent, sizeof(*extent));
 #endif
 	return extent;
 }

@@ -236,7 +236,7 @@ mmap_retcap(struct thread *td, vm_offset_t addr,
 		/* Set offset to vaddr of page */
 		newcap = cheri_setoffset(newcap,
 		    rounddown2(addr, PAGE_SIZE) - cap_base);
-		newcap = cheri_csetbounds(newcap,
+		newcap = cheri_setbounds(newcap,
 		    roundup2(mrp->mr_len + (addr - rounddown2(addr, PAGE_SIZE)),
 		    PAGE_SIZE));
 		/* Shift offset up if required */
@@ -250,7 +250,7 @@ mmap_retcap(struct thread *td, vm_offset_t addr,
 		    ("Allocated range (%zx - %zx) is not within source "
 		    "capability (%zx - %zx)", addr, addr + mrp->mr_len,
 		    cap_base, cap_base + cap_len));
-		newcap = cheri_csetbounds(
+		newcap = cheri_setbounds(
 		    cheri_setoffset(newcap, addr - cap_base),
 		    roundup2(mrp->mr_len, PAGE_SIZE));
 	}

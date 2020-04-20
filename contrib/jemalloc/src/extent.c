@@ -196,7 +196,7 @@ extent_alloc(tsdn_t *tsdn, arena_t *arena) {
 	malloc_mutex_unlock(tsdn, &arena->extent_avail_mtx);
 #ifdef __CHERI_PURE_CAPABILITY__
 	/* Ensure we return an extent with offset zero for rtree packing */
-	extent = cheri_csetboundsexact(extent, sizeof(*extent));
+	extent = cheri_setboundsexact(extent, sizeof(*extent));
 #endif
 	return extent;
 }
@@ -528,7 +528,7 @@ extents_alloc(tsdn_t *tsdn, arena_t *arena, extent_hooks_t **r_extent_hooks,
 #ifdef __CHERI_PURE_CAPABILITY__
 	/* Ensure we return an extent with offset zero for rtree packing */
 	if (extent != NULL)
-		extent = cheri_csetboundsexact(extent, sizeof(*extent));
+		extent = cheri_setboundsexact(extent, sizeof(*extent));
 #endif
 	return extent;
 }
