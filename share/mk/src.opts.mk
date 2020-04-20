@@ -373,6 +373,12 @@ BROKEN_OPTIONS+=GOOGLETEST SSP
 .endif
 
 .if ${__T:Mmips64*c*} || ${__T:Mriscv*c*}
+__DEFAULT_YES_OPTIONS+=	SNMALLOC
+.else
+__DEFAULT_NO_OPTIONS+=	SNMALLOC
+.endif
+
+.if ${__T:Mmips64*c*} || ${__T:Mriscv*c*}
 # nscd(8) caching depends on marshaling pointers to the daemon and back
 # and can't work without a rewrite.
 BROKEN_OPTIONS+=NS_CACHING
