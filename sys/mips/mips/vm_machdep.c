@@ -178,6 +178,7 @@ cpu_fork(struct thread *td1, struct proc *p2, struct thread *td2, int flags)
 	if (td1 != &thread0)
 		KASSERT((td2->td_frame->sr & MIPS_SR_COP_2_BIT) != 0,
 		    ("%s: COP2 not enabled in trapframe", __func__));
+	td2->td_md.md_scb = 0;
 #endif
 #ifdef CPU_CNMIPS
 	if (td1->td_md.md_flags & MDTD_COP2USED) {
