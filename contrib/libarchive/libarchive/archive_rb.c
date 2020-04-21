@@ -48,14 +48,8 @@
 
 #include "archive_rb.h"
 
-#ifdef __CHERI_PURE_CAPABILITY__
-#include <cheri/cheric.h>
-#define	__clear_bits(ptr, mask) cheri_clear_low_ptr_bits((ptr), (mask))
-#define	__get_bits(ptr, mask) cheri_get_low_ptr_bits((ptr), (mask))
-#else
-#define	__clear_bits(ptr, mask) ((ptr) & ~(mask))
-#define	__get_bits(ptr, mask)	((ptr) & (mask))
-#endif
+#define	__clear_bits(ptr, mask) ((ptr) & ~(size_t)(mask))
+#define	__get_bits(ptr, mask)	(size_t)((ptr) & (size_t)(mask))
 
 /* Keep in sync with archive_rb.h */
 #define	RB_DIR_LEFT		0

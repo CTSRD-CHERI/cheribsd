@@ -43,14 +43,11 @@
 
 #ifdef __CHERI_PURE_CAPABILITY__
 #include <cheri/cheric.h>
-#define je_get_low_bits(ptr, mask)	cheri_get_low_ptr_bits(ptr, mask)
-#define je_clear_low_bits(ptr, mask)	cheri_clear_low_ptr_bits(ptr, mask)
-#define je_set_low_bits(ptr, bits)	cheri_set_low_ptr_bits(ptr, bits)
-#else
-#define je_get_low_bits(ptr, mask)	((uintptr_t)(ptr) & ((uintptr_t)(mask)))
-#define je_clear_low_bits(ptr, mask)	((uintptr_t)(ptr) & (~(uintptr_t)(mask)))
-#define je_set_low_bits(ptr, bits)	((uintptr_t)(ptr) | ((uintptr_t)(bits)))
 #endif
+
+#define je_get_low_bits(ptr, mask)	((uintptr_t)(ptr) & ((size_t)(mask)))
+#define je_clear_low_bits(ptr, mask)	((uintptr_t)(ptr) & (~(size_t)(mask)))
+#define je_set_low_bits(ptr, bits)	((uintptr_t)(ptr) | ((size_t)(bits)))
 
 /* Node structure. */
 #define rb_node(a_type)							\

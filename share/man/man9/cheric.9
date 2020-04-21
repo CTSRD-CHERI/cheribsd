@@ -34,10 +34,8 @@
 .Os
 .Sh NAME
 .Nm cheri_andperm
-.Nm cheri_clear_low_ptr_bits
 .Nm cheri_csetbounds
 .Nm cheri_fromint
-.Nm cheri_get_low_ptr_bits
 .Nm cheri_getaddress
 .Nm cheri_getbase
 .Nm cheri_getdefault
@@ -54,7 +52,6 @@
 .Nm cheri_cleartag
 .Nm cheri_incoffset
 .Nm cheri_seal
-.Nm cheri_set_low_ptr_bits
 .Nm cheri_setaddress
 .Nm cheri_setoffset
 .Nm cheri_unseal
@@ -65,13 +62,9 @@
 .Ft void * __capability
 .Fn cheri_andperm "void * __capability c" "size_t mask"
 .Ft void * __capability
-.Fn cheri_clear_low_ptr_bits "void * __capability c" "size_t mask"
-.Ft void * __capability
 .Fn cheri_csetbounds "void * __capability c" "size_t length"
 .Ft void * __capability
 .Fn cheri_fromint "vaddr_t"
-.Ft size_t
-.Fn cheri_get_low_ptr_bits "void * __capability c" "size_t mask"
 .Ft vaddr_t
 .Fn cheri_getaddress "void * __capability c"
 .Ft vaddr_t
@@ -104,8 +97,6 @@
 .Fn cheri_incoffset "void * __capability c" "size_t offset"
 .Ft void * __capability
 .Fn cheri_seal "void * __capability c" "void * __capability typecap"
-.Ft void * __capability
-.Fn cheri_set_low_ptr_bits "void * __capability c" "size_t mask"
 .Ft void * __capability
 .Fn cheri_setaddress "void * __capability c" "vaddr_t address"
 .Ft void * __capability
@@ -187,28 +178,6 @@ Return a capability derived from
 .Fa c
 that has its offset field set to
 .Fa offset .
-.El
-.Ss Capability address low bits
-The following APIs assist in getting, setting, and clearing lower bits in
-capabilities:
-.Bl -tag -width short
-.It Fn cheri_clear_low_ptr_bits "c" "mask"
-Return a capability derived from
-.Fa c ,
-but with the bits of the address indicated by
-.Fa mask
-cleared.
-.It Fn cheri_get_low_ptr_bits "c" "mask"
-Return the lower bits of the address of capability
-.Fa c
-indicated by
-.Fa mask .
-.It Fn cheri_set_low_ptr_bits "c" "mask"
-Return a capability derived from
-.Fa c ,
-but with the bits of the address indicated by
-.Fa mask
-set.
 .El
 .Ss Capability alignment
 To be added.

@@ -72,12 +72,7 @@
 #include <dispatch/dispatch.h>
 #endif
 
-#ifdef __CHERI_PURE_CAPABILITY__
-#include <cheri/cheric.h>
-#define __get_bits(ptr, mask)	cheri_get_low_ptr_bits((ptr), (mask))
-#else
 #define __get_bits(ptr, mask)	((__intptr_t)(ptr) & (mask))
-#endif
 
 #if defined(__GNUC__) && defined(HAVE___SYNC_ADD_AND_FETCH)
 

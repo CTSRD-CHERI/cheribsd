@@ -1000,11 +1000,7 @@ avl_destroy_nodes(avl_tree_t *tree, void **cookie)
 	/*
 	 * If there is no parent to return to we are done.
 	 */
-#ifndef __CHERI_PURE_CAPABILITY__
 	parent = (avl_node_t *)((uintptr_t)(*cookie) & (uintptr_t)~CHILDBIT);
-#else
-	parent = (avl_node_t *)cheri_clear_low_ptr_bits((uintptr_t)(*cookie), CHILDBIT);
-#endif
 	if (parent == NULL) {
 		if (tree->avl_root != NULL) {
 			ASSERT(tree->avl_numnodes == 1);
@@ -1017,11 +1013,7 @@ avl_destroy_nodes(avl_tree_t *tree, void **cookie)
 	/*
 	 * Remove the child pointer we just visited from the parent and tree.
 	 */
-#ifndef __CHERI_PURE_CAPABILITY__
 	child = (uintptr_t)(*cookie) & (uintptr_t)CHILDBIT;
-#else
-	child = cheri_get_low_ptr_bits((uintptr_t)(*cookie), CHILDBIT);
-#endif
 	parent->avl_child[child] = NULL;
 	ASSERT(tree->avl_numnodes > 1);
 	--tree->avl_numnodes;
