@@ -1268,7 +1268,7 @@ hn_xpnt_vf_iocsetcaps(struct hn_softc *sc, struct ifreq *ifr)
 	 * Fix up requested capabilities w/ supported capabilities,
 	 * since the supported capabilities could have been changed.
 	 */
-	ifr->ifr_reqcap &= ifp->if_capabilities;
+	ifr_reqcap_set(ifr, ifr_reqcap_get(ifr) & ifp->if_capabilities);
 	/* Pass SIOCSIFCAP to VF. */
 	error = vf_ifp->if_ioctl(vf_ifp, SIOCSIFCAP, (caddr_t)ifr);
 
@@ -1321,8 +1321,8 @@ hn_xpnt_vf_iocsetflags(struct hn_softc *sc)
 
 	memset(&ifr, 0, sizeof(ifr));
 	strlcpy(ifr.ifr_name, vf_ifp->if_xname, sizeof(ifr.ifr_name));
-	ifr.ifr_flags = vf_ifp->if_flags & 0xffff;
-	ifr.ifr_flagshigh = vf_ifp->if_flags >> 16;
+	ifr_flags_set(&ifr, vf_ifp->if_flags & 0xffff);
+	ifr_flagshigh_set(&ifr, vf_ifp->if_flags >> 16);
 	return (vf_ifp->if_ioctl(vf_ifp, SIOCSIFFLAGS, (caddr_t)&ifr));
 }
 
@@ -1718,7 +1718,7 @@ hn_xpnt_vf_setready(struct hn_softc *sc)
 	 */
 	memset(&ifr, 0, sizeof(ifr));
 	strlcpy(ifr.ifr_name, vf_ifp->if_xname, sizeof(ifr.ifr_name));
-	ifr.ifr_reqcap = ifp->if_capenable;
+	ifr_reqcap_set(&ifr, ifp->if_capenable);
 	hn_xpnt_vf_iocsetcaps(sc, &ifr);
 
 	if (ifp->if_mtu != ETHERMTU) {

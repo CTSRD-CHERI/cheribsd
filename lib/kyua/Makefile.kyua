@@ -1,3 +1,5 @@
+# $FreeBSD$
+
 KYUA_VERSION=	0.13
 
 KYUA_CONFDIR=	/etc/kyua
@@ -5,3 +7,5 @@ KYUA_DOCDIR=	/usr/share/doc/kyua
 KYUA_EGDIR=	/usr/share/examples/kyua
 KYUA_MISCDIR=	/usr/share/kyua/misc
 KYUA_STOREDIR=	/usr/share/kyua/store
+
+KYUA_SRCDIR=	${SRCTOP}/contrib/kyua

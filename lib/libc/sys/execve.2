@@ -314,6 +314,8 @@ point
 to an illegal address.
 .It Bq Er EIO
 An I/O error occurred while reading from the file system.
+.It Bq Er EINTEGRITY
+Corrupted data was detected while reading from the file system.
 .El
 .Pp
 In addition, the
@@ -369,7 +371,7 @@ system call conforms to The Open Group Extended API Set 2 specification.
 The
 .Fn execve
 system call appeared in
-.Bx 4.2 .
+.At V7 .
 The
 .Fn fexecve
 system call appeared in

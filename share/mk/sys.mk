@@ -245,7 +245,7 @@ FFLAGS		?=	-O
 .endif
 EFLAGS		?=
 
-INSTALL		?=	install
+INSTALL		?=	${INSTALL_CMD:Uinstall}
 
 LEX		?=	lex
 LFLAGS		?=
@@ -286,6 +286,7 @@ SHELL		?=	sh
 
 .if !defined(%POSIX)
 SIZE		?=	size
+STRIPBIN	?=	strip
 .endif
 
 YACC		?=	yacc

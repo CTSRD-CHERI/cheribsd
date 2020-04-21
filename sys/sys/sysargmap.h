@@ -344,7 +344,6 @@ static int sysargmask[] = {
 	[SYS_jail_get] = (0x0 | 0x1),
 	[SYS_jail_set] = (0x0 | 0x1),
 	[SYS_jail_remove] = (0x0),
-	[SYS_closefrom] = (0x0),
 	[SYS___semctl] = (0x0 | 0x8),
 	[SYS_msgctl] = (0x0 | 0x4),
 	[SYS_shmctl] = (0x0 | 0x4),
@@ -408,6 +407,7 @@ static int sysargmask[] = {
 	[SYS_shm_rename] = (0x0 | 0x1 | 0x2),
 	[SYS_sigfastblock] = (0x0 | 0x2),
 	[SYS___realpathat] = (0x0 | 0x2 | 0x4),
+	[SYS_close_range] = (0x0),
 };
 
 #endif /* !_SYSARGMAP_H_ */

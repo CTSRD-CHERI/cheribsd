@@ -3209,16 +3209,6 @@ SYS_STUB(508, int, jail_remove,
     /* _localcheck */ {}
 )
 
-SYS_STUB(509, int, closefrom,
-    /* _protoargs */ (int lowfd),
-    /* _protoargs_chk */ (int *retp , int * __capability stub_errno, int lowfd),
-    /* _protoargs_err */ (int * __capability stub_errno, int lowfd),
-    /* _callargs */ (lowfd),
-    /* _callargs_chk */ (&ret, stub_errno, lowfd),
-    /* _callargs_err */ (&errno, lowfd),
-    /* _localcheck */ {}
-)
-
 SYS_STUB_ARGHASPTRS(510, int, __semctl,
     /* _protoargs */ (int semid, int semnum, int cmd, union semun*  arg),
     /* _protoargs_chk */ (int *retp , int * __capability stub_errno, int semid, int semnum, int cmd, union semun* __capability   arg),
@@ -3827,5 +3817,15 @@ SYS_STUB(574, int, __realpathat,
     /* _callargs_chk */ (&ret, stub_errno, fd, path, buf, size, flags),
     /* _callargs_err */ (&errno, fd, (const char * )path, (char * )buf, size, flags),
     /* _localcheck */ {if (!(cheri_getperm(path) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} if (!(cheri_getperm(buf) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} }
+)
+
+SYS_STUB(575, int, close_range,
+    /* _protoargs */ (u_int lowfd, u_int highfd, int flags),
+    /* _protoargs_chk */ (int *retp , int * __capability stub_errno, u_int lowfd, u_int highfd, int flags),
+    /* _protoargs_err */ (int * __capability stub_errno, u_int lowfd, u_int highfd, int flags),
+    /* _callargs */ (lowfd, highfd, flags),
+    /* _callargs_chk */ (&ret, stub_errno, lowfd, highfd, flags),
+    /* _callargs_err */ (&errno, lowfd, highfd, flags),
+    /* _localcheck */ {}
 )
 

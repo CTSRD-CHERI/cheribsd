@@ -421,8 +421,8 @@ freebsd6_freebsd32_mmap(struct thread *td,
 		prot |= PROT_EXEC;
 #endif
 
-	return (kern_mmap(td, (uintptr_t)uap->addr, 0,
-	    uap->len, PROT_MAX(_PROT_ALL) | prot, uap->flags, uap->fd,
+	return (kern_mmap(td, (uintptr_t)uap->addr, uap->len,
+	    PROT_MAX(_PROT_ALL) | prot, uap->flags, uap->fd,
 	    PAIR32TO64(off_t, uap->pos)));
 }
 #endif
@@ -1746,7 +1746,7 @@ freebsd4_freebsd32_sendfile(struct thread *td,
     struct freebsd4_freebsd32_sendfile_args *uap)
 {
 
-	return (return (kern_sendfile(td, uap->fd, uap->s,
+	return (kern_sendfile(td, uap->fd, uap->s,
 	    PAIR32TO64(off_t, uap->offset), uap->nbytes,
 	    __USER_CAP_OBJ(uap->hdtr), __USER_CAP_OBJ(uap->sbytes),
 	    uap->flags, 1, (copyin_hdtr_t *)freebsd32_copyin_hdtr,
@@ -2492,7 +2492,7 @@ freebsd32_user_clock_nanosleep(struct thread *td, clockid_t clock_id,
 {
 	struct timespec32 rmt32, rqt32;
 	struct timespec rmt, rqt;
-	int error;
+	int error, error2;
 
 	error = copyin(ua_rqtp, &rqt32, sizeof(rqt32));
 	if (error)
@@ -2501,18 +2501,13 @@ freebsd32_user_clock_nanosleep(struct thread *td, clockid_t clock_id,
 	CP(rqt32, rqt, tv_sec);
 	CP(rqt32, rqt, tv_nsec);
 
-	if (ua_rmtp != NULL && (flags & TIMER_ABSTIME) == 0 &&
-	    !useracc(ua_rmtp, sizeof(rmt32), VM_PROT_WRITE))
-		return (EFAULT);
 	error = kern_clock_nanosleep(td, clock_id, flags, &rqt, &rmt);
 	if (error == EINTR && ua_rmtp != NULL && (flags & TIMER_ABSTIME) == 0) {
-		int error2;
-
 		CP(rmt, rmt32, tv_sec);
 		CP(rmt, rmt32, tv_nsec);
 
 		error2 = copyout(&rmt32, ua_rmtp, sizeof(rmt32));
-		if (error2)
+		if (error2 != 0)
 			error = error2;
 	}
 	return (error);

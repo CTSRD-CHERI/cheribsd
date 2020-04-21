@@ -2797,7 +2797,7 @@ ifr_flags_get(void *ifrp)
 	return (ifr__short0_get(ifrp));
 }
 
-static void
+void
 ifr_flags_set(void *ifrp, short val)
 {
 
@@ -2811,7 +2811,7 @@ ifr_flagshigh_get(void *ifrp)
 	return (ifr__short1_get(ifrp));
 }
 
-static void
+void
 ifr_flagshigh_set(void *ifrp, short val)
 {
 
@@ -2884,7 +2884,7 @@ ifr_reqcap_get(void *ifrp)
 	return (ifr__int0_get(ifrp));
 }
 
-static void
+void
 ifr_reqcap_set(void *ifrp, int val)
 {
 

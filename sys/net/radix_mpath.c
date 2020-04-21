@@ -40,6 +40,7 @@ __FBSDID("$FreeBSD$");
 
 #include "opt_inet.h"
 #include "opt_inet6.h"
+#include "opt_mpath.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -48,6 +49,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/mutex.h>
 #include <sys/socket.h>
 #include <sys/domain.h>
+#include <sys/kernel.h>
 #include <sys/syslog.h>
 #include <net/radix.h>
 #include <net/radix_mpath.h>
@@ -210,7 +212,7 @@ rt_mpath_conflict(struct rib_head *rnh, struct rtentry *rt,
 	return (0);
 }
 
-static struct rtentry *
+struct rtentry *
 rt_mpath_selectrte(struct rtentry *rte, uint32_t hash)
 {
 	struct radix_node *rn0, *rn;
@@ -290,38 +292,20 @@ rtalloc_mpath_fib(struct route *ro, uint32_t hash, u_int fibnum)
 	RT_UNLOCK(ro->ro_rt);
 }
 
-extern int	in6_inithead(void **head, int off, u_int fibnum);
-extern int	in_inithead(void **head, int off, u_int fibnum);
-
-#ifdef INET
-int
-rn4_mpath_inithead(void **head, int off, u_int fibnum)
+void
+rt_mpath_init_rnh(struct rib_head *rnh)
 {
-	struct rib_head *rnh;
 
-	hashjitter = arc4random();
-	if (in_inithead(head, off, fibnum) == 1) {
-		rnh = (struct rib_head *)*head;
-		rnh->rnh_multipath = 1;
-		return 1;
-	} else
-		return 0;
-}
-#endif
-
-#ifdef INET6
-int
-rn6_mpath_inithead(void **head, int off, u_int fibnum)
-{
-	struct rib_head *rnh;
-
-	hashjitter = arc4random();
-	if (in6_inithead(head, off, fibnum) == 1) {
-		rnh = (struct rib_head *)*head;
-		rnh->rnh_multipath = 1;
-		return 1;
-	} else
-		return 0;
+	rnh->rnh_multipath = 1;
 }
 
+#ifdef RADIX_MPATH
+static void
+mpath_init(void)
+{
+
+	hashjitter = arc4random();
+}
+SYSINIT(mpath_init, SI_SUB_LAST, SI_ORDER_ANY, mpath_init, NULL);
 #endif
+

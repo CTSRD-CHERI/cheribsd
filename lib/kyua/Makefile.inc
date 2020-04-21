@@ -1,18 +1,20 @@
-KYUALIBDIR:=	${.PARSEDIR}
-KYUASRCDIR=	${SRCTOP}/contrib/subrepo-kyua
+# $FreeBSD$
 
-LIB_CXX=        kyua_${KYUALIB}
+KYUA_LIBDIR:=	${.PARSEDIR}
+
+.include "${KYUA_LIBDIR}/Makefile.kyua"
+
+LIB_CXX=        kyua_${KYUA_LIB}
 INTERNALLIB=
 
-.PATH: ${KYUASRCDIR}/${KYUALIB}
-CFLAGS+=	-I${KYUALIBDIR} \
-		-I${KYUASRCDIR}	\
-		-I${SRCTOP}/contrib/subrepo-lutok/include
+.PATH: ${KYUA_SRCDIR}/${KYUA_LIB}
+CFLAGS+=	-I${KYUA_LIBDIR} \
+		-I${KYUA_SRCDIR} \
+		-I${SRCTOP}/contrib/lutok/include
 
 CFLAGS+=	-DHAVE_CONFIG_H
 
 # kyua uses auto_ptr
 CFLAGS+=        -Wno-deprecated-declarations
 
-.include "${KYUALIBDIR}/Makefile.kyua"
 .include "${.PARSEDIR}/../Makefile.inc"

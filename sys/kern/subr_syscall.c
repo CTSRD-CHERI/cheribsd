@@ -104,7 +104,6 @@ syscallenter(struct thread *td)
 		goto retval;
 #endif
 
-	STOPEVENT(p, S_SCE, sa->narg);
 	if (__predict_false((p->p_flag & P_TRACED) != 0)) {
 		PROC_LOCK(p);
 		if (p->p_ptevents & PTRACE_SCE)
@@ -237,12 +236,6 @@ syscallret(struct thread *td)
 		td->td_dbgflags |= TDB_SCX;
 		PROC_UNLOCK(p);
 	}
-	/*
-	 * This works because errno is findable through the
-	 * register set.  If we ever support an emulation where this
-	 * is not the case, this code will need to be revisited.
-	 */
-	STOPEVENT(p, S_SCX, sa->code);
 	if (__predict_false(traced ||
 	    (td->td_dbgflags & (TDB_EXEC | TDB_FORK)) != 0)) {
 		PROC_LOCK(p);

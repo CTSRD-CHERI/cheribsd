@@ -374,7 +374,7 @@ ${SHLIB_NAME}.debug: ${SHLIB_NAME_FULL}
 
 .if ${SHLIB_NAME} != ${SHLIB_NAME_INSTALL}
 ${SHLIB_NAME_INSTALL}: ${SHLIB_NAME}
-	${STRIPBIN:Ustrip} -o ${.TARGET} ${STRIP_FLAGS} ${SHLIB_NAME}
+	${STRIPBIN} -o ${.TARGET} ${STRIP_FLAGS} ${SHLIB_NAME}
 .endif
 .endif #defined(SHLIB_NAME)
 
@@ -527,7 +527,10 @@ _libinstall:
 .include <bsd.nls.mk>
 .include <bsd.confs.mk>
 .include <bsd.files.mk>
+#No need to install header for INTERNALLIB
+.if !defined(INTERNALLIB)
 .include <bsd.incs.mk>
+.endif
 .endif
 
 LINKOWN?=	${LIBOWN}

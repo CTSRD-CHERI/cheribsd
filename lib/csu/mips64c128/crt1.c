@@ -178,7 +178,7 @@ _start(void *auxv,
 	crt_call_constructors();
 #endif
 
-#if defined(__CHERI_CAPABILITY_TABLE__) && __CHERI_CAPABILITY_TABLE__ != 3
+#if __CHERI_CAPABILITY_TABLE__ != 3
 	/* Store the $pcc with large bounds for __init_array/__fini_array */
 	__initfini_base_cap = cheri_getpcc();
 #endif

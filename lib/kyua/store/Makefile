@@ -1,6 +1,7 @@
 # $FreeBSD$
 
-KYUALIB=	store
+KYUA_LIB=	store
+LIBADD=		kyua_model kyua_utils sqlite3
 
 CFLAGS+=	-DKYUA_STOREDIR=\"${KYUA_STOREDIR}\"
 

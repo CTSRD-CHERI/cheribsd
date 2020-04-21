@@ -36,6 +36,38 @@
 #   xargs -n1 | sort | uniq -d;
 # done
 
+# 20200410 CHERI: cheri_serial.h removed
+OLD_FILES+=usr/include/cheri/cheri_serial.h
+
+# 20200401: Remove procfs-based process debugging
+OLD_FILES+=usr/include/sys/pioctl.h
+
+# 20200330: GDB_LIBEXEC option retired (always true)
+OLD_FILES+=usr/bin/gdb
+OLD_FILES+=usr/bin/gdbserver
+OLD_FILES+=usr/bin/kgdb
+OLD_FILES+=usr/share/man/man1/gdb.1.gz
+OLD_FILES+=usr/share/man/man1/gdbserver.1.gz
+OLD_FILES+=usr/share/man/man1/kgdb.1.gz
+
+# 20200327: OCF refactoring
+OLD_FILES+=usr/share/man/man9/crypto_find_driver.9
+OLD_FILES+=usr/share/man/man9/crypto_register.9
+OLD_FILES+=usr/share/man/man9/crypto_unregister.9
+
+# 20200323: INTERNALLIB don't install headers anymore
+OLD_FILES+=usr/include/libelftc.h
+OLD_FILES+=usr/include/libifconfig.h
+OLD_FILES+=usr/include/libpmcstat.h
+
+# 20200320: cx and ctau drivers retired
+OLD_FILES+=usr/share/man/man4/ctau.4.gz
+OLD_FILES+=usr/share/man/man4/cx.4.gz
+
+# 20200318: host.conf was deprecated a long time ago.
+OLD_FILES+=etc/host.conf
+OLD_FILES+=etc/rc.d/nsswitch
+
 # 20200310: new clang import which bumps version from 9.0.1 to 10.0.0.
 OLD_FILES+=usr/lib/clang/9.0.1/include/cuda_wrappers/algorithm
 OLD_FILES+=usr/lib/clang/9.0.1/include/cuda_wrappers/complex
@@ -295,6 +327,7 @@ OLD_FILES+=usr/share/man/man8/fsinfo.8.gz
 OLD_FILES+=usr/share/man/man8/hlfsd.8.gz
 OLD_FILES+=usr/share/man/man8/mk-amd-map.8.gz
 OLD_FILES+=usr/share/man/man8/wire-test.8.gz
+
 # 20200301: bktr removed
 OLD_DIRS+=usr/include/dev/bktr
 OLD_FILES+=usr/include/dev/bktr/ioctl_bktr.h
@@ -305,6 +338,7 @@ OLD_FILES+=usr/include/machine/ioctl_bktr.h
 OLD_FILES+=usr/include/machine/ioctl_meteor.h
 .endif
 OLD_FILES+=usr/share/man/man4/bktr.4.gz
+
 # 20200229: GCC 4.2.1 removed
 .if !defined(WITH_PORT_BASE_GCC)
 OLD_FILES+=usr/bin/g++
@@ -1654,8 +1688,6 @@ OLD_FILES+=lib/casper/libcap_sysctl.so.1
 # 20190509: tests/sys/opencrypto requires the net/py-dpkt package.
 OLD_FILES+=usr/tests/sys/opencrypto/dpkt.py
 OLD_FILES+=usr/tests/sys/opencrypto/dpkt.pyc
-# 20190326: tzdata 2019a import
-OLD_FILES+=usr/share/zoneinfo/Etc/UCT
 # 20190304: new libc++ import which bumps version from 7.0.1 to 8.0.0.
 OLD_FILES+=usr/include/c++/v1/experimental/dynarray
 # 20190304: new clang import which bumps version from 7.0.1 to 8.0.0.
@@ -5468,8 +5500,6 @@ OLD_FILES+=usr/lib32/libheimsqlite.a
 OLD_FILES+=usr/lib32/libheimsqlite.so
 OLD_LIBS+=usr/lib32/libheimsqlite.so.11
 OLD_FILES+=usr/lib32/libheimsqlite_p.a
-# 20150518: tzdata2015c update
-OLD_FILES+=usr/share/zoneinfo/America/Montreal
 # 20150506
 OLD_FILES+=usr/share/man/man9/NDHASGIANT.9.gz
 # 20150504
@@ -5973,10 +6003,6 @@ OLD_FILES+=etc/rc.d/hv_kvpd
 OLD_LIBS+=usr/lib/libnv.so.0
 # 20140829: rc.d/kerberos removed
 OLD_FILES+=etc/rc.d/kerberos
-# 20140827: tzdata2014f import
-OLD_FILES+=usr/share/zoneinfo/Asia/Chongqing
-OLD_FILES+=usr/share/zoneinfo/Asia/Harbin
-OLD_FILES+=usr/share/zoneinfo/Asia/Kashgar
 # 20140814: libopie version bump
 OLD_LIBS+=usr/lib/libopie.so.7
 OLD_LIBS+=usr/lib32/libopie.so.7
@@ -6267,9 +6293,6 @@ OLD_FILES+=usr/share/man/man2/extattr_get_list.2.gz
 # 20131107: example files removed
 OLD_FILES+=usr/share/examples/libusb20/aux.c
 OLD_FILES+=usr/share/examples/libusb20/aux.h
-# 20131105: tzdata 2013h import
-OLD_FILES+=usr/share/zoneinfo/America/Shiprock
-OLD_FILES+=usr/share/zoneinfo/Antarctica/South_Pole
 # 20131103: WITH_LIBICONV_COMPAT removal
 OLD_FILES+=usr/include/_libiconv_compat.h
 OLD_FILES+=usr/lib/libiconv.a
@@ -7212,9 +7235,6 @@ OLD_FILES+=usr/share/man/man3/ascftime.3.gz
 OLD_FILES+=usr/share/man/man3/cfree.3.gz
 OLD_FILES+=usr/share/man/man3/cftime.3.gz
 OLD_FILES+=usr/share/man/man3/getpw.3.gz
-# 20100801: tzdata2010k import
-OLD_FILES+=usr/share/zoneinfo/Pacific/Ponape
-OLD_FILES+=usr/share/zoneinfo/Pacific/Truk
 # 20100725: acpi_aiboost(4) removal.
 OLD_FILES+=usr/share/man/man4/acpi_aiboost.4.gz
 # 20100724: nfsclient/nfs_lock.h moved to nfs/nfs_lock.h
@@ -7891,8 +7911,6 @@ OLD_FILES+=usr/include/pccard/cis.h
 OLD_DIRS+=usr/include/pccard
 # 20090203: adding_user.8 moved to adding_user.7
 OLD_FILES+=usr/share/man/man8/adding_user.8.gz
-# 20090122: tzdata2009a import
-OLD_FILES+=usr/share/zoneinfo/Asia/Katmandu
 # 20090102: file 4.26 import
 OLD_FILES+=usr/share/misc/magic.mime
 OLD_FILES+=usr/share/misc/magic.mime.mgc
@@ -8125,9 +8143,6 @@ OLD_FILES+=usr/sbin/pkg_check
 OLD_FILES+=usr/sbin/pkg_sign
 OLD_FILES+=usr/share/man/man1/pkg_check.1.gz
 OLD_FILES+=usr/share/man/man1/pkg_sign.1.gz
-# 20080325: tzdata2008b import
-OLD_FILES+=usr/share/zoneinfo/Asia/Calcutta
-OLD_FILES+=usr/share/zoneinfo/Asia/Saigon
 # 20080314: stack_print(9) mlink fixed
 OLD_FILES+=usr/share/man/man9/stack_printf.9.gz
 # 20080312: libkse removal
@@ -9805,49 +9820,6 @@ OLD_FILES+=usr/bin/miniperl
 OLD_FILES+=usr/bin/sperl
 # 200001XX
 OLD_FILES+=usr/sbin/apmconf
-# 199911XX
-OLD_FILES+=usr/sbin/ipfstat
-OLD_FILES+=usr/sbin/ipmon
-OLD_FILES+=usr/sbin/ipnat
-OLD_FILES+=usr/sbin/bad144
-OLD_FILES+=usr/sbin/wormcontrol
-OLD_FILES+=usr/sbin/named-bootconf
-OLD_FILES+=usr/sbin/kvm_mkdb
-OLD_FILES+=usr/sbin/keyadmin
-# 199909XX
-OLD_FILES+=usr/lib/libdesrypt_p.a
-OLD_FILES+=sbin/ft
-# 199903XX
-OLD_FILES+=sbin/modload
-OLD_FILES+=sbin/modunload
-OLD_FILES+=usr/sbin/natd
-# 199812XX
-OLD_FILES+=sbin/dset
-# 199809XX
-OLD_FILES+=sbin/scsi
-OLD_FILES+=sbin/scsiformat
-OLD_FILES+=usr/sbin/ncrcontrol
-OLD_FILES+=usr/sbin/tickadj
-# 199806XX
-OLD_FILES+=usr/sbin/mkdosfs
-# 199801XX
-OLD_FILES+=sbin/mount_lfs
-OLD_FILES+=sbin/newlfs
-OLD_FILES+=sbin/dumplfs
-OLD_FILES+=usr/sbin/qcamcontrol
-OLD_FILES+=usr/sbin/supscan
-# 1997XXXX
-OLD_FILES+=usr/sbin/sysctl
-OLD_FILES+=usr/sbin/ctm_scan
-OLD_FILES+=usr/sbin/addgroup
-OLD_FILES+=usr/sbin/rmgroup
-# 1996XXXX
-OLD_FILES+=sbin/rdisc
-OLD_FILES+=usr/sbin/cdplay
-OLD_FILES+=usr/sbin/supfilesrv
-OLD_FILES+=usr/sbin/routed
-OLD_FILES+=usr/sbin/lsdev
-OLD_FILES+=usr/sbin/yppasswdd
 ## unsorted
 # do we still support aout builds?
 #OLD_FILES+=usr/lib/aout/c++rt0.o
@@ -10383,19 +10355,6 @@ OLD_FILES+=usr/share/misc/nslookup.help
 OLD_FILES+=usr/share/sendmail/cf/feature/nodns.m4
 OLD_FILES+=usr/share/syscons/keymaps/lat-amer.kbd
 OLD_FILES+=usr/share/vi/catalog/ru_SU.KOI8-R
-OLD_FILES+=usr/share/zoneinfo/Africa/Timbuktu
-OLD_FILES+=usr/share/zoneinfo/Africa/Asmera
-OLD_FILES+=usr/share/zoneinfo/America/Buenos_Aires
-OLD_FILES+=usr/share/zoneinfo/America/Cordoba
-OLD_FILES+=usr/share/zoneinfo/America/Jujuy
-OLD_FILES+=usr/share/zoneinfo/America/Catamarca
-OLD_FILES+=usr/share/zoneinfo/America/Mendoza
-OLD_FILES+=usr/share/zoneinfo/America/Indianapolis
-OLD_FILES+=usr/share/zoneinfo/America/Louisville
-OLD_FILES+=usr/share/zoneinfo/America/Argentina/ComodRivadavia
-OLD_FILES+=usr/share/zoneinfo/Atlantic/Faeroe
-OLD_FILES+=usr/share/zoneinfo/Europe/Belfast
-OLD_FILES+=usr/share/zoneinfo/Pacific/Yap
 OLD_FILES+=usr/share/zoneinfo/SystemV/YST9
 OLD_FILES+=usr/share/zoneinfo/SystemV/PST8
 OLD_FILES+=usr/share/zoneinfo/SystemV/EST5EDT
@@ -10794,10 +10753,6 @@ OLD_LIBS+=usr/lib/libtermcap.so.2
 OLD_LIBS+=usr/lib/libutil.so.2
 OLD_LIBS+=usr/lib/libvgl.so.1
 OLD_LIBS+=usr/lib/libwrap.so.2
-# 19991216
-OLD_FILES+=usr/sbin/xntpdc
-# 199909XX
-OLD_LIBS+=usr/lib/libc_r.so.3
 # ???
 OLD_LIBS+=usr/lib/libarchive.so.2
 OLD_LIBS+=usr/lib/libbsnmp.so.1

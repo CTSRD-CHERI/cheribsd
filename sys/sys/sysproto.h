@@ -29,15 +29,6 @@ struct thread;
 #if BYTE_ORDER == LITTLE_ENDIAN
 #define	PADL_(t)	0
 #define	PADR_(t)	PAD_(t)
-#elif defined(_MIPS_SZCAP) && _MIPS_SZCAP == 256
-/*
- * For non-capability arguments, the syscall argument is stored in the
- * cursor field in the second word.
- */
-#define	PADL_(t)	(sizeof (t) > sizeof(register_t) ? \
-		0 : 2 * sizeof(register_t) - sizeof(t))
-#define	PADR_(t)	(sizeof (t) > sizeof(register_t) ? \
-		0 : 2 * sizeof(register_t))
 #else
 #define	PADL_(t)	PAD_(t)
 #define	PADR_(t)	0
@@ -1545,9 +1536,6 @@ struct jail_set_args {
 struct jail_remove_args {
 	char jid_l_[PADL_(int)]; int jid; char jid_r_[PADR_(int)];
 };
-struct closefrom_args {
-	char lowfd_l_[PADL_(int)]; int lowfd; char lowfd_r_[PADR_(int)];
-};
 struct __semctl_args {
 	char semid_l_[PADL_(int)]; int semid; char semid_r_[PADR_(int)];
 	char semnum_l_[PADL_(int)]; int semnum; char semnum_r_[PADR_(int)];
@@ -1882,6 +1870,11 @@ struct __realpathat_args {
 	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
 	char buf_l_[PADL_(char * __capability)]; char * __capability buf; char buf_r_[PADR_(char * __capability)];
 	char size_l_[PADL_(size_t)]; size_t size; char size_r_[PADR_(size_t)];
+	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
+};
+struct close_range_args {
+	char lowfd_l_[PADL_(u_int)]; u_int lowfd; char lowfd_r_[PADR_(u_int)];
+	char highfd_l_[PADL_(u_int)]; u_int highfd; char highfd_r_[PADR_(u_int)];
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
 };
 int	nosys(struct thread *, struct nosys_args *);
@@ -2219,7 +2212,6 @@ int	sys_gssd_syscall(struct thread *, struct gssd_syscall_args *);
 int	sys_jail_get(struct thread *, struct jail_get_args *);
 int	sys_jail_set(struct thread *, struct jail_set_args *);
 int	sys_jail_remove(struct thread *, struct jail_remove_args *);
-int	sys_closefrom(struct thread *, struct closefrom_args *);
 int	sys___semctl(struct thread *, struct __semctl_args *);
 int	sys_msgctl(struct thread *, struct msgctl_args *);
 int	sys_shmctl(struct thread *, struct shmctl_args *);
@@ -2283,6 +2275,7 @@ int	sys_shm_open2(struct thread *, struct shm_open2_args *);
 int	sys_shm_rename(struct thread *, struct shm_rename_args *);
 int	sys_sigfastblock(struct thread *, struct sigfastblock_args *);
 int	sys___realpathat(struct thread *, struct __realpathat_args *);
+int	sys_close_range(struct thread *, struct close_range_args *);
 
 #ifdef COMPAT_43
 
@@ -2735,7 +2728,11 @@ struct freebsd12_shm_open_args {
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
 	char mode_l_[PADL_(mode_t)]; mode_t mode; char mode_r_[PADR_(mode_t)];
 };
+struct freebsd12_closefrom_args {
+	char lowfd_l_[PADL_(int)]; int lowfd; char lowfd_r_[PADR_(int)];
+};
 int	freebsd12_shm_open(struct thread *, struct freebsd12_shm_open_args *);
+int	freebsd12_closefrom(struct thread *, struct freebsd12_closefrom_args *);
 
 #endif /* COMPAT_FREEBSD12 */
 
@@ -3153,7 +3150,7 @@ int	freebsd12_shm_open(struct thread *, struct freebsd12_shm_open_args *);
 #define	SYS_AUE_jail_get	AUE_JAIL_GET
 #define	SYS_AUE_jail_set	AUE_JAIL_SET
 #define	SYS_AUE_jail_remove	AUE_JAIL_REMOVE
-#define	SYS_AUE_closefrom	AUE_CLOSEFROM
+#define	SYS_AUE_freebsd12_closefrom	AUE_CLOSEFROM
 #define	SYS_AUE___semctl	AUE_SEMCTL
 #define	SYS_AUE_msgctl	AUE_MSGCTL
 #define	SYS_AUE_shmctl	AUE_SHMCTL
@@ -3217,6 +3214,7 @@ int	freebsd12_shm_open(struct thread *, struct freebsd12_shm_open_args *);
 #define	SYS_AUE_shm_rename	AUE_SHMRENAME
 #define	SYS_AUE_sigfastblock	AUE_NULL
 #define	SYS_AUE___realpathat	AUE_REALPATHAT
+#define	SYS_AUE_close_range	AUE_NULL
 
 #undef PAD_
 #undef PADL_

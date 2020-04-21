@@ -55,7 +55,6 @@ __FBSDID("$FreeBSD$");
 #include <sys/mutex.h>
 #include <sys/proc.h>
 #include <sys/procdesc.h>
-#include <sys/pioctl.h>
 #include <sys/jail.h>
 #include <sys/tty.h>
 #include <sys/wait.h>
@@ -102,9 +101,6 @@ dtrace_execexit_func_t	dtrace_fasttrap_exit;
 
 SDT_PROVIDER_DECLARE(proc);
 SDT_PROBE_DEFINE1(proc, , , exit, "int");
-
-/* Hook for NFS teardown procedure. */
-void (*nlminfo_release_p)(struct proc *p);
 
 struct proc *
 proc_realparent(struct proc *child)
@@ -287,15 +283,6 @@ exit1(struct thread *td, int rval, int signo)
 	p->p_xsig = signo;
 
 	/*
-	 * Wakeup anyone in procfs' PIOCWAIT.  They should have a hold
-	 * on our vmspace, so we should block below until they have
-	 * released their reference to us.  Note that if they have
-	 * requested S_EXIT stops we will block here until they ack
-	 * via PIOCCONT.
-	 */
-	_STOPEVENT(p, S_EXIT, 0);
-
-	/*
 	 * Ignore any pending request to stop due to a stop signal.
 	 * Once P_WEXIT is set, future requests will be ignored as
 	 * well.
@@ -303,13 +290,8 @@ exit1(struct thread *td, int rval, int signo)
 	p->p_flag &= ~P_STOPPED_SIG;
 	KASSERT(!P_SHOULDSTOP(p), ("exiting process is stopped"));
 
-	/*
-	 * Note that we are exiting and do another wakeup of anyone in
-	 * PIOCWAIT in case they aren't listening for S_EXIT stops or
-	 * decided to wait again after we told them we are exiting.
-	 */
+	/* Note that we are exiting. */
 	p->p_flag |= P_WEXIT;
-	wakeup(&p->p_stype);
 
 	/*
 	 * Wait for any processes that have a hold on our vmspace to
@@ -389,12 +371,6 @@ exit1(struct thread *td, int rval, int signo)
 	 * F_SETOWN with our pid.
 	 */
 	funsetownlst(&p->p_sigiolst);
-
-	/*
-	 * If this process has an nlminfo data area (for lockd), release it
-	 */
-	if (nlminfo_release_p != NULL && p->p_nlminfo != NULL)
-		(*nlminfo_release_p)(p);
 
 	/*
 	 * Close open files and release open-file table.

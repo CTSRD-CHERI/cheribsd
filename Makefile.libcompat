@@ -59,15 +59,12 @@ LIBCOMPATIMAKE+=	${LIBCOMPATWMAKE:NINSTALL=*:NDESTDIR=*} \
 
 _LC_LIBDIRS.yes=		lib
 _LC_LIBDIRS.yes+=		gnu/lib
-_LC_LIBDIRS.yes+=		usr.bin/lex/lib
+# XXX: See src.opts.mk hack
+.if ${MK_COMPAT_CHERIABI} != "yes" || !${TARGET_ARCH:Mriscv64*}
 _LC_LIBDIRS.${MK_CDDL:tl}+=	cddl/lib
+.endif
 _LC_LIBDIRS.${MK_CRYPT:tl}+=	secure/lib
 _LC_LIBDIRS.${MK_KERBEROS:tl}+=	kerberos5/lib
-
-_LC_INCDIRS=	\
-		include \
-		lib/ncurses/ncursesw \
-		${_LC_LIBDIRS.yes}
 
 .if ${MK_FILE} != "no"
 _libmagic=	lib/libmagic
@@ -90,12 +87,6 @@ build${libcompat}: .PHONY
 	${WORLDTMP_MTREE} -f ${.CURDIR}/etc/mtree/BSD.lib${libcompat}.dist \
 	    -p ${WORLDTMP}/usr/lib/debug/usr >/dev/null
 .endif
-.for _t in ${_obj} includes
-.for _dir in ${_LC_INCDIRS}
-	${_+_}cd ${.CURDIR}/${_dir}; ${LIBCOMPATWMAKE} MK_INCLUDES=yes \
-	    DIRPRFX=${_dir}/ ${_t}
-.endfor
-.endfor
 .for _dir in lib/ncurses/ncurses lib/ncurses/ncursesw ${_libmagic} ${_jevents}
 .for _t in ${_obj} build-tools
 	${_+_}cd ${.CURDIR}/${_dir}; \

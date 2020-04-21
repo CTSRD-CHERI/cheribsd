@@ -124,9 +124,6 @@ void ktrfault(struct ktr_fault *);
 void ktrfaultend(struct ktr_faultend *);
 void ktrkevent(struct kevent *);
 void ktrstructarray(struct ktr_struct_array *, size_t);
-void ktrccall(struct ktr_ccall *);
-void ktrcreturn(struct ktr_creturn *);
-void ktrcexception(struct ktr_cexception *);
 void usage(void);
 
 #define	TIMESTAMP_NONE		0x0
@@ -538,15 +535,6 @@ main(int argc, char *argv[])
 		case KTR_STRUCT_ARRAY:
 			ktrstructarray((struct ktr_struct_array *)m, ktrlen);
 			break;
-		case KTR_CCALL:
-			ktrccall((struct ktr_ccall *)m);
-			break;
-		case KTR_CRETURN:
-			ktrcreturn((struct ktr_creturn *)m);
-			break;
-		case KTR_CEXCEPTION:
-			ktrcexception((struct ktr_cexception *)m);
-			break;
 		default:
 			printf("\n");
 			break;
@@ -667,15 +655,6 @@ dumpheader(struct ktr_header *kth, u_int sv_flags)
 		break;
 	case KTR_FAULTEND:
 		type = "PRET";
-		break;
-	case KTR_CCALL:
-		type = "CCAL";
-		break;
-	case KTR_CRETURN:
-		type = "CRET";
-		break;
-	case KTR_CEXCEPTION:
-		type = "CEXC";
 		break;
 	default:
 		sprintf(unknown, "UNKNOWN(%d)", kth->ktr_type);
@@ -2103,60 +2082,6 @@ ktrfaultend(struct ktr_faultend *ktr)
 	else
 		printf("<invalid=%d>", ktr->result);
 	printf("\n");
-}
-
-static void
-printcap(const char *name, struct cheri_serial *cap)
-{
-	static int screenwidth = 0;
-
-	printf("       %s: tag %u", name, cap->cs_tag);
-	if (cap->cs_tag) {
-		printf(" sealed %u perms %0*x type %x\n",
-		    cap->cs_sealed, cap->cs_permbits / 4, cap->cs_perms,
-		    cap->cs_tag);
-		printf("       base %016lx length %016lx offset %016lx\n",
-		    cap->cs_base, cap->cs_length, cap->cs_offset);
-	} else {
-		if (screenwidth == 0) {
-			struct winsize ws;
-
-			if (fancy &&
-			    ioctl(fileno(stderr), TIOCGWINSZ, &ws) != -1 &&
-			    ws.ws_col > 8)
-				screenwidth = ws.ws_col;
-			else
-				screenwidth = 80;
-		}
-		printf("\n");
-		hexdump(cap->cs_data, cap->cs_storage * 8, screenwidth);
-	}
-}
-
-void
-ktrccall(struct ktr_ccall *ktr)
-{
-
-	printf("method 0x%jx\n", ktr->ktr_method);
-	printcap("PCC", &ktr->ktr_pcc);
-	printcap("IDC", &ktr->ktr_idc);
-}
-
-void
-ktrcreturn(struct ktr_creturn *ktr)
-{
-
-	printf("integer return: %jd\n", (intmax_t)ktr->ktr_iret);
-	printcap("capability return", &ktr->ktr_cret);
-}
-
-void
-ktrcexception(struct ktr_cexception *ktr)
-{
-
-	/* XXXBD: Expand exception codes to names */
-	printf("ExcCode 0x%x RegNum %d\n", ktr->ktr_exccode, ktr->ktr_regnum);
-	printcap("faulting capability", &ktr->ktr_cap);
 }
 
 void

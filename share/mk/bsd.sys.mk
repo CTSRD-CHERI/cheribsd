@@ -199,9 +199,21 @@ CWARNFLAGS+=	-Wno-error=pass-failed
 .endif
 
 .if ${COMPILER_TYPE} == "clang" && ${COMPILER_VERSION} >= 100000
-CWARNFLAGS+=	-Wno-error=misleading-indentation
-# CXXWARNFLAGS+=	-Wno-error=deprecated-copy
-CXXWARNFLAGS+=	-Wno-deprecated-copy
+# CXXWARNFLAGS+=	-Wno-deprecated-copy
+CXXWARNFLAGS+=	-Wno-error=deprecated-copy
+.endif
+
+.if ${COMPILER_TYPE} == "clang" && ${COMPILER_VERSION} >= 110000
+CWARNFLAGS+=	-Wno-error=void-pointer-to-enum-cast
+CXXWARNFLAGS+=	-Wno-error=non-c-typedef-for-linkage
+# The void-pointer-to-enum-cast was introduced after first post-10.0 release
+# upstream merge, so to allow compilation to succeed with a compiler based on
+# the first merge and also those based on later merges, we have to ignore the
+# "unknown warning option '-Werror=void-pointer-to-enum-cast'" error.
+# FIXME: remove this after the next compiler flag day
+.if ${COMPILER_TYPE} == "clang" && ${COMPILER_VERSION} == 110000
+CWARNFLAGS+=	-Wno-unknown-warning-option
+.endif
 .endif
 
 # How to handle FreeBSD custom printf format specifiers.
@@ -218,16 +230,19 @@ CWARNFLAGS+=	-Wno-unknown-pragmas
 # This warning is utter nonsense
 CFLAGS+=	-Wno-format-zero-length
 
+.if ${COMPILER_TYPE} == "clang"
 # The headers provided by clang are incompatible with the FreeBSD headers.
 # If the version of clang is not one that has been patched to omit the
 # incompatible headers, we need to compile with -nobuiltininc and add the
-# resource dir to the end of the search paths. This ensures that headers
-# immintrin.h are still found but stddef.h, etc. are picked up from
-# FreeBSD.such as
-.if ${COMPILER_TYPE} == "clang" && ${MK_CLANG_BOOTSTRAP} == "no" && \
-    ${COMPILER_RESOURCE_DIR:Uunknown} != "unknown" && \
-    !defined(BOOTSTRAPPING)
+# resource dir to the end of the search paths. This ensures that headers such as
+# immintrin.h are still found but stddef.h, etc. are picked up from FreeBSD.
+#
+# XXX: This is a hack to support complete external installs of clang while
+# we work to synchronize our decleration guards with those in the clang tree.
+.if ${MK_CLANG_BOOTSTRAP:Uno} == "no" && \
+    ${COMPILER_RESOURCE_DIR} != "unknown" && !defined(BOOTSTRAPPING)
 CFLAGS+=-nobuiltininc -idirafter ${COMPILER_RESOURCE_DIR}/include
+.endif
 .endif
 
 CLANG_OPT_SMALL= -mstack-alignment=8 -mllvm -inline-threshold=3\

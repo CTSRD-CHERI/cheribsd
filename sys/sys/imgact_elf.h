@@ -39,7 +39,8 @@
 
 #define	AUXARGS_ENTRY(pos, id, val) \
     {(pos)->a_type = (id); (pos)->a_un.a_val = (val); (pos)++;}
-#if __has_feature(capabilities) && !defined(__ELF_CHERI)
+#if (__has_feature(capabilities) && !defined(__ELF_CHERI)) || \
+    (defined(__LP64__) && __ELF_WORD_SIZE == 32)
 #define	AUXARGS_ENTRY_PTR(pos, id, ptr) \
     {(pos)->a_type = (id); (pos)->a_un.a_val = (__cheri_addr vaddr_t)(ptr); (pos)++;}
 #else

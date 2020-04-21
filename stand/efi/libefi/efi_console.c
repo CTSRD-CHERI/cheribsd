@@ -377,9 +377,30 @@ efi_cons_respond(void *s __unused, const void *buf __unused,
 {
 }
 
+/*
+ * Set up conin/conout/coninex to make sure we have input ready.
+ */
 static void
 efi_cons_probe(struct console *cp)
 {
+	EFI_STATUS status;
+
+	conout = ST->ConOut;
+	conin = ST->ConIn;
+
+	/*
+	 * Call SetMode to work around buggy firmware.
+	 */
+	status = conout->SetMode(conout, conout->Mode->Mode);
+
+	if (coninex == NULL) {
+		status = BS->OpenProtocol(ST->ConsoleInHandle,
+		    &simple_input_ex_guid, (void **)&coninex,
+		    IH, NULL, EFI_OPEN_PROTOCOL_GET_PROTOCOL);
+		if (status != EFI_SUCCESS)
+			coninex = NULL;
+	}
+
 	cp->c_flags |= C_PRESENTIN | C_PRESENTOUT;
 }
 
@@ -807,11 +828,12 @@ efi_cons_update_mode(void)
 {
 	UINTN cols, rows;
 	const teken_attr_t *a;
+	teken_attr_t attr;
 	EFI_STATUS status;
-	char env[8];
+	char env[8], *ptr;
 
 	status = conout->QueryMode(conout, conout->Mode->Mode, &cols, &rows);
-	if (EFI_ERROR(status)) {
+	if (EFI_ERROR(status) || cols * rows == 0) {
 		cols = 80;
 		rows = 24;
 	}
@@ -842,27 +864,45 @@ efi_cons_update_mode(void)
 		tp.tp_row = rows;
 		tp.tp_col = cols;
 		buffer = malloc(rows * cols * sizeof(*buffer));
-		if (buffer == NULL)
-			return (false);
+		if (buffer != NULL) {
+			teken_set_winsize(&teken, &tp);
+			a = teken_get_defattr(&teken);
+			attr = *a;
 
-		teken_set_winsize(&teken, &tp);
-		a = teken_get_defattr(&teken);
+			/*
+			 * On first run, we set up the efi_set_colors()
+			 * callback. If the env is already set, we
+			 * pick up fg and bg color values from the environment.
+			 */
+			ptr = getenv("teken.fg_color");
+			if (ptr != NULL) {
+				attr.ta_fgcolor = strtol(ptr, NULL, 10);
+				ptr = getenv("teken.bg_color");
+				attr.ta_bgcolor = strtol(ptr, NULL, 10);
 
-		snprintf(env, sizeof(env), "%d", a->ta_fgcolor);
-		env_setenv("teken.fg_color", EV_VOLATILE, env, efi_set_colors,
-		    env_nounset);
-		snprintf(env, sizeof(env), "%d", a->ta_bgcolor);
-		env_setenv("teken.bg_color", EV_VOLATILE, env, efi_set_colors,
-		    env_nounset);
+				teken_set_defattr(&teken, &attr);
+			} else {
+				snprintf(env, sizeof(env), "%d",
+				    attr.ta_fgcolor);
+				env_setenv("teken.fg_color", EV_VOLATILE, env,
+				    efi_set_colors, env_nounset);
+				snprintf(env, sizeof(env), "%d",
+				    attr.ta_bgcolor);
+				env_setenv("teken.bg_color", EV_VOLATILE, env,
+				    efi_set_colors, env_nounset);
+			}
 
-		for (int row = 0; row < rows; row++) {
-			for (int col = 0; col < cols; col++) {
-				buffer[col + row * tp.tp_col].c = ' ';
-				buffer[col + row * tp.tp_col].a = *a;
+			for (int row = 0; row < rows; row++) {
+				for (int col = 0; col < cols; col++) {
+					buffer[col + row * tp.tp_col].c = ' ';
+					buffer[col + row * tp.tp_col].a = attr;
+				}
 			}
 		}
-	} else {
+	}
+
 #ifdef TERM_EMU
+	if (buffer == NULL) {
 		conout->SetAttribute(conout, EFI_TEXT_ATTR(DEFAULT_FGCOLOR,
 		    DEFAULT_BGCOLOR));
 		end_term();
@@ -870,8 +910,8 @@ efi_cons_update_mode(void)
 		curs_move(&curx, &cury, curx, cury);
 		fg_c = DEFAULT_FGCOLOR;
 		bg_c = DEFAULT_BGCOLOR;
-#endif
 	}
+#endif
 
 	snprintf(env, sizeof (env), "%u", (unsigned)rows);
 	setenv("LINES", env, 1);
@@ -886,18 +926,7 @@ efi_cons_init(int arg)
 {
 	EFI_STATUS status;
 
-	if (conin != NULL)
-		return (0);
-
-	conout = ST->ConOut;
-	conin = ST->ConIn;
-
 	conout->EnableCursor(conout, TRUE);
-	status = BS->OpenProtocol(ST->ConsoleInHandle, &simple_input_ex_guid,
-	    (void **)&coninex, IH, NULL, EFI_OPEN_PROTOCOL_GET_PROTOCOL);
-	if (status != EFI_SUCCESS)
-		coninex = NULL;
-
 	if (efi_cons_update_mode())
 		return (0);
 
@@ -1006,15 +1035,12 @@ efi_cons_putchar(int c)
 	 * Don't use Teken when we're doing pure serial, or a multiple console
 	 * with video "primary" because that's also serial.
 	 */
-	if ((mode & (RB_SERIAL | RB_MULTIPLE)) != 0) {
+	if ((mode & (RB_SERIAL | RB_MULTIPLE)) != 0 || buffer == NULL) {
 		input_byte(ch);
 		return;
 	}
 
-	if (buffer != NULL)
-		teken_input(&teken, &ch, sizeof (ch));
-	else
-		efi_cons_efiputchar(c);
+	teken_input(&teken, &ch, sizeof (ch));
 }
 
 static int

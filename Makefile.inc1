@@ -57,6 +57,8 @@ _MKSHOWCONFIG=	t
 SRCDIR?=	${.CURDIR}
 LOCALBASE?=	/usr/local
 
+.include "share/mk/src.tools.mk"
+
 # Cross toolchain changes must be in effect before bsd.compiler.mk
 # so that gets the right CC, and pass CROSS_TOOLCHAIN to submakes.
 .if defined(CROSS_TOOLCHAIN)
@@ -208,7 +210,7 @@ MK_SYSTEM_LINKER=	no
 .if defined(CROSS_TOOLCHAIN_PREFIX)
 CROSS_BINUTILS_PREFIX?=${CROSS_TOOLCHAIN_PREFIX}
 .endif
-XBINUTILS=	AS AR LD NM OBJCOPY RANLIB SIZE STRINGS
+XBINUTILS=	AS AR LD NM OBJCOPY RANLIB SIZE STRINGS STRIPBIN
 .for BINUTIL in ${XBINUTILS}
 .if defined(CROSS_BINUTILS_PREFIX) && \
     exists(${CROSS_BINUTILS_PREFIX}/${${BINUTIL}})
@@ -855,7 +857,7 @@ CROSSENV+=	CC="${XCC} ${CROSS_TARGET_FLAGS} ${XCFLAGS}"\
 		AS="${XAS}" AR="${XAR}" LD="${XLD}" LLVM_LINK="${XLLVM_LINK}" \
 		NM=${XNM} OBJCOPY="${XOBJCOPY}" \
 		RANLIB=${XRANLIB} STRINGS=${XSTRINGS} \
-		SIZE="${XSIZE}"
+		SIZE="${XSIZE}" STRIPBIN="${XSTRIPBIN}"
 
 .if defined(CROSS_BINUTILS_PREFIX) && exists(${CROSS_BINUTILS_PREFIX})
 # In the case of xdev-build tools, CROSS_BINUTILS_PREFIX won't be a
@@ -985,7 +987,8 @@ IMAKEENV+=	PATH=${TMPPATH}:${INSTALLTMP}
 
 # When generating install media, do not allow user and group information from
 # the build host to affect the contents of the distribution.
-.if make(distributeworld) || make(distrib-dirs) || make(distribution)
+.if make(distributeworld) || make(distrib-dirs) || make(distribution) || \
+    make(stageworld)
 DB_FROM_SRC=	yes
 .endif
 
@@ -1006,8 +1009,8 @@ MTREEFLAGS+=	-W
 INSTALLFLAGS+=	-h sha256
 .endif
 .if defined(DB_FROM_SRC) || defined(NO_ROOT)
-IMAKE_INSTALL=	INSTALL="install ${INSTALLFLAGS}"
-IMAKE_MTREE=	MTREE_CMD="mtree ${MTREEFLAGS}"
+IMAKE_INSTALL=	INSTALL="${INSTALL_CMD} ${INSTALLFLAGS}"
+IMAKE_MTREE=	MTREE_CMD="${MTREE_CMD} ${MTREEFLAGS}"
 .endif
 
 DESTDIR_MTREEFLAGS=	-deU
@@ -1019,12 +1022,12 @@ WORLDTMP_MTREEFLAGS=	-deUW
 # that are created by mtree to be owned by root/wheel.
 DESTDIR_MTREEFLAGS+=	-W
 .endif
-MTREE?=	mtree
+DISTR_MTREE=	${MTREE_CMD}
 .if ${BUILD_WITH_STRICT_TMPPATH} != 0
-MTREE=	${WORLDTMP}/legacy/usr/sbin/mtree
+DISTR_MTREE=	${WORLDTMP}/legacy/usr/sbin/mtree
 .endif
-WORLDTMP_MTREE=	${MTREE} ${WORLDTMP_MTREEFLAGS}
-DESTDIR_MTREE=	${MTREE} ${DESTDIR_MTREEFLAGS}
+WORLDTMP_MTREE=	${DISTR_MTREE} ${WORLDTMP_MTREEFLAGS}
+DESTDIR_MTREE=	${DISTR_MTREE} ${DESTDIR_MTREEFLAGS}
 
 # kernel stage
 KMAKEENV=	${WMAKEENV:NSYSROOT=*}
@@ -1056,17 +1059,9 @@ _sanity_check: .PHONY .MAKE
 # tree changes, particularly with respect to removing source files and
 # replacing generated files.  Handle these cases here in an ad-hoc fashion.
 _cleanobj_fast_depend_hack: .PHONY
+	@echo ">>> Deleting stale dependencies...";
+	sh ${.CURDIR}/tools/build/depend-cleanup.sh ${OBJTOP}
 # Date      SVN Rev  Syscalls/Changes
-# 20200310  r358851  rename of openmp's ittnotify_static.c to .cpp
-.for f in ittnotify_static
-	@if [ -e "${OBJTOP}/lib/libomp/.depend.${f}.pico" ] && \
-	    egrep -qw '${f}\.c' ${OBJTOP}/lib/libomp/.depend.${f}.pico; then \
-		echo "Removing stale dependencies for ${f}"; \
-		rm -f ${OBJTOP}/lib/libomp/.depend.${f}.* \
-		   ${OBJTOP}/obj-lib32/lib/libomp/.depend.${f}.* \
-		   ${LIBCOMPAT:D${LIBCOMPAT_OBJTOP}/lib/libomp/.depend.${f}.*}; \
-	fi
-.endfor
 # Syscall stubs rewritten in C and obsolete MD assembly implementations
 # 20191009  r353340  removal of opensolaris_atomic.S (also r353381)
 .if ${MACHINE} != i386
@@ -1094,47 +1089,6 @@ _cleanobj_fast_depend_hack: .PHONY
 	fi
 .endif
 .endfor
-# 20180604  r334626  brk sbrk
-# 20190916  r352703  shm_open
-.for f in brk sbrk shm_open
-	@if [ -e "${OBJTOP}/lib/libc/.depend.${f}.o" ] && \
-	    egrep -qw '${f}\.[sS]' ${OBJTOP}/lib/libc/.depend.${f}.o; then \
-		echo "Removing stale dependencies for ${f} syscall wrappers"; \
-		rm -f ${OBJTOP}/lib/libc/.depend.${f}.* \
-		   ${_LIBCOMPAT:D${LIBCOMPAT_OBJTOP}/lib/libc/.depend.${f}.*}; \
-	fi
-.endfor
-# 20181013  r339348  bcopy reimplemented as .c
-.for f in bcopy memcpy memmove
-	@if [ -e "${OBJTOP}/lib/libc/.depend.${f}.o" ] && \
-	    egrep -qw 'bcopy\.[sS]' ${OBJTOP}/lib/libc/.depend.${f}.o; then \
-		echo "Removing stale dependencies for bcopy"; \
-		rm -f ${OBJTOP}/lib/libc/.depend.${f}.* \
-		   ${_LIBCOMPAT:D${LIBCOMPAT_OBJTOP}/lib/libc/.depend.${f}.*}; \
-	fi
-.endfor
-# 20181115  r340463  bzero reimplemented as .c
-	@if [ -e "${OBJTOP}/lib/libc/.depend.bzero.o" ] && \
-	    egrep -qw 'bzero\.[sS]' ${OBJTOP}/lib/libc/.depend.bzero.o; then \
-		echo "Removing stale dependencies for bzero"; \
-		rm -f ${OBJTOP}/lib/libc/.depend.bzero.* \
-		   ${_LIBCOMPAT:D${LIBCOMPAT_OBJTOP}/lib/libc/.depend.bzero.*}; \
-	fi
-# 20181009 track migration from ntp's embedded libevent to updated one
-	@if [ -e "${OBJTOP}/usr.sbin/ntp/libntpevent/.depend.bufferevent_openssl.o" ] && \
-	    egrep -q 'contrib/ntp/sntp/libevent/bufferevent_openssl.c' \
-	    ${OBJTOP}/usr.sbin/ntp/libntpevent/.depend.bufferevent_openssl.o ; then \
-		echo "Removing stale libevent dependencies"; \
-		rm -f ${OBJTOP}/usr.sbin/ntp/libntpevent/.depend.*; \
-	fi
-
-# 20181209  r341759 track migration across wpa update
-	@if [ -e "${OBJTOP}/usr.sbin/wpa/wpa_supplicant/.depend.rrm.o" ] && \
-	    egrep -q 'src/ap/rrm.c' \
-	    ${OBJTOP}/usr.sbin/wpa/wpa_supplicant/.depend.rrm.o; then \
-		echo "Removing stale wpa dependencies"; \
-		rm -f ${OBJTOP}/usr.sbin/wpa/*/.depend*; \
-	fi
 
 .if ${TARGET:Mmips*}
 .for f in memset
@@ -1276,7 +1230,8 @@ _libraries:
 	@echo "--------------------------------------------------------------"
 	${_+_}cd ${.CURDIR}; \
 	    ${WMAKE} -DNO_FSCHG MK_HTML=no -DNO_LINT MK_MAN=no \
-	    MK_PROFILE=no MK_TESTS=no MK_TESTS_SUPPORT=${MK_TESTS} libraries
+	    MK_PROFILE=no MK_TESTS=no MK_TESTS_SUPPORT=${MK_TESTS_SUPPORT} \
+	    libraries
 everything: .PHONY
 	@echo
 	@echo "--------------------------------------------------------------"
@@ -1570,14 +1525,14 @@ distributeworld installworld stageworld installsysroot: _installcheck_world .PHO
 .endif
 .endif
 .if defined(NO_ROOT)
-	${IMAKEENV} ${MTREE} -C -f ${.CURDIR}/etc/mtree/BSD.root.dist | \
+	${IMAKEENV} ${DISTR_MTREE} -C -f ${.CURDIR}/etc/mtree/BSD.root.dist | \
 	    sed -e 's#^\./#./${dist}/#' >> ${METALOG}
-	${IMAKEENV} ${MTREE} -C -f ${.CURDIR}/etc/mtree/BSD.usr.dist | \
+	${IMAKEENV} ${DISTR_MTREE} -C -f ${.CURDIR}/etc/mtree/BSD.usr.dist | \
 	    sed -e 's#^\./#./${dist}/usr/#' >> ${METALOG}
-	${IMAKEENV} ${MTREE} -C -f ${.CURDIR}/etc/mtree/BSD.include.dist | \
+	${IMAKEENV} ${DISTR_MTREE} -C -f ${.CURDIR}/etc/mtree/BSD.include.dist | \
 	    sed -e 's#^\./#./${dist}/usr/include/#' >> ${METALOG}
 .if defined(_LIBCOMPAT)
-	${IMAKEENV} ${MTREE} -C -f ${.CURDIR}/etc/mtree/BSD.lib${libcompat}.dist | \
+	${IMAKEENV} ${DISTR_MTREE} -C -f ${.CURDIR}/etc/mtree/BSD.lib${libcompat}.dist | \
 	    sed -e 's#^\./#./${dist}/usr/#' >> ${METALOG}
 .endif
 .endif
@@ -1727,7 +1682,8 @@ distrib-dirs distribution: .MAKE .PHONY
 .if make(distribution)
 	${_+_}cd ${.CURDIR}; ${CROSSENV} PATH=${TMPPATH} \
 		${MAKE} -f Makefile.inc1 ${IMAKE_INSTALL} \
-		METALOG=${METALOG} MK_TESTS=no installconfig
+		METALOG=${METALOG} MK_TESTS=no \
+		MK_TESTS_SUPPORT=${MK_TESTS_SUPPORT} installconfig
 .endif
 .endif  # !defined(SYSROOT_ONLY)
 
@@ -2198,7 +2154,7 @@ sign-packages:	_pkgbootstrap .PHONY
 # Run test suite on installed world.
 #
 checkworld: .PHONY
-	@if [ ! -x "${LOCALBASE}/bin/kyua" ]; then \
+	@if [ ! -x "${LOCALBASE}/bin/kyua" ] && [ ! -x "/usr/bin/kyua" ]; then \
 		echo "You need kyua (devel/kyua) to run the test suite." | /usr/bin/fmt; \
 		exit 1; \
 	fi
@@ -2253,9 +2209,9 @@ update: .PHONY
 _host_bootstrap_libs=	lib/libmd lib/libsbuf
 .endif
 
-# libnv and libl are both requirements for config(8), which is an unconditional
+# libnv is a requirement for config(8), which is an unconditional
 # bootstrap-tool.
-_config_deps= lib/libnv usr.bin/lex/lib
+_config_deps= lib/libnv
 
 legacy: .PHONY
 .if ${BOOTSTRAPPING} < ${MINIMUM_SUPPORTED_OSREL} && ${BOOTSTRAPPING} != 0
@@ -2417,10 +2373,7 @@ _bootstrap_tools_links+=kbdcontrol
 .endif
 .endif
 
-_yacc=		lib/liby \
-		usr.bin/yacc
-
-${_bt}-usr.bin/yacc: ${_bt}-lib/liby
+_yacc=		usr.bin/yacc
 
 .if ${MK_BSNMP} != "no"
 _gensnmptree=	usr.sbin/bsnmpd/gensnmptree
@@ -2903,6 +2856,7 @@ NXBMAKE+=	XCC="${NXBOBJTOP}/tmp/usr/bin/cc" \
 		XCPP="${NXBOBJTOP}/tmp/usr/bin/cpp"
 .endif
 NXBMAKE+=	${NXBMAKEENV} ${MAKE} -f Makefile.inc1 ${NXBMAKEARGS} \
+		MACHINE=${MACHINE} MACHINE_ARCH=${MACHINE_ARCH} \
 		TARGET=${NXB_TARGET} TARGET_ARCH=${NXB_TARGET_ARCH} \
 		TARGET_TRIPLE=${MACHINE_TRIPLE:Q}
 # NXBDIRS is improperly based on MACHINE rather than NXB_TARGET.  Need to
@@ -3072,7 +3026,7 @@ lib/libcasper__L: lib/libnv__L
 lib/liblzma__L: lib/libthr__L
 lib/libzstd__L: lib/libthr__L
 
-_generic_libs=	${_cddl_lib} gnu/lib ${_kerberos5_lib} lib ${_secure_lib} usr.bin/lex/lib
+_generic_libs=	${_cddl_lib} gnu/lib ${_kerberos5_lib} lib ${_secure_lib}
 .if ${MK_IPFILTER} != "no"
 _generic_libs+=	sbin/ipf/libipf
 .endif
