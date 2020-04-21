@@ -112,6 +112,41 @@ sbready_compress(struct sockbuf *sb, struct mbuf *m0, struct mbuf *end)
 
 	for (m = m0; m != end; m = m->m_next) {
 		MPASS((m->m_flags & M_NOTREADY) == 0);
+		/*
+		 * NB: In sbcompress(), 'n' is the last mbuf in the
+		 * socket buffer and 'm' is the new mbuf being copied
+		 * into the trailing space of 'n'.  Here, the roles
+		 * are reversed and 'n' is the next mbuf after 'm'
+		 * that is being copied into the trailing space of
+		 * 'm'.
+		 */
+		n = m->m_next;
+#ifdef KERN_TLS
+		/* Try to coalesce adjacent ktls mbuf hdr/trailers. */
+		if ((n != NULL) && (n != end) && (m->m_flags & M_EOR) == 0 &&
+		    (m->m_flags & M_NOMAP) &&
+		    (n->m_flags & M_NOMAP) &&
+		    !mbuf_has_tls_session(m) &&
+		    !mbuf_has_tls_session(n)) {
+			struct mbuf_ext_pgs *mpgs, *npgs;
+			int hdr_len, trail_len;
+
+			mpgs = &m->m_ext_pgs;
+			npgs = &n->m_ext_pgs;
+			hdr_len = npgs->hdr_len;
+			trail_len = mpgs->trail_len;
+			if (trail_len != 0 && hdr_len != 0 &&
+			    trail_len + hdr_len <= MBUF_PEXT_TRAIL_LEN) {
+				/* copy n's header to m's trailer */
+				memcpy(&m->m_epg_trail[trail_len],
+				    n->m_epg_hdr, hdr_len);
+				mpgs->trail_len += hdr_len;
+				m->m_len += hdr_len;
+				npgs->hdr_len = 0;
+				n->m_len -= hdr_len;
+			}
+		}
+#endif
 
 		/* Compress small unmapped mbufs into plain mbufs. */
 		if ((m->m_flags & M_NOMAP) && m->m_len <= MLEN &&
@@ -124,15 +159,6 @@ sbready_compress(struct sockbuf *sb, struct mbuf *m0, struct mbuf *end)
 			}
 		}
 
-		/*
-		 * NB: In sbcompress(), 'n' is the last mbuf in the
-		 * socket buffer and 'm' is the new mbuf being copied
-		 * into the trailing space of 'n'.  Here, the roles
-		 * are reversed and 'n' is the next mbuf after 'm'
-		 * that is being copied into the trailing space of
-		 * 'm'.
-		 */
-		n = m->m_next;
 		while ((n != NULL) && (n != end) && (m->m_flags & M_EOR) == 0 &&
 		    M_WRITABLE(m) &&
 		    (m->m_flags & M_NOMAP) == 0 &&
@@ -188,13 +214,13 @@ sbready(struct sockbuf *sb, struct mbuf *m0, int count)
 		    ("%s: m %p !M_NOTREADY", __func__, m));
 		if ((m->m_flags & M_EXT) != 0 &&
 		    m->m_ext.ext_type == EXT_PGS) {
-			if (count < m->m_ext.ext_pgs->nrdy) {
-				m->m_ext.ext_pgs->nrdy -= count;
+			if (count < m->m_ext_pgs.nrdy) {
+				m->m_ext_pgs.nrdy -= count;
 				count = 0;
 				break;
 			}
-			count -= m->m_ext.ext_pgs->nrdy;
-			m->m_ext.ext_pgs->nrdy = 0;
+			count -= m->m_ext_pgs.nrdy;
+			m->m_ext_pgs.nrdy = 0;
 		} else
 			count--;
 
@@ -1075,11 +1101,11 @@ sbappendaddr(struct sockbuf *sb, const struct sockaddr *asa,
 
 void
 sbappendcontrol_locked(struct sockbuf *sb, struct mbuf *m0,
-    struct mbuf *control)
+    struct mbuf *control, int flags)
 {
 	struct mbuf *m, *mlast;
 
-	m_clrprotoflags(m0);
+	sbm_clrprotoflags(m0, flags);
 	m_last(control)->m_next = m0;
 
 	SBLASTRECORDCHK(sb);
@@ -1097,11 +1123,12 @@ sbappendcontrol_locked(struct sockbuf *sb, struct mbuf *m0,
 }
 
 void
-sbappendcontrol(struct sockbuf *sb, struct mbuf *m0, struct mbuf *control)
+sbappendcontrol(struct sockbuf *sb, struct mbuf *m0, struct mbuf *control,
+    int flags)
 {
 
 	SOCKBUF_LOCK(sb);
-	sbappendcontrol_locked(sb, m0, control);
+	sbappendcontrol_locked(sb, m0, control, flags);
 	SOCKBUF_UNLOCK(sb);
 }
 

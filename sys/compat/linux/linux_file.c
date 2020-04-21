@@ -610,8 +610,8 @@ linux_chmod(struct thread *td, struct linux_chmod_args *args)
 
 	LCONVPATHEXIST(td, args->path, &path);
 
-	error = kern_fchmodat(td, AT_FDCWD, UADDR2PTR(path), UIO_SYSSPACE,
-	    args->mode, 0);
+	error = kern_fchmodat(td, AT_FDCWD, (__cheri_tocap char *)path,
+	    UIO_SYSSPACE, args->mode, 0);
 	LFREEPATH(path);
 	return (error);
 }
@@ -626,8 +626,8 @@ linux_fchmodat(struct thread *td, struct linux_fchmodat_args *args)
 	dfd = (args->dfd == LINUX_AT_FDCWD) ? AT_FDCWD : args->dfd;
 	LCONVPATHEXIST_AT(td, args->filename, &path, dfd);
 
-	error = kern_fchmodat(td, dfd, UADDR2PTR(path), UIO_SYSSPACE,
-	    args->mode, 0);
+	error = kern_fchmodat(td, dfd, (__cheri_tocap char *)path,
+	    UIO_SYSSPACE, args->mode, 0);
 	LFREEPATH(path);
 	return (error);
 }

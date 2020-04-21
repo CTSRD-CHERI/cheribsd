@@ -414,6 +414,18 @@ options 	DDB_NUMSYM
 options 	GDB
 
 #
+# Trashes list pointers when they become invalid (i.e., the element is
+# removed from a list).  Relatively inexpensive to enable.
+#
+options 	QUEUE_MACRO_DEBUG_TRASH
+
+#
+# Stores information about the last caller to modify the list object
+# in the list object.  Requires additional memory overhead.
+#
+#options 	QUEUE_MACRO_DEBUG_TRACE
+
+#
 # SYSCTL_DEBUG enables a 'sysctl' debug tree that can be used to dump the
 # contents of the registered sysctl nodes on the console.  It is disabled by
 # default because it generates excessively verbose console output that can
@@ -1786,6 +1798,7 @@ device  	axphy		# Asix Semiconductor AX88x9x
 device  	bmtphy		# Broadcom BCM5201/BCM5202 and 3Com 3c905C
 device		bnxt		# Broadcom NetXtreme-C/NetXtreme-E
 device  	brgphy		# Broadcom BCM54xx/57xx 1000baseTX
+device  	cgem		# Cadence GEM Gigabit Ethernet
 device  	ciphy		# Cicada/Vitesse CS/VSC8xxx
 device  	e1000phy	# Marvell 88E1000 1000/100/10-BT
 device  	gentbi		# Generic 10-bit 1000BASE-{LX,SX} fiber ifaces

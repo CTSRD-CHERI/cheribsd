@@ -39,6 +39,7 @@
   * CHERI CHANGES END
   */
 
+#include <sys/param.h>
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
@@ -88,16 +89,20 @@ xstrdup(const char *str)
 }
 
 void *
-malloc_aligned(size_t size, size_t align)
+malloc_aligned(size_t size, size_t align, size_t offset)
 {
-	void *mem, *res;
+	char *mem, *res, *x;
 
+	offset &= align - 1;
 	if (align < sizeof(void *))
 		align = sizeof(void *);
 
-	mem = xmalloc(size + sizeof(void *) + align - 1);
-	res = __builtin_align_up((char *)mem + sizeof(void *), align);
-	*(void **)((uintptr_t)res - sizeof(void *)) = mem;
+	mem = xmalloc(size + 3 * align + offset);
+	x = __builtin_align_up(mem + sizeof(void *), align);
+	x += offset;
+	res = x;
+	x -= sizeof(void *);
+	memcpy(x, &mem, sizeof(mem));
 	return (res);
 }
 
@@ -111,6 +116,6 @@ free_aligned(void *ptr)
 		return;
 	x = (uintptr_t)ptr;
 	x -= sizeof(void *);
-	mem = *(void **)x;
+	memcpy(&mem, (void *)x, sizeof(mem));
 	free(mem);
 }

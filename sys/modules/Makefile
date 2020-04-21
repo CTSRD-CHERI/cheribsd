@@ -98,7 +98,6 @@ SUBDIR=	\
 	${_cpufreq} \
 	${_crypto} \
 	${_cryptodev} \
-	${_ctau} \
 	ctl \
 	${_cxgb} \
 	${_cxgbe} \
@@ -260,7 +259,6 @@ SUBDIR=	\
 	nfscl \
 	nfscommon \
 	nfsd \
-	nfslock \
 	nfslockd \
 	nfssvc \
 	nge \
@@ -279,6 +277,7 @@ SUBDIR=	\
 	${_padlock} \
 	${_padlock_rng} \
 	${_pccard} \
+	${_pchtherm} \
 	${_pcfclock} \
 	${_pf} \
 	${_pflog} \
@@ -686,6 +685,7 @@ _padlock=	padlock
 _padlock_rng=	padlock_rng
 _rdrand_rng=	rdrand_rng
 .endif
+_pchtherm = pchtherm
 _s3=		s3
 _sdhci_acpi=	sdhci_acpi
 _superio=	superio
@@ -746,9 +746,6 @@ _glxsb=		glxsb
 _pcfclock=	pcfclock
 _pst=		pst
 _sbni=		sbni
-.if ${MK_SOURCELESS_UCODE} != "no"
-_ctau=		ctau
-.endif
 .endif
 
 .if ${MACHINE_CPUARCH} == "arm"

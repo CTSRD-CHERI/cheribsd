@@ -111,7 +111,7 @@ CRUNCH_BUILDOPTS_netstat+=MK_NETGRAPH_SUPPORT=no -j1
 
 
 # Misc libs copied from recue/bsdbox:
-CRUNCH_LIBS+= -ledit -ll -ltermcapw
+CRUNCH_LIBS+= -ledit -ltermcapw
 
 ###################################################################
 # Programs from stock /bin

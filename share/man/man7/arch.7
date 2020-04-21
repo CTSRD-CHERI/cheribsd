@@ -26,7 +26,7 @@
 .\"
 .\" $FreeBSD$
 .\"
-.Dd March 8, 2020
+.Dd March 28, 2020
 .Dt ARCH 7
 .Os
 .Sh NAME
@@ -283,42 +283,17 @@ is 8 bytes on all supported architectures except i386.
 .It riscv64sf   Ta soft Ta soft, double precision
 .El
 .Ss Default Tool Chain
-.Fx uses a variety of tool chain components for the supported CPU
-architectures:
+.Fx
+uses
 .Xr clang 1
-and
+as the default compiler on all supported CPU architectures,
+LLVM's
 .Xr ld.lld 1
-provided by the base system,
-GNU
-.Xr gcc 1
-and Binutils
-.Xr ld 1 ,
-or an external toolchain compiler and linker provided by a port or package.
-This table shows the default tool chain for each architecture.
-.Bl -column -offset indent "Architecture" "Compiler" "Linker"
-.It Sy Architecture Ta Sy Compiler Ta Sy Linker
-.It aarch64     Ta Clang     Ta lld
-.It amd64       Ta Clang     Ta lld
-.It armv6       Ta Clang     Ta lld
-.It armv7       Ta Clang     Ta lld
-.It i386        Ta Clang     Ta lld
-.It mips        Ta GCC(1)    Ta GNU ld(1)
-.It mipsel      Ta GCC(1)    Ta GNU ld(1)
-.It mipselhf    Ta GCC(1)    Ta GNU ld(1)
-.It mipshf      Ta GCC(1)    Ta GNU ld(1)
-.It mipsn32     Ta GCC(1)    Ta GNU ld(1)
-.It mips64      Ta GCC(1)    Ta GNU ld(1)
-.It mips64el    Ta GCC(1)    Ta GNU ld(1)
-.It mips64elhf  Ta GCC(1)    Ta GNU ld(1)
-.It mips64hf    Ta GCC(1)    Ta GNU ld(1)
-.It powerpc     Ta Clang     Ta GNU ld 2.17.50
-.It powerpcspe  Ta Clang     Ta GNU ld 2.17.50
-.It powerpc64   Ta Clang     Ta lld
-.It riscv64     Ta Clang     Ta lld
-.It riscv64sf   Ta Clang     Ta lld
-.El
-.Pp
-(1) External toolchain provided by ports/packages.
+as the default linker, and
+ELF Tool Chain binary utilities such as
+.Xr objcopy 1
+and
+.Xr readelf 1 .
 .Ss MACHINE_ARCH vs MACHINE_CPUARCH vs MACHINE
 .Dv MACHINE_CPUARCH
 should be preferred in Makefiles when the generic

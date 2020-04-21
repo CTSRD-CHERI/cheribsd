@@ -1,7 +1,5 @@
 #! $FreeBSD$
 
-#.include <src.lua.mk>
-
 LUASRC?=	${SRCTOP}/contrib/lua/src
 .PATH: ${LUASRC}
 

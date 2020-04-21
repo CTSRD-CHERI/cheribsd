@@ -39,11 +39,10 @@
 #ifndef _COMPAT_FREEBSD64_FREEBSD64_H_
 #define _COMPAT_FREEBSD64_FREEBSD64_H_
 
+#include <sys/abi_compat.h>
 #include <sys/uio.h>
 #include <sys/proc.h>
 #include <sys/user.h>
-
-#define CP(src,dst,fld) do { (dst).fld = (src).fld; } while (0)
 
 struct jail64 {
 	uint32_t	version;

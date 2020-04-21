@@ -1,11 +1,12 @@
 # $FreeBSD$
 
-KYUA_SRCDIR=	${SRCTOP}/contrib/subrepo-kyua
+.include "${SRCTOP}/lib/kyua/Makefile.kyua"
+
 .PATH: ${KYUA_SRCDIR}
 
 .if ${MACHINE_ARCH} != "mips64"
 # FIXME: doesn't work as a purecap binary yet
-WANT_COMPAT=	64
+WANT_COMPAT=   64
 .include <bsd.compat.mk>
 .else
 WANT_CHERI=none
@@ -37,8 +38,11 @@ CFLAGS+=	-Wno-deprecated-declarations
 
 FILESGROUPS=	DOCS EXAMPLES MISC STORE
 
-CONFS=		kyua.conf
+# Install a minimal default config that uses the 'tests' user.
+# The examples config is not appropriate for general use.
+CONFS=		kyua.conf-default
 CONFSDIR=	${KYUA_CONFDIR}
+CONFSNAME=	kyua.conf
 
 DOCS=		AUTHORS CONTRIBUTORS LICENSE
 DOCSDIR=	${KYUA_DOCDIR}
@@ -56,7 +60,7 @@ STOREDIR=	${KYUA_STOREDIR}
 .PATH:		${KYUA_SRCDIR}/store
 
 CLEANFILES+=	${MAN}
-.PATH: ${SRCTOP}/contrib/subrepo-kyua/doc
+.PATH: ${KYUA_SRCDIR}/doc
 .for man in ${MAN}
 ${man}: ${man}.in
 	sh ${KYUA_SRCDIR}/doc/manbuild.sh \
@@ -71,5 +75,4 @@ ${man}: ${man}.in
 	    ${.ALLSRC} ${.TARGET}
 .endfor
 
-.include "${SRCTOP}/lib/kyua/Makefile.kyua"
 .include <bsd.prog.mk>

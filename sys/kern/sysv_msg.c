@@ -65,6 +65,9 @@ __FBSDID("$FreeBSD$");
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/sysproto.h>
+#if defined(COMPAT_CHERIABI) || defined(COMPAT_FREEBSD32) || defined(COMPAT_FREEBSD64)
+#include <sys/abi_compat.h>
+#endif
 #include <sys/kernel.h>
 #include <sys/priv.h>
 #include <sys/proc.h>
@@ -84,10 +87,6 @@ __FBSDID("$FreeBSD$");
 
 #include <security/audit/audit.h>
 #include <security/mac/mac_framework.h>
-
-#if defined(COMPAT_CHERIABI) || defined(COMPAT_FREEBSD32) || defined(COMPAT_FREEBSD64)
-#define CP(src,dst,fld) do { (dst).fld = (src).fld; } while (0)
-#endif
 
 FEATURE(sysv_msg, "System V message queues support");
 

@@ -5,7 +5,7 @@ INTERNALLIB=
 
 LIBADD=		lua
 
-.PATH: ${SRCTOP}/contrib/subrepo-lutok
+.PATH: ${SRCTOP}/contrib/lutok
 SRCS=	c_gate.cpp		\
 	debug.cpp		\
 	exceptions.cpp		\
@@ -13,7 +13,7 @@ SRCS=	c_gate.cpp		\
 	stack_cleaner.cpp	\
 	state.cpp
 
-CFLAGS+=	-I${SRCTOP}/contrib/subrepo-lutok/include \
+CFLAGS+=	-I${SRCTOP}/contrib/lutok/include \
 		-I${SRCTOP}/lib/liblua	\
 		-I${SRCTOP}/contrib/lua/src
 

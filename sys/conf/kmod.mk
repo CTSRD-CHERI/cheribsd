@@ -94,6 +94,16 @@ WERROR?=	-Wno-error
 WERROR?=	-Werror
 .endif
 
+LINUXKPI_GENSRCS+= \
+	bus_if.h \
+	device_if.h \
+	pci_if.h \
+	pci_iov_if.h \
+	vnode_if.h \
+	usb_if.h \
+	opt_usb.h \
+	opt_stack.h
+
 CFLAGS+=	${WERROR}
 CFLAGS+=	-D_KERNEL
 CFLAGS+=	-DKLD_MODULE
@@ -123,6 +133,13 @@ CFLAGS.gcc+= --param large-function-growth=1000
 
 # Disallow common variables, and if we end up with commons from
 # somewhere unexpected, allocate storage for them in the module itself.
+#
+# -fno-common is the default for src builds, but this should be left in place
+# until at least we catch up to GCC10/LLVM11 or otherwise enable -fno-common
+# in <bsd.sys.mk> instead.  For now, we will have duplicate -fno-common in
+# CFLAGS for in-tree module builds as they will also pick it up from
+# share/mk/src.sys.mk, but the following is important for out-of-tree modules
+# (e.g. ports).
 CFLAGS+=	-fno-common
 LDFLAGS+=	-d -warn-common
 
@@ -508,13 +525,13 @@ assym.inc: ${SYSDIR}/kern/genassym.sh
 	sh ${SYSDIR}/kern/genassym.sh genassym.o > ${.TARGET}
 genassym.o: ${SYSDIR}/${MACHINE}/${MACHINE}/genassym.c offset.inc
 genassym.o: ${SRCS:Mopt_*.h}
-	${CC} -c ${CFLAGS:N-flto:N-fno-common} \
+	${CC} -c ${CFLAGS:N-flto:N-fno-common} -fcommon \
 	    ${SYSDIR}/${MACHINE}/${MACHINE}/genassym.c
 offset.inc: ${SYSDIR}/kern/genoffset.sh genoffset.o
 	sh ${SYSDIR}/kern/genoffset.sh genoffset.o > ${.TARGET}
 genoffset.o: ${SYSDIR}/kern/genoffset.c
 genoffset.o: ${SRCS:Mopt_*.h}
-	${CC} -c ${CFLAGS:N-flto:N-fno-common} \
+	${CC} -c ${CFLAGS:N-flto:N-fno-common} -fcommon \
 	    ${SYSDIR}/kern/genoffset.c
 
 CLEANDEPENDFILES+=	${_ILINKS}

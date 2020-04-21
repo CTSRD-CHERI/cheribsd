@@ -242,18 +242,18 @@ _LIBRARIES+= \
 .endif
 
 .if ${MK_BEARSSL} == "yes"
-_INTERNALLIBS+= \
+_LIBRARIES+= \
 		bearssl \
 		secureboot \
 
-LIBBEARSSL?=	${LIBBEARSSLDIR}/libbearssl${PIE_SUFFIX}.a
-LIBSECUREBOOT?=	${LIBSECUREBOOTDIR}/libsecureboot${PIE_SUFFIX}.a
+LIBBEARSSL?=	${LIBBEARSSLDIR}/libbearssl.a
+LIBSECUREBOOT?=	${LIBSECUREBOOTDIR}/libsecureboot.a
 .endif
 
 .if ${MK_VERIEXEC} == "yes"
-_INTERNALLIBS+= veriexec
+_LIBRARIES+= veriexec
 
-LIBVERIEXEC?=	${LIBVERIEXECDIR}/libveriexec${PIE_SUFFIX}.a
+LIBVERIEXEC?=	${LIBVERIEXECDIR}/libveriexec.a
 .endif
 
 # Each library's LIBADD needs to be duplicated here for static linkage of
@@ -283,8 +283,12 @@ _DP_bsnmp=	crypto
 _DP_geom=	bsdxml sbuf
 _DP_cam=	sbuf
 _DP_kvm=	elf
-_DP_kyua_cli=	lutok kyua_utils
-_DP_kyua_store=	sqlite3
+_DP_kyua_cli=		kyua_drivers kyua_engine kyua_model kyua_store kyua_utils
+_DP_kyua_drivers=	kyua_model kyua_engine kyua_store
+_DP_kyua_engine=	lutok kyua_utils
+_DP_kyua_model=		lutok
+_DP_kyua_utils=		lutok
+_DP_kyua_store=		kyua_model kyua_utils sqlite3
 _DP_casper=	nv
 _DP_cap_dns=	nv
 _DP_cap_fileargs=	nv

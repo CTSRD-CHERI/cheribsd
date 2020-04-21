@@ -87,9 +87,6 @@ can_use_tight_pcc_bounds(const struct Struct_Obj_Entry *defobj)
 	case DF_MIPS_CHERI_ABI_PLT:
 	case DF_MIPS_CHERI_ABI_FNDESC:
 		return true;
-#ifndef __CHERI_CAPABILITY_TABLE__
-	case DF_MIPS_CHERI_ABI_LEGACY:
-#endif
 	case DF_MIPS_CHERI_ABI_PCREL:
 		return false;
 	default:
@@ -107,8 +104,8 @@ allocate_function_pointer_trampoline(dlfunc_t target_func, const Obj_Entry *obj)
 static inline dlfunc_t
 _make_rtld_function_pointer(dlfunc_t target_func) {
 	extern struct Struct_Obj_Entry obj_rtld;
-#if !defined(__CHERI_CAPABILITY_TABLE__) || __CHERI_CAPABILITY_TABLE__ == 3
-	/* PC-rel/legacy */
+#if __CHERI_CAPABILITY_TABLE__ == 3
+	/* PC-relative */
 	dbg_assert(!can_use_tight_pcc_bounds(&obj_rtld));
 	return target_func;
 #else
@@ -118,8 +115,8 @@ _make_rtld_function_pointer(dlfunc_t target_func) {
 #endif
 }
 
-#if !defined(__CHERI_CAPABILITY_TABLE__) || __CHERI_CAPABILITY_TABLE__ == 3
-/* Legacy/pc-rel can just use &func since there is no need for a trampoline */
+#if __CHERI_CAPABILITY_TABLE__ == 3
+/* PC-relative can just use &func since there is no need for a trampoline */
 #define _make_local_only_fn_pointer(func) (dlfunc_t)(&func)
 #else
 /*
@@ -153,16 +150,6 @@ make_code_pointer(const Elf_Sym *def, const struct Struct_Obj_Entry *defobj,
     bool tight_bounds, size_t addend)
 {
 	const void *ret = get_codesegment(defobj) + def->st_value;
-#ifndef __CHERI_CAPABILITY_TABLE__
-	if (defobj->cheri_captable_abi == DF_MIPS_CHERI_ABI_LEGACY) {
-		/*
-		 * Legacy abi: we need to give it full address space range
-		 * (including the full permissions mask) to support legacy binaries.
-		 */
-		assert(cheri_getbase(cheri_getpcc()) == 0);
-		return (dlfunc_t)cheri_setaddress(cheri_getpcc(), (vaddr_t)ret);
-	}
-#endif
 	/* Remove store and seal permissions */
 	ret = cheri_clearperm(ret, FUNC_PTR_REMOVE_PERMS);
 	dbg_assert(defobj->cheri_captable_abi != DF_MIPS_CHERI_ABI_LEGACY);
@@ -253,7 +240,6 @@ static inline void
 _call_init_fini_array_pointer(const struct Struct_Obj_Entry *obj, vaddr_t target, int argc, char** argv, char** env) {
 
 	InitArrFunc func = (InitArrFunc)vaddr_to_code_pointer(obj, target);
-#if defined(__CHERI_CAPABILITY_TABLE__)
 	/* Set the target object $cgp when calling the pointer:
 	 * Note: we use target_cgp_for_func() to support per-function captable */
 	const void *init_fini_cgp = target_cgp_for_func(obj, (dlfunc_t)func);
@@ -274,9 +260,6 @@ _call_init_fini_array_pointer(const struct Struct_Obj_Entry *obj, vaddr_t target
 	func(argc, argv, env);
 	/* Ensure that the function call is not reordered before/after asm */
 	__compiler_membar();
-#else
-	func(argc, argv, env);
-#endif
 }
 
 #define call_init_array_pointer(obj, target)			\

@@ -76,7 +76,7 @@ NON_GPROF_ENTRY(__vdso_getcpu)
 	.previous
 #endif
 
-	.section .eh_frame,"a",@progbits
+	.section .eh_frame,"a",@unwind /* LLVM expects SHT_X86_64_UNWIND = 0x70000001 */
 .LSTARTFRAMEDLSI0:
 	.long .LENDCIEDLSI0-.LSTARTCIEDLSI0
 .LSTARTCIEDLSI0:
