@@ -71,13 +71,6 @@ SYMLINKS=	../..${BINDIR}/${PROG} ${LIBEXECDIR}/${PROG}
 MLINKS?=	rtld.1 ld-elf.so.1.1 \
 		rtld.1 ld.so.1
 
-.if ${MACHINE_CPUARCH} == "amd64" || ${MACHINE_CPUARCH} == "i386"
-CFLAGS+=	-fvisibility=hidden
-.endif
-.if ${MACHINE_CPUARCH} == "mips"
-CFLAGS.reloc.c+=-fno-jump-tables
-CFLAGS+=	-DTLS_USE_SYSARCH=1
-.endif
 CFLAGS+=	-fpic -DPIC $(DEBUG)
 # Since we pass -shared, we shouldn't also pass -pie
 MK_PIE:=	no

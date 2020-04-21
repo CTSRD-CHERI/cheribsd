@@ -33,11 +33,8 @@
 #include <sys/param.h>
 #include <sys/kernel.h>
 #include <sys/proc.h>
-#include <sys/syscallsubr.h>
 #include <sys/sysctl.h>
 #include <sys/sysent.h>
-#include <sys/sysproto.h>
-#include <sys/unistd.h>
 
 #include <ddb/ddb.h>
 #include <sys/kdb.h>
@@ -49,14 +46,7 @@
 #include <machine/pcb.h>
 #include <machine/proc.h>
 #include <machine/sysarch.h>
-#include <machine/md_var.h>
-
-#include <vm/vm.h>
-#include <vm/vm_param.h>
-#include <vm/vm_extern.h>
-#include <vm/vm_page.h>
-#include <vm/vm_pageout.h>
-#include <vm/vm_map.h>
+#include <machine/vmparam.h>
 
 CTASSERT(sizeof(void * __capability) == CHERICAP_SIZE);
 /* 33 capability registers + capcause + capvalid + padding. */

@@ -149,19 +149,11 @@ extern u_int	security_cheri_bound_legacy_capabilities;
  * Functions exposed to machine-independent code that must interact with
  * CHERI-specific features; e.g., ktrace.
  */
-struct ktr_ccall;
-struct ktr_creturn;
-struct ktr_cexception;
-struct thr_param_c;
 struct trapframe;
 void	colocation_get_peer(struct thread *td, struct thread **peertdp);
 void	colocation_thread_exit(struct thread *td);
 void	colocation_unborrow(struct thread *td, struct trapframe **trapframep);
 bool	colocation_trap_in_switcher(struct thread *td, struct trapframe *trapframe);
-void	ktrccall_mdfill(struct pcb *pcb, struct ktr_ccall *kc);
-void	ktrcreturn_mdfill(struct pcb *pcb, struct ktr_creturn *kr);
-void	ktrcexception_mdfill(struct trapframe *frame,
-	    struct ktr_cexception *ke);
 void	db_print_scb_td(struct thread *td);
 #endif /* !_KERNEL */
 
