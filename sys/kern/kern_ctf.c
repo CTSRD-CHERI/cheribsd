@@ -100,7 +100,13 @@ link_elf_ctf_get(linker_file_t lf, linker_ctf_t *lc)
 	 */
 	ef->ctfcnt = -1;
 
-	NDINIT(&nd, LOOKUP, FOLLOW, UIO_SYSSPACE, lf->pathname, td);
+	char * pathname =
+#ifdef __mips__
+ 	    strcmp(lf->pathname,"kernel") == 0 ? "/boot/kernel/kernel" :
+#endif
+	    lf->pathname;
+
+	NDINIT(&nd, LOOKUP, FOLLOW, UIO_SYSSPACE, pathname, td);
 	flags = FREAD;
 	error = vn_open(&nd, &flags, 0, NULL);
 	if (error)
