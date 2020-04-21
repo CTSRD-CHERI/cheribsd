@@ -34,7 +34,7 @@
 
 #define CHERI_INIT_GLOBALS_GDC_ONLY
 #include <cheri_init_globals.h>
-#ifndef CHERI_INIT_GLOBALS_SUPPORTS_CONSTANT_FLAG
+#if !defined(CHERI_INIT_GLOBALS_VERSION) || CHERI_INIT_GLOBALS_VERSION < 4
 #error "cheri_init_globals.h is outdated. Please update LLVM"
 #endif
 

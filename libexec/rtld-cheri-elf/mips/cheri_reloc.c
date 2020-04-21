@@ -45,6 +45,9 @@ __FBSDID("$FreeBSD$");
 /* The clang-provided header is not warning-clean: */
 __unused static void cheri_init_globals(void);
 #include <cheri_init_globals.h>
+#if !defined(CHERI_INIT_GLOBALS_VERSION) || CHERI_INIT_GLOBALS_VERSION < 4
+#error "cheri_init_globals.h is outdated. Please update LLVM"
+#endif
 
 #include "debug.h"
 #include "rtld.h"
@@ -58,19 +61,13 @@ void _do___caprelocs(const struct capreloc *start_relocs,
     const struct capreloc * stop_relocs, void* gdc, const void* pcc,
     vaddr_t base_addr, bool tight_pcc_bounds)
 {
-#if defined(CHERI_INIT_GLOBALS_VERSION) && CHERI_INIT_GLOBALS_VERSION >= 2
 	cheri_init_globals_impl(start_relocs, stop_relocs, /*data_cap=*/gdc,
 	    /*code_cap=*/pcc, /*rodata_cap=*/pcc,
 	    /*tight_code_bounds=*/tight_pcc_bounds, base_addr);
-#else
-#error "LLVM cheri_init_globals.h is too old, please update LLVM"
-#endif
 }
 
 /*
- * XXXAR: We can't use cheri_init_globals since that uses dla and
- * therefore would cause text relocations. Instead use the PIC_LOAD_CODE_PTR()
- * macro in the assembly and pass in __start_cap_relocs/__stop_cap_relocs.
+ * The assembly startup code passes __start_cap_relocs/__stop_cap_relocs.
  *
  * TODO: We could also parse the DT_CHERI___CAPRELOCS and DT_CHERI___CAPRELOCSSZ
  * in _rtld_relocate_nonplt_self and save that to the stack instead. Might
@@ -85,13 +82,6 @@ _rtld_do___caprelocs_self(const struct capreloc *start_relocs,
 	//  from ASM if it was built for the PLT ABI
 
 	bool relative_relocs = cheri_flags & DF_MIPS_CHERI_RELATIVE_CAPRELOCS;
-#if CHERI_INIT_GLOBALS_VERSION < 3
-#pragma message("Please update LLVM!")
-	if (relative_relocs) {
-		/* Not possible with the old <cheri_init_globals.h> */
-		__builtin_trap();
-	}
-#endif
 	// If the binary includes the RELATIVE_CAPRELOCS dynamic flag we have
 	// to add getaddr(relocbase) to every __cap_reloc location and object.
 	vaddr_t base_addr = relative_relocs ? cheri_getaddress(relocbase) : 0;
@@ -129,18 +119,11 @@ process___cap_relocs(Obj_Entry* obj)
 	 * In the non-relative case we do not need to add the base address since
 	 * that value will already have been added by the relocation processing.
 	 */
-#if CHERI_INIT_GLOBALS_VERSION < 3
-#pragma message("Please update LLVM!")
-	if (obj->relative_cap_relocs) {
-		rtld_fatal("Not possible with the old <cheri_init_globals.h>");
-	}
-#else
 	if (!obj->relative_cap_relocs) {
 		rtld_fdprintf(STDERR_FILENO,
 		    "File '%s' still uses old __cap_relocs. Please recompile "
 		    "it with a newer toolchain.\n", obj->path);
 	}
-#endif
 	// If the binary includes the RELATIVE_CAPRELOCS dynamic flag we have
 	// to add getaddr(relocbase) to every __cap_reloc location and object.
 	vaddr_t base_addr = obj->relative_cap_relocs ? cheri_getaddress(obj->relocbase) : 0;
