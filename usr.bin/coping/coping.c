@@ -31,8 +31,8 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
-#include <machine/param.h>
 #include <machine/sysarch.h>
+#include <sys/param.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <ctype.h>
@@ -43,13 +43,13 @@ __FBSDID("$FreeBSD$");
 #include <stdlib.h>
 #include <unistd.h>
 
-static long long buf[1000000];
+static long long buf[MAXBSIZE / sizeof(long long)];
 
 static void
 usage(void)
 {
 
-	fprintf(stderr, "usage: coping [-v] service-name\n");
+	fprintf(stderr, "usage: coping [-kv] service-name\n");
 	exit(0);
 }
 
@@ -59,11 +59,14 @@ main(int argc, char **argv)
 	void * __capability switcher_code;
 	void * __capability switcher_data;
 	void * __capability lookedup;
-	bool vflag = false;
+	bool kflag = false, vflag = false;
 	int ch, error;
 
-	while ((ch = getopt(argc, argv, "v")) != -1) {
+	while ((ch = getopt(argc, argv, "kv")) != -1) {
 		switch (ch) {
+		case 'k':
+			kflag = true;
+			break;
 		case 'v':
 			vflag = true;
 			break;
@@ -101,7 +104,10 @@ main(int argc, char **argv)
 	buf[0] = 42;
 
 	for (;;) {
-		error = cocall(switcher_code, switcher_data, lookedup, buf, sizeof(buf));
+		if (kflag)
+			error = cocall_slow(switcher_code, switcher_data, lookedup, buf, sizeof(buf));
+		else
+			error = cocall(switcher_code, switcher_data, lookedup, buf, sizeof(buf));
 		if (error != 0)
 			warn("cocall");
 

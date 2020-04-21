@@ -37,6 +37,7 @@
 .Nd colocated ping responder
 .Sh SYNOPSIS
 .Nm
+.Op Fl k
 .Op Fl v
 .Op Fl x
 .Ar target-name
@@ -50,6 +51,11 @@ and
 .Pp
 The following options are available:
 .Bl -tag -width ".Fl v"
+.It Fl k
+Use
+.Xr coaccept_slow 2
+instead of
+.Xr coaccept 2 .
 .It Fl v
 Be verbose.
 .It Fl x

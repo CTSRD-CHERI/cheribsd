@@ -37,6 +37,7 @@
 .Nd colocated ping
 .Sh SYNOPSIS
 .Nm
+.Op Fl k
 .Op Fl v
 .Ar target-name
 .Sh DESCRIPTION
@@ -47,6 +48,11 @@ utility is used to send colocated pings; usually used with
 .Pp
 The following options are available:
 .Bl -tag -width ".Fl v"
+.It Fl k
+Use
+.Xr cocall_slow 2
+instead of
+.Xr cocall 2 .
 .It Fl v
 Be verbose.
 .El

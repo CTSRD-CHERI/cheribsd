@@ -31,8 +31,8 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
-#include <machine/param.h>
 #include <machine/sysarch.h>
+#include <sys/param.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <ctype.h>
@@ -42,13 +42,13 @@ __FBSDID("$FreeBSD$");
 #include <stdlib.h>
 #include <unistd.h>
 
-static long long buf[1000000];
+static long long buf[MAXBSIZE / sizeof(long long)];
 
 static void
 usage(void)
 {
 
-	fprintf(stderr, "usage: copong [-xv] service-name\n");
+	fprintf(stderr, "usage: copong [-kxv] service-name\n");
 	exit(0);
 }
 
@@ -59,11 +59,14 @@ main(int argc, char **argv)
 	void * __capability switcher_data;
 	void * __capability cookie;
 	uint64_t *halfcookie;
-	bool vflag = false, xflag = false;
+	bool kflag = false, vflag = false, xflag = false;
 	int ch, error;
 
-	while ((ch = getopt(argc, argv, "xv")) != -1) {
+	while ((ch = getopt(argc, argv, "kxv")) != -1) {
 		switch (ch) {
+		case 'k':
+			kflag = true;
+			break;
 		case 'x':
 			xflag = true;
 			break;
@@ -97,7 +100,10 @@ main(int argc, char **argv)
 		fprintf(stderr, "%s: coaccepting...\n", getprogname());
 
 	for (;;) {
-		error = coaccept(switcher_code, switcher_data, &cookie, buf, sizeof(buf));
+		if (kflag)
+			error = coaccept_slow(switcher_code, switcher_data, &cookie, buf, sizeof(buf));
+		else
+			error = coaccept(switcher_code, switcher_data, &cookie, buf, sizeof(buf));
 		if (error != 0)
 			warn("coaccept");
 		if (vflag) {
