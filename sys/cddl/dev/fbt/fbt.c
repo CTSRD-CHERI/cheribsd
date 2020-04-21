@@ -960,7 +960,8 @@ fbt_type_name(linker_ctf_t *lc, ctf_id_t type, char *buf, size_t len)
 				ctf_decl_sprintf(&cd, "(");
 				lp = -1;
 			}
-
+// TODO(nicomazz): if it is a pointer, and the size is 128, then add capability.
+// Actually, void  * capability is seen as a pointer to an 0 bits integer
 			switch (cdp->cd_kind) {
 			case CTF_K_INTEGER:
 			case CTF_K_FLOAT:
