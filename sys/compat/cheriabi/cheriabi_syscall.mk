@@ -369,6 +369,8 @@ MIASM =  \
 	cheriabi_ppoll.o \
 	cheriabi_futimens.o \
 	cheriabi_utimensat.o \
+	cheriabi_cocall_slow.o \
+	cheriabi_coaccept_slow.o \
 	fdatasync.o \
 	cheriabi_fstat.o \
 	cheriabi_fstatat.o \

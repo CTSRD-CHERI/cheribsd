@@ -1361,6 +1361,20 @@ struct cheriabi_utimensat_args {
 	char times_l_[PADL_(const struct timespec * __capability)]; const struct timespec * __capability times; char times_r_[PADR_(const struct timespec * __capability)];
 	char flag_l_[PADL_(int)]; int flag; char flag_r_[PADR_(int)];
 };
+struct cheriabi_cocall_slow_args {
+	char code_l_[PADL_(void * __capability __capability)]; void * __capability __capability code; char code_r_[PADR_(void * __capability __capability)];
+	char data_l_[PADL_(void * __capability __capability)]; void * __capability __capability data; char data_r_[PADR_(void * __capability __capability)];
+	char target_l_[PADL_(void * __capability __capability)]; void * __capability __capability target; char target_r_[PADR_(void * __capability __capability)];
+	char buf_l_[PADL_(void * __capability __capability)]; void * __capability __capability buf; char buf_r_[PADR_(void * __capability __capability)];
+	char len_l_[PADL_(size_t)]; size_t len; char len_r_[PADR_(size_t)];
+};
+struct cheriabi_coaccept_slow_args {
+	char code_l_[PADL_(void * __capability __capability)]; void * __capability __capability code; char code_r_[PADR_(void * __capability __capability)];
+	char data_l_[PADL_(void * __capability __capability)]; void * __capability __capability data; char data_r_[PADR_(void * __capability __capability)];
+	char cookiep_l_[PADL_(void * __capability __capability * __capability)]; void * __capability __capability * __capability cookiep; char cookiep_r_[PADR_(void * __capability __capability * __capability)];
+	char buf_l_[PADL_(void * __capability __capability)]; void * __capability __capability buf; char buf_r_[PADR_(void * __capability __capability)];
+	char len_l_[PADL_(size_t)]; size_t len; char len_r_[PADR_(size_t)];
+};
 struct cheriabi_fstat_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
 	char sb_l_[PADL_(struct stat * __capability)]; struct stat * __capability sb; char sb_r_[PADR_(struct stat * __capability)];
@@ -1774,6 +1788,8 @@ int	cheriabi_procctl(struct thread *, struct cheriabi_procctl_args *);
 int	cheriabi_ppoll(struct thread *, struct cheriabi_ppoll_args *);
 int	cheriabi_futimens(struct thread *, struct cheriabi_futimens_args *);
 int	cheriabi_utimensat(struct thread *, struct cheriabi_utimensat_args *);
+int	cheriabi_cocall_slow(struct thread *, struct cheriabi_cocall_slow_args *);
+int	cheriabi_coaccept_slow(struct thread *, struct cheriabi_coaccept_slow_args *);
 int	cheriabi_fstat(struct thread *, struct cheriabi_fstat_args *);
 int	cheriabi_fstatat(struct thread *, struct cheriabi_fstatat_args *);
 int	cheriabi_fhstat(struct thread *, struct cheriabi_fhstat_args *);
@@ -2116,6 +2132,8 @@ int	cheriabi___realpathat(struct thread *, struct cheriabi___realpathat_args *);
 #define	CHERIABI_SYS_AUE_cheriabi_ppoll	AUE_POLL
 #define	CHERIABI_SYS_AUE_cheriabi_futimens	AUE_FUTIMES
 #define	CHERIABI_SYS_AUE_cheriabi_utimensat	AUE_FUTIMESAT
+#define	CHERIABI_SYS_AUE_cheriabi_cocall_slow	AUE_NULL
+#define	CHERIABI_SYS_AUE_cheriabi_coaccept_slow	AUE_NULL
 #define	CHERIABI_SYS_AUE_cheriabi_fstat	AUE_FSTAT
 #define	CHERIABI_SYS_AUE_cheriabi_fstatat	AUE_FSTATAT
 #define	CHERIABI_SYS_AUE_cheriabi_fhstat	AUE_FHSTAT

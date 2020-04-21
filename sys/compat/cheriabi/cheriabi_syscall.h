@@ -490,8 +490,8 @@
 #define	CHERIABI_SYS_cheriabi_ppoll	545
 #define	CHERIABI_SYS_cheriabi_futimens	546
 #define	CHERIABI_SYS_cheriabi_utimensat	547
-				/* 548 is obsolete numa_getaffinity */
-				/* 549 is obsolete numa_setaffinity */
+#define	CHERIABI_SYS_cheriabi_cocall_slow	548
+#define	CHERIABI_SYS_cheriabi_coaccept_slow	549
 #define	CHERIABI_SYS_fdatasync	550
 #define	CHERIABI_SYS_cheriabi_fstat	551
 #define	CHERIABI_SYS_cheriabi_fstatat	552

@@ -398,6 +398,8 @@ MIASM =  \
 	ppoll.o \
 	futimens.o \
 	utimensat.o \
+	cocall_slow.o \
+	coaccept_slow.o \
 	fdatasync.o \
 	fstat.o \
 	fstatat.o \

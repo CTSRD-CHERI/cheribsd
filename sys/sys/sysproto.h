@@ -1730,6 +1730,20 @@ struct utimensat_args {
 	char times_l_[PADL_(const struct timespec * __capability)]; const struct timespec * __capability times; char times_r_[PADR_(const struct timespec * __capability)];
 	char flag_l_[PADL_(int)]; int flag; char flag_r_[PADR_(int)];
 };
+struct cocall_slow_args {
+	char code_l_[PADL_(void * __capability __capability)]; void * __capability __capability code; char code_r_[PADR_(void * __capability __capability)];
+	char data_l_[PADL_(void * __capability __capability)]; void * __capability __capability data; char data_r_[PADR_(void * __capability __capability)];
+	char target_l_[PADL_(void * __capability __capability)]; void * __capability __capability target; char target_r_[PADR_(void * __capability __capability)];
+	char buf_l_[PADL_(void * __capability __capability)]; void * __capability __capability buf; char buf_r_[PADR_(void * __capability __capability)];
+	char len_l_[PADL_(size_t)]; size_t len; char len_r_[PADR_(size_t)];
+};
+struct coaccept_slow_args {
+	char code_l_[PADL_(void * __capability __capability)]; void * __capability __capability code; char code_r_[PADR_(void * __capability __capability)];
+	char data_l_[PADL_(void * __capability __capability)]; void * __capability __capability data; char data_r_[PADR_(void * __capability __capability)];
+	char cookiep_l_[PADL_(void * __capability __capability * __capability)]; void * __capability __capability * __capability cookiep; char cookiep_r_[PADR_(void * __capability __capability * __capability)];
+	char buf_l_[PADL_(void * __capability __capability)]; void * __capability __capability buf; char buf_r_[PADR_(void * __capability __capability)];
+	char len_l_[PADL_(size_t)]; size_t len; char len_r_[PADR_(size_t)];
+};
 struct fdatasync_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
 };
@@ -2242,6 +2256,8 @@ int	sys_procctl(struct thread *, struct procctl_args *);
 int	sys_ppoll(struct thread *, struct ppoll_args *);
 int	sys_futimens(struct thread *, struct futimens_args *);
 int	sys_utimensat(struct thread *, struct utimensat_args *);
+int	sys_cocall_slow(struct thread *, struct cocall_slow_args *);
+int	sys_coaccept_slow(struct thread *, struct coaccept_slow_args *);
 int	sys_fdatasync(struct thread *, struct fdatasync_args *);
 int	sys_fstat(struct thread *, struct fstat_args *);
 int	sys_fstatat(struct thread *, struct fstatat_args *);
@@ -3174,6 +3190,8 @@ int	freebsd12_shm_open(struct thread *, struct freebsd12_shm_open_args *);
 #define	SYS_AUE_ppoll	AUE_POLL
 #define	SYS_AUE_futimens	AUE_FUTIMES
 #define	SYS_AUE_utimensat	AUE_FUTIMESAT
+#define	SYS_AUE_cocall_slow	AUE_NULL
+#define	SYS_AUE_coaccept_slow	AUE_NULL
 #define	SYS_AUE_fdatasync	AUE_FSYNC
 #define	SYS_AUE_fstat	AUE_FSTAT
 #define	SYS_AUE_fstatat	AUE_FSTATAT

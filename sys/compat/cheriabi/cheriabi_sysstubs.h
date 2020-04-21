@@ -3569,6 +3569,26 @@ SYS_STUB(547, int, utimensat,
     /* _localcheck */ {if (!(cheri_getperm(path) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} if (!(cheri_getperm(times) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} }
 )
 
+SYS_STUB(548, int, cocall_slow,
+    /* _protoargs */ (void *  __capability code, void *  __capability data, void *  __capability target, void *  __capability buf, size_t len),
+    /* _protoargs_chk */ (int *retp , int * __capability stub_errno, void * __capability   __capability code, void * __capability   __capability data, void * __capability   __capability target, void * __capability   __capability buf, size_t len),
+    /* _protoargs_err */ (int * __capability stub_errno, void * __capability   __capability code, void * __capability   __capability data, void * __capability   __capability target, void * __capability   __capability buf, size_t len),
+    /* _callargs */ ((__cheri_fromcap void *  __capability)code, (__cheri_fromcap void *  __capability)data, (__cheri_fromcap void *  __capability)target, (__cheri_fromcap void *  __capability)buf, len),
+    /* _callargs_chk */ (&ret, stub_errno, code, data, target, buf, len),
+    /* _callargs_err */ (&errno, (void *  __capability)code, (void *  __capability)data, (void *  __capability)target, (void *  __capability)buf, len),
+    /* _localcheck */ {if (!(cheri_getperm(code) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} if (!(cheri_getperm(data) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} if (!(cheri_getperm(target) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} if (!(cheri_getperm(buf) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} }
+)
+
+SYS_STUB(549, int, coaccept_slow,
+    /* _protoargs */ (void *  __capability code, void *  __capability data, void *  __capability * __capability cookiep, void *  __capability buf, size_t len),
+    /* _protoargs_chk */ (int *retp , int * __capability stub_errno, void * __capability   __capability code, void * __capability   __capability data, void * __capability   __capability * __capability  __capability cookiep, void * __capability   __capability buf, size_t len),
+    /* _protoargs_err */ (int * __capability stub_errno, void * __capability   __capability code, void * __capability   __capability data, void * __capability   __capability * __capability  __capability cookiep, void * __capability   __capability buf, size_t len),
+    /* _callargs */ ((__cheri_fromcap void *  __capability)code, (__cheri_fromcap void *  __capability)data, (__cheri_fromcap void *  __capability * __capability)cookiep, (__cheri_fromcap void *  __capability)buf, len),
+    /* _callargs_chk */ (&ret, stub_errno, code, data, cookiep, buf, len),
+    /* _callargs_err */ (&errno, (void *  __capability)code, (void *  __capability)data, (void *  __capability * __capability)cookiep, (void *  __capability)buf, len),
+    /* _localcheck */ {if (!(cheri_getperm(code) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} if (!(cheri_getperm(data) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} if (!(cheri_getperm(cookiep) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} if (!(cheri_getperm(buf) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} }
+)
+
 SYS_STUB(550, int, fdatasync,
     /* _protoargs */ (int fd),
     /* _protoargs_chk */ (int *retp , int * __capability stub_errno, int fd),

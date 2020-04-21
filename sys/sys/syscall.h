@@ -490,8 +490,8 @@
 #define	SYS_ppoll	545
 #define	SYS_futimens	546
 #define	SYS_utimensat	547
-				/* 548 is obsolete numa_getaffinity */
-				/* 549 is obsolete numa_setaffinity */
+#define	SYS_cocall_slow	548
+#define	SYS_coaccept_slow	549
 #define	SYS_fdatasync	550
 #define	SYS_fstat	551
 #define	SYS_fstatat	552
