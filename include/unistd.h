@@ -600,7 +600,14 @@ int	 coregister(const char *, void * __capability *);
 int	 colookup(const char *, void * __capability *);
 int	 cogetpid(pid_t *pidp);
 ssize_t	 write_c(int, const void * __capability, size_t);
-#endif
+
+/*
+ * Kernel-based replacement for cocall(2) and coaccept(2) usually
+ * provided by the switcher; intended for testing purposes.
+ */
+int	 cocall_slow(void * __capability, void * __capability, void * __capability, void * __capability, size_t);
+int	 coaccept_slow(void * __capability, void * __capability, void * __capability * __capability, void * __capability, size_t);
+#endif /* __has_feature(capabilities) */
 #endif /* __BSD_VISIBLE */
 __END_DECLS
 

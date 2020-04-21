@@ -179,6 +179,16 @@ cpu_fork(struct thread *td1, struct proc *p2, struct thread *td2, int flags)
 		KASSERT((td2->td_frame->sr & MIPS_SR_COP_2_BIT) != 0,
 		    ("%s: COP2 not enabled in trapframe", __func__));
 	td2->td_md.md_scb = 0;
+
+	/*
+	 * XXX: This should be only neccessary with INVARIANTS.
+	 */
+	memset(&td2->td_md.md_slow_cv, 0, sizeof(struct cv));
+	memset(&td2->td_md.md_slow_lock, 0, sizeof(struct sx));
+	td2->td_md.md_slow_caller_td = NULL;
+	td2->td_md.md_slow_buf = NULL;
+	td2->td_md.md_slow_len = 0;
+	td2->td_md.md_slow_accepting = false;
 #endif
 #ifdef CPU_CNMIPS
 	if (td1->td_md.md_flags & MDTD_COP2USED) {

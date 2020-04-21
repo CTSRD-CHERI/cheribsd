@@ -161,10 +161,19 @@ colocation_get_peer(struct thread *td, struct thread **peertdp)
 void
 colocation_thread_exit(struct thread *td)
 {
+	struct mdthread *callermd;
 	struct switchercb scb, *peerscb;
 	vaddr_t addr;
 	bool have_scb;
 	int error;
+
+	/*
+	 * Wake up any thread waiting on cocall_slow(2).
+	 */
+	if (td->td_md.md_slow_caller_td != NULL) {
+		callermd = &td->td_md.md_slow_caller_td->td_md;
+		cv_signal(&callermd->md_slow_cv);
+	}
 
 	have_scb = colocation_fetch_scb(td, &scb);
 	if (!have_scb)
@@ -358,6 +367,16 @@ setup_scb(struct thread *td)
 	KASSERT(error == 0,
 	    ("%s: copyoutcap() failed with error %d\n", __func__, error));
 
+	/*
+	 * Stuff neccessary for cocall_slow(2)/coaccept_slow(2).
+	 */
+	cv_init(&td->td_md.md_slow_cv, "slowcv");
+	sx_init(&td->td_md.md_slow_lock, "slowlock");
+	td->td_md.md_slow_caller_td = NULL;
+	td->td_md.md_slow_buf = NULL;
+	td->td_md.md_slow_len = 0;
+	td->td_md.md_slow_accepting = false;
+
 	return (0);
 }
 
@@ -482,6 +501,7 @@ kern_coregister(struct thread *td, const char * __capability namep,
 
 	con = malloc(sizeof(struct coname), M_TEMP, M_WAITOK);
 	con->c_name = strdup(name, M_TEMP);
+	con->c_td = curthread;
 	con->c_value = cap;
 	LIST_INSERT_HEAD(&vmspace->vm_conames, con, c_next);
 	vm_map_unlock(&vmspace->vm_map);
@@ -584,6 +604,211 @@ kern_copark(struct thread *td)
 	}
 
 	return (error);
+}
+
+int
+kern_cocall_slow(void * __capability code, void * __capability data,
+    void * __capability target, void * __capability buf, size_t len)
+{
+	struct mdthread *md, *calleemd;
+	struct thread *calleetd;
+	struct coname *con;
+	int error;
+
+	md = &curthread->td_md;
+
+	/*
+	 * Copy from caller into the kernel buffer.
+	 */
+	if (buf == NULL) {
+		if (len != 0) {
+			printf("%s: buf == NULL, but len != 0, returning EINVAL\n", __func__);
+			return (EINVAL);
+		}
+
+		md->md_slow_len = 0;
+		md->md_slow_buf = NULL;
+	} else {
+		if (len == 0) {
+			printf("%s: buf != NULL, but len == 0, returning EINVAL\n", __func__);
+			return (EINVAL);
+		}
+
+		if (len > MAXBSIZE) {
+			printf("%s: len %zd > %d, returning EMSGSIZE\n", __func__, len, MAXBSIZE);
+			return (EMSGSIZE);
+		}
+
+		md->md_slow_len = len;
+		md->md_slow_buf = malloc(len, M_TEMP, M_WAITOK);
+
+		error = copyin_c(buf, md->md_slow_buf, len);
+		if (error != 0) {
+			printf("%s: copyin failed with error %d\n", __func__, error);
+			goto out;
+		}
+	}
+
+	/*
+	 * Find the callee (coaccepting) thread.
+	 */
+	calleetd = NULL;
+	LIST_FOREACH(con, &curthread->td_proc->p_vmspace->vm_conames, c_next) {
+		if (con->c_value == target) {
+			calleetd = con->c_td;
+			break;
+		}
+	}
+
+	if (calleetd == NULL) {
+		printf("%s: target thread not found, returning EINVAL\n", __func__);
+		error = EINVAL;
+		goto out;
+	}
+
+	calleemd = &calleetd->td_md;
+	sx_xlock(&calleemd->md_slow_lock);
+
+	if (!calleemd->md_slow_accepting) {
+		sx_xunlock(&calleemd->md_slow_lock);
+		printf("%s: target not in coaccept_slow(2), returning EINVAL\n", __func__);
+		error = EINVAL;
+		goto out;
+	}
+
+	/*
+	 * Wake up the callee and wait for them to complete.
+	 */
+	calleemd->md_slow_caller_td = curthread;
+	cv_signal(&calleemd->md_slow_cv);
+	error = cv_wait_sig(&md->md_slow_cv, &calleemd->md_slow_lock);
+	if (error != 0) {
+		calleemd->md_slow_caller_td = NULL;
+		sx_xunlock(&calleemd->md_slow_lock);
+		printf("%s: cv_wait_sig failed with error %d\n", __func__, error);
+		error = EINVAL;
+		goto out;
+	}
+
+	/*
+	 * Copy stuff out into caller's buffer, if there is anything.
+	 */
+	if (buf != NULL) {
+		if (len > md->md_slow_len)
+			len = md->md_slow_len;
+		if (len > 0) {
+			error = copyout_c(md->md_slow_buf, buf, len);
+			if (error != 0)
+				printf("%s: copyout failed with error %d\n", __func__, error);
+		}
+	}
+
+	calleemd->md_slow_caller_td = NULL;
+	sx_xunlock(&calleemd->md_slow_lock);
+out:
+
+	free(md->md_slow_buf, M_TEMP);
+	md->md_slow_buf = NULL;
+	md->md_slow_len = 0;
+
+	return (error);
+}
+
+int
+sys_cocall_slow(struct thread *td, struct cocall_slow_args *uap)
+{
+
+	return (kern_cocall_slow(uap->code, uap->data,
+	    uap->target, uap->buf, uap->len));
+}
+
+int
+kern_coaccept_slow(void * __capability code, void * __capability data,
+    void * __capability * __capability cookiep, void * __capability buf, size_t len)
+{
+	struct mdthread *md, *callermd;
+	size_t minlen;
+	int error;
+
+	md = &curthread->td_md;
+
+	if (buf == NULL) {
+		if (len != 0) {
+			printf("%s: buf != NULL, but len == 0, returning EINVAL\n", __func__);
+			return (EINVAL);
+		}
+	} else {
+		if (len == 0) {
+			printf("%s: buf != NULL, but len == 0, returning EINVAL\n", __func__);
+			return (EINVAL);
+		}
+
+		if (len > MAXBSIZE) {
+			printf("%s: len %zd > %d, returning EMSGSIZE\n", __func__, len, MAXBSIZE);
+			return (EMSGSIZE);
+		}
+	}
+
+	/*
+	 * If there's a caller waiting for us, get them their data
+	 * and wake them up.
+	 */
+	if (md->md_slow_caller_td != NULL) {
+		callermd = &md->md_slow_caller_td->td_md;
+
+		if (buf != NULL) {
+			minlen = MIN(len, callermd->md_slow_len);
+			if (minlen > 0) {
+				error = copyin_c(buf, callermd->md_slow_buf, minlen);
+				if (error != 0) {
+					printf("%s: copyin failed with error %d\n", __func__, error);
+					return (error);
+				}
+			}
+		}
+
+		cv_signal(&callermd->md_slow_cv);
+	}
+
+	/*
+	 * NB: This is not supposed to ever be cleared.
+	 */
+	md->md_slow_accepting = true;
+
+	/*
+	 * Wait for a new caller.
+	 */
+	sx_xlock(&md->md_slow_lock);
+	error = cv_wait_sig(&md->md_slow_cv, &md->md_slow_lock);
+	sx_xunlock(&md->md_slow_lock); // XXX
+	if (error != 0) {
+		printf("%s: cv_wait_sig failed with error %d\n", __func__, error);
+		return (error);
+	}
+
+	callermd = &md->md_slow_caller_td->td_md;
+
+	/*
+	 * Copy stuff out into the userspace buffer and return to the callee.
+	 */
+	if (buf != NULL) {
+		minlen = MIN(len, callermd->md_slow_len);
+		if (minlen > 0) {
+			error = copyout_c(callermd->md_slow_buf, buf, len);
+			if (error != 0)
+				printf("%s: copyout failed with error %d\n", __func__, error);
+		}
+	}
+
+	return (error);
+}
+
+int
+sys_coaccept_slow(struct thread *td, struct coaccept_slow_args *uap)
+{
+
+	return (kern_coaccept_slow(uap->code, uap->data,
+	    uap->cookiep, uap->buf, uap->len));
 }
 
 #ifdef DDB

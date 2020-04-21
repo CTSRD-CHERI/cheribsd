@@ -259,6 +259,7 @@ vm_map_modflags(vm_map_t map, vm_flags_t set, vm_flags_t clear)
 
 struct coname {
 	LIST_ENTRY(coname)	c_next;
+	struct thread		*c_td;
 	char			*c_name;
 	void * __capability	c_value;
 };

@@ -109,6 +109,16 @@ struct mdthread {
 #endif
 #ifdef	CPU_CHERI
 	vaddr_t		md_scb;
+
+	/*
+	 * Stuff below is used for cocall_slow(2)/cocaccept_slow(2).
+	 */
+	struct cv	md_slow_cv;
+	struct sx	md_slow_lock;
+	struct thread	*md_slow_caller_td;
+	void		*md_slow_buf;
+	size_t		md_slow_len;
+	bool		md_slow_accepting;
 #endif
 };
 

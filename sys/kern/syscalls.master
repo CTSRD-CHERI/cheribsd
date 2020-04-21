@@ -3065,8 +3065,24 @@
 		    int flag
 		);
 	}
-548	AUE_NULL	OBSOL	numa_getaffinity
-549	AUE_NULL	OBSOL	numa_setaffinity
+548	AUE_NULL	STD {
+		int cocall_slow(
+		    _In_ void * __capability code,
+		    _In_ void * __capability data,
+		    _In_ void * __capability target,
+		    _In_reads_bytes_(len) void * __capability buf,
+		    size_t len
+		);
+	}
+549	AUE_NULL	STD {
+		int coaccept_slow(
+		    _In_ void * __capability code,
+		    _In_ void * __capability data,
+		    _Inout_ void * __capability *cookiep,
+		    _Out_writes_bytes(len) void * __capability buf,
+		    size_t len
+		);
+}
 550	AUE_FSYNC	STD {
 		int fdatasync(
 		    int fd

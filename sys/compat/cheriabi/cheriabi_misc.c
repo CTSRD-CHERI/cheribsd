@@ -2033,6 +2033,22 @@ cheriabi_cogetpid(struct thread *td, struct cheriabi_cogetpid_args *uap)
 	return (kern_cogetpid(td, uap->pidp));
 }
 
+int
+cheriabi_cocall_slow(struct thread *td, struct cheriabi_cocall_slow_args *uap)
+{
+
+	return (kern_cocall_slow(uap->code, uap->data,
+	    uap->target, uap->buf, uap->len));
+}
+
+int
+cheriabi_coaccept_slow(struct thread *td, struct cheriabi_coaccept_slow_args *uap)
+{
+
+	return (kern_coaccept_slow(uap->code, uap->data,
+	    uap->cookiep, uap->buf, uap->len));
+}
+
 #if 0
 int
 cheriabi_copark(struct thread *td, struct cheriabi_copark_args *uap)
