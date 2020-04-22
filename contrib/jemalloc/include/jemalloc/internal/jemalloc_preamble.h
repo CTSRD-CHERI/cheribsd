@@ -62,14 +62,6 @@ static const bool config_debug =
 #endif
     ;
 
-static const bool config_cheri_setbounds =
-#if defined(JEMALLOC_NO_PTR_BOUNDS)
-    false
-#else
-    true
-#endif
-    ;
-
 static const bool have_dss =
 #ifdef JEMALLOC_DSS
     true
