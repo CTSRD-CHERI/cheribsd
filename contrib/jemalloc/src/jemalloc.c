@@ -209,7 +209,7 @@ typedef struct {
 #else
 #define	BOUND_PTR(ptr, size)						\
     (ptr == NULL) ? NULL :						\
-    cheri_andperm(cheri_setbounds((ptr), (size)),			\
+    cheri_andperm(cheri_setboundsexact((ptr), (size)),			\
 	CHERI_PERMS_USERSPACE_DATA & ~CHERI_PERM_CHERIABI_VMMAP)
 #define roundup2(x, y)	(((x)+((y)-1))&(~((y)-1)))
 
@@ -1808,7 +1808,7 @@ compute_size_with_overflow(bool may_overflow, dynamic_opts_t *dopts,
 	/* A size_t with its high-half bits all set to 1. */
 	static const size_t high_bits = SIZE_T_MAX << (sizeof(size_t) * 8 / 2);
 
-	*size = dopts->item_size * dopts->num_items;
+	*size = ROUND_SIZE(dopts->item_size * dopts->num_items);
 
 	if (unlikely(*size == 0)) {
 		return (dopts->num_items != 0 && dopts->item_size != 0);
@@ -1855,8 +1855,6 @@ imalloc_body(static_opts_t *sopts, dynamic_opts_t *dopts, tsd_t *tsd) {
 	    &size))) {
 		goto label_oom;
 	}
-
-	size = ROUND_SIZE(size);
 
 	/* Validate the user input. */
 	if (sopts->bump_empty_alloc) {
@@ -2032,8 +2030,12 @@ label_invalid_alignment:
 JEMALLOC_ALWAYS_INLINE int
 imalloc(static_opts_t *sopts, dynamic_opts_t *dopts) {
 	int ret;
+	size_t size;
 
-	/* NB: Rounding of allocation size occurs in imalloc_body() */
+	/*
+	 * CHERI: Rounding of allocation size occurs in imalloc_body()
+	 * via compute_size_with_overflow()
+	 */
 
 	if (unlikely(!malloc_initialized()) && unlikely(malloc_init())) {
 		if (config_xmalloc && unlikely(opt_xmalloc)) {
@@ -2059,9 +2061,11 @@ imalloc(static_opts_t *sopts, dynamic_opts_t *dopts) {
 		sopts->slow = true;
 		ret = imalloc_body(sopts, dopts, tsd);
 	}
-	if (ret == 0)
-		*dopts->result = BOUND_PTR(*dopts->result,
-		    dopts->num_items * dopts->item_size);
+	if (ret == 0) {
+		/* overflow causes imalloc_body to return ENOMEM */
+		(void)compute_size_with_overflow(1, dopts, &size);
+		*dopts->result = BOUND_PTR(*dopts->result, size);
+	}
 	return ret;
 }
 /******************************************************************************/
