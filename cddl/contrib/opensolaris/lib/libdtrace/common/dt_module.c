@@ -786,8 +786,22 @@ dt_module_load(dtrace_hdl_t *dtp, dt_module_t *dmp)
 	dmp->dm_ctdata.cts_entsize = 0;
 	dmp->dm_ctdata.cts_offset = 0;
 
+	// TODO: remove this when we are able to load the kernel symtable
+#ifdef __mips__
+	if (strcmp(dmp->dm_name,"kernel") == 0) {
+		dt_dprintf(
+		    "LOADING .dynsym INSTEAD OF .symtab FOR MIPS! A lot of symbols will"
+		    "be missing\n");
+		dmp->dm_symtab.cts_name = ".dynsym";
+		dmp->dm_symtab.cts_type = SHT_DYNSYM;
+	} else {
+		dmp->dm_symtab.cts_name = ".symtab";
+		dmp->dm_symtab.cts_type = SHT_SYMTAB;
+	}
+#else
 	dmp->dm_symtab.cts_name = ".symtab";
 	dmp->dm_symtab.cts_type = SHT_SYMTAB;
+#endif
 	dmp->dm_symtab.cts_flags = 0;
 	dmp->dm_symtab.cts_data = NULL;
 	dmp->dm_symtab.cts_size = 0;
@@ -1179,6 +1193,10 @@ dt_module_update(dtrace_hdl_t *dtp, struct kld_file_stat *k_stat)
 
 	(void) strlcpy(name, k_stat->name, sizeof(name));
 	(void) strlcpy(fname, k_stat->pathname, sizeof(fname));
+#ifdef __mips__
+	if (strncmp(name, "kernel", sizeof(name)) == 0)
+		strlcpy(fname,"/boot/kernel/kernel",sizeof(fname));
+#endif
 #endif
 
 	if ((fd = open(fname, O_RDONLY)) == -1 || fstat64(fd, &st) == -1 ||
