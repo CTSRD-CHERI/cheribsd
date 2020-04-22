@@ -187,6 +187,7 @@ gdbinit:
 .endif
 .endif
 
+CTFFLAGS_KERNEL=${CTFFLAGS}
 .if ${MACHINE_CPUARCH} == "mips"
 # For mips, the CTF section is generated from the symbols in `.dynsym`.
 # `.dymsym` only contains a subset of the `.symtab` symbols, needed for
@@ -194,7 +195,7 @@ gdbinit:
 # loaded at boot time, and its address is not available anywhere without a
 # proper bootloader.
 # The problem can be solved looking at |sys/mips/mips/elf_trampoline.c|.
-CTFFLAGS+=-s
+CTFFLAGS_KERNEL+=-s
 .endif
 
 ${FULLKERNEL}: ${SYSTEM_DEP} vers.o
@@ -206,8 +207,8 @@ ${FULLKERNEL}: ${SYSTEM_DEP} vers.o
 .endif
 
 .if ${MK_CTF} != "no"
-	@echo ${CTFMERGE} ${CTFFLAGS} -o ${.TARGET} ...
-	@${CTFMERGE} ${CTFFLAGS} -o ${.TARGET} ${SYSTEM_OBJS} vers.o
+	@echo ${CTFMERGE} ${CTFFLAGS_KERNEL} -o ${.TARGET} ...
+	@${CTFMERGE} ${CTFFLAGS_KERNEL} -o ${.TARGET} ${SYSTEM_OBJS} vers.o
 .endif
 .if !defined(DEBUG)
 	${OBJCOPY} --strip-debug ${.TARGET}
