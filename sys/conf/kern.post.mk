@@ -187,22 +187,22 @@ gdbinit:
 .endif
 .endif
 
+.if ${MACHINE_CPUARCH} == "mips"
+# For mips, the CTF section is generated from the symbols in `.dynsym`.
+# `.dymsym` only contains a subset of the `.symtab` symbols, needed for
+# dynamic linking. This flag is needed because the `.symtab` section is not
+# loaded at boot time, and its address is not available anywhere without a
+# proper bootloader.
+# The problem can be solved looking at |sys/mips/mips/elf_trampoline.c|.
+CTFFLAGS+=-s
+.endif
+
 ${FULLKERNEL}: ${SYSTEM_DEP} vers.o
 	@rm -f ${.TARGET}
 	@echo linking ${.TARGET}
 	${SYSTEM_LD}
 .if !empty(MD_ROOT_SIZE_CONFIGURED) && defined(MFS_IMAGE)
 	@sh ${S}/tools/embed_mfs.sh ${.TARGET} ${MFS_IMAGE}
-.endif
-
-.if ${MACHINE_CPUARCH} == "mips"
-	# For mips, the CTF section is generated from the symbols in `.dynsym`.
-	# `.dymsym` only contains a subset of the `.symtab` symbols, needed for
-	# dynamic linking. This flag is needed because the `.symtab` section is not
-	# loaded at boot time, and its address is not available anywhere without a
-	# proper bootloader.
-	# The problem can be solved looking at |sys/mips/mips/elf_trampoline.c|.
-	CTFFLAGS+= -s
 .endif
 
 .if ${MK_CTF} != "no"
