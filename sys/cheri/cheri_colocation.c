@@ -75,6 +75,12 @@ static int colocation_debug;
 SYSCTL_INT(_debug, OID_AUTO, colocation_debug, CTLFLAG_RWTUN,
     &colocation_debug, 0, "Enable process colocation debugging");
 
+#define	COLOCATION_DEBUG(X, ...)					\
+	do {								\
+		if (colocation_debug > 0)				\
+			printf("%s: " X "\n", __func__, ## __VA_ARGS__);\
+	} while (0)
+
 static void
 colocation_startup(void)
 {
@@ -180,7 +186,8 @@ colocation_thread_exit(struct thread *td)
 		return;
 
 	peerscb = (__cheri_fromcap struct switchercb *)scb.scb_peer_scb;
-	//printf("%s: terminating thread %p, scb %p, peer scb %p\n", __func__, td, (void *)td->td_md.md_scb, peerscb);
+	COLOCATION_DEBUG("terminating thread %p, scb %p, peer scb %p",
+	    td, (void *)td->td_md.md_scb, peerscb);
 
 	/*
 	 * Set scb_peer_scb to a special "null" capability, so that cocall(2)
@@ -194,8 +201,8 @@ colocation_thread_exit(struct thread *td)
 	td->td_md.md_scb = 0;
 	error = copyoutcap(&scb, ___USER_CFROMPTR((void *)addr, userspace_cap), sizeof(scb));
 	if (error != 0) {
-		printf("%s: copyoutcap to %p failed with error %d\n",
-		    __func__, (void *)addr, error);
+		COLOCATION_DEBUG("copyoutcap to %p failed with error %d",
+		    (void *)addr, error);
 		return;
 	}
 
@@ -204,8 +211,8 @@ colocation_thread_exit(struct thread *td)
 
 	error = copyincap(___USER_CFROMPTR((void *)peerscb, userspace_cap), &scb, sizeof(scb));
 	if (error != 0) {
-		printf("%s: peer copyincap from %p failed with error %d\n",
-		    __func__, (void *)peerscb, error);
+		COLOCATION_DEBUG("peer copyincap from %p failed with error %d",
+		    (void *)peerscb, error);
 		return;
 	}
 
@@ -214,8 +221,8 @@ colocation_thread_exit(struct thread *td)
 
 	error = copyoutcap(&scb, ___USER_CFROMPTR((void *)peerscb, userspace_cap), sizeof(scb));
 	if (error != 0) {
-		printf("%s: peer copyoutcap to %p failed with error %d\n",
-		    __func__, (void *)peerscb, error);
+		COLOCATION_DEBUG("peer copyoutcap to %p failed with error %d",
+		    (void *)peerscb, error);
 		return;
 	}
 }
@@ -248,16 +255,14 @@ colocation_unborrow(struct thread *td, struct trapframe **trapframep)
 	KASSERT(peertd != td,
 	    ("%s: peertd %p == td %p\n", __func__, peertd, td));
 
-	if (colocation_debug) {
-		printf("%s: replacing current td %p, pid %d (%s), switchercb %#lx, "
-		    "md_tls %p, md_tls_tcb_offset %zd, "
-		    "with td %p, pid %d (%s), switchercb %#lx, "
-		    "md_tls %p, md_tls_tcb_offset %zd\n", __func__,
-		    td, td->td_proc->p_pid, td->td_proc->p_comm, td->td_md.md_scb,
-		    (__cheri_fromcap void *)td->td_md.md_tls, td->td_md.md_tls_tcb_offset,
-		    peertd, peertd->td_proc->p_pid, peertd->td_proc->p_comm, peertd->td_md.md_scb,
-		    (__cheri_fromcap void *)peertd->td_md.md_tls, peertd->td_md.md_tls_tcb_offset);
-	}
+	COLOCATION_DEBUG("replacing current td %p, pid %d (%s), switchercb %#lx, "
+	    "md_tls %p, md_tls_tcb_offset %zd, "
+	    "with td %p, pid %d (%s), switchercb %#lx, "
+	    "md_tls %p, md_tls_tcb_offset %zd",
+	    td, td->td_proc->p_pid, td->td_proc->p_comm, td->td_md.md_scb,
+	    (__cheri_fromcap void *)td->td_md.md_tls, td->td_md.md_tls_tcb_offset,
+	    peertd, peertd->td_proc->p_pid, peertd->td_proc->p_comm, peertd->td_md.md_scb,
+	    (__cheri_fromcap void *)peertd->td_md.md_tls, peertd->td_md.md_tls_tcb_offset);
 
 	/*
 	 * Assign our trapframe (userspace context) to the thread waiting
@@ -332,7 +337,7 @@ setup_scb(struct thread *td)
 
 	addr = vm_map_findspace(map, vm_map_min(map), PAGE_SIZE);
 	if (addr + PAGE_SIZE > vm_map_max(map)) {
-		printf("%s: vm_map_findspace() failed\n", __func__);
+		COLOCATION_DEBUG("vm_map_findspace() failed");
 		vm_map_unlock(map);
 		return (ENOMEM);
 	}
@@ -341,8 +346,7 @@ setup_scb(struct thread *td)
 	    VM_PROT_READ | VM_PROT_WRITE, VM_PROT_READ | VM_PROT_WRITE,
 	    MAP_DISABLE_COREDUMP);
 	if (rv != KERN_SUCCESS) {
-		printf("%s: vm_map_insert() failed with rv %d\n",
-		    __func__, rv);
+		COLOCATION_DEBUG("vm_map_insert() failed with rv %d", rv);
 		vm_map_unlock(map);
 		return (ENOMEM);
 	}
@@ -584,8 +588,6 @@ kern_copark(struct thread *td)
 {
 	int error;
 
-	//printf("%s: go, td %p!\n", __func__, td);
-
 	mtx_lock(&switcher_lock);
 	error = msleep(&td->td_md.md_scb, &switcher_lock,
 	    PPAUSE | PCATCH, "copark", 0);
@@ -622,7 +624,7 @@ kern_cocall_slow(void * __capability code, void * __capability data,
 	 */
 	if (buf == NULL) {
 		if (len != 0) {
-			printf("%s: buf == NULL, but len != 0, returning EINVAL\n", __func__);
+			COLOCATION_DEBUG("buf == NULL, but len != 0, returning EINVAL");
 			return (EINVAL);
 		}
 
@@ -630,12 +632,12 @@ kern_cocall_slow(void * __capability code, void * __capability data,
 		md->md_slow_buf = NULL;
 	} else {
 		if (len == 0) {
-			printf("%s: buf != NULL, but len == 0, returning EINVAL\n", __func__);
+			COLOCATION_DEBUG("buf != NULL, but len == 0, returning EINVAL");
 			return (EINVAL);
 		}
 
 		if (len > MAXBSIZE) {
-			printf("%s: len %zd > %d, returning EMSGSIZE\n", __func__, len, MAXBSIZE);
+			COLOCATION_DEBUG("len %zd > %d, returning EMSGSIZE", len, MAXBSIZE);
 			return (EMSGSIZE);
 		}
 
@@ -644,7 +646,7 @@ kern_cocall_slow(void * __capability code, void * __capability data,
 
 		error = copyin_c(buf, md->md_slow_buf, len);
 		if (error != 0) {
-			printf("%s: copyin failed with error %d\n", __func__, error);
+			COLOCATION_DEBUG("copyin failed with error %d", error);
 			goto out;
 		}
 	}
@@ -661,7 +663,7 @@ kern_cocall_slow(void * __capability code, void * __capability data,
 	}
 
 	if (calleetd == NULL) {
-		printf("%s: target thread not found, returning EINVAL\n", __func__);
+		COLOCATION_DEBUG("target thread not found, returning EINVAL");
 		error = EINVAL;
 		goto out;
 	}
@@ -671,7 +673,7 @@ kern_cocall_slow(void * __capability code, void * __capability data,
 
 	if (!calleemd->md_slow_accepting) {
 		sx_xunlock(&calleemd->md_slow_lock);
-		printf("%s: target not in coaccept_slow(2), returning EINVAL\n", __func__);
+		COLOCATION_DEBUG("target not in coaccept_slow(2), returning EINVAL");
 		error = EINVAL;
 		goto out;
 	}
@@ -685,7 +687,7 @@ kern_cocall_slow(void * __capability code, void * __capability data,
 	if (error != 0) {
 		calleemd->md_slow_caller_td = NULL;
 		sx_xunlock(&calleemd->md_slow_lock);
-		printf("%s: cv_wait_sig failed with error %d\n", __func__, error);
+		COLOCATION_DEBUG("cv_wait_sig failed with error %d", error);
 		error = EINVAL;
 		goto out;
 	}
@@ -699,7 +701,7 @@ kern_cocall_slow(void * __capability code, void * __capability data,
 		if (len > 0) {
 			error = copyout_c(md->md_slow_buf, buf, len);
 			if (error != 0)
-				printf("%s: copyout failed with error %d\n", __func__, error);
+				COLOCATION_DEBUG("copyout failed with error %d", error);
 		}
 	}
 
@@ -734,17 +736,17 @@ kern_coaccept_slow(void * __capability code, void * __capability data,
 
 	if (buf == NULL) {
 		if (len != 0) {
-			printf("%s: buf != NULL, but len == 0, returning EINVAL\n", __func__);
+			COLOCATION_DEBUG("buf != NULL, but len == 0, returning EINVAL");
 			return (EINVAL);
 		}
 	} else {
 		if (len == 0) {
-			printf("%s: buf != NULL, but len == 0, returning EINVAL\n", __func__);
+			COLOCATION_DEBUG("buf != NULL, but len == 0, returning EINVAL");
 			return (EINVAL);
 		}
 
 		if (len > MAXBSIZE) {
-			printf("%s: len %zd > %d, returning EMSGSIZE\n", __func__, len, MAXBSIZE);
+			COLOCATION_DEBUG("len %zd > %d, returning EMSGSIZE", len, MAXBSIZE);
 			return (EMSGSIZE);
 		}
 	}
@@ -761,7 +763,7 @@ kern_coaccept_slow(void * __capability code, void * __capability data,
 			if (minlen > 0) {
 				error = copyin_c(buf, callermd->md_slow_buf, minlen);
 				if (error != 0) {
-					printf("%s: copyin failed with error %d\n", __func__, error);
+					COLOCATION_DEBUG("copyin failed with error %d", error);
 					return (error);
 				}
 			}
@@ -782,7 +784,7 @@ kern_coaccept_slow(void * __capability code, void * __capability data,
 	error = cv_wait_sig(&md->md_slow_cv, &md->md_slow_lock);
 	sx_xunlock(&md->md_slow_lock); // XXX
 	if (error != 0) {
-		printf("%s: cv_wait_sig failed with error %d\n", __func__, error);
+		COLOCATION_DEBUG("cv_wait_sig failed with error %d", error);
 		return (error);
 	}
 
@@ -796,7 +798,7 @@ kern_coaccept_slow(void * __capability code, void * __capability data,
 		if (minlen > 0) {
 			error = copyout_c(callermd->md_slow_buf, buf, len);
 			if (error != 0)
-				printf("%s: copyout failed with error %d\n", __func__, error);
+				COLOCATION_DEBUG("copyout failed with error %d", error);
 		}
 	}
 
