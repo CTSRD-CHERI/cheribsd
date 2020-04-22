@@ -207,11 +207,10 @@ typedef struct {
 #define	BOUND_PTR(ptr, size)	(ptr)
 #define	ROUND_SIZE(size)		(size)
 #else
-#define	BOUND_PTR(ptr, size)	\
-    ((config_cheri_setbounds && ptr != NULL) ? \
-    cheri_andperm(cheri_setbounds((ptr), (size)), \
-	CHERI_PERMS_USERSPACE_DATA & ~CHERI_PERM_CHERIABI_VMMAP) : \
-    (ptr))
+#define	BOUND_PTR(ptr, size)						\
+    (ptr == NULL) ? NULL :						\
+    cheri_andperm(cheri_setbounds((ptr), (size)),			\
+	CHERI_PERMS_USERSPACE_DATA & ~CHERI_PERM_CHERIABI_VMMAP)
 #define roundup2(x, y)	(((x)+((y)-1))&(~((y)-1)))
 
 /*
@@ -3195,7 +3194,7 @@ je_malloc_usable_size(JEMALLOC_USABLE_SIZE_CONST void *ptr) {
 			ret = isalloc(tsdn, ptr);
 		}
 #ifdef __CHERI_PURE_CAPABILITY__
-		if (config_cheri_setbounds && ret != 0) {
+		if (ret != 0) {
 			ret = MIN(ret, cheri_getlen(ptr));
 		}
 #endif

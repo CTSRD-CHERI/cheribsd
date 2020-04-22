@@ -857,13 +857,6 @@ for related details)\&. This option is disabled by default unless discarding vir
 causes issues on 32\-bit Linux as well, retaining virtual memory for 32\-bit Linux is disabled by default due to the practical possibility of address space exhaustion\&.
 .RE
 .PP
-config\&.cheri_setbounds (\fBbool\fR) r\-
-.RS 4
-Set bounds on allocations\&. This is enabled by default unless jemalloc is compiled with
-\fB\JEMALLOC_NO_PTR_BOUNDS\fR
-defined\&. This option is available only on CHERI systems in pure-capability mode.
-.RE
-.PP
 opt\&.dss (\fBconst char *\fR) r\-
 .RS 4
 dss (\fBsbrk\fR(2)) allocation precedence as related to
