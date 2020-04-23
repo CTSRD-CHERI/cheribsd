@@ -43,13 +43,6 @@
 
 extern char **environ;
 
-#define SLOW_COCALLS
-
-#ifdef SLOW_COCALLS
-#define	coaccept coaccept_slow
-#define	cocall cocall_slow
-#endif /* SLOW_COCALLS */
-
 /*
  * We are our own helper.  Each test case that requires a helper
  * has its '_h' counterpart.  These helper test cases do nothing
