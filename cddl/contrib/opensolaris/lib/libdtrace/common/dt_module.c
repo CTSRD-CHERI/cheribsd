@@ -1201,7 +1201,7 @@ dt_module_update(dtrace_hdl_t *dtp, struct kld_file_stat *k_stat)
 	(void) strlcpy(name, k_stat->name, sizeof(name));
 	(void) strlcpy(fname, k_stat->pathname, sizeof(fname));
 #ifdef __mips__
-	if (strncmp(name, "kernel", sizeof(name)) == 0)
+	if (strncmp(fname, "kernel", sizeof(name)) == 0)
 		strlcpy(fname,"/boot/kernel/kernel",sizeof(fname));
 #endif
 #endif
