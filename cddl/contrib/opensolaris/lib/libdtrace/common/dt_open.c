@@ -1282,8 +1282,9 @@ alloc:
 	}
 #endif
 #else
-#if defined(__amd64__) || defined(__i386__)
-	if (dtp->dt_conf.dtc_ctfmodel == CTF_MODEL_LP64) {
+#if defined(__amd64__) || defined(__i386__) || defined(__mips__)
+	if (dtp->dt_conf.dtc_ctfmodel == CTF_MODEL_LP64 ||
+	    dtp->dt_conf.dtc_ctfmodel == CTF_MODEL_LP64_CAP) {
 		if (dt_cpp_add_arg(dtp, "-m64") == NULL)
 			return (set_open_errno(dtp, errp, EDT_NOMEM));
 	} else {
