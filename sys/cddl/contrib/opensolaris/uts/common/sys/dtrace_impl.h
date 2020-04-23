@@ -784,7 +784,7 @@ typedef struct dtrace_speculation {
  * emulation code, the hash bucket is unlocked.
  */
 typedef struct dtrace_key {
-	uint64_t dttk_value;			/* data value or data pointer */
+	uintcap_t dttk_value;			/* data value or data pointer */
 	uint64_t dttk_size;			/* 0 if by-val, >0 if by-ref */
 } dtrace_key_t;
 
@@ -925,7 +925,7 @@ typedef struct dtrace_mstate {
 	uintptr_t dtms_scratch_ptr;		/* current scratch pointer */
 	size_t dtms_scratch_size;		/* scratch size */
 	uint32_t dtms_present;			/* variables that are present */
-	uint64_t dtms_arg[5];			/* cached arguments */
+	uintcap_t dtms_arg[5];			/* cached arguments */
 	dtrace_epid_t dtms_epid;		/* current EPID */
 	uint64_t dtms_timestamp;		/* cached timestamp */
 	hrtime_t dtms_walltimestamp;		/* cached wall timestamp */
@@ -1280,7 +1280,7 @@ typedef struct dtrace_toxrange {
 #ifdef illumos
 extern uint64_t dtrace_getarg(int, int);
 #else
-extern uint64_t __noinline dtrace_getarg(int, int);
+extern uintcap_t __noinline dtrace_getarg(int, int);
 #endif
 extern greg_t dtrace_getfp(void);
 extern int dtrace_getipl(void);

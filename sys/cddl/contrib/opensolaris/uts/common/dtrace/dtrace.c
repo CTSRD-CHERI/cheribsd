@@ -600,7 +600,7 @@ uint8_t dtrace_load8(uintptr_t);
 void dtrace_dynvar_clean(dtrace_dstate_t *);
 dtrace_dynvar_t *dtrace_dynvar(dtrace_dstate_t *, uint_t, dtrace_key_t *,
     size_t, dtrace_dynvar_op_t, dtrace_mstate_t *, dtrace_vstate_t *);
-uintptr_t dtrace_dif_varstr(uintptr_t, dtrace_state_t *, dtrace_mstate_t *);
+uintcap_t dtrace_dif_varstr(uintptr_t, dtrace_state_t *, dtrace_mstate_t *);
 static int dtrace_priv_proc(dtrace_state_t *);
 static void dtrace_getf_barrier(void);
 static int dtrace_canload_remains(uint64_t, size_t, size_t *,
@@ -3232,7 +3232,7 @@ dtrace_speculation_buffer(dtrace_state_t *state, processorid_t cpuid,
  * dtrace_dif_variable() uses this routine as a helper for various
  * builtin values such as 'execname' and 'probefunc.'
  */
-uintptr_t
+uintcap_t
 dtrace_dif_varstr(uintptr_t addr, dtrace_state_t *state,
     dtrace_mstate_t *mstate)
 {
@@ -3278,7 +3278,7 @@ dtrace_dif_varstr(uintptr_t addr, dtrace_state_t *state,
  * dtrace_dif_variable() uses this routine as a helper for various
  * builtin values such as 'execargs'.
  */
-static uintptr_t
+static uintcap_t
 dtrace_dif_varstrz(uintptr_t addr, size_t strsz, dtrace_state_t *state,
     dtrace_mstate_t *mstate)
 {
@@ -3310,9 +3310,9 @@ dtrace_dif_varstrz(uintptr_t addr, size_t strsz, dtrace_state_t *state,
  * This function implements the DIF emulator's variable lookups.  The emulator
  * passes a reserved variable identifier and optional built-in array index.
  */
-static uint64_t
-dtrace_dif_variable(dtrace_mstate_t *mstate, dtrace_state_t *state, uint64_t v,
-    uint64_t ndx)
+static uintcap_t
+dtrace_dif_variable(
+    dtrace_mstate_t *mstate, dtrace_state_t *state, uint64_t v, uint64_t ndx)
 {
 	/*
 	 * If we're accessing one of the uncached arguments, we'll turn this
@@ -3330,15 +3330,17 @@ dtrace_dif_variable(dtrace_mstate_t *mstate, dtrace_state_t *state, uint64_t v,
 		    sizeof (mstate->dtms_arg[0])) {
 			int aframes = mstate->dtms_probe->dtpr_aframes + 2;
 			dtrace_provider_t *pv;
-			uint64_t val;
+			uintcap_t val;
 
 			pv = mstate->dtms_probe->dtpr_provider;
-			if (pv->dtpv_pops.dtps_getargval != NULL)
+			if (pv->dtpv_pops.dtps_getargval != NULL) {
 				val = pv->dtpv_pops.dtps_getargval(pv->dtpv_arg,
 				    mstate->dtms_probe->dtpr_id,
 				    mstate->dtms_probe->dtpr_arg, ndx, aframes);
-			else
+			} else {
+				// TODO(nicomazz): make this capability aware
 				val = dtrace_getarg(ndx, aframes);
+			}
 
 			/*
 			 * This is regrettably required to keep the compiler
@@ -4237,9 +4239,8 @@ dtrace_json(uint64_t size, uintptr_t json, char *elemlist, int nelems,
  * happen is that a bogus program can obtain bogus results.
  */
 static void
-dtrace_dif_subr(uint_t subr, uint_t rd, uint64_t *regs,
-    dtrace_key_t *tupregs, int nargs,
-    dtrace_mstate_t *mstate, dtrace_state_t *state)
+dtrace_dif_subr(uint_t subr, uint_t rd, uintcap_t *regs, dtrace_key_t *tupregs,
+    int nargs, dtrace_mstate_t *mstate, dtrace_state_t *state)
 {
 	volatile uint16_t *flags = &cpu_core[curcpu].cpuc_dtrace_flags;
 	volatile uintptr_t *illval = &cpu_core[curcpu].cpuc_dtrace_illval;
@@ -6109,7 +6110,7 @@ dtrace_dif_emulate(dtrace_difo_t *difo, dtrace_mstate_t *mstate,
 	const char *strtab = difo->dtdo_strtab;
 	const uint64_t *inttab = difo->dtdo_inttab;
 
-	uint64_t rval = 0;
+	uintcap_t rval = 0;
 	dtrace_statvar_t *svar;
 	dtrace_dstate_t *dstate = &vstate->dtvs_dynvars;
 	dtrace_difv_t *v;
@@ -6117,7 +6118,7 @@ dtrace_dif_emulate(dtrace_difo_t *difo, dtrace_mstate_t *mstate,
 	volatile uintptr_t *illval = &cpu_core[curcpu].cpuc_dtrace_illval;
 
 	dtrace_key_t tupregs[DIF_DTR_NREGS + 2]; /* +2 for thread and id */
-	uint64_t regs[DIF_DIR_NREGS];
+	uintcap_t regs[DIF_DIR_NREGS];
 	uint64_t *tmp;
 
 	uint8_t cc_n = 0, cc_z = 0, cc_v = 0, cc_c = 0;
@@ -6144,14 +6145,15 @@ dtrace_dif_emulate(dtrace_difo_t *difo, dtrace_mstate_t *mstate,
 		rd = DIF_INSTR_RD(instr);
 
 		switch (DIF_INSTR_OP(instr)) {
+			//TODO(nicomazz): those operations break capabilities. Find how to avoid them with real capabilities
 		case DIF_OP_OR:
-			regs[rd] = regs[r1] | regs[r2];
+			regs[rd] = (uint64_t)regs[r1] | regs[r2];
 			break;
 		case DIF_OP_XOR:
-			regs[rd] = regs[r1] ^ regs[r2];
+			regs[rd] = (uint64_t)regs[r1] ^ regs[r2];
 			break;
 		case DIF_OP_AND:
-			regs[rd] = regs[r1] & regs[r2];
+			regs[rd] = (uint64_t)regs[r1] & regs[r2];
 			break;
 		case DIF_OP_SLL:
 			regs[rd] = regs[r1] << regs[r2];
@@ -6163,10 +6165,10 @@ dtrace_dif_emulate(dtrace_difo_t *difo, dtrace_mstate_t *mstate,
 			regs[rd] = regs[r1] - regs[r2];
 			break;
 		case DIF_OP_ADD:
-			regs[rd] = regs[r1] + regs[r2];
+			regs[rd] = (uint64_t)regs[r1] + regs[r2];
 			break;
 		case DIF_OP_MUL:
-			regs[rd] = regs[r1] * regs[r2];
+			regs[rd] = (uint64_t)regs[r1] * regs[r2];
 			break;
 		case DIF_OP_SDIV:
 			if (regs[r2] == 0) {
@@ -7313,8 +7315,8 @@ dtrace_probe_exit(dtrace_icookie_t cookie)
  * subsequent probe-context DTrace activity emanates.
  */
 void
-dtrace_probe(dtrace_id_t id, uintptr_t arg0, uintptr_t arg1,
-    uintptr_t arg2, uintptr_t arg3, uintptr_t arg4)
+dtrace_probe(dtrace_id_t id, uintcap_t arg0, uintcap_t arg1, uintcap_t arg2,
+    uintcap_t arg3, uintcap_t arg4)
 {
 	processorid_t cpuid;
 	dtrace_icookie_t cookie;
@@ -7639,10 +7641,11 @@ dtrace_probe(dtrace_id_t id, uintptr_t arg0, uintptr_t arg1,
 				if (!dtrace_priv_kernel(state))
 					continue;
 
-				dtrace_getpcstack((pc_t *)(tomax + valoffs),
+				// TODO(nicomazz): fix this!
+				/*dtrace_getpcstack((pc_t *)(tomax + valoffs),
 				    size / sizeof (pc_t), probe->dtpr_aframes,
 				    DTRACE_ANCHORED(probe) ? NULL :
-				    (uint32_t *)arg0);
+				    (uint32_t *)arg0);*/
 				continue;
 
 			case DTRACEACT_JSTACK:

@@ -381,8 +381,8 @@ SET_DECLARE(sdt_argtypes_set, struct sdt_argtype);
  * This type definition must match that of dtrace_probe. It is defined this
  * way to avoid having to rely on CDDL code.
  */
-typedef	void (*sdt_probe_func_t)(uint32_t, uintptr_t arg0, uintptr_t arg1,
-    uintptr_t arg2, uintptr_t arg3, uintptr_t arg4);
+typedef void (*sdt_probe_func_t)(uint32_t, uintcap_t arg0, uintcap_t arg1,
+    uintcap_t arg2, uintcap_t arg3, uintcap_t arg4);
 
 /*
  * The 'sdt' provider will set it to dtrace_probe when it loads.
@@ -424,8 +424,8 @@ struct sdt_provider {
 	int		sdt_refs;	/* Number of module references. */
 };
 
-void sdt_probe_stub(uint32_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t,
-    uintptr_t);
+void sdt_probe_stub(
+    uint32_t, uintcap_t, uintcap_t, uintcap_t, uintcap_t, uintcap_t);
 
 SDT_PROVIDER_DECLARE(sdt);
 

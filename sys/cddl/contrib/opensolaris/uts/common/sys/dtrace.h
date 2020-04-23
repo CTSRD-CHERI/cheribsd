@@ -2225,8 +2225,8 @@ extern dtrace_id_t dtrace_probe_lookup(dtrace_provider_id_t, char *,
 extern dtrace_id_t dtrace_probe_create(dtrace_provider_id_t, const char *,
     const char *, const char *, int, void *);
 extern void *dtrace_probe_arg(dtrace_provider_id_t, dtrace_id_t);
-extern void dtrace_probe(dtrace_id_t, uintptr_t arg0, uintptr_t arg1,
-    uintptr_t arg2, uintptr_t arg3, uintptr_t arg4);
+extern void dtrace_probe(dtrace_id_t, uintcap_t arg0, uintcap_t arg1,
+    uintcap_t arg2, uintcap_t arg3, uintcap_t arg4);
 
 /*
  * DTrace Meta Provider API

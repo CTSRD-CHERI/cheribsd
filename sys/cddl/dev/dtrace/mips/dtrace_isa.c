@@ -215,7 +215,7 @@ dtrace_getufpstack(uint64_t *pcstack, uint64_t *fpstack, int pcstack_limit)
 }
 
 /*ARGSUSED*/
-uint64_t
+uintcap_t
 dtrace_getarg(int arg, int aframes)
 {
 	int i;
