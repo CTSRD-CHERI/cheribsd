@@ -71,7 +71,7 @@ int			fbt_probetab_mask;
 
 static d_open_t	fbt_open;
 static int	fbt_unload(void);
-static void	fbt_getargdesc(void *, dtrace_id_t, void *, dtrace_argdesc_t *);
+void	fbt_getargdesc(void *, dtrace_id_t, void *, dtrace_argdesc_t *);
 static void	fbt_provide_module(void *, modctl_t *);
 static void	fbt_destroy(void *, dtrace_id_t, void *);
 static void	fbt_enable(void *, dtrace_id_t, void *);
@@ -1009,7 +1009,7 @@ fbt_type_name(linker_ctf_t *lc, ctf_id_t type, char *buf, size_t len)
 	return (cd.cd_len);
 }
 
-static void
+void
 fbt_getargdesc(void *arg __unused, dtrace_id_t id __unused, void *parg, dtrace_argdesc_t *desc)
 {
 	const ushort_t *dp;

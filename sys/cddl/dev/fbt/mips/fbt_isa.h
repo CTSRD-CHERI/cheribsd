@@ -27,4 +27,6 @@
 
 typedef uint32_t fbt_patchval_t;
 
+void fbt_getargdesc(void *arg __unused, dtrace_id_t id __unused, void *parg,
+		    dtrace_argdesc_t *desc);
 #endif

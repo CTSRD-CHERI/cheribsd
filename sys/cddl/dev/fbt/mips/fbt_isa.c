@@ -44,6 +44,62 @@
 #define	FBT_ENTRY		"entry"
 #define	FBT_RETURN		"return"
 
+#define FBT_PARAMETER_CAPABILITY 0x1
+#define FBT_PARAMETER_FLOAT 0x2
+#define FBT_PARAMETER_OTHERS 0x3
+#define FBT_PARAMETER_UNKNOWN 0x4
+
+static int
+fbt_get_params_type(fbt_probe_t *probe, int inx)
+{
+	dtrace_argdesc_t desc;
+	desc.dtargd_ndx = inx;
+
+	fbt_getargdesc(NULL, 0, probe, &desc);
+	// TODO(nicomazz): in a hybrid kernel, a pointer isn't always a
+	//     capability. This check will change when we can distinguish them.
+	if (strstr(desc.dtargd_native, "*"))
+		return FBT_PARAMETER_CAPABILITY;
+
+	if (strstr(desc.dtargd_native, "float"))
+		return FBT_PARAMETER_FLOAT;
+
+	return FBT_PARAMETER_OTHERS;
+}
+
+static void
+fbt_get_params(struct trapframe *frame, fbt_probe_t *fbt, uintcap_t *params)
+{
+	void *__capability *cap_registers;
+	void *__capability att_cap_r;
+	register_t *normal_registers;
+	register_t att_r;
+	int n_inx, c_inx;
+
+	cap_registers = (void *__capability[5]) { frame->c3, frame->c4,
+		frame->c5, frame->c6, frame->c7 };
+	normal_registers = (register_t[5]) { frame->a0, frame->a1, frame->a2,
+		frame->a3, frame->a4 };
+	n_inx = 0;
+	c_inx = 0;
+
+	for (int i = 0; i < 5; i++) {
+		att_r = normal_registers[n_inx];
+		att_cap_r = cap_registers[c_inx];
+
+		switch (fbt_get_params_type(fbt, i)) {
+		case FBT_PARAMETER_CAPABILITY:
+			params[i] = (uintcap_t)att_cap_r;
+			c_inx++;
+			break;
+
+		default:
+			params[i] = att_r;
+			n_inx++;
+		}
+	}
+}
+
 int
 fbt_invop(uintptr_t addr, struct trapframe *frame, uintptr_t rval)
 {
@@ -57,9 +113,12 @@ fbt_invop(uintptr_t addr, struct trapframe *frame, uintptr_t rval)
 		if ((uintptr_t)fbt->fbtp_patchpoint == addr) {
 			cpu->cpu_dtrace_caller = addr;
 
-			dtrace_probe(fbt->fbtp_id, frame->a0,
-			    frame->a1, frame->a2,
-			    frame->a3, frame->a4);
+			uintcap_t params[5];
+
+			fbt_get_params(frame, fbt, params);
+
+			dtrace_probe(fbt->fbtp_id, params[0], params[1],
+			    params[2], params[3], params[4]);
 
 			cpu->cpu_dtrace_caller = 0;
 			return (fbt->fbtp_savedval);

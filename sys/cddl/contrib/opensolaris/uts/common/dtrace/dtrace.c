@@ -608,6 +608,8 @@ static int dtrace_canload_remains(uint64_t, size_t, size_t *,
 static int dtrace_canstore_remains(uint64_t, size_t, size_t *,
     dtrace_mstate_t *, dtrace_vstate_t *);
 
+
+static int dtrace_capability_len(uintcap_t cap);
 /*
  * DTrace Probe Context Functions
  *
@@ -1219,6 +1221,12 @@ dtrace_strncmp(char *s1, char *s2, size_t limit)
 	} while (--limit && c1 != '\0' && !(*flags & CPU_DTRACE_FAULT));
 
 	return (0);
+}
+
+static int
+dtrace_capability_len(uintcap_t cap)
+{
+	return cheri_getlen((void *__capability)cap);
 }
 
 /*
@@ -4670,7 +4678,11 @@ dtrace_dif_subr(uint_t subr, uint_t rd, uint64_t *regs,
 		}
 		break;
 	}
-
+	case DIF_SUBR_CAPABILITY_LEN: {
+		uintcap_t addr = (uintcap_t)tupregs[0].dttk_value;
+		regs[rd] = dtrace_capability_len(addr);
+		break;
+	}
 	case DIF_SUBR_STRLEN: {
 		size_t size = state->dts_options[DTRACEOPT_STRSIZE];
 		uintptr_t addr = (uintptr_t)tupregs[0].dttk_value;
