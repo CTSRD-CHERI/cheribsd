@@ -774,7 +774,7 @@ dt_node_type_size(const dt_node_t *dnp)
 	    ctf_getmodel(dnp->dn_ctfp) == CTF_MODEL_ILP32 &&
 	    !(dnp->dn_flags & DT_NF_USERLAND) &&
 	    dtp->dt_conf.dtc_ctfmodel == CTF_MODEL_LP64)
-			return (8);
+			return (8); // TODO(nicomazz): this should be 16 with CHERI
 
 	return (ctf_type_size(dnp->dn_ctfp, dnp->dn_type));
 }

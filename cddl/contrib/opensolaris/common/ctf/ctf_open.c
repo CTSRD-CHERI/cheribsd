@@ -35,6 +35,7 @@
 static const ctf_dmodel_t _libctf_models[] = {
 	{ "ILP32", CTF_MODEL_ILP32, 4, 1, 2, 4, 4 },
 	{ "LP64", CTF_MODEL_LP64, 8, 1, 2, 4, 8 },
+	{ "LP64_CAP", CTF_MODEL_LP64_CAP, 16, 1, 2, 4, 8 },
 	{ NULL, 0, 0, 0, 0, 0, 0 }
 };
 
@@ -772,8 +773,13 @@ ctf_bufopen(const ctf_sect_t *ctfsect, const ctf_sect_t *symsect,
 	fp->ctf_lookups[4].ctl_hash = NULL;
 
 	if (symsect != NULL) {
-		if (symsect->cts_entsize == sizeof (Elf64_Sym))
-			(void) ctf_setmodel(fp, CTF_MODEL_LP64);
+		if (symsect->cts_entsize == sizeof (Elf64_Sym)) {
+#if __has_feature(capabilities)
+			(void)ctf_setmodel(fp, CTF_MODEL_LP64_CAP);
+#else
+			(void)ctf_setmodel(fp, CTF_MODEL_LP64);
+#endif
+		}
 		else
 			(void) ctf_setmodel(fp, CTF_MODEL_ILP32);
 	} else

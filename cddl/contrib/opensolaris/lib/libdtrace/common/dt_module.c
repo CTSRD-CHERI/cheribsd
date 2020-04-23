@@ -500,7 +500,8 @@ dt_module_create(dtrace_hdl_t *dtp, const char *name)
 	dtp->dt_mods[h] = dmp;
 	dtp->dt_nmods++;
 
-	if (dtp->dt_conf.dtc_ctfmodel == CTF_MODEL_LP64)
+	if (dtp->dt_conf.dtc_ctfmodel == CTF_MODEL_LP64 ||
+	    dtp->dt_conf.dtc_ctfmodel == CTF_MODEL_LP64_CAP)
 		dmp->dm_ops = &dt_modops_64;
 	else
 		dmp->dm_ops = &dt_modops_32;
@@ -893,8 +894,14 @@ dt_module_getctf(dtrace_hdl_t *dtp, dt_module_t *dmp)
 	if (dmp->dm_ctfp != NULL || dt_module_load(dtp, dmp) != 0)
 		return (dmp->dm_ctfp);
 
-	if (dmp->dm_ops == &dt_modops_64)
+	if (dmp->dm_ops == &dt_modops_64){
+#if __has_feature(capabilities)
+		model = CTF_MODEL_LP64_CAP;
+#else
 		model = CTF_MODEL_LP64;
+#endif
+
+	}
 	else
 		model = CTF_MODEL_ILP32;
 

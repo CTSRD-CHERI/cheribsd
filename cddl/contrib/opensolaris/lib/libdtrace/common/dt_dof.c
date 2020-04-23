@@ -603,6 +603,8 @@ dof_hdr(dtrace_hdl_t *dtp, uint8_t dofversion, dof_hdr_t *hp)
 
 	if (dtp->dt_conf.dtc_ctfmodel == CTF_MODEL_LP64)
 		hp->dofh_ident[DOF_ID_MODEL] = DOF_MODEL_LP64;
+	else if (dtp->dt_conf.dtc_ctfmodel == CTF_MODEL_LP64_CAP)
+		hp->dofh_ident[DOF_ID_MODEL] = DOF_MODEL_LP64_CAP;
 	else
 		hp->dofh_ident[DOF_ID_MODEL] = DOF_MODEL_ILP32;
 

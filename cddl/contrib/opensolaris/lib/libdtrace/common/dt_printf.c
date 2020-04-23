@@ -952,7 +952,8 @@ dt_printf_create(dtrace_hdl_t *dtp, const char *s)
 			goto fmt_switch;
 
 		case '?':
-			if (dtp->dt_conf.dtc_ctfmodel == CTF_MODEL_LP64)
+			if (dtp->dt_conf.dtc_ctfmodel == CTF_MODEL_LP64 ||
+			    dtp->dt_conf.dtc_ctfmodel == CTF_MODEL_LP64_CAP)
 				pfd->pfd_width = 16;
 			else
 				pfd->pfd_width = 8;

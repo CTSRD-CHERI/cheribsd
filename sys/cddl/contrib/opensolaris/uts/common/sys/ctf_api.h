@@ -125,7 +125,10 @@ typedef struct ctf_lblinfo {
  */
 #define	CTF_MODEL_ILP32	1	/* object data model is ILP32 */
 #define	CTF_MODEL_LP64	2	/* object data model is LP64 */
-#ifdef _LP64
+#define	CTF_MODEL_LP64_CAP 3	/* object data model is LP64 */
+#if __has_feature(capabilities)
+#define	CTF_MODEL_NATIVE	CTF_MODEL_LP64_CAP
+#elif  _LP64
 #define	CTF_MODEL_NATIVE	CTF_MODEL_LP64
 #else
 #define	CTF_MODEL_NATIVE	CTF_MODEL_ILP32

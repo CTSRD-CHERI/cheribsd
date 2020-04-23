@@ -658,8 +658,11 @@ typedef struct dof_hdr {
 #define	DOF_MODEL_NONE	0	/* DOF_ID_MODEL */
 #define	DOF_MODEL_ILP32	1
 #define	DOF_MODEL_LP64	2
+#define	DOF_MODEL_LP64_CAP	2
 
-#ifdef _LP64
+#if __has_feature(capabilities)
+#define	DOF_MODEL_NATIVE	DOF_MODEL_LP64_CAP
+#elif defined(_LP64)
 #define	DOF_MODEL_NATIVE	DOF_MODEL_LP64
 #else
 #define	DOF_MODEL_NATIVE	DOF_MODEL_ILP32
