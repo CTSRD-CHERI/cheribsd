@@ -98,6 +98,7 @@ fbt_provide_module_function(linker_file_t lf, int symindx,
 
 	/* Look for store double to ra register */
 	for (; instr < limit; instr++) {
+		// TODO(nicomazz): verify that this works also for cheriABI
 		if ((*instr & LDSD_RA_SP_MASK) == SD_RA_SP)
 			break;
 	}
