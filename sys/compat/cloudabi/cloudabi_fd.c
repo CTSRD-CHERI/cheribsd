@@ -23,6 +23,8 @@
  * SUCH DAMAGE.
  */
 
+#define	EXPLICIT_USER_ACCESS
+
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
@@ -411,7 +413,7 @@ cloudabi_sys_fd_stat_get(struct thread *td,
 	convert_capabilities(&fcaps.fc_rights, fsb.fs_filetype,
 	    &fsb.fs_rights_base, &fsb.fs_rights_inheriting);
 	filecaps_free(&fcaps);
-	return (copyout(&fsb, (void *)uap->buf, sizeof(fsb)));
+	return (copyout(&fsb, __USER_CAP_OBJ(uap->buf), sizeof(fsb)));
 }
 
 /* Converts CloudABI rights to a set of Capsicum capabilities. */
@@ -441,7 +443,7 @@ cloudabi_sys_fd_stat_put(struct thread *td,
 	cap_rights_t rights;
 	int error, oflags;
 
-	error = copyin(uap->buf, &fsb, sizeof(fsb));
+	error = copyin(__USER_CAP_OBJ(uap->buf), &fsb, sizeof(fsb));
 	if (error != 0)
 		return (error);
 
