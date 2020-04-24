@@ -43,6 +43,7 @@
  * CHERI-aware Clang/LLVM, and full capability context switching.
  */
 #define	cheri_getlen(x)		__builtin_cheri_length_get((x))
+#define	cheri_getlength(x)	__builtin_cheri_length_get((x))
 #define	cheri_getbase(x)	__builtin_cheri_base_get((x))
 #define	cheri_getoffset(x)	__builtin_cheri_offset_get((x))
 #define	cheri_getaddress(x)	__builtin_cheri_address_get((x))
