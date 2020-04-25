@@ -107,8 +107,7 @@ nfsm_uiombuf(struct nfsrv_descript *nd, struct uio *uiop, int siz)
 			    NFSBCOPY((__cheri_fromcap char *)uiocp,
 				mtod(mp, caddr_t) + mp->m_len, xfer);
 			else
-			    copyin(CAST_USER_ADDR_T(uiocp),
-				mtod(mp, caddr_t) + mp->m_len, xfer);
+			    copyin(uiocp, mtod(mp, caddr_t) + mp->m_len, xfer);
 			mp->m_len += xfer;
 			left -= xfer;
 			uiocp += xfer;
