@@ -123,6 +123,7 @@ mips/mips/mips_pic.c			optional	intrng
 cddl/compat/opensolaris/kern/opensolaris_atomic.c	optional zfs | dtrace compile-with "${CDDL_C}"
 cddl/dev/dtrace/mips/dtrace_asm.S			optional dtrace compile-with "${DTRACE_S}"
 cddl/dev/dtrace/mips/dtrace_subr.c			optional dtrace compile-with "${DTRACE_C}"
+cddl/contrib/opensolaris/uts/mips/dtrace/fasttrap_isa.c     optional dtrace compile-with "${FASTTRAP_C}"
 cddl/dev/fbt/mips/fbt_isa.c				optional dtrace_fbt | dtraceall compile-with "${FBT_C}"
 
 # Zstd
