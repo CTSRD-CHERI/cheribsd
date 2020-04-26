@@ -13,6 +13,8 @@ makeoptions     KERNLOADADDR=0xffffffff80100000
 
 makeoptions     DEBUG="-g"
 makeoptions     WITH_CTF=1
+
+# TODO(nicomazz) compile dtrace test into kernel, to avoid fixing modules
 # makeoptions     MODULES_OVERRIDE="dtrace/dtrace_test dtrace/dtraceall"
 
 options         KTRACE

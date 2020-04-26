@@ -83,6 +83,24 @@ fasttrap_tracepoint_remove(proc_t *p, fasttrap_tracepoint_t *tp)
 
 	return (0);
 }
+uint64_t
+fasttrap_pid_getarg(void *arg, dtrace_id_t id, void *parg, int argno,
+		    int aframes)
+{
+	printf("IMPLEMENT ME: %s\n", __func__);
+
+
+	return 0;
+}
+uint64_t
+fasttrap_usdt_getarg(void *arg, dtrace_id_t id, void *parg, int argno,
+		     int aframes)
+{
+	printf("IMPLEMENT ME: %s\n", __func__);
+
+
+	return 0;
+}
 
 // TODO(nicomazz): handle B instructions correctly, if they will be needed.
 /*
@@ -171,58 +189,6 @@ fasttrap_tracepoint_init(proc_t *p, fasttrap_tracepoint_t *tp, uintptr_t pc,
 //     has to be taken from a capability register. Otherwise, from a normal
 //     register
 
-/*
-static uint64_t
-fasttrap_anarg(struct reg *rp, int argno)
-{
-	uint64_t value;
-	proc_t  *p = curproc;
-
-	*/
-/* The first 8 arguments are in registers. */ /*
-
-	 if (argno < 8)
-		 return rp->fixreg[argno + 3];
-
-	 */
-/* Arguments on stack start after SP+LR (2 register slots). */ /*
-
-	 if (SV_PROC_FLAG(p, SV_ILP32)) {
-		 DTRACE_CPUFLAG_SET(CPU_DTRACE_NOFAULT);
-		 value = dtrace_fuword32((void *)(rp->fixreg[1] + 8 +
-						  ((argno - 8) *
- sizeof(uint32_t)))); DTRACE_CPUFLAG_CLEAR(CPU_DTRACE_NOFAULT |
- CPU_DTRACE_BADADDR); } else { DTRACE_CPUFLAG_SET(CPU_DTRACE_NOFAULT); value =
- dtrace_fuword64((void *)(rp->fixreg[1] + 48 +
-						  ((argno - 8) *
- sizeof(uint64_t)))); DTRACE_CPUFLAG_CLEAR(CPU_DTRACE_NOFAULT |
- CPU_DTRACE_BADADDR);
-	 }
-	 return value;
- }
- */
-
-/*uint64_t
-fasttrap_pid_getarg(void *arg, dtrace_id_t id, void *parg, int argno,
-		    int aframes)
-{
-	struct reg r;
-
-	fill_regs(curthread, &r);
-
-	return (fasttrap_anarg(&r, argno));
-}
-
-uint64_t
-fasttrap_usdt_getarg(void *arg, dtrace_id_t id, void *parg, int argno,
-		     int aframes)
-{
-	struct reg r;
-
-	fill_regs(curthread, &r);
-
-	return (fasttrap_anarg(&r, argno));
-}*/
 
 // TODO(nicomazz): this is not currently used/tested, because we are only
 //     supporting the entry probe

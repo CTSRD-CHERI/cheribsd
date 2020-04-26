@@ -43,7 +43,7 @@ extern "C" {
 typedef	uint32_t	fasttrap_instr_t;
 
 /* This mips implementation will only support to put a probe on the entrypoint
- * of a userpsace function, and not at an offset or return (so far)
+ * of a userpsace function, and not at an offset or return.
  */
 // This struct is a field of fasttrap_tracepoint
 typedef struct fasttrap_machtp_t {
