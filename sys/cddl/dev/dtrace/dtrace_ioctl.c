@@ -466,7 +466,7 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 		if (!CAP_USPACE) {
 			dtrace_enable_io_64_t *p =
 			    (dtrace_enable_io_64_t *)addr;
-			dof_ptr = __USER_CAP_OBJ(p->dof);
+			dof_ptr = __USER_CAP_UNBOUND(p->dof);
 			n_matched = &p->n_matched;
 		} else {
 			dtrace_enable_io_t *p = (dtrace_enable_io_t *)addr;

@@ -71,6 +71,12 @@ typedef struct fasttrap_machtp_t {
 #define FASTTRAP_T_BC		0x02
 #define FASTTRAP_T_NOP		0x05
 
+
+#define	FASTTRAP_AFRAMES		3
+#define	FASTTRAP_RETURN_AFRAMES		4
+#define	FASTTRAP_ENTRY_AFRAMES		3
+#define	FASTTRAP_OFFSET_AFRAMES		3
+
 #ifdef	__cplusplus
 }
 #endif

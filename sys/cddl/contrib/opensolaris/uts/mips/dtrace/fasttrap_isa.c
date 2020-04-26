@@ -50,7 +50,10 @@
 #include <cddl/contrib/opensolaris/uts/common/sys/fasttrap.h>
 #include <cddl/contrib/opensolaris/uts/common/sys/dtrace.h>
 
-
+/*
+ * This is not a complete implementation of fasttrap, but only aims at catching
+ * the entry point of functions, and their parameters.
+ * */
 int
 fasttrap_tracepoint_install(proc_t *p, fasttrap_tracepoint_t *tp)
 {
@@ -81,7 +84,7 @@ fasttrap_tracepoint_remove(proc_t *p, fasttrap_tracepoint_t *tp)
 	return (0);
 }
 
-// TODO(nicomazz): handle B instructions correctly
+// TODO(nicomazz): handle B instructions correctly, if they will be needed.
 /*
  * get the type of instruction from the pc among:
  * FASTTRAP_T_COMMON
@@ -129,13 +132,12 @@ fasttrap_tracepoint_init(proc_t *p, fasttrap_tracepoint_t *tp, uintptr_t pc,
 			break; // TODO(nicomazz): is this break needed?
 		}
 	}
-	case OP_TEQ: /* trap instructions?*/
+	case OP_TEQ: /* trap instructions*/
 	case OP_TGE:
 	case OP_TGEU:
 	case OP_TLT:
 	case OP_TLTU:
 	case OP_TNE:
-
 		return (-1);
 	// TODO(nicomazz) handle all the various branch cases. In theory, as
 	// long as we are only supporting the entry probe, this is not neeeded.
@@ -226,7 +228,7 @@ fasttrap_usdt_getarg(void *arg, dtrace_id_t id, void *parg, int argno,
 //     supporting the entry probe
 static void
 fasttrap_return_common(
-    struct reg *rp, uintptr_t pc, pid_t pid, uintptr_t new_pc)
+    struct reg *rp, uintcap_t pc, pid_t pid, uintptr_t new_pc)
 {
 	printf("IMPLEMENT ME: %s\n", __func__);
 	// see how it is done for powerpc
@@ -262,7 +264,7 @@ fasttrap_pid_probe(struct trapframe *frame)
 	 */
 	if (curthread->t_dtrace_step) {
 		ASSERT(curthread->t_dtrace_on);
-		fasttrap_sigtrap(p, curthread, pc);
+		fasttrap_sigtrap(p, curthread, pcc);
 		return (0);
 	}
 
@@ -277,7 +279,7 @@ fasttrap_pid_probe(struct trapframe *frame)
 
 	rm_rlock(&fasttrap_tp_lock, &tracker);
 	pid = p->p_pid;
-	bucket = &fasttrap_tpoints.fth_table[FASTTRAP_TPOINTS_INDEX(pid, pc)];
+	bucket = &fasttrap_tpoints.fth_table[FASTTRAP_TPOINTS_INDEX(pid, pcc)];
 
 	/*
 	 * Lookup the tracepoint that the process just hit.
@@ -331,10 +333,11 @@ fasttrap_pid_probe(struct trapframe *frame)
 				 * encounters the true probe.
 				 */
 				is_enabled = 1;
-			} else  {
+			} else {
 				// TODO(nicomazz): use CTF to understand where
 				// to get the parameters from (cap registers or
-				// normal ones)
+				// normal ones). Look how it is done in
+				// fbt_isa.c
 				dtrace_probe(probe->ftp_id, rp->r_regs[A0],
 				    rp->r_regs[A1], rp->r_regs[A2],
 				    rp->r_regs[A3], rp->r_regs[A4]);
@@ -408,11 +411,11 @@ done:
 		 * need to wait until the user thread returns to the kernel.
 		 */
 		if (tp->ftt_type != FASTTRAP_T_COMMON) {
-			fasttrap_return_common(rp, pc, pid, new_pc);
+			fasttrap_return_common(rp, pcc, pid, new_pc);
 		} else {
 			// TODO(nicomazz): is this code complete?
 			ASSERT(curthread->t_dtrace_ret != 0);
-			ASSERT(curthread->t_dtrace_pc == pc);
+			ASSERT(curthread->t_dtrace_pc == pcc);
 			ASSERT(curthread->t_dtrace_scrpc != 0);
 			ASSERT(new_pc == curthread->t_dtrace_astpc);
 		}
@@ -429,8 +432,8 @@ fasttrap_return_probe(struct trapframe *tf)
 {
 	struct reg reg, *rp;
 	proc_t *p = curproc;
-	uintptr_t pc = curthread->t_dtrace_pc;
-	uintptr_t npc = curthread->t_dtrace_npc;
+	uintcap_t pc = curthread->t_dtrace_pc;
+	uintcap_t npc = curthread->t_dtrace_npc;
 
 	curthread->t_dtrace_pc = 0;
 	curthread->t_dtrace_npc = 0;
@@ -446,7 +449,7 @@ fasttrap_return_probe(struct trapframe *tf)
 	 * instruction.
 	 */
 
-	TRAPF_PC_SET_ADDR(pc);
+	TRAPF_PC_SET_ADDR(tf,pc);
 
 	fasttrap_return_common(rp, pc, p->p_pid, npc);
 
