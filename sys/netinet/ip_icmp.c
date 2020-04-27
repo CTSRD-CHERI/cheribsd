@@ -569,7 +569,7 @@ icmp_input(struct mbuf **mp, int *offp, int proto)
 		ctlfunc = inetsw[ip_protox[icp->icmp_ip.ip_p]].pr_ctlinput;
 		if (ctlfunc)
 			(*ctlfunc)(code, (struct sockaddr *)&icmpsrc,
-				   (void *)&icp->icmp_ip);
+				   (void *)__unbounded_addressof(icp->icmp_ip));
 		break;
 
 	badcode:
