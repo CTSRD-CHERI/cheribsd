@@ -54,7 +54,7 @@ ef_reloc(struct elf_file *ef, const void *reldata, int reltype, Elf_Off relbase,
 	const Elf_Rela *rela;
 	Elf_Addr addend, addr;
 	Elf_Size rtype, symidx;
-	int dest_offset;
+	ptrdiff_t dest_offset;
 
 	switch (reltype) {
 	case EF_RELOC_REL:
@@ -67,7 +67,7 @@ ef_reloc(struct elf_file *ef, const void *reldata, int reltype, Elf_Off relbase,
 		break;
 	case EF_RELOC_RELA:
 		rela = (const Elf_Rela *)reldata;
-		dest_offset = relbase + rel->r_offset - dataoff;
+		dest_offset = relbase + rela->r_offset - dataoff;
 		where = (Elf_Addr *)((char *)dest + dest_offset);
 		addend = rela->r_addend;
 		rtype = ELF_R_TYPE(rela->r_info);
