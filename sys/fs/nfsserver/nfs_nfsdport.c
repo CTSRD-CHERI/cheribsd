@@ -3486,7 +3486,8 @@ nfssvc_nfsd(struct thread *td, struct nfssvc_args *uap)
 			goto out;
 		}
 		if ((uap->flag & NFSSVC_NEWSTRUCT) == 0) {
-			error = copyin(uap->argp, &onfsdarg, sizeof(onfsdarg));
+			error = copyincap(uap->argp, &onfsdarg,
+			    sizeof(onfsdarg));
 			if (error == 0) {
 				nfsdarg.principal = onfsdarg.principal;
 				nfsdarg.minthreads = onfsdarg.minthreads;
@@ -3503,7 +3504,7 @@ nfssvc_nfsd(struct thread *td, struct nfssvc_args *uap)
 				nfsdarg.mirrorcnt = 1;
 			}
 		} else
-			error = copyin(uap->argp, &nfsdarg, sizeof(nfsdarg));
+			error = copyincap(uap->argp, &nfsdarg, sizeof(nfsdarg));
 		if (error)
 			goto out;
 		if (nfsdarg.addrlen > 0 && nfsdarg.addrlen < 10000 &&
@@ -3579,7 +3580,7 @@ nfssvc_nfsd(struct thread *td, struct nfssvc_args *uap)
 		free((__cheri_fromcap char *)nfsdarg.dspath, M_TEMP);
 		free((__cheri_fromcap char *)nfsdarg.mdspath, M_TEMP);
 	} else if (uap->flag & NFSSVC_PNFSDS) {
-		error = copyin(uap->argp, &pnfsdarg, sizeof(pnfsdarg));
+		error = copyincap(uap->argp, &pnfsdarg, sizeof(pnfsdarg));
 		if (error == 0 && (pnfsdarg.op == PNFSDOP_DELDSSERVER ||
 		    pnfsdarg.op == PNFSDOP_FORCEDELDS)) {
 			cp = malloc(PATH_MAX + 1, M_TEMP, M_WAITOK);
@@ -3706,7 +3707,7 @@ nfssvc_srvcall(struct thread *p, struct nfssvc_args *uap, struct ucred *cred)
 		if (!error)
 			error = nfsrv_adminrevoke(&adminrevoke, p);
 	} else if (uap->flag & NFSSVC_DUMPCLIENTS) {
-		error = copyin(uap->argp, (caddr_t)&dumplist,
+		error = copyincap(uap->argp, (caddr_t)&dumplist,
 		    sizeof (struct nfsd_dumplist));
 		if (!error && (dumplist.ndl_size < 1 ||
 			dumplist.ndl_size > NFSRV_MAXDUMPLIST))
@@ -3719,7 +3720,7 @@ nfssvc_srvcall(struct thread *p, struct nfssvc_args *uap, struct ucred *cred)
 		    free(dumpclients, M_TEMP);
 		}
 	} else if (uap->flag & NFSSVC_DUMPLOCKS) {
-		error = copyin(uap->argp, (caddr_t)&dumplocklist,
+		error = copyincap(uap->argp, (caddr_t)&dumplocklist,
 		    sizeof (struct nfsd_dumplocklist));
 		if (!error && (dumplocklist.ndllck_size < 1 ||
 			dumplocklist.ndllck_size > NFSRV_MAXDUMPLIST))
