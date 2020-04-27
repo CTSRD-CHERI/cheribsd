@@ -480,6 +480,9 @@ dt_cg_typecast(const dt_node_t *src, const dt_node_t *dst,
 		return; /* not narrowing or changing signed-ness */
 	if (dstsize > srcsize && (src->dn_flags & DT_NF_SIGNED) == 0)
 		return; /* nothing to do in this case */
+	if (dstsize == sizeof(intptr_t) && srcsize == sizeof(uint64_t))
+		return; /* TODO(nicomazz): find where the size of args is set
+			   to 8. In the meantime this will fix the issue. */
 
 	rg = dt_regset_alloc(drp);
 
