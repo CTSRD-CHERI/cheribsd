@@ -83,9 +83,13 @@ _rtld_error(const char *fmt __unused, ...)
 	va_end(ap);
 }
 
+#if 0
 #define PRINT_FUNCTION_NOT_AVAILABLE()	\
 	_rtld_error("%s: %s is not available when statically linked.", \
 	    getprogname(), __func__)
+#else
+#define PRINT_FUNCTION_NOT_AVAILABLE()	dlerror()
+#endif
 
 #pragma weak dladdr
 int
