@@ -66,6 +66,7 @@ SUBDIR=	${SUBDIR_BOOTSTRAP} \
 	libjpeg \
 	libkiconv \
 	libkvm \
+	liblinker_set_test \
 	liblua \
 	liblzma \
 	libmemstat \

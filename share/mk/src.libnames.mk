@@ -219,6 +219,9 @@ _LIBRARIES=	\
 		zfs \
 		zpool \
 
+
+_LIBRARIES+=	linker_set_test
+
 .if ${MK_BLACKLIST} != "no"
 _LIBRARIES+= \
 		blacklist \
