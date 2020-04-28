@@ -106,8 +106,8 @@ ATF_TC_BODY(cocall, tc)
 {
 	void * __capability switcher_code;
 	void * __capability switcher_data;
-	uint64_t buf;
 	char *name;
+	uint64_t buf;
 	pid_t pid, pid2;
 	int error;
 
@@ -147,8 +147,8 @@ ATF_TC_BODY(cocall_h, tc)
 	void * __capability switcher_code;
 	void * __capability switcher_data;
 	void * __capability lookedup;
-	uint64_t buf;
 	char *arg;
+	uint64_t buf;
 	int error;
 
 	arg = getenv("COCALL_TEST_HELPER_ARG");
@@ -170,8 +170,8 @@ ATF_TC_BODY(cocall_bad_caller_buf, tc)
 {
 	void * __capability switcher_code;
 	void * __capability switcher_data;
-	uint64_t buf;
 	char *name;
+	uint64_t buf;
 	pid_t pid, pid2;
 	int error;
 
@@ -269,8 +269,8 @@ ATF_TC_BODY(cocall_bad_callee_buf_h, tc)
 	void * __capability switcher_code;
 	void * __capability switcher_data;
 	void * __capability lookedup;
-	uint64_t buf;
 	char *arg;
+	uint64_t buf;
 	int error;
 
 	arg = getenv("COCALL_TEST_HELPER_ARG");
@@ -292,8 +292,8 @@ ATF_TC_BODY(cocall_callee_abort, tc)
 {
 	void * __capability switcher_code;
 	void * __capability switcher_data;
-	uint64_t buf;
 	char *name;
+	uint64_t buf;
 	pid_t pid, pid2;
 	int error;
 
@@ -332,8 +332,8 @@ ATF_TC_BODY(cocall_callee_abort_h, tc)
 	void * __capability switcher_code;
 	void * __capability switcher_data;
 	void * __capability lookedup;
-	uint64_t buf;
 	char *arg;
+	uint64_t buf;
 	int error;
 
 	arg = getenv("COCALL_TEST_HELPER_ARG");
@@ -355,8 +355,8 @@ ATF_TC_BODY(cocall_callee_dead, tc)
 {
 	void * __capability switcher_code;
 	void * __capability switcher_data;
-	uint64_t buf;
 	char *name, *pidstr;
+	uint64_t buf;
 	pid_t pid, pid2;
 	int error;
 
@@ -399,8 +399,8 @@ ATF_TC_BODY(cocall_callee_dead_h, tc)
 	void * __capability switcher_code;
 	void * __capability switcher_data;
 	void * __capability lookedup;
-	uint64_t buf;
 	char *arg, *arg2;
+	uint64_t buf;
 	pid_t pid;
 	int error;
 
