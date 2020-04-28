@@ -192,13 +192,13 @@ struct ifgroupreq64 {
 };
 
 struct ifmediareq64 {
-	char	ifm_name[IFNAMSIZ];
-	int	ifm_current;
-	int	ifm_mask;
-	int	ifm_status;
-	int	ifm_active;
-	int	ifm_count;
-	int	*ifm_ulist;
+	char		ifm_name[IFNAMSIZ];
+	int		ifm_current;
+	int		ifm_mask;
+	int		ifm_status;
+	int		ifm_active;
+	int		ifm_count;
+	uint64_t	ifm_ulist; /* (int *) */
 };
 #define	SIOCGIFMEDIA64	_IOC_NEWTYPE(SIOCGIFMEDIA, struct ifmediareq64)
 #define	SIOCGIFXMEDIA64	_IOC_NEWTYPE(SIOCGIFXMEDIA, struct ifmediareq64)
