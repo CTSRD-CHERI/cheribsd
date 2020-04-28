@@ -167,23 +167,29 @@ colocation_get_peer(struct thread *td, struct thread **peertdp)
 void
 colocation_thread_exit(struct thread *td)
 {
-	struct mdthread *callermd;
+	struct mdthread *md, *callermd;
 	struct switchercb scb, *peerscb;
 	vaddr_t addr;
 	bool have_scb;
 	int error;
 
-	/*
-	 * Wake up any thread waiting on cocall_slow(2).
-	 */
-	if (td->td_md.md_slow_caller_td != NULL) {
-		callermd = &td->td_md.md_slow_caller_td->td_md;
-		cv_signal(&callermd->md_slow_cv);
-	}
-
 	have_scb = colocation_fetch_scb(td, &scb);
 	if (!have_scb)
 		return;
+
+	md = &td->td_md;
+	sx_xlock(&md->md_slow_lock);
+	md->md_slow_accepting = false;
+	sx_xunlock(&md->md_slow_lock);
+
+	/*
+	 * Wake up any thread waiting on cocall_slow(2).
+	 */
+	if (md->md_slow_caller_td != NULL) {
+		COLOCATION_DEBUG("waking up slow cocaller %p", md->md_slow_caller_td);
+		callermd = &md->md_slow_caller_td->td_md;
+		cv_signal(&callermd->md_slow_cv);
+	}
 
 	peerscb = (__cheri_fromcap struct switchercb *)scb.scb_peer_scb;
 	COLOCATION_DEBUG("terminating thread %p, scb %p, peer scb %p",
@@ -773,7 +779,7 @@ kern_coaccept_slow(void * __capability code, void * __capability data,
 	}
 
 	/*
-	 * NB: This is not supposed to ever be cleared.
+	 * NB: This is not supposed to be cleared until the thread exits.
 	 */
 	md->md_slow_accepting = true;
 

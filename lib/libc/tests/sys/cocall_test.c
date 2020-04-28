@@ -40,6 +40,7 @@
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 
 extern char **environ;
 
@@ -67,7 +68,7 @@ get_exec_path(char *path)
 }
 
 static void
-coexec_helper(pid_t pid, char *name, char *arg)
+coexec_helper(pid_t pid, char *name, char *arg, char *arg2)
 {
 	char path[PATH_MAX];
 	char *helper_argv[4];
@@ -81,6 +82,10 @@ coexec_helper(pid_t pid, char *name, char *arg)
 
 	error = setenv("COCALL_TEST_HELPER_ARG", arg, 1);
 	ATF_REQUIRE_EQ(error, 0);
+	if (arg2 != NULL) {
+		error = setenv("COCALL_TEST_HELPER_ARG2", arg2, 1);
+		ATF_REQUIRE_EQ(error, 0);
+	}
 
 	error = coexecve(pid, path, helper_argv, environ);
 	ATF_REQUIRE_EQ_MSG(error, 0, "failed to execute \"%s %s\": %s",
@@ -127,7 +132,7 @@ ATF_TC_BODY(cocall, tc)
 
 	pid2 = atf_utils_fork();
 	if (pid2 == 0) {
-		coexec_helper(pid, "cocall_h", name);
+		coexec_helper(pid, "cocall_h", name, NULL);
 		atf_tc_fail("You're not supposed to be here");
 	}
 	atf_utils_wait(pid2, 0, "passed\n", "save:/dev/null");
@@ -191,7 +196,7 @@ ATF_TC_BODY(cocall_bad_caller_buf, tc)
 
 	pid2 = atf_utils_fork();
 	if (pid2 == 0) {
-		coexec_helper(pid, "cocall_bad_caller_buf_h", name);
+		coexec_helper(pid, "cocall_bad_caller_buf_h", name, NULL);
 		atf_tc_fail("You're not supposed to be here");
 	}
 	atf_utils_wait(pid2, 0, "passed\n", "save:/dev/null");
@@ -249,7 +254,7 @@ ATF_TC_BODY(cocall_bad_callee_buf, tc)
 
 	pid2 = atf_utils_fork();
 	if (pid2 == 0) {
-		coexec_helper(pid, "cocall_bad_callee_buf_h", name);
+		coexec_helper(pid, "cocall_bad_callee_buf_h", name, NULL);
 		atf_tc_fail("You're not supposed to be here");
 	}
 	atf_utils_wait(pid2, 0, "passed\n", "save:/dev/null");
@@ -312,7 +317,7 @@ ATF_TC_BODY(cocall_callee_abort, tc)
 
 	pid2 = atf_utils_fork();
 	if (pid2 == 0) {
-		coexec_helper(pid, "cocall_callee_abort_h", name);
+		coexec_helper(pid, "cocall_callee_abort_h", name, NULL);
 		atf_tc_fail("You're not supposed to be here");
 	}
 	atf_utils_wait(pid2, 0, "passed\n", "save:/dev/null");
@@ -345,6 +350,90 @@ ATF_TC_BODY(cocall_callee_abort_h, tc)
 	ATF_REQUIRE_EQ(buf, 7);
 }
 
+ATF_TC_WITHOUT_HEAD(cocall_callee_dead);
+ATF_TC_BODY(cocall_callee_dead, tc)
+{
+	void * __capability switcher_code;
+	void * __capability switcher_data;
+	uint64_t buf;
+	char *name, *pidstr;
+	pid_t pid, pid2;
+	int error;
+
+	name = random_string();
+
+	pid = atf_utils_fork();
+	if (pid == 0) {
+		error = cosetup(COSETUP_COACCEPT, &switcher_code, &switcher_data);
+		ATF_REQUIRE_EQ(error, 0);
+
+		error = coregister(name, NULL);
+		ATF_REQUIRE_EQ(error, 0);
+
+		for (;;) {
+			buf = 42;
+			error = coaccept(switcher_code, switcher_data, NULL, &buf, sizeof(buf));
+			ATF_REQUIRE_EQ(error, -1);
+			ATF_REQUIRE_ERRNO(EINTR, error);
+			ATF_REQUIRE_EQ(buf, 42);
+			abort();
+		}
+		atf_tc_fail("You're not supposed to be here");
+	}
+
+	pidstr = NULL;
+	asprintf(&pidstr, "%d",pid);
+	ATF_REQUIRE(pidstr != NULL);
+
+	pid2 = atf_utils_fork();
+	if (pid2 == 0) {
+		coexec_helper(pid, "cocall_callee_dead_h", name, pidstr);
+		atf_tc_fail("You're not supposed to be here");
+	}
+	atf_utils_wait(pid2, 0, "passed\n", "save:/dev/null");
+}
+
+ATF_TC_WITHOUT_HEAD(cocall_callee_dead_h);
+ATF_TC_BODY(cocall_callee_dead_h, tc)
+{
+	void * __capability switcher_code;
+	void * __capability switcher_data;
+	void * __capability lookedup;
+	uint64_t buf;
+	char *arg, *arg2;
+	pid_t pid;
+	int error;
+
+	arg = getenv("COCALL_TEST_HELPER_ARG");
+	if (arg == NULL)
+		atf_tc_skip("helper testcase, not supposed to be run directly");
+
+	arg2 = getenv("COCALL_TEST_HELPER_ARG2");
+	ATF_REQUIRE(arg2 != NULL);
+
+	pid = atoi(arg2);
+	ATF_REQUIRE(pid != 0);
+
+	error = cosetup(COSETUP_COCALL, &switcher_code, &switcher_data);
+	ATF_REQUIRE_EQ(error, 0);
+	error = colookup(arg, &lookedup);
+	ATF_REQUIRE_EQ(error, 0);
+
+	/*
+	 * XXX: Slightly racy.
+	 */
+	sleep(1);
+
+	error = kill(pid, SIGTERM);
+	ATF_REQUIRE_EQ(error, 0);
+
+	buf = 7;
+	error = cocall(switcher_code, switcher_data, lookedup, &buf, sizeof(buf));
+	ATF_REQUIRE_EQ(error, -1);
+	ATF_REQUIRE_ERRNO(EINVAL, error);
+	ATF_REQUIRE_EQ(buf, 7);
+}
+
 ATF_TP_ADD_TCS(tp)
 {
 	ATF_TP_ADD_TC(tp, cocall);
@@ -355,8 +444,9 @@ ATF_TP_ADD_TCS(tp)
 	ATF_TP_ADD_TC(tp, cocall_bad_callee_buf_h);
 	ATF_TP_ADD_TC(tp, cocall_callee_abort);
 	ATF_TP_ADD_TC(tp, cocall_callee_abort_h);
-#if 0
 	ATF_TP_ADD_TC(tp, cocall_callee_dead);
+	ATF_TP_ADD_TC(tp, cocall_callee_dead_h);
+#if 0
 	ATF_TP_ADD_TC(tp, cocall_many_callers);
 	ATF_TP_ADD_TC(tp, cocall_three_way);
 	ATF_TP_ADD_TC(tp, cocall_three_way_with_abort);
