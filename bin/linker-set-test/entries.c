@@ -30,13 +30,32 @@
  * SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+
 #include <stdio.h>
+
+#include "linker-set-test.h"
+
+SET_DECLARE(linker_set_test, struct entry);
+
+TEST_ENTRY("baz");
 
 int	list_entries(void);
 
 int
-main(void)
+list_entries(void)
 {
-
-	return (list_entries());
+	int n_entries;
+	struct entry **entry;
+	
+	n_entries = 0;
+	SET_FOREACH(entry, linker_set_test) {
+		printf("name: %s, path: %s\n", (*entry)->name, (*entry)->path);
+	}
+	printf("Found %d entries in the linker_set_test linker set\n",
+	    n_entries);
+	
+	if (n_entries == 0)
+		return (-1);
+	return (0);
 }
