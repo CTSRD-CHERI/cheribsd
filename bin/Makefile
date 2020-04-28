@@ -20,6 +20,7 @@ SUBDIR= cat \
 	hostname \
 	kenv \
 	kill \
+	linker-set-test \
 	ln \
 	ls \
 	mkdir \
