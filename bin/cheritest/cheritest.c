@@ -1699,6 +1699,10 @@ static const struct cheri_test cheri_tests[] = {
 	  .ct_desc = "Test CheriABI mmap() with unrepresentable lengths",
 	  .ct_func = test_cheriabi_mmap_unrepresentable },
 
+	{ .ct_name = "test_cheriabi_malloc_zero_size",
+	  .ct_desc = "Check that zero-sized mallocs are properly bounded",
+	  .ct_func = test_cheriabi_malloc_zero_size },
+
 	/*
 	 * Tests for pathname handling in open(2).
 	 */

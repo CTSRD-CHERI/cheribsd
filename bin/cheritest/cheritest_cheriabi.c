@@ -237,3 +237,15 @@ test_cheriabi_mmap_unrepresentable(const struct cheri_test *ctp __unused)
 
 	cheritest_success();
 }
+
+void
+test_cheriabi_malloc_zero_size(const struct cheri_test *ctp __unused)
+{
+	void *cap;
+
+	cap = malloc(0);
+	if (cap != NULL && cheri_getlength(cap) != 0)
+		cheritest_failure_errx("malloc(0) returned a non-NULL capability with "
+		    "non-zero length (%zu)", cheri_getlength(cap));
+	cheritest_success();
+}
