@@ -201,8 +201,8 @@ typedef struct Struct_Obj_Entry {
      * By having these additional members we can remove execute permissions from
      * relocbase and mapbase.
      */
-    Elf_Addr text_rodata_start;
-    Elf_Addr text_rodata_end;
+    Elf_Addr text_rodata_start_offset;
+    Elf_Addr text_rodata_end_offset;
     const char* text_rodata_cap;	/* Capability for the executable mapping */
     struct CheriExports *cheri_exports;	/* Unique thunks for function pointers */
     struct CheriPlt *cheri_plt_stubs;	/* PLT stubs for external calls */

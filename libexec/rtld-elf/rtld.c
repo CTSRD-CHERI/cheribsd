@@ -1637,6 +1637,13 @@ digest_dynamic2(Obj_Entry *obj, const Elf_Dyn *dyn_rpath,
 
 	set_bounds_if_nonnull(obj->cap_relocs, obj->cap_relocs_size);
 	set_bounds_if_nonnull(obj->writable_captable, obj->captable_size);
+	if (cheri_getlength(obj->writable_captable) != obj->captable_size) {
+		dbg("Using imprecise bounds for captable: " PTR_FMT
+		    " - size was %zd but real size should be %zd",
+		    obj->writable_captable,
+		    cheri_getlength(obj->writable_captable),
+		    obj->captable_size);
+	}
 #if RTLD_SUPPORT_PER_FUNCTION_CAPTABLE == 1
 	set_bounds_if_nonnull(obj->captable_mapping, obj->captable_mapping_size);
 #endif
@@ -1644,23 +1651,52 @@ digest_dynamic2(Obj_Entry *obj, const Elf_Dyn *dyn_rpath,
 	if (obj->writable_captable)
 		obj->_target_cgp = cheri_clearperm(obj->writable_captable, TARGET_CGP_REMOVE_PERMS);
 
-	// Now reduce the bounds on text_rodata_cap:  I, and for PLT/FNDESC we can set tight bounds
-	// so we only need .text
+	// Now reduce the bounds on text_rodata_cap: for PLT/FNDESC we can set
+	// tight bounds and only need .text, but for PC-relative we have to also
+	// include the captable since the text/rodata capability is used for
+	// all code pointers, and functions need to be able to access the
+	// captable from PCC.
 	if (obj->cheri_captable_abi == DF_MIPS_CHERI_ABI_PCREL) {
-		// For pcrel ABI we need to include captable as well
+		// For pcrel ABI we need to include the captable
 		dbg("%s: text/rodata start = %#zx, text/rodata end = %#zx, "
-		    "captable = " PTR_FMT " (relative to start %#zx)", obj->path,
-		    (size_t)obj->text_rodata_start, (size_t)obj->text_rodata_end,
-		    obj->writable_captable, (char*)obj->writable_captable - obj->text_rodata_cap);
+		    "captable = " PTR_FMT " (relative to start %#zx), "
+		    "current text/rodata cap = " PTR_FMT,
+		    obj->path, (size_t)obj->text_rodata_start_offset,
+		    (size_t)obj->text_rodata_end_offset, obj->writable_captable,
+		    (char *)obj->writable_captable - obj->text_rodata_cap,
+		    obj->text_rodata_cap);
 		if (obj->writable_captable) {
-			vaddr_t start = rtld_min(obj->text_rodata_start,
-			    (vaddr_t)((char*)obj->writable_captable - obj->text_rodata_cap));
-			vaddr_t end = rtld_max(obj->text_rodata_end,
-			    (vaddr_t)(((char*)obj->writable_captable +
-			    cheri_getlen(obj->writable_captable)) - obj->text_rodata_cap));
-			obj->text_rodata_cap += start;
+			// Note: due to capabilities not being precise, the end
+			// of the captable may not be the same as captable +
+			// cheri_getlen(captable). Use the value we got from
+			// DT_MIPS_CHERI_CAPTABLESZ instead
+			vaddr_t captable_start_offset = (vaddr_t)(
+			    (char *)obj->writable_captable - obj->relocbase);
+			rtld_min(obj->text_rodata_start_offset,
+			    (vaddr_t)((char *)obj->writable_captable -
+				obj->text_rodata_cap));
+			vaddr_t captable_end_offset =
+			    captable_start_offset + obj->captable_size;
+			// Set base to min_offset(.text/.rodata, .captable)
+			vaddr_t start_offset = rtld_min(captable_start_offset,
+			    obj->text_rodata_start_offset);
+			size_t end_offset = rtld_max(
+			    captable_end_offset, obj->text_rodata_end_offset);
+			size_t precise_size = end_offset - start_offset;
+			// Note: not setting precise bounds here since the end
+			// of the captable is probably not strongly aligned.
+			obj->text_rodata_cap += start_offset;
 			obj->text_rodata_cap = cheri_setbounds_sametype(
-			    obj->text_rodata_cap, end - start);
+			    obj->text_rodata_cap, precise_size);
+			if (cheri_getlength(obj->text_rodata_cap) !=
+			    precise_size) {
+				dbg("Using imprecise bounds for text/rodata"
+				    "/captable: " PTR_FMT
+				    " - size was %zd but real size should be %zd",
+				    obj->text_rodata_cap,
+				    cheri_getlength(obj->text_rodata_cap),
+				    precise_size);
+			}
 		} else {
 			dbg("%s: missing DT_CHERI_CAPTABLE so can't set "
 			    "sensible bounds on text/rodata -> using full DSO"
@@ -1668,12 +1704,12 @@ digest_dynamic2(Obj_Entry *obj, const Elf_Dyn *dyn_rpath,
 		}
 	} else {
 		// tight bounds on text_rodata possible since $cgp is live-in
-		obj->text_rodata_cap += obj->text_rodata_start;
+		obj->text_rodata_cap += obj->text_rodata_start_offset;
 		// TODO: data-only .so files? Possibly used by icu4c? For now
 		// I'll keep this assertion until we hit an error
-		rtld_require(obj->text_rodata_end != 0, "No text segment in %s?", obj->path);
+		rtld_require(obj->text_rodata_end_offset != 0, "No text segment in %s?", obj->path);
 		obj->text_rodata_cap = cheri_setbounds_sametype(
-		   obj->text_rodata_cap, obj->text_rodata_end - obj->text_rodata_start);
+		   obj->text_rodata_cap, obj->text_rodata_end_offset - obj->text_rodata_start_offset);
 	}
 	dbg("%s: tightened bounds of text/rodata cap: " PTR_FMT, obj->path,
 	    obj->text_rodata_cap);
@@ -1761,11 +1797,11 @@ digest_phdr(const Elf_Phdr *phdr, int phnum, dlfunc_t entry, const char *path)
 #ifdef __CHERI_PURE_CAPABILITY__
 	    if (!(ph->p_flags & PF_W)) {
 		Elf_Addr start_addr = ph->p_vaddr;
-		obj->text_rodata_start = rtld_min(start_addr, obj->text_rodata_start);
-		obj->text_rodata_end = rtld_max(start_addr + ph->p_memsz, obj->text_rodata_end);
+		obj->text_rodata_start_offset = rtld_min(start_addr, obj->text_rodata_start_offset);
+		obj->text_rodata_end_offset = rtld_max(start_addr + ph->p_memsz, obj->text_rodata_end_offset);
 		dbg("%s: processing readonly PT_LOAD[%d], new text/rodata start "
 		    " = %zx text/rodata end = %zx", path, nsegs,
-		    (size_t)obj->text_rodata_start, (size_t)obj->text_rodata_end);
+		    (size_t)obj->text_rodata_start_offset, (size_t)obj->text_rodata_end_offset);
 	    }
 #endif
 	    break;
@@ -1791,11 +1827,11 @@ digest_phdr(const Elf_Phdr *phdr, int phnum, dlfunc_t entry, const char *path)
 	    obj->relro_page = obj->relocbase + trunc_page(ph->p_vaddr);
 	    obj->relro_size = round_page(ph->p_memsz);
 #ifdef __CHERI_PURE_CAPABILITY__
-	    obj->text_rodata_start = rtld_min(ph->p_vaddr, obj->text_rodata_start);
-	    obj->text_rodata_end = rtld_max(ph->p_vaddr + ph->p_memsz, obj->text_rodata_end);
+	    obj->text_rodata_start_offset = rtld_min(ph->p_vaddr, obj->text_rodata_start_offset);
+	    obj->text_rodata_end_offset = rtld_max(ph->p_vaddr + ph->p_memsz, obj->text_rodata_end_offset);
 	    dbg("%s: Adding PT_GNU_RELRO, new text/rodata start "
 		" = %zx text/rodata end = %zx", path,
-		(size_t)obj->text_rodata_start, (size_t)obj->text_rodata_end);
+		(size_t)obj->text_rodata_start_offset, (size_t)obj->text_rodata_end_offset);
 #endif
 	    break;
 
@@ -2498,13 +2534,13 @@ init_rtld(caddr_t mapbase, Elf_Auxinfo **aux_info)
 	    continue;
 	if (!(ph->p_flags & PF_W)) {
 	    Elf_Addr start_addr = ph->p_vaddr;
-	    objtmp.text_rodata_start = rtld_min(start_addr, objtmp.text_rodata_start);
-	    objtmp.text_rodata_end = rtld_max(start_addr + ph->p_memsz, objtmp.text_rodata_end);
+	    objtmp.text_rodata_start_offset = rtld_min(start_addr, objtmp.text_rodata_start_offset);
+	    objtmp.text_rodata_end_offset = rtld_max(start_addr + ph->p_memsz, objtmp.text_rodata_end_offset);
 #if defined(DEBUG_VERBOSE) && DEBUG_VERBOSE > 3
 	    /* debug is not initialized yet so dbg() is a no-op */
 	    rtld_fdprintf(STDERR_FILENO, "rtld: processing PT_LOAD phdr[%d], "
 		"new text/rodata start  = %zx text/rodata end = %zx\n", i + 1,
-		(size_t)objtmp.text_rodata_start, (size_t)objtmp.text_rodata_end);
+		(size_t)objtmp.text_rodata_start_offset, (size_t)objtmp.text_rodata_end_offset);
 #endif
 	}
     }
