@@ -36,9 +36,6 @@
 #   xargs -n1 | sort | uniq -d;
 # done
 
-# 20200410 CHERI: cheri_serial.h removed
-OLD_FILES+=usr/include/cheri/cheri_serial.h
-
 # 20200401: Remove procfs-based process debugging
 OLD_FILES+=usr/include/sys/pioctl.h
 
@@ -10778,5 +10775,8 @@ OLD_DIRS+=usr/include/ufs/mfs
 # 20011001: UUCP migration to ports
 OLD_DIRS+=usr/libexec/uucp
 
+
+# 20200410 CHERI: cheri_serial.h removed
+OLD_FILES+=usr/include/cheri/cheri_serial.h
 
 .include "tools/build/mk/OptionalObsoleteFiles.inc"
