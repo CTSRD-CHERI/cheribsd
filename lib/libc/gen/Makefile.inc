@@ -164,7 +164,7 @@ SRCS+=	__getosreldate.c \
 	waitpid.c \
 	waitid.c \
 	wordexp.c
-.if ${MK_SYMVER} == yes && !${MACHINE_ABI:Mpurecap}
+.if !${MACHINE_ABI:Mpurecap}
 SRCS+=	devname-compat11.c \
 	fts-compat.c \
 	fts-compat11.c \
