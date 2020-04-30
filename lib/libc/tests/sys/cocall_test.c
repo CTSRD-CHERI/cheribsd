@@ -435,6 +435,271 @@ ATF_TC_BODY(cocall_callee_dead_h, tc)
 	ATF_REQUIRE_EQ(buf, 1);
 }
 
+ATF_TC_WITHOUT_HEAD(cocall_proxy);
+ATF_TC_BODY(cocall_proxy, tc)
+{
+	void * __capability switcher_code;
+	void * __capability switcher_data;
+	char *name, *name2;
+	uint64_t buf;
+	pid_t pid, pid2, pid3;
+	int error;
+
+	/*
+	 * Accept a call from cocall_proxy_h.
+	 */
+
+	name = random_string();
+	name2 = random_string();
+
+	pid = atf_utils_fork();
+	if (pid == 0) {
+		error = cosetup(COSETUP_COACCEPT, &switcher_code, &switcher_data);
+		ATF_REQUIRE_EQ(error, 0);
+
+		error = coregister(name, NULL);
+		ATF_REQUIRE_EQ(error, 0);
+
+		buf = 42;
+		for (;;) {
+			fprintf(stderr, "%s: waiting\n", __func__);
+			error = coaccept(switcher_code, switcher_data, NULL, &buf, sizeof(buf));
+			fprintf(stderr, "%s: waited\n", __func__);
+			ATF_REQUIRE_EQ(error, 0);
+			ATF_REQUIRE_EQ(buf, 2);
+			buf++;
+		}
+		atf_tc_fail("You're not supposed to be here");
+	}
+
+	pid2 = atf_utils_fork();
+	if (pid2 == 0) {
+		coexec_helper(pid, "cocall_proxy_h", name, name2);
+		atf_tc_fail("You're not supposed to be here");
+	}
+
+	pid3 = atf_utils_fork();
+	if (pid3 == 0) {
+		coexec_helper(pid, "cocall_proxy_h2", name2, NULL);
+		atf_tc_fail("You're not supposed to be here");
+	}
+
+	atf_utils_wait(pid3, 0, "passed\n", "save:/dev/null");
+
+	error = kill(pid, SIGTERM);
+	ATF_REQUIRE_EQ(error, 0);
+	error = kill(pid2, SIGTERM);
+	ATF_REQUIRE_EQ(error, 0);
+}
+
+ATF_TC_WITHOUT_HEAD(cocall_proxy_h);
+ATF_TC_BODY(cocall_proxy_h, tc)
+{
+	void * __capability switcher_code;
+	void * __capability switcher_data;
+	void * __capability switcher_code2;
+	void * __capability switcher_data2;
+	void * __capability lookedup;
+	char *arg, *arg2;
+	uint64_t buf;
+	int error;
+
+	/*
+	 * Accept a coll from cocall_proxy_h2, and call into cocall_proxy.
+	 */
+
+	arg = getenv("COCALL_TEST_HELPER_ARG");
+	if (arg == NULL)
+		atf_tc_skip("helper testcase, not supposed to be run directly");
+
+	arg2 = getenv("COCALL_TEST_HELPER_ARG2");
+	ATF_REQUIRE(arg2 != NULL);
+
+	error = cosetup(COSETUP_COACCEPT, &switcher_code2, &switcher_data2);
+	ATF_REQUIRE_EQ(error, 0);
+
+	error = coregister(arg2, NULL);
+	ATF_REQUIRE_EQ(error, 0);
+
+	error = cosetup(COSETUP_COCALL, &switcher_code, &switcher_data);
+	ATF_REQUIRE_EQ(error, 0);
+	error = colookup(arg, &lookedup);
+	ATF_REQUIRE_EQ(error, 0);
+
+	buf = 42;
+	for (;;) {
+		error = coaccept(switcher_code2, switcher_data2, NULL, &buf, sizeof(buf));
+		ATF_REQUIRE_EQ(error, 0);
+		ATF_REQUIRE_EQ(buf, 1);
+
+		buf = 2;
+		error = cocall(switcher_code, switcher_data, lookedup, &buf, sizeof(buf));
+		ATF_REQUIRE_EQ(error, 0);
+		ATF_REQUIRE_EQ(buf, 3);
+
+		buf = 4;
+	}
+}
+
+ATF_TC_WITHOUT_HEAD(cocall_proxy_h2);
+ATF_TC_BODY(cocall_proxy_h2, tc)
+{
+	void * __capability switcher_code;
+	void * __capability switcher_data;
+	void * __capability lookedup;
+	char *arg;
+	uint64_t buf;
+	int error;
+
+	/*
+	 * Call into cocall_proxy_h.
+	 */
+
+	arg = getenv("COCALL_TEST_HELPER_ARG");
+	if (arg == NULL)
+		atf_tc_skip("helper testcase, not supposed to be run directly");
+
+	error = cosetup(COSETUP_COCALL, &switcher_code, &switcher_data);
+	ATF_REQUIRE_EQ(error, 0);
+	error = colookup(arg, &lookedup);
+	ATF_REQUIRE_EQ(error, 0);
+	buf = 1;
+	error = cocall(switcher_code, switcher_data, lookedup, &buf, sizeof(buf));
+	ATF_REQUIRE_EQ(error, 0);
+	ATF_REQUIRE_EQ(buf, 4);
+}
+
+ATF_TC_WITHOUT_HEAD(cocall_proxy_abort);
+ATF_TC_BODY(cocall_proxy_abort, tc)
+{
+	void * __capability switcher_code;
+	void * __capability switcher_data;
+	char *name, *name2;
+	uint64_t buf;
+	pid_t pid, pid2, pid3;
+	int error;
+
+	/*
+	 * Accept a call from cocall_proxy_abort_h.
+	 */
+
+	name = random_string();
+	name2 = random_string();
+
+	pid = atf_utils_fork();
+	if (pid == 0) {
+		error = cosetup(COSETUP_COACCEPT, &switcher_code, &switcher_data);
+		ATF_REQUIRE_EQ(error, 0);
+
+		error = coregister(name, NULL);
+		ATF_REQUIRE_EQ(error, 0);
+
+		buf = 42;
+		for (;;) {
+			fprintf(stderr, "%s: waiting\n", __func__);
+			error = coaccept(switcher_code, switcher_data, NULL, &buf, sizeof(buf));
+			abort();
+		}
+		atf_tc_fail("You're not supposed to be here");
+	}
+
+	pid2 = atf_utils_fork();
+	if (pid2 == 0) {
+		coexec_helper(pid, "cocall_proxy_abort_h", name, name2);
+		atf_tc_fail("You're not supposed to be here");
+	}
+
+	pid3 = atf_utils_fork();
+	if (pid3 == 0) {
+		coexec_helper(pid, "cocall_proxy_abort_h2", name2, NULL);
+		atf_tc_fail("You're not supposed to be here");
+	}
+
+	atf_utils_wait(pid3, 0, "passed\n", "save:/dev/null");
+
+	error = kill(pid, SIGTERM);
+	ATF_REQUIRE_EQ(error, 0);
+	error = kill(pid2, SIGTERM);
+	ATF_REQUIRE_EQ(error, 0);
+}
+
+ATF_TC_WITHOUT_HEAD(cocall_proxy_abort_h);
+ATF_TC_BODY(cocall_proxy_abort_h, tc)
+{
+	void * __capability switcher_code;
+	void * __capability switcher_data;
+	void * __capability switcher_code2;
+	void * __capability switcher_data2;
+	void * __capability lookedup;
+	char *arg, *arg2;
+	uint64_t buf;
+	int error;
+
+	/*
+	 * Accept a coll from cocall_proxy_abort_h2, and call into cocall_proxy_abort.
+	 */
+
+	arg = getenv("COCALL_TEST_HELPER_ARG");
+	if (arg == NULL)
+		atf_tc_skip("helper testcase, not supposed to be run directly");
+
+	arg2 = getenv("COCALL_TEST_HELPER_ARG2");
+	ATF_REQUIRE(arg2 != NULL);
+
+	error = cosetup(COSETUP_COACCEPT, &switcher_code2, &switcher_data2);
+	ATF_REQUIRE_EQ(error, 0);
+
+	error = coregister(arg2, NULL);
+	ATF_REQUIRE_EQ(error, 0);
+
+	error = cosetup(COSETUP_COCALL, &switcher_code, &switcher_data);
+	ATF_REQUIRE_EQ(error, 0);
+	error = colookup(arg, &lookedup);
+	ATF_REQUIRE_EQ(error, 0);
+
+	buf = 42;
+	for (;;) {
+		error = coaccept(switcher_code2, switcher_data2, NULL, &buf, sizeof(buf));
+		ATF_REQUIRE_EQ(error, 0);
+		ATF_REQUIRE_EQ(buf, 1);
+
+		buf = 2;
+		error = cocall(switcher_code, switcher_data, lookedup, &buf, sizeof(buf));
+		ATF_REQUIRE_EQ(error, 0);
+		ATF_REQUIRE_EQ(buf, 2);
+
+		buf = 4;
+	}
+}
+
+ATF_TC_WITHOUT_HEAD(cocall_proxy_abort_h2);
+ATF_TC_BODY(cocall_proxy_abort_h2, tc)
+{
+	void * __capability switcher_code;
+	void * __capability switcher_data;
+	void * __capability lookedup;
+	char *arg;
+	uint64_t buf;
+	int error;
+
+	/*
+	 * Call into cocall_proxy_abort_h.
+	 */
+
+	arg = getenv("COCALL_TEST_HELPER_ARG");
+	if (arg == NULL)
+		atf_tc_skip("helper testcase, not supposed to be run directly");
+
+	error = cosetup(COSETUP_COCALL, &switcher_code, &switcher_data);
+	ATF_REQUIRE_EQ(error, 0);
+	error = colookup(arg, &lookedup);
+	ATF_REQUIRE_EQ(error, 0);
+	buf = 1;
+	error = cocall(switcher_code, switcher_data, lookedup, &buf, sizeof(buf));
+	ATF_REQUIRE_EQ(error, 0);
+	ATF_REQUIRE_EQ(buf, 4);
+}
+
 ATF_TP_ADD_TCS(tp)
 {
 	ATF_TP_ADD_TC(tp, cocall);
@@ -447,11 +712,14 @@ ATF_TP_ADD_TCS(tp)
 	ATF_TP_ADD_TC(tp, cocall_callee_abort_h);
 	ATF_TP_ADD_TC(tp, cocall_callee_dead);
 	ATF_TP_ADD_TC(tp, cocall_callee_dead_h);
+	ATF_TP_ADD_TC(tp, cocall_proxy);
+	ATF_TP_ADD_TC(tp, cocall_proxy_h);
+	ATF_TP_ADD_TC(tp, cocall_proxy_h2);
+	ATF_TP_ADD_TC(tp, cocall_proxy_abort);
+	ATF_TP_ADD_TC(tp, cocall_proxy_abort_h);
+	ATF_TP_ADD_TC(tp, cocall_proxy_abort_h2);
 #if 0
 	ATF_TP_ADD_TC(tp, cocall_many_callers);
-	ATF_TP_ADD_TC(tp, cocall_three_way);
-	ATF_TP_ADD_TC(tp, cocall_three_way_with_abort);
-	ATF_TP_ADD_TC(tp, cocall_three_way_with_abort_2);
 #endif
 
 	return atf_no_error();
