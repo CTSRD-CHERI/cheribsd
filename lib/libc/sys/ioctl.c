@@ -46,6 +46,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/types.h>
 #include <stdarg.h>
 #include <stddef.h>
+#include <cheri/cheric.h>
 #include "libc_private.h"
 
 __weak_reference(__sys_ioctl, __ioctl);
@@ -69,8 +70,8 @@ _ioctl(int fd, unsigned long com, ...)
 	void *data;
 
 	size = IOCPARM_LEN(com);
+	va_start(ap, com);
 	if (size > 0) {
-		va_start(ap, com);
 		if (com & IOC_VOID) {
 			/*
 			 * In the (size > 0 && com & IOC_VOID) case, the
@@ -88,9 +89,13 @@ _ioctl(int fd, unsigned long com, ...)
 		} else {
 			data = va_arg(ap, void *);
 		}
-		va_end(ap);
 	} else {
-		data = NULL;
+		if (cheri_getlen((void*)ap) == 16)
+			data = va_arg(ap, void *);
+		else
+			data = NULL;
 	}
+	va_end(ap);
+
 	return (__sys_ioctl(fd, com, data));
 }
