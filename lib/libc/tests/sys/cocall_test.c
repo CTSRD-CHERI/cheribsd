@@ -101,6 +101,17 @@ random_string(void)
 	return (str);
 }
 
+static void
+wait_for_coregister(void)
+{
+	/*
+	 * Delay execution until the other process calls coregister(2).
+	 *
+	 * XXX: You might have been expecting something more clever.
+	 */
+	 usleep(200000);
+}
+
 ATF_TC_WITHOUT_HEAD(cocall);
 ATF_TC_BODY(cocall, tc)
 {
@@ -158,6 +169,7 @@ ATF_TC_BODY(cocall_h, tc)
 
 	error = cosetup(COSETUP_COCALL, &switcher_code, &switcher_data);
 	ATF_REQUIRE_EQ(error, 0);
+	wait_for_coregister();
 	error = colookup(arg, &lookedup);
 	ATF_REQUIRE_EQ(error, 0);
 	buf = 1;
@@ -221,6 +233,7 @@ ATF_TC_BODY(cocall_bad_caller_buf_h, tc)
 
 	error = cosetup(COSETUP_COCALL, &switcher_code, &switcher_data);
 	ATF_REQUIRE_EQ(error, 0);
+	wait_for_coregister();
 	error = colookup(arg, &lookedup);
 	ATF_REQUIRE_EQ(error, 0);
 	error = cocall(switcher_code, switcher_data, lookedup, (void *)13, 8);
@@ -280,6 +293,7 @@ ATF_TC_BODY(cocall_bad_callee_buf_h, tc)
 
 	error = cosetup(COSETUP_COCALL, &switcher_code, &switcher_data);
 	ATF_REQUIRE_EQ(error, 0);
+	wait_for_coregister();
 	error = colookup(arg, &lookedup);
 	ATF_REQUIRE_EQ(error, 0);
 	buf = 1;
@@ -343,6 +357,7 @@ ATF_TC_BODY(cocall_callee_abort_h, tc)
 
 	error = cosetup(COSETUP_COCALL, &switcher_code, &switcher_data);
 	ATF_REQUIRE_EQ(error, 0);
+	wait_for_coregister();
 	error = colookup(arg, &lookedup);
 	ATF_REQUIRE_EQ(error, 0);
 	buf = 1;
@@ -417,6 +432,7 @@ ATF_TC_BODY(cocall_callee_dead_h, tc)
 
 	error = cosetup(COSETUP_COCALL, &switcher_code, &switcher_data);
 	ATF_REQUIRE_EQ(error, 0);
+	wait_for_coregister();
 	error = colookup(arg, &lookedup);
 	ATF_REQUIRE_EQ(error, 0);
 
@@ -523,6 +539,7 @@ ATF_TC_BODY(cocall_proxy_h, tc)
 
 	error = cosetup(COSETUP_COCALL, &switcher_code, &switcher_data);
 	ATF_REQUIRE_EQ(error, 0);
+	wait_for_coregister();
 	error = colookup(arg, &lookedup);
 	ATF_REQUIRE_EQ(error, 0);
 
@@ -561,6 +578,7 @@ ATF_TC_BODY(cocall_proxy_h2, tc)
 
 	error = cosetup(COSETUP_COCALL, &switcher_code, &switcher_data);
 	ATF_REQUIRE_EQ(error, 0);
+	wait_for_coregister();
 	error = colookup(arg, &lookedup);
 	ATF_REQUIRE_EQ(error, 0);
 	buf = 1;
@@ -654,6 +672,7 @@ ATF_TC_BODY(cocall_proxy_abort_h, tc)
 
 	error = cosetup(COSETUP_COCALL, &switcher_code, &switcher_data);
 	ATF_REQUIRE_EQ(error, 0);
+	wait_for_coregister();
 	error = colookup(arg, &lookedup);
 	ATF_REQUIRE_EQ(error, 0);
 
@@ -692,6 +711,7 @@ ATF_TC_BODY(cocall_proxy_abort_h2, tc)
 
 	error = cosetup(COSETUP_COCALL, &switcher_code, &switcher_data);
 	ATF_REQUIRE_EQ(error, 0);
+	wait_for_coregister();
 	error = colookup(arg, &lookedup);
 	ATF_REQUIRE_EQ(error, 0);
 	buf = 1;
