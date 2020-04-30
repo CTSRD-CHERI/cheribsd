@@ -121,11 +121,12 @@ ATF_TC_BODY(cocall, tc)
 		error = coregister(name, NULL);
 		ATF_REQUIRE_EQ(error, 0);
 
+		buf = 42;
 		for (;;) {
-			buf = 42;
 			error = coaccept(switcher_code, switcher_data, NULL, &buf, sizeof(buf));
 			ATF_REQUIRE_EQ(error, 0);
-			ATF_REQUIRE_EQ(buf, 7);
+			ATF_REQUIRE_EQ(buf, 1);
+			buf++;
 		}
 		atf_tc_fail("You're not supposed to be here");
 	}
@@ -159,10 +160,10 @@ ATF_TC_BODY(cocall_h, tc)
 	ATF_REQUIRE_EQ(error, 0);
 	error = colookup(arg, &lookedup);
 	ATF_REQUIRE_EQ(error, 0);
-	buf = 7;
+	buf = 1;
 	error = cocall(switcher_code, switcher_data, lookedup, &buf, sizeof(buf));
 	ATF_REQUIRE_EQ(error, 0);
-	ATF_REQUIRE_EQ(buf, 42);
+	ATF_REQUIRE_EQ(buf, 2);
 }
 
 ATF_TC_WITHOUT_HEAD(cocall_bad_caller_buf);
@@ -185,8 +186,8 @@ ATF_TC_BODY(cocall_bad_caller_buf, tc)
 		error = coregister(name, NULL);
 		ATF_REQUIRE_EQ(error, 0);
 
+		buf = 42;
 		for (;;) {
-			buf = 42;
 			error = coaccept(switcher_code, switcher_data, NULL, &buf, sizeof(buf));
 			ATF_REQUIRE_EQ(error, 0);
 			ATF_REQUIRE_EQ(buf, 42);
@@ -281,10 +282,10 @@ ATF_TC_BODY(cocall_bad_callee_buf_h, tc)
 	ATF_REQUIRE_EQ(error, 0);
 	error = colookup(arg, &lookedup);
 	ATF_REQUIRE_EQ(error, 0);
-	buf = 7;
+	buf = 1;
 	error = cocall(switcher_code, switcher_data, lookedup, &buf, sizeof(buf));
 	ATF_REQUIRE_EQ(error, 0);
-	ATF_REQUIRE_EQ(buf, 7);
+	ATF_REQUIRE_EQ(buf, 1);
 }
 
 ATF_TC_WITHOUT_HEAD(cocall_callee_abort);
@@ -307,8 +308,8 @@ ATF_TC_BODY(cocall_callee_abort, tc)
 		error = coregister(name, NULL);
 		ATF_REQUIRE_EQ(error, 0);
 
+		buf = 42;
 		for (;;) {
-			buf = 42;
 			error = coaccept(switcher_code, switcher_data, NULL, &buf, sizeof(buf));
 			abort();
 		}
@@ -344,10 +345,10 @@ ATF_TC_BODY(cocall_callee_abort_h, tc)
 	ATF_REQUIRE_EQ(error, 0);
 	error = colookup(arg, &lookedup);
 	ATF_REQUIRE_EQ(error, 0);
-	buf = 7;
+	buf = 1;
 	error = cocall(switcher_code, switcher_data, lookedup, &buf, sizeof(buf));
 	ATF_REQUIRE_EQ(error, 0);
-	ATF_REQUIRE_EQ(buf, 7);
+	ATF_REQUIRE_EQ(buf, 1);
 }
 
 ATF_TC_WITHOUT_HEAD(cocall_callee_dead);
@@ -370,8 +371,8 @@ ATF_TC_BODY(cocall_callee_dead, tc)
 		error = coregister(name, NULL);
 		ATF_REQUIRE_EQ(error, 0);
 
+		buf = 42;
 		for (;;) {
-			buf = 42;
 			error = coaccept(switcher_code, switcher_data, NULL, &buf, sizeof(buf));
 			ATF_REQUIRE_EQ(error, -1);
 			ATF_REQUIRE_ERRNO(EINTR, error);
@@ -427,11 +428,11 @@ ATF_TC_BODY(cocall_callee_dead_h, tc)
 	error = kill(pid, SIGTERM);
 	ATF_REQUIRE_EQ(error, 0);
 
-	buf = 7;
+	buf = 1;
 	error = cocall(switcher_code, switcher_data, lookedup, &buf, sizeof(buf));
 	ATF_REQUIRE_EQ(error, -1);
 	ATF_REQUIRE_ERRNO(EINVAL, error);
-	ATF_REQUIRE_EQ(buf, 7);
+	ATF_REQUIRE_EQ(buf, 1);
 }
 
 ATF_TP_ADD_TCS(tp)
