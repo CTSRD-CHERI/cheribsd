@@ -43,19 +43,34 @@
 #define	CLEARLO_BITS	(1 << 1  /* $at */ | \
 			 1 << 2  /* $v0 */ | \
 			 1 << 3  /* $v1 */ | \
-			 /* $a0-$a7 are preserved and passed to the callee */ \
+			 1 << 4  /* $a0 */ | \
+			 1 << 5  /* $a1 */ | \
+			 1 << 6  /* $a2 */ | \
+			 1 << 7  /* $a3 */ | \
+			 1 << 8  /* $a4 */ | \
+			 1 << 9  /* $a5 */ | \
+			 1 << 10 /* $a6 */ | \
+			 1 << 11 /* $a7 */ | \
 			 1 << 12 /* $t4 */ | \
 			 1 << 13 /* $t5 */ | \
-			 1 << 14 /* $t6 */)
-			 /* $t7 is used by libc stub to save $gp */
+			 1 << 14 /* $t6 */ | \
+			 1 << 15 /* $t7 */)
 
-#define	CLEARHI_BITS	(/* s0-s7 are loaded from the callee context */ \
+#define	CLEARHI_BITS	(1 << 0  /* $s0 */ | \
+			 1 << 1  /* $s1 */ | \
+			 1 << 2  /* $s2 */ | \
+			 1 << 3  /* $s3 */ | \
+			 1 << 4  /* $s4 */ | \
+			 1 << 5  /* $s5 */ | \
+			 1 << 6  /* $s6 */ | \
+			 1 << 7  /* $s7 */ | \
 			 1 << 8  /* $t8 */ | \
-			 1 << 9  /* $t9 */)
-			 /* $k0 and $k1 are reserved for the kernel */
-			 /* $gp and $sp are loaded from the callee context */
-			 /* $s8 is loaded from the callee context */
-			 /* $ra is loaded from the callee context */ 
+			 1 << 9  /* $t9 */ | \
+			 /* $k0 and $k1 are reserved for the kernel */ \
+			 1 << 12 /* $gp */ | \
+			 1 << 13 /* $sp */ | \
+			 1 << 14 /* $s8 */ | \
+			 1 << 15 /* $ra */)
 
 // XXX: $c0 (DDC)?
 #define	CCLEARLO_BITS	(1 << 1  /* PCC */ | \
@@ -84,8 +99,6 @@
  *
  * Zero before calling the callee: at, v0, v1, t4-t6, s0-s7, t8, t9, gp, sp, s8, ra, hi, lo
  *
- * XXX: Floating point
- *
  * Note that this code executes while ignoring all the signals - a trapping
  * instruction will just get skipped over.
  *
@@ -106,20 +119,6 @@ _C_LABEL(switcher_cocall):
 	 *
 	 * XXX: Make sure the IDC is cleared if we get a signal while here.
 	 */
-	csd	s0, zero, 3*CHERICAP_SIZE+0($idc)
-	csd	s1, zero, 3*CHERICAP_SIZE+8($idc)
-	csd	s2, zero, 3*CHERICAP_SIZE+16($idc)
-	csd	s3, zero, 3*CHERICAP_SIZE+24($idc)
-	csd	s4, zero, 3*CHERICAP_SIZE+32($idc)
-	csd	s5, zero, 3*CHERICAP_SIZE+40($idc)
-	csd	s6, zero, 3*CHERICAP_SIZE+48($idc)
-	csd	s7, zero, 3*CHERICAP_SIZE+56($idc)
-	csd	gp, zero, 3*CHERICAP_SIZE+64($idc)
-	csd	sp, zero, 3*CHERICAP_SIZE+72($idc)
-	csd	s8, zero, 3*CHERICAP_SIZE+80($idc)
-	csd	ra, zero, 3*CHERICAP_SIZE+88($idc)
-	csd	$15, zero, 3*CHERICAP_SIZE+96($idc) // t7
-
 	csc	$c11, zero, 1*CHERICAP_SIZE+3*CHERICAP_SIZE+256($idc)
 	csc	$c17, zero, 2*CHERICAP_SIZE+3*CHERICAP_SIZE+256($idc)
 	csc	$c18, zero, 3*CHERICAP_SIZE+3*CHERICAP_SIZE+256($idc)
@@ -185,20 +184,6 @@ _C_LABEL(switcher_cocall):
 	/*
 	 * Restore the callee's context.
 	 */
-	cld	s0, zero, 3*CHERICAP_SIZE+0($c25)
-	cld	s1, zero, 3*CHERICAP_SIZE+8($c25)
-	cld	s2, zero, 3*CHERICAP_SIZE+16($c25)
-	cld	s3, zero, 3*CHERICAP_SIZE+24($c25)
-	cld	s4, zero, 3*CHERICAP_SIZE+32($c25)
-	cld	s5, zero, 3*CHERICAP_SIZE+40($c25)
-	cld	s6, zero, 3*CHERICAP_SIZE+48($c25)
-	cld	s7, zero, 3*CHERICAP_SIZE+56($c25)
-	cld	gp, zero, 3*CHERICAP_SIZE+64($c25)
-	cld	sp, zero, 3*CHERICAP_SIZE+72($c25)
-	cld	s8, zero, 3*CHERICAP_SIZE+80($c25)
-	cld	ra, zero, 3*CHERICAP_SIZE+88($c25)
-	cld	$15, zero, 3*CHERICAP_SIZE+96($c25) // t7
-
 	clc	$c11, zero, 1*CHERICAP_SIZE+3*CHERICAP_SIZE+256($c25)
 	clc	$c17, zero, 2*CHERICAP_SIZE+3*CHERICAP_SIZE+256($c25)
 	clc	$c18, zero, 3*CHERICAP_SIZE+3*CHERICAP_SIZE+256($c25)
