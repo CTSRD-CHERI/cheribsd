@@ -108,8 +108,8 @@ main(int argc, char **argv)
 			warn("coaccept");
 		if (vflag) {
 			halfcookie = (uint64_t *)&cookie;
-			printf("pong, pid %d, cookie %#lx%lx, buf[0] is %lld\n",
-			    getpid(), halfcookie[0], halfcookie[1], buf[0]);
+			printf("%s: coaccepted, pid %d, cookie %#lx%lx, buf[0] is %lld\n",
+			    getprogname(), getpid(), halfcookie[0], halfcookie[1], buf[0]);
 		}
 		buf[0]++;
 		if (xflag)

@@ -112,7 +112,7 @@ main(int argc, char **argv)
 			warn("cocall");
 
 		if (vflag)
-			printf("done, pid %d, buf[0] is %lld\n", getpid(), buf[0]);
+			printf("%s: returned, pid %d, buf[0] is %lld\n", getprogname(), getpid(), buf[0]);
 		else
 			printf(".");
 		sleep(1);
