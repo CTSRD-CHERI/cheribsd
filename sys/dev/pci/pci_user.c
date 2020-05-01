@@ -132,8 +132,8 @@ struct pci_list_vpd_io64 {
 #define	PCIOCGETCONF64	_IOC_NEWTYPE(PCIOCGETCONF, struct pci_conf_io64)
 #define	PCIOCLISTVPD64	_IOC_NEWTYPE(PCIOCLISTVPD, struct pci_list_vpd_io64)
 /*
- * We don't support PCIOCGETCONF_OLD64 because the only COMPAT_FREEBSD64
- * architectures didn't exist until 9.0 (mips).
+ * We don't support PCIOCGETCONF_OLD64 because the earliest
+ * COMPAT_FREEBSD64 architecture didn't exist until 9.0 (mips).
  */
 #endif
 
