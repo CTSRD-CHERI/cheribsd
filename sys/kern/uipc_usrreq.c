@@ -526,8 +526,6 @@ uipc_attach(struct socket *so, int proto, struct thread *td)
 	unp->unp_socket = so;
 	so->so_pcb = unp;
 	unp->unp_refcount = 1;
-	if (so->so_listen != NULL)
-		unp->unp_flags |= UNP_NASCENT;
 
 	if ((locked = UNP_LINK_WOWNED()) == false)
 		UNP_LINK_WLOCK();
@@ -767,7 +765,6 @@ uipc_detach(struct socket *so)
 {
 	struct unpcb *unp, *unp2;
 	struct mtx *vplock;
-	struct sockaddr_un *saved_unp_addr;
 	struct vnode *vp;
 	int freeunp, local_unp_rights;
 
@@ -777,6 +774,18 @@ uipc_detach(struct socket *so)
 	vp = NULL;
 	vplock = NULL;
 	local_unp_rights = 0;
+
+	SOCK_LOCK(so);
+	if (!SOLISTENING(so)) {
+		/*
+		 * Once the socket is removed from the global lists,
+		 * uipc_ready() will not be able to locate its socket buffer, so
+		 * clear the buffer now.  At this point internalized rights have
+		 * already been disposed of.
+		 */
+		sbrelease(&so->so_rcv, so);
+	}
+	SOCK_UNLOCK(so);
 
 	UNP_LINK_WLOCK();
 	LIST_REMOVE(unp, unp_link);
@@ -793,15 +802,11 @@ uipc_detach(struct socket *so)
 		mtx_lock(vplock);
 	}
 	UNP_PCB_LOCK(unp);
-	if (unp->unp_vnode != vp &&
-		unp->unp_vnode != NULL) {
+	if (unp->unp_vnode != vp && unp->unp_vnode != NULL) {
 		if (vplock)
 			mtx_unlock(vplock);
 		UNP_PCB_UNLOCK(unp);
 		goto restart;
-	}
-	if ((unp->unp_flags & UNP_NASCENT) != 0) {
-		goto teardown;
 	}
 	if ((vp = unp->unp_vnode) != NULL) {
 		VOP_UNP_DETACH(vp);
@@ -810,21 +815,20 @@ uipc_detach(struct socket *so)
 	if (__predict_false(unp == unp->unp_conn)) {
 		unp_disconnect(unp, unp);
 		unp2 = NULL;
-		goto connect_self;
+	} else {
+		if ((unp2 = unp->unp_conn) != NULL) {
+			unp_pcb_owned_lock2(unp, unp2, freeunp);
+			if (freeunp)
+				unp2 = NULL;
+		}
+		unp_pcb_hold(unp);
+		if (unp2 != NULL) {
+			unp_pcb_hold(unp2);
+			unp_disconnect(unp, unp2);
+			if (unp_pcb_rele(unp2) == 0)
+				UNP_PCB_UNLOCK(unp2);
+		}
 	}
-	if ((unp2 = unp->unp_conn) != NULL) {
-		unp_pcb_owned_lock2(unp, unp2, freeunp);
-		if (freeunp)
-			unp2 = NULL;
-	}
-	unp_pcb_hold(unp);
-	if (unp2 != NULL) {
-		unp_pcb_hold(unp2);
-		unp_disconnect(unp, unp2);
-		if (unp_pcb_rele(unp2) == 0)
-			UNP_PCB_UNLOCK(unp2);
-	}
- connect_self:
 	UNP_PCB_UNLOCK(unp);
 	UNP_REF_LIST_LOCK();
 	while (!LIST_EMPTY(&unp->unp_refs)) {
@@ -844,15 +848,11 @@ uipc_detach(struct socket *so)
 	freeunp = unp_pcb_rele(unp);
 	MPASS(freeunp == 0);
 	local_unp_rights = unp_rights;
-teardown:
 	unp->unp_socket->so_pcb = NULL;
-	saved_unp_addr = unp->unp_addr;
-	unp->unp_addr = NULL;
 	unp->unp_socket = NULL;
-	freeunp = unp_pcb_rele(unp);
-	if (saved_unp_addr != NULL)
-		free(saved_unp_addr, M_SONAME);
-	if (!freeunp)
+	free(unp->unp_addr, M_SONAME);
+	unp->unp_addr = NULL;
+	if (!unp_pcb_rele(unp))
 		UNP_PCB_UNLOCK(unp);
 	if (vp) {
 		mtx_unlock(vplock);
@@ -1138,25 +1138,29 @@ uipc_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *nam,
 	case SOCK_STREAM:
 		if ((so->so_state & SS_ISCONNECTED) == 0) {
 			if (nam != NULL) {
-				if ((error = connect_internal(so, nam, td)))
+				error = connect_internal(so, nam, td);
+				if (error != 0)
 					break;
-			} else  {
+			} else {
 				error = ENOTCONN;
 				break;
 			}
-		} else if ((unp2 = unp->unp_conn) == NULL) {
+		} else {
+			UNP_PCB_LOCK(unp);
+		}
+
+		if ((unp2 = unp->unp_conn) == NULL) {
+			UNP_PCB_UNLOCK(unp);
 			error = ENOTCONN;
 			break;
 		} else if (so->so_snd.sb_state & SBS_CANTSENDMORE) {
+			UNP_PCB_UNLOCK(unp);
 			error = EPIPE;
 			break;
-		} else {
-			UNP_PCB_LOCK(unp);
-			if ((unp2 = unp->unp_conn) == NULL) {
-				UNP_PCB_UNLOCK(unp);
-				error = ENOTCONN;
-				break;
-			}
+		} else if ((unp2 = unp->unp_conn) == NULL) {
+			UNP_PCB_UNLOCK(unp);
+			error = ENOTCONN;
+			break;
 		}
 		unp_pcb_owned_lock2(unp, unp2, freed);
 		UNP_PCB_UNLOCK(unp);
@@ -1192,21 +1196,17 @@ uipc_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *nam,
 		case SOCK_STREAM:
 			if (control != NULL) {
 				sbappendcontrol_locked(&so2->so_rcv, m,
-				    control);
+				    control, flags);
 				control = NULL;
 			} else
 				sbappend_locked(&so2->so_rcv, m, flags);
 			break;
 
-		case SOCK_SEQPACKET: {
-			const struct sockaddr *from;
-
-			from = &sun_noname;
+		case SOCK_SEQPACKET:
 			if (sbappendaddr_nospacecheck_locked(&so2->so_rcv,
-			    from, m, control))
+			    &sun_noname, m, control))
 				control = NULL;
 			break;
-			}
 		}
 
 		mbcnt = so2->so_rcv.sb_mbcnt;
@@ -1256,19 +1256,54 @@ release:
 	return (error);
 }
 
+static bool
+uipc_ready_scan(struct socket *so, struct mbuf *m, int count, int *errorp)
+{
+	struct mbuf *mb, *n;
+	struct sockbuf *sb;
+
+	SOCK_LOCK(so);
+	if (SOLISTENING(so)) {
+		SOCK_UNLOCK(so);
+		return (false);
+	}
+	mb = NULL;
+	sb = &so->so_rcv;
+	SOCKBUF_LOCK(sb);
+	if (sb->sb_fnrdy != NULL) {
+		for (mb = sb->sb_mb, n = mb->m_nextpkt; mb != NULL;) {
+			if (mb == m) {
+				*errorp = sbready(sb, m, count);
+				break;
+			}
+			mb = mb->m_next;
+			if (mb == NULL) {
+				mb = n;
+				n = mb->m_nextpkt;
+			}
+		}
+	}
+	SOCKBUF_UNLOCK(sb);
+	SOCK_UNLOCK(so);
+	return (mb != NULL);
+}
+
 static int
 uipc_ready(struct socket *so, struct mbuf *m, int count)
 {
 	struct unpcb *unp, *unp2;
 	struct socket *so2;
-	int error;
+	int error, i;
 
 	unp = sotounpcb(so);
+
+	KASSERT(so->so_type == SOCK_STREAM,
+	    ("%s: unexpected socket type for %p", __func__, so));
 
 	UNP_PCB_LOCK(unp);
 	if ((unp2 = unp->unp_conn) == NULL) {
 		UNP_PCB_UNLOCK(unp);
-		goto error;
+		goto search;
 	}
 	if (unp != unp2) {
 		if (UNP_PCB_TRYLOCK(unp2) == 0) {
@@ -1276,25 +1311,39 @@ uipc_ready(struct socket *so, struct mbuf *m, int count)
 			UNP_PCB_UNLOCK(unp);
 			UNP_PCB_LOCK(unp2);
 			if (unp_pcb_rele(unp2))
-				goto error;
+				goto search;
 		} else
 			UNP_PCB_UNLOCK(unp);
 	}
 	so2 = unp2->unp_socket;
-
 	SOCKBUF_LOCK(&so2->so_rcv);
 	if ((error = sbready(&so2->so_rcv, m, count)) == 0)
 		sorwakeup_locked(so2);
 	else
 		SOCKBUF_UNLOCK(&so2->so_rcv);
-
 	UNP_PCB_UNLOCK(unp2);
-
 	return (error);
- error:
-	for (int i = 0; i < count; i++)
-		m = m_free(m);
-	return (ECONNRESET);
+
+search:
+	/*
+	 * The receiving socket has been disconnected, but may still be valid.
+	 * In this case, the now-ready mbufs are still present in its socket
+	 * buffer, so perform an exhaustive search before giving up and freeing
+	 * the mbufs.
+	 */
+	UNP_LINK_RLOCK();
+	LIST_FOREACH(unp, &unp_shead, unp_link) {
+		if (uipc_ready_scan(unp->unp_socket, m, count, &error))
+			break;
+	}
+	UNP_LINK_RUNLOCK();
+
+	if (unp == NULL) {
+		for (i = 0; i < count; i++)
+			m = m_free(m);
+		error = ECONNRESET;
+	}
+	return (error);
 }
 
 static int
@@ -1685,7 +1734,6 @@ unp_connect2(struct socket *so, struct socket *so2, int req)
 
 	if (so2->so_type != so->so_type)
 		return (EPROTOTYPE);
-	unp2->unp_flags &= ~UNP_NASCENT;
 	unp->unp_conn = unp2;
 	unp_pcb_hold(unp2);
 	unp_pcb_hold(unp);

@@ -30,8 +30,9 @@
  * @BERI_LICENSE_HEADER_END@
  */
 #include "cheri_c_test.h"
-extern int buffer[42];
-int buffer[42];
+
+// Mark as used so that the compiler can't optimize it away.
+__attribute__((used)) static int buffer[42];
 
 __attribute__((noinline))
 static void set(int* __capability x)

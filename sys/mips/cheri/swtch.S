@@ -392,14 +392,17 @@ blocked_loop:
  */
 #if (PAGE_SIZE != 4096)
 #error PAGE_SIZE is not 4K.
-#elif defined(CPU_CHERI128)
+#elif defined(CHERI_PURECAP_KERNLE)
 #if (KSTACK_PAGE_SIZE != (1 << 14))
 #error CHERI128 KSTACK_PAGE_SIZE is not 16K.
 #endif
-#elif defined(CPU_CHERI)
-#if (KSTACK_PAGE_SIZE != (1 << 16))
-#error CHERI256 KSTACK_PAGE_SIZE is not 64K.
-#endif
+/*
+ * XXX-AM: remove cheri-256 support
+ * #elif defined(CPU_CHERI)
+ * #if (KSTACK_PAGE_SIZE != (1 << 16))
+ * #error CHERI256 KSTACK_PAGE_SIZE is not 64K.
+ * #endif
+ */
 #endif
 	/*
 	 * Number of pairs of 4K pages in the KSTACK_SIZE region

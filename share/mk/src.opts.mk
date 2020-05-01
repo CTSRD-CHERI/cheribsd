@@ -79,6 +79,8 @@ __DEFAULT_YES_OPTIONS = \
     CCD \
     CDDL \
     CLANG \
+    CLANG_BOOTSTRAP \
+    CLANG_IS_CC \
     CPP \
     CROSS_COMPILER \
     CRYPT \
@@ -104,7 +106,6 @@ __DEFAULT_YES_OPTIONS = \
     FTP \
     GAMES \
     GDB \
-    GDB_LIBEXEC \
     GNU_DIFF \
     GNU_GREP \
     GOOGLETEST \
@@ -125,9 +126,13 @@ __DEFAULT_YES_OPTIONS = \
     LDNS \
     LDNS_UTILS \
     LEGACY_CONSOLE \
+    LIBCPLUSPLUS \
     LIBPTHREAD \
     LIBTHR \
     LLD \
+    LLD_BOOTSTRAP \
+    LLD_IS_LD \
+    LLVM_ASSERTIONS \
     LLVM_COV \
     LLVM_TARGET_ALL \
     LOADER_GELI \
@@ -195,7 +200,6 @@ __DEFAULT_YES_OPTIONS = \
     ZONEINFO
 
 __DEFAULT_NO_OPTIONS = \
-    AMD \
     BEARSSL \
     BSD_GREP \
     CLANG_EXTRAS \
@@ -215,13 +219,13 @@ __DEFAULT_NO_OPTIONS = \
     SORT_THREADS \
     SVN \
     ZONEINFO_LEAPSECONDS_SUPPORT \
-    ZONEINFO_OLD_TIMEZONES_SUPPORT \
 
 __DEFAULT_NO_OPTIONS+= \
     LIBCHERI
 
 __DEFAULT_YES_OPTIONS+=	\
-	COMPAT_CHERIABI
+	COMPAT_CHERIABI \
+	CHERIBSDBOX
 
 # LEFT/RIGHT. Left options which default to "yes" unless their corresponding
 # RIGHT option is disabled.
@@ -229,6 +233,7 @@ __DEFAULT_DEPENDENT_OPTIONS= \
 	CLANG_FULL/CLANG \
 	LOADER_VERIEXEC/BEARSSL \
 	LOADER_EFI_SECUREBOOT/LOADER_VERIEXEC \
+	LOADER_VERIEXEC_VECTX/LOADER_VERIEXEC \
 	VERIEXEC/BEARSSL \
 
 # MK_*_SUPPORT options which default to "yes" unless their corresponding
@@ -257,15 +262,15 @@ __DEFAULT_DEPENDENT_OPTIONS+= ${var}_SUPPORT/${var}
 # Additional, per-target behavior should be rarely added only after much
 # gnashing of teeth and grinding of gears.
 #
-.if defined(TARGET_ARCH)
+# Note: we have to use MACHINE_ARCH in the bsd.compat.mk case (WANT_COMPAT)
+# since TARGET_ARCH is generally set on the make commandline and cannot be
+# overriden by bsd.compat.mk.
+.if defined(TARGET_ARCH) && !defined(WANT_COMPAT)
 __T=${TARGET_ARCH}
+__C=${TARGET_CPUTYPE}
 .else
 __T=${MACHINE_ARCH}
-.endif
-.if defined(TARGET)
-__TT=${TARGET}
-.else
-__TT=${MACHINE}
+__C=${CPUTYPE}
 .endif
 
 # All supported backends for LLVM_TARGET_XXX
@@ -276,21 +281,19 @@ __LLVM_TARGETS= \
 		powerpc \
 		riscv \
 		x86
-__LLVM_TARGET_FILT=	C/(amd64|i386)/x86/:S/arm64/aarch64/:S/powerpc64/powerpc/
+__LLVM_TARGET_FILT=	C/(amd64|i386)/x86/:C/powerpc.*/powerpc/:C/armv[67]/arm/:C/riscv.*/riscv/:C/mips.*/mips/
 .for __llt in ${__LLVM_TARGETS}
 # Default enable the given TARGET's LLVM_TARGET support
-.if ${__TT:${__LLVM_TARGET_FILT}} == ${__llt}
+.if ${__T:${__LLVM_TARGET_FILT}} == ${__llt}
 __DEFAULT_YES_OPTIONS+=	LLVM_TARGET_${__llt:${__LLVM_TARGET_FILT}:tu}
 # aarch64 needs arm for -m32 support.
-.elif ${__TT} == "arm64" && ${__llt} == "arm"
+.elif ${__T} == "aarch64" && ${__llt:Marm*} != ""
 __DEFAULT_DEPENDENT_OPTIONS+=	LLVM_TARGET_ARM/LLVM_TARGET_AARCH64
 # Default the rest of the LLVM_TARGETs to the value of MK_LLVM_TARGET_ALL.
 .else
 __DEFAULT_DEPENDENT_OPTIONS+=	LLVM_TARGET_${__llt:${__LLVM_TARGET_FILT}:tu}/LLVM_TARGET_ALL
 .endif
 .endfor
-# until we can unwind clang + sparc
-MK_LLVM_TARGET_SPARC:=no
 
 __DEFAULT_NO_OPTIONS+=LLVM_TARGET_BPF
 
@@ -313,29 +316,23 @@ BROKEN_OPTIONS+=OFED
 BROKEN_OPTIONS+=LIB32
 .endif
 
-.if ${__TT} != "mips"
-# Clang is installed as the default /usr/bin/cc.
-__DEFAULT_YES_OPTIONS+=CLANG_BOOTSTRAP CLANG_IS_CC
-.else
-# Clang is enabled but we still require an external toolchain.
-__DEFAULT_NO_OPTIONS+=CLANG_BOOTSTRAP CLANG_IS_CC
+.ifdef COMPAT_64BIT
+# ofed needs to be part of the default build for headers to be available.
+# Since it isn't yet working under purecap, disable it here.
+BROKEN_OPTIONS+=OFED
 .endif
+
 # In-tree binutils/gcc are older versions without modern architecture support.
 .if ${__T} == "aarch64" || ${__T:Mriscv*} != ""
 BROKEN_OPTIONS+=BINUTILS BINUTILS_BOOTSTRAP GDB
 .endif
-.if ${__T} == "amd64" || ${__T} == "i386" || ${__T:Mpowerpc*}
+.if ${__T} == "amd64" || ${__T} == "i386"
 __DEFAULT_YES_OPTIONS+=BINUTILS_BOOTSTRAP
 .else
 __DEFAULT_NO_OPTIONS+=BINUTILS_BOOTSTRAP
 .endif
 .if ${__T:Mriscv*} != ""
 BROKEN_OPTIONS+=OFED
-.endif
-.if ${__TT} != "mips" && ${__T} != "powerpc" && ${__T} != "powerpcspe"
-__DEFAULT_YES_OPTIONS+=LLD_BOOTSTRAP LLD_IS_LD
-.else
-__DEFAULT_NO_OPTIONS+=LLD_BOOTSTRAP LLD_IS_LD
 .endif
 .if ${__T} == "aarch64" || ${__T} == "amd64" || ${__T} == "i386"
 __DEFAULT_YES_OPTIONS+=LLDB
@@ -376,10 +373,6 @@ BROKEN_OPTIONS+=SSP
 # nscd(8) caching depends on marshaling pointers to the daemon and back
 # and can't work without a rewrite.
 BROKEN_OPTIONS+=NS_CACHING
-# cheribsdbox is a useful recovery tool
-__DEFAULT_YES_OPTIONS+=CHERIBSDBOX
-.else
-__DEFAULT_NO_OPTIONS+=CHERIBSDBOX
 .endif
 
 .if ${__T:Mriscv*c*}
@@ -394,6 +387,11 @@ BROKEN_OPTIONS+=SVN SVNLITE
 
 # libcheri has not been ported to RISCV
 BROKEN_OPTIONS+=LIBCHERI
+
+# No RTLD yet
+BROKEN_OPTIONS+=CASPER DYNAMICROOT
+# kerberos causes linker errors when linking statically due to -fno-common
+BROKEN_OPTIONS+=KERBEROS KERBEROS_SUPPORT
 .endif
 
 # EFI doesn't exist on mips, powerpc or riscv.
@@ -431,7 +429,10 @@ __DEFAULT_YES_OPTIONS+=PIE
 __DEFAULT_NO_OPTIONS+=PIE
 .endif
 
-.if ${__T} != "mips64" && (${__TT} != "riscv" || ${__T:Mriscv*64*c})
+# We'd really like this to be:
+#    !${MACHINE_CPU:Mcheri} || ${MACHINE_ABI:Mpurecap}
+# but that logic doesn't work in Makefile.inc1...
+.if ${__C} != "cheri" || (${__T:Mmips64*c*} || ${__T:Mriscv64*c*})
 BROKEN_OPTIONS+=COMPAT_CHERIABI
 .endif
 
@@ -456,8 +457,7 @@ BROKEN_OPTIONS+=NVME
 BROKEN_OPTIONS+=GOOGLETEST
 .endif
 
-.if ${COMPILER_FEATURES:Mc++11} && \
-    (${__T} == "amd64" || ${__T} == "i386" || ${__T} == "powerpc64")
+.if ${__T} == "amd64" || ${__T} == "i386" || ${__T} == "powerpc64"
 __DEFAULT_YES_OPTIONS+=OPENMP
 .else
 __DEFAULT_NO_OPTIONS+=OPENMP
@@ -477,35 +477,9 @@ MK_GCC_BOOTSTRAP:=no
 .endif
 
 #
-# MK_* options that default to "yes" if the compiler is a C++11 compiler.
-#
-.for var in \
-    LIBCPLUSPLUS
-.if !defined(MK_${var})
-.if ${COMPILER_FEATURES:Mc++11}
-.if defined(WITHOUT_${var})
-MK_${var}:=	no
-.else
-MK_${var}:=	yes
-.endif
-.else
-.if defined(WITH_${var})
-MK_${var}:=	yes
-.else
-MK_${var}:=	no
-.endif
-.endif
-.endif
-.endfor
-
-#
 # Force some options off if their dependencies are off.
 # Order is somewhat important.
 #
-.if !${COMPILER_FEATURES:Mc++11}
-MK_GOOGLETEST:=	no
-.endif
-
 .if ${MK_CAPSICUM} == "no"
 MK_CASPER:=	no
 .endif
@@ -598,7 +572,6 @@ MK_GOOGLETEST:=	no
 
 .if ${MK_ZONEINFO} == "no"
 MK_ZONEINFO_LEAPSECONDS_SUPPORT:= no
-MK_ZONEINFO_OLD_TIMEZONES_SUPPORT:= no
 .endif
 
 .if ${MK_CROSS_COMPILER} == "no"
@@ -627,12 +600,6 @@ MK_LLVM_COV:= no
 MK_LOADER_VERIEXEC_PASS_MANIFEST := no
 .endif
 
-# COMPAT_CHERIABI and LIBCHERI depend on CHERI support on mips.
-.if ${MK_CHERI} == "no" && ${__TT} == "mips"
-MK_LIBCHERI:=	no
-MK_COMPAT_CHERIABI:=	no
-.endif
-
 #
 # MK_* options whose default value depends on another option.
 #
@@ -651,9 +618,5 @@ MK_${vv:H}:=	${MK_${vv:T}}
 #
 # Set defaults for the MK_*_SUPPORT variables.
 #
-
-.if !${COMPILER_FEATURES:Mc++11}
-MK_LLDB:=	no
-.endif
 
 .endif #  !target(__<src.opts.mk>__)

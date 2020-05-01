@@ -118,6 +118,16 @@ static uma_zone_t kegs;
 static uma_zone_t zones;
 
 /*
+ * On INVARIANTS builds, the slab contains a second bitset of the same size,
+ * "dbg_bits", which is laid out immediately after us_free.
+ */
+#ifdef INVARIANTS
+#define	SLAB_BITSETS	2
+#else
+#define	SLAB_BITSETS	1
+#endif
+
+/*
  * These are the two zones from which all offpage uma_slab_ts are allocated.
  *
  * One zone is for slab headers that can represent a larger number of items,
@@ -1943,7 +1953,7 @@ zero_init(void *mem, int size, int flags)
 }
 
 #ifdef INVARIANTS
-struct noslabbits *
+static struct noslabbits *
 slab_dbg_bits(uma_slab_t slab, uma_keg_t keg)
 {
 
@@ -1954,22 +1964,13 @@ slab_dbg_bits(uma_slab_t slab, uma_keg_t keg)
 /*
  * Actual size of embedded struct slab (!OFFPAGE).
  */
-size_t
+static size_t
 slab_sizeof(int nitems)
 {
 	size_t s;
 
 	s = sizeof(struct uma_slab) + BITSET_SIZE(nitems) * SLAB_BITSETS;
 	return (roundup(s, UMA_ALIGN_PTR + 1));
-}
-
-/*
- * Size of memory for embedded slabs (!OFFPAGE).
- */
-size_t
-slab_space(int nitems)
-{
-	return (UMA_SLAB_SIZE - slab_sizeof(nitems));
 }
 
 #define	UMA_FIXPT_SHIFT	31
@@ -2010,18 +2011,6 @@ slab_ipers_hdr(u_int size, u_int rsize, u_int slabsize, bool hdr)
 	}
 
 	return (ipers);
-}
-
-/*
- * Compute the number of items that will fit in a slab for a startup zone.
- */
-int
-slab_ipers(size_t size, int align)
-{
-	int rsize;
-
-	rsize = roundup(size, align + 1); /* Assume no CACHESPREAD */
-	return (slab_ipers_hdr(size, rsize, UMA_SLAB_SIZE, true));
 }
 
 struct keg_layout_result {
@@ -2112,14 +2101,22 @@ keg_layout(uma_keg_t keg)
 		slabsize = rsize * (UMA_SLAB_SIZE / alignsize);
 		slabsize = MIN(slabsize, rsize * SLAB_MAX_SETSIZE);
 		slabsize = MIN(slabsize, UMA_CACHESPREAD_MAX_SIZE);
+#ifdef UMA_SUPERPAGE_SLAB
+		slabsize = roundup2(keg->uk_size, UMA_SLAB_SIZE);
+#else
 		slabsize = round_page(slabsize);
+#endif
 	} else {
 		/*
 		 * Start with a slab size of as many pages as it takes to
 		 * represent a single item.  We will try to fit as many
 		 * additional items into the slab as possible.
 		 */
+#ifdef UMA_SUPERPAGE_SLAB
+		slabsize = roundup2(keg->uk_size, UMA_SLAB_SIZE);
+#else
 		slabsize = round_page(keg->uk_size);
+#endif
 	}
 
 	/* Build a list of all of the available formats for this keg. */
@@ -2153,7 +2150,7 @@ keg_layout(uma_keg_t keg)
 	 * Prefer the smallest slab size that meets the constraints.
 	 *
 	 * Start with a minimum slab size, to accommodate CACHESPREAD.  Then,
-	 * for small items (up to PAGE_SIZE), the iteration increment is one
+	 * for small items (up to UMA_SLAB_SIZE), the iteration increment is one
 	 * page; and for large items, the increment is one item.
 	 */
 	i = (slabsize + rsize - keg->uk_size) / MAX(PAGE_SIZE, rsize);
@@ -2246,11 +2243,6 @@ keg_ctor(void *mem, int size, void *udata, int flags)
 	keg->uk_reserve = 0;
 	keg->uk_flags = arg->flags;
 
-#ifdef CHERI_PURECAP_KERNEL
-	if ((keg->uk_flags & UMA_ZFLAG_HASH) == 0)
-		keg->uk_flags |= UMA_ZFLAG_VTOSLAB;
-#endif
-
 	/*
 	 * We use a global round-robin policy by default.  Zones with
 	 * UMA_ZONE_FIRSTTOUCH set will use first-touch instead, in which
@@ -2270,6 +2262,10 @@ keg_ctor(void *mem, int size, void *udata, int flags)
 
 	if (arg->flags & UMA_ZONE_MALLOC)
 		keg->uk_flags |= UMA_ZFLAG_VTOSLAB;
+#ifdef CHERI_PURECAP_KERNEL
+	if ((keg->uk_flags & UMA_ZFLAG_HASH) == 0)
+		keg->uk_flags |= UMA_ZFLAG_VTOSLAB;
+#endif
 
 #ifndef SMP
 	keg->uk_flags &= ~UMA_ZONE_PCPU;
@@ -5344,9 +5340,12 @@ uma_dbg_alloc(uma_zone_t zone, uma_slab_t slab, void *item)
 #ifdef CHERI_PURECAP_KERNEL
 	/* Check first that item is a subset of slab capability */
 	if ((keg->uk_flags & UMA_ZFLAG_OFFPAGE) == 0 &&
-	    !cheri_is_subset(slab, item))
+	    !cheri_is_subset(slab, item)) {
+		CHERI_PRINT_PTR(slab);
+		CHERI_PRINT_PTR(item);
 		panic("Item capability %p is not a subset of the"
 		    " slab capability %p.", item, slab);
+        }
 #endif
 	freei = slab_item_index(slab, keg, item);
 

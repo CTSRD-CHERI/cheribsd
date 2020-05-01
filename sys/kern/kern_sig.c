@@ -69,7 +69,6 @@ __FBSDID("$FreeBSD$");
 #include <sys/procdesc.h>
 #include <sys/ptrace.h>
 #include <sys/posix4.h>
-#include <sys/pioctl.h>
 #include <sys/racct.h>
 #include <sys/resourcevar.h>
 #include <sys/sdt.h>
@@ -119,6 +118,7 @@ static int	coredump(struct thread *);
 static int	killpg1(struct thread *td, int sig, int pgid, int all,
 		    ksiginfo_t *ksi);
 static int	issignal(struct thread *td);
+static void	reschedule_signals(struct proc *p, sigset_t block, int flags);
 static void	tdsigwakeup(struct thread *, int, sig_t, int);
 static int	sig_suspend_threads(struct thread *, struct proc *, int);
 static int	filt_sigattach(struct knote *kn);
@@ -2341,14 +2341,6 @@ tdsendsignal(struct proc *p, struct thread *td, int sig, ksiginfo_t *ksi)
 	    !((prop & SIGPROP_CONT) && (p->p_flag & P_STOPPED_SIG)))
 		return (ret);
 
-	/* SIGKILL: Remove procfs STOPEVENTs. */
-	if (sig == SIGKILL) {
-		/* from procfs_ioctl.c: PIOCBIC */
-		p->p_stops = 0;
-		/* from procfs_ioctl.c: PIOCCONT */
-		p->p_step = 0;
-		wakeup(&p->p_step);
-	}
 	wakeup_swapper = 0;
 
 	/*
@@ -2769,7 +2761,7 @@ stopme:
 	return (td->td_xsig);
 }
 
-void
+static void
 reschedule_signals(struct proc *p, sigset_t block, int flags)
 {
 	struct sigacts *ps;
@@ -2938,15 +2930,13 @@ issignal(struct thread *td)
 	struct sigqueue *queue;
 	sigset_t sigpending;
 	ksiginfo_t ksi;
-	int prop, sig, traced;
+	int prop, sig;
 
 	p = td->td_proc;
 	ps = p->p_sigacts;
 	mtx_assert(&ps->ps_mtx, MA_OWNED);
 	PROC_LOCK_ASSERT(p, MA_OWNED);
 	for (;;) {
-		traced = (p->p_flag & P_TRACED) || (p->p_stops & S_SIG);
-
 		sigpending = td->td_sigqueue.sq_signals;
 		SIGSETOR(sigpending, p->p_sigqueue.sq_signals);
 		SIGSETNAND(sigpending, td->td_sigmask);
@@ -2989,17 +2979,12 @@ issignal(struct thread *td)
 			sig = sig_ffs(&sigpending);
 		}
 
-		if (p->p_stops & S_SIG) {
-			mtx_unlock(&ps->ps_mtx);
-			stopevent(p, S_SIG, sig);
-			mtx_lock(&ps->ps_mtx);
-		}
-
 		/*
 		 * We should see pending but ignored signals
 		 * only if P_TRACED was on when they were posted.
 		 */
-		if (SIGISMEMBER(ps->ps_sigignore, sig) && (traced == 0)) {
+		if (SIGISMEMBER(ps->ps_sigignore, sig) &&
+		    (p->p_flag & P_TRACED) == 0) {
 			sigqueue_delete(&td->td_sigqueue, sig);
 			sigqueue_delete(&p->p_sigqueue, sig);
 			continue;
@@ -3206,11 +3191,6 @@ postsig(int sig)
 		ktrpsig(sig, action, td->td_pflags & TDP_OLDMASK ?
 		    &td->td_oldsigmask : &td->td_sigmask, ksi.ksi_code);
 #endif
-	if ((p->p_stops & S_SIG) != 0) {
-		mtx_unlock(&ps->ps_mtx);
-		stopevent(p, S_SIG, sig);
-		mtx_lock(&ps->ps_mtx);
-	}
 
 	if (action == SIG_DFL) {
 		/*
@@ -3766,7 +3746,6 @@ coredump(struct thread *td)
 
 	PROC_LOCK_ASSERT(p, MA_OWNED);
 	MPASS((p->p_flag & P_HADTHREADS) == 0 || p->p_singlethread == td);
-	_STOPEVENT(p, S_CORE, 0);
 
 	if (!do_coredump || (!sugid_coredump && (p->p_flag & P_SUGID) != 0) ||
 	    (p->p_flag2 & P2_NOTRACE) != 0) {
@@ -4215,7 +4194,8 @@ sigfastblock_clear(struct thread *td)
 	if ((td->td_pflags & TDP_SIGFASTBLOCK) == 0)
 		return;
 	td->td_sigblock_val = 0;
-	resched = (td->td_pflags & TDP_SIGFASTPENDING) != 0;
+	resched = (td->td_pflags & TDP_SIGFASTPENDING) != 0 ||
+	    SIGPENDING(td);
 	td->td_pflags &= ~(TDP_SIGFASTBLOCK | TDP_SIGFASTPENDING);
 	if (resched) {
 		p = td->td_proc;
@@ -4233,8 +4213,8 @@ sigfastblock_fetch(struct thread *td)
 	(void)sigfastblock_fetch_sig(td, true, &val);
 }
 
-void
-sigfastblock_setpend(struct thread *td)
+static void
+sigfastblock_setpend1(struct thread *td)
 {
 	int res;
 	uint32_t oldval;
@@ -4261,6 +4241,20 @@ sigfastblock_setpend(struct thread *td)
 		MPASS(res == 1);
 		if (thread_check_susp(td, false) != 0)
 			break;
+	}
+}
+
+void
+sigfastblock_setpend(struct thread *td, bool resched)
+{
+	struct proc *p;
+
+	sigfastblock_setpend1(td);
+	if (resched) {
+		p = td->td_proc;
+		PROC_LOCK(p);
+		reschedule_signals(p, fastblock_mask, SIGPROCMASK_FASTBLK);
+		PROC_UNLOCK(p);
 	}
 }
 // CHERI CHANGES START

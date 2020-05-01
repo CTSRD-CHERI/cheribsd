@@ -167,7 +167,7 @@ _libcheri=	libcheri
 SUBDIR+= libsimple_printf
 .endif
 
-.if !defined(COMPAT_32BIT) && !defined(COMPAT_64BIT) && !defined(COMPAT_SOFTFP)
+.if !defined(COMPAT_32BIT) && !defined(COMPAT_64BIT) && !defined(COMPAT_SOFTFP) && !defined(COMPAT_CHERI)
 SUBDIR.${MK_CLANG}+=	clang
 .endif
 
@@ -238,15 +238,9 @@ SUBDIR.${MK_PMC}+=	libpmc libpmcstat
 SUBDIR.${MK_RADIUS_SUPPORT}+=	libradius
 SUBDIR.${MK_SENDMAIL}+=	libmilter libsm libsmdb libsmutil
 SUBDIR.${MK_TELNET}+=	libtelnet
-
-.if ${MK_TESTS_SUPPORT} != "no" || ${MK_TESTS} != "no"
-SUBDIR+=		atf
-.if ${MK_CXX} != "no"
-SUBDIR+=		kyua
-SUBDIR+=		liblutok
-.endif
-.endif
-
+SUBDIR.${MK_TESTS_SUPPORT}+=	atf
+SUBDIR.${MK_TESTS_SUPPORT}.${MK_CXX}+=	kyua
+SUBDIR.${MK_TESTS_SUPPORT}.${MK_CXX}+=	liblutok
 SUBDIR.${MK_TESTS}+=	tests
 SUBDIR.${MK_UNBOUND}+=	libunbound
 SUBDIR.${MK_USB}+=	libusbhid libusb

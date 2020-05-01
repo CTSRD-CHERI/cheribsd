@@ -2571,6 +2571,7 @@ ifr__short1_get(void *ifrp)
 #ifdef COMPAT_FREEBSD32
 	if (SV_CURPROC_FLAG(SV_ILP32))
 		return (ifrup->ifr32.ifr_ifru.ifru_flags[1]);
+	else
 #endif
 #ifdef COMPAT_FREEBSD64
 	if (!SV_CURPROC_FLAG(SV_CHERI))
@@ -2805,7 +2806,7 @@ ifr_flags_get(void *ifrp)
 	return (ifr__short0_get(ifrp));
 }
 
-static void
+void
 ifr_flags_set(void *ifrp, short val)
 {
 
@@ -2819,7 +2820,7 @@ ifr_flagshigh_get(void *ifrp)
 	return (ifr__short1_get(ifrp));
 }
 
-static void
+void
 ifr_flagshigh_set(void *ifrp, short val)
 {
 
@@ -2892,7 +2893,7 @@ ifr_reqcap_get(void *ifrp)
 	return (ifr__int0_get(ifrp));
 }
 
-static void
+void
 ifr_reqcap_set(void *ifrp, int val)
 {
 

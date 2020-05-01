@@ -22,7 +22,9 @@ CFLAGS+=	-D__STDC_CONSTANT_MACROS
 CFLAGS+=	-D__STDC_FORMAT_MACROS
 CFLAGS+=	-D__STDC_LIMIT_MACROS
 CFLAGS+=	-DHAVE_VCS_VERSION_INC
-#CFLAGS+=	-DNDEBUG
+.if ${MK_LLVM_ASSERTIONS} == "no"
+CFLAGS+=	-DNDEBUG
+.endif
 
 TARGET_ARCH?=	${MACHINE_ARCH}
 BUILD_ARCH?=	${MACHINE_ARCH}
@@ -80,12 +82,6 @@ CFLAGS+=	-DLLVM_TARGET_ENABLE_RISCV
 LLVM_NATIVE_ARCH=	RISCV
 . endif
 .endif
-.if ${MK_LLVM_TARGET_SPARC} != "no"
-CFLAGS+=	-DLLVM_TARGET_ENABLE_SPARC
-. if ${MACHINE_CPUARCH} == "sparc64"
-LLVM_NATIVE_ARCH=	Sparc
-. endif
-.endif
 .if ${MK_LLVM_TARGET_X86} != "no"
 CFLAGS+=	-DLLVM_TARGET_ENABLE_X86
 . if ${MACHINE_CPUARCH} == "i386" || ${MACHINE_CPUARCH} == "amd64"
@@ -106,12 +102,7 @@ CFLAGS+=	-ffunction-sections
 CFLAGS+=	-fdata-sections
 LDFLAGS+=	-Wl,--gc-sections
 
-CXXSTD?=	c++11
+CXXSTD?=	c++14
 CXXFLAGS+=	-fno-exceptions
 CXXFLAGS+=	-fno-rtti
 CXXFLAGS.clang+= -stdlib=libc++
-
-.if ${MACHINE_CPUARCH} == "arm"
-STATIC_CFLAGS+= -mlong-calls
-STATIC_CXXFLAGS+= -mlong-calls
-.endif

@@ -169,6 +169,8 @@ struct tcpcb {
 	u_int	t_starttime;		/* time connection was established */
 
 	u_int	t_pmtud_saved_maxseg;	/* pre-blackhole MSS */
+	int	t_blackhole_enter;	/* when to enter blackhole detection */
+	int	t_blackhole_exit;	/* when to exit blackhole detection */
 	u_int	t_rttmin;		/* minimum rtt allowed */
 
 	u_int	t_rttbest;		/* best rtt we've seen */
@@ -652,9 +654,10 @@ VNET_PCPUSTAT_DECLARE(struct tcpstat, tcpstat);	/* tcp statistics */
 /*
  * Kernel module consumers must use this accessor macro.
  */
-void	kmod_tcpstat_inc(int statnum);
-#define	KMOD_TCPSTAT_INC(name)						\
-    kmod_tcpstat_inc(offsetof(struct tcpstat, name) / sizeof(uint64_t))
+void	kmod_tcpstat_add(int statnum, int val);
+#define	KMOD_TCPSTAT_ADD(name, val)					\
+    kmod_tcpstat_add(offsetof(struct tcpstat, name) / sizeof(uint64_t), val)
+#define	KMOD_TCPSTAT_INC(name)	KMOD_TCPSTAT_ADD(name, 1)
 
 /*
  * Running TCP connection count by state.

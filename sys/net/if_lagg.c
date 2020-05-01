@@ -1610,12 +1610,13 @@ mst_to_lst(struct m_snd_tag *mst)
  * contents.
  */
 static struct lagg_port *
-lookup_snd_tag_port(struct ifnet *ifp, uint32_t flowid, uint32_t flowtype)
+lookup_snd_tag_port(struct ifnet *ifp, uint32_t flowid, uint32_t flowtype,
+    uint8_t numa_domain)
 {
 	struct lagg_softc *sc;
 	struct lagg_port *lp;
 	struct lagg_lb *lb;
-	uint32_t p;
+	uint32_t hash, p;
 
 	sc = ifp->if_softc;
 
@@ -1635,7 +1636,8 @@ lookup_snd_tag_port(struct ifnet *ifp, uint32_t flowid, uint32_t flowtype)
 		if ((sc->sc_opts & LAGG_OPT_USE_FLOWID) == 0 ||
 		    flowtype == M_HASHTYPE_NONE)
 			return (NULL);
-		return (lacp_select_tx_port_by_hash(sc, flowid));
+		hash = flowid >> sc->flowid_shift;
+		return (lacp_select_tx_port_by_hash(sc, hash, numa_domain));
 	default:
 		return (NULL);
 	}
@@ -1655,7 +1657,8 @@ lagg_snd_tag_alloc(struct ifnet *ifp,
 	sc = ifp->if_softc;
 
 	LAGG_RLOCK();
-	lp = lookup_snd_tag_port(ifp, params->hdr.flowid, params->hdr.flowtype);
+	lp = lookup_snd_tag_port(ifp, params->hdr.flowid,
+	    params->hdr.flowtype, params->hdr.numa_domain);
 	if (lp == NULL) {
 		LAGG_RUNLOCK();
 		return (EOPNOTSUPP);
@@ -1872,10 +1875,6 @@ lagg_transmit(struct ifnet *ifp, struct mbuf *m)
 
 	error = lagg_proto_start(sc, m);
 	LAGG_RUNLOCK();
-
-	if (error != 0)
-		if_inc_counter(ifp, IFCOUNTER_OERRORS, 1);
-
 	return (error);
 }
 
@@ -2098,6 +2097,7 @@ lagg_rr_start(struct lagg_softc *sc, struct mbuf *m)
 	 * port if the link is down or the port is NULL.
 	 */
 	if ((lp = lagg_link_active(sc, lp)) == NULL) {
+		if_inc_counter(sc->sc_ifp, IFCOUNTER_OERRORS, 1);
 		m_freem(m);
 		return (ENETDOWN);
 	}
@@ -2143,31 +2143,28 @@ lagg_bcast_start(struct lagg_softc *sc, struct mbuf *m)
 				errors++;
 				break;
 			}
-
-			ret = lagg_enqueue(last->lp_ifp, m0);
-			if (ret != 0)
-				errors++;
+			lagg_enqueue(last->lp_ifp, m0);
 		}
 		last = lp;
 	}
 
 	if (last == NULL) {
+		if_inc_counter(sc->sc_ifp, IFCOUNTER_OERRORS, 1);
 		m_freem(m);
 		return (ENOENT);
 	}
 	if ((last = lagg_link_active(sc, last)) == NULL) {
+		errors++;
+		if_inc_counter(sc->sc_ifp, IFCOUNTER_OERRORS, errors);
 		m_freem(m);
 		return (ENETDOWN);
 	}
 
 	ret = lagg_enqueue(last->lp_ifp, m);
-	if (ret != 0)
-		errors++;
+	if (errors != 0)
+		if_inc_counter(sc->sc_ifp, IFCOUNTER_OERRORS, errors);
 
-	if (errors == 0)
-		return (ret);
-
-	return (0);
+	return (ret);
 }
 
 static struct mbuf*
@@ -2190,6 +2187,7 @@ lagg_fail_start(struct lagg_softc *sc, struct mbuf *m)
 
 	/* Use the master port if active or the next available port */
 	if ((lp = lagg_link_active(sc, sc->sc_primary)) == NULL) {
+		if_inc_counter(sc->sc_ifp, IFCOUNTER_OERRORS, 1);
 		m_freem(m);
 		return (ENETDOWN);
 	}
@@ -2313,6 +2311,7 @@ lagg_lb_start(struct lagg_softc *sc, struct mbuf *m)
 	 * port if the link is down or the port is NULL.
 	 */
 	if ((lp = lagg_link_active(sc, lp)) == NULL) {
+		if_inc_counter(sc->sc_ifp, IFCOUNTER_OERRORS, 1);
 		m_freem(m);
 		return (ENETDOWN);
 	}
@@ -2384,6 +2383,7 @@ lagg_lacp_start(struct lagg_softc *sc, struct mbuf *m)
 
 	lp = lacp_select_tx_port(sc, m);
 	if (lp == NULL) {
+		if_inc_counter(sc->sc_ifp, IFCOUNTER_OERRORS, 1);
 		m_freem(m);
 		return (ENETDOWN);
 	}

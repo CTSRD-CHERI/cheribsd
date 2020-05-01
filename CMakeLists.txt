@@ -3,6 +3,7 @@ set(CMAKE_SYSTEM_NAME FreeBSD)
 set(CMAKE_TRY_COMPILE_TARGET_TYPE STATIC_LIBRARY)
 cmake_minimum_required(VERSION 3.8)
 project(CheriBSD LANGUAGES NONE)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 set(TARGET "" CACHE STRING "Target machine.")
 set(TARGET_ARCH "" CACHE STRING "Target machine arch.")
@@ -29,9 +30,11 @@ endif()
 
 include_directories(${CMAKE_SOURCE_DIR}/include)
 include_directories(${CMAKE_SOURCE_DIR}/sys)
+include_directories(${CMAKE_SOURCE_DIR}/contrib/libxo)
+include_directories(${CMAKE_SOURCE_DIR}/contrib/libc-vis)
 
 set(TMPSYSROOT ${CMAKE_BINARY_DIR}/sysroot/usr)
-add_compile_options(--sysroot=${CMAKE_BINARY_DIR}/sysroot/)
+file(MAKE_DIRECTORY ${TMPSYSROOT}/include/)
 
 # Create symlinks
 execute_process(COMMAND ${CMAKE_COMMAND} -E create_symlink ${MACHINE_HEADERS} ${TMPSYSROOT}/include/machine)
@@ -48,12 +51,45 @@ file(WRITE ${CMAKE_BINARY_DIR}/kern_opt/opt_ktrace.h "#define KTRACE 1\n")
 file(WRITE ${CMAKE_BINARY_DIR}/kern_opt/opt_global.h "#define KDB 1
 // #define COMPAT_FREEBSD11 1
 #define COMPAT_CHERIABI 1
+#define COMPAT_FREEBSD32 1
+#define COMPAT_FREEBSD64 1
 #define CPU_CHERI 1
 // #define INVARIANT_SUPPORT 1
 #define CPU_MALTA 1
 // #define COMPAT_FREEBSD32 1
 #define TICK_USE_YAMON_FREQ defined
 #define YAMON 1
+// Pretend that we have capabilities
+#define __CHERI__
+#define __has_feature(x) __fake_has_feature_##x
+#define __fake_has_feature_capabilities 1
+// But we don't really so define __capability to nothing
+#define __capability
+// And provide the builtins for code completion
+long __builtin_cheri_length_get(void* __capability);
+long __builtin_cheri_base_get(void* __capability);
+long __builtin_cheri_offset_get(void* __capability);
+long __builtin_cheri_address_get(void* __capability);
+long __builtin_cheri_flags_get(void* __capability);
+long __builtin_cheri_perms_get(void* __capability);
+long __builtin_cheri_sealed_get(void* __capability);
+long __builtin_cheri_tag_get(void* __capability);
+long __builtin_cheri_type_get(void* __capability));
+void* __capability __builtin_cheri_perms_and(void* __capability, long);
+void* __capability __builtin_cheri_tag_clear(void* __capability);
+void* __capability __builtin_cheri_offset_increment(void* __capability, long);
+void* __capability __builtin_cheri_offset_set(void* __capability, long);
+void* __capability __builtin_cheri_address_set(void* __capability, long);
+void* __capability __builtin_cheri_flags_set(void* __capability, long);
+void* __capability __builtin_cheri_seal(void* __capability, void* __capability);
+void* __capability __builtin_cheri_unseal(void* __capability, void* __capability);
+void __builtin_cheri_perms_check(void* __capability, long);
+void __builtin_cheri_type_check(void* __capability, void* __capability);
+void* __capability __builtin_cheri_global_data_get(void);
+void* __capability __builtin_cheri_program_counter_get(void);
+void* __capability __builtin_cheri_stack_get(void);
+void* __capability __builtin_cheri_bounds_set(void* __capability, long);
+void* __capability __builtin_cheri_bounds_set_exact(void* __capability, long);
 // #define INVARIANTS 1
 // #define MAC 1
 // #define AUDIT 1")
@@ -81,6 +117,6 @@ file(GLOB_RECURSE FAKE_KERNEL_SRCS_KERN sys/kern "*.c")
 file(GLOB_RECURSE FAKE_KERNEL_SRCS_LIBKERN sys/libkern "*.c")
 add_library(fake_kernel STATIC ${FAKE_KERNEL_SRCS_MIPS} ${FAKE_KERNEL_SRCS_DDB} ${FAKE_KERNEL_SRCS_CHERI} ${FAKE_KERNEL_SRCS_CHERIABI} ${FAKE_KERNEL_SRCS_KERN} ${FAKE_KERNEL_SRCS_LIBKERN})
 target_compile_definitions(fake_kernel PRIVATE _KERNEL=1)
-target_include_directories(fake_kernel PRIVATE ${CMAKE_SOURCE_DIR}/sys)
 target_include_directories(fake_kernel PRIVATE ${CMAKE_BINARY_DIR}/kern_opt)
+target_include_directories(fake_kernel PRIVATE ${CMAKE_SOURCE_DIR}/sys/contrib/ck/include)
 target_compile_options(fake_kernel PRIVATE -include ${CMAKE_BINARY_DIR}/kern_opt/opt_global.h)

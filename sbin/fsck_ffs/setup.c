@@ -58,6 +58,8 @@ __FBSDID("$FreeBSD$");
 
 #include "fsck.h"
 
+struct inoinfo **inphead, **inpsort;
+
 struct uufsd disk;
 struct fs_summary_info ufs_summary_info;
 struct bufarea asblk;

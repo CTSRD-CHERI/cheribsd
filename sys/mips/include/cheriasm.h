@@ -103,11 +103,12 @@
  * This will be removed once all live bitfiles and toolchain have been
  * updated.
  */
-#if (defined(CPU_CHERI) && !defined(CPU_CHERI128))
-#define	CHERI_ASM_CMOVE(cd, cb)		cmove cd, cb
-#else
+/* #if (defined(CPU_CHERI) && !defined(CPU_CHERI128)) */
+/* #define	CHERI_ASM_CMOVE(cd, cb)		cmove cd, cb */
+/* #else */
+/* XXX-AM: remove cheri-256 support */
 #define	CHERI_ASM_CMOVE(cd, cb)		cincoffset cd, cb, zero
-#endif
+/* #endif */
 
 #ifdef CHERI_PURECAP_KERNEL
 

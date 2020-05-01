@@ -8,7 +8,6 @@
 mips/cheri/cheri.c			optional cpu_cheri compile-with ${NOCOV_C}
 mips/cheri/cheri_debug.c		optional cpu_cheri
 mips/cheri/cheri_exception.c		optional cpu_cheri
-mips/cheri/cheri_ktrace.c		optional cpu_cheri ktrace
 mips/cheri/cheri_memcpy_c.S		optional cpu_cheri
 mips/cheri/cheri_sealcap.c		optional cpu_cheri
 mips/cheri/cheri_signal.c		optional cpu_cheri

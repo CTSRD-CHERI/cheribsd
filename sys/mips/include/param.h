@@ -150,11 +150,12 @@
 #ifndef CHERI_PURECAP_KERNEL
 #define	NPDEPGSHIFT		9               /* LOG2(NPTEPG) */
 #else /* CHERI_PURECAP_KERNEL */
-#ifdef CPU_CHERI128
+/* #ifdef CPU_CHERI128 */
 #define NPDEPGSHIFT		8		/* LOG2(NPDEPG) */
-#else /* CHERI256 */
-#define NPDEPGSHIFT		7		/* LOG2(NPDEPG) */
-#endif /* CHERI256*/
+/* XXX-AM: remove cheri-256 support */
+/* #else  CHERI256 */
+/* #define NPDEPGSHIFT		7		/\* LOG2(NPDEPG) *\/ */
+/* #endif /\* CHERI256*\/ */
 #endif /* CHERI_PURECAP_KERNEL */
 #define	SEGSHIFT		(PAGE_SHIFT + NPTEPGSHIFT + NPDEPGSHIFT)
 #define	NBSEG			(1ul << SEGSHIFT)
@@ -181,16 +182,18 @@
  * For a large kernel stack page the KSTACK_SIZE needs to be a page size
  * supported by the hardware (e.g. 16K).
  */
-#if defined(CHERI_PURECAP_KERNEL) && !defined(CPU_CHERI128)
+/* XXX-AM: remove cheri-256 support */
+/* #if defined(CHERI_PURECAP_KERNEL) && !defined(CPU_CHERI128) */
 /*
  * Cheri-256 uses two 64K pages for the kernel stack, without any guard pages.
  * The stack capability is bounded properly so the stack should never overflow.
  */
-#define KSTACK_PAGE_SIZE	(1 << 16)	/* Single 64K page */
-#define	KSTACK_SIZE		(KSTACK_PAGE_SIZE * 2)
-#define KSTACK_GUARD_PAGES	0
+/* #define KSTACK_PAGE_SIZE	(1 << 16)	/\* Single 64K page *\/ */
+/* #define	KSTACK_SIZE		(KSTACK_PAGE_SIZE * 2) */
+/* #define KSTACK_GUARD_PAGES	0 */
 
-#elif defined(CHERI_PURECAP_KERNEL) && defined(CPU_CHERI128)
+/* #elif defined(CHERI_PURECAP_KERNEL) && defined(CPU_CHERI128) */
+#ifdef CHERI_PURECAP_KERNEL
 /*
  * Cheri-128 uses two 16K pages for the kernel stack, without any guard pages.
  * The stack capability is bounded propery so the stack should never overflow.
@@ -234,12 +237,13 @@
 #define	CHERI_SHMLBA	(1 << 20)
 #endif
 
-#if defined(CHERI_PURECAP_KERNEL) && !defined(CPU_CHERI128)
+/* XXX-AM: remove cheri-256 support */
+/* #if defined(CHERI_PURECAP_KERNEL) && !defined(CPU_CHERI128) */
 /*
- * Mbufs are larger in the cheri256 purecap kernel.
+ * Mbufs are larger in the purecap kernel.
  */
 #define MSIZE 512
-#endif
+/* #endif */
 
 /*
  * Mach derived conversion macros

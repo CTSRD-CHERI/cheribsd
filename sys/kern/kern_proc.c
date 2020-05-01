@@ -1238,7 +1238,7 @@ fill_kinfo_thread(struct thread *td, struct kinfo_proc *kp, int preferthread)
 	kp->ki_tid = td->td_tid;
 	kp->ki_numthreads = p->p_numthreads;
 	kp->ki_pcb = EXPORT_KPTR(td->td_pcb);
-	kp->ki_kstack = EXPORT_KPTR((void *)td->td_kstack);
+	kp->ki_kstack = EXPORT_KPTR(td->td_kstack);
 	kp->ki_slptime = (ticks - td->td_slptick) / hz;
 	kp->ki_pri.pri_class = td->td_pri_class;
 	kp->ki_pri.pri_user = td->td_user_pri;
@@ -3232,13 +3232,13 @@ sysctl_kern_proc_sigtramp(SYSCTL_HANDLER_ARGS)
 #endif
 	bzero(&kst, sizeof(kst));
 	if (sv->sv_sigcode_base != 0) {
-		kst.ksigtramp_start = EXPORT_KPTR((char *)sv->sv_sigcode_base);
-		kst.ksigtramp_end = EXPORT_KPTR((char *)sv->sv_sigcode_base +
+		kst.ksigtramp_start = EXPORT_KPTR(sv->sv_sigcode_base);
+		kst.ksigtramp_end = EXPORT_KPTR(sv->sv_sigcode_base +
 		    *sv->sv_szsigcode);
 	} else {
-		kst.ksigtramp_start = EXPORT_KPTR((char *)sv->sv_psstrings -
+		kst.ksigtramp_start = EXPORT_KPTR(sv->sv_psstrings -
 		    *sv->sv_szsigcode);
-		kst.ksigtramp_end = EXPORT_KPTR((char *)sv->sv_psstrings);
+		kst.ksigtramp_end = EXPORT_KPTR(sv->sv_psstrings);
 	}
 	PROC_UNLOCK(p);
 	/* NB CHERI: this strips tags... */

@@ -416,6 +416,7 @@ struct sockproto {
 #define	NET_RT_IFMALIST	4		/* return multicast address list */
 #define	NET_RT_IFLISTL	5		/* Survey interface list, using 'l'en
 					 * versions of msghdr structs. */
+#define NET_RT_NHOP	6		/* dump routing nexthops */
 #endif /* __BSD_VISIBLE */
 
 /*
@@ -547,7 +548,7 @@ struct sockcred {
  * Aligning to capability size should remove the need for realignment in the hybrid kernel/
  * purecap userspace combination.
  */
-#if __has_feature(capabilities)
+#if __has_feature(capabilities) && defined(_KERNEL)
 #define	_CMSG_ALIGN(n)	__builtin_align_up((n), sizeof(void * __capability))
 #else
 #define	_CMSG_ALIGN(n)	_ALIGN(n)

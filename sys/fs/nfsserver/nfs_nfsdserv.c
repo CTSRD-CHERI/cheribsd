@@ -81,6 +81,10 @@ static int	nfsrv_linux42server = 1;
 SYSCTL_INT(_vfs_nfsd, OID_AUTO, linux42server, CTLFLAG_RW,
     &nfsrv_linux42server, 0,
     "Enable Linux style NFSv4.2 server (non-RFC compliant)");
+static bool	nfsrv_openaccess = true;
+SYSCTL_BOOL(_vfs_nfsd, OID_AUTO, v4openaccess, CTLFLAG_RW,
+    &nfsrv_openaccess, 0,
+    "Enable Linux style NFSv4 Open access check");
 
 /*
  * This list defines the GSS mechanisms supported.
@@ -688,9 +692,9 @@ nfsrvd_readlink(struct nfsrv_descript *nd, __unused int isdgram,
 		goto out;
 	NFSM_BUILD(tl, u_int32_t *, NFSX_UNSIGNED);
 	*tl = txdr_unsigned(len);
-	mbuf_setnext(nd->nd_mb, mp);
+	nd->nd_mb->m_next = mp;
 	nd->nd_mb = mpend;
-	nd->nd_bpos = NFSMTOD(mpend, caddr_t) + mbuf_len(mpend);
+	nd->nd_bpos = mtod(mpend, caddr_t) + mpend->m_len;
 
 out:
 	NFSEXITCODE2(0, nd);
@@ -845,7 +849,7 @@ nfsrvd_read(struct nfsrv_descript *nd, __unused int isdgram,
 		if (nd->nd_repstat) {
 			vput(vp);
 			if (m3)
-				mbuf_freem(m3);
+				m_freem(m3);
 			if (nd->nd_flag & ND_NFSV3)
 				nfsrv_postopattr(nd, getret, &nva);
 			goto out;
@@ -869,9 +873,9 @@ nfsrvd_read(struct nfsrv_descript *nd, __unused int isdgram,
 	}
 	*tl = txdr_unsigned(cnt);
 	if (m3) {
-		mbuf_setnext(nd->nd_mb, m3);
+		nd->nd_mb->m_next = m3;
 		nd->nd_mb = m2;
-		nd->nd_bpos = NFSMTOD(m2, caddr_t) + mbuf_len(m2);
+		nd->nd_bpos = mtod(m2, caddr_t) + m2->m_len;
 	}
 
 out:
@@ -2742,7 +2746,7 @@ nfsrvd_open(struct nfsrv_descript *nd, __unused int isdgram,
 	u_int32_t *tl;
 	int i, retext;
 	struct nfsstate *stp = NULL;
-	int error = 0, create, claim, exclusive_flag = 0;
+	int error = 0, create, claim, exclusive_flag = 0, override;
 	u_int32_t rflags = NFSV4OPEN_LOCKTYPEPOSIX, acemask;
 	int how = NFSCREATE_UNCHECKED;
 	int32_t cverf[2], tverf[2] = { 0, 0 };
@@ -3046,15 +3050,38 @@ nfsrvd_open(struct nfsrv_descript *nd, __unused int isdgram,
 		 */
 		nd->nd_repstat = (vp->v_type == VDIR) ? NFSERR_ISDIR : NFSERR_SYMLINK;
 	}
+
+	/*
+	 * If the Open is being done for a file that already exists, apply
+	 * normal permission checking including for the file owner, if
+	 * vfs.nfsd.v4openaccess is set.
+	 * Previously, the owner was always allowed to open the file to
+	 * be consistent with the NFS tradition of always allowing the
+	 * owner of the file to write to the file regardless of permissions.
+	 * It now appears that the Linux client expects the owner
+	 * permissions to be checked for opens that are not creating the
+	 * file.  I believe the correct approach is to use the Access
+	 * operation's results to be consistent with NFSv3, but that is
+	 * not what the current Linux client appears to be doing.
+	 * Since both the Linux and OpenSolaris NFSv4 servers do this check,
+	 * I have enabled it by default.
+	 * If this semantic change causes a problem, it can be disabled by
+	 * setting the sysctl vfs.nfsd.v4openaccess to 0 to re-enable the
+	 * previous semantics.
+	 */
+	if (nfsrv_openaccess && create == NFSV4OPEN_NOCREATE)
+		override = NFSACCCHK_NOOVERRIDE;
+	else
+		override = NFSACCCHK_ALLOWOWNER;
 	if (!nd->nd_repstat && (stp->ls_flags & NFSLCK_WRITEACCESS))
 	    nd->nd_repstat = nfsvno_accchk(vp, VWRITE, nd->nd_cred,
-	        exp, p, NFSACCCHK_ALLOWOWNER, NFSACCCHK_VPISLOCKED, NULL);
+	        exp, p, override, NFSACCCHK_VPISLOCKED, NULL);
 	if (!nd->nd_repstat && (stp->ls_flags & NFSLCK_READACCESS)) {
 	    nd->nd_repstat = nfsvno_accchk(vp, VREAD, nd->nd_cred,
-	        exp, p, NFSACCCHK_ALLOWOWNER, NFSACCCHK_VPISLOCKED, NULL);
+	        exp, p, override, NFSACCCHK_VPISLOCKED, NULL);
 	    if (nd->nd_repstat)
 		nd->nd_repstat = nfsvno_accchk(vp, VEXEC,
-		    nd->nd_cred, exp, p, NFSACCCHK_ALLOWOWNER,
+		    nd->nd_cred, exp, p, override,
 		    NFSACCCHK_VPISLOCKED, NULL);
 	}
 
@@ -5537,9 +5564,11 @@ nfsrvd_getxattr(struct nfsrv_descript *nd, __unused int isdgram,
 	if (nd->nd_repstat == 0) {
 		NFSM_BUILD(tl, uint32_t *, NFSX_UNSIGNED);
 		*tl = txdr_unsigned(len);
-		mbuf_setnext(nd->nd_mb, mp);
-		nd->nd_mb = mpend;
-		nd->nd_bpos = NFSMTOD(mpend, caddr_t) + mbuf_len(mpend);
+		if (len > 0) {
+			nd->nd_mb->m_next = mp;
+			nd->nd_mb = mpend;
+			nd->nd_bpos = mtod(mpend, caddr_t) + mpend->m_len;
+		}
 	}
 	free(name, M_TEMP);
 
@@ -5589,7 +5618,7 @@ nfsrvd_setxattr(struct nfsrv_descript *nd, __unused int isdgram,
 		goto nfsmout;
 	NFSM_DISSECT(tl, uint32_t *, NFSX_UNSIGNED);
 	len = fxdr_unsigned(int, *tl);
-	if (len <= 0 || len > IOSIZE_MAX) {
+	if (len < 0 || len > IOSIZE_MAX) {
 		nd->nd_repstat = NFSERR_XATTR2BIG;
 		goto nfsmout;
 	}
@@ -5625,7 +5654,7 @@ nfsrvd_setxattr(struct nfsrv_descript *nd, __unused int isdgram,
 		if (nd->nd_repstat == ENXIO)
 			nd->nd_repstat = NFSERR_XATTR2BIG;
 	}
-	if (nd->nd_repstat == 0)
+	if (nd->nd_repstat == 0 && len > 0)
 		nd->nd_repstat = nfsm_advance(nd, NFSM_RNDUP(len), -1);
 	if (nd->nd_repstat == 0)
 		nd->nd_repstat = nfsvno_getattr(vp, &nva, nd, p, 1, &attrbits);
@@ -5700,7 +5729,8 @@ nfsrvd_rmxattr(struct nfsrv_descript *nd, __unused int isdgram,
 	if (nd->nd_repstat == 0)
 		nd->nd_repstat = nfsvno_getattr(vp, &nva, nd, p, 1, &attrbits);
 	if (nd->nd_repstat == 0) {
-		NFSM_BUILD(tl, uint32_t *, 2 * NFSX_HYPER);
+		NFSM_BUILD(tl, uint32_t *, 2 * NFSX_HYPER + NFSX_UNSIGNED);
+		*tl++ = newnfs_true;
 		txdr_hyper(ova.na_filerev, tl); tl += 2;
 		txdr_hyper(nva.na_filerev, tl);
 	}

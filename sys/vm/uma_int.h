@@ -132,15 +132,17 @@
 #ifndef VM_UMA_INT_H
 #define VM_UMA_INT_H
 
-#if defined(CHERI_PURECAP_KERNEL) && !defined(CPU_CHERI128)
+#if 0 /* XXX-AM: remove cheri-256 support */
+/* #if defined(CHERI_PURECAP_KERNEL) && !defined(CPU_CHERI128) */
 #define UMA_SLAB_SIZE	(2*PAGE_SIZE)		/* How big are our slabs? */
 #define UMA_SLAB_MASK	(2*PAGE_SIZE - 1)	/* Mask to get back to the page */
 #define UMA_SLAB_SHIFT	(PAGE_SHIFT + 1)	/* Number of bits PAGE_MASK */
-#else /* ! CHERI_PURECAP_KERNEL or CPU_CHERI128 */
+/* #else /\* ! CHERI_PURECAP_KERNEL or CPU_CHERI128 *\/ */
+#endif
 #define UMA_SLAB_SIZE	PAGE_SIZE	/* How big are our slabs? */
 #define UMA_SLAB_MASK	(PAGE_SIZE - 1)	/* Mask to get back to the page */
 #define UMA_SLAB_SHIFT	PAGE_SHIFT	/* Number of bits PAGE_MASK */
-#endif /* ! CHERI_PURECAP_KERNEL or CPU_CHERI128 */
+/* #endif /\* ! CHERI_PURECAP_KERNEL or CPU_CHERI128 *\/ */
 
 /* Max waste percentage before going to off page slab management */
 #define UMA_MAX_WASTE	10
@@ -358,7 +360,7 @@ struct uma_keg {
 	uma_free	uk_freef;	/* Free routine */
 
 	u_long		uk_offset;	/* Next free offset from base KVA */
-	vm_offset_t	uk_kva;		/* Zone base KVA */
+	vm_ptr_t	uk_kva;		/* Zone base KVA */
 
 	uint32_t	uk_pgoff;	/* Offset to uma_slab struct */
 	uint16_t	uk_ppera;	/* pages per allocation from backend */
@@ -373,11 +375,6 @@ struct uma_keg {
 	struct uma_domain	uk_domain[];	/* Keg's slab lists. */
 };
 typedef struct uma_keg	* uma_keg_t;
-
-#ifdef _KERNEL
-#define	KEG_ASSERT_COLD(k)						\
-	KASSERT(uma_keg_get_allocs((k)) == 0,				\
-	    ("keg %s initialization after use.", (k)->uk_name))
 
 /*
  * Free bits per-slab.
@@ -397,30 +394,15 @@ struct uma_slab {
 	uint8_t		us_domain;		/* Backing NUMA domain. */
 	struct noslabbits us_free;		/* Free bitmask, flexible. */
 };
-#ifndef CHERI_PURECAP_KERNEL
-_Static_assert(sizeof(struct uma_slab) == offsetof(struct uma_slab, us_free),
+#ifndef __CHERI_PURE_CAPABILITY__
+/* XXX-CHERI: this seems to fail in CheriABI userspace. */
+_Static_assert(sizeof(struct uma_slab) == __offsetof(struct uma_slab, us_free),
     "us_free field must be last");
 #endif
-#if MAXMEMDOM >= 255
-#error "Slab domain type insufficient"
-#endif
+_Static_assert(MAXMEMDOM < 255,
+    "us_domain field is not wide enough");
 
 typedef struct uma_slab * uma_slab_t;
-
-/*
- * On INVARIANTS builds, the slab contains a second bitset of the same size,
- * "dbg_bits", which is laid out immediately after us_free.
- */
-#ifdef INVARIANTS
-#define	SLAB_BITSETS	2
-#else
-#define	SLAB_BITSETS	1
-#endif
-
-/* These three functions are for embedded (!OFFPAGE) use only. */
-size_t slab_sizeof(int nitems);
-size_t slab_space(int nitems);
-int slab_ipers(size_t size, int align);
 
 /*
  * Slab structure with a full sized bitset and hash link for both
@@ -469,7 +451,6 @@ slab_item_index(uma_slab_t slab, uma_keg_t keg, void *item)
 	data = (uintptr_t)slab_data(slab, keg);
 	return (((vaddr_t)item - (vaddr_t)data) / keg->uk_rsize);
 }
-#endif /* _KERNEL */
 
 STAILQ_HEAD(uma_bucketlist, uma_bucket);
 
@@ -587,6 +568,10 @@ static __inline uma_slab_t hash_sfind(struct uma_hash *hash, uint8_t *data);
 	KASSERT((void *)(keg) != NULL,				\
 	    ("%s: Invalid zone %p type", __func__, (zone)));	\
 	} while (0)
+
+#define	KEG_ASSERT_COLD(k)						\
+	KASSERT(uma_keg_get_allocs((k)) == 0,				\
+	    ("keg %s initialization after use.", (k)->uk_name))
 
 /* Domains are contiguous after the last CPU */
 #define	ZDOM_GET(z, n)							\

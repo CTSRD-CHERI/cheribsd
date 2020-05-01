@@ -422,7 +422,7 @@ linprocfs_domtab(PFS_FILL_ARGS)
 	char *dlep, *flep, *mntto, *mntfrom, *fstype;
 	size_t lep_len;
 	int error;
-	struct statfs * __capability buf
+	struct statfs * __capability buf;
 	struct statfs *sp;
 	size_t count;
 

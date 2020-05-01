@@ -5,10 +5,12 @@
 #
 # universe            - *Really* build *everything* (buildworld and
 #                       all kernels on all architectures).  Define
-#                       MAKE_JUST_KERNELS to only build kernels,
-#                       MAKE_JUST_WORLDS to only build userland.
+#                       MAKE_JUST_KERNELS or WITHOUT_WORLDS to only build kernels,
+#                       MAKE_JUST_WORLDS or WITHOUT_KERNELS to only build userland.
 # tinderbox           - Same as universe, but presents a list of failed build
 #                       targets and exits with an error if there were any.
+# worlds	      - Same as universe, except just makes the worlds.
+# kernels	      - Same as universe, except just makes the kernels.
 # buildworld          - Rebuild *everything*, including glue to help do
 #                       upgrades.
 # installworld        - Install everything built by "buildworld".
@@ -107,6 +109,15 @@
 # For more information, see the build(7) manual page.
 #
 
+.if defined(UNIVERSE_TARGET) || defined(MAKE_JUST_WORLDS) || defined(WITHOUT_KERNELS)
+__DO_KERNELS=no
+.endif
+.if defined(MAKE_JUST_KERNELS) || defined(WITHOUT_WORLDS)
+__DO_WORLDS=no
+.endif
+__DO_WORLDS?=yes
+__DO_KERNELS?=yes
+
 # This is included so CC is set to ccache for -V, and COMPILER_TYPE/VERSION
 # can be cached for sub-makes. We can't do this while still running on the
 # old fmake from FreeBSD 9.x or older, so avoid including it then to avoid
@@ -125,7 +136,7 @@
 .include "targets/Makefile"
 .else
 
-TGTS=	all all-man buildenv buildenvvars buildkernel buildworld \
+TGTS=	all all-man buildenv buildenvvars buildkernel buildsysroot buildworld \
 	check check-old check-old-dirs check-old-files check-old-libs \
 	checkdpadd checkworld clean cleandepend cleandir cleanworld \
 	cleanuniverse \
@@ -135,7 +146,7 @@ TGTS=	all all-man buildenv buildenvvars buildkernel buildworld \
 	everything hier hierarchy install installcheck installkernel \
 	installkernel.debug packagekernel packageworld \
 	reinstallkernel reinstallkernel.debug \
-	installworld kernel-toolchain libraries maninstall \
+	installsysroot installworld kernel-toolchain libraries maninstall \
 	obj objlink showconfig tags toolchain update \
 	makeman sysent \
 	_worldtmp _legacy _bootstrap-tools _cleanobj _obj \
@@ -151,8 +162,7 @@ TGTS=	all all-man buildenv buildenvvars buildkernel buildworld \
 	stage-packages stage-packages-kernel stage-packages-world \
 	create-packages-world create-packages-kernel create-packages \
 	packages installconfig real-packages sign-packages package-pkg \
-	print-dir test-system-compiler test-system-linker \
-	buildsysroot installsysroot
+	print-dir test-system-compiler test-system-linker
 
 # These targets require a TARGET and TARGET_ARCH be defined.
 XTGTS=	native-xtools native-xtools-install xdev xdev-build xdev-install \
@@ -499,7 +509,7 @@ kernel-toolchains: .PHONY
 	@cd ${.CURDIR}; ${SUB_MAKE} UNIVERSE_TARGET=kernel-toolchain universe
 
 kernels: .PHONY
-	@cd ${.CURDIR}; ${SUB_MAKE} UNIVERSE_TARGET=buildkernel universe
+	@cd ${.CURDIR}; ${SUB_MAKE} universe -DWITHOUT_WORLDS
 
 worlds: .PHONY
 	@cd ${.CURDIR}; ${SUB_MAKE} UNIVERSE_TARGET=buildworld universe
@@ -514,30 +524,32 @@ worlds: .PHONY
 .if make(universe) || make(universe_kernels) || make(tinderbox) || \
     make(targets) || make(universe-toolchain)
 #
-# Always build architectures supported by clang.  Only build architectures
-# only supported by GCC if a suitable toolchain is present or enabled.
-# In all cases, if the user specifies TARGETS on the command line,
-# honor that most of all.
+# Don't build rarely used, semi-supported architectures unless requested.
 #
+.if defined(EXTRA_TARGETS)
+EXTRA_ARCHES_mips=	mipsel mipshf mipselhf mips64el mips64hf mips64elhf
+EXTRA_ARCHES_mips+=	mipsn32
+# powerpcspe excluded from main list until clang fixed
+EXTRA_ARCHES_powerpc=	powerpcspe
+.endif
 TARGETS?=amd64 arm arm64 i386 mips powerpc riscv
 _UNIVERSE_TARGETS=	${TARGETS}
 TARGET_ARCHES_arm?=	armv6 armv7
 TARGET_ARCHES_arm64?=	aarch64
-TARGET_ARCHES_mips?=	mipsel mips mips64el mips64 mipsn32 mipselhf mipshf mips64elhf mips64hf
-# powerpcspe excluded until clang fixed
-TARGET_ARCHES_powerpc?=	powerpc powerpc64
+TARGET_ARCHES_mips?=	mips mips64 ${EXTRA_ARCHES_mips}
+TARGET_ARCHES_powerpc?=	powerpc powerpc64 ${EXTRA_ARCHES_powerpc}
 TARGET_ARCHES_riscv?=	riscv64 riscv64sf
 .for target in ${TARGETS}
 TARGET_ARCHES_${target}?= ${target}
 .endfor
 
-MAKE_PARAMS_mips?=	CROSS_TOOLCHAIN=mips-gcc6
-
-TOOLCHAINS_mips=	mips-gcc6
-
 # Remove architectures only supported by external toolchain from
 # universe if required toolchain packages are missing.
-.for target in mips
+# Note: We no longer have targets that require an external toolchain, but for
+# now keep this block in case a new non-LLVM architecture is added and to reuse
+# it for a future extenal GCC make universe variant.
+_external_toolchain_targets=
+.for target in ${_external_toolchain_targets}
 .if ${_UNIVERSE_TARGETS:M${target}}
 .for toolchain in ${TOOLCHAINS_${target}}
 .if !exists(/usr/local/share/toolchains/${toolchain}.mk)
@@ -551,11 +563,7 @@ universe_${toolchain}_skip: universe_prologue .PHONY
 .endif
 .endfor
 
-.if defined(UNIVERSE_TARGET)
-MAKE_JUST_WORLDS=	YES
-.else
 UNIVERSE_TARGET?=	buildworld
-.endif
 KERNSRCDIR?=		${.CURDIR}/sys
 
 targets:	.PHONY
@@ -664,7 +672,7 @@ MAKE_PARAMS_${target}+= \
 .endfor
 .endif	# !make(targets)
 
-.if !defined(MAKE_JUST_KERNELS)
+.if ${__DO_WORLDS} == "yes"
 universe_${target}_done: universe_${target}_worlds .PHONY
 .for target_arch in ${TARGET_ARCHES_${target}}
 universe_${target}_worlds: universe_${target}_${target_arch} .PHONY
@@ -688,9 +696,9 @@ universe_${target}_${target_arch}: universe_${target}_prologue .MAKE .PHONY
 	    ${MAKEFAIL}))
 	@echo ">> ${target}.${target_arch} ${UNIVERSE_TARGET} completed on `LC_ALL=C date`"
 .endfor
-.endif # !MAKE_JUST_KERNELS
+.endif # ${__DO_WORLDS} == "yes"
 
-.if !defined(MAKE_JUST_WORLDS)
+.if ${__DO_KERNELS} == "yes"
 universe_${target}_done: universe_${target}_kernels .PHONY
 universe_${target}_kernels: universe_${target}_worlds .PHONY
 universe_${target}_kernels: universe_${target}_prologue .MAKE .PHONY
@@ -703,7 +711,7 @@ universe_${target}_kernels: universe_${target}_prologue .MAKE .PHONY
 	fi
 	@cd ${.CURDIR}; ${SUB_MAKE} ${.MAKEFLAGS} TARGET=${target} \
 	    universe_kernels
-.endif # !MAKE_JUST_WORLDS
+.endif # ${__DO_KERNELS} == "yes"
 
 # Tell the user the worlds and kernels have completed
 universe_${target}: universe_${target}_done

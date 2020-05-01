@@ -215,9 +215,9 @@ check_initreg_code(void * __capability c)
 	cheritest_success();
 }
 
-#ifndef __CHERI_CAPABILITY_TABLE__
+#ifndef __CHERI_PURE_CAPABILITY__
 static void
-check_initreg_data(void * __capability c)
+check_initreg_data_full_addrspace(void * __capability c)
 {
 	uintmax_t v;
 
@@ -310,7 +310,7 @@ void
 test_initregs_default(const struct cheri_test *ctp __unused)
 {
 
-#ifdef __CHERI_CAPABILITY_TABLE__
+#ifdef __CHERI_PURE_CAPABILITY__
 	if (cheri_getdefault() == NULL)
 		cheritest_success();
 	else
@@ -318,7 +318,7 @@ test_initregs_default(const struct cheri_test *ctp __unused)
 		    cheri_getdefault());
 
 #else
-	check_initreg_data(cheri_getdefault());
+	check_initreg_data_full_addrspace(cheri_getdefault());
 #endif
 }
 
@@ -334,8 +334,21 @@ test_initregs_default(const struct cheri_test *ctp __unused)
  */
 #ifdef __CHERI_PURE_CAPABILITY__
 
-#define CHERI_STACK_OFFSET_MAX 0x7fffff
-#define CHERI_STACK_OFFSET_MIN 0x7fc000
+/*
+ * Following along in kern_exec.c, ...
+ *
+ * 1. We don't specify the size of the stack in the GNU_STACK program header,
+ * 2. At least on CHERI-MIPS, sv_maxssiz == NULL
+ * 3. maxssiz is set by sysctl (sys/kern/subr_param.c),
+ *    but on CHERI-MIPS defaults to 64MiB (see MAXSSIZ in
+ *    sys/mips/include/vmparam.h).
+ *
+ * So, require our stack offset to be somewhere in the first 256KiB.  That
+ * should be plenty of room for the aux vector and args and all that.
+ */
+
+#define CHERI_STACK_OFFSET_MAX 0x4000000
+#define CHERI_STACK_OFFSET_MIN 0x3fc0000
 
 void
 test_initregs_stack_user_perms(const struct cheri_test *ctp __unused)
@@ -446,18 +459,10 @@ void
 test_initregs_idc(const struct cheri_test *ctp __unused)
 {
 
-#ifndef __CHERI_CAPABILITY_TABLE__
-	check_initreg_data(cheri_getidc());
+#ifndef __CHERI_PURE_CAPABILITY__
+	check_initreg_data_full_addrspace(cheri_getidc());
 #else
-#if __has_builtin(__builtin_mips_cheri_get_captable)
 	void* __capability cgp = __builtin_mips_cheri_get_captable();
-#else
-	/*
-	 * XXXAR: this is not guaranteed to work (and in the pc-relative ABI it
-	 * will almost certainly be wrong
-	 */
-	void* __capability cgp = cheri_getidc();
-#endif
 	uintmax_t perms = cheri_getperm(cgp);
 	extern void _CHERI_CAPABILITY_TABLE_;
 	void* __capability cap_table = &_CHERI_CAPABILITY_TABLE_;

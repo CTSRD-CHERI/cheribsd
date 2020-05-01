@@ -90,7 +90,8 @@ struct rt_metrics {
 	u_long	rmx_rttvar;	/* estimated rtt variance */
 	u_long	rmx_pksent;	/* packets sent using this route */
 	u_long	rmx_weight;	/* route weight */
-	u_long	rmx_filler[3];	/* will be used for T/TCP later */
+	u_long	rmx_nhidx;	/* route nexhop index */
+	u_long	rmx_filler[2];	/* will be used for T/TCP later */
 };
 
 /*
@@ -151,6 +152,7 @@ struct rtentry {
 	struct	sockaddr *rt_gateway;	/* value */
 	struct	ifnet *rt_ifp;		/* the answer: interface to use */
 	struct	ifaddr *rt_ifa;		/* the answer: interface address to use */
+	struct nhop_object	*rt_nhop;	/* nexthop data */
 	int		rt_flags;	/* up/down?, host/net */
 	int		rt_refcnt;	/* # held references */
 	u_int		rt_fibnum;	/* which FIB */
@@ -216,8 +218,12 @@ struct rtentry {
 #define	NHF_HOST		0x0400	/* RTF_HOST */
 
 /* Nexthop request flags */
+#define	NHR_NONE		0x00	/* empty flags field */
 #define	NHR_IFAIF		0x01	/* Return ifa_ifp interface */
 #define	NHR_REF			0x02	/* For future use */
+
+/* uRPF */
+#define	NHR_NODEFAULT		0x04	/* do not consider default route */
 
 /* Control plane route request flags */
 #define	NHR_COPY		0x100	/* Copy rte data */
@@ -246,6 +252,8 @@ struct rtstat {
 	uint64_t rts_newgateway;	/* routes modified by redirects */
 	uint64_t rts_unreach;		/* lookups which failed */
 	uint64_t rts_wildcard;		/* lookups satisfied by a wildcard */
+	uint64_t rts_nh_idx_alloc_failure;	/* nexthop index alloc failure*/
+	uint64_t rts_nh_alloc_failure;	/* nexthop allocation failure*/
 };
 
 /*
@@ -415,6 +423,8 @@ struct rt_addrinfo {
 	RTFREE_LOCKED(_rt);					\
 } while (0)
 
+#define	RTFREE_FUNC(_rt)	rtfree_func(_rt)
+
 #define	RO_RTFREE(_ro) do {					\
 	if ((_ro)->ro_rt)					\
 		RTFREE((_ro)->ro_rt);				\
@@ -475,6 +485,7 @@ int	rtsock_routemsg_info(int, struct rt_addrinfo *, int);
  */
 
 void	 rtfree(struct rtentry *);
+void	 rtfree_func(struct rtentry *);
 void	rt_updatemtu(struct ifnet *);
 
 typedef int rt_walktree_f_t(struct rtentry *, void *);
@@ -508,6 +519,8 @@ int	rib_add_redirect(u_int fibnum, struct sockaddr *dst,
 	   struct sockaddr *gateway, struct sockaddr *author, struct ifnet *ifp,
 	   int flags, int expire_sec);
 
+/* New API */
+void	rib_walk(int af, u_int fibnum, rt_walktree_f_t *wa_f, void *arg);
 #endif
 
 #endif

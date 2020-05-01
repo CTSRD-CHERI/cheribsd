@@ -4472,11 +4472,11 @@ __umtx_op_robust_lists_compat32(struct thread *td, struct _umtx_op_args *uap)
 	if (error != 0)
 		return (error);
 	rb.robust_list_offset =
-	    (intcap_t)__USER_CAP_UNBOUND((void *)rb.robust_list_offset);
+	    (intcap_t)__USER_CAP_UNBOUND(rb.robust_list_offset);
 	rb.robust_priv_list_offset =
-	    (intcap_t)__USER_CAP_UNBOUND((void *)rb.robust_priv_list_offset);
+	    (intcap_t)__USER_CAP_UNBOUND(rb.robust_priv_list_offset);
 	rb.robust_inact_offset =
-	    (intcap_t)__USER_CAP_UNBOUND((void *)rb.robust_inact_offset);
+	    (intcap_t)__USER_CAP_UNBOUND(rb.robust_inact_offset);
 	return (umtx_robust_lists(td, &rb));
 }
 
@@ -4881,11 +4881,11 @@ __umtx_op_robust_lists64(struct thread *td, struct freebsd64__umtx_op_args *uap)
 	if (error != 0)
 		return (error);
 	rb.robust_list_offset =
-	    (intcap_t)__USER_CAP_UNBOUND((void *)rb64.robust_list_offset);
+	    (intcap_t)__USER_CAP_UNBOUND(rb64.robust_list_offset);
 	rb.robust_priv_list_offset =
-	    (intcap_t)__USER_CAP_UNBOUND((void *)rb64.robust_priv_list_offset);
+	    (intcap_t)__USER_CAP_UNBOUND(rb64.robust_priv_list_offset);
 	rb.robust_inact_offset =
-	    (intcap_t)__USER_CAP_UNBOUND((void *)rb64.robust_inact_offset);
+	    (intcap_t)__USER_CAP_UNBOUND(rb64.robust_inact_offset);
 	return (umtx_robust_lists(td, &rb));
 }
 

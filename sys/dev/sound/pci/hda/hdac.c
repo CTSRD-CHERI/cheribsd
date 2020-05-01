@@ -440,9 +440,7 @@ hdac_reset(struct hdac_softc *sc, int wakeup)
 
 	/*
 	 * Wait for codecs to finish their own reset sequence. The delay here
-	 * should be of 250us but for some reasons, it's not enough on my
-	 * computer. Let's use twice as much as necessary to make sure that
-	 * it's reset properly.
+	 * must be at least 521us (HDA 1.0a section 4.3 Codec Discovery).
 	 */
 	DELAY(1000);
 
@@ -1001,7 +999,8 @@ hdac_send_command(struct hdac_softc *sc, nid_t cad, uint32_t verb)
 	} while (sc->codecs[cad].pending != 0 && --timeout);
 
 	if (sc->codecs[cad].pending != 0) {
-		device_printf(sc->dev, "Command timeout on address %d\n", cad);
+		device_printf(sc->dev, "Command 0x%08x timeout on address %d\n",
+		    verb, cad);
 		sc->codecs[cad].pending = 0;
 	}
 
@@ -1413,21 +1412,11 @@ hdac_poll_reinit(struct hdac_softc *sc)
 		pollticks >>= 1;
 		if (pollticks > hz)
 			pollticks = hz;
-		if (pollticks < 1) {
-			HDA_BOOTVERBOSE(
-				device_printf(sc->dev,
-				    "poll interval < 1 tick !\n");
-			);
+		if (pollticks < 1)
 			pollticks = 1;
-		}
 		if (min > pollticks)
 			min = pollticks;
 	}
-	HDA_BOOTVERBOSE(
-		device_printf(sc->dev,
-		    "poll interval %d -> %d ticks\n",
-		    sc->poll_ival, min);
-	);
 	sc->poll_ival = min;
 	if (min == 1000000)
 		callout_stop(&sc->poll_callout);
@@ -1540,7 +1529,7 @@ hdac_attach2(void *arg)
 			if (vendorid == HDA_INVALID &&
 			    revisionid == HDA_INVALID) {
 				device_printf(sc->dev,
-				    "CODEC is not responding!\n");
+				    "CODEC at address %d not responding!\n", i);
 				continue;
 			}
 			sc->codecs[i].vendor_id =

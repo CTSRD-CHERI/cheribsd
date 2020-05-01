@@ -52,7 +52,8 @@ SRCS=		rtld_start.S reloc.c rtld.c heap.c malloc.c cheri_reloc.c
 SRCS+=	rtld_lock.c map_object.c xmalloc.c debug.c libmap.c
 
 MAN=
-NEED_CHERI=	pure
+NEED_COMPAT=	CHERI
+.include <bsd.compat.mk>
 CSTD?=		gnu99
 CFLAGS+=	-Wall -DFREEBSD_ELF -DIN_RTLD -ffreestanding
 .if !${MACHINE_ARCH:Mmips64*c*}

@@ -48,8 +48,7 @@ _set_tp(void *tp)
 {
 
 #ifdef __CHERI_PURE_CAPABILITY__
-#pragma message("FIXME: is the 0x10 correct?")
-	__asm __volatile("cmove ctp, %0" :: "C"((char*)tp + 0x10));
+	__asm __volatile("cincoffset ctp, %0, %1" :: "C" (tp), "I" (TP_OFFSET));
 #else
 	__asm __volatile("addi  tp, %0, %1" :: "r" (tp), "I" (TP_OFFSET));
 #endif

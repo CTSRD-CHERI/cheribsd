@@ -59,7 +59,6 @@ __FBSDID("$FreeBSD$");
 #include <sys/pmckern.h>
 #include <sys/proc.h>
 #include <sys/ktr.h>
-#include <sys/pioctl.h>
 #include <sys/ptrace.h>
 #include <sys/racct.h>
 #include <sys/resourcevar.h>
@@ -328,11 +327,7 @@ ast(struct trapframe *framep)
 		sigfastblock_fetch(td);
 		if ((td->td_pflags & TDP_SIGFASTBLOCK) != 0 &&
 		    td->td_sigblock_val != 0) {
-			sigfastblock_setpend(td);
-			PROC_LOCK(p);
-			reschedule_signals(p, fastblock_mask,
-			    SIGPROCMASK_FASTBLK);
-			PROC_UNLOCK(p);
+			sigfastblock_setpend(td, true);
 		} else {
 			PROC_LOCK(p);
 			mtx_lock(&p->p_sigacts->ps_mtx);
@@ -350,7 +345,7 @@ ast(struct trapframe *framep)
 	 * the postsig() loop was performed.
 	 */
 	if (td->td_pflags & TDP_SIGFASTPENDING)
-		sigfastblock_setpend(td);
+		sigfastblock_setpend(td, false);
 
 	/*
 	 * We need to check to see if we have to exit or wait due to a

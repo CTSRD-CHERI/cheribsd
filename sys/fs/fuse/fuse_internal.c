@@ -345,6 +345,7 @@ fuse_internal_fsync(struct vnode *vp,
 	 * which file handle the caller is really referring to.
 	 */
 	LIST_FOREACH(fufh, &fvdat->handles, next) {
+		fdi.iosize = sizeof(*ffsi);
 		if (ffsi == NULL)
 			fdisp_make_vp(&fdi, op, vp, td, NULL);
 		else
@@ -856,6 +857,9 @@ fuse_internal_forget_send(struct mount *mp,
 	fdisp_destroy(&fdi);
 }
 
+SDT_PROBE_DEFINE2(fusefs, , internal, getattr_cache_incoherent,
+	"struct vnode*", "struct fuse_attr_out*");
+
 /* Fetch the vnode's attributes from the daemon*/
 int
 fuse_internal_do_getattr(struct vnode *vp, struct vattr *vap,
@@ -898,6 +902,24 @@ fuse_internal_do_getattr(struct vnode *vp, struct vattr *vap,
 		fao->attr.mtime = old_mtime.tv_sec;
 		fao->attr.mtimensec = old_mtime.tv_nsec;
 	}
+	if (vnode_isreg(vp) &&
+	    fvdat->cached_attrs.va_size != VNOVAL &&
+	    fao->attr.size != fvdat->cached_attrs.va_size) {
+		/*
+		 * The server changed the file's size even though we had it
+		 * cached!  That's a server bug.
+		 */
+		SDT_PROBE2(fusefs, , internal, getattr_cache_incoherent, vp,
+		    fao);
+		printf("%s: cache incoherent on %s!  "
+		    "Buggy FUSE server detected.  To prevent data corruption, "
+		    "disable the data cache by mounting with -o direct_io, or "
+		    "as directed otherwise by your FUSE server's "
+		    "documentation\n", __func__,
+		    vnode_mount(vp)->mnt_stat.f_mntonname);
+		int iosize = fuse_iosize(vp);
+		v_inval_buf_range(vp, 0, INT64_MAX, iosize);
+	}
 	fuse_internal_cache_attrs(vp, &fao->attr, fao->attr_valid,
 		fao->attr_valid_nsec, vap);
 	if (vtyp != vnode_vtype(vp)) {
@@ -937,6 +959,8 @@ fuse_internal_vnode_disappear(struct vnode *vp)
 
 /* fuse start/stop */
 
+SDT_PROBE_DEFINE2(fusefs, , internal, init_done,
+	"struct fuse_data*", "struct fuse_init_out*");
 int
 fuse_internal_init_callback(struct fuse_ticket *tick, struct uio *uio)
 {
@@ -1021,6 +1045,7 @@ out:
 	}
 	FUSE_LOCK();
 	data->dataflags |= FSESS_INITED;
+	SDT_PROBE2(fusefs, , internal, init_done, data, fiio);
 	wakeup(&data->ticketer);
 	FUSE_UNLOCK();
 

@@ -645,24 +645,6 @@ exec_setregs(struct thread *td, struct image_params *imgp, uintcap_t stack)
 
 		td->td_frame->csp = cheri_exec_stack_pointer(imgp, stack);
 		cheri_set_mmap_capability(td, imgp, td->td_frame->csp);
-#ifdef CHERIABI_LEGACY_SUPPORT
-		/*
-		 * XXXAR: data_length needs to be the full address
-		 * space to allow legacy ABI to work since the TLS
-		 * region will be beyond the end of the text section.
-		 *
-		 * TODO: Start with a NULL $ddc once we drop legacy
-		 * ABI support.
-		 *
-		 * Having a full address space $ddc on startup does
-		 * not matter for new binaries since they will all
-		 * clear $ddc as one of the first user instructions
-		 * anyway.
-		 */
-		td->td_frame->ddc = cheri_capability_build_user_data(
-		    CHERI_CAP_USER_DATA_PERMS, CHERI_CAP_USER_DATA_BASE,
-		    CHERI_CAP_USER_DATA_LENGTH, CHERI_CAP_USER_DATA_OFFSET);
-#endif
 		td->td_frame->pcc = cheri_exec_pcc(imgp);
 		td->td_frame->c12 = td->td_frame->pc;
 
@@ -713,9 +695,6 @@ exec_setregs(struct thread *td, struct image_params *imgp, uintcap_t stack)
 		csigp = &td->td_pcb->pcb_cherisignal;
 		csigp->csig_csp = td->td_frame->csp;
 		csigp->csig_default_stack = csigp->csig_csp;
-#ifdef CHERIABI_LEGACY_SUPPORT
-		csigp->csig_ddc = frame->ddc;
-#endif
 	} else
 #endif
 	{

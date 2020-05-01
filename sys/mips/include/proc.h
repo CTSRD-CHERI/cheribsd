@@ -106,11 +106,7 @@ struct syscall_args {
 
 #ifdef __mips_n64
 #if __has_feature(capabilities)
-#ifdef CPU_CHERI128
 #define KINFO_PROC_SIZE 1248
-#else /* CHERI256 */
-#define KINFO_PROC_SIZE 1568
-#endif
 #define	KINFO_PROC64_SIZE 1088
 #else /* !__has_feature(capabilities) */
 #define	KINFO_PROC_SIZE 1088

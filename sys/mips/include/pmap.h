@@ -137,13 +137,14 @@ typedef struct pv_entry {
  * need to track per-pmap assignments.
  */
 #ifdef __CHERI_PURE_CAPABILITY__
-#ifdef CPU_CHERI128
+/* #ifdef CPU_CHERI128 */
 #define	_NPCM	2
 #define	_NPCPV	83
-#else /* CHERI256 */
-#define	_NPCM	1
-#define	_NPCPV	40
-#endif /* CHERI258 */
+/* XXX-AM: remove cheri-256 support */
+/* #else /\* CHERI256 *\/ */
+/* #define	_NPCM	1 */
+/* #define	_NPCPV	40 */
+/* #endif /\* CHERI256 *\/ */
 #elif defined(__mips_n64)
 #define	_NPCM	3
 #define	_NPCPV	168

@@ -4468,9 +4468,9 @@ nfsrv_docallback(struct nfsclient *clp, int procnum, nfsv4stateid_t *stateidp,
 	 * Get the first mbuf for the request.
 	 */
 	MGET(m, M_WAITOK, MT_DATA);
-	mbuf_setlen(m, 0);
+	m->m_len = 0;
 	nd->nd_mreq = nd->nd_mb = m;
-	nd->nd_bpos = NFSMTOD(m, caddr_t);
+	nd->nd_bpos = mtod(m, caddr_t);
 	
 	/*
 	 * and build the callback request.
@@ -4480,7 +4480,7 @@ nfsrv_docallback(struct nfsclient *clp, int procnum, nfsv4stateid_t *stateidp,
 		error = nfsrv_cbcallargs(nd, clp, callback, NFSV4OP_CBGETATTR,
 		    "CB Getattr", &sep);
 		if (error != 0) {
-			mbuf_freem(nd->nd_mreq);
+			m_freem(nd->nd_mreq);
 			goto errout;
 		}
 		(void)nfsm_fhtom(nd, (u_int8_t *)fhp, NFSX_MYFH, 0);
@@ -4490,7 +4490,7 @@ nfsrv_docallback(struct nfsclient *clp, int procnum, nfsv4stateid_t *stateidp,
 		error = nfsrv_cbcallargs(nd, clp, callback, NFSV4OP_CBRECALL,
 		    "CB Recall", &sep);
 		if (error != 0) {
-			mbuf_freem(nd->nd_mreq);
+			m_freem(nd->nd_mreq);
 			goto errout;
 		}
 		NFSM_BUILD(tl, u_int32_t *, NFSX_UNSIGNED + NFSX_STATEID);
@@ -4510,7 +4510,7 @@ nfsrv_docallback(struct nfsclient *clp, int procnum, nfsv4stateid_t *stateidp,
 		    NFSV4OP_CBLAYOUTRECALL, "CB Reclayout", &sep);
 		NFSD_DEBUG(4, "aft cbcallargs=%d\n", error);
 		if (error != 0) {
-			mbuf_freem(nd->nd_mreq);
+			m_freem(nd->nd_mreq);
 			goto errout;
 		}
 		NFSM_BUILD(tl, u_int32_t *, 4 * NFSX_UNSIGNED);
@@ -4536,13 +4536,13 @@ nfsrv_docallback(struct nfsclient *clp, int procnum, nfsv4stateid_t *stateidp,
 		if ((clp->lc_flags & LCL_NFSV41) != 0) {
 			error = nfsv4_getcbsession(clp, &sep);
 			if (error != 0) {
-				mbuf_freem(nd->nd_mreq);
+				m_freem(nd->nd_mreq);
 				goto errout;
 			}
 		}
 	} else {
 		error = NFSERR_SERVERFAULT;
-		mbuf_freem(nd->nd_mreq);
+		m_freem(nd->nd_mreq);
 		goto errout;
 	}
 
@@ -4626,7 +4626,7 @@ errout:
 			error = nfsv4_loadattr(nd, NULL, nap, NULL, NULL, 0,
 			    NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL,
 			    p, NULL);
-		mbuf_freem(nd->nd_mrep);
+		m_freem(nd->nd_mrep);
 	}
 	NFSLOCKSTATE();
 	clp->lc_cbref--;
@@ -6294,22 +6294,56 @@ nfsrv_checkreclaimcomplete(struct nfsrv_descript *nd, int onefs)
  * Cache the reply in a session slot.
  */
 void
-nfsrv_cache_session(uint8_t *sessionid, uint32_t slotid, int repstat,
-   struct mbuf **m)
+nfsrv_cache_session(struct nfsrv_descript *nd, struct mbuf **m)
 {
 	struct nfsdsession *sep;
 	struct nfssessionhash *shp;
+	char *buf, *cp;
+#ifdef INET
+	struct sockaddr_in *sin;
+#endif
+#ifdef INET6
+	struct sockaddr_in6 *sin6;
+#endif
 
-	shp = NFSSESSIONHASH(sessionid);
+	shp = NFSSESSIONHASH(nd->nd_sessionid);
 	NFSLOCKSESSION(shp);
-	sep = nfsrv_findsession(sessionid);
+	sep = nfsrv_findsession(nd->nd_sessionid);
 	if (sep == NULL) {
 		NFSUNLOCKSESSION(shp);
-		printf("nfsrv_cache_session: no session\n");
+		if ((nfsrv_stablefirst.nsf_flags & NFSNSF_GRACEOVER) != 0) {
+			buf = malloc(INET6_ADDRSTRLEN, M_TEMP, M_WAITOK);
+			switch (nd->nd_nam->sa_family) {
+#ifdef INET
+			case AF_INET:
+				sin = (struct sockaddr_in *)nd->nd_nam;
+				cp = inet_ntop(sin->sin_family,
+				    &sin->sin_addr.s_addr, buf,
+				    INET6_ADDRSTRLEN);
+				break;
+#endif
+#ifdef INET6
+			case AF_INET6:
+				sin6 = (struct sockaddr_in6 *)nd->nd_nam;
+				cp = inet_ntop(sin6->sin6_family,
+				    &sin6->sin6_addr, buf, INET6_ADDRSTRLEN);
+				break;
+#endif
+			default:
+				cp = NULL;
+			}
+			if (cp != NULL)
+				printf("nfsrv_cache_session: no session "
+				    "IPaddr=%s\n", cp);
+			else
+				printf("nfsrv_cache_session: no session\n");
+			free(buf, M_TEMP);
+		}
 		m_freem(*m);
 		return;
 	}
-	nfsv4_seqsess_cacherep(slotid, sep->sess_slots, repstat, m);
+	nfsv4_seqsess_cacherep(nd->nd_slotid, sep->sess_slots, nd->nd_repstat,
+	    m);
 	NFSUNLOCKSESSION(shp);
 }
 

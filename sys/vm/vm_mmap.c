@@ -894,7 +894,7 @@ int
 freebsd6_mmap(struct thread *td, struct freebsd6_mmap_args *uap)
 {
 
-	return (kern_mmap(td, (uintptr_t)uap->addr, 0, uap->len, uap->prot,
+	return (kern_mmap(td, (uintptr_t)uap->addr, uap->len, uap->prot,
 	    uap->flags, uap->fd, uap->pos));
 }
 #endif

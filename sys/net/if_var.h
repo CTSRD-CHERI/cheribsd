@@ -198,6 +198,7 @@ struct if_snd_tag_alloc_header {
 	uint32_t type;		/* send tag type, see IF_SND_TAG_XXX */
 	uint32_t flowid;	/* mbuf hash value */
 	uint32_t flowtype;	/* mbuf hash type */
+	uint8_t numa_domain;	/* numa domain of associated inp */
 };
 
 struct if_snd_tag_alloc_rate_limit {
@@ -835,6 +836,9 @@ void * __capability ifr_data_get_ptr(void *ifrp);
 u_int ifr_fib_get(void *ifrp);
 void ifr_fib_set(void *ifrp, u_int fib);
 short ifr_flags_get(void *ifrp);
+void ifr_flags_set(void *ifrp, short val);
+void ifr_flagshigh_set(void *ifrp, short val);
+void ifr_reqcap_set(void *ifrp, int val);
 int ifr_media_get(void *ifrp);
 int ifr_mtu_get(void *ifrp);
 void ifr_mtu_set(void *ifrp, int val);

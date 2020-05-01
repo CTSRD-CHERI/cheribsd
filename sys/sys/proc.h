@@ -182,7 +182,6 @@ struct kcov_info;
 struct kdtrace_proc;
 struct kdtrace_thread;
 struct mqueue_notifier;
-struct nlminfo;
 struct p_sched;
 struct proc;
 struct procdesc;
@@ -656,12 +655,7 @@ struct proc {
 	struct sigiolst	p_sigiolst;	/* (c) List of sigio sources. */
 	int		p_sigparent;	/* (c) Signal to parent on exit. */
 	int		p_sig;		/* (n) For core dump/debugger XXX. */
-	u_int		p_stops;	/* (c) Stop event bitmask. */
-	u_int		p_stype;	/* (c) Stop event type. */
-	char		p_step;		/* (c) Process is stopped. */
-	u_char		p_pfsflags;	/* (c) Procfs flags. */
 	u_int		p_ptevents;	/* (c + e) ptrace() event mask. */
-	struct nlminfo	*p_nlminfo;	/* (?) Only used by/for lockd. */
 	struct kaioinfo	*p_aioinfo;	/* (y) ASYNC I/O info. */
 	struct thread	*p_singlethread;/* (c + j) If single threading this is it */
 	int		p_suspcount;	/* (j) Num threads in suspended mode. */
@@ -875,23 +869,6 @@ extern pid_t pid_max;
 
 #define	SESS_LEADER(p)	((p)->p_session->s_leader == (p))
 
-
-#define	STOPEVENT(p, e, v) do {						\
-	WITNESS_WARN(WARN_GIANTOK | WARN_SLEEPOK, NULL,			\
- 	    "checking stopevent %d", (e));				\
-	if ((p)->p_stops & (e))	{					\
-		PROC_LOCK(p);						\
-		stopevent((p), (e), (v));				\
-		PROC_UNLOCK(p);						\
-	}								\
-} while (0)
-#define	_STOPEVENT(p, e, v) do {					\
-	PROC_LOCK_ASSERT(p, MA_OWNED);					\
-	WITNESS_WARN(WARN_GIANTOK | WARN_SLEEPOK, &p->p_mtx.lock_object, \
- 	    "checking stopevent %d", (e));				\
-	if ((p)->p_stops & (e))						\
-		stopevent((p), (e), (v));				\
-} while (0)
 
 /* Lock and unlock a process. */
 #define	PROC_LOCK(p)	mtx_lock(&(p)->p_mtx)

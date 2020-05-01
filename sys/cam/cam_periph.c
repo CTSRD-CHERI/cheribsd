@@ -649,7 +649,7 @@ cam_periph_invalidate(struct cam_periph *periph)
 
 	cam_periph_assert(periph, MA_OWNED);
 	/*
-	 * We only call this routine the first time a peripheral is
+	 * We only tear down the device the first time a peripheral is
 	 * invalidated.
 	 */
 	if ((periph->flags & CAM_PERIPH_INVALID) != 0)
@@ -729,7 +729,9 @@ camperiphfree(struct cam_periph *periph)
 		periph->periph_dtor(periph);
 
 	/*
-	 * The peripheral list is protected by the topology lock.
+	 * The peripheral list is protected by the topology lock. We have to
+	 * remove the periph from the drv list before we call deferred_ac. The
+	 * AC_FOUND_DEVICE callback won't create a new periph if it's still there.
 	 */
 	xpt_lock_buses();
 
@@ -969,14 +971,7 @@ cam_periph_mapmem(union ccb *ccb, struct cam_periph_map_info *mapinfo,
 		mapinfo->bp[i]->b_iocmd = (dirs[i] == CAM_DIR_OUT) ?
 		    BIO_WRITE : BIO_READ;
 
-		/*
-		 * Map the buffer into kernel memory.
-		 *
-		 * Note that useracc() alone is not a  sufficient test.
-		 * vmapbuf() can still fail due to a smaller file mapped
-		 * into a larger area of VM, or if userland races against
-		 * vmapbuf() after the useracc() check.
-		 */
+		/* Map the buffer into kernel memory. */
 		if (vmapbuf(mapinfo->bp[i], 1) < 0) {
 			uma_zfree(pbuf_zone, mapinfo->bp[i]);
 			goto fail;

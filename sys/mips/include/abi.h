@@ -112,11 +112,15 @@
 /* XXX-AM: these should never be used in purecap */
 #define CALLFRAME_RA    CALLFRAME_CRA
 #define CALLFRAME_SP    CALLFRAME_CSP
-#ifdef CPU_CHERI128
+#ifdef CPU_CHERI
 #define CALLFRAME_GP    CALLFRAME_CGP + 8
-#else /* CPU_CHERI256 */
-#define CALLFRAME_GP    CALLFRAME_CGP + 24
 #endif
+/*
+ * XXX-AM: remove CHERI-256 support
+ * #else //  CPU_CHERI256
+ * #define CALLFRAME_GP    CALLFRAME_CGP + 24
+ * #endif
+ */
 #else /* ! CHERI_PURECAP_KERNEL */
 
 /*
