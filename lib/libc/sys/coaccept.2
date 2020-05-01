@@ -29,7 +29,7 @@
 .\"
 .\" $FreeBSD$
 .\"
-.Dd April 30, 2018
+.Dd April 30, 2020
 .Dt COACCEPT 2
 .Os
 .Sh NAME
@@ -40,7 +40,7 @@
 .Sh SYNOPSIS
 .In unistd.h
 .Ft int
-.Fn coaccept "void * __capability code" "void * __capability data" "void * __capability *cookiep" "void * __capability buf" "size_t len"
+.Fn coaccept "void * __capability code" "void * __capability data" "void * __capability * __capability cookiep" "void * __capability buf" "size_t len"
 .Sh DESCRIPTION
 The
 .Fn coaccept
