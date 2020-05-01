@@ -1,10 +1,11 @@
 /*-
- * Copyright (c) 2018 Edward Tomasz Napierala <trasz@FreeBSD.org>
+ * Copyright (c) 2020 Edward Tomasz Napierala <trasz@FreeBSD.org>
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
- * Cambridge Computer Laboratory under DARPA/AFRL contract (FA8750-10-C-0237)
- * ("CTSRD"), as part of the DARPA CRASH research programme.
+ * Cambridge Computer Laboratory (Department of Computer Science and
+ * Technology) under DARPA contract HR0011-18-C-0016 ("ECATS"), as part of the
+ * DARPA SSITH research programme.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -28,25 +29,28 @@
  * SUCH DAMAGE.
  */
 
-.set noreorder
-.set noat
-
-#include <machine/asm.h>
+#include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
-#include "SYS.h"
 
-LEAF(coaccept)
-	PIC_PROLOGUE(coaccept)
+#include <setjmp.h>
+#include <unistd.h>
 
-	cgetpcc $c13
-	cincoffset $c13, $c13, 12
-	ccall	$c3, $c4, 1
-	nop
-	bnez	v0, 1f
-	nop
-	PIC_RETURN()
-	nop
-1:
-	PIC_TAILCALL(__cerror)
-	nop
-END(coaccept)
+int	_cocall(void * __capability, void * __capability, void * __capability,
+	    void * __capability, size_t);
+
+int
+cocall(void * __capability code, void * __capability data, void * __capability target,
+    void * __capability buf, size_t len)
+{
+	jmp_buf env;
+	int error, returning;
+
+	returning = _setjmp(env);
+	if (returning) {
+		return (error);
+	} else {
+		error = _cocall(code, data, target, buf, len);
+		_longjmp(env, 1);
+		/* NOTREACHED */
+	}
+}

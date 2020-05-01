@@ -31,8 +31,6 @@ FBSD_1.0 {
 
 FBSD_1.3 {
 	__flt_rounds;
-	coaccept;
-	cocall;
 };
 
 FBSDprivate_1.0 {

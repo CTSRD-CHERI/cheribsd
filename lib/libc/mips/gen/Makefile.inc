@@ -16,6 +16,8 @@ SRCS+=	_setjmp_c.S setjmp_c.S
 SRCS+=	_setjmp.S setjmp.S
 .endif
 
+# XXX: The reason those two are here and not in lib/libc/sys/Makefile.inc
+#      is that it fails to link (missing _setjmp and _longjmp) otherwise.
 .if ${MK_CHERI} == "yes"
-SRCS+=	coaccept.S cocall.S
+SRCS+=	coaccept.c cocall.c
 .endif

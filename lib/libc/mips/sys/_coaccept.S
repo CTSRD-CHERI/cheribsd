@@ -35,8 +35,8 @@
 __FBSDID("$FreeBSD$");
 #include "SYS.h"
 
-LEAF(cocall)
-	PIC_PROLOGUE(cocall)
+LEAF(_coaccept)
+	PIC_PROLOGUE(_coaccept)
 
 	cgetpcc $c13
 	cincoffset $c13, $c13, 12
@@ -49,4 +49,4 @@ LEAF(cocall)
 1:
 	PIC_TAILCALL(__cerror)
 	nop
-END(cocall)
+END(_coaccept)
