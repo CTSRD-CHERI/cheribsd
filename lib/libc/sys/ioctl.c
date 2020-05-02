@@ -48,6 +48,10 @@ __FBSDID("$FreeBSD$");
 #include <stddef.h>
 #include "libc_private.h"
 
+#ifdef __CHERI_PURE_CAPABILITY__
+#include <cheri/cheric.h>
+#endif
+
 __weak_reference(__sys_ioctl, __ioctl);
 #ifdef __CHERI_PURE_CAPABILITY__
 __weak_reference(_ioctl, ioctl);
@@ -69,8 +73,8 @@ _ioctl(int fd, unsigned long com, ...)
 	void *data;
 
 	size = IOCPARM_LEN(com);
+	va_start(ap, com);
 	if (size > 0) {
-		va_start(ap, com);
 		if (com & IOC_VOID) {
 			/*
 			 * In the (size > 0 && com & IOC_VOID) case, the
@@ -88,9 +92,22 @@ _ioctl(int fd, unsigned long com, ...)
 		} else {
 			data = va_arg(ap, void *);
 		}
-		va_end(ap);
 	} else {
-		data = NULL;
+#ifdef __CHERI_PURE_CAPABILITY__
+		if (cheri_getlen((void*)ap) == sizeof(void *))
+			data = va_arg(ap, void *);
+		else if (cheri_getlen((void*)ap) == sizeof(uint64_t))
+			data = (void *)(intptr_t)va_arg(ap,  int64_t);
+		else if (cheri_getlen((void*)ap) == sizeof(int32_t))
+			data = (void *)(intptr_t)va_arg(ap, int32_t);
+		else
+			data = NULL;
+#else
+		/* Assume this was passed in a register. */
+		data = (void *)(intptr_t)va_arg(ap, register_t);
+#endif
 	}
+	va_end(ap);
+
 	return (__sys_ioctl(fd, com, data));
 }
