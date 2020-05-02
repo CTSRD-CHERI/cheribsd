@@ -404,9 +404,6 @@ cryptof_ioctl(
 		switch (sop->cipher) {
 		case 0:
 			break;
-		case CRYPTO_3DES_CBC:
-			txform = &enc_xform_3des;
-			break;
 		case CRYPTO_AES_CBC:
 			txform = &enc_xform_rijndael128;
 			break;
