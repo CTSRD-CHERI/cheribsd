@@ -240,16 +240,18 @@ typedef struct Struct_Obj_Entry {
     const Elf_Sym *symtab;	/* Symbol table */
     const char *strtab;		/* String table */
     unsigned long strsize;	/* Size in bytes of string table */
-#ifdef __mips__
 #ifdef __CHERI_PURE_CAPABILITY__
     caddr_t cap_relocs;		/* start of the __cap_relocs section */
+    size_t cap_relocs_size;	/* size of the __cap_relocs section */
+#endif
+#ifdef __mips__
+#ifdef __CHERI_PURE_CAPABILITY__
     /*
      * Two pointers to the start of the .cap_table section: one writable
      * for use by RTLD and one read-only for use as the target $cgp in plt stubs.
      */
     struct CheriCapTableEntry* writable_captable;
     const struct CheriCapTableEntry* _target_cgp;
-    size_t cap_relocs_size;	/* size of the __cap_relocs section */
     size_t captable_size;	/* size of the .cap_table section */
 #if RTLD_SUPPORT_PER_FUNCTION_CAPTABLE == 1
     const struct CheriCapTableMappingEntry* captable_mapping;
