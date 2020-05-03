@@ -1401,61 +1401,6 @@ digest_dynamic1(Obj_Entry *obj, int early, const Elf_Dyn **dyn_rpath,
 	    obj->fini_array_num = dynp->d_un.d_val / sizeof(InitArrayEntry);
 	    break;
 
-#ifdef __CHERI_PURE_CAPABILITY__
-	case DT_MIPS_CHERI___CAPRELOCS:
-	    obj->cap_relocs = (obj->relocbase + dynp->d_un.d_ptr);
-	    break;
-
-	case DT_MIPS_CHERI___CAPRELOCSSZ:
-	    obj->cap_relocs_size = dynp->d_un.d_val;
-	    break;
-
-	case DT_MIPS_CHERI_FLAGS: {
-	    size_t flags = dynp->d_un.d_val;
-	    unsigned abi = flags & DF_MIPS_CHERI_ABI_MASK;
-	    obj->cheri_captable_abi = abi;
-	    flags &= ~DF_MIPS_CHERI_ABI_MASK;
-	    if (flags & DF_MIPS_CHERI_RELATIVE_CAPRELOCS) {
-		flags &= ~DF_MIPS_CHERI_RELATIVE_CAPRELOCS;
-		obj->relative_cap_relocs = true;
-	    }
-	    if ((flags & DF_MIPS_CHERI_CAPTABLE_PER_FILE) ||
-	        (flags & DF_MIPS_CHERI_CAPTABLE_PER_FUNC)) {
-#if RTLD_SUPPORT_PER_FUNCTION_CAPTABLE == 1
-		obj->per_function_captable = true;
-#else
-		rtld_fatal("Cannot load %s with per-file/per-function "
-		    "captable since " _PATH_RTLD " was not compiled with "
-		    "-DRTLD_SUPPORT_PER_FUNCTION_CAPTABLE=1", obj->path);
-#endif
-	    } else if (flags) {
-		rtld_fdprintf(STDERR_FILENO, "Unknown DT_MIPS_CHERI_FLAGS in %s"
-		    ": 0x%zx", obj->path, (size_t)flags);
-	    }
-	    break;
-	}
-
-	case DT_MIPS_CHERI_CAPTABLE:
-	    obj->writable_captable =
-	        (struct CheriCapTableEntry*)(obj->relocbase + dynp->d_un.d_ptr);
-	    break;
-
-	case DT_MIPS_CHERI_CAPTABLESZ:
-	    obj->captable_size = dynp->d_un.d_val;
-	    break;
-
-#if RTLD_SUPPORT_PER_FUNCTION_CAPTABLE == 1
-	case DT_MIPS_CHERI_CAPTABLE_MAPPING:
-	    obj->captable_mapping =
-	        (struct CheriCapTableMappingEntry*)(obj->relocbase + dynp->d_un.d_ptr);
-	    break;
-
-	case DT_MIPS_CHERI_CAPTABLE_MAPPINGSZ:
-	    obj->captable_mapping_size = dynp->d_un.d_val;
-	    break;
-#endif /* RTLD_SUPPORT_PER_FUNCTION_CAPTABLE == 1 */
-#endif /* defined(__CHERI_PURE_CAPABILITY__) */
-
 	/*
 	 * Don't process DT_DEBUG on MIPS as the dynamic section
 	 * is mapped read-only. DT_MIPS_RLD_MAP is used instead.
@@ -1522,6 +1467,60 @@ digest_dynamic1(Obj_Entry *obj, int early, const Elf_Dyn **dyn_rpath,
 		    dynp->d_un.d_ptr);
 		break;
 
+#ifdef __CHERI_PURE_CAPABILITY__
+	case DT_MIPS_CHERI___CAPRELOCS:
+	    obj->cap_relocs = (obj->relocbase + dynp->d_un.d_ptr);
+	    break;
+
+	case DT_MIPS_CHERI___CAPRELOCSSZ:
+	    obj->cap_relocs_size = dynp->d_un.d_val;
+	    break;
+
+	case DT_MIPS_CHERI_FLAGS: {
+	    size_t flags = dynp->d_un.d_val;
+	    unsigned abi = flags & DF_MIPS_CHERI_ABI_MASK;
+	    obj->cheri_captable_abi = abi;
+	    flags &= ~DF_MIPS_CHERI_ABI_MASK;
+	    if (flags & DF_MIPS_CHERI_RELATIVE_CAPRELOCS) {
+		flags &= ~DF_MIPS_CHERI_RELATIVE_CAPRELOCS;
+		obj->relative_cap_relocs = true;
+	    }
+	    if ((flags & DF_MIPS_CHERI_CAPTABLE_PER_FILE) ||
+	        (flags & DF_MIPS_CHERI_CAPTABLE_PER_FUNC)) {
+#if RTLD_SUPPORT_PER_FUNCTION_CAPTABLE == 1
+		obj->per_function_captable = true;
+#else
+		rtld_fatal("Cannot load %s with per-file/per-function "
+		    "captable since " _PATH_RTLD " was not compiled with "
+		    "-DRTLD_SUPPORT_PER_FUNCTION_CAPTABLE=1", obj->path);
+#endif
+	    } else if (flags) {
+		rtld_fdprintf(STDERR_FILENO, "Unknown DT_MIPS_CHERI_FLAGS in %s"
+		    ": 0x%zx", obj->path, (size_t)flags);
+	    }
+	    break;
+	}
+
+	case DT_MIPS_CHERI_CAPTABLE:
+	    obj->writable_captable =
+	        (struct CheriCapTableEntry*)(obj->relocbase + dynp->d_un.d_ptr);
+	    break;
+
+	case DT_MIPS_CHERI_CAPTABLESZ:
+	    obj->captable_size = dynp->d_un.d_val;
+	    break;
+
+#if RTLD_SUPPORT_PER_FUNCTION_CAPTABLE == 1
+	case DT_MIPS_CHERI_CAPTABLE_MAPPING:
+	    obj->captable_mapping =
+	        (struct CheriCapTableMappingEntry*)(obj->relocbase + dynp->d_un.d_ptr);
+	    break;
+
+	case DT_MIPS_CHERI_CAPTABLE_MAPPINGSZ:
+	    obj->captable_mapping_size = dynp->d_un.d_val;
+	    break;
+#endif /* RTLD_SUPPORT_PER_FUNCTION_CAPTABLE == 1 */
+#endif /* defined(__CHERI_PURE_CAPABILITY__) */
 #endif
 
 #ifdef __powerpc__
