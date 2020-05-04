@@ -20,12 +20,11 @@ def buildImageAndRunTests(params, String suffix) {
         sh "./cheribuild/jenkins-cheri-build.py --build disk-image-${suffix} ${params.extraArgs}"
     }
     stage("Running tests") {
-        sh 'rm -rf cheribsd-test-results && mkdir cheribsd-test-results'
         // copy qemu archive and run directly on the host
         dir("qemu-${params.buildOS}") { deleteDir() }
-        dir("cheribsd-test-results") { deleteDir() }
         copyArtifacts projectName: "qemu/qemu-cheri", filter: "qemu-${params.buildOS}/**", target: '.', fingerprintArtifacts: false
         sh label: 'generate SSH key', script: 'test -e $WORKSPACE/id_ed25519 || ssh-keygen -t ed25519 -N \'\' -f $WORKSPACE/id_ed25519 < /dev/null'
+        sh 'rm -rf cheribsd-test-results && mkdir cheribsd-test-results'
         sh "./cheribuild/jenkins-cheri-build.py --test run-${suffix} --test-extra-args=--no-timestamped-test-subdir ${params.extraArgs} --test-ssh-key \$WORKSPACE/id_ed25519.pub"
         sh 'find cheribsd-test-results'
         junit allowEmptyResults: false, keepLongStdio: true, testResults: 'cheribsd-test-results/cheri*.xml'
