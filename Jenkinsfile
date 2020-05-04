@@ -11,8 +11,27 @@ properties([disableConcurrentBuilds(),
 
 jobs = [:]
 
+def buildImageAndRunTests(String suffix) {
+    if (!suffix.startsWith("mips-")) {
+        echo("Cannot run tests for ${suffix} yet")
+        return
+    }
+    stage("Building disk image") {
+        sh "./cheribuild/jenkins-cheri-build.py --build disk-image-${suffix}"
+    }
+    stage("Running tests") {
+        sh 'rm -rf cheribsd-test-results && mkdir cheribsd-test-results'
+        sh "./cheribuild/jenkins-cheri-build.py --test run-${suffix} --test-extra-args=--no-timestamped-test-subdir"
+        sh 'find cheribsd-test-results'
+        junit allowEmptyResults: false, keepLongStdio: true, testResults: 'cheribsd-test-results/cheri*.xml'
+    }
+}
+
 ["mips-nocheri", "mips-hybrid", "mips-purecap", "riscv64", "riscv64-hybrid", "riscv64-purecap", "native"].each { suffix ->
     String name = "cheribsd-${suffix}"
+    if (suffix != "mips-hybrid") {
+        return // reduce load on jenkins while testing this PR
+    }
     jobs[name] = { ->
         cheribuildProject(target: "cheribsd-${suffix}", architecture: suffix,
                 extraArgs: '--cheribsd/build-options=-s --cheribsd/no-debug-info',
@@ -20,7 +39,9 @@ jobs = [:]
                 sdkCompilerOnly: true, // We only need clang not the CheriBSD sysroot since we are building that.
                 customGitCheckoutDir: 'cheribsd',
                 gitHubStatusContext: "ci/${suffix}",
-                runTests: false, /* TODO: run cheritest */)
+                /* Custom function to run tests since --test will not work (yet) */
+                runTests: false, afterBuild: { params -> buildImageAndRunTests(suffix) }
+        )
     }
 }
 
