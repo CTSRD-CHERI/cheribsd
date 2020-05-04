@@ -31,8 +31,31 @@
  */
 #include <dlfcn.h>
 
+#include <sys/types.h>
+
+#include "debug.h"
+#include "rtld.h"
+
+/* The clang-provided header is not warning-clean: */
+__unused static void cheri_init_globals(void);
+#include <cheri_init_globals.h>
+#if !defined(CHERI_INIT_GLOBALS_VERSION) || CHERI_INIT_GLOBALS_VERSION < 4
+#error "cheri_init_globals.h is outdated. Please update LLVM"
+#endif
+
 extern bool add_cheri_plt_stub(const Obj_Entry *obj, const Obj_Entry *rtldobj,
     Elf_Word r_symndx, void **where);
+
+/* FIXME: replace this with cheri_init_globals_impl once everyone has updated clang */
+static __attribute__((always_inline))
+void _do___caprelocs(const struct capreloc *start_relocs,
+    const struct capreloc * stop_relocs, void* gdc, const void* pcc,
+    vaddr_t base_addr, bool tight_pcc_bounds)
+{
+	cheri_init_globals_impl(start_relocs, stop_relocs, /*data_cap=*/gdc,
+	    /*code_cap=*/pcc, /*rodata_cap=*/pcc,
+	    /*tight_code_bounds=*/tight_pcc_bounds, base_addr);
+}
 
 static inline int
 process_r_cheri_capability(Obj_Entry *obj, Elf_Word r_symndx,
