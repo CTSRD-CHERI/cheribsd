@@ -380,7 +380,6 @@ BROKEN_OPTIONS+=NS_CACHING
 # Skip until https://github.com/CTSRD-CHERI/llvm-project/issues/379 is fixed.
 BROKEN_OPTIONS+=LIBCPLUSPLUS CXX
 # Crash in ZFS code. TODO: investigate
-# Remove corresponding hack in Makefile.libcompat when removing
 BROKEN_OPTIONS+=CDDL
 
 # Some compilation failure: TODO: investigate
@@ -433,7 +432,7 @@ __DEFAULT_NO_OPTIONS+=PIE
 # We'd really like this to be:
 #    !${MACHINE_CPU:Mcheri} || ${MACHINE_ABI:Mpurecap}
 # but that logic doesn't work in Makefile.inc1...
-.if ${__C} != "cheri" || (${__T:Mmips64*c*} || ${__C:Mriscv64*c*})
+.if ${__C} != "cheri" || (${__T:Mmips64*c*} || ${__T:Mriscv64*c*})
 BROKEN_OPTIONS+=COMPAT_CHERIABI
 .endif
 
