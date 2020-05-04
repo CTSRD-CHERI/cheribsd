@@ -24,15 +24,30 @@ def buildImageAndRunTests(params, String suffix) {
         dir("qemu-${params.buildOS}") { deleteDir() }
         copyArtifacts projectName: "qemu/qemu-cheri", filter: "qemu-${params.buildOS}/**", target: '.', fingerprintArtifacts: false
         sh label: 'generate SSH key', script: 'test -e $WORKSPACE/id_ed25519 || ssh-keygen -t ed25519 -N \'\' -f $WORKSPACE/id_ed25519 < /dev/null'
-        sh 'rm -rf cheribsd-test-results && mkdir cheribsd-test-results'
-        sh "./cheribuild/jenkins-cheri-build.py --test run-${suffix} --test-extra-args=--no-timestamped-test-subdir ${params.extraArgs} --test-ssh-key \$WORKSPACE/id_ed25519.pub || echo some tests failed"
-        sh 'find cheribsd-test-results'
-        junit allowEmptyResults: false, keepLongStdio: true, testResults: 'cheribsd-test-results/cheri*.xml'
+        sh label: "Run tests in QEMU", script: """
+rm -rf cheribsd-test-results && mkdir cheribsd-test-results
+./cheribuild/jenkins-cheri-build.py --test run-${suffix} --test-extra-args=--no-timestamped-test-subdir ${params.extraArgs} --test-ssh-key \$WORKSPACE/id_ed25519.pub
+find cheribsd-test-results
+"""
+        def summary = junit allowEmptyResults: false, keepLongStdio: true, testResults: 'cheribsd-test-results/cheri*.xml'
+        echo ("${suffix} test summary: ${summary.totalCount}, Failures: ${summary.failCount}, Skipped: ${summary.skipCount}, Passed: ${summary.passCount}")
+        if (summary.failCount != 0) {
+            // Note: Junit set should have set stage/build status to unstable already, but we still need to set
+            // the per-configuration status, since Jenkins doesn't have a build result for each parallel branch.
+            params.result = 'UNSTABLE'
+        }
+        if (summary.passCount == 0 || summary.totalCount == 0) {
+            params.result = 'FAILURE'
+            error("No tests successful?")
+        }
     }
 }
 
 ["mips-nocheri", "mips-hybrid", "mips-purecap", "riscv64", "riscv64-hybrid", "riscv64-purecap", "native"].each { suffix ->
     String name = "cheribsd-${suffix}"
+    if (suffix != "mips-hybrid") {
+        return // reduce load on jenkins while testing this PR
+    }
     jobs[name] = { ->
         cheribuildProject(target: "cheribsd-${suffix}", architecture: suffix,
                 extraArgs: '--cheribsd/build-options=-s --cheribsd/no-debug-info --keep-install-dir --install-prefix=/rootfs --cheribsd/build-tests',
