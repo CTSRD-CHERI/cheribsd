@@ -56,7 +56,6 @@ SND_DECLARE_FILE("$FreeBSD$");
 #define hdac_lock(sc)		snd_mtxlock((sc)->lock)
 #define hdac_unlock(sc)		snd_mtxunlock((sc)->lock)
 #define hdac_lockassert(sc)	snd_mtxassert((sc)->lock)
-#define hdac_lockowned(sc)	mtx_owned((sc)->lock)
 
 #define HDAC_QUIRK_64BIT	(1 << 0)
 #define HDAC_QUIRK_DMAPOS	(1 << 1)
@@ -233,9 +232,6 @@ static int	hdac_resume(device_t);
 static int	hdac_rirb_flush(struct hdac_softc *sc);
 static int	hdac_unsolq_flush(struct hdac_softc *sc);
 
-#define hdac_command(a1, a2, a3)	\
-		hdac_send_command(a1, a3, a2)
-
 /* This function surely going to make its way into upper level someday. */
 static void
 hdac_config_fetch(struct hdac_softc *sc, uint32_t *on, uint32_t *off)
@@ -361,8 +357,7 @@ hdac_poll_callback(void *arg)
 		hdac_unlock(sc);
 		return;
 	}
-	callout_reset(&sc->poll_callout, sc->poll_ival,
-	    hdac_poll_callback, sc);
+	callout_reset(&sc->poll_callout, sc->poll_ival, hdac_poll_callback, sc);
 	hdac_unlock(sc);
 
 	hdac_intr_handler(sc);
@@ -413,7 +408,7 @@ hdac_reset(struct hdac_softc *sc, int wakeup)
 		if (!(gctl & HDAC_GCTL_CRST))
 			break;
 		DELAY(10);
-	} while	(--count);
+	} while (--count);
 	if (gctl & HDAC_GCTL_CRST) {
 		device_printf(sc->dev, "Unable to put hdac in reset\n");
 		return (ENXIO);
@@ -446,7 +441,6 @@ hdac_reset(struct hdac_softc *sc, int wakeup)
 
 	return (0);
 }
-
 
 /****************************************************************************
  * int hdac_get_capabilities(struct hdac_softc *);
@@ -621,11 +615,10 @@ hdac_dma_alloc_fail:
 	return (result);
 }
 
-
 /****************************************************************************
  * void hdac_dma_free(struct hdac_softc *, struct hdac_dma *)
  *
- * Free a struct dhac_dma that has been previously allocated via the
+ * Free a struct hdac_dma that has been previously allocated via the
  * hdac_dma_alloc function.
  ****************************************************************************/
 static void
@@ -975,8 +968,7 @@ hdac_send_command(struct hdac_softc *sc, nid_t cad, uint32_t verb)
 	int timeout;
 	uint32_t *corb;
 
-	if (!hdac_lockowned(sc))
-		device_printf(sc->dev, "WARNING!!!! mtx not owned!!!!\n");
+	hdac_lockassert(sc);
 	verb &= ~HDA_CMD_CAD_MASK;
 	verb |= ((uint32_t)cad) << HDA_CMD_CAD_SHIFT;
 	sc->codecs[cad].response = HDA_INVALID;
@@ -1043,8 +1035,7 @@ hdac_probe(device_t dev)
 		if (HDA_DEV_MATCH(hdac_devices[i].model, model) &&
 		    class == PCIC_MULTIMEDIA &&
 		    subclass == PCIS_MULTIMEDIA_HDA) {
-			snprintf(desc, sizeof(desc),
-			    "%s (0x%04x)",
+			snprintf(desc, sizeof(desc), "%s (0x%04x)",
 			    hdac_devices[i].desc, pci_get_device(dev));
 			result = BUS_PROBE_GENERIC;
 			break;
@@ -1702,20 +1693,17 @@ hdac_print_child(device_t dev, device_t child)
 	int retval;
 
 	retval = bus_print_child_header(dev, child);
-	retval += printf(" at cad %d",
-	    (int)(intptr_t)device_get_ivars(child));
+	retval += printf(" at cad %d", (int)(intptr_t)device_get_ivars(child));
 	retval += bus_print_child_footer(dev, child);
 
 	return (retval);
 }
 
 static int
-hdac_child_location_str(device_t dev, device_t child, char *buf,
-    size_t buflen)
+hdac_child_location_str(device_t dev, device_t child, char *buf, size_t buflen)
 {
 
-	snprintf(buf, buflen, "cad=%d",
-	    (int)(intptr_t)device_get_ivars(child));
+	snprintf(buf, buflen, "cad=%d", (int)(intptr_t)device_get_ivars(child));
 	return (0);
 }
 
@@ -1726,8 +1714,8 @@ hdac_child_pnpinfo_str_method(device_t dev, device_t child, char *buf,
 	struct hdac_softc *sc = device_get_softc(dev);
 	nid_t cad = (uintptr_t)device_get_ivars(child);
 
-	snprintf(buf, buflen, "vendor=0x%04x device=0x%04x revision=0x%02x "
-	    "stepping=0x%02x",
+	snprintf(buf, buflen,
+	    "vendor=0x%04x device=0x%04x revision=0x%02x stepping=0x%02x",
 	    sc->codecs[cad].vendor_id, sc->codecs[cad].device_id,
 	    sc->codecs[cad].revision_id, sc->codecs[cad].stepping_id);
 	return (0);
@@ -1903,8 +1891,8 @@ hdac_stream_free(device_t dev, device_t child, int dir, int stream)
 }
 
 static int
-hdac_stream_start(device_t dev, device_t child,
-    int dir, int stream, bus_addr_t buf, int blksz, int blkcnt)
+hdac_stream_start(device_t dev, device_t child, int dir, int stream,
+    bus_addr_t buf, int blksz, int blkcnt)
 {
 	struct hdac_softc *sc = device_get_softc(dev);
 	struct hdac_bdle *bdle;

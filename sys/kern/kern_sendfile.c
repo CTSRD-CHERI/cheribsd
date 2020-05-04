@@ -295,10 +295,12 @@ sendfile_iodone(void *arg, vm_page_t *pa, int count, int error)
 		 * unbusied the swapped-in pages, they can become
 		 * invalid under us.
 		 */
+		MPASS(count == 0 || pa[0] != bogus_page);
 		for (i = 0; i < count; i++) {
 			if (pa[i] == bogus_page) {
-				pa[i] = vm_page_relookup(sfio->obj,
-				    sfio->pindex0 + i + (pa - sfio->pa));
+				sfio->pa[(pa[0]->pindex - sfio->pindex0) + i] =
+				    pa[i] = vm_page_relookup(sfio->obj,
+				    pa[0]->pindex + i);
 				KASSERT(pa[i] != NULL,
 				    ("%s: page %p[%d] disappeared",
 				    __func__, pa, i));
@@ -310,6 +312,24 @@ sendfile_iodone(void *arg, vm_page_t *pa, int count, int error)
 
 	if (!refcount_release(&sfio->nios))
 		return;
+
+#ifdef INVARIANTS
+	for (i = 1; i < sfio->npages; i++) {
+		if (sfio->pa[i] == NULL)
+			break;
+		KASSERT(vm_page_wired(sfio->pa[i]),
+		    ("sfio %p page %d %p not wired", sfio, i, sfio->pa[i]));
+		if (i == 0)
+			continue;
+		KASSERT(sfio->pa[0]->object == sfio->pa[i]->object,
+		    ("sfio %p page %d %p wrong owner %p %p", sfio, i,
+		    sfio->pa[i], sfio->pa[0]->object, sfio->pa[i]->object));
+		KASSERT(sfio->pa[0]->pindex + i == sfio->pa[i]->pindex,
+		    ("sfio %p page %d %p wrong index %jx %jx", sfio, i,
+		    sfio->pa[i], (uintmax_t)sfio->pa[0]->pindex,
+		    (uintmax_t)sfio->pa[i]->pindex));
+	}
+#endif
 
 	vm_object_pip_wakeup(sfio->obj);
 
