@@ -12,7 +12,6 @@ properties([disableConcurrentBuilds(),
 jobs = [:]
 
 def buildImageAndRunTests(params, String suffix) {
-    try{
     if (!suffix.startsWith("mips-")) {
         echo("Cannot run tests for ${suffix} yet")
         return
@@ -22,12 +21,14 @@ def buildImageAndRunTests(params, String suffix) {
     }
     stage("Running tests") {
         sh 'rm -rf cheribsd-test-results && mkdir cheribsd-test-results'
-        sh "./cheribuild/jenkins-cheri-build.py --test run-${suffix} --test-extra-args=--no-timestamped-test-subdir ${params.extraArgs}"
+        // copy qemu archive and run directly on the host
+        dir("qemu-${params.buildOS}") { deleteDir() }
+        dir("cheribsd-test-results") { deleteDir() }
+        copyArtifacts projectName: "qemu/qemu-cheri", filter: "qemu-${params.buildOS}/**", target: '.', fingerprintArtifacts: false
+        sh label: 'generate SSH key', script: 'test -e $WORKSPACE/id_ed25519 || ssh-keygen -t ed25519 -N \'\' -f $WORKSPACE/id_ed25519 < /dev/null'
+        sh "./cheribuild/jenkins-cheri-build.py --test run-${suffix} --test-extra-args=--no-timestamped-test-subdir ${params.extraArgs} --test-ssh-key \$WORKSPACE/id_ed25519.pub"
         sh 'find cheribsd-test-results'
         junit allowEmptyResults: false, keepLongStdio: true, testResults: 'cheribsd-test-results/cheri*.xml'
-    }
-    } finally {
-	    sh "find ."  // check what files exist
     }
 }
 
@@ -47,8 +48,6 @@ def buildImageAndRunTests(params, String suffix) {
                 runTests: false, afterBuild: { params -> buildImageAndRunTests(params, suffix) }
         )
     }
-
-
 }
 
 boolean runParallel = true;
