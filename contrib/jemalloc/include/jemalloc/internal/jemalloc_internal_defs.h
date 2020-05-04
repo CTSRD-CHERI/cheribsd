@@ -250,7 +250,11 @@
  * Used to mark unreachable code to quiet "end of non-void" compiler warnings.
  * Don't use this directly; instead use unreachable() from util.h
  */
-#define JEMALLOC_INTERNAL_UNREACHABLE __builtin_unreachable
+/* #define JEMALLOC_INTERNAL_UNREACHABLE __builtin_unreachable */
+/* Note: for CHERI purecap we should avoid having empty functions since that
+ * confuses the linker. We can revert back to __builtin_unreachable if we
+ * decide to change the compiler to always emit non-zero-size functions */
+#define JEMALLOC_INTERNAL_UNREACHABLE abort
 
 /*
  * ffs*() functions to use for bitmapping.  Don't use these directly; instead,
