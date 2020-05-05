@@ -56,7 +56,7 @@ NEED_COMPAT=	CHERI
 .include <bsd.compat.mk>
 CSTD?=		gnu99
 CFLAGS+=	-Wall -DFREEBSD_ELF -DIN_RTLD -ffreestanding
-.if !${MACHINE_ARCH:Mmips64*c*}
+.if !${MACHINE_ARCH:Mmips64*c*} && !${MACHINE_ARCH:Mriscv64*c*}
 CFLAGS+=	-DCOMPAT_CHERI
 .endif
 CFLAGS+=	-I${SRCTOP}/lib/csu/common \
