@@ -84,6 +84,3 @@ if (runParallel) {
         value();
     }
 }
-if (env.CHANGE_ID) {
-    deleteDir() // Avoid using up all Jenkins disk space
-}
