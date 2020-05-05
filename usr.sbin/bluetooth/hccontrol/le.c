@@ -172,13 +172,13 @@ parse_param(int argc, char *argv[], char *buf, int *len)
 				goto done;
 			curbuf[0] = 2;
 			curbuf[1] = 1;
-			curbuf[2] = atoi(optarg);
+			curbuf[2] = (uint8_t)strtol(optarg, NULL, 16);
 			curbuf += 3;
 			break;
 		case 'u':
-			lenpos = buf;
 			if ((buf+2) >= buflast)
 				goto done;
+			lenpos = curbuf;
 			curbuf[1] = 2;
 			*lenpos = 1;
 			curbuf += 2;
@@ -189,6 +189,7 @@ parse_param(int argc, char *argv[], char *buf, int *len)
 				curbuf[0] = value &0xff;
 				curbuf[1] = (value>>8)&0xff;
 				curbuf += 2;
+				*lenpos += 2;
 			}
 				
 		}
@@ -491,6 +492,7 @@ le_set_advertising_data(int s, int argc, char *argv[])
 	parse_param(argc, argv, buf, &len);
 	memset(cp.advertising_data, 0, sizeof(cp.advertising_data));
 	cp.advertising_data_length = len;
+	memcpy(cp.advertising_data, buf, len);
 
 	if (hci_request(s, NG_HCI_OPCODE(NG_HCI_OGF_LE,
 		NG_HCI_OCF_LE_SET_ADVERTISING_DATA), 
