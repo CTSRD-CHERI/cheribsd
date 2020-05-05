@@ -387,11 +387,6 @@ BROKEN_OPTIONS+=SVN SVNLITE
 
 # libcheri has not been ported to RISCV
 BROKEN_OPTIONS+=LIBCHERI
-
-# No RTLD yet
-BROKEN_OPTIONS+=CASPER DYNAMICROOT
-# kerberos causes linker errors when linking statically due to -fno-common
-BROKEN_OPTIONS+=KERBEROS KERBEROS_SUPPORT
 .endif
 
 # EFI doesn't exist on mips, powerpc or riscv.
