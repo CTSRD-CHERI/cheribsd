@@ -41,53 +41,10 @@
 
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
-#include <sys/types.h>
-/* The clang-provided header is not warning-clean: */
-__unused static void cheri_init_globals(void);
-#include <cheri_init_globals.h>
-#if !defined(CHERI_INIT_GLOBALS_VERSION) || CHERI_INIT_GLOBALS_VERSION < 4
-#error "cheri_init_globals.h is outdated. Please update LLVM"
-#endif
 
+#include "cheri_reloc.h"
 #include "debug.h"
 #include "rtld.h"
-
-void _rtld_do___caprelocs_self(const struct capreloc *start_relocs,
-    const struct capreloc* end_relocs, void *relocbase, Elf_Addr cheri_flags);
-
-/* FIXME: replace this with cheri_init_globals_impl once everyone has updated clang */
-static __attribute__((always_inline))
-void _do___caprelocs(const struct capreloc *start_relocs,
-    const struct capreloc * stop_relocs, void* gdc, const void* pcc,
-    vaddr_t base_addr, bool tight_pcc_bounds)
-{
-	cheri_init_globals_impl(start_relocs, stop_relocs, /*data_cap=*/gdc,
-	    /*code_cap=*/pcc, /*rodata_cap=*/pcc,
-	    /*tight_code_bounds=*/tight_pcc_bounds, base_addr);
-}
-
-/*
- * The assembly startup code passes __start_cap_relocs/__stop_cap_relocs.
- *
- * TODO: We could also parse the DT_CHERI___CAPRELOCS and DT_CHERI___CAPRELOCSSZ
- * in _rtld_relocate_nonplt_self and save that to the stack instead. Might
- * save a few instructions but not sure it's worth the effort of writing more asm.
- */
-void
-_rtld_do___caprelocs_self(const struct capreloc *start_relocs,
-    const struct capreloc* end_relocs, void *relocbase, Elf_Addr cheri_flags)
-{
-	void *pcc = __builtin_cheri_program_counter_get();
-	// TODO: allow using tight bounds for RTLD by passing in the parameter
-	//  from ASM if it was built for the PLT ABI
-
-	bool relative_relocs = cheri_flags & DF_MIPS_CHERI_RELATIVE_CAPRELOCS;
-	// If the binary includes the RELATIVE_CAPRELOCS dynamic flag we have
-	// to add getaddr(relocbase) to every __cap_reloc location and object.
-	vaddr_t base_addr = relative_relocs ? cheri_getaddress(relocbase) : 0;
-	_do___caprelocs(
-	    start_relocs, end_relocs, relocbase, pcc, base_addr, false);
-}
 
 void
 process___cap_relocs(Obj_Entry* obj)

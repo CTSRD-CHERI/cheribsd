@@ -26,3 +26,5 @@ CXXFLAGS+= -std=c++11 -fno-rtti -fno-exceptions
 # We need to be able to find plt_code.inc
 CXXFLAGS+=	-I.
 CFLAGS+=	-I${SRCTOP}/contrib/uthash/src
+
+RTLD_ENTRY=	rtld_start
