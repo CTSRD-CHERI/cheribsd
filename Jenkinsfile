@@ -57,9 +57,6 @@ find cheribsd-test-results
 
 ["mips-nocheri", "mips-hybrid", "mips-purecap", "riscv64", "riscv64-hybrid", "riscv64-purecap", "native"].each { suffix ->
     String name = "cheribsd-${suffix}"
-    if (!suffix.startsWith("mips-")) {
-        return // reduce load on jenkins while testing this PR
-    }
     jobs[name] = { ->
         cheribuildProject(target: "cheribsd-${suffix}", architecture: suffix,
                 extraArgs: '--cheribsd/build-options=-s --cheribsd/no-debug-info --keep-install-dir --install-prefix=/rootfs --cheribsd/build-tests',
