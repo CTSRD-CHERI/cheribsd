@@ -40,18 +40,18 @@ find cheribsd-test-results
             if (exitCode != 0 || summary.failCount != 0) {
                 // Note: Junit set should have set stage/build status to unstable already, but we still need to set
                 // the per-configuration status, since Jenkins doesn't have a build result for each parallel branch.
-                params.result = 'UNSTABLE'
+                params.statusUnstable("Test script returned ${exitCode}, failed tests: ${summary.failCount}")
             }
             if (summary.passCount == 0 || summary.totalCount == 0) {
-                params.result = 'FAILURE'
-                error("No tests successful?")
+                params.statusFailure("No tests successful?")
             }
         } else {
             // No cheritest, just check that that the test script exited successfully
             if (exitCode != 0) {
-                params.result = 'UNSTABLE'
+                params.statusUnstable("Test script returned ${exitCode}")
             }
         }
+
     }
 }
 
