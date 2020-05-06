@@ -329,6 +329,16 @@ vm_kstack_palloc(vm_object_t ksobj, vm_offset_t ks, int allocflags, int pages,
 	KASSERT((ksobj != NULL), ("vm_kstack_palloc: invalid VM object"));
 	VM_OBJECT_ASSERT_WLOCKED(ksobj);
 
+#ifndef NO_SWAPPING
+	/*
+	 * Swapping adds races where some of the backing store might
+	 * be swapped out when swapping back in, but then we'd need to
+	 * make sure new pages are physically contiguous.  Without
+	 * swapping, this is only called for new kstacks for which
+	 * there should never be any existing backing store.
+	 */
+#error "KSTACK_LARGE_PAGE requires NO_SWAPPING"
+#endif
 	allocflags = (allocflags & ~VM_ALLOC_CLASS_MASK) | VM_ALLOC_NORMAL;
 
 	for (i = 0; i < pages; i++) {
