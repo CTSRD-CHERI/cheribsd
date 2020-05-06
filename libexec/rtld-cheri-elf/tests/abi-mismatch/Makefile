@@ -2,9 +2,12 @@
 
 TESTSDIR=	${TESTSBASE}/libexec/rtld-cheri-elf/abi-mismatch
 
-.if !${MACHINE_ABI:Mpurecap}
 # Disable when building a pure-cap world as we don't support
-# bsd.cheri.mk hacks there.  Alternative workaround needed.
+# bsd.cheri.mk hacks there. Alternative workaround needed.
+# Similarly, non-MIPS lacks bsd.cheri.mk, even for hybrid.
+# We should probably use bsd.compat.mk to get either freebsd64
+# or cheriabi and allow forcing nocheri or hybrid for freebsd64.
+.if !${MACHINE_ABI:Mpurecap} && ${MACHINE_CPUARCH} == "mips"
 SUBDIR+=	basic_nocheri_lib basic_hybrid_lib basic_purecap_lib
 .endif
 
