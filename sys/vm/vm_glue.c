@@ -315,25 +315,6 @@ SYSCTL_PROC(_vm, OID_AUTO, kstack_cache_size,
 
 #if defined(__mips__)
 
-static vm_offset_t
-vm_kstack_valloc(int pages)
-{
-	vm_offset_t ks;
-
-	/*
-	 * We need to align the kstack's mapped address to fit within
-	 * a single TLB entry.
-	 */
-	if (vmem_xalloc(kernel_arena,
-	    (pages + KSTACK_GUARD_PAGES) * PAGE_SIZE,
-	    KSTACK_PAGE_SIZE * 2, 0, 0, VMEM_ADDR_MIN, VMEM_ADDR_MAX,
-	    M_BESTFIT | M_NOWAIT, &ks)) {
-		return (0);
-	}
-
-	return (ks);
-}
-
 #ifdef KSTACK_LARGE_PAGE
 
 #define	KSTACK_OBJT		OBJT_PHYS
@@ -429,16 +410,6 @@ vm_kstack_palloc(vm_object_t ksobj, vm_offset_t ks, int allocflags, int pages,
 
 #define	KSTACK_OBJT		OBJT_DEFAULT
 
-static vm_offset_t
-vm_kstack_valloc(int pages)
-{
-	vm_offset_t ks;
-
-	ks = kva_alloc((pages + KSTACK_GUARD_PAGES) * PAGE_SIZE);
-
-	return(ks);
-}
-
 static int
 vm_kstack_palloc(vm_object_t ksobj, vm_offset_t ks, int allocflags, int pages,
     vm_page_t ma[])
@@ -483,7 +454,19 @@ vm_thread_stack_create(struct domainset *ds, vm_object_t *ksobjp, int pages)
 	/*
 	 * Get a kernel virtual address for this thread's kstack.
 	 */
-	ks = vm_kstack_valloc(pages);
+#if defined(__mips__)
+	/*
+	 * We need to align the kstack's mapped address to fit within
+	 * a single TLB entry.
+	 */
+	if (vmem_xalloc(kernel_arena, (pages + KSTACK_GUARD_PAGES) * PAGE_SIZE,
+	    KSTACK_PAGE_SIZE * 2, 0, 0, VMEM_ADDR_MIN, VMEM_ADDR_MAX,
+	    M_BESTFIT | M_NOWAIT, &ks)) {
+		ks = 0;
+	}
+#else
+	ks = kva_alloc((pages + KSTACK_GUARD_PAGES) * PAGE_SIZE);
+#endif
 	if (ks == 0) {
 		printf("%s: kstack allocation failed\n", __func__);
 		vm_object_deallocate(ksobj);
