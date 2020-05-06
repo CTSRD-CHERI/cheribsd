@@ -313,131 +313,6 @@ SYSCTL_PROC(_vm, OID_AUTO, kstack_cache_size,
 #define KSTACK_MAX_PAGES 32
 #endif
 
-#if defined(__mips__)
-
-#ifdef KSTACK_LARGE_PAGE
-
-static int
-vm_kstack_palloc(vm_object_t ksobj, vm_offset_t ks, int allocflags, int pages,
-    vm_page_t ma[])
-{
-	vm_page_t m, end_m;
-	int i;
-
-	KASSERT((ksobj != NULL), ("vm_kstack_palloc: invalid VM object"));
-	VM_OBJECT_ASSERT_WLOCKED(ksobj);
-
-#ifndef NO_SWAPPING
-	/*
-	 * Swapping adds races where some of the backing store might
-	 * be swapped out when swapping back in, but then we'd need to
-	 * make sure new pages are physically contiguous.  Without
-	 * swapping, this is only called for new kstacks for which
-	 * there should never be any existing backing store.
-	 */
-#error "KSTACK_LARGE_PAGE requires NO_SWAPPING"
-#endif
-	allocflags = (allocflags & ~VM_ALLOC_CLASS_MASK) | VM_ALLOC_NORMAL;
-
-	for (i = 0; i < pages; i++) {
-retrylookup:
-		if ((m = vm_page_lookup(ksobj, i)) == NULL)
-			break;
-		if (vm_page_busied(m)) {
-			/*
-			 * Reference the page before unlocking and
-			 * sleeping so that the page daemon is less
-			 * likely to reclaim it.
-			 */
-			vm_page_aflag_set(m, PGA_REFERENCED);
-			vm_page_lock(m);
-			VM_OBJECT_WUNLOCK(ksobj);
-			vm_page_busy_sleep(m, "pgrbwt", false);
-			VM_OBJECT_WLOCK(ksobj);
-			goto retrylookup;
-		} else {
-			if ((allocflags & VM_ALLOC_WIRED) != 0) {
-				vm_page_lock(m);
-				vm_page_wire(m);
-				vm_page_unlock(m);
-			}
-			ma[i] = m;
-		}
-	}
-	if (i == pages)
-		return (i);
-
-	KASSERT((i == 0), ("vm_kstack_palloc: ksobj already has kstack pages"));
-
-	for (;;) {
-		m = vm_page_alloc_contig(ksobj, 0, allocflags,
-		    atop(KSTACK_PAGE_SIZE), 0ul, ~0ul, KSTACK_PAGE_SIZE, 0,
-		    VM_MEMATTR_DEFAULT);
-		if (m != NULL)
-			break;
-		VM_OBJECT_WUNLOCK(ksobj);
-		vm_wait(ksobj);
-		VM_OBJECT_WLOCK(ksobj);
-	}
-	end_m = m + atop(KSTACK_PAGE_SIZE);
-	for (i = 0; m < end_m; m++) {
-		m->pindex = (vm_pindex_t)i;
-		if ((allocflags & VM_ALLOC_NOBUSY) != 0)
-			m->valid = VM_PAGE_BITS_ALL;
-		ma[i] = m;
-		i++;
-	}
-	return (i);
-}
-
-#else /* ! KSTACK_LARGE_PAGE */
-
-static int
-vm_kstack_palloc(vm_object_t ksobj, vm_offset_t ks, int allocflags, int pages,
-    vm_page_t ma[])
-{
-	int i;
-
-	KASSERT((ksobj != NULL), ("vm_kstack_palloc: invalid VM object"));
-	VM_OBJECT_ASSERT_WLOCKED(ksobj);
-
-	allocflags = (allocflags & ~VM_ALLOC_CLASS_MASK) | VM_ALLOC_NORMAL;
-
-	(void)vm_page_grab_pages(ksobj, 0, allocflags, ma, pages);
-	for (i = 0; i < pages; i++) {
-		vm_page_valid(ma[i]);
-		vm_page_xunbusy(ma[i]);
-	}
-	return (i);
-}
-#endif /* ! KSTACK_LARGE_PAGE */
-
-#else /* ! __mips__ */
-
-static int
-vm_kstack_palloc(vm_object_t ksobj, vm_offset_t ks, int allocflags, int pages,
-    vm_page_t ma[])
-{
-	int i;
-
-	KASSERT((ksobj != NULL), ("vm_kstack_palloc: invalid VM object"));
-	VM_OBJECT_ASSERT_WLOCKED(ksobj);
-
-	allocflags = (allocflags & ~VM_ALLOC_CLASS_MASK) | VM_ALLOC_NORMAL;
-
-	for (i = 0; i < pages; i++) {
-		/*
-		 * Get a kernel stack page.
-		 */
-		ma[i] = vm_page_grab(ksobj, i, allocflags);
-		if (allocflags & VM_ALLOC_NOBUSY)
-			ma[i]->valid = VM_PAGE_BITS_ALL;
-	}
-
-	return (i);
-}
-#endif /* ! __mips__ */
-
 /*
  * Create the kernel stack (including pcb for i386) for a new thread.
  * This routine directly affects the fork perf for a process and
@@ -447,8 +322,12 @@ static vm_offset_t
 vm_thread_stack_create(struct domainset *ds, vm_object_t *ksobjp, int pages)
 {
 	vm_page_t ma[KSTACK_MAX_PAGES];
+#if defined(__mips__) && defined(KSTACK_LARGE_PAGE)
+	vm_page_t m;
+#endif
 	vm_object_t ksobj;
 	vm_offset_t ks;
+	int i;
 
 	/*
 	 * Allocate an object for the kstack.
@@ -492,8 +371,40 @@ vm_thread_stack_create(struct domainset *ds, vm_object_t *ksobjp, int pages)
 	 * page of stack.
 	 */
 	VM_OBJECT_WLOCK(ksobj);
-	pages = vm_kstack_palloc(ksobj, ks, VM_ALLOC_NOBUSY | VM_ALLOC_WIRED,
-	    pages, ma);
+#if defined(__mips__) && defined(KSTACK_LARGE_PAGE)
+#ifndef NO_SWAPPING
+	/*
+	 * Swapping adds races where some of the backing store might
+	 * be swapped out when swapping back in, but then we'd need to
+	 * make sure new pages are physically contiguous.  Without
+	 * swapping, this is only called for new kstacks for which
+	 * there should never be any existing backing store.
+	 */
+#error "KSTACK_LARGE_PAGE requires NO_SWAPPING"
+#endif
+	KASSERT(pages == atop(KSTACK_PAGE_SIZE),
+	    ("%s: request for %d pages != KSTACK_PAGE_SIZE", __func__, pages));
+
+	for (;;) {
+		m = vm_page_alloc_contig(ksobj, 0, VM_ALLOC_NORMAL |
+		    VM_ALLOC_WIRED | VM_ALLOC_NOWAIT, atop(KSTACK_PAGE_SIZE),
+		    0ul, ~0ul, KSTACK_PAGE_SIZE, 0, VM_MEMATTR_DEFAULT);
+		if (m != NULL)
+			break;
+		VM_OBJECT_WUNLOCK(ksobj);
+		if (!vm_page_reclaim_contig(VM_ALLOC_NORMAL,
+		    atop(KSTACK_PAGE_SIZE), 0ul, ~0ul, KSTACK_PAGE_SIZE, 0))
+			vm_wait(ksobj);
+		VM_OBJECT_WLOCK(ksobj);
+	}
+	for (i = 0; i < atop(KSTACK_PAGE_SIZE); m++, i++)
+		ma[i] = m;
+#else
+	(void)vm_page_grab_pages(ksobj, 0, VM_ALLOC_NORMAL | VM_ALLOC_WIRED,
+	    ma, pages);
+#endif
+	for (i = 0; i < pages; i++)
+		vm_page_valid(ma[i]);
 	VM_OBJECT_WUNLOCK(ksobj);
 	if (pages == 0) {
 		printf("vm_thread_new: vm_kstack_palloc() failed\n");
