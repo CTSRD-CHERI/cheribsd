@@ -317,8 +317,6 @@ SYSCTL_PROC(_vm, OID_AUTO, kstack_cache_size,
 
 #ifdef KSTACK_LARGE_PAGE
 
-#define	KSTACK_OBJT		OBJT_PHYS
-
 static int
 vm_kstack_palloc(vm_object_t ksobj, vm_offset_t ks, int allocflags, int pages,
     vm_page_t ma[])
@@ -394,8 +392,6 @@ retrylookup:
 
 #else /* ! KSTACK_LARGE_PAGE */
 
-#define	KSTACK_OBJT		OBJT_DEFAULT
-
 static int
 vm_kstack_palloc(vm_object_t ksobj, vm_offset_t ks, int allocflags, int pages,
     vm_page_t ma[])
@@ -417,8 +413,6 @@ vm_kstack_palloc(vm_object_t ksobj, vm_offset_t ks, int allocflags, int pages,
 #endif /* ! KSTACK_LARGE_PAGE */
 
 #else /* ! __mips__ */
-
-#define	KSTACK_OBJT		OBJT_DEFAULT
 
 static int
 vm_kstack_palloc(vm_object_t ksobj, vm_offset_t ks, int allocflags, int pages,
@@ -459,7 +453,7 @@ vm_thread_stack_create(struct domainset *ds, vm_object_t *ksobjp, int pages)
 	/*
 	 * Allocate an object for the kstack.
 	 */
-	ksobj = vm_object_allocate(KSTACK_OBJT, pages);
+	ksobj = vm_object_allocate(OBJT_DEFAULT, pages);
 
 	/*
 	 * Get a kernel virtual address for this thread's kstack.
