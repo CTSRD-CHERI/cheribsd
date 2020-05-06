@@ -26,7 +26,7 @@ EFI_TARGET=	efi-app-ia32
 .else
 EFI_TARGET=	binary
 .endif
-# XXX: doesn't work with llvm-objdump!
+# XXX: doesn't work with llvm-objcopy!
 OBJCOPY=${WORLDTMP}/usr/bin/objcopy
 
 # Arbitrarily set the PE/COFF header timestamps to 1 Jan 2016 00:00:00
