@@ -48,20 +48,20 @@ __FBSDID("$FreeBSD$");
 
 struct jail64_v0 {
 	u_int32_t	version;
-	char * /* __ptr64 */ path;
-	char * /* __ptr64 */ hostname;
+	uint64_t	path;
+	uint64_t	hostname;
 	u_int32_t	ip_number;
 };
 
 struct jail64 {
 	uint32_t	version;
-	char * /* __ptr64 */ path;
-	char * /* __ptr64 */ hostname;
-	char * /* __ptr64 */ jailname;
+	uint64_t	path;
+	uint64_t	hostname;
+	uint64_t	jailname;
 	uint32_t	ip4s;
 	uint32_t	ip6s;
-	struct in_addr * /* __ptr64 */ ip4;
-	struct in6_addr * /* __ptr64 */ ip6;
+	uint64_t	ip4;
+	uint64_t	ip6;
 };
 
 int
