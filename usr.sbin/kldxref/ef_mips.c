@@ -31,6 +31,16 @@
  *
  * $FreeBSD$
  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20200507,
+ *   "changes": [
+ *     "bounds_compression"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */
 
 #include <sys/types.h>
 #include <machine/elf.h>
