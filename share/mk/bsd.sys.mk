@@ -260,7 +260,7 @@ CFLAGS.clang+=	 -Qunused-arguments
 # but not yet.
 CXXFLAGS.clang+=	 -Wno-c++11-extensions
 
-.if ${MK_SSP} != "no" && \
+.if ${MK_SSP} != "no" && !${MACHINE_ABI:Mpurecap} && \
     ${MACHINE_CPUARCH} != "arm" && ${MACHINE_CPUARCH} != "mips"
 .if (${COMPILER_TYPE} == "clang" && ${COMPILER_VERSION} >= 30500) || \
     (${COMPILER_TYPE} == "gcc" && \
@@ -271,7 +271,7 @@ SSP_CFLAGS?=	-fstack-protector-strong
 SSP_CFLAGS?=	-fstack-protector
 .endif
 CFLAGS+=	${SSP_CFLAGS}
-.endif # SSP && !ARM && !MIPS
+.endif # SSP && !ARM && !MIPS && !purecap
 
 # Additional flags passed in CFLAGS and CXXFLAGS when MK_DEBUG_FILES is
 # enabled.
