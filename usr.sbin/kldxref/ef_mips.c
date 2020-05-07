@@ -47,6 +47,7 @@
 
 #include <err.h>
 #include <errno.h>
+#include <stddef.h>
 
 #include "ef.h"
 
