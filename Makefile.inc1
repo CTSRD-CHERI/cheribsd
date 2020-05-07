@@ -2915,7 +2915,7 @@ libraries: .MAKE .PHONY
 # static libgcc.a prerequisite for shared libc
 #
 _prereq_libs= lib/libcompiler_rt
-.if ${MK_SSP} != "no"
+.if ${MK_SSP} != "no" && !${MACHINE_ABI:Mpurecap}
 _prereq_libs+= lib/libssp_nonshared
 .endif
 

@@ -34,7 +34,7 @@ TESTS_SUBDIRS+=	iconv
 TESTS_SUBDIRS+=	locale
 .endif
 
-.if ${MK_SSP} != "no"
+.if ${MK_SSP} != "no" && !${MACHINE_ABI:Mpurecap}
 TESTS_SUBDIRS+=	ssp
 .endif
 
