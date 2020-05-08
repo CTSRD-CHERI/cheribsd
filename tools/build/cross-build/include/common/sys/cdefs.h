@@ -127,6 +127,18 @@
 #endif
 #endif
 
+/* Some files built as part of the bootstrap libegacy use these macros, but
+ * since we aren't actually building libc.so, we can defined them to be empty */
+#ifndef __sym_compat
+#define	__sym_compat(sym,impl,verid)	/* not needed for bootstrapping */
+#endif
+#ifndef __sym_default
+#define	__sym_default(sym,impl,verid)	/* not needed for bootstrapping */
+#endif
+#ifndef __sym_default
+#define	__warn_references(sym,msg)	/* not needed for bootstrapping */
+#endif
+
 #ifndef __malloc_like
 #define	__malloc_like	__attribute__((__malloc__))
 #endif
