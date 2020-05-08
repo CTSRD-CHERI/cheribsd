@@ -1238,8 +1238,11 @@ send:
 	if (flags & TH_SYN)
 		th->th_win = htons((u_short)
 				(min(sbspace(&so->so_rcv), TCP_MAXWIN)));
-	else
+	else {
+		/* Avoid shrinking window with window scaling. */
+		recwin = roundup2(recwin, 1 << tp->rcv_scale);
 		th->th_win = htons((u_short)(recwin >> tp->rcv_scale));
+	}
 
 	/*
 	 * Adjust the RXWIN0SENT flag - indicate that we have advertised
@@ -1908,8 +1911,8 @@ tcp_m_copym(struct mbuf *m, int32_t off0, int32_t *plen,
 	top = NULL;
 	pkthdrlen = NULL;
 #ifdef KERN_TLS
-	if (hw_tls && (m->m_flags & M_NOMAP))
-		tls = m->m_ext_pgs.tls;
+	if (hw_tls && (m->m_flags & M_EXTPG))
+		tls = m->m_epg_tls;
 	else
 		tls = NULL;
 	start = m;
@@ -1925,8 +1928,8 @@ tcp_m_copym(struct mbuf *m, int32_t off0, int32_t *plen,
 		}
 #ifdef KERN_TLS
 		if (hw_tls) {
-			if (m->m_flags & M_NOMAP)
-				ntls = m->m_ext_pgs.tls;
+			if (m->m_flags & M_EXTPG)
+				ntls = m->m_epg_tls;
 			else
 				ntls = NULL;
 
@@ -1958,14 +1961,14 @@ tcp_m_copym(struct mbuf *m, int32_t off0, int32_t *plen,
 		mlen = min(len, m->m_len - off);
 		if (seglimit) {
 			/*
-			 * For M_NOMAP mbufs, add 3 segments
+			 * For M_EXTPG mbufs, add 3 segments
 			 * + 1 in case we are crossing page boundaries
 			 * + 2 in case the TLS hdr/trailer are used
 			 * It is cheaper to just add the segments
 			 * than it is to take the cache miss to look
 			 * at the mbuf ext_pgs state in detail.
 			 */
-			if (m->m_flags & M_NOMAP) {
+			if (m->m_flags & M_EXTPG) {
 				fragsize = min(segsize, PAGE_SIZE);
 				frags = 3;
 			} else {
@@ -2020,7 +2023,7 @@ tcp_m_copym(struct mbuf *m, int32_t off0, int32_t *plen,
 		}
 		n->m_len = mlen;
 		len_cp += n->m_len;
-		if (m->m_flags & M_EXT) {
+		if (m->m_flags & (M_EXT|M_EXTPG)) {
 			n->m_data = m->m_data + off;
 			mb_dupcl(n, m);
 		} else

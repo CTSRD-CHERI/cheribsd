@@ -98,8 +98,9 @@ struct tls_mac_data {
 #define	TLS_MINOR_VER_TWO	3	/* 3, 3 */
 #define	TLS_MINOR_VER_THREE	4	/* 3, 4 */
 
-/* For TCP_TXTLS_ENABLE */
-struct tls_enable {
+/* For TCP_TXTLS_ENABLE and TCP_RXTLS_ENABLE. */
+#ifdef _KERNEL
+struct tls_enable_v0 {
 	const uint8_t *cipher_key;
 	const uint8_t *iv;		/* Implicit IV. */
 	const uint8_t *auth_key;
@@ -112,6 +113,33 @@ struct tls_enable {
 	uint8_t tls_vmajor;
 	uint8_t tls_vminor;
 };
+#endif
+
+struct tls_enable {
+	const uint8_t *cipher_key;
+	const uint8_t *iv;		/* Implicit IV. */
+	const uint8_t *auth_key;
+	int	cipher_algorithm;	/* e.g. CRYPTO_AES_CBC */
+	int	cipher_key_len;
+	int	iv_len;
+	int	auth_algorithm;		/* e.g. CRYPTO_SHA2_256_HMAC */
+	int	auth_key_len;
+	int	flags;
+	uint8_t tls_vmajor;
+	uint8_t tls_vminor;
+	uint8_t rec_seq[8];
+};
+
+/* Structure for TLS_GET_RECORD. */
+struct tls_get_record {
+	/* TLS record header. */
+	uint8_t  tls_type;
+	uint8_t  tls_vmajor;
+	uint8_t  tls_vminor;
+	uint16_t tls_length;
+};
+
+#ifdef _KERNEL
 
 struct tls_session_params {
 	uint8_t *cipher_key;
@@ -131,7 +159,9 @@ struct tls_session_params {
 	uint8_t flags;
 };
 
-#ifdef _KERNEL
+/* Used in APIs to request RX vs TX sessions. */
+#define	KTLS_TX		1
+#define	KTLS_RX		2
 
 #define	KTLS_API_VERSION 6
 
@@ -139,7 +169,6 @@ struct iovec;
 struct ktls_session;
 struct m_snd_tag;
 struct mbuf;
-struct mbuf_ext_pgs;
 struct sockbuf;
 struct socket;
 
@@ -175,13 +204,15 @@ struct ktls_session {
 
 int ktls_crypto_backend_register(struct ktls_crypto_backend *be);
 int ktls_crypto_backend_deregister(struct ktls_crypto_backend *be);
+int ktls_enable_rx(struct socket *so, struct tls_enable *en);
 int ktls_enable_tx(struct socket *so, struct tls_enable *en);
 void ktls_destroy(struct ktls_session *tls);
 void ktls_frame(struct mbuf *m, struct ktls_session *tls, int *enqueue_cnt,
     uint8_t record_type);
 void ktls_seq(struct sockbuf *sb, struct mbuf *m);
 void ktls_enqueue(struct mbuf *m, struct socket *so, int page_count);
-void ktls_enqueue_to_free(struct mbuf_ext_pgs *pgs);
+void ktls_enqueue_to_free(struct mbuf *m);
+int ktls_get_rx_mode(struct socket *so);
 int ktls_set_tx_mode(struct socket *so, int mode);
 int ktls_get_tx_mode(struct socket *so);
 int ktls_output_eagain(struct inpcb *inp, struct ktls_session *tls);

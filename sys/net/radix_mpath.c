@@ -57,7 +57,7 @@ __FBSDID("$FreeBSD$");
 #include <net/route.h>
 #include <net/route/nhop.h>
 #include <net/route/shared.h>
-#include <net/route_var.h>
+#include <net/route/route_var.h>
 #include <net/route/nhop.h>
 #include <net/if.h>
 #include <net/if_var.h>
@@ -183,6 +183,7 @@ rt_mpath_conflict(struct rib_head *rnh, struct rtentry *rt,
     struct sockaddr *netmask)
 {
 	struct radix_node *rn, *rn1;
+	struct nhop_object *nh, *nh1;
 	struct rtentry *rt1;
 
 	rn = (struct radix_node *)rt;
@@ -198,15 +199,17 @@ rt_mpath_conflict(struct rib_head *rnh, struct rtentry *rt,
 		if (rn1 == rn)
 			continue;
         
-		if (rt1->rt_gateway->sa_family == AF_LINK) {
-			if (rt1->rt_ifa->ifa_addr->sa_len != rt->rt_ifa->ifa_addr->sa_len ||
-			    bcmp(rt1->rt_ifa->ifa_addr, rt->rt_ifa->ifa_addr, 
-			    rt1->rt_ifa->ifa_addr->sa_len))
+		nh = rt->rt_nhop;
+		nh1 = rt1->rt_nhop;
+
+		if (nh1->gw_sa.sa_family == AF_LINK) {
+			if (nh1->nh_ifa->ifa_addr->sa_len != nh->nh_ifa->ifa_addr->sa_len ||
+			    bcmp(nh1->nh_ifa->ifa_addr, nh->nh_ifa->ifa_addr, 
+			    nh1->nh_ifa->ifa_addr->sa_len))
 				continue;
 		} else {
-			if (rt1->rt_gateway->sa_len != rt->rt_gateway->sa_len ||
-			    bcmp(rt1->rt_gateway, rt->rt_gateway,
-			    rt1->rt_gateway->sa_len))
+			if (nh1->gw_sa.sa_len != nh->gw_sa.sa_len ||
+			    bcmp(&nh1->gw_sa, &nh->gw_sa, nh1->gw_sa.sa_len))
 				continue;
 		}
 
@@ -254,46 +257,6 @@ rt_mpath_select(struct rtentry *rte, uint32_t hash)
 		return (rte);
 
 	return (rt_mpath_selectrte(rte, hash));
-}
-
-void
-rtalloc_mpath_fib(struct route *ro, uint32_t hash, u_int fibnum)
-{
-	struct rtentry *rt, *rt_tmp;
-
-	/*
-	 * XXX we don't attempt to lookup cached route again; what should
-	 * be done for sendto(3) case?
-	 */
-	if (ro->ro_nh && RT_LINK_IS_UP(ro->ro_nh->nh_ifp))
-		return;				 
-	ro->ro_nh = NULL;
-	rt_tmp = rtalloc1_fib(&ro->ro_dst, 1, 0, fibnum);
-
-	/* if the route does not exist or it is not multipath, don't care */
-	if (rt_tmp == NULL)
-		return;
-	if (rn_mpath_next((struct radix_node *)rt_tmp) == NULL) {
-		ro->ro_nh = rt_tmp->rt_nhop;
-		nhop_ref_object(ro->ro_nh);
-		RT_UNLOCK(rt_tmp);
-		return;
-	}
-
-	rt = rt_mpath_selectrte(rt_tmp, hash);
-	/* XXX try filling rt_gwroute and avoid unreachable gw  */
-
-	/* gw selection has failed - there must be only zero weight routes */
-	if (!rt) {
-		RT_UNLOCK(rt_tmp);
-		return;
-	}
-	if (rt_tmp != rt) {
-		RTFREE_LOCKED(rt_tmp);
-		ro->ro_nh = rt->rt_nhop;
-		nhop_ref_object(ro->ro_nh);
-	} else
-		RT_UNLOCK(rt_tmp);
 }
 
 void

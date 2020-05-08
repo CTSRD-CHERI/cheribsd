@@ -624,7 +624,7 @@ sbtls_recover_record(struct mbuf *mb, int wait, uint32_t tcp_old, uint32_t *ptcp
 
 	/* check format of incoming mbuf */
 	if (mb->m_next == NULL ||
-	    (mb->m_next->m_flags & (M_NOMAP | M_EXT)) != (M_NOMAP | M_EXT)) {
+	    (mb->m_next->m_flags & (M_EXTPG | M_EXT)) != (M_EXTPG | M_EXT)) {
 		top = NULL;
 		goto done;
 	}
@@ -680,13 +680,11 @@ done:
 static int
 mlx5e_sq_tls_populate(struct mbuf *mb, uint64_t *pseq)
 {
-	struct mbuf_ext_pgs *ext_pgs;
 
 	for (; mb != NULL; mb = mb->m_next) {
-		if (!(mb->m_flags & M_NOMAP))
+		if (!(mb->m_flags & M_EXTPG))
 			continue;
-		ext_pgs = &mb->m_ext_pgs;
-		*pseq = ext_pgs->seqno;
+		*pseq = mb->m_epg_seqno;
 		return (1);
 	}
 	return (0);

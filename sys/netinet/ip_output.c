@@ -68,9 +68,6 @@ __FBSDID("$FreeBSD$");
 #include <net/pfil.h>
 #include <net/route.h>
 #include <net/route/nhop.h>
-#ifdef RADIX_MPATH
-#include <net/radix_mpath.h>
-#endif
 #include <net/rss_config.h>
 #include <net/vnet.h>
 
@@ -233,7 +230,7 @@ ip_output_send(struct inpcb *inp, struct ifnet *ifp, struct mbuf *m,
 	 * dropping the mbuf's reference) in if_output.
 	 */
 	if (m->m_next != NULL && mbuf_has_tls_session(m->m_next)) {
-		tls = ktls_hold(m->m_next->m_ext_pgs.tls);
+		tls = ktls_hold(m->m_next->m_epg_tls);
 		mst = tls->snd_tag;
 
 		/*
@@ -470,14 +467,15 @@ again:
 			 * layer, as this is probably required in all cases
 			 * for correct operation (as it is for ARP).
 			 */
+			uint32_t flowid;
 #ifdef RADIX_MPATH
-			rtalloc_mpath_fib(ro,
-			    ntohl(ip->ip_src.s_addr ^ ip->ip_dst.s_addr),
-			    fibnum);
+			flowid = ntohl(ip->ip_src.s_addr ^ ip->ip_dst.s_addr);
 #else
-			ro->ro_nh = fib4_lookup(fibnum, dst->sin_addr, 0,
-			    NHR_REF, m->m_pkthdr.flowid);
+			flowid = m->m_pkthdr.flowid;
 #endif
+			ro->ro_nh = fib4_lookup(fibnum, dst->sin_addr, 0,
+			    NHR_REF, flowid);
+
 			if (ro->ro_nh == NULL || (!NH_IS_VALID(ro->ro_nh)) ||
 			    !RT_LINK_IS_UP(ro->ro_nh->nh_ifp)) {
 #if defined(IPSEC) || defined(IPSEC_SUPPORT)

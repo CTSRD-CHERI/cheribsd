@@ -124,34 +124,30 @@ sbready_compress(struct sockbuf *sb, struct mbuf *m0, struct mbuf *end)
 #ifdef KERN_TLS
 		/* Try to coalesce adjacent ktls mbuf hdr/trailers. */
 		if ((n != NULL) && (n != end) && (m->m_flags & M_EOR) == 0 &&
-		    (m->m_flags & M_NOMAP) &&
-		    (n->m_flags & M_NOMAP) &&
+		    (m->m_flags & M_EXTPG) &&
+		    (n->m_flags & M_EXTPG) &&
 		    !mbuf_has_tls_session(m) &&
 		    !mbuf_has_tls_session(n)) {
-			struct mbuf_ext_pgs *mpgs, *npgs;
 			int hdr_len, trail_len;
 
-			mpgs = &m->m_ext_pgs;
-			npgs = &n->m_ext_pgs;
-			hdr_len = npgs->hdr_len;
-			trail_len = mpgs->trail_len;
+			hdr_len = n->m_epg_hdrlen;
+			trail_len = m->m_epg_trllen;
 			if (trail_len != 0 && hdr_len != 0 &&
 			    trail_len + hdr_len <= MBUF_PEXT_TRAIL_LEN) {
 				/* copy n's header to m's trailer */
 				memcpy(&m->m_epg_trail[trail_len],
 				    n->m_epg_hdr, hdr_len);
-				mpgs->trail_len += hdr_len;
+				m->m_epg_trllen += hdr_len;
 				m->m_len += hdr_len;
-				npgs->hdr_len = 0;
+				n->m_epg_hdrlen = 0;
 				n->m_len -= hdr_len;
 			}
 		}
 #endif
 
 		/* Compress small unmapped mbufs into plain mbufs. */
-		if ((m->m_flags & M_NOMAP) && m->m_len <= MLEN &&
+		if ((m->m_flags & M_EXTPG) && m->m_len <= MLEN &&
 		    !mbuf_has_tls_session(m)) {
-			MPASS(m->m_flags & M_EXT);
 			ext_size = m->m_ext.ext_size;
 			if (mb_unmapped_compress(m) == 0) {
 				sb->sb_mbcnt -= ext_size;
@@ -161,7 +157,7 @@ sbready_compress(struct sockbuf *sb, struct mbuf *m0, struct mbuf *end)
 
 		while ((n != NULL) && (n != end) && (m->m_flags & M_EOR) == 0 &&
 		    M_WRITABLE(m) &&
-		    (m->m_flags & M_NOMAP) == 0 &&
+		    (m->m_flags & M_EXTPG) == 0 &&
 		    !mbuf_has_tls_session(n) &&
 		    !mbuf_has_tls_session(m) &&
 		    n->m_len <= MCLBYTES / 4 && /* XXX: Don't copy too much */
@@ -193,8 +189,8 @@ sbready_compress(struct sockbuf *sb, struct mbuf *m0, struct mbuf *end)
 
 /*
  * Mark ready "count" units of I/O starting with "m".  Most mbufs
- * count as a single unit of I/O except for EXT_PGS-backed mbufs which
- * can be backed by multiple pages.
+ * count as a single unit of I/O except for M_EXTPG mbufs which
+ * are backed by multiple pages.
  */
 int
 sbready(struct sockbuf *sb, struct mbuf *m0, int count)
@@ -212,15 +208,14 @@ sbready(struct sockbuf *sb, struct mbuf *m0, int count)
 	while (count > 0) {
 		KASSERT(m->m_flags & M_NOTREADY,
 		    ("%s: m %p !M_NOTREADY", __func__, m));
-		if ((m->m_flags & M_EXT) != 0 &&
-		    m->m_ext.ext_type == EXT_PGS) {
-			if (count < m->m_ext_pgs.nrdy) {
-				m->m_ext_pgs.nrdy -= count;
+		if ((m->m_flags & M_EXTPG) != 0) {
+			if (count < m->m_epg_nrdy) {
+				m->m_epg_nrdy -= count;
 				count = 0;
 				break;
 			}
-			count -= m->m_ext_pgs.nrdy;
-			m->m_ext_pgs.nrdy = 0;
+			count -= m->m_epg_nrdy;
+			m->m_epg_nrdy = 0;
 		} else
 			count--;
 
@@ -1175,7 +1170,7 @@ sbcompress(struct sockbuf *sb, struct mbuf *m, struct mbuf *n)
 		    M_WRITABLE(n) &&
 		    ((sb->sb_flags & SB_NOCOALESCE) == 0) &&
 		    !(m->m_flags & M_NOTREADY) &&
-		    !(n->m_flags & (M_NOTREADY | M_NOMAP)) &&
+		    !(n->m_flags & (M_NOTREADY | M_EXTPG)) &&
 		    !mbuf_has_tls_session(m) &&
 		    !mbuf_has_tls_session(n) &&
 		    m->m_len <= MCLBYTES / 4 && /* XXX: Don't copy too much */
@@ -1192,7 +1187,7 @@ sbcompress(struct sockbuf *sb, struct mbuf *m, struct mbuf *n)
 			m = m_free(m);
 			continue;
 		}
-		if (m->m_len <= MLEN && (m->m_flags & M_NOMAP) &&
+		if (m->m_len <= MLEN && (m->m_flags & M_EXTPG) &&
 		    (m->m_flags & M_NOTREADY) == 0 &&
 		    !mbuf_has_tls_session(m))
 			(void)mb_unmapped_compress(m);
