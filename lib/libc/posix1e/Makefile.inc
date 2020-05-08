@@ -11,7 +11,6 @@ subr_acl_nfs4.c: ${SRCTOP}/sys/kern/subr_acl_nfs4.c
 CONFS+=	posix1e/mac.conf
 SRCS+=	acl_branding.c			\
 	acl_calc_mask.c			\
-	acl_compat.c			\
 	acl_copy.c			\
 	acl_delete.c			\
 	acl_delete_entry.c		\
@@ -37,6 +36,9 @@ SRCS+=	acl_branding.c			\
 	mac_get.c			\
 	mac_set.c			\
 	subr_acl_nfs4.c
+.if ${MK_SYMVER} == yes
+SRCS+=	acl_compat.c
+.endif
 
 SYM_MAPS+=${LIBC_SRCTOP}/posix1e/Symbol.map
 
