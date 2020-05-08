@@ -64,6 +64,7 @@ __DEFAULT_YES_OPTIONS = \
     PIE \
     PROFILE \
     SSP \
+    SYMVER \
     TESTS \
     TOOLCHAIN \
     WARNS
