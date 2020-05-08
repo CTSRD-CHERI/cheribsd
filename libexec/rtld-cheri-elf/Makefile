@@ -95,7 +95,6 @@ BUILDING_RTLD_CHERI_ELF=yes
 SIMPLE_PRINTF_PREFIX=rtld
 .include "${SRCTOP}/lib/libsimple_printf/Makefile.inc"
 
-.if ${MK_SYMVER} == "yes"
 # LIBCSRCDIR does not appear to be set correctly for libcheribuildenv
 LIBCSRCDIR=	${SRCTOP}/lib/libc
 VERSION_DEF=	${LIBCSRCDIR}/Versions.def
@@ -105,7 +104,6 @@ LDFLAGS+=	-Wl,--version-script=${VERSION_MAP}
 
 .if exists(${RTLD_CHERI_ELF_DIR}/${RTLD_ARCH}/Symbol.map)
 SYMBOL_MAPS+=	${RTLD_CHERI_ELF_DIR}/${RTLD_ARCH}/Symbol.map
-.endif
 .endif
 
 .sinclude "${RTLD_CHERI_ELF_DIR}/${RTLD_ARCH}/Makefile.inc"
