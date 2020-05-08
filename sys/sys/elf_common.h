@@ -1372,6 +1372,8 @@ enum MipsCheriFlags {
 #define	R_RISCV_SET8		54
 #define	R_RISCV_SET16		55
 #define	R_RISCV_SET32		56
+#define	R_RISCV_32_PCREL	57
+#define	R_RISCV_IRELATIVE	58
 
 /* Relocation types added by CHERI used by the dynamic linker */
 #define	R_RISCV_CHERI_CAPABILITY		193
