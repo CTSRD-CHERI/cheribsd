@@ -11,19 +11,16 @@ properties([disableConcurrentBuilds(),
 
 jobs = [:]
 
-["mips-nocheri", "cheri", "purecap", "riscv64", "riscv64-hybrid", "riscv64-purecap", "native"].each { suffix ->
+["mips-nocheri", "mips-hybrid", "mips-purecap", "riscv64", "riscv64-hybrid", "riscv64-purecap", "native"].each { suffix ->
     String name = "cheribsd-${suffix}"
     jobs[name] = { ->
         cheribuildProject(target: "cheribsd-${suffix}", architecture: suffix,
                 extraArgs: '--cheribsd/build-options=-s --cheribsd/no-debug-info',
-                skipArchiving: true,
+                skipArchiving: true, skipTarball: true,
                 sdkCompilerOnly: true, // We only need clang not the CheriBSD sysroot since we are building that.
                 customGitCheckoutDir: 'cheribsd',
                 gitHubStatusContext: "ci/${suffix}",
                 runTests: false, /* TODO: run cheritest */)
-         if (env.CHANGE_ID) {
-             deleteDir() // Avoid using up all Jenkins disk space
-         }
     }
 }
 

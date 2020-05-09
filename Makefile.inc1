@@ -895,17 +895,14 @@ XCFLAGS+=	${BFLAGS}
 
 .if ${MK_COMPAT_CHERIABI} == "yes"
 _LIBCOMPAT=CHERI
-.include "Makefile.libcompat"
 .elif ${MK_LIB32} == "yes"
 _LIBCOMPAT= 32
-.include "Makefile.libcompat"
 .elif ${MK_LIB64} == "yes"
 _LIBCOMPAT=64
-.include "Makefile.libcompat"
 .elif ${MK_LIBSOFT} == "yes"
 _LIBCOMPAT= SOFT
-.include "Makefile.libcompat"
 .endif
+.include "Makefile.libcompat"
 
 # META_MODE normally ignores host file changes since every build updates
 # timestamps (see NO_META_IGNORE_HOST in sys.mk).  There are known times
