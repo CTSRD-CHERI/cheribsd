@@ -35,13 +35,31 @@ __FBSDID("$FreeBSD$");
 #include <sys/types.h>
 #define	_WANT_MIPS_REGNUM
 #include <sys/ptrace.h>
-
+#ifdef __mips__
+#include <machine/regnum.h>
+#endif
 #include <err.h>
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
 
 #include "_libproc.h"
+
+#if __has_feature(capabilities)
+#include <cheri/cheric.h>
+#include <cheri/cheri.h>
+
+static int
+get_pcc_base(struct proc_handle *phdl)
+{
+	struct capreg capregs;
+
+	if (ptrace(PT_GETCAPREGS, proc_getpid(phdl), (caddr_t)&capregs, 0) < 0)
+		return (-1);
+
+	return cheri_getbase(((struct cheri_frame *)&capregs)->cf_pcc);
+}
+#endif
 
 int
 proc_regget(struct proc_handle *phdl, proc_reg_t reg, unsigned long *regvalue)
@@ -68,6 +86,9 @@ proc_regget(struct proc_handle *phdl, proc_reg_t reg, unsigned long *regvalue)
 		*regvalue = regs.r_eip;
 #elif defined(__mips__)
 		*regvalue = regs.r_regs[PC];
+#if __has_feature(capabilities)
+		*regvalue += get_pcc_base(phdl);
+#endif
 #elif defined(__powerpc__)
 		*regvalue = regs.pc;
 #elif defined(__riscv)
@@ -123,6 +144,9 @@ proc_regset(struct proc_handle *phdl, proc_reg_t reg, unsigned long regvalue)
 		regs.r_eip = regvalue;
 #elif defined(__mips__)
 		regs.r_regs[PC] = regvalue;
+#if __has_feature(capabilities)
+		regs.r_regs[PC] -= get_pcc_base(phdl);
+#endif
 #elif defined(__powerpc__)
 		regs.pc = regvalue;
 #elif defined(__riscv)
