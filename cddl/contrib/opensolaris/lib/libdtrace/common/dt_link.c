@@ -433,6 +433,8 @@ prepare_elf64(dtrace_hdl_t *dtp, const dof_hdr_t *dof, dof_elf64_t *dep)
 /* XXX */
 #elif defined(__mips__)
 /* XXX */
+			printf("%s:%s(%d): MIPS not implemented\n",
+			       __FUNCTION__, __FILE__, __LINE__);
 #elif defined(__powerpc__)
 			rel->r_offset = s->dofs_offset +
 			    dofr[j].dofr_offset;
