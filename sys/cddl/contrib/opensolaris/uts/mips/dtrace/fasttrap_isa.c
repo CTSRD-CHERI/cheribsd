@@ -49,6 +49,7 @@
 #include <cddl/compat/opensolaris/sys/proc.h>
 #include <cddl/contrib/opensolaris/uts/common/sys/fasttrap.h>
 #include <cddl/contrib/opensolaris/uts/common/sys/dtrace.h>
+#include <machine/regnum.h>
 
 /*
  * This is not a complete implementation of fasttrap, but only aims at catching
@@ -207,7 +208,7 @@ fasttrap_pid_probe(struct trapframe *frame)
 	struct capreg creg, *crp;
 	struct rm_priotracker tracker;
 	proc_t *p = curproc;
-	uintcap_t pcc;
+	uintptr_t pc;
 	uintptr_t new_pc = 0;
 	fasttrap_bucket_t *bucket;
 	fasttrap_tracepoint_t *tp, tp_local;
@@ -220,7 +221,7 @@ fasttrap_pid_probe(struct trapframe *frame)
 
 	rp = &reg;
 	crp = &creg;
-	pcc = TRAPF_PC(frame);
+	pc = TRAPF_PC(frame);
 
 	/*
 	 * It's possible that a user (in a veritable orgy of bad planning)
@@ -230,7 +231,7 @@ fasttrap_pid_probe(struct trapframe *frame)
 	 */
 	if (curthread->t_dtrace_step) {
 		ASSERT(curthread->t_dtrace_on);
-		fasttrap_sigtrap(p, curthread, pcc);
+		fasttrap_sigtrap(p, curthread, pc);
 		return (0);
 	}
 
@@ -245,13 +246,13 @@ fasttrap_pid_probe(struct trapframe *frame)
 
 	rm_rlock(&fasttrap_tp_lock, &tracker);
 	pid = p->p_pid;
-	bucket = &fasttrap_tpoints.fth_table[FASTTRAP_TPOINTS_INDEX(pid, pcc)];
+	bucket = &fasttrap_tpoints.fth_table[FASTTRAP_TPOINTS_INDEX(pid, pc)];
 
 	/*
 	 * Lookup the tracepoint that the process just hit.
 	 */
 	for (tp = bucket->ftb_data; tp != NULL; tp = tp->ftt_next) {
-		if (pid == tp->ftt_pid && pcc == tp->ftt_pc &&
+		if (pid == tp->ftt_pid && pc == tp->ftt_pc &&
 		    tp->ftt_proc->ftpc_acount != 0)
 			break;
 	}
@@ -336,7 +337,7 @@ fasttrap_pid_probe(struct trapframe *frame)
 		printf("IMPLEMENT ME: %s(%d)\n", __func__,__LINE__);
 
 		//rp->fixreg[3] = 1
-		//new_pc = crp->pc + 4;
+		new_pc = pc + 4;
 		goto done;
 	}
 
@@ -377,19 +378,19 @@ done:
 		 * need to wait until the user thread returns to the kernel.
 		 */
 		if (tp->ftt_type != FASTTRAP_T_COMMON) {
-			fasttrap_return_common(rp, pcc, pid, new_pc);
+			fasttrap_return_common(rp, pc, pid, new_pc);
 		} else {
 			// TODO(nicomazz): is this code complete?
 			ASSERT(curthread->t_dtrace_ret != 0);
-			ASSERT(curthread->t_dtrace_pc == pcc);
+			ASSERT(curthread->t_dtrace_pc == pc);
 			ASSERT(curthread->t_dtrace_scrpc != 0);
 			ASSERT(new_pc == curthread->t_dtrace_astpc);
 		}
 	}
 
 	TRAPF_PC_SET_ADDR(frame, new_pc);
+	rp->r_regs[PT_REGS_PC] = TRAPF_PC(frame);
 	set_regs(curthread, rp);
-	set_capregs(curthread, crp);
 	return (0);
 }
 
