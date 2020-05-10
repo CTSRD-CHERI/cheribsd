@@ -32,7 +32,7 @@
 #ifndef _AMD64_LINUX_H_
 #define	_AMD64_LINUX_H_
 
-#include <sys/compat.h>
+#include <sys/abi_compat.h>
 
 #include <compat/linux/linux.h>
 #include <amd64/linux/linux_syscall.h>

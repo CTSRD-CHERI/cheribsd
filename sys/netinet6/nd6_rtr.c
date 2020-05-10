@@ -59,7 +59,8 @@ __FBSDID("$FreeBSD$");
 #include <net/if_types.h>
 #include <net/if_dl.h>
 #include <net/route.h>
-#include <net/route_var.h>
+#include <net/route/nhop.h>
+#include <net/route/route_var.h>
 #include <net/radix.h>
 #include <net/vnet.h>
 
@@ -603,14 +604,6 @@ nd6_ra_input(struct mbuf *m, int off, int icmp6len)
 	m_freem(m);
 }
 
-/* tell the change to user processes watching the routing socket. */
-static void
-nd6_rtmsg(int cmd, struct rtentry *rt)
-{
-
-	rt_routemsg(cmd, rt, rt->rt_ifp, 0, rt->rt_fibnum);
-}
-
 /* PFXRTR */
 static struct nd_pfxrouter *
 pfxrtr_lookup(struct nd_prefix *pr, struct nd_defrouter *dr)
@@ -681,6 +674,7 @@ defrouter_addreq(struct nd_defrouter *new)
 {
 	struct sockaddr_in6 def, mask, gate;
 	struct rtentry *newrt = NULL;
+	unsigned int fibnum;
 	int error;
 
 	bzero(&def, sizeof(def));
@@ -691,13 +685,14 @@ defrouter_addreq(struct nd_defrouter *new)
 	    sizeof(struct sockaddr_in6);
 	def.sin6_family = gate.sin6_family = AF_INET6;
 	gate.sin6_addr = new->rtaddr;
+	fibnum = new->ifp->if_fib;
 
 	error = in6_rtrequest(RTM_ADD, (struct sockaddr *)&def,
 	    (struct sockaddr *)&gate, (struct sockaddr *)&mask,
-	    RTF_GATEWAY, &newrt, new->ifp->if_fib);
+	    RTF_GATEWAY, &newrt, fibnum);
 	if (newrt) {
-		nd6_rtmsg(RTM_ADD, newrt); /* tell user process */
-		RTFREE(newrt);
+		rt_routemsg(RTM_ADD, newrt, new->ifp, 0, fibnum);
+		RTFREE_FUNC(newrt);
 	}
 	if (error == 0)
 		new->installed = 1;
@@ -713,6 +708,7 @@ defrouter_delreq(struct nd_defrouter *dr)
 {
 	struct sockaddr_in6 def, mask, gate;
 	struct rtentry *oldrt = NULL;
+	unsigned int fibnum;
 
 	bzero(&def, sizeof(def));
 	bzero(&mask, sizeof(mask));
@@ -722,13 +718,14 @@ defrouter_delreq(struct nd_defrouter *dr)
 	    sizeof(struct sockaddr_in6);
 	def.sin6_family = gate.sin6_family = AF_INET6;
 	gate.sin6_addr = dr->rtaddr;
+	fibnum = dr->ifp->if_fib;
 
 	in6_rtrequest(RTM_DELETE, (struct sockaddr *)&def,
 	    (struct sockaddr *)&gate,
-	    (struct sockaddr *)&mask, RTF_GATEWAY, &oldrt, dr->ifp->if_fib);
+	    (struct sockaddr *)&mask, RTF_GATEWAY, &oldrt, fibnum);
 	if (oldrt) {
-		nd6_rtmsg(RTM_DELETE, oldrt);
-		RTFREE(oldrt);
+		rt_routemsg(RTM_DELETE, oldrt, dr->ifp, 0, fibnum);
+		RTFREE_FUNC(oldrt);
 	}
 
 	dr->installed = 0;
@@ -787,7 +784,7 @@ defrouter_del(struct nd_defrouter *dr)
 
 
 struct nd_defrouter *
-defrouter_lookup_locked(struct in6_addr *addr, struct ifnet *ifp)
+defrouter_lookup_locked(const struct in6_addr *addr, struct ifnet *ifp)
 {
 	struct nd_defrouter *dr;
 
@@ -801,7 +798,7 @@ defrouter_lookup_locked(struct in6_addr *addr, struct ifnet *ifp)
 }
 
 struct nd_defrouter *
-defrouter_lookup(struct in6_addr *addr, struct ifnet *ifp)
+defrouter_lookup(const struct in6_addr *addr, struct ifnet *ifp)
 {
 	struct nd_defrouter *dr;
 
@@ -2009,7 +2006,7 @@ restart:
 static int
 nd6_prefix_onlink_rtrequest(struct nd_prefix *pr, struct ifaddr *ifa)
 {
-	struct sockaddr_dl sdl;
+	struct sockaddr_dl_short sdl;
 	struct rtentry *rt;
 	struct sockaddr_in6 mask6;
 	u_long rtflags;
@@ -2024,8 +2021,8 @@ nd6_prefix_onlink_rtrequest(struct nd_prefix *pr, struct ifaddr *ifa)
 	mask6.sin6_addr = pr->ndpr_mask;
 	rtflags = (ifa->ifa_flags & ~IFA_RTSELF) | RTF_UP;
 
-	bzero(&sdl, sizeof(struct sockaddr_dl));
-	sdl.sdl_len = sizeof(struct sockaddr_dl);
+	bzero(&sdl, sizeof(struct sockaddr_dl_short));
+	sdl.sdl_len = sizeof(struct sockaddr_dl_short);
 	sdl.sdl_family = AF_LINK;
 	sdl.sdl_type = ifa->ifa_ifp->if_type;
 	sdl.sdl_index = ifa->ifa_ifp->if_index;
@@ -2044,15 +2041,7 @@ nd6_prefix_onlink_rtrequest(struct nd_prefix *pr, struct ifaddr *ifa)
 		error = in6_rtrequest(RTM_ADD,
 		    (struct sockaddr *)&pr->ndpr_prefix, (struct sockaddr *)&sdl,
 		    (struct sockaddr *)&mask6, rtflags, &rt, fibnum);
-		if (error == 0) {
-			KASSERT(rt != NULL, ("%s: in6_rtrequest return no "
-			    "error(%d) but rt is NULL, pr=%p, ifa=%p", __func__,
-			    error, pr, ifa));
-			RT_LOCK(rt);
-			nd6_rtmsg(RTM_ADD, rt);
-			RT_UNLOCK(rt);
-			pr->ndpr_stateflags |= NDPRF_ONLINK;
-		} else {
+		if (error != 0) {
 			char ip6buf[INET6_ADDRSTRLEN];
 			char ip6bufg[INET6_ADDRSTRLEN];
 			char ip6bufm[INET6_ADDRSTRLEN];
@@ -2070,13 +2059,12 @@ nd6_prefix_onlink_rtrequest(struct nd_prefix *pr, struct ifaddr *ifa)
 
 			/* Save last error to return, see rtinit(). */
 			a_failure = error;
+			continue;
 		}
 
-		if (rt != NULL) {
-			RT_LOCK(rt);
-			RT_REMREF(rt);
-			RT_UNLOCK(rt);
-		}
+		pr->ndpr_stateflags |= NDPRF_ONLINK;
+		rt_routemsg(RTM_ADD, rt, pr->ndpr_ifp, 0, fibnum);
+		RTFREE_FUNC(rt);
 	}
 
 	/* Return the last error we got. */
@@ -2209,17 +2197,15 @@ nd6_prefix_offlink(struct nd_prefix *pr)
 		rt = NULL;
 		error = in6_rtrequest(RTM_DELETE, (struct sockaddr *)&sa6, NULL,
 		    (struct sockaddr *)&mask6, 0, &rt, fibnum);
-		if (error == 0) {
-			/* report the route deletion to the routing socket. */
-			if (rt != NULL)
-				nd6_rtmsg(RTM_DELETE, rt);
-		} else {
+		if (error != 0) {
 			/* Save last error to return, see rtinit(). */
 			a_failure = error;
+			continue;
 		}
-		if (rt != NULL) {
-			RTFREE(rt);
-		}
+
+		/* report route deletion to the routing socket. */
+		rt_routemsg(RTM_DELETE, rt, ifp, 0, fibnum);
+		RTFREE_FUNC(rt);
 	}
 	error = a_failure;
 	a_failure = 1;
@@ -2407,15 +2393,16 @@ in6_tmpifadd(const struct in6_ifaddr *ia0, int forcegen, int delay)
 }
 
 static int
-rt6_deleteroute(const struct rtentry *rt, void *arg)
+rt6_deleteroute(const struct rtentry *rt, const struct nhop_object *nh,
+    void *arg)
 {
-#define SIN6(s)	((struct sockaddr_in6 *)s)
 	struct in6_addr *gate = (struct in6_addr *)arg;
+	int nh_rt_flags;
 
-	if (rt->rt_gateway == NULL || rt->rt_gateway->sa_family != AF_INET6)
+	if (nh->gw_sa.sa_family != AF_INET6)
 		return (0);
 
-	if (!IN6_ARE_ADDR_EQUAL(gate, &SIN6(rt->rt_gateway)->sin6_addr)) {
+	if (!IN6_ARE_ADDR_EQUAL(gate, &nh->gw6_sa.sin6_addr)) {
 		return (0);
 	}
 
@@ -2424,14 +2411,15 @@ rt6_deleteroute(const struct rtentry *rt, void *arg)
 	 * XXX: this seems to be a bit ad-hoc. Should we consider the
 	 * 'cloned' bit instead?
 	 */
-	if ((rt->rt_flags & RTF_STATIC) != 0)
+	nh_rt_flags = nhop_get_rtflags(nh);
+	if ((nh_rt_flags & RTF_STATIC) != 0)
 		return (0);
 
 	/*
 	 * We delete only host route. This means, in particular, we don't
 	 * delete default route.
 	 */
-	if ((rt->rt_flags & RTF_HOST) == 0)
+	if ((nh_rt_flags & RTF_HOST) == 0)
 		return (0);
 
 	return (1);

@@ -81,7 +81,7 @@ cheri_exec_stack_pointer(struct image_params *imgp, uintcap_t stack)
 	    ("%s: rounded base (0x%zx) != base (0x%zx)", __func__,
 		CHERI_REPRESENTABLE_BASE(stackbase, stacklen), stackbase));
 	csp = cheri_setaddress((void * __capability)stack, stackbase);
-	csp = cheri_csetbounds(csp, stacklen);
+	csp = cheri_setbounds(csp, stacklen);
 	return (csp + stacklen);
 }
 
@@ -140,15 +140,6 @@ cheri_exec_pcc(struct image_params *imgp)
 	vm_offset_t code_start, code_end;
 	size_t code_length;
 
-#ifdef CHERIABI_LEGACY_SUPPORT
-#pragma message("Warning: Building kernel with LEGACY ABI support!")
-	/*
-	 * The legacy ABI needs a full address space $pcc (with base
-	 * == 0) to create code capabilities using cgetpccsetoffset
-	 */
-	code_start = CHERI_CAP_USER_CODE_BASE;
-	code_end = CHERI_CAP_USER_CODE_LENGTH;
-#else
 	/*
 	 * If we are executing a static binary we use end_addr as the
 	 * end of the text segment. If $pcc is the start of rtld we
@@ -170,7 +161,6 @@ cheri_exec_pcc(struct image_params *imgp)
 		code_start = imgp->reloc_base;
 	else
 		code_start = 0;
-#endif
 
 	/* Ensure CHERI128 representability */
 	code_length = code_end - code_start;
@@ -201,5 +191,5 @@ cheri_auxv_capability(struct image_params *imgp, uintcap_t stack)
 
 	auxv = ((void * __capability * __capability)stack +
 	    imgp->args->argc + 1 + imgp->args->envc + 1);
-	return (cheri_csetbounds(auxv, AT_COUNT * sizeof(Elf_Auxinfo)));
+	return (cheri_setbounds(auxv, AT_COUNT * sizeof(Elf_Auxinfo)));
 }

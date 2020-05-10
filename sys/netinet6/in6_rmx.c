@@ -64,6 +64,8 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
+#include "opt_mpath.h"
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -79,7 +81,9 @@ __FBSDID("$FreeBSD$");
 #include <net/if.h>
 #include <net/if_var.h>
 #include <net/route.h>
-#include <net/route_var.h>
+#include <net/route/route_var.h>
+#include <net/route/nhop.h>
+#include <net/route/shared.h>
 
 #include <netinet/in.h>
 #include <netinet/ip_var.h>
@@ -101,55 +105,41 @@ extern int	in6_inithead(void **head, int off, u_int fibnum);
 extern int	in6_detachhead(void **head, int off);
 #endif
 
-/*
- * Do what we need to do when inserting a route.
- */
-static struct radix_node *
-in6_addroute(void *v_arg, void *n_arg, struct radix_head *head,
-    struct radix_node *treenodes)
+static int
+rib6_preadd(u_int fibnum, const struct sockaddr *addr, const struct sockaddr *mask,
+    struct nhop_object *nh)
 {
-	struct rtentry *rt = (struct rtentry *)treenodes;
-	struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *)rt_key(rt);
+	uint16_t nh_type;
 
-	if (IN6_IS_ADDR_MULTICAST(&sin6->sin6_addr))
-		rt->rt_flags |= RTF_MULTICAST;
+	/* XXX: RTF_LOCAL */
 
 	/*
-	 * A little bit of help for both IPv6 output and input:
-	 *   For local addresses, we make sure that RTF_LOCAL is set,
-	 *   with the thought that this might one day be used to speed up
-	 *   ip_input().
-	 *
-	 * We also mark routes to multicast addresses as such, because
-	 * it's easy to do and might be useful (but this is much more
-	 * dubious since it's so easy to inspect the address).  (This
-	 * is done above.)
-	 *
-	 * XXX
-	 * should elaborate the code.
+	 * Check route MTU:
+	 * inherit interface MTU if not set or
+	 * check if MTU is too large.
 	 */
-	if (rt->rt_flags & RTF_HOST) {
-		if (IN6_ARE_ADDR_EQUAL(&satosin6(rt->rt_ifa->ifa_addr)
-					->sin6_addr,
-				       &sin6->sin6_addr)) {
-			rt->rt_flags |= RTF_LOCAL;
-		}
+	if (nh->nh_mtu == 0) {
+		nh->nh_mtu = IN6_LINKMTU(nh->nh_ifp);
+	} else if (nh->nh_mtu > IN6_LINKMTU(nh->nh_ifp))
+		nh->nh_mtu = IN6_LINKMTU(nh->nh_ifp);
+
+	/* Ensure that default route nhop has special flag */
+	const struct sockaddr_in6 *mask6 = (const struct sockaddr_in6 *)mask;
+	if ((nhop_get_rtflags(nh) & RTF_HOST) == 0 && mask6 != NULL &&
+	    IN6_IS_ADDR_UNSPECIFIED(&mask6->sin6_addr))
+		nh->nh_flags |= NHF_DEFAULT;
+
+	/* Set nexthop type */
+	if (nhop_get_type(nh) == 0) {
+		if (nh->nh_flags & NHF_GATEWAY)
+			nh_type = NH_TYPE_IPV6_ETHER_NHOP;
+		else
+			nh_type = NH_TYPE_IPV6_ETHER_RSLV;
+
+		nhop_set_type(nh, nh_type);
 	}
 
-	if (rt->rt_ifp != NULL) {
-
-		/*
-		 * Check route MTU:
-		 * inherit interface MTU if not set or
-		 * check if MTU is too large.
-		 */
-		if (rt->rt_mtu == 0) {
-			rt->rt_mtu = IN6_LINKMTU(rt->rt_ifp);
-		} else if (rt->rt_mtu > IN6_LINKMTU(rt->rt_ifp))
-			rt->rt_mtu = IN6_LINKMTU(rt->rt_ifp);
-	}
-
-	return (rn_addroute(v_arg, n_arg, head, treenodes));
+	return (0);
 }
 
 /*
@@ -166,7 +156,10 @@ in6_inithead(void **head, int off, u_int fibnum)
 	if (rh == NULL)
 		return (0);
 
-	rh->rnh_addaddr = in6_addroute;
+	rh->rnh_preadd = rib6_preadd;
+#ifdef	RADIX_MPATH
+	rt_mpath_init_rnh(rh);
+#endif
 	*head = (void *)rh;
 
 	return (1);
@@ -194,23 +187,3 @@ in6_rtrequest(int req, struct sockaddr *dst, struct sockaddr *gw,
 	return (rtrequest_fib(req, dst, gw, mask, flags, ret_nrt, fibnum));
 }
 
-void
-in6_rtalloc(struct route_in6 *ro, u_int fibnum)
-{
-
-	rtalloc_ign_fib((struct route *)ro, 0ul, fibnum);
-}
-
-void
-in6_rtalloc_ign(struct route_in6 *ro, u_long ignflags, u_int fibnum)
-{
-
-	rtalloc_ign_fib((struct route *)ro, ignflags, fibnum);
-}
-
-struct rtentry *
-in6_rtalloc1(struct sockaddr *dst, int report, u_long ignflags, u_int fibnum)
-{
-
-	return (rtalloc1_fib(dst, report, ignflags, fibnum));
-}

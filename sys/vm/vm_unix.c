@@ -183,7 +183,7 @@ kern_break(struct thread *td, uintptr_t *addr)
 			prot |= VM_PROT_EXECUTE;
 #endif
 		rv = vm_map_insert(map, NULL, 0, old, new, prot, VM_PROT_ALL,
-		    0);
+		    0, base);
 		if (rv == KERN_SUCCESS && (map->flags & MAP_WIREFUTURE) != 0) {
 			rv = vm_map_wire_locked(map, old, new,
 			    VM_MAP_WIRE_USER | VM_MAP_WIRE_NOHOLES);

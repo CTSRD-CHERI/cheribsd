@@ -355,7 +355,7 @@ MIASM =  \
 	freebsd64_jail_get.o \
 	freebsd64_jail_set.o \
 	jail_remove.o \
-	closefrom.o \
+	freebsd12_closefrom.o \
 	freebsd64___semctl.o \
 	freebsd64_msgctl.o \
 	freebsd64_shmctl.o \
@@ -416,4 +416,5 @@ MIASM =  \
 	freebsd64_shm_open2.o \
 	freebsd64_shm_rename.o \
 	freebsd64_sigfastblock.o \
-	freebsd64___realpathat.o
+	freebsd64___realpathat.o \
+	close_range.o

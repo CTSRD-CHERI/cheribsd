@@ -177,7 +177,7 @@ host_id_func(char *buffer, size_t *buffer_size, va_list ap, void *cache_mdata)
 	res_options = statp->options & (RES_RECURSE | RES_DEFNAMES |
 	    RES_DNSRCH | RES_NOALIASES | RES_USE_INET6);
 
-	lookup_type = (enum nss_lookup_type)cache_mdata;
+	lookup_type = (enum nss_lookup_type)(uintptr_t)cache_mdata;
 	switch (lookup_type) {
 	case nss_lt_name:
 		str = va_arg(ap, char *);
@@ -270,7 +270,7 @@ host_marshal_func(char *buffer, size_t *buffer_size, void *retval, va_list ap,
 
 	buffer = __builtin_assume_aligned(buffer, _Alignof(struct hostent));
 
-	switch ((enum nss_lookup_type)cache_mdata) {
+	switch ((enum nss_lookup_type)(uintptr_t)cache_mdata) {
 	case nss_lt_name:
 		str = va_arg(ap, char *);
 		type = va_arg(ap, int);
@@ -379,7 +379,7 @@ host_unmarshal_func(char *buffer, size_t buffer_size, void *retval, va_list ap,
 
 	buffer = __builtin_assume_aligned(buffer, _Alignof(struct hostent));
 
-	switch ((enum nss_lookup_type)cache_mdata) {
+	switch ((enum nss_lookup_type)(uintptr_t)cache_mdata) {
 	case nss_lt_name:
 		str = va_arg(ap, char *);
 		type = va_arg(ap, int);

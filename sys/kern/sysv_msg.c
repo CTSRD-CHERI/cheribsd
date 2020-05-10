@@ -66,7 +66,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/systm.h>
 #include <sys/sysproto.h>
 #if defined(COMPAT_CHERIABI) || defined(COMPAT_FREEBSD32) || defined(COMPAT_FREEBSD64)
-#include <sys/compat.h>
+#include <sys/abi_compat.h>
 #endif
 #include <sys/kernel.h>
 #include <sys/priv.h>

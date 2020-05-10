@@ -20,6 +20,7 @@ kern/pic_if.m			standard
 kern/subr_devmap.c		standard
 kern/subr_dummy_vdso_tc.c	standard
 kern/subr_intr.c		standard
+kern/subr_physmem.c		standard
 libkern/bcmp.c			standard
 libkern/bcopy.c			standard
 libkern/bcopy_c.c		optional	cpu_cheri
@@ -33,7 +34,6 @@ libkern/memcmp.c		standard
 libkern/memset.c		standard
 riscv/cheri/cheri_debug.c	optional	cpu_cheri ddb
 riscv/cheri/cheri_exception.c	optional	cpu_cheri
-riscv/cheri/cheri_ktrace.c	optional	cpu_cheri
 riscv/cheri/cheri_machdep.c	optional	cpu_cheri
 riscv/riscv/autoconf.c		standard
 riscv/riscv/bus_machdep.c	standard

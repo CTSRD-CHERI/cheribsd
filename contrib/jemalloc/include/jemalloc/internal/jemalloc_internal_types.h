@@ -14,6 +14,8 @@
  * CHERI CHANGES END
  */
 
+#include "jemalloc/internal/quantum.h"
+
 /* Page size index type. */
 typedef unsigned pszind_t;
 
@@ -62,87 +64,6 @@ typedef int malloc_cpuid_t;
 
 /* Smallest size class to support. */
 #define TINY_MIN		(1U << LG_TINY_MIN)
-
-/*
- * Minimum allocation alignment is 2^LG_QUANTUM bytes (ignoring tiny size
- * classes).
- */
-#ifndef LG_QUANTUM
-#  if (defined(__i386__) || defined(_M_IX86))
-#    define LG_QUANTUM		4
-#  endif
-#  ifdef __ia64__
-#    define LG_QUANTUM		4
-#  endif
-#  ifdef __alpha__
-#    define LG_QUANTUM		4
-#  endif
-#  if (defined(__sparc64__) || defined(__sparcv9) || defined(__sparc_v9__))
-#    define LG_QUANTUM		4
-#  endif
-#  if (defined(__amd64__) || defined(__x86_64__) || defined(_M_X64))
-#    define LG_QUANTUM		4
-#  endif
-#  ifdef __arm__
-#    define LG_QUANTUM		3
-#  endif
-#  ifdef __aarch64__
-#    define LG_QUANTUM		4
-#  endif
-#  ifdef __hppa__
-#    define LG_QUANTUM		4
-#  endif
-#  ifdef __m68k__
-#    define LG_QUANTUM		3
-#  endif
-#  ifdef __mips__
-#    if defined(__CHERI_PURE_CAPABILITY__) && _MIPS_SZCAP == 256
-#      define LG_QUANTUM	5
-#    elif defined(__CHERI_PURE_CAPABILITY__) && _MIPS_SZCAP == 128
-#      define LG_QUANTUM	4
-#    elif defined(__mips_n32) || defined(__mips_n64)
-#      define LG_QUANTUM	4
-#    else
-#      define LG_QUANTUM	3
-#    endif
-#  endif
-#  ifdef __nios2__
-#    define LG_QUANTUM		3
-#  endif
-#  ifdef __or1k__
-#    define LG_QUANTUM		3
-#  endif
-#  ifdef __powerpc__
-#    define LG_QUANTUM		4
-#  endif
-#  if defined(__riscv) || defined(__riscv__)
-#    define LG_QUANTUM		4
-#  endif
-#  ifdef __s390__
-#    define LG_QUANTUM		4
-#  endif
-#  if (defined (__SH3E__) || defined(__SH4_SINGLE__) || defined(__SH4__) || \
-	defined(__SH4_SINGLE_ONLY__))
-#    define LG_QUANTUM		4
-#  endif
-#  ifdef __tile__
-#    define LG_QUANTUM		4
-#  endif
-#  ifdef __le32__
-#    define LG_QUANTUM		4
-#  endif
-#  ifndef LG_QUANTUM
-#    error "Unknown minimum alignment for architecture; specify via "
-	 "--with-lg-quantum"
-#  endif
-#endif
-
-#define QUANTUM			((size_t)(1U << LG_QUANTUM))
-#define QUANTUM_MASK		(QUANTUM - 1)
-
-/* Return the smallest quantum multiple that is >= a. */
-#define QUANTUM_CEILING(a)						\
-	(((a) + QUANTUM_MASK) & ~QUANTUM_MASK)
 
 #define LONG			((size_t)(1U << LG_SIZEOF_LONG))
 #define LONG_MASK		(LONG - 1)

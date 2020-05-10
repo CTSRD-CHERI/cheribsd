@@ -12,6 +12,12 @@
 
 #define AS(name) (sizeof(struct name) / sizeof(syscallarg_t))
 
+#ifdef COMPAT_FREEBSD12
+#define compat12(n, name) n, (sy_call_t *)__CONCAT(freebsd12_,name)
+#else
+#define compat12(n, name) 0, (sy_call_t *)nosys
+#endif
+
 /* The casts are bogus but will do for now. */
 struct sysent cheriabi_sysent[] = {
 	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },		/* 0 = syscall */
@@ -496,7 +502,7 @@ struct sysent cheriabi_sysent[] = {
 	{ AS(cheriabi_truncate_args), (sy_call_t *)cheriabi_truncate, AUE_TRUNCATE, NULL, 0, 0, 0, SY_THR_STATIC },	/* 479 = cheriabi_truncate */
 	{ AS(ftruncate_args), (sy_call_t *)sys_ftruncate, AUE_FTRUNCATE, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 480 = ftruncate */
 	{ AS(thr_kill2_args), (sy_call_t *)sys_thr_kill2, AUE_THR_KILL2, NULL, 0, 0, 0, SY_THR_STATIC },	/* 481 = thr_kill2 */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 482 = obsolete freebsd12_shm_open */
+	{ compat12(AS(freebsd12_cheriabi_shm_open_args),cheriabi_shm_open), AUE_SHMOPEN, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 482 = freebsd12 cheriabi_shm_open */
 	{ AS(cheriabi_shm_unlink_args), (sy_call_t *)cheriabi_shm_unlink, AUE_SHMUNLINK, NULL, 0, 0, 0, SY_THR_STATIC },	/* 483 = cheriabi_shm_unlink */
 	{ AS(cheriabi_cpuset_args), (sy_call_t *)cheriabi_cpuset, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 484 = cheriabi_cpuset */
 	{ AS(cpuset_setid_args), (sy_call_t *)sys_cpuset_setid, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 485 = cpuset_setid */
@@ -523,7 +529,7 @@ struct sysent cheriabi_sysent[] = {
 	{ AS(cheriabi_jail_get_args), (sy_call_t *)cheriabi_jail_get, AUE_JAIL_GET, NULL, 0, 0, 0, SY_THR_STATIC },	/* 506 = cheriabi_jail_get */
 	{ AS(cheriabi_jail_set_args), (sy_call_t *)cheriabi_jail_set, AUE_JAIL_SET, NULL, 0, 0, 0, SY_THR_STATIC },	/* 507 = cheriabi_jail_set */
 	{ AS(jail_remove_args), (sy_call_t *)sys_jail_remove, AUE_JAIL_REMOVE, NULL, 0, 0, 0, SY_THR_STATIC },	/* 508 = jail_remove */
-	{ AS(closefrom_args), (sy_call_t *)sys_closefrom, AUE_CLOSEFROM, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 509 = closefrom */
+	{ compat12(AS(freebsd12_closefrom_args),closefrom), AUE_CLOSEFROM, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 509 = freebsd12 closefrom */
 	{ AS(cheriabi___semctl_args), (sy_call_t *)lkmressys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },	/* 510 = cheriabi___semctl */
 	{ AS(cheriabi_msgctl_args), (sy_call_t *)lkmressys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },	/* 511 = cheriabi_msgctl */
 	{ AS(cheriabi_shmctl_args), (sy_call_t *)lkmressys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },	/* 512 = cheriabi_shmctl */
@@ -589,4 +595,5 @@ struct sysent cheriabi_sysent[] = {
 	{ AS(cheriabi_shm_rename_args), (sy_call_t *)cheriabi_shm_rename, AUE_SHMRENAME, NULL, 0, 0, 0, SY_THR_STATIC },	/* 572 = cheriabi_shm_rename */
 	{ AS(cheriabi_sigfastblock_args), (sy_call_t *)cheriabi_sigfastblock, AUE_NULL, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 573 = cheriabi_sigfastblock */
 	{ AS(cheriabi___realpathat_args), (sy_call_t *)cheriabi___realpathat, AUE_REALPATHAT, NULL, 0, 0, 0, SY_THR_STATIC },	/* 574 = cheriabi___realpathat */
+	{ AS(close_range_args), (sy_call_t *)sys_close_range, AUE_NULL, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 575 = close_range */
 };

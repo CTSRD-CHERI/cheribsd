@@ -56,7 +56,7 @@ __FBSDID("$FreeBSD$");
 #endif
 
 #ifdef IPMICTL_SEND_COMMAND_32
-#include <sys/compat.h>
+#include <sys/abi_compat.h>
 #endif
 
 /*

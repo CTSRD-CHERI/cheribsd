@@ -43,13 +43,23 @@
 
 struct gctl_req_arg {
 	u_int				nlen;
-	char				*name;
+	union {
+#ifdef _KERNEL
+		char * __capability	user_name;
+#endif
+		char			*name;
+	};
 	off_t				offset;
 	int				flag;
 	int				len;
-	void				*value;
+	void * __kerncap		value;
 	/* kernel only fields */
-	void				*kvalue;
+	union {
+#ifdef _KERNEL
+		void * __capability	_dummy;
+#endif
+		void			*kvalue;
+	};
 };
 
 #define GCTL_PARAM_RD		1	/* Must match VM_PROT_READ */
@@ -66,14 +76,24 @@ struct gctl_req {
 	u_int				version;
 	u_int				serial;
 	u_int				narg;
-	struct gctl_req_arg		*arg;
+	union {
+#ifdef _KERNEL
+		struct gctl_req_arg* __capability user_arg;
+#endif
+		struct gctl_req_arg	*arg;
+	};
 	u_int				lerror;
-	char				*error;
-	struct gctl_req_table		*reqt;
+	char * __kerncap		error;
+	struct gctl_req_table* __kerncap reqt;
 
 	/* kernel only fields */
 	int				nerror;
-	struct sbuf			*serror;
+	union {
+#ifdef _KERNEL
+		void * __capability	_dummy;
+#endif
+		struct sbuf		*serror;
+	};
 };
 
 #define GEOM_CTL	_IOW('G', GCTL_VERSION, struct gctl_req)

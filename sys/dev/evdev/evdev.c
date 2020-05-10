@@ -66,7 +66,12 @@ enum evdev_sparse_result
 
 MALLOC_DEFINE(M_EVDEV, "evdev", "evdev memory");
 
-int evdev_rcpt_mask = EVDEV_RCPT_SYSMOUSE | EVDEV_RCPT_KBDMUX;
+/* adb keyboard driver used on powerpc does not support evdev yet */
+#if defined(__powerpc__) && !defined(__powerpc64__)
+int evdev_rcpt_mask = EVDEV_RCPT_KBDMUX | EVDEV_RCPT_HW_MOUSE;
+#else
+int evdev_rcpt_mask = EVDEV_RCPT_HW_MOUSE | EVDEV_RCPT_HW_KBD;
+#endif
 int evdev_sysmouse_t_axis = 0;
 
 SYSCTL_NODE(_kern, OID_AUTO, evdev, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
@@ -295,7 +300,7 @@ evdev_register_common(struct evdev_dev *evdev)
 	if (evdev_event_supported(evdev, EV_REP) &&
 	    bit_test(evdev->ev_flags, EVDEV_FLAG_SOFTREPEAT)) {
 		/* Initialize callout */
-		callout_init_mtx(&evdev->ev_rep_callout, &evdev->ev_mtx, 0);
+		callout_init_mtx(&evdev->ev_rep_callout, evdev->ev_lock, 0);
 
 		if (evdev->ev_rep[REP_DELAY] == 0 &&
 		    evdev->ev_rep[REP_PERIOD] == 0) {
@@ -358,7 +363,7 @@ evdev_register_mtx(struct evdev_dev *evdev, struct mtx *mtx)
 int
 evdev_unregister(struct evdev_dev *evdev)
 {
-	struct evdev_client *client;
+	struct evdev_client *client, *tmp;
 	int ret;
 	debugf(evdev, "%s: unregistered evdev provider: %s\n",
 	    evdev->ev_shortname, evdev->ev_name);
@@ -368,7 +373,7 @@ evdev_unregister(struct evdev_dev *evdev)
 	EVDEV_LOCK(evdev);
 	evdev->ev_cdev->si_drv1 = NULL;
 	/* Wake up sleepers */
-	LIST_FOREACH(client, &evdev->ev_clients, ec_link) {
+	LIST_FOREACH_SAFE(client, &evdev->ev_clients, ec_link, tmp) {
 		evdev_revoke_client(client);
 		evdev_dispose_client(evdev, client);
 		EVDEV_CLIENT_LOCKQ(client);
