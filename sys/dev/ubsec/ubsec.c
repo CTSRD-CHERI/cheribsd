@@ -472,6 +472,7 @@ skip_rng:
 		crypto_kregister(sc->sc_cid, CRK_MOD_EXP_CRT, 0);
 #endif
 	}
+	gone_in_dev(dev, 13, "Does not support modern crypto algorithms");
 	return (0);
 bad4:
 	while (!SIMPLEQ_EMPTY(&sc->sc_freequeue)) {
@@ -1043,15 +1044,7 @@ ubsec_process(device_t dev, struct cryptop *crp, int hint)
 
 		ctx.pc_flags |= htole16(UBS_PKTCTX_ENC_3DES);
 
-		if (crp->crp_flags & CRYPTO_F_IV_GENERATE) {
-			arc4rand(ctx.pc_iv, csp->csp_ivlen, 0);
-			crypto_copyback(crp, crp->crp_iv_start,
-			    csp->csp_ivlen, ctx.pc_iv);
-		} else if (crp->crp_flags & CRYPTO_F_IV_SEPARATE)
-			memcpy(ctx.pc_iv, crp->crp_iv, csp->csp_ivlen);
-		else
-			crypto_copydata(crp, crp->crp_iv_start, csp->csp_ivlen,
-			    ctx.pc_iv);
+		crypto_read_iv(crp, ctx.pc_iv);
 
 		if (!CRYPTO_OP_IS_ENCRYPT(crp->crp_op)) {
 			ctx.pc_flags |= htole16(UBS_PKTCTX_INBOUND);

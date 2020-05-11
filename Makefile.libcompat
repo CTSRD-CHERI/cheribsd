@@ -9,6 +9,19 @@ __<${_this:T}>__:
 # - 32-bit compat libraries on MIPS, PowerPC, and AMD64.
 # - 64-bit compat on CHERI MIPS
 
+_LC_LIBDIRS.yes=		lib
+_LC_LIBDIRS.yes+=		gnu/lib
+_LC_LIBDIRS.${MK_CDDL:tl}+=	cddl/lib
+_LC_LIBDIRS.${MK_CRYPT:tl}+=	secure/lib
+_LC_LIBDIRS.${MK_KERBEROS:tl}+=	kerberos5/lib
+
+_lc_distribute _lc_install: .PHONY
+.for _dir in ${_LC_LIBDIRS.yes}
+	${_+_}cd ${.CURDIR}/${_dir}; ${MAKE} ${.TARGET:S/^_lc_//}
+.endfor
+
+.if defined(_LIBCOMPAT)
+
 .include <bsd.compat.mk>
 
 # Yes, the flags are redundant.
@@ -56,15 +69,6 @@ LIBCOMPATWMAKE+=	${LIBCOMPATWMAKEENV} ${MAKE} ${LIBCOMPATWMAKEFLAGS} \
 LIBCOMPATIMAKE+=	${LIBCOMPATWMAKE:NINSTALL=*:NDESTDIR=*} \
 			${IMAKE_INSTALL} \
 			-DLIBRARIES_ONLY
-
-_LC_LIBDIRS.yes=		lib
-_LC_LIBDIRS.yes+=		gnu/lib
-# XXX: See src.opts.mk hack
-.if ${MK_COMPAT_CHERIABI} != "yes" || !${TARGET_ARCH:Mriscv64*}
-_LC_LIBDIRS.${MK_CDDL:tl}+=	cddl/lib
-.endif
-_LC_LIBDIRS.${MK_CRYPT:tl}+=	secure/lib
-_LC_LIBDIRS.${MK_KERBEROS:tl}+=	kerberos5/lib
 
 .if ${MK_FILE} != "no"
 _libmagic=	lib/libmagic
@@ -115,9 +119,8 @@ build${libcompat}: .PHONY
 .endif
 
 distribute${libcompat} install${libcompat}: .PHONY
-.for _dir in ${_LC_LIBDIRS.yes}
-	${_+_}cd ${.CURDIR}/${_dir}; ${LIBCOMPATIMAKE} ${.TARGET:S/${libcompat}$//}
-.endfor
+	${_+_}cd ${.CURDIR}; \
+	    ${LIBCOMPATIMAKE} -f Makefile.inc1 _lc_${.TARGET:S/${libcompat}$//}
 
 .if ${.TARGETS:Mlib${libcompat}buildenv}
 .if ${.MAKEFLAGS:M-j}
@@ -136,5 +139,7 @@ lib${libcompat}buildenv: .PHONY
 	    TARGET=${LIBCOMPAT_MACHINE} TARGET_ARCH=${LIBCOMPAT_MACHINE_ARCH} \
 	    "MAKEFLAGS=${MAKEFLAGS:NTARGET*}" ${BUILDENV_SHELL} || true
 .endif
+
+.endif # defined(_LIBCOMPAT)
 
 .endif # !targets(__<${_this:T}>__)

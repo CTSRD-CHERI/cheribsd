@@ -743,7 +743,7 @@ linux_copyout_strings(struct image_params *imgp, uintptr_t *stack_base)
 		destp -= execpath_len;
 		destp = rounddown2(destp, sizeof(uint32_t));
 		imgp->execpathp = (void *)destp;
-		error = copyout(imgp->execpath, (void *)destp, execpath_len);
+		error = copyout(imgp->execpath, imgp->execpathp, execpath_len);
 		if (error != 0)
 			return (error);
 	}
@@ -752,7 +752,7 @@ linux_copyout_strings(struct image_params *imgp, uintptr_t *stack_base)
 	arc4rand(canary, sizeof(canary), 0);
 	destp -= roundup(sizeof(canary), sizeof(uint32_t));
 	imgp->canary = (void *)destp;
-	error = copyout(canary, (void *)destp, sizeof(canary));
+	error = copyout(canary, imgp->canary, sizeof(canary));
 	if (error != 0)
 		return (error);
 

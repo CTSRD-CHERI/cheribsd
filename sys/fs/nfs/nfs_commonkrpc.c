@@ -893,7 +893,7 @@ tryagain:
 	 */
 	newnfs_realign(&nd->nd_mrep, M_WAITOK);
 	nd->nd_md = nd->nd_mrep;
-	nd->nd_dpos = NFSMTOD(nd->nd_md, caddr_t);
+	nd->nd_dpos = mtod(nd->nd_md, caddr_t);
 	nd->nd_repstat = 0;
 	if (nd->nd_procnum != NFSPROC_NULL &&
 	    nd->nd_procnum != NFSV4PROC_CBNULL) {
@@ -1188,8 +1188,8 @@ tryagain:
 		newnfs_restore_sigmask(td, &oldset);
 	return (0);
 nfsmout:
-	mbuf_freem(nd->nd_mrep);
-	mbuf_freem(nd->nd_mreq);
+	m_freem(nd->nd_mrep);
+	m_freem(nd->nd_mreq);
 	if (usegssname == 0)
 		AUTH_DESTROY(auth);
 	if (rep != NULL)

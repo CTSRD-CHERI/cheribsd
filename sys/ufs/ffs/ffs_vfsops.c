@@ -596,7 +596,7 @@ ffs_cmount(struct mntarg *ma, void * __capability data, uint64_t flags)
 
 	if (data == NULL)
 		return (EINVAL);
-	error = copyin(data, &args, sizeof args);
+	error = copyincap(data, &args, sizeof args);
 	if (error)
 		return (error);
 	vfs_oexport_conv(&args.export, &exp);
@@ -1249,11 +1249,9 @@ ffs_unmount(mp, mntflags)
 	flags = 0;
 	td = curthread;
 	fs = ump->um_fs;
-	susp = 0;
-	if (mntflags & MNT_FORCE) {
+	if (mntflags & MNT_FORCE)
 		flags |= FORCECLOSE;
-		susp = fs->fs_ronly == 0;
-	}
+	susp = fs->fs_ronly == 0;
 #ifdef UFS_EXTATTR
 	if ((error = ufs_extattr_stop(mp, td))) {
 		if (error != EOPNOTSUPP)

@@ -67,7 +67,7 @@
 struct if_clonereq {
 	int	ifcr_total;		/* total cloners (out) */
 	int	ifcr_count;		/* room for this many in user buffer */
-	char	*ifcr_buffer;		/* buffer for cloner names */
+	char * __kerncap ifcr_buffer;	/* buffer for cloner names */
 };
 
 /*

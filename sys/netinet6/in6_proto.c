@@ -90,9 +90,6 @@ __FBSDID("$FreeBSD$");
 #include <net/if_var.h>
 #include <net/radix.h>
 #include <net/route.h>
-#ifdef RADIX_MPATH
-#include <net/radix_mpath.h>
-#endif
 
 #include <netinet/in.h>
 #include <netinet/in_systm.h>
@@ -175,11 +172,11 @@ struct protosw inet6sw[] = {
 	.pr_input =		tcp6_input,
 	.pr_ctlinput =		tcp6_ctlinput,
 	.pr_ctloutput =		tcp_ctloutput,
-#ifndef INET	/* don't call initialization and timeout routines twice */
+#ifndef INET	/* don't call initialization, timeout, and drain routines twice */
 	.pr_init =		tcp_init,
 	.pr_slowtimo =		tcp_slowtimo,
-#endif
 	.pr_drain =		tcp_drain,
+#endif
 	.pr_usrreqs =		&tcp6_usrreqs,
 },
 #ifdef SCTP
@@ -191,8 +188,8 @@ struct protosw inet6sw[] = {
 	.pr_input =		sctp6_input,
 	.pr_ctlinput =		sctp6_ctlinput,
 	.pr_ctloutput =	sctp_ctloutput,
+#ifndef INET	/* Do not call initialization and drain routines twice. */
 	.pr_drain =		sctp_drain,
-#ifndef INET	/* Do not call initialization twice. */
 	.pr_init =		sctp_init,
 #endif
 	.pr_usrreqs =		&sctp6_usrreqs
@@ -205,7 +202,7 @@ struct protosw inet6sw[] = {
 	.pr_input =		sctp6_input,
 	.pr_ctlinput =		sctp6_ctlinput,
 	.pr_ctloutput =		sctp_ctloutput,
-	.pr_drain =		sctp_drain,
+	.pr_drain =		NULL, /* Covered by the SOCK_SEQPACKET entry. */
 	.pr_usrreqs =		&sctp6_usrreqs
 },
 #endif /* SCTP */
@@ -346,11 +343,7 @@ struct domain inet6domain = {
 	.dom_name =		"internet6",
 	.dom_protosw =		(struct protosw *)inet6sw,
 	.dom_protoswNPROTOSW =	(struct protosw *)&inet6sw[nitems(inet6sw)],
-#ifdef RADIX_MPATH
-	.dom_rtattach =		rn6_mpath_inithead,
-#else
 	.dom_rtattach =		in6_inithead,
-#endif
 #ifdef VIMAGE
 	.dom_rtdetach =		in6_detachhead,
 #endif

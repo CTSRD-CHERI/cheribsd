@@ -610,8 +610,9 @@ write_tx_sgl(void *dst, struct mbuf *start, struct mbuf *stop, int nsegs, int n)
 
 	i = -1;
 	for (m = start; m != stop; m = m->m_next) {
-		if (m->m_flags & M_NOMAP)
-			rc = sglist_append_mb_ext_pgs(&sg, m);
+		if (m->m_flags & M_EXTPG)
+			rc = sglist_append_mbuf_epg(&sg, m,
+			    mtod(m, vm_offset_t), m->m_len);
 		else
 			rc = sglist_append(&sg, mtod(m, void *), m->m_len);
 		if (__predict_false(rc != 0))
@@ -730,9 +731,9 @@ t4_push_frames(struct adapter *sc, struct toepcb *toep, int drop)
 		for (m = sndptr; m != NULL; m = m->m_next) {
 			int n;
 
-			if (m->m_flags & M_NOMAP) {
+			if (m->m_flags & M_EXTPG) {
 #ifdef KERN_TLS
-				if (m->m_ext.ext_pgs->tls != NULL) {
+				if (m->m_epg_tls != NULL) {
 					toep->flags |= TPF_KTLS;
 					if (plen == 0) {
 						SOCKBUF_UNLOCK(sb);
@@ -742,7 +743,8 @@ t4_push_frames(struct adapter *sc, struct toepcb *toep, int drop)
 					break;
 				}
 #endif
-				n = sglist_count_mb_ext_pgs(m);
+				n = sglist_count_mbuf_epg(m,
+				    mtod(m, vm_offset_t), m->m_len);
 			} else
 				n = sglist_count(mtod(m, void *), m->m_len);
 
@@ -770,7 +772,7 @@ t4_push_frames(struct adapter *sc, struct toepcb *toep, int drop)
 				break;
 			}
 
-			if (m->m_flags & M_NOMAP)
+			if (m->m_flags & M_EXTPG)
 				nomap_mbuf_seen = true;
 			if (max_nsegs_1mbuf < n)
 				max_nsegs_1mbuf = n;
@@ -1922,20 +1924,18 @@ aiotx_free_job(struct kaiocb *job)
 static void
 aiotx_free_pgs(struct mbuf *m)
 {
-	struct mbuf_ext_pgs *ext_pgs;
 	struct kaiocb *job;
 	vm_page_t pg;
 
-	MBUF_EXT_PGS_ASSERT(m);
-	ext_pgs = m->m_ext.ext_pgs;
+	M_ASSERTEXTPG(m);
 	job = m->m_ext.ext_arg1;
 #ifdef VERBOSE_TRACES
 	CTR3(KTR_CXGBE, "%s: completed %d bytes for tid %d", __func__,
 	    m->m_len, jobtotid(job));
 #endif
 
-	for (int i = 0; i < ext_pgs->npgs; i++) {
-		pg = PHYS_TO_VM_PAGE(ext_pgs->pa[i]);
+	for (int i = 0; i < m->m_epg_npgs; i++) {
+		pg = PHYS_TO_VM_PAGE(m->m_epg_pa[i]);
 		vm_page_unwire(pg, PQ_ACTIVE);
 	}
 
@@ -1952,7 +1952,6 @@ alloc_aiotx_mbuf(struct kaiocb *job, int len)
 	struct vmspace *vm;
 	vm_page_t pgs[MBUF_PEXT_MAX_PGS];
 	struct mbuf *m, *top, *last;
-	struct mbuf_ext_pgs *ext_pgs;
 	vm_map_t map;
 	vm_offset_t start;
 	int i, mlen, npages, pgoff;
@@ -1984,26 +1983,25 @@ alloc_aiotx_mbuf(struct kaiocb *job, int len)
 		if (npages < 0)
 			break;
 
-		m = mb_alloc_ext_pgs(M_WAITOK, false, aiotx_free_pgs);
+		m = mb_alloc_ext_pgs(M_WAITOK, aiotx_free_pgs);
 		if (m == NULL) {
 			vm_page_unhold_pages(pgs, npages);
 			break;
 		}
 
-		ext_pgs = m->m_ext.ext_pgs;
-		ext_pgs->first_pg_off = pgoff;
-		ext_pgs->npgs = npages;
+		m->m_epg_1st_off = pgoff;
+		m->m_epg_npgs = npages;
 		if (npages == 1) {
 			KASSERT(mlen + pgoff <= PAGE_SIZE,
 			    ("%s: single page is too large (off %d len %d)",
 			    __func__, pgoff, mlen));
-			ext_pgs->last_pg_len = mlen;
+			m->m_epg_last_len = mlen;
 		} else {
-			ext_pgs->last_pg_len = mlen - (PAGE_SIZE - pgoff) -
+			m->m_epg_last_len = mlen - (PAGE_SIZE - pgoff) -
 			    (npages - 2) * PAGE_SIZE;
 		}
 		for (i = 0; i < npages; i++)
-			ext_pgs->pa[i] = VM_PAGE_TO_PHYS(pgs[i]);
+			m->m_epg_pa[i] = VM_PAGE_TO_PHYS(pgs[i]);
 
 		m->m_len = mlen;
 		m->m_ext.ext_size = npages * PAGE_SIZE;

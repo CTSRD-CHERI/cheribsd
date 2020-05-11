@@ -1630,7 +1630,8 @@ vm_map_lookup_entry(
  */
 int
 vm_map_insert(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
-    vm_offset_t start, vm_offset_t end, vm_prot_t prot, vm_prot_t max, int cow)
+    vm_offset_t start, vm_offset_t end, vm_prot_t prot, vm_prot_t max, int cow,
+    vm_offset_t reservation)
 {
 	vm_map_entry_t new_entry, next_entry, prev_entry;
 	struct ucred *cred;
@@ -1690,6 +1691,8 @@ vm_map_insert(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 		protoeflags |= MAP_ENTRY_VN_EXEC;
 	if ((cow & MAP_CREATE_GUARD) != 0)
 		protoeflags |= MAP_ENTRY_GUARD;
+	if ((cow & MAP_CREATE_UNMAPPED) != 0)
+		protoeflags |= MAP_ENTRY_UNMAPPED;
 	if ((cow & MAP_CREATE_STACK_GAP_DN) != 0)
 		protoeflags |= MAP_ENTRY_STACK_GAP_DN;
 	if ((cow & MAP_CREATE_STACK_GAP_UP) != 0)
@@ -1751,11 +1754,14 @@ charged:
 		if (prev_entry->inheritance == inheritance &&
 		    prev_entry->protection == prot &&
 		    prev_entry->max_protection == max &&
-		    prev_entry->wired_count == 0) {
+		    prev_entry->wired_count == 0 &&
+		    ((map->flags & MAP_RESERVATIONS) == 0 ||
+		    prev_entry->reservation == reservation)) {
 			KASSERT((prev_entry->eflags & MAP_ENTRY_USER_WIRED) ==
 			    0, ("prev_entry %p has incoherent wiring",
 			    prev_entry));
-			if ((prev_entry->eflags & MAP_ENTRY_GUARD) == 0)
+			if ((prev_entry->eflags & (MAP_ENTRY_GUARD |
+			    MAP_ENTRY_UNMAPPED)) == 0)
 				map->size += end - prev_entry->end;
 			vm_map_entry_resize(map, prev_entry,
 			    end - prev_entry->end);
@@ -1789,6 +1795,7 @@ charged:
 	new_entry = vm_map_entry_create(map);
 	new_entry->start = start;
 	new_entry->end = end;
+	new_entry->reservation = reservation;
 	new_entry->cred = NULL;
 
 	new_entry->eflags = protoeflags;
@@ -1811,7 +1818,7 @@ charged:
 	 * Insert the new entry into the list
 	 */
 	vm_map_entry_link(map, new_entry);
-	if ((new_entry->eflags & MAP_ENTRY_GUARD) == 0)
+	if ((new_entry->eflags & (MAP_ENTRY_GUARD | MAP_ENTRY_UNMAPPED)) == 0)
 		map->size += new_entry->end - new_entry->start;
 
 	vm_map_log("insert", new_entry);
@@ -1945,7 +1952,8 @@ vm_map_fixed(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
     vm_offset_t start, vm_size_t length, vm_prot_t prot,
     vm_prot_t max, int cow)
 {
-	vm_offset_t end;
+	vm_map_entry_t entry;
+	vm_offset_t end, reservation;
 	int result;
 
 	end = start + length;
@@ -1954,15 +1962,38 @@ vm_map_fixed(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 	    ("vm_map_fixed: non-NULL backing object for stack"));
 	vm_map_lock(map);
 	VM_MAP_RANGE_CHECK(map, start, end);
-	if ((cow & MAP_CHECK_EXCL) == 0)
+	reservation = start;
+	if ((cow & MAP_CHECK_EXCL) == 0) {
+		if ((map->flags & MAP_RESERVATIONS) != 0) {
+			if (vm_map_lookup_entry(map, start, &entry))
+				reservation = entry->reservation;
+			else
+				entry = vm_map_entry_succ(entry);
+
+			/*
+			 * Prevent mappings that span reservations
+			 * or are already unmapped.
+			 */
+			while ((entry->eflags & MAP_ENTRY_HEADER) == 0 &&
+			    entry->end <= end) {
+				if (entry->reservation != reservation ||
+				    ((entry->eflags & MAP_UNMAPPED) != 0)) {
+					result = KERN_NO_SPACE;
+					goto done;
+				}
+				entry = vm_map_entry_succ(entry);
+			}
+		}
 		vm_map_delete(map, start, end);
+	}
 	if ((cow & (MAP_STACK_GROWS_DOWN | MAP_STACK_GROWS_UP)) != 0) {
 		result = vm_map_stack_locked(map, start, length, sgrowsiz,
 		    prot, max, cow);
 	} else {
 		result = vm_map_insert(map, object, offset, start, end,
-		    prot, max, cow);
+		    prot, max, cow, reservation);
 	}
+done:
 	vm_map_unlock(map);
 	return (result);
 }
@@ -2210,7 +2241,7 @@ again:
 		    max, cow);
 	} else {
 		rv = vm_map_insert(map, object, offset, *addr, *addr + length,
-		    prot, max, cow);
+		    prot, max, cow, *addr);
 	}
 	if (rv == KERN_SUCCESS && update_anon)
 		map->anon_loc = *addr + length;
@@ -2258,7 +2289,8 @@ vm_map_find_min(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 	    MAP_ENTRY_IN_TRANSITION | MAP_ENTRY_IS_SUB_MAP | MAP_ENTRY_VN_EXEC)
 
 static bool
-vm_map_mergeable_neighbors(vm_map_entry_t prev, vm_map_entry_t entry)
+vm_map_mergeable_neighbors(vm_map_t map, vm_map_entry_t prev,
+    vm_map_entry_t entry)
 {
 
 	KASSERT((prev->eflags & MAP_ENTRY_NOMERGE_MASK) == 0 ||
@@ -2274,7 +2306,9 @@ vm_map_mergeable_neighbors(vm_map_entry_t prev, vm_map_entry_t entry)
 	    prev->max_protection == entry->max_protection &&
 	    prev->inheritance == entry->inheritance &&
 	    prev->wired_count == entry->wired_count &&
-	    prev->cred == entry->cred);
+	    prev->cred == entry->cred &&
+	    ((map->flags & MAP_RESERVATIONS) == 0 ||
+	    prev->reservation == entry->reservation));
 }
 
 static void
@@ -2314,7 +2348,7 @@ vm_map_try_merge_entries(vm_map_t map, vm_map_entry_t prev_entry,
 
 	VM_MAP_ASSERT_LOCKED(map);
 	if ((entry->eflags & MAP_ENTRY_NOMERGE_MASK) == 0 &&
-	    vm_map_mergeable_neighbors(prev_entry, entry)) {
+	    vm_map_mergeable_neighbors(map, prev_entry, entry)) {
 		vm_map_entry_unlink(map, prev_entry, UNLINK_MERGE_NEXT);
 		vm_map_merged_neighbor_dispose(map, prev_entry);
 	}
@@ -2355,7 +2389,7 @@ vm_map_entry_charge_object(vm_map_t map, vm_map_entry_t entry)
 	KASSERT((entry->eflags & MAP_ENTRY_IS_SUB_MAP) == 0,
 	    ("map entry %p is a submap", entry));
 	if (entry->object.vm_object == NULL && !map->system_map &&
-	    (entry->eflags & MAP_ENTRY_GUARD) == 0)
+	    (entry->eflags & (MAP_ENTRY_GUARD | MAP_ENTRY_UNMAPPED)) == 0)
 		vm_map_entry_back(entry);
 	else if (entry->object.vm_object != NULL &&
 	    ((entry->eflags & MAP_ENTRY_NEEDS_COPY) == 0) &&
@@ -2697,7 +2731,8 @@ again:
 	 */
 	for (entry = first_entry; entry->start < end;
 	    entry = vm_map_entry_succ(entry)) {
-		if ((entry->eflags & MAP_ENTRY_GUARD) != 0)
+		if ((entry->eflags &
+		    (MAP_ENTRY_GUARD | MAP_ENTRY_UNMAPPED)) != 0)
 			continue;
 		if ((entry->eflags & MAP_ENTRY_IS_SUB_MAP) != 0) {
 			vm_map_unlock(map);
@@ -2740,7 +2775,8 @@ again:
 		if (set_max ||
 		    ((new_prot & ~entry->protection) & VM_PROT_WRITE) == 0 ||
 		    ENTRY_CHARGED(entry) ||
-		    (entry->eflags & MAP_ENTRY_GUARD) != 0) {
+		    (entry->eflags &
+		    (MAP_ENTRY_GUARD | MAP_ENTRY_UNMAPPED)) != 0) {
 			continue;
 		}
 
@@ -2798,7 +2834,8 @@ again:
 	    vm_map_try_merge_entries(map, prev_entry, entry),
 	    prev_entry = entry, entry = vm_map_entry_succ(entry)) {
 		if (rv != KERN_SUCCESS ||
-		    (entry->eflags & MAP_ENTRY_GUARD) != 0)
+		    (entry->eflags &
+		    (MAP_ENTRY_GUARD | MAP_ENTRY_UNMAPPED)) != 0)
 			continue;
 
 		old_prot = entry->protection;
@@ -3060,7 +3097,8 @@ vm_map_inherit(vm_map_t map, vm_offset_t start, vm_offset_t end,
 	    entry->start < end;
 	    prev_entry = entry, entry = vm_map_entry_succ(entry)) {
 		vm_map_clip_end(map, entry, end);
-		if ((entry->eflags & MAP_ENTRY_GUARD) == 0 ||
+		if ((entry->eflags &
+		    (MAP_ENTRY_GUARD | MAP_ENTRY_UNMAPPED)) == 0 ||
 		    new_inheritance != VM_INHERIT_ZERO)
 			entry->inheritance = new_inheritance;
 		vm_map_try_merge_entries(map, prev_entry, entry);
@@ -3814,7 +3852,7 @@ vm_map_entry_delete(vm_map_t map, vm_map_entry_t entry)
 	vm_map_entry_unlink(map, entry, UNLINK_MERGE_NONE);
 	object = entry->object.vm_object;
 
-	if ((entry->eflags & MAP_ENTRY_GUARD) != 0) {
+	if ((entry->eflags & (MAP_ENTRY_GUARD | MAP_ENTRY_UNMAPPED)) != 0) {
 		MPASS(entry->cred == NULL);
 		MPASS((entry->eflags & MAP_ENTRY_IS_SUB_MAP) == 0);
 		MPASS(object == NULL);
@@ -4195,7 +4233,7 @@ vmspace_map_entry_forked(const struct vmspace *vm1, struct vmspace *vm2,
 	vm_size_t entrysize;
 	vm_offset_t newend;
 
-	if ((entry->eflags & MAP_ENTRY_GUARD) != 0)
+	if ((entry->eflags & (MAP_ENTRY_GUARD | MAP_ENTRY_UNMAPPED)) != 0)
 		return;
 	entrysize = entry->end - entry->start;
 	vm2->vm_map.size += entrysize;
@@ -4268,7 +4306,8 @@ vmspace_fork(struct vmspace *vm1, vm_ooffset_t *fork_charge)
 			panic("vm_map_fork: encountered a submap");
 
 		inh = old_entry->inheritance;
-		if ((old_entry->eflags & MAP_ENTRY_GUARD) != 0 &&
+		if ((old_entry->eflags &
+		    (MAP_ENTRY_GUARD | MAP_ENTRY_UNMAPPED)) != 0 &&
 		    inh != VM_INHERIT_NONE)
 			inh = VM_INHERIT_COPY;
 
@@ -4531,7 +4570,7 @@ vm_map_stack_locked(vm_map_t map, vm_offset_t addrbos, vm_size_t max_ssize,
 		gap_bot = top;
 		gap_top = addrbos + max_ssize;
 	}
-	rv = vm_map_insert(map, NULL, 0, bot, top, prot, max, cow);
+	rv = vm_map_insert(map, NULL, 0, bot, top, prot, max, cow, addrbos);
 	if (rv != KERN_SUCCESS)
 		return (rv);
 	new_entry = vm_map_entry_succ(prev_entry);
@@ -4547,7 +4586,7 @@ vm_map_stack_locked(vm_map_t map, vm_offset_t addrbos, vm_size_t max_ssize,
 		return (KERN_SUCCESS);
 	rv = vm_map_insert(map, NULL, 0, gap_bot, gap_top, VM_PROT_NONE,
 	    VM_PROT_NONE, MAP_CREATE_GUARD | (orient == MAP_STACK_GROWS_DOWN ?
-	    MAP_CREATE_STACK_GAP_DN : MAP_CREATE_STACK_GAP_UP));
+	    MAP_CREATE_STACK_GAP_DN : MAP_CREATE_STACK_GAP_UP), addrbos);
 	if (rv == KERN_SUCCESS) {
 		/*
 		 * Gap can never successfully handle a fault, so
@@ -4732,12 +4771,13 @@ retry:
 		rv = vm_map_insert(map, NULL, 0, grow_start,
 		    grow_start + grow_amount,
 		    stack_entry->protection, stack_entry->max_protection,
-		    MAP_STACK_GROWS_DOWN);
+		    MAP_STACK_GROWS_DOWN, stack_entry->reservation);
 		if (rv != KERN_SUCCESS) {
 			if (gap_deleted) {
 				rv1 = vm_map_insert(map, NULL, 0, gap_start,
 				    gap_end, VM_PROT_NONE, VM_PROT_NONE,
-				    MAP_CREATE_GUARD | MAP_CREATE_STACK_GAP_DN);
+				    MAP_CREATE_GUARD | MAP_CREATE_STACK_GAP_DN,
+				    stack_entry->reservation);
 				MPASS(rv1 == KERN_SUCCESS);
 			} else
 				vm_map_entry_resize(map, gap_entry,
@@ -5166,6 +5206,33 @@ vm_map_pmap_KBI(vm_map_t map)
 {
 
 	return (map->pmap);
+}
+
+int
+vm_map_reservation_delete(vm_map_t map, vm_offset_t reservation)
+{
+	vm_map_entry_t	entry, next_entry;
+
+	if (!vm_map_lookup_entry(map, reservation, &entry))
+		return (KERN_FAILURE);
+
+	while (entry->reservation == reservation) {
+		next_entry = vm_map_entry_succ(entry);
+		vm_map_entry_delete(map, entry);
+	}
+	return (KERN_SUCCESS);
+}
+
+bool
+vm_map_reservation_is_unmapped(vm_map_t map, vm_offset_t reservation)
+{
+	vm_map_entry_t	entry;
+
+	if (vm_map_lookup_entry(map, reservation, &entry) &&
+	    entry->reservation == entry->start &&
+	    entry->reservation != vm_map_entry_succ(entry)->reservation)
+		return (true);
+	return (false);
 }
 
 #ifdef INVARIANTS

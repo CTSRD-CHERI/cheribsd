@@ -253,7 +253,7 @@ set_rootvnode(void)
 
 	VOP_UNLOCK(rootvnode);
 
-	pwd_ensure_dirs();
+	pwd_set_rootvnode();
 }
 
 static int

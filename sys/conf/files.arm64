@@ -85,7 +85,6 @@ arm/arm/gic.c			standard
 arm/arm/gic_acpi.c		optional	acpi
 arm/arm/gic_fdt.c		optional	fdt
 arm/arm/pmu.c			standard
-arm/arm/physmem.c		standard
 arm/broadcom/bcm2835/bcm2835_audio.c		optional sound vchiq fdt \
 	compile-with "${NORMAL_C} -DUSE_VCHIQ_ARM -D__VCCOREVER__=0x04000000 -I$S/contrib/vchiq"
 arm/broadcom/bcm2835/bcm2835_bsc.c		optional bcm2835_bsc fdt
@@ -179,6 +178,7 @@ arm64/arm64/vm_machdep.c	standard
 arm64/broadcom/brcmmdio/mdio_mux_iproc.c	optional	fdt
 arm64/broadcom/brcmmdio/mdio_nexus_iproc.c	optional	fdt
 arm64/broadcom/brcmmdio/mdio_ns2_pcie_phy.c	optional	fdt pci
+arm64/broadcom/genet/if_genet.c		optional SOC_BRCM_BCM2838 fdt genet
 arm64/cavium/thunder_pcie_fdt.c		optional	soc_cavm_thunderx pci fdt
 arm64/cavium/thunder_pcie_pem.c		optional	soc_cavm_thunderx pci
 arm64/cavium/thunder_pcie_pem_fdt.c	optional	soc_cavm_thunderx pci fdt
@@ -291,6 +291,7 @@ kern/msi_if.m			optional	intrng
 kern/pic_if.m			optional	intrng
 kern/subr_devmap.c		standard
 kern/subr_intr.c		optional	intrng
+kern/subr_physmem.c		standard
 libkern/bcmp.c			standard
 libkern/memcmp.c		standard				\
 	compile-with "${NORMAL_C:N-fsanitize*}"

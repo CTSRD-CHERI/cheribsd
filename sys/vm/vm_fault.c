@@ -792,6 +792,7 @@ vm_fault_lookup(struct faultstate *fs)
 	}
 
 	MPASS((fs->entry->eflags & MAP_ENTRY_GUARD) == 0);
+	MPASS((fs->entry->eflags & MAP_ENTRY_UNMAPPED) == 0);
 
 	if (fs->wired)
 		fs->fault_type = fs->prot | (fs->fault_type & VM_PROT_COPY);

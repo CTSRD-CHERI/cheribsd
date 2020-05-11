@@ -557,11 +557,6 @@ cpu_set_upcall(struct thread *td, void (* __capability entry)(void *),
 		csigp = &td->td_pcb->pcb_cherisignal;
 		csigp->csig_csp = td->td_frame->csp;
 		csigp->csig_default_stack = csigp->csig_csp;
-#ifdef CHERIABI_LEGACY_SUPPORT
-		/* Setup $ddc when targeting the legacy ABI */
-		tf->ddc = curthread->td_frame->ddc;
-		csigp->csig_ddc = tf->ddc;
-#endif
 	} else
 #endif
 	{
@@ -656,11 +651,7 @@ cpu_set_user_tls(struct thread *td, void * __capability tls_base)
 			    :
 			    : "C" ((char * __capability)td->td_md.md_tls +
 				td->td_md.md_tls_tcb_offset));
-#ifdef CHERIABI_LEGACY_SUPPORT
-#pragma message("Warning: Building with support for LEGACY TLS")
-#else
 		else
-#endif
 #endif
 		if (cpuinfo.userlocal_reg == true) {
 			mips_wr_userlocal((__cheri_addr u_long)tls_base +

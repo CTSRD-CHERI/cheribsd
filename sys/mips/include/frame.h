@@ -209,10 +209,6 @@ struct trapframe {
 	};
 	register_t		capcause;  /* NB: Saved but not restored. */
 	register_t		_pad0;
-#if (CHERICAP_SIZE == 32)
-	register_t		_pad1;
-	register_t		_pad2;
-#endif
 #endif
 
 	/*

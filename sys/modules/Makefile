@@ -259,7 +259,6 @@ SUBDIR=	\
 	nfscl \
 	nfscommon \
 	nfsd \
-	nfslock \
 	nfslockd \
 	nfssvc \
 	nge \
@@ -386,6 +385,7 @@ SUBDIR=	\
 	${_wpi} \
 	${_wpifw} \
 	${_x86bios} \
+	xdr \
 	xl \
 	xz \
 	zlib

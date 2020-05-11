@@ -35,7 +35,6 @@
 #ifndef _NET_ROUTE_H_
 #define _NET_ROUTE_H_
 
-#include <sys/counter.h>
 #include <net/vnet.h>
 
 /*
@@ -51,7 +50,7 @@
  * with its length.
  */
 struct route {
-	struct	rtentry *ro_rt;
+	struct	nhop_object *ro_nh;
 	struct	llentry *ro_lle;
 	/*
 	 * ro_prepend and ro_plen are only used for bpf to pass in a
@@ -90,7 +89,8 @@ struct rt_metrics {
 	u_long	rmx_rttvar;	/* estimated rtt variance */
 	u_long	rmx_pksent;	/* packets sent using this route */
 	u_long	rmx_weight;	/* route weight */
-	u_long	rmx_filler[3];	/* will be used for T/TCP later */
+	u_long	rmx_nhidx;	/* route nexhop index */
+	u_long	rmx_filler[2];	/* will be used for T/TCP later */
 };
 
 /*
@@ -128,41 +128,6 @@ VNET_DECLARE(u_int, rt_add_addr_allfibs); /* Announce interfaces to all fibs */
  * gateways are marked so that the output routines know to address the
  * gateway rather than the ultimate destination.
  */
-#ifndef RNF_NORMAL
-#include <net/radix.h>
-#ifdef RADIX_MPATH
-#include <net/radix_mpath.h>
-#endif
-#endif
-
-#if defined(_KERNEL)
-struct rtentry {
-	struct	radix_node rt_nodes[2];	/* tree glue, and other values */
-	/*
-	 * XXX struct rtentry must begin with a struct radix_node (or two!)
-	 * because the code does some casts of a 'struct radix_node *'
-	 * to a 'struct rtentry *'
-	 */
-#define	rt_key(r)	(*((struct sockaddr **)(&(r)->rt_nodes->rn_key)))
-#define	rt_mask(r)	(*((struct sockaddr **)(&(r)->rt_nodes->rn_mask)))
-#define	rt_key_const(r)		(*((const struct sockaddr * const *)(&(r)->rt_nodes->rn_key)))
-#define	rt_mask_const(r)	(*((const struct sockaddr * const *)(&(r)->rt_nodes->rn_mask)))
-	struct	sockaddr *rt_gateway;	/* value */
-	struct	ifnet *rt_ifp;		/* the answer: interface to use */
-	struct	ifaddr *rt_ifa;		/* the answer: interface address to use */
-	int		rt_flags;	/* up/down?, host/net */
-	int		rt_refcnt;	/* # held references */
-	u_int		rt_fibnum;	/* which FIB */
-	u_long		rt_mtu;		/* MTU for this path */
-	u_long		rt_weight;	/* absolute weight */ 
-	u_long		rt_expire;	/* lifetime for route, e.g. redirect */
-#define	rt_endzero	rt_pksent
-	counter_u64_t	rt_pksent;	/* packets sent using this route */
-	struct mtx	rt_mtx;		/* mutex for routing entry */
-	struct rtentry	*rt_chain;	/* pointer to next rtentry to delete */
-};
-#endif /* _KERNEL */
-
 #define	RTF_UP		0x1		/* route usable */
 #define	RTF_GATEWAY	0x2		/* destination is a gateway */
 #define	RTF_HOST	0x4		/* host entry (net otherwise) */
@@ -215,26 +180,15 @@ struct rtentry {
 #define	NHF_HOST		0x0400	/* RTF_HOST */
 
 /* Nexthop request flags */
+#define	NHR_NONE		0x00	/* empty flags field */
 #define	NHR_IFAIF		0x01	/* Return ifa_ifp interface */
 #define	NHR_REF			0x02	/* For future use */
 
+/* uRPF */
+#define	NHR_NODEFAULT		0x04	/* do not consider default route */
+
 /* Control plane route request flags */
 #define	NHR_COPY		0x100	/* Copy rte data */
-
-#ifdef _KERNEL
-/* rte<>ro_flags translation */
-static inline void
-rt_update_ro_flags(struct route *ro)
-{
-	int rt_flags = ro->ro_rt->rt_flags;
-
-	ro->ro_flags &= ~ (RT_REJECT|RT_BLACKHOLE|RT_HAS_GW);
-
-	ro->ro_flags |= (rt_flags & RTF_REJECT) ? RT_REJECT : 0;
-	ro->ro_flags |= (rt_flags & RTF_BLACKHOLE) ? RT_BLACKHOLE : 0;
-	ro->ro_flags |= (rt_flags & RTF_GATEWAY) ? RT_HAS_GW : 0;
-}
-#endif
 
 /*
  * Routing statistics.
@@ -245,6 +199,8 @@ struct rtstat {
 	uint64_t rts_newgateway;	/* routes modified by redirects */
 	uint64_t rts_unreach;		/* lookups which failed */
 	uint64_t rts_wildcard;		/* lookups satisfied by a wildcard */
+	uint64_t rts_nh_idx_alloc_failure;	/* nexthop index alloc failure*/
+	uint64_t rts_nh_alloc_failure;	/* nexthop allocation failure*/
 };
 
 /*
@@ -338,7 +294,10 @@ struct rt_msghdr {
 #define RTAX_BRD	7	/* for NEWADDR, broadcast or p-p dest addr */
 #define RTAX_MAX	8	/* size of array to allocate */
 
-typedef int rt_filter_f_t(const struct rtentry *, void *);
+struct rtentry;
+struct nhop_object;
+typedef int rt_filter_f_t(const struct rtentry *, const struct nhop_object *,
+    void *);
 
 struct rt_addrinfo {
 	int	rti_addrs;			/* Route RTF_ flags */
@@ -373,57 +332,23 @@ struct rt_addrinfo {
 #define RT_LINK_IS_UP(ifp)	(!((ifp)->if_capabilities & IFCAP_LINKSTATE) \
 				 || (ifp)->if_link_state == LINK_STATE_UP)
 
-#define	RT_LOCK_INIT(_rt) \
-	mtx_init(&(_rt)->rt_mtx, "rtentry", NULL, MTX_DEF | MTX_DUPOK | MTX_NEW)
-#define	RT_LOCK(_rt)		mtx_lock(&(_rt)->rt_mtx)
-#define	RT_UNLOCK(_rt)		mtx_unlock(&(_rt)->rt_mtx)
-#define	RT_LOCK_DESTROY(_rt)	mtx_destroy(&(_rt)->rt_mtx)
-#define	RT_LOCK_ASSERT(_rt)	mtx_assert(&(_rt)->rt_mtx, MA_OWNED)
-#define	RT_UNLOCK_COND(_rt)	do {				\
-	if (mtx_owned(&(_rt)->rt_mtx))				\
-		mtx_unlock(&(_rt)->rt_mtx);			\
-} while (0)
+#define	RTFREE_FUNC(_rt)	rtfree_func(_rt)
 
-#define	RT_ADDREF(_rt)	do {					\
-	RT_LOCK_ASSERT(_rt);					\
-	KASSERT((_rt)->rt_refcnt >= 0,				\
-		("negative refcnt %d", (_rt)->rt_refcnt));	\
-	(_rt)->rt_refcnt++;					\
-} while (0)
-
-#define	RT_REMREF(_rt)	do {					\
-	RT_LOCK_ASSERT(_rt);					\
-	KASSERT((_rt)->rt_refcnt > 0,				\
-		("bogus refcnt %d", (_rt)->rt_refcnt));	\
-	(_rt)->rt_refcnt--;					\
-} while (0)
-
-#define	RTFREE_LOCKED(_rt) do {					\
-	if ((_rt)->rt_refcnt <= 1)				\
-		rtfree(_rt);					\
-	else {							\
-		RT_REMREF(_rt);					\
-		RT_UNLOCK(_rt);					\
+#define	RO_NHFREE(_ro) do {					\
+	if ((_ro)->ro_nh) {					\
+		NH_FREE((_ro)->ro_nh);				\
+		(_ro)->ro_nh = NULL;				\
 	}							\
-	/* guard against invalid refs */			\
-	_rt = 0;						\
-} while (0)
-
-#define	RTFREE(_rt) do {					\
-	RT_LOCK(_rt);						\
-	RTFREE_LOCKED(_rt);					\
-} while (0)
-
-#define	RO_RTFREE(_ro) do {					\
-	if ((_ro)->ro_rt)					\
-		RTFREE((_ro)->ro_rt);				\
 } while (0)
 
 #define	RO_INVALIDATE_CACHE(ro) do {					\
-		RO_RTFREE(ro);						\
 		if ((ro)->ro_lle != NULL) {				\
 			LLE_FREE((ro)->ro_lle);				\
 			(ro)->ro_lle = NULL;				\
+		}							\
+		if ((ro)->ro_nh != NULL) {				\
+			NH_FREE((ro)->ro_nh);				\
+			(ro)->ro_nh = NULL;				\
 		}							\
 	} while (0)
 
@@ -432,7 +357,7 @@ struct rt_addrinfo {
  * out-of-date cache, simply free it.  Update the generation number
  * for the new allocation
  */
-#define RT_VALIDATE(ro, cookiep, fibnum) do {				\
+#define NH_VALIDATE(ro, cookiep, fibnum) do {				\
 	rt_gen_t cookie = RT_GEN(fibnum, (ro)->ro_dst.sa_family);	\
 	if (*(cookiep) != cookie) {					\
 		RO_INVALIDATE_CACHE(ro);				\
@@ -463,6 +388,8 @@ int	rtsock_addrmsg(int, struct ifaddr *, int);
 int	rtsock_routemsg(int, struct rtentry *, struct ifnet *ifp, int, int);
 int	rtsock_routemsg_info(int, struct rt_addrinfo *, int);
 
+struct sockaddr *rtsock_fix_netmask(const struct sockaddr *dst,
+	    const struct sockaddr *smask, struct sockaddr_storage *dmask);
 /*
  * Note the following locking behavior:
  *
@@ -474,6 +401,7 @@ int	rtsock_routemsg_info(int, struct rt_addrinfo *, int);
  */
 
 void	 rtfree(struct rtentry *);
+void	 rtfree_func(struct rtentry *);
 void	rt_updatemtu(struct ifnet *);
 
 typedef int rt_walktree_f_t(struct rtentry *, void *);
@@ -494,7 +422,6 @@ int	 rtinit(struct ifaddr *, int, int);
  * For now the protocol indepedent versions are the same as the AF_INET ones
  * but this will change.. 
  */
-void	 rtalloc_ign_fib(struct route *ro, u_long ignflags, u_int fibnum);
 struct rtentry *rtalloc1_fib(struct sockaddr *, int, u_long, u_int);
 int	 rtioctl_fib(u_long, caddr_t, u_int);
 int	 rtrequest_fib(int, struct sockaddr *,
@@ -507,6 +434,8 @@ int	rib_add_redirect(u_int fibnum, struct sockaddr *dst,
 	   struct sockaddr *gateway, struct sockaddr *author, struct ifnet *ifp,
 	   int flags, int expire_sec);
 
+/* New API */
+void	rib_walk(int af, u_int fibnum, rt_walktree_f_t *wa_f, void *arg);
 #endif
 
 #endif

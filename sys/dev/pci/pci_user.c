@@ -25,6 +25,8 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define	EXPLICIT_USER_ACCESS
+
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
@@ -121,10 +123,17 @@ struct pci_conf_io64 {
 	uint32_t		status;		/* request status */
 };
 
+struct pci_list_vpd_io64 {
+	struct pcisel	plvi_sel;	/* device to operate on */
+	uint64_t	plvi_len;	/* size of the data area */
+	uint64_t	plvi_data;
+};
+
 #define	PCIOCGETCONF64	_IOC_NEWTYPE(PCIOCGETCONF, struct pci_conf_io64)
+#define	PCIOCLISTVPD64	_IOC_NEWTYPE(PCIOCLISTVPD, struct pci_list_vpd_io64)
 /*
- * We don't support PCIOCGETCONF_OLD64 because the only COMPAT_FREEBSD64
- * architectures didn't exist until 9.0 (mips).
+ * We don't support PCIOCGETCONF_OLD64 because the earliest
+ * COMPAT_FREEBSD64 architecture didn't exist until 9.0 (mips).
  */
 #endif
 
@@ -591,13 +600,13 @@ pci_conf_match(u_long cmd, struct pci_match_conf *matches, int num_matches,
  * pointer that cannot be dereferenced.
  */
 #define	PVE_NEXT_LEN(pve, datalen)					\
-	((struct pci_vpd_element *)((char *)(pve) +			\
+	((struct pci_vpd_element * __capability)((char * __capability)(pve) +			\
 	    sizeof(struct pci_vpd_element) + (datalen)))
 
 static int
 pci_list_vpd(device_t dev, struct pci_list_vpd_io *lvio)
 {
-	struct pci_vpd_element vpd_element, *vpd_user;
+	struct pci_vpd_element vpd_element, * __capability vpd_user;
 	struct pcicfg_vpd *vpd;
 	size_t len;
 	int error, i;
@@ -671,7 +680,7 @@ pci_list_vpd(device_t dev, struct pci_list_vpd_io *lvio)
 			return (error);
 		vpd_user = PVE_NEXT_LEN(vpd_user, vpd_element.pve_datalen);
 	}
-	KASSERT((char *)vpd_user - (char *)lvio->plvi_data == len,
+	KASSERT((char * __capability)vpd_user - (char * __capability)lvio->plvi_data == len,
 	    ("length mismatch"));
 	lvio->plvi_len = len;
 	return (0);
@@ -1011,6 +1020,10 @@ pci_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int flag, struct thread *t
 	struct pci_io *io;
 	struct pci_bar_io *bio;
 	struct pci_list_vpd_io *lvio;
+#ifdef COMPAT_FREEBSD64
+	struct pci_list_vpd_io64 *lvio64;
+	struct pci_list_vpd_io lvios;
+#endif
 	struct pci_match_conf *pattern_buf;
 	struct pci_map *pm;
 	struct pci_bar_mmap *pbm;
@@ -1041,12 +1054,14 @@ pci_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int flag, struct thread *t
 #endif
 		case PCIOCGETBAR:
 		case PCIOCLISTVPD:
+#ifdef COMPAT_FREEBSD64
+		case PCIOCLISTVPD64:
+#endif
 			break;
 		default:
 			return (EPERM);
 		}
 	}
-
 
 	/* Giant because newbus is Giant locked revisit with newbus locking */
 	mtx_lock(&Giant);
@@ -1358,7 +1373,18 @@ getconfexit:
 			error = ENODEV;
 		break;
 	case PCIOCLISTVPD:
-		lvio = (struct pci_list_vpd_io *)data;
+#ifdef COMPAT_FREEBSD64
+	case PCIOCLISTVPD64:
+		if (cmd == PCIOCLISTVPD64) {
+			lvio64 = (struct pci_list_vpd_io64 *)data;
+			lvio = &lvios;
+			lvio->plvi_sel = lvio64->plvi_sel;
+			lvio->plvi_len = lvio64->plvi_len;
+			lvio->plvi_data = __USER_CAP(lvio64->plvi_data,
+			    lvio64->plvi_len);
+		} else
+#endif
+			lvio = (struct pci_list_vpd_io *)data;
 
 		/*
 		 * Assume that the user-level bus number is
@@ -1372,6 +1398,10 @@ getconfexit:
 			break;
 		}
 		error = pci_list_vpd(pcidev, lvio);
+#ifdef COMPAT_FREEBSD64
+		if (cmd == PCIOCLISTVPD64)
+			lvio64->plvi_len = lvio->plvi_len;
+#endif
 		break;
 
 	case PCIOCBARMMAP:

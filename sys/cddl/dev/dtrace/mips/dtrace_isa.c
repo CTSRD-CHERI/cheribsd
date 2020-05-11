@@ -151,9 +151,9 @@ dtrace_getupcstack(uint64_t *pcstack, int pcstack_limit)
 	if (pcstack_limit <= 0)
 		return;
 
-	pc = TRAPF_PC(tf);
-	sp = (uintcap_t)tf->sp;
-	ra = (uintcap_t)tf->ra;
+	pc =  TRAPF_PC(tf);
+	sp = (uint64_t)tf->sp;
+	ra = (uint64_t)tf->ra;
 	*pcstack++ = TRAPF_PC(tf);
 
 	/*

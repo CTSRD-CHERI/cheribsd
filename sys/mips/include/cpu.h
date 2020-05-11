@@ -71,11 +71,8 @@
 #define	TRAPF_PC(framep)	((__cheri_addr vaddr_t)(framep)->pc)
 #define	TRAPF_PC_OFFSET(framep)	((__cheri_offset vaddr_t)(framep)->pc)
 #if __has_feature(capabilities)
-#define	TRAPF_PC_SET_ADDR(framep, addr)	do {				\
-    (framep)->pc = __builtin_cheri_address_set((framep)->pc, addr);	\
-    KASSERT(cheri_gettag((framep)->pc), 				\
-        ("created untagged pcc: " _CHERI_PRINT_PTR_FMT((framep)->pc)));	\
-    } while(0)
+#define	TRAPF_PC_SET_ADDR(framep, addr)	\
+    (framep)->pc = __builtin_cheri_address_set((framep)->pc, addr)
 #else
 #define	TRAPF_PC_SET_ADDR(framep, addr)	\
     ((framep)->pc) = (trapf_pc_t)(uintptr_t)addr
