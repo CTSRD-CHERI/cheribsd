@@ -131,9 +131,9 @@
 #define	DT_VERS_1_12	DT_VERSION_NUMBER(1, 12, 0)
 #define	DT_VERS_1_12_1	DT_VERSION_NUMBER(1, 12, 1)
 #define	DT_VERS_1_13	DT_VERSION_NUMBER(1, 13, 0)
-#define	DT_VERS_1_13_1	DT_VERSION_NUMBER(1, 13, 1)
-#define	DT_VERS_LATEST	DT_VERS_1_13_1
-#define	DT_VERS_STRING	"Sun D 1.13.1"
+#define	DT_VERS_2_0	DT_VERSION_NUMBER(2, 0, 0)
+#define	DT_VERS_LATEST	DT_VERS_2_0
+#define	DT_VERS_STRING	"Sun D 1.14"
 
 const dt_version_t _dtrace_versions[] = {
 	DT_VERS_1_0,	/* D API 1.0.0 (PSARC 2001/466) Solaris 10 FCS */
@@ -160,7 +160,7 @@ const dt_version_t _dtrace_versions[] = {
 	DT_VERS_1_12,	/* D API 1.12 */
 	DT_VERS_1_12_1,	/* D API 1.12.1 */
 	DT_VERS_1_13,	/* D API 1.13 */
-	DT_VERS_1_13_1,	/* D API 1.13.1 Capabilities support */
+	DT_VERS_2_0,	/* D API 1.13.1 Capabilities support */
 	0
 };
 
@@ -222,9 +222,11 @@ static const dt_ident_t _dtrace_globals[] = {
 { "breakpoint", DT_IDENT_ACTFUNC, 0, DT_ACT_BREAKPOINT,
 	DT_ATTR_STABCMN, DT_VERS_1_0,
 	&dt_idops_func, "void()" },
+#if __has_feature(capabilities)
 { "capabilitylen", DT_IDENT_FUNC, 0, DIF_SUBR_CAPABILITY_LEN,
-	DT_ATTR_STABCMN, DT_VERS_1_13_1,
+	DT_ATTR_STABCMN, DT_VERS_2_0,
 	&dt_idops_func, "uint_t(__uintcap_t)" },
+#endif
 { "caller", DT_IDENT_SCALAR, 0, DIF_VAR_CALLER, DT_ATTR_STABCMN, DT_VERS_1_0,
 	&dt_idops_type, "uintptr_t" },
 { "chill", DT_IDENT_ACTFUNC, 0, DT_ACT_CHILL, DT_ATTR_STABCMN, DT_VERS_1_0,
