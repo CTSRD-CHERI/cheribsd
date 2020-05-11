@@ -1357,7 +1357,7 @@ typedef struct {
 } dtrace_enable_io_t;
 typedef struct {
 	void 	*dof; 		/* DOF userland address written to driver. */
-	int 	n_matched	/* # matches returned by driver. */
+	int 	n_matched;	/* # matches returned by driver. */
 } dtrace_enable_io_64_t;
 #define	DTRACEIOC_ENABLE	_IOWR('x',6,dtrace_enable_io_t)
 							/* enable probes */
