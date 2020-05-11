@@ -603,7 +603,7 @@ uint8_t dtrace_load8(uintptr_t);
 void dtrace_dynvar_clean(dtrace_dstate_t *);
 dtrace_dynvar_t *dtrace_dynvar(dtrace_dstate_t *, uint_t, dtrace_key_t *,
     size_t, dtrace_dynvar_op_t, dtrace_mstate_t *, dtrace_vstate_t *);
-uintcap_t dtrace_dif_varstr(uintptr_t, dtrace_state_t *, dtrace_mstate_t *);
+uintptr_t dtrace_dif_varstr(uintptr_t, dtrace_state_t *, dtrace_mstate_t *);
 static int dtrace_priv_proc(dtrace_state_t *);
 static void dtrace_getf_barrier(void);
 static int dtrace_canload_remains(uint64_t, size_t, size_t *,
@@ -3238,7 +3238,7 @@ dtrace_speculation_buffer(dtrace_state_t *state, processorid_t cpuid,
  * dtrace_dif_variable() uses this routine as a helper for various
  * builtin values such as 'execname' and 'probefunc.'
  */
-uintcap_t
+uintptr_t
 dtrace_dif_varstr(uintptr_t addr, dtrace_state_t *state,
     dtrace_mstate_t *mstate)
 {
@@ -3284,7 +3284,7 @@ dtrace_dif_varstr(uintptr_t addr, dtrace_state_t *state,
  * dtrace_dif_variable() uses this routine as a helper for various
  * builtin values such as 'execargs'.
  */
-static uintcap_t
+static uintptr_t
 dtrace_dif_varstrz(uintptr_t addr, size_t strsz, dtrace_state_t *state,
     dtrace_mstate_t *mstate)
 {
