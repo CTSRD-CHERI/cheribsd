@@ -45,6 +45,11 @@ __FBSDID("$FreeBSD$");
 #include <sys/sysctl.h>
 #include <sys/systm.h>
 #include <sys/tty.h>
+#include <sys/types.h>
+
+#ifdef CHERI_PURECAP_KERNEL
+#include <cheri/cheric.h>
+#endif
 
 #include <ddb/ddb.h>
 
@@ -68,6 +73,11 @@ int		aju_cons_buffer_valid;
 int		aju_cons_jtag_present;
 u_int		aju_cons_jtag_missed;
 struct mtx	aju_cons_lock;
+
+#ifdef CHERI_PURECAP_KERNEL
+/* UART memory mapping capability */
+char *aju_io_capability;
+#endif
 
 /*
  * Low-level console driver functions.
@@ -108,48 +118,61 @@ SYSCTL_UINT(_hw_altera_jtag_uart, OID_AUTO, ac_poll_delay,
  * low-level console is used for polled read while the TTY driver is also
  * looking for input.  Probably we should also share buffers between layers.
  */
-#define	MIPS_XKPHYS_UNCACHED_BASE	0x9000000000000000
 
-typedef	uint64_t	paddr_t;
-
-static inline vaddr_t
-mips_phys_to_uncached(paddr_t phys)            
+/*
+ * Get memory-mapped JTAG UART register address in
+ * uncached physically mapped memory.
+ */
+static inline char *
+mips_aju_register_addr(vm_paddr_t regoff)
 {
 
-	return (phys | MIPS_XKPHYS_UNCACHED_BASE);
+#ifdef CHERI_PURECAP_KERNEL
+	return (cheri_setoffset(aju_io_capability, regoff));
+#else
+	return (MIPS_PHYS_TO_XKPHYS_UNCACHED(BERI_UART_BASE + regoff));
+#endif
 }
 
 static inline uint32_t
-mips_ioread_uint32(vaddr_t vaddr)
+mips_ioread_uint32(char *raddr)
 {
 	uint32_t v;
 
-	__asm__ __volatile__ ("lw %0, 0(%1)" : "=r" (v) : "r" (vaddr));
+#ifdef CHERI_PURECAP_KERNEL
+	__asm__ __volatile__ ("clw %0, $zero, 0(%1)" : "=r" (v) : "C" (raddr));
+#else
+	__asm__ __volatile__ ("lw %0, 0(%1)" : "=r" (v) : "r" (raddr));
+#endif
 	return (v);
 }
 
 static inline void
-mips_iowrite_uint32(vaddr_t vaddr, uint32_t v)
+mips_iowrite_uint32(char *raddr, uint32_t v)
 {
 
-	__asm__ __volatile__ ("sw %0, 0(%1)" : : "r" (v), "r" (vaddr));
+#ifdef CHERI_PURECAP_KERNEL
+	__asm__ __volatile__ ("csw %0, $zero, 0(%1)" : : "r" (v), "C" (raddr));
+#else
+	__asm__ __volatile__ ("sw %0, 0(%1)" : : "r" (v), "r" (raddr));
+#endif
 }
 
 /*
  * Little-endian versions of 32-bit I/O routines.
  */
 static inline uint32_t
-mips_ioread_uint32le(vaddr_t vaddr)
+mips_ioread_uint32le(char *raddr)
 {
 
-	return (le32toh(mips_ioread_uint32(vaddr)));
+	return (le32toh(mips_ioread_uint32(raddr)));
 }
 
 static inline void
-mips_iowrite_uint32le(vaddr_t vaddr, uint32_t v)
+mips_iowrite_uint32le(char *raddr, uint32_t v)
 {
 
-	mips_iowrite_uint32(vaddr, htole32(v));
+	mips_iowrite_uint32(raddr, htole32(v));
 }
 
 /*
@@ -160,7 +183,7 @@ static inline uint32_t
 aju_cons_data_read(void)
 {
 
-	return (mips_ioread_uint32le(mips_phys_to_uncached(BERI_UART_BASE +
+	return (mips_ioread_uint32le(mips_aju_register_addr(
 	    ALTERA_JTAG_UART_DATA_OFF)));
 }
 
@@ -168,7 +191,7 @@ static inline void
 aju_cons_data_write(uint32_t v)
 {
 
-	mips_iowrite_uint32le(mips_phys_to_uncached(BERI_UART_BASE +
+	mips_iowrite_uint32le(mips_aju_register_addr(
 	    ALTERA_JTAG_UART_DATA_OFF), v);
 }
 
@@ -176,7 +199,7 @@ static inline uint32_t
 aju_cons_control_read(void)
 {
 
-	return (mips_ioread_uint32le(mips_phys_to_uncached(BERI_UART_BASE +
+	return (mips_ioread_uint32le(mips_aju_register_addr(
 	    ALTERA_JTAG_UART_CONTROL_OFF)));
 }
 
@@ -184,7 +207,7 @@ static inline void
 aju_cons_control_write(uint32_t v)
 {
 
-	mips_iowrite_uint32le(mips_phys_to_uncached(BERI_UART_BASE +
+	mips_iowrite_uint32le(mips_aju_register_addr(
 	    ALTERA_JTAG_UART_CONTROL_OFF), v);
 }
 
@@ -288,6 +311,11 @@ aju_cninit(struct consdev *cp)
 	AJU_CONSOLE_LOCK_INIT();
 
 	AJU_CONSOLE_LOCK();
+#ifdef CHERI_PURECAP_KERNEL
+	aju_io_capability = cheri_ptrperm(
+		MIPS_PHYS_TO_XKPHYS_UNCACHED(BERI_UART_BASE),
+		8, CHERI_PERM_GLOBAL | CHERI_PERM_LOAD | CHERI_PERM_STORE);
+#endif
 	v = aju_cons_control_read();
 	v &= ~ALTERA_JTAG_UART_CONTROL_AC;
 	aju_cons_control_write(v);
