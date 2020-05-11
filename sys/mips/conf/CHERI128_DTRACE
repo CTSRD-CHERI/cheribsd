@@ -17,6 +17,8 @@ makeoptions     WITH_CTF=1
 
 options         KTRACE
 
+options NO_SWAPPING
+
 #debug things
 options KDB
 options DDB
