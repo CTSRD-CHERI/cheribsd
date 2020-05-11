@@ -158,7 +158,7 @@ static void
 malta_lcd_print(char *str)
 {
 	int i;
-	
+
 	if (str == NULL)
 		return;
 
@@ -372,7 +372,7 @@ platform_argv_ptr(int32_t argv)
 #endif
 
 void
-platform_start(__register_t a0, __intptr_t a1,  __intptr_t a2,
+platform_start(__register_t a0, __register_t a1,  __register_t a2,
     __register_t a3)
 {
 	uint64_t platform_counter_freq;
@@ -385,9 +385,15 @@ platform_start(__register_t a0, __intptr_t a1,  __intptr_t a2,
 
 	/* Clear the BSS and SBSS segments */
 #ifdef CHERI_PURECAP_KERNEL
+  argv = cheri_ptrperm(cheri_setaddress(cheri_kseg0_capability, a1),
+                       argc * sizeof(uint64_t), CHERI_PERM_LOAD);
+  envp = cheri_andperm(cheri_setaddress(cheri_kseg0_capability, a2),
+                       CHERI_PERM_LOAD);
 	platform_clear_bss(cheri_kdata_capability);
 #else
-        platform_clear_bss();
+  argv = (int32_t *)a1;
+  envp = (int32_t *)a2;
+  platform_clear_bss();
 #endif
 
 	mips_postboot_fixup();
@@ -400,7 +406,7 @@ platform_start(__register_t a0, __intptr_t a1,  __intptr_t a2,
 	cninit();
 	printf("entry: platform_start()\n");
 
-	/* 
+	/*
 	 * Parse kernel cmdline.
 	 * YAMON uses 32bit pointers to strings so
 	 * sign-extend them to the correct type manually.

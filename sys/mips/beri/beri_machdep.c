@@ -108,18 +108,60 @@ extern int	*end;
 static void *
 beri_platform_ptr(vm_offset_t vaddr)
 {
+	if (vaddr == 0)
+		return (NULL);
+
 	void *cap = cheri_setaddress(cheri_kall_capability, vaddr);
 	cap = cheri_andperm(cap, CHERI_PERM_LOAD);
 
 	return (cap);
 }
-#else
+
+static void *
+beri_platform_ptrbounds(vm_offset_t vaddr, size_t len)
+{
+	if (vaddr == 0)
+		return (NULL);
+	return (cheri_csetbounds(beri_platform_ptr(vaddr), len));
+}
+
+static void
+platform_clear_bss(void *kroot)
+{
+	/*
+	 * We need to hand-craft a capability for edata because it is defined
+	 * by the linker script and have no size info.
+	 */
+	void *edata_start;
+	size_t edata_siz = (__cheri_addr size_t)(&end) -
+		(__cheri_addr size_t)(&edata);
+
+	edata_start = cheri_ptrperm(
+		cheri_setaddress(kroot, (__cheri_addr vaddr_t)(&edata)),
+		edata_siz, CHERI_PERM_STORE);
+	memset(edata_start, 0, edata_siz);
+}
+#else /* CHERI_PURECAP_KERNEL */
 static void *
 beri_platform_ptr(vm_offset_t vaddr)
 {
 	return ((void *)vaddr);
 }
-#endif
+
+static void *
+beri_platform_ptrbounds(vm_offset_t vaddr, size_t len)
+{
+	return ((void *)vaddr);
+}
+
+static void
+platform_clear_bss()
+{
+	vm_offset_t kernend = (vm_offset_t)&end;
+
+	memset(&edata, 0, kernend - (vm_offset_t)(&edata));
+}
+#endif /* CHERI_PURECAP_KERNEL */
 
 void
 platform_cpu_init()
@@ -205,15 +247,14 @@ platform_reset(void)
 }
 
 void
-platform_start(__register_t a0, __intptr_t a1,  __intptr_t a2,
+platform_start(__register_t a0, __register_t a1,  __register_t a2,
     __register_t a3)
 {
 	struct bootinfo *bootinfop;
-	vm_offset_t kernend;
 	uint64_t platform_counter_freq;
 	int argc = a0;
-	char **argv = (char **)a1;
-	char **envp = (char **)a2;
+	uint64_t *argv;
+	uint64_t *envp;
 	long memsize;
 	char *boot_env;
 #ifdef FDT
@@ -230,9 +271,15 @@ platform_start(__register_t a0, __intptr_t a1,  __intptr_t a2,
 	int i;
 
 	/* clear the BSS and SBSS segments */
-	/* XXX-AM: may need to reuse code from malta platform_start for this. */
-	kernend = (vm_offset_t)&end;
-	memset(&edata, 0, kernend - (vm_offset_t)(&edata));
+#ifdef CHERI_PURECAP_KERNEL
+	argv = beri_platform_ptr(a1);
+	envp = beri_platform_ptr(a2);
+	platform_clear_bss(cheri_kdata_capability);
+#else
+	argv = (char **)a1;
+	envp = (char **)a2;
+	platform_clear_bss();
+#endif
 
 	mips_postboot_fixup();
 
@@ -249,7 +296,8 @@ platform_start(__register_t a0, __intptr_t a1,  __intptr_t a2,
 	 * module information.
 	 */
 	if (a3 >= 0x9800000000000000ULL) {
-		bootinfop = beri_platform_ptr(a3);
+		bootinfop = beri_platform_ptrbounds(
+		    a3, sizeof(struct bootinfo));
 		preload_metadata = beri_platform_ptr(bootinfop->bi_modulep);
 		memsize = bootinfop->bi_memsize;
 	} else {
@@ -378,13 +426,18 @@ platform_start(__register_t a0, __intptr_t a1,  __intptr_t a2,
 	bootverbose = 1;
 	if (bootverbose) {
 		printf("cmd line: ");
-		for (i = 0; i < argc; i++)
-			printf("%s ", argv[i]);
+		for (i = 0; i < argc; i++) {
+			char *argv_value = beri_platform_ptr(argv[i]);
+			printf("%s ", argv_value);
+		}
 		printf("\n");
 
 		printf("envp:\n");
-		for (i = 0; envp[i]; i += 2)
-			printf("\t%s = %s\n", envp[i], envp[i+1]);
+		for (i = 0; envp[i]; i += 2) {
+			char *envp_name = beri_platform_ptr(envp[i]);
+			char *envp_value = beri_platform_ptr(envp[i+1]);
+			printf("\t%s = %s\n", envp_name, envp_value);
+		}
 
 		if (bootinfop != NULL) {
 			printf("bootinfo found at %p, "

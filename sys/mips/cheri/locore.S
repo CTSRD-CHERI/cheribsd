@@ -304,17 +304,6 @@ VECTOR(_locore, unknown)
 	move a1, s1
 	move a2, s2
 	move a3, s3
-
-	/* Reconstruct platform_start arguments */
-	CAPTABLE_LOAD($c28, _C_LABEL(cheri_kseg0_capability))
-	clc		$c28, zero, 0($c28)
-	csetaddr	$c3, $c28, a1
-	dsll		t0, a0, 3
-	csetbounds	$c3, $c3, t0
-	/* do not bound envp because we do not have
-	* reliable length information */
-	csetaddr	$c4, $c28, a2
-	move	a1, a3
 	CAPCALL_LOAD($c12, _C_LABEL(platform_start))
 	cjalr	$c12, $c17
 	nop
