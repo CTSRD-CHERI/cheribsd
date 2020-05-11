@@ -104,7 +104,7 @@ WERROR?=	-Werror
 CFLAGS+=	-fno-common
 
 # XXX LOCORE means "don't declare C stuff" not "for locore.s".
-ASM_CFLAGS= -x assembler-with-cpp -DLOCORE ${CFLAGS} ${ASM_CFLAGS.${.IMPSRC:T}} 
+ASM_CFLAGS= -x assembler-with-cpp -DLOCORE ${CFLAGS} ${ASM_CFLAGS.${.IMPSRC:T}}
 
 .if defined(PROFLEVEL) && ${PROFLEVEL} >= 1
 CFLAGS+=	-DGPROF
@@ -355,6 +355,7 @@ EMBEDFS_FORMAT.mips?=		elf32-tradbigmips
 EMBEDFS_FORMAT.mipsel?=		elf32-tradlittlemips
 EMBEDFS_FORMAT.mips64?=		elf64-tradbigmips
 EMBEDFS_FORMAT.mips64el?=	elf64-tradlittlemips
+EMBEDFS_FORMAT.mips64c128?=	elf64-tradbigmips-fbsd-cheri
 EMBEDFS_FORMAT.riscv64?=	elf64-littleriscv
 .endif
 .endif
