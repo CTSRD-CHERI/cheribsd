@@ -1201,8 +1201,13 @@ dt_module_update(dtrace_hdl_t *dtp, struct kld_file_stat *k_stat)
 	(void) strlcpy(name, k_stat->name, sizeof(name));
 	(void) strlcpy(fname, k_stat->pathname, sizeof(fname));
 #ifdef __mips__
-	if (strncmp(fname, "kernel", sizeof(name)) == 0)
-		strlcpy(fname,"/boot/kernel/kernel",sizeof(fname));
+	// in mips, the kernel doesn't have the correct file name.
+	if (strncmp(fname, "kernel", sizeof(name)) == 0) {
+		char bootfile[MAXPATHLEN];
+		size_t len = sizeof(bootfile);
+		if (sysctlbyname("kern.bootfile", bootfile, &len, NULL, 0) != 0)
+			strlcpy(fname,bootfile,sizeof(fname));
+	}
 #endif
 #endif
 
