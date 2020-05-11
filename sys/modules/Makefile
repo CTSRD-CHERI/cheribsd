@@ -354,7 +354,6 @@ SUBDIR=	\
 	twe \
 	tws \
 	${_uart} \
-	ubsec \
 	udf \
 	udf_iconv \
 	ufs \
