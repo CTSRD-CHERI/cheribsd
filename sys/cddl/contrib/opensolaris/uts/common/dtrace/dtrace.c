@@ -10992,8 +10992,8 @@ dtrace_predicate_release(dtrace_predicate_t *pred, dtrace_vstate_t *vstate)
  * DTrace Action Description Functions
  */
 static dtrace_actdesc_t *
-dtrace_actdesc_create(
-    dtrace_actkind_t kind, uint32_t ntuple, dtrace_uarg_t uarg, uint64_t arg)
+dtrace_actdesc_create(dtrace_actkind_t kind, uint32_t ntuple,
+    dtrace_uarg_t uarg, uint64_t arg)
 {
 	dtrace_actdesc_t *act;
 
@@ -13247,7 +13247,7 @@ dtrace_dof_copyin(dtrace_uarg_t uarg, int *errp)
 	/*
 	 * First, we're going to copyin() the sizeof (dof_hdr_t).
 	 */
-	if (copyin_c((void * __capability) uarg, &hdr, sizeof (hdr)) != 0) {
+	if (copyin((void * __capability) uarg, &hdr, sizeof (hdr)) != 0) {
 		dtrace_dof_error(NULL, "failed to copyin DOF header");
 		*errp = EFAULT;
 		return (NULL);

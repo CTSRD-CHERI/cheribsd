@@ -171,8 +171,8 @@ SET_DECLARE(sdt_argtypes_set, struct sdt_argtype);
 	if (SDT_PROBES_ENABLED()) {						\
 		if (__predict_false(sdt_##prov##_##mod##_##func##_##name->id))	\
 		(*sdt_probe_func)(sdt_##prov##_##mod##_##func##_##name->id,	\
-		    (uintcap_t) arg0, (uintptr_t) arg1, (uintptr_t) arg2,	\
-		    (uintptr_t) arg3, (uintptr_t) arg4);			\
+		    (uintcap_t) arg0, (uintcap_t) arg1, (uintcap_t) arg2,	\
+		    (uintcap_t) arg3, (uintcap_t) arg4);			\
 	} \
 } while (0)
 
