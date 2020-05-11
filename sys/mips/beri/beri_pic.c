@@ -81,7 +81,7 @@ enum {
 struct beripic_softc;
 
 struct beri_pic_isrc {
-	struct intr_irqsrc	isrc;
+	struct intr_irqsrc	isrc __subobject_use_container_bounds;
 	u_int			irq;
 	uint32_t		mips_hard_irq;
 };
@@ -161,7 +161,7 @@ beripic_probe(device_t dev)
 
 	if (!ofw_bus_is_compatible(dev, "sri-cambridge,beri-pic"))
 		return (ENXIO);
-		
+
 	device_set_desc(dev, "BERI Programmable Interrupt Controller");
 
 	return (BUS_PROBE_DEFAULT);

@@ -113,7 +113,7 @@ struct mtx mips_pic_mtx;
 MTX_SYSINIT(mips_pic_mtx, &mips_pic_mtx, "mips intr controller mutex", MTX_DEF);
 
 struct mips_pic_irqsrc {
-	struct intr_irqsrc	isrc;
+	struct intr_irqsrc	isrc __subobject_use_container_bounds;
 	u_int			irq;
 };
 
