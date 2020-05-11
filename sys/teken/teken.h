@@ -63,7 +63,7 @@ typedef unsigned char teken_color_t;
 typedef struct {
 	teken_unit_t	tp_row;
 	teken_unit_t	tp_col;
-} teken_pos_t;
+} __aligned(2 * sizeof(teken_unit_t)) teken_pos_t;
 typedef struct {
 	teken_pos_t	tr_begin;
 	teken_pos_t	tr_end;
@@ -76,7 +76,7 @@ typedef struct {
 typedef struct {
 	teken_unit_t	ts_begin;
 	teken_unit_t	ts_end;
-} teken_span_t;
+} __aligned(2 * sizeof(teken_unit_t)) teken_span_t;
 
 typedef struct __teken teken_t;
 
