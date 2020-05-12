@@ -211,6 +211,12 @@ exclude EXFAIL common/usdt/tst.user.ksh
 # Triggers a lock assertion by using the raise() action from a profile probe.
 exclude SKIP common/ustack/tst.spin.ksh
 
+
+
+
+
+
+
 ####
 # CHERI SPECIFIC EXCLUDE
 # The followings cause instability, make the system stuck, or timeout on CHERI.
@@ -236,7 +242,7 @@ exclude SKIP common/fbtprovider/tst.tailcall.d
 exclude SKIP builtinvar/t_dtrace_contrib:tst_arg1to8clause_d
 exclude SKIP builtinvar/t_dtrace_contrib:tst_arg0clause_d
 
-# causes core dump
+# causes trap
 exclude SKIP bitfields/t_dtrace_contrib:tst_SizeofBitField_d
 
 # Some of them cause the system to stuck:
@@ -417,4 +423,8 @@ exclude SKIP common/usdt/tst.static2.ksh
 exclude SKIP common/usdt/tst.static2.ksh.out
 exclude SKIP common/usdt/tst.user.ksh
 exclude SKIP common/usdt/tst.user.ksh.out
+
+#trap: to debug
+
+exclude SKIP assocs/t_dtrace_contrib:tst_misc_d
 

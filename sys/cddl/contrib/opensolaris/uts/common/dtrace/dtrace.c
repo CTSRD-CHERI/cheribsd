@@ -6103,6 +6103,31 @@ inetout:	regs[rd] = (uintptr_t)end + 1;
 #endif
 	}
 }
+#if __has_feature(capabilities)
+static uintcap_t
+dtrace_sum_capabilities(uintcap_t r1, uintcap_t r2)
+{
+	void *__capability c1 = (void *__capability)r1;
+	void *__capability c2 = (void *__capability)r2;
+	if (cheri_gettag(c1) && cheri_gettag(c2)) {
+		printf("%s Both capabilities are valid. This shouldn't happen",
+		    __func__);
+		ASSERT(0);
+		return 0;
+	}
+
+	if (cheri_gettag(c1))
+		return (uintcap_t)(c1 + (__cheri_addr vaddr_t)c2);
+	return (uintcap_t)(c2 + (__cheri_addr vaddr_t)c1);
+}
+
+void
+ensure_tag_zero(uintcap_t r1,uintcap_t r2){
+	void *__capability c1 = (void *__capability)r1;
+	void *__capability c2 = (void *__capability)r2;
+	ASSERT(cheri_gettag(c1) == 0 && cheri_gettag(c2) == 0);
+}
+#endif
 
 /*
  * Emulate the execution of DTrace IR instructions specified by the given
@@ -6151,9 +6176,25 @@ dtrace_dif_emulate(dtrace_difo_t *difo, dtrace_mstate_t *mstate,
 		r1 = DIF_INSTR_R1(instr);
 		r2 = DIF_INSTR_R2(instr);
 		rd = DIF_INSTR_RD(instr);
+#if __has_feature(capabilities)
+		switch (DIF_INSTR_OP(instr)) {
+		case DIF_OP_OR:
+		case DIF_OP_XOR:
+		case DIF_OP_AND:
+		case DIF_OP_SLL:
+		case DIF_OP_SRL:
+		case DIF_OP_SUB:
+		case DIF_OP_MUL:
+		case DIF_OP_SDIV:
+		case DIF_OP_UDIV:
+		case DIF_OP_SREM:
+		case DIF_OP_UREM:
+		case DIF_OP_NOT:
+			ensure_tag_zero(regs[r1], regs[r2]);
+		}
+#endif
 
 		switch (DIF_INSTR_OP(instr)) {
-			//TODO(nicomazz): those operations break capabilities. Find how to avoid them with real capabilities
 		case DIF_OP_OR:
 			regs[rd] = (uint64_t)regs[r1] | regs[r2];
 			break;
@@ -6173,7 +6214,11 @@ dtrace_dif_emulate(dtrace_difo_t *difo, dtrace_mstate_t *mstate,
 			regs[rd] = regs[r1] - regs[r2];
 			break;
 		case DIF_OP_ADD:
-			regs[rd] = (uint64_t)regs[r1] + regs[r2];
+#if __has_feature(capabilities)
+			regs[rd] = dtrace_sum_capabilities(regs[r1],regs[r2]);
+#else
+			regs[rd] = regs[r1] + regs[r2];
+#endif
 			break;
 		case DIF_OP_MUL:
 			regs[rd] = (uint64_t)regs[r1] * regs[r2];
