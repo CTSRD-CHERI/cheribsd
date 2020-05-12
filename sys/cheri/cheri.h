@@ -122,12 +122,9 @@ void	hybridabi_sendsig(struct thread *td);
  */
 struct pcb;
 struct proc;
-struct sysarch_args;
 void	cheri_sealcap_copy(struct proc *dst, struct proc *src);
 void	cheri_signal_copy(struct pcb *dst, struct pcb *src);
 int	cheri_sysarch_getsealcap(struct thread *td, void * __capability ucap);
-int	cheri_sysarch_getstack(struct thread *td, struct sysarch_args *uap);
-int	cheri_sysarch_setstack(struct thread *td, struct sysarch_args *uap);
 
 /*
  * Functions to manage object types.
@@ -147,19 +144,6 @@ extern u_int	security_cheri_debugger_on_sigprot;
 extern u_int	security_cheri_sandboxed_signals;
 extern u_int	security_cheri_syscall_violations;
 extern u_int	security_cheri_bound_legacy_capabilities;
-
-/*
- * Functions exposed to machine-independent code that must interact with
- * CHERI-specific features; e.g., ktrace.
- */
-struct ktr_ccall;
-struct ktr_creturn;
-struct ktr_cexception;
-struct trapframe;
-void	ktrccall_mdfill(struct pcb *pcb, struct ktr_ccall *kc);
-void	ktrcreturn_mdfill(struct pcb *pcb, struct ktr_creturn *kr);
-void	ktrcexception_mdfill(struct trapframe *frame,
-	    struct ktr_cexception *ke);
 #endif /* !_KERNEL */
 
 /*

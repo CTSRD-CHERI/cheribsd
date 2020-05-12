@@ -155,7 +155,7 @@ test_cheriabi_open_bad_len(const struct cheri_test *ctp __unused)
 	char *path;
 	int fd;
 
-	path = cheri_csetbounds(pathbuf, strlen(path));
+	path = cheri_setbounds(pathbuf, strlen(path));
 
 	fd = open(path, O_RDONLY);
 	if (fd > 0)
@@ -174,7 +174,7 @@ test_cheriabi_open_bad_len_2(const struct cheri_test *ctp __unused)
 	char *path;
 	int fd;
 
-	path = cheri_csetbounds(pathbuf, 3);
+	path = cheri_setbounds(pathbuf, 3);
 	path += 4;
 
 	fd = open(path, O_RDONLY);

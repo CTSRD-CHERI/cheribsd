@@ -31,12 +31,6 @@
 #ifndef _LIBCHERI_SYSTEM_MD_H_
 #define	_LIBCHERI_SYSTEM_MD_H_
 
-/* XXXRW: Needed temporarily for CHERI_ASM_CMOVE(). */
-#define	_CHERI_INTERNAL
-#define	zero	$zero
-#include <machine/cheriasm.h>
-#undef _CHERI_INTERNAL
-
 /*
  * CHERI system class CCall landing pad code: catches CCalls inbound from
  * sandboxes seeking system services, and bootstraps C code.  A number of
@@ -72,10 +66,7 @@
 
 #ifdef __CHERI_PURE_CAPABILITY__
 
-#ifdef __CHERI_CAPABILITY_TABLE__
-
-/* TODO: Support other captable ABIs that aren't pcrel */
-
+#if __CHERI_CAPABILITY_TABLE__ == 3
 #define	LIBCHERI_CLASS_ASM(class)					\
 	.text;								\
 	.option pic0;							\
@@ -137,67 +128,12 @@ $__libcheri_ ## class ## _entry_end:					\
 	.end __libcheri_## class ## _entry;				\
 	.size __libcheri_ ## class ## _entry,$__libcheri_ ## class ## _entry_end - __libcheri_ ## class ## _entry
 
-#else /* !__CHERI_CAPABILITY_TABLE__ */
-
-#define	LIBCHERI_CLASS_ASM(class)					\
-	.text;								\
-	.option pic0;							\
-	.global __libcheri_ ## class ## _entry;				\
-	.type __libcheri_ ## class ## _entry,@function;			\
-	.ent __libcheri_ ## class ## _entry;				\
-__libcheri_ ## class ## _entry:						\
-									\
-	/*								\
-	 * Load sandbox object's DDC via IDC.				\
-	 */								\
-	clc	$c12, zero, (4*CHERICAP_SIZE)($c26);			\
-	csetdefault	$c12;						\
-									\
-	/*								\
-	 * Install global invocation stack.  NB: this means we can't	\
-	 * support recursion or concurrency.  Further note: this is	\
-	 * shared by all classes outside of the sandbox.		\
-	 */								\
-	dla	$t0, __libcheri_enter_stack_csp;			\
-	clc	$csp, $t0, 0($c12);					\
-									\
-	/*								\
-	 * Set up global pointer.					\
-	 */								\
-	dla	$gp, _gp;						\
-									\
-	/*								\
-	 * The fourth entry of $idc is a method vtable.  If it is a	\
-	 * valid capability, then load the address at offset $v0	\
-	 * rather than using the "enter" functions.			\
-	 */								\
-	clc	$c12, zero, (3*CHERICAP_SIZE)($c26);			\
-	cld	$t9, $v0, 0($c12);					\
-	dla	$ra, 0f;						\
-	cgetpcc	$c12;							\
-	csetoffset	$c12, $c12, $t9;				\
-	cjalr	$c12, $c17;						\
-	nop;			/* Branch-delay slot */			\
-									\
-0:									\
-	/*								\
-	 * Return to caller - load creturn capability from		\
-	 * __libcheri_object_creturn into $c1, $c2, and then ccall.	\
-	 */								\
-	dla	$t0, __libcheri_object_creturn;				\
-	cgetdefault	$c2;						\
-	clc	$c1, $t0, 0($c2);					\
-	clc	$c2, $t0, CHERICAP_SIZE($c2);				\
-	CCALL($c1, $c2);						\
-									\
-$__libcheri_ ## class ## _entry_end:					\
-	.end __libcheri_## class ## _entry;				\
-	.size __libcheri_ ## class ## _entry,$__libcheri_ ## class ## _entry_end - __libcheri_ ## class ## _entry
-
+#else
+#error "Only PC-relative ABI is supported"
 #endif /* !__CHERI_CAPABILITY_TABLE__ */
 
-#else /* !__CHERI_PURE_CAPABILITY__ */
-
+#else /* not PC-relative ABI */
+/* TODO: Support other captable ABIs that aren't pcrel */
 #define	LIBCHERI_CLASS_ASM(class)					\
 	.text;								\
 	.option pic0;							\

@@ -35,6 +35,8 @@
  * SUCH DAMAGE.
  */
 
+#define	EXPLICIT_USER_ACCESS
+
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
@@ -605,7 +607,7 @@ g_dev_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag, struct thread
 			}
 			encryptedkey = malloc(kda->kda_encryptedkeysize, M_TEMP,
 			    M_WAITOK);
-			error = copyin(kda->kda_encryptedkey, encryptedkey,
+			error = copyin(kda->kda_user_encryptedkey, encryptedkey,
 			    kda->kda_encryptedkeysize);
 		} else {
 			encryptedkey = NULL;
@@ -702,7 +704,8 @@ g_dev_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag, struct thread
 	}
 	case DIOCZONECMD: {
 		struct disk_zone_args *zone_args =(struct disk_zone_args *)data;
-		struct disk_zone_rep_entry *new_entries, *old_entries;
+		struct disk_zone_rep_entry *new_entries;
+		struct disk_zone_rep_entry * __capability old_entries;
 		struct disk_zone_report *rep;
 		size_t alloc_size;
 
@@ -721,7 +724,7 @@ g_dev_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag, struct thread
 			if (alloc_size != 0)
 				new_entries = g_malloc(alloc_size,
 				    M_WAITOK| M_ZERO);
-			old_entries = rep->entries;
+			old_entries = rep->user_entries;
 			rep->entries = new_entries;
 		}
 		error = g_io_zonecmd(zone_args, cp);
@@ -729,7 +732,7 @@ g_dev_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag, struct thread
 		    alloc_size != 0 && error == 0)
 			error = copyout(new_entries, old_entries, alloc_size);
 		if (old_entries != NULL && rep != NULL)
-			rep->entries = old_entries;
+			rep->user_entries = old_entries;
 		if (new_entries != NULL)
 			g_free(new_entries);
 		break;

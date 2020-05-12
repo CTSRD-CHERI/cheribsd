@@ -1129,7 +1129,7 @@ typedef struct dtrace_bufdesc_64 {
 	uint32_t dtbd_cpu;			/* CPU or DTRACE_CPUALL */
 	uint32_t dtbd_errors;			/* number of errors */
 	uint64_t dtbd_drops;			/* number of drops */
-	char * dtbd_data;				/* data */
+	char * dtbd_data;			/* data */
 	uint64_t dtbd_oldest;			/* offset of oldest record */
 	uint64_t dtbd_timestamp;		/* hrtime of snapshot */
 } dtrace_bufdesc_64_t;
@@ -1352,12 +1352,12 @@ typedef struct dtrace_providerdesc {
 #define	DTRACEIOC_PROBEMATCH	_IOWR('x',5,dtrace_probedesc_t)
 							/* match probes */
 typedef struct {
-	void *__kerncap dof; /* DOF userland address written to driver. */
-	int n_matched; /* # matches returned by driver. */
+	void 	*__kerncap dof; /* DOF userland address written to driver. */
+	int 	n_matched; 	/* # matches returned by driver. */
 } dtrace_enable_io_t;
 typedef struct {
-	void *dof; /* DOF userland address written to driver. */
-	int n_matched; /* # matches returned by driver. */
+	void 	*dof; 		/* DOF userland address written to driver. */
+	int 	n_matched;	/* # matches returned by driver. */
 } dtrace_enable_io_64_t;
 #define	DTRACEIOC_ENABLE	_IOWR('x',6,dtrace_enable_io_t)
 							/* enable probes */

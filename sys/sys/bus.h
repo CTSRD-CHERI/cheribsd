@@ -103,7 +103,7 @@ struct u_device {
  * must have parameter definitions which begin with dr_name.
  */
 struct devreq_buffer {
-	void	*buffer;
+	void	* __kerncap buffer;
 	size_t	length;
 };
 
@@ -112,7 +112,7 @@ struct devreq {
 	int		dr_flags;		/* request-specific flags */
 	union {
 		struct devreq_buffer dru_buffer;
-		void	*dru_data;
+		void	* __kerncap dru_data;
 	} dr_dru;
 #define	dr_buffer	dr_dru.dru_buffer	/* variable-sized buffer */
 #define	dr_data		dr_dru.dru_data		/* fixed-size buffer */

@@ -76,6 +76,7 @@ __FBSDID("$FreeBSD$");
 #include <vm/uma.h>
 
 #include <net/route.h>
+#include <net/route/nhop.h>
 #include <net/if.h>
 #include <net/if_var.h>
 #include <net/vnet.h>
@@ -2199,9 +2200,9 @@ tcp_notify(struct inpcb *inp, int error)
 	if (tp->t_state == TCPS_ESTABLISHED &&
 	    (error == EHOSTUNREACH || error == ENETUNREACH ||
 	     error == EHOSTDOWN)) {
-		if (inp->inp_route.ro_rt) {
-			RTFREE(inp->inp_route.ro_rt);
-			inp->inp_route.ro_rt = (struct rtentry *)NULL;
+		if (inp->inp_route.ro_nh) {
+			NH_FREE(inp->inp_route.ro_nh);
+			inp->inp_route.ro_nh = (struct nhop_object *)NULL;
 		}
 		return (inp);
 	} else if (tp->t_state < TCPS_ESTABLISHED && tp->t_rxtshift > 3 &&
@@ -3463,4 +3464,33 @@ tcp_inptoxtp(const struct inpcb *inp, struct xtcpcb *xt)
 	in_pcbtoxinpcb(inp, &xt->xt_inp);
 	if (inp->inp_socket == NULL)
 		xt->xt_inp.xi_socket.xso_protocol = IPPROTO_TCP;
+}
+
+void
+tcp_log_end_status(struct tcpcb *tp, uint8_t status)
+{
+	uint32_t bit, i;
+
+	if ((tp == NULL) ||
+	    (status > TCP_EI_STATUS_MAX_VALUE) ||
+	    (status == 0)) {
+		/* Invalid */
+		return;
+	}
+	if (status > (sizeof(uint32_t) * 8)) {
+		/* Should this be a KASSERT? */
+		return;
+	}
+	bit = 1U << (status - 1);
+	if (bit & tp->t_end_info_status) {
+		/* already logged */
+		return;
+	}
+	for (i = 0; i < TCP_END_BYTE_INFO; i++) {
+		if (tp->t_end_info_bytes[i] == TCP_EI_EMPTY_SLOT) {
+			tp->t_end_info_bytes[i] = status;
+			tp->t_end_info_status |= bit;
+			break;
+		}
+	}
 }

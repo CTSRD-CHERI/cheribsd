@@ -65,7 +65,6 @@ struct hdacc_softc {
 #define hdacc_lock(codec)	snd_mtxlock((codec)->lock)
 #define hdacc_unlock(codec)	snd_mtxunlock((codec)->lock)
 #define hdacc_lockassert(codec)	snd_mtxassert((codec)->lock)
-#define hdacc_lockowned(codec)	mtx_owned((codec)->lock)
 
 MALLOC_DEFINE(M_HDACC, "hdacc", "HDA CODEC");
 
@@ -86,6 +85,7 @@ static const struct {
 	{ HDA_CODEC_ALC235, 0,		"Realtek ALC235" },
 	{ HDA_CODEC_ALC255, 0,		"Realtek ALC255" },
 	{ HDA_CODEC_ALC256, 0,		"Realtek ALC256" },
+	{ HDA_CODEC_ALC257, 0,		"Realtek ALC257" },
 	{ HDA_CODEC_ALC260, 0,		"Realtek ALC260" },
 	{ HDA_CODEC_ALC262, 0,		"Realtek ALC262" },
 	{ HDA_CODEC_ALC267, 0,		"Realtek ALC267" },
@@ -434,7 +434,8 @@ hdacc_probe(device_t dev)
 	int i;
 
 	id = ((uint32_t)hda_get_vendor_id(dev) << 16) + hda_get_device_id(dev);
-	revid = ((uint32_t)hda_get_revision_id(dev) << 8) + hda_get_stepping_id(dev);
+	revid = ((uint32_t)hda_get_revision_id(dev) << 8) +
+	    hda_get_stepping_id(dev);
 
 	for (i = 0; i < nitems(hdacc_codecs); i++) {
 		if (!HDA_DEV_MATCH(hdacc_codecs[i].id, id))
@@ -525,8 +526,7 @@ hdacc_detach(device_t dev)
 }
 
 static int
-hdacc_child_location_str(device_t dev, device_t child, char *buf,
-    size_t buflen)
+hdacc_child_location_str(device_t dev, device_t child, char *buf, size_t buflen)
 {
 	struct hdacc_fg *fg = device_get_ivars(child);
 
@@ -645,8 +645,8 @@ hdacc_stream_free(device_t dev, device_t child, int dir, int stream)
 }
 
 static int
-hdacc_stream_start(device_t dev, device_t child,
-    int dir, int stream, bus_addr_t buf, int blksz, int blkcnt)
+hdacc_stream_start(device_t dev, device_t child, int dir, int stream,
+    bus_addr_t buf, int blksz, int blkcnt)
 {
 
 	return (HDAC_STREAM_START(device_get_parent(dev), dev,

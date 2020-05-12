@@ -63,12 +63,14 @@ MAN=	acct.5 \
 	resolver.5 \
 	services.5 \
 	shells.5 \
+	smbfs.5 \
 	src.conf.5 \
 	stab.5 \
 	style.Makefile.5 \
 	style.mdoc.5 \
 	sysctl.conf.5 \
-	tmpfs.5
+	tmpfs.5 \
+	unionfs.5
 
 MLINKS=	dir.5 dirent.5
 MLINKS+=ext2fs.5 ext4fs.5

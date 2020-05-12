@@ -40,6 +40,7 @@ __FBSDID("$FreeBSD$");
 
 #include "opt_inet.h"
 #include "opt_inet6.h"
+#include "opt_mpath.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -48,12 +49,16 @@ __FBSDID("$FreeBSD$");
 #include <sys/mutex.h>
 #include <sys/socket.h>
 #include <sys/domain.h>
+#include <sys/kernel.h>
 #include <sys/syslog.h>
 #include <net/radix.h>
 #include <net/radix_mpath.h>
 #include <sys/rmlock.h>
 #include <net/route.h>
-#include <net/route_var.h>
+#include <net/route/nhop.h>
+#include <net/route/shared.h>
+#include <net/route/route_var.h>
+#include <net/route/nhop.h>
 #include <net/if.h>
 #include <net/if_var.h>
 
@@ -108,22 +113,24 @@ struct rtentry *
 rt_mpath_matchgate(struct rtentry *rt, struct sockaddr *gate)
 {
 	struct radix_node *rn;
+	struct nhop_object *nh;
 
-	if (!gate || !rt->rt_gateway)
-		return NULL;
+	if (gate == NULL)
+		return (NULL);
 
 	/* beyond here, we use rn as the master copy */
 	rn = (struct radix_node *)rt;
 	do {
 		rt = (struct rtentry *)rn;
+		nh = rt->rt_nhop;
 		/*
-		 * we are removing an address alias that has 
+		 * we are removing an address alias that has
 		 * the same prefix as another address
 		 * we need to compare the interface address because
-		 * rt_gateway is a special sockadd_dl structure
+		 * gateway is a special sockaddr_dl structure
 		 */
-		if (rt->rt_gateway->sa_family == AF_LINK) {
-			if (!memcmp(rt->rt_ifa->ifa_addr, gate, gate->sa_len))
+		if (nh->gw_sa.sa_family == AF_LINK) {
+			if (!memcmp(nh->nh_ifa->ifa_addr, gate, gate->sa_len))
 				break;
 		}
 
@@ -132,8 +139,8 @@ rt_mpath_matchgate(struct rtentry *rt, struct sockaddr *gate)
 		 * 1) Routes with 'real' IPv4/IPv6 gateway
 		 * 2) Loopback host routes (another AF_LINK/sockadd_dl check)
 		 * */
-		if (rt->rt_gateway->sa_len == gate->sa_len &&
-		    !memcmp(rt->rt_gateway, gate, gate->sa_len))
+		if (nh->gw_sa.sa_len == gate->sa_len &&
+		    !memcmp(&nh->gw_sa, gate, gate->sa_len))
 			break;
 	} while ((rn = rn_mpath_next(rn)) != NULL);
 
@@ -176,6 +183,7 @@ rt_mpath_conflict(struct rib_head *rnh, struct rtentry *rt,
     struct sockaddr *netmask)
 {
 	struct radix_node *rn, *rn1;
+	struct nhop_object *nh, *nh1;
 	struct rtentry *rt1;
 
 	rn = (struct radix_node *)rt;
@@ -191,15 +199,17 @@ rt_mpath_conflict(struct rib_head *rnh, struct rtentry *rt,
 		if (rn1 == rn)
 			continue;
         
-		if (rt1->rt_gateway->sa_family == AF_LINK) {
-			if (rt1->rt_ifa->ifa_addr->sa_len != rt->rt_ifa->ifa_addr->sa_len ||
-			    bcmp(rt1->rt_ifa->ifa_addr, rt->rt_ifa->ifa_addr, 
-			    rt1->rt_ifa->ifa_addr->sa_len))
+		nh = rt->rt_nhop;
+		nh1 = rt1->rt_nhop;
+
+		if (nh1->gw_sa.sa_family == AF_LINK) {
+			if (nh1->nh_ifa->ifa_addr->sa_len != nh->nh_ifa->ifa_addr->sa_len ||
+			    bcmp(nh1->nh_ifa->ifa_addr, nh->nh_ifa->ifa_addr, 
+			    nh1->nh_ifa->ifa_addr->sa_len))
 				continue;
 		} else {
-			if (rt1->rt_gateway->sa_len != rt->rt_gateway->sa_len ||
-			    bcmp(rt1->rt_gateway, rt->rt_gateway,
-			    rt1->rt_gateway->sa_len))
+			if (nh1->gw_sa.sa_len != nh->gw_sa.sa_len ||
+			    bcmp(&nh1->gw_sa, &nh->gw_sa, nh1->gw_sa.sa_len))
 				continue;
 		}
 
@@ -210,7 +220,7 @@ rt_mpath_conflict(struct rib_head *rnh, struct rtentry *rt,
 	return (0);
 }
 
-static struct rtentry *
+struct rtentry *
 rt_mpath_selectrte(struct rtentry *rte, uint32_t hash)
 {
 	struct radix_node *rn0, *rn;
@@ -250,78 +260,19 @@ rt_mpath_select(struct rtentry *rte, uint32_t hash)
 }
 
 void
-rtalloc_mpath_fib(struct route *ro, uint32_t hash, u_int fibnum)
+rt_mpath_init_rnh(struct rib_head *rnh)
 {
-	struct rtentry *rt;
 
-	/*
-	 * XXX we don't attempt to lookup cached route again; what should
-	 * be done for sendto(3) case?
-	 */
-	if (ro->ro_rt && ro->ro_rt->rt_ifp && (ro->ro_rt->rt_flags & RTF_UP)
-	    && RT_LINK_IS_UP(ro->ro_rt->rt_ifp))
-		return;				 
-	ro->ro_rt = rtalloc1_fib(&ro->ro_dst, 1, 0, fibnum);
-
-	/* if the route does not exist or it is not multipath, don't care */
-	if (ro->ro_rt == NULL)
-		return;
-	if (rn_mpath_next((struct radix_node *)ro->ro_rt) == NULL) {
-		RT_UNLOCK(ro->ro_rt);
-		return;
-	}
-
-	rt = rt_mpath_selectrte(ro->ro_rt, hash);
-	/* XXX try filling rt_gwroute and avoid unreachable gw  */
-
-	/* gw selection has failed - there must be only zero weight routes */
-	if (!rt) {
-		RT_UNLOCK(ro->ro_rt);
-		ro->ro_rt = NULL;
-		return;
-	}
-	if (ro->ro_rt != rt) {
-		RTFREE_LOCKED(ro->ro_rt);
-		ro->ro_rt = rt;
-		RT_LOCK(ro->ro_rt);
-		RT_ADDREF(ro->ro_rt);
-
-	} 
-	RT_UNLOCK(ro->ro_rt);
+	rnh->rnh_multipath = 1;
 }
 
-extern int	in6_inithead(void **head, int off, u_int fibnum);
-extern int	in_inithead(void **head, int off, u_int fibnum);
-
-#ifdef INET
-int
-rn4_mpath_inithead(void **head, int off, u_int fibnum)
+#ifdef RADIX_MPATH
+static void
+mpath_init(void)
 {
-	struct rib_head *rnh;
 
 	hashjitter = arc4random();
-	if (in_inithead(head, off, fibnum) == 1) {
-		rnh = (struct rib_head *)*head;
-		rnh->rnh_multipath = 1;
-		return 1;
-	} else
-		return 0;
 }
+SYSINIT(mpath_init, SI_SUB_LAST, SI_ORDER_ANY, mpath_init, NULL);
 #endif
 
-#ifdef INET6
-int
-rn6_mpath_inithead(void **head, int off, u_int fibnum)
-{
-	struct rib_head *rnh;
-
-	hashjitter = arc4random();
-	if (in6_inithead(head, off, fibnum) == 1) {
-		rnh = (struct rib_head *)*head;
-		rnh->rnh_multipath = 1;
-		return 1;
-	} else
-		return 0;
-}
-
-#endif

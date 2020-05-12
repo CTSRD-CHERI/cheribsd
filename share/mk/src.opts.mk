@@ -62,7 +62,6 @@ __DEFAULT_YES_OPTIONS = \
     AUTHPF \
     AUTOFS \
     BHYVE \
-    BINUTILS \
     BLACKLIST \
     BLUETOOTH \
     BOOT \
@@ -201,6 +200,7 @@ __DEFAULT_YES_OPTIONS = \
 
 __DEFAULT_NO_OPTIONS = \
     BEARSSL \
+    BHYVE_SNAPSHOT \
     BSD_GREP \
     CLANG_EXTRAS \
     DTRACE_TESTS \
@@ -219,7 +219,6 @@ __DEFAULT_NO_OPTIONS = \
     SORT_THREADS \
     SVN \
     ZONEINFO_LEAPSECONDS_SUPPORT \
-    ZONEINFO_OLD_TIMEZONES_SUPPORT \
 
 __DEFAULT_NO_OPTIONS+= \
     LIBCHERI
@@ -268,8 +267,10 @@ __DEFAULT_DEPENDENT_OPTIONS+= ${var}_SUPPORT/${var}
 # overriden by bsd.compat.mk.
 .if defined(TARGET_ARCH) && !defined(WANT_COMPAT)
 __T=${TARGET_ARCH}
+__C=${TARGET_CPUTYPE}
 .else
 __T=${MACHINE_ARCH}
+__C=${CPUTYPE}
 .endif
 
 # All supported backends for LLVM_TARGET_XXX
@@ -326,9 +327,9 @@ BROKEN_OPTIONS+=OFED
 BROKEN_OPTIONS+=BINUTILS BINUTILS_BOOTSTRAP GDB
 .endif
 .if ${__T} == "amd64" || ${__T} == "i386"
-__DEFAULT_YES_OPTIONS+=BINUTILS_BOOTSTRAP
+__DEFAULT_YES_OPTIONS+=BINUTILS BINUTILS_BOOTSTRAP
 .else
-__DEFAULT_NO_OPTIONS+=BINUTILS_BOOTSTRAP
+__DEFAULT_NO_OPTIONS+=BINUTILS BINUTILS_BOOTSTRAP
 .endif
 .if ${__T:Mriscv*} != ""
 BROKEN_OPTIONS+=OFED
@@ -379,7 +380,6 @@ BROKEN_OPTIONS+=NS_CACHING
 # Skip until https://github.com/CTSRD-CHERI/llvm-project/issues/379 is fixed.
 BROKEN_OPTIONS+=LIBCPLUSPLUS CXX
 # Crash in ZFS code. TODO: investigate
-# Remove corresponding hack in Makefile.libcompat when removing
 BROKEN_OPTIONS+=CDDL
 
 # Some compilation failure: TODO: investigate
@@ -429,7 +429,10 @@ __DEFAULT_YES_OPTIONS+=PIE
 __DEFAULT_NO_OPTIONS+=PIE
 .endif
 
-.if ${__T} != "mips64" && (!${__T:Mriscv*} || ${__T:Mriscv*64*c})
+# We'd really like this to be:
+#    !${MACHINE_CPU:Mcheri} || ${MACHINE_ABI:Mpurecap}
+# but that logic doesn't work in Makefile.inc1...
+.if ${__C} != "cheri" || (${__T:Mmips64*c*} || ${__T:Mriscv64*c*})
 BROKEN_OPTIONS+=COMPAT_CHERIABI
 .endif
 
@@ -539,6 +542,10 @@ MK_OPENSSH:=	no
 MK_KERBEROS:=	no
 MK_KERBEROS_SUPPORT:=	no
 MK_LDNS:=	no
+MK_PKGBOOTSTRAP:=	no
+MK_SVN:=		no
+MK_SVNLITE:=		no
+MK_WIRELESS:=		no
 .endif
 
 .if ${MK_LDNS} == "no"
@@ -569,7 +576,6 @@ MK_GOOGLETEST:=	no
 
 .if ${MK_ZONEINFO} == "no"
 MK_ZONEINFO_LEAPSECONDS_SUPPORT:= no
-MK_ZONEINFO_OLD_TIMEZONES_SUPPORT:= no
 .endif
 
 .if ${MK_CROSS_COMPILER} == "no"
@@ -596,12 +602,6 @@ MK_LLVM_COV:= no
 
 .if ${MK_LOADER_VERIEXEC} == "no"
 MK_LOADER_VERIEXEC_PASS_MANIFEST := no
-.endif
-
-# COMPAT_CHERIABI and LIBCHERI depend on CHERI support on mips.
-.if ${MK_CHERI} == "no" && ${__TT} == "mips"
-MK_LIBCHERI:=	no
-MK_COMPAT_CHERIABI:=	no
 .endif
 
 #

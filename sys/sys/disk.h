@@ -150,7 +150,7 @@ struct diocskerneldump_arg_freebsd12 {
 	uint8_t		 kda12_encryption;
 	uint8_t		 kda12_key[KERNELDUMP_KEY_MAX_SIZE];
 	uint32_t	 kda12_encryptedkeysize;
-	uint8_t		*kda12_encryptedkey;
+	uint8_t * __kerncap kda12_encryptedkey;
 };
 #define	DIOCSKERNELDUMP_FREEBSD12 \
 	_IOW('d', 144, struct diocskerneldump_arg_freebsd12)
@@ -191,7 +191,12 @@ struct diocskerneldump_arg {
 	uint8_t		 kda_encryption;
 	uint8_t		 kda_key[KERNELDUMP_KEY_MAX_SIZE];
 	uint32_t	 kda_encryptedkeysize;
-	uint8_t		*kda_encryptedkey;
+	union {
+#ifdef _KERNEL
+		uint8_t * __capability kda_user_encryptedkey;
+#endif
+		uint8_t	*kda_encryptedkey;
+	};
 	char		 kda_iface[IFNAMSIZ];
 	union kd_ip	 kda_server;
 	union kd_ip	 kda_client;

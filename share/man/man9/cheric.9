@@ -35,7 +35,7 @@
 .Sh NAME
 .Nm cheri_andperm
 .Nm cheri_clear_low_ptr_bits
-.Nm cheri_csetbounds
+.Nm cheri_setbounds
 .Nm cheri_fromint
 .Nm cheri_get_low_ptr_bits
 .Nm cheri_getaddress
@@ -67,7 +67,7 @@
 .Ft void * __capability
 .Fn cheri_clear_low_ptr_bits "void * __capability c" "size_t mask"
 .Ft void * __capability
-.Fn cheri_csetbounds "void * __capability c" "size_t length"
+.Fn cheri_setbounds "void * __capability c" "size_t length"
 .Ft void * __capability
 .Fn cheri_fromint "vaddr_t"
 .Ft size_t
@@ -165,7 +165,7 @@ that has its permissions mask bit-wise AND'd with the value of
 Return a capability derived from
 .Fa c
 that has its validity tag cleared.
-.It Fn cheri_csetbounds "c" "length"
+.It Fn cheri_setbounds "c" "length"
 Return a capability derived from
 .Fa c
 that has its base set to the current address of

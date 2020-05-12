@@ -103,6 +103,7 @@ struct vm_map_entry {
 	struct vm_map_entry *right;	/* right child or next entry */
 	vm_offset_t start;		/* start address */
 	vm_offset_t end;		/* end address */
+	vm_offset_t reservation;	/* VM reservation ID (lowest VA)  */
 	vm_offset_t next_read;		/* vaddr of the next sequential read */
 	vm_size_t max_free;		/* max free space in subtree */
 	union vm_map_object object;	/* object I point to */
@@ -148,6 +149,7 @@ struct vm_map_entry {
 #define	MAP_ENTRY_STACK_GAP_DN		0x00020000
 #define	MAP_ENTRY_STACK_GAP_UP		0x00040000
 #define	MAP_ENTRY_HEADER		0x00080000
+#define	MAP_ENTRY_UNMAPPED		0x00100000
 
 #ifdef	_KERNEL
 static __inline u_char
@@ -223,6 +225,7 @@ struct vm_map {
 #define	MAP_IS_SUB_MAP		0x04	/* has parent */
 #define	MAP_ASLR		0x08	/* enabled ASLR */
 #define	MAP_ASLR_IGNSTART	0x10
+#define	MAP_RESERVATIONS	0x20	/* Don't merge reservations */
 
 #ifdef	_KERNEL
 #if defined(KLD_MODULE) && !defined(KLD_TIED)
@@ -363,6 +366,7 @@ long vmspace_resident_count(struct vmspace *vmspace);
 #define	MAP_CREATE_STACK_GAP_UP	0x00010000
 #define	MAP_CREATE_STACK_GAP_DN	0x00020000
 #define	MAP_VN_EXEC		0x00040000
+#define MAP_CREATE_UNMAPPED	0x00080000
 
 /*
  * vm_fault option flags
@@ -456,13 +460,16 @@ int vm_map_fixed(vm_map_t, vm_object_t, vm_ooffset_t, vm_offset_t, vm_size_t,
 vm_offset_t vm_map_findspace(vm_map_t, vm_offset_t, vm_size_t);
 int vm_map_inherit (vm_map_t, vm_offset_t, vm_offset_t, vm_inherit_t);
 void vm_map_init(vm_map_t, pmap_t, vm_offset_t, vm_offset_t);
-int vm_map_insert (vm_map_t, vm_object_t, vm_ooffset_t, vm_offset_t, vm_offset_t, vm_prot_t, vm_prot_t, int);
+int vm_map_insert (vm_map_t, vm_object_t, vm_ooffset_t, vm_offset_t,
+    vm_offset_t, vm_prot_t, vm_prot_t, int, vm_offset_t);
 int vm_map_lookup (vm_map_t *, vm_offset_t, vm_prot_t, vm_map_entry_t *, vm_object_t *,
     vm_pindex_t *, vm_prot_t *, boolean_t *);
 int vm_map_lookup_locked(vm_map_t *, vm_offset_t, vm_prot_t, vm_map_entry_t *, vm_object_t *,
     vm_pindex_t *, vm_prot_t *, boolean_t *);
 void vm_map_lookup_done (vm_map_t, vm_map_entry_t);
 boolean_t vm_map_lookup_entry (vm_map_t, vm_offset_t, vm_map_entry_t *);
+bool vm_map_reservation_is_unmapped(vm_map_t, vm_offset_t);
+int vm_map_reservation_delete(vm_map_t, vm_offset_t);
 
 static inline vm_map_entry_t
 vm_map_entry_first(vm_map_t map)

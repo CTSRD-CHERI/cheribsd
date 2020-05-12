@@ -37,7 +37,7 @@ __FBSDID("$FreeBSD$");
 
 #include <sys/param.h>
 #ifdef __amd64__
-#include <sys/compat.h>
+#include <sys/abi_compat.h>
 #endif
 #include <sys/conf.h>
 #include <sys/errno.h>

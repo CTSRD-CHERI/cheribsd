@@ -814,14 +814,14 @@ t4_tcp_info(struct toedev *tod, struct tcpcb *tp, struct tcp_info *ti)
 #ifdef KERN_TLS
 static int
 t4_alloc_tls_session(struct toedev *tod, struct tcpcb *tp,
-    struct ktls_session *tls)
+    struct ktls_session *tls, int direction)
 {
 	struct toepcb *toep = tp->t_toe;
 
 	INP_WLOCK_ASSERT(tp->t_inpcb);
 	MPASS(tls != NULL);
 
-	return (tls_alloc_ktls(toep, tls));
+	return (tls_alloc_ktls(toep, tls, direction));
 }
 #endif
 
@@ -1895,6 +1895,7 @@ t4_tom_mod_unload(void)
 	t4_uninit_listen_cpl_handlers();
 	t4_uninit_cpl_io_handlers();
 	t4_register_shared_cpl_handler(CPL_L2T_WRITE_RPL, NULL, CPL_COOKIE_TOM);
+	t4_register_cpl_handler(CPL_GET_TCB_RPL, NULL);
 
 	return (0);
 }

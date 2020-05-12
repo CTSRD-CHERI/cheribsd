@@ -133,6 +133,8 @@ static void	tcp_disconnect(struct tcpcb *);
 static void	tcp_usrclosed(struct tcpcb *);
 static void	tcp_fill_info(struct tcpcb *, struct tcp_info *);
 
+static int	tcp_pru_options_support(struct tcpcb *tp, int flags);
+
 #ifdef TCPDEBUG
 #define	TCPDEBUG0	int ostate = 0
 #define	TCPDEBUG1()	ostate = tp ? tp->t_state : 0
@@ -979,6 +981,15 @@ tcp_usr_send(struct socket *so, int flags, struct mbuf *m,
 		goto out;
 	}
 	tp = intotcpcb(inp);
+	if (flags & PRUS_OOB) {
+		if ((error = tcp_pru_options_support(tp, PRUS_OOB)) != 0) {
+			if (control)
+				m_freem(control);
+			if (m && (flags & PRUS_NOTREADY) == 0)
+				m_freem(m);
+			goto out;
+		}
+	}
 	TCPDEBUG1();
 	if (nam != NULL && tp->t_state < TCPS_SYN_SENT) {
 		switch (nam->sa_family) {
@@ -1362,6 +1373,24 @@ tcp_usr_close(struct socket *so)
 	NET_EPOCH_EXIT(et);
 }
 
+static int 
+tcp_pru_options_support(struct tcpcb *tp, int flags)
+{
+	/*
+	 * If the specific TCP stack has a pru_options
+	 * specified then it does not always support
+	 * all the PRU_XX options and we must ask it.
+	 * If the function is not specified then all
+	 * of the PRU_XX options are supported.
+	 */
+	int ret = 0;
+
+	if (tp->t_fb->tfb_pru_options) {
+		ret = (*tp->t_fb->tfb_pru_options)(tp, flags);
+	}
+	return (ret);
+}
+
 /*
  * Receive out-of-band data.
  */
@@ -1381,6 +1410,10 @@ tcp_usr_rcvoob(struct socket *so, struct mbuf *m, int flags)
 		goto out;
 	}
 	tp = intotcpcb(inp);
+	error = tcp_pru_options_support(tp, PRUS_OOB);
+	if (error) {
+		goto out;
+	}
 	TCPDEBUG1();
 	if ((so->so_oobmark == 0 &&
 	     (so->so_rcv.sb_state & SBS_RCVATMARK) == 0) ||
@@ -1823,6 +1856,37 @@ CTASSERT(TCP_CA_NAME_MAX <= TCP_LOG_ID_LEN);
 CTASSERT(TCP_LOG_REASON_LEN <= TCP_LOG_ID_LEN);
 #endif
 
+#ifdef KERN_TLS
+static int
+copyin_tls_enable(struct sockopt *sopt, struct tls_enable *tls)
+{
+	struct tls_enable_v0 tls_v0;
+	int error;
+
+	if (sopt->sopt_valsize == sizeof(tls_v0)) {
+		error = sooptcopyin(sopt, &tls_v0, sizeof(tls_v0),
+		    sizeof(tls_v0));
+		if (error)
+			return (error);
+		memset(tls, 0, sizeof(*tls));
+		tls->cipher_key = tls_v0.cipher_key;
+		tls->iv = tls_v0.iv;
+		tls->auth_key = tls_v0.auth_key;
+		tls->cipher_algorithm = tls_v0.cipher_algorithm;
+		tls->cipher_key_len = tls_v0.cipher_key_len;
+		tls->iv_len = tls_v0.iv_len;
+		tls->auth_algorithm = tls_v0.auth_algorithm;
+		tls->auth_key_len = tls_v0.auth_key_len;
+		tls->flags = tls_v0.flags;
+		tls->tls_vmajor = tls_v0.tls_vmajor;
+		tls->tls_vminor = tls_v0.tls_vminor;
+		return (0);
+	}
+
+	return (sooptcopyin(sopt, tls, sizeof(*tls), sizeof(*tls)));
+}
+#endif
+
 int
 tcp_default_ctloutput(struct socket *so, struct sockopt *sopt, struct inpcb *inp, struct tcpcb *tp)
 {
@@ -2034,8 +2098,7 @@ unlock_and_done:
 #ifdef KERN_TLS
 		case TCP_TXTLS_ENABLE:
 			INP_WUNLOCK(inp);
-			error = sooptcopyin(sopt, &tls, sizeof(tls),
-			    sizeof(tls));
+			error = copyin_tls_enable(sopt, &tls);
 			if (error)
 				break;
 			error = ktls_enable_tx(so, &tls);
@@ -2049,6 +2112,14 @@ unlock_and_done:
 			INP_WLOCK_RECHECK(inp);
 			error = ktls_set_tx_mode(so, ui);
 			INP_WUNLOCK(inp);
+			break;
+		case TCP_RXTLS_ENABLE:
+			INP_WUNLOCK(inp);
+			error = sooptcopyin(sopt, &tls, sizeof(tls),
+			    sizeof(tls));
+			if (error)
+				break;
+			error = ktls_enable_rx(so, &tls);
 			break;
 #endif
 
@@ -2385,6 +2456,11 @@ unhold:
 #ifdef KERN_TLS
 		case TCP_TXTLS_MODE:
 			optval = ktls_get_tx_mode(so);
+			INP_WUNLOCK(inp);
+			error = sooptcopyout(sopt, &optval, sizeof(optval));
+			break;
+		case TCP_RXTLS_MODE:
+			optval = ktls_get_rx_mode(so);
 			INP_WUNLOCK(inp);
 			error = sooptcopyout(sopt, &optval, sizeof(optval));
 			break;

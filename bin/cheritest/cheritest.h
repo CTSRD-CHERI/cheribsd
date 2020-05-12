@@ -297,6 +297,7 @@ DECLARE_CHERI_TEST(test_fault_ccall_data_execute);
 DECLARE_CHERI_TEST(test_cheriabi_mmap_nospace);
 DECLARE_CHERI_TEST(test_cheriabi_mmap_perms);
 DECLARE_CHERI_TEST(test_cheriabi_mmap_unrepresentable);
+DECLARE_CHERI_TEST(test_cheriabi_malloc_zero_size);
 
 /* cheritest_cheriabi_open.c */
 DECLARE_CHERI_TEST(test_cheriabi_open_ordinary);

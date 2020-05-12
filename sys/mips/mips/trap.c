@@ -40,6 +40,9 @@
  *	from: @(#)trap.c	8.5 (Berkeley) 1/11/94
  *	JNPR: trap.c,v 1.13.2.2 2007/08/29 10:03:49 girish
  */
+
+#define	EXPLICIT_USER_ACCESS
+
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 #define TRAP_DEBUG 1
@@ -625,6 +628,8 @@ cpu_fetch_syscall_args(struct thread *td)
 	sa->narg = sa->callp->sy_narg;
 
 	if (sa->narg > nsaved) {
+		char * __capability stack_args;
+
 #if defined(__mips_n32) || defined(__mips_n64)
 		/*
 		 * XXX
@@ -643,20 +648,26 @@ cpu_fetch_syscall_args(struct thread *td)
 			unsigned i;
 			int32_t arg;
 
+			stack_args = __USER_CAP(locr0->sp + 4 * sizeof(int32_t),
+			    (sa->narg - nsaved) * sizeof(int32_t));
 			error = 0; /* XXX GCC is awful.  */
 			for (i = nsaved; i < sa->narg; i++) {
-				error = copyin((caddr_t)(intptr_t)(locr0->sp +
-				    (4 + (i - nsaved)) * sizeof(int32_t)),
-				    (caddr_t)&arg, sizeof arg);
+				error = copyin(stack_args +
+				    (i - nsaved) * sizeof(int32_t),
+				    &arg, sizeof(arg));
 				if (error != 0)
 					break;
 				sa->args[i] = arg;
 			}
 		} else
 #endif
-		error = copyin((caddr_t)(intptr_t)(locr0->sp +
-		    4 * sizeof(register_t)), (caddr_t)&sa->args[nsaved],
-		   (u_int)(sa->narg - nsaved) * sizeof(register_t));
+		{
+			stack_args = __USER_CAP(locr0->sp +
+			    4 * sizeof(register_t), (sa->narg - nsaved) *
+			    sizeof(register_t));
+			error = copyin(stack_args, &sa->args[nsaved],
+			    (u_int)(sa->narg - nsaved) * sizeof(register_t));
+		}
 		if (error != 0) {
 			locr0->v0 = error;
 			locr0->a3 = 1;
@@ -1150,10 +1161,6 @@ dofault:
 
 	case T_C2E + T_USER:
 		msg = "USER_CHERI_EXCEPTION";
-#ifdef KTRACE
-		if (KTRPOINT(td, KTR_CEXCEPTION))
-			ktrcexception(trapframe);
-#endif
 		fetch_bad_instr(trapframe);
 		log_c2e_exception(msg, trapframe, type);
 		i = SIGPROT;
@@ -1468,10 +1475,7 @@ MipsEmulateBranch(struct trapframe *framePtr, trapf_pc_t _instPC, int fpcCSR,
 	(InstPtr + 4 + ((short)inst.IType.imm << 2))
 
 	if (instptr) {
-		if (!KERNLAND(instptr))
-			inst.word = fuword32((void *)instptr); /* XXXAR: error check? */
-		else
-			inst = *(InstFmt *) instptr;
+		inst = *(InstFmt *) instptr;
 	} else {
 		if (!KERNLAND((__cheri_addr vaddr_t)instPC))
 			inst.word = fuword32_c(instPC);  /* XXXAR: error check? */
@@ -1825,7 +1829,7 @@ log_illegal_instruction(const char *msg, struct trapframe *frame)
 	pt_entry_t *ptep;
 	pd_entry_t *pdep;
 #ifndef CPU_CHERI
-	unsigned int *addr;
+	unsigned int *addr, instr[4];
 #endif
 	struct thread *td;
 	struct proc *p;
@@ -1860,21 +1864,17 @@ log_illegal_instruction(const char *msg, struct trapframe *frame)
 	 *
 	 * XXXRW: Temporarily disabled in CHERI as this doesn't properly
 	 * indirect through $c0 / $pcc.
-	 *
-	 * XXXRW: Arguably, this is also incorrect for non-CHERI: it should be
-	 * using copyin() to access user addresses!
 	 */
-	if (!(pc & 3) &&
-	    useracc((caddr_t)(intptr_t)pc, sizeof(int) * 4, VM_PROT_READ)) {
+	addr = (unsigned int *)(intptr_t)pc;
+	if ((pc & 3) == 0 && copyin(addr, instr, sizeof(instr)) == 0) {
 		/* dump page table entry for faulting instruction */
 		log(LOG_ERR, "Page table info for pc address %#jx: pde = %p, pte = %#jx\n",
 		    (intmax_t)pc, (void *)(intptr_t)*pdep, (uintmax_t)(ptep ? *ptep : 0));
 
-		addr = (unsigned int *)(intptr_t)pc;
 		log(LOG_ERR, "Dumping 4 words starting at pc address %p: \n",
 		    addr);
 		log(LOG_ERR, "%08x %08x %08x %08x\n",
-		    addr[0], addr[1], addr[2], addr[3]);
+		    instr[0], instr[1], instr[2], instr[3]);
 	} else {
 		log(LOG_ERR, "pc address %#jx is inaccessible, pde = %p, pte = %#jx\n",
 		    (intmax_t)pc, (void *)(intptr_t)*pdep, (uintmax_t)(ptep ? *ptep : 0));
@@ -1888,7 +1888,7 @@ log_bad_page_fault(char *msg, struct trapframe *frame, int trap_type)
 	pt_entry_t *ptep;
 	pd_entry_t *pdep;
 #ifndef CPU_CHERI
-	unsigned int *addr;
+	unsigned int *addr, instr[4];
 #endif
 	struct thread *td;
 	struct proc *p;
@@ -1948,22 +1948,19 @@ log_bad_page_fault(char *msg, struct trapframe *frame, int trap_type)
 	 *
 	 * XXXRW: Temporarily disabled in CHERI as this doesn't properly
 	 * indirect through $c0 / $pcc.
-	 *
-	 * XXXRW: Arguably, this is also incorrect for non-CHERI: it should be
-	 * using copyin() to access user addresses!
 	 */
-	if (!(pc & 3) && (pc != frame->badvaddr) &&
-	    (trap_type != T_BUS_ERR_IFETCH) &&
-	    useracc((caddr_t)(intptr_t)pc, sizeof(int) * 4, VM_PROT_READ)) {
+	addr = (unsigned int *)(intptr_t)pc;
+	if ((pc & 3) == 0 && pc != frame->badvaddr &&
+	    trap_type != T_BUS_ERR_IFETCH &&
+	    copyin((caddr_t)(intptr_t)pc, instr, sizeof(instr)) == 0) {
 		/* dump page table entry for faulting instruction */
 		log(LOG_ERR, "Page table info for pc address %#jx: pde = %p, pte = %#jx\n",
 		    (intmax_t)pc, (void *)(intptr_t)*pdep, (uintmax_t)(ptep ? *ptep : 0));
 
-		addr = (unsigned int *)(intptr_t)pc;
 		log(LOG_ERR, "Dumping 4 words starting at pc address %p: \n",
 		    addr);
 		log(LOG_ERR, "%08x %08x %08x %08x\n",
-		    addr[0], addr[1], addr[2], addr[3]);
+		    instr[0], instr[1], instr[2], instr[3]);
 	} else {
 		log(LOG_ERR, "pc address %#jx is inaccessible, pde = %p, pte = %#jx\n",
 		    (intmax_t)pc, (void *)(intptr_t)*pdep, (uintmax_t)(ptep ? *ptep : 0));

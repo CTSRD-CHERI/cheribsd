@@ -119,6 +119,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/mman.h>
 #include <sys/msgbuf.h>
 #include <sys/mutex.h>
+#include <sys/physmem.h>
 #include <sys/proc.h>
 #include <sys/rwlock.h>
 #include <sys/sbuf.h>
@@ -147,8 +148,6 @@ __FBSDID("$FreeBSD$");
 #include <machine/machdep.h>
 #include <machine/md_var.h>
 #include <machine/pcb.h>
-
-#include <arm/include/physmem.h>
 
 #define	PMAP_ASSERT_STAGE1(pmap)	MPASS((pmap)->pm_stage == PM_STAGE1)
 
@@ -832,9 +831,7 @@ void
 pmap_bootstrap(vm_offset_t l0pt, vm_offset_t l1pt, vm_paddr_t kernstart,
     vm_size_t kernlen)
 {
-	u_int l1_slot, l2_slot;
-	pt_entry_t *l2;
-	vm_offset_t va, freemempos;
+	vm_offset_t freemempos;
 	vm_offset_t dpcpu, msgbufpv;
 	vm_paddr_t start_pa, pa, min_pa;
 	uint64_t kern_delta;
@@ -861,14 +858,14 @@ pmap_bootstrap(vm_offset_t l0pt, vm_offset_t l1pt, vm_paddr_t kernstart,
 	/* Assume the address we were loaded to is a valid physical address */
 	min_pa = KERNBASE - kern_delta;
 
-	physmap_idx = arm_physmem_avail(physmap, nitems(physmap));
+	physmap_idx = physmem_avail(physmap, nitems(physmap));
 	physmap_idx /= 2;
 
 	/*
 	 * Find the minimum physical address. physmap is sorted,
 	 * but may contain empty ranges.
 	 */
-	for (i = 0; i < (physmap_idx * 2); i += 2) {
+	for (i = 0; i < physmap_idx * 2; i += 2) {
 		if (physmap[i] == physmap[i + 1])
 			continue;
 		if (physmap[i] <= min_pa)
@@ -881,38 +878,14 @@ pmap_bootstrap(vm_offset_t l0pt, vm_offset_t l1pt, vm_paddr_t kernstart,
 	/* Create a direct map region early so we can use it for pa -> va */
 	freemempos = pmap_bootstrap_dmap(l1pt, min_pa, freemempos);
 
-	va = KERNBASE;
 	start_pa = pa = KERNBASE - kern_delta;
 
 	/*
-	 * Read the page table to find out what is already mapped.
-	 * This assumes we have mapped a block of memory from KERNBASE
-	 * using a single L1 entry.
+	 * Create the l2 tables up to VM_MAX_KERNEL_ADDRESS.  We assume that the
+	 * loader allocated the first and only l2 page table page used to map
+	 * the kernel, preloaded files and module metadata.
 	 */
-	l2 = pmap_early_page_idx(l1pt, KERNBASE, &l1_slot, &l2_slot);
-
-	/* Sanity check the index, KERNBASE should be the first VA */
-	KASSERT(l2_slot == 0, ("The L2 index is non-zero"));
-
-	/* Find how many pages we have mapped */
-	for (; l2_slot < Ln_ENTRIES; l2_slot++) {
-		if ((l2[l2_slot] & ATTR_DESCR_MASK) == 0)
-			break;
-
-		/* Check locore used L2 blocks */
-		KASSERT((l2[l2_slot] & ATTR_DESCR_MASK) == L2_BLOCK,
-		    ("Invalid bootstrap L2 table"));
-		KASSERT((l2[l2_slot] & ~ATTR_MASK) == pa,
-		    ("Incorrect PA in L2 table"));
-
-		va += L2_SIZE;
-		pa += L2_SIZE;
-	}
-
-	va = roundup2(va, L1_SIZE);
-
-	/* Create the l2 tables up to VM_MAX_KERNEL_ADDRESS */
-	freemempos = pmap_bootstrap_l2(l1pt, va, freemempos);
+	freemempos = pmap_bootstrap_l2(l1pt, KERNBASE + L1_SIZE, freemempos);
 	/* And the l3 tables for the early devmap */
 	freemempos = pmap_bootstrap_l3(l1pt,
 	    VM_MAX_KERNEL_ADDRESS - (PMAP_MAPDEV_EARLY_SIZE), freemempos);
@@ -942,7 +915,7 @@ pmap_bootstrap(vm_offset_t l0pt, vm_offset_t l1pt, vm_paddr_t kernstart,
 
 	pa = pmap_early_vtophys(l1pt, freemempos);
 
-	arm_physmem_exclude_region(start_pa, pa - start_pa, EXFLAG_NOALLOC);
+	physmem_exclude_region(start_pa, pa - start_pa, EXFLAG_NOALLOC);
 
 	cpu_tlb_flushID();
 }

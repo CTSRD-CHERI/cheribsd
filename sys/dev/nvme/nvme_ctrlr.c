@@ -40,7 +40,9 @@ __FBSDID("$FreeBSD$");
 #include <sys/proc.h>
 #include <sys/smp.h>
 #include <sys/uio.h>
+#include <sys/sbuf.h>
 #include <sys/endian.h>
+#include <machine/stdarg.h>
 #include <vm/vm.h>
 
 #include "nvme_private.h"
@@ -49,6 +51,35 @@ __FBSDID("$FreeBSD$");
 
 static void nvme_ctrlr_construct_and_submit_aer(struct nvme_controller *ctrlr,
 						struct nvme_async_event_request *aer);
+
+static void
+nvme_ctrlr_devctl_log(struct nvme_controller *ctrlr, const char *type, const char *msg, ...)
+{
+	struct sbuf sb;
+	va_list ap;
+	int error;
+
+	if (sbuf_new(&sb, NULL, 0, SBUF_AUTOEXTEND | SBUF_NOWAIT) == NULL)
+		return;
+	sbuf_printf(&sb, "%s: ", device_get_nameunit(ctrlr->dev));
+	va_start(ap, msg);
+	sbuf_vprintf(&sb, msg, ap);
+	va_end(ap);
+	error = sbuf_finish(&sb);
+	if (error == 0)
+		printf("%s\n", sbuf_data(&sb));
+
+	sbuf_clear(&sb);
+	sbuf_printf(&sb, "name=\"%s\" reason=\"", device_get_nameunit(ctrlr->dev));
+	va_start(ap, msg);
+	sbuf_vprintf(&sb, msg, ap);
+	va_end(ap);
+	sbuf_printf(&sb, "\"");
+	error = sbuf_finish(&sb);
+	if (error == 0)
+		devctl_notify("nvme", "controller", type, sbuf_data(&sb));
+	sbuf_delete(&sb);
+}
 
 static int
 nvme_ctrlr_construct_admin_qpair(struct nvme_controller *ctrlr)
@@ -607,23 +638,28 @@ nvme_ctrlr_log_critical_warnings(struct nvme_controller *ctrlr,
 {
 
 	if (state & NVME_CRIT_WARN_ST_AVAILABLE_SPARE)
-		nvme_printf(ctrlr, "available spare space below threshold\n");
+		nvme_ctrlr_devctl_log(ctrlr, "critical",
+		    "available spare space below threshold");
 
 	if (state & NVME_CRIT_WARN_ST_TEMPERATURE)
-		nvme_printf(ctrlr, "temperature above threshold\n");
+		nvme_ctrlr_devctl_log(ctrlr, "critical",
+		    "temperature above threshold");
 
 	if (state & NVME_CRIT_WARN_ST_DEVICE_RELIABILITY)
-		nvme_printf(ctrlr, "device reliability degraded\n");
+		nvme_ctrlr_devctl_log(ctrlr, "critical",
+		    "device reliability degraded");
 
 	if (state & NVME_CRIT_WARN_ST_READ_ONLY)
-		nvme_printf(ctrlr, "media placed in read only mode\n");
+		nvme_ctrlr_devctl_log(ctrlr, "critical",
+		    "media placed in read only mode");
 
 	if (state & NVME_CRIT_WARN_ST_VOLATILE_MEMORY_BACKUP)
-		nvme_printf(ctrlr, "volatile memory backup device failed\n");
+		nvme_ctrlr_devctl_log(ctrlr, "critical",
+		    "volatile memory backup device failed");
 
 	if (state & NVME_CRIT_WARN_ST_RESERVED_MASK)
-		nvme_printf(ctrlr,
-		    "unknown critical warning(s): state = 0x%02x\n", state);
+		nvme_ctrlr_devctl_log(ctrlr, "critical",
+		    "unknown critical warning(s): state = 0x%02x", state);
 }
 
 static void
@@ -1121,7 +1157,7 @@ nvme_ctrlr_reset_task(void *arg, int pending)
 	struct nvme_controller	*ctrlr = arg;
 	int			status;
 
-	nvme_printf(ctrlr, "resetting controller\n");
+	nvme_ctrlr_devctl_log(ctrlr, "RESET", "resetting controller");
 	status = nvme_ctrlr_hw_reset(ctrlr);
 	/*
 	 * Use pause instead of DELAY, so that we yield to any nvme interrupt
@@ -1299,6 +1335,7 @@ nvme_ctrlr_ioctl(struct cdev *cdev, u_long cmd, caddr_t arg, int flag,
 		struct nvme_get_nsid *gnsid = (struct nvme_get_nsid *)arg;
 		strncpy(gnsid->cdev, device_get_nameunit(ctrlr->dev),
 		    sizeof(gnsid->cdev));
+		gnsid->cdev[sizeof(gnsid->cdev) - 1] = '\0';
 		gnsid->nsid = 0;
 		break;
 	}
@@ -1583,12 +1620,12 @@ nvme_ctrlr_resume(struct nvme_controller *ctrlr)
 		goto fail;
 
 	/*
-	 * Now that we're reset the hardware, we can restart the controller. Any
+	 * Now that we've reset the hardware, we can restart the controller. Any
 	 * I/O that was pending is requeued. Any admin commands are aborted with
 	 * an error. Once we've restarted, take the controller out of reset.
 	 */
 	nvme_ctrlr_start(ctrlr, true);
-	atomic_cmpset_32(&ctrlr->is_resetting, 1, 0);
+	(void)atomic_cmpset_32(&ctrlr->is_resetting, 1, 0);
 
 	return (0);
 fail:
@@ -1599,6 +1636,6 @@ fail:
 	 */
 	nvme_printf(ctrlr, "Failed to reset on resume, failing.\n");
 	nvme_ctrlr_fail(ctrlr);
-	atomic_cmpset_32(&ctrlr->is_resetting, 1, 0);
+	(void)atomic_cmpset_32(&ctrlr->is_resetting, 1, 0);
 	return (0);
 }

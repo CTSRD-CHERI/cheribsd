@@ -6,6 +6,8 @@
 .if !targets(__<${_this:T}>__)
 __<${_this:T}>__:
 
+.include <src.opts.mk>
+
 .if defined(_LIBCOMPAT)
 COMPAT_ARCH?=	${TARGET_ARCH}
 COMPAT_CPUTYPE?= ${CPUTYPE_${_LIBCOMPAT}}
@@ -24,6 +26,7 @@ COMPAT_COMPILER_TYPE=${COMPILER_TYPE}
 
 # -------------------------------------------------------------------
 # 32 bit world
+.if ${MK_LIB32} != "no"
 .if ${COMPAT_ARCH} == "amd64"
 HAS_COMPAT=32
 .if empty(COMPAT_CPUTYPE)
@@ -95,9 +98,11 @@ LIB32WMAKEFLAGS+= OBJCOPY="${XOBJCOPY}"
 LIB32CFLAGS=	-DCOMPAT_32BIT
 LIB32DTRACE=	${DTRACE} -32
 LIB32WMAKEFLAGS+=	-DCOMPAT_32BIT
+.endif # ${MK_LIB32} != "no"
 
 # -------------------------------------------------------------------
 # 64 bit world
+.if ${MK_LIB64} != "no"
 .if ${COMPAT_ARCH:Mmips64*c*}
 HAS_COMPAT=64
 # XXX: clang specific
@@ -137,9 +142,11 @@ LIB64WMAKEFLAGS+= NM="${XNM}" OBJCOPY="${XOBJCOPY}"
 LIB64CFLAGS=	-DCOMPAT_64BIT
 LIB64DTRACE=	${DTRACE} -64
 LIB64WMAKEFLAGS+=	-DCOMPAT_64BIT
+.endif # ${MK_LIB64} != "no"
 
 # -------------------------------------------------------------------
 # CHERI world
+.if ${MK_COMPAT_CHERIABI} != "no"
 .if ${COMPAT_ARCH:Mmips64*} && !${COMPAT_ARCH:Mmips64*c*}
 .if ${COMPAT_ARCH:Mmips*el*}
 .error No little endian CHERI
@@ -161,6 +168,7 @@ COMPAT_RISCV_ABI:=	${COMPAT_RISCV_ABI}d
 .endif
 LIBCHERICPUFLAGS+=	-march=${COMPAT_RISCV_MARCH} -mabi=${COMPAT_RISCV_ABI}
 .endif	# ${COMPAT_ARCH:Mriscv64*}
+.endif # ${MK_COMPAT_CHERIABI} != "no"
 
 .if ${COMPAT_ARCH:Mriscv*}
 # See bsd.cpu.mk
@@ -215,9 +223,14 @@ WANT_COMPAT:=	${NEED_COMPAT}
 .if defined(HAS_COMPAT) && defined(WANT_COMPAT)
 .if ${WANT_COMPAT} == "any"
 _LIBCOMPAT:=	${HAS_COMPAT:[1]}
+.elif !${HAS_COMPAT:M${WANT_COMPAT}}
+.warning WANT_COMPAT (${WANT_COMPAT}) defined, but not in HAS_COMPAT (${HAS_COMPAT})
+.undef WANT_COMPAT
 .else
 _LIBCOMPAT:=	${WANT_COMPAT}
 .endif
+.else # defined(HAS_COMPAT) && defined(WANT_COMPAT)
+.undef WANT_COMPAT
 .endif
 
 # -------------------------------------------------------------------

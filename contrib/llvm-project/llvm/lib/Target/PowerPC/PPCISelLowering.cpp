@@ -7848,9 +7848,10 @@ bool PPCTargetLowering::canReuseLoadAddress(SDValue Op, EVT MemVT,
                                             SelectionDAG &DAG,
                                             ISD::LoadExtType ET) const {
   SDLoc dl(Op);
+  bool ValidFPToUint = Op.getOpcode() == ISD::FP_TO_UINT &&
+                       (Subtarget.hasFPCVT() || Op.getValueType() == MVT::i32);
   if (ET == ISD::NON_EXTLOAD &&
-      (Op.getOpcode() == ISD::FP_TO_UINT ||
-       Op.getOpcode() == ISD::FP_TO_SINT) &&
+      (ValidFPToUint || Op.getOpcode() == ISD::FP_TO_SINT) &&
       isOperationLegalOrCustom(Op.getOpcode(),
                                Op.getOperand(0).getValueType())) {
 
@@ -15249,9 +15250,6 @@ bool PPCTargetLowering::allowsMisalignedMemoryAccesses(EVT VT,
   // boundaries.
 
   if (!VT.isSimple())
-    return false;
-
-  if (VT.isFloatingPoint() && !Subtarget.allowsUnalignedFPAccess())
     return false;
 
   if (VT.getSimpleVT().isVector()) {

@@ -76,6 +76,8 @@ struct nfsdevicehead nfsrv_devidhead;
 volatile int nfsrv_devidcnt = 0;
 void (*nfsd_call_servertimer)(void) = NULL;
 void (*ncl_call_invalcaches)(struct vnode *) = NULL;
+vop_advlock_t *nfs_advlock_p = NULL;
+vop_reclaim_t *nfs_reclaim_p = NULL;
 
 int nfs_pnfsio(task_fn_t *, void *);
 
@@ -474,9 +476,9 @@ nfssvc_call(struct thread *p, struct nfssvc_args *uap, struct ucred *cred)
 
 	if (uap->flag & NFSSVC_IDNAME) {
 		if ((uap->flag & NFSSVC_NEWSTRUCT) != 0)
-			error = copyin(uap->argp, &nid, sizeof(nid));
+			error = copyincap(uap->argp, &nid, sizeof(nid));
 		else {
-			error = copyin(uap->argp, &onid, sizeof(onid));
+			error = copyincap(uap->argp, &onid, sizeof(onid));
 			if (error == 0) {
 				nid.nid_flag = onid.nid_flag;
 				nid.nid_uid = onid.nid_uid;

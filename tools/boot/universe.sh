@@ -19,6 +19,12 @@
 # Output is put into _.boot.$TARGET_ARCH.log in sys.boot.
 #
 
+die()
+{
+    echo $*
+    exit 1
+}
+
 dobuild()
 {
     local ta=$1
@@ -27,6 +33,12 @@ dobuild()
 
     echo -n "Building $ta ${opt} ... "
     objdir=$(make buildenv TARGET_ARCH=$ta BUILDENV_SHELL="make -V .OBJDIR" | tail -1)
+    case ${objdir} in
+	/*) ;;
+	make*) echo Error message from make: $objdir
+	       continue ;;
+	*) die Crazy object dir: $objdir ;;
+    esac
     rm -rf ${objdir}
     if ! make buildenv TARGET_ARCH=$ta BUILDENV_SHELL="make clean cleandepend cleandir obj depend"  \
 	 > $lf 2>&1; then
@@ -65,12 +77,11 @@ done
 # Default build for a goodly selection of architectures
 for i in \
 	amd64/amd64 \
-	arm/arm arm/armv7 \
+	arm/armv7 \
 	arm64/aarch64 \
 	i386/i386 \
 	mips/mips mips/mips64 \
 	powerpc/powerpc powerpc/powerpc64 \
-	sparc64/sparc64 \
 	; do
     ta=${i##*/}
     dobuild $ta _.boot.${ta}.log ""
@@ -79,22 +90,20 @@ done
 # Default build for a goodly selection of architectures with Lua
 for i in \
 	amd64/amd64 \
-	arm/arm arm/armv7 \
+	arm/armv7 \
 	arm64/aarch64 \
 	i386/i386 \
 	mips/mips mips/mips64 \
 	powerpc/powerpc powerpc/powerpc64 \
-	sparc64/sparc64 \
 	; do
     ta=${i##*/}
-    dobuild $ta _.boot.${ta}.lua.log "MK_LOADEDER_LUA=yes MK_FORTH=no"
+    dobuild $ta _.boot.${ta}.lua.log "MK_LOADER_LUA=yes MK_FORTH=no"
 done
 
 # Build w/o ZFS
 for i in \
 	amd64/amd64 \
 	i386/i386 \
-	sparc64/sparc64 \
 	; do
     ta=${i##*/}
     dobuild $ta _.boot.${ta}.no_zfs.log "MK_ZFS=no"
@@ -108,12 +117,3 @@ for i in \
     ta=${i##*/}
     dobuild $ta _.boot.${ta}.firewire.log "MK_LOADER_FIREWIRE=yes"
 done
-
-# Build with LOADER_DEBUG, only sparc64 does this.
-for i in \
-	sparc64/sparc64 \
-	; do
-    ta=${i##*/}
-    dobuild $ta _.boot.${ta}.debug.log "LOADER_DEBUG=yes"
-done
-

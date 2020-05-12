@@ -147,7 +147,7 @@ private:
 		dbg_assert(__builtin_is_aligned(next, sizeof(void*)));
 		current_offset += size;
 		dbg_assert(current_offset <= BLOCK_SIZE);
-		return cheri_csetbounds(next, size);
+		return cheri_setbounds(next, size);
 	}
 public:
 	template<typename T> T* allocate() {
@@ -319,7 +319,7 @@ add_cheri_plt_stub(const Obj_Entry* obj, const Obj_Entry *rtldobj,
 	plt->_r_symndx = r_symndx; // FIXME: remove
 	// The target cap will span the whole plt stub:
 
-	// void* target_cap = cheri_csetbounds(plt, sizeof(CheriPltStub));
+	// void* target_cap = cheri_setbounds(plt, sizeof(CheriPltStub));
 	void* target_cap = plt;
 	// currently use a self-reference (to beginning of struct) as data cap
 	plt->trampoline.init(target_cap, _rtld_bind_start_local_fn_ptr);
@@ -711,7 +711,7 @@ find_per_function_cgp(const Obj_Entry *obj, const void* func) {
 	    " len=%#zx", (int)(it - obj->captable_mapping),
 	    (size_t)it->cap_table_offset, (size_t)it->sub_table_size);
 	// __builtin_dump_struct(it, &rtld_printf);
-	const void* captable_subset = cheri_csetbounds(
+	const void* captable_subset = cheri_setbounds(
 	    cheri_incoffset(obj->_target_cgp, it->cap_table_offset), it->sub_table_size);
 	dbg_cheri_plt("captable subset for function %p is %#p. Full table is %#p",
 	    func, captable_subset, obj->_target_cgp);

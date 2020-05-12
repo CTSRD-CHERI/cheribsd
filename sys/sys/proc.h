@@ -182,7 +182,6 @@ struct kcov_info;
 struct kdtrace_proc;
 struct kdtrace_thread;
 struct mqueue_notifier;
-struct nlminfo;
 struct p_sched;
 struct proc;
 struct procdesc;
@@ -356,7 +355,6 @@ struct thread {
 	/* LP64 hole */
 	struct callout	td_slpcallout;	/* (h) Callout for sleep. */
 	struct trapframe *td_frame;	/* (k) */
-	struct vm_object *td_kstack_obj;/* (a) Kstack object. */
 	vm_offset_t	td_kstack;	/* (a) Kernel VA of kstack. */
 	int		td_kstack_pages; /* (a) Size of the kstack. */
 	volatile u_int	td_critnest;	/* (k*) Critical section nest level. */
@@ -652,7 +650,6 @@ struct proc {
 	int		p_sigparent;	/* (c) Signal to parent on exit. */
 	int		p_sig;		/* (n) For core dump/debugger XXX. */
 	u_int		p_ptevents;	/* (c + e) ptrace() event mask. */
-	struct nlminfo	*p_nlminfo;	/* (?) Only used by/for lockd. */
 	struct kaioinfo	*p_aioinfo;	/* (y) ASYNC I/O info. */
 	struct thread	*p_singlethread;/* (c + j) If single threading this is it */
 	int		p_suspcount;	/* (j) Num threads in suspended mode. */
