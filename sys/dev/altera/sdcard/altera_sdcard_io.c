@@ -144,7 +144,7 @@ altera_sdcard_read_csd(struct altera_sdcard_softc *sc)
 	 * XXXRW: Treating this as an array of bytes, so no byte swapping --
 	 * is that a safe assumption?
 	 */
-	KASSERT(((uintptr_t)&sc->as_csd.csd_data) % 2 == 0,
+	KASSERT(is_aligned(&sc->as_csd.csd_data, 2),
 	    ("%s: CSD buffer unaligned", __func__));
 	bus_read_region_2(sc->as_res, ALTERA_SDCARD_OFF_CSD,
 	    (uint16_t *)sc->as_csd.csd_data, sizeof(sc->as_csd) / 2);
@@ -214,7 +214,7 @@ altera_sdcard_read_rxtx_buffer(struct altera_sdcard_softc *sc, void *data,
     size_t len)
 {
 
-	KASSERT((uintptr_t)data % 2 == 0,
+	KASSERT(is_aligned(data, 2),
 	    ("%s: unaligned data %p", __func__, data));
 	KASSERT((len <= ALTERA_SDCARD_SECTORSIZE) && (len % 2 == 0),
 	    ("%s: invalid length %ju", __func__, len));
@@ -230,7 +230,7 @@ altera_sdcard_write_rxtx_buffer(struct altera_sdcard_softc *sc, void *data,
 	u_int corrections, differences, i, retry_counter;
 	uint16_t d, v;
 
-	KASSERT((uintptr_t)data % 2 == 0,
+	KASSERT(is_aligned(data, 2),
 	    ("%s: unaligned data %p", __func__, data));
 	KASSERT((len <= ALTERA_SDCARD_SECTORSIZE) && (len % 2 == 0),
 	    ("%s: invalid length %ju", __func__, len));
@@ -266,7 +266,7 @@ recheck:
 							corrections++;
 							device_printf(sc->as_dev,
 							    "%s: single word rewrite worked"
-							    " at offset %u\n", 
+							    " at offset %u\n",
 							    __func__, i);
 							continue;
 						}
@@ -447,3 +447,12 @@ altera_sdcard_io_complete(struct altera_sdcard_softc *sc, uint16_t asr)
 	sc->as_currentbio = NULL;
 	return (1);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20200517,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_alignment"
+//   ]
+// }
+// CHERI CHANGES END
