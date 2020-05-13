@@ -39,11 +39,7 @@ __FBSDID("$FreeBSD$");
 #include <libelf.h>
 #include <libproc.h>
 
-#ifdef __CHERI_PURE_CAPABILITY__
-#define	LD_ELF	"ld-cheri-elf"
-#else
 #define	LD_ELF	"ld-elf"
-#endif
 
 static const char *aout_object = "a.out";
 static const char *ldelf_object = LD_ELF".so.1";
