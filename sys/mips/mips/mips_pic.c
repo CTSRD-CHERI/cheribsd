@@ -84,7 +84,7 @@ static void			 cpu_establish_intr(struct mips_pic_softc *sc,
 #define	INTR_MAP_DATA_MIPS	INTR_MAP_DATA_PLAT_1
 
 struct intr_map_data_mips_pic {
-	struct intr_map_data	hdr;
+	struct intr_map_data	hdr __subobject_use_container_bounds;
 	u_int			irq;
 };
 
@@ -443,7 +443,7 @@ mips_pic_find_intr(struct resource *r)
 /**
  * Allocate a fixed IRQ mapping for the given MIPS @p irq, or return the
  * existing mapping if @p irq was previously mapped.
- * 
+ *
  * @param	irq	The MIPS IRQ to be mapped.
  * @param[out]	mapping	On success, will be populated with the interrupt
  *			mapping.
@@ -478,6 +478,7 @@ mips_pic_map_fixed_intr(u_int irq, struct mips_pic_intr **mapping)
 		return (0);
 	}
 
+	/* XXX-AM: should not be able to allocate with M_WAITOK while holding mips_pic_mtx */
 	/* Map the interrupt */
 	data = (struct intr_map_data_mips_pic *)intr_alloc_map_data(
 		INTR_MAP_DATA_MIPS, sizeof(*data), M_WAITOK | M_ZERO);
@@ -507,13 +508,13 @@ mips_pic_map_fixed_intr(u_int irq, struct mips_pic_intr **mapping)
 }
 
 /**
- * 
+ *
  * Produce fixed IRQ mappings for all MIPS IRQs.
  *
  * Non-FDT/OFW MIPS targets do not provide an equivalent to OFW_BUS_MAP_INTR();
  * it is instead necessary to reserve INTRNG IRQ# 0-7 for use by MIPS device
  * drivers that assume INTRNG IRQs 0-7 are directly mapped to MIPS IRQs 0-7.
- * 
+ *
  * XXX: There is no support in INTRNG for reserving a fixed IRQ range. However,
  * we should be called prior to any other interrupt mapping requests, and work
  * around this by iteratively allocating the required 0-7 MIP IRQ# range.
@@ -584,7 +585,7 @@ mips_pic_activate_intr(device_t child, struct resource *r)
 /**
  * If @p r references a MIPS interrupt mapped by the MIPS32 interrupt
  * controller, handle interrupt deactivation internally.
- * 
+ *
  * Otherwise, delegate directly to intr_deactivate_irq().
  */
 int
@@ -610,7 +611,7 @@ mips_pic_deactivate_intr(device_t child, struct resource *r)
 		}
 	}
 	intr->consumers--;
-	
+
 	mtx_unlock(&mips_pic_mtx);
 	return (0);
 }
@@ -622,7 +623,7 @@ cpu_init_interrupts(void)
 
 /**
  * Provide backwards-compatible support for registering a MIPS interrupt handler
- * directly, without allocating a bus resource. 
+ * directly, without allocating a bus resource.
  */
 static void
 cpu_establish_intr(struct mips_pic_softc *sc, const char *name,
@@ -672,7 +673,7 @@ cpu_establish_intr(struct mips_pic_softc *sc, const char *name,
 			res = intr->res;
 			mtx_unlock(&mips_pic_mtx);
 		}
-	
+
 		if (res == NULL) {
 			panic("Unable to allocate IRQ %d->%u resource", irq,
 			    intr->intr_irq);
@@ -711,4 +712,12 @@ cpu_establish_softintr(const char *name, driver_filter_t *filt,
 	cpu_establish_intr(pic_sc, name, filt, handler, arg, irq, flags,
 	    cookiep);
 }
-
+// CHERI CHANGES START
+// {
+//   "updated": 20200517,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "subobject_bounds"
+//   ]
+// }
+// CHERI CHANGES END
