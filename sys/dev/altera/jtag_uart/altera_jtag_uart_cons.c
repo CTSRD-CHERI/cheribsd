@@ -361,3 +361,13 @@ aju_cnungrab(struct consdev *cp)
 }
 
 CONSOLE_DRIVER(aju);
+// CHERI CHANGES START
+// {
+//   "updated": 20200517,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_as_integer",
+//     "support"
+//   ]
+// }
+// CHERI CHANGES END

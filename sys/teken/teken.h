@@ -219,3 +219,13 @@ teken_color_t teken_256to16(teken_color_t);
 teken_color_t teken_256to8(teken_color_t);
 
 #endif /* !_TEKEN_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20200517,
+//   "target_type": "header",
+//   "changes_purecap": [
+//     "support"
+//   ],
+//   "change_comment": "Compiler assumes alignment"
+// }
+// CHERI CHANGES END

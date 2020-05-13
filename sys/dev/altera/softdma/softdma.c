@@ -216,7 +216,7 @@ softdma_intr(void *arg)
 
 	reg = softdma_memc_read(sc, A_ONCHIP_FIFO_MEM_CORE_STATUS_REG_EVENT);
 
-	if (reg & (A_ONCHIP_FIFO_MEM_CORE_EVENT_OVERFLOW | 
+	if (reg & (A_ONCHIP_FIFO_MEM_CORE_EVENT_OVERFLOW |
 	    A_ONCHIP_FIFO_MEM_CORE_EVENT_UNDERFLOW)) {
 		/* Errors */
 		err = (((reg & A_ONCHIP_FIFO_MEM_CORE_ERROR_MASK) >> \
@@ -894,3 +894,13 @@ static devclass_t softdma_devclass;
 
 EARLY_DRIVER_MODULE(softdma, simplebus, softdma_driver, softdma_devclass, 0, 0,
     BUS_PASS_INTERRUPT + BUS_PASS_ORDER_LATE);
+// CHERI CHANGES START
+// {
+//   "updated": 20200517,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_as_integer"
+//   ],
+//   "change_comment": "bus_addr_t"
+// }
+// CHERI CHANGES END
