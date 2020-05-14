@@ -478,7 +478,7 @@ embedfs_${MFS_IMAGE:T:R}.o: ${MFS_IMAGE}
 	    --binary-architecture ${EMBEDFS_ARCH.${MACHINE_ARCH}} \
 	    ${MFS_IMAGE} ${.TARGET}
 	${OBJCOPY} \
-	    --rename-section .data=mfs,contents,alloc,load,readonly,data \
+	    --rename-section .data=mfs,contents,alloc,load,data \
 	    --redefine-sym \
 		_binary_${MFS_IMAGE:C,[^[:alnum:]],_,g}_size=__mfs_root_size \
 	    --redefine-sym \
