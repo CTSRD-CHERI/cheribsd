@@ -51,6 +51,15 @@
 #include <cddl/contrib/opensolaris/uts/common/sys/dtrace.h>
 #include <machine/regnum.h>
 
+#define DEBUG_FASTTRAP
+
+// TODO(nicomazz): maybe enable with ioctl? or, which is the best way to disable
+// the printfs?
+#ifdef DEBUG_FASTTRAP
+#define ft_printf printf
+#else
+#define ft_printf
+#endif
 /*
  * This is not a complete implementation of fasttrap, but only aims at catching
  * the entry point of functions, and their parameters.
@@ -58,6 +67,7 @@
 int
 fasttrap_tracepoint_install(proc_t *p, fasttrap_tracepoint_t *tp)
 {
+	ft_printf("fasttrap: Installing tracepoint at %lx\n",(uint64_t)tp->ftt_pc);
 	fasttrap_instr_t instr = FASTTRAP_INSTR;
 
 	if (uwrite(p, &instr, 4, tp->ftt_pc) != 0)
@@ -69,6 +79,7 @@ fasttrap_tracepoint_install(proc_t *p, fasttrap_tracepoint_t *tp)
 int
 fasttrap_tracepoint_remove(proc_t *p, fasttrap_tracepoint_t *tp)
 {
+	ft_printf("fasttrap: removing tracepoint from %lx\n",(uint64_t)tp->ftt_pc);
 	uint32_t instr;
 
 	/*
@@ -141,48 +152,9 @@ fasttrap_tracepoint_init(proc_t *p, fasttrap_tracepoint_t *tp, uintptr_t pc,
 	tp->ftt_type = FASTTRAP_T_COMMON;
 	tp->ftt_instr = instr;
 
-	switch (_instr.JType.op) {
-	case OP_SPECIAL: // todo
-	{
-		switch (_instr.RType.func) {
-		case OP_SLL:
-			if (_instr.word == 0) // nop (sll r0,r0,0)
-				tp->ftt_type = FASTTRAP_T_NOP;
-			break; // TODO(nicomazz): is this break needed?
-		}
-	}
-	case OP_TEQ: /* trap instructions*/
-	case OP_TGE:
-	case OP_TGEU:
-	case OP_TLT:
-	case OP_TLTU:
-	case OP_TNE:
-		return (-1);
-	// TODO(nicomazz) handle all the various branch cases. In theory, as
-	// long as we are only supporting the entry probe, this is not neeeded.
-	case OP_BCOND: // those have a single register, and another opcode in rt
-	case OP_BEQ:
-	case OP_BNE:
-	case OP_BLEZ:
-	case OP_BGTZ:
-
-		tp->ftt_type = FASTTRAP_T_BC;
-		tp->ftt_rs = _instr.RType.rs;
-		tp->ftt_rt = _instr.RType.rt;
-		/* Extract target address, and compute destination.
-		 * In mips, the destination is relative to the address of the
-		 * delay slot instruction (pc + 4)
-		 * */
-		tp->ftt_dest = _instr.IType.imm + 4 + pc;
-		break;
-
-	case OP_J:
-	case OP_JAL:
-		tp->ftt_type = FASTTRAP_T_BC;
-		/* Extract target address, and compute destination.*/
-		tp->ftt_dest = _instr.JType.target;
-		break;
-	}
+	/* TODO(nicomazz): See the instruction type and save it to ftt_type.
+	 * This will be needed to "emulate" them when we place a breakpoint on
+	 * them. */
 
 	return (0);
 }
@@ -209,6 +181,7 @@ fasttrap_pid_probe(struct trapframe *frame)
 	struct rm_priotracker tracker;
 	proc_t *p = curproc;
 	uintptr_t pc;
+	int pc_increment;
 	uintptr_t new_pc = 0;
 	fasttrap_bucket_t *bucket;
 	fasttrap_tracepoint_t *tp, tp_local;
@@ -222,6 +195,7 @@ fasttrap_pid_probe(struct trapframe *frame)
 	rp = &reg;
 	crp = &creg;
 	pc = TRAPF_PC(frame);
+	pc_increment = 0;
 
 	/*
 	 * It's possible that a user (in a veritable orgy of bad planning)
@@ -234,6 +208,8 @@ fasttrap_pid_probe(struct trapframe *frame)
 		fasttrap_sigtrap(p, curthread, pc);
 		return (0);
 	}
+	ft_printf("%s: received a break!\n",__func__);
+	ft_printf("Initial PC: 0x%lx\n",(uint64_t)pc);
 
 	/*
 	 * Clear all user tracing flags.
@@ -321,46 +297,34 @@ fasttrap_pid_probe(struct trapframe *frame)
 	rm_runlock(&fasttrap_tp_lock, &tracker);
 	tp = &tp_local;
 
-	// TODO(nicomazz): find the equivalent of xor r3, r3, r3
-	/*
-	 * If there's an is-enabled probe connected to this tracepoint it
-	 * means that there was a 'xor r3, r3, r3'
-	 * instruction that was placed there by DTrace when the binary was
-	 * linked. As this probe is, in fact, enabled, we need to stuff 1
-	 * into R3. Accordingly, we can bypass all the instruction
-	 * emulation logic since we know the inevitable result. It's possible
-	 * that a user could construct a scenario where the 'is-enabled'
-	 * probe was on some other instruction, but that would be a rather
-	 * exotic way to shoot oneself in the foot.
-	 */
-	if (is_enabled) {
-		printf("IMPLEMENT ME: %s(%d)\n", __func__,__LINE__);
-
-		//rp->fixreg[3] = 1
-		new_pc = pc + 4;
-		goto done;
-	}
-
 	switch (tp->ftt_type) {
 	case FASTTRAP_T_NOP:
 		// no emulation needed
-		TRAPF_PC_INCREMENT(frame,4);
+		pc_increment = 4;
 		break;
-		// TODO(nicomazz): emulate the behaviour of the branch
-		//     instructions. If we only need to instrument the entry
-		//     point, this is probably useless
-	/*case FASTTRAP_T_BC:
-		if (!fasttrap_branch_taken(tp->ftt_bo, tp->ftt_bi, rp))
+	case FASTTRAP_T_COMMON: {
+		/* Now, we remove the breakpoint, and continue from where we
+		 * were. Afterwards, a scratch space will be used to emulate the
+		 * instruction. */
+		if (pget(pid, PGET_HOLD | PGET_NOTWEXIT, &p) != 0) {
+			ft_printf("Error trying to hold the processs\n");
 			break;
-		*/
-	/* FALLTHROUGH */ /*
-case FASTTRAP_T_B:
-       if (tp->ftt_instr & 0x01)
-	       rp->lr = rp->pc + 4;
-       new_pc = tp->ftt_dest;
-       break;*/
-	case FASTTRAP_T_COMMON:
+		}
+
+		int error;
+		ft_printf(
+		    "%s: replacing break instruction with original(0x%lx) at 0x%lx\n",
+		    __func__, (uint64_t)tp->ftt_instr, (uint64_t)tp->ftt_pc);
+
+		if ((error = uwrite(p, &(tp->ftt_instr), 4, tp->ftt_pc)) != 0) {
+			ft_printf(
+			    "Error replacing the original instruction: %d\n",
+			    error);
+		}
+		pc_increment = 0;
+		PRELE(p);
 		break;
+	}
 	};
 done:
 	/*
@@ -388,9 +352,12 @@ done:
 		}
 	}
 
-	TRAPF_PC_SET_ADDR(frame, new_pc);
-	rp->r_regs[PT_REGS_PC] = TRAPF_PC(frame);
-	set_regs(curthread, rp);
+	if (pc_increment != 0) {
+		rp->r_regs[PT_REGS_PC] += pc_increment;
+		ft_printf("Setting new pc from fasttrap_pid_probe: 0x%lx\n",
+		    (uint64_t)rp->r_regs[PT_REGS_PC]);
+		set_regs(curthread, rp);
+	}
 	return (0);
 }
 
