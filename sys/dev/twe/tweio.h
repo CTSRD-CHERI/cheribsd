@@ -40,7 +40,7 @@
  */
 struct twe_usercommand {
     TWE_Command	tu_command;	/* command ready for the controller */
-    void	*tu_data;	/* pointer to data in userspace */
+    void	* __kerncap tu_data;	/* pointer to data in userspace */
     size_t	tu_size;	/* userspace data length */
 };
 
@@ -84,7 +84,7 @@ union twe_statrequest {
 struct twe_paramcommand {
     u_int16_t	tp_table_id;
     u_int8_t	tp_param_id;
-    void	*tp_data;
+    void	* __kerncap tp_data;
     u_int8_t	tp_size;
 };
 
