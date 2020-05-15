@@ -680,15 +680,13 @@ contrib/libb2/blake2s-ref.c	optional crypto | ipsec | ipsec_support \
 	compile-with "${NORMAL_C} -I$S/crypto/blake2 -Wno-cast-qual -DSUFFIX=_ref -Wno-unused-function"
 crypto/blake2/blake2-sw.c	optional crypto | ipsec | ipsec_support \
 	compile-with "${NORMAL_C} -I$S/crypto/blake2 -Wno-cast-qual"
-crypto/blowfish/bf_ecb.c	optional ipsec | ipsec_support
-crypto/blowfish/bf_skey.c	optional crypto | ipsec | ipsec_support
 crypto/camellia/camellia.c	optional crypto | ipsec | ipsec_support
 crypto/camellia/camellia-api.c	optional crypto | ipsec | ipsec_support
 crypto/chacha20/chacha.c	standard
 crypto/chacha20/chacha-sw.c	optional crypto | ipsec | ipsec_support
-crypto/des/des_ecb.c		optional crypto | ipsec | ipsec_support | netsmb
-crypto/des/des_setkey.c		optional crypto | ipsec | ipsec_support | netsmb
-crypto/rc4/rc4.c		optional netgraph_mppc_encryption | kgssapi
+crypto/des/des_ecb.c		optional netsmb
+crypto/des/des_setkey.c		optional netsmb
+crypto/rc4/rc4.c		optional netgraph_mppc_encryption
 crypto/rijndael/rijndael-alg-fst.c optional crypto | ekcd | geom_bde | \
 	ipsec | ipsec_support | !random_loadable | wlan_ccmp
 crypto/rijndael/rijndael-api-fst.c optional ekcd | geom_bde | !random_loadable
@@ -3182,7 +3180,6 @@ dev/uart/uart_dev_z8530.c	optional uart uart_z8530 | uart scc
 dev/uart/uart_if.m		optional uart
 dev/uart/uart_subr.c		optional uart
 dev/uart/uart_tty.c		optional uart
-dev/ubsec/ubsec.c		optional ubsec
 #
 # USB controller drivers
 #
@@ -4798,7 +4795,6 @@ dev/mlx5/mlx5_en/mlx5_en_port_buffer.c		optional mlx5en pci inet inet6	\
 	compile-with "${OFED_C}"
 
 # crypto support
-opencrypto/cast.c		optional crypto | ipsec | ipsec_support
 opencrypto/criov.c		optional crypto | ipsec | ipsec_support
 opencrypto/crypto.c		optional crypto | ipsec | ipsec_support
 opencrypto/cryptodev.c		optional cryptodev
@@ -4808,7 +4804,6 @@ opencrypto/cryptodeflate.c	optional crypto | ipsec | ipsec_support
 opencrypto/gmac.c		optional crypto | ipsec | ipsec_support
 opencrypto/gfmult.c		optional crypto | ipsec | ipsec_support
 opencrypto/rmd160.c		optional crypto | ipsec | ipsec_support
-opencrypto/skipjack.c		optional crypto | ipsec | ipsec_support
 opencrypto/xform.c		optional crypto | ipsec | ipsec_support
 opencrypto/xform_poly1305.c	optional crypto \
 	compile-with "${NORMAL_C} -I$S/contrib/libsodium/src/libsodium/include -I$S/crypto/libsodium"
