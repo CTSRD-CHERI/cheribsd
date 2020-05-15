@@ -38,6 +38,8 @@
  * Materiel Command, USAF, under agreement number F30602-01-2-0537.
  */
 
+#define	EXPLICIT_USER_ACCESS
+
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
@@ -1323,7 +1325,7 @@ cryptodev_key(struct crypt_kop *kop)
 		krp->krp_param[i].crp_p = malloc(size, M_XDATA, M_WAITOK);
 		if (i >= krp->krp_iparams)
 			continue;
-		error = copyin(kop->crk_param[i].crp_p, krp->krp_param[i].crp_p, size);
+		error = copyin(kop->crk_param[i].crp_up, krp->krp_param[i].crp_p, size);
 		if (error) {
 			SDT_PROBE1(opencrypto, dev, ioctl, error, __LINE__);
 			goto fail;
@@ -1353,7 +1355,7 @@ cryptodev_key(struct crypt_kop *kop)
 		size = (krp->krp_param[i].crp_nbits + 7) / 8;
 		if (size == 0)
 			continue;
-		error = copyout(krp->krp_param[i].crp_p, kop->crk_param[i].crp_p, size);
+		error = copyout(krp->krp_param[i].crp_p, kop->crk_param[i].crp_up, size);
 		if (error) {
 			SDT_PROBE1(opencrypto, dev, ioctl, error, __LINE__);
 			goto fail;
