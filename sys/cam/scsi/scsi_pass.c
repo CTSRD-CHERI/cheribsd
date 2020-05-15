@@ -1173,13 +1173,12 @@ passiocleanup(struct pass_softc *softc, struct pass_io_req *io_req)
 		}
 	} else if (io_req->data_flags == CAM_DATA_SG) {
 		for (i = 0; i < io_req->num_kern_segs; i++) {
-			if ((uint8_t *)(uintptr_t)
-			    io_req->kern_segptr[i].ds_addr == NULL)
+			if (io_req->kern_segptr[i].ds_vaddr == NULL)
 				continue;
 
-			uma_zfree(softc->pass_io_zone, (uint8_t *)(uintptr_t)
-			    io_req->kern_segptr[i].ds_addr);
-			io_req->kern_segptr[i].ds_addr = 0;
+			uma_zfree(softc->pass_io_zone,
+			    io_req->kern_segptr[i].ds_vaddr);
+			io_req->kern_segptr[i].ds_vaddr = NULL;
 		}
 	}
 
@@ -1224,9 +1223,9 @@ passcopysglist(struct cam_periph *periph, struct pass_io_req *io_req,
 		len_to_copy = min(user_sglist[i].ds_len -user_watermark,
 		    kern_sglist[j].ds_len - kern_watermark);
 
-		user_ptr = (uint8_t *)(uintptr_t)user_sglist[i].ds_addr;
+		user_ptr = user_sglist[i].ds_vaddr;
 		user_ptr = user_ptr + user_watermark;
-		kern_ptr = (uint8_t *)(uintptr_t)kern_sglist[j].ds_addr;
+		kern_ptr = kern_sglist[j].ds_vaddr;
 		kern_ptr = kern_ptr + kern_watermark;
 
 		user_watermark += len_to_copy;
@@ -1565,8 +1564,7 @@ passmemsetup(struct cam_periph *periph, struct pass_io_req *io_req)
 
 			alloc_size = min(size_to_go, softc->io_zone_size);
 			kern_ptr = uma_zalloc(softc->pass_io_zone, M_WAITOK);
-			io_req->kern_segptr[i].ds_addr =
-			    (bus_addr_t)(uintptr_t)kern_ptr;
+			io_req->kern_segptr[i].ds_vaddr = kern_ptr;
 			io_req->kern_segptr[i].ds_len = alloc_size;
 		}
 		if (size_to_go > 0) {

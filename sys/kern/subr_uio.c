@@ -192,8 +192,8 @@ physcopyin_vlist(bus_dma_segment_t *src, off_t offset, vm_paddr_t dst,
 
 	while (len > 0 && error == 0) {
 		seg_len = MIN(src->ds_len - offset, len);
-		error = physcopyin((void *)(uintptr_t)(src->ds_addr + offset),
-		    dst, seg_len);
+		error = physcopyin((char *)src->ds_vaddr + offset, dst,
+		    seg_len);
 		offset = 0;
 		src++;
 		len -= seg_len;
@@ -218,8 +218,8 @@ physcopyout_vlist(vm_paddr_t src, bus_dma_segment_t *dst, off_t offset,
 
 	while (len > 0 && error == 0) {
 		seg_len = MIN(dst->ds_len - offset, len);
-		error = physcopyout(src, (void *)(uintptr_t)(dst->ds_addr +
-		    offset), seg_len);
+		error = physcopyout(src, (char *)dst->ds_vaddr + offset,
+		    seg_len);
 		offset = 0;
 		dst++;
 		len -= seg_len;
