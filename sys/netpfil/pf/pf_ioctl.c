@@ -37,6 +37,8 @@
  *	$OpenBSD: pf_ioctl.c,v 1.213 2009/02/15 21:46:12 mbalmer Exp $
  */
 
+#define	EXPLICIT_USER_ACCESS
+
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
