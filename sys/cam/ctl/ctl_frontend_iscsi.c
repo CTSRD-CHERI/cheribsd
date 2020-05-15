@@ -35,6 +35,8 @@
  * CTL frontend for the iSCSI protocol.
  */
 
+#define	EXPLICIT_USER_ACCESS
+
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
