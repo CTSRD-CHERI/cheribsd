@@ -1063,13 +1063,13 @@ dofault:
 			if (DELAYBRANCH(trapframe->cause))
 				va += sizeof(int);
 
-			if (td->td_md.md_ss_addr != (__cheri_addr intptr_t)va) {
+			if (td->td_md.md_ss_addr != (__cheri_addr uintptr_t)va) {
 				addr = va;
 				break;
 			}
 
 			/* read break instruction */
-			instr = fuword32_c(__USER_CODE_CAP((__cheri_fromcap void *)va));
+			instr = fuword32_c(va);
 
 			if (instr != MIPS_BREAK_SSTEP) {
 				addr = va;
@@ -1077,8 +1077,8 @@ dofault:
 			}
 
 			CTR3(KTR_PTRACE,
-			    "trap: tid %d, single step at %p: %#08x",
-			    td->td_tid, (__cheri_fromcap void *)va, instr);
+			    "trap: tid %d, single step at 0x%lx: %#08x",
+			    td->td_tid, (__cheri_addr long)va, instr);
 			PROC_LOCK(p);
 			_PHOLD(p);
 			error = ptrace_clear_single_step(td);
