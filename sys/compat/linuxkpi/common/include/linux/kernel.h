@@ -433,7 +433,7 @@ kstrtobool(const char *s, bool *res)
 }
 
 static inline int
-kstrtobool_from_user(const char __user *s, size_t count, bool *res)
+kstrtobool_from_user(const char __user * __capability s, size_t count, bool *res)
 {
 	char buf[8] = {};
 
