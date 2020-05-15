@@ -37,8 +37,8 @@ extern "C" {
 
 #define	FASTTRAP_SUNWDTRACE_SIZE	64
 
-// teq $0, $0
-#define FASTTRAP_INSTR			0x00000034
+// break
+#define FASTTRAP_INSTR			MIPS_BREAK_PID_BKPT
 
 typedef	uint32_t	fasttrap_instr_t;
 
