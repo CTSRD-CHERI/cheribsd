@@ -120,8 +120,8 @@
 #  if !defined(IPFILTER_LKM) && defined(__FreeBSD_version)
 #   include "opt_ipfilter.h"
 #  endif
-#  define	COPYIN(a,b,c)	copyin((caddr_t)(a), (caddr_t)(b), (c))
-#  define	COPYOUT(a,b,c)	copyout((caddr_t)(a), (caddr_t)(b), (c))
+#  define	COPYIN(a,b,c)	copyin((a), (b), (c))
+#  define	COPYOUT(a,b,c)	copyout((a), (b), (c))
 
 # else
 #  include <inttypes.h>

@@ -11,6 +11,7 @@
 # define        KERNEL	1
 # define        _KERNEL	1
 #endif
+#define	EXPLICIT_USER_ACCESS
 #include <sys/param.h>
 #include <sys/types.h>
 #include <sys/errno.h>
