@@ -48,9 +48,9 @@ struct smbcmd {
 		short	word;
 	} rdata;
 	int  slave;
-	char *wbuf;	/* use wdata if NULL */
+	char * __kerncap wbuf;	/* use wdata if NULL */
 	int  wcount;
-	char *rbuf;	/* use rdata if NULL */
+	char * __kerncap rbuf;	/* use rdata if NULL */
 	int  rcount;
 };
 
