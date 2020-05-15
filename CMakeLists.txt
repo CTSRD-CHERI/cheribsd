@@ -122,6 +122,7 @@ file(WRITE ${CMAKE_BINARY_DIR}/kern_opt/opt_global.h "
 #define TICK_USE_YAMON_FREQ defined
 #define YAMON 1
 #define INVARIANTS 1
+#define __FreeBSD__
 // #define MAC 1
 // #define AUDIT 1")
 
