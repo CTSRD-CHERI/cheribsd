@@ -26,6 +26,7 @@ options DDB
 options KDB_TRACE
 options DDB_NUMSYM
 options GDB
+options KTR
 
 #
 # Features required for CHERI CPU and CheriBSD support.
