@@ -1063,13 +1063,24 @@ dofault:
 			if (DELAYBRANCH(trapframe->cause))
 				va += sizeof(int);
 
+			instr = fuword32_c(__USER_CODE_CAP((__cheri_offset vaddr_t)va));
+#ifdef KDTRACE_HOOKS
+
+			if (instr == MIPS_BREAK_PID_BKPT &&
+			    dtrace_pid_probe_ptr != NULL) {
+				addr = va;
+				(*dtrace_pid_probe_ptr)(trapframe);
+				addr = va;
+				break;
+			}
+#endif
+
 			if (td->td_md.md_ss_addr != (__cheri_addr intptr_t)va) {
 				addr = va;
 				break;
 			}
 
 			/* read break instruction */
-			instr = fuword32_c(__USER_CODE_CAP((__cheri_fromcap void *)va));
 
 			if (instr != MIPS_BREAK_SSTEP) {
 				addr = va;
