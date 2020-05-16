@@ -4,6 +4,12 @@
 # FreeBSD, and docsExamples doesn't seem amenable to automated testing.
 
 TESTSDIR=	${TESTSBASE}/cddl/usr.sbin/dtrace/common
+
+
+# A few tests how did not compile in CHERI have been removed from here.
+# The problems were missing dependencies.
+# Tests removed: json usdt
+
 TESTS_SUBDIRS+= aggs \
 		arithmetic \
 		arrays \
@@ -31,7 +37,6 @@ TESTS_SUBDIRS+= aggs \
 		io \
 		ip \
 		java_api \
-		json \
 		lexer \
 		llquantize \
 		mdb \
@@ -80,7 +85,6 @@ TESTS_SUBDIRS+= aggs \
 		types \
 		uctf \
 		union \
-		usdt \
 		ustack \
 		vars \
 		version \

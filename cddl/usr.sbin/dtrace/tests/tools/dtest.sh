@@ -53,7 +53,9 @@ runtest()
             dflags="$dflags ${pid}"
         fi
 
-        dtrace -C -s "${TFILE}" $dflags >$STDOUT 2>$STDERR
+        # So far, there is no C preprocessor in cheri. When it will be
+        # available,a "-C" should be added after "dtrace"
+        dtrace -s "${TFILE}" $dflags >$STDOUT 2>$STDERR
         status=$?
 
         if [ $status -ne $exstatus ]; then
@@ -72,7 +74,9 @@ runtest()
     err.*.ksh|tst.*.ksh)
         expr "$TFILE" : 'err.*' >/dev/null && exstatus=1
 
-        tst=$TFILE ksh "$TFILE" /usr/sbin/dtrace >$STDOUT 2>$STDERR
+        # TODO(nicomazz): here we should use ksh instead of sh for some test. It
+        #  should be changed when I find a way to install ksh
+        tst=$TFILE sh "$TFILE" /usr/sbin/dtrace >$STDOUT 2>$STDERR
         status=$?
 
         if [ $status -ne $exstatus ]; then
@@ -88,7 +92,9 @@ runtest()
 
     if [ $retval -eq 0 ] && \
         head -n 1 $STDOUT | grep -q -E '^#!/.*ksh$'; then
-        ksh $STDOUT
+        # ksh is not in FreeBSD by default.
+        # TODO: change this to ksh when it will be available.
+        sh $STDOUT
         retval=$?
     fi
 
@@ -102,7 +108,8 @@ readonly STDOUT=$(mktemp)
 readonly TFILE=$(basename $1)
 readonly EXOUT=${TFILE}.out
 
-kldstat -q -m dtrace_test || kldload dtrace_test
+# dtrace_test is compiled into kernel
+# kldstat -q -m dtrace_test || kldload dtrace_test
 cd $(dirname $1)
 runtest
 RESULT=$?
