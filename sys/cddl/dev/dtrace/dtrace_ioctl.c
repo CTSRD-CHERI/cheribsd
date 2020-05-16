@@ -21,6 +21,9 @@
  * $FreeBSD$
  *
  */
+
+#define EXPLICIT_USER_ACCESS
+
 #include <sys/sysent.h>
 #include <cddl/contrib/opensolaris/uts/common/sys/dtrace.h>
 #include <sys/systm.h>
@@ -360,7 +363,7 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 				sz = buf->dtb_size;
 			}
 
-			if (copyout_c(buf->dtb_tomax, desc_dtbd_data, sz) !=
+			if (copyout(buf->dtb_tomax, desc_dtbd_data, sz) !=
 			    0) {
 				mutex_exit(&dtrace_lock);
 				return (EFAULT);
@@ -415,7 +418,7 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 		/*
 		 * We have our snapshot; now copy it out.
 		 */
-		if (copyout_c(buf->dtb_xamot, desc_dtbd_data,
+		if (copyout(buf->dtb_xamot, desc_dtbd_data,
 		    buf->dtb_xamot_offset) != 0) {
 			mutex_exit(&dtrace_lock);
 			return (EFAULT);
@@ -706,7 +709,7 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 		if (len > *dtfd_length) {
 			*dtfd_length = len;
 		} else {
-			if (copyout_c(str, dtfd_string, len) != 0) {
+			if (copyout(str, dtfd_string, len) != 0) {
 				mutex_exit(&dtrace_lock);
 				return (EINVAL);
 			}
