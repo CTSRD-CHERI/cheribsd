@@ -101,9 +101,6 @@ cryptocteon_auth_supported(const struct crypto_session_params *csp)
 	u_int hash_len;
 
 	switch (csp->csp_auth_alg) {
-	case CRYPTO_MD5_HMAC:
-		hash_len = MD5_HASH_LEN;
-		break;
 	case CRYPTO_SHA1_HMAC:
 		hash_len = SHA1_HASH_LEN;
 		break;
@@ -121,14 +118,6 @@ cryptocteon_cipher_supported(const struct crypto_session_params *csp)
 {
 
 	switch (csp->csp_cipher_alg) {
-	case CRYPTO_DES_CBC:
-	case CRYPTO_3DES_CBC:
-		if (csp->csp_ivlen != 8)
-			return (false);
-		if (csp->csp_cipher_klen != 8 &&
-		    csp->csp_cipher_klen != 24)
-			return (false);
-		break;
 	case CRYPTO_AES_CBC:
 		if (csp->csp_ivlen != 16)
 			return (false);
@@ -205,9 +194,6 @@ cryptocteon_newsession(device_t dev, crypto_session_t cses,
 	ocd->octo_mlen = csp->csp_auth_mlen;
 	if (csp->csp_auth_mlen == 0) {
 		switch (csp->csp_auth_alg) {
-		case CRYPTO_MD5_HMAC:
-			ocd->octo_mlen = MD5_HASH_LEN;
-			break;
 		case CRYPTO_SHA1_HMAC:
 			ocd->octo_mlen = SHA1_HASH_LEN;
 			break;
@@ -217,10 +203,6 @@ cryptocteon_newsession(device_t dev, crypto_session_t cses,
 	switch (csp->csp_mode) {
 	case CSP_MODE_DIGEST:
 		switch (csp->csp_auth_alg) {
-		case CRYPTO_MD5_HMAC:
-			ocd->octo_encrypt = octo_null_md5_encrypt;
-			ocd->octo_decrypt = octo_null_md5_encrypt;
-			break;
 		case CRYPTO_SHA1_HMAC:
 			ocd->octo_encrypt = octo_null_sha1_encrypt;
 			ocd->octo_decrypt = octo_null_sha1_encrypt;
@@ -229,11 +211,6 @@ cryptocteon_newsession(device_t dev, crypto_session_t cses,
 		break;
 	case CSP_MODE_CIPHER:
 		switch (csp->csp_cipher_alg) {
-		case CRYPTO_DES_CBC:
-		case CRYPTO_3DES_CBC:
-			ocd->octo_encrypt = octo_des_cbc_encrypt;
-			ocd->octo_decrypt = octo_des_cbc_decrypt;
-			break;
 		case CRYPTO_AES_CBC:
 			ocd->octo_encrypt = octo_aes_cbc_encrypt;
 			ocd->octo_decrypt = octo_aes_cbc_decrypt;
@@ -242,25 +219,8 @@ cryptocteon_newsession(device_t dev, crypto_session_t cses,
 		break;
 	case CSP_MODE_ETA:
 		switch (csp->csp_cipher_alg) {
-		case CRYPTO_DES_CBC:
-		case CRYPTO_3DES_CBC:
-			switch (csp->csp_auth_alg) {
-			case CRYPTO_MD5_HMAC:
-				ocd->octo_encrypt = octo_des_cbc_md5_encrypt;
-				ocd->octo_decrypt = octo_des_cbc_md5_decrypt;
-				break;
-			case CRYPTO_SHA1_HMAC:
-				ocd->octo_encrypt = octo_des_cbc_sha1_encrypt;
-				ocd->octo_decrypt = octo_des_cbc_sha1_encrypt;
-				break;
-			}
-			break;
 		case CRYPTO_AES_CBC:
 			switch (csp->csp_auth_alg) {
-			case CRYPTO_MD5_HMAC:
-				ocd->octo_encrypt = octo_aes_cbc_md5_encrypt;
-				ocd->octo_decrypt = octo_aes_cbc_md5_decrypt;
-				break;
 			case CRYPTO_SHA1_HMAC:
 				ocd->octo_encrypt = octo_aes_cbc_sha1_encrypt;
 				ocd->octo_decrypt = octo_aes_cbc_sha1_decrypt;

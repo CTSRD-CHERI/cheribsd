@@ -70,6 +70,7 @@ process___cap_relocs(Obj_Entry* obj)
 	dbg("Processing %lu __cap_relocs for %s (code base = %-#p, data base = %-#p) \n",
 	    (end_relocs - start_relocs), obj->path, code_base, data_base);
 
+#ifdef __mips__
 	/*
 	 * We have dynamic relocations for the cap_relocs location, unless the
 	 * binary has the DF_MIPS_CHERI_RELATIVE_CAPRELOCS flag set.
@@ -84,6 +85,10 @@ process___cap_relocs(Obj_Entry* obj)
 	// If the binary includes the RELATIVE_CAPRELOCS dynamic flag we have
 	// to add getaddr(relocbase) to every __cap_reloc location and object.
 	vaddr_t base_addr = obj->relative_cap_relocs ? cheri_getaddress(obj->relocbase) : 0;
+#else
+	/* Newer architectures have relative __cap_relocs out of the box */
+	vaddr_t base_addr = cheri_getaddress(obj->relocbase);
+#endif
 
 	_do___caprelocs(start_relocs, end_relocs, data_base, code_base, base_addr,
 	    can_use_tight_pcc_bounds(obj));
