@@ -4,12 +4,6 @@
 # FreeBSD, and docsExamples doesn't seem amenable to automated testing.
 
 TESTSDIR=	${TESTSBASE}/cddl/usr.sbin/dtrace/common
-
-
-# A few tests how did not compile in CHERI have been removed from here.
-# The problems were missing dependencies.
-# Tests removed: json usdt
-
 TESTS_SUBDIRS+= aggs \
 		arithmetic \
 		arrays \
@@ -88,6 +82,13 @@ TESTS_SUBDIRS+= aggs \
 		ustack \
 		vars \
 		version \
+
+# A few tests how did not compile in CHERI have been removed from here.
+# The problems were missing dependencies.
+.if !${TARGET_ARCH:M*cheri*}
+TESTS_SUBDIRS += json \
+		usdt
+.endif
 
 .PATH:		${.CURDIR:H:H:H:H:H}/tests
 KYUAFILE=	YES
