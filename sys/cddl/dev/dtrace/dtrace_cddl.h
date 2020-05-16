@@ -74,11 +74,11 @@ typedef struct kdtrace_thread {
 #define	td_dtrace_ast	_tdu._tds._td_dtrace_ast
 #define	td_dtrace_reg	_tdu._tds._td_dtrace_reg
 
-	uintcap_t	td_dtrace_pc;	/* DTrace saved pc from fasttrap. */
-	uintcap_t	td_dtrace_npc;	/* DTrace next pc from fasttrap. */
-	uintcap_t	td_dtrace_scrpc;
+	uintptr_t	td_dtrace_pc;	/* DTrace saved pc from fasttrap. */
+	uintptr_t	td_dtrace_npc;	/* DTrace next pc from fasttrap. */
+	uintptr_t	td_dtrace_scrpc;
 					/* DTrace per-thread scratch location. */
-	uintcap_t	td_dtrace_astpc;
+	uintptr_t	td_dtrace_astpc;
 					/* DTrace return sequence location. */
 #ifdef __amd64__
 	uintptr_t	td_dtrace_regv;

@@ -292,14 +292,14 @@ fasttrap_hash_str(const char *p)
 }
 
 void
-fasttrap_sigtrap(proc_t *p, kthread_t *t, uintcap_t pc)
+fasttrap_sigtrap(proc_t *p, kthread_t *t, uintptr_t pc)
 {
 	ksiginfo_t ksi;
 
 	ksiginfo_init(&ksi);
 	ksi.ksi_signo = SIGTRAP;
 	ksi.ksi_code = TRAP_DTRACE;
-	ksi.ksi_addr = (void * __capability) pc;
+	ksi.ksi_addr = (caddr_t)pc;
 	PROC_LOCK(p);
 	(void)tdsendsignal(p, t, SIGTRAP, &ksi);
 	PROC_UNLOCK(p);
