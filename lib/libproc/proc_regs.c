@@ -49,15 +49,15 @@ __FBSDID("$FreeBSD$");
 #include <cheri/cheric.h>
 #include <cheri/cheri.h>
 
-static int
-get_pcc_base(struct proc_handle *phdl)
+static void * __capability
+get_pcc(struct proc_handle *phdl)
 {
 	struct capreg capregs;
 
 	if (ptrace(PT_GETCAPREGS, proc_getpid(phdl), (caddr_t)&capregs, 0) < 0)
-		return (-1);
+		return NULL;
 
-	return cheri_getbase(((struct cheri_frame *)&capregs)->cf_pcc);
+	return ((struct cheri_frame *)&capregs)->cf_pcc;
 }
 #endif
 
@@ -75,7 +75,7 @@ proc_regget(struct proc_handle *phdl, proc_reg_t reg, unsigned long *regvalue)
 	if (ptrace(PT_GETREGS, proc_getpid(phdl), (caddr_t)&regs, 0) < 0)
 		return (-1);
 	switch (reg) {
-	case REG_PC:
+	case REG_PC: {
 #if defined(__aarch64__)
 		*regvalue = regs.elr;
 #elif defined(__amd64__)
@@ -85,9 +85,13 @@ proc_regget(struct proc_handle *phdl, proc_reg_t reg, unsigned long *regvalue)
 #elif defined(__i386__)
 		*regvalue = regs.r_eip;
 #elif defined(__mips__)
-		*regvalue = regs.r_regs[PC];
 #if __has_feature(capabilities)
-		*regvalue += get_pcc_base(phdl);
+		void *__capability pcc = get_pcc(phdl);
+		if (pcc == NULL)
+			return -1;
+		*regvalue = (__cheri_addr vaddr_t)pcc;
+#else
+		*regvalue = regs.r_regs[PC];
 #endif
 #elif defined(__powerpc__)
 		*regvalue = regs.pc;
@@ -95,6 +99,7 @@ proc_regget(struct proc_handle *phdl, proc_reg_t reg, unsigned long *regvalue)
 		*regvalue = regs.sepc;
 #endif
 		break;
+	}
 	case REG_SP:
 #if defined(__aarch64__)
 		*regvalue = regs.sp;
@@ -133,7 +138,7 @@ proc_regset(struct proc_handle *phdl, proc_reg_t reg, unsigned long regvalue)
 	if (ptrace(PT_GETREGS, proc_getpid(phdl), (caddr_t)&regs, 0) < 0)
 		return (-1);
 	switch (reg) {
-	case REG_PC:
+	case REG_PC: {
 #if defined(__aarch64__)
 		regs.elr = regvalue;
 #elif defined(__amd64__)
@@ -145,7 +150,10 @@ proc_regset(struct proc_handle *phdl, proc_reg_t reg, unsigned long regvalue)
 #elif defined(__mips__)
 		regs.r_regs[PC] = regvalue;
 #if __has_feature(capabilities)
-		regs.r_regs[PC] -= get_pcc_base(phdl);
+		void * __capability pcc = get_pcc(phdl);
+		if (pcc == NULL)
+			return -1;
+		regs.r_regs[PC] -= cheri_getbase(pcc);
 #endif
 #elif defined(__powerpc__)
 		regs.pc = regvalue;
@@ -153,6 +161,7 @@ proc_regset(struct proc_handle *phdl, proc_reg_t reg, unsigned long regvalue)
 		regs.sepc = regvalue;
 #endif
 		break;
+	}
 	case REG_SP:
 #if defined(__aarch64__)
 		regs.sp = regvalue;
