@@ -136,6 +136,7 @@ kern_pdfork(struct thread *td, int * __capability fdp, int flags)
 	fr.fr_pidp = &pid;
 	fr.fr_pd_fd = &fd;
 	fr.fr_pd_flags = flags;
+	AUDIT_ARG_FFLAGS(flags);
 	/*
 	 * It is necessary to return fd by reference because 0 is a valid file
 	 * descriptor number, and the child needs to be able to distinguish
@@ -917,6 +918,7 @@ fork1(struct thread *td, struct fork_req *fr)
 		    fr->fr_pd_flags, fr->fr_pd_fcaps);
 		if (error != 0)
 			goto fail2;
+		AUDIT_ARG_FD(*fr->fr_pd_fd);
 	}
 
 	mem_charged = 0;
