@@ -45,4 +45,23 @@ int	cheri_sccsr_to_sicode(register_t sccsr);
 void	hybridabi_thread_setregs(struct thread *td, unsigned long entry_addr);
 #endif
 
+/*
+ * Special marker NOPs for QEMU to start / stop region
+ * of interest in trace.
+ */
+#define	CHERI_START_TRACE	do {					\
+	__asm__ __volatile__("slti zero, zero, 0x1b");                  \
+} while(0)
+#define	CHERI_STOP_TRACE	do {					\
+	__asm__ __volatile__("slti zero, zero, 0x1e");                  \
+} while(0)
+
+#define	CHERI_START_USER_TRACE	do {					\
+	__asm__ __volatile__("slti zero, zero, 0x2b");			\
+} while(0)
+
+#define	CHERI_STOP_USER_TRACE	do {					\
+	__asm__ __volatile__("slti zero, zero, 0x2e");			\
+} while(0)
+
 #endif /* !_MACHINE_CHERI_H_ */

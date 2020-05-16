@@ -6,5 +6,6 @@ include "GENERIC"
 
 ident QEMU
 
+options 	CPU_QEMU_RISCV
 options 	HZ=100
 options 	ROOTDEVNAME=\"ufs:/dev/vtbd0\"

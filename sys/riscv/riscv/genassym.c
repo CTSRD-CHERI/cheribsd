@@ -89,6 +89,7 @@ ASSYM(TD_PROC, offsetof(struct thread, td_proc));
 ASSYM(TD_FRAME, offsetof(struct thread, td_frame));
 ASSYM(TD_MD, offsetof(struct thread, td_md));
 ASSYM(TD_LOCK, offsetof(struct thread, td_lock));
+ASSYM(TD_MDFLAGS, offsetof(struct thread, td_md.md_flags));
 
 ASSYM(TF_SIZE, sizeof(struct trapframe));
 ASSYM(TF_RA, offsetof(struct trapframe, tf_ra));
@@ -112,3 +113,7 @@ ASSYM(RISCV_BOOTPARAMS_KERN_PHYS, offsetof(struct riscv_bootparams, kern_phys));
 ASSYM(RISCV_BOOTPARAMS_KERN_STACK, offsetof(struct riscv_bootparams,
     kern_stack));
 ASSYM(RISCV_BOOTPARAMS_DTBP_VIRT, offsetof(struct riscv_bootparams, dtbp_virt));
+
+#ifdef CPU_QEMU_RISCV
+ASSYM(MDTD_QTRACE, MDTD_QTRACE);
+#endif
