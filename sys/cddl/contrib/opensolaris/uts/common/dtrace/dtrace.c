@@ -13929,6 +13929,7 @@ dtrace_dof_ecbdesc(dof_hdr_t *dof, dof_sec_t *sec, dtrace_vstate_t *vstate,
 		dtrace_dof_error(dof, "truncated ECB description");
 		return (NULL);
 	}
+
 	if (sec->dofs_align != sizeof (dtrace_uarg_t)) {
 		dtrace_dof_error(dof, "bad alignment in ECB description");
 		return (NULL);

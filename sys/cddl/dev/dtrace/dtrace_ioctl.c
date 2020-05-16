@@ -29,9 +29,7 @@ static int dtrace_verbose_ioctl;
 SYSCTL_INT(_debug_dtrace, OID_AUTO, verbose_ioctl, CTLFLAG_RW,
     &dtrace_verbose_ioctl, 0, "log DTrace ioctls");
 
-#define DTRACE_IOCTL_PRINTF(fmt, ...) \
-	if (dtrace_verbose_ioctl)     \
-	printf(fmt, ##__VA_ARGS__)
+#define DTRACE_IOCTL_PRINTF(fmt, ...)	if (dtrace_verbose_ioctl) printf(fmt, ## __VA_ARGS__ )
 
 #define CORRECT_CAP_VERSION(BASE, VAR) \
 	(SV_CURPROC_FLAG(SV_CHERI) ? &BASE.BASE.VAR : &BASE.BASE##_64.VAR)
@@ -62,7 +60,7 @@ dtrace_ioctl_helper(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 		addr = (caddr_t)(uintptr_t)dhp->dofhp_dof;
 		p = curproc;
 		if (p->p_pid == dhp->dofhp_pid) {
-			dof = dtrace_dof_copyin((uintcap_t)dof_addr_cap, &rval);
+			dof = dtrace_dof_copyin((uintptr_t)addr, &rval);
 		} else {
 			p = pfind(dhp->dofhp_pid);
 			if (p == NULL)

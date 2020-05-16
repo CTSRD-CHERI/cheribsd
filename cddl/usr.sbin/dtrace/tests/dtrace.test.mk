@@ -14,7 +14,7 @@ ${TESTGROUP}EXEPACKAGE=	${PACKAGE}
 TESTWRAPPER=	t_dtrace_contrib
 ATF_TESTS_SH+=	${TESTWRAPPER}
 # TODO(nicomazz): This is a temporary workaround. When ksh will be installed,
-# this should be decommented
+#     the following line should be restored
 # TEST_METADATA.t_dtrace_contrib+= required_files="/usr/local/bin/ksh"
 TEST_METADATA.t_dtrace_contrib+= required_user="root"
 

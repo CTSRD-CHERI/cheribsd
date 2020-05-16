@@ -6,7 +6,9 @@
 TESTSDIR=	${TESTSBASE}/cddl/usr.sbin/dtrace/common
 
 
-# A few tests how did not compile in CHERI have been removed from here: json usdt
+# A few tests how did not compile in CHERI have been removed from here.
+# The problems were missing dependencies.
+# Tests removed: json usdt
 
 TESTS_SUBDIRS+= aggs \
 		arithmetic \
