@@ -66,6 +66,9 @@
  * [Group] Functions", allowing one to find each block by searching forward
  * on capital-f functions.
  */
+
+#define EXPLICIT_USER_ACCESS
+
 #include <sys/errno.h>
 #ifndef illumos
 #include <sys/time.h>
@@ -73,6 +76,7 @@
 #include <sys/stat.h>
 #include <sys/modctl.h>
 #include <sys/conf.h>
+#include <sys/sysent.h>
 #include <sys/systm.h>
 #ifdef illumos
 #include <sys/ddi.h>

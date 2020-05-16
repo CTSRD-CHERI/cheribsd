@@ -151,11 +151,11 @@ dtrace_getupcstack(uint64_t *pcstack, int pcstack_limit)
 	if (pcstack_limit <= 0)
 		return;
 
-	pc = (uint64_t)tf->pc;
+	pc =  TRAPF_PC(tf);
 	sp = (uint64_t)tf->sp;
 	ra = (uint64_t)tf->ra;
-	*pcstack++ = (uint64_t)tf->pc;
-	
+	*pcstack++ = TRAPF_PC(tf);
+
 	/*
 	 * Unwind, and unwind, and unwind
 	 */
@@ -191,7 +191,7 @@ dtrace_getustackdepth(void)
 	if (p == NULL || (tf = curthread->td_frame) == NULL)
 		return (0);
 
-	pc = (uint64_t)tf->pc;
+	pc = TRAPF_PC(tf);
 	sp = (uint64_t)tf->sp;
 	ra = (uint64_t)tf->ra;
 	n++;
