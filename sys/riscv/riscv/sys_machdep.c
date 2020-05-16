@@ -36,6 +36,7 @@
 __FBSDID("$FreeBSD$");
 
 #include <sys/param.h>
+#include <sys/proc.h>
 #include <sys/systm.h>
 #include <sys/sysproto.h>
 
@@ -44,6 +45,29 @@ __FBSDID("$FreeBSD$");
 int
 sysarch(struct thread *td, struct sysarch_args *uap)
 {
+#ifdef CPU_QEMU_RISCV
+	int val;
+	int error;
+#endif
 
+	switch (uap->op) {
+#ifdef CPU_QEMU_RISCV
+	case QEMU_GET_QTRACE:
+		val = (td->td_md.md_flags & MDTD_QTRACE) ? 1 : 0;
+		error = copyout(&val, uap->parms, sizeof(val));
+		return (error);
+	case QEMU_SET_QTRACE:
+		error = copyin(uap->parms, &val, sizeof(val));
+		if (error)
+			return (error);
+		if (val)
+			td->td_md.md_flags |= MDTD_QTRACE;
+		else
+			td->td_md.md_flags &= ~MDTD_QTRACE;
+		return (0);
+#endif
+	default:
+		break;
+	}
 	return (ENOTSUP);
 }

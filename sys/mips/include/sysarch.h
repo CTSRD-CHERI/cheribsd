@@ -77,11 +77,11 @@
 #define	CHERI_MMAP_SETBOUNDS	13	/* Set capability bounds. */
 
 /*
- * Query, enable, and disable Qemu ISA-level tracing on threads.  To use this
+ * Query, enable, and disable QEMU ISA-level tracing on threads. To use this
  * feature, the sysctl hw.qemu_trace_perthread must be enabled.
  */
-#define	QEMU_GET_QTRACE		100	/* Get Qemu tracing. */
-#define	QEMU_SET_QTRACE		101	/* Set (or clear) Qemu tracing. */
+#define	QEMU_GET_QTRACE		100	/* Get QEMU tracing. */
+#define	QEMU_SET_QTRACE		101	/* Set (or clear) QEMU tracing. */
 
 #ifndef _KERNEL
 #include <sys/cdefs.h>

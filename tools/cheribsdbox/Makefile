@@ -286,7 +286,8 @@ CRUNCH_ALIAS_hexdump=	hd od
 CRUNCH_ALIAS_w=	uptime
 CRUNCH_PROGS_usr.bin+=su
 
-.if ${MACHINE_ARCH:Mmips64*}
+# Tracing currently only implemented for CHERI-QEMU architectures
+.if ${MACHINE} == "mips" || ${MACHINE} == "riscv"
 CRUNCH_PROGS_usr.bin+=	qtrace
 .endif
 .if ${MACHINE_ARCH:Mmips64*}

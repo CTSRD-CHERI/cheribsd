@@ -320,13 +320,13 @@ mips_sw1:
 	nop
 
 	/*
-	 * If per-thread tracing is enabled, update Qemu-internal state to
+	 * If per-thread tracing is enabled, update QEMU-internal state to
 	 * reflect the thread we are switching to.  Don't disable before
 	 * checking, so we can ensure that we get a full trace if both the
 	 * 'old' and 'new' threads have tracing enabled.
 	 */
 	lw	t2, TD_MDFLAGS(a1)			# Get new->md_flags
-	andi	t2, t2, MDTD_QTRACE			# Mask Qemu trace bit
+	andi	t2, t2, MDTD_QTRACE			# Mask QEMU trace bit
 	beqz	t2, disable_qemu_tracing		# Branch if not set
 	nop
 

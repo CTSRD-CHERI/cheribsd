@@ -36,6 +36,13 @@
 #ifndef _MACHINE_SYSARCH_H_
 #define	_MACHINE_SYSARCH_H_
 
+/*
+ * Query, enable, and disable QEMU ISA-level tracing on threads. To use this
+ * feature, the sysctl hw.qemu_trace_perthread must be enabled.
+ */
+#define	QEMU_GET_QTRACE		100	/* Get QEMU tracing. */
+#define	QEMU_SET_QTRACE		101	/* Set (or clear) QEMU tracing. */
+
 #ifndef _KERNEL
 
 __BEGIN_DECLS
