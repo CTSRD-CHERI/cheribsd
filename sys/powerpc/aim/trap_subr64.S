@@ -318,7 +318,7 @@ CNAME(rstcode):
 	 * It is software reset when 46:47 = 0b00
 	 */
 	/* 0x00 */
-	ld	%r2,TRAP_ENTRY(0)	/* Real-mode &generictrap */
+	ld	%r2,TRAP_GENTRAP(0)	/* Real-mode &generictrap */
 	mfsrr1	%r9			/* Load SRR1 into r9 */
 	andis.	%r9,%r9,0x3		/* Logic AND with 46:47 bits */
 
@@ -797,6 +797,8 @@ generictrap:
 	std	%r31,(PC_TEMPSAVE+CPUSAVE_R31)(%r1)
 	mfdar	%r30
 	std	%r30,(PC_TEMPSAVE+CPUSAVE_AIM_DAR)(%r1)
+	mfdsisr	%r30
+	std	%r30,(PC_TEMPSAVE+CPUSAVE_AIM_DSISR)(%r1)
 	mfsprg1	%r1			/* restore SP, in case of branch */
 	mfsprg2	%r28			/* save LR */
 	mfcr	%r29			/* save CR */

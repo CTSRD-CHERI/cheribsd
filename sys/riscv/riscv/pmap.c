@@ -2348,6 +2348,7 @@ retryl2:
 				if (!atomic_fcmpset_long(l2, &l2e, l2e & ~mask))
 					goto retryl2;
 				anychanged = true;
+				continue;
 			} else {
 				if (!pv_lists_locked) {
 					pv_lists_locked = true;

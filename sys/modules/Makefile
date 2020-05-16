@@ -354,7 +354,6 @@ SUBDIR=	\
 	twe \
 	tws \
 	${_uart} \
-	ubsec \
 	udf \
 	udf_iconv \
 	ufs \
@@ -629,9 +628,7 @@ _aac=		aac
 _aacraid=	aacraid
 _acpi=		acpi
 .if ${MK_CRYPT} != "no" || defined(ALL_MODULES)
-.if ${COMPILER_TYPE} != "gcc" || ${COMPILER_VERSION} > 40201
 _aesni=		aesni
-.endif
 .endif
 _amd_ecc_inject=amd_ecc_inject
 _amdsbwd=	amdsbwd
