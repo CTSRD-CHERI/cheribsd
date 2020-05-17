@@ -151,6 +151,8 @@ fasttrap_tracepoint_init(proc_t *p, fasttrap_tracepoint_t *tp, uintptr_t pc,
 	 */
 	tp->ftt_type = FASTTRAP_T_COMMON;
 	tp->ftt_instr = instr;
+	tp->single_stepping = 0;
+	ft_printf("%s: precedent instr at pc 0x%lx: 0x%x\n",__func__,(uint64_t)pc,instr);
 
 	/* TODO(nicomazz): See the instruction type and save it to ftt_type.
 	 * This will be needed to "emulate" them when we place a breakpoint on
@@ -173,6 +175,40 @@ fasttrap_return_common(
 	// see how it is done for powerpc
 }
 
+static fasttrap_tracepoint_t *
+fasttrap_find_tracepoint(pid_t pid, uintptr_t pc){
+	fasttrap_tracepoint_t *tp;
+	fasttrap_bucket_t * bucket = &fasttrap_tpoints.fth_table[FASTTRAP_TPOINTS_INDEX(pid, pc)];
+
+	/*
+	 * Lookup the tracepoint that the process just hit.
+	 */
+	for (tp = bucket->ftb_data; tp != NULL; tp = tp->ftt_next) {
+		if (pid == tp->ftt_pid && pc == tp->ftt_pc &&
+		    tp->ftt_proc->ftpc_acount != 0)
+			break;
+	}
+	return tp;
+}
+
+static int
+fasttrap_clear_single_step(proc_t * p, fasttrap_tracepoint_t *tp)
+{
+	int error = 0;
+	fasttrap_instr_t instr = FASTTRAP_INSTR;
+
+	error = fasttrap_tracepoint_install(p, tp);
+	error |= uwrite(p, &tp->ftt_next_instr, 4, tp->ftt_pc + 4);
+	tp->single_stepping = 0;
+	if (error) {
+		printf("Problems in writing back the original instructions\n");
+		return -1;
+	}
+
+	ft_printf("single step cleaned!\n");
+
+	return (0);
+}
 int
 fasttrap_pid_probe(struct trapframe *frame)
 {
@@ -181,10 +217,10 @@ fasttrap_pid_probe(struct trapframe *frame)
 	struct rm_priotracker tracker;
 	proc_t *p = curproc;
 	uintptr_t pc;
-	int pc_increment;
+	int pc_increment = 0;
 	uintptr_t new_pc = 0;
 	fasttrap_bucket_t *bucket;
-	fasttrap_tracepoint_t *tp, tp_local;
+	fasttrap_tracepoint_t *tp;
 	pid_t pid;
 	dtrace_icookie_t cookie;
 	uint_t is_enabled = 0;
@@ -222,25 +258,40 @@ fasttrap_pid_probe(struct trapframe *frame)
 
 	rm_rlock(&fasttrap_tp_lock, &tracker);
 	pid = p->p_pid;
-	bucket = &fasttrap_tpoints.fth_table[FASTTRAP_TPOINTS_INDEX(pid, pc)];
 
-	/*
-	 * Lookup the tracepoint that the process just hit.
-	 */
-	for (tp = bucket->ftb_data; tp != NULL; tp = tp->ftt_next) {
-		if (pid == tp->ftt_pid && pc == tp->ftt_pc &&
-		    tp->ftt_proc->ftpc_acount != 0)
-			break;
+	// let's see if there is break due to step over breakpoint
+	tp = fasttrap_find_tracepoint(pid,pc-4);
+	if (tp && tp->single_stepping) {
+		if (pget(pid, PGET_HOLD | PGET_NOTWEXIT, &p) != 0) {
+			ft_printf("Error trying to hold the processs\n");
+		}
+		int error = fasttrap_clear_single_step(p, tp);
+		rm_runlock(&fasttrap_tp_lock, &tracker);
+		PRELE(p);
+		return error;
 	}
 
-	/*
-	 * If we couldn't find a matching tracepoint, either a tracepoint has
-	 * been inserted without using the pid<pid> ioctl interface (see
-	 * fasttrap_ioctl), or somehow we have mislaid this tracepoint.
-	 */
-	if (tp == NULL) {
+	tp = fasttrap_find_tracepoint(pid,pc);
+
+
+
+	if (tp == NULL){
 		rm_runlock(&fasttrap_tp_lock, &tracker);
 		return (-1);
+	}
+
+	// if the exception occurred on the delay slot, maybe is because the
+	// previous instruction was a branch, and had a trap
+	if (tp->single_stepping) {
+		if (pget(pid, PGET_HOLD | PGET_NOTWEXIT, &p) != 0) {
+			ft_printf("Error trying to hold the processs\n");
+		}
+		// this means that it was a branch. Let's restore the original one, and remove the tracepoint
+		int error = fasttrap_clear_single_step(p, tp);
+		error |= fasttrap_tracepoint_remove(p,tp);
+		rm_runlock(&fasttrap_tp_lock, &tracker);
+		PRELE(p);
+		return error;
 	}
 
 	/*
@@ -288,24 +339,10 @@ fasttrap_pid_probe(struct trapframe *frame)
 		}
 	}
 
-	/*
-	 * We're about to do a bunch of work so we cache a local copy of
-	 * the tracepoint to emulate the instruction, and then find the
-	 * tracepoint again later if we need to light up any return probes.
-	 */
-	tp_local = *tp;
-	rm_runlock(&fasttrap_tp_lock, &tracker);
-	tp = &tp_local;
-
 	switch (tp->ftt_type) {
-	case FASTTRAP_T_NOP:
-		// no emulation needed
-		pc_increment = 4;
-		break;
 	case FASTTRAP_T_COMMON: {
-		/* Now, we remove the breakpoint, and continue from where we
-		 * were. Afterwards, a scratch space will be used to emulate the
-		 * instruction. */
+		/* We remove the breakpoint, and place another one in the next
+		 * instruction */
 		if (pget(pid, PGET_HOLD | PGET_NOTWEXIT, &p) != 0) {
 			ft_printf("Error trying to hold the processs\n");
 			break;
@@ -316,10 +353,20 @@ fasttrap_pid_probe(struct trapframe *frame)
 		    "%s: replacing break instruction with original(0x%lx) at 0x%lx\n",
 		    __func__, (uint64_t)tp->ftt_instr, (uint64_t)tp->ftt_pc);
 
-		if ((error = uwrite(p, &(tp->ftt_instr), 4, tp->ftt_pc)) != 0) {
+		//error = uwrite(p, &(tp->ftt_instr), 4, tp->ftt_pc);
+		uint32_t next_instruction = 0;
+		error = fasttrap_tracepoint_remove(p,tp);
+		error |= uread(p, &next_instruction, 4, tp->ftt_pc + 4);
+		ft_printf(
+		    "%s next instruction: 0x%x\n", __func__, next_instruction);
+		fasttrap_instr_t instr = FASTTRAP_INSTR;
+		error |= uwrite(p, &instr, 4, tp->ftt_pc + 4);
+		if (error) {
 			ft_printf(
-			    "Error replacing the original instruction: %d\n",
-			    error);
+			    "Some error occurred rewriting the instructions\n");
+		} else {
+			tp->ftt_next_instr = next_instruction;
+			tp->single_stepping = 1;
 		}
 		pc_increment = 0;
 		PRELE(p);
@@ -358,6 +405,7 @@ done:
 		    (uint64_t)rp->r_regs[PT_REGS_PC]);
 		set_regs(curthread, rp);
 	}
+	rm_runlock(&fasttrap_tp_lock, &tracker);
 	return (0);
 }
 

@@ -48,28 +48,18 @@ typedef	uint32_t	fasttrap_instr_t;
 // This struct is a field of fasttrap_tracepoint
 typedef struct fasttrap_machtp_t {
 	fasttrap_instr_t	ftmt_instr;	/* original instruction */
-	uintptr_t		ftmt_dest;	/* branch target */
+	fasttrap_instr_t	ftmt_next_instr;	/* original instruction */
+	uint8_t			single_stepping;	/* original instruction */
 	uint8_t			ftmt_type;	/* emulation type */
-	uint8_t			ftmt_flags;	/* emulation flags */
-	uint8_t			ftmt_rs;	/* rs field */
-	uint8_t			ftmt_rt;	/* rt field */
-	uint8_t			ftmt_rd;	/* rd field */
-	uint8_t			ftmt_imm;	/* imm field */
+
 } fasttrap_machtp_t;
 
 #define	ftt_instr	ftt_mtp.ftmt_instr
-#define	ftt_dest	ftt_mtp.ftmt_dest
+#define	ftt_next_instr	ftt_mtp.ftmt_next_instr
+#define	single_stepping	ftt_mtp.single_stepping
 #define	ftt_type	ftt_mtp.ftmt_type
-#define	ftt_flags	ftt_mtp.ftmt_flags
-#define	ftt_rs		ftt_mtp.ftmt_rs
-#define	ftt_rt		ftt_mtp.ftmt_rt
-#define	ftt_rd		ftt_mtp.ftmt_rd
-#define	ftt_imm		ftt_mtp.ftmt_imm
 
 #define FASTTRAP_T_COMMON	0x00
-//TODO(nicomazz): implement the emulation for the other types of jump
-#define FASTTRAP_T_BC		0x02
-#define FASTTRAP_T_NOP		0x05
 
 
 #define	FASTTRAP_AFRAMES		3
