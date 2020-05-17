@@ -71,6 +71,17 @@ proc_regget(struct proc_handle *phdl, proc_reg_t reg, unsigned long *regvalue)
 		errno = ENOENT;
 		return (-1);
 	}
+
+#if __has_feature(capabilities) && defined(__mips__)
+	if (reg == REG_PC) {
+		void *__capability pcc = get_pcc(phdl);
+		if (pcc == NULL)
+			return -1;
+		*regvalue = (__cheri_addr vaddr_t)pcc;
+		return 0;
+	}
+#endif
+
 	memset(&regs, 0, sizeof(regs));
 	if (ptrace(PT_GETREGS, proc_getpid(phdl), (caddr_t)&regs, 0) < 0)
 		return (-1);
@@ -85,12 +96,6 @@ proc_regget(struct proc_handle *phdl, proc_reg_t reg, unsigned long *regvalue)
 #elif defined(__i386__)
 		*regvalue = regs.r_eip;
 #elif defined(__mips__)
-#if __has_feature(capabilities)
-		void *__capability pcc = get_pcc(phdl);
-		if (pcc == NULL)
-			return -1;
-		*regvalue = (__cheri_addr vaddr_t)pcc;
-#else
 		*regvalue = regs.r_regs[PC];
 #endif
 #elif defined(__powerpc__)
