@@ -97,7 +97,6 @@ proc_regget(struct proc_handle *phdl, proc_reg_t reg, unsigned long *regvalue)
 		*regvalue = regs.r_eip;
 #elif defined(__mips__)
 		*regvalue = regs.r_regs[PC];
-#endif
 #elif defined(__powerpc__)
 		*regvalue = regs.pc;
 #elif defined(__riscv)
