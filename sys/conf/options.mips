@@ -123,11 +123,6 @@ FDT_DTB_STATIC_ONLY		opt_platform.h
 #
 
 #
-# Access user space through kernel DDC (via legacy load/store instructions)
-#
-CHERI_IMPLICIT_USER_DDC	opt_global.h
-
-#
 # Options that control the NetFPGA-10G Embedded CPU Ethernet Core.
 #
 NF10BMAC_64BIT			opt_netfpga.h

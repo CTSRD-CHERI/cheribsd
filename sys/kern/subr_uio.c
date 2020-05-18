@@ -75,7 +75,7 @@ static int uiomove_flags(void *cp, int n, struct uio *uio, bool nofault,
     bool preserve_tags);
 
 int
-copyin_nofault(const void *udaddr, void *kaddr, size_t len)
+copyin_nofault(const void * __capability udaddr, void *kaddr, size_t len)
 {
 	int error, save;
 
@@ -85,21 +85,8 @@ copyin_nofault(const void *udaddr, void *kaddr, size_t len)
 	return (error);
 }
 
-#if __has_feature(capabilities)
 int
-copyin_nofault_c(const void * __capability udaddr, void *kaddr, size_t len)
-{
-	int error, save;
-
-	save = vm_fault_disable_pagefaults();
-	error = copyin_c(udaddr, kaddr, len);
-	vm_fault_enable_pagefaults(save);
-	return (error);
-}
-#endif
-
-int
-copyout_nofault(const void *kaddr, void *udaddr, size_t len)
+copyout_nofault(const void *kaddr, void * __capability udaddr, size_t len)
 {
 	int error, save;
 
@@ -110,18 +97,6 @@ copyout_nofault(const void *kaddr, void *udaddr, size_t len)
 }
 
 #if __has_feature(capabilities)
-int
-copyout_nofault_c(const void *kaddr, void * __capability udaddr,
-    size_t len)
-{
-	int error, save;
-
-	save = vm_fault_disable_pagefaults();
-	error = copyout_c(kaddr, udaddr, len);
-	vm_fault_enable_pagefaults(save);
-	return (error);
-}
-
 int
 copyoutcap_nofault(const void *kaddr, void * __capability udaddr, size_t len)
 {
@@ -538,180 +513,7 @@ copyout_unmap(struct thread *td, vm_offset_t addr, size_t sz)
 	return (0);
 }
 
-#if __has_feature(capabilities) && !defined(CHERI_IMPLICIT_USER_DDC)
-static inline bool
-allow_implicit_capability_use(void)
-{
-
-	if (SV_CURPROC_FLAG(SV_CHERI)) {
-		kdb_backtrace();
-		/* XXX-BD: kill process? */
-		return (false);
-	}
-	return (true);
-}
-
-/*
- * Construct a user data capability.  Ordinarily, we use __USER_CAP to
- * retrieve DDC, but the pcb isn't set up yet in do_execve() so while
- * we're in there we derive one from whole cloth.
- *
- * Longer term, we should store appropriate capabilities in struct
- * image_args along the way and use those.
- */
-static inline void * __capability
-io_user_cap(volatile const void * uaddr, size_t len)
-{
-	bool inexec;
-	vaddr_t base;
-
-	/* XXX: this is rather expensive... */
-	PROC_LOCK(curproc);
-	inexec = ((curproc->p_flag & P_INEXEC) != 0);
-	PROC_UNLOCK(curproc);
-
-	if (inexec) {
-		base = CHERI_REPRESENTABLE_BASE((vaddr_t)uaddr, len);
-		len = CHERI_REPRESENTABLE_LENGTH(len);
-		return (cheri_capability_build_user_data(
-		    CHERI_CAP_USER_DATA_PERMS, base, len, (vaddr_t)uaddr - base));
-	}
-	return (__USER_CAP(uaddr, len));
-}
-
-int
-copyinstr(const void *uaddr, void *kaddr, size_t len, size_t *done)
-{
-
-	if (!allow_implicit_capability_use())
-		return (EPROT);
-
-	return (copyinstr_c(io_user_cap(uaddr, len), kaddr, len, done));
-}
-
-int
-copyin(const void *uaddr, void *kaddr, size_t len)
-{
-
-	if (!allow_implicit_capability_use())
-		return (EPROT);
-
-	return (copyin_c(io_user_cap(uaddr, len), kaddr, len));
-}
-
-int
-copyout(const void *kaddr, void *uaddr, size_t len)
-{
-
-	if (!allow_implicit_capability_use())
-		return (EPROT);
-
-	return (copyout_c(kaddr, io_user_cap(uaddr, len), len));
-}
-
-int
-fubyte(volatile const void *base)
-{
-
-	if (!allow_implicit_capability_use())
-		return (-1);
-
-	return (fubyte_c(io_user_cap(base, 1)));
-}
-
-int
-fueword(volatile const void *base, long *val)
-{
-
-	if (!allow_implicit_capability_use())
-		return (-1);
-
-	return (fueword_c(io_user_cap(base, sizeof(long)), val));
-}
-
-int
-fueword32(volatile const void *base, int32_t *val)
-{
-
-	if (!allow_implicit_capability_use())
-		return (-1);
-
-	return (fueword32_c(io_user_cap(base, sizeof(int32_t)), val));
-}
-
-int
-fueword64(volatile const void *base, int64_t *val)
-{
-
-	if (!allow_implicit_capability_use())
-		return (-1);
-
-	return (fueword64_c(io_user_cap(base, sizeof(int64_t)), val));
-}
-
-int
-subyte(volatile void *base, int byte)
-{
-
-	if (!allow_implicit_capability_use())
-		return (-1);
-
-	return (subyte_c(io_user_cap(base, 1), byte));
-}
-
-int
-suword(volatile void *base, long word)
-{
-
-	if (!allow_implicit_capability_use())
-		return (-1);
-
-	return (suword_c(io_user_cap(base, sizeof(long)), word));
-}
-
-int
-suword32(volatile void *base, int32_t word)
-{
-
-	if (!allow_implicit_capability_use())
-		return (-1);
-
-	return (suword32_c(io_user_cap(base, sizeof(int32_t)), word));
-}
-
-int
-suword64(volatile void *base, int64_t word)
-{
-
-	if (!allow_implicit_capability_use())
-		return (-1);
-
-	return (suword64_c(io_user_cap(base, sizeof(int64_t)), word));
-}
-
-int
-casueword32(volatile uint32_t *base, uint32_t oldval, uint32_t *oldvalp,
-    uint32_t newval)
-{
-
-	if (!allow_implicit_capability_use())
-		return (-1);
-
-	return (casueword32_c(io_user_cap(base, sizeof(u_long)), oldval,
-	    oldvalp, newval));
-}
-
-int
-casueword(volatile u_long *p, u_long oldval, u_long *oldvalp, u_long newval)
-{
-
-	if (!allow_implicit_capability_use())
-		return (-1);
-
-	return (casueword_c(io_user_cap(p, sizeof(u_long)), oldval,
-	    oldvalp, newval));
-}
-
+#if __has_feature(capabilities)
 int
 copyin_implicit_cap(const void *uaddr, void *kaddr, size_t len)
 {
@@ -728,7 +530,7 @@ copyout_implicit_cap(const void *kaddr, void *uaddr, size_t len)
 	    cheri_capability_build_user_data(CHERI_CAP_USER_DATA_PERMS,
 	    (vaddr_t)uaddr, len, 0), len));
 }
-#else /* !( __has_feature(capabilities) && !defined(CHERI_IMPLICIT_USER_DDC)) */
+#else
 int
 copyin_implicit_cap(const void *uaddr, void *kaddr, size_t len)
 {
@@ -742,10 +544,10 @@ copyout_implicit_cap(const void *kaddr, void *uaddr, size_t len)
 
 	return (copyout(kaddr, uaddr, len));
 }
-#endif /* !(__has_feature(capabilities) && !defined(CHERI_IMPLICIT_USER_DDC)) */
+#endif
 
 int32_t
-fuword32(volatile const void *addr)
+fuword32(volatile const void * __capability addr)
 {
 	int rv;
 	int32_t val;
@@ -756,7 +558,7 @@ fuword32(volatile const void *addr)
 
 #ifdef _LP64
 int64_t
-fuword64(volatile const void *addr)
+fuword64(volatile const void * __capability addr)
 {
 	int rv;
 	int64_t val;
@@ -767,7 +569,7 @@ fuword64(volatile const void *addr)
 #endif /* _LP64 */
 
 long
-fuword(volatile const void *addr)
+fuword(volatile const void * __capability addr)
 {
 	long val;
 	int rv;
@@ -777,7 +579,7 @@ fuword(volatile const void *addr)
 }
 
 uint32_t
-casuword32(volatile uint32_t *addr, uint32_t old, uint32_t new)
+casuword32(volatile uint32_t * __capability addr, uint32_t old, uint32_t new)
 {
 	int rv;
 	uint32_t val;
@@ -787,7 +589,7 @@ casuword32(volatile uint32_t *addr, uint32_t old, uint32_t new)
 }
 
 u_long
-casuword(volatile u_long *addr, u_long old, u_long new)
+casuword(volatile u_long * __capability addr, u_long old, u_long new)
 {
 	int rv;
 	u_long val;
@@ -796,48 +598,6 @@ casuword(volatile u_long *addr, u_long old, u_long new)
 	return (rv == -1 ? -1 : val);
 }
 
-#if __has_feature(capabilities)
-long
-fuword_c(volatile const void * __capability base)
-{
-	long val;
-
-	if (fueword_c(base, &val) == -1)
-		return (-1);
-	return (val);
-}
-
-int
-fuword32_c(volatile const void * __capability base)
-{
-	int32_t val;
-
-	if (fueword32_c(base, &val) == -1)
-		return (-1);
-	return (val);
-}
-
-int64_t
-fuword64_c(volatile const void * __capability base)
-{
-	int64_t val;
-
-	if (fueword64_c(base, &val) == -1)
-		return (-1);
-	return (val);
-}
-
-uint32_t
-casuword32_c(volatile uint32_t * __capability base, uint32_t oldval,
-    uint32_t newval)
-{
-	int32_t ov;
-
-	if (casueword32_c(base, oldval, &ov, newval) == -1)
-		return (-1);
-	return (ov);
-}
-#endif
 // CHERI CHANGES START
 // {
 //   "updated": 20191025,
