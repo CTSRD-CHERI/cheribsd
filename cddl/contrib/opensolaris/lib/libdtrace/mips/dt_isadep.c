@@ -72,8 +72,22 @@ dt_pid_create_offset_probe(struct ps_prochandle *P, dtrace_hdl_t *dtp,
     fasttrap_probe_spec_t *ftp, const GElf_Sym *symp, ulong_t off)
 {
 
-	dt_dprintf("%s: unimplemented\n", __func__);
-	return (DT_PROC_ERR);
+	if (off & 0x3)
+		return (DT_PROC_ALIGN);
+
+	ftp->ftps_type = DTFTP_OFFSETS;
+	ftp->ftps_pc = (uintptr_t)symp->st_value;
+	ftp->ftps_size = (size_t)symp->st_size;
+	ftp->ftps_noffs = 1;
+	ftp->ftps_offs[0] = off;
+
+	if (ioctl(dtp->dt_ftfd, FASTTRAPIOC_MAKEPROBE, ftp) != 0) {
+		dt_dprintf("fasttrap probe creation ioctl failed: %s\n",
+		    strerror(errno));
+		return (dt_set_errno(dtp, errno));
+	}
+
+	return (1);
 }
 
 /*ARGSUSED*/
