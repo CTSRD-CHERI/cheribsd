@@ -47,9 +47,9 @@
 struct ofiocdesc {
 	phandle_t	of_nodeid;	/* passed or returned node id */
 	int		of_namelen;	/* length of of_name */
-	const char	*of_name;	/* pointer to field name */
+	const char * __kerncap of_name;	/* pointer to field name */
 	int		of_buflen;	/* length of of_buf (value-result) */
-	char		*of_buf;	/* pointer to field value */
+	char *__kerncap	of_buf;		/* pointer to field value */
 };
 
 #define	OFIOC_BASE	'O'
