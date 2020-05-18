@@ -28,6 +28,8 @@ POSSIBILITY OF SUCH DAMAGE.
 
 ***************************************************************************/
 
+#define EXPLICIT_USER_ACCESS
+
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
@@ -2830,7 +2832,7 @@ cxgb_extension_ioctl(struct cdev *dev, unsigned long cmd, caddr_t data,
 	case CHELSIO_GET_MEM: {
 		struct ch_mem_range *t = (struct ch_mem_range *)data;
 		struct mc7 *mem;
-		uint8_t *useraddr;
+		uint8_t * __capability useraddr;
 		u64 buf[32];
 
 		/*
@@ -2865,7 +2867,7 @@ cxgb_extension_ioctl(struct cdev *dev, unsigned long cmd, caddr_t data,
 		 * Read 256 bytes at a time as len can be large and we don't
 		 * want to use huge intermediate buffers.
 		 */
-		useraddr = (uint8_t *)t->buf; 
+		useraddr = (uint8_t * __capability)t->buf; 
 		while (len) {
 			unsigned int chunk = min(len, sizeof(buf));
 
