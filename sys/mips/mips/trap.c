@@ -1485,7 +1485,6 @@ MipsEmulateBranch(struct trapframe *framePtr, trapf_pc_t _instPC, int fpcCSR,
 	/* Save the bad branch instruction so we can log it */
 	framePtr->badinstr_p.inst = inst.word;
 
-
 	switch ((int)inst.JType.op) {
 	case OP_SPECIAL:
 		switch ((int)inst.RType.func) {
