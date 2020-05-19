@@ -212,9 +212,9 @@ struct session_op {
 	u_int32_t	mac;		/* ie. CRYPTO_SHA2_256_HMAC */
 
 	u_int32_t	keylen;		/* cipher key */
-	c_caddr_t	key;
+	const char * __kerncap key;
 	int		mackeylen;	/* mac key */
-	c_caddr_t	mackey;
+	const char * __kerncap mackey;
 
   	u_int32_t	ses;		/* returns: session # */ 
 };
@@ -229,9 +229,9 @@ struct session2_op {
 	u_int32_t	mac;		/* ie. CRYPTO_SHA2_256_HMAC */
 
 	u_int32_t	keylen;		/* cipher key */
-	c_caddr_t	key;
+	const char * __kerncap key;
 	int		mackeylen;	/* mac key */
-	c_caddr_t	mackey;
+	const char * __kerncap mackey;
 
   	u_int32_t	ses;		/* returns: session # */ 
 	int		crid;		/* driver id + flags (rw) */
@@ -247,10 +247,10 @@ struct crypt_op {
 #define	COP_F_CIPHER_FIRST	0x0001	/* Cipher before MAC. */
 #define	COP_F_BATCH		0x0008	/* Batch op if possible */
 	u_int		len;
-	c_caddr_t	src;		/* become iov[] inside kernel */
-	caddr_t		dst;
-	caddr_t		mac;		/* must be big enough for chosen MAC */
-	c_caddr_t	iv;
+	const char * __kerncap src;	/* become iov[] inside kernel */
+	char * __kerncap dst;
+	char * __kerncap mac;		/* must be big enough for chosen MAC */
+	const char * __kerncap iv;
 };
 
 /* op and flags the same as crypt_op */
@@ -261,11 +261,11 @@ struct crypt_aead {
 	u_int		len;
 	u_int		aadlen;
 	u_int		ivlen;
-	c_caddr_t	src;		/* become iov[] inside kernel */
-	caddr_t		dst;
-	c_caddr_t	aad;		/* additional authenticated data */
-	caddr_t		tag;		/* must fit for chosen TAG length */
-	c_caddr_t	iv;
+	const char * __kerncap src;	/* become iov[] inside kernel */
+	char * __kerncap dst;
+	const char * __kerncap aad;	/* additional authenticated data */
+	char * __kerncap tag;		/* must fit for chosen TAG length */
+	const char * __kerncap iv;
 };
 
 /*
@@ -280,7 +280,12 @@ struct crypt_find_op {
 
 /* bignum parameter, in packed bytes, ... */
 struct crparam {
-	caddr_t		crp_p;
+	union {
+#ifdef _KERNEL
+		char * __capability crp_up;
+#endif
+		caddr_t	crp_p;
+	};
 	u_int		crp_nbits;
 };
 

@@ -57,13 +57,13 @@ union mfi_statrequest {
 #define MAX_SPACE_FOR_SENSE_PTR		32
 union mfi_sense_ptr {
 	uint8_t		sense_ptr_data[MAX_SPACE_FOR_SENSE_PTR];
-	void 		*user_space;
+	void * __kerncap user_space;
 	struct {
 		uint32_t	low;
 		uint32_t	high;
 	} addr;
 }
-#ifndef __CHERI_PURE_CAPABILITY__
+#if !(defined(_KERNEL) || defined(__CHERI_PURE_CAPABILITY__))
 /*
  * XXX-BD: This __packed appears to be gratutious and won't whole thing
  * is a bit absurd in CheriABI.
@@ -164,9 +164,9 @@ struct mfi_linux_ioc_packet {
 struct mfi_ioc_passthru {
 	struct mfi_dcmd_frame	ioc_frame;
 	uint32_t		buf_size;
-	uint8_t			*buf;
+	uint8_t			* __kerncap buf;
 }
-#ifndef __CHERI_PURE_CAPABILITY__
+#if !(defined(_KERNEL) || defined(__CHERI_PURE_CAPABILITY__))
 /*
  * Packing is gratutious, but part of the ABI.  Don't pack in CheriABI
  * where it won't work.
@@ -183,10 +183,21 @@ struct mfi_ioc_passthru32 {
 } __packed;
 #endif
 
+#ifdef COMPAT_FREEBSD64
+struct mfi_ioc_passthru64 {
+	struct mfi_dcmd_frame	ioc_frame;
+	uint32_t		buf_size;
+	uint64_t		buf;
+} __packed;
+#endif
+
 #define MFIIO_STATS	_IOWR('Q', 101, union mfi_statrequest)
 #define MFIIO_PASSTHRU	_IOWR('C', 102, struct mfi_ioc_passthru)
 #ifdef COMPAT_FREEBSD32
 #define MFIIO_PASSTHRU32	_IOC_NEWTYPE(MFIIO_PASSTHRU, struct mfi_ioc_passthru32)
+#endif
+#ifdef COMPAT_FREEBSD64
+#define MFIIO_PASSTHRU64	_IOC_NEWTYPE(MFIIO_PASSTHRU, struct mfi_ioc_passthru64)
 #endif
 
 struct mfi_linux_ioc_aen {

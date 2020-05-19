@@ -9,6 +9,7 @@
 # define        KERNEL	1
 # define        _KERNEL	1
 #endif
+#define EXPLICIT_USER_ACCESS
 #include <sys/errno.h>
 #include <sys/types.h>
 #include <sys/param.h>
@@ -538,7 +539,7 @@ ipf_dstlist_node_add(softc, arg, op, uid)
 		 * in (including \0) and ends up being the offset from
 		 * fd_names (0).
 		 */
-		err = COPYIN((char *)op->iplo_struct + sizeof(dest),
+		err = COPYIN((char * __capability)op->iplo_struct + sizeof(dest),
 			     node->ipfd_names, dest.fd_name);
 		if (err != 0) {
 			IPFERROR(120017);

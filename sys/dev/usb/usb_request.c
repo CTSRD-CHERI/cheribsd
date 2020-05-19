@@ -28,6 +28,8 @@
  * SUCH DAMAGE.
  */ 
 
+#define	EXPLICIT_USER_ACCESS
+
 #ifdef USB_GLOBAL_INCLUDE_FILE
 #include USB_GLOBAL_INCLUDE_FILE
 #else
@@ -505,7 +507,7 @@ usbd_do_request_flags(struct usb_device *udev, struct mtx *mtx,
 		if (length > 0) {
 #if USB_HAVE_USER_IO
 			if (flags & USB_USER_DATA_PTR) {
-				if (copyout(desc, data, length)) {
+				if (copyout(desc, *(void * __capability *)data, length)) {
 					err = USB_ERR_INVAL;
 					goto done;
 				}
@@ -591,7 +593,7 @@ usbd_do_request_flags(struct usb_device *udev, struct mtx *mtx,
 				if (flags & USB_USER_DATA_PTR) {
 					USB_XFER_UNLOCK(xfer);
 					err = usbd_copy_in_user(xfer->frbuffers + 1,
-					    0, data, temp);
+					    0, *(void * __capability *)data, temp);
 					USB_XFER_LOCK(xfer);
 					if (err) {
 						err = USB_ERR_INVAL;
@@ -660,7 +662,7 @@ usbd_do_request_flags(struct usb_device *udev, struct mtx *mtx,
 				if (flags & USB_USER_DATA_PTR) {
 					USB_XFER_UNLOCK(xfer);
 					err = usbd_copy_out_user(xfer->frbuffers + 1,
-					    0, data, temp);
+					    0, *(void * __capability *)data, temp);
 					USB_XFER_LOCK(xfer);
 					if (err) {
 						err = USB_ERR_INVAL;

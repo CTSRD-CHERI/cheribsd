@@ -41,13 +41,13 @@ struct sg_io_hdr {
 	u_char		mx_sb_len;
 	u_short		iovec_count;
 	u_int		dxfer_len;
-	void		*dxferp;
-	u_char		*cmdp;
-	u_char		*sbp;
+	void		* __kerncap dxferp;
+	u_char		* __kerncap cmdp;
+	u_char		* __kerncap sbp;
 	u_int		timeout;
 	u_int		flags;
 	int		pack_id;
-	void		*usr_ptr;
+	void		* __kerncap usr_ptr;
 	u_char		status;
 	u_char		masked_status;
 	u_char		msg_status;

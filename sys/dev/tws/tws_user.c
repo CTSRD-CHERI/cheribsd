@@ -36,6 +36,8 @@
  * $FreeBSD$
  */
 
+#define	EXPLICIT_USER_ACCESS
+
 #include <dev/tws/tws.h>
 #include <dev/tws/tws_services.h>
 #include <dev/tws/tws_hdm.h>

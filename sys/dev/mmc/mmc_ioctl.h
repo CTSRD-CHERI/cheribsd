@@ -40,15 +40,24 @@ struct mmc_ioc_cmd {
 	u_int		blocks;
 	u_int		__spare[4];
 	uint32_t	__pad;
+#if defined(_KERNEL) || defined(__CHERI_PURE_CAPABILITY__)
+	void * __capability data_ptr;
+#else
 	uint64_t	data_ptr;
+#endif
 };
 
+#if defined(_KERNEL) || defined(__CHERI_PURE_CAPABILITY__)
+#define	mmc_ioc_cmd_set_data(mic, ptr)					\
+    (mic).data_ptr = (ptr)
+#else
 #define	mmc_ioc_cmd_set_data(mic, ptr)					\
     (mic).data_ptr = (uint64_t)(uintptr_t)(ptr)
+#endif
 
 struct mmc_ioc_multi_cmd {
 	uint64_t		num_of_cmds;
-	struct mmc_ioc_cmd	cmds[0];
+	void * __kerncap	cmds;
 };
 
 #define	MMC_IOC_BASE		'M'

@@ -33,6 +33,8 @@
  * $FreeBSD$
  */
 
+#define	EXPLICIT_USER_ACCESS
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bitstring.h>
@@ -899,7 +901,7 @@ ng_btsocket_l2cap_raw_control(struct socket *so, u_long cmd, caddr_t data,
 						p1->num_connections);
 			if (p->num_connections > 0)
 				error = copyout((caddr_t) p2, 
-					(caddr_t) p->connections,
+					p->connections,
 					p->num_connections * sizeof(*p2));
 		} else
 			error = EINVAL;
@@ -963,7 +965,7 @@ ng_btsocket_l2cap_raw_control(struct socket *so, u_long cmd, caddr_t data,
 						p1->num_channels);
 			if (p->num_channels > 0)
 				error = copyout((caddr_t) p2, 
-						(caddr_t) p->channels,
+						p->channels,
 						p->num_channels * sizeof(*p2));
 		} else
 			error = EINVAL;

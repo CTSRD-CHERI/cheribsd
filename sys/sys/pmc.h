@@ -678,7 +678,7 @@ struct pmc_op_getdyneventinfo {
 
 struct pmc_syscall_args {
 	register_t	pmop_code;	/* one of PMC_OP_* */
-	void		*pmop_data;	/* syscall parameter */
+	void * __kerncap pmop_data;	/* syscall parameter */
 };
 
 /*
