@@ -47,19 +47,17 @@ typedef	uint32_t	fasttrap_instr_t;
  */
 // This struct is a field of fasttrap_tracepoint
 typedef struct fasttrap_machtp_t {
-	fasttrap_instr_t	ftmt_instr;	/* original instruction */
-	fasttrap_instr_t	ftmt_next_instr;	/* original instruction */
-	uint8_t			single_stepping;	/* original instruction */
-	uint8_t			ftmt_type;	/* emulation type */
+	fasttrap_instr_t	ftmt_instr		/* original instruction */
+	fasttrap_instr_t	ftmt_next_instr;	/* used to single step */
+	uint64_t		ftmt_next_instr_addr;
+	uint8_t			single_stepping;
 
 } fasttrap_machtp_t;
 
-#define	ftt_instr	ftt_mtp.ftmt_instr
-#define	ftt_next_instr	ftt_mtp.ftmt_next_instr
-#define	single_stepping	ftt_mtp.single_stepping
-#define	ftt_type	ftt_mtp.ftmt_type
-
-#define FASTTRAP_T_COMMON	0x00
+#define	ftt_instr		ftt_mtp.ftmt_instr
+#define	ftt_next_instr		ftt_mtp.ftmt_next_instr
+#define	ftt_next_instr_addr	ftt_mtp.ftmt_next_instr_addr
+#define	single_stepping		ftt_mtp.single_stepping
 
 
 #define	FASTTRAP_AFRAMES		3
