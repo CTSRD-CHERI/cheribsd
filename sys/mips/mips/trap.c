@@ -1455,7 +1455,7 @@ trapDump(char *msg)
  * Return the resulting PC as if the branch was executed.
  *
  * XXXRW: What about CHERI branch instructions?
- * XXXAR: This needs to be fixed for cjalr/cjr/ccall_fast
+ * XXXAR: This needs to be fixed for ccall_fast
  */
 trapf_pc_t
 MipsEmulateBranch(struct trapframe *framePtr, trapf_pc_t _instPC, int fpcCSR,
@@ -1485,9 +1485,7 @@ MipsEmulateBranch(struct trapframe *framePtr, trapf_pc_t _instPC, int fpcCSR,
 	/* Save the bad branch instruction so we can log it */
 	framePtr->badinstr_p.inst = inst.word;
 
-	/*
-	 * XXXRW: CHERI branch instructions are not handled here.
-	 */
+
 	switch ((int)inst.JType.op) {
 	case OP_SPECIAL:
 		switch ((int)inst.RType.func) {
@@ -1609,28 +1607,36 @@ MipsEmulateBranch(struct trapframe *framePtr, trapf_pc_t _instPC, int fpcCSR,
 #ifdef CPU_CHERI
 	case OP_COP2:
 		switch (inst.CType.fmt) {
-		case 0x9:
-		case 0xa:
-		case 0x11:
-		case 0x12:
+		case OP_CJ:
+			switch (inst.CType.r3) {
+			case OP_CJALR:
+				retAddr = capRegsPtr[inst.CType.r2];
+				break;
+			case OP_CJR:
+				retAddr = capRegsPtr[inst.CType.r1];
+				break;
+			}
+			if (retAddr != NULL)
+				return (trapf_pc_t)(retAddr);
+			break;
+		case OP_CBEZ:
+		case OP_CBNZ:
+		case OP_CBTS:
+		case OP_CBTU:
 			switch (inst.BC2FType.fmt) {
-			case 0x9:
-				/* CBTU */
+			case OP_CBTU:
 				condition = !cheri_gettag(
 				    capRegsPtr[inst.BC2FType.cd]);
 				break;
-			case 0xa:
-				/* CBTS */
+			case OP_CBTS:
 				condition = cheri_gettag(
 				    capRegsPtr[inst.BC2FType.cd]);
 				break;
-			case 0x11:
-				/* CBEZ */
+			case OP_CBEZ:
 				condition =
 				    (capRegsPtr[inst.BC2FType.cd] == NULL);
 				break;
-			case 0x12:
-				/* CBNZ */
+			case OP_CBNZ:
 				condition =
 				    (capRegsPtr[inst.BC2FType.cd] != NULL);
 				break;
