@@ -59,14 +59,7 @@
 		printf(fmt, ##__VA_ARGS__); \
 	} while (0)
 #else
-static int dtrace_verbose_fasttrap;
-SYSCTL_INT(_debug_fasttrap, OID_AUTO, verbose_fasttrap, CTLFLAG_RW,
-    &dtrace_verbose_fasttrap, 0, "log DTrace fasttrap");
-#define ft_printf(fmt, ...)                 \
-	if (dtrace_verbose_fasttrap) {      \
-		printf("fasttrap: ");   \
-		printf(fmt, ##__VA_ARGS__); \
-	}
+#define ft_printf(fmt, ...)
 #endif
 
 
