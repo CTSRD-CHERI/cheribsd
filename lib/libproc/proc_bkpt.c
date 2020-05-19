@@ -269,7 +269,7 @@ proc_bkptexec(struct proc_handle *phdl, unsigned long saved)
 		DPRINTFX("ERROR: don't know why process stopped");
 		return (-1);
 	}
-#ifdef __mips
+#ifdef __mips__
 	if (proc_regget(phdl, REG_PC, &pc_after_step) < 0) {
 		DPRINTFX("ERROR: couldn't get PC register");
 		return (-1);
