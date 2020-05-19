@@ -26,6 +26,8 @@
  * SUCH DAMAGE.
  */
 
+#define	EXPLICIT_USER_ACCESS
+
 #ifdef USB_GLOBAL_INCLUDE_FILE
 #include USB_GLOBAL_INCLUDE_FILE
 #else
@@ -937,7 +939,7 @@ ugen_do_request(struct usb_fifo *f, struct usb_ctl_request *ur)
 	}
 	/* do the USB request */
 	error = usbd_do_request_flags
-	    (f->udev, NULL, &ur->ucr_request, ur->ucr_data,
+	    (f->udev, NULL, &ur->ucr_request, &ur->ucr_data,
 	    (ur->ucr_flags & USB_SHORT_XFER_OK) |
 	    USB_USER_DATA_PTR, &actlen,
 	    USB_DEFAULT_TIMEOUT);
@@ -1049,7 +1051,7 @@ ugen_fs_copy_in(struct usb_fifo *f, uint8_t ep_index)
 	struct usb_device_request *req;
 	struct usb_xfer *xfer;
 	struct usb_fs_endpoint fs_ep;
-	void *uaddr;			/* userland pointer */
+	void * __capability uaddr;	/* userland pointer */
 	void *kaddr;
 	usb_frlength_t offset;
 	usb_frlength_t rem;
@@ -1220,7 +1222,7 @@ complete:
 }
 
 static int
-ugen_fs_copy_out_cancelled(struct usb_fs_endpoint *fs_ep_uptr)
+ugen_fs_copy_out_cancelled(struct usb_fs_endpoint * __capability fs_ep_uptr)
 {
 	struct usb_fs_endpoint fs_ep;
 	int error;
@@ -1259,8 +1261,8 @@ ugen_fs_copy_out(struct usb_fifo *f, uint8_t ep_index)
 	struct usb_device_request *req;
 	struct usb_xfer *xfer;
 	struct usb_fs_endpoint fs_ep;
-	struct usb_fs_endpoint *fs_ep_uptr;	/* userland ptr */
-	void *uaddr;			/* userland ptr */
+	struct usb_fs_endpoint * __capability fs_ep_uptr; /* userland ptr */
+	void * __capability uaddr;		/* userland ptr */
 	void *kaddr;
 	usb_frlength_t offset;
 	usb_frlength_t rem;

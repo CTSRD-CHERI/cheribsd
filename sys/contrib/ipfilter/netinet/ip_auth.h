@@ -20,7 +20,7 @@ typedef struct  frauth {
 	int	fra_index;
 	u_32_t	fra_pass;
 	fr_info_t	fra_info;
-	char	*fra_buf;
+	char	* __kerncap fra_buf;
 	u_32_t	fra_flx;
 #ifdef	MENTAT
 	queue_t	*fra_q;

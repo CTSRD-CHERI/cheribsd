@@ -600,7 +600,7 @@ md_malloc_move_vlist(bus_dma_segment_t **pvlist, int *pma_offs,
 
 	for (; len != 0; len -= seg_len) {
 		seg_len = imin(vlist->ds_len - ma_offs, len);
-		p = (uint8_t *)(uintptr_t)vlist->ds_addr + ma_offs;
+		p = (uint8_t *)vlist->ds_vaddr + ma_offs;
 		switch (op) {
 		case MD_MALLOC_MOVE_ZERO:
 			bzero(p, seg_len);
@@ -818,7 +818,7 @@ mdcopyto_vlist(void *src, bus_dma_segment_t *vlist, off_t offset, off_t len)
 
 	while (len != 0) {
 		seg_len = omin(len, vlist->ds_len - offset);
-		bcopy(src, (void *)(uintptr_t)(vlist->ds_addr + offset),
+		bcopy(src, (uint8_t *)vlist->ds_vaddr + offset,
 		    seg_len);
 		offset = 0;
 		src = (uint8_t *)src + seg_len;
@@ -839,7 +839,7 @@ mdcopyfrom_vlist(bus_dma_segment_t *vlist, off_t offset, void *dst, off_t len)
 
 	while (len != 0) {
 		seg_len = omin(len, vlist->ds_len - offset);
-		bcopy((void *)(uintptr_t)(vlist->ds_addr + offset), dst,
+		bcopy((uint8_t *)vlist->ds_vaddr + offset, dst,
 		    seg_len);
 		offset = 0;
 		dst = (uint8_t *)dst + seg_len;
@@ -958,7 +958,7 @@ mdstart_vnode(struct md_s *sc, struct bio *bp)
 		vlist = (bus_dma_segment_t *)bp->bio_data;
 		while (len > 0) {
 			IOVEC_INIT(piov,
-			    (void *)(uintptr_t)(vlist->ds_addr + ma_offs),
+			    (uint8_t *)vlist->ds_vaddr + ma_offs,
 			    MIN(vlist->ds_len - ma_offs, len));
 			len -= piov->iov_len;
 			ma_offs = 0;

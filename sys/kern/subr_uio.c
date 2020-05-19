@@ -71,7 +71,8 @@ __FBSDID("$FreeBSD$");
 SYSCTL_INT(_kern, KERN_IOV_MAX, iov_max, CTLFLAG_RD, SYSCTL_NULL_INT_PTR, UIO_MAXIOV,
 	"Maximum number of elements in an I/O vector; sysconf(_SC_IOV_MAX)");
 
-static int uiomove_faultflag(void *cp, int n, struct uio *uio, int nofault);
+static int uiomove_flags(void *cp, int n, struct uio *uio, bool nofault,
+    bool preserve_tags);
 
 int
 copyin_nofault(const void *udaddr, void *kaddr, size_t len)
@@ -192,8 +193,8 @@ physcopyin_vlist(bus_dma_segment_t *src, off_t offset, vm_paddr_t dst,
 
 	while (len > 0 && error == 0) {
 		seg_len = MIN(src->ds_len - offset, len);
-		error = physcopyin((void *)(uintptr_t)(src->ds_addr + offset),
-		    dst, seg_len);
+		error = physcopyin((char *)src->ds_vaddr + offset, dst,
+		    seg_len);
 		offset = 0;
 		src++;
 		len -= seg_len;
@@ -218,8 +219,8 @@ physcopyout_vlist(vm_paddr_t src, bus_dma_segment_t *dst, off_t offset,
 
 	while (len > 0 && error == 0) {
 		seg_len = MIN(dst->ds_len - offset, len);
-		error = physcopyout(src, (void *)(uintptr_t)(dst->ds_addr +
-		    offset), seg_len);
+		error = physcopyout(src, (char *)dst->ds_vaddr + offset,
+		    seg_len);
 		offset = 0;
 		dst++;
 		len -= seg_len;
@@ -233,18 +234,27 @@ int
 uiomove(void *cp, int n, struct uio *uio)
 {
 
-	return (uiomove_faultflag(cp, n, uio, 0));
+	return (uiomove_flags(cp, n, uio, false, false));
 }
 
 int
 uiomove_nofault(void *cp, int n, struct uio *uio)
 {
 
-	return (uiomove_faultflag(cp, n, uio, 1));
+	return (uiomove_flags(cp, n, uio, true, false));
 }
 
+int
+uiomove_cap(void *cp, int n, struct uio *uio)
+{
+
+	return (uiomove_flags(cp, n, uio, false, true));
+}
+
+
 static int
-uiomove_faultflag(void *cp, int n, struct uio *uio, int nofault)
+uiomove_flags(void *cp, int n, struct uio *uio, bool nofault,
+    bool preserve_tags)
 {
 	struct iovec *iov;
 	size_t cnt;
@@ -288,7 +298,14 @@ uiomove_faultflag(void *cp, int n, struct uio *uio, int nofault)
 
 		case UIO_USERSPACE:
 			maybe_yield();
-			if (uio->uio_rw == UIO_READ)
+			if (preserve_tags) {
+				if (uio->uio_rw == UIO_READ)
+					error = copyoutcap(cp, iov->iov_base,
+					    cnt);
+				else
+					error = copyincap(iov->iov_base, cp,
+					    cnt);
+			} else if (uio->uio_rw == UIO_READ)
 				error = copyout_c(cp, iov->iov_base, cnt);
 			else
 				error = copyin_c(iov->iov_base, cp, cnt);

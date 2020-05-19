@@ -33,6 +33,8 @@
  * Structures and routines specific && private to SES only
  */
 
+#define	EXPLICIT_USER_ACCESS
+
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 

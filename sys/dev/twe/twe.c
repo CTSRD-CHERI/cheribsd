@@ -35,6 +35,8 @@
  * Driver for the 3ware Escalade family of IDE RAID controllers.
  */
 
+#define	EXPLICIT_USER_ACCESS
+
 #include <dev/twe/twe_compat.h>
 #include <dev/twe/twereg.h>
 #include <dev/twe/tweio.h>

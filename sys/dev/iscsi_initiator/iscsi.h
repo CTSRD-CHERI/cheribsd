@@ -422,11 +422,21 @@ typedef struct {
      union ipdu_u	ipdu;
      u_int		hdr_dig;	// header digest
 
-     ahs_t		*ahs_addr;
+     union {
+#ifdef _KERNEL
+	     ahs_t * __capability ahs_uaddr;
+#endif
+	     ahs_t	*ahs_addr;
+     };
      u_int		ahs_len;
      u_int		ahs_size;	// the allocated size
 
-     u_char		*ds_addr;
+     union {
+#ifdef _KERNEL
+	     u_char * __capability ds_uaddr;
+#endif
+	     u_char	*ds_addr;
+     };
      u_int		ds_len;
      u_int		ds_size;	// the allocated size
      u_int		ds_dig;		// data digest
@@ -453,26 +463,116 @@ typedef struct opvals {
      boolean_t	immediateData;
      boolean_t	dataPDUInOrder;
      boolean_t	dataSequenceInOrder;
-     char	*headerDigest;
-     char	*dataDigest;
-     char	*sessionType;
-     char	*sendTargets;
-     char	*targetAddress;
-     char	*targetAlias;
-     char	*targetName;
-     char	*initiatorName;
-     char	*initiatorAlias;
-     char	*authMethod;
-     char	*chapSecret;
-     char	*chapIName;
-     char	*chapDigest;
-     char	*tgtChapName;
-     char	*tgtChapSecret;
+     union {
+#ifdef _KERNEL
+	char	* __kerncap headerDigest_u;
+#endif
+	char	*headerDigest;
+     };
+     union {
+#ifdef _KERNEL
+	char	* __kerncap dataDigest_u;
+#endif
+	char	*dataDigest;
+     };
+     union {
+#ifdef _KERNEL
+	char	* __kerncap sessionType_u;
+#endif
+	char	*sessionType;
+     };
+     union {
+#ifdef _KERNEL
+	char	* __kerncap sendTargets_u;
+#endif
+	char	*sendTargets;
+     };
+     union {
+#ifdef _KERNEL
+	char	* __kerncap targetAddress_u;
+#endif
+	char	*targetAddress;
+     };
+     union {
+#ifdef _KERNEL
+	char	* __kerncap targetAlias_u;
+#endif
+	char	*targetAlias;
+     };
+     union {
+#ifdef _KERNEL
+	char	* __kerncap targetName_u;
+#endif
+	char	*targetName;
+     };
+     union {
+#ifdef _KERNEL
+	char	* __kerncap initiatorName_u;
+#endif
+	char	*initiatorName;
+     };
+     union {
+#ifdef _KERNEL
+	char	* __kerncap initiatorAlias_u;
+#endif
+	char	*initiatorAlias;
+     };
+     union {
+#ifdef _KERNEL
+	char	* __kerncap authMethod_u;
+#endif
+	char	*authMethod;
+     };
+     union {
+#ifdef _KERNEL
+	char	* __kerncap chapSecret_u;
+#endif
+	char	*chapSecret;
+     };
+     union {
+#ifdef _KERNEL
+	char	* __kerncap chapIName_u;
+#endif
+	char	*chapIName;
+     };
+     union {
+#ifdef _KERNEL
+	char	* __kerncap chapDigest_u;
+#endif
+	char	*chapDigest;
+     };
+     union {
+#ifdef _KERNEL
+	char	* __kerncap tgtChapName_u;
+#endif
+	char	*tgtChapName;
+     };
+     union {
+#ifdef _KERNEL
+	char	* __kerncap tgtChapSecret_u;
+#endif
+	char	*tgtChapSecret;
+     };
      int	tgtChallengeLen;
      u_char	tgtChapID;
-     char	*tgtChapDigest;
-     char	*iqn;
-     char	*pidfile;
+     union {
+#ifdef _KERNEL
+	char	* __kerncap tgtChapDigest_u;
+#endif
+	char	*tgtChapDigest;
+     };
+     union {
+#ifdef _KERNEL
+	char	* __kerncap iqn_u;
+#endif
+	char	*iqn;
+     };
+     union {
+#ifdef _KERNEL
+	char	* __kerncap pidfile_u;
+#endif
+	char	*pidfile;
+     };
 } isc_opt_t;
 
 /*

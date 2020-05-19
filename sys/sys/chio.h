@@ -245,7 +245,7 @@ struct changer_element_status_request {
 	u_int16_t			cesr_flags;
 #define	CESR_VOLTAGS	0x01
 
-	struct changer_element_status	*cesr_element_status;
+	struct changer_element_status	* __kerncap cesr_element_status;
 };
 
 

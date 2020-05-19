@@ -179,7 +179,12 @@ union ctl_priv {
 #define CTL_UNMAPPED_IID     0xFF
 
 struct ctl_sg_entry {
-	void	*addr;
+	union {
+#ifdef _KERNEL
+		void * __capability uaddr;
+#endif
+		void	*addr;
+	};
 	size_t	len;
 };
 
@@ -274,7 +279,12 @@ struct ctl_scsiio {
 	 * doesn't modify or use them.
 	 */
 	uint32_t   ext_sg_entries;	/* 0 = no S/G list, > 0 = num entries */
-	uint8_t	   *ext_data_ptr;	/* data buffer or S/G list */
+	union {
+#ifdef _KERNEL
+		uint8_t * __capability ext_data_uptr;
+#endif
+		uint8_t    *ext_data_ptr;	/* data buffer or S/G list */
+	};
 	uint32_t   ext_data_len;	/* Data transfer length */
 	uint32_t   ext_data_filled;	/* Amount of data filled so far */
 
@@ -289,7 +299,12 @@ struct ctl_scsiio {
 	/*
 	 * The data pointer or a pointer to the scatter/gather list.
 	 */
-	uint8_t    *kern_data_ptr;
+	union {
+#ifdef _KERNEL
+		uint8_t * __capability kern_data_uptr;
+#endif
+		uint8_t *kern_data_ptr;
+	};
 
 	/*
 	 * Length of the data buffer or scatter/gather list.  It's also
@@ -327,8 +342,18 @@ struct ctl_scsiio {
 	ctl_tag_type tag_type;		/* simple, ordered, head of queue,etc.*/
 	uint8_t    cdb_len;		/* CDB length */
 	uint8_t	   cdb[CTL_MAX_CDBLEN];	/* CDB */
-	int	   (*be_move_done)(union ctl_io *io); /* called by fe */
-	int        (*io_cont)(union ctl_io *io); /* to continue processing */
+	union {
+#ifdef _KERNEL
+		void * __kerncap _dummy0;
+#endif
+		int (*be_move_done)(union ctl_io *io); /* called by fe */
+	};
+	union {
+#ifdef _KERNEL
+		void * __kerncap _dummy1;
+#endif
+		int (*io_cont)(union ctl_io *io); /* to continue processing */
+	};
 };
 
 typedef enum {

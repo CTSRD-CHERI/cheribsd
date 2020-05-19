@@ -168,8 +168,8 @@ struct ifbreq {
 struct ifbifconf {
 	uint32_t	ifbic_len;	/* buffer size */
 	union {
-		caddr_t	ifbicu_buf;
-		struct ifbreq *ifbicu_req;
+		char * __kerncap ifbicu_buf;
+		struct ifbreq * __kerncap ifbicu_req;
 	} ifbic_ifbicu;
 #define	ifbic_buf	ifbic_ifbicu.ifbicu_buf
 #define	ifbic_req	ifbic_ifbicu.ifbicu_req
@@ -199,8 +199,8 @@ struct ifbareq {
 struct ifbaconf {
 	uint32_t	ifbac_len;	/* buffer size */
 	union {
-		caddr_t ifbacu_buf;
-		struct ifbareq *ifbacu_req;
+		char * __kerncap ifbacu_buf;
+		struct ifbareq * __kerncap ifbacu_req;
 	} ifbac_ifbacu;
 #define	ifbac_buf	ifbac_ifbacu.ifbacu_buf
 #define	ifbac_req	ifbac_ifbacu.ifbacu_req
@@ -262,8 +262,8 @@ struct ifbpstpreq {
 struct ifbpstpconf {
 	uint32_t	ifbpstp_len;	/* buffer size */
 	union {
-		caddr_t	ifbpstpu_buf;
-		struct ifbpstpreq *ifbpstpu_req;
+		char * __kerncap ifbpstpu_buf;
+		struct ifbpstpreq * __kerncap ifbpstpu_req;
 	} ifbpstp_ifbpstpu;
 #define	ifbpstp_buf	ifbpstp_ifbpstpu.ifbpstpu_buf
 #define	ifbpstp_req	ifbpstp_ifbpstpu.ifbpstpu_req

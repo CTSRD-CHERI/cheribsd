@@ -312,9 +312,15 @@ typedef union {
 	SLIST_ENTRY(ccb_hdr) sle;
 	TAILQ_ENTRY(ccb_hdr) tqe;
 	STAILQ_ENTRY(ccb_hdr) stqe;
+#ifdef _KERNEL
+	void * __capability _dummy[2];
+#endif
 } camq_entry;
 
 typedef union {
+#ifdef _KERNEL
+	void * __capability user_ptr;
+#endif
 	void		*ptr;
 	u_long		field;
 	u_int8_t	bytes[sizeof(uintptr_t)];
@@ -331,7 +337,7 @@ typedef union {
 } ccb_spriv_area;
 
 typedef struct {
-	struct timeval	*etime;
+	struct timeval	* __kerncap etime;
 	uintptr_t	sim_data;
 	uintptr_t	periph_data;
 } ccb_qos_area;
@@ -346,7 +352,12 @@ struct ccb_hdr {
 					/* Callback on completion function */
 	xpt_opcode	func_code;	/* XPT function code */
 	u_int32_t	status;		/* Status returned by CAM subsystem */
-	struct		cam_path *path;	/* Compiled path for this ccb */
+	union {
+#ifdef _KERNEL
+		struct cam_path * __capability user_path;
+#endif
+		struct cam_path *path;	/* Compiled path for this ccb */
+	};
 	path_id_t	path_id;	/* Path ID for the request */
 	target_id_t	target_id;	/* Target device ID */
 	lun_id_t	target_lun;	/* Target LUN number */
@@ -569,10 +580,20 @@ struct ccb_dev_match {
 	ccb_dev_match_status		status;
 	u_int32_t			num_patterns;
 	u_int32_t			pattern_buf_len;
-	struct dev_match_pattern	*patterns;
+	union {
+#ifdef _KERNEL
+		struct dev_match_pattern * __capability user_patterns;
+#endif
+		struct dev_match_pattern *patterns;
+	};
 	u_int32_t			num_matches;
 	u_int32_t			match_buf_len;
-	struct dev_match_result		*matches;
+	union {
+#ifdef _KERNEL
+		struct dev_match_result	* __capability user_matches;
+#endif
+		struct dev_match_result	*matches;
+	};
 	struct ccb_dev_position		pos;
 };
 
@@ -706,17 +727,27 @@ typedef enum {
  */
 struct ccb_smpio {
 	struct ccb_hdr		ccb_h;
-	uint8_t			*smp_request;
+	union {
+#ifdef _KERNEL
+		uint8_t	* __capability smp_user_request;
+#endif
+		uint8_t		*smp_request;
+	};
 	int			smp_request_len;
 	uint16_t		smp_request_sglist_cnt;
-	uint8_t			*smp_response;
+	union {
+#ifdef _KERNEL
+		uint8_t * __capability smp_user_response;
+#endif
+		uint8_t		*smp_response;
+	};
 	int			smp_response_len;
 	uint16_t		smp_response_sglist_cnt;
 	ccb_smp_pass_flags	flags;
 };
 
 typedef union {
-	u_int8_t *sense_ptr;		/*
+	u_int8_t * __kerncap sense_ptr;	/*
 					 * Pointer to storage
 					 * for sense information
 					 */
@@ -725,7 +756,12 @@ typedef union {
 } sense_t;
 
 typedef union {
-	u_int8_t  *cdb_ptr;		/* Pointer to the CDB bytes to send */
+	union {
+#ifdef _KERNEL
+		u_int8_t  * __capability cdb_user_ptr;
+#endif
+		u_int8_t  *cdb_ptr;	/* Pointer to the CDB bytes to send */
+	};
 					/* Area for the CDB send */
 	u_int8_t  cdb_bytes[IOCDBLEN];
 } cdb_t;
@@ -736,9 +772,19 @@ typedef union {
  */
 struct ccb_scsiio {
 	struct	   ccb_hdr ccb_h;
-	union	   ccb *next_ccb;	/* Ptr for next CCB for action */
-	u_int8_t   *req_map;		/* Ptr to mapping info */
-	u_int8_t   *data_ptr;		/* Ptr to the data buf/SG list */
+	union	   ccb * __kerncap next_ccb;	/* Ptr for next CCB for action */
+	union {
+#ifdef _KERNEL
+		u_int8_t * __capability user_req_map;
+#endif
+		u_int8_t   *req_map;	/* Ptr to mapping info */
+	};
+	union {
+#ifdef _KERNEL
+		u_int8_t * __capability user_data_ptr;
+#endif
+		u_int8_t   *data_ptr;	/* Ptr to the data buf/SG list */
+	};
 	u_int32_t  dxfer_len;		/* Data transfer length */
 					/* Autosense storage */
 	struct     scsi_sense_data sense_data;
@@ -749,7 +795,7 @@ struct ccb_scsiio {
 	u_int8_t   sense_resid;		/* Autosense resid length: 2's comp */
 	u_int32_t  resid;		/* Transfer residual length: 2's comp */
 	cdb_t	   cdb_io;		/* Union for CDB bytes/pointer */
-	u_int8_t   *msg_ptr;		/* Pointer to the message buffer */
+	u_int8_t   * __kerncap msg_ptr;	/* Pointer to the message buffer */
 	u_int16_t  msg_len;		/* Number of bytes for the Message */
 	u_int8_t   tag_action;		/* What to do for tag queueing */
 	/*
@@ -777,10 +823,15 @@ scsiio_cdb_ptr(struct ccb_scsiio *ccb)
  */
 struct ccb_ataio {
 	struct	   ccb_hdr ccb_h;
-	union	   ccb *next_ccb;	/* Ptr for next CCB for action */
+	union	   ccb * __kerncap next_ccb;	/* Ptr for next CCB for action */
 	struct ata_cmd	cmd;		/* ATA command register set */
 	struct ata_res	res;		/* ATA result register set */
-	u_int8_t   *data_ptr;		/* Ptr to the data buf/SG list */
+	union {
+#ifdef _KERNEL
+		u_int8_t * __capability user_data_ptr;
+#endif
+		u_int8_t   *data_ptr;	/* Ptr to the data buf/SG list */
+	};
 	u_int32_t  dxfer_len;		/* Data transfer length */
 	u_int32_t  resid;		/* Transfer residual length: 2's comp */
 	u_int8_t   ata_flags;		/* Flags for the rest of the buffer */
@@ -794,7 +845,7 @@ struct ccb_ataio {
  */
 struct ccb_mmcio {
 	struct	   ccb_hdr ccb_h;
-	union	   ccb *next_ccb;	/* Ptr for next CCB for action */
+	union	   ccb * __kerncap next_ccb;	/* Ptr for next CCB for action */
 	struct mmc_command cmd;
         struct mmc_command stop;
 };
@@ -835,10 +886,15 @@ struct ccb_relsim {
  */
 struct ccb_nvmeio {
 	struct	   ccb_hdr ccb_h;
-	union	   ccb *next_ccb;	/* Ptr for next CCB for action */
+	union	   ccb * __kerncap next_ccb;	/* Ptr for next CCB for action */
 	struct nvme_command cmd;	/* NVME command, per NVME standard */
 	struct nvme_completion cpl;	/* NVME completion, per NVME standard */
-	uint8_t   *data_ptr;		/* Ptr to the data buf/SG list */
+	union {
+#ifdef _KERNEL
+		uint8_t * __capability user_data_ptr;
+#endif
+		uint8_t   *data_ptr;	/* Ptr to the data buf/SG list */
+	};
 	uint32_t  dxfer_len;		/* Data transfer length */
 	uint16_t  sglist_cnt;		/* Number of SG list entries */
 	uint16_t  unused;		/* padding for removed uint32_t */
@@ -891,6 +947,7 @@ struct ac_device_changed {
 struct ccb_setasync {
 	struct ccb_hdr	 ccb_h;
 	u_int32_t	 event_enable;	/* Async Event enables */
+	/* XXXCHERI: Assume this is kernel-only. */
 	ac_callback_t	*callback;
 	void		*callback_arg;
 };
@@ -906,7 +963,12 @@ struct ccb_setdev {
 /* Abort XPT request CCB */
 struct ccb_abort {
 	struct 	ccb_hdr ccb_h;
-	union	ccb *abort_ccb;	/* Pointer to CCB to abort */
+	union {
+#ifdef _KERNEL
+		union	ccb * __capability abort_user_ccb;
+#endif
+		union	ccb *abort_ccb;	/* Pointer to CCB to abort */
+	};
 };
 
 /* Reset SCSI Bus CCB */
@@ -1234,11 +1296,11 @@ struct ccb_eng_inq {
 
 struct ccb_eng_exec {	/* This structure must match SCSIIO size */
 	struct	  ccb_hdr ccb_h;
-	u_int8_t  *pdrv_ptr;	/* Ptr used by the peripheral driver */
-	u_int8_t  *req_map;	/* Ptr for mapping info on the req. */
-	u_int8_t  *data_ptr;	/* Pointer to the data buf/SG list */
+	u_int8_t  * __kerncap pdrv_ptr;	/* Ptr used by the peripheral driver */
+	u_int8_t  * __kerncap req_map;	/* Ptr for mapping info on the req. */
+	u_int8_t  * __kerncap data_ptr;	/* Pointer to the data buf/SG list */
 	u_int32_t dxfer_len;	/* Data transfer length */
-	u_int8_t  *engdata_ptr;	/* Pointer to the engine buffer data */
+	u_int8_t  * __kerncap engdata_ptr;	/* Pointer to the engine buffer data */
 	u_int16_t sglist_cnt;	/* Num of scatter gather list entries */
 	u_int32_t dmax_len;	/* Destination data maximum length */
 	u_int32_t dest_len;	/* Destination data length */
@@ -1286,7 +1348,12 @@ struct ccb_dev_advinfo {
 	off_t bufsiz;			/* IN: Size of external buffer */
 #define	CAM_SCSI_DEVID_MAXLEN	65536	/* length in buffer is an uint16_t */
 	off_t provsiz;			/* OUT: Size required/used */
-	uint8_t *buf;			/* IN/OUT: Buffer for requested data */
+	union {
+#ifdef _KERNEL
+		uint8_t * __capability user_buf;
+#endif
+		uint8_t *buf;		/* IN/OUT: Buffer for requested data */
+	};
 };
 
 /*
@@ -1296,6 +1363,7 @@ struct ccb_async {
 	struct ccb_hdr ccb_h;
 	uint32_t async_code;
 	off_t async_arg_size;
+	/* XXXCHERI: Assume this is kernel-only. */
 	void *async_arg_ptr;
 };
 

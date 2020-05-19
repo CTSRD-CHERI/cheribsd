@@ -32,6 +32,8 @@
  * Driver for the Mylex DAC960 family of RAID controllers.
  */
 
+#define	EXPLICIT_USER_ACCESS
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bio.h>
