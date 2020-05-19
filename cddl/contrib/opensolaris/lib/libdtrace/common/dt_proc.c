@@ -167,7 +167,7 @@ dt_proc_bpmatch(dtrace_hdl_t *dtp, dt_proc_t *dpr)
 		if (psp->pr_reg[R_PC] == dbp->dbp_addr)
 			break;
 #else
-		if (pc == dbp->dbp_addr)
+		if (dbp->dbp_active && pc == dbp->dbp_addr)
 			break;
 #endif
 	}
