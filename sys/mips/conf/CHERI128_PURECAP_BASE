@@ -1,0 +1,35 @@
+#
+# CHERI -- Kernel for the SRI/Cambridge "CHERI" (Capability Hardware Enhanced
+# RISC Instructions) FPGA soft core, as configured in its Terasic DE-4
+# reference configuration - 128bit version.
+#
+# $FreeBSD$
+#
+
+include		"std.CHERI128"
+
+machine		mips mips64c128
+
+nomakeoptions 	ARCH_FLAGS
+makeoptions	ARCH_PIC_FLAGS="-fpic"
+makeoptions	ARCH_FLAGS="-target cheri-unknown-freebsd -mcpu=cheri128 -cheri-cap-table-abi=plt -mxcaptable -Xclang -cheri-bounds=subobject-safe"
+makeoptions	CFLAGS+="-gdwarf-5"
+makeoptions	WERROR="-Wno-error"
+makeoptions 	KERNLOADADDR=0xffffffff80100000
+
+# purecap kernel options
+options		CHERI_PURECAP_KERNEL
+options 	KSTACK_LARGE_PAGE
+
+# debugging
+options 	KTRACE
+options 	KDB
+options		KDB_TRACE # stacktrace on panic
+nooptions	DDB
+
+# disable raid, we don't need it
+nooptions	GEOM_RAID
+
+# networking
+options		INET6
+device		tuntap

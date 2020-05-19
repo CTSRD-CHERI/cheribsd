@@ -9,25 +9,14 @@
 include		"BERI_DE4_BASE"
 ident		CHERI128_PURECAP_DE4_MDROOT
 
-include		"std.CHERI128"
+include		"CHERI128_PURECAP_BASE"
 include   "std.MFS_ROOT"
 
 machine		mips mips64c128
 
 makeoptions	EMBED_CHERITEST_LIST=YES
 
-nomakeoptions 	ARCH_FLAGS
-makeoptions	ARCH_PIC_FLAGS="-fpic"
-makeoptions	ARCH_FLAGS="-target cheri-unknown-freebsd -march=mips64 -cheri=128 -cheri-cap-table-abi=plt -mxcaptable -Xclang -cheri-bounds=subobject-safe"
-makeoptions	CFLAGS+="-gdwarf-5"
-makeoptions	WERROR="-Wno-error"
-makeoptions 	KERNLOADADDR=0xffffffff80100000
-
 nooptions	SMP
-
-# purecap kernel options
-options		CHERI_PURECAP_KERNEL
-nooptions	CHERI_IMPLICIT_USER_DDC
 
 # kernel modules
 options 	TMPFS
@@ -35,19 +24,6 @@ options		FFS
 options		CD9660
 nooptions	MSDOSFS
 nooptions	NFSD, NFSCL
-
-# disable raid, we don't need it
-nooptions	GEOM_RAID
-
-# networking
-options		INET6
-device		tuntap
-
-# debugging
-options 	KTRACE
-options 	KDB
-options		KDB_TRACE # stacktrace on panic
-nooptions	DDB
 
 options		DIAGNOSTIC
 options		VERBOSE_SYSINIT
@@ -64,9 +40,6 @@ nodevice usb
 nodevice saf1761otg
 nodevice ukbd
 nodevice ums
-
-# disable raid, we don't need it
-nooptions	GEOM_RAID
 
 nodevice xdma
 nodevice altera_softdma
