@@ -197,7 +197,7 @@ typedef struct fasttrap_hash {
 #define	fasttrap_sulword	suword32
 #endif
 
-extern void fasttrap_sigtrap(proc_t *, kthread_t *, uintcap_t);
+extern void fasttrap_sigtrap(proc_t *, kthread_t *, uintptr_t);
 #ifndef illumos
 extern fasttrap_scrspace_t *fasttrap_scraddr(struct thread *,
     fasttrap_proc_t *);

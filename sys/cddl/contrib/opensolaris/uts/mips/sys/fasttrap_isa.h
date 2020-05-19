@@ -59,6 +59,7 @@ typedef struct fasttrap_machtp_t {
 #define	single_stepping		ftt_mtp.single_stepping
 
 
+// Required by fasttrap
 #define	FASTTRAP_AFRAMES		3
 #define	FASTTRAP_RETURN_AFRAMES		4
 #define	FASTTRAP_ENTRY_AFRAMES		3

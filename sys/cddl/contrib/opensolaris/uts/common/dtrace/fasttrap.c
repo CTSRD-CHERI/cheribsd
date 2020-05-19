@@ -292,14 +292,19 @@ fasttrap_hash_str(const char *p)
 }
 
 void
-fasttrap_sigtrap(proc_t *p, kthread_t *t, uintcap_t pc)
+fasttrap_sigtrap(proc_t *p, kthread_t *t, uintptr_t pc)
 {
 	ksiginfo_t ksi;
 
 	ksiginfo_init(&ksi);
 	ksi.ksi_signo = SIGTRAP;
 	ksi.ksi_code = TRAP_DTRACE;
-	ksi.ksi_addr = (void * __capability) pc;
+#if __has_feature(capabilities)
+	ksi.ksi_addr = NULL;
+	printf("%s: NULL ksi_addr.\n");
+#else
+	ksi.ksi_addr = (caddr_t)pc;
+#endif
 	PROC_LOCK(p);
 	(void)tdsendsignal(p, t, SIGTRAP, &ksi);
 	PROC_UNLOCK(p);
@@ -2335,9 +2340,14 @@ err:
 #ifdef notyet
 		int ret;
 #endif
-
-		if (copyin((__cheri_tocap void * __capability)arg, &instr, sizeof (instr)) != 0)
+#if __has_feature(capabilities)
+		if (copyin((__cheri_tocap void *__capability)arg, &instr,
+			sizeof(instr)) != 0)
 			return (EFAULT);
+#else
+		if (copyin((void *)arg, &instr, sizeof(instr)) != 0)
+			return (EFAULT);
+#endif
 
 #ifdef notyet
 		if (!PRIV_POLICY_CHOICE(cr, PRIV_ALL, B_FALSE)) {
