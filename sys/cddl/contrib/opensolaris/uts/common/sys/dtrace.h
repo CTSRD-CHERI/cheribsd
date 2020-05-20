@@ -1405,7 +1405,7 @@ typedef struct {
 	_IOC_NEWTYPE(DTRACEIOC_AGGDESC, dtrace_aggdesc_64_t *)
 #define DTRACEIOC_FORMAT_64 _IOC_NEWTYPE(DTRACEIOC_FORMAT, dtrace_fmtdesc_64_t)
 #define DTRACEIOC_DOFGET_64 _IOC_NEWTYPE(DTRACEIOC_DOFGET, dof_hdr_t *)
-Prote#endif
+#endif
 
 #endif
 
