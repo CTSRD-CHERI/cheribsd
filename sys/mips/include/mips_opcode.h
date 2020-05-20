@@ -491,6 +491,10 @@ typedef union {
  */
 #define	OP_CHERI_CGETCAUSE_OLD	0x04	/* CGetCause - 0x12 0x00 .. 0x04 */
 #define	OP_CHERI_CGETPCC_OLD	0x07	/* CGetPCC - 0x12 0x00 .. 0x07 */
+
+#define OP_CINCOFFIMM 	0x13
+#define OP_CINCOFF 	0x12
+#define OP_CSC 		0x3e
 #endif
 
 #endif /* !_MACHINE_MIPS_OPCODE_H_ */
