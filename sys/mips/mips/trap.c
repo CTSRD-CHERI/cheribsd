@@ -1454,7 +1454,6 @@ trapDump(char *msg)
 /*
  * Return the resulting PC as if the branch was executed.
  *
- * XXXRW: What about CHERI branch instructions?
  * XXXAR: This needs to be fixed for ccall_fast
  */
 trapf_pc_t
