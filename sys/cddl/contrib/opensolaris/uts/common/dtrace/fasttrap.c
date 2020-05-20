@@ -301,7 +301,7 @@ fasttrap_sigtrap(proc_t *p, kthread_t *t, uintptr_t pc)
 	ksi.ksi_code = TRAP_DTRACE;
 #if __has_feature(capabilities)
 	ksi.ksi_addr = NULL;
-	printf("%s: NULL ksi_addr.\n");
+	printf("%s: NULL ksi_addr.\n",__func__);
 #else
 	ksi.ksi_addr = (caddr_t)pc;
 #endif
