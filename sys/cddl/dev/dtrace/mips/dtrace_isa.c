@@ -512,8 +512,6 @@ error:
 static int
 dtrace_next_uframe(register_t *pc, register_t *sp, register_t *ra)
 {
-	printf("\033[32m--> dtrace  next uframe\033[0m\n");
-	printf("pc: 0x%lx , sp: 0x%lx, ra: 0x%lx\n", (uint64_t) *pc, (uint64_t) *sp, (uint64_t)*ra);
 	int offset, registers_on_stack;
 	uint32_t opcode, mask;
 	register_t function_start;
@@ -555,8 +553,6 @@ dtrace_next_uframe(register_t *pc, register_t *sp, register_t *ra)
 		    i.CCMType.rt == 11) {
 			function_start = *pc - offset;
 			registers_on_stack = 1;
-			printf("cincofsetimm found at 0x%lx\n",
-			    (int64_t)(*pc - offset));
 			break;
 		}
 		/* cincoffset   $c11,$c11,at */
@@ -564,8 +560,6 @@ dtrace_next_uframe(register_t *pc, register_t *sp, register_t *ra)
 		    i.CType.func == OP_CINCOFF && i.CType.r1 == 11 &&
 		    i.CType.r2 == 11 && i.CType.r3 == 1) {
 			prev_daddiu_at = 1;
-			printf("cincofset found at 0x%lx\n",
-			    (int64_t)(*pc - offset));
 		}
 		/* [d]addiu at, zero, -X */
 		if (prev_daddiu_at &&
@@ -573,9 +567,6 @@ dtrace_next_uframe(register_t *pc, register_t *sp, register_t *ra)
 			((opcode & 0xffff8000) == 0x64018000))) {
 			function_start = *pc - offset;
 			registers_on_stack = 1;
-
-			printf("addiu at found at 0x%lx\n",
-			    (int64_t)(*pc - offset));
 			break;
 		}
 #endif
@@ -669,8 +660,6 @@ dtrace_next_uframe(register_t *pc, register_t *sp, register_t *ra)
 					if (i.CCMType.cb != 11 ||
 					    i.CCMType.rt != 11)
 						break;
-					printf("Stack size: %d\n",
-					    i.CCMType.offset);
 					stksize = -((short)i.CCMType.offset);
 				}
 				break;
@@ -688,13 +677,8 @@ dtrace_next_uframe(register_t *pc, register_t *sp, register_t *ra)
 				    (void *)(vm_offset_t)(
 					*sp + (short)i.CCMType.offset * 16);
 
-				printf(
-				    "addr: 0x%lx Tring to fetch the return address from: 0x%lx\n",
-				    (vm_offset_t)(function_start + offset),
-				    (uint64_t)base_addr_to_fetch);
 				// Let's fetch only the address
 				*ra = dtrace_fuword64(base_addr_to_fetch + 8);
-				printf("Fetched: 0x%lx\n", (uint64_t)*ra);
 #endif
 			}
 
@@ -713,8 +697,6 @@ dtrace_next_uframe(register_t *pc, register_t *sp, register_t *ra)
 
 	*pc = *ra;
 	*sp += stksize;
-	printf("stk_size: %d, new pc: 0x%lx, new sp: 0x%lx\n", stksize,
-	    (uint64_t)*pc, (uint64_t)*sp);
 	return (0);
 fault:
 	/*
