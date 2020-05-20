@@ -999,7 +999,9 @@ INSTALL_DDIR=	${_INSTALL_DDIR:S://:/:g:C:/$::}
 METALOG?=	${DESTDIR}/${DISTDIR}/METALOG
 METALOG:=	${METALOG:C,//+,/,g}
 IMAKE+=		-DNO_ROOT METALOG=${METALOG}
-INSTALLFLAGS+=	-U -M ${METALOG} -D ${INSTALL_DDIR}
+METALOG_INSTALLFLAGS=	-U -M ${METALOG} -D ${INSTALL_DDIR}
+INSTALLFLAGS+=	${METALOG_INSTALLFLAGS}
+CERTCLTFLAGS=	${METALOG_INSTALLFLAGS}
 MTREEFLAGS+=	-W
 .endif
 .if defined(BUILD_PKGS)
@@ -1570,14 +1572,10 @@ distributeworld installworld stageworld installsysroot: _installcheck_world .PHO
 .endfor
 .endif
 .elif make(installworld) && ${MK_CAROOT} != "no"
-	# We could make certctl a bootstrap tool, but it requires OpenSSL and
-	# friends, which we likely don't want.  We'll rehash on a best-effort
-	# basis, otherwise we'll just mention that we're not doing it to raise
-	# awareness.
-	@if which certctl>/dev/null; then \
-		certctl rehash; \
+	@if which openssl>/dev/null; then \
+		sh ${SRCTOP}/usr.sbin/certctl/certctl.sh ${CERTCLTFLAGS} rehash \
 	else \
-		echo "No certctl on the host, not rehashing target -- /etc/ssl may not be populated."; \
+		echo "No openssl on the host, not rehashing certificates target -- /etc/ssl may not be populated."; \
 	fi
 .endif
 
