@@ -152,8 +152,13 @@ dtrace_getupcstack(uint64_t *pcstack, int pcstack_limit)
 		return;
 
 	pc =  TRAPF_PC(tf);
+#if __has_feature(capabilities)
+	sp = (__cheri_addr uint64_t)tf->csp;
+	ra = (__cheri_addr uint64_t)tf->c17;
+#else
 	sp = (uint64_t)tf->sp;
 	ra = (uint64_t)tf->ra;
+#endif
 	*pcstack++ = TRAPF_PC(tf);
 
 	/*
@@ -507,11 +512,15 @@ error:
 static int
 dtrace_next_uframe(register_t *pc, register_t *sp, register_t *ra)
 {
+	printf("\033[32m--> dtrace  next uframe\033[0m\n");
+	printf("pc: 0x%lx , sp: 0x%lx, ra: 0x%lx\n", (uint64_t) *pc, (uint64_t) *sp, (uint64_t)*ra);
 	int offset, registers_on_stack;
 	uint32_t opcode, mask;
 	register_t function_start;
 	int stksize;
 	InstFmt i;
+	int prev_daddiu_at; /* if 1, the next addiu at,zero,-X contains the
+			       stack size */
 
 	volatile uint16_t *flags =
 	    (volatile uint16_t *)&cpu_core[curcpu].cpuc_dtrace_flags;
@@ -521,9 +530,12 @@ dtrace_next_uframe(register_t *pc, register_t *sp, register_t *ra)
 	function_start = 0;
 	offset = 0;
 	stksize = 0;
+	prev_daddiu_at = 0;
 
 	while (offset < MAX_FUNCTION_SIZE) {
 		opcode = dtrace_fuword32((void *)(vm_offset_t)(*pc - offset));
+
+		i.word = opcode;
 
 		if (*flags & CPU_DTRACE_FAULT)
 			goto fault;
@@ -535,7 +547,38 @@ dtrace_next_uframe(register_t *pc, register_t *sp, register_t *ra)
 			registers_on_stack = 1;
 			break;
 		}
+#if __has_feature(capabilities)
 
+		/* cincoffsetimm   $c11,$c11,-X */
+		if (prev_daddiu_at == 0 && i.CCMType.op == OP_COP2 &&
+		    i.CCMType.cs == OP_CINCOFFIMM && i.CCMType.cb == 11 &&
+		    i.CCMType.rt == 11) {
+			function_start = *pc - offset;
+			registers_on_stack = 1;
+			printf("cincofsetimm found at 0x%lx\n",
+			    (int64_t)(*pc - offset));
+			break;
+		}
+		/* cincoffset   $c11,$c11,at */
+		if (i.CType.op == OP_COP2 && i.CType.fmt == 0 &&
+		    i.CType.func == OP_CINCOFF && i.CType.r1 == 11 &&
+		    i.CType.r2 == 11 && i.CType.r3 == 1) {
+			prev_daddiu_at = 1;
+			printf("cincofset found at 0x%lx\n",
+			    (int64_t)(*pc - offset));
+		}
+		/* [d]addiu at, zero, -X */
+		if (prev_daddiu_at &&
+		    (((opcode & 0xffff8000) == 0x24208000) ||
+			((opcode & 0xffff8000) == 0x64018000))) {
+			function_start = *pc - offset;
+			registers_on_stack = 1;
+
+			printf("addiu at found at 0x%lx\n",
+			    (int64_t)(*pc - offset));
+			break;
+		}
+#endif
 		/* lui gp, X */
 		if ((opcode & 0xffff8000) == 0x3c1c0000) {
 			/*
@@ -604,10 +647,55 @@ dtrace_next_uframe(register_t *pc, register_t *sp, register_t *ra)
 			case OP_ADDIU:
 			case OP_DADDI:
 			case OP_DADDIU:
+#if __has_feature(capabilities)
+				if (stksize)
+					break;
+				// daddiu  at,zero,-X
+				if (prev_daddiu_at && i.IType.rs == 1 &&
+				    i.IType.rt == 0) {
+					stksize = -((short)i.IType.imm);
+					break;
+				}
+#endif
 				/* look for stack pointer adjustment */
 				if (i.IType.rs != 29 || i.IType.rt != 29)
 					break;
 				stksize = -((short)i.IType.imm);
+				break;
+#if __has_feature(capabilities)
+			case OP_COP2:
+				switch (i.CCMType.cs) {
+				case OP_CINCOFFIMM:
+					if (i.CCMType.cb != 11 ||
+					    i.CCMType.rt != 11)
+						break;
+					printf("Stack size: %d\n",
+					    i.CCMType.offset);
+					stksize = -((short)i.CCMType.offset);
+				}
+				break;
+			case OP_CSC:
+				//  csc     $c17,zero,X($c11)
+				if (i.CCMType.cb != 11 || i.CCMType.cs != 17 ||
+				    i.CCMType.rt != 0)
+					break;
+				// only first one
+				if (mask & (1 << i.CCMType.cs))
+					break;
+				mask |= (1 << i.CCMType.cs);
+
+				void *base_addr_to_fetch =
+				    (void *)(vm_offset_t)(
+					*sp + (short)i.CCMType.offset * 16);
+
+				printf(
+				    "addr: 0x%lx Tring to fetch the return address from: 0x%lx\n",
+				    (vm_offset_t)(function_start + offset),
+				    (uint64_t)base_addr_to_fetch);
+				// Let's fetch only the address
+				*ra = dtrace_fuword64(base_addr_to_fetch + 8);
+				printf("Fetched: 0x%lx\n", (uint64_t)*ra);
+#endif
 			}
 
 			offset += sizeof(int);
@@ -625,7 +713,8 @@ dtrace_next_uframe(register_t *pc, register_t *sp, register_t *ra)
 
 	*pc = *ra;
 	*sp += stksize;
-
+	printf("stk_size: %d, new pc: 0x%lx, new sp: 0x%lx\n", stksize,
+	    (uint64_t)*pc, (uint64_t)*sp);
 	return (0);
 fault:
 	/*
