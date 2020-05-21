@@ -2395,9 +2395,9 @@ kern_statat(struct thread *td, int flag, int fd, const char * __capability path,
 		return (error);
 	error = vn_stat(nd.ni_vp, sbp, td->td_ucred, NOCRED, td);
 	if (error == 0) {
-		SDT_PROBE2(vfs, , stat, mode, path, sbp->st_mode);
+		SDT_PROBE2(vfs, , stat, mode, (__cheri_addr uintptr_t)path, sbp->st_mode);
 		if (S_ISREG(sbp->st_mode))
-			SDT_PROBE2(vfs, , stat, reg, path, pathseg);
+			SDT_PROBE2(vfs, , stat, reg, (__cheri_addr uintptr_t)path, pathseg);
 		if (__predict_false(hook != NULL))
 			hook(nd.ni_vp, sbp);
 	}
