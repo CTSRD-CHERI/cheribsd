@@ -57,6 +57,7 @@
 
 #include "cheritest.h"
 
+#ifdef __mips__
 void
 test_copyregs(const struct cheri_test *ctp __unused)
 {
@@ -114,6 +115,7 @@ test_listregs(const struct cheri_test *ctp __unused)
 	CHERI_PCC_PRINT();
 	cheritest_success();
 }
+#endif	/* __mips__ */
 
 /*
  * These tests assume that the compiler and run-time libraries won't muck with
@@ -454,6 +456,7 @@ test_initregs_stack(const struct cheri_test *ctp __unused)
 }
 #endif
 
+#ifdef __mips__
 void
 test_initregs_idc(const struct cheri_test *ctp __unused)
 {
@@ -495,6 +498,7 @@ test_initregs_idc(const struct cheri_test *ctp __unused)
 #endif
 	cheritest_success();
 }
+#endif
 
 void
 test_initregs_pcc(const struct cheri_test *ctp __unused)
