@@ -39,7 +39,6 @@
 #include <sys/sysctl.h>
 #include <sys/time.h>
 
-#include <machine/cpuregs.h>
 #include <machine/sysarch.h>
 
 #include <cheri/cheri.h>

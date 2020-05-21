@@ -49,7 +49,6 @@
 
 #include <sys/event.h>
 
-#include <machine/cpuregs.h>
 #include <machine/frame.h>
 #include <machine/trap.h>
 

@@ -40,7 +40,6 @@
 #include <sys/sysctl.h>
 #include <sys/time.h>
 
-#include <machine/cpuregs.h>
 #include <machine/pte.h>
 #include <machine/vmparam.h>
 
