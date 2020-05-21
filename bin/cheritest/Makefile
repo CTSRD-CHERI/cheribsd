@@ -40,6 +40,7 @@ CFLAGS.cheri_memcpy_c.S=-D__KERN_FUNC_PREFIX -D_KERNEL -DINVARIANTS
 CFLAGS+=	-DKERNEL_MEMCPY_TESTS
 .endif
 
+.if ${MACHINE} == "mips"
 .ifdef CHERI_C_TESTS
 CHERI_C_TESTS_DIR=	${SRCTOP}/contrib/subrepo-cheri-c-tests
 .if exists(${CHERI_C_TESTS_DIR}/Makefile)
@@ -62,6 +63,7 @@ SRCS+=	test_runtime.c	\
 # declared global so that the compiler emits them
 CFLAGS.${test}+=-Wno-missing-prototypes -Wno-missing-variable-declarations
 .endfor
+.endif
 .endif
 .endif
 
