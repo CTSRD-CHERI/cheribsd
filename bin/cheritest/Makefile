@@ -13,7 +13,6 @@ SRCS+=	cheritest_bounds_globals.c					\
 	cheritest_kbounce.c						\
 	cheritest_longjmp.c						\
 	cheritest_registers.c						\
-	cheritest_sandbox.S						\
 	cheritest_sealcap.c						\
 	cheritest_signal.c						\
 	cheritest_string.c						\
@@ -80,6 +79,10 @@ WANT_CHERI=	pure
 LIBADD= 	z
 
 LIBADD+=	xo util
+
+.if ${MK_LIBCHERI} == "yes"
+SRCS+=	cheritest_sandbox.S
+.endif
 
 .ifdef CHERI_DYNAMIC_TESTS
 CFLAGS+=	-DCHERI_DYNAMIC_TESTS
