@@ -47,9 +47,13 @@ SUBDIR.${MK_LIBCHERI}+=	cheri_bench
 
 # Small cheri programs
 .if ${MACHINE_ABI:Mpurecap} || ${MK_COMPAT_CHERIABI} == "yes"
+.if ${MACHINE} == "mips"
+# link failure on riscv
 SUBDIR.${MK_CHERI}+=	cheri_minimal_dynamic_exe
 SUBDIR.${MK_CHERI}+=	cheri_minimal_pie_exe
+# mips assembly
 SUBDIR.${MK_CHERI}+=	cheri_pthreads
+.endif
 SUBDIR.${MK_CHERI}+=	helloworld
 .if ${MK_CXX} != "no"
 SUBDIR.${MK_CHERI}+=	helloworld_cxx
