@@ -44,7 +44,6 @@
 #include <cheri/cheri.h>
 #include <cheri/cheric.h>
 
-#include <machine/cpuregs.h>
 #include <machine/sysarch.h>
 
 #include <err.h>

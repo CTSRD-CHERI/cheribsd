@@ -41,7 +41,6 @@
 #include <sys/time.h>
 #include <sys/ptrace.h>
 
-#include <machine/cpuregs.h>
 #include <machine/sysarch.h>
 
 #include <cheri/cheri.h>
