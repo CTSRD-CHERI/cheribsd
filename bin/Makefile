@@ -65,7 +65,6 @@ SUBDIR.${MK_LIBCHERI}+=	cheri_helloworld
 SUBDIR.${MK_LIBCHERI}+=	cheriabi_helloworld
 
 # cheritest
-.if ${MACHINE_ARCH:Mmips*}
 SUBDIR.${MK_CHERI}+=	cheriabitest
 SUBDIR.${MK_CHERI}+=	cheriabitest-dynamic
 SUBDIR.${MK_CHERI}+=	cheriabitest-dynamic-mt
@@ -74,9 +73,6 @@ SUBDIR.${MK_CHERI}+=	cheritest
 SUBDIR.${MK_CHERI}+=	cheritest-dynamic
 SUBDIR.${MK_CHERI}+=	cheritest-dynamic-mt
 SUBDIR.${MK_CHERI}+=	cheritest-mt
-.else
-.warn "TODO: port cheritest to RISCV"
-.endif
 .endif  # ${MACHINE_ABI:Mpurecap} || ${MK_COMPAT_CHERIABI} == "yes"
 
 
