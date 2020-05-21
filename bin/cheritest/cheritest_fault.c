@@ -63,6 +63,7 @@
 static char array[ARRAY_LEN];
 static char sink;
 
+#ifdef __mips__
 void
 test_fault_bounds(const struct cheri_test *ctp __unused)
 {
@@ -85,6 +86,7 @@ test_fault_perm_load(const struct cheri_test *ctp __unused)
 
 	cheritest_failure_errx("access without required permissions did not fault");
 }
+#endif	/* __mips__ */
 
 void
 test_nofault_perm_load(const struct cheri_test *ctp __unused)
@@ -96,6 +98,7 @@ test_nofault_perm_load(const struct cheri_test *ctp __unused)
 	cheritest_success();
 }
 
+#ifdef CHERI_GET_SEALCAP
 void
 test_fault_perm_seal(const struct cheri_test *ctp __unused)
 {
@@ -116,7 +119,9 @@ test_fault_perm_seal(const struct cheri_test *ctp __unused)
 	    _CHERI_PRINTF_CAP_FMT " with bad sealcap" _CHERI_PRINTF_CAP_FMT,
 	    _CHERI_PRINTF_CAP_ARG(sealed), _CHERI_PRINTF_CAP_ARG(sealcap));
 }
+#endif
 
+#ifdef __mips__
 void
 test_fault_perm_store(const struct cheri_test *ctp __unused)
 {
@@ -124,6 +129,7 @@ test_fault_perm_store(const struct cheri_test *ctp __unused)
 
 	arrayp[0] = sink;
 }
+#endif	/* __mips__ */
 
 void
 test_nofault_perm_store(const struct cheri_test *ctp __unused)
@@ -135,6 +141,7 @@ test_nofault_perm_store(const struct cheri_test *ctp __unused)
 	cheritest_success();
 }
 
+#ifdef CHERI_GET_SEALCAP
 void
 test_fault_perm_unseal(const struct cheri_test *ctp __unused)
 {
@@ -159,7 +166,9 @@ test_fault_perm_unseal(const struct cheri_test *ctp __unused)
 	    _CHERI_PRINTF_CAP_FMT " with bad unsealcap" _CHERI_PRINTF_CAP_FMT,
 	    _CHERI_PRINTF_CAP_ARG(unsealed), _CHERI_PRINTF_CAP_ARG(sealcap));
 }
+#endif
 
+#ifdef __mips__
 void
 test_fault_tag(const struct cheri_test *ctp __unused)
 {
@@ -253,3 +262,4 @@ test_fault_read_epcc(const struct cheri_test *ctp __unused)
 
 	CHERI_CAP_PRINT(cheri_getepcc());
 }
+#endif	/* __mips__ */

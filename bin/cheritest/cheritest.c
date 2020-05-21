@@ -46,7 +46,9 @@
 #include <cheri/cheri.h>
 #include <cheri/cheric.h>
 
+#ifdef __mips__
 #include <machine/cpuregs.h>
+#endif
 #include <machine/frame.h>
 #include <machine/trap.h>
 
@@ -120,14 +122,17 @@ static const struct cheri_test cheri_tests[] = {
 	  .ct_xfail_reason = "CHERI_PERM_CHERIABI_VMMAP "
 	    "unnecessarily set in stack capability" },
 #endif
+#ifdef __mips__
 	{ .ct_name = "test_initregs_idc",
 	  .ct_desc = "Test initial value of invoked data capability",
 	  .ct_func = test_initregs_idc },
+#endif
 
 	{ .ct_name = "test_initregs_pcc",
 	  .ct_desc = "Test initial value of program-counter capability",
 	  .ct_func = test_initregs_pcc },
 
+#ifdef __mips__
 	{ .ct_name = "test_copyregs",
 	  .ct_desc = "Exercise CP2 register assignments",
 	  .ct_func = test_copyregs },
@@ -136,11 +141,13 @@ static const struct cheri_test cheri_tests[] = {
 	  .ct_desc = "Print out a list of CP2 registers and values",
 	  .ct_func = test_listregs,
 	  .ct_flags = CT_FLAG_STDOUT_IGNORE },
+#endif
 
 	/*
 	 * Capability manipulation and use tests that sometimes generate
 	 * signals.
 	 */
+#ifdef __mips__
 	{ .ct_name = "test_fault_cgetcause",
 	  .ct_desc = "Ensure CGetCause is unavailable in userspace",
 	  .ct_func = test_fault_cgetcause,
@@ -174,11 +181,13 @@ static const struct cheri_test cheri_tests[] = {
 	  .ct_si_code = PROT_CHERI_PERM,
 	  .ct_mips_exccode = T_C2E,
 	  .ct_cp2_exccode = CHERI_EXCCODE_PERM_LOAD },
+#endif
 
 	{ .ct_name = "test_nofault_perm_load",
 	  .ct_desc = "Exercise capability load permission success",
 	  .ct_func = test_nofault_perm_load },
 
+#ifdef __mips__
 	{ .ct_name = "test_fault_perm_seal",
 	  .ct_desc = "Exercise capability seal permission failure",
 	  .ct_func = test_fault_perm_seal,
@@ -198,11 +207,13 @@ static const struct cheri_test cheri_tests[] = {
 	  .ct_si_code = PROT_CHERI_PERM,
 	  .ct_mips_exccode = T_C2E,
 	  .ct_cp2_exccode = CHERI_EXCCODE_PERM_STORE },
+#endif
 
 	{ .ct_name = "test_nofault_perm_store",
 	  .ct_desc = "Exercise capability store permission success",
 	  .ct_func = test_nofault_perm_store },
 
+#ifdef __mips__
 	{ .ct_name = "test_fault_perm_unseal",
 	  .ct_desc = "Exercise capability unseal permission failure",
 	  .ct_func = test_fault_perm_unseal,
@@ -286,10 +297,12 @@ static const struct cheri_test cheri_tests[] = {
 	  .ct_si_code = PROT_CHERI_SYSREG,
 	  .ct_mips_exccode = T_C2E,
 	  .ct_cp2_exccode = CHERI_EXCCODE_SYSTEM_REGS },
+#endif
 
 	/*
 	 * Tests on the kernel-provided sealing capability (sealcap).
 	 */
+#ifdef CHERI_GET_SEALCAP
 	{ .ct_name = "test_sealcap_sysarch",
 	  .ct_desc = "Retrieve sealcap using sysarch(2)",
 	  .ct_func = test_sealcap_sysarch, },
@@ -301,6 +314,7 @@ static const struct cheri_test cheri_tests[] = {
 	{ .ct_name = "test_sealcap_seal_unseal",
 	  .ct_desc = "Use sealcap to seal and unseal a capability",
 	  .ct_func = test_sealcap_seal_unseal, },
+#endif
 
 	/*
 	 * Test bounds on globals in the same file they are allocated in.
@@ -999,6 +1013,7 @@ static const struct cheri_test cheri_tests[] = {
 	  .ct_desc = "check tags are stored for /dev/zero MAP_PRIVATE pages",
 	  .ct_func = cheritest_vm_tag_dev_zero_private, },
 
+#ifdef __mips__
 	/* XXXRW: I wonder if we also need some sort of load-related test? */
 	{ .ct_name = "cheritest_vm_notag_tmpfile_shared",
 	  .ct_desc = "check tags are not stored for tmpfile() MAP_SHARED pages",
@@ -1010,6 +1025,7 @@ static const struct cheri_test cheri_tests[] = {
 	  .ct_mips_exccode = T_C2E,
 	  .ct_cp2_exccode = CHERI_EXCCODE_TLBSTORE,
 	  .ct_check_xfail = xfail_need_writable_non_tmpfs_tmp, },
+#endif
 
 	{ .ct_name = "cheritest_vm_tag_tmpfile_private",
 	  .ct_desc = "check tags are stored for tmpfile() MAP_PRIVATE pages",
@@ -1624,15 +1640,19 @@ static const struct cheri_test cheri_tests[] = {
 	{ .ct_name = "test_string_memcpy",
 	  .ct_desc = "Test implicit capability memcpy",
 	  .ct_func = test_string_memcpy },
+#ifdef __mips__
 	{ .ct_name = "test_string_memcpy_c",
 	  .ct_desc = "Test explicit capability memcpy",
 	  .ct_func = test_string_memcpy_c },
+#endif
 	{ .ct_name = "test_string_memmove",
 	  .ct_desc = "Test implicit capability memmove",
 	  .ct_func = test_string_memmove },
+#ifdef __mips__
 	{ .ct_name = "test_string_memmove_c",
 	  .ct_desc = "Test explicit capability memmove",
 	  .ct_func = test_string_memmove_c },
+#endif
 
 	/* Unaligned memcpy/memmove with capabilities */
 	{ .ct_name = "test_unaligned_capability_copy_memcpy",
@@ -1687,17 +1707,23 @@ static const struct cheri_test cheri_tests[] = {
 	 * CheriABI specific tests.
 	 */
 #ifdef CHERIABI_TESTS
+#ifdef CHERI_MMAP_SETBOUNDS
 	{ .ct_name = "test_cheriabi_mmap_nospace",
 	  .ct_desc = "Test CheriABI mmap() with no space in default capability",
 	  .ct_func = test_cheriabi_mmap_nospace },
+#endif
 
+#ifdef CHERI_MMAP_GETPERM
 	{ .ct_name = "test_cheriabi_mmap_perms",
 	  .ct_desc = "Test CheriABI mmap() permissions",
 	  .ct_func = test_cheriabi_mmap_perms },
+#endif
 
+#ifdef CHERI_BASELEN_BITS
 	{ .ct_name = "test_cheriabi_mmap_unrepresentable",
 	  .ct_desc = "Test CheriABI mmap() with unrepresentable lengths",
 	  .ct_func = test_cheriabi_mmap_unrepresentable },
+#endif
 
 	{ .ct_name = "test_cheriabi_malloc_zero_size",
 	  .ct_desc = "Check that zero-sized mallocs are properly bounded",
@@ -1742,9 +1768,11 @@ static const struct cheri_test cheri_tests[] = {
 	  .ct_desc = "Path with CHERI_PERM_LOAD permission missing",
 	  .ct_func = test_cheriabi_open_bad_perm, },
 
+#ifdef CHERI_GET_SEALCAP
 	{ .ct_name = "test_cheriabi_open_sealed",
 	  .ct_desc = "Sealed path",
 	  .ct_func = test_cheriabi_open_sealed, },
+#endif
 #endif
 #ifdef CHERI_C_TESTS
 #define	DECLARE_TEST(name, desc)			\
@@ -1849,7 +1877,9 @@ list_tests(void)
 static void
 signal_handler(int signum, siginfo_t *info, void *vuap)
 {
+#ifdef __mips__
 	struct cheri_frame *cfp;
+#endif
 	ucontext_t *uap;
 #ifdef CHERI_LIBCHERI_TESTS
 	u_int numframes;
@@ -1857,6 +1887,7 @@ signal_handler(int signum, siginfo_t *info, void *vuap)
 #endif
 
 	uap = (ucontext_t *)vuap;
+#ifdef __mips__
 	if (uap->uc_mcontext.mc_regs[0] != /* UCONTEXT_MAGIC */ 0xACEDBADE) {
 		ccsp->ccs_signum = -1;
 		fprintf(stderr, "%s: missing UCONTEXT_MAGIC\n", __func__);
@@ -1873,10 +1904,13 @@ signal_handler(int signum, siginfo_t *info, void *vuap)
 		ccsp->ccs_signum = -1;
 		_exit(EX_OSERR);
 	}
+#endif	/* __mips__ */
 	ccsp->ccs_signum = signum;
 	ccsp->ccs_si_code = info->si_code;
+#ifdef __mips__
 	ccsp->ccs_mips_cause = uap->uc_mcontext.cause;
 	ccsp->ccs_cp2_cause = cfp->cf_capcause;
+#endif
 
 #ifdef CHERI_LIBCHERI_TESTS
 	/*
@@ -1936,6 +1970,7 @@ signal_handler_clear(int sig)
 static inline void
 set_thread_tracing(void)
 {
+#ifdef CHERI_START_TRACE
 	int error, intval;
 
 	intval = 1;
@@ -1948,7 +1983,10 @@ set_thread_tracing(void)
 	 */
 	CHERI_START_TRACE;
 	if (qtrace_user_mode_only)
-		__asm__ __volatile__("li $0, 0xdeaf");
+		CHERI_START_USER_TRACE;
+#else
+	err(EX_OSERR, "%s", __func__);
+#endif
 }
 
 /* Maximum size of stdout data we will check if called for by a test. */
@@ -1965,7 +2003,9 @@ cheritest_run_test(const struct cheri_test *ctp)
 	char buffer[TEST_BUFFER_LEN];
 	const char *xfail_reason;
 	char* failure_message;
+#ifdef __mips__
 	register_t cp2_exccode, mips_exccode;
+#endif
 	ssize_t len;
 	xo_attr("classname", "%s", ctp->ct_name);
 	xo_attr("name", "%s", ctp->ct_desc);
@@ -2149,6 +2189,7 @@ cheritest_run_test(const struct cheri_test *ctp)
 		    "unwind");
 		goto fail;
 	}
+#ifdef __mips__
 	if (ctp->ct_flags & CT_FLAG_MIPS_EXCCODE) {
 		mips_exccode = (ccsp->ccs_mips_cause & MIPS_CR_EXC_CODE) >>
 		    MIPS_CR_EXC_CODE_SHIFT;
@@ -2170,6 +2211,7 @@ cheritest_run_test(const struct cheri_test *ctp)
 			goto fail;
 		}
 	}
+#endif
 
 	/*
 	 * Next, we are concerned with whether the test itself reports a
