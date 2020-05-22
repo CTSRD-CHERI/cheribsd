@@ -31,8 +31,6 @@
  *	from: @(#)sys_machdep.c	5.5 (Berkeley) 1/19/91
  */
 
-#define	EXPLICIT_USER_ACCESS
-
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 

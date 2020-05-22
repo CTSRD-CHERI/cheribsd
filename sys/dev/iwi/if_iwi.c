@@ -37,8 +37,6 @@ __FBSDID("$FreeBSD$");
  * http://www.intel.com/network/connectivity/products/wireless/prowireless_mobile.htm
  */
 
-#define	EXPLICIT_USER_ACCESS
-
 #include <sys/param.h>
 #include <sys/sysctl.h>
 #include <sys/sockio.h>

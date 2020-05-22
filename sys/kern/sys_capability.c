@@ -63,8 +63,6 @@ __FBSDID("$FreeBSD$");
 #include "opt_capsicum.h"
 #include "opt_ktrace.h"
 
-#define	EXPLICIT_USER_ACCESS
-
 #include <sys/param.h>
 #include <sys/capsicum.h>
 #include <sys/file.h>

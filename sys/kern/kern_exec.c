@@ -1,4 +1,4 @@
-/*
+/*-
  * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
  *
  * Copyright (c) 1993, David Greenman
@@ -25,8 +25,6 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-
-#define	EXPLICIT_USER_ACCESS
 
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");

@@ -47,8 +47,6 @@
 
 #include "opt_ddb.h"
 
-#define	EXPLICIT_USER_ACCESS
-
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/kernel.h>

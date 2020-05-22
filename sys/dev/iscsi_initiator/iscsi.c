@@ -30,8 +30,6 @@
  | $Id: iscsi.c 752 2009-08-20 11:23:28Z danny $
  */
 
-#define	EXPLICIT_USER_ACCESS
-
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 

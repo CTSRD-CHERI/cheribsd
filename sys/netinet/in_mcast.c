@@ -34,8 +34,6 @@
  * IPv4 multicast socket, group, and socket option processing module.
  */
 
-#define	EXPLICIT_USER_ACCESS
-
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 

@@ -37,8 +37,6 @@ __FBSDID("$FreeBSD$");
 #include "opt_ktrace.h"
 #include "opt_posix.h"
 
-#define	EXPLICIT_USER_ACCESS
-
 #include <sys/param.h>
 #include <sys/signal.h>
 #include <sys/syscallsubr.h>

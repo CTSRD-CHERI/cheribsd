@@ -28,8 +28,6 @@
  * $FreeBSD$
  */
 
-#define	EXPLICIT_USER_ACCESS
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/proc.h>

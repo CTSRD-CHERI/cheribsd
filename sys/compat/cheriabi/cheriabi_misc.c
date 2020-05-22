@@ -39,8 +39,6 @@ __FBSDID("$FreeBSD$");
 #include "opt_posix.h"
 #include "opt_capsicum.h"
 
-#define	EXPLICIT_USER_ACCESS
-
 #include <sys/param.h>
 #include <sys/bus.h>
 #include <sys/capsicum.h>

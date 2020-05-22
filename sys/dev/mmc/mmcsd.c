@@ -53,8 +53,6 @@
  * information, know-how or other confidential information to any third party.
  */
 
-#define	EXPLICIT_USER_ACCESS
-
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 

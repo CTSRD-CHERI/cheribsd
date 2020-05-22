@@ -51,8 +51,6 @@ __FBSDID("$FreeBSD$");
 #include "opt_vlan.h"
 #include "opt_ratelimit.h"
 
-#define	EXPLICIT_USER_ACCESS
-
 #include <sys/param.h>
 #include <sys/eventhandler.h>
 #include <sys/kernel.h>

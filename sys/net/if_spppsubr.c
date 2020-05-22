@@ -26,8 +26,6 @@
 #include "opt_inet.h"
 #include "opt_inet6.h"
 
-#define	EXPLICIT_USER_ACCESS
-
 #include <sys/systm.h>
 #include <sys/kernel.h>
 #include <sys/lock.h>

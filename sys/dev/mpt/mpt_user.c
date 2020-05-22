@@ -32,8 +32,6 @@
  * LSI MPT-Fusion Host Adapter FreeBSD userland interface
  */
 
-#define	EXPLICIT_USER_ACCESS
-
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 

@@ -137,8 +137,6 @@
  *         distinguish between the operation failing, and
  *         deserialization failing.
  */
-#define EXPLICIT_USER_ACCESS
-
 #ifdef __FreeBSD__
 #include "opt_kstack_pages.h"
 #endif

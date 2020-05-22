@@ -36,8 +36,6 @@
  *	@(#)kern_sig.c	8.7 (Berkeley) 4/18/94
  */
 
-#define	EXPLICIT_USER_ACCESS
-
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 

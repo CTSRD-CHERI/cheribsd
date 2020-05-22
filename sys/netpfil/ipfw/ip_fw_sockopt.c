@@ -44,8 +44,6 @@ __FBSDID("$FreeBSD$");
 #endif /* INET */
 #include "opt_inet6.h"
 
-#define	EXPLICIT_USER_ACCESS
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/malloc.h>
