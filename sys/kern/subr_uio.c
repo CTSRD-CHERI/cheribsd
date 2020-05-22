@@ -281,9 +281,9 @@ uiomove_flags(void *cp, int n, struct uio *uio, bool nofault,
 					error = copyincap(iov->iov_base, cp,
 					    cnt);
 			} else if (uio->uio_rw == UIO_READ)
-				error = copyout_c(cp, iov->iov_base, cnt);
+				error = copyout(cp, iov->iov_base, cnt);
 			else
-				error = copyin_c(iov->iov_base, cp, cnt);
+				error = copyin(iov->iov_base, cp, cnt);
 			if (error)
 				goto out;
 			break;
@@ -518,7 +518,7 @@ int
 copyin_implicit_cap(const void *uaddr, void *kaddr, size_t len)
 {
 
-	return (copyin_c(cheri_capability_build_user_data(
+	return (copyin(cheri_capability_build_user_data(
 	    CHERI_CAP_USER_DATA_PERMS, (vaddr_t)uaddr, len, 0), kaddr, len));
 }
 
@@ -526,7 +526,7 @@ int
 copyout_implicit_cap(const void *kaddr, void *uaddr, size_t len)
 {
 
-	return (copyout_c(kaddr,
+	return (copyout(kaddr,
 	    cheri_capability_build_user_data(CHERI_CAP_USER_DATA_PERMS,
 	    (vaddr_t)uaddr, len, 0), len));
 }
