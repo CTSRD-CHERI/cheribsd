@@ -541,23 +541,6 @@ int	casueword(volatile u_long * __capability base, u_long oldval,
 int	casueword32(volatile uint32_t * __capability base, uint32_t oldval,
 	    uint32_t *oldvalp, uint32_t newval);
 
-/* XXX: Aliases to remove. */
-#define	fubyte_c	fubyte
-#define	fuword_c	fuword
-#define	fuword16_c	fuword16
-#define	fuword32_c	fuword32
-#define	fuword64_c	fuword64
-#define	fueword_c	fueword
-#define	fueword32_c	fueword32
-#define	subyte_c	subyte
-#define	suword_c	suword
-#define	suword16_c	suword16
-#define	suword32_c	suword32
-#define	suword64_c	suword64
-#define	casuword32_c	casuword32
-#define	casuword_c	casuword
-#define	casueword32_c	casueword32
-
 void	realitexpire(void *);
 
 int	sysbeep(int hertz, int period);

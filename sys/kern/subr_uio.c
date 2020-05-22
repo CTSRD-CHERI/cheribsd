@@ -358,7 +358,7 @@ again:
 	switch (uio->uio_segflg) {
 
 	case UIO_USERSPACE:
-		if (subyte_c(iov->iov_base, c) < 0)
+		if (subyte(iov->iov_base, c) < 0)
 			return (EFAULT);
 		break;
 
