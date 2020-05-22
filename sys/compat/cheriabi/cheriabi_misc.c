@@ -1770,8 +1770,8 @@ cheriabi_ptrace(struct thread *td, struct cheriabi_ptrace_args *uap)
 {
 	union {
 		struct ptrace_io_desc piod;
-		struct ptrace_lwpinfo pl;
-		kptrace_vm_entry_t pve;
+		struct ptrace_lwpinfo64 pl;
+		struct ptrace_vm_entry pve;
 #if __has_feature(capabilities)
 		struct capreg capreg;
 #endif

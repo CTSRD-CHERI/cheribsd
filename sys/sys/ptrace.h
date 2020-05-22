@@ -111,8 +111,8 @@ struct ptrace_io_desc {
 #if defined(_KERNEL) && COMPAT_FREEBSD64
 struct ptrace_io_desc64 {
 	int	piod_op;	/* I/O operation */
-	void	*piod_offs;	/* child offset */
-	void	*piod_addr;	/* parent offset */
+	uint64_t piod_offs;	/* child offset */
+	uint64_t piod_addr;	/* parent offset */
 	size_t	piod_len;	/* request length */
 };
 #endif
@@ -153,20 +153,6 @@ struct ptrace_lwpinfo {
 	u_int		pl_syscall_narg;
 };
 
-#if defined(_KERNEL) && defined(COMPAT_FREEBSD64)
-struct ptrace_lwpinfo_64 {
-	lwpid_t	pl_lwpid;	/* LWP described. */
-	int	pl_event;	/* Event that stopped the LWP. */
-	int	pl_flags;	/* LWP flags. */
-	sigset_t	pl_sigmask;	/* LWP signal mask */
-	sigset_t	pl_siglist;	/* LWP pending signal */
-	struct siginfo_64	pl_siginfo;	/* siginfo for signal */
-	char		pl_tdname[MAXCOMLEN + 1]; /* LWP name */
-	pid_t		pl_child_pid;	/* New child pid */
-	u_int		pl_syscall_code;
-	u_int		pl_syscall_narg;
-};
-#endif
 
 #if defined(_WANT_LWPINFO32) || (defined(_KERNEL) && defined(__LP64__))
 struct ptrace_lwpinfo32 {

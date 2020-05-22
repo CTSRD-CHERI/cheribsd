@@ -310,8 +310,8 @@ typedef	struct __siginfo {
 } siginfo_t;
 
 #ifdef _KERNEL
-#ifdef COMPAT_FREEBSD64
-struct siginfo_64 {
+#ifdef COMPAT_CHERIABI
+struct siginfo_c {
 	int	si_signo;		/* signal number */
 	int	si_errno;		/* errno association */
 	/*
@@ -324,7 +324,7 @@ struct siginfo_64 {
 	__pid_t	si_pid;			/* sending process */
 	__uid_t	si_uid;			/* sender's ruid */
 	int	si_status;		/* exit value */
-	void*  si_addr;	/* faulting instruction */
+	void* __capability si_addr;	/* faulting instruction */
 	union sigval_c si_value;
 	union	{
 		struct {
