@@ -1769,9 +1769,9 @@ int
 cheriabi_ptrace(struct thread *td, struct cheriabi_ptrace_args *uap)
 {
 	union {
-		struct ptrace_io_desc_c piod;
+		struct ptrace_io_desc piod;
 		struct ptrace_lwpinfo pl;
-		struct ptrace_vm_entry_c pve;
+		kptrace_vm_entry_t pve;
 #if __has_feature(capabilities)
 		struct capreg capreg;
 #endif
@@ -1784,7 +1784,7 @@ cheriabi_ptrace(struct thread *td, struct cheriabi_ptrace_args *uap)
 	} r = { 0 };
 
 	union {
-		struct ptrace_lwpinfo_c pl;
+		struct ptrace_lwpinfo pl;
 	} c = { 0 };
 
 	int error = 0, data;
@@ -1913,7 +1913,7 @@ cheriabi_ptrace(struct thread *td, struct cheriabi_ptrace_args *uap)
 		 * of copyoutcap.
 		 */
 		error = copyout(&r.piod.piod_len, uap->addr +
-		    offsetof(struct ptrace_io_desc_c, piod_len),
+		    offsetof(struct ptrace_io_desc, piod_len),
 		    sizeof(r.piod.piod_len));
 		break;
 #if 0

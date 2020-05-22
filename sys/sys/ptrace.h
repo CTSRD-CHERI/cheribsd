@@ -103,16 +103,16 @@
 
 struct ptrace_io_desc {
 	int	piod_op;	/* I/O operation */
-	void	*piod_offs;	/* child offset */
-	void	*piod_addr;	/* parent offset */
+	void	* __kerncap piod_offs;	/* child offset */
+	void	* __kerncap piod_addr;	/* parent offset */
 	size_t	piod_len;	/* request length */
 };
 
-#if defined(_KERNEL) && __has_feature(capabilities)
-struct ptrace_io_desc_c {
+#if defined(_KERNEL) && COMPAT_FREEBSD64
+struct ptrace_io_desc64 {
 	int	piod_op;	/* I/O operation */
-	void	* __capability piod_offs;	/* child offset */
-	void	* __capability piod_addr;	/* parent offset */
+	void	*piod_offs;	/* child offset */
+	void	*piod_addr;	/* parent offset */
 	size_t	piod_len;	/* request length */
 };
 #endif
@@ -153,14 +153,14 @@ struct ptrace_lwpinfo {
 	u_int		pl_syscall_narg;
 };
 
-#if defined(_KERNEL) && defined(COMPAT_CHERIABI)
-struct ptrace_lwpinfo_c {
+#if defined(_KERNEL) && defined(COMPAT_FREEBSD64)
+struct ptrace_lwpinfo_64 {
 	lwpid_t	pl_lwpid;	/* LWP described. */
 	int	pl_event;	/* Event that stopped the LWP. */
 	int	pl_flags;	/* LWP flags. */
 	sigset_t	pl_sigmask;	/* LWP signal mask */
 	sigset_t	pl_siglist;	/* LWP pending signal */
-	struct siginfo_c	pl_siginfo;	/* siginfo for signal */
+	struct siginfo_64	pl_siginfo;	/* siginfo for signal */
 	char		pl_tdname[MAXCOMLEN + 1]; /* LWP name */
 	pid_t		pl_child_pid;	/* New child pid */
 	u_int		pl_syscall_code;

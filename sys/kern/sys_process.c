@@ -643,7 +643,7 @@ sys_ptrace(struct thread *td, struct ptrace_args *uap)
 	 * structs may be too large to put on the stack anyway.
 	 */
 	union {
-		struct ptrace_io_desc_c piod;
+		struct ptrace_io_desc piod;
 		struct ptrace_lwpinfo pl;
 		kptrace_vm_entry_t pve;
 #if __has_feature(capabilities)
@@ -665,10 +665,6 @@ sys_ptrace(struct thread *td, struct ptrace_args *uap)
 		int ptevents;
 	} r = { 0 };
 
-	union {
-		struct ptrace_lwpinfo_c pl;
-	} c = { 0 };
-
 	int error = 0, data;
 	void * __capability addr = &r;
 
@@ -682,7 +678,6 @@ sys_ptrace(struct thread *td, struct ptrace_args *uap)
 	AUDIT_ARG_CMD(uap->req);
 	AUDIT_ARG_VALUE(uap->data);
 
-	(void)c;
 	data = uap->data;
 
 	switch (uap->req) {
@@ -735,10 +730,7 @@ sys_ptrace(struct thread *td, struct ptrace_args *uap)
 #endif
 		break;
 	case PT_LWPINFO:
-		if (uap->data > sizeof(c.pl))
-			error = EINVAL;
-		else
-			data = sizeof(r.pl);
+		data = sizeof(r.pl);
 		break;
 
 	/* Pass along an untagged virtual address for the desired PC. */
@@ -775,7 +767,7 @@ sys_ptrace(struct thread *td, struct ptrace_args *uap)
 		 * of copyoutcap.
 		 */
 		error = COPYOUT(&r.piod.piod_len,
-		    uap->addr + offsetof(struct ptrace_io_desc_c, piod_len),
+		    uap->addr + offsetof(struct ptrace_io_desc, piod_len),
 		    sizeof(r.piod.piod_len));
 		break;
 	case PT_GETREGS:
@@ -797,19 +789,7 @@ sys_ptrace(struct thread *td, struct ptrace_args *uap)
 		error = copyout(&r.ptevents, uap->addr, uap->data);
 		break;
 	case PT_LWPINFO:
-		memset(&c.pl, 0, sizeof(c.pl));
-		c.pl.pl_lwpid = r.pl.pl_lwpid;
-		c.pl.pl_event = r.pl.pl_event;
-		c.pl.pl_flags = r.pl.pl_flags;
-		c.pl.pl_sigmask = r.pl.pl_sigmask;
-		c.pl.pl_siglist = r.pl.pl_siglist;
-		c.pl.pl_child_pid = r.pl.pl_child_pid;
-		c.pl.pl_syscall_code = r.pl.pl_syscall_code;
-		c.pl.pl_syscall_narg = r.pl.pl_syscall_narg;
-		memcpy(c.pl.pl_tdname, r.pl.pl_tdname, sizeof(c.pl.pl_tdname));
-		memcpy(&c.pl.pl_siginfo, &r.pl.pl_siginfo, sizeof(c.pl.pl_siginfo));
-
-		error = copyout(&c.pl, uap->addr, uap->data);
+		error = copyout(&r.pl, uap->addr, uap->data);
 		break;
 	case PT_GET_SC_ARGS:
 		error = copyout(r.args, uap->addr, MIN(uap->data,
@@ -876,11 +856,9 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 	lwpid_t tid = 0, *buf;
 #ifdef COMPAT_FREEBSD64
 	int wrap64 = 0;
+	struct ptrace_io_desc64 * __capability piod64 = NULL;
 	struct ptrace_sc_ret64 * __capability psr64 = NULL;
 	struct ptrace_lwpinfo64 * __capability pl64 = NULL;
-#endif
-#if __has_feature(capabilities)
-	struct ptrace_io_desc_c * __capability piodc = NULL;
 #endif
 #ifdef COMPAT_FREEBSD32
 	int wrap32 = 0, safe = 0;
@@ -1445,16 +1423,7 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 		break;
 
 	case PT_IO:
-#if __has_feature(capabilities)
-		if (SV_CURPROC_FLAG(SV_CHERI)) {
-			piodc = addr;
-			IOVEC_INIT_C(&iov, piodc->piod_addr, piodc->piod_len);
-			uio.uio_offset =
-			    (off_t)(__cheri_addr uintptr_t)piodc->piod_offs;
-			uio.uio_resid = piodc->piod_len;
-			tmp = piodc->piod_op;
-		} else
-#endif
+
 #ifdef COMPAT_FREEBSD32
 		if (wrap32) {
 			piod32 = addr;
@@ -1465,10 +1434,20 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 			tmp = piod32->piod_op;
 		} else
 #endif
+#ifdef COMPAT_FREEBSD64
+		if (wrap64){
+			piod64 = addr;
+			IOVEC_INIT(&iov, piod64->piod_addr, piod64->piod_len);
+			uio.uio_offset = (off_t)(uintptr_t)piod64->piod_offs;
+			uio.uio_resid = piod64->piod_len;
+			tmp = piod64->piod_op;
+		} else
+#endif
 		{
 			piod = addr;
-			IOVEC_INIT(&iov, piod->piod_addr, piod->piod_len);
-			uio.uio_offset = (off_t)(uintptr_t)piod->piod_offs;
+			IOVEC_INIT_C(&iov, piod->piod_addr, piod->piod_len);
+			uio.uio_offset =
+			    (off_t)(__cheri_addr uintptr_t)piod->piod_offs;
 			uio.uio_resid = piod->piod_len;
 			tmp = piod->piod_op;
 		}
@@ -1498,12 +1477,17 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 		error = proc_rwmem(p, &uio);
 #if __has_feature(capabilities)
 		if (SV_CURPROC_FLAG(SV_CHERI))
-			piodc->piod_len -= uio.uio_resid;
+			piod->piod_len -= uio.uio_resid;
 		else
 #endif
 #ifdef COMPAT_FREEBSD32
 		if (wrap32)
 			piod32->piod_len -= uio.uio_resid;
+		else
+#endif
+#ifdef COMPAT_FREEBSD64
+		if (wrap64)
+			piod64->piod_len -= uio.uio_resid;
 		else
 #endif
 			piod->piod_len -= uio.uio_resid;
