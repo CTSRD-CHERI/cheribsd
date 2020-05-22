@@ -660,26 +660,32 @@ sys_ptrace(struct thread *td, struct ptrace_args *uap)
 		struct ptrace_lwpinfo32 pl32;
 		struct ptrace_vm_entry32 pve32;
 #endif
+#ifdef COMPAT_FREEBSD64
+		struct ptrace_lwpinfo64 pl64;
+#endif
 		syscallarg_t args[nitems(td->td_sa.args)];
 		struct ptrace_sc_ret psr;
 		int ptevents;
-	} r = { 0 };
-
+	} r;
+	void * __capability addr;
 	int error = 0, data;
-	void * __capability addr = &r;
-
 #ifdef COMPAT_FREEBSD32
 	int wrap32 = 0;
 
 	if (SV_CURPROC_FLAG(SV_ILP32))
 		wrap32 = 1;
 #endif
+#ifdef COMPAT_FREEBSD64
+	int wrap64 = 0;
+
+	if (SV_CURPROC_FLAG(SV_CHERI | SV_LP64) == SV_LP64)
+		wrap64 = 1;
+#endif
 	AUDIT_ARG_PID(uap->pid);
 	AUDIT_ARG_CMD(uap->req);
 	AUDIT_ARG_VALUE(uap->data);
-
+	addr = &r;
 	data = uap->data;
-
 	switch (uap->req) {
 	case PT_GET_EVENT_MASK:
 	case PT_GET_SC_ARGS:
@@ -746,10 +752,20 @@ sys_ptrace(struct thread *td, struct ptrace_args *uap)
 #endif
 		break;
 	case PT_LWPINFO:
+#ifdef COMPAT_FREEBSD32
+		if (wrap32)
+			data = sizeof(r.pl32);
+		else
+#endif
+#ifdef COMPAT_FREEBSD64
+		if (wrap64)
+			data = sizeof(r.pl64);
+		else
+#endif
 		data = sizeof(r.pl);
 		break;
 
-	/* Pass along an untagged virtual address for the desired PC. */
+	/* Pass along an untagged capability for the desired PC. */
 	case PT_CONTINUE:
 	case PT_STEP:
 	case PT_TO_SCE:
@@ -1442,7 +1458,6 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 		break;
 
 	case PT_IO:
-
 #ifdef COMPAT_FREEBSD32
 		if (wrap32) {
 			piod32 = addr;
@@ -1454,9 +1469,10 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 		} else
 #endif
 #ifdef COMPAT_FREEBSD64
-		if (wrap64){
+		    if (wrap64) {
 			piod64 = addr;
-			IOVEC_INIT(&iov, piod64->piod_addr, piod64->piod_len);
+			IOVEC_INIT(
+			    &iov, (void *)piod64->piod_addr, piod64->piod_len);
 			uio.uio_offset = (off_t)(uintptr_t)piod64->piod_offs;
 			uio.uio_resid = piod64->piod_len;
 			tmp = piod64->piod_op;
