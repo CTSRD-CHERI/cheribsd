@@ -502,13 +502,6 @@ int	copyoutcap_nofault(
 #define	copyoutcap_nofault	copyout_nofault
 #endif
 
-/* XXX: Aliases to remove. */
-#define	copyinstr_c	copyinstr
-#define	copyin_c	copyin
-#define	copyin_nofault_c	copyin_nofault
-#define	copyout_c	copyout
-#define	copyout_nofault_c	copyout_nofault
-
 #ifdef KCSAN
 int	kcsan_copyin(const void *, void *, size_t);
 int	kcsan_copyinstr(const void *, void *, size_t, size_t *);

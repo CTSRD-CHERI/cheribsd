@@ -1163,7 +1163,7 @@ pci_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int flag, struct thread *t
 			 */
 			pattern_buf = malloc(cio->pat_buf_len, M_TEMP,
 			    M_WAITOK);
-			error = copyin_c(cio->patterns, pattern_buf,
+			error = copyin(cio->patterns, pattern_buf,
 			    cio->pat_buf_len);
 			if (error != 0) {
 				error = EINVAL;
@@ -1224,7 +1224,7 @@ pci_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int flag, struct thread *t
 				}
 
 				pci_conf_for_copyout(&dinfo->conf, &pcu, cmd);
-				error = copyout_c(&pcu,
+				error = copyout(&pcu,
 				    (char * __capability)cio->matches +
 				    confsz * cio->num_matches, confsz);
 				if (error)

@@ -158,7 +158,7 @@ freebsd64_copyout_siginfo(const siginfo_t *si, void * __capability info)
 	struct siginfo64 si64;
 	
 	siginfo_to_siginfo64(si, &si64);
-	return (copyout_c(&si64, info, sizeof(struct siginfo64)));
+	return (copyout(&si64, info, sizeof(struct siginfo64)));
 }
 
 int

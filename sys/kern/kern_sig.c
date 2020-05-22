@@ -1139,13 +1139,13 @@ user_sigprocmask(struct thread *td, int how,
 	setp = (uset != NULL) ? &set : NULL;
 	osetp = (uoset != NULL) ? &oset : NULL;
 	if (setp) {
-		error = copyin_c(uset, setp, sizeof(set));
+		error = copyin(uset, setp, sizeof(set));
 		if (error)
 			return (error);
 	}
 	error = kern_sigprocmask(td, how, setp, osetp, 0);
 	if (osetp && !error) {
-		error = copyout_c(osetp, uoset, sizeof(oset));
+		error = copyout(osetp, uoset, sizeof(oset));
 	}
 	return (error);
 }
@@ -1185,7 +1185,7 @@ user_sigwait(struct thread *td, const sigset_t * __capability uset,
 	sigset_t set;
 	int error;
 
-	error = copyin_c(uset, &set, sizeof(set));
+	error = copyin(uset, &set, sizeof(set));
 	if (error) {
 		td->td_retval[0] = error;
 		return (0);
@@ -1201,7 +1201,7 @@ user_sigwait(struct thread *td, const sigset_t * __capability uset,
 		return (0);
 	}
 
-	error = copyout_c(&ksi.ksi_signo, usig, sizeof(ksi.ksi_signo));
+	error = copyout(&ksi.ksi_signo, usig, sizeof(ksi.ksi_signo));
 	td->td_retval[0] = error;
 	return (0);
 }
@@ -1233,7 +1233,7 @@ user_sigtimedwait(struct thread *td, const sigset_t * __capability uset,
 	int error;
 
 	if (utimeout) {
-		error = copyin_c(utimeout, &ts, sizeof(ts));
+		error = copyin(utimeout, &ts, sizeof(ts));
 		if (error)
 			return (error);
 
@@ -1241,7 +1241,7 @@ user_sigtimedwait(struct thread *td, const sigset_t * __capability uset,
 	} else
 		timeout = NULL;
 
-	error = copyin_c(uset, &set, sizeof(set));
+	error = copyin(uset, &set, sizeof(set));
 	if (error)
 		return (error);
 
@@ -1272,7 +1272,7 @@ user_sigwaitinfo(struct thread *td, const sigset_t * __capability uset,
 	sigset_t set;
 	int error;
 
-	error = copyin_c(uset, &set, sizeof(set));
+	error = copyin(uset, &set, sizeof(set));
 	if (error)
 		return (error);
 
@@ -1455,7 +1455,7 @@ kern_sigpending(struct thread *td, sigset_t * __capability set)
 	pending = p->p_sigqueue.sq_signals;
 	SIGSETOR(pending, td->td_sigqueue.sq_signals);
 	PROC_UNLOCK(p);
-	return (copyout_c(&pending, set, sizeof(sigset_t)));
+	return (copyout(&pending, set, sizeof(sigset_t)));
 }
 
 #ifdef COMPAT_43	/* XXX - COMPAT_FBSD3 */
@@ -1580,7 +1580,7 @@ user_sigsuspend(struct thread *td, const sigset_t * __capability sigmask)
 	sigset_t mask;
 	int error;
 
-	error = copyin_c(sigmask, &mask, sizeof(mask));
+	error = copyin(sigmask, &mask, sizeof(mask));
 	if (error)
 		return (error);
 	return (kern_sigsuspend(td, mask));

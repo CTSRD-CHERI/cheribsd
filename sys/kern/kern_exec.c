@@ -1501,7 +1501,7 @@ exec_args_add_fname(struct image_args *args, const char * __capability fname,
 			error = copystr((__cheri_fromcap const char *)fname,
 			    args->fname, PATH_MAX, &length);
 		else
-			error = copyinstr_c(fname, args->fname, PATH_MAX,
+			error = copyinstr(fname, args->fname, PATH_MAX,
 			    &length);
 		if (error != 0)
 			return (error == ENAMETOOLONG ? E2BIG : error);
@@ -1534,7 +1534,7 @@ exec_args_add_str(struct image_args *args, const char * __capability str,
 		error = copystr((__cheri_fromcap const char *)str, args->endp,
 		    args->stringspace, &length);
 	else
-		error = copyinstr_c(str, args->endp, args->stringspace,
+		error = copyinstr(str, args->endp, args->stringspace,
 		    &length);
 	if (error != 0)
 		return (error == ENAMETOOLONG ? E2BIG : error);
@@ -1674,7 +1674,7 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 		destp -= szsigcode;
 		destp = __builtin_align_down(destp,
 		    sizeof(void * __capability));
-		error = copyout_c(p->p_sysent->sv_sigcode, destp, szsigcode);
+		error = copyout(p->p_sysent->sv_sigcode, destp, szsigcode);
 		if (error != 0)
 			return (error);
 	}
@@ -1691,7 +1691,7 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 #else
 		imgp->execpathp = destp;
 #endif
-		error = copyout_c(imgp->execpath, imgp->execpathp, execpath_len);
+		error = copyout(imgp->execpath, imgp->execpathp, execpath_len);
 		if (error != 0)
 			return (error);
 	}
@@ -1706,7 +1706,7 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 #else
 	imgp->canary = destp;
 #endif
-	error = copyout_c(canary, imgp->canary, sizeof(canary));
+	error = copyout(canary, imgp->canary, sizeof(canary));
 	if (error != 0)
 		return (error);
 	imgp->canarylen = sizeof(canary);
@@ -1721,7 +1721,7 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 #else
 	imgp->pagesizes = destp;
 #endif
-	error = copyout_c(pagesizes, imgp->pagesizes, szps);
+	error = copyout(pagesizes, imgp->pagesizes, szps);
 	if (error != 0)
 		return (error);
 	imgp->pagesizeslen = szps;
@@ -1771,7 +1771,7 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	/*
 	 * Copy out strings - arguments and environment.
 	 */
-	error = copyout_c(stringp, (void * __capability)ustringp,
+	error = copyout(stringp, (void * __capability)ustringp,
 	    ARG_MAX - imgp->args->stringspace);
 	if (error != 0)
 		return (error);
