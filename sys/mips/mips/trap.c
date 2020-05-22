@@ -1454,7 +1454,6 @@ trapDump(char *msg)
 /*
  * Return the resulting PC as if the branch was executed.
  *
- * XXXRW: What about CHERI branch instructions?
  * XXXAR: This needs to be fixed for ccall_fast
  */
 trapf_pc_t
@@ -1484,7 +1483,6 @@ MipsEmulateBranch(struct trapframe *framePtr, trapf_pc_t _instPC, int fpcCSR,
 	}
 	/* Save the bad branch instruction so we can log it */
 	framePtr->badinstr_p.inst = inst.word;
-
 
 	switch ((int)inst.JType.op) {
 	case OP_SPECIAL:
