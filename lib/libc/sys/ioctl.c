@@ -93,7 +93,12 @@ _ioctl(int fd, unsigned long com, ...)
 			data = va_arg(ap, void *);
 		}
 	} else {
-#ifdef __CHERI_PURE_CAPABILITY__
+#if defined(__CHERI_PURE_CAPABILITY__) && __mips__
+		/*
+		 * For some ioctls, the size is zero, but the handler still
+		 * expect an address. This is done to skip the copyin in
+		 * user_ioctl, and handle it manually in the ioctl handler.
+		 */
 		if (cheri_getlen((void*)ap) >= sizeof(void *))
 			data = va_arg(ap, void *);
 		else
