@@ -1311,7 +1311,11 @@ zpool_destroy(zpool_handle_t *zhp, const char *log_str)
 		return (-1);
 
 	(void) strlcpy(zc.zc_name, zhp->zpool_name, sizeof (zc.zc_name));
+#ifdef __CHERI_PURE_CAPABILITY__
+	zc.zc_history = (void *)(uintptr_t)log_str;
+#else
 	zc.zc_history = (uint64_t)(uintptr_t)log_str;
+#endif
 
 	if (zfs_ioctl(hdl, ZFS_IOC_POOL_DESTROY, &zc) != 0) {
 		(void) snprintf(msg, sizeof (msg), dgettext(TEXT_DOMAIN,
@@ -1509,7 +1513,11 @@ zpool_export_common(zpool_handle_t *zhp, boolean_t force, boolean_t hardforce,
 	(void) strlcpy(zc.zc_name, zhp->zpool_name, sizeof (zc.zc_name));
 	zc.zc_cookie = force;
 	zc.zc_guid = hardforce;
+#ifdef __CHERI_PURE_CAPABILITY__
+	zc.zc_history = (void *)(uintptr_t)log_str;
+#else
 	zc.zc_history = (uint64_t)(uintptr_t)log_str;
+#endif
 
 	if (zfs_ioctl(zhp->zpool_hdl, ZFS_IOC_POOL_EXPORT, &zc) != 0) {
 		switch (errno) {
@@ -3901,8 +3909,13 @@ zpool_get_errlog(zpool_handle_t *zhp, nvlist_t **nverrlistp)
 	    &count) == 0);
 	if (count == 0)
 		return (0);
+#ifdef __CHERI_PURE_CAPABILITY__
+	if ((zc.zc_nvlist_dst = zfs_alloc(zhp->zpool_hdl,
+	    count * sizeof (zbookmark_phys_t))) == NULL)
+#else
 	if ((zc.zc_nvlist_dst = (uintptr_t)zfs_alloc(zhp->zpool_hdl,
 	    count * sizeof (zbookmark_phys_t))) == (uintptr_t)NULL)
+#endif
 		return (-1);
 	zc.zc_nvlist_dst_size = count;
 	(void) strcpy(zc.zc_name, zhp->zpool_name);
@@ -3918,7 +3931,11 @@ zpool_get_errlog(zpool_handle_t *zhp, nvlist_t **nverrlistp)
 				    sizeof (zbookmark_phys_t));
 				if (dst == NULL)
 					return (-1);
+#ifdef __CHERI_PURE_CAPABILITY__
+				zc.zc_nvlist_dst = dst;
+#else
 				zc.zc_nvlist_dst = (uintptr_t)dst;
+#endif
 			} else {
 				return (-1);
 			}
@@ -4043,7 +4060,11 @@ get_history(zpool_handle_t *zhp, char *buf, uint64_t *off, uint64_t *len)
 
 	(void) strlcpy(zc.zc_name, zhp->zpool_name, sizeof (zc.zc_name));
 
+#ifdef __CHERI_PURE_CAPABILITY__
+	zc.zc_history = buf;
+#else
 	zc.zc_history = (uint64_t)(uintptr_t)buf;
+#endif
 	zc.zc_history_len = *len;
 	zc.zc_history_offset = *off;
 
