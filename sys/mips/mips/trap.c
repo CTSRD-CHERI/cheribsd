@@ -40,9 +40,6 @@
  *	from: @(#)trap.c	8.5 (Berkeley) 1/11/94
  *	JNPR: trap.c,v 1.13.2.2 2007/08/29 10:03:49 girish
  */
-
-#define	EXPLICIT_USER_ACCESS
-
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 #define TRAP_DEBUG 1

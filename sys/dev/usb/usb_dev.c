@@ -29,8 +29,6 @@
  * usb_dev.c - An abstraction layer for creating devices under /dev/...
  */
 
-#define	EXPLICIT_USER_ACCESS
-
 #ifdef USB_GLOBAL_INCLUDE_FILE
 #include USB_GLOBAL_INCLUDE_FILE
 #else

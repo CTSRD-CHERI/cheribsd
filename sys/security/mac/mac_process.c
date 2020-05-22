@@ -47,8 +47,6 @@ __FBSDID("$FreeBSD$");
 
 #include "opt_mac.h"
 
-#define	EXPLICIT_USER_ACCESS
-
 #include <sys/param.h>
 #include <sys/condvar.h>
 #include <sys/imgact.h>

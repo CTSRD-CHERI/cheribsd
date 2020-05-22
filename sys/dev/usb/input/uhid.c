@@ -43,8 +43,6 @@ __FBSDID("$FreeBSD$");
  * HID spec: http://www.usb.org/developers/devclass_docs/HID1_11.pdf
  */
 
-#define	EXPLICIT_USER_ACCESS
-
 #include <sys/stdint.h>
 #include <sys/stddef.h>
 #include <sys/param.h>

@@ -30,8 +30,6 @@
  * SUCH DAMAGE.
  */
 
-#define	EXPLICIT_USER_ACCESS
-
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 

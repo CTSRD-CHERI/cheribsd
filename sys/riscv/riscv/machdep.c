@@ -33,7 +33,6 @@
  * SUCH DAMAGE.
  */
 
-#define EXPLICIT_USER_ACCESS
 #include "opt_ddb.h"
 #include "opt_platform.h"
 

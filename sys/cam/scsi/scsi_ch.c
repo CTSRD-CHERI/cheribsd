@@ -65,8 +65,6 @@
  * $NetBSD: ch.c,v 1.34 1998/08/31 22:28:06 cgd Exp $
  */
 
-#define	EXPLICIT_USER_ACCESS
-
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 

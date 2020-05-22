@@ -48,8 +48,6 @@
  * this list and displaying it to the user.
  */
 
-#define	EXPLICIT_USER_ACCESS
-
 #include <sys/dmu_tx.h>
 #include <sys/spa.h>
 #include <sys/spa_impl.h>

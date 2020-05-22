@@ -31,8 +31,6 @@
  | $Id: isc_subr.c 560 2009-05-07 07:37:49Z danny $
  */
 
-#define	EXPLICIT_USER_ACCESS
-
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 

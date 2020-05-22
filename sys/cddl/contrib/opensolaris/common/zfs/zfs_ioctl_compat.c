@@ -26,8 +26,6 @@
  * Use is subject to license terms.
  */
 
-#define EXPLICIT_USER_ACCESS
-
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/cred.h>
