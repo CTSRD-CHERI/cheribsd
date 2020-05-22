@@ -74,9 +74,15 @@ CFLAGS+=	-DCHERITHREAD_TESTS
 MAN=
 
 .if ${PROG:Mcheritest*}
-NEED_CHERI=	hybrid
+.if ${MACHINE_ABI:Mpurecap}
+NEED_COMPAT=	64
+.include <bsd.compat.mk>
+.endif
 .elif ${PROG:Mcheriabitest*}
-WANT_CHERI=	pure
+.if !${MACHINE_ABI:Mpurecap}
+NEED_COMPAT=	CHERI
+.include <bsd.compat.mk>
+.endif
 .else
 .error Unknown cheritest variant ${PROG}
 .endif
