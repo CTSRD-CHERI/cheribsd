@@ -724,7 +724,23 @@ sys_ptrace(struct thread *td, struct ptrace_args *uap)
 		break;
 	case PT_VM_ENTRY:
 #if __has_feature(capabilities)
-		error = copyincap(uap->addr, (char *)&r.pve, sizeof r.pve);
+	{
+		struct ptrace_vm_entry pve;
+		error = COPYIN(uap->addr, &pve, sizeof pve);
+		if (error)
+			break;
+
+		r.pve.pve_entry     = pve.pve_entry;
+		r.pve.pve_timestamp = pve.pve_timestamp;
+		r.pve.pve_start     = pve.pve_start;
+		r.pve.pve_end       = pve.pve_end;
+		r.pve.pve_offset    = pve.pve_offset;
+		r.pve.pve_prot      = pve.pve_prot;
+		r.pve.pve_pathlen   = pve.pve_pathlen;
+		r.pve.pve_fileid    = pve.pve_fileid;
+		r.pve.pve_fsid      = pve.pve_fsid;
+		r.pve.pve_path      = (void * __capability)(intcap_t)pve.pve_path;
+	}
 #else
 		error = COPYIN(uap->addr, &r.pve, sizeof r.pve);
 #endif
@@ -739,7 +755,9 @@ sys_ptrace(struct thread *td, struct ptrace_args *uap)
 	case PT_TO_SCE:
 	case PT_TO_SCX:
 	case PT_SYSCALL:
+#if __has_feature(capabilities)
 		addr = cheri_cleartag(uap->addr);
+#endif
 		break;
 
 	/* Pass along 'addr' unmodified. */
@@ -789,6 +807,7 @@ sys_ptrace(struct thread *td, struct ptrace_args *uap)
 		error = copyout(&r.ptevents, uap->addr, uap->data);
 		break;
 	case PT_LWPINFO:
+		/* NB: The size in uap->data is validated in kern_ptrace(). */
 		error = copyout(&r.pl, uap->addr, uap->data);
 		break;
 	case PT_GET_SC_ARGS:
@@ -1445,7 +1464,11 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 #endif
 		{
 			piod = addr;
+#if __has_feature(capabilities)
 			IOVEC_INIT_C(&iov, piod->piod_addr, piod->piod_len);
+#else
+			IOVEC_INIT(&iov, piod->piod_addr, piod->piod_len);
+#endif
 			uio.uio_offset =
 			    (off_t)(__cheri_addr uintptr_t)piod->piod_offs;
 			uio.uio_resid = piod->piod_len;
