@@ -55,7 +55,7 @@ SUBDIR.${MK_CHERI}+=	cheri_minimal_pie_exe
 SUBDIR.${MK_CHERI}+=	cheri_pthreads
 .endif
 SUBDIR.${MK_CHERI}+=	helloworld
-.if ${MK_CXX} != "no"
+.if ${MK_CXX} != "no" && ${MACHINE} != riscv
 SUBDIR.${MK_CHERI}+=	helloworld_cxx
 .endif
 SUBDIR.${MK_CHERI}+=	helloworld_static
