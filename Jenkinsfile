@@ -9,6 +9,11 @@ properties([disableConcurrentBuilds(),
             pipelineTriggers([githubPush()])
 ])
 
+if (env.CHANGE_ID && !shouldBuildPullRequest()) {
+	echo "Not building this pull request."
+	return
+}
+
 jobs = [:]
 
 def buildImageAndRunTests(params, String suffix) {
