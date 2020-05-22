@@ -643,7 +643,7 @@ sys_ptrace(struct thread *td, struct ptrace_args *uap)
 	 * structs may be too large to put on the stack anyway.
 	 */
 	union {
-		struct ptrace_io_desc piod;
+z		struct ptrace_io_desc_c piod;
 		struct ptrace_lwpinfo pl;
 		kptrace_vm_entry_t pve;
 #if __has_feature(capabilities)
@@ -663,9 +663,15 @@ sys_ptrace(struct thread *td, struct ptrace_args *uap)
 		syscallarg_t args[nitems(td->td_sa.args)];
 		struct ptrace_sc_ret psr;
 		int ptevents;
-	} r;
-	void * __capability addr;
-	int error = 0;
+	} r = { 0 };
+
+	union {
+		struct ptrace_lwpinfo_c pl;
+	} c = { 0 };
+
+	int error = 0, data;
+	void * __capability addr = &r;
+
 #ifdef COMPAT_FREEBSD32
 	int wrap32 = 0;
 
@@ -675,10 +681,12 @@ sys_ptrace(struct thread *td, struct ptrace_args *uap)
 	AUDIT_ARG_PID(uap->pid);
 	AUDIT_ARG_CMD(uap->req);
 	AUDIT_ARG_VALUE(uap->data);
-	addr = &r;
+
+	(void)c;
+	data = uap->data;
+
 	switch (uap->req) {
 	case PT_GET_EVENT_MASK:
-	case PT_LWPINFO:
 	case PT_GET_SC_ARGS:
 	case PT_GET_SC_RET:
 		break;
@@ -717,30 +725,34 @@ sys_ptrace(struct thread *td, struct ptrace_args *uap)
 			error = copyin(uap->addr, &r.ptevents, uap->data);
 		break;
 	case PT_IO:
-		error = COPYIN(uap->addr, &r.piod, sizeof r.piod);
+		error = copyincap(uap->addr, &r.piod, sizeof r.piod);
 		break;
 	case PT_VM_ENTRY:
 #if __has_feature(capabilities)
-	{
-		struct ptrace_vm_entry pve;
-		error = COPYIN(uap->addr, &pve, sizeof pve);
-		if (error)
-			break;
-
-		r.pve.pve_entry     = pve.pve_entry;
-		r.pve.pve_timestamp = pve.pve_timestamp;
-		r.pve.pve_start     = pve.pve_start;
-		r.pve.pve_end       = pve.pve_end;
-		r.pve.pve_offset    = pve.pve_offset;
-		r.pve.pve_prot      = pve.pve_prot;
-		r.pve.pve_pathlen   = pve.pve_pathlen;
-		r.pve.pve_fileid    = pve.pve_fileid;
-		r.pve.pve_fsid      = pve.pve_fsid;
-		r.pve.pve_path      = (void * __capability)(intcap_t)pve.pve_path;
-	}
+		error = copyincap(uap->addr, (char *)&r.pve, sizeof r.pve);
 #else
 		error = COPYIN(uap->addr, &r.pve, sizeof r.pve);
 #endif
+		break;
+	case PT_LWPINFO:
+		if (uap->data > sizeof(c.pl))
+			error = EINVAL;
+		else
+			data = sizeof(r.pl);
+		break;
+
+	/* Pass along an untagged virtual address for the desired PC. */
+	case PT_CONTINUE:
+	case PT_STEP:
+	case PT_TO_SCE:
+	case PT_TO_SCX:
+	case PT_SYSCALL:
+		addr = cheri_cleartag(uap->addr);
+		break;
+
+	/* Pass along 'addr' unmodified. */
+	case PT_GETLWPLIST:
+		addr = uap->addr;
 		break;
 	default:
 		addr = (__cheri_tocap void * __capability)uap->addr;
@@ -749,7 +761,7 @@ sys_ptrace(struct thread *td, struct ptrace_args *uap)
 	if (error)
 		return (error);
 
-	error = kern_ptrace(td, uap->req, uap->pid, addr, uap->data);
+	error = kern_ptrace(td, uap->req, uap->pid, addr, data);
 	if (error)
 		return (error);
 
@@ -758,7 +770,13 @@ sys_ptrace(struct thread *td, struct ptrace_args *uap)
 		error = COPYOUT(&r.pve, uap->addr, sizeof r.pve);
 		break;
 	case PT_IO:
-		error = COPYOUT(&r.piod, uap->addr, sizeof r.piod);
+		/*
+		 * Only copy out the updated piod_len to avoid the use
+		 * of copyoutcap.
+		 */
+		error = COPYOUT(&r.piod.piod_len,
+		    uap->addr + offsetof(struct ptrace_io_desc_c, piod_len),
+		    sizeof(r.piod.piod_len));
 		break;
 	case PT_GETREGS:
 		error = COPYOUT(&r.reg, uap->addr, sizeof r.reg);
@@ -779,8 +797,19 @@ sys_ptrace(struct thread *td, struct ptrace_args *uap)
 		error = copyout(&r.ptevents, uap->addr, uap->data);
 		break;
 	case PT_LWPINFO:
-		/* NB: The size in uap->data is validated in kern_ptrace(). */
-		error = copyout(&r.pl, uap->addr, uap->data);
+		memset(&c.pl, 0, sizeof(c.pl));
+		c.pl.pl_lwpid = r.pl.pl_lwpid;
+		c.pl.pl_event = r.pl.pl_event;
+		c.pl.pl_flags = r.pl.pl_flags;
+		c.pl.pl_sigmask = r.pl.pl_sigmask;
+		c.pl.pl_siglist = r.pl.pl_siglist;
+		c.pl.pl_child_pid = r.pl.pl_child_pid;
+		c.pl.pl_syscall_code = r.pl.pl_syscall_code;
+		c.pl.pl_syscall_narg = r.pl.pl_syscall_narg;
+		memcpy(c.pl.pl_tdname, r.pl.pl_tdname, sizeof(c.pl.pl_tdname));
+		memcpy(&c.pl.pl_siginfo, &r.pl.pl_siginfo, sizeof(c.pl.pl_siginfo));
+
+		error = copyout(&c.pl, uap->addr, uap->data);
 		break;
 	case PT_GET_SC_ARGS:
 		error = copyout(r.args, uap->addr, MIN(uap->data,
