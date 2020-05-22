@@ -1388,13 +1388,7 @@ ret:
 	return (error);
 }
 
-#if 1
-/* XXX: Temporary hack. */
-#undef suword
-#define	suword __CONCAT(__CONCAT(suword, __ELF_WORD_SIZE), _c)
-#else
 #define	suword __CONCAT(suword, __ELF_WORD_SIZE)
-#endif
 
 #ifdef __ELF_CHERI
 static void * __capability
@@ -1572,7 +1566,7 @@ __elfN(freebsd_fixup)(uintcap_t *stack_base, struct image_params *imgp)
 
 	base = (Elf_Addr * __capability)*stack_base;
 	base--;
-	if (suword_c(base, imgp->args->argc) == -1)
+	if (suword(base, imgp->args->argc) == -1)
 		return (EFAULT);
 	*stack_base = (uintcap_t)base;
 #endif

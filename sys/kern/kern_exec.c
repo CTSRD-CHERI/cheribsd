@@ -1180,7 +1180,7 @@ get_argenv_ptr(void * __capability *arrayp, void * __capability *ptrp)
 	array = *arrayp;
 #ifdef COMPAT_FREEBSD32
 	if (SV_CURPROC_FLAG(SV_ILP32)) {
-		if (fueword32_c(array, &ptr32) == -1)
+		if (fueword32(array, &ptr32) == -1)
 			return (EFAULT);
 		array += sizeof(ptr32);
 		*ptrp = __USER_CAP_STR((void *)(uintptr_t)ptr32);
@@ -1195,7 +1195,7 @@ get_argenv_ptr(void * __capability *arrayp, void * __capability *ptrp)
 	} else
 #endif
 	{
-		if (fueword_c(array, &ptr) == -1)
+		if (fueword(array, &ptr) == -1)
 			return (EFAULT);
 		array += sizeof(ptr);
 		*ptrp = __USER_CAP_STR((void *)(uintptr_t)ptr);
@@ -1786,7 +1786,7 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 #endif
 	if (sucap(&arginfo->ps_argvstr, (intcap_t)imgp->argv) != 0)
 		return (EFAULT);
-	if (suword32_c(&arginfo->ps_nargvstr, argc) != 0)
+	if (suword32(&arginfo->ps_nargvstr, argc) != 0)
 		return (EFAULT);
 
 	/*
@@ -1807,7 +1807,7 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	}
 
 	/* a null vector table pointer separates the argp's from the envp's */
-	if (suword_c(vectp++, 0) != 0)
+	if (suword(vectp++, 0) != 0)
 		return (EFAULT);
 
 #if __has_feature(capabilities)
@@ -1817,7 +1817,7 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 #endif
 	if (sucap(&arginfo->ps_envstr, (intcap_t)imgp->envv) != 0)
 		return (EFAULT);
-	if (suword32_c(&arginfo->ps_nenvstr, envc) != 0)
+	if (suword32(&arginfo->ps_nenvstr, envc) != 0)
 		return (EFAULT);
 
 	/*
@@ -1838,7 +1838,7 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	}
 
 	/* end of vector table is a null pointer */
-	if (suword_c(vectp, 0) != 0)
+	if (suword(vectp, 0) != 0)
 		return (EFAULT);
 
 	if (imgp->auxargs) {

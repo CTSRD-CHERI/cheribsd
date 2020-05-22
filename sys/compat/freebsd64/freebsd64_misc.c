@@ -500,7 +500,7 @@ freebsd64_updateiov(const struct uio *uiop, struct iovec64 * __capability iovp)
 	int i, error;
 
 	for (i = 0; i < uiop->uio_iovcnt; i++) {
-		error = suword_c(&iovp[i].iov_len, uiop->uio_iov[i].iov_len);
+		error = suword(&iovp[i].iov_len, uiop->uio_iov[i].iov_len);
 		if (error != 0)
 			return (error);
 	}

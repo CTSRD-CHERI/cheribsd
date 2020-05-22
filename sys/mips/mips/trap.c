@@ -458,7 +458,7 @@ fetch_instr_near_pc(struct trapframe *frame, register_t offset_from_pc, int32_t 
 #else
 	bad_inst_ptr = __USER_CODE_CAP((uint8_t*)(frame->pc) + offset_from_pc);
 #endif
-	if (fueword32_c(bad_inst_ptr, instr) != 0) {
+	if (fueword32(bad_inst_ptr, instr) != 0) {
 		struct thread *td = curthread;
 		struct proc *p = td->td_proc;
 		log(LOG_ERR, "%s: pid %d tid %ld (%s), uid %d: Could not fetch "
@@ -1069,7 +1069,7 @@ dofault:
 			}
 
 			/* read break instruction */
-			instr = fuword32_c(va);
+			instr = fuword32(va);
 
 			if (instr != MIPS_BREAK_SSTEP) {
 				addr = va;
@@ -1478,7 +1478,7 @@ MipsEmulateBranch(struct trapframe *framePtr, trapf_pc_t _instPC, int fpcCSR,
 		inst = *(InstFmt *) instptr;
 	} else {
 		if (!KERNLAND((__cheri_addr vaddr_t)instPC))
-			inst.word = fuword32_c(instPC);  /* XXXAR: error check? */
+			inst.word = fuword32(instPC);  /* XXXAR: error check? */
 		else
 			memcpy_c(&inst, instPC, sizeof(InstFmt));
 	}
