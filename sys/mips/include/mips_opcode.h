@@ -468,7 +468,6 @@ typedef union {
 #define	COPz_BCL_FALSE		0x00
 
 #ifdef CPU_CHERI
-
 /*
  * Values for the 'fmt' field when 'op' == OP_COP2 (CType)
  */
@@ -477,7 +476,6 @@ typedef union {
 #define OP_CBTS 	0x0a
 #define OP_CBEZ 	0x11
 #define OP_CBNZ 	0x12
-
 
 /*
  * Values for the 'r3' field when 'fmt' == OP_CJ
