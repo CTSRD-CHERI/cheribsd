@@ -3528,7 +3528,11 @@ zfs_receive_one(libzfs_handle_t *hdl, int infd, const char *tosnap,
 		return (recv_skip(hdl, infd, flags->byteswap));
 	}
 
+#ifdef __CHERI_PURE_CAPABILITY__
+	zc.zc_nvlist_dst = prop_errbuf;
+#else
 	zc.zc_nvlist_dst = (uint64_t)(uintptr_t)prop_errbuf;
+#endif
 	zc.zc_nvlist_dst_size = sizeof (prop_errbuf);
 	zc.zc_cleanup_fd = cleanup_fd;
 	zc.zc_action_handle = *action_handlep;

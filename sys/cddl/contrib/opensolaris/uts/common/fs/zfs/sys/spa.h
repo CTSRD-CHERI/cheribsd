@@ -918,7 +918,7 @@ extern void zfs_post_remove(spa_t *spa, vdev_t *vd);
 extern void zfs_post_state_change(spa_t *spa, vdev_t *vd);
 extern void zfs_post_autoreplace(spa_t *spa, vdev_t *vd);
 extern uint64_t spa_get_errlog_size(spa_t *spa);
-extern int spa_get_errlog(spa_t *spa, void *uaddr, size_t *count);
+extern int spa_get_errlog(spa_t *spa, void * __capability uaddr, size_t *count);
 extern void spa_errlog_rotate(spa_t *spa);
 extern void spa_errlog_drain(spa_t *spa);
 extern void spa_errlog_sync(spa_t *spa, uint64_t txg);
