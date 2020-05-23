@@ -36,8 +36,6 @@ __FBSDID("$FreeBSD$");
 
 #include "opt_umtx_profiling.h"
 
-#define	EXPLICIT_USER_ACCESS
-
 #include <sys/param.h>
 #include <sys/kernel.h>
 #include <sys/fcntl.h>

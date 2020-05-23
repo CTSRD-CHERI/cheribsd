@@ -28,9 +28,6 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF 
  * SUCH DAMAGE. 
  */ 
-
-#define	EXPLICIT_USER_ACCESS
-
 #include <sys/cdefs.h>
 #ifdef __FreeBSD__
 __FBSDID("$FreeBSD$");

@@ -52,8 +52,6 @@
  * SUCH DAMAGE.
  */
 
-#define	EXPLICIT_USER_ACCESS
-
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
@@ -3014,7 +3012,7 @@ mfi_stp_cmd(struct mfi_softc *sc, struct mfi_command *cm,caddr_t arg)
 			    ioc->mfi_sgl[i].iov_len;
 		}
 
-		error = copyin_c(ioc->mfi_sgl[i].iov_base,
+		error = copyin(ioc->mfi_sgl[i].iov_base,
 		    sc->kbuff_arr[i],
 		    ioc->mfi_sgl[i].iov_len);
 		if (error != 0) {
@@ -3296,7 +3294,7 @@ mfi_ioctl(struct cdev *dev, u_long cmd, caddr_t arg, int flag, struct thread *td
 						break;
 #endif
 					}
-					error = copyin_c(addr, temp, len);
+					error = copyin(addr, temp, len);
 					if (error != 0) {
 						device_printf(sc->mfi_dev,
 						    "Copy in failed\n");
@@ -3362,7 +3360,7 @@ mfi_ioctl(struct cdev *dev, u_long cmd, caddr_t arg, int flag, struct thread *td
 						addr = __USER_CAP(ioc64->mfi_sgl[i].iov_base, len);
 #endif
 					}
-					error = copyout_c(temp, addr, len);
+					error = copyout(temp, addr, len);
 					if (error != 0) {
 						device_printf(sc->mfi_dev,
 						    "Copy out failed\n");

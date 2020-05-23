@@ -110,8 +110,6 @@ __FBSDID("$FreeBSD$");
 #include "opt_kern_tls.h"
 #include "opt_sctp.h"
 
-#define	EXPLICIT_USER_ACCESS
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/fcntl.h>

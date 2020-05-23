@@ -136,13 +136,9 @@ END(copyio_fault)
 /*
  * Copies from a kernel to user address
  *
- * int copyout_c(const void *kaddr, void * __capability udaddr, size_t len)
+ * int copyout(const void *kaddr, void * __capability udaddr, size_t len)
  */
-#if __has_feature(capabilities)
-ENTRY(copyout_c)
-#else
 ENTRY(copyout)
-#endif
 	beqz	a2, copyout_end	/* If len == 0 then skip loop */
 	add	a3, a1, a2
 	li	a4, VM_MAXUSER_ADDRESS
@@ -159,22 +155,14 @@ ENTRY(copyout)
 copyout_end:
 	li	a0, 0		/* return 0 */
 	ret
-#if __has_feature(capabilities)
-END(copyout_c)
-#else
 END(copyout)
-#endif
 
 /*
  * Copies from a user to kernel address
  *
- * int copyin_c(const void * __capability uaddr, void *kaddr, size_t len)
+ * int copyin(const void * __capability uaddr, void *kaddr, size_t len)
  */
-#if __has_feature(capabilities)
-ENTRY(copyin_c)
-#else
 ENTRY(copyin)
-#endif
 	beqz	a2, copyin_end	/* If len == 0 then skip loop */
 	add	a3, a0, a2
 	li	a4, VM_MAXUSER_ADDRESS
@@ -191,22 +179,15 @@ ENTRY(copyin)
 copyin_end:
 	li	a0, 0		/* return 0 */
 	ret
-#if __has_feature(capabilities)
-END(copyin_c)
-#else
 END(copyin)
-#endif
 
 /*
  * Copies a string from a user to kernel address
  *
- * int copyinstr_c(const void * __capability udaddr, void *kaddr, size_t len, size_t *done)
+ * int copyinstr(const void * __capability udaddr, void *kaddr, size_t len,
+ *	size_t *done)
  */
-#if __has_feature(capabilities)
-ENTRY(copyinstr_c)
-#else
 ENTRY(copyinstr)
-#endif
 	mv	a5, x0		/* count = 0 */
 	beqz	a2, 3f		/* If len == 0 then skip loop */
 
@@ -250,11 +231,7 @@ ENTRY(copyinstr)
 	li	a0, ENAMETOOLONG
 5:
 	ret
-#if __has_feature(capabilities)
-END(copyinstr_c)
-#else
 END(copyinstr)
-#endif
 
 #if __has_feature(capabilities)
 /*
@@ -342,7 +319,7 @@ END(copyoutcap)
 /*
  * Copies from a user to kernel address preserving tags
  *
- * int copyin_c(const void * __capability uaddr, void *kaddr, size_t len)
+ * int copyincap(const void * __capability uaddr, void *kaddr, size_t len)
  */
 ENTRY(copyincap)
 	beqz	a2, copyincap_end	/* If len == 0 then skip loop */

@@ -469,6 +469,21 @@ typedef union {
 
 #ifdef CPU_CHERI
 /*
+ * Values for the 'fmt' field when 'op' == OP_COP2 (CType)
+ */
+#define	OP_CJ		0x00
+#define	OP_CBTU		0x09
+#define	OP_CBTS		0x0a
+#define	OP_CBEZ		0x11
+#define	OP_CBNZ		0x12
+
+/*
+ * Values for the 'r3' field when 'fmt' == OP_CJ
+ */
+#define	OP_CJALR	0x0c
+#define	OP_CJR		0x1f
+
+/*
  * Some CHERI opcodes are known to the disassembler as they are exceptions to
  * the normal (if any) formatting rules.
  */

@@ -1522,7 +1522,7 @@ retry:
 			 */
 			while ((lastvecindex + 1) < vecindex) {
 				++lastvecindex;
-				error = subyte_c(vec + lastvecindex, 0);
+				error = subyte(vec + lastvecindex, 0);
 				if (error) {
 					error = EFAULT;
 					goto done2;
@@ -1532,7 +1532,7 @@ retry:
 			/*
 			 * Pass the page information to the user
 			 */
-			error = subyte_c(vec + vecindex, mincoreinfo);
+			error = subyte(vec + vecindex, mincoreinfo);
 			if (error) {
 				error = EFAULT;
 				goto done2;
@@ -1562,7 +1562,7 @@ retry:
 	vecindex = atop(end - first_addr);
 	while ((lastvecindex + 1) < vecindex) {
 		++lastvecindex;
-		error = subyte_c(vec + lastvecindex, 0);
+		error = subyte(vec + lastvecindex, 0);
 		if (error) {
 			error = EFAULT;
 			goto done2;

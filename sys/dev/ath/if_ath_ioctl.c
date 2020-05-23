@@ -49,8 +49,6 @@ __FBSDID("$FreeBSD$");
 #include "opt_ah.h"
 #include "opt_wlan.h"
 
-#define	EXPLICIT_USER_ACCESS
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/sysctl.h>

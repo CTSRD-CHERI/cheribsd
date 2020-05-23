@@ -27,8 +27,6 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#define	EXPLICIT_USER_ACCESS
-
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
@@ -1578,7 +1576,7 @@ linux_file_ioctl(struct file *fp, u_long cmd, void *data, struct ucred *cred,
 			error = EINVAL;
 			break;
 		}
-		error = copyout_c(p, fiodgname_buf_get_ptr(fgn, cmd), i);
+		error = copyout(p, fiodgname_buf_get_ptr(fgn, cmd), i);
 		break;
 	default:
 		error = linux_file_ioctl_sub(fp, filp, fop, cmd, data, td);

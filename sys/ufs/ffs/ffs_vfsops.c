@@ -31,8 +31,6 @@
  *	@(#)ffs_vfsops.c	8.31 (Berkeley) 5/20/95
  */
 
-#define	EXPLICIT_USER_ACCESS
-
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 

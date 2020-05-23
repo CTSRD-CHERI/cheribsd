@@ -33,8 +33,6 @@
  *
  */
 
-#define	EXPLICIT_USER_ACCESS
-
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
@@ -653,7 +651,7 @@ nfsm_mbufuio(struct nfsrv_descript *nd, struct uio *uiop, int siz)
 				NFSBCOPY(mbufcp,
 				    (__cheri_fromcap char *)uiocp, xfer);
 			else
-				copyout_c(mbufcp, uiocp, xfer);
+				copyout(mbufcp, uiocp, xfer);
 			left -= xfer;
 			len -= xfer;
 			mbufcp += xfer;

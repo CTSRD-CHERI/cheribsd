@@ -26,8 +26,6 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#define	EXPLICIT_USER_ACCESS
-
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
@@ -3627,7 +3625,7 @@ ieee80211_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		break;
 	case CASE_IOC_IFREQ(SIOCG80211STATS):
 		ifr = (struct ifreq *)data;
-		copyout_c(&vap->iv_stats, ifr_data_get_ptr(ifr),
+		copyout(&vap->iv_stats, ifr_data_get_ptr(ifr),
 		    sizeof (vap->iv_stats));
 		break;
 	case CASE_IOC_IFREQ(SIOCSIFMTU):
