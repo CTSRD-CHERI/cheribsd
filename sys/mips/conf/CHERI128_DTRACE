@@ -49,7 +49,6 @@ device       dtrace_sdt
 device       dtrace_prototype
 device       dtrace_fbt
 device       dtrace_profile
-device       dtraceall
 
 
 # Access host files on QEMU
