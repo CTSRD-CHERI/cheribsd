@@ -506,7 +506,7 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 		if (!SV_CURPROC_FLAG(SV_CHERI)) {
 			dtrace_enable_io_64_t *p =
 			    (dtrace_enable_io_64_t *)addr;
-			dof_ptr = __USER_CAP_UNBOUND(p->dof);
+			dof_ptr = __USER_CAP_UNBOUND((void *)p->dof);
 			n_matched = &p->n_matched;
 		} else {
 #endif
