@@ -192,7 +192,8 @@ va:
 
 	/* Ensure sscratch is zero */
 #if __has_feature(capabilities)
-	cspecialw sscratchc, cnull
+	cmove	ct0, cnull
+	cspecialw sscratchc, ct0
 #else
 	li	t0, 0
 	csrw	sscratch, t0
