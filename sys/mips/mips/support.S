@@ -97,13 +97,6 @@
 #include <cheri/cherireg.h>
 #endif
 
-/* Always build normal userspace access functions for non-CHERI */
-#ifndef CPU_CHERI
-#ifndef CHERI_IMPLICIT_USER_DDC
-#define	CHERI_IMPLICIT_USER_DDC
-#endif
-#endif
-
 #include "assym.inc"
 
 	.set	noreorder		# Noreorder is default style!
@@ -114,13 +107,24 @@
 
 	.text
 
+#ifndef CPU_CHERI
 /*
- * int copystr(void *kfaddr, void *kdaddr, size_t maxlen, size_t *lencopied)
- * Copy a NIL-terminated string, at most maxlen characters long.  Return the
- * number of characters copied (including the NIL) in *lencopied.  If the
- * string is too long, return ENAMETOOLONG; else return 0.
+ * Copy a null terminated string from the user address space into
+ * the kernel address space.
+ *
+ *	copyinstr(fromaddr, toaddr, maxlength, &lencopied)
+ *		caddr_t fromaddr;
+ *		caddr_t toaddr;
+ *		u_int maxlength;
+ *		u_int *lencopied;
  */
-LEAF(copystr)
+LEAF(copyinstr)
+	PTR_LA		v0, __copyinstr_err
+	blt		a0, zero, __copyinstr_err  # make sure address is in user space
+	GET_CPU_PCPU(v1)
+	PTR_L		v1, PC_CURPCB(v1)
+	PTR_S		v0, U_PCB_ONFAULT(v1)
+
 	move		t0, a2
 	beq		a2, zero, 4f
 1:
@@ -138,54 +142,27 @@ LEAF(copystr)
 	PTR_SUBU	a2, t0, a2		# if the 4th arg was non-NULL
 	PTR_S		a2, 0(a3)
 3:
-	j		ra			# v0 is 0 or ENAMETOOLONG
+
+	PTR_S		zero, U_PCB_ONFAULT(v1)
+	j		ra
 	nop
-END(copystr)
 
-
-#ifdef CHERI_IMPLICIT_USER_DDC
-/*
- * Copy a null terminated string from the user address space into
- * the kernel address space.
- *
- *	copyinstr(fromaddr, toaddr, maxlength, &lencopied)
- *		caddr_t fromaddr;
- *		caddr_t toaddr;
- *		size_t maxlength;
- *		size_t *lencopied;
- */
-NESTED(copyinstr, CALLFRAME_SIZ, ra)
-	PTR_SUBU	sp, sp, CALLFRAME_SIZ
-	.mask	0x80000000, (CALLFRAME_RA - CALLFRAME_SIZ)
-	PTR_LA	v0, copyerr
-	blt	a0, zero, _C_LABEL(copyerr)  # make sure address is in user space
-	REG_S	ra, CALLFRAME_RA(sp)
-	GET_CPU_PCPU(v1)
-	PTR_L	v1, PC_CURPCB(v1)
-	PTR_LA	t9, _C_LABEL(copystr)
-	jalr	t9
-	PTR_S	v0, U_PCB_ONFAULT(v1)
-	REG_L	ra, CALLFRAME_RA(sp)
-	GET_CPU_PCPU(v1)
-	PTR_L	v1, PC_CURPCB(v1)
-	PTR_S	zero, U_PCB_ONFAULT(v1)
-	j	ra
-	PTR_ADDU	sp, sp, CALLFRAME_SIZ
+__copyinstr_err:
+	j		ra
+	li		v0, EFAULT
 END(copyinstr)
-#endif /* CHERI_IMPLICIT_USER_DDC */
-
+#else
 /*
  * Copy a null terminated string from the kernel address space into
  * the user address space.
  *
- *	copyinstr_c(from, to, maxlength, &lencopied)
+ *	copyinstr(from, to, maxlength, &lencopied)
  *		char * __capability fromaddr;		c3
  *		char *toaddr;				a0
  *		size_t maxlength;			a1
  *		size_t *lencopied;			a2
  */
-#ifdef CPU_CHERI
-NESTED(copyinstr_c, CALLFRAME_SIZ, ra)
+NESTED(copyinstr, CALLFRAME_SIZ, ra)
 	PTR_SUBU	sp, sp, CALLFRAME_SIZ
 	.mask		0x80000000, (CALLFRAME_RA - CALLFRAME_SIZ)
 	PTR_LA		v0, copyerr
@@ -214,10 +191,10 @@ NESTED(copyinstr_c, CALLFRAME_SIZ, ra)
 	PTR_S		zero, U_PCB_ONFAULT(v1)
 	j		ra
 	PTR_ADDU	sp, sp, CALLFRAME_SIZ
-END(copyinstr_c)
+END(copyinstr)
 #endif
 
-#ifdef CHERI_IMPLICIT_USER_DDC
+#ifndef CPU_CHERI
 /*
  * Copy specified amount of data from user space into the kernel
  *	copyin(from, to, len)
@@ -233,7 +210,7 @@ NESTED(copyin, CALLFRAME_SIZ, ra)
 	REG_S	ra, CALLFRAME_RA(sp)
 	GET_CPU_PCPU(v1)
 	PTR_L	v1, PC_CURPCB(v1)
-	PTR_LA	t9, _C_LABEL(bcopy)
+	PTR_LA	t9, _C_LABEL(bcopy_asm_for_copyinout)
 	jalr	t9
 	PTR_S	v0, U_PCB_ONFAULT(v1)
 	REG_L	ra, CALLFRAME_RA(sp)
@@ -244,19 +221,17 @@ NESTED(copyin, CALLFRAME_SIZ, ra)
 	j	ra
 	move	v0, zero
 END(copyin)
-#endif /* CHERI_IMPLICIT_USER_DDC */
-
-#ifdef CPU_CHERI
+#else
 /*
  * Copy specified amount of data from user space into the kernel via
  * capabilities
  * NOTE: Does not copy capabilities
- *	copyin_c(from, to, len)
+ *	copyin(from, to, len)
  *		void * __capability from;	c3 (user source capability)
  *		void * to;			a0 (kernel destination address)
  *		unsigned len;			a1
  */
-NESTED(copyin_c, CALLFRAME_SIZ, ra)
+NESTED(copyin, CALLFRAME_SIZ, ra)
 	PTR_SUBU	sp, sp, CALLFRAME_SIZ
 	.mask	0x80000000, (CALLFRAME_RA - CALLFRAME_SIZ)
 	PTR_LA	v0, copyerr
@@ -279,7 +254,7 @@ NESTED(copyin_c, CALLFRAME_SIZ, ra)
 	PTR_ADDU	sp, sp, CALLFRAME_SIZ
 	j	ra
 	move	v0, zero
-END(copyin_c)
+END(copyin)
 
 /*
  * Copy specified amount of data from user space into the kernel via
@@ -315,7 +290,7 @@ NESTED(copyincap, CALLFRAME_SIZ, ra)
 END(copyincap)
 #endif
 
-#ifdef CHERI_IMPLICIT_USER_DDC
+#ifndef CPU_CHERI
 /*
  * Copy specified amount of data from kernel to the user space
  *	copyout(from, to, len)
@@ -331,7 +306,7 @@ NESTED(copyout, CALLFRAME_SIZ, ra)
 	REG_S	ra, CALLFRAME_RA(sp)
 	GET_CPU_PCPU(v1)
 	PTR_L	v1, PC_CURPCB(v1)
-	PTR_LA	t9, _C_LABEL(bcopy)
+	PTR_LA	t9, _C_LABEL(bcopy_asm_for_copyinout)
 	jalr	t9
 	PTR_S	v0, U_PCB_ONFAULT(v1)
 	REG_L	ra, CALLFRAME_RA(sp)
@@ -342,18 +317,16 @@ NESTED(copyout, CALLFRAME_SIZ, ra)
 	j	ra
 	move	v0, zero
 END(copyout)
-#endif /* CHERI_IMPLICIT_USER_DDC */
-
-#ifdef CPU_CHERI
+#else
 /*
  * Copy specified amount of data from kernel to the user space via capabilities
  * NOTE: does not copy capabilities
- *	copyout_c(from, to, len)
+ *	copyout(from, to, len)
  *		void *from;			a0 (kernel source address)
  *		void * __capability to;		c3 (user destination capability)
  *		unsigned len;			a1
  */
-NESTED(copyout_c, CALLFRAME_SIZ, ra)
+NESTED(copyout, CALLFRAME_SIZ, ra)
 	PTR_SUBU	sp, sp, CALLFRAME_SIZ
 	.mask	0x80000000, (CALLFRAME_RA - CALLFRAME_SIZ)
 	PTR_LA	v0, copyerr
@@ -377,7 +350,7 @@ NESTED(copyout_c, CALLFRAME_SIZ, ra)
 	PTR_ADDU	sp, sp, CALLFRAME_SIZ
 	j	ra
 	move	v0, zero
-END(copyout_c)
+END(copyout)
 
 /*
  * Copy specified amount of data from the kernel to user space via
@@ -421,7 +394,7 @@ LEAF(copyerr)
 	li	v0, EFAULT			# return error
 END(copyerr)
 
-#ifdef CHERI_IMPLICIT_USER_DDC
+#ifndef CPU_CHERI
 /*
  * {fu,su},{byte,sword,word}, fetch or store a byte, short or word to
  * user-space.
@@ -604,20 +577,13 @@ LEAF(subyte)
 	j	ra
 	move	v0, zero
 END(subyte)
-#endif /* CHERI_IMPLICIT_USER_DDC */
-
-LEAF(fswberr)
-	j	ra
-	li	v0, -1
-END(fswberr)
-
-#ifdef CPU_CHERI
+#else
 /*
  * {fue,su},{byte,cap,sword,word}, fetch or store a byte, short or word to
  * user data space.
  */
-LEAF(fueword64_c)
-XLEAF(fueword_c)
+LEAF(fueword64)
+XLEAF(fueword)
 	PTR_LA	v0, fswberr
 	cgetbase	t0, $c3
 	blt	t0, zero, fswberr	# make sure address is in user space
@@ -630,9 +596,9 @@ XLEAF(fueword_c)
 	sd	v0, 0(a0)		# store word
 	j	ra
 	li	v0, 0
-END(fueword64_c)
+END(fueword64)
 
-LEAF(fueword32_c)
+LEAF(fueword32)
 	PTR_LA	v0, fswberr
 	cgetbase	t0, $c3
 	blt	t0, zero, fswberr	# make sure address is in user space
@@ -645,9 +611,9 @@ LEAF(fueword32_c)
 	sw	v0, 0(a0)		# store word
 	j	ra
 	li	v0, 0
-END(fueword32_c)
+END(fueword32)
 
-LEAF(fuesword_c)
+LEAF(fuesword)
 	PTR_LA	v0, fswberr
 	cgetbase	t0, $c3
 	blt	t0, zero, fswberr	# make sure address is in user space
@@ -660,9 +626,9 @@ LEAF(fuesword_c)
 	sh	v0, 0(a0)		# store short
 	j	ra
 	li	v0, 0
-END(fuesword_c)
+END(fuesword)
 
-LEAF(fubyte_c)
+LEAF(fubyte)
 	PTR_LA	v0, fswberr
 	cgetbase	t0, $c3
 	blt	t0, zero, fswberr	# make sure address is in user space
@@ -673,7 +639,7 @@ LEAF(fubyte_c)
 	clbu	v0, zero, 0($c3)	# fetch byte
 	j	ra
 	PTR_S	zero, U_PCB_ONFAULT(v1)
-END(fubyte_c)
+END(fubyte)
 
 LEAF(fuecap)
 	PTR_LA	v0, fswberr
@@ -689,7 +655,7 @@ LEAF(fuecap)
 	li	v0, 0
 END(fuecap)
 
-LEAF(suword32_c)
+LEAF(suword32)
 	PTR_LA	v0, fswberr
 	cgetbase	t0, $c3
 	blt	t0, zero, fswberr	# make sure address is in user space
@@ -701,10 +667,10 @@ LEAF(suword32_c)
 	PTR_S	zero, U_PCB_ONFAULT(v1)
 	j	ra
 	move	v0, zero
-END(suword32_c)
+END(suword32)
 
-LEAF(suword64_c)
-XLEAF(suword_c)
+LEAF(suword64)
+XLEAF(suword)
 	PTR_LA	v0, fswberr
 	cgetbase	t0, $c3
 	blt	t0, zero, fswberr	# make sure address is in user space
@@ -716,7 +682,7 @@ XLEAF(suword_c)
 	PTR_S	zero, U_PCB_ONFAULT(v1)
 	j	ra
 	move	v0, zero
-END(suword64_c)
+END(suword64)
 
 LEAF(sucap)
 	PTR_LA	v0, fswberr
@@ -733,16 +699,16 @@ LEAF(sucap)
 END(sucap)
 
 /*
- * casueword_c(9)
- * <v0>u_long casueword_c(<c3>u_long * __capability p, <a0>u_long oldval,
+ * casueword(9)
+ * <v0>u_long casueword(<c3>u_long * __capability p, <a0>u_long oldval,
  *     <a1>u_long *oldval_p, <a2>u_long newval);
  */
 /*
- * casueword32_c(9)
- * <v0>uint32_t casueword32_c(<c3>uint32_t *p, <a0>uint32_t oldval,
+ * casueword32(9)
+ * <v0>uint32_t casueword32(<c3>uint32_t *p, <a0>uint32_t oldval,
  *     <a1>int32_t *oldval_p, <a2>uint32_t newval);
  */
-LEAF(casueword32_c)
+LEAF(casueword32)
 	PTR_LA	v0, fswberr
 	cgetbase	t0, $c3
 	blt	t0, zero, fswberr	# make sure address is in user space
@@ -765,10 +731,10 @@ LEAF(casueword32_c)
 	PTR_S	zero, U_PCB_ONFAULT(v1)
 	jr	ra
 	sw	t1, 0(a1)	# unconditionally store old word
-END(casueword32_c)
+END(casueword32)
 
-LEAF(casueword64_c)
-XLEAF(casueword_c)
+LEAF(casueword64)
+XLEAF(casueword)
 	PTR_LA	v0, fswberr
 	cgetbase	t0, $c3
 	blt	t0, zero, fswberr	# make sure address is in user space
@@ -791,12 +757,12 @@ XLEAF(casueword_c)
 	PTR_S	zero, U_PCB_ONFAULT(v1)
 	jr	ra
 	sd	t1, 0(a1)	# unconditionally store old word
-END(casueword64_c)
+END(casueword64)
 
 /*
  * Will have to flush the instruction cache if byte merging is done in hardware.
  */
-LEAF(susword_c)
+LEAF(susword)
 	PTR_LA	v0, fswberr
 	cgetbase	t0, $c3
 	blt	t0, zero, fswberr	# make sure address is in user space
@@ -808,9 +774,9 @@ LEAF(susword_c)
 	PTR_S	zero, U_PCB_ONFAULT(v1)
 	j	ra
 	move	v0, zero
-END(susword_c)
+END(susword)
 
-LEAF(subyte_c)
+LEAF(subyte)
 	PTR_LA	v0, fswberr
 	cgetbase	t0, $c3
 	blt	t0, zero, fswberr	# make sure address is in user space
@@ -822,9 +788,13 @@ LEAF(subyte_c)
 	PTR_S	zero, U_PCB_ONFAULT(v1)
 	j	ra
 	move	v0, zero
-END(subyte_c)
+END(subyte)
+#endif /* !CPU_CHERI */
 
-#endif /* CPU_CHERI */
+LEAF(fswberr)
+	j	ra
+	li	v0, -1
+END(fswberr)
 
 /*
  * memset(void *s1, int c, int len)

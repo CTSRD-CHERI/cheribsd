@@ -60,7 +60,7 @@ __FBSDID("$FreeBSD$");
 struct targ_cmd_descr {
 	struct cam_periph_map_info  mapinfo;
 	TAILQ_ENTRY(targ_cmd_descr) tqe;
-	union ccb *user_ccb;
+	union ccb * __capability user_ccb;
 	int	   priority;
 	int	   func_code;
 };
@@ -525,7 +525,7 @@ targdtor(struct cam_periph *periph)
 static int
 targwrite(struct cdev *dev, struct uio *uio, int ioflag)
 {
-	union ccb *user_ccb;
+	union ccb * __capability user_ccb;
 	struct targ_softc *softc;
 	struct targ_cmd_descr *descr;
 	int write_len, error;
@@ -538,7 +538,7 @@ targwrite(struct cdev *dev, struct uio *uio, int ioflag)
 	while (uio->uio_resid >= sizeof(user_ccb) && error == 0) {
 		union ccb *ccb;
 
-		error = uiomove((caddr_t)&user_ccb, sizeof(user_ccb), uio);
+		error = uiomove_cap((caddr_t)&user_ccb, sizeof(user_ccb), uio);
 		if (error != 0) {
 			CAM_DEBUG(softc->path, CAM_DEBUG_PERIPH,
 				  ("write - uiomove failed (%d)\n", error));
@@ -560,7 +560,7 @@ targwrite(struct cdev *dev, struct uio *uio, int ioflag)
 			descr->user_ccb = user_ccb;
 			descr->func_code = func_code;
 			CAM_DEBUG(softc->path, CAM_DEBUG_PERIPH,
-				  ("Sent ATIO/INOT (%p)\n", user_ccb));
+			    ("Sent ATIO/INOT (%p)\n", (__cheri_fromcap void *)user_ccb));
 			xpt_action(ccb);
 			TAILQ_INSERT_TAIL(&softc->pending_ccb_queue,
 					  &ccb->ccb_h,
@@ -572,7 +572,7 @@ targwrite(struct cdev *dev, struct uio *uio, int ioflag)
 			if ((func_code & XPT_FC_QUEUED) != 0) {
 				CAM_DEBUG(softc->path, CAM_DEBUG_PERIPH,
 					  ("Sending queued ccb %#x (%p)\n",
-					  func_code, user_ccb));
+					  func_code, (__cheri_fromcap void *)user_ccb));
 				descr = targgetdescr(softc);
 				descr->user_ccb = user_ccb;
 				descr->priority = priority;
@@ -583,7 +583,7 @@ targwrite(struct cdev *dev, struct uio *uio, int ioflag)
 			} else {
 				CAM_DEBUG(softc->path, CAM_DEBUG_PERIPH,
 					  ("Sending inline ccb %#x (%p)\n",
-					  func_code, user_ccb));
+					  func_code, (__cheri_fromcap void *)user_ccb));
 				ccb = targgetccb(softc, func_code, priority);
 				descr = (struct targ_cmd_descr *)
 					 ccb->ccb_h.targ_descr;
@@ -655,7 +655,7 @@ static int
 targusermerge(struct targ_softc *softc, struct targ_cmd_descr *descr,
 	      union ccb *ccb)
 {
-	struct ccb_hdr *u_ccbh, *k_ccbh;
+	struct ccb_hdr * __capability u_ccbh, *k_ccbh;
 	size_t ccb_len;
 	int error;
 
@@ -689,7 +689,8 @@ targusermerge(struct targ_softc *softc, struct targ_cmd_descr *descr,
 			struct targ_cmd_descr *ab_descr;
 
 			ab_descr = (struct targ_cmd_descr *)ccb_h->targ_descr;
-			if (ab_descr->user_ccb == cab->abort_ccb) {
+			if ((__cheri_fromcap union ccb *)ab_descr->user_ccb ==
+			    cab->abort_ccb) {
 				CAM_DEBUG(softc->path, CAM_DEBUG_PERIPH,
 					  ("Changing abort for %p to %p\n",
 					  cab->abort_ccb, ccb_h));
@@ -809,7 +810,7 @@ targread(struct cdev *dev, struct uio *uio, int ioflag)
 	struct targ_softc	*softc;
 	struct ccb_queue  *user_queue;
 	struct ccb_hdr	  *ccb_h;
-	union  ccb	  *user_ccb;
+	union  ccb	  * __capability user_ccb;
 	int		   read_len, error;
 
 	error = 0;
@@ -852,12 +853,12 @@ targread(struct cdev *dev, struct uio *uio, int ioflag)
 		descr = (struct targ_cmd_descr *)ccb_h->targ_descr;
 		user_ccb = descr->user_ccb;
 		CAM_DEBUG(softc->path, CAM_DEBUG_PERIPH,
-			  ("targread ccb %p (%p)\n", ccb_h, user_ccb));
+			  ("targread ccb %p (%p)\n", ccb_h, (__cheri_fromcap void *)user_ccb));
 		error = targreturnccb(softc, (union ccb *)ccb_h);
 		if (error != 0)
 			goto read_fail;
 		cam_periph_unlock(softc->periph);
-		error = uiomove((caddr_t)&user_ccb, sizeof(user_ccb), uio);
+		error = uiomove_cap((caddr_t)&user_ccb, sizeof(user_ccb), uio);
 		cam_periph_lock(softc->periph);
 		if (error != 0)
 			goto read_fail;
@@ -874,10 +875,10 @@ targread(struct cdev *dev, struct uio *uio, int ioflag)
 		user_ccb = user_descr->user_ccb;
 		CAM_DEBUG(softc->path, CAM_DEBUG_PERIPH,
 			  ("targread aborted descr %p (%p)\n",
-			  user_descr, user_ccb));
+			  user_descr, (__cheri_fromcap void *)user_ccb));
 		suword(&user_ccb->ccb_h.status, CAM_REQ_ABORTED);
 		cam_periph_unlock(softc->periph);
-		error = uiomove((caddr_t)&user_ccb, sizeof(user_ccb), uio);
+		error = uiomove_cap((caddr_t)&user_ccb, sizeof(user_ccb), uio);
 		cam_periph_lock(softc->periph);
 		if (error != 0)
 			goto read_fail;
@@ -904,7 +905,7 @@ static int
 targreturnccb(struct targ_softc *softc, union ccb *ccb)
 {
 	struct targ_cmd_descr *descr;
-	struct ccb_hdr *u_ccbh;
+	struct ccb_hdr * __capability u_ccbh;
 	size_t ccb_len;
 	int error;
 

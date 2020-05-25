@@ -74,7 +74,7 @@ static struct cdevsw openfirm_cdevsw = {
 static phandle_t lastnode;	/* speed hack */
 
 static int openfirm_checkid(phandle_t, phandle_t);
-static int openfirm_getstr(int, const char *, char **);
+static int openfirm_getstr(int, const char * __capability, char **);
 
 /*
  * Verify target ID is valid (exists in the OPENPROM tree), as
@@ -92,7 +92,7 @@ openfirm_checkid(phandle_t sid, phandle_t tid)
 }
 
 static int
-openfirm_getstr(int len, const char *user, char **cpp)
+openfirm_getstr(int len, const char * __capability user, char **cpp)
 {
 	int error;
 	char *cp;

@@ -107,4 +107,18 @@ extern void *__tls_get_addr(tls_index* ti);
 
 #define	md_abi_variant_hook(x)
 
+#define rtld_validate_target_eflags(path, hdr, main_path)	\
+	_rtld_validate_target_eflags(path, hdr, main_path)
+static inline bool
+_rtld_validate_target_eflags(const char *path, Elf_Ehdr *hdr, const char *main_path)
+{
+	if (hdr->e_flags & EF_RISCV_CHERIABI) {
+		_rtld_error("%s: cannot load %s since it is CheriABI",
+		    main_path, path);
+		return (false);
+	}
+
+	return (true);
+}
+
 #endif

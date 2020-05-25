@@ -4165,7 +4165,7 @@ copyinptr(softc, src, dst, size)
 	void *src, *dst;
 	size_t size;
 {
-	caddr_t ca;
+	char * __capability ca;
 	int error;
 
 # if SOLARIS
@@ -4201,7 +4201,7 @@ copyoutptr(softc, src, dst, size)
 	void *src, *dst;
 	size_t size;
 {
-	caddr_t ca;
+	char * __capability ca;
 	int error;
 
 	bcopy(dst, (caddr_t)&ca, sizeof(ca));
@@ -4781,7 +4781,16 @@ frrequest(softc, unit, req, data, set, makecopy)
 				bcopy(uptr, ptr, fp->fr_dsize);
 				error = 0;
 			} else {
+				/*
+				 * XXXCHERI: This is a band-aid to
+				 * make hybrid compile with minimal
+				 * changes.
+				 */
+#ifndef __CHERI_PURE_CAPABILITY__
+				error = COPYIN(__USER_CAP(uptr, fp->fr_dsize), ptr, fp->fr_dsize);
+#else
 				error = COPYIN(uptr, ptr, fp->fr_dsize);
+#endif
 				if (error != 0) {
 					IPFERROR(17);
 					error = EFAULT;
@@ -5021,8 +5030,13 @@ frrequest(softc, unit, req, data, set, makecopy)
 
 			if (error == 0) {
 				if ((f->fr_dsize != 0) && (uptr != NULL)) {
+#ifndef __CHERI_PURE_CAPABILITY__
+					error = COPYOUT(f->fr_data, __USER_CAP(uptr, f->fr_dsize),
+							f->fr_dsize);
+#else
 					error = COPYOUT(f->fr_data, uptr,
 							f->fr_dsize);
+#endif
 					if (error == 0) {
 						f->fr_hits = 0;
 						f->fr_bytes = 0;
@@ -5451,7 +5465,7 @@ ipf_resolvefunc(softc, data)
 				    sizeof(res.ipfu_name)) == 0) {
 				res.ipfu_addr = ft->ipfu_addr;
 				res.ipfu_init = ft->ipfu_init;
-				if (COPYOUT(&res, data, sizeof(res)) != 0) {
+				if (BCOPYOUT(&res, data, sizeof(res)) != 0) {
 					IPFERROR(35);
 					return EFAULT;
 				}
@@ -5464,7 +5478,7 @@ ipf_resolvefunc(softc, data)
 				(void) strncpy(res.ipfu_name, ft->ipfu_name,
 					       sizeof(res.ipfu_name));
 				res.ipfu_init = ft->ipfu_init;
-				if (COPYOUT(&res, data, sizeof(res)) != 0) {
+				if (BCOPYOUT(&res, data, sizeof(res)) != 0) {
 					IPFERROR(36);
 					return EFAULT;
 				}
@@ -7918,7 +7932,7 @@ ipf_getnextrule(softc, t, ptr)
 	frgroup_t *fg;
 	ipfobj_t obj;
 	int predict;
-	char *dst;
+	char * __capability dst;
 	int unit;
 
 	if (t == NULL || ptr == NULL) {
@@ -7995,7 +8009,7 @@ ipf_getnextrule(softc, t, ptr)
 		(void) ipf_derefrule(softc, &fr);
 
 	obj.ipfo_type = IPFOBJ_FRENTRY;
-	dst = (char *)it.iri_rule;
+	dst = (char * __capability)it.iri_rule;
 
 	if (next != NULL) {
 		obj.ipfo_size = next->fr_size;
@@ -8009,7 +8023,6 @@ ipf_getnextrule(softc, t, ptr)
 		next = &zero;
 		t->ipt_data = NULL;
 	}
-	it.iri_rule = predict ? next : NULL;
 	if (predict == 0)
 		ipf_token_mark_complete(t);
 

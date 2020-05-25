@@ -78,7 +78,7 @@ struct usb_read_dir {
 #ifdef COMPAT_32BIT
 	uint64_t urd_data;
 #else
-	void   *urd_data;
+	void   * __kerncap urd_data;
 #endif
 	uint32_t urd_startentry;
 	uint32_t urd_maxlen;
@@ -88,7 +88,7 @@ struct usb_ctl_request {
 #ifdef COMPAT_32BIT
 	uint64_t ucr_data;
 #else
-	void   *ucr_data;
+	void   * __kerncap ucr_data;
 #endif
 	uint16_t ucr_flags;
 	uint16_t ucr_actlen;		/* actual length transferred */
@@ -105,7 +105,7 @@ struct usb_gen_descriptor {
 #ifdef COMPAT_32BIT
 	uint64_t ugd_data;
 #else
-	void   *ugd_data;
+	void   * __kerncap ugd_data;
 #endif
 	uint16_t ugd_lang_id;
 	uint16_t ugd_maxlen;
@@ -185,8 +185,8 @@ struct usb_fs_endpoint {
 	uint64_t ppBuffer;
 	uint64_t pLength;
 #else
-	void  **ppBuffer;		/* pointer to userland buffers */
-	uint32_t *pLength;		/* pointer to frame lengths, updated
+	void  * __kerncap * __kerncap ppBuffer;	/* pointer to userland buffers */
+	uint32_t  * __kerncap pLength;	/* pointer to frame lengths, updated
 					 * to actual length */
 #endif
 	uint32_t nFrames;		/* number of frames */
@@ -213,7 +213,7 @@ struct usb_fs_init {
 #ifdef COMPAT_32BIT
 	uint64_t pEndpoints;
 #else
-	struct usb_fs_endpoint *pEndpoints;
+	struct usb_fs_endpoint * __kerncap pEndpoints;
 #endif
 	/* maximum number of endpoints */
 	uint8_t	ep_index_max;

@@ -443,7 +443,7 @@ uhid_stop_write(struct usb_fifo *fifo)
 
 static int
 uhid_get_report(struct uhid_softc *sc, uint8_t type,
-    uint8_t id, void *kern_data, void *user_data,
+    uint8_t id, void *kern_data, void * __capability user_data,
     uint16_t len)
 {
 	int err;
@@ -479,7 +479,7 @@ done:
 
 static int
 uhid_set_report(struct uhid_softc *sc, uint8_t type,
-    uint8_t id, void *kern_data, void *user_data,
+    uint8_t id, void *kern_data, void * __capability user_data,
     uint16_t len)
 {
 	int err;

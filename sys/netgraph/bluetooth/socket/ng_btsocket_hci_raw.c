@@ -1202,7 +1202,7 @@ ng_btsocket_hci_raw_control(struct socket *so, u_long cmd, caddr_t data,
 			p->num_entries = min(p->num_entries, p1->num_entries);
 			if (p->num_entries > 0)
 				error = copyout((caddr_t) p2, 
-						(caddr_t) p->entries,
+						p->entries,
 						p->num_entries * sizeof(*p2));
 		} else
 			error = EINVAL;
@@ -1266,7 +1266,7 @@ ng_btsocket_hci_raw_control(struct socket *so, u_long cmd, caddr_t data,
 						p1->num_connections);
 			if (p->num_connections > 0)
 				error = copyout((caddr_t) p2, 
-					(caddr_t) p->connections,
+					p->connections,
 					p->num_connections * sizeof(*p2));
 		} else
 			error = EINVAL;
@@ -1346,7 +1346,7 @@ ng_btsocket_hci_raw_control(struct socket *so, u_long cmd, caddr_t data,
 	case SIOC_HCI_RAW_NODE_LIST_NAMES: {
 		struct ng_btsocket_hci_raw_node_list_names	*nl =
 			(struct ng_btsocket_hci_raw_node_list_names *) data;
-		struct nodeinfo					*ni = nl->names;
+		struct nodeinfo	* __capability			 ni = nl->names;
 
 		if (nl->num_names == 0) {
 			mtx_unlock(&pcb->pcb_mtx);
@@ -1393,7 +1393,7 @@ ng_btsocket_hci_raw_control(struct socket *so, u_long cmd, caddr_t data,
 			while (nl->num_names > 0 && nl1->numnames > 0) {
 				if (strcmp(ni1->type, NG_HCI_NODE_TYPE) == 0) {
 					error = copyout((caddr_t) ni1,
-							(caddr_t) ni,
+							ni,
 							sizeof(*ni));
 					if (error != 0)
 						break;

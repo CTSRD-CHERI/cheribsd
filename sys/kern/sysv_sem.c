@@ -49,8 +49,6 @@ __FBSDID("$FreeBSD$");
 
 #include "opt_sysvipc.h"
 
-#define	EXPLICIT_USER_ACCESS
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/sysproto.h>

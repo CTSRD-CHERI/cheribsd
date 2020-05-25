@@ -564,32 +564,33 @@ amr_linux_ioctl_int(struct cdev *dev, u_long cmd, caddr_t addr, int32_t flag,
     struct amr_command		*ac;
     struct amr_mailbox		*mb;
     struct amr_linux_ioctl	ali;
-    void			*dp, *temp;
+    void			*dp, * __capability temp;
     int				error;
     int				len, ac_flags = 0;
     int				logical_drives_changed = 0;
     u_int32_t			linux_version = 0x02100000;
     u_int8_t			status;
-    struct amr_passthrough	*ap;	/* 60 bytes */
+    struct amr_passthrough	*ap, * __capability uap;	/* 60 bytes */
 
     error = 0;
     dp = NULL;
     ac = NULL;
     ap = NULL;
 
-    if ((error = copyin(addr, &ali, sizeof(ali))) != 0)
+    if ((error = copyin(__USER_CAP(addr, sizeof(ali)), &ali, sizeof(ali))) != 0)
 	return (error);
     switch (ali.ui.fcs.opcode) {
     case 0x82:
 	switch(ali.ui.fcs.subopcode) {
 	case 'e':
-	    copyout(&linux_version, (void *)(uintptr_t)ali.data,
+	    copyout(&linux_version, __USER_CAP(ali.data, sizeof(linux_version)),
 		sizeof(linux_version));
 	    error = 0;
 	    break;
 
 	case 'm':
-	    copyout(&linux_no_adapter, (void *)(uintptr_t)ali.data,
+	    copyout(&linux_no_adapter, __USER_CAP(ali.data,
+		sizeof(linux_no_adapter)),
 		sizeof(linux_no_adapter));
 	    td->td_retval[0] = linux_no_adapter;
 	    error = 0;
@@ -627,7 +628,8 @@ amr_linux_ioctl_int(struct cdev *dev, u_long cmd, caddr_t addr, int32_t flag,
 	    mtx_unlock(&sc->amr_list_lock);
 	    ap = &ac->ac_ccb->ccb_pthru;
 
-	    error = copyin((void *)(uintptr_t)mb->mb_physaddr, ap,
+	    uap = __USER_CAP(mb->mb_physaddr, sizeof(struct amr_passthrough));
+	    error = copyin(uap, ap,
 		sizeof(struct amr_passthrough));
 	    if (error)
 		break;
@@ -637,7 +639,8 @@ amr_linux_ioctl_int(struct cdev *dev, u_long cmd, caddr_t addr, int32_t flag,
 		    M_WAITOK | M_ZERO);
 
 	    if (ali.inlen) {
-		error = copyin((void *)(uintptr_t)ap->ap_data_transfer_address,
+		error = copyin(__USER_CAP(ap->ap_data_transfer_address,
+		    ap->ap_data_transfer_length),
 		    dp, ap->ap_data_transfer_length);
 		if (error)
 		    break;
@@ -650,7 +653,8 @@ amr_linux_ioctl_int(struct cdev *dev, u_long cmd, caddr_t addr, int32_t flag,
 
 	    ac->ac_data = dp;
 	    ac->ac_length = ap->ap_data_transfer_length;
-	    temp = (void *)(uintptr_t)ap->ap_data_transfer_address;
+	    temp = __USER_CAP(ap->ap_data_transfer_address,
+		ap->ap_data_transfer_length);
 
 	    mtx_lock(&sc->amr_list_lock);
 	    error = amr_wait_command(ac);
@@ -659,7 +663,7 @@ amr_linux_ioctl_int(struct cdev *dev, u_long cmd, caddr_t addr, int32_t flag,
 		break;
 
 	    status = ac->ac_status;
-	    error = copyout(&status, &((struct amr_passthrough *)(uintptr_t)mb->mb_physaddr)->ap_scsi_status, sizeof(status));
+	    error = copyout(&status, &uap->ap_scsi_status, sizeof(status));
 	    if (error)
 		break;
 
@@ -668,7 +672,8 @@ amr_linux_ioctl_int(struct cdev *dev, u_long cmd, caddr_t addr, int32_t flag,
 	        if (error)
 		    break;
 	    }
-	    error = copyout(ap->ap_request_sense_area, ((struct amr_passthrough *)(uintptr_t)mb->mb_physaddr)->ap_request_sense_area, ap->ap_request_sense_length);
+	    error = copyout(ap->ap_request_sense_area,
+		uap->ap_request_sense_area, ap->ap_request_sense_length);
 	    if (error)
 		break;
 
@@ -688,7 +693,7 @@ amr_linux_ioctl_int(struct cdev *dev, u_long cmd, caddr_t addr, int32_t flag,
 	    dp = malloc(len, M_AMR, M_WAITOK | M_ZERO);
 
 	    if (ali.inlen) {
-		error = copyin((void *)(uintptr_t)mb->mb_physaddr, dp, len);
+		error = copyin(__USER_CAP(mb->mb_physaddr, len), dp, len);
 		if (error)
 		    break;
 	    }
@@ -711,9 +716,9 @@ amr_linux_ioctl_int(struct cdev *dev, u_long cmd, caddr_t addr, int32_t flag,
 		break;
 
 	    status = ac->ac_status;
-	    error = copyout(&status, &((struct amr_mailbox *)&((struct amr_linux_ioctl *)addr)->mbox[0])->mb_status, sizeof(status));
+	    error = copyout(&status, __USER_CAP(&((struct amr_mailbox *)&((struct amr_linux_ioctl *)addr)->mbox[0])->mb_status, sizeof(status)), sizeof(status));
 	    if (ali.outlen) {
-		error = copyout(dp, (void *)(uintptr_t)mb->mb_physaddr, ali.outlen);
+		error = copyout(dp, __USER_CAP(mb->mb_physaddr, len), ali.outlen);
 		if (error)
 		    break;
 	    }
@@ -759,7 +764,7 @@ amr_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int32_t flag, struct threa
     } arg;
     struct amr_command		*ac;
     struct amr_mailbox_ioctl	*mbi;
-    void			*dp, *au_buffer;
+    void			*dp, * __capability au_buffer;
     unsigned long		au_length, real_length;
     unsigned char		*au_cmd;
     int				*au_statusp;
@@ -792,7 +797,7 @@ amr_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int32_t flag, struct threa
     case AMR_IO_COMMAND32:
 	debug(1, "AMR_IO_COMMAND32 0x%x", arg.au32->au_cmd[0]);
 	au_cmd = arg.au32->au_cmd;
-	au_buffer = (void *)(u_int64_t)arg.au32->au_buffer;
+	au_buffer = __USER_CAP(arg.au32->au_buffer, arg.au32->au_length);
 	au_length = arg.au32->au_length;
 	au_statusp = &arg.au32->au_status;
 	break;
@@ -801,7 +806,7 @@ amr_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int32_t flag, struct threa
     case AMR_IO_COMMAND:
 	debug(1, "AMR_IO_COMMAND  0x%x", arg.au->au_cmd[0]);
 	au_cmd = arg.au->au_cmd;
-	au_buffer = (void *)arg.au->au_buffer;
+	au_buffer = arg.au->au_buffer;
 	au_length = arg.au->au_length;
 	au_statusp = &arg.au->au_status;
 	break;
@@ -817,7 +822,7 @@ amr_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int32_t flag, struct threa
 	    if (devclass == NULL)
 		return (ENOENT);
 
-	    error = copyin(addr, &ali, sizeof(ali));
+	    error = copyin(__USER_CAP(addr, sizeof(ali)), &ali, sizeof(ali));
 	    if (error)
 		return (error);
 	    if (ali.ui.fcs.opcode == 0x82)

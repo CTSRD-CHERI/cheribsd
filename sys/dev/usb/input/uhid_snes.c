@@ -161,7 +161,7 @@ static const struct usb_config uhid_snes_config[UHID_SNES_N_TRANSFER] = {
 
 static int
 uhid_get_report(struct uhid_snes_softc *sc, uint8_t type,
-    uint8_t id, void *kern_data, void *user_data, uint16_t len)
+    uint8_t id, void *kern_data, void * __capability user_data, uint16_t len)
 {
 	int err;
 	uint8_t free_data = 0;
@@ -196,7 +196,7 @@ done:
 
 static int
 uhid_set_report(struct uhid_snes_softc *sc, uint8_t type,
-    uint8_t id, void *kern_data, void *user_data, uint16_t len)
+    uint8_t id, void *kern_data, void * __capability user_data, uint16_t len)
 {
 	int err;
 	uint8_t free_data = 0;

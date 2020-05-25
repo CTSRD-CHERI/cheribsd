@@ -364,10 +364,10 @@ enc_ioctl(struct cdev *dev, u_long cmd, caddr_t arg_addr, int flag,
 	encioc_elm_status_t elms;
 	encioc_elm_desc_t elmd;
 	encioc_elm_devnames_t elmdn;
-	encioc_element_t *uelm;
+	encioc_element_t * __capability uelm;
 	enc_softc_t *enc;
 	enc_cache_t *cache;
-	void *addr;
+	void * __capability addr;
 	int error, i;
 
 #ifdef	COMPAT_FREEBSD32
@@ -380,7 +380,7 @@ enc_ioctl(struct cdev *dev, u_long cmd, caddr_t arg_addr, int flag,
 #endif
 
 	if (arg_addr)
-		addr = *((caddr_t *) arg_addr);
+		addr = *((void * __capability *) arg_addr);
 	else
 		addr = NULL;
 
@@ -487,7 +487,7 @@ enc_ioctl(struct cdev *dev, u_long cmd, caddr_t arg_addr, int flag,
 			error = EINVAL;
 			break;
 		}
-		error = copyin(addr, &sstr, sizeof(sstr));
+		error = copyincap(addr, &sstr, sizeof(sstr));
 		if (error)
 			break;
 		cam_periph_lock(periph);
@@ -495,7 +495,7 @@ enc_ioctl(struct cdev *dev, u_long cmd, caddr_t arg_addr, int flag,
 		cam_periph_unlock(periph);
 		if (error == 0 || error == ENOMEM)
 			(void)copyout(&sstr.bufsiz,
-			    &((encioc_string_t *)addr)->bufsiz,
+			    &((encioc_string_t * __capability)addr)->bufsiz,
 			    sizeof(sstr.bufsiz));
 		break;
 
@@ -516,7 +516,7 @@ enc_ioctl(struct cdev *dev, u_long cmd, caddr_t arg_addr, int flag,
 		break;
 
 	case ENCIOC_GETELMDESC:
-		error = copyin(addr, &elmd, sizeof(elmd));
+		error = copyincap(addr, &elmd, sizeof(elmd));
 		if (error)
 			break;
 		if (elmd.elm_idx >= cache->nelms) {
@@ -529,7 +529,7 @@ enc_ioctl(struct cdev *dev, u_long cmd, caddr_t arg_addr, int flag,
 				break;
 		} else
 			elmd.elm_desc_len = 0;
-		error = copyout(&elmd, addr, sizeof(elmd));
+		error = copyoutcap(&elmd, addr, sizeof(elmd));
 		break;
 
 	case ENCIOC_GETELMDEVNAMES:
@@ -537,7 +537,7 @@ enc_ioctl(struct cdev *dev, u_long cmd, caddr_t arg_addr, int flag,
 			error = EINVAL;
 			break;
 		}
-		error = copyin(addr, &elmdn, sizeof(elmdn));
+		error = copyincap(addr, &elmdn, sizeof(elmdn));
 		if (error)
 			break;
 		if (elmdn.elm_idx >= cache->nelms) {
@@ -549,7 +549,7 @@ enc_ioctl(struct cdev *dev, u_long cmd, caddr_t arg_addr, int flag,
 		cam_periph_unlock(periph);
 		if (error)
 			break;
-		error = copyout(&elmdn, addr, sizeof(elmdn));
+		error = copyoutcap(&elmdn, addr, sizeof(elmdn));
 		break;
 
 	case ENCIOC_SETELMSTAT:

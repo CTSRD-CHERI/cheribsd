@@ -35,6 +35,7 @@
 #ifndef RNF_NORMAL
 #include <net/radix.h>
 #endif
+#include <netinet/in.h>		/* struct sockaddr_in */
 #include <sys/counter.h>
 
 struct nh_control;
@@ -49,7 +50,6 @@ struct rib_head {
 	rn_lookup_f_t		*rnh_lookup;	/* exact match for sockaddr */
 	rn_walktree_t		*rnh_walktree;	/* traverse tree */
 	rn_walktree_from_t	*rnh_walktree_from; /* traverse tree below a */
-	rn_close_t		*rnh_close;	/*do something when the last ref drops*/
 	rnh_preadd_entry_f_t	*rnh_preadd;	/* hook to alter record prior to insertion */
 	rt_gen_t		rnh_gen;	/* generation counter */
 	int			rnh_multipath;	/* multipath capable ? */
@@ -120,14 +120,32 @@ struct rtentry {
 #define	rt_mask(r)	(*((struct sockaddr **)(&(r)->rt_nodes->rn_mask)))
 #define	rt_key_const(r)		(*((const struct sockaddr * const *)(&(r)->rt_nodes->rn_key)))
 #define	rt_mask_const(r)	(*((const struct sockaddr * const *)(&(r)->rt_nodes->rn_mask)))
+
+	/*
+	 * 2 radix_node structurs above consists of 2x6 pointers, leaving
+	 * 4 pointers (32 bytes) of the second cache line on amd64.
+	 *
+	 */
 	struct nhop_object	*rt_nhop;	/* nexthop data */
+	union {
+		/*
+		 * Destination address storage.
+		 * sizeof(struct sockaddr_in6) == 28, however
+		 * the dataplane-relevant part (e.g. address) lies
+		 * at offset 8..24, making the address not crossing
+		 * cacheline boundary.
+		 */
+		struct sockaddr_in	rt_dst4;
+		struct sockaddr_in6	rt_dst6;
+		struct sockaddr		rt_dst;
+		char			rt_dstb[28];
+	};
+
 	int		rt_flags;	/* up/down?, host/net */
 	int		rt_refcnt;	/* # held references */
-	u_int		rt_fibnum;	/* which FIB */
 	u_long		rt_weight;	/* absolute weight */ 
 	u_long		rt_expire;	/* lifetime for route, e.g. redirect */
-#define	rt_endzero	rt_pksent
-	counter_u64_t	rt_pksent;	/* packets sent using this route */
+#define	rt_endzero	rt_mtx
 	struct mtx	rt_mtx;		/* mutex for routing entry */
 	struct rtentry	*rt_chain;	/* pointer to next rtentry to delete */
 };

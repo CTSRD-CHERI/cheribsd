@@ -32,8 +32,6 @@
  * SUCH DAMAGE.
  */
 
-#define	EXPLICIT_USER_ACCESS 1
-
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
@@ -214,7 +212,7 @@ freebsd64_copyout_control(struct msghdr *msg, struct mbuf *control)
 			}
 			oldclen = cm->cmsg_len;
 			cm->cmsg_len = FREEBSD64_CMSG_LEN(datalen);
-			error = copyout_c(cm, ctlbuf, copylen);
+			error = copyout(cm, ctlbuf, copylen);
 			cm->cmsg_len = oldclen;
 			if (error != 0)
 				goto exit;
@@ -230,7 +228,7 @@ freebsd64_copyout_control(struct msghdr *msg, struct mbuf *control)
 			}
 
 			/* Copy out the message data. */
-			error = copyout_c(data, ctlbuf, copylen);
+			error = copyout(data, ctlbuf, copylen);
 			if (error)
 				goto exit;
 

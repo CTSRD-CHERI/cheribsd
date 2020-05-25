@@ -226,7 +226,7 @@ ieee80211_ioctl_getstastats(struct ieee80211vap *vap, struct ieee80211req *ireq)
 	if (ireq->i_len > sizeof(struct ieee80211req_sta_stats))
 		ireq->i_len = sizeof(struct ieee80211req_sta_stats);
 	/* NB: copy out only the statistics */
-	error = copyout(&ni->ni_stats, (uint8_t *) ireq->i_data + off,
+	error = copyout(&ni->ni_stats, (uint8_t * __capability)ireq->i_data + off,
 			ireq->i_len - off);
 	ieee80211_free_node(ni);
 	return error;
@@ -492,7 +492,8 @@ getstainfo_common(struct ieee80211vap *vap, struct ieee80211req *ireq,
 		} else
 			get_sta_info(&req, ni);
 		ireq->i_len = space - req.space;
-		error = copyout(p, (uint8_t *) ireq->i_data+off, ireq->i_len);
+		error = copyout(p, (uint8_t * __capability)ireq->i_data + off,
+		    ireq->i_len);
 		IEEE80211_FREE(p, M_TEMP);
 	} else
 		ireq->i_len = 0;
@@ -3624,7 +3625,7 @@ ieee80211_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		break;
 	case CASE_IOC_IFREQ(SIOCG80211STATS):
 		ifr = (struct ifreq *)data;
-		copyout_c(&vap->iv_stats, ifr_data_get_ptr(ifr),
+		copyout(&vap->iv_stats, ifr_data_get_ptr(ifr),
 		    sizeof (vap->iv_stats));
 		break;
 	case CASE_IOC_IFREQ(SIOCSIFMTU):

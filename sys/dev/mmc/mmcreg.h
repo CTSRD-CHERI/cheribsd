@@ -105,7 +105,12 @@ struct mmc_command {
 #define	MMC_ERR_INVALID	5
 #define	MMC_ERR_NO_MEMORY 6
 #define	MMC_ERR_MAX	6
-	struct mmc_data	*data;		/* Data segment with cmd */
+	union {
+#ifdef _KERNEL
+		struct mmc_data	* __capability user_data;
+#endif
+		struct mmc_data	*data;	/* Data segment with cmd */
+	};
 	struct mmc_request *mrq;	/* backpointer to request */
 };
 

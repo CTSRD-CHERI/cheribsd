@@ -293,7 +293,7 @@ static int
 iicrdwr(struct iic_cdevpriv *priv, struct iic_rdwr_data *d, int flags)
 {
 	struct iic_msg *buf, *m;
-	void **usrbufs;
+	struct iic_msg_user *usrbufs;
 	device_t iicdev, parent;
 	int error;
 	uint32_t i;
@@ -305,20 +305,21 @@ iicrdwr(struct iic_cdevpriv *priv, struct iic_rdwr_data *d, int flags)
 	if (d->nmsgs > IIC_RDRW_MAX_MSGS)
 		return (EINVAL);
 
-	buf = malloc(sizeof(*d->msgs) * d->nmsgs, M_IIC, M_WAITOK);
+	buf = malloc(sizeof(*d->msgs) * d->nmsgs, M_IIC, M_WAITOK | M_ZERO);
+	usrbufs = malloc(sizeof(*usrbufs) * d->nmsgs, M_IIC, M_WAITOK);
 
-	error = copyin(d->msgs, buf, sizeof(*d->msgs) * d->nmsgs);
+	error = copyin(d->msgs, usrbufs, sizeof(*usrbufs) * d->nmsgs);
 	if (error != 0) {
+		free(usrbufs, M_IIC);
 		free(buf, M_IIC);
 		return (error);
 	}
 
-	/* Alloc kernel buffers for userland data, copyin write data */
-	usrbufs = malloc(sizeof(void *) * d->nmsgs, M_IIC, M_WAITOK | M_ZERO);
-
 	for (i = 0; i < d->nmsgs; i++) {
 		m = &(buf[i]);
-		usrbufs[i] = m->buf;
+		m->slave = usrbufs[i].slave;
+		m->flags = usrbufs[i].flags;
+		m->len = usrbufs[i].len;
 
 		/*
 		 * At least init the buffer to NULL so we can safely free() it later.
@@ -331,7 +332,7 @@ iicrdwr(struct iic_cdevpriv *priv, struct iic_rdwr_data *d, int flags)
 		/* m->len is uint16_t, so allocation size is capped at 64K. */
 		m->buf = malloc(m->len, M_IIC, M_WAITOK);
 		if (!(m->flags & IIC_M_RD))
-			error = copyin(usrbufs[i], m->buf, m->len);
+			error = copyin(usrbufs[i].buf, m->buf, m->len);
 	}
 
 	if (error == 0)
@@ -347,7 +348,7 @@ iicrdwr(struct iic_cdevpriv *priv, struct iic_rdwr_data *d, int flags)
 	for (i = 0; i < d->nmsgs; i++) {
 		m = &(buf[i]);
 		if ((error == 0) && (m->flags & IIC_M_RD))
-			error = copyout(m->buf, usrbufs[i], m->len);
+			error = copyout(m->buf, usrbufs[i].buf, m->len);
 		free(m->buf, M_IIC);
 	}
 
@@ -436,7 +437,7 @@ iicioctl(struct cdev *dev, u_long cmd, caddr_t data, int flags, struct thread *t
 			error = EINVAL;
 			break;
 		}
-		IOVEC_INIT(&uvec, s->buf, s->count);
+		IOVEC_INIT_C(&uvec, s->buf, s->count);
 		ubuf.uio_iov = &uvec;
 		ubuf.uio_iovcnt = 1;
 		ubuf.uio_segflg = UIO_USERSPACE;
@@ -452,7 +453,7 @@ iicioctl(struct cdev *dev, u_long cmd, caddr_t data, int flags, struct thread *t
 			error = EINVAL;
 			break;
 		}
-		IOVEC_INIT(&uvec, s->buf, s->count);
+		IOVEC_INIT_C(&uvec, s->buf, s->count);
 		ubuf.uio_iov = &uvec;
 		ubuf.uio_iovcnt = 1;
 		ubuf.uio_segflg = UIO_USERSPACE;

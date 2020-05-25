@@ -29,8 +29,6 @@
 
 #include "opt_evdev.h"
 
-#define	EXPLICIT_USER_ACCESS
-
 #include <sys/param.h>
 #include <sys/conf.h>
 #include <sys/fcntl.h>
@@ -606,7 +604,7 @@ uinput_ioctl_sub(struct uinput_cdev_state *state, u_long cmd, caddr_t data)
 			cap = *(void * __capability *)data;
 		if (state->ucs_state == UINPUT_RUNNING)
 			return (EINVAL);
-		ret = copyinstr_c(cap, buf, sizeof(buf), NULL);
+		ret = copyinstr(cap, buf, sizeof(buf), NULL);
 		/* Linux returns EINVAL when string does not fit the buffer */
 		if (ret == ENAMETOOLONG)
 			ret = EINVAL;

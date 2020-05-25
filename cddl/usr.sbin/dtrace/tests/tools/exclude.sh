@@ -220,7 +220,7 @@ exclude SKIP common/ustack/tst.spin.ksh
 ####
 # CHERI SPECIFIC EXCLUDE
 # The followings cause instability, make the system stuck, or timeout on CHERI.
-# With time, they should work
+# Ideally, this list will be made empty.
 ####
 
 # json gives problem

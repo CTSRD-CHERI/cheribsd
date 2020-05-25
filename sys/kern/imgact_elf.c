@@ -31,8 +31,6 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#define	EXPLICIT_USER_ACCESS
-
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
@@ -1388,13 +1386,7 @@ ret:
 	return (error);
 }
 
-#if 1
-/* XXX: Temporary hack. */
-#undef suword
-#define	suword __CONCAT(__CONCAT(suword, __ELF_WORD_SIZE), _c)
-#else
 #define	suword __CONCAT(suword, __ELF_WORD_SIZE)
-#endif
 
 #ifdef __ELF_CHERI
 static void * __capability
@@ -1464,6 +1456,7 @@ __elfN(freebsd_copyout_auxargs)(struct image_params *imgp, uintcap_t base)
 	Elf_Auxinfo *argarray, *pos;
 #ifdef __ELF_CHERI
 	void * __capability exec_base;
+	void * __capability entry;
 #endif
 	int error;
 
@@ -1488,9 +1481,17 @@ __elfN(freebsd_copyout_auxargs)(struct image_params *imgp, uintcap_t base)
 	AUXARGS_ENTRY(pos, AT_PAGESZ, args->pagesz);
 	AUXARGS_ENTRY(pos, AT_FLAGS, args->flags);
 #ifdef __ELF_CHERI
-	AUXARGS_ENTRY_PTR(pos, AT_ENTRY, cheri_setaddress(prog_cap(imgp,
+	entry = cheri_setaddress(prog_cap(imgp,
 	    CHERI_CAP_USER_DATA_PERMS | CHERI_CAP_USER_CODE_PERMS),
-	    args->entry));
+	    args->entry);
+#ifdef CHERI_FLAGS_CAP_MODE
+	/*
+	 * On architectures with a mode flag bit, we must ensure the flag is set in
+	 * AT_ENTRY for RTLD to be able to jump to it.
+	 */
+	entry = cheri_setflags(entry, CHERI_FLAGS_CAP_MODE);
+#endif
+	AUXARGS_ENTRY_PTR(pos, AT_ENTRY, entry);
 
 	/*
 	 * XXX: AT_BASE is both writable and executable to permit textrel
@@ -1563,7 +1564,7 @@ __elfN(freebsd_fixup)(uintcap_t *stack_base, struct image_params *imgp)
 
 	base = (Elf_Addr * __capability)*stack_base;
 	base--;
-	if (suword_c(base, imgp->args->argc) == -1)
+	if (suword(base, imgp->args->argc) == -1)
 		return (EFAULT);
 	*stack_base = (uintcap_t)base;
 #endif

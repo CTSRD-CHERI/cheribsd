@@ -39,7 +39,7 @@ typedef	struct	iplookupop	{
 	u_int	iplo_arg;
 	char	iplo_name[FR_GROUPLEN];
 	size_t	iplo_size;	/* sizeof struct at iplo_struct */
-	void	*iplo_struct;
+	void * __kerncap iplo_struct;
 } iplookupop_t;
 
 #define	LOOKUP_ANON	0x80000000
@@ -84,7 +84,7 @@ typedef	struct	ipflookupiter	{
 	int			ili_nitems;
 	iplookupiterkey_t	ili_lkey;
 	char			ili_name[FR_GROUPLEN];
-	void			*ili_data;
+	void * __kerncap	ili_data;
 } ipflookupiter_t;
 
 #define	ili_key		ili_lkey.ilik_key

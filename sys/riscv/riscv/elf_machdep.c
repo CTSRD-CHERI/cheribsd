@@ -125,7 +125,11 @@ static __ElfN(Brandinfo) freebsd_brand_info = {
 	.emul_path	= NULL,
 	.interp_path	= "/libexec/ld-elf.so.1",
 	.sysvec		= &elf_freebsd_sysvec,
+#if __has_feature(capabilities)
+	.interp_newpath	= "/libexec/ld-cheri-elf.so.1",
+#else
 	.interp_newpath	= NULL,
+#endif
 	.brand_note	= &__elfN(freebsd_brandnote),
 	.flags		= BI_CAN_EXEC_DYN | BI_BRAND_NOTE
 };

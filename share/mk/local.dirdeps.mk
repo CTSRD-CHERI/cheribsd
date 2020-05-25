@@ -73,7 +73,7 @@ DIRDEPS_FILTER.xtras+= Nusr.bin/clang/clang.host
 # this is how we can handle optional dependencies
 .if ${DEP_RELDIR} == "lib/libc"
 DIRDEPS += lib/libc_nonshared
-.if ${MK_SSP:Uno} != "no" 
+.if ${MK_SSP:Uno} != "no" && !${MACHINE_ABI:Mpurecap}
 DIRDEPS += lib/libssp_nonshared
 .endif
 .else

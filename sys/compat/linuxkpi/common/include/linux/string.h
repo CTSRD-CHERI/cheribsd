@@ -56,7 +56,7 @@ match_string(const char *const *table, int n, const char *key)
 }
 
 static inline void *
-memdup_user(const void *ptr, size_t len)
+memdup_user(const void * __capability ptr, size_t len)
 {
 	void *retval;
 	int error;
@@ -71,7 +71,7 @@ memdup_user(const void *ptr, size_t len)
 }
 
 static inline void *
-memdup_user_nul(const void *ptr, size_t len)
+memdup_user_nul(const void * __capability ptr, size_t len)
 {
 	char *retval;
 	int error;

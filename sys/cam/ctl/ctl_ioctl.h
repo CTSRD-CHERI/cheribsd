@@ -264,7 +264,7 @@ struct ctl_ooa {
 	uint64_t		lun_num;	/* passed to kernel */
 	uint32_t		alloc_len;	/* passed to kernel */
 	uint32_t		alloc_num;	/* passed to kernel */
-	struct ctl_ooa_entry	*entries;	/* filled in kernel */
+	struct ctl_ooa_entry * __kerncap entries; /* filled in kernel */
 	uint32_t		fill_len;	/* passed to userland */
 	uint32_t		fill_num;	/* passed to userland */
 	uint32_t		dropped_num;	/* passed to userland */
@@ -456,11 +456,21 @@ struct ctl_lun_req {
 	char			backend[CTL_BE_NAME_LEN];
 	ctl_lunreq_type		reqtype;
 	union ctl_lunreq_data	reqdata;
-	void *			args;
-	nvlist_t *		args_nvl;
+	void * __kerncap	args;
+	union {
+#ifdef _KERNEL
+		nvlist_t * __kerncap _dummy0;
+#endif
+		nvlist_t *	args_nvl;
+	};
 	size_t			args_len;
-	void *			result;
-	nvlist_t *		result_nvl;
+	void * __kerncap	result;
+	union {
+#ifdef _KERNEL
+		nvlist_t * __kerncap _dummy1;
+#endif
+		nvlist_t *	result_nvl;
+	};
 	size_t			result_len;
 	ctl_lun_status		status;
 	char			error_str[CTL_ERROR_STR_LEN];
@@ -513,7 +523,7 @@ typedef enum {
 struct ctl_lun_list {
 	char			backend[CTL_BE_NAME_LEN]; /* passed to kernel*/
 	uint32_t		alloc_len;	/* passed to kernel */
-	char			*lun_xml;	/* filled in kernel */
+	char * __kerncap	lun_xml;	/* filled in kernel */
 	uint32_t		fill_len;	/* passed to userland */
 	ctl_lun_list_status	status;		/* passed to userland */
 	char			error_str[CTL_ERROR_STR_LEN];
@@ -552,11 +562,21 @@ typedef enum {
 struct ctl_req {
 	char			driver[CTL_DRIVER_NAME_LEN];
 	ctl_req_type		reqtype;
-	void *			args;
-	nvlist_t *		args_nvl;
+	void * __kerncap	args;
+	union {
+#ifdef _KERNEL
+		nvlist_t * __kerncap _dummy0;
+#endif
+		nvlist_t *	args_nvl;
+	};
 	size_t			args_len;
-	void *			result;
-	nvlist_t *		result_nvl;
+	void * __kerncap	result;
+	union {
+#ifdef _KERNEL
+		nvlist_t * __kerncap _dummy1;
+#endif
+		nvlist_t *	result_nvl;
+	};
 	size_t			result_len;
 	ctl_lun_status		status;
 	char			error_str[CTL_ERROR_STR_LEN];
@@ -639,7 +659,7 @@ struct ctl_iscsi_handoff_params {
 
 struct ctl_iscsi_list_params {
 	uint32_t		alloc_len;	/* passed to kernel */
-	char                   *conn_xml;	/* filled in kernel */
+	char * __kerncap        conn_xml;	/* filled in kernel */
 	uint32_t		fill_len;	/* passed to userland */
 	int			spare[4];
 };

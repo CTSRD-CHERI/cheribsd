@@ -31,8 +31,6 @@
  *	from: @(#)sys_machdep.c	5.5 (Berkeley) 1/19/91
  */
 
-#define	EXPLICIT_USER_ACCESS
-
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
@@ -94,6 +92,98 @@ sysarch(struct thread *td, struct sysarch_args *uap)
 #ifdef CPU_CHERI
 	case CHERI_GET_SEALCAP:
 		return (cheri_sysarch_getsealcap(td, uap->parms));
+
+	/*
+	 * CheriABI specific operations.
+	 */
+	case CHERI_MMAP_GETBASE: {
+		size_t base;
+
+		base = cheri_getbase(td->td_cheri_mmap_cap);
+		if (suword(uap->parms, base) != 0)
+			return (EFAULT);
+		return (0);
+	}
+
+	case CHERI_MMAP_GETLEN: {
+		size_t len;
+
+		len = cheri_getlen(td->td_cheri_mmap_cap);
+		if (suword(uap->parms, len) != 0)
+			return (EFAULT);
+		return (0);
+	}
+
+	case CHERI_MMAP_GETOFFSET: {
+		ssize_t offset;
+
+		offset = cheri_getoffset(td->td_cheri_mmap_cap);
+		if (suword(uap->parms, offset) != 0)
+			return (EFAULT);
+		return (0);
+	}
+
+	case CHERI_MMAP_GETPERM: {
+		uint64_t perms;
+
+		perms = cheri_getperm(td->td_cheri_mmap_cap);
+		if (suword64(uap->parms, perms) != 0)
+			return (EFAULT);
+		return (0);
+	}
+
+	case CHERI_MMAP_ANDPERM: {
+		uint64_t perms;
+		perms = fuword64(uap->parms);
+
+		if (perms == -1)
+			return (EINVAL);
+		td->td_cheri_mmap_cap =
+		    cheri_andperm(td->td_cheri_mmap_cap, perms);
+		perms = cheri_getperm(td->td_cheri_mmap_cap);
+		if (suword64(uap->parms, perms) != 0)
+			return (EFAULT);
+		return (0);
+	}
+
+	case CHERI_MMAP_SETOFFSET: {
+		size_t len;
+		ssize_t offset;
+
+		offset = fuword(uap->parms);
+		/* Reject errors and misaligned offsets */
+		if (offset == -1 || (offset & PAGE_MASK) != 0)
+			return (EINVAL);
+		len = cheri_getlen(td->td_cheri_mmap_cap);
+		/* Don't allow out of bounds offsets, they aren't useful */
+		if (offset < 0 || offset > len) {
+			return (EINVAL);
+		}
+		td->td_cheri_mmap_cap =
+		    cheri_setoffset(td->td_cheri_mmap_cap,
+		    (register_t)offset);
+		return (0);
+	}
+
+	case CHERI_MMAP_SETBOUNDS: {
+		size_t len, olen;
+		ssize_t offset;
+
+		len = fuword(uap->parms);
+		/* Reject errors or misaligned lengths */
+		if (len == (size_t)-1 || (len & PAGE_MASK) != 0)
+			return (EINVAL);
+		olen = cheri_getlen(td->td_cheri_mmap_cap);
+		offset = cheri_getoffset(td->td_cheri_mmap_cap);
+		/* Don't try to set out of bounds lengths */
+		if (offset > olen || len > olen - offset) {
+			return (EINVAL);
+		}
+		td->td_cheri_mmap_cap =
+		    cheri_setbounds(td->td_cheri_mmap_cap,
+		    (register_t)len);
+		return (0);
+	}
 #endif
 
 	default:

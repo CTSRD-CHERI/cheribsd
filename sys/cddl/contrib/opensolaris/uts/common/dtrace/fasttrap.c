@@ -32,8 +32,6 @@
  * Copyright (c) 2015, Joyent, Inc. All rights reserved.
  */
 
-#define	EXPLICIT_USER_ACCESS
-
 #include <sys/atomic.h>
 #include <sys/errno.h>
 #include <sys/stat.h>
