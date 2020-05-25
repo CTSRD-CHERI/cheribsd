@@ -468,6 +468,23 @@ typedef union {
 #define	COPz_BCL_FALSE		0x00
 
 #ifdef CPU_CHERI
+
+/*
+ * Values for the 'fmt' field when 'op' == OP_COP2 (CType)
+ */
+#define OP_CJ 	 	0x00
+#define OP_CBTU 	0x09
+#define OP_CBTS 	0x0a
+#define OP_CBEZ 	0x11
+#define OP_CBNZ 	0x12
+
+
+/*
+ * Values for the 'r3' field when 'fmt' == OP_CJ
+ */
+#define OP_CJALR 	0x0c
+#define OP_CJR		0x1f
+
 /*
  * Values for the 'fmt' field when 'op' == OP_COP2 (CType)
  */
@@ -489,6 +506,10 @@ typedef union {
  */
 #define	OP_CHERI_CGETCAUSE_OLD	0x04	/* CGetCause - 0x12 0x00 .. 0x04 */
 #define	OP_CHERI_CGETPCC_OLD	0x07	/* CGetPCC - 0x12 0x00 .. 0x07 */
+
+#define OP_CINCOFFIMM 	0x13
+#define OP_CINCOFF 	0x12
+#define OP_CSC 		0x3e
 #endif
 
 #endif /* !_MACHINE_MIPS_OPCODE_H_ */

@@ -658,25 +658,34 @@ sys_ptrace(struct thread *td, struct ptrace_args *uap)
 		struct ptrace_lwpinfo32 pl32;
 		struct ptrace_vm_entry32 pve32;
 #endif
+#ifdef COMPAT_FREEBSD64
+		struct ptrace_lwpinfo64 pl64;
+#endif
 		syscallarg_t args[nitems(td->td_sa.args)];
 		struct ptrace_sc_ret psr;
 		int ptevents;
 	} r;
 	void * __capability addr;
-	int error = 0;
+	int error = 0, data;
 #ifdef COMPAT_FREEBSD32
 	int wrap32 = 0;
 
 	if (SV_CURPROC_FLAG(SV_ILP32))
 		wrap32 = 1;
 #endif
+#ifdef COMPAT_FREEBSD64
+	int wrap64 = 0;
+
+	if (SV_CURPROC_FLAG(SV_CHERI | SV_LP64) == SV_LP64)
+		wrap64 = 1;
+#endif
 	AUDIT_ARG_PID(uap->pid);
 	AUDIT_ARG_CMD(uap->req);
 	AUDIT_ARG_VALUE(uap->data);
 	addr = &r;
+	data = uap->data;
 	switch (uap->req) {
 	case PT_GET_EVENT_MASK:
-	case PT_LWPINFO:
 	case PT_GET_SC_ARGS:
 	case PT_GET_SC_RET:
 		break;
@@ -715,7 +724,7 @@ sys_ptrace(struct thread *td, struct ptrace_args *uap)
 			error = copyin(uap->addr, &r.ptevents, uap->data);
 		break;
 	case PT_IO:
-		error = COPYIN(uap->addr, &r.piod, sizeof r.piod);
+		error = copyincap(uap->addr, &r.piod, sizeof r.piod);
 		break;
 	case PT_VM_ENTRY:
 #if __has_feature(capabilities)
@@ -740,6 +749,35 @@ sys_ptrace(struct thread *td, struct ptrace_args *uap)
 		error = COPYIN(uap->addr, &r.pve, sizeof r.pve);
 #endif
 		break;
+	case PT_LWPINFO:
+#ifdef COMPAT_FREEBSD32
+		if (wrap32)
+			data = sizeof(r.pl32);
+		else
+#endif
+#ifdef COMPAT_FREEBSD64
+		if (wrap64)
+			data = sizeof(r.pl64);
+		else
+#endif
+		data = sizeof(r.pl);
+		break;
+
+	/* Pass along an untagged capability for the desired PC. */
+	case PT_CONTINUE:
+	case PT_STEP:
+	case PT_TO_SCE:
+	case PT_TO_SCX:
+	case PT_SYSCALL:
+#if __has_feature(capabilities)
+		addr = cheri_cleartag(uap->addr);
+#endif
+		break;
+
+	/* Pass along 'addr' unmodified. */
+	case PT_GETLWPLIST:
+		addr = uap->addr;
+		break;
 	default:
 		addr = (__cheri_tocap void * __capability)uap->addr;
 		break;
@@ -747,7 +785,7 @@ sys_ptrace(struct thread *td, struct ptrace_args *uap)
 	if (error)
 		return (error);
 
-	error = kern_ptrace(td, uap->req, uap->pid, addr, uap->data);
+	error = kern_ptrace(td, uap->req, uap->pid, addr, data);
 	if (error)
 		return (error);
 
@@ -756,7 +794,13 @@ sys_ptrace(struct thread *td, struct ptrace_args *uap)
 		error = COPYOUT(&r.pve, uap->addr, sizeof r.pve);
 		break;
 	case PT_IO:
-		error = COPYOUT(&r.piod, uap->addr, sizeof r.piod);
+		/*
+		 * Only copy out the updated piod_len to avoid the use
+		 * of copyoutcap.
+		 */
+		error = COPYOUT(&r.piod.piod_len,
+		    uap->addr + offsetof(struct ptrace_io_desc, piod_len),
+		    sizeof(r.piod.piod_len));
 		break;
 	case PT_GETREGS:
 		error = COPYOUT(&r.reg, uap->addr, sizeof r.reg);
@@ -845,11 +889,9 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 	lwpid_t tid = 0, *buf;
 #ifdef COMPAT_FREEBSD64
 	int wrap64 = 0;
+	struct ptrace_io_desc64 * __capability piod64 = NULL;
 	struct ptrace_sc_ret64 * __capability psr64 = NULL;
 	struct ptrace_lwpinfo64 * __capability pl64 = NULL;
-#endif
-#if __has_feature(capabilities)
-	struct ptrace_io_desc_c * __capability piodc = NULL;
 #endif
 #ifdef COMPAT_FREEBSD32
 	int wrap32 = 0, safe = 0;
@@ -1414,16 +1456,6 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 		break;
 
 	case PT_IO:
-#if __has_feature(capabilities)
-		if (SV_CURPROC_FLAG(SV_CHERI)) {
-			piodc = addr;
-			IOVEC_INIT_C(&iov, piodc->piod_addr, piodc->piod_len);
-			uio.uio_offset =
-			    (off_t)(__cheri_addr uintptr_t)piodc->piod_offs;
-			uio.uio_resid = piodc->piod_len;
-			tmp = piodc->piod_op;
-		} else
-#endif
 #ifdef COMPAT_FREEBSD32
 		if (wrap32) {
 			piod32 = addr;
@@ -1434,10 +1466,25 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 			tmp = piod32->piod_op;
 		} else
 #endif
+#ifdef COMPAT_FREEBSD64
+		    if (wrap64) {
+			piod64 = addr;
+			IOVEC_INIT(
+			    &iov, (void *)piod64->piod_addr, piod64->piod_len);
+			uio.uio_offset = (off_t)(uintptr_t)piod64->piod_offs;
+			uio.uio_resid = piod64->piod_len;
+			tmp = piod64->piod_op;
+		} else
+#endif
 		{
 			piod = addr;
+#if __has_feature(capabilities)
+			IOVEC_INIT_C(&iov, piod->piod_addr, piod->piod_len);
+#else
 			IOVEC_INIT(&iov, piod->piod_addr, piod->piod_len);
-			uio.uio_offset = (off_t)(uintptr_t)piod->piod_offs;
+#endif
+			uio.uio_offset =
+			    (off_t)(__cheri_addr uintptr_t)piod->piod_offs;
 			uio.uio_resid = piod->piod_len;
 			tmp = piod->piod_op;
 		}
@@ -1467,12 +1514,17 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 		error = proc_rwmem(p, &uio);
 #if __has_feature(capabilities)
 		if (SV_CURPROC_FLAG(SV_CHERI))
-			piodc->piod_len -= uio.uio_resid;
+			piod->piod_len -= uio.uio_resid;
 		else
 #endif
 #ifdef COMPAT_FREEBSD32
 		if (wrap32)
 			piod32->piod_len -= uio.uio_resid;
+		else
+#endif
+#ifdef COMPAT_FREEBSD64
+		if (wrap64)
+			piod64->piod_len -= uio.uio_resid;
 		else
 #endif
 			piod->piod_len -= uio.uio_resid;

@@ -34,12 +34,36 @@
 #ifdef	__cplusplus
 extern "C" {
 #endif
-/*
- *  XXXDTRACE: placehodler for MIPS fasttrap stuff
- */
+
+#define	FASTTRAP_SUNWDTRACE_SIZE	64
+
+// break
+#define FASTTRAP_INSTR			MIPS_BREAK_PID_BKPT
 
 typedef	uint32_t	fasttrap_instr_t;
-#define	FASTTRAP_SUNWDTRACE_SIZE	64
+
+/* This mips implementation will only support to put a probe on the entrypoint
+ * of a userpsace function, and not at an offset or return.
+ */
+typedef struct fasttrap_machtp_t {
+	fasttrap_instr_t	ftmt_instr;	     /* original instruction */
+	fasttrap_instr_t	ftmt_next_instr;     /* used to single step */
+	uint64_t		ftmt_next_instr_addr;
+	uint8_t			single_stepping;
+
+} fasttrap_machtp_t;
+
+#define	ftt_instr		ftt_mtp.ftmt_instr
+#define	ftt_next_instr		ftt_mtp.ftmt_next_instr
+#define	ftt_next_instr_addr	ftt_mtp.ftmt_next_instr_addr
+#define	single_stepping		ftt_mtp.single_stepping
+
+
+// Required by fasttrap
+#define	FASTTRAP_AFRAMES		3
+#define	FASTTRAP_RETURN_AFRAMES		4
+#define	FASTTRAP_ENTRY_AFRAMES		3
+#define	FASTTRAP_OFFSET_AFRAMES		3
 
 #ifdef	__cplusplus
 }

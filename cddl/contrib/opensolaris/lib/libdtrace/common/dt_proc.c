@@ -167,7 +167,7 @@ dt_proc_bpmatch(dtrace_hdl_t *dtp, dt_proc_t *dpr)
 		if (psp->pr_reg[R_PC] == dbp->dbp_addr)
 			break;
 #else
-		if (pc == dbp->dbp_addr)
+		if (dbp->dbp_active && pc == dbp->dbp_addr)
 			break;
 #endif
 	}
@@ -311,10 +311,11 @@ dt_proc_rdevent(dtrace_hdl_t *dtp, dt_proc_t *dpr, const char *evname)
 			break;
 
 		Pupdate_syms(dpr->dpr_proc);
+		dt_proc_bpdisable(dpr);
 		if (dt_pid_create_probes_module(dtp, dpr) != 0)
 			dt_proc_notify(dtp, dtp->dt_procs, dpr,
 			    dpr->dpr_errmsg);
-
+		dt_proc_bpenable(dpr);
 		break;
 	case RD_PREINIT:
 		Pupdate_syms(dpr->dpr_proc);

@@ -1767,9 +1767,9 @@ int
 cheriabi_ptrace(struct thread *td, struct cheriabi_ptrace_args *uap)
 {
 	union {
-		struct ptrace_io_desc_c piod;
-		struct ptrace_lwpinfo pl;
-		struct ptrace_vm_entry_c pve;
+		struct ptrace_io_desc piod;
+		struct ptrace_lwpinfo64 pl;
+		struct ptrace_vm_entry pve;
 #if __has_feature(capabilities)
 		struct capreg capreg;
 #endif
@@ -1782,7 +1782,7 @@ cheriabi_ptrace(struct thread *td, struct cheriabi_ptrace_args *uap)
 	} r = { 0 };
 
 	union {
-		struct ptrace_lwpinfo_c pl;
+		struct ptrace_lwpinfo pl;
 	} c = { 0 };
 
 	int error = 0, data;
@@ -1911,24 +1911,24 @@ cheriabi_ptrace(struct thread *td, struct cheriabi_ptrace_args *uap)
 		 * of copyoutcap.
 		 */
 		error = copyout(&r.piod.piod_len, uap->addr +
-		    offsetof(struct ptrace_io_desc_c, piod_len),
+		    offsetof(struct ptrace_io_desc, piod_len),
 		    sizeof(r.piod.piod_len));
 		break;
-#if 0
+
 	case PT_GETREGS:
-		error = COPYOUT(&r.reg, uap->addr, sizeof r.reg);
+		error = copyout(&r.reg, uap->addr, sizeof r.reg);
 		break;
 	case PT_GETFPREGS:
-		error = COPYOUT(&r.fpreg, uap->addr, sizeof r.fpreg);
+		error = copyout(&r.fpreg, uap->addr, sizeof r.fpreg);
 		break;
 	case PT_GETDBREGS:
-		error = COPYOUT(&r.dbreg, uap->addr, sizeof r.dbreg);
+		error = copyout(&r.dbreg, uap->addr, sizeof r.dbreg);
 		break;
+
 #if __has_feature(capabilities)
 	case PT_GETCAPREGS:
-		error = COPYOUT(&r.capreg, uap->addr, sizeof r.capreg);
+		error = copyout(&r.capreg, uap->addr, sizeof r.capreg);
 		break;
-#endif
 #endif
 	case PT_GET_EVENT_MASK:
 		/* NB: The size in uap->data is validated in kern_ptrace(). */

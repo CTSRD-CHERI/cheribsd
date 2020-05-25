@@ -297,7 +297,12 @@ fasttrap_sigtrap(proc_t *p, kthread_t *t, uintptr_t pc)
 	ksiginfo_init(&ksi);
 	ksi.ksi_signo = SIGTRAP;
 	ksi.ksi_code = TRAP_DTRACE;
+#if __has_feature(capabilities)
+	ksi.ksi_addr = NULL;
+	printf("%s: NULL ksi_addr.\n",__func__);
+#else
 	ksi.ksi_addr = (caddr_t)pc;
+#endif
 	PROC_LOCK(p);
 	(void)tdsendsignal(p, t, SIGTRAP, &ksi);
 	PROC_UNLOCK(p);
@@ -2333,9 +2338,14 @@ err:
 #ifdef notyet
 		int ret;
 #endif
-
-		if (copyin((void *)arg, &instr, sizeof (instr)) != 0)
+#if __has_feature(capabilities)
+		if (copyin((__cheri_tocap void *__capability)arg, &instr,
+			sizeof(instr)) != 0)
 			return (EFAULT);
+#else
+		if (copyin((void *)arg, &instr, sizeof(instr)) != 0)
+			return (EFAULT);
+#endif
 
 #ifdef notyet
 		if (!PRIV_POLICY_CHOICE(cr, PRIV_ALL, B_FALSE)) {
@@ -2386,7 +2396,8 @@ err:
 		    sizeof (instr.ftiq_instr));
 		mutex_exit(&fasttrap_tpoints.fth_table[index].ftb_mtx);
 
-		if (copyout(&instr, (void *)arg, sizeof (instr)) != 0)
+		if (copyout(&instr, (__cheri_tocap void *__capability)arg,
+			sizeof(instr)) != 0)
 			return (EFAULT);
 
 		return (0);

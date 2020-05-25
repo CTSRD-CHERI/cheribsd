@@ -1060,13 +1060,23 @@ dofault:
 			if (DELAYBRANCH(trapframe->cause))
 				va += sizeof(int);
 
+			/* read break instruction */
+			instr = fuword32(va);
+
+#ifdef KDTRACE_HOOKS
+			if (instr == MIPS_BREAK_PID_BKPT &&
+			    dtrace_pid_probe_ptr != NULL) {
+				addr = va;
+				(*dtrace_pid_probe_ptr)(trapframe);
+				addr = va;
+				break;
+			}
+#endif
+
 			if (td->td_md.md_ss_addr != (__cheri_addr uintptr_t)va) {
 				addr = va;
 				break;
 			}
-
-			/* read break instruction */
-			instr = fuword32(va);
 
 			if (instr != MIPS_BREAK_SSTEP) {
 				addr = va;

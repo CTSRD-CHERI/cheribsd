@@ -510,11 +510,12 @@ proc_addr2sym(struct proc_handle *p, uintptr_t addr, char *name,
 	int error;
 
 	if ((mapping = _proc_addr2map(p, addr)) == NULL) {
-		DPRINTFX("ERROR: proc_addr2map failed to resolve 0x%jx", addr);
+		DPRINTFX("ERROR: proc_addr2map failed to resolve 0x%jx",
+		    (uint64_t)addr);
 		return (-1);
 	}
 	if (open_object(mapping) != 0) {
-		DPRINTFX("ERROR: failed to open object %s",
+		DPRINTFX("ERROR: proc_addr2map failed to open object %s",
 		    mapping->map.pr_mapname);
 		return (-1);
 	}
@@ -619,7 +620,7 @@ proc_name2sym(struct proc_handle *p, const char *object, const char *symbol,
 		return (-1);
 	}
 	if (open_object(mapping) != 0) {
-		DPRINTFX("ERROR: failed to open object %s",
+		DPRINTFX("ERROR: proc_name2map failed to open object %s",
 		    mapping->map.pr_mapname);
 		return (-1);
 	}

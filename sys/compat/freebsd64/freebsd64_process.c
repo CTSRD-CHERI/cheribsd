@@ -89,7 +89,7 @@ freebsd64_ptrace(struct thread *td, struct freebsd64_ptrace_args *uap)
 	 * structs may be too large to put on the stack anyway.
 	 */
 	union {
-		struct ptrace_io_desc piod;
+		struct ptrace_io_desc64 piod;
 		struct ptrace_lwpinfo64 pl;
 		kptrace_vm_entry_t pve;
 #if __has_feature(capabilities)

@@ -44,6 +44,10 @@ __FBSDID("$FreeBSD$");
 
 #include "_libproc.h"
 
+#ifdef __mips__
+#include "../../sys/mips/include/cpuregs.h"
+#endif
+
 #if defined(__aarch64__)
 #define	AARCH64_BRK		0xd4200000
 #define	AARCH64_BRK_IMM16_SHIFT	5
@@ -112,7 +116,7 @@ proc_bkptset(struct proc_handle *phdl, uintptr_t address,
 		return (-1);
 	}
 
-	DPRINTFX("adding breakpoint at 0x%lx", address);
+	DPRINTFX("adding breakpoint at 0x%lx", (uint64_t) address);
 
 	stopped = 0;
 	if (phdl->status != PS_STOP) {
@@ -135,6 +139,15 @@ proc_bkptset(struct proc_handle *phdl, uintptr_t address,
 		ret = -1;
 		goto done;
 	}
+#ifdef __mips__
+	if ((instr & (~MIPS_BREAK_VAL_MASK)) == MIPS_BREAK_INSTR) {
+		DPRINTF(
+		    "ERROR: cannot set a breakpoint on top of another breakpoint(0x%lx) at 0x%jx",
+		    (uint64_t)instr, (uintmax_t)address);
+		ret = -1;
+		goto done;
+	}
+#endif
 	*saved = instr;
 	/*
 	 * Write a breakpoint instruction to that address.
@@ -173,7 +186,7 @@ proc_bkptdel(struct proc_handle *phdl, uintptr_t address,
 		return (-1);
 	}
 
-	DPRINTFX("removing breakpoint at 0x%lx", address);
+	DPRINTFX("removing breakpoint at 0x%lx", (uint64_t) address);
 
 	stopped = 0;
 	if (phdl->status != PS_STOP) {
@@ -228,6 +241,7 @@ int
 proc_bkptexec(struct proc_handle *phdl, unsigned long saved)
 {
 	unsigned long pc;
+	unsigned long pc_after_step;
 	unsigned long samesaved;
 	int status;
 
@@ -255,6 +269,18 @@ proc_bkptexec(struct proc_handle *phdl, unsigned long saved)
 		DPRINTFX("ERROR: don't know why process stopped");
 		return (-1);
 	}
+#ifdef __mips__
+	if (proc_regget(phdl, REG_PC, &pc_after_step) < 0) {
+		DPRINTFX("ERROR: couldn't get PC register");
+		return (-1);
+	}
+	// might have been that there was another break as original instruction,
+	// that caused PT_STEP to fail.
+	if (pc_after_step == pc) {
+		DPRINTFX("ERROR: couldn't step over breakpoint");
+		return (-1);
+	}
+#endif
 	/*
 	 * Restore the breakpoint. The saved instruction should be
 	 * the same as the one that we were passed in.
