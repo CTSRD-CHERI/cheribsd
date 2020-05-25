@@ -51,6 +51,8 @@
 #include <sys/linker.h>
 #include <sys/module.h>
 #include <sys/stat.h>
+#include <sys/types.h>
+#include <sys/sysctl.h>
 #endif
 
 #include <unistd.h>
