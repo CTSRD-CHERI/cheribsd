@@ -125,8 +125,6 @@
 #define CHERI_EXCEPTION_KR2C_RETURN		\
 	cgetkr2c	CHERI_REG_KSCRATCH2
 
-#define CHERI_EXCEPTION_KCC_RETURN
-
 #else
 
 /*
@@ -145,19 +143,6 @@
 	/* If returning to userspace, restore saved user $ddc. */	\
 	cgetkr2c	CHERI_REG_KSCRATCH;				\
 	csetdefault	CHERI_REG_KSCRATCH
-
-#define CHERI_EXCEPTION_KCC_RETURN					\
-	/* If returning to kernelspace, reinstall kernel code $pcc. */	\
-	/*								\
-	 * XXXRW: If requested PC has been adjusted by stack, similarly	\
-	 * adjust $epcc.offset, which will overwrite an earlier $epc	\
-	 * assignment.							\
-	 * FIXME: this does not work with non-zero $pcc base		\
-	 */								\
-	MFC0	reg, MIPS_COP_0_EXC_PC;					\
-	CGetKCC		CHERI_REG_KSCRATCH;				\
-	CSetOffset	CHERI_REG_KSCRATCH, CHERI_REG_KSCRATCH, reg;	\
-	CSetEPCC	CHERI_REG_KSCRATCH
 #endif
 
 /*
@@ -216,11 +201,7 @@
 	beq	reg, $0, 65f;						\
 	nop;								\
 	CHERI_EXCEPTION_KR2C_RETURN;					\
-	b	66f;							\
-	nop; /* delay slot */						\
 65:									\
-	CHERI_EXCEPTION_KCC_RETURN;					\
-66:									\
 	/* Restore $c27. */						\
 	cgetkr1c	CHERI_REG_KSCRATCH;
 
