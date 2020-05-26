@@ -34,7 +34,7 @@
 #define __attribute__(x)
 #endif
 
-#if __has_feature(capabilities)
+#if __has_feature(capabilities) && defined(CHERI_TCPDUMP)
 #include <cheri/cheri.h>
 #include <cheri/cheric.h>
 #endif
@@ -143,7 +143,7 @@ typedef struct netdissect_options netdissect_options;
 
 typedef u_int (*if_printer) IF_PRINTER_ARGS;
 
-#if __has_feature(capabilities) && defined(__mips__)
+#if __has_feature(capabilities) && defined(CHERI_TCPDUMP)
 #pragma pointer_interpretation capability
 #endif
 struct netdissect_options {
@@ -215,7 +215,7 @@ struct netdissect_options {
 #endif
 		     ;
 };
-#if __has_feature(capabilities) && defined(__mips__)
+#if __has_feature(capabilities) && defined(CHERI_TCPDUMP)
 #pragma pointer_interpretation default
 #endif
 
