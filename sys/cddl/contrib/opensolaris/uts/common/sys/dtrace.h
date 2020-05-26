@@ -1398,7 +1398,7 @@ typedef struct {
 #define DTRACEIOC_ENABLE_64 \
 	_IOC_NEWTYPE(DTRACEIOC_ENABLE, dtrace_enable_io_64_t)
 #define DTRACEIOC_AGGSNAP_64 \
-	_IOC_NEWTYPE(DTRACEIOC_AGGSNAP, dtrace_bufdesc_64 *)
+	_IOC_NEWTYPE(DTRACEIOC_AGGSNAP, dtrace_bufdesc_64_t *)
 #define DTRACEIOC_EPROBE_64 \
 	_IOC_NEWTYPE(DTRACEIOC_EPROBE, dtrace_eprobedesc_t *)
 #define DTRACEIOC_AGGDESC_64 \
