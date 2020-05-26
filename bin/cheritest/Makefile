@@ -86,8 +86,8 @@ NEED_COMPAT=	CHERI
 .else
 .error Unknown cheritest variant ${PROG}
 .endif
-LIBADD= 	z
 
+LIBADD= 	z
 LIBADD+=	xo util
 
 .if ${MK_LIBCHERI} == "yes"
