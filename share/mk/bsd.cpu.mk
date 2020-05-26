@@ -143,7 +143,7 @@ _CPUCFLAGS = -mcpu=${CPUTYPE}
 	${CPUTYPE:Mmips[1234]} != ""
 _CPUCFLAGS = -march=${CPUTYPE}
 . elif ${CPUTYPE} == "cheri"
-# XXX: assume we're getting the right flags already.
+_CPUCFLAGS = -cheri=128
 . else
 # Default -march to the CPUTYPE passed in, with mips stripped off so we
 # accept either mips4kc or 4kc, mostly for historical reasons
