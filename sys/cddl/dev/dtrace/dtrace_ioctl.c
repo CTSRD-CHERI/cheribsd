@@ -263,10 +263,11 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 		kmem_free(buf, size);
 		return (0);
 	}
-	case DTRACEIOC_AGGSNAP:
 #ifdef COMPAT_FREEBSD64
+	case DTRACEIOC_AGGSNAP_64:
 	case DTRACEIOC_BUFSNAP_64:
 #endif
+	case DTRACEIOC_AGGSNAP:
 	case DTRACEIOC_BUFSNAP: {
 		union dtrace_bufdesc_union desc;
 		caddr_t cached;
