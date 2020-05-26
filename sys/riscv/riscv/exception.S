@@ -125,7 +125,7 @@ __FBSDID("$FreeBSD$");
 	cspecialr ct0, sscratchc
 	csc	ct0, (TF_SP)(csp)
 .endif
-	li	t0, 0
+	cmove	ct0, cnull
 	cspecialw sscratchc, ct0
 	cspecialr ct0, sepcc
 	csc	ct0, (TF_SEPC)(csp)
