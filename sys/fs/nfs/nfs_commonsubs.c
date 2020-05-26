@@ -33,6 +33,8 @@
  *
  */
 
+#define	EXPLICIT_USER_ACCESS
+
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
@@ -611,7 +613,7 @@ nfsm_mbufuio(struct nfsrv_descript *nd, struct uio *uiop, int siz)
 {
 	char *mbufcp, * __capability uiocp;
 	int xfer, left, len;
-	mbuf_t mp;
+	struct mbuf *mp;
 	long uiosiz, rem;
 	int error = 0;
 
@@ -653,8 +655,7 @@ nfsm_mbufuio(struct nfsrv_descript *nd, struct uio *uiop, int siz)
 				NFSBCOPY(mbufcp,
 				    (__cheri_fromcap char *)uiocp, xfer);
 			else
-				copyout_c(mbufcp, CAST_USER_ADDR_T(uiocp),
-				    xfer);
+				copyout_c(mbufcp, uiocp, xfer);
 			left -= xfer;
 			len -= xfer;
 			mbufcp += xfer;
@@ -694,7 +695,7 @@ out:
 APPLESTATIC void *
 nfsm_dissct(struct nfsrv_descript *nd, int siz, int how)
 {
-	mbuf_t mp2;
+	struct mbuf *mp2;
 	int siz2, xfer;
 	caddr_t p;
 	int left;
@@ -808,9 +809,9 @@ out:
 APPLESTATIC int
 nfsm_strtom(struct nfsrv_descript *nd, const char *cp, int siz)
 {
-	mbuf_t m2;
+	struct mbuf *m2;
 	int xfer, left;
-	mbuf_t m1;
+	struct mbuf *m1;
 	int rem, bytesize;
 	u_int32_t *tl;
 	char *cp2;
@@ -1006,60 +1007,13 @@ nfsaddr2_match(NFSSOCKADDR_T nam1, NFSSOCKADDR_T nam2)
 	return (0);
 }
 
-
-/*
- * Trim the stuff already dissected off the mbuf list.
- */
-APPLESTATIC void
-newnfs_trimleading(nd)
-	struct nfsrv_descript *nd;
-{
-	mbuf_t m, n;
-	int offs;
-
-	/*
-	 * First, free up leading mbufs.
-	 */
-	if (nd->nd_mrep != nd->nd_md) {
-		m = nd->nd_mrep;
-		while (m->m_next != nd->nd_md) {
-			if (m->m_next == NULL)
-				panic("nfsm trim leading");
-			m = m->m_next;
-		}
-		m->m_next = NULL;
-		m_freem(nd->nd_mrep);
-	}
-	m = nd->nd_md;
-
-	/*
-	 * Now, adjust this mbuf, based on nd_dpos.
-	 */
-	offs = nd->nd_dpos - mtod(m, caddr_t);
-	if (offs == m->m_len) {
-		n = m;
-		m = m->m_next;
-		if (m == NULL)
-			panic("nfsm trim leading2");
-		n->m_next = NULL;
-		m_freem(n);
-	} else if (offs > 0) {
-		m->m_len -= offs;
-		m->m_data += offs;
-	} else if (offs < 0)
-		panic("nfsm trimleading offs");
-	nd->nd_mrep = m;
-	nd->nd_md = m;
-	nd->nd_dpos = mtod(m, caddr_t);
-}
-
 /*
  * Trim trailing data off the mbuf list being built.
  */
 APPLESTATIC void
 newnfs_trimtrailing(nd, mb, bpos)
 	struct nfsrv_descript *nd;
-	mbuf_t mb;
+	struct mbuf *mb;
 	caddr_t bpos;
 {
 
@@ -2426,7 +2380,7 @@ nfsrv_mtostr(struct nfsrv_descript *nd, char *str, int siz)
 {
 	char *cp;
 	int xfer, len;
-	mbuf_t mp;
+	struct mbuf *mp;
 	int rem, error = 0;
 
 	mp = nd->nd_md;
@@ -3766,8 +3720,7 @@ nfssvc_idname(struct nfsd_idargs *nidp)
 	}
 	if (nidp->nid_flag & NFSID_INITIALIZE) {
 		cp = malloc(nidp->nid_namelen + 1, M_NFSSTRING, M_WAITOK);
-		error = copyin(CAST_USER_ADDR_T(nidp->nid_name), cp,
-		    nidp->nid_namelen);
+		error = copyin(nidp->nid_name, cp, nidp->nid_namelen);
 		if (error != 0) {
 			free(cp, M_NFSSTRING);
 			goto out;
@@ -3863,13 +3816,13 @@ nfssvc_idname(struct nfsd_idargs *nidp)
 	 */
 	newusrp = malloc(sizeof(struct nfsusrgrp) + nidp->nid_namelen,
 	    M_NFSUSERGROUP, M_WAITOK | M_ZERO);
-	error = copyin(CAST_USER_ADDR_T(nidp->nid_name), newusrp->lug_name,
+	error = copyin(nidp->nid_name, newusrp->lug_name,
 	    nidp->nid_namelen);
 	if (error == 0 && nidp->nid_ngroup > 0 &&
 	    (nidp->nid_flag & NFSID_ADDUID) != 0) {
 		grps = malloc(sizeof(gid_t) * nidp->nid_ngroup, M_TEMP,
 		    M_WAITOK);
-		error = copyin(CAST_USER_ADDR_T(nidp->nid_grps), grps,
+		error = copyin(nidp->nid_grps, grps,
 		    sizeof(gid_t) * nidp->nid_ngroup);
 		if (error == 0) {
 			/*
@@ -4444,7 +4397,7 @@ nfsrv_refstrbigenough(int siz, u_char **cpp, u_char **cpp2, int *slenp)
 APPLESTATIC void
 nfsrvd_rephead(struct nfsrv_descript *nd)
 {
-	mbuf_t mreq;
+	struct mbuf *mreq;
 
 	/*
 	 * If this is a big reply, use a cluster.

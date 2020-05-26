@@ -155,7 +155,7 @@ make_code_pointer(const Elf_Sym *def, const struct Struct_Obj_Entry *defobj,
 	dbg_assert(defobj->cheri_captable_abi != DF_MIPS_CHERI_ABI_LEGACY);
 	if (tight_bounds) {
 		dbg_assert(defobj->cheri_captable_abi != DF_MIPS_CHERI_ABI_PCREL);
-		ret = cheri_csetbounds(ret, def->st_size);
+		ret = cheri_setbounds(ret, def->st_size);
 	} else {
 		/* PC-relative ABI needs full DSO bounds */
 		dbg_assert(defobj->cheri_captable_abi == DF_MIPS_CHERI_ABI_PCREL);
@@ -201,7 +201,7 @@ make_data_pointer(const Elf_Sym* def, const struct Struct_Obj_Entry *defobj)
 	/* Remove execute and seal permissions */
 	ret = cheri_clearperm(ret, DATA_PTR_REMOVE_PERMS);
 	/* TODO: can we always set bounds here or does it break compat? */
-	ret = cheri_csetbounds(ret, def->st_size);
+	ret = cheri_setbounds(ret, def->st_size);
 	return ret;
 }
 
@@ -222,24 +222,16 @@ static inline const void* target_cgp_for_func(const struct Struct_Obj_Entry *obj
 	return obj->_target_cgp;
 }
 
-static inline dlfunc_t
-vaddr_to_code_pointer(const struct Struct_Obj_Entry *obj, vaddr_t code_addr) {
-	const void* text = get_codesegment(obj);
-	dbg_assert(code_addr >= (vaddr_t)text);
-	dbg_assert(code_addr < (vaddr_t)text + cheri_getlen(text));
-	return (dlfunc_t)cheri_copyaddress(text, cheri_fromint(code_addr));
-}
-
 #define set_bounds_if_nonnull(ptr, size)	\
-	do { if (ptr) { ptr = cheri_csetbounds_sametype(ptr, size); } } while(0)
+	do { if (ptr) { ptr = cheri_setbounds_sametype(ptr, size); } } while(0)
 
 // ignore _init/_fini
 #define call_initfini_pointer(obj, target) rtld_fatal("%s: _init or _fini used!", obj->path)
 
 static inline void
-_call_init_fini_array_pointer(const struct Struct_Obj_Entry *obj, vaddr_t target, int argc, char** argv, char** env) {
+_call_init_fini_array_pointer(const struct Struct_Obj_Entry *obj, InitArrayEntry entry, int argc, char** argv, char** env) {
 
-	InitArrFunc func = (InitArrFunc)vaddr_to_code_pointer(obj, target);
+	InitArrFunc func = (InitArrFunc)entry.value;
 	/* Set the target object $cgp when calling the pointer:
 	 * Note: we use target_cgp_for_func() to support per-function captable */
 	const void *init_fini_cgp = target_cgp_for_func(obj, (dlfunc_t)func);
@@ -278,9 +270,9 @@ typedef struct {
 
 #define round(size, align) \
     (((size) + (align) - 1) & ~((align) - 1))
-#define calculate_first_tls_offset(size, align) \
+#define calculate_first_tls_offset(size, align, offset) \
     TLS_TCB_SIZE
-#define calculate_tls_offset(prev_offset, prev_size, size, align) \
+#define calculate_tls_offset(prev_offset, prev_size, size, align, offset) \
     round(prev_offset + prev_size, align)
 #define calculate_tls_end(off, size)    ((off) + (size))
 #define	calculate_tls_post_size(align)	0

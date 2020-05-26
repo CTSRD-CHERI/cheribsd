@@ -10,7 +10,7 @@ MK_SSP=		no
 RTLD_CHERI_ELF_DIR=${SRCTOP}/libexec/rtld-cheri-elf
 RTLD_ELF_DIR=${SRCTOP}/libexec/rtld-elf
 
-.PATH: ${RTLD_CHERI_ELF_DIR}/../../lib/libmalloc_simple
+.PATH: ${RTLD_CHERI_ELF_DIR} ${RTLD_CHERI_ELF_DIR}/../../lib/libmalloc_simple
 
 # Disable DEBUG to get a fair performance comparison to rtld-elf
 # DEBUG=-DDEBUG
@@ -67,7 +67,7 @@ RTLD_ARCH=	${MACHINE_ARCH}
 RTLD_ARCH=	${MACHINE_CPUARCH}
 .endif
 CFLAGS+=	-I${RTLD_CHERI_ELF_DIR}/${RTLD_ARCH} -I${RTLD_CHERI_ELF_DIR} -I${RTLD_ELF_DIR}
-LDFLAGS+=	-nostdlib -e rtld_start
+LDFLAGS+=	-nostdlib -e ${RTLD_ENTRY}
 NO_WCAST_ALIGN=	yes
 WARNS?=		6
 INSTALLFLAGS=	-C -b
@@ -109,6 +109,7 @@ SYMBOL_MAPS+=	${RTLD_CHERI_ELF_DIR}/${RTLD_ARCH}/Symbol.map
 .endif
 
 .sinclude "${RTLD_CHERI_ELF_DIR}/${RTLD_ARCH}/Makefile.inc"
+RTLD_ENTRY?=	.rtld_start
 
 .PATH: ${RTLD_CHERI_ELF_DIR}/${RTLD_ARCH} ${RTLD_ELF_DIR}/${RTLD_ARCH}
 

@@ -49,7 +49,7 @@ __FBSDID("$FreeBSD$");
 #include <net/if_var.h>
 #include <net/if_dl.h>
 #include <net/route.h>
-#include <net/route_var.h>
+#include <net/route/route_var.h>
 #include <net/route/nhop.h>
 #include <net/route/shared.h>
 #include <net/vnet.h>
@@ -362,7 +362,7 @@ fib6_check_urpf(uint32_t fibnum, const struct in6_addr *dst6,
 	struct rib_head *rh;
 	struct radix_node *rn;
 	struct rtentry *rt;
-	struct in6_addr addr;
+	struct sockaddr_in6 sin6;
 	int ret;
 
 	KASSERT((fibnum < rt_numfibs), ("fib6_check_urpf: bad fibnum"));
@@ -370,13 +370,18 @@ fib6_check_urpf(uint32_t fibnum, const struct in6_addr *dst6,
 	if (rh == NULL)
 		return (0);
 
-	addr = *dst6;
+	/* TODO: radix changes */
+	/* Prepare lookup key */
+	memset(&sin6, 0, sizeof(sin6));
+	sin6.sin6_len = sizeof(struct sockaddr_in6);
+	sin6.sin6_addr = *dst6;
+
 	/* Assume scopeid is valid and embed it directly */
 	if (IN6_IS_SCOPE_LINKLOCAL(dst6))
-		addr.s6_addr16[1] = htons(scopeid & 0xffff);
+		sin6.sin6_addr.s6_addr16[1] = htons(scopeid & 0xffff);
 
 	RIB_RLOCK(rh);
-	rn = rh->rnh_matchaddr((void *)&addr, &rh->head);
+	rn = rh->rnh_matchaddr((void *)&sin6, &rh->head);
 	if (rn != NULL && ((rn->rn_flags & RNF_ROOT) == 0)) {
 		rt = RNTORT(rn);
 #ifdef	RADIX_MPATH
@@ -390,6 +395,47 @@ fib6_check_urpf(uint32_t fibnum, const struct in6_addr *dst6,
 	RIB_RUNLOCK(rh);
 
 	return (0);
+}
+
+struct nhop_object *
+fib6_lookup_debugnet(uint32_t fibnum, const struct in6_addr *dst6,
+    uint32_t scopeid, uint32_t flags)
+{
+	struct rib_head *rh;
+	struct radix_node *rn;
+	struct rtentry *rt;
+	struct nhop_object *nh;
+	struct sockaddr_in6 sin6;
+
+	KASSERT((fibnum < rt_numfibs), ("fib6_lookup: bad fibnum"));
+	rh = rt_tables_get_rnh(fibnum, AF_INET6);
+	if (rh == NULL)
+		return (NULL);
+
+	/* TODO: radix changes */
+	//addr = *dst6;
+	/* Prepare lookup key */
+	memset(&sin6, 0, sizeof(sin6));
+	sin6.sin6_len = sizeof(struct sockaddr_in6);
+	sin6.sin6_addr = *dst6;
+
+	/* Assume scopeid is valid and embed it directly */
+	if (IN6_IS_SCOPE_LINKLOCAL(dst6))
+		sin6.sin6_addr.s6_addr16[1] = htons(scopeid & 0xffff);
+
+	rn = rh->rnh_matchaddr((void *)&sin6, &rh->head);
+	if (rn != NULL && ((rn->rn_flags & RNF_ROOT) == 0)) {
+		rt = RNTORT(rn);
+		nh = rt->rt_nhop;
+		/* Ensure route & ifp is UP */
+		if (RT_LINK_IS_UP(nh->nh_ifp)) {
+			if (flags & NHR_REF)
+				nhop_ref_object(nh);
+			return (nh);
+		}
+	}
+
+	return (NULL);
 }
 
 #endif

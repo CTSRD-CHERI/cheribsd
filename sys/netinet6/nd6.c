@@ -62,6 +62,8 @@ __FBSDID("$FreeBSD$");
 #include <net/if_dl.h>
 #include <net/if_types.h>
 #include <net/route.h>
+#include <net/route/route_var.h>
+#include <net/route/nhop.h>
 #include <net/vnet.h>
 
 #include <netinet/in.h>
@@ -136,7 +138,8 @@ static void nd6_free_redirect(const struct llentry *);
 static void nd6_llinfo_timer(void *);
 static void nd6_llinfo_settimer_locked(struct llentry *, long);
 static void clear_llinfo_pqueue(struct llentry *);
-static void nd6_rtrequest(int, struct rtentry *, struct rt_addrinfo *);
+static void nd6_rtrequest(int, struct rtentry *, struct nhop_object *,
+    struct rt_addrinfo *);
 static int nd6_resolve_slow(struct ifnet *, int, struct mbuf *,
     const struct sockaddr_in6 *, u_char *, uint32_t *, struct llentry **);
 static int nd6_need_cache(struct ifnet *);
@@ -1526,14 +1529,15 @@ nd6_free(struct llentry **lnp, int gc)
 }
 
 static int
-nd6_isdynrte(const struct rtentry *rt, void *xap)
+nd6_isdynrte(const struct rtentry *rt, const struct nhop_object *nh, void *xap)
 {
 
-	if (rt->rt_flags == (RTF_UP | RTF_HOST | RTF_DYNAMIC))
+	if (nh->nh_flags & NHF_REDIRECT)
 		return (1);
 
 	return (0);
 }
+
 /*
  * Remove the rtentry for the given llentry,
  * both of which were installed by a redirect.
@@ -1559,33 +1563,29 @@ nd6_free_redirect(const struct llentry *ln)
  * processing.
  */
 void
-nd6_rtrequest(int req, struct rtentry *rt, struct rt_addrinfo *info)
+nd6_rtrequest(int req, struct rtentry *rt, struct nhop_object *nh,
+    struct rt_addrinfo *info)
 {
 	struct sockaddr_in6 *gateway;
 	struct nd_defrouter *dr;
-	struct ifnet *ifp;
 
-	gateway = (struct sockaddr_in6 *)rt->rt_gateway;
-	ifp = rt->rt_ifp;
+	gateway = &nh->gw6_sa;
 
 	switch (req) {
 	case RTM_ADD:
 		break;
 
 	case RTM_DELETE:
-		if (!ifp)
-			return;
 		/*
 		 * Only indirect routes are interesting.
 		 */
-		if ((rt->rt_flags & RTF_GATEWAY) == 0)
+		if ((nh->nh_flags & NHF_GATEWAY) == 0)
 			return;
 		/*
 		 * check for default route
 		 */
-		if (IN6_ARE_ADDR_EQUAL(&in6addr_any,
-		    &SIN6(rt_key(rt))->sin6_addr)) {
-			dr = defrouter_lookup(&gateway->sin6_addr, ifp);
+		if (nh->nh_flags & NHF_DEFAULT) {
+			dr = defrouter_lookup(&gateway->sin6_addr, nh->nh_ifp);
 			if (dr != NULL) {
 				dr->installed = 0;
 				defrouter_rele(dr);

@@ -2734,6 +2734,7 @@ kern_proc_vmmap_out(struct proc *p, struct sbuf *sb, ssize_t maxlen, int flags)
 		kve->kve_start = entry->start;
 		kve->kve_end = entry->end;
 		kve->kve_offset += entry->offset;
+		kve->kve_reservation = entry->reservation;
 		kve->kve_pid = entry->owner;
 
 		if (entry->protection & VM_PROT_READ)
@@ -2755,6 +2756,10 @@ kern_proc_vmmap_out(struct proc *p, struct sbuf *sb, ssize_t maxlen, int flags)
 			kve->kve_flags |= KVME_FLAG_GROWS_DOWN;
 		if (entry->eflags & MAP_ENTRY_USER_WIRED)
 			kve->kve_flags |= KVME_FLAG_USER_WIRED;
+		if (entry->eflags & MAP_ENTRY_GUARD)
+			kve->kve_flags |= KVME_FLAG_GUARD;
+		if (entry->eflags & MAP_ENTRY_UNMAPPED)
+			kve->kve_flags |= KVME_FLAG_UNMAPPED;
 
 		last_timestamp = map->timestamp;
 		vm_map_unlock_read(map);

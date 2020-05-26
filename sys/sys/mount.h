@@ -486,11 +486,11 @@ struct oexport_args {
 	int	ex_flags;		/* export related flags */
 	uid_t	ex_root;		/* mapping for root uid */
 	struct	xucred ex_anon;		/* mapping for anonymous user */
-	struct	sockaddr *ex_addr;	/* net address to which exported */
+	struct	sockaddr * __kerncap ex_addr;	/* net address to which exported */
 	u_char	ex_addrlen;		/* and the net address length */
-	struct	sockaddr *ex_mask;	/* mask of valid bits in saddr */
+	struct	sockaddr * __kerncap ex_mask;	/* mask of valid bits in saddr */
 	u_char	ex_masklen;		/* and the smask length */
-	char	*ex_indexfile;		/* index file for WebNFS URLs */
+	char	* __kerncap ex_indexfile;	/* index file for WebNFS URLs */
 };
 
 /*
@@ -501,11 +501,11 @@ struct export_args {
 	int	ex_flags;		/* export related flags */
 	uid_t	ex_root;		/* mapping for root uid */
 	struct	xucred ex_anon;		/* mapping for anonymous user */
-	struct	sockaddr *ex_addr;	/* net address to which exported */
+	struct	sockaddr * __kerncap ex_addr;	/* net address to which exported */
 	u_char	ex_addrlen;		/* and the net address length */
-	struct	sockaddr *ex_mask;	/* mask of valid bits in saddr */
+	struct	sockaddr * __kerncap ex_mask;	/* mask of valid bits in saddr */
 	u_char	ex_masklen;		/* and the smask length */
-	char	*ex_indexfile;		/* index file for WebNFS URLs */
+	char	* __kerncap ex_indexfile;	/* index file for WebNFS URLs */
 	int	ex_numsecflavors;	/* security flavor count */
 	int	ex_secflavors[MAXSECFLAVORS]; /* list of security flavors */
 };

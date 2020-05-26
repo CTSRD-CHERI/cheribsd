@@ -3063,6 +3063,11 @@ nfsvno_checkexp(struct mount *mp, struct sockaddr *nam, struct nfsexstuff *exp,
 			exp->nes_numsecflavor = 0;
 			error = 0;
 		}
+	} else if (exp->nes_numsecflavor < 1 || exp->nes_numsecflavor >
+	    MAXSECFLAVORS) {
+		printf("nfsvno_checkexp: numsecflavors out of range\n");
+		exp->nes_numsecflavor = 0;
+		error = EACCES;
 	} else {
 		/* Copy the security flavors. */
 		for (i = 0; i < exp->nes_numsecflavor; i++)
@@ -3099,6 +3104,12 @@ nfsvno_fhtovp(struct mount *mp, fhandle_t *fhp, struct sockaddr *nam,
 			} else {
 				vput(*vpp);
 			}
+		} else if (exp->nes_numsecflavor < 1 || exp->nes_numsecflavor >
+		    MAXSECFLAVORS) {
+			printf("nfsvno_fhtovp: numsecflavors out of range\n");
+			exp->nes_numsecflavor = 0;
+			error = EACCES;
+			vput(*vpp);
 		} else {
 			/* Copy the security flavors. */
 			for (i = 0; i < exp->nes_numsecflavor; i++)
@@ -3450,7 +3461,7 @@ nfssvc_nfsd(struct thread *td, struct nfssvc_args *uap)
 	char fname[PNFS_FILENAME_LEN + 1];
 
 	if (uap->flag & NFSSVC_NFSDADDSOCK) {
-		error = copyin(uap->argp, (caddr_t)&sockarg, sizeof (sockarg));
+		error = copyincap(uap->argp, &sockarg, sizeof(sockarg));
 		if (error)
 			goto out;
 		/*
@@ -3475,7 +3486,8 @@ nfssvc_nfsd(struct thread *td, struct nfssvc_args *uap)
 			goto out;
 		}
 		if ((uap->flag & NFSSVC_NEWSTRUCT) == 0) {
-			error = copyin(uap->argp, &onfsdarg, sizeof(onfsdarg));
+			error = copyincap(uap->argp, &onfsdarg,
+			    sizeof(onfsdarg));
 			if (error == 0) {
 				nfsdarg.principal = onfsdarg.principal;
 				nfsdarg.minthreads = onfsdarg.minthreads;
@@ -3492,7 +3504,7 @@ nfssvc_nfsd(struct thread *td, struct nfssvc_args *uap)
 				nfsdarg.mirrorcnt = 1;
 			}
 		} else
-			error = copyin(uap->argp, &nfsdarg, sizeof(nfsdarg));
+			error = copyincap(uap->argp, &nfsdarg, sizeof(nfsdarg));
 		if (error)
 			goto out;
 		if (nfsdarg.addrlen > 0 && nfsdarg.addrlen < 10000 &&
@@ -3568,7 +3580,7 @@ nfssvc_nfsd(struct thread *td, struct nfssvc_args *uap)
 		free((__cheri_fromcap char *)nfsdarg.dspath, M_TEMP);
 		free((__cheri_fromcap char *)nfsdarg.mdspath, M_TEMP);
 	} else if (uap->flag & NFSSVC_PNFSDS) {
-		error = copyin(uap->argp, &pnfsdarg, sizeof(pnfsdarg));
+		error = copyincap(uap->argp, &pnfsdarg, sizeof(pnfsdarg));
 		if (error == 0 && (pnfsdarg.op == PNFSDOP_DELDSSERVER ||
 		    pnfsdarg.op == PNFSDOP_FORCEDELDS)) {
 			cp = malloc(PATH_MAX + 1, M_TEMP, M_WAITOK);
@@ -3695,7 +3707,7 @@ nfssvc_srvcall(struct thread *p, struct nfssvc_args *uap, struct ucred *cred)
 		if (!error)
 			error = nfsrv_adminrevoke(&adminrevoke, p);
 	} else if (uap->flag & NFSSVC_DUMPCLIENTS) {
-		error = copyin(uap->argp, (caddr_t)&dumplist,
+		error = copyincap(uap->argp, (caddr_t)&dumplist,
 		    sizeof (struct nfsd_dumplist));
 		if (!error && (dumplist.ndl_size < 1 ||
 			dumplist.ndl_size > NFSRV_MAXDUMPLIST))
@@ -3704,12 +3716,11 @@ nfssvc_srvcall(struct thread *p, struct nfssvc_args *uap, struct ucred *cred)
 		    len = sizeof (struct nfsd_dumpclients) * dumplist.ndl_size;
 		    dumpclients = malloc(len, M_TEMP, M_WAITOK | M_ZERO);
 		    nfsrv_dumpclients(dumpclients, dumplist.ndl_size);
-		    error = copyout(dumpclients,
-			CAST_USER_ADDR_T(dumplist.ndl_list), len);
+		    error = copyout(dumpclients, dumplist.ndl_list, len);
 		    free(dumpclients, M_TEMP);
 		}
 	} else if (uap->flag & NFSSVC_DUMPLOCKS) {
-		error = copyin(uap->argp, (caddr_t)&dumplocklist,
+		error = copyincap(uap->argp, (caddr_t)&dumplocklist,
 		    sizeof (struct nfsd_dumplocklist));
 		if (!error && (dumplocklist.ndllck_size < 1 ||
 			dumplocklist.ndllck_size > NFSRV_MAXDUMPLIST))
@@ -3724,8 +3735,8 @@ nfssvc_srvcall(struct thread *p, struct nfssvc_args *uap, struct ucred *cred)
 			nfsrv_dumplocks(nd.ni_vp, dumplocks,
 			    dumplocklist.ndllck_size, p);
 			vput(nd.ni_vp);
-			error = copyout(dumplocks,
-			    CAST_USER_ADDR_T(dumplocklist.ndllck_list), len);
+			error = copyout(dumplocks, dumplocklist.ndllck_list,
+			    len);
 			free(dumplocks, M_TEMP);
 		}
 	} else if (uap->flag & NFSSVC_BACKUPSTABLE) {

@@ -33,6 +33,8 @@
  * $FreeBSD$
  */
 
+#define	EXPLICIT_USER_ACCESS
+
 #include <sys/param.h>
 #include <sys/eventhandler.h>
 #include <sys/malloc.h>
@@ -480,7 +482,7 @@ if_clone_free(struct if_clone *ifc)
 int
 if_clone_list(struct if_clonereq *ifcr)
 {
-	char *buf, *dst, *outbuf = NULL;
+	char *buf, * __capability dst, *outbuf = NULL;
 	struct if_clone *ifc;
 	int buf_count, count, err = 0;
 

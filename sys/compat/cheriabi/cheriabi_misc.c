@@ -696,7 +696,7 @@ cheriabi_copyout_strings(struct image_params *imgp, uintptr_t *stack_base)
 	 */
 	if (execpath_len != 0) {
 		destp -= execpath_len;
-		imgp->execpathp = cheri_csetbounds(destp, execpath_len);
+		imgp->execpathp = cheri_setbounds(destp, execpath_len);
 		copyout(imgp->execpath, destp, execpath_len);
 	}
 
@@ -705,7 +705,7 @@ cheriabi_copyout_strings(struct image_params *imgp, uintptr_t *stack_base)
 	 */
 	arc4rand(canary, sizeof(canary), 0);
 	destp -= sizeof(canary);
-	imgp->canary = cheri_csetbounds(destp, sizeof(canary));
+	imgp->canary = cheri_setbounds(destp, sizeof(canary));
 	copyout(canary, destp, sizeof(canary));
 	imgp->canarylen = sizeof(canary);
 
@@ -714,7 +714,7 @@ cheriabi_copyout_strings(struct image_params *imgp, uintptr_t *stack_base)
 	 */
 	destp -= szps;
 	destp = __builtin_align_down(destp, sizeof(void * __capability));
-	imgp->pagesizes = cheri_csetbounds(destp, szps);
+	imgp->pagesizes = cheri_setbounds(destp, szps);
 	copyout(pagesizes, destp, szps);
 	imgp->pagesizeslen = szps;
 
@@ -750,7 +750,7 @@ cheriabi_copyout_strings(struct image_params *imgp, uintptr_t *stack_base)
 	/*
 	 * Fill in "ps_strings" struct for ps, w, etc.
 	 */
-	imgp->argv = cheri_csetbounds(vectp, (argc + 1) * sizeof(*vectp));
+	imgp->argv = cheri_setbounds(vectp, (argc + 1) * sizeof(*vectp));
 	sucap(&arginfo->ps_argvstr, (intcap_t)imgp->argv);
 	suword32(&arginfo->ps_nargvstr, argc);
 
@@ -759,7 +759,7 @@ cheriabi_copyout_strings(struct image_params *imgp, uintptr_t *stack_base)
 	 */
 	for (; argc > 0; --argc) {
 		sucap(vectp++,
-		    (intcap_t)cheri_csetbounds(destp, strlen(stringp) + 1));
+		    (intcap_t)cheri_setbounds(destp, strlen(stringp) + 1));
 		while (*stringp++ != 0)
 			destp++;
 		destp++;
@@ -769,7 +769,7 @@ cheriabi_copyout_strings(struct image_params *imgp, uintptr_t *stack_base)
 	/* XXX: suword clears the tag */
 	suword(vectp++, 0);
 
-	imgp->envv = cheri_csetbounds(vectp, (envc + 1) * sizeof(*vectp));
+	imgp->envv = cheri_setbounds(vectp, (envc + 1) * sizeof(*vectp));
 	sucap(&arginfo->ps_envstr, (intcap_t)imgp->envv);
 	suword32(&arginfo->ps_nenvstr, envc);
 
@@ -778,7 +778,7 @@ cheriabi_copyout_strings(struct image_params *imgp, uintptr_t *stack_base)
 	 */
 	for (; envc > 0; --envc) {
 		sucap(vectp++,
-		    (intcap_t)cheri_csetbounds(destp, strlen(stringp) + 1));
+		    (intcap_t)cheri_setbounds(destp, strlen(stringp) + 1));
 		while (*stringp++ != 0)
 			destp++;
 		destp++;

@@ -23,6 +23,8 @@
  * SUCH DAMAGE.
  */
 
+#define	EXPLICIT_USER_ACCESS
+
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
@@ -953,21 +955,21 @@ static int
 futex_user_load(uint32_t *obj, uint32_t *val)
 {
 
-	return (fueword32(obj, val) != 0 ? EFAULT : 0);
+	return (fueword32(__USER_CAP_OBJ(obj), val) != 0 ? EFAULT : 0);
 }
 
 static int
 futex_user_store(uint32_t *obj, uint32_t val)
 {
 
-	return (suword32(obj, val) != 0 ? EFAULT : 0);
+	return (suword32(__USER_CAP_OBJ(obj), val) != 0 ? EFAULT : 0);
 }
 
 static int
 futex_user_cmpxchg(uint32_t *obj, uint32_t cmp, uint32_t *old, uint32_t new)
 {
 
-	return (casueword32(obj, cmp, old, new) != 0 ? EFAULT : 0);
+	return (casueword32(__USER_CAP_OBJ(obj), cmp, old, new) != 0 ? EFAULT : 0);
 }
 
 /*

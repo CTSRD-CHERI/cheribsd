@@ -572,7 +572,7 @@ struct __msfilterreq {
 	uint32_t		 msfr_fmode;	/* filter mode for group */
 	uint32_t		 msfr_nsrcs;	/* # of sources in msfr_srcs */
 	struct sockaddr_storage	 msfr_group;	/* group address */
-	struct sockaddr_storage	*msfr_srcs;	/* pointer to the first member
+	struct sockaddr_storage	* __kerncap msfr_srcs;	/* pointer to the first member
 						 * of a contiguous array of
 						 * sources to filter in full.
 						 */

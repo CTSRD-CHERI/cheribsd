@@ -40,6 +40,9 @@
  *	from: @(#)trap.c	8.5 (Berkeley) 1/11/94
  *	JNPR: trap.c,v 1.13.2.2 2007/08/29 10:03:49 girish
  */
+
+#define	EXPLICIT_USER_ACCESS
+
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 #define TRAP_DEBUG 1
@@ -625,6 +628,8 @@ cpu_fetch_syscall_args(struct thread *td)
 	sa->narg = sa->callp->sy_narg;
 
 	if (sa->narg > nsaved) {
+		char * __capability stack_args;
+
 #if defined(__mips_n32) || defined(__mips_n64)
 		/*
 		 * XXX
@@ -643,20 +648,26 @@ cpu_fetch_syscall_args(struct thread *td)
 			unsigned i;
 			int32_t arg;
 
+			stack_args = __USER_CAP(locr0->sp + 4 * sizeof(int32_t),
+			    (sa->narg - nsaved) * sizeof(int32_t));
 			error = 0; /* XXX GCC is awful.  */
 			for (i = nsaved; i < sa->narg; i++) {
-				error = copyin((caddr_t)(intptr_t)(locr0->sp +
-				    (4 + (i - nsaved)) * sizeof(int32_t)),
-				    (caddr_t)&arg, sizeof arg);
+				error = copyin(stack_args +
+				    (i - nsaved) * sizeof(int32_t),
+				    &arg, sizeof(arg));
 				if (error != 0)
 					break;
 				sa->args[i] = arg;
 			}
 		} else
 #endif
-		error = copyin((caddr_t)(intptr_t)(locr0->sp +
-		    4 * sizeof(register_t)), (caddr_t)&sa->args[nsaved],
-		   (u_int)(sa->narg - nsaved) * sizeof(register_t));
+		{
+			stack_args = __USER_CAP(locr0->sp +
+			    4 * sizeof(register_t), (sa->narg - nsaved) *
+			    sizeof(register_t));
+			error = copyin(stack_args, &sa->args[nsaved],
+			    (u_int)(sa->narg - nsaved) * sizeof(register_t));
+		}
 		if (error != 0) {
 			locr0->v0 = error;
 			locr0->a3 = 1;
@@ -1472,10 +1483,7 @@ MipsEmulateBranch(struct trapframe *framePtr, trapf_pc_t _instPC, int fpcCSR,
 	(InstPtr + 4 + ((short)inst.IType.imm << 2))
 
 	if (instptr) {
-		if (!KERNLAND(instptr))
-			inst.word = fuword32((void *)instptr); /* XXXAR: error check? */
-		else
-			inst = *(InstFmt *) instptr;
+		inst = *(InstFmt *) instptr;
 	} else {
 		if (!KERNLAND((__cheri_addr vaddr_t)instPC))
 			inst.word = fuword32_c(instPC);  /* XXXAR: error check? */

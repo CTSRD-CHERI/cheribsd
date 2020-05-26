@@ -106,7 +106,35 @@ struct sendfile_sync {
 	struct mtx	mtx;
 	struct cv	cv;
 	unsigned	count;
+	bool		waiting;
 };
+
+static void
+sendfile_sync_destroy(struct sendfile_sync *sfs)
+{
+	KASSERT(sfs->count == 0, ("sendfile sync %p still busy", sfs));
+
+	cv_destroy(&sfs->cv);
+	mtx_destroy(&sfs->mtx);
+	free(sfs, M_SENDFILE);
+}
+
+static void
+sendfile_sync_signal(struct sendfile_sync *sfs)
+{
+	mtx_lock(&sfs->mtx);
+	KASSERT(sfs->count > 0, ("sendfile sync %p not busy", sfs));
+	if (--sfs->count == 0) {
+		if (!sfs->waiting) {
+			/* The sendfile() waiter was interrupted by a signal. */
+			sendfile_sync_destroy(sfs);
+			return;
+		} else {
+			cv_signal(&sfs->cv);
+		}
+	}
+	mtx_unlock(&sfs->mtx);
+}
 
 counter_u64_t sfstat[sizeof(struct sfstat) / sizeof(uint64_t)];
 
@@ -153,45 +181,32 @@ sendfile_free_mext(struct mbuf *m)
 
 	if (m->m_ext.ext_flags & EXT_FLAG_SYNC) {
 		struct sendfile_sync *sfs = m->m_ext.ext_arg2;
-
-		mtx_lock(&sfs->mtx);
-		KASSERT(sfs->count > 0, ("Sendfile sync botchup count == 0"));
-		if (--sfs->count == 0)
-			cv_signal(&sfs->cv);
-		mtx_unlock(&sfs->mtx);
+		sendfile_sync_signal(sfs);
 	}
 }
 
 static void
 sendfile_free_mext_pg(struct mbuf *m)
 {
-	struct mbuf_ext_pgs *ext_pgs;
 	vm_page_t pg;
 	int flags, i;
 	bool cache_last;
 
-	KASSERT(m->m_flags & M_EXT && m->m_ext.ext_type == EXT_PGS,
-	    ("%s: m %p !M_EXT or !EXT_PGS", __func__, m));
+	M_ASSERTEXTPG(m);
 
 	cache_last = m->m_ext.ext_flags & EXT_FLAG_CACHE_LAST;
-	ext_pgs = &m->m_ext_pgs;
 	flags = (m->m_ext.ext_flags & EXT_FLAG_NOCACHE) != 0 ? VPR_TRYFREE : 0;
 
-	for (i = 0; i < ext_pgs->npgs; i++) {
-		if (cache_last && i == ext_pgs->npgs - 1)
+	for (i = 0; i < m->m_epg_npgs; i++) {
+		if (cache_last && i == m->m_epg_npgs - 1)
 			flags = 0;
-		pg = PHYS_TO_VM_PAGE(ext_pgs->m_epg_pa[i]);
+		pg = PHYS_TO_VM_PAGE(m->m_epg_pa[i]);
 		vm_page_release(pg, flags);
 	}
 
 	if (m->m_ext.ext_flags & EXT_FLAG_SYNC) {
 		struct sendfile_sync *sfs = m->m_ext.ext_arg1;
-
-		mtx_lock(&sfs->mtx);
-		KASSERT(sfs->count > 0, ("Sendfile sync botchup count == 0"));
-		if (--sfs->count == 0)
-			cv_signal(&sfs->cv);
-		mtx_unlock(&sfs->mtx);
+		sendfile_sync_signal(sfs);
 	}
 }
 
@@ -295,10 +310,12 @@ sendfile_iodone(void *arg, vm_page_t *pa, int count, int error)
 		 * unbusied the swapped-in pages, they can become
 		 * invalid under us.
 		 */
+		MPASS(count == 0 || pa[0] != bogus_page);
 		for (i = 0; i < count; i++) {
 			if (pa[i] == bogus_page) {
-				pa[i] = vm_page_relookup(sfio->obj,
-				    sfio->pindex0 + i + (pa - sfio->pa));
+				sfio->pa[(pa[0]->pindex - sfio->pindex0) + i] =
+				    pa[i] = vm_page_relookup(sfio->obj,
+				    pa[0]->pindex + i);
 				KASSERT(pa[i] != NULL,
 				    ("%s: page %p[%d] disappeared",
 				    __func__, pa, i));
@@ -310,6 +327,24 @@ sendfile_iodone(void *arg, vm_page_t *pa, int count, int error)
 
 	if (!refcount_release(&sfio->nios))
 		return;
+
+#ifdef INVARIANTS
+	for (i = 1; i < sfio->npages; i++) {
+		if (sfio->pa[i] == NULL)
+			break;
+		KASSERT(vm_page_wired(sfio->pa[i]),
+		    ("sfio %p page %d %p not wired", sfio, i, sfio->pa[i]));
+		if (i == 0)
+			continue;
+		KASSERT(sfio->pa[0]->object == sfio->pa[i]->object,
+		    ("sfio %p page %d %p wrong owner %p %p", sfio, i,
+		    sfio->pa[i], sfio->pa[0]->object, sfio->pa[i]->object));
+		KASSERT(sfio->pa[0]->pindex + i == sfio->pa[i]->pindex,
+		    ("sfio %p page %d %p wrong index %jx %jx", sfio, i,
+		    sfio->pa[i], (uintmax_t)sfio->pa[0]->pindex,
+		    (uintmax_t)sfio->pa[i]->pindex));
+	}
+#endif
 
 	vm_object_pip_wakeup(sfio->obj);
 
@@ -327,9 +362,8 @@ sendfile_iodone(void *arg, vm_page_t *pa, int count, int error)
 	}
 
 #if defined(KERN_TLS) && defined(INVARIANTS)
-	if ((sfio->m->m_flags & M_EXT) != 0 &&
-	    sfio->m->m_ext.ext_type == EXT_PGS)
-		KASSERT(sfio->tls == sfio->m->m_ext_pgs.tls,
+	if ((sfio->m->m_flags & M_EXTPG) != 0)
+		KASSERT(sfio->tls == sfio->m->m_epg_tls,
 		    ("TLS session mismatch"));
 	else
 		KASSERT(sfio->tls == NULL,
@@ -654,7 +688,6 @@ vn_sendfile(struct file *fp, int sockfd, struct uio *hdr_uio,
 #ifdef KERN_TLS
 	struct ktls_session *tls;
 #endif
-	struct mbuf_ext_pgs *ext_pgs;
 	struct mbuf *m, *mh, *mhtail;
 	struct sf_buf *sf;
 	struct shmfd *shmfd;
@@ -699,6 +732,7 @@ vn_sendfile(struct file *fp, int sockfd, struct uio *hdr_uio,
 		sfs = malloc(sizeof(*sfs), M_SENDFILE, M_WAITOK | M_ZERO);
 		mtx_init(&sfs->mtx, "sendfile", NULL, MTX_DEF);
 		cv_init(&sfs->cv, "sendfile");
+		sfs->waiting = true;
 	}
 
 	rem = nbytes ? omin(nbytes, obj_size - offset) : obj_size - offset;
@@ -809,7 +843,7 @@ retry_space:
 #ifdef KERN_TLS
 			if (tls != NULL)
 				mh = m_uiotombuf(hdr_uio, M_WAITOK, space,
-				    tls->params.max_frame_len, M_NOMAP);
+				    tls->params.max_frame_len, M_EXTPG);
 			else
 #endif
 				mh = m_uiotombuf(hdr_uio, M_WAITOK,
@@ -979,18 +1013,11 @@ retry_space:
 					if (sfs != NULL) {
 						m0->m_ext.ext_flags |=
 						    EXT_FLAG_SYNC;
-						if (m0->m_ext.ext_type ==
-						    EXT_PGS)
-							m0->m_ext.ext_arg1 =
-								sfs;
-						else
-							m0->m_ext.ext_arg2 =
-								sfs;
+						m0->m_ext.ext_arg1 = sfs;
 						mtx_lock(&sfs->mtx);
 						sfs->count++;
 						mtx_unlock(&sfs->mtx);
 					}
-					ext_pgs = &m0->m_ext_pgs;
 					ext_pgs_idx = 0;
 
 					/* Append to mbuf chain. */
@@ -999,19 +1026,19 @@ retry_space:
 					else
 						m = m0;
 					mtail = m0;
-					ext_pgs->first_pg_off =
+					m0->m_epg_1st_off =
 					    vmoff(i, off) & PAGE_MASK;
 				}
 				if (nios) {
 					mtail->m_flags |= M_NOTREADY;
-					ext_pgs->nrdy++;
+					m0->m_epg_nrdy++;
 				}
 
-				ext_pgs->m_epg_pa[ext_pgs_idx] = VM_PAGE_TO_PHYS(pga);
-				ext_pgs->npgs++;
+				m0->m_epg_pa[ext_pgs_idx] = VM_PAGE_TO_PHYS(pga);
+				m0->m_epg_npgs++;
 				xfs = xfsize(i, npages, off, space);
-				ext_pgs->last_pg_len = xfs;
-				MBUF_EXT_PGS_ASSERT_SANITY(ext_pgs);
+				m0->m_epg_last_len = xfs;
+				MBUF_EXT_PGS_ASSERT_SANITY(m0);
 				mtail->m_len += xfs;
 				mtail->m_ext.ext_size += PAGE_SIZE;
 				continue;
@@ -1061,10 +1088,6 @@ retry_space:
 				m0->m_ext.ext_flags |= EXT_FLAG_NOCACHE;
 			if (sfs != NULL) {
 				m0->m_ext.ext_flags |= EXT_FLAG_SYNC;
-				if (m0->m_ext.ext_type == EXT_PGS)
-					m0->m_ext.ext_arg1 = sfs;
-				else
-					m0->m_ext.ext_arg2 = sfs;
 				m0->m_ext.ext_arg2 = sfs;
 				mtx_lock(&sfs->mtx);
 				sfs->count++;
@@ -1201,11 +1224,13 @@ out:
 	if (sfs != NULL) {
 		mtx_lock(&sfs->mtx);
 		if (sfs->count != 0)
-			cv_wait(&sfs->cv, &sfs->mtx);
-		KASSERT(sfs->count == 0, ("sendfile sync still busy"));
-		cv_destroy(&sfs->cv);
-		mtx_destroy(&sfs->mtx);
-		free(sfs, M_SENDFILE);
+			error = cv_wait_sig(&sfs->cv, &sfs->mtx);
+		if (sfs->count == 0) {
+			sendfile_sync_destroy(sfs);
+		} else {
+			sfs->waiting = false;
+			mtx_unlock(&sfs->mtx);
+		}
 	}
 #ifdef KERN_TLS
 	if (tls != NULL)

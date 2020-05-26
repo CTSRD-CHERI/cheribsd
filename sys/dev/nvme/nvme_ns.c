@@ -87,6 +87,7 @@ nvme_ns_ioctl(struct cdev *cdev, u_long cmd, caddr_t arg, int flag,
 		struct nvme_get_nsid *gnsid = (struct nvme_get_nsid *)arg;
 		strncpy(gnsid->cdev, device_get_nameunit(ctrlr->dev),
 		    sizeof(gnsid->cdev));
+		gnsid->cdev[sizeof(gnsid->cdev) - 1] = '\0';
 		gnsid->nsid = ns->id;
 		break;
 	}
@@ -617,7 +618,8 @@ nvme_ns_construct(struct nvme_namespace *ns, uint32_t id,
 	return (0);
 }
 
-void nvme_ns_destruct(struct nvme_namespace *ns)
+void
+nvme_ns_destruct(struct nvme_namespace *ns)
 {
 
 	if (ns->cdev != NULL)

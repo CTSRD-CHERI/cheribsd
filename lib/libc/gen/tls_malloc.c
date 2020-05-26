@@ -73,7 +73,7 @@
 #include "spinlock.h"
 
 #ifndef __CHERI_PURE_CAPABILITY__
-#define	cheri_csetbounds(ptr, size)	((void *)(ptr))
+#define	cheri_setbounds(ptr, size)	((void *)(ptr))
 #define	cheri_andperm(ptr, size)	((void *)(ptr))
 #define	CHERI_PERMS_USERSPACE_DATA	0
 #define	CHERI_PERM_CHERIABI_VMMAP	0
@@ -218,7 +218,7 @@ bound_ptr(void *mem, size_t nbytes)
 {
 	void *ptr;
 
-	ptr = cheri_csetbounds(mem, nbytes);
+	ptr = cheri_setbounds(mem, nbytes);
 	ptr = cheri_andperm(ptr,
 	    CHERI_PERMS_USERSPACE_DATA & ~CHERI_PERM_CHERIABI_VMMAP);
 	return (ptr);
@@ -324,16 +324,16 @@ morecore(int bucket)
 		if (__morepages(amt/pagesz) == 0)
 			return;
 
-	buf = cheri_csetbounds(pagepool_start, amt);
+	buf = cheri_setbounds(pagepool_start, amt);
 	pagepool_start += amt;
 
 	/*
 	 * Add new memory allocated to that on
 	 * free list for this hash bucket.
 	 */
-	nextf[bucket] = op = cheri_csetbounds(buf, sz);
+	nextf[bucket] = op = cheri_setbounds(buf, sz);
 	while (--nblks > 0) {
-		op->ov_next = (union overhead *)cheri_csetbounds(buf + sz, sz);
+		op->ov_next = (union overhead *)cheri_setbounds(buf + sz, sz);
 		buf += sz;
 		op = op->ov_next;
 	}

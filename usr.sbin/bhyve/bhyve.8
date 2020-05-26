@@ -24,7 +24,7 @@
 .\"
 .\" $FreeBSD$
 .\"
-.Dd December 13, 2019
+.Dd May 04, 2020
 .Dt BHYVE 8
 .Os
 .Sh NAME
@@ -32,23 +32,41 @@
 .Nd "run a guest operating system inside a virtual machine"
 .Sh SYNOPSIS
 .Nm
-.Op Fl abehuwxACHPSWY
+.Op Fl AabCeHhPSuWwxY
 .Oo
-.Fl c\~ Ns
+.Sm off
+.Fl c\~
 .Oo
-.Op Ar cpus= Ns
-.Ar numcpus Ns
-.Oc Ns
-.Op Ar ,sockets=n Ns
-.Op Ar ,cores=n Ns
-.Op Ar ,threads=n
+.Op Cm cpus=
+.Ar numcpus
 .Oc
-.Op Fl g Ar gdbport
-.Op Fl l Ar help|lpcdev Ns Op , Ns Ar conf
-.Op Fl m Ar memsize Ns Op Ar K|k|M|m|G|g|T|t
-.Op Fl p Ar vcpu:hostcpu
-.Op Fl s Ar help|slot,emulation Ns Op , Ns Ar conf
+.Op Cm ,sockets= Ar n
+.Op Cm ,cores= Ar n
+.Op Cm ,threads= Ar n
+.Oc
+.Sm on
 .Op Fl G Ar port
+.Op Fl g Ar gdbport
+.Oo Fl l
+.Sm off
+.Cm help | Ar lpcdev Op Cm \&, Ar conf
+.Sm on
+.Oc
+.Oo Fl m
+.Sm off
+.Ar memsize
+.Oo
+.Cm K No | Cm k No | Cm M No | Cm m No | Cm G No | Cm g No | Cm T No | Cm t
+.Oc
+.Sm on
+.Oc
+.Op Fl p Ar vcpu Ns Cm \&: Ns Ar hostcpu
+.Op Fl r Ar file
+.Oo Fl s
+.Sm off
+.Cm help | Ar slot Cm \&, Ar emulation Op Cm \&, Ar conf
+.Sm on
+.Oc
 .Op Fl U Ar uuid
 .Ar vmname
 .Sh DESCRIPTION
@@ -174,6 +192,21 @@ to
 .Em hostcpu .
 .It Fl P
 Force the guest virtual CPU to exit when a PAUSE instruction is detected.
+.It Fl r Ar file
+Resume a guest from a snapshot.
+The guest memory contents are restored from
+.Ar file ,
+and the guest device and vCPU state are restored from the file
+.Dq Ar file Ns .kern .
+.Pp
+Note that the current snapshot file format requires that the configuration of
+devices in the new VM match the VM from which the snapshot was taken by specifying the
+same
+.Op Fl s
+and
+.Op Fl l
+options.
+The count of vCPUs and memory configuration are read from the snapshot.
 .It Fl s Op Ar help|slot,emulation Ns Op , Ns Ar conf
 Configure a virtual PCI slot and function.
 .Pp

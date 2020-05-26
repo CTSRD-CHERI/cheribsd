@@ -2459,8 +2459,10 @@ _other_bootstrap_tools+=tools/build/cross-build/fake_sysctl
 _basic_bootstrap_tools+=usr.bin/mkfifo
 
 .if ${MK_BOOT} != "no"
-# xz/unxz is used by EFI
+.if !defined(CROSSBUILD_HOST)
+# xz/unxz is used by EFI (but it can only be bootstrapped on FreeBSD)
 _basic_bootstrap_tools_multilink+=usr.bin/xz xz,unxz
+.endif
 # md5 is used by boot/beri (and possibly others)
 _basic_bootstrap_tools+=sbin/md5
 .if defined(BOOTSTRAP_ALL_TOOLS)
@@ -2990,7 +2992,7 @@ gnu/lib/libdialog__L: lib/msun__L lib/ncurses/ncursesw__L
 _prebuild_libs+= lib/libc++
 .endif
 
-lib/libgeom__L: lib/libexpat__L
+lib/libgeom__L: lib/libexpat__L lib/libsbuf__L
 lib/libkvm__L: lib/libelf__L
 
 .if ${MK_LIBTHR} != "no"
