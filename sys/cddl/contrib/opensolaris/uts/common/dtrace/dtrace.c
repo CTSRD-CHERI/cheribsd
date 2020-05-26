@@ -611,9 +611,7 @@ static int dtrace_canload_remains(uint64_t, size_t, size_t *,
 static int dtrace_canstore_remains(uint64_t, size_t, size_t *,
     dtrace_mstate_t *, dtrace_vstate_t *);
 
-#if __has_feature(capability)
-static int dtrace_capability_len(uintcap_t cap);
-#endif
+
 /*
  * DTrace Probe Context Functions
  *
@@ -1227,13 +1225,7 @@ dtrace_strncmp(char *s1, char *s2, size_t limit)
 	return (0);
 }
 
-#if __has_feature(capability)
-static int
-dtrace_capability_len(uintcap_t cap)
-{
-	return cheri_getlen((void *__capability)cap);
-}
-#endif
+
 
 /*
  * Compute strlen(s) for a string using safe memory accesses.  The additional
@@ -4685,10 +4677,31 @@ dtrace_dif_subr(uint_t subr, uint_t rd, uintcap_t *regs, dtrace_key_t *tupregs,
 		}
 		break;
 	}
-#if __has_feature(capability)
+#if __has_feature(capabilities)
 	case DIF_SUBR_CAPABILITY_LEN: {
 		uintcap_t addr = (uintcap_t)tupregs[0].dttk_value;
-		regs[rd] = dtrace_capability_len(addr);
+		regs[rd] = cheri_getlength((void * __capability)addr);
+		break;
+	}
+	case DIF_SUBR_CAPABILITY_BASE: {
+		uintcap_t addr = (uintcap_t)tupregs[0].dttk_value;
+		regs[rd] = cheri_getbase((void * __capability)addr);
+		break;
+	}
+	case DIF_SUBR_CAPABILITY_OFFSET: {
+		uintcap_t addr = (uintcap_t)tupregs[0].dttk_value;
+		regs[rd] = cheri_getoffset((void * __capability)addr);
+		break;
+	}
+	case DIF_SUBR_CAPABILITY_ADDR: {
+		uintcap_t addr = (uintcap_t)tupregs[0].dttk_value;
+		regs[rd] = cheri_getbase((void *__capability)addr) +
+		    cheri_getoffset((void *__capability)addr);
+		break;
+	}
+	case DIF_SUBR_CAPABILITY_VALID: {
+		uintcap_t addr = (uintcap_t)tupregs[0].dttk_value;
+		regs[rd] = cheri_gettag((void * __capability)addr);
 		break;
 	}
 #endif
