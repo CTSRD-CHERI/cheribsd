@@ -103,19 +103,10 @@
 
 struct ptrace_io_desc {
 	int	piod_op;	/* I/O operation */
-	void	*piod_offs;	/* child offset */
-	void	*piod_addr;	/* parent offset */
+	void * __kerncap piod_offs;	/* child offset */
+	void * __kerncap piod_addr;	/* parent offset */
 	size_t	piod_len;	/* request length */
 };
-
-#if defined(_KERNEL) && __has_feature(capabilities)
-struct ptrace_io_desc_c {
-	int	piod_op;	/* I/O operation */
-	void	* __capability piod_offs;	/* child offset */
-	void	* __capability piod_addr;	/* parent offset */
-	size_t	piod_len;	/* request length */
-};
-#endif
 
 /*
  * Operations in piod_op.
@@ -153,21 +144,6 @@ struct ptrace_lwpinfo {
 	u_int		pl_syscall_narg;
 };
 
-#if defined(_KERNEL) && defined(COMPAT_CHERIABI)
-struct ptrace_lwpinfo_c {
-	lwpid_t	pl_lwpid;	/* LWP described. */
-	int	pl_event;	/* Event that stopped the LWP. */
-	int	pl_flags;	/* LWP flags. */
-	sigset_t	pl_sigmask;	/* LWP signal mask */
-	sigset_t	pl_siglist;	/* LWP pending signal */
-	struct siginfo_c	pl_siginfo;	/* siginfo for signal */
-	char		pl_tdname[MAXCOMLEN + 1]; /* LWP name */
-	pid_t		pl_child_pid;	/* New child pid */
-	u_int		pl_syscall_code;
-	u_int		pl_syscall_narg;
-};
-#endif
-
 #if defined(_WANT_LWPINFO32) || (defined(_KERNEL) && defined(__LP64__))
 struct ptrace_lwpinfo32 {
 	lwpid_t	pl_lwpid;	/* LWP described. */
@@ -204,13 +180,6 @@ struct ptrace_sc_ret {
 	int		sr_error;
 };
 
-#if defined(_KERNEL) && __has_feature(capabilities)
-struct ptrace_sc_ret64 {
-	uint64_t	sr_retval[2];	/* Only valid if sr_error == 0. */
-	int		sr_error;
-};
-#endif
-
 /* Argument structure for PT_VM_ENTRY. */
 struct ptrace_vm_entry {
 	int		pve_entry;	/* Entry number used for iteration. */
@@ -222,25 +191,8 @@ struct ptrace_vm_entry {
 	u_int		pve_pathlen;	/* Size of path. */
 	long		pve_fileid;	/* File ID. */
 	uint32_t	pve_fsid;	/* File system ID. */
-	char		*pve_path;	/* Path name of object. */
+	char * __kerncap pve_path;	/* Path name of object. */
 };
-#if __has_feature(capabilities)
-struct ptrace_vm_entry_c {
-	int		pve_entry;	/* Entry number used for iteration. */
-	int		pve_timestamp;	/* Generation number of VM map. */
-	u_long		pve_start;	/* Start VA of range. */
-	u_long		pve_end;	/* End VA of range (incl). */
-	u_long		pve_offset;	/* Offset in backing object. */
-	u_int		pve_prot;	/* Protection of memory range. */
-	u_int		pve_pathlen;	/* Size of path. */
-	long		pve_fileid;	/* File ID. */
-	uint32_t	pve_fsid;	/* File system ID. */
-	char * __capability pve_path;	/* Path name of object. */
-};
-typedef struct ptrace_vm_entry_c	kptrace_vm_entry_t;
-#else
-typedef struct ptrace_vm_entry		kptrace_vm_entry_t;
-#endif
 
 #ifdef _KERNEL
 
