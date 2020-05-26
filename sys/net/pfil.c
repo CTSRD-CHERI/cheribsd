@@ -32,6 +32,8 @@
  * SUCH DAMAGE.
  */
 
+#define	EXPLICIT_USER_ACCESS
+
 #include <sys/param.h>
 #include <sys/conf.h>
 #include <sys/kernel.h>

@@ -123,8 +123,9 @@ void	exec_setregs(struct thread *, struct image_params *, uintcap_t);
 int	exec_shell_imgact(struct image_params *);
 int	exec_copyin_args(struct image_args *, const char * __capability,
 	    enum uio_seg, void * __capability, void * __capability);
-int	exec_copyin_data_fds(struct thread *, struct image_args *, const void *,
-	size_t, const int *, size_t);
+int	exec_copyin_data_fds(struct thread *, struct image_args *,
+	    const void * __capability, size_t, const int * __capability,
+	    size_t);
 int	pre_execve(struct thread *td, struct vmspace **oldvmspace);
 void	post_execve(struct thread *td, int error, struct vmspace *oldvmspace);
 #endif

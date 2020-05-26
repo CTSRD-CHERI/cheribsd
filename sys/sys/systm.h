@@ -208,9 +208,9 @@ void	kassert_panic(const char *fmt, ...)  __printflike(1, 2);
 })
 
 #else /* !has_feature(capabilities) */
-#define	__USER_CAP_UNBOUND(ptr)	(ptr)
-#define	__USER_CODE_CAP(ptr)	(ptr)
-#define	__USER_CAP(ptr, len)	(ptr)
+#define	__USER_CAP_UNBOUND(ptr)	((void *)(uintptr_t)(ptr))
+#define	__USER_CODE_CAP(ptr)	((void *)(uintptr_t)(ptr))
+#define	__USER_CAP(ptr, len)	((void *)(uintptr_t)(ptr))
 #endif /* !has_feature(capabilities) */
 
 #define	__USER_CAP_ADDR(ptr)	__USER_CAP_UNBOUND(ptr)

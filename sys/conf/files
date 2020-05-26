@@ -4128,12 +4128,13 @@ net/radix_mpath.c		standard
 net/raw_cb.c			standard
 net/raw_usrreq.c		standard
 net/route.c			standard
-net/route_temporal.c		standard
 net/route/nhop.c		standard
 net/route/nhop_ctl.c		standard
 net/route/nhop_utils.c		standard
 net/route/route_ctl.c		standard
+net/route/route_ddb.c		optional ddb
 net/route/route_helpers.c	standard
+net/route/route_temporal.c	standard
 net/rss_config.c		optional inet rss | inet6 rss
 net/rtsock.c			standard
 net/slcompress.c		optional netgraph_vjc | sppp | \
@@ -5020,9 +5021,9 @@ xen/xenbus/xenbusb.c		optional xenhvm
 xen/xenbus/xenbusb_front.c	optional xenhvm
 xen/xenbus/xenbusb_back.c	optional xenhvm
 xen/xenmem/xenmem_if.m		optional xenhvm
-xdr/xdr.c			optional krpc | nfslockd | nfscl | nfsd
-xdr/xdr_array.c			optional krpc | nfslockd | nfscl | nfsd
-xdr/xdr_mbuf.c			optional krpc | nfslockd | nfscl | nfsd
-xdr/xdr_mem.c			optional krpc | nfslockd | nfscl | nfsd
-xdr/xdr_reference.c		optional krpc | nfslockd | nfscl | nfsd
-xdr/xdr_sizeof.c		optional krpc | nfslockd | nfscl | nfsd
+xdr/xdr.c			optional xdr | krpc | nfslockd | nfscl | nfsd
+xdr/xdr_array.c			optional xdr | krpc | nfslockd | nfscl | nfsd
+xdr/xdr_mbuf.c			optional xdr | krpc | nfslockd | nfscl | nfsd
+xdr/xdr_mem.c			optional xdr | krpc | nfslockd | nfscl | nfsd
+xdr/xdr_reference.c		optional xdr | krpc | nfslockd | nfscl | nfsd
+xdr/xdr_sizeof.c		optional xdr | krpc | nfslockd | nfscl | nfsd

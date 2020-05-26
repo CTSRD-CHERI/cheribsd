@@ -32,6 +32,11 @@
 #ifndef _NET_ROUTE_VAR_H_
 #define _NET_ROUTE_VAR_H_
 
+#ifndef RNF_NORMAL
+#include <net/radix.h>
+#endif
+#include <sys/counter.h>
+
 struct nh_control;
 typedef int rnh_preadd_entry_f_t(u_int fibnum, const struct sockaddr *addr,
 	const struct sockaddr *mask, struct nhop_object *nh);
@@ -69,6 +74,9 @@ struct rib_head {
 #define	RIB_LOCK_ASSERT(rh)	rm_assert(&(rh)->rib_lock, RA_LOCKED)
 #define	RIB_WLOCK_ASSERT(rh)	rm_assert(&(rh)->rib_lock, RA_WLOCKED)
 
+/* Constants */
+#define	RIB_MAX_RETRIES	3
+
 /* Macro for verifying fields in af-specific 'struct route' structures */
 #define CHK_STRUCT_FIELD_GENERIC(_s1, _f1, _s2, _f2)			\
 _Static_assert(sizeof(((_s1 *)0)->_f1) == sizeof(((_s2 *)0)->_f2),	\
@@ -80,7 +88,7 @@ _Static_assert(__offsetof(_s1, _f1) == __offsetof(_s2, _f2),		\
 	CHK_STRUCT_FIELD_GENERIC(struct route, _field, _route_new, _field)
 
 #define CHK_STRUCT_ROUTE_FIELDS(_route_new)	\
-	_CHK_ROUTE_FIELD(_route_new, ro_rt)	\
+	_CHK_ROUTE_FIELD(_route_new, ro_nh)	\
 	_CHK_ROUTE_FIELD(_route_new, ro_lle)	\
 	_CHK_ROUTE_FIELD(_route_new, ro_prepend)\
 	_CHK_ROUTE_FIELD(_route_new, ro_plen)	\
@@ -100,6 +108,70 @@ VNET_PCPUSTAT_DECLARE(struct rtstat, rtstat);
 #define	RTSTAT_ADD(name, val)	\
 	VNET_PCPUSTAT_ADD(struct rtstat, rtstat, name, (val))
 #define	RTSTAT_INC(name)	RTSTAT_ADD(name, 1)
+
+struct rtentry {
+	struct	radix_node rt_nodes[2];	/* tree glue, and other values */
+	/*
+	 * XXX struct rtentry must begin with a struct radix_node (or two!)
+	 * because the code does some casts of a 'struct radix_node *'
+	 * to a 'struct rtentry *'
+	 */
+#define	rt_key(r)	(*((struct sockaddr **)(&(r)->rt_nodes->rn_key)))
+#define	rt_mask(r)	(*((struct sockaddr **)(&(r)->rt_nodes->rn_mask)))
+#define	rt_key_const(r)		(*((const struct sockaddr * const *)(&(r)->rt_nodes->rn_key)))
+#define	rt_mask_const(r)	(*((const struct sockaddr * const *)(&(r)->rt_nodes->rn_mask)))
+	struct nhop_object	*rt_nhop;	/* nexthop data */
+	int		rt_flags;	/* up/down?, host/net */
+	int		rt_refcnt;	/* # held references */
+	u_int		rt_fibnum;	/* which FIB */
+	u_long		rt_weight;	/* absolute weight */ 
+	u_long		rt_expire;	/* lifetime for route, e.g. redirect */
+#define	rt_endzero	rt_pksent
+	counter_u64_t	rt_pksent;	/* packets sent using this route */
+	struct mtx	rt_mtx;		/* mutex for routing entry */
+	struct rtentry	*rt_chain;	/* pointer to next rtentry to delete */
+};
+
+#define	RT_LOCK_INIT(_rt) \
+	mtx_init(&(_rt)->rt_mtx, "rtentry", NULL, MTX_DEF | MTX_DUPOK | MTX_NEW)
+#define	RT_LOCK(_rt)		mtx_lock(&(_rt)->rt_mtx)
+#define	RT_UNLOCK(_rt)		mtx_unlock(&(_rt)->rt_mtx)
+#define	RT_LOCK_DESTROY(_rt)	mtx_destroy(&(_rt)->rt_mtx)
+#define	RT_LOCK_ASSERT(_rt)	mtx_assert(&(_rt)->rt_mtx, MA_OWNED)
+#define	RT_UNLOCK_COND(_rt)	do {				\
+	if (mtx_owned(&(_rt)->rt_mtx))				\
+		mtx_unlock(&(_rt)->rt_mtx);			\
+} while (0)
+
+#define	RT_ADDREF(_rt)	do {					\
+	RT_LOCK_ASSERT(_rt);					\
+	KASSERT((_rt)->rt_refcnt >= 0,				\
+		("negative refcnt %d", (_rt)->rt_refcnt));	\
+	(_rt)->rt_refcnt++;					\
+} while (0)
+
+#define	RT_REMREF(_rt)	do {					\
+	RT_LOCK_ASSERT(_rt);					\
+	KASSERT((_rt)->rt_refcnt > 0,				\
+		("bogus refcnt %d", (_rt)->rt_refcnt));	\
+	(_rt)->rt_refcnt--;					\
+} while (0)
+
+#define	RTFREE_LOCKED(_rt) do {					\
+	if ((_rt)->rt_refcnt <= 1)				\
+		rtfree(_rt);					\
+	else {							\
+		RT_REMREF(_rt);					\
+		RT_UNLOCK(_rt);					\
+	}							\
+	/* guard against invalid refs */			\
+	_rt = 0;						\
+} while (0)
+
+#define	RTFREE(_rt) do {					\
+	RT_LOCK(_rt);						\
+	RTFREE_LOCKED(_rt);					\
+} while (0)
 
 /*
  * With the split between the routing entry and the nexthop,

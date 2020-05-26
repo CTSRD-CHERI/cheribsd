@@ -2413,37 +2413,35 @@ m_advance(struct mbuf **pm, int *poffset, int len)
 static inline int
 count_mbuf_ext_pgs(struct mbuf *m, int skip, vm_paddr_t *nextaddr)
 {
-	struct mbuf_ext_pgs *ext_pgs;
 	vm_paddr_t paddr;
 	int i, len, off, pglen, pgoff, seglen, segoff;
 	int nsegs = 0;
 
-	MBUF_EXT_PGS_ASSERT(m);
-	ext_pgs = &m->m_ext_pgs;
+	M_ASSERTEXTPG(m);
 	off = mtod(m, vm_offset_t);
 	len = m->m_len;
 	off += skip;
 	len -= skip;
 
-	if (ext_pgs->hdr_len != 0) {
-		if (off >= ext_pgs->hdr_len) {
-			off -= ext_pgs->hdr_len;
+	if (m->m_epg_hdrlen != 0) {
+		if (off >= m->m_epg_hdrlen) {
+			off -= m->m_epg_hdrlen;
 		} else {
-			seglen = ext_pgs->hdr_len - off;
+			seglen = m->m_epg_hdrlen - off;
 			segoff = off;
 			seglen = min(seglen, len);
 			off = 0;
 			len -= seglen;
 			paddr = pmap_kextract(
-			    (vm_offset_t)&ext_pgs->m_epg_hdr[segoff]);
+			    (vm_offset_t)&m->m_epg_hdr[segoff]);
 			if (*nextaddr != paddr)
 				nsegs++;
 			*nextaddr = paddr + seglen;
 		}
 	}
-	pgoff = ext_pgs->first_pg_off;
-	for (i = 0; i < ext_pgs->npgs && len > 0; i++) {
-		pglen = mbuf_ext_pg_len(ext_pgs, i, pgoff);
+	pgoff = m->m_epg_1st_off;
+	for (i = 0; i < m->m_epg_npgs && len > 0; i++) {
+		pglen = m_epg_pagelen(m, i, pgoff);
 		if (off >= pglen) {
 			off -= pglen;
 			pgoff = 0;
@@ -2454,16 +2452,16 @@ count_mbuf_ext_pgs(struct mbuf *m, int skip, vm_paddr_t *nextaddr)
 		off = 0;
 		seglen = min(seglen, len);
 		len -= seglen;
-		paddr = ext_pgs->m_epg_pa[i] + segoff;
+		paddr = m->m_epg_pa[i] + segoff;
 		if (*nextaddr != paddr)
 			nsegs++;
 		*nextaddr = paddr + seglen;
 		pgoff = 0;
 	};
 	if (len != 0) {
-		seglen = min(len, ext_pgs->trail_len - off);
+		seglen = min(len, m->m_epg_trllen - off);
 		len -= seglen;
-		paddr = pmap_kextract((vm_offset_t)&ext_pgs->m_epg_trail[off]);
+		paddr = pmap_kextract((vm_offset_t)&m->m_epg_trail[off]);
 		if (*nextaddr != paddr)
 			nsegs++;
 		*nextaddr = paddr + seglen;
@@ -2499,7 +2497,7 @@ count_mbuf_nsegs(struct mbuf *m, int skip, uint8_t *cflags)
 			skip -= len;
 			continue;
 		}
-		if ((m->m_flags & M_NOMAP) != 0) {
+		if ((m->m_flags & M_EXTPG) != 0) {
 			*cflags |= MC_NOMAP;
 			nsegs += count_mbuf_ext_pgs(m, skip, &nextaddr);
 			skip = 0;
@@ -5838,9 +5836,12 @@ write_ethofld_wr(struct cxgbe_rate_tag *cst, struct fw_eth_tx_eo_wr *wr,
 				immhdrs -= m0->m_len;
 				continue;
 			}
-
-			sglist_append(&sg, mtod(m0, char *) + immhdrs,
-			    m0->m_len - immhdrs);
+			if (m0->m_flags & M_EXTPG)
+				sglist_append_mbuf_epg(&sg, m0,
+				    mtod(m0, vm_offset_t), m0->m_len);
+                        else
+				sglist_append(&sg, mtod(m0, char *) + immhdrs,
+				    m0->m_len - immhdrs);
 			immhdrs = 0;
 		}
 		MPASS(sg.sg_nseg == nsegs);

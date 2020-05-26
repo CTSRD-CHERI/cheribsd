@@ -64,6 +64,16 @@ SYSCTL_INT(_vfs_nfs, OID_AUTO, dssameconn, CTLFLAG_RW,
     &nfscl_dssameconn, 0, "Use same TCP connection to multiple DSs");
 
 /*
+ * No one else seems to rewind iovecs so defined here instead of in
+ * sys/sys/_iovec.h/
+ */
+#define	IOVEC_REWIND(iovp, amt)	do {					\
+	size_t amount = (amt);						\
+	(iovp)->iov_base = (char * __capability)((iovp)->iov_base) - amount; \
+	(iovp)->iov_len += amount;					\
+} while(0)
+
+/*
  * Global variables
  */
 extern int nfs_numnfscbd;
@@ -932,7 +942,7 @@ nfsmout:
  */
 APPLESTATIC int
 nfsrpc_setclient(struct nfsmount *nmp, struct nfsclclient *clp, int reclaim,
-    struct ucred *cred, NFSPROC_T *p)
+    bool *retokp, struct ucred *cred, NFSPROC_T *p)
 {
 	u_int32_t *tl;
 	struct nfsrv_descript nfsd;
@@ -944,26 +954,81 @@ nfsrpc_setclient(struct nfsmount *nmp, struct nfsclclient *clp, int reclaim,
 	nfsquad_t confirm;
 	u_int32_t lease;
 	static u_int32_t rev = 0;
-	struct nfsclds *dsp;
+	struct nfsclds *dsp, *odsp;
 	struct in6_addr a6;
 	struct nfsclsession *tsep;
 
 	if (nfsboottime.tv_sec == 0)
 		NFSSETBOOTTIME(nfsboottime);
-	clp->nfsc_rev = rev++;
 	if (NFSHASNFSV4N(nmp)) {
-		/*
-		 * Either there was no previous session or the
-		 * previous session has failed, so...
-		 * do an ExchangeID followed by the CreateSession.
-		 */
-		error = nfsrpc_exchangeid(nmp, clp, &nmp->nm_sockreq, 0,
-		    NFSV4EXCH_USEPNFSMDS | NFSV4EXCH_USENONPNFS, &dsp, cred, p);
-		NFSCL_DEBUG(1, "aft exch=%d\n", error);
-		if (error == 0)
+		error = NFSERR_BADSESSION;
+		odsp = dsp = NULL;
+		if (retokp != NULL) {
+			NFSLOCKMNT(nmp);
+			odsp = TAILQ_FIRST(&nmp->nm_sess);
+			NFSUNLOCKMNT(nmp);
+		}
+		if (odsp != NULL) {
+			/*
+			 * When a session already exists, first try a
+			 * CreateSession with the extant ClientID.
+			 */
+			dsp = malloc(sizeof(struct nfsclds) +
+			    odsp->nfsclds_servownlen + 1, M_NFSCLDS,
+			    M_WAITOK | M_ZERO);
+			dsp->nfsclds_expire = NFSD_MONOSEC + clp->nfsc_renew;
+			dsp->nfsclds_servownlen = odsp->nfsclds_servownlen;
+			dsp->nfsclds_sess.nfsess_clientid =
+			    odsp->nfsclds_sess.nfsess_clientid;
+			dsp->nfsclds_sess.nfsess_sequenceid =
+			    odsp->nfsclds_sess.nfsess_sequenceid;
+			dsp->nfsclds_flags = odsp->nfsclds_flags;
+			if (dsp->nfsclds_servownlen > 0)
+				memcpy(dsp->nfsclds_serverown,
+				    odsp->nfsclds_serverown,
+				    dsp->nfsclds_servownlen + 1);
+			mtx_init(&dsp->nfsclds_mtx, "nfsds", NULL, MTX_DEF);
+			mtx_init(&dsp->nfsclds_sess.nfsess_mtx, "nfssession",
+			    NULL, MTX_DEF);
+			nfscl_initsessionslots(&dsp->nfsclds_sess);
 			error = nfsrpc_createsession(nmp, &dsp->nfsclds_sess,
 			    &nmp->nm_sockreq, NULL,
 			    dsp->nfsclds_sess.nfsess_sequenceid, 1, cred, p);
+			NFSCL_DEBUG(1, "create session for extant "
+			    "ClientID=%d\n", error);
+			if (error != 0) {
+				nfscl_freenfsclds(dsp);
+				dsp = NULL;
+				/*
+				 * If *retokp is true, return any error other
+				 * than NFSERR_STALECLIENTID,
+				 * NFSERR_BADSESSION or NFSERR_STALEDONTRECOVER
+				 * so that nfscl_recover() will not loop.
+				 */
+				if (*retokp)
+					return (NFSERR_IO);
+			} else
+				*retokp = true;
+		} else if (retokp != NULL && *retokp)
+			return (NFSERR_IO);
+		if (error != 0) {
+			/*
+			 * Either there was no previous session or the
+			 * CreateSession attempt failed, so...
+			 * do an ExchangeID followed by the CreateSession.
+			 */
+			clp->nfsc_rev = rev++;
+			error = nfsrpc_exchangeid(nmp, clp, &nmp->nm_sockreq, 0,
+			    NFSV4EXCH_USEPNFSMDS | NFSV4EXCH_USENONPNFS, &dsp,
+			    cred, p);
+			NFSCL_DEBUG(1, "aft exch=%d\n", error);
+			if (error == 0)
+				error = nfsrpc_createsession(nmp,
+				    &dsp->nfsclds_sess, &nmp->nm_sockreq, NULL,
+				    dsp->nfsclds_sess.nfsess_sequenceid, 1,
+				    cred, p);
+			NFSCL_DEBUG(1, "aft createsess=%d\n", error);
+		}
 		if (error == 0) {
 			NFSLOCKMNT(nmp);
 			/*
@@ -988,9 +1053,8 @@ nfsrpc_setclient(struct nfsmount *nmp, struct nfsclclient *clp, int reclaim,
 				wakeup(&tsep->nfsess_slots);
 			wakeup(&nmp->nm_sess);
 			NFSUNLOCKMNT(nmp);
-		} else
+		} else if (dsp != NULL)
 			nfscl_freenfsclds(dsp);
-		NFSCL_DEBUG(1, "aft createsess=%d\n", error);
 		if (error == 0 && reclaim == 0) {
 			error = nfsrpc_reclaimcomplete(nmp, cred, p);
 			NFSCL_DEBUG(1, "aft reclaimcomp=%d\n", error);
@@ -1000,7 +1064,9 @@ nfsrpc_setclient(struct nfsmount *nmp, struct nfsclclient *clp, int reclaim,
 				error = 0;
 		}
 		return (error);
-	}
+	} else if (retokp != NULL && *retokp)
+		return (NFSERR_IO);
+	clp->nfsc_rev = rev++;
 
 	/*
 	 * Allocate a single session structure for NFSv4.0, because some of
@@ -1561,7 +1627,7 @@ nfsrpc_readrpc(vnode_t vp, struct uio *uiop, struct ucred *cred,
 	off_t tmp_off;
 
 	*attrflagp = 0;
-	tsiz = uio_uio_resid(uiop);
+	tsiz = uiop->uio_resid;
 	tmp_off = uiop->uio_offset + tsiz;
 	NFSLOCKMNT(nmp);
 	if (tmp_off > nmp->nm_maxfilesize || tmp_off < uiop->uio_offset) {
@@ -1737,7 +1803,7 @@ nfsrpc_writerpc(vnode_t vp, struct uio *uiop, int *iomode,
 
 	KASSERT(uiop->uio_iovcnt == 1, ("nfs: writerpc iovcnt > 1"));
 	*attrflagp = 0;
-	tsiz = uio_uio_resid(uiop);
+	tsiz = uiop->uio_resid;
 	tmp_off = uiop->uio_offset + tsiz;
 	NFSLOCKMNT(nmp);
 	if (tmp_off > nmp->nm_maxfilesize || tmp_off < uiop->uio_offset) {
@@ -1822,9 +1888,8 @@ nfsrpc_writerpc(vnode_t vp, struct uio *uiop, int *iomode,
 			 * back.
 			 */
 			uiop->uio_offset -= len;
-			uio_uio_resid_add(uiop, len);
-			uio_iov_base_add(uiop, -len);
-			uio_iov_len_add(uiop, len);
+			uiop->uio_resid += len;
+			IOVEC_REWIND(uiop->uio_iov, len);
 		}
 		if (nd->nd_flag & (ND_NFSV3 | ND_NFSV4)) {
 			error = nfscl_wcc_data(nd, vp, nap, attrflagp,
@@ -1842,10 +1907,9 @@ nfsrpc_writerpc(vnode_t vp, struct uio *uiop, int *iomode,
 					goto nfsmout;
 				} else if (rlen < len) {
 					backup = len - rlen;
-					uio_iov_base_add(uiop, -(backup));
-					uio_iov_len_add(uiop, backup);
+					IOVEC_REWIND(uiop->uio_iov, backup);
 					uiop->uio_offset -= backup;
-					uio_uio_resid_add(uiop, backup);
+					uiop->uio_resid += backup;
 					len = rlen;
 				}
 				commit = fxdr_unsigned(int, *tl++);
@@ -2869,7 +2933,7 @@ nfsrpc_readdir(vnode_t vp, struct uio *uiop, nfsuint64 *cookiep,
 	size_t tresid;
 
 	KASSERT(uiop->uio_iovcnt == 1 &&
-	    (uio_uio_resid(uiop) & (DIRBLKSIZ - 1)) == 0,
+	    (uiop->uio_resid & (DIRBLKSIZ - 1)) == 0,
 	    ("nfs readdirrpc bad uio"));
 	ncookie.lval[0] = ncookie.lval[1] = 0;
 	/*
@@ -2879,13 +2943,13 @@ nfsrpc_readdir(vnode_t vp, struct uio *uiop, nfsuint64 *cookiep,
 	 * will never make readsize > nm_readdirsize.
 	 */
 	readsize = nmp->nm_readdirsize;
-	if (readsize > uio_uio_resid(uiop))
-		readsize = uio_uio_resid(uiop) + DIRBLKSIZ;
+	if (readsize > uiop->uio_resid)
+		readsize = uiop->uio_resid + DIRBLKSIZ;
 
 	*attrflagp = 0;
 	if (eofp)
 		*eofp = 0;
-	tresid = uio_uio_resid(uiop);
+	tresid = uiop->uio_resid;
 	cookie.lval[0] = cookiep->nfsuquad[0];
 	cookie.lval[1] = cookiep->nfsuquad[1];
 	nd->nd_mrep = NULL;
@@ -2980,7 +3044,7 @@ nfsrpc_readdir(vnode_t vp, struct uio *uiop, nfsuint64 *cookiep,
 			if (error)
 			    return (error);
 			nd->nd_mrep = NULL;
-			dp = (struct dirent *)uio_iov_base(uiop);
+			dp = (__cheri_fromcap struct dirent *)uiop->uio_iov->iov_base;
 			dp->d_pad0 = dp->d_pad1 = 0;
 			dp->d_off = 0;
 			dp->d_type = DT_DIR;
@@ -2996,11 +3060,10 @@ nfsrpc_readdir(vnode_t vp, struct uio *uiop, nfsuint64 *cookiep,
 			*tl++ = 0;
 			*tl = 0;
 			blksiz += dp->d_reclen;
-			uio_uio_resid_add(uiop, -(dp->d_reclen));
+			uiop->uio_resid -= dp->d_reclen;
 			uiop->uio_offset += dp->d_reclen;
-			uio_iov_base_add(uiop, dp->d_reclen);
-			uio_iov_len_add(uiop, -(dp->d_reclen));
-			dp = (struct dirent *)uio_iov_base(uiop);
+			IOVEC_ADVANCE(uiop->uio_iov, dp->d_reclen);
+			dp = (__cheri_fromcap struct dirent *)uiop->uio_iov->iov_base;
 			dp->d_pad0 = dp->d_pad1 = 0;
 			dp->d_off = 0;
 			dp->d_type = DT_DIR;
@@ -3017,10 +3080,9 @@ nfsrpc_readdir(vnode_t vp, struct uio *uiop, nfsuint64 *cookiep,
 			*tl++ = 0;
 			*tl = 0;
 			blksiz += dp->d_reclen;
-			uio_uio_resid_add(uiop, -(dp->d_reclen));
+			uiop->uio_resid -= dp->d_reclen;
 			uiop->uio_offset += dp->d_reclen;
-			uio_iov_base_add(uiop, dp->d_reclen);
-			uio_iov_len_add(uiop, -(dp->d_reclen));
+			IOVEC_ADVANCE(uiop->uio_iov, dp->d_reclen);
 		}
 		NFSSETBIT_ATTRBIT(&attrbits, NFSATTRBIT_RDATTRERROR);
 	} else {
@@ -3115,19 +3177,19 @@ nfsrpc_readdir(vnode_t vp, struct uio *uiop, nfsuint64 *cookiep,
 				tlen += 8;  /* To ensure null termination. */
 			left = DIRBLKSIZ - blksiz;
 			if (_GENERIC_DIRLEN(len) + NFSX_HYPER > left) {
-				NFSBZERO(uio_iov_base(uiop), left);
+				NFSBZERO((__cheri_fromcap void *)
+				    uiop->uio_iov->iov_base, left);
 				dp->d_reclen += left;
-				uio_iov_base_add(uiop, left);
-				uio_iov_len_add(uiop, -(left));
-				uio_uio_resid_add(uiop, -(left));
+				IOVEC_ADVANCE(uiop->uio_iov, left);
+				uiop->uio_resid -= left;
 				uiop->uio_offset += left;
 				blksiz = 0;
 			}
 			if (_GENERIC_DIRLEN(len) + NFSX_HYPER >
-			    uio_uio_resid(uiop))
+			    uiop->uio_resid)
 				bigenough = 0;
 			if (bigenough) {
-				dp = (struct dirent *)uio_iov_base(uiop);
+				dp = (__cheri_fromcap struct dirent *)uiop->uio_iov->iov_base;
 				dp->d_pad0 = dp->d_pad1 = 0;
 				dp->d_off = 0;
 				dp->d_namlen = len;
@@ -3137,21 +3199,20 @@ nfsrpc_readdir(vnode_t vp, struct uio *uiop, nfsuint64 *cookiep,
 				blksiz += dp->d_reclen;
 				if (blksiz == DIRBLKSIZ)
 					blksiz = 0;
-				uio_uio_resid_add(uiop, -(DIRHDSIZ));
+				uiop->uio_resid -= DIRHDSIZ;
 				uiop->uio_offset += DIRHDSIZ;
-				uio_iov_base_add(uiop, DIRHDSIZ);
-				uio_iov_len_add(uiop, -(DIRHDSIZ));
+				IOVEC_ADVANCE(uiop->uio_iov, DIRHDSIZ);
 				error = nfsm_mbufuio(nd, uiop, len);
 				if (error)
 					goto nfsmout;
-				cp = uio_iov_base(uiop);
+				cp = (__cheri_fromcap void *)uiop->uio_iov->iov_base;
 				tlen -= len;
 				NFSBZERO(cp, tlen);
 				cp += tlen;	/* points to cookie storage */
 				tl2 = (u_int32_t *)cp;
-				uio_iov_base_add(uiop, (tlen + NFSX_HYPER));
-				uio_iov_len_add(uiop, -(tlen + NFSX_HYPER));
-				uio_uio_resid_add(uiop, -(tlen + NFSX_HYPER));
+				IOVEC_ADVANCE(uiop->uio_iov,
+				    tlen + NFSX_HYPER);
+				uiop->uio_resid -= tlen + NFSX_HYPER;
 				uiop->uio_offset += (tlen + NFSX_HYPER);
 			} else {
 				error = nfsm_advance(nd, NFSM_RNDUP(len), -1);
@@ -3234,11 +3295,10 @@ nfsrpc_readdir(vnode_t vp, struct uio *uiop, nfsuint64 *cookiep,
 	 */
 	if (blksiz > 0) {
 		left = DIRBLKSIZ - blksiz;
-		NFSBZERO(uio_iov_base(uiop), left);
+		NFSBZERO((__cheri_fromcap void *)uiop->uio_iov->iov_base, left);
 		dp->d_reclen += left;
-		uio_iov_base_add(uiop, left);
-		uio_iov_len_add(uiop, -(left));
-		uio_uio_resid_add(uiop, -(left));
+		IOVEC_ADVANCE(uiop->uio_iov, left);
+		uiop->uio_resid -= left;
 		uiop->uio_offset += left;
 	}
 
@@ -3249,7 +3309,7 @@ nfsrpc_readdir(vnode_t vp, struct uio *uiop, nfsuint64 *cookiep,
 	 * Otherwise, return the eof flag from the server.
 	 */
 	if (eofp) {
-		if (tresid == ((size_t)(uio_uio_resid(uiop))))
+		if (tresid == ((size_t)(uiop->uio_resid)))
 			*eofp = 1;
 		else if (!bigenough)
 			*eofp = 0;
@@ -3260,17 +3320,16 @@ nfsrpc_readdir(vnode_t vp, struct uio *uiop, nfsuint64 *cookiep,
 	/*
 	 * Add extra empty records to any remaining DIRBLKSIZ chunks.
 	 */
-	while (uio_uio_resid(uiop) > 0 && uio_uio_resid(uiop) != tresid) {
-		dp = (struct dirent *)uio_iov_base(uiop);
+	while (uiop->uio_resid > 0 && uiop->uio_resid != tresid) {
+		dp = (__cheri_fromcap struct dirent *)uiop->uio_iov->iov_base;
 		NFSBZERO(dp, DIRBLKSIZ);
 		dp->d_type = DT_UNKNOWN;
 		tl = (u_int32_t *)&dp->d_name[4];
 		*tl++ = cookie.lval[0];
 		*tl = cookie.lval[1];
 		dp->d_reclen = DIRBLKSIZ;
-		uio_iov_base_add(uiop, DIRBLKSIZ);
-		uio_iov_len_add(uiop, -(DIRBLKSIZ));
-		uio_uio_resid_add(uiop, -(DIRBLKSIZ));
+		IOVEC_ADVANCE(uiop->uio_iov, DIRBLKSIZ);
+		uiop->uio_resid -= DIRBLKSIZ;
 		uiop->uio_offset += DIRBLKSIZ;
 	}
 
@@ -3315,7 +3374,7 @@ nfsrpc_readdirplus(vnode_t vp, struct uio *uiop, nfsuint64 *cookiep,
 	struct timespec dctime;
 
 	KASSERT(uiop->uio_iovcnt == 1 &&
-	    (uio_uio_resid(uiop) & (DIRBLKSIZ - 1)) == 0,
+	    (uiop->uio_resid & (DIRBLKSIZ - 1)) == 0,
 	    ("nfs readdirplusrpc bad uio"));
 	ncookie.lval[0] = ncookie.lval[1] = 0;
 	timespecclear(&dctime);
@@ -3326,7 +3385,7 @@ nfsrpc_readdirplus(vnode_t vp, struct uio *uiop, nfsuint64 *cookiep,
 	nd->nd_mrep = NULL;
 	cookie.lval[0] = cookiep->nfsuquad[0];
 	cookie.lval[1] = cookiep->nfsuquad[1];
-	tresid = uio_uio_resid(uiop);
+	tresid = uiop->uio_resid;
 
 	/*
 	 * For NFSv4, first create the "." and ".." entries.
@@ -3417,7 +3476,7 @@ nfsrpc_readdirplus(vnode_t vp, struct uio *uiop, nfsuint64 *cookiep,
 			if (error)
 			    return (error);
 			nd->nd_mrep = NULL;
-			dp = (struct dirent *)uio_iov_base(uiop);
+			dp = (__cheri_fromcap struct dirent *)uiop->uio_iov->iov_base;
 			dp->d_pad0 = dp->d_pad1 = 0;
 			dp->d_off = 0;
 			dp->d_type = DT_DIR;
@@ -3433,11 +3492,10 @@ nfsrpc_readdirplus(vnode_t vp, struct uio *uiop, nfsuint64 *cookiep,
 			*tl++ = 0;
 			*tl = 0;
 			blksiz += dp->d_reclen;
-			uio_uio_resid_add(uiop, -(dp->d_reclen));
+			uiop->uio_resid -= dp->d_reclen;
 			uiop->uio_offset += dp->d_reclen;
-			uio_iov_base_add(uiop, dp->d_reclen);
-			uio_iov_len_add(uiop, -(dp->d_reclen));
-			dp = (struct dirent *)uio_iov_base(uiop);
+			IOVEC_ADVANCE(uiop->uio_iov, dp->d_reclen);
+			dp = (__cheri_fromcap struct dirent *)uiop->uio_iov->iov_base;
 			dp->d_pad0 = dp->d_pad1 = 0;
 			dp->d_off = 0;
 			dp->d_type = DT_DIR;
@@ -3454,10 +3512,9 @@ nfsrpc_readdirplus(vnode_t vp, struct uio *uiop, nfsuint64 *cookiep,
 			*tl++ = 0;
 			*tl = 0;
 			blksiz += dp->d_reclen;
-			uio_uio_resid_add(uiop, -(dp->d_reclen));
+			uiop->uio_resid -= dp->d_reclen;
 			uiop->uio_offset += dp->d_reclen;
-			uio_iov_base_add(uiop, dp->d_reclen);
-			uio_iov_len_add(uiop, -(dp->d_reclen));
+			IOVEC_ADVANCE(uiop->uio_iov, dp->d_reclen);
 		}
 		NFSREADDIRPLUS_ATTRBIT(&attrbits);
 		if (gotmnton)
@@ -3533,19 +3590,18 @@ nfsrpc_readdirplus(vnode_t vp, struct uio *uiop, nfsuint64 *cookiep,
 				tlen += 8;  /* To ensure null termination. */
 			left = DIRBLKSIZ - blksiz;
 			if (_GENERIC_DIRLEN(len) + NFSX_HYPER > left) {
-				NFSBZERO(uio_iov_base(uiop), left);
+				NFSBZERO((__cheri_fromcap void *)uiop->uio_iov->iov_base, left);
 				dp->d_reclen += left;
-				uio_iov_base_add(uiop, left);
-				uio_iov_len_add(uiop, -(left));
-				uio_uio_resid_add(uiop, -(left));
+				IOVEC_ADVANCE(uiop->uio_iov, left);
+				uiop->uio_resid -= left;
 				uiop->uio_offset += left;
 				blksiz = 0;
 			}
 			if (_GENERIC_DIRLEN(len) + NFSX_HYPER >
-			    uio_uio_resid(uiop))
+			    uiop->uio_resid)
 				bigenough = 0;
 			if (bigenough) {
-				dp = (struct dirent *)uio_iov_base(uiop);
+				dp = (__cheri_fromcap struct dirent *)uiop->uio_iov->iov_base;
 				dp->d_pad0 = dp->d_pad1 = 0;
 				dp->d_off = 0;
 				dp->d_namlen = len;
@@ -3555,17 +3611,16 @@ nfsrpc_readdirplus(vnode_t vp, struct uio *uiop, nfsuint64 *cookiep,
 				blksiz += dp->d_reclen;
 				if (blksiz == DIRBLKSIZ)
 					blksiz = 0;
-				uio_uio_resid_add(uiop, -(DIRHDSIZ));
+				uiop->uio_resid -= DIRHDSIZ;
 				uiop->uio_offset += DIRHDSIZ;
-				uio_iov_base_add(uiop, DIRHDSIZ);
-				uio_iov_len_add(uiop, -(DIRHDSIZ));
-				cnp->cn_nameptr = uio_iov_base(uiop);
+				IOVEC_ADVANCE(uiop->uio_iov, DIRHDSIZ);
+				cnp->cn_nameptr = (__cheri_fromcap void *)uiop->uio_iov->iov_base;
 				cnp->cn_namelen = len;
 				NFSCNHASHZERO(cnp);
 				error = nfsm_mbufuio(nd, uiop, len);
 				if (error)
 					goto nfsmout;
-				cp = uio_iov_base(uiop);
+				cp = (__cheri_fromcap void *)uiop->uio_iov->iov_base;
 				tlen -= len;
 				NFSBZERO(cp, tlen);
 				cp += tlen;	/* points to cookie storage */
@@ -3575,9 +3630,9 @@ nfsrpc_readdirplus(vnode_t vp, struct uio *uiop, nfsuint64 *cookiep,
 					isdotdot = 1;
 				else
 					isdotdot = 0;
-				uio_iov_base_add(uiop, (tlen + NFSX_HYPER));
-				uio_iov_len_add(uiop, -(tlen + NFSX_HYPER));
-				uio_uio_resid_add(uiop, -(tlen + NFSX_HYPER));
+				IOVEC_ADVANCE(uiop->uio_iov,
+				    tlen + NFSX_HYPER);
+				uiop->uio_resid -= tlen + NFSX_HYPER;
 				uiop->uio_offset += (tlen + NFSX_HYPER);
 			} else {
 				error = nfsm_advance(nd, NFSM_RNDUP(len), -1);
@@ -3737,11 +3792,10 @@ nfsrpc_readdirplus(vnode_t vp, struct uio *uiop, nfsuint64 *cookiep,
 	 */
 	if (blksiz > 0) {
 		left = DIRBLKSIZ - blksiz;
-		NFSBZERO(uio_iov_base(uiop), left);
+		NFSBZERO((__cheri_fromcap void *)uiop->uio_iov->iov_base, left);
 		dp->d_reclen += left;
-		uio_iov_base_add(uiop, left);
-		uio_iov_len_add(uiop, -(left));
-		uio_uio_resid_add(uiop, -(left));
+		IOVEC_ADVANCE(uiop->uio_iov, left);
+		uiop->uio_resid -= left;
 		uiop->uio_offset += left;
 	}
 
@@ -3752,7 +3806,7 @@ nfsrpc_readdirplus(vnode_t vp, struct uio *uiop, nfsuint64 *cookiep,
 	 * Otherwise, return the eof flag from the server.
 	 */
 	if (eofp != NULL) {
-		if (tresid == uio_uio_resid(uiop))
+		if (tresid == uiop->uio_resid)
 			*eofp = 1;
 		else if (!bigenough)
 			*eofp = 0;
@@ -3763,17 +3817,16 @@ nfsrpc_readdirplus(vnode_t vp, struct uio *uiop, nfsuint64 *cookiep,
 	/*
 	 * Add extra empty records to any remaining DIRBLKSIZ chunks.
 	 */
-	while (uio_uio_resid(uiop) > 0 && uio_uio_resid(uiop) != tresid) {
-		dp = (struct dirent *)uio_iov_base(uiop);
+	while (uiop->uio_resid > 0 && uiop->uio_resid != tresid) {
+		dp = (__cheri_fromcap struct dirent *)uiop->uio_iov->iov_base;
 		NFSBZERO(dp, DIRBLKSIZ);
 		dp->d_type = DT_UNKNOWN;
 		tl = (u_int32_t *)&dp->d_name[4];
 		*tl++ = cookie.lval[0];
 		*tl = cookie.lval[1];
 		dp->d_reclen = DIRBLKSIZ;
-		uio_iov_base_add(uiop, DIRBLKSIZ);
-		uio_iov_len_add(uiop, -(DIRBLKSIZ));
-		uio_uio_resid_add(uiop, -(DIRBLKSIZ));
+		IOVEC_ADVANCE(uiop->uio_iov, DIRBLKSIZ);
+		uiop->uio_resid -= DIRBLKSIZ;
 		uiop->uio_offset += DIRBLKSIZ;
 	}
 
@@ -5871,8 +5924,7 @@ nfscl_doiods(vnode_t vp, struct uio *uiop, int *iomode, int *must_commit,
 				 */
 				uiop->uio_offset = offs;
 				uiop->uio_resid = resid;
-				uiop->uio_iov->iov_base = iovbase;
-				uiop->uio_iov->iov_len = iovlen;
+				IOVEC_INIT(uiop->uio_iov, iovbase, iovlen);
 			}
 		}
 	}
@@ -6339,9 +6391,8 @@ nfsrpc_writeds(vnode_t vp, struct uio *uiop, int *iomode, int *must_commit,
 		 * back.
 		 */
 		uiop->uio_offset -= len;
-		uio_uio_resid_add(uiop, len);
-		uio_iov_base_add(uiop, -len);
-		uio_iov_len_add(uiop, len);
+		uiop->uio_resid += len;
+		IOVEC_REWIND(uiop->uio_iov, len);
 		error = nd->nd_repstat;
 	} else {
 		if (vers == NFS_VER3) {
@@ -6359,10 +6410,9 @@ nfsrpc_writeds(vnode_t vp, struct uio *uiop, int *iomode, int *must_commit,
 			goto nfsmout;
 		} else if (rlen < len) {
 			backup = len - rlen;
-			uio_iov_base_add(uiop, -(backup));
-			uio_iov_len_add(uiop, backup);
+			IOVEC_REWIND(uiop->uio_iov, backup);
 			uiop->uio_offset -= backup;
-			uio_uio_resid_add(uiop, backup);
+			uiop->uio_resid += backup;
 			len = rlen;
 		}
 		commit = fxdr_unsigned(int, *tl++);

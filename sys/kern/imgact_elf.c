@@ -31,6 +31,8 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define	EXPLICIT_USER_ACCESS
+
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
@@ -1522,7 +1524,13 @@ ret:
 	return (error);
 }
 
+#if 1
+/* XXX: Temporary hack. */
+#undef suword
+#define	suword __CONCAT(__CONCAT(suword, __ELF_WORD_SIZE), _c)
+#else
 #define	suword __CONCAT(suword, __ELF_WORD_SIZE)
+#endif
 
 #ifdef __ELF_CHERI
 static void * __capability
@@ -1778,11 +1786,13 @@ static void note_procstat_vmmap(void *, struct sbuf *, size_t *);
  * Write out a core segment to the compression stream.
  */
 static int
-compress_chunk(struct coredump_params *p, char *base, char *buf, u_int len)
+compress_chunk(struct coredump_params *p, char *base_vaddr, char *buf, u_int len)
 {
+	char * __capability base;
 	u_int chunk_len;
 	int error;
 
+	base = __USER_CAP(base_vaddr, len);
 	while (len > 0) {
 		chunk_len = MIN(len, CORE_BUF_SIZE);
 

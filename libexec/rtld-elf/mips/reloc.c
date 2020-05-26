@@ -60,6 +60,10 @@ __FBSDID("$FreeBSD$");
 #include "debug.h"
 #include "rtld.h"
 
+#ifdef __CHERI_PURE_CAPABILITY__
+#include "cheri_reloc.h"
+#endif
+
 #ifdef __mips_n64
 #define	GOT1_MASK	0x8000000000000000UL
 #else
@@ -178,7 +182,7 @@ do_copy_relocations(Obj_Entry *dstobj)
 }
 #endif  /* !defined(__CHERI_PURE_CAPABILITY) */
 
-Elf_Addr _rtld_relocate_nonplt_self(Elf_Dyn *, caddr_t);
+void _rtld_relocate_nonplt_self(Elf_Dyn *, caddr_t);
 
 /*
  * It is possible for the compiler to emit relocations for unaligned data.
@@ -231,7 +235,7 @@ store_ptr(void *where, Elf_Sxword val, size_t len)
 #endif
 }
 
-Elf_Addr
+void
 _rtld_relocate_nonplt_self(Elf_Dyn *dynp, caddr_t relocbase)
 {
 	/*
@@ -253,7 +257,14 @@ _rtld_relocate_nonplt_self(Elf_Dyn *dynp, caddr_t relocbase)
 	Elf_Addr *got = NULL;
 	Elf_Word local_gotno = 0, symtabno = 0, gotsym = 0;
 	size_t i;
+#ifdef __CHERI_PURE_CAPABILITY__
+	const struct capreloc *caprelocs = NULL, *caprelocslim;
+	Elf_Addr caprelocssz;
 	Elf_Addr cheri_flags = 0;
+	void *pcc;
+	bool relative_relocs;
+	vaddr_t base_addr;
+#endif
 
 	for (; dynp->d_tag != DT_NULL; dynp++) {
 		switch (dynp->d_tag) {
@@ -283,9 +294,17 @@ _rtld_relocate_nonplt_self(Elf_Dyn *dynp, caddr_t relocbase)
 		case DT_MIPS_GOTSYM:
 			gotsym = dynp->d_un.d_val;
 			break;
+#ifdef __CHERI_PURE_CAPABILITY__
 		case DT_MIPS_CHERI_FLAGS:
 			cheri_flags = dynp->d_un.d_val;
 			break;
+		case DT_MIPS_CHERI___CAPRELOCS:
+			caprelocs = (const struct capreloc *)(relocbase + dynp->d_un.d_ptr);
+			break;
+		case DT_MIPS_CHERI___CAPRELOCSSZ:
+			caprelocssz = dynp->d_un.d_val;
+			break;
+#endif
 		}
 	}
 
@@ -422,7 +441,18 @@ _rtld_relocate_nonplt_self(Elf_Dyn *dynp, caddr_t relocbase)
 			break;
 		}
 	}
-	return cheri_flags;
+
+#ifdef __CHERI_PURE_CAPABILITY__
+	caprelocs = cheri_setbounds(caprelocs, caprelocssz);
+	caprelocslim = (const struct capreloc *)((const char *)caprelocs + caprelocssz);
+	pcc = __builtin_cheri_program_counter_get();
+	relative_relocs = cheri_flags & DF_MIPS_CHERI_RELATIVE_CAPRELOCS;
+	// If the binary includes the RELATIVE_CAPRELOCS dynamic flag we have
+	// to add getaddr(relocbase) to every __cap_reloc location and object.
+	base_addr = relative_relocs ? cheri_getaddress(relocbase) : 0;
+	// TODO: allow using tight bounds for RTLD
+	_do___caprelocs(caprelocs, caprelocslim, relocbase, pcc, base_addr, false);
+#endif
 }
 
 #ifndef __CHERI_PURE_CAPABILITY__
@@ -457,10 +487,6 @@ _mips_rtld_bind(Obj_Entry *obj, Elf_Size reloff)
 	return (Elf_Addr)target;
 }
 #endif /* #ifndef __CHERI_PURE_CAPABILITY__*/
-
-#ifdef __CHERI_PURE_CAPABILITY__
-#include "cheri_reloc.h"
-#endif
 
 int
 reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
@@ -849,8 +875,22 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 				return (-1);
 			break;
 		case R_TYPE(CHERI_CAPABILITY):
+			/*
+			 * MIPS's use of Elf_Rel rather than Elf_Rela, combined
+			 * with being big-endian, makes this odd. We store the
+			 * addend in the first 8 bytes, despite that not being
+			 * where the cursor of a capability is. This
+			 * effectively makes it:
+			 *
+			 *   union { size_t addend; uintcap_t capability; }
+			 *
+			 * This has the benefit of greater compatibility, as
+			 * tools often assume both that 64 bits are enough for
+			 * any relocation and that the addend is stored at the
+			 * location given by r_offset.
+			 */
 			if (process_r_cheri_capability(obj, r_symndx, lockstate,
-			    flags, where) != 0)
+			    flags, where, load_ptr(where, sizeof(Elf_Sword))) != 0)
 				return (-1);
 			break;
 #endif /* __CHERI_PURE_CAPABILITY__ */

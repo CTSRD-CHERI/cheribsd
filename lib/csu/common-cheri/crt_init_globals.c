@@ -34,7 +34,7 @@
 
 #define CHERI_INIT_GLOBALS_GDC_ONLY
 #include <cheri_init_globals.h>
-#ifndef CHERI_INIT_GLOBALS_SUPPORTS_CONSTANT_FLAG
+#if !defined(CHERI_INIT_GLOBALS_VERSION) || CHERI_INIT_GLOBALS_VERSION < 4
 #error "cheri_init_globals.h is outdated. Please update LLVM"
 #endif
 
@@ -151,7 +151,7 @@ do_crt_init_globals(const Elf_Phdr *phdr, long phnum)
 	    CHERI_PERM_STORE_LOCAL_CAP);
 	rodata_cap = cheri_setaddress(rodata_cap, readonly_start);
 	rodata_cap =
-	    cheri_csetbounds(rodata_cap, readonly_end - readonly_start);
+	    cheri_setbounds(rodata_cap, readonly_end - readonly_start);
 
 	void *data_cap = NULL;
 	if (!have_data_segment) {
@@ -180,7 +180,7 @@ do_crt_init_globals(const Elf_Phdr *phdr, long phnum)
 		data_cap = cheri_clearperm(data_cap, CHERI_PERM_EXECUTE);
 		/* TODO: should we use exact setbounds? */
 		data_cap =
-		    cheri_csetbounds(data_cap, writable_end - writable_start);
+		    cheri_setbounds(data_cap, writable_end - writable_start);
 
 		if (!cheri_gettag(data_cap))
 			__builtin_trap();

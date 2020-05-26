@@ -953,6 +953,7 @@ zfs_write(vnode_t *vp, uio_t *uio, int ioflag, cred_t *cr, caller_context_t *ct)
 			break;
 		}
 
+#ifdef illumos
 		if (xuio && abuf == NULL) {
 			ASSERT(i_iov < iovcnt);
 			aiov = &iovp[i_iov];
@@ -964,7 +965,9 @@ zfs_write(vnode_t *vp, uio_t *uio, int ioflag, cred_t *cr, caller_context_t *ct)
 			    ((char *)aiov->iov_base - (char *)abuf->b_data +
 			    aiov->iov_len == arc_buf_size(abuf)));
 			i_iov++;
-		} else if (abuf == NULL && n >= max_blksz &&
+		} else
+#endif
+			if (abuf == NULL && n >= max_blksz &&
 		    woff >= zp->z_size &&
 		    P2PHASE(woff, max_blksz) == 0 &&
 		    zp->z_blksz == max_blksz) {
@@ -1052,6 +1055,7 @@ zfs_write(vnode_t *vp, uio_t *uio, int ioflag, cred_t *cr, caller_context_t *ct)
 			 * block-aligned, use assign_arcbuf().  Otherwise,
 			 * write via dmu_write().
 			 */
+#ifdef illumos
 			if (tx_bytes < max_blksz && (!write_eof ||
 			    aiov->iov_base != abuf->b_data)) {
 				ASSERT(xuio);
@@ -1059,7 +1063,9 @@ zfs_write(vnode_t *vp, uio_t *uio, int ioflag, cred_t *cr, caller_context_t *ct)
 				    aiov->iov_len, aiov->iov_base, tx);
 				dmu_return_arcbuf(abuf);
 				xuio_stat_wbuf_copied();
-			} else {
+			} else
+#endif
+			{
 				ASSERT(xuio || tx_bytes == max_blksz);
 				dmu_assign_arcbuf(sa_get_db(zp->z_sa_hdl),
 				    woff, abuf, tx);
@@ -2338,7 +2344,7 @@ zfs_readdir(vnode_t *vp, uio_t *uio, cred_t *cr, int *eofp, int *ncookies, u_lon
 	} else {
 		bufsize = bytes_wanted;
 		outbuf = NULL;
-		odp = (struct dirent64 *)iovp->iov_base;
+		odp = (struct dirent64 *)(__cheri_addr uintptr_t)iovp->iov_base;
 	}
 	eodp = (struct edirent *)odp;
 

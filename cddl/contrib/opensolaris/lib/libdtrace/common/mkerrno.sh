@@ -28,13 +28,14 @@
 
 set -e
 
-echo "\
-/*\n\
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.\n\
- * Use is subject to license terms.\n\
- */\n\
-\n\
-#pragma ident\t\"%Z%%M%\t%I%\t%E% SMI\"\n"
+printf "%s" "
+/*
+ * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+#pragma ident\t\"%Z%%M%\t%I%\t%E% SMI\"
+"
 
 pattern='^#define[	 ]\(E[A-Z0-9]*\)[	 ]*\([A-Z0-9]*\).*$'
 replace='inline int \1 = \2;@#pragma D binding "1.0" \1'

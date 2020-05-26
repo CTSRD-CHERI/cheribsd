@@ -58,6 +58,7 @@ __FBSDID("$FreeBSD$");
 #include "opt_mfi.h"
 
 #include <sys/param.h>
+#include <sys/abi_compat.h>
 #include <sys/systm.h>
 #include <sys/sysctl.h>
 #include <sys/malloc.h>

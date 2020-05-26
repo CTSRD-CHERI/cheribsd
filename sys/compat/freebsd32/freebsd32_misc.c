@@ -2959,7 +2959,7 @@ freebsd32_copyout_strings(struct image_params *imgp, uintptr_t *stack_base)
 	if (execpath_len != 0) {
 		destp -= execpath_len;
 		imgp->execpathp = (void *)destp;
-		error = copyout(imgp->execpath, (void *)destp, execpath_len);
+		error = copyout(imgp->execpath, imgp->execpathp, execpath_len);
 		if (error != 0)
 			return (error);
 	}
@@ -2970,7 +2970,7 @@ freebsd32_copyout_strings(struct image_params *imgp, uintptr_t *stack_base)
 	arc4rand(canary, sizeof(canary), 0);
 	destp -= sizeof(canary);
 	imgp->canary = (void *)destp;
-	error = copyout(canary, (void *)destp, sizeof(canary));
+	error = copyout(canary, imgp->canary, sizeof(canary));
 	if (error != 0)
 		return (error);
 	imgp->canarylen = sizeof(canary);
@@ -2983,7 +2983,7 @@ freebsd32_copyout_strings(struct image_params *imgp, uintptr_t *stack_base)
 	destp -= sizeof(pagesizes32);
 	destp = rounddown2(destp, sizeof(uint32_t));
 	imgp->pagesizes = (void *)destp;
-	error = copyout(pagesizes32, (void *)destp, sizeof(pagesizes32));
+	error = copyout(pagesizes32, imgp->pagesizes, sizeof(pagesizes32));
 	if (error != 0)
 		return (error);
 	imgp->pagesizeslen = sizeof(pagesizes32);

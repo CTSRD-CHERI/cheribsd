@@ -2132,7 +2132,7 @@ cheri_restore_tag(void * __capability *cp)
 
 	newcap = swap_restore_cap;
 	newcap = cheri_setoffset(newcap, base);
-	newcap = cheri_csetbounds(newcap, len);
+	newcap = cheri_setbounds(newcap, len);
 	newcap = cheri_andperm(newcap, perm);
 	newcap = cheri_incoffset(newcap, offset);
 

@@ -77,7 +77,7 @@ static eventhandler_tag lle_event_eh;
 
 static int
 toedev_connect(struct toedev *tod __unused, struct socket *so __unused,
-    struct rtentry *rt __unused, struct sockaddr *nam __unused)
+    struct nhop_object *nh __unused, struct sockaddr *nam __unused)
 {
 
 	return (ENOTSUP);
@@ -138,7 +138,7 @@ toedev_l2_update(struct toedev *tod __unused, struct ifnet *ifp __unused,
 
 static void
 toedev_route_redirect(struct toedev *tod __unused, struct ifnet *ifp __unused,
-    struct rtentry *rt0 __unused, struct rtentry *rt1 __unused)
+    struct nhop_object *nh0 __unused, struct nhop_object *nh1 __unused)
 {
 
 	return;
@@ -193,7 +193,7 @@ toedev_tcp_info(struct toedev *tod __unused, struct tcpcb *tp __unused,
 
 static int
 toedev_alloc_tls_session(struct toedev *tod __unused, struct tcpcb *tp __unused,
-    struct ktls_session *tls __unused)
+    struct ktls_session *tls __unused, int direction __unused)
 {
 
 	return (EINVAL);

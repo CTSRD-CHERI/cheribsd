@@ -81,7 +81,7 @@ cheri_exec_stack_pointer(struct image_params *imgp, uintcap_t stack)
 	    ("%s: rounded base (0x%zx) != base (0x%zx)", __func__,
 		CHERI_REPRESENTABLE_BASE(stackbase, stacklen), stackbase));
 	csp = cheri_setaddress((void * __capability)stack, stackbase);
-	csp = cheri_csetbounds(csp, stacklen);
+	csp = cheri_setbounds(csp, stacklen);
 	return (csp + stacklen);
 }
 
@@ -191,5 +191,5 @@ cheri_auxv_capability(struct image_params *imgp, uintcap_t stack)
 
 	auxv = ((void * __capability * __capability)stack +
 	    imgp->args->argc + 1 + imgp->args->envc + 1);
-	return (cheri_csetbounds(auxv, AT_COUNT * sizeof(Elf_Auxinfo)));
+	return (cheri_setbounds(auxv, AT_COUNT * sizeof(Elf_Auxinfo)));
 }

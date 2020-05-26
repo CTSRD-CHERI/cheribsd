@@ -26,6 +26,8 @@
  * SUCH DAMAGE.
  */
 
+#define	EXPLICIT_USER_ACCESS
+
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
@@ -274,7 +276,7 @@ struct fexecve_args {
 	int	fd;
 	char	**argv;
 	char	**envv;
-}
+};
 #endif
 int
 sys_fexecve(struct thread *td, struct fexecve_args *uap)
@@ -1207,6 +1209,10 @@ exec_new_vmspace(struct image_params *imgp, struct sysentvec *sv)
 		map = &vmspace->vm_map;
 	}
 	map->flags |= imgp->map_flags;
+	if (SV_PROC_FLAG(p, SV_CHERI))
+		map->flags |= MAP_RESERVATIONS;
+	else
+		map->flags &= ~MAP_RESERVATIONS;
 
 #ifdef CPU_QEMU_MALTA
 	if (curthread->td_md.md_flags & MDTD_QTRACE) {
@@ -1399,7 +1405,8 @@ err_exit:
 
 int
 exec_copyin_data_fds(struct thread *td, struct image_args *args,
-    const void *data, size_t datalen, const int *fds, size_t fdslen)
+    const void * __capability data, size_t datalen,
+    const int * __capability fds, size_t fdslen)
 {
 	struct filedesc *ofdp;
 	const char *p;
@@ -1727,7 +1734,7 @@ exec_args_get_begin_envv(struct image_args *args)
  * and env vector tables. Return a pointer to the base so that it can be used
  * as the initial stack pointer.
  *
- * XXX: We may want a wrapper of cheri_csetbounds() that warns about
+ * XXX: We may want a wrapper of cheri_setbounds() that warns about
  * capabilities that are overly broad.
  */
 int
@@ -1785,7 +1792,7 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	    CHERI_CAP_USER_DATA_PERMS, rounded_stack_vaddr,
 	    CHERI_REPRESENTABLE_LENGTH(ssiz + stack_offset), stack_offset);
 	destp = cheri_setaddress(ustackp, p->p_psstrings);
-	arginfo = (struct ps_strings * __capability)cheri_csetbounds(destp,
+	arginfo = (struct ps_strings * __capability)cheri_setbounds(destp,
 	    sizeof(*arginfo));
 #else
 	destp = (void *)p->p_psstrings;
@@ -1817,11 +1824,11 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 		destp = __builtin_align_down(destp,
 		    sizeof(void * __capability));
 #if __has_feature(capabilities)
-		imgp->execpathp = cheri_csetbounds(destp, execpath_len);
+		imgp->execpathp = cheri_setbounds(destp, execpath_len);
 #else
 		imgp->execpathp = destp;
 #endif
-		error = copyout_c(imgp->execpath, destp, execpath_len);
+		error = copyout_c(imgp->execpath, imgp->execpathp, execpath_len);
 		if (error != 0)
 			return (error);
 	}
@@ -1832,11 +1839,11 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	arc4rand(canary, sizeof(canary), 0);
 	destp -= sizeof(canary);
 #if __has_feature(capabilities)
-	imgp->canary = cheri_csetbounds(destp, sizeof(canary));
+	imgp->canary = cheri_setbounds(destp, sizeof(canary));
 #else
 	imgp->canary = destp;
 #endif
-	error = copyout_c(canary, destp, sizeof(canary));
+	error = copyout_c(canary, imgp->canary, sizeof(canary));
 	if (error != 0)
 		return (error);
 	imgp->canarylen = sizeof(canary);
@@ -1847,11 +1854,11 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	destp -= szps;
 	destp = __builtin_align_down(destp, sizeof(void * __capability));
 #if __has_feature(capabilities)
-	imgp->pagesizes = cheri_csetbounds(destp, szps);
+	imgp->pagesizes = cheri_setbounds(destp, szps);
 #else
 	imgp->pagesizes = destp;
 #endif
-	error = copyout_c(pagesizes, destp, szps);
+	error = copyout_c(pagesizes, imgp->pagesizes, szps);
 	if (error != 0)
 		return (error);
 	imgp->pagesizeslen = szps;
@@ -1862,7 +1869,7 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	destp -= ARG_MAX - imgp->args->stringspace;
 	destp = __builtin_align_down(destp, sizeof(void * __capability));
 #if __has_feature(capabilities)
-	ustringp = cheri_csetbounds(destp, ARG_MAX - imgp->args->stringspace);
+	ustringp = cheri_setbounds(destp, ARG_MAX - imgp->args->stringspace);
 #else
 	ustringp = destp;
 #endif
@@ -1910,7 +1917,7 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	 * Fill in "ps_strings" struct for ps, w, etc.
 	 */
 #if __has_feature(capabilities)
-	imgp->argv = cheri_csetbounds(vectp, (argc + 1) * sizeof(*vectp));
+	imgp->argv = cheri_setbounds(vectp, (argc + 1) * sizeof(*vectp));
 #else
 	imgp->argv = vectp;
 #endif
@@ -1925,7 +1932,7 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	for (; argc > 0; --argc) {
 		len = strlen(stringp) + 1;
 #if __has_feature(capabilities)
-		if (sucap(vectp++, (intcap_t)cheri_csetbounds(ustringp,
+		if (sucap(vectp++, (intcap_t)cheri_setbounds(ustringp,
 		    len)) != 0)
 			return (EFAULT);
 #else
@@ -1941,7 +1948,7 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 		return (EFAULT);
 
 #if __has_feature(capabilities)
-	imgp->envv = cheri_csetbounds(vectp, (envc + 1) * sizeof(*vectp));
+	imgp->envv = cheri_setbounds(vectp, (envc + 1) * sizeof(*vectp));
 #else
 	imgp->envv = vectp;
 #endif
@@ -1956,7 +1963,7 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	for (; envc > 0; --envc) {
 		len = strlen(stringp) + 1;
 #if __has_feature(capabilities)
-		if (sucap(vectp++, (intcap_t)cheri_csetbounds(ustringp,
+		if (sucap(vectp++, (intcap_t)cheri_setbounds(ustringp,
 		    len)) != 0)
 			return (EFAULT);
 #else

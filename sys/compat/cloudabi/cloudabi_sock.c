@@ -23,6 +23,8 @@
  * SUCH DAMAGE.
  */
 
+#define	EXPLICIT_USER_ACCESS
+
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
@@ -73,7 +75,7 @@ cloudabi_sys_sock_shutdown(struct thread *td,
 
 int
 cloudabi_sock_recv(struct thread *td, cloudabi_fd_t fd, struct iovec *data,
-    size_t datalen, cloudabi_fd_t *fds, size_t fdslen,
+    size_t datalen, cloudabi_fd_t *in_fds, size_t fdslen,
     cloudabi_riflags_t flags, size_t *rdatalen, size_t *rfdslen,
     cloudabi_roflags_t *rflags)
 {
@@ -82,7 +84,10 @@ cloudabi_sock_recv(struct thread *td, cloudabi_fd_t fd, struct iovec *data,
 		.msg_iovlen = datalen,
 	};
 	struct mbuf *control;
+	cloudabi_fd_t * __capability fds;
 	int error;
+
+	fds = __USER_CAP_ARRAY(in_fds, fdslen);
 
 	/* Convert flags. */
 	if (flags & CLOUDABI_SOCK_RECV_PEEK)
@@ -169,7 +174,8 @@ cloudabi_sock_send(struct thread *td, cloudabi_fd_t fd, struct iovec *data,
 		chdr->cmsg_len = CMSG_LEN(fdslen * sizeof(int));
 		chdr->cmsg_level = SOL_SOCKET;
 		chdr->cmsg_type = SCM_RIGHTS;
-		error = copyin(fds, CMSG_DATA(chdr), fdslen * sizeof(int));
+		error = copyin(__USER_CAP_ARRAY(fds, fdslen), CMSG_DATA(chdr),
+		    fdslen * sizeof(int));
 		if (error != 0) {
 			m_free(control);
 			return (error);

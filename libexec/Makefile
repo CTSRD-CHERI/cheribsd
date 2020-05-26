@@ -45,7 +45,7 @@ SUBDIR+=	bootpd
 .endif
 
 # Not ported to RISCV yet
-.if !defined(NO_PIC) && !defined(NO_RTLD) && (${MACHINE_ABI:Mpurecap} || ${MK_CHERI} != "no") && !${MACHINE_ARCH:Mriscv*}
+.if !defined(NO_PIC) && !defined(NO_RTLD) && (${MACHINE_ABI:Mpurecap} || ${MK_COMPAT_CHERIABI} != "no") && !${MACHINE_ARCH:Mriscv*}
 SUBDIR+=	rtld-cheri-elf rtld-cheri-elf-debug
 .endif
 

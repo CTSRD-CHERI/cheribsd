@@ -370,7 +370,7 @@ int add_tid_to_history(struct adapter *, u_int);
 /* t4_connect.c */
 void t4_init_connect_cpl_handlers(void);
 void t4_uninit_connect_cpl_handlers(void);
-int t4_connect(struct toedev *, struct socket *, struct rtentry *,
+int t4_connect(struct toedev *, struct socket *, struct nhop_object *,
     struct sockaddr *);
 void act_open_failure_cleanup(struct adapter *, u_int, u_int);
 
@@ -452,6 +452,6 @@ int tls_rx_key(struct toepcb *);
 void tls_stop_handshake_timer(struct toepcb *);
 int tls_tx_key(struct toepcb *);
 void tls_uninit_toep(struct toepcb *);
-int tls_alloc_ktls(struct toepcb *, struct ktls_session *);
+int tls_alloc_ktls(struct toepcb *, struct ktls_session *, int);
 
 #endif

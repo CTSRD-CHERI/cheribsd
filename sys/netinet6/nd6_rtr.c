@@ -59,7 +59,8 @@ __FBSDID("$FreeBSD$");
 #include <net/if_types.h>
 #include <net/if_dl.h>
 #include <net/route.h>
-#include <net/route_var.h>
+#include <net/route/nhop.h>
+#include <net/route/route_var.h>
 #include <net/radix.h>
 #include <net/vnet.h>
 
@@ -783,7 +784,7 @@ defrouter_del(struct nd_defrouter *dr)
 
 
 struct nd_defrouter *
-defrouter_lookup_locked(struct in6_addr *addr, struct ifnet *ifp)
+defrouter_lookup_locked(const struct in6_addr *addr, struct ifnet *ifp)
 {
 	struct nd_defrouter *dr;
 
@@ -797,7 +798,7 @@ defrouter_lookup_locked(struct in6_addr *addr, struct ifnet *ifp)
 }
 
 struct nd_defrouter *
-defrouter_lookup(struct in6_addr *addr, struct ifnet *ifp)
+defrouter_lookup(const struct in6_addr *addr, struct ifnet *ifp)
 {
 	struct nd_defrouter *dr;
 
@@ -2005,7 +2006,7 @@ restart:
 static int
 nd6_prefix_onlink_rtrequest(struct nd_prefix *pr, struct ifaddr *ifa)
 {
-	struct sockaddr_dl sdl;
+	struct sockaddr_dl_short sdl;
 	struct rtentry *rt;
 	struct sockaddr_in6 mask6;
 	u_long rtflags;
@@ -2020,8 +2021,8 @@ nd6_prefix_onlink_rtrequest(struct nd_prefix *pr, struct ifaddr *ifa)
 	mask6.sin6_addr = pr->ndpr_mask;
 	rtflags = (ifa->ifa_flags & ~IFA_RTSELF) | RTF_UP;
 
-	bzero(&sdl, sizeof(struct sockaddr_dl));
-	sdl.sdl_len = sizeof(struct sockaddr_dl);
+	bzero(&sdl, sizeof(struct sockaddr_dl_short));
+	sdl.sdl_len = sizeof(struct sockaddr_dl_short);
 	sdl.sdl_family = AF_LINK;
 	sdl.sdl_type = ifa->ifa_ifp->if_type;
 	sdl.sdl_index = ifa->ifa_ifp->if_index;
@@ -2392,15 +2393,16 @@ in6_tmpifadd(const struct in6_ifaddr *ia0, int forcegen, int delay)
 }
 
 static int
-rt6_deleteroute(const struct rtentry *rt, void *arg)
+rt6_deleteroute(const struct rtentry *rt, const struct nhop_object *nh,
+    void *arg)
 {
-#define SIN6(s)	((struct sockaddr_in6 *)s)
 	struct in6_addr *gate = (struct in6_addr *)arg;
+	int nh_rt_flags;
 
-	if (rt->rt_gateway == NULL || rt->rt_gateway->sa_family != AF_INET6)
+	if (nh->gw_sa.sa_family != AF_INET6)
 		return (0);
 
-	if (!IN6_ARE_ADDR_EQUAL(gate, &SIN6(rt->rt_gateway)->sin6_addr)) {
+	if (!IN6_ARE_ADDR_EQUAL(gate, &nh->gw6_sa.sin6_addr)) {
 		return (0);
 	}
 
@@ -2409,14 +2411,15 @@ rt6_deleteroute(const struct rtentry *rt, void *arg)
 	 * XXX: this seems to be a bit ad-hoc. Should we consider the
 	 * 'cloned' bit instead?
 	 */
-	if ((rt->rt_flags & RTF_STATIC) != 0)
+	nh_rt_flags = nhop_get_rtflags(nh);
+	if ((nh_rt_flags & RTF_STATIC) != 0)
 		return (0);
 
 	/*
 	 * We delete only host route. This means, in particular, we don't
 	 * delete default route.
 	 */
-	if ((rt->rt_flags & RTF_HOST) == 0)
+	if ((nh_rt_flags & RTF_HOST) == 0)
 		return (0);
 
 	return (1);

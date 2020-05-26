@@ -472,6 +472,8 @@ struct kinfo_file {
 #define	KVME_FLAG_GROWS_UP	0x00000010
 #define	KVME_FLAG_GROWS_DOWN	0x00000020
 #define	KVME_FLAG_USER_WIRED	0x00000040
+#define	KVME_FLAG_GUARD		0x00000080
+#define	KVME_FLAG_UNMAPPED	0x00000100
 
 #if defined(__amd64__)
 #define	KINFO_OVMENTRY_SIZE	1168
@@ -524,8 +526,9 @@ struct kinfo_vmentry {
 	uint16_t kve_status;			/* Status flags. */
 	uint64_t kve_vn_fsid;			/* dev_t of vnode location */
 	uint64_t kve_vn_rdev;			/* Device id if device. */
+	uint64_t kve_reservation;		/* Map reservation */
 	int	 kve_pid;			/* Process ID of the owner. */
-	int	 _kve_ispare[7];		/* Space for more stuff. */
+	int	 _kve_ispare[5];		/* Space for more stuff. */
 	/* Truncated before copyout in sysctl */
 	char	 kve_path[PATH_MAX];		/* Path to VM obj, if any. */
 };
