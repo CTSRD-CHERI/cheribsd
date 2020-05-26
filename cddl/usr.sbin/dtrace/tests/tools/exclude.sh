@@ -426,5 +426,21 @@ exclude SKIP common/usdt/tst.user.ksh.out
 
 #trap: to debug
 
-exclude SKIP assocs/t_dtrace_contrib:tst_misc_d
+exclude SKIP common/assocs/t_dtrace_contrib:tst_misc_d
 
+
+# fbt::: doesn't work in cheri, yet.
+
+exclude SKIP common/fbtprovider/tst.return.d
+exclude SKIP common/fbtprovider/tst.tailcall.d
+exclude SKIP common/misc/tst.roch.d
+exclude SKIP common/safety/tst.basename.d
+exclude SKIP common/safety/tst.cleanpath.d
+exclude SKIP common/safety/tst.ddi_pathname.d
+exclude SKIP common/safety/tst.dirname.d
+exclude SKIP common/safety/tst.index.d
+exclude SKIP common/safety/tst.msgdsize.d
+exclude SKIP common/safety/tst.strchr.d
+exclude SKIP common/safety/tst.strjoin.d
+exclude SKIP common/safety/tst.strstr.d
+exclude SKIP common/safety/tst.strtok.d
