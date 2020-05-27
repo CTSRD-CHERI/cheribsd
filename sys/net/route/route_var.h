@@ -110,7 +110,8 @@ VNET_PCPUSTAT_DECLARE(struct rtstat, rtstat);
 #define	RTSTAT_INC(name)	RTSTAT_ADD(name, 1)
 
 struct rtentry {
-	struct	radix_node rt_nodes[2];	/* tree glue, and other values */
+	/* tree glue, and other values */
+	struct	radix_node rt_nodes[2] __subobject_use_container_bounds;
 	/*
 	 * XXX struct rtentry must begin with a struct radix_node (or two!)
 	 * because the code does some casts of a 'struct radix_node *'
