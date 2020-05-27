@@ -852,7 +852,7 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 
 	/* Make room, keeping the stack aligned */
 	fp--;
-	fp = __builtin_align_down(fp, STACKALIGNBYTES + 1);
+	fp = STACKALIGN(fp);
 
 	/* Fill in the frame to copy out */
 	bzero(&frame, sizeof(frame));
