@@ -19,6 +19,7 @@ options 	KTRACE
 # Features required for CHERI CPU and CheriBSD support.
 #
 options 	KSTACK_LARGE_PAGE
+options 	NO_SWAPPING
 options 	TMPFS
 
 #
