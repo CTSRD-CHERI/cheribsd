@@ -58,6 +58,7 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_extern.h>
 
 #if __has_feature(capabilities)
+#include <sys/sysargmap.h>
 #include <cheri/cheric.h>
 #endif
 
@@ -104,6 +105,11 @@ cpu_fetch_syscall_args(struct thread *td)
 	syscallarg_t *ap;
 	struct syscall_args *sa;
 	int nap;
+#if __has_feature(capabilities)
+	char * __capability stack_args = NULL;
+	u_int i;
+	int error;
+#endif
 
 	nap = NARGREG;
 	p = td->td_proc;
@@ -115,6 +121,15 @@ cpu_fetch_syscall_args(struct thread *td)
 	if (sa->code == SYS_syscall || sa->code == SYS___syscall) {
 		sa->code = *ap++;
 		nap--;
+
+#if __has_feature(capabilities)
+		/*
+		 * For syscall() and __syscall(), the arguments are
+		 * stored in a var args block on the stack.
+		 */
+		if (SV_PROC_FLAG(td->td_proc, SV_CHERI))
+			stack_args = (char * __capability)td->td_frame->tf_sp;
+#endif
 	}
 
 	if (sa->code >= p->p_sysent->sv_size)
@@ -123,9 +138,39 @@ cpu_fetch_syscall_args(struct thread *td)
 		sa->callp = &p->p_sysent->sv_table[sa->code];
 
 	sa->narg = sa->callp->sy_narg;
-	memcpy(sa->args, ap, nap * sizeof(syscallarg_t));
-	if (sa->narg > nap)
-		panic("TODO: Could we have more then %d args?", NARGREG);
+#if __has_feature(capabilities)
+	if (stack_args != NULL) {
+		register_t intval;
+		int offset, ptrmask;
+
+		if (sa->code >= nitems(sysargmask))
+			ptrmask = 0;
+		else
+			ptrmask = sysargmask[sa->code];
+
+		offset = 0;
+		for (i = 0; i < sa->narg; i++) {
+			if (ptrmask & (1 << i)) {
+				offset = roundup2(offset, sizeof(uintcap_t));
+				error = fuecap(stack_args + offset,
+				    &sa->args[i]);
+				offset += sizeof(uintcap_t);
+			} else {
+				error = fueword(stack_args + offset, &intval);
+				sa->args[i] = intval;
+				offset += sizeof(intval);
+			}
+			if (error)
+				return (error);
+		}
+	} else
+#endif
+	{
+		memcpy(sa->args, ap, nap * sizeof(syscallarg_t));
+		if (sa->narg > nap)
+			panic("TODO: Could we have more then %d args?",
+			    NARGREG);
+	}
 
 	td->td_retval[0] = 0;
 	td->td_retval[1] = 0;
