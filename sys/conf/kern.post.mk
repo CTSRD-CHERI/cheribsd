@@ -205,7 +205,6 @@ ${FULLKERNEL}: ${SYSTEM_DEP} vers.o
 .if !empty(MD_ROOT_SIZE_CONFIGURED) && defined(MFS_IMAGE)
 	@sh ${S}/tools/embed_mfs.sh ${.TARGET} ${MFS_IMAGE}
 .endif
-
 .if ${MK_CTF} != "no"
 	@echo ${CTFMERGE} ${CTFFLAGS_KERNEL} -o ${.TARGET} ...
 	@${CTFMERGE} ${CTFFLAGS_KERNEL} -o ${.TARGET} ${SYSTEM_OBJS} vers.o
