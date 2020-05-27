@@ -788,9 +788,8 @@ dt_module_load(dtrace_hdl_t *dtp, dt_module_t *dmp)
 
 #ifdef __mips__
 	if (strcmp(dmp->dm_name,"kernel") == 0) {
-		dt_dprintf(
-		    "LOADING .dynsym INSTEAD OF .symtab FOR MIPS! A lot of symbols will"
-		    "be missing\n");
+		dt_dprintf("LOADING .dynsym INSTEAD OF .symtab FOR MIPS! "
+		    A lot of symbols will be missing\n");
 		dmp->dm_symtab.cts_name = ".dynsym";
 		dmp->dm_symtab.cts_type = SHT_DYNSYM;
 	} else {
