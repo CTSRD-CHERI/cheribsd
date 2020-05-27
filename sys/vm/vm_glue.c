@@ -464,22 +464,22 @@ vm_thread_stack_back(struct domainset *ds, vm_offset_t ks, vm_page_t ma[],
 	 */
 #error "KSTACK_LARGE_PAGE requires NO_SWAPPING"
 #endif
-	KASSERT(npages == atop(KSTACK_PAGE_SIZE),
-	    ("%s: request for %d pages != KSTACK_PAGE_SIZE", __func__, npages));
+	KASSERT(npages == atop(KSTACK_SIZE),
+	    ("%s: request for %d pages != KSTACK_SIZE", __func__, npages));
 
 	for (;;) {
 		m = vm_page_alloc_contig(kstack_object, pindex, req_class |
-		    VM_ALLOC_WIRED | VM_ALLOC_NOWAIT, atop(KSTACK_PAGE_SIZE),
+		    VM_ALLOC_WIRED | VM_ALLOC_NOWAIT, atop(KSTACK_SIZE),
 		    0ul, ~0ul, KSTACK_PAGE_SIZE, 0, VM_MEMATTR_DEFAULT);
 		if (m != NULL)
 			break;
 		VM_OBJECT_WUNLOCK(kstack_object);
 		if (!vm_page_reclaim_contig(req_class,
-		    atop(KSTACK_PAGE_SIZE), 0ul, ~0ul, KSTACK_PAGE_SIZE, 0))
+		    atop(KSTACK_SIZE), 0ul, ~0ul, KSTACK_PAGE_SIZE, 0))
 			vm_wait(kstack_object);
 		VM_OBJECT_WLOCK(kstack_object);
 	}
-	for (n = 0; n < atop(KSTACK_PAGE_SIZE); m++, n++)
+	for (n = 0; n < atop(KSTACK_SIZE); m++, n++)
 		ma[n] = m;
 #else
 	for (n = 0; n < npages;) {
