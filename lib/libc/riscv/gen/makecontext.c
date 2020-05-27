@@ -97,7 +97,7 @@ __makecontext(ucontext_t *ucp, void (*func)(void), int argc, ...)
 	va_end(ap);
 
 	/* Set the stack */
-	CTX_REG(gp, sp) = STACKALIGN(ucp->uc_stack.ss_sp + ucp->uc_stack.ss_size);
+	CTX_REG(gp, sp) = STACKALIGN((uintptr_t)ucp->uc_stack.ss_sp + ucp->uc_stack.ss_size);
 	/* Arrange for return via the trampoline code. */
 #ifdef __CHERI_PURE_CAPABILITY__
 	/* Can't use CTX_REG here since the c is a suffix instead of a prefix */
