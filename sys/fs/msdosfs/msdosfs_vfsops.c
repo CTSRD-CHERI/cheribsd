@@ -50,8 +50,6 @@
  * October 1992
  */
 
-#define	EXPLICIT_USER_ACCESS
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/buf.h>
@@ -197,7 +195,7 @@ msdosfs_cmount(struct mntarg *ma, void * __capability data, uint64_t flags)
 
 	if (data == NULL)
 		return (EINVAL);
-	error = copyin(data, &args, sizeof args);
+	error = copyincap(data, &args, sizeof args);
 	if (error)
 		return (error);
 	vfs_oexport_conv(&args.export, &exp);

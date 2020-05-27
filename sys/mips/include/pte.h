@@ -56,7 +56,7 @@ typedef	pt_entry_t *pd_entry_t;
 static __inline pd_entry_t
 pde_page_bound(vm_ptr_t ptr)
 {
-	pd_entry_t pde = cheri_csetbounds((pd_entry_t)ptr, PAGE_SIZE);
+	pd_entry_t pde = cheri_setbounds((pd_entry_t)ptr, PAGE_SIZE);
 	return cheri_andperm(pde, (CHERI_PERM_LOAD | CHERI_PERM_STORE |
 	    CHERI_PERM_LOAD_CAP | CHERI_PERM_STORE_CAP |
 	    CHERI_PERM_STORE_LOCAL_CAP));

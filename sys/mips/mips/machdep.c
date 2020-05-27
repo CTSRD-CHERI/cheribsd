@@ -120,7 +120,7 @@ int cold = 1;
 long realmem = 0;
 long Maxmem = 0;
 int cpu_clock = MIPS_DEFAULT_HZ;
-SYSCTL_INT(_hw, OID_AUTO, clockrate, CTLFLAG_RD, 
+SYSCTL_INT(_hw, OID_AUTO, clockrate, CTLFLAG_RD,
     &cpu_clock, 0, "CPU instruction clock rate");
 int clocks_running = 0;
 
@@ -182,7 +182,7 @@ u_int32_t bootdev;
 struct bootinfo bootinfo;
 /*
  * First kseg0 address available for use. By default it's equal to &end.
- * But in some cases there might be additional data placed right after 
+ * But in some cases there might be additional data placed right after
  * _end by loader or ELF trampoline.
  */
 vm_offset_t kernel_kseg0_end = (vm_offset_t)&end;
@@ -219,7 +219,7 @@ cpu_startup(void *dummy)
 
 	vm_ksubmap_init(&kmi);
 
-	printf("avail memory = %ju (%juMB)\n", 
+	printf("avail memory = %ju (%juMB)\n",
 	    ptoa((uintmax_t)vm_free_count()),
 	    ptoa((uintmax_t)vm_free_count()) / 1048576);
 	cpu_init_interrupts();
@@ -322,10 +322,10 @@ mips_proc0_init(void)
 	    thread0.td_kstack_pages * PAGE_SIZE) - 1;
 #else /* CHERI_PURECAP_KERNEL */
 	/* Adjust the bounds of the thread0 kernel stack and pcb. */
-	thread0.td_pcb = cheri_csetbounds((struct pcb *)(thread0.td_kstack +
+	thread0.td_pcb = cheri_setbounds((struct pcb *)(thread0.td_kstack +
 		thread0.td_kstack_pages * PAGE_SIZE) - 1,
 		sizeof(struct pcb));
-	thread0.td_kstack = (vm_ptr_t) cheri_csetbounds((void *)thread0.td_kstack,
+	thread0.td_kstack = (vm_ptr_t) cheri_setbounds((void *)thread0.td_kstack,
 		thread0.td_kstack_pages * PAGE_SIZE - sizeof(struct pcb));
 #endif /* CHERI_PURECAP_KERNEL */
 	thread0.td_frame = &thread0.td_pcb->pcb_regs;
@@ -358,7 +358,7 @@ void
 mips_vector_init(void)
 {
 	/*
-	 * Make sure that the Wait region logic is not been 
+	 * Make sure that the Wait region logic is not been
 	 * changed
 	 */
 	if (MipsWaitEnd - MipsWaitStart != 16)
@@ -407,7 +407,7 @@ mips_vector_init(void)
 	mips_icache_sync_all();
 	mips_dcache_wbinv_all();
 
-	/* 
+	/*
 	 * Mask all interrupts. Each interrupt will be enabled
 	 * when handler is installed for it
 	 */
@@ -418,7 +418,7 @@ mips_vector_init(void)
 }
 
 /*
- * Fix kernel_kseg0_end address in case trampoline placed debug sympols 
+ * Fix kernel_kseg0_end address in case trampoline placed debug sympols
  * data there
  */
 void

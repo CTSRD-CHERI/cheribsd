@@ -443,7 +443,7 @@ i_send(struct cdev *dev, caddr_t arg, struct thread *td)
      if(pp->ahs_len) {
 	  // XXX: never tested, looks suspicious
 	  n = pp->ahs_len;
-	  error = copyin(pp->ahs_addr, bp, n);
+	  error = copyin(pp->ahs_uaddr, bp, n);
 	  if(error != 0) {
 	       sdebug(3, "copyin ahs: error=%d", error);
 	       goto out;
@@ -453,7 +453,7 @@ i_send(struct cdev *dev, caddr_t arg, struct thread *td)
      }
      if(pp->ds_len) {
 	  n = pp->ds_len;
-	  error = copyin(pp->ds_addr, bp, n);
+	  error = copyin(pp->ds_uaddr, bp, n);
 	  if(error != 0) {
 	       sdebug(3, "copyin ds: error=%d", error);
 	       goto out;
@@ -545,7 +545,7 @@ i_recv(struct cdev *dev, caddr_t arg, struct thread *td)
 	  if(pp->ahs_len) {
 	       need = pp->ahs_len;
 	       n = MIN(up->ahs_size, need);
-	       error = copyout(bp, (caddr_t)up->ahs_addr, n);
+	       error = copyout(bp, up->ahs_uaddr, n);
 	       up->ahs_len = n;
 	       bp += need;
 	  }
@@ -553,10 +553,10 @@ i_recv(struct cdev *dev, caddr_t arg, struct thread *td)
 	       need = pp->ds_len;
 	       if((have = up->ds_size) == 0) {
 		    have = up->ahs_size - n;
-		    up->ds_addr = (caddr_t)up->ahs_addr + n;
+		    up->ds_uaddr = (char * __capability)up->ahs_uaddr + n;
 	       }
 	       n = MIN(have, need);
-	       error = copyout(bp, (caddr_t)up->ds_addr, n);
+	       error = copyout(bp, up->ds_uaddr, n);
 	       up->ds_len = n;
 	  }
 

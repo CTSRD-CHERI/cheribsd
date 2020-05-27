@@ -610,7 +610,7 @@ proc0_init(void *dummy __unused)
 	 */
 	caddr_t minuser_cap = cheri_setoffset(cheri_xuseg_capability,
 	    p->p_sysent->sv_minuser);
-	minuser_cap = cheri_csetbounds(minuser_cap,
+	minuser_cap = cheri_setbounds(minuser_cap,
 	    p->p_sysent->sv_maxuser - p->p_sysent->sv_minuser);
 	minuser_cap = cheri_andperm(minuser_cap, 0);
 
@@ -739,11 +739,11 @@ start_init(void *dummy)
 		freeenv(var);
 	}
 	free_init_path = tmp_init_path = strdup(init_path, M_TEMP);
-	
+
 	while ((path = strsep(&tmp_init_path, ":")) != NULL) {
 		if (bootverbose)
 			printf("start_init: trying %s\n", path);
-			
+
 		memset(&args, 0, sizeof(args));
 		error = exec_alloc_args(&args);
 		if (error != 0)

@@ -47,6 +47,7 @@
  * CHERI-aware Clang/LLVM, and full capability context switching.
  */
 #define	cheri_getlen(x)		__builtin_cheri_length_get((x))
+#define	cheri_getlength(x)	__builtin_cheri_length_get((x))
 #define	cheri_getbase(x)	__builtin_cheri_base_get((x))
 #define	cheri_getoffset(x)	__builtin_cheri_offset_get((x))
 #define	cheri_getaddress(x)	__builtin_cheri_address_get((x))
@@ -76,13 +77,13 @@
 
 #define	cheri_local(c)		cheri_andperm((c), ~CHERI_PERM_GLOBAL)
 
-#define	cheri_csetbounds(x, y)	__builtin_cheri_bounds_set((x), (y))
-#define	cheri_csetboundsexact(x, y)	__builtin_cheri_bounds_set_exact((x), (y))
-/* XXXAR: shouldn't this be the default and we add cheri_csetbounds_untyped? */
-#define	cheri_csetbounds_changetype(type, x, y)	\
-	(type)cheri_csetbounds((x), (y)))
-#define	cheri_csetbounds_sametype(x, y)	\
-	((__typeof__(x))cheri_csetbounds((x), (y)))
+#define	cheri_setbounds(x, y)	__builtin_cheri_bounds_set((x), (y))
+#define	cheri_setboundsexact(x, y)	__builtin_cheri_bounds_set_exact((x), (y))
+/* XXXAR: shouldn't this be the default and we add cheri_setbounds_untyped? */
+#define	cheri_setbounds_changetype(type, x, y)	\
+	(type)cheri_setbounds((x), (y)))
+#define	cheri_setbounds_sametype(x, y)	\
+	((__typeof__(x))cheri_setbounds((x), (y)))
 
 /* Create an untagged capability from an integer */
 #define cheri_fromint(x)	cheri_incoffset(NULL, x)
@@ -157,7 +158,7 @@ cheri_codeptr(const void *ptr, size_t len)
 #endif
 
 	/* Assume CFromPtr without base set, availability of CSetBounds. */
-	return (cheri_csetbounds(c, len));
+	return (cheri_setbounds(c, len));
 }
 
 static __inline void * __capability
@@ -173,8 +174,7 @@ cheri_ptr(const void *ptr, size_t len)
 {
 
 	/* Assume CFromPtr without base set, availability of CSetBounds. */
-	// KASSERT(len > 0, ("cheri_ptr with 0 length"));
-	return (cheri_csetbounds((__cheri_tocap const void * __capability)ptr, len));
+	return (cheri_setbounds((__cheri_tocap const void * __capability)ptr, len));
 }
 
 static __inline void * __capability
@@ -207,7 +207,7 @@ cheri_maketype(void * __capability root_type, register_t type)
 
 	c = root_type;
 	c = cheri_setoffset(c, type);	/* Set type as desired. */
-	c = cheri_csetbounds(c, 1);	/* ISA implies length of 1. */
+	c = cheri_setbounds(c, 1);	/* ISA implies length of 1. */
 	c = cheri_andperm(c, CHERI_PERM_GLOBAL | CHERI_PERM_SEAL); /* Perms. */
 	return (c);
 }

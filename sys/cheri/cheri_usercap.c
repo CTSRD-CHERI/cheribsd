@@ -85,7 +85,7 @@ _cheri_capability_build_user_rwx(uint32_t perms, vaddr_t basep, size_t length,
 {
 	void * __capability tmpcap;
 
-	tmpcap = cheri_setoffset(cheri_andperm(cheri_csetbounds(
+	tmpcap = cheri_setoffset(cheri_andperm(cheri_setbounds(
 	    cheri_setoffset(userspace_cap, basep), length), perms), off);
 
 	KASSERT(cheri_getlen(tmpcap) == length,

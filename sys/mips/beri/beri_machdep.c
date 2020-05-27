@@ -122,7 +122,7 @@ beri_platform_ptrbounds(vm_offset_t vaddr, size_t len)
 {
 	if (vaddr == 0)
 		return (NULL);
-	return (cheri_csetbounds(beri_platform_ptr(vaddr), len));
+	return (cheri_setbounds(beri_platform_ptr(vaddr), len));
 }
 
 static void

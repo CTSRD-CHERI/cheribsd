@@ -42,15 +42,10 @@
 .set noreorder
 
 
-/*
- * NB: Use CHERICAP_SIZE to hold relocbase to retain stack alignment
- */
-
-#define	SFRAME_SIZE		(4*CHERICAP_SIZE)
-#define	SFRAME_AUXARGS		(3*CHERICAP_SIZE)
-#define	SFRAME_OBJP		(2*CHERICAP_SIZE)
-#define	SFRAME_CLEANUP		(1*CHERICAP_SIZE)
-#define	SFRAME_RELOCBASE	(0*CHERICAP_SIZE)
+#define	SFRAME_SIZE		(3*CHERICAP_SIZE)
+#define	SFRAME_AUXARGS		(2*CHERICAP_SIZE)
+#define	SFRAME_OBJP		(1*CHERICAP_SIZE)
+#define	SFRAME_CLEANUP		(0*CHERICAP_SIZE)
 
 /*
  *      c3      auxargs pointer
@@ -75,7 +70,6 @@ LEAF(rtld_start)
 
 	cmove		$c24, $c11
 
-	csc		$c4, zero, SFRAME_RELOCBASE($c11) /* relocbase */
 	/* $pcc still has large bounds here -> load _DYNAMIC from $pcc */
 	PCREL_LOAD_CODE_PTR($c3, a0, _DYNAMIC)
 	/* XXXAR: this assumes relocbase is R/W */
@@ -87,24 +81,6 @@ LEAF(rtld_start)
 	PCREL_LOAD_CODE_PTR($c12, t9, _rtld_relocate_nonplt_self)
 	cjalr $c12, $c17; /* (&_DYNAMIC, relocbase) */
 	cincoffset	$c3, $c4, a0	/* dynp (in delay slot) */
-	/* Returns DT_MIPS_CHERI_FLAGS value in $v0 */
-
-	/*
-	 * Now that we have processed the self relocations we can do the
-	 * __cap_relocs processing (the location needs to be adjusted to the
-	 * real address).
-	 * TODO: since there should be no external symbols in __cap_relocs we
-	 * should be able to do this before _rtld_relocate_nonplt_self and just
-	 * add the relocabase value to all targets and sources instead of the
-	 * more expensive ELF_REL processing.
-	 */
-	PCREL_LOAD_CODE_PTR($c3, a0, __start___cap_relocs)
-	PCREL_LOAD_CODE_PTR($c4, a1, __stop___cap_relocs)
-	clc		$c5, zero, SFRAME_RELOCBASE($c11) /* relocbase */
-
-	PCREL_LOAD_CODE_PTR($c12, t9, _rtld_do___caprelocs_self)
-	cjalr $c12, $c17; /* _rtld_do___caprelocs_self(&__start___cap_relocs, &__stop___cap_relocs, relocbase, flags) */
-	move	a0, v0 /* move flags to argument registers (delay slot) */
 
 #if __CHERI_CAPABILITY_TABLE__ != 3
 	/* For the non-pc-relative case set up $cgp now */

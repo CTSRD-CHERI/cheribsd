@@ -32,9 +32,15 @@ SUBDIR+= pmu-events
 .endif
 .endif
 
-libpmc_events.c: ${JEVENTS}
-	${JEVENTS} ${EVENT_ARCH} ${.CURDIR}/pmu-events/arch libpmc_events.c
-SRCS+= libpmc_events.c
+libpmc_events.c.tmp: ${JEVENTS} .META
+	${JEVENTS} ${EVENT_ARCH} ${.CURDIR}/pmu-events/arch ${.TARGET}
+
+libpmc_events.c: libpmc_events.c.tmp
+	if [ ! -e ${.TARGET} ] || ! cmp -s ${.TARGET} ${.TARGET}.tmp; then \
+		mv -f ${.TARGET}.tmp ${.TARGET}; \
+	fi
+CLEANFILES+=	libpmc_events.c.tmp libpmc_events.c
+SRCS+=	libpmc_events.c
 .endif
 
 WARNS?=	3

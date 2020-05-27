@@ -148,7 +148,7 @@ process_kernel_cap_relocs(Elf64_Capreloc *start, Elf64_Capreloc *end,
 		 * Should probably go away at some point.
 		 */
 		if (reloc->size != 0)
-			cap = cheri_csetbounds(cap, reloc->size);
+			cap = cheri_setbounds(cap, reloc->size);
 		cap = cheri_incoffset(cap, reloc->offset);
 		*dst = cap;
 	}
@@ -185,12 +185,12 @@ process_kernel_dyn_relocs(Elf64_Rel *start, Elf64_Rel *end,
 				 * Should probably go away at some point.
 				 */
 				if (symentry->st_size != 0)
-				  cap = cheri_csetbounds(cap, symentry->st_size);
+				  cap = cheri_setbounds(cap, symentry->st_size);
 			}
 			else {
 				cap = cheri_setaddress(data_cap,
 				    symentry->st_value);
-				cap = cheri_csetbounds(cap, symentry->st_size);
+				cap = cheri_setbounds(cap, symentry->st_size);
 			}
 			*dst = cap;
 			break;
@@ -262,14 +262,14 @@ cheri_init_capabilities(void * __capability kroot)
 	    CHERI_CAP_KERN_PERMS);
 
 	ctemp = cheri_setoffset(kroot, MIPS_KSEG0_START);
-	ctemp = cheri_csetboundsexact(ctemp,
+	ctemp = cheri_setboundsexact(ctemp,
 	    (vaddr_t)&etext - (vaddr_t)MIPS_KSEG0_START);
 	cheri_kcode_capability = cheri_andperm(ctemp,
 	    (CHERI_PERM_EXECUTE | CHERI_PERM_LOAD | CHERI_PERM_CCALL |
 	     CHERI_PERM_SYSTEM_REGS | CHERI_PERM_GLOBAL));
 
 	ctemp = cheri_setoffset(kroot, (vaddr_t)&etext);
-	ctemp = cheri_csetboundsexact(ctemp,
+	ctemp = cheri_setboundsexact(ctemp,
 	    (vaddr_t)&end - (vaddr_t)&etext);
 	cheri_kdata_capability = cheri_andperm(ctemp,
 	    ~(CHERI_PERM_EXECUTE | CHERI_PERM_CCALL | CHERI_PERM_SEAL |

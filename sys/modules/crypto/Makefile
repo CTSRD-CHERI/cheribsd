@@ -4,7 +4,6 @@ LIBSODIUM=${SRCTOP}/sys/contrib/libsodium/src/libsodium
 
 .PATH:	${SRCTOP}/sys/opencrypto
 .PATH:	${SRCTOP}/sys/crypto
-.PATH:	${SRCTOP}/sys/crypto/blowfish
 .PATH:	${SRCTOP}/sys/crypto/camellia
 .PATH:	${SRCTOP}/sys/crypto/des
 .PATH:	${SRCTOP}/sys/crypto/rijndael
@@ -22,8 +21,7 @@ LIBSODIUM=${SRCTOP}/sys/contrib/libsodium/src/libsodium
 KMOD	= crypto
 SRCS	= crypto.c cryptodev_if.c
 SRCS	+= criov.c cryptosoft.c xform.c
-SRCS	+= cast.c cryptodeflate.c rmd160.c rijndael-alg-fst.c rijndael-api.c rijndael-api-fst.c
-SRCS	+= skipjack.c bf_enc.c bf_ecb.c bf_skey.c
+SRCS	+= cryptodeflate.c rmd160.c rijndael-alg-fst.c rijndael-api.c rijndael-api-fst.c
 SRCS	+= camellia.c camellia-api.c
 SRCS	+= des_ecb.c des_enc.c des_setkey.c
 SRCS	+= sha1.c sha256c.c sha512c.c

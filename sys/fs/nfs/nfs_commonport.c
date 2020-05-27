@@ -33,8 +33,6 @@
  *
  */
 
-#define	EXPLICIT_USER_ACCESS
-
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
@@ -478,9 +476,9 @@ nfssvc_call(struct thread *p, struct nfssvc_args *uap, struct ucred *cred)
 
 	if (uap->flag & NFSSVC_IDNAME) {
 		if ((uap->flag & NFSSVC_NEWSTRUCT) != 0)
-			error = copyin(uap->argp, &nid, sizeof(nid));
+			error = copyincap(uap->argp, &nid, sizeof(nid));
 		else {
-			error = copyin(uap->argp, &onid, sizeof(onid));
+			error = copyincap(uap->argp, &onid, sizeof(onid));
 			if (error == 0) {
 				nid.nid_flag = onid.nid_flag;
 				nid.nid_uid = onid.nid_uid;

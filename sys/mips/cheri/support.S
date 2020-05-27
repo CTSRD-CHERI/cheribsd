@@ -325,7 +325,7 @@ END(copyerr)
  * c3 - target address
  * c4 - destination address
  */
-LEAF(fueword64_c)
+LEAF(fueword64)
 XLEAF(fueword_c)
 XLEAF(fueword)
 	cgetaddr t0, $c3	# make sure source is in userspace
@@ -346,7 +346,7 @@ XLEAF(fueword)
 	nop
 XEND(fueword)
 XEND(fueword_c)
-END(fueword64_c)
+END(fueword64)
 
 LEAF(fueword32)
 XLEAF(fueword32_c)
@@ -446,7 +446,7 @@ XLEAF(suword)
 	cjr	$c2	# fswberr
 	nop
 XEND(suword)
-XEND(suword64)	
+XEND(suword64)
 XEND(suword_c)
 END(suword64_c)
 
@@ -466,7 +466,7 @@ LEAF(sucap)
 1:
 	cjr	$c2	# fswberr
 	nop
-END(sucap)	
+END(sucap)
 
 LEAF(suword32)
 XLEAF(suword32_c)
@@ -724,7 +724,7 @@ XLEAF(blkclr)
 	cgetoffset	a3, $c3
 	PTR_ADDU	a3, a3, t0
 	// PTR_SUBU	a3, zero, a0
-	and	a3, a3, 3		# compute # bytes to word align address	
+	and	a3, a3, 3		# compute # bytes to word align address
 	beq	a3, zero, 1f		# skip if word aligned
 	PTR_SUBU	a0, a0, a3	# subtract from remaining count
 
@@ -839,7 +839,7 @@ LEAF(ffs)
 	nop
 END(ffs)
 
-	
+
 #if defined(DDB) || defined(DEBUG)
 
 LEAF(kdbpeek)

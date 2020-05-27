@@ -980,9 +980,9 @@ vn_io_fault_touch(char * __capability base, const struct uio *uio)
 {
 	int r;
 
-	r = fubyte_c(base);
+	r = fubyte(base);
 	if (r == -1 || (uio->uio_rw == UIO_READ &&
-	    subyte_c(base, r) == -1))
+	    subyte(base, r) == -1))
 		return (EFAULT);
 	return (0);
 }

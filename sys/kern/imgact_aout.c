@@ -292,7 +292,8 @@ exec_aout_imgact(struct image_params *imgp)
 		file_offset,
 		virtual_offset, text_end,
 		VM_PROT_READ | VM_PROT_EXECUTE, VM_PROT_ALL,
-		MAP_COPY_ON_WRITE | MAP_PREFAULT | MAP_VN_EXEC);
+		MAP_COPY_ON_WRITE | MAP_PREFAULT | MAP_VN_EXEC,
+		virtual_offset);
 	if (error) {
 		vm_map_unlock(map);
 		vm_object_deallocate(object);
@@ -306,7 +307,8 @@ exec_aout_imgact(struct image_params *imgp)
 			file_offset + a_out->a_text,
 			text_end, data_end,
 			VM_PROT_ALL, VM_PROT_ALL,
-			MAP_COPY_ON_WRITE | MAP_PREFAULT | MAP_VN_EXEC);
+			MAP_COPY_ON_WRITE | MAP_PREFAULT | MAP_VN_EXEC,
+			virtual_offset);
 		if (error) {
 			vm_map_unlock(map);
 			vm_object_deallocate(object);
@@ -318,7 +320,8 @@ exec_aout_imgact(struct image_params *imgp)
 	if (bss_size) {
 		error = vm_map_insert(map, NULL, 0,
 			data_end, data_end + bss_size,
-			VM_PROT_ALL, VM_PROT_ALL, 0);
+			VM_PROT_ALL, VM_PROT_ALL, 0,
+			virtual_offset);
 		if (error) {
 			vm_map_unlock(map);
 			return (error);

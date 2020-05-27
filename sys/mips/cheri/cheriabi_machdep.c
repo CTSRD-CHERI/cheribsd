@@ -47,8 +47,6 @@
 
 #include "opt_ddb.h"
 
-#define	EXPLICIT_USER_ACCESS
-
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/kernel.h>
@@ -532,7 +530,7 @@ cheriabi_sysarch(struct thread *td, struct cheriabi_sysarch_args *uap)
 			return (EINVAL);
 		}
 		td->td_cheri_mmap_cap =
-		    cheri_csetbounds(td->td_cheri_mmap_cap,
+		    cheri_setbounds(td->td_cheri_mmap_cap,
 		    (register_t)len);
 		return (0);
 	}

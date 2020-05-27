@@ -1672,13 +1672,22 @@ typedef struct {
 	u_int16_t connection_handle;
 }__attribute__ ((packed)) ng_hci_le_long_term_key_request_negative_reply_rp;
 
+#define NG_HCI_OCF_LE_READ_BUFFER_SIZE_V2		0x0060
+/*No command parameter */
+typedef struct {
+	u_int8_t	status;
+	u_int16_t 	hc_le_data_packet_length;
+	u_int8_t	hc_total_num_le_data_packets; 
+	u_int16_t 	hc_iso_data_packet_length;
+	u_int8_t	hc_total_num_iso_data_packets; 
+} __attribute__ ((packed)) ng_hci_le_read_buffer_size_rp_v2;
 
-#define NG_HCI_OCF_LE_READ_SUPPORTED_STATUS		0x001c
+#define NG_HCI_OCF_LE_READ_SUPPORTED_STATES		0x001c
 /*No command parameter*/
 typedef struct {
 	u_int8_t status;
-	u_int64_t le_status;
-}__attribute__ ((packed)) ng_hci_le_read_supported_status_rp;
+	u_int64_t le_states;
+}__attribute__ ((packed)) ng_hci_le_read_supported_states_rp;
 
 #define NG_HCI_OCF_LE_RECEIVER_TEST			0x001d
 typedef struct{
@@ -1971,7 +1980,8 @@ typedef struct {
 	u_int8_t addr_type;
 	bdaddr_t bdaddr;
 	u_int8_t length_data;
-	u_int8_t data[NG_HCI_SCAN_RESPONSE_DATA_MAX];
+	/* The last octet is for RSSI */
+	u_int8_t data[NG_HCI_SCAN_RESPONSE_DATA_MAX+1];
 }__attribute__((packed)) ng_hci_le_advreport;
 
 #define NG_HCI_LEEV_CON_UPDATE_COMPL 0x03

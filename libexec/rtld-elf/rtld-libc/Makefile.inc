@@ -77,11 +77,14 @@ _libc_other_objects+=umoddi3 udivdi3 qdivrem
 # For CHERI we also use sysctlbyname
 _libc_other_objects+=sysctlbyname
 .ifdef BUILDING_RTLD_CHERI_ELF
-# In purecap, mergesort uses timsort
-_libc_other_objects+=timsort
 # Instead of setjmp/_setjmp we use setjmp_c/_setjmp_c
 _libc_other_objects:=${_libc_other_objects:Nsetjmp:N_setjmp} setjmp_c _setjmp_c
 .endif
+.endif
+
+.ifdef BUILDING_RTLD_CHERI_ELF
+# In purecap, mergesort uses timsort
+_libc_other_objects+=timsort
 .endif
 
 .ifdef BUILDING_RTLD_CHERI_ELF

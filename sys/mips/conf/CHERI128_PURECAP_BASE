@@ -20,6 +20,7 @@ makeoptions 	KERNLOADADDR=0xffffffff80100000
 # purecap kernel options
 options		CHERI_PURECAP_KERNEL
 options 	KSTACK_LARGE_PAGE
+options   NO_SWAPPING
 
 # debugging
 options 	KTRACE

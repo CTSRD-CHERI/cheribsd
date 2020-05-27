@@ -78,7 +78,7 @@ copyin_path(const char *uaddr, size_t len, char **result)
 	if (len >= PATH_MAX)
 		return (ENAMETOOLONG);
 	buf = malloc(len + 1, M_CLOUDABI_PATH, M_WAITOK);
-	error = copyin(uaddr, buf, len);
+	error = copyin(__USER_CAP(uaddr, len), buf, len);
 	if (error != 0) {
 		free(buf, M_CLOUDABI_PATH);
 		return (error);
@@ -209,7 +209,7 @@ cloudabi_sys_file_open(struct thread *td,
 	int error, fd, fflags;
 	bool read, write;
 
-	error = copyin(uap->fds, &fds, sizeof(fds));
+	error = copyin(__USER_CAP_OBJ(uap->fds), &fds, sizeof(fds));
 	if (error != 0)
 		return (error);
 
@@ -580,7 +580,7 @@ cloudabi_sys_file_stat_fget(struct thread *td,
 	/* Convert attributes to CloudABI's format. */
 	convert_stat(&sb, &csb);
 	csb.st_filetype = filetype;
-	return (copyout(&csb, uap->buf, sizeof(csb)));
+	return (copyout(&csb, __USER_CAP_OBJ(uap->buf), sizeof(csb)));
 }
 
 /* Converts timestamps to arguments to futimens() and utimensat(). */
@@ -616,7 +616,7 @@ cloudabi_sys_file_stat_fput(struct thread *td,
 	struct timespec ts[2];
 	int error;
 
-	error = copyin(uap->buf, &fs, sizeof(fs));
+	error = copyin(__USER_CAP_OBJ(uap->buf), &fs, sizeof(fs));
 	if (error != 0)
 		return (error);
 
@@ -685,7 +685,7 @@ cloudabi_sys_file_stat_get(struct thread *td,
 		csb.st_filetype = CLOUDABI_FILETYPE_SYMBOLIC_LINK;
 	else
 		csb.st_filetype = CLOUDABI_FILETYPE_UNKNOWN;
-	return (copyout(&csb, uap->buf, sizeof(csb)));
+	return (copyout(&csb, __USER_CAP_OBJ(uap->buf), sizeof(csb)));
 }
 
 int
@@ -706,7 +706,7 @@ cloudabi_sys_file_stat_put(struct thread *td,
 	    CLOUDABI_FILESTAT_MTIM_NOW)) != 0)
 		return (EINVAL);
 
-	error = copyin(uap->buf, &fs, sizeof(fs));
+	error = copyin(__USER_CAP_OBJ(uap->buf), &fs, sizeof(fs));
 	if (error != 0)
 		return (error);
 	error = copyin_path(uap->path, uap->path_len, &path);

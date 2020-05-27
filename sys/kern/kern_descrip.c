@@ -43,8 +43,6 @@ __FBSDID("$FreeBSD$");
 #include "opt_ddb.h"
 #include "opt_ktrace.h"
 
-#define	EXPLICIT_USER_ACCESS
-
 #include <sys/param.h>
 #include <sys/systm.h>
 
@@ -3479,6 +3477,27 @@ pwd_ensure_dirs(void)
 		vrefact(rootvnode);
 		newpwd->pwd_rdir = rootvnode;
 	}
+	pwd_set(fdp, newpwd);
+	FILEDESC_XUNLOCK(fdp);
+	pwd_drop(oldpwd);
+}
+
+void
+pwd_set_rootvnode(void)
+{
+	struct filedesc *fdp;
+	struct pwd *oldpwd, *newpwd;
+
+	fdp = curproc->p_fd;
+
+	newpwd = pwd_alloc();
+	FILEDESC_XLOCK(fdp);
+	oldpwd = FILEDESC_XLOCKED_LOAD_PWD(fdp);
+	vrefact(rootvnode);
+	newpwd->pwd_cdir = rootvnode;
+	vrefact(rootvnode);
+	newpwd->pwd_rdir = rootvnode;
+	pwd_fill(oldpwd, newpwd);
 	pwd_set(fdp, newpwd);
 	FILEDESC_XUNLOCK(fdp);
 	pwd_drop(oldpwd);

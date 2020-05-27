@@ -806,7 +806,7 @@ freebsd32_copyinuio(struct iovec32 * __capability iovp, u_int iovcnt,
 	uio = malloc(iovlen + sizeof *uio, M_IOV, M_WAITOK);
 	iov = (struct iovec *)(uio + 1);
 	for (i = 0; i < iovcnt; i++) {
-		error = copyin_c(&iovp[i], &iov32, sizeof(struct iovec32));
+		error = copyin(&iovp[i], &iov32, sizeof(struct iovec32));
 		if (error) {
 			free(uio, M_IOV);
 			return (error);
@@ -879,7 +879,7 @@ freebsd32_copyiniov(struct iovec32 * __capability iovp32, u_int iovcnt,
 	iovlen = iovcnt * sizeof(struct iovec);
 	iov = malloc(iovlen, M_IOV, M_WAITOK);
 	for (i = 0; i < iovcnt; i++) {
-		error = copyin_c(&iovp32[i], &iov32, sizeof(struct iovec32));
+		error = copyin(&iovp32[i], &iov32, sizeof(struct iovec32));
 		if (error) {
 			free(iov, M_IOV);
 			return (error);
@@ -1728,7 +1728,7 @@ freebsd32_copyin_hdtr(const struct sf_hdtr32 * __capability uhdtr,
 	struct sf_hdtr32 hdtr32;
 	int error;
 
-	error = copyin_c(uhdtr, &hdtr32, sizeof(hdtr32));
+	error = copyin(uhdtr, &hdtr32, sizeof(hdtr32));
 	if (error != 0)
 		return (error);
 	hdtr->headers = __USER_CAP_ARRAY(PTRIN(hdtr32.headers), hdtr32.hdr_cnt);
@@ -2212,7 +2212,7 @@ freebsd32_updateiov(const struct uio *uiop,
 	int i, error;
 
 	for (i = 0; i < uiop->uio_iovcnt; i++) {
-		error = suword32_c(&iovp[i].iov_len, uiop->uio_iov[i].iov_len);
+		error = suword32(&iovp[i].iov_len, uiop->uio_iov[i].iov_len);
 		if (error != 0)
 			return (error);
 	}
@@ -2720,7 +2720,7 @@ freebsd32_copyout_siginfo(const siginfo_t *si, void * __capability info)
 	struct siginfo32 si32;
 
 	siginfo_to_siginfo32(si, &si32);
-	return (copyout_c(&si32, info, sizeof(si32)));
+	return (copyout(&si32, info, sizeof(si32)));
 }
 
 
@@ -2959,7 +2959,7 @@ freebsd32_copyout_strings(struct image_params *imgp, uintptr_t *stack_base)
 	if (execpath_len != 0) {
 		destp -= execpath_len;
 		imgp->execpathp = (void *)destp;
-		error = copyout(imgp->execpath, (void *)destp, execpath_len);
+		error = copyout(imgp->execpath, imgp->execpathp, execpath_len);
 		if (error != 0)
 			return (error);
 	}
@@ -2970,7 +2970,7 @@ freebsd32_copyout_strings(struct image_params *imgp, uintptr_t *stack_base)
 	arc4rand(canary, sizeof(canary), 0);
 	destp -= sizeof(canary);
 	imgp->canary = (void *)destp;
-	error = copyout(canary, (void *)destp, sizeof(canary));
+	error = copyout(canary, imgp->canary, sizeof(canary));
 	if (error != 0)
 		return (error);
 	imgp->canarylen = sizeof(canary);
@@ -2983,7 +2983,7 @@ freebsd32_copyout_strings(struct image_params *imgp, uintptr_t *stack_base)
 	destp -= sizeof(pagesizes32);
 	destp = rounddown2(destp, sizeof(uint32_t));
 	imgp->pagesizes = (void *)destp;
-	error = copyout(pagesizes32, (void *)destp, sizeof(pagesizes32));
+	error = copyout(pagesizes32, imgp->pagesizes, sizeof(pagesizes32));
 	if (error != 0)
 		return (error);
 	imgp->pagesizeslen = sizeof(pagesizes32);

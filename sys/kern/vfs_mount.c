@@ -39,8 +39,6 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
-#define	EXPLICIT_USER_ACCESS
-
 #include <sys/param.h>
 #include <sys/conf.h>
 #include <sys/smp.h>
@@ -351,7 +349,7 @@ vfs_buildopts(struct uio *auio, struct vfsoptlist **options)
 				    auio->uio_iov[i + 1].iov_base, opt->value,
 				    optlen);
 			} else {
-				error = copyin(auio->uio_iov[i + 1].iov_base,
+				error = copyincap(auio->uio_iov[i + 1].iov_base,
 				    opt->value, optlen);
 				if (error)
 					goto bad;

@@ -228,7 +228,7 @@ static char *ld_utrace;		/* Use utrace() to log events. */
 static bool ld_skip_init_funcs = false;	/* XXXAR: debug environment variable to verify relocation processing */
 static struct obj_entry_q obj_list;	/* Queue of all loaded objects */
 static Obj_Entry *obj_main;	/* The main program shared object */
-#ifndef __CHERI_PURE_CAPABILITY__
+#if !defined(__mips__) || !defined(__CHERI_PURE_CAPABILITY__)
 static
 #endif
 Obj_Entry obj_rtld;	/* The dynamic linker shared object */
@@ -932,7 +932,7 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
     *exit_proc = rtld_exit_ptr;
     *objp = obj_main;
 
-#ifdef __CHERI_PURE_CAPABILITY__
+#if defined(__mips__) && defined(__CHERI_PURE_CAPABILITY__)
     // ensure that we setup a valid $cgp if the binary is built with -nostartfiles
     // Note: This value should still remain valid after the return since clang
     // won't clobber it. This should ensure that on return from here to
@@ -1374,19 +1374,19 @@ digest_dynamic1(Obj_Entry *obj, int early, const Elf_Dyn **dyn_rpath,
 	    break;
 
 	case DT_PREINIT_ARRAY:
-	    obj->preinit_array_ptr = (Elf_Addr *)(obj->relocbase + dynp->d_un.d_ptr);
+	    obj->preinit_array_ptr = (InitArrayEntry *)(obj->relocbase + dynp->d_un.d_ptr);
 	    break;
 
 	case DT_PREINIT_ARRAYSZ:
-	    obj->preinit_array_num = dynp->d_un.d_val / sizeof(Elf_Addr);
+	    obj->preinit_array_num = dynp->d_un.d_val / sizeof(InitArrayEntry);
 	    break;
 
 	case DT_INIT_ARRAY:
-	    obj->init_array_ptr = (Elf_Addr *)(obj->relocbase + dynp->d_un.d_ptr);
+	    obj->init_array_ptr = (InitArrayEntry *)(obj->relocbase + dynp->d_un.d_ptr);
 	    break;
 
 	case DT_INIT_ARRAYSZ:
-	    obj->init_array_num = dynp->d_un.d_val / sizeof(Elf_Addr);
+	    obj->init_array_num = dynp->d_un.d_val / sizeof(InitArrayEntry);
 	    break;
 
 	case DT_FINI:
@@ -1394,67 +1394,12 @@ digest_dynamic1(Obj_Entry *obj, int early, const Elf_Dyn **dyn_rpath,
 	    break;
 
 	case DT_FINI_ARRAY:
-	    obj->fini_array_ptr = (Elf_Addr *)(obj->relocbase + dynp->d_un.d_ptr);
+	    obj->fini_array_ptr = (InitArrayEntry *)(obj->relocbase + dynp->d_un.d_ptr);
 	    break;
 
 	case DT_FINI_ARRAYSZ:
-	    obj->fini_array_num = dynp->d_un.d_val / sizeof(Elf_Addr);
+	    obj->fini_array_num = dynp->d_un.d_val / sizeof(InitArrayEntry);
 	    break;
-
-#ifdef __CHERI_PURE_CAPABILITY__
-	case DT_MIPS_CHERI___CAPRELOCS:
-	    obj->cap_relocs = (obj->relocbase + dynp->d_un.d_ptr);
-	    break;
-
-	case DT_MIPS_CHERI___CAPRELOCSSZ:
-	    obj->cap_relocs_size = dynp->d_un.d_val;
-	    break;
-
-	case DT_MIPS_CHERI_FLAGS: {
-	    size_t flags = dynp->d_un.d_val;
-	    unsigned abi = flags & DF_MIPS_CHERI_ABI_MASK;
-	    obj->cheri_captable_abi = abi;
-	    flags &= ~DF_MIPS_CHERI_ABI_MASK;
-	    if (flags & DF_MIPS_CHERI_RELATIVE_CAPRELOCS) {
-		flags &= ~DF_MIPS_CHERI_RELATIVE_CAPRELOCS;
-		obj->relative_cap_relocs = true;
-	    }
-	    if ((flags & DF_MIPS_CHERI_CAPTABLE_PER_FILE) ||
-	        (flags & DF_MIPS_CHERI_CAPTABLE_PER_FUNC)) {
-#if RTLD_SUPPORT_PER_FUNCTION_CAPTABLE == 1
-		obj->per_function_captable = true;
-#else
-		rtld_fatal("Cannot load %s with per-file/per-function "
-		    "captable since " _PATH_RTLD " was not compiled with "
-		    "-DRTLD_SUPPORT_PER_FUNCTION_CAPTABLE=1", obj->path);
-#endif
-	    } else if (flags) {
-		rtld_fdprintf(STDERR_FILENO, "Unknown DT_MIPS_CHERI_FLAGS in %s"
-		    ": 0x%zx", obj->path, (size_t)flags);
-	    }
-	    break;
-	}
-
-	case DT_MIPS_CHERI_CAPTABLE:
-	    obj->writable_captable =
-	        (struct CheriCapTableEntry*)(obj->relocbase + dynp->d_un.d_ptr);
-	    break;
-
-	case DT_MIPS_CHERI_CAPTABLESZ:
-	    obj->captable_size = dynp->d_un.d_val;
-	    break;
-
-#if RTLD_SUPPORT_PER_FUNCTION_CAPTABLE == 1
-	case DT_MIPS_CHERI_CAPTABLE_MAPPING:
-	    obj->captable_mapping =
-	        (struct CheriCapTableMappingEntry*)(obj->relocbase + dynp->d_un.d_ptr);
-	    break;
-
-	case DT_MIPS_CHERI_CAPTABLE_MAPPINGSZ:
-	    obj->captable_mapping_size = dynp->d_un.d_val;
-	    break;
-#endif /* RTLD_SUPPORT_PER_FUNCTION_CAPTABLE == 1 */
-#endif /* defined(__CHERI_PURE_CAPABILITY__) */
 
 	/*
 	 * Don't process DT_DEBUG on MIPS as the dynamic section
@@ -1522,6 +1467,60 @@ digest_dynamic1(Obj_Entry *obj, int early, const Elf_Dyn **dyn_rpath,
 		    dynp->d_un.d_ptr);
 		break;
 
+#ifdef __CHERI_PURE_CAPABILITY__
+	case DT_MIPS_CHERI___CAPRELOCS:
+	    obj->cap_relocs = (obj->relocbase + dynp->d_un.d_ptr);
+	    break;
+
+	case DT_MIPS_CHERI___CAPRELOCSSZ:
+	    obj->cap_relocs_size = dynp->d_un.d_val;
+	    break;
+
+	case DT_MIPS_CHERI_FLAGS: {
+	    size_t flags = dynp->d_un.d_val;
+	    unsigned abi = flags & DF_MIPS_CHERI_ABI_MASK;
+	    obj->cheri_captable_abi = abi;
+	    flags &= ~DF_MIPS_CHERI_ABI_MASK;
+	    if (flags & DF_MIPS_CHERI_RELATIVE_CAPRELOCS) {
+		flags &= ~DF_MIPS_CHERI_RELATIVE_CAPRELOCS;
+		obj->relative_cap_relocs = true;
+	    }
+	    if ((flags & DF_MIPS_CHERI_CAPTABLE_PER_FILE) ||
+	        (flags & DF_MIPS_CHERI_CAPTABLE_PER_FUNC)) {
+#if RTLD_SUPPORT_PER_FUNCTION_CAPTABLE == 1
+		obj->per_function_captable = true;
+#else
+		rtld_fatal("Cannot load %s with per-file/per-function "
+		    "captable since " _PATH_RTLD " was not compiled with "
+		    "-DRTLD_SUPPORT_PER_FUNCTION_CAPTABLE=1", obj->path);
+#endif
+	    } else if (flags) {
+		rtld_fdprintf(STDERR_FILENO, "Unknown DT_MIPS_CHERI_FLAGS in %s"
+		    ": 0x%zx", obj->path, (size_t)flags);
+	    }
+	    break;
+	}
+
+	case DT_MIPS_CHERI_CAPTABLE:
+	    obj->writable_captable =
+	        (struct CheriCapTableEntry*)(obj->relocbase + dynp->d_un.d_ptr);
+	    break;
+
+	case DT_MIPS_CHERI_CAPTABLESZ:
+	    obj->captable_size = dynp->d_un.d_val;
+	    break;
+
+#if RTLD_SUPPORT_PER_FUNCTION_CAPTABLE == 1
+	case DT_MIPS_CHERI_CAPTABLE_MAPPING:
+	    obj->captable_mapping =
+	        (struct CheriCapTableMappingEntry*)(obj->relocbase + dynp->d_un.d_ptr);
+	    break;
+
+	case DT_MIPS_CHERI_CAPTABLE_MAPPINGSZ:
+	    obj->captable_mapping_size = dynp->d_un.d_val;
+	    break;
+#endif /* RTLD_SUPPORT_PER_FUNCTION_CAPTABLE == 1 */
+#endif /* defined(__CHERI_PURE_CAPABILITY__) */
 #endif
 
 #ifdef __powerpc__
@@ -1532,6 +1531,18 @@ digest_dynamic1(Obj_Entry *obj, int early, const Elf_Dyn **dyn_rpath,
 #else
 	case DT_PPC_GOT:
 		obj->gotptr = (Elf_Addr *)(obj->relocbase + dynp->d_un.d_ptr);
+		break;
+#endif
+#endif
+
+#ifdef __riscv
+#ifdef __CHERI_PURE_CAPABILITY__
+	case DT_RISCV_CHERI___CAPRELOCS:
+		obj->cap_relocs = (obj->relocbase + dynp->d_un.d_ptr);
+		break;
+
+	case DT_RISCV_CHERI___CAPRELOCSSZ:
+		obj->cap_relocs_size = dynp->d_un.d_val;
 		break;
 #endif
 #endif
@@ -1628,12 +1639,25 @@ digest_dynamic2(Obj_Entry *obj, const Elf_Dyn *dyn_rpath,
 	set_bounds_if_nonnull(obj->strtab, obj->strsize);
 	set_bounds_if_nonnull(obj->phdr, obj->phsize);
 
-	set_bounds_if_nonnull(obj->preinit_array_ptr, obj->preinit_array_num * sizeof(Elf_Addr));
-	set_bounds_if_nonnull(obj->init_array_ptr, obj->init_array_num * sizeof(Elf_Addr));
-	set_bounds_if_nonnull(obj->fini_array_ptr, obj->fini_array_num * sizeof(Elf_Addr));
+	set_bounds_if_nonnull(obj->preinit_array_ptr,
+	    obj->preinit_array_num * sizeof(InitArrayEntry));
+	set_bounds_if_nonnull(
+	    obj->init_array_ptr, obj->init_array_num * sizeof(InitArrayEntry));
+	set_bounds_if_nonnull(
+	    obj->fini_array_ptr, obj->fini_array_num * sizeof(InitArrayEntry));
 
 	set_bounds_if_nonnull(obj->cap_relocs, obj->cap_relocs_size);
+
+	/* TODO: Bring the useful ABI features to RISC-V */
+#ifdef __mips__
 	set_bounds_if_nonnull(obj->writable_captable, obj->captable_size);
+	if (cheri_getlength(obj->writable_captable) != obj->captable_size) {
+		dbg("Using imprecise bounds for captable: " PTR_FMT
+		    " - size was %zd but real size should be %zd",
+		    obj->writable_captable,
+		    cheri_getlength(obj->writable_captable),
+		    obj->captable_size);
+	}
 #if RTLD_SUPPORT_PER_FUNCTION_CAPTABLE == 1
 	set_bounds_if_nonnull(obj->captable_mapping, obj->captable_mapping_size);
 #endif
@@ -1641,23 +1665,52 @@ digest_dynamic2(Obj_Entry *obj, const Elf_Dyn *dyn_rpath,
 	if (obj->writable_captable)
 		obj->_target_cgp = cheri_clearperm(obj->writable_captable, TARGET_CGP_REMOVE_PERMS);
 
-	// Now reduce the bounds on text_rodata_cap:  I, and for PLT/FNDESC we can set tight bounds
-	// so we only need .text
+	// Now reduce the bounds on text_rodata_cap: for PLT/FNDESC we can set
+	// tight bounds and only need .text, but for PC-relative we have to also
+	// include the captable since the text/rodata capability is used for
+	// all code pointers, and functions need to be able to access the
+	// captable from PCC.
 	if (obj->cheri_captable_abi == DF_MIPS_CHERI_ABI_PCREL) {
-		// For pcrel ABI we need to include captable as well
+		// For pcrel ABI we need to include the captable
 		dbg("%s: text/rodata start = %#zx, text/rodata end = %#zx, "
-		    "captable = " PTR_FMT " (relative to start %#zx)", obj->path,
-		    (size_t)obj->text_rodata_start, (size_t)obj->text_rodata_end,
-		    obj->writable_captable, (char*)obj->writable_captable - obj->text_rodata_cap);
+		    "captable = " PTR_FMT " (relative to start %#zx), "
+		    "current text/rodata cap = " PTR_FMT,
+		    obj->path, (size_t)obj->text_rodata_start_offset,
+		    (size_t)obj->text_rodata_end_offset, obj->writable_captable,
+		    (char *)obj->writable_captable - obj->text_rodata_cap,
+		    obj->text_rodata_cap);
 		if (obj->writable_captable) {
-			vaddr_t start = rtld_min(obj->text_rodata_start,
-			    (vaddr_t)((char*)obj->writable_captable - obj->text_rodata_cap));
-			vaddr_t end = rtld_max(obj->text_rodata_end,
-			    (vaddr_t)(((char*)obj->writable_captable +
-			    cheri_getlen(obj->writable_captable)) - obj->text_rodata_cap));
-			obj->text_rodata_cap += start;
-			obj->text_rodata_cap = cheri_csetbounds_sametype(
-			    obj->text_rodata_cap, end - start);
+			// Note: due to capabilities not being precise, the end
+			// of the captable may not be the same as captable +
+			// cheri_getlen(captable). Use the value we got from
+			// DT_MIPS_CHERI_CAPTABLESZ instead
+			vaddr_t captable_start_offset = (vaddr_t)(
+			    (char *)obj->writable_captable - obj->relocbase);
+			rtld_min(obj->text_rodata_start_offset,
+			    (vaddr_t)((char *)obj->writable_captable -
+				obj->text_rodata_cap));
+			vaddr_t captable_end_offset =
+			    captable_start_offset + obj->captable_size;
+			// Set base to min_offset(.text/.rodata, .captable)
+			vaddr_t start_offset = rtld_min(captable_start_offset,
+			    obj->text_rodata_start_offset);
+			size_t end_offset = rtld_max(
+			    captable_end_offset, obj->text_rodata_end_offset);
+			size_t precise_size = end_offset - start_offset;
+			// Note: not setting precise bounds here since the end
+			// of the captable is probably not strongly aligned.
+			obj->text_rodata_cap += start_offset;
+			obj->text_rodata_cap = cheri_setbounds_sametype(
+			    obj->text_rodata_cap, precise_size);
+			if (cheri_getlength(obj->text_rodata_cap) !=
+			    precise_size) {
+				dbg("Using imprecise bounds for text/rodata"
+				    "/captable: " PTR_FMT
+				    " - size was %zd but real size should be %zd",
+				    obj->text_rodata_cap,
+				    cheri_getlength(obj->text_rodata_cap),
+				    precise_size);
+			}
 		} else {
 			dbg("%s: missing DT_CHERI_CAPTABLE so can't set "
 			    "sensible bounds on text/rodata -> using full DSO"
@@ -1665,15 +1718,16 @@ digest_dynamic2(Obj_Entry *obj, const Elf_Dyn *dyn_rpath,
 		}
 	} else {
 		// tight bounds on text_rodata possible since $cgp is live-in
-		obj->text_rodata_cap += obj->text_rodata_start;
+		obj->text_rodata_cap += obj->text_rodata_start_offset;
 		// TODO: data-only .so files? Possibly used by icu4c? For now
 		// I'll keep this assertion until we hit an error
-		rtld_require(obj->text_rodata_end != 0, "No text segment in %s?", obj->path);
-		obj->text_rodata_cap = cheri_csetbounds_sametype(
-		   obj->text_rodata_cap, obj->text_rodata_end - obj->text_rodata_start);
+		rtld_require(obj->text_rodata_end_offset != 0, "No text segment in %s?", obj->path);
+		obj->text_rodata_cap = cheri_setbounds_sametype(
+		   obj->text_rodata_cap, obj->text_rodata_end_offset - obj->text_rodata_start_offset);
 	}
 	dbg("%s: tightened bounds of text/rodata cap: " PTR_FMT, obj->path,
 	    obj->text_rodata_cap);
+#endif /* defined(__mips__) */
 #endif
 	return (true);
 }
@@ -1712,7 +1766,7 @@ digest_phdr(const Elf_Phdr *phdr, int phnum, dlfunc_t entry, const char *path)
 
 	obj->phsize = ph->p_memsz;
 #ifdef __CHERI_PURE_CAPABILITY__
-	obj->phdr = cheri_csetbounds(phdr, ph->p_memsz);
+	obj->phdr = cheri_setbounds(phdr, ph->p_memsz);
 #else
 	obj->phdr = phdr;
 #endif
@@ -1758,11 +1812,11 @@ digest_phdr(const Elf_Phdr *phdr, int phnum, dlfunc_t entry, const char *path)
 #ifdef __CHERI_PURE_CAPABILITY__
 	    if (!(ph->p_flags & PF_W)) {
 		Elf_Addr start_addr = ph->p_vaddr;
-		obj->text_rodata_start = rtld_min(start_addr, obj->text_rodata_start);
-		obj->text_rodata_end = rtld_max(start_addr + ph->p_memsz, obj->text_rodata_end);
+		obj->text_rodata_start_offset = rtld_min(start_addr, obj->text_rodata_start_offset);
+		obj->text_rodata_end_offset = rtld_max(start_addr + ph->p_memsz, obj->text_rodata_end_offset);
 		dbg("%s: processing readonly PT_LOAD[%d], new text/rodata start "
 		    " = %zx text/rodata end = %zx", path, nsegs,
-		    (size_t)obj->text_rodata_start, (size_t)obj->text_rodata_end);
+		    (size_t)obj->text_rodata_start_offset, (size_t)obj->text_rodata_end_offset);
 	    }
 #endif
 	    break;
@@ -1788,11 +1842,11 @@ digest_phdr(const Elf_Phdr *phdr, int phnum, dlfunc_t entry, const char *path)
 	    obj->relro_page = obj->relocbase + trunc_page(ph->p_vaddr);
 	    obj->relro_size = round_page(ph->p_memsz);
 #ifdef __CHERI_PURE_CAPABILITY__
-	    obj->text_rodata_start = rtld_min(ph->p_vaddr, obj->text_rodata_start);
-	    obj->text_rodata_end = rtld_max(ph->p_vaddr + ph->p_memsz, obj->text_rodata_end);
+	    obj->text_rodata_start_offset = rtld_min(ph->p_vaddr, obj->text_rodata_start_offset);
+	    obj->text_rodata_end_offset = rtld_max(ph->p_vaddr + ph->p_memsz, obj->text_rodata_end_offset);
 	    dbg("%s: Adding PT_GNU_RELRO, new text/rodata start "
 		" = %zx text/rodata end = %zx", path,
-		(size_t)obj->text_rodata_start, (size_t)obj->text_rodata_end);
+		(size_t)obj->text_rodata_start_offset, (size_t)obj->text_rodata_end_offset);
 #endif
 	    break;
 
@@ -1809,7 +1863,7 @@ digest_phdr(const Elf_Phdr *phdr, int phnum, dlfunc_t entry, const char *path)
     }
 
 #ifdef __CHERI_PURE_CAPABILITY__
-   obj->relocbase = cheri_csetbounds(obj->relocbase, obj->mapsize);
+   obj->relocbase = cheri_setbounds(obj->relocbase, obj->mapsize);
     /*
      * Derive text_rodata cap from AT_ENTRY (but set the address to the beginning
      * of the object). Note: csetbounds is done after parsing .dynamic
@@ -2495,13 +2549,13 @@ init_rtld(caddr_t mapbase, Elf_Auxinfo **aux_info)
 	    continue;
 	if (!(ph->p_flags & PF_W)) {
 	    Elf_Addr start_addr = ph->p_vaddr;
-	    objtmp.text_rodata_start = rtld_min(start_addr, objtmp.text_rodata_start);
-	    objtmp.text_rodata_end = rtld_max(start_addr + ph->p_memsz, objtmp.text_rodata_end);
+	    objtmp.text_rodata_start_offset = rtld_min(start_addr, objtmp.text_rodata_start_offset);
+	    objtmp.text_rodata_end_offset = rtld_max(start_addr + ph->p_memsz, objtmp.text_rodata_end_offset);
 #if defined(DEBUG_VERBOSE) && DEBUG_VERBOSE > 3
 	    /* debug is not initialized yet so dbg() is a no-op */
 	    rtld_fdprintf(STDERR_FILENO, "rtld: processing PT_LOAD phdr[%d], "
 		"new text/rodata start  = %zx text/rodata end = %zx\n", i + 1,
-		(size_t)objtmp.text_rodata_start, (size_t)objtmp.text_rodata_end);
+		(size_t)objtmp.text_rodata_start_offset, (size_t)objtmp.text_rodata_end_offset);
 #endif
 	}
     }
@@ -2967,7 +3021,7 @@ obj_from_addr(const void *addr)
 static void
 preinit_main(void)
 {
-    Elf_Addr *preinit_addr;
+    InitArrayEntry *preinit_addr;
     int index;
 
     preinit_addr = obj_main->preinit_array_ptr;
@@ -2975,11 +3029,11 @@ preinit_main(void)
 	return;
 
     for (index = 0; index < obj_main->preinit_array_num; index++) {
-	if (preinit_addr[index] != 0 && preinit_addr[index] != 1) {
-	    dbg("calling preinit function for %s at %lx", obj_main->path,
-		preinit_addr[index]);
+	if (preinit_addr[index].value != 0 && preinit_addr[index].value != 1) {
+	    dbg("calling preinit function for %s at %p", obj_main->path,
+		(void*)(uintptr_t)preinit_addr[index].value);
 	    LD_UTRACE(UTRACE_INIT_CALL, obj_main,
-	      (void *)(intptr_t)preinit_addr[index], 0, 0, obj_main->path);
+	      (void *)(intptr_t)preinit_addr[index].value, 0, 0, obj_main->path);
 	    call_init_array_pointer(obj_main, preinit_addr[index]);
 	}
     }
@@ -2997,7 +3051,7 @@ objlist_call_fini(Objlist *list, Obj_Entry *root, RtldLockState *lockstate)
 {
     Objlist_Entry *elm;
     char *saved_msg;
-    Elf_Addr *fini_addr;
+    InitArrayEntry *fini_addr;
     int index;
 
     assert(root == NULL || root->refcount == 1);
@@ -3031,11 +3085,11 @@ objlist_call_fini(Objlist *list, Obj_Entry *root, RtldLockState *lockstate)
 	    if (fini_addr != NULL && elm->obj->fini_array_num > 0) {
 		for (index = elm->obj->fini_array_num - 1; index >= 0;
 		  index--) {
-		    if (fini_addr[index] != 0 && fini_addr[index] != 1) {
-			dbg("calling fini_array function for %s at %lx",
-			    elm->obj->path, fini_addr[index]);
+		    if (fini_addr[index].value != 0 && fini_addr[index].value != 1) {
+			dbg("calling fini_array function for %s at %p",
+			    elm->obj->path, (void*)(uintptr_t)fini_addr[index].value);
 			LD_UTRACE(UTRACE_FINI_CALL, elm->obj,
-			    (void *)(intptr_t)fini_addr[index], 0, 0, elm->obj->path);
+			    (void *)(intptr_t)fini_addr[index].value, 0, 0, elm->obj->path);
 			call_fini_array_pointer(elm->obj, fini_addr[index]);
 		    }
 		}
@@ -3074,7 +3128,7 @@ objlist_call_init(Objlist *list, RtldLockState *lockstate)
     Objlist_Entry *elm;
     Obj_Entry *obj;
     char *saved_msg;
-    Elf_Addr *init_addr;
+    InitArrayEntry *init_addr;
     void (*reg)(void (*)(void));
     int index;
 
@@ -3135,11 +3189,11 @@ objlist_call_init(Objlist *list, RtldLockState *lockstate)
 	init_addr = elm->obj->init_array_ptr;
 	if (init_addr != NULL) {
 	    for (index = 0; index < elm->obj->init_array_num; index++) {
-		if (init_addr[index] != 0 && init_addr[index] != 1) {
+		if (init_addr[index].value != 0 && init_addr[index].value != 1) {
 		    dbg("calling init array function for %s at %p", elm->obj->path,
-			(void *)(uintptr_t)init_addr[index]);
+			(void *)(uintptr_t)init_addr[index].value);
 		    LD_UTRACE(UTRACE_INIT_CALL, elm->obj,
-			(void *)(uintptr_t)init_addr[index], 0, 0, elm->obj->path);
+			(void *)(uintptr_t)init_addr[index].value, 0, 0, elm->obj->path);
 		    call_init_array_pointer(elm->obj, init_addr[index]);
 		}
 	    }
@@ -3328,7 +3382,7 @@ relocate_object(Obj_Entry *obj, bool bind_now, Obj_Entry *rtldobj,
 	init_pltgot(obj);
 
 	/* Process the PLT relocations. */
-#ifdef __CHERI_PURE_CAPABILITY__
+#if defined(__mips__) && defined(__CHERI_PURE_CAPABILITY__)
 	/* No reloc_jmpslots for CHERI since it works differently: if BIND_NOW
 	 * is set, reloc_plt can avoid allocating trampolines for pc-rel code */
 	if (reloc_plt(obj, (obj->bind_now || bind_now), flags, rtldobj,
@@ -3734,7 +3788,7 @@ rtld_dlopen(const char *name, int fd, int mode)
     if (mode & RTLD_NOLOAD)
 	    lo_flags |= RTLD_LO_NOLOAD;
     if (ld_tracing != NULL)
-	    lo_flags |= RTLD_LO_TRACE;
+	    lo_flags |= RTLD_LO_TRACE | RTLD_LO_IGNSTLS;
 
     return (dlopen_object(name, fd, obj_main, lo_flags,
       mode & (RTLD_MODEMASK | RTLD_GLOBAL), NULL));
@@ -3785,15 +3839,15 @@ dlopen_object(const char *name, int fd, Obj_Entry *refobj, int lo_flags,
 	    /* We loaded something new. */
 	    assert(globallist_next(old_obj_tail) == obj);
 	    result = 0;
-	    if ((lo_flags & RTLD_LO_EARLY) == 0 && obj->static_tls &&
-	      !allocate_tls_offset(obj)) {
+	    if ((lo_flags & (RTLD_LO_EARLY | RTLD_LO_IGNSTLS)) == 0 &&
+	      obj->static_tls && !allocate_tls_offset(obj)) {
 		_rtld_error("%s: No space available "
 		  "for static Thread Local Storage", obj->path);
 		result = -1;
 	    }
 	    if (result != -1)
 		result = load_needed_objects(obj, lo_flags & (RTLD_LO_DLOPEN |
-		    RTLD_LO_EARLY));
+		    RTLD_LO_EARLY | RTLD_LO_IGNSTLS));
 	    init_dag(obj);
 	    ref_dag(obj);
 	    if (result != -1)
@@ -5384,13 +5438,13 @@ allocate_tls(Obj_Entry *objs, void *oldtls, size_t tcbsize, size_t tcbalign)
     ralign = tcbalign;
     if (tls_static_max_align > ralign)
 	    ralign = tls_static_max_align;
-    size = round(tls_static_space, ralign) + round(tcbsize, ralign);
+    size = roundup(tls_static_space, ralign) + roundup(tcbsize, ralign);
 
     assert(tcbsize >= 2*sizeof(Elf_Addr));
     tls = malloc_aligned(size, ralign, 0 /* XXX */);
     dtv = xcalloc(tls_max_index + 2, sizeof(Elf_Addr));
 
-    segbase = (Elf_Addr)(tls + round(tls_static_space, ralign));
+    segbase = (Elf_Addr)(tls + roundup(tls_static_space, ralign));
     ((Elf_Addr*)segbase)[0] = segbase;
     ((Elf_Addr*)segbase)[1] = (Elf_Addr) dtv;
 
@@ -5456,7 +5510,7 @@ free_tls(void *tls, size_t tcbsize  __unused, size_t tcbalign)
     ralign = tcbalign;
     if (tls_static_max_align > ralign)
 	    ralign = tls_static_max_align;
-    size = round(tls_static_space, ralign);
+    size = roundup(tls_static_space, ralign);
 
     dtv = ((Elf_Addr**)tls)[1];
     dtvsize = dtv[1];
@@ -5514,10 +5568,11 @@ allocate_tls_offset(Obj_Entry *obj)
     }
 
     if (tls_last_offset == 0)
-	off = calculate_first_tls_offset(obj->tlssize, obj->tlsalign);
+	off = calculate_first_tls_offset(obj->tlssize, obj->tlsalign,
+	  obj->tlspoffset);
     else
 	off = calculate_tls_offset(tls_last_offset, tls_last_size,
-				   obj->tlssize, obj->tlsalign);
+	  obj->tlssize, obj->tlsalign, obj->tlspoffset);
 
     /*
      * If we have already fixed the size of the static TLS block, we

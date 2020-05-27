@@ -112,7 +112,7 @@ extern char pcpu_space[MAXCPU][PAGE_SIZE * 2];
 #ifndef CHERI_PURECAP_KERNEL
 #define	PCPU_ADDR(cpu)		(struct pcpu *)(pcpu_space[(cpu)])
 #else /* CHERI_PURECAP_KERNEL */
-#define PCPU_ADDR(cpu)		cheri_csetbounds((struct pcpu *)(pcpu_space[(cpu)]), sizeof(struct pcpu))
+#define PCPU_ADDR(cpu)		cheri_setbounds((struct pcpu *)(pcpu_space[(cpu)]), sizeof(struct pcpu))
 #endif /* CHERI_PURECAP_KERNEL*/
 
 extern struct pcpu *pcpup;

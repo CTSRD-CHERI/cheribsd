@@ -24,6 +24,7 @@ CFLAGS+=-I${.CURDIR}/arch/${MACHINE_CPUARCH}/include
 CFLAGS+=-I${.CURDIR}/sys
 CFLAGS+=-I${SRCTOP}/libexec/rtld-elf
 .if ${MACHINE_ABI:Mpurecap}
+CFLAGS+=-I${SRCTOP}/libexec/rtld-cheri-elf
 CFLAGS+=-I${SRCTOP}/libexec/rtld-cheri-elf/${MACHINE_CPUARCH}
 .else
 CFLAGS+=-I${SRCTOP}/libexec/rtld-elf/${MACHINE_CPUARCH}
@@ -33,10 +34,7 @@ CFLAGS+=-Winline
 
 CFLAGS.thr_stack.c+=	-Wno-cast-align
 CFLAGS.rtld_malloc.c+=	-Wno-cast-align
-.include <bsd.compiler.mk>
-.if !(${COMPILER_TYPE} == "gcc" && ${COMPILER_VERSION} < 40300)
 CFLAGS.thr_symbols.c+=	-Wno-missing-variable-declarations
-.endif
 
 .ifndef NO_THREAD_UNWIND_STACK
 CFLAGS+=-fexceptions

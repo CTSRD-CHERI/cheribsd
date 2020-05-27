@@ -42,6 +42,17 @@ SYSCTL_DECL(_vfs_zfs_version);
 SYSCTL_INT(_vfs_zfs_version, OID_AUTO, ioctl, CTLFLAG_RD, &zfs_version_ioctl,
     0, "ZFS_IOCTL_VERSION");
 
+#ifdef _KERNEL
+#define	__PTR_COMPAT_TO_NATIVE(addr, len)	__USER_CAP(addr, len)
+#define	__PTR_NATIVE_TO_COMPAT(ptr)		((__cheri_addr vaddr_t)(ptr))
+#elif defined(__CHERI_PURE_CAPABILITY__)
+#define	__PTR_COMPAT_TO_NATIVE(addr, len)	((void *)(uintptr_t)(addr))
+#define	__PTR_NATIVE_TO_COMPAT(ptr)		((__cheri_addr vaddr_t)(ptr))
+#else
+#define	__PTR_COMPAT_TO_NATIVE(addr, len)	(addr)
+#define	__PTR_NATIVE_TO_COMPAT(ptr)		(ptr)
+#endif
+
 /*
  * FreeBSD zfs_cmd compatibility with older binaries
  * appropriately remap/extend the zfs_cmd_t structure
@@ -66,15 +77,16 @@ zfs_cmd_compat_get(zfs_cmd_t *zc, caddr_t addr, const int cflag)
 		strlcpy(zc->zc_string, inlanes_c->zc_string, MAXPATHLEN);
 
 #define FIELD_COPY(field) zc->field = inlanes_c->field
-		FIELD_COPY(zc_nvlist_src);
+#define PTR_COPY(field, len) zc->field = __PTR_COMPAT_TO_NATIVE(inlanes_c->field, inlanes_c->len)
+		PTR_COPY(zc_nvlist_src, zc_nvlist_src_size);
 		FIELD_COPY(zc_nvlist_src_size);
-		FIELD_COPY(zc_nvlist_dst);
+		PTR_COPY(zc_nvlist_dst, zc_nvlist_dst_size);
 		FIELD_COPY(zc_nvlist_dst_size);
 		FIELD_COPY(zc_nvlist_dst_filled);
 		FIELD_COPY(zc_pad2);
-		FIELD_COPY(zc_history);
+		PTR_COPY(zc_history, zc_history_len);
 		FIELD_COPY(zc_guid);
-		FIELD_COPY(zc_nvlist_conf);
+		PTR_COPY(zc_nvlist_conf, zc_nvlist_conf_size);
 		FIELD_COPY(zc_nvlist_conf_size);
 		FIELD_COPY(zc_cookie);
 		FIELD_COPY(zc_objset_type);
@@ -99,6 +111,7 @@ zfs_cmd_compat_get(zfs_cmd_t *zc, caddr_t addr, const int cflag)
 		FIELD_COPY(zc_createtxg);
 		FIELD_COPY(zc_stat);
 #undef FIELD_COPY
+#undef PTR_COPY
 		break;
 
 	case ZFS_CMD_COMPAT_RESUME:
@@ -109,15 +122,16 @@ zfs_cmd_compat_get(zfs_cmd_t *zc, caddr_t addr, const int cflag)
 		strlcpy(zc->zc_string, resume_c->zc_string, MAXPATHLEN);
 
 #define FIELD_COPY(field) zc->field = resume_c->field
-		FIELD_COPY(zc_nvlist_src);
+#define PTR_COPY(field, len) zc->field = __PTR_COMPAT_TO_NATIVE(resume_c->field, resume_c->len)
+		PTR_COPY(zc_nvlist_src, zc_nvlist_src_size);
 		FIELD_COPY(zc_nvlist_src_size);
-		FIELD_COPY(zc_nvlist_dst);
+		PTR_COPY(zc_nvlist_dst, zc_nvlist_dst_size);
 		FIELD_COPY(zc_nvlist_dst_size);
 		FIELD_COPY(zc_nvlist_dst_filled);
 		FIELD_COPY(zc_pad2);
-		FIELD_COPY(zc_history);
+		PTR_COPY(zc_history, zc_history_len);
 		FIELD_COPY(zc_guid);
-		FIELD_COPY(zc_nvlist_conf);
+		PTR_COPY(zc_nvlist_conf, zc_nvlist_conf_size);
 		FIELD_COPY(zc_nvlist_conf_size);
 		FIELD_COPY(zc_cookie);
 		FIELD_COPY(zc_objset_type);
@@ -159,6 +173,7 @@ zfs_cmd_compat_get(zfs_cmd_t *zc, caddr_t addr, const int cflag)
 		FIELD_COPY(zc_createtxg);
 		FIELD_COPY(zc_stat);
 #undef FIELD_COPY
+#undef PTR_COPY
 		break;
 
 	case ZFS_CMD_COMPAT_EDBP:
@@ -169,15 +184,16 @@ zfs_cmd_compat_get(zfs_cmd_t *zc, caddr_t addr, const int cflag)
 		strlcpy(zc->zc_string, edbp_c->zc_string, MAXPATHLEN);
 
 #define FIELD_COPY(field) zc->field = edbp_c->field
-		FIELD_COPY(zc_nvlist_src);
+#define PTR_COPY(field, len) zc->field = __PTR_COMPAT_TO_NATIVE(edbp_c->field, edbp_c->len)
+		PTR_COPY(zc_nvlist_src, zc_nvlist_src_size);
 		FIELD_COPY(zc_nvlist_src_size);
-		FIELD_COPY(zc_nvlist_dst);
+		PTR_COPY(zc_nvlist_dst, zc_nvlist_dst_size);
 		FIELD_COPY(zc_nvlist_dst_size);
 		FIELD_COPY(zc_nvlist_dst_filled);
 		FIELD_COPY(zc_pad2);
-		FIELD_COPY(zc_history);
+		PTR_COPY(zc_history, zc_history_len);
 		FIELD_COPY(zc_guid);
-		FIELD_COPY(zc_nvlist_conf);
+		PTR_COPY(zc_nvlist_conf, zc_nvlist_conf_size);
 		FIELD_COPY(zc_nvlist_conf_size);
 		FIELD_COPY(zc_cookie);
 		FIELD_COPY(zc_objset_type);
@@ -219,6 +235,7 @@ zfs_cmd_compat_get(zfs_cmd_t *zc, caddr_t addr, const int cflag)
 		FIELD_COPY(zc_createtxg);
 		FIELD_COPY(zc_stat);
 #undef FIELD_COPY
+#undef PTR_COPY
 		break;
 
 	case ZFS_CMD_COMPAT_ZCMD:
@@ -229,15 +246,16 @@ zfs_cmd_compat_get(zfs_cmd_t *zc, caddr_t addr, const int cflag)
 		strlcpy(zc->zc_string, zcmd_c->zc_string, MAXPATHLEN);
 
 #define FIELD_COPY(field) zc->field = zcmd_c->field
-		FIELD_COPY(zc_nvlist_src);
+#define PTR_COPY(field, len) zc->field = __PTR_COMPAT_TO_NATIVE(zcmd_c->field, zcmd_c->len)
+		PTR_COPY(zc_nvlist_src, zc_nvlist_src_size);
 		FIELD_COPY(zc_nvlist_src_size);
-		FIELD_COPY(zc_nvlist_dst);
+		PTR_COPY(zc_nvlist_dst, zc_nvlist_dst_size);
 		FIELD_COPY(zc_nvlist_dst_size);
 		FIELD_COPY(zc_nvlist_dst_filled);
 		FIELD_COPY(zc_pad2);
-		FIELD_COPY(zc_history);
+		PTR_COPY(zc_history, zc_history_len);
 		FIELD_COPY(zc_guid);
-		FIELD_COPY(zc_nvlist_conf);
+		PTR_COPY(zc_nvlist_conf, zc_nvlist_conf_size);
 		FIELD_COPY(zc_nvlist_conf_size);
 		FIELD_COPY(zc_cookie);
 		FIELD_COPY(zc_objset_type);
@@ -282,6 +300,7 @@ zfs_cmd_compat_get(zfs_cmd_t *zc, caddr_t addr, const int cflag)
 		FIELD_COPY(zc_createtxg);
 		FIELD_COPY(zc_stat);
 #undef FIELD_COPY
+#undef PTR_COPY
 
 		break;
 
@@ -293,17 +312,18 @@ zfs_cmd_compat_get(zfs_cmd_t *zc, caddr_t addr, const int cflag)
 		strlcpy(zc->zc_string, zcdm_c->zc_string, MAXPATHLEN);
 
 #define FIELD_COPY(field) zc->field = zcdm_c->field
+#define PTR_COPY(field, len) zc->field = __PTR_COMPAT_TO_NATIVE(zcdm_c->field, zcdm_c->len)
 		zc->zc_guid = zcdm_c->zc_guid;
-		zc->zc_nvlist_conf = zcdm_c->zc_nvlist_conf;
+		PTR_COPY(zc_nvlist_conf, zc_nvlist_conf_size);
 		zc->zc_nvlist_conf_size = zcdm_c->zc_nvlist_conf_size;
-		zc->zc_nvlist_src = zcdm_c->zc_nvlist_src;
+		PTR_COPY(zc_nvlist_src, zc_nvlist_src_size);
 		zc->zc_nvlist_src_size = zcdm_c->zc_nvlist_src_size;
-		zc->zc_nvlist_dst = zcdm_c->zc_nvlist_dst;
+		PTR_COPY(zc_nvlist_dst, zc_nvlist_dst_size);
 		zc->zc_nvlist_dst_size = zcdm_c->zc_nvlist_dst_size;
 		zc->zc_cookie = zcdm_c->zc_cookie;
 		zc->zc_objset_type = zcdm_c->zc_objset_type;
 		zc->zc_perm_action = zcdm_c->zc_perm_action;
-		zc->zc_history = zcdm_c->zc_history;
+		PTR_COPY(zc_history, zc_history_len);
 		zc->zc_history_len = zcdm_c->zc_history_len;
 		zc->zc_history_offset = zcdm_c->zc_history_offset;
 		zc->zc_obj = zcdm_c->zc_obj;
@@ -344,6 +364,7 @@ zfs_cmd_compat_get(zfs_cmd_t *zc, caddr_t addr, const int cflag)
 		/* we always assume zc_nvlist_dst_filled is true */
 		zc->zc_nvlist_dst_filled = B_TRUE;
 #undef FIELD_COPY
+#undef PTR_COPY
 		break;
 
 	case ZFS_CMD_COMPAT_V28:
@@ -353,17 +374,20 @@ zfs_cmd_compat_get(zfs_cmd_t *zc, caddr_t addr, const int cflag)
 		strlcpy(zc->zc_name, zc28_c->zc_name, MAXPATHLEN);
 		strlcpy(zc->zc_value, zc28_c->zc_value, MAXPATHLEN * 2);
 		strlcpy(zc->zc_string, zc28_c->zc_string, MAXPATHLEN);
+
+#define PTR_COPY(field, len) zc->field = __PTR_COMPAT_TO_NATIVE(zc28_c->field, zc28_c->len)
+
 		zc->zc_guid = zc28_c->zc_guid;
-		zc->zc_nvlist_conf = zc28_c->zc_nvlist_conf;
+		PTR_COPY(zc_nvlist_conf, zc_nvlist_conf_size);
 		zc->zc_nvlist_conf_size = zc28_c->zc_nvlist_conf_size;
-		zc->zc_nvlist_src = zc28_c->zc_nvlist_src;
+		PTR_COPY(zc_nvlist_src, zc_nvlist_src_size);
 		zc->zc_nvlist_src_size = zc28_c->zc_nvlist_src_size;
-		zc->zc_nvlist_dst = zc28_c->zc_nvlist_dst;
+		PTR_COPY(zc_nvlist_dst, zc_nvlist_dst_size);
 		zc->zc_nvlist_dst_size = zc28_c->zc_nvlist_dst_size;
 		zc->zc_cookie = zc28_c->zc_cookie;
 		zc->zc_objset_type = zc28_c->zc_objset_type;
 		zc->zc_perm_action = zc28_c->zc_perm_action;
-		zc->zc_history = zc28_c->zc_history;
+		PTR_COPY(zc_history, zc_history_len);
 		zc->zc_history_len = zc28_c->zc_history_len;
 		zc->zc_history_offset = zc28_c->zc_history_offset;
 		zc->zc_obj = zc28_c->zc_obj;
@@ -415,6 +439,7 @@ zfs_cmd_compat_get(zfs_cmd_t *zc, caddr_t addr, const int cflag)
 		zc->zc_inject_record.zi_nlanes = 1;
 		zc->zc_inject_record.zi_cmd = ZINJECT_UNINITIALIZED;
 		zc->zc_inject_record.zi_pad = 0;
+#undef PTR_COPY
 		break;
 
 	case ZFS_CMD_COMPAT_V15:
@@ -424,17 +449,20 @@ zfs_cmd_compat_get(zfs_cmd_t *zc, caddr_t addr, const int cflag)
 		strlcpy(zc->zc_name, zc_c->zc_name, MAXPATHLEN);
 		strlcpy(zc->zc_value, zc_c->zc_value, MAXPATHLEN);
 		strlcpy(zc->zc_string, zc_c->zc_string, MAXPATHLEN);
+
+#define PTR_COPY(field, len) zc->field = __PTR_COMPAT_TO_NATIVE(zc_c->field, zc_c->len)
+
 		zc->zc_guid = zc_c->zc_guid;
-		zc->zc_nvlist_conf = zc_c->zc_nvlist_conf;
+		PTR_COPY(zc_nvlist_conf, zc_nvlist_conf_size);
 		zc->zc_nvlist_conf_size = zc_c->zc_nvlist_conf_size;
-		zc->zc_nvlist_src = zc_c->zc_nvlist_src;
+		PTR_COPY(zc_nvlist_src, zc_nvlist_src_size);
 		zc->zc_nvlist_src_size = zc_c->zc_nvlist_src_size;
-		zc->zc_nvlist_dst = zc_c->zc_nvlist_dst;
+		PTR_COPY(zc_nvlist_dst, zc_nvlist_dst_size);
 		zc->zc_nvlist_dst_size = zc_c->zc_nvlist_dst_size;
 		zc->zc_cookie = zc_c->zc_cookie;
 		zc->zc_objset_type = zc_c->zc_objset_type;
 		zc->zc_perm_action = zc_c->zc_perm_action;
-		zc->zc_history = zc_c->zc_history;
+		PTR_COPY(zc_history, zc_history_len);
 		zc->zc_history_len = zc_c->zc_history_len;
 		zc->zc_history_offset = zc_c->zc_history_offset;
 		zc->zc_obj = zc_c->zc_obj;
@@ -464,6 +492,7 @@ zfs_cmd_compat_get(zfs_cmd_t *zc, caddr_t addr, const int cflag)
 		    zc_c->zc_inject_record.zi_freq;
 		zc->zc_inject_record.zi_failfast =
 		    zc_c->zc_inject_record.zi_failfast;
+#undef PTR_COPY
 		break;
 	}
 }
@@ -488,15 +517,16 @@ zfs_cmd_compat_put(zfs_cmd_t *zc, caddr_t addr, const int request,
 		strlcpy(inlanes_c->zc_string, zc->zc_string, MAXPATHLEN);
 
 #define FIELD_COPY(field) inlanes_c->field = zc->field
-		FIELD_COPY(zc_nvlist_src);
+#define PTR_COPY(field) inlanes_c->field = __PTR_NATIVE_TO_COMPAT(zc->field)
+		PTR_COPY(zc_nvlist_src);
 		FIELD_COPY(zc_nvlist_src_size);
-		FIELD_COPY(zc_nvlist_dst);
+		PTR_COPY(zc_nvlist_dst);
 		FIELD_COPY(zc_nvlist_dst_size);
 		FIELD_COPY(zc_nvlist_dst_filled);
 		FIELD_COPY(zc_pad2);
-		FIELD_COPY(zc_history);
+		PTR_COPY(zc_history);
 		FIELD_COPY(zc_guid);
-		FIELD_COPY(zc_nvlist_conf);
+		PTR_COPY(zc_nvlist_conf);
 		FIELD_COPY(zc_nvlist_conf_size);
 		FIELD_COPY(zc_cookie);
 		FIELD_COPY(zc_objset_type);
@@ -520,6 +550,7 @@ zfs_cmd_compat_put(zfs_cmd_t *zc, caddr_t addr, const int request,
 		FIELD_COPY(zc_createtxg);
 		FIELD_COPY(zc_stat);
 #undef FIELD_COPY
+#undef PTR_COPY
 		break;
 
 	case ZFS_CMD_COMPAT_RESUME:
@@ -529,15 +560,16 @@ zfs_cmd_compat_put(zfs_cmd_t *zc, caddr_t addr, const int request,
 		strlcpy(resume_c->zc_string, zc->zc_string, MAXPATHLEN);
 
 #define FIELD_COPY(field) resume_c->field = zc->field
-		FIELD_COPY(zc_nvlist_src);
+#define PTR_COPY(field) resume_c->field = __PTR_NATIVE_TO_COMPAT(zc->field)
+		PTR_COPY(zc_nvlist_src);
 		FIELD_COPY(zc_nvlist_src_size);
-		FIELD_COPY(zc_nvlist_dst);
+		PTR_COPY(zc_nvlist_dst);
 		FIELD_COPY(zc_nvlist_dst_size);
 		FIELD_COPY(zc_nvlist_dst_filled);
 		FIELD_COPY(zc_pad2);
-		FIELD_COPY(zc_history);
+		PTR_COPY(zc_history);
 		FIELD_COPY(zc_guid);
-		FIELD_COPY(zc_nvlist_conf);
+		PTR_COPY(zc_nvlist_conf);
 		FIELD_COPY(zc_nvlist_conf_size);
 		FIELD_COPY(zc_cookie);
 		FIELD_COPY(zc_objset_type);
@@ -577,6 +609,7 @@ zfs_cmd_compat_put(zfs_cmd_t *zc, caddr_t addr, const int request,
 		FIELD_COPY(zc_createtxg);
 		FIELD_COPY(zc_stat);
 #undef FIELD_COPY
+#undef PTR_COPY
 		break;
 
 	case ZFS_CMD_COMPAT_EDBP:
@@ -586,15 +619,16 @@ zfs_cmd_compat_put(zfs_cmd_t *zc, caddr_t addr, const int request,
 		strlcpy(edbp_c->zc_string, zc->zc_string, MAXPATHLEN);
 
 #define FIELD_COPY(field) edbp_c->field = zc->field
-		FIELD_COPY(zc_nvlist_src);
+#define PTR_COPY(field) edbp_c->field = __PTR_NATIVE_TO_COMPAT(zc->field)
+		PTR_COPY(zc_nvlist_src);
 		FIELD_COPY(zc_nvlist_src_size);
-		FIELD_COPY(zc_nvlist_dst);
+		PTR_COPY(zc_nvlist_dst);
 		FIELD_COPY(zc_nvlist_dst_size);
 		FIELD_COPY(zc_nvlist_dst_filled);
 		FIELD_COPY(zc_pad2);
-		FIELD_COPY(zc_history);
+		PTR_COPY(zc_history);
 		FIELD_COPY(zc_guid);
-		FIELD_COPY(zc_nvlist_conf);
+		PTR_COPY(zc_nvlist_conf);
 		FIELD_COPY(zc_nvlist_conf_size);
 		FIELD_COPY(zc_cookie);
 		FIELD_COPY(zc_objset_type);
@@ -634,6 +668,7 @@ zfs_cmd_compat_put(zfs_cmd_t *zc, caddr_t addr, const int request,
 		FIELD_COPY(zc_createtxg);
 		FIELD_COPY(zc_stat);
 #undef FIELD_COPY
+#undef PTR_COPY
 		break;
 
 	case ZFS_CMD_COMPAT_ZCMD:
@@ -644,15 +679,16 @@ zfs_cmd_compat_put(zfs_cmd_t *zc, caddr_t addr, const int request,
 		strlcpy(zcmd_c->zc_string, zc->zc_string, MAXPATHLEN);
 
 #define FIELD_COPY(field) zcmd_c->field = zc->field
-		FIELD_COPY(zc_nvlist_src);
+#define PTR_COPY(field) zcmd_c->field = __PTR_NATIVE_TO_COMPAT(zc->field)
+		PTR_COPY(zc_nvlist_src);
 		FIELD_COPY(zc_nvlist_src_size);
-		FIELD_COPY(zc_nvlist_dst);
+		PTR_COPY(zc_nvlist_dst);
 		FIELD_COPY(zc_nvlist_dst_size);
 		FIELD_COPY(zc_nvlist_dst_filled);
 		FIELD_COPY(zc_pad2);
-		FIELD_COPY(zc_history);
+		PTR_COPY(zc_history);
 		FIELD_COPY(zc_guid);
-		FIELD_COPY(zc_nvlist_conf);
+		PTR_COPY(zc_nvlist_conf);
 		FIELD_COPY(zc_nvlist_conf_size);
 		FIELD_COPY(zc_cookie);
 		FIELD_COPY(zc_objset_type);
@@ -695,6 +731,7 @@ zfs_cmd_compat_put(zfs_cmd_t *zc, caddr_t addr, const int request,
 		FIELD_COPY(zc_createtxg);
 		FIELD_COPY(zc_stat);
 #undef FIELD_COPY
+#undef PTR_COPY
 
 		break;
 
@@ -706,17 +743,18 @@ zfs_cmd_compat_put(zfs_cmd_t *zc, caddr_t addr, const int request,
 		strlcpy(zcdm_c->zc_string, zc->zc_string, MAXPATHLEN);
 
 #define FIELD_COPY(field) zcdm_c->field = zc->field
+#define PTR_COPY(field) zcdm_c->field = __PTR_NATIVE_TO_COMPAT(zc->field)
 		zcdm_c->zc_guid = zc->zc_guid;
-		zcdm_c->zc_nvlist_conf = zc->zc_nvlist_conf;
+		PTR_COPY(zc_nvlist_conf);
 		zcdm_c->zc_nvlist_conf_size = zc->zc_nvlist_conf_size;
-		zcdm_c->zc_nvlist_src = zc->zc_nvlist_src;
+		PTR_COPY(zc_nvlist_src);
 		zcdm_c->zc_nvlist_src_size = zc->zc_nvlist_src_size;
-		zcdm_c->zc_nvlist_dst = zc->zc_nvlist_dst;
+		PTR_COPY(zc_nvlist_dst);
 		zcdm_c->zc_nvlist_dst_size = zc->zc_nvlist_dst_size;
 		zcdm_c->zc_cookie = zc->zc_cookie;
 		zcdm_c->zc_objset_type = zc->zc_objset_type;
 		zcdm_c->zc_perm_action = zc->zc_perm_action;
-		zcdm_c->zc_history = zc->zc_history;
+		PTR_COPY(zc_history);
 		zcdm_c->zc_history_len = zc->zc_history_len;
 		zcdm_c->zc_history_offset = zc->zc_history_offset;
 		zcdm_c->zc_obj = zc->zc_obj;
@@ -752,6 +790,7 @@ zfs_cmd_compat_put(zfs_cmd_t *zc, caddr_t addr, const int request,
 		FIELD_COPY(zc_inject_record.zi_cmd);
 		FIELD_COPY(zc_inject_record.zi_pad);
 #undef FIELD_COPY
+#undef PTR_COPY
 #ifndef _KERNEL
 		if (request == ZFS_IOC_RECV)
 			strlcpy(zcdm_c->zc_top_ds,
@@ -766,17 +805,19 @@ zfs_cmd_compat_put(zfs_cmd_t *zc, caddr_t addr, const int request,
 		strlcpy(zc28_c->zc_name, zc->zc_name, MAXPATHLEN);
 		strlcpy(zc28_c->zc_value, zc->zc_value, MAXPATHLEN * 2);
 		strlcpy(zc28_c->zc_string, zc->zc_string, MAXPATHLEN);
+
+#define PTR_COPY(field) zc28_c->field = __PTR_NATIVE_TO_COMPAT(zc->field)
 		zc28_c->zc_guid = zc->zc_guid;
-		zc28_c->zc_nvlist_conf = zc->zc_nvlist_conf;
+		PTR_COPY(zc_nvlist_conf);
 		zc28_c->zc_nvlist_conf_size = zc->zc_nvlist_conf_size;
-		zc28_c->zc_nvlist_src = zc->zc_nvlist_src;
+		PTR_COPY(zc_nvlist_src);
 		zc28_c->zc_nvlist_src_size = zc->zc_nvlist_src_size;
-		zc28_c->zc_nvlist_dst = zc->zc_nvlist_dst;
+		PTR_COPY(zc_nvlist_dst);
 		zc28_c->zc_nvlist_dst_size = zc->zc_nvlist_dst_size;
 		zc28_c->zc_cookie = zc->zc_cookie;
 		zc28_c->zc_objset_type = zc->zc_objset_type;
 		zc28_c->zc_perm_action = zc->zc_perm_action;
-		zc28_c->zc_history = zc->zc_history;
+		PTR_COPY(zc_history);
 		zc28_c->zc_history_len = zc->zc_history_len;
 		zc28_c->zc_history_offset = zc->zc_history_offset;
 		zc28_c->zc_obj = zc->zc_obj;
@@ -829,6 +870,7 @@ zfs_cmd_compat_put(zfs_cmd_t *zc, caddr_t addr, const int request,
 		    zc->zc_inject_record.zi_duration;
 		zc28_c->zc_inject_record.zi_timer =
 		    zc->zc_inject_record.zi_timer;
+#undef PTR_COPY
 		break;
 
 	case ZFS_CMD_COMPAT_V15:
@@ -838,17 +880,19 @@ zfs_cmd_compat_put(zfs_cmd_t *zc, caddr_t addr, const int request,
 		strlcpy(zc_c->zc_name, zc->zc_name, MAXPATHLEN);
 		strlcpy(zc_c->zc_value, zc->zc_value, MAXPATHLEN);
 		strlcpy(zc_c->zc_string, zc->zc_string, MAXPATHLEN);
+
+#define PTR_COPY(field) zc_c->field = __PTR_NATIVE_TO_COMPAT(zc->field)
 		zc_c->zc_guid = zc->zc_guid;
-		zc_c->zc_nvlist_conf = zc->zc_nvlist_conf;
+		PTR_COPY(zc_nvlist_conf);
 		zc_c->zc_nvlist_conf_size = zc->zc_nvlist_conf_size;
-		zc_c->zc_nvlist_src = zc->zc_nvlist_src;
+		PTR_COPY(zc_nvlist_src);
 		zc_c->zc_nvlist_src_size = zc->zc_nvlist_src_size;
-		zc_c->zc_nvlist_dst = zc->zc_nvlist_dst;
+		PTR_COPY(zc_nvlist_dst);
 		zc_c->zc_nvlist_dst_size = zc->zc_nvlist_dst_size;
 		zc_c->zc_cookie = zc->zc_cookie;
 		zc_c->zc_objset_type = zc->zc_objset_type;
 		zc_c->zc_perm_action = zc->zc_perm_action;
-		zc_c->zc_history = zc->zc_history;
+		PTR_COPY(zc_history);
 		zc_c->zc_history_len = zc->zc_history_len;
 		zc_c->zc_history_offset = zc->zc_history_offset;
 		zc_c->zc_obj = zc->zc_obj;
@@ -878,14 +922,21 @@ zfs_cmd_compat_put(zfs_cmd_t *zc, caddr_t addr, const int request,
 		    zc->zc_inject_record.zi_freq;
 		zc_c->zc_inject_record.zi_failfast =
 		    zc->zc_inject_record.zi_failfast;
+#undef PTR_COPY
 
 		break;
 	}
 }
 
+#if defined(_KERNEL) || defined(__CHERI_PURE_CAPABILITY__)
+static int
+zfs_ioctl_compat_get_nvlist(void * __capability nvl, size_t size, int iflag,
+    nvlist_t **nvp)
+#else
 static int
 zfs_ioctl_compat_get_nvlist(uint64_t nvl, size_t size, int iflag,
     nvlist_t **nvp)
+#endif
 {
 	char *packed;
 	int error;
@@ -899,7 +950,7 @@ zfs_ioctl_compat_get_nvlist(uint64_t nvl, size_t size, int iflag,
 
 #ifdef _KERNEL
 	packed = kmem_alloc(size, KM_SLEEP);
-	if ((error = ddi_copyin((void *)(uintptr_t)nvl, packed, size,
+	if ((error = ddi_copyin(nvl, packed, size,
 	    iflag)) != 0) {
 		kmem_free(packed, size);
 		return (error);
@@ -936,7 +987,7 @@ zfs_ioctl_compat_put_nvlist(zfs_cmd_t *zc, nvlist_t *nvl)
 	    KM_SLEEP) == 0);
 
 	if (ddi_copyout(packed,
-	    (void *)(uintptr_t)zc->zc_nvlist_dst, size, zc->zc_iflags) != 0)
+	    zc->zc_nvlist_dst, size, zc->zc_iflags) != 0)
 		error = EFAULT;
 	kmem_free(packed, size);
 #else
@@ -1069,31 +1120,51 @@ zcmd_ioctl_compat(int fd, int request, zfs_cmd_t *zc, const int cflag)
 	switch (cflag) {
 	case ZFS_CMD_COMPAT_NONE:
 		ncmd = _IOWR('Z', request, struct zfs_iocparm);
+#ifdef __CHERI_PURE_CAPABILITY__
+		zp.zfs_cmd = zc;
+#else
 		zp.zfs_cmd = (uint64_t)zc;
+#endif
 		zp.zfs_cmd_size = sizeof(zfs_cmd_t);
 		zp.zfs_ioctl_version = ZFS_IOCVER_CURRENT;
 		return (ioctl(fd, ncmd, &zp));
 	case ZFS_CMD_COMPAT_INLANES:
 		ncmd = _IOWR('Z', request, struct zfs_iocparm);
+#ifdef __CHERI_PURE_CAPABILITY__
+		zp.zfs_cmd = zc;
+#else
 		zp.zfs_cmd = (uint64_t)zc;
+#endif
 		zp.zfs_cmd_size = sizeof(zfs_cmd_inlanes_t);
 		zp.zfs_ioctl_version = ZFS_IOCVER_INLANES;
 		return (ioctl(fd, ncmd, &zp));
 	case ZFS_CMD_COMPAT_RESUME:
 		ncmd = _IOWR('Z', request, struct zfs_iocparm);
+#ifdef __CHERI_PURE_CAPABILITY__
+		zp.zfs_cmd = zc;
+#else
 		zp.zfs_cmd = (uint64_t)zc;
+#endif
 		zp.zfs_cmd_size = sizeof(zfs_cmd_resume_t);
 		zp.zfs_ioctl_version = ZFS_IOCVER_RESUME;
 		return (ioctl(fd, ncmd, &zp));
 	case ZFS_CMD_COMPAT_EDBP:
 		ncmd = _IOWR('Z', request, struct zfs_iocparm);
+#ifdef __CHERI_PURE_CAPABILITY__
+		zp.zfs_cmd = zc;
+#else
 		zp.zfs_cmd = (uint64_t)zc;
+#endif
 		zp.zfs_cmd_size = sizeof(zfs_cmd_edbp_t);
 		zp.zfs_ioctl_version = ZFS_IOCVER_EDBP;
 		return (ioctl(fd, ncmd, &zp));
 	case ZFS_CMD_COMPAT_ZCMD:
 		ncmd = _IOWR('Z', request, struct zfs_iocparm);
+#ifdef __CHERI_PURE_CAPABILITY__
+		zp.zfs_cmd = zc;
+#else
 		zp.zfs_cmd = (uint64_t)zc;
+#endif
 		zp.zfs_cmd_size = sizeof(zfs_cmd_zcmd_t);
 		zp.zfs_ioctl_version = ZFS_IOCVER_ZCMD;
 		return (ioctl(fd, ncmd, &zp));

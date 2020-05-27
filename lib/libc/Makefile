@@ -34,7 +34,7 @@ CFLAGS+=-DNO__SCCSID -DNO__RCSID
 
 LIB?=c
 SHLIB_MAJOR= 7
-.if ${MK_SSP} != "no" && \
+.if ${MK_SSP} != "no" && !${MACHINE_ABI:Mpurecap} && \
     (${LIBC_ARCH} == "i386" || ${MACHINE_ARCH:Mpower*} != "")
 SHLIB_LDSCRIPT=libc.ldscript
 .else
@@ -63,7 +63,7 @@ CFLAGS+=${CANCELPOINTS_CFLAGS}
 LDFLAGS+= -nodefaultlibs
 LIBADD+=	compiler_rt
 
-.if ${MK_SSP} != "no" && \
+.if ${MK_SSP} != "no" && !${MACHINE_ABI:Mpurecap} && \
     (${LIBC_ARCH} == "i386" || ${MACHINE_ARCH:Mpower*} != "")
 LIBADD+=	ssp_nonshared
 .endif
@@ -119,10 +119,7 @@ SRCS+=	interposing_table.c
 CFLAGS+=	-DNO_SYSCALLS
 .endif
 
-.if ${MK_SSP} != "no"
-.if ${MACHINE_ABI:Mpurecap}
-.error "stack-protector is useless when we have CHERI, MK_SSP should not be set"
-.endif
+.if ${MK_SSP} != "no" && !${MACHINE_ABI:Mpurecap}
 .include "${LIBC_SRCTOP}/secure/Makefile.inc"
 .endif
 .include "${LIBC_SRCTOP}/rpc/Makefile.inc"

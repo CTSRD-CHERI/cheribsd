@@ -40,6 +40,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <uuid.h>
 #include "hccontrol.h"
 
 /* Send Read_Node_State command to the node */
@@ -153,7 +154,7 @@ hci_read_node_features(int s, int argc, char **argv)
 {
 	struct ng_btsocket_hci_raw_node_features	r;
 	int						n;
-	char						buffer[1024];
+	char						buffer[2048];
 
 	memset(&r, 0, sizeof(r));
 	if (ioctl(s, SIOC_HCI_RAW_NODE_GET_FEATURES, &r, sizeof(r)) < 0)
@@ -210,52 +211,6 @@ hci_flush_neighbor_cache(int s, int argc, char **argv)
 	return (OK);
 } /* hci_flush_neighbor_cache */
 
-#define MIN(a,b) (((a)>(b)) ? (b) :(a) )
-
-static int  hci_dump_adv(uint8_t *data, int length)
-{
-	int elemlen;
-	int type;
-	int i;
-
-	while(length>0){
-		elemlen = *data;
-		data++;
-		length --;
-		elemlen--;
-		if(length<=0)
-			break;
-		type = *data;
-		data++;
-		length --;
-		elemlen--;
-		if(length<=0)
-			break;
-		switch(type){
-		case 0x1:
-			printf("NDflag:%x\n", *data);
-			break;
-		case 0x9:
-			printf("LocalName:");
-			for(i = 0; i < MIN(length,elemlen); i++){
-				putchar(data[i]);
-			}
-			printf("\n");
-			break;
-		default:
-			printf("Type%d:", type);
-			for(i=0; i < MIN(length,elemlen); i++){
-				printf("%02x ",data[i]);
-			}
-			printf("\n");
-			break;
-		}
-		data += elemlen;
-		length -= elemlen;
-	}
-	return 0;
-}
-#undef MIN
 /* Send Read_Neighbor_Cache command to the node */
 static int
 hci_read_neighbor_cache(int s, int argc, char **argv)
@@ -305,8 +260,8 @@ hci_read_neighbor_cache(int s, int argc, char **argv)
 			r.entries[n].features[6], r.entries[n].features[7],
 			r.entries[n].clock_offset, r.entries[n].page_scan_mode,
 			r.entries[n].page_scan_rep_mode);
-		hci_dump_adv(r.entries[n].extinq_data,
-			     r.entries[n].extinq_size);
+		print_adv_data(r.entries[n].extinq_size,
+			r.entries[n].extinq_data);
 		fprintf(stdout,"\n");
 	}
 out:

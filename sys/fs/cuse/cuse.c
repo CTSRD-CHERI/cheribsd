@@ -834,13 +834,13 @@ cuse_server_ioctl_copy_locked(struct cuse_server *pcs,
 
 	if (isread == 0) {
 		error = copyin(
-		    (void *)pchk->local_ptr,
+		    (void * __capability)pchk->local_ptr,
 		    pccmd->client->ioctl_buffer + offset,
 		    pchk->length);
 	} else {
 		error = copyout(
 		    pccmd->client->ioctl_buffer + offset,
-		    (void *)pchk->local_ptr,
+		    (void * __capability)pchk->local_ptr,
 		    pchk->length);
 	}
 
@@ -855,8 +855,8 @@ cuse_server_ioctl_copy_locked(struct cuse_server *pcs,
 }
 
 static int
-cuse_proc2proc_copy(struct proc *proc_s, vm_offset_t data_s,
-    struct proc *proc_d, vm_offset_t data_d, size_t len)
+cuse_proc2proc_copy(struct proc *proc_s, uintcap_t data_s,
+    struct proc *proc_d, uintcap_t data_d, size_t len)
 {
 	struct thread *td;
 	struct proc *proc_cur;
@@ -867,7 +867,7 @@ cuse_proc2proc_copy(struct proc *proc_s, vm_offset_t data_s,
 
 	if (proc_cur == proc_d) {
 		struct iovec iov;
-		IOVEC_INIT(&iov, (void *)data_d, len);
+		IOVEC_INIT_C(&iov, (void * __capability)data_d, len);
 		struct uio uio = {
 			.uio_iov = &iov,
 			.uio_iovcnt = 1,
@@ -884,7 +884,7 @@ cuse_proc2proc_copy(struct proc *proc_s, vm_offset_t data_s,
 
 	} else if (proc_cur == proc_s) {
 		struct iovec iov;
-		IOVEC_INIT(&iov, (void *)data_s, len);
+		IOVEC_INIT_C(&iov, (void * __capability)data_s, len);
 		struct uio uio = {
 			.uio_iov = &iov,
 			.uio_iovcnt = 1,

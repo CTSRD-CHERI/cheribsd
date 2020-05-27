@@ -235,7 +235,7 @@ again:
 	 */
 #ifdef CHERI_PURECAP_KERNEL
 	size = CHERI_REPRESENTABLE_LENGTH((long)nbuf * BKVASIZE);
-	tmpaddr = cheri_csetbounds(firstaddr, size);
+	tmpaddr = cheri_setbounds(firstaddr, size);
 	CHERI_VM_ASSERT_EXACT(tmpaddr, size);
 #else
 	size = (long)nbuf * BKVASIZE;
@@ -254,7 +254,7 @@ again:
 #ifdef CHERI_PURECAP_KERNEL
 		size = CHERI_REPRESENTABLE_LENGTH(
 		    (long)bio_transient_maxcnt * MAXPHYS);
-		tmpaddr = cheri_csetbounds(firstaddr, size);
+		tmpaddr = cheri_setbounds(firstaddr, size);
 		CHERI_VM_ASSERT_EXACT(tmpaddr, size);
 #else
 		size = (long)bio_transient_maxcnt * MAXPHYS;

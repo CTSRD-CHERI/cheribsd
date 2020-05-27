@@ -1150,7 +1150,7 @@ out:
 	VMEM_UNLOCK(vm);
 #ifdef CHERI_PURECAP_KERNEL
 	CHERI_VM_ASSERT_VALID(*addrp);
-	*addrp = (vmem_addr_t)cheri_csetboundsexact((void *)*addrp, size);
+	*addrp = (vmem_addr_t)cheri_setboundsexact((void *)*addrp, size);
 	CHERI_VM_ASSERT_EXACT(*addrp, size);
 #endif
 	return (error);
@@ -1315,7 +1315,7 @@ vmem_alloc(vmem_t *vm, vmem_size_t size, int flags, vmem_addr_t *addrp)
 		if (__predict_true(*addrp != 0)) {
 #ifdef CHERI_PURECAP_KERNEL
 			CHERI_VM_ASSERT_VALID(*addrp);
-			*addrp = (vmem_addr_t)cheri_csetbounds(
+			*addrp = (vmem_addr_t)cheri_setbounds(
 			    (void *)*addrp, size);
 			CHERI_VM_ASSERT_BOUNDS(*addrp, size);
 #endif
@@ -1466,7 +1466,7 @@ out:
 		panic("failed to allocate waiting allocation\n");
 #ifdef CHERI_PURECAP_KERNEL
 	CHERI_VM_ASSERT_VALID(*addrp);
-	*addrp = (vmem_addr_t)cheri_csetboundsexact((void *)*addrp, size);
+	*addrp = (vmem_addr_t)cheri_setboundsexact((void *)*addrp, size);
 	CHERI_VM_ASSERT_EXACT(*addrp, size);
 #endif
 

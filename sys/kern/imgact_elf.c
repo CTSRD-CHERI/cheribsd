@@ -135,7 +135,7 @@ SYSCTL_INT(ELF_NODE_OID, OID_AUTO,
     ELF_ABI_NAME " brand of last resort");
 
 static int elf_legacy_coredump = 0;
-SYSCTL_INT(_debug, OID_AUTO, __elfN(legacy_coredump), CTLFLAG_RW, 
+SYSCTL_INT(_debug, OID_AUTO, __elfN(legacy_coredump), CTLFLAG_RW,
     &elf_legacy_coredump, 0,
     "include all and only RW pages in core dumps");
 
@@ -517,7 +517,7 @@ __elfN(copyout)(vm_map_t map, caddr_t kaddr, vm_offset_t uaddr, size_t sz)
 	int error;
 
 #ifdef CHERI_PURECAP_KERNEL
-	caddr_t uaddr_cap = cheri_csetbounds(
+	caddr_t uaddr_cap = cheri_setbounds(
 	    cheri_setaddress(vm_map_rootcap(map), uaddr), sz);
 	error = copyout(kaddr, uaddr_cap, sz);
 #else
@@ -981,7 +981,7 @@ __elfN(enforce_limits)(struct image_params *imgp, const Elf_Ehdr *hdr,
 		}
 		total_size += seg_size;
 	}
-	
+
 	if (data_addr == 0 && data_size == 0) {
 		data_addr = text_addr;
 		data_size = text_size;
@@ -1168,7 +1168,7 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 		uprintf("Program headers not in the first page\n");
 		return (ENOEXEC);
 	}
-	phdr = (const Elf_Phdr *)(imgp->image_header + hdr->e_phoff); 
+	phdr = (const Elf_Phdr *)(imgp->image_header + hdr->e_phoff);
 	if (!aligned(phdr, Elf_Addr)) {
 		uprintf("Unaligned program headers\n");
 		return (ENOEXEC);
@@ -1481,6 +1481,7 @@ __elfN(freebsd_copyout_auxargs)(struct image_params *imgp, uintcap_t base)
 	Elf_Auxinfo *argarray, *pos;
 #ifdef __ELF_CHERI
 	void * __capability exec_base;
+	void * __capability entry;
 #endif
 	int error;
 
@@ -1505,9 +1506,17 @@ __elfN(freebsd_copyout_auxargs)(struct image_params *imgp, uintcap_t base)
 	AUXARGS_ENTRY(pos, AT_PAGESZ, args->pagesz);
 	AUXARGS_ENTRY(pos, AT_FLAGS, args->flags);
 #ifdef __ELF_CHERI
-	AUXARGS_ENTRY_PTR(pos, AT_ENTRY, cheri_setaddress(prog_cap(imgp,
+	entry = cheri_setaddress(prog_cap(imgp,
 	    CHERI_CAP_USER_DATA_PERMS | CHERI_CAP_USER_CODE_PERMS),
-	    args->entry));
+	    args->entry);
+#ifdef CHERI_FLAGS_CAP_MODE
+	/*
+	 * On architectures with a mode flag bit, we must ensure the flag is set in
+	 * AT_ENTRY for RTLD to be able to jump to it.
+	 */
+	entry = cheri_setflags(entry, CHERI_FLAGS_CAP_MODE);
+#endif
+	AUXARGS_ENTRY_PTR(pos, AT_ENTRY, entry);
 
 	/*
 	 * XXX: AT_BASE is both writable and executable to permit textrel
@@ -1580,7 +1589,7 @@ __elfN(freebsd_fixup)(uintcap_t *stack_base, struct image_params *imgp)
 
 	base = (Elf_Addr * __capability)*stack_base;
 	base--;
-	if (suword_c(base, imgp->args->argc) == -1)
+	if (suword(base, imgp->args->argc) == -1)
 		return (EFAULT);
 	*stack_base = (uintcap_t)base;
 #endif
@@ -1667,11 +1676,13 @@ static void note_procstat_vmmap(void *, struct sbuf *, size_t *);
  * Write out a core segment to the compression stream.
  */
 static int
-compress_chunk(struct coredump_params *p, char *base, char *buf, u_int len)
+compress_chunk(struct coredump_params *p, char *base_vaddr, char *buf, u_int len)
 {
+	char * __capability base;
 	u_int chunk_len;
 	int error;
 
+	base = __USER_CAP(base_vaddr, len);
 	while (len > 0) {
 		chunk_len = MIN(len, CORE_BUF_SIZE);
 

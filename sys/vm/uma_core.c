@@ -862,7 +862,7 @@ cache_bucket_load_free(uma_cache_t cache, uma_bucket_t b)
 }
 
 #ifdef NUMA
-static inline void 
+static inline void
 cache_bucket_load_cross(uma_cache_t cache, uma_bucket_t b)
 {
 
@@ -1654,14 +1654,14 @@ startup_alloc(uma_zone_t zone, vm_size_t bytes, int domain, uint8_t *pflag,
 	KASSERT(pages > 0, ("%s can't reserve 0 pages", __func__));
 
 	*pflag = UMA_SLAB_BOOT;
-#ifdef UMA_SUPERPAGE_SLAB	
+#ifdef UMA_SUPERPAGE_SLAB
 	/* Align bootmem to slab size */
 	bootmem_align = UMA_SLAB_SIZE;
 #else
 	bootmem_align = 1;
 #endif
 	m = vm_page_alloc_contig_domain(NULL, 0, domain,
-	    malloc2vm_flags(wait) | VM_ALLOC_NOOBJ | VM_ALLOC_WIRED, pages, 
+	    malloc2vm_flags(wait) | VM_ALLOC_NOOBJ | VM_ALLOC_WIRED, pages,
 	    (vm_paddr_t)0, ~(vm_paddr_t)0, bootmem_align, 0,
 	    VM_MEMATTR_DEFAULT);
 	if (m == NULL)
@@ -1846,7 +1846,7 @@ noobj_alloc(uma_zone_t zone, vm_size_t bytes, int domain, uint8_t *flags,
 		 */
 		TAILQ_FOREACH_SAFE(p, &alloctail, listq, p_next) {
 			vm_page_unwire_noq(p);
-			vm_page_free(p); 
+			vm_page_free(p);
 		}
 		return (NULL);
 	}
@@ -2668,7 +2668,7 @@ zone_ctor(void *mem, int size, void *udata, int flags)
 	 */
 	zone->uz_import = zone_import;
 	zone->uz_release = zone_release;
-	zone->uz_arg = zone; 
+	zone->uz_arg = zone;
 	keg = arg->keg;
 
 	if (arg->flags & UMA_ZONE_SECONDARY) {
@@ -2948,7 +2948,7 @@ uma_startup2(void)
 	if (bootstart != bootmem) {
 		vm_map_lock(kernel_map);
 		(void)vm_map_insert(kernel_map, NULL, 0, bootstart, bootmem,
-		    VM_PROT_RW, VM_PROT_RW, MAP_NOFAULT);
+		    VM_PROT_RW, VM_PROT_RW, MAP_NOFAULT, bootstart);
 		vm_map_unlock(kernel_map);
 	}
 
@@ -3687,7 +3687,7 @@ slab_alloc_item(uma_keg_t keg, uma_slab_t slab)
 		LIST_INSERT_HEAD(&dom->ud_full_slab, slab, us_link);
 	}
 #ifdef CHERI_PURECAP_KERNEL
-        item = cheri_csetbounds(item, keg->uk_size);
+        item = cheri_setbounds(item, keg->uk_size);
 #endif
 
 	return (item);
@@ -3716,7 +3716,7 @@ zone_import(void *arg, void **bucket, int max, int domain, int flags)
 		stripe = howmany(max, vm_ndomains);
 #endif
 		dom = &keg->uk_domain[slab->us_domain];
-		while (slab->us_freecount && i < max) { 
+		while (slab->us_freecount && i < max) {
 			bucket[i++] = slab_alloc_item(keg, slab);
 			if (dom->ud_free_items <= keg->uk_reserve)
 				break;

@@ -454,7 +454,7 @@ fetch_instr_near_pc(struct trapframe *frame, register_t offset_from_pc, int32_t 
 	}
 #endif
 	if (USERLAND(frame->badvaddr)) {
-		if (fueword32_c(bad_inst_ptr, instr) != 0) {
+		if (fueword32(bad_inst_ptr, instr) != 0) {
 			struct thread *td = curthread;
 			struct proc *p = td->td_proc;
 			log(LOG_ERR, "%s: pid %d tid %ld (%s), uid %d: Could not fetch "
@@ -520,7 +520,7 @@ cpu_fetch_syscall_args(struct thread *td)
 
 	locr0 = td->td_frame;
 	sa = &td->td_sa;
-	
+
 	bzero(sa->args, sizeof(sa->args));
 
 	/* compute next PC after syscall instruction */
@@ -554,7 +554,7 @@ cpu_fetch_syscall_args(struct thread *td)
 			sa->args[1] = locr0->a3;
 			nsaved = 2;
 			break;
-		} 
+		}
 #endif
 		/*
 		 * This is either not a quad syscall, or is a quad syscall with a
@@ -629,6 +629,8 @@ cpu_fetch_syscall_args(struct thread *td)
 	sa->narg = sa->callp->sy_narg;
 
 	if (sa->narg > nsaved) {
+		char * __capability stack_args;
+
 #if defined(__mips_n32) || defined(__mips_n64)
 		/*
 		 * XXX
@@ -647,20 +649,26 @@ cpu_fetch_syscall_args(struct thread *td)
 			unsigned i;
 			int32_t arg;
 
+			stack_args = __USER_CAP(locr0->sp + 4 * sizeof(int32_t),
+			    (sa->narg - nsaved) * sizeof(int32_t));
 			error = 0; /* XXX GCC is awful.  */
 			for (i = nsaved; i < sa->narg; i++) {
-				error = copyin((caddr_t)(intptr_t)(locr0->sp +
-				    (4 + (i - nsaved)) * sizeof(int32_t)),
-				    (caddr_t)&arg, sizeof arg);
+				error = copyin(stack_args +
+				    (i - nsaved) * sizeof(int32_t),
+				    &arg, sizeof(arg));
 				if (error != 0)
 					break;
 				sa->args[i] = arg;
 			}
 		} else
 #endif
-		error = copyin((caddr_t)(intptr_t)(locr0->sp +
-		    4 * sizeof(register_t)), (caddr_t)&sa->args[nsaved],
-		   (u_int)(sa->narg - nsaved) * sizeof(register_t));
+		{
+			stack_args = __USER_CAP(locr0->sp +
+			    4 * sizeof(register_t), (sa->narg - nsaved) *
+			    sizeof(register_t));
+			error = copyin(stack_args, &sa->args[nsaved],
+			    (u_int)(sa->narg - nsaved) * sizeof(register_t));
+		}
 		if (error != 0) {
 			locr0->v0 = error;
 			locr0->a3 = 1;
@@ -876,7 +884,7 @@ trap(struct trapframe *trapframe)
 	case T_TLB_MOD:
 		/* check for kernel address */
 		if (KERNLAND(trapframe->badvaddr)) {
-			if (pmap_emulate_modified(kernel_pmap, 
+			if (pmap_emulate_modified(kernel_pmap,
 			    trapframe->badvaddr) != 0) {
 				ftype = VM_PROT_WRITE;
 				goto kernel_fault;
@@ -1069,7 +1077,7 @@ dofault:
 			}
 
 			/* read break instruction */
-			instr = fuword32_c(__USER_CODE_CAP((__cheri_fromcap void *)va));
+			instr = fuword32(va);
 
 			if (instr != MIPS_BREAK_SSTEP) {
 				addr = va;
@@ -1077,8 +1085,8 @@ dofault:
 			}
 
 			CTR3(KTR_PTRACE,
-			    "trap: tid %d, single step at %p: %#08x",
-			    td->td_tid, (__cheri_fromcap void *)va, instr);
+			    "trap: tid %d, single step at 0x%lx: %#08x",
+			    td->td_tid, (__cheri_addr long)va, instr);
 			PROC_LOCK(p);
 			_PHOLD(p);
 			error = ptrace_clear_single_step(td);
@@ -1217,7 +1225,7 @@ dofault:
 		}
 
 		octeon_cop2_restore(td->td_md.md_cop2);
-		
+
 		/* Make userland re-request its context */
 		td->td_frame->sr &= ~MIPS_SR_COP_2_BIT;
 		td->td_md.md_flags |= MDTD_COP2USED;
@@ -1462,7 +1470,7 @@ trapDump(char *msg)
 			break;
 
 		printf("%s: ADR %jx PC %jx CR %jx SR %jx\n",
-		    trap_type[(trp->cause & MIPS_CR_EXC_CODE) >> 
+		    trap_type[(trp->cause & MIPS_CR_EXC_CODE) >>
 			MIPS_CR_EXC_CODE_SHIFT],
 		    (intmax_t)trp->vadr, (intmax_t)trp->pc,
 		    (intmax_t)trp->cause, (intmax_t)trp->status);
@@ -1478,8 +1486,7 @@ trapDump(char *msg)
 /*
  * Return the resulting PC as if the branch was executed.
  *
- * XXXRW: What about CHERI branch instructions?
- * XXXAR: This needs to be fixed for cjalr/cjr/ccall_fast
+ * XXXAR: This needs to be fixed for ccall_fast
  */
 trapf_pc_t
 MipsEmulateBranch(struct trapframe *framePtr, trapf_pc_t _instPC, int fpcCSR,
@@ -1500,22 +1507,16 @@ MipsEmulateBranch(struct trapframe *framePtr, trapf_pc_t _instPC, int fpcCSR,
 	(InstPtr + 4 + ((short)inst.IType.imm << 2))
 
 	if (instptr) {
-		if (!KERNLAND(instptr))
-			inst.word = fuword32((void *)instptr); /* XXXAR: error check? */
-		else
-			inst = *(InstFmt *) instptr;
+		inst = *(InstFmt *) instptr;
 	} else {
 		if (!KERNLAND((__cheri_addr vaddr_t)instPC))
-			inst.word = fuword32_c(instPC);  /* XXXAR: error check? */
+			inst.word = fuword32(instPC);  /* XXXAR: error check? */
 		else
 			memcpy_c(&inst, instPC, sizeof(InstFmt));
 	}
 	/* Save the bad branch instruction so we can log it */
 	framePtr->badinstr_p.inst = inst.word;
 
-	/*
-	 * XXXRW: CHERI branch instructions are not handled here.
-	 */
 	switch ((int)inst.JType.op) {
 	case OP_SPECIAL:
 		switch ((int)inst.RType.func) {
@@ -1637,28 +1638,36 @@ MipsEmulateBranch(struct trapframe *framePtr, trapf_pc_t _instPC, int fpcCSR,
 #ifdef CPU_CHERI
 	case OP_COP2:
 		switch (inst.CType.fmt) {
-		case 0x9:
-		case 0xa:
-		case 0x11:
-		case 0x12:
+		case OP_CJ:
+			switch (inst.CType.r3) {
+			case OP_CJALR:
+				retAddr = capRegsPtr[inst.CType.r2];
+				break;
+			case OP_CJR:
+				retAddr = capRegsPtr[inst.CType.r1];
+				break;
+			}
+			if (retAddr != NULL)
+				return (trapf_pc_t)(retAddr);
+			break;
+		case OP_CBEZ:
+		case OP_CBNZ:
+		case OP_CBTS:
+		case OP_CBTU:
 			switch (inst.BC2FType.fmt) {
-			case 0x9:
-				/* CBTU */
+			case OP_CBTU:
 				condition = !cheri_gettag(
 				    capRegsPtr[inst.BC2FType.cd]);
 				break;
-			case 0xa:
-				/* CBTS */
+			case OP_CBTS:
 				condition = cheri_gettag(
 				    capRegsPtr[inst.BC2FType.cd]);
 				break;
-			case 0x11:
-				/* CBEZ */
+			case OP_CBEZ:
 				condition =
 				    (capRegsPtr[inst.BC2FType.cd] == NULL);
 				break;
-			case 0x12:
-				/* CBNZ */
+			case OP_CBNZ:
 				condition =
 				    (capRegsPtr[inst.BC2FType.cd] != NULL);
 				break;
@@ -2200,7 +2209,7 @@ mips_unaligned_load_store(struct trapframe *frame, int mode, register_t addr, ui
 #else
 	dst_addr = addr;
 #endif
-	
+
 	if (is_store) {
 		value = reg[src_regno];
 		if (USERLAND(frame->badvaddr)) {

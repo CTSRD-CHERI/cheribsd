@@ -43,8 +43,6 @@
 #include "opt_inet6.h"
 #include "opt_inet.h"
 
-#define	EXPLICIT_USER_ACCESS
-
 #include "oce_if.h"
 #include "oce_user.h"
 

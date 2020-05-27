@@ -15,6 +15,7 @@ __<src.libnames.mk>__:
 _PRIVATELIBS=	\
 		atf_c \
 		atf_cxx \
+		auditd \
 		bsdstat \
 		devdctl \
 		event \
@@ -81,7 +82,6 @@ _LIBRARIES=	\
 		alias \
 		archive \
 		asn1 \
-		auditd \
 		avl \
 		be \
 		begemot \
@@ -382,7 +382,7 @@ _DP_xo=		util
 # assert happy.
 _DP_c=		compiler_rt
 _DP_c_nosyscalls=		compiler_rt
-.if ${MK_SSP} != "no" && \
+.if ${MK_SSP} != "no" && !${MACHINE_ABI:Mpurecap} && \
     (${MACHINE_ARCH} == "i386" || ${MACHINE_ARCH:Mpower*} != "")
 _DP_c+=		ssp_nonshared
 _DP_c_nosyscalls+=		ssp_nonshared

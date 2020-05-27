@@ -10,7 +10,7 @@ MK_SSP=		no
 RTLD_CHERI_ELF_DIR=${SRCTOP}/libexec/rtld-cheri-elf
 RTLD_ELF_DIR=${SRCTOP}/libexec/rtld-elf
 
-.PATH: ${RTLD_CHERI_ELF_DIR}/../../lib/libmalloc_simple
+.PATH: ${RTLD_CHERI_ELF_DIR} ${RTLD_CHERI_ELF_DIR}/../../lib/libmalloc_simple
 
 # Disable DEBUG to get a fair performance comparison to rtld-elf
 # DEBUG=-DDEBUG
@@ -56,7 +56,7 @@ NEED_COMPAT=	CHERI
 .include <bsd.compat.mk>
 CSTD?=		gnu99
 CFLAGS+=	-Wall -DFREEBSD_ELF -DIN_RTLD -ffreestanding
-.if !${MACHINE_ARCH:Mmips64*c*}
+.if !${MACHINE_ARCH:Mmips64*c*} && !${MACHINE_ARCH:Mriscv64*c*}
 CFLAGS+=	-DCOMPAT_CHERI
 .endif
 CFLAGS+=	-I${SRCTOP}/lib/csu/common \
@@ -67,7 +67,7 @@ RTLD_ARCH=	${MACHINE_ARCH}
 RTLD_ARCH=	${MACHINE_CPUARCH}
 .endif
 CFLAGS+=	-I${RTLD_CHERI_ELF_DIR}/${RTLD_ARCH} -I${RTLD_CHERI_ELF_DIR} -I${RTLD_ELF_DIR}
-LDFLAGS+=	-nostdlib -e rtld_start
+LDFLAGS+=	-nostdlib -e ${RTLD_ENTRY}
 NO_WCAST_ALIGN=	yes
 WARNS?=		6
 INSTALLFLAGS=	-C -b
@@ -95,7 +95,6 @@ BUILDING_RTLD_CHERI_ELF=yes
 SIMPLE_PRINTF_PREFIX=rtld
 .include "${SRCTOP}/lib/libsimple_printf/Makefile.inc"
 
-.if ${MK_SYMVER} == "yes"
 # LIBCSRCDIR does not appear to be set correctly for libcheribuildenv
 LIBCSRCDIR=	${SRCTOP}/lib/libc
 VERSION_DEF=	${LIBCSRCDIR}/Versions.def
@@ -106,9 +105,9 @@ LDFLAGS+=	-Wl,--version-script=${VERSION_MAP}
 .if exists(${RTLD_CHERI_ELF_DIR}/${RTLD_ARCH}/Symbol.map)
 SYMBOL_MAPS+=	${RTLD_CHERI_ELF_DIR}/${RTLD_ARCH}/Symbol.map
 .endif
-.endif
 
 .sinclude "${RTLD_CHERI_ELF_DIR}/${RTLD_ARCH}/Makefile.inc"
+RTLD_ENTRY?=	.rtld_start
 
 .PATH: ${RTLD_CHERI_ELF_DIR}/${RTLD_ARCH} ${RTLD_ELF_DIR}/${RTLD_ARCH}
 

@@ -88,9 +88,9 @@ Elf_Addr reloc_jmpslot(Elf_Addr *where, Elf_Addr target,
 
 #define round(size, align) \
     (((size) + (align) - 1) & ~((align) - 1))
-#define calculate_first_tls_offset(size, align) \
+#define calculate_first_tls_offset(size, align, offset)	\
     TLS_TCB_SIZE
-#define calculate_tls_offset(prev_offset, prev_size, size, align) \
+#define calculate_tls_offset(prev_offset, prev_size, size, align, offset) \
     round(prev_offset + prev_size, align)
 #define calculate_tls_end(off, size)    ((off) + (size))
 #define calculate_tls_post_size(align)  0
@@ -106,5 +106,19 @@ extern void *__tls_get_addr(tls_index* ti);
 #define	RTLD_DEFAULT_STACK_EXEC		PROT_EXEC
 
 #define	md_abi_variant_hook(x)
+
+#define rtld_validate_target_eflags(path, hdr, main_path)	\
+	_rtld_validate_target_eflags(path, hdr, main_path)
+static inline bool
+_rtld_validate_target_eflags(const char *path, Elf_Ehdr *hdr, const char *main_path)
+{
+	if (hdr->e_flags & EF_RISCV_CHERIABI) {
+		_rtld_error("%s: cannot load %s since it is CheriABI",
+		    main_path, path);
+		return (false);
+	}
+
+	return (true);
+}
 
 #endif

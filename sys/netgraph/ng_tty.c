@@ -5,7 +5,7 @@
 /*-
  * Copyright (c) 1996-1999 Whistle Communications, Inc.
  * All rights reserved.
- * 
+ *
  * Subject to the following obligations and disclaimer of warranty, use and
  * redistribution of this software, in source or object code forms, with or
  * without modifications are expressly permitted by Whistle Communications;
@@ -16,7 +16,7 @@
  *    Communications, Inc. trademarks, including the mark "WHISTLE
  *    COMMUNICATIONS" on advertising, endorsements, or otherwise except as
  *    such appears in the above copyright notice or in the software.
- * 
+ *
  * THIS SOFTWARE IS BEING PROVIDED BY WHISTLE COMMUNICATIONS "AS IS", AND
  * TO THE MAXIMUM EXTENT PERMITTED BY LAW, WHISTLE COMMUNICATIONS MAKES NO
  * REPRESENTATIONS OR WARRANTIES, EXPRESS OR IMPLIED, REGARDING THIS SOFTWARE,
@@ -261,7 +261,7 @@ ngt_rcvmsg(node_p node, item_p item, hook_p lasthook)
 		case NGM_TTY_SET_TTY:
 			if (sc->tp != NULL)
 				return (EBUSY);
-			
+
 			p = pfind(((int *)msg->data)[0]);
 			if (p == NULL || (p->p_flag & P_WEXIT))
 				return (ESRCH);
@@ -414,7 +414,7 @@ ngt_rint_bypass(struct tty *tp, const void *buf, size_t len)
 	size_t total = 0;
 	int error = 0, length;
 
-	tty_lock_assert(tp, MA_OWNED);
+	tty_assert_locked(tp);
 
 	if (sc->hook == NULL)
 		return (0);
@@ -441,7 +441,11 @@ ngt_rint_bypass(struct tty *tp, const void *buf, size_t len)
 		 * Odd, we have changed from non-bypass to bypass. It is
 		 * unlikely but not impossible, flush the data first.
 		 */
-		sc->m->m_data = cheri_csetbounds(sc->m->m_pktdat, MHLEN);
+#ifdef CHERI_PURECAP_KERNEL
+		sc->m->m_data = cheri_setbounds(sc->m->m_pktdat, MHLEN);
+#else
+		sc->m->m_data = sc->m->m_pktdat;
+#endif
 		NG_SEND_DATA_ONLY(error, sc->hook, sc->m);
 		sc->m = NULL;
 	}
@@ -462,7 +466,7 @@ ngt_rint(struct tty *tp, char c, int flags)
 	struct mbuf *m;
 	int error = 0;
 
-	tty_lock_assert(tp, MA_OWNED);
+	tty_assert_locked(tp);
 
 	if (sc->hook == NULL)
 		return (0);
@@ -497,7 +501,11 @@ ngt_rint(struct tty *tp, char c, int flags)
 
 	/* Ship off mbuf if it's time */
 	if (sc->hotchar == -1 || c == sc->hotchar || m->m_len >= MHLEN) {
-		m->m_data = cheri_csetbounds(m->m_pktdat, MHLEN);
+#ifdef CHERI_PURECAP_KERNEL
+		m->m_data = cheri_setbounds(m->m_pktdat, MHLEN);
+#else
+		m->m_data = m->m_pktdat;
+#endif
 		sc->m = NULL;
 		NG_SEND_DATA_ONLY(error, sc->hook, m);	/* Will queue */
 	}
@@ -511,4 +519,3 @@ ngt_rint_poll(struct tty *tp)
 	/* We can always accept input */
 	return (1);
 }
-

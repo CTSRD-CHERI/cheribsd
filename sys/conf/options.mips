@@ -119,15 +119,6 @@ PLATFORM_INIT_SECONDARY		opt_global.h
 FDT_DTB_STATIC_ONLY		opt_platform.h
 
 #
-# CHERI MIPS support.
-#
-
-#
-# Access user space through kernel DDC (via legacy load/store instructions)
-#
-CHERI_IMPLICIT_USER_DDC	opt_global.h
-
-#
 # Experimental support for pure capability kernel
 #
 CHERI_PURECAP_KERNEL		opt_global.h

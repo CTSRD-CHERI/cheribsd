@@ -94,7 +94,8 @@ static int zfs_version_zpl = ZPL_VERSION;
 SYSCTL_INT(_vfs_zfs_version, OID_AUTO, zpl, CTLFLAG_RD, &zfs_version_zpl, 0,
     "ZPL_VERSION");
 
-static int zfs_quotactl(vfs_t *vfsp, int cmds, uid_t id, void *arg);
+static int zfs_quotactl(vfs_t *vfsp, int cmds, uid_t id,
+    void * __capability arg);
 static int zfs_mount(vfs_t *vfsp);
 static int zfs_umount(vfs_t *vfsp, int fflag);
 static int zfs_root(vfs_t *vfsp, int flags, vnode_t **vpp);
@@ -176,7 +177,7 @@ done:
 }
 
 static int
-zfs_quotactl(vfs_t *vfsp, int cmds, uid_t id, void *arg)
+zfs_quotactl(vfs_t *vfsp, int cmds, uid_t id, void * __capability arg)
 {
 	zfsvfs_t *zfsvfs = vfsp->vfs_data;
 	struct thread *td;
@@ -267,7 +268,7 @@ zfs_quotactl(vfs_t *vfsp, int cmds, uid_t id, void *arg)
 		vfs_unbusy(vfsp);
 		break;
 	case Q_SETQUOTA:
-		error = copyin(&dqblk, arg, sizeof(dqblk));
+		error = copyin(arg, &dqblk, sizeof(dqblk));
 		if (error == 0)
 			error = zfs_set_userquota(zfsvfs, quota_type,
 						  "", id, dbtob(dqblk.dqb_bhardlimit));

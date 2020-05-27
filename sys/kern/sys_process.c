@@ -31,8 +31,6 @@
  * SUCH DAMAGE.
  */
 
-#define	EXPLICIT_USER_ACCESS
-
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
@@ -487,7 +485,7 @@ ptrace_vm_entry(struct thread *td, struct proc *p,
 				pve->pve_pathlen = strlen(fullpath) + 1;
 				if (pve->pve_pathlen <= pathlen) {
 #if __has_feature(capabilities)
-					error = copyout_c(fullpath,
+					error = copyout(fullpath,
 						pve->pve_path,
 						pve->pve_pathlen);
 #else
@@ -1663,7 +1661,7 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 			buf[tmp++] = td2->td_tid;
 		}
 		PROC_UNLOCK(p);
-		error = copyout_c(buf, addr, tmp * sizeof(lwpid_t));
+		error = copyout(buf, addr, tmp * sizeof(lwpid_t));
 		free(buf, M_TEMP);
 		if (!error)
 			td->td_retval[0] = tmp;

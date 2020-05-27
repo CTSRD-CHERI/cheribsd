@@ -83,9 +83,13 @@ _rtld_error(const char *fmt __unused, ...)
 	va_end(ap);
 }
 
+#if 0
 #define PRINT_FUNCTION_NOT_AVAILABLE()	\
 	_rtld_error("%s: %s is not available when statically linked.", \
 	    getprogname(), __func__)
+#else
+#define PRINT_FUNCTION_NOT_AVAILABLE()	dlerror()
+#endif
 
 #pragma weak dladdr
 int
@@ -230,7 +234,7 @@ dl_init_phdr_info(void)
 #ifndef __CHERI_PURE_CAPABILITY__
 			    (void*)phdr_info.dlpi_phdr[i].p_vaddr;
 #else
-			    cheri_csetbounds(cheri_setaddress(phdr_info.dlpi_phdr,
+			    cheri_setbounds(cheri_setaddress(phdr_info.dlpi_phdr,
 				phdr_info.dlpi_phdr[i].p_vaddr),
 				phdr_info.dlpi_phdr[i].p_filesz);
 

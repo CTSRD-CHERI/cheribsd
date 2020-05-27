@@ -113,7 +113,7 @@ struct usb_fifo {
 	struct usb_fifo_methods *methods;
 	struct usb_symlink *symlink[2];/* our symlinks */
 	struct proc *async_p;		/* process that wants SIGIO */
-	struct usb_fs_endpoint *fs_ep_ptr;
+	struct usb_fs_endpoint * __capability fs_ep_ptr;
 	struct usb_device *udev;
 	struct usb_xfer *xfer[2];
 	struct usb_xfer **fs_xfer;
@@ -153,7 +153,7 @@ void	usb_fifo_signal(struct usb_fifo *fifo);
 uint8_t	usb_fifo_opened(struct usb_fifo *fifo);
 struct usb_symlink *usb_alloc_symlink(const char *target);
 void	usb_free_symlink(struct usb_symlink *ps);
-int	usb_read_symlink(uint8_t *user_ptr, uint32_t startentry,
+int	usb_read_symlink(uint8_t * __capability user_ptr, uint32_t startentry,
 	    uint32_t user_len);
 
 #endif					/* _USB_DEV_H_ */

@@ -73,8 +73,6 @@ __FBSDID("$FreeBSD$");
 
 #include "opt_sysvipc.h"
 
-#define	EXPLICIT_USER_ACCESS
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/abi_compat.h>
@@ -586,7 +584,7 @@ kern_shmat_locked(struct thread *td, int shmid,
 		 * given by vm_map_find().
 		 */
 		shmaddr = cheri_setaddress(shmaddr, (vm_offset_t)attach_addr);
-		shmaddr = cheri_csetbounds(shmaddr,
+		shmaddr = cheri_setbounds(shmaddr,
 		    CHERI_REPRESENTABLE_LENGTH(shmseg->u.shm_segsz));
 		/* XXX: set perms */
 		td->td_retval[0] = (uintcap_t)__DECONST_CAP(void * __capability,

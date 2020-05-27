@@ -3483,7 +3483,7 @@ mesh_ioctl_get80211(struct ieee80211vap *vap, struct ieee80211req *ireq)
 				off += sizeof(*imr);
 			}
 			MESH_RT_UNLOCK(ms);
-			error = copyout(p, (uint8_t *)ireq->i_data,
+			error = copyout(p, ireq->i_data,
 			    ireq->i_len);
 			IEEE80211_FREE(p, M_TEMP);
 			break;
@@ -3501,7 +3501,7 @@ mesh_ioctl_get80211(struct ieee80211vap *vap, struct ieee80211req *ireq)
 			return EINVAL;
 		ireq->i_len = len;
 		error = copyout(ms->ms_pmetric->mpm_descr,
-		    (uint8_t *)ireq->i_data, len);
+		    ireq->i_data, len);
 		break;
 	case IEEE80211_IOC_MESH_PR_PATH:
 		len = strlen(ms->ms_ppath->mpp_descr);
@@ -3509,7 +3509,7 @@ mesh_ioctl_get80211(struct ieee80211vap *vap, struct ieee80211req *ireq)
 			return EINVAL;
 		ireq->i_len = len;
 		error = copyout(ms->ms_ppath->mpp_descr,
-		    (uint8_t *)ireq->i_data, len);
+		    ireq->i_data, len);
 		break;
 	default:
 		return ENOSYS;
@@ -3575,16 +3575,21 @@ mesh_ioctl_set80211(struct ieee80211vap *vap, struct ieee80211req *ireq)
 			ieee80211_mesh_rt_flush(vap);
 			break;
 		case IEEE80211_MESH_RTCMD_ADD:
-			if (IEEE80211_ADDR_EQ(vap->iv_myaddr, ireq->i_data) ||
-			    IEEE80211_ADDR_EQ(broadcastaddr, ireq->i_data))
-				return EINVAL;
-			error = copyin(ireq->i_data, &tmpaddr,
+			error = copyin(ireq->i_data, tmpaddr,
 			    IEEE80211_ADDR_LEN);
-			if (error == 0)
-				ieee80211_mesh_discover(vap, tmpaddr, NULL);
+			if (error != 0)
+				break;
+			if (IEEE80211_ADDR_EQ(vap->iv_myaddr, tmpaddr) ||
+			    IEEE80211_ADDR_EQ(broadcastaddr, tmpaddr))
+				return EINVAL;
+			ieee80211_mesh_discover(vap, tmpaddr, NULL);
 			break;
 		case IEEE80211_MESH_RTCMD_DELETE:
-			ieee80211_mesh_rt_del(vap, ireq->i_data);
+			error = copyin(ireq->i_data, tmpaddr,
+			    IEEE80211_ADDR_LEN);
+			if (error != 0)
+				break;
+			ieee80211_mesh_rt_del(vap, tmpaddr);
 			break;
 		default:
 			return ENOSYS;

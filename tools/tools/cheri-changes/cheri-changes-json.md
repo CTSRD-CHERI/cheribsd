@@ -12,6 +12,7 @@ comments.  The following example shows all the current annotations.
  *   "updated": 20180626,
  *   "target_type": "header, kernel, lib, or prog"
  *   "changes": [
+ *     "bounds_compression",
  *     "calling_convention",
  *     "hashing",
  *     "ioctl:misc",
@@ -59,6 +60,9 @@ for used by validation tools.
 `changes`: Zero or more tags indicating the types of changes.  Current
 values are:
 
+ * `bounds_compression` - Pointers taken far out of bounds may lose their
+   tags due to a lack of representability.  These changes avoid such
+   situations.
  * `calling_convention` - Changes required by the CHERI-MIPS calling
    convention such as declaring arguments in prototypes and va_args and
    non-va_args functions having different register use.

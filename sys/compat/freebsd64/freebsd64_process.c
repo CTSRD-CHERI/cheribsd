@@ -131,33 +131,41 @@ freebsd64_ptrace(struct thread *td, struct freebsd64_ptrace_args *uap)
 		BZERO(&r.dbreg, sizeof r.dbreg);
 		break;
 	case PT_SETREGS:
-		error = COPYIN(uap->addr, &r.reg, sizeof r.reg);
+		error = COPYIN(__USER_CAP(uap->addr, sizeof(r.reg)), &r.reg,
+		    sizeof r.reg);
 		break;
 	case PT_SETFPREGS:
-		error = COPYIN(uap->addr, &r.fpreg, sizeof r.fpreg);
+		error = COPYIN(__USER_CAP(uap->addr, sizeof(r.fpreg)), &r.fpreg,
+		    sizeof r.fpreg);
 		break;
 	case PT_SETDBREGS:
-		error = COPYIN(uap->addr, &r.dbreg, sizeof r.dbreg);
+		error = COPYIN(__USER_CAP(uap->addr, sizeof(r.dbreg)), &r.dbreg,
+		    sizeof r.dbreg);
 		break;
 #if __has_feature(capabilities)
 	case PT_SETCAPREGS:
-		error = COPYIN(uap->addr, &r.capreg, sizeof r.capreg);
+		error = COPYIN(__USER_CAP(uap->addr, sizeof(r.capreg)),
+		    &r.capreg, sizeof r.capreg);
 		break;
 #endif
 	case PT_SET_EVENT_MASK:
 		if (uap->data != sizeof(r.ptevents))
 			error = EINVAL;
 		else
-			error = COPYIN(uap->addr, &r.ptevents, uap->data);
+			error = copyin(__USER_CAP(uap->addr, uap->data),
+			    &r.ptevents, uap->data);
 		break;
 	case PT_IO:
-		error = COPYIN(uap->addr, &r.piod, sizeof r.piod);
+		error = COPYIN(__USER_CAP(uap->addr, sizeof(r.piod)), &r.piod,
+		    sizeof r.piod);
 		break;
 	case PT_VM_ENTRY:
 #if __has_feature(capabilities)
 	{
 		struct ptrace_vm_entry pve;
-		error = COPYIN(uap->addr, &pve, sizeof pve);
+
+		error = COPYIN(__USER_CAP(uap->addr, sizeof(pve)), &pve,
+		    sizeof pve);
 		if (error)
 			break;
 
@@ -173,7 +181,8 @@ freebsd64_ptrace(struct thread *td, struct freebsd64_ptrace_args *uap)
 		r.pve.pve_path      = (void * __capability)(intcap_t)pve.pve_path;
 	}
 #else
-		error = COPYIN(uap->addr, &r.pve, sizeof r.pve);
+		error = COPYIN(__USER_CAP(uap->addr, sizeof(r.pve)), &r.pve,
+		    sizeof r.pve);
 #endif
 		break;
 	default:
@@ -189,40 +198,48 @@ freebsd64_ptrace(struct thread *td, struct freebsd64_ptrace_args *uap)
 
 	switch (uap->req) {
 	case PT_VM_ENTRY:
-		error = COPYOUT(&r.pve, uap->addr, sizeof r.pve);
+		error = COPYOUT(&r.pve, __USER_CAP(uap->addr, sizeof(r.pve)),
+		    sizeof r.pve);
 		break;
 	case PT_IO:
-		error = COPYOUT(&r.piod, uap->addr, sizeof r.piod);
+		error = COPYOUT(&r.piod, __USER_CAP(uap->addr, sizeof(r.piod)),
+		    sizeof r.piod);
 		break;
 	case PT_GETREGS:
-		error = COPYOUT(&r.reg, uap->addr, sizeof r.reg);
+		error = COPYOUT(&r.reg, __USER_CAP(uap->addr, sizeof(r.reg)),
+		    sizeof r.reg);
 		break;
 	case PT_GETFPREGS:
-		error = COPYOUT(&r.fpreg, uap->addr, sizeof r.fpreg);
+		error = COPYOUT(&r.fpreg, __USER_CAP(uap->addr, sizeof(r.fpreg)),
+		    sizeof r.fpreg);
 		break;
 	case PT_GETDBREGS:
-		error = COPYOUT(&r.dbreg, uap->addr, sizeof r.dbreg);
+		error = COPYOUT(&r.dbreg, __USER_CAP(uap->addr, sizeof(r.dbreg)),
+		    sizeof r.dbreg);
 		break;
 #if __has_feature(capabilities)
 	case PT_GETCAPREGS:
-		error = COPYOUT(&r.capreg, uap->addr, sizeof r.capreg);
+		error = COPYOUT(&r.capreg, __USER_CAP(uap->addr,
+		    sizeof(r.capreg)), sizeof r.capreg);
 		break;
 #endif
 	case PT_GET_EVENT_MASK:
 		/* NB: The size in uap->data is validated in kern_ptrace(). */
-		error = COPYOUT(&r.ptevents, uap->addr, uap->data);
+		error = copyout(&r.ptevents, __USER_CAP(uap->addr, uap->data),
+		    uap->data);
 		break;
 	case PT_LWPINFO:
 		/* NB: The size in uap->data is validated in kern_ptrace(). */
-		error = COPYOUT(&r.pl, uap->addr, uap->data);
+		error = copyout(&r.pl, __USER_CAP(uap->addr, uap->data),
+		    uap->data);
 		break;
 	case PT_GET_SC_ARGS:
-		error = COPYOUT(r.args, uap->addr, MIN(uap->data,
-		    sizeof(r.args)));
+		error = copyout(r.args, __USER_CAP(uap->addr, uap->data),
+		    MIN(uap->data, sizeof(r.args)));
 		break;
 	case PT_GET_SC_RET:
-		error = COPYOUT(&r.psr, uap->addr, MIN(uap->data,
-		    sizeof(r.psr)));
+		error = copyout(&r.psr, __USER_CAP(uap->addr, uap->data),
+		    MIN(uap->data, sizeof(r.psr)));
 		break;
 	}
 

@@ -34,8 +34,6 @@ __FBSDID("$FreeBSD$");
 #include "opt_ktrace.h"
 #include "opt_kqueue.h"
 
-#define	EXPLICIT_USER_ACCESS
-
 #ifdef COMPAT_FREEBSD11
 #define	_WANT_FREEBSD11_KEVENT
 #endif
@@ -618,7 +616,7 @@ knote_fork(struct knlist *list, int pid)
     (NOTE_SECONDS | NOTE_MSECONDS | NOTE_USECONDS | NOTE_NSECONDS)
 
 static sbintime_t
-timer2sbintime(intptr_t data, int flags)
+timer2sbintime(int64_t data, int flags)
 {
 	int64_t secs;
 

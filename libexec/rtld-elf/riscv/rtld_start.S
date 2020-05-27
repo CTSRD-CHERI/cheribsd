@@ -35,12 +35,57 @@
 #include <machine/asm.h>
 __FBSDID("$FreeBSD$");
 
+#ifdef __CHERI_PURE_CAPABILITY__
+#include <machine/riscvreg.h>
+#include "SYS.h"
+#endif
+
 /*
+ * Pure-capability:
+ *
+ * void
+ * _rtld_relocate_nonplt_self(Elf_Dyn *dynp, Elf_Auxinfo *aux)
+ *
+ * func_ptr_type
+ * _rtld(Elf_Auxinfo *aux, func_ptr_type *exit_proc, Obj_Entry **objp)
+ */
+
+/*
+ * Plain:
+ *
  * func_ptr_type
  * _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
  */
 
 ENTRY(.rtld_start)
+#ifdef __CHERI_PURE_CAPABILITY__
+	cmove	cs0, ca0				/* Put aux in a callee-saved register */
+	cmove	cs1, csp				/* And the stack pointer */
+
+	cincoffset csp, csp, -(CLEN * 2)		/* Make room for obj_main & exit_proc */
+
+	cllc	ca0, _DYNAMIC				/* dynp */
+	cmove	ca1, cs0				/* aux */
+	ASM_LOCAL_CALL(ra, _rtld_relocate_nonplt_self)	/* Relocate ourselves early, including __cap_relocs */
+
+#if __CHERI_CAPABILITY_TABLE__ != 3
+	/* TODO: CGP for PLT and FNDESC ABIs */
+#error "Only the PC-relative ABI is currently supported"
+#endif
+
+	cmove	ca0, cs0				/* Restore aux */
+	csetbounds	ca1, csp, CLEN			/* exit_proc */
+	cincoffset	ca2, csp, CLEN
+	csetbounds	ca2, ca2, CLEN			/* obj_main */
+	ASM_LOCAL_CALL(ra, _rtld)			/* Call the loader */
+	cmove	ct0, ca0				/* Backup the entry point */
+
+	clc	ca1, (CLEN * 0)(csp)			/* Load cleanup */
+	clc	ca2, (CLEN * 1)(csp)			/* Load obj_main */
+	cmove	ca0, cs0				/* Restore aux */
+	cmove	csp, cs1				/* Restore the stack pointer */
+	cjr	ct0					/* Jump to the entry point */
+#else /* defined(__CHERI_PURE_CAPABILITY__) */
 	mv	s0, a0		/* Put ps_strings in a callee-saved register */
 	mv	s1, sp		/* And the stack pointer */
 
@@ -56,6 +101,7 @@ ENTRY(.rtld_start)
 	mv	a0, s0		/* Restore ps_strings */
 	mv	sp, s1		/* Restore the stack pointer */
 	jr	t0		/* Jump to the entry point */
+#endif /* defined(__CHERI_PURE_CAPABILITY__) */
 END(.rtld_start)
 
 /*
@@ -63,6 +109,10 @@ END(.rtld_start)
  * t1 = reloc offset
  */
 ENTRY(_rtld_bind_start)
+#ifdef __CHERI_PURE_CAPABILITY__
+	/* Currently unused and unimplemented for pure-capability code */
+	unimp
+#else /* defined(__CHERI_PURE_CAPABILITY__) */
 	/* Save the arguments and ra */
 	addi	sp, sp, -(8 * 17)
 	sd	a0, (8 * 0)(sp)
@@ -126,4 +176,5 @@ ENTRY(_rtld_bind_start)
 
 	/* Call into the correct function */
 	jr	t0
+#endif /* defined(__CHERI_PURE_CAPABILITY__) */
 END(_rtld_bind_start)

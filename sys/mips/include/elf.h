@@ -106,7 +106,7 @@
  * The expected EI_ABIVERSION value for CheriABI binaries. Can be used to
  * reject loading of binaries compiled with a too new/old toolchain.
  */
-#define ELF_CHERIABI_ABIVERSION 2
+#define ELF_CHERIABI_ABIVERSION 3
 
 /*
  * Auxiliary vector entries for passing information to the interpreter.

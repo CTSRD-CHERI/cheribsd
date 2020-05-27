@@ -292,11 +292,6 @@ struct fcrypt {
 	struct mtx	lock;
 };
 
-static struct timeval warninterval = { .tv_sec = 60, .tv_usec = 0 };
-SYSCTL_TIMEVAL_SEC(_kern, OID_AUTO, cryptodev_warn_interval, CTLFLAG_RW,
-    &warninterval,
-    "Delay in seconds between warnings of deprecated /dev/crypto algorithms");
-
 static	int cryptof_ioctl(struct file *, u_long, void *,
 		    struct ucred *, struct thread *);
 static	int cryptof_stat(struct file *, struct stat *,
@@ -409,21 +404,6 @@ cryptof_ioctl(
 		switch (sop->cipher) {
 		case 0:
 			break;
-		case CRYPTO_DES_CBC:
-			txform = &enc_xform_des;
-			break;
-		case CRYPTO_3DES_CBC:
-			txform = &enc_xform_3des;
-			break;
-		case CRYPTO_BLF_CBC:
-			txform = &enc_xform_blf;
-			break;
-		case CRYPTO_CAST_CBC:
-			txform = &enc_xform_cast5;
-			break;
-		case CRYPTO_SKIPJACK_CBC:
-			txform = &enc_xform_skipjack;
-			break;
 		case CRYPTO_AES_CBC:
 			txform = &enc_xform_rijndael128;
 			break;
@@ -432,9 +412,6 @@ cryptof_ioctl(
 			break;
 		case CRYPTO_NULL_CBC:
 			txform = &enc_xform_null;
-			break;
-		case CRYPTO_ARC4:
-			txform = &enc_xform_arc4;
 			break;
  		case CRYPTO_CAMELLIA_CBC:
  			txform = &enc_xform_camellia;
@@ -460,9 +437,6 @@ cryptof_ioctl(
 
 		switch (sop->mac) {
 		case 0:
-			break;
-		case CRYPTO_MD5_HMAC:
-			thash = &auth_hash_hmac_md5;
 			break;
 		case CRYPTO_POLY1305:
 			thash = &auth_hash_poly1305;
@@ -492,6 +466,8 @@ cryptof_ioctl(
 			/* Should always be paired with GCM. */
 			if (sop->cipher != CRYPTO_AES_NIST_GCM_16) {
 				CRYPTDEB("GMAC without GCM");
+				SDT_PROBE1(opencrypto, dev, ioctl, error,
+				    __LINE__);
 				return (EINVAL);
 			}
 			break;
@@ -533,11 +509,6 @@ cryptof_ioctl(
 				return (EINVAL);
 			}
 			break;
-#ifdef notdef
-		case CRYPTO_MD5:
-			thash = &auth_hash_md5;
-			break;
-#endif
 		case CRYPTO_SHA1:
 			thash = &auth_hash_sha1;
 			break;
@@ -571,8 +542,10 @@ cryptof_ioctl(
 			return (EINVAL);
 		}
 
-		if (txform == NULL && thash == NULL)
+		if (txform == NULL && thash == NULL) {
+			SDT_PROBE1(opencrypto, dev, ioctl, error, __LINE__);
 			return (EINVAL);
+		}
 
 		memset(&csp, 0, sizeof(csp));
 
@@ -582,13 +555,18 @@ cryptof_ioctl(
 			case CRYPTO_AES_128_NIST_GMAC:
 			case CRYPTO_AES_192_NIST_GMAC:
 			case CRYPTO_AES_256_NIST_GMAC:
-				if (sop->keylen != sop->mackeylen)
+				if (sop->keylen != sop->mackeylen) {
+					SDT_PROBE1(opencrypto, dev, ioctl,
+					    error, __LINE__);
 					return (EINVAL);
+				}
 				break;
 #endif
 			case 0:
 				break;
 			default:
+				SDT_PROBE1(opencrypto, dev, ioctl, error,
+				    __LINE__);
 				return (EINVAL);
 			}
 			csp.csp_mode = CSP_MODE_AEAD;
@@ -596,14 +574,19 @@ cryptof_ioctl(
 			switch (sop->mac) {
 #ifdef COMPAT_FREEBSD12
 			case CRYPTO_AES_CCM_CBC_MAC:
-				if (sop->keylen != sop->mackeylen)
+				if (sop->keylen != sop->mackeylen) {
+					SDT_PROBE1(opencrypto, dev, ioctl,
+					    error, __LINE__);
 					return (EINVAL);
+				}
 				thash = NULL;
 				break;
 #endif
 			case 0:
 				break;
 			default:
+				SDT_PROBE1(opencrypto, dev, ioctl, error,
+				    __LINE__);
 				return (EINVAL);
 			}
 			csp.csp_mode = CSP_MODE_AEAD;
@@ -848,49 +831,6 @@ cod_free(struct cryptop_data *cod)
 	free(cod, M_XDATA);
 }
 
-static void
-cryptodev_warn(struct csession *cse)
-{
-	static struct timeval arc4warn, blfwarn, castwarn, deswarn, md5warn;
-	static struct timeval skipwarn, tdeswarn;
-	const struct crypto_session_params *csp;
-
-	csp = crypto_get_params(cse->cses);
-	switch (csp->csp_cipher_alg) {
-	case CRYPTO_DES_CBC:
-		if (ratecheck(&deswarn, &warninterval))
-			gone_in(13, "DES cipher via /dev/crypto");
-		break;
-	case CRYPTO_3DES_CBC:
-		if (ratecheck(&tdeswarn, &warninterval))
-			gone_in(13, "3DES cipher via /dev/crypto");
-		break;
-	case CRYPTO_BLF_CBC:
-		if (ratecheck(&blfwarn, &warninterval))
-			gone_in(13, "Blowfish cipher via /dev/crypto");
-		break;
-	case CRYPTO_CAST_CBC:
-		if (ratecheck(&castwarn, &warninterval))
-			gone_in(13, "CAST128 cipher via /dev/crypto");
-		break;
-	case CRYPTO_SKIPJACK_CBC:
-		if (ratecheck(&skipwarn, &warninterval))
-			gone_in(13, "Skipjack cipher via /dev/crypto");
-		break;
-	case CRYPTO_ARC4:
-		if (ratecheck(&arc4warn, &warninterval))
-			gone_in(13, "ARC4 cipher via /dev/crypto");
-		break;
-	}
-
-	switch (csp->csp_auth_alg) {
-	case CRYPTO_MD5_HMAC:
-		if (ratecheck(&md5warn, &warninterval))
-			gone_in(13, "MD5-HMAC authenticator via /dev/crypto");
-		break;
-	}
-}
-
 static int
 cryptodev_op(
 	struct csession *cse,
@@ -1041,7 +981,6 @@ cryptodev_op(
 			goto bail;
 		}
 	}
-	cryptodev_warn(cse);
 again:
 	/*
 	 * Let the dispatch run unlocked, then, interlock against the
@@ -1232,7 +1171,6 @@ cryptodev_aead(
 		SDT_PROBE1(opencrypto, dev, ioctl, error, __LINE__);
 		goto bail;
 	}
-	cryptodev_warn(cse);
 again:
 	/*
 	 * Let the dispatch run unlocked, then, interlock against the
@@ -1385,7 +1323,7 @@ cryptodev_key(struct crypt_kop *kop)
 		krp->krp_param[i].crp_p = malloc(size, M_XDATA, M_WAITOK);
 		if (i >= krp->krp_iparams)
 			continue;
-		error = copyin(kop->crk_param[i].crp_p, krp->krp_param[i].crp_p, size);
+		error = copyin(kop->crk_param[i].crp_up, krp->krp_param[i].crp_p, size);
 		if (error) {
 			SDT_PROBE1(opencrypto, dev, ioctl, error, __LINE__);
 			goto fail;
@@ -1415,7 +1353,7 @@ cryptodev_key(struct crypt_kop *kop)
 		size = (krp->krp_param[i].crp_nbits + 7) / 8;
 		if (size == 0)
 			continue;
-		error = copyout(krp->krp_param[i].crp_p, kop->crk_param[i].crp_p, size);
+		error = copyout(krp->krp_param[i].crp_p, kop->crk_param[i].crp_up, size);
 		if (error) {
 			SDT_PROBE1(opencrypto, dev, ioctl, error, __LINE__);
 			goto fail;

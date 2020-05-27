@@ -539,7 +539,7 @@ malloc_dbg(caddr_t *vap, size_t *sizep, struct malloc_type *mtp,
 #ifdef EPOCH_TRACE
 			epoch_trace_list(curthread);
 #endif
-			KASSERT(1, 
+			KASSERT(1,
 			    ("malloc(M_WAITOK) with sleeping prohibited"));
 		}
 	}
@@ -872,7 +872,7 @@ zfree(void *addr, struct malloc_type *mtp)
 	vtozoneslab((vm_offset_t)addr & (~UMA_SLAB_MASK), &zone, &slab);
 	if (slab == NULL)
 		panic("free: address %p(%p) has not been allocated.\n",
-		    addr, (void *)((u_long)addr & (~UMA_SLAB_MASK)));
+		    addr, (void *)(uintptr_t)((u_long)addr & (~UMA_SLAB_MASK)));
 
 	if (__predict_true(!malloc_large_slab(slab))) {
 		size = zone->uz_size;
@@ -1068,7 +1068,7 @@ kmeminit(void)
 	 * kmem arena can be set statically at compile-time or manually
 	 * through the kernel environment.  However, it is still limited to
 	 * twice the physical memory size, which has been sufficient to handle
-	 * the most severe cases of external fragmentation in the kmem arena. 
+	 * the most severe cases of external fragmentation in the kmem arena.
 	 */
 	if (vm_kmem_size / 2 / PAGE_SIZE > mem_size)
 		vm_kmem_size = 2 * mem_size * PAGE_SIZE;
@@ -1127,7 +1127,7 @@ mallocinit(void *dummy)
 			    NULL, NULL, NULL, NULL,
 #endif
 			    UMA_ALIGN_PTR, UMA_ZONE_MALLOC);
-		}		    
+		}
 		for (;i <= size; i+= KMEM_ZBASE)
 			kmemsize[i >> KMEM_ZSHIFT] = indx;
 
@@ -1474,7 +1474,7 @@ sysctl_kern_mprof(SYSCTL_HANDLER_ARGS)
 	if (error != 0)
 		return (error);
 	sbuf_new_for_sysctl(&sbuf, NULL, 128, req);
-	sbuf_printf(&sbuf, 
+	sbuf_printf(&sbuf,
 	    "\n  Size                    Requests  Real Size\n");
 	for (i = 0; i < KMEM_ZSIZE; i++) {
 		size = i << KMEM_ZSHIFT;

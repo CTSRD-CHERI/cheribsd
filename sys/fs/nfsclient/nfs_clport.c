@@ -33,8 +33,6 @@
  *
  */
 
-#define	EXPLICIT_USER_ACCESS
-
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
@@ -1112,7 +1110,7 @@ nfscl_checksattr(struct vattr *vap, struct nfsvattr *nvap)
  * error should only be returned for the Open, Create and Setattr Ops.
  * As such, most calls can just pass in 0 for those arguments.
  */
-APPLESTATIC int
+int
 nfscl_maperr(struct thread *td, int error, uid_t uid, gid_t gid)
 {
 	struct proc *p;
@@ -1236,7 +1234,7 @@ nfssvc_nfscl(struct thread *td, struct nfssvc_args *uap)
 	struct nfsmount *nmp;
 
 	if (uap->flag & NFSSVC_CBADDSOCK) {
-		error = copyin(uap->argp, (caddr_t)&nfscbdarg, sizeof(nfscbdarg));
+		error = copyincap(uap->argp, &nfscbdarg, sizeof(nfscbdarg));
 		if (error)
 			return (error);
 		/*
@@ -1261,8 +1259,7 @@ nfssvc_nfscl(struct thread *td, struct nfssvc_args *uap)
 	} else if (uap->flag & NFSSVC_NFSCBD) {
 		if (uap->argp == NULL) 
 			return (EINVAL);
-		error = copyin(uap->argp, (caddr_t)&nfscbdarg2,
-		    sizeof(nfscbdarg2));
+		error = copyincap(uap->argp, &nfscbdarg2, sizeof(nfscbdarg2));
 		if (error)
 			return (error);
 		error = nfscbd_nfsd(td, &nfscbdarg2);

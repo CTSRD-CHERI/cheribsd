@@ -108,8 +108,8 @@ map_object(int fd, const char *path, const struct stat *sb, const char* main_pat
     size_t note_map_len;
     Elf_Addr text_end;
 #ifdef __CHERI_PURE_CAPABILITY__
-    Elf_Addr text_rodata_start = 0;
-    Elf_Addr text_rodata_end = 0;
+    Elf_Addr text_rodata_start_offset = 0;
+    Elf_Addr text_rodata_end_offset = 0;
 #endif
 
     hdr = get_elf_header(fd, path, sb, main_path);
@@ -153,11 +153,11 @@ map_object(int fd, const char *path, const struct stat *sb, const char* main_pat
 #ifdef __CHERI_PURE_CAPABILITY__
 	    if (!(segs[nsegs]->p_flags & PF_W)) {
 		Elf_Addr start_addr = segs[nsegs]->p_vaddr;
-		text_rodata_start = rtld_min(start_addr, text_rodata_start);
-		text_rodata_end = rtld_max(start_addr + segs[nsegs]->p_memsz, text_rodata_end);
+		text_rodata_start_offset = rtld_min(start_addr, text_rodata_start_offset);
+		text_rodata_end_offset = rtld_max(start_addr + segs[nsegs]->p_memsz, text_rodata_end_offset);
 		dbg("%s: processing readonly PT_LOAD[%d], new text/rodata start "
 		    " = %zx text/rodata end = %zx", path, nsegs,
-		    (size_t)text_rodata_start, (size_t)text_rodata_end);
+		    (size_t)text_rodata_start_offset, (size_t)text_rodata_end_offset);
 	    }
 #endif
 	    if ((segs[nsegs]->p_flags & PF_X) == PF_X) {
@@ -187,11 +187,11 @@ map_object(int fd, const char *path, const struct stat *sb, const char* main_pat
 	    relro_page = phdr->p_vaddr;
 	    relro_size = phdr->p_memsz;
 #ifdef __CHERI_PURE_CAPABILITY__
-	    text_rodata_start = rtld_min(phdr->p_vaddr, text_rodata_start);
-	    text_rodata_end = rtld_max(phdr->p_vaddr + phdr->p_memsz, text_rodata_end);
+	    text_rodata_start_offset = rtld_min(phdr->p_vaddr, text_rodata_start_offset);
+	    text_rodata_end_offset = rtld_max(phdr->p_vaddr + phdr->p_memsz, text_rodata_end_offset);
 	    dbg("%s: Adding PT_GNU_RELRO, new text/rodata start "
 		" = %zx text/rodata end = %zx", path,
-		(size_t)text_rodata_start, (size_t)text_rodata_end);
+		(size_t)text_rodata_start_offset, (size_t)text_rodata_end_offset);
 #endif
 	    break;
 
@@ -362,8 +362,8 @@ map_object(int fd, const char *path, const struct stat *sb, const char* main_pat
 	rtld_fdprintf(STDERR_FILENO, "%s: nonzero vaddrbase %zd may be broken "
 	    "for CheriABI", path, obj->vaddrbase);
     }
-    obj->text_rodata_start = text_rodata_start;
-    obj->text_rodata_end = text_rodata_end;
+    obj->text_rodata_start_offset = text_rodata_start_offset;
+    obj->text_rodata_end_offset = text_rodata_end_offset;
     /*
      * Note: no csetbounds yet since we also need to include .cap_table (which
      * is part of the r/w section). Bounds are set after .dynamic is read.

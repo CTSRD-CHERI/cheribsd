@@ -111,6 +111,13 @@ typedef struct Struct_Objlist_Entry {
 typedef STAILQ_HEAD(Struct_Objlist, Struct_Objlist_Entry) Objlist;
 
 /* Types of init and fini functions */
+#ifdef __CHERI_PURE_CAPABILITY__
+typedef struct { uintcap_t value; } InitArrayEntry;
+#define initfini_array_addr(entry)	((entry).value)
+#else
+typedef struct { Elf_Addr value; } InitArrayEntry;
+#define initfini_array_addr(entry)	(entry)
+#endif
 typedef void (*InitFunc)(void);
 typedef void (*InitArrFunc)(int, char **, char **);
 
@@ -194,8 +201,8 @@ typedef struct Struct_Obj_Entry {
      * By having these additional members we can remove execute permissions from
      * relocbase and mapbase.
      */
-    Elf_Addr text_rodata_start;
-    Elf_Addr text_rodata_end;
+    Elf_Addr text_rodata_start_offset;
+    Elf_Addr text_rodata_end_offset;
     const char* text_rodata_cap;	/* Capability for the executable mapping */
     struct CheriExports *cheri_exports;	/* Unique thunks for function pointers */
     struct CheriPlt *cheri_plt_stubs;	/* PLT stubs for external calls */
@@ -233,16 +240,18 @@ typedef struct Struct_Obj_Entry {
     const Elf_Sym *symtab;	/* Symbol table */
     const char *strtab;		/* String table */
     unsigned long strsize;	/* Size in bytes of string table */
-#ifdef __mips__
 #ifdef __CHERI_PURE_CAPABILITY__
     caddr_t cap_relocs;		/* start of the __cap_relocs section */
+    size_t cap_relocs_size;	/* size of the __cap_relocs section */
+#endif
+#ifdef __mips__
+#ifdef __CHERI_PURE_CAPABILITY__
     /*
      * Two pointers to the start of the .cap_table section: one writable
      * for use by RTLD and one read-only for use as the target $cgp in plt stubs.
      */
     struct CheriCapTableEntry* writable_captable;
     const struct CheriCapTableEntry* _target_cgp;
-    size_t cap_relocs_size;	/* size of the __cap_relocs section */
     size_t captable_size;	/* size of the .cap_table section */
 #if RTLD_SUPPORT_PER_FUNCTION_CAPTABLE == 1
     const struct CheriCapTableMappingEntry* captable_mapping;
@@ -295,9 +304,9 @@ typedef struct Struct_Obj_Entry {
 
     void* init_ptr;		/* Initialization function to call */
     void* fini_ptr;		/* Termination function to call */
-    Elf_Addr* preinit_array_ptr;	/* Pre-initialization array of functions */
-    Elf_Addr* init_array_ptr;	/* Initialization array of functions */
-    Elf_Addr* fini_array_ptr;	/* Termination array of functions */
+    InitArrayEntry* preinit_array_ptr;	/* Pre-initialization array of functions */
+    InitArrayEntry* init_array_ptr;	/* Initialization array of functions */
+    InitArrayEntry* fini_array_ptr;	/* Termination array of functions */
     int preinit_array_num;	/* Number of entries in preinit_array */
     int init_array_num; 	/* Number of entries in init_array */
     int fini_array_num; 	/* Number of entries in fini_array */
@@ -387,6 +396,7 @@ TAILQ_HEAD(obj_entry_q, Struct_Obj_Entry);
 #define	RTLD_LO_FILTEES 0x10	/* Loading filtee. */
 #define	RTLD_LO_EARLY	0x20	/* Do not call ctors, postpone it to the
 				   initialization during the image start. */
+#define	RTLD_LO_IGNSTLS 0x40	/* Do not allocate static TLS */
 
 /*
  * Symbol cache entry used during relocation to avoid multiple lookups
@@ -470,11 +480,11 @@ __END_DECLS
 
 /* Archictectures other than CHERI can just call the pointer */
 #ifndef call_init_array_pointer
-#define call_init_array_pointer(obj, target) call_init_pointer(obj, target)
+#define call_init_array_pointer(obj, target) call_init_pointer(obj, (target).value)
 #endif
 
 #ifndef call_fini_array_pointer
-#define call_fini_array_pointer(obj, target) call_initfini_pointer(obj, target)
+#define call_fini_array_pointer(obj, target) call_initfini_pointer(obj, (target).value)
 #endif
 
 #ifndef make_rtld_function_pointer
@@ -522,7 +532,7 @@ int convert_prot(int elfflags);
 int do_copy_relocations(Obj_Entry *);
 int reloc_non_plt(Obj_Entry *, Obj_Entry *, int flags,
     struct Struct_RtldLockState *);
-#ifdef __CHERI_PURE_CAPABILITY__
+#if defined(__mips__) && defined(__CHERI_PURE_CAPABILITY__)
 int reloc_plt(Obj_Entry *obj, bool bind_now, int flags, const Obj_Entry *rtldobj,
     struct Struct_RtldLockState *lockstate);
 #else

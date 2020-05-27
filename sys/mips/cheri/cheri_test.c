@@ -121,7 +121,7 @@ cheri_test_init(void)
 	cheri_test_untaggedcap = cheri_cleartag(cheri_test_finecap);
 
 	/* Valid capability to cheri_test_int -- but bounds set to 0 length. */
-	cheri_test_nilboundscap = cheri_csetbounds(cheri_test_finecap, 0);
+	cheri_test_nilboundscap = cheri_setbounds(cheri_test_finecap, 0);
 
 	/* Valid capability to cheri_test_int -- but read-only. */
 	cheri_test_readonlycap = cheri_andperm(cheri_test_finecap,

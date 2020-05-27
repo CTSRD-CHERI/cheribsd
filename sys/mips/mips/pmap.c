@@ -214,7 +214,7 @@ pmap_init_reserved_pages(void)
 	struct pcpu *pc;
 	vm_offset_t pages;
  	int i;
- 
+
 	if (need_local_mappings == 0)
 		return;
 
@@ -425,7 +425,7 @@ pmap_steal_memory(vm_size_t size)
 		panic("Out of memory below 512Meg?");
 	va = (caddr_t)MIPS_PHYS_TO_DIRECT(pa);
 #ifdef CHERI_PURECAP_KERNEL
-	va = cheri_csetbounds(va, size);
+	va = cheri_setbounds(va, size);
 #endif
 	bzero(va, size);
 	return ((vm_ptr_t)va);
@@ -961,7 +961,7 @@ pmap_map(vm_ptr_t *virt, vm_paddr_t start, vm_paddr_t end, int prot)
 		caddr_t map_addr;
 
 		map_addr = MIPS_PHYS_TO_DIRECT(start);
-		map_addr = cheri_csetbounds(map_addr, end - start);
+		map_addr = cheri_setbounds(map_addr, end - start);
 		if (!(prot & VM_PROT_READ))
 		  map_addr = cheri_andperm(map_addr,
 			 ~(CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP));
@@ -1057,18 +1057,26 @@ static void
 _pmap_unwire_ptp(pmap_t pmap, vm_offset_t va, vm_page_t m)
 {
 	pd_entry_t *pde;
+	vm_offset_t sva, eva;
 
 	PMAP_LOCK_ASSERT(pmap, MA_OWNED);
 	/*
 	 * unmap the page table page
 	 */
 #ifdef __mips_n64
-	if (m->pindex < NUPDE)
+	if (m->pindex < NUPDE) {
 		pde = pmap_pde(pmap, va);
-	else
+		sva = va & ~PDRMASK;
+		eva = sva + NBPDR;
+	} else {
 		pde = pmap_segmap(pmap, va);
+		sva = va & ~SEGMASK;
+		eva = sva + NBSEG;
+	}
 #else
 	pde = pmap_pde(pmap, va);
+	sva = va & ~SEGMASK;
+	eva = sva + NBSEG;
 #endif
 	*pde = 0;
 	pmap->pm_stats.resident_count--;
@@ -1079,12 +1087,22 @@ _pmap_unwire_ptp(pmap_t pmap, vm_offset_t va, vm_page_t m)
 		vm_page_t pdpg;
 
 		/*
-		 * Recursively decrement next level pagetable refcount
+		 * Recursively decrement next level pagetable refcount.
+		 * Either that shoots down a larger range from TLBs (below)
+		 * or we're to shoot down just the page in question.
 		 */
 		pdp = (pd_entry_t *)*pmap_segmap(pmap, va);
 		pdpg = PHYS_TO_VM_PAGE(MIPS_DIRECT_TO_PHYS(pdp));
-		pmap_unwire_ptp(pmap, va, pdpg);
+		if (!pmap_unwire_ptp(pmap, va, pdpg)) {
+			pmap_invalidate_range(pmap, sva, eva);
+		}
+	} else {
+		/* Segmap entry shootdown */
+		pmap_invalidate_range(pmap, sva, eva);
 	}
+#else
+	/* Segmap entry shootdown */
+	pmap_invalidate_range(pmap, sva, eva);
 #endif
 
 	/*
@@ -1346,9 +1364,9 @@ pmap_growkernel(vm_offset_t addr)
 			nkpg = pmap_alloc_direct_page(nkpt, req_class);
 			if (nkpg == NULL)
 				panic("pmap_growkernel: no memory to grow kernel");
-			/* 
-			 * XXX-AM: this rederives the pointer, not good! pmap_alloc 
-			 * should return a valid capability already. 
+			/*
+			 * XXX-AM: this rederives the pointer, not good! pmap_alloc
+			 * should return a valid capability already.
 			 */
 			*pdpe = (pd_entry_t)MIPS_PHYS_TO_DIRECT(VM_PAGE_TO_PHYS(nkpg));
 			continue; /* try again */
@@ -1566,7 +1584,15 @@ pmap_pv_reclaim(pmap_t locked_pmap)
 				if (TAILQ_EMPTY(&m->md.pv_list))
 					vm_page_aflag_clear(m, PGA_WRITEABLE);
 				pc->pc_map[field] |= 1UL << bit;
-				pmap_unuse_pt(pmap, va, *pde);
+
+				/*
+				 * For simplicity, we will unconditionally shoot
+				 * down TLBs either at the end of this function
+				 * or at the top of the loop above if we switch
+				 * to a different pmap.
+				 */
+				(void)pmap_unuse_pt(pmap, va, *pde);
+
 				freed++;
 			}
 		}
@@ -1795,6 +1821,23 @@ pmap_try_insert_pv_entry(pmap_t pmap, vm_page_t mpte, vm_offset_t va,
 
 /*
  * pmap_remove_pte: do the things to unmap a page in a process
+ *
+ * Returns true if this was the last PTE in the PT (and possibly the last PT in
+ * the PD, and possibly the last PD in the segmap), in which case...
+ *
+ *   1) the TLB has been invalidated for the whole PT's span (at least),
+ *   already, to ensure that MipsDoTLBMiss does not attempt to follow a
+ *   dangling pointer into a freed page.  No additional TLB shootdown is
+ *   required.
+ *
+ *   2) if this removal was part of a sweep to remove PTEs, it is safe to jump
+ *   to the PT span boundary and continue.
+ *
+ *   3) The given pde may now point onto a freed page and must not be
+ *   dereferenced
+ *
+ * If the return value is false, the TLB has not been shot down (and the segmap
+ * entry, PD, and PT all remain in place).
  */
 static int
 pmap_remove_pte(struct pmap *pmap, pt_entry_t *ptq, vm_offset_t va,
@@ -1863,8 +1906,12 @@ pmap_remove_page(struct pmap *pmap, vm_offset_t va)
 	if (!pte_test(ptq, PTE_V))
 		return;
 
-	(void)pmap_remove_pte(pmap, ptq, va, *pde);
-	pmap_invalidate_page(pmap, va);
+	/*
+	 * Remove this PTE from the PT.  If this is the last one, then
+	 * the TLB has already been shot down, so don't bother again
+	 */
+	if (!pmap_remove_pte(pmap, ptq, va, *pde))
+		pmap_invalidate_page(pmap, va);
 }
 
 /*
@@ -1878,7 +1925,9 @@ pmap_remove(pmap_t pmap, vm_offset_t sva, vm_offset_t eva)
 {
 	pd_entry_t *pde, *pdpe;
 	pt_entry_t *pte;
-	vm_offset_t va, va_next;
+	vm_offset_t va_next;
+	vm_offset_t va_init, va_fini;
+	bool need_tlb_shootdown;
 
 	/*
 	 * Perform an unsynchronized read.  This is, however, safe.
@@ -1907,6 +1956,8 @@ pmap_remove(pmap_t pmap, vm_offset_t sva, vm_offset_t eva)
 			continue;
 		}
 #endif
+
+		/* Scan up to the end of the page table pointed to by pde */
 		va_next = (sva + NBPDR) & ~PDRMASK;
 		if (va_next < sva)
 			va_next = eva;
@@ -1923,25 +1974,44 @@ pmap_remove(pmap_t pmap, vm_offset_t sva, vm_offset_t eva)
 		if (va_next > eva)
 			va_next = eva;
 
-		va = va_next;
+		need_tlb_shootdown = false;
+		va_init = sva;
+		va_fini = va_next;
 		for (pte = pmap_pde_to_pte(pde, sva); sva != va_next; pte++,
 		    sva += PAGE_SIZE) {
+
+			/* Skip over invalid entries; no need to shootdown */
 			if (!pte_test(pte, PTE_V)) {
-				if (va != va_next) {
-					pmap_invalidate_range(pmap, va, sva);
-					va = va_next;
-				}
+				/*
+				 * If we have not yet found a valid entry, then
+				 * we can move the lower edge of the region to
+				 * invalidate to the next PTE.
+				 */
+				if (!need_tlb_shootdown)
+					va_init = sva + PAGE_SIZE;
 				continue;
 			}
-			if (va == va_next)
-				va = sva;
+
+			/*
+			 * A valid entry; the range we are shooting down must
+			 * include this page.  va_fini is used instead of sva
+			 * so that if the range ends with a run of !PTE_V PTEs,
+			 * but doesn't clear out so much that pmap_remove_pte
+			 * removes the entire PT, we won't include these !PTE_V
+			 * entries in the region to be shot down.
+			 */
+			va_fini = sva + PAGE_SIZE;
+
 			if (pmap_remove_pte(pmap, pte, sva, *pde)) {
-				sva += PAGE_SIZE;
+				/* Entire PT removed and TLBs shot down. */
+				need_tlb_shootdown = false;
 				break;
+			} else {
+				need_tlb_shootdown = true;
 			}
 		}
-		if (va != va_next)
-			pmap_invalidate_range(pmap, va, sva);
+		if (need_tlb_shootdown)
+			pmap_invalidate_range(pmap, va_init, va_fini);
 	}
 out:
 	rw_wunlock(&pvh_global_lock);
@@ -2011,10 +2081,11 @@ pmap_remove_all(vm_page_t m)
 			    __func__, pv->pv_va, (uintmax_t)tpte));
 			vm_page_dirty(m);
 		}
-		pmap_invalidate_page(pmap, pv->pv_va);
+
+		if (!pmap_unuse_pt(pmap, pv->pv_va, *pde))
+			pmap_invalidate_page(pmap, pv->pv_va);
 
 		TAILQ_REMOVE(&m->md.pv_list, pv, pv_list);
-		pmap_unuse_pt(pmap, pv->pv_va, *pde);
 		free_pv_entry(pmap, pv);
 		PMAP_UNLOCK(pmap);
 	}
@@ -2470,7 +2541,7 @@ pmap_kenter_temporary(vm_paddr_t pa, int i)
 #ifndef __mips_n64    /* XXX : to be converted to new style */
 		pt_entry_t *pte, npte;
 
-		pte = pmap_pte(kernel_pmap, crashdumpva); 
+		pte = pmap_pte(kernel_pmap, crashdumpva);
 
 		/* Since this is for the debugger, no locks or any other fun */
 		npte = TLBLO_PA_TO_PFN(pa) | PTE_C_CACHE | PTE_D | PTE_V |
@@ -2949,7 +3020,12 @@ pmap_remove_pages(pmap_t pmap)
 				TAILQ_REMOVE(&m->md.pv_list, pv, pv_list);
 				if (TAILQ_EMPTY(&m->md.pv_list))
 					vm_page_aflag_clear(m, PGA_WRITEABLE);
-				pmap_unuse_pt(pmap, pv->pv_va, *pde);
+
+				/*
+				 * For simplicity, unconditionally call
+				 * pmap_invalidate_all(), below.
+				 */
+				(void)pmap_unuse_pt(pmap, pv->pv_va, *pde);
 			}
 		}
 		if (allfree) {
@@ -3291,7 +3367,7 @@ pmap_mapdev_attr(vm_paddr_t pa, vm_size_t size, vm_memattr_t ma)
 		va = (caddr_t)MIPS_PHYS_TO_DIRECT_UNCACHED(pa);
 #ifdef CHERI_PURECAP_KERNEL
 		/* Device memory should never contain capabilities (for now) */
-		va = cheri_csetbounds(va, size);
+		va = cheri_setbounds(va, size);
 		va = cheri_andperm(va, ~(CHERI_PERM_LOAD_CAP |
 		    CHERI_PERM_STORE_CAP | CHERI_PERM_STORE_LOCAL_CAP));
 #endif
@@ -3573,28 +3649,71 @@ pmap_emulate_modified(pmap_t pmap, vm_offset_t va)
 
 	PMAP_LOCK(pmap);
 	pte = pmap_pte(pmap, va);
-	if (pte == NULL)
-		panic("pmap_emulate_modified: can't find PTE");
-#ifdef SMP
-	/* It is possible that some other CPU changed m-bit */
-	if (!pte_test(pte, PTE_V) || pte_test(pte, PTE_D)) {
+
+	/*
+	 * It is possible that some other CPU or thread changed the pmap while
+	 * we weren't looking; in the SMP case, this is readily apparent, but
+	 * it can even happen in the UP case, because we may have been blocked
+	 * on PMAP_LOCK(pmap) above while someone changed this out from
+	 * underneath us.
+	 */
+
+	if (pte == NULL) {
+		/*
+		 * This PTE's PTP (or one of its ancestors) has been reclaimed;
+		 * trigger a full fault to reconstruct it via pmap_enter.
+		 */
+		PMAP_UNLOCK(pmap);
+		return (1);
+	}
+
+	if (!pte_test(pte, PTE_V)) {
+		/*
+		 * This PTE is no longer valid; the other thread or other
+		 * processor must have arranged for our TLB to no longer
+		 * have this entry, possibly by IPI, so no tlb_update is
+		 * required.  Fall out of the fast path and go take a
+		 * general fault before retrying the instruction (or taking
+		 * a signal).
+		 */
+		PMAP_UNLOCK(pmap);
+		return (1);
+	}
+
+	if (pte_test(pte, PTE_D)) {
+		/*
+		 * This PTE is valid and has the PTE_D bit asserted; since
+		 * this is an increase in permission, we may have been expected
+		 * to update the TLB lazily.  Do so here and return, on the
+		 * fast path, to retry the instruction.
+		 */
 		tlb_update(pmap, va, *pte);
 		PMAP_UNLOCK(pmap);
 		return (0);
 	}
-#else
-	if (!pte_test(pte, PTE_V) || pte_test(pte, PTE_D))
-		panic("pmap_emulate_modified: invalid pte");
-#endif
+
 	if (pte_test(pte, PTE_RO)) {
+		/*
+		 * This PTE is valid, not dirty, and read-only.  Go take a
+		 * full fault (most likely to upgrade this part of the address
+		 * space to writeable).
+		 */
 		PMAP_UNLOCK(pmap);
 		return (1);
 	}
-	pte_set(pte, PTE_D);
-	tlb_update(pmap, va, *pte);
+
 	if (!pte_test(pte, PTE_MANAGED))
 		panic("pmap_emulate_modified: unmanaged page");
+
+	/*
+	 * PTE is valid, managed, not dirty, and not read-only.  Set PTE_D
+	 * and eagerly update the local TLB, returning on the fast path.
+	 */
+
+	pte_set(pte, PTE_D);
+	tlb_update(pmap, va, *pte);
 	PMAP_UNLOCK(pmap);
+
 	return (0);
 }
 

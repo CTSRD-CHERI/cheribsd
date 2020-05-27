@@ -480,7 +480,7 @@ if_clone_free(struct if_clone *ifc)
 int
 if_clone_list(struct if_clonereq *ifcr)
 {
-	char *buf, *dst, *outbuf = NULL;
+	char *buf, * __capability dst, *outbuf = NULL;
 	struct if_clone *ifc;
 	int buf_count, count, err = 0;
 

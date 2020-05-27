@@ -38,8 +38,6 @@ __FBSDID("$FreeBSD$");
 
 #include "opt_rss.h"
 
-#define	EXPLICIT_USER_ACCESS
-
 #include <sys/param.h>
 #include <sys/kernel.h>
 #include <sys/bus.h>

@@ -65,7 +65,7 @@ __FBSDID("$FreeBSD$");
 static MALLOC_DEFINE(M_ISC, "iSC", "iSCSI driver options");
 
 static char *
-i_strdupin(char *s, size_t maxlen)
+i_strdupin(char * __capability s, size_t maxlen)
 {
      size_t	len;
      char	*p, *q;
@@ -97,6 +97,9 @@ i_crc32c(const void *buf, size_t size, uint32_t crc)
 int
 i_setopt(isc_session_t *sp, isc_opt_t *opt)
 {
+     char buf[16];
+     int error;
+
      if(opt->maxRecvDataSegmentLength > 0) {
 	  sp->opt.maxRecvDataSegmentLength = opt->maxRecvDataSegmentLength;
 	  sdebug(2, "maxRecvDataSegmentLength=%d", sp->opt.maxRecvDataSegmentLength);
@@ -114,19 +117,19 @@ i_setopt(isc_session_t *sp, isc_opt_t *opt)
      if(opt->targetAddress != NULL) {
 	  if(sp->opt.targetAddress != NULL)
 	       free(sp->opt.targetAddress, M_ISC);
-	  sp->opt.targetAddress = i_strdupin(opt->targetAddress, 128);
+	  sp->opt.targetAddress = i_strdupin(opt->targetAddress_u, 128);
 	  sdebug(2, "opt.targetAddress='%s'", sp->opt.targetAddress);
      }
      if(opt->targetName != NULL) {
 	  if(sp->opt.targetName != NULL)
 	       free(sp->opt.targetName, M_ISC);
-	  sp->opt.targetName = i_strdupin(opt->targetName, 128);
+	  sp->opt.targetName = i_strdupin(opt->targetName_u, 128);
 	  sdebug(2, "opt.targetName='%s'", sp->opt.targetName);
      }
      if(opt->initiatorName != NULL) {
 	  if(sp->opt.initiatorName != NULL)
 	       free(sp->opt.initiatorName, M_ISC);
-	  sp->opt.initiatorName = i_strdupin(opt->initiatorName, 128);
+	  sp->opt.initiatorName = i_strdupin(opt->initiatorName_u, 128);
 	  sdebug(2, "opt.initiatorName='%s'", sp->opt.initiatorName);
      }
 
@@ -137,16 +140,22 @@ i_setopt(isc_session_t *sp, isc_opt_t *opt)
 	  sdebug(2, "opt.maxluns=%d", sp->opt.maxluns);
      }
 
-     if(opt->headerDigest != NULL) {
-	  sdebug(2, "opt.headerDigest='%s'", opt->headerDigest);
-	  if(strcmp(opt->headerDigest, "CRC32C") == 0) {
+     if(opt->headerDigest_u != NULL) {
+	  error = copyinstr(opt->headerDigest_u, buf, sizeof(buf), NULL);
+	  if (error != 0)
+	       return (error);
+	  sdebug(2, "opt.headerDigest='%s'", buf);
+	  if(strcmp(buf, "CRC32C") == 0) {
 	       sp->hdrDigest = (digest_t *)i_crc32c;
 	       sdebug(2, "opt.headerDigest set");
 	  }
      }
-     if(opt->dataDigest != NULL) {
-	  sdebug(2, "opt.dataDigest='%s'", opt->headerDigest);
-	  if(strcmp(opt->dataDigest, "CRC32C") == 0) {
+     if(opt->dataDigest_u != NULL) {
+	  error = copyinstr(opt->dataDigest_u, buf, sizeof(buf), NULL);
+	  if (error != 0)
+	       return (error);
+	  sdebug(2, "opt.dataDigest='%s'", opt->dataDigest);
+	  if(strcmp(buf, "CRC32C") == 0) {
 	       sp->dataDigest = (digest_t *)i_crc32c;
 	       sdebug(2, "opt.dataDigest set");
 	  }

@@ -1305,8 +1305,8 @@ struct pfioc_state_kill {
 struct pfioc_states {
 	int	ps_len;
 	union {
-		caddr_t			 psu_buf;
-		struct pfsync_state	*psu_states;
+		char * __kerncap 	 psu_buf;
+		struct pfsync_state	* __kerncap psu_states;
 	} ps_u;
 #define ps_buf		ps_u.psu_buf
 #define ps_states	ps_u.psu_states
@@ -1315,8 +1315,8 @@ struct pfioc_states {
 struct pfioc_src_nodes {
 	int	psn_len;
 	union {
-		caddr_t		 psu_buf;
-		struct pf_src_node	*psu_src_nodes;
+		char * __kerncap		 psu_buf;
+		struct pf_src_node	* __kerncap psu_src_nodes;
 	} psn_u;
 #define psn_buf		psn_u.psu_buf
 #define psn_src_nodes	psn_u.psu_src_nodes
@@ -1401,7 +1401,7 @@ struct pfioc_trans {
 		int		rs_num;
 		char		anchor[MAXPATHLEN];
 		u_int32_t	ticket;
-	}		*array;
+	}		* __kerncap array;
 };
 
 #define PFR_FLAG_ATOMIC		0x00000001	/* unused */
@@ -1418,7 +1418,7 @@ struct pfioc_trans {
 
 struct pfioc_table {
 	struct pfr_table	 pfrio_table;
-	void			*pfrio_buffer;
+	void * __kerncap	 pfrio_buffer;
 	int			 pfrio_esize;
 	int			 pfrio_size;
 	int			 pfrio_size2;
@@ -1437,7 +1437,7 @@ struct pfioc_table {
 
 struct pfioc_iface {
 	char	 pfiio_name[IFNAMSIZ];
-	void	*pfiio_buffer;
+	void	* __kerncap pfiio_buffer;
 	int	 pfiio_esize;
 	int	 pfiio_size;
 	int	 pfiio_nzero;

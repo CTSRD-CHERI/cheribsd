@@ -47,11 +47,8 @@ SUBDIR.${MK_LIBCHERI}+=	cheri_bench
 
 # Small cheri programs
 .if ${MACHINE_ABI:Mpurecap} || ${MK_COMPAT_CHERIABI} == "yes"
-# No RTLD for RISCV purecap yet
-.if !${MACHINE_ARCH:Mriscv*}
 SUBDIR.${MK_CHERI}+=	cheri_minimal_dynamic_exe
 SUBDIR.${MK_CHERI}+=	cheri_minimal_pie_exe
-.endif
 SUBDIR.${MK_CHERI}+=	cheri_pthreads
 SUBDIR.${MK_CHERI}+=	helloworld
 .if ${MK_CXX} != "no"

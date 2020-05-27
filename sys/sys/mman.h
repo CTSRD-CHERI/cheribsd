@@ -107,6 +107,9 @@
 #if defined(__LP64__) || defined(__CHERI_PURE_CAPABILITY__)
 #define	MAP_32BIT	 0x00080000 /* map in the low 2GB of address space */
 #endif
+#ifdef _KERNEL
+#define	MAP_UNMAPPED	 0x00100000
+#endif
 
 /*
  * Request specific alignment (n == log2 of the desired alignment).

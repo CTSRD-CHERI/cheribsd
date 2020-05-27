@@ -62,7 +62,6 @@ __DEFAULT_YES_OPTIONS = \
     AUTHPF \
     AUTOFS \
     BHYVE \
-    BINUTILS \
     BLACKLIST \
     BLUETOOTH \
     BOOT \
@@ -201,6 +200,7 @@ __DEFAULT_YES_OPTIONS = \
 
 __DEFAULT_NO_OPTIONS = \
     BEARSSL \
+    BHYVE_SNAPSHOT \
     BSD_GREP \
     CLANG_EXTRAS \
     DTRACE_TESTS \
@@ -326,10 +326,15 @@ BROKEN_OPTIONS+=OFED
 .if ${__T} == "aarch64" || ${__T:Mriscv*} != ""
 BROKEN_OPTIONS+=BINUTILS BINUTILS_BOOTSTRAP GDB
 .endif
-.if ${__T} == "amd64" || ${__T} == "i386"
-__DEFAULT_YES_OPTIONS+=BINUTILS_BOOTSTRAP
-.else
+# BINUTILS is enabled on x86 to provide as for ports - PR 205250
+# BINUTILS_BOOTSTRAP is needed on amd64 only, for skein_block_asm.s
+.if ${__T} == "amd64"
+__DEFAULT_YES_OPTIONS+=BINUTILS BINUTILS_BOOTSTRAP
+.elif ${__T} == "i386"
+__DEFAULT_YES_OPTIONS+=BINUTILS
 __DEFAULT_NO_OPTIONS+=BINUTILS_BOOTSTRAP
+.else
+__DEFAULT_NO_OPTIONS+=BINUTILS BINUTILS_BOOTSTRAP
 .endif
 .if ${__T:Mriscv*} != ""
 BROKEN_OPTIONS+=OFED
@@ -368,8 +373,6 @@ BROKEN_OPTIONS+=GOOGLETEST SSP
 .endif
 
 .if ${__T:Mmips64*c*} || ${__T:Mriscv*c*}
-# Stack protector does not make sense for CHERI purecap
-BROKEN_OPTIONS+=SSP
 # nscd(8) caching depends on marshaling pointers to the daemon and back
 # and can't work without a rewrite.
 BROKEN_OPTIONS+=NS_CACHING
@@ -387,11 +390,6 @@ BROKEN_OPTIONS+=SVN SVNLITE
 
 # libcheri has not been ported to RISCV
 BROKEN_OPTIONS+=LIBCHERI
-
-# No RTLD yet
-BROKEN_OPTIONS+=CASPER DYNAMICROOT
-# kerberos causes linker errors when linking statically due to -fno-common
-BROKEN_OPTIONS+=KERBEROS KERBEROS_SUPPORT
 .endif
 
 # EFI doesn't exist on mips, powerpc or riscv.
@@ -542,6 +540,10 @@ MK_OPENSSH:=	no
 MK_KERBEROS:=	no
 MK_KERBEROS_SUPPORT:=	no
 MK_LDNS:=	no
+MK_PKGBOOTSTRAP:=	no
+MK_SVN:=		no
+MK_SVNLITE:=		no
+MK_WIRELESS:=		no
 .endif
 
 .if ${MK_LDNS} == "no"

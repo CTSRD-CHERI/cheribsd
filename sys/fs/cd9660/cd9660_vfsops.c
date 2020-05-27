@@ -36,8 +36,6 @@
  *	@(#)cd9660_vfsops.c	8.18 (Berkeley) 5/22/95
  */
 
-#define	EXPLICIT_USER_ACCESS
-
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
@@ -106,7 +104,7 @@ cd9660_cmount(struct mntarg *ma, void * __capability data, uint64_t flags)
 	struct export_args exp;
 	int error;
 
-	error = copyin(data, &args, sizeof args);
+	error = copyincap(data, &args, sizeof args);
 	if (error)
 		return (error);
 	vfs_oexport_conv(&args.export, &exp);

@@ -2104,7 +2104,7 @@ fail:
 	case CASE_IOC_IFREQ(SIOCGI2C): {
 		struct ifi2creq i2c;
 
-		rc = copyin_c(ifr_data_get_ptr(ifr), &i2c, sizeof(i2c));
+		rc = copyin(ifr_data_get_ptr(ifr), &i2c, sizeof(i2c));
 		if (rc != 0)
 			break;
 		if (i2c.dev_addr != 0xA0 && i2c.dev_addr != 0xA2) {
@@ -2122,7 +2122,7 @@ fail:
 		    i2c.offset, i2c.len, &i2c.data[0]);
 		end_synchronized_op(sc, 0);
 		if (rc == 0)
-			rc = copyout_c(&i2c, ifr_data_get_ptr(ifr),
+			rc = copyout(&i2c, ifr_data_get_ptr(ifr),
 			    sizeof(i2c));
 		break;
 	}

@@ -158,7 +158,6 @@ __FBSDID("$FreeBSD$");
  *	that case. This level should be set high enough that this almost
  *	never happens.
  */
-#ifndef APPLEKEXT
 #include <fs/nfs/nfsport.h>
 
 extern struct nfsstatsv1 nfsstatsv1;
@@ -166,7 +165,6 @@ extern struct mtx nfsrc_udpmtx;
 extern struct nfsrchash_bucket nfsrchash_table[NFSRVCACHE_HASHSIZE];
 extern struct nfsrchash_bucket nfsrcahash_table[NFSRVCACHE_HASHSIZE];
 int nfsrc_floodlevel = NFSRVCACHE_FLOODLEVEL, nfsrc_tcpsavedreplies = 0;
-#endif	/* !APPLEKEXT */
 
 SYSCTL_DECL(_vfs_nfsd);
 
@@ -285,7 +283,7 @@ static void nfsrc_lock(struct nfsrvcache *rp);
 static void nfsrc_unlock(struct nfsrvcache *rp);
 static void nfsrc_wanted(struct nfsrvcache *rp);
 static void nfsrc_freecache(struct nfsrvcache *rp);
-static int nfsrc_getlenandcksum(mbuf_t m1, u_int16_t *cksum);
+static int nfsrc_getlenandcksum(struct mbuf *m1, u_int16_t *cksum);
 static void nfsrc_marksametcpconn(u_int64_t);
 
 /*
@@ -303,7 +301,7 @@ nfsrc_cachemutex(struct nfsrvcache *rp)
 /*
  * Initialize the server request cache list
  */
-APPLESTATIC void
+void
 nfsrvd_initcache(void)
 {
 	int i;
@@ -328,7 +326,7 @@ nfsrvd_initcache(void)
  * Get a cache entry for this request. Basically just malloc a new one
  * and then call nfsrc_getudp() or nfsrc_gettcp() to do the rest.
  */
-APPLESTATIC int
+int
 nfsrvd_getcache(struct nfsrv_descript *nd)
 {
 	struct nfsrvcache *newrp;
@@ -455,12 +453,12 @@ out:
 /*
  * Update a request cache entry after the rpc has been done
  */
-APPLESTATIC struct nfsrvcache *
+struct nfsrvcache *
 nfsrvd_updatecache(struct nfsrv_descript *nd)
 {
 	struct nfsrvcache *rp;
 	struct nfsrvcache *retrp = NULL;
-	mbuf_t m;
+	struct mbuf *m;
 	struct mtx *mutex;
 
 	rp = nd->nd_rp;
@@ -557,7 +555,7 @@ out:
  * Invalidate and, if possible, free an in prog cache entry.
  * Must not sleep.
  */
-APPLESTATIC void
+void
 nfsrvd_delcache(struct nfsrvcache *rp)
 {
 	struct mtx *mutex;
@@ -577,7 +575,7 @@ nfsrvd_delcache(struct nfsrvcache *rp)
  * the entry's sequence number and unlock it. The argument is
  * the pointer returned by nfsrvd_updatecache().
  */
-APPLESTATIC void
+void
 nfsrvd_sentcache(struct nfsrvcache *rp, int have_seq, uint32_t seq)
 {
 	struct nfsrchash_bucket *hbp;
@@ -809,7 +807,7 @@ nfsrc_freecache(struct nfsrvcache *rp)
 /*
  * Clean out the cache. Called when nfsserver module is unloaded.
  */
-APPLESTATIC void
+void
 nfsrvd_cleancache(void)
 {
 	struct nfsrvcache *rp, *nextrp;
@@ -974,7 +972,7 @@ nfsrc_trimcache(u_int64_t sockref, uint32_t snd_una, int final)
 /*
  * Add a seqid# reference to the cache entry.
  */
-APPLESTATIC void
+void
 nfsrvd_refcache(struct nfsrvcache *rp)
 {
 	struct mtx *mutex;
@@ -993,7 +991,7 @@ nfsrvd_refcache(struct nfsrvcache *rp)
 /*
  * Dereference a seqid# cache entry.
  */
-APPLESTATIC void
+void
 nfsrvd_derefcache(struct nfsrvcache *rp)
 {
 	struct mtx *mutex;
@@ -1013,10 +1011,10 @@ nfsrvd_derefcache(struct nfsrvcache *rp)
  * NFSRVCACHE_CHECKLEN bytes.
  */
 static int
-nfsrc_getlenandcksum(mbuf_t m1, u_int16_t *cksum)
+nfsrc_getlenandcksum(struct mbuf *m1, u_int16_t *cksum)
 {
 	int len = 0, cklen;
-	mbuf_t m;
+	struct mbuf *m;
 
 	m = m1;
 	while (m) {

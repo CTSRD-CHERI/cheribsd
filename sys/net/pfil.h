@@ -62,8 +62,8 @@ struct pfilioc_hook {
 struct pfilioc_list {
 	u_int			 pio_nheads;
 	u_int			 pio_nhooks;
-	struct pfilioc_head	*pio_heads;
-	struct pfilioc_hook	*pio_hooks;
+	struct pfilioc_head * __kerncap pio_heads;
+	struct pfilioc_hook * __kerncap pio_hooks;
 };
 
 struct pfilioc_link {

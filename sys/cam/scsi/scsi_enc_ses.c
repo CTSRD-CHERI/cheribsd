@@ -2904,13 +2904,19 @@ ses_handle_string(enc_softc_t *enc, encioc_string_t *sstr, int ioc)
 		buf[1] = 0;
 		buf[2] = sstr->bufsiz >> 8;
 		buf[3] = sstr->bufsiz & 0xff;
-		memcpy(&buf[4], sstr->buf, sstr->bufsiz);
+		ret = copyin(sstr->buf, &buf[4], sstr->bufsiz);
+		if (ret != 0) {
+			ENC_FREE(buf);
+			return (ret);
+		}
 		break;
 	case ENCIOC_GETSTRING:
 		payload = sstr->bufsiz;
 		amt = payload;
+		buf = ENC_MALLOC(payload);
+		if (buf == NULL)
+			return (ENOMEM);
 		ses_page_cdb(cdb, payload, SesStringIn, CAM_DIR_IN);
-		buf = sstr->buf;
 		break;
 	case ENCIOC_GETENCNAME:
 		if (ses_cache->ses_nsubencs < 1)
@@ -2926,11 +2932,11 @@ ses_handle_string(enc_softc_t *enc, encioc_string_t *sstr, int ioc)
 		    vendor, product, rev) + 1;
 		if (rsize > sizeof(str))
 			rsize = sizeof(str);
-		copyout(&rsize, &sstr->bufsiz, sizeof(rsize));
 		size = rsize;
 		if (size > sstr->bufsiz)
 			size = sstr->bufsiz;
 		copyout(str, sstr->buf, size);
+		sstr->bufsiz = rsize;
 		return (size == rsize ? 0 : ENOMEM);
 	case ENCIOC_GETENCID:
 		if (ses_cache->ses_nsubencs < 1)
@@ -2940,17 +2946,19 @@ ses_handle_string(enc_softc_t *enc, encioc_string_t *sstr, int ioc)
 		    scsi_8btou64(enc_desc->logical_id)) + 1;
 		if (rsize > sizeof(str))
 			rsize = sizeof(str);
-		copyout(&rsize, &sstr->bufsiz, sizeof(rsize));
 		size = rsize;
 		if (size > sstr->bufsiz)
 			size = sstr->bufsiz;
 		copyout(str, sstr->buf, size);
+		sstr->bufsiz = rsize;
 		return (size == rsize ? 0 : ENOMEM);
 	default:
 		return (EINVAL);
 	}
 	ret = enc_runcmd(enc, cdb, 6, buf, &amt);
-	if (ioc == ENCIOC_SETSTRING)
+	if (ret == 0 && ioc == ENCIOC_GETSTRING)
+		ret = copyout(buf, sstr->buf, sstr->bufsiz);
+	if (ioc == ENCIOC_SETSTRING || ioc == ENCIOC_GETSTRING)
 		ENC_FREE(buf);
 	return (ret);
 }

@@ -1321,7 +1321,7 @@ typedef	int	(*ipftq_delete_fn_t)(struct ipf_main_softc_s *, void *);
 typedef	struct	ipfobj	{
 	u_32_t		ipfo_rev;	/* IPFilter version number */
 	u_32_t		ipfo_size;	/* size of object at ipfo_ptr */
-	void		*ipfo_ptr;	/* pointer to object */
+	void * __kerncap ipfo_ptr;	/* pointer to object */
 	int		ipfo_type;	/* type of object being pointed to */
 	int		ipfo_offset;	/* bytes from ipfo_ptr where to start */
 	int		ipfo_retval;	/* return value */
@@ -1443,7 +1443,7 @@ typedef	struct	ipfruleiter {
 	int		iri_active;
 	int		iri_nrules;
 	int		iri_v;		/* No longer used (compatibility) */
-	frentry_t	*iri_rule;
+	frentry_t * __kerncap iri_rule;
 } ipfruleiter_t;
 
 /*
@@ -1458,7 +1458,7 @@ typedef	struct	ipfruleiter {
 typedef	struct	ipfgeniter {
 	int	igi_type;
 	int	igi_nitems;
-	void	*igi_data;
+	void * __kerncap igi_data;
 } ipfgeniter_t;
 
 #define	IPFGENITER_IPF		0
@@ -1473,7 +1473,7 @@ typedef	struct	ipfgeniter {
 
 typedef	struct	ipftable {
 	int	ita_type;
-	void	*ita_table;
+	void * __kerncap ita_table;
 } ipftable_t;
 
 #define	IPFTABLE_BUCKETS	1
