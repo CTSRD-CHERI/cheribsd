@@ -264,7 +264,7 @@ freebsd64_ptrace(struct thread *td, struct freebsd64_ptrace_args *uap)
 		    r64.pve.pve_pathlen);
 		break;
 	default:
-		addr = (__cheri_tocap void * __capability)uap->addr;
+		addr = __USER_CAP_UNBOUND(uap->addr);
 		break;
 	}
 	if (error)
