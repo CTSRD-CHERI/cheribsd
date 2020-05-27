@@ -678,7 +678,6 @@ cheriabi_copyout_strings(struct image_params *imgp, uintptr_t *stack_base)
 		szsigcode = *(imgp->proc->p_sysent->sv_szsigcode);
 	else
 		szsigcode = 0;
-
 	destp =	(char * __capability)arginfo;
 
 	/*
