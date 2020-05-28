@@ -72,7 +72,7 @@ typedef struct {
 	teken_format_t	ta_format;
 	teken_color_t	ta_fgcolor;
 	teken_color_t	ta_bgcolor;
-} teken_attr_t;
+} __aligned(2 * sizeof(teken_unit_t)) teken_attr_t;
 typedef struct {
 	teken_unit_t	ts_begin;
 	teken_unit_t	ts_end;
