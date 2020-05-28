@@ -925,6 +925,9 @@ __elfN(enforce_limits)(struct image_params *imgp, const Elf_Ehdr *hdr,
 	err_str = NULL;
 	text_size = data_size = total_size = text_addr = data_addr = 0;
 
+	/* Initialize start_addr so that MIN() produces something useful. */
+	imgp->start_addr = ~0UL;
+
 	for (i = 0; i < hdr->e_phnum; i++) {
 		if (phdr[i].p_type != PT_LOAD || phdr[i].p_memsz == 0)
 			continue;
