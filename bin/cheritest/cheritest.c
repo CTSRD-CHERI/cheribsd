@@ -1788,6 +1788,7 @@ static const u_int cheri_tests_len = sizeof(cheri_tests) /
 	    sizeof(cheri_tests[0]);
 static StringList* cheri_failed_tests;
 static StringList* cheri_xfailed_tests;
+static StringList* cheri_xpassed_tests;
 
 /* Shared memory page with child process. */
 struct cheritest_child_state *ccsp;
@@ -2013,6 +2014,8 @@ cheritest_run_test(const struct cheri_test *ctp)
 	bzero(ccsp, sizeof(*ccsp));
 	xo_emit("TEST: {d:name/%s}: {d:description/%s}\n", ctp->ct_name,
 		    ctp->ct_desc);
+	reason[0] = '\0';
+	visreason[0] = '\0';
 
 	if (ctp->ct_check_xfail != NULL)
 		xfail_reason = ctp->ct_check_xfail(ctp->ct_name);
@@ -2296,12 +2299,15 @@ cheritest_run_test(const struct cheri_test *ctp)
 	}
 
 pass:
-	if (xfail_reason == NULL)
-		xo_emit("{d:status/%s}: {d:name/%s}\n", "PASS", ctp->ct_name);
-	else {
+	if (xfail_reason != NULL) {
+		// Passed but we expected failure:
 		xo_emit("XPASS: {d:name/%s} (Expected failure due to "
-		    "{d:reason/%s}) {e:failure/XPASS: %s}\n", ctp->ct_name,
+			"{d:reason/%s}) {e:failure/XPASS: %s}\n", ctp->ct_name,
 		    xfail_reason, xfail_reason);
+		asprintf(&failure_message, "%s: %s", ctp->ct_name, xfail_reason);
+		sl_add(cheri_xpassed_tests, failure_message);
+	} else {
+		xo_emit("{d:status/%s}: {d:name/%s}\n", "PASS", ctp->ct_name);
 	}
 	tests_passed++;
 	close(pipefd_stdin[1]);
@@ -2510,6 +2516,7 @@ main(int argc, char *argv[])
 
 	cheri_failed_tests = sl_init();
 	cheri_xfailed_tests = sl_init();
+	cheri_xpassed_tests = sl_init();
 	/* Run the actual tests. */
 #ifdef CHERI_LIBCHERI_TESTS
 #if 0
@@ -2570,30 +2577,36 @@ main(int argc, char *argv[])
 	xo_finish();
 
 	/* print a summary which tests failed */
-	if (tests_xfailed > 0) {
+	if (cheri_xfailed_tests->sl_cur != 0) {
 		xo_emit("Expected failures:\n");
 		for (i = 0; (size_t)i < cheri_xfailed_tests->sl_cur; i++)
-			xo_emit("  {d:%s}\n",
-			    cheri_xfailed_tests->sl_str[i]);
-		sl_free(cheri_xfailed_tests, true);
+			xo_emit("  {d:%s}\n", cheri_xfailed_tests->sl_str[i]);
 	}
-	if (tests_failed > tests_xfailed) {
+	if (cheri_failed_tests->sl_cur != 0) {
 		xo_emit("Unexpected failures:\n");
 		for (i = 0; (size_t)i < cheri_failed_tests->sl_cur; i++)
 			xo_emit("  {d:%s}\n", cheri_failed_tests->sl_str[i]);
-		sl_free(cheri_failed_tests, true);
 	}
+	if (cheri_xpassed_tests->sl_cur != 0) {
+		xo_emit("Unexpected passes:\n");
+		for (i = 0; (size_t)i < cheri_xpassed_tests->sl_cur; i++)
+			xo_emit("  {d:%s}\n", cheri_xpassed_tests->sl_str[i]);
+	}
+	sl_free(cheri_failed_tests, true);
+	sl_free(cheri_xfailed_tests, true);
+	sl_free(cheri_xpassed_tests, true);
 	if (tests_passed + tests_failed > 1) {
 		if (expected_failures == 0)
 			xo_emit("SUMMARY: passed {d:/%d} failed %d\n",
 			    tests_passed, tests_failed);
 		else if (expected_failures == tests_xfailed)
 			xo_emit("SUMMARY: passed {d:/%d} failed {d:/%d} "
-			    "({d:/%d} expected)\n",
+			    "({d:/%d} expected {Np:failure,failures})\n",
 			    tests_passed, tests_failed, expected_failures);
 		else
 			xo_emit("SUMMARY: passed {d:/%d} failed {d:/%d} "
-			    "({d:/%d} expected) ({d:/%d} unexpected passes)\n",
+			    "({d:/%d} expected {Np:failure,failures}) "
+			    "({d:/%d} unexpected {Np:pass,passes})\n",
 			    tests_passed, tests_failed, tests_xfailed,
 			    expected_failures - tests_xfailed);
 	}
