@@ -36,8 +36,6 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
-#define EXPLICIT_USER_ACCESS
-
 /*
  * Functions that need to be different for different versions of BSD
  * kernel should be kept here, along with any global storage specific
@@ -955,12 +953,3 @@ MODULE_VERSION(nfscommon, 1);
 MODULE_DEPEND(nfscommon, nfssvc, 1, 1, 1);
 MODULE_DEPEND(nfscommon, krpc, 1, 1, 1);
 
-// CHERI CHANGES START
-// {
-//   "updated": 20181022,
-//   "target_type": "kernel",
-//   "changes_purecap": [
-//     "user_capabilities"
-//   ]
-// }
-// CHERI CHANGES END

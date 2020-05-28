@@ -31,8 +31,6 @@
  * SUCH DAMAGE.
  */
 
-#define	EXPLICIT_USER_ACCESS 1
-
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
@@ -81,8 +79,8 @@ struct ptrace_args {
 #endif
 
 #define	BZERO(a, s)		bzero(a, s)
-#define	COPYIN(u, k, s)		copyin(__USER_CAP(u, s), k, s)
-#define	COPYOUT(k, u, s)	copyout(k, __USER_CAP(u, s), s)
+#define	COPYIN(u, k, s)		copyin(u, k, s)
+#define	COPYOUT(k, u, s)	copyout(k, u, s)
 int
 freebsd64_ptrace(struct thread *td, struct freebsd64_ptrace_args *uap)
 {
@@ -248,3 +246,4 @@ freebsd64_ptrace(struct thread *td, struct freebsd64_ptrace_args *uap)
 #undef COPYIN
 #undef COPYOUT
 #undef BZERO
+
