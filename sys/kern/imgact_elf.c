@@ -1481,8 +1481,7 @@ __elfN(freebsd_copyout_auxargs)(struct image_params *imgp, uintcap_t base)
 	AUXARGS_ENTRY(pos, AT_PAGESZ, args->pagesz);
 	AUXARGS_ENTRY(pos, AT_FLAGS, args->flags);
 #ifdef __ELF_CHERI
-	entry = cheri_setaddress(prog_cap(imgp,
-	    CHERI_CAP_USER_DATA_PERMS | CHERI_CAP_USER_CODE_PERMS),
+	entry = cheri_setaddress(prog_cap(imgp, CHERI_CAP_USER_CODE_PERMS),
 	    args->entry);
 #ifdef CHERI_FLAGS_CAP_MODE
 	/*
