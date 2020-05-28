@@ -75,6 +75,21 @@ find cheribsd-test-results
     }
 }
 
+["mips-hybrid", "mips-purecap"].each { suffix ->
+    String name = "cheribsd-purecap-kern-${suffix}"
+    jobs[suffix] = { ->
+        cheribuildProject(target: "cheribsd-${suffix}", architecture: suffix,
+                extraArgs: '--cheribsd/build-options=-s --cheribsd/no-debug-info --keep-install-dir --install-prefix=/rootfs --cheribsd/build-tests --cheribsd/pure-cap-kernel',
+                skipArchiving: true, skipTarball: true,
+                sdkCompilerOnly: true, // We only need clang not the CheriBSD sysroot since we are building that.
+                customGitCheckoutDir: 'cheribsd',
+                gitHubStatusContext: "ci/${name}",
+                /* Custom function to run tests since --test will not work (yet) */
+                runTests: false, afterBuild: { params -> buildImageAndRunTests(params, suffix) }
+        )
+    }
+}
+
 boolean runParallel = true;
 echo("Running jobs in parallel: ${runParallel}")
 if (runParallel) {
