@@ -1109,7 +1109,7 @@ freebsd64_kldstat(struct thread *td, struct freebsd64_kldstat_args *uap)
         bcopy(&stat.name[0], &stat64.name[0], sizeof(stat.name));
         CP(stat, stat64, refs);
         CP(stat, stat64, id);
-	stat64.address = (uint64_t)stat.address;
+	stat64.address = (__cheri_addr uint64_t)stat.address;
         CP(stat, stat64, size);
         bcopy(&stat.pathname[0], &stat64.pathname[0], sizeof(stat.pathname));
         return (copyout(&stat64, __USER_CAP_OBJ(uap->stat), version));
