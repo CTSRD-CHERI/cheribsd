@@ -7707,11 +7707,10 @@ dtrace_probe(dtrace_id_t id, uintcap_t arg0, uintcap_t arg1, uintcap_t arg2,
 				if (!dtrace_priv_kernel(state))
 					continue;
 
-				// TODO(nicomazz): fix this!
-				/*dtrace_getpcstack((pc_t *)(tomax + valoffs),
+				dtrace_getpcstack((pc_t *)(tomax + valoffs),
 				    size / sizeof (pc_t), probe->dtpr_aframes,
 				    DTRACE_ANCHORED(probe) ? NULL :
-				    (uint32_t *)arg0);*/
+				    (uint32_t *)(__cheri_addr vaddr_t)arg0);
 				continue;
 
 			case DTRACEACT_JSTACK:
