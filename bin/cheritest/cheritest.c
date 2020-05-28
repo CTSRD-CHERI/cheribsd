@@ -2574,7 +2574,6 @@ main(int argc, char *argv[])
 	xo_close_list("test");
 	xo_close_container("testsuite");
 	xo_close_container("testsuites");
-	xo_finish();
 
 	/* print a summary which tests failed */
 	if (cheri_xfailed_tests->sl_cur != 0) {
@@ -2610,6 +2609,8 @@ main(int argc, char *argv[])
 			    tests_passed, tests_failed, tests_xfailed,
 			    expected_failures - tests_xfailed);
 	}
+	xo_finish();
+
 
 #ifdef CHERI_LIBCHERI_TESTS
 	if (!unsandboxed_tests_only)
