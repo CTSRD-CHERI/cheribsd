@@ -316,7 +316,7 @@ kmem_alloc_contig_domain(int domain, vm_size_t size, int flags, vm_paddr_t low,
 	vm_offset_t offset, tmp;
 	vm_page_t end_m, m;
 	u_long npages;
-	int pflags, tries;
+	int pflags;
 
 #ifdef CHERI_PURECAP_KERNEL
         size = CHERI_REPRESENTABLE_LENGTH(size);
@@ -816,9 +816,9 @@ kmem_init(vm_ptr_t start, vm_ptr_t end)
 	/* N.B.: cannot use kgdb to debug, starting with this assignment ... */
 	kernel_map = m;
 #ifdef __amd64__
-	    KERNBASE,
+	addr = KERNBASE;
 #else
-	    kern_map_start,
+	addr = kern_map_start;
 #endif
 	(void)vm_map_insert(m, NULL, 0, addr, start, VM_PROT_ALL,
 	    VM_PROT_ALL, MAP_NOFAULT, VM_MIN_KERNEL_ADDRESS);
