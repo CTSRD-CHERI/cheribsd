@@ -276,8 +276,8 @@ platform_start(__register_t a0, __register_t a1,  __register_t a2,
 	envp = beri_platform_ptr(a2);
 	platform_clear_bss(cheri_kdata_capability);
 #else
-	argv = (char **)a1;
-	envp = (char **)a2;
+	argv = (uint64_t *)a1;
+	envp = (uint64_t *)a2;
 	platform_clear_bss();
 #endif
 

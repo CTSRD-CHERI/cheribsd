@@ -159,15 +159,15 @@ extern caddr_t cheri_kall_capability;
 	((x) - __builtin_mips_cheri_get_cap_base(cheri_kdata_capability)))
 #define MIPS_KALL(x) (cheri_kall_capability + (x))
 #else /* ! CHERI_PURECAP_KERNEL */
-#define MIPS_XKPHYS(x) (x)
-#define MIPS_XKSEG(x) (x)
-#define MIPS_XUSEG(x) (x)
-#define MIPS_KSEG0(x) (x)
-#define MIPS_KSEG1(x) (x)
-#define MIPS_KSEG2(x) (x)
-#define MIPS_KCODE(x) (x)
-#define MIPS_KDATA(x) (x)
-#define MIPS_KALL(x) (x)
+#define MIPS_XKPHYS(x) ((char *)(x))
+#define MIPS_XKSEG(x) ((char *)(x))
+#define MIPS_XUSEG(x) ((char *)(x))
+#define MIPS_KSEG0(x) ((char *)(x))
+#define MIPS_KSEG1(x) ((char *)(x))
+#define MIPS_KSEG2(x) ((char *)(x))
+#define MIPS_KCODE(x) ((char *)(x))
+#define MIPS_KDATA(x) ((char *)(x))
+#define MIPS_KALL(x) ((char *)(x))
 #endif /* ! CHERI_PURECAP_KERNEL */
 
 #define	MIPS_PHYS_TO_KSEG0(x)					\
@@ -586,7 +586,7 @@ extern caddr_t cheri_kall_capability;
 #define	MIPS_CONFIG0_MT_SHIFT	7
 #define	MIPS_CONFIG0_BE		0x00008000	/* data is big-endian */
 #define	MIPS_CONFIG0_VI		0x00000008	/* inst cache is virtual */
- 
+
 /*
  * Config1 Register Fields
  * (See "MIPS Architecture for Programmers Volume III", MD00091, Table 9-1)

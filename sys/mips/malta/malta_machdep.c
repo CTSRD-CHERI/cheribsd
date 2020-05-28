@@ -377,23 +377,23 @@ platform_start(__register_t a0, __register_t a1,  __register_t a2,
 {
 	uint64_t platform_counter_freq;
 	int argc = a0;
-	int32_t *argv = (int32_t*)a1;
-	int32_t *envp = (int32_t*)a2;
+	int32_t *argv;
+	int32_t *envp;
 	unsigned int memsize = a3;
 	uint64_t ememsize = 0;
 	int i;
 
 	/* Clear the BSS and SBSS segments */
 #ifdef CHERI_PURECAP_KERNEL
-  argv = cheri_ptrperm(cheri_setaddress(cheri_kseg0_capability, a1),
-                       argc * sizeof(uint64_t), CHERI_PERM_LOAD);
-  envp = cheri_andperm(cheri_setaddress(cheri_kseg0_capability, a2),
-                       CHERI_PERM_LOAD);
+	argv = cheri_ptrperm(cheri_setaddress(cheri_kseg0_capability, a1),
+	    argc * sizeof(uint64_t), CHERI_PERM_LOAD);
+	envp = cheri_andperm(cheri_setaddress(cheri_kseg0_capability, a2),
+	    CHERI_PERM_LOAD);
 	platform_clear_bss(cheri_kdata_capability);
 #else
-  argv = (int32_t *)a1;
-  envp = (int32_t *)a2;
-  platform_clear_bss();
+	argv = (int32_t *)a1;
+	envp = (int32_t *)a2;
+	platform_clear_bss();
 #endif
 
 	mips_postboot_fixup();

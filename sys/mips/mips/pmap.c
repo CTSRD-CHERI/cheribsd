@@ -956,7 +956,7 @@ pmap_map(vm_ptr_t *virt, vm_paddr_t start, vm_paddr_t end, int prot)
 
 	if (MIPS_DIRECT_MAPPABLE(end - 1)) {
 #ifndef CHERI_PURECAP_KERNEL
-		return (MIPS_PHYS_TO_DIRECT(start));
+		return ((vm_ptr_t)MIPS_PHYS_TO_DIRECT(start));
 #else /* CHERI_PURECAP_KERNEL */
 		caddr_t map_addr;
 
