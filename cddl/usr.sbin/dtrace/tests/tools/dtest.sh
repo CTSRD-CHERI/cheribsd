@@ -29,6 +29,12 @@ runtest()
     exstatus=0
     retval=0
 
+    dtrace_sh=ksh
+    if command -v ksh ; then
+        dtrace_sh=ksh
+    else
+        dtrace_sh=sh
+    fi
     case $TFILE in
     drp.DTRACEDROP_*.d|err.*.d|tst.*.d)
         case $TFILE in
@@ -74,9 +80,7 @@ runtest()
     err.*.ksh|tst.*.ksh)
         expr "$TFILE" : 'err.*' >/dev/null && exstatus=1
 
-        # TODO(nicomazz): here we should use ksh instead of sh for some test. It
-        #  should be changed when I find a way to install ksh
-        tst=$TFILE sh "$TFILE" /usr/sbin/dtrace >$STDOUT 2>$STDERR
+        tst=$TFILE $dtrace_sh "$TFILE" /usr/sbin/dtrace >$STDOUT 2>$STDERR
         status=$?
 
         if [ $status -ne $exstatus ]; then
@@ -92,8 +96,7 @@ runtest()
 
     if [ $retval -eq 0 ] && \
         head -n 1 $STDOUT | grep -q -E '^#!/.*ksh$'; then
-        # TODO(nicomazz): here we should use ksh instead of sh for some test
-        sh $STDOUT
+        $dtrace_sh $STDOUT
         retval=$?
     fi
 
