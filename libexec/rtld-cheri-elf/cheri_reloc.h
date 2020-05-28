@@ -59,7 +59,7 @@ void _do___caprelocs(const struct capreloc *start_relocs,
 
 static inline int
 process_r_cheri_capability(Obj_Entry *obj, Elf_Word r_symndx,
-    RtldLockState *lockstate, int flags, void *where, Elf_Sword addend)
+    RtldLockState *lockstate, int flags, void *where, Elf_Ssize addend)
 {
 	const Obj_Entry *defobj;
 	const Elf_Sym *def =
