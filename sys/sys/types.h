@@ -270,7 +270,7 @@ typedef	__vm_size_t	vm_size_t;
 
 typedef __rman_res_t    rman_res_t;
 
-#if __has_feature(capabilities)
+#if defined(_KERNEL) || defined(__CHERI_PURE_CAPABILITY__)
 typedef __intcap_t	syscallarg_t;
 #else
 typedef register_t	syscallarg_t;
