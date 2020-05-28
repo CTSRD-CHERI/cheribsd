@@ -3749,3 +3749,13 @@ SYS_STUB(575, int, close_range,
     /* _localcheck */ {}
 )
 
+SYS_STUB(576, int, rpctls_syscall,
+    /* _protoargs */ (int op, const char *  path),
+    /* _protoargs_chk */ (int *retp , int * __capability stub_errno, int op, const char * __capability   path),
+    /* _protoargs_err */ (int * __capability stub_errno, int op, const char * __capability   path),
+    /* _callargs */ (op, (__cheri_fromcap const char * )path),
+    /* _callargs_chk */ (&ret, stub_errno, op, path),
+    /* _callargs_err */ (&errno, op, (const char * )path),
+    /* _localcheck */ {if (!(cheri_getperm(path) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} }
+)
+

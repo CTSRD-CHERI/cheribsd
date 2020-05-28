@@ -512,4 +512,5 @@
 #define	CHERIABI_SYS_cheriabi_sigfastblock	573
 #define	CHERIABI_SYS_cheriabi___realpathat	574
 #define	CHERIABI_SYS_close_range	575
-#define	CHERIABI_SYS_MAXSYSCALL	576
+#define	CHERIABI_SYS_cheriabi_rpctls_syscall	576
+#define	CHERIABI_SYS_MAXSYSCALL	577

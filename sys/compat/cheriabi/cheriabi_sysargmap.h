@@ -375,6 +375,7 @@ int cheriabi_sysargmask[] = {
  [CHERIABI_SYS_cheriabi_sigfastblock] = (0x0 | 0x2),
  [CHERIABI_SYS_cheriabi___realpathat] = (0x0 | 0x2 | 0x4),
  [CHERIABI_SYS_close_range] = (0x0),
+ [CHERIABI_SYS_cheriabi_rpctls_syscall] = (0x0 | 0x2),
 };
 
 #endif /* !_CHERIABI_SYSARGMAP_H_ */

@@ -512,4 +512,5 @@
 #define	FREEBSD64_SYS_freebsd64_sigfastblock	573
 #define	FREEBSD64_SYS_freebsd64___realpathat	574
 #define	FREEBSD64_SYS_close_range	575
-#define	FREEBSD64_SYS_MAXSYSCALL	576
+#define	FREEBSD64_SYS_freebsd64_rpctls_syscall	576
+#define	FREEBSD64_SYS_MAXSYSCALL	577
