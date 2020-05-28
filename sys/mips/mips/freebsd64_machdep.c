@@ -274,11 +274,11 @@ freebsd64_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	struct thread *td;
 	struct trapframe *regs;
 #ifdef CPU_CHERI
-	struct cheri_frame *cfp;
+	struct cheri_frame *cfp, * __capability user_cfp;
 #endif
 	struct sigacts *psp;
-	struct sigframe64 sf, *sfp;
-	uintptr_t sp;
+	struct sigframe64 sf, * __capability sfp;
+	uintcap_t sp;
 #ifdef CPU_CHERI
 	size_t cp2_len;
 	int cheri_is_sandboxed;
@@ -358,8 +358,7 @@ freebsd64_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	sf.sf_uc.uc_mcontext.mc_pc = TRAPF_PC_OFFSET(regs);
 	sf.sf_uc.uc_mcontext.mullo = regs->mullo;
 	sf.sf_uc.uc_mcontext.mulhi = regs->mulhi;
-	sf.sf_uc.uc_mcontext.mc_tls =
-	    (uint64_t)(__cheri_fromcap void *)td->td_md.md_tls;
+	sf.sf_uc.uc_mcontext.mc_tls = (__cheri_addr uint64_t)td->td_md.md_tls;
 	sf.sf_uc.uc_mcontext.mc_regs[0] = UCONTEXT_MAGIC;  /* magic number */
 	bcopy(__unbounded_addressof(regs->ast),
 	    (void *)&sf.sf_uc.uc_mcontext.mc_regs[1],
@@ -381,7 +380,7 @@ freebsd64_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	/* Allocate and validate space for the signal handler context. */
 	if ((td->td_pflags & TDP_ALTSTACK) != 0 && !oonstack &&
 	    SIGISMEMBER(psp->ps_sigonstack, sig)) {
-		sp = (uintptr_t)td->td_sigstk.ss_sp + td->td_sigstk.ss_size;
+		sp = (uintcap_t)td->td_sigstk.ss_sp + td->td_sigstk.ss_size;
 	} else {
 #ifdef CPU_CHERI
 		/*
@@ -399,31 +398,33 @@ freebsd64_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 			sigexit(td, SIGILL);
 			/* NOTREACHED */
 		}
-		sp = (uintptr_t)
+		sp = (uintcap_t)
 		    cheri_capability_build_user_data(CHERI_CAP_USER_DATA_PERMS,
 		        CHERI_CAP_USER_DATA_BASE, CHERI_CAP_USER_DATA_LENGTH,
 		        regs->sp);
 #else
-		sp = (uintptr_t)regs->sp;
+		sp = (uintcap_t)regs->sp;
 #endif
 	}
 #ifdef CPU_CHERI
 	cp2_len = sizeof(*cfp);
 	sp -= cp2_len;
 	sp = rounddown2(sp, CHERICAP_SIZE);
-	sf.sf_uc.uc_mcontext.mc_cp2state = sp;
+	user_cfp = cheri_setbounds((struct cheri_frame * __capability)sp,
+	    cp2_len);
+	sf.sf_uc.uc_mcontext.mc_cp2state = (__cheri_addr register_t)user_cfp;
 	sf.sf_uc.uc_mcontext.mc_cp2state_len = cp2_len;
 #endif
 	sp -= sizeof(sf);
 	sp = rounddown2(sp, STACK_ALIGN);
-	sfp = (struct sigframe64 *)sp;
+	sfp = (struct sigframe64 * __capability)sp;
 
 	/* Build the argument list for the signal handler. */
 	regs->a0 = sig;
-	regs->a2 = (register_t)(intptr_t)&sfp->sf_uc;
+	regs->a2 = (__cheri_addr register_t)&sfp->sf_uc;
 	if (SIGISMEMBER(psp->ps_siginfo, sig)) {
 		/* Signal handler installed with SA_SIGINFO. */
-		regs->a1 = (register_t)(intptr_t)&sfp->sf_si;
+		regs->a1 = (__cheri_addr register_t)&sfp->sf_si;
 		/* sf.sf_ahu.sf_action = (__siginfohandler_t *)catcher; */
 
 		/* fill siginfo structure */
@@ -445,9 +446,7 @@ freebsd64_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 #ifdef CPU_CHERI
 	cfp = malloc(sizeof(*cfp), M_TEMP, M_WAITOK);
 	cheri_trapframe_to_cheriframe(&td->td_pcb->pcb_regs, cfp);
-	if (copyoutcap(cfp,
-	    __USER_CAP((void *)(uintptr_t)sf.sf_uc.uc_mcontext.mc_cp2state,
-	    cp2_len), cp2_len) != 0) {
+	if (copyoutcap(cfp, user_cfp, cp2_len) != 0) {
 		free(cfp, M_TEMP);
 		PROC_LOCK(p);
 		printf("pid %d, tid %d: could not copy out cheriframe\n",
@@ -457,7 +456,7 @@ freebsd64_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	}
 	free(cfp, M_TEMP);
 #endif
-	if (copyout(&sf, __USER_CAP_OBJ(sfp), sizeof(sf)) != 0) {
+	if (copyout(&sf, sfp, sizeof(sf)) != 0) {
 		/*
 		 * Something is wrong with the stack pointer.
 		 * ...Kill the process.
@@ -480,7 +479,7 @@ freebsd64_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 
 	regs->pc = (trapf_pc_t)catcher;
 	regs->t9 = TRAPF_PC_OFFSET(regs);
-	regs->sp = (register_t)(intptr_t)sfp;
+	regs->sp = (__cheri_addr register_t)sfp;
 	if (p->p_sysent->sv_sigcode_base != 0) {
 		/* Signal trampoline code is in the shared page */
 		regs->ra = p->p_sysent->sv_sigcode_base;
