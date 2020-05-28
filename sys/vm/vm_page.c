@@ -4839,7 +4839,7 @@ vm_page_bits_set(vm_page_t m, vm_page_bits_t *bits, vm_page_bits_t set)
 	 * containing aligned word, to not depend on the existence
 	 * of atomic_{set, clear}_{8, 16}.
 	 */
-	shift = ((__cheri_addr vaddr_t)addr) & (sizeof(uint32_t) - 1);
+	shift = addr & (sizeof(uint32_t) - 1);
 #if BYTE_ORDER == BIG_ENDIAN
 	shift = (sizeof(uint32_t) - sizeof(vm_page_bits_t) - shift) * NBBY;
 #else
@@ -4872,7 +4872,7 @@ vm_page_bits_clear(vm_page_t m, vm_page_bits_t *bits, vm_page_bits_t clear)
 	 * containing aligned word, to not depend on the existence
 	 * of atomic_{set, clear}_{8, 16}.
 	 */
-	shift = ((__cheri_addr vaddr_t)addr) & (sizeof(uint32_t) - 1);
+	shift = addr & (sizeof(uint32_t) - 1);
 #if BYTE_ORDER == BIG_ENDIAN
 	shift = (sizeof(uint32_t) - sizeof(vm_page_bits_t) - shift) * NBBY;
 #else

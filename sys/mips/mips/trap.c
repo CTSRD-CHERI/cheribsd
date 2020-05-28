@@ -466,7 +466,7 @@ fetch_instr_near_pc(struct trapframe *frame, register_t offset_from_pc, int32_t 
 		}
 	}
 	else {
-		*instr = *(int32_t *)bad_inst_ptr;
+		*instr = *(int32_t * __capability)bad_inst_ptr;
 	}
 	/* Should this be a kerncap instead instead of being indirected by $pcc? */
 	return bad_inst_ptr;
@@ -1355,10 +1355,6 @@ dofault:
 			if (access_type != 0)
 				return (trapframe->pc);
 		}
-		printf("capcause = 0x%x, badaddr = %#jx, pc = %#jx, ra = %p, "
-		    "sp = %p, sr = %jx\n", trapframe->capcause,
-		    (intmax_t)trapframe->badvaddr, (intmax_t)trapframe->pc,
-		    trapframe->c17, trapframe->csp, (intmax_t)trapframe->sr);
 		/* FALLTHROUGH */
 
 	case T_BUS_ERR_LD_ST:	/* BERR asserted to cpu */
@@ -2064,9 +2060,9 @@ mips_unaligned_load_store(struct trapframe *frame, int mode, register_t addr, ui
 	int op_type = 0;
 	int is_store = 0;
 	int sign_extend = 0;
-	uintptr_t dst_addr;
+	void * __capability dst_addr;
 	int err;
-	char * __capability kaddr;
+	char *kaddr;
 #ifdef CPU_CHERI
 	void * __capability *cap_regs = __bounded_addressof(frame->ddc,
 	    sizeof(void * __capability) * 32);
@@ -2193,7 +2189,7 @@ mips_unaligned_load_store(struct trapframe *frame, int mode, register_t addr, ui
 	if ((op_type < MIPS_LD_ACCESS) && sign_extend)
 		op_type++;
 
-	kaddr = (char * __capability)&value;
+	kaddr = (char *)&value;
 	/*
 	 * Stores don't have signed / unsigned variants, so just copy
 	 * the data from the register to memory.  Less-than-doubleword
@@ -2205,7 +2201,7 @@ mips_unaligned_load_store(struct trapframe *frame, int mode, register_t addr, ui
 #endif
 
 #ifdef CPU_CHERI
-	dst_addr = (uintptr_t)cheri_setaddress(dest, addr);
+	dst_addr = cheri_setaddress(dest, addr);
 #else
 	dst_addr = addr;
 #endif
@@ -2213,12 +2209,11 @@ mips_unaligned_load_store(struct trapframe *frame, int mode, register_t addr, ui
 	if (is_store) {
 		value = reg[src_regno];
 		if (USERLAND(frame->badvaddr)) {
-			if ((err = copyout_implicit_cap(kaddr,
-			    (void *)dst_addr, size)))
+			if ((err = copyout(kaddr, dst_addr, size)))
 				return (0);
 		}
 		else {
-			memcpy_c((void * __capability)dst_addr, kaddr, size);
+			memcpy((__cheri_fromcap void *)dst_addr, kaddr, size);
 		}
 
 		return (op_type);
@@ -2226,12 +2221,11 @@ mips_unaligned_load_store(struct trapframe *frame, int mode, register_t addr, ui
 		/* Get the value as a zero-extended version */
 		value = 0;
 		if (USERLAND(frame->badvaddr)) {
-			if ((err = copyin_implicit_cap((void*)dst_addr,
-			    kaddr, size)))
+			if ((err = copyin(dst_addr, kaddr, size)))
 				return (0);
 		}
 		else {
-			memcpy_c(kaddr, (void * __capability)dst_addr, size);
+			memcpy(kaddr, (__cheri_fromcap void *)dst_addr, size);
 		}
 		/* If we need to sign extend it, then shift it so that the sign
 		 * bit is in the correct place and then shift it back. */

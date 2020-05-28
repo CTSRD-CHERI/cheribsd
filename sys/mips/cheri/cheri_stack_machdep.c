@@ -2,6 +2,7 @@
  * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
  *
  * Copyright (c) 2005 Antoine Brodin
+ * Copyright (c) 2020 Alfredo Mazzinghi
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -43,6 +44,8 @@ __FBSDID("$FreeBSD$");
 #include <machine/regnum.h>
 
 #include <machine/abi.h>
+
+#ifdef CHERI_PURECAP_KERNEL
 
 static uintptr_t
 stack_register_fetch(uintptr_t sp, u_register_t stack_pos)
@@ -209,7 +212,7 @@ stack_save_td(struct stack *st, struct thread *td)
 	THREAD_LOCK_ASSERT(td, MA_OWNED);
 	KASSERT(!TD_IS_SWAPPED(td),
 	    ("stack_save_td: thread %p is swapped", td));
-        
+
 	if (TD_IS_RUNNING(td))
                 return (EOPNOTSUPP);
 
@@ -239,6 +242,8 @@ stack_save(struct stack *st)
 	sp = (uintptr_t)cheri_getstack();
 	stack_capture(st, pc, sp);
 }
+
+#endif /* CHERI_PURECAP_KERNEL */
 // CHERI CHANGES START
 // {
 //   "updated": 20190830,
@@ -250,4 +255,3 @@ stack_save(struct stack *st)
 //   ]
 // }
 // CHERI CHANGES END
-

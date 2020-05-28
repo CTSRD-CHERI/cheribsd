@@ -1421,14 +1421,8 @@ pmap_growkernel(vm_offset_t addr)
 
 CTASSERT(sizeof(struct pv_chunk) == PAGE_SIZE);
 #ifdef __CHERI_PURE_CAPABILITY__
-/* #ifdef CPU_CHERI128 */
 CTASSERT(_NPCM == 2);
 CTASSERT(_NPCPV	== 83);
-/* XXX-AM: remove cheri-256 support */
-/* #else /\* CHERI256 *\/ */
-/* CTASSERT(_NPCM	== 1); */
-/* CTASSERT(_NPCPV	== 40); */
-/* #endif /\* CHERI258 *\/ */
 #elif defined(__mips_n64)
 CTASSERT(_NPCM == 3);
 CTASSERT(_NPCPV == 168);
@@ -1448,14 +1442,11 @@ pv_to_chunk(pv_entry_t pv)
 
 #ifdef __mips_n64
 #define	PC_FREE0_1	0xfffffffffffffffful
-/* XXX-AM: remove cheri-256 support */
-/* #if defined(CHERI_PURECAP_KERNEL) && defined(CPU_CHERI128) */
 #ifdef CHERI_PURECAP_KERNEL
 #define PC_FREE2	0x000000000007fffful
+#else
+#define PC_FREE2	0x000000fffffffffful
 #endif
-/* #else /\* ! (CHERI_PURECAP_KERNEL && CPU_CHERI128) *\/ */
-/* #define	PC_FREE2	0x000000fffffffffful */
-/* #endif /\* ! (CHERI_PURECAP_KERNEL && CPU_CHERI128) *\/ */
 #else
 #define	PC_FREE0_9	0xfffffffful	/* Free values for index 0 through 9 */
 #define	PC_FREE10	0x0000fffful	/* Free values for index 10 */
@@ -1464,12 +1455,7 @@ pv_to_chunk(pv_entry_t pv)
 static const u_long pc_freemask[_NPCM] = {
 #ifdef __mips_n64
 #ifdef CHERI_PURECAP_KERNEL
-/* #ifdef CPU_CHERI128 */
 	PC_FREE0_1, PC_FREE2
-/* XXX-AM: remove cheri-256 support */
-/* #else /\* CPU_CHERI256 *\/ */
-/* 	PC_FREE2 */
-/* #endif /\* CPU_CHERI256 *\/ */
 #else  /* ! CHERI_PURECAP_KERNEL */
 	PC_FREE0_1, PC_FREE0_1, PC_FREE2
 #endif /* ! CHERI_PURECAP_KERNEL */

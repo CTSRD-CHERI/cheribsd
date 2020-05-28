@@ -95,7 +95,7 @@
 /*
  * Macro to abstract the creation of a NULL capability
  */
-#define CHERI_NULL(reg) cmove reg, $cnull
+#define	CHERI_NULL(reg) cmove reg, $cnull
 
 /*
  * Macro to abstract use of cmove in kernel assembly, used as a temporary
@@ -118,11 +118,11 @@
  * Note that KSCRATCH2 is aliased to GPC so we install the kernel GP
  * here as well.
  */
-#define CHERI_EXCEPTION_KR2C_ENTER					\
+#define	CHERI_EXCEPTION_KR2C_ENTER				\
 	csetkr2c	CHERI_REG_KSCRATCH2;				\
 	cgetkdc		CHERI_REG_KSCRATCH2
 
-#define CHERI_EXCEPTION_KR2C_RETURN		\
+#define	CHERI_EXCEPTION_KR2C_RETURN	\
 	cgetkr2c	CHERI_REG_KSCRATCH2
 
 #else
@@ -131,7 +131,7 @@
  * KR2C is used to preserve the user DDC when
  * the exception occurs in user mode.
  */
-#define CHERI_EXCEPTION_KR2C_ENTER					\
+#define	CHERI_EXCEPTION_KR2C_ENTER				\
 	/* Save user $ddc in $kr2c. */					\
 	cgetdefault	CHERI_REG_KSCRATCH;				\
 	csetkr2c	CHERI_REG_KSCRATCH;				\
@@ -139,7 +139,7 @@
 	cgetkdc		CHERI_REG_KSCRATCH;				\
 	csetdefault	CHERI_REG_KSCRATCH
 
-#define CHERI_EXCEPTION_KR2C_RETURN					\
+#define	CHERI_EXCEPTION_KR2C_RETURN				\
 	/* If returning to userspace, restore saved user $ddc. */	\
 	cgetkr2c	CHERI_REG_KSCRATCH;				\
 	csetdefault	CHERI_REG_KSCRATCH
@@ -210,9 +210,9 @@
 /*
  * Capcause access to PCB
  */
-#define SAVE_CAPCAUSE_TO_PCB(treg, treg2, pcb)	\
+#define	SAVE_CAPCAUSE_TO_PCB(treg, treg2, pcb)	\
 	SAVE_U_PCB_REG(treg, CAPCAUSE, pcb)
-#define RESTORE_CAPCAUSE_FROM_PCB(treg, pcb)	\
+#define	RESTORE_CAPCAUSE_FROM_PCB(treg, pcb)	\
 	RESTORE_U_PCB_REG(treg, CAPCAUSE, pcb)
 
 #else /* CHERI_PURECAP_KERNEL */
@@ -221,9 +221,9 @@
  * Capcause offset is too large for CHERI256 in this case and does not
  * fit in the csd immediate offset.
  */
-#define SAVE_CAPCAUSE_TO_PCB(treg, treg2, pcb)	\
+#define	SAVE_CAPCAUSE_TO_PCB(treg, treg2, pcb)	\
 	SAVE_U_PCB_REG_FAR(treg, treg2, CAPCAUSE, pcb)
-#define RESTORE_CAPCAUSE_FROM_PCB(treg, pcb)	\
+#define	RESTORE_CAPCAUSE_FROM_PCB(treg, pcb)		\
 	RESTORE_U_PCB_REG_FAR(treg, treg, CAPCAUSE, pcb)
 
 #endif /* CHERI_PURECAP_KERNEL */
@@ -381,8 +381,6 @@
 	SAVE_U_PCB_CREG(CHERI_REG_C29, C29, pcb);			\
 	SAVE_U_PCB_CREG(CHERI_REG_C30, C30, pcb);			\
 	SAVE_U_PCB_CREG(CHERI_REG_C31, C31, pcb);			\
-	/* Note we save KR2C here, so later we can use it */		\
-	SAVE_U_PCB_CREG(CHERI_REG_SEC0, DDC, pcb);			\
 	/* Save special registers after KSCRATCH (C27) */		\
 	/* User DDC is saved in $kr2c. */				\
 	CGetKR2C	CHERI_REG_KSCRATCH;				\
@@ -447,8 +445,8 @@
 	clc		creg, base, (U_PCB_CHERIKFRAME +		\
 			    CHERICAP_SIZE * offs)($ddc)
 
-#define SAVE_CHERIKFRAME_GPC
-#define RESTORE_CHERIKFRAME_GPC
+#define	SAVE_CHERIKFRAME_GPC(base)
+#define	RESTORE_CHERIKFRAME_GPC(base)
 #else /* CHERI_PURECAP_KERNEL */
 #define	SAVE_U_PCB_CHERIKFRAME_CREG(creg, offs, base)			\
 	cscbi		creg, (U_PCB_CHERIKFRAME +			\
@@ -459,10 +457,10 @@
 			    CHERICAP_SIZE * offs)(base)
 
 /* Save and restore globals pointer as well */
-#define SAVE_CHERIKFRAME_GPC(base)					\
+#define	SAVE_CHERIKFRAME_GPC(base)				\
 	SAVE_U_PCB_CHERIKFRAME_CREG(CHERI_REG_GPC, CHERIKFRAME_OFF_GPC, \
 				    base)
-#define RESTORE_CHERIKFRAME_GPC(base)					\
+#define	RESTORE_CHERIKFRAME_GPC(base)				\
 	RESTORE_U_PCB_CHERIKFRAME_CREG(CHERI_REG_GPC,			\
 				       CHERIKFRAME_OFF_GPC, base)
 #endif /* CHERI_PURECAP_KERNEL */
@@ -580,9 +578,9 @@
 /*
  * Load symbol from capability table
  */
-#define CAPTABLE_LOAD(dst, sym)				\
+#define	CAPTABLE_LOAD(dst, sym)			\
 	clcbi dst, %captab20(sym)(CHERI_REG_GPC)
-#define CAPCALL_LOAD(dst, sym)				\
+#define	CAPCALL_LOAD(dst, sym)			\
 	clcbi dst, %capcall20(sym)(CHERI_REG_GPC)
 
 /*

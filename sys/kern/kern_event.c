@@ -1111,8 +1111,7 @@ kevent11_copyout(void *arg, struct kevent *kevp, int count)
 		kev11.fflags = kevp->fflags;
 		kev11.data = kevp->data;
 		kev11.udata = kevp->udata;
-		error = copyoutcap(&kev11, __USER_CAP_OBJ(uap->eventlist),
-		    sizeof(kev11));
+		error = copyoutcap(&kev11, uap->eventlist, sizeof(kev11));
 		if (error != 0)
 			break;
 		uap->eventlist++;

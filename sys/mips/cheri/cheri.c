@@ -90,6 +90,7 @@ CTASSERT(sizeof(struct cheri_object) == 32);
 
 /* Set to -1 to prevent it from being zeroed with the rest of BSS */
 void * __capability user_sealcap = (void * __capability)(intcap_t)-1;
+extern void * __capability userspace_cap;
 
 #ifdef CHERI_PURECAP_KERNEL
 __attribute__((weak))
@@ -99,8 +100,6 @@ extern Elf64_Capreloc __stop___cap_relocs;
 
 /* Defined in linker script, mark the end of .text and kernel image */
 extern char etext[], end[];
-
-extern void * __capability userspace_cap;
 
 /*
  * Global capabilities for various address-space segments.
@@ -213,19 +212,19 @@ process_kernel_dyn_relocs(Elf64_Rel *start, Elf64_Rel *end,
 void
 cheri_init_capabilities(void * __capability kroot)
 {
-#ifdef CHERI_PURECAP_KERNEL
-	void * ctemp;
-#endif
+	void * __capability ctemp;
 
 	/* Create a capability for userspace to seal capabilities with. */
-	user_sealcap = cheri_ptrperm(
-	    cheri_setoffset(kroot, CHERI_SEALCAP_USERSPACE_BASE),
-	    CHERI_SEALCAP_USERSPACE_LENGTH,
-	    CHERI_SEALCAP_USERSPACE_PERMS);
-	userspace_cap = cheri_ptrperm(
-	    cheri_setoffset(kroot, CHERI_CAP_USER_DATA_BASE),
-	    CHERI_CAP_USER_DATA_LENGTH,
-	    CHERI_CAP_USER_DATA_PERMS | CHERI_CAP_USER_CODE_PERMS);
+	ctemp = cheri_setaddress(kroot, CHERI_SEALCAP_USERSPACE_BASE);
+	ctemp = cheri_setbounds(ctemp, CHERI_SEALCAP_USERSPACE_LENGTH);
+	ctemp = cheri_andperm(ctemp, CHERI_SEALCAP_USERSPACE_PERMS);
+	user_sealcap = ctemp;
+
+	ctemp = cheri_setaddress(kroot, CHERI_CAP_USER_DATA_BASE);
+	ctemp = cheri_setbounds(ctemp, CHERI_CAP_USER_DATA_LENGTH);
+	ctemp = cheri_andperm(ctemp, CHERI_CAP_USER_DATA_PERMS |
+	    CHERI_CAP_USER_CODE_PERMS);
+	userspace_cap = ctemp;
 
 #ifdef CHERI_PURECAP_KERNEL
 	/*

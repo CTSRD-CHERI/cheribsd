@@ -179,10 +179,10 @@
 
 #ifdef CPU_CHERI
 #define	SAVE_U_PCB_CREG(creg, offs, base) \
-	csc	creg, base, (U_PCB_REGS + (SZREG * offs)) (CHERI_REG_KDC)
+	csc	creg, base, (U_PCB_REGS + (SZREG * offs)) ($ddc)
 
 #define	RESTORE_U_PCB_CREG(creg, offs, base) \
-	clc	creg, base, (U_PCB_REGS + (SZREG * offs)) (CHERI_REG_KDC)
+	clc	creg, base, (U_PCB_REGS + (SZREG * offs)) ($ddc)
 #endif
 
 #define	SAVE_U_PCB_CONTEXT(reg, offs, base)			\
