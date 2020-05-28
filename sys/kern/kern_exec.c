@@ -119,7 +119,7 @@ SYSCTL_INT(_kern, OID_AUTO, coredump_pack_vmmapinfo, CTLFLAG_RWTUN,
     &coredump_pack_vmmapinfo, 0,
     "Enable file path packing in 'procstat -v' coredump notes");
 
-int use_cheriabi = 0;
+int use_cheriabi = 1;
 SYSCTL_INT(_debug, OID_AUTO, use_cheriabi, CTLFLAG_RWTUN,
     &use_cheriabi, 0,
     "Use COMPAT_CHERIABI for purecap binaries");
