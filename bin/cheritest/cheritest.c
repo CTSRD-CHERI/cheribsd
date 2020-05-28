@@ -2595,8 +2595,8 @@ main(int argc, char *argv[])
 	sl_free(cheri_xfailed_tests, true);
 	sl_free(cheri_xpassed_tests, true);
 	if (tests_passed + tests_failed > 1) {
-		if (expected_failures == 0)
-			xo_emit("SUMMARY: passed {d:/%d} failed %d\n",
+		if (expected_failures == 0 && tests_xfailed == 0)
+			xo_emit("SUMMARY: passed {d:/%d} failed {d:/%d}\n",
 			    tests_passed, tests_failed);
 		else if (expected_failures == tests_xfailed)
 			xo_emit("SUMMARY: passed {d:/%d} failed {d:/%d} "
