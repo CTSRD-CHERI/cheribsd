@@ -417,4 +417,5 @@ MIASM =  \
 	freebsd64_shm_rename.o \
 	freebsd64_sigfastblock.o \
 	freebsd64___realpathat.o \
-	close_range.o
+	close_range.o \
+	freebsd64_rpctls_syscall.o

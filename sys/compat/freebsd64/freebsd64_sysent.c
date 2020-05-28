@@ -619,5 +619,6 @@ struct sysent freebsd64_sysent[] = {
 	{ AS(freebsd64_shm_rename_args), (sy_call_t *)freebsd64_shm_rename, AUE_SHMRENAME, NULL, 0, 0, 0, SY_THR_STATIC },	/* 572 = freebsd64_shm_rename */
 	{ AS(freebsd64_sigfastblock_args), (sy_call_t *)freebsd64_sigfastblock, AUE_NULL, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 573 = freebsd64_sigfastblock */
 	{ AS(freebsd64___realpathat_args), (sy_call_t *)freebsd64___realpathat, AUE_REALPATHAT, NULL, 0, 0, 0, SY_THR_STATIC },	/* 574 = freebsd64___realpathat */
-	{ AS(close_range_args), (sy_call_t *)sys_close_range, AUE_NULL, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 575 = close_range */
+	{ AS(close_range_args), (sy_call_t *)sys_close_range, AUE_CLOSERANGE, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 575 = close_range */
+	{ AS(freebsd64_rpctls_syscall_args), (sy_call_t *)lkmressys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },	/* 576 = freebsd64_rpctls_syscall */
 };

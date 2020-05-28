@@ -1476,6 +1476,10 @@ struct cheriabi___realpathat_args {
 	char size_l_[PADL_(size_t)]; size_t size; char size_r_[PADR_(size_t)];
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
 };
+struct cheriabi_rpctls_syscall_args {
+	char op_l_[PADL_(int)]; int op; char op_r_[PADR_(int)];
+	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
+};
 int	cheriabi_read(struct thread *, struct cheriabi_read_args *);
 int	cheriabi_write(struct thread *, struct cheriabi_write_args *);
 int	cheriabi_open(struct thread *, struct cheriabi_open_args *);
@@ -1771,6 +1775,7 @@ int	cheriabi_shm_open2(struct thread *, struct cheriabi_shm_open2_args *);
 int	cheriabi_shm_rename(struct thread *, struct cheriabi_shm_rename_args *);
 int	cheriabi_sigfastblock(struct thread *, struct cheriabi_sigfastblock_args *);
 int	cheriabi___realpathat(struct thread *, struct cheriabi___realpathat_args *);
+int	cheriabi_rpctls_syscall(struct thread *, struct cheriabi_rpctls_syscall_args *);
 
 #ifdef COMPAT_43
 
@@ -2115,6 +2120,7 @@ int	freebsd12_cheriabi_shm_open(struct thread *, struct freebsd12_cheriabi_shm_o
 #define	CHERIABI_SYS_AUE_cheriabi_shm_rename	AUE_SHMRENAME
 #define	CHERIABI_SYS_AUE_cheriabi_sigfastblock	AUE_NULL
 #define	CHERIABI_SYS_AUE_cheriabi___realpathat	AUE_REALPATHAT
+#define	CHERIABI_SYS_AUE_cheriabi_rpctls_syscall	AUE_NULL
 
 #undef PAD_
 #undef PADL_

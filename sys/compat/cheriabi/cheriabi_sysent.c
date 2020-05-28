@@ -595,5 +595,6 @@ struct sysent cheriabi_sysent[] = {
 	{ AS(cheriabi_shm_rename_args), (sy_call_t *)cheriabi_shm_rename, AUE_SHMRENAME, NULL, 0, 0, 0, SY_THR_STATIC },	/* 572 = cheriabi_shm_rename */
 	{ AS(cheriabi_sigfastblock_args), (sy_call_t *)cheriabi_sigfastblock, AUE_NULL, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 573 = cheriabi_sigfastblock */
 	{ AS(cheriabi___realpathat_args), (sy_call_t *)cheriabi___realpathat, AUE_REALPATHAT, NULL, 0, 0, 0, SY_THR_STATIC },	/* 574 = cheriabi___realpathat */
-	{ AS(close_range_args), (sy_call_t *)sys_close_range, AUE_NULL, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 575 = close_range */
+	{ AS(close_range_args), (sy_call_t *)sys_close_range, AUE_CLOSERANGE, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 575 = close_range */
+	{ AS(cheriabi_rpctls_syscall_args), (sy_call_t *)lkmressys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },	/* 576 = cheriabi_rpctls_syscall */
 };

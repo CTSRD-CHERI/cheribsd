@@ -389,4 +389,5 @@ MIASM =  \
 	cheriabi_shm_rename.o \
 	cheriabi_sigfastblock.o \
 	cheriabi___realpathat.o \
-	close_range.o
+	close_range.o \
+	cheriabi_rpctls_syscall.o
