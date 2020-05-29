@@ -103,6 +103,15 @@ static struct procabi freebsd32 = {
 };
 #endif
 
+#ifdef __CHERI_PURE_CAPABILITY__
+static struct procabi freebsd64 = {
+	"FreeBSD64",
+	SYSDECODE_ABI_FREEBSD64,
+	STAILQ_HEAD_INITIALIZER(freebsd64.extra_syscalls),
+	{ NULL }
+};
+#endif
+
 static struct procabi linux = {
 	"Linux",
 	SYSDECODE_ABI_LINUX,
@@ -122,14 +131,23 @@ static struct procabi linux32 = {
 static struct procabi_table abis[] = {
 	{ "CloudABI ELF32", &cloudabi32 },
 	{ "CloudABI ELF64", &cloudabi64 },
-#ifdef __LP64__
+#ifdef __CHERI_PURE_CAPABILITY__
+	{ "FreeBSD ELF64C", &freebsd },
+#elif defined(__LP64__)
+	/* This permits hybrid truss to trace CheriABI. */
+	{ "FreeBSD ELF64C", &freebsd },
 	{ "FreeBSD ELF64", &freebsd },
-	{ "FreeBSD ELF32", &freebsd32 },
 #else
 	{ "FreeBSD ELF32", &freebsd },
 #endif
 #if defined(__powerpc64__)
 	{ "FreeBSD ELF64 V2", &freebsd },
+#endif
+#ifdef __CHERI_PURE_CAPABILITY__
+	{ "FreeBSD ELF64", &freebsd64 },
+#endif
+#ifdef __LP64__
+	{ "FreeBSD ELF32", &freebsd32 },
 #endif
 #if defined(__amd64__)
 	{ "FreeBSD a.out", &freebsd32 },
@@ -144,13 +162,9 @@ static struct procabi_table abis[] = {
 	{ "Linux ELF", &linux },
 #endif
 	/*
-	 * XXX: Temporary hack for CheriABI.  If CheriABI were going
-	 * to stay around longer we might add a sysdecode enum, etc.
-	 *
-	 * Eventually we will have to handle freebsd64 though.
+	 * XXX: Temporary hack for COMPAT_CHERIABI.
 	 */
 	{ "CheriABI ELF64", &freebsd },
-	{ "FreeBSD ELF64C", &freebsd },
 };
 
 /*
