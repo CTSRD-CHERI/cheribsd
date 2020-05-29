@@ -727,16 +727,10 @@ dumpheader(struct ktr_header *kth, u_int sv_flags)
 		else
 			arch = "00";
 
-		if (sv_flags & SV_CHERI) {
-			/* XXX: Can't determine capability size from sv_flags */
-#if MIPS_SZCAP == 32
-			cap = "C256";
-#else
-			cap = "C128";
-#endif
-		}
-			else
-				cap = "";
+		if (sv_flags & SV_CHERI)
+			cap = "C";
+		else
+			cap = "";
 
 		printf("%s%s%s  ", abi, arch, cap);
 	}
