@@ -144,22 +144,22 @@ SYSCTL_INT(_machdep, OID_AUTO, log_cheri_registers, CTLFLAG_RW,
 
 #define	lwl_macro(data, addr)						\
 	__asm __volatile ("lwl %0, 0x0(%1)"				\
-			: "=r" (data)	/* outputs */			\
+			: "+r" (data)	/* outputs */			\
 			: "r" (addr));	/* inputs */
 
 #define	lwr_macro(data, addr)						\
 	__asm __volatile ("lwr %0, 0x0(%1)"				\
-			: "=r" (data)	/* outputs */			\
+			: "+r" (data)	/* outputs */			\
 			: "r" (addr));	/* inputs */
 
 #define	ldl_macro(data, addr)						\
 	__asm __volatile ("ldl %0, 0x0(%1)"				\
-			: "=r" (data)	/* outputs */			\
+			: "+r" (data)	/* outputs */			\
 			: "r" (addr));	/* inputs */
 
 #define	ldr_macro(data, addr)						\
 	__asm __volatile ("ldr %0, 0x0(%1)"				\
-			: "=r" (data)	/* outputs */			\
+			: "+r" (data)	/* outputs */			\
 			: "r" (addr));	/* inputs */
 
 #define	sb_macro(data, addr)						\
@@ -2021,7 +2021,7 @@ static int
 mips_unaligned_load_store(struct trapframe *frame, int mode, register_t addr, uint32_t inst)
 {
 	register_t *reg = (register_t *) frame;
-	register_t value;
+	register_t value = 0;
 	unsigned size;
 	int src_regno;
 	int op_type = 0;
