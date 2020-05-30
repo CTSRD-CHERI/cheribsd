@@ -13860,11 +13860,25 @@ dtrace_dof_predicate(dof_hdr_t *dof, dof_sec_t *sec, dtrace_vstate_t *vstate,
 	return (dtrace_predicate_create(dp));
 }
 
+static dof_actdesc_t
+freebsd64_dof_actdesc(dof_actdesc_64_t *actdesc64)
+{
+	dof_actdesc_t actdesc;
+	actdesc.dofa_difo = actdesc64->dofa_difo;
+	actdesc.dofa_strtab = actdesc64->dofa_strtab;
+	actdesc.dofa_kind = actdesc64->dofa_kind;
+	actdesc.dofa_ntuple = actdesc64->dofa_ntuple;
+	actdesc.dofa_arg = actdesc64->dofa_arg;
+	actdesc.dofa_uarg = (uintcap_t)cheri_fromint(actdesc64->dofa_uarg);
+	return actdesc;
+}
+
 static dtrace_actdesc_t *
 dtrace_dof_actdesc(dof_hdr_t *dof, dof_sec_t *sec, dtrace_vstate_t *vstate,
     cred_t *cr)
 {
 	dtrace_actdesc_t *act, *first = NULL, *last = NULL, *next;
+	dof_actdesc_t _desc;
 	dof_actdesc_t *desc;
 	dof_sec_t *difosec;
 	size_t offs;
@@ -13910,10 +13924,16 @@ dtrace_dof_actdesc(dof_hdr_t *dof, dof_sec_t *sec, dtrace_vstate_t *vstate,
 		dtrace_dof_error(dof, "actions exceed dtrace_actions_max");
 		return (NULL);
 	}
-
+	desc = &_desc;
 	for (offs = 0; offs < sec->dofs_size; offs += sec->dofs_entsize) {
-		desc = (dof_actdesc_t *)(daddr +
-		    (uintptr_t)sec->dofs_offset + offs);
+		uintptr_t act_desc = daddr + (uintptr_t)sec->dofs_offset + offs;
+		_desc =
+#ifdef COMPAT_FREEBSD64
+		    !SV_CURPROC_FLAG(SV_CHERI) ?
+		    freebsd64_dof_actdesc((dof_actdesc_64_t *)act_desc) :
+
+#endif
+		    *(dof_actdesc_t *)act_desc;
 		kind = (dtrace_actkind_t)desc->dofa_kind;
 
 		if ((DTRACEACT_ISPRINTFLIKE(kind) &&
@@ -13965,15 +13985,8 @@ dtrace_dof_actdesc(dof_hdr_t *dof, dof_sec_t *sec, dtrace_vstate_t *vstate,
 				arg = desc->dofa_arg;
 			}
 		}
-		dtrace_uarg_t desc_dofa_uarg =
-#ifdef COMPAT_FREEBSD64
-		    !SV_CURPROC_FLAG(SV_CHERI) ?
-		    (uintcap_t)cheri_fromint(
-			((dof_actdesc_64_t *)desc)->dofa_uarg) :
-#endif
-		    desc->dofa_uarg;
 		act = dtrace_actdesc_create(kind, desc->dofa_ntuple,
-		    desc_dofa_uarg, arg);
+		    desc->dofa_uarg, arg);
 
 		if (last != NULL) {
 			last->dtad_next = act;
