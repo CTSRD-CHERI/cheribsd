@@ -959,7 +959,7 @@ typedef struct dtrace_ecbdesc {
 	dtrace_actdesc_t *dted_action;		/* action description(s) */
 	dtrace_preddesc_t dted_pred;		/* predicate description */
 	dtrace_probedesc_t dted_probe;		/* probe description */
-	dtrace_uarg_t dted_uarg;			/* library argument */
+	uint64_t dted_uarg;			/* library argument */
 	int dted_refcnt;			/* reference count */
 } dtrace_ecbdesc_t;
 
