@@ -36,6 +36,7 @@ def buildImageAndRunTests(params, String suffix) {
         }
         def exitCode = sh returnStatus: true, label: "Run tests in QEMU", script: """
 rm -rf cheribsd-test-results && mkdir cheribsd-test-results
+test -e \$WORKSPACE/id_ed25519 || ssh-keygen -t ed25519 -N '' -f \$WORKSPACE/id_ed25519 < /dev/null
 ./cheribuild/jenkins-cheri-build.py --test run-${suffix} '--test-extra-args=${testExtraArgs}' ${params.extraArgs} --test-ssh-key \$WORKSPACE/id_ed25519.pub
 find cheribsd-test-results
 """
