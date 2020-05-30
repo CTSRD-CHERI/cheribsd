@@ -13871,18 +13871,27 @@ dtrace_dof_actdesc(dof_hdr_t *dof, dof_sec_t *sec, dtrace_vstate_t *vstate,
 	uintptr_t daddr = (uintptr_t)dof;
 	uint64_t arg;
 	dtrace_actkind_t kind;
+	int sizeof_uarg = sizeof(dtrace_uarg_t);
+	int sizeof_dof_actdesc_t = sizeof(dof_actdesc_t);
+
+#ifdef COMPAT_FREEBSD64
+	if (!SV_CURPROC_FLAG(SV_CHERI)) {
+		sizeof_uarg = sizeof(uint64_t);
+		sizeof_dof_actdesc_t = sizeof(dof_actdesc_64_t);
+	}
+#endif
 
 	if (sec->dofs_type != DOF_SECT_ACTDESC) {
 		dtrace_dof_error(dof, "invalid action section");
 		return (NULL);
 	}
 
-	if (sec->dofs_offset + sizeof (dof_actdesc_t) > dof->dofh_loadsz) {
+	if (sec->dofs_offset + sizeof_dof_actdesc_t > dof->dofh_loadsz) {
 		dtrace_dof_error(dof, "truncated action description");
 		return (NULL);
 	}
 
-	if (sec->dofs_align != sizeof(dtrace_uarg_t)) {
+	if (sec->dofs_align != sizeof_uarg) {
 		dtrace_dof_error(dof, "bad alignment in action description");
 		return (NULL);
 	}
@@ -13892,7 +13901,7 @@ dtrace_dof_actdesc(dof_hdr_t *dof, dof_sec_t *sec, dtrace_vstate_t *vstate,
 		return (NULL);
 	}
 
-	if (sec->dofs_entsize != sizeof (dof_actdesc_t)) {
+	if (sec->dofs_entsize != sizeof_dof_actdesc_t) {
 		dtrace_dof_error(dof, "bad entry size in action description");
 		return (NULL);
 	}
@@ -13956,9 +13965,15 @@ dtrace_dof_actdesc(dof_hdr_t *dof, dof_sec_t *sec, dtrace_vstate_t *vstate,
 				arg = desc->dofa_arg;
 			}
 		}
-
+		dtrace_uarg_t desc_dofa_uarg =
+#ifdef COMPAT_FREEBSD64
+		    !SV_CURPROC_FLAG(SV_CHERI) ?
+		    (uintcap_t)cheri_fromint(
+			((dof_actdesc_64_t *)desc)->dofa_uarg) :
+#endif
+		    desc->dofa_uarg;
 		act = dtrace_actdesc_create(kind, desc->dofa_ntuple,
-		    desc->dofa_uarg, arg);
+		    desc_dofa_uarg, arg);
 
 		if (last != NULL) {
 			last->dtad_next = act;
