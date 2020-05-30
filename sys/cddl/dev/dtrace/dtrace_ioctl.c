@@ -38,10 +38,10 @@ SYSCTL_INT(_debug_dtrace, OID_AUTO, verbose_ioctl, CTLFLAG_RW,
 				     &BASE_UNION.BASE_UNION##_64.FIELD)
 #define SIZEOF(BASE_TYPE) \
 	(SV_CURPROC_FLAG(SV_CHERI) ? sizeof (BASE_TYPE##_t) : \
-				     sizeof (BASE_TYPE##_64_t) )
+				     sizeof (BASE_TYPE##64_t) )
 #define OFFSETOF(BASE_TYPE,FIELD) \
 	(SV_CURPROC_FLAG(SV_CHERI) ? offsetof(BASE_TYPE##_t, FIELD) : \
-				     offsetof(BASE_TYPE##_64_t, FIELD) )
+				     offsetof(BASE_TYPE##64_t, FIELD) )
 #else
 #define GET_COMPAT_FIELD(BASE_UNION, FIELD) &BASE_UNION.BASE_UNION.FIELD
 #define SIZEOF(BASE_TYPE) (sizeof (BASE_TYPE##_t))
@@ -253,7 +253,7 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 #ifdef COMPAT_FREEBSD64
 			/* Only the last field is a capability*/
 			if (!SV_CURPROC_FLAG(SV_CHERI))
-				((dtrace_recdesc_64_t *)dest)->dtrd_uarg =
+				((dtrace_recdesc64_t *)dest)->dtrd_uarg =
 				    (__cheri_addr uint64_t)act->dta_rec.dtrd_uarg;
 #endif
 			act->dta_rec.dtrd_offset += offs;
@@ -516,8 +516,8 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 
 #ifdef COMPAT_FREEBSD64
 		if (!SV_CURPROC_FLAG(SV_CHERI)) {
-			dtrace_enable_io_64_t *p =
-			    (dtrace_enable_io_64_t *)addr;
+			dtrace_enable_io64_t *p =
+			    (dtrace_enable_io64_t *)addr;
 			dof_ptr = __USER_CAP_UNBOUND((void *)p->dof);
 			n_matched = &p->n_matched;
 		} else {
@@ -659,7 +659,7 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 #ifdef COMPAT_FREEBSD64
 			/* Only the last field is a capability*/
 			if (!SV_CURPROC_FLAG(SV_CHERI))
-				((dtrace_recdesc_64_t *)dest)->dtrd_uarg =
+				((dtrace_recdesc64_t *)dest)->dtrd_uarg =
 				    (__cheri_addr uint64_t)
 					act->dta_rec.dtrd_uarg;
 #endif
@@ -690,7 +690,7 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 		int *dtfd_length;
 #ifdef COMPAT_FREEBSD64
 		if (!SV_CURPROC_FLAG(SV_CHERI)) {
-			dtrace_fmtdesc_64_t *fmt = (dtrace_fmtdesc_64_t *)addr;
+			dtrace_fmtdesc64_t *fmt = (dtrace_fmtdesc64_t *)addr;
 
 			dtfd_string = __USER_CAP_STR(fmt->dtfd_string);
 			dtfd_format = &fmt->dtfd_format;

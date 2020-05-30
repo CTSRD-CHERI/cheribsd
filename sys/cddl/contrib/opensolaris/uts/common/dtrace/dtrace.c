@@ -13783,7 +13783,7 @@ dtrace_dof_predicate(dof_hdr_t *dof, dof_sec_t *sec, dtrace_vstate_t *vstate,
 }
 
 static dof_actdesc_t
-freebsd64_dof_actdesc(dof_actdesc_64_t *actdesc64)
+freebsd64_dof_actdesc(dof_actdesc64_t *actdesc64)
 {
 	dof_actdesc_t actdesc;
 	actdesc.dofa_difo = actdesc64->dofa_difo;
@@ -13813,7 +13813,7 @@ dtrace_dof_actdesc(dof_hdr_t *dof, dof_sec_t *sec, dtrace_vstate_t *vstate,
 #ifdef COMPAT_FREEBSD64
 	if (!SV_CURPROC_FLAG(SV_CHERI)) {
 		sizeof_uarg = sizeof(uint64_t);
-		sizeof_dof_actdesc_t = sizeof(dof_actdesc_64_t);
+		sizeof_dof_actdesc_t = sizeof(dof_actdesc64_t);
 	}
 #endif
 
@@ -13852,7 +13852,7 @@ dtrace_dof_actdesc(dof_hdr_t *dof, dof_sec_t *sec, dtrace_vstate_t *vstate,
 		_desc =
 #ifdef COMPAT_FREEBSD64
 		    !SV_CURPROC_FLAG(SV_CHERI) ?
-		    freebsd64_dof_actdesc((dof_actdesc_64_t *)act_desc) :
+		    freebsd64_dof_actdesc((dof_actdesc64_t *)act_desc) :
 
 #endif
 		    *(dof_actdesc_t *)act_desc;
