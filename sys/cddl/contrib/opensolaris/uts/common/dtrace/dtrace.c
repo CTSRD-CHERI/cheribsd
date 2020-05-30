@@ -13240,7 +13240,7 @@ dtrace_dof_create(dtrace_state_t *state)
 }
 
 static dof_hdr_t *
-dtrace_dof_copyin(dtrace_uarg_t uarg, int *errp)
+dtrace_dof_copyin(uintcap_t uarg, int *errp)
 {
 	dof_hdr_t hdr, *dof;
 
@@ -13924,12 +13924,12 @@ dtrace_dof_ecbdesc(dof_hdr_t *dof, dof_sec_t *sec, dtrace_vstate_t *vstate,
 	dtrace_probedesc_t *desc;
 	dtrace_predicate_t *pred = NULL;
 
-	if (sec->dofs_size < sizeof (dof_ecbdesc_t)) {
+	if (sec->dofs_size < sizeof (uint64_t)) {
 		dtrace_dof_error(dof, "truncated ECB description");
 		return (NULL);
 	}
 
-	if (sec->dofs_align != sizeof (dtrace_uarg_t)) {
+	if (sec->dofs_align != sizeof (uint64_t)) {
 		dtrace_dof_error(dof, "bad alignment in ECB description");
 		return (NULL);
 	}

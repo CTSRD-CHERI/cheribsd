@@ -234,7 +234,7 @@ struct dtrace_ecb {
 	uint32_t dte_cond;			/* security condition */
 	dtrace_probe_t *dte_probe;		/* pointer to probe */
 	dtrace_action_t *dte_action_last;	/* last action on ECB */
-	dtrace_uarg_t dte_uarg;			/* library argument */
+	uint64_t dte_uarg;			/* library argument */
 };
 
 struct dtrace_predicate {

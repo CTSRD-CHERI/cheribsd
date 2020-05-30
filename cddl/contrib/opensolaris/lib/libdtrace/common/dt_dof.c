@@ -813,7 +813,7 @@ dtrace_dof_create(dtrace_hdl_t *dtp, dtrace_prog_t *pgp, uint_t flags)
 		dofe.dofe_uarg = edp->dted_uarg;
 
 		(void) dof_add_lsect(ddo, &dofe, DOF_SECT_ECBDESC,
-		    sizeof (dtrace_uarg_t), 0, 0, sizeof (dof_ecbdesc_t));
+		    sizeof (uint64_t), 0, 0, sizeof (dof_ecbdesc_t));
 	}
 
 	/*
