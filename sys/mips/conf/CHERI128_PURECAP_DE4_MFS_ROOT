@@ -18,13 +18,6 @@ makeoptions	EMBED_CHERITEST_LIST=YES
 
 nooptions	SMP
 
-# kernel modules
-options 	TMPFS
-options		FFS
-options		CD9660
-nooptions	MSDOSFS
-nooptions	NFSD, NFSCL
-
 options		DIAGNOSTIC
 options		VERBOSE_SYSINIT
 options		BOOTVERBOSE=1

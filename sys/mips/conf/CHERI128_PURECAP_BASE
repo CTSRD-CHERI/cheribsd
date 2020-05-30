@@ -35,3 +35,10 @@ nooptions	GEOM_RAID
 # networking
 options		INET6
 device		tuntap
+
+# filesystems
+options 	TMPFS
+options		FFS
+options		CD9660
+options		MSDOSFS
+nooptions		NFSD, NFSCL

@@ -8,12 +8,6 @@ ident		CHERI128_PURECAP_MALTA64
 
 hints		"CHERI_MALTA64.hints"  #Default places to look for devices.
 
-# kernel modules
-options		FFS
-options		CD9660
-nooptions	MSDOSFS
-nooptions	NFSD, NFSCL
-
 options		DIAGNOSTIC
 options		VERBOSE_SYSINIT
 options		BOOTVERBOSE=1
