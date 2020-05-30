@@ -35,7 +35,7 @@ SYSCTL_INT(_debug_dtrace, OID_AUTO, verbose_ioctl, CTLFLAG_RW,
 #define DTRACE_IOCTL_PRINTF(fmt, ...)	if (dtrace_verbose_ioctl) printf(fmt, ## __VA_ARGS__ )
 
 #ifdef COMPAT_FREEBSD64
-#define CORRECT_CAP_VERSION(BASE_UNION, FIELD)                      \
+#define GET_COMPAT_FIELD(BASE_UNION, FIELD)                      \
 	(SV_CURPROC_FLAG(SV_CHERI) ? &BASE_UNION.BASE_UNION.FIELD : \
 				     &BASE_UNION.BASE_UNION##_64.FIELD)
 #define SIZEOF(BASE_TYPE) \
@@ -45,7 +45,7 @@ SYSCTL_INT(_debug_dtrace, OID_AUTO, verbose_ioctl, CTLFLAG_RW,
 	(SV_CURPROC_FLAG(SV_CHERI) ? offsetof(BASE_TYPE##_t, FIELD) : \
 				     offsetof(BASE_TYPE##_64_t, FIELD) )
 #else
-#define CORRECT_CAP_VERSION(BASE_UNION, FIELD) &BASE_UNION.BASE_UNION.FIELD
+#define GET_COMPAT_FIELD(BASE_UNION, FIELD) &BASE_UNION.BASE_UNION.FIELD
 #define SIZEOF(BASE_TYPE) (sizeof (BASE_TYPE##_t))
 #define OFFSETOF(BASE_TYPE,FIELD) offsetof(BASE_TYPE##_t, FIELD)
 #endif
@@ -170,11 +170,11 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 		mutex_enter(&dtrace_lock);
 
 		dtrace_aggid_t *dtagd_id =
-		    CORRECT_CAP_VERSION(aggdesc, dtagd_id);
+		    GET_COMPAT_FIELD(aggdesc, dtagd_id);
 		dtrace_epid_t *dtagd_epid =
-		    CORRECT_CAP_VERSION(aggdesc, dtagd_epid);
-		int *dtagd_nrecs = CORRECT_CAP_VERSION(aggdesc, dtagd_nrecs);
-		uint32_t *dtagd_size = CORRECT_CAP_VERSION(aggdesc, dtagd_size);
+		    GET_COMPAT_FIELD(aggdesc, dtagd_epid);
+		int *dtagd_nrecs = GET_COMPAT_FIELD(aggdesc, dtagd_nrecs);
+		uint32_t *dtagd_size = GET_COMPAT_FIELD(aggdesc, dtagd_size);
 
 		if ((agg = dtrace_aggid2agg(state, *dtagd_id)) == NULL) {
 			mutex_exit(&dtrace_lock);
@@ -304,13 +304,13 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 		if (copyincap(pdesc_cap, &desc, sizeof_bufdesc) != 0)
 			return (EFAULT);
 
-		uint64_t *dtbd_size = CORRECT_CAP_VERSION(desc, dtbd_size);
-		uint32_t *dtbd_cpu = CORRECT_CAP_VERSION(desc, dtbd_cpu);
-		uint32_t *dtbd_errors = CORRECT_CAP_VERSION(desc, dtbd_errors);
-		uint64_t *dtbd_drops = CORRECT_CAP_VERSION(desc, dtbd_drops);
-		uint64_t *dtbd_oldest = CORRECT_CAP_VERSION(desc, dtbd_oldest);
+		uint64_t *dtbd_size = GET_COMPAT_FIELD(desc, dtbd_size);
+		uint32_t *dtbd_cpu = GET_COMPAT_FIELD(desc, dtbd_cpu);
+		uint32_t *dtbd_errors = GET_COMPAT_FIELD(desc, dtbd_errors);
+		uint64_t *dtbd_drops = GET_COMPAT_FIELD(desc, dtbd_drops);
+		uint64_t *dtbd_oldest = GET_COMPAT_FIELD(desc, dtbd_oldest);
 		uint64_t *dtbd_timestamp =
-		    CORRECT_CAP_VERSION(desc, dtbd_timestamp);
+		    GET_COMPAT_FIELD(desc, dtbd_timestamp);
 
 		char *__capability desc_dtbd_data =
 #ifdef COMPAT_FREEBSD64
