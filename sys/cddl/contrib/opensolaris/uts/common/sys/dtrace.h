@@ -741,9 +741,9 @@ typedef struct dof_sec {
 	((x) == DOF_SECT_PRENOFFS))
 
 #if __has_feature(capabilities)
-typedef uintcap_t dtrace_uarg_t;
+typedef kuintcap_t dtrace_uarg_t;
 #else
-typedef __uint128_t dtrace_uarg_t;
+typedef uint64_t dtrace_uarg_t;
 #endif
 
 typedef struct dof_ecbdesc {
@@ -751,10 +751,9 @@ typedef struct dof_ecbdesc {
 	dof_secidx_t dofe_pred;		/* link to DOF_SECT_DIFOHDR */
 	dof_secidx_t dofe_actions;	/* link to DOF_SECT_ACTDESC */
 	uint32_t dofe_pad;		/* reserved for future use */
-	dtrace_uarg_t dofe_uarg;		/* user-supplied library argument */
+	uint64_t dofe_uarg;		/* user-supplied library argument */
 } dof_ecbdesc_t;
 
-_Static_assert(sizeof(dof_ecbdesc_t) == 32, "dof_ecbdesc_t has the wrong size");
 
 typedef struct dof_probedesc {
 	dof_secidx_t dofp_strtab;	/* link to DOF_SECT_STRTAB section */
@@ -774,7 +773,16 @@ typedef struct dof_actdesc {
 	dtrace_uarg_t dofa_uarg;
 } dof_actdesc_t;
 
-_Static_assert(sizeof(dof_actdesc_t) == 48, "dof_actdesc_t has thewrong size");
+#ifdef COMPAT_FREEBSD64
+typedef struct dof_actdesc64 {
+	dof_secidx_t dofa_difo;		/* link to DOF_SECT_DIFOHDR */
+	dof_secidx_t dofa_strtab;	/* link to DOF_SECT_STRTAB section */
+	uint32_t dofa_kind;		/* action kind (DTRACEACT_* constant) */
+	uint32_t dofa_ntuple;		/* number of subsequent tuple actions */
+	uint64_t dofa_arg;		/* kind-specific argument */
+	uint64_t dofa_uarg;
+} dof_actdesc_64_t;
+#endif
 
 typedef struct dof_difohdr {
 	dtrace_diftype_t dofd_rtype;	/* return type for this fragment */
@@ -979,17 +987,40 @@ typedef struct dtrace_recdesc {
 	uint16_t dtrd_alignment;		/* required alignment */
 	uint16_t dtrd_format;			/* format, if any */
 	uint64_t dtrd_arg;			/* action argument */
-	dtrace_uarg_t dtrd_uarg;			/* user argument */
+	dtrace_uarg_t dtrd_uarg;		/* user argument */
 } dtrace_recdesc_t;
+
+#ifdef COMPAT_FREEBSD64
+typedef struct dtrace_recdesc64 {
+	dtrace_actkind_t dtrd_action;		/* kind of action */
+	uint32_t dtrd_size;			/* size of record */
+	uint32_t dtrd_offset;			/* offset in ECB's data */
+	uint16_t dtrd_alignment;		/* required alignment */
+	uint16_t dtrd_format;			/* format, if any */
+	uint64_t dtrd_arg;			/* action argument */
+	uint64_t dtrd_uarg;			/* user argument */
+} dtrace_recdesc_64_t;
+#endif
 
 typedef struct dtrace_eprobedesc {
 	dtrace_epid_t dtepd_epid;		/* enabled probe ID */
 	dtrace_id_t dtepd_probeid;		/* probe ID */
-	dtrace_uarg_t dtepd_uarg;			/* library argument */
+	uint64_t dtepd_uarg;			/* library argument */
 	uint32_t dtepd_size;			/* total size */
 	int dtepd_nrecs;			/* number of records */
 	dtrace_recdesc_t dtepd_rec[1];		/* records themselves */
 } dtrace_eprobedesc_t;
+
+#ifdef COMPAT_FREEBSD64
+typedef struct dtrace_eprobedesc_64 {
+	dtrace_epid_t dtepd_epid;		/* enabled probe ID */
+	dtrace_id_t dtepd_probeid;		/* probe ID */
+	uint64_t dtepd_uarg;			/* library argument */
+	uint32_t dtepd_size;			/* total size */
+	int dtepd_nrecs;			/* number of records */
+	dtrace_recdesc_64_t dtepd_rec[1];	/* records themselves */
+} dtrace_eprobedesc_64_t;
+#endif
 
 typedef struct dtrace_aggdesc {
 	DTRACE_PTR(char, dtagd_name);		/* not filled in by kernel */
@@ -1013,7 +1044,7 @@ typedef struct dtrace_aggdesc_64 {
 	uint32_t dtagd_size;			/* size in bytes */
 	int dtagd_nrecs;			/* number of records */
 	uint32_t dtagd_pad;			/* explicit padding */
-	dtrace_recdesc_t dtagd_rec[1];		/* record descriptions */
+	dtrace_recdesc_64_t dtagd_rec[1];		/* record descriptions */
 } dtrace_aggdesc_64_t;
 #endif
 union dtrace_aggdesc_union {
