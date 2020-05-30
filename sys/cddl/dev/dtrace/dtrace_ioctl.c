@@ -38,8 +38,16 @@ SYSCTL_INT(_debug_dtrace, OID_AUTO, verbose_ioctl, CTLFLAG_RW,
 #define CORRECT_CAP_VERSION(BASE_UNION, FIELD)                      \
 	(SV_CURPROC_FLAG(SV_CHERI) ? &BASE_UNION.BASE_UNION.FIELD : \
 				     &BASE_UNION.BASE_UNION##_64.FIELD)
+#define SIZEOF(BASE_TYPE) \
+	(SV_CURPROC_FLAG(SV_CHERI) ? sizeof (BASE_TYPE##_t) : \
+				     sizeof (BASE_TYPE##_64_t) )
+#define OFFSETOF(BASE_TYPE,FIELD) \
+	(SV_CURPROC_FLAG(SV_CHERI) ? offsetof(BASE_TYPE##_t, FIELD) : \
+				     offsetof(BASE_TYPE##_64_t, FIELD) )
 #else
 #define CORRECT_CAP_VERSION(BASE_UNION, FIELD) &BASE_UNION.BASE_UNION.FIELD
+#define SIZEOF(BASE_TYPE) (sizeof (BASE_TYPE##_t))
+#define OFFSETOF(BASE_TYPE,FIELD) offsetof(BASE_TYPE##_t, FIELD)
 #endif
 
 static int
@@ -211,33 +219,29 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 		 * the temporary buffer to be able to drop dtrace_lock()
 		 * across the copyout(), below.
 		 */
-		size_t sizeof_aggdesc =
-#ifdef COMPAT_FREEBSD64
-		    !SV_CURPROC_FLAG(SV_CHERI) ? sizeof(dtrace_aggdesc_64_t) :
-#endif
-						 sizeof(dtrace_aggdesc_t);
-		size =
-		    sizeof_aggdesc + (*dtagd_nrecs * sizeof(dtrace_recdesc_t));
+		size = SIZEOF(dtrace_aggdesc) +
+		    (*dtagd_nrecs * SIZEOF(dtrace_recdesc));
 
 		buf = kmem_alloc(size, KM_SLEEP);
 		dest = (uintptr_t)buf;
 
-		bcopy(&aggdesc, (void *)dest, sizeof_aggdesc);
-		dest +=
-#ifdef COMPAT_FREEBSD64
-		    !SV_CURPROC_FLAG(SV_CHERI) ?
-		    offsetof(dtrace_aggdesc_64_t, dtagd_rec[0]) :
-#endif
-		    offsetof(dtrace_aggdesc_t, dtagd_rec[0]);
+		bcopy(&aggdesc, (void *)dest, SIZEOF(dtrace_aggdesc));
+		dest += OFFSETOF(dtrace_aggdesc, dtagd_rec[0]);
+
 
 		for (act = agg->dtag_first; ; act = act->dta_next) {
-			dtrace_recdesc_t rec = act->dta_rec;
+
+			/* using the following line doesn't work: it seems that
+			 * the compiler is doing some optimisation, and rec ends
+			 * up being all zero.
+			 * dtrace_recdesc_t rec = act->dta_rec;
+			 */
 
 			/*
 			 * See the comment in the above loop for why we pass
 			 * over zero-length records.
 			 */
-			if (rec.dtrd_size == 0) {
+			if (act->dta_rec.dtrd_size == 0) {
 				ASSERT(agg->dtag_hasarg);
 				continue;
 			}
@@ -245,9 +249,18 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 			if (nrecs-- == 0)
 				break;
 
-			rec.dtrd_offset -= offs;
-			bcopy(&rec, (void *)dest, sizeof (rec));
-			dest += sizeof (dtrace_recdesc_t);
+			act->dta_rec.dtrd_offset -= offs;
+			bcopy(&act->dta_rec, (void *)dest,
+			    SIZEOF(dtrace_recdesc));
+#ifdef COMPAT_FREEBSD64
+			/* Only the last field is a capability*/
+			if (!SV_CURPROC_FLAG(SV_CHERI))
+				((dtrace_recdesc_64_t *)dest)->dtrd_uarg =
+				    (__cheri_addr uint64_t)act->dta_rec.dtrd_uarg;
+#endif
+			act->dta_rec.dtrd_offset += offs;
+
+			dest += SIZEOF(dtrace_recdesc);
 
 			if (act == &agg->dtag_action)
 				break;
@@ -593,7 +606,7 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 #endif
 		    *(dtrace_eprobedesc_t * __capability *)addr;
 
-		if (copyincap(pepdesc_cap, &epdesc, sizeof(epdesc)) != 0)
+		if (copyincap(pepdesc_cap, &epdesc, SIZEOF(dtrace_eprobedesc)) != 0)
 			return (EFAULT);
 
 		mutex_enter(&dtrace_lock);
@@ -627,14 +640,14 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 		 * the temporary buffer to be able to drop dtrace_lock()
 		 * across the copyout(), below.
 		 */
-		size = sizeof (dtrace_eprobedesc_t) +
-		    (epdesc.dtepd_nrecs * sizeof (dtrace_recdesc_t));
+		size = SIZEOF(dtrace_eprobedesc) +
+		    (epdesc.dtepd_nrecs * SIZEOF(dtrace_recdesc));
 
 		buf = kmem_alloc(size, KM_SLEEP);
 		dest = (uintptr_t)buf;
 
-		bcopy(&epdesc, (void *)dest, sizeof (epdesc));
-		dest += offsetof(dtrace_eprobedesc_t, dtepd_rec[0]);
+		bcopy(&epdesc, (void *)dest, SIZEOF(dtrace_eprobedesc));
+		dest += OFFSETOF(dtrace_eprobedesc, dtepd_rec[0]);
 
 		for (act = ecb->dte_action; act != NULL; act = act->dta_next) {
 			if (DTRACEACT_ISAGG(act->dta_kind) || act->dta_intuple)
@@ -644,8 +657,15 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 				break;
 
 			bcopy(&act->dta_rec, (void *)dest,
-			    sizeof (dtrace_recdesc_t));
-			dest += sizeof (dtrace_recdesc_t);
+			    SIZEOF(dtrace_recdesc));
+#ifdef COMPAT_FREEBSD64
+			/* Only the last field is a capability*/
+			if (!SV_CURPROC_FLAG(SV_CHERI))
+				((dtrace_recdesc_64_t *)dest)->dtrd_uarg =
+				    (__cheri_addr uint64_t)
+					act->dta_rec.dtrd_uarg;
+#endif
+			dest += SIZEOF(dtrace_recdesc);
 		}
 
 		mutex_exit(&dtrace_lock);
