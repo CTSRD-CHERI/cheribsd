@@ -789,7 +789,7 @@ typedef struct dof_actdesc64 {
 	uint32_t dofa_ntuple;		/* number of subsequent tuple actions */
 	uint64_t dofa_arg;		/* kind-specific argument */
 	uint64_t dofa_uarg;
-} dof_actdesc_64_t;
+} dof_actdesc64_t;
 #endif
 
 typedef struct dof_difohdr {
@@ -1007,7 +1007,7 @@ typedef struct dtrace_recdesc64 {
 	uint16_t dtrd_format;			/* format, if any */
 	uint64_t dtrd_arg;			/* action argument */
 	uint64_t dtrd_uarg;			/* user argument */
-} dtrace_recdesc_64_t;
+} dtrace_recdesc64_t;
 #endif
 
 typedef struct dtrace_eprobedesc {
@@ -1026,8 +1026,8 @@ typedef struct dtrace_eprobedesc_64 {
 	uint64_t dtepd_uarg;			/* library argument */
 	uint32_t dtepd_size;			/* total size */
 	int dtepd_nrecs;			/* number of records */
-	dtrace_recdesc_64_t dtepd_rec[1];	/* records themselves */
-} dtrace_eprobedesc_64_t;
+	dtrace_recdesc64_t dtepd_rec[1];	/* records themselves */
+} dtrace_eprobedesc64_t;
 #endif
 
 typedef struct dtrace_aggdesc {
@@ -1052,13 +1052,13 @@ typedef struct dtrace_aggdesc_64 {
 	uint32_t dtagd_size;			/* size in bytes */
 	int dtagd_nrecs;			/* number of records */
 	uint32_t dtagd_pad;			/* explicit padding */
-	dtrace_recdesc_64_t dtagd_rec[1];		/* record descriptions */
-} dtrace_aggdesc_64_t;
+	dtrace_recdesc64_t dtagd_rec[1];		/* record descriptions */
+} dtrace_aggdesc64_t;
 #endif
 union dtrace_aggdesc_union {
 	dtrace_aggdesc_t aggdesc;
 #ifdef COMPAT_FREEBSD64
-	dtrace_aggdesc_64_t aggdesc_64;
+	dtrace_aggdesc64_t aggdesc_64;
 #endif
 };
 
@@ -1073,7 +1073,7 @@ typedef struct dtrace_fmtdesc_64 {
 	uint64_t dtfd_string; // char *		/* format string */
 	int dtfd_length;			/* length of format string */
 	uint16_t dtfd_format;			/* format identifier */
-} dtrace_fmtdesc_64_t;
+} dtrace_fmtdesc64_t;
 #endif
 
 #define	DTRACE_SIZEOF_EPROBEDESC(desc)				\
@@ -1176,12 +1176,12 @@ typedef struct dtrace_bufdesc_64 {
 	uint64_t dtbd_data; // char *		/* data */
 	uint64_t dtbd_oldest;			/* offset of oldest record */
 	uint64_t dtbd_timestamp;		/* hrtime of snapshot */
-} dtrace_bufdesc_64_t;
+} dtrace_bufdesc64_t;
 #endif
 union dtrace_bufdesc_union {
 	dtrace_bufdesc_t desc; // base version
 #ifdef COMPAT_FREEBSD64
-	dtrace_bufdesc_64_t desc_64; // with capabilities
+	dtrace_bufdesc64_t desc_64; // with capabilities
 #endif
 };
 /*
@@ -1405,7 +1405,7 @@ typedef struct {
 typedef struct {
 	uint64_t dof; // void * /* DOF userland address written to driver. */
 	int 	n_matched;	/* # matches returned by driver. */
-} dtrace_enable_io_64_t;
+} dtrace_enable_io64_t;
 #endif
 #define	DTRACEIOC_ENABLE	_IOWR('x',6,dtrace_enable_io_t)
 							/* enable probes */
@@ -1433,16 +1433,16 @@ typedef struct {
 							/* replicate enab */
 #ifdef COMPAT_FREEBSD64
 #define DTRACEIOC_BUFSNAP_64 \
-	_IOC_NEWTYPE(DTRACEIOC_BUFSNAP, dtrace_bufdesc_64_t *)
+	_IOC_NEWTYPE(DTRACEIOC_BUFSNAP, dtrace_bufdesc64_t *)
 #define DTRACEIOC_ENABLE_64 \
-	_IOC_NEWTYPE(DTRACEIOC_ENABLE, dtrace_enable_io_64_t)
+	_IOC_NEWTYPE(DTRACEIOC_ENABLE, dtrace_enable_io64_t)
 #define DTRACEIOC_AGGSNAP_64 \
-	_IOC_NEWTYPE(DTRACEIOC_AGGSNAP, dtrace_bufdesc_64_t *)
+	_IOC_NEWTYPE(DTRACEIOC_AGGSNAP, dtrace_bufdesc64_t *)
 #define DTRACEIOC_EPROBE_64 \
 	_IOC_NEWTYPE(DTRACEIOC_EPROBE, dtrace_eprobedesc_t *)
 #define DTRACEIOC_AGGDESC_64 \
-	_IOC_NEWTYPE(DTRACEIOC_AGGDESC, dtrace_aggdesc_64_t *)
-#define DTRACEIOC_FORMAT_64 _IOC_NEWTYPE(DTRACEIOC_FORMAT, dtrace_fmtdesc_64_t)
+	_IOC_NEWTYPE(DTRACEIOC_AGGDESC, dtrace_aggdesc64_t *)
+#define DTRACEIOC_FORMAT_64 _IOC_NEWTYPE(DTRACEIOC_FORMAT, dtrace_fmtdesc64_t)
 #define DTRACEIOC_DOFGET_64 _IOC_NEWTYPE(DTRACEIOC_DOFGET, dof_hdr_t *)
 #endif
 
