@@ -22,8 +22,6 @@
  *
  */
 
-#define EXPLICIT_USER_ACCESS
-
 #include <sys/sysent.h>
 #include <cddl/contrib/opensolaris/uts/common/sys/dtrace.h>
 #include <sys/systm.h>
