@@ -806,16 +806,28 @@ dt_module_load(dtrace_hdl_t *dtp, dt_module_t *dmp)
 	dmp->dm_strtab.cts_entsize = 0;
 	dmp->dm_strtab.cts_offset = 0;
 
-	// TODO: remove this when we are able to load the kernel symtable
+	/* TODO: remove this when we are able to load the kernel symtable */
 #ifdef __mips__
-	if (strcmp(dmp->dm_name,"kernel") == 0) {
-		dt_dprintf(
-		    "LOADING .dynsym INSTEAD OF .symtab FOR MIPS! "
-		    "A lot of symbols will be missing\n");
-		dmp->dm_symtab.cts_name = ".dynsym";
-		dmp->dm_symtab.cts_type = SHT_DYNSYM;
-		// The string table for .dynsym is .dynstr, not .strtab.
-		dmp->dm_strtab.cts_name = ".dynstr";
+	if (strcmp(dmp->dm_name, "kernel") == 0) {
+		/*
+		 * Let's try to load the symtab. If it is empty, then let's
+		 * default to the dynsym.
+		 */
+		if (dt_module_load_sect(dtp, dmp, &dmp->dm_symtab) == -1 ||
+		    dmp->dm_symtab.cts_size == 0) {
+
+			dt_dprintf(
+			    "LOADING .dynsym INSTEAD OF .symtab FOR MIPS! "
+			    "A lot of symbols will be missing\n");
+			dmp->dm_symtab.cts_name = ".dynsym";
+			dmp->dm_symtab.cts_type = SHT_DYNSYM;
+			dmp->dm_symtab.cts_flags = 0;
+			dmp->dm_symtab.cts_data = NULL;
+			dmp->dm_symtab.cts_size = 0;
+			dmp->dm_symtab.cts_offset = 0;
+			/* The str table for .dynsym is .dynstr, not .strtab. */
+			dmp->dm_strtab.cts_name = ".dynstr";
+		}
 	}
 #endif
 
