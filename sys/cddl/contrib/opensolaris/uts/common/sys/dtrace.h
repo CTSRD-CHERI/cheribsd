@@ -1012,7 +1012,7 @@ typedef struct dtrace_eprobedesc {
 } dtrace_eprobedesc_t;
 
 #ifdef COMPAT_FREEBSD64
-typedef struct dtrace_eprobedesc_64 {
+typedef struct dtrace_eprobedesc64 {
 	dtrace_epid_t dtepd_epid;		/* enabled probe ID */
 	dtrace_id_t dtepd_probeid;		/* probe ID */
 	uint64_t dtepd_uarg;			/* library argument */
@@ -1035,7 +1035,7 @@ typedef struct dtrace_aggdesc {
 } dtrace_aggdesc_t;
 
 #ifdef COMPAT_FREEBSD64
-typedef struct dtrace_aggdesc_64 {
+typedef struct dtrace_aggdesc64 {
 	uint64_t tagd_name; // char *		/* not filled in by kernel */
 	dtrace_aggvarid_t dtagd_varid;		/* not filled in by kernel */
 	int dtagd_flags;			/* not filled in by kernel */
@@ -1055,7 +1055,7 @@ typedef struct dtrace_fmtdesc {
 } dtrace_fmtdesc_t;
 
 #ifdef COMPAT_FREEBSD64
-typedef struct dtrace_fmtdesc_64 {
+typedef struct dtrace_fmtdesc64 {
 	uint64_t dtfd_string; // char *		/* format string */
 	int dtfd_length;			/* length of format string */
 	uint16_t dtfd_format;			/* format identifier */
@@ -1154,7 +1154,7 @@ typedef struct dtrace_bufdesc {
 } dtrace_bufdesc_t;
 
 #ifdef COMPAT_FREEBSD64
-typedef struct dtrace_bufdesc_64 {
+typedef struct dtrace_bufdesc64 {
 	uint64_t dtbd_size;			/* size of buffer */
 	uint32_t dtbd_cpu;			/* CPU or DTRACE_CPUALL */
 	uint32_t dtbd_errors;			/* number of errors */
@@ -1412,18 +1412,18 @@ typedef struct {
 #define	DTRACEIOC_REPLICATE	_IOW('x',18,dtrace_repldesc_t)	
 							/* replicate enab */
 #ifdef COMPAT_FREEBSD64
-#define DTRACEIOC_BUFSNAP_64 \
+#define DTRACEIOC_BUFSNAP64 \
 	_IOC_NEWTYPE(DTRACEIOC_BUFSNAP, dtrace_bufdesc64_t *)
-#define DTRACEIOC_ENABLE_64 \
+#define DTRACEIOC_ENABLE64 \
 	_IOC_NEWTYPE(DTRACEIOC_ENABLE, dtrace_enable_io64_t)
-#define DTRACEIOC_AGGSNAP_64 \
+#define DTRACEIOC_AGGSNAP64 \
 	_IOC_NEWTYPE(DTRACEIOC_AGGSNAP, dtrace_bufdesc64_t *)
-#define DTRACEIOC_EPROBE_64 \
+#define DTRACEIOC_EPROBE64 \
 	_IOC_NEWTYPE(DTRACEIOC_EPROBE, dtrace_eprobedesc_t *)
-#define DTRACEIOC_AGGDESC_64 \
+#define DTRACEIOC_AGGDESC64 \
 	_IOC_NEWTYPE(DTRACEIOC_AGGDESC, dtrace_aggdesc64_t *)
-#define DTRACEIOC_FORMAT_64 _IOC_NEWTYPE(DTRACEIOC_FORMAT, dtrace_fmtdesc64_t)
-#define DTRACEIOC_DOFGET_64 _IOC_NEWTYPE(DTRACEIOC_DOFGET, dof_hdr_t *)
+#define DTRACEIOC_FORMAT64 _IOC_NEWTYPE(DTRACEIOC_FORMAT, dtrace_fmtdesc64_t)
+#define DTRACEIOC_DOFGET64 _IOC_NEWTYPE(DTRACEIOC_DOFGET, dof_hdr_t *)
 #endif
 
 #endif
