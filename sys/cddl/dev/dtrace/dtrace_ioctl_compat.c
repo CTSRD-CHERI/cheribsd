@@ -156,7 +156,7 @@ copyin_aggdesc(dtrace_aggdesc_t *__capability uaddr, dtrace_aggdesc_t *aggdesc)
 }
 
 #define CASE(VAL)      \
-	case VAL##_64: \
+	case VAL##64: \
 		return VAL
 
 static u_long
