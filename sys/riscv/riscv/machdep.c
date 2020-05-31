@@ -988,11 +988,6 @@ vm_offset_t
 fake_preload_metadata(struct riscv_bootparams *rvbp)
 {
 	static uint32_t fake_preload[35];
-#ifdef DDB
-#if 0
-	vm_offset_t zstart = 0, zend = 0;
-#endif
-#endif
 	vm_offset_t lastaddr;
 	size_t fake_size, dtb_size;
 
@@ -1011,6 +1006,7 @@ fake_preload_metadata(struct riscv_bootparams *rvbp)
 } while (0)
 
 	fake_size = 0;
+	lastaddr = (vm_offset_t)&end;
 
 	PRELOAD_PUSH_VALUE(uint32_t, MODINFO_NAME);
 	PRELOAD_PUSH_STRING("kernel");
@@ -1024,24 +1020,6 @@ fake_preload_metadata(struct riscv_bootparams *rvbp)
 	PRELOAD_PUSH_VALUE(uint32_t, MODINFO_SIZE);
 	PRELOAD_PUSH_VALUE(uint32_t, sizeof(size_t));
 	PRELOAD_PUSH_VALUE(uint64_t, (size_t)((vm_offset_t)&end - KERNBASE));
-#ifdef DDB
-#if 0
-	/* RISCVTODO */
-	if (*(uint32_t *)KERNVIRTADDR == MAGIC_TRAMP_NUMBER) {
-		fake_preload[i++] = MODINFO_METADATA|MODINFOMD_SSYM;
-		fake_preload[i++] = sizeof(vm_offset_t);
-		fake_preload[i++] = *(uint32_t *)(KERNVIRTADDR + 4);
-		fake_preload[i++] = MODINFO_METADATA|MODINFOMD_ESYM;
-		fake_preload[i++] = sizeof(vm_offset_t);
-		fake_preload[i++] = *(uint32_t *)(KERNVIRTADDR + 8);
-		lastaddr = *(uint32_t *)(KERNVIRTADDR + 8);
-		zend = lastaddr;
-		zstart = *(uint32_t *)(KERNVIRTADDR + 4);
-		db_fetch_ksymtab(zstart, zend);
-	} else
-#endif
-#endif
-		lastaddr = (vm_offset_t)&end;
 
 	/* Copy the DTB to KVA space. */
 	lastaddr = roundup(lastaddr, sizeof(int));
