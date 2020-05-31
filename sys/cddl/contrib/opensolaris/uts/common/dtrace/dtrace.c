@@ -13948,7 +13948,7 @@ dtrace_dof_ecbdesc(dof_hdr_t *dof, dof_sec_t *sec, dtrace_vstate_t *vstate,
 	dtrace_probedesc_t *desc;
 	dtrace_predicate_t *pred = NULL;
 
-	if (sec->dofs_size < sizeof (uint64_t)) {
+	if (sec->dofs_size < sizeof (dof_ecbdesc_t)) {
 		dtrace_dof_error(dof, "truncated ECB description");
 		return (NULL);
 	}
