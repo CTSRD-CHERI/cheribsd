@@ -13982,6 +13982,7 @@ dtrace_dof_actdesc(dof_hdr_t *dof, dof_sec_t *sec, dtrace_vstate_t *vstate,
 				arg = desc->dofa_arg;
 			}
 		}
+
 		act = dtrace_actdesc_create(kind, desc->dofa_ntuple,
 		    desc->dofa_uarg, arg);
 
