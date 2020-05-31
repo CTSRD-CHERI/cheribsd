@@ -217,8 +217,8 @@ dtrace_trap(struct trapframe *frame, u_int type)
 				    0, 0);
  				*/
 				panic("%s: delay slot at %jx, badvaddr = %jx\n",
-				    __func__, TRAPF_PC(frame),
-				    (intmax_t)frame->badvaddr);
+				    __func__,
+				    (intmax_t)frame->pc, (intmax_t)frame->badvaddr);
 			}
 			else
  				TRAPF_PC_INCREMENT(frame, sizeof(int));
