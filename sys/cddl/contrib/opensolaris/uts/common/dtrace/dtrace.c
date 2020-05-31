@@ -13921,6 +13921,7 @@ dtrace_dof_actdesc(dof_hdr_t *dof, dof_sec_t *sec, dtrace_vstate_t *vstate,
 		dtrace_dof_error(dof, "actions exceed dtrace_actions_max");
 		return (NULL);
 	}
+
 	for (offs = 0; offs < sec->dofs_size; offs += sec->dofs_entsize) {
 		uintptr_t act_desc = daddr + (uintptr_t)sec->dofs_offset + offs;
 		_desc =
