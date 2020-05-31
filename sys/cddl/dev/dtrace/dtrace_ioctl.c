@@ -132,8 +132,7 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 	cmd = dtrace_translate_ioctl_to_native(cmd);
 	switch (cmd) {
 	case DTRACEIOC_AGGDESC: {
-		dtrace_aggdesc_t *__capability paggdesc =
-		    make_aggdesc_cap(addr);
+		void *__capability paggdesc = make_aggdesc_cap(addr);
 		dtrace_aggdesc_t aggdesc;
 		dtrace_action_t *act;
 		dtrace_aggregation_t *agg;
@@ -487,8 +486,7 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 		return (err);
 	}
 	case DTRACEIOC_EPROBE: {
-		dtrace_eprobedesc_t *__capability pepdesc =
-		    make_eprobedesc_cap(addr);
+		void *__capability pepdesc = make_eprobedesc_cap(addr);
 		dtrace_eprobedesc_t epdesc;
 		dtrace_ecb_t *ecb;
 		dtrace_action_t *act;
