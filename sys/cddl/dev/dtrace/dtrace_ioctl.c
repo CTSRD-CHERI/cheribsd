@@ -25,6 +25,7 @@
 #include <sys/sysent.h>
 #include <cddl/contrib/opensolaris/uts/common/sys/dtrace.h>
 #include <sys/systm.h>
+#include <dtrace_ioctl_compat.c>
 
 static int dtrace_verbose_ioctl;
 SYSCTL_INT(_debug_dtrace, OID_AUTO, verbose_ioctl, CTLFLAG_RW,
@@ -33,9 +34,6 @@ SYSCTL_INT(_debug_dtrace, OID_AUTO, verbose_ioctl, CTLFLAG_RW,
 #define DTRACE_IOCTL_PRINTF(fmt, ...)	if (dtrace_verbose_ioctl) printf(fmt, ## __VA_ARGS__ )
 
 #ifdef COMPAT_FREEBSD64
-#define GET_COMPAT_FIELD(BASE_UNION, FIELD)                      \
-	(SV_CURPROC_FLAG(SV_CHERI) ? &BASE_UNION.BASE_UNION.FIELD : \
-				     &BASE_UNION.BASE_UNION##_64.FIELD)
 #define SIZEOF(BASE_TYPE) \
 	(SV_CURPROC_FLAG(SV_CHERI) ? sizeof (BASE_TYPE##_t) : \
 				     sizeof (BASE_TYPE##64_t) )
@@ -43,7 +41,6 @@ SYSCTL_INT(_debug_dtrace, OID_AUTO, verbose_ioctl, CTLFLAG_RW,
 	(SV_CURPROC_FLAG(SV_CHERI) ? offsetof(BASE_TYPE##_t, FIELD) : \
 				     offsetof(BASE_TYPE##64_t, FIELD) )
 #else
-#define GET_COMPAT_FIELD(BASE_UNION, FIELD) &BASE_UNION.BASE_UNION.FIELD
 #define SIZEOF(BASE_TYPE) (sizeof (BASE_TYPE##_t))
 #define OFFSETOF(BASE_TYPE,FIELD) offsetof(BASE_TYPE##_t, FIELD)
 #endif
@@ -119,7 +116,6 @@ dtrace_ioctl_helper(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 	return (rval);
 #endif
 }
-
 /* ARGSUSED */
 static int
 dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
@@ -136,13 +132,12 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 		ASSERT(dtrace_anon.dta_state == NULL);
 		state = state->dts_anon;
 	}
-
+	cmd = dtrace_translate_ioctl_to_native(cmd);
 	switch (cmd) {
-#ifdef COMPAT_FREEBSD64
-	case DTRACEIOC_AGGDESC_64:
-#endif
 	case DTRACEIOC_AGGDESC: {
-		union dtrace_aggdesc_union aggdesc;
+		dtrace_aggdesc_t *__capability paggdesc =
+		    make_aggdesc_cap(addr);
+		dtrace_aggdesc_t aggdesc;
 		dtrace_action_t *act;
 		dtrace_aggregation_t *agg;
 		int nrecs;
@@ -152,41 +147,26 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 		size_t size;
 		uintptr_t dest;
 
-		DTRACE_IOCTL_PRINTF(
-		    "%s(%d): DTRACEIOC_AGGDESC\n", __func__, __LINE__);
+		DTRACE_IOCTL_PRINTF("%s(%d): DTRACEIOC_AGGDESC\n",__func__,__LINE__);
 
-		dtrace_aggdesc_t *__capability paggdesc_cap =
-#ifdef COMPAT_FREEBSD64
-		    !SV_CURPROC_FLAG(SV_CHERI) ?
-		    __USER_CAP_OBJ(*(dtrace_aggdesc_t **)addr) :
-#endif
-		    *(dtrace_aggdesc_t * __capability *)addr;
-
-		if (copyincap(paggdesc_cap, &aggdesc, sizeof(aggdesc)) != 0)
+		if (copyin_aggdesc(paggdesc, &aggdesc) != 0)
 			return (EFAULT);
 
 		mutex_enter(&dtrace_lock);
 
-		dtrace_aggid_t *dtagd_id =
-		    GET_COMPAT_FIELD(aggdesc, dtagd_id);
-		dtrace_epid_t *dtagd_epid =
-		    GET_COMPAT_FIELD(aggdesc, dtagd_epid);
-		int *dtagd_nrecs = GET_COMPAT_FIELD(aggdesc, dtagd_nrecs);
-		uint32_t *dtagd_size = GET_COMPAT_FIELD(aggdesc, dtagd_size);
-
-		if ((agg = dtrace_aggid2agg(state, *dtagd_id)) == NULL) {
+		if ((agg = dtrace_aggid2agg(state, aggdesc.dtagd_id)) == NULL) {
 			mutex_exit(&dtrace_lock);
 			return (EINVAL);
 		}
 
-		*dtagd_epid = agg->dtag_ecb->dte_epid;
+		aggdesc.dtagd_epid = agg->dtag_ecb->dte_epid;
 
-		nrecs = *dtagd_nrecs;
-		*dtagd_nrecs = 0;
+		nrecs = aggdesc.dtagd_nrecs;
+		aggdesc.dtagd_nrecs = 0;
 
 		offs = agg->dtag_base;
 		lrec = &agg->dtag_action.dta_rec;
-		*dtagd_size = lrec->dtrd_offset + lrec->dtrd_size - offs;
+		aggdesc.dtagd_size = lrec->dtrd_offset + lrec->dtrd_size - offs;
 
 		for (act = agg->dtag_first; ; act = act->dta_next) {
 			ASSERT(act->dta_intuple ||
@@ -205,7 +185,7 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 				continue;
 			}
 
-			(*dtagd_nrecs)++;
+			aggdesc.dtagd_nrecs++;
 
 			if (act == &agg->dtag_action)
 				break;
@@ -218,12 +198,12 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 		 * across the copyout(), below.
 		 */
 		size = SIZEOF(dtrace_aggdesc) +
-		    (*dtagd_nrecs * SIZEOF(dtrace_recdesc));
+		    (aggdesc.dtagd_nrecs * SIZEOF(dtrace_recdesc));
 
 		buf = kmem_alloc(size, KM_SLEEP);
 		dest = (uintptr_t)buf;
 
-		bcopy(&aggdesc, (void *)dest, SIZEOF(dtrace_aggdesc));
+		bcopy_aggdesc(&aggdesc, (void *)dest);
 		dest += OFFSETOF(dtrace_aggdesc, dtagd_rec[0]);
 
 
@@ -248,16 +228,8 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 				break;
 
 			act->dta_rec.dtrd_offset -= offs;
-			bcopy(&act->dta_rec, (void *)dest,
-			    SIZEOF(dtrace_recdesc));
-#ifdef COMPAT_FREEBSD64
-			/* Only the last field is a capability*/
-			if (!SV_CURPROC_FLAG(SV_CHERI))
-				((dtrace_recdesc64_t *)dest)->dtrd_uarg =
-				    (__cheri_addr uint64_t)act->dta_rec.dtrd_uarg;
-#endif
+			bcopy_recdesc(&act->dta_rec, (void *)dest);
 			act->dta_rec.dtrd_offset += offs;
-
 			dest += SIZEOF(dtrace_recdesc);
 
 			if (act == &agg->dtag_action)
@@ -266,7 +238,7 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 
 		mutex_exit(&dtrace_lock);
 
-		if (copyoutcap(buf, paggdesc_cap, dest - (uintptr_t)buf) != 0) {
+		if (copyoutcap(buf, paggdesc, dest - (uintptr_t)buf) != 0) {
 			kmem_free(buf, size);
 			return (EFAULT);
 		}
@@ -274,68 +246,33 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 		kmem_free(buf, size);
 		return (0);
 	}
-#ifdef COMPAT_FREEBSD64
-	case DTRACEIOC_AGGSNAP_64:
-	case DTRACEIOC_BUFSNAP_64:
-#endif
 	case DTRACEIOC_AGGSNAP:
 	case DTRACEIOC_BUFSNAP: {
-		union dtrace_bufdesc_union desc;
+		dtrace_bufdesc_t *__capability pdesc = make_buffdesc_cap(addr);
+		dtrace_bufdesc_t desc;
 		caddr_t cached;
 		dtrace_buffer_t *buf;
 
 		dtrace_debug_output();
 
-		dtrace_bufdesc_t *__capability pdesc_cap =
-#ifdef COMPAT_FREEBSD64
-		    !SV_CURPROC_FLAG(SV_CHERI) ?
-		    __USER_CAP_OBJ(*(dtrace_bufdesc_t **)addr) :
-#endif
-		    *(dtrace_bufdesc_t * __capability *)addr;
-
-		size_t sizeof_bufdesc =
-#ifdef COMPAT_FREEBSD64
-		    !SV_CURPROC_FLAG(SV_CHERI) ? sizeof(desc.desc_64) :
-#endif
-						 sizeof(desc.desc);
-
-		if (copyincap(pdesc_cap, &desc, sizeof_bufdesc) != 0)
+		if (copyin_buffdesc(pdesc, &desc) != 0)
 			return (EFAULT);
-
-		uint64_t *dtbd_size = GET_COMPAT_FIELD(desc, dtbd_size);
-		uint32_t *dtbd_cpu = GET_COMPAT_FIELD(desc, dtbd_cpu);
-		uint32_t *dtbd_errors = GET_COMPAT_FIELD(desc, dtbd_errors);
-		uint64_t *dtbd_drops = GET_COMPAT_FIELD(desc, dtbd_drops);
-		uint64_t *dtbd_oldest = GET_COMPAT_FIELD(desc, dtbd_oldest);
-		uint64_t *dtbd_timestamp =
-		    GET_COMPAT_FIELD(desc, dtbd_timestamp);
-
-		char *__capability desc_dtbd_data =
-#ifdef COMPAT_FREEBSD64
-		    !SV_CURPROC_FLAG(SV_CHERI) ?
-		    __USER_CAP_STR(desc.desc_64.dtbd_data) :
-#endif
-		    desc.desc.dtbd_data;
 
 		DTRACE_IOCTL_PRINTF("%s(%d): %s curcpu %d cpu %d\n",
 		    __func__,__LINE__,
 		    cmd == DTRACEIOC_AGGSNAP ?
 		    "DTRACEIOC_AGGSNAP":"DTRACEIOC_BUFSNAP",
-		    curcpu, *dtbd_cpu);
+		    curcpu, desc.dtbd_cpu);
 
-		if (*dtbd_cpu >= MAXCPU || CPU_ABSENT(*dtbd_cpu))
+		if (desc.dtbd_cpu >= MAXCPU || CPU_ABSENT(desc.dtbd_cpu))
 			return (ENOENT);
 
 		mutex_enter(&dtrace_lock);
 
-		if (cmd == DTRACEIOC_BUFSNAP
-#ifdef COMPAT_FREEBSD64
-		    || cmd == DTRACEIOC_BUFSNAP_64
-#endif
-		) {
-			buf = &state->dts_buffer[*dtbd_cpu];
+		if (cmd == DTRACEIOC_BUFSNAP) {
+			buf = &state->dts_buffer[desc.dtbd_cpu];
 		} else {
-			buf = &state->dts_aggbuffer[*dtbd_cpu];
+			buf = &state->dts_aggbuffer[desc.dtbd_cpu];
 		}
 
 		if (buf->dtb_flags & (DTRACEBUF_RING | DTRACEBUF_FILL)) {
@@ -354,13 +291,13 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 			if (buf->dtb_flags & DTRACEBUF_CONSUMED) {
 				mutex_exit(&dtrace_lock);
 
-				*dtbd_size = 0;
-				*dtbd_drops = 0;
-				*dtbd_errors = 0;
-				*dtbd_oldest = 0;
-				sz = sizeof_bufdesc;
+				desc.dtbd_size = 0;
+				desc.dtbd_drops = 0;
+				desc.dtbd_errors = 0;
+				desc.dtbd_oldest = 0;
+				sz = sizeof (desc);
 
-				if (copyoutcap(&desc, pdesc_cap, sz) != 0)
+				if (copyout_buffdesc(&desc, pdesc) != 0)
 					return (EFAULT);
 
 				return (0);
@@ -375,21 +312,20 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 				sz = buf->dtb_size;
 			}
 
-			if (copyout(buf->dtb_tomax, desc_dtbd_data, sz) !=
-			    0) {
+			if (copyout(buf->dtb_tomax, desc.dtbd_data, sz) != 0) {
 				mutex_exit(&dtrace_lock);
 				return (EFAULT);
 			}
 
-			*dtbd_size = sz;
-			*dtbd_drops = buf->dtb_drops;
-			*dtbd_errors = buf->dtb_errors;
-			*dtbd_oldest = buf->dtb_xamot_offset;
-			*dtbd_timestamp = dtrace_gethrtime();
+			desc.dtbd_size = sz;
+			desc.dtbd_drops = buf->dtb_drops;
+			desc.dtbd_errors = buf->dtb_errors;
+			desc.dtbd_oldest = buf->dtb_xamot_offset;
+			desc.dtbd_timestamp = dtrace_gethrtime();
 
 			mutex_exit(&dtrace_lock);
 
-			if (copyoutcap(&desc, pdesc_cap, sizeof_bufdesc) != 0)
+			if (copyout_buffdesc(&desc, pdesc) != 0)
 				return (EFAULT);
 
 			buf->dtb_flags |= DTRACEBUF_CONSUMED;
@@ -406,7 +342,7 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 		cached = buf->dtb_tomax;
 		ASSERT(!(buf->dtb_flags & DTRACEBUF_NOSWITCH));
 
-		dtrace_xcall(*dtbd_cpu,
+		dtrace_xcall(desc.dtbd_cpu,
 		    (dtrace_xcall_t)dtrace_buffer_switch, buf);
 
 		state->dts_errors += buf->dtb_xamot_errors;
@@ -430,26 +366,26 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 		/*
 		 * We have our snapshot; now copy it out.
 		 */
-		if (copyout(buf->dtb_xamot, desc_dtbd_data,
+		if (copyout(buf->dtb_xamot, desc.dtbd_data,
 		    buf->dtb_xamot_offset) != 0) {
 			mutex_exit(&dtrace_lock);
 			return (EFAULT);
 		}
 
-		*dtbd_size = buf->dtb_xamot_offset;
-		*dtbd_drops = buf->dtb_xamot_drops;
-		*dtbd_errors = buf->dtb_xamot_errors;
-		*dtbd_oldest = 0;
-		*dtbd_timestamp = buf->dtb_switched;
+		desc.dtbd_size = buf->dtb_xamot_offset;
+		desc.dtbd_drops = buf->dtb_xamot_drops;
+		desc.dtbd_errors = buf->dtb_xamot_errors;
+		desc.dtbd_oldest = 0;
+		desc.dtbd_timestamp = buf->dtb_switched;
 
 		mutex_exit(&dtrace_lock);
 
-		DTRACE_IOCTL_PRINTF("%s(%d): copyout buffer desc: size %zd drops %lu errors %lu\n",__func__,__LINE__,(size_t) *dtbd_size,(u_long) *dtbd_drops,(u_long) *dtbd_errors);
+		DTRACE_IOCTL_PRINTF("%s(%d): copyout buffer desc: size %zd drops %lu errors %lu\n",__func__,__LINE__,(size_t) desc.dtbd_size,(u_long) desc.dtbd_drops,(u_long) desc.dtbd_errors);
 
 		/*
 		 * Finally, copy out the buffer description.
 		 */
-		if (copyoutcap(&desc, pdesc_cap, sizeof_bufdesc) != 0)
+		if (copyout_buffdesc(&desc, pdesc) != 0)
 			return (EFAULT);
 
 		return (0);
@@ -469,25 +405,15 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 
 		return (0);
 	}
-#ifdef COMPAT_FREEBSD64
-	case DTRACEIOC_DOFGET_64:
-#endif
 	case DTRACEIOC_DOFGET: {
-
+		dof_hdr_t *__capability pdof = make_pdof_cap(addr);
 		dof_hdr_t hdr, *dof;
 		int rval;
 		uint64_t len;
 
 		DTRACE_IOCTL_PRINTF("%s(%d): DTRACEIOC_DOFGET\n",__func__,__LINE__);
 
-		dof_hdr_t *__capability pdof_cap =
-#ifdef COMPAT_FREEBSD64
-		    !SV_CURPROC_FLAG(SV_CHERI) ?
-		    __USER_CAP_OBJ(*(dof_hdr_t **)addr) :
-#endif
-		    *(dof_hdr_t * __capability *)addr;
-
-		if (copyincap(pdof_cap, &hdr, sizeof(hdr)) != 0)
+		if (copyincap(pdof, &hdr, sizeof(hdr)) != 0)
 			return (EFAULT);
 
 		mutex_enter(&dtrace_lock);
@@ -495,15 +421,11 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 		mutex_exit(&dtrace_lock);
 
 		len = MIN(hdr.dofh_loadsz, dof->dofh_loadsz);
-
-		rval = copyoutcap(dof, pdof_cap, len);
+		rval = copyoutcap(dof, pdof, len);
 		dtrace_dof_destroy(dof);
 
 		return (rval == 0 ? 0 : EFAULT);
 	}
-#ifdef COMPAT_FREEBSD64
-	case DTRACEIOC_ENABLE_64:
-#endif
 	case DTRACEIOC_ENABLE: {
 		dof_hdr_t *dof = NULL;
 		dtrace_enabling_t *enab = NULL;
@@ -511,23 +433,8 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 		int err = 0;
 		int rval;
 
-		void *__capability dof_ptr;
-		int *n_matched;
-
-#ifdef COMPAT_FREEBSD64
-		if (!SV_CURPROC_FLAG(SV_CHERI)) {
-			dtrace_enable_io64_t *p =
-			    (dtrace_enable_io64_t *)addr;
-			dof_ptr = __USER_CAP_UNBOUND((void *)p->dof);
-			n_matched = &p->n_matched;
-		} else {
-#endif
-			dtrace_enable_io_t *p = (dtrace_enable_io_t *)addr;
-			dof_ptr = p->dof;
-			n_matched = &p->n_matched;
-#ifdef COMPAT_FREEBSD64
-		}
-#endif
+		dtrace_enable_io_t _p = make_dtrace_enable_io(addr);
+		dtrace_enable_io_t *p = &_p;
 
 		DTRACE_IOCTL_PRINTF("%s(%d): DTRACEIOC_ENABLE\n",__func__,__LINE__);
 
@@ -535,13 +442,13 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 		 * If a NULL argument has been passed, we take this as our
 		 * cue to reevaluate our enablings.
 		 */
-		if (dof_ptr == NULL) {
+		if (p->dof == NULL) {
 			dtrace_enabling_matchall();
 
 			return (0);
 		}
 
-		if ((dof = dtrace_dof_copyin((intcap_t)dof_ptr, &rval)) == NULL)
+		if ((dof = dtrace_dof_copyin((uintcap_t)p->dof, &rval)) == NULL)
 			return (EINVAL);
 
 		mutex_enter(&cpu_lock);
@@ -570,23 +477,21 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 			dtrace_dof_destroy(dof);
 			return (rval);
 		}
-
-		if ((err = dtrace_enabling_match(enab, n_matched) == 0)) {
+		if ((err = dtrace_enabling_match(enab, &p->n_matched)) == 0) {
 			err = dtrace_enabling_retain(enab);
 		} else {
 			dtrace_enabling_destroy(enab);
 		}
-
+		bcopy_dtrace_enable_io(p,addr);
 		mutex_exit(&cpu_lock);
 		mutex_exit(&dtrace_lock);
 		dtrace_dof_destroy(dof);
 
 		return (err);
 	}
-#ifdef COMPAT_FREEBSD64
-	case DTRACEIOC_EPROBE_64:
-#endif
 	case DTRACEIOC_EPROBE: {
+		dtrace_eprobedesc_t *__capability pepdesc =
+		    make_eprobedesc_cap(addr);
 		dtrace_eprobedesc_t epdesc;
 		dtrace_ecb_t *ecb;
 		dtrace_action_t *act;
@@ -597,14 +502,7 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 
 		DTRACE_IOCTL_PRINTF("%s(%d): DTRACEIOC_EPROBE\n",__func__,__LINE__);
 
-		dtrace_eprobedesc_t *__capability pepdesc_cap =
-#ifdef COMPAT_FREEBSD64
-		    !SV_CURPROC_FLAG(SV_CHERI) ?
-		    __USER_CAP_OBJ(*(dtrace_eprobedesc_t **)addr) :
-#endif
-		    *(dtrace_eprobedesc_t * __capability *)addr;
-
-		if (copyincap(pepdesc_cap, &epdesc, SIZEOF(dtrace_eprobedesc)) != 0)
+		if (copyincap(pepdesc, &epdesc, SIZEOF(dtrace_eprobedesc)) != 0)
 			return (EFAULT);
 
 		mutex_enter(&dtrace_lock);
@@ -654,21 +552,13 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 			if (nrecs-- == 0)
 				break;
 
-			bcopy(&act->dta_rec, (void *)dest,
-			    SIZEOF(dtrace_recdesc));
-#ifdef COMPAT_FREEBSD64
-			/* Only the last field is a capability*/
-			if (!SV_CURPROC_FLAG(SV_CHERI))
-				((dtrace_recdesc64_t *)dest)->dtrd_uarg =
-				    (__cheri_addr uint64_t)
-					act->dta_rec.dtrd_uarg;
-#endif
+			bcopy_recdesc(&act->dta_rec,(void *)dest);
 			dest += SIZEOF(dtrace_recdesc);
 		}
 
 		mutex_exit(&dtrace_lock);
 
-		if (copyoutcap(buf, pepdesc_cap, dest - (uintptr_t)buf) != 0) {
+		if (copyoutcap(buf, pepdesc, dest - (uintptr_t)buf) != 0) {
 			kmem_free(buf, size);
 			return (EFAULT);
 		}
@@ -676,39 +566,18 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 		kmem_free(buf, size);
 		return (0);
 	}
-#ifdef COMPAT_FREEBSD64
-	case DTRACEIOC_FORMAT_64:
-#endif
 	case DTRACEIOC_FORMAT: {
+		dtrace_fmtdesc_t _fmt = make_dtrace_fmtdesc(addr);
+		dtrace_fmtdesc_t *fmt = &_fmt;
 		char *str;
 		int len;
 
 		DTRACE_IOCTL_PRINTF("%s(%d): DTRACEIOC_FORMAT\n",__func__,__LINE__);
 
-		char *__capability dtfd_string;
-		uint16_t *dtfd_format;
-		int *dtfd_length;
-#ifdef COMPAT_FREEBSD64
-		if (!SV_CURPROC_FLAG(SV_CHERI)) {
-			dtrace_fmtdesc64_t *fmt = (dtrace_fmtdesc64_t *)addr;
-
-			dtfd_string = __USER_CAP_STR(fmt->dtfd_string);
-			dtfd_format = &fmt->dtfd_format;
-			dtfd_length = &fmt->dtfd_length;
-		} else {
-#endif
-			dtrace_fmtdesc_t *fmt_c = (dtrace_fmtdesc_t *)addr;
-
-			dtfd_string = fmt_c->dtfd_string;
-			dtfd_format = &fmt_c->dtfd_format;
-			dtfd_length = &fmt_c->dtfd_length;
-#ifdef COMPAT_FREEBSD64
-		}
-#endif
-
 		mutex_enter(&dtrace_lock);
 
-		if (*dtfd_format == 0 || *dtfd_format > state->dts_nformats) {
+		if (fmt->dtfd_format == 0 ||
+		    fmt->dtfd_format > state->dts_nformats) {
 			mutex_exit(&dtrace_lock);
 			return (EINVAL);
 		}
@@ -720,20 +589,20 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 		 * and that the format for the specified index is non-NULL.
 		 */
 		ASSERT(state->dts_formats != NULL);
-		str = state->dts_formats[*dtfd_format - 1];
+		str = state->dts_formats[fmt->dtfd_format - 1];
 		ASSERT(str != NULL);
 
 		len = strlen(str) + 1;
 
-		if (len > *dtfd_length) {
-			*dtfd_length = len;
+		if (len > fmt->dtfd_length) {
+			fmt->dtfd_length = len;
 		} else {
-			if (copyout(str, dtfd_string, len) != 0) {
+			if (copyout(str, fmt->dtfd_string, len) != 0) {
 				mutex_exit(&dtrace_lock);
 				return (EINVAL);
 			}
 		}
-
+		bcopy_dtrace_fmtdesc(fmt,addr);
 		mutex_exit(&dtrace_lock);
 		return (0);
 	}
