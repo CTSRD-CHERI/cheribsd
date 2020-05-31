@@ -22,9 +22,6 @@
  *
  */
 
-#include <sys/sysent.h>
-#include <cddl/contrib/opensolaris/uts/common/sys/dtrace.h>
-#include <sys/systm.h>
 #include <dtrace_ioctl_compat.c>
 
 static int dtrace_verbose_ioctl;

@@ -1055,12 +1055,6 @@ typedef struct dtrace_aggdesc_64 {
 	dtrace_recdesc64_t dtagd_rec[1];		/* record descriptions */
 } dtrace_aggdesc64_t;
 #endif
-union dtrace_aggdesc_union {
-	dtrace_aggdesc_t aggdesc;
-#ifdef COMPAT_FREEBSD64
-	dtrace_aggdesc64_t aggdesc_64;
-#endif
-};
 
 typedef struct dtrace_fmtdesc {
 	DTRACE_PTR(char, dtfd_string);		/* format string */
@@ -1178,12 +1172,6 @@ typedef struct dtrace_bufdesc_64 {
 	uint64_t dtbd_timestamp;		/* hrtime of snapshot */
 } dtrace_bufdesc64_t;
 #endif
-union dtrace_bufdesc_union {
-	dtrace_bufdesc_t desc; // base version
-#ifdef COMPAT_FREEBSD64
-	dtrace_bufdesc64_t desc_64; // with capabilities
-#endif
-};
 /*
  * Each record in the buffer (dtbd_data) begins with a header that includes
  * the epid and a timestamp.  The timestamp is split into two 4-byte parts
