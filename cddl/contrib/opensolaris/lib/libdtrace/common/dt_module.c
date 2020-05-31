@@ -897,11 +897,11 @@ dt_module_getctf(dtrace_hdl_t *dtp, dt_module_t *dmp)
 
 	if (dmp->dm_ops == &dt_modops_64){
 #if __has_feature(capabilities)
-		model = CTF_MODEL_LP64_CAP;
-#else
-		model = CTF_MODEL_LP64;
+		if (sizeof(void *) == 16)
+			model = CTF_MODEL_LP64_CAP;
+		else
 #endif
-
+		model = CTF_MODEL_LP64;
 	}
 	else
 		model = CTF_MODEL_ILP32;
@@ -912,10 +912,15 @@ dt_module_getctf(dtrace_hdl_t *dtp, dt_module_t *dmp)
 	 * returned to the compiler.  If we support mixed data models in the
 	 * future for combined kernel/user tracing, this can be removed.
 	 */
+	/* With cheri, we support mixed models (e.g. purecap userspace-hybrid
+	 * kernel
+	 */
+	/*
 	if (dtp->dt_conf.dtc_ctfmodel != model) {
 		(void) dt_set_errno(dtp, EDT_DATAMODEL);
 		return (NULL);
 	}
+	*/
 
 	if (dmp->dm_ctdata.cts_size == 0) {
 		(void) dt_set_errno(dtp, EDT_NOCTF);

@@ -1253,12 +1253,14 @@ alloc:
 	else if (dt_ioctl(dtp, DTRACEIOC_CONF, &dtp->dt_conf) != 0)
 		return (set_open_errno(dtp, errp, errno));
 
-	if (flags & DTRACE_O_LP64)
+	if (flags & DTRACE_O_LP64) {
 #if __has_feature(capabilities)
-		dtp->dt_conf.dtc_ctfmodel = CTF_MODEL_LP64_CAP;
-#else
-		dtp->dt_conf.dtc_ctfmodel = CTF_MODEL_LP64;
+		if (sizeof(void *) == 16)
+			dtp->dt_conf.dtc_ctfmodel = CTF_MODEL_LP64_CAP;
+		else
 #endif
+			dtp->dt_conf.dtc_ctfmodel = CTF_MODEL_LP64;
+	}
 	else if (flags & DTRACE_O_ILP32)
 		dtp->dt_conf.dtc_ctfmodel = CTF_MODEL_ILP32;
 

@@ -775,10 +775,12 @@ ctf_bufopen(const ctf_sect_t *ctfsect, const ctf_sect_t *symsect,
 	if (symsect != NULL) {
 		if (symsect->cts_entsize == sizeof (Elf64_Sym)) {
 #if __has_feature(capabilities)
-			(void)ctf_setmodel(fp, CTF_MODEL_LP64_CAP);
-#else
-			(void)ctf_setmodel(fp, CTF_MODEL_LP64);
+			// todo: check this
+			if (sizeof(void *) == 16)
+				(void)ctf_setmodel(fp, CTF_MODEL_LP64_CAP);
+			else
 #endif
+			(void)ctf_setmodel(fp, CTF_MODEL_LP64);
 		}
 		else
 			(void) ctf_setmodel(fp, CTF_MODEL_ILP32);
