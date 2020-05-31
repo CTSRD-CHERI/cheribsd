@@ -112,14 +112,7 @@ extern const char *freebsd32_syscallnames[];
  * using a generated function. See sys/kern/makesyscalls.sh.
  */
 #include <sys/syscall.h>
-
-#if __has_feature(capabilities)
-#include <compat/cheriabi/cheriabi_proto.h>
-#include <compat/cheriabi/cheriabi_systrace_args.c>
-#else
 #include <kern/systrace_args.c>
-#endif
-
 #define	MODNAME		"freebsd"
 #define	MAXSYSCALL	SYS_MAXSYSCALL
 #define	SYSCALLNAMES	syscallnames
