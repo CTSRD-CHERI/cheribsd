@@ -5219,6 +5219,7 @@ vm_map_reservation_delete(vm_map_t map, vm_offset_t reservation)
 	while (entry->reservation == reservation) {
 		next_entry = vm_map_entry_succ(entry);
 		vm_map_entry_delete(map, entry);
+		entry = next_entry;
 	}
 	return (KERN_SUCCESS);
 }
