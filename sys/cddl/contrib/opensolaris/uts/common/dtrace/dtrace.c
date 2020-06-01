@@ -2140,7 +2140,7 @@ next:
 	 * size up to the chunksize for allocation.
 	 */
 	for (ksize = 0, i = 0; i < nkeys; i++)
-		ksize += P2ROUNDUP(key[i].dttk_size, sizeof (uint64_t));
+		ksize += P2ROUNDUP(key[i].dttk_size, sizeof (uintcap_t));
 
 	/*
 	 * This should be pretty much impossible, but could happen if, say,
@@ -2288,7 +2288,7 @@ retry:
 			    (const void *)(uintptr_t)key[i].dttk_value,
 			    (void *)kdata, kesize);
 			dkey->dttk_value = kdata;
-			kdata += P2ROUNDUP(kesize, sizeof (uint64_t));
+			kdata += P2ROUNDUP(kesize, sizeof (uintcap_t));
 		} else {
 			dkey->dttk_value = key[i].dttk_value;
 		}
@@ -10624,7 +10624,7 @@ dtrace_difo_chunksize(dtrace_difo_t *dp, dtrace_vstate_t *vstate)
 		 * We have a dynamic variable allocation; calculate its size.
 		 */
 		for (ksize = 0, i = 0; i < nkeys; i++)
-			ksize += P2ROUNDUP(key[i].dttk_size, sizeof (uint64_t));
+			ksize += P2ROUNDUP(key[i].dttk_size, sizeof (uintcap_t));
 
 		size = sizeof (dtrace_dynvar_t);
 		size += sizeof (dtrace_key_t) * (nkeys - 1);
@@ -10651,7 +10651,7 @@ dtrace_difo_chunksize(dtrace_difo_t *dp, dtrace_vstate_t *vstate)
 		 * We have the size.  If this is larger than the chunk size
 		 * for our dynamic variable state, reset the chunk size.
 		 */
-		size = P2ROUNDUP(size, sizeof (uint64_t));
+		size = P2ROUNDUP(size, sizeof (uintcap_t));
 
 		/*
 		 * Before setting the chunk size, check that we're not going
