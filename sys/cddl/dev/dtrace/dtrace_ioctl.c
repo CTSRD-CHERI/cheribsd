@@ -23,6 +23,7 @@
  */
 
 #include <dtrace_ioctl_compat.c>
+#include <cddl/contrib/opensolaris/uts/common/sys/dtrace.h>
 
 static int dtrace_verbose_ioctl;
 SYSCTL_INT(_debug_dtrace, OID_AUTO, verbose_ioctl, CTLFLAG_RW,
@@ -132,7 +133,7 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 	cmd = dtrace_translate_ioctl_to_native(cmd);
 	switch (cmd) {
 	case DTRACEIOC_AGGDESC: {
-		void *__capability paggdesc = make_aggdesc_cap(addr);
+		void * __capability paggdesc = make_aggdesc_cap(addr);
 		dtrace_aggdesc_t aggdesc;
 		dtrace_action_t *act;
 		dtrace_aggregation_t *agg;
@@ -244,7 +245,7 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 	}
 	case DTRACEIOC_AGGSNAP:
 	case DTRACEIOC_BUFSNAP: {
-		dtrace_bufdesc_t *__capability pdesc = make_buffdesc_cap(addr);
+		dtrace_bufdesc_t * __capability pdesc = make_buffdesc_cap(addr);
 		dtrace_bufdesc_t desc;
 		caddr_t cached;
 		dtrace_buffer_t *buf;
@@ -402,7 +403,7 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 		return (0);
 	}
 	case DTRACEIOC_DOFGET: {
-		dof_hdr_t *__capability pdof = make_pdof_cap(addr);
+		dof_hdr_t * __capability pdof = make_pdof_cap(addr);
 		dof_hdr_t hdr, *dof;
 		int rval;
 		uint64_t len;
@@ -439,6 +440,7 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 		 * cue to reevaluate our enablings.
 		 */
 		if (p->dof == NULL) {
+			printf("mathcing all\n");
 			dtrace_enabling_matchall();
 
 			return (0);
@@ -447,6 +449,7 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 		if ((dof = dtrace_dof_copyin((uintcap_t)p->dof, &rval)) == NULL)
 			return (EINVAL);
 
+		printf("copied in\n");
 		mutex_enter(&cpu_lock);
 		mutex_enter(&dtrace_lock);
 		vstate = &state->dts_vstate;
@@ -465,6 +468,7 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 			dtrace_dof_destroy(dof);
 			return (EINVAL);
 		}
+		printf("slurped\n");
 
 		if ((rval = dtrace_dof_options(dof, state)) != 0) {
 			dtrace_enabling_destroy(enab);
@@ -473,9 +477,13 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 			dtrace_dof_destroy(dof);
 			return (rval);
 		}
+		printf("optioned\n");
+
 		if ((err = dtrace_enabling_match(enab, &p->n_matched)) == 0) {
+			printf("matched\n");
 			err = dtrace_enabling_retain(enab);
 		} else {
+			printf("destroying\n");
 			dtrace_enabling_destroy(enab);
 		}
 		bcopy_dtrace_enable_io(p,addr);
@@ -486,7 +494,7 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 		return (err);
 	}
 	case DTRACEIOC_EPROBE: {
-		void *__capability pepdesc = make_eprobedesc_cap(addr);
+		void * __capability pepdesc = make_eprobedesc_cap(addr);
 		dtrace_eprobedesc_t epdesc;
 		dtrace_ecb_t *ecb;
 		dtrace_action_t *act;
