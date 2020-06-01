@@ -119,22 +119,6 @@ static struct sysentvec elf_freebsd_sysvec = {
 INIT_SYSENTVEC(elf_sysvec, &elf_freebsd_sysvec);
 
 #if __has_feature(capabilities)
-static __inline boolean_t
-cheriabi_check_cpu_compatible(uint32_t bits, const char *execpath)
-{
-	static struct timeval lastfail;
-	static int curfail;
-	const uint32_t expected = CHERICAP_SIZE * 8;
-
-	if (bits == expected)
-		return TRUE;
-	if (ppsratecheck(&lastfail, &curfail, 1))
-		printf("warning: attempting to execute %d-bit CheriABI "
-		    "binary '%s' on a %d-bit kernel\n", bits, execpath,
-		    expected);
-	return FALSE;
-}
-
 static boolean_t
 mips_elf_header_supported(struct image_params * imgp)
 {
@@ -144,11 +128,18 @@ mips_elf_header_supported(struct image_params * imgp)
 	if (use_cheriabi)
 		return FALSE;
 
-	if (machine == EF_MIPS_MACH_CHERI128)
-		return cheriabi_check_cpu_compatible(128, imgp->execpath);
-	else if (machine == EF_MIPS_MACH_CHERI256)
-		return cheriabi_check_cpu_compatible(256, imgp->execpath);
-	return FALSE;
+	if (machine == EF_MIPS_MACH_CHERI256) {
+		static struct timeval lastfail;
+		static int curfail;
+
+		if (ppsratecheck(&lastfail, &curfail, 1))
+			printf(
+	    "warning: attempting to execute 256-bit CheriABI binary '%s'\n",
+			    imgp->execpath);
+		return FALSE;
+	}
+
+	return TRUE;
 }
 #endif
 
