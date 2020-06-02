@@ -22,12 +22,12 @@
  *
  */
 
-static dtrace_bufdesc_t * __capability
+static void * __capability
 dtrace_make_buffdesc_cap(caddr_t addr)
 {
 #ifdef COMPAT_FREEBSD64
 	if (!SV_CURPROC_FLAG(SV_CHERI))
-	    return __USER_CAP_OBJ(*(dtrace_bufdesc_t **)addr);
+	    return __USER_CAP_OBJ(*(dtrace_bufdesc_64_t **)addr);
 #endif
 	return *(dtrace_bufdesc_t * __capability *)addr;
 }

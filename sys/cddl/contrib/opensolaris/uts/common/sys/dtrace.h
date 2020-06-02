@@ -1387,14 +1387,16 @@ typedef struct dtrace_providerdesc {
 							/* match probes */
 typedef struct {
 	void * __kerncap dof;	/* DOF userland address written to driver. */
-	int n_matched;		/* # matches returned by driver. */
+	int	n_matched;	/* # matches returned by driver. */
 } dtrace_enable_io_t;
+
 #ifdef COMPAT_FREEBSD64
 typedef struct {
 	uint64_t dof; // void * /* DOF userland address written to driver. */
-	int n_matched;		/* # matches returned by driver. */
+	int	n_matched;	/* # matches returned by driver. */
 } dtrace_enable_io64_t;
 #endif
+
 #define	DTRACEIOC_ENABLE	_IOWR('x',6,dtrace_enable_io_t)
 							/* enable probes */
 #define	DTRACEIOC_AGGSNAP	_IOW('x',7,dtrace_bufdesc_t * __kerncap)
@@ -1419,6 +1421,7 @@ typedef struct {
 							/* get DOF */
 #define	DTRACEIOC_REPLICATE	_IOW('x',18,dtrace_repldesc_t)	
 							/* replicate enab */
+
 #ifdef COMPAT_FREEBSD64
 #define DTRACEIOC_BUFSNAP64 \
 	_IOC_NEWTYPE(DTRACEIOC_BUFSNAP, dtrace_bufdesc64_t *)
@@ -1433,7 +1436,6 @@ typedef struct {
 #define DTRACEIOC_FORMAT64 _IOC_NEWTYPE(DTRACEIOC_FORMAT, dtrace_fmtdesc64_t)
 #define DTRACEIOC_DOFGET64 _IOC_NEWTYPE(DTRACEIOC_DOFGET, dof_hdr_t *)
 #endif
-
 #endif
 
 /*

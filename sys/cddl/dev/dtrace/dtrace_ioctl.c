@@ -32,15 +32,15 @@ SYSCTL_INT(_debug_dtrace, OID_AUTO, verbose_ioctl, CTLFLAG_RW,
 #define DTRACE_IOCTL_PRINTF(fmt, ...)	if (dtrace_verbose_ioctl) printf(fmt, ## __VA_ARGS__ )
 
 #ifdef COMPAT_FREEBSD64
-#define SIZEOF(BASE_TYPE) \
-	(SV_CURPROC_FLAG(SV_CHERI) ? sizeof (BASE_TYPE##_t) : \
-				     sizeof (BASE_TYPE##64_t) )
-#define OFFSETOF(BASE_TYPE,FIELD) \
-	(SV_CURPROC_FLAG(SV_CHERI) ? offsetof(BASE_TYPE##_t, FIELD) : \
-				     offsetof(BASE_TYPE##64_t, FIELD) )
+#define SIZEOF(base_type) \
+	(SV_CURPROC_FLAG(SV_CHERI) ? sizeof (base_type##_t) : \
+				     sizeof (base_type##64_t) )
+#define OFFSETOF(base_type, field) \
+	(SV_CURPROC_FLAG(SV_CHERI) ? offsetof(base_type##_t, field) : \
+				     offsetof(base_type##64_t, field) )
 #else
-#define SIZEOF(BASE_TYPE) (sizeof (BASE_TYPE##_t))
-#define OFFSETOF(BASE_TYPE,FIELD) offsetof(BASE_TYPE##_t, FIELD)
+#define SIZEOF(base_type) (sizeof (base_type##_t))
+#define OFFSETOF(base_type, field) offsetof(base_type##_t, field)
 #endif
 
 static int
@@ -113,6 +113,7 @@ dtrace_ioctl_helper(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 	}
 	return (rval);
 #endif
+
 }
 /* ARGSUSED */
 static int
@@ -130,6 +131,7 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 		ASSERT(dtrace_anon.dta_state == NULL);
 		state = state->dts_anon;
 	}
+
 	cmd = dtrace_translate_ioctl_to_native(cmd);
 	switch (cmd) {
 	case DTRACEIOC_AGGDESC: {
@@ -203,7 +205,6 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 		dtrace_bcopy_aggdesc(&aggdesc, (void *)dest);
 		dest += OFFSETOF(dtrace_aggdesc, dtagd_rec[0]);
 
-
 		for (act = agg->dtag_first; ; act = act->dta_next) {
 
 			/* using the following line doesn't work: it seems that
@@ -245,8 +246,7 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 	}
 	case DTRACEIOC_AGGSNAP:
 	case DTRACEIOC_BUFSNAP: {
-		dtrace_bufdesc_t *__capability pdesc =
-		    dtrace_make_buffdesc_cap(addr);
+		void *__capability pdesc = dtrace_make_buffdesc_cap(addr);
 		dtrace_bufdesc_t desc;
 		caddr_t cached;
 		dtrace_buffer_t *buf;
@@ -441,7 +441,6 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 		 * cue to reevaluate our enablings.
 		 */
 		if (p->dof == NULL) {
-			printf("mathcing all\n");
 			dtrace_enabling_matchall();
 
 			return (0);
@@ -450,7 +449,6 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 		if ((dof = dtrace_dof_copyin((uintcap_t)p->dof, &rval)) == NULL)
 			return (EINVAL);
 
-		printf("copied in\n");
 		mutex_enter(&cpu_lock);
 		mutex_enter(&dtrace_lock);
 		vstate = &state->dts_vstate;
@@ -469,7 +467,6 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 			dtrace_dof_destroy(dof);
 			return (EINVAL);
 		}
-		printf("slurped\n");
 
 		if ((rval = dtrace_dof_options(dof, state)) != 0) {
 			dtrace_enabling_destroy(enab);
@@ -478,16 +475,14 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 			dtrace_dof_destroy(dof);
 			return (rval);
 		}
-		printf("optioned\n");
 
 		if ((err = dtrace_enabling_match(enab, &p->n_matched)) == 0) {
-			printf("matched\n");
 			err = dtrace_enabling_retain(enab);
 		} else {
-			printf("destroying\n");
 			dtrace_enabling_destroy(enab);
 		}
-		dtrace_bcopy_enable_io(p,addr);
+
+		dtrace_bcopy_enable_io(p, addr);
 		mutex_exit(&cpu_lock);
 		mutex_exit(&dtrace_lock);
 		dtrace_dof_destroy(dof);
@@ -606,7 +601,8 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 				return (EINVAL);
 			}
 		}
-		dtrace_bcopy_fmtdesc(fmt,addr);
+
+		dtrace_bcopy_fmtdesc(fmt, addr);
 		mutex_exit(&dtrace_lock);
 		return (0);
 	}
@@ -885,3 +881,6 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 	}
 	return (error);
 }
+
+#undef SIZEOF
+#undef OFFSETOF
