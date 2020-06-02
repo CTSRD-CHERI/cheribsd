@@ -156,13 +156,14 @@ dtrace_copyin_aggdesc(void * __capability uaddr, dtrace_aggdesc_t *aggdesc)
 	return copyincap(uaddr, aggdesc, sizeof (dtrace_bufdesc_t));
 }
 
-#define CASE(VAL)      \
-	case VAL##64: \
-		return VAL
-
 static u_long
 dtrace_translate_ioctl_to_native(u_long cmd)
 {
+
+#define CASE(VAL)     \
+	case VAL##64: \
+		return VAL
+
 #ifdef COMPAT_FREEBSD64
 	switch (cmd) {
 		CASE(DTRACEIOC_AGGDESC);
@@ -174,6 +175,8 @@ dtrace_translate_ioctl_to_native(u_long cmd)
 		CASE(DTRACEIOC_FORMAT);
 	}
 #endif
+#undef CASE
+
 	return cmd;
 }
 
