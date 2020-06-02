@@ -22,9 +22,6 @@
  *
  */
 
-/*
- * dtrace_bufdesc_t
- * */
 static dtrace_bufdesc_t * __capability
 dtrace_make_buffdesc_cap(caddr_t addr)
 {
@@ -76,9 +73,6 @@ dtrace_copyout_buffdesc(dtrace_bufdesc_t *bufdesc,
 	return copyoutcap(bufdesc, uaddr, sizeof (dtrace_bufdesc_t));
 }
 
-/*
- * dtrace_recdesc_t
- * */
 static void
 dtrace_bcopy_recdesc(dtrace_recdesc_t *recdesc, void *dest)
 {
@@ -99,9 +93,6 @@ dtrace_bcopy_recdesc(dtrace_recdesc_t *recdesc, void *dest)
 	bcopy(recdesc, dest, sizeof (dtrace_recdesc_t));
 }
 
-/*
- * dtrace_aggdesc_t
- * */
 static void
 dtrace_bcopy_aggdesc(dtrace_aggdesc_t *aggdesc, void *dest)
 {
@@ -223,9 +214,7 @@ dtrace_bcopy_enable_io(dtrace_enable_io_t *from, caddr_t to)
 #endif
 	bcopy(from, (void *)to, sizeof (dtrace_enable_io_t));
 }
-/*
- * dtrace_eprobedesc_t
- * */
+
 static void * __capability
 dtrace_make_eprobedesc_cap(caddr_t addr)
 {
@@ -237,9 +226,6 @@ dtrace_make_eprobedesc_cap(caddr_t addr)
 	return *(dtrace_eprobedesc_t * __capability *)addr;
 }
 
-/*
- * dtrace_fmtdesc_t
- * */
 static dtrace_fmtdesc_t
 dtrace_make_fmtdesc(caddr_t addr)
 {
