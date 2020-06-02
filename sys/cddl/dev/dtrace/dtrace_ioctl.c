@@ -411,7 +411,7 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 
 		DTRACE_IOCTL_PRINTF("%s(%d): DTRACEIOC_DOFGET\n",__func__,__LINE__);
 
-		if (copyincap(pdof, &hdr, sizeof(hdr)) != 0)
+		if (copyincap(pdof, &hdr, sizeof (hdr)) != 0)
 			return (EFAULT);
 
 		mutex_enter(&dtrace_lock);
