@@ -520,6 +520,7 @@ dtrace_next_uframe(register_t *pc, register_t *sp, register_t *ra)
 	int offset, registers_on_stack;
 	uint32_t opcode, mask;
 	register_t function_start;
+	register_t prec_fp;
 	int stksize;
 	InstFmt i;
 	int prev_daddiu_at; /* if 1, the next addiu at,zero,-X contains the
@@ -534,6 +535,7 @@ dtrace_next_uframe(register_t *pc, register_t *sp, register_t *ra)
 	offset = 0;
 	stksize = 0;
 	prev_daddiu_at = 0;
+	prec_fp = 0;
 
 	while (offset < MAX_FUNCTION_SIZE) {
 		opcode = dtrace_fuword32((void *)(vm_offset_t)(*pc - offset));
@@ -550,16 +552,17 @@ dtrace_next_uframe(register_t *pc, register_t *sp, register_t *ra)
 			registers_on_stack = 1;
 			break;
 		}
-#if __has_feature(capabilities)
 
+#if __has_feature(capabilities)
 		/* cincoffsetimm   $c11,$c11,-X */
 		if (prev_daddiu_at == 0 && i.CCMType.op == OP_COP2 &&
 		    i.CCMType.cs == OP_CINCOFFIMM && i.CCMType.cb == 11 &&
-		    i.CCMType.rt == 11) {
+		    i.CCMType.rt == 11 && i.CCMType.offset < 0) {
 			function_start = *pc - offset;
 			registers_on_stack = 1;
 			break;
 		}
+
 		/* cincoffset   $c11,$c11,at */
 		if (i.CType.op == OP_COP2 && i.CType.fmt == 0 &&
 		    i.CType.func == OP_CINCOFF && i.CType.r1 == 11 &&
@@ -574,7 +577,17 @@ dtrace_next_uframe(register_t *pc, register_t *sp, register_t *ra)
 			registers_on_stack = 1;
 			break;
 		}
+
+		/* The last userspace function called before a syscall starts
+		 * with this, because it jumps to an address contained in a
+		 * position relative to the $pcc:
+		 * cgetpcc $c26 */
+		if (opcode == 0x481a07ff) {
+			function_start = *pc - offset;
+			break;
+		}
 #endif
+
 		/* lui gp, X */
 		if ((opcode & 0xffff8000) == 0x3c1c0000) {
 			/*
@@ -648,7 +661,7 @@ dtrace_next_uframe(register_t *pc, register_t *sp, register_t *ra)
 					break;
 				// daddiu  at,zero,-X
 				if (prev_daddiu_at && i.IType.rs == 1 &&
-				    i.IType.rt == 0) {
+				    i.IType.rt == 0 && i.IType.imm < 0) {
 					stksize = -((short)i.IType.imm);
 					break;
 				}
@@ -663,17 +676,22 @@ dtrace_next_uframe(register_t *pc, register_t *sp, register_t *ra)
 				switch (i.CCMType.cs) {
 				case OP_CINCOFFIMM:
 					if (i.CCMType.cb != 11 ||
-					    i.CCMType.rt != 11)
+					    i.CCMType.rt != 11 ||
+					    i.CCMType.offset > 0)
 						break;
+					/* cincoffsetimm   $c11,$c11,-X */
 					stksize = -((short)i.CCMType.offset);
 				}
 				break;
 			case OP_CSC:
-				//  csc     $c17,zero,X($c11)
-				if (i.CCMType.cb != 11 || i.CCMType.cs != 17 ||
-				    i.CCMType.rt != 0)
+				/* csc  $c17,zero,X($c11)
+				 * csc  $c24,zero,X($c11)
+				 * */
+				if (i.CCMType.cb != 11 ||
+				    (i.CCMType.cs != 17 && i.CCMType.cs != 24)
+				    || i.CCMType.rt != 0)
 					break;
-				// only first one
+				/* only the first */
 				if (mask & (1 << i.CCMType.cs))
 					break;
 				mask |= (1 << i.CCMType.cs);
@@ -681,9 +699,15 @@ dtrace_next_uframe(register_t *pc, register_t *sp, register_t *ra)
 				void *base_addr_to_fetch =
 				    (void *)(vm_offset_t)(
 					*sp + (short)i.CCMType.offset * 16);
+				/* It is a capability. Let's skip the first 64
+				 * bytes with "+8" */
+				uint64_t res = dtrace_fuword64(
+				    base_addr_to_fetch + 8);
 
-				// Let's fetch only the address
-				*ra = dtrace_fuword64(base_addr_to_fetch + 8);
+				if (i.CCMType.cs == 24)
+					prec_fp = res;
+				else
+					*ra = res;
 #endif
 			}
 
@@ -702,6 +726,14 @@ dtrace_next_uframe(register_t *pc, register_t *sp, register_t *ra)
 
 	*pc = *ra;
 	*sp += stksize;
+
+	/* If we have a frame pointer, it is more accurate to use it. It might
+	 * happen that in the precedent frame an `alloca` happened, modifying
+	 * the stack pointer after the beginning of the function. Using the fp
+	 * is always correct, but it might not be available in the first frame.
+	 * pointer from the fp */
+	if (prec_fp)
+		*sp = prec_fp;
 
 	return (0);
 fault:
