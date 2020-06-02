@@ -6,29 +6,37 @@
 # Ideally, this list will be made empty.
 ####
 
-# missing curpsinfo due to missing symbol
-exclude EXFAIL common/aggs/err.D_KEY_TYPE.badkey4.d
-
-# goes into timeout. Probably missing dependencies. Not important.
+# aggs - goes into timeout. Probably missing dependencies. Not important.
 exclude SKIP common/aggs/tst.aggpackbanner.ksh
 
-# times are to short. With a faster cpu will probably work.
+# aggs - times are to short. With a faster cpu will probably work.
 exclude EXFAIL common/aggs/tst.clear.d
 exclude EXFAIL common/aggs/tst.cleardenormalize.d
 
-# smal deltas in the output.
+# aggs - small deltas in the output.
 exclude EXFAIL common/aggs/tst.neglquant.d
 exclude EXFAIL common/aggs/tst.negquant.d
 
-# Registers acronyms not defined for mips (should be in reg.d.in)
+# arrays - Registers acronyms not defined for mips (should be in reg.d.in)
 exclude EXFAIL common/arrays/tst.uregsarray.d
 
+# dtraceUtil - preprocessor
+exclude EXFAIL common/dtraceUtil/man.AddSearchPath.d
+
+# dtraceutil - -m option make the system to stuck
+exclude SKIP common/dtraceUtil/tst.DestructWithModule.d.ksh
+
+# env - depends on ksh
+exclude EXFAIL common/env/tst.unsetenv2.ksh
+exclude EXFAIL common/dtraceUtil/tst.DefineNameWithCPP.d.ksh
 
 # json gives problem
 exclude SKIP common/json/usdt.d
 
-# fbt::: doesn't work in cheri, yet.
+# funcs - lockstat doesn't work? or nexted exceptions are generated?
+exclude SKIP common/func/tst.mutex_owner.d
 
+# fbt - when all the probes are enabled, the system is stucks
 exclude SKIP common/fbtprovider/tst.return.d
 exclude SKIP common/fbtprovider/tst.tailcall.d
 exclude SKIP common/misc/tst.roch.d
@@ -55,8 +63,25 @@ exclude SKIP bitfields/t_dtrace_contrib:tst_SizeofBitField_d
 exclude SKIP common/buffering/tst.alignring.d
 exclude SKIP common/pid/tst.args1.d
 
+# ip - they all require ksh
+exclude EXFAIL tst.ipv4localicmp.ksh
+exclude EXFAIL tst.ipv4localsctp.ksh
+exclude EXFAIL tst.ipv4localtcp.ksh
+exclude EXFAIL tst.ipv4localudp.ksh
+exclude EXFAIL tst.ipv4localudplite.ksh
+exclude EXFAIL tst.ipv4remoteicmp.ksh
+exclude EXFAIL tst.ipv4remotesctp.ksh
+exclude EXFAIL tst.ipv4remotetcp.ksh
+exclude EXFAIL tst.ipv4remoteudp.ksh
+exclude EXFAIL tst.ipv4remoteudplite.ksh
+exclude EXFAIL tst.ipv6localicmp.ksh
+exclude EXFAIL tst.ipv6remoteicmp.ksh
+exclude EXFAIL tst.localsctpstate.ksh
+exclude EXFAIL tst.localtcpstate.ksh
+exclude EXFAIL tst.remotesctpstate.ksh
+exclude EXFAIL tst.remotetcpstate.ksh
 
-# usdt not ready
+# usdt available in cheri
 exclude SKIP common/usdt/argmap.d
 exclude SKIP common/usdt/args.d
 exclude SKIP common/usdt/forker.d
@@ -70,19 +95,13 @@ exclude SKIP common/usdt/tst.args.d
 exclude SKIP common/usdt/tst.badguess.ksh
 exclude SKIP common/usdt/tst.corruptenv.ksh
 exclude SKIP common/usdt/tst.dlclose1.ksh
-exclude SKIP common/usdt/tst.dlclose1.ksh.out
 exclude SKIP common/usdt/tst.dlclose2.ksh
-exclude SKIP common/usdt/tst.dlclose2.ksh.out
 exclude SKIP common/usdt/tst.dlclose3.ksh
 exclude SKIP common/usdt/tst.eliminate.ksh
 exclude SKIP common/usdt/tst.enabled.ksh
-exclude SKIP common/usdt/tst.enabled.ksh.out
 exclude SKIP common/usdt/tst.enabled2.ksh
-exclude SKIP common/usdt/tst.enabled2.ksh.out
 exclude SKIP common/usdt/tst.entryreturn.ksh
-exclude SKIP common/usdt/tst.entryreturn.ksh.out
 exclude SKIP common/usdt/tst.fork.ksh
-exclude SKIP common/usdt/tst.fork.ksh.out
 exclude SKIP common/usdt/tst.forker.c
 exclude SKIP common/usdt/tst.forker.ksh
 exclude SKIP common/usdt/tst.guess32.ksh
@@ -92,9 +111,7 @@ exclude SKIP common/usdt/tst.include.ksh
 exclude SKIP common/usdt/tst.linkpriv.ksh
 exclude SKIP common/usdt/tst.linkunpriv.ksh
 exclude SKIP common/usdt/tst.multiple.ksh
-exclude SKIP common/usdt/tst.multiple.ksh.out
 exclude SKIP common/usdt/tst.multiprov.ksh
-exclude SKIP common/usdt/tst.multiprov.ksh.out
 exclude SKIP common/usdt/tst.nodtrace.ksh
 exclude SKIP common/usdt/tst.noprobes.ksh
 exclude SKIP common/usdt/tst.noreap.ksh
@@ -103,10 +120,10 @@ exclude SKIP common/usdt/tst.onlyenabled.ksh
 exclude SKIP common/usdt/tst.reap.ksh
 exclude SKIP common/usdt/tst.reeval.ksh
 exclude SKIP common/usdt/tst.sameprovmulti.ksh
-exclude SKIP common/usdt/tst.sameprovmulti.ksh.out
 exclude SKIP common/usdt/tst.static.ksh
-exclude SKIP common/usdt/tst.static.ksh.out
 exclude SKIP common/usdt/tst.static2.ksh
-exclude SKIP common/usdt/tst.static2.ksh.out
 exclude SKIP common/usdt/tst.user.ksh
-exclude SKIP common/usdt/tst.user.ksh.out
+
+# ustack - ksh not available in CHERI
+exclude EXFAIL common/ustack/tst.bigstack.d
+exclude EXFAIL common/ustack/tst.depth.ksh
