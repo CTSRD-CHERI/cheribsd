@@ -42,7 +42,7 @@ dtrace_copyin_buffdesc(
 #ifdef COMPAT_FREEBSD64
 	if (!SV_CURPROC_FLAG(SV_CHERI)) {
 		dtrace_bufdesc64_t bufdesc64;
-		int retval = copyin(uaddr, &bufdesc64, sizeof(bufdesc64));
+		int retval = copyin(uaddr, &bufdesc64, sizeof (bufdesc64));
 		bufdesc->dtbd_size = bufdesc64.dtbd_size;
 		bufdesc->dtbd_cpu = bufdesc64.dtbd_cpu;
 		bufdesc->dtbd_errors = bufdesc64.dtbd_errors;
@@ -53,7 +53,7 @@ dtrace_copyin_buffdesc(
 		return retval;
 	}
 #endif
-	return copyincap(uaddr, bufdesc, sizeof(dtrace_bufdesc_t));
+	return copyincap(uaddr, bufdesc, sizeof (dtrace_bufdesc_t));
 }
 
 static int
@@ -70,10 +70,10 @@ dtrace_copyout_buffdesc(dtrace_bufdesc_t *bufdesc,
 		bufdesc64.dtbd_data = (__cheri_addr uint64_t)bufdesc->dtbd_data;
 		bufdesc64.dtbd_oldest = bufdesc->dtbd_oldest;
 		bufdesc64.dtbd_timestamp = bufdesc->dtbd_timestamp;
-		return copyout(&bufdesc64, uaddr, sizeof(dtrace_bufdesc64_t));
+		return copyout(&bufdesc64, uaddr, sizeof (dtrace_bufdesc64_t));
 	}
 #endif
-	return copyoutcap(bufdesc, uaddr, sizeof(dtrace_bufdesc_t));
+	return copyoutcap(bufdesc, uaddr, sizeof (dtrace_bufdesc_t));
 }
 
 /*
@@ -92,11 +92,11 @@ dtrace_bcopy_recdesc(dtrace_recdesc_t *recdesc, void *dest)
 		recdesc64.dtrd_format = recdesc->dtrd_format;
 		recdesc64.dtrd_arg = recdesc->dtrd_arg;
 		recdesc64.dtrd_uarg = (__cheri_addr uint64_t)recdesc->dtrd_uarg;
-		bcopy(&recdesc64, dest, sizeof(dtrace_recdesc64_t));
+		bcopy(&recdesc64, dest, sizeof (dtrace_recdesc64_t));
 		return;
 	}
 #endif
-	bcopy(recdesc, dest, sizeof(dtrace_recdesc_t));
+	bcopy(recdesc, dest, sizeof (dtrace_recdesc_t));
 }
 
 /*
@@ -117,11 +117,11 @@ dtrace_bcopy_aggdesc(dtrace_aggdesc_t *aggdesc, void *dest)
 		aggdesc64.dtagd_size = aggdesc->dtagd_size;
 		aggdesc64.dtagd_nrecs = aggdesc->dtagd_nrecs;
 		aggdesc64.dtagd_pad = aggdesc->dtagd_pad;
-		bcopy(&aggdesc64, dest, sizeof(dtrace_aggdesc64_t));
+		bcopy(&aggdesc64, dest, sizeof (dtrace_aggdesc64_t));
 		return;
 	}
 #endif
-	bcopy(aggdesc, dest, sizeof(dtrace_aggdesc_t));
+	bcopy(aggdesc, dest, sizeof (dtrace_aggdesc_t));
 }
 
 static void * __capability
@@ -140,7 +140,7 @@ dtrace_copyin_aggdesc(void * __capability uaddr, dtrace_aggdesc_t *aggdesc)
 #ifdef COMPAT_FREEBSD64
 	if (!SV_CURPROC_FLAG(SV_CHERI)) {
 		dtrace_aggdesc64_t aggdesc64;
-		int retval = copyin(uaddr, &aggdesc64, sizeof(aggdesc64));
+		int retval = copyin(uaddr, &aggdesc64, sizeof (aggdesc64));
 		aggdesc->dtagd_name =
 		    __USER_CAP_STR((void *)aggdesc64.tagd_name);
 		aggdesc->dtagd_varid = aggdesc64.dtagd_varid;
@@ -153,7 +153,7 @@ dtrace_copyin_aggdesc(void * __capability uaddr, dtrace_aggdesc_t *aggdesc)
 		return retval;
 	}
 #endif
-	return copyincap(uaddr, aggdesc, sizeof(dtrace_bufdesc_t));
+	return copyincap(uaddr, aggdesc, sizeof (dtrace_bufdesc_t));
 }
 
 #define CASE(VAL)      \
@@ -214,11 +214,11 @@ dtrace_bcopy_enable_io(dtrace_enable_io_t *from, caddr_t to)
 		dtrace_enable_io64_t p64;
 		p64.dof = (__cheri_addr uint64_t)from->dof;
 		p64.n_matched = from->n_matched;
-		bcopy(&p64, (void *)to, sizeof(dtrace_enable_io64_t));
+		bcopy(&p64, (void *)to, sizeof (dtrace_enable_io64_t));
 		return;
 	}
 #endif
-	bcopy(from, (void *)to, sizeof(dtrace_enable_io_t));
+	bcopy(from, (void *)to, sizeof (dtrace_enable_io_t));
 }
 /*
  * dtrace_eprobedesc_t
@@ -263,9 +263,9 @@ dtrace_bcopy_fmtdesc(dtrace_fmtdesc_t *fmtdesc, caddr_t to)
 		fmt64.dtfd_string = (__cheri_addr uint64_t)fmtdesc->dtfd_string;
 		fmt64.dtfd_length = fmtdesc->dtfd_length;
 		fmt64.dtfd_format = fmtdesc->dtfd_format;
-		bcopy(&fmt64, (void *)to, sizeof(dtrace_fmtdesc64_t));
+		bcopy(&fmt64, (void *)to, sizeof (dtrace_fmtdesc64_t));
 		return;
 	}
 #endif
-	bcopy(fmtdesc, (void *)to, sizeof(dtrace_fmtdesc_t));
+	bcopy(fmtdesc, (void *)to, sizeof (dtrace_fmtdesc_t));
 }
