@@ -13928,7 +13928,6 @@ dtrace_dof_actdesc(dof_hdr_t *dof, dof_sec_t *sec, dtrace_vstate_t *vstate,
 #ifdef COMPAT_FREEBSD64
 		    !SV_CURPROC_FLAG(SV_CHERI) ?
 		    freebsd64_dof_actdesc((dof_actdesc64_t *)act_desc) :
-
 #endif
 		    *(dof_actdesc_t *)act_desc;
 		kind = (dtrace_actkind_t)desc->dofa_kind;

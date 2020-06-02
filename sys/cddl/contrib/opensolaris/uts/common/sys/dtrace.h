@@ -762,7 +762,6 @@ typedef struct dof_ecbdesc {
 	uint64_t dofe_uarg;		/* user-supplied library argument */
 } dof_ecbdesc_t;
 
-
 typedef struct dof_probedesc {
 	dof_secidx_t dofp_strtab;	/* link to DOF_SECT_STRTAB section */
 	dof_stridx_t dofp_provider;	/* provider string */
@@ -1172,6 +1171,7 @@ typedef struct dtrace_bufdesc64 {
 	uint64_t dtbd_timestamp;		/* hrtime of snapshot */
 } dtrace_bufdesc64_t;
 #endif
+
 /*
  * Each record in the buffer (dtbd_data) begins with a header that includes
  * the epid and a timestamp.  The timestamp is split into two 4-byte parts
