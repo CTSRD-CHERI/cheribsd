@@ -153,12 +153,11 @@ static __ElfN(Brandinfo) freebsd_brand_info = {
 #if __has_feature(capabilities)
 	.interp_newpath	= "/libexec/ld-cheri-elf.so.1",
 	.header_supported = mips_elf_header_supported,
-	.flags		= BI_CAN_EXEC_DYN
 #else
 	.interp_newpath	= NULL,
+#endif
 	.brand_note	= &__elfN(freebsd_brandnote),
 	.flags		= BI_CAN_EXEC_DYN | BI_BRAND_NOTE
-#endif
 };
 
 
