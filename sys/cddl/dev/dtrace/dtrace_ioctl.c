@@ -206,18 +206,13 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 		dest += OFFSETOF(dtrace_aggdesc, dtagd_rec[0]);
 
 		for (act = agg->dtag_first; ; act = act->dta_next) {
-
-			/* using the following line doesn't work: it seems that
-			 * the compiler is doing some optimisation, and rec ends
-			 * up being all zero.
-			 * dtrace_recdesc_t rec = act->dta_rec;
-			 */
+			dtrace_recdesc_t rec = act->dta_rec;
 
 			/*
 			 * See the comment in the above loop for why we pass
 			 * over zero-length records.
 			 */
-			if (act->dta_rec.dtrd_size == 0) {
+			if (rec.dtrd_size == 0) {
 				ASSERT(agg->dtag_hasarg);
 				continue;
 			}
@@ -225,9 +220,9 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 			if (nrecs-- == 0)
 				break;
 
-			act->dta_rec.dtrd_offset -= offs;
-			dtrace_bcopy_recdesc(&act->dta_rec, (void *)dest);
-			act->dta_rec.dtrd_offset += offs;
+			rec.dtrd_offset -= offs;
+			dtrace_bcopy_recdesc(&rec, (void *)dest);
+			rec.dtrd_offset += offs;
 			dest += SIZEOF(dtrace_recdesc);
 
 			if (act == &agg->dtag_action)
