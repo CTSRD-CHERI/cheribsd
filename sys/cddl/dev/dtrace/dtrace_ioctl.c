@@ -193,7 +193,7 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 		buf = kmem_alloc(size, KM_SLEEP);
 		dest = (uintptr_t)buf;
 
-		dtrace_bcopy_aggdesc(&aggdesc, (void *)dest);
+		dtrace_copy_aggdesc(&aggdesc, (void *)dest);
 		dest += OFFSETOF(dtrace_aggdesc, dtagd_rec[0]);
 
 		for (act = agg->dtag_first; ; act = act->dta_next) {
@@ -212,7 +212,7 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 				break;
 
 			rec.dtrd_offset -= offs;
-			dtrace_bcopy_recdesc(&rec, (void *)dest);
+			dtrace_copy_recdesc(&rec, (void *)dest);
 			rec.dtrd_offset += offs;
 			dest += SIZEOF(dtrace_recdesc);
 
@@ -467,7 +467,7 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 			dtrace_enabling_destroy(enab);
 		}
 
-		dtrace_bcopy_enable_io(p, addr);
+		dtrace_copy_enable_io(p, addr);
 		mutex_exit(&cpu_lock);
 		mutex_exit(&dtrace_lock);
 		dtrace_dof_destroy(dof);
@@ -536,7 +536,7 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 			if (nrecs-- == 0)
 				break;
 
-			dtrace_bcopy_recdesc(&act->dta_rec,(void *)dest);
+			dtrace_copy_recdesc(&act->dta_rec,(void *)dest);
 			dest += SIZEOF(dtrace_recdesc);
 		}
 
@@ -587,7 +587,7 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 			}
 		}
 
-		dtrace_bcopy_fmtdesc(fmt, addr);
+		dtrace_copy_fmtdesc(fmt, addr);
 		mutex_exit(&dtrace_lock);
 		return (0);
 	}
