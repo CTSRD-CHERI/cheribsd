@@ -1620,9 +1620,9 @@ MipsEmulateBranch(struct trapframe *framePtr, trapf_pc_t _instPC, int fpcCSR,
 			case OP_CJR:
 				retAddr = capRegsPtr[inst.CType.r1];
 				break;
+			default:
+				retAddr = instPC + 4;
 			}
-			if (retAddr != NULL)
-				return (trapf_pc_t)(retAddr);
 			break;
 		case OP_CBEZ:
 		case OP_CBNZ:
@@ -1651,7 +1651,10 @@ MipsEmulateBranch(struct trapframe *framePtr, trapf_pc_t _instPC, int fpcCSR,
 			else
 				retAddr = instPC + 8;
 			return (trapf_pc_t)(retAddr);
+		default:
+			retAddr = instPC + 4;
 		}
+		break;
 		/* FALLTHROUGH */
 #endif
 
