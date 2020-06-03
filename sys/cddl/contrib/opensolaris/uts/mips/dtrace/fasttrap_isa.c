@@ -110,11 +110,49 @@ fasttrap_tracepoint_remove(proc_t *p, fasttrap_tracepoint_t *tp)
 	return (0);
 }
 
+
+static int
+fasttrap_is_branch(fasttrap_instr_t i)
+{
+	InstFmt inst;
+	inst.word = i;
+
+	switch ((int)inst.JType.op) {
+	case OP_SPECIAL:
+	case OP_BCOND:
+	case OP_J:
+	case OP_JAL:
+	case OP_BEQ:
+	case OP_BEQL:
+	case OP_BNE:
+	case OP_BNEL:
+	case OP_BLEZ:
+	case OP_BLEZL:
+	case OP_BGTZ:
+	case OP_BGTZL:
+	case OP_COP1:
+		return 1;
+#if __has_feature(capabilities)
+	case OP_COP2:
+		switch (inst.CType.fmt) {
+		case OP_CJ:
+		case OP_CBEZ:
+		case OP_CBNZ:
+		case OP_CBTS:
+		case OP_CBTU:
+			return 1;
+		}
+#endif
+	}
+	return 0;
+}
+
 int
 fasttrap_tracepoint_init(proc_t *p, fasttrap_tracepoint_t *tp, uintptr_t pc,
     fasttrap_probe_type_t type)
 {
 	uint32_t instr;
+	uint32_t prec_instr;
 	InstFmt _instr;
 	/*
 	 * Read the instruction at the given address out of the process's
@@ -125,7 +163,18 @@ fasttrap_tracepoint_init(proc_t *p, fasttrap_tracepoint_t *tp, uintptr_t pc,
 	if (uread(p, &instr, 4, pc) != 0)
 		return (-1);
 
+	if (uread(p, &prec_instr, 4, pc-4) != 0)
+		return (-1);
+
+	/* do not instrument branches */
+	if (fasttrap_is_branch(instr) || fasttrap_is_branch(prec_instr))
+		return (-1);
+
 	_instr.word = instr;
+
+        /* cjr $c17 */
+        if (instr == 0x48111fff)
+            return (-1);
 
 	tp->ftt_instr = instr;
 	tp->single_stepping = 0;
@@ -151,40 +200,6 @@ fasttrap_find_tracepoint(pid_t pid, uintptr_t pc)
 	return tp;
 }
 
-static int
-fasttrap_is_branch(fasttrap_instr_t i)
-{
-	InstFmt inst;
-	inst.word = i;
-
-	switch ((int)inst.JType.op) {
-	case OP_SPECIAL:
-	case OP_BCOND:
-	case OP_J:
-	case OP_JAL:
-	case OP_BEQ:
-	case OP_BEQL:
-	case OP_BNE:
-	case OP_BNEL:
-	case OP_BLEZ:
-	case OP_BLEZL:
-	case OP_BGTZ:
-	case OP_BGTZL:
-		return 1;
-#if __has_feature(capabilities)
-	case OP_COP2:
-		switch (inst.CType.fmt) {
-		case OP_CJ:
-		case OP_CBEZ:
-		case OP_CBNZ:
-		case OP_CBTS:
-		case OP_CBTU:
-			return 1;
-		}
-#endif
-	}
-	return 0;
-}
 
 static int
 fasttrap_clear_single_step(proc_t *p, fasttrap_tracepoint_t *tp)
