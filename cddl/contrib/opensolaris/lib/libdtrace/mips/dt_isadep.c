@@ -70,6 +70,38 @@ dt_pid_create_glob_offset_probes(struct ps_prochandle *P, dtrace_hdl_t *dtp,
     fasttrap_probe_spec_t *ftp, const GElf_Sym *symp, const char *pattern)
 {
 
-	dt_dprintf("%s: unimplemented\n", __func__);
-	return (DT_PROC_ERR);
+	ulong_t i;
+
+	ftp->ftps_type = DTFTP_OFFSETS;
+	ftp->ftps_pc = (uintptr_t)symp->st_value;
+	ftp->ftps_size = (size_t)symp->st_size;
+	ftp->ftps_noffs = 0;
+
+	/*
+	 * If we're matching against everything, just iterate through each
+	 * instruction in the function, otherwise look for matching offset
+	 * names by constructing the string and comparing it against the
+	 * pattern.
+	 */
+	if (strcmp("*", pattern) == 0) {
+		for (i = 0; i < symp->st_size; i += 4) {
+			ftp->ftps_offs[ftp->ftps_noffs++] = i;
+		}
+	} else {
+		char name[sizeof (i) * 2 + 1];
+
+		for (i = 0; i < symp->st_size; i += 4) {
+			(void) sprintf(name, "%lx", i);
+			if (gmatch(name, pattern))
+				ftp->ftps_offs[ftp->ftps_noffs++] = i;
+		}
+	}
+
+	if (ioctl(dtp->dt_ftfd, FASTTRAPIOC_MAKEPROBE, ftp) != 0) {
+		dt_dprintf("fasttrap probe creation ioctl failed: %s\n",
+			   strerror(errno));
+		return (dt_set_errno(dtp, errno));
+	}
+
+	return (ftp->ftps_noffs);
 }
