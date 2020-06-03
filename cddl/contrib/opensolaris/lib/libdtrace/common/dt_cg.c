@@ -1290,11 +1290,11 @@ dt_cg_array_op(dt_node_t *dnp, dt_irlist_t *dlp, dt_regset_t *drp)
 	if (idp->di_id != DIF_VAR_ARGS || !dt_node_is_scalar(dnp))
 		return;
 
-	if ((size = dt_node_type_size(dnp)) == sizeof (uint64_t))
+	if ((size = dt_node_type_size(dnp)) == sizeof (uint64_t) * 2)
 		return;
 
 	reg = dt_regset_alloc(drp);
-	assert(size < sizeof (uint64_t));
+	assert(size < sizeof (uint64_t) * 2);
 	n = sizeof (uint64_t) * NBBY - size * NBBY;
 
 	dt_cg_setx(dlp, reg, n);
