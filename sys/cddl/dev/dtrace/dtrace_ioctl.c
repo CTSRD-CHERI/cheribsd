@@ -55,14 +55,6 @@ dtrace_ioctl_helper(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 	dhp = NULL;
 	dof = NULL;
 	rval = 0;
-	printf("%s - not implemented\n", __func__);
-	return ENOSYS;
-	/*
-	 * According to sys/cddl/contrib/opensolaris/uts/common/sys/dtrace.h:
-	 * The DTRACEHIOC_ADD and DTRACEHIOC_REMOVE are left in place for
-	 * legacy helpers and should no longer be used.
-	 */
-#if 0
 	switch (cmd) {
 	case DTRACEHIOC_ADDDOF:
 		dhp = (dof_helper_t *)addr;
@@ -112,9 +104,8 @@ dtrace_ioctl_helper(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 		break;
 	}
 	return (rval);
-#endif
-
 }
+
 /* ARGSUSED */
 static int
 dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
@@ -425,7 +416,6 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 		dtrace_vstate_t *vstate;
 		int err = 0;
 		int rval;
-
 		dtrace_enable_io_t _p = dtrace_make_enable_io(addr);
 		dtrace_enable_io_t *p = &_p;
 
@@ -441,7 +431,7 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 			return (0);
 		}
 
-		if ((dof = dtrace_dof_copyin((uintcap_t)p->dof, &rval)) == NULL)
+		if ((dof = dtrace_dof_copyin((uintcap_t) p->dof, &rval)) == NULL)
 			return (EINVAL);
 
 		mutex_enter(&cpu_lock);
