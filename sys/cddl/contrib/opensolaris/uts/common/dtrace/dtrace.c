@@ -13797,22 +13797,26 @@ dtrace_dof_actdesc(dof_hdr_t *dof, dof_sec_t *sec, dtrace_vstate_t *vstate,
     cred_t *cr)
 {
 	dtrace_actdesc_t *act, *first = NULL, *last = NULL, *next;
-	dof_actdesc_t _desc;
-	dof_actdesc_t *desc = &_desc;
+	dof_actdesc_t desc_storage;
+	dof_actdesc_t *desc = &desc_storage;
 	dof_sec_t *difosec;
 	size_t offs;
 	uintptr_t daddr = (uintptr_t)dof;
 	uint64_t arg;
 	dtrace_actkind_t kind;
-	int sizeof_uarg = sizeof(dtrace_uarg_t);
-	int sizeof_dof_actdesc_t = sizeof(dof_actdesc_t);
+	int sizeof_uarg;
+	int sizeof_dof_actdesc_t;
 
 #ifdef COMPAT_FREEBSD64
 	if (!SV_CURPROC_FLAG(SV_CHERI)) {
 		sizeof_uarg = sizeof(uint64_t);
 		sizeof_dof_actdesc_t = sizeof(dof_actdesc64_t);
-	}
+	} else
 #endif
+	{
+		sizeof_uarg = sizeof(dtrace_uarg_t);
+		sizeof_dof_actdesc_t = sizeof(dof_actdesc_t);
+	}
 
 	if (sec->dofs_type != DOF_SECT_ACTDESC) {
 		dtrace_dof_error(dof, "invalid action section");
@@ -13846,12 +13850,13 @@ dtrace_dof_actdesc(dof_hdr_t *dof, dof_sec_t *sec, dtrace_vstate_t *vstate,
 
 	for (offs = 0; offs < sec->dofs_size; offs += sec->dofs_entsize) {
 		uintptr_t act_desc = daddr + (uintptr_t)sec->dofs_offset + offs;
-		_desc =
 #ifdef COMPAT_FREEBSD64
-		    !SV_CURPROC_FLAG(SV_CHERI) ?
-		    freebsd64_dof_actdesc((dof_actdesc64_t *)act_desc) :
+		if (!SV_CURPROC_FLAG(SV_CHERI))
+			desc_storage =
+			    freebsd64_dof_actdesc((dof_actdesc64_t *)act_desc);
+		else
 #endif
-		    *(dof_actdesc_t *)act_desc;
+			desc_storage = *(dof_actdesc_t *)act_desc;
 		kind = (dtrace_actkind_t)desc->dofa_kind;
 
 		if ((DTRACEACT_ISPRINTFLIKE(kind) &&

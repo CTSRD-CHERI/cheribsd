@@ -769,7 +769,7 @@ typedef struct dof_actdesc {
 	uint32_t dofa_kind;		/* action kind (DTRACEACT_* constant) */
 	uint32_t dofa_ntuple;		/* number of subsequent tuple actions */
 	uint64_t dofa_arg;		/* kind-specific argument */
-        dtrace_uarg_t dofa_uarg;	/* user-supplied argument */
+	dtrace_uarg_t dofa_uarg;	/* user-supplied argument */
 } dof_actdesc_t;
 
 #ifdef COMPAT_FREEBSD64
@@ -1384,8 +1384,8 @@ typedef struct {
 
 #ifdef COMPAT_FREEBSD64
 typedef struct {
-	uint64_t dof; // void * /* DOF userland address written to driver. */
-	int	n_matched;	/* # matches returned by driver. */
+	uint64_t dof;		/* DOF userland address written to driver. */
+	int n_matched;		/* # matches returned by driver. */
 } dtrace_enable_io64_t;
 #endif
 

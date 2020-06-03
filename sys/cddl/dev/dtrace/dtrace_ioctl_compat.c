@@ -27,19 +27,21 @@ dtrace_make_buffdesc_cap(caddr_t addr)
 {
 #ifdef COMPAT_FREEBSD64
 	if (!SV_CURPROC_FLAG(SV_CHERI))
-	    return __USER_CAP_OBJ(*(dtrace_bufdesc64_t **)addr);
+	    return (__USER_CAP_OBJ(*(dtrace_bufdesc64_t **)addr));
 #endif
-	return *(dtrace_bufdesc_t * __capability *)addr;
+	return (*(dtrace_bufdesc_t * __capability *)addr);
 }
 
 static int
-dtrace_copyin_buffdesc(
-    dtrace_bufdesc_t * __capability uaddr, dtrace_bufdesc_t *bufdesc)
+dtrace_copyin_buffdesc(dtrace_bufdesc_t * __capability uaddr,
+    dtrace_bufdesc_t *bufdesc)
 {
 #ifdef COMPAT_FREEBSD64
 	if (!SV_CURPROC_FLAG(SV_CHERI)) {
 		dtrace_bufdesc64_t bufdesc64;
-		int retval = copyin(uaddr, &bufdesc64, sizeof (bufdesc64));
+		int error = copyin(uaddr, &bufdesc64, sizeof (bufdesc64));
+		if (error != 0)
+			return (error);
 		bufdesc->dtbd_size = bufdesc64.dtbd_size;
 		bufdesc->dtbd_cpu = bufdesc64.dtbd_cpu;
 		bufdesc->dtbd_errors = bufdesc64.dtbd_errors;
@@ -47,10 +49,10 @@ dtrace_copyin_buffdesc(
 		bufdesc->dtbd_data = __USER_CAP_STR(bufdesc64.dtbd_data);
 		bufdesc->dtbd_oldest = bufdesc64.dtbd_oldest;
 		bufdesc->dtbd_timestamp = bufdesc64.dtbd_timestamp;
-		return retval;
+		return (0);
 	}
 #endif
-	return copyincap(uaddr, bufdesc, sizeof (dtrace_bufdesc_t));
+	return (copyincap(uaddr, bufdesc, sizeof (dtrace_bufdesc_t)));
 }
 
 static int
@@ -67,14 +69,14 @@ dtrace_copyout_buffdesc(dtrace_bufdesc_t *bufdesc,
 		bufdesc64.dtbd_data = (__cheri_addr uint64_t)bufdesc->dtbd_data;
 		bufdesc64.dtbd_oldest = bufdesc->dtbd_oldest;
 		bufdesc64.dtbd_timestamp = bufdesc->dtbd_timestamp;
-		return copyout(&bufdesc64, uaddr, sizeof (dtrace_bufdesc64_t));
+		return (copyout(&bufdesc64, uaddr, sizeof(dtrace_bufdesc64_t)));
 	}
 #endif
-	return copyoutcap(bufdesc, uaddr, sizeof (dtrace_bufdesc_t));
+	return (copyoutcap(bufdesc, uaddr, sizeof (dtrace_bufdesc_t)));
 }
 
 static void
-dtrace_bcopy_recdesc(dtrace_recdesc_t *recdesc, void *dest)
+dtrace_copy_recdesc(const dtrace_recdesc_t *recdesc, void *dest)
 {
 #ifdef COMPAT_FREEBSD64
 	if (!SV_CURPROC_FLAG(SV_CHERI)) {
@@ -94,7 +96,7 @@ dtrace_bcopy_recdesc(dtrace_recdesc_t *recdesc, void *dest)
 }
 
 static void
-dtrace_bcopy_aggdesc(dtrace_aggdesc_t *aggdesc, void *dest)
+dtrace_copy_aggdesc(const dtrace_aggdesc_t *aggdesc, void *dest)
 {
 #ifdef COMPAT_FREEBSD64
 	if (!SV_CURPROC_FLAG(SV_CHERI)) {
@@ -120,9 +122,9 @@ dtrace_make_aggdesc_cap(caddr_t addr)
 {
 #ifdef COMPAT_FREEBSD64
 	if (!SV_CURPROC_FLAG(SV_CHERI))
-		return __USER_CAP_OBJ(*(dtrace_aggdesc64_t **)addr);
+		return (__USER_CAP_OBJ(*(dtrace_aggdesc64_t **)addr));
 #endif
-	return *(dtrace_aggdesc_t * __capability *)addr;
+	return (*(dtrace_aggdesc_t * __capability *)addr);
 }
 
 static int
@@ -131,7 +133,9 @@ dtrace_copyin_aggdesc(void * __capability uaddr, dtrace_aggdesc_t *aggdesc)
 #ifdef COMPAT_FREEBSD64
 	if (!SV_CURPROC_FLAG(SV_CHERI)) {
 		dtrace_aggdesc64_t aggdesc64;
-		int retval = copyin(uaddr, &aggdesc64, sizeof (aggdesc64));
+		int error = copyin(uaddr, &aggdesc64, sizeof (aggdesc64));
+		if (error != 0)
+			return (error);
 		aggdesc->dtagd_name =
 		    __USER_CAP_STR((void *)aggdesc64.tagd_name);
 		aggdesc->dtagd_varid = aggdesc64.dtagd_varid;
@@ -141,10 +145,10 @@ dtrace_copyin_aggdesc(void * __capability uaddr, dtrace_aggdesc_t *aggdesc)
 		aggdesc->dtagd_size = aggdesc64.dtagd_size;
 		aggdesc->dtagd_nrecs = aggdesc64.dtagd_nrecs;
 		aggdesc->dtagd_pad = aggdesc64.dtagd_pad;
-		return retval;
+		return (0);
 	}
 #endif
-	return copyincap(uaddr, aggdesc, sizeof (dtrace_bufdesc_t));
+	return (copyincap(uaddr, aggdesc, sizeof (dtrace_bufdesc_t)));
 }
 
 static u_long
@@ -153,7 +157,7 @@ dtrace_translate_ioctl_to_native(u_long cmd)
 
 #define CASE(VAL)     \
 	case VAL##64: \
-		return VAL
+		return (VAL)
 
 #ifdef COMPAT_FREEBSD64
 	switch (cmd) {
@@ -168,7 +172,7 @@ dtrace_translate_ioctl_to_native(u_long cmd)
 #endif
 #undef CASE
 
-	return cmd;
+	return (cmd);
 }
 
 static dof_hdr_t * __capability
@@ -176,10 +180,10 @@ dtrace_make_pdof_cap(caddr_t addr)
 {
 #ifdef COMPAT_FREEBSD64
 	if (!SV_CURPROC_FLAG(SV_CHERI)) {
-		return __USER_CAP_OBJ(*(dof_hdr_t **)addr);
+		return (__USER_CAP_OBJ(*(dof_hdr_t **)addr));
 	}
 #endif
-	return *(dof_hdr_t * __capability *)addr;
+	return (*(dof_hdr_t * __capability *)addr);
 }
 
 static dtrace_enable_io_t
@@ -192,14 +196,14 @@ dtrace_make_enable_io(caddr_t addr)
 		dtrace_enable_io64_t *p64 = (dtrace_enable_io64_t *)addr;
 		enable.dof = __USER_CAP_UNBOUND((void *)p64->dof);
 		enable.n_matched = p64->n_matched;
-		return enable;
+		return (enable);
 	}
 #endif
-	return *(dtrace_enable_io_t *)addr;
+	return (*(dtrace_enable_io_t *)addr);
 }
 
 static void
-dtrace_bcopy_enable_io(dtrace_enable_io_t *from, caddr_t to)
+dtrace_copy_enable_io(const dtrace_enable_io_t *from, caddr_t to)
 {
 #ifdef COMPAT_FREEBSD64
 	dtrace_enable_io_t enable;
@@ -220,10 +224,10 @@ dtrace_make_eprobedesc_cap(caddr_t addr)
 {
 #ifdef COMPAT_FREEBSD64
 	if (!SV_CURPROC_FLAG(SV_CHERI)) {
-		return __USER_CAP_OBJ(*(dtrace_eprobedesc64_t **)addr);
+		return (__USER_CAP_OBJ(*(dtrace_eprobedesc64_t **)addr));
 	}
 #endif
-	return *(dtrace_eprobedesc_t * __capability *)addr;
+	return (*(dtrace_eprobedesc_t * __capability *)addr);
 }
 
 static dtrace_fmtdesc_t
@@ -236,14 +240,14 @@ dtrace_make_fmtdesc(caddr_t addr)
 		desc.dtfd_string = __USER_CAP_STR(p64->dtfd_string);
 		desc.dtfd_length = p64->dtfd_length;
 		desc.dtfd_format = p64->dtfd_format;
-		return desc;
+		return (desc);
 	}
 #endif
-	return *(dtrace_fmtdesc_t *)addr;
+	return (*(dtrace_fmtdesc_t *)addr);
 }
 
 static void
-dtrace_bcopy_fmtdesc(dtrace_fmtdesc_t *fmtdesc, caddr_t to)
+dtrace_copy_fmtdesc(const dtrace_fmtdesc_t *fmtdesc, caddr_t to)
 {
 #ifdef COMPAT_FREEBSD64
 	dtrace_fmtdesc_t desc;
