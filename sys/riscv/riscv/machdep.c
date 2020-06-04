@@ -1051,8 +1051,8 @@ fake_preload_metadata(struct riscv_bootparams *rvbp)
 	preload_metadata = (void *)fake_preload;
 
 	/* Check if bootloader clobbered part of the kernel with the DTB. */
-	KASSERT(rvbp->dtbp_phys + dtb_size < rvbp->kern_phys ||
-		rvbp->dtbp_phys > rvbp->kern_phys + (lastaddr - KERNBASE),
+	KASSERT(rvbp->dtbp_phys + dtb_size <= rvbp->kern_phys ||
+		rvbp->dtbp_phys >= rvbp->kern_phys + (lastaddr - KERNBASE),
 	    ("FDT (%lx-%lx) and kernel (%lx-%lx) overlap", rvbp->dtbp_phys,
 		rvbp->dtbp_phys + dtb_size, rvbp->kern_phys,
 		rvbp->kern_phys + (lastaddr - KERNBASE)));
