@@ -230,6 +230,7 @@ va:
 
 	li	t0, (VM_EARLY_DTB_ADDRESS)
 	sd	t0, RISCV_BOOTPARAMS_DTBP_VIRT(sp)
+	sd	a1, RISCV_BOOTPARAMS_DTBP_PHYS(sp)
 
 	mv	a0, sp
 	call	_C_LABEL(initriscv)	/* Off we go */
