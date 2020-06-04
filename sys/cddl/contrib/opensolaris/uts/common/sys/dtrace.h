@@ -772,7 +772,7 @@ typedef struct dof_actdesc {
 	dtrace_uarg_t dofa_uarg;	/* user-supplied argument */
 } dof_actdesc_t;
 
-#ifdef COMPAT_FREEBSD64
+#if defined(_KERNEL) && defined(COMPAT_FREEBSD64)
 typedef struct dof_actdesc64 {
 	dof_secidx_t dofa_difo;		/* link to DOF_SECT_DIFOHDR */
 	dof_secidx_t dofa_strtab;	/* link to DOF_SECT_STRTAB section */
@@ -989,7 +989,7 @@ typedef struct dtrace_recdesc {
 	dtrace_uarg_t dtrd_uarg;		/* user argument */
 } dtrace_recdesc_t;
 
-#ifdef COMPAT_FREEBSD64
+#if defined(_KERNEL) && defined(COMPAT_FREEBSD64)
 typedef struct dtrace_recdesc64 {
 	dtrace_actkind_t dtrd_action;		/* kind of action */
 	uint32_t dtrd_size;			/* size of record */
@@ -1010,7 +1010,7 @@ typedef struct dtrace_eprobedesc {
 	dtrace_recdesc_t dtepd_rec[1];		/* records themselves */
 } dtrace_eprobedesc_t;
 
-#ifdef COMPAT_FREEBSD64
+#if defined(_KERNEL) && defined(COMPAT_FREEBSD64)
 typedef struct dtrace_eprobedesc64 {
 	dtrace_epid_t dtepd_epid;		/* enabled probe ID */
 	dtrace_id_t dtepd_probeid;		/* probe ID */
@@ -1033,7 +1033,7 @@ typedef struct dtrace_aggdesc {
 	dtrace_recdesc_t dtagd_rec[1];		/* record descriptions */
 } dtrace_aggdesc_t;
 
-#ifdef COMPAT_FREEBSD64
+#if defined(_KERNEL) && defined(COMPAT_FREEBSD64)
 typedef struct dtrace_aggdesc64 {
 	uint64_t tagd_name; // char *		/* not filled in by kernel */
 	dtrace_aggvarid_t dtagd_varid;		/* not filled in by kernel */
@@ -1053,7 +1053,7 @@ typedef struct dtrace_fmtdesc {
 	uint16_t dtfd_format;			/* format identifier */
 } dtrace_fmtdesc_t;
 
-#ifdef COMPAT_FREEBSD64
+#if defined(_KERNEL) && defined(COMPAT_FREEBSD64)
 typedef struct dtrace_fmtdesc64 {
 	uint64_t dtfd_string; // char *		/* format string */
 	int dtfd_length;			/* length of format string */
@@ -1152,7 +1152,7 @@ typedef struct dtrace_bufdesc {
 	uint64_t dtbd_timestamp;		/* hrtime of snapshot */
 } dtrace_bufdesc_t;
 
-#ifdef COMPAT_FREEBSD64
+#if defined(_KERNEL) && defined(COMPAT_FREEBSD64)
 typedef struct dtrace_bufdesc64 {
 	uint64_t dtbd_size;			/* size of buffer */
 	uint32_t dtbd_cpu;			/* CPU or DTRACE_CPUALL */
@@ -1382,7 +1382,7 @@ typedef struct {
 	int	n_matched;	/* # matches returned by driver. */
 } dtrace_enable_io_t;
 
-#ifdef COMPAT_FREEBSD64
+#if defined(_KERNEL) && defined(COMPAT_FREEBSD64)
 typedef struct {
 	uint64_t dof;		/* DOF userland address written to driver. */
 	int n_matched;		/* # matches returned by driver. */
@@ -1414,7 +1414,7 @@ typedef struct {
 #define	DTRACEIOC_REPLICATE	_IOW('x',18,dtrace_repldesc_t)	
 							/* replicate enab */
 
-#ifdef COMPAT_FREEBSD64
+#if defined(_KERNEL) && defined(COMPAT_FREEBSD64)
 #define DTRACEIOC_BUFSNAP64 _IOC_NEWTYPE(DTRACEIOC_BUFSNAP, uint64_t)
 #define DTRACEIOC_ENABLE64  _IOC_NEWTYPE(DTRACEIOC_ENABLE, dtrace_enable_io64_t)
 #define DTRACEIOC_AGGSNAP64 _IOC_NEWTYPE(DTRACEIOC_AGGSNAP, uint64_t)
