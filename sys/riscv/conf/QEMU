@@ -6,5 +6,12 @@ include "GENERIC"
 
 ident QEMU
 
+options 	CPU_QEMU_RISCV
 options 	HZ=100
 options 	ROOTDEVNAME=\"ufs:/dev/vtbd0\"
+
+# Access host files on QEMU
+options 	SMBFS
+options 	NETSMB			# Seems to be needed by SMBFS
+options 	LIBMCHAIN		# Also seems to be needed by SMBFS
+options 	LIBICONV		# Also seems to be needed by SMBFS

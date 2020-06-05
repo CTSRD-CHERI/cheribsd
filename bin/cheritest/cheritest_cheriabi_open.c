@@ -225,6 +225,7 @@ test_cheriabi_open_bad_perm(const struct cheri_test *ctp __unused)
 	cheritest_success();
 }
 
+#ifdef CHERI_GET_SEALCAP
 void
 test_cheriabi_open_sealed(const struct cheri_test *ctp __unused)
 {
@@ -252,3 +253,4 @@ test_cheriabi_open_sealed(const struct cheri_test *ctp __unused)
 
 	cheritest_success();
 }
+#endif

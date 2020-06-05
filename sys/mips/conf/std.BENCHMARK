@@ -3,5 +3,4 @@
 
 nooptions	INVARIANTS
 nooptions	INVARIANTS_SUPPORT
-nooptions	KTRACE
 nooptions	WITNESS

@@ -44,7 +44,6 @@
 #include <cheri/cheri.h>
 #include <cheri/cheric.h>
 
-#include <machine/cpuregs.h>
 #include <machine/sysarch.h>
 
 #include <err.h>
@@ -65,6 +64,7 @@
 #define	PERM_EXEC	CHERI_PERM_EXECUTE
 #define	PERM_RWX	(PERM_READ|PERM_WRITE|PERM_EXEC)
 
+#ifdef CHERI_MMAP_SETBOUNDS
 void
 test_cheriabi_mmap_nospace(const struct cheri_test *ctp __unused)
 {
@@ -83,7 +83,9 @@ test_cheriabi_mmap_nospace(const struct cheri_test *ctp __unused)
 
 	cheritest_success();
 }
+#endif
 
+#ifdef CHERI_MMAP_GETPERM
 void
 test_cheriabi_mmap_perms(const struct cheri_test *ctp __unused)
 {
@@ -212,11 +214,12 @@ test_cheriabi_mmap_perms(const struct cheri_test *ctp __unused)
 
 	cheritest_success();
 }
+#endif	/* CHERI_MMAP_GETPERM */
 
+#ifdef CHERI_BASELEN_BITS
 void
 test_cheriabi_mmap_unrepresentable(const struct cheri_test *ctp __unused)
 {
-#ifdef CHERI_BASELEN_BITS
 	size_t len = ((size_t)PAGE_SIZE << CHERI_BASELEN_BITS) + 1;
 	size_t expected_len;
 	void *cap;
@@ -232,11 +235,10 @@ test_cheriabi_mmap_unrepresentable(const struct cheri_test *ctp __unused)
 		    "an unexpected length (%zu vs %zu) when given an "
 		    "unrepresentable length (%zu): %#p", cheri_getlen(cap),
 		    expected_len, len, cap);
-	cheritest_success();
-#endif
 
 	cheritest_success();
 }
+#endif
 
 void
 test_cheriabi_malloc_zero_size(const struct cheri_test *ctp __unused)

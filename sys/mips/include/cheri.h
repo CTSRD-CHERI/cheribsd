@@ -171,6 +171,14 @@ cheri_get_cyclecount(void)
 	__asm__ __volatile__("li $0, 0xdead");				\
 } while(0)
 
+#define	CHERI_START_USER_TRACE	do {					\
+	__asm__ __volatile__("li $0, 0xdeaf");				\
+} while(0)
+
+#define	CHERI_STOP_USER_TRACE	do {					\
+	__asm__ __volatile__("li $0, 0xfaed");				\
+} while(0)
+
 #ifdef _KERNEL
 /*
  * Special marker NOP to log messages in instruction traces.

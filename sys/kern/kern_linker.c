@@ -1314,7 +1314,7 @@ kern_kldstat(struct thread *td, int fileid, struct kld_file_stat *stat)
 	bcopy(lf->filename, &stat->name[0], namelen);
 	stat->refs = lf->refs;
 	stat->id = lf->id;
-	stat->address = lf->address;
+	stat->address = (char * __capability)(uintcap_t)lf->address;
 	stat->size = lf->size;
 	/* Version 2 fields: */
 	namelen = strlen(lf->pathname) + 1;

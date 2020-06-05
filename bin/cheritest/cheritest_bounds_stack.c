@@ -41,7 +41,6 @@
 #include <cheri/cheri.h>
 #include <cheri/cheric.h>
 
-#include <machine/cpuregs.h>
 #include <machine/sysarch.h>
 
 #include <err.h>
@@ -67,18 +66,35 @@ test_bounds_precise(void * __capability c, size_t expected_len)
 {
 	size_t len, offset;
 
-	/* Confirm precise lower bound: offset of zero. */
 	offset = cheri_getoffset(c);
-	if (offset != 0)
-		cheritest_failure_errx("offset (%jd) not zero: "
-		    _CHERI_PRINTF_CAP_FMT, offset, _CHERI_PRINTF_CAP_ARG(c));
+	len = cheri_getlen(c);
+
+#ifdef __CHERI_PURE_CAPABILITY__
+	/* Confirm precise lower bound: offset of zero. */
+	CHERITEST_VERIFY2(offset == 0,
+	    "offset (%jd) not zero: " _CHERI_PRINTF_CAP_FMT, offset,
+	    _CHERI_PRINTF_CAP_ARG(c));
 
 	/* Confirm precise upper bound: length of expected size for type. */
-	len = cheri_getlen(c);
-	if (len != expected_len)
-		cheritest_failure_errx("length (%jd) not expected %jd: "
-		    _CHERI_PRINTF_CAP_FMT, len, expected_len,
-		    _CHERI_PRINTF_CAP_ARG(c));
+	CHERITEST_VERIFY2(len == expected_len,
+	    "length (%jd) not expected %jd: " _CHERI_PRINTF_CAP_FMT, len,
+	    expected_len, _CHERI_PRINTF_CAP_ARG(c));
+#else
+	/*
+	 * In hybrid mode we don't increase alignment of allocations to ensure
+	 * precise bounds, so the offset may be non-zero if the bounds were
+	 * not precisely representable. For now, simply  check that we got at
+	 * least the expected length but no more than twice that.
+	 *
+	 * See https://github.com/CTSRD-CHERI/llvm-project/issues/431
+	 */
+	CHERITEST_VERIFY2(len >= expected_len,
+	    "length (%jd) smaller than expected lower bound %jd: " _CHERI_PRINTF_CAP_FMT,
+	    len, expected_len, _CHERI_PRINTF_CAP_ARG(c));
+	CHERITEST_VERIFY2(len <= 2 * expected_len,
+	    "length (%jd) greater than expected upper bound %jd: " _CHERI_PRINTF_CAP_FMT,
+	    len, 2 * expected_len, _CHERI_PRINTF_CAP_ARG(c));
+#endif
 	cheritest_success();
 }
 

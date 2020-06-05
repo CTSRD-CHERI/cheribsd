@@ -20,11 +20,21 @@ set(MACHINE_HEADERS "${CMAKE_SOURCE_DIR}/sys/${TARGET}/include")
 if("${TARGET}" STREQUAL "mips")
     if("${TARGET_ARCH}" STREQUAL "mips64")
         add_compile_options(-mabi=n64)
-        set(CLANG_TRIPLE mips64-unknown-freebsd12)
+        set(CLANG_TRIPLE mips64-unknown-freebsd13)
         add_compile_definitions(__mips__)
         add_compile_definitions(__mips_n64)
     else()
         message(FATAL_ERROR "Unsupported MIPS TARGET_ARCH: ${TARGET}:${TARGET_ARCH}!")
+    endif()
+elseif("${TARGET}" STREQUAL "riscv")
+    if("${TARGET_ARCH}" STREQUAL "riscv64")
+        add_compile_options(-mabi=lp64)
+        set(CLANG_TRIPLE riscv64-unknown-freebsd13)
+        add_compile_definitions(__riscv)
+        add_compile_definitions(__riscv__)
+        add_compile_definitions(__riscv_xlen=64)
+    else()
+        message(FATAL_ERROR "Unsupported RISC-V TARGET_ARCH: ${TARGET}:${TARGET_ARCH}!")
     endif()
 else()
     message(FATAL_ERROR "Unsupported TARGET: ${TARGET}:${TARGET_ARCH}!")
@@ -51,7 +61,8 @@ file(MAKE_DIRECTORY ${TMPSYSROOT}/kern_opt)
 file(WRITE ${CMAKE_BINARY_DIR}/kern_opt/opt_ddb.h "#define DDB 1\n")
 file(WRITE ${CMAKE_BINARY_DIR}/kern_opt/opt_ktrace.h "#define KTRACE 1\n")
 file(WRITE ${CMAKE_BINARY_DIR}/cheri_builtins.h "
-// Pretend that we have capabilities
+// Pretend that we have capabilities in CLion
+#ifdef __JETBRAINS_IDE__
 #define __CHERI__
 #define __has_feature(x) __fake_has_feature_##x
 #define __fake_has_feature_capabilities 1
@@ -99,12 +110,16 @@ void* __capability __builtin_cheri_bounds_set_exact(const void* __capability, lo
 #define __SIZEOF_CHERI_CAPABILITY__ 16
 #define __SIZEOF_UINTCAP__ 16
 #define __SIZEOF_INTCAP__ 16
+#endif /* __JETBRAINS_IDE__ */
 ")
 
 file(WRITE ${CMAKE_BINARY_DIR}/cheri_purecap.h "
+// Pretend that we have capabilities in CLion
+#ifdef __JETBRAINS_IDE__
 #define __CHERI_PURE_CAPABILITY__ 1
 #define __CHERI_CAPABILITY_TABLE__ 3
 #include \"cheri_builtins.h\"
+#endif
 ")
 add_compile_options(-include ${CMAKE_BINARY_DIR}/cheri_purecap.h)
 
@@ -118,10 +133,13 @@ file(WRITE ${CMAKE_BINARY_DIR}/kern_opt/opt_global.h "
 #define COMPAT_FREEBSD64 1
 #define CPU_CHERI 1
 #define INVARIANT_SUPPORT 1
+#define INVARIANTS 1
+#define FDT 1
 #define CPU_MALTA 1
 #define TICK_USE_YAMON_FREQ defined
 #define YAMON 1
 #define INVARIANTS 1
+#define CPU_QEMU_RISCV
 #define __FreeBSD__
 // #define MAC 1
 // #define AUDIT 1")
@@ -141,14 +159,14 @@ message(STATUS "BUILTIN_HEADERS_DIR=${BUILTIN_HEADERS_DIR}")
 add_compile_options(-idirafter ${BUILTIN_HEADERS_DIR}/include)
 
 add_subdirectory(libexec/rtld-cheri-elf)
-file(GLOB_RECURSE FAKE_KERNEL_SRCS_MIPS sys/mips "*.c")
-file(GLOB_RECURSE FAKE_KERNEL_SRCS_DDB sys/ddb "*.c")
-file(GLOB_RECURSE FAKE_KERNEL_SRCS_CHERI sys/cheri "*.c")
-file(GLOB_RECURSE FAKE_KERNEL_SRCS_CHERIABI sys/compat/cheriabi "*.c")
-file(GLOB_RECURSE FAKE_KERNEL_SRCS_KERN sys/kern "*.c")
-file(GLOB_RECURSE FAKE_KERNEL_SRCS_LIBKERN sys/libkern "*.c")
-add_library(fake_kernel STATIC ${FAKE_KERNEL_SRCS_MIPS} ${FAKE_KERNEL_SRCS_DDB} ${FAKE_KERNEL_SRCS_CHERI} ${FAKE_KERNEL_SRCS_CHERIABI} ${FAKE_KERNEL_SRCS_KERN} ${FAKE_KERNEL_SRCS_LIBKERN})
+file(GLOB_RECURSE FAKE_KERNEL_SRCS_TARGET LIST_DIRECTORIES FALSE "sys/${TARGET}/*.c")
+file(GLOB_RECURSE FAKE_KERNEL_SRCS_DDB "sys/ddb/*.c")
+file(GLOB_RECURSE FAKE_KERNEL_SRCS_CHERI "sys/cheri/*.c")
+file(GLOB_RECURSE FAKE_KERNEL_SRCS_CHERIABI "sys/compat/cheriabi/*.c")
+file(GLOB_RECURSE FAKE_KERNEL_SRCS_KERN "sys/kern/*.c")
+file(GLOB_RECURSE FAKE_KERNEL_SRCS_LIBKERN "sys/libkern/*.c")
+add_library(fake_kernel STATIC ${FAKE_KERNEL_SRCS_TARGET} ${FAKE_KERNEL_SRCS_DDB} ${FAKE_KERNEL_SRCS_CHERI} ${FAKE_KERNEL_SRCS_CHERIABI} ${FAKE_KERNEL_SRCS_KERN} ${FAKE_KERNEL_SRCS_LIBKERN})
 target_compile_definitions(fake_kernel PRIVATE _KERNEL=1)
 target_include_directories(fake_kernel PRIVATE ${CMAKE_BINARY_DIR}/kern_opt)
 target_include_directories(fake_kernel PRIVATE ${CMAKE_SOURCE_DIR}/sys/contrib/ck/include)
-target_compile_options(fake_kernel PRIVATE -include ${CMAKE_BINARY_DIR}/kern_opt/opt_global.h)
+target_compile_options(fake_kernel PRIVATE "-include${CMAKE_BINARY_DIR}/kern_opt/opt_global.h")

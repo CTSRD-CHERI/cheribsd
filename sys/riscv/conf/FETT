@@ -1,0 +1,15 @@
+#NO_UNIVERSE
+
+include "GENERIC"
+
+ident FETT
+
+device		virtio_random	# VirtIO Entropy device
+
+options 	HZ=100
+options 	ROOTDEVNAME=\"ufs:/dev/vtbd0\"
+
+makeoptions 	KERNEL_LMA=0xc0200000
+
+options 	BREAK_TO_DEBUGGER
+options 	ALT_BREAK_TO_DEBUGGER
