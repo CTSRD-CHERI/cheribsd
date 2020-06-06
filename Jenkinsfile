@@ -14,7 +14,7 @@ if (env.CHANGE_ID && !shouldBuildPullRequest()) {
 jobs = [:]
 
 def buildImageAndRunTests(params, String suffix) {
-    if (!suffix.startsWith("mips-")) {
+    if (!suffix.startsWith('mips-') && !suffix.startsWith('riscv64')) {
         echo("Cannot run tests for ${suffix} yet")
         return
     }
@@ -22,15 +22,12 @@ def buildImageAndRunTests(params, String suffix) {
         sh "./cheribuild/jenkins-cheri-build.py --build disk-image-${suffix} ${params.extraArgs}"
     }
     stage("Running tests") {
-        def haveCheritest = suffix == 'mips-hybrid' || suffix == 'mips-purecap'
+        def haveCheritest = suffix.endsWith('-hybrid') || suffix.endsWith('-purecap')
         // copy qemu archive and run directly on the host
         dir("qemu-${params.buildOS}") { deleteDir() }
         copyArtifacts projectName: "qemu/qemu-cheri", filter: "qemu-${params.buildOS}/**", target: '.', fingerprintArtifacts: false
         sh label: 'generate SSH key', script: 'test -e $WORKSPACE/id_ed25519 || ssh-keygen -t ed25519 -N \'\' -f $WORKSPACE/id_ed25519 < /dev/null'
         def testExtraArgs = '--no-timestamped-test-subdir'
-        if (!haveCheritest) {
-            testExtraArgs += ' --no-run-cheritest'
-        }
         def exitCode = sh returnStatus: true, label: "Run tests in QEMU", script: """
 rm -rf cheribsd-test-results && mkdir cheribsd-test-results
 test -e \$WORKSPACE/id_ed25519 || ssh-keygen -t ed25519 -N '' -f \$WORKSPACE/id_ed25519 < /dev/null
