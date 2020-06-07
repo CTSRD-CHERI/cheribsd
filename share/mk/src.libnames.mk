@@ -54,7 +54,6 @@ _INTERNALLIBS=	\
 		netbsd \
 		ntp \
 		ntpevent \
-		opcodes \
 		openbsd \
 		opts \
 		parse \
@@ -69,9 +68,6 @@ _INTERNALLIBS=	\
 
 .if ${MK_BSNMP} == "yes"
 _INTERNALLIBS+=	bsnmptools
-.endif
-.if ${MK_BINUTILS} == "yes"
-_INTERNALLIBS+=	bfd binutils iberty
 .endif
 
 _LIBRARIES=	\
@@ -603,18 +599,6 @@ LIBPMCSTAT?=	${LIBPMCSTATDIR}/libpmcstat${PIE_SUFFIX}.a
 
 LIBC_NOSSP_PICDIR=	${_LIB_OBJTOP}/lib/libc
 LIBC_NOSSP_PIC?=	${LIBC_NOSSP_PICDIR}/libc_nossp_pic${PIE_SUFFIX}.a
-
-LIBBFDDIR=	${_LIB_OBJTOP}/gnu/usr.bin/binutils/libbfd
-LIBBFD?=	${LIBBFDDIR}/libbfd${PIE_SUFFIX}.a
-
-LIBBINUTILSDIR=	${_LIB_OBJTOP}/gnu/usr.bin/binutils/libbinutils
-LIBBINUTILS?=	${LIBBINUTILSDIR}/libbinutils${PIE_SUFFIX}.a
-
-LIBIBERTYDIR=	${_LIB_OBJTOP}/gnu/usr.bin/binutils/libiberty
-LIBIBERTY?=	${LIBIBERTYDIR}/libiberty${PIE_SUFFIX}.a
-
-LIBOPCODESDIR=	${_LIB_OBJTOP}/gnu/usr.bin/binutils/libopcodes
-LIBOPCODES?=	${LIBOPCODESDIR}/libopcodes${PIE_SUFFIX}.a
 
 # Define a directory for each library.  This is useful for adding -L in when
 # not using a --sysroot or for meta mode bootstrapping when there is no
