@@ -156,22 +156,22 @@ static struct pmc_event_descr soft_event_table[PMC_EV_DYN_COUNT];
 #undef	__PMC_EV_ALIAS
 #define	__PMC_EV_ALIAS(N,CODE) 	{ N, PMC_EV_##CODE },
 
-static const struct pmc_event_descr cortex_a8_event_table[] = 
+static const struct pmc_event_descr cortex_a8_event_table[] =
 {
 	__PMC_EV_ALIAS_ARMV7_CORTEX_A8()
 };
 
-static const struct pmc_event_descr cortex_a9_event_table[] = 
+static const struct pmc_event_descr cortex_a9_event_table[] =
 {
 	__PMC_EV_ALIAS_ARMV7_CORTEX_A9()
 };
 
-static const struct pmc_event_descr cortex_a53_event_table[] = 
+static const struct pmc_event_descr cortex_a53_event_table[] =
 {
 	__PMC_EV_ALIAS_ARMV8_CORTEX_A53()
 };
 
-static const struct pmc_event_descr cortex_a57_event_table[] = 
+static const struct pmc_event_descr cortex_a57_event_table[] =
 {
 	__PMC_EV_ALIAS_ARMV8_CORTEX_A57()
 };

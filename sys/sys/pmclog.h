@@ -119,11 +119,7 @@ struct pmclog_callchain {
 	uint32_t		pl_pmcid;
 	uint32_t		pl_cpuflags;
 	/* 8 byte aligned */
-	/*
-	 * XXXAR: not sure whether this actually needs to be a valid cap.
-	 * If it is we need to increase the alignment of this struct
-	 */
-	/* uintptr_t */ vaddr_t	pl_pc[PMC_CALLCHAIN_DEPTH_MAX];
+	vaddr_t			pl_pc[PMC_CALLCHAIN_DEPTH_MAX];
 } __packed;
 
 #define	PMC_CALLCHAIN_CPUFLAGS_TO_CPU(CF)	(((CF) >> 16) & 0xFFFF)
@@ -152,7 +148,7 @@ struct pmclog_map_in {
 	PMCLOG_ENTRY_HEADER
 	uint32_t		pl_pid;
 	uint32_t		pl_pad;
-	uintfptr_t		pl_start;	/* 8 byte aligned */
+	vaddr_t			pl_start;	/* 8 byte aligned */
 	char			pl_pathname[PATH_MAX];
 } __packed;
 
@@ -160,8 +156,8 @@ struct pmclog_map_out {
 	PMCLOG_ENTRY_HEADER
 	uint32_t		pl_pid;
 	uint32_t		pl_pad;
-	uintfptr_t		pl_start;	/* 8 byte aligned */
-	uintfptr_t		pl_end;
+	vaddr_t			pl_start;	/* 8 byte aligned */
+	vaddr_t			pl_end;
 } __packed;
 
 struct pmclog_pmcallocate {
@@ -206,7 +202,7 @@ struct pmclog_procexec {
 	PMCLOG_ENTRY_HEADER
 	uint32_t		pl_pid;
 	uint32_t		pl_pmcid;
-	uintfptr_t		pl_start;	/* keep 8 byte aligned */
+	vaddr_t			pl_start;	/* keep 8 byte aligned */
 	char			pl_pathname[PATH_MAX];
 } __packed;
 
@@ -306,16 +302,16 @@ void	pmclog_process_callchain(struct pmc *_pm, struct pmc_sample *_ps);
 void	pmclog_process_closelog(struct pmc_owner *po);
 void	pmclog_process_dropnotify(struct pmc_owner *po);
 void	pmclog_process_map_in(struct pmc_owner *po, pid_t pid,
-    uintfptr_t start, const char *path);
+    vaddr_t start, const char *path);
 void	pmclog_process_map_out(struct pmc_owner *po, pid_t pid,
-    uintfptr_t start, uintfptr_t end);
+    vaddr_t start, vaddr_t end);
 void	pmclog_process_pmcallocate(struct pmc *_pm);
 void	pmclog_process_pmcattach(struct pmc *_pm, pid_t _pid, char *_path);
 void	pmclog_process_pmcdetach(struct pmc *_pm, pid_t _pid);
 void	pmclog_process_proccsw(struct pmc *_pm, struct pmc_process *_pp,
     pmc_value_t _v, struct thread *);
 void	pmclog_process_procexec(struct pmc_owner *_po, pmc_id_t _pmid, pid_t _pid,
-    uintfptr_t _startaddr, char *_path);
+    vaddr_t _startaddr, char *_path);
 void	pmclog_process_procexit(struct pmc *_pm, struct pmc_process *_pp);
 void	pmclog_process_procfork(struct pmc_owner *_po, pid_t _oldpid, pid_t _newpid);
 void	pmclog_process_sysexit(struct pmc_owner *_po, pid_t _pid);

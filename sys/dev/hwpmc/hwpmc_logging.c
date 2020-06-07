@@ -158,7 +158,7 @@ static struct mtx pmc_kthread_mtx;	/* sleep lock */
 	error=ENOMEM;goto error)
 
 #define	PMCLOG_EMIT32(V)	do { *_le++ = (V); } while (0)
-#define	PMCLOG_EMIT64(V)	do { 					\
+#define	PMCLOG_EMIT64(V)	do {					\
 		*_le++ = (uint32_t) ((V) & 0xFFFFFFFF);			\
 		*_le++ = (uint32_t) (((V) >> 32) & 0xFFFFFFFF);		\
 	} while (0)
@@ -192,23 +192,23 @@ static struct mtx pmc_kthread_mtx;	/* sleep lock */
  * Assertions about the log file format.
  */
 CTASSERT(sizeof(struct pmclog_callchain) == 7*4 + TSDELTA +
-    PMC_CALLCHAIN_DEPTH_MAX*sizeof(uintfptr_t));
+    PMC_CALLCHAIN_DEPTH_MAX*sizeof(vaddr_t));
 CTASSERT(sizeof(struct pmclog_closelog) == 3*4 + TSDELTA);
 CTASSERT(sizeof(struct pmclog_dropnotify) == 3*4 + TSDELTA);
 CTASSERT(sizeof(struct pmclog_map_in) == PATH_MAX + TSDELTA +
-    5*4 + sizeof(uintfptr_t));
+    5*4 + sizeof(vaddr_t));
 CTASSERT(offsetof(struct pmclog_map_in,pl_pathname) ==
-    5*4 + TSDELTA + sizeof(uintfptr_t));
-CTASSERT(sizeof(struct pmclog_map_out) == 5*4 + 2*sizeof(uintfptr_t) + TSDELTA);
+    5*4 + TSDELTA + sizeof(vaddr_t));
+CTASSERT(sizeof(struct pmclog_map_out) == 5*4 + 2*sizeof(vaddr_t) + TSDELTA);
 CTASSERT(sizeof(struct pmclog_pmcallocate) == 9*4 + TSDELTA);
 CTASSERT(sizeof(struct pmclog_pmcattach) == 5*4 + PATH_MAX + TSDELTA);
 CTASSERT(offsetof(struct pmclog_pmcattach,pl_pathname) == 5*4 + TSDELTA);
 CTASSERT(sizeof(struct pmclog_pmcdetach) == 5*4 + TSDELTA);
 CTASSERT(sizeof(struct pmclog_proccsw) == 7*4 + 8 + TSDELTA);
 CTASSERT(sizeof(struct pmclog_procexec) == 5*4 + PATH_MAX +
-    sizeof(uintfptr_t) + TSDELTA);
+    sizeof(vaddr_t) + TSDELTA);
 CTASSERT(offsetof(struct pmclog_procexec,pl_pathname) == 5*4 + TSDELTA +
-    sizeof(uintfptr_t));
+    sizeof(vaddr_t));
 CTASSERT(sizeof(struct pmclog_procexit) == 5*4 + 8 + TSDELTA);
 CTASSERT(sizeof(struct pmclog_procfork) == 5*4 + TSDELTA);
 CTASSERT(sizeof(struct pmclog_sysexit) == 6*4);
@@ -901,7 +901,7 @@ pmclog_close(struct pmc_owner *po)
 	po->po_flags |= PMC_PO_SHUTDOWN;
 	/* give time for all to see */
 	DELAY(50);
-	
+
 	/*
 	 * Schedule the current buffer.
 	 */
@@ -952,7 +952,7 @@ pmclog_process_dropnotify(struct pmc_owner *po)
 }
 
 void
-pmclog_process_map_in(struct pmc_owner *po, pid_t pid, uintfptr_t start,
+pmclog_process_map_in(struct pmc_owner *po, pid_t pid, vaddr_t start,
     const char *path)
 {
 	int pathlen, recordlen;
@@ -972,8 +972,8 @@ pmclog_process_map_in(struct pmc_owner *po, pid_t pid, uintfptr_t start,
 }
 
 void
-pmclog_process_map_out(struct pmc_owner *po, pid_t pid, uintfptr_t start,
-    uintfptr_t end)
+pmclog_process_map_out(struct pmc_owner *po, pid_t pid, vaddr_t start,
+    vaddr_t end)
 {
 	KASSERT(start <= end, ("[pmclog,%d] start > end", __LINE__));
 
@@ -1103,7 +1103,7 @@ pmclog_process_proccsw(struct pmc *pm, struct pmc_process *pp, pmc_value_t v, st
 
 void
 pmclog_process_procexec(struct pmc_owner *po, pmc_id_t pmid, pid_t pid,
-    uintfptr_t startaddr, char *path)
+    vaddr_t startaddr, char *path)
 {
 	int pathlen, recordlen;
 

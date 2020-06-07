@@ -17,17 +17,17 @@ union pmc_md_op_pmcallocate {
 /* Logging */
 #if defined(__mips_n64)
 #define	PMCLOG_READADDR		PMCLOG_READ64
-#define	PMCLOG_EMITADDR		PMCLOG_EMIT64
+#define	PMCLOG_EMITADDR(V)		PMCLOG_EMIT64((vaddr_t)(V))
 #else
 #define	PMCLOG_READADDR		PMCLOG_READ32
-#define	PMCLOG_EMITADDR		PMCLOG_EMIT32
+#define	PMCLOG_EMITADDR(V)		PMCLOG_EMIT32((vaddr_t)(V))
 #endif
 
 #if	_KERNEL
 
 /*
  * MIPS event codes are encoded with a select bit.  The
- * select bit is used when writing to CP0 so that we 
+ * select bit is used when writing to CP0 so that we
  * can select either counter 0/2 or 1/3.  The cycle
  * and instruction counters are special in that they
  * can be counted on either 0/2 or 1/3.
