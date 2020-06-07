@@ -143,7 +143,74 @@ fbt_excluded(const char *name)
 	if (strncmp(name, "fbt_", 4) == 0)
 		return (1);
 #endif
-
+#ifdef __mips__
+	if (
+	    // strcmp(name,"panic") == 0 ||
+	    strncmp(name, "cam_", 4) == 0 || strncmp(name, "scsi_", 5) == 0 ||
+	    strncmp(name, "VOP", 3) == 0 || strncmp(name, "cpu_", 4) == 0 ||
+	    strncmp(name, "pmap_", 5) == 0 || strcmp(name, "trap") == 0 ||
+	    strstr(name, "Mips") != 0 || strstr(name, "mips") != 0 ||
+	    strncmp(name, "yna", 4) == 0 ||
+	    strncmp(name, "linker_ctf", 10) == 0 ||
+	    strcmp(name, "link_elf_ctf_get") == 0 ||
+	    strcmp(name, "yamon_getenv") == 0 ||
+	    strcmp(name, "yamon_getcpufreq") == 0 ||
+	    strcmp(name, "lcd_puts") == 0 || strcmp(name, "lcd_init") == 0 ||
+	    strcmp(name, "obio_probe") == 0 ||
+	    strcmp(name, "obio_attach") == 0 || strcmp(name, "__ctzsi2") == 0 ||
+	    strcmp(name, "__ctzdi2") == 0 || strcmp(name, "__clzsi2") == 0 ||
+	    strcmp(name, "__clzdi2") == 0 || strcmp(name, "__bswapsi2") == 0 ||
+	    strcmp(name, "__bswapdi2") == 0 ||
+	    strcmp(name, "des_encrypt2") == 0 || strcmp(name, "bcopy") == 0 ||
+	    strcmp(name, "__ashrdi3") == 0 || strcmp(name, "__ashldi3") == 0 ||
+	    strcmp(name, "ffsll") == 0 ||
+	    strcmp(name, "busdma_bufalloc_destroy") == 0 ||
+	    strcmp(name, "suspendclock") == 0 ||
+	    strcmp(name, "resumeclock") == 0 ||
+	    strcmp(name, "hardclockintr") == 0 ||
+	    strcmp(name, "trapDump") == 0 || strcmp(name, "tlb_save") == 0 ||
+	    strcmp(name, "tlb_insert_wired") == 0 ||
+	    strcmp(name, "stack_save") == 0 || strcmp(name, "sc_tone") == 0 ||
+	    strcmp(name, "sc_max_unit") == 0 ||
+	    strcmp(name, "sc_get_softc") == 0 ||
+	    strcmp(name, "sc_get_cons_priority") == 0 ||
+	    strcmp(name, "sc_get_bios_values") == 0 ||
+	    strcmp(name, "tlb_update") == 0 ||
+	    strcmp(name, "tlb_invalidate_range") == 0 ||
+	    strcmp(name, "tlb_invalidate_all_user") == 0 ||
+	    strcmp(name, "tlb_invalidate_address") == 0 ||
+	    strcmp(name, "bcopynocap") == 0 ||
+	    strcmp(name, "platform_reset") == 0 ||
+	    strcmp(name, "platform_initclocks") == 0 ||
+	    strcmp(name, "is_cacheable_mem") == 0 ||
+	    strcmp(name, "tlb_invalidate_all") == 0 ||
+	    strcmp(name, "platform_cpu_init") == 0 ||
+	    strcmp(name, "busdma_swi") == 0 ||
+	    strcmp(name, "busdma_lock_mutex") == 0 ||
+	    strcmp(name, "busdma_bufalloc_free_uncacheable") == 0 ||
+	    strcmp(name, "busdma_bufalloc_findzone") == 0 ||
+	    strcmp(name, "busdma_bufalloc_create") == 0 ||
+	    strcmp(name, "busdma_bufalloc_alloc_uncacheable") == 0 ||
+	    strcmp(name, "bus_dma_template_tag") == 0 ||
+	    strcmp(name, "bus_dma_template_init") == 0 ||
+	    strcmp(name, "bus_dma_template_clone") == 0 ||
+	    strcmp(name, "bus_dma_tag_set_domain") == 0 ||
+	    strncmp(name, "generic_", 8) == 0 || strncmp(name, "vm_", 3) == 0 ||
+	    strcmp(name, "nanouptime") == 0 ||
+	    strcmp(name, "msgbuf_addchar") == 0 || strstr(name, "lock") != 0 ||
+	    strcmp(name, "intr_event_handle") == 0 || strstr(name, "VM") != 0 ||
+	    strstr(name, "print") != 0 || strcmp(name, "mi_startup") == 0 ||
+	    strcmp(name, "platform_start") == 0 || strstr(name, "sbuf") != 0 ||
+	    strstr(name, "mtx") != 0 || strcmp(name, "bsearch") == 0 ||
+	    strstr(name, "kdb") != 0 || strstr(name, "trash") != 0 ||
+	    strstr(name, "put") != 0 ||
+	    // strstr(name,"assert") != 0 ||
+	    strstr(name, "kmem") != 0 || strcmp(name, "ffsl") == 0 ||
+	    strstr(name, "witness") != 0 || strstr(name, "uma") != 0 ||
+	    strstr(name, "sx") != 0 || strstr(name, "xcep") != 0 ||
+	    strstr(name, "int") || strstr(name, "TLB"))
+		return (1);
+#endif
 	return (0);
 }
 
