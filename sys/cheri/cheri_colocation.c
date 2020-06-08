@@ -90,6 +90,22 @@ colocation_startup(void)
 SYSINIT(colocation_startup, SI_SUB_CPU, SI_ORDER_FIRST, colocation_startup,
     NULL);
 
+void
+colocation_cleanup(struct thread *td)
+{
+	td->td_md.md_scb = 0;
+
+	/*
+	 * XXX: This should be only neccessary with INVARIANTS.
+	 */
+	memset(&td->td_md.md_slow_cv, 0, sizeof(struct cv));
+	memset(&td->td_md.md_slow_lock, 0, sizeof(struct sx));
+	td->td_md.md_slow_caller_td = NULL;
+	td->td_md.md_slow_buf = NULL;
+	td->td_md.md_slow_len = 0;
+	td->td_md.md_slow_accepting = false;
+}
+
 static bool
 colocation_fetch_scb(struct thread *td, struct switchercb *scbp)
 {

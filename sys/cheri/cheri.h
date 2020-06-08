@@ -150,6 +150,7 @@ extern u_int	security_cheri_bound_legacy_capabilities;
  * CHERI-specific features; e.g., ktrace.
  */
 struct trapframe;
+void	colocation_cleanup(struct thread *td);
 void	colocation_get_peer(struct thread *td, struct thread **peertdp);
 void	colocation_thread_exit(struct thread *td);
 void	colocation_unborrow(struct thread *td, struct trapframe **trapframep);
