@@ -515,7 +515,7 @@ kern_coregister(struct thread *td, const char * __capability namep,
 
 	vmspace = td->td_proc->p_vmspace;
 
-	error = copyinstr_c(namep, name, sizeof(name), NULL);
+	error = copyinstr(namep, name, sizeof(name), NULL);
 	if (error != 0)
 		return (error);
 
@@ -581,7 +581,7 @@ kern_colookup(struct thread *td, const char * __capability namep,
 
 	vmspace = td->td_proc->p_vmspace;
 
-	error = copyinstr_c(namep, name, sizeof(name), NULL);
+	error = copyinstr(namep, name, sizeof(name), NULL);
 	if (error != 0)
 		return (error);
 
@@ -694,7 +694,7 @@ kern_cocall_slow(void * __capability code, void * __capability data,
 		md->md_slow_len = len;
 		md->md_slow_buf = malloc(len, M_TEMP, M_WAITOK);
 
-		error = copyin_c(buf, md->md_slow_buf, len);
+		error = copyin(buf, md->md_slow_buf, len);
 		if (error != 0) {
 			COLOCATION_DEBUG("copyin failed with error %d", error);
 			goto out;
@@ -749,7 +749,7 @@ kern_cocall_slow(void * __capability code, void * __capability data,
 		if (len > md->md_slow_len)
 			len = md->md_slow_len;
 		if (len > 0) {
-			error = copyout_c(md->md_slow_buf, buf, len);
+			error = copyout(md->md_slow_buf, buf, len);
 			if (error != 0)
 				COLOCATION_DEBUG("copyout failed with error %d", error);
 		}
@@ -811,7 +811,7 @@ kern_coaccept_slow(void * __capability code, void * __capability data,
 		if (buf != NULL) {
 			minlen = MIN(len, callermd->md_slow_len);
 			if (minlen > 0) {
-				error = copyin_c(buf, callermd->md_slow_buf, minlen);
+				error = copyin(buf, callermd->md_slow_buf, minlen);
 				if (error != 0) {
 					COLOCATION_DEBUG("copyin failed with error %d", error);
 					return (error);
@@ -846,7 +846,7 @@ kern_coaccept_slow(void * __capability code, void * __capability data,
 	if (buf != NULL) {
 		minlen = MIN(len, callermd->md_slow_len);
 		if (minlen > 0) {
-			error = copyout_c(callermd->md_slow_buf, buf, len);
+			error = copyout(callermd->md_slow_buf, buf, len);
 			if (error != 0)
 				COLOCATION_DEBUG("copyout failed with error %d", error);
 		}
