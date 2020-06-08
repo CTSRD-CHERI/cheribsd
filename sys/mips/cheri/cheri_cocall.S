@@ -102,6 +102,15 @@
  * Note that this code executes while ignoring all the signals - a trapping
  * instruction will just get skipped over.
  *
+ * Layout of struct switchercb, pointed to by $idc (caller)
+ * and, later on, $c25 (callee):
+ *
+ * scb_peer_scb:	0($idc)
+ * scb_td:		1*CHERICAP_SIZE($idc)
+ * scb_borrower_td:	1*CHERICAP_SIZE+8($idc)
+ * scb_unsealcap:	2*CHERICAP_SIZE($idc)
+ * ... and the rest:	3*CHERICAP_SIZE+XXX($idc)
+ *
  */
 .text
 .globl _C_LABEL(switcher_cocall)
@@ -113,9 +122,6 @@ _C_LABEL(switcher_cocall):
 	 * the caller-saved ones will be zeroed on return.
 	 *
 	 * The "3*CHERICAP_SIZE" is to skip over 'struct switchercb'.
-	 *
-	 * XXX: Would be nice if we could redefine the ABI for cocall(2)
-	 *      so that most of those don't need restoring.
 	 *
 	 * XXX: Make sure the IDC is cleared if we get a signal while here.
 	 */

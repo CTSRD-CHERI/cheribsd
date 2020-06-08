@@ -111,6 +111,16 @@
  *
  * Note that this code executes while ignoring all the signals - a trapping
  * instruction will just get skipped over.
+ *
+ * Layout of struct switchercb, pointed to by $idc (callee side)
+ * and, later on, $c25 (caller side):
+ *
+ * scb_peer_scb:	0($idc)
+ * scb_td:		1*CHERICAP_SIZE($idc)
+ * scb_borrower_td:	1*CHERICAP_SIZE+8($idc)
+ * scb_unsealcap:	2*CHERICAP_SIZE($idc)
+ * ... and the rest:	3*CHERICAP_SIZE+XXX($idc)
+ *
  */
 .text
 .globl _C_LABEL(switcher_coaccept)
