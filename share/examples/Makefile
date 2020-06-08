@@ -12,7 +12,6 @@ LDIRS=	BSD_daemon \
 	IPv6 \
 	bootforth \
 	csh \
-	coexec \
 	diskless \
 	drivers \
 	etc \
