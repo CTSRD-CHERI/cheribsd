@@ -13779,6 +13779,7 @@ dtrace_dof_predicate(dof_hdr_t *dof, dof_sec_t *sec, dtrace_vstate_t *vstate,
 	return (dtrace_predicate_create(dp));
 }
 
+#ifdef COMPAT_FREEBSD64
 static dof_actdesc_t
 freebsd64_dof_actdesc(dof_actdesc64_t *actdesc64)
 {
@@ -13791,6 +13792,7 @@ freebsd64_dof_actdesc(dof_actdesc64_t *actdesc64)
 	actdesc.dofa_uarg = (uintcap_t)cheri_fromint(actdesc64->dofa_uarg);
 	return actdesc;
 }
+#endif
 
 static dtrace_actdesc_t *
 dtrace_dof_actdesc(dof_hdr_t *dof, dof_sec_t *sec, dtrace_vstate_t *vstate,
