@@ -109,7 +109,7 @@
  * scb_td:		1*CHERICAP_SIZE($idc)
  * scb_borrower_td:	1*CHERICAP_SIZE+8($idc)
  * scb_unsealcap:	2*CHERICAP_SIZE($idc)
- * ... and the rest:	3*CHERICAP_SIZE+XXX($idc)
+ * ... and the rest:	4*CHERICAP_SIZE+XXX($idc)
  *
  */
 .text
@@ -121,30 +121,30 @@ _C_LABEL(switcher_cocall):
 	 * only saving the registeres which are defined as callee-saved;
 	 * the caller-saved ones will be zeroed on return.
 	 *
-	 * The "3*CHERICAP_SIZE" is to skip over 'struct switchercb'.
+	 * The "4*CHERICAP_SIZE" is to skip over 'struct switchercb'.
 	 *
 	 * XXX: Make sure the IDC is cleared if we get a signal while here.
 	 */
-	csc	$c11, zero, 1*CHERICAP_SIZE+3*CHERICAP_SIZE+256($idc)
-	csc	$c17, zero, 2*CHERICAP_SIZE+3*CHERICAP_SIZE+256($idc)
-	csc	$c18, zero, 3*CHERICAP_SIZE+3*CHERICAP_SIZE+256($idc)
-	csc	$c19, zero, 4*CHERICAP_SIZE+3*CHERICAP_SIZE+256($idc)
-	csc	$c20, zero, 5*CHERICAP_SIZE+3*CHERICAP_SIZE+256($idc)
-	csc	$c21, zero, 6*CHERICAP_SIZE+3*CHERICAP_SIZE+256($idc)
-	csc	$c22, zero, 7*CHERICAP_SIZE+3*CHERICAP_SIZE+256($idc)
-	csc	$c23, zero, 8*CHERICAP_SIZE+3*CHERICAP_SIZE+256($idc)
-	csc	$c24, zero, 9*CHERICAP_SIZE+3*CHERICAP_SIZE+256($idc)
+	csc	$c11, zero, 1*CHERICAP_SIZE+4*CHERICAP_SIZE+256($idc)
+	csc	$c17, zero, 2*CHERICAP_SIZE+4*CHERICAP_SIZE+256($idc)
+	csc	$c18, zero, 3*CHERICAP_SIZE+4*CHERICAP_SIZE+256($idc)
+	csc	$c19, zero, 4*CHERICAP_SIZE+4*CHERICAP_SIZE+256($idc)
+	csc	$c20, zero, 5*CHERICAP_SIZE+4*CHERICAP_SIZE+256($idc)
+	csc	$c21, zero, 6*CHERICAP_SIZE+4*CHERICAP_SIZE+256($idc)
+	csc	$c22, zero, 7*CHERICAP_SIZE+4*CHERICAP_SIZE+256($idc)
+	csc	$c23, zero, 8*CHERICAP_SIZE+4*CHERICAP_SIZE+256($idc)
+	csc	$c24, zero, 9*CHERICAP_SIZE+4*CHERICAP_SIZE+256($idc)
 
 	/*
 	 * Save the data transfer args.
 	 */
-	csc	$c6, zero, 10*CHERICAP_SIZE+3*CHERICAP_SIZE+256($idc)
-	csd	a0, zero, 3*CHERICAP_SIZE+104($idc)
+	csc	$c6, zero, 10*CHERICAP_SIZE+4*CHERICAP_SIZE+256($idc)
+	csd	a0, zero, 4*CHERICAP_SIZE+104($idc)
 
 	/*
 	 * Save the PCC, put there by cocall().
 	 */
-	csc	$c13, zero, 11*CHERICAP_SIZE+3*CHERICAP_SIZE+256($idc)
+	csc	$c13, zero, 11*CHERICAP_SIZE+4*CHERICAP_SIZE+256($idc)
 
 	/*
 	 * Unseal the callee's control block.
@@ -183,30 +183,30 @@ _C_LABEL(switcher_cocall):
 	 * Put the caller cookie (caller's data capability with the tag
 	 * stripped off) where the callee wants it.
 	 */
-	clc	$c24, zero, 12*CHERICAP_SIZE+3*CHERICAP_SIZE+256($c25)
+	clc	$c24, zero, 12*CHERICAP_SIZE+4*CHERICAP_SIZE+256($c25)
 	ccleartag	$c4, $c4
 	csc	$c4, zero, 0($c24)
 
 	/*
 	 * Restore the callee's context.
 	 */
-	clc	$c11, zero, 1*CHERICAP_SIZE+3*CHERICAP_SIZE+256($c25)
-	clc	$c17, zero, 2*CHERICAP_SIZE+3*CHERICAP_SIZE+256($c25)
-	clc	$c18, zero, 3*CHERICAP_SIZE+3*CHERICAP_SIZE+256($c25)
-	clc	$c19, zero, 4*CHERICAP_SIZE+3*CHERICAP_SIZE+256($c25)
-	clc	$c20, zero, 5*CHERICAP_SIZE+3*CHERICAP_SIZE+256($c25)
-	clc	$c21, zero, 6*CHERICAP_SIZE+3*CHERICAP_SIZE+256($c25)
-	clc	$c22, zero, 7*CHERICAP_SIZE+3*CHERICAP_SIZE+256($c25)
-	clc	$c23, zero, 8*CHERICAP_SIZE+3*CHERICAP_SIZE+256($c25)
-	clc	$c24, zero, 9*CHERICAP_SIZE+3*CHERICAP_SIZE+256($c25)
+	clc	$c11, zero, 1*CHERICAP_SIZE+4*CHERICAP_SIZE+256($c25)
+	clc	$c17, zero, 2*CHERICAP_SIZE+4*CHERICAP_SIZE+256($c25)
+	clc	$c18, zero, 3*CHERICAP_SIZE+4*CHERICAP_SIZE+256($c25)
+	clc	$c19, zero, 4*CHERICAP_SIZE+4*CHERICAP_SIZE+256($c25)
+	clc	$c20, zero, 5*CHERICAP_SIZE+4*CHERICAP_SIZE+256($c25)
+	clc	$c21, zero, 6*CHERICAP_SIZE+4*CHERICAP_SIZE+256($c25)
+	clc	$c22, zero, 7*CHERICAP_SIZE+4*CHERICAP_SIZE+256($c25)
+	clc	$c23, zero, 8*CHERICAP_SIZE+4*CHERICAP_SIZE+256($c25)
+	clc	$c24, zero, 9*CHERICAP_SIZE+4*CHERICAP_SIZE+256($c25)
 
-	clc	$c13, zero, 11*CHERICAP_SIZE+3*CHERICAP_SIZE+256($c25)
+	clc	$c13, zero, 11*CHERICAP_SIZE+4*CHERICAP_SIZE+256($c25)
 
 	/*
 	 * Do the data transfer.
 	 */
-	clc	$c7, zero, 10*CHERICAP_SIZE+3*CHERICAP_SIZE+256($c25)
-	cld	t0, zero, 3*CHERICAP_SIZE+104($c25)
+	clc	$c7, zero, 10*CHERICAP_SIZE+4*CHERICAP_SIZE+256($c25)
+	cld	t0, zero, 4*CHERICAP_SIZE+104($c25)
 
 	/*
 	 * Compare buffer sizes, put the smaller one into t0.
