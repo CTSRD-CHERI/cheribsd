@@ -890,7 +890,7 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 			 * location given by r_offset.
 			 */
 			if (process_r_cheri_capability(obj, r_symndx, lockstate,
-			    flags, where, load_ptr(where, sizeof(Elf_Sword))) != 0)
+			    flags, where, load_ptr(where, sizeof(Elf_Ssize))) != 0)
 				return (-1);
 			break;
 #endif /* __CHERI_PURE_CAPABILITY__ */

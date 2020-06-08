@@ -1569,6 +1569,16 @@ distributeworld installworld stageworld installsysroot: _installcheck_world .PHO
 	${DESTDIR}/${DISTDIR}/${dist}.debug.meta
 .endfor
 .endif
+.elif make(installworld) && ${MK_CAROOT} != "no"
+	# We could make certctl a bootstrap tool, but it requires OpenSSL and
+	# friends, which we likely don't want.  We'll rehash on a best-effort
+	# basis, otherwise we'll just mention that we're not doing it to raise
+	# awareness.
+	@if which certctl>/dev/null; then \
+		certctl rehash; \
+	else \
+		echo "No certctl on the host, not rehashing target -- /etc/ssl may not be populated."; \
+	fi
 .endif
 
 packageworld: .PHONY
@@ -2917,7 +2927,7 @@ libraries: .MAKE .PHONY
 # static libgcc.a prerequisite for shared libc
 #
 _prereq_libs= lib/libcompiler_rt
-.if ${MK_SSP} != "no"
+.if ${MK_SSP} != "no" && !${MACHINE_ABI:Mpurecap}
 _prereq_libs+= lib/libssp_nonshared
 .endif
 

@@ -146,21 +146,13 @@ cheri_exec_pcc(struct image_params *imgp)
 	 * use interp_end.  If we are executing rtld directly we can
 	 * use end_addr to find the end of the rtld mapping.
 	 */
-	if (imgp->interp_end != 0)
-		code_end = imgp->interp_end;
-	else
-		code_end = imgp->end_addr;
-
-	/*
-	 * Statically linked binaries need a base 0 code capability
-	 * since otherwise crt_init_globals_will fail.
-	 *
-	 * XXXAR: TODO: is this still true??
-	 */
-	if (imgp->interp_end != 0)
+	if (imgp->interp_end != 0) {
 		code_start = imgp->reloc_base;
-	else
-		code_start = 0;
+		code_end = imgp->interp_end;
+	} else {
+		code_start = imgp->start_addr;
+		code_end = imgp->end_addr;
+	}
 
 	/* Ensure CHERI128 representability */
 	code_length = code_end - code_start;

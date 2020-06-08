@@ -34,8 +34,6 @@
  * Normative references: RFC 2292, RFC 3492, RFC 3542, RFC 3678, RFC 3810.
  */
 
-#define	EXPLICIT_USER_ACCESS
-
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 

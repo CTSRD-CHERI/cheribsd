@@ -64,7 +64,7 @@ init_print(netdissect_options *ndo, uint32_t localnet, uint32_t mask,
 
 void
 pretty_print_packet(netdissect_options *ndo, const struct pcap_pkthdr *h,
-    const u_char * __capability sp, u_int packets_captured)
+    const u_char * __cap sp, u_int packets_captured)
 {
 	u_int hdrlen;
 

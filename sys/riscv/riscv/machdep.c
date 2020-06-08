@@ -33,7 +33,6 @@
  * SUCH DAMAGE.
  */
 
-#define EXPLICIT_USER_ACCESS
 #include "opt_ddb.h"
 #include "opt_platform.h"
 
@@ -132,6 +131,23 @@ uint32_t boot_hart;	/* The hart we booted on. */
 cpuset_t all_harts;
 
 extern int *end;
+
+/*
+ * When emulating RISC-V boards under QEMU, ISA-level tracing can be enabled and
+ * disabled using special NOP instructions. By default this is a simple global
+ * setting that the kernel doesn't interfere with, allowing userspace to turn
+ * on and off tracing as it sees fit. If this sysctl is set, then the kernel
+ * will use a per-thread flag (td->td_md.md_flags & MDTD_QTRACE) to pause
+ * and resume tracing during context switching. The flag can be set and queried
+ * using the sysarch system call.
+ *
+ * NB: This is a QEMU-CHERI feature.
+ */
+#ifdef CPU_QEMU_RISCV
+u_int	qemu_trace_perthread;
+SYSCTL_UINT(_hw, OID_AUTO, qemu_trace_perthread, CTLFLAG_RW,
+    &qemu_trace_perthread, 0, "Per-thread Qemu ISA-level tracing configured");
+#endif
 
 static void
 cpu_startup(void *dummy)
@@ -853,7 +869,7 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 
 	/* Make room, keeping the stack aligned */
 	fp--;
-	fp = __builtin_align_down(fp, STACKALIGNBYTES + 1);
+	fp = STACKALIGN(fp);
 
 	/* Fill in the frame to copy out */
 	bzero(&frame, sizeof(frame));

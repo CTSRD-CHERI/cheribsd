@@ -77,7 +77,7 @@ _bus_dmamap_load_vlist(bus_dma_tag_t dmat, bus_dmamap_t map,
 
 		KASSERT((offset < list->ds_len),
 		    ("Invalid mid-segment offset"));
-		addr = (char *)(uintptr_t)list->ds_addr + offset;
+		addr = (char *)list->ds_vaddr + offset;
 		ds_len = list->ds_len - offset;
 		offset = 0;
 		if (ds_len > length)

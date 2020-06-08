@@ -730,7 +730,7 @@ ipf_proxy_ioctl(softc, data, cmd, mode, ctx)
 				IPFERROR(80003);
 				error = ENOMEM;
 			} else {
-				error = copyinptr(softc, ctl.apc_data, ptr,
+				error = copyinptr(softc, &ctl.apc_udata, ptr,
 						  ctl.apc_dsize);
 				if (error == 0)
 					ctl.apc_data = ptr;

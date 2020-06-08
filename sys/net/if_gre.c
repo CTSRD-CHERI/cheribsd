@@ -41,8 +41,6 @@ __FBSDID("$FreeBSD$");
 #include "opt_inet6.h"
 #include "opt_rss.h"
 
-#define	EXPLICIT_USER_ACCESS
-
 #include <sys/param.h>
 #include <sys/kernel.h>
 #include <sys/lock.h>

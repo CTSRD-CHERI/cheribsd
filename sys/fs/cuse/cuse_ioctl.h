@@ -41,8 +41,8 @@
 struct cuse_dev;
 
 struct cuse_data_chunk {
-	uintptr_t local_ptr;
-	uintptr_t peer_ptr;
+	kuintcap_t local_ptr;
+	kuintcap_t peer_ptr;
 	unsigned long length;
 };
 

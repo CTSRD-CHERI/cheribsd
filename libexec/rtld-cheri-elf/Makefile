@@ -33,7 +33,7 @@ CFLAGS+=-DNO_LD_DEBUG
 # This could be optimized to use different stubs for per-file stubs but for
 # now making it opt-in is easier.
 # TODO: add a make options for this (e.g. MK_BENCHMARK_OPTIONS)?
-.ifdef RTLD_PER_FUNCTION_CAPTABLE_SUPPORT
+.if defined(RTLD_PER_FUNCTION_CAPTABLE_SUPPORT) && ${TARGET} == "mips"
 CFLAGS+=-DRTLD_SUPPORT_PER_FUNCTION_CAPTABLE=1
 .else
 CFLAGS+=-DRTLD_SUPPORT_PER_FUNCTION_CAPTABLE=0
@@ -56,7 +56,7 @@ NEED_COMPAT=	CHERI
 .include <bsd.compat.mk>
 CSTD?=		gnu99
 CFLAGS+=	-Wall -DFREEBSD_ELF -DIN_RTLD -ffreestanding
-.if !${MACHINE_ARCH:Mmips64*c*}
+.if !${MACHINE_ARCH:Mmips64*c*} && !${MACHINE_ARCH:Mriscv64*c*}
 CFLAGS+=	-DCOMPAT_CHERI
 .endif
 CFLAGS+=	-I${SRCTOP}/lib/csu/common \
@@ -95,7 +95,6 @@ BUILDING_RTLD_CHERI_ELF=yes
 SIMPLE_PRINTF_PREFIX=rtld
 .include "${SRCTOP}/lib/libsimple_printf/Makefile.inc"
 
-.if ${MK_SYMVER} == "yes"
 # LIBCSRCDIR does not appear to be set correctly for libcheribuildenv
 LIBCSRCDIR=	${SRCTOP}/lib/libc
 VERSION_DEF=	${LIBCSRCDIR}/Versions.def
@@ -105,7 +104,6 @@ LDFLAGS+=	-Wl,--version-script=${VERSION_MAP}
 
 .if exists(${RTLD_CHERI_ELF_DIR}/${RTLD_ARCH}/Symbol.map)
 SYMBOL_MAPS+=	${RTLD_CHERI_ELF_DIR}/${RTLD_ARCH}/Symbol.map
-.endif
 .endif
 
 .sinclude "${RTLD_CHERI_ELF_DIR}/${RTLD_ARCH}/Makefile.inc"

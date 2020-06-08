@@ -26,8 +26,6 @@
  * SUCH DAMAGE.
  */
 
-#define	EXPLICIT_USER_ACCESS
-
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
@@ -1115,7 +1113,7 @@ user_kldload(struct thread *td, const char * __capability file)
 	td->td_retval[0] = -1;
 
 	pathname = malloc(MAXPATHLEN, M_TEMP, M_WAITOK);
-	error = copyinstr_c(file, pathname, MAXPATHLEN, NULL);
+	error = copyinstr(file, pathname, MAXPATHLEN, NULL);
 	if (error == 0) {
 		error = kern_kldload(td, pathname, &fileid);
 		if (error == 0)
@@ -1212,7 +1210,7 @@ kern_kldfind(struct thread *td, const char * __capability file)
 	td->td_retval[0] = -1;
 
 	pathname = malloc(MAXPATHLEN, M_TEMP, M_WAITOK);
-	if ((error = copyinstr_c(file, pathname, MAXPATHLEN, NULL)) != 0)
+	if ((error = copyinstr(file, pathname, MAXPATHLEN, NULL)) != 0)
 		goto out;
 
 	filename = linker_basename(pathname);
@@ -1316,7 +1314,7 @@ kern_kldstat(struct thread *td, int fileid, struct kld_file_stat *stat)
 	bcopy(lf->filename, &stat->name[0], namelen);
 	stat->refs = lf->refs;
 	stat->id = lf->id;
-	stat->address = lf->address;
+	stat->address = (char * __capability)(uintcap_t)lf->address;
 	stat->size = lf->size;
 	/* Version 2 fields: */
 	namelen = strlen(lf->pathname) + 1;
@@ -1414,7 +1412,7 @@ kern_kldsym(struct thread *td, int fileid, int cmd,
 #endif
 
 	symstr = malloc(MAXPATHLEN, M_TEMP, M_WAITOK);
-	error = copyinstr_c(symname, symstr, MAXPATHLEN, NULL);
+	error = copyinstr(symname, symstr, MAXPATHLEN, NULL);
 	if (error != 0)
 		goto done;
 	sx_xlock(&kld_sx);

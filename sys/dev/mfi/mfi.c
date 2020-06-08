@@ -3012,7 +3012,7 @@ mfi_stp_cmd(struct mfi_softc *sc, struct mfi_command *cm,caddr_t arg)
 			    ioc->mfi_sgl[i].iov_len;
 		}
 
-		error = copyin_c(ioc->mfi_sgl[i].iov_base,
+		error = copyin(ioc->mfi_sgl[i].iov_base,
 		    sc->kbuff_arr[i],
 		    ioc->mfi_sgl[i].iov_len);
 		if (error != 0) {
@@ -3115,6 +3115,11 @@ mfi_ioctl(struct cdev *dev, u_long cmd, caddr_t arg, int flag, struct thread *td
 	struct mfi_ioc_passthru *iop = (struct mfi_ioc_passthru *)arg;
 #ifdef COMPAT_FREEBSD32
 	struct mfi_ioc_passthru32 *iop32 = (struct mfi_ioc_passthru32 *)arg;
+#endif
+#ifdef COMPAT_FREEBSD64
+	struct mfi_ioc_passthru64 *iop64 = (struct mfi_ioc_passthru64 *)arg;
+#endif
+#if defined(COMPAT_FREEBSD32) || defined(COMPAT_FREEBSD64)
 	struct mfi_ioc_passthru iop_swab;
 #endif
 	int error, locked;
@@ -3289,7 +3294,7 @@ mfi_ioctl(struct cdev *dev, u_long cmd, caddr_t arg, int flag, struct thread *td
 						break;
 #endif
 					}
-					error = copyin_c(addr, temp, len);
+					error = copyin(addr, temp, len);
 					if (error != 0) {
 						device_printf(sc->mfi_dev,
 						    "Copy in failed\n");
@@ -3355,7 +3360,7 @@ mfi_ioctl(struct cdev *dev, u_long cmd, caddr_t arg, int flag, struct thread *td
 						addr = __USER_CAP(ioc64->mfi_sgl[i].iov_base, len);
 #endif
 					}
-					error = copyout_c(temp, addr, len);
+					error = copyout(temp, addr, len);
 					if (error != 0) {
 						device_printf(sc->mfi_dev,
 						    "Copy out failed\n");
@@ -3481,16 +3486,28 @@ out:
 		}
 		iop_swab.ioc_frame	= iop32->ioc_frame;
 		iop_swab.buf_size	= iop32->buf_size;
-		iop_swab.buf		= PTRIN(iop32->buf);
-		iop			= &iop_swab;
-		/* FALLTHROUGH */
+		iop_swab.buf		= __USER_CAP(PTRIN(iop32->buf),
+		    iop32->buf_size);
+		error = mfi_user_command(sc, &iop_swab);
+		iop32->ioc_frame = iop_swab.ioc_frame;
+		break;
+#endif
+#ifdef COMPAT_FREEBSD64
+	case MFIIO_PASSTHRU64:
+		if (SV_CURPROC_FLAG(SV_LP64 | SV_CHERI) != SV_LP64) {
+			error = ENOTTY;
+			break;
+		}
+		iop_swab.ioc_frame	= iop64->ioc_frame;
+		iop_swab.buf_size	= iop64->buf_size;
+		iop_swab.buf		= __USER_CAP(iop64->buf,
+		    iop64->buf_size);
+		error = mfi_user_command(sc, &iop_swab);
+		iop64->ioc_frame = iop_swab.ioc_frame;
+		break;
 #endif
 	case MFIIO_PASSTHRU:
 		error = mfi_user_command(sc, iop);
-#ifdef COMPAT_FREEBSD32
-		if (cmd == MFIIO_PASSTHRU32)
-			iop32->ioc_frame = iop_swab.ioc_frame;
-#endif
 		break;
 	default:
 		device_printf(sc->mfi_dev, "IOCTL 0x%lx not handled\n", cmd);

@@ -498,7 +498,8 @@ arena_tdata_get_hard(tsd_t *tsd, unsigned ind) {
 
 		if (tsd_nominal(tsd) && !*arenas_tdata_bypassp) {
 			*arenas_tdata_bypassp = true;
-			arenas_tdata = (arena_tdata_t *)a0malloc(
+			arenas_tdata = BOUND_PTR((arena_tdata_t *)a0malloc(
+			    sizeof(arena_tdata_t) * narenas_tdata),
 			    sizeof(arena_tdata_t) * narenas_tdata);
 			*arenas_tdata_bypassp = false;
 		}

@@ -33,12 +33,8 @@
 
 #include <sys/malloc.h>
 #include <sys/errno.h>
-#include <crypto/blowfish/blowfish.h>
-#include <crypto/des/des.h>
 #include <crypto/rijndael/rijndael.h>
 #include <crypto/camellia/camellia.h>
-#include <opencrypto/cast.h>
-#include <opencrypto/skipjack.h>
 #include <opencrypto/cryptodev.h>
 #include <opencrypto/xform_userland.h>
 
@@ -71,17 +67,11 @@ struct enc_xform {
 
 
 extern struct enc_xform enc_xform_null;
-extern struct enc_xform enc_xform_des;
-extern struct enc_xform enc_xform_3des;
-extern struct enc_xform enc_xform_blf;
-extern struct enc_xform enc_xform_cast5;
-extern struct enc_xform enc_xform_skipjack;
 extern struct enc_xform enc_xform_rijndael128;
 extern struct enc_xform enc_xform_aes_icm;
 extern struct enc_xform enc_xform_aes_nist_gcm;
 extern struct enc_xform enc_xform_aes_nist_gmac;
 extern struct enc_xform enc_xform_aes_xts;
-extern struct enc_xform enc_xform_arc4;
 extern struct enc_xform enc_xform_camellia;
 extern struct enc_xform enc_xform_chacha20;
 extern struct enc_xform enc_xform_ccm;

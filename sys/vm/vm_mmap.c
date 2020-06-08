@@ -1056,6 +1056,13 @@ int
 sys_munmap(struct thread *td, struct munmap_args *uap)
 {
 
+#if __has_feature(capabilities)
+	if (cap_covers_pages(uap->addr, uap->len) == 0)
+		return (ENOMEM);
+	if ((cheri_getperm(uap->addr) & CHERI_PERM_CHERIABI_VMMAP) == 0)
+		return (EPROT);
+#endif
+
 	return (kern_munmap(td, (__cheri_addr uintptr_t)uap->addr, uap->len));
 }
 
@@ -1179,6 +1186,13 @@ int
 sys_mprotect(struct thread *td, struct mprotect_args *uap)
 {
 
+#if __has_feature(capabilities)
+	if (cap_covers_pages(uap->addr, uap->len) == 0)
+		return (ENOMEM);
+	if ((cheri_getperm(uap->addr) & CHERI_PERM_CHERIABI_VMMAP) == 0)
+		return (EPROT);
+#endif
+
 	return (kern_mprotect(td, (__cheri_addr uintptr_t)uap->addr, uap->len,
 	    uap->prot));
 }
@@ -1246,6 +1260,12 @@ int
 sys_minherit(struct thread *td, struct minherit_args *uap)
 {
 
+#if __has_feature(capabilities)
+	if (cap_covers_pages(uap->addr, uap->len) == 0)
+		return (ENOMEM);
+	if ((cheri_getperm(uap->addr) & CHERI_PERM_CHERIABI_VMMAP) == 0)
+		return (EPROT);
+#endif
 	return (kern_minherit(td, (__cheri_addr vm_offset_t)uap->addr, uap->len,
 	    uap->inherit));
 }
@@ -1543,7 +1563,7 @@ retry:
 			 */
 			while ((lastvecindex + 1) < vecindex) {
 				++lastvecindex;
-				error = subyte_c(vec + lastvecindex, 0);
+				error = subyte(vec + lastvecindex, 0);
 				if (error) {
 					error = EFAULT;
 					goto done2;
@@ -1553,7 +1573,7 @@ retry:
 			/*
 			 * Pass the page information to the user
 			 */
-			error = subyte_c(vec + vecindex, mincoreinfo);
+			error = subyte(vec + vecindex, mincoreinfo);
 			if (error) {
 				error = EFAULT;
 				goto done2;
@@ -1583,7 +1603,7 @@ retry:
 	vecindex = atop(end - first_addr);
 	while ((lastvecindex + 1) < vecindex) {
 		++lastvecindex;
-		error = subyte_c(vec + lastvecindex, 0);
+		error = subyte(vec + lastvecindex, 0);
 		if (error) {
 			error = EFAULT;
 			goto done2;

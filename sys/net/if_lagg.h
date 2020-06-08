@@ -116,7 +116,7 @@ struct lagg_reqall {
 	u_int			ra_proto;		/* lagg protocol */
 
 	size_t			ra_size;		/* size of buffer */
-	struct lagg_reqport	*ra_port;		/* allocated buffer */
+	struct lagg_reqport	* __kerncap ra_port;	/* allocated buffer */
 	int			ra_ports;		/* total port count */
 	union {
 		struct lacp_opreq rpsc_lacp;

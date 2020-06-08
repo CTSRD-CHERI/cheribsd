@@ -97,7 +97,7 @@ struct ch_mem_range {
 	uint32_t addr;
 	uint32_t len;
 	uint32_t version;
-	uint8_t  *buf;
+	uint8_t * __kerncap buf;
 };
 
 enum { MEM_CM, MEM_PMRX, MEM_PMTX };   /* ch_mem_range.mem_id values */
@@ -177,7 +177,7 @@ struct ch_trace {
 struct ch_ifconf_regs {
 	uint32_t  version;
 	uint32_t  len; /* bytes */
-	uint8_t   *data;
+	uint8_t * __kerncap data;
 };
 
 struct ch_mii_data {
@@ -191,7 +191,7 @@ struct ch_eeprom {
 	uint32_t magic;
 	uint32_t offset;
 	uint32_t len;
-	uint8_t  *data;
+	uint8_t * __kerncap data;
 };
 
 #define LA_BUFSIZE	(2 * 1024)
@@ -199,7 +199,7 @@ struct ch_up_la {
 	uint32_t stopped;
 	uint32_t idx;
 	uint32_t bufsize;
-	uint32_t *data;
+	uint32_t * __kerncap data;
 };
 
 struct t3_ioq_entry {
@@ -216,7 +216,7 @@ struct ch_up_ioqs {
 	uint32_t ioq_rx_status;
 	uint32_t ioq_tx_status;
 	uint32_t bufsize;
-	struct t3_ioq_entry *data;
+	struct t3_ioq_entry * __kerncap data;
 };
 
 struct ch_filter_tuple {

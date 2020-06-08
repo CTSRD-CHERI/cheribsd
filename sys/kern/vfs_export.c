@@ -36,8 +36,6 @@
  *	@(#)vfs_subr.c	8.31 (Berkeley) 5/26/95
  */
 
-#define	EXPLICIT_USER_ACCESS
-
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
@@ -113,6 +111,11 @@ vfs_hang_addrlist(struct mount *mp, struct netexport *nep,
 	int off;
 #endif
 	int error;
+
+	KASSERT(argp->ex_numsecflavors > 0,
+	    ("%s: numsecflavors <= 0", __func__));
+	KASSERT(argp->ex_numsecflavors < MAXSECFLAVORS,
+	    ("%s: numsecflavors >= MAXSECFLAVORS", __func__));
 
 	/*
 	 * XXX: This routine converts from a `struct xucred'
@@ -302,8 +305,12 @@ vfs_export(struct mount *mp, struct export_args *argp)
 	struct netexport *nep;
 	int error;
 
-	if (argp->ex_numsecflavors < 0
-	    || argp->ex_numsecflavors >= MAXSECFLAVORS)
+	if ((argp->ex_flags & (MNT_DELEXPORT | MNT_EXPORTED)) == 0)
+		return (EINVAL);
+
+	if ((argp->ex_flags & MNT_EXPORTED) != 0 &&
+	    (argp->ex_numsecflavors <= 0
+	    || argp->ex_numsecflavors >= MAXSECFLAVORS))
 		return (EINVAL);
 
 	error = 0;
@@ -520,8 +527,13 @@ vfs_stdcheckexp(struct mount *mp, struct sockaddr *nam, int *extflagsp,
 	*extflagsp = np->netc_exflags;
 	if ((*credanonp = np->netc_anon) != NULL)
 		crhold(*credanonp);
-	if (numsecflavors)
+	if (numsecflavors) {
 		*numsecflavors = np->netc_numsecflavors;
+		KASSERT(*numsecflavors > 0,
+		    ("%s: numsecflavors <= 0", __func__));
+		KASSERT(*numsecflavors < MAXSECFLAVORS,
+		    ("%s: numsecflavors >= MAXSECFLAVORS", __func__));
+	}
 	if (secflavors)
 		*secflavors = np->netc_secflavors;
 	lockmgr(&mp->mnt_explock, LK_RELEASE, NULL);

@@ -1717,7 +1717,7 @@ if_getgroup(struct ifgroupreq *ifgr, struct ifnet *ifp)
 		bzero(&ifgrq, sizeof ifgrq);
 		strlcpy(ifgrq.ifgrq_group, ifgl->ifgl_group->ifg_group,
 		    sizeof(ifgrq.ifgrq_group));
-		if ((error = copyout_c(&ifgrq, ifgp, sizeof(struct ifg_req))))
+		if ((error = copyout(&ifgrq, ifgp, sizeof(struct ifg_req))))
 			return (error);
 		len -= sizeof(ifgrq);
 		ifgp++;
@@ -1763,7 +1763,7 @@ if_getgroupmembers(struct ifgroupreq *ifgr)
 		bzero(&ifgrq, sizeof ifgrq);
 		strlcpy(ifgrq.ifgrq_member, ifgm->ifgm_ifp->if_xname,
 		    sizeof(ifgrq.ifgrq_member));
-		if ((error = copyout_c(&ifgrq, ifgp, sizeof(struct ifg_req)))) {
+		if ((error = copyout(&ifgrq, ifgp, sizeof(struct ifg_req)))) {
 			IFNET_RUNLOCK();
 			return (error);
 		}
@@ -2992,7 +2992,7 @@ ifhwioctl(u_long cmd, struct ifnet *ifp, caddr_t data, struct thread *td)
 			if (ifr_buffer_get_length(ifr) < descrlen)
 				ifr_buffer_set_buffer_null(ifr);
 			else
-				error = copyout_c(ifp->if_description,
+				error = copyout(ifp->if_description,
 				    ifr_buffer_get_buffer(ifr), descrlen);
 			ifr_buffer_set_length(ifr, descrlen);
 		}
@@ -3017,7 +3017,7 @@ ifhwioctl(u_long cmd, struct ifnet *ifp, caddr_t data, struct thread *td)
 		else {
 			descrbuf = malloc(ifr_buffer_get_length(ifr),
 			    M_IFDESCR, M_WAITOK | M_ZERO);
-			error = copyin_c(ifr_buffer_get_buffer(ifr),
+			error = copyin(ifr_buffer_get_buffer(ifr),
 			    descrbuf, ifr_buffer_get_length(ifr) - 1);
 			if (error) {
 				free(descrbuf, M_IFDESCR);
@@ -3109,7 +3109,7 @@ ifhwioctl(u_long cmd, struct ifnet *ifp, caddr_t data, struct thread *td)
 		error = priv_check(td, PRIV_NET_SETIFNAME);
 		if (error)
 			return (error);
-		error = copyinstr_c(ifr_data_get_ptr(ifr), new_name, IFNAMSIZ,
+		error = copyinstr(ifr_data_get_ptr(ifr), new_name, IFNAMSIZ,
 		    NULL);
 		if (error != 0)
 			return (error);
@@ -3858,7 +3858,7 @@ again:
 
 	ifc->ifc_len = valid_len;
 	sbuf_finish(sb);
-	error = copyout_c(sbuf_data(sb), ifc->ifc_req, ifc->ifc_len);
+	error = copyout(sbuf_data(sb), ifc->ifc_req, ifc->ifc_len);
 	sbuf_delete(sb);
 	return (error);
 }

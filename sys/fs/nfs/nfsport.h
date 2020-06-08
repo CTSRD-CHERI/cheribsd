@@ -98,16 +98,10 @@
 #include <netinet/tcp_timer.h>
 #include <netinet/tcp_var.h>
 #include <machine/in_cksum.h>
-#include <crypto/des/des.h>
 #include <sys/md5.h>
 #include <rpc/rpc.h>
 #include <rpc/rpcsec_gss.h>
 
-/*
- * For Darwin, these functions should be "static" when built in a kext.
- * (This is always defined as nil otherwise.)
- */
-#define	APPLESTATIC
 #include <ufs/ufs/dir.h>
 #include <ufs/ufs/quota.h>
 #include <ufs/ufs/inode.h>

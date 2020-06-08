@@ -52,8 +52,6 @@ __FBSDID("$FreeBSD$");
 
 #include "opt_ifmedia.h"
 
-#define	EXPLICIT_USER_ACCESS
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/socket.h>

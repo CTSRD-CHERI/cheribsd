@@ -466,6 +466,8 @@ cryptof_ioctl(
 			/* Should always be paired with GCM. */
 			if (sop->cipher != CRYPTO_AES_NIST_GCM_16) {
 				CRYPTDEB("GMAC without GCM");
+				SDT_PROBE1(opencrypto, dev, ioctl, error,
+				    __LINE__);
 				return (EINVAL);
 			}
 			break;
@@ -507,11 +509,6 @@ cryptof_ioctl(
 				return (EINVAL);
 			}
 			break;
-#ifdef notdef
-		case CRYPTO_MD5:
-			thash = &auth_hash_md5;
-			break;
-#endif
 		case CRYPTO_SHA1:
 			thash = &auth_hash_sha1;
 			break;
@@ -545,8 +542,10 @@ cryptof_ioctl(
 			return (EINVAL);
 		}
 
-		if (txform == NULL && thash == NULL)
+		if (txform == NULL && thash == NULL) {
+			SDT_PROBE1(opencrypto, dev, ioctl, error, __LINE__);
 			return (EINVAL);
+		}
 
 		memset(&csp, 0, sizeof(csp));
 
@@ -556,13 +555,18 @@ cryptof_ioctl(
 			case CRYPTO_AES_128_NIST_GMAC:
 			case CRYPTO_AES_192_NIST_GMAC:
 			case CRYPTO_AES_256_NIST_GMAC:
-				if (sop->keylen != sop->mackeylen)
+				if (sop->keylen != sop->mackeylen) {
+					SDT_PROBE1(opencrypto, dev, ioctl,
+					    error, __LINE__);
 					return (EINVAL);
+				}
 				break;
 #endif
 			case 0:
 				break;
 			default:
+				SDT_PROBE1(opencrypto, dev, ioctl, error,
+				    __LINE__);
 				return (EINVAL);
 			}
 			csp.csp_mode = CSP_MODE_AEAD;
@@ -570,14 +574,19 @@ cryptof_ioctl(
 			switch (sop->mac) {
 #ifdef COMPAT_FREEBSD12
 			case CRYPTO_AES_CCM_CBC_MAC:
-				if (sop->keylen != sop->mackeylen)
+				if (sop->keylen != sop->mackeylen) {
+					SDT_PROBE1(opencrypto, dev, ioctl,
+					    error, __LINE__);
 					return (EINVAL);
+				}
 				thash = NULL;
 				break;
 #endif
 			case 0:
 				break;
 			default:
+				SDT_PROBE1(opencrypto, dev, ioctl, error,
+				    __LINE__);
 				return (EINVAL);
 			}
 			csp.csp_mode = CSP_MODE_AEAD;
@@ -1314,7 +1323,7 @@ cryptodev_key(struct crypt_kop *kop)
 		krp->krp_param[i].crp_p = malloc(size, M_XDATA, M_WAITOK);
 		if (i >= krp->krp_iparams)
 			continue;
-		error = copyin(kop->crk_param[i].crp_p, krp->krp_param[i].crp_p, size);
+		error = copyin(kop->crk_param[i].crp_up, krp->krp_param[i].crp_p, size);
 		if (error) {
 			SDT_PROBE1(opencrypto, dev, ioctl, error, __LINE__);
 			goto fail;
@@ -1344,7 +1353,7 @@ cryptodev_key(struct crypt_kop *kop)
 		size = (krp->krp_param[i].crp_nbits + 7) / 8;
 		if (size == 0)
 			continue;
-		error = copyout(krp->krp_param[i].crp_p, kop->crk_param[i].crp_p, size);
+		error = copyout(krp->krp_param[i].crp_p, kop->crk_param[i].crp_up, size);
 		if (error) {
 			SDT_PROBE1(opencrypto, dev, ioctl, error, __LINE__);
 			goto fail;

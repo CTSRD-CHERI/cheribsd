@@ -27,11 +27,10 @@
 
 #include <sys/cdefs.h>
 
-#if !__has_feature(capabilities) || !defined(__mips__)
-#ifdef __capability
-#undef __capability
-#endif
-#define	__capability
+#ifdef CHERI_TCPDUMP
+#define	__cap	__capability
+#else
+#define	__cap
 #endif
 
 #ifndef print_h
@@ -45,7 +44,7 @@ int	has_printer(int type);
 void	ndo_set_if_printer(netdissect_options *ndo, int type);
 
 void	pretty_print_packet(netdissect_options *ndo,
-	    const struct pcap_pkthdr *h, const u_char * __capability sp,
+	    const struct pcap_pkthdr *h, const u_char * __cap sp,
 	    u_int packets_captured);
 
 void	ndo_set_function_pointers(netdissect_options *ndo);

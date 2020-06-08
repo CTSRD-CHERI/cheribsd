@@ -34,8 +34,6 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
-#define	EXPLICIT_USER_ACCESS
-
 #include "qlnx_os.h"
 #include "bcm_osal.h"
 #include "reg_addr.h"

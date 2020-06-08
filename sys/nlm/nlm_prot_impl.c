@@ -27,8 +27,6 @@
  * SUCH DAMAGE.
  */
 
-#define	EXPLICIT_USER_ACCESS
-
 #include "opt_inet6.h"
 
 #include <sys/cdefs.h>

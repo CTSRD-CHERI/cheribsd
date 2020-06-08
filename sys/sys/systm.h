@@ -126,6 +126,9 @@ void	kassert_panic(const char *fmt, ...)  __printflike(1, 2);
 	VNASSERT(exp, vp, ("condition %s not met at %s:%d (%s)",	\
 	    _exp, __FILE__, __LINE__, __func__));			\
 } while (0)
+#define	__assert_unreachable() \
+	panic("executing segment marked as unreachable at %s:%d (%s)\n", \
+	    __FILE__, __LINE__, __func__)
 #else
 #define	KASSERT(exp,msg) do { \
 } while (0)
@@ -134,6 +137,7 @@ void	kassert_panic(const char *fmt, ...)  __printflike(1, 2);
 } while (0)
 #define	VNPASS(exp, vp) do { \
 } while (0)
+#define	__assert_unreachable()	__unreachable()
 #endif
 
 #ifndef CTASSERT	/* Allow lint to override */
@@ -452,180 +456,92 @@ void	*memcpy_early(void * _Nonnull to, const void * _Nonnull from, size_t len);
 void	*memmove_early(void * _Nonnull dest, const void * _Nonnull src, size_t n);
 #define bcopy_early(from, to, len) memmove_early((to), (from), (len))
 
-int	copystr(const void * _Nonnull __restrict kfaddr,
-	    void * _Nonnull __restrict kdaddr, size_t len,
-	    size_t * __restrict lencopied);
-#if __has_feature(capabilities) && defined(EXPLICIT_USER_ACCESS)
-#define	copyinstr	copyinstr_c
-#else
-int	copyinstr(const void * __restrict udaddr,
+#define	copystr(src, dst, len, outlen)	({			\
+	size_t __r, __len, *__outlen;				\
+								\
+	__len = (len);						\
+	__outlen = (outlen);					\
+	__r = strlcpy((dst), (src), __len);			\
+	if (__outlen != NULL)					\
+		*__outlen = ((__r >= __len) ? __len : __r + 1);	\
+	((__r >= __len) ? ENAMETOOLONG : 0);			\
+})
+
+int	copyinstr(const void * __restrict __capability udaddr,
 	    void * _Nonnull __restrict kaddr, size_t len,
 	    size_t * __restrict lencopied);
-#endif
-#if __has_feature(capabilities)
-int	copyinstr_c(const void * __restrict __capability udaddr,
-	    void * _Nonnull __restrict kaddr, size_t len,
-	    size_t * __restrict lencopied);
-#else
-#define	copyinstr_c	copyinstr
-#endif
-#if __has_feature(capabilities) && defined(EXPLICIT_USER_ACCESS)
-#define copyin	copyin_c
-#else
-int	copyin(const void * __restrict udaddr,
+int	copyin(const void * __restrict __capability udaddr,
 	    void * _Nonnull __restrict kaddr, size_t len);
-#endif
 int	copyin_implicit_cap(const void * __restrict udaddr,
 	    void * _Nonnull __restrict kaddr, size_t len);
 #if __has_feature(capabilities)
-int	copyin_c(const void * __restrict __capability udaddr,
-	    void * _Nonnull __restrict kaddr, size_t len);
 int	copyincap(const void * __restrict __capability udaddr,
 	    void * _Nonnull __restrict kaddr, size_t len);
 #else
-#define	copyin_c	copyin
 #define	copyincap	copyin
 #endif
-#if __has_feature(capabilities) && defined(EXPLICIT_USER_ACCESS)
-#define	copyin_nofault	copyin_nofault_c
-#else
-int	copyin_nofault(const void * __restrict udaddr,
+int	copyin_nofault(const void * __capability __restrict udaddr,
 	    void * _Nonnull __restrict kaddr, size_t len);
-#endif
-#if __has_feature(capabilities)
-int	copyin_nofault_c(const void * __capability __restrict udaddr,
-	    void * _Nonnull __restrict kaddr, size_t len);
-#else
-#define	copyin_nofault_c	copyin_nofault
-#endif
-#if __has_feature(capabilities) && defined(EXPLICIT_USER_ACCESS)
-#define	copyout	copyout_c
-#else
 int	copyout(const void * _Nonnull __restrict kaddr,
-	    void * __restrict udaddr, size_t len);
-#endif
+	    void * __restrict __capability udaddr, size_t len);
 int	copyout_implicit_cap(const void * _Nonnull __restrict kaddr,
 	    void * __restrict udaddr, size_t len);
-
 #if __has_feature(capabilities)
-int	copyout_c(const void * _Nonnull __restrict kaddr,
-	    void * __restrict __capability udaddr, size_t len);
 int	copyoutcap(const void * _Nonnull __restrict kaddr,
 	    void * __capability __restrict udaddr, size_t len);
 #else
-#define	copyout_c	copyout
 #define	copyoutcap	copyout
 #endif
-#if __has_feature(capabilities) && defined(EXPLICIT_USER_ACCESS)
-#define	copyout_nofault	copyout_nofault_c
-#else
 int	copyout_nofault(const void * _Nonnull __restrict kaddr,
-	    void * __restrict udaddr, size_t len);
-#endif
-#if __has_feature(capabilities)
-int	copyout_nofault_c(const void * _Nonnull __restrict kaddr,
 	    void * __capability __restrict udaddr, size_t len);
+#if __has_feature(capabilities)
 int	copyoutcap_nofault(
 	    const void * _Nonnull __restrict kaddr,
 	    void * __capability __restrict udaddr, size_t len);
 #else
-#define	copyout_nofault_c	copyout_nofault
 #define	copyoutcap_nofault	copyout_nofault
 #endif
 
 #ifdef KCSAN
-int	kcsan_copystr(const void *, void *, size_t, size_t *);
 int	kcsan_copyin(const void *, void *, size_t);
 int	kcsan_copyinstr(const void *, void *, size_t, size_t *);
 int	kcsan_copyout(const void *, void *, size_t);
-#define	copystr(kf, k, l, lc) kcsan_copystr((kf), (k), (l), (lc))
 #define	copyin(u, k, l) kcsan_copyin((u), (k), (l))
 #define	copyinstr(u, k, l, lc) kcsan_copyinstr((u), (k), (l), (lc))
 #define	copyout(k, u, l) kcsan_copyout((k), (u), (l))
 #endif
 
-#if __has_feature(capabilities) && defined(EXPLICIT_USER_ACCESS)
-#define	fubyte		fubyte_c
-#define	fuword		fuword_c
-#define	fuword16	fuword16_c
-#define	fuword32	fuword32_c
-#define	fuword64	fuword64_c
-#define	fueword		fueword_c
-#define	fueword32	fueword32_c
-#define	fueword64	fueword64_c
-#define	subyte		subyte_c
-#define	suword		suword_c
-#define	suword16	suword16_c
-#define	suword32	suword32_c
-#define	suword64	suword64_c
-#define	casuword32	casuword32_c
-#define	casuword	casuword_c
-#define	casueword32	casueword32_c
-#define	casueword	casueword_c
-#else
-int	fubyte(volatile const void *base);
-long	fuword(volatile const void *base);
-int	fuword16(volatile const void *base);
-int32_t	fuword32(volatile const void *base);
-int64_t	fuword64(volatile const void *base);
-int	fueword(volatile const void *base, long *val);
-int	fueword32(volatile const void *base, int32_t *val);
-int	fueword64(volatile const void *base, int64_t *val);
-int	subyte(volatile void *base, int byte);
-int	suword(volatile void *base, long word);
-int	suword16(volatile void *base, int word);
-int	suword32(volatile void *base, int32_t word);
-int	suword64(volatile void *base, int64_t word);
-uint32_t casuword32(volatile uint32_t *base, uint32_t oldval, uint32_t newval);
-u_long	casuword(volatile u_long *p, u_long oldval, u_long newval);
-int	casueword32(volatile uint32_t *base, uint32_t oldval, uint32_t *oldvalp,
-	    uint32_t newval);
-int	casueword(volatile u_long *p, u_long oldval, u_long *oldvalp,
-	    u_long newval);
-#endif
-
+int	fubyte(volatile const void * __capability base);
+long	fuword(volatile const void * __capability base);
+int	fuword16(volatile const void * __capability base);
+int32_t	fuword32(volatile const void * __capability base);
+int64_t	fuword64(volatile const void * __capability base);
 #if __has_feature(capabilities)
-int	fubyte_c(volatile const void * __capability base);
-long	fuword_c(volatile const void * __capability base);
-int	fuword16_c(volatile const void * __capability base);
-int32_t	fuword32_c(volatile const void * __capability base);
-int64_t	fuword64_c(volatile const void * __capability base);
 int	fuecap(volatile const void * __capability base, intcap_t *val);
-int	fueword_c(volatile const void * __capability base, long *val);
-int	fueword32_c(volatile const void * __capability base, int32_t *val);
-int	fueword64_c(volatile const void * __capability base, int64_t *val);
-int	subyte_c(volatile void * __capability base, int byte);
-int	suword_c(volatile void * __capability base, long word);
-int	suword16_c(volatile void * __capability base, int word);
-int	suword32_c(volatile void * __capability base, int32_t word);
-int	suword64_c(volatile void * __capability base, int64_t word);
-int	sucap(volatile const void * __capability base, intcap_t val);
-uint32_t casuword32_c(volatile uint32_t * __capability base, uint32_t oldval,
-	    uint32_t newval);
-u_long	casuword_c(volatile u_long * __capability base, u_long oldval,
-	    u_long newval);
-int	casueword_c(volatile u_long * __capability base, u_long oldval,
-	    u_long *oldvalp, u_long newval);
-int	casueword32_c(volatile uint32_t * __capability base, uint32_t oldval,
-	    uint32_t *oldvalp, uint32_t newval);
 #else
-#define	fubyte_c	fubyte
-#define	fuword_c	fuword
-#define	fuword16_c	fuword16
-#define	fuword32_c	fuword32
-#define	fuword64_c	fuword64
-#define	fueword_c	fueword
-#define	fueword32_c	fueword32
-#define	subyte_c	subyte
-#define	suword_c	suword
-#define	suword16_c	suword16
-#define	suword32_c	suword32
-#define	suword64_c	suword64
-#define	sucap		suword
-#define	casuword32_c	casuword32
-#define	casuword_c	casuword
-#define	casueword32_c	casueword32
+#define	fuecap		fueword
 #endif
+int	fueword(volatile const void * __capability base, long *val);
+int	fueword32(volatile const void * __capability base, int32_t *val);
+int	fueword64(volatile const void * __capability base, int64_t *val);
+int	subyte(volatile void * __capability base, int byte);
+int	suword(volatile void * __capability base, long word);
+int	suword16(volatile void * __capability base, int word);
+int	suword32(volatile void * __capability base, int32_t word);
+int	suword64(volatile void * __capability base, int64_t word);
+#if __has_feature(capabilities)
+int	sucap(volatile const void * __capability base, intcap_t val);
+#else
+#define	sucap		suword
+#endif
+uint32_t casuword32(volatile uint32_t * __capability base, uint32_t oldval,
+	    uint32_t newval);
+u_long	casuword(volatile u_long * __capability base, u_long oldval,
+	    u_long newval);
+int	casueword(volatile u_long * __capability base, u_long oldval,
+	    u_long *oldvalp, u_long newval);
+int	casueword32(volatile uint32_t * __capability base, uint32_t oldval,
+	    uint32_t *oldvalp, uint32_t newval);
 
 void	realitexpire(void *);
 

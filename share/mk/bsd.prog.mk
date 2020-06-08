@@ -37,11 +37,6 @@ CTFFLAGS+= -g
 PROG=	${PROG_CXX}
 .endif
 
-.if ${MACHINE_ABI:Mpurecap} && ${MACHINE_ARCH:Mriscv*} && !defined(NO_SHARED)
-.info "Building ${PROG} statically since we don't have purecap RTLD yet"
-NO_SHARED:=yes
-.endif
-
 .if !empty(LDFLAGS:M-Wl,*--oformat,*) || !empty(LDFLAGS:M-static)
 MK_DEBUG_FILES=	no
 .endif

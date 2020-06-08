@@ -31,8 +31,6 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
-#define	EXPLICIT_USER_ACCESS
-
 #include <sys/param.h>
 
 #ifdef _KERNEL

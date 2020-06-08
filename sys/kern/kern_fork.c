@@ -42,8 +42,6 @@ __FBSDID("$FreeBSD$");
 #include "opt_ktrace.h"
 #include "opt_kstack_pages.h"
 
-#define	EXPLICIT_USER_ACCESS
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bitstring.h>

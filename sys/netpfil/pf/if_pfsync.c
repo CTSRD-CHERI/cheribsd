@@ -66,8 +66,6 @@ __FBSDID("$FreeBSD$");
 #include "opt_inet6.h"
 #include "opt_pf.h"
 
-#define	EXPLICIT_USER_ACCESS
-
 #include <sys/param.h>
 #include <sys/bus.h>
 #include <sys/endian.h>

@@ -187,6 +187,17 @@ gdbinit:
 .endif
 .endif
 
+CTFFLAGS_KERNEL=${CTFFLAGS}
+.if ${MACHINE_CPUARCH} == "mips"
+# For mips, the CTF section is generated from the symbols in `.dynsym`.
+# `.dymsym` only contains a subset of the `.symtab` symbols, needed for
+# dynamic linking. This flag is needed because the `.symtab` section is not
+# loaded at boot time, and its address is not available anywhere without a
+# proper bootloader.
+# The problem can be solved looking at |sys/mips/mips/elf_trampoline.c|.
+CTFFLAGS_KERNEL+=-s
+.endif
+
 ${FULLKERNEL}: ${SYSTEM_DEP} vers.o
 	@rm -f ${.TARGET}
 	@echo linking ${.TARGET}
@@ -195,8 +206,8 @@ ${FULLKERNEL}: ${SYSTEM_DEP} vers.o
 	@sh ${S}/tools/embed_mfs.sh ${.TARGET} ${MFS_IMAGE}
 .endif
 .if ${MK_CTF} != "no"
-	@echo ${CTFMERGE} ${CTFFLAGS} -o ${.TARGET} ...
-	@${CTFMERGE} ${CTFFLAGS} -o ${.TARGET} ${SYSTEM_OBJS} vers.o
+	@echo ${CTFMERGE} ${CTFFLAGS_KERNEL} -o ${.TARGET} ...
+	@${CTFMERGE} ${CTFFLAGS_KERNEL} -o ${.TARGET} ${SYSTEM_OBJS} vers.o
 .endif
 .if !defined(DEBUG)
 	${OBJCOPY} --strip-debug ${.TARGET}
@@ -345,10 +356,7 @@ ${__obj}: ${OBJS_DEPEND_GUESS.${__obj}}
 
 .depend: .PRECIOUS ${SRCS}
 
-.if ${COMPILER_TYPE} == "clang" || \
-    (${COMPILER_TYPE} == "gcc" && ${COMPILER_VERSION} >= 60000)
 _MAP_DEBUG_PREFIX= yes
-.endif
 
 _ILINKS= machine
 .if ${MACHINE} != ${MACHINE_CPUARCH} && ${MACHINE} != "arm64"

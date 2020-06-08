@@ -47,12 +47,8 @@ __FBSDID("$FreeBSD$");
 #include <sys/limits.h>
 #include <sys/mutex.h>
 
-#include <crypto/blowfish/blowfish.h>
 #include <crypto/sha1.h>
 #include <opencrypto/rmd160.h>
-#include <opencrypto/cast.h>
-#include <opencrypto/skipjack.h>
-#include <sys/md5.h>
 
 #include <opencrypto/cryptodev.h>
 #include <opencrypto/xform.h>
@@ -66,7 +62,6 @@ struct swcr_auth {
 	void		*sw_octx;
 	struct auth_hash *sw_axf;
 	uint16_t	sw_mlen;
-	uint16_t	sw_octx_len;
 };
 
 struct swcr_encdec {
@@ -340,7 +335,6 @@ swcr_authprepare(struct auth_hash *axf, struct swcr_auth *sw,
 {
 
 	switch (axf->type) {
-	case CRYPTO_MD5_HMAC:
 	case CRYPTO_SHA1_HMAC:
 	case CRYPTO_SHA2_224_HMAC:
 	case CRYPTO_SHA2_256_HMAC:
@@ -351,27 +345,6 @@ swcr_authprepare(struct auth_hash *axf, struct swcr_auth *sw,
 		hmac_init_ipad(axf, key, klen, sw->sw_ictx);
 		hmac_init_opad(axf, key, klen, sw->sw_octx);
 		break;
-	case CRYPTO_MD5_KPDK:
-	case CRYPTO_SHA1_KPDK:
-	{
-		/* 
-		 * We need a buffer that can hold an md5 and a sha1 result
-		 * just to throw it away.
-		 * What we do here is the initial part of:
-		 *   ALGO( key, keyfill, .. )
-		 * adding the key to sw_ictx and abusing Final() to get the
-		 * "keyfill" padding.
-		 * In addition we abuse the sw_octx to save the key to have
-		 * it to be able to append it at the end in swcr_authcompute().
-		 */
-		u_char buf[SHA1_RESULTLEN];
-
-		bcopy(key, sw->sw_octx, klen);
-		axf->Init(sw->sw_ictx);
-		axf->Update(sw->sw_ictx, key, klen);
-		axf->Final(buf, sw->sw_ictx);
-		break;
-	}
 	case CRYPTO_POLY1305:
 	case CRYPTO_BLAKE2B:
 	case CRYPTO_BLAKE2S:
@@ -428,7 +401,6 @@ swcr_authcompute(struct swcr_session *ses, struct cryptop *crp)
 		axf->Final(aalg, &ctx);
 		break;
 
-	case CRYPTO_MD5_HMAC:
 	case CRYPTO_SHA1_HMAC:
 	case CRYPTO_SHA2_224_HMAC:
 	case CRYPTO_SHA2_256_HMAC:
@@ -441,23 +413,6 @@ swcr_authcompute(struct swcr_session *ses, struct cryptop *crp)
 		axf->Final(aalg, &ctx);
 		bcopy(sw->sw_octx, &ctx, axf->ctxsize);
 		axf->Update(&ctx, aalg, axf->hashsize);
-		axf->Final(aalg, &ctx);
-		break;
-
-	case CRYPTO_MD5_KPDK:
-	case CRYPTO_SHA1_KPDK:
-		/* If we have no key saved, return error. */
-		if (sw->sw_octx == NULL)
-			return EINVAL;
-
-		/*
-		 * Add the trailing copy of the key (see comment in
-		 * swcr_authprepare()) after the data:
-		 *   ALGO( .., key, algofill )
-		 * and let Final() do the proper, natural "algofill"
-		 * padding.
-		 */
-		axf->Update(&ctx, sw->sw_octx, sw->sw_octx_len);
 		axf->Final(aalg, &ctx);
 		break;
 
@@ -941,7 +896,6 @@ swcr_setup_auth(struct swcr_session *ses,
 		return (ENOBUFS);
 	
 	switch (csp->csp_auth_alg) {
-	case CRYPTO_MD5_HMAC:
 	case CRYPTO_SHA1_HMAC:
 	case CRYPTO_SHA2_224_HMAC:
 	case CRYPTO_SHA2_256_HMAC:
@@ -949,8 +903,7 @@ swcr_setup_auth(struct swcr_session *ses,
 	case CRYPTO_SHA2_512_HMAC:
 	case CRYPTO_NULL_HMAC:
 	case CRYPTO_RIPEMD160_HMAC:
-		swa->sw_octx_len = axf->ctxsize;
-		swa->sw_octx = malloc(swa->sw_octx_len, M_CRYPTO_DATA,
+		swa->sw_octx = malloc(axf->ctxsize, M_CRYPTO_DATA,
 		    M_NOWAIT);
 		if (swa->sw_octx == NULL)
 			return (ENOBUFS);
@@ -963,26 +916,6 @@ swcr_setup_auth(struct swcr_session *ses,
 		if (csp->csp_mode == CSP_MODE_DIGEST)
 			ses->swcr_process = swcr_authcompute;
 		break;
-	case CRYPTO_MD5_KPDK:
-	case CRYPTO_SHA1_KPDK:
-		swa->sw_octx_len = csp->csp_auth_klen;
-		swa->sw_octx = malloc(swa->sw_octx_len, M_CRYPTO_DATA,
-		    M_NOWAIT);
-		if (swa->sw_octx == NULL)
-			return (ENOBUFS);
-
-		/* Store the key so we can "append" it to the payload */
-		if (csp->csp_auth_key != NULL) {
-			swcr_authprepare(axf, swa, csp->csp_auth_key,
-			    csp->csp_auth_klen);
-		}
-
-		if (csp->csp_mode == CSP_MODE_DIGEST)
-			ses->swcr_process = swcr_authcompute;
-		break;
-#ifdef notdef
-	case CRYPTO_MD5:
-#endif
 	case CRYPTO_SHA1:
 	case CRYPTO_SHA2_224:
 	case CRYPTO_SHA2_256:
@@ -1148,7 +1081,6 @@ swcr_auth_supported(const struct crypto_session_params *csp)
 	if (axf == NULL)
 		return (false);
 	switch (csp->csp_auth_alg) {
-	case CRYPTO_MD5_HMAC:
 	case CRYPTO_SHA1_HMAC:
 	case CRYPTO_SHA2_224_HMAC:
 	case CRYPTO_SHA2_256_HMAC:
@@ -1156,8 +1088,6 @@ swcr_auth_supported(const struct crypto_session_params *csp)
 	case CRYPTO_SHA2_512_HMAC:
 	case CRYPTO_NULL_HMAC:
 	case CRYPTO_RIPEMD160_HMAC:
-	case CRYPTO_MD5_KPDK:
-	case CRYPTO_SHA1_KPDK:
 		break;
 	case CRYPTO_AES_NIST_GMAC:
 		switch (csp->csp_auth_klen * 8) {
@@ -1404,7 +1334,7 @@ swcr_freesession(device_t dev, crypto_session_t cses)
 			free(swa->sw_ictx, M_CRYPTO_DATA);
 		}
 		if (swa->sw_octx != NULL) {
-			explicit_bzero(swa->sw_octx, swa->sw_octx_len);
+			explicit_bzero(swa->sw_octx, axf->ctxsize);
 			free(swa->sw_octx, M_CRYPTO_DATA);
 		}
 	}

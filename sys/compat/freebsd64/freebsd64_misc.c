@@ -35,8 +35,6 @@
  * SUCH DAMAGE.
  */
 
-#define EXPLICIT_USER_ACCESS 1
-
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
@@ -500,7 +498,7 @@ freebsd64_updateiov(const struct uio *uiop, struct iovec64 * __capability iovp)
 	int i, error;
 
 	for (i = 0; i < uiop->uio_iovcnt; i++) {
-		error = suword_c(&iovp[i].iov_len, uiop->uio_iov[i].iov_len);
+		error = suword(&iovp[i].iov_len, uiop->uio_iov[i].iov_len);
 		if (error != 0)
 			return (error);
 	}
@@ -1111,7 +1109,7 @@ freebsd64_kldstat(struct thread *td, struct freebsd64_kldstat_args *uap)
         bcopy(&stat.name[0], &stat64.name[0], sizeof(stat.name));
         CP(stat, stat64, refs);
         CP(stat, stat64, id);
-	stat64.address = (uint64_t)stat.address;
+	stat64.address = (__cheri_addr uint64_t)stat.address;
         CP(stat, stat64, size);
         bcopy(&stat.pathname[0], &stat64.pathname[0], sizeof(stat.pathname));
         return (copyout(&stat64, __USER_CAP_OBJ(uap->stat), version));

@@ -761,6 +761,9 @@ enum MipsCheriFlags {
 #define	DT_PPC64_OPDSZ			0x70000002
 #define	DT_PPC64_TLSOPT			0x70000003
 
+#define	DT_RISCV_CHERI___CAPRELOCS	0x7000c000 /* start of __cap_relocs section */
+#define	DT_RISCV_CHERI___CAPRELOCSSZ	0x7000c001 /* size of __cap_relocs section */
+
 #define	DT_AUXILIARY	0x7ffffffd	/* shared library auxiliary name */
 #define	DT_USED		0x7ffffffe	/* ignored - same as needed */
 #define	DT_FILTER	0x7fffffff	/* shared library filter name */
@@ -1369,6 +1372,18 @@ enum MipsCheriFlags {
 #define	R_RISCV_SET8		54
 #define	R_RISCV_SET16		55
 #define	R_RISCV_SET32		56
+#define	R_RISCV_32_PCREL	57
+#define	R_RISCV_IRELATIVE	58
+
+/* Relocation types added by CHERI used by the dynamic linker */
+#define	R_RISCV_CHERI_CAPABILITY		193
+#define	R_RISCV_CHERI_CAPABILITY_CALL		194
+
+/* Relocation types added by CHERI not used by the dynamic linker */
+#define	R_RISCV_CHERI_SIZE			195
+#define	R_RISCV_CHERI_TPREL_CINCOFFSET		196
+#define	R_RISCV_CHERI_TLS_IE_CAPTAB_PCREL_HI20	197
+#define	R_RISCV_CHERI_TLS_GD_CAPTAB_PCREL_HI20	198
 
 #define	R_SPARC_NONE		0
 #define	R_SPARC_8		1

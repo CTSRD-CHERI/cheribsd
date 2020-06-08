@@ -161,7 +161,7 @@ spa_get_errlog_size(spa_t *spa)
 
 #ifdef _KERNEL
 static int
-process_error_log(spa_t *spa, uint64_t obj, void *addr, size_t *count)
+process_error_log(spa_t *spa, uint64_t obj, void * __capability addr, size_t *count)
 {
 	zap_cursor_t zc;
 	zap_attribute_t za;
@@ -181,7 +181,7 @@ process_error_log(spa_t *spa, uint64_t obj, void *addr, size_t *count)
 
 		name_to_bookmark(za.za_name, &zb);
 
-		if (copyout(&zb, (char *)addr +
+		if (copyout(&zb, (char * __capability)addr +
 		    (*count - 1) * sizeof (zbookmark_phys_t),
 		    sizeof (zbookmark_phys_t)) != 0) {
 			zap_cursor_fini(&zc);
@@ -197,7 +197,7 @@ process_error_log(spa_t *spa, uint64_t obj, void *addr, size_t *count)
 }
 
 static int
-process_error_list(avl_tree_t *list, void *addr, size_t *count)
+process_error_list(avl_tree_t *list, void * __capability addr, size_t *count)
 {
 	spa_error_entry_t *se;
 
@@ -206,7 +206,7 @@ process_error_list(avl_tree_t *list, void *addr, size_t *count)
 		if (*count == 0)
 			return (SET_ERROR(ENOMEM));
 
-		if (copyout(&se->se_bookmark, (char *)addr +
+		if (copyout(&se->se_bookmark, (char * __capability)addr +
 		    (*count - 1) * sizeof (zbookmark_phys_t),
 		    sizeof (zbookmark_phys_t)) != 0)
 			return (SET_ERROR(EFAULT));
@@ -230,7 +230,7 @@ process_error_list(avl_tree_t *list, void *addr, size_t *count)
  * the error list lock when we are finished.
  */
 int
-spa_get_errlog(spa_t *spa, void *uaddr, size_t *count)
+spa_get_errlog(spa_t *spa, void * __capability uaddr, size_t *count)
 {
 	int ret = 0;
 

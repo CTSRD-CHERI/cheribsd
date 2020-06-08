@@ -372,6 +372,27 @@ ENTRY(cpu_switch)
 	ld	t0, TD_LOCK(a1)
 	beq	t0, s2, 1b
 #endif
+
+#ifdef CPU_QEMU_RISCV
+	/*
+	 * Check if per-thread tracing is enabled, if so pause/resume
+	 * QEMU instruction tracing to reflect the new thread tracing
+	 * flag.
+	 */
+	lw	t0, _C_LABEL(qemu_trace_perthread)
+	beqz	t0, .Lout_qemu_tracing
+
+	lw	t0, TD_MDFLAGS(a1)
+	andi	t0, t0, MDTD_QTRACE
+	beqz	t0, .Ldisable_qemu_tracing
+.Lenable_qemu_tracing:
+	slti	x0, x0, 0x1b
+	j	.Lout_qemu_tracing
+.Ldisable_qemu_tracing:
+	slti	x0, x0, 0x1e
+.Lout_qemu_tracing:
+#endif
+
 	/*
 	 * Restore the saved context.
 	 */

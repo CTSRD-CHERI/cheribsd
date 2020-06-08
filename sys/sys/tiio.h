@@ -264,7 +264,7 @@ struct tg_reg {
 
 struct tg_mem {
 	u_int32_t	tgAddr;
-	caddr_t		userAddr;
+	char * __capability userAddr;
 	int		len;
 }; 
 
@@ -310,7 +310,7 @@ typedef enum {
 } ti_trace_type;
 
 struct ti_trace_buf {
-	u_long	*buf;
+	u_long	* __kerncap buf;
 	int	buf_len;
 	int	fill_len;
 	u_long	cur_trace_ptr;

@@ -31,12 +31,11 @@
  * SUCH DAMAGE.
  */
 
-#define	EXPLICIT_USER_ACCESS
-
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
 #include <sys/param.h>
+#include <sys/abi_compat.h>
 #include <sys/systm.h>
 #include <sys/ktr.h>
 #include <sys/lock.h>
@@ -68,6 +67,60 @@ __FBSDID("$FreeBSD$");
 
 #include <compat/freebsd64/freebsd64_proto.h>
 
+struct ptrace_io_desc64 {
+	int		piod_op;	/* I/O operation */
+	uint64_t	piod_offs;	/* child offset */
+	uint64_t	piod_addr;	/* parent offset */
+	uint64_t	piod_len;	/* request length */
+};
+
+struct ptrace_sc_ret64 {
+	uint64_t	sr_retval[2];	/* Only valid if sr_error == 0. */
+	int		sr_error;
+};
+
+struct ptrace_vm_entry64 {
+	int		pve_entry;	/* Entry number used for iteration. */
+	int		pve_timestamp;	/* Generation number of VM map. */
+	uint64_t	pve_start;	/* Start VA of range. */
+	uint64_t	pve_end;	/* End VA of range (incl). */
+	uint64_t	pve_offset;	/* Offset in backing object. */
+	u_int		pve_prot;	/* Protection of memory range. */
+	u_int		pve_pathlen;	/* Size of path. */
+	int64_t		pve_fileid;	/* File ID. */
+	uint32_t	pve_fsid;	/* File system ID. */
+	uint64_t	pve_path;	/* Path name of object. */
+};
+
+static void
+ptrace_lwpinfo_to64(const struct ptrace_lwpinfo *pl,
+    struct ptrace_lwpinfo64 *pl64)
+{
+
+	bzero(pl64, sizeof(*pl64));
+	pl64->pl_lwpid = pl->pl_lwpid;
+	pl64->pl_event = pl->pl_event;
+	pl64->pl_flags = pl->pl_flags;
+	pl64->pl_sigmask = pl->pl_sigmask;
+	pl64->pl_siglist = pl->pl_siglist;
+	siginfo_to_siginfo64(&pl->pl_siginfo, &pl64->pl_siginfo);
+	strcpy(pl64->pl_tdname, pl->pl_tdname);
+	pl64->pl_child_pid = pl->pl_child_pid;
+	pl64->pl_syscall_code = pl->pl_syscall_code;
+	pl64->pl_syscall_narg = pl->pl_syscall_narg;
+}
+
+static void
+ptrace_sc_ret_to64(const struct ptrace_sc_ret *psr,
+    struct ptrace_sc_ret64 *psr64)
+{
+
+	bzero(psr64, sizeof(*psr64));
+	psr64->sr_retval[0] = (__cheri_addr uint64_t)psr->sr_retval[0];
+	psr64->sr_retval[1] = (__cheri_addr uint64_t)psr->sr_retval[1];
+	psr64->sr_error = psr->sr_error;
+}
+
 /*
  * Process debugging system call.
  */
@@ -80,9 +133,6 @@ struct ptrace_args {
 };
 #endif
 
-#define	BZERO(a, s)		bzero(a, s)
-#define	COPYIN(u, k, s)		copyin(u, k, s)
-#define	COPYOUT(k, u, s)	copyout(k, u, s)
 int
 freebsd64_ptrace(struct thread *td, struct freebsd64_ptrace_args *uap)
 {
@@ -92,59 +142,87 @@ freebsd64_ptrace(struct thread *td, struct freebsd64_ptrace_args *uap)
 	 */
 	union {
 		struct ptrace_io_desc piod;
-		struct ptrace_lwpinfo64 pl;
-		kptrace_vm_entry_t pve;
+		struct ptrace_lwpinfo pl;
+		struct ptrace_vm_entry pve;
 #if __has_feature(capabilities)
 		struct capreg capreg;
 #endif
 		struct dbreg dbreg;
 		struct fpreg fpreg;
 		struct reg reg;
-		uint64_t args[nitems(td->td_sa.args)];
-		struct ptrace_sc_ret64 psr;
+		syscallarg_t args[nitems(td->td_sa.args)];
+		struct ptrace_sc_ret psr;
 		int ptevents;
 	} r;
+	union {
+		struct ptrace_io_desc64 piod;
+		struct ptrace_lwpinfo64 pl;
+		struct ptrace_vm_entry64 pve;
+		uint64_t args[nitems(td->td_sa.args)];
+		struct ptrace_sc_ret64 psr;
+	} r64;
 	void * __capability addr;
-	int error = 0;
+	int data, error = 0, i;
+
 	AUDIT_ARG_PID(uap->pid);
 	AUDIT_ARG_CMD(uap->req);
 	AUDIT_ARG_VALUE(uap->data);
 	addr = &r;
+	data = uap->data;
 	switch (uap->req) {
 	case PT_GET_EVENT_MASK:
-	case PT_LWPINFO:
 	case PT_GET_SC_ARGS:
 	case PT_GET_SC_RET:
 		break;
+	case PT_LWPINFO:
+		if (uap->data > sizeof(r64.pl))
+			return (EINVAL);
+
+		/*
+		 * Pass size of native structure in 'data'.  Truncate
+		 * if necessary to avoid siginfo.
+		 */
+		data = sizeof(r.pl);
+		if (uap->data < offsetof(struct ptrace_lwpinfo64, pl_siginfo) +
+		    sizeof(struct siginfo64))
+			data = offsetof(struct ptrace_lwpinfo, pl_siginfo);
+		break;
+	case PT_GETLWPLIST:
+		if (uap->data <= 0) {
+			error = EINVAL;
+			break;
+		}
+		addr = __USER_CAP(uap->addr, uap->data * sizeof(lwpid_t));
+		break;
 	case PT_GETREGS:
-		BZERO(&r.reg, sizeof r.reg);
+		bzero(&r.reg, sizeof r.reg);
 		break;
 	case PT_GETFPREGS:
-		BZERO(&r.fpreg, sizeof r.fpreg);
+		bzero(&r.fpreg, sizeof r.fpreg);
 		break;
 #if __has_feature(capabilities)
 	case PT_GETCAPREGS:
-		BZERO(&r.capreg, sizeof r.capreg);
+		bzero(&r.capreg, sizeof r.capreg);
 		break;
 #endif
 	case PT_GETDBREGS:
-		BZERO(&r.dbreg, sizeof r.dbreg);
+		bzero(&r.dbreg, sizeof r.dbreg);
 		break;
 	case PT_SETREGS:
-		error = COPYIN(__USER_CAP(uap->addr, sizeof(r.reg)), &r.reg,
+		error = copyin(__USER_CAP(uap->addr, sizeof(r.reg)), &r.reg,
 		    sizeof r.reg);
 		break;
 	case PT_SETFPREGS:
-		error = COPYIN(__USER_CAP(uap->addr, sizeof(r.fpreg)), &r.fpreg,
+		error = copyin(__USER_CAP(uap->addr, sizeof(r.fpreg)), &r.fpreg,
 		    sizeof r.fpreg);
 		break;
 	case PT_SETDBREGS:
-		error = COPYIN(__USER_CAP(uap->addr, sizeof(r.dbreg)), &r.dbreg,
+		error = copyin(__USER_CAP(uap->addr, sizeof(r.dbreg)), &r.dbreg,
 		    sizeof r.dbreg);
 		break;
 #if __has_feature(capabilities)
 	case PT_SETCAPREGS:
-		error = COPYIN(__USER_CAP(uap->addr, sizeof(r.capreg)),
+		error = copyin(__USER_CAP(uap->addr, sizeof(r.capreg)),
 		    &r.capreg, sizeof r.capreg);
 		break;
 #endif
@@ -156,70 +234,80 @@ freebsd64_ptrace(struct thread *td, struct freebsd64_ptrace_args *uap)
 			    &r.ptevents, uap->data);
 		break;
 	case PT_IO:
-		error = COPYIN(__USER_CAP(uap->addr, sizeof(r.piod)), &r.piod,
-		    sizeof r.piod);
+		error = copyin(__USER_CAP(uap->addr, sizeof(r64.piod)),
+		    &r64.piod, sizeof(r64.piod));
+		if (error)
+			break;
+		CP(r64.piod, r.piod, piod_op);
+		r.piod.piod_offs =
+		    (void * __capability)(uintcap_t)r64.piod.piod_offs;
+		r.piod.piod_addr = __USER_CAP(r64.piod.piod_addr,
+		    r64.piod.piod_len);
+		CP(r64.piod, r.piod, piod_len);
 		break;
 	case PT_VM_ENTRY:
-#if __has_feature(capabilities)
-	{
-		struct ptrace_vm_entry pve;
-
-		error = COPYIN(__USER_CAP(uap->addr, sizeof(pve)), &pve,
-		    sizeof pve);
+		error = copyin(__USER_CAP(uap->addr, sizeof(r64.pve)),
+		    &r64.pve, sizeof(r64.pve));
 		if (error)
 			break;
 
-		r.pve.pve_entry     = pve.pve_entry;
-		r.pve.pve_timestamp = pve.pve_timestamp;
-		r.pve.pve_start     = pve.pve_start;
-		r.pve.pve_end       = pve.pve_end;
-		r.pve.pve_offset    = pve.pve_offset;
-		r.pve.pve_prot      = pve.pve_prot;
-		r.pve.pve_pathlen   = pve.pve_pathlen;
-		r.pve.pve_fileid    = pve.pve_fileid;
-		r.pve.pve_fsid      = pve.pve_fsid;
-		r.pve.pve_path      = (void * __capability)(intcap_t)pve.pve_path;
-	}
-#else
-		error = COPYIN(__USER_CAP(uap->addr, sizeof(r.pve)), &r.pve,
-		    sizeof r.pve);
-#endif
+		CP(r64.pve, r.pve, pve_entry);
+		CP(r64.pve, r.pve, pve_timestamp);
+		CP(r64.pve, r.pve, pve_start);
+		CP(r64.pve, r.pve, pve_end);
+		CP(r64.pve, r.pve, pve_offset);
+		CP(r64.pve, r.pve, pve_prot);
+		CP(r64.pve, r.pve, pve_pathlen);
+		CP(r64.pve, r.pve, pve_fileid);
+		CP(r64.pve, r.pve, pve_fsid);
+		r.pve.pve_path = __USER_CAP(r64.pve.pve_path,
+		    r64.pve.pve_pathlen);
 		break;
 	default:
-		addr = (__cheri_tocap void * __capability)uap->addr;
+		addr = __USER_CAP_UNBOUND(uap->addr);
 		break;
 	}
 	if (error)
 		return (error);
 
-	error = kern_ptrace(td, uap->req, uap->pid, addr, uap->data);
+	error = kern_ptrace(td, uap->req, uap->pid, addr, data);
 	if (error)
 		return (error);
 
 	switch (uap->req) {
 	case PT_VM_ENTRY:
-		error = COPYOUT(&r.pve, __USER_CAP(uap->addr, sizeof(r.pve)),
-		    sizeof r.pve);
+		CP(r.pve, r64.pve, pve_entry);
+		CP(r.pve, r64.pve, pve_timestamp);
+		CP(r.pve, r64.pve, pve_start);
+		CP(r.pve, r64.pve, pve_end);
+		CP(r.pve, r64.pve, pve_offset);
+		CP(r.pve, r64.pve, pve_prot);
+		CP(r.pve, r64.pve, pve_pathlen);
+		CP(r.pve, r64.pve, pve_fileid);
+		CP(r.pve, r64.pve, pve_fsid);
+		error = copyout(&r64.pve, __USER_CAP(uap->addr, sizeof(r64.pve)),
+		    sizeof(r64.pve));
 		break;
 	case PT_IO:
-		error = COPYOUT(&r.piod, __USER_CAP(uap->addr, sizeof(r.piod)),
-		    sizeof r.piod);
+		CP(r.piod, r64.piod, piod_len);
+		error = copyout(&r64.piod,
+		    __USER_CAP(uap->addr, sizeof(r64.piod)), sizeof(r64.piod));
 		break;
 	case PT_GETREGS:
-		error = COPYOUT(&r.reg, __USER_CAP(uap->addr, sizeof(r.reg)),
+		error = copyout(&r.reg, __USER_CAP(uap->addr, sizeof(r.reg)),
 		    sizeof r.reg);
 		break;
 	case PT_GETFPREGS:
-		error = COPYOUT(&r.fpreg, __USER_CAP(uap->addr, sizeof(r.fpreg)),
+		error = copyout(&r.fpreg, __USER_CAP(uap->addr, sizeof(r.fpreg)),
 		    sizeof r.fpreg);
 		break;
 	case PT_GETDBREGS:
-		error = COPYOUT(&r.dbreg, __USER_CAP(uap->addr, sizeof(r.dbreg)),
+		error = copyout(&r.dbreg, __USER_CAP(uap->addr, sizeof(r.dbreg)),
 		    sizeof r.dbreg);
 		break;
 #if __has_feature(capabilities)
 	case PT_GETCAPREGS:
-		error = COPYOUT(&r.capreg, __USER_CAP(uap->addr,
+		error = copyout(&r.capreg, __USER_CAP(uap->addr,
 		    sizeof(r.capreg)), sizeof r.capreg);
 		break;
 #endif
@@ -229,23 +317,22 @@ freebsd64_ptrace(struct thread *td, struct freebsd64_ptrace_args *uap)
 		    uap->data);
 		break;
 	case PT_LWPINFO:
-		/* NB: The size in uap->data is validated in kern_ptrace(). */
-		error = copyout(&r.pl, __USER_CAP(uap->addr, uap->data),
+		ptrace_lwpinfo_to64(&r.pl, &r64.pl);
+		error = copyout(&r64.pl, __USER_CAP(uap->addr, uap->data),
 		    uap->data);
 		break;
 	case PT_GET_SC_ARGS:
-		error = copyout(r.args, __USER_CAP(uap->addr, uap->data),
-		    MIN(uap->data, sizeof(r.args)));
+		for (i = 0; i < nitems(r.args); i++)
+			r64.args[i] = (__cheri_addr uint64_t)r.args[i];
+		error = copyout(r64.args, __USER_CAP(uap->addr, uap->data),
+		    MIN(uap->data, sizeof(r64.args)));
 		break;
 	case PT_GET_SC_RET:
-		error = copyout(&r.psr, __USER_CAP(uap->addr, uap->data),
-		    MIN(uap->data, sizeof(r.psr)));
+		ptrace_sc_ret_to64(&r.psr, &r64.psr);
+		error = copyout(&r64.psr, __USER_CAP(uap->addr, uap->data),
+		    MIN(uap->data, sizeof(r64.psr)));
 		break;
 	}
 
 	return (error);
 }
-#undef COPYIN
-#undef COPYOUT
-#undef BZERO
-

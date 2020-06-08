@@ -58,7 +58,7 @@ struct mlx_usercommand
 {
     /* data buffer */
     size_t	mu_datasize;	/* size of databuffer */
-    void	*mu_buf;	/* address in userspace of databuffer */
+    void * __kerncap mu_buf;	/* address in userspace of databuffer */
     int		mu_bufptr;	/* offset into command mailbox to place databuffer address */
 
     /* command */

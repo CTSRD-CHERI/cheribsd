@@ -50,8 +50,6 @@
  * October 1992
  */
 
-#define	EXPLICIT_USER_ACCESS
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/buf.h>
