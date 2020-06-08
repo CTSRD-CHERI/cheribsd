@@ -46,7 +46,8 @@ __FBSDID("$FreeBSD$");
 #include <string.h>
 #include <unistd.h>
 
-pthread_t	service_thread;
+static pthread_t	service_thread;
+static char		*coname;
 
 #if 0
 #define SHARED_PAGE	0x7ffffff000
@@ -128,8 +129,8 @@ call(void)
 	if (error != 0)
 		err(1, "cosetup");
 
-	fprintf(stderr, "%s: colookingup...\n", __func__);
-	error = colookup("kopytko", &lookedup);
+	fprintf(stderr, "%s: colookingup %s...\n", __func__, coname);
+	error = colookup(coname, &lookedup);
 	if (error != 0)
 		err(1, "colookup");
 
@@ -162,8 +163,8 @@ service_proc(void *dummy __unused)
 	if (error != 0)
 		err(1, "cosetup");
 
-	fprintf(stderr, "%s: coregistering...\n", __func__);
-	error = coregister("kopytko", NULL);
+	fprintf(stderr, "%s: coregistering as %s...\n", __func__, coname);
+	error = coregister(coname, NULL);
 	if (error != 0)
 		err(1, "coregister");
 
@@ -187,6 +188,10 @@ int
 main(int argc __unused, char **argv __unused)
 {
 	int error;
+
+	coname = mktemp(strdup("stevie.XXXXXX"));
+	if (coname == NULL)
+		err(1, "mktemp");
 
 #if 0
 	fprintf(stderr, "memory at %p:\n", (void *)SHARED_PAGE);
