@@ -1323,7 +1323,7 @@ usie_if_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		 * relative to the noise floor.
 		 */
 		si.isi_rssi = 2 * sc->sc_rssi;
-		if (copyout(&si, (uint8_t *)ireq->i_data + 8,
+		if (copyout(&si, (uint8_t * __capability)ireq->i_data + 8,
 		    sizeof(struct ieee80211req_sta_info)))
 			DPRINTF("copyout failed\n");
 		DPRINTF("80211\n");

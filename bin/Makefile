@@ -47,14 +47,15 @@ SUBDIR.${MK_LIBCHERI}+=	cheri_bench
 
 # Small cheri programs
 .if ${MACHINE_ABI:Mpurecap} || ${MK_COMPAT_CHERIABI} == "yes"
-# No RTLD for RISCV purecap yet
-.if !${MACHINE_ARCH:Mriscv*}
+.if ${MACHINE} == "mips"
+# link failure on riscv
 SUBDIR.${MK_CHERI}+=	cheri_minimal_dynamic_exe
 SUBDIR.${MK_CHERI}+=	cheri_minimal_pie_exe
-.endif
+# mips assembly
 SUBDIR.${MK_CHERI}+=	cheri_pthreads
+.endif
 SUBDIR.${MK_CHERI}+=	helloworld
-.if ${MK_CXX} != "no"
+.if ${MK_CXX} != "no" && ${MACHINE} != riscv
 SUBDIR.${MK_CHERI}+=	helloworld_cxx
 .endif
 SUBDIR.${MK_CHERI}+=	helloworld_static
@@ -64,7 +65,6 @@ SUBDIR.${MK_LIBCHERI}+=	cheri_helloworld
 SUBDIR.${MK_LIBCHERI}+=	cheriabi_helloworld
 
 # cheritest
-.if ${MACHINE_ARCH:Mmips*}
 SUBDIR.${MK_CHERI}+=	cheriabitest
 SUBDIR.${MK_CHERI}+=	cheriabitest-dynamic
 SUBDIR.${MK_CHERI}+=	cheriabitest-dynamic-mt
@@ -73,9 +73,6 @@ SUBDIR.${MK_CHERI}+=	cheritest
 SUBDIR.${MK_CHERI}+=	cheritest-dynamic
 SUBDIR.${MK_CHERI}+=	cheritest-dynamic-mt
 SUBDIR.${MK_CHERI}+=	cheritest-mt
-.else
-.warn "TODO: port cheritest to RISCV"
-.endif
 .endif  # ${MACHINE_ABI:Mpurecap} || ${MK_COMPAT_CHERIABI} == "yes"
 
 

@@ -132,7 +132,13 @@ struct uio;
  *	are suitable for programming into DMA registers.
  */
 typedef struct bus_dma_segment {
-	bus_addr_t	ds_addr;	/* DMA address */
+	union {
+#ifdef _KERNEL
+		void * __capability ds_user_vaddr;
+#endif
+		void	 *ds_vaddr;	/* Virtual address. */
+		bus_addr_t ds_addr;	/* DMA address */
+	};
 	bus_size_t	ds_len;		/* length of transfer */
 } bus_dma_segment_t;
 

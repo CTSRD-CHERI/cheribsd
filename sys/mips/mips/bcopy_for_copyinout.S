@@ -35,8 +35,6 @@
  */
 
 
-.error "Should no longer be used"
-
 #include <machine/asm.h>
 __FBSDID("$FreeBSD$");
 
@@ -55,47 +53,21 @@ __FBSDID("$FreeBSD$");
 #endif
 
 /*
- *	memmove(caddr_t dst, caddr_t src, unsigned int len)
+ *	bcopy_asm_for_copyinout(caddr_t src, caddr_t dst, unsigned int len)
  *
- *	a0 	dst address
- *	a1	src address
+ *	a0 	src address
+ *	a1	dst address
  *	a2	length
  */
 
-#define	DSTREG	a0
-#define	SRCREG	a1
+#define	SRCREG	a0
+#define	DSTREG	a1
 #define	SIZEREG	a2
 
-.set	noreorder
-
-.macro DO_MAGIC_NOP nop_code, return_label=.Lmemmove_return
-	PTR_LI	v0, 0
-	PTR_LI	v1, \nop_code	# selector for QEMU magic nop
-	ori	$0, $0, 0xC0DE	# call QEMU magic nop
-	/* If the magic nop changed $v1 to 0xdec0ded then we can return */
-	beq	v1, 0xdec0ded, \return_label
-	nop
-.endm
-
-LEAF(bcopy)
-XLEAF(ovbcopy)
-	DO_MAGIC_NOP 7
-	# swap argument registers:
-	move	v0, a0
-	move	a0, a1
-	move	a1, v0
-	b .Lmips_implementation
-	nop
-XLEAF(memcpy)
-	DO_MAGIC_NOP 3
-	b .Lmips_implementation
-	nop
-XLEAF(memmove)
-	DO_MAGIC_NOP 5
-.Lmips_implementation:
+LEAF(bcopy_asm_for_copyinout)
+	.set	push
 	.set	noat
-	/* set up return value, while we still can */
-	move	v0,DSTREG
+	.set	noreorder
 	/*
 	 *	Make sure we can copy forwards.
 	 */
@@ -277,7 +249,6 @@ XLEAF(memmove)
 	bgtz		SIZEREG,1b
 	PTR_SUBU	DSTREG,1
 
-.Lmemmove_return:
 4:	# copydone
 	j	ra
 	nop
@@ -304,8 +275,5 @@ XLEAF(memmove)
 	b		3b
 	nop
 
-	.set	reorder
-	.set	at
-XEND(memmove)
-XEND(memcpy)
-END(bcopy)
+	.set	pop
+END(bcopy_asm_for_copyinout)

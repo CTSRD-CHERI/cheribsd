@@ -69,6 +69,11 @@ __FBSDID("$FreeBSD$");
 #include <poll.h>
 #include <assert.h>
 
+#ifdef NETGRAPH
+#include <sys/param.h>
+#include <sys/sysctl.h>
+#include <netgraph.h>
+#endif
 
 #include "debug.h"
 #include "iov.h"
@@ -91,7 +96,7 @@ struct net_backend {
 	 * and should not be called by the frontend.
 	 */
 	int (*init)(struct net_backend *be, const char *devname,
-	    net_be_rxeof_t cb, void *param);
+	    const char *opts, net_be_rxeof_t cb, void *param);
 	void (*cleanup)(struct net_backend *be);
 
 	/*
@@ -199,7 +204,7 @@ tap_cleanup(struct net_backend *be)
 
 static int
 tap_init(struct net_backend *be, const char *devname,
-	 net_be_rxeof_t cb, void *param)
+	 const char *opts, net_be_rxeof_t cb, void *param)
 {
 	struct tap_priv *priv = (struct tap_priv *)be->opaque;
 	char tbuf[80];
@@ -383,6 +388,194 @@ static struct net_backend vmnet_backend = {
 DATA_SET(net_backend_set, tap_backend);
 DATA_SET(net_backend_set, vmnet_backend);
 
+#ifdef NETGRAPH
+
+/*
+ * Netgraph backend
+ */
+
+#define NG_SBUF_MAX_SIZE (4 * 1024 * 1024)
+
+static int
+ng_init(struct net_backend *be, const char *devname,
+	 const char *opts, net_be_rxeof_t cb, void *param)
+{
+	struct tap_priv *p = (struct tap_priv *)be->opaque;
+	struct ngm_connect ngc;
+	char *ngopts, *tofree;
+	char nodename[NG_NODESIZ];
+	int sbsz;
+	int ctrl_sock;
+	int flags;
+	int path_provided;
+	int peerhook_provided;
+	int socket_provided;
+	unsigned long maxsbsz;
+	size_t msbsz;
+#ifndef WITHOUT_CAPSICUM
+	cap_rights_t rights;
+#endif
+
+	if (cb == NULL) {
+		WPRINTF(("Netgraph backend requires non-NULL callback"));
+		return (-1);
+	}
+
+	be->fd = -1;
+
+	memset(&ngc, 0, sizeof(ngc));
+
+	strncpy(ngc.ourhook, "vmlink", NG_HOOKSIZ - 1);
+
+	tofree = ngopts = strdup(opts);
+
+	if (ngopts == NULL) {
+		WPRINTF(("strdup error"));
+		return (-1);
+	}
+
+	socket_provided = 0;
+	path_provided = 0;
+	peerhook_provided = 0;
+
+	(void)strsep(&ngopts, ",");
+
+	while (ngopts != NULL) {
+		char *value = ngopts;
+		char *key;
+
+		key = strsep(&value, "=");
+		if (value == NULL)
+			break;
+		ngopts = value;
+		(void) strsep(&ngopts, ",");
+
+		if (strcmp(key, "socket") == 0) {
+			strncpy(nodename, value, NG_NODESIZ - 1);
+			socket_provided = 1;
+		} else if (strcmp(key, "path") == 0) {
+			strncpy(ngc.path, value, NG_PATHSIZ - 1);
+			path_provided = 1;
+		} else if (strcmp(key, "hook") == 0) {
+			strncpy(ngc.ourhook, value, NG_HOOKSIZ - 1);
+		} else if (strcmp(key, "peerhook") == 0) {
+			strncpy(ngc.peerhook, value, NG_HOOKSIZ - 1);
+			peerhook_provided = 1;
+		}
+	}
+
+	free(tofree);
+
+	if (!path_provided) {
+		WPRINTF(("path must be provided"));
+		return (-1);
+	}
+
+	if (!peerhook_provided) {
+		WPRINTF(("peer hook must be provided"));
+		return (-1);
+	}
+
+	if (NgMkSockNode(socket_provided ? nodename : NULL,
+		&ctrl_sock, &be->fd) < 0) {
+		WPRINTF(("can't get Netgraph sockets"));
+		return (-1);
+	}
+
+	if (NgSendMsg(ctrl_sock, ".",
+		NGM_GENERIC_COOKIE,
+		NGM_CONNECT, &ngc, sizeof(ngc)) < 0) {
+		WPRINTF(("can't connect to node"));
+		close(ctrl_sock);
+		goto error;
+	}
+
+	close(ctrl_sock);
+
+	flags = fcntl(be->fd, F_GETFL);
+
+	if (flags < 0) {
+		WPRINTF(("can't get socket flags"));
+		goto error;
+	}
+
+	if (fcntl(be->fd, F_SETFL, flags | O_NONBLOCK) < 0) {
+		WPRINTF(("can't set O_NONBLOCK flag"));
+		goto error;
+	}
+
+	/*
+	 * The default ng_socket(4) buffer's size is too low.
+	 * Calculate the minimum value between NG_SBUF_MAX_SIZE
+	 * and kern.ipc.maxsockbuf. 
+	 */
+	msbsz = sizeof(maxsbsz);
+	if (sysctlbyname("kern.ipc.maxsockbuf", &maxsbsz, &msbsz,
+		NULL, 0) < 0) {
+		WPRINTF(("can't get 'kern.ipc.maxsockbuf' value"));
+		goto error;
+	}
+
+	/*
+	 * We can't set the socket buffer size to kern.ipc.maxsockbuf value,
+	 * as it takes into account the mbuf(9) overhead.
+	 */
+	maxsbsz = maxsbsz * MCLBYTES / (MSIZE + MCLBYTES);
+
+	sbsz = MIN(NG_SBUF_MAX_SIZE, maxsbsz);
+
+	if (setsockopt(be->fd, SOL_SOCKET, SO_SNDBUF, &sbsz,
+		sizeof(sbsz)) < 0) {
+		WPRINTF(("can't set TX buffer size"));
+		goto error;
+	}
+
+	if (setsockopt(be->fd, SOL_SOCKET, SO_RCVBUF, &sbsz,
+		sizeof(sbsz)) < 0) {
+		WPRINTF(("can't set RX buffer size"));
+		goto error;
+	}
+
+#ifndef WITHOUT_CAPSICUM
+	cap_rights_init(&rights, CAP_EVENT, CAP_READ, CAP_WRITE);
+	if (caph_rights_limit(be->fd, &rights) == -1)
+		errx(EX_OSERR, "Unable to apply rights for sandbox");
+#endif
+
+	memset(p->bbuf, 0, sizeof(p->bbuf));
+	p->bbuflen = 0;
+
+	p->mevp = mevent_add_disabled(be->fd, EVF_READ, cb, param);
+	if (p->mevp == NULL) {
+		WPRINTF(("Could not register event"));
+		goto error;
+	}
+
+	return (0);
+
+error:
+	tap_cleanup(be);
+	return (-1);
+}
+
+static struct net_backend ng_backend = {
+	.prefix = "netgraph",
+	.priv_size = sizeof(struct tap_priv),
+	.init = ng_init,
+	.cleanup = tap_cleanup,
+	.send = tap_send,
+	.peek_recvlen = tap_peek_recvlen,
+	.recv = tap_recv,
+	.recv_enable = tap_recv_enable,
+	.recv_disable = tap_recv_disable,
+	.get_cap = tap_get_cap,
+	.set_cap = tap_set_cap,
+};
+
+DATA_SET(net_backend_set, ng_backend);
+
+#endif /* NETGRAPH */
+
 /*
  * The netmap backend
  */
@@ -473,7 +666,7 @@ netmap_set_cap(struct net_backend *be, uint64_t features,
 
 static int
 netmap_init(struct net_backend *be, const char *devname,
-	    net_be_rxeof_t cb, void *param)
+	    const char *opts, net_be_rxeof_t cb, void *param)
 {
 	struct netmap_priv *priv = (struct netmap_priv *)be->opaque;
 
@@ -746,11 +939,21 @@ DATA_SET(net_backend_set, vale_backend);
  *	the argument for the callback.
  */
 int
-netbe_init(struct net_backend **ret, const char *devname, net_be_rxeof_t cb,
+netbe_init(struct net_backend **ret, const char *opts, net_be_rxeof_t cb,
     void *param)
 {
 	struct net_backend **pbe, *nbe, *tbe = NULL;
+	char *devname;
+	char *options;
 	int err;
+
+	devname = options = strdup(opts);
+
+	if (devname == NULL) {
+		return (-1);
+	}
+
+	devname = strsep(&options, ",");
 
 	/*
 	 * Find the network backend that matches the user-provided
@@ -771,8 +974,11 @@ netbe_init(struct net_backend **ret, const char *devname, net_be_rxeof_t cb,
 	}
 
 	*ret = NULL;
-	if (tbe == NULL)
+	if (tbe == NULL) {
+		free(devname);
 		return (EINVAL);
+	}
+
 	nbe = calloc(1, sizeof(*nbe) + tbe->priv_size);
 	*nbe = *tbe;	/* copy the template */
 	nbe->fd = -1;
@@ -781,13 +987,15 @@ netbe_init(struct net_backend **ret, const char *devname, net_be_rxeof_t cb,
 	nbe->fe_vnet_hdr_len = 0;
 
 	/* Initialize the backend. */
-	err = nbe->init(nbe, devname, cb, param);
+	err = nbe->init(nbe, devname, options, cb, param);
 	if (err) {
+		free(devname);
 		free(nbe);
 		return (err);
 	}
 
 	*ret = nbe;
+	free(devname);
 
 	return (0);
 }

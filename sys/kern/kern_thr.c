@@ -26,8 +26,6 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#define	EXPLICIT_USER_ACCESS
-
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
@@ -600,10 +598,10 @@ kern_thr_set_name(struct thread *td, lwpid_t id,
 	error = 0;
 	name[0] = '\0';
 	if (uname != NULL) {
-		error = copyinstr_c(uname, name, sizeof(name),
+		error = copyinstr(uname, name, sizeof(name),
 		    NULL);
 		if (error == ENAMETOOLONG) {
-			error = copyin_c(uname, &name[0], sizeof(name) - 1);
+			error = copyin(uname, &name[0], sizeof(name) - 1);
 			name[sizeof(name) - 1] = '\0';
 		}
 		if (error)

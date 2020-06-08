@@ -33,8 +33,6 @@
  * $FreeBSD$
  */
 
-#define	EXPLICIT_USER_ACCESS
-
 #include <sys/param.h>
 #include <sys/eventhandler.h>
 #include <sys/malloc.h>

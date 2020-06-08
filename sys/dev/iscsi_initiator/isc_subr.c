@@ -65,7 +65,7 @@ __FBSDID("$FreeBSD$");
 static MALLOC_DEFINE(M_ISC, "iSC", "iSCSI driver options");
 
 static char *
-i_strdupin(char *s, size_t maxlen)
+i_strdupin(char * __capability s, size_t maxlen)
 {
      size_t	len;
      char	*p, *q;
@@ -117,19 +117,19 @@ i_setopt(isc_session_t *sp, isc_opt_t *opt)
      if(opt->targetAddress != NULL) {
 	  if(sp->opt.targetAddress != NULL)
 	       free(sp->opt.targetAddress, M_ISC);
-	  sp->opt.targetAddress = i_strdupin(opt->targetAddress, 128);
+	  sp->opt.targetAddress = i_strdupin(opt->targetAddress_u, 128);
 	  sdebug(2, "opt.targetAddress='%s'", sp->opt.targetAddress);
      }
      if(opt->targetName != NULL) {
 	  if(sp->opt.targetName != NULL)
 	       free(sp->opt.targetName, M_ISC);
-	  sp->opt.targetName = i_strdupin(opt->targetName, 128);
+	  sp->opt.targetName = i_strdupin(opt->targetName_u, 128);
 	  sdebug(2, "opt.targetName='%s'", sp->opt.targetName);
      }
      if(opt->initiatorName != NULL) {
 	  if(sp->opt.initiatorName != NULL)
 	       free(sp->opt.initiatorName, M_ISC);
-	  sp->opt.initiatorName = i_strdupin(opt->initiatorName, 128);
+	  sp->opt.initiatorName = i_strdupin(opt->initiatorName_u, 128);
 	  sdebug(2, "opt.initiatorName='%s'", sp->opt.initiatorName);
      }
 
@@ -140,8 +140,8 @@ i_setopt(isc_session_t *sp, isc_opt_t *opt)
 	  sdebug(2, "opt.maxluns=%d", sp->opt.maxluns);
      }
 
-     if(opt->headerDigest != NULL) {
-	  error = copyinstr(opt->headerDigest, buf, sizeof(buf), NULL);
+     if(opt->headerDigest_u != NULL) {
+	  error = copyinstr(opt->headerDigest_u, buf, sizeof(buf), NULL);
 	  if (error != 0)
 	       return (error);
 	  sdebug(2, "opt.headerDigest='%s'", buf);
@@ -150,8 +150,8 @@ i_setopt(isc_session_t *sp, isc_opt_t *opt)
 	       sdebug(2, "opt.headerDigest set");
 	  }
      }
-     if(opt->dataDigest != NULL) {
-	  error = copyinstr(opt->dataDigest, buf, sizeof(buf), NULL);
+     if(opt->dataDigest_u != NULL) {
+	  error = copyinstr(opt->dataDigest_u, buf, sizeof(buf), NULL);
 	  if (error != 0)
 	       return (error);
 	  sdebug(2, "opt.dataDigest='%s'", opt->dataDigest);

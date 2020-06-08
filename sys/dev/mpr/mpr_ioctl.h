@@ -86,7 +86,7 @@
 struct mpr_cfg_page_req {	
 	MPI2_CONFIG_PAGE_HEADER header;
 	uint32_t page_address;
-	void	*buf;
+	void * __kerncap buf;
 	int	len;
 	uint16_t ioc_status;
 };
@@ -94,7 +94,7 @@ struct mpr_cfg_page_req {
 struct mpr_ext_cfg_page_req {
 	MPI2_CONFIG_EXTENDED_PAGE_HEADER header;
 	uint32_t page_address;
-	void	*buf;
+	void * __kerncap buf;
 	int	len;
 	uint16_t ioc_status;
 };
@@ -105,7 +105,7 @@ struct mpr_raid_action {
 	uint8_t volume_id;
 	uint8_t phys_disk_num;
 	uint32_t action_data_word;
-	void *buf;
+	void * __kerncap buf;
 	int len;
 	uint32_t volume_status;
 	uint32_t action_data[4];
@@ -115,11 +115,11 @@ struct mpr_raid_action {
 };
 
 struct mpr_usr_command {
-	void *req;
+	void * __kerncap req;
 	uint32_t req_len;
-	void *rpl;
+	void * __kerncap rpl;
 	uint32_t rpl_len;
-	void *buf;
+	void * __kerncap buf;
 	int len;
 	uint32_t flags;
 };
@@ -173,7 +173,11 @@ typedef struct mpr_adapter_data
 
 typedef struct mpr_update_flash
 {
+#if defined(_KERNEL) || defined(__CHERI_PURE_CAPABILITY__)
+	void * __capability PtrBuffer;
+#else
 	uint64_t	PtrBuffer;
+#endif
 	uint32_t	ImageChecksum;
 	uint32_t	ImageOffset;
 	uint32_t	ImageSize;
@@ -188,14 +192,24 @@ typedef struct mpr_update_flash
 
 typedef struct mpr_pass_thru
 {
+#if defined(_KERNEL) || defined(__CHERI_PURE_CAPABILITY__)
+	void * __capability PtrRequest;
+	void * __capability PtrReply;
+	void * __capability PtrData;
+#else
 	uint64_t	PtrRequest;
 	uint64_t	PtrReply;
 	uint64_t	PtrData;
+#endif
 	uint32_t	RequestSize;
 	uint32_t	ReplySize;
 	uint32_t	DataSize;
 	uint32_t	DataDirection;
+#if defined(_KERNEL) || defined(__CHERI_PURE_CAPABILITY__)
+	void * __capability PtrDataOut;
+#else
 	uint64_t	PtrDataOut;
+#endif
 	uint32_t	DataOutSize;
 	uint32_t	Timeout;
 } mpr_pass_thru_t;
@@ -232,7 +246,11 @@ typedef struct mpr_event_entry
 typedef struct mpr_event_report
 {
 	uint32_t	Size;
+#if defined(_KERNEL) || defined(__CHERI_PURE_CAPABILITY__)
+	void * __capability PtrEvents;
+#else
 	uint64_t	PtrEvents;
+#endif
 } mpr_event_report_t;
 
 
@@ -250,7 +268,11 @@ typedef struct mpr_diag_action
 {
 	uint32_t	Action;
 	uint32_t	Length;
+#if defined(_KERNEL) || defined(__CHERI_PURE_CAPABILITY__)
+	void * __capability PtrDiagAction;
+#else
 	uint64_t	PtrDiagAction;
+#endif
 	uint32_t	ReturnCode;
 } mpr_diag_action_t;
 
@@ -327,7 +349,11 @@ typedef struct mpr_diag_read_buffer
 	uint32_t	StartingOffset;
 	uint32_t	BytesToRead;
 	uint32_t	UniqueId;
+#if defined(_KERNEL) || defined(__CHERI_PURE_CAPABILITY__)
+	void * __capability PtrDataBuffer;
+#else
 	uint64_t	PtrDataBuffer;
+#endif
 } mpr_diag_read_buffer_t;
 
 /*

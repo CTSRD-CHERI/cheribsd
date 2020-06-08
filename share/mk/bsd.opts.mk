@@ -64,7 +64,6 @@ __DEFAULT_YES_OPTIONS = \
     PIE \
     PROFILE \
     SSP \
-    SYMVER \
     TESTS \
     TOOLCHAIN \
     WARNS
@@ -121,8 +120,6 @@ WITH_CHERI:=	yes
 
 .if ${__TT:Mmips*} && ${MK_CHERI} == "yes"
 MK_CLANG:=	no
-.else
-MK_CHERI:=	no
 .endif
 
 #

@@ -33,8 +33,6 @@ __FBSDID("$FreeBSD$");
 #include "opt_acpi.h"
 #include "opt_sched.h"
 
-#define	EXPLICIT_USER_ACCESS
-
 #include <sys/param.h>
 #include <sys/types.h>
 #include <sys/bus.h>

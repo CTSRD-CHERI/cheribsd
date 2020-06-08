@@ -1,4 +1,4 @@
-/*
+/*-
  * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
  *
  * Copyright (c) 1993, David Greenman
@@ -25,8 +25,6 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-
-#define	EXPLICIT_USER_ACCESS
 
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
@@ -121,7 +119,7 @@ SYSCTL_INT(_kern, OID_AUTO, coredump_pack_vmmapinfo, CTLFLAG_RWTUN,
     &coredump_pack_vmmapinfo, 0,
     "Enable file path packing in 'procstat -v' coredump notes");
 
-int use_cheriabi = 1;
+int use_cheriabi = 0;
 SYSCTL_INT(_debug, OID_AUTO, use_cheriabi, CTLFLAG_RWTUN,
     &use_cheriabi, 0,
     "Use COMPAT_CHERIABI for purecap binaries");
@@ -1300,37 +1298,37 @@ exec_new_vmspace(struct image_params *imgp, struct sysentvec *sv)
 static int
 get_argenv_ptr(void * __capability *arrayp, void * __capability *ptrp)
 {
-	uintptr_t ptr;
+	uintcap_t ptr;
 	char * __capability array;
-#if __has_feature(capabilities)
-	intcap_t ptr_c;
-#endif
 #ifdef COMPAT_FREEBSD32
 	uint32_t ptr32;
+#endif
+#ifdef COMPAT_FREEBSD64
+	uint64_t ptr64;
 #endif
 
 	array = *arrayp;
 #ifdef COMPAT_FREEBSD32
 	if (SV_CURPROC_FLAG(SV_ILP32)) {
-		if (fueword32_c(array, &ptr32) == -1)
+		if (fueword32(array, &ptr32) == -1)
 			return (EFAULT);
 		array += sizeof(ptr32);
 		*ptrp = __USER_CAP_STR((void *)(uintptr_t)ptr32);
 	} else
 #endif
-#if __has_feature(capabilities)
-	if (SV_CURPROC_FLAG(SV_CHERI)) {
-		if (fuecap(array, &ptr_c) == -1)
+#ifdef COMPAT_FREEBSD64
+	if (SV_CURPROC_FLAG(SV_LP64 | SV_CHERI) == SV_LP64) {
+		if (fueword64(array, &ptr64) == -1)
 			return (EFAULT);
-		array += sizeof(ptr_c);
-		*ptrp = (void * __capability)ptr_c;
+		array += sizeof(ptr64);
+		*ptrp = __USER_CAP_STR((void *)(uintptr_t)ptr64);
 	} else
 #endif
 	{
-		if (fueword_c(array, &ptr) == -1)
+		if (fuecap(array, &ptr) == -1)
 			return (EFAULT);
 		array += sizeof(ptr);
-		*ptrp = __USER_CAP_STR((void *)(uintptr_t)ptr);
+		*ptrp = (void * __capability)ptr;
 	}
 	*arrayp = array;
 	return (0);
@@ -1633,7 +1631,7 @@ exec_args_add_fname(struct image_args *args, const char * __capability fname,
 			error = copystr((__cheri_fromcap const char *)fname,
 			    args->fname, PATH_MAX, &length);
 		else
-			error = copyinstr_c(fname, args->fname, PATH_MAX,
+			error = copyinstr(fname, args->fname, PATH_MAX,
 			    &length);
 		if (error != 0)
 			return (error == ENAMETOOLONG ? E2BIG : error);
@@ -1666,7 +1664,7 @@ exec_args_add_str(struct image_args *args, const char * __capability str,
 		error = copystr((__cheri_fromcap const char *)str, args->endp,
 		    args->stringspace, &length);
 	else
-		error = copyinstr_c(str, args->endp, args->stringspace,
+		error = copyinstr(str, args->endp, args->stringspace,
 		    &length);
 	if (error != 0)
 		return (error == ENAMETOOLONG ? E2BIG : error);
@@ -1811,7 +1809,7 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 		destp -= szsigcode;
 		destp = __builtin_align_down(destp,
 		    sizeof(void * __capability));
-		error = copyout_c(p->p_sysent->sv_sigcode, destp, szsigcode);
+		error = copyout(p->p_sysent->sv_sigcode, destp, szsigcode);
 		if (error != 0)
 			return (error);
 	}
@@ -1828,7 +1826,7 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 #else
 		imgp->execpathp = destp;
 #endif
-		error = copyout_c(imgp->execpath, imgp->execpathp, execpath_len);
+		error = copyout(imgp->execpath, imgp->execpathp, execpath_len);
 		if (error != 0)
 			return (error);
 	}
@@ -1843,7 +1841,7 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 #else
 	imgp->canary = destp;
 #endif
-	error = copyout_c(canary, imgp->canary, sizeof(canary));
+	error = copyout(canary, imgp->canary, sizeof(canary));
 	if (error != 0)
 		return (error);
 	imgp->canarylen = sizeof(canary);
@@ -1858,7 +1856,7 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 #else
 	imgp->pagesizes = destp;
 #endif
-	error = copyout_c(pagesizes, imgp->pagesizes, szps);
+	error = copyout(pagesizes, imgp->pagesizes, szps);
 	if (error != 0)
 		return (error);
 	imgp->pagesizeslen = szps;
@@ -1908,7 +1906,7 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	/*
 	 * Copy out strings - arguments and environment.
 	 */
-	error = copyout_c(stringp, (void * __capability)ustringp,
+	error = copyout(stringp, (void * __capability)ustringp,
 	    ARG_MAX - imgp->args->stringspace);
 	if (error != 0)
 		return (error);
@@ -1923,7 +1921,7 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 #endif
 	if (sucap(&arginfo->ps_argvstr, (intcap_t)imgp->argv) != 0)
 		return (EFAULT);
-	if (suword32_c(&arginfo->ps_nargvstr, argc) != 0)
+	if (suword32(&arginfo->ps_nargvstr, argc) != 0)
 		return (EFAULT);
 
 	/*
@@ -1944,7 +1942,7 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	}
 
 	/* a null vector table pointer separates the argp's from the envp's */
-	if (suword_c(vectp++, 0) != 0)
+	if (suword(vectp++, 0) != 0)
 		return (EFAULT);
 
 #if __has_feature(capabilities)
@@ -1954,7 +1952,7 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 #endif
 	if (sucap(&arginfo->ps_envstr, (intcap_t)imgp->envv) != 0)
 		return (EFAULT);
-	if (suword32_c(&arginfo->ps_nenvstr, envc) != 0)
+	if (suword32(&arginfo->ps_nenvstr, envc) != 0)
 		return (EFAULT);
 
 	/*
@@ -1975,7 +1973,7 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	}
 
 	/* end of vector table is a null pointer */
-	if (suword_c(vectp, 0) != 0)
+	if (suword(vectp, 0) != 0)
 		return (EFAULT);
 
 	if (imgp->auxargs) {

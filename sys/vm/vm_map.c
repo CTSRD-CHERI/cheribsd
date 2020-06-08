@@ -2111,6 +2111,7 @@ vm_map_fixed(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 	    ("vm_map_fixed: non-NULL backing object for stack"));
 	vm_map_lock(map);
 	VM_MAP_RANGE_CHECK(map, start, end);
+	reservation = start;
 	if ((cow & MAP_CHECK_EXCL) == 0) {
 		result = vm_map_check_owner(map, start, end);
 		if (result != KERN_SUCCESS) {
@@ -2118,7 +2119,6 @@ vm_map_fixed(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 			    __func__, result);
 			goto done;
 		}
-		reservation = start;
 		if ((map->flags & MAP_RESERVATIONS) != 0) {
 			if (vm_map_lookup_entry(map, start, &entry))
 				reservation = entry->reservation;
@@ -5516,6 +5516,7 @@ vm_map_reservation_delete(vm_map_t map, vm_offset_t reservation)
 	while (entry->reservation == reservation) {
 		next_entry = vm_map_entry_succ(entry);
 		vm_map_entry_delete(map, entry);
+		entry = next_entry;
 	}
 	return (KERN_SUCCESS);
 }

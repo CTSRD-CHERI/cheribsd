@@ -164,12 +164,12 @@ static int mps_diag_unregister(struct mps_softc *sc,
 static int mps_diag_query(struct mps_softc *sc, mps_fw_diag_query_t *diag_query,
     uint32_t *return_code);
 static int mps_diag_read_buffer(struct mps_softc *sc,
-    mps_diag_read_buffer_t *diag_read_buffer, uint8_t *ioctl_buf,
+    mps_diag_read_buffer_t *diag_read_buffer, uint8_t * __capability ioctl_buf,
     uint32_t *return_code);
 static int mps_diag_release(struct mps_softc *sc,
     mps_fw_diag_release_t *diag_release, uint32_t *return_code);
 static int mps_do_diag_action(struct mps_softc *sc, uint32_t action,
-    uint8_t *diag_action, uint32_t length, uint32_t *return_code);
+    uint8_t * __capability diag_action, uint32_t length, uint32_t *return_code);
 static int mps_user_diag_action(struct mps_softc *sc, mps_diag_action_t *data);
 static void mps_user_event_query(struct mps_softc *sc, mps_event_query_t *data);
 static void mps_user_event_enable(struct mps_softc *sc,
@@ -798,8 +798,8 @@ mps_user_pass_thru(struct mps_softc *sc, mps_pass_thru_t *data)
 		goto RetFreeUnlocked;
 	}
 
-	mps_dprint(sc, MPS_USER, "%s: req 0x%jx %d  rpl 0x%jx %d "
-	    "data in 0x%jx %d data out 0x%jx %d data dir %d\n", __func__,
+	mps_dprint(sc, MPS_USER, "%s: req %p %d  rpl %p %d "
+	    "data in %p %d data out %p %d data dir %d\n", __func__,
 	    data->PtrRequest, data->RequestSize, data->PtrReply,
 	    data->ReplySize, data->PtrData, data->DataSize,
 	    data->PtrDataOut, data->DataOutSize, data->DataDirection);
@@ -808,7 +808,7 @@ mps_user_pass_thru(struct mps_softc *sc, mps_pass_thru_t *data)
 	 * copy in the header so we know what we're dealing with before we
 	 * commit to allocating a command for it.
 	 */
-	err = copyin(PTRIN(data->PtrRequest), &tmphdr, data->RequestSize);
+	err = copyin(data->PtrRequest, &tmphdr, data->RequestSize);
 	if (err != 0)
 		goto RetFreeUnlocked;
 
@@ -873,7 +873,7 @@ mps_user_pass_thru(struct mps_softc *sc, mps_pass_thru_t *data)
 				    __func__, data->ReplySize, sz);
 			}
 			mps_unlock(sc);
-			copyout(cm->cm_reply, PTRIN(data->PtrReply),
+			copyout(cm->cm_reply, data->PtrReply,
 			    data->ReplySize);
 			mps_lock(sc);
 		}
@@ -919,12 +919,12 @@ mps_user_pass_thru(struct mps_softc *sc, mps_pass_thru_t *data)
 		cm->cm_flags = MPS_CM_FLAGS_DATAIN;
 		if (data->DataOutSize) {
 			cm->cm_flags |= MPS_CM_FLAGS_DATAOUT;
-			err = copyin(PTRIN(data->PtrDataOut),
+			err = copyin(data->PtrDataOut,
 			    cm->cm_data, data->DataOutSize);
 		} else if (data->DataDirection ==
 		    MPS_PASS_THRU_DIRECTION_WRITE) {
 			cm->cm_flags = MPS_CM_FLAGS_DATAOUT;
-			err = copyin(PTRIN(data->PtrData),
+			err = copyin(data->PtrData,
 			    cm->cm_data, data->DataSize);
 		}
 		if (err != 0)
@@ -1007,7 +1007,7 @@ mps_user_pass_thru(struct mps_softc *sc, mps_pass_thru_t *data)
 		if (cm->cm_flags & MPS_CM_FLAGS_DATAIN) {
 			mps_unlock(sc);
 			err = copyout(cm->cm_data,
-			    PTRIN(data->PtrData), data->DataSize);
+			    data->PtrData, data->DataSize);
 			mps_lock(sc);
 			if (err != 0)
 				mps_dprint(sc, MPS_FAULT, "%s: failed to copy "
@@ -1028,7 +1028,7 @@ mps_user_pass_thru(struct mps_softc *sc, mps_pass_thru_t *data)
 			    data->ReplySize, sz);
 		}
 		mps_unlock(sc);
-		copyout(cm->cm_reply, PTRIN(data->PtrReply), data->ReplySize);
+		copyout(cm->cm_reply, data->PtrReply, data->ReplySize);
 		mps_lock(sc);
 
 		if ((function == MPI2_FUNCTION_SCSI_IO_REQUEST) ||
@@ -1040,8 +1040,8 @@ mps_user_pass_thru(struct mps_softc *sc, mps_pass_thru_t *data)
 				    SenseCount)), sizeof(struct
 				    scsi_sense_data));
 				mps_unlock(sc);
-				copyout(cm->cm_sense, (PTRIN(data->PtrReply +
-				    sizeof(MPI2_SCSI_IO_REPLY))), sense_len);
+				copyout(cm->cm_sense, (char * __capability)data->PtrReply +
+				    sizeof(MPI2_SCSI_IO_REPLY), sense_len);
 				mps_lock(sc);
 			}
 		}
@@ -1675,7 +1675,7 @@ mps_diag_query(struct mps_softc *sc, mps_fw_diag_query_t *diag_query,
 
 static int
 mps_diag_read_buffer(struct mps_softc *sc,
-    mps_diag_read_buffer_t *diag_read_buffer, uint8_t *ioctl_buf,
+    mps_diag_read_buffer_t *diag_read_buffer, uint8_t * __capability ioctl_buf,
     uint32_t *return_code)
 {
 	mps_fw_diagnostic_buffer_t	*pBuffer;
@@ -1784,7 +1784,7 @@ mps_diag_release(struct mps_softc *sc, mps_fw_diag_release_t *diag_release,
 }
 
 static int
-mps_do_diag_action(struct mps_softc *sc, uint32_t action, uint8_t *diag_action,
+mps_do_diag_action(struct mps_softc *sc, uint32_t action, uint8_t * __capability diag_action,
     uint32_t length, uint32_t *return_code)
 {
 	mps_fw_diag_register_t		diag_register;
@@ -1855,7 +1855,7 @@ mps_do_diag_action(struct mps_softc *sc, uint32_t action, uint8_t *diag_action,
 				break;
 			}
 			status = mps_diag_read_buffer(sc, &diag_read_buffer,
-			    PTRIN(diag_read_buffer.PtrDataBuffer),
+			    diag_read_buffer.PtrDataBuffer,
 			    return_code);
 			if (status == MPS_DIAG_SUCCESS) {
 				if (copyout(&diag_read_buffer, diag_action,
@@ -1918,7 +1918,7 @@ mps_user_diag_action(struct mps_softc *sc, mps_diag_action_t *data)
 	    data->Action == MPS_FW_DIAG_TYPE_READ_BUFFER ||
 	    data->Action == MPS_FW_DIAG_TYPE_RELEASE) {
 		status = mps_do_diag_action(sc, data->Action,
-		    PTRIN(data->PtrDiagAction), data->Length,
+		    data->PtrDiagAction, data->Length,
 		    &data->ReturnCode);
 	} else
 		status = EINVAL;
@@ -1981,7 +1981,7 @@ mps_user_event_report(struct mps_softc *sc, mps_event_report_t *data)
 	if ((size >= sizeof(sc->recorded_events)) && (status == 0)) {
 		mps_unlock(sc);
 		if (copyout((void *)sc->recorded_events,
-		    PTRIN(data->PtrEvents), size) != 0)
+		    data->PtrEvents, size) != 0)
 			status = EFAULT;
 		mps_lock(sc);
 	} else {

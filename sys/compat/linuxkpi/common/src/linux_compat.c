@@ -798,9 +798,9 @@ linux_dev_fdopen(struct cdev *dev, int fflags, struct thread *td,
 #define	LINUX_IOCTL_MAX_PTR (LINUX_IOCTL_MIN_PTR + IOCPARM_MAX)
 
 static inline int
-linux_remap_address(void **uaddr, size_t len)
+linux_remap_address(void * __capability *uaddr, size_t len)
 {
-	uintptr_t uaddr_val = (uintptr_t)(*uaddr);
+	vaddr_t uaddr_val = (__cheri_addr vaddr_t)(*uaddr);
 
 	if (unlikely(uaddr_val >= LINUX_IOCTL_MIN_PTR &&
 	    uaddr_val < LINUX_IOCTL_MAX_PTR)) {
@@ -821,47 +821,46 @@ linux_remap_address(void **uaddr, size_t len)
 		}
 
 		/* re-add kernel buffer address */
-		uaddr_val += (uintptr_t)pts->bsd_ioctl_data;
-
-		/* update address location */
-		*uaddr = (void *)uaddr_val;
+		*uaddr =
+		    (__cheri_tocap char * __capability)pts->bsd_ioctl_data +
+		    uaddr_val;
 		return (1);
 	}
 	return (0);
 }
 
 int
-linux_copyin(const void *uaddr, void *kaddr, size_t len)
+linux_copyin(const void * __capability uaddr, void *kaddr, size_t len)
 {
-	if (linux_remap_address(__DECONST(void **, &uaddr), len)) {
+	if (linux_remap_address(__DECONST(void * __capability *, &uaddr), len)) {
 		if (uaddr == NULL)
 			return (-EFAULT);
-		memcpy(kaddr, uaddr, len);
+		memcpy(kaddr, (__cheri_fromcap const void *)uaddr, len);
 		return (0);
 	}
 	return (-copyin(uaddr, kaddr, len));
 }
 
 int
-linux_copyout(const void *kaddr, void *uaddr, size_t len)
+linux_copyout(const void *kaddr, void * __capability uaddr, size_t len)
 {
 	if (linux_remap_address(&uaddr, len)) {
 		if (uaddr == NULL)
 			return (-EFAULT);
-		memcpy(uaddr, kaddr, len);
+		memcpy((__cheri_fromcap void *)uaddr, kaddr, len);
 		return (0);
 	}
 	return (-copyout(kaddr, uaddr, len));
 }
 
 size_t
-linux_clear_user(void *_uaddr, size_t _len)
+linux_clear_user(void * __capability _uaddr, size_t _len)
 {
-	uint8_t *uaddr = _uaddr;
+	uint8_t * __capability uaddr = _uaddr;
 	size_t len = _len;
 
 	/* make sure uaddr is aligned before going into the fast loop */
-	while (((uintptr_t)uaddr & 7) != 0 && len > 7) {
+	while (!__builtin_is_aligned(uaddr, 8) && len > 7) {
 		if (subyte(uaddr, 0))
 			return (_len);
 		uaddr++;
@@ -894,14 +893,14 @@ linux_clear_user(void *_uaddr, size_t _len)
 }
 
 int
-linux_access_ok(const void *uaddr, size_t len)
+linux_access_ok(const void * __capability uaddr, size_t len)
 {
-	uintptr_t saddr;
-	uintptr_t eaddr;
+	vaddr_t saddr;
+	vaddr_t eaddr;
 
 	/* get start and end address */
-	saddr = (uintptr_t)uaddr;
-	eaddr = (uintptr_t)uaddr + len;
+	saddr = (__cheri_addr vaddr_t)uaddr;
+	eaddr = (__cheri_addr vaddr_t)uaddr + len;
 
 	/* verify addresses are valid for userspace */
 	return ((saddr == eaddr) ||
@@ -930,6 +929,7 @@ linux_file_ioctl_sub(struct file *fp, struct linux_file *filp,
     struct thread *td)
 {
 	struct task_struct *task = current;
+	void * __capability udata;
 	unsigned size;
 	int error;
 
@@ -944,17 +944,17 @@ linux_file_ioctl_sub(struct file *fp, struct linux_file *filp,
 		 */
 		task->bsd_ioctl_data = data;
 		task->bsd_ioctl_len = size;
-		data = (void *)LINUX_IOCTL_MIN_PTR;
+		udata = (void * __capability)(uintcap_t)LINUX_IOCTL_MIN_PTR;
 	} else {
 		/* fetch user-space pointer */
-		data = *(void **)data;
+		udata = *(void * __capability *)data;
 	}
 #if defined(__amd64__)
 	if (td->td_proc->p_elf_machine == EM_386) {
 		/* try the compat IOCTL handler first */
 		if (fop->compat_ioctl != NULL) {
 			error = -OPW(fp, td, fop->compat_ioctl(filp,
-			    cmd, (u_long)data));
+			    cmd, (uintcap_t)udata));
 		} else {
 			error = ENOTTY;
 		}
@@ -962,14 +962,14 @@ linux_file_ioctl_sub(struct file *fp, struct linux_file *filp,
 		/* fallback to the regular IOCTL handler, if any */
 		if (error == ENOTTY && fop->unlocked_ioctl != NULL) {
 			error = -OPW(fp, td, fop->unlocked_ioctl(filp,
-			    cmd, (u_long)data));
+			    cmd, (uintcap_t)udata));
 		}
 	} else
 #endif
 	{
 		if (fop->unlocked_ioctl != NULL) {
 			error = -OPW(fp, td, fop->unlocked_ioctl(filp,
-			    cmd, (u_long)data));
+			    cmd, (uintcap_t)udata));
 		} else {
 			error = ENOTTY;
 		}
@@ -1576,7 +1576,7 @@ linux_file_ioctl(struct file *fp, u_long cmd, void *data, struct ucred *cred,
 			error = EINVAL;
 			break;
 		}
-		error = copyout_c(p, fiodgname_buf_get_ptr(fgn, cmd), i);
+		error = copyout(p, fiodgname_buf_get_ptr(fgn, cmd), i);
 		break;
 	default:
 		error = linux_file_ioctl_sub(fp, filp, fop, cmd, data, td);

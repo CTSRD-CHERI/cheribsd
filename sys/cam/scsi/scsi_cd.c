@@ -52,8 +52,6 @@ __FBSDID("$FreeBSD$");
 
 #include "opt_cd.h"
 
-#define	EXPLICIT_USER_ACCESS
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>

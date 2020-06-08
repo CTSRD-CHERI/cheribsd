@@ -157,7 +157,7 @@ struct g_gate_ctl_io {
 	u_int		 gctl_cmd;
 	off_t		 gctl_offset;
 	off_t		 gctl_length;
-	void		*gctl_data;
+	void * __kerncap gctl_data;
 	int		 gctl_error;
 };
 #endif	/* !_G_GATE_H_ */

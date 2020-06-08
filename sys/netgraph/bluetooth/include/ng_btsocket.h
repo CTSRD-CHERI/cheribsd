@@ -144,7 +144,7 @@ struct ng_btsocket_hci_raw_node_stat {
 /* Get neighbor cache */
 struct ng_btsocket_hci_raw_node_neighbor_cache {
 	u_int32_t				 num_entries;
-	ng_hci_node_neighbor_cache_entry_ep	*entries;
+	ng_hci_node_neighbor_cache_entry_ep	* __kerncap entries;
 };
 #define SIOC_HCI_RAW_NODE_GET_NEIGHBOR_CACHE \
 	_IOWR('b', NGM_HCI_NODE_GET_NEIGHBOR_CACHE, \
@@ -153,7 +153,7 @@ struct ng_btsocket_hci_raw_node_neighbor_cache {
 /* Get connection list */
 struct ng_btsocket_hci_raw_con_list {
 	u_int32_t		 num_connections;
-	ng_hci_node_con_ep	*connections;
+	ng_hci_node_con_ep	* __kerncap connections;
 };
 #define SIOC_HCI_RAW_NODE_GET_CON_LIST \
 	_IOWR('b', NGM_HCI_NODE_GET_CON_LIST, \
@@ -195,7 +195,7 @@ struct ng_btsocket_hci_raw_node_role_switch {
 /* Get list of HCI node names */
 struct ng_btsocket_hci_raw_node_list_names {
 	u_int32_t	 num_names;
-	struct nodeinfo	*names;
+	struct nodeinfo	* __kerncap names;
 };
 #define SIOC_HCI_RAW_NODE_LIST_NAMES \
 	_IOWR('b', NGM_HCI_NODE_LIST_NAMES, \
@@ -262,7 +262,7 @@ struct sockaddr_l2cap {
 struct ng_btsocket_l2cap_raw_ping {
 	u_int32_t		 result;
 	u_int32_t		 echo_size;
-	u_int8_t		*echo_data;
+	u_int8_t		* __kerncap echo_data;
 };
 #define SIOC_L2CAP_L2CA_PING \
 	_IOWR('b', NGM_L2CAP_L2CA_PING, \
@@ -273,7 +273,7 @@ struct ng_btsocket_l2cap_raw_get_info {
 	u_int32_t		 result;
 	u_int32_t		 info_type;
 	u_int32_t		 info_size;
-	u_int8_t		*info_data;
+	u_int8_t		* __kerncap info_data;
 };
 #define SIOC_L2CAP_L2CA_GET_INFO \
 	_IOWR('b', NGM_L2CAP_L2CA_GET_INFO, \
@@ -301,7 +301,7 @@ struct ng_btsocket_l2cap_raw_node_debug {
 /* Get connection list */
 struct ng_btsocket_l2cap_raw_con_list {
 	u_int32_t		 num_connections;
-	ng_l2cap_node_con_ep	*connections;
+	ng_l2cap_node_con_ep	* __kerncap connections;
 };
 #define SIOC_L2CAP_NODE_GET_CON_LIST \
 	_IOWR('b', NGM_L2CAP_NODE_GET_CON_LIST, \
@@ -310,7 +310,7 @@ struct ng_btsocket_l2cap_raw_con_list {
 /* Get channel list */
 struct ng_btsocket_l2cap_raw_chan_list {
 	u_int32_t		 num_channels;
-	ng_l2cap_node_chan_ep	*channels;
+	ng_l2cap_node_chan_ep	* __kerncap channels;
 };
 #define SIOC_L2CAP_NODE_GET_CHAN_LIST \
 	_IOWR('b', NGM_L2CAP_NODE_GET_CHAN_LIST, \

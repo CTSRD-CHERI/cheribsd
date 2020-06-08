@@ -135,8 +135,8 @@ struct file_operations {
 	ssize_t (*read)(struct linux_file *, char __user *, size_t, off_t *);
 	ssize_t (*write)(struct linux_file *, const char __user *, size_t, off_t *);
 	unsigned int (*poll) (struct linux_file *, struct poll_table_struct *);
-	long (*unlocked_ioctl)(struct linux_file *, unsigned int, unsigned long);
-	long (*compat_ioctl)(struct linux_file *, unsigned int, unsigned long);
+	long (*unlocked_ioctl)(struct linux_file *, unsigned int, uintcap_t);
+	long (*compat_ioctl)(struct linux_file *, unsigned int, uintcap_t);
 	int (*mmap)(struct linux_file *, struct vm_area_struct *);
 	int (*open)(struct inode *, struct file *);
 	int (*release)(struct inode *, struct linux_file *);

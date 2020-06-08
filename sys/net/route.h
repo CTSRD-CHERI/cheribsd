@@ -378,7 +378,6 @@ int	 rt_addrmsg(int, struct ifaddr *, int);
 int	 rt_routemsg(int, struct rtentry *, struct ifnet *ifp, int, int);
 int	 rt_routemsg_info(int, struct rt_addrinfo *, int);
 void	 rt_newmaddrmsg(int, struct ifmultiaddr *);
-int	 rt_setgate(struct rtentry *, struct sockaddr *, struct sockaddr *);
 void 	 rt_maskedcopy(struct sockaddr *, struct sockaddr *, struct sockaddr *);
 struct rib_head *rt_table_init(int, int, u_int);
 void	rt_table_destroy(struct rib_head *);
@@ -392,8 +391,6 @@ struct sockaddr *rtsock_fix_netmask(const struct sockaddr *dst,
 	    const struct sockaddr *smask, struct sockaddr_storage *dmask);
 /*
  * Note the following locking behavior:
- *
- *    rtalloc1() returns a locked rtentry
  *
  *    rtfree() and RTFREE_LOCKED() require a locked rtentry
  *
@@ -415,14 +412,12 @@ void	rt_flushifroutes(struct ifnet *ifp);
 
 /* XXX MRT COMPAT VERSIONS THAT SET UNIVERSE to 0 */
 /* Thes are used by old code not yet converted to use multiple FIBS */
-struct rtentry *rtalloc1(struct sockaddr *, int, u_long);
 int	 rtinit(struct ifaddr *, int, int);
 
 /* XXX MRT NEW VERSIONS THAT USE FIBs
  * For now the protocol indepedent versions are the same as the AF_INET ones
  * but this will change.. 
  */
-struct rtentry *rtalloc1_fib(struct sockaddr *, int, u_long, u_int);
 int	 rtioctl_fib(u_long, caddr_t, u_int);
 int	 rtrequest_fib(int, struct sockaddr *,
 	    struct sockaddr *, struct sockaddr *, int, struct rtentry **, u_int);
@@ -436,6 +431,8 @@ int	rib_add_redirect(u_int fibnum, struct sockaddr *dst,
 
 /* New API */
 void	rib_walk(int af, u_int fibnum, rt_walktree_f_t *wa_f, void *arg);
+struct nhop_object *rib_lookup(uint32_t fibnum, const struct sockaddr *dst,
+	    uint32_t flags, uint32_t flowid);
 #endif
 
 #endif

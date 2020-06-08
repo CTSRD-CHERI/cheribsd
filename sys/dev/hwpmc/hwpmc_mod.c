@@ -3379,7 +3379,7 @@ pmc_syscall_handler(struct thread *td, void *syscall_args)
 	int error, is_sx_downgraded, op;
 	struct pmc_syscall_args *c;
 	void *pmclog_proc_handle;
-	void *arg;
+	void * __capability arg;
 
 	c = (struct pmc_syscall_args *)syscall_args;
 	op = c->pmop_code;
@@ -3404,7 +3404,7 @@ pmc_syscall_handler(struct thread *td, void *syscall_args)
 	PMC_GET_SX_XLOCK(ENOSYS);
 	is_sx_downgraded = 0;
 	PMCDBG3(MOD,PMS,1, "syscall op=%d \"%s\" arg=%p", op,
-	    pmc_op_to_name[op], arg);
+	    pmc_op_to_name[op], (void * __cheri_fromcap)arg);
 
 	error = 0;
 	counter_u64_add(pmc_stats.pm_syscalls, 1);
@@ -3539,14 +3539,14 @@ pmc_syscall_handler(struct thread *td, void *syscall_args)
 	{
 		enum pmc_class			cl;
 		enum pmc_event			ev;
-		struct pmc_op_getdyneventinfo	*gei;
+		struct pmc_op_getdyneventinfo	* __capability gei;
 		struct pmc_dyn_event_descr	dev;
 		struct pmc_soft			*ps;
 		uint32_t			nevent;
 
 		sx_assert(&pmc_sx, SX_LOCKED);
 
-		gei = (struct pmc_op_getdyneventinfo *) arg;
+		gei = (struct pmc_op_getdyneventinfo * __capability) arg;
 
 		if ((error = copyin(&gei->pm_class, &cl, sizeof(cl))) != 0)
 			break;
@@ -3639,11 +3639,11 @@ pmc_syscall_handler(struct thread *td, void *syscall_args)
 		struct pmc_binding pb;
 		struct pmc_classdep *pcd;
 		struct pmc_info *p, *pmcinfo;
-		struct pmc_op_getpmcinfo *gpi;
+		struct pmc_op_getpmcinfo * __capability gpi;
 
 		PMC_DOWNGRADE_SX();
 
-		gpi = (struct pmc_op_getpmcinfo *) arg;
+		gpi = (struct pmc_op_getpmcinfo * __capability) arg;
 
 		if ((error = copyin(&gpi->pm_cpu, &cpu, sizeof(cpu))) != 0)
 			break;
@@ -4329,7 +4329,7 @@ pmc_syscall_handler(struct thread *td, void *syscall_args)
 		struct pmc_binding pb;
 		struct pmc_op_pmcrw prw;
 		struct pmc_classdep *pcd;
-		struct pmc_op_pmcrw *pprw;
+		struct pmc_op_pmcrw * __capability pprw;
 
 		PMC_DOWNGRADE_SX();
 
@@ -4431,7 +4431,7 @@ pmc_syscall_handler(struct thread *td, void *syscall_args)
 				break;
 		}
 
-		pprw = (struct pmc_op_pmcrw *) arg;
+		pprw = (struct pmc_op_pmcrw * __capability) arg;
 
 #ifdef	HWPMC_DEBUG
 		if (prw.pm_flags & PMC_F_NEWVALUE)

@@ -110,6 +110,7 @@ invalidate(struct Test *t1)
 		*x = 0xa5;
 }
 
+#ifdef __mips__
 void
 test_string_memcpy_c(const struct cheri_test *ctp __unused)
 {
@@ -211,6 +212,7 @@ test_string_memcpy_c(const struct cheri_test *ctp __unused)
 
 	cheritest_success();
 }
+#endif	/* __mips__ */
 
 void
 test_string_memcpy(const struct cheri_test *ctp __unused)
@@ -273,6 +275,7 @@ test_string_memcpy(const struct cheri_test *ctp __unused)
 	cheritest_success();
 }
 
+#ifdef __mips__
 void
 test_string_memmove_c(const struct cheri_test *ctp __unused)
 {
@@ -373,6 +376,7 @@ test_string_memmove_c(const struct cheri_test *ctp __unused)
 
 	cheritest_success();
 }
+#endif	/* __mips__ */
 
 void
 test_string_memmove(const struct cheri_test *ctp __unused)

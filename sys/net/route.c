@@ -241,10 +241,6 @@ rtentry_zinit(void *mem, int size, int how)
 {
 	struct rtentry *rt = mem;
 
-	rt->rt_pksent = counter_u64_alloc(how);
-	if (rt->rt_pksent == NULL)
-		return (ENOMEM);
-
 	RT_LOCK_INIT(rt);
 
 	return (0);
@@ -256,7 +252,6 @@ rtentry_zfini(void *mem, int size)
 	struct rtentry *rt = mem;
 
 	RT_LOCK_DESTROY(rt);
-	counter_u64_free(rt->rt_pksent);
 }
 
 static int
@@ -265,7 +260,6 @@ rtentry_ctor(void *mem, int size, void *arg, int how)
 	struct rtentry *rt = mem;
 
 	bzero(rt, offsetof(struct rtentry, rt_endzero));
-	counter_u64_zero(rt->rt_pksent);
 	rt->rt_chain = NULL;
 
 	return (0);
@@ -426,87 +420,14 @@ sys_setfib(struct thread *td, struct setfib_args *uap)
 }
 
 /*
- * Look up the route that matches the address given
- * Or, at least try.. Create a cloned route if needed.
- *
- * The returned route, if any, is locked.
- */
-struct rtentry *
-rtalloc1(struct sockaddr *dst, int report, u_long ignflags)
-{
-
-	return (rtalloc1_fib(dst, report, ignflags, RT_DEFAULT_FIB));
-}
-
-struct rtentry *
-rtalloc1_fib(struct sockaddr *dst, int report, u_long ignflags,
-		    u_int fibnum)
-{
-	RIB_RLOCK_TRACKER;
-	struct rib_head *rh;
-	struct radix_node *rn;
-	struct rtentry *newrt;
-	struct rt_addrinfo info;
-	int err = 0, msgtype = RTM_MISS;
-
-	KASSERT((fibnum < rt_numfibs), ("rtalloc1_fib: bad fibnum"));
-	rh = rt_tables_get_rnh(fibnum, dst->sa_family);
-	newrt = NULL;
-	if (rh == NULL)
-		goto miss;
-
-	/*
-	 * Look up the address in the table for that Address Family
-	 */
-	if ((ignflags & RTF_RNH_LOCKED) == 0)
-		RIB_RLOCK(rh);
-#ifdef INVARIANTS
-	else
-		RIB_LOCK_ASSERT(rh);
-#endif
-	rn = rh->rnh_matchaddr(dst, &rh->head);
-	if (rn && ((rn->rn_flags & RNF_ROOT) == 0)) {
-		newrt = RNTORT(rn);
-		RT_LOCK(newrt);
-		RT_ADDREF(newrt);
-		if ((ignflags & RTF_RNH_LOCKED) == 0)
-			RIB_RUNLOCK(rh);
-		return (newrt);
-
-	} else if ((ignflags & RTF_RNH_LOCKED) == 0)
-		RIB_RUNLOCK(rh);
-	/*
-	 * Either we hit the root or could not find any match,
-	 * which basically means: "cannot get there from here".
-	 */
-miss:
-	RTSTAT_INC(rts_unreach);
-
-	if (report) {
-		/*
-		 * If required, report the failure to the supervising
-		 * Authorities.
-		 * For a delete, this is not an error. (report == 0)
-		 */
-		bzero(&info, sizeof(info));
-		info.rti_info[RTAX_DST] = dst;
-		rt_missmsg_fib(msgtype, &info, 0, err, fibnum);
-	}
-	return (newrt);
-}
-
-/*
  * Remove a reference count from an rtentry.
  * If the count gets low enough, take it out of the routing table
  */
 void
 rtfree(struct rtentry *rt)
 {
-	struct rib_head *rnh;
 
 	KASSERT(rt != NULL,("%s: NULL rt", __func__));
-	rnh = rt_tables_get_rnh(rt->rt_fibnum, rt_key(rt)->sa_family);
-	KASSERT(rnh != NULL,("%s: NULL rnh", __func__));
 
 	RT_LOCK_ASSERT(rt);
 
@@ -519,18 +440,6 @@ rtfree(struct rtentry *rt)
 		log(LOG_DEBUG, "%s: %p has %d refs\n", __func__, rt, rt->rt_refcnt);
 		goto done;
 	}
-
-	/*
-	 * On last reference give the "close method" a chance
-	 * to cleanup private state.  This also permits (for
-	 * IPv4 and IPv6) a chance to decide if the routing table
-	 * entry should be purged immediately or at a later time.
-	 * When an immediate purge is to happen the close routine
-	 * typically calls rtexpunge which clears the RTF_UP flag
-	 * on the entry so that the code below reclaims the storage.
-	 */
-	if (rt->rt_refcnt == 0 && rnh->rnh_close)
-		rnh->rnh_close((struct radix_node *)rt, &rnh->head);
 
 	/*
 	 * If we are no longer "up" (and ref == 0)
@@ -551,12 +460,6 @@ rtfree(struct rtentry *rt)
 			goto done;
 		}
 #endif
-		/*
-		 * The key is separatly alloc'd so free it (see rt_setgate()).
-		 * This also frees the gateway, as they are always malloc'd
-		 * together.
-		 */
-		R_Free(rt_key(rt));
 
 		/* Unreference nexthop */
 		nhop_free(rt->rt_nhop);
@@ -683,7 +586,6 @@ ifa_ifwithroute(int flags, const struct sockaddr *dst, struct sockaddr *gateway,
 				u_int fibnum)
 {
 	struct ifaddr *ifa;
-	int not_found = 0;
 
 	NET_EPOCH_ASSERT();
 	if ((flags & RTF_GATEWAY) == 0) {
@@ -710,34 +612,17 @@ ifa_ifwithroute(int flags, const struct sockaddr *dst, struct sockaddr *gateway,
 	if (ifa == NULL)
 		ifa = ifa_ifwithnet(gateway, 0, fibnum);
 	if (ifa == NULL) {
-		struct rtentry *rt;
+		struct nhop_object *nh;
 
-		rt = rtalloc1_fib(gateway, 0, flags, fibnum);
-		if (rt == NULL)
-			goto out;
+		nh = rib_lookup(fibnum, gateway, NHR_NONE, 0);
+
 		/*
 		 * dismiss a gateway that is reachable only
 		 * through the default router
 		 */
-		switch (gateway->sa_family) {
-		case AF_INET:
-			if (satosin(rt_key(rt))->sin_addr.s_addr == INADDR_ANY)
-				not_found = 1;
-			break;
-		case AF_INET6:
-			if (IN6_IS_ADDR_UNSPECIFIED(&satosin6(rt_key(rt))->sin6_addr))
-				not_found = 1;
-			break;
-		default:
-			break;
-		}
-		if (!not_found && rt->rt_nhop->nh_ifa != NULL) {
-			ifa = rt->rt_nhop->nh_ifa;
-		}
-		RT_REMREF(rt);
-		RT_UNLOCK(rt);
-		if (not_found || ifa == NULL)
-			goto out;
+		if ((nh == NULL) || (nh->nh_flags & NHF_DEFAULT))
+			return (NULL);
+		ifa = nh->nh_ifa;
 	}
 	if (ifa->ifa_addr->sa_family != dst->sa_family) {
 		struct ifaddr *oifa = ifa;
@@ -745,7 +630,7 @@ ifa_ifwithroute(int flags, const struct sockaddr *dst, struct sockaddr *gateway,
 		if (ifa == NULL)
 			ifa = oifa;
 	}
- out:
+
 	return (ifa);
 }
 
@@ -1575,6 +1460,9 @@ add_route(struct rib_head *rnh, struct rt_addrinfo *info,
 	    (gateway->sa_family != AF_UNSPEC) && (gateway->sa_family != AF_LINK))
 		return (EINVAL);
 
+	if (dst->sa_len > sizeof(((struct rtentry *)NULL)->rt_dstb))
+		return (EINVAL);
+
 	if (info->rti_ifa == NULL) {
 		error = rt_getifa_fib(info, rnh->rib_fibnum);
 		if (error)
@@ -1598,17 +1486,11 @@ add_route(struct rib_head *rnh, struct rt_addrinfo *info,
 		return (ENOBUFS);
 	}
 	rt->rt_flags = RTF_UP | flags;
-	rt->rt_fibnum = rnh->rib_fibnum;
 	rt->rt_nhop = nh;
-	/*
-	 * Add the gateway. Possibly re-malloc-ing the storage for it.
-	 */
-	if ((error = rt_setgate(rt, dst, gateway)) != 0) {
-		ifa_free(info->rti_ifa);
-		nhop_free(nh);
-		uma_zfree(V_rtzone, rt);
-		return (error);
-	}
+
+	/* Fill in dst */
+	memcpy(&rt->rt_dst, dst, dst->sa_len);
+	rt_key(rt) = &rt->rt_dst;
 
 	/*
 	 * point to the (possibly newly malloc'd) dest address.
@@ -1641,7 +1523,6 @@ add_route(struct rib_head *rnh, struct rt_addrinfo *info,
 		rt_mpath_conflict(rnh, rt, netmask)) {
 		RIB_WUNLOCK(rnh);
 
-		R_Free(rt_key(rt));
 		nhop_free(nh);
 		uma_zfree(V_rtzone, rt);
 		return (EEXIST);
@@ -1681,7 +1562,6 @@ add_route(struct rib_head *rnh, struct rt_addrinfo *info,
 	 * then un-make it (this should be a function)
 	 */
 	if (rn == NULL) {
-		R_Free(rt_key(rt));
 		nhop_free(nh);
 		uma_zfree(V_rtzone, rt);
 		return (EEXIST);
@@ -1915,40 +1795,6 @@ rt_setmetrics(const struct rt_addrinfo *info, struct rtentry *rt)
 	if (info->rti_mflags & RTV_EXPIRE)
 		rt->rt_expire = info->rti_rmx->rmx_expire ?
 		    info->rti_rmx->rmx_expire - time_second + time_uptime : 0;
-}
-
-int
-rt_setgate(struct rtentry *rt, struct sockaddr *dst, struct sockaddr *gate)
-{
-	/* XXX dst may be overwritten, can we move this to below */
-	int dlen = SA_SIZE(dst), glen = SA_SIZE(gate);
-
-	/*
-	 * Prepare to store the gateway in rt->rt_gateway.
-	 * Both dst and gateway are stored one after the other in the same
-	 * malloc'd chunk. If we have room, we can reuse the old buffer,
-	 * rt_gateway already points to the right place.
-	 * Otherwise, malloc a new block and update the 'dst' address.
-	 */
-	if (rt_key(rt) == NULL) {
-		caddr_t new;
-
-		R_Malloc(new, caddr_t, dlen + glen);
-		if (new == NULL)
-			return ENOBUFS;
-		/*
-		 * XXX note, we copy from *dst and not *rt_key(rt) because
-		 * rt_setgate() can be called to initialize a newly
-		 * allocated route entry, in which case rt_key(rt) == NULL
-		 * (and also rt->rt_gateway == NULL).
-		 * Free()/free() handle a NULL argument just fine.
-		 */
-		bcopy(dst, new, dlen);
-		R_Free(rt_key(rt));	/* free old block, if any */
-		rt_key(rt) = (struct sockaddr *)new;
-	}
-
-	return (0);
 }
 
 void

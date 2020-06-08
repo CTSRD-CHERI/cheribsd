@@ -50,6 +50,7 @@ mips/mips/stack_machdep.c		optional	ddb | stack
 mips/mips/stdatomic.c			standard \
 	compile-with "${NORMAL_C:N-Wmissing-prototypes}"
 mips/mips/support.S			standard
+mips/mips/bcopy_for_copyinout.S			standard
 mips/mips/swtch.S			standard
 mips/mips/sys_machdep.c			standard
 mips/mips/tlb.c				standard
@@ -94,10 +95,7 @@ mips/mips/sc_machdep.c			optional	sc
 dev/uart/uart_cpu_fdt.c			optional	uart fdt
 
 # crypto support -- use generic
-crypto/blowfish/bf_enc.c		optional	crypto | ipsec | \
-	ipsec_support
-crypto/des/des_enc.c			optional	crypto | ipsec | \
-	ipsec_support | netsmb
+crypto/des/des_enc.c			optional	netsmb
 
 # AP common nvram interface MIPS specific, but maybe should be more generic
 dev/nvram2env/nvram2env_mips.c		optional	nvram2env
@@ -124,6 +122,7 @@ mips/mips/mips_pic.c			optional	intrng
 cddl/compat/opensolaris/kern/opensolaris_atomic.c	optional zfs | dtrace compile-with "${CDDL_C}"
 cddl/dev/dtrace/mips/dtrace_asm.S			optional dtrace compile-with "${DTRACE_S}"
 cddl/dev/dtrace/mips/dtrace_subr.c			optional dtrace compile-with "${DTRACE_C}"
+cddl/contrib/opensolaris/uts/mips/dtrace/fasttrap_isa.c     optional dtrace_fasttrap | dtraceall compile-with "${FASTTRAP_C}"
 cddl/dev/fbt/mips/fbt_isa.c				optional dtrace_fbt | dtraceall compile-with "${FBT_C}"
 
 # Zstd

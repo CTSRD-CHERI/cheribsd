@@ -39,8 +39,6 @@ __FBSDID("$FreeBSD$");
 #include "opt_posix.h"
 #include "opt_capsicum.h"
 
-#define	EXPLICIT_USER_ACCESS
-
 #include <sys/param.h>
 #include <sys/bus.h>
 #include <sys/capsicum.h>
@@ -678,7 +676,6 @@ cheriabi_copyout_strings(struct image_params *imgp, uintptr_t *stack_base)
 		szsigcode = *(imgp->proc->p_sysent->sv_szsigcode);
 	else
 		szsigcode = 0;
-
 	destp =	(char * __capability)arginfo;
 
 	/*
@@ -1808,9 +1805,9 @@ int
 cheriabi_ptrace(struct thread *td, struct cheriabi_ptrace_args *uap)
 {
 	union {
-		struct ptrace_io_desc_c piod;
+		struct ptrace_io_desc piod;
 		struct ptrace_lwpinfo pl;
-		struct ptrace_vm_entry_c pve;
+		struct ptrace_vm_entry pve;
 #if __has_feature(capabilities)
 		struct capreg capreg;
 #endif
@@ -1822,10 +1819,6 @@ cheriabi_ptrace(struct thread *td, struct cheriabi_ptrace_args *uap)
 		int ptevents;
 	} r = { 0 };
 
-	union {
-		struct ptrace_lwpinfo_c pl;
-	} c = { 0 };
-
 	int error = 0, data;
 	void * __capability addr = &r;
 
@@ -1833,7 +1826,6 @@ cheriabi_ptrace(struct thread *td, struct cheriabi_ptrace_args *uap)
 	AUDIT_ARG_CMD(uap->req);
 	AUDIT_ARG_VALUE(uap->data);
 
-	(void)c;
 	data = uap->data;
 
 	switch (uap->req) {
@@ -1859,13 +1851,7 @@ cheriabi_ptrace(struct thread *td, struct cheriabi_ptrace_args *uap)
 	case PT_GET_SC_RET:
 	case PT_LWP_EVENTS:
 	case PT_SUSPEND:
-		break;
-
 	case PT_LWPINFO:
-		if (uap->data > sizeof(c.pl))
-			error = EINVAL;
-		else
-			data = sizeof(r.pl);
 		break;
 
 	/* Pass along an untagged virtual address for the desired PC. */
@@ -1941,18 +1927,21 @@ cheriabi_ptrace(struct thread *td, struct cheriabi_ptrace_args *uap)
 		return (error);
 
 	switch (uap->req) {
-#if 0
 	case PT_VM_ENTRY:
-		error = COPYOUT(&r.pve, uap->addr, sizeof r.pve);
+		/*
+		 * Only copy out updated fields prior to pve_path to
+		 * avoid the use of copyoutcap.
+		 */
+		error = copyout(&r.pve, uap->addr,
+		    offsetof(struct ptrace_vm_entry, pve_path));
 		break;
-#endif
 	case PT_IO:
 		/*
 		 * Only copy out the updated piod_len to avoid the use
 		 * of copyoutcap.
 		 */
 		error = copyout(&r.piod.piod_len, uap->addr +
-		    offsetof(struct ptrace_io_desc_c, piod_len),
+		    offsetof(struct ptrace_io_desc, piod_len),
 		    sizeof(r.piod.piod_len));
 		break;
 #if 0
@@ -1976,19 +1965,7 @@ cheriabi_ptrace(struct thread *td, struct cheriabi_ptrace_args *uap)
 		error = copyout(&r.ptevents, uap->addr, uap->data);
 		break;
 	case PT_LWPINFO:
-		memset(&c.pl, 0, sizeof(c.pl));
-		c.pl.pl_lwpid = r.pl.pl_lwpid;
-		c.pl.pl_event = r.pl.pl_event;
-		c.pl.pl_flags = r.pl.pl_flags;
-		c.pl.pl_sigmask = r.pl.pl_sigmask;
-		c.pl.pl_siglist = r.pl.pl_siglist;
-		c.pl.pl_child_pid = r.pl.pl_child_pid;
-		c.pl.pl_syscall_code = r.pl.pl_syscall_code;
-		c.pl.pl_syscall_narg = r.pl.pl_syscall_narg;
-		memcpy(c.pl.pl_tdname, r.pl.pl_tdname, sizeof(c.pl.pl_tdname));
-		memcpy(&c.pl.pl_siginfo, &r.pl.pl_siginfo, sizeof(c.pl.pl_siginfo));
-
-		error = copyout(&c.pl, uap->addr, uap->data);
+		error = copyout(&r.pl, uap->addr, uap->data);
 		break;
 	case PT_GET_SC_ARGS:
 		error = copyout(r.args, uap->addr, MIN(uap->data,

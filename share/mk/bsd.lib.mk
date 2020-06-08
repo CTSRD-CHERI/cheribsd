@@ -256,7 +256,7 @@ SHLIB_NAME_INSTALL=${SHLIB_NAME}
 
 # Allow libraries to specify their own version map or have it
 # automatically generated (see bsd.symver.mk above).
-.if ${MK_SYMVER} == "yes" && !empty(VERSION_MAP)
+.if !empty(VERSION_MAP)
 ${SHLIB_NAME_FULL}:	${VERSION_MAP}
 LDFLAGS+=	-Wl,--version-script=${VERSION_MAP}
 .endif

@@ -40,7 +40,6 @@
 #include <sys/sysctl.h>
 #include <sys/time.h>
 
-#include <machine/cpuregs.h>
 #include <machine/pte.h>
 #include <machine/vmparam.h>
 
@@ -50,6 +49,7 @@
 #include <err.h>
 #include <fcntl.h>
 #include <inttypes.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -58,6 +58,7 @@
 
 #include "cheritest.h"
 
+#ifdef __mips__
 void
 test_copyregs(const struct cheri_test *ctp __unused)
 {
@@ -115,6 +116,7 @@ test_listregs(const struct cheri_test *ctp __unused)
 	CHERI_PCC_PRINT();
 	cheritest_success();
 }
+#endif	/* __mips__ */
 
 /*
  * These tests assume that the compiler and run-time libraries won't muck with
@@ -130,36 +132,59 @@ check_initreg_code(void * __capability c)
 {
 	uintmax_t v;
 
-	/* Base. */
-	v = cheri_getbase(c);
-	if (v != CHERI_CAP_USER_CODE_BASE)
-		cheritest_failure_errx("base %jx (expected %jx)", v,
-		    (uintmax_t)CHERI_CAP_USER_CODE_BASE);
+	CHERI_FPRINT_PTR(stderr, c);
 
-	/* Length. */
-	v = cheri_getlen(c);
-	if (v > CHERI_CAP_USER_CODE_LENGTH)
-		cheritest_failure_errx("length 0x%jx (expected <= 0x%jx)", v,
-		    CHERI_CAP_USER_CODE_LENGTH);
-
+#if defined(__CHERI_PURE_CAPABILITY__)
+	/*
+	 * Dynamically linked pure-capability code should have a program
+	 * counter that is bounded to the current DSO/executable (or function).
+	 */
+	CHERITEST_VERIFY2(cheri_getbase(c) != 0, "code base should be nonzero");
+	/*
+	 * Check that PCC ends at the end of the current DSO (or executable in
+	 * the statically linked case). Since we don't know the real value here,
+	 * just check that it is less than PCC plus a constant that should be
+	 * large enough for this binary (rounded to the next representable
+	 * length).
+	 */
+	vaddr_t upper_bound =
+	    CHERI_REPRESENTABLE_LENGTH(cheri_getaddress(c) + 0x100000);
+	CHERITEST_VERIFY2(cheri_getlength(c) < upper_bound,
+	    "code length 0x%jx should be < than 0x%jx)", cheri_getlength(c),
+	    upper_bound);
+#else
+	/*
+	 * In hybrid mode PCC should start at zero and extend to the end of the
+	 * user address space.
+	 */
+	CHERITEST_VERIFY2(cheri_getbase(c) == CHERI_CAP_USER_CODE_BASE,
+	    "code base 0x%jx (expected 0x%jx)", cheri_getbase(c),
+	    (uintmax_t)CHERI_CAP_USER_CODE_BASE);
+	CHERITEST_VERIFY2(cheri_getlength(c) == CHERI_CAP_USER_CODE_LENGTH,
+	    "code length 0x%jx should be 0x%jx", cheri_getlength(c),
+	    (uintmax_t)CHERI_CAP_USER_CODE_LENGTH);
+#endif
 	/* Offset. */
-	v = cheri_getoffset(c);
-	if (v != CHERI_CAP_USER_CODE_OFFSET)
-		cheritest_failure_errx("offset %jx (expected %jx)", v,
-		    (uintmax_t)CHERI_CAP_USER_CODE_OFFSET);
+	CHERITEST_VERIFY(cheri_getoffset(c) == 0);
 
 	/* Type -- should be (-1) for an unsealed capability. */
 	v = cheri_gettype(c);
-	if (v != 0xffffffffffffffff)
+	if (v != (uintmax_t)CHERI_OTYPE_UNSEALED)
 		cheritest_failure_errx("otype %jx (expected %jx)", v,
-		    (uintmax_t)0xffffffffffffffff);
+		    (uintmax_t)CHERI_OTYPE_UNSEALED);
+
+	/* Sealed bit. */
+	v = cheri_getsealed(c);
+	if (v != 0)
+		cheritest_failure_errx("sealed %jx (expected 0)", v);
+
+	/* Tag bit. */
+	v = cheri_gettag(c);
+	if (v != 1)
+		cheritest_failure_errx("tag %jx (expected 1)", v);
 
 	/* Permissions. */
 	v = cheri_getperm(c);
-	if (v != CHERI_CAP_USER_CODE_PERMS)
-		cheritest_failure_errx("perms %jx (expected %jx)", v,
-		    (uintmax_t)CHERI_CAP_USER_CODE_PERMS);
-
 	/*
 	 * More overt tests for permissions that should -- or should not -- be
 	 * there, regardless of consistency with the kernel headers.
@@ -203,15 +228,11 @@ check_initreg_code(void * __capability c)
 		cheritest_failure_errx("perms %jx (expected swperms %x)", v,
 		    (CHERI_PERMS_SWALL & ~CHERI_PERM_CHERIABI_VMMAP));
 
-	/* Sealed bit. */
-	v = cheri_getsealed(c);
-	if (v != 0)
-		cheritest_failure_errx("sealed %jx (expected 0)", v);
+	/* Check that the raw permission bits match the kernel header: */
+	if (v != CHERI_CAP_USER_CODE_PERMS)
+		cheritest_failure_errx("perms %jx (expected %jx)", v,
+		    (uintmax_t)CHERI_CAP_USER_CODE_PERMS);
 
-	/* Tag bit. */
-	v = cheri_gettag(c);
-	if (v != 1)
-		cheritest_failure_errx("tag %jx (expected 1)", v);
 	cheritest_success();
 }
 
@@ -455,6 +476,7 @@ test_initregs_stack(const struct cheri_test *ctp __unused)
 }
 #endif
 
+#ifdef __mips__
 void
 test_initregs_idc(const struct cheri_test *ctp __unused)
 {
@@ -496,6 +518,7 @@ test_initregs_idc(const struct cheri_test *ctp __unused)
 #endif
 	cheritest_success();
 }
+#endif
 
 void
 test_initregs_pcc(const struct cheri_test *ctp __unused)

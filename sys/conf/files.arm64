@@ -133,7 +133,6 @@ arm64/arm64/busdma_machdep.c	standard
 arm64/arm64/bzero.S		standard
 arm64/arm64/clock.c		standard
 arm64/arm64/copyinout.S		standard
-arm64/arm64/copystr.c		standard
 arm64/arm64/cpu_errata.c	standard
 arm64/arm64/cpufunc_asm.S	standard
 arm64/arm64/db_disasm.c		optional	ddb
@@ -221,8 +220,7 @@ armv8_crypto_wrap.o		optional	armv8crypto		\
 	compile-with	"${CC} -c ${CFLAGS:C/^-O2$/-O3/:N-nostdinc:N-mgeneral-regs-only} -I$S/crypto/armv8/ ${WERROR} ${NO_WCAST_QUAL} ${PROF} -march=armv8-a+crypto ${.IMPSRC}" \
 	no-implicit-rule						\
 	clean		"armv8_crypto_wrap.o"
-crypto/blowfish/bf_enc.c	optional	crypto | ipsec | ipsec_support
-crypto/des/des_enc.c		optional	crypto | ipsec | ipsec_support | netsmb
+crypto/des/des_enc.c		optional	netsmb
 dev/acpica/acpi_bus_if.m	optional	acpi
 dev/acpica/acpi_if.m		optional	acpi
 dev/acpica/acpi_pci_link.c	optional	acpi pci

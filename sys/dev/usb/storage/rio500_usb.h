@@ -37,7 +37,7 @@ struct RioCommand
   int   requesttype;
   int   value;
   int   index;
-  void *buffer;
+  void * __kerncap buffer;
   int  timeout;
 };
 

@@ -40,9 +40,6 @@
  *	from: @(#)trap.c	8.5 (Berkeley) 1/11/94
  *	JNPR: trap.c,v 1.13.2.2 2007/08/29 10:03:49 girish
  */
-
-#define	EXPLICIT_USER_ACCESS
-
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 #define TRAP_DEBUG 1
@@ -458,7 +455,7 @@ fetch_instr_near_pc(struct trapframe *frame, register_t offset_from_pc, int32_t 
 #else
 	bad_inst_ptr = __USER_CODE_CAP((uint8_t*)(frame->pc) + offset_from_pc);
 #endif
-	if (fueword32_c(bad_inst_ptr, instr) != 0) {
+	if (fueword32(bad_inst_ptr, instr) != 0) {
 		struct thread *td = curthread;
 		struct proc *p = td->td_proc;
 		log(LOG_ERR, "%s: pid %d tid %ld (%s), uid %d: Could not fetch "
@@ -1065,13 +1062,13 @@ dofault:
 			if (DELAYBRANCH(trapframe->cause))
 				va += sizeof(int);
 
-			if (td->td_md.md_ss_addr != (__cheri_addr intptr_t)va) {
+			if (td->td_md.md_ss_addr != (__cheri_addr uintptr_t)va) {
 				addr = va;
 				break;
 			}
 
 			/* read break instruction */
-			instr = fuword32_c(__USER_CODE_CAP((__cheri_fromcap void *)va));
+			instr = fuword32(va);
 
 			if (instr != MIPS_BREAK_SSTEP) {
 				addr = va;
@@ -1079,8 +1076,8 @@ dofault:
 			}
 
 			CTR3(KTR_PTRACE,
-			    "trap: tid %d, single step at %p: %#08x",
-			    td->td_tid, (__cheri_fromcap void *)va, instr);
+			    "trap: tid %d, single step at 0x%lx: %#08x",
+			    td->td_tid, (__cheri_addr long)va, instr);
 			PROC_LOCK(p);
 			_PHOLD(p);
 			error = ptrace_clear_single_step(td);
@@ -1462,8 +1459,7 @@ trapDump(char *msg)
 /*
  * Return the resulting PC as if the branch was executed.
  *
- * XXXRW: What about CHERI branch instructions?
- * XXXAR: This needs to be fixed for cjalr/cjr/ccall_fast
+ * XXXAR: This needs to be fixed for ccall_fast
  */
 trapf_pc_t
 MipsEmulateBranch(struct trapframe *framePtr, trapf_pc_t _instPC, int fpcCSR,
@@ -1486,16 +1482,13 @@ MipsEmulateBranch(struct trapframe *framePtr, trapf_pc_t _instPC, int fpcCSR,
 		inst = *(InstFmt *) instptr;
 	} else {
 		if (!KERNLAND((__cheri_addr vaddr_t)instPC))
-			inst.word = fuword32_c(instPC);  /* XXXAR: error check? */
+			inst.word = fuword32(instPC);  /* XXXAR: error check? */
 		else
 			memcpy_c(&inst, instPC, sizeof(InstFmt));
 	}
 	/* Save the bad branch instruction so we can log it */
 	framePtr->badinstr_p.inst = inst.word;
 
-	/*
-	 * XXXRW: CHERI branch instructions are not handled here.
-	 */
 	switch ((int)inst.JType.op) {
 	case OP_SPECIAL:
 		switch ((int)inst.RType.func) {
@@ -1617,28 +1610,36 @@ MipsEmulateBranch(struct trapframe *framePtr, trapf_pc_t _instPC, int fpcCSR,
 #ifdef CPU_CHERI
 	case OP_COP2:
 		switch (inst.CType.fmt) {
-		case 0x9:
-		case 0xa:
-		case 0x11:
-		case 0x12:
+		case OP_CJ:
+			switch (inst.CType.r3) {
+			case OP_CJALR:
+				retAddr = capRegsPtr[inst.CType.r2];
+				break;
+			case OP_CJR:
+				retAddr = capRegsPtr[inst.CType.r1];
+				break;
+			}
+			if (retAddr != NULL)
+				return (trapf_pc_t)(retAddr);
+			break;
+		case OP_CBEZ:
+		case OP_CBNZ:
+		case OP_CBTS:
+		case OP_CBTU:
 			switch (inst.BC2FType.fmt) {
-			case 0x9:
-				/* CBTU */
+			case OP_CBTU:
 				condition = !cheri_gettag(
 				    capRegsPtr[inst.BC2FType.cd]);
 				break;
-			case 0xa:
-				/* CBTS */
+			case OP_CBTS:
 				condition = cheri_gettag(
 				    capRegsPtr[inst.BC2FType.cd]);
 				break;
-			case 0x11:
-				/* CBEZ */
+			case OP_CBEZ:
 				condition =
 				    (capRegsPtr[inst.BC2FType.cd] == NULL);
 				break;
-			case 0x12:
-				/* CBNZ */
+			case OP_CBNZ:
 				condition =
 				    (capRegsPtr[inst.BC2FType.cd] != NULL);
 				break;

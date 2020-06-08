@@ -93,11 +93,7 @@ CFLAGS.gcc+= -fms-extensions
 .if defined(CFLAGS_ARCH_PARAMS)
 CFLAGS.gcc+=${CFLAGS_ARCH_PARAMS}
 .endif
-.if ${COMPILER_TYPE} == "gcc" && ${COMPILER_VERSION} < 50000
-WERROR?=	-Wno-error
-.else
 WERROR?=	-Werror
-.endif
 # The following should be removed no earlier than LLVM11 being imported into the
 # tree, to ensure we don't regress the build.  LLVM11 and GCC10 will switch the
 # default over to -fno-common, making this redundant.
@@ -161,9 +157,9 @@ LDFLAGS+=	--build-id=sha1
 .endif
 
 .if (${MACHINE_CPUARCH} == "aarch64" || ${MACHINE_CPUARCH} == "amd64" || \
-    ${MACHINE_CPUARCH} == "i386") && \
+    ${MACHINE_CPUARCH} == "i386" || ${MACHINE} == "powerpc") && \
     defined(LINKER_FEATURES) && ${LINKER_FEATURES:Mifunc} == ""
-.error amd64/arm64/i386 kernel requires linker ifunc support
+.error amd64/arm64/i386/ppc* kernel requires linker ifunc support
 .endif
 
 .if ${MACHINE_CPUARCH} == "amd64"
@@ -245,6 +241,15 @@ FBT_CFLAGS=	-DBUILDING_DTRACE -nostdinc -I$S/cddl/dev/fbt/${MACHINE_CPUARCH} -I$
 FBT_CFLAGS+=	-I$S/cddl/dev/fbt/x86
 .endif
 FBT_C=		${CC} -c ${FBT_CFLAGS}		${WERROR} ${PROF} ${.IMPSRC}
+
+# Special flags for managing the compat compiles for DTrace/fasttrap
+FASTTRAP_CFLAGS=	-DBUILDING_DTRACE -nostdinc \
+	-I$S/cddl/contrib/opensolaris/uts/${MACHINE_CPUARCH} \
+	-I$S/cddl/contrib/opensolaris/uts/common/sys \
+	-I$S/cddl/compat/opensolaris \
+	-I$S/cddl/contrib/opensolaris/uts/common \
+	-I$S ${CDDL_CFLAGS}
+FASTTRAP_C=		${CC} -c ${FASTTRAP_CFLAGS}		${WERROR} ${PROF} ${.IMPSRC}
 
 .if ${MK_CTF} != "no"
 NORMAL_CTFCONVERT=	${CTFCONVERT} ${CTFFLAGS} ${.TARGET}

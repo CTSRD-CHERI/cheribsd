@@ -221,7 +221,7 @@ typedef enum {
 
 struct mtextget {
 	uint32_t		alloc_len;
-	char			*status_xml;
+	char			* __kerncap status_xml;
 	uint32_t		fill_len;
 	mt_ext_get_status	status;
 	char			error_str[128];
@@ -283,7 +283,12 @@ struct mtparamset {
 struct mtsetlist {
 	int num_params;
 	int param_len;
-	struct mtparamset *params;
+	union {
+#ifdef _KERNEL
+		struct mtparamset * __capability user_params;
+#endif
+		struct mtparamset *params;
+	};
 };
 
 /*

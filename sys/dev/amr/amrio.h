@@ -99,7 +99,7 @@
 
 struct amr_user_ioctl {
     unsigned char	au_cmd[32];	/* command text from userspace */
-    void		*au_buffer;	/* data buffer in userspace */
+    void * __kerncap	au_buffer;	/* data buffer in userspace */
     unsigned long	au_length;	/* data buffer size (0 == no data) */
     int			au_direction;	/* data transfer direction */
 #define AMR_IO_NODATA	0

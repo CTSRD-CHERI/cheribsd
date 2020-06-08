@@ -39,8 +39,6 @@ __FBSDID("$FreeBSD$");
 #include "opt_inet6.h"
 #include "opt_ktrace.h"
 
-#define	EXPLICIT_USER_ACCESS
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/capsicum.h>
@@ -1207,7 +1205,7 @@ int
 sys_recvmsg(struct thread *td, struct recvmsg_args *uap)
 {
 	struct msghdr msg;
-	struct iovec *iov;
+	struct iovec * __capability uiov, *iov;
 	int error;
 
 	error = copyincap(uap->msg, &msg, sizeof(msg));
@@ -1216,15 +1214,18 @@ sys_recvmsg(struct thread *td, struct recvmsg_args *uap)
 	error = copyiniov(msg.msg_iov, msg.msg_iovlen, &iov, EMSGSIZE);
 	if (error != 0)
 		return (error);
-	msg.msg_iov = (__cheri_tocap struct iovec * __capability)iov;
 	msg.msg_flags = uap->flags;
 #ifdef COMPAT_OLDSOCK
 	if (SV_PROC_FLAG(td->td_proc, SV_AOUT))
 		msg.msg_flags &= ~MSG_COMPAT;
 #endif
+	uiov = msg.msg_iov;
+	msg.msg_iov = (__cheri_tocap struct iovec * __capability)iov;
 	error = recvit(td, uap->s, &msg, NULL);
-	if (error == 0)
+	if (error == 0) {
+		msg.msg_iov = uiov;
 		error = copyoutcap(&msg, uap->msg, sizeof(msg));
+	}
 	free(iov, M_IOV);
 	return (error);
 }

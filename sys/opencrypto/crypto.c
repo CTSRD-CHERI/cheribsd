@@ -530,8 +530,6 @@ crypto_auth_hash(const struct crypto_session_params *csp)
 {
 
 	switch (csp->csp_auth_alg) {
-	case CRYPTO_MD5_HMAC:
-		return (&auth_hash_hmac_md5);
 	case CRYPTO_SHA1_HMAC:
 		return (&auth_hash_hmac_sha1);
 	case CRYPTO_SHA2_224_HMAC:
@@ -546,14 +544,6 @@ crypto_auth_hash(const struct crypto_session_params *csp)
 		return (&auth_hash_null);
 	case CRYPTO_RIPEMD160_HMAC:
 		return (&auth_hash_hmac_ripemd_160);
-	case CRYPTO_MD5_KPDK:
-		return (&auth_hash_key_md5);
-	case CRYPTO_SHA1_KPDK:
-		return (&auth_hash_key_sha1);
-#ifdef notyet
-	case CRYPTO_MD5:
-		return (&auth_hash_md5);
-#endif
 	case CRYPTO_SHA1:
 		return (&auth_hash_sha1);
 	case CRYPTO_SHA2_224:
@@ -602,16 +592,6 @@ crypto_cipher(const struct crypto_session_params *csp)
 {
 
 	switch (csp->csp_cipher_alg) {
-	case CRYPTO_DES_CBC:
-		return (&enc_xform_des);
-	case CRYPTO_3DES_CBC:
-		return (&enc_xform_3des);
-	case CRYPTO_BLF_CBC:
-		return (&enc_xform_blf);
-	case CRYPTO_CAST_CBC:
-		return (&enc_xform_cast5);
-	case CRYPTO_SKIPJACK_CBC:
-		return (&enc_xform_skipjack);
 	case CRYPTO_RIJNDAEL128_CBC:
 		return (&enc_xform_rijndael128);
 	case CRYPTO_AES_XTS:
@@ -692,19 +672,9 @@ static enum alg_type {
 	ALG_COMPRESSION,
 	ALG_AEAD
 } alg_types[] = {
-	[CRYPTO_DES_CBC] = ALG_CIPHER,
-	[CRYPTO_3DES_CBC] = ALG_CIPHER,
-	[CRYPTO_BLF_CBC] = ALG_CIPHER,
-	[CRYPTO_CAST_CBC] = ALG_CIPHER,
-	[CRYPTO_SKIPJACK_CBC] = ALG_CIPHER,
-	[CRYPTO_MD5_HMAC] = ALG_KEYED_DIGEST,
 	[CRYPTO_SHA1_HMAC] = ALG_KEYED_DIGEST,
 	[CRYPTO_RIPEMD160_HMAC] = ALG_KEYED_DIGEST,
-	[CRYPTO_MD5_KPDK] = ALG_KEYED_DIGEST,
-	[CRYPTO_SHA1_KPDK] = ALG_KEYED_DIGEST,
 	[CRYPTO_AES_CBC] = ALG_CIPHER,
-	[CRYPTO_ARC4] = ALG_CIPHER,
-	[CRYPTO_MD5] = ALG_DIGEST,
 	[CRYPTO_SHA1] = ALG_DIGEST,
 	[CRYPTO_NULL_HMAC] = ALG_DIGEST,
 	[CRYPTO_NULL_CBC] = ALG_CIPHER,
@@ -810,10 +780,8 @@ check_csp(const struct crypto_session_params *csp)
 		if (csp->csp_cipher_alg != CRYPTO_NULL_CBC) {
 			if (csp->csp_cipher_klen == 0)
 				return (false);
-			if (csp->csp_cipher_alg != CRYPTO_ARC4) {
-				if (csp->csp_ivlen == 0)
-					return (false);
-			}
+			if (csp->csp_ivlen == 0)
+				return (false);
 		}
 		if (csp->csp_ivlen >= EALG_MAX_BLOCK_LEN)
 			return (false);
@@ -877,10 +845,8 @@ check_csp(const struct crypto_session_params *csp)
 		if (csp->csp_cipher_alg != CRYPTO_NULL_CBC) {
 			if (csp->csp_cipher_klen == 0)
 				return (false);
-			if (csp->csp_cipher_alg != CRYPTO_ARC4) {
-				if (csp->csp_ivlen == 0)
-					return (false);
-			}
+			if (csp->csp_ivlen == 0)
+				return (false);
 		}
 		if (csp->csp_ivlen >= EALG_MAX_BLOCK_LEN)
 			return (false);

@@ -34,8 +34,6 @@
  *	from nfs_vfsops.c	8.12 (Berkeley) 5/20/95
  */
 
-#define	EXPLICIT_USER_ACCESS
-
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 

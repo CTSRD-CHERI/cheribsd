@@ -34,8 +34,6 @@ __FBSDID("$FreeBSD$");
 
 #include "opt_ffclock.h"
 
-#define	EXPLICIT_USER_ACCESS
-
 #include <sys/param.h>
 #include <sys/bus.h>
 #include <sys/kernel.h>

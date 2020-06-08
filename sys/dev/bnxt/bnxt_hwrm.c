@@ -29,8 +29,6 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
-#define EXPLICIT_USER_ACCESS
-
 #include <sys/endian.h>
 #include <sys/bitstring.h>
 

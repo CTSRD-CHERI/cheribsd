@@ -13,7 +13,6 @@ SRCS+=	cheritest_bounds_globals.c					\
 	cheritest_kbounce.c						\
 	cheritest_longjmp.c						\
 	cheritest_registers.c						\
-	cheritest_sandbox.S						\
 	cheritest_sealcap.c						\
 	cheritest_signal.c						\
 	cheritest_string.c						\
@@ -34,11 +33,14 @@ SRCS+=	cheritest_cheriabi_open.c
 CFLAGS+=	-DCHERIABI_TESTS
 .endif
 
+.if ${MACHINE} == mips
 .PATH: ${SRCTOP}/sys/mips/cheri
 SRCS+=	cheri_memcpy_c.S
 CFLAGS.cheri_memcpy_c.S=-D__KERN_FUNC_PREFIX -D_KERNEL -DINVARIANTS
 CFLAGS+=	-DKERNEL_MEMCPY_TESTS
+.endif
 
+.if ${MACHINE} == "mips"
 .ifdef CHERI_C_TESTS
 CHERI_C_TESTS_DIR=	${SRCTOP}/contrib/subrepo-cheri-c-tests
 .if exists(${CHERI_C_TESTS_DIR}/Makefile)
@@ -63,6 +65,7 @@ CFLAGS.${test}+=-Wno-missing-prototypes -Wno-missing-variable-declarations
 .endfor
 .endif
 .endif
+.endif
 
 .ifdef CHERITHREAD_TESTS
 CFLAGS+=	-DCHERITHREAD_TESTS
@@ -71,15 +74,25 @@ CFLAGS+=	-DCHERITHREAD_TESTS
 MAN=
 
 .if ${PROG:Mcheritest*}
-NEED_CHERI=	hybrid
+.if ${MACHINE_ABI:Mpurecap}
+NEED_COMPAT=	64
+.include <bsd.compat.mk>
+.endif
 .elif ${PROG:Mcheriabitest*}
-WANT_CHERI=	pure
+.if !${MACHINE_ABI:Mpurecap}
+NEED_COMPAT=	CHERI
+.include <bsd.compat.mk>
+.endif
 .else
 .error Unknown cheritest variant ${PROG}
 .endif
-LIBADD= 	z
 
+LIBADD= 	z
 LIBADD+=	xo util
+
+.if ${MK_LIBCHERI} == "yes"
+SRCS+=	cheritest_sandbox.S
+.endif
 
 .ifdef CHERI_DYNAMIC_TESTS
 CFLAGS+=	-DCHERI_DYNAMIC_TESTS

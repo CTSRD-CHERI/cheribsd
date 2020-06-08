@@ -75,22 +75,18 @@
 
 /* Hash values */
 #define	NULL_HASH_LEN		16
-#define	MD5_HASH_LEN		16
 #define	SHA1_HASH_LEN		20
 #define	RIPEMD160_HASH_LEN	20
 #define	SHA2_224_HASH_LEN	28
 #define	SHA2_256_HASH_LEN	32
 #define	SHA2_384_HASH_LEN	48
 #define	SHA2_512_HASH_LEN	64
-#define	MD5_KPDK_HASH_LEN	16
-#define	SHA1_KPDK_HASH_LEN	20
 #define	AES_GMAC_HASH_LEN	16
 #define	POLY1305_HASH_LEN	16
 #define	AES_CBC_MAC_HASH_LEN	16
 /* Maximum hash algorithm result length */
 #define	HASH_MAX_LEN		SHA2_512_HASH_LEN /* Keep this updated */
 
-#define	MD5_BLOCK_LEN		64
 #define	SHA1_BLOCK_LEN		64
 #define	RIPEMD160_BLOCK_LEN	64
 #define	SHA2_224_BLOCK_LEN	64
@@ -116,22 +112,15 @@
 
 /* Encryption algorithm block sizes */
 #define	NULL_BLOCK_LEN		4	/* IPsec to maintain alignment */
-#define	DES_BLOCK_LEN		8
-#define	DES3_BLOCK_LEN		8
-#define	BLOWFISH_BLOCK_LEN	8
-#define	SKIPJACK_BLOCK_LEN	8
-#define	CAST128_BLOCK_LEN	8
 #define	RIJNDAEL128_BLOCK_LEN	16
 #define	AES_BLOCK_LEN		16
 #define	AES_ICM_BLOCK_LEN	1
-#define	ARC4_BLOCK_LEN		1
 #define	CAMELLIA_BLOCK_LEN	16
 #define	CHACHA20_NATIVE_BLOCK_LEN	64
 #define	EALG_MAX_BLOCK_LEN	CHACHA20_NATIVE_BLOCK_LEN /* Keep this updated */
 
 /* IV Lengths */
 
-#define	ARC4_IV_LEN		1
 #define	AES_GCM_IV_LEN		12
 #define	AES_CCM_IV_LEN		12
 #define	AES_XTS_IV_LEN		8
@@ -140,24 +129,12 @@
 /* Min and Max Encryption Key Sizes */
 #define	NULL_MIN_KEY		0
 #define	NULL_MAX_KEY		256 /* 2048 bits, max key */
-#define	DES_MIN_KEY		8
-#define	DES_MAX_KEY		DES_MIN_KEY
-#define	TRIPLE_DES_MIN_KEY	24
-#define	TRIPLE_DES_MAX_KEY	TRIPLE_DES_MIN_KEY
-#define	BLOWFISH_MIN_KEY	5
-#define	BLOWFISH_MAX_KEY	56 /* 448 bits, max key */
-#define	CAST_MIN_KEY		5
-#define	CAST_MAX_KEY		16
-#define	SKIPJACK_MIN_KEY	10
-#define	SKIPJACK_MAX_KEY	SKIPJACK_MIN_KEY
 #define	RIJNDAEL_MIN_KEY	16
 #define	RIJNDAEL_MAX_KEY	32
 #define	AES_MIN_KEY		RIJNDAEL_MIN_KEY
 #define	AES_MAX_KEY		RIJNDAEL_MAX_KEY
 #define	AES_XTS_MIN_KEY		(2 * AES_MIN_KEY)
 #define	AES_XTS_MAX_KEY		(2 * AES_MAX_KEY)
-#define	ARC4_MIN_KEY		1
-#define	ARC4_MAX_KEY		32
 #define	CAMELLIA_MIN_KEY	8
 #define	CAMELLIA_MAX_KEY	32
 
@@ -231,13 +208,13 @@
 
 /* NB: deprecated */
 struct session_op {
-	u_int32_t	cipher;		/* ie. CRYPTO_DES_CBC */
-	u_int32_t	mac;		/* ie. CRYPTO_MD5_HMAC */
+	u_int32_t	cipher;		/* ie. CRYPTO_AES_CBC */
+	u_int32_t	mac;		/* ie. CRYPTO_SHA2_256_HMAC */
 
 	u_int32_t	keylen;		/* cipher key */
-	c_caddr_t	key;
+	const char * __kerncap key;
 	int		mackeylen;	/* mac key */
-	c_caddr_t	mackey;
+	const char * __kerncap mackey;
 
   	u_int32_t	ses;		/* returns: session # */ 
 };
@@ -248,13 +225,13 @@ struct session_op {
  * "cryptop" (no underscore).
  */
 struct session2_op {
-	u_int32_t	cipher;		/* ie. CRYPTO_DES_CBC */
-	u_int32_t	mac;		/* ie. CRYPTO_MD5_HMAC */
+	u_int32_t	cipher;		/* ie. CRYPTO_AES_CBC */
+	u_int32_t	mac;		/* ie. CRYPTO_SHA2_256_HMAC */
 
 	u_int32_t	keylen;		/* cipher key */
-	c_caddr_t	key;
+	const char * __kerncap key;
 	int		mackeylen;	/* mac key */
-	c_caddr_t	mackey;
+	const char * __kerncap mackey;
 
   	u_int32_t	ses;		/* returns: session # */ 
 	int		crid;		/* driver id + flags (rw) */
@@ -270,10 +247,10 @@ struct crypt_op {
 #define	COP_F_CIPHER_FIRST	0x0001	/* Cipher before MAC. */
 #define	COP_F_BATCH		0x0008	/* Batch op if possible */
 	u_int		len;
-	c_caddr_t	src;		/* become iov[] inside kernel */
-	caddr_t		dst;
-	caddr_t		mac;		/* must be big enough for chosen MAC */
-	c_caddr_t	iv;
+	const char * __kerncap src;	/* become iov[] inside kernel */
+	char * __kerncap dst;
+	char * __kerncap mac;		/* must be big enough for chosen MAC */
+	const char * __kerncap iv;
 };
 
 /* op and flags the same as crypt_op */
@@ -284,11 +261,11 @@ struct crypt_aead {
 	u_int		len;
 	u_int		aadlen;
 	u_int		ivlen;
-	c_caddr_t	src;		/* become iov[] inside kernel */
-	caddr_t		dst;
-	c_caddr_t	aad;		/* additional authenticated data */
-	caddr_t		tag;		/* must fit for chosen TAG length */
-	c_caddr_t	iv;
+	const char * __kerncap src;	/* become iov[] inside kernel */
+	char * __kerncap dst;
+	const char * __kerncap aad;	/* additional authenticated data */
+	char * __kerncap tag;		/* must fit for chosen TAG length */
+	const char * __kerncap iv;
 };
 
 /*
@@ -303,7 +280,12 @@ struct crypt_find_op {
 
 /* bignum parameter, in packed bytes, ... */
 struct crparam {
-	caddr_t		crp_p;
+	union {
+#ifdef _KERNEL
+		char * __capability crp_up;
+#endif
+		caddr_t	crp_p;
+	};
 	u_int		crp_nbits;
 };
 

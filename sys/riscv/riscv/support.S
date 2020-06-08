@@ -52,13 +52,9 @@ fsu_fault_nopcb:
 END(fsu_fault)
 
 /*
- * int casueword32_c(volatile uint32_t * __capability, uint32_t, uint32_t *, uint32_t)
+ * int casueword32(volatile uint32_t * __capability, uint32_t, uint32_t *, uint32_t)
  */
-#if __has_feature(capabilities)
-ENTRY(casueword32_c)
-#else
 ENTRY(casueword32)
-#endif
 	li	a4, (VM_MAXUSER_ADDRESS-3)
 	bgt	a0, a4, fsu_fault_nopcb
 	la	a6, fsu_fault		/* Load the fault handler */
@@ -83,20 +79,12 @@ ENTRY(casueword32)
 	sw	a4, 0(a2)		/* Store the read data */
 	mv	a0, a5			/* Success indicator */
 	ret				/* Return */
-#if __has_feature(capabilities)
-END(casueword32_c)
-#else
 END(casueword32)
-#endif
 
 /*
- * int casueword_c(volatile u_long * __capability, u_long, u_long *, u_long)
+ * int casueword(volatile u_long * __capability, u_long, u_long *, u_long)
  */
-#if __has_feature(capabilities)
-ENTRY(casueword_c)
-#else
 ENTRY(casueword)
-#endif
 	li	a4, (VM_MAXUSER_ADDRESS-7)
 	bgt	a0, a4, fsu_fault_nopcb
 	la	a6, fsu_fault		/* Load the fault handler */
@@ -121,20 +109,12 @@ ENTRY(casueword)
 	sd	a4, 0(a2)		/* Store the read data */
 	mv	a0, a5			/* Success indicator */
 	ret				/* Return */
-#if __has_feature(capabilities)
-END(casueword_c)
-#else
 END(casueword)
-#endif
 
 /*
- * int fubyte_c(volatile const void * __capability)
+ * int fubyte(volatile const void * __capability)
  */
-#if __has_feature(capabilities)
-ENTRY(fubyte_c)
-#else
 ENTRY(fubyte)
-#endif
 	li	a1, VM_MAXUSER_ADDRESS
 	bgt	a0, a1, fsu_fault_nopcb
 	la	a6, fsu_fault		/* Load the fault handler */
@@ -148,20 +128,12 @@ ENTRY(fubyte)
 	EXIT_USER_ACCESS(a1)
 	SET_FAULT_HANDLER(x0, a1)	/* Reset the fault handler */
 	ret				/* Return */
-#if __has_feature(capabilities)
-END(fubyte_c)
-#else
 END(fubyte)
-#endif
 
 /*
- * int fuword16_c(volatile const void * __capability)
+ * int fuword16(volatile const void * __capability)
  */
-#if __has_feature(capabilities)
-ENTRY(fuword16_c)
-#else
 ENTRY(fuword16)
-#endif
 	li	a1, (VM_MAXUSER_ADDRESS-1)
 	bgt	a0, a1, fsu_fault_nopcb
 	la	a6, fsu_fault		/* Load the fault handler */
@@ -175,20 +147,12 @@ ENTRY(fuword16)
 	EXIT_USER_ACCESS(a1)
 	SET_FAULT_HANDLER(x0, a1)	/* Reset the fault handler */
 	ret				/* Return */
-#if __has_feature(capabilities)
-END(fuword16_c)
-#else
 END(fuword16)
-#endif
 
 /*
- * int32_t fueword32_c(volatile const void * __capability, int32_t *)
+ * int32_t fueword32(volatile const void * __capability, int32_t *)
  */
-#if __has_feature(capabilities)
-ENTRY(fueword32_c)
-#else
 ENTRY(fueword32)
-#endif
 	li	a2, (VM_MAXUSER_ADDRESS-3)
 	bgt	a0, a2, fsu_fault_nopcb
 	la	a6, fsu_fault		/* Load the fault handler */
@@ -204,23 +168,14 @@ ENTRY(fueword32)
 	sw	a0, 0(a1)		/* Save the data in kernel space */
 	li	a0, 0			/* Success */
 	ret				/* Return */
-#if __has_feature(capabilities)
-END(fueword32_c)
-#else
 END(fueword32)
-#endif
 
 /*
- * long fueword_c(volatile const void __capability *, int64_t *)
- * int64_t fueword64_c(volatile const void __capability *, int64_t *)
+ * long fueword(volatile const void __capability *, int64_t *)
+ * int64_t fueword64(volatile const void __capability *, int64_t *)
  */
-#if __has_feature(capabilities)
-ENTRY(fueword_c)
-EENTRY(fueword64_c)
-#else
 ENTRY(fueword)
 EENTRY(fueword64)
-#endif
 	li	a2, (VM_MAXUSER_ADDRESS-7)
 	bgt	a0, a2, fsu_fault_nopcb
 	la	a6, fsu_fault		/* Load the fault handler */
@@ -236,13 +191,8 @@ EENTRY(fueword64)
 	sd	a0, 0(a1)		/* Save the data in kernel space */
 	li	a0, 0			/* Success */
 	ret				/* Return */
-#if __has_feature(capabilities)
-EEND(fueword64_c)
-END(fueword_c)
-#else
 EEND(fueword64)
 END(fueword)
-#endif
 
 #if __has_feature(capabilities)
 /*
@@ -264,13 +214,9 @@ END(fuecap)
 #endif
 
 /*
- * int subyte_c(volatile void * __capability, int)
+ * int subyte(volatile void * __capability, int)
  */
-#if __has_feature(capabilities)
-ENTRY(subyte_c)
-#else
 ENTRY(subyte)
-#endif
 	li	a2, VM_MAXUSER_ADDRESS
 	bgt	a0, a2, fsu_fault_nopcb
 	la	a6, fsu_fault		/* Load the fault handler */
@@ -285,20 +231,12 @@ ENTRY(subyte)
 	SET_FAULT_HANDLER(x0, a2)	/* Reset the fault handler */
 	li	a0, 0			/* Success */
 	ret				/* Return */
-#if __has_feature(capabilities)
-END(subyte_c)
-#else
 END(subyte)
-#endif
 
 /*
- * int suword16_c(volatile void * __capability, int)
+ * int suword16(volatile void * __capability, int)
  */
-#if __has_feature(capabilities)
-ENTRY(suword16_c)
-#else
 ENTRY(suword16)
-#endif
 	li	a2, (VM_MAXUSER_ADDRESS-1)
 	bgt	a0, a2, fsu_fault_nopcb
 	la	a6, fsu_fault		/* Load the fault handler */
@@ -313,20 +251,12 @@ ENTRY(suword16)
 	SET_FAULT_HANDLER(x0, a2)	/* Reset the fault handler */
 	li	a0, 0			/* Success */
 	ret				/* Return */
-#if __has_feature(capabilities)
-END(suword16_c)
-#else
 END(suword16)
-#endif
 
 /*
- * int suword32_c(volatile void * __capability, int)
+ * int suword32(volatile void * __capability, int)
  */
-#if __has_feature(capabilities)
-ENTRY(suword32_c)
-#else
 ENTRY(suword32)
-#endif
 	li	a2, (VM_MAXUSER_ADDRESS-3)
 	bgt	a0, a2, fsu_fault_nopcb
 	la	a6, fsu_fault		/* Load the fault handler */
@@ -341,22 +271,13 @@ ENTRY(suword32)
 	SET_FAULT_HANDLER(x0, a2)	/* Reset the fault handler */
 	li	a0, 0			/* Success */
 	ret				/* Return */
-#if __has_feature(capabilities)
-END(suword32_c)
-#else
 END(suword32)
-#endif
 
 /*
- * int suword_c(volatile void * __capability, long)
+ * int suword(volatile void * __capability, long)
  */
-#if __has_feature(capabilities)
-ENTRY(suword_c)
-EENTRY(suword64_c)
-#else
 ENTRY(suword)
 EENTRY(suword64)
-#endif
 	li	a2, (VM_MAXUSER_ADDRESS-7)
 	bgt	a0, a2, fsu_fault_nopcb
 	la	a6, fsu_fault		/* Load the fault handler */
@@ -371,13 +292,8 @@ EENTRY(suword64)
 	SET_FAULT_HANDLER(x0, a2)	/* Reset the fault handler */
 	li	a0, 0			/* Success */
 	ret				/* Return */
-#if __has_feature(capabilities)
-EEND(suword64_c)
-END(suword_c)
-#else
 EEND(suword64)
 END(suword)
-#endif
 
 #if __has_feature(capabilities)
 /*

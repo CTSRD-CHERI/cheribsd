@@ -228,7 +228,7 @@ static char *ld_utrace;		/* Use utrace() to log events. */
 static bool ld_skip_init_funcs = false;	/* XXXAR: debug environment variable to verify relocation processing */
 static struct obj_entry_q obj_list;	/* Queue of all loaded objects */
 static Obj_Entry *obj_main;	/* The main program shared object */
-#ifndef __CHERI_PURE_CAPABILITY__
+#if !defined(__mips__) || !defined(__CHERI_PURE_CAPABILITY__)
 static
 #endif
 Obj_Entry obj_rtld;	/* The dynamic linker shared object */
@@ -932,7 +932,7 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
     *exit_proc = rtld_exit_ptr;
     *objp = obj_main;
 
-#ifdef __CHERI_PURE_CAPABILITY__
+#if defined(__mips__) && defined(__CHERI_PURE_CAPABILITY__)
     // ensure that we setup a valid $cgp if the binary is built with -nostartfiles
     // Note: This value should still remain valid after the return since clang
     // won't clobber it. This should ensure that on return from here to
@@ -1535,6 +1535,18 @@ digest_dynamic1(Obj_Entry *obj, int early, const Elf_Dyn **dyn_rpath,
 #endif
 #endif
 
+#ifdef __riscv
+#ifdef __CHERI_PURE_CAPABILITY__
+	case DT_RISCV_CHERI___CAPRELOCS:
+		obj->cap_relocs = (obj->relocbase + dynp->d_un.d_ptr);
+		break;
+
+	case DT_RISCV_CHERI___CAPRELOCSSZ:
+		obj->cap_relocs_size = dynp->d_un.d_val;
+		break;
+#endif
+#endif
+
 	case DT_FLAGS_1:
 		if (dynp->d_un.d_val & DF_1_NOOPEN)
 		    obj->z_noopen = true;
@@ -1635,6 +1647,9 @@ digest_dynamic2(Obj_Entry *obj, const Elf_Dyn *dyn_rpath,
 	    obj->fini_array_ptr, obj->fini_array_num * sizeof(InitArrayEntry));
 
 	set_bounds_if_nonnull(obj->cap_relocs, obj->cap_relocs_size);
+
+	/* TODO: Bring the useful ABI features to RISC-V */
+#ifdef __mips__
 	set_bounds_if_nonnull(obj->writable_captable, obj->captable_size);
 	if (cheri_getlength(obj->writable_captable) != obj->captable_size) {
 		dbg("Using imprecise bounds for captable: " PTR_FMT
@@ -1712,6 +1727,7 @@ digest_dynamic2(Obj_Entry *obj, const Elf_Dyn *dyn_rpath,
 	}
 	dbg("%s: tightened bounds of text/rodata cap: " PTR_FMT, obj->path,
 	    obj->text_rodata_cap);
+#endif /* defined(__mips__) */
 #endif
 	return (true);
 }
@@ -3366,7 +3382,7 @@ relocate_object(Obj_Entry *obj, bool bind_now, Obj_Entry *rtldobj,
 	init_pltgot(obj);
 
 	/* Process the PLT relocations. */
-#ifdef __CHERI_PURE_CAPABILITY__
+#if defined(__mips__) && defined(__CHERI_PURE_CAPABILITY__)
 	/* No reloc_jmpslots for CHERI since it works differently: if BIND_NOW
 	 * is set, reloc_plt can avoid allocating trampolines for pc-rel code */
 	if (reloc_plt(obj, (obj->bind_now || bind_now), flags, rtldobj,

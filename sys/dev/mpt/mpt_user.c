@@ -36,7 +36,7 @@
 __FBSDID("$FreeBSD$");
 
 #include <sys/param.h>
-#ifdef __amd64__
+#if defined(__amd64__) || defined(COMPAT_FREEBSD64)
 #include <sys/abi_compat.h>
 #endif
 #include <sys/conf.h>
@@ -601,10 +601,17 @@ mpt_ioctl(struct cdev *dev, u_long cmd, caddr_t arg, int flag, struct thread *td
 	struct mpt_page_memory mpt_page;
 #ifdef __amd64__
 	struct mpt_cfg_page_req32 *page_req32;
-	struct mpt_cfg_page_req page_req_swab;
 	struct mpt_ext_cfg_page_req32 *ext_page_req32;
-	struct mpt_ext_cfg_page_req ext_page_req_swab;
 	struct mpt_raid_action32 *raid_act32;
+#endif
+#ifdef COMPAT_FREEBSD64
+	struct mpt_cfg_page_req64 *page_req64;
+	struct mpt_ext_cfg_page_req64 *ext_page_req64;
+	struct mpt_raid_action64 *raid_act64;
+#endif
+#if defined(__amd64__) || defined(COMPAT_FREEBSD64)
+	struct mpt_cfg_page_req page_req_swab;
+	struct mpt_ext_cfg_page_req ext_page_req_swab;
 	struct mpt_raid_action raid_act_swab;
 #endif
 	int error;
@@ -627,7 +634,8 @@ mpt_ioctl(struct cdev *dev, u_long cmd, caddr_t arg, int flag, struct thread *td
 		page_req = &page_req_swab;
 		page_req->header = page_req32->header;
 		page_req->page_address = page_req32->page_address;
-		page_req->buf = PTRIN(page_req32->buf);
+		page_req->buf = __USER_CAP(PTRIN(page_req32->buf),
+		    page_req32->len);
 		page_req->len = page_req32->len;
 		page_req->ioc_status = page_req32->ioc_status;
 		break;
@@ -636,7 +644,8 @@ mpt_ioctl(struct cdev *dev, u_long cmd, caddr_t arg, int flag, struct thread *td
 		ext_page_req = &ext_page_req_swab;
 		ext_page_req->header = ext_page_req32->header;
 		ext_page_req->page_address = ext_page_req32->page_address;
-		ext_page_req->buf = PTRIN(ext_page_req32->buf);
+		ext_page_req->buf = __USER_CAP(PTRIN(ext_page_req32->buf),
+		    ext_page_req32->len);
 		ext_page_req->len = ext_page_req32->len;
 		ext_page_req->ioc_status = ext_page_req32->ioc_status;
 		break;
@@ -647,7 +656,8 @@ mpt_ioctl(struct cdev *dev, u_long cmd, caddr_t arg, int flag, struct thread *td
 		raid_act->volume_id = raid_act32->volume_id;
 		raid_act->phys_disk_num = raid_act32->phys_disk_num;
 		raid_act->action_data_word = raid_act32->action_data_word;
-		raid_act->buf = PTRIN(raid_act32->buf);
+		raid_act->buf = __USER_CAP(PTRIN(raid_act32->buf),
+		    raid_act32->len);
 		raid_act->len = raid_act32->len;
 		raid_act->volume_status = raid_act32->volume_status;
 		bcopy(raid_act32->action_data, raid_act->action_data,
@@ -658,10 +668,59 @@ mpt_ioctl(struct cdev *dev, u_long cmd, caddr_t arg, int flag, struct thread *td
 		break;
 	}
 #endif
+#ifdef COMPAT_FREEBSD64
+	/* Convert 64-bit structs to native ones. */
+	page_req64 = (void *)arg;
+	ext_page_req64 = (void *)arg;
+	raid_act64 = (void *)arg;
+	switch (cmd) {
+	case MPTIO_READ_CFG_HEADER64:
+	case MPTIO_READ_CFG_PAGE64:
+	case MPTIO_WRITE_CFG_PAGE64:
+		page_req = &page_req_swab;
+		page_req->header = page_req64->header;
+		page_req->page_address = page_req64->page_address;
+		page_req->buf = __USER_CAP(PTRIN(page_req64->buf),
+		    page_req64->len);
+		page_req->len = page_req64->len;
+		page_req->ioc_status = page_req64->ioc_status;
+		break;
+	case MPTIO_READ_EXT_CFG_HEADER64:
+	case MPTIO_READ_EXT_CFG_PAGE64:
+		ext_page_req = &ext_page_req_swab;
+		ext_page_req->header = ext_page_req64->header;
+		ext_page_req->page_address = ext_page_req64->page_address;
+		ext_page_req->buf = __USER_CAP(PTRIN(ext_page_req64->buf),
+		    ext_page_req64->len);
+		ext_page_req->len = ext_page_req64->len;
+		ext_page_req->ioc_status = ext_page_req64->ioc_status;
+		break;
+	case MPTIO_RAID_ACTION64:
+		raid_act = &raid_act_swab;
+		raid_act->action = raid_act64->action;
+		raid_act->volume_bus = raid_act64->volume_bus;
+		raid_act->volume_id = raid_act64->volume_id;
+		raid_act->phys_disk_num = raid_act64->phys_disk_num;
+		raid_act->action_data_word = raid_act64->action_data_word;
+		raid_act->buf = __USER_CAP(PTRIN(raid_act64->buf),
+		    raid_act64->len);
+		raid_act->len = raid_act64->len;
+		raid_act->volume_status = raid_act64->volume_status;
+		bcopy(raid_act64->action_data, raid_act->action_data,
+		    sizeof(raid_act->action_data));
+		raid_act->action_status = raid_act64->action_status;
+		raid_act->ioc_status = raid_act64->ioc_status;
+		raid_act->write = raid_act64->write;
+		break;
+	}
+#endif
 
 	switch (cmd) {
 #ifdef __amd64__
 	case MPTIO_READ_CFG_HEADER32:
+#endif
+#ifdef COMPAT_FREEBSD64
+	case MPTIO_READ_CFG_HEADER64:
 #endif
 	case MPTIO_READ_CFG_HEADER:
 		MPT_LOCK(mpt);
@@ -670,6 +729,9 @@ mpt_ioctl(struct cdev *dev, u_long cmd, caddr_t arg, int flag, struct thread *td
 		break;
 #ifdef __amd64__
 	case MPTIO_READ_CFG_PAGE32:
+#endif
+#ifdef COMPAT_FREEBSD64
+	case MPTIO_READ_CFG_PAGE64:
 #endif
 	case MPTIO_READ_CFG_PAGE:
 		error = mpt_alloc_buffer(mpt, &mpt_page, page_req->len);
@@ -689,6 +751,9 @@ mpt_ioctl(struct cdev *dev, u_long cmd, caddr_t arg, int flag, struct thread *td
 #ifdef __amd64__
 	case MPTIO_READ_EXT_CFG_HEADER32:
 #endif
+#ifdef COMPAT_FREEBSD64
+	case MPTIO_READ_EXT_CFG_HEADER64:
+#endif
 	case MPTIO_READ_EXT_CFG_HEADER:
 		MPT_LOCK(mpt);
 		error = mpt_user_read_extcfg_header(mpt, ext_page_req);
@@ -696,6 +761,9 @@ mpt_ioctl(struct cdev *dev, u_long cmd, caddr_t arg, int flag, struct thread *td
 		break;
 #ifdef __amd64__
 	case MPTIO_READ_EXT_CFG_PAGE32:
+#endif
+#ifdef COMPAT_FREEBSD64
+	case MPTIO_READ_EXT_CFG_PAGE64:
 #endif
 	case MPTIO_READ_EXT_CFG_PAGE:
 		error = mpt_alloc_buffer(mpt, &mpt_page, ext_page_req->len);
@@ -716,6 +784,9 @@ mpt_ioctl(struct cdev *dev, u_long cmd, caddr_t arg, int flag, struct thread *td
 #ifdef __amd64__
 	case MPTIO_WRITE_CFG_PAGE32:
 #endif
+#ifdef COMPAT_FREEBSD64
+	case MPTIO_WRITE_CFG_PAGE64:
+#endif
 	case MPTIO_WRITE_CFG_PAGE:
 		error = mpt_alloc_buffer(mpt, &mpt_page, page_req->len);
 		if (error)
@@ -729,6 +800,9 @@ mpt_ioctl(struct cdev *dev, u_long cmd, caddr_t arg, int flag, struct thread *td
 		break;
 #ifdef __amd64__
 	case MPTIO_RAID_ACTION32:
+#endif
+#ifdef COMPAT_FREEBSD64
+	case MPTIO_RAID_ACTION64:
 #endif
 	case MPTIO_RAID_ACTION:
 		if (raid_act->buf != NULL) {
@@ -767,7 +841,6 @@ mpt_ioctl(struct cdev *dev, u_long cmd, caddr_t arg, int flag, struct thread *td
 	case MPTIO_WRITE_CFG_PAGE32:
 		page_req32->header = page_req->header;
 		page_req32->page_address = page_req->page_address;
-		page_req32->buf = PTROUT(page_req->buf);
 		page_req32->len = page_req->len;
 		page_req32->ioc_status = page_req->ioc_status;
 		break;
@@ -775,7 +848,6 @@ mpt_ioctl(struct cdev *dev, u_long cmd, caddr_t arg, int flag, struct thread *td
 	case MPTIO_READ_EXT_CFG_PAGE32:		
 		ext_page_req32->header = ext_page_req->header;
 		ext_page_req32->page_address = ext_page_req->page_address;
-		ext_page_req32->buf = PTROUT(ext_page_req->buf);
 		ext_page_req32->len = ext_page_req->len;
 		ext_page_req32->ioc_status = ext_page_req->ioc_status;
 		break;
@@ -785,7 +857,6 @@ mpt_ioctl(struct cdev *dev, u_long cmd, caddr_t arg, int flag, struct thread *td
 		raid_act32->volume_id = raid_act->volume_id;
 		raid_act32->phys_disk_num = raid_act->phys_disk_num;
 		raid_act32->action_data_word = raid_act->action_data_word;
-		raid_act32->buf = PTROUT(raid_act->buf);
 		raid_act32->len = raid_act->len;
 		raid_act32->volume_status = raid_act->volume_status;
 		bcopy(raid_act->action_data, raid_act32->action_data,
@@ -793,6 +864,40 @@ mpt_ioctl(struct cdev *dev, u_long cmd, caddr_t arg, int flag, struct thread *td
 		raid_act32->action_status = raid_act->action_status;
 		raid_act32->ioc_status = raid_act->ioc_status;
 		raid_act32->write = raid_act->write;
+		break;
+	}
+#endif
+#ifdef COMPAT_FREEBSD64
+	/* Convert native structs to 64-bit ones. */
+	switch (cmd) {
+	case MPTIO_READ_CFG_HEADER64:
+	case MPTIO_READ_CFG_PAGE64:
+	case MPTIO_WRITE_CFG_PAGE64:
+		page_req64->header = page_req->header;
+		page_req64->page_address = page_req->page_address;
+		page_req64->len = page_req->len;
+		page_req64->ioc_status = page_req->ioc_status;
+		break;
+	case MPTIO_READ_EXT_CFG_HEADER64:
+	case MPTIO_READ_EXT_CFG_PAGE64:		
+		ext_page_req64->header = ext_page_req->header;
+		ext_page_req64->page_address = ext_page_req->page_address;
+		ext_page_req64->len = ext_page_req->len;
+		ext_page_req64->ioc_status = ext_page_req->ioc_status;
+		break;
+	case MPTIO_RAID_ACTION64:
+		raid_act64->action = raid_act->action;
+		raid_act64->volume_bus = raid_act->volume_bus;
+		raid_act64->volume_id = raid_act->volume_id;
+		raid_act64->phys_disk_num = raid_act->phys_disk_num;
+		raid_act64->action_data_word = raid_act->action_data_word;
+		raid_act64->len = raid_act->len;
+		raid_act64->volume_status = raid_act->volume_status;
+		bcopy(raid_act->action_data, raid_act64->action_data,
+		    sizeof(raid_act->action_data));
+		raid_act64->action_status = raid_act->action_status;
+		raid_act64->ioc_status = raid_act->ioc_status;
+		raid_act64->write = raid_act->write;
 		break;
 	}
 #endif

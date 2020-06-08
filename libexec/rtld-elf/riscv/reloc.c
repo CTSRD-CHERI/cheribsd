@@ -43,6 +43,10 @@ __FBSDID("$FreeBSD$");
 #include "rtld.h"
 #include "rtld_printf.h"
 
+#ifdef __CHERI_PURE_CAPABILITY__
+#include "cheri_reloc.h"
+#endif
+
 /*
  * It is possible for the compiler to emit relocations for unaligned data.
  * We handle this situation with these inlines.
@@ -50,6 +54,7 @@ __FBSDID("$FreeBSD$");
 #define	RELOC_ALIGNED_P(x) \
 	(((uintptr_t)(x) & (sizeof(void *) - 1)) == 0)
 
+#ifndef __CHERI_PURE_CAPABILITY__
 uint64_t
 set_gp(Obj_Entry *obj)
 {
@@ -72,6 +77,7 @@ set_gp(Obj_Entry *obj)
 
 	return (old);
 }
+#endif
 
 void
 init_pltgot(Obj_Entry *obj)
@@ -82,6 +88,54 @@ init_pltgot(Obj_Entry *obj)
 		obj->pltgot[1] = (Elf_Addr)obj;
 	}
 }
+
+#ifdef __CHERI_PURE_CAPABILITY__
+/*
+ * Plain RISC-V can rely on PC-relative addressing early in rtld startup.
+ * However, pure capability code requires capabilities from the captable for
+ * function calls, and so we must perform early self-relocation before calling
+ * the general _rtld C entry point.
+ *
+ * TODO: For now we use __cap_relocs. Instead we should use normal ELF
+ *       relocations that are all assumed to be relative capability
+ *       relocations, ditching the ad-hoc __cap_relocs format and using
+ *       CBuildCap.
+ */
+void _rtld_relocate_nonplt_self(Elf_Dyn *dynp, Elf_Auxinfo *aux);
+
+void
+_rtld_relocate_nonplt_self(Elf_Dyn *dynp, Elf_Auxinfo *aux)
+{
+	caddr_t relocbase = NULL;
+	const struct capreloc *caprelocs = NULL, *caprelocslim;
+	Elf_Addr caprelocssz = 0;
+	void *pcc;
+
+	for (; aux->a_type != AT_NULL; aux++) {
+		if (aux->a_type == AT_BASE) {
+			relocbase = aux->a_un.a_ptr;
+			break;
+		}
+	}
+
+	for (; dynp->d_tag != DT_NULL; dynp++) {
+		switch (dynp->d_tag) {
+		case DT_RISCV_CHERI___CAPRELOCS:
+			caprelocs = (const struct capreloc *)(relocbase + dynp->d_un.d_ptr);
+			break;
+		case DT_RISCV_CHERI___CAPRELOCSSZ:
+			caprelocssz = dynp->d_un.d_val;
+			break;
+		}
+	}
+	caprelocs = cheri_setbounds(caprelocs, caprelocssz);
+	caprelocslim = (const struct capreloc *)((const char *)caprelocs + caprelocssz);
+	pcc = __builtin_cheri_program_counter_get();
+	/* TODO: allow using tight bounds for RTLD */
+	_do___caprelocs(caprelocs, caprelocslim, relocbase, pcc,
+	    (Elf_Addr)relocbase, false);
+}
+#endif /* __CHERI_PURE_CAPABILITY__ */
 
 int
 do_copy_relocations(Obj_Entry *dstobj)
@@ -257,6 +311,17 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 	Elf_Addr *where;
 	unsigned long symnum;
 
+#ifdef __CHERI_PURE_CAPABILITY__
+	/*
+	 * The __cap_relocs for the dynamic loader have already been done, and
+	 * there should be no normal ELF relocations.
+	 */
+	if (obj == obj_rtld) {
+		assert(obj->relasize == 0);
+		return (0);
+	}
+#endif
+
 	if ((flags & SYMLOOK_IFUNC) != 0)
 		/* XXX not implemented */
 		return (0);
@@ -368,6 +433,13 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 		case R_RISCV_RELATIVE:
 			*where = (Elf_Addr)(obj->relocbase + rela->r_addend);
 			break;
+#ifdef __CHERI_PURE_CAPABILITY__
+		case R_RISCV_CHERI_CAPABILITY:
+			if (process_r_cheri_capability(obj, symnum, lockstate,
+			    flags, where, rela->r_addend) != 0)
+				return (-1);
+			break;
+#endif /* __CHERI_PURE_CAPABILITY__ */
 		default:
 			rtld_printf("%s: Unhandled relocation %lu\n",
 			    obj->path, ELF_R_TYPE(rela->r_info));
@@ -406,7 +478,11 @@ allocate_initial_tls(Obj_Entry *objs)
 	tp = (Elf_Addr **)((char *)allocate_tls(objs, NULL, TLS_TCB_SIZE, 16)
 	    + TLS_TP_OFFSET + TLS_TCB_SIZE);
 
+#ifdef __CHERI_PURE_CAPABILITY__
+	__asm __volatile("cmove ctp, %0" :: "C"(tp));
+#else
 	__asm __volatile("mv  tp, %0" :: "r"(tp));
+#endif
 }
 
 void *
@@ -415,9 +491,13 @@ __tls_get_addr(tls_index* ti)
 	char *_tp;
 	void *p;
 
+#ifdef __CHERI_PURE_CAPABILITY__
+	__asm __volatile("cmove %0, ctp" : "=C" (_tp));
+#else
 	__asm __volatile("mv %0, tp" : "=r" (_tp));
+#endif
 
-	p = tls_get_addr_common((Elf_Addr**)((Elf_Addr)_tp - TLS_TP_OFFSET
+	p = tls_get_addr_common((uintptr_t **)(_tp - TLS_TP_OFFSET
 	    - TLS_TCB_SIZE), ti->ti_module, ti->ti_offset);
 
 	return ((char*)p + TLS_DTV_OFFSET);

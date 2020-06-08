@@ -471,7 +471,7 @@ struct  ifdrv {
 	char            ifd_name[IFNAMSIZ];     /* if name, e.g. "en0" */
 	unsigned long   ifd_cmd;
 	size_t          ifd_len;
-	void            *ifd_data;
+	void            * __kerncap ifd_data;
 };
 
 /* 

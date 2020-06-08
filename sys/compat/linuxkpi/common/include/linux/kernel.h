@@ -107,6 +107,7 @@
       if (__ret) {						\
 		printf("WARNING %s failed at %s:%d\n",		\
 		    __stringify(cond), __FILE__, __LINE__);	\
+		linux_dump_stack();				\
       }								\
       unlikely(__ret);						\
 })
@@ -120,6 +121,7 @@
 		__warn_on_once = 1;				\
 		printf("WARNING %s failed at %s:%d\n",		\
 		    __stringify(cond), __FILE__, __LINE__);	\
+		linux_dump_stack();				\
       }								\
       unlikely(__ret);						\
 })
@@ -431,7 +433,7 @@ kstrtobool(const char *s, bool *res)
 }
 
 static inline int
-kstrtobool_from_user(const char __user *s, size_t count, bool *res)
+kstrtobool_from_user(const char __user * __capability s, size_t count, bool *res)
 {
 	char buf[8] = {};
 

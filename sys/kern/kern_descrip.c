@@ -43,8 +43,6 @@ __FBSDID("$FreeBSD$");
 #include "opt_ddb.h"
 #include "opt_ktrace.h"
 
-#define	EXPLICIT_USER_ACCESS
-
 #include <sys/param.h>
 #include <sys/systm.h>
 

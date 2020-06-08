@@ -29,8 +29,6 @@
 
 /* Portions Copyright 2010 Robert Milkowski */
 
-#define	EXPLICIT_USER_ACCESS
-
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/systm.h>
