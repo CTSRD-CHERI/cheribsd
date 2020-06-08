@@ -154,6 +154,7 @@ void	colocation_get_peer(struct thread *td, struct thread **peertdp);
 void	colocation_thread_exit(struct thread *td);
 void	colocation_unborrow(struct thread *td, struct trapframe **trapframep);
 bool	colocation_trap_in_switcher(struct thread *td, struct trapframe *trapframe);
+void	colocation_update_tls(struct thread *td);
 void	db_print_scb_td(struct thread *td);
 #endif /* !_KERNEL */
 

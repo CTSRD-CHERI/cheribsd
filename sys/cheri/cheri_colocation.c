@@ -322,6 +322,33 @@ colocation_trap_in_switcher(struct thread *td, struct trapframe *trapframe)
 	return (false);
 }
 
+void
+colocation_update_tls(struct thread *td)
+{
+	vaddr_t addr;
+	struct switchercb scb;
+	int error;
+
+	addr = td->td_md.md_scb;
+	if (addr == 0) {
+		/*
+		 * We've never called cosetup(2).
+		 */
+		return;
+	}
+
+	error = copyincap(___USER_CFROMPTR((const void *)addr, userspace_cap), &scb, sizeof(scb));
+	KASSERT(error == 0, ("%s: copyincap from %p failed with error %d\n", __func__, (void *)addr, error));
+
+	COLOCATION_DEBUG("changing TLS from %p to %p",
+	    (__cheri_fromcap void *)scb.scb_tls,
+	    (__cheri_fromcap void *)((char * __capability)td->td_md.md_tls + td->td_md.md_tls_tcb_offset));
+	scb.scb_tls = (char * __capability)td->td_md.md_tls + td->td_md.md_tls_tcb_offset;
+
+	error = copyoutcap(&scb, ___USER_CFROMPTR((void *)addr, userspace_cap), sizeof(scb));
+	KASSERT(error == 0, ("%s: copyoutcap from %p failed with error %d\n", __func__, (void *)addr, error));
+}
+
 /*
  * Setup the per-thread switcher control block.
  */
@@ -371,6 +398,7 @@ setup_scb(struct thread *td)
 	scb.scb_td = td;
 	scb.scb_borrower_td = NULL;
 	scb.scb_peer_scb = NULL;
+	scb.scb_tls = (char * __capability)td->td_md.md_tls + td->td_md.md_tls_tcb_offset;
 
 	error = copyoutcap(&scb,
 	    ___USER_CFROMPTR((void *)addr, userspace_cap), sizeof(scb));
@@ -827,6 +855,7 @@ db_print_scb(struct switchercb *scb)
 	db_printf("    scb_peer_scb:	%p\n", (__cheri_fromcap void *)scb->scb_peer_scb);
 	db_printf("    scb_td:		%p\n", scb->scb_td);
 	db_printf("    scb_borrower_td:	%p\n", scb->scb_borrower_td);
+	db_printf("    scb_tls:		%p\n", (__cheri_fromcap void *)scb->scb_tls);
 }
 
 void

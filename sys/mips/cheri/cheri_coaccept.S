@@ -119,6 +119,7 @@
  * scb_td:		1*CHERICAP_SIZE($idc)
  * scb_borrower_td:	1*CHERICAP_SIZE+8($idc)
  * scb_unsealcap:	2*CHERICAP_SIZE($idc)
+ * scb_tls:		3*CHERICAP_SIZE($idc)
  * ... and the rest:	4*CHERICAP_SIZE+XXX($idc)
  *
  */
@@ -185,6 +186,12 @@ _C_LABEL(switcher_coaccept):
 	cld	t8, zero, 1*CHERICAP_SIZE($c25);
 	csd	t8, zero, 1*CHERICAP_SIZE+8($idc)
 	csd	zero, zero, 1*CHERICAP_SIZE+8($c25)
+
+	/*
+	 * Restore caller's TLS pointer.
+	 */
+	clc	$c11, zero, 3*CHERICAP_SIZE($c25)
+	cwritehwr	$c11, $chwr_userlocal
 
 	/*
 	 * Restore the caller's context.

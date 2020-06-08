@@ -659,11 +659,13 @@ cpu_set_user_tls(struct thread *td, void * __capability tls_base)
 		 * with the '_thread' attribute).
 		 */
 #if __has_feature(capabilities)
-		if (SV_PROC_FLAG(td->td_proc, SV_CHERI))
+		if (SV_PROC_FLAG(td->td_proc, SV_CHERI)) {
 			__asm __volatile ("cwritehwr %0, $chwr_userlocal"
 			    :
 			    : "C" ((char * __capability)td->td_md.md_tls +
 				td->td_md.md_tls_tcb_offset));
+			colocation_update_tls(td);
+		}
 		else
 #endif
 		if (cpuinfo.userlocal_reg == true) {

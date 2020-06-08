@@ -109,6 +109,7 @@
  * scb_td:		1*CHERICAP_SIZE($idc)
  * scb_borrower_td:	1*CHERICAP_SIZE+8($idc)
  * scb_unsealcap:	2*CHERICAP_SIZE($idc)
+ * scb_tls:		3*CHERICAP_SIZE($idc)
  * ... and the rest:	4*CHERICAP_SIZE+XXX($idc)
  *
  */
@@ -186,6 +187,12 @@ _C_LABEL(switcher_cocall):
 	clc	$c24, zero, 12*CHERICAP_SIZE+4*CHERICAP_SIZE+256($c25)
 	ccleartag	$c4, $c4
 	csc	$c4, zero, 0($c24)
+
+	/*
+	 * Restore callee's TLS pointer.  (XXX: 3 - offset of two capabilities and two pointers inbetween; this is somewhat horrible.)
+	 */
+	clc	$c11, zero, 3*CHERICAP_SIZE($c25)
+	cwritehwr	$c11, $chwr_userlocal
 
 	/*
 	 * Restore the callee's context.
