@@ -721,15 +721,13 @@ start_init(void *dummy)
 	}
 	free_init_path = tmp_init_path = strdup(init_path, M_TEMP);
 
-#define TEST_KERNEL_STARTUP_VAR "cheribsd.kernel_startup_benchmark"
-	if (kern_getenv(TEST_KERNEL_STARTUP_VAR)) {
-		printf("Shutting down for benchmarking (%s is set)\n",
-		    TEST_KERNEL_STARTUP_VAR);
+	if (kern_getenv("cheribsd.kernel_startup_benchmark")) {
+		printf("Shutting down for benchmarking"
+		    " (cheribsd.kernel_startup_benchmark is set)\n");
 		poweroff_delay = 0; /* Don't sleep before poweroff. */
 		kern_reboot(RB_HALT | RB_POWEROFF | RB_NOSYNC | RB_VERBOSE);
 		panic("Did not power off");
 	}
-#undef TEST_KERNEL_STARTUP_VAR
 
 	while ((path = strsep(&tmp_init_path, ":")) != NULL) {
 		if (bootverbose)
