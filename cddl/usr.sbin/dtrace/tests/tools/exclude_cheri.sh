@@ -37,19 +37,49 @@ exclude SKIP common/json/usdt.d
 exclude SKIP common/func/tst.mutex_owner.d
 
 # fbt - when all the probes are enabled, the system is stucks
+exclude SKIP common/misc/tst.schrock.ksh
+exclude SKIP common/misc/tst.roch.d
+exclude SKIP common/fbtprovider/tst.basic.d
 exclude SKIP common/fbtprovider/tst.return.d
 exclude SKIP common/fbtprovider/tst.tailcall.d
-exclude SKIP common/misc/tst.roch.d
-exclude SKIP common/safety/tst.basename.d
-exclude SKIP common/safety/tst.cleanpath.d
-exclude SKIP common/safety/tst.ddi_pathname.d
-exclude SKIP common/safety/tst.dirname.d
-exclude SKIP common/safety/tst.index.d
-exclude SKIP common/safety/tst.msgdsize.d
-exclude SKIP common/safety/tst.strchr.d
-exclude SKIP common/safety/tst.strjoin.d
-exclude SKIP common/safety/tst.strstr.d
+exclude SKIP common/docsExamples/specopen.d
+exclude SKIP common/safety/tst.stddev.d
+exclude SKIP common/safety/tst.uid.d
 exclude SKIP common/safety/tst.strtok.d
+exclude SKIP common/safety/tst.progenyof.d
+exclude SKIP common/safety/tst.uregs.d
+exclude SKIP common/safety/tst.rw.d
+exclude SKIP common/safety/tst.zonename.d
+exclude SKIP common/safety/tst.errno.d
+exclude SKIP common/safety/tst.strstr.d
+exclude SKIP common/safety/tst.unalign.d
+exclude SKIP common/safety/tst.ddi_pathname.d
+exclude SKIP common/safety/tst.stack.d
+exclude SKIP common/safety/tst.index.d
+exclude SKIP common/safety/tst.substr.d
+exclude SKIP common/safety/tst.jid.d
+exclude SKIP common/safety/tst.random.d
+exclude SKIP common/safety/tst.jailname.d
+exclude SKIP common/safety/tst.basename.d
+exclude SKIP common/safety/tst.ustackdepth.d
+exclude SKIP common/safety/tst.gid.d
+exclude SKIP common/safety/tst.hton.d
+exclude SKIP common/safety/tst.vahole.d
+exclude SKIP common/safety/tst.null.d
+exclude SKIP common/safety/tst.dirname.d
+exclude SKIP common/safety/tst.strjoin.d
+exclude SKIP common/safety/tst.ustack.d
+exclude SKIP common/safety/tst.execname.d
+exclude SKIP common/safety/tst.stackdepth.d
+exclude SKIP common/safety/tst.pid.d
+exclude SKIP common/safety/tst.ucaller.d
+exclude SKIP common/safety/tst.msgsize.d
+exclude SKIP common/safety/tst.strchr.d
+exclude SKIP common/safety/tst.caller.d
+exclude SKIP common/safety/tst.cleanpath.d
+exclude SKIP common/safety/tst.ppid.d
+exclude SKIP common/safety/tst.violentdeath.ksh
+exclude SKIP common/safety/tst.msgdsize.d
 
 
 # timeout for some reason
@@ -127,3 +157,8 @@ exclude SKIP common/usdt/tst.user.ksh
 # ustack - ksh not available in CHERI
 exclude EXFAIL common/ustack/tst.bigstack.d
 exclude EXFAIL common/ustack/tst.depth.ksh
+
+
+
+
+
