@@ -33,6 +33,7 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
+#include <sys/param.h>
 #include <sys/wait.h>
 
 #include <machine/elf.h>
@@ -44,6 +45,9 @@ __FBSDID("$FreeBSD$");
 #include <err.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <gelf.h>
+#include <libelf.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -344,6 +348,74 @@ usage(void)
 	exit(1);
 }
 
+static bool
+check_notes(const char *buf, size_t len)
+{
+	const Elf_Note *note;
+	const char *name;
+	size_t namesz, descsz;
+
+	for (;;) {
+		if (len < sizeof(*note))
+			return (false);
+		note = (const Elf_Note *)(uintptr_t)buf;
+		buf += sizeof(*note);
+		len -= sizeof(*note);
+
+		namesz = roundup2(note->n_namesz, 4);
+		descsz = roundup2(note->n_descsz, 4);
+		if (len < namesz + descsz)
+			return (false);
+
+		name = buf;
+		if (strncmp(name, "FreeBSD", namesz) == 0 && 
+		    note->n_type == NT_FREEBSD_ABI_TAG)
+			return (true);
+
+		buf += namesz + descsz;
+		len -= namesz + descsz;
+	}
+
+	return (false);
+}
+
+static bool
+is_freebsd_elf(const char *fname, Elf *elf, GElf_Ehdr *ehdr)
+{
+	GElf_Shdr shdr;
+	Elf_Scn *scn;
+	Elf_Data *d;
+
+	switch (ehdr->e_ident[EI_OSABI]) {
+	case ELFOSABI_FREEBSD:
+		return (true);
+	case ELFOSABI_NONE:
+		break;
+	default:
+		return (false);
+	}
+
+	scn = NULL;
+	while ((scn = elf_nextscn(elf, scn)) != NULL) {
+		if (gelf_getshdr(scn, &shdr) == NULL) {
+			warnx("%s: %s", fname, elf_errmsg(0));
+			return (false);
+		}
+
+		if (shdr.sh_type != SHT_NOTE)
+			continue;
+
+		d = elf_getdata(scn, NULL);
+		if (d == NULL)
+			continue;
+
+		if (check_notes(d->d_buf, d->d_size))
+			return (true);
+	}
+
+	return (false);
+}
+
 static int
 is_executable(const char *fname, int fd, int *is_shlib, int *type,
     const char** rtld)
@@ -352,11 +424,9 @@ is_executable(const char *fname, int fd, int *is_shlib, int *type,
 #ifdef AOUT_SUPPORTED
 		struct exec aout;
 #endif
-#if __ELF_WORD_SIZE > 32 && defined(ELF32_SUPPORTED)
-		Elf32_Ehdr elf32;
-#endif
 		Elf_Ehdr elf;
 	} hdr;
+	Elf *elf;
 	int n;
 
 	*is_shlib = 0;
@@ -385,106 +455,100 @@ is_executable(const char *fname, int fd, int *is_shlib, int *type,
 	}
 #endif
 
-#if __ELF_WORD_SIZE > 32 && defined(ELF32_SUPPORTED)
-	if ((size_t)n >= sizeof(hdr.elf32) && IS_ELF(hdr.elf32) &&
-	    hdr.elf32.e_ident[EI_CLASS] == ELFCLASS32) {
-		/* Handle 32 bit ELF objects */
-		Elf32_Phdr phdr;
-		int dynamic, i;
+	if ((size_t)n >= sizeof(hdr.elf) && IS_ELF(hdr.elf)) {
+		GElf_Ehdr ehdr;
+		GElf_Phdr phdr;
+		int i;
+		bool dynamic, interp;
 
-		dynamic = 0;
-		*type = TYPE_ELF32;
-		*rtld = _COMPAT32_PATH_RTLD;
+		dynamic = false;
+		interp = false;
 
-		if (lseek(fd, hdr.elf32.e_phoff, SEEK_SET) == -1) {
-			warnx("%s: header too short", fname);
+		if (elf_version(EV_CURRENT) == EV_NONE) {
+			warnx("unsupported libelf");
 			return (0);
 		}
-		for (i = 0; i < hdr.elf32.e_phnum; i++) {
-			if (read(fd, &phdr, hdr.elf32.e_phentsize) !=
-			    sizeof(phdr)) {
-				warnx("%s: can't read program header", fname);
-				return (0);
-			}
-			if (phdr.p_type == PT_DYNAMIC) {
-				dynamic = 1;
-				break;
-			}
+		elf = elf_begin(fd, ELF_C_READ, NULL);
+		if (elf == NULL) {
+			warnx("%s: %s", fname, elf_errmsg(0));
+			return (0);
 		}
-
-		if (!dynamic) {
+		if (elf_kind(elf) != ELF_K_ELF) {
+			elf_end(elf);
 			warnx("%s: not a dynamic ELF executable", fname);
 			return (0);
 		}
-		if (hdr.elf32.e_type == ET_DYN) {
-			if (hdr.elf32.e_ident[EI_OSABI] == ELFOSABI_FREEBSD) {
-				*is_shlib = 1;
-				return (1);
-			}
-			warnx("%s: not a FreeBSD ELF shared object", fname);
+		if (gelf_getehdr(elf, &ehdr) == NULL) {
+			warnx("%s: %s", fname, elf_errmsg(0));
+			elf_end(elf);
 			return (0);
 		}
 
-		return (1);
-	}
-#endif
-
-	if ((size_t)n >= sizeof(hdr.elf) && IS_ELF(hdr.elf) &&
-	    hdr.elf.e_ident[EI_CLASS] == ELF_TARG_CLASS) {
-		/* Handle default ELF objects on this architecture */
-		Elf_Phdr phdr;
-		int dynamic, i;
-
-		dynamic = 0;
 		*type = TYPE_ELF;
 		*rtld = _DEFAULT_PATH_RTLD;
-
-		if (lseek(fd, hdr.elf.e_phoff, SEEK_SET) == -1) {
-			warnx("%s: header too short", fname);
-			return (0);
+#if __ELF_WORD_SIZE > 32 && defined(ELF32_SUPPORTED)
+		if (gelf_getclass(elf) == ELFCLASS32) {
+			*type = TYPE_ELF32;
+			*rtld = _COMPAT32_PATH_RTLD;
 		}
-		for (i = 0; i < hdr.elf.e_phnum; i++) {
-			if (read(fd, &phdr, hdr.elf.e_phentsize)
-			   != sizeof(phdr)) {
-				warnx("%s: can't read program header", fname);
+#endif
+
+		for (i = 0; i < ehdr.e_phnum; i++) {
+			if (gelf_getphdr(elf, i, &phdr) == NULL) {
+				warnx("%s: %s", fname, elf_errmsg(0));
+				elf_end(elf);
 				return (0);
 			}
-			if (phdr.p_type == PT_DYNAMIC) {
-				dynamic = 1;
+			switch (phdr.p_type) {
+			case PT_DYNAMIC:
+				dynamic = true;
+				break;
+			case PT_INTERP:
+				interp = true;
 				break;
 			}
 		}
 
 		if (!dynamic) {
+			elf_end(elf);
 			warnx("%s: not a dynamic ELF executable", fname);
 			return (0);
 		}
-		if (hdr.elf.e_type == ET_DYN) {
-			switch (hdr.elf.e_ident[EI_OSABI]) {
-			case ELFOSABI_FREEBSD:
-				*is_shlib = 1;
-#ifdef __mips
-				if ((hdr.elf.e_flags & EF_MIPS_ABI) ==
-				    EF_MIPS_ABI_CHERIABI)
-					*rtld = _CHERIABI_PATH_RTLD;
 
+		/*
+		 * PIE binaries are ET_DYN, so use the presence of
+		 * PT_INTERP to differentiate executables from shared
+		 * libraries.
+		 */
+		if (!interp)
+			*is_shlib = 1;
+
+		if (!is_freebsd_elf(fname, elf, &ehdr)) {
+#if defined(__aarch64__) || defined(__riscv)
+			/*
+			 * Shared libraries on AArch64 and RISC-V have
+			 * neither a FreeBSD OSABI or a brand note.
+			 */
+			if (interp)
 #endif
-				return (1);
-#ifdef __ARM_EABI__
-			case ELFOSABI_NONE:
-				if (hdr.elf.e_machine != EM_ARM)
-					break;
-				if (EF_ARM_EABI_VERSION(hdr.elf.e_flags) <
-				    EF_ARM_EABI_FREEBSD_MIN)
-					break;
-				*is_shlib = 1;
-				return (1);
-#endif
+			{
+				elf_end(elf);
+				warnx("%s: not a FreeBSD ELF file", fname);
+				return (0);
 			}
-			warnx("%s: not a FreeBSD ELF shared object", fname);
-			return (0);
 		}
+		elf_end(elf);
 
+#ifndef __CHERI_PURE_CAPABILITY__
+#ifdef __mips__
+		if ((ehdr.e_flags & EF_MIPS_ABI) == EF_MIPS_ABI_CHERIABI)
+			*rtld = _CHERIABI_PATH_RTLD;
+#endif
+#ifdef __riscv
+		if ((ehdr.e_flags & EF_RISCV_CHERIABI) != 0)
+			*rtld = _CHERIABI_PATH_RTLD;
+#endif
+#endif
 		return (1);
 	}
 
