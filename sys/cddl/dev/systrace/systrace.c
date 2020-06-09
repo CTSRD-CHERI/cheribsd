@@ -115,6 +115,8 @@ extern const char *freebsd32_syscallnames[];
 
 #if __has_feature(capabilities)
 #include <compat/cheriabi/cheriabi_proto.h>
+#include <compat/cheriabi/cheriabi_util.h>
+#include <compat/cheriabi/cheriabi_syscall.h>
 #include <compat/cheriabi/cheriabi_systrace_args.c>
 #else
 #include <kern/systrace_args.c>
@@ -123,7 +125,7 @@ extern const char *freebsd32_syscallnames[];
 #define	MODNAME		"freebsd"
 #define	MAXSYSCALL	SYS_MAXSYSCALL
 #define	SYSCALLNAMES	syscallnames
-#define	SYSENT		sysent
+#define	SYSENT		cheriabi_sysent
 #define	NATIVE_ABI
 #endif
 
