@@ -892,22 +892,22 @@ freebsd32_ptrace(struct thread *td, struct freebsd32_ptrace_args *uap)
 			data = offsetof(struct ptrace_lwpinfo, pl_siginfo);
 		break;
 	case PT_GETREGS:
-		bzero(&r.reg, sizeof r.reg);
+		bzero(&r.reg, sizeof(r.reg));
 		break;
 	case PT_GETFPREGS:
-		bzero(&r.fpreg, sizeof r.fpreg);
+		bzero(&r.fpreg, sizeof(r.fpreg));
 		break;
 	case PT_GETDBREGS:
-		bzero(&r.dbreg, sizeof r.dbreg);
+		bzero(&r.dbreg, sizeof(r.dbreg));
 		break;
 	case PT_SETREGS:
-		error = copyin(uap->addr, &r.reg, sizeof r.reg);
+		error = copyin(uap->addr, &r.reg, sizeof(r.reg));
 		break;
 	case PT_SETFPREGS:
-		error = copyin(uap->addr, &r.fpreg, sizeof r.fpreg);
+		error = copyin(uap->addr, &r.fpreg, sizeof(r.fpreg));
 		break;
 	case PT_SETDBREGS:
-		error = copyin(uap->addr, &r.dbreg, sizeof r.dbreg);
+		error = copyin(uap->addr, &r.dbreg, sizeof(r.dbreg));
 		break;
 	case PT_SET_EVENT_MASK:
 		if (uap->data != sizeof(r.ptevents))
@@ -969,13 +969,13 @@ freebsd32_ptrace(struct thread *td, struct freebsd32_ptrace_args *uap)
 		error = copyout(&r32.piod, uap->addr, sizeof(r32.piod));
 		break;
 	case PT_GETREGS:
-		error = copyout(&r.reg, uap->addr, sizeof r.reg);
+		error = copyout(&r.reg, uap->addr, sizeof(r.reg));
 		break;
 	case PT_GETFPREGS:
-		error = copyout(&r.fpreg, uap->addr, sizeof r.fpreg);
+		error = copyout(&r.fpreg, uap->addr, sizeof(r.fpreg));
 		break;
 	case PT_GETDBREGS:
-		error = copyout(&r.dbreg, uap->addr, sizeof r.dbreg);
+		error = copyout(&r.dbreg, uap->addr, sizeof(r.dbreg));
 		break;
 	case PT_GET_EVENT_MASK:
 		/* NB: The size in uap->data is validated in kern_ptrace(). */
