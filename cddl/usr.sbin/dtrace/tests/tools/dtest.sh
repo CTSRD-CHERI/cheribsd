@@ -30,7 +30,7 @@ runtest()
     retval=0
 
     dtrace_sh=ksh
-    if command -v ksh ; then
+    if command -v ksh > /dev/null; then
         dtrace_sh=ksh
     else
         dtrace_sh=sh
