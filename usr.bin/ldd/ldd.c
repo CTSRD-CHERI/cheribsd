@@ -520,22 +520,21 @@ is_executable(const char *fname, int fd, int *is_shlib, int *type,
 		 * PT_INTERP to differentiate executables from shared
 		 * libraries.
 		 */
-		if (!interp)
+		if (!interp) {
 			*is_shlib = 1;
 
-		if (!is_freebsd_elf(fname, elf, &ehdr)) {
 #if defined(__aarch64__) || defined(__riscv)
 			/*
 			 * Shared libraries on AArch64 and RISC-V have
 			 * neither a FreeBSD OSABI or a brand note.
 			 */
-			if (interp)
-#endif
-			{
+			if (!is_freebsd_elf(fname, elf, &ehdr)) {
 				elf_end(elf);
-				warnx("%s: not a FreeBSD ELF file", fname);
+				warnx("%s: not a FreeBSD ELF shared object",
+				    fname);
 				return (0);
 			}
+#endif
 		}
 		elf_end(elf);
 
