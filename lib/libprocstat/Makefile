@@ -55,7 +55,7 @@ MLINKS+=libprocstat.3 procstat_close.3 \
 		libprocstat.3 procstat_open_sysctl.3
 
 # XXX This is a hack.
-.if ${MK_CDDL} != "no"
+.if ${MK_CDDL} != "no" && ${MACHINE} != "mips"
 CFLAGS+=	-DLIBPROCSTAT_ZFS
 SRCS+=	zfs.c
 OBJS+=	zfs/zfs_defs.o
