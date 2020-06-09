@@ -55,6 +55,8 @@ typedef struct fbt_probe {
 	modctl_t	*fbtp_ctl;
 	int		fbtp_loadcnt;
 	int		fbtp_symindx;
+	/* (pointer_args >> i) & 1 == 1 iif ith-arg is pointer*/
+	int8_t 	pointer_args;
 } fbt_probe_t;
 
 struct linker_file;

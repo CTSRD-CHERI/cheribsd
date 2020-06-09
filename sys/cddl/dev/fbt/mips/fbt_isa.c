@@ -34,9 +34,13 @@
 #include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/dtrace.h>
+#include <sys/sysent.h>
 
 #include <machine/cpuregs.h>
 #include <machine/cache.h>
+
+#include <sys/param.h>
+#include <sys/sysctl.h>
 
 #include "fbt.h"
 
@@ -48,6 +52,10 @@
 #define FBT_PARAMETER_FLOAT 0x2
 #define FBT_PARAMETER_OTHERS 0x3
 #define FBT_PARAMETER_UNKNOWN 0x4
+
+
+extern int dtrace_cap_parameters;
+
 
 static int
 fbt_get_params_type(fbt_probe_t *probe, int inx)
@@ -71,32 +79,29 @@ static void
 fbt_get_params(struct trapframe *frame, fbt_probe_t *fbt, uintcap_t *params)
 {
 	void *__capability *cap_registers;
-	void *__capability att_cap_r;
 	register_t *normal_registers;
-	register_t att_r;
 	int n_inx, c_inx;
 
-	cap_registers = (void *__capability[5]) { frame->c3, frame->c4,
-		frame->c5, frame->c6, frame->c7 };
-	normal_registers = (register_t[5]) { frame->a0, frame->a1, frame->a2,
-		frame->a3, frame->a4 };
+	cap_registers = &frame->c3;
+	normal_registers = &frame->a0;
+
 	n_inx = 0;
 	c_inx = 0;
 
+	if (fbt->pointer_args == -1) {
+		fbt->pointer_args = 0;
+		for (int i = 0; i < 5; i++)
+			if (fbt_get_params_type(fbt, i) ==
+			    FBT_PARAMETER_CAPABILITY)
+				fbt->pointer_args |= (1 << i);
+	}
+
 	for (int i = 0; i < 5; i++) {
-		att_r = normal_registers[n_inx];
-		att_cap_r = cap_registers[c_inx];
+		if ((fbt->pointer_args >> i) & 1)
+			params[i] = (uintcap_t)cap_registers[c_inx++];
+		else
+			params[i] = normal_registers[n_inx++];
 
-		switch (fbt_get_params_type(fbt, i)) {
-		case FBT_PARAMETER_CAPABILITY:
-			params[i] = (uintcap_t)att_cap_r;
-			c_inx++;
-			break;
-
-		default:
-			params[i] = att_r;
-			n_inx++;
-		}
 	}
 }
 
@@ -113,12 +118,17 @@ fbt_invop(uintptr_t addr, struct trapframe *frame, uintptr_t rval)
 		if ((uintptr_t)fbt->fbtp_patchpoint == addr) {
 			cpu->cpu_dtrace_caller = addr;
 
-			uintcap_t params[5];
+			if (!SV_CURPROC_FLAG(SV_CHERI) || !dtrace_cap_parameters) {
+				dtrace_probe(fbt->fbtp_id, frame->a0, frame->a1,
+				    frame->a2, frame->a3, frame->a4);
+			} else {
+				uintcap_t params[5];
 
-			fbt_get_params(frame, fbt, params);
+				fbt_get_params(frame, fbt, params);
 
-			dtrace_probe(fbt->fbtp_id, params[0], params[1],
-			    params[2], params[3], params[4]);
+				dtrace_probe(fbt->fbtp_id, params[0], params[1],
+				    params[2], params[3], params[4]);
+			}
 
 			cpu->cpu_dtrace_caller = 0;
 			return (fbt->fbtp_savedval);
@@ -179,6 +189,7 @@ fbt_provide_module_function(linker_file_t lf, int symindx,
 	fbt->fbtp_hashnext = fbt_probetab[FBT_ADDR2NDX(instr)];
 	fbt_probetab[FBT_ADDR2NDX(instr)] = fbt;
 
+	fbt->pointer_args = -1;
 	lf->fbt_nentries++;
 
 	retfbt = NULL;
