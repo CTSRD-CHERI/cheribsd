@@ -366,14 +366,14 @@ fasttrap_pid_probe(struct trapframe *frame)
 				 * encounters the true probe.
 				 */
 				is_enabled = 1;
-			} else {
+			} else { //offset or return probe
 				// TODO(nicomazz): use CTF to understand where
 				// to get the parameters from (cap registers or
 				// normal ones). Look how it is done in
 				// fbt_isa.c
-				dtrace_probe(probe->ftp_id, rp->r_regs[A0],
+				dtrace_probe(probe->ftp_id, tp->ftt_instr, rp->r_regs[A0],
 				    rp->r_regs[A1], rp->r_regs[A2],
-				    rp->r_regs[A3], rp->r_regs[A4]);
+				    rp->r_regs[A3]);
 			}
 		}
 	}
