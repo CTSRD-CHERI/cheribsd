@@ -1,0 +1,16 @@
+#
+# CHERI -- Kernel for the SRI/Cambridge "CHERI" (Capability Hardware Enhanced
+# RISC Instructions) FPGA soft core, as configured in its Terasic DE-4
+# reference configuration - 128bit version.
+#
+# This configuration is the same as the pure capability kernel with MFS root,
+# with the addition of kernel coverage.
+#
+# $FreeBSD$
+#
+
+include		"CHERI128_PURECAP_DE4_MFS_ROOT"
+
+# kernel coverage
+options		COVERAGE
+options		KCOV
