@@ -11,7 +11,7 @@ CFLAGS+=	${PICFLAG}
 CFLAGS+=	-fvisibility=hidden
 CFLAGS+=	-DVISIBILITY_HIDDEN
 .if (${MACHINE_ARCH:Mmips*} || ${MACHINE_ARCH:Mriscv*c*})
-CFLAGS+=	-I${SRCTOP}/contrib/subrepo-cheri-libcxxrt
+CFLAGS+=	-I${SRCTOP}/contrib/subrepo-cheri-libcxxrt/src
 .else
 CFLAGS+=	-I${SRCTOP}/contrib/libcxxrt
 .endif
