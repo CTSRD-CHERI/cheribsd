@@ -36,7 +36,9 @@
 #include <crypto/rijndael/rijndael.h>
 #include <crypto/camellia/camellia.h>
 #include <opencrypto/cryptodev.h>
-#include <opencrypto/xform_userland.h>
+#ifdef _STANDALONE
+#include <stand.h>
+#endif
 
 #define AESICM_BLOCKSIZE	AES_BLOCK_LEN
 #define	AES_XTS_BLOCKSIZE	16
@@ -47,22 +49,27 @@
 struct enc_xform {
 	int type;
 	char *name;
+	size_t ctxsize;
 	u_int16_t blocksize;	/* Required input block size -- 1 for stream ciphers. */
+	uint16_t native_blocksize;	/* Used for stream ciphers. */
 	u_int16_t ivsize;
 	u_int16_t minkey, maxkey;
-	void (*encrypt) (caddr_t, u_int8_t *);
-	void (*decrypt) (caddr_t, u_int8_t *);
-	int (*setkey) (u_int8_t **, const u_int8_t *, int len);
-	void (*zerokey) (u_int8_t **);
-	void (*reinit) (caddr_t, const u_int8_t *);
+
 	/*
-	 * Encrypt/decrypt 1+ blocks of input -- total size is 'len' bytes.
-	 * Len is guaranteed to be a multiple of the defined 'blocksize'.
-	 * Optional interface -- most useful for stream ciphers with a small
-	 * blocksize (1).
+	 * Encrypt/decrypt a single block.  For stream ciphers this
+	 * encrypts/decrypts a single "native" block.
 	 */
-	void (*encrypt_multi) (void *, uint8_t *, size_t len);
-	void (*decrypt_multi) (void *, uint8_t *, size_t len);
+	void (*encrypt) (void *, const uint8_t *, uint8_t *);
+	void (*decrypt) (void *, const uint8_t *, uint8_t *);
+	int (*setkey) (void *, const uint8_t *, int len);
+	void (*reinit) (void *, const u_int8_t *);
+
+	/*
+	 * For stream ciphers, encrypt/decrypt the final partial block
+	 * of 'len' bytes.
+	 */
+	void (*encrypt_last) (void *, const uint8_t *, uint8_t *, size_t len);
+	void (*decrypt_last) (void *, const uint8_t *, uint8_t *, size_t len);
 };
 
 

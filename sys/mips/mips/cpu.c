@@ -61,50 +61,10 @@ __FBSDID("$FreeBSD$");
 #include <contrib/octeon-sdk/octeon-model.h>
 #endif
 
-static void cpu_identify(void);
-
 struct mips_cpuinfo cpuinfo;
 
 #define _ENCODE_INSN(a,b,c,d,e) \
     ((uint32_t)(((a) << 26)|((b) << 21)|((c) << 16)|((d) << 11)|(e)))
-
-#if defined(__mips_n64)
-
-#   define	_LOAD_T0_MDTLS_A1 \
-    _ENCODE_INSN(OP_LD, A1, T0, 0, offsetof(struct thread, td_md.md_tls))
-
-#   define	_LOAD_T0_MDTLS_TCV_OFFSET_A1 \
-    _ENCODE_INSN(OP_LD, A1, T1, 0, \
-    offsetof(struct thread, td_md.md_tls_tcb_offset))
-
-#   define	_ADDU_V0_T0_T1 \
-    _ENCODE_INSN(0, T0, T1, V0, OP_DADDU)
-
-#else /* mips 32 */
-
-#   define	_LOAD_T0_MDTLS_A1 \
-    _ENCODE_INSN(OP_LW, A1, T0, 0, offsetof(struct thread, td_md.md_tls))
-
-#   define	_LOAD_T0_MDTLS_TCV_OFFSET_A1 \
-    _ENCODE_INSN(OP_LW, A1, T1, 0, \
-    offsetof(struct thread, td_md.md_tls_tcb_offset))
-
-#   define	_ADDU_V0_T0_T1 \
-    _ENCODE_INSN(0, T0, T1, V0, OP_ADDU)
-
-#endif /* ! __mips_n64 */
-
-#if defined(__mips_n64) || defined(__mips_n32)
-
-#   define _MTC0_V0_USERLOCAL \
-    _ENCODE_INSN(OP_COP0, OP_DMT, V0, 4, 2)
-
-#else /* mips o32 */
-
-#   define _MTC0_V0_USERLOCAL \
-    _ENCODE_INSN(OP_COP0, OP_MT, V0, 4, 2)
-
-#endif /* ! (__mips_n64 || __mipsn32) */
 
 #define	_JR_RA	_ENCODE_INSN(OP_SPECIAL, RA, 0, 0, OP_JR)
 #define	_NOP	0
@@ -120,18 +80,9 @@ remove_userlocal_code(uint32_t *cpu_switch_code)
 {
 	uint32_t *instructp;
 
-	for (instructp = cpu_switch_code;; instructp++) {
-		if (instructp[0] == _JR_RA)
-			panic("%s: Unable to patch cpu_switch().", __func__);
-		if (instructp[0] == _LOAD_T0_MDTLS_A1 &&
-		    instructp[1] == _LOAD_T0_MDTLS_TCV_OFFSET_A1 &&
-		    instructp[2] == _ADDU_V0_T0_T1 &&
-		    instructp[3] == _MTC0_V0_USERLOCAL) {
-			instructp[0] = _JR_RA;
-			instructp[1] = _NOP;
-			break;
-		}
-	}
+	instructp = cpu_switch_code;
+	instructp[0] = _JR_RA;
+	instructp[1] = _NOP;
 }
 
 /*
@@ -202,7 +153,7 @@ mips_get_identity(struct mips_cpuinfo *cpuinfo)
 		 * cpu_switch() and remove unsupported code.
 		 */
 		cpuinfo->userlocal_reg = false;
-		remove_userlocal_code((uint32_t *)cpu_switch);
+		remove_userlocal_code((uint32_t *)cpu_switch_set_userlocal);
 	}
 
 
@@ -341,18 +292,16 @@ mips_cpu_init(void)
 
 	mips_icache_sync_all();
 	mips_dcache_wbinv_all();
-	/* Print some info about CPU */
-	cpu_identify();
 }
 
-static void
+void
 cpu_identify(void)
 {
 	uint32_t cfg0, cfg1, cfg2, cfg3;
 #if defined(CPU_MIPS1004K) || defined (CPU_MIPS74K) || defined (CPU_MIPS24K)
 	uint32_t cfg7;
 #endif
-	printf("cpu%d: ", 0);   /* XXX per-cpu */
+	printf("CPU: ");
 	switch (cpuinfo.cpu_vendor) {
 	case MIPS_PRID_CID_MTI:
 		printf("MIPS Technologies");
@@ -394,6 +343,8 @@ cpu_identify(void)
 		printf("Unknown cid %#x", cpuinfo.cpu_vendor);
 		break;
 	}
+	if (cpu_model[0] != '\0')
+		printf(" (%s)", cpu_model);
 	printf(" processor v%d.%d\n", cpuinfo.cpu_rev, cpuinfo.cpu_impl);
 
 	printf("  MMU: ");

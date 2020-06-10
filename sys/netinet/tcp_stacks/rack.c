@@ -4095,9 +4095,15 @@ rack_cong_signal(struct tcpcb *tp, struct tcphdr *th, uint32_t type)
 		}
 		break;
 	case CC_ECN:
-		if (!IN_CONGRECOVERY(tp->t_flags)) {
+		if (!IN_CONGRECOVERY(tp->t_flags) ||
+		    /*
+		     * Allow ECN reaction on ACK to CWR, if
+		     * that data segment was also CE marked.
+		     */
+		    SEQ_GEQ(th->th_ack, tp->snd_recover)) {
+			EXIT_CONGRECOVERY(tp->t_flags);
 			KMOD_TCPSTAT_INC(tcps_ecn_rcwnd);
-			tp->snd_recover = tp->snd_max;
+			tp->snd_recover = tp->snd_max + 1;
 			if (tp->t_flags2 & TF2_ECN_PERMIT)
 				tp->t_flags2 |= TF2_ECN_SND_CWR;
 		}
@@ -11070,21 +11076,32 @@ rack_do_segment_nounlock(struct mbuf *m, struct tcphdr *th, struct socket *so,
 		 * this is traditional behavior, may need to be cleaned up.
 		 */
 		if (tp->t_state == TCPS_SYN_SENT && (thflags & TH_SYN)) {
+			/* Handle parallel SYN for ECN */
+			if (!(thflags & TH_ACK) &&
+			    ((thflags & (TH_CWR | TH_ECE)) == (TH_CWR | TH_ECE)) &&
+			    ((V_tcp_do_ecn == 1) || (V_tcp_do_ecn == 2))) {
+				tp->t_flags2 |= TF2_ECN_PERMIT;
+				tp->t_flags2 |= TF2_ECN_SND_ECE;
+				TCPSTAT_INC(tcps_ecn_shs);
+			}
 			if ((to.to_flags & TOF_SCALE) &&
 			    (tp->t_flags & TF_REQ_SCALE)) {
 				tp->t_flags |= TF_RCVD_SCALE;
 				tp->snd_scale = to.to_wscale;
-			}
+			} else
+				tp->t_flags &= ~TF_REQ_SCALE;
 			/*
 			 * Initial send window.  It will be updated with the
 			 * next incoming segment to the scaled value.
 			 */
 			tp->snd_wnd = th->th_win;
-			if (to.to_flags & TOF_TS) {
+			if ((to.to_flags & TOF_TS) &&
+			    (tp->t_flags & TF_REQ_TSTMP)) {
 				tp->t_flags |= TF_RCVD_TSTMP;
 				tp->ts_recent = to.to_tsval;
 				tp->ts_recent_age = cts;
-			}
+			} else
+				tp->t_flags &= ~TF_REQ_TSTMP;
 			if (to.to_flags & TOF_MSS)
 				tcp_mss(tp, to.to_mss);
 			if ((tp->t_flags & TF_SACK_PERMIT) &&
@@ -13523,6 +13540,12 @@ send:
 		} else
 			flags |= TH_ECE | TH_CWR;
 	}
+	/* Handle parallel SYN for ECN */
+	if ((tp->t_state == TCPS_SYN_RECEIVED) &&
+	    (tp->t_flags2 & TF2_ECN_SND_ECE)) {
+		flags |= TH_ECE;
+		tp->t_flags2 &= ~TF2_ECN_SND_ECE;
+	}
 	if (tp->t_state == TCPS_ESTABLISHED &&
 	    (tp->t_flags2 & TF2_ECN_PERMIT)) {
 		/*
@@ -13539,13 +13562,14 @@ send:
 #endif
 				ip->ip_tos |= IPTOS_ECN_ECT0;
 			KMOD_TCPSTAT_INC(tcps_ecn_ect0);
-		}
-		/*
-		 * Reply with proper ECN notifications.
-		 */
-		if (tp->t_flags2 & TF2_ECN_SND_CWR) {
-			flags |= TH_CWR;
-			tp->t_flags2 &= ~TF2_ECN_SND_CWR;
+			/*
+			 * Reply with proper ECN notifications.
+			 * Only set CWR on new data segments.
+			 */
+			if (tp->t_flags2 & TF2_ECN_SND_CWR) {
+				flags |= TH_CWR;
+				tp->t_flags2 &= ~TF2_ECN_SND_CWR;
+			}
 		}
 		if (tp->t_flags2 & TF2_ECN_SND_ECE)
 			flags |= TH_ECE;

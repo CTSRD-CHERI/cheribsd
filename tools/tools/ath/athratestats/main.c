@@ -146,9 +146,12 @@ ath_sample_stats(struct ath_ratestats *r, struct ath_rateioctl_rt *rt,
 		    sn->sample_tt[y]);
 		PRINTATTR_OFF(COLOR_PAIR(3) | A_BOLD);
 	}
-	PRINTMSG("   TX Rate     TXTOTAL:TXOK       EWMA          T/   F"
+	PRINTMSG("   TX Rate      TXTOTAL:TXOK       EWMA          T/   F"
+	    "     avg last xmit  ");
+	PRINTMSG("   TX Rate      TXTOTAL:TXOK       EWMA          T/   F"
 	    "     avg last xmit\n");
 	for (mask = sn->ratemask, rix = 0; mask != 0; mask >>= 1, rix++) {
+		int c = 0;
 		if ((mask & 1) == 0)
 				continue;
 		for (y = 0; y < NUM_PACKET_SIZE_BINS; y++) {
@@ -164,8 +167,8 @@ ath_sample_stats(struct ath_ratestats *r, struct ath_rateioctl_rt *rt,
 			else if (sn->stats[y][rix].ewma_pct / 10 < 75)
 				PRINTATTR_ON(COLOR_PAIR(1) | A_BOLD);
 #endif
-			PRINTMSG("[%2u %s:%4u] %8ju:%-8ju "
-			    "(%3d.%1d%%) %8ju/%4d %5uuS %u\n",
+			PRINTMSG("[%2u %s:%5u] %8ju:%-8ju "
+			    "(%3d.%1d%%) %8ju/%4d %5uuS %u ",
 			    dot11rate(rt, rix),
 			    dot11str(rt, rix),
 			    bin_to_size(y),
@@ -187,7 +190,14 @@ ath_sample_stats(struct ath_ratestats *r, struct ath_rateioctl_rt *rt,
 			else if (sn->stats[y][rix].ewma_pct / 10 < 75)
 				PRINTATTR_OFF(COLOR_PAIR(1) | A_BOLD);
 #endif
+			c++;
+			if (c == 2) {
+				PRINTMSG("\n");
+				c = 0;
+			}
 		}
+		if (c != 0)
+			PRINTMSG("\n");
 	}
 }
 

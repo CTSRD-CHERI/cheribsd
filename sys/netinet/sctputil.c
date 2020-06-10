@@ -1144,7 +1144,6 @@ sctp_init_asoc(struct sctp_inpcb *inp, struct sctp_tcb *stcb,
 	asoc->sctp_cmt_on_off = inp->sctp_cmt_on_off;
 	asoc->ecn_supported = inp->ecn_supported;
 	asoc->prsctp_supported = inp->prsctp_supported;
-	asoc->idata_supported = inp->idata_supported;
 	asoc->auth_supported = inp->auth_supported;
 	asoc->asconf_supported = inp->asconf_supported;
 	asoc->reconfig_supported = inp->reconfig_supported;
@@ -1560,8 +1559,8 @@ select_a_new_ep:
 			iteration_count = 0;
 		}
 		KASSERT(it->inp == it->stcb->sctp_ep,
-		        ("%s: stcb %p does not belong to inp %p, but inp %p",
-		         __func__, it->stcb, it->inp, it->stcb->sctp_ep));
+		    ("%s: stcb %p does not belong to inp %p, but inp %p",
+		    __func__, it->stcb, it->inp, it->stcb->sctp_ep));
 
 		/* run function on this one */
 		(*it->function_assoc) (it->inp, it->stcb, it->pointer, it->val);
@@ -2933,7 +2932,7 @@ sctp_calculate_rto(struct sctp_tcb *stcb,
 		(void)SCTP_GETTIME_TIMEVAL(&now);
 	}
 	if ((old->tv_sec > now.tv_sec) ||
-	    ((old->tv_sec == now.tv_sec) && (old->tv_sec > now.tv_sec))) {
+	    ((old->tv_sec == now.tv_sec) && (old->tv_usec > now.tv_usec))) {
 		/* The starting point is in the future. */
 		return (0);
 	}

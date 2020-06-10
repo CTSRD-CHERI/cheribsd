@@ -1401,7 +1401,7 @@ ath_tx_do_ratelookup(struct ath_softc *sc, struct ath_buf *bf, int tid,
 
 	if (bf->bf_state.bfs_ismrr && try0 != ATH_TXMAXTRY)
 		ath_rate_getxtxrates(sc, ATH_NODE(bf->bf_node), rix,
-		    bf->bf_state.bfs_rc);
+		    is_aggr, bf->bf_state.bfs_rc);
 	ATH_NODE_UNLOCK(ATH_NODE(bf->bf_node));
 
 	sc->sc_txrix = rix;	/* for LED blinking */
@@ -5011,7 +5011,11 @@ ath_tx_aggr_comp_aggr(struct ath_softc *sc, struct ath_buf *bf_first,
 		    "%s: AR5416 bug: hasba=%d; txok=%d, isaggr=%d, "
 		    "seq_st=%d\n",
 		    __func__, hasba, tx_ok, isaggr, seq_st);
-		/* XXX TODO: schedule an interface reset */
+		taskqueue_enqueue(sc->sc_tq, &sc->sc_fataltask);
+		/* And as we can't really trust the BA here .. */
+		ba[0] = 0;
+		ba[1] = 0;
+		seq_st = 0;
 #ifdef ATH_DEBUG
 		ath_printtxbuf(sc, bf_first,
 		    sc->sc_ac2q[atid->ac]->axq_qnum, 0, 0);

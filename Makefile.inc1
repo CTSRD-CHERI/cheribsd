@@ -1523,16 +1523,6 @@ distributeworld installworld stageworld: _installcheck_world .PHONY
 	${DESTDIR}/${DISTDIR}/${dist}.debug.meta
 .endfor
 .endif
-.elif make(installworld) && ${MK_CAROOT} != "no"
-	# We could make certctl a bootstrap tool, but it requires OpenSSL and
-	# friends, which we likely don't want.  We'll rehash on a best-effort
-	# basis, otherwise we'll just mention that we're not doing it to raise
-	# awareness.
-	@if which certctl>/dev/null; then \
-		certctl rehash; \
-	else \
-		echo "No certctl on the host, not rehashing target -- /etc/ssl may not be populated."; \
-	fi
 .endif
 
 packageworld: .PHONY
@@ -2032,7 +2022,7 @@ create-world-package-${pkgname}: .PHONY
 _default_flavor=	-default
 .if make(*package*) && exists(${KSTAGEDIR}/kernel.meta)
 . if ${MK_DEBUG_FILES} != "no"
-_debug=-debug
+_debug=-dbg
 . endif
 create-kernel-packages:	.PHONY
 . for flavor in "" ${_debug}
@@ -2066,7 +2056,7 @@ create-kernel-packages-flavor${flavor:C,^""$,${_default_flavor},}: _pkgbootstrap
 . for _kernel in ${BUILDKERNELS:[2..-1]}
 .  if exists(${KSTAGEDIR}/kernel.${_kernel}.meta)
 .   if ${MK_DEBUG_FILES} != "no"
-_debug=-debug
+_debug=-dbg
 .   endif
 .   for flavor in "" ${_debug}
 create-kernel-packages: create-kernel-packages-extra-flavor${flavor:C,^""$,${_default_flavor},}-${_kernel}

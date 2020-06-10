@@ -33,7 +33,6 @@ __FBSDID("$FreeBSD$");
 #include <sys/param.h>
 #include <sys/kernel.h>
 #include <sys/systm.h>
-#include <sys/epoch.h>
 #include <sys/conf.h>
 #include <sys/bitstring.h>
 #include <sys/queue.h>
@@ -406,7 +405,6 @@ static u_int64_t	KPTphys;	/* phys addr of kernel level 1 */
 
 static vm_offset_t qframe = 0;
 static struct mtx qframe_mtx;
-static epoch_t pmap_epoch;
 
 void mmu_radix_activate(mmu_t mmu, struct thread *);
 void mmu_radix_advise(mmu_t mmu, pmap_t, vm_offset_t, vm_offset_t, int);
@@ -484,6 +482,7 @@ static void mmu_radix_dumpsys_map(mmu_t mmu, vm_paddr_t pa, size_t sz,
     void **va);
 static void mmu_radix_scan_init(mmu_t mmu);
 static void	mmu_radix_cpu_bootstrap(mmu_t, int ap);
+static void	mmu_radix_tlbie_all(mmu_t);
 
 static mmu_method_t mmu_radix_methods[] = {
 	MMUMETHOD(mmu_bootstrap,	mmu_radix_bootstrap),
@@ -545,6 +544,8 @@ static mmu_method_t mmu_radix_methods[] = {
 	MMUMETHOD(mmu_change_attr,	mmu_radix_change_attr),
 	MMUMETHOD(mmu_map_user_ptr,	mmu_radix_map_user_ptr),
 	MMUMETHOD(mmu_decode_kernel_ptr, mmu_radix_decode_kernel_ptr),
+
+	MMUMETHOD(mmu_tlbie_all,	mmu_radix_tlbie_all),
 	{ 0, 0 }
 };
 
@@ -777,6 +778,13 @@ mmu_radix_tlbiel_flush(int scope)
 }
 
 static void
+mmu_radix_tlbie_all(mmu_t __unused mmu)
+{
+	/* TODO: LPID invalidate */
+	mmu_radix_tlbiel_flush(TLB_INVAL_SCOPE_GLOBAL);
+}
+
+static void
 mmu_radix_init_amor(void)
 {
 	/*
@@ -849,43 +857,6 @@ pa_cmp(const void *a, const void *b)
 	    PG_M | PG_A | RPTE_EAA_MASK | PG_V)
 
 
-static void
-pmap_epoch_init(void *arg __unused)
-{
-	pmap_epoch = epoch_alloc("pmap", EPOCH_PREEMPT | EPOCH_LOCKED);
-}
-SYSINIT(epoch, SI_SUB_EPOCH + 1, SI_ORDER_ANY, pmap_epoch_init, NULL);
-
-static bool
-pmap_not_in_di(void)
-{
-
-	return (curthread->td_md.md_invl_gen.gen == 0);
-}
-
-#define	PMAP_ASSERT_NOT_IN_DI() \
-    KASSERT(pmap_not_in_di(), ("DI already started"))
-
-static void
-pmap_delayed_invl_started(epoch_tracker_t et)
-{
-	epoch_enter_preempt(pmap_epoch, et);
-	curthread->td_md.md_invl_gen.gen = 1;
-}
-
-static void
-pmap_delayed_invl_finished(epoch_tracker_t et)
-{
-	curthread->td_md.md_invl_gen.gen = 0;
-	epoch_exit_preempt(pmap_epoch, et);
-}
-
-static void
-pmap_delayed_invl_wait(vm_page_t m __unused)
-{
-	epoch_wait_preempt(pmap_epoch);
-}
-
 static __inline void
 pmap_resident_count_inc(pmap_t pmap, int count)
 {
@@ -909,10 +880,8 @@ static void
 pagezero(vm_offset_t va)
 {
 	va = trunc_page(va);
-	int off;
 
-	for (off = 0; off < PAGE_SIZE; off += cacheline_size)
-		__asm __volatile("dcbz 0,%0" :: "r"(va + off));
+	bzero((void *)va, PAGE_SIZE);
 }
 
 static uint64_t
@@ -1372,8 +1341,7 @@ out:
 }
 
 static void
-reclaim_pv_chunk_leave_pmap(pmap_t pmap, pmap_t locked_pmap, bool start_di,
-	epoch_tracker_t et)
+reclaim_pv_chunk_leave_pmap(pmap_t pmap, pmap_t locked_pmap)
 {
 
 	if (pmap == NULL)
@@ -1381,8 +1349,6 @@ reclaim_pv_chunk_leave_pmap(pmap_t pmap, pmap_t locked_pmap, bool start_di,
 	pmap_invalidate_all(pmap);
 	if (pmap != locked_pmap)
 		PMAP_UNLOCK(pmap);
-	if (start_di)
-		pmap_delayed_invl_finished(et);
 }
 
 /*
@@ -1412,8 +1378,6 @@ reclaim_pv_chunk(pmap_t locked_pmap, struct rwlock **lockp)
 	struct spglist free;
 	uint64_t inuse;
 	int bit, field, freed;
-	bool start_di;
-	struct epoch_tracker et;
 
 	PMAP_LOCK_ASSERT(locked_pmap, MA_OWNED);
 	KASSERT(lockp != NULL, ("reclaim_pv_chunk: lockp is NULL"));
@@ -1424,13 +1388,6 @@ reclaim_pv_chunk(pmap_t locked_pmap, struct rwlock **lockp)
 	bzero(&pc_marker_end_b, sizeof(pc_marker_end_b));
 	pc_marker = (struct pv_chunk *)&pc_marker_b;
 	pc_marker_end = (struct pv_chunk *)&pc_marker_end_b;
-
-	/*
-	 * A delayed invalidation block should already be active if
-	 * pmap_advise() or pmap_remove() called this function by way
-	 * of pmap_demote_l3e_locked().
-	 */
-	start_di = pmap_not_in_di();
 
 	mtx_lock(&pv_chunks_mutex);
 	active_reclaims++;
@@ -1456,21 +1413,16 @@ reclaim_pv_chunk(pmap_t locked_pmap, struct rwlock **lockp)
 		 * corresponding pmap is locked.
 		 */
 		if (pmap != next_pmap) {
-			reclaim_pv_chunk_leave_pmap(pmap, locked_pmap,
-				start_di, &et);
+			reclaim_pv_chunk_leave_pmap(pmap, locked_pmap);
 			pmap = next_pmap;
 			/* Avoid deadlock and lock recursion. */
 			if (pmap > locked_pmap) {
 				RELEASE_PV_LIST_LOCK(lockp);
 				PMAP_LOCK(pmap);
-				if (start_di)
-					pmap_delayed_invl_started(&et);
 				mtx_lock(&pv_chunks_mutex);
 				continue;
 			} else if (pmap != locked_pmap) {
 				if (PMAP_TRYLOCK(pmap)) {
-					if (start_di)
-						pmap_delayed_invl_started(&et);
 					mtx_lock(&pv_chunks_mutex);
 					continue;
 				} else {
@@ -1482,8 +1434,7 @@ reclaim_pv_chunk(pmap_t locked_pmap, struct rwlock **lockp)
 						continue;
 					goto next_chunk;
 				}
-			} else if (start_di)
-				pmap_delayed_invl_started(&et);
+			}
 		}
 
 		/*
@@ -1572,7 +1523,7 @@ next_chunk:
 	TAILQ_REMOVE(&pv_chunks, pc_marker_end, pc_lru);
 	active_reclaims--;
 	mtx_unlock(&pv_chunks_mutex);
-	reclaim_pv_chunk_leave_pmap(pmap, locked_pmap, start_di, &et);
+	reclaim_pv_chunk_leave_pmap(pmap, locked_pmap);
 	if (m_pc == NULL && !SLIST_EMPTY(&free)) {
 		m_pc = SLIST_FIRST(&free);
 		SLIST_REMOVE_HEAD(&free, plinks.s.ss);
@@ -2250,12 +2201,10 @@ mmu_radix_advise(mmu_t mmu, pmap_t pmap, vm_offset_t sva, vm_offset_t eva,
 	vm_offset_t va, va_next;
 	vm_page_t m;
 	boolean_t anychanged;
-	struct epoch_tracker et;
 
 	if (advice != MADV_DONTNEED && advice != MADV_FREE)
 		return;
 	anychanged = FALSE;
-	pmap_delayed_invl_started(&et);
 	PMAP_LOCK(pmap);
 	for (; sva < eva; sva = va_next) {
 		l1e = pmap_pml1e(pmap, sva);
@@ -2349,7 +2298,6 @@ maybe_invlrng:
 	if (anychanged)
 		pmap_invalidate_all(pmap);
 	PMAP_UNLOCK(pmap);
-	pmap_delayed_invl_finished(&et);
 }
 
 /*
@@ -3178,7 +3126,6 @@ pmap_enter_l3e(pmap_t pmap, vm_offset_t va, pml3_entry_t newpde, u_int flags,
 	struct spglist free;
 	pml3_entry_t oldl3e, *l3e;
 	vm_page_t mt, pdpg;
-	struct epoch_tracker et;
 
 	KASSERT((newpde & (PG_M | PG_RW)) != PG_RW,
 	    ("pmap_enter_pde: newpde is missing PG_M"));
@@ -3213,11 +3160,9 @@ pmap_enter_l3e(pmap_t pmap, vm_offset_t va, pml3_entry_t newpde, u_int flags,
 			 */
 			(void)pmap_remove_l3e(pmap, l3e, va, &free, lockp);
 		} else {
-			pmap_delayed_invl_started(&et);
 			if (pmap_remove_ptes(pmap, va, va + L3_PAGE_SIZE, l3e,
 			    &free, lockp))
 		               pmap_invalidate_all(pmap);
-			pmap_delayed_invl_finished(&et);
 		}
 		vm_page_free_pages_toq(&free, true);
 		if (va >= VM_MAXUSER_ADDRESS) {
@@ -4245,7 +4190,6 @@ _pmap_allocpte(pmap_t pmap, vm_pindex_t ptepindex, struct rwlock **lockp)
 		if (lockp != NULL) {
 			RELEASE_PV_LIST_LOCK(lockp);
 			PMAP_UNLOCK(pmap);
-			PMAP_ASSERT_NOT_IN_DI();
 			vm_wait(NULL);
 			PMAP_LOCK(pmap);
 		}
@@ -4514,26 +4458,6 @@ mmu_radix_protect(mmu_t mmu, pmap_t pmap, vm_offset_t sva, vm_offset_t eva,
 			   pmap, sva, eva, prot, pmap->pm_pid);
 #endif
 	anychanged = FALSE;
-
-	/*
-	 * Although this function delays and batches the invalidation
-	 * of stale TLB entries, it does not need to call
-	 * pmap_delayed_invl_started() and
-	 * pmap_delayed_invl_finished(), because it does not
-	 * ordinarily destroy mappings.  Stale TLB entries from
-	 * protection-only changes need only be invalidated before the
-	 * pmap lock is released, because protection-only changes do
-	 * not destroy PV entries.  Even operations that iterate over
-	 * a physical page's PV list of mappings, like
-	 * pmap_remove_write(), acquire the pmap lock for each
-	 * mapping.  Consequently, for protection-only changes, the
-	 * pmap lock suffices to synchronize both page table and TLB
-	 * updates.
-	 *
-	 * This function only destroys a mapping if pmap_demote_l3e()
-	 * fails.  In that case, stale TLB entries are immediately
-	 * invalidated.
-	 */
 
 	PMAP_LOCK(pmap);
 	for (; sva < eva; sva = va_next) {
@@ -5196,7 +5120,6 @@ mmu_radix_remove(mmu_t mmu, pmap_t pmap, vm_offset_t sva, vm_offset_t eva)
 	pml2_entry_t *l2e;
 	pml3_entry_t ptpaddr, *l3e;
 	struct spglist free;
-	struct epoch_tracker et;
 	bool anyvalid;
 
 	CTR4(KTR_PMAP, "%s(%p, %#x, %#x)", __func__, pmap, sva, eva);
@@ -5214,7 +5137,6 @@ mmu_radix_remove(mmu_t mmu, pmap_t pmap, vm_offset_t sva, vm_offset_t eva)
 	sva = (sva + PAGE_MASK) & ~PAGE_MASK;
 	eva = (eva + PAGE_MASK) & ~PAGE_MASK;
 
-	pmap_delayed_invl_started(&et);
 	PMAP_LOCK(pmap);
 
 	/*
@@ -5303,7 +5225,6 @@ out:
 	if (anyvalid)
 		pmap_invalidate_all(pmap);
 	PMAP_UNLOCK(pmap);
-	pmap_delayed_invl_finished(&et);
 	vm_page_free_pages_toq(&free, true);
 }
 
@@ -5386,7 +5307,6 @@ retry:
 	}
 	vm_page_aflag_clear(m, PGA_WRITEABLE);
 	rw_wunlock(lock);
-	pmap_delayed_invl_wait(m);
 	vm_page_free_pages_toq(&free, true);
 }
 
@@ -5663,7 +5583,6 @@ retry:
 	}
 	rw_wunlock(lock);
 	vm_page_aflag_clear(m, PGA_WRITEABLE);
-	pmap_delayed_invl_wait(m);
 }
 
 /*
