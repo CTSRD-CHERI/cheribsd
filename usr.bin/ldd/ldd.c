@@ -348,6 +348,7 @@ usage(void)
 	exit(1);
 }
 
+#if !defined(__aarch64__) && !defined(__riscv)
 static bool
 check_notes(const char *buf, size_t len)
 {
@@ -415,6 +416,7 @@ is_freebsd_elf(const char *fname, Elf *elf, GElf_Ehdr *ehdr)
 
 	return (false);
 }
+#endif
 
 static int
 is_executable(const char *fname, int fd, int *is_shlib, int *type,
@@ -523,7 +525,7 @@ is_executable(const char *fname, int fd, int *is_shlib, int *type,
 		if (!interp) {
 			*is_shlib = 1;
 
-#if defined(__aarch64__) || defined(__riscv)
+#if !defined(__aarch64__) && !defined(__riscv)
 			/*
 			 * Shared libraries on AArch64 and RISC-V have
 			 * neither a FreeBSD OSABI or a brand note.
