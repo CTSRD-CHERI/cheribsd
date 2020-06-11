@@ -33,7 +33,7 @@ exclude SKIP common/dtraceUtil/tst.ZeroNameProbes.d.ksh
 exclude SKIP common/dtraceUtil/tst.ZeroProviderProbes.d.ksh
 
 # dtraceUtil - requires preprocessor
-exlude SKIP common/dtraceUtil/tst.PreprocessorStatement.d.ksh
+exclude SKIP common/dtraceUtil/tst.PreprocessorStatement.d.ksh
 
 # env - depends on ksh
 exclude EXFAIL common/env/tst.unsetenv2.ksh
