@@ -26,6 +26,15 @@ exclude EXFAIL common/dtraceUtil/man.AddSearchPath.d
 # dtraceutil - -m option make the system to stuck
 exclude SKIP common/dtraceUtil/tst.DestructWithModule.d.ksh
 
+# dtraceUtil - panic, but strange dtrace syntax I've never seen before
+exclude SKIP common/dtraceUtil/tst.ZeroFunctionProbes.d.ksh
+exclude SKIP common/dtraceUtil/tst.ZeroModuleProbes.d.ksh
+exclude SKIP common/dtraceUtil/tst.ZeroNameProbes.d.ksh
+exclude SKIP common/dtraceUtil/tst.ZeroProviderProbes.d.ksh
+
+# dtraceUtil - requires preprocessor
+exlude SKIP common/dtraceUtil/tst.PreprocessorStatement.d.ksh
+
 # env - depends on ksh
 exclude EXFAIL common/env/tst.unsetenv2.ksh
 exclude EXFAIL common/dtraceUtil/tst.DefineNameWithCPP.d.ksh
