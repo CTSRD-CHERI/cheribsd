@@ -114,19 +114,19 @@ beri_iommu_init(device_t dev, struct xdma_iommu *xio)
 }
 
 static int
-beri_iommu_remove(device_t dev, struct xdma_iommu *xio, vm_offset_t va)
+beri_iommu_remove(device_t dev, struct xdma_iommu *xio, vm_ptr_t va)
 {
 	struct beri_iommu_softc *sc;
 
 	sc = device_get_softc(dev);
 
-	beri_iommu_invalidate(sc, va);
+	beri_iommu_invalidate(sc, (vm_offset_t)va);
 
 	return (0);
 }
 
 static int
-beri_iommu_enter(device_t dev, struct xdma_iommu *xio, vm_offset_t va,
+beri_iommu_enter(device_t dev, struct xdma_iommu *xio, vm_ptr_t va,
     vm_paddr_t pa)
 {
 	struct beri_iommu_softc *sc;
@@ -137,7 +137,7 @@ beri_iommu_enter(device_t dev, struct xdma_iommu *xio, vm_offset_t va,
 	sc = device_get_softc(dev);
 	p = &xio->p;
 
-	pte = pmap_pte(p, va);
+	pte = pmap_pte(p, (vm_offset_t)va);
 	if (pte == NULL)
 		panic("pte is NULL\n");
 

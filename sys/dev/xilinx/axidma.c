@@ -481,8 +481,8 @@ axidma_channel_submit_sg(device_t dev, struct xdma_channel *xchan,
 	tmp = 0;
 
 	for (i = 0; i < sg_n; i++) {
-		src_addr = (uint32_t)sg[i].src_addr;
-		dst_addr = (uint32_t)sg[i].dst_addr;
+		src_addr = (uint32_t)sg[i].src.addr;
+		dst_addr = (uint32_t)sg[i].dst.addr;
 		len = (uint32_t)sg[i].len;
 
 		dprintf("%s(%d): src %x dst %x len %d\n", __func__,

@@ -91,11 +91,11 @@ xdma_enqueue_bio(xdma_channel_t *xchan, struct bio **bp,
 	xr->src_width = src_width;
 	xr->dst_width = dst_width;
 	if (dir == XDMA_MEM_TO_DEV) {
-		xr->dst_addr = addr;
-		xr->src_addr = 0;
+		xr->dst.addr = addr;
+		xr->src.addr = 0;
 	} else {
-		xr->dst_addr = 0;
-		xr->src_addr = addr;
+		xr->dst.addr = 0;
+		xr->src.addr = addr;
 	}
 
 	QUEUE_IN_LOCK(xchan);

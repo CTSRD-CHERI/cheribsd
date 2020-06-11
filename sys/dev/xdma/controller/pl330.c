@@ -517,8 +517,8 @@ pl330_channel_submit_sg(device_t dev, struct xdma_channel *xchan,
 
 		offs += emit_mov(&chan->ibuf[offs], R_CCR, reg);
 
-		src_addr_lo = (uint32_t)sg[i].src_addr;
-		dst_addr_lo = (uint32_t)sg[i].dst_addr;
+		src_addr_lo = (uint32_t)sg[i].src.addr;
+		dst_addr_lo = (uint32_t)sg[i].dst.addr;
 		len = (uint32_t)sg[i].len;
 
 		dprintf("%s: src %x dst %x len %d periph_id %d\n", __func__,

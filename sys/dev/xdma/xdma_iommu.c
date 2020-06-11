@@ -61,13 +61,13 @@ __FBSDID("$FreeBSD$");
 #include "xdma_if.h"
 
 void
-xdma_iommu_remove_entry(xdma_channel_t *xchan, vm_offset_t va)
+xdma_iommu_remove_entry(xdma_channel_t *xchan, vm_ptr_t va)
 {
 	struct xdma_iommu *xio;
 
 	xio = &xchan->xio;
 
-	va &= ~(PAGE_SIZE - 1);
+	va = rounddown2(va, PAGE_SIZE);
 	pmap_remove(&xio->p, va, va + PAGE_SIZE);
 
 	XDMA_IOMMU_REMOVE(xio->dev, xio, va);
@@ -76,7 +76,7 @@ xdma_iommu_remove_entry(xdma_channel_t *xchan, vm_offset_t va)
 }
 
 static void
-xdma_iommu_enter(struct xdma_iommu *xio, vm_offset_t va,
+xdma_iommu_enter(struct xdma_iommu *xio, vm_ptr_t va,
     vm_paddr_t pa, vm_size_t size, vm_prot_t prot)
 {
 	vm_page_t m;
@@ -99,11 +99,11 @@ xdma_iommu_enter(struct xdma_iommu *xio, vm_offset_t va,
 }
 
 void
-xdma_iommu_add_entry(xdma_channel_t *xchan, vm_offset_t *va,
+xdma_iommu_add_entry(xdma_channel_t *xchan, vm_ptr_t *va,
     vm_paddr_t pa, vm_size_t size, vm_prot_t prot)
 {
 	struct xdma_iommu *xio;
-	vm_offset_t addr;
+	vmem_addr_t addr;
 
 	size = roundup2(size, PAGE_SIZE);
 	xio = &xchan->xio;

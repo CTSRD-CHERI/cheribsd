@@ -94,11 +94,11 @@ xdma_enqueue_mbuf(xdma_channel_t *xchan, struct mbuf **mp,
 	xr->m = *mp;
 	xr->req_type = XR_TYPE_MBUF;
 	if (dir == XDMA_MEM_TO_DEV) {
-		xr->dst_addr = addr;
-		xr->src_addr = 0;
+		xr->dst.addr = addr;
+		xr->src.addr = 0;
 	} else {
-		xr->src_addr = addr;
-		xr->dst_addr = 0;
+		xr->src.addr = addr;
+		xr->dst.addr = 0;
 	}
 	xr->src_width = src_width;
 	xr->dst_width = dst_width;

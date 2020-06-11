@@ -101,8 +101,8 @@ struct softdma_channel {
 };
 
 struct softdma_desc {
-	bus_addr_t		src_addr;
-	bus_addr_t		dst_addr;
+	void			*src_addr;
+	void			*dst_addr;
 	uint32_t		len;
 	uint32_t		access_width;
 	uint32_t		count;
@@ -299,7 +299,7 @@ static int
 softdma_process_tx(struct softdma_channel *chan, struct softdma_desc *desc)
 {
 	struct softdma_softc *sc;
-	bus_addr_t addr;
+	uintptr_t addr;
 	uint64_t buf;
 	uint32_t word;
 	uint32_t missing;
@@ -320,7 +320,7 @@ softdma_process_tx(struct softdma_channel *chan, struct softdma_desc *desc)
 	got_bits = 0;
 	buf = 0;
 
-	addr = desc->src_addr;
+	addr = (uintptr_t)desc->src_addr;
 	len = desc->len;
 
 	if (addr & 1) {
@@ -459,14 +459,15 @@ softdma_process_rx(struct softdma_channel *chan, struct softdma_desc *desc)
 		}
 
 		if (empty == 0) {
-			*(uint32_t *)(desc->dst_addr + dst_offs) = data;
+			*(uint32_t *)((uintptr_t)desc->dst_addr + dst_offs) =
+			    data;
 			dst_offs += 4;
 		} else if (empty == 1) {
-			*(uint16_t *)(desc->dst_addr + dst_offs) =
+			*(uint16_t *)((uintptr_t)desc->dst_addr + dst_offs) =
 			    ((data >> 16) & 0xffff);
 			dst_offs += 2;
 
-			*(uint8_t *)(desc->dst_addr + dst_offs) =
+			*(uint8_t *)((uintptr_t)desc->dst_addr + dst_offs) =
 			    ((data >> 8) & 0xff);
 			dst_offs += 1;
 		} else {
@@ -754,8 +755,8 @@ softdma_channel_submit_sg(device_t dev, struct xdma_channel *xchan,
 		len = (uint32_t)sg[i].len;
 
 		desc = &chan->descs[chan->idx_head];
-		desc->src_addr = sg[i].src_addr;
-		desc->dst_addr = sg[i].dst_addr;
+		desc->src_addr = (void *)sg[i].src.vaddr;
+		desc->dst_addr = (void *)sg[i].dst.vaddr;
 		if (sg[i].direction == XDMA_MEM_TO_DEV) {
 			desc->src_incr = 1;
 			desc->dst_incr = 0;
@@ -819,8 +820,8 @@ softdma_channel_request(device_t dev, struct xdma_channel *xchan,
 
 	desc = &chan->descs[0];
 
-	desc->src_addr = req->src_addr;
-	desc->dst_addr = req->dst_addr;
+	desc->src_addr = (void *)req->src.vaddr;
+	desc->dst_addr = (void *)req->dst.vaddr;
 	desc->len = req->block_len;
 	desc->src_incr = 1;
 	desc->dst_incr = 1;

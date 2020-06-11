@@ -235,8 +235,8 @@ xdmatest_test(struct xdmatest_softc *sc)
 
 	sc->req.type = XR_TYPE_PHYS_ADDR;
 	sc->req.direction = XDMA_MEM_TO_MEM;
-	sc->req.src_addr = sc->src_phys;
-	sc->req.dst_addr = sc->dst_phys;
+	sc->req.src.addr = sc->src_phys;
+	sc->req.dst.addr = sc->dst_phys;
 	sc->req.src_width = 4;
 	sc->req.dst_width = 4;
 	sc->req.block_len = sc->len;

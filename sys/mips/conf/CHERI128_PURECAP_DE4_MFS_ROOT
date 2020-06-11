@@ -25,8 +25,8 @@ options		STACK
 options		WITNESS
 options		DEBUG_VFS_LOCKS
 
-# no BPF support
-nodevice bpf
+# needed by dhclient
+device bpf
 
 # disable usb for now
 nodevice usb
@@ -34,7 +34,7 @@ nodevice saf1761otg
 nodevice ukbd
 nodevice ums
 
-nodevice xdma
-nodevice altera_softdma
-nodevice altera_msgdma
-nodevice altera_atse
+device xdma
+device altera_softdma
+device altera_msgdma
+device altera_atse

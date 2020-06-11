@@ -68,34 +68,46 @@ xchan_sglist_free(xdma_channel_t *xchan)
 }
 
 int
-xdma_sglist_add(struct xdma_sglist *sg, struct bus_dma_segment *seg,
+xdma_sglist_add_busdma(struct xdma_sglist *sg, struct bus_dma_segment *seg,
     uint32_t nsegs, struct xdma_request *xr)
 {
 	int i;
+	xdma_request_addr_t seg_addr;
 
 	if (nsegs == 0)
 		return (-1);
 
 	for (i = 0; i < nsegs; i++) {
-		sg[i].src_width = xr->src_width;
-		sg[i].dst_width = xr->dst_width;
-
-		if (xr->direction == XDMA_MEM_TO_DEV) {
-			sg[i].src_addr = seg[i].ds_addr;
-			sg[i].dst_addr = xr->dst_addr;
-		} else {
-			sg[i].src_addr = xr->src_addr;
-			sg[i].dst_addr = seg[i].ds_addr;
-		}
-		sg[i].len = seg[i].ds_len;
-		sg[i].direction = xr->direction;
-
-		sg[i].first = 0;
-		sg[i].last = 0;
+		seg_addr.addr = seg[i].ds_addr;
+		xdma_sglist_add(&sg[i], seg_addr, seg[i].ds_len, xr);
 	}
 
 	sg[0].first = 1;
 	sg[nsegs - 1].last = 1;
+
+	return (0);
+}
+
+int
+xdma_sglist_add(struct xdma_sglist *sg, xdma_request_addr_t seg_addr,
+    size_t len, struct xdma_request *xr)
+{
+
+	sg->src_width = xr->src_width;
+	sg->dst_width = xr->dst_width;
+
+	if (xr->direction == XDMA_MEM_TO_DEV) {
+		sg->src = seg_addr;
+		sg->dst = xr->dst;
+	} else {
+		sg->src = xr->src;
+		sg->dst = seg_addr;
+	}
+
+	sg->len = len;
+	sg->direction = xr->direction;
+	sg->first = 0;
+	sg->last = 0;
 
 	return (0);
 }
