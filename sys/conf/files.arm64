@@ -105,6 +105,7 @@ arm/broadcom/bcm2835/bcm2835_vcio.c		optional soc_brcm_bcm2837 fdt | soc_brcm_bc
 arm/broadcom/bcm2835/bcm2835_wdog.c		optional soc_brcm_bcm2837 fdt | soc_brcm_bcm2838 fdt
 arm/broadcom/bcm2835/bcm2836.c			optional soc_brcm_bcm2837 fdt | soc_brcm_bcm2838 fdt
 arm/broadcom/bcm2835/bcm283x_dwc_fdt.c		optional dwcotg fdt soc_brcm_bcm2837 | dwcotg fdt soc_brcm_bcm2838
+arm/freescale/vybrid/vf_i2c.c			optional vf_i2c iicbus SOC_NXP_LS
 arm/mv/a37x0_gpio.c				optional a37x0_gpio gpio fdt
 arm/mv/a37x0_iic.c				optional a37x0_iic iicbus fdt
 arm/mv/a37x0_spi.c				optional a37x0_spi spibus fdt
@@ -133,7 +134,6 @@ arm64/arm64/busdma_machdep.c	standard
 arm64/arm64/bzero.S		standard
 arm64/arm64/clock.c		standard
 arm64/arm64/copyinout.S		standard
-arm64/arm64/copystr.c		standard
 arm64/arm64/cpu_errata.c	standard
 arm64/arm64/cpufunc_asm.S	standard
 arm64/arm64/db_disasm.c		optional	ddb
@@ -196,6 +196,10 @@ arm64/coresight/coresight-tmc.c			standard
 arm64/intel/firmware.c				optional soc_intel_stratix10
 arm64/intel/stratix10-soc-fpga-mgr.c		optional soc_intel_stratix10
 arm64/intel/stratix10-svc.c			optional soc_intel_stratix10
+arm64/qoriq/ls1046_gpio.c			optional ls1046_gpio gpio fdt SOC_NXP_LS
+arm64/qoriq/clk/ls1046a_clkgen.c		optional clk SOC_NXP_LS
+arm64/qoriq/clk/qoriq_clk_pll.c			optional clk SOC_NXP_LS
+arm64/qoriq/clk/qoriq_clkgen.c			optional clk SOC_NXP_LS
 arm64/qualcomm/qcom_gcc.c			optional qcom_gcc fdt
 contrib/vchiq/interface/compat/vchi_bsd.c	optional vchiq soc_brcm_bcm2837 \
 	compile-with "${NORMAL_C} -DUSE_VCHIQ_ARM -D__VCCOREVER__=0x04000000 -I$S/contrib/vchiq"
@@ -227,6 +231,7 @@ dev/acpica/acpi_if.m		optional	acpi
 dev/acpica/acpi_pci_link.c	optional	acpi pci
 dev/acpica/acpi_pcib.c		optional	acpi pci
 dev/acpica/acpi_pxm.c		optional	acpi
+dev/ahci/ahci_fsl_fdt.c		optional	SOC_NXP_LS ahci fdt
 dev/ahci/ahci_generic.c		optional	ahci
 dev/altera/dwc/if_dwc_socfpga.c	optional	fdt dwc_socfpga
 dev/axgbe/if_axgbe.c		optional	axgbe
@@ -235,6 +240,52 @@ dev/axgbe/xgbe-dev.c		optional	axgbe
 dev/axgbe/xgbe-drv.c		optional	axgbe
 dev/axgbe/xgbe-mdio.c		optional	axgbe
 dev/cpufreq/cpufreq_dt.c	optional	cpufreq fdt
+dev/ice/if_ice_iflib.c		optional	ice pci \
+	compile-with "${NORMAL_C} -I$S/dev/ice"
+dev/ice/ice_lib.c		optional	ice pci \
+	compile-with "${NORMAL_C} -I$S/dev/ice"
+dev/ice/ice_osdep.c		optional	ice pci \
+	compile-with "${NORMAL_C} -I$S/dev/ice"
+dev/ice/ice_resmgr.c		optional	ice pci \
+	compile-with "${NORMAL_C} -I$S/dev/ice"
+dev/ice/ice_strings.c		optional	ice pci \
+	compile-with "${NORMAL_C} -I$S/dev/ice"
+dev/ice/ice_iflib_recovery_txrx.c	optional	ice pci \
+	compile-with "${NORMAL_C} -I$S/dev/ice"
+dev/ice/ice_iflib_txrx.c	optional	ice pci \
+	compile-with "${NORMAL_C} -I$S/dev/ice"
+dev/ice/ice_common.c		optional	ice pci \
+	compile-with "${NORMAL_C} -I$S/dev/ice"
+dev/ice/ice_controlq.c		optional	ice pci \
+	compile-with "${NORMAL_C} -I$S/dev/ice"
+dev/ice/ice_dcb.c		optional	ice pci \
+	compile-with "${NORMAL_C} -I$S/dev/ice"
+dev/ice/ice_flex_pipe.c		optional	ice pci \
+	compile-with "${NORMAL_C} -I$S/dev/ice"
+dev/ice/ice_flow.c		optional	ice pci \
+	compile-with "${NORMAL_C} -I$S/dev/ice"
+dev/ice/ice_nvm.c		optional	ice pci \
+	compile-with "${NORMAL_C} -I$S/dev/ice"
+dev/ice/ice_sched.c		optional	ice pci \
+	compile-with "${NORMAL_C} -I$S/dev/ice"
+dev/ice/ice_sriov.c		optional	ice pci \
+	compile-with "${NORMAL_C} -I$S/dev/ice"
+dev/ice/ice_switch.c		optional	ice pci \
+	compile-with "${NORMAL_C} -I$S/dev/ice"
+ice_ddp.c			optional ice_ddp	\
+	compile-with	"${AWK} -f $S/tools/fw_stub.awk ice_ddp.fw:ice_ddp:0x01030900 -mice_ddp -c${.TARGET}"	\
+	no-implicit-rule before-depend local		\
+	clean		"ice_ddp.c"
+ice_ddp.fwo			optional ice_ddp	\
+	dependency	"ice_ddp.fw"			\
+	compile-with	"${NORMAL_FWO}"			\
+	no-implicit-rule				\
+	clean		"ice_ddp.fwo"
+ice_ddp.fw			optional ice_ddp	\
+	dependency	"$S/contrib/dev/ice/ice-1.3.9.0.pkg" \
+	compile-with	"${CP} $S/contrib/dev/ice/ice-1.3.9.0.pkg ice_ddp.fw" \
+	no-obj no-implicit-rule				\
+	clean		"ice_ddp.fw"
 dev/iicbus/sy8106a.c		optional	sy8106a fdt
 dev/iicbus/twsi/mv_twsi.c	optional	twsi fdt
 dev/iicbus/twsi/a10_twsi.c	optional	twsi fdt

@@ -71,6 +71,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/resourcevar.h>
 #include <sys/rwlock.h>
 #include <sys/sx.h>
+#include <sys/sleepqueue.h>
 #include <sys/sysctl.h>
 #include <sys/ttycom.h>
 #include <sys/conf.h>
@@ -671,6 +672,83 @@ vn_rdwr_inchunks(enum uio_rw rw, struct vnode *vp, void *base, size_t len,
 	return (error);
 }
 
+#if OFF_MAX <= LONG_MAX
+off_t
+foffset_lock(struct file *fp, int flags)
+{
+	volatile short *flagsp;
+	off_t res;
+	short state;
+
+	KASSERT((flags & FOF_OFFSET) == 0, ("FOF_OFFSET passed"));
+
+	if ((flags & FOF_NOLOCK) != 0)
+		return (atomic_load_long(&fp->f_offset));
+
+	/*
+	 * According to McKusick the vn lock was protecting f_offset here.
+	 * It is now protected by the FOFFSET_LOCKED flag.
+	 */
+	flagsp = &fp->f_vnread_flags;
+	if (atomic_cmpset_acq_16(flagsp, 0, FOFFSET_LOCKED))
+		return (atomic_load_long(&fp->f_offset));
+
+	sleepq_lock(&fp->f_vnread_flags);
+	state = atomic_load_16(flagsp);
+	for (;;) {
+		if ((state & FOFFSET_LOCKED) == 0) {
+			if (!atomic_fcmpset_acq_16(flagsp, &state,
+			    FOFFSET_LOCKED))
+				continue;
+			break;
+		}
+		if ((state & FOFFSET_LOCK_WAITING) == 0) {
+			if (!atomic_fcmpset_acq_16(flagsp, &state,
+			    state | FOFFSET_LOCK_WAITING))
+				continue;
+		}
+		DROP_GIANT();
+		sleepq_add(&fp->f_vnread_flags, NULL, "vofflock", 0, 0);
+		sleepq_wait(&fp->f_vnread_flags, PUSER -1);
+		PICKUP_GIANT();
+		sleepq_lock(&fp->f_vnread_flags);
+		state = atomic_load_16(flagsp);
+	}
+	res = atomic_load_long(&fp->f_offset);
+	sleepq_release(&fp->f_vnread_flags);
+	return (res);
+}
+
+void
+foffset_unlock(struct file *fp, off_t val, int flags)
+{
+	volatile short *flagsp;
+	short state;
+
+	KASSERT((flags & FOF_OFFSET) == 0, ("FOF_OFFSET passed"));
+
+	if ((flags & FOF_NOUPDATE) == 0)
+		atomic_store_long(&fp->f_offset, val);
+	if ((flags & FOF_NEXTOFF) != 0)
+		fp->f_nextoff = val;
+
+	if ((flags & FOF_NOLOCK) != 0)
+		return;
+
+	flagsp = &fp->f_vnread_flags;
+	state = atomic_load_16(flagsp);
+	if ((state & FOFFSET_LOCK_WAITING) == 0 &&
+	    atomic_cmpset_rel_16(flagsp, state, 0))
+		return;
+
+	sleepq_lock(&fp->f_vnread_flags);
+	MPASS((fp->f_vnread_flags & FOFFSET_LOCKED) != 0);
+	MPASS((fp->f_vnread_flags & FOFFSET_LOCK_WAITING) != 0);
+	fp->f_vnread_flags = 0;
+	sleepq_broadcast(&fp->f_vnread_flags, SLEEPQ_SLEEP, 0, 0);
+	sleepq_release(&fp->f_vnread_flags);
+}
+#else
 off_t
 foffset_lock(struct file *fp, int flags)
 {
@@ -679,19 +757,6 @@ foffset_lock(struct file *fp, int flags)
 
 	KASSERT((flags & FOF_OFFSET) == 0, ("FOF_OFFSET passed"));
 
-#if OFF_MAX <= LONG_MAX
-	/*
-	 * Caller only wants the current f_offset value.  Assume that
-	 * the long and shorter integer types reads are atomic.
-	 */
-	if ((flags & FOF_NOLOCK) != 0)
-		return (fp->f_offset);
-#endif
-
-	/*
-	 * According to McKusick the vn lock was protecting f_offset here.
-	 * It is now protected by the FOFFSET_LOCKED flag.
-	 */
 	mtxp = mtx_pool_find(mtxpool_sleep, fp);
 	mtx_lock(mtxp);
 	if ((flags & FOF_NOLOCK) == 0) {
@@ -714,16 +779,6 @@ foffset_unlock(struct file *fp, off_t val, int flags)
 
 	KASSERT((flags & FOF_OFFSET) == 0, ("FOF_OFFSET passed"));
 
-#if OFF_MAX <= LONG_MAX
-	if ((flags & FOF_NOLOCK) != 0) {
-		if ((flags & FOF_NOUPDATE) == 0)
-			fp->f_offset = val;
-		if ((flags & FOF_NEXTOFF) != 0)
-			fp->f_nextoff = val;
-		return;
-	}
-#endif
-
 	mtxp = mtx_pool_find(mtxpool_sleep, fp);
 	mtx_lock(mtxp);
 	if ((flags & FOF_NOUPDATE) == 0)
@@ -739,6 +794,7 @@ foffset_unlock(struct file *fp, off_t val, int flags)
 	}
 	mtx_unlock(mtxp);
 }
+#endif
 
 void
 foffset_lock_uio(struct file *fp, struct uio *uio, int flags)

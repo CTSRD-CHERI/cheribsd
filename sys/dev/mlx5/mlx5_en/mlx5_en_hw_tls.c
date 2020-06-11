@@ -119,7 +119,7 @@ mlx5e_tls_init(struct mlx5e_priv *priv)
 	struct sysctl_oid *node;
 	uint32_t x;
 
-	if (MLX5_CAP_GEN(priv->mdev, tls) == 0)
+	if (MLX5_CAP_GEN(priv->mdev, tls_tx) == 0)
 		return (0);
 
 	ptls->wq = create_singlethread_workqueue("mlx5-tls-wq");
@@ -161,7 +161,7 @@ mlx5e_tls_cleanup(struct mlx5e_priv *priv)
 	struct mlx5e_tls *ptls = &priv->tls;
 	uint32_t x;
 
-	if (MLX5_CAP_GEN(priv->mdev, tls) == 0)
+	if (MLX5_CAP_GEN(priv->mdev, tls_tx) == 0)
 		return;
 
 	ptls->init = 0;
@@ -251,18 +251,14 @@ mlx5e_tls_set_params(void *ctx, const struct tls_session_params *en)
 	MLX5_SET(sw_tls_cntx, ctx, param.encryption_standard, 1); /* TLS */
 
 	/* copy the initial vector in place */
-	if (en->iv_len == MLX5_FLD_SZ_BYTES(sw_tls_cntx, param.gcm_iv)) {
+	switch (en->iv_len) {
+	case MLX5_FLD_SZ_BYTES(sw_tls_cntx, param.gcm_iv):
+	case MLX5_FLD_SZ_BYTES(sw_tls_cntx, param.gcm_iv) +
+	     MLX5_FLD_SZ_BYTES(sw_tls_cntx, param.implicit_iv):
 		memcpy(MLX5_ADDR_OF(sw_tls_cntx, ctx, param.gcm_iv),
-		    en->iv, MLX5_FLD_SZ_BYTES(sw_tls_cntx, param.gcm_iv));
-	} else if (en->iv_len == (MLX5_FLD_SZ_BYTES(sw_tls_cntx, param.gcm_iv) +
-				  MLX5_FLD_SZ_BYTES(sw_tls_cntx, param.implicit_iv))) {
-		memcpy(MLX5_ADDR_OF(sw_tls_cntx, ctx, param.gcm_iv),
-		    (char *)en->iv + MLX5_FLD_SZ_BYTES(sw_tls_cntx, param.implicit_iv),
-		    MLX5_FLD_SZ_BYTES(sw_tls_cntx, param.gcm_iv));
-		memcpy(MLX5_ADDR_OF(sw_tls_cntx, ctx, param.implicit_iv),
-		    en->iv,
-		    MLX5_FLD_SZ_BYTES(sw_tls_cntx, param.implicit_iv));
-	} else {
+		    en->iv, en->iv_len);
+		break;
+	default:
 		return (EINVAL);
 	}
 
@@ -564,9 +560,7 @@ mlx5e_tls_send_progress_parameters(struct mlx5e_sq *sq, struct mlx5e_tls_tag *pt
 	wqe->ctrl.qpn_ds = cpu_to_be32((sq->sqn << 8) | ds_cnt);
 
 	if (mlx5e_do_send_cqe(sq))
-		wqe->ctrl.fm_ce_se = MLX5_WQE_CTRL_CQ_UPDATE | MLX5_FENCE_MODE_INITIATOR_SMALL;
-	else
-		wqe->ctrl.fm_ce_se = MLX5_FENCE_MODE_INITIATOR_SMALL;
+		wqe->ctrl.fm_ce_se = MLX5_WQE_CTRL_CQ_UPDATE;
 
 	/* copy in the PSV control segment */
 	memcpy(&wqe->psv, MLX5_ADDR_OF(sw_tls_cntx, ptag->crypto_params, progress),
@@ -767,10 +761,6 @@ mlx5e_sq_tls_xmit(struct mlx5e_sq *sq, struct mlx5e_xmit_args *parg, struct mbuf
 			/* setup TLS static parameters */
 			MLX5_SET64(sw_tls_cntx, ptls_tag->crypto_params,
 			    param.initial_record_number, rcd_sn);
-
-			/* setup TLS progress parameters */
-			MLX5_SET(sw_tls_cntx, ptls_tag->crypto_params,
-			    progress.next_record_tcp_sn, tcp_seq);
 
 			/*
 			 * NOTE: The sendqueue should have enough room to
