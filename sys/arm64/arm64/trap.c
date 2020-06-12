@@ -284,7 +284,7 @@ data_abort(struct thread *td, struct trapframe *frame, uint64_t esr,
 					return;
 			}
 #endif
-			panic("vm_fault failed: %lx", frame->tf_elr);
+			panic("vm_fault failed: %lx", (uint64_t)frame->tf_elr);
 		}
 	}
 
@@ -299,11 +299,11 @@ print_registers(struct trapframe *frame)
 
 	for (reg = 0; reg < nitems(frame->tf_x); reg++) {
 		printf(" %sx%d: %16lx\n", (reg < 10) ? " " : "", reg,
-		    frame->tf_x[reg]);
+		    (uint64_t)frame->tf_x[reg]);
 	}
-	printf("  sp: %16lx\n", frame->tf_sp);
-	printf("  lr: %16lx\n", frame->tf_lr);
-	printf(" elr: %16lx\n", frame->tf_elr);
+	printf("  sp: %16lx\n", (uint64_t)frame->tf_sp);
+	printf("  lr: %16lx\n", (uint64_t)frame->tf_lr);
+	printf(" elr: %16lx\n", (uint64_t)frame->tf_elr);
 	printf("spsr:         %8x\n", frame->tf_spsr);
 }
 
