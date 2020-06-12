@@ -1,6 +1,8 @@
 # $FreeBSD$
 
 ARM64				opt_global.h
+MORELLO				opt_global.h
+
 INTRNG				opt_global.h
 SOCDEV_PA			opt_global.h
 SOCDEV_VA			opt_global.h

@@ -42,6 +42,10 @@ typedef	uint64_t	pt_entry_t;		/* page table entry */
 #define	ATTR_MASK_H		UINT64_C(0xfffc000000000000)
 #define	ATTR_MASK_L		UINT64_C(0x0000000000000fff)
 #define	ATTR_MASK		(ATTR_MASK_H | ATTR_MASK_L)
+#define	ATTR_LC_MASK		(3UL << 61)
+#define	ATTR_LC_DISABLED	(0UL << 61)
+#define	ATTR_LC_ENABLED		(1UL << 61)
+#define	ATTR_SC			(1UL << 60)
 /* Bits 58:55 are reserved for software */
 #define	ATTR_SW_UNUSED2		(1UL << 58)
 #define	ATTR_SW_UNUSED1		(1UL << 57)
@@ -91,7 +95,12 @@ typedef	uint64_t	pt_entry_t;		/* page table entry */
 #define	 ATTR_S2_MEMATTR_WT		0xa
 #define	 ATTR_S2_MEMATTR_WB		0xf
 
+#ifdef MORELLO
+#define	ATTR_DEFAULT			\
+    (ATTR_AF | ATTR_SH(ATTR_SH_IS) | ATTR_LC_ENABLED | ATTR_SC)
+#else
 #define	ATTR_DEFAULT	(ATTR_AF | ATTR_SH(ATTR_SH_IS))
+#endif
 
 #define	ATTR_DESCR_MASK		3
 #define	ATTR_DESCR_VALID	1

@@ -192,6 +192,9 @@ int
 fill_regs(struct thread *td, struct reg *regs)
 {
 	struct trapframe *frame;
+#ifdef MORELLO
+	int i;
+#endif
 
 	frame = td->td_frame;
 	regs->sp = frame->tf_sp;
@@ -199,7 +202,12 @@ fill_regs(struct thread *td, struct reg *regs)
 	regs->elr = frame->tf_elr;
 	regs->spsr = frame->tf_spsr;
 
+#ifdef MORELLO
+	for (i = 0; i < nitems(frame->tf_x); i++)
+		regs->x[i] = frame->tf_x[i];
+#else
 	memcpy(regs->x, frame->tf_x, sizeof(regs->x));
+#endif
 
 #ifdef COMPAT_FREEBSD32
 	/*
@@ -218,6 +226,9 @@ int
 set_regs(struct thread *td, struct reg *regs)
 {
 	struct trapframe *frame;
+#ifdef MORELLO
+	int i;
+#endif
 
 	frame = td->td_frame;
 	frame->tf_sp = regs->sp;
@@ -226,7 +237,12 @@ set_regs(struct thread *td, struct reg *regs)
 	frame->tf_spsr &= ~PSR_FLAGS;
 	frame->tf_spsr |= regs->spsr & PSR_FLAGS;
 
+#ifdef MORELLO
+	for (i = 0; i < nitems(frame->tf_x); i++)
+		frame->tf_x[i] = regs->x[i];
+#else
 	memcpy(frame->tf_x, regs->x, sizeof(frame->tf_x));
+#endif
 
 #ifdef COMPAT_FREEBSD32
 	if (SV_PROC_FLAG(td->td_proc, SV_ILP32)) {
@@ -454,16 +470,21 @@ exec_setregs(struct thread *td, struct image_params *imgp, uintcap_t stack)
 	tf->tf_elr = imgp->entry_addr;
 }
 
+#ifndef MORELLO
 /* Sanity check these are the same size, they will be memcpy'd to and fro */
 CTASSERT(sizeof(((struct trapframe *)0)->tf_x) ==
     sizeof((struct gpregs *)0)->gp_x);
 CTASSERT(sizeof(((struct trapframe *)0)->tf_x) ==
     sizeof((struct reg *)0)->x);
+#endif
 
 int
 get_mcontext(struct thread *td, mcontext_t *mcp, int clear_ret)
 {
 	struct trapframe *tf = td->td_frame;
+#ifdef MORELLO
+	int i;
+#endif
 
 	if (clear_ret & GET_MC_CLEAR_RET) {
 		mcp->mc_gpregs.gp_x[0] = 0;
@@ -473,8 +494,13 @@ get_mcontext(struct thread *td, mcontext_t *mcp, int clear_ret)
 		mcp->mc_gpregs.gp_spsr = tf->tf_spsr;
 	}
 
+#ifdef MORELLO
+	for (i = 1; i < nitems(tf->tf_x); i++)
+		mcp->mc_gpregs.gp_x[i] = tf->tf_x[i];
+#else
 	memcpy(&mcp->mc_gpregs.gp_x[1], &tf->tf_x[1],
 	    sizeof(mcp->mc_gpregs.gp_x[1]) * (nitems(mcp->mc_gpregs.gp_x) - 1));
+#endif
 
 	mcp->mc_gpregs.gp_sp = tf->tf_sp;
 	mcp->mc_gpregs.gp_lr = tf->tf_lr;
@@ -489,6 +515,9 @@ set_mcontext(struct thread *td, mcontext_t *mcp)
 {
 	struct trapframe *tf = td->td_frame;
 	uint32_t spsr;
+#ifdef MORELLO
+	int i;
+#endif
 
 	spsr = mcp->mc_gpregs.gp_spsr;
 	if ((spsr & PSR_M_MASK) != PSR_M_EL0t ||
@@ -496,7 +525,12 @@ set_mcontext(struct thread *td, mcontext_t *mcp)
 	    (spsr & PSR_DAIF) != (td->td_frame->tf_spsr & PSR_DAIF))
 		return (EINVAL); 
 
+#ifdef MORELLO
+	for (i = 0; i < nitems(tf->tf_x); i++)
+		tf->tf_x[i] = mcp->mc_gpregs.gp_x[i];
+#else
 	memcpy(tf->tf_x, mcp->mc_gpregs.gp_x, sizeof(tf->tf_x));
+#endif
 
 	tf->tf_sp = mcp->mc_gpregs.gp_sp;
 	tf->tf_lr = mcp->mc_gpregs.gp_lr;

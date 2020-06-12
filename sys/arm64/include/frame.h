@@ -47,7 +47,11 @@ struct trapframe {
 	uint64_t tf_elr;
 	uint32_t tf_spsr;
 	uint32_t tf_esr;
+#ifdef MORELLO
+	__uint128_t tf_x[30];
+#else
 	uint64_t tf_x[30];
+#endif
 };
 
 struct arm64_frame {

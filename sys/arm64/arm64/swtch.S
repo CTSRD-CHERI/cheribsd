@@ -213,6 +213,22 @@ ENTRY(fork_trampoline)
 	mov	fp, #0	/* Stack traceback stops here. */
 	bl	_C_LABEL(fork_exit)
 
+#ifdef MORELLO
+	ldp	c2, c3, [sp, #TF_X + 2 * 16]
+	ldp	c4, c5, [sp, #TF_X + 4 * 16]
+	ldp	c6, c7, [sp, #TF_X + 6 * 16]
+	ldp	c8, c9, [sp, #TF_X + 8 * 16]
+	ldp	c10, c11, [sp, #TF_X + 10 * 16]
+	ldp	c12, c13, [sp, #TF_X + 12 * 16]
+	ldp	c14, c15, [sp, #TF_X + 14 * 16]
+	ldp	c16, c17, [sp, #TF_X + 16 * 16]
+	ldr	     c19, [sp, #TF_X + 19 * 16]
+	ldp	c20, c21, [sp, #TF_X + 20 * 16]
+	ldp	c22, c23, [sp, #TF_X + 22 * 16]
+	ldp	c24, c25, [sp, #TF_X + 24 * 16]
+	ldp	c26, c27, [sp, #TF_X + 26 * 16]
+	ldp	c28, c29, [sp, #TF_X + 28 * 16]
+#else
 	/* Restore the registers other than x0 and x1 */
 	ldp	x2, x3, [sp, #TF_X + 2 * 8]
 	ldp	x4, x5, [sp, #TF_X + 4 * 8]
@@ -228,6 +244,7 @@ ENTRY(fork_trampoline)
 	ldp	x24, x25, [sp, #TF_X + 24 * 8]
 	ldp	x26, x27, [sp, #TF_X + 26 * 8]
 	ldp	x28, x29, [sp, #TF_X + 28 * 8]
+#endif
 
 	/*
 	 * Disable interrupts to avoid
@@ -242,12 +259,22 @@ ENTRY(fork_trampoline)
 
 	/* Restore elr and spsr */
 	ldp	x0, x1, [sp, #TF_ELR]
+#ifdef MORELLO
+	cvtp	c0, x0
+	msr	celr_el1, c0
+#else
 	msr	elr_el1, x0
+#endif
 	msr	spsr_el1, x1
 
 	/* Finally x0 and x1 */
+#ifdef MORELLO
+	ldp	c0, c1, [sp, #TF_X + 0 * 16]
+	ldr	c18, [sp, #TF_X + 18 * 16]
+#else
 	ldp	x0, x1, [sp, #TF_X + 0 * 8]
 	ldr	x18, [sp, #TF_X + 18 * 8]
+#endif
 
 	/*
 	 * No need for interrupts reenabling since PSR

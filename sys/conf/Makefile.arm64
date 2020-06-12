@@ -27,6 +27,14 @@ S=	../../..
 
 INCLUDES+= -I$S/contrib/libfdt
 
+# TODO: This shouldn't be needed, we should be building with TAARGET_ARCH=morello
+MORELLO_ENABLED!=	grep MORELLO opt_global.h || true ; echo
+.if !empty(MORELLO_ENABLED)
+CFLAGS.exception-morello.S=	-march=morello
+CFLAGS.locore.S=		-march=morello
+CFLAGS.swtch.S=			-march=morello
+.endif
+
 # Use a custom SYSTEM_LD command to generate the elf kernel, so we can
 # set the text segment start address, and also strip the "arm mapping
 # symbols" which have names like $a.0 and $d.2; see the document

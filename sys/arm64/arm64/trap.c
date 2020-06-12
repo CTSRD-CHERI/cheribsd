@@ -119,7 +119,12 @@ int
 cpu_fetch_syscall_args(struct thread *td)
 {
 	struct proc *p;
+#if defined(MORELLO) && !__has_feature(capabilities)
+	__uint128_t *ap;
+	int i;
+#else
 	syscallarg_t *ap;
+#endif
 	struct syscall_args *sa;
 	int nap;
 
@@ -141,7 +146,12 @@ cpu_fetch_syscall_args(struct thread *td)
 		sa->callp = &p->p_sysent->sv_table[sa->code];
 
 	sa->narg = sa->callp->sy_narg;
+#if defined(MORELLO) && !__has_feature(capabilities)
+	for (i = 0; i < nap; i++)
+		sa->args[i] = ap[i];
+#else
 	memcpy(sa->args, ap, nap * sizeof(syscallarg_t));
+#endif
 	if (sa->narg > nap)
 		panic("ARM64TODO: Could we have more than 8 args?");
 
@@ -299,7 +309,7 @@ print_registers(struct trapframe *frame)
 
 	for (reg = 0; reg < nitems(frame->tf_x); reg++) {
 		printf(" %sx%d: %16lx\n", (reg < 10) ? " " : "", reg,
-		    frame->tf_x[reg]);
+		    (uint64_t)frame->tf_x[reg]);
 	}
 	printf("  sp: %16lx\n", frame->tf_sp);
 	printf("  lr: %16lx\n", frame->tf_lr);
