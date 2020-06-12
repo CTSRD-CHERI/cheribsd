@@ -4,6 +4,13 @@
 
 include		"CHERI128_PURECAP_MALTA64"
 
+# Disable verbose things to avoid making the kernel too slow
+#nooptions		DIAGNOSTIC
+#nooptions		VERBOSE_SYSINIT
+#nooptions		STACK
+#nooptions		WITNESS
+#nooptions		DEBUG_VFS_LOCKS
+
 # kernel coverage
 options		COVERAGE
 options		KCOV
