@@ -75,5 +75,8 @@ ASSYM(TD_LOCK, offsetof(struct thread, td_lock));
 ASSYM(TF_SIZE, sizeof(struct trapframe));
 ASSYM(TF_SP, offsetof(struct trapframe, tf_sp));
 ASSYM(TF_ELR, offsetof(struct trapframe, tf_elr));
+#if __has_feature(capabilities)
+ASSYM(TF_DDC, offsetof(struct trapframe, tf_ddc));
+#endif
 ASSYM(TF_SPSR, offsetof(struct trapframe, tf_spsr));
 ASSYM(TF_X, offsetof(struct trapframe, tf_x));

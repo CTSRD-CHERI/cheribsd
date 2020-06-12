@@ -43,7 +43,12 @@
 
 /* CPTR_EL2 - Architecture feature trap register */
 #define	CPTR_RES0	0x7fefc800
+#if __has_feature(capabilities)
+#define	CPTR_RES1	0x000031ff
+#define	CPTR_TC		0x00000200	/* Trap Capabilities */
+#else
 #define	CPTR_RES1	0x000033ff
+#endif
 #define	CPTR_TFP	0x00000400
 #define	CPTR_TTA	0x00100000
 #define	CPTR_TCPAC	0x80000000

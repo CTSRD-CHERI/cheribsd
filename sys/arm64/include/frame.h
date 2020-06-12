@@ -42,12 +42,24 @@
  * NOTE: keep this structure in sync with struct reg and struct mcontext.
  */
 struct trapframe {
+#if __has_feature(capabilities)
+	uintcap_t tf_sp;
+	uintcap_t tf_lr;
+	uintcap_t tf_elr;
+	uintcap_t tf_ddc;
+#else
 	uint64_t tf_sp;
 	uint64_t tf_lr;
 	uint64_t tf_elr;
+#endif
 	uint32_t tf_spsr;
 	uint32_t tf_esr;
+#if __has_feature(capabilities)
+	uint64_t tf_pad;
+	uintcap_t tf_x[30];
+#else
 	uint64_t tf_x[30];
+#endif
 };
 
 struct arm64_frame {
