@@ -2203,7 +2203,7 @@ mips_unaligned_load_store(struct trapframe *frame, int mode, register_t addr, ui
 #ifdef CPU_CHERI
 	dst_addr = cheri_setaddress(dest, addr);
 #else
-	dst_addr = addr;
+	dst_addr = (void *)(uintptr_t)addr;
 #endif
 
 	if (is_store) {
