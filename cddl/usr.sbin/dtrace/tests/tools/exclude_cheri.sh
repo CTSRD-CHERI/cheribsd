@@ -42,8 +42,9 @@ exclude EXFAIL common/dtraceUtil/tst.DefineNameWithCPP.d.ksh
 # json gives problem
 exclude SKIP common/json/usdt.d
 
-# funcs - lockstat doesn't work? or nexted exceptions are generated?
-exclude SKIP common/func/tst.mutex_owner.d
+# fbt - pointer access
+exclude SKIP common/funcs/tst.mutex_owner.d
+exclude SKIP common/funcs/tst.mutex_owned.d
 
 # fbt - when all the probes are enabled, the system is stucks
 exclude SKIP common/misc/tst.schrock.ksh
@@ -91,6 +92,8 @@ exclude SKIP common/safety/tst.violentdeath.ksh
 exclude SKIP common/safety/tst.msgdsize.d
 
 
+# printa - too high profile
+exclude SKIP common/printa/tst.many.d
 # timeout for some reason
 exclude SKIP builtinvar/t_dtrace_contrib:tst_arg1to8clause_d
 exclude SKIP builtinvar/t_dtrace_contrib:tst_arg0clause_d
