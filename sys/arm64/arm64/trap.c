@@ -124,7 +124,12 @@ int
 cpu_fetch_syscall_args(struct thread *td)
 {
 	struct proc *p;
+#if defined(MORELLO) && !__has_feature(capabilities)
+	__uint128_t *ap;
+	int i;
+#else
 	syscallarg_t *ap;
+#endif
 	struct syscall_args *sa;
 	int nap;
 
@@ -146,7 +151,12 @@ cpu_fetch_syscall_args(struct thread *td)
 		sa->callp = &p->p_sysent->sv_table[sa->code];
 
 	sa->narg = sa->callp->sy_narg;
+#if defined(MORELLO) && !__has_feature(capabilities)
+	for (i = 0; i < nap; i++)
+		sa->args[i] = ap[i];
+#else
 	memcpy(sa->args, ap, nap * sizeof(syscallarg_t));
+#endif
 	if (sa->narg > nap)
 		panic("ARM64TODO: Could we have more than 8 args?");
 
