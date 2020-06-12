@@ -79,6 +79,11 @@
 #define	CNTP_CTL_ISTATUS	(1 << 2)
 
 /* CPACR_EL1 */
+#define	CPACR_CEN_MASK		(0x3 << 18)
+#define	 CPACR_CEN_TRAP_ALL1	(0x0 << 18) /* Traps from EL0 and EL1 */
+#define	 CPACR_CEN_TRAP_EL0	(0x1 << 18) /* Traps from EL0 */
+#define	 CPACR_CEN_TRAP_ALL2	(0x2 << 18) /* Traps from EL0 and EL1 */
+#define	 CPACR_CEN_TRAP_NONE	(0x3 << 18) /* No traps */
 #define	CPACR_FPEN_MASK		(0x3 << 20)
 #define	 CPACR_FPEN_TRAP_ALL1	(0x0 << 20) /* Traps from EL0 and EL1 */
 #define	 CPACR_FPEN_TRAP_EL0	(0x1 << 20) /* Traps from EL0 */
