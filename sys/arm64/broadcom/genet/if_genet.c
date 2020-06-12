@@ -1495,7 +1495,7 @@ gen_ioctl(if_t ifp, u_long cmd, caddr_t data)
 
 	case SIOCSIFCAP:
 		enable = if_getcapenable(ifp);
-		flags = ifr->ifr_reqcap ^ enable;
+		flags = ifr_reqcap_get(ifr) ^ enable;
 		if (flags & IFCAP_RXCSUM)
 			enable ^= IFCAP_RXCSUM;
 		if (flags & IFCAP_RXCSUM_IPV6)
