@@ -2696,6 +2696,8 @@ DB_SHOW_COMMAND(vmochk, vm_object_check)
 				    (void *)object->backing_object);
 			}
 		}
+		if (db_pager_quit)
+			return;
 	}
 }
 
@@ -2746,6 +2748,9 @@ DB_SHOW_COMMAND(object, vm_object_print_static)
 
 		db_printf("(off=0x%jx,page=0x%jx)",
 		    (uintmax_t)p->pindex, (uintmax_t)VM_PAGE_TO_PHYS(p));
+
+		if (db_pager_quit)
+			break;
 	}
 	if (count != 0)
 		db_printf("\n");
