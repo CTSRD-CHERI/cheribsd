@@ -42,9 +42,13 @@ exclude EXFAIL common/dtraceUtil/tst.DefineNameWithCPP.d.ksh
 # json gives problem
 exclude SKIP common/json/usdt.d
 
-# fbt - pointer access
+# funcs - struct mtx is not capability aware
 exclude SKIP common/funcs/tst.mutex_owner.d
 exclude SKIP common/funcs/tst.mutex_owned.d
+exclude SKIP common/funcs/tst.mutex_type_adaptive.d
+
+# misc - mtx not capability aware
+exclude SKIP common/misc/tst.roch.d
 
 # fbt - when all the probes are enabled, the system is stucks
 exclude SKIP common/misc/tst.schrock.ksh
