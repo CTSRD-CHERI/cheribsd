@@ -195,7 +195,7 @@ again:
 		 * Try to protect 32-bit DMAable memory from the largest
 		 * early alloc of wired mem.
 		 */
-		firstaddr = kmem_alloc_attr(size, M_ZERO | M_NOWAIT,
+		firstaddr = (caddr_t)kmem_alloc_attr(size, M_ZERO | M_NOWAIT,
 		    (vm_paddr_t)1 << 32, ~(vm_paddr_t)0, VM_MEMATTR_DEFAULT);
 		if (firstaddr == 0)
 #endif

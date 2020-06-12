@@ -442,7 +442,11 @@ nm_os_generic_xmit_frame(struct nm_os_gen_arg *a)
 #else  /* __FreeBSD_version >= 1100000 */
 	/* New FreeBSD versions. Link the external storage to
 	 * the netmap buffer, so that no copy is necessary. */
+#ifdef CHERI_PURECAP_KERNEL
 	m->m_ext.ext_buf = m->m_data = cheri_setbounds(a->addr, len);
+#else
+	m->m_ext.ext_buf = m->m_data = a->addr;
+#endif
 	m->m_ext.ext_size = len;
 #endif /* __FreeBSD_version >= 1100000 */
 

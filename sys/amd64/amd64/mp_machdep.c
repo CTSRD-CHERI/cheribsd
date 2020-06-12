@@ -475,11 +475,11 @@ native_start_all_aps(void)
 		    M_ZERO);
 		mce_stack = (char *)kmem_malloc(PAGE_SIZE, M_WAITOK | M_ZERO);
 		nmi_stack = (char *)kmem_malloc_domainset(
-		    DOMAINSET_PREF(domain), PAGE_SIZE, M_WAITOK | M_ZERO);
+		    DOMAINSET_PREF(domain), PAGE_SIZE, M_WAITOK | M_ZERO, 0);
 		dbg_stack = (char *)kmem_malloc_domainset(
-		    DOMAINSET_PREF(domain), PAGE_SIZE, M_WAITOK | M_ZERO);
+		    DOMAINSET_PREF(domain), PAGE_SIZE, M_WAITOK | M_ZERO, 0);
 		dpcpu = (void *)kmem_malloc_domainset(DOMAINSET_PREF(domain),
-		    DPCPU_SIZE, M_WAITOK | M_ZERO);
+		    DPCPU_SIZE, M_WAITOK | M_ZERO, 0);
 
 		bootSTK = (char *)bootstacks[cpu] +
 		    kstack_pages * PAGE_SIZE - 8;

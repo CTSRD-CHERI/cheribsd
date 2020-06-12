@@ -98,7 +98,7 @@ __FBSDID("$FreeBSD$");
 #include <ddb/ddb.h>
 #include <ddb/db_sym.h>
 
-#include <cheri/cheri.h>
+#include <cheri/cheric.h>
 
 void mi_startup(void);				/* Should be elsewhere */
 

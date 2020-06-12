@@ -36,11 +36,9 @@
 #include <sys/cdefs.h>
 #include <sys/types.h>
 
-#include <cheri/cherireg.h>	/* Permission definitions. */
-
 #if __has_feature(capabilities) || defined(__CHERI__)
 
-#include <machine/cherireg.h>	/* Permission definitions. */
+#include <cheri/cherireg.h>	/* Permission definitions. */
 
 /*
  * Programmer-friendly macros for CHERI-aware C code -- requires use of
@@ -307,6 +305,13 @@ cheri_bytes_remaining(const void * __capability cap)
  * XXXAR: Should kept in sync with the version from clang's cheri.h.
  */
 
+/*
+ * XXX-AM: Ugly thing to make this importable from linux compat,
+ * which redefines __always_inline
+ */
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wduplicate-decl-specifier"
+
 static inline __always_inline __result_use_check size_t
 __cheri_get_low_ptr_bits(uintptr_t ptr, size_t mask) {
   /*
@@ -345,6 +350,7 @@ __cheri_clear_low_ptr_bits(uintptr_t ptr, size_t bits_mask) {
   return ptr & (~bits_mask);
 #pragma clang diagnostic pop
 }
+#pragma clang diagnostic pop
 
 /* Turn on the checking by default for now (until we have fixed everything)*/
 #define __check_low_ptr_bits_assignment

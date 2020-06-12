@@ -158,7 +158,7 @@ linux_mmap_common(struct thread *td, uintptr_t addr, size_t len, int prot,
 		 * fixed size of (STACK_SIZE - GUARD_SIZE).
 		 */
 
-		if ((caddr_t)addr + len > vms->vm_maxsaddr) {
+		if (addr + len > vms->vm_maxsaddr) {
 			/*
 			 * Some Linux apps will attempt to mmap
 			 * thread stacks near the top of their
@@ -176,7 +176,7 @@ linux_mmap_common(struct thread *td, uintptr_t addr, size_t len, int prot,
 			 * mmap's return value.
 			 */
 			PROC_LOCK(p);
-			vms->vm_maxsaddr = (char *)p->p_sysent->sv_usrstack -
+			vms->vm_maxsaddr = p->p_sysent->sv_usrstack -
 			    lim_cur_proc(p, RLIMIT_STACK);
 			PROC_UNLOCK(p);
 		}

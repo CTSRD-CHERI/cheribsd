@@ -53,7 +53,7 @@ __FBSDID("$FreeBSD$");
 #include <cam/cam.h>
 #include <cam/cam_ccb.h>
 
-#include <cheri/cheri.h>
+#include <cheri/cheric.h>
 
 /* prototypes */
 static int ata_generic_status(device_t dev);
