@@ -537,6 +537,7 @@ static const struct rt2860_rate {
 	{  0x85, 5, IEEE80211_T_HT, 4, 60, 60 },
 	{  0x86, 6, IEEE80211_T_HT, 4, 60, 60 },
 	{  0x87, 7, IEEE80211_T_HT, 4, 60, 60 },
+
 	/* MCS - 2 streams */
 	{  0x88, 8, IEEE80211_T_HT, 4, 60, 60 },
 	{  0x89, 9, IEEE80211_T_HT, 4, 60, 60 },
@@ -546,6 +547,16 @@ static const struct rt2860_rate {
 	{  0x8d, 13, IEEE80211_T_HT, 4, 60, 60 },
 	{  0x8e, 14, IEEE80211_T_HT, 4, 60, 60 },
 	{  0x8f, 15, IEEE80211_T_HT, 4, 60, 60 },
+
+	/* MCS - 3 streams */
+	{  0x90, 16, IEEE80211_T_HT, 4, 60, 60 },
+	{  0x91, 17, IEEE80211_T_HT, 4, 60, 60 },
+	{  0x92, 18, IEEE80211_T_HT, 4, 60, 60 },
+	{  0x93, 19, IEEE80211_T_HT, 4, 60, 60 },
+	{  0x94, 20, IEEE80211_T_HT, 4, 60, 60 },
+	{  0x95, 21, IEEE80211_T_HT, 4, 60, 60 },
+	{  0x96, 22, IEEE80211_T_HT, 4, 60, 60 },
+	{  0x97, 23, IEEE80211_T_HT, 4, 60, 60 },
 };
 
 /* These are indexes into the above rt2860_rates[] array */
@@ -553,7 +564,7 @@ static const struct rt2860_rate {
 #define	RT2860_RIDX_CCK11		3
 #define	RT2860_RIDX_OFDM6		4
 #define	RT2860_RIDX_MCS0		12
-#define	RT2860_RIDX_MAX			28
+#define	RT2860_RIDX_MAX			36
 
 static const struct {
 	uint16_t	reg;
@@ -847,19 +858,21 @@ run_attach(device_t self)
 	    IEEE80211_C_WME |		/* WME */
 	    IEEE80211_C_WPA;		/* WPA1|WPA2(RSN) */
 
-	ic->ic_htcaps =
-		    IEEE80211_HTC_HT |
-		    IEEE80211_HTC_AMPDU |
-		    IEEE80211_HTC_AMSDU |
-		    IEEE80211_HTCAP_MAXAMSDU_3839 |
-		    IEEE80211_HTCAP_SMPS_OFF;
-
 	/*
-	 * For now, just do 1 stream.  Later on we'll figure out
-	 * how many tx/rx streams a particular NIC supports.
+	 * RF2020 is not an 11n device.
 	 */
-	ic->ic_rxstream = 1;
-	ic->ic_txstream = 1;
+	if (sc->rf_rev != RT3070_RF_2020) {
+		device_printf(sc->sc_dev, "[HT] Enabling 802.11n\n");
+		ic->ic_htcaps =
+			    IEEE80211_HTC_HT |
+			    IEEE80211_HTC_AMPDU |
+			    IEEE80211_HTC_AMSDU |
+			    IEEE80211_HTCAP_MAXAMSDU_3839 |
+			    IEEE80211_HTCAP_SMPS_OFF;
+
+		ic->ic_rxstream = sc->nrxchains;
+		ic->ic_txstream = sc->ntxchains;
+	}
 
 	ic->ic_cryptocaps =
 	    IEEE80211_CRYPTO_WEP |
@@ -1028,8 +1041,15 @@ run_vap_create(struct ieee80211com *ic, const char name[IFNAMSIZ], int unit,
 	vap->iv_update_beacon = run_update_beacon;
 	vap->iv_max_aid = RT2870_WCID_MAX;
 
-	vap->iv_ampdu_rxmax = IEEE80211_HTCAP_MAXRXAMPDU_64K;
-	vap->iv_ampdu_density = IEEE80211_HTCAP_MPDUDENSITY_2;
+	/*
+	 * The linux rt2800 driver limits 1 stream devices to a 32KB
+	 * RX AMPDU.
+	 */
+	if (ic->ic_rxstream > 1)
+		vap->iv_ampdu_rxmax = IEEE80211_HTCAP_MAXRXAMPDU_64K;
+	else
+		vap->iv_ampdu_rxmax = IEEE80211_HTCAP_MAXRXAMPDU_32K;
+	vap->iv_ampdu_density = IEEE80211_HTCAP_MPDUDENSITY_2; /* 2uS */
 
 	/*
 	 * To delete the right key from h/w, we need wcid.
@@ -3030,10 +3050,11 @@ run_bulk_rx_callback(struct usb_xfer *xfer, usb_error_t error)
 tr_setup:
 		if (sc->rx_m == NULL) {
 			sc->rx_m = m_getjcl(M_NOWAIT, MT_DATA, M_PKTHDR,
-			    MJUMPAGESIZE /* xfer can be bigger than MCLBYTES */);
+			    RUN_MAX_RXSZ);
 		}
 		if (sc->rx_m == NULL) {
-			RUN_DPRINTF(sc, RUN_DEBUG_RECV | RUN_DEBUG_RECV_DESC,
+			RUN_DPRINTF(sc, RUN_DEBUG_RECV |
+			    RUN_DEBUG_RECV_DESC | RUN_DEBUG_USB,
 			    "could not allocate mbuf - idle with stall\n");
 			counter_u64_add(ic->ic_ierrors, 1);
 			usbd_xfer_set_stall(xfer);
@@ -3377,7 +3398,7 @@ run_set_tx_desc(struct run_softc *sc, struct run_tx_data *data)
 		mcs |= RT2860_PHY_OFDM;
 	} else if (rt2860_rates[ridx].phy == IEEE80211_T_HT) {
 		/* XXX TODO: [adrian] set short preamble for MCS? */
-		mcs |= RT2860_PHY_HT; /* Mixed, not greenfield */
+		mcs |= RT2860_PHY_HT_MIX; /* Mixed, not greenfield */
 	}
 	txwi->phy = htole16(mcs);
 
@@ -4920,7 +4941,8 @@ run_getradiocaps(struct ieee80211com *ic,
 	memset(bands, 0, sizeof(bands));
 	setbit(bands, IEEE80211_MODE_11B);
 	setbit(bands, IEEE80211_MODE_11G);
-	setbit(bands, IEEE80211_MODE_11NG);
+	if (sc->rf_rev != RT3070_RF_2020)
+		setbit(bands, IEEE80211_MODE_11NG);
 
 	/* Note: for now, only support HT20 channels */
 	ieee80211_add_channels_default_2ghz(chans, maxchans, nchans, bands, 0);
@@ -4929,7 +4951,8 @@ run_getradiocaps(struct ieee80211com *ic,
 	    sc->rf_rev == RT3070_RF_3052 || sc->rf_rev == RT3593_RF_3053 ||
 	    sc->rf_rev == RT5592_RF_5592) {
 		setbit(bands, IEEE80211_MODE_11A);
-		setbit(bands, IEEE80211_MODE_11NA);
+		if (sc->rf_rev != RT3070_RF_2020)
+			setbit(bands, IEEE80211_MODE_11NA);
 		/* Note: for now, only support HT20 channels */
 		ieee80211_add_channel_list_5ghz(chans, maxchans, nchans,
 		    run_chan_5ghz, nitems(run_chan_5ghz), bands, 0);

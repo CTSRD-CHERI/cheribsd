@@ -76,6 +76,10 @@ __FBSDID("$FreeBSD$");
 #include <netinet/in.h>
 #include <netinet/ip.h>
 #include <netinet/ip6.h>
+#define ICMPV6_HACK	/* workaround for chip issue */
+#ifdef ICMPV6_HACK
+#include <netinet/icmp6.h>
+#endif
 
 #include "syscon_if.h"
 #include "miibus_if.h"
@@ -948,6 +952,9 @@ gen_start(if_t ifp)
 	GEN_UNLOCK(sc);
 }
 
+/* Test for any delayed checksum */
+#define CSUM_DELAY_ANY	(CSUM_TCP | CSUM_UDP | CSUM_IP6_TCP | CSUM_IP6_UDP)
+
 static int
 gen_encap(struct gen_softc *sc, struct mbuf **mp)
 {
@@ -965,6 +972,36 @@ gen_encap(struct gen_softc *sc, struct mbuf **mp)
 	q = &sc->tx_queue[DEF_TXQUEUE];
 
 	m = *mp;
+#ifdef ICMPV6_HACK
+	/*
+	 * Reflected ICMPv6 packets, e.g. echo replies, tend to get laid
+	 * out with only the Ethernet header in the first mbuf, and this
+	 * doesn't seem to work.
+	 */
+#define ICMP6_LEN (sizeof(struct ether_header) + sizeof(struct ip6_hdr) + \
+		    sizeof(struct icmp6_hdr))
+	if (m->m_len == sizeof(struct ether_header)) {
+		int ether_type = mtod(m, struct ether_header *)->ether_type;
+		if (ntohs(ether_type) == ETHERTYPE_IPV6 &&
+		    m->m_next->m_len >= sizeof(struct ip6_hdr)) {
+			struct ip6_hdr *ip6;
+
+			ip6 = mtod(m->m_next, struct ip6_hdr *);
+			if (ip6->ip6_nxt == IPPROTO_ICMPV6) {
+				m = m_pullup(m,
+				    MIN(m->m_pkthdr.len, ICMP6_LEN));
+				if (m == NULL) {
+					if (sc->ifp->if_flags & IFF_DEBUG)
+						device_printf(sc->dev,
+						    "ICMPV6 pullup fail\n");
+					*mp = NULL;
+					return (ENOMEM);
+				}
+			}
+		}
+	}
+#undef ICMP6_LEN
+#endif
 	if ((if_getcapenable(sc->ifp) & (IFCAP_TXCSUM | IFCAP_TXCSUM_IPV6)) !=
 	    0) {
 		csum_flags = m->m_pkthdr.csum_flags;
@@ -978,12 +1015,11 @@ gen_encap(struct gen_softc *sc, struct mbuf **mp)
 		}
 		offset = gen_parse_tx(m, csum_flags);
 		sb = mtod(m, struct statusblock *);
-		if (csum_flags != 0) {
+		if ((csum_flags & CSUM_DELAY_ANY) != 0) {
 			csuminfo = (offset << TXCSUM_OFF_SHIFT) |
 			    (offset + csumdata);
-			if (csum_flags & (CSUM_TCP | CSUM_UDP))
-				csuminfo |= TXCSUM_LEN_VALID;
-			if (csum_flags & CSUM_UDP)
+			csuminfo |= TXCSUM_LEN_VALID;
+			if (csum_flags & (CSUM_UDP | CSUM_IP6_UDP))
 				csuminfo |= TXCSUM_UDP;
 			sb->txcsuminfo = csuminfo;
 		} else
@@ -1045,7 +1081,7 @@ gen_encap(struct gen_softc *sc, struct mbuf **mp)
 		if (i == 0) {
 			length_status |= GENET_TX_DESC_STATUS_SOP |
 			    GENET_TX_DESC_STATUS_CRC;
-			if (csum_flags != 0)
+			if ((csum_flags & CSUM_DELAY_ANY) != 0)
 				length_status |= GENET_TX_DESC_STATUS_CKSUM;
 		}
 		if (i == nsegs - 1)
@@ -1087,6 +1123,7 @@ static int
 gen_parse_tx(struct mbuf *m, int csum_flags)
 {
 	int offset, off_in_m;
+	bool copy = false, shift = false;
 	u_char *p, *copy_p = NULL;
 	struct mbuf *m0 = m;
 	uint16_t ether_type;
@@ -1098,22 +1135,44 @@ gen_parse_tx(struct mbuf *m, int csum_flags)
 		m = m->m_next;
 		off_in_m = 0;
 		p = mtod(m, u_char *);
+		copy = true;
 	} else {
+		/*
+		 * If statusblock is not at beginning of mbuf (likely),
+		 * then remember to move mbuf contents down before copying
+		 * after them.
+		 */
+		if ((m->m_flags & M_EXT) == 0 && m->m_data != m->m_pktdat)
+			shift = true;
 		p = mtodo(m, sizeof(struct statusblock));
 		off_in_m = sizeof(struct statusblock);
 	}
 
-/* If headers need to be copied contiguous to statusblock, do so. */
-#define COPY(size) {						\
-	if (copy_p != NULL) {					\
-		int hsize = size;				\
-		bcopy(p, copy_p, hsize);			\
-		m0->m_len += hsize;				\
-		m0->m_pkthdr.len += hsize;	/* unneeded */	\
-		copy_p += hsize;				\
-		m->m_len -= hsize;				\
-		m->m_data += hsize;				\
-	}							\
+/*
+ * If headers need to be copied contiguous to statusblock, do so.
+ * If copying to the internal mbuf data area, and the status block
+ * is not at the beginning of that area, shift the status block (which
+ * is empty) and following data.
+ */
+#define COPY(size) {							\
+	int hsize = size;						\
+	if (copy) {							\
+		if (shift) {						\
+			u_char *p0;					\
+			shift = false;					\
+			p0 = mtodo(m0, sizeof(struct statusblock));	\
+			m0->m_data = m0->m_pktdat;			\
+			bcopy(p0, mtodo(m0, sizeof(struct statusblock)),\
+			    m0->m_len - sizeof(struct statusblock));	\
+			copy_p = mtodo(m0, sizeof(struct statusblock));	\
+		}							\
+		bcopy(p, copy_p, hsize);				\
+		m0->m_len += hsize;					\
+		m0->m_pkthdr.len += hsize;	/* unneeded */		\
+		m->m_len -= hsize;					\
+		m->m_data += hsize;					\
+	}								\
+	copy_p += hsize;						\
 }
 
 	KASSERT((sizeof(struct statusblock) + sizeof(struct ether_vlan_header) +
@@ -1127,6 +1186,7 @@ gen_parse_tx(struct mbuf *m, int csum_flags)
 			m = m->m_next;
 			off_in_m = 0;
 			p = mtod(m, u_char *);
+			copy = true;
 		} else {
 			off_in_m += sizeof(struct ether_vlan_header);
 			p += sizeof(struct ether_vlan_header);
@@ -1139,6 +1199,7 @@ gen_parse_tx(struct mbuf *m, int csum_flags)
 			m = m->m_next;
 			off_in_m = 0;
 			p = mtod(m, u_char *);
+			copy = true;
 		} else {
 			off_in_m += sizeof(struct ether_header);
 			p += sizeof(struct ether_header);

@@ -751,6 +751,7 @@ ccr_blkcipher(struct ccr_softc *sc, struct ccr_session *s, struct cryptop *crp)
 	/* XXX: TODO backpressure */
 	t4_wrq_tx(sc->adapter, wr);
 
+	explicit_bzero(iv, sizeof(iv));
 	return (0);
 }
 
@@ -1069,6 +1070,7 @@ ccr_eta(struct ccr_softc *sc, struct ccr_session *s, struct cryptop *crp)
 	/* XXX: TODO backpressure */
 	t4_wrq_tx(sc->adapter, wr);
 
+	explicit_bzero(iv, sizeof(iv));
 	return (0);
 }
 
@@ -1351,6 +1353,7 @@ ccr_gcm(struct ccr_softc *sc, struct ccr_session *s, struct cryptop *crp)
 	/* XXX: TODO backpressure */
 	t4_wrq_tx(sc->adapter, wr);
 
+	explicit_bzero(iv, sizeof(iv));
 	return (0);
 }
 
@@ -1495,11 +1498,15 @@ ccr_gcm_soft(struct ccr_session *s, struct cryptop *crp)
 			}
 		} else
 			error = EBADMSG;
+		explicit_bzero(digest2, sizeof(digest2));
 	}
 
 out:
 	zfree(kschedule, M_CCR);
 	zfree(auth_ctx, M_CCR);
+	explicit_bzero(block, sizeof(block));
+	explicit_bzero(iv, sizeof(iv));
+	explicit_bzero(digest, sizeof(digest));
 	crp->crp_etype = error;
 	crypto_done(crp);
 }
@@ -1814,6 +1821,7 @@ ccr_ccm(struct ccr_softc *sc, struct ccr_session *s, struct cryptop *crp)
 	/* XXX: TODO backpressure */
 	t4_wrq_tx(sc->adapter, wr);
 
+	explicit_bzero(iv, sizeof(iv));
 	return (0);
 }
 
@@ -1953,11 +1961,15 @@ ccr_ccm_soft(struct ccr_session *s, struct cryptop *crp)
 			}
 		} else
 			error = EBADMSG;
+		explicit_bzero(digest2, sizeof(digest2));
 	}
 
 out:
 	zfree(kschedule, M_CCR);
 	zfree(auth_ctx, M_CCR);
+	explicit_bzero(block, sizeof(block));
+	explicit_bzero(iv, sizeof(iv));
+	explicit_bzero(digest, sizeof(digest));
 	crp->crp_etype = error;
 	crypto_done(crp);
 }
