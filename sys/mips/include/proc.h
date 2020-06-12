@@ -67,7 +67,6 @@ struct mdthread {
 	int		md_pc_count;	/* performance counter */
 	int		md_pc_spill;	/* performance counter spill */
 	void * __capability md_tls;
-	size_t		md_tls_tcb_offset;	/* TCB offset */
 #ifdef	CPU_CNMIPS
 	struct octeon_cop2_state	*md_cop2; /* kernel context */
 	struct octeon_cop2_state	*md_ucop2; /* userland context */
@@ -86,7 +85,7 @@ struct mdthread {
 #endif
 
 struct mdproc {
-	long md_dummy;
+	size_t		md_tls_tcb_offset;	/* TCB offset */
 };
 
 struct syscall_args {

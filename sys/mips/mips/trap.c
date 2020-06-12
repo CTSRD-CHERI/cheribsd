@@ -1145,7 +1145,7 @@ dofault:
 					if (inst.RType.rd == 29) {
 						frame_regs = &(trapframe->zero);
 						frame_regs[inst.RType.rt] = (register_t)(intptr_t)(__cheri_fromcap void *)td->td_md.md_tls;
-						frame_regs[inst.RType.rt] += td->td_md.md_tls_tcb_offset;
+						frame_regs[inst.RType.rt] += td->td_proc->p_md.md_tls_tcb_offset;
 						TRAPF_PC_INCREMENT(trapframe, sizeof(int));
 						goto out;
 					}
