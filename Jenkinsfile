@@ -77,7 +77,7 @@ find cheribsd-test-results
 
 ["mips-hybrid", "mips-purecap"].each { suffix ->
     String name = "cheribsd-purecap-kern-${suffix}"
-    jobs[suffix] = { ->
+    jobs[name] = { ->
         cheribuildProject(target: "cheribsd-${suffix}", architecture: suffix,
                 extraArgs: '--cheribsd/build-options=-s --cheribsd/no-debug-info --keep-install-dir --install-prefix=/rootfs --cheribsd/build-tests --cheribsd/pure-cap-kernel',
                 skipArchiving: true, skipTarball: true,
