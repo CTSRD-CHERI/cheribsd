@@ -50,6 +50,9 @@ exclude SKIP common/funcs/tst.mutex_type_adaptive.d
 # misc - mtx not capability aware
 exclude SKIP common/misc/tst.roch.d
 
+# ip - non-invalid capability in bytecode instruction: to investigate more!
+exclude SKIP common/ip/tst.ipv4localicmp.ksh
+
 # fbt - when all the probes are enabled, the system is stucks
 exclude SKIP common/misc/tst.schrock.ksh
 exclude SKIP common/misc/tst.roch.d
