@@ -6200,7 +6200,8 @@ dtrace_dif_emulate(dtrace_difo_t *difo, dtrace_mstate_t *mstate,
 		case DIF_OP_SREM:
 		case DIF_OP_UREM:
 		case DIF_OP_NOT:
-			ensure_tag_zero(regs[r1], regs[r2]);
+			break;
+			//ensure_tag_zero(regs[r1], regs[r2]);
 		}
 #endif
 
