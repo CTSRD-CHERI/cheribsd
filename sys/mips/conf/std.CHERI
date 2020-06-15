@@ -9,5 +9,6 @@ makeoptions	ARCH_FLAGS="-target cheri-unknown-freebsd -march=beri -mabi=64 -mcpu
 options 	CPU_CHERI
 options 	COMPAT_CHERIABI
 options 	COMPAT_FREEBSD64
+options 	BOOTVERBOSE=1
 
 options 	TMPFS

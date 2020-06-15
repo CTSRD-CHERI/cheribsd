@@ -79,7 +79,7 @@ find cheribsd-test-results
     String name = "cheribsd-purecap-kern-${suffix}"
     jobs[name] = { ->
         cheribuildProject(target: "cheribsd-${suffix}", architecture: suffix,
-                extraArgs: '--cheribsd/build-options=-s --cheribsd/no-debug-info --keep-install-dir --install-prefix=/rootfs --cheribsd/build-tests --cheribsd-${suffix}/pure-cap-kernel',
+                extraArgs: "--cheribsd/build-options=-s --cheribsd/no-debug-info --keep-install-dir --install-prefix=/rootfs --cheribsd/build-tests --cheribsd-${suffix}/pure-cap-kernel",
                 skipArchiving: true, skipTarball: true,
                 sdkCompilerOnly: true, // We only need clang not the CheriBSD sysroot since we are building that.
                 customGitCheckoutDir: 'cheribsd',

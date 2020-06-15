@@ -1,5 +1,5 @@
 # Inherit base config
-include "CHERI128_PURECAP_MALTA64"
+include "CHERI_PURECAP_MALTA64"
 
 ident CHERI128_PURECAP_MALTA64_BENCHMARK
 
