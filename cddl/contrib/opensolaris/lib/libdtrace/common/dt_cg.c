@@ -169,11 +169,12 @@ dt_cg_load(dt_node_t *dnp, ctf_file_t *ctfp, ctf_id_t type)
 	else
 		size = ctf_type_size(ctfp, type);
 
-	if (size < 1 || size > 8 || (size & (size - 1)) != 0) {
+	// TODO: check this. it might be very wrong!!
+	if (size < 1 || size > 16 || (size & (size - 1)) != 0) {
 		xyerror(D_UNKNOWN, "internal error -- cg cannot load "
 		    "size %ld when passed by value\n", (long)size);
 	}
-
+	if (size == 16) size = 8;
 	size--; /* convert size to 3-bit index */
 
 	if (dnp->dn_flags & DT_NF_SIGNED)
