@@ -36,6 +36,7 @@
 #include <dt_pid.h>
 
 #include <libproc_compat.h>
+#include <machine/mips_opcode.h>
 
 /*ARGSUSED*/
 int
@@ -58,6 +59,12 @@ dt_pid_create_entry_probe(struct ps_prochandle *P, dtrace_hdl_t *dtp,
 }
 #define	LDSD_RA_SP_MASK		0xffff0000
 #define	LD_RA_SP		0xdfbf0000
+#if __has_feature(capabilities)
+#define CSETBOUNDS_MASK		((0x3ff << 21) | 0x2f)
+#define CSETBOUNDS		((0x12 << 26) | (0x01 << 21) | 0x8)
+#define CSETBOUNDSIMM_MASK	(0x3ff << 21)
+#define CSETBOUNDSIMM		((0x12 << 26) | (0x14 << 21))
+#endif
 int
 dt_pid_create_return_probe(struct ps_prochandle *P, dtrace_hdl_t *dtp,
     fasttrap_probe_spec_t *ftp, const GElf_Sym *symp, uint64_t *stret)
@@ -155,7 +162,39 @@ dt_pid_create_glob_offset_probes(struct ps_prochandle *P, dtrace_hdl_t *dtp,
 		for (i = 0; i < symp->st_size; i += 4) {
 			ftp->ftps_offs[ftp->ftps_noffs++] = i;
 		}
-	} else {
+	}
+#if __has_feature(capabilities)
+	else if (strcmp("*csetbounds", pattern) == 0) {
+		ftp->ftps_type = DTFTP_CSETBOUNDS;
+
+		uintptr_t temp;
+		uint32_t *text;
+		int i;
+		int srdepth = 0;
+
+		if ((text = malloc(symp->st_size + 4)) == NULL) {
+			return (DT_PROC_ERR);
+		}
+		if (Pread(P, text, symp->st_size, symp->st_value) != symp->st_size) {
+			dt_dprintf("dt_pid can't read enough\n");
+			free(text);
+			return 0;
+		}
+		for (i = 0; i < symp->st_size; i+= 4) {
+			if (((text[i] & CSETBOUNDSIMM_MASK) != CSETBOUNDSIMM) &&
+			    ((text[i] & CSETBOUNDS_MASK) != CSETBOUNDS))
+				continue;
+
+			dt_dprintf("csetbounds at offset %x\n", i);
+			ftp->ftps_offs[ftp->ftps_noffs++] = i;
+		}
+		free(text);
+
+		if (ftp->ftps_noffs == 0)
+			return (0);
+	}
+#endif
+	else {
 		char name[sizeof (i) * 2 + 1];
 
 		for (i = 0; i < symp->st_size; i += 4) {

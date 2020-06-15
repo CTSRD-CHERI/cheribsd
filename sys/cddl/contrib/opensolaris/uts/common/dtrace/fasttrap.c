@@ -823,6 +823,7 @@ again:
 		case DTFTP_ENTRY:
 		case DTFTP_OFFSETS:
 		case DTFTP_IS_ENABLED:
+		case DTFTP_CSETBOUNDS:
 			id->fti_next = tp->ftt_ids;
 			membar_producer();
 			tp->ftt_ids = id;
@@ -901,6 +902,7 @@ again:
 	switch (id->fti_ptype) {
 	case DTFTP_ENTRY:
 	case DTFTP_OFFSETS:
+	case DTFTP_CSETBOUNDS:
 	case DTFTP_IS_ENABLED:
 		id->fti_next = NULL;
 		new_tp->ftt_ids = id;
@@ -974,6 +976,7 @@ fasttrap_tracepoint_disable(proc_t *p, fasttrap_probe_t *probe, uint_t index)
 	switch (id->fti_ptype) {
 	case DTFTP_ENTRY:
 	case DTFTP_OFFSETS:
+	case DTFTP_CSETBOUNDS:
 	case DTFTP_IS_ENABLED:
 		ASSERT(tp->ftt_ids != NULL);
 		idp = &tp->ftt_ids;
@@ -1872,6 +1875,7 @@ fasttrap_add_probe(fasttrap_probe_spec_t *pdata)
 		aframes = FASTTRAP_RETURN_AFRAMES;
 		break;
 	case DTFTP_OFFSETS:
+	case DTFTP_CSETBOUNDS:
 		name = NULL;
 		break;
 	default:

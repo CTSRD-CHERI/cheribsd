@@ -52,7 +52,8 @@ typedef enum fasttrap_probe_type {
 	DTFTP_RETURN,
 	DTFTP_OFFSETS,
 	DTFTP_POST_OFFSETS,
-	DTFTP_IS_ENABLED
+	DTFTP_IS_ENABLED,
+	DTFTP_CSETBOUNDS
 } fasttrap_probe_type_t;
 
 typedef struct fasttrap_probe_spec {

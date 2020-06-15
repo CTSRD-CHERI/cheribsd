@@ -8711,8 +8711,8 @@ static dtrace_probekey_f *
 dtrace_probekey_func(const char *p)
 {
 	char c;
-
-	if (p == NULL || *p == '\0')
+	// TODO: find a nicer way
+	if (p == NULL || *p == '\0' || strcmp("*csetbounds",p) == 0)
 		return (&dtrace_match_nul);
 
 	while ((c = *p++) != '\0') {

@@ -366,6 +366,21 @@ fasttrap_pid_probe(struct trapframe *frame)
 				 * encounters the true probe.
 				 */
 				is_enabled = 1;
+			} else if (id->fti_ptype == DTFTP_CSETBOUNDS) {
+				struct capreg cr;
+				fill_capregs(curthread,&cr);
+				InstFmt _instr;
+				_instr.word = tp->ftt_instr;
+
+				void * __capability cd = cr.r_regs[_instr.CType.r1];
+				void * __capability cb = cr.r_regs[_instr.CType.r2];
+				int rt = 0;
+				if (_instr.CType.fmt == 0x12)
+					rt = reg.r_regs[_instr.CType.r3];
+				else
+					rt = _instr.CCMType.offset;
+
+				dtrace_probe(probe->ftp_id, (uintcap_t) cd, (uintcap_t) cb, rt, 0, 0);
 			} else { //offset or return probe
 				// TODO(nicomazz): use CTF to understand where
 				// to get the parameters from (cap registers or
