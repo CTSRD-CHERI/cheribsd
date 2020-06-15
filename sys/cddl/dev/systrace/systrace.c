@@ -118,6 +118,9 @@ extern const char *freebsd32_syscallnames[];
 #include <compat/cheriabi/cheriabi_util.h>
 #include <compat/cheriabi/cheriabi_syscall.h>
 #include <compat/cheriabi/cheriabi_systrace_args.c>
+#include <compat/freebsd64/freebsd64_proto.h>
+#include <compat/freebsd64/freebsd64_util.h>
+#include <compat/freebsd64/freebsd64_syscall.h>
 #else
 #include <kern/systrace_args.c>
 #endif
@@ -125,7 +128,8 @@ extern const char *freebsd32_syscallnames[];
 #define	MODNAME		"freebsd"
 #define	MAXSYSCALL	SYS_MAXSYSCALL
 #define	SYSCALLNAMES	syscallnames
-#define	SYSENT		cheriabi_sysent
+// TODO: this should be done as with the others. IT is needed to add a module. just look for FREEBSD32_SYSTRACE and do the same
+#define	SYSENT		freebsd64_sysent //cheriabi_sysent
 #define	NATIVE_ABI
 #endif
 
