@@ -1703,8 +1703,12 @@ arena_dalloc_bin_locked_impl(tsdn_t *tsdn, arena_t *arena, bin_t *bin,
 	arena_slab_data_t *slab_data = extent_slab_data_get(slab);
 	const bin_info_t *bin_info = &bin_infos[binind];
 
-	if (!junked && config_fill && unlikely(opt_junk_free)) {
-		arena_dalloc_junk_small(ptr, bin_info);
+	if (!junked && config_fill) {
+		if (unlikely(opt_junk_free)) {
+			arena_dalloc_junk_small(ptr, bin_info);
+		} else if (unlikely(opt_zero_free)) {
+			memset(ptr, 0, bin_info->reg_size);
+		}
 	}
 
 	arena_slab_reg_dalloc(slab, slab_data, ptr);

@@ -17,6 +17,7 @@ extern bool opt_junk_free;
 extern bool opt_utrace;
 extern bool opt_xmalloc;
 extern bool opt_zero;
+extern bool opt_zero_free;
 extern unsigned opt_narenas;
 
 /* Number of CPUs. */
