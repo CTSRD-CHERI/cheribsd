@@ -86,7 +86,7 @@ void do_trap_user(struct trapframe *);
 
 static __inline void
 call_trapsignal(struct thread *td, int sig, int code, void * __capability addr,
-    int capreg)
+    int trapno, int capreg)
 {
 	ksiginfo_t ksi;
 
@@ -95,6 +95,7 @@ call_trapsignal(struct thread *td, int sig, int code, void * __capability addr,
 	ksi.ksi_code = code;
 	ksi.ksi_addr = addr;
 	ksi.ksi_capreg = capreg;
+	ksi.ksi_trapno = trapno;
 	trapsignal(td, &ksi);
 }
 
@@ -291,7 +292,8 @@ data_abort(struct trapframe *frame, int usermode)
 	if (error != KERN_SUCCESS) {
 		if (usermode) {
 			call_trapsignal(td, sig, ucode,
-			    (void * __capability)(uintcap_t)stval, 0);
+			    (void * __capability)(uintcap_t)stval,
+			    frame->tf_scause & EXCP_MASK, 0);
 		} else {
 			if (pcb->pcb_onfault != 0) {
 				frame->tf_a[0] = error;
@@ -449,12 +451,12 @@ do_trap_user(struct trapframe *frame)
 		}
 #endif
 		call_trapsignal(td, SIGILL, ILL_ILLTRP,
-		    (void * __capability)frame->tf_sepc, 0);
+		    (void * __capability)frame->tf_sepc, exception, 0);
 		userret(td, frame);
 		break;
 	case EXCP_BREAKPOINT:
 		call_trapsignal(td, SIGTRAP, TRAP_BRKPT,
-		    (void * __capability)frame->tf_sepc, 0);
+		    (void * __capability)frame->tf_sepc, exception, 0);
 		userret(td, frame);
 		break;
 #if __has_feature(capabilities)
@@ -462,7 +464,7 @@ do_trap_user(struct trapframe *frame)
 		sccsr = csr_read(sccsr);
 
 		call_trapsignal(td, SIGPROT, cheri_sccsr_to_sicode(sccsr),
-		    (void * __capability)frame->tf_sepc,
+		    (void * __capability)frame->tf_sepc, exception,
 		    (sccsr & SCCSR_CAP_IDX_MASK) >> SCCSR_CAP_IDX_SHIFT);
 		userret(td, frame);
 		break;
