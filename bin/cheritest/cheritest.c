@@ -1005,7 +1005,12 @@ static const struct cheri_test cheri_tests[] = {
 	  .ct_signum = SIGPROT,
 	  .ct_si_code = PROT_CHERI_STORETAG,
 	  .ct_si_trapno = TRAPNO_CHERI,
-	  .ct_check_xfail = xfail_need_writable_non_tmpfs_tmp, },
+#ifdef __riscv
+	  .ct_xfail_reason = "CHERI-RISC-V doesn't implement CHERI PTE bits",
+#else
+	  .ct_check_xfail = xfail_need_writable_non_tmpfs_tmp,
+#endif
+	},
 
 	{ .ct_name = "cheritest_vm_tag_tmpfile_private",
 	  .ct_desc = "check tags are stored for tmpfile() MAP_PRIVATE pages",
