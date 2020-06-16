@@ -442,6 +442,8 @@ static struct eflags_desc riscv_eflags_desc[] = {
 	{EF_RISCV_RVC, "RVC"},
 	{EF_RISCV_RVE, "RVE"},
 	{EF_RISCV_TSO, "TSO"},
+	{EF_RISCV_CHERIABI, "cheriabi"},
+	{EF_RISCV_CAPMODE, "capmode"},
 	{0, NULL}
 };
 
