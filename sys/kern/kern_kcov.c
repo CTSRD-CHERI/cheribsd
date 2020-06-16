@@ -374,6 +374,27 @@ kcov_alloc(struct kcov_info *info, size_t entries)
 	info->bufsize = roundup2(entries * KCOV_ELEMENT_SIZE, PAGE_SIZE);
 	pages = info->bufsize / PAGE_SIZE;
 
+#if defined(KCOV_DIRECT_MAP) && defined(__mips__)
+	info->bufobj = vm_pager_allocate(OBJT_PHYS, 0, info->bufsize,
+	    PROT_READ | PROT_WRITE, 0, curthread->td_ucred);
+
+	VM_OBJECT_WLOCK(info->bufobj);
+	m = vm_page_alloc_contig(info->bufobj, 0,
+	    VM_ALLOC_WIRED | VM_ALLOC_ZERO, pages, (vm_paddr_t)0,
+	    ~(vm_paddr_t)0, PAGE_SIZE, 0, VM_MEMATTR_DEFAULT);
+	for (n = 0; n < pages; n++) {
+		pmap_zero_page(&m[n]);
+		vm_page_valid(&m[n]);
+		vm_page_xunbusy(&m[n]);
+	}
+	VM_OBJECT_WUNLOCK(info->bufobj);
+#ifdef CHERI_PURECAP_KERNEL
+	info->kvaddr = (vm_ptr_t)cheri_setbounds(
+	    MIPS_PHYS_TO_DIRECT(VM_PAGE_TO_PHYS(m)), info->bufsize);
+#else
+	info->kvaddr = MIPS_PHYS_TO_DIRECT(VM_PAGE_TO_PHYS(m));
+#endif
+#else
 	if ((info->kvaddr = kva_alloc(info->bufsize)) == 0)
 		return (ENOMEM);
 
@@ -389,6 +410,7 @@ kcov_alloc(struct kcov_info *info, size_t entries)
 		pmap_qenter(info->kvaddr + n * PAGE_SIZE, &m, 1);
 	}
 	VM_OBJECT_WUNLOCK(info->bufobj);
+#endif
 
 	info->entries = entries;
 
@@ -402,8 +424,10 @@ kcov_free(struct kcov_info *info)
 	size_t i;
 
 	if (info->kvaddr != 0) {
+#if !defined(KCOV_DIRECT_MAP) || !defined(__mips__)
 		pmap_qremove(info->kvaddr, info->bufsize / PAGE_SIZE);
 		kva_free(info->kvaddr, info->bufsize);
+#endif
 	}
 	if (info->bufobj != NULL) {
 		VM_OBJECT_WLOCK(info->bufobj);

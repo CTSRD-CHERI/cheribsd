@@ -234,6 +234,7 @@ COVERAGE	opt_global.h
 KCOV
 KCSAN		opt_global.h
 KUBSAN		opt_global.h
+KCOV_DIRECT_MAP		opt_global.h
 
 # POSIX kernel options
 P1003_1B_MQUEUE			opt_posix.h
