@@ -28,9 +28,14 @@
  * SUCH DAMAGE.
  */
 #include <sys/cdefs.h>
+#include <sys/stat.h>
+#include <sys/ioctl.h>
+#include <sys/kcov.h>
+#include <sys/mman.h>
 #include <err.h>
 #include <stdio.h>
 #include <unistd.h>
+#include <fcntl.h>
 #include <stdlib.h>
 #include <inttypes.h>
 #include <stdbool.h>
@@ -351,7 +356,7 @@ void dump_statcounters (
         fclose(fp);
     } else {
         warn("Failed to open statcounters output %s", fname);
-    } 
+    }
 }
 int statcounters_dump (const statcounters_bank_t * const b)
 {
@@ -670,6 +675,56 @@ uint64_t statcounters_sample_by_id (int id)
 }
 
 #ifndef STATCOUNTERS_NO_CTOR_DTOR
+// KCov routines
+//////////////////////////////////////////////////////////////////////////////
+
+static const char *kcov_dev_path = "/dev/kcov";
+static unsigned long *kcov_buffer;
+static bool kcov_enable = false;
+static int kcov_fd;
+
+static void statcounters_kcov_setup()
+{
+
+	if (access(kcov_dev_path, R_OK | W_OK) == -1)
+		return;
+	if ((kcov_fd = open(kcov_dev_path, O_RDWR)) == -1)
+		return;
+	if (ioctl(kcov_fd, KIOSETBUFSIZE, KCOV_MAXENTRIES))
+		close(kcov_fd);
+	kcov_buffer = mmap(NULL, KCOV_MAXENTRIES * KCOV_ENTRY_SIZE,
+			   PROT_READ | PROT_WRITE, MAP_SHARED, kcov_fd, 0);
+	if (kcov_buffer == MAP_FAILED)
+		close(kcov_fd);
+
+	if (ioctl(kcov_fd, KIOENABLE, KCOV_MODE_TRACE_PC)) {
+		munmap(kcov_buffer, KCOV_MAXENTRIES * KCOV_ENTRY_SIZE);
+		close(kcov_fd);
+	}
+	kcov_enable = true;
+}
+
+static void statcounters_kcov_teardown()
+{
+	unsigned long i, n;
+	FILE *fp = stdout;
+
+	if (ioctl(kcov_fd, KIODISABLE, 0))
+		goto out;
+
+	n = kcov_buffer[0];
+	if (n + 2 > KCOV_MAXENTRIES)
+		fprintf(stderr, "kcov buffer too small, some entries were dropped");
+	const char * const fname = getenv("STATCOUNTERS_KCOV_OUTPUT");
+	if (fname && fname[0] != '\0') {
+		fp = fopen(fname, "a");
+	}
+	for (i = 1; i < n + 1; i++)
+		fprintf(fp, "%lx\n", kcov_buffer[i]);
+out:
+	munmap(kcov_buffer, KCOV_MAXENTRIES * KCOV_ENTRY_SIZE);
+	close(kcov_fd);
+}
 
 // C constructor / atexit interface
 //////////////////////////////////////////////////////////////////////////////
@@ -683,21 +738,28 @@ static void end_sample (void);
 __attribute__((constructor))
 static void start_sample (void)
 {
-    // registering exit function
-    atexit(end_sample);
-    // initial sampling
-    statcounters_sample(&start_cnt);
+	const char * const kcov_config = getenv("STATCOUNTERS_KCOV");
+
+	// registering exit function
+	atexit(end_sample);
+	if (kcov_config && (strcmp(kcov_config, "yes") == 0))
+		statcounters_kcov_setup();
+	// initial sampling
+	statcounters_sample(&start_cnt);
 }
 
 //__attribute__((destructor)) static void end_sample (void)
 static void end_sample (void)
 {
-    // final sampling
-    statcounters_sample(&end_cnt); // TODO change the order of sampling to keep cycle sampled early
-    // compute difference between samples
-    statcounters_diff(&diff_cnt, &end_cnt, &start_cnt);
-    // dump the counters
-    statcounters_dump(&diff_cnt);
+	// final sampling
+	statcounters_sample(&end_cnt); // TODO change the order of sampling to keep cycle sampled early
+	// stop kernel coverage and dump results
+	if (kcov_enable)
+		statcounters_kcov_teardown();
+	// compute difference between samples
+	statcounters_diff(&diff_cnt, &end_cnt, &start_cnt);
+	// dump the counters
+	statcounters_dump(&diff_cnt);
 }
 
 #endif /* STATCOUNTERS_NO_CTOR_DTOR */

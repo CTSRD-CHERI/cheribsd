@@ -131,7 +131,7 @@ VECTOR(_locore, unknown)
 	mtc0	t0, MIPS_COP_0_CONFIG
 	COP0_SYNC
 
-#if defined(CPU_BERI)
+#if defined(CPU_BERI) || defined(CPU_MALTA)
 	/*
 	 * Enable userspace cycle-count, cycle-count resolution, and CPU
 	 * number registers available via rdhwr.
