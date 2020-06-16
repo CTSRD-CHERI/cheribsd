@@ -70,8 +70,10 @@ struct cheritest_child_state {
 	/* Fields filled in by the child signal handler. */
 	int		ccs_signum;
 	int		ccs_si_code;
-	register_t	ccs_mips_cause;
+	int		ccs_si_trapno;
+#ifdef __mips__
 	register_t	ccs_cp2_cause;
+#endif
 	int		ccs_unwound;  /* If any trusted-stack frames unwound. */
 
 	/* Fields filled in by the test itself. */
@@ -94,8 +96,7 @@ extern struct cheritest_child_state *ccsp;
  * access to configuration state, such as strings passed to/from stdio.
  */
 #define	CT_FLAG_SIGNAL		0x00000001  /* Should fault; checks signum. */
-#define	CT_FLAG_MIPS_EXCCODE	0x00000002  /* Check MIPS exception code. */
-#define	CT_FLAG_CP2_EXCCODE	0x00000004  /* Check CP2 exception code. */
+#define	CT_FLAG_SI_TRAPNO	0x00000002  /* Check signal si_trapno. */
 #define	CT_FLAG_STDOUT_STRING	0x00000008  /* Check stdout for a string. */
 #define	CT_FLAG_STDIN_STRING	0x00000010  /* Provide string on stdin. */
 #define	CT_FLAG_STDOUT_IGNORE	0x00000020  /* Standard output produced,
@@ -123,8 +124,7 @@ struct cheri_test {
 	u_int		 ct_flags;
 	int		 ct_signum;
 	int		 ct_si_code;
-	register_t	 ct_mips_exccode;
-	register_t	 ct_cp2_exccode;
+	int		 ct_si_trapno;
 	const char	*ct_stdin_string;
 	const char	*ct_stdout_string;
 	const char	*ct_xfail_reason;
