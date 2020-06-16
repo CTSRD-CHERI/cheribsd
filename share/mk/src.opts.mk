@@ -369,9 +369,6 @@ BROKEN_OPTIONS+=NS_CACHING
 .endif
 
 .if ${__T:Mriscv*c*}
-# Compiler crash:
-# Skip until https://github.com/CTSRD-CHERI/llvm-project/issues/379 is fixed.
-BROKEN_OPTIONS+=LIBCPLUSPLUS CXX
 # Crash in ZFS code. TODO: investigate
 BROKEN_OPTIONS+=CDDL
 
