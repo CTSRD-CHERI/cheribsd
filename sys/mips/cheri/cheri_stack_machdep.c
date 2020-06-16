@@ -42,10 +42,15 @@ __FBSDID("$FreeBSD$");
 
 #include <machine/pcb.h>
 #include <machine/regnum.h>
+#include <machine/md_var.h>
 
 #include <machine/abi.h>
 
 #ifdef CHERI_PURECAP_KERNEL
+
+#define	pc_in(pc, fn)							\
+	((pc) >= (uintptr_t)cheri_getbase(fn) &&			\
+	 (pc) < (uintptr_t)cheri_gettop(fn))
 
 static uintptr_t
 stack_register_fetch(uintptr_t sp, u_register_t stack_pos)
@@ -109,6 +114,8 @@ stack_capture(struct stack *st, uintptr_t pc, uintptr_t sp)
 	InstFmt insn;
 	uintptr_t exc_saved_ra = 0;
 	boolean_t is_exc_handler;
+	vaddr_t va;
+	void *kcode = cheri_kcode_capability;
 
 	stack_zero(st);
 
@@ -155,7 +162,9 @@ stack_capture(struct stack *st, uintptr_t pc, uintptr_t sp)
 		 * we are not be in a leaf function.
 		 */
 		if (!next_sp)
-		    break;
+			break;
+		if (pc_in(pc, fork_trampoline))
+			break;
 
 		/*
 		 * Check if we are in an exception handler, if so we record
@@ -179,9 +188,13 @@ stack_capture(struct stack *st, uintptr_t pc, uintptr_t sp)
 		}
 
 		if (is_exc_handler) {
-			exc_saved_ra = stack_register_fetch(sp,
+			va = stack_register_fetch(sp,
 			    (CALLFRAME_SIZ + SZREG * C17));
-			pc = stack_register_fetch(sp, ra_stack_pos);
+			exc_saved_ra = (va) ?
+			    (uintptr_t)cheri_setaddress(kcode, va) : 0;
+			va = stack_register_fetch(sp, ra_stack_pos);
+			pc = (va) ?
+			    (uintptr_t)cheri_setaddress(kcode, va) : 0;
 		}
 		else {
 			if (ra_stack_pos < 0) {
@@ -192,9 +205,10 @@ stack_capture(struct stack *st, uintptr_t pc, uintptr_t sp)
 					break;
 			}
 			else {
-				ra = stack_register_fetch(sp, ra_stack_pos);
-				if (!ra)
+				va = stack_register_fetch(sp, ra_stack_pos);
+				if (!va)
 					break;
+				ra = (uintptr_t)cheri_setaddress(kcode, va);
 				pc = ra - sizeof(insn);
 			}
 		}
