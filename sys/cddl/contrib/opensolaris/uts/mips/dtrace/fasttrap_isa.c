@@ -374,7 +374,7 @@ fasttrap_pid_probe(struct trapframe *frame)
 
 				void * __capability cd = cr.r_regs[_instr.CType.r1];
 				void * __capability cb = cr.r_regs[_instr.CType.r2];
-				int rt = 0;
+				uint64_t rt = 0;
 				if (_instr.CType.fmt == 0x12)
 					rt = reg.r_regs[_instr.CType.r3];
 				else

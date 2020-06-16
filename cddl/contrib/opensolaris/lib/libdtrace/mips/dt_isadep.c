@@ -60,9 +60,9 @@ dt_pid_create_entry_probe(struct ps_prochandle *P, dtrace_hdl_t *dtp,
 #define	LDSD_RA_SP_MASK		0xffff0000
 #define	LD_RA_SP		0xdfbf0000
 #if __has_feature(capabilities)
-#define CSETBOUNDS_MASK		((0x3ff << 21) | 0x2f)
-#define CSETBOUNDS		((0x12 << 26) | (0x01 << 21) | 0x8)
-#define CSETBOUNDSIMM_MASK	(0x3ff << 21)
+#define CSETBOUNDS_MASK		((0x7ff << 21) | 0x3f)
+#define CSETBOUNDS		((0x12 << 26) | (0x00 << 21) | 0x8)
+#define CSETBOUNDSIMM_MASK	(0x7ff << 21)
 #define CSETBOUNDSIMM		((0x12 << 26) | (0x14 << 21))
 #endif
 int
@@ -180,13 +180,13 @@ dt_pid_create_glob_offset_probes(struct ps_prochandle *P, dtrace_hdl_t *dtp,
 			free(text);
 			return 0;
 		}
-		for (i = 0; i < symp->st_size; i+= 4) {
+		for (i = 0; i < symp->st_size / 4; i++) {
 			if (((text[i] & CSETBOUNDSIMM_MASK) != CSETBOUNDSIMM) &&
 			    ((text[i] & CSETBOUNDS_MASK) != CSETBOUNDS))
 				continue;
 
-			dt_dprintf("csetbounds at offset %x\n", i);
-			ftp->ftps_offs[ftp->ftps_noffs++] = i;
+			dt_dprintf("csetbounds at offset %x\n", i * 4);
+			ftp->ftps_offs[ftp->ftps_noffs++] = i * 4;
 		}
 		free(text);
 
