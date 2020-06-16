@@ -233,6 +233,8 @@ static const dt_ident_t _dtrace_globals[] = {
 	DT_ATTR_STABCMN, DT_VERS_2_0, &dt_idops_func, "uint_t(__uintcap_t)" },
 { "capability_valid", DT_IDENT_FUNC, 0, DIF_SUBR_CAPABILITY_VALID,
 	DT_ATTR_STABCMN, DT_VERS_2_0, &dt_idops_func, "uint_t(__uintcap_t)" },
+{ "capability_perm", DT_IDENT_FUNC, 0, DIF_SUBR_CAPABILITY_PERM, DT_ATTR_STABCMN,
+  	DT_VERS_2_0, &dt_idops_func, "uint_t(__uintcap_t)" },
 #endif
 { "caller", DT_IDENT_SCALAR, 0, DIF_VAR_CALLER, DT_ATTR_STABCMN, DT_VERS_1_0,
 	&dt_idops_type, "uintptr_t" },

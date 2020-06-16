@@ -320,7 +320,8 @@ typedef enum dtrace_probespec {
 #define	DIF_SUBR_CAPABILITY_OFFSET	56
 #define	DIF_SUBR_CAPABILITY_ADDR	57
 #define	DIF_SUBR_CAPABILITY_VALID	58
-#define	DIF_SUBR_MAX			58	/* max subroutine value */
+#define DIF_SUBR_CAPABILITY_PERM	59
+#define	DIF_SUBR_MAX			59	/* max subroutine value */
 
 typedef uint32_t dif_instr_t;
 

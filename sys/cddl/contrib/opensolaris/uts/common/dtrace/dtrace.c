@@ -4701,6 +4701,11 @@ dtrace_dif_subr(uint_t subr, uint_t rd, uintcap_t *regs, dtrace_key_t *tupregs,
 		regs[rd] = cheri_gettag((void * __capability)addr);
 		break;
 	}
+	case DIF_SUBR_CAPABILITY_PERM: {
+		uintcap_t addr = (uintcap_t)tupregs[0].dttk_value;
+		regs[rd] = cheri_getperm((void * __capability)addr);
+		break;
+	}
 #endif
 	case DIF_SUBR_STRLEN: {
 		size_t size = state->dts_options[DTRACEOPT_STRSIZE];
