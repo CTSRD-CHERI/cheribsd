@@ -4965,7 +4965,7 @@ ufs/ffs/ffs_alloc.c		optional ffs
 ufs/ffs/ffs_balloc.c		optional ffs
 ufs/ffs/ffs_inode.c		optional ffs
 ufs/ffs/ffs_snapshot.c		optional ffs
-ufs/ffs/ffs_softdep.c		optional ffs
+ufs/ffs/ffs_softdep.c		optional ffs compile-with "${UNOPTIMIZED_C}"
 ufs/ffs/ffs_subr.c		optional ffs | geom_label
 ufs/ffs/ffs_tables.c		optional ffs | geom_label
 ufs/ffs/ffs_vfsops.c		optional ffs

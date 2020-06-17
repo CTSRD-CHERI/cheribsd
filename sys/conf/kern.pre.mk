@@ -254,6 +254,9 @@ FASTTRAP_CFLAGS=	-DBUILDING_DTRACE -nostdinc \
 	-I$S ${CDDL_CFLAGS}
 FASTTRAP_C=		${CC} -c ${FASTTRAP_CFLAGS}		${WERROR} ${PROF} ${.IMPSRC}
 
+# Special flags to disable optimizations selectively
+UNOPTIMIZED_C=${NORMAL_C} -O0
+
 .if ${MK_CTF} != "no"
 NORMAL_CTFCONVERT=	${CTFCONVERT} ${CTFFLAGS} ${.TARGET}
 .elif ${MAKE_VERSION} >= 5201111300
