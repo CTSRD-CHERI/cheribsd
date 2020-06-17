@@ -1384,7 +1384,7 @@ err:
 	ksi.ksi_code = ucode;
 	/* XXXBD: probably not quite right for CheriABI */
 	ksi.ksi_addr = (void * __capability)(intcap_t)addr;
-	ksi.ksi_trapno = type;
+	ksi.ksi_trapno = type & ~T_USER;
 #if defined(CPU_CHERI)
 	if (i == SIGPROT)
 		ksi.ksi_capreg = trapframe->capcause &
