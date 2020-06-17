@@ -188,7 +188,7 @@ class report_console_hooks : public drivers::scan_results::base_hooks {
         const model::properties_map props =
             test_case.get_metadata().to_properties();
 
-        _output << F("===> %s:%s\n") %
+        _output << F("\033[1m===> %s:%s\033[0m\n") %
             result_iter.test_program()->relative_path() %
             result_iter.test_case_name();
         _output << F("Result:     %s\n") %
@@ -206,16 +206,16 @@ class report_console_hooks : public drivers::scan_results::base_hooks {
         for (model::properties_map::const_iterator iter = props.begin();
              iter != props.end(); ++iter) {
             if ((*iter).second.empty()) {
-                _output << F("    %s is empty\n") % (*iter).first;
+                _output << F("\033[2m    %s is empty\033[0m\n") % (*iter).first;
             } else {
-                _output << F("    %s = %s\n") % (*iter).first % (*iter).second;
+                _output << F("\033[2m    %s = %s\033[0m\n") % (*iter).first % (*iter).second;
             }
         }
 
         const std::string stdout_contents = result_iter.stdout_contents();
         if (!stdout_contents.empty()) {
             _output << "\n"
-                    << "Standard output:\n"
+                    << "\033[31mStandard output:\033[0m\n"
                     << stdout_contents;
         }
 
@@ -225,6 +225,7 @@ class report_console_hooks : public drivers::scan_results::base_hooks {
                     << "Standard error:\n"
                     << stderr_contents;
         }
+	_output<<"\n\n\n\033[0m";
     }
 
     /// Counts how many results of a given type have been received.

@@ -360,10 +360,10 @@ cli::format_result(const model::test_result& result)
     std::string text;
 
     switch (result.type()) {
-    case model::test_result_broken: text = "broken"; break;
+    case model::test_result_broken: text = "\033[31mbroken"; break;
     case model::test_result_expected_failure: text = "expected_failure"; break;
-    case model::test_result_failed: text = "failed"; break;
-    case model::test_result_passed: text = "passed"; break;
+    case model::test_result_failed: text = "\033[31mfailed"; break;
+    case model::test_result_passed: text = "\033[32mpassed"; break;
     case model::test_result_skipped: text = "skipped"; break;
     }
     INV(!text.empty());
@@ -371,6 +371,7 @@ cli::format_result(const model::test_result& result)
     if (!result.reason().empty())
         text += ": " + result.reason();
 
+    text += "\033[0m";
     return text;
 }
 
