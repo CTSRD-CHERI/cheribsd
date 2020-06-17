@@ -84,27 +84,6 @@
 #include "cheritest.h"
 #include "cheritest.h"
 
-#ifndef SIGPROT
-#define	SIGPROT				0
-#define	PROT_CHERI_BOUNDS		0
-#define	PROT_CHERI_TAG			0
-#define	PROT_CHERI_SEALED		0
-#define	PROT_CHERI_TYPE			0
-#define	PROT_CHERI_PERM			0
-#define	PROT_CHERI_STORETAG		0
-#define	PROT_CHERI_IMPRECISE		0
-#define	PROT_CHERI_STORELOCAL		0
-#define	PROT_CHERI_CCALL		0
-#define	PROT_CHERI_CRETURN		0
-#define	PROT_CHERI_SYSREG		0
-#define	PROT_CHERI_UNSEALED		0
-#define	PROT_CHERI_OVERFLOW		0
-#define	PROT_CHERI_UNDERFLOW		0
-#define	PROT_CHERI_CCALLREGS		0
-#define	PROT_CHERI_LOCALARG		0
-#define	PROT_CHERI_LOCALRET		0
-#endif /* SIGPROT */
-
 #ifdef __mips__
 #define	TRAPNO_CHERI	(T_C2E)
 #elif defined(__riscv)
