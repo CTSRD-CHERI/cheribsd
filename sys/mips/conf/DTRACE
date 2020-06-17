@@ -1,0 +1,21 @@
+# CHERI128_DTRACE -- 64-bit kernel config for with DTrace support
+#
+# $FreeBSD$
+
+ident           DTRACE
+
+options         KDTRACE_HOOKS
+options         DDB_CTF
+makeoptions	DEBUG=-g
+makeoptions	WITH_CTF=1
+
+options COMPAT_FREEBSD64
+
+device       dtrace
+device       dtrace_systrace
+device       dtrace_sdt
+device       dtrace_prototype
+device       dtrace_fbt
+device       dtrace_profile
+device       dtrace_fasttrap
+
