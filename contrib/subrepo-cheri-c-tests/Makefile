@@ -58,7 +58,7 @@ TESTS_LIBC:=\
 	libc_setjmp\
 	libc_string
 
-CFLAGS=-mcpu=beri -mabi=purecap -msoft-float -g -cheri-linker -Werror -O3 -target cheri-unknown-freebsd -Wall
+CFLAGS=-mcpu=beri -mabi=purecap -msoft-float -g -cheri-linker -Werror -O3 -target mips64-unknown-freebsd -cheri -Wall
 CFLAGS+=-DHAVE_MALLOC_USUABLE_SIZE
 CFLAGS+=-I.
 CFLAGS_TESTS_CLANG_=$(CFLAGS:-mabi%=)
@@ -92,7 +92,7 @@ $(TESTS_CLANG_HYBRID): %: %.c test_runtime.n64.o Makefile
 	${SDK_ROOT}/bin/clang ${CFLAGS} -S $< -o $@
 
 %.dump: %
-	${SDK_ROOT}/bin/llvm-objdump -triple cheri-unknown-freebsd -d $< > $@
+	${SDK_ROOT}/bin/llvm-objdump -triple mips64-unknown-freebsd -d $< > $@
 
 test_runtime.o: test_runtime.c
 	${SDK_ROOT}/bin/clang -c ${CFLAGS} $< -o $@
