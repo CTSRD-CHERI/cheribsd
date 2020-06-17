@@ -6,35 +6,5 @@
 # $FreeBSD$
 #
 
-include		"BERI_DE4_BASE"
-ident		CHERI128_PURECAP_DE4_MDROOT
-
-include		"CHERI128_PURECAP_BASE"
-include   "std.MFS_ROOT"
-
-machine		mips mips64c128
-
-makeoptions	EMBED_CHERITEST_LIST=YES
-
-nooptions	SMP
-
-options		DIAGNOSTIC
-options		VERBOSE_SYSINIT
-options		BOOTVERBOSE=1
-options		STACK
-options		WITNESS
-options		DEBUG_VFS_LOCKS
-
-# needed by dhclient
-device bpf
-
-# disable usb for now
-nodevice usb
-nodevice saf1761otg
-nodevice ukbd
-nodevice ums
-
-device xdma
-device altera_softdma
-device altera_msgdma
-device altera_atse
+include		"CHERI_PURECAP_DE4_MFS_ROOT_BASE"
+ident		CHERI_PURECAP_DE4_MFS_ROOT

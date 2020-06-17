@@ -1,0 +1,39 @@
+#
+# CHERI -- Base configuration for pure capability kernel for
+# the SRI/Cambridge "CHERI" (Capability Hardware Enhanced
+# RISC Instructions) FPGA soft core, as configured in its Terasic DE-4
+# reference configuration - 128bit version.
+#
+# $FreeBSD$
+#
+
+include		"BERI_DE4_BASE"
+include		"CHERI128_PURECAP_BASE"
+include   "std.MFS_ROOT"
+
+machine		mips mips64c128
+
+makeoptions	EMBED_CHERITEST_LIST=YES
+
+nooptions	SMP
+
+options		DIAGNOSTIC
+options		VERBOSE_SYSINIT
+options		BOOTVERBOSE=1
+options		STACK
+options		WITNESS
+options		DEBUG_VFS_LOCKS
+
+# needed by dhclient
+device bpf
+
+# disable usb for now
+nodevice usb
+nodevice saf1761otg
+nodevice ukbd
+nodevice ums
+
+device xdma
+device altera_softdma
+device altera_msgdma
+device altera_atse

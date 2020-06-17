@@ -12,7 +12,7 @@ machine		mips mips64c128
 
 nomakeoptions 	ARCH_FLAGS
 makeoptions 	ARCH_PIC_FLAGS="-fpic"
-makeoptions 	ARCH_FLAGS="-target cheri-unknown-freebsd -mcpu=cheri128 -cheri-cap-table-abi=plt -mxcaptable -Xclang -cheri-bounds=subobject-safe"
+makeoptions 	ARCH_FLAGS="-target mips64c128-unknown-freebsd -mcpu=cheri128 -cheri-cap-table-abi=plt -mxcaptable -Xclang -cheri-bounds=subobject-safe"
 makeoptions 	CFLAGS+="-gdwarf-5"
 makeoptions 	WERROR="-Wno-error"
 makeoptions 	KERNLOADADDR=0xffffffff80100000

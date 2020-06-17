@@ -8,3 +8,4 @@ include		"CHERI_PURECAP_MALTA64_BENCHMARK"
 # kernel coverage
 options		COVERAGE
 options		KCOV
+options		KCOV_DIRECT_MAP
