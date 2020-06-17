@@ -145,4 +145,15 @@
 #define	CHERI_OTYPE_ISKERN(x)	(((x) & CHERI_OTYPE_KERN_FLAG) != 0)
 #define	CHERI_OTYPE_ISUSER(x)	(!(CHERI_OTYPE_ISKERN(x)))
 
+/*
+ * When performing a userspace-to-userspace CCall, capability flow-control
+ * checks normally prevent local capabilities from being delegated.  This can
+ * be disabled on call (but not return) by using an object type with the 22nd
+ * bit set -- combined with a suitable selector on the CCall instruction to
+ * ensure that this behaviour is intended.
+ */
+#define	CHERI_OTYPE_LOCALOK_SHIFT	(CHERI_OTYPE_BITS - 2)
+#define	CHERI_OTYPE_LOCALOK_FLAG	(1 << CHERI_OTYPE_LOCALOK_SHIFT
+#define	CHERI_OTYPE_IS_LOCALOK(x)	(((x) & CHERI_OTYPE_LOCALOK_FLAG) != 0)
+
 #endif /* _ARM64_INCLUDE_CHERIREG_H_ */
