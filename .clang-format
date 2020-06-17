@@ -5,6 +5,7 @@ BasedOnStyle: WebKit
 AlignAfterOpenBracket: DontAlign
 AlignConsecutiveAssignments: false
 AlignConsecutiveDeclarations: false
+AlignConsecutiveMacros: true
 AlignEscapedNewlines: Left
 AlignOperands: false
 AlignTrailingComments: false
