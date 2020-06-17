@@ -87,6 +87,7 @@ typedef void (abort_handler)(struct thread *, struct trapframe *, uint64_t,
     uint64_t, int);
 
 static abort_handler align_abort;
+static abort_handler cap_abort;
 static abort_handler data_abort;
 
 static abort_handler *abort_handlers[] = {
@@ -101,6 +102,10 @@ static abort_handler *abort_handlers[] = {
 	[ISS_DATA_DFSC_PF_L2] = data_abort,
 	[ISS_DATA_DFSC_PF_L3] = data_abort,
 	[ISS_DATA_DFSC_ALIGN] = align_abort,
+	[ISS_DATA_DFSC_CAP_TAG] = cap_abort,
+	[ISS_DATA_DFSC_CAP_SEALED] = cap_abort,
+	[ISS_DATA_DFSC_CAP_BOUND] = cap_abort,
+	[ISS_DATA_DFSC_CAP_PERM] = cap_abort,
 };
 
 static __inline void
@@ -186,6 +191,21 @@ align_abort(struct thread *td, struct trapframe *frame, uint64_t esr,
 
 	call_trapsignal(td, SIGBUS, BUS_ADRALN,
 	    (void * __capability)frame->tf_elr);
+	userret(td, frame);
+}
+
+static void
+cap_abort(struct thread *td, struct trapframe *frame, uint64_t esr,
+    uint64_t far, int lower)
+{
+	if (!lower) {
+		print_registers(frame);
+		printf(" far: %16lx\n", far);
+		printf(" esr:         %.8lx\n", esr);
+		panic("Capability abort from kernel space!");
+	}
+
+	call_trapsignal(td, SIGPROT, 0, (void * __capability)frame->tf_elr);
 	userret(td, frame);
 }
 
@@ -294,7 +314,7 @@ data_abort(struct thread *td, struct trapframe *frame, uint64_t esr,
 					return;
 			}
 #endif
-			panic("vm_fault failed: %lx", frame->tf_elr);
+			panic("vm_fault failed: %lx", (uint64_t)frame->tf_elr);
 		}
 	}
 
@@ -311,9 +331,9 @@ print_registers(struct trapframe *frame)
 		printf(" %sx%d: %16lx\n", (reg < 10) ? " " : "", reg,
 		    (uint64_t)frame->tf_x[reg]);
 	}
-	printf("  sp: %16lx\n", frame->tf_sp);
-	printf("  lr: %16lx\n", frame->tf_lr);
-	printf(" elr: %16lx\n", frame->tf_elr);
+	printf("  sp: %16lx\n", (uint64_t)frame->tf_sp);
+	printf("  lr: %16lx\n", (uint64_t)frame->tf_lr);
+	printf(" elr: %16lx\n", (uint64_t)frame->tf_elr);
 	printf("spsr:         %8x\n", frame->tf_spsr);
 }
 

@@ -253,16 +253,21 @@ ENTRY(fork_trampoline)
 	msr	daifset, #2
 
 	/* Restore sp and lr */
+#ifdef MORELLO
+	ldp	c0, c1, [sp, #TF_SP]
+#else
 	ldp	x0, x1, [sp, #TF_SP]
+#endif
 	msr	sp_el0, x0
 	mov	lr, x1
 
 	/* Restore elr and spsr */
-	ldp	x0, x1, [sp, #TF_ELR]
 #ifdef MORELLO
+	ldp	c0, c1, [sp, #TF_ELR]
 	cvtp	c0, x0
 	msr	celr_el1, c0
 #else
+	ldp	x0, x1, [sp, #TF_ELR]
 	msr	elr_el1, x0
 #endif
 	msr	spsr_el1, x1

@@ -55,15 +55,15 @@ __FBSDID("$FreeBSD$");
 	stp	c4,  c5,  [sp, #(TF_X + 4  * 16)]
 	stp	c2,  c3,  [sp, #(TF_X + 2  * 16)]
 	stp	c0,  c1,  [sp, #(TF_X + 0  * 16)]
-	mrs	x10, elr_el1
+	mrs	c10, celr_el1
 	mrs	x11, spsr_el1
 	mrs	x12, esr_el1
 .if \el == 0
-	mrs	x18, sp_el0
+	mrs	c18, csp_el0
 .endif
-	str	x10, [sp, #(TF_ELR)]
+	str	c10, [sp, #(TF_ELR)]
 	stp	w11, w12, [sp, #(TF_SPSR)]
-	stp	x18,  lr, [sp, #(TF_SP)]
+	stp	c18, clr, [sp, #(TF_SP)]
 	mrs	x18, tpidr_el1
 	add	x29, sp, #(TF_SIZE)
 .if \el == 0
@@ -101,13 +101,15 @@ __FBSDID("$FreeBSD$");
 	blr	x1
 1:
 .endif
-	ldp	x18,  lr, [sp, #(TF_SP)]
-	ldp	x10, x11, [sp, #(TF_ELR)]
+	ldp	c18, clr, [sp, #(TF_SP)]
+	ldr	c10, [sp, #(TF_ELR)]
+	/* TODO: Remove when the kernel understands capabilities */
+	cvtp	c10, x10
+	ldr	w11, [sp, #(TF_SPSR)]
 .if \el == 0
-	msr	sp_el0, x18
+	msr	csp_el0, c18
 .endif
 	msr	spsr_el1, x11
-	cvtp	c10, x10
 	msr	celr_el1, c10
 	ldp	c0,  c1,  [sp, #(TF_X + 0  * 16)]
 	ldp	c2,  c3,  [sp, #(TF_X + 2  * 16)]

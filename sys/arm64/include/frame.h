@@ -42,12 +42,19 @@
  * NOTE: keep this structure in sync with struct reg and struct mcontext.
  */
 struct trapframe {
+#ifdef MORELLO
+	__uint128_t tf_sp;
+	__uint128_t tf_lr;
+	__uint128_t tf_elr;
+#else
 	uint64_t tf_sp;
 	uint64_t tf_lr;
 	uint64_t tf_elr;
+#endif
 	uint32_t tf_spsr;
 	uint32_t tf_esr;
 #ifdef MORELLO
+	uint64_t tf_pad;
 	__uint128_t tf_x[30];
 #else
 	uint64_t tf_x[30];
