@@ -1422,6 +1422,8 @@ typedef struct {
 							/* get DOF */
 #define	DTRACEIOC_REPLICATE	_IOW('x',18,dtrace_repldesc_t)	
 							/* replicate enab */
+#define	DTRACEIOC_BENCHMARK	_IO('x',19)
+
 
 #if defined(_KERNEL) && defined(COMPAT_FREEBSD64)
 #define DTRACEIOC_BUFSNAP64 _IOC_NEWTYPE(DTRACEIOC_BUFSNAP, uint64_t)
@@ -2259,6 +2261,9 @@ extern void *dtrace_probe_arg(dtrace_provider_id_t, dtrace_id_t);
 extern void dtrace_probe(dtrace_id_t, uintcap_t arg0, uintcap_t arg1,
     uintcap_t arg2, uintcap_t arg3, uintcap_t arg4);
 
+extern
+int
+f_benchmark(int a, char *b, int c, int d, char *e);
 /*
  * DTrace Meta Provider API
  *

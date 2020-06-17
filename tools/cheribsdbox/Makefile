@@ -293,6 +293,7 @@ CRUNCH_PROGS_usr.bin+=	qtrace
 .endif
 .if ${MACHINE_ARCH:Mmips64*}
 CRUNCH_PROGS_usr.bin+=	beri_count_stats
+CRUNCH_PROGS_usr.bin+=	dtrace_benchmark
 .endif
 
 

@@ -193,6 +193,7 @@ SUBDIR=	alias \
 
 .if ${MACHINE_ARCH:Mmips64*}
 SUBDIR+=	beri_count_stats
+SUBDIR+=	dtrace_benchmark
 .endif
 
 # NB: keep these sorted by MK_* knobs

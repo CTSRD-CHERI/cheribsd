@@ -109,6 +109,18 @@ dtrace_ioctl_helper(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 	return (rval);
 }
 
+
+void __noinline __attribute__((optnone))
+dtrace_benchmark()
+{
+	printf("Starting benchmarks\n");
+	char *str = "test";
+	for (int i = 0; i < 100; i++) {
+		f_benchmark(1, str, 2, 3, str);
+	}
+	printf("ending benchmarks\n");
+}
+
 /* ARGSUSED */
 static int
 dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
@@ -863,6 +875,10 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 		mutex_exit(&dtrace_lock);
 
 		return (rval);
+	}
+	case DTRACEIOC_BENCHMARK: {
+		dtrace_benchmark();
+		return (0);
 	}
 	default:
 		error = ENOTTY;

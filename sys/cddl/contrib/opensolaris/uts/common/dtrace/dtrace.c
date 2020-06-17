@@ -7378,6 +7378,12 @@ dtrace_probe_exit(dtrace_icookie_t cookie)
 	dtrace_interrupt_enable(cookie);
 }
 
+int __noinline __attribute__((optnone))
+f_benchmark(int a, char *b, int c, int d, char *e)
+{
+	return a + c + d + (uint64_t)b + (uint64_t)e;
+}
+
 /*
  * If you're looking for the epicenter of DTrace, you just found it.  This
  * is the function called by the provider to fire a probe -- from which all
