@@ -26,7 +26,7 @@
 #include <cddl/contrib/opensolaris/uts/common/sys/dtrace.h>
 
 static int dtrace_verbose_ioctl;
-int dtrace_cap_parameters;
+int dtrace_cap_parameters = 1;
 SYSCTL_INT(_debug_dtrace, OID_AUTO, verbose_ioctl, CTLFLAG_RW,
     &dtrace_verbose_ioctl, 0, "log DTrace ioctls");
 SYSCTL_INT(_debug_dtrace, OID_AUTO, dtrace_cap_parameters, CTLFLAG_RW,
