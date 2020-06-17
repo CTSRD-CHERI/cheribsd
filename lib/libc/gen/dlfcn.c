@@ -237,8 +237,7 @@ dl_init_phdr_info(void)
 #else
 			    cheri_setbounds(cheri_setaddress(phdr_info.dlpi_phdr,
 				phdr_info.dlpi_phdr[i].p_vaddr),
-				phdr_info.dlpi_phdr[i].p_filesz);
-
+				phdr_info.dlpi_phdr[i].p_memsz);
 #endif
 		}
 	}
