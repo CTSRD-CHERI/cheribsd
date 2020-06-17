@@ -95,7 +95,7 @@ _start:
 	 */
 	mrs	x2, cpacr_el1
 	bic	x2, x2, CPACR_CEN_MASK
-	orr	x2, x2, CPACR_CEN_TRAP_EL0
+	orr	x2, x2, CPACR_CEN_TRAP_NONE
 	msr	cpacr_el1, x2
 #endif
 
@@ -224,7 +224,7 @@ ENTRY(mpentry)
 	 */
 	mrs	x2, cpacr_el1
 	bic	x2, x2, CPACR_CEN_MASK
-	orr	x2, x2, CPACR_CEN_TRAP_EL0
+	orr	x2, x2, CPACR_CEN_TRAP_NONE
 	msr	cpacr_el1, x2
 #endif
 
@@ -804,7 +804,7 @@ mair:
 		MAIR_ATTR(MAIR_NORMAL_WT, VM_MEMATTR_WRITE_THROUGH)
 tcr:
 #if __has_feature(capabilities)
-#define	TCR_MORELLO	(TCR_HPD1 | TCR_HWU1)
+#define	TCR_MORELLO	(TCR_HPD0 | TCR_HPD1 | TCR_HWU0 | TCR_HWU1)
 #else
 #define	TCR_MORELLO	0
 #endif
