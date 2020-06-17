@@ -1648,6 +1648,25 @@ restage reinstall reinstallsysroot: .MAKE .PHONY
 .if defined(_LIBCOMPAT)
 	${_+_}cd ${.CURDIR}; ${MAKE} -f Makefile.inc1 install${libcompat}
 .endif
+	@echo
+	@echo "--------------------------------------------------------------"
+	@echo ">>> Adding symlinks for native ABI libdir: ${MACHINE_ABI}"
+	@echo "--------------------------------------------------------------"
+.if ${MACHINE_ABI:Mpurecap}
+	@echo "Purecap ABI: creating libcheri links"
+	ln -sfnv lib ${DESTDIR}/libcheri
+	ln -sfnv lib ${DESTDIR}/usr/libcheri
+.elif ${MACHINE_ABI:Mptr64}
+	@echo "64-bit ABI: creating lib64 links"
+	ln -sfnv lib ${DESTDIR}/lib64
+	ln -sfnv lib ${DESTDIR}/usr/lib64
+.elif ${MACHINE_ABI:Mptr32}
+	@echo "32-bit ABI: creating lib32 links"
+	ln -sfnv lib ${DESTDIR}/lib32
+	ln -sfnv lib ${DESTDIR}/usr/lib32
+.else
+.error "MACHINE_ABI incorrect? ${MACHINE_ABI}"
+.endif
 .if make(reinstallsysroot)
 	@echo "Removing $$(find ${DESTDIR} -type d -empty -print | wc -l) empty directories from ${DESTDIR}"
 	find ${DESTDIR} -type d -empty -delete
