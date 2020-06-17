@@ -1401,9 +1401,9 @@ nfsv4_loadattr(struct nfsrv_descript *nd, vnode_t vp,
 			if (compare) {
 			    if (*retcmpp == 0) {
 				if (thyp != (u_int64_t)
-				    vfs_statfs(vnode_mount(vp))->f_fsid.val[0] ||
+				    vp->v_mount->mnt_stat.f_fsid.val[0] ||
 				    thyp2 != (u_int64_t)
-				    vfs_statfs(vnode_mount(vp))->f_fsid.val[1])
+				    vp->v_mount->mnt_stat.f_fsid.val[1])
 					*retcmpp = NFSERR_NOTSAME;
 			    }
 			} else if (nap != NULL) {
@@ -1875,9 +1875,8 @@ nfsv4_loadattr(struct nfsrv_descript *nd, vnode_t vp,
 			     */
 			    savuid = p->p_cred->p_ruid;
 			    p->p_cred->p_ruid = cred->cr_uid;
-			    if (!VFS_QUOTACTL(vnode_mount(vp),QCMD(Q_GETQUOTA,
-				USRQUOTA), cred->cr_uid,
-				(struct dqblk * __capability)&dqb))
+			    if (!VFS_QUOTACTL(vp->v_mount,QCMD(Q_GETQUOTA,
+				USRQUOTA), cred->cr_uid, &dqb))
 				freenum = min(dqb.dqb_bhardlimit, freenum);
 			    p->p_cred->p_ruid = savuid;
 #endif	/* QUOTA */
@@ -1905,9 +1904,8 @@ nfsv4_loadattr(struct nfsrv_descript *nd, vnode_t vp,
 			     */
 			    savuid = p->p_cred->p_ruid;
 			    p->p_cred->p_ruid = cred->cr_uid;
-			    if (!VFS_QUOTACTL(vnode_mount(vp),QCMD(Q_GETQUOTA,
-				USRQUOTA), cred->cr_uid,
-				(struct dqblk * __capability)&dqb))
+			    if (!VFS_QUOTACTL(vp->v_mount,QCMD(Q_GETQUOTA,
+				USRQUOTA), cred->cr_uid, &dqb))
 				freenum = min(dqb.dqb_bsoftlimit, freenum);
 			    p->p_cred->p_ruid = savuid;
 #endif	/* QUOTA */
@@ -1932,9 +1930,8 @@ nfsv4_loadattr(struct nfsrv_descript *nd, vnode_t vp,
 			     */
 			    savuid = p->p_cred->p_ruid;
 			    p->p_cred->p_ruid = cred->cr_uid;
-			    if (!VFS_QUOTACTL(vnode_mount(vp),QCMD(Q_GETQUOTA,
-				USRQUOTA), cred->cr_uid,
-				(struct dqblk * __capability)&dqb))
+			    if (!VFS_QUOTACTL(vp->v_mount,QCMD(Q_GETQUOTA,
+				USRQUOTA), cred->cr_uid, &dqb))
 				freenum = dqb.dqb_curblocks;
 			    p->p_cred->p_ruid = savuid;
 #endif	/* QUOTA */

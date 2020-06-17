@@ -1497,7 +1497,7 @@ ncl_readrpc(struct vnode *vp, struct uio *uiop, struct ucred *cred)
 	struct nfsvattr nfsva;
 	struct nfsmount *nmp;
 
-	nmp = VFSTONFS(vnode_mount(vp));
+	nmp = VFSTONFS(vp->v_mount);
 	error = EIO;
 	attrflag = 0;
 	if (NFSHASPNFS(nmp))
@@ -1528,7 +1528,7 @@ ncl_writerpc(struct vnode *vp, struct uio *uiop, struct ucred *cred,
 	int error, attrflag, ret;
 	struct nfsmount *nmp;
 
-	nmp = VFSTONFS(vnode_mount(vp));
+	nmp = VFSTONFS(vp->v_mount);
 	error = EIO;
 	attrflag = 0;
 	if (NFSHASPNFS(nmp))
@@ -1686,7 +1686,7 @@ nfs_create(struct vop_create_args *ap)
 	if (vap->va_vaflags & VA_EXCLUSIVE)
 		fmode |= O_EXCL;
 	dnp = VTONFS(dvp);
-	nmp = VFSTONFS(vnode_mount(dvp));
+	nmp = VFSTONFS(dvp->v_mount);
 again:
 	/* For NFSv4, wait until any remove is done. */
 	NFSLOCKNODE(dnp);
