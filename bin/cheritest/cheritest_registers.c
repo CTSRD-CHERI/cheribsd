@@ -474,6 +474,33 @@ test_initregs_stack(const struct cheri_test *ctp __unused)
 		cheritest_failure_errx("tag %jx (expected 1)", v);
 	cheritest_success();
 }
+
+void
+test_initregs_returncap(const struct cheri_test *ctp __unused)
+{
+	/* The return capability should always be a sentry capability */
+	void *retcap = __builtin_return_address(0);
+	uintmax_t perms = cheri_getperm(retcap);
+
+	CHERITEST_VERIFY(cheri_gettag(retcap));
+	/* Check that execute is present and store permissions aren't */
+	CHERITEST_VERIFY2((perms & CHERI_PERM_EXECUTE) == CHERI_PERM_EXECUTE,
+	    "perms %jx (executable should be set)", perms);
+	CHERITEST_VERIFY2((perms & CHERI_PERM_STORE) == 0,
+	    "perms %jx (store should not be set)", perms);
+	CHERITEST_VERIFY2((perms & CHERI_PERM_STORE_CAP) == 0,
+	    "perms %jx (store_cap should not be set)", perms);
+	CHERITEST_VERIFY2((perms & CHERI_PERM_STORE_LOCAL_CAP) == 0,
+	    "perms %jx (store_local_cap should not be set)", perms);
+
+	CHERITEST_VERIFY2(cheri_gettype(retcap) == CHERI_OTYPE_SENTRY,
+	    "expected a sentry and not type %ld", (long)cheri_gettype(retcap));
+
+	/* __builtin_extract_return_addr() should be a no-op */
+	CHERITEST_CHECK_EQ_CAP(retcap, __builtin_extract_return_addr(retcap));
+
+	cheritest_success();
+}
 #endif
 
 #ifdef __mips__
