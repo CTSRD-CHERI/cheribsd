@@ -2898,6 +2898,8 @@ inline bool Registers_mips_o32::validFloatRegister(int regNum) const {
 #if defined(__mips_hard_float) && __mips_fpr == 64
   if (regNum >= UNW_MIPS_F0 && regNum <= UNW_MIPS_F31)
     return true;
+#else
+  (void)regNum;
 #endif
   return false;
 }
@@ -2907,6 +2909,7 @@ inline double Registers_mips_o32::getFloatRegister(int regNum) const {
   assert(validFloatRegister(regNum));
   return _floats[regNum - UNW_MIPS_F0];
 #else
+  (void)regNum;
   _LIBUNWIND_ABORT("mips_o32 float support not implemented");
 #endif
 }
@@ -2917,6 +2920,8 @@ inline void Registers_mips_o32::setFloatRegister(int regNum,
   assert(validFloatRegister(regNum));
   _floats[regNum - UNW_MIPS_F0] = value;
 #else
+  (void)regNum;
+  (void)value;
   _LIBUNWIND_ABORT("mips_o32 float support not implemented");
 #endif
 }
@@ -3192,6 +3197,8 @@ inline bool Registers_mips_newabi::validFloatRegister(int regNum) const {
 #ifdef __mips_hard_float
   if (regNum >= UNW_MIPS_F0 && regNum <= UNW_MIPS_F31)
     return true;
+#else
+  (void)regNum;
 #endif
   return false;
 }
@@ -3201,6 +3208,7 @@ inline double Registers_mips_newabi::getFloatRegister(int regNum) const {
   assert(validFloatRegister(regNum));
   return _floats[regNum - UNW_MIPS_F0];
 #else
+  (void)regNum;
   _LIBUNWIND_ABORT("mips_newabi float support not implemented");
 #endif
 }
@@ -3211,6 +3219,8 @@ inline void Registers_mips_newabi::setFloatRegister(int regNum,
   assert(validFloatRegister(regNum));
   _floats[regNum - UNW_MIPS_F0] = value;
 #else
+  (void)regNum;
+  (void)value;
   _LIBUNWIND_ABORT("mips_newabi float support not implemented");
 #endif
 }
@@ -3912,17 +3922,13 @@ inline const char *Registers_sparc::getRegisterName(int regNum) {
 /// Registers_riscv holds the register state of a thread in a 64-bit RISC-V
 /// process.
 
-#if !__has_feature(capabilities)
-typedef uint64_t uintcap_t;
-#endif
-
 class _LIBUNWIND_HIDDEN Registers_riscv {
 public:
   Registers_riscv();
   Registers_riscv(const void *registers);
   bool        validRegister(int num) const;
-  uintcap_t   getRegister(int num) const;
-  void        setRegister(int num, uintcap_t value);
+  uintptr_t   getRegister(int num) const;
+  void        setRegister(int num, uintptr_t value);
   bool        validFloatRegister(int num) const;
   double      getFloatRegister(int num) const;
   void        setFloatRegister(int num, double value);
@@ -3934,7 +3940,7 @@ public:
   static int  lastDwarfRegNum() { return _LIBUNWIND_HIGHEST_DWARF_REGISTER_RISCV; }
   static int  getArch() { return REGISTERS_RISCV; }
 
-#if __has_feature(capabilities)
+#ifdef __CHERI_PURE_CAPABILITY__
   bool        validCapabilityRegister(int num) const;
   uintcap_t   getCapabilityRegister(int num) const;
   void        setCapabilityRegister(int num, uintcap_t value);
@@ -3942,16 +3948,16 @@ public:
   CAPABILITIES_NOT_SUPPORTED
 #endif
 
-  uintcap_t  getSP() const         { return _registers[2]; }
-  void      setSP(uintcap_t value) { _registers[2] = value; }
-  uintcap_t  getIP() const         { return _registers[1]; }
-  void      setIP(uintcap_t value) { _registers[1] = value; }
+  uintptr_t  getSP() const         { return _registers[2]; }
+  void      setSP(uintptr_t value) { _registers[2] = value; }
+  uintptr_t  getIP() const         { return _registers[1]; }
+  void      setIP(uintptr_t value) { _registers[1] = value; }
 
 private:
-  uintcap_t _registers[32];
+  uintptr_t _registers[32];
   double   _floats[32];
-#if !__has_feature(capabilities)
-  uint64_t padding[32]; // To make size match hybrid and not change offset of floats
+#ifdef __CHERI_PURE_CAPABILITY__
+  uintcap_t _ddc;
 #endif
 };
 
@@ -3959,18 +3965,31 @@ inline Registers_riscv::Registers_riscv(const void *registers) {
   static_assert((check_fit<Registers_riscv, unw_context_t>::does_fit),
                 "riscv registers do not fit into unw_context_t");
   memcpy(&_registers, registers, sizeof(_registers));
-#if !__has_feature(capabilities)
+#ifdef __CHERI_PURE_CAPABILITY__
+  static_assert(sizeof(_registers) == 0x200,
+                "expected float registers to be at offset 512");
+#else
   static_assert(sizeof(_registers) == 0x100,
                 "expected float registers to be at offset 256");
 #endif
-  memcpy(_floats,
+  memcpy(&_floats,
          static_cast<const uint8_t *>(registers) + sizeof(_registers),
          sizeof(_floats));
+#ifdef __CHERI_PURE_CAPABILITY__
+  static_assert(sizeof(_registers) + sizeof(_floats) == 0x300,
+                "expected float registers to be at offset 768");
+  memcpy(&_ddc,
+         static_cast<const uint8_t *>(registers) + sizeof(_registers) + sizeof(_floats),
+         sizeof(_ddc));
+#endif
 }
 
 inline Registers_riscv::Registers_riscv() {
   memset(&_registers, 0, sizeof(_registers));
   memset(&_floats, 0, sizeof(_floats));
+#ifdef __CHERI_PURE_CAPABILITY__
+  memset(&_ddc, 0, sizeof(_ddc));
+#endif
 }
 
 inline bool Registers_riscv::validRegister(int regNum) const {
@@ -3980,7 +3999,7 @@ inline bool Registers_riscv::validRegister(int regNum) const {
     return true;
   if (regNum < 0)
     return false;
-#if __has_feature(capabilities)
+#ifdef __CHERI_PURE_CAPABILITY__
   if (regNum == UNW_RISCV_DDC)
     return true;
 #endif
@@ -3989,7 +4008,7 @@ inline bool Registers_riscv::validRegister(int regNum) const {
   return true;
 }
 
-inline uintcap_t Registers_riscv::getRegister(int regNum) const {
+inline uintptr_t Registers_riscv::getRegister(int regNum) const {
   if (regNum == UNW_REG_IP)
     return _registers[1];
   if (regNum == UNW_REG_SP)
@@ -3998,14 +4017,14 @@ inline uintcap_t Registers_riscv::getRegister(int regNum) const {
     return 0;
   if ((regNum > 0) && (regNum < 32))
     return _registers[regNum];
-#if __has_feature(capabilities)
+#ifdef __CHERI_PURE_CAPABILITY__
   if (regNum == UNW_RISCV_DDC)
-    return _registers[0];
+    return _ddc;
 #endif
   _LIBUNWIND_ABORT("unsupported riscv register");
 }
 
-inline void Registers_riscv::setRegister(int regNum, uintcap_t value) {
+inline void Registers_riscv::setRegister(int regNum, uintptr_t value) {
   if (regNum == UNW_REG_IP)
     _registers[1] = value;
   else if (regNum == UNW_REG_SP)
@@ -4013,10 +4032,9 @@ inline void Registers_riscv::setRegister(int regNum, uintcap_t value) {
   else if (regNum == UNW_RISCV_X0)
     /* x0 is hardwired to zero */
     return;
-#if __has_feature(capabilities)
-  // We use the zero slot for storing $ddc
-  if (regNum == UNW_RISCV_DDC)
-    _registers[regNum] = value;
+#ifdef __CHERI_PURE_CAPABILITY__
+  else if (regNum == UNW_RISCV_DDC)
+    _ddc = value;
 #endif
   else if ((regNum > 0) && (regNum < 32))
     _registers[regNum] = value;
@@ -4024,7 +4042,7 @@ inline void Registers_riscv::setRegister(int regNum, uintcap_t value) {
     _LIBUNWIND_ABORT("unsupported riscv register");
 }
 
-#if __has_feature(capabilities)
+#ifdef __CHERI_PURE_CAPABILITY__
 inline bool Registers_riscv::validCapabilityRegister(int regNum) const {
   if (regNum == UNW_REG_IP)
     return true;
@@ -4184,7 +4202,7 @@ inline const char *Registers_riscv::getRegisterName(int regNum) {
     return "ft10";
   case UNW_RISCV_F31:
     return "ft11";
-#if __has_feature(capabilities)
+#ifdef __CHERI_PURE_CAPABILITY__
   case UNW_RISCV_DDC:
     return "ddc";
 #endif
@@ -4206,6 +4224,7 @@ inline double Registers_riscv::getFloatRegister(int regNum) const {
   assert(validFloatRegister(regNum));
   return _floats[regNum - UNW_RISCV_F0];
 #else
+  (void)regNum;
   _LIBUNWIND_ABORT("libunwind not built with float support");
 #endif
 }
@@ -4215,6 +4234,8 @@ inline void Registers_riscv::setFloatRegister(int regNum, double value) {
   assert(validFloatRegister(regNum));
   _floats[regNum - UNW_RISCV_F0] = value;
 #else
+  (void)regNum;
+  (void)value;
   _LIBUNWIND_ABORT("libunwind not built with float support");
 #endif
 }
