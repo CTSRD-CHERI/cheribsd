@@ -356,20 +356,11 @@ test_initregs_default(const struct cheri_test *ctp __unused)
 #ifdef __CHERI_PURE_CAPABILITY__
 
 /*
- * Following along in kern_exec.c, ...
- *
- * 1. We don't specify the size of the stack in the GNU_STACK program header,
- * 2. At least on CHERI-MIPS, sv_maxssiz == NULL
- * 3. maxssiz is set by sysctl (sys/kern/subr_param.c),
- *    but on CHERI-MIPS defaults to 64MiB (see MAXSSIZ in
- *    sys/mips/include/vmparam.h).
- *
- * So, require our stack offset to be somewhere in the first 256KiB.  That
+ * We require our stack offset to be somewhere in the first 256KiB.  That
  * should be plenty of room for the aux vector and args and all that.
  */
 
-#define CHERI_STACK_OFFSET_MAX 0x4000000
-#define CHERI_STACK_OFFSET_MIN 0x3fc0000
+#define	CHERI_STACK_USE_MAX	(256 * 1024)
 
 void
 test_initregs_stack_user_perms(const struct cheri_test *ctp __unused)
@@ -400,16 +391,17 @@ test_initregs_stack(const struct cheri_test *ctp __unused)
 		    (uintmax_t)CHERI_CAP_USER_DATA_BASE);
 
 	/* Length. */
-	v = cheri_getlen(c);
-	if (v == CHERI_CAP_USER_DATA_LENGTH)
-		cheritest_failure_errx("length 0x%jx (did not expect 0x%jx)",
-		    v, CHERI_CAP_USER_DATA_LENGTH);
+	/* Technically dynamic, but defaults to MAXSSIZ. */
+	if (cheri_getlen(c) > MAXSSIZ)
+		cheritest_failure_errx("length 0x%jx (> MAXSSIZ 0x%jx)",
+		    cheri_getlen(c), (uintmax_t)MAXSSIZ);
 
 	/* Offset. */
-	v = cheri_getoffset(c);
-	if (v > CHERI_STACK_OFFSET_MAX || v < CHERI_STACK_OFFSET_MIN)
-		cheritest_failure_errx("stack offset 0x%jx (expected range "			    "0x%jx to 0x%jx)", v, (uintmax_t)CHERI_STACK_OFFSET_MIN,
-		    (uintmax_t)CHERI_STACK_OFFSET_MAX);
+	/* If we're running len > offset... */
+	if (cheri_getlen(c) - cheri_getoffset(c) > CHERI_STACK_USE_MAX)
+		cheritest_failure_errx("offset more then 0x%jx from top "
+		    "(0x%jx)", (intmax_t)CHERI_STACK_USE_MAX,
+		    cheri_getlen(c) - cheri_getoffset(c));
 
 	/* Type -- should be zero for an unsealed capability. */
 	v = cheri_gettype(c);
