@@ -478,23 +478,27 @@ test_initregs_stack(const struct cheri_test *ctp __unused)
 void
 test_initregs_returncap(const struct cheri_test *ctp __unused)
 {
+	void *retcap;
+	uintmax_t v;
+	
 	/* The return capability should always be a sentry capability */
-	void *retcap = __builtin_return_address(0);
-	uintmax_t perms = cheri_getperm(retcap);
+	c = __builtin_return_address(0);
+	v = cheri_getperm(retcap);
 
 	CHERITEST_VERIFY(cheri_gettag(retcap));
 	/* Check that execute is present and store permissions aren't */
 	CHERITEST_VERIFY2((perms & CHERI_PERM_EXECUTE) == CHERI_PERM_EXECUTE,
-	    "perms %jx (executable should be set)", perms);
+	    "perms %jx (execute missing)", perms);
 	CHERITEST_VERIFY2((perms & CHERI_PERM_STORE) == 0,
-	    "perms %jx (store should not be set)", perms);
+	    "perms %jx (store present)", perms);
 	CHERITEST_VERIFY2((perms & CHERI_PERM_STORE_CAP) == 0,
-	    "perms %jx (store_cap should not be set)", perms);
+	    "perms %jx (storecap present)", perms);
 	CHERITEST_VERIFY2((perms & CHERI_PERM_STORE_LOCAL_CAP) == 0,
-	    "perms %jx (store_local_cap should not be set)", perms);
+	    "perms %jx (store_local_cap present)", perms);
 
-	CHERITEST_VERIFY2(cheri_gettype(retcap) == CHERI_OTYPE_SENTRY,
-	    "expected a sentry and not type %ld", (long)cheri_gettype(retcap));
+	v = cheri_gettype(retcap);
+	CHERITEST_VERIFY2(v == (uintmax_t)CHERI_OTYPE_SENTRY,
+	    "otype %jx (expected %jx)", v, (uintmax_t)CHERI_OTYPE_SENTRY);
 
 	/* __builtin_extract_return_addr() should be a no-op */
 	CHERITEST_CHECK_EQ_CAP(retcap, __builtin_extract_return_addr(retcap));
