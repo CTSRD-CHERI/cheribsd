@@ -148,7 +148,7 @@ check_initreg_code(void * __capability c)
 	 * length).
 	 */
 	vaddr_t upper_bound =
-	    CHERI_REPRESENTABLE_LENGTH(cheri_getaddress(c) + 0x100000);
+	    CHERI_REPRESENTABLE_LENGTH(cheri_getaddress(c) + 0x1000000);
 	CHERITEST_VERIFY2(cheri_getlength(c) < upper_bound,
 	    "code length 0x%jx should be < than 0x%jx)", cheri_getlength(c),
 	    upper_bound);
