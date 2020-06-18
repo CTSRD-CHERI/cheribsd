@@ -396,7 +396,7 @@ test_initregs_stack(const struct cheri_test *ctp __unused)
 	/* Base. */
 	v = cheri_getbase(c);
 	if (v == CHERI_CAP_USER_DATA_BASE)
-		cheritest_failure_errx("base %jx (did not expect %jx)", v,
+		cheritest_failure_errx("base 0x%jx (did not expect 0x%jx)", v,
 		    (uintmax_t)CHERI_CAP_USER_DATA_BASE);
 
 	/* Length. */
@@ -408,14 +408,13 @@ test_initregs_stack(const struct cheri_test *ctp __unused)
 	/* Offset. */
 	v = cheri_getoffset(c);
 	if (v > CHERI_STACK_OFFSET_MAX || v < CHERI_STACK_OFFSET_MIN)
-		cheritest_failure_errx("stack offset %jx (expected range %jx "
-		    "to %jx)", v, (uintmax_t)CHERI_STACK_OFFSET_MIN,
-		    (uintmax_t)CHERI_STACK_OFFSET_MIN);
+		cheritest_failure_errx("stack offset 0x%jx (expected range "			    "0x%jx to 0x%jx)", v, (uintmax_t)CHERI_STACK_OFFSET_MIN,
+		    (uintmax_t)CHERI_STACK_OFFSET_MAX);
 
 	/* Type -- should be zero for an unsealed capability. */
 	v = cheri_gettype(c);
 	if (v != -1)
-		cheritest_failure_errx("otype %jx (expected %jx)", v,
+		cheritest_failure_errx("otype 0x%jx (expected 0x%jx)", v,
 		    (uintmax_t)0);
 
 	/* Permissions. */
