@@ -478,7 +478,7 @@ test_initregs_stack(const struct cheri_test *ctp __unused)
 void
 test_initregs_returncap(const struct cheri_test *ctp __unused)
 {
-	void *retcap;
+	void *c;
 	uintmax_t v;
 	
 	/* The return capability should always be a sentry capability */
