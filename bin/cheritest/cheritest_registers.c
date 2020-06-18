@@ -485,23 +485,23 @@ test_initregs_returncap(const struct cheri_test *ctp __unused)
 	c = __builtin_return_address(0);
 	v = cheri_getperm(retcap);
 
-	CHERITEST_VERIFY(cheri_gettag(retcap));
+	CHERITEST_VERIFY(cheri_gettag(c));
 	/* Check that execute is present and store permissions aren't */
-	CHERITEST_VERIFY2((perms & CHERI_PERM_EXECUTE) == CHERI_PERM_EXECUTE,
-	    "perms %jx (execute missing)", perms);
-	CHERITEST_VERIFY2((perms & CHERI_PERM_STORE) == 0,
-	    "perms %jx (store present)", perms);
-	CHERITEST_VERIFY2((perms & CHERI_PERM_STORE_CAP) == 0,
-	    "perms %jx (storecap present)", perms);
-	CHERITEST_VERIFY2((perms & CHERI_PERM_STORE_LOCAL_CAP) == 0,
-	    "perms %jx (store_local_cap present)", perms);
+	CHERITEST_VERIFY2((v & CHERI_PERM_EXECUTE) == CHERI_PERM_EXECUTE,
+	    "perms %jx (execute missing)", v);
+	CHERITEST_VERIFY2((v & CHERI_PERM_STORE) == 0,
+	    "perms %jx (store present)", v);
+	CHERITEST_VERIFY2((v & CHERI_PERM_STORE_CAP) == 0,
+	    "perms %jx (storecap present)", v);
+	CHERITEST_VERIFY2((v & CHERI_PERM_STORE_LOCAL_CAP) == 0,
+	    "perms %jx (store_local_cap present)", v);
 
 	v = cheri_gettype(retcap);
 	CHERITEST_VERIFY2(v == (uintmax_t)CHERI_OTYPE_SENTRY,
 	    "otype %jx (expected %jx)", v, (uintmax_t)CHERI_OTYPE_SENTRY);
 
 	/* __builtin_extract_return_addr() should be a no-op */
-	CHERITEST_CHECK_EQ_CAP(retcap, __builtin_extract_return_addr(retcap));
+	CHERITEST_CHECK_EQ_CAP(c, __builtin_extract_return_addr(c));
 
 	cheritest_success();
 }
