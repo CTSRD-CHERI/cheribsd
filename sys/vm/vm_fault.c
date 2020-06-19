@@ -294,6 +294,25 @@ vm_fault_dirty(struct faultstate *fs, vm_page_t m)
 }
 
 /*
+ * Determine extra flags to pmap_enter to control pmap tag
+ * permissions.
+ */
+static u_int
+pmap_tag_flags(vm_object_t obj)
+{
+	u_int flags;
+
+	flags = 0;
+#if __has_feature(capabilities)
+	if (obj->flags & OBJ_NOLOADTAGS)
+		flags |= PMAP_ENTER_NOLOADTAGS;
+	if (obj->flags & OBJ_NOSTORETAGS)
+		flags |= PMAP_ENTER_NOSTORETAGS;
+#endif
+	return (flags);
+}
+
+/*
  * Unlocks fs.first_object and fs.map on success.
  */
 static int
@@ -349,14 +368,9 @@ vm_fault_soft_fast(struct faultstate *fs)
 		}
 	}
 #endif
-#if __has_feature(capabilities)
-	if (fs->first_object->flags & OBJ_NOLOADTAGS)
-		fs->fault_type |= PMAP_ENTER_NOLOADTAGS;
-	if (fs->first_object->flags & OBJ_NOSTORETAGS)
-		fs->fault_type |= PMAP_ENTER_NOSTORETAGS;
-#endif
 	rv = pmap_enter(fs->map->pmap, vaddr, m_map, fs->prot, fs->fault_type |
-	    PMAP_ENTER_NOSLEEP | (fs->wired ? PMAP_ENTER_WIRED : 0), psind);
+	    PMAP_ENTER_NOSLEEP | (fs->wired ? PMAP_ENTER_WIRED : 0) |
+	    pmap_tag_flags(fs->first_object), psind);
 	if (rv != KERN_SUCCESS)
 		goto out;
 	if (fs->m_hold != NULL) {
@@ -520,13 +534,15 @@ vm_fault_populate(struct faultstate *fs)
 		}
 		VM_OBJECT_WUNLOCK(fs->first_object);
 		rv = pmap_enter(fs->map->pmap, vaddr, m, fs->prot, fs->fault_type |
-		    (fs->wired ? PMAP_ENTER_WIRED : 0), psind);
+		    (fs->wired ? PMAP_ENTER_WIRED : 0) |
+		    pmap_tag_flags(fs->first_object), psind);
 #if defined(__amd64__)
 		if (psind > 0 && rv == KERN_FAILURE) {
 			for (i = 0; i < npages; i++) {
 				rv = pmap_enter(fs->map->pmap, vaddr + ptoa(i),
 				    &m[i], fs->prot, fs->fault_type |
-				    (fs->wired ? PMAP_ENTER_WIRED : 0), 0);
+				    (fs->wired ? PMAP_ENTER_WIRED : 0) |
+				    pmap_tag_flags(fs->first_object), 0);
 				MPASS(rv == KERN_SUCCESS);
 			}
 		}
@@ -1237,7 +1253,6 @@ int
 vm_fault(vm_map_t map, vm_offset_t vaddr, vm_prot_t fault_type,
     int fault_flags, vm_page_t *m_hold)
 {
-	u_int flags;
 	struct faultstate fs;
 	int ahead, behind, faultcount;
 	int nera, result, rv;
@@ -1515,16 +1530,9 @@ RetryFault:
 	 * back on the active queue until later so that the pageout daemon
 	 * won't find it (yet).
 	 */
-	flags = fs.fault_type;
-	if (fs.wired)
-		flags |= PMAP_ENTER_WIRED;
-#if __has_feature(capabilities)
-	if (fs.object->flags & OBJ_NOLOADTAGS)
-		flags |= PMAP_ENTER_NOLOADTAGS;
-	if (fs.object->flags & OBJ_NOSTORETAGS)
-		flags |= PMAP_ENTER_NOSTORETAGS;
-#endif
-	pmap_enter(fs.map->pmap, vaddr, fs.m, fs.prot, flags, 0);
+	pmap_enter(fs.map->pmap, vaddr, fs.m, fs.prot,
+	    fs.fault_type | (fs.wired ? PMAP_ENTER_WIRED : 0) |
+	    pmap_tag_flags(fs.object), 0);
 	if (faultcount != 1 && (fs.fault_flags & VM_FAULT_WIRE) == 0 &&
 	    fs.wired == 0)
 		vm_fault_prefault(&fs, vaddr,
@@ -1722,6 +1730,9 @@ vm_fault_prefault(const struct faultstate *fs, vm_offset_t addra,
 		 * XXXRW: No flags argument we can use to pass NOTAGS!
 		 */
 		if (vm_page_all_valid(m) &&
+#if __has_feature(capabilities)
+		    pmap_tag_flags(entry->object.vm_object) == 0 &&
+#endif
 		    (m->flags & PG_FICTITIOUS) == 0)
 			pmap_enter_quick(pmap, addr, m, entry->protection);
 		if (!obj_locked || lobject != entry->object.vm_object)
@@ -1840,7 +1851,6 @@ vm_fault_copy_entry(vm_map_t dst_map, vm_map_t src_map,
 	vm_offset_t vaddr;
 	vm_page_t dst_m;
 	vm_page_t src_m;
-	u_int flags;
 	boolean_t upgrade;
 
 #ifdef	lint
@@ -2002,18 +2012,10 @@ again:
 		 * all copies of the wired map entry have similar
 		 * backing pages.
 		 */
-		flags = access;
-		if (upgrade)
-			access |= PMAP_ENTER_WIRED;
-#if __has_feature(capabilities)
-		if (dst_object->flags & OBJ_NOLOADTAGS)
-			flags |= PMAP_ENTER_NOLOADTAGS;
-		if (dst_object->flags & OBJ_NOSTORETAGS)
-			flags |= PMAP_ENTER_NOSTORETAGS;
-#endif
 		if (vm_page_all_valid(dst_m)) {
 			pmap_enter(dst_map->pmap, vaddr, dst_m, prot,
-			    access | (upgrade ? PMAP_ENTER_WIRED : 0), 0);
+			    access | (upgrade ? PMAP_ENTER_WIRED : 0) |
+			    pmap_tag_flags(dst_object), 0);
 		}
 
 		/*
