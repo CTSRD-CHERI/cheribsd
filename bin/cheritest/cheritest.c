@@ -990,7 +990,7 @@ static const struct cheri_test cheri_tests[] = {
 	  .ct_si_code = PROT_CHERI_STORETAG,
 	  .ct_si_trapno = TRAPNO_CHERI,
 #endif
-	  .ct_check_xfail = xfail_need_writable_non_tmpfs_tmp },
+	  .ct_check_xfail = xfail_need_writable_tmp },
 
 	{ .ct_name = "cheritest_vm_tag_tmpfile_private",
 	  .ct_desc = "check tags are stored for tmpfile() MAP_PRIVATE pages",
