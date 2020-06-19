@@ -739,20 +739,8 @@ kern_mmap_req(struct thread *td, struct mmap_req *mrp)
 		}
 
 		/* Address range must be all in user VM space. */
-		if (addr < vm_map_min(&vms->vm_map) ||
-		    addr + size > vm_map_max(&vms->vm_map)) {
-			SYSERRCAUSE("%s: range (%p-%p) is outside user "
-			    "address range (%p-%p)", __func__, (void *)addr,
-			    (void *)(addr + size),
-			    (void *)vm_map_min(&vms->vm_map),
-			    (void *)vm_map_max(&vms->vm_map));
+		if (!vm_map_range_valid(&vms->vm_map, addr, addr + size))
 			return (EINVAL);
-		}
-		if (addr + size < addr) {
-			SYSERRCAUSE("%s: addr (%p) + size (0x%zx) overflows",
-			    __func__, (void *)addr, size);
-			return (EINVAL);
-		}
 #ifdef MAP_32BIT
 		if (flags & MAP_32BIT) {
 			KASSERT(!SV_CURPROC_FLAG(SV_CHERI),
@@ -1054,7 +1042,7 @@ kern_munmap(struct thread *td, uintptr_t addr0, size_t size)
 	bool pmc_handled;
 #endif
 	vm_map_entry_t entry;
-	vm_offset_t addr, reservation;
+	vm_offset_t addr, end, reservation;
 	vm_size_t pageoff;
 	vm_map_t map;
 	int result;
@@ -1067,15 +1055,11 @@ kern_munmap(struct thread *td, uintptr_t addr0, size_t size)
 	addr -= pageoff;
 	size += pageoff;
 	size = (vm_size_t) round_page(size);
-	if (addr + size < addr)
+	end = addr + size;
+	map = &td->td_proc->p_vmspace->vm_map;
+	if (!vm_map_range_valid(map, addr, end))
 		return (EINVAL);
 
-	/*
-	 * Check for illegal addresses.  Watch out for address wrap...
-	 */
-	map = &td->td_proc->p_vmspace->vm_map;
-	if (addr < vm_map_min(map) || addr + size > vm_map_max(map))
-		return (EINVAL);
 	vm_map_lock(map);
 #ifdef HWPMC_HOOKS
 	pmc_handled = false;
@@ -1087,7 +1071,7 @@ kern_munmap(struct thread *td, uintptr_t addr0, size_t size)
 		 */
 		pkm.pm_address = (uintptr_t) NULL;
 		if (vm_map_lookup_entry(map, addr, &entry)) {
-			for (; entry->start < addr + size;
+			for (; entry->start < end;
 			    entry = vm_map_entry_succ(entry)) {
 				if (vm_map_check_protection(map, entry->start,
 					entry->end, VM_PROT_EXECUTE) == TRUE) {
@@ -1105,7 +1089,7 @@ kern_munmap(struct thread *td, uintptr_t addr0, size_t size)
 			reservation = entry->reservation;
 	}
 
-	vm_map_delete(map, addr, addr + size);
+	vm_map_delete(map, addr, end);
 
 	if ((map->flags & MAP_RESERVATIONS) != 0) {
 		result = vm_map_insert(map, NULL, 0, addr, addr + size,
@@ -1300,9 +1284,7 @@ kern_madvise(struct thread *td, uintptr_t addr0, size_t len, int behav)
 	 */
 	map = &td->td_proc->p_vmspace->vm_map;
 	addr = addr0;
-	if (addr < vm_map_min(map) || addr + len > vm_map_max(map))
-		return (EINVAL);
-	if ((addr + len) < addr)
+	if (!vm_map_range_valid(map, addr, addr + len))
 		return (EINVAL);
 
 	/*

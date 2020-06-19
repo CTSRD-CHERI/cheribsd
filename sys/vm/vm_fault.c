@@ -1773,10 +1773,7 @@ vm_fault_quick_hold_pages(vm_map_t map, void * __capability addr, vm_size_t len,
 	start = (__cheri_addr vm_offset_t)trunc_page(addr);
 	end = (__cheri_addr vm_offset_t)round_page((char * __capability)addr + len);
 
-	/*
-	 * Check for illegal addresses.
-	 */
-	if (start < vm_map_min(map) || start > end || end > vm_map_max(map))
+	if (!vm_map_range_valid(map, start, end))
 		return (-1);
 
 	if (atop(end - start) > max_count)
