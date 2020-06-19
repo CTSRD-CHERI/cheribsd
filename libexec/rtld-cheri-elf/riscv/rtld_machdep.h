@@ -90,12 +90,13 @@ make_code_pointer(const Elf_Sym *def, const struct Struct_Obj_Entry *defobj,
 	if (tight_bounds) {
 		ret = cheri_setbounds(ret, def->st_size);
 	}
-	ret = cheri_incoffset(ret, addend); /* TODO: remove addend support */
-	/* Enable once supported in the toolchain, hardware and emulators */
-#if 0
+	/*
+	 * Note: The addend is required for C++ exceptions since capabilities
+	 * for catch blocks point to the middle of a function.
+	 */
+	ret = cheri_incoffset(ret, addend);
 	/* All code pointers should be sentries: */
 	ret = __builtin_cheri_seal_entry(ret);
-#endif
 	return __DECONST(dlfunc_t, ret);
 }
 
