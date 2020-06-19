@@ -234,7 +234,7 @@ vm_object_zinit(void *mem, int size, int flags)
 }
 
 static void
-_vm_object_allocate(objtype_t type, vm_pindex_t size, u_short flags,
+_vm_object_allocate(objtype_t type, vm_pindex_t size, u_int flags,
     vm_object_t object, void *handle)
 {
 
@@ -319,7 +319,7 @@ vm_object_init(void)
 }
 
 void
-vm_object_clear_flag(vm_object_t object, u_short bits)
+vm_object_clear_flag(vm_object_t object, u_int bits)
 {
 
 	VM_OBJECT_ASSERT_WLOCKED(object);
@@ -425,7 +425,7 @@ vm_object_t
 vm_object_allocate(objtype_t type, vm_pindex_t size)
 {
 	vm_object_t object;
-	u_short flags;
+	u_int flags;
 
 	switch (type) {
 	case OBJT_DEAD:
