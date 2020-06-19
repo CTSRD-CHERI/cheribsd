@@ -306,8 +306,8 @@ dumpfs(const char *name)
 		(uintmax_t)afs.fs_providersize);
 	printf("\ncs[].cs_(nbfree,ndir,nifree,nffree):\n\t");
 	afs.fs_si = calloc(1, sizeof(*afs.fs_si));
-	afs.fs_si->fs_csp = calloc(1, afs.fs_cssize);
-	if (bread(&disk, fsbtodb(&afs, afs.fs_csaddr), afs.fs_si->fs_csp, afs.fs_cssize) == -1)
+	afs.fs_csp = calloc(1, afs.fs_cssize);
+	if (bread(&disk, fsbtodb(&afs, afs.fs_csaddr), afs.fs_csp, afs.fs_cssize) == -1)
 		goto err;
 	for (i = 0; i < afs.fs_ncg; i++) {
 		struct csum *cs = &afs.fs_cs(&afs, i);

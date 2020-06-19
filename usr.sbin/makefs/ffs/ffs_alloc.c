@@ -679,7 +679,7 @@ ffs_clusteracct(struct fs *fs, struct cg *cgp, int32_t blkno, int cnt)
 	for (i = fs->fs_contigsumsize; i > 0; i--)
 		if (ufs_rw32(*lp--, needswap) > 0)
 			break;
-	fs->fs_si->fs_maxcluster[ufs_rw32(cgp->cg_cgx, needswap)] = i;
+	fs->fs_maxcluster[ufs_rw32(cgp->cg_cgx, needswap)] = i;
 }
 // CHERI CHANGES START
 // {

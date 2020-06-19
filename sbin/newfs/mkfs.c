@@ -79,7 +79,6 @@ __FBSDID("$FreeBSD$");
 static struct	csum *fscs;
 #define	sblock	disk.d_fs
 #define	acg	disk.d_cg
-static struct	fs_summary_info fs_si;
 
 union dinode {
 	struct ufs1_dinode dp1;
@@ -135,6 +134,10 @@ mkfs(struct partition *pp, char *fsys)
 		utime = 1000000000;
 	else
 		time(&utime);
+	if ((sblock.fs_si = malloc(sizeof(struct fs_summary_info))) == NULL) {
+		printf("Superblock summary info allocation failed.\n");
+		exit(18);
+	}
 	sblock.fs_old_flags = FS_FLAGS_UPDATED;
 	sblock.fs_flags = 0;
 	if (Uflag)
@@ -549,6 +552,10 @@ restart:
 			}
 		}
 	}
+	/*
+	 * Reference the summary information so it will also be written.
+	 */
+	sblock.fs_csp = fscs;
 	if (!Nflag && sbput(disk.d_fd, &disk.d_fs, 0) != 0)
 		err(1, "sbput: %s", disk.d_error);
 	if (Xflag == 1) {
@@ -612,11 +619,6 @@ restart:
 		printf("** Exiting on Xflag 3\n");
 		exit(0);
 	}
-	/*
-	 * Reference the summary information so it will also be written.
-	 */
-	sblock.fs_si = &fs_si;
-	sblock.fs_si->fs_csp = fscs;
 	if (sbput(disk.d_fd, &disk.d_fs, 0) != 0)
 		err(1, "sbput: %s", disk.d_error);
 	/*
