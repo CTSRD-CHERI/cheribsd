@@ -1382,8 +1382,10 @@ err:
 	ksiginfo_init_trap(&ksi);
 	ksi.ksi_signo = i;
 	ksi.ksi_code = ucode;
+	if (i == SIGSEGV)
+		addr = (void * __capability)(intcap_t)trapframe->badvaddr;
 	/* XXXBD: probably not quite right for CheriABI */
-	ksi.ksi_addr = (void * __capability)(intcap_t)addr;
+	ksi.ksi_addr = addr;
 	ksi.ksi_trapno = type & ~T_USER;
 #if defined(CPU_CHERI)
 	if (i == SIGPROT)
