@@ -981,15 +981,16 @@ static const struct cheri_test cheri_tests[] = {
 	  .ct_desc = "check tags are not stored for tmpfile() MAP_SHARED pages",
 	  .ct_func = cheritest_vm_notag_tmpfile_shared,
 	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
+#ifdef __riscv
+	  .ct_signum = SIGSEGV,
+	  .ct_si_code = SEGV_STORETAG,
+	  .ct_si_trapno = EXCP_STORE_AMO_CAP_PAGE_FAULT,
+#else
 	  .ct_signum = SIGPROT,
 	  .ct_si_code = PROT_CHERI_STORETAG,
 	  .ct_si_trapno = TRAPNO_CHERI,
-#ifdef __riscv
-	  .ct_xfail_reason = "CHERI-RISC-V doesn't implement CHERI PTE bits",
-#else
-	  .ct_check_xfail = xfail_need_writable_non_tmpfs_tmp,
 #endif
-	},
+	  .ct_check_xfail = xfail_need_writable_non_tmpfs_tmp },
 
 	{ .ct_name = "cheritest_vm_tag_tmpfile_private",
 	  .ct_desc = "check tags are stored for tmpfile() MAP_PRIVATE pages",
