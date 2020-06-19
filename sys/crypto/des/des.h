@@ -65,7 +65,7 @@ typedef struct des_ks_struct
 	des_cblock cblock;
 	/* make sure things are correct size on machines with
 	 * 8 byte longs */
-	DES_LONG deslong[2];
+	DES_LONG deslong[2] __subobject_use_container_bounds;
 	} ks;
 	int weak_key;
 } des_key_schedule[16];
