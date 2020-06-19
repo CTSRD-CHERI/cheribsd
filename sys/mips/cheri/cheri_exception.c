@@ -391,7 +391,7 @@ cheri_capcause_to_sicode(register_t capcause)
 		return (PROT_CHERI_PERM);
 
 	case CHERI_EXCCODE_TLBSTORE:
-		return (PROT_CHERI_STORETAG);
+		panic("TLBSTORE uses SIGSEGV");
 
 	case CHERI_EXCCODE_IMPRECISE:
 		return (PROT_CHERI_IMPRECISE);

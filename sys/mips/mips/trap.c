@@ -1160,8 +1160,14 @@ dofault:
 		msg = "USER_CHERI_EXCEPTION";
 		fetch_bad_instr(trapframe);
 		log_c2e_exception(msg, trapframe, type);
-		i = SIGPROT;
-		ucode = cheri_capcause_to_sicode(trapframe->capcause);
+		if (CHERI_CAPCAUSE_EXCCODE(trapframe->capcause) ==
+		    CHERI_EXCCODE_TLBSTORE) {
+			i = SIGSEGV;
+			ucode = SEGV_STORETAG;
+		} else {
+			i = SIGPROT;
+			ucode = cheri_capcause_to_sicode(trapframe->capcause);
+		}
 		break;
 
 #else
