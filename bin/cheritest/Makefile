@@ -10,6 +10,7 @@ SRCS+=	cheritest_bounds_globals.c					\
 	cheritest_bounds_heap.c						\
 	cheritest_bounds_stack.c					\
 	cheritest_fault.c						\
+	cheritest_flag_captured.c					\
 	cheritest_kbounce.c						\
 	cheritest_longjmp.c						\
 	cheritest_registers.c						\

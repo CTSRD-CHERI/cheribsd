@@ -1518,6 +1518,16 @@ SYS_STUB(258, int, kbounce,
     /* _localcheck */ {if (!(cheri_getperm(src) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} if (!(cheri_getperm(dst) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} }
 )
 
+SYS_STUB(259, int, flag_captured,
+    /* _protoargs */ (const char *  message),
+    /* _protoargs_chk */ (int *retp , int * __capability stub_errno, const char * __capability   message),
+    /* _protoargs_err */ (int * __capability stub_errno, const char * __capability   message),
+    /* _callargs */ ((__cheri_fromcap const char * )message),
+    /* _callargs_chk */ (&ret, stub_errno, message),
+    /* _callargs_err */ (&errno, (const char * )message),
+    /* _localcheck */ {if (!(cheri_getperm(message) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} }
+)
+
 SYS_STUB(274, int, lchmod,
     /* _protoargs */ (const char *  path, mode_t mode),
     /* _protoargs_chk */ (int *retp , int * __capability stub_errno, const char * __capability   path, mode_t mode),

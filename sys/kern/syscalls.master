@@ -1481,7 +1481,12 @@
 		    int flags
 		);
 	}
-259-271	AUE_NULL	UNIMPL	nosys
+259	AUE_NULL	STD {
+		int flag_captured(
+		    _In_z_ const char *message
+		);
+	}
+260-271	AUE_NULL	UNIMPL	nosys
 272	AUE_O_GETDENTS	COMPAT11 {
 		int getdents(
 		    int fd,

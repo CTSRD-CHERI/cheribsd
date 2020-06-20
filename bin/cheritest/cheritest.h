@@ -386,6 +386,13 @@ DECLARE_CHERI_TEST(test_sandbox_fd_read_revoke);
 DECLARE_CHERI_TEST(test_sandbox_fd_write);
 DECLARE_CHERI_TEST(test_sandbox_fd_write_revoke);
 
+/* cheritest_flag_captured.c */
+DECLARE_CHERI_TEST(test_flag_captured);
+DECLARE_CHERI_TEST(test_flag_captured_null);
+#ifdef __CHERI_PURE_CAPABILITY__
+DECLARE_CHERI_TEST(test_flag_captured_empty);
+#endif
+
 /* cheritest_kbounce.c */
 DECLARE_CHERI_TEST(test_kbounce);
 

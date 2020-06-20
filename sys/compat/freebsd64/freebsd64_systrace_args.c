@@ -1330,6 +1330,13 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 4;
 		break;
 	}
+	/* freebsd64_flag_captured */
+	case 259: {
+		struct freebsd64_flag_captured_args *p = params;
+		uarg[0] = (intptr_t) p->message; /* const char * */
+		*n_args = 1;
+		break;
+	}
 	/* freebsd64_lchmod */
 	case 274: {
 		struct freebsd64_lchmod_args *p = params;
@@ -5486,6 +5493,16 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		case 3:
 			p = "int";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* freebsd64_flag_captured */
+	case 259:
+		switch(ndx) {
+		case 0:
+			p = "userland const char *";
 			break;
 		default:
 			break;
@@ -9826,6 +9843,11 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		break;
 	/* freebsd64_kbounce */
 	case 258:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* freebsd64_flag_captured */
+	case 259:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;

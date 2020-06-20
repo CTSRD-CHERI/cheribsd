@@ -153,6 +153,7 @@ MIASM =  \
 	cheriabi_aio_write.o \
 	cheriabi_lio_listio.o \
 	cheriabi_kbounce.o \
+	cheriabi_flag_captured.o \
 	cheriabi_lchmod.o \
 	cheriabi_lutimes.o \
 	cheriabi_preadv.o \

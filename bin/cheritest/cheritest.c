@@ -1100,6 +1100,20 @@ static const struct cheri_test cheri_tests[] = {
 #endif
 #endif
 
+	{ .ct_name = "test_flag_captured",
+	  .ct_desc = "Call flag_captured(2) with a message",
+	  .ct_func = test_flag_captured, },
+
+	{ .ct_name = "test_flag_captured_null",
+	  .ct_desc = "Call flag_captured(2) without a message",
+	  .ct_func = test_flag_captured_null, },
+
+#ifdef __CHERI_PURE_CAPABILITY__
+	{ .ct_name = "test_flag_captured_empty",
+	  .ct_desc = "Call flag_captured(2) with a zero-length capability",
+	  .ct_func = test_flag_captured_empty, },
+#endif
+
 	/*
 	 * Test copyin/out(_c) via kbounce(2) syscall.
 	 */
