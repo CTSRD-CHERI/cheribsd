@@ -495,12 +495,6 @@ struct siginfo64 {
 #define	PROT_CHERI_CCALL	9	/* CCall fault			*/
 #define	PROT_CHERI_CRETURN	10	/* CReturn fault		*/
 #define	PROT_CHERI_SYSREG	11	/* Capability system register fault */
-#define	PROT_CHERI_UNSEALED	61	/* CCall unsealed argument fault */
-#define	PROT_CHERI_OVERFLOW	62	/* Trusted stack oveflow fault	*/
-#define	PROT_CHERI_UNDERFLOW	63	/* Trusted stack underflow fault */
-#define	PROT_CHERI_CCALLREGS	64	/* CCall argument fault		*/
-#define	PROT_CHERI_LOCALARG	65	/* CCall local argument fault	*/
-#define	PROT_CHERI_LOCALRET	66	/* CReturn local retval fault	*/
 #endif
 
 #if __POSIX_VISIBLE || __XSI_VISIBLE
