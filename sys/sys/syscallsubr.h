@@ -226,6 +226,8 @@ int	kern_fhreadlink(struct thread *td, fhandle_t * __capability fhp,
 	    char * __capability buf, size_t bufsize);
 int	kern_fhstat(struct thread *td, fhandle_t fh, struct stat *buf);
 int	kern_fhstatfs(struct thread *td, fhandle_t fh, struct statfs *buf);
+int	kern_flag_captured(struct thread *td, const char * __capability message,
+	    const char *source);
 int	kern_fpathconf(struct thread *td, int fd, int name, long *valuep);
 int	kern_fstat(struct thread *td, int fd, struct stat *sbp);
 int	kern_fstatfs(struct thread *td, int fd, struct statfs *buf);

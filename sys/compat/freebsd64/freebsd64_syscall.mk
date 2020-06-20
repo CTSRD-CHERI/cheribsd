@@ -169,6 +169,7 @@ MIASM =  \
 	freebsd64_aio_write.o \
 	freebsd64_lio_listio.o \
 	freebsd64_kbounce.o \
+	freebsd64_flag_captured.o \
 	freebsd11_freebsd64_getdents.o \
 	freebsd64_lchmod.o \
 	freebsd64_lutimes.o \

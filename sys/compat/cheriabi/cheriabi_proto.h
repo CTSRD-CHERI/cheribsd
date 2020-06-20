@@ -514,6 +514,9 @@ struct cheriabi_kbounce_args {
 	char len_l_[PADL_(size_t)]; size_t len; char len_r_[PADR_(size_t)];
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
 };
+struct cheriabi_flag_captured_args {
+	char message_l_[PADL_(const char * __capability)]; const char * __capability message; char message_r_[PADR_(const char * __capability)];
+};
 struct cheriabi_lchmod_args {
 	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
 	char mode_l_[PADL_(mode_t)]; mode_t mode; char mode_r_[PADR_(mode_t)];
@@ -1582,6 +1585,7 @@ int	cheriabi_aio_read(struct thread *, struct cheriabi_aio_read_args *);
 int	cheriabi_aio_write(struct thread *, struct cheriabi_aio_write_args *);
 int	cheriabi_lio_listio(struct thread *, struct cheriabi_lio_listio_args *);
 int	cheriabi_kbounce(struct thread *, struct cheriabi_kbounce_args *);
+int	cheriabi_flag_captured(struct thread *, struct cheriabi_flag_captured_args *);
 int	cheriabi_lchmod(struct thread *, struct cheriabi_lchmod_args *);
 int	cheriabi_lutimes(struct thread *, struct cheriabi_lutimes_args *);
 int	cheriabi_preadv(struct thread *, struct cheriabi_preadv_args *);
@@ -1926,6 +1930,7 @@ int	freebsd12_cheriabi_shm_open(struct thread *, struct freebsd12_cheriabi_shm_o
 #define	CHERIABI_SYS_AUE_cheriabi_aio_write	AUE_AIO_WRITE
 #define	CHERIABI_SYS_AUE_cheriabi_lio_listio	AUE_LIO_LISTIO
 #define	CHERIABI_SYS_AUE_cheriabi_kbounce	AUE_NULL
+#define	CHERIABI_SYS_AUE_cheriabi_flag_captured	AUE_NULL
 #define	CHERIABI_SYS_AUE_cheriabi_lchmod	AUE_LCHMOD
 #define	CHERIABI_SYS_AUE_cheriabi_lutimes	AUE_LUTIMES
 #define	CHERIABI_SYS_AUE_cheriabi_preadv	AUE_PREADV

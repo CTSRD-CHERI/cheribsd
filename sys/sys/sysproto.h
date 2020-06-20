@@ -720,6 +720,9 @@ struct kbounce_args {
 	char len_l_[PADL_(size_t)]; size_t len; char len_r_[PADR_(size_t)];
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
 };
+struct flag_captured_args {
+	char message_l_[PADL_(const char * __capability)]; const char * __capability message; char message_r_[PADR_(const char * __capability)];
+};
 struct lchmod_args {
 	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
 	char mode_l_[PADL_(mode_t)]; mode_t mode; char mode_r_[PADR_(mode_t)];
@@ -1998,6 +2001,7 @@ int	sys_aio_read(struct thread *, struct aio_read_args *);
 int	sys_aio_write(struct thread *, struct aio_write_args *);
 int	sys_lio_listio(struct thread *, struct lio_listio_args *);
 int	sys_kbounce(struct thread *, struct kbounce_args *);
+int	sys_flag_captured(struct thread *, struct flag_captured_args *);
 int	sys_lchmod(struct thread *, struct lchmod_args *);
 int	sys_lutimes(struct thread *, struct lutimes_args *);
 int	sys_preadv(struct thread *, struct preadv_args *);
@@ -2909,6 +2913,7 @@ int	freebsd12_closefrom(struct thread *, struct freebsd12_closefrom_args *);
 #define	SYS_AUE_aio_write	AUE_AIO_WRITE
 #define	SYS_AUE_lio_listio	AUE_LIO_LISTIO
 #define	SYS_AUE_kbounce	AUE_NULL
+#define	SYS_AUE_flag_captured	AUE_NULL
 #define	SYS_AUE_freebsd11_getdents	AUE_O_GETDENTS
 #define	SYS_AUE_lchmod	AUE_LCHMOD
 #define	SYS_AUE_lutimes	AUE_LUTIMES

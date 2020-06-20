@@ -3758,6 +3758,7 @@ kern/kern_exec.c		standard
 kern/kern_exit.c		standard
 kern/kern_fail.c		standard
 kern/kern_ffclock.c		standard
+kern/kern_flag.c		standard
 kern/kern_fork.c		standard
 kern/kern_hhook.c		standard
 kern/kern_idle.c		standard

@@ -1028,6 +1028,16 @@ cheriabi_acct(struct thread *td, struct cheriabi_acct_args *uap)
 }
 
 /*
+ * kern_flag.c
+ */
+int
+cheriabi_flag_captured(struct thread *td,
+    struct cheriabi_flag_captured_args *uap)
+{
+	return (kern_flag_captured(td, uap->message, __func__));
+}
+
+/*
  * kern_fork.c
  */
 int

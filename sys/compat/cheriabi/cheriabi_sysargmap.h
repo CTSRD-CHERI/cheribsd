@@ -145,6 +145,7 @@ int cheriabi_sysargmask[] = {
  [CHERIABI_SYS_cheriabi_aio_write] = (0x0 | 0x1),
  [CHERIABI_SYS_cheriabi_lio_listio] = (0x0 | 0x2 | 0x8),
  [CHERIABI_SYS_cheriabi_kbounce] = (0x0 | 0x1 | 0x2),
+ [CHERIABI_SYS_cheriabi_flag_captured] = (0x0 | 0x1),
  [CHERIABI_SYS_cheriabi_lchmod] = (0x0 | 0x1),
  [CHERIABI_SYS_cheriabi_lutimes] = (0x0 | 0x1 | 0x2),
  [CHERIABI_SYS_cheriabi_preadv] = (0x0 | 0x2),
