@@ -41,9 +41,9 @@ void * __capability userspace_cap = (void * __capability)(intcap_t)-1;
 /*
  * Build a new userspace capability derived from userspace_cap.
  * The resulting capability may include both read and execute permissions,
- * but not write. For architectures that use flags, the flags for the resulting
- * capability will be set based on what is expected by userspace for the
- * specified thread.
+ * but not write, and will be a sentry capability. For architectures that use
+ * flags, the flags for the resulting capability will be set based on what is
+ * expected by userspace for the specified thread.
  */
 void * __capability
 _cheri_capability_build_user_code(struct thread *td, uint32_t perms,
@@ -63,7 +63,7 @@ _cheri_capability_build_user_code(struct thread *td, uint32_t perms,
 		tmpcap = cheri_setflags(tmpcap, CHERI_FLAGS_CAP_MODE);
 #endif
 
-	return (tmpcap);
+	return (cheri_sealentry(tmpcap));
 }
 
 /*
