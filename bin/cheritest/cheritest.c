@@ -1577,6 +1577,11 @@ static const struct cheri_test cheri_tests[] = {
 	{ .ct_name = "test_signal_sigaltstack_disable",
 	  .ct_desc = "Check signal handlers don't use a given alternate stack when re-disabled",
 	  .ct_func = test_signal_sigaltstack_disable },
+#ifdef __CHERI_PURE_CAPABILITY__
+	{ .ct_name = "test_signal_returncap",
+	  .ct_desc = "Test value of signal handler return capability",
+	  .ct_func = test_signal_returncap },
+#endif
 
 	/*
 	 * Standard library string tests.

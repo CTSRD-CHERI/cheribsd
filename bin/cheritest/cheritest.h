@@ -486,6 +486,9 @@ DECLARE_CHERI_TEST(test_signal_handler_usr1);
 DECLARE_CHERI_TEST(test_signal_sigaction_usr1);
 DECLARE_CHERI_TEST(test_signal_sigaltstack);
 DECLARE_CHERI_TEST(test_signal_sigaltstack_disable);
+#ifdef __CHERI_PURE_CAPABILITY__
+DECLARE_CHERI_TEST(test_signal_returncap);
+#endif
 
 /* cheritest_string.c */
 DECLARE_CHERI_TEST(test_string_kern_memcpy_c);

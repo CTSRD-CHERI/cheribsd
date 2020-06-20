@@ -222,3 +222,68 @@ test_signal_sigaltstack_disable(const struct cheri_test *ctp __unused)
 
 	cheritest_success();
 }
+
+#ifdef __CHERI_PURE_CAPABILITY__
+extern int __sys_sigaction(int, const struct sigaction *, struct sigaction *);
+
+static void *handler_returncap;
+
+static void
+returncap_func(int signum __unused)
+{
+	handler_returncap = __builtin_return_address(0);
+}
+
+void
+test_signal_returncap(const struct cheri_test *ctp __unused)
+{
+	struct sigaction sa;
+	uintmax_t v;
+
+	sa.sa_handler = returncap_func;
+	sigemptyset(&sa.sa_mask);
+	sa.sa_flags = 0;
+	/*
+	 * Note: we call __sys_sigaction directly here to avoid any interposing by
+	 * libthr and ensure that our handler is called directly by the kernel,
+	 * since we want to capture the return capability for sigcode it gives to
+	 * userspace.
+	 */
+	if (__sys_sigaction(SIGUSR1, &sa, NULL) != 0)
+		cheritest_failure_errx("sigaction failed: %s",
+		                       strerror(errno));
+
+	handler_returncap = NULL;
+	if (kill(getpid(), SIGUSR1) != 0)
+		cheritest_failure_errx("kill(getpid(), SIGUSR1) failed: %s",
+		                       strerror(errno));
+
+	/* Length -- 256 bytes should be more than enough to cover sigcode. */
+	v = cheri_getlen(handler_returncap);
+	CHERITEST_VERIFY2(v <= 0x100, "length 0x%jx (expected <= 0x100)", v);
+
+	/* Type -- should be a sentry capability. */
+	v = cheri_gettype(handler_returncap);
+	CHERITEST_VERIFY2(v == (uintmax_t)CHERI_OTYPE_SENTRY,
+	    "otype %jx (expected %jx)", v, (uintmax_t)CHERI_OTYPE_SENTRY);
+
+	/* Sealed bit. */
+	CHERITEST_VERIFY(cheri_getsealed(handler_returncap));
+
+	/* Tag bit. */
+	CHERITEST_VERIFY(cheri_gettag(handler_returncap));
+
+	/* Permissions -- should have execute but no store permissions. */
+	v = cheri_getperm(handler_returncap);
+	CHERITEST_VERIFY2((v & CHERI_PERM_EXECUTE) == CHERI_PERM_EXECUTE,
+	    "perms %jx (execute missing)", v);
+	CHERITEST_VERIFY2((v & CHERI_PERM_STORE) == 0,
+	    "perms %jx (store present)", v);
+	CHERITEST_VERIFY2((v & CHERI_PERM_STORE_CAP) == 0,
+	    "perms %jx (storecap present)", v);
+	CHERITEST_VERIFY2((v & CHERI_PERM_STORE_LOCAL_CAP) == 0,
+	    "perms %jx (store_local_cap present)", v);
+
+	cheritest_success();
+}
+#endif
