@@ -258,6 +258,10 @@ initstack:
 	.space  (PAGE_SIZE * KSTACK_PAGES)
 initstack_end:
 
+.option push
+#if __has_feature(capabilities)
+.option capmode
+#endif
 ENTRY(sigcode)
 #if __has_feature(capabilities)
 	cincoffset ca0, csp, SF_UC
@@ -279,8 +283,13 @@ END(sigcode)
 	/* This may be copied to the stack, keep it 16-byte aligned */
 	.align	3
 esigcode:
+.option pop
 
 #ifdef COMPAT_FREEBSD64
+.option push
+#if __has_feature(capabilities)
+.option nocapmode
+#endif
 ENTRY(freebsd64_sigcode)
 	mv	a0, sp
 	addi	a0, a0, SF64_UC
@@ -298,6 +307,7 @@ END(freebsd64_sigcode)
 	/* This may be copied to the stack, keep it 16-byte aligned */
 	.align	3
 freebsd64_esigcode:
+.option pop
 #endif
 
 	.data
