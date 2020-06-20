@@ -44,3 +44,7 @@
 /* Neither GLibc nor macOS define __va_list but many FreeBSD headers require it */
 typedef __builtin_va_list __va_list;
 
+/* Needed for e.g. sys/tree.h */
+typedef __UINTPTR_TYPE__ __uintptr_t;
+typedef __INTPTR_TYPE__ __intptr_t;
+
