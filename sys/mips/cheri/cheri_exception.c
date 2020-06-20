@@ -346,9 +346,8 @@ cheri_log_exception(struct trapframe *frame, int trap_type)
 #endif
 	if ((trap_type == T_C2E) || (trap_type == T_C2E + T_USER)) {
 		cause = frame->capcause;
-		exccode = (cause & CHERI_CAPCAUSE_EXCCODE_MASK) >>
-		    CHERI_CAPCAUSE_EXCCODE_SHIFT;
-		regnum = cause & CHERI_CAPCAUSE_REGNUM_MASK;
+		exccode = CHERI_CAPCAUSE_EXCCODE(cause);
+		regnum = CHERI_CAPCAUSE_REGNUM(cause);
 		printf("CHERI cause: ExcCode: 0x%02x ", exccode);
 		if (regnum < 32)
 			printf("RegNum: $c%02d ", regnum);
@@ -366,8 +365,7 @@ cheri_capcause_to_sicode(register_t capcause)
 {
 	uint8_t exccode;
 
-	exccode = (capcause & CHERI_CAPCAUSE_EXCCODE_MASK) >>
-	    CHERI_CAPCAUSE_EXCCODE_SHIFT;
+	exccode = CHERI_CAPCAUSE_EXCCODE(capcause);
 	switch (exccode) {
 	case CHERI_EXCCODE_LENGTH:
 		return (PROT_CHERI_BOUNDS);
