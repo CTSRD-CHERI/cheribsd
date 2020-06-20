@@ -490,7 +490,6 @@ struct siginfo64 {
 #define	PROT_CHERI_SEALED	3	/* Capability sealed fault	*/
 #define	PROT_CHERI_TYPE		4	/* Type mismatch fault		*/
 #define	PROT_CHERI_PERM		5	/* Capability permission fault	*/
-#define	PROT_CHERI_STORETAG	6	/* Tag-store page fault		*/
 #define	PROT_CHERI_IMPRECISE	7	/* Imprecise bounds fault	*/
 #define	PROT_CHERI_STORELOCAL	8	/* Store-local fault		*/
 #define	PROT_CHERI_CCALL	9	/* CCall fault			*/
