@@ -29,6 +29,8 @@
  */
 
 #include <sys/param.h>
+#include <sys/proc.h>
+#include <sys/sysent.h>
 #include <sys/systm.h>
 
 #include <cheri/cheric.h>
@@ -39,19 +41,29 @@ void * __capability userspace_cap = (void * __capability)(intcap_t)-1;
 /*
  * Build a new userspace capability derived from userspace_cap.
  * The resulting capability may include both read and execute permissions,
- * but not write.
+ * but not write. For architectures that use flags, the flags for the resulting
+ * capability will be set based on what is expected by userspace for the
+ * specified thread.
  */
 void * __capability
-_cheri_capability_build_user_code(uint32_t perms, vaddr_t basep, size_t length,
-    off_t off, const char* func, int line)
+_cheri_capability_build_user_code(struct thread *td, uint32_t perms,
+    vaddr_t basep, size_t length, off_t off, const char* func, int line)
 {
+	void * __capability tmpcap;
 
 	KASSERT((perms & ~CHERI_CAP_USER_CODE_PERMS) == 0,
 	    ("%s:%d: perms %x has permission not in CHERI_CAP_USER_CODE_PERMS %x",
 	    func, line, perms, CHERI_CAP_USER_CODE_PERMS));
 
-	return (_cheri_capability_build_user_rwx(
-	    perms & CHERI_CAP_USER_CODE_PERMS, basep, length, off, func, line));
+	tmpcap = _cheri_capability_build_user_rwx(
+	    perms & CHERI_CAP_USER_CODE_PERMS, basep, length, off, func, line);
+
+#ifdef CHERI_FLAGS_CAP_MODE
+	if (SV_PROC_FLAG(td->td_proc, SV_CHERI))
+		tmpcap = cheri_setflags(tmpcap, CHERI_FLAGS_CAP_MODE);
+#endif
+
+	return (tmpcap);
 }
 
 /*
