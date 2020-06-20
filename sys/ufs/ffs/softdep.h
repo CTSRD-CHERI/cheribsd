@@ -524,7 +524,7 @@ struct indirdep {
  * can then be freed as it is no longer applicable.
  */
 struct allocindir {
-	struct	newblk ai_block;	/* Common block area */
+	struct	newblk ai_block __subobject_use_container_bounds;	/* Common block area */
 #	define	ai_state ai_block.nb_list.wk_state /* indirect pointer state */
 	LIST_ENTRY(allocindir) ai_next;	/* indirdep's list of allocindir's */
 	struct	indirdep *ai_indirdep;	/* address of associated indirdep */
