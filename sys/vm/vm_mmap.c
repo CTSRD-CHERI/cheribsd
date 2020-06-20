@@ -1206,14 +1206,20 @@ sys_minherit(struct thread *td, struct minherit_args *uap)
 	if ((cheri_getperm(uap->addr) & CHERI_PERM_CHERIABI_VMMAP) == 0)
 		return (EPROT);
 #endif
-	return (kern_minherit(td, (__cheri_addr vm_offset_t)uap->addr, uap->len,
+	return (kern_minherit(td, (__cheri_addr uintptr_t)uap->addr, uap->len,
 	    uap->inherit));
 }
 
 int
-kern_minherit(struct thread *td, vm_offset_t addr, vm_size_t size, int inherit)
+kern_minherit(struct thread *td, uintptr_t addr0, size_t len, int inherit0)
 {
-	vm_size_t pageoff;
+	vm_offset_t addr;
+	vm_size_t size, pageoff;
+	vm_inherit_t inherit;
+
+	addr = (vm_offset_t)addr0;
+	size = len;
+	inherit = inherit0;
 
 	pageoff = (addr & PAGE_MASK);
 	addr -= pageoff;
