@@ -1034,7 +1034,7 @@ int
 cheriabi_flag_captured(struct thread *td,
     struct cheriabi_flag_captured_args *uap)
 {
-	return (kern_flag_captured(td, uap->message, __func__));
+	return (kern_flag_captured(td, uap->message, uap->key, __func__));
 }
 
 /*

@@ -388,6 +388,7 @@ DECLARE_CHERI_TEST(test_sandbox_fd_write_revoke);
 
 /* cheritest_flag_captured.c */
 DECLARE_CHERI_TEST(test_flag_captured);
+DECLARE_CHERI_TEST(test_flag_captured_incorrect_key);
 DECLARE_CHERI_TEST(test_flag_captured_null);
 #ifdef __CHERI_PURE_CAPABILITY__
 DECLARE_CHERI_TEST(test_flag_captured_empty);

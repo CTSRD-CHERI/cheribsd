@@ -722,6 +722,7 @@ struct kbounce_args {
 };
 struct flag_captured_args {
 	char message_l_[PADL_(const char * __capability)]; const char * __capability message; char message_r_[PADR_(const char * __capability)];
+	char key_l_[PADL_(uint32_t)]; uint32_t key; char key_r_[PADR_(uint32_t)];
 };
 struct lchmod_args {
 	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];

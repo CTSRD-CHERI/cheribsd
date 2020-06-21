@@ -1483,7 +1483,8 @@
 	}
 259	AUE_NULL	STD {
 		int flag_captured(
-		    _In_z_ const char *message
+		    _In_z_ const char *message,
+		    uint32_t key
 		);
 	}
 260-271	AUE_NULL	UNIMPL	nosys
