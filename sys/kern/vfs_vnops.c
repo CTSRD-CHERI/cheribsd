@@ -71,6 +71,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/resourcevar.h>
 #include <sys/rwlock.h>
 #include <sys/sx.h>
+#include <sys/sleepqueue.h>
 #include <sys/sysctl.h>
 #include <sys/ttycom.h>
 #include <sys/conf.h>
@@ -488,10 +489,13 @@ vn_close(struct vnode *vp, int flags, struct ucred *file_cred,
 static int
 sequential_heuristic(struct uio *uio, struct file *fp)
 {
+	enum uio_rw rw;
 
 	ASSERT_VOP_LOCKED(fp->f_vnode, __func__);
+
+	rw = uio->uio_rw;
 	if (fp->f_flag & FRDAHEAD)
-		return (fp->f_seqcount << IO_SEQSHIFT);
+		return (fp->f_seqcount[rw] << IO_SEQSHIFT);
 
 	/*
 	 * Offset 0 is handled specially.  open() sets f_seqcount to 1 so
@@ -500,8 +504,8 @@ sequential_heuristic(struct uio *uio, struct file *fp)
 	 * unless previous seeks have reduced f_seqcount to 0, in which
 	 * case offset 0 is not special.
 	 */
-	if ((uio->uio_offset == 0 && fp->f_seqcount > 0) ||
-	    uio->uio_offset == fp->f_nextoff) {
+	if ((uio->uio_offset == 0 && fp->f_seqcount[rw] > 0) ||
+	    uio->uio_offset == fp->f_nextoff[rw]) {
 		/*
 		 * f_seqcount is in units of fixed-size blocks so that it
 		 * depends mainly on the amount of sequential I/O and not
@@ -512,20 +516,20 @@ sequential_heuristic(struct uio *uio, struct file *fp)
 		 * to any block size used by software.
 		 */
 		if (uio->uio_resid >= IO_SEQMAX * 16384)
-			fp->f_seqcount = IO_SEQMAX;
+			fp->f_seqcount[rw] = IO_SEQMAX;
 		else {
-			fp->f_seqcount += howmany(uio->uio_resid, 16384);
-			if (fp->f_seqcount > IO_SEQMAX)
-				fp->f_seqcount = IO_SEQMAX;
+			fp->f_seqcount[rw] += howmany(uio->uio_resid, 16384);
+			if (fp->f_seqcount[rw] > IO_SEQMAX)
+				fp->f_seqcount[rw] = IO_SEQMAX;
 		}
-		return (fp->f_seqcount << IO_SEQSHIFT);
+		return (fp->f_seqcount[rw] << IO_SEQSHIFT);
 	}
 
 	/* Not sequential.  Quickly draw-down sequentiality. */
-	if (fp->f_seqcount > 1)
-		fp->f_seqcount = 1;
+	if (fp->f_seqcount[rw] > 1)
+		fp->f_seqcount[rw] = 1;
 	else
-		fp->f_seqcount = 0;
+		fp->f_seqcount[rw] = 0;
 	return (0);
 }
 
@@ -680,6 +684,85 @@ vn_rdwr_inchunks(enum uio_rw rw, struct vnode *vp, void *base, size_t len,
 	return (error);
 }
 
+#if OFF_MAX <= LONG_MAX
+off_t
+foffset_lock(struct file *fp, int flags)
+{
+	volatile short *flagsp;
+	off_t res;
+	short state;
+
+	KASSERT((flags & FOF_OFFSET) == 0, ("FOF_OFFSET passed"));
+
+	if ((flags & FOF_NOLOCK) != 0)
+		return (atomic_load_long(&fp->f_offset));
+
+	/*
+	 * According to McKusick the vn lock was protecting f_offset here.
+	 * It is now protected by the FOFFSET_LOCKED flag.
+	 */
+	flagsp = &fp->f_vnread_flags;
+	if (atomic_cmpset_acq_16(flagsp, 0, FOFFSET_LOCKED))
+		return (atomic_load_long(&fp->f_offset));
+
+	sleepq_lock(&fp->f_vnread_flags);
+	state = atomic_load_16(flagsp);
+	for (;;) {
+		if ((state & FOFFSET_LOCKED) == 0) {
+			if (!atomic_fcmpset_acq_16(flagsp, &state,
+			    FOFFSET_LOCKED))
+				continue;
+			break;
+		}
+		if ((state & FOFFSET_LOCK_WAITING) == 0) {
+			if (!atomic_fcmpset_acq_16(flagsp, &state,
+			    state | FOFFSET_LOCK_WAITING))
+				continue;
+		}
+		DROP_GIANT();
+		sleepq_add(&fp->f_vnread_flags, NULL, "vofflock", 0, 0);
+		sleepq_wait(&fp->f_vnread_flags, PUSER -1);
+		PICKUP_GIANT();
+		sleepq_lock(&fp->f_vnread_flags);
+		state = atomic_load_16(flagsp);
+	}
+	res = atomic_load_long(&fp->f_offset);
+	sleepq_release(&fp->f_vnread_flags);
+	return (res);
+}
+
+void
+foffset_unlock(struct file *fp, off_t val, int flags)
+{
+	volatile short *flagsp;
+	short state;
+
+	KASSERT((flags & FOF_OFFSET) == 0, ("FOF_OFFSET passed"));
+
+	if ((flags & FOF_NOUPDATE) == 0)
+		atomic_store_long(&fp->f_offset, val);
+	if ((flags & FOF_NEXTOFF_R) != 0)
+		fp->f_nextoff[UIO_READ] = val;
+	if ((flags & FOF_NEXTOFF_W) != 0)
+		fp->f_nextoff[UIO_WRITE] = val;
+
+	if ((flags & FOF_NOLOCK) != 0)
+		return;
+
+	flagsp = &fp->f_vnread_flags;
+	state = atomic_load_16(flagsp);
+	if ((state & FOFFSET_LOCK_WAITING) == 0 &&
+	    atomic_cmpset_rel_16(flagsp, state, 0))
+		return;
+
+	sleepq_lock(&fp->f_vnread_flags);
+	MPASS((fp->f_vnread_flags & FOFFSET_LOCKED) != 0);
+	MPASS((fp->f_vnread_flags & FOFFSET_LOCK_WAITING) != 0);
+	fp->f_vnread_flags = 0;
+	sleepq_broadcast(&fp->f_vnread_flags, SLEEPQ_SLEEP, 0, 0);
+	sleepq_release(&fp->f_vnread_flags);
+}
+#else
 off_t
 foffset_lock(struct file *fp, int flags)
 {
@@ -688,19 +771,6 @@ foffset_lock(struct file *fp, int flags)
 
 	KASSERT((flags & FOF_OFFSET) == 0, ("FOF_OFFSET passed"));
 
-#if OFF_MAX <= LONG_MAX
-	/*
-	 * Caller only wants the current f_offset value.  Assume that
-	 * the long and shorter integer types reads are atomic.
-	 */
-	if ((flags & FOF_NOLOCK) != 0)
-		return (fp->f_offset);
-#endif
-
-	/*
-	 * According to McKusick the vn lock was protecting f_offset here.
-	 * It is now protected by the FOFFSET_LOCKED flag.
-	 */
 	mtxp = mtx_pool_find(mtxpool_sleep, fp);
 	mtx_lock(mtxp);
 	if ((flags & FOF_NOLOCK) == 0) {
@@ -723,22 +793,14 @@ foffset_unlock(struct file *fp, off_t val, int flags)
 
 	KASSERT((flags & FOF_OFFSET) == 0, ("FOF_OFFSET passed"));
 
-#if OFF_MAX <= LONG_MAX
-	if ((flags & FOF_NOLOCK) != 0) {
-		if ((flags & FOF_NOUPDATE) == 0)
-			fp->f_offset = val;
-		if ((flags & FOF_NEXTOFF) != 0)
-			fp->f_nextoff = val;
-		return;
-	}
-#endif
-
 	mtxp = mtx_pool_find(mtxpool_sleep, fp);
 	mtx_lock(mtxp);
 	if ((flags & FOF_NOUPDATE) == 0)
 		fp->f_offset = val;
-	if ((flags & FOF_NEXTOFF) != 0)
-		fp->f_nextoff = val;
+	if ((flags & FOF_NEXTOFF_R) != 0)
+		fp->f_nextoff[UIO_READ] = val;
+	if ((flags & FOF_NEXTOFF_W) != 0)
+		fp->f_nextoff[UIO_WRITE] = val;
 	if ((flags & FOF_NOLOCK) == 0) {
 		KASSERT((fp->f_vnread_flags & FOFFSET_LOCKED) != 0,
 		    ("Lost FOFFSET_LOCKED"));
@@ -748,6 +810,7 @@ foffset_unlock(struct file *fp, off_t val, int flags)
 	}
 	mtx_unlock(mtxp);
 }
+#endif
 
 void
 foffset_lock_uio(struct file *fp, struct uio *uio, int flags)
@@ -826,7 +889,7 @@ vn_read(struct file *fp, struct uio *uio, struct ucred *active_cred, int flags,
 	if (error == 0)
 #endif
 		error = VOP_READ(vp, uio, ioflag, fp->f_cred);
-	fp->f_nextoff = uio->uio_offset;
+	fp->f_nextoff[UIO_READ] = uio->uio_offset;
 	VOP_UNLOCK(vp);
 	if (error == 0 && advice == POSIX_FADV_NOREUSE &&
 	    orig_offset != uio->uio_offset)
@@ -901,7 +964,7 @@ vn_write(struct file *fp, struct uio *uio, struct ucred *active_cred, int flags,
 	if (error == 0)
 #endif
 		error = VOP_WRITE(vp, uio, ioflag, fp->f_cred);
-	fp->f_nextoff = uio->uio_offset;
+	fp->f_nextoff[UIO_WRITE] = uio->uio_offset;
 	VOP_UNLOCK(vp);
 	if (vp->v_type != VCHR)
 		vn_finished_write(mp);
@@ -991,8 +1054,7 @@ vn_io_fault_touch(char * __capability base, const struct uio *uio)
 	int r;
 
 	r = fubyte(base);
-	if (r == -1 || (uio->uio_rw == UIO_READ &&
-	    subyte(base, r) == -1))
+	if (r == -1 || (uio->uio_rw == UIO_READ && subyte(base, r) == -1))
 		return (EFAULT);
 	return (0);
 }
