@@ -531,6 +531,7 @@ struct freebsd64_kbounce_args {
 };
 struct freebsd64_flag_captured_args {
 	char message_l_[PADL_(const char *)]; const char * message; char message_r_[PADR_(const char *)];
+	char key_l_[PADL_(uint32_t)]; uint32_t key; char key_r_[PADR_(uint32_t)];
 };
 struct freebsd64_lchmod_args {
 	char path_l_[PADL_(const char *)]; const char * path; char path_r_[PADR_(const char *)];

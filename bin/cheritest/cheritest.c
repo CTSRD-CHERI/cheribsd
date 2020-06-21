@@ -1110,6 +1110,10 @@ static const struct cheri_test cheri_tests[] = {
 	  .ct_desc = "Call flag_captured(2) with a message",
 	  .ct_func = test_flag_captured, },
 
+	{ .ct_name = "test_flag_captured_incorrect_key",
+	  .ct_desc = "Call flag_captured(2) with an incorrect key",
+	  .ct_func = test_flag_captured_incorrect_key, },
+
 	{ .ct_name = "test_flag_captured_null",
 	  .ct_desc = "Call flag_captured(2) without a message",
 	  .ct_func = test_flag_captured_null, },

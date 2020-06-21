@@ -1280,7 +1280,8 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 259: {
 		struct cheriabi_flag_captured_args *p = params;
 		uarg[0] = (__cheri_addr intptr_t) p->message; /* const char * __capability */
-		*n_args = 1;
+		uarg[1] = p->key; /* uint32_t */
+		*n_args = 2;
 		break;
 	}
 	/* cheriabi_lchmod */
@@ -5353,6 +5354,9 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		switch(ndx) {
 		case 0:
 			p = "userland const char * __capability";
+			break;
+		case 1:
+			p = "uint32_t";
 			break;
 		default:
 			break;

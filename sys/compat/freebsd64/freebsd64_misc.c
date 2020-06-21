@@ -956,7 +956,8 @@ int
 freebsd64_flag_captured(struct thread *td,
     struct freebsd64_flag_captured_args *uap)
 {
-	return (kern_flag_captured(td, __USER_CAP_STR(uap->message), __func__));
+	return (kern_flag_captured(td, __USER_CAP_STR(uap->message), uap->key,
+	    __func__));
 }
 
 /*
