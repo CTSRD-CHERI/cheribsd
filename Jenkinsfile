@@ -1,17 +1,14 @@
 @Library('ctsrd-jenkins-scripts') _
 
-properties([disableConcurrentBuilds(),
-            disableResume(),
-            [$class: 'GithubProjectProperty', displayName: '', projectUrlStr: 'https://github.com/CTSRD-CHERI/cheribsd/'],
-            [$class: 'CopyArtifactPermissionProperty', projectNames: '*'],
-            [$class: 'JobPropertyImpl', throttle: [count: 1, durationName: 'hour', userBoost: true]],
-            durabilityHint('PERFORMANCE_OPTIMIZED'),
-            pipelineTriggers([githubPush()])
+// Set the default job properties (work around properties() not being additive but replacing)
+setDefaultJobProperties([rateLimitBuilds([count: 1, durationName: 'hour', userBoost: true]),
+                         [$class: 'GithubProjectProperty', displayName: '', projectUrlStr: 'https://github.com/CTSRD-CHERI/cheribsd/'],
+                         copyArtifactPermission('*'), // Downstream jobs need the kernels/disk images
 ])
 
 if (env.CHANGE_ID && !shouldBuildPullRequest()) {
-	echo "Not building this pull request."
-	return
+    echo "Not building this pull request."
+    return
 }
 
 jobs = [:]
@@ -71,8 +68,7 @@ find cheribsd-test-results
                 customGitCheckoutDir: 'cheribsd',
                 gitHubStatusContext: "ci/${suffix}",
                 /* Custom function to run tests since --test will not work (yet) */
-                runTests: false, afterBuild: { params -> buildImageAndRunTests(params, suffix) }
-        )
+                runTests: false, afterBuild: { params -> buildImageAndRunTests(params, suffix) })
     }
 }
 
