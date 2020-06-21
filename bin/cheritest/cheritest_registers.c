@@ -483,7 +483,7 @@ test_initregs_returncap(const struct cheri_test *ctp __unused)
 	
 	/* The return capability should always be a sentry capability */
 	c = __builtin_return_address(0);
-	v = cheri_getperm(retcap);
+	v = cheri_getperm(c);
 
 	CHERITEST_VERIFY(cheri_gettag(c));
 	/* Check that execute is present and store permissions aren't */
@@ -496,7 +496,7 @@ test_initregs_returncap(const struct cheri_test *ctp __unused)
 	CHERITEST_VERIFY2((v & CHERI_PERM_STORE_LOCAL_CAP) == 0,
 	    "perms %jx (store_local_cap present)", v);
 
-	v = cheri_gettype(retcap);
+	v = cheri_gettype(c);
 	CHERITEST_VERIFY2(v == (uintmax_t)CHERI_OTYPE_SENTRY,
 	    "otype %jx (expected %jx)", v, (uintmax_t)CHERI_OTYPE_SENTRY);
 
