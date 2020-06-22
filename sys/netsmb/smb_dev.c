@@ -331,6 +331,7 @@ static void
 smbioc_ossn32_to_ossn(struct smbioc_ossn *ossn, const void *data)
 {
 	const struct smbioc_ossn32 *ossn32;
+	size_t copysize;
 
 	ossn32 = data;
 	ossn->ioc_opt = ossn32->ioc_opt;
@@ -340,8 +341,12 @@ smbioc_ossn32_to_ossn(struct smbioc_ossn *ossn, const void *data)
 	ossn->ioc_lolen = ossn32->ioc_lolen;
 	ossn->ioc_local = __USER_CAP((void *)(uintptr_t)ossn32->ioc_local,
 	    ossn32->ioc_lolen);
-	memcpy(&ossn->ioc_srvname, &ossn32->ioc_srvname,
-	    sizeof(*ossn) - offsetof(struct smbioc_ossn, ioc_srvname));
+	/* Do not include padding */
+	copysize = min(
+	    sizeof(*ossn) - offsetof(struct smbioc_ossn, ioc_srvname),
+	    sizeof(*ossn32) - offsetof(struct smbioc_ossn32, ioc_srvname));
+	memcpy(__unbounded_addressof(ossn->ioc_srvname),
+	    __unbounded_addressof(ossn32->ioc_srvname), copysize);
 }
 
 static void
@@ -463,6 +468,7 @@ static void
 smbioc_ossn64_to_ossn(struct smbioc_ossn *ossn, const void *data)
 {
 	const struct smbioc_ossn64 *ossn64;
+	size_t copysize;
 
 	ossn64 = data;
 	ossn->ioc_opt = ossn64->ioc_opt;
@@ -472,8 +478,12 @@ smbioc_ossn64_to_ossn(struct smbioc_ossn *ossn, const void *data)
 	ossn->ioc_lolen = ossn64->ioc_lolen;
 	ossn->ioc_local = __USER_CAP((void *)(uintptr_t)ossn64->ioc_local,
 	    ossn64->ioc_lolen);
-	memcpy(&ossn->ioc_srvname, &ossn64->ioc_srvname,
-	    sizeof(*ossn) - offsetof(struct smbioc_ossn, ioc_srvname));
+	/* Do not include padding */
+	copysize = min(
+	    sizeof(*ossn) - offsetof(struct smbioc_ossn, ioc_srvname),
+	    sizeof(*ossn64) - offsetof(struct smbioc_ossn64, ioc_srvname));
+	memcpy(__unbounded_addressof(ossn->ioc_srvname),
+	    __unbounded_addressof(ossn64->ioc_srvname), copysize);
 }
 
 static void
