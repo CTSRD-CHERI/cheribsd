@@ -294,9 +294,9 @@ static void		mmu_booke_copy_pages(vm_page_t *,
 static int		mmu_booke_enter(pmap_t, vm_offset_t, vm_page_t,
     vm_prot_t, u_int flags, int8_t psind);
 static void		mmu_booke_enter_object(pmap_t, vm_offset_t, vm_offset_t,
-    vm_page_t, vm_prot_t);
+    vm_page_t, vm_prot_t, u_int);
 static void		mmu_booke_enter_quick(pmap_t, vm_offset_t, vm_page_t,
-    vm_prot_t);
+    vm_prot_t, u_int);
 static vm_paddr_t	mmu_booke_extract(pmap_t, vm_offset_t);
 static vm_page_t	mmu_booke_extract_and_hold(pmap_t, vm_offset_t,
     vm_prot_t);
@@ -1447,7 +1447,7 @@ mmu_booke_enter_locked(pmap_t pmap, vm_offset_t va, vm_page_t m,
  */
 static void
 mmu_booke_enter_object(pmap_t pmap, vm_offset_t start,
-    vm_offset_t end, vm_page_t m_start, vm_prot_t prot)
+    vm_offset_t end, vm_page_t m_start, vm_prot_t prot, u_int flags)
 {
 	vm_page_t m;
 	vm_pindex_t diff, psize;
@@ -1470,7 +1470,7 @@ mmu_booke_enter_object(pmap_t pmap, vm_offset_t start,
 
 static void
 mmu_booke_enter_quick(pmap_t pmap, vm_offset_t va, vm_page_t m,
-    vm_prot_t prot)
+    vm_prot_t prot, u_int flags)
 {
 
 	rw_wlock(&pvh_global_lock);
