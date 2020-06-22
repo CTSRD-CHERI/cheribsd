@@ -260,8 +260,8 @@ void moea64_copy_pages(vm_page_t *ma, vm_offset_t a_offset,
 int moea64_enter(pmap_t, vm_offset_t, vm_page_t, vm_prot_t,
     u_int flags, int8_t psind);
 void moea64_enter_object(pmap_t, vm_offset_t, vm_offset_t, vm_page_t,
-    vm_prot_t);
-void moea64_enter_quick(pmap_t, vm_offset_t, vm_page_t, vm_prot_t);
+    vm_prot_t, u_int);
+void moea64_enter_quick(pmap_t, vm_offset_t, vm_page_t, vm_prot_t, u_int);
 vm_paddr_t moea64_extract(pmap_t, vm_offset_t);
 vm_page_t moea64_extract_and_hold(pmap_t, vm_offset_t, vm_prot_t);
 void moea64_init(void);
@@ -1578,7 +1578,7 @@ moea64_syncicache(pmap_t pmap, vm_offset_t va, vm_paddr_t pa,
  */
 void
 moea64_enter_object(pmap_t pm, vm_offset_t start, vm_offset_t end,
-    vm_page_t m_start, vm_prot_t prot)
+    vm_page_t m_start, vm_prot_t prot, u_int flags)
 {
 	vm_page_t m;
 	vm_pindex_t diff, psize;
@@ -1597,7 +1597,7 @@ moea64_enter_object(pmap_t pm, vm_offset_t start, vm_offset_t end,
 
 void
 moea64_enter_quick(pmap_t pm, vm_offset_t va, vm_page_t m,
-    vm_prot_t prot)
+    vm_prot_t prot, u_int flags)
 {
 
 	moea64_enter(pm, va, m, prot & (VM_PROT_READ | VM_PROT_EXECUTE),

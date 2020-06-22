@@ -415,8 +415,8 @@ void mmu_radix_copy(pmap_t, pmap_t, vm_offset_t, vm_size_t, vm_offset_t);
 int mmu_radix_decode_kernel_ptr(vm_offset_t, int *, vm_offset_t *);
 int mmu_radix_enter(pmap_t, vm_offset_t, vm_page_t, vm_prot_t, u_int, int8_t);
 void mmu_radix_enter_object(pmap_t, vm_offset_t, vm_offset_t, vm_page_t,
-	vm_prot_t);
-void mmu_radix_enter_quick(pmap_t, vm_offset_t, vm_page_t, vm_prot_t);
+	vm_prot_t, u_int);
+void mmu_radix_enter_quick(pmap_t, vm_offset_t, vm_page_t, vm_prot_t, u_int);
 vm_paddr_t mmu_radix_extract(pmap_t pmap, vm_offset_t va);
 vm_page_t mmu_radix_extract_and_hold(pmap_t, vm_offset_t, vm_prot_t);
 void mmu_radix_kenter(vm_offset_t, vm_paddr_t);
@@ -3217,7 +3217,7 @@ pmap_enter_l3e(pmap_t pmap, vm_offset_t va, pml3_entry_t newpde, u_int flags,
 
 void
 mmu_radix_enter_object(pmap_t pmap, vm_offset_t start,
-    vm_offset_t end, vm_page_t m_start, vm_prot_t prot)
+    vm_offset_t end, vm_page_t m_start, vm_prot_t prot, u_int flags)
 {
 
 	struct rwlock *lock;
@@ -3364,7 +3364,7 @@ mmu_radix_enter_quick_locked(pmap_t pmap, vm_offset_t va, vm_page_t m,
 
 void
 mmu_radix_enter_quick(pmap_t pmap, vm_offset_t va, vm_page_t m,
-    vm_prot_t prot)
+    vm_prot_t prot, u_int flags)
 {
 	struct rwlock *lock;
 	bool invalidate;

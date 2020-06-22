@@ -6467,7 +6467,7 @@ pmap_enter_pde(pmap_t pmap, vm_offset_t va, pd_entry_t newpde, u_int flags,
  */
 void
 pmap_enter_object(pmap_t pmap, vm_offset_t start, vm_offset_t end,
-    vm_page_t m_start, vm_prot_t prot)
+    vm_page_t m_start, vm_prot_t prot, u_int flags)
 {
 	struct rwlock *lock;
 	vm_offset_t va;
@@ -6508,7 +6508,8 @@ pmap_enter_object(pmap_t pmap, vm_offset_t start, vm_offset_t end,
  */
 
 void
-pmap_enter_quick(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot)
+pmap_enter_quick(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot,
+    u_int flags)
 {
 	struct rwlock *lock;
 
