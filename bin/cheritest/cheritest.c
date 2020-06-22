@@ -283,6 +283,25 @@ static const struct cheri_test cheri_tests[] = {
 #endif
 
 	/*
+	 * Tests on function pointers as sentries.
+	 */
+#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef CHERI_DYNAMIC_TESTS
+	{ .ct_name = "test_sentry_dlsym",
+	  .ct_desc = "Check that a function pointer obtaine dfrom via dlsym is a sentry",
+	  .ct_func = test_sentry_dlsym, },
+#endif
+
+	{ .ct_name = "test_sentry_libc",
+	  .ct_desc = "Check that a function pointer from libc is a sentry",
+	  .ct_func = test_sentry_libc, },
+
+	{ .ct_name = "test_sentry_static",
+	  .ct_desc = "Check that a statically initialized function pointer is a sentry",
+	  .ct_func = test_sentry_static, },
+#endif
+
+	/*
 	 * Test bounds on globals in the same file they are allocated in.
 	 */
 	{ .ct_name = "test_bounds_global_static_uint8",
