@@ -520,6 +520,15 @@ DECLARE_CHERI_TEST(test_initregs_pcc);
 DECLARE_CHERI_TEST(test_copyregs);
 DECLARE_CHERI_TEST(test_listregs);
 
+/* cheritest_sentries.c */
+#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef CHERI_DYNAMIC_TESTS
+DECLARE_CHERI_TEST(test_sentry_dlsym);
+#endif
+DECLARE_CHERI_TEST(test_sentry_libc);
+DECLARE_CHERI_TEST(test_sentry_static);
+#endif
+
 /* cheritest_tls.c */
 DECLARE_CHERI_TEST(test_tls_align_4k);
 DECLARE_CHERI_TEST(test_tls_align_cap);

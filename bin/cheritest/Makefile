@@ -14,6 +14,7 @@ NEED_COMPAT=	64
 .if !${MACHINE_ABI:Mpurecap}
 NEED_COMPAT=	CHERI
 .include <bsd.compat.mk>
+LIBM_SO=	/usr/libcheri/libm.so.5
 .endif
 .else
 .error Unknown cheritest variant ${PROG}
@@ -37,6 +38,9 @@ SRCS+=	cheritest_bounds_globals.c					\
 	cheritest_vm.c							\
 	cheritest_vm_swap.c						\
 	cheritest_zlib.c
+.if ${MACHINE_ABI:Mpurecap}
+SRCS+=	cheritest_sentries.c
+.endif
 # This test is broken
 CFLAGS.cheritest_vm_swap.c+=-Wno-cheri-capability-misuse
 
@@ -96,6 +100,8 @@ SRCS+=	cheritest_sandbox.S
 
 .ifdef CHERI_DYNAMIC_TESTS
 CFLAGS+=	-DCHERI_DYNAMIC_TESTS
+LIBM_SO?=	/lib/libm.so.5
+CFLAGS+=	'-DLIBM_SO="${LIBM_SO}"'
 .else
 NO_SHARED?=	YES
 # XXX-JC: Enable unconditionally once we have a dynamic libcheri
