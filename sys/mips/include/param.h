@@ -75,15 +75,26 @@
 # define _HF_SUFFIX ""
 #endif
 
+#if defined(__CHERI_PURE_CAPABILITY__) || (defined(_KERNEL) && __has_feature(capabilities))
+# define _PURECAP_SUFFIX "c128"
+#else
+# define _PURECAP_SUFFIX ""
+#endif
+
 #ifndef MACHINE
 # define MACHINE	"mips"
 #endif
 #ifndef MACHINE_ARCH
-# define MACHINE_ARCH 	"mips" _N64_SUFFIX _EL_SUFFIX _HF_SUFFIX
+# define MACHINE_ARCH 	"mips" _N64_SUFFIX _EL_SUFFIX _HF_SUFFIX _PURECAP_SUFFIX
 #endif
 #ifdef __mips_n64
 # ifndef MACHINE_ARCH32
 #  define MACHINE_ARCH32 "mips" _EL_SUFFIX _HF_SUFFIX
+# endif
+#endif
+#if __has_feature(capabilities)
+# ifndef MACHINE_ARCH64
+#  define MACHINE_ARCH64 "mips64" _EL_SUFFIX _HF_SUFFIX
 # endif
 #endif
 

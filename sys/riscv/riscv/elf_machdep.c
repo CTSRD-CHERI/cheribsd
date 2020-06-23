@@ -114,7 +114,7 @@ riscv_machine_arch(struct proc *p)
 
 	if ((p->p_elf_flags & EF_RISCV_FLOAT_ABI_MASK) ==
 	    EF_RISCV_FLOAT_ABI_SOFT)
-		return (MACHINE_ARCH "sf");
+		return (MACHINE_ARCHSF);
 	return (MACHINE_ARCH);
 }
 
