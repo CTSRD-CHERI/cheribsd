@@ -263,7 +263,7 @@ cheritest_vm_shm_open_anon_unix_surprise(const struct cheri_test *ctp __unused)
 	}
 }
 
-#ifdef CHERIABI_TESTS
+#ifdef __CHERI_PURE_CAPABILITY__
 
 /*
  * We can fork processes with shared file descriptor tables, including
