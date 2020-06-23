@@ -2707,7 +2707,12 @@ pmap_copy_page_internal(vm_page_t src, vm_page_t dst, int flags)
 	} else {
 		va_src = pmap_lmem_map2(phys_src, phys_dst);
 		va_dst = va_src + PAGE_SIZE;
-		bcopy((void *)va_src, (void *)va_dst, PAGE_SIZE);
+#if __has_feature(capabilities)
+		if ((flags & PMAP_COPY_TAGS) == 0)
+		    bcopynocap((void *)va_src, (void *)va_dst, PAGE_SIZE);
+		else
+#endif
+		    bcopy((void *)va_src, (void *)va_dst, PAGE_SIZE);
 		mips_dcache_wbinv_range(va_dst, PAGE_SIZE);
 		pmap_lmem_unmap();
 	}
