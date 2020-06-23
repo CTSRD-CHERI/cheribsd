@@ -73,7 +73,7 @@ struct rib_subscription {
 	rib_subscription_cb_t			*func;
 	void					*arg;
 	enum rib_subscription_type		type;
-	struct epoch_context			epoch_ctx;
+	struct epoch_context			epoch_ctx __subobject_use_container_bounds;
 };
 
 static void rib_notify(struct rib_head *rnh, enum rib_subscription_type type,

@@ -177,7 +177,8 @@ struct rtentry {
 #define	rt_endzero	rt_mtx
 	struct mtx	rt_mtx;		/* mutex for routing entry */
 	struct rtentry	*rt_chain;	/* pointer to next rtentry to delete */
-	struct epoch_context	rt_epoch_ctx;	/* net epoch tracker */
+	/* net epoch tracker */
+	struct epoch_context	rt_epoch_ctx __subobject_use_container_bounds;
 };
 
 #define	RT_LOCK_INIT(_rt) \
