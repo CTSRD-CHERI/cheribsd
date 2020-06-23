@@ -279,6 +279,10 @@ proc_machine_arch(struct proc *p)
 	if (SV_PROC_FLAG(p, SV_ILP32))
 		return (MACHINE_ARCH32);
 #endif
+#ifdef COMPAT_FREEBSD64
+	if (!SV_PROC_FLAG(p, SV_CHERI))
+		return (MACHINE_ARCH64);
+#endif
 	return (MACHINE_ARCH);
 }
 
@@ -298,8 +302,10 @@ SYSCTL_PROC(_hw, HW_MACHINE_ARCH, machine_arch, CTLTYPE_STRING | CTLFLAG_RD |
     "System architecture");
 
 #ifndef MACHINE_ARCHES
-#ifdef COMPAT_FREEBSD32
+#if defined(COMPAT_FREEBSD32)
 #define	MACHINE_ARCHES	MACHINE_ARCH " " MACHINE_ARCH32
+#elif defined(COMPAT_FREEBSD64)
+#define	MACHINE_ARCHES	MACHINE_ARCH " " MACHINE_ARCH64
 #else
 #define	MACHINE_ARCHES	MACHINE_ARCH
 #endif
