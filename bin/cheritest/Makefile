@@ -5,6 +5,20 @@
 PROG?=	cheritest
 SRCS=	cheritest.c
 
+.if ${PROG:Mcheritest*}
+.if ${MACHINE_ABI:Mpurecap}
+NEED_COMPAT=	64
+.include <bsd.compat.mk>
+.endif
+.elif ${PROG:Mcheriabitest*}
+.if !${MACHINE_ABI:Mpurecap}
+NEED_COMPAT=	CHERI
+.include <bsd.compat.mk>
+.endif
+.else
+.error Unknown cheritest variant ${PROG}
+.endif
+
 SRCS+=	cheritest_bounds_globals.c					\
 	cheritest_bounds_globals_x.c					\
 	cheritest_bounds_heap.c						\
@@ -73,20 +87,6 @@ CFLAGS+=	-DCHERITHREAD_TESTS
 .endif
 
 MAN=
-
-.if ${PROG:Mcheritest*}
-.if ${MACHINE_ABI:Mpurecap}
-NEED_COMPAT=	64
-.include <bsd.compat.mk>
-.endif
-.elif ${PROG:Mcheriabitest*}
-.if !${MACHINE_ABI:Mpurecap}
-NEED_COMPAT=	CHERI
-.include <bsd.compat.mk>
-.endif
-.else
-.error Unknown cheritest variant ${PROG}
-.endif
 
 LIBADD= 	z
 LIBADD+=	xo util
