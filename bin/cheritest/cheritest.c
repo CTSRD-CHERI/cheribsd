@@ -957,7 +957,7 @@ static const struct cheri_test cheri_tests[] = {
 	  .ct_xfail_reason =
 	    "Tags currently survive cross-AS aliasing of SHM_ANON objects", },
 
-#ifdef CHERIABI_TESTS
+#ifdef __CHERI_PURE_CAPABILITY__
 	{ .ct_name = "cheritest_vm_cap_share_fd_kqueue",
 	  .ct_desc = "Demonstrate capability passing via shared FD table",
 	  .ct_func = cheritest_vm_cap_share_fd_kqueue,
@@ -1667,7 +1667,7 @@ static const struct cheri_test cheri_tests[] = {
 	/*
 	 * CheriABI specific tests.
 	 */
-#ifdef CHERIABI_TESTS
+#ifdef __CHERI_PURE_CAPABILITY__
 #ifdef CHERI_MMAP_SETBOUNDS
 	{ .ct_name = "test_cheriabi_mmap_nospace",
 	  .ct_desc = "Test CheriABI mmap() with no space in default capability",

@@ -42,10 +42,9 @@ CFLAGS.cheritest_vm_swap.c+=-Wno-cheri-capability-misuse
 
 CHERITEST_DIR:=	${.PARSEDIR}
 
-.ifdef CHERIABI_TESTS
+.if ${MACHINE_ABI:Mpurecap}
 SRCS+=	cheritest_cheriabi.c
 SRCS+=	cheritest_cheriabi_open.c
-CFLAGS+=	-DCHERIABI_TESTS
 .endif
 
 .if ${MACHINE} == mips
