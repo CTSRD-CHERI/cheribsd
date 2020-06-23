@@ -28,7 +28,7 @@ MDSRCS+=	${CHERI_MDSRCS}
 
 .if ! ${MACHINE_ABI:Mpurecap}
 .for src in ${CHERI_MDSRCS} ${CHERI_MISRCS}
-CC.${src}=	${CC} -target cheri-unknown-freebsd -cheri=128
+CC.${src}=	${CC} -target mips64-unknown-freebsd -cheri
 .endfor
 .endif
 

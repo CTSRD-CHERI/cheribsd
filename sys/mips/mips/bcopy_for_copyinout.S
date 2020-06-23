@@ -65,6 +65,9 @@ __FBSDID("$FreeBSD$");
 #define	SIZEREG	a2
 
 LEAF(bcopy_asm_for_copyinout)
+	.set	push
+	.set	noat
+	.set	noreorder
 	/*
 	 *	Make sure we can copy forwards.
 	 */
@@ -272,6 +275,5 @@ LEAF(bcopy_asm_for_copyinout)
 	b		3b
 	nop
 
-	.set	reorder
-	.set	at
+	.set	pop
 END(bcopy_asm_for_copyinout)

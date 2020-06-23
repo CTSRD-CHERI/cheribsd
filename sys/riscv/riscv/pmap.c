@@ -521,7 +521,7 @@ pmap_bootstrap_dmap(vm_offset_t kern_l1, vm_paddr_t min_pa, vm_paddr_t max_pa)
 
 		/* superpages */
 		pn = (pa / PAGE_SIZE);
-		entry = PTE_KERN;
+		entry = PTE_KERN_CAP;
 		entry |= (pn << PTE_PPN0_S);
 		pmap_store(&l1[l1_slot], entry);
 	}
@@ -582,8 +582,6 @@ pmap_bootstrap(vm_offset_t l1pt, vm_paddr_t kernstart, vm_size_t kernlen)
 	int i;
 
 	printf("pmap_bootstrap %lx %lx %lx\n", l1pt, kernstart, kernlen);
-	printf("%lx\n", l1pt);
-	printf("%lx\n", (KERNBASE >> L1_SHIFT) & Ln_ADDR_MASK);
 
 	/* Set this early so we can use the pagetable walking functions */
 	kernel_pmap_store.pm_l1 = (pd_entry_t *)l1pt;
@@ -1033,7 +1031,7 @@ pmap_qenter(vm_offset_t sva, vm_page_t *ma, int count)
 		pn = (pa / PAGE_SIZE);
 		l3 = pmap_l3(kernel_pmap, va);
 
-		entry = PTE_KERN;
+		entry = PTE_KERN_CAP;
 		entry |= (pn << PTE_PPN0_S);
 		pmap_store(l3, entry);
 
@@ -2660,6 +2658,12 @@ pmap_enter(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot,
 		new_l3 |= PTE_W;
 	if (va < VM_MAX_USER_ADDRESS)
 		new_l3 |= PTE_U;
+#if __has_feature(capabilities)
+	if ((flags & PMAP_ENTER_NOLOADTAGS) == 0)
+		new_l3 |= PTE_LC;
+	if ((flags & PMAP_ENTER_NOSTORETAGS) == 0)
+		new_l3 |= PTE_SC;
+#endif
 
 	new_l3 |= (pn << PTE_PPN0_S);
 	if ((flags & PMAP_ENTER_WIRED) != 0)

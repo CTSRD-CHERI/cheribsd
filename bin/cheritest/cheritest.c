@@ -46,8 +46,10 @@
 #include <cheri/cheri.h>
 #include <cheri/cheric.h>
 
-#include <machine/cpuregs.h>
 #include <machine/frame.h>
+#ifdef __riscv
+#include <machine/riscvreg.h>
+#endif
 #include <machine/trap.h>
 
 #ifdef CHERI_LIBCHERI_TESTS
@@ -82,26 +84,13 @@
 #include "cheritest.h"
 #include "cheritest.h"
 
-#ifndef SIGPROT
-#define	SIGPROT				0
-#define	PROT_CHERI_BOUNDS		0
-#define	PROT_CHERI_TAG			0
-#define	PROT_CHERI_SEALED		0
-#define	PROT_CHERI_TYPE			0
-#define	PROT_CHERI_PERM			0
-#define	PROT_CHERI_STORETAG		0
-#define	PROT_CHERI_IMPRECISE		0
-#define	PROT_CHERI_STORELOCAL		0
-#define	PROT_CHERI_CCALL		0
-#define	PROT_CHERI_CRETURN		0
-#define	PROT_CHERI_SYSREG		0
-#define	PROT_CHERI_UNSEALED		0
-#define	PROT_CHERI_OVERFLOW		0
-#define	PROT_CHERI_UNDERFLOW		0
-#define	PROT_CHERI_CCALLREGS		0
-#define	PROT_CHERI_LOCALARG		0
-#define	PROT_CHERI_LOCALRET		0
-#endif /* SIGPROT */
+#ifdef __mips__
+#define	TRAPNO_CHERI	(T_C2E)
+#elif defined(__riscv)
+#define	TRAPNO_CHERI	(EXCP_CHERI)
+#else
+#error "Unsupported architecture"
+#endif
 
 static const struct cheri_test cheri_tests[] = {
 	/*
@@ -119,15 +108,21 @@ static const struct cheri_test cheri_tests[] = {
 	  .ct_func = test_initregs_stack_user_perms,
 	  .ct_xfail_reason = "CHERI_PERM_CHERIABI_VMMAP "
 	    "unnecessarily set in stack capability" },
+	{ .ct_name = "test_initregs_returncap",
+	  .ct_desc = "Test value of return capability",
+	  .ct_func = test_initregs_returncap },
 #endif
+#ifdef __mips__
 	{ .ct_name = "test_initregs_idc",
 	  .ct_desc = "Test initial value of invoked data capability",
 	  .ct_func = test_initregs_idc },
+#endif
 
 	{ .ct_name = "test_initregs_pcc",
 	  .ct_desc = "Test initial value of program-counter capability",
 	  .ct_func = test_initregs_pcc },
 
+#ifdef __mips__
 	{ .ct_name = "test_copyregs",
 	  .ct_desc = "Exercise CP2 register assignments",
 	  .ct_func = test_copyregs },
@@ -136,20 +131,21 @@ static const struct cheri_test cheri_tests[] = {
 	  .ct_desc = "Print out a list of CP2 registers and values",
 	  .ct_func = test_listregs,
 	  .ct_flags = CT_FLAG_STDOUT_IGNORE },
+#endif
 
 	/*
 	 * Capability manipulation and use tests that sometimes generate
 	 * signals.
 	 */
+#ifdef __mips__
 	{ .ct_name = "test_fault_cgetcause",
 	  .ct_desc = "Ensure CGetCause is unavailable in userspace",
 	  .ct_func = test_fault_cgetcause,
-	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE |
-		    CT_FLAG_MIPS_EXCCODE | CT_FLAG_CP2_EXCCODE,
+	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
 	  .ct_signum = SIGPROT,
 	  .ct_si_code = PROT_CHERI_SYSREG,
-	  .ct_mips_exccode = T_C2E,
-	  .ct_cp2_exccode = CHERI_EXCCODE_SYSTEM_REGS },
+	  .ct_si_trapno = TRAPNO_CHERI },
+#endif
 
 	{ .ct_name = "test_nofault_cfromptr",
 	  .ct_desc = "Exercise CFromPtr success",
@@ -158,80 +154,71 @@ static const struct cheri_test cheri_tests[] = {
 	{ .ct_name = "test_fault_bounds",
 	  .ct_desc = "Exercise capability bounds check failure",
 	  .ct_func = test_fault_bounds,
-	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE |
-		    CT_FLAG_MIPS_EXCCODE | CT_FLAG_CP2_EXCCODE,
+	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
 	  .ct_signum = SIGPROT,
 	  .ct_si_code = PROT_CHERI_BOUNDS,
-	  .ct_mips_exccode = T_C2E,
-	  .ct_cp2_exccode = CHERI_EXCCODE_LENGTH },
+	  .ct_si_trapno = TRAPNO_CHERI },
 
 	{ .ct_name = "test_fault_perm_load",
 	  .ct_desc = "Exercise capability load permission failure",
 	  .ct_func = test_fault_perm_load,
-	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE |
-		    CT_FLAG_MIPS_EXCCODE | CT_FLAG_CP2_EXCCODE,
+	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
 	  .ct_signum = SIGPROT,
 	  .ct_si_code = PROT_CHERI_PERM,
-	  .ct_mips_exccode = T_C2E,
-	  .ct_cp2_exccode = CHERI_EXCCODE_PERM_LOAD },
+	  .ct_si_trapno = TRAPNO_CHERI },
 
 	{ .ct_name = "test_nofault_perm_load",
 	  .ct_desc = "Exercise capability load permission success",
 	  .ct_func = test_nofault_perm_load },
 
+#ifdef CHERI_GET_SEALCAP
 	{ .ct_name = "test_fault_perm_seal",
 	  .ct_desc = "Exercise capability seal permission failure",
 	  .ct_func = test_fault_perm_seal,
-	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE |
-		    CT_FLAG_MIPS_EXCCODE | CT_FLAG_CP2_EXCCODE,
+	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
 	  .ct_signum = SIGPROT,
 	  .ct_si_code = PROT_CHERI_PERM,
-	  .ct_mips_exccode = T_C2E,
-	  .ct_cp2_exccode = CHERI_EXCCODE_PERM_SEAL },
+	  .ct_si_trapno = TRAPNO_CHERI },
+#endif
 
 	{ .ct_name = "test_fault_perm_store",
 	  .ct_desc = "Exercise capability store permission failure",
 	  .ct_func = test_fault_perm_store,
-	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE |
-		    CT_FLAG_MIPS_EXCCODE | CT_FLAG_CP2_EXCCODE,
+	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
 	  .ct_signum = SIGPROT,
 	  .ct_si_code = PROT_CHERI_PERM,
-	  .ct_mips_exccode = T_C2E,
-	  .ct_cp2_exccode = CHERI_EXCCODE_PERM_STORE },
+	  .ct_si_trapno = TRAPNO_CHERI },
 
 	{ .ct_name = "test_nofault_perm_store",
 	  .ct_desc = "Exercise capability store permission success",
 	  .ct_func = test_nofault_perm_store },
 
+#ifdef CHERI_GET_SEALCAP
 	{ .ct_name = "test_fault_perm_unseal",
 	  .ct_desc = "Exercise capability unseal permission failure",
 	  .ct_func = test_fault_perm_unseal,
-	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE |
-		    CT_FLAG_MIPS_EXCCODE | CT_FLAG_CP2_EXCCODE,
+	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
 	  .ct_signum = SIGPROT,
 	  .ct_si_code = PROT_CHERI_PERM,
-	  .ct_mips_exccode = T_C2E,
-	  .ct_cp2_exccode = CHERI_EXCCODE_PERM_UNSEAL },
+	  .ct_si_trapno = TRAPNO_CHERI },
+#endif
 
 	{ .ct_name = "test_fault_tag",
 	  .ct_desc = "Store via untagged capability",
 	  .ct_func = test_fault_tag,
-	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE |
-		    CT_FLAG_MIPS_EXCCODE | CT_FLAG_CP2_EXCCODE,
+	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
 	  .ct_signum = SIGPROT,
 	  .ct_si_code = PROT_CHERI_TAG,
-	  .ct_mips_exccode = T_C2E,
-	  .ct_cp2_exccode = CHERI_EXCCODE_TAG },
+	  .ct_si_trapno = TRAPNO_CHERI },
 
+#ifdef __mips__
 	{ .ct_name = "test_fault_ccheck_user_fail",
 	  .ct_desc = "Exercise CCheckPerm failure",
 	  .ct_func = test_fault_ccheck_user_fail,
-	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE |
-		    CT_FLAG_MIPS_EXCCODE | CT_FLAG_CP2_EXCCODE,
+	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
 	  .ct_signum = SIGPROT,
 	  .ct_si_code = PROT_CHERI_PERM,
-	  .ct_mips_exccode = T_C2E,
-	  .ct_cp2_exccode = CHERI_EXCCODE_PERM_USER },
+	  .ct_si_trapno = TRAPNO_CHERI },
 
 	{ .ct_name = "test_nofault_ccheck_user_pass",
 	  .ct_desc = "Exercise CCheckPerm success",
@@ -240,56 +227,48 @@ static const struct cheri_test cheri_tests[] = {
 	{ .ct_name = "test_fault_read_kr1c",
 	  .ct_desc = "Ensure KR1C is unavailable in userspace",
 	  .ct_func = test_fault_read_kr1c,
-	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE |
-		    CT_FLAG_MIPS_EXCCODE | CT_FLAG_CP2_EXCCODE,
+	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
 	  .ct_signum = SIGPROT,
 	  .ct_si_code = PROT_CHERI_SYSREG,
-	  .ct_mips_exccode = T_C2E,
-	  .ct_cp2_exccode = CHERI_EXCCODE_SYSTEM_REGS },
+	  .ct_si_trapno = TRAPNO_CHERI },
 
 	{ .ct_name = "test_fault_read_kr2c",
 	  .ct_desc = "Ensure KR2C is unavailable in userspace",
 	  .ct_func = test_fault_read_kr2c,
-	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE |
-		    CT_FLAG_MIPS_EXCCODE | CT_FLAG_CP2_EXCCODE,
+	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
 	  .ct_signum = SIGPROT,
 	  .ct_si_code = PROT_CHERI_SYSREG,
-	  .ct_mips_exccode = T_C2E,
-	  .ct_cp2_exccode = CHERI_EXCCODE_SYSTEM_REGS },
+	  .ct_si_trapno = TRAPNO_CHERI },
 
 	{ .ct_name = "test_fault_read_kcc",
 	  .ct_desc = "Ensure KCC is unavailable in userspace",
 	  .ct_func = test_fault_read_kcc,
-	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE |
-		    CT_FLAG_MIPS_EXCCODE | CT_FLAG_CP2_EXCCODE,
+	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
 	  .ct_signum = SIGPROT,
 	  .ct_si_code = PROT_CHERI_SYSREG,
-	  .ct_mips_exccode = T_C2E,
-	  .ct_cp2_exccode = CHERI_EXCCODE_SYSTEM_REGS },
+	  .ct_si_trapno = TRAPNO_CHERI },
 
 	{ .ct_name = "test_fault_read_kdc",
 	  .ct_desc = "Ensure KDC is unavailable in userspace",
 	  .ct_func = test_fault_read_kdc,
-	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE |
-		    CT_FLAG_MIPS_EXCCODE | CT_FLAG_CP2_EXCCODE,
+	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
 	  .ct_signum = SIGPROT,
 	  .ct_si_code = PROT_CHERI_SYSREG,
-	  .ct_mips_exccode = T_C2E,
-	  .ct_cp2_exccode = CHERI_EXCCODE_SYSTEM_REGS },
+	  .ct_si_trapno = TRAPNO_CHERI },
 
 	{ .ct_name = "test_fault_read_epcc",
 	  .ct_desc = "Ensure EPCC is unavailable in userspace",
 	  .ct_func = test_fault_read_epcc,
-	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE |
-		    CT_FLAG_MIPS_EXCCODE | CT_FLAG_CP2_EXCCODE,
+	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
 	  .ct_signum = SIGPROT,
 	  .ct_si_code = PROT_CHERI_SYSREG,
-	  .ct_mips_exccode = T_C2E,
-	  .ct_cp2_exccode = CHERI_EXCCODE_SYSTEM_REGS },
+	  .ct_si_trapno = TRAPNO_CHERI },
+#endif
 
 	/*
 	 * Tests on the kernel-provided sealing capability (sealcap).
 	 */
+#ifdef CHERI_GET_SEALCAP
 	{ .ct_name = "test_sealcap_sysarch",
 	  .ct_desc = "Retrieve sealcap using sysarch(2)",
 	  .ct_func = test_sealcap_sysarch, },
@@ -301,6 +280,7 @@ static const struct cheri_test cheri_tests[] = {
 	{ .ct_name = "test_sealcap_seal_unseal",
 	  .ct_desc = "Use sealcap to seal and unseal a capability",
 	  .ct_func = test_sealcap_seal_unseal, },
+#endif
 
 	/*
 	 * Test bounds on globals in the same file they are allocated in.
@@ -974,8 +954,11 @@ static const struct cheri_test cheri_tests[] = {
 	{ .ct_name = "cheritest_vm_shm_open_anon_unix_surprise",
 	  .ct_desc = "test SHM_ANON vs SCM_RIGHTS",
 	  .ct_func = cheritest_vm_shm_open_anon_unix_surprise,
+#ifdef mips
 	  .ct_xfail_reason =
-	    "Tags currently survive cross-AS aliasing of SHM_ANON objects", },
+	    "Tags currently survive cross-AS aliasing of SHM_ANON objects",
+#endif
+	},
 
 #ifdef CHERIABI_TESTS
 	{ .ct_name = "cheritest_vm_cap_share_fd_kqueue",
@@ -1003,13 +986,15 @@ static const struct cheri_test cheri_tests[] = {
 	{ .ct_name = "cheritest_vm_notag_tmpfile_shared",
 	  .ct_desc = "check tags are not stored for tmpfile() MAP_SHARED pages",
 	  .ct_func = cheritest_vm_notag_tmpfile_shared,
-	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE |
-	    CT_FLAG_MIPS_EXCCODE | CT_FLAG_CP2_EXCCODE,
-	  .ct_signum = SIGPROT,
-	  .ct_si_code = PROT_CHERI_STORETAG,
-	  .ct_mips_exccode = T_C2E,
-	  .ct_cp2_exccode = CHERI_EXCCODE_TLBSTORE,
-	  .ct_check_xfail = xfail_need_writable_non_tmpfs_tmp, },
+	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
+	  .ct_signum = SIGSEGV,
+	  .ct_si_code = SEGV_STORETAG,
+#ifdef __riscv
+	  .ct_si_trapno = EXCP_STORE_AMO_CAP_PAGE_FAULT,
+#else
+	  .ct_si_trapno = TRAPNO_CHERI,
+#endif
+	  .ct_check_xfail = xfail_need_writable_tmp },
 
 	{ .ct_name = "cheritest_vm_tag_tmpfile_private",
 	  .ct_desc = "check tags are stored for tmpfile() MAP_PRIVATE pages",
@@ -1042,12 +1027,10 @@ static const struct cheri_test cheri_tests[] = {
 	{ .ct_name = "test_fault_creturn",
 	  .ct_desc = "Exercise trusted stack underflow",
 	  .ct_func = test_fault_creturn,
-	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE |
-		    CT_FLAG_MIPS_EXCCODE | CT_FLAG_CP2_EXCCODE,
+	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
 	  .ct_signum = SIGPROT,
 	  .ct_si_code = PROT_CHERI_UNDERFLOW,
-	  .ct_mips_exccode = T_C2E,
-	  .ct_cp2_exccode = CHERI_EXCCODE_RETURN },
+	  .ct_si_trapno = TRAPNO_CHERI },
 
 	{ .ct_name = "test_nofault_ccall_creturn",
 	  .ct_desc = "Exercise CCall/CReturn",
@@ -1068,73 +1051,77 @@ static const struct cheri_test cheri_tests[] = {
 	{ .ct_name = "test_fault_ccall_code_untagged",
 	  .ct_desc = "Invoke CCall with untagged code capability",
 	  .ct_func = test_fault_ccall_code_untagged,
-	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE |
-		    CT_FLAG_MIPS_EXCCODE | CT_FLAG_CP2_EXCCODE,
+	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
 	  .ct_signum = SIGPROT,
 	  .ct_si_code = PROT_CHERI_TAG,
-	  .ct_mips_exccode = T_C2E,
-	  .ct_cp2_exccode = CHERI_EXCCODE_TAG },
+	  .ct_si_trapno = TRAPNO_CHERI },
 
 	{ .ct_name = "test_fault_ccall_data_untagged",
 	  .ct_desc = "Invoke CCall with an untagged data capability",
 	  .ct_func = test_fault_ccall_data_untagged,
-	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE |
-		    CT_FLAG_MIPS_EXCCODE | CT_FLAG_CP2_EXCCODE,
+	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
 	  .ct_signum = SIGPROT,
 	  .ct_si_code = PROT_CHERI_TAG,
-	  .ct_mips_exccode = T_C2E,
-	  .ct_cp2_exccode = CHERI_EXCCODE_TAG },
+	  .ct_si_trapno = TRAPNO_CHERI },
 
 	{ .ct_name = "test_fault_ccall_code_unsealed",
 	  .ct_desc = "Invoke CCall with an unsealed code capability",
 	  .ct_func = test_fault_ccall_code_unsealed,
-	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE |
-		    CT_FLAG_MIPS_EXCCODE | CT_FLAG_CP2_EXCCODE,
+	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
 	  .ct_signum = SIGPROT,
 	  .ct_si_code = PROT_CHERI_UNSEALED,
-	  .ct_mips_exccode = T_C2E,
-	  .ct_cp2_exccode = CHERI_EXCCODE_SEAL },
+	  .ct_si_trapno = TRAPNO_CHERI },
 
 	{ .ct_name = "test_fault_ccall_data_unsealed",
 	  .ct_desc = "Invoke CCall with an unsealed data capability",
 	  .ct_func = test_fault_ccall_data_unsealed,
-	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE |
-		    CT_FLAG_MIPS_EXCCODE | CT_FLAG_CP2_EXCCODE,
+	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
 	  .ct_signum = SIGPROT,
 	  .ct_si_code = PROT_CHERI_UNSEALED,
-	  .ct_mips_exccode = T_C2E,
-	  .ct_cp2_exccode = CHERI_EXCCODE_SEAL },
+	  .ct_si_trapno = TRAPNO_CHERI },
 
 	{ .ct_name = "test_fault_ccall_typemismatch",
 	  .ct_desc = "Invoke CCall with code/data type mismatch",
 	  .ct_func = test_fault_ccall_typemismatch,
-	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE |
-		    CT_FLAG_MIPS_EXCCODE | CT_FLAG_CP2_EXCCODE,
+	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
 	  .ct_signum = SIGPROT,
 	  .ct_si_code = PROT_CHERI_TYPE,
-	  .ct_mips_exccode = T_C2E,
-	  .ct_cp2_exccode = CHERI_EXCCODE_TYPE },
+	  .ct_si_trapno = TRAPNO_CHERI },
 
 	{ .ct_name = "test_fault_ccall_code_noexecute",
 	  .ct_desc = "Invoke CCall with a non-executable code capability",
 	  .ct_func = test_fault_ccall_code_noexecute,
-	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE |
-		    CT_FLAG_MIPS_EXCCODE | CT_FLAG_CP2_EXCCODE,
+	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
 	  .ct_signum = SIGPROT,
 	  .ct_si_code = PROT_CHERI_PERM,
-	  .ct_mips_exccode = T_C2E,
-	  .ct_cp2_exccode = CHERI_EXCCODE_PERM_EXECUTE },
+	  .ct_si_trapno = TRAPNO_CHERI },
 
 	{ .ct_name = "test_fault_ccall_data_execute",
 	  .ct_desc = "Invoke CCall with an executable data capability",
 	  .ct_func = test_fault_ccall_data_execute,
-	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE |
-		    CT_FLAG_MIPS_EXCCODE | CT_FLAG_CP2_EXCCODE,
+	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
 	  .ct_signum = SIGPROT,
 	  .ct_si_code = PROT_CHERI_PERM,
-	  .ct_mips_exccode = T_C2E,
-	  .ct_cp2_exccode = CHERI_EXCCODE_PERM_EXECUTE },
+	  .ct_si_trapno = TRAPNO_CHERI },
 #endif
+#endif
+
+	{ .ct_name = "test_flag_captured",
+	  .ct_desc = "Call flag_captured(2) with a message",
+	  .ct_func = test_flag_captured, },
+
+	{ .ct_name = "test_flag_captured_incorrect_key",
+	  .ct_desc = "Call flag_captured(2) with an incorrect key",
+	  .ct_func = test_flag_captured_incorrect_key, },
+
+	{ .ct_name = "test_flag_captured_null",
+	  .ct_desc = "Call flag_captured(2) without a message",
+	  .ct_func = test_flag_captured_null, },
+
+#ifdef __CHERI_PURE_CAPABILITY__
+	{ .ct_name = "test_flag_captured_empty",
+	  .ct_desc = "Call flag_captured(2) with a zero-length capability",
+	  .ct_func = test_flag_captured_empty, },
 #endif
 
 	/*
@@ -1183,13 +1170,11 @@ static const struct cheri_test cheri_tests[] = {
 	{ .ct_name = "test_sandbox_cp2_bound_catch",
 	  .ct_desc = "Exercise sandboxed CP2 bounds-check failure; caught",
 	  .ct_func = test_sandbox_cp2_bound_catch,
-	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE |
-		    CT_FLAG_MIPS_EXCCODE | CT_FLAG_CP2_EXCCODE |
+	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO |
 		    CT_FLAG_SIGNAL_UNWIND | CT_FLAG_SANDBOX,
 	  .ct_signum = SIGPROT,
 	  .ct_si_code = PROT_CHERI_BOUNDS,
-	  .ct_mips_exccode = T_C2E,
-	  .ct_cp2_exccode = CHERI_EXCCODE_LENGTH },
+	  .ct_si_trapno = TRAPNO_CHERI },
 
 	{ .ct_name = "test_sandbox_cp2_bound_nocatch",
 	  .ct_desc = "Exercise sandboxed CP2 bounds-check failure; uncaught",
@@ -1207,13 +1192,11 @@ static const struct cheri_test cheri_tests[] = {
 	{ .ct_name = "test_sandbox_cp2_perm_load_catch",
 	  .ct_desc = "Exercise sandboxed CP2 load-perm-check failure; caught",
 	  .ct_func = test_sandbox_cp2_perm_load_catch,
-	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE |
-		    CT_FLAG_MIPS_EXCCODE | CT_FLAG_CP2_EXCCODE |
+	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO |
 		    CT_FLAG_SIGNAL_UNWIND | CT_FLAG_SANDBOX,
 	  .ct_signum = SIGPROT,
 	  .ct_si_code = PROT_CHERI_PERM,
-	  .ct_mips_exccode = T_C2E,
-	  .ct_cp2_exccode = CHERI_EXCCODE_PERM_LOAD },
+	  .ct_si_trapno = TRAPNO_CHERI },
 
 	{ .ct_name = "test_sandbox_cp2_perm_load_nocatch",
 	  .ct_desc = "Exercise sandboxed CP2 load-perm-check failure; uncaught",
@@ -1224,13 +1207,11 @@ static const struct cheri_test cheri_tests[] = {
 	{ .ct_name = "test_sandbox_cp2_perm_store_catch",
 	  .ct_desc = "Exercise sandboxed CP2 store-perm-check failure; caught",
 	  .ct_func = test_sandbox_cp2_perm_store_catch,
-	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE |
-		    CT_FLAG_MIPS_EXCCODE | CT_FLAG_CP2_EXCCODE |
+	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO |
 		    CT_FLAG_SIGNAL_UNWIND | CT_FLAG_SANDBOX,
 	  .ct_signum = SIGPROT,
 	  .ct_si_code = PROT_CHERI_PERM,
-	  .ct_mips_exccode = T_C2E,
-	  .ct_cp2_exccode = CHERI_EXCCODE_PERM_STORE },
+	  .ct_si_trapno = TRAPNO_CHERI },
 
 	{ .ct_name = "test_sandbox_cp2_perm_store_nocatch",
 	  .ct_desc = "Exercise sandboxed CP2 store-perm-check failure; uncaught",
@@ -1241,13 +1222,11 @@ static const struct cheri_test cheri_tests[] = {
 	{ .ct_name = "test_sandbox_cp2_tag_catch",
 	  .ct_desc = "Exercise sandboxed CP2 tag-check failure; caught",
 	  .ct_func = test_sandbox_cp2_tag_catch,
-	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE |
-		    CT_FLAG_MIPS_EXCCODE | CT_FLAG_CP2_EXCCODE |
+	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO |
 		    CT_FLAG_SIGNAL_UNWIND | CT_FLAG_SANDBOX,
 	  .ct_signum = SIGPROT,
 	  .ct_si_code = PROT_CHERI_TAG,
-	  .ct_mips_exccode = T_C2E,
-	  .ct_cp2_exccode = CHERI_EXCCODE_TAG },
+	  .ct_si_trapno = TRAPNO_CHERI },
 
 	{ .ct_name = "test_sandbox_cp2_tag_nocatch",
 	  .ct_desc = "Exercise sandboxed CP2 tag-check failure; uncaught",
@@ -1258,13 +1237,11 @@ static const struct cheri_test cheri_tests[] = {
 	{ .ct_name = "test_sandbox_cp2_seal_catch",
 	  .ct_desc = "Exercise sandboxed CP2 seal failure; caught",
 	  .ct_func = test_sandbox_cp2_seal_catch,
-	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE |
-		    CT_FLAG_MIPS_EXCCODE | CT_FLAG_CP2_EXCCODE |
+	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO |
 		    CT_FLAG_SIGNAL_UNWIND | CT_FLAG_SANDBOX,
 	  .ct_signum = SIGPROT,
 	  .ct_si_code = PROT_CHERI_PERM,
-	  .ct_mips_exccode = T_C2E,
-	  .ct_cp2_exccode = CHERI_EXCCODE_PERM_SEAL },
+	  .ct_si_trapno = TRAPNO_CHERI },
 
 	{ .ct_name = "test_sandbox_cp2_seal_nocatch",
 	  .ct_desc = "Exercise sandboxed CP2 seal failure; uncaught",
@@ -1275,30 +1252,30 @@ static const struct cheri_test cheri_tests[] = {
 	{ .ct_name = "test_sandbox_divzero_catch",
 	  .ct_desc = "Exercise sandboxed divide-by-zero exception; caught",
 	  .ct_func = test_sandbox_divzero_catch,
-	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_MIPS_EXCCODE |
+	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_TRAPNO |
 		    CT_FLAG_SIGNAL_UNWIND | CT_FLAG_SANDBOX,
 	  .ct_signum = SIGTRAP,
-	  .ct_mips_exccode = T_TRAP,
+	  .ct_si_trapno = T_TRAP,
 	  .ct_xfail_reason =
 	    "LLVM assembler generates break rather than trap instruction", },
 
 	{ .ct_name = "test_sandbox_divzero_nocatch",
 	  .ct_desc = "Exercise sandboxed divide-by-zero exception; uncaught",
 	  .ct_func = test_sandbox_divzero_nocatch,
-	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_MIPS_EXCCODE |
+	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_TRAPNO |
 		    CT_FLAG_SIGNAL_UNWIND | CT_FLAG_SANDBOX,
 	  .ct_signum = SIGTRAP,
-	  .ct_mips_exccode = T_TRAP,
+	  .ct_si_trapno = T_TRAP,
 	  .ct_xfail_reason =
 	    "LLVM assembler generates break rather than trap instruction", },
 
 	{ .ct_name = "test_sandbox_vm_rfault_catch",
 	  .ct_desc = "Exercise sandboxed VM read fault; caught",
 	  .ct_func = test_sandbox_vm_rfault_catch,
-	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_MIPS_EXCCODE |
+	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_TRAPNO |
 		    CT_FLAG_SIGNAL_UNWIND | CT_FLAG_SANDBOX,
 	  .ct_signum = SIGSEGV,
-	  .ct_mips_exccode = T_TLB_LD_MISS },
+	  .ct_si_trapno = T_TLB_LD_MISS },
 
 	{ .ct_name = "test_sandbox_vm_rfault_nocatch",
 	  .ct_desc = "Exercise sandboxed VM read fault; uncaught",
@@ -1309,10 +1286,10 @@ static const struct cheri_test cheri_tests[] = {
 	{ .ct_name = "test_sandbox_vm_wfault_catch",
 	  .ct_desc = "Exercise sandboxed VM write fault; caught",
 	  .ct_func = test_sandbox_vm_wfault_catch,
-	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_MIPS_EXCCODE |
+	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_TRAPNO |
 		    CT_FLAG_SIGNAL_UNWIND | CT_FLAG_SANDBOX,
 	  .ct_signum = SIGSEGV,
-	  .ct_mips_exccode = T_TLB_ST_MISS },
+	  .ct_si_trapno = T_TLB_ST_MISS },
 
 	{ .ct_name = "test_sandbox_vm_wfault_nocatch",
 	  .ct_desc = "Exercise sandboxed VM write fault; uncaught",
@@ -1323,10 +1300,10 @@ static const struct cheri_test cheri_tests[] = {
 	{ .ct_name = "test_sandbox_vm_xfault_catch",
 	  .ct_desc = "Exercise sandboxed VM exec fault; caught",
 	  .ct_func = test_sandbox_vm_xfault_catch,
-	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_MIPS_EXCCODE |
+	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_TRAPNO |
 		    CT_FLAG_SIGNAL_UNWIND | CT_FLAG_SANDBOX,
 	  .ct_signum = SIGSEGV,
-	  .ct_mips_exccode = T_TLB_LD_MISS },
+	  .ct_si_trapno = T_TLB_LD_MISS },
 
 	{ .ct_name = "test_sandbox_vm_xfault_nocatch",
 	  .ct_desc = "Exercise sandboxed VM exec fault; uncaught",
@@ -1487,9 +1464,9 @@ static const struct cheri_test cheri_tests[] = {
 	{ .ct_name = "test_sandbox_trustedstack_underflow",
 	  .ct_desc = "Underflow trusted stack",
 	  .ct_func = test_sandbox_trustedstack_underflow,
-	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_MIPS_EXCCODE | CT_FLAG_SANDBOX,
+	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_TRAPNO | CT_FLAG_SANDBOX,
 	  .ct_signum = SIGEMT,
-	  .ct_mips_exccode = T_TRAP },
+	  .ct_si_trapno = T_TRAP },
 
 	/*
 	 * Check various properties to do with global vs. local capabilities
@@ -1503,13 +1480,11 @@ static const struct cheri_test cheri_tests[] = {
 	{ .ct_name = "test_sandbox_store_local_capability_in_bss_catch",
 	  .ct_desc = "Try to store local capability to sandbox bss; caught",
 	  .ct_func = test_sandbox_store_local_capability_in_bss_catch,
-	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE |
-		    CT_FLAG_MIPS_EXCCODE | CT_FLAG_CP2_EXCCODE |
+	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO |
 		    CT_FLAG_SIGNAL_UNWIND | CT_FLAG_SANDBOX,
 	  .ct_signum = SIGPROT,
 	  .ct_si_code = PROT_CHERI_STORELOCAL,
-	  .ct_mips_exccode = T_C2E,
-	  .ct_cp2_exccode = CHERI_EXCCODE_STORE_LOCALCAP },
+	  .ct_si_trapno = TRAPNO_CHERI },
 
 	{ .ct_name = "test_sandbox_store_local_capability_in_bss_nocatch",
 	  .ct_desc = "Try to store local capability to sandbox bss; uncaught",
@@ -1609,6 +1584,11 @@ static const struct cheri_test cheri_tests[] = {
 	{ .ct_name = "test_signal_sigaltstack_disable",
 	  .ct_desc = "Check signal handlers don't use a given alternate stack when re-disabled",
 	  .ct_func = test_signal_sigaltstack_disable },
+#ifdef __CHERI_PURE_CAPABILITY__
+	{ .ct_name = "test_signal_returncap",
+	  .ct_desc = "Test value of signal handler return capability",
+	  .ct_func = test_signal_returncap },
+#endif
 
 	/*
 	 * Standard library string tests.
@@ -1624,15 +1604,19 @@ static const struct cheri_test cheri_tests[] = {
 	{ .ct_name = "test_string_memcpy",
 	  .ct_desc = "Test implicit capability memcpy",
 	  .ct_func = test_string_memcpy },
+#ifdef __mips__
 	{ .ct_name = "test_string_memcpy_c",
 	  .ct_desc = "Test explicit capability memcpy",
 	  .ct_func = test_string_memcpy_c },
+#endif
 	{ .ct_name = "test_string_memmove",
 	  .ct_desc = "Test implicit capability memmove",
 	  .ct_func = test_string_memmove },
+#ifdef __mips__
 	{ .ct_name = "test_string_memmove_c",
 	  .ct_desc = "Test explicit capability memmove",
 	  .ct_func = test_string_memmove_c },
+#endif
 
 	/* Unaligned memcpy/memmove with capabilities */
 	{ .ct_name = "test_unaligned_capability_copy_memcpy",
@@ -1687,17 +1671,23 @@ static const struct cheri_test cheri_tests[] = {
 	 * CheriABI specific tests.
 	 */
 #ifdef CHERIABI_TESTS
+#ifdef CHERI_MMAP_SETBOUNDS
 	{ .ct_name = "test_cheriabi_mmap_nospace",
 	  .ct_desc = "Test CheriABI mmap() with no space in default capability",
 	  .ct_func = test_cheriabi_mmap_nospace },
+#endif
 
+#ifdef CHERI_MMAP_GETPERM
 	{ .ct_name = "test_cheriabi_mmap_perms",
 	  .ct_desc = "Test CheriABI mmap() permissions",
 	  .ct_func = test_cheriabi_mmap_perms },
+#endif
 
+#ifdef CHERI_BASELEN_BITS
 	{ .ct_name = "test_cheriabi_mmap_unrepresentable",
 	  .ct_desc = "Test CheriABI mmap() with unrepresentable lengths",
 	  .ct_func = test_cheriabi_mmap_unrepresentable },
+#endif
 
 	{ .ct_name = "test_cheriabi_malloc_zero_size",
 	  .ct_desc = "Check that zero-sized mallocs are properly bounded",
@@ -1742,9 +1732,11 @@ static const struct cheri_test cheri_tests[] = {
 	  .ct_desc = "Path with CHERI_PERM_LOAD permission missing",
 	  .ct_func = test_cheriabi_open_bad_perm, },
 
+#ifdef CHERI_GET_SEALCAP
 	{ .ct_name = "test_cheriabi_open_sealed",
 	  .ct_desc = "Sealed path",
 	  .ct_func = test_cheriabi_open_sealed, },
+#endif
 #endif
 #ifdef CHERI_C_TESTS
 #define	DECLARE_TEST(name, desc)			\
@@ -1760,6 +1752,7 @@ static const u_int cheri_tests_len = sizeof(cheri_tests) /
 	    sizeof(cheri_tests[0]);
 static StringList* cheri_failed_tests;
 static StringList* cheri_xfailed_tests;
+static StringList* cheri_xpassed_tests;
 
 /* Shared memory page with child process. */
 struct cheritest_child_state *ccsp;
@@ -1849,7 +1842,9 @@ list_tests(void)
 static void
 signal_handler(int signum, siginfo_t *info, void *vuap)
 {
+#ifdef __mips__
 	struct cheri_frame *cfp;
+#endif
 	ucontext_t *uap;
 #ifdef CHERI_LIBCHERI_TESTS
 	u_int numframes;
@@ -1857,6 +1852,7 @@ signal_handler(int signum, siginfo_t *info, void *vuap)
 #endif
 
 	uap = (ucontext_t *)vuap;
+#ifdef __mips__
 	if (uap->uc_mcontext.mc_regs[0] != /* UCONTEXT_MAGIC */ 0xACEDBADE) {
 		ccsp->ccs_signum = -1;
 		fprintf(stderr, "%s: missing UCONTEXT_MAGIC\n", __func__);
@@ -1873,10 +1869,13 @@ signal_handler(int signum, siginfo_t *info, void *vuap)
 		ccsp->ccs_signum = -1;
 		_exit(EX_OSERR);
 	}
+#endif	/* __mips__ */
 	ccsp->ccs_signum = signum;
 	ccsp->ccs_si_code = info->si_code;
-	ccsp->ccs_mips_cause = uap->uc_mcontext.cause;
+	ccsp->ccs_si_trapno = info->si_trapno;
+#ifdef __mips__
 	ccsp->ccs_cp2_cause = cfp->cf_capcause;
+#endif
 
 #ifdef CHERI_LIBCHERI_TESTS
 	/*
@@ -1936,6 +1935,7 @@ signal_handler_clear(int sig)
 static inline void
 set_thread_tracing(void)
 {
+#ifdef CHERI_START_TRACE
 	int error, intval;
 
 	intval = 1;
@@ -1948,7 +1948,10 @@ set_thread_tracing(void)
 	 */
 	CHERI_START_TRACE;
 	if (qtrace_user_mode_only)
-		__asm__ __volatile__("li $0, 0xdeaf");
+		CHERI_START_USER_TRACE;
+#else
+	err(EX_OSERR, "%s", __func__);
+#endif
 }
 
 /* Maximum size of stdout data we will check if called for by a test. */
@@ -1965,7 +1968,6 @@ cheritest_run_test(const struct cheri_test *ctp)
 	char buffer[TEST_BUFFER_LEN];
 	const char *xfail_reason;
 	char* failure_message;
-	register_t cp2_exccode, mips_exccode;
 	ssize_t len;
 	xo_attr("classname", "%s", ctp->ct_name);
 	xo_attr("name", "%s", ctp->ct_desc);
@@ -1973,6 +1975,8 @@ cheritest_run_test(const struct cheri_test *ctp)
 	bzero(ccsp, sizeof(*ccsp));
 	xo_emit("TEST: {d:name/%s}: {d:description/%s}\n", ctp->ct_name,
 		    ctp->ct_desc);
+	reason[0] = '\0';
+	visreason[0] = '\0';
 
 	if (ctp->ct_check_xfail != NULL)
 		xfail_reason = ctp->ct_check_xfail(ctp->ct_name);
@@ -2149,26 +2153,12 @@ cheritest_run_test(const struct cheri_test *ctp)
 		    "unwind");
 		goto fail;
 	}
-	if (ctp->ct_flags & CT_FLAG_MIPS_EXCCODE) {
-		mips_exccode = (ccsp->ccs_mips_cause & MIPS_CR_EXC_CODE) >>
-		    MIPS_CR_EXC_CODE_SHIFT;
-		if (mips_exccode != ctp->ct_mips_exccode) {
-			snprintf(reason, sizeof(reason),
-			    "Expected MIPS exccode %ju, got %ju",
-			    ctp->ct_mips_exccode, mips_exccode);
-			goto fail;
-		}
-	}
-	if (ctp->ct_flags & CT_FLAG_CP2_EXCCODE) {
-		cp2_exccode = (ccsp->ccs_cp2_cause &
-		    CHERI_CAPCAUSE_EXCCODE_MASK) >>
-		    CHERI_CAPCAUSE_EXCCODE_SHIFT;
-		if (cp2_exccode != ctp->ct_cp2_exccode) {
-			snprintf(reason, sizeof(reason),
-			    "Expected CP2 exccode %ju, got %ju",
-			    ctp->ct_cp2_exccode, cp2_exccode);
-			goto fail;
-		}
+	if ((ctp->ct_flags & CT_FLAG_SI_TRAPNO) &&
+	    ccsp->ccs_si_trapno != ctp->ct_si_trapno) {
+		snprintf(reason, sizeof(reason),
+		    "Expected si_trapno %d, got %d", ctp->ct_si_trapno,
+		    ccsp->ccs_si_trapno);
+		goto fail;
 	}
 
 	/*
@@ -2254,12 +2244,15 @@ cheritest_run_test(const struct cheri_test *ctp)
 	}
 
 pass:
-	if (xfail_reason == NULL)
-		xo_emit("{d:status/%s}: {d:name/%s}\n", "PASS", ctp->ct_name);
-	else {
+	if (xfail_reason != NULL) {
+		// Passed but we expected failure:
 		xo_emit("XPASS: {d:name/%s} (Expected failure due to "
-		    "{d:reason/%s}) {e:failure/XPASS: %s}\n", ctp->ct_name,
+			"{d:reason/%s}) {e:failure/XPASS: %s}\n", ctp->ct_name,
 		    xfail_reason, xfail_reason);
+		asprintf(&failure_message, "%s: %s", ctp->ct_name, xfail_reason);
+		sl_add(cheri_xpassed_tests, failure_message);
+	} else {
+		xo_emit("{d:status/%s}: {d:name/%s}\n", "PASS", ctp->ct_name);
 	}
 	tests_passed++;
 	close(pipefd_stdin[1]);
@@ -2468,6 +2461,7 @@ main(int argc, char *argv[])
 
 	cheri_failed_tests = sl_init();
 	cheri_xfailed_tests = sl_init();
+	cheri_xpassed_tests = sl_init();
 	/* Run the actual tests. */
 #ifdef CHERI_LIBCHERI_TESTS
 #if 0
@@ -2525,36 +2519,43 @@ main(int argc, char *argv[])
 	xo_close_list("test");
 	xo_close_container("testsuite");
 	xo_close_container("testsuites");
-	xo_finish();
 
 	/* print a summary which tests failed */
-	if (tests_xfailed > 0) {
+	if (cheri_xfailed_tests->sl_cur != 0) {
 		xo_emit("Expected failures:\n");
 		for (i = 0; (size_t)i < cheri_xfailed_tests->sl_cur; i++)
-			xo_emit("  {d:%s}\n",
-			    cheri_xfailed_tests->sl_str[i]);
-		sl_free(cheri_xfailed_tests, true);
+			xo_emit("  {d:%s}\n", cheri_xfailed_tests->sl_str[i]);
 	}
-	if (tests_failed > tests_xfailed) {
+	if (cheri_failed_tests->sl_cur != 0) {
 		xo_emit("Unexpected failures:\n");
 		for (i = 0; (size_t)i < cheri_failed_tests->sl_cur; i++)
 			xo_emit("  {d:%s}\n", cheri_failed_tests->sl_str[i]);
-		sl_free(cheri_failed_tests, true);
 	}
+	if (cheri_xpassed_tests->sl_cur != 0) {
+		xo_emit("Unexpected passes:\n");
+		for (i = 0; (size_t)i < cheri_xpassed_tests->sl_cur; i++)
+			xo_emit("  {d:%s}\n", cheri_xpassed_tests->sl_str[i]);
+	}
+	sl_free(cheri_failed_tests, true);
+	sl_free(cheri_xfailed_tests, true);
+	sl_free(cheri_xpassed_tests, true);
 	if (tests_passed + tests_failed > 1) {
-		if (expected_failures == 0)
-			xo_emit("SUMMARY: passed {d:/%d} failed %d\n",
+		if (expected_failures == 0 && tests_xfailed == 0)
+			xo_emit("SUMMARY: passed {d:/%d} failed {d:/%d}\n",
 			    tests_passed, tests_failed);
 		else if (expected_failures == tests_xfailed)
 			xo_emit("SUMMARY: passed {d:/%d} failed {d:/%d} "
-			    "({d:/%d} expected)\n",
+			    "({d:/%d} expected {Np:failure,failures})\n",
 			    tests_passed, tests_failed, expected_failures);
 		else
 			xo_emit("SUMMARY: passed {d:/%d} failed {d:/%d} "
-			    "({d:/%d} expected) ({d:/%d} unexpected passes)\n",
+			    "({d:/%d} expected {Np:failure,failures}) "
+			    "({d:/%d} unexpected {Np:pass,passes})\n",
 			    tests_passed, tests_failed, tests_xfailed,
 			    expected_failures - tests_xfailed);
 	}
+	xo_finish();
+
 
 #ifdef CHERI_LIBCHERI_TESTS
 	if (!unsandboxed_tests_only)

@@ -94,6 +94,7 @@ bool	opt_junk_free =
 bool	opt_utrace = false;
 bool	opt_xmalloc = false;
 bool	opt_zero = false;
+bool	opt_zero_free = false;
 unsigned	opt_narenas = 0;
 
 unsigned	ncpus;
@@ -135,7 +136,8 @@ enum {
 	flag_opt_junk_free	= (1U << 1),
 	flag_opt_zero		= (1U << 2),
 	flag_opt_utrace		= (1U << 3),
-	flag_opt_xmalloc	= (1U << 4)
+	flag_opt_xmalloc	= (1U << 4),
+	flag_opt_zero_free	= (1U << 5)
 };
 static uint8_t	malloc_slow_flags;
 
@@ -500,7 +502,8 @@ arena_tdata_get_hard(tsd_t *tsd, unsigned ind) {
 
 		if (tsd_nominal(tsd) && !*arenas_tdata_bypassp) {
 			*arenas_tdata_bypassp = true;
-			arenas_tdata = (arena_tdata_t *)a0malloc(
+			arenas_tdata = BOUND_PTR((arena_tdata_t *)a0malloc(
+			    sizeof(arena_tdata_t) * narenas_tdata),
 			    sizeof(arena_tdata_t) * narenas_tdata);
 			*arenas_tdata_bypassp = false;
 		}
@@ -982,7 +985,8 @@ malloc_slow_flag_init(void) {
 	    | (opt_junk_free ? flag_opt_junk_free : 0)
 	    | (opt_zero ? flag_opt_zero : 0)
 	    | (opt_utrace ? flag_opt_utrace : 0)
-	    | (opt_xmalloc ? flag_opt_xmalloc : 0);
+	    | (opt_xmalloc ? flag_opt_xmalloc : 0)
+	    | (opt_zero_free ? flag_opt_zero_free : 0);
 
 	malloc_slow = (malloc_slow_flags != 0);
 }
@@ -1336,6 +1340,7 @@ malloc_conf_init_helper(sc_data_t *sc_data, unsigned bin_shard_sizes[SC_NBINS],
 					CONF_CONTINUE;
 				}
 				CONF_HANDLE_BOOL(opt_zero, "zero")
+				CONF_HANDLE_BOOL(opt_zero_free, "zero_free")
 			}
 			if (config_utrace) {
 				CONF_HANDLE_BOOL(opt_utrace, "utrace")

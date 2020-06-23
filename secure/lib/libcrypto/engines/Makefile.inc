@@ -1,10 +1,6 @@
 # $FreeBSD$
 
-.ifdef LIBCHERI
-SHLIBDIR= /usr/libcheri/engines
-.else
-SHLIBDIR?= /usr/lib/engines
-.endif
+SHLIBDIR=	${LIBDIR}/engines
 
 LCRYPTO_SRC=	${SRCTOP}/crypto/openssl
 

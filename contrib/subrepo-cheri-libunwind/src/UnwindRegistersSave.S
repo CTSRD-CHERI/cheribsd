@@ -1096,7 +1096,7 @@ DEFINE_LIBUNWIND_FUNCTION(__unw_getcontext)
 
 .macro save_fpr num
 #ifdef __CHERI_PURE_CAPABILITY__
-  cfsd    f\num, (__SIZEOF_CHERI_CAPABILITY__ * 32 + 8 * \num)(ca0)
+  cfsd   f\num, (__SIZEOF_CHERI_CAPABILITY__ * 32 + 8 * \num)(ca0)
 #else
   fsd    f\num, (8 * 32 + 8 * \num)(a0)
 #endif
@@ -1117,9 +1117,6 @@ DEFINE_LIBUNWIND_FUNCTION(__unw_getcontext)
 #  thread_state pointer is in a0
 #
 DEFINE_LIBUNWIND_FUNCTION(__unw_getcontext)
-#ifdef __CHERI_PURE_CAPABILITY__
-#pragma message("TODO: save $ddc")
-#endif
   // x0 is zero
   save_gpr 1
   save_gpr 2
@@ -1186,6 +1183,11 @@ DEFINE_LIBUNWIND_FUNCTION(__unw_getcontext)
   save_fpr 29
   save_fpr 30
   save_fpr 31
+#endif
+
+#ifdef __CHERI_PURE_CAPABILITY__
+  cspecialr ct0, ddc
+  csc ct0, (__SIZEOF_CHERI_CAPABILITY__ * 32 + 8 * 32)(ca0)
 #endif
 
   li     a0, 0  // return UNW_ESUCCESS

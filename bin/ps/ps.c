@@ -696,7 +696,7 @@ main(int argc, char *argv[])
 			fwidthmin = (xo_get_style(NULL) != XO_STYLE_TEXT ||
 			    (STAILQ_NEXT(vent, next_ve) == NULL &&
 			    (vent->var->flag & LJUST))) ? 0 : vent->var->width;
-			snprintf(fmtbuf, sizeof(fmtbuf), "{:%s/%%%s%d..%ds}",
+			snprintf(fmtbuf, sizeof(fmtbuf), "{:%s/%%%s%d..%dhs}",
 			    vent->var->field ? vent->var->field : vent->var->name,
 			    (vent->var->flag & LJUST) ? "-" : "",
 			    fwidthmin, fwidthmax);

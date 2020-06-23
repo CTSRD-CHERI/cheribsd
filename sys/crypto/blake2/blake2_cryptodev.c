@@ -129,7 +129,8 @@ blake2_attach(device_t dev)
 	sc->dying = false;
 
 	sc->cid = crypto_get_driverid(dev, sizeof(struct blake2_session),
-	    CRYPTOCAP_F_SOFTWARE | CRYPTOCAP_F_SYNC);
+	    CRYPTOCAP_F_SOFTWARE | CRYPTOCAP_F_SYNC |
+	    CRYPTOCAP_F_ACCEL_SOFTWARE);
 	if (sc->cid < 0) {
 		device_printf(dev, "Could not get crypto driver id.\n");
 		return (ENOMEM);
@@ -303,7 +304,7 @@ blake2_cipher_setup(struct blake2_session *ses,
 }
 
 static int
-blake2b_applicator(void *state, void *buf, u_int len)
+blake2b_applicator(void *state, const void *buf, u_int len)
 {
 	int rc;
 
@@ -314,7 +315,7 @@ blake2b_applicator(void *state, void *buf, u_int len)
 }
 
 static int
-blake2s_applicator(void *state, void *buf, u_int len)
+blake2s_applicator(void *state, const void *buf, u_int len)
 {
 	int rc;
 

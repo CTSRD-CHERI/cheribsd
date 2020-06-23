@@ -1128,18 +1128,9 @@ DEFINE_LIBUNWIND_FUNCTION(_ZN9libunwind15Registers_sparc6jumptoEv)
 
 #elif defined(__riscv) && __riscv_xlen == 64
 
-//
-// void libunwind::Registers_riscv::jumpto()
-//
-// On entry:
-//  thread_state pointer is in a0
-//
-  .p2align 2
-DEFINE_LIBUNWIND_FUNCTION(_ZN9libunwind15Registers_riscv6jumptoEv)
-#if defined(__riscv_flen) && __riscv_flen == 64
 .macro restore_fpr num
 #ifdef __CHERI_PURE_CAPABILITY__
-  cfld    f\num, (__SIZEOF_CHERI_CAPABILITY__ * 32 + 8 * \num)(ca0)
+  cfld   f\num, (__SIZEOF_CHERI_CAPABILITY__ * 32 + 8 * \num)(ca0)
 #else
   fld    f\num, (8 * 32 + 8 * \num)(a0)
 #endif
@@ -1153,6 +1144,20 @@ DEFINE_LIBUNWIND_FUNCTION(_ZN9libunwind15Registers_riscv6jumptoEv)
 #endif
 .endm
 
+//
+// void libunwind::Registers_riscv::jumpto()
+//
+// On entry:
+//  thread_state pointer is in a0
+//
+  .p2align 2
+DEFINE_LIBUNWIND_FUNCTION(_ZN9libunwind15Registers_riscv6jumptoEv)
+#ifdef __CHERI_PURE_CAPABILITY__
+  clc ct0, (__SIZEOF_CHERI_CAPABILITY__ * 32 + 8 * 32)(ca0)
+  cspecialw ddc, ct0
+#endif
+
+#if defined(__riscv_flen) && __riscv_flen == 64
    restore_fpr 0
    restore_fpr 1
    restore_fpr 2
@@ -1187,9 +1192,6 @@ DEFINE_LIBUNWIND_FUNCTION(_ZN9libunwind15Registers_riscv6jumptoEv)
    restore_fpr 31
 #endif
 
-#ifdef __CHERI_PURE_CAPABILITY__
-#pragma message("TODO: restore $ddc")
-#endif
   // x0 is zero
   restore_gpr 1
   restore_gpr 2

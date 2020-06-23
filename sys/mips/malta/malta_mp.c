@@ -244,6 +244,10 @@ platform_start_ap(int cpuid)
 	 * reg = 0x80000000;
 	 * mttc0(2, 3, reg);
 	 */
+#if defined(CPU_QEMU_MALTA)
+	extern char _locore[];
+	mttc0(2, 3, (uintptr_t)_locore);
+#endif
 
 	/* Enable thread */
 	reg = mftc0(2, 1);

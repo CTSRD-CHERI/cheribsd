@@ -284,6 +284,11 @@
 #define	CHERI_CAPCAUSE_EXCCODE_MASK	0xff00
 #define	CHERI_CAPCAUSE_EXCCODE_SHIFT	8
 #define	CHERI_CAPCAUSE_REGNUM_MASK	0xff
+#define	CHERI_CAPCAUSE_EXCCODE(capcause)				\
+	(((capcause) & CHERI_CAPCAUSE_EXCCODE_MASK) >>			\
+	    CHERI_CAPCAUSE_EXCCODE_SHIFT)
+#define	CHERI_CAPCAUSE_REGNUM(capcause)					\
+	((capcause) & CHERI_CAPCAUSE_REGNUM_MASK)
 
 /*
  * Location of the CHERI CCall/CReturn software-path exception vector.

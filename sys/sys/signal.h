@@ -447,6 +447,8 @@ struct siginfo64 {
 #define SEGV_ACCERR	2	/* Invalid permissions for mapped	*/
 				/* object.				*/
 #define	SEGV_PKUERR	100	/* x86: PKU violation			*/
+#define	SEGV_LOADTAG	101	/* Tag-load page fault.                 */
+#define	SEGV_STORETAG	102	/* Tag-store page fault.                */
 
 /* codes for SIGFPE */
 #define FPE_INTOVF	1	/* Integer overflow.			*/
@@ -488,7 +490,6 @@ struct siginfo64 {
 #define	PROT_CHERI_SEALED	3	/* Capability sealed fault	*/
 #define	PROT_CHERI_TYPE		4	/* Type mismatch fault		*/
 #define	PROT_CHERI_PERM		5	/* Capability permission fault	*/
-#define	PROT_CHERI_STORETAG	6	/* Tag-store page fault		*/
 #define	PROT_CHERI_IMPRECISE	7	/* Imprecise bounds fault	*/
 #define	PROT_CHERI_STORELOCAL	8	/* Store-local fault		*/
 #define	PROT_CHERI_CCALL	9	/* CCall fault			*/

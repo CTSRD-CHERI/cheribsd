@@ -58,6 +58,7 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_extern.h>
 
 #if __has_feature(capabilities)
+#include <sys/sysargmap.h>
 #include <cheri/cheric.h>
 #endif
 
@@ -85,7 +86,7 @@ void do_trap_user(struct trapframe *);
 
 static __inline void
 call_trapsignal(struct thread *td, int sig, int code, void * __capability addr,
-    int capreg)
+    int trapno, int capreg)
 {
 	ksiginfo_t ksi;
 
@@ -94,6 +95,7 @@ call_trapsignal(struct thread *td, int sig, int code, void * __capability addr,
 	ksi.ksi_code = code;
 	ksi.ksi_addr = addr;
 	ksi.ksi_capreg = capreg;
+	ksi.ksi_trapno = trapno;
 	trapsignal(td, &ksi);
 }
 
@@ -104,6 +106,11 @@ cpu_fetch_syscall_args(struct thread *td)
 	syscallarg_t *ap;
 	struct syscall_args *sa;
 	int nap;
+#if __has_feature(capabilities)
+	char * __capability stack_args = NULL;
+	u_int i;
+	int error;
+#endif
 
 	nap = NARGREG;
 	p = td->td_proc;
@@ -115,6 +122,15 @@ cpu_fetch_syscall_args(struct thread *td)
 	if (sa->code == SYS_syscall || sa->code == SYS___syscall) {
 		sa->code = *ap++;
 		nap--;
+
+#if __has_feature(capabilities)
+		/*
+		 * For syscall() and __syscall(), the arguments are
+		 * stored in a var args block on the stack.
+		 */
+		if (SV_PROC_FLAG(td->td_proc, SV_CHERI))
+			stack_args = (char * __capability)td->td_frame->tf_sp;
+#endif
 	}
 
 	if (sa->code >= p->p_sysent->sv_size)
@@ -123,9 +139,39 @@ cpu_fetch_syscall_args(struct thread *td)
 		sa->callp = &p->p_sysent->sv_table[sa->code];
 
 	sa->narg = sa->callp->sy_narg;
-	memcpy(sa->args, ap, nap * sizeof(syscallarg_t));
-	if (sa->narg > nap)
-		panic("TODO: Could we have more then %d args?", NARGREG);
+#if __has_feature(capabilities)
+	if (stack_args != NULL) {
+		register_t intval;
+		int offset, ptrmask;
+
+		if (sa->code >= nitems(sysargmask))
+			ptrmask = 0;
+		else
+			ptrmask = sysargmask[sa->code];
+
+		offset = 0;
+		for (i = 0; i < sa->narg; i++) {
+			if (ptrmask & (1 << i)) {
+				offset = roundup2(offset, sizeof(uintcap_t));
+				error = fuecap(stack_args + offset,
+				    &sa->args[i]);
+				offset += sizeof(uintcap_t);
+			} else {
+				error = fueword(stack_args + offset, &intval);
+				sa->args[i] = intval;
+				offset += sizeof(intval);
+			}
+			if (error)
+				return (error);
+		}
+	} else
+#endif
+	{
+		memcpy(sa->args, ap, nap * sizeof(syscallarg_t));
+		if (sa->narg > nap)
+			panic("TODO: Could we have more then %d args?",
+			    NARGREG);
+	}
 
 	td->td_retval[0] = 0;
 	td->td_retval[1] = 0;
@@ -246,7 +292,8 @@ data_abort(struct trapframe *frame, int usermode)
 	if (error != KERN_SUCCESS) {
 		if (usermode) {
 			call_trapsignal(td, sig, ucode,
-			    (void * __capability)(uintcap_t)stval, 0);
+			    (void * __capability)(uintcap_t)stval,
+			    frame->tf_scause & EXCP_MASK, 0);
 		} else {
 			if (pcb->pcb_onfault != 0) {
 				frame->tf_a[0] = error;
@@ -310,10 +357,9 @@ do_trap_supervisor(struct trapframe *frame)
 		break;
 	case EXCP_BREAKPOINT:
 #ifdef KDTRACE_HOOKS
-		if (dtrace_invop_jump_addr != 0) {
-			dtrace_invop_jump_addr(frame);
-			break;
-		}
+		if (dtrace_invop_jump_addr != NULL &&
+		    dtrace_invop_jump_addr(frame) == 0)
+				break;
 #endif
 #ifdef KDB
 		kdb_trap(exception, 0, frame);
@@ -328,6 +374,8 @@ do_trap_supervisor(struct trapframe *frame)
 		    (__cheri_addr unsigned long)frame->tf_sepc);
 		break;
 #if __has_feature(capabilities)
+	case EXCP_LOAD_CAP_PAGE_FAULT:
+	case EXCP_STORE_AMO_CAP_PAGE_FAULT:
 	case EXCP_CHERI:
 		if (curthread->td_pcb->pcb_onfault != 0) {
 			frame->tf_a[0] = EPROT;
@@ -336,11 +384,19 @@ do_trap_supervisor(struct trapframe *frame)
 			break;
 		}
 		dump_regs(frame);
-		sccsr = csr_read(sccsr);
-		panic("CHERI exception %#x at 0x%016lx\n",
-		    (sccsr & SCCSR_CAUSE_MASK) >> SCCSR_CAUSE_SHIFT,
-		    (__cheri_addr unsigned long)frame->tf_sepc);
-		break;
+		switch (exception) {
+		default:
+			panic("Fatal capability page fault %#lx: %#016lx",
+			    (__cheri_addr unsigned long)frame->tf_sepc,
+			    frame->tf_stval);
+			break;
+		case EXCP_CHERI:
+			sccsr = csr_read(sccsr);
+			panic("CHERI exception %#x at 0x%016lx\n",
+			    (sccsr & SCCSR_CAUSE_MASK) >> SCCSR_CAUSE_SHIFT,
+			    (__cheri_addr unsigned long)frame->tf_sepc);
+			break;
+		}
 #endif
 	default:
 		dump_regs(frame);
@@ -405,20 +461,30 @@ do_trap_user(struct trapframe *frame)
 		}
 #endif
 		call_trapsignal(td, SIGILL, ILL_ILLTRP,
-		    (void * __capability)frame->tf_sepc, 0);
+		    (void * __capability)frame->tf_sepc, exception, 0);
 		userret(td, frame);
 		break;
 	case EXCP_BREAKPOINT:
 		call_trapsignal(td, SIGTRAP, TRAP_BRKPT,
-		    (void * __capability)frame->tf_sepc, 0);
+		    (void * __capability)frame->tf_sepc, exception, 0);
 		userret(td, frame);
 		break;
 #if __has_feature(capabilities)
+	case EXCP_LOAD_CAP_PAGE_FAULT:
+		call_trapsignal(td, SIGSEGV, SEGV_LOADTAG,
+		    (void * __capability)(uintcap_t)frame->tf_stval, exception,
+		    0);
+		break;
+	case EXCP_STORE_AMO_CAP_PAGE_FAULT:
+		call_trapsignal(td, SIGSEGV, SEGV_STORETAG,
+		    (void * __capability)(uintcap_t)frame->tf_stval, exception,
+		    0);
+		break;
 	case EXCP_CHERI:
 		sccsr = csr_read(sccsr);
 
 		call_trapsignal(td, SIGPROT, cheri_sccsr_to_sicode(sccsr),
-		    (void * __capability)frame->tf_sepc,
+		    (void * __capability)frame->tf_sepc, exception,
 		    (sccsr & SCCSR_CAP_IDX_MASK) >> SCCSR_CAP_IDX_SHIFT);
 		userret(td, frame);
 		break;

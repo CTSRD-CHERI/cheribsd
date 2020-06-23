@@ -125,9 +125,14 @@ large_ralloc_no_move_shrink(tsdn_t *tsdn, extent_t *extent, size_t usize) {
 			return true;
 		}
 
-		if (config_fill && unlikely(opt_junk_free)) {
-			large_dalloc_maybe_junk(extent_addr_get(trail),
-			    extent_size_get(trail));
+		if (config_fill) {
+			if (unlikely(opt_junk_free)) {
+				large_dalloc_maybe_junk(extent_addr_get(trail),
+				    extent_size_get(trail));
+			} else if (unlikely(opt_zero_free)) {
+				memset(extent_addr_get(trail), 0,
+				    extent_size_get(trail));
+			}
 		}
 
 		arena_extents_dirty_dalloc(tsdn, arena, &extent_hooks, trail);

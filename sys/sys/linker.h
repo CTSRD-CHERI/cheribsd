@@ -320,11 +320,7 @@ struct kld_file_stat_1 {
     char        name[MAXPATHLEN];
     int		refs;
     int		id;
-#ifndef __CHERI_PURE_CAPABILITY__
-    caddr_t	address;	/* load address */
-#else
-    vaddr_t	address;	/* load address */
-#endif
+    char * __kerncap address;	/* load address */
     size_t	size;		/* size in bytes */
 };
 #endif /* _KERNEL */
@@ -334,7 +330,7 @@ struct kld_file_stat {
     char        name[MAXPATHLEN];
     int		refs;
     int		id;
-    caddr_t	address;	/* load address */
+    char * __kerncap address;	/* load address */
     size_t	size;		/* size in bytes */
     char        pathname[MAXPATHLEN];
 };

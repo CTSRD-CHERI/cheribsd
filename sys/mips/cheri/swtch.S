@@ -486,10 +486,10 @@ sw2:
  * Set the new thread's TLS pointer.
  *
  * Note that this code is normally removed if the CPU doesn't support ULRI by
- * remove_userlocal_code() in cpu.c. We assume that CHERI cpu supports the
- * thread's TLS pointer, otherwise the following breaks remove_userlocal_code()
- * in cpu.c.
+ * remove_userlocal_code() in cpu.c.
  */
+	.globl	cpu_switch_set_userlocal
+cpu_switch_set_userlocal:
 	clc	$c3, zero, TD_MDTLS($c4)	# Get TLS pointer
 	PTR_LI	t0, TD_MDTLS_TCB_OFFSET
 	cld	t0, t0, 0($c4)			# Get TLS/TCB offset

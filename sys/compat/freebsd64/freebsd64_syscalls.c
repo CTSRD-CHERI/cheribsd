@@ -265,7 +265,7 @@ const char *freebsd64_syscallnames[] = {
 	"freebsd64_aio_write",			/* 256 = freebsd64_aio_write */
 	"freebsd64_lio_listio",			/* 257 = freebsd64_lio_listio */
 	"freebsd64_kbounce",			/* 258 = freebsd64_kbounce */
-	"#259",			/* 259 = nosys */
+	"freebsd64_flag_captured",			/* 259 = freebsd64_flag_captured */
 	"#260",			/* 260 = nosys */
 	"#261",			/* 261 = nosys */
 	"#262",			/* 262 = nosys */
@@ -582,4 +582,5 @@ const char *freebsd64_syscallnames[] = {
 	"freebsd64_sigfastblock",			/* 573 = freebsd64_sigfastblock */
 	"freebsd64___realpathat",			/* 574 = freebsd64___realpathat */
 	"close_range",			/* 575 = close_range */
+	"freebsd64_rpctls_syscall",			/* 576 = freebsd64_rpctls_syscall */
 };

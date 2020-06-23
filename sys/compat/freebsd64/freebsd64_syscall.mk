@@ -169,6 +169,7 @@ MIASM =  \
 	freebsd64_aio_write.o \
 	freebsd64_lio_listio.o \
 	freebsd64_kbounce.o \
+	freebsd64_flag_captured.o \
 	freebsd11_freebsd64_getdents.o \
 	freebsd64_lchmod.o \
 	freebsd64_lutimes.o \
@@ -417,4 +418,5 @@ MIASM =  \
 	freebsd64_shm_rename.o \
 	freebsd64_sigfastblock.o \
 	freebsd64___realpathat.o \
-	close_range.o
+	close_range.o \
+	freebsd64_rpctls_syscall.o

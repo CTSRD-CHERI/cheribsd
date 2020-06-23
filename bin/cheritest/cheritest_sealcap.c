@@ -36,7 +36,6 @@
 
 #include <sys/types.h>
 
-#include <machine/cpuregs.h>
 #include <machine/sysarch.h>
 
 #include <cheri/cheri.h>
@@ -46,6 +45,7 @@
 
 #include "cheritest.h"
 
+#ifdef CHERI_GET_SEALCAP
 void
 test_sealcap_sysarch(const struct cheri_test *ctp __unused)
 {
@@ -255,3 +255,4 @@ test_sealcap_seal_unseal(const struct cheri_test *ctp __unused)
 
 	cheritest_success();
 }
+#endif	/* CHERI_GET_SEALCAP */

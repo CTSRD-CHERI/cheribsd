@@ -65,6 +65,7 @@
 
 #define	cheri_seal(x, y)	__builtin_cheri_seal((x), (y))
 #define	cheri_unseal(x, y)	__builtin_cheri_unseal((x), (y))
+#define	cheri_sealentry(x)	__builtin_cheri_seal_entry((x))
 
 #define	cheri_ccheckperm(c, p)	__builtin_cheri_perms_check((c), (p))
 #define	cheri_cchecktype(c, t)	__builtin_cheri_type_check((c), (t))

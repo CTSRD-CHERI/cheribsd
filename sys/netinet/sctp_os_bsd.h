@@ -295,6 +295,8 @@ typedef struct callout sctp_os_timer_t;
 
 #define SCTP_ALIGN_TO_END(m, len) M_ALIGN(m, len)
 
+#define SCTP_SNPRINTF(...) snprintf(__VA_ARGS__)
+
 /* We make it so if you have up to 4 threads
  * writing based on the default size of
  * the packet log 65 k, that would be
@@ -309,8 +311,6 @@ typedef struct callout sctp_os_timer_t;
 #define SCTP_GATHER_MTU_FROM_IFN_INFO(ifn, ifn_index, af) ((struct ifnet *)ifn)->if_mtu
 #define SCTP_GATHER_MTU_FROM_ROUTE(sctp_ifa, sa, nh) ((uint32_t)((nh != NULL) ? nh->nh_mtu : 0))
 #define SCTP_GATHER_MTU_FROM_INTFC(sctp_ifn) ((sctp_ifn->ifn_p != NULL) ? ((struct ifnet *)(sctp_ifn->ifn_p))->if_mtu : 0)
-/* XXX: Setting MTU from the protocol in this way is simply incorrect */
-#define SCTP_SET_MTU_OF_ROUTE(sa, rt, mtu)
 
 /* (de-)register interface event notifications */
 #define SCTP_REGISTER_INTERFACE(ifhandle, af)

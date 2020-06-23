@@ -1166,13 +1166,13 @@ exec_new_vmspace(struct image_params *imgp, struct sysentvec *sv)
 static int
 get_argenv_ptr(void * __capability *arrayp, void * __capability *ptrp)
 {
-	vaddr_t ptr;
+	uintcap_t ptr;
 	char * __capability array;
-#if __has_feature(capabilities)
-	intcap_t ptr_c;
-#endif
 #ifdef COMPAT_FREEBSD32
 	uint32_t ptr32;
+#endif
+#ifdef COMPAT_FREEBSD64
+	uint64_t ptr64;
 #endif
 
 	array = *arrayp;
@@ -1184,19 +1184,19 @@ get_argenv_ptr(void * __capability *arrayp, void * __capability *ptrp)
 		*ptrp = __USER_CAP_STR((void *)(uintptr_t)ptr32);
 	} else
 #endif
-#if __has_feature(capabilities)
-	if (SV_CURPROC_FLAG(SV_CHERI)) {
-		if (fuecap(array, &ptr_c) == -1)
+#ifdef COMPAT_FREEBSD64
+	if (SV_CURPROC_FLAG(SV_LP64 | SV_CHERI) == SV_LP64) {
+		if (fueword64(array, &ptr64) == -1)
 			return (EFAULT);
-		array += sizeof(ptr_c);
-		*ptrp = (void * __capability)ptr_c;
+		array += sizeof(ptr64);
+		*ptrp = __USER_CAP_STR((void *)(uintptr_t)ptr64);
 	} else
 #endif
 	{
-		if (fueword(array, &ptr) == -1)
+		if (fuecap(array, &ptr) == -1)
 			return (EFAULT);
 		array += sizeof(ptr);
-		*ptrp = __USER_CAP_STR((void *)(uintptr_t)ptr);
+		*ptrp = (void * __capability)ptr;
 	}
 	*arrayp = array;
 	return (0);

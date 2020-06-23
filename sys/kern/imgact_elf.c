@@ -950,6 +950,9 @@ __elfN(enforce_limits)(struct image_params *imgp, const Elf_Ehdr *hdr,
 	err_str = NULL;
 	text_size = data_size = total_size = text_addr = data_addr = 0;
 
+	/* Initialize start_addr so that MIN() produces something useful. */
+	imgp->start_addr = ~0UL;
+
 	for (i = 0; i < hdr->e_phnum; i++) {
 		if (phdr[i].p_type != PT_LOAD || phdr[i].p_memsz == 0)
 			continue;
@@ -1506,8 +1509,7 @@ __elfN(freebsd_copyout_auxargs)(struct image_params *imgp, uintcap_t base)
 	AUXARGS_ENTRY(pos, AT_PAGESZ, args->pagesz);
 	AUXARGS_ENTRY(pos, AT_FLAGS, args->flags);
 #ifdef __ELF_CHERI
-	entry = cheri_setaddress(prog_cap(imgp,
-	    CHERI_CAP_USER_DATA_PERMS | CHERI_CAP_USER_CODE_PERMS),
+	entry = cheri_setaddress(prog_cap(imgp, CHERI_CAP_USER_CODE_PERMS),
 	    args->entry);
 #ifdef CHERI_FLAGS_CAP_MODE
 	/*

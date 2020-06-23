@@ -135,7 +135,7 @@ cheri_set_mmap_capability(struct thread *td, struct image_params *imgp,
 }
 
 void * __capability
-cheri_exec_pcc(struct image_params *imgp)
+cheri_exec_pcc(struct thread *td, struct image_params *imgp)
 {
 	vm_offset_t code_start, code_end;
 	size_t code_length;
@@ -146,21 +146,13 @@ cheri_exec_pcc(struct image_params *imgp)
 	 * use interp_end.  If we are executing rtld directly we can
 	 * use end_addr to find the end of the rtld mapping.
 	 */
-	if (imgp->interp_end != 0)
-		code_end = imgp->interp_end;
-	else
-		code_end = imgp->end_addr;
-
-	/*
-	 * Statically linked binaries need a base 0 code capability
-	 * since otherwise crt_init_globals_will fail.
-	 *
-	 * XXXAR: TODO: is this still true??
-	 */
-	if (imgp->interp_end != 0)
+	if (imgp->interp_end != 0) {
 		code_start = imgp->reloc_base;
-	else
-		code_start = 0;
+		code_end = imgp->interp_end;
+	} else {
+		code_start = imgp->start_addr;
+		code_end = imgp->end_addr;
+	}
 
 	/* Ensure CHERI128 representability */
 	code_length = code_end - code_start;
@@ -168,7 +160,7 @@ cheri_exec_pcc(struct image_params *imgp)
 	code_length = CHERI_REPRESENTABLE_LENGTH(code_length);
 	KASSERT(code_start + code_length >= code_end,
 	    ("%s: truncated PCC", __func__));
-	return (cheri_capability_build_user_code(CHERI_CAP_USER_CODE_PERMS,
+	return (cheri_capability_build_user_code(td, CHERI_CAP_USER_CODE_PERMS,
 	    code_start, code_length, imgp->entry_addr - code_start));
 }
 
@@ -180,7 +172,7 @@ cheri_sigcode_capability(struct thread *td)
 	sv = td->td_proc->p_sysent;
 	KASSERT(sv->sv_sigcode_base != 0,
 	    ("CheriABI requires shared page for sigcode"));
-	return (cheri_capability_build_user_code(CHERI_CAP_USER_CODE_PERMS,
+	return (cheri_capability_build_user_code(td, CHERI_CAP_USER_CODE_PERMS,
 	    sv->sv_sigcode_base, *sv->sv_szsigcode, 0));
 }
 

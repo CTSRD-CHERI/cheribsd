@@ -143,7 +143,7 @@ _CPUCFLAGS = -mcpu=${CPUTYPE}
 	${CPUTYPE:Mmips[1234]} != ""
 _CPUCFLAGS = -march=${CPUTYPE}
 . elif ${CPUTYPE} == "cheri"
-# XXX: assume we're getting the right flags already.
+_CPUCFLAGS = -cheri=128
 . else
 # Default -march to the CPUTYPE passed in, with mips stripped off so we
 # accept either mips4kc or 4kc, mostly for historical reasons
@@ -425,6 +425,10 @@ RISCV_MARCH:=	${RISCV_MARCH}xcheri
 
 .if ${MACHINE_ARCH:Mriscv*c*}
 RISCV_ABI=	l64pc128
+# Clang no longer defines __LP64__ for Cheri purecap ABI but there are a
+# lot of files that use it to check for not 32-bit
+# XXXAR: Remove this once we have checked all the #ifdef __LP64__ uses
+CFLAGS+=	-D__LP64__=1
 .else
 RISCV_ABI=	lp64
 .endif
