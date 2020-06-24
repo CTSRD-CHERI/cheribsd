@@ -274,14 +274,16 @@ ckh_grow(tsd_t *tsd, ckh_t *ckh) {
 		size_t usize;
 
 		lg_curcells++;
-		usize = sz_sa2u(sizeof(ckhc_t) << lg_curcells, CACHELINE);
+		usize = ROUND_SIZE(sz_sa2u(sizeof(ckhc_t) << lg_curcells,
+		    CACHELINE));
 		if (unlikely(usize == 0
 		    || usize > SC_LARGE_MAXCLASS)) {
 			ret = true;
 			goto label_return;
 		}
-		tab = (ckhc_t *)ipallocztm(tsd_tsdn(tsd), usize, CACHELINE,
-		    true, NULL, true, arena_ichoose(tsd, NULL));
+		tab = (ckhc_t *)BOUND_PTR(ipallocztm(tsd_tsdn(tsd), usize,
+		    CACHELINE, true, NULL, true, arena_ichoose(tsd, NULL)),
+		    usize);
 		if (tab == NULL) {
 			ret = true;
 			goto label_return;
@@ -320,12 +322,12 @@ ckh_shrink(tsd_t *tsd, ckh_t *ckh) {
 	 */
 	lg_prevbuckets = ckh->lg_curbuckets;
 	lg_curcells = ckh->lg_curbuckets + LG_CKH_BUCKET_CELLS - 1;
-	usize = sz_sa2u(sizeof(ckhc_t) << lg_curcells, CACHELINE);
+	usize = ROUND_SIZE(sz_sa2u(sizeof(ckhc_t) << lg_curcells, CACHELINE));
 	if (unlikely(usize == 0 || usize > SC_LARGE_MAXCLASS)) {
 		return;
 	}
-	tab = (ckhc_t *)ipallocztm(tsd_tsdn(tsd), usize, CACHELINE, true, NULL,
-	    true, arena_ichoose(tsd, NULL));
+	tab = (ckhc_t *)BOUND_PTR(ipallocztm(tsd_tsdn(tsd), usize, CACHELINE,
+	    true, NULL, true, arena_ichoose(tsd, NULL)), usize);
 	if (tab == NULL) {
 		/*
 		 * An OOM error isn't worth propagating, since it doesn't
@@ -396,13 +398,13 @@ ckh_new(tsd_t *tsd, ckh_t *ckh, size_t minitems, ckh_hash_t *hash,
 	ckh->hash = hash;
 	ckh->keycomp = keycomp;
 
-	usize = sz_sa2u(sizeof(ckhc_t) << lg_mincells, CACHELINE);
+	usize = ROUND_SIZE(sz_sa2u(sizeof(ckhc_t) << lg_mincells, CACHELINE));
 	if (unlikely(usize == 0 || usize > SC_LARGE_MAXCLASS)) {
 		ret = true;
 		goto label_return;
 	}
-	ckh->tab = (ckhc_t *)ipallocztm(tsd_tsdn(tsd), usize, CACHELINE, true,
-	    NULL, true, arena_ichoose(tsd, NULL));
+	ckh->tab = (ckhc_t *)BOUND_PTR(ipallocztm(tsd_tsdn(tsd), usize,
+	    CACHELINE, true, NULL, true, arena_ichoose(tsd, NULL)), usize);
 	if (ckh->tab == NULL) {
 		ret = true;
 		goto label_return;
