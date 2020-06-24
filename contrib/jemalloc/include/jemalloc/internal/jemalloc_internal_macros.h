@@ -121,8 +121,8 @@ JEMALLOC_DIAGNOSTIC_DISABLE_SPURIOUS
 	     CHERI_PERMS_USERSPACE_DATA & ~CHERI_PERM_CHERIABI_VMMAP))
 
 /*
- * XXX-BD: In theory this poses an overflow risk.  It's overflow
- * handling is probalby needed in each individual function, returning
+ * XXX-BD: In theory this poses an overflow risk.  Its overflow
+ * handling is probably needed in each individual function, returning
  * an appropriate error value.
  */
 #define	ROUND_SIZE(size)	CHERI_REPRESENTABLE_LENGTH(size)
