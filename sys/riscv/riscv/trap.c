@@ -470,6 +470,13 @@ do_trap_user(struct trapframe *frame)
 		userret(td, frame);
 		break;
 #if __has_feature(capabilities)
+	/* M-mode emulates alignment of non-CHERI instructions */
+	case EXCP_MISALIGNED_LOAD:
+	case EXCP_MISALIGNED_STORE:
+		call_trapsignal(td, SIGBUS, BUS_ADRALN,
+		    (void * __capability)(uintcap_t)frame->tf_stval, exception,
+		    0);
+		break;
 	case EXCP_LOAD_CAP_PAGE_FAULT:
 		call_trapsignal(td, SIGSEGV, SEGV_LOADTAG,
 		    (void * __capability)(uintcap_t)frame->tf_stval, exception,
