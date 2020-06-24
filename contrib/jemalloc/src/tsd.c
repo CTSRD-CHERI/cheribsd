@@ -317,7 +317,9 @@ tsd_fetch_slow(tsd_t *tsd, bool minimal) {
 
 void *
 malloc_tsd_malloc(size_t size) {
-	return a0malloc(CACHELINE_CEILING(size));
+	size = ROUND_SIZE(CACHELINE_CEILING(size));
+
+	return BOUND_PTR(a0malloc(size), size);
 }
 
 void
