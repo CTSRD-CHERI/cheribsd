@@ -144,6 +144,10 @@ typedef struct blocking_gai_resp_tag {
 	 * Followed by ai_count struct addrinfo and then ai_count
 	 * sockaddr_u and finally the canonical name strings.
 	 */
+	union {
+		struct addrinfo	ai;
+		sockaddr_u	socku;
+	} _align[0];
 } blocking_gai_resp;
 
 typedef struct blocking_gni_req_tag {

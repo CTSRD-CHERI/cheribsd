@@ -237,6 +237,7 @@ typedef u_int32 tstamp_t;	/* NTP seconds timestamp */
  */
 typedef union max_alignment_tag {
 	double		d;
+	void *		p;
 } max_alignment;
 
 #define MAXALIGN		sizeof(max_alignment)
