@@ -1317,6 +1317,8 @@ pmap_pdpe_to_pde(pdp_entry_t *pdpe, vm_offset_t va)
 {
 	pd_entry_t *pde;
 
+	KASSERT((*pdpe & PG_PS) == 0,
+	    ("%s: pdpe %#lx is a leaf", __func__, *pdpe));
 	pde = (pd_entry_t *)PHYS_TO_DMAP(*pdpe & PG_FRAME);
 	return (&pde[pmap_pde_index(va)]);
 }
@@ -1341,6 +1343,8 @@ pmap_pde_to_pte(pd_entry_t *pde, vm_offset_t va)
 {
 	pt_entry_t *pte;
 
+	KASSERT((*pde & PG_PS) == 0,
+	    ("%s: pde %#lx is a leaf", __func__, *pde));
 	pte = (pt_entry_t *)PHYS_TO_DMAP(*pde & PG_FRAME);
 	return (&pte[pmap_pte_index(va)]);
 }
@@ -1696,7 +1700,7 @@ pmap_bootstrap(vm_paddr_t *firstaddr)
 	 * are required for promotion of the corresponding kernel virtual
 	 * addresses to superpage mappings.
 	 */
-	vm_phys_add_seg(KPTphys, KPTphys + ptoa(nkpt));
+	vm_phys_early_add_seg(KPTphys, KPTphys + ptoa(nkpt));
 
 	/*
 	 * Account for the virtual addresses mapped by create_pagetables().
@@ -2587,6 +2591,20 @@ DEFINE_IFUNC(static, void, pmap_invalidate_page_mode, (pmap_t, vm_offset_t))
 	return (pmap_invalidate_page_nopcid);
 }
 
+static void
+pmap_invalidate_page_curcpu_cb(pmap_t pmap, vm_offset_t va,
+    vm_offset_t addr2 __unused)
+{
+
+	if (pmap == kernel_pmap) {
+		invlpg(va);
+	} else {
+		if (pmap == PCPU_GET(curpmap))
+			invlpg(va);
+		pmap_invalidate_page_mode(pmap, va);
+	}
+}
+
 void
 pmap_invalidate_page(pmap_t pmap, vm_offset_t va)
 {
@@ -2599,16 +2617,8 @@ pmap_invalidate_page(pmap_t pmap, vm_offset_t va)
 	KASSERT(pmap->pm_type == PT_X86,
 	    ("pmap_invalidate_page: invalid type %d", pmap->pm_type));
 
-	sched_pin();
-	if (pmap == kernel_pmap) {
-		invlpg(va);
-	} else {
-		if (pmap == PCPU_GET(curpmap))
-			invlpg(va);
-		pmap_invalidate_page_mode(pmap, va);
-	}
-	smp_masked_invlpg(pmap_invalidate_cpu_mask(pmap), va, pmap);
-	sched_unpin();
+	smp_masked_invlpg(pmap_invalidate_cpu_mask(pmap), va, pmap,
+	    pmap_invalidate_page_curcpu_cb);
 }
 
 /* 4k PTEs -- Chosen to exceed the total size of Broadwell L2 TLB */
@@ -2684,10 +2694,26 @@ DEFINE_IFUNC(static, void, pmap_invalidate_range_mode, (pmap_t, vm_offset_t,
 	return (pmap_invalidate_range_nopcid);
 }
 
+static void
+pmap_invalidate_range_curcpu_cb(pmap_t pmap, vm_offset_t sva, vm_offset_t eva)
+{
+	vm_offset_t addr;
+
+	if (pmap == kernel_pmap) {
+		for (addr = sva; addr < eva; addr += PAGE_SIZE)
+			invlpg(addr);
+	} else {
+		if (pmap == PCPU_GET(curpmap)) {
+			for (addr = sva; addr < eva; addr += PAGE_SIZE)
+				invlpg(addr);
+		}
+		pmap_invalidate_range_mode(pmap, sva, eva);
+	}
+}
+
 void
 pmap_invalidate_range(pmap_t pmap, vm_offset_t sva, vm_offset_t eva)
 {
-	vm_offset_t addr;
 
 	if (eva - sva >= PMAP_INVLPG_THRESHOLD) {
 		pmap_invalidate_all(pmap);
@@ -2702,19 +2728,8 @@ pmap_invalidate_range(pmap_t pmap, vm_offset_t sva, vm_offset_t eva)
 	KASSERT(pmap->pm_type == PT_X86,
 	    ("pmap_invalidate_range: invalid type %d", pmap->pm_type));
 
-	sched_pin();
-	if (pmap == kernel_pmap) {
-		for (addr = sva; addr < eva; addr += PAGE_SIZE)
-			invlpg(addr);
-	} else {
-		if (pmap == PCPU_GET(curpmap)) {
-			for (addr = sva; addr < eva; addr += PAGE_SIZE)
-				invlpg(addr);
-		}
-		pmap_invalidate_range_mode(pmap, sva, eva);
-	}
-	smp_masked_invlpg_range(pmap_invalidate_cpu_mask(pmap), sva, eva, pmap);
-	sched_unpin();
+	smp_masked_invlpg_range(pmap_invalidate_cpu_mask(pmap), sva, eva, pmap,
+	    pmap_invalidate_range_curcpu_cb);
 }
 
 static inline void
@@ -2801,6 +2816,14 @@ DEFINE_IFUNC(static, void, pmap_invalidate_all_mode, (pmap_t))
 	return (pmap_invalidate_all_nopcid);
 }
 
+static void
+pmap_invalidate_all_curcpu_cb(pmap_t pmap, vm_offset_t addr1 __unused,
+    vm_offset_t addr2 __unused)
+{
+
+	pmap_invalidate_all_mode(pmap);
+}
+
 void
 pmap_invalidate_all(pmap_t pmap)
 {
@@ -2813,20 +2836,23 @@ pmap_invalidate_all(pmap_t pmap)
 	KASSERT(pmap->pm_type == PT_X86,
 	    ("pmap_invalidate_all: invalid type %d", pmap->pm_type));
 
-	sched_pin();
-	pmap_invalidate_all_mode(pmap);
-	smp_masked_invltlb(pmap_invalidate_cpu_mask(pmap), pmap);
-	sched_unpin();
+	smp_masked_invltlb(pmap_invalidate_cpu_mask(pmap), pmap,
+	    pmap_invalidate_all_curcpu_cb);
+}
+
+static void
+pmap_invalidate_cache_curcpu_cb(pmap_t pmap __unused, vm_offset_t va __unused,
+    vm_offset_t addr2 __unused)
+{
+
+	wbinvd();
 }
 
 void
 pmap_invalidate_cache(void)
 {
 
-	sched_pin();
-	wbinvd();
-	smp_cache_flush();
-	sched_unpin();
+	smp_cache_flush(pmap_invalidate_cache_curcpu_cb);
 }
 
 struct pde_action {
@@ -6441,7 +6467,7 @@ pmap_enter_pde(pmap_t pmap, vm_offset_t va, pd_entry_t newpde, u_int flags,
  */
 void
 pmap_enter_object(pmap_t pmap, vm_offset_t start, vm_offset_t end,
-    vm_page_t m_start, vm_prot_t prot)
+    vm_page_t m_start, vm_prot_t prot, u_int flags)
 {
 	struct rwlock *lock;
 	vm_offset_t va;
@@ -6482,7 +6508,8 @@ pmap_enter_object(pmap_t pmap, vm_offset_t start, vm_offset_t end,
  */
 
 void
-pmap_enter_quick(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot)
+pmap_enter_quick(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot,
+    u_int flags)
 {
 	struct rwlock *lock;
 

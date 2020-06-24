@@ -43,6 +43,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/arb.h>
 #include <sys/module.h>
 #include <sys/kernel.h>
+#include <sys/libkern.h>
 #ifdef TCP_HHOOK
 #include <sys/hhook.h>
 #endif
@@ -3097,43 +3098,6 @@ bbr_lt_bw_samp_done(struct tcp_bbr *bbr, uint64_t bw, uint32_t cts, uint32_t tim
 	bbr_log_type_ltbw(bbr, cts, 5, 0, (uint32_t)bw, 0, timin);
 }
 
-/*
- * RRS: Copied from user space!
- * Calculate a uniformly distributed random number less than upper_bound
- * avoiding "modulo bias".
- *
- * Uniformity is achieved by generating new random numbers until the one
- * returned is outside the range [0, 2**32 % upper_bound).  This
- * guarantees the selected random number will be inside
- * [2**32 % upper_bound, 2**32) which maps back to [0, upper_bound)
- * after reduction modulo upper_bound.
- */
-static uint32_t
-arc4random_uniform(uint32_t upper_bound)
-{
-	uint32_t r, min;
-
-	if (upper_bound < 2)
-		return 0;
-
-	/* 2**32 % x == (2**32 - x) % x */
-	min = -upper_bound % upper_bound;
-
-	/*
-	 * This could theoretically loop forever but each retry has
-	 * p > 0.5 (worst case, usually far better) of selecting a
-	 * number inside the range we need, so it should rarely need
-	 * to re-roll.
-	 */
-	for (;;) {
-		r = arc4random();
-		if (r >= min)
-			break;
-	}
-
-	return r % upper_bound;
-}
-
 static void
 bbr_randomize_extra_state_time(struct tcp_bbr *bbr)
 {
@@ -4975,6 +4939,15 @@ bbr_remxt_tmr(struct tcpcb *tp)
 			rsm->r_flags &= ~(BBR_ACKED | BBR_SACK_PASSED | BBR_WAS_SACKPASS);
 			bbr_log_type_rsmclear(bbr, cts, rsm, old_flags, __LINE__);
 		} else {
+			if ((tp->t_state < TCPS_ESTABLISHED) &&
+			    (rsm->r_start == tp->snd_una)) {
+				/*
+				 * Special case for TCP FO. Where
+				 * we sent more data beyond the snd_max.
+				 * We don't mark that as lost and stop here.
+				 */
+				break;
+			}
 			if ((rsm->r_flags & BBR_MARKED_LOST) == 0) {
 				bbr->r_ctl.rc_lost += rsm->r_end - rsm->r_start;
 				bbr->r_ctl.rc_lost_bytes += rsm->r_end - rsm->r_start;
@@ -6055,7 +6028,7 @@ bbr_log_output(struct tcp_bbr *bbr, struct tcpcb *tp, struct tcpopt *to, int32_t
 		 * or FIN if seq_out is adding more on and a FIN is present
 		 * (and we are not resending).
 		 */
-		if (th_flags & TH_SYN)
+		if ((th_flags & TH_SYN) && (tp->iss == seq_out))
 			len++;
 		if (th_flags & TH_FIN)
 			len++;
@@ -8105,7 +8078,7 @@ bbr_restart_after_idle(struct tcp_bbr *bbr, uint32_t cts, uint32_t idle_time)
 			bbr->r_ctl.rc_bbr_hptsi_gain = bbr->r_ctl.rc_startup_pg;
 			bbr->r_ctl.rc_bbr_cwnd_gain = bbr->r_ctl.rc_startup_pg;
 			bbr_log_type_statechange(bbr, cts, __LINE__);
-		} else {
+		} else if (bbr->rc_bbr_state == BBR_STATE_PROBE_BW) {
 			bbr_substate_change(bbr, cts, __LINE__, 1);
 		}
 	}
@@ -8396,7 +8369,7 @@ bbr_process_data(struct mbuf *m, struct tcphdr *th, struct socket *so,
 	 */
 	tfo_syn = ((tp->t_state == TCPS_SYN_RECEIVED) &&
 		   IS_FASTOPEN(tp->t_flags));
-	if ((tlen || (thflags & TH_FIN) || tfo_syn) &&
+	if ((tlen || (thflags & TH_FIN) || (tfo_syn && tlen > 0)) &&
 	    TCPS_HAVERCVDFIN(tp->t_state) == 0) {
 		tcp_seq save_start = th->th_seq;
 		tcp_seq save_rnxt  = tp->rcv_nxt;
@@ -8442,6 +8415,15 @@ bbr_process_data(struct mbuf *m, struct tcphdr *th, struct socket *so,
 				tp->t_flags |= TF_ACKNOW;
 			}
 			tp->rcv_nxt += tlen;
+			if (tlen &&
+			    ((tp->t_flags2 & TF2_FBYTES_COMPLETE) == 0) &&
+			    (tp->t_fbyte_in == 0)) {
+				tp->t_fbyte_in = ticks;
+				if (tp->t_fbyte_in == 0)
+					tp->t_fbyte_in = 1;
+				if (tp->t_fbyte_out && tp->t_fbyte_in)
+					tp->t_flags2 |= TF2_FBYTES_COMPLETE;
+			}
 			thflags = th->th_flags & TH_FIN;
 			KMOD_TCPSTAT_ADD(tcps_rcvpack, (int)nsegs);
 			KMOD_TCPSTAT_ADD(tcps_rcvbyte, tlen);
@@ -8658,6 +8640,15 @@ bbr_do_fastnewdata(struct mbuf *m, struct tcphdr *th, struct socket *so,
 		tcp_clean_sackreport(tp);
 	KMOD_TCPSTAT_INC(tcps_preddat);
 	tp->rcv_nxt += tlen;
+	if (tlen &&
+	    ((tp->t_flags2 & TF2_FBYTES_COMPLETE) == 0) &&
+	    (tp->t_fbyte_in == 0)) {
+		tp->t_fbyte_in = ticks;
+		if (tp->t_fbyte_in == 0)
+			tp->t_fbyte_in = 1;
+		if (tp->t_fbyte_out && tp->t_fbyte_in)
+			tp->t_flags2 |= TF2_FBYTES_COMPLETE;
+	}
 	/*
 	 * Pull snd_wl1 up to prevent seq wrap relative to th_seq.
 	 */
@@ -11586,17 +11577,20 @@ bbr_do_segment_nounlock(struct mbuf *m, struct tcphdr *th, struct socket *so,
 			    (tp->t_flags & TF_REQ_SCALE)) {
 				tp->t_flags |= TF_RCVD_SCALE;
 				tp->snd_scale = to.to_wscale;
-			}
+			} else
+				tp->t_flags &= ~TF_REQ_SCALE;
 			/*
 			 * Initial send window.  It will be updated with the
 			 * next incoming segment to the scaled value.
 			 */
 			tp->snd_wnd = th->th_win;
-			if (to.to_flags & TOF_TS) {
+			if ((to.to_flags & TOF_TS) &&
+			    (tp->t_flags & TF_REQ_TSTMP)) {
 				tp->t_flags |= TF_RCVD_TSTMP;
 				tp->ts_recent = to.to_tsval;
 				tp->ts_recent_age = tcp_tv_to_mssectick(&bbr->rc_tv);
-			}
+			} else
+			    tp->t_flags &= ~TF_REQ_TSTMP;
 			if (to.to_flags & TOF_MSS)
 				tcp_mss(tp, to.to_mss);
 			if ((tp->t_flags & TF_SACK_PERMIT) &&
@@ -12006,21 +12000,27 @@ bbr_window_update_needed(struct tcpcb *tp, struct socket *so, uint32_t recwin, i
 	 * "adv" is the amount we could increase the window, taking into
 	 * account that we are limited by TCP_MAXWIN << tp->rcv_scale.
 	 */
-	uint32_t adv;
+	int32_t adv;
 	int32_t oldwin;
 
-	adv = min(recwin, TCP_MAXWIN << tp->rcv_scale);
+	adv = recwin;
 	if (SEQ_GT(tp->rcv_adv, tp->rcv_nxt)) {
 		oldwin = (tp->rcv_adv - tp->rcv_nxt);
-		adv -= oldwin;
+		if (adv > oldwin)
+			adv -= oldwin;
+		else {
+			/* We can't increase the window */
+			adv = 0;
+		}
 	} else
 		oldwin = 0;
 
 	/*
-	 * If the new window size ends up being the same as the old size
-	 * when it is scaled, then don't force a window update.
+	 * If the new window size ends up being the same as or less
+	 * than the old size when it is scaled, then don't force
+	 * a window update.
 	 */
-	if (oldwin >> tp->rcv_scale == (adv + oldwin) >> tp->rcv_scale)
+	if (oldwin >> tp->rcv_scale >= (adv + oldwin) >> tp->rcv_scale)
 		return (0);
 
 	if (adv >= (2 * maxseg) &&
@@ -12315,7 +12315,8 @@ bbr_output_wtime(struct tcpcb *tp, const struct timeval *tv)
 	     (tp->t_state == TCPS_SYN_SENT)) &&
 	    SEQ_GT(tp->snd_max, tp->snd_una) &&	/* initial SYN or SYN|ACK sent */
 	    (tp->t_rxtshift == 0)) {	/* not a retransmit */
-		return (0);
+		len = 0;
+		goto just_return_nolock;
 	}
 	/*
 	 * Before sending anything check for a state update. For hpts
@@ -14286,6 +14287,7 @@ nomore:
 	    (hw_tls == 0) &&
 	    (len > 0) &&
 	    ((flags & TH_RST) == 0) &&
+	    ((flags & TH_SYN) == 0) &&
 	    (IN_RECOVERY(tp->t_flags) == 0) &&
 	    (bbr->rc_in_persist == 0) &&
 	    (tot_len < bbr->r_ctl.rc_pace_max_segs)) {

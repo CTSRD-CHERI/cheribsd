@@ -144,22 +144,22 @@ SYSCTL_INT(_machdep, OID_AUTO, log_cheri_registers, CTLFLAG_RW,
 
 #define	lwl_macro(data, addr)						\
 	__asm __volatile ("lwl %0, 0x0(%1)"				\
-			: "=r" (data)	/* outputs */			\
+			: "+r" (data)	/* outputs */			\
 			: "r" (addr));	/* inputs */
 
 #define	lwr_macro(data, addr)						\
 	__asm __volatile ("lwr %0, 0x0(%1)"				\
-			: "=r" (data)	/* outputs */			\
+			: "+r" (data)	/* outputs */			\
 			: "r" (addr));	/* inputs */
 
 #define	ldl_macro(data, addr)						\
 	__asm __volatile ("ldl %0, 0x0(%1)"				\
-			: "=r" (data)	/* outputs */			\
+			: "+r" (data)	/* outputs */			\
 			: "r" (addr));	/* inputs */
 
 #define	ldr_macro(data, addr)						\
 	__asm __volatile ("ldr %0, 0x0(%1)"				\
-			: "=r" (data)	/* outputs */			\
+			: "+r" (data)	/* outputs */			\
 			: "r" (addr));	/* inputs */
 
 #define	sb_macro(data, addr)						\
@@ -1160,8 +1160,14 @@ dofault:
 		msg = "USER_CHERI_EXCEPTION";
 		fetch_bad_instr(trapframe);
 		log_c2e_exception(msg, trapframe, type);
-		i = SIGPROT;
-		ucode = cheri_capcause_to_sicode(trapframe->capcause);
+		if (CHERI_CAPCAUSE_EXCCODE(trapframe->capcause) ==
+		    CHERI_EXCCODE_TLBSTORE) {
+			i = SIGSEGV;
+			ucode = SEGV_STORETAG;
+		} else {
+			i = SIGPROT;
+			ucode = cheri_capcause_to_sicode(trapframe->capcause);
+		}
 		break;
 
 #else
@@ -1382,9 +1388,11 @@ err:
 	ksiginfo_init_trap(&ksi);
 	ksi.ksi_signo = i;
 	ksi.ksi_code = ucode;
+	if (i == SIGSEGV)
+		addr = (void * __capability)(intcap_t)trapframe->badvaddr;
 	/* XXXBD: probably not quite right for CheriABI */
-	ksi.ksi_addr = (void * __capability)(intcap_t)addr;
-	ksi.ksi_trapno = type;
+	ksi.ksi_addr = addr;
+	ksi.ksi_trapno = type & ~T_USER;
 #if defined(CPU_CHERI)
 	if (i == SIGPROT)
 		ksi.ksi_capreg = trapframe->capcause &
@@ -2021,7 +2029,7 @@ static int
 mips_unaligned_load_store(struct trapframe *frame, int mode, register_t addr, uint32_t inst)
 {
 	register_t *reg = (register_t *) frame;
-	register_t value;
+	register_t value = 0;
 	unsigned size;
 	int src_regno;
 	int op_type = 0;

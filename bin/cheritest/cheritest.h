@@ -70,8 +70,10 @@ struct cheritest_child_state {
 	/* Fields filled in by the child signal handler. */
 	int		ccs_signum;
 	int		ccs_si_code;
-	register_t	ccs_mips_cause;
+	int		ccs_si_trapno;
+#ifdef __mips__
 	register_t	ccs_cp2_cause;
+#endif
 	int		ccs_unwound;  /* If any trusted-stack frames unwound. */
 
 	/* Fields filled in by the test itself. */
@@ -94,8 +96,7 @@ extern struct cheritest_child_state *ccsp;
  * access to configuration state, such as strings passed to/from stdio.
  */
 #define	CT_FLAG_SIGNAL		0x00000001  /* Should fault; checks signum. */
-#define	CT_FLAG_MIPS_EXCCODE	0x00000002  /* Check MIPS exception code. */
-#define	CT_FLAG_CP2_EXCCODE	0x00000004  /* Check CP2 exception code. */
+#define	CT_FLAG_SI_TRAPNO	0x00000002  /* Check signal si_trapno. */
 #define	CT_FLAG_STDOUT_STRING	0x00000008  /* Check stdout for a string. */
 #define	CT_FLAG_STDIN_STRING	0x00000010  /* Provide string on stdin. */
 #define	CT_FLAG_STDOUT_IGNORE	0x00000020  /* Standard output produced,
@@ -123,8 +124,7 @@ struct cheri_test {
 	u_int		 ct_flags;
 	int		 ct_signum;
 	int		 ct_si_code;
-	register_t	 ct_mips_exccode;
-	register_t	 ct_cp2_exccode;
+	int		 ct_si_trapno;
 	const char	*ct_stdin_string;
 	const char	*ct_stdout_string;
 	const char	*ct_xfail_reason;
@@ -386,6 +386,14 @@ DECLARE_CHERI_TEST(test_sandbox_fd_read_revoke);
 DECLARE_CHERI_TEST(test_sandbox_fd_write);
 DECLARE_CHERI_TEST(test_sandbox_fd_write_revoke);
 
+/* cheritest_flag_captured.c */
+DECLARE_CHERI_TEST(test_flag_captured);
+DECLARE_CHERI_TEST(test_flag_captured_incorrect_key);
+DECLARE_CHERI_TEST(test_flag_captured_null);
+#ifdef __CHERI_PURE_CAPABILITY__
+DECLARE_CHERI_TEST(test_flag_captured_empty);
+#endif
+
 /* cheritest_kbounce.c */
 DECLARE_CHERI_TEST(test_kbounce);
 
@@ -479,6 +487,9 @@ DECLARE_CHERI_TEST(test_signal_handler_usr1);
 DECLARE_CHERI_TEST(test_signal_sigaction_usr1);
 DECLARE_CHERI_TEST(test_signal_sigaltstack);
 DECLARE_CHERI_TEST(test_signal_sigaltstack_disable);
+#ifdef __CHERI_PURE_CAPABILITY__
+DECLARE_CHERI_TEST(test_signal_returncap);
+#endif
 
 /* cheritest_string.c */
 DECLARE_CHERI_TEST(test_string_kern_memcpy_c);
@@ -502,11 +513,21 @@ DECLARE_CHERI_TEST(test_initregs_default);
 #ifdef __CHERI_PURE_CAPABILITY__
 DECLARE_CHERI_TEST(test_initregs_stack);
 DECLARE_CHERI_TEST(test_initregs_stack_user_perms);
+DECLARE_CHERI_TEST(test_initregs_returncap);
 #endif
 DECLARE_CHERI_TEST(test_initregs_idc);
 DECLARE_CHERI_TEST(test_initregs_pcc);
 DECLARE_CHERI_TEST(test_copyregs);
 DECLARE_CHERI_TEST(test_listregs);
+
+/* cheritest_sentries.c */
+#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef CHERI_DYNAMIC_TESTS
+DECLARE_CHERI_TEST(test_sentry_dlsym);
+#endif
+DECLARE_CHERI_TEST(test_sentry_libc);
+DECLARE_CHERI_TEST(test_sentry_static);
+#endif
 
 /* cheritest_tls.c */
 DECLARE_CHERI_TEST(test_tls_align_4k);
@@ -522,7 +543,7 @@ DECLARE_CHERI_TEST(cheritest_vm_tag_shm_open_anon_shared);
 DECLARE_CHERI_TEST(cheritest_vm_tag_shm_open_anon_private);
 DECLARE_CHERI_TEST(cheritest_vm_tag_shm_open_anon_shared2x);
 DECLARE_CHERI_TEST(cheritest_vm_shm_open_anon_unix_surprise);
-#ifdef CHERIABI_TESTS
+#ifdef __CHERI_PURE_CAPABILITY__
 DECLARE_CHERI_TEST(cheritest_vm_cap_share_fd_kqueue);
 DECLARE_CHERI_TEST(cheritest_vm_cap_share_sigaction);
 #endif
@@ -534,7 +555,6 @@ DECLARE_CHERI_TEST(cheritest_vm_tag_tmpfile_private_prefault);
 DECLARE_CHERI_TEST(cheritest_vm_cow_read);
 DECLARE_CHERI_TEST(cheritest_vm_cow_write);
 const char	*xfail_need_writable_tmp(const char *name);
-const char	*xfail_need_writable_non_tmpfs_tmp(const char *name);
 
 /* cheritest_vm_swap.c */
 DECLARE_CHERI_TEST(cheritest_vm_swap);

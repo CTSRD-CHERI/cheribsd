@@ -41,9 +41,10 @@
 
 static void	hybridabi_capability_set_user_ddc(void * __capability *);
 static void	hybridabi_capability_set_user_csp(void * __capability *);
-static void	hybridabi_capability_set_user_pcc(void * __capability *);
-static void	hybridabi_capability_set_user_entry(void * __capability *,
-		    unsigned long);
+static void	hybridabi_capability_set_user_pcc(struct thread *td,
+		    void * __capability *);
+static void	hybridabi_capability_set_user_entry(struct thread *td,
+		    void * __capability *, unsigned long);
 static void	hybridabi_thread_init(struct thread *td, unsigned long);
 
 static void
@@ -78,24 +79,24 @@ hybridabi_capability_set_user_idc(void * __capability *cp)
 }
 
 static void
-hybridabi_capability_set_user_pcc(void * __capability *cp)
+hybridabi_capability_set_user_pcc(struct thread *td, void * __capability *cp)
 {
 
-	*cp = cheri_capability_build_user_code(CHERI_CAP_USER_CODE_PERMS,
+	*cp = cheri_capability_build_user_code(td, CHERI_CAP_USER_CODE_PERMS,
 	    CHERI_CAP_USER_CODE_BASE, CHERI_CAP_USER_CODE_LENGTH,
 	    CHERI_CAP_USER_CODE_OFFSET);
 }
 
 static void
-hybridabi_capability_set_user_entry(void * __capability *cp,
-    unsigned long entry_addr)
+hybridabi_capability_set_user_entry(struct thread *td,
+    void * __capability *cp, unsigned long entry_addr)
 {
 
 	/*
 	 * Set the jump target register for the pure capability calling
 	 * convention.
 	 */
-	*cp = cheri_capability_build_user_code(CHERI_CAP_USER_CODE_PERMS,
+	*cp = cheri_capability_build_user_code(td, CHERI_CAP_USER_CODE_PERMS,
 	    CHERI_CAP_USER_CODE_BASE, CHERI_CAP_USER_CODE_LENGTH, entry_addr);
 }
 
@@ -130,8 +131,8 @@ hybridabi_thread_init(struct thread *td, unsigned long entry_addr)
 	hybridabi_capability_set_user_ddc(&frame->ddc);
 	hybridabi_capability_set_user_csp(&frame->csp);
 	hybridabi_capability_set_user_idc(&frame->idc);
-	hybridabi_capability_set_user_entry((void * __capability *)&frame->pc, entry_addr);
-	hybridabi_capability_set_user_entry(&frame->c12, entry_addr);
+	hybridabi_capability_set_user_entry(td, (void * __capability *)&frame->pc, entry_addr);
+	hybridabi_capability_set_user_entry(td, &frame->c12, entry_addr);
 
 	/*
 	 * Initialise signal-handling state; this can't yet be modified
@@ -145,7 +146,7 @@ hybridabi_thread_init(struct thread *td, unsigned long entry_addr)
 	hybridabi_capability_set_user_csp(&csigp->csig_csp);
 	hybridabi_capability_set_user_csp(&csigp->csig_default_stack);
 	hybridabi_capability_set_user_idc(&csigp->csig_idc);
-	hybridabi_capability_set_user_pcc(&csigp->csig_pcc);
+	hybridabi_capability_set_user_pcc(td, &csigp->csig_pcc);
 	csigp->csig_sigcode = cheri_sigcode_capability(td);
 
         /*

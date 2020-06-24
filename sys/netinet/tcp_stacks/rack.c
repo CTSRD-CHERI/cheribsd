@@ -3873,6 +3873,7 @@ skip_measurement:
 	 * the next send will trigger us picking up the missing data.
 	 */
 	if (rack->r_ctl.rc_first_appl &&
+	    TCPS_HAVEESTABLISHED(tp->t_state) &&
 	    rack->r_ctl.rc_app_limited_cnt &&
 	    (SEQ_GT(rack->r_ctl.rc_first_appl->r_start, th_ack)) &&
 	    ((rack->r_ctl.rc_first_appl->r_start - th_ack) >
@@ -4094,9 +4095,15 @@ rack_cong_signal(struct tcpcb *tp, struct tcphdr *th, uint32_t type)
 		}
 		break;
 	case CC_ECN:
-		if (!IN_CONGRECOVERY(tp->t_flags)) {
+		if (!IN_CONGRECOVERY(tp->t_flags) ||
+		    /*
+		     * Allow ECN reaction on ACK to CWR, if
+		     * that data segment was also CE marked.
+		     */
+		    SEQ_GEQ(th->th_ack, tp->snd_recover)) {
+			EXIT_CONGRECOVERY(tp->t_flags);
 			KMOD_TCPSTAT_INC(tcps_ecn_rcwnd);
-			tp->snd_recover = tp->snd_max;
+			tp->snd_recover = tp->snd_max + 1;
 			if (tp->t_flags2 & TF2_ECN_PERMIT)
 				tp->t_flags2 |= TF2_ECN_SND_CWR;
 		}
@@ -6230,7 +6237,7 @@ rack_log_output(struct tcpcb *tp, struct tcpopt *to, int32_t len,
 		 * or FIN if seq_out is adding more on and a FIN is present
 		 * (and we are not resending).
 		 */
-		if (th_flags & TH_SYN)
+		if ((th_flags & TH_SYN) && (seq_out == tp->iss)) 
 			len++;
 		if (th_flags & TH_FIN)
 			len++;
@@ -6273,6 +6280,7 @@ again:
 		rsm->usec_orig_send = us_cts;
 		if (th_flags & TH_SYN) {
 			/* The data space is one beyond snd_una */
+			rsm->r_flags |= RACK_HAS_SIN;
 			rsm->r_start = seq_out + 1;
 			rsm->r_end = rsm->r_start + (len - 1);
 		} else {
@@ -8717,7 +8725,7 @@ rack_process_data(struct mbuf *m, struct tcphdr *th, struct socket *so,
 	 */
 	tfo_syn = ((tp->t_state == TCPS_SYN_RECEIVED) &&
 		   IS_FASTOPEN(tp->t_flags));
-	if ((tlen || (thflags & TH_FIN) || tfo_syn) &&
+	if ((tlen || (thflags & TH_FIN) || (tfo_syn && tlen > 0)) &&
 	    TCPS_HAVERCVDFIN(tp->t_state) == 0) {
 		tcp_seq save_start = th->th_seq;
 		tcp_seq save_rnxt  = tp->rcv_nxt;
@@ -8755,6 +8763,15 @@ rack_process_data(struct mbuf *m, struct tcphdr *th, struct socket *so,
 #endif
 			rack_handle_delayed_ack(tp, rack, tlen, tfo_syn);
 			tp->rcv_nxt += tlen;
+			if (tlen &&
+			    ((tp->t_flags2 & TF2_FBYTES_COMPLETE) == 0) &&
+			    (tp->t_fbyte_in == 0)) {
+				tp->t_fbyte_in = ticks;
+				if (tp->t_fbyte_in == 0)
+					tp->t_fbyte_in = 1;
+				if (tp->t_fbyte_out && tp->t_fbyte_in)
+					tp->t_flags2 |= TF2_FBYTES_COMPLETE;
+			}
 			thflags = th->th_flags & TH_FIN;
 			KMOD_TCPSTAT_ADD(tcps_rcvpack, nsegs);
 			KMOD_TCPSTAT_ADD(tcps_rcvbyte, tlen);
@@ -8978,6 +8995,15 @@ rack_do_fastnewdata(struct mbuf *m, struct tcphdr *th, struct socket *so,
 		tcp_clean_sackreport(tp);
 	KMOD_TCPSTAT_INC(tcps_preddat);
 	tp->rcv_nxt += tlen;
+	if (tlen &&
+	    ((tp->t_flags2 & TF2_FBYTES_COMPLETE) == 0) &&
+	    (tp->t_fbyte_in == 0)) {
+		tp->t_fbyte_in = ticks;
+		if (tp->t_fbyte_in == 0)
+			tp->t_fbyte_in = 1;
+		if (tp->t_fbyte_out && tp->t_fbyte_in)
+			tp->t_flags2 |= TF2_FBYTES_COMPLETE;
+	}
 	/*
 	 * Pull snd_wl1 up to prevent seq wrap relative to th_seq.
 	 */
@@ -11069,21 +11095,32 @@ rack_do_segment_nounlock(struct mbuf *m, struct tcphdr *th, struct socket *so,
 		 * this is traditional behavior, may need to be cleaned up.
 		 */
 		if (tp->t_state == TCPS_SYN_SENT && (thflags & TH_SYN)) {
+			/* Handle parallel SYN for ECN */
+			if (!(thflags & TH_ACK) &&
+			    ((thflags & (TH_CWR | TH_ECE)) == (TH_CWR | TH_ECE)) &&
+			    ((V_tcp_do_ecn == 1) || (V_tcp_do_ecn == 2))) {
+				tp->t_flags2 |= TF2_ECN_PERMIT;
+				tp->t_flags2 |= TF2_ECN_SND_ECE;
+				TCPSTAT_INC(tcps_ecn_shs);
+			}
 			if ((to.to_flags & TOF_SCALE) &&
 			    (tp->t_flags & TF_REQ_SCALE)) {
 				tp->t_flags |= TF_RCVD_SCALE;
 				tp->snd_scale = to.to_wscale;
-			}
+			} else
+				tp->t_flags &= ~TF_REQ_SCALE;
 			/*
 			 * Initial send window.  It will be updated with the
 			 * next incoming segment to the scaled value.
 			 */
 			tp->snd_wnd = th->th_win;
-			if (to.to_flags & TOF_TS) {
+			if ((to.to_flags & TOF_TS) &&
+			    (tp->t_flags & TF_REQ_TSTMP)) {
 				tp->t_flags |= TF_RCVD_TSTMP;
 				tp->ts_recent = to.to_tsval;
 				tp->ts_recent_age = cts;
-			}
+			} else
+				tp->t_flags &= ~TF_REQ_TSTMP;
 			if (to.to_flags & TOF_MSS)
 				tcp_mss(tp, to.to_mss);
 			if ((tp->t_flags & TF_SACK_PERMIT) &&
@@ -11741,6 +11778,13 @@ rack_start_gp_measurement(struct tcpcb *tp, struct tcp_rack *rack,
 	struct rack_sendmap *my_rsm = NULL;
 	struct rack_sendmap fe;
 
+	if (tp->t_state < TCPS_ESTABLISHED) {
+		/*
+		 * We don't start any measurements if we are
+		 * not at least established.
+		 */
+		return;
+	}
 	tp->t_flags |= TF_GPUTINPROG;
 	rack->r_ctl.rc_gp_lowrtt = 0xffffffff;
 	rack->r_ctl.rc_gp_high_rwnd = rack->rc_tp->snd_wnd;
@@ -12109,8 +12153,10 @@ rack_output(struct tcpcb *tp)
 	    ((tp->t_state == TCPS_SYN_RECEIVED) ||
 	     (tp->t_state == TCPS_SYN_SENT)) &&
 	    SEQ_GT(tp->snd_max, tp->snd_una) && /* initial SYN or SYN|ACK sent */
-	    (tp->t_rxtshift == 0))              /* not a retransmit */
-		return (0);
+	    (tp->t_rxtshift == 0)) {              /* not a retransmit */
+		cwnd_to_use = rack->r_ctl.cwnd_to_use = tp->snd_cwnd;
+		goto just_return_nolock;
+	}
 	/*
 	 * Determine length of data that should be transmitted, and flags
 	 * that will be used. If there is some data or critical controls
@@ -12536,8 +12582,10 @@ again:
 		len = 0;
 	}
 	/* Without fast-open there should never be data sent on a SYN */
-	if ((flags & TH_SYN) && (!IS_FASTOPEN(tp->t_flags)))
+	if ((flags & TH_SYN) && (!IS_FASTOPEN(tp->t_flags))) {
+		tp->snd_nxt = tp->iss;
 		len = 0;
+	}
 	orig_len = len;
 	if (len <= 0) {
 		/*
@@ -12797,18 +12845,24 @@ again:
 		int32_t adv;
 		int oldwin;
 
-		adv = min(recwin, (long)TCP_MAXWIN << tp->rcv_scale);
+		adv = recwin;
 		if (SEQ_GT(tp->rcv_adv, tp->rcv_nxt)) {
 			oldwin = (tp->rcv_adv - tp->rcv_nxt);
-			adv -= oldwin;
+			if (adv > oldwin)
+			    adv -= oldwin;
+			else {
+				/* We can't increase the window */
+				adv = 0;
+			}
 		} else
 			oldwin = 0;
 
 		/*
-		 * If the new window size ends up being the same as the old
-		 * size when it is scaled, then don't force a window update.
+		 * If the new window size ends up being the same as or less
+		 * than the old size when it is scaled, then don't force
+		 * a window update.
 		 */
-		if (oldwin >> tp->rcv_scale == (adv + oldwin) >> tp->rcv_scale)
+		if (oldwin >> tp->rcv_scale >= (adv + oldwin) >> tp->rcv_scale)
 			goto dontupdate;
 
 		if (adv >= (int32_t)(2 * segsiz) &&
@@ -13513,6 +13567,12 @@ send:
 		} else
 			flags |= TH_ECE | TH_CWR;
 	}
+	/* Handle parallel SYN for ECN */
+	if ((tp->t_state == TCPS_SYN_RECEIVED) &&
+	    (tp->t_flags2 & TF2_ECN_SND_ECE)) {
+		flags |= TH_ECE;
+		tp->t_flags2 &= ~TF2_ECN_SND_ECE;
+	}
 	if (tp->t_state == TCPS_ESTABLISHED &&
 	    (tp->t_flags2 & TF2_ECN_PERMIT)) {
 		/*
@@ -13529,13 +13589,14 @@ send:
 #endif
 				ip->ip_tos |= IPTOS_ECN_ECT0;
 			KMOD_TCPSTAT_INC(tcps_ecn_ect0);
-		}
-		/*
-		 * Reply with proper ECN notifications.
-		 */
-		if (tp->t_flags2 & TF2_ECN_SND_CWR) {
-			flags |= TH_CWR;
-			tp->t_flags2 &= ~TF2_ECN_SND_CWR;
+			/*
+			 * Reply with proper ECN notifications.
+			 * Only set CWR on new data segments.
+			 */
+			if (tp->t_flags2 & TF2_ECN_SND_CWR) {
+				flags |= TH_CWR;
+				tp->t_flags2 &= ~TF2_ECN_SND_CWR;
+			}
 		}
 		if (tp->t_flags2 & TF2_ECN_SND_ECE)
 			flags |= TH_ECE;

@@ -236,6 +236,7 @@
 #define	SYS_aio_write	256
 #define	SYS_lio_listio	257
 #define	SYS_kbounce	258
+#define	SYS_flag_captured	259
 #define	SYS_freebsd11_getdents	272
 #define	SYS_lchmod	274
 				/* 275 is obsolete netbsd_lchown */
@@ -513,4 +514,5 @@
 #define	SYS_sigfastblock	573
 #define	SYS___realpathat	574
 #define	SYS_close_range	575
-#define	SYS_MAXSYSCALL	576
+#define	SYS_rpctls_syscall	576
+#define	SYS_MAXSYSCALL	577

@@ -454,6 +454,14 @@ opensslconf.h: opensslconf.h.in
 .endif
 	mv -f ${.TARGET}.tmp ${.TARGET}
 
+# See https://github.com/CTSRD-CHERI/cheribsd/issues/526
+# I wasted many hours assuming this was an error in the GVN pass of the CHERI
+# clang compiler since it only affected pure-capability compilation, but it
+# looks like non-CHERI might also suffer from this issue with improved compiler
+# alias analysis.
+# See https://github.com/openssl/openssl/issues/12247 for the upstream bug report.
+CFLAGS.bn_nist.c+=	-fno-strict-aliasing
+
 .include <bsd.lib.mk>
 
 PICFLAG+=	-DOPENSSL_PIC

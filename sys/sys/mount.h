@@ -52,9 +52,14 @@
 
 typedef struct fsid { int32_t val[2]; } fsid_t;	/* filesystem id type */
 
+#define fsidcmp(a, b) memcmp((a), (b), sizeof(fsid_t))
+
 /*
  * File identifier.
  * These are unique per filesystem on a single machine.
+ *
+ * Note that the offset of fid_data is 4 bytes, so care must be taken to avoid
+ * undefined behavior accessing unaligned fields within an embedded struct.
  */
 #define	MAXFIDSZ	16
 

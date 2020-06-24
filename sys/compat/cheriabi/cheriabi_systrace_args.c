@@ -1286,6 +1286,14 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 4;
 		break;
 	}
+	/* cheriabi_flag_captured */
+	case 259: {
+		struct cheriabi_flag_captured_args *p = params;
+		uarg[0] = (__cheri_addr intptr_t) p->message; /* const char * __capability */
+		uarg[1] = p->key; /* uint32_t */
+		*n_args = 2;
+		break;
+	}
 	/* cheriabi_lchmod */
 	case 274: {
 		struct cheriabi_lchmod_args *p = params;
@@ -3334,6 +3342,14 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 3;
 		break;
 	}
+	/* cheriabi_rpctls_syscall */
+	case 576: {
+		struct cheriabi_rpctls_syscall_args *p = params;
+		iarg[0] = p->op; /* int */
+		uarg[1] = (__cheri_addr intptr_t) p->path; /* const char * __capability */
+		*n_args = 2;
+		break;
+	}
 	default:
 		*n_args = 0;
 		break;
@@ -5357,6 +5373,19 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		case 3:
 			p = "int";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* cheriabi_flag_captured */
+	case 259:
+		switch(ndx) {
+		case 0:
+			p = "userland const char * __capability";
+			break;
+		case 1:
+			p = "uint32_t";
 			break;
 		default:
 			break;
@@ -8916,6 +8945,19 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
+	/* cheriabi_rpctls_syscall */
+	case 576:
+		switch(ndx) {
+		case 0:
+			p = "int";
+			break;
+		case 1:
+			p = "userland const char * __capability";
+			break;
+		default:
+			break;
+		};
+		break;
 	default:
 		break;
 	};
@@ -9659,6 +9701,11 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		break;
 	/* cheriabi_kbounce */
 	case 258:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* cheriabi_flag_captured */
+	case 259:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
@@ -10819,6 +10866,11 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		break;
 	/* close_range */
 	case 575:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* cheriabi_rpctls_syscall */
+	case 576:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;

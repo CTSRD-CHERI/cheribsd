@@ -5,7 +5,7 @@
 # $FreeBSD$
 #
 nomakeoptions	ARCH_FLAGS
-makeoptions	ARCH_FLAGS="-target cheri-unknown-freebsd -march=beri -mabi=64 -mcpu=beri -cheri=128 -Wno-unused-command-line-argument"
+makeoptions	ARCH_FLAGS="-target mips64-unknown-freebsd -march=beri -mabi=64 -mcpu=beri -cheri -Wno-unused-command-line-argument"
 options 	CPU_CHERI
 options 	COMPAT_CHERIABI
 options 	COMPAT_FREEBSD64

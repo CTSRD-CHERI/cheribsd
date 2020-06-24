@@ -167,7 +167,7 @@ static pv_entry_t pmap_pvh_remove(struct md_page *pvh, pmap_t pmap,
     vm_offset_t va);
 static vm_page_t pmap_alloc_direct_page(unsigned int index, int req);
 static vm_page_t pmap_enter_quick_locked(pmap_t pmap, vm_offset_t va,
-    vm_page_t m, vm_prot_t prot, vm_page_t mpte);
+    vm_page_t m, vm_prot_t prot, u_int flags, vm_page_t mpte);
 static void pmap_grow_direct_page(int req);
 static int pmap_remove_pte(struct pmap *pmap, pt_entry_t *ptq, vm_offset_t va,
     pd_entry_t pde);
@@ -2336,19 +2336,20 @@ validate:
  */
 
 void
-pmap_enter_quick(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot)
+pmap_enter_quick(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot,
+    u_int flags)
 {
 
 	rw_wlock(&pvh_global_lock);
 	PMAP_LOCK(pmap);
-	(void)pmap_enter_quick_locked(pmap, va, m, prot, NULL);
+	(void)pmap_enter_quick_locked(pmap, va, m, prot, flags, NULL);
 	rw_wunlock(&pvh_global_lock);
 	PMAP_UNLOCK(pmap);
 }
 
 static vm_page_t
 pmap_enter_quick_locked(pmap_t pmap, vm_offset_t va, vm_page_t m,
-    vm_prot_t prot, vm_page_t mpte)
+    vm_prot_t prot, u_int flags, vm_page_t mpte)
 {
 	pt_entry_t *pte, npte;
 	vm_paddr_t pa;
@@ -2430,6 +2431,12 @@ pmap_enter_quick_locked(pmap_t pmap, vm_offset_t va, vm_page_t m,
 	 * Now validate mapping with RO protection
 	 */
 	npte = PTE_RO | TLBLO_PA_TO_PFN(pa) | PTE_V;
+#ifdef CPU_CHERI
+	if ((flags & PMAP_ENTER_NOLOADTAGS) != 0)
+		npte |= PTE_LC;
+	if ((flags & PMAP_ENTER_NOSTORETAGS) != 0)
+		npte |= PTE_SC;
+#endif
 	if ((m->oflags & VPO_UNMANAGED) == 0)
 		npte |= PTE_MANAGED;
 
@@ -2517,7 +2524,7 @@ pmap_kenter_temporary_free(vm_paddr_t pa)
  */
 void
 pmap_enter_object(pmap_t pmap, vm_offset_t start, vm_offset_t end,
-    vm_page_t m_start, vm_prot_t prot)
+    vm_page_t m_start, vm_prot_t prot, u_int flags)
 {
 	vm_page_t m, mpte;
 	vm_pindex_t diff, psize;
@@ -2531,7 +2538,7 @@ pmap_enter_object(pmap_t pmap, vm_offset_t start, vm_offset_t end,
 	PMAP_LOCK(pmap);
 	while (m != NULL && (diff = m->pindex - m_start->pindex) < psize) {
 		mpte = pmap_enter_quick_locked(pmap, start + ptoa(diff), m,
-		    prot, mpte);
+		    prot, flags, mpte);
 		m = TAILQ_NEXT(m, listq);
 	}
 	rw_wunlock(&pvh_global_lock);
@@ -2700,7 +2707,12 @@ pmap_copy_page_internal(vm_page_t src, vm_page_t dst, int flags)
 	} else {
 		va_src = pmap_lmem_map2(phys_src, phys_dst);
 		va_dst = va_src + PAGE_SIZE;
-		bcopy((void *)va_src, (void *)va_dst, PAGE_SIZE);
+#if __has_feature(capabilities)
+		if ((flags & PMAP_COPY_TAGS) == 0)
+		    bcopynocap((void *)va_src, (void *)va_dst, PAGE_SIZE);
+		else
+#endif
+		    bcopy((void *)va_src, (void *)va_dst, PAGE_SIZE);
 		mips_dcache_wbinv_range(va_dst, PAGE_SIZE);
 		pmap_lmem_unmap();
 	}

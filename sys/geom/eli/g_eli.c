@@ -489,7 +489,8 @@ g_eli_newsession(struct g_eli_worker *wr)
 {
 	struct g_eli_softc *sc;
 	struct crypto_session_params csp;
-	int error;
+	uint32_t caps;
+	int error, new_crypto;
 	void *key;
 
 	sc = wr->w_softc;
@@ -516,6 +517,7 @@ g_eli_newsession(struct g_eli_worker *wr)
 	}
 
 	switch (sc->sc_crypto) {
+	case G_ELI_CRYPTO_SW_ACCEL:
 	case G_ELI_CRYPTO_SW:
 		error = crypto_newsession(&wr->w_sid, &csp,
 		    CRYPTOCAP_F_SOFTWARE);
@@ -526,18 +528,18 @@ g_eli_newsession(struct g_eli_worker *wr)
 		break;
 	case G_ELI_CRYPTO_UNKNOWN:
 		error = crypto_newsession(&wr->w_sid, &csp,
-		    CRYPTOCAP_F_HARDWARE);
+		    CRYPTOCAP_F_HARDWARE | CRYPTOCAP_F_SOFTWARE);
 		if (error == 0) {
+			caps = crypto_ses2caps(wr->w_sid);
+			if (caps & CRYPTOCAP_F_HARDWARE)
+				new_crypto = G_ELI_CRYPTO_HW;
+			else if (caps & CRYPTOCAP_F_ACCEL_SOFTWARE)
+				new_crypto = G_ELI_CRYPTO_SW_ACCEL;
+			else
+				new_crypto = G_ELI_CRYPTO_SW;
 			mtx_lock(&sc->sc_queue_mtx);
 			if (sc->sc_crypto == G_ELI_CRYPTO_UNKNOWN)
-				sc->sc_crypto = G_ELI_CRYPTO_HW;
-			mtx_unlock(&sc->sc_queue_mtx);
-		} else {
-			error = crypto_newsession(&wr->w_sid, &csp,
-			    CRYPTOCAP_F_SOFTWARE);
-			mtx_lock(&sc->sc_queue_mtx);
-			if (sc->sc_crypto == G_ELI_CRYPTO_UNKNOWN)
-				sc->sc_crypto = G_ELI_CRYPTO_SW;
+				sc->sc_crypto = new_crypto;
 			mtx_unlock(&sc->sc_queue_mtx);
 		}
 		break;
@@ -983,6 +985,7 @@ g_eli_create(struct gctl_req *req, struct g_class *mp, struct g_provider *bpp,
 	if (sc->sc_flags & G_ELI_FLAG_AUTH)
 		G_ELI_DEBUG(0, " Integrity: %s", g_eli_algo2str(sc->sc_aalgo));
 	G_ELI_DEBUG(0, "    Crypto: %s",
+	    sc->sc_crypto == G_ELI_CRYPTO_SW_ACCEL ? "accelerated software" :
 	    sc->sc_crypto == G_ELI_CRYPTO_SW ? "software" : "hardware");
 	return (gp);
 failed:
@@ -1381,6 +1384,9 @@ g_eli_dumpconf(struct sbuf *sb, const char *indent, struct g_geom *gp,
 	case G_ELI_CRYPTO_SW:
 		sbuf_cat(sb, "software");
 		break;
+	case G_ELI_CRYPTO_SW_ACCEL:
+		sbuf_cat(sb, "accelerated software");
+		break;
 	default:
 		sbuf_cat(sb, "UNKNOWN");
 		break;
@@ -1416,11 +1422,13 @@ g_eli_shutdown_pre_sync(void *arg, int howto)
 			continue;
 		pp = LIST_FIRST(&gp->provider);
 		KASSERT(pp != NULL, ("No provider? gp=%p (%s)", gp, gp->name));
-		if (pp->acr + pp->acw + pp->ace == 0)
-			error = g_eli_destroy(sc, TRUE);
-		else {
+		if (pp->acr != 0 || pp->acw != 0 || pp->ace != 0 ||
+		    SCHEDULER_STOPPED())
+		{
 			sc->sc_flags |= G_ELI_FLAG_RW_DETACH;
 			gp->access = g_eli_access;
+		} else {
+			error = g_eli_destroy(sc, TRUE);
 		}
 	}
 	g_topology_unlock();

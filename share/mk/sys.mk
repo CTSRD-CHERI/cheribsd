@@ -24,6 +24,12 @@ MACHINE_ABI+=	hard-float
 .if (${MACHINE_ARCH:Mmips*c*} || ${MACHINE_ARCH:Mriscv*c*})
 MACHINE_ABI+=	purecap
 .endif
+# Currently all 64-bit architectures include 64 in their name (see arch(7)).
+.if ${MACHINE_ARCH:M*64*}
+MACHINE_ABI+=	ptr64
+.else
+MACHINE_ABI+=	ptr32
+.endif
 
 
 __DEFAULT_YES_OPTIONS+= \

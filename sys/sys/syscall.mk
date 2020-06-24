@@ -170,6 +170,7 @@ MIASM =  \
 	aio_write.o \
 	lio_listio.o \
 	kbounce.o \
+	flag_captured.o \
 	freebsd11_getdents.o \
 	lchmod.o \
 	lutimes.o \
@@ -418,4 +419,5 @@ MIASM =  \
 	shm_rename.o \
 	sigfastblock.o \
 	__realpathat.o \
-	close_range.o
+	close_range.o \
+	rpctls_syscall.o

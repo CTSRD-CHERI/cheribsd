@@ -315,7 +315,7 @@ struct sysent sysent[] = {
 	{ AS(aio_write_args), (sy_call_t *)sys_aio_write, AUE_AIO_WRITE, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 256 = aio_write */
 	{ AS(lio_listio_args), (sy_call_t *)sys_lio_listio, AUE_LIO_LISTIO, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 257 = lio_listio */
 	{ AS(kbounce_args), (sy_call_t *)sys_kbounce, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 258 = kbounce */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 259 = nosys */
+	{ AS(flag_captured_args), (sy_call_t *)sys_flag_captured, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 259 = flag_captured */
 	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 260 = nosys */
 	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 261 = nosys */
 	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 262 = nosys */
@@ -632,4 +632,5 @@ struct sysent sysent[] = {
 	{ AS(sigfastblock_args), (sy_call_t *)sys_sigfastblock, AUE_NULL, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 573 = sigfastblock */
 	{ AS(__realpathat_args), (sy_call_t *)sys___realpathat, AUE_REALPATHAT, NULL, 0, 0, 0, SY_THR_STATIC },	/* 574 = __realpathat */
 	{ AS(close_range_args), (sy_call_t *)sys_close_range, AUE_CLOSERANGE, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 575 = close_range */
+	{ AS(rpctls_syscall_args), (sy_call_t *)lkmressys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },	/* 576 = rpctls_syscall */
 };

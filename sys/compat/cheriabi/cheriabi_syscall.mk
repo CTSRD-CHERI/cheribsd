@@ -154,6 +154,7 @@ MIASM =  \
 	cheriabi_aio_write.o \
 	cheriabi_lio_listio.o \
 	cheriabi_kbounce.o \
+	cheriabi_flag_captured.o \
 	cheriabi_lchmod.o \
 	cheriabi_lutimes.o \
 	cheriabi_preadv.o \
@@ -390,4 +391,5 @@ MIASM =  \
 	cheriabi_shm_rename.o \
 	cheriabi_sigfastblock.o \
 	cheriabi___realpathat.o \
-	close_range.o
+	close_range.o \
+	cheriabi_rpctls_syscall.o

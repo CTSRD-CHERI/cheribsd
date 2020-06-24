@@ -23,6 +23,7 @@ MIASM:=	${MIASM:S/cheriabi_//}
 # declarations in common:
 #
 NOASM=	exit.o \
+	flag_captured.o \
 	getlogin.o \
 	sstk.o \
 	yield.o

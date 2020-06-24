@@ -86,7 +86,7 @@ void do_trap_user(struct trapframe *);
 
 static __inline void
 call_trapsignal(struct thread *td, int sig, int code, void * __capability addr,
-    int capreg)
+    int trapno, int capreg)
 {
 	ksiginfo_t ksi;
 
@@ -95,6 +95,7 @@ call_trapsignal(struct thread *td, int sig, int code, void * __capability addr,
 	ksi.ksi_code = code;
 	ksi.ksi_addr = addr;
 	ksi.ksi_capreg = capreg;
+	ksi.ksi_trapno = trapno;
 	trapsignal(td, &ksi);
 }
 
@@ -291,7 +292,8 @@ data_abort(struct trapframe *frame, int usermode)
 	if (error != KERN_SUCCESS) {
 		if (usermode) {
 			call_trapsignal(td, sig, ucode,
-			    (void * __capability)(uintcap_t)stval, 0);
+			    (void * __capability)(uintcap_t)stval,
+			    frame->tf_scause & EXCP_MASK, 0);
 		} else {
 			if (pcb->pcb_onfault != 0) {
 				frame->tf_a[0] = error;
@@ -355,10 +357,9 @@ do_trap_supervisor(struct trapframe *frame)
 		break;
 	case EXCP_BREAKPOINT:
 #ifdef KDTRACE_HOOKS
-		if (dtrace_invop_jump_addr != 0) {
-			dtrace_invop_jump_addr(frame);
-			break;
-		}
+		if (dtrace_invop_jump_addr != NULL &&
+		    dtrace_invop_jump_addr(frame) == 0)
+				break;
 #endif
 #ifdef KDB
 		kdb_trap(exception, 0, frame);
@@ -373,6 +374,8 @@ do_trap_supervisor(struct trapframe *frame)
 		    (__cheri_addr unsigned long)frame->tf_sepc);
 		break;
 #if __has_feature(capabilities)
+	case EXCP_LOAD_CAP_PAGE_FAULT:
+	case EXCP_STORE_AMO_CAP_PAGE_FAULT:
 	case EXCP_CHERI:
 		if (curthread->td_pcb->pcb_onfault != 0) {
 			frame->tf_a[0] = EPROT;
@@ -381,11 +384,19 @@ do_trap_supervisor(struct trapframe *frame)
 			break;
 		}
 		dump_regs(frame);
-		sccsr = csr_read(sccsr);
-		panic("CHERI exception %#x at 0x%016lx\n",
-		    (sccsr & SCCSR_CAUSE_MASK) >> SCCSR_CAUSE_SHIFT,
-		    (__cheri_addr unsigned long)frame->tf_sepc);
-		break;
+		switch (exception) {
+		default:
+			panic("Fatal capability page fault %#lx: %#016lx",
+			    (__cheri_addr unsigned long)frame->tf_sepc,
+			    frame->tf_stval);
+			break;
+		case EXCP_CHERI:
+			sccsr = csr_read(sccsr);
+			panic("CHERI exception %#x at 0x%016lx\n",
+			    (sccsr & SCCSR_CAUSE_MASK) >> SCCSR_CAUSE_SHIFT,
+			    (__cheri_addr unsigned long)frame->tf_sepc);
+			break;
+		}
 #endif
 	default:
 		dump_regs(frame);
@@ -450,20 +461,30 @@ do_trap_user(struct trapframe *frame)
 		}
 #endif
 		call_trapsignal(td, SIGILL, ILL_ILLTRP,
-		    (void * __capability)frame->tf_sepc, 0);
+		    (void * __capability)frame->tf_sepc, exception, 0);
 		userret(td, frame);
 		break;
 	case EXCP_BREAKPOINT:
 		call_trapsignal(td, SIGTRAP, TRAP_BRKPT,
-		    (void * __capability)frame->tf_sepc, 0);
+		    (void * __capability)frame->tf_sepc, exception, 0);
 		userret(td, frame);
 		break;
 #if __has_feature(capabilities)
+	case EXCP_LOAD_CAP_PAGE_FAULT:
+		call_trapsignal(td, SIGSEGV, SEGV_LOADTAG,
+		    (void * __capability)(uintcap_t)frame->tf_stval, exception,
+		    0);
+		break;
+	case EXCP_STORE_AMO_CAP_PAGE_FAULT:
+		call_trapsignal(td, SIGSEGV, SEGV_STORETAG,
+		    (void * __capability)(uintcap_t)frame->tf_stval, exception,
+		    0);
+		break;
 	case EXCP_CHERI:
 		sccsr = csr_read(sccsr);
 
 		call_trapsignal(td, SIGPROT, cheri_sccsr_to_sicode(sccsr),
-		    (void * __capability)frame->tf_sepc,
+		    (void * __capability)frame->tf_sepc, exception,
 		    (sccsr & SCCSR_CAP_IDX_MASK) >> SCCSR_CAP_IDX_SHIFT);
 		userret(td, frame);
 		break;

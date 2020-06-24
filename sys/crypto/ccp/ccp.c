@@ -92,86 +92,25 @@ static struct random_source random_ccp = {
  * crypto operation buffer.
  */
 static int
-ccp_populate_sglist(struct sglist *sg, struct cryptop *crp)
+ccp_populate_sglist(struct sglist *sg, struct crypto_buffer *cb)
 {
 	int error;
 
 	sglist_reset(sg);
-	switch (crp->crp_buf_type) {
+	switch (cb->cb_type) {
 	case CRYPTO_BUF_MBUF:
-		error = sglist_append_mbuf(sg, crp->crp_mbuf);
+		error = sglist_append_mbuf(sg, cb->cb_mbuf);
 		break;
 	case CRYPTO_BUF_UIO:
-		error = sglist_append_uio(sg, crp->crp_uio);
+		error = sglist_append_uio(sg, cb->cb_uio);
 		break;
 	case CRYPTO_BUF_CONTIG:
-		error = sglist_append(sg, crp->crp_buf, crp->crp_ilen);
+		error = sglist_append(sg, cb->cb_buf, cb->cb_buf_len);
 		break;
 	default:
 		error = EINVAL;
 	}
 	return (error);
-}
-
-/*
- * Handle a GCM request with an empty payload by performing the
- * operation in software.
- */
-static void
-ccp_gcm_soft(struct ccp_session *s, struct cryptop *crp)
-{
-	struct aes_gmac_ctx gmac_ctx;
-	char block[GMAC_BLOCK_LEN];
-	char digest[GMAC_DIGEST_LEN];
-	char iv[AES_BLOCK_LEN];
-	int i, len;
-
-	/*
-	 * This assumes a 12-byte IV from the crp.  See longer comment
-	 * above in ccp_gcm() for more details.
-	 */
-	if ((crp->crp_flags & CRYPTO_F_IV_SEPARATE) == 0) {
-		crp->crp_etype = EINVAL;
-		goto out;
-	}
-	memcpy(iv, crp->crp_iv, 12);
-	*(uint32_t *)&iv[12] = htobe32(1);
-
-	/* Initialize the MAC. */
-	AES_GMAC_Init(&gmac_ctx);
-	AES_GMAC_Setkey(&gmac_ctx, s->blkcipher.enckey, s->blkcipher.key_len);
-	AES_GMAC_Reinit(&gmac_ctx, iv, sizeof(iv));
-
-	/* MAC the AAD. */
-	for (i = 0; i < crp->crp_aad_length; i += sizeof(block)) {
-		len = imin(crp->crp_aad_length - i, sizeof(block));
-		crypto_copydata(crp, crp->crp_aad_start + i, len, block);
-		bzero(block + len, sizeof(block) - len);
-		AES_GMAC_Update(&gmac_ctx, block, sizeof(block));
-	}
-
-	/* Length block. */
-	bzero(block, sizeof(block));
-	((uint32_t *)block)[1] = htobe32(crp->crp_aad_length * 8);
-	AES_GMAC_Update(&gmac_ctx, block, sizeof(block));
-	AES_GMAC_Final(digest, &gmac_ctx);
-
-	if (CRYPTO_OP_IS_ENCRYPT(crp->crp_op)) {
-		crypto_copyback(crp, crp->crp_digest_start, sizeof(digest),
-		    digest);
-		crp->crp_etype = 0;
-	} else {
-		char digest2[GMAC_DIGEST_LEN];
-
-		crypto_copydata(crp, crp->crp_digest_start, sizeof(digest2),
-		    digest2);
-		if (timingsafe_bcmp(digest, digest2, sizeof(digest)) == 0)
-			crp->crp_etype = 0;
-		else
-			crp->crp_etype = EBADMSG;
-	}
-out:
-	crypto_done(crp);
 }
 
 static int
@@ -608,7 +547,7 @@ ccp_process(device_t dev, struct cryptop *crp, int hint)
 		goto out;
 	qpheld = true;
 
-	error = ccp_populate_sglist(qp->cq_sg_crp, crp);
+	error = ccp_populate_sglist(qp->cq_sg_crp, &crp->crp_buf);
 	if (error != 0)
 		goto out;
 
@@ -643,11 +582,6 @@ ccp_process(device_t dev, struct cryptop *crp, int hint)
 		error = ccp_authenc(qp, s, crp);
 		break;
 	case GCM:
-		if (crp->crp_payload_length == 0) {
-			mtx_unlock(&qp->cq_lock);
-			ccp_gcm_soft(s, crp);
-			return (0);
-		}
 		if (s->pending != 0) {
 			error = EAGAIN;
 			break;

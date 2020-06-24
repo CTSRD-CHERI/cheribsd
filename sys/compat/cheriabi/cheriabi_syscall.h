@@ -236,6 +236,7 @@
 #define	CHERIABI_SYS_cheriabi_aio_write	256
 #define	CHERIABI_SYS_cheriabi_lio_listio	257
 #define	CHERIABI_SYS_cheriabi_kbounce	258
+#define	CHERIABI_SYS_cheriabi_flag_captured	259
 				/* 272 is obsolete freebsd11_getdents */
 #define	CHERIABI_SYS_cheriabi_lchmod	274
 				/* 275 is obsolete netbsd_lchown */
@@ -513,4 +514,5 @@
 #define	CHERIABI_SYS_cheriabi_sigfastblock	573
 #define	CHERIABI_SYS_cheriabi___realpathat	574
 #define	CHERIABI_SYS_close_range	575
-#define	CHERIABI_SYS_MAXSYSCALL	576
+#define	CHERIABI_SYS_cheriabi_rpctls_syscall	576
+#define	CHERIABI_SYS_MAXSYSCALL	577

@@ -1488,7 +1488,13 @@
 		    int flags
 		);
 	}
-259-271	AUE_NULL	UNIMPL	nosys
+259	AUE_NULL	STD {
+		int flag_captured(
+		    _In_z_ const char *message,
+		    uint32_t key
+		);
+	}
+260-271	AUE_NULL	UNIMPL	nosys
 272	AUE_O_GETDENTS	COMPAT11 {
 		int getdents(
 		    int fd,
@@ -3241,6 +3247,13 @@
 		    u_int lowfd,
 		    u_int highfd,
 		    int flags
+		);
+	}
+; 576 is initialised by the krpc code, if present.
+576	AUE_NULL	NOSTD {
+		int rpctls_syscall(
+		    int op,
+		    _In_z_ const char *path
 		);
 	}
 

@@ -262,6 +262,8 @@ typedef enum {
 
 union ctl_io;
 
+typedef void (*ctl_ref)(void *arg, int diff);
+
 /*
  * SCSI passthrough I/O structure for the CAM Target Layer.  Note
  * that some of these fields are here for completeness, but they aren't
@@ -353,6 +355,18 @@ struct ctl_scsiio {
 		void * __kerncap _dummy1;
 #endif
 		int (*io_cont)(union ctl_io *io); /* to continue processing */
+	};
+	union {
+#ifdef _KERNEL
+		void * __kerncap _dummy2;
+#endif
+		ctl_ref	    kern_data_ref; /* Method to reference/release data */
+	};
+	union {
+#ifdef _KERNEL
+		void * __kerncap _dummy3;
+#endif
+		void	   *kern_data_arg; /* Opaque argument for kern_data_ref() */
 	};
 };
 

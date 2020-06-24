@@ -44,7 +44,6 @@
 #include <opencrypto/cbc_mac.h>
 
 #include <opencrypto/cryptodev.h>
-#include <opencrypto/xform_userland.h>
 
 /* XXX use a define common with other hash stuff ! */
 #define	AH_ALEN_MAX	64	/* max authenticator hash length */
@@ -58,9 +57,9 @@ struct auth_hash {
 	u_int16_t ctxsize;
 	u_int16_t blocksize;
 	void (*Init) (void *);
-	void (*Setkey) (void *, const u_int8_t *, u_int16_t);
-	void (*Reinit) (void *, const u_int8_t *, u_int16_t);
-	int  (*Update) (void *, const u_int8_t *, u_int16_t);
+	void (*Setkey) (void *, const uint8_t *, u_int);
+	void (*Reinit) (void *, const uint8_t *, u_int);
+	int  (*Update) (void *, const void *, u_int);
 	void (*Final) (u_int8_t *, void *);
 };
 

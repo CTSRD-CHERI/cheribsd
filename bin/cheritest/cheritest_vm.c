@@ -263,7 +263,7 @@ cheritest_vm_shm_open_anon_unix_surprise(const struct cheri_test *ctp __unused)
 	}
 }
 
-#ifdef CHERIABI_TESTS
+#ifdef __CHERI_PURE_CAPABILITY__
 
 /*
  * We can fork processes with shared file descriptor tables, including
@@ -433,7 +433,6 @@ cheritest_vm_notag_tmpfile_shared(const struct cheri_test *ctp __unused)
 	    PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0));
 	cp_value = cheri_ptr(&v, sizeof(v));
 	*cp = cp_value;
-	/* this test fails if /tmp is on tmpfs as it will silently strip the tag */
 	cheritest_failure_errx("tagged store succeeded");
 }
 
@@ -474,18 +473,6 @@ xfail_need_writable_tmp(const char *name __unused)
 	}
 	reason = "/tmp is not writable";
 	return (reason);
-}
-
-const char*
-xfail_need_writable_non_tmpfs_tmp(const char *name)
-{
-	struct statfs info;
-
-	CHERITEST_CHECK_SYSCALL(statfs("/tmp", &info));
-	if (strcmp(info.f_fstypename, "tmpfs") == 0) {
-		return ("cheritest_vm_notag_tmpfile_shared needs non-tmpfs /tmp");
-	}
-	return (xfail_need_writable_tmp(name));
 }
 
 /*

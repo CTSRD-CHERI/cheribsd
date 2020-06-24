@@ -129,8 +129,7 @@
 #else
 #define _LIBUNWIND_ABORT(msg)                                                  \
   do {                                                                         \
-    fprintf(stderr, "libunwind: %s %s:%d - %s\n", __func__, __FILE__,          \
-            __LINE__, msg);                                                    \
+    fprintf(stderr, "libunwind: %s - %s\n", __func__, msg);                    \
     fflush(stderr);                                                            \
     __builtin_trap(); abort();                                                 \
   } while (0)

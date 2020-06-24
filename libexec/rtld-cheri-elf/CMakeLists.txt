@@ -1,5 +1,13 @@
 set(RTLD_ARCH ${TARGET})
-set(rtld_SRCS cheri_reloc.c ${RTLD_ARCH}/rtld_start.S ${RTLD_ARCH}/cheri_plt.cpp)
+set(rtld_SRCS cheri_reloc.c)
+if (EXISTS ${RTLD_ARCH}/cheri_plt.cpp)
+    list(APPEND rtld_SRCS ${RTLD_ARCH}/cheri_plt.cpp)
+endif()
+if (EXISTS ${RTLD_ARCH}/rtld_start.S)
+    list(APPEND rtld_SRCS ${RTLD_ARCH}/rtld_start.S)
+else()
+    list(APPEND rtld_SRCS ../rtld-elf/${RTLD_ARCH}/rtld_start.S)
+endif()
 list(APPEND rtld_SRCS
 	../../lib/libmalloc_simple/heap.c
 	../rtld-elf/${RTLD_ARCH}/reloc.c

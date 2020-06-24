@@ -166,6 +166,7 @@ static int sysargmask[] = {
 	[SYS_aio_write] = (0x0 | 0x1),
 	[SYS_lio_listio] = (0x0 | 0x2 | 0x8),
 	[SYS_kbounce] = (0x0 | 0x1 | 0x2),
+	[SYS_flag_captured] = (0x0 | 0x1),
 	[SYS_lchmod] = (0x0 | 0x1),
 	[SYS_lutimes] = (0x0 | 0x1 | 0x2),
 	[SYS_preadv] = (0x0 | 0x2),
@@ -401,6 +402,7 @@ static int sysargmask[] = {
 	[SYS_sigfastblock] = (0x0 | 0x2),
 	[SYS___realpathat] = (0x0 | 0x2 | 0x4),
 	[SYS_close_range] = (0x0),
+	[SYS_rpctls_syscall] = (0x0 | 0x2),
 };
 
 #endif /* !_SYSARGMAP_H_ */

@@ -45,7 +45,6 @@ static const char *cheri_exccode_descr[] = {
 	[CHERI_EXCCODE_CALL] = "call trap",
 	[CHERI_EXCCODE_RETURN] = "return trap",
 	[CHERI_EXCCODE_PERM_USER] = "user-defined permission violation",
-	[CHERI_EXCCODE_TLBSTORE] = "TLB prohibits store capability",
 	[CHERI_EXCCODE_IMPRECISE] = "bounds cannot be represented precisely",
 	[CHERI_EXCCODE_UNALIGNED_BASE] = "Unaligned PCC base",
 	[CHERI_EXCCODE_GLOBAL] = "global violation",
@@ -106,9 +105,6 @@ cheri_sccsr_to_sicode(register_t sccsr)
 	case CHERI_EXCCODE_USER_PERM:
 	case CHERI_EXCCODE_PERM_SET_CID:
 		return (PROT_CHERI_PERM);
-
-	case CHERI_EXCCODE_TLBSTORE:
-		return (PROT_CHERI_STORETAG);
 
 	case CHERI_EXCCODE_IMPRECISE:
 		return (PROT_CHERI_IMPRECISE);

@@ -265,7 +265,7 @@ const char *syscallnames[] = {
 	"aio_write",			/* 256 = aio_write */
 	"lio_listio",			/* 257 = lio_listio */
 	"kbounce",			/* 258 = kbounce */
-	"#259",			/* 259 = nosys */
+	"flag_captured",			/* 259 = flag_captured */
 	"#260",			/* 260 = nosys */
 	"#261",			/* 261 = nosys */
 	"#262",			/* 262 = nosys */
@@ -582,4 +582,5 @@ const char *syscallnames[] = {
 	"sigfastblock",			/* 573 = sigfastblock */
 	"__realpathat",			/* 574 = __realpathat */
 	"close_range",			/* 575 = close_range */
+	"rpctls_syscall",			/* 576 = rpctls_syscall */
 };

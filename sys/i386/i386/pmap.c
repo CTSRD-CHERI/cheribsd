@@ -633,7 +633,7 @@ __CONCAT(PMTYPE, bootstrap)(vm_paddr_t firstaddr)
 	 * are required for promotion of the corresponding kernel virtual
 	 * addresses to superpage mappings.
 	 */
-	vm_phys_add_seg(KPTphys, KPTphys + ptoa(nkpt));
+	vm_phys_early_add_seg(KPTphys, KPTphys + ptoa(nkpt));
 
 	/*
 	 * Initialize the first available kernel virtual address.
@@ -1203,6 +1203,13 @@ pmap_update_pde_invalidate(vm_offset_t va, pd_entry_t newpde)
 }
 
 #ifdef SMP
+
+static void
+pmap_curcpu_cb_dummy(pmap_t pmap __unused, vm_offset_t addr1 __unused,
+    vm_offset_t addr2 __unused)
+{
+}
+
 /*
  * For SMP, these functions have to use the IPI mechanism for coherence.
  *
@@ -1241,7 +1248,7 @@ pmap_invalidate_page_int(pmap_t pmap, vm_offset_t va)
 		CPU_AND(&other_cpus, &pmap->pm_active);
 		mask = &other_cpus;
 	}
-	smp_masked_invlpg(*mask, va, pmap);
+	smp_masked_invlpg(*mask, va, pmap, pmap_curcpu_cb_dummy);
 	sched_unpin();
 }
 
@@ -1274,7 +1281,7 @@ pmap_invalidate_range_int(pmap_t pmap, vm_offset_t sva, vm_offset_t eva)
 		CPU_AND(&other_cpus, &pmap->pm_active);
 		mask = &other_cpus;
 	}
-	smp_masked_invlpg_range(*mask, sva, eva, pmap);
+	smp_masked_invlpg_range(*mask, sva, eva, pmap, pmap_curcpu_cb_dummy);
 	sched_unpin();
 }
 
@@ -1297,18 +1304,21 @@ pmap_invalidate_all_int(pmap_t pmap)
 		CPU_AND(&other_cpus, &pmap->pm_active);
 		mask = &other_cpus;
 	}
-	smp_masked_invltlb(*mask, pmap);
+	smp_masked_invltlb(*mask, pmap, pmap_curcpu_cb_dummy);
 	sched_unpin();
+}
+
+static void
+pmap_invalidate_cache_curcpu_cb(pmap_t pmap __unused,
+    vm_offset_t addr1 __unused, vm_offset_t addr2 __unused)
+{
+	wbinvd();
 }
 
 static void
 __CONCAT(PMTYPE, invalidate_cache)(void)
 {
-
-	sched_pin();
-	wbinvd();
-	smp_cache_flush();
-	sched_unpin();
+	smp_cache_flush(pmap_invalidate_cache_curcpu_cb);
 }
 
 struct pde_action {
@@ -4048,7 +4058,7 @@ pmap_enter_pde(pmap_t pmap, vm_offset_t va, pd_entry_t newpde, u_int flags,
  */
 static void
 __CONCAT(PMTYPE, enter_object)(pmap_t pmap, vm_offset_t start, vm_offset_t end,
-    vm_page_t m_start, vm_prot_t prot)
+    vm_page_t m_start, vm_prot_t prot, u_int flags)
 {
 	vm_offset_t va;
 	vm_page_t m, mpte;
@@ -4087,7 +4097,7 @@ __CONCAT(PMTYPE, enter_object)(pmap_t pmap, vm_offset_t start, vm_offset_t end,
 
 static void
 __CONCAT(PMTYPE, enter_quick)(pmap_t pmap, vm_offset_t va, vm_page_t m,
-    vm_prot_t prot)
+    vm_prot_t prot, u_int flags)
 {
 
 	rw_wlock(&pvh_global_lock);
