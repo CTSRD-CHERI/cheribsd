@@ -91,7 +91,7 @@ test_bounds_precise(void * __capability c, size_t expected_len)
 	CHERITEST_VERIFY2(len >= expected_len,
 	    "length (%jd) smaller than expected lower bound %jd: " _CHERI_PRINTF_CAP_FMT,
 	    len, expected_len, _CHERI_PRINTF_CAP_ARG(c));
-#ifndef __riscv  /* RISC-V does not bound stack capabilities in hybrid mode */
+#ifndef __riscv  /* RISC-V does not bound __cheri_tocap casts in hybrid mode */
 	CHERITEST_VERIFY2(len <= 2 * expected_len,
 	    "length (%jd) greater than expected upper bound %jd: " _CHERI_PRINTF_CAP_FMT,
 	    len, 2 * expected_len, _CHERI_PRINTF_CAP_ARG(c));
