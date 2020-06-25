@@ -878,6 +878,10 @@ static const struct cheri_test cheri_tests[] = {
 	  .ct_desc = "read capabilities from a faulted copy-on-write page",
 	  .ct_func = cheribsdtest_vm_cow_write, },
 
+	{ .ct_name = "cheribsdtest_vm_capdirty",
+	  .ct_desc = "verify capdirty marking and mincore",
+	  .ct_func = cheribsdtest_vm_capdirty, },
+
 #if 0
 	{ .ct_name = "cheribsdtest_vm_swap",
 	  .ct_desc = "check tags are swapped out by swap pager",
