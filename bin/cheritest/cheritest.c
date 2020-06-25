@@ -1037,6 +1037,10 @@ static const struct cheri_test cheri_tests[] = {
 	  .ct_check_xfail = xfail_swap_required},
 #endif
 
+	{ .ct_name = "cheritest_vm_capdirty",
+	  .ct_desc = "verify capdirty marking and mincore",
+	  .ct_func = cheritest_vm_capdirty, },
+
 #ifdef CHERI_LIBCHERI_TESTS
 #if 0
 	/*

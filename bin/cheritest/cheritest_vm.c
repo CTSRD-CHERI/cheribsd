@@ -602,3 +602,53 @@ cheritest_vm_cow_write(const struct cheri_test *ctp __unused)
 	CHERITEST_CHECK_SYSCALL(close(fd));
 	cheritest_success();
 }
+
+/* Store a cap to a page and check that mincore reports it dirty */
+void
+cheritest_vm_capdirty(const struct cheri_test *ctp __unused)
+{
+	static const size_t npg = 2;
+	size_t sz = npg * getpagesize();
+
+	void * __capability *pg0;
+	unsigned char mcv[npg] = { 0 };
+
+	pg0 = CHERITEST_CHECK_SYSCALL(
+	    mmap(NULL, sz, PROT_READ | PROT_WRITE, MAP_ANON, -1, 0));
+
+	void * __capability *pg1 = (void *)&((char *)pg0)[getpagesize()];
+
+	CHERITEST_CHECK_SYSCALL(mincore(pg0, sz, &mcv[0]));
+	CHERITEST_VERIFY2(mcv[0] == 0, "page 0 status 0");
+	CHERITEST_VERIFY2(mcv[1] == 0, "page 1 status 0");
+
+	*(char *)pg0 = 0x42;
+
+	CHERITEST_CHECK_SYSCALL(mincore(pg0, sz, &mcv[0]));
+	CHERITEST_VERIFY2(
+	    (mcv[0] & MINCORE_MODIFIED) != 0, "page 0 modified 1");
+	CHERITEST_VERIFY2(
+	    (mcv[0] & MINCORE_CAPSTORE) != 0, "page 0 capstore 1");
+	CHERITEST_VERIFY2(
+	    (mcv[0] & MINCORE_CAPDIRTY) == 0, "page 0 !capdirty 1");
+	CHERITEST_VERIFY2(mcv[1] == 0, "page 1 status 1");
+
+	*pg1 = (void * __capability)pg0;
+
+	CHERITEST_CHECK_SYSCALL(mincore(pg0, sz, &mcv[0]));
+	CHERITEST_VERIFY2(
+	    (mcv[0] & MINCORE_MODIFIED) != 0, "page 0 modified 2");
+	CHERITEST_VERIFY2(
+	    (mcv[0] & MINCORE_CAPSTORE) != 0, "page 0 capstore 2");
+	CHERITEST_VERIFY2(
+	    (mcv[0] & MINCORE_CAPDIRTY) == 0, "page 0 !capdirty 2");
+	CHERITEST_VERIFY2(
+	    (mcv[1] & MINCORE_MODIFIED) != 0, "page 1 modified 2");
+	CHERITEST_VERIFY2(
+	    (mcv[1] & MINCORE_CAPSTORE) != 0, "page 1 capstore 2");
+	CHERITEST_VERIFY2(
+	    (mcv[1] & MINCORE_CAPDIRTY) != 0, "page 1 capdirty 2");
+
+	CHERITEST_CHECK_SYSCALL(munmap(pg0, sz));
+	cheritest_success();
+}
