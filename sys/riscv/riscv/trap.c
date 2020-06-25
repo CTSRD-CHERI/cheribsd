@@ -76,6 +76,13 @@ __FBSDID("$FreeBSD$");
 #include <sys/dtrace_bsd.h>
 #endif
 
+#if __has_feature(capabilities)
+int log_user_cheri_exceptions = 0;
+SYSCTL_INT(_machdep, OID_AUTO, log_user_cheri_exceptions, CTLFLAG_RWTUN,
+    &log_user_cheri_exceptions, 0,
+    "Print registers and process details on user CHERI exceptions");
+#endif
+
 int (*dtrace_invop_jump_addr)(struct trapframe *);
 
 extern register_t fsu_intr_fault;
@@ -222,6 +229,54 @@ dump_regs(struct trapframe *frame)
 	printf("sstatus == 0x%016lx\n", frame->tf_sstatus);
 	printf("stval == 0x%016lx\n", frame->tf_stval);
 }
+
+#if __has_feature(capabilities)
+static void
+dump_cheri_exception(struct trapframe *frame)
+{
+	struct thread *td;
+	struct proc *p;
+	uint64_t sccsr;
+
+	td = curthread;
+	p = td->td_proc;
+	printf("pid %d tid %ld (%s), uid %d: ", p->p_pid, td->td_tid,
+	    p->p_comm, td->td_ucred->cr_uid);
+	switch (frame->tf_scause & EXCP_MASK) {
+	case EXCP_LOAD_CAP_PAGE_FAULT:
+		printf("LOAD CAP page fault");
+		break;
+	case EXCP_STORE_AMO_CAP_PAGE_FAULT:
+		printf("STORE/AMO CAP page fault");
+		break;
+	case EXCP_CHERI:
+		sccsr = csr_read(sccsr);
+		printf("CHERI fault (type %#x), capidx %d",
+		    (sccsr & SCCSR_CAUSE_MASK) >> SCCSR_CAUSE_SHIFT,
+		    (sccsr & SCCSR_CAP_IDX_MASK) >> SCCSR_CAP_IDX_SHIFT);
+		break;
+	default:
+		printf("fault %d", frame->tf_scause & EXCP_MASK);
+		break;
+	}
+	printf("\n");
+	if (p->p_args != NULL) {
+		char *args;
+		unsigned len;
+
+		args = p->p_args->ar_args;
+		len = p->p_args->ar_length;
+		for (unsigned i = 0; i < len; i++) {
+			if (args[i] == '\0')
+				printf(" ");
+			else
+				printf("%c", args[i]);
+		}
+		printf("\n");
+	}
+	dump_regs(frame);
+}
+#endif
 
 static void
 svc_handler(struct trapframe *frame)
@@ -478,18 +533,23 @@ do_trap_user(struct trapframe *frame)
 		    0);
 		break;
 	case EXCP_LOAD_CAP_PAGE_FAULT:
+		if (log_user_cheri_exceptions)
+			dump_cheri_exception(frame);
 		call_trapsignal(td, SIGSEGV, SEGV_LOADTAG,
 		    (void * __capability)(uintcap_t)frame->tf_stval, exception,
 		    0);
 		break;
 	case EXCP_STORE_AMO_CAP_PAGE_FAULT:
+		if (log_user_cheri_exceptions)
+			dump_cheri_exception(frame);
 		call_trapsignal(td, SIGSEGV, SEGV_STORETAG,
 		    (void * __capability)(uintcap_t)frame->tf_stval, exception,
 		    0);
 		break;
 	case EXCP_CHERI:
+		if (log_user_cheri_exceptions)
+			dump_cheri_exception(frame);
 		sccsr = csr_read(sccsr);
-
 		call_trapsignal(td, SIGPROT, cheri_sccsr_to_sicode(sccsr),
 		    (void * __capability)frame->tf_sepc, exception,
 		    (sccsr & SCCSR_CAP_IDX_MASK) >> SCCSR_CAP_IDX_SHIFT);
