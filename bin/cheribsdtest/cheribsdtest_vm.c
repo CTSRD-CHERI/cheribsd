@@ -1104,4 +1104,74 @@ CHERIBSDTEST(cheribsdtest_vm_shm_largepage_basic,
 	cheribsdtest_success();
 }
 #endif /* PMAP_HAS_LARGEPAGES */
+
+/*
+ * Store a cap to a page and check that mincore reports it CAPSTORE.
+ *
+ * Due to a shortage of bits in mincore()'s uint8_t reporting bit vector, this
+ * particular test is not able to distinguish CAPSTORE and CAPDIRTY and so is
+ * not sensitive to the vm.pmap.enter_capstore_as_capdirty sysctl.
+ *
+ * On the other hand, this test is sensitive to the vm.capstore_on_alloc sysctl:
+ * if that is asserted, our cap-capable anonymous memory will be installed
+ * CAPSTORE (and possibly even CAPDIRTY, in light of the above) whereas, if this
+ * sysctl is clear, our initial view of said memory will be !CAPSTORE.
+ */
+CHERIBSDTEST(cheribsdtest_vm_capdirty, "verify capdirty marking and mincore")
+{
+#define CHERIBSDTEST_VM_CAPDIRTY_NPG	2
+	size_t sz = CHERIBSDTEST_VM_CAPDIRTY_NPG * getpagesize();
+	uint8_t capstore_on_alloc;
+	size_t capstore_on_alloc_sz = sizeof(capstore_on_alloc);
+
+	void * __capability *pg0;
+	unsigned char mcv[CHERIBSDTEST_VM_CAPDIRTY_NPG] = { 0 };
+
+	CHERIBSDTEST_CHECK_SYSCALL(
+	    sysctlbyname("vm.capstore_on_alloc", &capstore_on_alloc,
+	        &capstore_on_alloc_sz, NULL, 0));
+
+	pg0 = CHERIBSDTEST_CHECK_SYSCALL(
+	    mmap(NULL, sz, PROT_READ | PROT_WRITE, MAP_ANON, -1, 0));
+
+	void * __capability *pg1 = (void *)&((char *)pg0)[getpagesize()];
+
+	/*
+	 * Pages are ZFOD and so will not be CAPSTORE, or, really, anything
+	 * else, either.
+	 */
+	CHERIBSDTEST_CHECK_SYSCALL(mincore(pg0, sz, &mcv[0]));
+	CHERIBSDTEST_VERIFY2(mcv[0] == 0, "page 0 status 0");
+	CHERIBSDTEST_VERIFY2(mcv[1] == 0, "page 1 status 0");
+
+	/*
+	 * Write data to page 0, causing it to become allocated and MODIFIED.
+	 * If vm.capstore_on_alloc, then it should be CAPSTORE as well, despite
+	 * having never been the target of a capability store.
+	 */
+	*(char *)pg0 = 0x42;
+
+	CHERIBSDTEST_CHECK_SYSCALL(mincore(pg0, sz, &mcv[0]));
+	CHERIBSDTEST_VERIFY2(
+	    (mcv[0] & MINCORE_MODIFIED) != 0, "page 0 modified 1");
+	CHERIBSDTEST_VERIFY2(
+	    !(mcv[0] & MINCORE_CAPSTORE) == !capstore_on_alloc,
+	    "page 0 capstore 1");
+
+	/*
+	 * Write a capability to page 1 and check that it is MODIFIED and
+	 * CAPSTORE regardless of vm.capstore_on_alloc.
+	 */
+	*pg1 = (__cheri_tocap void * __capability)pg0;
+
+	CHERIBSDTEST_CHECK_SYSCALL(mincore(pg0, sz, &mcv[0]));
+	CHERIBSDTEST_VERIFY2(
+	    (mcv[1] & MINCORE_MODIFIED) != 0, "page 1 modified 2");
+	CHERIBSDTEST_VERIFY2(
+	    (mcv[1] & MINCORE_CAPSTORE) != 0, "page 1 capstore 2");
+
+	CHERIBSDTEST_CHECK_SYSCALL(munmap(pg0, sz));
+	cheribsdtest_success();
+#undef CHERIBSDTEST_VM_CAPDIRTY_NPG
+}
 #endif /* __CHERI_PURE_CAPABILITY__ */
