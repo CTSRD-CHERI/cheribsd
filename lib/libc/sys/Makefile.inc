@@ -205,6 +205,7 @@ MAN+=	abort2.2 \
 	fhlink.2 \
 	fhopen.2 \
 	fhreadlink.2 \
+	flag_captured.2 \
 	flock.2 \
 	fork.2 \
 	fsync.2 \
