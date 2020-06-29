@@ -24,7 +24,7 @@ directly, avoid the `-DNO_CLEAN` make option.
 
 | Date       | Commit      | Description | Required action |
 | ---------- | ----------- | --- | --- |
-| 2020-06-24 | [e5c4980cd] | Enable MK_LIB64 on CHERI-RISC-V | delete bin/cheritest*/*.o from riscv64 purecap build directores or clean rebuild |
+| 2020-06-24 | [e5c4980cd] | Enable MK_LIB64 on CHERI-RISC-V | delete bin/cheritest*/*.o and usr.bin/kyua/main.o from riscv64 purecap build directores or clean rebuild |
 | 2020-05-26 | [cc876df74] | MIPS with CHERI support now builds hybrid | Clean rebuild |
 | 2020-04-21 | [7e76d8f71] | C/C++ ABI changes | Update to [LLVM b7f5c847dc] and a clean rebuild.|
 | 2020-03-06 | [6ce214d1e] | ELF auxargs flags altered | Clean rebuild |
