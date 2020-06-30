@@ -373,6 +373,19 @@ fatal:
 	    (__cheri_addr unsigned long)frame->tf_sepc, stval);
 }
 
+#if __has_feature(capabilities)
+static int
+try_capdirty(pmap_t kpmap, pmap_t upmap, struct trapframe *frame)
+{
+	vm_offset_t va = frame->tf_stval;
+
+	if ((va >= VM_MAX_USER_ADDRESS) && kpmap)
+		return pmap_fault_fixup(kpmap, va, VM_PROT_WRITE_CAP);
+	else
+		return pmap_fault_fixup(upmap, va, VM_PROT_WRITE_CAP);
+}
+#endif
+
 void
 do_trap_supervisor(struct trapframe *frame)
 {
@@ -424,8 +437,15 @@ do_trap_supervisor(struct trapframe *frame)
 		    (__cheri_addr unsigned long)frame->tf_sepc);
 		break;
 #if __has_feature(capabilities)
-	case EXCP_LOAD_CAP_PAGE_FAULT:
 	case EXCP_STORE_AMO_CAP_PAGE_FAULT:
+		/* This could be a cap-dirtying fast trap */
+		if (try_capdirty(kernel_map->pmap,
+				 curthread->td_proc->p_vmspace->vm_map.pmap,
+				 frame))
+			break;
+
+		/* FALLTHROUGH */
+	case EXCP_LOAD_CAP_PAGE_FAULT:
 	case EXCP_CHERI:
 		if (curthread->td_pcb->pcb_onfault != 0) {
 			frame->tf_a[0] = EPROT;
@@ -531,8 +551,14 @@ do_trap_user(struct trapframe *frame)
 		    0);
 		break;
 	case EXCP_STORE_AMO_CAP_PAGE_FAULT:
+		/* This could be a cap-dirtying fast trap */
+		if (try_capdirty(NULL, td->td_proc->p_vmspace->vm_map.pmap,
+				 frame))
+			break;
+
 		if (log_user_cheri_exceptions)
 			dump_cheri_exception(frame);
+
 		call_trapsignal(td, SIGSEGV, SEGV_STORETAG,
 		    (void * __capability)(uintcap_t)frame->tf_stval, exception,
 		    0);
