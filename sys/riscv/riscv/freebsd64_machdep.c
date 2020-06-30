@@ -246,7 +246,7 @@ freebsd64_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	onstack = sigonstack(tf->tf_sp);
 
 	CTR4(KTR_SIG, "sendsig: td=%p (%s) catcher=%p sig=%d", td, p->p_comm,
-	    catcher, sig);
+	    (__cheri_addr vaddr_t)catcher, sig);
 
 	/* Allocate and validate space for the signal handler context. */
 	if ((td->td_pflags & TDP_ALTSTACK) != 0 && !onstack &&
