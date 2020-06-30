@@ -70,7 +70,8 @@ typedef	uint64_t	pn_t;			/* page number */
 /* CHERI uses reserved bits in 55:63 */
 #define	PTE_SC		(1UL << 63) /* Store Capability */
 #define	PTE_LC		(1UL << 62) /* Load Capability */
-#define	PTE_KERN_CHERI	(PTE_LC | PTE_SC)
+#define	PTE_CD		(1UL << 61) /* Capability Dirty */
+#define	PTE_KERN_CHERI	(PTE_LC | PTE_SC | PTE_CD)
 #define	PTE_PROMOTE_CHERI (PTE_LC | PTE_SC)
 #else
 #define	PTE_KERN_CHERI	0

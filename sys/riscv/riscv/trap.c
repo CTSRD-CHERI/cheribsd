@@ -299,6 +299,7 @@ data_abort(struct trapframe *frame, int usermode)
 	vm_offset_t va;
 	struct proc *p;
 	int error, sig, ucode;
+	const char *panictype;
 
 #ifdef KDB
 	if (kdb_active) {
@@ -334,6 +335,10 @@ data_abort(struct trapframe *frame, int usermode)
 		ftype = VM_PROT_WRITE;
 	} else if (frame->tf_scause == EXCP_INST_PAGE_FAULT) {
 		ftype = VM_PROT_EXECUTE;
+#if __has_feature(capabilities)
+	} else if (frame->tf_scause == EXCP_STORE_AMO_CAP_PAGE_FAULT) {
+		ftype = VM_PROT_WRITE | VM_PROT_WRITE_CAP;
+#endif
 	} else {
 		ftype = VM_PROT_READ;
 	}
@@ -344,6 +349,12 @@ data_abort(struct trapframe *frame, int usermode)
 	error = vm_fault_trap(map, va, ftype, VM_FAULT_NORMAL, &sig, &ucode);
 	if (error != KERN_SUCCESS) {
 		if (usermode) {
+#if __has_feature(capabilities)
+			if (log_user_cheri_exceptions &&
+			    frame->tf_scause == EXCP_STORE_AMO_CAP_PAGE_FAULT) {
+				dump_cheri_exception(frame);
+			}
+#endif
 			call_trapsignal(td, sig, ucode,
 			    (void * __capability)(uintcap_t)stval,
 			    frame->tf_scause & EXCP_MASK, 0);
@@ -368,8 +379,15 @@ done:
 	return;
 
 fatal:
+#if __has_feature(capabilities)
+	if (frame->tf_scause == EXCP_STORE_AMO_CAP_PAGE_FAULT) {
+		panictype = "capability ";
+	} else
+#endif
+	panictype = "";
+
 	dump_regs(frame);
-	panic("Fatal page fault at %#lx: %#016lx",
+	panic("Fatal %spage fault at %#lx: %#016lx", panictype,
 	    (__cheri_addr unsigned long)frame->tf_sepc, stval);
 }
 
@@ -403,6 +421,9 @@ do_trap_supervisor(struct trapframe *frame)
 	case EXCP_FAULT_FETCH:
 	case EXCP_STORE_PAGE_FAULT:
 	case EXCP_LOAD_PAGE_FAULT:
+#if __has_feature(capabilities)
+	case EXCP_STORE_AMO_CAP_PAGE_FAULT:
+#endif
 		data_abort(frame, 0);
 		break;
 	case EXCP_BREAKPOINT:
@@ -425,7 +446,6 @@ do_trap_supervisor(struct trapframe *frame)
 		break;
 #if __has_feature(capabilities)
 	case EXCP_LOAD_CAP_PAGE_FAULT:
-	case EXCP_STORE_AMO_CAP_PAGE_FAULT:
 	case EXCP_CHERI:
 		if (curthread->td_pcb->pcb_onfault != 0) {
 			frame->tf_a[0] = EPROT;
@@ -486,6 +506,9 @@ do_trap_user(struct trapframe *frame)
 	case EXCP_STORE_PAGE_FAULT:
 	case EXCP_LOAD_PAGE_FAULT:
 	case EXCP_INST_PAGE_FAULT:
+#if __has_feature(capabilities)
+	case EXCP_STORE_AMO_CAP_PAGE_FAULT:
+#endif
 		data_abort(frame, 1);
 		break;
 	case EXCP_USER_ECALL:
@@ -527,13 +550,6 @@ do_trap_user(struct trapframe *frame)
 		if (log_user_cheri_exceptions)
 			dump_cheri_exception(frame);
 		call_trapsignal(td, SIGSEGV, SEGV_LOADTAG,
-		    (void * __capability)(uintcap_t)frame->tf_stval, exception,
-		    0);
-		break;
-	case EXCP_STORE_AMO_CAP_PAGE_FAULT:
-		if (log_user_cheri_exceptions)
-			dump_cheri_exception(frame);
-		call_trapsignal(td, SIGSEGV, SEGV_STORETAG,
 		    (void * __capability)(uintcap_t)frame->tf_stval, exception,
 		    0);
 		break;

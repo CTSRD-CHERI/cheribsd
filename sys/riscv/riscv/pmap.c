@@ -2421,14 +2421,35 @@ pmap_fault_fixup(pmap_t pmap, vm_offset_t va, vm_prot_t ftype)
 	}
 
 	if ((pmap != kernel_pmap && (oldpte & PTE_U) == 0) ||
-	    (ftype == VM_PROT_WRITE && (oldpte & PTE_W) == 0) ||
+	    ((ftype & VM_PROT_WRITE) != 0 && (oldpte & PTE_W) == 0) ||
 	    (ftype == VM_PROT_EXECUTE && (oldpte & PTE_X) == 0) ||
 	    (ftype == VM_PROT_READ && (oldpte & PTE_R) == 0))
 		goto done;
 
 	bits = PTE_A;
-	if (ftype == VM_PROT_WRITE)
+	if ((ftype & VM_PROT_WRITE) != 0)
 		bits |= PTE_D;
+
+#if __has_feature(capabilities)
+	if (ftype == (VM_PROT_WRITE | VM_PROT_WRITE_CAP)) {
+		/*
+		 * XXX until hardware's caught up, we use PTE_CD as a "not
+		 * capability read-only" flag, and leave PTE_SC clear to force
+		 * traps.  If PTE_CD is clear, we don't mean for this page to
+		 * be cap-capable.
+		 *
+		 * When hardware catches up by understanding that PTE_SC is
+		 * like PTE_W, and so writes are also gated by PTE_CD, this
+		 * "not capability read-only" will be expressed directly in
+		 * PTE_SC, at which point this should be checking PTE_SC and
+		 * setting PTE_CD.
+		 */
+		if ((oldpte & PTE_CD) == 0)
+			goto done;
+
+		bits |= PTE_SC;
+	}
+#endif
 
 	/*
 	 * Spurious faults can occur if the implementation caches invalid
@@ -2623,10 +2644,18 @@ pmap_promote_l2(pmap_t pmap, pd_entry_t *l2, vm_offset_t va,
 static inline uint64_t cheri_pte_sc(vm_page_t m)
 {
 	if ((m->oflags & VPO_CAPSTORE) != 0) {
-		// Until we get to cap-dirtying, possibility implies permission
-		return PTE_SC;
+		if ((vm_page_astate_load(m).flags & PGA_CAPDIRTY) != 0) {
+			return PTE_SC | PTE_CD;
+		} else {
+			/*
+			 * XXX This should be PTE_SC instead, but our hardware
+			 * is not yet CD-aware, so we're going to use PTE_CD
+			 * to pass basically "not capability read only" to
+			 * ourself in pmap_fault_fixup
+			 */
+			return PTE_CD;
+		}
 	}
-	// Cap stores forbidden: don't set PTE_SC
 	return 0;
 }
 #endif
@@ -3249,8 +3278,12 @@ pmap_enter_quick_locked(pmap_t pmap, vm_offset_t va, vm_page_t m,
 		(!!(flags & PMAP_ENTER_NOSTORETAGS) ==
 		!(m->oflags & VPO_CAPSTORE)),
 		("ENTER_NOSTORETAGS vs VPO_CAPSTORE"));
-	if ((m->oflags & VPO_CAPSTORE) != 0)
-		newl3 |= PTE_SC;
+	if ((m->oflags & VPO_CAPSTORE) != 0) {
+		/*
+		 * XXX Until hardware catches up, use PTE_CD, not PTE_SC here
+		 */
+		newl3 |= PTE_CD;
+	}
 #endif
 
 	/*
@@ -4317,6 +4350,7 @@ pmap_mincore(pmap_t pmap, vm_offset_t addr, vm_paddr_t *pap)
 			val |= MINCORE_MODIFIED | MINCORE_MODIFIED_OTHER;
 		if ((tpte & PTE_A) != 0)
 			val |= MINCORE_REFERENCED | MINCORE_REFERENCED_OTHER;
+
 		managed = (tpte & PTE_SW_MANAGED) == PTE_SW_MANAGED;
 	} else {
 		managed = false;
