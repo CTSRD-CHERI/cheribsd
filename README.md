@@ -1,9 +1,9 @@
 # CheriBSD
 
-CheriBSD extends FreeBSD/BERI to implement memory protection and
+CheriBSD extends FreeBSD to implement memory protection and
 software compartmentalization features supported by the CHERI ISA.
-FreeBSD/BERI is a port of the open-source FreeBSD operating system that
-extends support for the Bluespec Extensible RISC implementation (BERI).
+CheriBSD includes support for CHERI extensions to the MIPS and RISC-V
+architectures.
 To build and run CheriBSD we recommend using the
 [cheribuild](https://github.com/CTSRD-CHERI/cheribuild) script.
 
@@ -16,23 +16,18 @@ http://www.cl.cam.ac.uk/research/security/ctsrd/cheri/cheribsd.html
 The Qemu-CHERI web page may also be useful:
 http://www.cl.cam.ac.uk/research/security/ctsrd/cheri/cheri-qemu.html
 
-More information about BERI and CHERI can be found on
-http://beri-cpu.org, http://cheri-cpu.org, in the following
-Technical Reports:
+More information about CHERI can be found on http://cheri-cpu.org and
+in the following Technical Reports:
+
+An Introduction to CHERI
+https://www.cl.cam.ac.uk/techreports/UCAM-CL-TR-941.pdf
 
 Capability Hardware Enhanced RISC Instructions: CHERI Instruction-Set
 Architecture
 https://www.cl.cam.ac.uk/techreports/UCAM-CL-TR-927.pdf
 
-Capability Hardware Enhanced RISC Instructions: CHERI Programmer's Guide (outdated, new version coming soon)
-http://www.cl.cam.ac.uk/techreports/UCAM-CL-TR-877.pdf
-
-
-Bluespec Extensible RISC Implementation: BERI Hardware reference
-http://www.cl.cam.ac.uk/techreports/UCAM-CL-TR-868.pdf
-
-Bluespec Extensible RISC Implementation: BERI Software reference
-http://www.cl.cam.ac.uk/techreports/UCAM-CL-TR-869.pdf
+CHERI C/C++ Programming Guide
+https://www.cl.cam.ac.uk/techreports/UCAM-CL-TR-947.pdf
 
 FreeBSD Source:
 ---------------
