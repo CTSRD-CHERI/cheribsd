@@ -2012,6 +2012,14 @@ pmap_remove_kernel_l2(pmap_t pmap, pt_entry_t *l2, vm_offset_t va)
 	    __func__, l2, oldl2));
 }
 
+static void
+pmap_page_dirty(pt_entry_t tpte, vm_page_t m)
+{
+	vm_page_dirty(m);
+	if ((tpte & (PTE_SC | PTE_CD)) == (PTE_SC | PTE_CD))
+		vm_page_capdirty(m);
+}
+
 /*
  * pmap_remove_l2: Do the things to unmap a level 2 superpage.
  */
@@ -2049,7 +2057,7 @@ pmap_remove_l2(pmap_t pmap, pt_entry_t *l2, vm_offset_t sva,
 		for (va = sva, m = PHYS_TO_VM_PAGE(PTE_TO_PHYS(oldl2));
 		    va < eva; va += PAGE_SIZE, m++) {
 			if ((oldl2 & PTE_D) != 0)
-				vm_page_dirty(m);
+				pmap_page_dirty(oldl2, m);
 			if ((oldl2 & PTE_A) != 0)
 				vm_page_aflag_set(m, PGA_REFERENCED);
 			if (TAILQ_EMPTY(&m->md.pv_list) &&
@@ -2097,7 +2105,7 @@ pmap_remove_l3(pmap_t pmap, pt_entry_t *l3, vm_offset_t va,
 		phys = PTE_TO_PHYS(old_l3);
 		m = PHYS_TO_VM_PAGE(phys);
 		if ((old_l3 & PTE_D) != 0)
-			vm_page_dirty(m);
+			pmap_page_dirty(old_l3, m);
 		if (old_l3 & PTE_A)
 			vm_page_aflag_set(m, PGA_REFERENCED);
 		CHANGE_PV_LIST_LOCK_TO_VM_PAGE(lockp, m);
@@ -2276,7 +2284,7 @@ pmap_remove_all(vm_page_t m)
 		 * Update the vm_page_t clean and reference bits.
 		 */
 		if ((l3e & PTE_D) != 0)
-			vm_page_dirty(m);
+			pmap_page_dirty(l3e, m);
 		pmap_unuse_pt(pmap, pv->pv_va, pmap_load(l2), &free);
 		TAILQ_REMOVE(&m->md.pv_list, pv, pv_next);
 		m->md.pv_gen++;
@@ -2345,7 +2353,7 @@ retryl2:
 					pa = PTE_TO_PHYS(l2e);
 					m = PHYS_TO_VM_PAGE(pa);
 					for (mt = m; mt < &m[Ln_ENTRIES]; mt++)
-						vm_page_dirty(mt);
+						pmap_page_dirty(l2e, mt);
 				}
 				if (!atomic_fcmpset_long(l2, &l2e, l2e & ~mask))
 					goto retryl2;
@@ -2385,7 +2393,7 @@ retryl3:
 			    (l3e & (PTE_SW_MANAGED | PTE_D)) ==
 			    (PTE_SW_MANAGED | PTE_D)) {
 				m = PHYS_TO_VM_PAGE(PTE_TO_PHYS(l3e));
-				vm_page_dirty(m);
+				pmap_page_dirty(l3e, m);
 			}
 			if (!atomic_fcmpset_long(l3, &l3e, l3e & ~mask))
 				goto retryl3;
@@ -2861,7 +2869,7 @@ pmap_enter(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot,
 			 * pmap_ts_referenced().
 			 */
 			if ((orig_l3 & PTE_D) != 0)
-				vm_page_dirty(om);
+				pmap_page_dirty(orig_l3, om);
 			if ((orig_l3 & PTE_A) != 0)
 				vm_page_aflag_set(om, PGA_REFERENCED);
 			CHANGE_PV_LIST_LOCK_TO_PHYS(&lock, opa);
@@ -2919,7 +2927,7 @@ validate:
 		    ("pmap_enter: invalid update"));
 		if ((orig_l3 & (PTE_D | PTE_SW_MANAGED)) ==
 		    (PTE_D | PTE_SW_MANAGED))
-			vm_page_dirty(m);
+			pmap_page_dirty(orig_l3, m);
 	} else {
 		pmap_store(l3, new_l3);
 	}
@@ -3770,9 +3778,10 @@ pmap_remove_pages(pmap_t pmap)
 					if (superpage)
 						for (mt = m;
 						    mt < &m[Ln_ENTRIES]; mt++)
-							vm_page_dirty(mt);
+							pmap_page_dirty(tpte,
+									mt);
 					else
-						vm_page_dirty(m);
+						pmap_page_dirty(tpte, m);
 				}
 
 				CHANGE_PV_LIST_LOCK_TO_VM_PAGE(&lock, m);
@@ -4001,7 +4010,7 @@ retry:
 			if (!atomic_fcmpset_long(l3, &oldl3, newl3))
 				goto retry;
 			if ((oldl3 & PTE_D) != 0)
-				vm_page_dirty(m);
+				pmap_page_dirty(oldl3, m);
 			pmap_invalidate_page(pmap, pv->pv_va);
 		}
 		PMAP_UNLOCK(pmap);
@@ -4077,7 +4086,7 @@ retry:
 			 * this function is called at a 4KB page granularity,
 			 * we only update the 4KB page under test.
 			 */
-			vm_page_dirty(m);
+			pmap_page_dirty(l2e, m);
 		}
 		if ((l2e & PTE_A) != 0) {
 			/*
@@ -4142,7 +4151,7 @@ small_mappings:
 		l3 = pmap_l2_to_l3(l2, pv->pv_va);
 		l3e = pmap_load(l3);
 		if ((l3e & PTE_D) != 0)
-			vm_page_dirty(m);
+			pmap_page_dirty(l3e, m);
 		if ((l3e & PTE_A) != 0) {
 			if ((l3e & PTE_SW_WIRED) == 0) {
 				/*
@@ -4244,7 +4253,7 @@ restart:
 			va += VM_PAGE_TO_PHYS(m) - PTE_TO_PHYS(oldl2);
 			l3 = pmap_l2_to_l3(l2, va);
 			pmap_clear_bits(l3, PTE_D | PTE_W);
-			vm_page_dirty(m);
+			pmap_page_dirty(oldl2, m);
 			pmap_invalidate_page(pmap, va);
 		}
 		PMAP_UNLOCK(pmap);
