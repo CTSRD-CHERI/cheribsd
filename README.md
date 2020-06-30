@@ -8,7 +8,7 @@ To build and run CheriBSD we recommend using the
 [cheribuild](https://github.com/CTSRD-CHERI/cheribuild) script.
 
 For information on our branching model, updates, and flag days, please
-read [CHERI-UPDATING.md].
+read [CHERI-UPDATING.md](CHERI-UPDATING.md).
 
 The CheriBSD web page can be found here:
 http://www.cl.cam.ac.uk/research/security/ctsrd/cheri/cheribsd.html
