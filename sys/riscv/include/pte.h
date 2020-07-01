@@ -99,6 +99,9 @@ typedef	uint64_t	pn_t;			/* page number */
 /* Bits 63 - 54 are reserved for future use. */
 #define PTE_HI_MASK	0xFFC0000000000000ULL
 
+/* Bits 63 - 54 are reserved for future use. */
+#define PTE_HI_MASK	0xFFC0000000000000ULL
+
 #define	PTE_PPN0_S	10
 #define	PTE_PPN1_S	19
 #define	PTE_PPN2_S	28
