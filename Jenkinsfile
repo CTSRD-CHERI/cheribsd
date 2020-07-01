@@ -60,6 +60,22 @@ find cheribsd-test-results
     }
 }
 
+def buildFPGAKernels(params, String name, String suffix) {
+    stage("Building minimal disk image") {
+        sh "./cheribuild/jenkins-cheri-build.py --build disk-image-minimal-${suffix} ${params.extraArgs}"
+    }
+    stage("Building FPGA kernels") {
+        cheribuildProject(target: "cheribsd-${suffix}", architecture: suffix,
+            extraArgs: params.extraArgs + " --cheribsd-${suffix}/build-fpga-kernels --cheribsd-${suffix}/mfs-root-image $WORKSPACE/cherisdk/disk-image-minimal-${suffix} --skip-buildworld",
+            skipArchiving: true, skipTarball: true, skipInitialSetup: true,
+            customGitCheckoutDir: 'cheribsd',
+            gitHubStatusContext: "ci/${name}-fpga",
+            /* Custom function to run tests since --test will not work (yet) */
+            runTests: false
+        )
+    }
+}
+
 ["mips-nocheri", "mips-hybrid", "mips-purecap", "riscv64", "riscv64-hybrid", "riscv64-purecap", "native"].each { suffix ->
     String name = "cheribsd-${suffix}"
     jobs[suffix] = { ->
@@ -85,7 +101,11 @@ find cheribsd-test-results
                 customGitCheckoutDir: 'cheribsd',
                 gitHubStatusContext: "ci/${name}",
                 /* Custom function to run tests since --test will not work (yet) */
-                runTests: false, afterBuild: { params -> buildImageAndRunTests(params, suffix) }
+                runTests: false,
+                afterBuild: { params ->
+                        buildFPGAKernels(params, name, suffix)
+                        buildImageAndRunTests(params, suffix)
+                }
         )
     }
 }
