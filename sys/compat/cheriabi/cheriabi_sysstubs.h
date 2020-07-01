@@ -19,8 +19,8 @@ struct __ucontext;
 struct __wrusage;
 struct acl;
 struct aiocb;
-struct auditinfo_addr;
 struct auditinfo;
+struct auditinfo_addr;
 struct ffclock_estimate;
 struct fhandle;
 struct freebsd11_stat;
@@ -30,15 +30,15 @@ struct iovec;
 struct itimerspec;
 struct itimerval;
 struct jail;
-struct kevent_freebsd11;
 struct kevent;
+struct kevent_freebsd11;
 struct kld_file_stat;
 struct mac;
 struct module_stat;
 struct mq_attr;
 struct msghdr;
-struct msqid_ds_old;
 struct msqid_ds;
+struct msqid_ds_old;
 struct nstat;
 struct ntptimeval;
 struct oaiocb;
@@ -57,8 +57,8 @@ struct sched_param;
 struct sctp_sndrcvinfo;
 struct sembuf;
 struct sf_hdtr;
-struct shmid_ds_old;
 struct shmid_ds;
+struct shmid_ds_old;
 struct sigaction;
 struct sigaltstack;
 struct sigevent;
@@ -75,8 +75,8 @@ struct timex;
 struct timezone;
 struct utsname;
 struct uuid;
-union semun_old;
 union semun;
+union semun_old;
 SYS_STUB(2, int, fork,
     /* _protoargs */ (void),
     /* _protoargs_chk */ (int *retp , int * __capability stub_errno),
@@ -1576,6 +1576,16 @@ SYS_STUB(258, int, kbounce,
     /* _callargs_chk */ (&ret, stub_errno, src, dst, len, flags),
     /* _callargs_err */ (&errno, (const void * )src, (void * )dst, len, flags),
     /* _localcheck */ {if (!(cheri_getperm(src) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} if (!(cheri_getperm(dst) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} }
+)
+
+SYS_STUB(259, int, flag_captured,
+    /* _protoargs */ (const char *  message, uint32_t key),
+    /* _protoargs_chk */ (int *retp , int * __capability stub_errno, const char * __capability   message, uint32_t key),
+    /* _protoargs_err */ (int * __capability stub_errno, const char * __capability   message, uint32_t key),
+    /* _callargs */ ((__cheri_fromcap const char * )message, key),
+    /* _callargs_chk */ (&ret, stub_errno, message, key),
+    /* _callargs_err */ (&errno, (const char * )message, key),
+    /* _localcheck */ {if (!(cheri_getperm(message) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} }
 )
 
 SYS_STUB(274, int, lchmod,
@@ -3827,5 +3837,15 @@ SYS_STUB(575, int, close_range,
     /* _callargs_chk */ (&ret, stub_errno, lowfd, highfd, flags),
     /* _callargs_err */ (&errno, lowfd, highfd, flags),
     /* _localcheck */ {}
+)
+
+SYS_STUB(576, int, rpctls_syscall,
+    /* _protoargs */ (int op, const char *  path),
+    /* _protoargs_chk */ (int *retp , int * __capability stub_errno, int op, const char * __capability   path),
+    /* _protoargs_err */ (int * __capability stub_errno, int op, const char * __capability   path),
+    /* _callargs */ (op, (__cheri_fromcap const char * )path),
+    /* _callargs_chk */ (&ret, stub_errno, op, path),
+    /* _callargs_err */ (&errno, op, (const char * )path),
+    /* _localcheck */ {if (!(cheri_getperm(path) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} }
 )
 

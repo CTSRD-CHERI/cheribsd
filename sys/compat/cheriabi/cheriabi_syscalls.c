@@ -265,7 +265,7 @@ const char *cheriabi_syscallnames[] = {
 	"cheriabi_aio_write",			/* 256 = cheriabi_aio_write */
 	"cheriabi_lio_listio",			/* 257 = cheriabi_lio_listio */
 	"cheriabi_kbounce",			/* 258 = cheriabi_kbounce */
-	"#259",			/* 259 = nosys */
+	"cheriabi_flag_captured",			/* 259 = cheriabi_flag_captured */
 	"#260",			/* 260 = nosys */
 	"#261",			/* 261 = nosys */
 	"#262",			/* 262 = nosys */
@@ -582,4 +582,5 @@ const char *cheriabi_syscallnames[] = {
 	"cheriabi_sigfastblock",			/* 573 = cheriabi_sigfastblock */
 	"cheriabi___realpathat",			/* 574 = cheriabi___realpathat */
 	"close_range",			/* 575 = close_range */
+	"cheriabi_rpctls_syscall",			/* 576 = cheriabi_rpctls_syscall */
 };

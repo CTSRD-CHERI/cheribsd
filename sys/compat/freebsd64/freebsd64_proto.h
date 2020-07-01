@@ -529,6 +529,10 @@ struct freebsd64_kbounce_args {
 	char len_l_[PADL_(size_t)]; size_t len; char len_r_[PADR_(size_t)];
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
 };
+struct freebsd64_flag_captured_args {
+	char message_l_[PADL_(const char *)]; const char * message; char message_r_[PADR_(const char *)];
+	char key_l_[PADL_(uint32_t)]; uint32_t key; char key_r_[PADR_(uint32_t)];
+};
 struct freebsd64_lchmod_args {
 	char path_l_[PADL_(const char *)]; const char * path; char path_r_[PADR_(const char *)];
 	char mode_l_[PADL_(mode_t)]; mode_t mode; char mode_r_[PADR_(mode_t)];
@@ -1491,6 +1495,10 @@ struct freebsd64___realpathat_args {
 	char size_l_[PADL_(size_t)]; size_t size; char size_r_[PADR_(size_t)];
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
 };
+struct freebsd64_rpctls_syscall_args {
+	char op_l_[PADL_(int)]; int op; char op_r_[PADR_(int)];
+	char path_l_[PADL_(const char *)]; const char * path; char path_r_[PADR_(const char *)];
+};
 int	freebsd64_read(struct thread *, struct freebsd64_read_args *);
 int	freebsd64_write(struct thread *, struct freebsd64_write_args *);
 int	freebsd64_open(struct thread *, struct freebsd64_open_args *);
@@ -1597,6 +1605,7 @@ int	freebsd64_aio_read(struct thread *, struct freebsd64_aio_read_args *);
 int	freebsd64_aio_write(struct thread *, struct freebsd64_aio_write_args *);
 int	freebsd64_lio_listio(struct thread *, struct freebsd64_lio_listio_args *);
 int	freebsd64_kbounce(struct thread *, struct freebsd64_kbounce_args *);
+int	freebsd64_flag_captured(struct thread *, struct freebsd64_flag_captured_args *);
 int	freebsd64_lchmod(struct thread *, struct freebsd64_lchmod_args *);
 int	freebsd64_lutimes(struct thread *, struct freebsd64_lutimes_args *);
 int	freebsd64_preadv(struct thread *, struct freebsd64_preadv_args *);
@@ -1790,6 +1799,7 @@ int	freebsd64_shm_open2(struct thread *, struct freebsd64_shm_open2_args *);
 int	freebsd64_shm_rename(struct thread *, struct freebsd64_shm_rename_args *);
 int	freebsd64_sigfastblock(struct thread *, struct freebsd64_sigfastblock_args *);
 int	freebsd64___realpathat(struct thread *, struct freebsd64___realpathat_args *);
+int	freebsd64_rpctls_syscall(struct thread *, struct freebsd64_rpctls_syscall_args *);
 
 #ifdef COMPAT_43
 
@@ -2120,6 +2130,7 @@ int	freebsd12_freebsd64_shm_open(struct thread *, struct freebsd12_freebsd64_shm
 #define	FREEBSD64_SYS_AUE_freebsd64_aio_write	AUE_AIO_WRITE
 #define	FREEBSD64_SYS_AUE_freebsd64_lio_listio	AUE_LIO_LISTIO
 #define	FREEBSD64_SYS_AUE_freebsd64_kbounce	AUE_NULL
+#define	FREEBSD64_SYS_AUE_freebsd64_flag_captured	AUE_NULL
 #define	FREEBSD64_SYS_AUE_freebsd11_freebsd64_getdents	AUE_O_GETDENTS
 #define	FREEBSD64_SYS_AUE_freebsd64_lchmod	AUE_LCHMOD
 #define	FREEBSD64_SYS_AUE_freebsd64_lutimes	AUE_LUTIMES
@@ -2329,6 +2340,7 @@ int	freebsd12_freebsd64_shm_open(struct thread *, struct freebsd12_freebsd64_shm
 #define	FREEBSD64_SYS_AUE_freebsd64_shm_rename	AUE_SHMRENAME
 #define	FREEBSD64_SYS_AUE_freebsd64_sigfastblock	AUE_NULL
 #define	FREEBSD64_SYS_AUE_freebsd64___realpathat	AUE_REALPATHAT
+#define	FREEBSD64_SYS_AUE_freebsd64_rpctls_syscall	AUE_NULL
 
 #undef PAD_
 #undef PADL_

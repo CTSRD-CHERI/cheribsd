@@ -8,9 +8,15 @@
     lib64
         dtrace
         ..
+        engines
+        ..
         geom
         ..
         i18n
+        ..
+        libxo
+            encoder
+            ..
         ..
     ..
 ..

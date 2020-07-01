@@ -1045,4 +1045,5 @@ FBSDprivate_1.0 {
 	_cpuset_setdomain;
 	__sys_cpuset_setdomain;
 	__sys_break;
+	rpctls_syscall;
 };

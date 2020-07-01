@@ -41,8 +41,8 @@
 /*
  * Console ioctl commands.  Some commands are named as KDXXXX, GIO_XXX, and
  * PIO_XXX, rather than CONS_XXX, for historical and compatibility reasons.
- * Some other CONS_XXX commands are works as wrapper around frame buffer 
- * ioctl commands FBIO_XXX.  Do not try to change all these commands, 
+ * Some other CONS_XXX commands are works as wrapper around frame buffer
+ * ioctl commands FBIO_XXX.  Do not try to change all these commands,
  * otherwise we shall have compatibility problems.
  */
 
@@ -231,8 +231,8 @@ typedef struct vfnt_map	vfnt_map_t;
 #define VFNT_MAP_BOLD_RIGHT	3
 #define VFNT_MAPS		4
 struct vfnt {
-	vfnt_map_t	*map[VFNT_MAPS];
-	uint8_t		*glyphs;
+	vfnt_map_t * __kerncap map[VFNT_MAPS];
+	uint8_t * __kerncap glyphs;
 	unsigned int	map_count[VFNT_MAPS];
 	unsigned int	glyph_count;
 	unsigned int	width;

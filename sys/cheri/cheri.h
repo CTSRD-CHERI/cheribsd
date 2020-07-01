@@ -75,17 +75,17 @@ struct cheri_signal {
  * capabilities themselves.
  */
 #ifdef _KERNEL
-void * __capability	_cheri_capability_build_user_code(uint32_t perms,
-			    vaddr_t basep, size_t length, off_t off,
-			    const char* func, int line);
+void * __capability	_cheri_capability_build_user_code(struct thread *td,
+			    uint32_t perms, vaddr_t basep, size_t length,
+			    off_t off, const char* func, int line);
 void * __capability	_cheri_capability_build_user_data(uint32_t perms,
 			    vaddr_t basep, size_t length, off_t off,
 			    const char* func, int line);
 void * __capability	_cheri_capability_build_user_rwx(uint32_t perms,
 			    vaddr_t basep, size_t length, off_t off,
 			    const char* func, int line);
-#define cheri_capability_build_user_code(perms, basep, length, off)	\
-	_cheri_capability_build_user_code(perms, basep, length, off,	\
+#define cheri_capability_build_user_code(td, perms, basep, length, off)	\
+	_cheri_capability_build_user_code(td, perms, basep, length, off,\
 	    __func__, __LINE__)
 #define cheri_capability_build_user_data(perms, basep, length, off)	\
 	_cheri_capability_build_user_data(perms, basep, length, off,	\
@@ -101,7 +101,8 @@ struct image_params;
 struct thread;
 void * __capability cheri_auxv_capability(struct image_params *imgp,
 	    uintcap_t stack);
-void * __capability cheri_exec_pcc(struct image_params *imgp);
+void * __capability cheri_exec_pcc(struct thread *td,
+	    struct image_params *imgp);
 void * __capability cheri_exec_stack_pointer(struct image_params *imgp,
 	    uintcap_t stack);
 void	cheri_set_mmap_capability(struct thread *td, struct image_params *imgp,

@@ -442,6 +442,8 @@ static struct eflags_desc riscv_eflags_desc[] = {
 	{EF_RISCV_RVC, "RVC"},
 	{EF_RISCV_RVE, "RVE"},
 	{EF_RISCV_TSO, "TSO"},
+	{EF_RISCV_CHERIABI, "cheriabi"},
+	{EF_RISCV_CAPMODE, "capmode"},
 	{0, NULL}
 };
 
@@ -2904,6 +2906,9 @@ static struct flag_desc dt_flags_1[] = {
 	{ 0x400000,		"NORELOC" },
 	{ 0x800000,		"SYMINTPOSE" },
 	{ 0x1000000,		"GLOBAUDIT" },
+	{ 0x02000000,		"SINGLETON" },
+	{ 0x04000000,		"STUB" },
+	{ DF_1_PIE,		"PIE" },
 	{ 0, NULL }
 };
 

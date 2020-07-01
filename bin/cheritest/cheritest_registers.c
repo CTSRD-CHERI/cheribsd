@@ -148,7 +148,7 @@ check_initreg_code(void * __capability c)
 	 * length).
 	 */
 	vaddr_t upper_bound =
-	    CHERI_REPRESENTABLE_LENGTH(cheri_getaddress(c) + 0x100000);
+	    CHERI_REPRESENTABLE_LENGTH(cheri_getaddress(c) + 0x1000000);
 	CHERITEST_VERIFY2(cheri_getlength(c) < upper_bound,
 	    "code length 0x%jx should be < than 0x%jx)", cheri_getlength(c),
 	    upper_bound);
@@ -356,20 +356,11 @@ test_initregs_default(const struct cheri_test *ctp __unused)
 #ifdef __CHERI_PURE_CAPABILITY__
 
 /*
- * Following along in kern_exec.c, ...
- *
- * 1. We don't specify the size of the stack in the GNU_STACK program header,
- * 2. At least on CHERI-MIPS, sv_maxssiz == NULL
- * 3. maxssiz is set by sysctl (sys/kern/subr_param.c),
- *    but on CHERI-MIPS defaults to 64MiB (see MAXSSIZ in
- *    sys/mips/include/vmparam.h).
- *
- * So, require our stack offset to be somewhere in the first 256KiB.  That
+ * We require our stack offset to be somewhere in the first 256KiB.  That
  * should be plenty of room for the aux vector and args and all that.
  */
 
-#define CHERI_STACK_OFFSET_MAX 0x4000000
-#define CHERI_STACK_OFFSET_MIN 0x3fc0000
+#define	CHERI_STACK_USE_MAX	(256 * 1024)
 
 void
 test_initregs_stack_user_perms(const struct cheri_test *ctp __unused)
@@ -394,29 +385,27 @@ test_initregs_stack(const struct cheri_test *ctp __unused)
 	register_t v;
 
 	/* Base. */
-	v = cheri_getbase(c);
-	if (v == CHERI_CAP_USER_DATA_BASE)
-		cheritest_failure_errx("base %jx (did not expect %jx)", v,
-		    (uintmax_t)CHERI_CAP_USER_DATA_BASE);
+	if (cheri_getbase(c) == CHERI_CAP_USER_DATA_BASE)
+		cheritest_failure_errx("base 0x%jx (did not expect 0x%jx)",
+		    cheri_getbase(c), (uintmax_t)CHERI_CAP_USER_DATA_BASE);
 
 	/* Length. */
-	v = cheri_getlen(c);
-	if (v == CHERI_CAP_USER_DATA_LENGTH)
-		cheritest_failure_errx("length 0x%jx (did not expect 0x%jx)",
-		    v, CHERI_CAP_USER_DATA_LENGTH);
+	/* Technically dynamic, but defaults to MAXSSIZ. */
+	if (cheri_getlen(c) > MAXSSIZ)
+		cheritest_failure_errx("length 0x%jx (> MAXSSIZ 0x%jx)",
+		    cheri_getlen(c), (uintmax_t)MAXSSIZ);
 
 	/* Offset. */
-	v = cheri_getoffset(c);
-	if (v > CHERI_STACK_OFFSET_MAX || v < CHERI_STACK_OFFSET_MIN)
-		cheritest_failure_errx("stack offset %jx (expected range %jx "
-		    "to %jx)", v, (uintmax_t)CHERI_STACK_OFFSET_MIN,
-		    (uintmax_t)CHERI_STACK_OFFSET_MIN);
+	/* If we're running len > offset... */
+	if (cheri_getlen(c) - cheri_getoffset(c) > CHERI_STACK_USE_MAX)
+		cheritest_failure_errx("offset more then 0x%jx from top "
+		    "(0x%jx)", (intmax_t)CHERI_STACK_USE_MAX,
+		    cheri_getlen(c) - cheri_getoffset(c));
 
 	/* Type -- should be zero for an unsealed capability. */
-	v = cheri_gettype(c);
-	if (v != -1)
-		cheritest_failure_errx("otype %jx (expected %jx)", v,
-		    (uintmax_t)0);
+	if (cheri_gettype(c) != -1)
+		cheritest_failure_errx("otype 0x%jx (expected 0x%jx)",
+		    cheri_gettype(c), (uintmax_t)0);
 
 	/* Permissions. */
 	v = cheri_getperm(c);
@@ -472,6 +461,37 @@ test_initregs_stack(const struct cheri_test *ctp __unused)
 	v = cheri_gettag(c);
 	if (v != 1)
 		cheritest_failure_errx("tag %jx (expected 1)", v);
+	cheritest_success();
+}
+
+void
+test_initregs_returncap(const struct cheri_test *ctp __unused)
+{
+	void *c;
+	uintmax_t v;
+	
+	/* The return capability should always be a sentry capability */
+	c = __builtin_return_address(0);
+	v = cheri_getperm(c);
+
+	CHERITEST_VERIFY(cheri_gettag(c));
+	/* Check that execute is present and store permissions aren't */
+	CHERITEST_VERIFY2((v & CHERI_PERM_EXECUTE) == CHERI_PERM_EXECUTE,
+	    "perms %jx (execute missing)", v);
+	CHERITEST_VERIFY2((v & CHERI_PERM_STORE) == 0,
+	    "perms %jx (store present)", v);
+	CHERITEST_VERIFY2((v & CHERI_PERM_STORE_CAP) == 0,
+	    "perms %jx (storecap present)", v);
+	CHERITEST_VERIFY2((v & CHERI_PERM_STORE_LOCAL_CAP) == 0,
+	    "perms %jx (store_local_cap present)", v);
+
+	v = cheri_gettype(c);
+	CHERITEST_VERIFY2(v == (uintmax_t)CHERI_OTYPE_SENTRY,
+	    "otype %jx (expected %jx)", v, (uintmax_t)CHERI_OTYPE_SENTRY);
+
+	/* __builtin_extract_return_addr() should be a no-op */
+	CHERITEST_CHECK_EQ_CAP(c, __builtin_extract_return_addr(c));
+
 	cheritest_success();
 }
 #endif

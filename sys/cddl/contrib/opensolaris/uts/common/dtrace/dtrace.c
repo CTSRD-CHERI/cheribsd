@@ -73,6 +73,7 @@
 #include <sys/stat.h>
 #include <sys/modctl.h>
 #include <sys/conf.h>
+#include <sys/sysent.h>
 #include <sys/systm.h>
 #ifdef illumos
 #include <sys/ddi.h>
@@ -10992,7 +10993,7 @@ dtrace_predicate_release(dtrace_predicate_t *pred, dtrace_vstate_t *vstate)
  */
 static dtrace_actdesc_t *
 dtrace_actdesc_create(dtrace_actkind_t kind, uint32_t ntuple,
-    uint64_t uarg, uint64_t arg)
+    dtrace_uarg_t uarg, uint64_t arg)
 {
 	dtrace_actdesc_t *act;
 
@@ -13236,7 +13237,7 @@ dtrace_dof_create(dtrace_state_t *state)
 }
 
 static dof_hdr_t *
-dtrace_dof_copyin(uintptr_t uarg, int *errp)
+dtrace_dof_copyin(uintcap_t uarg, int *errp)
 {
 	dof_hdr_t hdr, *dof;
 
@@ -13245,7 +13246,7 @@ dtrace_dof_copyin(uintptr_t uarg, int *errp)
 	/*
 	 * First, we're going to copyin() the sizeof (dof_hdr_t).
 	 */
-	if (copyin((void *)uarg, &hdr, sizeof (hdr)) != 0) {
+	if (copyin((void * __capability) uarg, &hdr, sizeof (hdr)) != 0) {
 		dtrace_dof_error(NULL, "failed to copyin DOF header");
 		*errp = EFAULT;
 		return (NULL);
@@ -13269,7 +13270,7 @@ dtrace_dof_copyin(uintptr_t uarg, int *errp)
 
 	dof = kmem_alloc(hdr.dofh_loadsz, KM_SLEEP);
 
-	if (copyin((void *)uarg, dof, hdr.dofh_loadsz) != 0 ||
+	if (copyincap((void *__capability)uarg, dof, hdr.dofh_loadsz) != 0 ||
 	    dof->dofh_loadsz != hdr.dofh_loadsz) {
 		kmem_free(dof, hdr.dofh_loadsz);
 		*errp = EFAULT;
@@ -13778,29 +13779,58 @@ dtrace_dof_predicate(dof_hdr_t *dof, dof_sec_t *sec, dtrace_vstate_t *vstate,
 	return (dtrace_predicate_create(dp));
 }
 
+#ifdef COMPAT_FREEBSD64
+static dof_actdesc_t
+freebsd64_dof_actdesc(dof_actdesc64_t *actdesc64)
+{
+	dof_actdesc_t actdesc;
+	actdesc.dofa_difo = actdesc64->dofa_difo;
+	actdesc.dofa_strtab = actdesc64->dofa_strtab;
+	actdesc.dofa_kind = actdesc64->dofa_kind;
+	actdesc.dofa_ntuple = actdesc64->dofa_ntuple;
+	actdesc.dofa_arg = actdesc64->dofa_arg;
+	actdesc.dofa_uarg = (uintcap_t)cheri_fromint(actdesc64->dofa_uarg);
+	return actdesc;
+}
+#endif
+
 static dtrace_actdesc_t *
 dtrace_dof_actdesc(dof_hdr_t *dof, dof_sec_t *sec, dtrace_vstate_t *vstate,
     cred_t *cr)
 {
 	dtrace_actdesc_t *act, *first = NULL, *last = NULL, *next;
-	dof_actdesc_t *desc;
+	dof_actdesc_t desc_storage;
+	dof_actdesc_t *desc = &desc_storage;
 	dof_sec_t *difosec;
 	size_t offs;
 	uintptr_t daddr = (uintptr_t)dof;
 	uint64_t arg;
 	dtrace_actkind_t kind;
+	int sizeof_uarg;
+	int sizeof_dof_actdesc_t;
+
+#ifdef COMPAT_FREEBSD64
+	if (!SV_CURPROC_FLAG(SV_CHERI)) {
+		sizeof_uarg = sizeof(uint64_t);
+		sizeof_dof_actdesc_t = sizeof(dof_actdesc64_t);
+	} else
+#endif
+	{
+		sizeof_uarg = sizeof(dtrace_uarg_t);
+		sizeof_dof_actdesc_t = sizeof(dof_actdesc_t);
+	}
 
 	if (sec->dofs_type != DOF_SECT_ACTDESC) {
 		dtrace_dof_error(dof, "invalid action section");
 		return (NULL);
 	}
 
-	if (sec->dofs_offset + sizeof (dof_actdesc_t) > dof->dofh_loadsz) {
+	if (sec->dofs_offset + sizeof_dof_actdesc_t > dof->dofh_loadsz) {
 		dtrace_dof_error(dof, "truncated action description");
 		return (NULL);
 	}
 
-	if (sec->dofs_align != sizeof (uint64_t)) {
+	if (sec->dofs_align != sizeof_uarg) {
 		dtrace_dof_error(dof, "bad alignment in action description");
 		return (NULL);
 	}
@@ -13810,7 +13840,7 @@ dtrace_dof_actdesc(dof_hdr_t *dof, dof_sec_t *sec, dtrace_vstate_t *vstate,
 		return (NULL);
 	}
 
-	if (sec->dofs_entsize != sizeof (dof_actdesc_t)) {
+	if (sec->dofs_entsize != sizeof_dof_actdesc_t) {
 		dtrace_dof_error(dof, "bad entry size in action description");
 		return (NULL);
 	}
@@ -13821,8 +13851,14 @@ dtrace_dof_actdesc(dof_hdr_t *dof, dof_sec_t *sec, dtrace_vstate_t *vstate,
 	}
 
 	for (offs = 0; offs < sec->dofs_size; offs += sec->dofs_entsize) {
-		desc = (dof_actdesc_t *)(daddr +
-		    (uintptr_t)sec->dofs_offset + offs);
+		uintptr_t act_desc = daddr + (uintptr_t)sec->dofs_offset + offs;
+#ifdef COMPAT_FREEBSD64
+		if (!SV_CURPROC_FLAG(SV_CHERI))
+			desc_storage =
+			    freebsd64_dof_actdesc((dof_actdesc64_t *)act_desc);
+		else
+#endif
+			desc_storage = *(dof_actdesc_t *)act_desc;
 		kind = (dtrace_actkind_t)desc->dofa_kind;
 
 		if ((DTRACEACT_ISPRINTFLIKE(kind) &&

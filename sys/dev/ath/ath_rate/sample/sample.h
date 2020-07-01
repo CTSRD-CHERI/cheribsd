@@ -76,12 +76,11 @@ struct txschedule {
 };
 
 /*
- * for now, we track performance for three different packet
- * size buckets
+ * We track performance for eight different packet size buckets.
  */
-#define NUM_PACKET_SIZE_BINS 2
+#define NUM_PACKET_SIZE_BINS 7
 
-static const int packet_size_bins[NUM_PACKET_SIZE_BINS]  = { 250, 1600 };
+static const int packet_size_bins[NUM_PACKET_SIZE_BINS]  = { 250, 1600, 4096, 8192, 16384, 32768, 65536 };
 
 static inline int
 bin_to_size(int index)
@@ -106,7 +105,7 @@ struct sample_node {
 
 	int current_rix[NUM_PACKET_SIZE_BINS];
 	int packets_since_switch[NUM_PACKET_SIZE_BINS];
-	unsigned ticks_since_switch[NUM_PACKET_SIZE_BINS];
+	int ticks_since_switch[NUM_PACKET_SIZE_BINS];
 
 	int packets_since_sample[NUM_PACKET_SIZE_BINS];
 	unsigned sample_tt[NUM_PACKET_SIZE_BINS];

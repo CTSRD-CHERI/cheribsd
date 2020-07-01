@@ -745,6 +745,10 @@ struct kbounce_args {
 	char len_l_[PADL_(size_t)]; size_t len; char len_r_[PADR_(size_t)];
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
 };
+struct flag_captured_args {
+	char message_l_[PADL_(const char * __capability)]; const char * __capability message; char message_r_[PADR_(const char * __capability)];
+	char key_l_[PADL_(uint32_t)]; uint32_t key; char key_r_[PADR_(uint32_t)];
+};
 struct lchmod_args {
 	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
 	char mode_l_[PADL_(mode_t)]; mode_t mode; char mode_r_[PADR_(mode_t)];
@@ -1877,6 +1881,10 @@ struct close_range_args {
 	char highfd_l_[PADL_(u_int)]; u_int highfd; char highfd_r_[PADR_(u_int)];
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
 };
+struct rpctls_syscall_args {
+	char op_l_[PADL_(int)]; int op; char op_r_[PADR_(int)];
+	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
+};
 int	nosys(struct thread *, struct nosys_args *);
 void	sys_sys_exit(struct thread *, struct sys_exit_args *);
 int	sys_fork(struct thread *, struct fork_args *);
@@ -2039,6 +2047,7 @@ int	sys_aio_read(struct thread *, struct aio_read_args *);
 int	sys_aio_write(struct thread *, struct aio_write_args *);
 int	sys_lio_listio(struct thread *, struct lio_listio_args *);
 int	sys_kbounce(struct thread *, struct kbounce_args *);
+int	sys_flag_captured(struct thread *, struct flag_captured_args *);
 int	sys_lchmod(struct thread *, struct lchmod_args *);
 int	sys_lutimes(struct thread *, struct lutimes_args *);
 int	sys_preadv(struct thread *, struct preadv_args *);
@@ -2276,6 +2285,7 @@ int	sys_shm_rename(struct thread *, struct shm_rename_args *);
 int	sys_sigfastblock(struct thread *, struct sigfastblock_args *);
 int	sys___realpathat(struct thread *, struct __realpathat_args *);
 int	sys_close_range(struct thread *, struct close_range_args *);
+int	sys_rpctls_syscall(struct thread *, struct rpctls_syscall_args *);
 
 #ifdef COMPAT_43
 
@@ -2957,6 +2967,7 @@ int	freebsd12_closefrom(struct thread *, struct freebsd12_closefrom_args *);
 #define	SYS_AUE_aio_write	AUE_AIO_WRITE
 #define	SYS_AUE_lio_listio	AUE_LIO_LISTIO
 #define	SYS_AUE_kbounce	AUE_NULL
+#define	SYS_AUE_flag_captured	AUE_NULL
 #define	SYS_AUE_freebsd11_getdents	AUE_O_GETDENTS
 #define	SYS_AUE_lchmod	AUE_LCHMOD
 #define	SYS_AUE_lutimes	AUE_LUTIMES
@@ -3215,6 +3226,7 @@ int	freebsd12_closefrom(struct thread *, struct freebsd12_closefrom_args *);
 #define	SYS_AUE_sigfastblock	AUE_NULL
 #define	SYS_AUE___realpathat	AUE_REALPATHAT
 #define	SYS_AUE_close_range	AUE_CLOSERANGE
+#define	SYS_AUE_rpctls_syscall	AUE_NULL
 
 #undef PAD_
 #undef PADL_

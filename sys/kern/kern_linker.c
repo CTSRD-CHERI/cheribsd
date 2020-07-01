@@ -369,8 +369,7 @@ linker_file_register_modules(linker_file_t lf)
 
 	sx_assert(&kld_sx, SA_XLOCKED);
 
-	if (linker_file_lookup_set(lf, "modmetadata_set", &start,
-	    &stop, NULL) != 0) {
+	if (linker_file_lookup_set(lf, MDT_SETNAME, &start, &stop, NULL) != 0) {
 		/*
 		 * This fallback should be unnecessary, but if we get booted
 		 * from boot2 instead of loader and we are missing our
@@ -1902,7 +1901,7 @@ linker_hints_lookup(const char *path, int pathlen, const char *modname,
 	 * XXX: we need to limit this number to some reasonable value
 	 */
 	if (vattr.va_size > LINKER_HINTS_MAX) {
-		printf("hints file too large %ld\n", (long)vattr.va_size);
+		printf("linker.hints file too large %ld\n", (long)vattr.va_size);
 		goto bad;
 	}
 	hints = malloc(vattr.va_size, M_TEMP, M_WAITOK);
@@ -1920,7 +1919,7 @@ linker_hints_lookup(const char *path, int pathlen, const char *modname,
 	intp = (int *)hints;
 	ival = *intp++;
 	if (ival != LINKER_HINTS_VERSION) {
-		printf("hints file version mismatch %d\n", ival);
+		printf("linker.hints file version mismatch %d\n", ival);
 		goto bad;
 	}
 	bufend = hints + vattr.va_size;

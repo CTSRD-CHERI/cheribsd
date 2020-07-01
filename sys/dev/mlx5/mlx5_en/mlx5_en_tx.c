@@ -245,21 +245,21 @@ max_inline:
  * this function returns zero, the parsing failed.
  */
 int
-mlx5e_get_full_header_size(struct mbuf *mb, struct tcphdr **ppth)
+mlx5e_get_full_header_size(const struct mbuf *mb, const struct tcphdr **ppth)
 {
-	struct ether_vlan_header *eh;
-	struct tcphdr *th;
-	struct ip *ip;
+	const struct ether_vlan_header *eh;
+	const struct tcphdr *th;
+	const struct ip *ip;
 	int ip_hlen, tcp_hlen;
-	struct ip6_hdr *ip6;
+	const struct ip6_hdr *ip6;
 	uint16_t eth_type;
 	int eth_hdr_len;
 
-	eh = mtod(mb, struct ether_vlan_header *);
-	if (mb->m_len < ETHER_HDR_LEN)
+	eh = mtod(mb, const struct ether_vlan_header *);
+	if (unlikely(mb->m_len < ETHER_HDR_LEN))
 		goto failure;
 	if (eh->evl_encap_proto == htons(ETHERTYPE_VLAN)) {
-		if (mb->m_len < (ETHER_HDR_LEN + ETHER_VLAN_ENCAP_LEN))
+		if (unlikely(mb->m_len < (ETHER_HDR_LEN + ETHER_VLAN_ENCAP_LEN)))
 			goto failure;
 		eth_type = ntohs(eh->evl_proto);
 		eth_hdr_len = ETHER_HDR_LEN + ETHER_VLAN_ENCAP_LEN;
@@ -270,8 +270,8 @@ mlx5e_get_full_header_size(struct mbuf *mb, struct tcphdr **ppth)
 
 	switch (eth_type) {
 	case ETHERTYPE_IP:
-		ip = (struct ip *)(mb->m_data + eth_hdr_len);
-		if (mb->m_len < eth_hdr_len + sizeof(*ip))
+		ip = (const struct ip *)(mb->m_data + eth_hdr_len);
+		if (unlikely(mb->m_len < eth_hdr_len + sizeof(*ip)))
 			goto failure;
 		switch (ip->ip_p) {
 		case IPPROTO_TCP:
@@ -288,8 +288,8 @@ mlx5e_get_full_header_size(struct mbuf *mb, struct tcphdr **ppth)
 		}
 		break;
 	case ETHERTYPE_IPV6:
-		ip6 = (struct ip6_hdr *)(mb->m_data + eth_hdr_len);
-		if (mb->m_len < eth_hdr_len + sizeof(*ip6))
+		ip6 = (const struct ip6_hdr *)(mb->m_data + eth_hdr_len);
+		if (unlikely(mb->m_len < eth_hdr_len + sizeof(*ip6)))
 			goto failure;
 		switch (ip6->ip6_nxt) {
 		case IPPROTO_TCP:
@@ -307,9 +307,15 @@ mlx5e_get_full_header_size(struct mbuf *mb, struct tcphdr **ppth)
 		goto failure;
 	}
 tcp_packet:
-	if (mb->m_len < eth_hdr_len + sizeof(*th))
-		goto failure;
-	th = (struct tcphdr *)(mb->m_data + eth_hdr_len);
+	if (unlikely(mb->m_len < eth_hdr_len + sizeof(*th))) {
+		const struct mbuf *m_th = mb->m_next;
+		if (unlikely(mb->m_len != eth_hdr_len ||
+		    m_th == NULL || m_th->m_len < sizeof(*th)))
+			goto failure;
+		th = (const struct tcphdr *)(m_th->m_data);
+	} else {
+		th = (const struct tcphdr *)(mb->m_data + eth_hdr_len);
+	}
 	tcp_hlen = th->th_off << 2;
 	eth_hdr_len += tcp_hlen;
 udp_packet:
@@ -318,7 +324,7 @@ udp_packet:
 	 * does not need to reside within the first m_len bytes of
 	 * data:
 	 */
-	if (mb->m_pkthdr.len < eth_hdr_len)
+	if (unlikely(mb->m_pkthdr.len < eth_hdr_len))
 		goto failure;
 	if (ppth != NULL)
 		*ppth = th;

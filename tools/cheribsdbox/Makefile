@@ -238,6 +238,7 @@ CRUNCH_PROGS_usr.bin+= \
 		false \
 		fetch \
 		find \
+		fsync \
 		grep \
 		head \
 		hexdump \

@@ -235,6 +235,7 @@
 #define	FREEBSD64_SYS_freebsd64_aio_write	256
 #define	FREEBSD64_SYS_freebsd64_lio_listio	257
 #define	FREEBSD64_SYS_freebsd64_kbounce	258
+#define	FREEBSD64_SYS_freebsd64_flag_captured	259
 #define	FREEBSD64_SYS_freebsd11_freebsd64_getdents	272
 #define	FREEBSD64_SYS_freebsd64_lchmod	274
 				/* 275 is obsolete netbsd_lchown */
@@ -512,4 +513,5 @@
 #define	FREEBSD64_SYS_freebsd64_sigfastblock	573
 #define	FREEBSD64_SYS_freebsd64___realpathat	574
 #define	FREEBSD64_SYS_close_range	575
-#define	FREEBSD64_SYS_MAXSYSCALL	576
+#define	FREEBSD64_SYS_freebsd64_rpctls_syscall	576
+#define	FREEBSD64_SYS_MAXSYSCALL	577

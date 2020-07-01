@@ -41,7 +41,7 @@
 struct cfiocqry {
 	unsigned long	offset;
 	unsigned long	count;
-	u_char		*buffer;
+	u_char * __kerncap buffer;
 };
 
 #define	CFIOCQRY	_IOWR('q', 0, struct cfiocqry)

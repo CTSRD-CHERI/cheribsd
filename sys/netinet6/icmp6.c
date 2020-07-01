@@ -93,6 +93,7 @@ __FBSDID("$FreeBSD$");
 #include <net/if_llatbl.h>
 #include <net/if_types.h>
 #include <net/route.h>
+#include <net/route/route_ctl.h>
 #include <net/route/nhop.h>
 #include <net/vnet.h>
 
@@ -401,6 +402,8 @@ icmp6_input(struct mbuf **mp, int *offp, int proto)
 	struct icmp6_hdr *icmp6, *nicmp6;
 	char ip6bufs[INET6_ADDRSTRLEN], ip6bufd[INET6_ADDRSTRLEN];
 	int code, error, icmp6len, ip6len, noff, off, sum;
+
+	NET_EPOCH_ASSERT();
 
 	m = *mp;
 	off = *offp;

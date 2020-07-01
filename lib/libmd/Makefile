@@ -97,7 +97,7 @@ CFLAGS+= -I${.CURDIR} -I${SRCTOP}/sys/crypto/sha2
 CFLAGS+= -I${SRCTOP}/sys/crypto/skein
 CFLAGS+= -DWEAK_REFS
 # unroll the 256 and 512 loops, half unroll the 1024
-CFLAGS+= -DSKEIN_LOOP=995
+CFLAGS.skein_block.c+= -DSKEIN_LOOP=995
 .PATH: ${.CURDIR}/${MACHINE_ARCH} ${SRCTOP}/sys/crypto/sha2
 .PATH: ${SRCTOP}/sys/crypto/skein ${SRCTOP}/sys/crypto/skein/${MACHINE_ARCH}
 
@@ -116,18 +116,15 @@ CFLAGS+= -DSHA1_ASM
 SRCS+=	rmd160.S
 CFLAGS+= -DRMD160_ASM
 .endif
-.if exists(${MACHINE_ARCH}/skein_block_asm.s)
-.if defined(XAS) || ${MK_BINUTILS_BOOTSTRAP} != "no"
-AFLAGS += --strip-local-absolute
+.if exists(${MACHINE_ARCH}/skein_block_asm.S)
 # Fully unroll all loops in the assembly optimized version
-AFLAGS+= --defsym SKEIN_LOOP=0
-SRCS+= skein_block_asm.s
+ACFLAGS+= -DSKEIN_LOOP=0
+SRCS+= skein_block_asm.S
 CFLAGS+= -DSKEIN_ASM -DSKEIN_USE_ASM=1792 # list of block functions to replace with assembly: 256+512+1024 = 1792
 .else
 .warning as not available: not using optimized Skein asm
 .endif
-.endif
-.if exists(${MACHINE_ARCH}/sha.S) || exists(${MACHINE_ARCH}/rmd160.S) || exists(${MACHINE_ARCH}/skein_block_asm.s)
+.if exists(${MACHINE_ARCH}/sha.S) || exists(${MACHINE_ARCH}/rmd160.S) || exists(${MACHINE_ARCH}/skein_block_asm.S)
 ACFLAGS+= -DELF -Wa,--noexecstack
 .endif
 .endif # ${USE_ASM_SOURCES} != 0

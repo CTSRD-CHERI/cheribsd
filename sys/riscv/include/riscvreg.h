@@ -54,6 +54,8 @@
 #define	EXCP_LOAD_PAGE_FAULT		13
 #define	EXCP_STORE_PAGE_FAULT		15
 #if __has_feature(capabilities)
+#define	EXCP_LOAD_CAP_PAGE_FAULT	26
+#define	EXCP_STORE_AMO_CAP_PAGE_FAULT	27
 #define	EXCP_CHERI			28
 #endif
 #define	EXCP_INTR			(1ul << 63)

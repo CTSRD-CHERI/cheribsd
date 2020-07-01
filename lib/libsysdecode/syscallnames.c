@@ -48,6 +48,11 @@ static
 #include <compat/freebsd32/freebsd32_syscalls.c>
 #endif
 
+#if __has_feature(capabilities)
+static
+#include <compat/freebsd64/freebsd64_syscalls.c>
+#endif
+
 #if defined(__aarch64__) || defined(__amd64__) || defined(__i386__)
 static
 #ifdef __aarch64__
@@ -82,6 +87,12 @@ sysdecode_syscallname(enum sysdecode_abi abi, unsigned int code)
 	case SYSDECODE_ABI_FREEBSD32:
 		if (code < nitems(freebsd32_syscallnames))
 			return (freebsd32_syscallnames[code]);
+		break;
+#endif
+#if __has_feature(capabilities)
+	case SYSDECODE_ABI_FREEBSD64:
+		if (code < nitems(freebsd64_syscallnames))
+			return (freebsd64_syscallnames[code]);
 		break;
 #endif
 #if defined(__aarch64__) || defined(__amd64__) || defined(__i386__)

@@ -2107,7 +2107,8 @@ mvneta_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	case CASE_IOC_IFREQ(SIOCSIFCAP):
 		if (ifp->if_mtu > sc->tx_csum_limit &&
 		    ifr_reqcap_get(ifr) & IFCAP_TXCSUM)
-			ifr_reqcap_get(ifr) &= ~IFCAP_TXCSUM;
+			ifr_reqcap_set(ifr,
+			    ifr_reqcap_get(ifr) & ~IFCAP_TXCSUM);
 		mask = ifp->if_capenable ^ ifr_reqcap_get(ifr);
 		if (mask & IFCAP_HWCSUM) {
 			ifp->if_capenable &= ~IFCAP_HWCSUM;

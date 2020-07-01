@@ -33,7 +33,6 @@ __FBSDID("$FreeBSD$");
 #include <sys/param.h>
 #include <sys/kernel.h>
 #include <sys/systm.h>
-#include <sys/epoch.h>
 #include <sys/conf.h>
 #include <sys/bitstring.h>
 #include <sys/queue.h>
@@ -406,151 +405,143 @@ static u_int64_t	KPTphys;	/* phys addr of kernel level 1 */
 
 static vm_offset_t qframe = 0;
 static struct mtx qframe_mtx;
-static epoch_t pmap_epoch;
 
-void mmu_radix_activate(mmu_t mmu, struct thread *);
-void mmu_radix_advise(mmu_t mmu, pmap_t, vm_offset_t, vm_offset_t, int);
-void mmu_radix_align_superpage(mmu_t mmu, vm_object_t, vm_ooffset_t, vm_offset_t *,
+void mmu_radix_activate(struct thread *);
+void mmu_radix_advise(pmap_t, vm_offset_t, vm_offset_t, int);
+void mmu_radix_align_superpage(vm_object_t, vm_ooffset_t, vm_offset_t *,
     vm_size_t);
-void mmu_radix_clear_modify(mmu_t, vm_page_t);
-void mmu_radix_copy(mmu_t, pmap_t, pmap_t, vm_offset_t, vm_size_t, vm_offset_t);
-int mmu_radix_map_user_ptr(mmu_t mmu, pmap_t pm,
-    volatile const void *uaddr, void **kaddr, size_t ulen, size_t *klen);
-int mmu_radix_decode_kernel_ptr(mmu_t, vm_offset_t, int *, vm_offset_t *);
-int mmu_radix_enter(mmu_t, pmap_t, vm_offset_t, vm_page_t, vm_prot_t, u_int, int8_t);
-void mmu_radix_enter_object(mmu_t, pmap_t, vm_offset_t, vm_offset_t, vm_page_t,
-	vm_prot_t);
-void mmu_radix_enter_quick(mmu_t, pmap_t, vm_offset_t, vm_page_t, vm_prot_t);
-vm_paddr_t mmu_radix_extract(mmu_t, pmap_t pmap, vm_offset_t va);
-vm_page_t mmu_radix_extract_and_hold(mmu_t, pmap_t, vm_offset_t, vm_prot_t);
-void mmu_radix_kenter(mmu_t, vm_offset_t, vm_paddr_t);
-vm_paddr_t mmu_radix_kextract(mmu_t, vm_offset_t);
-void mmu_radix_kremove(mmu_t, vm_offset_t);
-boolean_t mmu_radix_is_modified(mmu_t, vm_page_t);
-boolean_t mmu_radix_is_prefaultable(mmu_t, pmap_t, vm_offset_t);
-boolean_t mmu_radix_is_referenced(mmu_t, vm_page_t);
-void mmu_radix_object_init_pt(mmu_t, pmap_t, vm_offset_t, vm_object_t,
+void mmu_radix_clear_modify(vm_page_t);
+void mmu_radix_copy(pmap_t, pmap_t, vm_offset_t, vm_size_t, vm_offset_t);
+int mmu_radix_decode_kernel_ptr(vm_offset_t, int *, vm_offset_t *);
+int mmu_radix_enter(pmap_t, vm_offset_t, vm_page_t, vm_prot_t, u_int, int8_t);
+void mmu_radix_enter_object(pmap_t, vm_offset_t, vm_offset_t, vm_page_t,
+	vm_prot_t, u_int);
+void mmu_radix_enter_quick(pmap_t, vm_offset_t, vm_page_t, vm_prot_t, u_int);
+vm_paddr_t mmu_radix_extract(pmap_t pmap, vm_offset_t va);
+vm_page_t mmu_radix_extract_and_hold(pmap_t, vm_offset_t, vm_prot_t);
+void mmu_radix_kenter(vm_offset_t, vm_paddr_t);
+vm_paddr_t mmu_radix_kextract(vm_offset_t);
+void mmu_radix_kremove(vm_offset_t);
+boolean_t mmu_radix_is_modified(vm_page_t);
+boolean_t mmu_radix_is_prefaultable(pmap_t, vm_offset_t);
+boolean_t mmu_radix_is_referenced(vm_page_t);
+void mmu_radix_object_init_pt(pmap_t, vm_offset_t, vm_object_t,
 	vm_pindex_t, vm_size_t);
-boolean_t mmu_radix_page_exists_quick(mmu_t, pmap_t, vm_page_t);
-void mmu_radix_page_init(mmu_t, vm_page_t);
-boolean_t mmu_radix_page_is_mapped(mmu_t, vm_page_t m);
-void mmu_radix_page_set_memattr(mmu_t, vm_page_t, vm_memattr_t);
-int mmu_radix_page_wired_mappings(mmu_t, vm_page_t);
-void mmu_radix_pinit(mmu_t, pmap_t);
-void mmu_radix_protect(mmu_t, pmap_t, vm_offset_t, vm_offset_t, vm_prot_t);
-boolean_t mmu_radix_ps_enabled(mmu_t, pmap_t);
-void mmu_radix_qenter(mmu_t, vm_offset_t, vm_page_t *, int);
-void mmu_radix_qremove(mmu_t, vm_offset_t, int);
-vm_offset_t mmu_radix_quick_enter_page(mmu_t, vm_page_t);
-void mmu_radix_quick_remove_page(mmu_t, vm_offset_t);
-boolean_t mmu_radix_ts_referenced(mmu_t, vm_page_t);
-void mmu_radix_release(mmu_t, pmap_t);
-void mmu_radix_remove(mmu_t, pmap_t, vm_offset_t, vm_offset_t);
-void mmu_radix_remove_all(mmu_t, vm_page_t);
-void mmu_radix_remove_pages(mmu_t, pmap_t);
-void mmu_radix_remove_write(mmu_t, vm_page_t);
-void mmu_radix_unwire(mmu_t, pmap_t, vm_offset_t, vm_offset_t);
-void mmu_radix_zero_page(mmu_t, vm_page_t);
-void mmu_radix_zero_page_area(mmu_t, vm_page_t, int, int);
-int mmu_radix_change_attr(mmu_t, vm_offset_t, vm_size_t, vm_memattr_t);
-void mmu_radix_page_array_startup(mmu_t mmu, long pages);
+boolean_t mmu_radix_page_exists_quick(pmap_t, vm_page_t);
+void mmu_radix_page_init(vm_page_t);
+boolean_t mmu_radix_page_is_mapped(vm_page_t m);
+void mmu_radix_page_set_memattr(vm_page_t, vm_memattr_t);
+int mmu_radix_page_wired_mappings(vm_page_t);
+int mmu_radix_pinit(pmap_t);
+void mmu_radix_protect(pmap_t, vm_offset_t, vm_offset_t, vm_prot_t);
+bool mmu_radix_ps_enabled(pmap_t);
+void mmu_radix_qenter(vm_offset_t, vm_page_t *, int);
+void mmu_radix_qremove(vm_offset_t, int);
+vm_offset_t mmu_radix_quick_enter_page(vm_page_t);
+void mmu_radix_quick_remove_page(vm_offset_t);
+boolean_t mmu_radix_ts_referenced(vm_page_t);
+void mmu_radix_release(pmap_t);
+void mmu_radix_remove(pmap_t, vm_offset_t, vm_offset_t);
+void mmu_radix_remove_all(vm_page_t);
+void mmu_radix_remove_pages(pmap_t);
+void mmu_radix_remove_write(vm_page_t);
+void mmu_radix_unwire(pmap_t, vm_offset_t, vm_offset_t);
+void mmu_radix_zero_page(vm_page_t);
+void mmu_radix_zero_page_area(vm_page_t, int, int);
+int mmu_radix_change_attr(vm_offset_t, vm_size_t, vm_memattr_t);
+void mmu_radix_page_array_startup(long pages);
 
 #include "mmu_oea64.h"
-#include "mmu_if.h"
-#include "moea64_if.h"
 
 /*
  * Kernel MMU interface
  */
 
-static void	mmu_radix_bootstrap(mmu_t mmup,
-		    vm_offset_t kernelstart, vm_offset_t kernelend);
+static void	mmu_radix_bootstrap(vm_offset_t, vm_offset_t);
 
-static void mmu_radix_copy_page(mmu_t, vm_page_t, vm_page_t);
-static void mmu_radix_copy_pages(mmu_t mmu, vm_page_t *ma, vm_offset_t a_offset,
+static void mmu_radix_copy_page(vm_page_t, vm_page_t);
+static void mmu_radix_copy_pages(vm_page_t *ma, vm_offset_t a_offset,
     vm_page_t *mb, vm_offset_t b_offset, int xfersize);
-static void mmu_radix_growkernel(mmu_t, vm_offset_t);
-static void mmu_radix_init(mmu_t);
-static int mmu_radix_mincore(mmu_t, pmap_t, vm_offset_t, vm_paddr_t *);
-static vm_offset_t mmu_radix_map(mmu_t, vm_offset_t *, vm_paddr_t, vm_paddr_t, int);
-static void mmu_radix_pinit0(mmu_t, pmap_t);
+static void mmu_radix_growkernel(vm_offset_t);
+static void mmu_radix_init(void);
+static int mmu_radix_mincore(pmap_t, vm_offset_t, vm_paddr_t *);
+static vm_offset_t mmu_radix_map(vm_offset_t *, vm_paddr_t, vm_paddr_t, int);
+static void mmu_radix_pinit0(pmap_t);
 
-static void *mmu_radix_mapdev(mmu_t, vm_paddr_t, vm_size_t);
-static void *mmu_radix_mapdev_attr(mmu_t, vm_paddr_t, vm_size_t, vm_memattr_t);
-static void mmu_radix_unmapdev(mmu_t, vm_offset_t, vm_size_t);
-static void mmu_radix_kenter_attr(mmu_t, vm_offset_t, vm_paddr_t, vm_memattr_t ma);
-static boolean_t mmu_radix_dev_direct_mapped(mmu_t, vm_paddr_t, vm_size_t);
-static void mmu_radix_dumpsys_map(mmu_t mmu, vm_paddr_t pa, size_t sz,
-    void **va);
-static void mmu_radix_scan_init(mmu_t mmu);
-static void	mmu_radix_cpu_bootstrap(mmu_t, int ap);
+static void *mmu_radix_mapdev(vm_paddr_t, vm_size_t);
+static void *mmu_radix_mapdev_attr(vm_paddr_t, vm_size_t, vm_memattr_t);
+static void mmu_radix_unmapdev(vm_offset_t, vm_size_t);
+static void mmu_radix_kenter_attr(vm_offset_t, vm_paddr_t, vm_memattr_t ma);
+static boolean_t mmu_radix_dev_direct_mapped(vm_paddr_t, vm_size_t);
+static void mmu_radix_dumpsys_map(vm_paddr_t pa, size_t sz, void **va);
+static void mmu_radix_scan_init(void);
+static void	mmu_radix_cpu_bootstrap(int ap);
+static void	mmu_radix_tlbie_all(void);
 
-static mmu_method_t mmu_radix_methods[] = {
-	MMUMETHOD(mmu_bootstrap,	mmu_radix_bootstrap),
-	MMUMETHOD(mmu_copy_page,	mmu_radix_copy_page),
-	MMUMETHOD(mmu_copy_pages,	mmu_radix_copy_pages),
-	MMUMETHOD(mmu_cpu_bootstrap,	mmu_radix_cpu_bootstrap),
-	MMUMETHOD(mmu_growkernel,	mmu_radix_growkernel),
-	MMUMETHOD(mmu_init,		mmu_radix_init),
-	MMUMETHOD(mmu_map,     		mmu_radix_map),
-	MMUMETHOD(mmu_mincore,     	mmu_radix_mincore),
-	MMUMETHOD(mmu_pinit,		mmu_radix_pinit),
-	MMUMETHOD(mmu_pinit0,		mmu_radix_pinit0),
+static struct pmap_funcs mmu_radix_methods = {
+	.bootstrap = mmu_radix_bootstrap,
+	.copy_page = mmu_radix_copy_page,
+	.copy_pages = mmu_radix_copy_pages,
+	.cpu_bootstrap = mmu_radix_cpu_bootstrap,
+	.growkernel = mmu_radix_growkernel,
+	.init = mmu_radix_init,
+	.map =      		mmu_radix_map,
+	.mincore =      	mmu_radix_mincore,
+	.pinit = mmu_radix_pinit,
+	.pinit0 = mmu_radix_pinit0,
 
-	MMUMETHOD(mmu_mapdev,		mmu_radix_mapdev),
-	MMUMETHOD(mmu_mapdev_attr,	mmu_radix_mapdev_attr),
-	MMUMETHOD(mmu_unmapdev,		mmu_radix_unmapdev),
-	MMUMETHOD(mmu_kenter_attr,	mmu_radix_kenter_attr),
-	MMUMETHOD(mmu_dev_direct_mapped,mmu_radix_dev_direct_mapped),
-	MMUMETHOD(mmu_scan_init,	mmu_radix_scan_init),
-	MMUMETHOD(mmu_dumpsys_map,	mmu_radix_dumpsys_map),
-	MMUMETHOD(mmu_page_is_mapped,	mmu_radix_page_is_mapped),
-	MMUMETHOD(mmu_ps_enabled,	mmu_radix_ps_enabled),
-	MMUMETHOD(mmu_object_init_pt,	mmu_radix_object_init_pt),
-	MMUMETHOD(mmu_protect,		mmu_radix_protect),
+	.mapdev = mmu_radix_mapdev,
+	.mapdev_attr = mmu_radix_mapdev_attr,
+	.unmapdev = mmu_radix_unmapdev,
+	.kenter_attr = mmu_radix_kenter_attr,
+	.dev_direct_mapped = mmu_radix_dev_direct_mapped,
+	.dumpsys_pa_init = mmu_radix_scan_init,
+	.dumpsys_map_chunk = mmu_radix_dumpsys_map,
+	.page_is_mapped = mmu_radix_page_is_mapped,
+	.ps_enabled = mmu_radix_ps_enabled,
+	.object_init_pt = mmu_radix_object_init_pt,
+	.protect = mmu_radix_protect,
 	/* pmap dispatcher interface */
-	MMUMETHOD(mmu_clear_modify,	mmu_radix_clear_modify),
-	MMUMETHOD(mmu_copy,		mmu_radix_copy),
-	MMUMETHOD(mmu_enter,		mmu_radix_enter),
-	MMUMETHOD(mmu_enter_object,	mmu_radix_enter_object),
-	MMUMETHOD(mmu_enter_quick,	mmu_radix_enter_quick),
-	MMUMETHOD(mmu_extract,		mmu_radix_extract),
-	MMUMETHOD(mmu_extract_and_hold,	mmu_radix_extract_and_hold),
-	MMUMETHOD(mmu_is_modified,	mmu_radix_is_modified),
-	MMUMETHOD(mmu_is_prefaultable,	mmu_radix_is_prefaultable),
-	MMUMETHOD(mmu_is_referenced,	mmu_radix_is_referenced),
-	MMUMETHOD(mmu_ts_referenced,	mmu_radix_ts_referenced),
-	MMUMETHOD(mmu_page_exists_quick,mmu_radix_page_exists_quick),
-	MMUMETHOD(mmu_page_init,	mmu_radix_page_init),
-	MMUMETHOD(mmu_page_wired_mappings, mmu_radix_page_wired_mappings),
-	MMUMETHOD(mmu_qenter,		mmu_radix_qenter),
-	MMUMETHOD(mmu_qremove,		mmu_radix_qremove),
-	MMUMETHOD(mmu_release,		mmu_radix_release),
-	MMUMETHOD(mmu_remove,		mmu_radix_remove),
-	MMUMETHOD(mmu_remove_all,	mmu_radix_remove_all),
-	MMUMETHOD(mmu_remove_write,	mmu_radix_remove_write),
-	MMUMETHOD(mmu_unwire,		mmu_radix_unwire),
-	MMUMETHOD(mmu_zero_page,	mmu_radix_zero_page),
-	MMUMETHOD(mmu_zero_page_area,	mmu_radix_zero_page_area),
-	MMUMETHOD(mmu_activate,		mmu_radix_activate),
-	MMUMETHOD(mmu_quick_enter_page, mmu_radix_quick_enter_page),
-	MMUMETHOD(mmu_quick_remove_page, mmu_radix_quick_remove_page),
-	MMUMETHOD(mmu_page_set_memattr,	mmu_radix_page_set_memattr),
-	MMUMETHOD(mmu_page_array_startup, mmu_radix_page_array_startup),
+	.clear_modify = mmu_radix_clear_modify,
+	.copy = mmu_radix_copy,
+	.enter = mmu_radix_enter,
+	.enter_object = mmu_radix_enter_object,
+	.enter_quick = mmu_radix_enter_quick,
+	.extract = mmu_radix_extract,
+	.extract_and_hold = mmu_radix_extract_and_hold,
+	.is_modified = mmu_radix_is_modified,
+	.is_prefaultable = mmu_radix_is_prefaultable,
+	.is_referenced = mmu_radix_is_referenced,
+	.ts_referenced = mmu_radix_ts_referenced,
+	.page_exists_quick = mmu_radix_page_exists_quick,
+	.page_init = mmu_radix_page_init,
+	.page_wired_mappings =  mmu_radix_page_wired_mappings,
+	.qenter = mmu_radix_qenter,
+	.qremove = mmu_radix_qremove,
+	.release = mmu_radix_release,
+	.remove = mmu_radix_remove,
+	.remove_all = mmu_radix_remove_all,
+	.remove_write = mmu_radix_remove_write,
+	.unwire = mmu_radix_unwire,
+	.zero_page = mmu_radix_zero_page,
+	.zero_page_area = mmu_radix_zero_page_area,
+	.activate = mmu_radix_activate,
+	.quick_enter_page =  mmu_radix_quick_enter_page,
+	.quick_remove_page =  mmu_radix_quick_remove_page,
+	.page_set_memattr = mmu_radix_page_set_memattr,
+	.page_array_startup =  mmu_radix_page_array_startup,
 
 	/* Internal interfaces */
-	MMUMETHOD(mmu_kenter,		mmu_radix_kenter),
-	MMUMETHOD(mmu_kextract,		mmu_radix_kextract),
-	MMUMETHOD(mmu_kremove,		mmu_radix_kremove),
-	MMUMETHOD(mmu_change_attr,	mmu_radix_change_attr),
-	MMUMETHOD(mmu_map_user_ptr,	mmu_radix_map_user_ptr),
-	MMUMETHOD(mmu_decode_kernel_ptr, mmu_radix_decode_kernel_ptr),
-	{ 0, 0 }
+	.kenter = mmu_radix_kenter,
+	.kextract = mmu_radix_kextract,
+	.kremove = mmu_radix_kremove,
+	.change_attr = mmu_radix_change_attr,
+	.decode_kernel_ptr =  mmu_radix_decode_kernel_ptr,
+
+	.tlbie_all = mmu_radix_tlbie_all,
 };
 
-MMU_DEF(mmu_radix, MMU_TYPE_RADIX, mmu_radix_methods, 0);
-
-#define METHODVOID(m) mmu_radix_ ## m(mmu_t mmup)
+MMU_DEF(mmu_radix, MMU_TYPE_RADIX, mmu_radix_methods);
 
 static boolean_t pmap_demote_l3e_locked(pmap_t pmap, pml3_entry_t *l3e, vm_offset_t va,
 	struct rwlock **lockp);
@@ -777,6 +768,13 @@ mmu_radix_tlbiel_flush(int scope)
 }
 
 static void
+mmu_radix_tlbie_all()
+{
+	/* TODO: LPID invalidate */
+	mmu_radix_tlbiel_flush(TLB_INVAL_SCOPE_GLOBAL);
+}
+
+static void
 mmu_radix_init_amor(void)
 {
 	/*
@@ -849,43 +847,6 @@ pa_cmp(const void *a, const void *b)
 	    PG_M | PG_A | RPTE_EAA_MASK | PG_V)
 
 
-static void
-pmap_epoch_init(void *arg __unused)
-{
-	pmap_epoch = epoch_alloc("pmap", EPOCH_PREEMPT | EPOCH_LOCKED);
-}
-SYSINIT(epoch, SI_SUB_EPOCH + 1, SI_ORDER_ANY, pmap_epoch_init, NULL);
-
-static bool
-pmap_not_in_di(void)
-{
-
-	return (curthread->td_md.md_invl_gen.gen == 0);
-}
-
-#define	PMAP_ASSERT_NOT_IN_DI() \
-    KASSERT(pmap_not_in_di(), ("DI already started"))
-
-static void
-pmap_delayed_invl_started(epoch_tracker_t et)
-{
-	epoch_enter_preempt(pmap_epoch, et);
-	curthread->td_md.md_invl_gen.gen = 1;
-}
-
-static void
-pmap_delayed_invl_finished(epoch_tracker_t et)
-{
-	curthread->td_md.md_invl_gen.gen = 0;
-	epoch_exit_preempt(pmap_epoch, et);
-}
-
-static void
-pmap_delayed_invl_wait(vm_page_t m __unused)
-{
-	epoch_wait_preempt(pmap_epoch);
-}
-
 static __inline void
 pmap_resident_count_inc(pmap_t pmap, int count)
 {
@@ -909,10 +870,8 @@ static void
 pagezero(vm_offset_t va)
 {
 	va = trunc_page(va);
-	int off;
 
-	for (off = 0; off < PAGE_SIZE; off += cacheline_size)
-		__asm __volatile("dcbz 0,%0" :: "r"(va + off));
+	bzero((void *)va, PAGE_SIZE);
 }
 
 static uint64_t
@@ -938,7 +897,7 @@ kvtopte(vm_offset_t va)
 }
 
 void
-mmu_radix_kenter(mmu_t mmu, vm_offset_t va, vm_paddr_t pa)
+mmu_radix_kenter(vm_offset_t va, vm_paddr_t pa)
 {
 	pt_entry_t *pte;
 
@@ -948,8 +907,8 @@ mmu_radix_kenter(mmu_t mmu, vm_offset_t va, vm_paddr_t pa)
 	    RPTE_EAA_P | PG_M | PG_A;
 }
 
-boolean_t
-mmu_radix_ps_enabled(mmu_t mmu, pmap_t pmap)
+bool
+mmu_radix_ps_enabled(pmap_t pmap)
 {
 	return (pg_ps_enabled && (pmap->pm_flags & PMAP_PDE_SUPERPAGE) != 0);
 }
@@ -1056,7 +1015,7 @@ pmap_nofault(pmap_t pmap, vm_offset_t va, vm_prot_t flags)
  * a 2mpage.  Otherwise, returns FALSE.
  */
 boolean_t
-mmu_radix_page_is_mapped(mmu_t mmu, vm_page_t m)
+mmu_radix_page_is_mapped(vm_page_t m)
 {
 	struct rwlock *lock;
 	boolean_t rv;
@@ -1372,8 +1331,7 @@ out:
 }
 
 static void
-reclaim_pv_chunk_leave_pmap(pmap_t pmap, pmap_t locked_pmap, bool start_di,
-	epoch_tracker_t et)
+reclaim_pv_chunk_leave_pmap(pmap_t pmap, pmap_t locked_pmap)
 {
 
 	if (pmap == NULL)
@@ -1381,8 +1339,6 @@ reclaim_pv_chunk_leave_pmap(pmap_t pmap, pmap_t locked_pmap, bool start_di,
 	pmap_invalidate_all(pmap);
 	if (pmap != locked_pmap)
 		PMAP_UNLOCK(pmap);
-	if (start_di)
-		pmap_delayed_invl_finished(et);
 }
 
 /*
@@ -1412,8 +1368,6 @@ reclaim_pv_chunk(pmap_t locked_pmap, struct rwlock **lockp)
 	struct spglist free;
 	uint64_t inuse;
 	int bit, field, freed;
-	bool start_di;
-	struct epoch_tracker et;
 
 	PMAP_LOCK_ASSERT(locked_pmap, MA_OWNED);
 	KASSERT(lockp != NULL, ("reclaim_pv_chunk: lockp is NULL"));
@@ -1424,13 +1378,6 @@ reclaim_pv_chunk(pmap_t locked_pmap, struct rwlock **lockp)
 	bzero(&pc_marker_end_b, sizeof(pc_marker_end_b));
 	pc_marker = (struct pv_chunk *)&pc_marker_b;
 	pc_marker_end = (struct pv_chunk *)&pc_marker_end_b;
-
-	/*
-	 * A delayed invalidation block should already be active if
-	 * pmap_advise() or pmap_remove() called this function by way
-	 * of pmap_demote_l3e_locked().
-	 */
-	start_di = pmap_not_in_di();
 
 	mtx_lock(&pv_chunks_mutex);
 	active_reclaims++;
@@ -1456,21 +1403,16 @@ reclaim_pv_chunk(pmap_t locked_pmap, struct rwlock **lockp)
 		 * corresponding pmap is locked.
 		 */
 		if (pmap != next_pmap) {
-			reclaim_pv_chunk_leave_pmap(pmap, locked_pmap,
-				start_di, &et);
+			reclaim_pv_chunk_leave_pmap(pmap, locked_pmap);
 			pmap = next_pmap;
 			/* Avoid deadlock and lock recursion. */
 			if (pmap > locked_pmap) {
 				RELEASE_PV_LIST_LOCK(lockp);
 				PMAP_LOCK(pmap);
-				if (start_di)
-					pmap_delayed_invl_started(&et);
 				mtx_lock(&pv_chunks_mutex);
 				continue;
 			} else if (pmap != locked_pmap) {
 				if (PMAP_TRYLOCK(pmap)) {
-					if (start_di)
-						pmap_delayed_invl_started(&et);
 					mtx_lock(&pv_chunks_mutex);
 					continue;
 				} else {
@@ -1482,8 +1424,7 @@ reclaim_pv_chunk(pmap_t locked_pmap, struct rwlock **lockp)
 						continue;
 					goto next_chunk;
 				}
-			} else if (start_di)
-				pmap_delayed_invl_started(&et);
+			}
 		}
 
 		/*
@@ -1572,7 +1513,7 @@ next_chunk:
 	TAILQ_REMOVE(&pv_chunks, pc_marker_end, pc_lru);
 	active_reclaims--;
 	mtx_unlock(&pv_chunks_mutex);
-	reclaim_pv_chunk_leave_pmap(pmap, locked_pmap, start_di, &et);
+	reclaim_pv_chunk_leave_pmap(pmap, locked_pmap);
 	if (m_pc == NULL && !SLIST_EMPTY(&free)) {
 		m_pc = SLIST_FIRST(&free);
 		SLIST_REMOVE_HEAD(&free, plinks.s.ss);
@@ -2085,7 +2026,7 @@ mmu_radix_early_bootstrap(vm_offset_t start, vm_offset_t end)
 }
 
 static void
-mmu_radix_late_bootstrap(mmu_t mmu, vm_offset_t start, vm_offset_t end)
+mmu_radix_late_bootstrap(vm_offset_t start, vm_offset_t end)
 {
 	int		i;
 	vm_paddr_t	pa;
@@ -2128,7 +2069,7 @@ mmu_radix_late_bootstrap(mmu_t mmu, vm_offset_t start, vm_offset_t end)
 	CTR2(KTR_PMAP, "moea64_bootstrap: kstack0 at %#x (%#x)", pa, va);
 	thread0.td_kstack = va;
 	for (i = 0; i < kstack_pages; i++) {
-		mmu_radix_kenter(mmu, va, pa);
+		mmu_radix_kenter(va, pa);
 		pa += PAGE_SIZE;
 		va += PAGE_SIZE;
 	}
@@ -2239,7 +2180,7 @@ mmu_radix_proctab_init(void)
 }
 
 void
-mmu_radix_advise(mmu_t mmu, pmap_t pmap, vm_offset_t sva, vm_offset_t eva,
+mmu_radix_advise(pmap_t pmap, vm_offset_t sva, vm_offset_t eva,
     int advice)
 {
 	struct rwlock *lock;
@@ -2250,12 +2191,10 @@ mmu_radix_advise(mmu_t mmu, pmap_t pmap, vm_offset_t sva, vm_offset_t eva,
 	vm_offset_t va, va_next;
 	vm_page_t m;
 	boolean_t anychanged;
-	struct epoch_tracker et;
 
 	if (advice != MADV_DONTNEED && advice != MADV_FREE)
 		return;
 	anychanged = FALSE;
-	pmap_delayed_invl_started(&et);
 	PMAP_LOCK(pmap);
 	for (; sva < eva; sva = va_next) {
 		l1e = pmap_pml1e(pmap, sva);
@@ -2349,14 +2288,13 @@ maybe_invlrng:
 	if (anychanged)
 		pmap_invalidate_all(pmap);
 	PMAP_UNLOCK(pmap);
-	pmap_delayed_invl_finished(&et);
 }
 
 /*
  * Routines used in machine-dependent code
  */
 static void
-mmu_radix_bootstrap(mmu_t mmu, vm_offset_t start, vm_offset_t end)
+mmu_radix_bootstrap(vm_offset_t start, vm_offset_t end)
 {
 	uint64_t lpcr;
 
@@ -2380,16 +2318,17 @@ mmu_radix_bootstrap(mmu_t mmu, vm_offset_t start, vm_offset_t end)
 	/* XXX assume CPU_FTR_HVMODE */
 	mmu_radix_tlbiel_flush(TLB_INVAL_SCOPE_GLOBAL);
 
-	mmu_radix_late_bootstrap(mmu, start, end);
+	mmu_radix_late_bootstrap(start, end);
 	numa_mem_regions(&numa_pregions, &numa_pregions_sz);
 	if (bootverbose)
 		printf("%s done\n", __func__);
 	pmap_bootstrapped = 1;
 	dmaplimit = roundup2(powerpc_ptob(Maxmem), L2_PAGE_SIZE);
+	PCPU_SET(flags, PCPU_GET(flags) | PC_FLAG_NOSRS);
 }
 
 static void
-mmu_radix_cpu_bootstrap(mmu_t mmu, int ap)
+mmu_radix_cpu_bootstrap(int ap)
 {
 	uint64_t lpcr;
 	uint64_t ptcr;
@@ -2434,7 +2373,7 @@ SYSCTL_ULONG(_vm_pmap_l2e, OID_AUTO, demotions, CTLFLAG_RD,
     &pmap_l2e_demotions, 0, "1GB page demotions");
 
 void
-mmu_radix_clear_modify(mmu_t mmu, vm_page_t m)
+mmu_radix_clear_modify(vm_page_t m)
 {
 	struct md_page *pvh;
 	pmap_t pmap;
@@ -2529,7 +2468,7 @@ restart:
 }
 
 void
-mmu_radix_copy(mmu_t mmu, pmap_t dst_pmap, pmap_t src_pmap, vm_offset_t dst_addr,
+mmu_radix_copy(pmap_t dst_pmap, pmap_t src_pmap, vm_offset_t dst_addr,
     vm_size_t len, vm_offset_t src_addr)
 {
 	struct rwlock *lock;
@@ -2686,7 +2625,7 @@ out:
 }
 
 static void
-mmu_radix_copy_page(mmu_t mmu, vm_page_t msrc, vm_page_t mdst)
+mmu_radix_copy_page(vm_page_t msrc, vm_page_t mdst)
 {
 	vm_offset_t src = PHYS_TO_DMAP(VM_PAGE_TO_PHYS(msrc));
 	vm_offset_t dst = PHYS_TO_DMAP(VM_PAGE_TO_PHYS(mdst));
@@ -2699,7 +2638,7 @@ mmu_radix_copy_page(mmu_t mmu, vm_page_t msrc, vm_page_t mdst)
 }
 
 static void
-mmu_radix_copy_pages(mmu_t mmu, vm_page_t ma[], vm_offset_t a_offset, vm_page_t mb[],
+mmu_radix_copy_pages(vm_page_t ma[], vm_offset_t a_offset, vm_page_t mb[],
     vm_offset_t b_offset, int xfersize)
 {
 
@@ -2819,7 +2758,7 @@ setpte:
 #endif /* VM_NRESERVLEVEL > 0 */
 
 int
-mmu_radix_enter(mmu_t mmu, pmap_t pmap, vm_offset_t va, vm_page_t m,
+mmu_radix_enter(pmap_t pmap, vm_offset_t va, vm_page_t m,
     vm_prot_t prot, u_int flags, int8_t psind)
 {
 	struct rwlock *lock;
@@ -3110,7 +3049,7 @@ unchanged:
 	 * populated, then attempt promotion.
 	 */
 	if ((mpte == NULL || mpte->ref_count == NPTEPG) &&
-	    mmu_radix_ps_enabled(mmu, pmap) &&
+	    mmu_radix_ps_enabled(pmap) &&
 	    (m->flags & PG_FICTITIOUS) == 0 &&
 	    vm_reserv_level_iffullpop(m) == 0 &&
 		pmap_promote_l3e(pmap, l3e, va, &lock) == 0)
@@ -3178,7 +3117,6 @@ pmap_enter_l3e(pmap_t pmap, vm_offset_t va, pml3_entry_t newpde, u_int flags,
 	struct spglist free;
 	pml3_entry_t oldl3e, *l3e;
 	vm_page_t mt, pdpg;
-	struct epoch_tracker et;
 
 	KASSERT((newpde & (PG_M | PG_RW)) != PG_RW,
 	    ("pmap_enter_pde: newpde is missing PG_M"));
@@ -3213,11 +3151,9 @@ pmap_enter_l3e(pmap_t pmap, vm_offset_t va, pml3_entry_t newpde, u_int flags,
 			 */
 			(void)pmap_remove_l3e(pmap, l3e, va, &free, lockp);
 		} else {
-			pmap_delayed_invl_started(&et);
 			if (pmap_remove_ptes(pmap, va, va + L3_PAGE_SIZE, l3e,
 			    &free, lockp))
 		               pmap_invalidate_all(pmap);
-			pmap_delayed_invl_finished(&et);
 		}
 		vm_page_free_pages_toq(&free, true);
 		if (va >= VM_MAXUSER_ADDRESS) {
@@ -3280,8 +3216,8 @@ pmap_enter_l3e(pmap_t pmap, vm_offset_t va, pml3_entry_t newpde, u_int flags,
 }
 
 void
-mmu_radix_enter_object(mmu_t mmu, pmap_t pmap, vm_offset_t start,
-    vm_offset_t end, vm_page_t m_start, vm_prot_t prot)
+mmu_radix_enter_object(pmap_t pmap, vm_offset_t start,
+    vm_offset_t end, vm_page_t m_start, vm_prot_t prot, u_int flags)
 {
 
 	struct rwlock *lock;
@@ -3303,7 +3239,7 @@ mmu_radix_enter_object(mmu_t mmu, pmap_t pmap, vm_offset_t start,
 	while (m != NULL && (diff = m->pindex - m_start->pindex) < psize) {
 		va = start + ptoa(diff);
 		if ((va & L3_PAGE_MASK) == 0 && va + L3_PAGE_SIZE <= end &&
-		    m->psind == 1 && mmu_radix_ps_enabled(mmu, pmap) &&
+		    m->psind == 1 && mmu_radix_ps_enabled(pmap) &&
 		    pmap_enter_2mpage(pmap, va, m, prot, &lock))
 			m = &m[L3_PAGE_SIZE / PAGE_SIZE - 1];
 		else
@@ -3427,8 +3363,8 @@ mmu_radix_enter_quick_locked(pmap_t pmap, vm_offset_t va, vm_page_t m,
 }
 
 void
-mmu_radix_enter_quick(mmu_t mmu, pmap_t pmap, vm_offset_t va, vm_page_t m,
-    vm_prot_t prot)
+mmu_radix_enter_quick(pmap_t pmap, vm_offset_t va, vm_page_t m,
+    vm_prot_t prot, u_int flags)
 {
 	struct rwlock *lock;
 	bool invalidate;
@@ -3447,7 +3383,7 @@ mmu_radix_enter_quick(mmu_t mmu, pmap_t pmap, vm_offset_t va, vm_page_t m,
 }
 
 vm_paddr_t
-mmu_radix_extract(mmu_t mmu, pmap_t pmap, vm_offset_t va)
+mmu_radix_extract(pmap_t pmap, vm_offset_t va)
 {
 	pml3_entry_t *l3e;
 	pt_entry_t *pte;
@@ -3479,7 +3415,7 @@ mmu_radix_extract(mmu_t mmu, pmap_t pmap, vm_offset_t va)
 }
 
 vm_page_t
-mmu_radix_extract_and_hold(mmu_t mmu, pmap_t pmap, vm_offset_t va, vm_prot_t prot)
+mmu_radix_extract_and_hold(pmap_t pmap, vm_offset_t va, vm_prot_t prot)
 {
 	pml3_entry_t l3e, *l3ep;
 	pt_entry_t pte;
@@ -3510,7 +3446,7 @@ mmu_radix_extract_and_hold(mmu_t mmu, pmap_t pmap, vm_offset_t va, vm_prot_t pro
 }
 
 static void
-mmu_radix_growkernel(mmu_t mmu, vm_offset_t addr)
+mmu_radix_growkernel(vm_offset_t addr)
 {
 	vm_paddr_t paddr;
 	vm_page_t nkpg;
@@ -3535,7 +3471,7 @@ mmu_radix_growkernel(mmu_t mmu, vm_offset_t addr)
 			if (nkpg == NULL)
 				panic("pmap_growkernel: no memory to grow kernel");
 			if ((nkpg->flags & PG_ZERO) == 0)
-				mmu_radix_zero_page(mmu, nkpg);
+				mmu_radix_zero_page(nkpg);
 			paddr = VM_PAGE_TO_PHYS(nkpg);
 			pde_store(l2e, paddr);
 			continue; /* try again */
@@ -3556,7 +3492,7 @@ mmu_radix_growkernel(mmu_t mmu, vm_offset_t addr)
 		if (nkpg == NULL)
 			panic("pmap_growkernel: no memory to grow kernel");
 		if ((nkpg->flags & PG_ZERO) == 0)
-			mmu_radix_zero_page(mmu, nkpg);
+			mmu_radix_zero_page(nkpg);
 		paddr = VM_PAGE_TO_PHYS(nkpg);
 		pde_store(l3e, paddr);
 
@@ -3614,7 +3550,7 @@ radix_pgd_release(void *arg __unused, void **store, int count)
 }
 
 static void
-mmu_radix_init(mmu_t mmu)
+mmu_radix_init()
 {
 	vm_page_t mpte;
 	vm_size_t s;
@@ -3781,7 +3717,7 @@ out:
  *	in any physical maps.
  */
 boolean_t
-mmu_radix_is_modified(mmu_t mmu, vm_page_t m)
+mmu_radix_is_modified(vm_page_t m)
 {
 
 	KASSERT((m->oflags & VPO_UNMANAGED) == 0,
@@ -3797,7 +3733,7 @@ mmu_radix_is_modified(mmu_t mmu, vm_page_t m)
 }
 
 boolean_t
-mmu_radix_is_prefaultable(mmu_t mmu, pmap_t pmap, vm_offset_t addr)
+mmu_radix_is_prefaultable(pmap_t pmap, vm_offset_t addr)
 {
 	pml3_entry_t *l3e;
 	pt_entry_t *pte;
@@ -3816,7 +3752,7 @@ mmu_radix_is_prefaultable(mmu_t mmu, pmap_t pmap, vm_offset_t addr)
 }
 
 boolean_t
-mmu_radix_is_referenced(mmu_t mmu, vm_page_t m)
+mmu_radix_is_referenced(vm_page_t m)
 {
 	KASSERT((m->oflags & VPO_UNMANAGED) == 0,
 	    ("pmap_is_referenced: page %p is not managed", m));
@@ -3845,7 +3781,7 @@ mmu_radix_is_referenced(mmu_t mmu, vm_page_t m)
  *	released.
  */
 boolean_t
-mmu_radix_ts_referenced(mmu_t mmu, vm_page_t m)
+mmu_radix_ts_referenced(vm_page_t m)
 {
 	struct md_page *pvh;
 	pv_entry_t pv, pvf;
@@ -3983,7 +3919,7 @@ out:
 }
 
 static vm_offset_t
-mmu_radix_map(mmu_t mmu, vm_offset_t *virt __unused, vm_paddr_t start,
+mmu_radix_map(vm_offset_t *virt __unused, vm_paddr_t start,
     vm_paddr_t end, int prot __unused)
 {
 
@@ -3993,7 +3929,7 @@ mmu_radix_map(mmu_t mmu, vm_offset_t *virt __unused, vm_paddr_t start,
 }
 
 void
-mmu_radix_object_init_pt(mmu_t mmu, pmap_t pmap, vm_offset_t addr,
+mmu_radix_object_init_pt(pmap_t pmap, vm_offset_t addr,
     vm_object_t object, vm_pindex_t pindex, vm_size_t size)
 {
 	pml3_entry_t *l3e;
@@ -4008,7 +3944,7 @@ mmu_radix_object_init_pt(mmu_t mmu, pmap_t pmap, vm_offset_t addr,
 			("pmap_object_init_pt: non-device object"));
 	/* NB: size can be logically ored with addr here */
 	if ((addr & L3_PAGE_MASK) == 0 && (size & L3_PAGE_MASK) == 0) {
-		if (!mmu_radix_ps_enabled(mmu, pmap))
+		if (!mmu_radix_ps_enabled(pmap))
 			return;
 		if (!vm_object_populate(object, pindex, pindex + atop(size)))
 			return;
@@ -4078,7 +4014,7 @@ mmu_radix_object_init_pt(mmu_t mmu, pmap_t pmap, vm_offset_t addr,
 }
 
 boolean_t
-mmu_radix_page_exists_quick(mmu_t mmu, pmap_t pmap, vm_page_t m)
+mmu_radix_page_exists_quick(pmap_t pmap, vm_page_t m)
 {
 	struct md_page *pvh;
 	struct rwlock *lock;
@@ -4118,7 +4054,7 @@ mmu_radix_page_exists_quick(mmu_t mmu, pmap_t pmap, vm_page_t m)
 }
 
 void
-mmu_radix_page_init(mmu_t mmu, vm_page_t m)
+mmu_radix_page_init(vm_page_t m)
 {
 
 	CTR2(KTR_PMAP, "%s(%p)", __func__, m);
@@ -4127,7 +4063,7 @@ mmu_radix_page_init(mmu_t mmu, vm_page_t m)
 }
 
 int
-mmu_radix_page_wired_mappings(mmu_t mmu, vm_page_t m)
+mmu_radix_page_wired_mappings(vm_page_t m)
 {
 	struct rwlock *lock;
 	struct md_page *pvh;
@@ -4192,8 +4128,8 @@ mmu_radix_update_proctab(int pid, pml1_entry_t l1pa)
 	isa3_proctab[pid].proctab0 = htobe64(RTS_SIZE |  l1pa | RADIX_PGD_INDEX_SHIFT);
 }
 
-void
-mmu_radix_pinit(mmu_t mmu, pmap_t pmap)
+int
+mmu_radix_pinit(pmap_t pmap)
 {
 	vmem_addr_t pid;
 	vm_paddr_t l1pa;
@@ -4217,6 +4153,8 @@ mmu_radix_pinit(mmu_t mmu, pmap_t pmap)
 	l1pa = DMAP_TO_PHYS((vm_offset_t)pmap->pm_pml1);
 	mmu_radix_update_proctab(pid, l1pa);
 	__asm __volatile("ptesync;isync" : : : "memory");
+
+	return (1);
 }
 
 /*
@@ -4245,7 +4183,6 @@ _pmap_allocpte(pmap_t pmap, vm_pindex_t ptepindex, struct rwlock **lockp)
 		if (lockp != NULL) {
 			RELEASE_PV_LIST_LOCK(lockp);
 			PMAP_UNLOCK(pmap);
-			PMAP_ASSERT_NOT_IN_DI();
 			vm_wait(NULL);
 			PMAP_LOCK(pmap);
 		}
@@ -4256,7 +4193,7 @@ _pmap_allocpte(pmap_t pmap, vm_pindex_t ptepindex, struct rwlock **lockp)
 		return (NULL);
 	}
 	if ((m->flags & PG_ZERO) == 0)
-		mmu_radix_zero_page(NULL, m);
+		mmu_radix_zero_page(m);
 
 	/*
 	 * Map the pagetable page into the process address space, if
@@ -4427,7 +4364,7 @@ retry:
 }
 
 static void
-mmu_radix_pinit0(mmu_t mmu, pmap_t pmap)
+mmu_radix_pinit0(pmap_t pmap)
 {
 
 	CTR2(KTR_PMAP, "%s(%p)", __func__, pmap);
@@ -4485,7 +4422,7 @@ retry:
 }
 
 void
-mmu_radix_protect(mmu_t mmu, pmap_t pmap, vm_offset_t sva, vm_offset_t eva,
+mmu_radix_protect(pmap_t pmap, vm_offset_t sva, vm_offset_t eva,
     vm_prot_t prot)
 {
 	vm_offset_t va_next;
@@ -4500,7 +4437,7 @@ mmu_radix_protect(mmu_t mmu, pmap_t pmap, vm_offset_t sva, vm_offset_t eva,
 
 	KASSERT((prot & ~VM_PROT_ALL) == 0, ("invalid prot %x", prot));
 	if (prot == VM_PROT_NONE) {
-		mmu_radix_remove(mmu, pmap, sva, eva);
+		mmu_radix_remove(pmap, sva, eva);
 		return;
 	}
 
@@ -4514,26 +4451,6 @@ mmu_radix_protect(mmu_t mmu, pmap_t pmap, vm_offset_t sva, vm_offset_t eva,
 			   pmap, sva, eva, prot, pmap->pm_pid);
 #endif
 	anychanged = FALSE;
-
-	/*
-	 * Although this function delays and batches the invalidation
-	 * of stale TLB entries, it does not need to call
-	 * pmap_delayed_invl_started() and
-	 * pmap_delayed_invl_finished(), because it does not
-	 * ordinarily destroy mappings.  Stale TLB entries from
-	 * protection-only changes need only be invalidated before the
-	 * pmap lock is released, because protection-only changes do
-	 * not destroy PV entries.  Even operations that iterate over
-	 * a physical page's PV list of mappings, like
-	 * pmap_remove_write(), acquire the pmap lock for each
-	 * mapping.  Consequently, for protection-only changes, the
-	 * pmap lock suffices to synchronize both page table and TLB
-	 * updates.
-	 *
-	 * This function only destroys a mapping if pmap_demote_l3e()
-	 * fails.  In that case, stale TLB entries are immediately
-	 * invalidated.
-	 */
 
 	PMAP_LOCK(pmap);
 	for (; sva < eva; sva = va_next) {
@@ -4632,7 +4549,7 @@ retry:
 }
 
 void
-mmu_radix_qenter(mmu_t mmu, vm_offset_t sva, vm_page_t *ma, int count)
+mmu_radix_qenter(vm_offset_t sva, vm_page_t *ma, int count)
 {
 
 	CTR4(KTR_PMAP, "%s(%#x, %p, %d)", __func__, sva, ma, count);
@@ -4674,7 +4591,7 @@ mmu_radix_qenter(mmu_t mmu, vm_offset_t sva, vm_page_t *ma, int count)
 }
 
 void
-mmu_radix_qremove(mmu_t mmu, vm_offset_t sva, int count)
+mmu_radix_qremove(vm_offset_t sva, int count)
 {
 	vm_offset_t va;
 	pt_entry_t *pte;
@@ -4825,7 +4742,7 @@ pmap_unuse_pt(pmap_t pmap, vm_offset_t va, pml3_entry_t ptepde,
 }
 
 void
-mmu_radix_release(mmu_t mmu, pmap_t pmap)
+mmu_radix_release(pmap_t pmap)
 {
 
 	CTR2(KTR_PMAP, "%s(%p)", __func__, pmap);
@@ -5188,7 +5105,7 @@ pmap_remove_ptes(pmap_t pmap, vm_offset_t sva, vm_offset_t eva,
 
 
 void
-mmu_radix_remove(mmu_t mmu, pmap_t pmap, vm_offset_t sva, vm_offset_t eva)
+mmu_radix_remove(pmap_t pmap, vm_offset_t sva, vm_offset_t eva)
 {
 	struct rwlock *lock;
 	vm_offset_t va_next;
@@ -5196,7 +5113,6 @@ mmu_radix_remove(mmu_t mmu, pmap_t pmap, vm_offset_t sva, vm_offset_t eva)
 	pml2_entry_t *l2e;
 	pml3_entry_t ptpaddr, *l3e;
 	struct spglist free;
-	struct epoch_tracker et;
 	bool anyvalid;
 
 	CTR4(KTR_PMAP, "%s(%p, %#x, %#x)", __func__, pmap, sva, eva);
@@ -5214,7 +5130,6 @@ mmu_radix_remove(mmu_t mmu, pmap_t pmap, vm_offset_t sva, vm_offset_t eva)
 	sva = (sva + PAGE_MASK) & ~PAGE_MASK;
 	eva = (eva + PAGE_MASK) & ~PAGE_MASK;
 
-	pmap_delayed_invl_started(&et);
 	PMAP_LOCK(pmap);
 
 	/*
@@ -5303,12 +5218,11 @@ out:
 	if (anyvalid)
 		pmap_invalidate_all(pmap);
 	PMAP_UNLOCK(pmap);
-	pmap_delayed_invl_finished(&et);
 	vm_page_free_pages_toq(&free, true);
 }
 
 void
-mmu_radix_remove_all(mmu_t mmu, vm_page_t m)
+mmu_radix_remove_all(vm_page_t m)
 {
 	struct md_page *pvh;
 	pv_entry_t pv;
@@ -5386,7 +5300,6 @@ retry:
 	}
 	vm_page_aflag_clear(m, PGA_WRITEABLE);
 	rw_wunlock(lock);
-	pmap_delayed_invl_wait(m);
 	vm_page_free_pages_toq(&free, true);
 }
 
@@ -5417,7 +5330,7 @@ retry:
  */
 
 void
-mmu_radix_remove_pages(mmu_t mmu, pmap_t pmap)
+mmu_radix_remove_pages(pmap_t pmap)
 {
 
 	CTR2(KTR_PMAP, "%s(%p)", __func__, pmap);
@@ -5586,7 +5499,7 @@ mmu_radix_remove_pages(mmu_t mmu, pmap_t pmap)
 }
 
 void
-mmu_radix_remove_write(mmu_t mmu, vm_page_t m)
+mmu_radix_remove_write(vm_page_t m)
 {
 	struct md_page *pvh;
 	pmap_t pmap;
@@ -5663,7 +5576,6 @@ retry:
 	}
 	rw_wunlock(lock);
 	vm_page_aflag_clear(m, PGA_WRITEABLE);
-	pmap_delayed_invl_wait(m);
 }
 
 /*
@@ -5679,7 +5591,7 @@ retry:
  *	function are not needed.
  */
 void
-mmu_radix_unwire(mmu_t mmu, pmap_t pmap, vm_offset_t sva, vm_offset_t eva)
+mmu_radix_unwire(pmap_t pmap, vm_offset_t sva, vm_offset_t eva)
 {
 	vm_offset_t va_next;
 	pml1_entry_t *l1e;
@@ -5751,7 +5663,7 @@ mmu_radix_unwire(mmu_t mmu, pmap_t pmap, vm_offset_t sva, vm_offset_t eva)
 }
 
 void
-mmu_radix_zero_page(mmu_t mmu, vm_page_t m)
+mmu_radix_zero_page(vm_page_t m)
 {
 	vm_offset_t addr;
 
@@ -5761,7 +5673,7 @@ mmu_radix_zero_page(mmu_t mmu, vm_page_t m)
 }
 
 void
-mmu_radix_zero_page_area(mmu_t mmu, vm_page_t m, int off, int size)
+mmu_radix_zero_page_area(vm_page_t m, int off, int size)
 {
 	caddr_t addr;
 
@@ -5775,8 +5687,7 @@ mmu_radix_zero_page_area(mmu_t mmu, vm_page_t m, int off, int size)
 
 
 static int
-mmu_radix_mincore(mmu_t mmu, pmap_t pmap, vm_offset_t addr,
-    vm_paddr_t *locked_pa)
+mmu_radix_mincore(pmap_t pmap, vm_offset_t addr, vm_paddr_t *locked_pa)
 {
 	pml3_entry_t *l3ep;
 	pt_entry_t pte;
@@ -5821,7 +5732,7 @@ mmu_radix_mincore(mmu_t mmu, pmap_t pmap, vm_offset_t addr,
 }
 
 void
-mmu_radix_activate(mmu_t mmu, struct thread *td)
+mmu_radix_activate(struct thread *td)
 {
 	pmap_t pmap;
 	uint32_t curpid;
@@ -5842,7 +5753,7 @@ mmu_radix_activate(mmu_t mmu, struct thread *td)
  *	different alignment might result in more superpage mappings.
  */
 void
-mmu_radix_align_superpage(mmu_t mmu, vm_object_t object, vm_ooffset_t offset,
+mmu_radix_align_superpage(vm_object_t object, vm_ooffset_t offset,
     vm_offset_t *addr, vm_size_t size)
 {
 
@@ -5865,7 +5776,7 @@ mmu_radix_align_superpage(mmu_t mmu, vm_object_t object, vm_ooffset_t offset,
 }
 
 static void *
-mmu_radix_mapdev_attr(mmu_t mmu, vm_paddr_t pa, vm_size_t size, vm_memattr_t attr)
+mmu_radix_mapdev_attr(vm_paddr_t pa, vm_size_t size, vm_memattr_t attr)
 {
 	vm_offset_t va, tmpva, ppa, offset;
 
@@ -5884,7 +5795,7 @@ mmu_radix_mapdev_attr(mmu_t mmu, vm_paddr_t pa, vm_size_t size, vm_memattr_t att
 		panic("%s: Couldn't alloc kernel virtual memory", __func__);
 
 	for (tmpva = va; size > 0;) {
-		mmu_radix_kenter_attr(mmu, tmpva, ppa, attr);
+		mmu_radix_kenter_attr(tmpva, ppa, attr);
 		size -= PAGE_SIZE;
 		tmpva += PAGE_SIZE;
 		ppa += PAGE_SIZE;
@@ -5895,16 +5806,16 @@ mmu_radix_mapdev_attr(mmu_t mmu, vm_paddr_t pa, vm_size_t size, vm_memattr_t att
 }
 
 static void *
-mmu_radix_mapdev(mmu_t mmu, vm_paddr_t pa, vm_size_t size)
+mmu_radix_mapdev(vm_paddr_t pa, vm_size_t size)
 {
 
 	CTR3(KTR_PMAP, "%s(%#x, %#x)", __func__, pa, size);
 
-	return (mmu_radix_mapdev_attr(mmu, pa, size, VM_MEMATTR_DEFAULT));
+	return (mmu_radix_mapdev_attr(pa, size, VM_MEMATTR_DEFAULT));
 }
 
 void
-mmu_radix_page_set_memattr(mmu_t mmu, vm_page_t m, vm_memattr_t ma)
+mmu_radix_page_set_memattr(vm_page_t m, vm_memattr_t ma)
 {
 
 	CTR3(KTR_PMAP, "%s(%p, %#x)", __func__, m, ma);
@@ -5916,13 +5827,13 @@ mmu_radix_page_set_memattr(mmu_t mmu, vm_page_t m, vm_memattr_t ma)
 	 * required for data coherence.
 	 */
 	if ((m->flags & PG_FICTITIOUS) == 0 &&
-	    mmu_radix_change_attr(mmu, PHYS_TO_DMAP(VM_PAGE_TO_PHYS(m)),
+	    mmu_radix_change_attr(PHYS_TO_DMAP(VM_PAGE_TO_PHYS(m)),
 	    PAGE_SIZE, m->md.mdpg_cache_attrs))
 		panic("memory attribute change on the direct map failed");
 }
 
 static void
-mmu_radix_unmapdev(mmu_t mmu, vm_offset_t va, vm_size_t size)
+mmu_radix_unmapdev(vm_offset_t va, vm_size_t size)
 {
 	vm_offset_t offset;
 
@@ -6010,7 +5921,7 @@ pmap_demote_l2e(pmap_t pmap, pml2_entry_t *l2e, vm_offset_t va)
 }
 
 vm_paddr_t
-mmu_radix_kextract(mmu_t mmu, vm_offset_t va)
+mmu_radix_kextract(vm_offset_t va)
 {
 	pml3_entry_t l3e;
 	vm_paddr_t pa;
@@ -6061,7 +5972,7 @@ mmu_radix_calc_wimg(vm_paddr_t pa, vm_memattr_t ma)
 }
 
 static void
-mmu_radix_kenter_attr(mmu_t mmu, vm_offset_t va, vm_paddr_t pa, vm_memattr_t ma)
+mmu_radix_kenter_attr(vm_offset_t va, vm_paddr_t pa, vm_memattr_t ma)
 {
 	pt_entry_t *pte, pteval;
 	uint64_t cache_bits;
@@ -6074,7 +5985,7 @@ mmu_radix_kenter_attr(mmu_t mmu, vm_offset_t va, vm_paddr_t pa, vm_memattr_t ma)
 }
 
 void
-mmu_radix_kremove(mmu_t mmu, vm_offset_t va)
+mmu_radix_kremove(vm_offset_t va)
 {
 	pt_entry_t *pte;
 
@@ -6084,21 +5995,8 @@ mmu_radix_kremove(mmu_t mmu, vm_offset_t va)
 	pte_clear(pte);
 }
 
-int mmu_radix_map_user_ptr(mmu_t mmu, pmap_t pm,
-    volatile const void *uaddr, void **kaddr, size_t ulen, size_t *klen)
-{
-	if ((uintptr_t)uaddr + ulen >= VM_MAXUSER_ADDRESS)
-		return (EFAULT);
-
-	*kaddr = (void *)(uintptr_t)uaddr;
-	if (klen)
-		*klen = ulen;
-
-	return (0);
-}
-
 int
-mmu_radix_decode_kernel_ptr(mmu_t mmu, vm_offset_t addr,
+mmu_radix_decode_kernel_ptr(vm_offset_t addr,
     int *is_user, vm_offset_t *decoded)
 {
 
@@ -6109,7 +6007,7 @@ mmu_radix_decode_kernel_ptr(mmu_t mmu, vm_offset_t addr,
 }
 
 static boolean_t
-mmu_radix_dev_direct_mapped(mmu_t mmu, vm_paddr_t pa, vm_size_t size)
+mmu_radix_dev_direct_mapped(vm_paddr_t pa, vm_size_t size)
 {
 
 	CTR3(KTR_PMAP, "%s(%#x, %#x)", __func__, pa, size);
@@ -6117,7 +6015,7 @@ mmu_radix_dev_direct_mapped(mmu_t mmu, vm_paddr_t pa, vm_size_t size)
 }
 
 static void
-mmu_radix_scan_init(mmu_t mmup)
+mmu_radix_scan_init()
 {
 
 	CTR1(KTR_PMAP, "%s()", __func__);
@@ -6125,7 +6023,7 @@ mmu_radix_scan_init(mmu_t mmup)
 }
 
 static void
-mmu_radix_dumpsys_map(mmu_t mmu, vm_paddr_t pa, size_t sz,
+mmu_radix_dumpsys_map(vm_paddr_t pa, size_t sz,
 	void **va)
 {
 	CTR4(KTR_PMAP, "%s(%#jx, %#zx, %p)", __func__, (uintmax_t)pa, sz, va);
@@ -6133,7 +6031,7 @@ mmu_radix_dumpsys_map(mmu_t mmu, vm_paddr_t pa, size_t sz,
 }
 
 vm_offset_t
-mmu_radix_quick_enter_page(mmu_t mmu, vm_page_t m)
+mmu_radix_quick_enter_page(vm_page_t m)
 {
 	vm_paddr_t paddr;
 
@@ -6143,7 +6041,7 @@ mmu_radix_quick_enter_page(mmu_t mmu, vm_page_t m)
 }
 
 void
-mmu_radix_quick_remove_page(mmu_t mmu, vm_offset_t addr __unused)
+mmu_radix_quick_remove_page(vm_offset_t addr __unused)
 {
 	/* no work to do here */
 	CTR2(KTR_PMAP, "%s(%#x)", __func__, addr);
@@ -6156,7 +6054,7 @@ pmap_invalidate_cache_range(vm_offset_t sva, vm_offset_t eva)
 }
 
 int
-mmu_radix_change_attr(mmu_t mmu, vm_offset_t va, vm_size_t size,
+mmu_radix_change_attr(vm_offset_t va, vm_size_t size,
     vm_memattr_t mode)
 {
 	int error;
@@ -6382,7 +6280,7 @@ pmap_change_attr_locked(vm_offset_t va, vm_size_t size, int mode, bool flush)
  * attempting to back the vm_pages with domain-local memory.
  */
 void
-mmu_radix_page_array_startup(mmu_t mmu, long pages)
+mmu_radix_page_array_startup(long pages)
 {
 #ifdef notyet
 	pml2_entry_t *l2e;
@@ -6402,7 +6300,7 @@ mmu_radix_page_array_startup(mmu_t mmu, long pages)
 
 	pa = vm_phys_early_alloc(0, end - start);
 
-	start = mmu_radix_map(mmu, &start, pa, end - start, VM_MEMATTR_DEFAULT);
+	start = mmu_radix_map(&start, pa, end - start, VM_MEMATTR_DEFAULT);
 #ifdef notyet
 	/* TODO: NUMA vm_page_array.  Blocked out until then (copied from amd64). */
 	for (va = start; va < end; va += L3_PAGE_SIZE) {
