@@ -1,17 +1,14 @@
 @Library('ctsrd-jenkins-scripts') _
 
-properties([disableConcurrentBuilds(),
-            disableResume(),
-            [$class: 'GithubProjectProperty', displayName: '', projectUrlStr: 'https://github.com/CTSRD-CHERI/cheribsd/'],
-            [$class: 'CopyArtifactPermissionProperty', projectNames: '*'],
-            [$class: 'JobPropertyImpl', throttle: [count: 1, durationName: 'hour', userBoost: true]],
-            durabilityHint('PERFORMANCE_OPTIMIZED'),
-            pipelineTriggers([githubPush()])
+// Set the default job properties (work around properties() not being additive but replacing)
+setDefaultJobProperties([rateLimitBuilds([count: 1, durationName: 'hour', userBoost: true]),
+                         [$class: 'GithubProjectProperty', displayName: '', projectUrlStr: 'https://github.com/CTSRD-CHERI/cheribsd/'],
+                         copyArtifactPermission('*'), // Downstream jobs need the kernels/disk images
 ])
 
 if (env.CHANGE_ID && !shouldBuildPullRequest()) {
-	echo "Not building this pull request."
-	return
+    echo "Not building this pull request."
+    return
 }
 
 jobs = [:]
@@ -36,6 +33,7 @@ def buildImageAndRunTests(params, String suffix) {
         }
         def exitCode = sh returnStatus: true, label: "Run tests in QEMU", script: """
 rm -rf cheribsd-test-results && mkdir cheribsd-test-results
+test -e \$WORKSPACE/id_ed25519 || ssh-keygen -t ed25519 -N '' -f \$WORKSPACE/id_ed25519 < /dev/null
 ./cheribuild/jenkins-cheri-build.py --test run-${suffix} '--test-extra-args=${testExtraArgs}' ${params.extraArgs} --test-ssh-key \$WORKSPACE/id_ed25519.pub
 find cheribsd-test-results
 """
@@ -86,8 +84,7 @@ def buildFPGAKernels(params, String name, String suffix) {
                 customGitCheckoutDir: 'cheribsd',
                 gitHubStatusContext: "ci/${suffix}",
                 /* Custom function to run tests since --test will not work (yet) */
-                runTests: false, afterBuild: { params -> buildImageAndRunTests(params, suffix) }
-        )
+                runTests: false, afterBuild: { params -> buildImageAndRunTests(params, suffix) })
     }
 }
 

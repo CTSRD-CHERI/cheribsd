@@ -72,6 +72,8 @@ __DEFAULT_NO_OPTIONS = \
     BIND_NOW \
     CCACHE_BUILD \
     CTF \
+    INIT_ALL_PATTERN \
+    INIT_ALL_ZERO \
     INSTALL_AS_USER \
     PIE \
     RETPOLINE \
@@ -120,8 +122,10 @@ WITH_CHERI:=	yes
 
 .if ${__TT:Mmips*} && ${MK_CHERI} == "yes"
 MK_CLANG:=	no
-.else
-MK_CHERI:=	no
+.endif
+
+.if ${MK_INIT_ALL_PATTERN} == "yes" && ${MK_INIT_ALL_ZERO} == "yes"
+.error WITH_INIT_ALL_PATTERN and WITH_INIT_ALL_ZERO are mutually exclusive.
 .endif
 
 #

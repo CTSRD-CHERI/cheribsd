@@ -35,7 +35,13 @@ enum sysdecode_abi {
 	SYSDECODE_ABI_LINUX,
 	SYSDECODE_ABI_LINUX32,
 	SYSDECODE_ABI_CLOUDABI64,
-	SYSDECODE_ABI_CLOUDABI32
+	SYSDECODE_ABI_CLOUDABI32,
+
+	/*
+	 * XXX: 100 is to avoid ABI issues in CheriBSD, would use next
+	 * value when merged upstream.
+	 */
+	SYSDECODE_ABI_FREEBSD64 = 100,
 };
 
 int	sysdecode_abi_to_freebsd_errno(enum sysdecode_abi _abi, int _error);

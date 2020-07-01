@@ -3295,3 +3295,73 @@ hci_addrtype2str(int type)
 	return (type >= SIZE(t)? "?" : t[type]);
 } /* hci_addrtype2str */
 
+char const *
+hci_role2str(int role)
+{
+	static char const * const	roles[] = {
+		/* 0x00 */ "Master",
+		/* 0x01 */ "Slave",
+	};
+
+	return (role >= SIZE(roles)? "Unknown role" : roles[role]);
+} /* hci_role2str */
+
+char const *
+hci_mc_accuracy2str(int accuracy)
+{
+	static char const * const	acc[] = {
+		/* 0x00 */ "500 ppm",
+		/* 0x01 */ "250 ppm",
+		/* 0x02 */ "150 ppm",
+		/* 0x03 */ "100 ppm",
+		/* 0x04 */ "75 ppm",
+		/* 0x05 */ "50 ppm",
+		/* 0x06 */ "30 ppm",
+		/* 0x07 */ "20 ppm",
+	};
+
+	return (accuracy >= SIZE(acc)? "Unknown accuracy" : acc[accuracy]);
+} /* hci_mc_accuracy2str */
+
+char const *
+hci_le_chanmap2str(uint8_t *map, char *buffer, int size)
+{
+	char	chantxt[4];
+	if (buffer != NULL && size > 0) {
+		int n, i, len0, len1;
+
+		memset(buffer, 0, size);
+		len1 = 0;
+		size--;
+
+		for (n = 0; n < 5; n++) {
+			fprintf(stdout, "%02x ", map[n]);
+			for (i = 0; i < 8; i++) {
+				len0 = strlen(buffer);
+				if (len0 >= size)
+					goto done;
+
+				if (map[n] & (1 << i)) {
+					if (len1 + 3 > 60) {
+						len1 = 0;
+						buffer[len0 - 1] = '\n';
+					}
+
+					len1 += 3;
+					snprintf(
+						chantxt,
+						sizeof(chantxt),
+						"%02d ",
+						(n * 8 + i));
+					strncat(
+						buffer,
+						chantxt,
+						size - len0);
+				}
+			}
+		}
+		fprintf(stdout, "\n");
+	}
+done:
+	return (buffer);
+}

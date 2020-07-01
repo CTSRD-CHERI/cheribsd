@@ -77,46 +77,53 @@
  * taking a pointer to the global, and using the existing pointer, return
  * offsets and sizes as desired.
  */
-#define	TEST_BOUNDS(test)						\
-	void								\
-	test_bounds_##test(const struct cheri_test *ctp __unused)	\
-	{								\
-		void * __capability allocation =			\
-		    (__cheri_tocap void * __capability )&test;		\
-		size_t allocation_offset = cheri_getoffset(allocation);	\
-		size_t allocation_len = cheri_getlen(allocation);	\
-		size_t pointer_offset = cheri_getoffset(test##p);	\
-		size_t pointer_len = cheri_getlen(test##p);		\
-		size_t size = sizeof(test);				\
-		size_t rounded_size = CHERI_REPRESENTABLE_LENGTH(size);	\
-									\
-		/* Global offset. */					\
-		if (allocation_offset != 0)				\
-			cheritest_failure_errx(				\
-			    "global: non-zero offset (%ju)",		\
-			    allocation_offset);				\
-									\
-		/* Global length. */					\
-		if (allocation_len != rounded_size)			\
-			cheritest_failure_errx(				\
-			    "global: incorrect length (expected %ju, "	\
-			    "rounded from %ju, got %ju)", 		\
-			    rounded_size, size, allocation_len);	\
-									\
-		/* Pointer offset. */					\
-		if (pointer_offset != 0)				\
-			cheritest_failure_errx(				\
-			    "pointer: non-zero offset (%ju)",		\
-			    pointer_offset);				\
-									\
-		/* Pointer length. */					\
-		if (pointer_len != rounded_size)			\
-			cheritest_failure_errx(				\
-			    "pointer: incorrect length (expected %ju, "	\
-			    "rounded from %ju, got %ju)", 		\
-			    rounded_size, size, pointer_len);		\
-		cheritest_success();					\
+#define TEST_BOUNDS(test)                                               \
+	void test_bounds_##test(const struct cheri_test *ctp __unused)  \
+	{                                                               \
+		void *__capability allocation =                         \
+		    (__cheri_tocap void *__capability) & test;          \
+		void *__capability global_ptr = test##p;                \
+		test_bounds_impl(allocation, global_ptr, sizeof(test)); \
 	}
+
+static void
+test_bounds_impl(void *__capability allocation, void *__capability global_ptr, size_t size)
+{
+	size_t allocation_offset = cheri_getoffset(allocation);
+	size_t allocation_len = cheri_getlen(allocation);
+	size_t pointer_offset = cheri_getoffset(global_ptr);
+	size_t pointer_len = cheri_getlen(global_ptr);
+	size_t rounded_size = CHERI_REPRESENTABLE_LENGTH(size);
+
+	/* Both the local cast and the global pointer should be tagged */
+	CHERITEST_VERIFY(cheri_gettag(allocation));
+	CHERITEST_VERIFY(cheri_gettag(global_ptr));
+
+	/* Global offset. */
+	if (allocation_offset != 0)
+		cheritest_failure_errx(
+		    "global: non-zero offset (%ju)", allocation_offset);
+
+	/* Global length. */
+	if (allocation_len != rounded_size)
+		cheritest_failure_errx(
+		    "global: incorrect length (expected %ju, "
+		    "rounded from %ju, got %ju)",
+		    rounded_size, size, allocation_len);
+
+	/* Pointer offset. */
+	if (pointer_offset != 0)
+		cheritest_failure_errx(
+		    "pointer: non-zero offset (%ju)", pointer_offset);
+
+	/* Pointer length. */
+	if (pointer_len != rounded_size)
+		cheritest_failure_errx(
+		    "pointer: incorrect length (expected %ju, "
+		    "rounded from %ju, got %ju)",
+		    rounded_size, size, pointer_len);
+	cheritest_success();
+}
 
 /*
  * Basic integer types.
@@ -477,40 +484,9 @@ TEST_BOUNDS(extern_global_array65536);
 	void								\
 	test_bounds_##test(const struct cheri_test *ctp __unused)	\
 	{								\
-		void * __capability allocation =				\
+		void * __capability allocation =			\
 		    (__cheri_tocap void * __capability)&test;		\
-		size_t allocation_offset = cheri_getoffset(allocation);	\
-		size_t allocation_len = cheri_getlen(allocation);	\
-		size_t pointer_offset = cheri_getoffset(test##p);	\
-		size_t pointer_len = cheri_getlen(test##p);		\
-		size_t rounded_size = CHERI_REPRESENTABLE_LENGTH(size);	\
-									\
-		/* Global offset. */					\
-		if (allocation_offset != 0)				\
-			cheritest_failure_errx(				\
-			    "global: non-zero offset (%ju)",		\
-			    allocation_offset);				\
-									\
-		/* Global length. */					\
-		if (allocation_len != rounded_size)			\
-			cheritest_failure_errx(				\
-			    "global: incorrect length (expected %ju, "	\
-			    "rounded from %ju, got %ju)", 		\
-			    rounded_size, size, allocation_len);	\
-									\
-		/* Pointer offset. */					\
-		if (pointer_offset != 0)				\
-			cheritest_failure_errx(				\
-			    "pointer: non-zero offset (%ju)",		\
-			    pointer_offset);				\
-									\
-		/* Pointer length. */					\
-		if (pointer_len != rounded_size)			\
-			cheritest_failure_errx(				\
-			    "pointer: incorrect length (expected %ju, "	\
-			    "rounded from %ju, got %ju)", 		\
-			    rounded_size, size, pointer_len);		\
-		cheritest_success();					\
+		test_bounds_impl(allocation, test##p, size);		\
 	}
 
 /*

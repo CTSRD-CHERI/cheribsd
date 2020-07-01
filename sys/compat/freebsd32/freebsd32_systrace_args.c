@@ -168,9 +168,9 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 0;
 		break;
 	}
-	/* ptrace */
+	/* freebsd32_ptrace */
 	case 26: {
-		struct ptrace_args *p = params;
+		struct freebsd32_ptrace_args *p = params;
 		iarg[0] = p->req; /* int */
 		iarg[1] = p->pid; /* pid_t */
 		uarg[2] = (intptr_t) p->addr; /* caddr_t */
@@ -3393,6 +3393,14 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 3;
 		break;
 	}
+	/* rpctls_syscall */
+	case 576: {
+		struct rpctls_syscall_args *p = params;
+		iarg[0] = p->op; /* int */
+		uarg[1] = (intptr_t) p->path; /* const char * */
+		*n_args = 2;
+		break;
+	}
 	default:
 		*n_args = 0;
 		break;
@@ -3632,7 +3640,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	/* geteuid */
 	case 25:
 		break;
-	/* ptrace */
+	/* freebsd32_ptrace */
 	case 26:
 		switch(ndx) {
 		case 0:
@@ -9149,6 +9157,19 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
+	/* rpctls_syscall */
+	case 576:
+		switch(ndx) {
+		case 0:
+			p = "int";
+			break;
+		case 1:
+			p = "userland const char *";
+			break;
+		default:
+			break;
+		};
+		break;
 	default:
 		break;
 	};
@@ -9253,7 +9274,7 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 24:
 	/* geteuid */
 	case 25:
-	/* ptrace */
+	/* freebsd32_ptrace */
 	case 26:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
@@ -11055,6 +11076,11 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		break;
 	/* close_range */
 	case 575:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* rpctls_syscall */
+	case 576:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;

@@ -104,8 +104,10 @@ typedef union {
 static inline pfil_packet_t
 pfil_packet_align(pfil_packet_t p)
 {
+	pfil_packet_t v;
 
-	return ((pfil_packet_t) roundup2((p).mem, _Alignof(void *)));
+	v.mem = roundup2((p).mem, _Alignof(void *));
+	return (v);
 }
 
 static inline struct mbuf *

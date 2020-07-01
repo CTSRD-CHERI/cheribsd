@@ -203,8 +203,8 @@ SUBDIR.${MK_BLUETOOTH}+=	bluetooth
 SUBDIR.${MK_BSD_CPIO}+=	cpio
 SUBDIR.${MK_CALENDAR}+=	calendar
 
-# Tracing currently only implemented for MIPS
-.if ${MACHINE_ARCH:Mmips*}
+# Tracing currently only implemented for CHERI-QEMU architectures
+.if ${MACHINE} == "mips" || ${MACHINE} == "riscv"
 SUBDIR+=	qtrace
 .endif
 

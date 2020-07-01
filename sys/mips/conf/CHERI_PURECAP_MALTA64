@@ -6,8 +6,6 @@ include		"std.MALTA"
 include		"CHERI128_PURECAP_BASE"
 ident		CHERI_PURECAP_MALTA64
 
-hints		"CHERI_MALTA64.hints"  #Default places to look for devices.
-
 options		DIAGNOSTIC
 options		VERBOSE_SYSINIT
 # options	BUS_DEBUG

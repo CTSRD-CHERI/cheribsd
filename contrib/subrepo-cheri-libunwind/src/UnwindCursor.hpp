@@ -1381,7 +1381,8 @@ bool UnwindCursor<A, R>::getInfoFromEHABISection(
 
   // If the high bit is set, the exception handling table entry is inline inside
   // the index table entry on the second word (aka |indexDataAddr|). Otherwise,
-  // the table points at an offset in the exception handling table (section 5 EHABI).
+  // the table points at an offset in the exception handling table (section 5
+  // EHABI).
   pint_t exceptionTableAddr;
   uint32_t exceptionTableData;
   bool isSingleWordEHT;
@@ -1480,7 +1481,7 @@ bool UnwindCursor<A, R>::getInfoFromEHABISection(
   _info.unwind_info = exceptionTableAddr;
   _info.lsda = lsda;
   // flags is pr_cache.additional. See EHABI #7.2 for definition of bit 0.
-  _info.flags = isSingleWordEHT ? 1 : 0 | scope32 ? 0x2 : 0;  // Use enum?
+  _info.flags = (isSingleWordEHT ? 1 : 0) | (scope32 ? 0x2 : 0);  // Use enum?
 
   return true;
 }
@@ -1878,12 +1879,12 @@ void UnwindCursor<A, R>::setInfoBasedOnIPRegister(bool isReturnAddress) {
   pc &= (pint_t)~0x1;
 #endif
 
+  // Exit early if at the top of the stack.
   if (pc.isNull()) {
-    CHERI_DBG("%s(%d): return pc was NULL, stopping unwinding\n", __func__, isReturnAddress);
+    CHERI_DBG("%s(%d): return pc was NULL, stopping unwinding\n", __func__,
+              isReturnAddress);
     // If the return address is zero that usually means that we have reached
     // the end of the thread's stack and can't continue unwinding
-    // TODO: are there any systems where a return PC of 0 is valid?
-    // no unwind info, flag that we can't reliably unwind
     _unwindInfoMissing = true;
     return;
   }

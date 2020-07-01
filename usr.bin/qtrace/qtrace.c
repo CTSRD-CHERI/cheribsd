@@ -58,17 +58,19 @@ usage(void)
 static inline void
 start_trace(void)
 {
-	CHERI_START_TRACE;
 	if (user_mode_only)
-		__asm__ __volatile__("li $0, 0xdeaf");
+		CHERI_START_USER_TRACE;
+	else
+		CHERI_START_TRACE;
 }
 
 static inline void
 stop_trace(void)
 {
 	if (user_mode_only)
-		__asm__ __volatile__("li $0, 0xfaed");
-	CHERI_STOP_TRACE;
+		CHERI_STOP_USER_TRACE;
+	else
+		CHERI_STOP_TRACE;
 }
 
 static inline void
@@ -81,7 +83,7 @@ set_thread_tracing(void)
 	if (error)
 		err(EX_OSERR, "QEMU_SET_QTRACE");
 	if (user_mode_only)
-		__asm__ __volatile__("li $0, 0xdeaf");
+		CHERI_START_USER_TRACE;
 }
 
 int
@@ -135,7 +137,7 @@ main(int argc, char **argv)
 		if (!qemu_trace_perthread)
 			stop_trace();
 		if (user_mode_only)
-			__asm__ __volatile__("li $0, 0xfaed");
+			CHERI_STOP_USER_TRACE;
 		if (!WIFEXITED(status)) {
 			warnx("child exited abnormally");
 			exit(-1);

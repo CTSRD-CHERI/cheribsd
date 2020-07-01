@@ -33,6 +33,7 @@
 #define opt_utrace JEMALLOC_N(opt_utrace)
 #define opt_xmalloc JEMALLOC_N(opt_xmalloc)
 #define opt_zero JEMALLOC_N(opt_zero)
+#define opt_zero_free JEMALLOC_N(opt_zero_free)
 #define sdallocx_default JEMALLOC_N(sdallocx_default)
 #define arena_alloc_junk_small JEMALLOC_N(arena_alloc_junk_small)
 #define arena_basic_stats_merge JEMALLOC_N(arena_basic_stats_merge)

@@ -60,6 +60,7 @@ __FBSDID("$FreeBSD$");
 #include <net/if_dl.h>
 #include <net/route.h>
 #include <net/route/nhop.h>
+#include <net/route/route_ctl.h>
 #include <net/route/route_var.h>
 #include <net/radix.h>
 #include <net/vnet.h>
@@ -690,10 +691,8 @@ defrouter_addreq(struct nd_defrouter *new)
 	error = in6_rtrequest(RTM_ADD, (struct sockaddr *)&def,
 	    (struct sockaddr *)&gate, (struct sockaddr *)&mask,
 	    RTF_GATEWAY, &newrt, fibnum);
-	if (newrt) {
+	if (newrt != NULL)
 		rt_routemsg(RTM_ADD, newrt, new->ifp, 0, fibnum);
-		RTFREE_FUNC(newrt);
-	}
 	if (error == 0)
 		new->installed = 1;
 }
@@ -708,6 +707,7 @@ defrouter_delreq(struct nd_defrouter *dr)
 {
 	struct sockaddr_in6 def, mask, gate;
 	struct rtentry *oldrt = NULL;
+	struct epoch_tracker et;
 	unsigned int fibnum;
 
 	bzero(&def, sizeof(def));
@@ -720,13 +720,13 @@ defrouter_delreq(struct nd_defrouter *dr)
 	gate.sin6_addr = dr->rtaddr;
 	fibnum = dr->ifp->if_fib;
 
+	NET_EPOCH_ENTER(et);
 	in6_rtrequest(RTM_DELETE, (struct sockaddr *)&def,
 	    (struct sockaddr *)&gate,
 	    (struct sockaddr *)&mask, RTF_GATEWAY, &oldrt, fibnum);
-	if (oldrt) {
+	if (oldrt != NULL)
 		rt_routemsg(RTM_DELETE, oldrt, dr->ifp, 0, fibnum);
-		RTFREE_FUNC(oldrt);
-	}
+	NET_EPOCH_EXIT(et);
 
 	dr->installed = 0;
 }
@@ -1022,6 +1022,7 @@ defrouter_select_fib(int fibnum)
 	}
 	ND6_RUNLOCK();
 
+	NET_EPOCH_ENTER(et);
 	/*
 	 * If we selected a router for this FIB and it's different
 	 * than the installed one, remove the installed router and
@@ -1037,6 +1038,7 @@ defrouter_select_fib(int fibnum)
 	}
 	if (selected_dr != NULL)
 		defrouter_rele(selected_dr);
+	NET_EPOCH_EXIT(et);
 }
 
 static struct nd_defrouter *
@@ -2064,7 +2066,6 @@ nd6_prefix_onlink_rtrequest(struct nd_prefix *pr, struct ifaddr *ifa)
 
 		pr->ndpr_stateflags |= NDPRF_ONLINK;
 		rt_routemsg(RTM_ADD, rt, pr->ndpr_ifp, 0, fibnum);
-		RTFREE_FUNC(rt);
 	}
 
 	/* Return the last error we got. */
@@ -2132,7 +2133,6 @@ nd6_prefix_onlink(struct nd_prefix *pr)
 		}
 		/* should we care about ia6_flags? */
 	}
-	NET_EPOCH_EXIT(et);
 	if (ifa == NULL) {
 		/*
 		 * This can still happen, when, for example, we receive an RA
@@ -2145,13 +2145,12 @@ nd6_prefix_onlink(struct nd_prefix *pr)
 		    "prefix(%s/%d) on %s\n", __func__,
 		    ip6_sprintf(ip6buf, &pr->ndpr_prefix.sin6_addr),
 		    pr->ndpr_plen, if_name(ifp)));
-		return (0);
-	}
-
-	error = nd6_prefix_onlink_rtrequest(pr, ifa);
-
-	if (ifa != NULL)
+		error = 0;
+	} else {
+		error = nd6_prefix_onlink_rtrequest(pr, ifa);
 		ifa_free(ifa);
+	}
+	NET_EPOCH_EXIT(et);
 
 	return (error);
 }
@@ -2167,6 +2166,7 @@ nd6_prefix_offlink(struct nd_prefix *pr)
 	char ip6buf[INET6_ADDRSTRLEN];
 	uint64_t genid;
 	int fibnum, maxfib, a_failure;
+	struct epoch_tracker et;
 
 	ND6_ONLINK_LOCK_ASSERT();
 	ND6_UNLOCK_ASSERT();
@@ -2193,6 +2193,7 @@ nd6_prefix_offlink(struct nd_prefix *pr)
 	}
 
 	a_failure = 0;
+	NET_EPOCH_ENTER(et);
 	for (; fibnum < maxfib; fibnum++) {
 		rt = NULL;
 		error = in6_rtrequest(RTM_DELETE, (struct sockaddr *)&sa6, NULL,
@@ -2205,8 +2206,8 @@ nd6_prefix_offlink(struct nd_prefix *pr)
 
 		/* report route deletion to the routing socket. */
 		rt_routemsg(RTM_DELETE, rt, ifp, 0, fibnum);
-		RTFREE_FUNC(rt);
 	}
+	NET_EPOCH_EXIT(et);
 	error = a_failure;
 	a_failure = 1;
 	if (error == 0) {

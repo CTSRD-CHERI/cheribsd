@@ -35,7 +35,7 @@ const char *freebsd32_syscallnames[] = {
 	"setuid",			/* 23 = setuid */
 	"getuid",			/* 24 = getuid */
 	"geteuid",			/* 25 = geteuid */
-	"ptrace",			/* 26 = ptrace */
+	"freebsd32_ptrace",			/* 26 = freebsd32_ptrace */
 	"freebsd32_recvmsg",			/* 27 = freebsd32_recvmsg */
 	"freebsd32_sendmsg",			/* 28 = freebsd32_sendmsg */
 	"freebsd32_recvfrom",			/* 29 = freebsd32_recvfrom */
@@ -612,4 +612,5 @@ const char *freebsd32_syscallnames[] = {
 	"sigfastblock",			/* 573 = sigfastblock */
 	"__realpathat",			/* 574 = __realpathat */
 	"close_range",			/* 575 = close_range */
+	"rpctls_syscall",			/* 576 = rpctls_syscall */
 };

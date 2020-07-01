@@ -193,13 +193,16 @@ struct ccr_softc {
 
 	/*
 	 * Pre-allocate S/G lists used when preparing a work request.
-	 * 'sg_crp' contains an sglist describing the entire buffer
-	 * for a 'struct cryptop'.  'sg_ulptx' is used to describe
-	 * the data the engine should DMA as input via ULPTX_SGL.
-	 * 'sg_dsgl' is used to describe the destination that cipher
-	 * text and a tag should be written to.
+	 * 'sg_input' contains an sglist describing the entire input
+	 * buffer for a 'struct cryptop'.  'sg_output' contains an
+	 * sglist describing the entire output buffer.  'sg_ulptx' is
+	 * used to describe the data the engine should DMA as input
+	 * via ULPTX_SGL.  'sg_dsgl' is used to describe the
+	 * destination that cipher text and a tag should be written
+	 * to.
 	 */
-	struct sglist *sg_crp;
+	struct sglist *sg_input;
+	struct sglist *sg_output;
 	struct sglist *sg_ulptx;
 	struct sglist *sg_dsgl;
 
@@ -247,26 +250,26 @@ struct ccr_softc {
  * requests.
  *
  * These scatter/gather lists can describe different subsets of the
- * buffer described by the crypto operation.  ccr_populate_sglist()
- * generates a scatter/gather list that covers the entire crypto
+ * buffers described by the crypto operation.  ccr_populate_sglist()
+ * generates a scatter/gather list that covers an entire crypto
  * operation buffer that is then used to construct the other
  * scatter/gather lists.
  */
 static int
-ccr_populate_sglist(struct sglist *sg, struct cryptop *crp)
+ccr_populate_sglist(struct sglist *sg, struct crypto_buffer *cb)
 {
 	int error;
 
 	sglist_reset(sg);
-	switch (crp->crp_buf_type) {
+	switch (cb->cb_type) {
 	case CRYPTO_BUF_MBUF:
-		error = sglist_append_mbuf(sg, crp->crp_mbuf);
+		error = sglist_append_mbuf(sg, cb->cb_mbuf);
 		break;
 	case CRYPTO_BUF_UIO:
-		error = sglist_append_uio(sg, crp->crp_uio);
+		error = sglist_append_uio(sg, cb->cb_uio);
 		break;
 	case CRYPTO_BUF_CONTIG:
-		error = sglist_append(sg, crp->crp_buf, crp->crp_ilen);
+		error = sglist_append(sg, cb->cb_buf, cb->cb_buf_len);
 		break;
 	default:
 		error = EINVAL;
@@ -495,7 +498,7 @@ ccr_hash(struct ccr_softc *sc, struct ccr_session *s, struct cryptop *crp)
 	} else {
 		imm_len = 0;
 		sglist_reset(sc->sg_ulptx);
-		error = sglist_append_sglist(sc->sg_ulptx, sc->sg_crp,
+		error = sglist_append_sglist(sc->sg_ulptx, sc->sg_input,
 		    crp->crp_payload_start, crp->crp_payload_length);
 		if (error)
 			return (error);
@@ -617,10 +620,14 @@ ccr_blkcipher(struct ccr_softc *sc, struct ccr_session *s, struct cryptop *crp)
 		op_type = CHCR_ENCRYPT_OP;
 	else
 		op_type = CHCR_DECRYPT_OP;
-	
+
 	sglist_reset(sc->sg_dsgl);
-	error = sglist_append_sglist(sc->sg_dsgl, sc->sg_crp,
-	    crp->crp_payload_start, crp->crp_payload_length);
+	if (CRYPTO_HAS_OUTPUT_BUFFER(crp))
+		error = sglist_append_sglist(sc->sg_dsgl, sc->sg_output,
+		    crp->crp_payload_output_start, crp->crp_payload_length);
+	else
+		error = sglist_append_sglist(sc->sg_dsgl, sc->sg_input,
+		    crp->crp_payload_start, crp->crp_payload_length);
 	if (error)
 		return (error);
 	dsgl_nsegs = ccr_count_sgl(sc->sg_dsgl, DSGL_SGE_MAXLEN);
@@ -645,7 +652,7 @@ ccr_blkcipher(struct ccr_softc *sc, struct ccr_session *s, struct cryptop *crp)
 	} else {
 		imm_len = 0;
 		sglist_reset(sc->sg_ulptx);
-		error = sglist_append_sglist(sc->sg_ulptx, sc->sg_crp,
+		error = sglist_append_sglist(sc->sg_ulptx, sc->sg_input,
 		    crp->crp_payload_start, crp->crp_payload_length);
 		if (error)
 			return (error);
@@ -744,6 +751,7 @@ ccr_blkcipher(struct ccr_softc *sc, struct ccr_session *s, struct cryptop *crp)
 	/* XXX: TODO backpressure */
 	t4_wrq_tx(sc->adapter, wr);
 
+	explicit_bzero(iv, sizeof(iv));
 	return (0);
 }
 
@@ -844,13 +852,21 @@ ccr_eta(struct ccr_softc *sc, struct ccr_session *s, struct cryptop *crp)
 	    iv_len + crp->crp_aad_length);
 	if (error)
 		return (error);
-	error = sglist_append_sglist(sc->sg_dsgl, sc->sg_crp,
-	    crp->crp_payload_start, crp->crp_payload_length);
+	if (CRYPTO_HAS_OUTPUT_BUFFER(crp))
+		error = sglist_append_sglist(sc->sg_dsgl, sc->sg_output,
+		    crp->crp_payload_output_start, crp->crp_payload_length);
+	else
+		error = sglist_append_sglist(sc->sg_dsgl, sc->sg_input,
+		    crp->crp_payload_start, crp->crp_payload_length);
 	if (error)
 		return (error);
 	if (op_type == CHCR_ENCRYPT_OP) {
-		error = sglist_append_sglist(sc->sg_dsgl, sc->sg_crp,
-		    crp->crp_digest_start, hash_size_in_response);
+		if (CRYPTO_HAS_OUTPUT_BUFFER(crp))
+			error = sglist_append_sglist(sc->sg_dsgl, sc->sg_output,
+			    crp->crp_digest_start, hash_size_in_response);
+		else
+			error = sglist_append_sglist(sc->sg_dsgl, sc->sg_input,
+			    crp->crp_digest_start, hash_size_in_response);
 		if (error)
 			return (error);
 	}
@@ -903,17 +919,17 @@ ccr_eta(struct ccr_softc *sc, struct ccr_session *s, struct cryptop *crp)
 		imm_len = 0;
 		sglist_reset(sc->sg_ulptx);
 		if (crp->crp_aad_length != 0) {
-			error = sglist_append_sglist(sc->sg_ulptx, sc->sg_crp,
+			error = sglist_append_sglist(sc->sg_ulptx, sc->sg_input,
 			    crp->crp_aad_start, crp->crp_aad_length);
 			if (error)
 				return (error);
 		}
-		error = sglist_append_sglist(sc->sg_ulptx, sc->sg_crp,
+		error = sglist_append_sglist(sc->sg_ulptx, sc->sg_input,
 		    crp->crp_payload_start, crp->crp_payload_length);
 		if (error)
 			return (error);
 		if (op_type == CHCR_DECRYPT_OP) {
-			error = sglist_append_sglist(sc->sg_ulptx, sc->sg_crp,
+			error = sglist_append_sglist(sc->sg_ulptx, sc->sg_input,
 			    crp->crp_digest_start, hash_size_in_response);
 			if (error)
 				return (error);
@@ -1054,6 +1070,7 @@ ccr_eta(struct ccr_softc *sc, struct ccr_session *s, struct cryptop *crp)
 	/* XXX: TODO backpressure */
 	t4_wrq_tx(sc->adapter, wr);
 
+	explicit_bzero(iv, sizeof(iv));
 	return (0);
 }
 
@@ -1153,13 +1170,21 @@ ccr_gcm(struct ccr_softc *sc, struct ccr_session *s, struct cryptop *crp)
 	    crp->crp_aad_length);
 	if (error)
 		return (error);
-	error = sglist_append_sglist(sc->sg_dsgl, sc->sg_crp,
-	    crp->crp_payload_start, crp->crp_payload_length);
+	if (CRYPTO_HAS_OUTPUT_BUFFER(crp))
+		error = sglist_append_sglist(sc->sg_dsgl, sc->sg_output,
+		    crp->crp_payload_output_start, crp->crp_payload_length);
+	else
+		error = sglist_append_sglist(sc->sg_dsgl, sc->sg_input,
+		    crp->crp_payload_start, crp->crp_payload_length);
 	if (error)
 		return (error);
 	if (op_type == CHCR_ENCRYPT_OP) {
-		error = sglist_append_sglist(sc->sg_dsgl, sc->sg_crp,
-		    crp->crp_digest_start, hash_size_in_response);
+		if (CRYPTO_HAS_OUTPUT_BUFFER(crp))
+			error = sglist_append_sglist(sc->sg_dsgl, sc->sg_output,
+			    crp->crp_digest_start, hash_size_in_response);
+		else
+			error = sglist_append_sglist(sc->sg_dsgl, sc->sg_input,
+			    crp->crp_digest_start, hash_size_in_response);
 		if (error)
 			return (error);
 	}
@@ -1199,17 +1224,17 @@ ccr_gcm(struct ccr_softc *sc, struct ccr_session *s, struct cryptop *crp)
 		imm_len = 0;
 		sglist_reset(sc->sg_ulptx);
 		if (crp->crp_aad_length != 0) {
-			error = sglist_append_sglist(sc->sg_ulptx, sc->sg_crp,
+			error = sglist_append_sglist(sc->sg_ulptx, sc->sg_input,
 			    crp->crp_aad_start, crp->crp_aad_length);
 			if (error)
 				return (error);
 		}
-		error = sglist_append_sglist(sc->sg_ulptx, sc->sg_crp,
+		error = sglist_append_sglist(sc->sg_ulptx, sc->sg_input,
 		    crp->crp_payload_start, crp->crp_payload_length);
 		if (error)
 			return (error);
 		if (op_type == CHCR_DECRYPT_OP) {
-			error = sglist_append_sglist(sc->sg_ulptx, sc->sg_crp,
+			error = sglist_append_sglist(sc->sg_ulptx, sc->sg_input,
 			    crp->crp_digest_start, hash_size_in_response);
 			if (error)
 				return (error);
@@ -1328,6 +1353,7 @@ ccr_gcm(struct ccr_softc *sc, struct ccr_session *s, struct cryptop *crp)
 	/* XXX: TODO backpressure */
 	t4_wrq_tx(sc->adapter, wr);
 
+	explicit_bzero(iv, sizeof(iv));
 	return (0);
 }
 
@@ -1354,8 +1380,7 @@ ccr_gcm_soft(struct ccr_session *s, struct cryptop *crp)
 {
 	struct auth_hash *axf;
 	struct enc_xform *exf;
-	void *auth_ctx;
-	uint8_t *kschedule;
+	void *auth_ctx, *kschedule;
 	char block[GMAC_BLOCK_LEN];
 	char digest[GMAC_DIGEST_LEN];
 	char iv[AES_BLOCK_LEN];
@@ -1389,7 +1414,12 @@ ccr_gcm_soft(struct ccr_session *s, struct cryptop *crp)
 
 	/* Initialize the cipher. */
 	exf = &enc_xform_aes_nist_gcm;
-	error = exf->setkey(&kschedule, s->blkcipher.enckey,
+	kschedule = malloc(exf->ctxsize, M_CCR, M_NOWAIT);
+	if (kschedule == NULL) {
+		error = ENOMEM;
+		goto out;
+	}
+	error = exf->setkey(kschedule, s->blkcipher.enckey,
 	    s->blkcipher.key_len);
 	if (error)
 		goto out;
@@ -1423,7 +1453,7 @@ ccr_gcm_soft(struct ccr_session *s, struct cryptop *crp)
 		crypto_copydata(crp, crp->crp_payload_start + i, len, block);
 		bzero(block + len, sizeof(block) - len);
 		if (CRYPTO_OP_IS_ENCRYPT(crp->crp_op)) {
-			exf->encrypt(kschedule, block);
+			exf->encrypt(kschedule, block, block);
 			axf->Update(auth_ctx, block, len);
 			crypto_copyback(crp, crp->crp_payload_start + i, len,
 			    block);
@@ -1462,20 +1492,21 @@ ccr_gcm_soft(struct ccr_session *s, struct cryptop *crp)
 				crypto_copydata(crp, crp->crp_payload_start + i,
 				    len, block);
 				bzero(block + len, sizeof(block) - len);
-				exf->decrypt(kschedule, block);
+				exf->decrypt(kschedule, block, block);
 				crypto_copyback(crp, crp->crp_payload_start + i,
 				    len, block);
 			}
 		} else
 			error = EBADMSG;
+		explicit_bzero(digest2, sizeof(digest2));
 	}
 
-	exf->zerokey(&kschedule);
 out:
-	if (auth_ctx != NULL) {
-		memset(auth_ctx, 0, axf->ctxsize);
-		free(auth_ctx, M_CCR);
-	}
+	zfree(kschedule, M_CCR);
+	zfree(auth_ctx, M_CCR);
+	explicit_bzero(block, sizeof(block));
+	explicit_bzero(iv, sizeof(iv));
+	explicit_bzero(digest, sizeof(digest));
 	crp->crp_etype = error;
 	crypto_done(crp);
 }
@@ -1592,13 +1623,21 @@ ccr_ccm(struct ccr_softc *sc, struct ccr_session *s, struct cryptop *crp)
 	    aad_len);
 	if (error)
 		return (error);
-	error = sglist_append_sglist(sc->sg_dsgl, sc->sg_crp,
-	    crp->crp_payload_start, crp->crp_payload_length);
+	if (CRYPTO_HAS_OUTPUT_BUFFER(crp))
+		error = sglist_append_sglist(sc->sg_dsgl, sc->sg_output,
+		    crp->crp_payload_output_start, crp->crp_payload_length);
+	else
+		error = sglist_append_sglist(sc->sg_dsgl, sc->sg_input,
+		    crp->crp_payload_start, crp->crp_payload_length);
 	if (error)
 		return (error);
 	if (op_type == CHCR_ENCRYPT_OP) {
-		error = sglist_append_sglist(sc->sg_dsgl, sc->sg_crp,
-		    crp->crp_digest_start, hash_size_in_response);
+		if (CRYPTO_HAS_OUTPUT_BUFFER(crp))
+			error = sglist_append_sglist(sc->sg_dsgl, sc->sg_output,
+			    crp->crp_digest_start, hash_size_in_response);
+		else
+			error = sglist_append_sglist(sc->sg_dsgl, sc->sg_input,
+			    crp->crp_digest_start, hash_size_in_response);
 		if (error)
 			return (error);
 	}
@@ -1640,17 +1679,17 @@ ccr_ccm(struct ccr_softc *sc, struct ccr_session *s, struct cryptop *crp)
 
 		sglist_reset(sc->sg_ulptx);
 		if (crp->crp_aad_length != 0) {
-			error = sglist_append_sglist(sc->sg_ulptx, sc->sg_crp,
+			error = sglist_append_sglist(sc->sg_ulptx, sc->sg_input,
 			    crp->crp_aad_start, crp->crp_aad_length);
 			if (error)
 				return (error);
 		}
-		error = sglist_append_sglist(sc->sg_ulptx, sc->sg_crp,
+		error = sglist_append_sglist(sc->sg_ulptx, sc->sg_input,
 		    crp->crp_payload_start, crp->crp_payload_length);
 		if (error)
 			return (error);
 		if (op_type == CHCR_DECRYPT_OP) {
-			error = sglist_append_sglist(sc->sg_ulptx, sc->sg_crp,
+			error = sglist_append_sglist(sc->sg_ulptx, sc->sg_input,
 			    crp->crp_digest_start, hash_size_in_response);
 			if (error)
 				return (error);
@@ -1782,6 +1821,7 @@ ccr_ccm(struct ccr_softc *sc, struct ccr_session *s, struct cryptop *crp)
 	/* XXX: TODO backpressure */
 	t4_wrq_tx(sc->adapter, wr);
 
+	explicit_bzero(iv, sizeof(iv));
 	return (0);
 }
 
@@ -1810,7 +1850,7 @@ ccr_ccm_soft(struct ccr_session *s, struct cryptop *crp)
 	struct auth_hash *axf;
 	struct enc_xform *exf;
 	union authctx *auth_ctx;
-	uint8_t *kschedule;
+	void *kschedule;
 	char block[CCM_CBC_BLOCK_LEN];
 	char digest[AES_CBC_MAC_HASH_LEN];
 	char iv[AES_CCM_IV_LEN];
@@ -1844,7 +1884,12 @@ ccr_ccm_soft(struct ccr_session *s, struct cryptop *crp)
 
 	/* Initialize the cipher. */
 	exf = &enc_xform_ccm;
-	error = exf->setkey(&kschedule, s->blkcipher.enckey,
+	kschedule = malloc(exf->ctxsize, M_CCR, M_NOWAIT);
+	if (kschedule == NULL) {
+		error = ENOMEM;
+		goto out;
+	}
+	error = exf->setkey(kschedule, s->blkcipher.enckey,
 	    s->blkcipher.key_len);
 	if (error)
 		goto out;
@@ -1876,11 +1921,11 @@ ccr_ccm_soft(struct ccr_session *s, struct cryptop *crp)
 		bzero(block + len, sizeof(block) - len);
 		if (CRYPTO_OP_IS_ENCRYPT(crp->crp_op)) {
 			axf->Update(auth_ctx, block, len);
-			exf->encrypt(kschedule, block);
+			exf->encrypt(kschedule, block, block);
 			crypto_copyback(crp, crp->crp_payload_start + i, len,
 			    block);
 		} else {
-			exf->decrypt(kschedule, block);
+			exf->decrypt(kschedule, block, block);
 			axf->Update(auth_ctx, block, len);
 		}
 	}
@@ -1910,20 +1955,21 @@ ccr_ccm_soft(struct ccr_session *s, struct cryptop *crp)
 				crypto_copydata(crp, crp->crp_payload_start + i,
 				    len, block);
 				bzero(block + len, sizeof(block) - len);
-				exf->decrypt(kschedule, block);
+				exf->decrypt(kschedule, block, block);
 				crypto_copyback(crp, crp->crp_payload_start + i,
 				    len, block);
 			}
 		} else
 			error = EBADMSG;
+		explicit_bzero(digest2, sizeof(digest2));
 	}
 
-	exf->zerokey(&kschedule);
 out:
-	if (auth_ctx != NULL) {
-		memset(auth_ctx, 0, axf->ctxsize);
-		free(auth_ctx, M_CCR);
-	}
+	zfree(kschedule, M_CCR);
+	zfree(auth_ctx, M_CCR);
+	explicit_bzero(block, sizeof(block));
+	explicit_bzero(iv, sizeof(iv));
+	explicit_bzero(digest, sizeof(digest));
 	crp->crp_etype = error;
 	crypto_done(crp);
 }
@@ -2077,7 +2123,8 @@ ccr_attach(device_t dev)
 	sc->adapter->ccr_softc = sc;
 
 	mtx_init(&sc->lock, "ccr", NULL, MTX_DEF);
-	sc->sg_crp = sglist_alloc(TX_SGL_SEGS, M_WAITOK);
+	sc->sg_input = sglist_alloc(TX_SGL_SEGS, M_WAITOK);
+	sc->sg_output = sglist_alloc(TX_SGL_SEGS, M_WAITOK);
 	sc->sg_ulptx = sglist_alloc(TX_SGL_SEGS, M_WAITOK);
 	sc->sg_dsgl = sglist_alloc(MAX_RX_PHYS_DSGL_SGE, M_WAITOK);
 	sc->iv_aad_buf = malloc(MAX_AAD_LEN, M_CCR, M_WAITOK);
@@ -2105,7 +2152,8 @@ ccr_detach(device_t dev)
 	free(sc->iv_aad_buf, M_CCR);
 	sglist_free(sc->sg_dsgl);
 	sglist_free(sc->sg_ulptx);
-	sglist_free(sc->sg_crp);
+	sglist_free(sc->sg_output);
+	sglist_free(sc->sg_input);
 	sc->adapter->ccr_softc = NULL;
 	return (0);
 }
@@ -2291,7 +2339,7 @@ ccr_probesession(device_t dev, const struct crypto_session_params *csp)
 {
 	unsigned int cipher_mode;
 
-	if (csp->csp_flags != 0)
+	if ((csp->csp_flags & ~(CSP_F_SEPARATE_OUTPUT)) != 0)
 		return (EINVAL);
 	switch (csp->csp_mode) {
 	case CSP_MODE_DIGEST:
@@ -2573,7 +2621,9 @@ ccr_process(device_t dev, struct cryptop *crp, int hint)
 	sc = device_get_softc(dev);
 
 	mtx_lock(&sc->lock);
-	error = ccr_populate_sglist(sc->sg_crp, crp);
+	error = ccr_populate_sglist(sc->sg_input, &crp->crp_buf);
+	if (error == 0 && CRYPTO_HAS_OUTPUT_BUFFER(crp))
+		error = ccr_populate_sglist(sc->sg_output, &crp->crp_obuf);
 	if (error) {
 		sc->stats_sglist_error++;
 		goto out;

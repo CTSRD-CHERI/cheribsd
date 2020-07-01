@@ -37,7 +37,13 @@
 struct mdthread {
 	int	md_spinlock_count;	/* (k) */
 	register_t md_saved_sstatus_ie;	/* (k) */
+	int	md_flags;		/* (k) */
 };
+
+/* md_flags */
+#ifdef CPU_QEMU_RISCV
+#define	MDTD_QTRACE	0x0001		/* QEMU-CHERI ISA-level tracing */
+#endif
 
 struct mdproc {
 #if __has_feature(capabilities)

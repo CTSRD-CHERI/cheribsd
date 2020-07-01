@@ -94,6 +94,9 @@
 #define	BUILD_BUG_ON_NOT_POWER_OF_2(x)	BUILD_BUG_ON(!powerof2(x))
 #define	BUILD_BUG_ON_INVALID(expr)	while (0) { (void)(expr); }
 
+extern const volatile int lkpi_build_bug_on_zero;
+#define	BUILD_BUG_ON_ZERO(x)	((x) ? lkpi_build_bug_on_zero : 0)
+
 #define	BUG()			panic("BUG at %s:%d", __FILE__, __LINE__)
 #define	BUG_ON(cond)		do {				\
 	if (cond) {						\
@@ -374,6 +377,24 @@ kstrtouint(const char *cp, unsigned int base, unsigned int *res)
 }
 
 static inline int
+kstrtou16(const char *cp, unsigned int base, u16 *res)
+{
+	char *end;
+	unsigned long temp;
+
+	*res = temp = strtoul(cp, &end, base);
+
+	/* skip newline character, if any */
+	if (*end == '\n')
+		end++;
+	if (*cp == 0 || *end != 0)
+		return (-EINVAL);
+	if (temp != (u16)temp)
+		return (-ERANGE);
+	return (0);
+}
+
+static inline int
 kstrtou32(const char *cp, unsigned int base, u32 *res)
 {
 	char *end;
@@ -462,6 +483,9 @@ kstrtobool_from_user(const char __user * __capability s, size_t count, bool *res
 	type __max2 = (y);			\
 	__max1 > __max2 ? __max1 : __max2; })
 
+#define offsetofend(t, m)	\
+        (offsetof(t, m) + sizeof((((t *)0)->m)))
+
 #define clamp_t(type, _x, min, max)	min_t(type, max_t(type, _x, min), max)
 #define clamp(x, lo, hi)		min( max(x,lo), hi)
 #define	clamp_val(val, lo, hi) clamp_t(typeof(val), val, lo, hi)
@@ -530,5 +554,14 @@ linux_ratelimited(linux_ratelimit_t *rl)
 {
 	return (ppsratecheck(&rl->lasttime, &rl->counter, 1));
 }
+
+#define	struct_size(ptr, field, num) ({ \
+	const size_t __size = offsetof(__typeof(*(ptr)), field); \
+	const size_t __max = (SIZE_MAX - __size) / sizeof((ptr)->field[0]); \
+	((num) > __max) ? SIZE_MAX : (__size + sizeof((ptr)->field[0]) * (num)); \
+})
+
+#define	__is_constexpr(x) \
+	__builtin_constant_p(x)
 
 #endif	/* _LINUX_KERNEL_H_ */

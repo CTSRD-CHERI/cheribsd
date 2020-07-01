@@ -99,6 +99,7 @@ SRCS+=	__getosreldate.c \
 	libc_dlopen.c \
 	lockf.c \
 	lrand48.c \
+	memalign.c \
 	mrand48.c \
 	nftw.c \
 	nice.c \

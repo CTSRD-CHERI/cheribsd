@@ -127,14 +127,17 @@ The Regents of the University of California.  All rights reserved.\n";
 
 #include "print.h"
 
-#if __has_feature(capabilities) && defined(__mips__)
+#if __has_feature(capabilities) && defined(CHERI_TCPDUMP)
 #include <cheri/cheri.h>
 #include <cheri/cheric.h>
 #define cheri_string(str)	cheri_ptr((str), strlen(str) + 1)
-#else
 #define	cheri_ptrperm(ptr, len, perm)	(ptr)
+#else
 #define cheri_string(str)	(str)
+#define	cheri_ptrperm(ptr, len, perm)	(ptr)
+#if !__has_feature(capabilities)
 #define __capability
+#endif
 #endif
 
 #ifndef PATH_MAX

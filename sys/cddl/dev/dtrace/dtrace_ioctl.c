@@ -22,11 +22,26 @@
  *
  */
 
+#include <dtrace_ioctl_compat.c>
+#include <cddl/contrib/opensolaris/uts/common/sys/dtrace.h>
+
 static int dtrace_verbose_ioctl;
 SYSCTL_INT(_debug_dtrace, OID_AUTO, verbose_ioctl, CTLFLAG_RW,
     &dtrace_verbose_ioctl, 0, "log DTrace ioctls");
 
 #define DTRACE_IOCTL_PRINTF(fmt, ...)	if (dtrace_verbose_ioctl) printf(fmt, ## __VA_ARGS__ )
+
+#ifdef COMPAT_FREEBSD64
+#define SIZEOF(base_type) \
+	(SV_CURPROC_FLAG(SV_CHERI) ? sizeof (base_type##_t) : \
+				     sizeof (base_type##64_t) )
+#define OFFSETOF(base_type, field) \
+	(SV_CURPROC_FLAG(SV_CHERI) ? offsetof(base_type##_t, field) : \
+				     offsetof(base_type##64_t, field) )
+#else
+#define SIZEOF(base_type) (sizeof (base_type##_t))
+#define OFFSETOF(base_type, field) offsetof(base_type##_t, field)
+#endif
 
 static int
 dtrace_ioctl_helper(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
@@ -108,9 +123,10 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 		state = state->dts_anon;
 	}
 
+	cmd = dtrace_translate_ioctl_to_native(cmd);
 	switch (cmd) {
 	case DTRACEIOC_AGGDESC: {
-		dtrace_aggdesc_t **paggdesc = (dtrace_aggdesc_t **) addr;
+		void * __capability paggdesc = dtrace_make_aggdesc_cap(addr);
 		dtrace_aggdesc_t aggdesc;
 		dtrace_action_t *act;
 		dtrace_aggregation_t *agg;
@@ -123,7 +139,7 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 
 		DTRACE_IOCTL_PRINTF("%s(%d): DTRACEIOC_AGGDESC\n",__func__,__LINE__);
 
-		if (copyin((void *) *paggdesc, &aggdesc, sizeof (aggdesc)) != 0)
+		if (dtrace_copyin_aggdesc(paggdesc, &aggdesc) != 0)
 			return (EFAULT);
 
 		mutex_enter(&dtrace_lock);
@@ -171,14 +187,14 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 		 * the temporary buffer to be able to drop dtrace_lock()
 		 * across the copyout(), below.
 		 */
-		size = sizeof (dtrace_aggdesc_t) +
-		    (aggdesc.dtagd_nrecs * sizeof (dtrace_recdesc_t));
+		size = SIZEOF(dtrace_aggdesc) +
+		    (aggdesc.dtagd_nrecs * SIZEOF(dtrace_recdesc));
 
 		buf = kmem_alloc(size, KM_SLEEP);
 		dest = (uintptr_t)buf;
 
-		bcopy(&aggdesc, (void *)dest, sizeof (aggdesc));
-		dest += offsetof(dtrace_aggdesc_t, dtagd_rec[0]);
+		dtrace_copy_aggdesc(&aggdesc, (void *)dest);
+		dest += OFFSETOF(dtrace_aggdesc, dtagd_rec[0]);
 
 		for (act = agg->dtag_first; ; act = act->dta_next) {
 			dtrace_recdesc_t rec = act->dta_rec;
@@ -196,8 +212,9 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 				break;
 
 			rec.dtrd_offset -= offs;
-			bcopy(&rec, (void *)dest, sizeof (rec));
-			dest += sizeof (dtrace_recdesc_t);
+			dtrace_copy_recdesc(&rec, (void *)dest);
+			rec.dtrd_offset += offs;
+			dest += SIZEOF(dtrace_recdesc);
 
 			if (act == &agg->dtag_action)
 				break;
@@ -205,7 +222,7 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 
 		mutex_exit(&dtrace_lock);
 
-		if (copyout(buf, (void *) *paggdesc, dest - (uintptr_t)buf) != 0) {
+		if (copyoutcap(buf, paggdesc, dest - (uintptr_t)buf) != 0) {
 			kmem_free(buf, size);
 			return (EFAULT);
 		}
@@ -215,14 +232,14 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 	}
 	case DTRACEIOC_AGGSNAP:
 	case DTRACEIOC_BUFSNAP: {
-		dtrace_bufdesc_t **pdesc = (dtrace_bufdesc_t **) addr;
+		void *__capability pdesc = dtrace_make_buffdesc_cap(addr);
 		dtrace_bufdesc_t desc;
 		caddr_t cached;
 		dtrace_buffer_t *buf;
 
 		dtrace_debug_output();
 
-		if (copyin((void *) *pdesc, &desc, sizeof (desc)) != 0)
+		if (dtrace_copyin_buffdesc(pdesc, &desc) != 0)
 			return (EFAULT);
 
 		DTRACE_IOCTL_PRINTF("%s(%d): %s curcpu %d cpu %d\n",
@@ -264,7 +281,7 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 				desc.dtbd_oldest = 0;
 				sz = sizeof (desc);
 
-				if (copyout(&desc, (void *) *pdesc, sz) != 0)
+				if (dtrace_copyout_buffdesc(&desc, pdesc) != 0)
 					return (EFAULT);
 
 				return (0);
@@ -292,7 +309,7 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 
 			mutex_exit(&dtrace_lock);
 
-			if (copyout(&desc, (void *) *pdesc, sizeof (desc)) != 0)
+			if (dtrace_copyout_buffdesc(&desc, pdesc) != 0)
 				return (EFAULT);
 
 			buf->dtb_flags |= DTRACEBUF_CONSUMED;
@@ -352,7 +369,7 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 		/*
 		 * Finally, copy out the buffer description.
 		 */
-		if (copyout(&desc, (void *) *pdesc, sizeof (desc)) != 0)
+		if (dtrace_copyout_buffdesc(&desc, pdesc) != 0)
 			return (EFAULT);
 
 		return (0);
@@ -373,14 +390,14 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 		return (0);
 	}
 	case DTRACEIOC_DOFGET: {
-		dof_hdr_t **pdof = (dof_hdr_t **) addr;
-		dof_hdr_t hdr, *dof = *pdof;
+		dof_hdr_t * __capability pdof = dtrace_make_pdof_cap(addr);
+		dof_hdr_t hdr, *dof;
 		int rval;
 		uint64_t len;
 
 		DTRACE_IOCTL_PRINTF("%s(%d): DTRACEIOC_DOFGET\n",__func__,__LINE__);
 
-		if (copyin((void *)dof, &hdr, sizeof (hdr)) != 0)
+		if (copyincap(pdof, &hdr, sizeof (hdr)) != 0)
 			return (EFAULT);
 
 		mutex_enter(&dtrace_lock);
@@ -388,7 +405,7 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 		mutex_exit(&dtrace_lock);
 
 		len = MIN(hdr.dofh_loadsz, dof->dofh_loadsz);
-		rval = copyout(dof, (void *) *pdof, len);
+		rval = copyoutcap(dof, pdof, len);
 		dtrace_dof_destroy(dof);
 
 		return (rval == 0 ? 0 : EFAULT);
@@ -399,7 +416,8 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 		dtrace_vstate_t *vstate;
 		int err = 0;
 		int rval;
-		dtrace_enable_io_t *p = (dtrace_enable_io_t *) addr;
+		dtrace_enable_io_t _p = dtrace_make_enable_io(addr);
+		dtrace_enable_io_t *p = &_p;
 
 		DTRACE_IOCTL_PRINTF("%s(%d): DTRACEIOC_ENABLE\n",__func__,__LINE__);
 
@@ -413,7 +431,7 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 			return (0);
 		}
 
-		if ((dof = dtrace_dof_copyin((uintptr_t) p->dof, &rval)) == NULL)
+		if ((dof = dtrace_dof_copyin((uintcap_t) p->dof, &rval)) == NULL)
 			return (EINVAL);
 
 		mutex_enter(&cpu_lock);
@@ -449,6 +467,7 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 			dtrace_enabling_destroy(enab);
 		}
 
+		dtrace_copy_enable_io(p, addr);
 		mutex_exit(&cpu_lock);
 		mutex_exit(&dtrace_lock);
 		dtrace_dof_destroy(dof);
@@ -456,7 +475,7 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 		return (err);
 	}
 	case DTRACEIOC_EPROBE: {
-		dtrace_eprobedesc_t **pepdesc = (dtrace_eprobedesc_t **) addr;
+		void * __capability pepdesc = dtrace_make_eprobedesc_cap(addr);
 		dtrace_eprobedesc_t epdesc;
 		dtrace_ecb_t *ecb;
 		dtrace_action_t *act;
@@ -467,7 +486,7 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 
 		DTRACE_IOCTL_PRINTF("%s(%d): DTRACEIOC_EPROBE\n",__func__,__LINE__);
 
-		if (copyin((void *)*pepdesc, &epdesc, sizeof (epdesc)) != 0)
+		if (copyincap(pepdesc, &epdesc, SIZEOF(dtrace_eprobedesc)) != 0)
 			return (EFAULT);
 
 		mutex_enter(&dtrace_lock);
@@ -501,14 +520,14 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 		 * the temporary buffer to be able to drop dtrace_lock()
 		 * across the copyout(), below.
 		 */
-		size = sizeof (dtrace_eprobedesc_t) +
-		    (epdesc.dtepd_nrecs * sizeof (dtrace_recdesc_t));
+		size = SIZEOF(dtrace_eprobedesc) +
+		    (epdesc.dtepd_nrecs * SIZEOF(dtrace_recdesc));
 
 		buf = kmem_alloc(size, KM_SLEEP);
 		dest = (uintptr_t)buf;
 
-		bcopy(&epdesc, (void *)dest, sizeof (epdesc));
-		dest += offsetof(dtrace_eprobedesc_t, dtepd_rec[0]);
+		bcopy(&epdesc, (void *)dest, SIZEOF(dtrace_eprobedesc));
+		dest += OFFSETOF(dtrace_eprobedesc, dtepd_rec[0]);
 
 		for (act = ecb->dte_action; act != NULL; act = act->dta_next) {
 			if (DTRACEACT_ISAGG(act->dta_kind) || act->dta_intuple)
@@ -517,14 +536,13 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 			if (nrecs-- == 0)
 				break;
 
-			bcopy(&act->dta_rec, (void *)dest,
-			    sizeof (dtrace_recdesc_t));
-			dest += sizeof (dtrace_recdesc_t);
+			dtrace_copy_recdesc(&act->dta_rec,(void *)dest);
+			dest += SIZEOF(dtrace_recdesc);
 		}
 
 		mutex_exit(&dtrace_lock);
 
-		if (copyout(buf, (void *) *pepdesc, dest - (uintptr_t)buf) != 0) {
+		if (copyoutcap(buf, pepdesc, dest - (uintptr_t)buf) != 0) {
 			kmem_free(buf, size);
 			return (EFAULT);
 		}
@@ -533,7 +551,8 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 		return (0);
 	}
 	case DTRACEIOC_FORMAT: {
-		dtrace_fmtdesc_t *fmt = (dtrace_fmtdesc_t *) addr;
+		dtrace_fmtdesc_t _fmt = dtrace_make_fmtdesc(addr);
+		dtrace_fmtdesc_t *fmt = &_fmt;
 		char *str;
 		int len;
 
@@ -568,6 +587,7 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 			}
 		}
 
+		dtrace_copy_fmtdesc(fmt, addr);
 		mutex_exit(&dtrace_lock);
 		return (0);
 	}
@@ -846,3 +866,6 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 	}
 	return (error);
 }
+
+#undef SIZEOF
+#undef OFFSETOF

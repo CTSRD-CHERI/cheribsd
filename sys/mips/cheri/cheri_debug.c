@@ -86,9 +86,8 @@ DB_SHOW_COMMAND(cp2, ddb_dump_cp2)
 	uint8_t exccode, regnum;
 
 	cause = cheri_getcause();
-	exccode = (cause & CHERI_CAPCAUSE_EXCCODE_MASK) >>
-	    CHERI_CAPCAUSE_EXCCODE_SHIFT;
-	regnum = cause & CHERI_CAPCAUSE_REGNUM_MASK;
+	exccode = CHERI_CAPCAUSE_EXCCODE(cause);
+	regnum = CHERI_CAPCAUSE_REGNUM(cause);
 	db_printf("CHERI cause: ExcCode: 0x%02x ", exccode);
 	if (regnum < 32)
 		db_printf("RegNum: $c%02d ", regnum);
@@ -118,9 +117,8 @@ db_show_cheri_trapframe(struct trapframe *frame)
 
 	db_printf("Trapframe at %p\n", frame);
 	cause = frame->capcause;
-	exccode = (cause & CHERI_CAPCAUSE_EXCCODE_MASK) >>
-	    CHERI_CAPCAUSE_EXCCODE_SHIFT;
-	regnum = cause & CHERI_CAPCAUSE_REGNUM_MASK;
+	exccode = CHERI_CAPCAUSE_EXCCODE(cause);
+	regnum = CHERI_CAPCAUSE_REGNUM(cause);
 	db_printf("CHERI cause: ExcCode: 0x%02x ", exccode);
 	if (regnum < 32)
 		db_printf("RegNum: $c%02d ", regnum);

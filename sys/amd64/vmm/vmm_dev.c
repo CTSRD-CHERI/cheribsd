@@ -58,6 +58,7 @@ __FBSDID("$FreeBSD$");
 #include <machine/vmm_dev.h>
 #include <machine/vmm_instruction_emul.h>
 #include <machine/vmm_snapshot.h>
+#include <x86/apicreg.h>
 
 #include "vmm_lapic.h"
 #include "vmm_stat.h"
@@ -251,7 +252,7 @@ vmmdev_rw(struct cdev *cdev, struct uio *uio, int flags)
 CTASSERT(sizeof(((struct vm_memseg *)0)->name) >= VM_MAX_SUFFIXLEN + 1);
 
 static int
-get_memseg(struct vmmdev_softc *sc, struct vm_memseg *mseg)
+get_memseg(struct vmmdev_softc *sc, struct vm_memseg *mseg, size_t len)
 {
 	struct devmem_softc *dsc;
 	int error;
@@ -268,17 +269,16 @@ get_memseg(struct vmmdev_softc *sc, struct vm_memseg *mseg)
 		}
 		KASSERT(dsc != NULL, ("%s: devmem segment %d not found",
 		    __func__, mseg->segid));
-		error = copystr(dsc->name, mseg->name, sizeof(mseg->name),
-		    NULL);
+		error = copystr(dsc->name, mseg->name, len, NULL);
 	} else {
-		bzero(mseg->name, sizeof(mseg->name));
+		bzero(mseg->name, len);
 	}
 
 	return (error);
 }
 
 static int
-alloc_memseg(struct vmmdev_softc *sc, struct vm_memseg *mseg)
+alloc_memseg(struct vmmdev_softc *sc, struct vm_memseg *mseg, size_t len)
 {
 	char *name;
 	int error;
@@ -294,8 +294,8 @@ alloc_memseg(struct vmmdev_softc *sc, struct vm_memseg *mseg)
 	 */
 	if (VM_MEMSEG_NAME(mseg)) {
 		sysmem = false;
-		name = malloc(sizeof(mseg->name), M_VMMDEV, M_WAITOK);
-		error = copystr(mseg->name, name, sizeof(mseg->name), NULL);
+		name = malloc(len, M_VMMDEV, M_WAITOK);
+		error = copystr(mseg->name, name, len, NULL);
 		if (error)
 			goto done;
 	}
@@ -382,6 +382,7 @@ vmmdev_ioctl(struct cdev *cdev, u_long cmd, caddr_t data, int fflag,
 	struct vm_rtc_data *rtcdata;
 	struct vm_memmap *mm;
 	struct vm_cpu_topology *topology;
+	struct vm_readwrite_kernemu_device *kernemu;
 	uint64_t *regvals;
 	int *regnums;
 #ifdef BHYVE_SNAPSHOT
@@ -436,6 +437,9 @@ vmmdev_ioctl(struct cdev *cdev, u_long cmd, caddr_t data, int fflag,
 	case VM_MAP_PPTDEV_MMIO:
 	case VM_BIND_PPTDEV:
 	case VM_UNBIND_PPTDEV:
+#ifdef COMPAT_FREEBSD12
+	case VM_ALLOC_MEMSEG_FBSD12:
+#endif
 	case VM_ALLOC_MEMSEG:
 	case VM_MMAP_MEMSEG:
 	case VM_REINIT:
@@ -449,6 +453,9 @@ vmmdev_ioctl(struct cdev *cdev, u_long cmd, caddr_t data, int fflag,
 		state_changed = 2;
 		break;
 
+#ifdef COMPAT_FREEBSD12
+	case VM_GET_MEMSEG_FBSD12:
+#endif
 	case VM_GET_MEMSEG:
 	case VM_MMAP_GETNEXT:
 		/*
@@ -561,6 +568,41 @@ vmmdev_ioctl(struct cdev *cdev, u_long cmd, caddr_t data, int fflag,
 	case VM_IOAPIC_PINCOUNT:
 		*(int *)data = vioapic_pincount(sc->vm);
 		break;
+	case VM_SET_KERNEMU_DEV:
+	case VM_GET_KERNEMU_DEV: {
+		mem_region_write_t mwrite;
+		mem_region_read_t mread;
+		bool arg;
+
+		kernemu = (void *)data;
+
+		if (kernemu->access_width > 0)
+			size = (1u << kernemu->access_width);
+		else
+			size = 1;
+
+		if (kernemu->gpa >= DEFAULT_APIC_BASE && kernemu->gpa < DEFAULT_APIC_BASE + PAGE_SIZE) {
+			mread = lapic_mmio_read;
+			mwrite = lapic_mmio_write;
+		} else if (kernemu->gpa >= VIOAPIC_BASE && kernemu->gpa < VIOAPIC_BASE + VIOAPIC_SIZE) {
+			mread = vioapic_mmio_read;
+			mwrite = vioapic_mmio_write;
+		} else if (kernemu->gpa >= VHPET_BASE && kernemu->gpa < VHPET_BASE + VHPET_SIZE) {
+			mread = vhpet_mmio_read;
+			mwrite = vhpet_mmio_write;
+		} else {
+			error = EINVAL;
+			break;
+		}
+
+		if (cmd == VM_SET_KERNEMU_DEV)
+			error = mwrite(sc->vm, kernemu->vcpuid, kernemu->gpa,
+			    kernemu->value, size, &arg);
+		else
+			error = mread(sc->vm, kernemu->vcpuid, kernemu->gpa,
+			    &kernemu->value, size, &arg);
+		break;
+		}
 	case VM_ISA_ASSERT_IRQ:
 		isa_irq = (struct vm_isa_irq *)data;
 		error = vatpic_assert_irq(sc->vm, isa_irq->atpic_irq);
@@ -596,11 +638,25 @@ vmmdev_ioctl(struct cdev *cdev, u_long cmd, caddr_t data, int fflag,
 		error = vm_mmap_memseg(sc->vm, mm->gpa, mm->segid, mm->segoff,
 		    mm->len, mm->prot, mm->flags);
 		break;
-	case VM_ALLOC_MEMSEG:
-		error = alloc_memseg(sc, (struct vm_memseg *)data);
+#ifdef COMPAT_FREEBSD12
+	case VM_ALLOC_MEMSEG_FBSD12:
+		error = alloc_memseg(sc, (struct vm_memseg *)data,
+		    sizeof(((struct vm_memseg_fbsd12 *)0)->name));
 		break;
+#endif
+	case VM_ALLOC_MEMSEG:
+		error = alloc_memseg(sc, (struct vm_memseg *)data,
+		    sizeof(((struct vm_memseg *)0)->name));
+		break;
+#ifdef COMPAT_FREEBSD12
+	case VM_GET_MEMSEG_FBSD12:
+		error = get_memseg(sc, (struct vm_memseg *)data,
+		    sizeof(((struct vm_memseg_fbsd12 *)0)->name));
+		break;
+#endif
 	case VM_GET_MEMSEG:
-		error = get_memseg(sc, (struct vm_memseg *)data);
+		error = get_memseg(sc, (struct vm_memseg *)data,
+		    sizeof(((struct vm_memseg *)0)->name));
 		break;
 	case VM_GET_REGISTER:
 		vmreg = (struct vm_register *)data;

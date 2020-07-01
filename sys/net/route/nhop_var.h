@@ -78,6 +78,7 @@ struct nhop_priv {
 	struct nhop_object	*nh;		/* backreference to the dataplane nhop */
 	struct nh_control	*nh_control;	/* backreference to the rnh */
 	struct nhop_priv	*nh_next;	/* hash table membership */
+	struct vnet		*nh_vnet;	/* vnet nhop belongs to */
 	struct epoch_context	nh_epoch_ctx __subobject_use_container_bounds;	/* epoch data for nhop */
 };
 

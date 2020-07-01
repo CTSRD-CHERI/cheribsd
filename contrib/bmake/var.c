@@ -1,4 +1,4 @@
-/*	$NetBSD: var.c,v 1.221 2018/12/21 05:50:19 sjg Exp $	*/
+/*	$NetBSD: var.c,v 1.224 2020/06/05 19:20:46 sjg Exp $	*/
 
 /*
  * Copyright (c) 1988, 1989, 1990, 1993
@@ -69,14 +69,14 @@
  */
 
 #ifndef MAKE_NATIVE
-static char rcsid[] = "$NetBSD: var.c,v 1.221 2018/12/21 05:50:19 sjg Exp $";
+static char rcsid[] = "$NetBSD: var.c,v 1.224 2020/06/05 19:20:46 sjg Exp $";
 #else
 #include <sys/cdefs.h>
 #ifndef lint
 #if 0
 static char sccsid[] = "@(#)var.c	8.3 (Berkeley) 3/19/94";
 #else
-__RCSID("$NetBSD: var.c,v 1.221 2018/12/21 05:50:19 sjg Exp $");
+__RCSID("$NetBSD: var.c,v 1.224 2020/06/05 19:20:46 sjg Exp $");
 #endif
 #endif /* not lint */
 #endif
@@ -1401,8 +1401,9 @@ VarSYSVMatch(GNode *ctx, Var_Parse_State *vpstate,
 	     char *word, Boolean addSpace, Buffer *buf,
 	     void *patp)
 {
-    int len;
+    size_t len;
     char *ptr;
+    Boolean hasPercent;
     VarPattern 	  *pat = (VarPattern *)patp;
     char *varexp;
 
@@ -1411,9 +1412,9 @@ VarSYSVMatch(GNode *ctx, Var_Parse_State *vpstate,
 
     addSpace = TRUE;
 
-    if ((ptr = Str_SYSVMatch(word, pat->lhs, &len)) != NULL) {
+    if ((ptr = Str_SYSVMatch(word, pat->lhs, &len, &hasPercent)) != NULL) {
         varexp = Var_Subst(NULL, pat->rhs, ctx, VARF_WANTRES);
-	Str_SYSVSubst(buf, varexp, ptr, len);
+	Str_SYSVSubst(buf, varexp, ptr, len, hasPercent);
 	free(varexp);
     } else {
 	Buf_AddBytes(buf, strlen(word), word);
@@ -2026,6 +2027,13 @@ VarWordCompare(const void *a, const void *b)
 	return r;
 }
 
+static int
+VarWordCompareReverse(const void *a, const void *b)
+{
+	int r = strcmp(*(const char * const *)b, *(const char * const *)a);
+	return r;
+}
+
 /*-
  *-----------------------------------------------------------------------
  * VarOrder --
@@ -2057,6 +2065,9 @@ VarOrder(const char *str, const char otype)
 
     if (ac > 0)
 	switch (otype) {
+	case 'r':	/* reverse sort alphabetically */
+	    qsort(av, ac, sizeof(char *), VarWordCompareReverse);
+	    break;
 	case 's':	/* sort alphabetically */
 	    qsort(av, ac, sizeof(char *), VarWordCompare);
 	    break;
@@ -2399,8 +2410,10 @@ VarHash(char *str)
 	    break;
 	case 3:
 	    k |= (ustr[2] << 16);
+	    /* FALLTHROUGH */
 	case 2:
 	    k |= (ustr[1] << 8);
+	    /* FALLTHROUGH */
 	case 1:
 	    k |= ustr[0];
 	    len = 0;
@@ -3559,7 +3572,7 @@ ApplyModifiers(char *nstr, const char *tstr,
 		if (tstr[1] == endc || tstr[1] == ':') {
 		    otype = 's';
 		    termc = *cp;
-		} else if ( (tstr[1] == 'x') &&
+		} else if ( (tstr[1] == 'r' || tstr[1] == 'x') &&
 			    (tstr[2] == endc || tstr[2] == ':') ) {
 		    otype = tstr[1];
 		    cp = tstr + 2;
