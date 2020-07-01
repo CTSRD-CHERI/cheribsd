@@ -235,10 +235,8 @@ dump_regs(struct trapframe *frame)
 	for (i = 0; i < nitems(frame->tf_s); i++)
 		PRINT_REG_N("s", i, frame->tf_s);
 
-
 	for (i = 0; i < nitems(frame->tf_a); i++)
 		PRINT_REG_N("a", i, frame->tf_a);
-
 
 	PRINT_REG("sepc", frame->tf_sepc);
 #if __has_feature(capabilities)
