@@ -156,6 +156,26 @@ EENTRY(fueword64)
 EEND(fueword64)
 END(fueword)
 
+#if __has_feature(capabilities)
+/*
+ * int fuecap(volatile const void __capability *, intcap_t *)
+ */
+ENTRY(fuecap)
+	ldr	x2, =(VM_MAXUSER_ADDRESS-7)
+	cmp	x0, x2
+	b.cs	fsu_fault_nopcb
+	adr	x6, fsu_fault		/* Load the fault handler */
+	SET_FAULT_HANDLER(x6, x2)	/* And set it */
+	ENTER_USER_ACCESS(w6, x4)
+	ldr	c0, [c0]		/* Try loading the data */
+	EXIT_USER_ACCESS(w6)
+	SET_FAULT_HANDLER(xzr, x2)	/* Reset the fault handler */
+	str	c0, [c1]		/* Save the data in kernel space */
+	mov	x0, #0			/* Success */
+	ret				/* Return */
+END(fuecap)
+#endif
+
 /*
  * int subyte(volatile void *, int)
  */
@@ -217,6 +237,26 @@ EENTRY(suword64)
 	ret				/* Return */
 EEND(suword64)
 END(suword)
+
+#if __has_feature(capabilities)
+/*
+ * int sucap(volatile void * __capability, intcap_t)
+ */
+ENTRY(sucap)
+	ldr	x2, =(VM_MAXUSER_ADDRESS-7)
+	cmp	x0, x2
+	b.cs	fsu_fault_nopcb
+	adr	x6, fsu_fault		/* Load the fault handler */
+	SET_FAULT_HANDLER(x6, x2)	/* And set it */
+	ENTER_USER_ACCESS(w6, x4)
+	/* TODO: Store through the capability */
+	str	c1, [x0]		/* Try storing the data */
+	EXIT_USER_ACCESS(w6)
+	SET_FAULT_HANDLER(xzr, x2)	/* Reset the fault handler */
+	mov	x0, #0			/* Success */
+	ret				/* Return */
+END(sucap)
+#endif
 
 ENTRY(setjmp)
 	/* Store the stack pointer */

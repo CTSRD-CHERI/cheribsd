@@ -224,3 +224,128 @@ ending:
 	mov	x0, xzr		/* return 0 */
 	ret
 	.size	copycommon, . - copycommon
+
+#if __has_feature(capabilities)
+/*
+ * Copy specified amount of data from the user to kernel space, preserving
+ * capability tags
+ *
+ * int copyincap(const void *uaddr, void *kdaddr, size_t len)
+ */
+ENTRY(copyincap)
+	cbz	x2, 1f
+	adds	x3, x0, x2
+	b.cs 	copyio_fault_nopcb
+	ldr	x4, =VM_MAXUSER_ADDRESS
+	cmp	x3, x4
+	b.hi	copyio_fault_nopcb
+
+	/* Check the length is greater than 1 capability */
+	cmp	x2, #16
+	b.lo	copycommon
+	/* And the addresses will both align on a capability */
+	eor	x3, x0, x1		/* Compare the pointers */
+	and	x3, x3, #0xf		/* Check the lower bits */
+	cbnz	x3, copycommon		/* If different don't copy tags */
+
+	b	copycapcommon
+
+1:	mov	x0, xzr		/* return 0 */
+	ret
+END(copyincap)
+
+/*
+ * Copy specified amount of data from kernel to the user space, preserving
+ * capability tags
+ *
+ * int copyoutcap(const void *kaddr, void *udaddr, size_t len)
+ */
+ENTRY(copyoutcap)
+	cbz	x2, 1f
+	adds	x3, x1, x2
+	b.cs 	copyio_fault_nopcb
+	ldr	x4, =VM_MAXUSER_ADDRESS
+	cmp	x3, x4
+	b.hi	copyio_fault_nopcb
+
+	/* Check the length is greater than 1 capability */
+	cmp	x2, #16
+	b.lo	copycommon
+	/* And the addresses will both align on a capability */
+	eor	x3, x0, x1		/* Compare the pointers */
+	and	x3, x3, #0xf		/* Check the lower bits */
+	cbnz	x3, copycommon		/* If different don't copy tags */
+
+	b	copycapcommon
+
+1:	mov	x0, xzr		/* return 0 */
+	ret
+END(copyoutcap)
+
+/*
+ * Local helper
+ *
+ * x0 - src pointer
+ * x1 - dst pointer
+ * x2 - size
+ * lr - the return address, so jump here instead of calling
+ *
+ * This function is optimized to minimize concurrent memory accesses. In
+ * present form it is suited for cores with a single memory prefetching
+ * unit.
+ */
+	.text
+	.align	4
+	.local	copycommon
+	.type	copycommon,@function
+
+copycapcommon:
+	adr	x6, copyio_fault /* Get the handler address */
+	SET_FAULT_HANDLER(x6, x7) /* Set the handler */
+	ENTER_USER_ACCESS(w6, x7)
+
+	/* Check alignment */
+	orr	x3, x0, x1
+	and	x3, x3, 0x0f
+	cbz	x3, cap_pairs
+
+cap_byte_by_byte:
+	ldrb	w4, [x0], #1
+	strb	w4, [x1], #1
+	sub	x2, x2, #1
+	add	x3, x3, #1
+	cmp	x3, #0x20
+	b.lo	cap_byte_by_byte
+
+cap_pairs:
+	cmp	x2, #32
+	b.lo	cap_final
+1:	ldp	c4, c5, [x0], #32
+	stp	c4, c5, [x1], #32
+	sub	x2, x2, #32
+	cmp	x2, #32
+	b.ge	1b
+	cbz	x2, cap_done
+
+cap_final:
+	cmp	x2, #16
+	b.lo	cap_end_bytes
+	ldr	c4, [x0], #16
+	str	c4, [x1], #16
+	sub	x2, x2, #16
+	cbz	x2, cap_done
+
+cap_end_bytes:
+	ldrb	w3, [x0], #0x01
+	strb	w3, [x1], #0x01
+	sub	x2, x2, #0x01
+	cbnz	x2, cap_end_bytes
+
+cap_done:
+	EXIT_USER_ACCESS(w6)
+	SET_FAULT_HANDLER(xzr, x7) /* Clear the handler */
+
+	mov	x0, xzr		/* return 0 */
+	RET
+	.size	copycommon, . - copycommon
+#endif
