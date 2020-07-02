@@ -37,8 +37,17 @@ __FBSDID("$FreeBSD$");
 
 #include "assym.inc"
 
+#ifdef __CHERI_PURE_CAPABILITY__
+#error TODO Port to purecap
+#endif
+
 .macro check_user_access user_arg, size_arg, bad_access_func
+#if __has_feature(capabilities)
+	gcvalue	x7, c\user_arg		/* Read the user capability value */
+	adds	x6, x7, x\size_arg
+#else
 	adds	x6, x\user_arg, x\size_arg
+#endif
 	b.cs	\bad_access_func
 	ldr	x7, =VM_MAXUSER_ADDRESS
 	cmp	x6, x7
@@ -48,23 +57,30 @@ __FBSDID("$FreeBSD$");
 /*
  * Fault handler for the copy{in,out} functions below.
  */
-ENTRY(copyio_fault)
+ENTRY(copyio_c64_fault)
+	EXIT_C64
+EENTRY(copyio_fault)
 	SET_FAULT_HANDLER(xzr, x1) /* Clear the handler */
 	EXIT_USER_ACCESS_CHECK(w0, x1)
 copyio_fault_nopcb:
 	mov	x0, #EFAULT
 	ret
-END(copyio_fault)
+EEND(copyio_fault)
+END(copyio_c64_fault)
 
 /*
  * Copies from a kernel to user address
  *
- * int copyout(const void *kaddr, void *udaddr, size_t len)
+ * int copyout(const void *kaddr, void * __capability udaddr, size_t len)
  */
 ENTRY(copyout)
 	cbz	x2, 1f
 	check_user_access 1, 2, copyio_fault_nopcb
 
+#if __has_feature(capabilities)
+	cvtd	c0, x0			/* Store through a capability */
+	scbnds	c0, c0, x2		/* Set the bounds */
+#endif
 	b	copycommon
 
 1:	mov	x0, xzr		/* return 0 */
@@ -75,11 +91,16 @@ END(copyout)
 /*
  * Copies from a user to kernel address
  *
- * int copyin(const void *uaddr, void *kdaddr, size_t len)
+ * int copyin(const void * __capability uaddr, void *kdaddr, size_t len)
  */
 ENTRY(copyin)
 	cbz	x2, 1f
 	check_user_access 0, 2, copyio_fault_nopcb
+
+#if __has_feature(capabilities)
+	cvtd	c1, x1			/* Store through a capability */
+	scbnds	c1, c1, x2		/* Set the bounds */
+#endif
 
 	b	copycommon
 
@@ -91,28 +112,48 @@ END(copyin)
 /*
  * Copies a string from a user to kernel address
  *
- * int copyinstr(const void *udaddr, void *kaddr, size_t len, size_t *done)
+ * int copyinstr(const void * __capability udaddr, void *kaddr, size_t len,
+ *         size_t *done)
  */
 ENTRY(copyinstr)
 	mov	x5, xzr		/* count = 0 */
 	mov	w4, #1		/* If zero return faulure */
 	cbz	x2, 3f		/* If len == 0 then skip loop */
 
-	adr	x6, copyio_fault /* Get the handler address */
+#if __has_feature(capabilities)
+	cvtd	c1, x1			/* Store through a capability */
+	scbnds	c1, c1, x2		/* Set the bounds */
+#endif
+
+	adr	x6, copyio_c64_fault /* Get the handler address */
 	SET_FAULT_HANDLER(x6, x7) /* Set the handler */
 
 	ldr	x7, =VM_MAXUSER_ADDRESS
-1:	cmp	x0, x7
-	b.cs	copyio_fault
+	ENTER_C64
+1:
+#if __has_feature(capabilities)
+	gcvalue	x9, c0
+	cmp	x9, x7
+#else
+	cmp	x0, x7
+#endif
+	b.cs	copyio_c64_fault
+#if __has_feature(capabilities)
+	ldtrb	w4, [c0]	/* Load from uaddr */
+	add	c0, c0, #1	/* Next char */
+	strb	w4, [c1], #1	/* Store in kaddr */
+#else
 	ldtrb	w4, [x0]	/* Load from uaddr */
 	add	x0, x0, #1	/* Next char */
 	strb	w4, [x1], #1	/* Store in kaddr */
+#endif
 	add	x5, x5, #1	/* count++ */
 	cbz	w4, 2f		/* Break when NUL-terminated */
 	sub	x2, x2, #1	/* len-- */
 	cbnz	x2, 1b
 
-2:	SET_FAULT_HANDLER(xzr, x7) /* Clear the handler */
+2:	EXIT_C64
+	SET_FAULT_HANDLER(xzr, x7) /* Clear the handler */
 
 
 3:	cbz	x3, 4f		/* Check if done != NULL */
@@ -124,6 +165,7 @@ ENTRY(copyinstr)
 	ret
 END(copyinstr)
 
+#if !__has_feature(capabilities)
 /*
  * Local helper
  *
@@ -222,3 +264,172 @@ ending:
 	mov	x0, xzr		/* return 0 */
 	ret
 	.size	copycommon, . - copycommon
+#endif /* !__has_feature(capabilities) */
+
+#if __has_feature(capabilities)
+/*
+ * Copy specified amount of data from the user to kernel space, preserving
+ * capability tags
+ *
+ * int copyincap(const void * __capability uaddr, void *kdaddr, size_t len)
+ */
+ENTRY(copyincap)
+	cbz	x2, 1f
+	check_user_access 0, 2, copyio_fault_nopcb
+
+	/* Create a capability from kdaddr */
+	mov	x5, x1			/* Backup kdaddr */
+	cvtd	c1, x1			/* Store through a capability */
+	scbnds	c1, c1, x2		/* Set the bounds */
+
+	/* Check the length is greater than 1 capability */
+	cmp	x2, #16
+	b.lo	copycommon
+
+	/* And the addresses will both align on a capability */
+	eor	x3, x6, x5		/* Compare the pointers */
+	and	x3, x3, #0xf		/* Check the lower bits */
+	cbnz	x3, copycommon		/* If different don't copy tags */
+
+	b	copytagcommon
+
+1:	mov	x0, xzr		/* return 0 */
+	ret
+END(copyincap)
+
+/*
+ * Copy specified amount of data from kernel to the user space, preserving
+ * capability tags
+ *
+ * int copyoutcap(const void *kaddr, void * __capability udaddr, size_t len)
+ */
+ENTRY(copyoutcap)
+	cbz	x2, 1f
+	check_user_access 1, 2, copyio_fault_nopcb
+
+	/* Create a capability from kaddr */
+	mov	x5, x0			/* Backup kaddr */
+	cvtd	c0, x0			/* Store through a capability */
+	scbnds	c0, c0, x2		/* Set the bounds */
+
+	/* Check the length is greater than 1 capability */
+	cmp	x2, #16
+	b.lo	copycommon
+
+	/* And the addresses will both align on a capability */
+	eor	x3, x6, x5		/* Compare the pointers */
+	and	x3, x3, #0xf		/* Check the lower bits */
+	cbnz	x3, copycommon		/* If different don't copy tags */
+
+	b	copytagcommon
+
+1:	mov	x0, xzr		/* return 0 */
+	ret
+END(copyoutcap)
+
+/*
+ * Local helpers to copy through capabilities
+ *
+ * c0 - src pointer
+ * c1 - dst pointer
+ * x2 - size
+ * lr - the return address, so jump here instead of calling
+ *
+ * In copytagcommon the bottom 4 bits of c0 and c1 must be identical so
+ * they can both be aligned load & store capabilities.
+ */
+	.text
+	.align	4
+	.local	copytagcommon
+	.type	copytagcommon,@function
+
+copytagcommon:
+	adr	x6, copyio_fault /* Get the handler address */
+	SET_FAULT_HANDLER(x6, x7) /* Set the handler */
+	ENTER_USER_ACCESS(w6, x7)
+
+	mov	x5, #0			/* x5 is the offset to load/store */
+
+	/* Check alignment. The bottom 4 bits must be identical. */
+	gcvalue	x4, c0			/* Read the source capability value */
+	and	x3, x4, 0x0f
+	cbz	x3, captag_main
+
+captag_byte_by_byte:
+	ldrb	w4, [c0, x5]
+	strb	w4, [c1, x5]
+	sub	x2, x2, #1
+	add	x3, x3, #1
+	add	x5, x5, #1
+	cmp	x3, #0x20
+	b.lo	captag_byte_by_byte
+
+captag_main:
+	cmp	x2, #16
+	b.lo	captag_end_bytes
+1:	ldr	c4, [c0, x5]
+	str	c4, [c1, x5]
+	sub	x2, x2, #16
+	add	x5, x5, #16
+	cmp	x2, #16
+	b.ge	1b
+	cbz	x2, captag_done
+
+captag_end_bytes:
+	ldrb	w3, [c0, x5]
+	strb	w3, [c1, x5]
+	sub	x2, x2, #1
+	add	x5, x5, #1
+	cbnz	x2, captag_end_bytes
+
+captag_done:
+	EXIT_USER_ACCESS(w6)
+	SET_FAULT_HANDLER(xzr, x7) /* Clear the handler */
+
+	mov	x0, xzr		/* return 0 */
+	ret
+	.size	copytagcommon, . - copytagcommon
+
+	.text
+	.align	4
+	.local	copycommon
+	.type	copycommon,@function
+
+copycommon:
+	adr	x6, copyio_fault /* Get the handler address */
+	SET_FAULT_HANDLER(x6, x7) /* Set the handler */
+	ENTER_USER_ACCESS(w6, x7)
+
+	mov	x5, #0			/* x5 is the offset to load/store */
+
+	/* Check alignment. The bottom 4 bits must be identical. */
+	gcvalue	x4, c0			/* Read the source capability value */
+	and	x3, x4, 0x0f
+	cbz	x3, cap_main
+
+cap_main:
+	cmp	x2, #8
+	b.lo	cap_end_bytes
+1:	ldr	x4, [c0, x5]
+	str	x4, [c1, x5]
+	sub	x2, x2, #8
+	add	x5, x5, #8
+	cmp	x2, #8
+	b.ge	1b
+	cbz	x2, cap_done
+
+cap_end_bytes:
+	ldrb	w3, [c0, x5]
+	strb	w3, [c1, x5]
+	sub	x2, x2, #1
+	add	x5, x5, #1
+	cbnz	x2, cap_end_bytes
+
+cap_done:
+	EXIT_USER_ACCESS(w6)
+	SET_FAULT_HANDLER(xzr, x7) /* Clear the handler */
+
+	mov	x0, xzr		/* return 0 */
+	ret
+	.size	copycommon, . - copycommon
+#endif
