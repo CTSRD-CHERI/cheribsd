@@ -38,9 +38,18 @@ __FBSDID("$FreeBSD$");
 
 #include "assym.inc"
 
+#ifdef __CHERI_PURE_CAPABILITY__
+#error TODO Port to purecap
+#endif
+
 .macro check_user_access user_arg, limit, bad_addr_func
 	ldr	x7, =(\limit)
+#if __has_feature(capabilities)
+	gcvalue	x6, c\user_arg
+	cmp	x6, x7
+#else
 	cmp	x\user_arg, x7
+#endif
 	b.cs	\bad_addr_func
 .endm
 
@@ -56,7 +65,8 @@ fsu_fault_nopcb:
 END(fsu_fault)
 
 /*
- * int casueword32(volatile uint32_t *, uint32_t, uint32_t *, uint32_t)
+ * int casueword32(volatile uint32_t * __capability, uint32_t, uint32_t *,
+ *         uint32_t)
  */
 ENTRY(casueword32)
 	check_user_access 0, (VM_MAXUSER_ADDRESS-3), fsu_fault_nopcb
@@ -64,11 +74,21 @@ ENTRY(casueword32)
 	mov	w5, #1
 	SET_FAULT_HANDLER(x6, x4)	/* And set it */
 	ENTER_USER_ACCESS(w6, x4)
+	ENTER_C64
+#if __has_feature(capabilities)
+	ldxr	w4, [c0]		/* Load-exclusive the data */
+#else
 	ldxr	w4, [x0]		/* Load-exclusive the data */
+#endif
 	cmp	w4, w1			/* Compare */
 	b.ne	1f			/* Not equal, exit */
+#if __has_feature(capabilities)
+	stxr	w5, w3, [c0]		/* Store the new data */
+#else
 	stxr	w5, w3, [x0]		/* Store the new data */
-1:	EXIT_USER_ACCESS(w6)
+#endif
+1:	EXIT_C64
+	EXIT_USER_ACCESS(w6)
 	SET_FAULT_HANDLER(xzr, x6)	/* Reset the fault handler */
 	str	w4, [x2]		/* Store the read data */
 	mov	w0, w5			/* Result same as store status */
@@ -76,7 +96,7 @@ ENTRY(casueword32)
 END(casueword32)
 
 /*
- * int casueword(volatile u_long *, u_long, u_long *, u_long)
+ * int casueword(volatile u_long * __capability, u_long, u_long *, u_long)
  */
 ENTRY(casueword)
 	check_user_access 0, (VM_MAXUSER_ADDRESS-7), fsu_fault_nopcb
@@ -84,11 +104,21 @@ ENTRY(casueword)
 	mov	w5, #1
 	SET_FAULT_HANDLER(x6, x4)	/* And set it */
 	ENTER_USER_ACCESS(w6, x4)
+	ENTER_C64
+#if __has_feature(capabilities)
+	ldxr	x4, [c0]		/* Load-exclusive the data */
+#else
 	ldxr	x4, [x0]		/* Load-exclusive the data */
+#endif
 	cmp	x4, x1			/* Compare */
 	b.ne	1f			/* Not equal, exit */
+#if __has_feature(capabilities)
+	stxr	w5, x3, [c0]		/* Store the new data */
+#else
 	stxr	w5, x3, [x0]		/* Store the new data */
-1:	EXIT_USER_ACCESS(w6)
+#endif
+1:	EXIT_C64
+	EXIT_USER_ACCESS(w6)
 	SET_FAULT_HANDLER(xzr, x6)	/* Reset the fault handler */
 	str	x4, [x2]		/* Store the read data */
 	mov	w0, w5			/* Result same as store status */
@@ -98,12 +128,18 @@ END(casueword)
 .macro fsudata insn, ret_reg, user_arg
 	adr	x7, fsu_fault		/* Load the fault handler */
 	SET_FAULT_HANDLER(x7, x6)	/* And set it */
+	ENTER_C64
+#if __has_feature(capabilities)
+	\insn	\ret_reg, [c\user_arg]	/* Try accessing the data */
+#else
 	\insn	\ret_reg, [x\user_arg]	/* Try accessing the data */
+#endif
+	EXIT_C64
 	SET_FAULT_HANDLER(xzr, x6)	/* Reset the fault handler */
 .endm
 
 /*
- * int fubyte(volatile const void *)
+ * int fubyte(volatile const void * __capability)
  */
 ENTRY(fubyte)
 	check_user_access 0, (VM_MAXUSER_ADDRESS), fsu_fault_nopcb
@@ -112,7 +148,7 @@ ENTRY(fubyte)
 END(fubyte)
 
 /*
- * int fuword(volatile const void *)
+ * int fuword(volatile const void * __capability)
  */
 ENTRY(fuword16)
 	check_user_access 0, (VM_MAXUSER_ADDRESS-1), fsu_fault_nopcb
@@ -121,7 +157,7 @@ ENTRY(fuword16)
 END(fuword16)
 
 /*
- * int32_t fueword32(volatile const void *, int32_t *)
+ * int32_t fueword32(volatile const void *, int32_t * __capability)
  */
 ENTRY(fueword32)
 	check_user_access 0, (VM_MAXUSER_ADDRESS-3), fsu_fault_nopcb
@@ -132,8 +168,8 @@ ENTRY(fueword32)
 END(fueword32)
 
 /*
- * long fueword(volatile const void *, int64_t *)
- * int64_t fueword64(volatile const void *, int64_t *)
+ * long fueword(volatile const void * __capability, int64_t *)
+ * int64_t fueword64(volatile const void * __capability, int64_t *)
  */
 ENTRY(fueword)
 EENTRY(fueword64)
@@ -145,8 +181,21 @@ EENTRY(fueword64)
 EEND(fueword64)
 END(fueword)
 
+#if __has_feature(capabilities)
 /*
- * int subyte(volatile void *, int)
+ * int fuecap(volatile const void * __capability, intcap_t *)
+ */
+ENTRY(fuecap)
+	check_user_access 0, (VM_MAXUSER_ADDRESS-15), fsu_fault_nopcb
+	fsudata	ldtr, c0, 0
+	str	c0, [x1]		/* Save the data in kernel space */
+	mov	x0, #0			/* Success */
+	ret				/* Return */
+END(fuecap)
+#endif
+
+/*
+ * int subyte(volatile void * __capability, int)
  */
 ENTRY(subyte)
 	check_user_access 0, (VM_MAXUSER_ADDRESS), fsu_fault_nopcb
@@ -156,7 +205,7 @@ ENTRY(subyte)
 END(subyte)
 
 /*
- * int suword16(volatile void *, int)
+ * int suword16(volatile void * __capability, int)
  */
 ENTRY(suword16)
 	check_user_access 0, (VM_MAXUSER_ADDRESS-1), fsu_fault_nopcb
@@ -166,7 +215,7 @@ ENTRY(suword16)
 END(suword16)
 
 /*
- * int suword32(volatile void *, int)
+ * int suword32(volatile void * __capability, int)
  */
 ENTRY(suword32)
 	check_user_access 0, (VM_MAXUSER_ADDRESS-3), fsu_fault_nopcb
@@ -176,7 +225,7 @@ ENTRY(suword32)
 END(suword32)
 
 /*
- * int suword(volatile void *, long)
+ * int suword(volatile void * __capability, long)
  */
 ENTRY(suword)
 EENTRY(suword64)
@@ -186,6 +235,18 @@ EENTRY(suword64)
 	ret				/* Return */
 EEND(suword64)
 END(suword)
+
+#if __has_feature(capabilities)
+/*
+ * int sucap(volatile void * __capability, intcap_t)
+ */
+ENTRY(sucap)
+	check_user_access 0, (VM_MAXUSER_ADDRESS-15), fsu_fault_nopcb
+	fsudata	sttr, c1, 0
+	mov	x0, #0			/* Success */
+	ret				/* Return */
+END(sucap)
+#endif
 
 ENTRY(setjmp)
 	/* Store the stack pointer */
