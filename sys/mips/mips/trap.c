@@ -133,6 +133,10 @@ int log_cheri_registers = 1;
 SYSCTL_INT(_machdep, OID_AUTO, log_cheri_registers, CTLFLAG_RW,
     &log_cheri_registers, 1, "Print CHERI registers for non-CHERI exceptions");
 #endif
+static uint64_t kern_unaligned_access_count = 0;
+SYSCTL_U64(_machdep, OID_AUTO, kern_unaligned_access, CTLFLAG_RD,
+    &kern_unaligned_access_count, 0,
+    "Cumulative count of kernel unaligned accesses");
 
 #define	lbu_macro(data, addr)						\
 	__asm __volatile ("lbu %0, 0x0(%1)"				\
@@ -1356,6 +1360,7 @@ dofault:
 				if (PCPU_GET(kern_unaligned_emul))
 					panic("Recursive kernel unaligned access");
 				PCPU_SET(kern_unaligned_emul, 1);
+				atomic_add_long(&kern_unaligned_access_count, 1);
 			}
 			access_type = emulate_unaligned_access(
 			    trapframe, mode);
