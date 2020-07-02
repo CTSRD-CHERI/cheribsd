@@ -21,6 +21,12 @@ def buildImageAndRunTests(params, String suffix) {
     stage("Building disk image") {
         sh "./cheribuild/jenkins-cheri-build.py --build disk-image-${suffix} ${params.extraArgs}"
     }
+    stage("Building minimal disk image") {
+        sh "./cheribuild/jenkins-cheri-build.py --build disk-image-minimal-${suffix} ${params.extraArgs}"
+    }
+    stage("Building MFS_ROOT kernels") {
+        sh "./cheribuild/jenkins-cheri-build.py --build cheribsd-mfs-root-kernel-${suffix} --cheribsd-mfs-root-kernel-${suffix}/build-fpga-kernels ${params.extraArgs}"
+    }
     stage("Running tests") {
         def haveCheritest = suffix.endsWith('-hybrid') || suffix.endsWith('-purecap')
         // copy qemu archive and run directly on the host
@@ -51,7 +57,6 @@ find cheribsd-test-results
                 params.statusUnstable("Test script returned ${exitCode}")
             }
         }
-
     }
 }
 
