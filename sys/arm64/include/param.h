@@ -47,8 +47,17 @@
 #ifndef MACHINE
 #define	MACHINE		"arm64"
 #endif
-#ifndef MACHINE_ARCH
-#define	MACHINE_ARCH	"aarch64"
+#if !__has_feature(capabilities)
+# ifndef MACHINE_ARCH
+#  define	MACHINE_ARCH	"aarch64"
+# endif
+#else
+# ifndef MACHINE_ARCH
+#  define	MACHINE_ARCH	"morello"
+# endif
+# ifndef MACHINE_ARCH64
+#  define	MACHINE_ARCH64	"aarch64"
+# endif
 #endif
 #ifndef MACHINE_ARCH32
 #define	MACHINE_ARCH32	"armv7"
