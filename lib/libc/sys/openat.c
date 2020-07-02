@@ -71,3 +71,23 @@ openat(int fd, const char *path, int flags, ...)
 	return (((int (*)(int, const char *, int, int))
 	    __libc_interposing[INTERPOS_openat])(fd, path, flags, mode));
 }
+
+#ifdef __CHERI_PURE_CAPABILITY__
+int _openat(int fd, const char *path, int flags, ...);
+#pragma weak _openat
+int
+_openat(int fd, const char *path, int flags, ...)
+{
+	va_list ap;
+	int mode;
+
+	if ((flags & O_CREAT) != 0) {
+		va_start(ap, flags);
+		mode = va_arg(ap, int);
+		va_end(ap);
+	} else {
+		mode = 0;
+	}
+	return (__sys_openat(fd, path, flags, mode));
+}
+#endif
