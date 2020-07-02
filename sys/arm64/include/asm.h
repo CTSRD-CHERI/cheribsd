@@ -61,6 +61,22 @@
 #define	lr		x30
 
 /*
+ * Switch into C64 mode to use instructions only available in Morello.
+ */
+#if __has_feature(capabilities) && !defined __CHERI_PURE_CAPABILITY__
+#define	ENTER_C64		\
+	bx #4;			\
+	.arch_extension	c64
+#define	EXIT_C64		\
+	bx #4;			\
+	.arch_extension	noc64;	\
+	.arch_extension	a64c
+#else
+#define	ENTER_C64
+#define	EXIT_C64
+#endif
+
+/*
  * Sets the trap fault handler. The exception handler will return to the
  * address in the handler register on a data abort or the xzr register to
  * clear the handler. The tmp parameter should be a register able to hold
