@@ -7,7 +7,6 @@ compartmentalization features supported by the CHERI ISA.
 CheriBSD source may be found at https://github.com/CTSRD-CHERI/cheribsd/
 
 We provide support via mailing list
-https://www.cl.cam.ac.uk/research/security/ctsrd/cheri/cheri-lists.html
-and Slack (request an invite via the mailing list).
+https://www.cl.cam.ac.uk/research/security/ctsrd/cheri/cheri-lists.html.
 
 Find out more about about CHERI at http://cheri-cpu.org/
