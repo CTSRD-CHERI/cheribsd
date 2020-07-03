@@ -188,41 +188,41 @@ cpu_copy_thread(struct thread *td, struct thread *td0)
  * the entry function with the given argument.
  */
 void
-cpu_set_upcall(struct thread *td, void (*entry)(void *), void *arg,
-	stack_t *stack)
+cpu_set_upcall(struct thread *td, void (* __capability entry)(void *),
+    void * __capability arg, stack_t *stack)
 {
 	struct trapframe *tf = td->td_frame;
 
 	/* 32bits processes use r13 for sp */
 	if (td->td_frame->tf_spsr & PSR_M_32)
-		tf->tf_x[13] = STACKALIGN((uintptr_t)stack->ss_sp + stack->ss_size);
+		tf->tf_x[13] = STACKALIGN((uintcap_t)stack->ss_sp + stack->ss_size);
 	else
-		tf->tf_sp = STACKALIGN((uintptr_t)stack->ss_sp + stack->ss_size);
-	tf->tf_elr = (register_t)entry;
-	tf->tf_x[0] = (register_t)arg;
+		tf->tf_sp = STACKALIGN((uintcap_t)stack->ss_sp + stack->ss_size);
+	tf->tf_elr = (uintcap_t)entry;
+	tf->tf_x[0] = (uintcap_t)arg;
 }
 
 int
-cpu_set_user_tls(struct thread *td, void *tls_base)
+cpu_set_user_tls(struct thread *td, void * __capability tls_base)
 {
 	struct pcb *pcb;
 
-	if ((uintptr_t)tls_base >= VM_MAXUSER_ADDRESS)
+	if ((__cheri_addr vaddr_t)tls_base >= VM_MAXUSER_ADDRESS)
 		return (EINVAL);
 
 	pcb = td->td_pcb;
 	if (td->td_frame->tf_spsr & PSR_M_32) {
 		/* 32bits arm stores the user TLS into tpidrro */
-		pcb->pcb_tpidrro_el0 = (register_t)tls_base;
-		pcb->pcb_tpidr_el0 = (register_t)tls_base;
+		pcb->pcb_tpidrro_el0 = (__cheri_addr vaddr_t)tls_base;
+		pcb->pcb_tpidr_el0 = (__cheri_addr vaddr_t)tls_base;
 		if (td == curthread) {
-			WRITE_SPECIALREG(tpidrro_el0, tls_base);
-			WRITE_SPECIALREG(tpidr_el0, tls_base);
+			WRITE_SPECIALREG(tpidrro_el0, (__cheri_addr vaddr_t)tls_base);
+			WRITE_SPECIALREG(tpidr_el0, (__cheri_addr vaddr_t)tls_base);
 		}
 	} else {
-		pcb->pcb_tpidr_el0 = (register_t)tls_base;
+		pcb->pcb_tpidr_el0 = (__cheri_addr vaddr_t)tls_base;
 		if (td == curthread)
-			WRITE_SPECIALREG(tpidr_el0, tls_base);
+			WRITE_SPECIALREG(tpidr_el0, (__cheri_addr vaddr_t)tls_base);
 	}
 
 	return (0);
@@ -285,7 +285,7 @@ cpu_exec_vmspace_reuse(struct proc *p __unused, vm_map_t map __unused)
 
 int
 cpu_procctl(struct thread *td __unused, int idtype __unused, id_t id __unused,
-    int com __unused, void *data __unused)
+    int com __unused, void * __capability data __unused)
 {
 
 	return (EINVAL);
