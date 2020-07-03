@@ -62,6 +62,8 @@ typedef struct statcounters_bank
     uint64_t tagcache[STATCOUNTERS_MAX_MOD_CNT];
     uint64_t l2cachemaster[STATCOUNTERS_MAX_MOD_CNT];
     uint64_t tagcachemaster[STATCOUNTERS_MAX_MOD_CNT];
+    /* Capture kernel unaligned access emulation statistics */
+    uint64_t kern_unaligned_access;
 } statcounters_bank_t;
 
 // format flags
@@ -84,6 +86,8 @@ int statcounters_zero (statcounters_bank_t * const cnt_bank);
 // sample hardware counters in a statcounters_bank
 void sample_statcounters (statcounters_bank_t * const cnt_bank) DEPRECATED("use statcounters_sample instead");
 int statcounters_sample (statcounters_bank_t * const cnt_bank);
+// sample kernel statistics via sysctl
+int statcounters_sample_sysctl (statcounters_bank_t * const cnt_bank);
 // diff two statcounters_banks into a third one
 void diff_statcounters (
     const statcounters_bank_t * const be,

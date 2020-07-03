@@ -32,6 +32,7 @@
 #include <sys/ioctl.h>
 #include <sys/kcov.h>
 #include <sys/mman.h>
+#include <sys/sysctl.h>
 #include <err.h>
 #include <stdio.h>
 #include <unistd.h>
@@ -289,6 +290,25 @@ int statcounters_sample (statcounters_bank_t * const cnt_bank)
     return 0;
 }
 
+/*
+ * Sample statistics that require access via a sysctl
+ */
+int statcounters_sample_sysctl(statcounters_bank_t * const cnt_bank)
+{
+    int err;
+    size_t len;
+
+    if (cnt_bank == NULL)
+        return (-1);
+#ifdef __mips__
+    err = sysctlbyname("machdep.kern_unaligned_access",
+        &cnt_bank->kern_unaligned_access, &len, NULL, 0);
+    if (err || len != sizeof(cnt_bank->kern_unaligned_access))
+        return (-1);
+#endif
+    return (0);
+}
+
 // diff two statcounters_banks into a third one
 void diff_statcounters (
     const statcounters_bank_t * const be,
@@ -322,6 +342,7 @@ int statcounters_diff (
         bd->l2cachemaster[i]  = be->l2cachemaster[i] - bs->l2cachemaster[i];
         bd->tagcachemaster[i] = be->tagcachemaster[i] - bs->tagcachemaster[i];
     }
+    bd->kern_unaligned_access = be->kern_unaligned_access - bs->kern_unaligned_access;
     return 0;
 }
 
@@ -499,6 +520,7 @@ int statcounters_dump_with_args (
             fprintf(fp, "tagcachemaster_write_rsp,");
             fprintf(fp, "imprecise_setbounds,");
             fprintf(fp, "unrepresentable_caps");
+            fprintf(fp, "kern_unaligned_access");
             fprintf(fp, "\n");
             // fallthrough
         case CSV_NOHEADER:
@@ -560,6 +582,7 @@ int statcounters_dump_with_args (
             fprintf(fp, "%lu,",b->tagcachemaster[STATCOUNTERS_WRITE_RSP]);
             fprintf(fp, "%lu,",b->imprecise_setbounds);
             fprintf(fp, "%lu",b->unrepresentable_caps);
+            fprintf(fp, "%lu",b->kern_unaligned_access);
             fprintf(fp, "\n");
             break;
         case HUMAN_READABLE:
@@ -629,6 +652,7 @@ int statcounters_dump_with_args (
             fprintf(fp, "\n");
             fprintf(fp, "imprecise_setbounds:          \t%lu\n",b->imprecise_setbounds);
             fprintf(fp, "unrepresentable_caps:         \t%lu\n",b->unrepresentable_caps);
+            fprintf(fp, "kernel emul unaligned access: \t%lu\n",b->kern_unaligned_access);
             fprintf(fp, "\n");
             break;
     }
@@ -745,6 +769,7 @@ static void start_sample (void)
 	if (kcov_config && (strcmp(kcov_config, "yes") == 0))
 		statcounters_kcov_setup();
 	// initial sampling
+        statcounters_sample_sysctl(&start_cnt);
 	statcounters_sample(&start_cnt);
 }
 
@@ -753,6 +778,7 @@ static void end_sample (void)
 {
 	// final sampling
 	statcounters_sample(&end_cnt); // TODO change the order of sampling to keep cycle sampled early
+        statcounters_sample_sysctl(&end_cnt);
 	// stop kernel coverage and dump results
 	if (kcov_enable)
 		statcounters_kcov_teardown();
