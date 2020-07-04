@@ -33,6 +33,9 @@
 #define	_SYS_TREE_H_
 
 #include <sys/cdefs.h>
+#ifdef __CHERI_PURE_CAPABILITY__
+#include <cheri/cheric.h>
+#endif
 
 /*
  * This file defines data structures for different types of trees:
@@ -319,7 +322,12 @@ struct __no_subobject_bounds {						\
 #define RB_FLIP(elm)			(*(__uintptr_t *)&(elm) ^= 1)
 #define RB_FLIP_LF(elm, field)		RB_FLIP(RB_LF(elm, field))
 #define RB_FLIP_RT(elm, field)		RB_FLIP(RB_RT(elm, field))
+#ifdef __CHERI_PURE_CAPABILITY__
+#define RB_ISRED(elm)							\
+	(cheri_get_low_ptr_bits(*(__uintptr_t *)&(elm), 1) != 0)
+#else
 #define RB_ISRED(elm)			((*(__uintptr_t *)&(elm) & 1) != 0)
+#endif
 #define RB_RED_LF(elm, field)		RB_ISRED(RB_LF(elm, field))
 #define RB_RED_RT(elm, field)		RB_ISRED(RB_RT(elm, field))
 #define RB_PTR(elm, field)		((__typeof(elm->field.rbe_parent)) \
@@ -805,3 +813,12 @@ name##_RB_REINSERT(struct name *head, struct type *elm)			\
 	     (x) = (y))
 
 #endif	/* _SYS_TREE_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20200204,
+//   "target_type": "header",
+//   "changes_purecap": [
+//     "pointer_bit_flags"
+//   ]
+// }
+// CHERI CHANGES END
