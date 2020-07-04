@@ -15,7 +15,7 @@ options		STACK
 options		WITNESS
 options		DEBUG_VFS_LOCKS
 # options	TRAP_DEBUG
-# options	KTR
+options		KTR
 # options	KTR_VERBOSE=2
 # nooptions	KTR_ALQ
 # options	LOCK_DEBUG
