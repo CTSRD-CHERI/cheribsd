@@ -1057,7 +1057,16 @@ ntpdmain(
 	/* Setup stack size in preparation for locking pages in memory. */
 # if defined(HAVE_MLOCKALL)
 #  ifdef HAVE_SETRLIMIT
+#   ifndef __CHERI_PURE_CAPABILITY__
+	/*
+	 * XXX: CheriABI currently puts ps_strings etc at the top of the stack
+	 * then rounds down to the next representable length, leaving huge
+	 * amoounts of padding. This means any moderately-restrictive limit
+	 * will cause us to segfault as soon as we touch any part of our stack.
+	 * Disable it entirely for now until we have a solution.
+	 */
 	ntp_rlimit(RLIMIT_STACK, DFLT_RLIMIT_STACK * 4096, 4096, "4k");
+#   endif
 #   if defined(RLIMIT_MEMLOCK) && defined(DFLT_RLIMIT_MEMLOCK) && DFLT_RLIMIT_MEMLOCK != -1
 	/*
 	 * The default RLIMIT_MEMLOCK is very low on Linux systems.

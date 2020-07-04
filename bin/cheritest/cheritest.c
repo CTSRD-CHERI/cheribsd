@@ -283,6 +283,25 @@ static const struct cheri_test cheri_tests[] = {
 #endif
 
 	/*
+	 * Tests on function pointers as sentries.
+	 */
+#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef CHERI_DYNAMIC_TESTS
+	{ .ct_name = "test_sentry_dlsym",
+	  .ct_desc = "Check that a function pointer obtaine dfrom via dlsym is a sentry",
+	  .ct_func = test_sentry_dlsym, },
+#endif
+
+	{ .ct_name = "test_sentry_libc",
+	  .ct_desc = "Check that a function pointer from libc is a sentry",
+	  .ct_func = test_sentry_libc, },
+
+	{ .ct_name = "test_sentry_static",
+	  .ct_desc = "Check that a statically initialized function pointer is a sentry",
+	  .ct_func = test_sentry_static, },
+#endif
+
+	/*
 	 * Test bounds on globals in the same file they are allocated in.
 	 */
 	{ .ct_name = "test_bounds_global_static_uint8",
@@ -954,13 +973,10 @@ static const struct cheri_test cheri_tests[] = {
 	{ .ct_name = "cheritest_vm_shm_open_anon_unix_surprise",
 	  .ct_desc = "test SHM_ANON vs SCM_RIGHTS",
 	  .ct_func = cheritest_vm_shm_open_anon_unix_surprise,
-#ifdef mips
 	  .ct_xfail_reason =
-	    "Tags currently survive cross-AS aliasing of SHM_ANON objects",
-#endif
-	},
+	    "Tags currently survive cross-AS aliasing of SHM_ANON objects", },
 
-#ifdef CHERIABI_TESTS
+#ifdef __CHERI_PURE_CAPABILITY__
 	{ .ct_name = "cheritest_vm_cap_share_fd_kqueue",
 	  .ct_desc = "Demonstrate capability passing via shared FD table",
 	  .ct_func = cheritest_vm_cap_share_fd_kqueue,
@@ -1670,7 +1686,7 @@ static const struct cheri_test cheri_tests[] = {
 	/*
 	 * CheriABI specific tests.
 	 */
-#ifdef CHERIABI_TESTS
+#ifdef __CHERI_PURE_CAPABILITY__
 #ifdef CHERI_MMAP_SETBOUNDS
 	{ .ct_name = "test_cheriabi_mmap_nospace",
 	  .ct_desc = "Test CheriABI mmap() with no space in default capability",

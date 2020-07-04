@@ -1726,15 +1726,10 @@ vm_fault_prefault(const struct faultstate *fs, vm_offset_t addra,
 			break;
 		}
 
-		/*
-		 * XXXRW: No flags argument we can use to pass NOTAGS!
-		 */
 		if (vm_page_all_valid(m) &&
-#if __has_feature(capabilities)
-		    pmap_tag_flags(entry->object.vm_object) == 0 &&
-#endif
 		    (m->flags & PG_FICTITIOUS) == 0)
-			pmap_enter_quick(pmap, addr, m, entry->protection);
+			pmap_enter_quick(pmap, addr, m, entry->protection,
+			    pmap_tag_flags(entry->object.vm_object));
 		if (!obj_locked || lobject != entry->object.vm_object)
 			VM_OBJECT_RUNLOCK(lobject);
 	}

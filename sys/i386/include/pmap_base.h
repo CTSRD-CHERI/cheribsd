@@ -81,8 +81,9 @@ struct pmap_methods {
 	int (*pm_enter)(pmap_t, vm_offset_t, vm_page_t, vm_prot_t, u_int,
 	    int8_t);
 	void (*pm_enter_object)(pmap_t, vm_offset_t, vm_offset_t,
-	    vm_page_t, vm_prot_t);
-	void (*pm_enter_quick)(pmap_t, vm_offset_t, vm_page_t, vm_prot_t);
+	    vm_page_t, vm_prot_t, u_int);
+	void (*pm_enter_quick)(pmap_t, vm_offset_t, vm_page_t, vm_prot_t,
+	    u_int);
 	void *(*pm_kenter_temporary)(vm_paddr_t pa, int);
 	void (*pm_object_init_pt)(pmap_t, vm_offset_t, vm_object_t,
 	    vm_pindex_t, vm_size_t);

@@ -2663,6 +2663,7 @@ vm_map_pmap_enter(vm_map_t map, vm_offset_t addr, vm_prot_t prot,
 	vm_offset_t start;
 	vm_page_t p, p_start;
 	vm_pindex_t mask, psize, threshold, tmpidx;
+	u_int pmap_flags;
 
 	if ((prot & (VM_PROT_READ | VM_PROT_EXECUTE)) == 0 || object == NULL)
 		return;
@@ -2690,6 +2691,13 @@ vm_map_pmap_enter(vm_map_t map, vm_offset_t addr, vm_prot_t prot,
 	start = 0;
 	p_start = NULL;
 	threshold = MAX_INIT_PT;
+	pmap_flags = 0;
+#if __has_feature(capabilities)
+	if (object->flags & OBJ_NOLOADTAGS)
+		pmap_flags |= PMAP_ENTER_NOLOADTAGS;
+	if (object->flags & OBJ_NOSTORETAGS)
+		pmap_flags |= PMAP_ENTER_NOSTORETAGS;
+#endif
 
 	p = vm_page_find_least(object, pindex);
 	/*
@@ -2728,13 +2736,13 @@ vm_map_pmap_enter(vm_map_t map, vm_offset_t addr, vm_prot_t prot,
 			}
 		} else if (p_start != NULL) {
 			pmap_enter_object(map->pmap, start, addr +
-			    ptoa(tmpidx), p_start, prot);
+			    ptoa(tmpidx), p_start, prot, pmap_flags);
 			p_start = NULL;
 		}
 	}
 	if (p_start != NULL)
 		pmap_enter_object(map->pmap, start, addr + ptoa(psize),
-		    p_start, prot);
+		    p_start, prot, pmap_flags);
 	VM_OBJECT_RUNLOCK(object);
 }
 

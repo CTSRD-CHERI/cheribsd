@@ -520,6 +520,15 @@ DECLARE_CHERI_TEST(test_initregs_pcc);
 DECLARE_CHERI_TEST(test_copyregs);
 DECLARE_CHERI_TEST(test_listregs);
 
+/* cheritest_sentries.c */
+#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef CHERI_DYNAMIC_TESTS
+DECLARE_CHERI_TEST(test_sentry_dlsym);
+#endif
+DECLARE_CHERI_TEST(test_sentry_libc);
+DECLARE_CHERI_TEST(test_sentry_static);
+#endif
+
 /* cheritest_tls.c */
 DECLARE_CHERI_TEST(test_tls_align_4k);
 DECLARE_CHERI_TEST(test_tls_align_cap);
@@ -534,7 +543,7 @@ DECLARE_CHERI_TEST(cheritest_vm_tag_shm_open_anon_shared);
 DECLARE_CHERI_TEST(cheritest_vm_tag_shm_open_anon_private);
 DECLARE_CHERI_TEST(cheritest_vm_tag_shm_open_anon_shared2x);
 DECLARE_CHERI_TEST(cheritest_vm_shm_open_anon_unix_surprise);
-#ifdef CHERIABI_TESTS
+#ifdef __CHERI_PURE_CAPABILITY__
 DECLARE_CHERI_TEST(cheritest_vm_cap_share_fd_kqueue);
 DECLARE_CHERI_TEST(cheritest_vm_cap_share_sigaction);
 #endif

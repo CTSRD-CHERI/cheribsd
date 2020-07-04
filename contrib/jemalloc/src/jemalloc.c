@@ -214,23 +214,6 @@ typedef struct {
 #  define UTRACE(a, b, c)
 #endif
 
-#ifndef __CHERI_PURE_CAPABILITY__
-#define	BOUND_PTR(ptr, size)	(ptr)
-#define	ROUND_SIZE(size)		(size)
-#else
-#define	BOUND_PTR(ptr, size)						\
-    (ptr == NULL) ? NULL :						\
-    cheri_andperm(cheri_setboundsexact((ptr), (size)),			\
-	CHERI_PERMS_USERSPACE_DATA & ~CHERI_PERM_CHERIABI_VMMAP)
-
-/*
- * XXX-BD: In theory this poses an overflow risk.  It's overflow
- * handling is probalby needed in each individual function, returning
- * an appropriate error value.
- */
-#define	ROUND_SIZE(size)	CHERI_REPRESENTABLE_LENGTH(size)
-#endif
-
 /* Whether encountered any invalid config options. */
 static bool had_conf_error = false;
 

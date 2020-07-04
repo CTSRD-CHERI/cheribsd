@@ -5,7 +5,6 @@ SRCDIR=	${.CURDIR}/../cheritest
 
 PROG=	cheriabitest-mt
 
-CHERIABI_TESTS=	yes
 CHERI_C_TESTS=	yes
 CHERITHREAD_TESTS=	yes
 

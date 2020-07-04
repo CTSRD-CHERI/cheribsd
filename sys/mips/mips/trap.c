@@ -124,9 +124,10 @@ SYSCTL_INT(_machdep, OID_AUTO, stop_vm_trace_on_fault, CTLFLAG_RW,
     &stop_vm_trace_on_fault, 0,
     "Disable VM instruction tracing when a fault is logged");
 #ifdef CPU_CHERI
-int log_cheri_exceptions = 1;
-SYSCTL_INT(_machdep, OID_AUTO, log_cheri_exceptions, CTLFLAG_RW,
-    &log_cheri_exceptions, 1, "Print trap frame on CHERI exceptions");
+int log_user_cheri_exceptions = 1;
+SYSCTL_INT(_machdep, OID_AUTO, log_user_cheri_exceptions, CTLFLAG_RW,
+    &log_user_cheri_exceptions, 0,
+    "Print registers and process details on user CHERI exceptions");
 
 int log_cheri_registers = 1;
 SYSCTL_INT(_machdep, OID_AUTO, log_cheri_registers, CTLFLAG_RW,
@@ -1170,7 +1171,8 @@ dofault:
 	case T_C2E + T_USER:
 		msg = "USER_CHERI_EXCEPTION";
 		fetch_bad_instr(trapframe);
-		log_c2e_exception(msg, trapframe, type);
+		if (log_user_cheri_exceptions)
+			log_c2e_exception(msg, trapframe, type);
 		if (CHERI_CAPCAUSE_EXCCODE(trapframe->capcause) ==
 		    CHERI_EXCCODE_TLBSTORE) {
 			i = SIGSEGV;
@@ -2021,9 +2023,6 @@ log_bad_page_fault(char *msg, struct trapframe *frame, int trap_type)
 static void
 log_c2e_exception(const char *msg, struct trapframe *frame, int trap_type)
 {
-
-	if (!log_cheri_exceptions)
-		return;
 
 #ifdef SMP
 	printf("cpuid = %d\n", PCPU_GET(cpuid));
