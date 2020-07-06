@@ -138,7 +138,7 @@ VNET_DECLARE(u_int, rt_add_addr_allfibs); /* Announce interfaces to all fibs */
 /*			0x80		   unused, was RTF_DELCLONE */
 /*			0x100		   unused, was RTF_CLONING */
 #define RTF_XRESOLVE	0x200		/* external daemon resolves name */
-#define RTF_LLINFO	0x400		/* DEPRECATED - exists ONLY for backward
+#define RTF_LLINFO	0x400		/* DEPRECATED - exists ONLY for backward 
 					   compatibility */
 #define RTF_LLDATA	0x400		/* used by apps to add/del L2 entries */
 #define RTF_STATIC	0x800		/* manually added */
@@ -408,7 +408,7 @@ int	 rtinit(struct ifaddr *, int, int);
 
 /* XXX MRT NEW VERSIONS THAT USE FIBs
  * For now the protocol indepedent versions are the same as the AF_INET ones
- * but this will change..
+ * but this will change.. 
  */
 int	 rtioctl_fib(u_long, caddr_t, u_int);
 int	 rtrequest_fib(int, struct sockaddr *,
@@ -424,12 +424,3 @@ struct nhop_object *rib_lookup(uint32_t fibnum, const struct sockaddr *dst,
 #endif
 
 #endif
-// CHERI CHANGES START
-// {
-//   "updated": 20190812,
-//   "target_type": "header",
-//   "changes_purecap": [
-//     "subobject_bounds"
-//   ]
-// }
-// CHERI CHANGES END

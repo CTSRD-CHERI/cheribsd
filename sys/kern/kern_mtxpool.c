@@ -187,12 +187,3 @@ mtx_pool_alloc(struct mtx_pool *pool)
 
 SYSINIT(mtxpooli2, SI_SUB_MTX_POOL_DYNAMIC, SI_ORDER_FIRST,
     mtx_pool_setup_dynamic, NULL);
-// CHERI CHANGES START
-// {
-//   "updated": 20200123,
-//   "target_type": "kernel",
-//   "changes_purecap": [
-//     "uintptr_interp_offset"
-//   ]
-// }
-// CHERI CHANGES END

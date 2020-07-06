@@ -2734,14 +2734,10 @@ noacquire:
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20200123,
+//   "updated": 20181203,
 //   "target_type": "kernel",
 //   "changes": [
 //     "integer_provenance",
-//     "user_capabilities"
-//   ],
-//   "changes_purecap": [
-//     "uintptr_interp_offset",
 //     "user_capabilities"
 //   ]
 // }

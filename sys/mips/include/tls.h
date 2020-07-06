@@ -42,10 +42,10 @@
     (defined(_KERNEL) && __has_feature(capabilities))
 #define TLS_TP_OFFSET	0
 #define TLS_DTP_OFFSET	0
-#else /* ! __CHERI_PURE_CAPABILITY__ */
+#else
 #define TLS_TP_OFFSET	0x7000
 #define TLS_DTP_OFFSET	0x8000
-#endif /* ! __CHERI_PURE_CAPABILITY__ */
+#endif
 #ifdef COMPAT_FREEBSD32
 #define TLS_TP_OFFSET32	0x7000
 #endif
@@ -64,12 +64,9 @@
 #endif	/* __MIPS_TLS_H__ */
 // CHERI CHANGES START
 // {
-//   "updated": 20191002,
+//   "updated": 20181114,
 //   "target_type": "header",
 //   "changes": [
-//     "user_capabilities"
-//   ],
-//   "changes_purecap": [
 //     "user_capabilities"
 //   ]
 // }

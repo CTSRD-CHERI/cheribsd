@@ -474,7 +474,7 @@ struct  ifdrv {
 	void            * __kerncap ifd_data;
 };
 
-/*
+/* 
  * Structure used to retrieve aux status data from interfaces.
  * Kernel suppliers to this interface should respect the formatting
  * needed by ifconfig(8): each line starts with a TAB and ends with
@@ -547,7 +547,7 @@ struct ifi2creq {
 	uint8_t spare0;
 	uint32_t spare1;
 	uint8_t data[8];	/* read buffer */
-};
+}; 
 
 /*
  * RSS hash.
@@ -622,12 +622,9 @@ __END_DECLS
 #endif /* !_NET_IF_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20190509,
+//   "updated": 20181121,
 //   "target_type": "header",
 //   "changes": [
-//     "ioctl:net"
-//   ],
-//   "changes_purecap": [
 //     "ioctl:net"
 //   ]
 // }

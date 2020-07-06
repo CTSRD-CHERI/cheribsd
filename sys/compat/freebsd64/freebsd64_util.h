@@ -112,6 +112,5 @@ int	freebsd64_copyinuio(struct iovec64 * __capability iovp, u_int iovcnt,
 
 int	freebsd64_get_mcontext(struct thread *td, mcontext64_t *mcp, int flags);
 int	freebsd64_set_mcontext(struct thread *td, mcontext64_t *mcp);
-int	freebsd64_set_user_tls(struct thread *td, void *tls_base);
 
 #endif /* !_COMPAT_FREEBSD64_FREEBSD64_UTIL_H_ */

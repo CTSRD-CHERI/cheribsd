@@ -130,9 +130,6 @@ typedef	__uint64_t		vaddr_t;
 //   "changes": [
 //     "integer_provenance",
 //     "virtual_address"
-//   ],
-//   "changes_purecap": [
-//     "user_capabilities"
 //   ]
 // }
 // CHERI CHANGES END

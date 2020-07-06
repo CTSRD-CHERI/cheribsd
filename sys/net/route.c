@@ -141,7 +141,7 @@ sysctl_my_fibnum(SYSCTL_HANDLER_ARGS)
 {
         int fibnum;
         int error;
-
+ 
         fibnum = curthread->td_proc->p_fibnum;
         error = sysctl_handle_int(oidp, &fibnum, 0, req);
         return (error);
@@ -487,7 +487,7 @@ rib_add_redirect(u_int fibnum, struct sockaddr *dst, struct sockaddr *gateway,
 	if ((ifa = ifaof_ifpforaddr(gateway, ifp)) == NULL)
 		return (ENETUNREACH);
 	ifa_ref(ifa);
-
+	
 	bzero(&info, sizeof(info));
 	info.rti_info[RTAX_DST] = dst;
 	info.rti_info[RTAX_GATEWAY] = gateway;
@@ -953,7 +953,7 @@ rt_getifa_fib(struct rt_addrinfo *info, u_int fibnum)
 		 * Order of preference:
 		 * 1) IFA address
 		 * 2) gateway address
-		 *   Note: for interface routes link-level gateway address
+		 *   Note: for interface routes link-level gateway address 
 		 *     is specified to indicate the interface index without
 		 *     specifying RTF_GATEWAY. In this case, ignore gateway
 		 *   Note: gateway AF may be different from dst AF. In this case,
@@ -1039,7 +1039,7 @@ p_sockaddr(char *buf, int buflen, struct sockaddr *s)
 
 	if (inet_ntop(s->sa_family, paddr, buf, buflen) == NULL)
 		return (0);
-
+	
 	return (strlen(buf));
 }
 
@@ -1109,12 +1109,12 @@ rt_mpath_unlink(struct rib_head *rnh, struct rt_addrinfo *info,
 			RT_UNLOCK(rto);
 		} else if (rt->rt_flags & RTF_GATEWAY) {
 			/*
-			 * For gateway routes, we need to
+			 * For gateway routes, we need to 
 			 * make sure that we we are deleting
-			 * the correct gateway.
-			 * rt_mpath_matchgate() does not
+			 * the correct gateway. 
+			 * rt_mpath_matchgate() does not 
 			 * check the case when there is only
-			 * one route in the chain.
+			 * one route in the chain.  
 			 */
 			if (gw &&
 			    (rt->rt_nhop->gw_sa.sa_len != gw->sa_len ||
@@ -1134,7 +1134,7 @@ rt_mpath_unlink(struct rib_head *rnh, struct rt_addrinfo *info,
 		*perror = 0;
 		return (rn);
 	}
-
+		
 	/*
 	 * if the entry is 2nd and on up
 	 */
@@ -1344,7 +1344,7 @@ rtinit1(struct ifaddr *ifa, int cmd, int flags, int fibnum)
 #ifdef RADIX_MPATH
 			if (rt_mpath_capable(rnh)) {
 
-				if (rn == NULL)
+				if (rn == NULL) 
 					error = ESRCH;
 				else {
 					rt = RNTORT(rn);
@@ -1356,7 +1356,7 @@ rtinit1(struct ifaddr *ifa, int cmd, int flags, int fibnum)
 					 */
 					rt = rt_mpath_matchgate(rt,
 					    ifa->ifa_addr);
-					if (rt == NULL)
+					if (rt == NULL) 
 						error = ESRCH;
 				}
 			}
@@ -1378,7 +1378,7 @@ rtinit1(struct ifaddr *ifa, int cmd, int flags, int fibnum)
 		info.rti_flags = flags |
 		    (ifa->ifa_flags & ~IFA_RTSELF) | RTF_PINNED;
 		info.rti_info[RTAX_DST] = dst;
-		/*
+		/* 
 		 * doing this for compatibility reasons
 		 */
 		if (cmd == RTM_ADD)
@@ -1477,7 +1477,7 @@ rt_routemsg(int cmd, struct rtentry *rt, struct ifnet *ifp, int rti_addrs,
 
 	KASSERT(cmd == RTM_ADD || cmd == RTM_DELETE,
 	    ("unexpected cmd %d", cmd));
-
+	
 	KASSERT(fibnum == RT_ALL_FIBS || (fibnum >= 0 && fibnum < rt_numfibs),
 	    ("%s: fib out of range 0 <=%d<%d", __func__, fibnum, rt_numfibs));
 
@@ -1500,7 +1500,7 @@ rt_routemsg_info(int cmd, struct rt_addrinfo *info, int fibnum)
 
 	KASSERT(cmd == RTM_ADD || cmd == RTM_DELETE || cmd == RTM_CHANGE,
 	    ("unexpected cmd %d", cmd));
-
+	
 	KASSERT(fibnum == RT_ALL_FIBS || (fibnum >= 0 && fibnum < rt_numfibs),
 	    ("%s: fib out of range 0 <=%d<%d", __func__, fibnum, rt_numfibs));
 
@@ -1533,3 +1533,4 @@ rt_newaddrmsg_fib(int cmd, struct ifaddr *ifa, struct rtentry *rt, int fibnum)
 		rt_addrmsg(cmd, ifa, fibnum);
 	}
 }
+

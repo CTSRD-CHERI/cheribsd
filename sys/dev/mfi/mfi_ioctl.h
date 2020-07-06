@@ -231,10 +231,6 @@ struct mfi_query_disk {
 //   "target_type": "header",
 //   "changes": [
 //     "integer_provenance"
-//   ],
-//   "changes_purecap": [
-//     "user_capabilities",
-//     "ioctl:misc"
 //   ]
 // }
 // CHERI CHANGES END

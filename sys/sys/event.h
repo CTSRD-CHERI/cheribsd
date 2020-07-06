@@ -405,12 +405,9 @@ __END_DECLS
 #endif /* !_SYS_EVENT_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20190528,
+//   "updated": 20181203,
 //   "target_type": "header",
 //   "changes": [
-//     "user_capabilities"
-//   ],
-//   "changes_purecap": [
 //     "user_capabilities"
 //   ]
 // }

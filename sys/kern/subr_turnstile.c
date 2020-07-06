@@ -1328,12 +1328,3 @@ DB_SHOW_COMMAND(locktree, db_show_locktree)
 		print_waiters(ts, 0);
 }
 #endif
-// CHERI CHANGES START
-// {
-//   "updated": 20200123,
-//   "target_type": "kernel",
-//   "changes_purecap": [
-//     "uintptr_interp_offset"
-//   ]
-// }
-// CHERI CHANGES END

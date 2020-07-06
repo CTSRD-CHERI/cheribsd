@@ -4277,9 +4277,6 @@ sigfastblock_setpend(struct thread *td, bool resched)
 //     "kernel_sig_types",
 //     "integer_provenance",
 //     "user_capabilities"
-//   ],
-//   "changes_purecap": [
-//     "uintptr_interp_offset"
 //   ]
 // }
 // CHERI CHANGES END

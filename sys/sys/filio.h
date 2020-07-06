@@ -92,12 +92,3 @@ void * __capability fiodgname_buf_get_ptr(void *fgnp, u_long com);
 #endif
 
 #endif /* !_SYS_FILIO_H_ */
-// CHERI CHANGES START
-// {
-//   "updated": 20190509,
-//   "target_type": "header",
-//   "changes_purecap": [
-//     "user_capabilities"
-//   ]
-// }
-// CHERI CHANGES END

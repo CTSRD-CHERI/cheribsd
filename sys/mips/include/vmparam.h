@@ -150,17 +150,7 @@
 #define	VM_INITIAL_PAGEIN	16
 #endif
 
-/*
- * Support uma small alloc if we are not in the cheri-256
- * purecap kernel. The cheri-256 purecap kernel need larger
- * slab sizes and require changes to small alloc.
- */
 #define	UMA_MD_SMALL_ALLOC
-#if 0
-/* XXX-AM: remove cheri-256 support */
-/* Cheri 256 purecap kernel needs larger slabs */
-#define UMA_SUPERPAGE_SLAB
-#endif
 
 /*
  * max number of non-contig chunks of physical RAM you can have
@@ -217,15 +207,11 @@
 #endif /* !_MACHINE_VMPARAM_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20180817,
+//   "updated": 20180629,
 //   "target_type": "header",
 //   "changes": [
 //     "support"
 //   ],
-//   "changes_purecap": [
-//     "support",
-//     "pointer_shape"
-//   ],
-//   "change_comment": "purecap: UMA slab size."
+//   "change_comment": ""
 // }
 // CHERI CHANGES END

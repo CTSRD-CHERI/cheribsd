@@ -1274,12 +1274,3 @@ nlm_init_lock(struct flock *fl, int flags, int svid,
 
 	return (0);
 }
-// CHERI CHANGES START
-// {
-//   "updated": 20200123,
-//   "target_type": "kernel",
-//   "changes_purecap": [
-//     "uintptr_interp_offset"
-//   ]
-// }
-// CHERI CHANGES END

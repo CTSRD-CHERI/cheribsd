@@ -2555,12 +2555,3 @@ lf_printlist(char *tag, struct lockf_entry *lock)
 	}
 }
 #endif /* LOCKF_DEBUG */
-// CHERI CHANGES START
-// {
-//   "updated": 20200123,
-//   "target_type": "kernel",
-//   "changes_purecap": [
-//     "uintptr_interp_offset"
-//   ]
-// }
-// CHERI CHANGES END

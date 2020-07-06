@@ -6026,13 +6026,3 @@ DB_SHOW_ALL_COMMAND(devices, db_show_all_devices)
 	}
 }
 #endif
-// CHERI CHANGES START
-// {
-//   "updated": 20190531,
-//   "target_type": "kernel",
-//   "changes_purecap": [
-//     "pointer_alignment",
-//     "pointer_shape"
-//   ]
-// }
-// CHERI CHANGES END

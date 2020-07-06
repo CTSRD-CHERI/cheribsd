@@ -665,15 +665,11 @@ is_magic_sighandler_constant(vaddr_t handler) {
 #endif /* !_SYS_SIGNAL_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20190604,
+//   "updated": 20181114,
 //   "target_type": "header",
 //   "changes": [
 //     "kernel_sig_types",
 //     "pointer_as_integer",
-//     "user_capabilities"
-//   ],
-//   "changes_purecap": [
-//     "kernel_sig_types",
 //     "user_capabilities"
 //   ],
 //   "change_comment": "",

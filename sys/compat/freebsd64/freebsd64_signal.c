@@ -154,7 +154,7 @@ static int
 freebsd64_copyout_siginfo(const siginfo_t *si, void * __capability info)
 {
 	struct siginfo64 si64;
-
+	
 	siginfo_to_siginfo64(si, &si64);
 	return (copyout(&si64, info, sizeof(struct siginfo64)));
 }
@@ -204,7 +204,7 @@ freebsd64_sigaltstack(struct thread *td,
 		error = copyin(__USER_CAP_OBJ(uap->ss), &ss64, sizeof(ss64));
 		if (error != 0)
 			return (error);
-		ss.ss_sp = __USER_CAP_UNBOUND((void *)(uintptr_t)ss64.ss_sp);
+		ss.ss_sp = __USER_CAP_UNBOUND(ss64.ss_sp);
 		ss.ss_size = ss64.ss_size;
 		ss.ss_flags = ss64.ss_flags;
 	}
@@ -238,18 +238,17 @@ freebsd64_sigqueue(struct thread *td, struct freebsd64_sigqueue_args *uap)
 }
 
 int freebsd64_sigfastblock(struct thread *td,
-                           struct freebsd64_sigfastblock_args *uap)
+    struct freebsd64_sigfastblock_args *uap)
 {
 
-    return (kern_sigfastblock(td, uap->cmd, __USER_CAP_OBJ(uap->ptr)));
+	return (kern_sigfastblock(td, uap->cmd, __USER_CAP_OBJ(uap->ptr)));
 }
-
 // CHERI CHANGES START
 // {
-//   "updated": 20190604,
+//   "updated": 20200706,
 //   "target_type": "kernel",
 //   "changes_purecap": [
-//     "user_capabilities"
+//     "pointer_as_integer"
 //   ]
 // }
 // CHERI CHANGES END

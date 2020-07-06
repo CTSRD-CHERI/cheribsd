@@ -159,12 +159,4 @@ void swap_release_by_cred(vm_ooffset_t decr, struct ucred *cred);
 void swapper(void);
 
 #endif				/* VM_H */
-// CHERI CHANGES START
-// {
-//   "updated": 20180226,
-//   "target_type": "header",
-//   "changes_purecap": [
-//     "pointer_as_integer"
-//   ]
-// }
-// CHERI CHANGES END
+

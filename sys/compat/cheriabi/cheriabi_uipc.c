@@ -186,6 +186,7 @@ cheriabi_recvmsg(struct thread *td, struct cheriabi_recvmsg_args *uap)
 	struct msghdr_c msg;
 	struct iovec_c *__capability uiov;
 	struct iovec_c *iov;
+
 	int error;
 
 	error = copyincap(uap->msg, &msg, sizeof(msg));

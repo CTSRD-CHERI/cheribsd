@@ -2509,3 +2509,5 @@ fuse_vnop_vptofh(struct vop_vptofh_args *ap)
 		return EOVERFLOW;
 	return (0);
 }
+
+

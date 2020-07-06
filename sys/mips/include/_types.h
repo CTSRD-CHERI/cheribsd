@@ -158,14 +158,6 @@ typedef	__uint64_t	__vm_paddr_t;
 typedef	__uint32_t	__vm_paddr_t;
 #endif
 
-#if defined(_KERNEL) && __has_feature(capabilities)
-typedef __intcap_t	__kintcap_t;
-typedef __uintcap_t	__kuintcap_t;
-#else
-typedef __intptr_t	__kintcap_t;
-typedef __uintptr_t	__kuintcap_t;
-#endif
-
 typedef	int		___wchar_t;
 
 #define	__WCHAR_MIN	__INT_MIN	/* min value for a wchar_t */
@@ -177,9 +169,6 @@ typedef	int		___wchar_t;
 //   "updated": 20181114,
 //   "target_type": "header",
 //   "changes": [
-//     "support"
-//   ],
-//   "changes_purecap": [
 //     "support"
 //   ]
 // }
