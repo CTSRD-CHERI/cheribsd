@@ -506,11 +506,11 @@ memguard_cmp_zone(uma_zone_t zone)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20200123,
+//   "updated": 20200706,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "pointer_alignment"
-//     "uniptr_interp_offset"
+//     "pointer_as_integer"
 //   ]
 // }
 // CHERI CHANGES END

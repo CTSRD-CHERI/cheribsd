@@ -837,4 +837,13 @@ nhops_dump_sysctl(struct rib_head *rh, struct sysctl_req *w)
 
 	return (0);
 }
-
+// CHERI CHANGES START
+// {
+//   "updated": 20200706,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "unsupported"
+//   ],
+//   "change_comment": "nhop struct grows above the limit"
+// }
+// CHERI CHANGES END

@@ -1891,15 +1891,14 @@ dqb32_dqb64(const struct dqblk32 *dqb32, struct dqblk64 *dqb64)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20200123,
+//   "updated": 20200706,
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
 //     "user_capabilities"
 //   ],
 //   "changes_purecap": [
-//     "hashing",
-//     "uintptr_interp_offset"
+//     "hashing"
 //   ]
 // }
 // CHERI CHANGES END

@@ -159,3 +159,12 @@ struct xbpf_d {
 #define BPFIF_FLAG_DYING	1	/* Reject new bpf consumers */
 
 #endif
+// CHERI CHANGES START
+// {
+//   "updated": 20200706,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "subobject_bounds"
+//   ]
+// }
+// CHERI CHANGES END

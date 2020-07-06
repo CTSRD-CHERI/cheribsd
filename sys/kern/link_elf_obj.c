@@ -1733,3 +1733,13 @@ link_elf_strtab_get(linker_file_t lf, caddr_t *strtab)
 
     return (ef->ddbstrcnt);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20200706,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_as_integer",
+//     "kdb"
+//   ]
+// }
+// CHERI CHANGES END

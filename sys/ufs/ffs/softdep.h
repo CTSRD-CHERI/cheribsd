@@ -1119,3 +1119,12 @@ struct mount_softdeps {
 #define	softdep_flushtd			um_softdep->sd_flushtd
 #define	softdep_curdeps			um_softdep->sd_curdeps
 #define	softdep_alldeps			um_softdep->sd_alldeps
+// CHERI CHANGES START
+// {
+//   "updated": 20200706,
+//   "target_type": "header",
+//   "changes_purecap": [
+//     "subobject_bounds"
+//   ]
+// }
+// CHERI CHANGES END

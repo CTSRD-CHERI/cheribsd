@@ -456,7 +456,7 @@ platform_start(__register_t a0, __register_t a1,  __register_t a2,
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20200517,
+//   "updated": 20200528,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "pointer_as_integer"

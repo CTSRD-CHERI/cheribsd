@@ -816,7 +816,7 @@ ptrace_clear_single_step(struct thread *td)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20190604,
+//   "updated": 20200706,
 //   "target_type": "kernel",
 //   "changes": [
 //     "kernel_sig_types",
@@ -824,7 +824,6 @@ ptrace_clear_single_step(struct thread *td)
 //     "user_capabilities"
 //   ],
 //   "changes_purecap": [
-//     "support",
 //     "subobject_bounds"
 //   ],
 //   "change_comment": "sendsig"

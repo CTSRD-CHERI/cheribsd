@@ -111,3 +111,14 @@ xdma_sglist_add(struct xdma_sglist *sg, xdma_request_addr_t seg_addr,
 
 	return (0);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20200706,
+//   "target_type": "header",
+//   "changes_purecap": [
+//     "pointer_as_integer",
+//     "support"
+//   ],
+//   "change_comment": "bus_addr_t"
+// }
+// CHERI CHANGES END

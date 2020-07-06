@@ -3492,3 +3492,12 @@ tcp_log_end_status(struct tcpcb *tp, uint8_t status)
 		}
 	}
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20200706,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "subobject_bounds"
+//   ]
+// }
+// CHERI CHANGES END

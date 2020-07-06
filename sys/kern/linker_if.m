@@ -146,9 +146,10 @@ METHOD int link_preload_finish {
 
 # CHERI CHANGES START
 # {
-#   "updated": 20190830,
+#   "updated": 20200706,
 #   "target_type": "kernel",
 #   "changes_purecap": [
+#     "pointer_as_integer",
 #     "kdb"
 #   ]
 # }

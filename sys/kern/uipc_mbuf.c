@@ -2157,3 +2157,13 @@ SYSCTL_PROC(_kern_ipc, OID_AUTO, mbufprofileclr,
     mbprof_clr_handler, "I",
     "clear mbuf profiling statistics");
 #endif
+// CHERI CHANGES START
+// {
+//   "updated": 202000706,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "support",
+//     "pointer_shape"
+//   ]
+// }
+// CHERI CHANGES END

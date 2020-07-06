@@ -666,7 +666,7 @@ kick_proc0(void)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20200123,
+//   "updated": 20200706,
 //   "target_type": "kernel",
 //   "changes": [
 //     "support",
@@ -674,8 +674,7 @@ kick_proc0(void)
 //   ],
 //   "changes_purecap": [
 //     "support",
-//     "pointer_as_integer",
-//     "uintptr_interp_offset"
+//     "pointer_as_integer"
 //   ]
 // }
 // CHERI CHANGES END

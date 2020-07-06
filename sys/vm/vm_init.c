@@ -286,11 +286,12 @@ again:
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20190603,
+//   "updated": 2020706,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "pointer_as_integer",
-//     "support"
+//     "support",
+//     "bounds_compression",
 //   ]
 // }
 // CHERI CHANGES END

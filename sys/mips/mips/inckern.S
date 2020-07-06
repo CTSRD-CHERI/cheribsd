@@ -45,3 +45,12 @@ kernel_start:
 .incbin KERNNAME
 .globl kernel_end;
 kernel_end:
+// CHERI CHANGES START
+// {
+//   "updated": 20200706,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "support"
+//   ]
+// }
+// CHERI CHANGES END

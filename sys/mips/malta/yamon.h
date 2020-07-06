@@ -108,11 +108,10 @@ extern yamon_env_t *fenvp[];
 #endif /* _MALTA_YAMON_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20171215,
+//   "updated": 20200706,
 //   "target_type": "header",
 //   "changes_purecap": [
-//     "pointer_as_integer",
-//     "support"
+//     "monotonicity"
 //   ]
 // }
 // CHERI CHANGES END

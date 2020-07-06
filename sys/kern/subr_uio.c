@@ -607,7 +607,7 @@ casuword(volatile u_long * __capability addr, u_long old, u_long new)
 //     "user_capabilities"
 //   ],
 //   "changes_purecap": [
-//     "user_capabilities",
+//     "support",
 //     "pointer_as_integer"
 //   ]
 // }

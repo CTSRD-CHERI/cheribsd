@@ -235,3 +235,12 @@ static devclass_t beri_iommu_devclass;
 
 DRIVER_MODULE(beri_iommu, simplebus, beri_iommu_driver,
     beri_iommu_devclass, 0, 0);
+// CHERI CHANGES START
+// {
+//   "updated": 20200615,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_as_integer"
+//   ]
+// }
+// CHERI CHANGES END

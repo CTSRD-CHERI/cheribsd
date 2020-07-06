@@ -144,3 +144,13 @@ static driver_t altpll_fdt_driver = {
 
 DRIVER_MODULE(altpll, simplebus, altpll_fdt_driver,
     altpll_devclass, 0, 0);
+// CHERI CHANGES START
+// {
+//   "updated": 20200706,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "other"
+//   ],
+//   "change_comment": "pointer printing"
+// }
+// CHERI CHANGES END

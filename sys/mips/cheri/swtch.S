@@ -617,13 +617,3 @@ szsigcode32:
 	.long	esigcode32-sigcode32
 	.text
 #endif
-// CHERI CHANGES START
-// {
-//   "updated": 20200227,
-//   "target_type": "header",
-//   "changes_purecap": [
-//     "support"
-//   ],
-//   "change_comment": ""
-// }
-// CHERI CHANGES END

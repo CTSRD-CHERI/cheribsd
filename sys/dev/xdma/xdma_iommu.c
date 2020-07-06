@@ -171,3 +171,13 @@ xdma_iommu_release(struct xdma_iommu *xio)
 
 	return (0);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20200706,
+//   "target_type": "header",
+//   "changes_purecap": [
+//     "pointer_as_integer"
+//   ],
+//   "change_comment": "bus_addr_t"
+// }
+// CHERI CHANGES END

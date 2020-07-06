@@ -1526,10 +1526,9 @@ ufs_checkpath(ino_t source_ino, ino_t parent_ino, struct inode *target, struct u
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20190812,
+//   "updated": 20200706,
 //   "target_type": "kernel",
 //   "changes_purecap": [
-//     "user_capabilities",
 //     "subobject_bounds"
 //   ]
 // }

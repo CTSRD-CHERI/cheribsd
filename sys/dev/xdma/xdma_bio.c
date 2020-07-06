@@ -104,3 +104,13 @@ xdma_enqueue_bio(xdma_channel_t *xchan, struct bio **bp,
 
 	return (0);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20200706,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_as_integer"
+//   ],
+//   "change_comment": "bus_addr_t"
+// }
+// CHERI CHANGES END

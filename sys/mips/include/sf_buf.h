@@ -81,10 +81,9 @@ sf_buf_unmap(struct sf_buf *sf)
 #endif /* !_MACHINE_SF_BUF_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20180917,
+//   "updated": 20200706,
 //   "target_type": "header",
 //   "changes_purecap": [
-//     "support",
 //     "pointer_as_integer"
 //   ]
 // }

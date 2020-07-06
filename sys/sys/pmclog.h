@@ -324,3 +324,12 @@ void	pmclog_shutdown(void);
 #endif	/* _KERNEL */
 
 #endif	/* _SYS_PMCLOG_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20200706,
+//   "target_type": "header",
+//   "changes_purecap": [
+//     "pointer_as_integer"
+//   ]
+// }
+// CHERI CHANGES END

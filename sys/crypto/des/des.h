@@ -108,3 +108,12 @@ int des_check_key_parity(const unsigned char *);
 #endif
 
 #endif
+// CHERI CHANGES START
+// {
+//   "updated": 20200706,
+//   "target_type": "header",
+//   "changes_purecap": [
+//     "subobject_bounds"
+//   ]
+// }
+// CHERI CHANGES END

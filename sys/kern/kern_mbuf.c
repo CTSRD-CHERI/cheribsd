@@ -1651,3 +1651,15 @@ mb_mapped_to_unmapped(struct mbuf *mp, int len, int mlen, int how,
 		*mlast = m;
 	return (mout);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20200706,
+//   "target_type": "kernel",
+//   "changes": [
+//     "integer_provenance"
+//   ],
+//   "changes_purecap": [
+//     "support"
+//   ]
+// }
+// CHERI CHANGES END

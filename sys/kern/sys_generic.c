@@ -2012,14 +2012,14 @@ kern_posix_error(struct thread *td, int error)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20191025,
+//   "updated": 20200706,
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
 //     "user_capabilities"
 //   ],
 //   "changes_purecap": [
-//     "uintptr_interp_offset"
+//     "pointer_shape"
 //   ]
 // }
 // CHERI CHANGES END

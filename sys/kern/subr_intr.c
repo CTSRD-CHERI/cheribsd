@@ -1664,3 +1664,12 @@ intr_map_init(void *dummy __unused)
 	mtx_init(&irq_map_lock, "intr map table", NULL, MTX_DEF);
 }
 SYSINIT(intr_map_init, SI_SUB_INTR, SI_ORDER_FIRST, intr_map_init, NULL);
+// CHERI CHANGES START
+// {
+//   "updated": 20200706,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_as_integer"
+//   ]
+// }
+// CHERI CHANGES END

@@ -302,9 +302,10 @@
 #endif /* _MIPS_INCLUDE_CHERIREG_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20190522,
+//   "updated": 20200706,
 //   "target_type": "header",
 //   "changes_purecap": [
+//     "pointer_as_integer",
 //     "support"
 //   ]
 // }

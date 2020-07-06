@@ -171,4 +171,12 @@ busdma_bufalloc_free_uncacheable(void *item, vm_size_t size, uint8_t pflag)
 
 	kmem_free((vm_ptr_t)item, size);
 }
-
+// CHERI CHANGES START
+// {
+//   "updated": 20200706,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_as_integer"
+//   ]
+// }
+// CHERI CHANGES END

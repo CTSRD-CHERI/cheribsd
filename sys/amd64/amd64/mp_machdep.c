@@ -751,3 +751,13 @@ invlrng_pcid_handler(void)
 	}
 	PCPU_SET(smp_tlb_done, generation);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20200612,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "support"
+//   ],
+//   "change_comment": "vm kmem_malloc alignment"
+// }
+// CHERI CHANGES END

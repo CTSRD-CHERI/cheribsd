@@ -282,3 +282,13 @@ db_trace_thread_wrapper(struct thread *td)
 		db_trace_thread(td, -1);
 	(void)kdb_jmpbuf(prev_jb);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20200706,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "virtual_address",
+//     "kdb"
+//   ]
+// }
+// CHERI CHANGES END

@@ -1083,12 +1083,11 @@ cluster_collectbufs(struct vnode *vp, struct buf *last_bp, int gbflags)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20200123,
+//   "updated": 20200706,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "pointer_as_integer",
-//     "pointer_provenance",
-//     "uintptr_interp_offset"
+//     "pointer_provenance"
 //   ]
 // }
 // CHERI CHANGES END

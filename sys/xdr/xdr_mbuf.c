@@ -307,11 +307,10 @@ xdrmbuf_inline(XDR *xdrs, u_int len)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20190709,
+//   "updated": 20200706,
 //   "target_type": "kernel",
 //   "changes_purecap": [
-//     "pointer_alignment",
-//     "uintptr_interp_offset"
+//     "pointer_alignment"
 //   ]
 // }
 // CHERI CHANGES END

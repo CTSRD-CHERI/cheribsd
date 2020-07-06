@@ -246,3 +246,12 @@ void tmproutes_init(struct rib_head *rh);
 void tmproutes_destroy(struct rib_head *rh);
 
 #endif
+// CHERI CHANGES START
+// {
+//   "updated": 20200706,
+//   "target_type": "header",
+//   "changes_purecap": [
+//     "subobject_bounds"
+//   ]
+// }
+// CHERI CHANGES END

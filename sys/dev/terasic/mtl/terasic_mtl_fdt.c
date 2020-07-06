@@ -215,3 +215,13 @@ static driver_t terasic_mtl_fdt_driver = {
 
 DRIVER_MODULE(mtl, simplebus, terasic_mtl_fdt_driver, terasic_mtl_devclass, 0,
     0);
+// CHERI CHANGES START
+// {
+//   "updated": 20200706,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "other"
+//   ],
+//   "change_comment": "pointer printing"
+// }
+// CHERI CHANGES END

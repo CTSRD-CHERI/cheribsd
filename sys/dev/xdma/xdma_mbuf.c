@@ -149,3 +149,13 @@ xdma_mbuf_defrag(xdma_channel_t *xchan, struct xdma_request *xr)
 
 	return (c);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20200706,
+//   "target_type": "header",
+//   "changes_purecap": [
+//     "pointer_as_integer"
+//   ],
+//   "change_comment": "bus_addr_t"
+// }
+// CHERI CHANGES END

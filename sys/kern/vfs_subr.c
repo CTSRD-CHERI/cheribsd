@@ -6499,13 +6499,13 @@ vn_dir_check_exec(struct vnode *vp, struct componentname *cnp)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20200123,
+//   "updated": 20200706,
 //   "target_type": "kernel",
 //   "changes": [
 //     "sysctl"
 //   ],
 //   "changes_purecap": [
-//     "uintptr_interp_offset"
+//     "hashing"
 //   ]
 // }
 // CHERI CHANGES END

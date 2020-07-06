@@ -867,13 +867,12 @@ int    ether_poll_deregister(if_t ifp);
 #endif /* !_NET_IF_VAR_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20190812,
+//   "updated": 20200706,
 //   "target_type": "header",
 //   "changes": [
 //     "ioctl:net"
 //   ],
 //   "changes_purecap": [
-//     "ioctl:net",
 //     "subobject_bounds"
 //   ]
 // }

@@ -92,9 +92,10 @@ __END_DECLS
 #endif
 // CHERI CHANGES START
 // {
-//   "updated": 20190607,
+//   "updated": 20200706,
 //   "target_type": "kernel",
 //   "changes_purecap": [
+//     "subobject_bounds"
 //     "unsupported"
 //   ],
 //   "change_comment": "underaligned sockaddr_dl causes oob"

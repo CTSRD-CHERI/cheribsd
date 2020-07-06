@@ -2970,3 +2970,12 @@ DB_SHOW_COMMAND(unpcb, db_show_unpcb)
 	db_printf("unp_refcount: %u\n", unp->unp_refcount);
 }
 #endif
+// CHERI CHANGES START
+// {
+//   "updated": 20200706,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "subobject_bounds"
+//   ]
+// }
+// CHERI CHANGES END

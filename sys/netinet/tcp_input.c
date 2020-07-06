@@ -3884,3 +3884,12 @@ tcp_compute_initwnd(uint32_t maxseg)
 			return (4 * maxseg);
 	}
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20200706,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "subobject_bounds"
+//   ]
+// }
+// CHERI CHANGES END

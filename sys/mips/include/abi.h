@@ -146,7 +146,7 @@
 #endif /* !_MACHINE_ABI_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20180820,
+//   "updated": 20200706,
 //   "target_type": "header",
 //   "changes_purecap": [
 //     "support"

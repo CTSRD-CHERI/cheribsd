@@ -536,10 +536,10 @@ TLBLO_PTE_TO_PA(pt_entry_t pte)
 #endif /* !_MACHINE_PTE_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20180515,
+//   "updated": 20200706,
 //   "target_type": "header",
 //   "changes_purecap": [
-//     "support"
+//     "pointer_as_integer"
 //   ]
 // }
 // CHERI CHANGES END

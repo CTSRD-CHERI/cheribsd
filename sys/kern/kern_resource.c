@@ -1571,13 +1571,12 @@ chgumtxcnt(struct uidinfo *uip, int diff, rlim_t max)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20190812,
+//   "updated": 20200706,
 //   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"
 //   ],
 //   "changes_purecap": [
-//     "user_capabilities",
 //     "subobject_bounds"
 //   ]
 // }

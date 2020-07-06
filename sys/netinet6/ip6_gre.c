@@ -592,3 +592,12 @@ in6_gre_uninit(void)
 		gre_hashdestroy((struct gre_list *)V_ipv6_sockets);
 	}
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20200706,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "subobject_bounds"
+//   ]
+// }
+// CHERI CHANGES END

@@ -519,3 +519,12 @@ ngt_rint_poll(struct tty *tp)
 	/* We can always accept input */
 	return (1);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20200706,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "support"
+//   ]
+// }
+// CHERI CHANGES END

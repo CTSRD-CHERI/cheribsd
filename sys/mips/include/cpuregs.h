@@ -789,11 +789,10 @@ extern caddr_t cheri_kall_capability;
 #endif /* _MIPS_CPUREGS_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20200123,
+//   "updated": 20200706,
 //   "target_type": "header",
 //   "changes_purecap": [
-//     "support",
-//     "uintptr_interp_offset"
+//     "pointer_as_integer"
 //   ]
 // }
 // CHERI CHANGES END

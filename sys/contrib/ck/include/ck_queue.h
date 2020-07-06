@@ -436,3 +436,12 @@ struct __no_subobject_bounds {							\
 } while (0)
 
 #endif /* CK_QUEUE_H */
+// CHERI CHANGES START
+// {
+//   "updated": 20200706,
+//   "target_type": "header",
+//   "changes_purecap": [
+//     "subobject_bounds"
+//   ]
+// }
+// CHERI CHANGES END

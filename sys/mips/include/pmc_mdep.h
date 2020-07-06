@@ -27,7 +27,7 @@ union pmc_md_op_pmcallocate {
 
 /*
  * MIPS event codes are encoded with a select bit.  The
- * select bit is used when writing to CP0 so that we
+ * select bit is used when writing to CP0 so that we 
  * can select either counter 0/2 or 1/3.  The cycle
  * and instruction counters are special in that they
  * can be counted on either 0/2 or 1/3.
@@ -78,3 +78,12 @@ uint64_t	mips_pmcn_write(unsigned int pmc, uint64_t v);
 #endif /* _KERNEL */
 
 #endif /* !_MACHINE_PMC_MDEP_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20200706,
+//   "target_type": "header",
+//   "changes_purecap": [
+//     "pointer_shape"
+//   ]
+// }
+// CHERI CHANGES END

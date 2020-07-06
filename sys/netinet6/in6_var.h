@@ -926,6 +926,7 @@ int	in6_rtrequest(int, struct sockaddr *, struct sockaddr *,
 //   "updated": 20191205,
 //   "target_type": "header",
 //   "changes_purecap": [
+//     "user_capabilities",
 //     "subobject_bounds"
 //   ]
 // }

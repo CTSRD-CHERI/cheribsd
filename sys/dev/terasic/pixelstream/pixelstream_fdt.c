@@ -140,3 +140,13 @@ static driver_t pixelstream_fdt_driver = {
 
 DRIVER_MODULE(pixelstream, simplebus, pixelstream_fdt_driver,
     pixelstream_devclass, 0, 0);
+// CHERI CHANGES START
+// {
+//   "updated": 20200706,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "other"
+//   ],
+//   "change_comment": "pointer printing"
+// }
+// CHERI CHANGES END

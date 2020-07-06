@@ -369,12 +369,13 @@ __END_DECLS
 #endif /* !_SYS_LINKER_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20190830,
+//   "updated": 20200706,
 //   "target_type": "header",
 //   "changes": [
 //     "pointer_shape"
 //   ],
 //   "changes_purecap": [
+//     "pointer_as_integer",
 //     "kdb"
 //   ]
 // }

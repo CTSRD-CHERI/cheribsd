@@ -113,7 +113,7 @@ cpu_fork(struct thread *td1, struct proc *p2, struct thread *td2, int flags)
 	 * our pcb also includes the td_frame being copied
 	 * too. The older mips2 code did an additional copy
 	 * of the td_frame, for us that's not needed any
-	 * longer (this copy does them both)
+	 * longer (this copy does them both) 
 	 */
 	bcopy(td1->td_pcb, pcb2, sizeof(*pcb2));
 #ifdef CPU_CHERI
@@ -219,12 +219,12 @@ cpu_fork(struct thread *td1, struct proc *p2, struct thread *td2, int flags)
 
 	if (td1->td_md.md_cop2) {
 		td2->td_md.md_cop2 = octeon_cop2_alloc_ctx();
-		memcpy(td2->td_md.md_cop2, td1->td_md.md_cop2,
+		memcpy(td2->td_md.md_cop2, td1->td_md.md_cop2, 
 			sizeof(*td1->td_md.md_cop2));
 	}
 	if (td1->td_md.md_ucop2) {
 		td2->td_md.md_ucop2 = octeon_cop2_alloc_ctx();
-		memcpy(td2->td_md.md_ucop2, td1->td_md.md_ucop2,
+		memcpy(td2->td_md.md_ucop2, td1->td_md.md_ucop2, 
 			sizeof(*td1->td_md.md_ucop2));
 	}
 	td2->td_md.md_cop2owner = td1->td_md.md_cop2owner;
@@ -823,7 +823,7 @@ DB_SHOW_COMMAND(pcb, ddb_dump_pcb)
 		td = db_lookup_thread(addr, true);
 	else
 		td = curthread;
-
+	
 	pcb = td->td_pcb;
 
 	db_printf("Thread %d at %p\n", td->td_tid, td);
@@ -864,7 +864,7 @@ DB_SHOW_COMMAND(pcb, ddb_dump_pcb)
  */
 DB_SHOW_COMMAND(trapframe, ddb_dump_trapframe)
 {
-
+	
 	if (!have_addr)
 		return;
 
@@ -874,16 +874,16 @@ DB_SHOW_COMMAND(trapframe, ddb_dump_trapframe)
 #endif	/* DDB */
 // CHERI CHANGES START
 // {
-//   "updated": 20200123,
+//   "updated": 20200706,
 //   "target_type": "kernel",
 //   "changes": [
 //     "support"
 //   ],
-//   "changes": [
+//   "changes_purecap": [
 //     "support",
 //     "pointer_alignment",
 //     "uintptr_interp_offset"
 //   ],
-//   "change_comment": ""
+//   "change_comment": "kstack size and guard page"
 // }
 // CHERI CHANGES END

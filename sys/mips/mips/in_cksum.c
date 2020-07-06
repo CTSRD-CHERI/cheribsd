@@ -250,11 +250,12 @@ u_int in_cksum_hdr(const struct ip *ip)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20200402,
+//   "updated": 20200706,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "pointer_alignment",
-//     "uintptr_interp_offset"
+//     "uintptr_interp_offset",
+//     "virtual_address"
 //   ]
 // }
 // CHERI CHANGES END

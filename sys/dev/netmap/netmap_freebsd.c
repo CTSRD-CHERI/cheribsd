@@ -1621,3 +1621,12 @@ MODULE_VERSION(netmap, 1);
 /* reduce conditional code */
 // linux API, use for the knlist in FreeBSD
 /* use a private mutex for the knlist */
+// CHERI CHANGES START
+// {
+//   "updated": 20200706,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "support"
+//   ]
+// }
+// CHERI CHANGES END

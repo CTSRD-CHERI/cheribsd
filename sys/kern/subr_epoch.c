@@ -848,10 +848,10 @@ epoch_drain_callbacks(epoch_t epoch)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20200123,
+//   "updated": 20200706,
 //   "target_type": "kernel",
 //   "changes_purecap": [
-//     "uintptr_interp_offset"
+//     "subobject_bounds"
 //   ]
 // }
 // CHERI CHANGES END

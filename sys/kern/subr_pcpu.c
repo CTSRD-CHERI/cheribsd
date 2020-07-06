@@ -428,11 +428,11 @@ DB_SHOW_ALIAS(allpcpu, db_show_cpu_all);
 #endif
 // CHERI CHANGES START
 // {
-//   "updated": 20200123,
+//   "updated": 20200706,
 //   "target_type": "kernel",
 //   "changes_purecap": [
-//     "pointer_shape",
-//     "uintptr_interp_offset"
+//     "bounds_compression",
+//     "pointer_provenance"
 //   ]
 // }
 // CHERI CHANGES END

@@ -1140,3 +1140,12 @@ badport_bandlim(int which)
 			V_icmp_rates[which].descr, (intmax_t )pps, V_icmplim);
 	return (0);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20200706,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "subobject_bounds"
+//   ]
+// }
+// CHERI CHANGES END

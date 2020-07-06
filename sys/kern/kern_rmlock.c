@@ -1084,3 +1084,12 @@ rms_wunlock(struct rmslock *rms)
 		wakeup(&rms->readers);
 	mtx_unlock(&rms->mtx);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20200706,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "subobject_bounds"
+//   ]
+// }
+// CHERI CHANGES END

@@ -4597,14 +4597,13 @@ fildesc_drvinit(void *unused)
 SYSINIT(fildescdev, SI_SUB_DRIVERS, SI_ORDER_MIDDLE, fildesc_drvinit, NULL);
 // CHERI CHANGES START
 // {
-//   "updated": 20200123,
+//   "updated": 20200706,
 //   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"
 //   ],
 //   "changes_purecap": [
-//     "subobject_bounds",
-//     "uintptr_interp_offset"
+//     "subobject_bounds"
 //   ]
 // }
 // CHERI CHANGES END

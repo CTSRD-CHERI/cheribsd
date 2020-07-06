@@ -221,10 +221,10 @@ teken_color_t teken_256to8(teken_color_t);
 #endif /* !_TEKEN_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20200517,
+//   "updated": 20200706,
 //   "target_type": "header",
 //   "changes_purecap": [
-//     "support"
+//     "other"
 //   ],
 //   "change_comment": "Compiler assumes alignment"
 // }

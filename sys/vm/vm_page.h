@@ -994,11 +994,10 @@ vm_page_none_valid(vm_page_t m)
 #endif				/* !_VM_PAGE_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20190812,
+//   "updated": 20200706,
 //   "target_type": "header",
 //   "changes_purecap": [
 //     "pointer_as_integer",
-//     "uintptr_interp_offset",
 //     "subobject_bounds"
 //   ]
 // }

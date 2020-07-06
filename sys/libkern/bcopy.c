@@ -188,3 +188,13 @@ bcopynocap(const void *src0, void *dst0, size_t length)
 	_memcpy(dst0, src0, length, false);
 }
 #endif
+// CHERI CHANGES START
+// {
+//   "updated": 20200706,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "uintptr_interp_offset",
+//     "virtual_address"
+//   ]
+// }
+// CHERI CHANGES END

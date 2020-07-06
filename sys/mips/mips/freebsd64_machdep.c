@@ -568,3 +568,14 @@ elf64_dump_thread(struct thread *td __unused, void *dst __unused,
     size_t *off __unused)
 {
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20200706,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_as_integer",
+//     "subobject_bounds",
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

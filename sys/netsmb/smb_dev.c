@@ -972,11 +972,14 @@ smb_dev2share(int fd, int mode, struct smb_cred *scred,
 
 // CHERI CHANGES START
 // {
-//   "updated": 20191025,
+//   "updated": 20200706,
 //   "target_type": "kernel",
 //   "changes": [
 //     "ioctl:misc",
 //     "iovec-macros"
+//   ],
+//   "changes_purecap": [
+//      "subobject_bounds"
 //   ]
 // }
 // CHERI CHANGES END

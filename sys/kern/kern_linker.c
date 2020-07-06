@@ -2310,12 +2310,13 @@ SYSCTL_PROC(_kern, OID_AUTO, function_list,
     "kernel function list");
 // CHERI CHANGES START
 // {
-//   "updated": 20190830,
+//   "updated": 20200706,
 //   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"
 //   ],
 //   "changes_purecap": [
+//     "pointer_as_integer",
 //     "kdb"
 //   ]
 // }

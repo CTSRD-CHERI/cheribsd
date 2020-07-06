@@ -290,11 +290,10 @@ exec_sysvec_init(void *param)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20200123,
+//   "updated": 20200706,
 //   "target_type": "kernel",
 //   "changes_purecap": [
-//     "pointer_as_integer",
-//     "uintptr_interp_offset"
+//     "pointer_as_integer"
 //   ]
 // }
 // CHERI CHANGES END

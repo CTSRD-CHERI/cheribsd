@@ -1843,11 +1843,11 @@ vmem_check(vmem_t *vm)
 #endif /* defined(DIAGNOSTIC) */
 // CHERI CHANGES START
 // {
-//   "updated": 20200414,
+//   "updated": 20200706,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "uintptr_interp_offset",
-//     "pointer_shape",
+//     "bounds_compression",
 //     "support",
 //     "pointer_alignment"
 //   ]

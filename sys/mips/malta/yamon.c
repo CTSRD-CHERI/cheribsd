@@ -83,11 +83,10 @@ yamon_getcpufreq(void)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20190702,
+//   "updated": 20200706,
 //   "target_type": "kernel",
 //   "changes_purecap": [
-//     "pointer_as_integer",
-//     "support"
+//     "monotonicity"
 //   ]
 // }
 // CHERI CHANGES END

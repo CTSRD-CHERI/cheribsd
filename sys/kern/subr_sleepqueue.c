@@ -1511,10 +1511,9 @@ DB_SHOW_ALIAS(sleepqueue, db_show_sleepqueue);
 #endif
 // CHERI CHANGES START
 // {
-//   "updated": 20200123,
+//   "updated": 20200706,
 //   "target_type": "kernel",
 //   "changes_purecap": [
-//     "uintptr_interp_offset",
 //     "hashing"
 //   ]
 // }

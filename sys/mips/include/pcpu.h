@@ -144,7 +144,7 @@ void	mips_pcpu_tlb_init(struct pcpu *pcpu);
 #endif	/* !_MACHINE_PCPU_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20190523,
+//   "updated": 20200706,
 //   "target_type": "header",
 //   "changes_purecap": [
 //     "pointer_shape",

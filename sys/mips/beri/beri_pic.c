@@ -370,7 +370,7 @@ EARLY_DRIVER_MODULE(beripic, ofwbus, beripic_driver, beripic_devclass, 0, 0,
     BUS_PASS_INTERRUPT + BUS_PASS_ORDER_MIDDLE);
 // CHERI CHANGES START
 // {
-//   "updated": 20200517,
+//   "updated": 20200513,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "subobject_bounds"

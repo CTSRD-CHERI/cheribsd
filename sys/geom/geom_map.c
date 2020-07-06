@@ -408,3 +408,12 @@ static struct g_class g_map_class = {
 };
 DECLARE_GEOM_CLASS(g_map_class, g_map);
 MODULE_VERSION(geom_map, 0);
+// CHERI CHANGES START
+// {
+//   "updated": 20200706,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "support"
+//   ]
+// }
+// CHERI CHANGES END

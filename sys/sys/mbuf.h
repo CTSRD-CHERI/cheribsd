@@ -1600,9 +1600,10 @@ mbuf_has_tls_session(struct mbuf *m)
 #endif /* !_SYS_MBUF_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20190812,
+//   "updated": 20200706,
 //   "target_type": "header",
 //   "changes_purecap": [
+//     "support",
 //     "pointer_shape",
 //     "subobject_bounds"
 //   ]
