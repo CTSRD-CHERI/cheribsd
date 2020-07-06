@@ -113,7 +113,7 @@ linux_common_open(struct thread *td, int dirfd, char *path, int l_flags, int mod
 		bsd_flags |= O_CLOEXEC;
 	if (l_flags & LINUX_O_NONBLOCK)
 		bsd_flags |= O_NONBLOCK;
-	if (l_flags & LINUX_FASYNC)
+	if (l_flags & LINUX_O_ASYNC)
 		bsd_flags |= O_ASYNC;
 	if (l_flags & LINUX_O_CREAT)
 		bsd_flags |= O_CREAT;
@@ -1286,7 +1286,7 @@ fcntl_common(struct thread *td, struct linux_fcntl_args *args)
 		if (result & O_FSYNC)
 			td->td_retval[0] |= LINUX_O_SYNC;
 		if (result & O_ASYNC)
-			td->td_retval[0] |= LINUX_FASYNC;
+			td->td_retval[0] |= LINUX_O_ASYNC;
 #ifdef LINUX_O_NOFOLLOW
 		if (result & O_NOFOLLOW)
 			td->td_retval[0] |= LINUX_O_NOFOLLOW;
@@ -1305,7 +1305,7 @@ fcntl_common(struct thread *td, struct linux_fcntl_args *args)
 			arg |= O_APPEND;
 		if (args->arg & LINUX_O_SYNC)
 			arg |= O_FSYNC;
-		if (args->arg & LINUX_FASYNC)
+		if (args->arg & LINUX_O_ASYNC)
 			arg |= O_ASYNC;
 #ifdef LINUX_O_NOFOLLOW
 		if (args->arg & LINUX_O_NOFOLLOW)
@@ -1371,9 +1371,10 @@ fcntl_common(struct thread *td, struct linux_fcntl_args *args)
 
 	case LINUX_F_DUPFD_CLOEXEC:
 		return (kern_fcntl(td, args->fd, F_DUPFD_CLOEXEC, args->arg));
+	default:
+		linux_msg(td, "unsupported fcntl cmd %d\n", args->cmd);
+		return (EINVAL);
 	}
-
-	return (EINVAL);
 }
 
 int

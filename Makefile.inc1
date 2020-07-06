@@ -329,7 +329,7 @@ TEST_SYSTEM_COMPILER_VARS= \
 	X_COMPILER_FREEBSD_VERSION
 TEST_SYSTEM_LINKER_VARS= \
 	USING_SYSTEM_LINKER MK_SYSTEM_LINKER \
-	MK_LLD_BOOTSTRAP MK_BINUTILS_BOOTSTRAP \
+	MK_LLD_BOOTSTRAP \
 	WANT_LINKER_TYPE WANT_LINKER_VERSION WANT_LINKER_VERSION_FILE \
 	WANT_LINKER_FREEBSD_VERSION WANT_LINKER_FREEBSD_VERSION_FILE \
 	LD LINKER_TYPE LINKER_FEATURES LINKER_VERSION \
@@ -2597,9 +2597,6 @@ _dtrace_tools= cddl/lib/libctf cddl/usr.bin/ctfconvert \
 
 # If we're given an XAS, don't build binutils.
 .if ${XAS:M/*} == ""
-.if ${MK_BINUTILS_BOOTSTRAP} != "no"
-_binutils=	gnu/usr.bin/binutils
-.endif
 .if ${MK_ELFTOOLCHAIN_BOOTSTRAP} != "no"
 _elftctools=	lib/libelftc \
 		lib/libpe \
@@ -2643,7 +2640,6 @@ cross-tools: .MAKE .PHONY
     ${_clang_libs} \
     ${_clang} \
     ${_lld} \
-    ${_binutils} \
     ${_elftctools} \
     ${_dtrace_tools} \
     ${_btxld} \
@@ -2740,9 +2736,6 @@ SUBDIR_DEPEND_usr.bin/clang=	lib/clang
 .if ${MK_CLANG} != "no"
 NXBDIRS+=	lib/clang
 NXBDIRS+=	usr.bin/clang
-.endif
-.if ${MK_BINUTILS} != "no"
-NXBDIRS+=	gnu/usr.bin/binutils
 .endif
 # XXX: native-xtools passes along ${NXBDIRS} in SUBDIR_OVERRIDE that needs
 # to be evaluated after NXBDIRS is set.
@@ -3449,7 +3442,6 @@ _xb-build-tools: .PHONY
 XDEVDIRS= \
     ${_clang_libs} \
     ${_lld} \
-    ${_binutils} \
     ${_elftctools} \
     usr.bin/ar \
     ${_clang}

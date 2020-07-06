@@ -167,7 +167,8 @@ aesni_attach(device_t dev)
 	sc = device_get_softc(dev);
 
 	sc->cid = crypto_get_driverid(dev, sizeof(struct aesni_session),
-	    CRYPTOCAP_F_SOFTWARE | CRYPTOCAP_F_SYNC);
+	    CRYPTOCAP_F_SOFTWARE | CRYPTOCAP_F_SYNC |
+	    CRYPTOCAP_F_ACCEL_SOFTWARE);
 	if (sc->cid < 0) {
 		device_printf(dev, "Could not get crypto driver id.\n");
 		return (ENOMEM);
@@ -387,7 +388,7 @@ MODULE_VERSION(aesni, 1);
 MODULE_DEPEND(aesni, crypto, 1, 1, 1);
 
 static int
-intel_sha1_update(void *vctx, void *vdata, u_int datalen)
+intel_sha1_update(void *vctx, const void *vdata, u_int datalen)
 {
 	struct sha1_ctxt *ctx = vctx;
 	const char *data = vdata;
@@ -436,7 +437,7 @@ SHA1_Finalize_fn(void *digest, void *ctx)
 }
 
 static int
-intel_sha256_update(void *vctx, void *vdata, u_int len)
+intel_sha256_update(void *vctx, const void *vdata, u_int len)
 {
 	SHA256_CTX *ctx = vctx;
 	uint64_t bitlen;
