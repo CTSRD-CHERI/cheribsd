@@ -459,12 +459,6 @@ typedef struct if_rxsd {
 #define PKT_INFO_SIZE 8
 #define RXD_INFO_SIZE 8
 #define PKT_TYPE uint64_t
-/* XXX-AM: remove cheri-256 support */
-/* #else /\* CPU_CHERI256 *\/ */
-/* #define PKT_INFO_SIZE 12 */
-/* #define RXD_INFO_SIZE 16 */
-/* #define PKT_TYPE uint64_t */
-/* #endif /\* CPU_CHERI256 *\/ */
 #elif defined(__LP64__)
 #define PKT_INFO_SIZE	6
 #define RXD_INFO_SIZE	5
@@ -498,11 +492,6 @@ pkt_info_zero(if_pkt_info_t pi)
 	pi_pad->pkt_val[3] = 0; pi_pad->pkt_val[4] = 0; pi_pad->pkt_val[5] = 0;
 #ifdef CHERI_PURECAP_KERNEL
 	pi_pad->pkt_val[6] = 0; pi_pad->pkt_val[7] = 0;
-/* XXX-AM: remove cheri-256 support */
-/* #ifndef CPU_CHERI128 */
-/* 	pi_pad->pkt_val[8] = 0;	pi_pad->pkt_val[9] = 0; pi_pad->pkt_val[10] = 0; */
-/* 	pi_pad->pkt_val[11] = 0; */
-/* #endif */
 #elif !defined(__LP64__)
 	pi_pad->pkt_val[6] = 0; pi_pad->pkt_val[7] = 0; pi_pad->pkt_val[8] = 0;
 	pi_pad->pkt_val[9] = 0; pi_pad->pkt_val[10] = 0;
@@ -6868,7 +6857,7 @@ iflib_debugnet_poll(if_t ifp, int count)
 #endif /* DEBUGNET */
 // CHERI CHANGES START
 // {
-//   "updated": 20200123,
+//   "updated": 20200706,
 //   "target_type": "kernel",
 //   "changes": [
 //     "ioctl:net",
@@ -6876,7 +6865,7 @@ iflib_debugnet_poll(if_t ifp, int count)
 //   ],
 //   "changes_purecap": [
 //     "pointer_shape",
-//     "uintptr_interp_offset"
+//     "pointer_alignment"
 //   ]
 // }
 // CHERI CHANGES END

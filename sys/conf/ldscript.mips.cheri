@@ -60,7 +60,7 @@ SECTIONS
   PROVIDE (etext = .);
   .rodata   : { *(.rodata) *(.rodata.*) *(.gnu.linkonce.r.*) }
   .rodata1   : { *(.rodata1) }
-  .interp     : { *(.interp) 	}
+  .interp     : { *(.interp)	}
   .hash          : { *(.hash)		}
   PROVIDE (_dynsym = ALIGN(0x8));
   .dynsym        : { *(.dynsym)		}
@@ -144,38 +144,38 @@ SECTIONS
       *(.rela.sbss.*)
       *(.rel.gnu.linkonce.sb.*)
     }
-  .rel.sdata2    : 
-    { 
+  .rel.sdata2    :
+    {
       *(.rel.sdata2)
       *(.rel.sdata2.*)
       *(.rel.gnu.linkonce.s2.*)
     }
-  .rela.sdata2   : 
+  .rela.sdata2   :
     {
       *(.rela.sdata2)
       *(.rela.sdata2.*)
       *(.rela.gnu.linkonce.s2.*)
     }
-  .rel.sbss2     : 
-    { 
-      *(.rel.sbss2)	
+  .rel.sbss2     :
+    {
+      *(.rel.sbss2)
       *(.rel.sbss2.*)
       *(.rel.gnu.linkonce.sb2.*)
     }
-  .rela.sbss2    : 
-    { 
-      *(.rela.sbss2)	
+  .rela.sbss2    :
+    {
+      *(.rela.sbss2)
       *(.rela.sbss2.*)
       *(.rela.gnu.linkonce.sb2.*)
     }
-  .rel.bss       : 
-    { 
+  .rel.bss       :
+    {
       *(.rel.bss)
       *(.rel.bss.*)
       *(.rel.gnu.linkonce.b.*)
     }
-  .rela.bss      : 
-    { 
+  .rela.bss      :
+    {
       *(.rela.bss)
       *(.rela.bss.*)
       *(.rela.gnu.linkonce.b.*)
@@ -208,7 +208,7 @@ SECTIONS
   .data1   : { *(.data1) }
     .eh_frame : { KEEP (*(.eh_frame)) }
   .gcc_except_table : { *(.gcc_except_table) }
-  .ctors   : 
+  .ctors   :
   {
     /* gcc uses crtbegin.o to find the start of
        the constructors, so we make sure it is
@@ -245,9 +245,9 @@ SECTIONS
   /* We want the small data sections together, so single-instruction offsets
      can access them all, and initialized data all before uninitialized, so
      we can shorten the on-disk segment size.  */
-  .sdata     : 
+  .sdata     :
   {
-    *(.sdata) 
+    *(.sdata)
     *(.sdata.*)
     *(.gnu.linkonce.s.*)
   }

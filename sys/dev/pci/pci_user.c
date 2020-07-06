@@ -151,7 +151,7 @@ struct cdevsw pcicdev = {
 	.d_ioctl =	pci_ioctl,
 	.d_name =	"pci",
 };
-
+  
 static int
 pci_open(struct cdev *dev, int oflags, int devtype, struct thread *td)
 {
@@ -217,7 +217,7 @@ pci_conf_match_native(struct pci_match_conf *matches, int num_matches,
 		 && (match_buf->pc_sel.pc_func != matches[i].pc_sel.pc_func))
 			continue;
 
-		if (((matches[i].flags & PCI_GETCONF_MATCH_VENDOR) != 0)
+		if (((matches[i].flags & PCI_GETCONF_MATCH_VENDOR) != 0) 
 		 && (match_buf->pc_vendor != matches[i].pc_vendor))
 			continue;
 
@@ -1426,15 +1426,14 @@ getconfexit:
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20190510,
+//   "updated": 20200706,
 //   "target_type": "kernel",
 //   "changes": [
 //     "ioctl:misc",
 //     "user_capabilities"
 //   ],
 //   "changes_purecap": [
-//     "ioctl:misc",
-//     "user_capabilities"
+//     "pointer_as_integer"
 //   ]
 // }
 // CHERI CHANGES END

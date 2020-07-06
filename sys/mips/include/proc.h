@@ -106,7 +106,7 @@ struct syscall_args {
 
 #ifdef __mips_n64
 #if __has_feature(capabilities)
-#define KINFO_PROC_SIZE 1248
+#define	KINFO_PROC_SIZE 1248
 #define	KINFO_PROC64_SIZE 1088
 #else /* !__has_feature(capabilities) */
 #define	KINFO_PROC_SIZE 1088
@@ -119,7 +119,7 @@ struct syscall_args {
 #endif	/* !_MACHINE_PROC_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20200706,
 //   "target_type": "header",
 //   "changes": [
 //     "support",

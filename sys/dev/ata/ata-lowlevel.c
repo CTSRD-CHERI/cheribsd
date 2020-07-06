@@ -64,7 +64,7 @@ static void ata_tf_read(struct ata_request *);
 static void ata_tf_write(struct ata_request *);
 
 /*
- * low level ATA functions
+ * low level ATA functions 
  */
 void
 ata_generic_hw(device_t dev)
@@ -275,7 +275,7 @@ ata_end_transaction(struct ata_request *request)
 	    request->error = ATA_IDX_INB(ch, ATA_ERROR);
 	    goto end_finished;
 	}
-
+	
 	/* are we moving data ? */
 	if (request->flags & (ATA_R_READ | ATA_R_WRITE)) {
 
@@ -301,7 +301,7 @@ ata_end_transaction(struct ata_request *request)
 	    if (request->bytecount > request->donecount) {
 
 		/* set this transfer size according to HW capabilities */
-		request->transfersize =
+		request->transfersize = 
 		    min((request->bytecount - request->donecount),
 			request->transfersize);
 
@@ -459,7 +459,7 @@ ata_end_transaction(struct ata_request *request)
 	    request->status |= ATA_S_ERROR;
 	else if (!(request->flags & ATA_R_TIMEOUT))
 	    request->donecount = request->bytecount;
-
+ 
 	/* release SG list etc */
 	ch->dma.unload(request);
 
@@ -500,7 +500,7 @@ ata_generic_reset(device_t dev)
     /* in some setups we dont want to test for a slave */
     if (!(ch->flags & ATA_NO_SLAVE)) {
 	ATA_IDX_OUTB(ch, ATA_DRIVE, ATA_D_IBM | ATA_D_LBA | ATA_DEV(ATA_SLAVE));
-	DELAY(10);
+	DELAY(10);      
 	ostat1 = ATA_IDX_INB(ch, ATA_STATUS);
 	if (((ostat1 & 0xf8) != 0xf8 || (ch->flags & ATA_KNOWN_PRESENCE)) &&
 		ostat1 != 0xa5) {
@@ -523,7 +523,7 @@ ata_generic_reset(device_t dev)
     ATA_IDX_OUTB(ch, ATA_DRIVE, ATA_D_IBM | ATA_D_LBA | ATA_DEV(ATA_MASTER));
     DELAY(10);
     ATA_IDX_OUTB(ch, ATA_CONTROL, ATA_A_IDS | ATA_A_RESET);
-    ata_udelay(10000);
+    ata_udelay(10000); 
     ATA_IDX_OUTB(ch, ATA_CONTROL, ATA_A_IDS);
     ata_udelay(100000);
     ATA_IDX_INB(ch, ATA_ERROR);
@@ -632,10 +632,10 @@ ata_wait(struct ata_channel *ch, int unit, u_int8_t mask)
 {
     u_int8_t status;
     int timeout = 0;
-
+    
     DELAY(1);
 
-    /* wait at max 1 second for device to get !BUSY */
+    /* wait at max 1 second for device to get !BUSY */ 
     while (timeout < 1000000) {
 	status = ATA_IDX_INB(ch, ATA_ALTSTAT);
 
@@ -649,7 +649,7 @@ ata_wait(struct ata_channel *ch, int unit, u_int8_t mask)
 
 	/* are we done ? */
 	if (!(status & ATA_S_BUSY))
-	    break;
+	    break;            
 
 	if (timeout > 1000) {
 	    timeout += 1000;
@@ -659,24 +659,24 @@ ata_wait(struct ata_channel *ch, int unit, u_int8_t mask)
 	    timeout += 10;
 	    DELAY(10);
 	}
-    }
-    if (timeout >= 1000000)
-	return -2;
-    if (!mask)
-	return (status & ATA_S_ERROR);
+    }    
+    if (timeout >= 1000000)      
+	return -2;          
+    if (!mask)     
+	return (status & ATA_S_ERROR);   
 
     DELAY(1);
-
-    /* wait 50 msec for bits wanted */
+    
+    /* wait 50 msec for bits wanted */     
     timeout = 5000;
-    while (timeout--) {
+    while (timeout--) {   
 	status = ATA_IDX_INB(ch, ATA_ALTSTAT);
-	if ((status & mask) == mask)
-	    return (status & ATA_S_ERROR);
-	DELAY(10);
-    }
-    return -3;
-}
+	if ((status & mask) == mask) 
+	    return (status & ATA_S_ERROR);            
+	DELAY(10);         
+    }     
+    return -3;      
+}   
 
 int
 ata_generic_command(struct ata_request *request)
@@ -687,7 +687,7 @@ ata_generic_command(struct ata_request *request)
     ATA_IDX_OUTB(ch, ATA_DRIVE, ATA_D_IBM | ATA_D_LBA | ATA_DEV(request->unit));
 
     /* ready to issue command ? */
-    if (ata_wait(ch, request->unit, 0) < 0) {
+    if (ata_wait(ch, request->unit, 0) < 0) { 
 	device_printf(request->parent, "timeout waiting to issue command\n");
 	request->flags |= ATA_R_TIMEOUT;
 	return (-1);
@@ -746,7 +746,7 @@ ata_generic_command(struct ata_request *request)
 
 	/* this seems to be needed for some (slow) devices */
 	DELAY(10);
-
+		    
 	/* output command block */
 	ATA_IDX_OUTSW_STRM(ch, ATA_DATA, (int16_t *)request->u.atapi.ccb,
 			   (request->flags & ATA_R_ATAPI16) ? 8 : 6);
@@ -775,7 +775,7 @@ ata_tf_read(struct ata_request *request)
 
 	ATA_IDX_OUTB(ch, ATA_CONTROL, ATA_A_4BIT);
 	request->u.ata.count |= ATA_IDX_INB(ch, ATA_COUNT);
-	request->u.ata.lba |=
+	request->u.ata.lba |= 
 	    (ATA_IDX_INB(ch, ATA_SECTOR) |
 	     (ATA_IDX_INB(ch, ATA_CYL_LSB) << 8) |
 	     (ATA_IDX_INB(ch, ATA_CYL_MSB) << 16));
@@ -1005,10 +1005,9 @@ ata_pio_write(struct ata_request *request, int length)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20200402,
+//   "updated": 20200706,
 //   "target_type": "kernel",
 //   "changes_purecap": [
-//     "uintptr_interp_offset",
 //     "pointer_as_integer",
 //     "pointer_alignment"
 //   ]

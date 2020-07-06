@@ -253,11 +253,8 @@ __ElfType(Auxinfo);
 #endif /* __MIPS_ELF_H */
 // CHERI CHANGES START
 // {
-//   "updated": 20191002,
+//   "updated": 20181114,
 //   "target_type": "header",
-//   "changes_purecap": [
-//     "pointer_shape"
-//   ]
 //   "changes": [
 //     "support"
 //   ]

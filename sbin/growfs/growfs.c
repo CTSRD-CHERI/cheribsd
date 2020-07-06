@@ -1460,7 +1460,7 @@ main(int argc, char **argv)
 		default:
 			errc(1, ret, "unable to read superblock");
 		}
-	}	
+	}
 	memcpy(&osblock, fs, fs->fs_sbsize);
 	osblock.fs_si = &osblock_summary_info;
 	memcpy(osblock.fs_si, fs->fs_si, sizeof(*fs->fs_si));
@@ -1764,7 +1764,7 @@ cgckhash(struct cg *cgp)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20190628,
+//   "updated": 20200706,
 //   "target_type": "prog",
 //   "changes_purecap": [
 //     "pointer_shape"

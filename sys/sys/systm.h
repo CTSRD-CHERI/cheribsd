@@ -176,7 +176,7 @@ void	kassert_panic(const char *fmt, ...)  __printflike(1, 2);
  */
 #define	CRITICAL_ASSERT(td)						\
 	KASSERT((td)->td_critnest >= 1, ("Not in critical section"));
-
+ 
 /*
  * If we have already panic'd and this is the thread that called
  * panic(), then don't block on any mutexes but silently succeed.
@@ -237,26 +237,6 @@ void	kassert_panic(const char *fmt, ...)  __printflike(1, 2);
  * XXX: We should probably have a __USER_CAP_PATH() with a MAXPATH limit.
  */
 #define	__USER_CAP_STR(strp)	__USER_CAP_UNBOUND(strp)
-
-#ifdef CHERI_PURECAP_KERNEL
-/*
- * Convert userspace pointers to capabilities only when the kernel
- * uses the pure capability ABI.
- */
-#define PURECAP_KERNEL_USER_CAP(ptr, len)	\
-	__USER_CAP(ptr, len)
-#define PURECAP_KERNEL_USER_CAP_OBJ(objp)	\
-	__USER_CAP_OBJ(objp)
-#define PURECAP_KERNEL_USER_CODE_CAP(ptr)	\
-	__USER_CODE_CAP(ptr)
-#define PURECAP_KERNEL_USER_CAP_UNBOUND(ptr)	\
-	__USER_CAP_UNBOUND(ptr)
-#else
-#define PURECAP_KERNEL_USER_CAP(ptr, len) (void *)(uintptr_t)(ptr)
-#define PURECAP_KERNEL_USER_CAP_OBJ(objp) (void *)(uintptr_t)(objp)
-#define PURECAP_KERNEL_USER_CODE_CAP(ptr) (void *)(uintptr_t)(ptr)
-#define PURECAP_KERNEL_USER_CAP_UNBOUND(ptr) (void *)(uintptr_t)(ptr)
-#endif
 
 /*
  * Align variables.
@@ -388,7 +368,7 @@ int	kvprintf(char const *, void (*)(int, void*), void *, int,
 void	log(int, const char *, ...) __printflike(2, 3);
 void	log_console(struct uio *);
 void	vlog(int, const char *, __va_list) __printflike(2, 0);
-int	asprintf(char **ret, struct malloc_type *mtp, const char *format,
+int	asprintf(char **ret, struct malloc_type *mtp, const char *format, 
 	    ...) __printflike(3, 4);
 int	printf(const char *, ...) __printflike(1, 2);
 int	snprintf(char *, size_t, const char *, ...) __printflike(3, 4);
@@ -780,7 +760,7 @@ __NULLABILITY_PRAGMA_POP
 #endif /* !_SYS_SYSTM_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20190617,
+//   "updated": 20200706,
 //   "target_type": "header",
 //   "changes": [
 //     "user_capabilities"

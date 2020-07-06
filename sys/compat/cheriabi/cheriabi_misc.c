@@ -1956,10 +1956,10 @@ cheriabi_ptrace(struct thread *td, struct cheriabi_ptrace_args *uap)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20190524,
+//   "updated": 20200706,
 //   "target_type": "kernel",
 //   "changes_purecap": [
-//     "other"
+//     "pointer_alignment"
 //   ],
 //   "change_comment":
 //     "Readability improvement of representability alignment."

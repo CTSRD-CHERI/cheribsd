@@ -150,7 +150,7 @@ mtrash_ctor(void *mem, int size, void *arg, int flags)
 		return (0);
 #endif
 	/*
-	 * XXX-AM: in CHERI256 we may find sizes smaller
+	 * In CHERI we may find sizes smaller
 	 * than the pointer size, in this case fall back to
 	 * trash_ctor.
 	 */
@@ -188,7 +188,7 @@ mtrash_dtor(void *mem, int size, void *arg)
 		return;
 #endif
 	/*
-	 * XXX-AM: in CHERI256 we may find sizes smaller
+	 * In CHERI we may find sizes smaller
 	 * than the pointer size, in this case fall back to
 	 * trash_dtor.
 	 */
@@ -221,7 +221,7 @@ mtrash_init(void *mem, int size, int flags)
 	mtrash_dtor(mem, size, NULL);
 
 	/*
-	 * XXX-AM: in CHERI256 we may find sizes smaller
+	 * In CHERI we may find sizes smaller
 	 * than the pointer size, in this case fall back to
 	 * trash_init behaviour.
 	 */

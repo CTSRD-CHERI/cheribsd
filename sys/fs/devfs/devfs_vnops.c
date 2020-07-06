@@ -1346,7 +1346,7 @@ devfs_readdir(struct vop_readdir_args *ap)
 	 * supporting cookies. We store the location of the ncookies pointer
 	 * in a temporary variable before calling vfs_subr.c:vfs_read_dirent()
 	 * and set the number of cookies to 0. We then set the pointer to
-	 * NULL so that vfs_read_dirent doesn't try to call realloc() on
+	 * NULL so that vfs_read_dirent doesn't try to call realloc() on 
 	 * ap->a_cookies. Later in this function, we restore the ap->a_ncookies
 	 * pointer to its original location before returning to the caller.
 	 */
@@ -1510,7 +1510,7 @@ devfs_revoke(struct vop_revoke_args *ap)
 
 	dev = vp->v_rdev;
 	cdp = cdev2priv(dev);
-
+ 
 	dev_lock();
 	cdp->cdp_inuse++;
 	dev_unlock();
@@ -1543,7 +1543,7 @@ devfs_revoke(struct vop_revoke_args *ap)
 				vdrop(vp2);
 				vput(vp2);
 				break;
-			}
+			} 
 		}
 		if (vp2 != NULL) {
 			continue;
@@ -1983,7 +1983,7 @@ VFS_VOP_VECTOR_REGISTER(devfs_specops);
 
 /*
  * Our calling convention to the device drivers used to be that we passed
- * vnode.h IO_* flags to read()/write(), but we're moving to fcntl.h O_
+ * vnode.h IO_* flags to read()/write(), but we're moving to fcntl.h O_ 
  * flags instead since that's what open(), close() and ioctl() takes and
  * we don't really want vnode.h in device drivers.
  * We solved the source compatibility by redefining some vnode flags to
@@ -1995,14 +1995,13 @@ CTASSERT(O_NONBLOCK == IO_NDELAY);
 CTASSERT(O_FSYNC == IO_SYNC);
 // CHERI CHANGES START
 // {
-//   "updated": 20190510,
+//   "updated": 20200706,
 //   "target_type": "kernel",
 //   "changes": [
 //     "ioctl:misc",
 //     "support"
 //   ],
 //   "changes_purecap": [
-//     "ioctl:misc",
 //     "pointer_as_integer"
 //   ]
 // }

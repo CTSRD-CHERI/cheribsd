@@ -1754,8 +1754,8 @@ te_data_get_ptr(void *irtep, u_long cmd)
 #endif
 #ifdef COMPAT_FREEBSD64
 	case sizeof(irteup->irte64):
-		return (__USER_CAP((struct cd_toc_entry *)(uintptr_t)
-		    irteup->irte64.data, irteup->irte64.data_len));
+		return (__USER_CAP(irteup->irte64.data,
+		    irteup->irte64.data_len));
 #endif
 	default:
 		panic("Unhandled ioctl command %ld", cmd);
@@ -4282,13 +4282,14 @@ scsi_read_toc(struct ccb_scsiio *csio, uint32_t retries,
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20190528,
+//   "updated": 20200706,
 //   "target_type": "kernel",
 //   "changes": [
 //     "ioctl:misc"
 //   ],
 //   "changes_purecap": [
-//     "ioctl:misc"
+//     "user_capabilities",
+//     "pointer_as_integer"
 //   ]
 // }
 // CHERI CHANGES END

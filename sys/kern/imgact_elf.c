@@ -3030,6 +3030,7 @@ __elfN(stackgap)(struct image_params *imgp, uintcap_t *stack_base)
 //   ],
 //   "changes_purecap": [
 //     "pointer_provenance",
+//     "pointer_as_integer",
 //     "uintptr_interp_offset"
 //   ]
 // }

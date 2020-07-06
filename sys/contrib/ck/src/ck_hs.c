@@ -357,7 +357,7 @@ restart:
 		i = probes = 0;
 
 		for (;;) {
-			bucket = (const void **)rounddown2((uintptr_t)&update->entries[offset], CK_MD_CACHELINE);
+			bucket = (const void **)rounddown2(&update->entries[offset], CK_MD_CACHELINE);
 
 			for (j = 0; j < CK_HS_PROBE_L1; j++) {
 				const void **cursor = bucket + ((j + offset) & (CK_HS_PROBE_L1 - 1));
@@ -452,7 +452,7 @@ ck_hs_map_probe(struct ck_hs *hs,
 		probe_limit = ck_hs_map_bound_get(map, h);
 
 	for (;;) {
-		bucket = (const void **)rounddown2((uintptr_t)&map->entries[offset], CK_MD_CACHELINE);
+		bucket = (const void **)rounddown2(&map->entries[offset], CK_MD_CACHELINE);
 
 		for (j = 0; j < CK_HS_PROBE_L1; j++) {
 			cursor = bucket + ((j + offset) & (CK_HS_PROBE_L1 - 1));
@@ -957,7 +957,7 @@ ck_hs_init(struct ck_hs *hs,
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20190528,
+//   "updated": 20200706,
 //   "target_type": "header",
 //   "changes_purecap": [
 //     "pointer_alignment"

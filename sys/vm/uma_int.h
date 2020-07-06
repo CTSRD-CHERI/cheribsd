@@ -132,17 +132,9 @@
 #ifndef VM_UMA_INT_H
 #define VM_UMA_INT_H
 
-#if 0 /* XXX-AM: remove cheri-256 support */
-/* #if defined(CHERI_PURECAP_KERNEL) && !defined(CPU_CHERI128) */
-#define UMA_SLAB_SIZE	(2*PAGE_SIZE)		/* How big are our slabs? */
-#define UMA_SLAB_MASK	(2*PAGE_SIZE - 1)	/* Mask to get back to the page */
-#define UMA_SLAB_SHIFT	(PAGE_SHIFT + 1)	/* Number of bits PAGE_MASK */
-/* #else /\* ! CHERI_PURECAP_KERNEL or CPU_CHERI128 *\/ */
-#endif
 #define UMA_SLAB_SIZE	PAGE_SIZE	/* How big are our slabs? */
 #define UMA_SLAB_MASK	(PAGE_SIZE - 1)	/* Mask to get back to the page */
 #define UMA_SLAB_SHIFT	PAGE_SHIFT	/* Number of bits PAGE_MASK */
-/* #endif /\* ! CHERI_PURECAP_KERNEL or CPU_CHERI128 *\/ */
 
 /* Max waste percentage before going to off page slab management */
 #define UMA_MAX_WASTE	10
@@ -737,12 +729,12 @@ void uma_set_limit(unsigned long limit);
 #endif /* VM_UMA_INT_H */
 // CHERI CHANGES START
 // {
-//   "updated": 20200123,
+//   "updated": 20200706,
 //   "target_type": "header",
 //   "changes_purecap": [
 //     "support",
 //     "uintptr_interp_offset",
-//     "pointer_shape",
+//     "subobject_bounds",
 //     "pointer_as_integer",
 //     "monotonicity"
 //   ]

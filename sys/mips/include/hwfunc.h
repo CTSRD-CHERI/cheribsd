@@ -109,12 +109,3 @@ struct cpu_group *platform_smp_topo(void);
 #endif	/* SMP */
 
 #endif /* !_MACHINE_HWFUNC_H_ */
-// CHERI CHANGES START
-// {
-//   "updated": 20171208,
-//   "target_type": "header",
-//   "changes_purecap": [
-//     "pointer_as_integer"
-//   ]
-// }
-// CHERI CHANGES END

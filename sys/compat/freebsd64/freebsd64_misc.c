@@ -319,7 +319,7 @@ kevent11_freebsd64_copyout(void *arg, struct kevent *kevp, int count)
 		kev11.flags = kevp->flags;
 		kev11.fflags = kevp->fflags;
 		kev11.data = kevp->data;
-		kev11.udata = (uint64_t)(__cheri_addr vaddr_t)kevp->udata;
+		kev11.udata = (__cheri_addr uint64_t)kevp->udata;
 		error = copyout(&kev11, __USER_CAP_OBJ(uap->eventlist),
 		    sizeof(kev11));
 		if (error != 0)
@@ -564,7 +564,8 @@ freebsd64_swapcontext(struct thread *td, struct freebsd64_swapcontext_args *uap)
 	PROC_LOCK(td->td_proc);
 	uc.uc_sigmask = td->td_sigmask;
 	PROC_UNLOCK(td->td_proc);
-	if ((ret = copyout(&uc, __USER_CAP_OBJ(uap->oucp), UC_COPY_SIZE)) != 0)
+	if ((ret = copyout(&uc, __USER_CAP_OBJ(uap->oucp), UC_COPY_SIZE)) !=
+	    0)
 		return (ret);
 	if ((ret = copyin(__USER_CAP_OBJ(uap->ucp), &uc, UC_COPY_SIZE)) != 0)
 		return (ret);
@@ -1792,12 +1793,11 @@ freebsd64_syscall_helper_unregister(struct syscall_helper_data *sd)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20191003,
+//   "updated": 20200706,
 //   "target_type": "kernel",
 //   "changes_purecap": [
-//     "user_capabilities",
 //     "pointer_shape"
 //   ],
-//   "change_comment": "struct kevent64, upstreamable"
+//   "change_comment": "struct kevent64"
 // }
 // CHERI CHANGES END

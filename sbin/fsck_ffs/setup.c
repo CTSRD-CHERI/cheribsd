@@ -447,7 +447,7 @@ sblock_init(void)
 	asblk.b_un.b_buf = Malloc(SBLOCKSIZE);
 	if (sblk.b_un.b_buf == NULL || asblk.b_un.b_buf == NULL)
 		errx(EEXIT, "cannot allocate space for superblock");
-	sblock.fs_si = Malloc(sizeof(*sblock.fs_si));	
+	sblock.fs_si = Malloc(sizeof(*sblock.fs_si));
 	altsblock.fs_si = Malloc(sizeof(*altsblock.fs_si));
 	if (sblock.fs_si == NULL || altsblock.fs_si == NULL)
 		errx(EEXIT, "cannot allocate space for superblock summary info");
@@ -573,7 +573,7 @@ saverecovery(int readfd, int writefd)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20190628,
+//   "updated": 20200706,
 //   "target_type": "prog",
 //   "changes_purecap": [
 //     "pointer_shape"

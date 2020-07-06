@@ -214,7 +214,7 @@ pmap_init_reserved_pages(void)
 	struct pcpu *pc;
 	vm_offset_t pages;
  	int i;
-
+ 
 	if (need_local_mappings == 0)
 		return;
 
@@ -3912,7 +3912,7 @@ pmap_is_valid_memattr(pmap_t pmap __unused, vm_memattr_t mode)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20181207,
+//   "updated": 20200706,
 //   "target_type": "kernel",
 //   "changes": [
 //     "support"

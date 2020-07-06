@@ -426,7 +426,7 @@ vm_ptr_t vm_map_make_ptr(vm_map_t map, vm_offset_t addr, vm_size_t size, vm_prot
 
 #define VM_MAP_WIRE_WRITE	4	/* Validate writable. */
 
-typedef int vm_map_entry_reader(void *token, vm_map_entry_t addr,
+typedef int vm_map_entry_reader(void *token, vm_map_entry_t addr, 
     vm_map_entry_t dest);
 
 #ifndef _KERNEL
@@ -537,7 +537,7 @@ void vm_map_entry_set_vnode_text(vm_map_entry_t entry, bool add);
 #endif				/* _VM_MAP_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20181228,
+//   "updated": 20200706,
 //   "target_type": "header",
 //   "changes": [
 //     "support"

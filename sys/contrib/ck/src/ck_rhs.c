@@ -373,7 +373,7 @@ ck_rhs_map_create(struct ck_rhs *hs, unsigned long entries)
 	map->max_entries = (map->capacity * (unsigned long)hs->load_factor) / 100;
 	/* Align map allocation to cache line. */
 	if (map->read_mostly) {
-		map->entries.no_entries.entries = (void *)roundup2((uintptr_t)&map[1], CK_MD_CACHELINE);
+		map->entries.no_entries.entries = (void *)roundup2(&map[1], CK_MD_CACHELINE);
 		map->entries.no_entries.descs = (void *)roundup2((uintptr_t)map->entries.no_entries.entries +
 		    (sizeof(void *) * n_entries), CK_MD_CACHELINE);
 		memset(map->entries.no_entries.entries, 0,
@@ -384,7 +384,7 @@ ck_rhs_map_create(struct ck_rhs *hs, unsigned long entries)
 		map->probe_func = ck_rhs_map_probe_rm;
 
 	} else {
-		map->entries.descs = (void *)roundup2((uintptr_t)&map[1], CK_MD_CACHELINE);
+		map->entries.descs = (void *)roundup2(&map[1], CK_MD_CACHELINE);
 		memset(map->entries.descs, 0, sizeof(struct ck_rhs_entry_desc) * n_entries);
 		map->offset_mask = (CK_MD_CACHELINE / sizeof(struct ck_rhs_entry_desc)) - 1;
 		map->probe_func = ck_rhs_map_probe;
@@ -1479,7 +1479,7 @@ ck_rhs_init(struct ck_rhs *hs,
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20190528,
+//   "updated": 20200706,
 //   "target_type": "header",
 //   "changes_purecap": [
 //     "pointer_alignment"

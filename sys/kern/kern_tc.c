@@ -2079,7 +2079,7 @@ uint64_t
 cpu_tickrate(void)
 {
 
-	if (cpu_ticks == tc_cpu_ticks)
+	if (cpu_ticks == tc_cpu_ticks) 
 		return (tc_getfrequency());
 	return (cpu_tick_frequency);
 }
@@ -2172,3 +2172,12 @@ tc_fill_vdso_timehands32(struct vdso_timehands32 *vdso_th32)
 	return (enabled);
 }
 #endif
+// CHERI CHANGES START
+// {
+//   "updated": 20200706,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_as_integer"
+//   ]
+// }
+// CHERI CHANGES END

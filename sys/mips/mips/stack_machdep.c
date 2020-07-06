@@ -46,7 +46,7 @@ __FBSDID("$FreeBSD$");
 static u_register_t
 stack_register_fetch(u_register_t sp, u_register_t stack_pos)
 {
-	u_register_t * stack =
+	u_register_t * stack = 
 	    ((u_register_t *)(intptr_t)sp + (size_t)stack_pos/sizeof(u_register_t));
 
 	return *stack;
@@ -105,7 +105,7 @@ stack_capture(struct stack *st, vaddr_t pc, vaddr_t sp)
 						break;
 					if (insn.RType.rs != RA)
 						break;
-					ra = stack_register_fetch(sp,
+					ra = stack_register_fetch(sp, 
 					    ra_stack_pos);
 					if (!ra)
 						goto done;

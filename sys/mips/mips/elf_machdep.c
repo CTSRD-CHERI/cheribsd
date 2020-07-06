@@ -567,14 +567,11 @@ elf_cpu_parse_dynamic(caddr_t loadbase __unused, Elf_Dyn *dynamic __unused)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20190604,
+//   "updated": 20181114,
 //   "target_type": "kernel",
 //   "changes": [
 //     "support"
 //   ],
-//   "changes_purecap": [
-//     "support"
-//   ],
-//   "change_comment": "shared page, purecap freebsd64 brandinfo."
+//   "change_comment": "shared page"
 // }
 // CHERI CHANGES END

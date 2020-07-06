@@ -1187,7 +1187,7 @@ bus_dmamap_sync_buf(vm_ptr_t buf, int len, bus_dmasync_op_t op, int aligned)
 			/*
 			 * Note that buf_cl and tmp_cl will have the same
 			 * misalignment since buf_cl is aligned to cache line.
-			 */			
+			 */
 			buf_cl = (vm_ptr_t)cheri_ptrperm(
 			    cheri_setoffset(cheri_kall_capability, tmp_va),
 			    size_cl, CHERI_PERMS_KERNEL_DATA);
@@ -1501,7 +1501,7 @@ alloc_bounce_pages(bus_dma_tag_t dmat, u_int numpages)
 			break;
 		}
 		bpage->busaddr = pmap_kextract(bpage->vaddr);
-		bpage->vaddr_nocache = 
+		bpage->vaddr_nocache =
 		    (vm_ptr_t)pmap_mapdev(bpage->busaddr, PAGE_SIZE);
 		mtx_lock(&bounce_lock);
 		STAILQ_INSERT_TAIL(&bz->bounce_page_list, bpage, links);
@@ -1632,7 +1632,7 @@ busdma_swi(void)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20200123,
+//   "updated": 20200706,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "pointer_as_integer",

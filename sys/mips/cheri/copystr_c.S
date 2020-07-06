@@ -60,7 +60,7 @@
  */
 LEAF(copystr_c)
 #ifdef CHERI_PURECAP_KERNEL
-XLEAF(copystr)	
+XLEAF(copystr)
 #endif
 	li		v0, 0	/* Hopefully we succeed */
 	beqz		a0, cstr_return_toolong /* Return if zero-length. */	
@@ -98,7 +98,7 @@ END(copystr_c)
 
 // CHERI CHANGES START
 // {
-//   "updated": 20180822,
+//   "updated": 20200706,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //	"support"

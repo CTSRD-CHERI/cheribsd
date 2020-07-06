@@ -266,7 +266,7 @@ recheck:
 							corrections++;
 							device_printf(sc->as_dev,
 							    "%s: single word rewrite worked"
-							    " at offset %u\n",
+							    " at offset %u\n", 
 							    __func__, i);
 							continue;
 						}
@@ -449,7 +449,7 @@ altera_sdcard_io_complete(struct altera_sdcard_softc *sc, uint16_t asr)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20200517,
+//   "updated": 20200706,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "pointer_alignment"

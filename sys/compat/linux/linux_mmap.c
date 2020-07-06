@@ -158,7 +158,7 @@ linux_mmap_common(struct thread *td, uintptr_t addr, size_t len, int prot,
 		 * fixed size of (STACK_SIZE - GUARD_SIZE).
 		 */
 
-		if (addr + len > vms->vm_maxsaddr) {
+		if ((caddr_t)addr + len > vms->vm_maxsaddr) {
 			/*
 			 * Some Linux apps will attempt to mmap
 			 * thread stacks near the top of their
@@ -258,11 +258,14 @@ linux_fixup_prot(struct thread *td, int *prot)
 #endif
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20200706,
 //   "target_type": "kernel",
 //   "changes": [
 //     "support"
 //   ],
+//   "changes_purecap": [
+//     "virtual_address"
+//   ]
 //   "change_comment": "PROT_MAX"
 // }
 // CHERI CHANGES END
