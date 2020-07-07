@@ -3691,4 +3691,5 @@ cheriabi_lio_listio(struct thread *td, struct cheriabi_lio_listio_args *uap)
 //     "kernel_sig_types",
 //     "user_capabilities"
 //   ]
+// }
 // CHERI CHANGES END
