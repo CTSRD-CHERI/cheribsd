@@ -453,7 +453,7 @@ fetch_instr_near_pc(struct trapframe *frame, register_t offset_from_pc, int32_t 
 		    "faulting instruction from untagged $pcc %p\n",  __func__,
 		    p->p_pid, (long)td->td_tid, p->p_comm,
 		    p->p_ucred ? p->p_ucred->cr_uid : -1,
-		    (void*)(uintptr_t)(__cheri_addr vaddr_t)(bad_inst_ptr));
+		    (void*)(uintptr_t)(bad_inst_ptr));
 		*instr = -1;
 		return (bad_inst_ptr);
 	}
@@ -466,7 +466,7 @@ fetch_instr_near_pc(struct trapframe *frame, register_t offset_from_pc, int32_t 
 			    "faulting instruction from %p\n",  __func__, p->p_pid,
 			    (long)td->td_tid, p->p_comm,
 			    p->p_ucred ? p->p_ucred->cr_uid : -1,
-			    (void*)(uintptr_t)(__cheri_addr vaddr_t)(bad_inst_ptr));
+			    (void*)(uintptr_t)(bad_inst_ptr));
 			*instr = -1;
 		}
 	}
@@ -1077,7 +1077,7 @@ dofault:
 			if (DELAYBRANCH(trapframe->cause))
 				va += sizeof(int);
 
-			if (td->td_md.md_ss_addr != (__cheri_addr vaddr_t)va) {
+			if (td->td_md.md_ss_addr != (uintptr_t)va) {
 				addr = va;
 				break;
 			}
@@ -2328,7 +2328,6 @@ emulate_unaligned_access(struct trapframe *frame, int mode)
 //   "changes_purecap": [
 //     "support",
 //     "kdb",
-//     "uintptr_interp_offset",
 //     "subobject_bounds"
 //   ],
 //   "change_comment": "kern unaligned load/store"

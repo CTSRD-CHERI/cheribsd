@@ -261,7 +261,7 @@ gctl_dump(struct gctl_req *req)
 		ap = &req->arg[i];
 		if (!(ap->flag & GCTL_PARAM_NAMEKERNEL))
 			printf("  param:\t%d@%p", ap->nlen,
-			    (void *)(uintptr_t)(__cheri_addr vaddr_t)ap->user_name);
+			    (void *)(uintptr_t)ap->user_name);
 		else
 			printf("  param:\t\"%s\"", ap->name);
 		printf(" [%s%s%d] = ",
@@ -269,7 +269,7 @@ gctl_dump(struct gctl_req *req)
 		    ap->flag & GCTL_PARAM_WR ? "W" : "",
 		    ap->len);
 		if (!(ap->flag & GCTL_PARAM_VALUEKERNEL)) {
-			printf(" =@ %p", (void *)(uintptr_t)(__cheri_addr vaddr_t)ap->value);
+			printf(" =@ %p", (void *)(uintptr_t)ap->value);
 		} else if (ap->flag & GCTL_PARAM_ASCII) {
 			printf("\"%s\"", (char *)ap->kvalue);
 		} else if (ap->len > 0) {

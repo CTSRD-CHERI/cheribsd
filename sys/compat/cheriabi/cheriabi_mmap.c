@@ -74,7 +74,7 @@ cap_covers_pages(const void * __capability cap, size_t size)
 	size_t pageoff;
 
 	addr = cap;
-	pageoff = ((__cheri_addr vaddr_t)addr & PAGE_MASK);
+	pageoff = ((vaddr_t)addr & PAGE_MASK);
 	addr -= pageoff;
 	size += pageoff;
 	size = (vm_size_t)round_page(size);
@@ -95,7 +95,7 @@ cheriabi_msync(struct thread *td, struct cheriabi_msync_args *uap)
 	if (uap->len != 0 && cap_covers_pages(uap->addr, uap->len) == 0)
 		return (EINVAL);
 
-	return (kern_msync(td, (__cheri_addr vaddr_t)uap->addr, uap->len,
+	return (kern_msync(td, (uintptr_t)uap->addr, uap->len,
 	    uap->flags));
 }
 
@@ -115,7 +115,7 @@ cheriabi_madvise(struct thread *td, struct cheriabi_madvise_args *uap)
 			return (EPROT);
 	}
 
-	return (kern_madvise(td, (__cheri_addr vaddr_t)uap->addr, uap->len,
+	return (kern_madvise(td, (uintptr_t)uap->addr, uap->len,
 	    uap->behav));
 }
 
@@ -291,7 +291,7 @@ cheriabi_munmap(struct thread *td, struct cheriabi_munmap_args *uap)
 	if ((cheri_getperm(uap->addr) & CHERI_PERM_CHERIABI_VMMAP) == 0)
 		return (EPROT);
 
-	return (kern_munmap(td, (__cheri_addr vaddr_t)uap->addr, uap->len));
+	return (kern_munmap(td, (uintptr_t)uap->addr, uap->len));
 }
 
 
@@ -452,7 +452,7 @@ cheriabi_mincore(struct thread *td, struct cheriabi_mincore_args *uap)
 	if (cap_covers_pages(uap->addr, uap->len) == 0)
 		return (ENOMEM);	/* XXX: EPROT? */
 
-	return (kern_mincore(td, (__cheri_addr vaddr_t)uap->addr, uap->len,
+	return (kern_mincore(td, (uintptr_t)uap->addr, uap->len,
 	    uap->vec));
 }
 
@@ -464,7 +464,7 @@ cheriabi_mlock(struct thread *td, struct cheriabi_mlock_args *uap)
 		return (ENOMEM);	/* XXX: EPROT? */
 
 	return (kern_mlock(td->td_proc, td->td_ucred,
-	    (__cheri_addr vaddr_t)uap->addr, uap->len));
+	    (uintptr_t)uap->addr, uap->len));
 }
 
 int
@@ -474,14 +474,5 @@ cheriabi_munlock(struct thread *td, struct cheriabi_munlock_args *uap)
 	if (cap_covers_pages(uap->addr, uap->len) == 0)
 		return (ENOMEM);	/* XXX: EPROT? */
 
-	return (kern_munlock(td, (__cheri_addr vaddr_t)uap->addr, uap->len));
+	return (kern_munlock(td, (uintptr_t)uap->addr, uap->len));
 }
-// CHERI CHANGES START
-// {
-//   "updated": 20190509,
-//   "target_type": "kernel",
-//   "changes_purecap": [
-//     "virtual_address"
-//   ]
-// }
-// CHERI CHANGES END

@@ -351,14 +351,14 @@ freebsd64_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	/* save user context */
 	bzero(&sf, sizeof(sf));
 	sf.sf_uc.uc_sigmask = *mask;
-	sf.sf_uc.uc_stack.ss_sp = (__cheri_addr uint64_t)td->td_sigstk.ss_sp;
+	sf.sf_uc.uc_stack.ss_sp = (uint64_t)td->td_sigstk.ss_sp;
 	sf.sf_uc.uc_stack.ss_size = td->td_sigstk.ss_size;
 	sf.sf_uc.uc_stack.ss_flags = td->td_sigstk.ss_flags;
 	sf.sf_uc.uc_mcontext.mc_onstack = (oonstack) ? 1 : 0;
 	sf.sf_uc.uc_mcontext.mc_pc = TRAPF_PC_OFFSET(regs);
 	sf.sf_uc.uc_mcontext.mullo = regs->mullo;
 	sf.sf_uc.uc_mcontext.mulhi = regs->mulhi;
-	sf.sf_uc.uc_mcontext.mc_tls = (__cheri_addr uint64_t)td->td_md.md_tls;
+	sf.sf_uc.uc_mcontext.mc_tls = (uint64_t)td->td_md.md_tls;
 	sf.sf_uc.uc_mcontext.mc_regs[0] = UCONTEXT_MAGIC;  /* magic number */
 	bcopy(__unbounded_addressof(regs->ast),
 	    (void *)&sf.sf_uc.uc_mcontext.mc_regs[1],
@@ -412,7 +412,7 @@ freebsd64_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	sp = rounddown2(sp, CHERICAP_SIZE);
 	user_cfp = cheri_setbounds((struct cheri_frame * __capability)sp,
 	    cp2_len);
-	sf.sf_uc.uc_mcontext.mc_cp2state = (__cheri_addr register_t)user_cfp;
+	sf.sf_uc.uc_mcontext.mc_cp2state = (register_t)user_cfp;
 	sf.sf_uc.uc_mcontext.mc_cp2state_len = cp2_len;
 #endif
 	sp -= sizeof(sf);
@@ -421,10 +421,10 @@ freebsd64_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 
 	/* Build the argument list for the signal handler. */
 	regs->a0 = sig;
-	regs->a2 = (__cheri_addr register_t)&sfp->sf_uc;
+	regs->a2 = (register_t)&sfp->sf_uc;
 	if (SIGISMEMBER(psp->ps_siginfo, sig)) {
 		/* Signal handler installed with SA_SIGINFO. */
-		regs->a1 = (__cheri_addr register_t)&sfp->sf_si;
+		regs->a1 = (register_t)&sfp->sf_si;
 		/* sf.sf_ahu.sf_action = (__siginfohandler_t *)catcher; */
 
 		/* fill siginfo structure */
@@ -433,7 +433,7 @@ freebsd64_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	} else {
 		/* Old FreeBSD-style arguments. */
 		regs->a1 = ksi->ksi_code;
-		regs->a3 = (__cheri_addr vaddr_t)ksi->ksi_addr;
+		regs->a3 = (register_t)ksi->ksi_addr;
 		/* sf.sf_ahu.sf_handler = catcher; */
 	}
 
@@ -479,7 +479,7 @@ freebsd64_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 
 	regs->pc = (trapf_pc_t)catcher;
 	regs->t9 = TRAPF_PC_OFFSET(regs);
-	regs->sp = (__cheri_addr register_t)sfp;
+	regs->sp = (register_t)sfp;
 	if (p->p_sysent->sv_sigcode_base != 0) {
 		/* Signal trampoline code is in the shared page */
 		regs->ra = p->p_sysent->sv_sigcode_base;
@@ -530,7 +530,7 @@ freebsd64_sysarch(struct thread *td, struct freebsd64_sysarch_args *uap)
 		    __USER_CAP_UNBOUND((void *)(intptr_t)uap->parms)));
 
 	case MIPS_GET_TLS:
-		tlsbase = (__cheri_addr int64_t)td->td_md.md_tls;
+		tlsbase = (int64_t)td->td_md.md_tls;
 		error = copyout(&tlsbase, __USER_CAP(uap->parms,
 		    sizeof(tlsbase)), sizeof(tlsbase));
 		return (error);
