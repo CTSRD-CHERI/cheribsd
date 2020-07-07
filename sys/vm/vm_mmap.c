@@ -2238,9 +2238,7 @@ vm_mmap_to_errno(int rv)
 //   ],
 //   "changes_purecap": [
 //     "support",
-//     "pointer_as_integer",
-//     "uintptr_interp_offset"
-//   ],
-//   "change_comment": ""
+//     "pointer_as_integer"
+//   ]
 // }
 // CHERI CHANGES END

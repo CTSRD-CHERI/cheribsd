@@ -368,7 +368,7 @@ CONSOLE_DRIVER(aju);
 //   "changes_purecap": [
 //     "pointer_as_integer",
 //     "support",
-//     "pointer_provenance",
+//     "pointer_provenance"
 //   ]
 // }
 // CHERI CHANGES END

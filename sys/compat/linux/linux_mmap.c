@@ -265,7 +265,7 @@ linux_fixup_prot(struct thread *td, int *prot)
 //   ],
 //   "changes_purecap": [
 //     "virtual_address"
-//   ]
+//   ],
 //   "change_comment": "PROT_MAX"
 // }
 // CHERI CHANGES END

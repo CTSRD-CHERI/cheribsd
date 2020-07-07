@@ -509,7 +509,7 @@ memguard_cmp_zone(uma_zone_t zone)
 //   "updated": 20200706,
 //   "target_type": "kernel",
 //   "changes_purecap": [
-//     "pointer_alignment"
+//     "pointer_alignment",
 //     "pointer_as_integer"
 //   ]
 // }

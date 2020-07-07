@@ -291,7 +291,7 @@ again:
 //   "changes_purecap": [
 //     "pointer_as_integer",
 //     "support",
-//     "bounds_compression",
+//     "bounds_compression"
 //   ]
 // }
 // CHERI CHANGES END

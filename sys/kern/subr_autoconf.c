@@ -278,7 +278,7 @@ DB_SHOW_COMMAND(conifhk, db_show_conifhk)
 //   "updated": 20190830,
 //   "target_type": "kernel",
 //   "changes_purecap": [
-//     "kdb",
+//     "kdb"
 //   ]
 // }
 // CHERI CHANGES END

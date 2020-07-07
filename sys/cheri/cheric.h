@@ -445,7 +445,7 @@ __cheri_clear_low_ptr_bits(uintptr_t ptr, size_t bits_mask) {
 //   "updated": 20190531,
 //   "target_type": "header",
 //   "changes_purecap": [
-//     "support",
+//     "support"
 //   ]
 // }
 // CHERI CHANGES END

@@ -95,7 +95,7 @@ __END_DECLS
 //   "updated": 20200706,
 //   "target_type": "kernel",
 //   "changes_purecap": [
-//     "subobject_bounds"
+//     "subobject_bounds",
 //     "unsupported"
 //   ],
 //   "change_comment": "underaligned sockaddr_dl causes oob"
