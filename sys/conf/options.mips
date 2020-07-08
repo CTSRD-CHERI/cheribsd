@@ -117,11 +117,6 @@ PLATFORM_INIT_SECONDARY		opt_global.h
 FDT_DTB_STATIC_ONLY		opt_platform.h
 
 #
-# Experimental support for pure capability kernel
-#
-CHERI_PURECAP_KERNEL		opt_global.h
-
-#
 # Enable debugging output on traps
 #
 TRAP_DEBUG			opt_global.h
