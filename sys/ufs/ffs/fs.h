@@ -270,6 +270,16 @@ struct csum_total {
 };
 
 /*
+ * Super block summary info.
+ */
+struct fs_summary_info {
+	u_int8_t *fs_contigdirs;	/* (u) # of contig. allocated dirs */
+	struct	csum *fs_csp;		/* (u) cg summary info buffer */
+	int32_t	*fs_maxcluster;		/* (u) max cluster in each cyl group */
+	u_int	*fs_active;		/* (u) used by snapshots to track fs */
+};
+
+/*
  * Super block for an FFS filesystem.
  */
 struct fs {
@@ -339,19 +349,9 @@ struct fs {
 	int32_t  fs_pad;		/* due to alignment of fs_swuid */
 /* these fields retain the current block allocation info */
 	int32_t	 fs_cgrotor;		/* last cg searched */
-#ifndef __CHERI_PURE_CAPABILITY__
-	void 	*fs_ocsp[NOCSPTRS];	/* padding; was list of fs_cs buffers */
-	u_int8_t *fs_contigdirs;	/* (u) # of contig. allocated dirs */
-	struct	csum *fs_csp;		/* (u) cg summary info buffer */
-	int32_t	*fs_maxcluster;		/* (u) max cluster in each cyl group */
-	u_int	*fs_active;		/* (u) used by snapshots to track fs */
-#else
 	u_int64_t cheri_align_pad;	/* Pad to 32-byte alignment */
-	u_int8_t *fs_contigdirs;	/* (u) # of contig. allocated dirs */
-	struct	csum *fs_csp;		/* Used by fsck */
-	int32_t	*fs_maxcluster;		/* Used by libufs */
-	char	fs_ocsp[128 - (3*sizeof(void *)) - 8];
-#endif
+	struct fs_summary_info *fs_si;	/* In-core pointer to summary info */
+	char	fs_ocsp[128 - sizeof(void *) - 8];
 	int32_t	 fs_old_cpc;		/* cyl per cycle in postbl */
 	int32_t	 fs_maxbsize;		/* maximum blocking factor permitted */
 	int64_t	 fs_unrefs;		/* number of unreferenced inodes */
@@ -502,14 +502,14 @@ CTASSERT(sizeof(struct fs) == 1376);
 /*
  * Macros to access bits in the fs_active array.
  */
-#define	ACTIVECGNUM(fs, cg)	((fs)->fs_active[(cg) / (NBBY * sizeof(int))])
+#define	ACTIVECGNUM(fs, cg)	((fs)->fs_si->fs_active[(cg) / (NBBY * sizeof(int))])
 #define	ACTIVECGOFF(cg)		(1 << ((cg) % (NBBY * sizeof(int))))
 #define	ACTIVESET(fs, cg)	do {					\
-	if ((fs)->fs_active)						\
+	if ((fs)->fs_si->fs_active)				\
 		ACTIVECGNUM((fs), (cg)) |= ACTIVECGOFF((cg));		\
 } while (0)
 #define	ACTIVECLEAR(fs, cg)	do {					\
-	if ((fs)->fs_active)						\
+	if ((fs)->fs_si->fs_active)				\
 		ACTIVECGNUM((fs), (cg)) &= ~ACTIVECGOFF((cg));		\
 } while (0)
 
@@ -537,7 +537,7 @@ CTASSERT(sizeof(struct fs) == 1376);
 /*
  * Convert cylinder group to base address of its global summary info.
  */
-#define	fs_cs(fs, indx) fs_csp[indx]
+#define	fs_cs(fs, indx) fs_si->fs_csp[indx]
 
 /*
  * Cylinder group block for a filesystem.
@@ -853,9 +853,12 @@ extern u_char *fragtbl[];
 #endif
 // CHERI CHANGES START
 // {
-//   "updated": 20181121,
+//   "updated": 20190628,
 //   "target_type": "header",
 //   "changes": [
+//     "pointer_shape"
+//   ],
+//   "changes_purecap": [
 //     "pointer_shape"
 //   ],
 //   "change_comment": "embedded pointer storage in superblock"

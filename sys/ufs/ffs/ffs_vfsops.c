@@ -680,10 +680,7 @@ ffs_reload(struct mount *mp, struct thread *td, int flags)
 	 * new superblock. These should really be in the ufsmount.	XXX
 	 * Note that important parameters (eg fs_ncg) are unchanged.
 	 */
-	newfs->fs_csp = fs->fs_csp;
-	newfs->fs_maxcluster = fs->fs_maxcluster;
-	newfs->fs_contigdirs = fs->fs_contigdirs;
-	newfs->fs_active = fs->fs_active;
+	newfs->fs_si = fs->fs_si;
 	newfs->fs_ronly = fs->fs_ronly;
 	sblockloc = fs->fs_sblockloc;
 	bcopy(newfs, fs, (u_int)fs->fs_sbsize);
@@ -708,9 +705,9 @@ ffs_reload(struct mount *mp, struct thread *td, int flags)
 	if (fs->fs_contigsumsize > 0)
 		size += fs->fs_ncg * sizeof(int32_t);
 	size += fs->fs_ncg * sizeof(u_int8_t);
-	free(fs->fs_csp, M_UFSMNT);
+	free(fs->fs_si->fs_csp, M_UFSMNT);
 	space = malloc(size, M_UFSMNT, M_WAITOK);
-	fs->fs_csp = space;
+	fs->fs_si->fs_csp = space;
 	for (i = 0; i < blks; i += fs->fs_frag) {
 		size = fs->fs_bsize;
 		if (i + fs->fs_frag > blks)
@@ -727,14 +724,14 @@ ffs_reload(struct mount *mp, struct thread *td, int flags)
 	 * We no longer know anything about clusters per cylinder group.
 	 */
 	if (fs->fs_contigsumsize > 0) {
-		fs->fs_maxcluster = lp = space;
+		fs->fs_si->fs_maxcluster = lp = space;
 		for (i = 0; i < fs->fs_ncg; i++)
 			*lp++ = fs->fs_contigsumsize;
 		space = lp;
 	}
 	size = fs->fs_ncg * sizeof(u_int8_t);
-	fs->fs_contigdirs = (u_int8_t *)space;
-	bzero(fs->fs_contigdirs, size);
+	fs->fs_si->fs_contigdirs = (u_int8_t *)space;
+	bzero(fs->fs_si->fs_contigdirs, size);
 	if ((flags & FFSR_UNSUSPEND) != 0) {
 		MNT_ILOCK(mp);
 		mp->mnt_kern_flag &= ~(MNTK_SUSPENDED | MNTK_SUSPEND2);
@@ -940,7 +937,7 @@ ffs_mountfs(odevvp, mp, td)
 	mtx_init(UFS_MTX(ump), "FFS", "FFS Lock", MTX_DEF);
 	ffs_oldfscompat_read(fs, ump, fs->fs_sblockloc);
 	fs->fs_ronly = ronly;
-	fs->fs_active = NULL;
+	fs->fs_si->fs_active = NULL;
 	mp->mnt_data = ump;
 	mp->mnt_stat.f_fsid.val[0] = fs->fs_id[0];
 	mp->mnt_stat.f_fsid.val[1] = fs->fs_id[1];
@@ -1099,7 +1096,8 @@ ffs_mountfs(odevvp, mp, td)
 	return (0);
 out:
 	if (fs != NULL) {
-		free(fs->fs_csp, M_UFSMNT);
+		free(fs->fs_si->fs_csp, M_UFSMNT);
+		free(fs->fs_si, M_UFSMNT);
 		free(fs, M_UFSMNT);
 	}
 	if (cp != NULL) {
@@ -1336,7 +1334,8 @@ ffs_unmount(mp, mntflags)
 		free(mp->mnt_gjprovider, M_UFSMNT);
 		mp->mnt_gjprovider = NULL;
 	}
-	free(fs->fs_csp, M_UFSMNT);
+	free(fs->fs_si->fs_csp, M_UFSMNT);
+	free(fs->fs_si, M_UFSMNT);
 	free(fs, M_UFSMNT);
 	if (ump->um_fsfail_task != NULL)
 		free(ump->um_fsfail_task, M_UFSMNT);
@@ -2462,3 +2461,12 @@ DB_SHOW_COMMAND(ffs, db_show_ffs)
 
 #endif	/* SOFTUPDATES */
 #endif	/* DDB */
+// CHERI CHANGES START
+// {
+//   "updated": 20190628,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_shape"
+//   ]
+// }
+// CHERI CHANGES END

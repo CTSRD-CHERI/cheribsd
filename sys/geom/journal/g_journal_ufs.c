@@ -84,7 +84,8 @@ g_journal_ufs_dirty(struct g_consumer *cp)
 	fs->fs_clean = 0;
 	fs->fs_flags |= FS_NEEDSFSCK | FS_UNCLEAN;
 	error = ffs_sbput(cp, fs, fs->fs_sblockloc, g_use_g_write_data);
-	g_free(fs->fs_csp);
+	g_free(fs->fs_si->fs_csp);
+	g_free(fs->fs_si);
 	g_free(fs);
 	if (error != 0) {
 		GJ_DEBUG(0, "Cannot mark file system %s as dirty "
@@ -103,3 +104,12 @@ const struct g_journal_desc g_journal_ufs = {
 
 MODULE_DEPEND(g_journal, ufs, 1, 1, 1);
 MODULE_VERSION(geom_journal, 0);
+// CHERI CHANGES START
+// {
+//   "updated": 20190628,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_shape"
+//   ]
+// }
+// CHERI CHANGES END
