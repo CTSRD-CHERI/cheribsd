@@ -474,3 +474,20 @@ CFLAGS_NO_SIMD += ${CFLAGS_NO_SIMD.${COMPILER_TYPE}}
 CFLAGS += ${CFLAGS.${MACHINE_ARCH}}
 CXXFLAGS += ${CXXFLAGS.${MACHINE_ARCH}}
 
+#
+# MACHINE_ABI is a list of properties about the ABI used for MACHINE_ARCH.
+#
+.if (${MACHINE_ARCH:Mmips*} && !${MACHINE_ARCH:Mmips*hf*}) || ${MACHINE_ARCH:Mriscv*sf*}
+MACHINE_ABI+=	soft-float
+.else
+MACHINE_ABI+=	hard-float
+.endif
+.if (${MACHINE_ARCH:Mmips*c*} || ${MACHINE_ARCH:Mriscv*c*})
+MACHINE_ABI+=	purecap
+.endif
+# Currently all 64-bit architectures include 64 in their name (see arch(7)).
+.if ${MACHINE_ARCH:M*64*}
+MACHINE_ABI+=	ptr64
+.else
+MACHINE_ABI+=	ptr32
+.endif
