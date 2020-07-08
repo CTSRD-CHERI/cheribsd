@@ -135,7 +135,7 @@ SYSCTL_INT(ELF_NODE_OID, OID_AUTO,
     ELF_ABI_NAME " brand of last resort");
 
 static int elf_legacy_coredump = 0;
-SYSCTL_INT(_debug, OID_AUTO, __elfN(legacy_coredump), CTLFLAG_RW,
+SYSCTL_INT(_debug, OID_AUTO, __elfN(legacy_coredump), CTLFLAG_RW, 
     &elf_legacy_coredump, 0,
     "include all and only RW pages in core dumps");
 
@@ -579,8 +579,7 @@ __elfN(map_insert)(struct image_params *imgp, vm_map_t map, vm_object_t object,
 	}
 	if (end != round_page(end)) {
 		rv = __elfN(map_partial)(map, object, offset +
-		    trunc_page(end) - start, trunc_page(end),
-		    end, prot);
+		    trunc_page(end) - start, trunc_page(end), end, prot);
 		if (rv != KERN_SUCCESS)
 			return (rv);
 		end = trunc_page(end);
@@ -868,9 +867,8 @@ __elfN(load_file)(struct proc *p, const char *file, u_long *addr,
 		goto fail;
 	if (hdr->e_type == ET_DYN)
 		rbase = *addr;
-	else if (hdr->e_type == ET_EXEC) {
+	else if (hdr->e_type == ET_EXEC)
 		rbase = 0;
-	}
 	else {
 		error = ENOEXEC;
 		goto fail;
@@ -896,7 +894,7 @@ __elfN(load_file)(struct proc *p, const char *file, u_long *addr,
 
 	*addr = base_addr;
 	*end_addr = base_addr + max_addr;
-	*entry = rbase + (unsigned long)hdr->e_entry;
+	*entry = (unsigned long)hdr->e_entry + rbase;
 
 fail:
 	if (imgp->firstpage)
@@ -984,7 +982,7 @@ __elfN(enforce_limits)(struct image_params *imgp, const Elf_Ehdr *hdr,
 		}
 		total_size += seg_size;
 	}
-
+	
 	if (data_addr == 0 && data_size == 0) {
 		data_addr = text_addr;
 		data_size = text_size;
@@ -1171,7 +1169,7 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 		uprintf("Program headers not in the first page\n");
 		return (ENOEXEC);
 	}
-	phdr = (const Elf_Phdr *)(imgp->image_header + hdr->e_phoff);
+	phdr = (const Elf_Phdr *)(imgp->image_header + hdr->e_phoff); 
 	if (!aligned(phdr, Elf_Addr)) {
 		uprintf("Unaligned program headers\n");
 		return (ENOEXEC);
@@ -3022,7 +3020,7 @@ __elfN(stackgap)(struct image_params *imgp, uintcap_t *stack_base)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20200123,
+//   "updated": 20200708,
 //   "target_type": "kernel",
 //   "changes": [
 //     "support",
@@ -3030,8 +3028,7 @@ __elfN(stackgap)(struct image_params *imgp, uintcap_t *stack_base)
 //   ],
 //   "changes_purecap": [
 //     "pointer_provenance",
-//     "pointer_as_integer",
-//     "uintptr_interp_offset"
+//     "pointer_as_integer"
 //   ]
 // }
 // CHERI CHANGES END

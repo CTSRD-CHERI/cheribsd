@@ -5168,14 +5168,15 @@ umtx_thread_cleanup(struct thread *td)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20200706,
+//   "updated": 20200708,
 //   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"
 //   ],
 //   "changes_purecap": [
 //     "subobject_bounds",
-//     "pointer_as_integer"
+//     "pointer_as_integer",
+//     "uintcap_arithmetic"
 //   ]
 // }
 // CHERI CHANGES END

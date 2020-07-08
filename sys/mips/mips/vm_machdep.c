@@ -874,15 +874,14 @@ DB_SHOW_COMMAND(trapframe, ddb_dump_trapframe)
 #endif	/* DDB */
 // CHERI CHANGES START
 // {
-//   "updated": 20200706,
+//   "updated": 20200708,
 //   "target_type": "kernel",
 //   "changes": [
 //     "support"
 //   ],
 //   "changes_purecap": [
 //     "support",
-//     "pointer_alignment",
-//     "uintptr_interp_offset"
+//     "pointer_alignment"
 //   ],
 //   "change_comment": "kstack size and guard page"
 // }

@@ -1050,7 +1050,7 @@ _bus_dmamap_load_buffer(bus_dma_tag_t dmat, bus_dmamap_t map, void *buf,
 		/*
 		 * Compute the segment size, and adjust counts.
 		 */
-		sgsize = PAGE_SIZE - ((vm_offset_t)curaddr & PAGE_MASK);
+		sgsize = PAGE_SIZE - (curaddr & PAGE_MASK);
 		if (sgsize > dmat->maxsegsz)
 			sgsize = dmat->maxsegsz;
 		if (buflen < sgsize)
@@ -1632,12 +1632,12 @@ busdma_swi(void)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20200706,
+//   "updated": 20200708,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "pointer_as_integer",
 //     "pointer_alignment",
-//     "uintptr_interp_offset",
+//     "uintptr_arithmetic",
 //     "unsupported"
 //   ]
 // }

@@ -5551,11 +5551,10 @@ DB_SHOW_COMMAND(umacache, db_show_umacache)
 #endif	/* DDB */
 // CHERI CHANGES START
 // {
-//   "updated": 202000706,
+//   "updated": 202000708,
 //   "target_type": "kernel",
 //   "changes_purecap": [
-//     "uintptr_interp_offset",
-//     "pointer_shape",
+//     "pointer_alignment",
 //     "pointer_as_integer",
 //     "monotonicity",
 //     "support"

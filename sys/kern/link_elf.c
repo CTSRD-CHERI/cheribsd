@@ -1972,11 +1972,11 @@ link_elf_ireloc(caddr_t kmdp)
 #endif
 // CHERI CHANGES START
 // {
-//   "updated": 20200123,
+//   "updated": 20200707,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "pointer_provenance",
-//     "uintptr_interp_offset",
+//     "support",
 //     "kdb"
 //   ]
 // }

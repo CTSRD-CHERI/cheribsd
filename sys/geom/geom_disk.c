@@ -1089,10 +1089,12 @@ SYSCTL_PROC(_kern, OID_AUTO, disks,
 
 // CHERI CHANGES START
 // {
-//   "updated": 20200123,
+//   "updated": 20200708,
 //   "target_type": "kernel",
 //   "changes_purecap": [
-//     "uintptr_interp_offset"
-//   ]
+//     "pointer_as_integer",
+//     "uintcap_arithmetic"
+//   ],
+//   "change_comment": "bus_addr_t or vaddr in bus_dma_segment_t?"
 // }
 // CHERI CHANGES END

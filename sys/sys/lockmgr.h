@@ -209,11 +209,11 @@ _lockmgr_args_rw(struct lock *lk, u_int flags, struct rwlock *ilk,
 #endif /* !_SYS_LOCKMGR_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20200127,
+//   "updated": 20200708,
 //   "target_type": "header",
 //   "changes_purecap": [
 //     "pointer_bit_flags",
-//     "uintptr_interp_offset"
+//     "uintcap_arithmetic"
 //   ]
 // }
 // CHERI CHANGES END

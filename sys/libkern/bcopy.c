@@ -100,12 +100,12 @@ _memcpy(void *dst0, const void *src0, size_t length, bool keeptags)
 		 */
 		t = (size_t)src;	/* only need low bits */
 
-		if ((t | (size_t)dst) & wmask) {
+		if ((t | (vaddr_t)dst) & wmask) {
 			/*
 			 * Try to align operands.  This cannot be done
 			 * unless the low bits match.
 			 */
-			if ((t ^ (size_t)dst) & wmask || length < wsize) {
+			if ((t ^ (vaddr_t)dst) & wmask || length < wsize) {
 				t = length;
 			} else {
 				t = wsize - (t & wmask);
@@ -139,8 +139,8 @@ _memcpy(void *dst0, const void *src0, size_t length, bool keeptags)
 		dst += length;
 		t = (size_t)src;
 
-		if ((t | (size_t)dst) & wmask) {
-			if ((t ^ (size_t)dst) & wmask || length <= wsize) {
+		if ((t | (vaddr_t)dst) & wmask) {
+			if ((t ^ (vaddr_t)dst) & wmask || length <= wsize) {
 				t = length;
 			} else {
 				t &= wmask;
@@ -190,11 +190,10 @@ bcopynocap(const void *src0, void *dst0, size_t length)
 #endif
 // CHERI CHANGES START
 // {
-//   "updated": 20200706,
+//   "updated": 20200708,
 //   "target_type": "kernel",
 //   "changes_purecap": [
-//     "uintptr_interp_offset",
-//     "virtual_address"
+//     "uintcap_arithmetic"
 //   ]
 // }
 // CHERI CHANGES END

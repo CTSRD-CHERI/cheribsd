@@ -949,11 +949,11 @@ SYSCTL_PROC(_debug, OID_AUTO, vm_lowmem, CTLTYPE_INT | CTLFLAG_MPSAFE | CTLFLAG_
     debug_vm_lowmem, "I", "set to trigger vm_lowmem event with given flags");
 // CHERI CHANGES START
 // {
-//   "updated": 20200706,
+//   "updated": 20200708,
 //   "target_type": "kernel",
 //   "changes_purecap": [
-//     "uintptr_interp_offset",
-//     "pointer_shape",
+//     "uintcap_arithmetic",
+//     "bounds_compression",
 //     "pointer_as_integer",
 //     "support"
 //   ]

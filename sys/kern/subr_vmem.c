@@ -209,11 +209,10 @@ static uma_zone_t vmem_zone;
 #define	VMEM_LOCK_DESTROY(vm)	mtx_destroy(&vm->vm_lock)
 #define	VMEM_ASSERT_LOCKED(vm)	mtx_assert(&vm->vm_lock, MA_OWNED);
 
-/* XXX-AM: should use roundup2 instead? */
-#define	VMEM_ALIGNUP(addr, align)	__builtin_align_up(addr, align)
+#define	VMEM_ALIGNUP(addr, align)	roundup2(addr, align)
 
-#define	VMEM_CROSS_P(addr1, addr2, boundary)				\
-    ((((vaddr_t)addr1 ^ (vaddr_t)addr2) & -(boundary)) != 0)
+#define	VMEM_CROSS_P(addr1, addr2, boundary) \
+    ((((vaddr_t)(addr1) ^ (vaddr_t)(addr2)) & -(boundary)) != 0)
 
 #define	ORDER2SIZE(order)	((order) < VMEM_OPTVALUE ? ((order) + 1) : \
     (vmem_size_t)1 << ((order) - (VMEM_OPTVALUE - VMEM_OPTORDER - 1)))
@@ -424,7 +423,7 @@ bt_lookupbusy(vmem_t *vm, vmem_addr_t addr)
 	bt_t *bt;
 
 	VMEM_ASSERT_LOCKED(vm);
-	list = bt_hashhead(vm, addr);
+	list = bt_hashhead(vm, addr); 
 	LIST_FOREACH(bt, list, bt_hashlist) {
 		if (bt->bt_start == addr) {
 			break;
@@ -606,7 +605,7 @@ static struct mtx_padalign __exclusive_cache_line vmem_bt_lock;
  * page of kva.  We dip into this reserve by specifying M_USE_RESERVE only
  * when allocating the page to hold new boundary tags.  In this way the
  * reserve is automatically filled by the allocation that uses the reserve.
- *
+ * 
  * We still have to guarantee that the new tags are allocated atomically since
  * many threads may try concurrently.  The bt_lock provides this guarantee.
  * We convert WAITOK allocations to NOWAIT and then handle the blocking here
@@ -926,7 +925,7 @@ vmem_fit(const bt_t *bt, vmem_size_t size, vmem_size_t align,
 	 */
 	CHERI_VM_ASSERT_VALID(start);
 	CHERI_VM_ASSERT_VALID(end);
-	if (start > end)
+	if (start > end) 
 		return (ENOMEM);
 
 	start = VMEM_ALIGNUP(start - phase, align) + phase;
@@ -1843,10 +1842,10 @@ vmem_check(vmem_t *vm)
 #endif /* defined(DIAGNOSTIC) */
 // CHERI CHANGES START
 // {
-//   "updated": 20200706,
+//   "updated": 20200708,
 //   "target_type": "kernel",
 //   "changes_purecap": [
-//     "uintptr_interp_offset",
+//     "uintcap_arithmetic",
 //     "bounds_compression",
 //     "support",
 //     "pointer_alignment"

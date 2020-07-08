@@ -126,10 +126,10 @@ stack_capture(struct stack *st, uintptr_t pc, uintptr_t sp)
 			next_sp = 0;
 		ra_stack_pos = -1;
 
-		if ((__cheri_addr vaddr_t)pc <= (__cheri_addr vaddr_t)btext)
+		if (pc <= (uintptr_t)btext)
 			break;
-		for (i = pc; i >= (intptr_t)btext &&
-		    (int64_t)cheri_getoffset((void *)i) >= 0;
+		for (i = pc; i >= (uintptr_t)btext &&
+		    cheri_getoffset((void *)i) >= 0;
 		    i -= sizeof(insn)) {
 			bcopy((void *)i, &insn, sizeof(insn));
 			if (op_is_cheri_cincoffsetimm(insn) &&
@@ -154,7 +154,7 @@ stack_capture(struct stack *st, uintptr_t pc, uintptr_t sp)
 			}
 		}
 
-		if (stack_put(st, (__cheri_addr vm_offset_t)pc) == -1)
+		if (stack_put(st, pc) == -1)
 			break;
 
 		/*
@@ -260,12 +260,11 @@ stack_save(struct stack *st)
 #endif /* CHERI_PURECAP_KERNEL */
 // CHERI CHANGES START
 // {
-//   "updated": 20190830,
+//   "updated": 20200708,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "support",
-//     "kdb",
-//     "uintptr_interp_offset"
+//     "kdb"
 //   ]
 // }
 // CHERI CHANGES END

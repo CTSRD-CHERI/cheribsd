@@ -729,11 +729,11 @@ void uma_set_limit(unsigned long limit);
 #endif /* VM_UMA_INT_H */
 // CHERI CHANGES START
 // {
-//   "updated": 20200706,
+//   "updated": 20200708,
 //   "target_type": "header",
 //   "changes_purecap": [
 //     "support",
-//     "uintptr_interp_offset",
+//     "uintcap_arithmetic",
 //     "subobject_bounds",
 //     "pointer_as_integer",
 //     "monotonicity"

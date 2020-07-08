@@ -103,7 +103,7 @@ run_interrupt_driven_config_hooks_warning(int warned)
 		    "seconds for", warned * WARNING_INTERVAL_SECS);
 		TAILQ_FOREACH(hook_entry, &intr_config_hook_list, ich_links) {
 			if (linker_search_symbol_name(
-			    (__cheri_addr vaddr_t)hook_entry->ich_func, namebuf,
+			    (vaddr_t)hook_entry->ich_func, namebuf,
 			    sizeof(namebuf), &offset) == 0)
 				printf(" %s", namebuf);
 			else
@@ -260,7 +260,7 @@ DB_SHOW_COMMAND(conifhk, db_show_conifhk)
 
 	TAILQ_FOREACH(hook_entry, &intr_config_hook_list, ich_links) {
 		if (linker_ddb_search_symbol_name(
-		    (__cheri_addr vaddr_t)hook_entry->ich_func, namebuf,
+		    (vaddr_t)hook_entry->ich_func, namebuf,
 		    sizeof(namebuf), &offset) == 0) {
 			db_printf("hook: %p at %s+%#lx arg: %p\n",
 			    hook_entry->ich_func, namebuf, offset,
@@ -275,7 +275,7 @@ DB_SHOW_COMMAND(conifhk, db_show_conifhk)
 
 // CHERI CHANGES START
 // {
-//   "updated": 20190830,
+//   "updated": 20200708,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "kdb"

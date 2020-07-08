@@ -5487,7 +5487,7 @@ DB_SHOW_COMMAND(procvm, procvm)
 #endif /* DDB */
 // CHERI CHANGES START
 // {
-//   "updated": 20200706,
+//   "updated": 20200708,
 //   "target_type": "kernel",
 //   "changes": [
 //     "platform"
@@ -5495,7 +5495,7 @@ DB_SHOW_COMMAND(procvm, procvm)
 //   "changes_purecap": [
 //     "pointer_as_integer",
 //     "support",
-//     "uintptr_interp_offset"
+//     "uintcap_arithmetic"
 //   ]
 // }
 // CHERI CHANGES END

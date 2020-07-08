@@ -872,7 +872,7 @@ zfree(void *addr, struct malloc_type *mtp)
 	vtozoneslab((vm_offset_t)addr & (~UMA_SLAB_MASK), &zone, &slab);
 	if (slab == NULL)
 		panic("free: address %p(%p) has not been allocated.\n",
-		    addr, (void *)(uintptr_t)((u_long)addr & (~UMA_SLAB_MASK)));
+		    addr, (void *)rounddown2(addr, UMA_SLAB_SIZE));
 
 	if (__predict_true(!malloc_large_slab(slab))) {
 		size = zone->uz_size;
@@ -1503,14 +1503,15 @@ SYSCTL_OID(_kern, OID_AUTO, mprof,
 #endif /* MALLOC_PROFILE */
 // CHERI CHANGES START
 // {
-//   "updated": 20200123,
+//   "updated": 20200707,
 //   "target_type": "kernel",
 //   "changes": [
 //     "integer_provenance"
 //   ],
 //   "changes_purecap": [
 //     "pointer_alignment",
-//     "uintptr_interp_offset"
+//     "pointer_as_integer",
+//     "support"
 //   ]
 // }
 // CHERI CHANGES END

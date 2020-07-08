@@ -430,7 +430,7 @@ kern_nmount(struct thread *td, void * __capability iovp, u_int iovcnt,
 
 	AUDIT_ARG_FFLAGS(flags);
 	CTR4(KTR_VFS, "%s: iovp %p with iovcnt %d and flags %d", __func__,
-	    (void *)(__cheri_addr vaddr_t)iovp, iovcnt, flags);
+	    (void *)(uintptr_t)iovp, iovcnt, flags);
 
 	/*
 	 * Filter out MNT_ROOTFS.  We do not want clients of nmount() in
@@ -2374,7 +2374,7 @@ vfs_oexport_conv(const struct oexport_args *oexp, struct export_args *exp)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20200706,
+//   "updated": 20200708,
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",

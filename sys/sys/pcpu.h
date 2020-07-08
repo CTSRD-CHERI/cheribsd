@@ -340,11 +340,10 @@ void	pcpu_init(struct pcpu *pcpu, int cpuid, size_t size);
 #endif /* !_SYS_PCPU_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20200123,
+//   "updated": 20200708,
 //   "target_type": "header",
 //   "changes_purecap": [
-//     "uintptr_interp_offset",
-//     "pointer_shape",
+//     "bounds_compression",
 //     "subobject_bounds"
 //   ]
 // }

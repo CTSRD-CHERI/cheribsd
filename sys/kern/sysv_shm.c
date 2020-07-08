@@ -570,7 +570,7 @@ kern_shmat_locked(struct thread *td, int shmid,
 	}
 	CHERI_VM_ASSERT_VALID(attach_addr);
 
-	shmmap_s->va = (vm_offset_t)attach_addr;
+	shmmap_s->va = attach_addr;
 	shmmap_s->shmid = shmid;
 	shmseg->u.shm_lpid = p->p_pid;
 	shmseg->u.shm_atime = time_second;
@@ -583,7 +583,7 @@ kern_shmat_locked(struct thread *td, int shmid,
 		 * capability. However we could directly return the capability
 		 * given by vm_map_find().
 		 */
-		shmaddr = cheri_setaddress(shmaddr, (vm_offset_t)attach_addr);
+		shmaddr = cheri_setaddress(shmaddr, attach_addr);
 		shmaddr = cheri_setbounds(shmaddr,
 		    CHERI_REPRESENTABLE_LENGTH(shmseg->u.shm_segsz));
 		/* XXX: set perms */
@@ -591,7 +591,7 @@ kern_shmat_locked(struct thread *td, int shmid,
 		    shmaddr);
 	} else
 #endif
-		td->td_retval[0] = (vm_offset_t)attach_addr;
+		td->td_retval[0] = attach_addr;
 	return (error);
 }
 
@@ -2228,14 +2228,13 @@ DECLARE_MODULE(sysvshm, sysvshm_mod, SI_SUB_SYSV_SHM, SI_ORDER_FIRST);
 MODULE_VERSION(sysvshm, 1);
 // CHERI CHANGES START
 // {
-//   "updated": 20200123,
+//   "updated": 20200708,
 //   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"
 //   ],
 //   "changes_purecap": [
 //     "pointer_as_integer",
-//     "uintptr_interp_offset",
 //     "support"
 //   ]
 // }
