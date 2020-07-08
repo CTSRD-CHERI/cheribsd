@@ -1,5 +1,7 @@
 # $FreeBSD$
 
+.include <src.opts.mk>
+
 .if ${MACHINE_ABI:Mpurecap}
 PROG=ld-elf-debug.so.1
 .else

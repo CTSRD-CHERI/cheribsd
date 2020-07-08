@@ -1,5 +1,7 @@
 # $FreeBSD$
 
+.include <src.opts.mk>
+
 TESTSDIR=	${TESTSBASE}/libexec/rtld-cheri-elf/abi-mismatch
 
 # Disable when building a pure-cap world as we don't support
