@@ -279,6 +279,12 @@ MACHINE_CPU = ssse3 sse3
 MACHINE_CPU = sse3
 .  endif
 MACHINE_CPU += amd64 sse2 sse mmx
+########## arm64
+. elif ${MACHINE_CPUARCH} == "aarch64"
+.  if ${CPUTYPE} == "cheri"
+MACHINE_CPU = cheri
+.  endif
+MACHINE_CPU += arm64
 ########## Mips
 . elif ${MACHINE_CPUARCH} == "mips"
 .  if ${CPUTYPE} == "cheri"
