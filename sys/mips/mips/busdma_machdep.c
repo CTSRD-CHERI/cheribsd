@@ -1637,7 +1637,7 @@ busdma_swi(void)
 //   "changes_purecap": [
 //     "pointer_as_integer",
 //     "pointer_alignment",
-//     "uintptr_arithmetic",
+//     "uintcap_arithmetic",
 //     "unsupported"
 //   ]
 // }
