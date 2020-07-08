@@ -135,11 +135,7 @@ INLINE_LIMIT?=	8000
 # code model as "medium" and "medany" respectively.
 #
 .if ${MACHINE_CPUARCH} == "riscv"
-.if ${MACHINE_ARCH:Mriscv*sf}
-RISCV_MARCH=	rv64imac
-.else
 RISCV_MARCH=	rv64imafdc
-.endif
 .if ${MACHINE_CPU:Mcheri}
 RISCV_MARCH:=	${RISCV_MARCH}xcheri
 .endif
