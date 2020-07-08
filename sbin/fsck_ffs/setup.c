@@ -61,6 +61,7 @@ __FBSDID("$FreeBSD$");
 struct inoinfo **inphead, **inpsort;
 
 struct uufsd disk;
+struct fs_summary_info ufs_summary_info;
 struct bufarea asblk;
 #define altsblock (*asblk.b_un.b_fs)
 #define POWEROF2(num)	(((num) & ((num) - 1)) == 0)
@@ -216,7 +217,7 @@ setup(char *dev)
 	disk.d_ufs = (sblock.fs_magic == FS_UFS1_MAGIC) ? 1 : 2;
 	disk.d_bsize = sblock.fs_fsize / fsbtodb(&sblock, 1);
 	disk.d_sblock = sblock.fs_sblockloc / disk.d_bsize;
-	disk.d_sbcsum = sblock.fs_csp;
+	disk.d_sbcsum = sblock.fs_si->fs_csp;
 
 	if (skipclean && ckclean && sblock.fs_clean) {
 		pwarn("FILE SYSTEM CLEAN; SKIPPING CHECKS\n");
@@ -261,8 +262,8 @@ setup(char *dev)
 	 * read in the summary info.
 	 */
 	asked = 0;
-	sblock.fs_csp = Calloc(1, sblock.fs_cssize);
-	if (sblock.fs_csp == NULL) {
+	sblock.fs_si->fs_csp = Calloc(1, sblock.fs_cssize);
+	if (sblock.fs_si->fs_csp == NULL) {
 		printf("cannot alloc %u bytes for cg summary info\n",
 		    (unsigned)sblock.fs_cssize);
 		goto badsb;
@@ -270,7 +271,7 @@ setup(char *dev)
 	for (i = 0, j = 0; i < sblock.fs_cssize; i += sblock.fs_bsize, j++) {
 		size = MIN(sblock.fs_cssize - i, sblock.fs_bsize);
 		readcnt[sblk.b_type]++;
-		if (blread(fsreadfd, (char *)sblock.fs_csp + i,
+		if (blread(fsreadfd, (char *)sblock.fs_si->fs_csp + i,
 		    fsbtodb(&sblock, sblock.fs_csaddr + j * sblock.fs_frag),
 		    size) != 0 && !asked) {
 			pfatal("BAD SUMMARY INFORMATION");
@@ -446,6 +447,10 @@ sblock_init(void)
 	asblk.b_un.b_buf = Malloc(SBLOCKSIZE);
 	if (sblk.b_un.b_buf == NULL || asblk.b_un.b_buf == NULL)
 		errx(EEXIT, "cannot allocate space for superblock");
+	sblock.fs_si = Malloc(sizeof(*sblock.fs_si));
+	altsblock.fs_si = Malloc(sizeof(*altsblock.fs_si));
+	if (sblock.fs_si == NULL || altsblock.fs_si == NULL)
+		errx(EEXIT, "cannot allocate space for superblock summary info");
 	dev_bsize = secsize = DEV_BSIZE;
 }
 
@@ -566,3 +571,13 @@ saverecovery(int readfd, int writefd)
 	blwrite(writefd, fsrbuf, (SBLOCK_UFS2 - secsize) / secsize, secsize);
 	free(fsrbuf);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20200706,
+//   "target_type": "prog",
+//   "changes_purecap": [
+//     "pointer_shape"
+//   ],
+//   "change_comment": "embedded pointer storage in superblock"
+// }
+// CHERI CHANGES END

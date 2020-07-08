@@ -1135,11 +1135,11 @@ retry:
 	 * in a same cg without intervening by files.
 	 */
 	if ((mode & IFMT) == IFDIR) {
-		if (fs->fs_contigdirs[cg] < 255)
-			fs->fs_contigdirs[cg]++;
+		if (fs->fs_si->fs_contigdirs[cg] < 255)
+			fs->fs_si->fs_contigdirs[cg]++;
 	} else {
-		if (fs->fs_contigdirs[cg] > 0)
-			fs->fs_contigdirs[cg]--;
+		if (fs->fs_si->fs_contigdirs[cg] > 0)
+			fs->fs_si->fs_contigdirs[cg]--;
 	}
 	ino = (ino_t)ffs_hashalloc(pip, cg, ipref, mode, 0,
 					(allocfcn_t *)ffs_nodealloccg);
@@ -1322,14 +1322,14 @@ ffs_dirpref(pip)
 		if (fs->fs_cs(fs, cg).cs_ndir < maxndir &&
 		    fs->fs_cs(fs, cg).cs_nifree >= minifree &&
 		    fs->fs_cs(fs, cg).cs_nbfree >= minbfree) {
-			if (fs->fs_contigdirs[cg] < maxcontigdirs)
+			if (fs->fs_si->fs_contigdirs[cg] < maxcontigdirs)
 				return ((ino_t)(fs->fs_ipg * cg));
 		}
 	for (cg = 0; cg < prefcg; cg++)
 		if (fs->fs_cs(fs, cg).cs_ndir < maxndir &&
 		    fs->fs_cs(fs, cg).cs_nifree >= minifree &&
 		    fs->fs_cs(fs, cg).cs_nbfree >= minbfree) {
-			if (fs->fs_contigdirs[cg] < maxcontigdirs)
+			if (fs->fs_si->fs_contigdirs[cg] < maxcontigdirs)
 				return ((ino_t)(fs->fs_ipg * cg));
 		}
 	/*
@@ -1943,7 +1943,7 @@ ffs_clusteralloc(ip, cg, bpref, len)
 
 	ump = ITOUMP(ip);
 	fs = ump->um_fs;
-	if (fs->fs_maxcluster[cg] < len)
+	if (fs->fs_si->fs_maxcluster[cg] < len)
 		return (0);
 	UFS_UNLOCK(ump);
 	if ((error = ffs_getcg(fs, ump->um_devvp, cg, 0, &bp, &cgp)) != 0) {
@@ -1971,7 +1971,7 @@ ffs_clusteralloc(ip, cg, bpref, len)
 			if (*lp-- > 0)
 				break;
 		UFS_LOCK(ump);
-		fs->fs_maxcluster[cg] = i;
+		fs->fs_si->fs_maxcluster[cg] = i;
 		brelse(bp);
 		return (0);
 	}
@@ -3519,10 +3519,13 @@ sysctl_ffs_fsck(SYSCTL_HANDLER_ARGS)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20190628,
 //   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"
+//   ],
+//   "changes_purecap": [
+//     "pointer_shape"
 //   ]
 // }
 // CHERI CHANGES END
