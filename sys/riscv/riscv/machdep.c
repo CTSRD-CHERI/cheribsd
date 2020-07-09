@@ -1105,7 +1105,7 @@ parse_metadata(void)
 	caddr_t kmdp;
 	vm_offset_t lastaddr;
 #ifdef DDB
-	vm_offset_t ksym_start, ksym_end;
+	vm_pointer_t ksym_start, ksym_end;
 #endif
 	char *kern_envp;
 
@@ -1275,3 +1275,12 @@ bzero(void *buf, size_t len)
 	while(len-- > 0)
 		*p++ = 0;
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20200803,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_as_integer"
+//   ]
+// }
+// CHERI CHANGES END
