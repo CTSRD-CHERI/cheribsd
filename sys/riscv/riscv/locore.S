@@ -72,22 +72,12 @@ _alt_start:
 #endif
 
 #ifdef __CHERI_PURE_CAPABILITY__
-.option push
-.option nocapmode
-
-	/*
-	 * The boot loader may enter in non-capmode even though
-	 * our ELF header requests capmode.  The instructions below
-	 * should work in both modes.
-	 */
-	lla	t0, 1f
-	cspecialr ct1, pcc
-	csetaddr ct1, ct1, t0
-	li	t0, 1
-	csetflags ct1, ct1, t0
-	cjr	ct1
+	/* Just in case, force capmode on. */
+	cllc	ct0, 1f
+	li	t1, 1
+	csetflags ct0, ct0, t1
+	cjr	ct0
 1:
-.option pop
 #endif
 
 	/* Pick a hart to run the boot process. */
@@ -137,25 +127,6 @@ _start:
 .option push
 .option norelax
 	lla	gp, __global_pointer$
-.option pop
-#endif
-
-#ifdef __CHERI_PURE_CAPABILITY__
-.option push
-.option nocapmode
-
-	/*
-	 * The boot loader may enter in non-capmode even though
-	 * our ELF header requests capmode.  The instructions below
-	 * should work in both modes.
-	 */
-	lla	t0, 1f
-	cspecialr ct1, pcc
-	csetaddr ct1, ct1, t0
-	li	t0, 1
-	csetflags ct1, ct1, t0
-	cjr	ct1
-1:
 .option pop
 #endif
 
@@ -743,14 +714,15 @@ mpva:
 	csetaddr ct1, ct1, t0
 	cjr	ct1
 1:
+#endif
 
 	/* Setup supervisor trap vector */
+#ifdef __CHERI_PURE_CAPABILITY__
 	cllc	ct0, cpu_exception_handler
 	cspecialw stcc, ct0
 	cmove	ct1, cnull
 	cspecialw stdc, ct1
 #else
-	/* Setup supervisor trap vector */
 	la	t0, cpu_exception_handler
 #if __has_feature(capabilities)
 	cspecialr ct1, pcc

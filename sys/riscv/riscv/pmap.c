@@ -4777,7 +4777,6 @@ SYSCTL_OID(_vm_pmap, OID_AUTO, kernel_maps,
     CTLTYPE_STRING | CTLFLAG_RD | CTLFLAG_MPSAFE,
     NULL, 0, sysctl_kmaps, "A",
     "Dump kernel address layout");
-
 // CHERI CHANGES START
 // {
 //   "updated": 20200803,

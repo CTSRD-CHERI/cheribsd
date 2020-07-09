@@ -43,7 +43,7 @@ struct riscv_bootparams {
 	vm_pointer_t	kern_stack;
 	uintptr_t	dtbp_virt;	/* Device tree blob virtual addr */
 	vm_paddr_t	dtbp_phys;	/* Device tree blob physical addr */
-	uintptr_t	modulep;	/* loader(8) metadata */
+	vm_pointer_t	modulep;	/* loader(8) metadata */
 };
 
 extern vm_paddr_t physmap[PHYS_AVAIL_ENTRIES];
