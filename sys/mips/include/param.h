@@ -232,13 +232,6 @@
 #define	CHERI_SHMLBA	(1 << 20)
 #endif
 
-#ifdef CHERI_PURECAP_KERNEL
-/*
- * Mbufs are larger in the purecap kernel.
- */
-#define MSIZE 512
-#endif
-
 /*
  * Mach derived conversion macros
  */
