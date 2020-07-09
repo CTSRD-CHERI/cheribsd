@@ -476,8 +476,8 @@ mips_postboot_fixup(void)
 #ifdef DDB
 	Elf_Size *trampoline_data = (Elf_Size*)kernel_kseg0_end;
 	Elf_Size symtabsize = 0;
-	vm_offset_t ksym_start;
-	vm_offset_t ksym_end;
+	vm_ptr_t ksym_start;
+	vm_ptr_t ksym_end;
 
 	if (trampoline_data[0] == SYMTAB_MAGIC) {
 		symtabsize = trampoline_data[1];
@@ -716,7 +716,8 @@ SYSINIT(sysctl, SI_SUB_KMEM, SI_ORDER_ANY, mips_exc_cntrs_sysctl_register, 0);
 //   "changes_purecap": [
 //     "support",
 //     "pointer_alignment",
-//     "subobject_bounds"
+//     "subobject_bounds",
+//     "pointer_as_integer"
 //   ]
 // }
 // CHERI CHANGES END

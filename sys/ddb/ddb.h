@@ -87,7 +87,8 @@ int	DB_CALL(db_expr_t, db_expr_t *, int, db_expr_t[]);
  * Most users should use db_fetch_symtab in order to set them from the
  * boot loader provided values.
  */
-extern vm_offset_t ksymtab, kstrtab, ksymtab_size;
+extern vm_ptr_t ksymtab, kstrtab;
+extern vm_size_t ksymtab_size;
 
 /*
  * There are three "command tables":
@@ -232,7 +233,7 @@ bool		db_value_of_name_vnet(const char *name, db_expr_t *valuep);
 int		db_write_bytes(vm_offset_t addr, size_t size, char *data);
 void		db_command_register(struct command_table *, struct command *);
 void		db_command_unregister(struct command_table *, struct command *);
-int		db_fetch_ksymtab(vm_offset_t ksym_start, vm_offset_t ksym_end);
+int		db_fetch_ksymtab(vm_ptr_t ksym_start, vm_ptr_t ksym_end);
 
 db_cmdfcn_t	db_breakpoint_cmd;
 db_cmdfcn_t	db_capture_cmd;
@@ -300,3 +301,12 @@ extern int	textdump_pending;	/* Call textdump_dumpsys() instead. */
 void	textdump_dumpsys(struct dumperinfo *di);
 
 #endif /* !_DDB_DDB_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20200803,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_as_integer"
+//   ]
+// }
+// CHERI CHANGES END

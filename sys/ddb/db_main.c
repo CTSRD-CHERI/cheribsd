@@ -44,6 +44,10 @@ __FBSDID("$FreeBSD$");
 #include <machine/pcb.h>
 #include <machine/setjmp.h>
 
+#ifdef __CHERI_PURE_CAPABILITY__
+#include <cheri/cheric.h>
+#endif
+
 #include <ddb/ddb.h>
 #include <ddb/db_command.h>
 #include <ddb/db_sym.h>
@@ -64,7 +68,8 @@ KDB_BACKEND(ddb, db_init, db_trace_self_wrapper, db_trace_thread_wrapper,
  * the symtab and strtab in memory. This is used when loaded from
  * boot loaders different than the native one (like Xen).
  */
-vm_offset_t ksymtab, kstrtab, ksymtab_size;
+vm_ptr_t ksymtab, kstrtab;
+vm_size_t ksymtab_size;
 
 bool
 X_db_line_at_pc(db_symtab_t *symtab, c_db_sym_t sym, char **file, int *line,
@@ -179,7 +184,7 @@ X_db_symbol_values(db_symtab_t *symtab, c_db_sym_t sym, const char **namep,
 }
 
 int
-db_fetch_ksymtab(vm_offset_t ksym_start, vm_offset_t ksym_end)
+db_fetch_ksymtab(vm_ptr_t ksym_start, vm_ptr_t ksym_end)
 {
 	Elf_Size strsz;
 
@@ -193,6 +198,13 @@ db_fetch_ksymtab(vm_offset_t ksym_start, vm_offset_t ksym_end)
 		if (kstrtab + strsz > ksym_end) {
 			/* Sizes doesn't match, unset everything. */
 			ksymtab = ksymtab_size = kstrtab = 0;
+		} else {
+#ifdef __CHERI_PURE_CAPABILITY__
+			ksymtab = (vm_ptr_t)cheri_setbounds((char *)ksymtab,
+			    ksymtab_size);
+			kstrtab = (vm_ptr_t)cheri_setbounds((char *)kstrtab,
+			    strsz);
+#endif
 		}
 	}
 
