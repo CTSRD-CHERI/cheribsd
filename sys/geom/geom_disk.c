@@ -340,15 +340,15 @@ g_disk_seg_limit(bus_dma_segment_t *seg, off_t *poffset,
 	if (length > seg->ds_len - offset)
 		length = seg->ds_len - offset;
 
-	seg_page_base = trunc_page(seg->ds_addr + offset);
-	seg_page_end  = round_page(seg->ds_addr + offset + length);
+	seg_page_base = trunc_page((uintptr_t)seg->ds_vaddr + offset);
+	seg_page_end  = round_page((uintptr_t)seg->ds_vaddr + offset + length);
 	seg_pages = ((vaddr_t)seg_page_end -
 	    (vaddr_t)seg_page_base) >> PAGE_SHIFT;
 
 	if (seg_pages > *ppages) {
 		seg_pages = *ppages;
-		length = (seg_page_base + (seg_pages << PAGE_SHIFT)) -
-		    (seg->ds_addr + offset);
+		length = (vaddr_t)(seg_page_base + (seg_pages << PAGE_SHIFT)) -
+		    (vaddr_t)((uintptr_t)seg->ds_vaddr + offset);
 	}
 
 	*poffset = 0;
