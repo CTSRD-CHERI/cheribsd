@@ -148,6 +148,7 @@ db_read_bytes(vm_offset_t addr, size_t size, char *data)
 {
 	jmp_buf jb;
 	void *prev_jb;
+	const char *src;
 	int ret;
 
 	prev_jb = kdb_jmpbuf(jb);
@@ -158,24 +159,22 @@ db_read_bytes(vm_offset_t addr, size_t size, char *data)
 		 * do atomic load/store in unit of size requested.
 		 * size == 8 is only atomic on 64bit or n32 kernel.
 		 */
+		src = DB_DATA_PTR_LEN(addr, const char, size);
 		if ((size == 2 || size == 4 || size == 8) &&
 		    ((addr & (size -1)) == 0) &&
 		    (((vm_offset_t)data & (size -1)) == 0)) {
 			switch (size) {
 			case 2:
-				*(uint16_t *)data = *(uint16_t *)addr;
+				*(uint16_t *)data = *(const uint16_t *)src;
 				break;
 			case 4:
-				*(uint32_t *)data = *(uint32_t *)addr;
+				*(uint32_t *)data = *(const uint32_t *)src;
 				break;
 			case 8:
-				*(uint64_t *)data = *(uint64_t *)addr;
+				*(uint64_t *)data = *(const uint64_t *)src;
 				break;
 			}
 		} else {
-			char *src;
-
-			src = (char *)addr;
 			while (size-- > 0)
 				*data++ = *src++;
 		}
@@ -191,6 +190,7 @@ db_write_bytes(vm_offset_t addr, size_t size, char *data)
 	int ret;
 	jmp_buf jb;
 	void *prev_jb;
+	char *dst;
 
 	prev_jb = kdb_jmpbuf(jb);
 	ret = setjmp(jb);
@@ -201,25 +201,24 @@ db_write_bytes(vm_offset_t addr, size_t size, char *data)
 		 * do atomic load/store in unit of size requested.
 		 * size == 8 is only atomic on 64bit or n32 kernel.
 		 */
+		dst = DB_DATA_PTR_LEN(addr, char, size);
 		if ((size == 2 || size == 4 || size == 8) &&
 		    ((addr & (size -1)) == 0) &&
 		    (((vm_offset_t)data & (size -1)) == 0)) {
 			switch (size) {
 			case 2:
-				*(uint16_t *)addr = *(uint16_t *)data;
+				*(uint16_t *)dst = *(uint16_t *)data;
 				break;
 			case 4:
-				*(uint32_t *)addr = *(uint32_t *)data;
+				*(uint32_t *)dst = *(uint32_t *)data;
 				break;
 			case 8:
-				*(uint64_t *)addr = *(uint64_t *)data;
+				*(uint64_t *)dst = *(uint64_t *)data;
 				break;
 			}
 		} else {
-			char *dst;
 			size_t len = size;
 
-			dst = (char *)addr;
 			while (len-- > 0)
 				*dst++ = *data++;
 		}

@@ -14986,7 +14986,7 @@ DB_SHOW_COMMAND(sd_inodedep, db_show_sd_inodedep)
 		db_printf("inodedep address required\n");
 		return;
 	}
-	inodedep_print((struct inodedep*)addr, 1);
+	inodedep_print(DB_DATA_PTR(addr, struct inodedep), 1);
 }
 
 DB_SHOW_COMMAND(sd_allinodedeps, db_show_sd_allinodedeps)
@@ -15000,7 +15000,7 @@ DB_SHOW_COMMAND(sd_allinodedeps, db_show_sd_allinodedeps)
 		db_printf("ufsmount address required\n");
 		return;
 	}
-	ump = (struct ufsmount *)addr;
+	ump = DB_DATA_PTR(addr, struct ufsmount);
 	for (cnt = 0; cnt < ump->inodedep_hash_size; cnt++) {
 		inodedephd = &ump->inodedep_hashtbl[cnt];
 		LIST_FOREACH(inodedep, inodedephd, id_hash) {
@@ -15016,7 +15016,7 @@ DB_SHOW_COMMAND(sd_worklist, db_show_sd_worklist)
 		db_printf("worklist address required\n");
 		return;
 	}
-	worklist_print((struct worklist *)addr, 1);
+	worklist_print(DB_DATA_PTR(addr, struct worklist), 1);
 }
 
 DB_SHOW_COMMAND(sd_workhead, db_show_sd_workhead)
@@ -15038,7 +15038,7 @@ DB_SHOW_COMMAND(sd_workhead, db_show_sd_workhead)
 	 * a list we will still get the same result, so nothing
 	 * unexpected will result.
 	 */
-	wk = (struct worklist *)addr;
+	wk = DB_DATA_PTR(addr, struct worklist);
 	if (wk == NULL)
 		return;
 	wkhd = (struct workhead *)wk->wk_list.le_prev;
@@ -15069,7 +15069,7 @@ DB_SHOW_COMMAND(sd_mkdir, db_show_sd_mkdir)
 		db_printf("mkdir address required\n");
 		return;
 	}
-	mkdir_print((struct mkdir *)addr);
+	mkdir_print(DB_DATA_PTR(addr, struct mkdir));
 }
 
 DB_SHOW_COMMAND(sd_mkdir_list, db_show_sd_mkdir_list)
@@ -15081,7 +15081,7 @@ DB_SHOW_COMMAND(sd_mkdir_list, db_show_sd_mkdir_list)
 		db_printf("mkdir listhead address required\n");
 		return;
 	}
-	mkdirlisthd = (struct mkdirlist *)addr;
+	mkdirlisthd = DB_DATA_PTR(addr, struct mkdirlist);
 	LIST_FOREACH(mkdir, mkdirlisthd, md_mkdirs) {
 		mkdir_print(mkdir);
 		if (mkdir->md_diradd != NULL) {
@@ -15101,7 +15101,7 @@ DB_SHOW_COMMAND(sd_allocdirect, db_show_sd_allocdirect)
 		db_printf("allocdirect address required\n");
 		return;
 	}
-	allocdirect_print((struct allocdirect *)addr);
+	allocdirect_print(DB_DATA_PTR(addr, struct allocdirect));
 }
 
 DB_SHOW_COMMAND(sd_allocindir, db_show_sd_allocindir)
@@ -15110,9 +15110,18 @@ DB_SHOW_COMMAND(sd_allocindir, db_show_sd_allocindir)
 		db_printf("allocindir address required\n");
 		return;
 	}
-	allocindir_print((struct allocindir *)addr);
+	allocindir_print(DB_DATA_PTR(addr, struct allocindir));
 }
 
 #endif /* DDB */
 
 #endif /* SOFTUPDATES */
+// CHERI CHANGES START
+// {
+//   "updated": 20190628,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "kdb"
+//   ]
+// }
+// CHERI CHANGES END

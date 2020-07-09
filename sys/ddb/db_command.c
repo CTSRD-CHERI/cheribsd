@@ -601,7 +601,7 @@ typedef db_expr_t __db_f(db_expr_t, db_expr_t, db_expr_t, db_expr_t,
 static __inline int
 db_fncall_generic(db_expr_t addr, db_expr_t *rv, int nargs, db_expr_t args[])
 {
-	__db_f *f = (__db_f *)addr;
+	__db_f *f = (__db_f *)DB_CODE_PTR(addr);
 
 	if (nargs > 10) {
 		db_printf("Too many arguments (max 10)\n");
@@ -901,7 +901,7 @@ db_stack_trace_all(db_expr_t dummy, bool dummy2, db_expr_t dummy3,
 db_expr_t
 db_hex2dec(db_expr_t expr)
 {
-	uintptr_t x, y;
+	uintmax_t x, y;
 	db_expr_t val;
 
 	y = 1;
@@ -916,3 +916,13 @@ db_hex2dec(db_expr_t expr)
 	}
 	return (val);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20200803,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_as_integer",
+//     "kdb"
+//   ]
+// }
+// CHERI CHANGES END

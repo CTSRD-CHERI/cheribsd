@@ -735,7 +735,7 @@ DB_SHOW_COMMAND(vnet, db_show_vnet)
 		return;
 	}
 
-	db_vnet_print((struct vnet *)addr);
+	db_vnet_print(DB_DATA_PTR(addr, struct vnet));
 }
 
 static void
@@ -806,3 +806,12 @@ DB_SHOW_COMMAND(vnetrcrs, db_show_vnetrcrs)
 }
 #endif
 #endif /* DDB */
+// CHERI CHANGES START
+// {
+//   "updated": 20200803,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "kdb"
+//   ]
+// }
+// CHERI CHANGES END

@@ -95,7 +95,7 @@ DB_SHOW_COMMAND(sta, db_show_sta)
 		db_printf("usage: show sta <addr>\n");
 		return;
 	}
-	_db_show_sta((const struct ieee80211_node *) addr);
+	_db_show_sta(DB_DATA_PTR(addr, const struct ieee80211_node));
 }
 
 DB_SHOW_COMMAND(statab, db_show_statab)
@@ -104,7 +104,8 @@ DB_SHOW_COMMAND(statab, db_show_statab)
 		db_printf("usage: show statab <addr>\n");
 		return;
 	}
-	_db_show_node_table("", (const struct ieee80211_node_table *) addr);
+	_db_show_node_table("", DB_DATA_PTR(addr,
+	    const struct ieee80211_node_table));
 }
 
 DB_SHOW_COMMAND(vap, db_show_vap)
@@ -128,7 +129,8 @@ DB_SHOW_COMMAND(vap, db_show_vap)
 			showprocs = 1;
 			break;
 		}
-	_db_show_vap((const struct ieee80211vap *) addr, showmesh, showprocs);
+	_db_show_vap(DB_DATA_PTR(addr, const struct ieee80211vap), showmesh,
+	    showprocs);
 }
 
 DB_SHOW_COMMAND(com, db_show_com)
@@ -159,7 +161,7 @@ DB_SHOW_COMMAND(com, db_show_com)
 			break;
 		}
 
-	ic = (const struct ieee80211com *) addr;
+	ic = DB_DATA_PTR(addr, const struct ieee80211com);
 	_db_show_com(ic, showvaps, showsta, showmesh, showprocs);
 }
 
@@ -186,7 +188,7 @@ DB_SHOW_ALL_COMMAND(mesh, db_show_mesh)
 		db_printf("usage: show mesh <addr>\n");
 		return;
 	}
-	ms = (const struct ieee80211_mesh_state *) addr;
+	ms = DB_DATA_PTR(addr, const struct ieee80211_mesh_state);
 	_db_show_mesh(ms);
 }
 #endif /* IEEE80211_SUPPORT_MESH */
@@ -904,3 +906,12 @@ _db_show_mesh(const struct ieee80211_mesh_state *ms)
 }
 #endif /* IEEE80211_SUPPORT_MESH */
 #endif /* DDB */
+// CHERI CHANGES START
+// {
+//   "updated": 20201217,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "kdb"
+//   ]
+// }
+// CHERI CHANGES END
