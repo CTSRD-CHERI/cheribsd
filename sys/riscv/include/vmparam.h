@@ -175,7 +175,7 @@
 	KASSERT(PHYS_IN_DMAP(pa),					\
 	    ("%s: PA out of range, PA: 0x%lx", __func__,		\
 	    (vm_paddr_t)(pa)));						\
-	(vm_pointer_t)dmap_capability + ((pa) - dmap_phys_base);		\
+	(vm_pointer_t)dmap_capability + ((pa) - dmap_phys_base);	\
 })
 
 #define	DMAP_TO_PHYS(va)						\
@@ -183,7 +183,7 @@
 	KASSERT(VIRT_IN_DMAP(va),					\
 	    ("%s: VA out of range, VA: 0x%lx", __func__,		\
 	    (vm_offset_t)(va)));					\
-	dmap_phys_base + ((vm_offset_t)(va) - (vaddr_t)dmap_capability); \
+	dmap_phys_base + ((vm_offset_t)(va) - (ptraddr_t)dmap_capability); \
 })
 #else
 #define	PHYS_TO_DMAP(pa)						\

@@ -4780,7 +4780,6 @@ SYSCTL_OID(_vm_pmap, OID_AUTO, kernel_maps,
 //   "updated": 20200803,
 //   "target_type": "kernel",
 //   "changes_purecap": [
-//     "pointer_as_integer",
 //     "support",
 //     "pointer_provenance",
 //     "pointer_shape"
