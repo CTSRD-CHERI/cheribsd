@@ -876,7 +876,7 @@ aio_process_mlock(struct kaiocb *job)
 	    ("%s: opcode %d", __func__, job->uaiocb.aio_lio_opcode));
 
 	aio_switch_vmspace(job);
-	error = kern_mlock(job->userproc, job->cred, (uintptr_t)
+	error = kern_mlock(job->userproc, job->cred, (__cheri_addr vaddr_t)
 	__DEVOLATILE_CAP(void * __capability, cb->aio_buf), cb->aio_nbytes);
 	aio_complete(job, error != 0 ? -1 : 0, error);
 }
@@ -1289,7 +1289,11 @@ aio_qbio(struct proc *p, struct kaiocb *job)
 	bp->bio_length = cb->aio_nbytes;
 	bp->bio_bcount = cb->aio_nbytes;
 	bp->bio_done = aio_biowakeup;
+#ifdef CHERI_PURECAP_KERNEL
 	bp->bio_data = (void *)(uintptr_t)cb->aio_buf;
+#else
+	bp->bio_data = (void *)(__cheri_addr vaddr_t)cb->aio_buf;
+#endif
 	bp->bio_offset = cb->aio_offset;
 	bp->bio_cmd = cb->aio_lio_opcode == LIO_WRITE ? BIO_WRITE : BIO_READ;
 	bp->bio_dev = dev;
@@ -3690,6 +3694,10 @@ cheriabi_lio_listio(struct thread *td, struct cheriabi_lio_listio_args *uap)
 //     "iovec-macros",
 //     "kernel_sig_types",
 //     "user_capabilities"
+//   ],
+//   "changes_purecap": [
+//     "uintptr_interp_offset",
+//     "pointer_as_integer"
 //   ]
 // }
 // CHERI CHANGES END

@@ -76,7 +76,7 @@ sys_break(struct thread *td, struct break_args *uap)
 	uintptr_t addr;
 	int error;
 
-	addr = (uintptr_t)uap->nsize;
+	addr = (__cheri_addr vaddr_t)uap->nsize;
 	error = kern_break(td, &addr);
 	if (error == 0)
 		td->td_retval[0] = addr;

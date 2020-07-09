@@ -1033,9 +1033,9 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 		case PT_TO_SCE:
 		case PT_TO_SCX:
 		case PT_SYSCALL:
-			if ((uintptr_t)addr != 1) {
+			if ((__cheri_addr vaddr_t)addr != 1) {
 				error = ptrace_set_pc(td2,
-				    (u_long)(uintptr_t)addr);
+				    (u_long)(__cheri_addr vaddr_t)addr);
 				if (error)
 					goto out;
 			}
@@ -1045,27 +1045,30 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 				CTR4(KTR_PTRACE,
 		    "PT_TO_SCE: pid %d, events = %#x, PC = %#lx, sig = %d",
 				    p->p_pid, p->p_ptevents,
-				    (u_long)(uintptr_t)addr, data);
+				    (u_long)(__cheri_addr vaddr_t)addr,
+				    data);
 				break;
 			case PT_TO_SCX:
 				p->p_ptevents |= PTRACE_SCX;
 				CTR4(KTR_PTRACE,
 		    "PT_TO_SCX: pid %d, events = %#x, PC = %#lx, sig = %d",
 				    p->p_pid, p->p_ptevents,
-				    (u_long)(uintptr_t)addr, data);
+				    (u_long)(__cheri_addr vaddr_t)addr,
+				    data);
 				break;
 			case PT_SYSCALL:
 				p->p_ptevents |= PTRACE_SYSCALL;
 				CTR4(KTR_PTRACE,
 		    "PT_SYSCALL: pid %d, events = %#x, PC = %#lx, sig = %d",
 				    p->p_pid, p->p_ptevents,
-				    (u_long)(uintptr_t)addr, data);
+				    (u_long)(__cheri_addr vaddr_t)addr,
+				    data);
 				break;
 			case PT_CONTINUE:
 				CTR3(KTR_PTRACE,
 				    "PT_CONTINUE: pid %d, PC = %#lx, sig = %d",
 				    p->p_pid,
-				    (u_long)(uintptr_t)addr,
+				    (u_long)(__cheri_addr vaddr_t)addr,
 				    data);
 				break;
 			}
@@ -1161,7 +1164,7 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 		td2->td_dbgflags |= TDB_USERWR;
 		PROC_UNLOCK(p);
 		error = 0;
-		if (proc_writemem(td, p, (off_t)(uintptr_t)addr,
+		if (proc_writemem(td, p, (off_t)(__cheri_addr vaddr_t)addr,
 		    &data, sizeof(int)) != sizeof(int))
 			error = ENOMEM;
 		else
@@ -1174,7 +1177,7 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 	case PT_READ_D:
 		PROC_UNLOCK(p);
 		error = tmp = 0;
-		if (proc_readmem(td, p, (off_t)(uintptr_t)addr,
+		if (proc_readmem(td, p, (off_t)(__cheri_addr vaddr_t)addr,
 		    &tmp, sizeof(int)) != sizeof(int))
 			error = ENOMEM;
 		else
@@ -1187,7 +1190,8 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 	case PT_IO:
 		piod = (__cheri_fromcap void *)addr;
 		IOVEC_INIT_C(&iov, piod->piod_addr, piod->piod_len);
-		uio.uio_offset = (off_t)(uintptr_t)piod->piod_offs;
+		uio.uio_offset =
+		    (off_t)(__cheri_addr vaddr_t)piod->piod_offs;
 		uio.uio_resid = piod->piod_len;
 		uio.uio_iov = &iov;
 		uio.uio_iovcnt = 1;
@@ -1403,11 +1407,14 @@ fail:
 
 // CHERI CHANGES START
 // {
-//   "updated": 20200706,
+//   "updated": 20191025,
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
 //     "support"
+//   ],
+//   "changes_purecap": [
+//     "uintptr_interp_offset"
 //   ]
 // }
 // CHERI CHANGES END

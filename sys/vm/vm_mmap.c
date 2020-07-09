@@ -321,7 +321,7 @@ sys_mmap(struct thread *td, struct mmap_args *uap)
 {
 #if !__has_feature(capabilities)
 
-	return (kern_mmap(td, (uintptr_t)uap->addr, uap->len,
+	return (kern_mmap(td, (__cheri_addr vaddr_t)uap->addr, uap->len,
 	    uap->prot, uap->flags, uap->fd, uap->pos));
 #else
 	int flags = uap->flags;
@@ -983,7 +983,7 @@ sys_msync(struct thread *td, struct msync_args *uap)
 		return (EINVAL);
 #endif
 
-	return (kern_msync(td, (uintptr_t)uap->addr, uap->len,
+	return (kern_msync(td, (__cheri_addr vaddr_t)uap->addr, uap->len,
 	    uap->flags));
 }
 
@@ -1048,7 +1048,7 @@ sys_munmap(struct thread *td, struct munmap_args *uap)
 		return (EPROT);
 #endif
 
-	return (kern_munmap(td, (uintptr_t)uap->addr, uap->len));
+	return (kern_munmap(td, (__cheri_addr vaddr_t)uap->addr, uap->len));
 }
 
 int
@@ -1154,7 +1154,7 @@ sys_mprotect(struct thread *td, struct mprotect_args *uap)
 		return (EPROT);
 #endif
 
-	return (kern_mprotect(td, (uintptr_t)uap->addr, uap->len,
+	return (kern_mprotect(td, (__cheri_addr vaddr_t)uap->addr, uap->len,
 	    uap->prot));
 }
 
@@ -1278,7 +1278,7 @@ sys_madvise(struct thread *td, struct madvise_args *uap)
 		return (EPROT);
 #endif
 
-	return (kern_madvise(td, (uintptr_t)uap->addr, uap->len,
+	return (kern_madvise(td, (__cheri_addr vaddr_t)uap->addr, uap->len,
 	    uap->behav));
 }
 
@@ -1340,7 +1340,7 @@ sys_mincore(struct thread *td, struct mincore_args *uap)
 		return (EPROT);
 #endif
 
-	return (kern_mincore(td, (uintptr_t)uap->addr, uap->len,
+	return (kern_mincore(td, (__cheri_addr vaddr_t)uap->addr, uap->len,
 	    uap->vec));
 }
 
@@ -1599,7 +1599,7 @@ sys_mlock(struct thread *td, struct mlock_args *uap)
 #endif
 
 	return (kern_mlock(td->td_proc, td->td_ucred,
-	    __DECONST_CAP(uintptr_t, uap->addr), uap->len));
+	    __DECONST_CAP(__cheri_addr vaddr_t, uap->addr), uap->len));
 }
 
 int
@@ -1778,7 +1778,7 @@ sys_munlock(struct thread *td, struct munlock_args *uap)
 		return (EPROT);
 #endif
 
-	return (kern_munlock(td, (uintptr_t)uap->addr, uap->len));
+	return (kern_munlock(td, (__cheri_addr vaddr_t)uap->addr, uap->len));
 }
 
 int
@@ -2230,7 +2230,7 @@ vm_mmap_to_errno(int rv)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20200706,
+//   "updated": 20200123,
 //   "target_type": "kernel",
 //   "changes": [
 //     "support",
