@@ -90,7 +90,6 @@ CTASSERT(sizeof(struct cheri_object) == 32);
 
 /* Set to -1 to prevent it from being zeroed with the rest of BSS */
 void * __capability user_sealcap = (void * __capability)(intcap_t)-1;
-extern void * __capability userspace_cap;
 
 #ifdef CHERI_PURECAP_KERNEL
 __attribute__((weak))
@@ -112,7 +111,7 @@ caddr_t cheri_kseg1_capability = (void *)(intcap_t)-1;
 caddr_t cheri_kseg2_capability = (void *)(intcap_t)-1;
 caddr_t cheri_kcode_capability = (void *)(intcap_t)-1;
 caddr_t cheri_kdata_capability = (void *)(intcap_t)-1;
-caddr_t cheri_kall_capability = (void *)(intcap_t)-1;
+void *cheri_kall_capability = (void *)(intcap_t)-1;
 
 /*
  * This is called from locore to initialise the cap table entries

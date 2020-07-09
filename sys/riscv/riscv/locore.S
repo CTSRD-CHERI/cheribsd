@@ -334,7 +334,6 @@ va:
 #endif
 
 	/* Save omnipotent DDC and clear kernel's DDC. */
-	/* XXX: We should probably save this somewhere? */
 	cspecialr cs0, ddc
 	cmove	ct0, cnull
 	cspecialw ddc, ct0

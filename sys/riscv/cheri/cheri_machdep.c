@@ -60,6 +60,10 @@ cheri_init_capabilities(void * __capability kroot)
 	userspace_cap = ctemp;
 
 	swap_restore_cap = kroot;
+
+#ifdef __CHERI_PURE_CAPABILITY__
+	cheri_kall_capability = kroot;
+#endif
 }
 
 void
@@ -100,3 +104,13 @@ cheri_signal_sandboxed(struct thread *td)
 	}
 	return (0);
 }
+
+// CHERI CHANGES START
+// {
+//   "updated": 20200803,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "support"
+//   ]
+// }
+// CHERI CHANGES END
