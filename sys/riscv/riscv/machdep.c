@@ -1064,7 +1064,11 @@ initriscv(struct riscv_bootparams *rvbp)
 	pcpup->pc_hart = boot_hart;
 
 	/* Set the pcpu pointer */
+#ifdef __CHERI_PURE_CAPABILITY__
+	__asm __volatile("cmove ctp, %0" :: "C"(pcpup));
+#else
 	__asm __volatile("mv tp, %0" :: "r"(pcpup));
+#endif
 
 	PCPU_SET(curthread, &thread0);
 
