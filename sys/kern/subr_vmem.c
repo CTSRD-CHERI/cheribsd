@@ -1685,7 +1685,7 @@ vmem_whatis(vmem_addr_t addr, int (*pr)(const char *, ...))
 		}
 		(*pr)("%p is %p+%zu in VMEM '%s' (%s)\n",
 		    (void *)addr, (void *)bt->bt_start,
-		    (vmem_size_t)(addr - bt->bt_start), vm->vm_name,
+		    (vmem_size_t)((vaddr_t)addr - (vaddr_t)bt->bt_start), vm->vm_name,
 		    (bt->bt_type == BT_TYPE_BUSY) ? "allocated" : "free");
 	}
 }
