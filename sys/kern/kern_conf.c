@@ -1537,7 +1537,7 @@ DB_SHOW_COMMAND(cdev, db_show_cdev)
 		return;
 	}
 
-	dev = (struct cdev *)addr;
+	dev = DB_DATA_PTR(addr, struct cdev);
 	cdp = cdev2priv(dev);
 	db_printf("dev %s ref %d use %ld thr %ld inuse %u fdpriv %p\n",
 	    dev->si_name, dev->si_refcount, dev->si_usecount,
@@ -1577,3 +1577,12 @@ DB_SHOW_COMMAND(cdev, db_show_cdev)
 	db_printf("cdp_flags %s\n", buf);
 }
 #endif
+// CHERI CHANGES START
+// {
+//   "updated": 20200803,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "kdb"
+//   ]
+// }
+// CHERI CHANGES END

@@ -119,7 +119,7 @@ db_lookup_thread(db_expr_t addr, bool check_pid)
 	 */
 	decaddr = db_hex2dec(addr);
 	if (decaddr == -1)
-		return ((struct thread *)addr);
+		return (DB_DATA_PTR(addr, struct thread));
 
 	td = kdb_thr_lookup(decaddr);
 	if (td != NULL)
@@ -130,7 +130,7 @@ db_lookup_thread(db_expr_t addr, bool check_pid)
 				return (FIRST_THREAD_IN_PROC(p));
 		}
 	}
-	return ((struct thread *)addr);
+	return (DB_DATA_PTR(addr, struct thread));
 }
 
 /*
@@ -152,5 +152,15 @@ db_lookup_proc(db_expr_t addr)
 				return (p);
 		}
 	}
-	return ((struct proc *)addr);
+	return (DB_DATA_PTR(addr, struct proc));
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20200803,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_as_integer",
+//     "kdb"
+//   ]
+// }
+// CHERI CHANGES END

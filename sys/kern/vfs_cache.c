@@ -3551,7 +3551,7 @@ DB_SHOW_COMMAND(vpath, db_show_vpath)
 		return;
 	}
 
-	vp = (struct vnode *)addr;
+	vp = DB_DATA_PTR(addr, struct vnode);
 	db_print_vpath(vp);
 }
 
@@ -4773,6 +4773,9 @@ out:
 //   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"
+//   ],
+//   "changes_purecap": [
+//     "kdb"
 //   ]
 // }
 // CHERI CHANGES END

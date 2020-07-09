@@ -232,6 +232,11 @@ void		db_command_register(struct command_table *, struct command *);
 void		db_command_unregister(struct command_table *, struct command *);
 int		db_fetch_ksymtab(vm_pointer_t ksym_start, vm_pointer_t ksym_end,
 		    vm_offset_t relbase);
+#ifdef __CHERI_PURE_CAPABILITY__
+void		*db_code_ptr(db_addr_t addr);
+void		*db_data_ptr_unbound(db_addr_t addr);
+void		*db_data_ptr(db_addr_t addr, size_t len);
+#endif
 
 db_cmdfcn_t	db_breakpoint_cmd;
 db_cmdfcn_t	db_capture_cmd;
@@ -298,13 +303,28 @@ int	textdump_writenextblock(struct dumperinfo *di, char *buffer);
 extern int	textdump_pending;	/* Call textdump_dumpsys() instead. */
 void	textdump_dumpsys(struct dumperinfo *di);
 
+/*
+ * Macros to construct valid pointers from addresses.
+ */
+#ifdef __CHERI_PURE_CAPABILITY__
+#define	DB_CODE_PTR(addr)			db_code_ptr((addr))
+#define	DB_DATA_PTR_LEN(addr, type, len)	((type *)db_data_ptr((addr), (len)))
+#define	DB_DATA_PTR_UNBOUND(addr, type)		((type *)db_data_ptr_unbound((addr)))
+#else
+#define	DB_CODE_PTR(addr)			((void *)(addr))
+#define	DB_DATA_PTR_LEN(addr, type, len)	((type *)(addr))
+#define	DB_DATA_PTR_UNBOUND(addr, type)		((type *)(addr))
+#endif
+#define	DB_DATA_PTR(addr, type)			DB_DATA_PTR_LEN(addr, type, sizeof(type))
+
 #endif /* !_DDB_DDB_H_ */
 // CHERI CHANGES START
 // {
 //   "updated": 20200803,
 //   "target_type": "kernel",
 //   "changes_purecap": [
-//     "pointer_as_integer"
+//     "pointer_as_integer",
+//     "kdb"
 //   ]
 // }
 // CHERI CHANGES END
