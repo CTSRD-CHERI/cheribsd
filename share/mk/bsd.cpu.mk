@@ -363,10 +363,6 @@ LDFLAGS+=	-fuse-ld=lld
 # XXXBD: still needed?
 LDFLAGS+=	-Wl,-melf64btsmip_cheri_fbsd
 LDFLAGS+=	-Wl,-preemptible-caprelocs=elf
-# Work around cheri-unknown-freebsd-ld.lld: error: section: .init_array
-# is not contiguous with other relro sections
-# TODO: remove this once I've debugged the root cause
-LDFLAGS+=	-Wl,-z,norelro
 CFLAGS+=	-Qunused-arguments
 CFLAGS+=	-Werror=cheri-bitwise-operations
 # Don't remove CHERI symbols from the symbol table
