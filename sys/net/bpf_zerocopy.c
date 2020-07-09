@@ -93,7 +93,7 @@ __FBSDID("$FreeBSD$");
  * knows that the space is not available.
  */
 struct zbuf {
-	vm_offset_t	 zb_uaddr;	/* User address at time of setup. */
+	vm_ptr_t	 zb_uaddr;	/* User address at time of setup. */
 	size_t		 zb_size;	/* Size of buffer, incl. header. */
 	u_int		 zb_numpages;	/* Number of pages. */
 	int		 zb_flags;	/* Flags on zbuf. */
@@ -176,8 +176,7 @@ zbuf_sfbuf_get(struct vm_map *map, vm_offset_t uaddr)
  * page alignment, size requirements, etc.
  */
 static int
-zbuf_setup(struct thread *td, vm_offset_t uaddr, size_t len,
-    struct zbuf **zbp)
+zbuf_setup(struct thread *td, vm_ptr_t uaddr, size_t len, struct zbuf **zbp)
 {
 	struct zbuf *zb;
 	struct vm_map *map;
@@ -550,11 +549,11 @@ bpf_zerocopy_ioctl_setzbuf(struct thread *td, struct bpf_d *d,
 	/*
 	 * Allocate new buffers.
 	 */
-	error = zbuf_setup(td, (vm_offset_t)bz->bz_bufa, bz->bz_buflen,
+	error = zbuf_setup(td, (vm_ptr_t)bz->bz_bufa, bz->bz_buflen,
 	    &zba);
 	if (error)
 		return (error);
-	error = zbuf_setup(td, (vm_offset_t)bz->bz_bufb, bz->bz_buflen,
+	error = zbuf_setup(td, (vm_ptr_t)bz->bz_bufb, bz->bz_buflen,
 	    &zbb);
 	if (error) {
 		zbuf_free(zba);
@@ -591,3 +590,13 @@ bpf_zerocopy_ioctl_setzbuf(struct thread *td, struct bpf_d *d,
 	BPFD_UNLOCK(d);
 	return (0);
 }
+
+// CHERI CHANGES START
+// {
+//   "updated": 20200804,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_as_integer"
+//   ]
+// }
+// CHERI CHANGES END
