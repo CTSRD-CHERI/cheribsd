@@ -44,11 +44,17 @@
 
 #define	ALT_STACK_SIZE	128
 
+#ifdef __CHERI_PURE_CAPABILITY__
+#define	__PCPU_PAD	168
+#else
+#define	__PCPU_PAD	56
+#endif
+
 #define	PCPU_MD_FIELDS							\
 	struct pmap *pc_curpmap;	/* Currently active pmap */	\
 	uint32_t pc_pending_ipis;	/* IPIs pending to this CPU */	\
 	uint32_t pc_hart;		/* Hart ID */			\
-	char __pad[56]			/* Pad to factor of PAGE_SIZE */
+	char __pad[__PCPU_PAD]		/* Pad to factor of PAGE_SIZE */
 
 #ifdef _KERNEL
 
