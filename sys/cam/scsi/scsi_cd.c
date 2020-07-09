@@ -245,6 +245,7 @@ struct ioc_read_toc_entry64 {
 	u_char	starting_track;
 	u_short	data_len;
 	uint64_t data; /* (struct cd_toc_entry *) */
+	uint64_t data;  /* (struct cd_toc_entry *) */
 };
 #define	CDIOREADTOCENTRYS_64	\
     _IOC_NEWTYPE(CDIOREADTOCENTRYS, struct ioc_read_toc_entry64)
@@ -1749,8 +1750,8 @@ te_data_get_ptr(void *irtep, u_long cmd)
 		return (irteup->irte.data);
 #ifdef COMPAT_FREEBSD32
 	case sizeof(irteup->irte32):
-		return (__USER_CAP((struct cd_toc_entry *)(uintptr_t)
-		    irteup->irte32.data, irteup->irte32.data_len));
+		return (__USER_CAP(irteup->irte32.data,
+		    irteup->irte32.data_len));
 #endif
 #ifdef COMPAT_FREEBSD64
 	case sizeof(irteup->irte64):

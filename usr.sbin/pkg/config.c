@@ -45,10 +45,6 @@ __FBSDID("$FreeBSD$");
 
 #include "config.h"
 
-#ifndef roundup2
-#define roundup2(x, y)	(((x)+((y)-1))&(~((y)-1))) /* if y is powers of two */
-#endif
-
 struct config_value {
        char *value;
        STAILQ_ENTRY(config_value) next;
