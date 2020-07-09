@@ -74,6 +74,18 @@ struct dbreg32 {
 	int dummy;
 };
 
+#if __has_feature(capabilities)
+struct capreg {
+	uintcap_t x[30];
+	uintcap_t lr;
+	uintcap_t sp;
+	uintcap_t elr;
+	uintcap_t ddc;
+	uint64_t tagmask;
+	uint64_t pad;
+};
+#endif
+
 #define	__HAVE_REG32
 
 #ifdef _KERNEL
@@ -93,6 +105,10 @@ int	fill_fpregs32(struct thread *, struct fpreg32 *);
 int	set_fpregs32(struct thread *, struct fpreg32 *);
 int	fill_dbregs32(struct thread *, struct dbreg32 *);
 int	set_dbregs32(struct thread *, struct dbreg32 *);
+#endif
+#if __has_feature(capabilities)
+int	fill_capregs(struct thread *, struct capreg *);
+int	set_capregs(struct thread *, struct capreg *);
 #endif
 #endif
 
