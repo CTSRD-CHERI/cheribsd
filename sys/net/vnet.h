@@ -161,8 +161,8 @@ __GLOBL(__start_set_vnet);
 extern uintptr_t	*__stop_set_vnet;
 __GLOBL(__stop_set_vnet);
 
-#define	VNET_START	(uintptr_t)&__start_set_vnet
-#define	VNET_STOP	(uintptr_t)&__stop_set_vnet
+#define	VNET_START	(char *)&__start_set_vnet
+#define	VNET_STOP	(char *)&__stop_set_vnet
 
 /*
  * Functions to allocate and destroy virtual network stacks.
@@ -287,8 +287,13 @@ extern struct sx vnet_sxlock;
 #define	VNET_DEFINE_STATIC(t, n) \
     static t VNET_NAME(n) __section(VNET_SETNAME) __used
 #endif
+#ifdef __CHERI_PURE_CAPABILITY__
+#define	_VNET_PTR(b, n)		(__typeof(VNET_NAME(n))*)		\
+	((b) + ((vaddr_t)&VNET_NAME(n) - (vaddr_t)VNET_START))
+#else
 #define	_VNET_PTR(b, n)		(__typeof(VNET_NAME(n))*)		\
 				    ((b) + (uintptr_t)&VNET_NAME(n))
+#endif
 
 #define	_VNET(b, n)		(*_VNET_PTR(b, n))
 
@@ -455,3 +460,12 @@ do {									\
 #endif /* _KERNEL */
 
 #endif /* !_NET_VNET_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20200803,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_provenance"
+//   ]
+// }
+// CHERI CHANGES END

@@ -382,6 +382,9 @@ sysctl_ipf_int_nat ( SYSCTL_HANDLER_ARGS )
 		nat_softc = V_ipfmain.ipf_nat_soft;
 #ifdef VIMAGE
 		arg1 = (void *)((uintptr_t)arg1 - curvnet->vnet_data_base);
+#ifdef __CHERI_PURE_CAPABILITY__
+		arg1 = (char *)arg1 + (vaddr_t)VNET_START;
+#endif
 #endif
 		arg1 = (void *)((uintptr_t)nat_softc + (uintptr_t)arg1);
 	}
@@ -399,6 +402,9 @@ sysctl_ipf_int_state ( SYSCTL_HANDLER_ARGS )
 		state_softc = V_ipfmain.ipf_state_soft;
 #ifdef VIMAGE
 		arg1 = (void *)((uintptr_t)arg1 - curvnet->vnet_data_base);
+#ifdef __CHERI_PURE_CAPABILITY__
+		arg1 = (char *)arg1 + (vaddr_t)VNET_START;
+#endif
 #endif
 		arg1 = (void *)((uintptr_t)state_softc + (uintptr_t)arg1);
 	}
@@ -416,6 +422,9 @@ sysctl_ipf_int_auth ( SYSCTL_HANDLER_ARGS )
 		auth_softc = V_ipfmain.ipf_auth_soft;
 #ifdef VIMAGE
 		arg1 = (void *)((uintptr_t)arg1 - curvnet->vnet_data_base);
+#ifdef __CHERI_PURE_CAPABILITY__
+		arg1 = (char *)arg1 + (vaddr_t)VNET_START;
+#endif
 #endif
 		arg1 = (void *)((uintptr_t)auth_softc + (uintptr_t)arg1);
 	}
@@ -433,6 +442,9 @@ sysctl_ipf_int_frag ( SYSCTL_HANDLER_ARGS )
 		frag_softc = V_ipfmain.ipf_frag_soft;
 #ifdef VIMAGE
 		arg1 = (void *)((uintptr_t)arg1 - curvnet->vnet_data_base);
+#ifdef __CHERI_PURE_CAPABILITY__
+		arg1 = (char *)arg1 + (vaddr_t)VNET_START;
+#endif
 #endif
 		arg1 = (void *)((uintptr_t)frag_softc + (uintptr_t)arg1);
 	}
@@ -681,3 +693,12 @@ ipf_fbsd_sysctl_destroy(void)
 	return 0;
 }
 
+// CHERI CHANGES START
+// {
+//   "updated": 20200803,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_provenance"
+//   ]
+// }
+// CHERI CHANGES END

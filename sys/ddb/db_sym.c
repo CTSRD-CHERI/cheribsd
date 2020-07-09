@@ -272,8 +272,11 @@ db_value_of_name_vnet(const char *name, db_expr_t *valuep)
 	if (sym == C_DB_SYM_NULL)
 		return (false);
 	db_symbol_values(sym, &name, &value);
-	if (value < VNET_START || value >= VNET_STOP)
+	if (value < (db_expr_t)VNET_START || value >= (db_expr_t)VNET_STOP)
 		return (false);
+#ifdef __CHERI_PURE_CAPABILITY__
+	value -= (db_expr_t)VNET_START;
+#endif
 	*valuep = (db_expr_t)((uintptr_t)value + vnet->vnet_data_base);
 	return (true);
 #else
@@ -478,7 +481,8 @@ db_sym_numargs(c_db_sym_t sym, int *nargp, char **argnames)
 //   "updated": 20190830,
 //   "target_type": "kernel",
 //   "changes_purecap": [
-//     "kdb"
+//     "kdb",
+//     "pointer_provenance"
 //   ]
 // }
 // CHERI CHANGES END

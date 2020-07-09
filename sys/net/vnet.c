@@ -244,12 +244,21 @@ vnet_alloc(void)
 	vnet->vnet_data_mem = malloc(VNET_SIZE, M_VNET_DATA, M_WAITOK);
 	memcpy(vnet->vnet_data_mem, (void *)VNET_START, VNET_BYTES);
 
+#ifndef __CHERI_PURE_CAPABILITY__
 	/*
 	 * All use of vnet-specific data will immediately subtract VNET_START
 	 * from the base memory pointer, so pre-calculate that now to avoid
 	 * it on each use.
 	 */
-	vnet->vnet_data_base = (uintptr_t)vnet->vnet_data_mem - VNET_START;
+	vnet->vnet_data_base = (uintptr_t)vnet->vnet_data_mem -
+	    (uintptr_t)VNET_START;
+#else
+	/*
+	 * Subtracting VNET_START would make the capability
+	 * unrepresentable, so do it in each dereference instead.
+	 */
+	vnet->vnet_data_base = (uintptr_t)vnet->vnet_data_mem;
+#endif
 
 	/* Initialize / attach vnet module instances. */
 	CURVNET_SET_QUIET(vnet);
@@ -463,7 +472,7 @@ vnet_data_copy(void *start, int size)
 	VNET_LIST_RLOCK();
 	LIST_FOREACH(vnet, &vnet_head, vnet_le)
 		memcpy((void *)((uintptr_t)vnet->vnet_data_base +
-		    (uintptr_t)start), start, size);
+		    (vaddr_t)start), start, size);
 	VNET_LIST_RUNLOCK();
 }
 
@@ -709,8 +718,12 @@ db_vnet_print(struct vnet *vnet)
 	db_printf(" vnet_ifcnt     = %u\n", vnet->vnet_ifcnt);
 	db_printf(" vnet_sockcnt   = %u\n", vnet->vnet_sockcnt);
 	db_printf(" vnet_data_mem  = %p\n", vnet->vnet_data_mem);
+#ifdef __CHERI_PURE_CAPABILITY__
+	db_printf(" vnet_data_base = %p\n", vnet->vnet_data_base);
+#else
 	db_printf(" vnet_data_base = %#jx\n",
 	    (uintmax_t)vnet->vnet_data_base);
+#endif
 	db_printf(" vnet_state     = %#08x\n", vnet->vnet_state);
 	db_printf(" vnet_shutdown  = %#03x\n", vnet->vnet_shutdown);
 	db_printf("\n");
@@ -812,7 +825,8 @@ DB_SHOW_COMMAND(vnetrcrs, db_show_vnetrcrs)
 //   "updated": 20200803,
 //   "target_type": "kernel",
 //   "changes_purecap": [
-//     "kdb"
+//     "kdb",
+//     "pointer_provenance"
 //   ]
 // }
 // CHERI CHANGES END

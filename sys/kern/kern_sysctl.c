@@ -2196,8 +2196,12 @@ sysctl_root(SYSCTL_HANDLER_ARGS)
 		goto out;
 #endif
 #ifdef VIMAGE
-	if ((oid->oid_kind & CTLFLAG_VNET) && arg1 != NULL)
-		arg1 = (void *)(curvnet->vnet_data_base + (uintptr_t)arg1);
+	if ((oid->oid_kind & CTLFLAG_VNET) && arg1 != NULL) {
+		arg1 = (void *)(curvnet->vnet_data_base + (vaddr_t)arg1);
+#ifdef __CHERI_PURE_CAPABILITY__
+		arg1 = (char *)arg1 - (vaddr_t)VNET_START;
+#endif
+	}
 #endif
 	error = sysctl_root_handler_locked(oid, arg1, arg2, req, &tracker);
 
@@ -2950,6 +2954,9 @@ out:
 //   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"
+//   ],
+//   "changes_purecap": [
+//     "pointer_provenance"
 //   ]
 // }
 // CHERI CHANGES END
