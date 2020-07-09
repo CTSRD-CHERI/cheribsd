@@ -564,7 +564,6 @@ cpu_mp_setmaxid(void)
 	mp_ncpus = 1;
 	mp_maxid = 0;
 }
-
 // CHERI CHANGES START
 // {
 //   "updated": 20200803,
