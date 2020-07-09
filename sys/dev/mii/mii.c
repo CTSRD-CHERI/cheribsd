@@ -503,7 +503,7 @@ mii_attach(device_t dev, device_t *miibus, if_t ifp,
 		    M_NOWAIT);
 		if (args == NULL)
 			goto skip;
-		bcopy((char *)&ma, (char *)args, sizeof(ma));
+		*args = ma;
 		phy = device_add_child(*miibus, NULL, -1);
 		if (phy == NULL) {
 			free(args, M_DEVBUF);
@@ -679,3 +679,13 @@ mii_dev_mac_softc(device_t parent)
 
 	return (device_get_softc(device_get_parent(device_get_parent(parent))));
 }
+
+// CHERI CHANGES START
+// {
+//   "updated": 20200803,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_alignment"
+//   ]
+// }
+// CHERI CHANGES END
