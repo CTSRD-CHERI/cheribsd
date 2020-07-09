@@ -39,13 +39,13 @@ __FBSDID("$FreeBSD$");
 #include <sys/systm.h>
 #include <sys/limits.h>
 #include <sys/proc.h>
-#include <sys/sf_buf.h>
 #include <sys/signal.h>
 #include <sys/sysent.h>
 #include <sys/unistd.h>
 
 #include <vm/vm.h>
 #include <vm/vm_page.h>
+#include <vm/vm_param.h>
 #include <vm/vm_map.h>
 #include <vm/uma.h>
 #include <vm/uma_int.h>

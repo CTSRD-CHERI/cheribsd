@@ -231,6 +231,9 @@ vm_offset_t kernel_vm_end = 0;
 vm_paddr_t dmap_phys_base;	/* The start of the dmap region */
 vm_paddr_t dmap_phys_max;	/* The limit of the dmap region */
 vm_offset_t dmap_max_addr;	/* The virtual address limit of the dmap */
+#ifdef __CHERI_PURE_CAPABILITY__
+void *dmap_capability;		/* Capability for dmap region */
+#endif
 
 /* This code assumes all L1 DMAP entries will be used */
 CTASSERT((DMAP_MIN_ADDRESS  & ~L1_OFFSET) == DMAP_MIN_ADDRESS);
@@ -529,7 +532,19 @@ pmap_bootstrap_dmap(vm_offset_t kern_l1, vm_paddr_t min_pa, vm_paddr_t max_pa)
 
 	/* Set the upper limit of the DMAP region */
 	dmap_phys_max = pa;
+
+#ifdef __CHERI_PURE_CAPABILITY__
+	dmap_capability = cheri_setaddress(cheri_kall_capability,
+	    DMAP_MIN_ADDRESS);
+	dmap_capability = cheri_setbounds(dmap_capability,
+	    dmap_phys_max - dmap_phys_base);
+
+	/* XXX: Is this the right set of permissions? */
+	dmap_capability = cheri_andperm(dmap_capability,
+	    CHERI_PERMS_KERNEL_CODE | CHERI_PERMS_KERNEL_DATA);
+#else
 	dmap_max_addr = va;
+#endif
 
 	sfence_vma();
 }
@@ -4700,7 +4715,8 @@ SYSCTL_OID(_vm_pmap, OID_AUTO, kernel_maps,
 //   "updated": 20200803,
 //   "target_type": "kernel",
 //   "changes_purecap": [
-//     "pointer_as_integer"
+//     "pointer_as_integer",
+//     "support"
 //   ]
 // }
 // CHERI CHANGES END
