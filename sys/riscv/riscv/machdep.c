@@ -917,7 +917,7 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 }
 
 static void
-init_proc0(vm_offset_t kstack)
+init_proc0(vm_ptr_t kstack)
 {
 	struct pcpu *pcpup;
 
@@ -1159,3 +1159,13 @@ bzero(void *buf, size_t len)
 	while(len-- > 0)
 		*p++ = 0;
 }
+
+// CHERI CHANGES START
+// {
+//   "updated": 20200803,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_as_integer"
+//   ]
+// }
+// CHERI CHANGES END
