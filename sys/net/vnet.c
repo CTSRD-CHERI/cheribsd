@@ -160,7 +160,7 @@ struct vnet *vnet0;
  * size of all kernel virtualized global variables, and the malloc(9) type
  * that will be used to allocate it.
  */
-#define	VNET_BYTES	(VNET_STOP - VNET_START)
+#define	VNET_BYTES	((ptraddr_t)VNET_STOP - (ptraddr_t)VNET_START)
 
 static MALLOC_DEFINE(M_VNET_DATA, "vnet_data", "VNET data");
 
@@ -245,11 +245,13 @@ vnet_alloc(void)
 	memcpy(vnet->vnet_data_mem, (void *)VNET_START, VNET_BYTES);
 
 	/*
-	 * All use of vnet-specific data will immediately subtract VNET_START
-	 * from the base memory pointer, so pre-calculate that now to avoid
-	 * it on each use.
+	 * vnet_data_base points to a network stack's global variables
+	 * with a bias of VNET_BIAS.  In non-purecap kernels, the bias
+	 * is -VNET_START removing a subtraction from the access.  In
+	 * CHERI purecap kernels, the bias is 0 as the base pointer
+	 * would be unrepresentable otherwise.
 	 */
-	vnet->vnet_data_base = (uintptr_t)vnet->vnet_data_mem - VNET_START;
+	vnet->vnet_data_base = (uintptr_t)vnet->vnet_data_mem + VNET_BIAS;
 
 	/* Initialize / attach vnet module instances. */
 	CURVNET_SET_QUIET(vnet);
@@ -463,7 +465,7 @@ vnet_data_copy(void *start, int size)
 	VNET_LIST_RLOCK();
 	LIST_FOREACH(vnet, &vnet_head, vnet_le)
 		memcpy((void *)((uintptr_t)vnet->vnet_data_base +
-		    (uintptr_t)start), start, size);
+		    (ptraddr_t)start), start, size);
 	VNET_LIST_RUNLOCK();
 }
 
@@ -709,8 +711,7 @@ db_vnet_print(struct vnet *vnet)
 	db_printf(" vnet_ifcnt     = %u\n", vnet->vnet_ifcnt);
 	db_printf(" vnet_sockcnt   = %u\n", vnet->vnet_sockcnt);
 	db_printf(" vnet_data_mem  = %p\n", vnet->vnet_data_mem);
-	db_printf(" vnet_data_base = %#jx\n",
-	    (uintmax_t)vnet->vnet_data_base);
+	db_printf(" vnet_data_base = %p\n", (void *)vnet->vnet_data_base);
 	db_printf(" vnet_state     = %#08x\n", vnet->vnet_state);
 	db_printf(" vnet_shutdown  = %#03x\n", vnet->vnet_shutdown);
 	db_printf("\n");
@@ -811,7 +812,8 @@ DB_SHOW_COMMAND(vnetrcrs, db_show_vnetrcrs)
 //   "updated": 20200803,
 //   "target_type": "kernel",
 //   "changes_purecap": [
-//     "kdb"
+//     "kdb",
+//     "pointer_provenance"
 //   ]
 // }
 // CHERI CHANGES END
