@@ -260,7 +260,7 @@ dpcpu_copy(void *s, int size)
 		dpcpu = dpcpu_off[i];
 		if (dpcpu == 0)
 			continue;
-		memcpy((void *)(dpcpu + (uintptr_t)s), s, size);
+		memcpy((void *)(dpcpu + (vaddr_t)s), s, size);
 	}
 #else
 	memcpy((void *)(dpcpu_off[0] + (vaddr_t)s), s, size);
