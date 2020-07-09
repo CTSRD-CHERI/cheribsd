@@ -876,8 +876,8 @@ aio_process_mlock(struct kaiocb *job)
 	    ("%s: opcode %d", __func__, job->uaiocb.aio_lio_opcode));
 
 	aio_switch_vmspace(job);
-	error = kern_mlock(job->userproc, job->cred,
-	    __DEVOLATILE_CAP(void * __capability, cb->aio_buf), cb->aio_nbytes);
+	error = kern_mlock(job->userproc, job->cred, (uintptr_t)
+	__DEVOLATILE_CAP(void * __capability, cb->aio_buf), cb->aio_nbytes);
 	aio_complete(job, error != 0 ? -1 : 0, error);
 }
 
