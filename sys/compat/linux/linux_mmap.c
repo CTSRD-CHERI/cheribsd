@@ -158,7 +158,7 @@ linux_mmap_common(struct thread *td, uintptr_t addr, size_t len, int prot,
 		 * fixed size of (STACK_SIZE - GUARD_SIZE).
 		 */
 
-		if ((caddr_t)addr + len > vms->vm_maxsaddr) {
+		if (addr + len > vms->vm_maxsaddr) {
 			/*
 			 * Some Linux apps will attempt to mmap
 			 * thread stacks near the top of their
