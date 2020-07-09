@@ -66,8 +66,8 @@ options 	AUDIT			# Security event auditing
 options 	CAPABILITY_MODE		# Capsicum capability mode
 options 	CAPABILITIES		# Capsicum capabilities
 options 	MAC			# TrustedBSD MAC Framework
-options 	KDTRACE_FRAME		# Ensure frames are compiled in
-options 	KDTRACE_HOOKS		# Kernel DTrace hooks
+#options 	KDTRACE_FRAME		# Ensure frames are compiled in
+#options 	KDTRACE_HOOKS		# Kernel DTrace hooks
 options 	VFP			# Floating-point support
 options 	RACCT			# Resource accounting framework
 options 	RACCT_DEFAULT_TO_DISABLED # Set kern.racct.enable=0 by default
@@ -103,7 +103,7 @@ options 	EKCD			# Support for encrypted kernel dumps
 options 	GZIO			# gzip-compressed kernel and user dumps
 options 	ZSTDIO			# zstd-compressed kernel and user dumps
 options 	DEBUGNET		# debugnet networking
-options 	NETDUMP			# netdump(4) client support
+#options 	NETDUMP			# netdump(4) client support
 
 # VirtIO support
 device		virtio
@@ -119,7 +119,7 @@ device		cpufreq
 device		pci
 device		pci_n1sdp	# ARM Neoverse N1 SDP PCI
 options 	PCI_HP			# PCI-Express native HotPlug
-options 	PCI_IOV		# PCI SR-IOV support
+#options 	PCI_IOV		# PCI SR-IOV support
 
 # PCI/PCI-X/PCIe Ethernet NICs that use iflib infrastructure
 device		iflib
@@ -207,7 +207,7 @@ device		tuntap		# Packet tunnel.
 device		md		# Memory "disks"
 device		gif		# IPv6 and IPv4 tunneling
 device		firmware	# firmware assist module
-options 	EFIRT		# EFI Runtime Services
+#options 	EFIRT		# EFI Runtime Services
 
 # EXT_RESOURCES pseudo devices
 options 	EXT_RESOURCES
