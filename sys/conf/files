@@ -313,12 +313,12 @@ cddl/contrib/opensolaris/uts/common/fs/zfs/lua/lvm.c			optional zfs compile-with
 cddl/contrib/opensolaris/uts/common/fs/zfs/lua/lzio.c			optional zfs compile-with "${ZFS_C}"
 
 # CHERI and CHERI-compat related files
-cheri/cheri_asserts.c			optional cpu_cheri
-cheri/cheri_exec.c			optional cpu_cheri
-cheri/cheri_sysctl.c			optional cpu_cheri
-cheri/cheri_otype.c			optional cpu_cheri
-cheri/cheri_syscall.c			optional cpu_cheri
-cheri/cheri_usercap.c			optional cpu_cheri
+cheri/cheri_asserts.c			optional cpu_cheri | morello
+cheri/cheri_exec.c			optional cpu_cheri | morello
+cheri/cheri_sysctl.c			optional cpu_cheri | morello
+cheri/cheri_otype.c			optional cpu_cheri | morello
+cheri/cheri_syscall.c			optional cpu_cheri | morello
+cheri/cheri_usercap.c			optional cpu_cheri | morello
 
 # dtrace specific
 cddl/contrib/opensolaris/uts/common/dtrace/dtrace.c	optional dtrace compile-with "${DTRACE_C}" \

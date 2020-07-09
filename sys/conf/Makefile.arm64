@@ -30,9 +30,7 @@ INCLUDES+= -I$S/contrib/libfdt
 # TODO: This shouldn't be needed, we should be building with TAARGET_ARCH=morello
 MORELLO_ENABLED!=	grep MORELLO opt_global.h || true ; echo
 .if !empty(MORELLO_ENABLED)
-CFLAGS.exception-morello.S=	-morello
-CFLAGS.locore.S=		-morello
-CFLAGS.swtch.S=			-morello
+CFLAGS+=	-morello
 .endif
 
 # Use a custom SYSTEM_LD command to generate the elf kernel, so we can
