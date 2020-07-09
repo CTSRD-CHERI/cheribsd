@@ -135,8 +135,8 @@
 /*
  * Mach derived conversion macros
  */
-#define	round_page(x)		(((unsigned long)(x) + PAGE_MASK) & ~PAGE_MASK)
-#define	trunc_page(x)		((unsigned long)(x) & ~PAGE_MASK)
+#define	round_page(x)		__builtin_align_up((x), PAGE_SIZE)
+#define	trunc_page(x)		__builtin_align_down((x), PAGE_SIZE)
 
 #define	atop(x)			((unsigned long)(x) >> PAGE_SHIFT)
 #define	ptoa(x)			((unsigned long)(x) << PAGE_SHIFT)
@@ -147,3 +147,13 @@
 #define	pgtok(x)		((unsigned long)(x) * (PAGE_SIZE / 1024))
 
 #endif /* !_MACHINE_PARAM_H_ */
+
+// CHERI CHANGES START
+// {
+//   "updated": 20200804,
+//   "target_type": "header",
+//   "changes_purecap": [
+//     "pointer_alignment"
+//   ]
+// }
+// CHERI CHANGES END
