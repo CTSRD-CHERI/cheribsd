@@ -3201,7 +3201,7 @@ DB_SHOW_COMMAND(inpcb, db_show_inpcb)
 		db_printf("usage: show inpcb <addr>\n");
 		return;
 	}
-	inp = (struct inpcb *)addr;
+	inp = DB_DATA_PTR(addr, sizeof(*inp));
 
 	db_print_inpcb(inp, "inpcb", 0);
 }
@@ -3527,3 +3527,13 @@ rl_init(void *st)
 SYSINIT(rl, SI_SUB_PROTO_DOMAININIT, SI_ORDER_ANY, rl_init, NULL);
 #endif
 #endif /* RATELIMIT */
+
+// CHERI CHANGES START
+// {
+//   "updated": 20200803,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "kdb"
+//   ]
+// }
+// CHERI CHANGES END

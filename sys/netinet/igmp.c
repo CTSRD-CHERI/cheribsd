@@ -3648,13 +3648,13 @@ VNET_SYSUNINIT(vnet_igmp_uninit, SI_SUB_PROTO_MC, SI_ORDER_ANY,
 DB_SHOW_COMMAND(igi_list, db_show_igi_list)
 {
 	struct igmp_ifsoftc *igi, *tigi;
-	LIST_HEAD(_igi_list, igmp_ifsoftc) *igi_head;
+	LIST_HEAD(, igmp_ifsoftc) *igi_head;
 
 	if (!have_addr) {
 		db_printf("usage: show igi_list <addr>\n");
 		return;
 	}
-	igi_head = (struct _igi_list *)addr;
+	igi_head = DB_DATA_PTR(addr, sizeof(*igi_head));
 
 	LIST_FOREACH_SAFE(igi, igi_head, igi_link, tigi) {
 		db_printf("igmp_ifsoftc %p:\n", igi);
@@ -3704,3 +3704,13 @@ static moduledata_t igmp_mod = {
     0
 };
 DECLARE_MODULE(igmp, igmp_mod, SI_SUB_PROTO_MC, SI_ORDER_MIDDLE);
+
+// CHERI CHANGES START
+// {
+//   "updated": 20200803,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "kdb"
+//   ]
+// }
+// CHERI CHANGES END

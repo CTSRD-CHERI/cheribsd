@@ -1716,7 +1716,7 @@ DB_SHOW_COMMAND(vmemdump, vmemdump)
 		return;
 	}
 
-	vmem_dump((const vmem_t *)addr, db_printf);
+	vmem_dump(DB_DATA_PTR(addr, sizeof(vmem_t)), db_printf);
 }
 
 DB_SHOW_ALL_COMMAND(vmemdump, vmemdumpall)
@@ -1729,7 +1729,7 @@ DB_SHOW_ALL_COMMAND(vmemdump, vmemdumpall)
 
 DB_SHOW_COMMAND(vmem, vmem_summ)
 {
-	const vmem_t *vm = (const void *)addr;
+	const vmem_t *vm;
 	const bt_t *bt;
 	size_t ft[VMEM_MAXORDER], ut[VMEM_MAXORDER];
 	size_t fs[VMEM_MAXORDER], us[VMEM_MAXORDER];
@@ -1740,6 +1740,7 @@ DB_SHOW_COMMAND(vmem, vmem_summ)
 		return;
 	}
 
+	vm = DB_DATA_PTR(addr, sizeof(*vm));
 	db_printf("vmem %p '%s'\n", vm, vm->vm_name);
 	db_printf("\tquantum:\t%zu\n", vm->vm_quantum_mask + 1);
 	db_printf("\tsize:\t%zu\n", vm->vm_size);
@@ -1848,7 +1849,8 @@ vmem_check(vmem_t *vm)
 //     "uintcap_arithmetic",
 //     "bounds_compression",
 //     "support",
-//     "pointer_alignment"
+//     "pointer_alignment",
+//     "kdb"
 //   ]
 // }
 // CHERI CHANGES END

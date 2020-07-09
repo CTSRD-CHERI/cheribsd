@@ -1431,7 +1431,7 @@ DB_SHOW_COMMAND(multizone_matches, db_show_multizone_matches)
 		db_printf("Usage: show multizone_matches <malloc type/addr>\n");
 		return;
 	}
-	mtp = (void *)addr;
+	mtp = DB_DATA_PTR(addr, sizeof(*mtp));
 	if (mtp->ks_magic != M_MAGIC) {
 		db_printf("Magic %lx does not match expected %x\n",
 		    mtp->ks_magic, M_MAGIC);
@@ -1511,7 +1511,8 @@ SYSCTL_OID(_kern, OID_AUTO, mprof,
 //   "changes_purecap": [
 //     "pointer_alignment",
 //     "pointer_as_integer",
-//     "support"
+//     "support",
+//     "kdb"
 //   ]
 // }
 // CHERI CHANGES END

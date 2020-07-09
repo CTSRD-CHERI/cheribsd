@@ -686,7 +686,7 @@ DB_SHOW_COMMAND(pctrienode, db_show_pctrienode)
 
         if (!have_addr)
                 return;
-	node = (struct pctrie_node *)addr;
+	node = DB_DATA_PTR(addr, sizeof(*node));
 	db_printf("node %p, owner %jx, children count %u, level %u:\n",
 	    (void *)node, (uintmax_t)node->pn_owner, node->pn_count,
 	    node->pn_clev);
@@ -704,7 +704,8 @@ DB_SHOW_COMMAND(pctrienode, db_show_pctrienode)
 //   "updated": 20200127,
 //   "target_type": "kernel",
 //   "changes_purecap": [
-//     "pointer_bit_flags"
+//     "pointer_bit_flags",
+//     "kdb"
 //   ]
 // }
 // CHERI CHANGES END

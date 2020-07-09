@@ -71,6 +71,11 @@ KDB_BACKEND(ddb, db_init, db_trace_self_wrapper, db_trace_thread_wrapper,
 vm_ptr_t ksymtab, kstrtab;
 vm_size_t ksymtab_size;
 
+#ifdef __CHERI_PURE_CAPABILITY__
+void *db_code_cap;
+void *db_data_cap;
+#endif
+
 bool
 X_db_line_at_pc(db_symtab_t *symtab, c_db_sym_t sym, char **file, int *line,
     db_expr_t off)
@@ -225,6 +230,12 @@ db_init(void)
 		    (char *)(ksymtab + ksymtab_size), "elf", (char *)kstrtab);
 	}
 	db_add_symbol_table(NULL, NULL, "kld", NULL);
+#ifdef __CHERI_PURE_CAPABILITY__
+	db_code_cap = cheri_andperm(cheri_kall_capability,
+	    CHERI_PERMS_KERNEL_CODE);
+	db_data_cap = cheri_andperm(cheri_kall_capability,
+	    CHERI_PERMS_KERNEL_DATA);
+#endif
 	return (1);	/* We're the default debugger. */
 }
 
@@ -294,6 +305,27 @@ db_trace_thread_wrapper(struct thread *td)
 		db_trace_thread(td, -1);
 	(void)kdb_jmpbuf(prev_jb);
 }
+
+#ifdef __CHERI_PURE_CAPABILITY__
+void *
+db_code_ptr(db_addr_t addr)
+{
+	return (cheri_setaddress(db_code_cap, addr));
+}
+
+void *
+db_data_ptr_unbound(db_addr_t addr)
+{
+	return (cheri_setaddress(db_data_cap, addr));
+}
+
+void *
+db_data_ptr(db_addr_t addr, size_t len)
+{
+	return (cheri_setbounds(db_data_ptr_unbound(addr), len));
+}
+#endif
+
 // CHERI CHANGES START
 // {
 //   "updated": 20200706,

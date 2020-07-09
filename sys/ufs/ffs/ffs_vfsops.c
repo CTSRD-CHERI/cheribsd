@@ -2446,7 +2446,8 @@ DB_SHOW_COMMAND(ffs, db_show_ffs)
 	struct ufsmount *ump;
 
 	if (have_addr) {
-		ump = VFSTOUFS((struct mount *)addr);
+		mp = DB_DATA_PTR(addr, sizeof(*mp));
+		ump = VFSTOUFS(mp);
 		db_print_ffs(ump);
 		return;
 	}
@@ -2464,7 +2465,8 @@ DB_SHOW_COMMAND(ffs, db_show_ffs)
 //   "updated": 20190628,
 //   "target_type": "kernel",
 //   "changes_purecap": [
-//     "pointer_shape"
+//     "pointer_shape",
+//     "kdb"
 //   ]
 // }
 // CHERI CHANGES END

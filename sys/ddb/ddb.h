@@ -234,6 +234,11 @@ int		db_write_bytes(vm_offset_t addr, size_t size, char *data);
 void		db_command_register(struct command_table *, struct command *);
 void		db_command_unregister(struct command_table *, struct command *);
 int		db_fetch_ksymtab(vm_ptr_t ksym_start, vm_ptr_t ksym_end);
+#ifdef __CHERI_PURE_CAPABILITY__
+void		*db_code_ptr(db_addr_t addr);
+void		*db_data_ptr_unbound(db_addr_t addr);
+void		*db_data_ptr(db_addr_t addr, size_t len);
+#endif
 
 db_cmdfcn_t	db_breakpoint_cmd;
 db_cmdfcn_t	db_capture_cmd;
@@ -300,13 +305,27 @@ int	textdump_writenextblock(struct dumperinfo *di, char *buffer);
 extern int	textdump_pending;	/* Call textdump_dumpsys() instead. */
 void	textdump_dumpsys(struct dumperinfo *di);
 
+/*
+ * Macros to construct valid pointers from addresses.
+ */
+#ifdef __CHERI_PURE_CAPABILITY__
+#define	DB_CODE_PTR(addr)	db_code_ptr((addr))
+#define	DB_DATA_PTR(addr, len)	db_data_ptr((addr), (len))
+#define	DB_DATA_PTR_UNBOUND(addr)	db_data_ptr_unbound((addr))
+#else
+#define	DB_CODE_PTR(addr)	((void *)(addr))
+#define	DB_DATA_PTR(addr, len)	((void *)(addr))
+#define	DB_DATA_PTR_UNBOUND(addr)	((void *)(addr))
+#endif
+
 #endif /* !_DDB_DDB_H_ */
 // CHERI CHANGES START
 // {
 //   "updated": 20200803,
 //   "target_type": "kernel",
 //   "changes_purecap": [
-//     "pointer_as_integer"
+//     "pointer_as_integer",
+//     "kdb"
 //   ]
 // }
 // CHERI CHANGES END

@@ -1547,7 +1547,7 @@ DB_SHOW_COMMAND(callout, db_show_callout)
 		return;
 	}
 
-	_show_callout((struct callout *)addr);
+	_show_callout(DB_DATA_PTR(addr, sizeof(struct callout)));
 }
 
 static void
@@ -1588,3 +1588,13 @@ DB_SHOW_COMMAND(callout_last, db_show_callout_last)
 	}
 }
 #endif /* DDB */
+
+// CHERI CHANGES START
+// {
+//   "updated": 20200803,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "kdb"
+//   ]
+// }
+// CHERI CHANGES END

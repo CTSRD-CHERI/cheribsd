@@ -5999,15 +5999,9 @@ _gone_in_dev(device_t dev, int major, const char *msg)
 }
 
 #ifdef DDB
-DB_SHOW_COMMAND(device, db_show_device)
+static void
+db_print_device(device_t dev)
 {
-	device_t dev;
-
-	if (!have_addr)
-		return;
-
-	dev = (device_t)addr;
-
 	db_printf("name:    %s\n", device_get_nameunit(dev));
 	db_printf("  driver:  %s\n", DRIVERNAME(dev->driver));
 	db_printf("  class:   %s\n", DEVCLANAME(dev->devclass));
@@ -6017,12 +6011,33 @@ DB_SHOW_COMMAND(device, db_show_device)
 	db_printf("  ivars:   %p\n", dev->ivars);
 }
 
+DB_SHOW_COMMAND(device, db_show_device)
+{
+	device_t dev;
+
+	if (!have_addr)
+		return;
+
+	dev = DB_DATA_PTR(addr, sizeof(struct device));
+	db_print_device(dev);
+}
+
 DB_SHOW_ALL_COMMAND(devices, db_show_all_devices)
 {
 	device_t dev;
 
 	TAILQ_FOREACH(dev, &bus_data_devices, devlink) {
-		db_show_device((db_expr_t)dev, true, count, modif);
+		db_print_device(dev);
 	}
 }
 #endif
+
+// CHERI CHANGES START
+// {
+//   "updated": 20200803,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "kdb"
+//   ]
+// }
+// CHERI CHANGES END

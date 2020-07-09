@@ -4322,7 +4322,7 @@ DB_SHOW_COMMAND(file, db_show_file)
 		db_printf("usage: show file <addr>\n");
 		return;
 	}
-	fp = (struct file *)addr;
+	fp = DB_DATA_PTR(addr, sizeof(*fp));
 	db_print_file(fp, 1);
 }
 
@@ -4603,7 +4603,8 @@ SYSINIT(fildescdev, SI_SUB_DRIVERS, SI_ORDER_MIDDLE, fildesc_drvinit, NULL);
 //     "user_capabilities"
 //   ],
 //   "changes_purecap": [
-//     "subobject_bounds"
+//     "subobject_bounds",
+//     "kdb"
 //   ]
 // }
 // CHERI CHANGES END

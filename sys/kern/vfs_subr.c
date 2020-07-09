@@ -4189,7 +4189,7 @@ DB_SHOW_COMMAND(vnode, db_show_vnode)
 
 	if (!have_addr)
 		return;
-	vp = (struct vnode *)addr;
+	vp = DB_DATA_PTR(addr, sizeof(*vp));
 	vn_printf(vp, "vnode ");
 }
 
@@ -4220,7 +4220,7 @@ DB_SHOW_COMMAND(mount, db_show_mount)
 		return;
 	}
 
-	mp = (struct mount *)addr;
+	mp = DB_DATA_PTR(addr, sizeof(*mp));
 	db_printf("%p %s on %s (%s)\n", mp, mp->mnt_stat.f_mntfromname,
 	    mp->mnt_stat.f_mntonname, mp->mnt_stat.f_fstypename);
 
@@ -6505,7 +6505,8 @@ vn_dir_check_exec(struct vnode *vp, struct componentname *cnp)
 //     "sysctl"
 //   ],
 //   "changes_purecap": [
-//     "hashing"
+//     "hashing",
+//     "kdb"
 //   ]
 // }
 // CHERI CHANGES END
