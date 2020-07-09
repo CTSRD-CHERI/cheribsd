@@ -13,6 +13,7 @@ machine		mips mips64c128
 nomakeoptions 	ARCH_FLAGS
 makeoptions 	ARCH_PIC_FLAGS="-fpic"
 makeoptions 	ARCH_FLAGS="-target mips64c128-unknown-freebsd -mcpu=cheri128 -cheri-cap-table-abi=plt -mxcaptable -Xclang -cheri-bounds=subobject-safe"
+# -mllvm -collect-csetbounds-stats=csv -mllvm -collect-csetbounds-output=/home/am2419/git/evaluation/csetbounds-stats.csv
 makeoptions 	CFLAGS+="-gdwarf-5"
 makeoptions 	WERROR="-Wno-error"
 makeoptions 	KERNLOADADDR=0xffffffff80100000
