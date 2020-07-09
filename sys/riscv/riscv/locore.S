@@ -222,6 +222,15 @@ va:
 	sw	a0, 0(t0)
 #endif
 
+	/* Save DTB physical pointer in s1. */
+	mv	s1, a1
+
+#if __has_feature(capabilities)
+	/* Initialize capabilities. */
+	cspecialr ca0, ddc
+	call	_C_LABEL(cheri_init_capabilities)
+#endif
+
 	/* Fill riscv_bootparams */
 	la	t0, pagetable_l1
 	sd	t0, RISCV_BOOTPARAMS_KERN_L1PT(sp)
@@ -233,10 +242,10 @@ va:
 	li	t0, (VM_EARLY_DTB_ADDRESS)
 	/* Add offset of DTB within superpage */
 	li	t1, (L2_OFFSET)
-	and	t1, a1, t1
+	and	t1, s1, t1
 	add	t0, t0, t1
 	sd	t0, RISCV_BOOTPARAMS_DTBP_VIRT(sp)
-	sd	a1, RISCV_BOOTPARAMS_DTBP_PHYS(sp)
+	sd	s1, RISCV_BOOTPARAMS_DTBP_PHYS(sp)
 
 	mv	a0, sp
 	call	_C_LABEL(initriscv)	/* Off we go */
