@@ -459,8 +459,8 @@ mips_postboot_fixup(void)
 #ifdef DDB
 	Elf_Size *trampoline_data = (Elf_Size*)kernel_kseg0_end;
 	Elf_Size symtabsize = 0;
-	vm_offset_t ksym_start;
-	vm_offset_t ksym_end;
+	vm_pointer_t ksym_start;
+	vm_pointer_t ksym_end;
 
 	if (trampoline_data[0] == SYMTAB_MAGIC) {
 		symtabsize = trampoline_data[1];
@@ -692,3 +692,12 @@ mips_exc_cntrs_sysctl_register(void *arg)
 
 SYSINIT(sysctl, SI_SUB_KMEM, SI_ORDER_ANY, mips_exc_cntrs_sysctl_register, 0);
 #endif /* defined((MIPS_EXC_CNTRS) */
+// CHERI CHANGES START
+// {
+//   "updated": 20190812,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_as_integer"
+//   ]
+// }
+// CHERI CHANGES END
