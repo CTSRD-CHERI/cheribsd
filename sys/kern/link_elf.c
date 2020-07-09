@@ -51,6 +51,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/fcntl.h>
 #include <sys/vnode.h>
 #include <sys/linker.h>
+#include <sys/stddef.h>
 #include <sys/sysctl.h>
 
 #include <machine/elf.h>
@@ -112,13 +113,13 @@ typedef struct elf_file {
 	caddr_t		ctfoff;		/* CTF offset table */
 	caddr_t		typoff;		/* Type offset table */
 	long		typlen;		/* Number of type entries. */
-	Elf_Addr	pcpu_start;	/* Pre-relocation pcpu set start. */
-	Elf_Addr	pcpu_stop;	/* Pre-relocation pcpu set stop. */
-	Elf_Addr	pcpu_base;	/* Relocated pcpu set address. */
+	caddr_t		pcpu_start;	/* Pre-relocation pcpu set start. */
+	caddr_t		pcpu_stop;	/* Pre-relocation pcpu set stop. */
+	caddr_t		pcpu_base;	/* Relocated pcpu set address. */
 #ifdef VIMAGE
-	Elf_Addr	vnet_start;	/* Pre-relocation vnet set start. */
-	Elf_Addr	vnet_stop;	/* Pre-relocation vnet set stop. */
-	Elf_Addr	vnet_base;	/* Relocated vnet set address. */
+	caddr_t		vnet_start;	/* Pre-relocation vnet set start. */
+	caddr_t		vnet_stop;	/* Pre-relocation vnet set stop. */
+	caddr_t		vnet_base;	/* Relocated vnet set address. */
 #endif
 #ifdef GDB
 	struct link_map	gdb;		/* hooks for gdb */
@@ -126,9 +127,9 @@ typedef struct elf_file {
 } *elf_file_t;
 
 struct elf_set {
-	Elf_Addr	es_start;
-	Elf_Addr	es_stop;
-	Elf_Addr	es_base;
+	caddr_t		es_start;
+	caddr_t		es_stop;
+	caddr_t		es_base;
 	TAILQ_ENTRY(elf_set)	es_link;
 };
 
@@ -203,7 +204,7 @@ static struct elf_set_head set_vnet_list;
 #endif
 
 static void
-elf_set_add(struct elf_set_head *list, Elf_Addr start, Elf_Addr stop, Elf_Addr base)
+elf_set_add(struct elf_set_head *list, caddr_t start, caddr_t stop, caddr_t base)
 {
 	struct elf_set *set, *iter;
 
@@ -216,9 +217,8 @@ elf_set_add(struct elf_set_head *list, Elf_Addr start, Elf_Addr stop, Elf_Addr b
 
 		KASSERT((set->es_start < iter->es_start && set->es_stop < iter->es_stop) ||
 		    (set->es_start > iter->es_start && set->es_stop > iter->es_stop),
-		    ("linker sets intersection: to insert: 0x%jx-0x%jx; inserted: 0x%jx-0x%jx",
-		    (uintmax_t)set->es_start, (uintmax_t)set->es_stop,
-		    (uintmax_t)iter->es_start, (uintmax_t)iter->es_stop));
+		    ("linker sets intersection: to insert: %p-%p; inserted: %p-%p",
+		    set->es_start, set->es_stop, iter->es_start, iter->es_stop));
 
 		if (iter->es_start > set->es_start) {
 			TAILQ_INSERT_BEFORE(iter, set, es_link);
@@ -231,7 +231,7 @@ elf_set_add(struct elf_set_head *list, Elf_Addr start, Elf_Addr stop, Elf_Addr b
 }
 
 static int
-elf_set_find(struct elf_set_head *list, Elf_Addr addr, Elf_Addr *start, Elf_Addr *base)
+elf_set_find(struct elf_set_head *list, caddr_t addr, caddr_t *start, caddr_t *base)
 {
 	struct elf_set *set;
 
@@ -249,7 +249,7 @@ elf_set_find(struct elf_set_head *list, Elf_Addr addr, Elf_Addr *start, Elf_Addr
 }
 
 static void
-elf_set_delete(struct elf_set_head *list, Elf_Addr start)
+elf_set_delete(struct elf_set_head *list, caddr_t start)
 {
 	struct elf_set *set;
 
@@ -689,19 +689,20 @@ parse_dynamic(elf_file_t ef)
 static int
 parse_dpcpu(elf_file_t ef)
 {
-	int error, size;
+	ptrdiff_t size;
+	int error;
 #if defined(__i386__)
 	uint32_t pad;
 #endif
 
-	ef->pcpu_start = 0;
-	ef->pcpu_stop = 0;
+	ef->pcpu_start = NULL;
+	ef->pcpu_stop = NULL;
 	error = link_elf_lookup_set(&ef->lf, "pcpu", (void ***)&ef->pcpu_start,
 	    (void ***)&ef->pcpu_stop, NULL);
 	/* Error just means there is no pcpu set to relocate. */
 	if (error != 0)
 		return (0);
-	size = (uintptr_t)ef->pcpu_stop - (uintptr_t)ef->pcpu_start;
+	size = ef->pcpu_stop - ef->pcpu_start;
 	/* Empty set? */
 	if (size < 1)
 		return (0);
@@ -714,7 +715,7 @@ parse_dpcpu(elf_file_t ef)
 	}
 
 	/* Padding from linker-script correct? */
-	pad = *(uint32_t *)((uintptr_t)ef->pcpu_stop - sizeof(pad));
+	pad = *(uint32_t *)(ef->pcpu_stop - sizeof(pad));
 	if (pad != LS_PADDING) {
 		uprintf("Kernel module '%s' must be recompiled with "
 		    "linker script, invalid padding %#04x (%#04x)\n",
@@ -730,15 +731,15 @@ parse_dpcpu(elf_file_t ef)
 	 * initialization from the data section and then initialize
 	 * all per-cpu storage from that.
 	 */
-	ef->pcpu_base = (Elf_Addr)(uintptr_t)dpcpu_alloc(size);
-	if (ef->pcpu_base == 0) {
+	ef->pcpu_base = dpcpu_alloc(size);
+	if (ef->pcpu_base == NULL) {
 		printf("%s: pcpu module space is out of space; "
-		    "cannot allocate %d for %s\n",
+		    "cannot allocate %td for %s\n",
 		    __func__, size, ef->lf.pathname);
 		return (ENOSPC);
 	}
-	memcpy((void *)ef->pcpu_base, (void *)ef->pcpu_start, size);
-	dpcpu_copy((void *)ef->pcpu_base, size);
+	memcpy(ef->pcpu_base, ef->pcpu_start, size);
+	dpcpu_copy(ef->pcpu_base, size);
 	elf_set_add(&set_pcpu_list, ef->pcpu_start, ef->pcpu_stop,
 	    ef->pcpu_base);
 
@@ -749,19 +750,20 @@ parse_dpcpu(elf_file_t ef)
 static int
 parse_vnet(elf_file_t ef)
 {
-	int error, size;
+	ptrdiff_t size;
+	int error;
 #if defined(__i386__)
 	uint32_t pad;
 #endif
 
-	ef->vnet_start = 0;
-	ef->vnet_stop = 0;
+	ef->vnet_start = NULL;
+	ef->vnet_stop = NULL;
 	error = link_elf_lookup_set(&ef->lf, "vnet", (void ***)&ef->vnet_start,
 	    (void ***)&ef->vnet_stop, NULL);
 	/* Error just means there is no vnet data set to relocate. */
 	if (error != 0)
 		return (0);
-	size = (uintptr_t)ef->vnet_stop - (uintptr_t)ef->vnet_start;
+	size = ef->vnet_stop - ef->vnet_start;
 	/* Empty set? */
 	if (size < 1)
 		return (0);
@@ -774,7 +776,7 @@ parse_vnet(elf_file_t ef)
 	}
 
 	/* Padding from linker-script correct? */
-	pad = *(uint32_t *)((uintptr_t)ef->vnet_stop - sizeof(pad));
+	pad = *(uint32_t *)(ef->vnet_stop - sizeof(pad));
 	if (pad != LS_PADDING) {
 		uprintf("Kernel module '%s' must be recompiled with "
 		    "linker script, invalid padding %#04x (%#04x)\n",
@@ -790,15 +792,15 @@ parse_vnet(elf_file_t ef)
 	 * initialization from the data section and then initialize
 	 * all per-vnet storage from that.
 	 */
-	ef->vnet_base = (Elf_Addr)(uintptr_t)vnet_data_alloc(size);
-	if (ef->vnet_base == 0) {
+	ef->vnet_base = vnet_data_alloc(size);
+	if (ef->vnet_base == NULL) {
 		printf("%s: vnet module space is out of space; "
-		    "cannot allocate %d for %s\n",
+		    "cannot allocate %td for %s\n",
 		    __func__, size, ef->lf.pathname);
 		return (ENOSPC);
 	}
-	memcpy((void *)ef->vnet_base, (void *)ef->vnet_start, size);
-	vnet_data_copy((void *)ef->vnet_base, size);
+	memcpy(ef->vnet_base, ef->vnet_start, size);
+	vnet_data_copy(ef->vnet_base, size);
 	elf_set_add(&set_vnet_list, ef->vnet_start, ef->vnet_stop,
 	    ef->vnet_base);
 
@@ -1376,11 +1378,11 @@ elf_relocaddr(linker_file_t lf, Elf_Addr x)
 	    ("elf_relocaddr: unexpected linker file %p", lf));
 
 	ef = (elf_file_t)lf;
-	if (x >= ef->pcpu_start && x < ef->pcpu_stop)
-		return ((x - ef->pcpu_start) + ef->pcpu_base);
+	if (x >= (Elf_Addr)ef->pcpu_start && x < (Elf_Addr)ef->pcpu_stop)
+		return ((x - (Elf_Addr)ef->pcpu_start) + (Elf_Addr)ef->pcpu_base);
 #ifdef VIMAGE
-	if (x >= ef->vnet_start && x < ef->vnet_stop)
-		return ((x - ef->vnet_start) + ef->vnet_base);
+	if (x >= (Elf_Addr)ef->vnet_start && x < (Elf_Addr)ef->vnet_stop)
+		return ((x - (Elf_Addr)ef->vnet_start) + (Elf_Addr)ef->vnet_base);
 #endif
 	return (x);
 }
@@ -1810,7 +1812,7 @@ elf_lookup(linker_file_t lf, Elf_Size symidx, int deps, Elf_Addr *res)
 	elf_file_t ef = (elf_file_t)lf;
 	const Elf_Sym *sym;
 	const char *symbol;
-	Elf_Addr addr, start, base;
+	caddr_t addr, start, base;
 
 	/* Don't even try to lookup the symbol if the index is bogus. */
 	if (symidx >= ef->nchains) {
@@ -1849,19 +1851,19 @@ elf_lookup(linker_file_t lf, Elf_Size symidx, int deps, Elf_Addr *res)
 		return (EINVAL);
 	}
 
-	addr = ((Elf_Addr)linker_file_lookup_symbol(lf, symbol, deps));
-	if (addr == 0 && ELF_ST_BIND(sym->st_info) != STB_WEAK) {
+	addr = linker_file_lookup_symbol(lf, symbol, deps);
+	if (addr == NULL && ELF_ST_BIND(sym->st_info) != STB_WEAK) {
 		*res = 0;
 		return (EINVAL);
 	}
 
 	if (elf_set_find(&set_pcpu_list, addr, &start, &base))
-		addr = addr - start + base;
+		addr = (vaddr_t)addr - (vaddr_t)start + base;
 #ifdef VIMAGE
 	else if (elf_set_find(&set_vnet_list, addr, &start, &base))
-		addr = addr - start + base;
+		addr = (vaddr_t)addr - (vaddr_t)start + base;
 #endif
-	*res = addr;
+	*res = (Elf_Addr)addr;
 	return (0);
 }
 
@@ -1977,7 +1979,8 @@ link_elf_ireloc(caddr_t kmdp)
 //   "changes_purecap": [
 //     "pointer_provenance",
 //     "support",
-//     "kdb"
+//     "kdb",
+//     "pointer_as_integer"
 //   ]
 // }
 // CHERI CHANGES END
