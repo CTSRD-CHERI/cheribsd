@@ -766,7 +766,7 @@ __NULLABILITY_PRAGMA_POP
 //     "user_capabilities"
 //   ],
 //   "changes_purecap": [
-//     "virtual_address"
+//     "uintcap_arithmetic"
 //   ]
 // }
 // CHERI CHANGES END

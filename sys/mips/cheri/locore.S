@@ -332,3 +332,12 @@ VECTOR(_locore, unknown)
 	PANIC("Startup failed!")
 
 VECTOR_END(_locore)
+// CHERI CHANGES START
+// {
+//   "updated": 20200708,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "support"
+//   ]
+// }
+// CHERI CHANGES END

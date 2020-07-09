@@ -287,7 +287,7 @@ db_trace_thread_wrapper(struct thread *td)
 //   "updated": 20200706,
 //   "target_type": "kernel",
 //   "changes_purecap": [
-//     "virtual_address",
+//     "pointer_as_integer",
 //     "kdb"
 //   ]
 // }

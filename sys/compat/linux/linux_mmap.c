@@ -258,13 +258,13 @@ linux_fixup_prot(struct thread *td, int *prot)
 #endif
 // CHERI CHANGES START
 // {
-//   "updated": 20200706,
+//   "updated": 20200708,
 //   "target_type": "kernel",
 //   "changes": [
 //     "support"
 //   ],
 //   "changes_purecap": [
-//     "virtual_address"
+//     "pointer_as_integer"
 //   ],
 //   "change_comment": "PROT_MAX"
 // }

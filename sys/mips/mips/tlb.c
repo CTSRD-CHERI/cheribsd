@@ -434,7 +434,7 @@ DB_SHOW_COMMAND(tlb, ddb_dump_tlb)
 //     "platform"
 //   ],
 //   "changes_purecap": [
-//     "virtual_address"
+//     "pointer_as_integer"
 //   ]
 // }
 // CHERI CHANGES END

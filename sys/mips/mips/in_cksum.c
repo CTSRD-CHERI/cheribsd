@@ -254,8 +254,7 @@ u_int in_cksum_hdr(const struct ip *ip)
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "pointer_alignment",
-//     "uintcap_arithmetic",
-//     "virtual_address"
+//     "uintcap_arithmetic"
 //   ]
 // }
 // CHERI CHANGES END

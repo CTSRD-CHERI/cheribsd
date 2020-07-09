@@ -2223,10 +2223,6 @@ g_md_fini(struct g_class *mp __unused)
 //   "changes": [
 //     "ioctl:misc",
 //     "iovec-macros"
-//   ],
-//   "changes_purecap": [
-//     "ioctl:misc",
-//     "iovec-macros"
 //   ]
 // }
 // CHERI CHANGES END

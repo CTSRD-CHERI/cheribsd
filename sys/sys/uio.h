@@ -123,7 +123,7 @@ __END_DECLS
 //     "user_capabilities"
 //   ],
 //   "changes_purecap": [
-//     "poiner_as_integer"
+//     "pointer_as_integer"
 //   ]
 // }
 // CHERI CHANGES END

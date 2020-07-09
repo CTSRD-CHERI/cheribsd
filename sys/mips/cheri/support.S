@@ -1046,3 +1046,12 @@ LEAF(cheri_trace_log)
 	.set pop
 END(cheri_trace_log)
 #endif
+// CHERI CHANGES START
+// {
+//   "updated": 20200708,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "support"
+//   ]
+// }
+// CHERI CHANGES END

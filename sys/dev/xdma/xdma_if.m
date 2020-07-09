@@ -150,13 +150,13 @@ METHOD int iommu_remove {
 	struct xdma_iommu *xio;
 	vm_ptr_t va;
 };
-// CHERI CHANGES START
-// {
-//   "updated": 20200706,
-//   "target_type": "kernel",
-//   "changes_purecap": [
-//     "pointer_as_integer"
-//   ],
-//   "change_comment": "bus_addr_t"
-// }
-// CHERI CHANGES END
+# CHERI CHANGES START
+# {
+#   "updated": 20200706,
+#   "target_type": "kernel",
+#   "changes_purecap": [
+#     "pointer_as_integer"
+#   ],
+#   "change_comment": "bus_addr_t"
+# }
+# CHERI CHANGES END

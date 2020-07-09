@@ -1568,3 +1568,12 @@ NESTED_NOPROFILE(MipsCacheException, KERN_EXC_FRAME_SIZE, ra)
 	MSG("cache error @ EPC 0x%x CachErr 0x%x");
 	.set	at
 END(MipsCacheException)
+// CHERI CHANGES START
+// {
+//   "updated": 20200708,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "support"
+//   ]
+// }
+// CHERI CHANGES END
