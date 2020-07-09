@@ -247,6 +247,9 @@ db_value_of_name_pcpu(const char *name, db_expr_t *valuep)
 	db_symbol_values(sym, &name, &value);
 	if (value < (db_expr_t)DPCPU_START || value >= (db_expr_t)DPCPU_STOP)
 		return (false);
+#ifdef __CHERI_PURE_CAPABILITY__
+	value -= (db_expr_t)DPCPU_START;
+#endif
 	*valuep = (db_expr_t)((uintptr_t)value + dpcpu_off[cpu]);
 	return (true);
 }

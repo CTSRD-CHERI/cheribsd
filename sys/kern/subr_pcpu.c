@@ -297,6 +297,9 @@ sysctl_dpcpu_quad(SYSCTL_HANDLER_ARGS)
 	int i;
 
 	count = 0;
+#ifdef __CHERI_PURE_CAPABILITY__
+	arg1 = (char *)arg1 - (vaddr_t)DPCPU_START;
+#endif
 	CPU_FOREACH(i) {
 		dpcpu = dpcpu_off[i];
 		if (dpcpu == 0)
@@ -314,6 +317,9 @@ sysctl_dpcpu_long(SYSCTL_HANDLER_ARGS)
 	int i;
 
 	count = 0;
+#ifdef __CHERI_PURE_CAPABILITY__
+	arg1 = (char *)arg1 - (vaddr_t)DPCPU_START;
+#endif
 	CPU_FOREACH(i) {
 		dpcpu = dpcpu_off[i];
 		if (dpcpu == 0)
@@ -331,6 +337,9 @@ sysctl_dpcpu_int(SYSCTL_HANDLER_ARGS)
 	int i;
 
 	count = 0;
+#ifdef __CHERI_PURE_CAPABILITY__
+	arg1 = (char *)arg1 - (vaddr_t)DPCPU_START;
+#endif
 	CPU_FOREACH(i) {
 		dpcpu = dpcpu_off[i];
 		if (dpcpu == 0)
@@ -346,9 +355,13 @@ DB_SHOW_COMMAND(dpcpu_off, db_show_dpcpu_off)
 	int id;
 
 	CPU_FOREACH(id) {
+#ifdef __CHERI_PURE_CAPABILITY__
+		db_printf("dpcpu_off[%2d] = %p)\n", id, dpcpu_off[id]);
+#else
 		db_printf("dpcpu_off[%2d] = 0x%jx (+ DPCPU_START = %p)\n",
 		    id, (uintmax_t)dpcpu_off[id],
 		    (void *)(uintptr_t)(dpcpu_off[id] + DPCPU_START));
+#endif
 	}
 }
 
@@ -432,7 +445,8 @@ DB_SHOW_ALIAS(allpcpu, db_show_cpu_all);
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "bounds_compression",
-//     "pointer_provenance"
+//     "pointer_provenance",
+//     "kdb"
 //   ]
 // }
 // CHERI CHANGES END
