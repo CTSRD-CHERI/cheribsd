@@ -55,6 +55,7 @@ __FBSDID("$FreeBSD$");
 	stp	c4,  c5,  [sp, #(TF_X + 4  * 16)]
 	stp	c2,  c3,  [sp, #(TF_X + 2  * 16)]
 	stp	c0,  c1,  [sp, #(TF_X + 0  * 16)]
+	mrs	c9, ddc_el0
 	mrs	c10, celr_el1
 	mrs	x11, spsr_el1
 	mrs	x12, esr_el1
@@ -62,6 +63,7 @@ __FBSDID("$FreeBSD$");
 	mrs	c18, csp_el0
 .endif
 	str	c10, [sp, #(TF_ELR)]
+	str	c9, [sp, #(TF_DDC)]
 	stp	w11, w12, [sp, #(TF_SPSR)]
 	stp	c18, clr, [sp, #(TF_SP)]
 	mrs	x18, tpidr_el1
@@ -103,6 +105,7 @@ __FBSDID("$FreeBSD$");
 .endif
 	ldp	c18, clr, [sp, #(TF_SP)]
 	ldr	c10, [sp, #(TF_ELR)]
+	ldr	c9, [sp, #(TF_DDC)]
 	/* TODO: Remove when the kernel understands capabilities */
 	cvtp	c10, x10
 	ldr	w11, [sp, #(TF_SPSR)]
@@ -111,6 +114,8 @@ __FBSDID("$FreeBSD$");
 .endif
 	msr	spsr_el1, x11
 	msr	celr_el1, c10
+	/* TODO: Enable when we set a per-proces DDC */
+	/*msr	ddc_el0, c9*/
 	ldp	c0,  c1,  [sp, #(TF_X + 0  * 16)]
 	ldp	c2,  c3,  [sp, #(TF_X + 2  * 16)]
 	ldp	c4,  c5,  [sp, #(TF_X + 4  * 16)]
