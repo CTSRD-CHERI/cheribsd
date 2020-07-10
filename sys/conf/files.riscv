@@ -22,7 +22,7 @@ kern/subr_intr.c		standard
 kern/subr_physmem.c		standard
 libkern/bcmp.c			standard
 libkern/bcopy.c			standard
-libkern/bcopy_c.c		optional	cpu_cheri
+libkern/bcopy_c.c		optional	cpu_cheri !cheri_purecap_kernel
 libkern/ffs.c			standard
 libkern/ffsl.c			standard
 libkern/ffsll.c			standard
