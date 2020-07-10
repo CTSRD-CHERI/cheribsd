@@ -5403,9 +5403,9 @@ vm_map_print(vm_map_t map)
 	db_indent += 2;
 	prev = &map->header;
 	VM_MAP_ENTRY_FOREACH(entry, map) {
-		db_iprintf("map entry %p: start=%p, end=%p, eflags=%#x, \n",
-		    (void *)entry, (void *)entry->start, (void *)entry->end,
-		    entry->eflags);
+		db_iprintf("map entry %p: start=%#jx, end=%#jx, eflags=%#x, \n",
+		    (void *)entry, (uintmax_t)entry->start,
+		    (uintmax_t)entry->end, entry->eflags);
 		{
 			static const char * const inheritance_name[4] =
 			{"share", "copy", "none", "donate_copy"};
