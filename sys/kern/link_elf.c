@@ -901,7 +901,7 @@ link_elf_link_preload(linker_class_t cls, const char *filename,
 	elf_file_t ef;
 	linker_file_t lf;
 	int error;
-	vm_offset_t dp;
+	void *dp;
 
 	/* Look to see if we have the file preloaded */
 	modptr = preload_search_by_name(filename);
@@ -931,7 +931,7 @@ link_elf_link_preload(linker_class_t cls, const char *filename,
 #ifdef SPARSE_MAPPING
 	ef->object = NULL;
 #endif
-	dp = (vm_offset_t)ef->address + *(vm_offset_t *)dynptr;
+	dp = ef->address + *(vm_offset_t *)dynptr;
 	ef->dynamic = (Elf_Dyn *)dp;
 	lf->address = ef->address;
 	lf->size = *(size_t *)sizeptr;
@@ -1643,7 +1643,7 @@ link_elf_search_symbol(linker_file_t lf, vaddr_t value,
     c_linker_sym_t *sym, long *diffp)
 {
 	elf_file_t ef = (elf_file_t) lf;
-	u_long off = (uintptr_t) (void *) value;
+	u_long off = (uintptr_t) value;
 	u_long diff = off;
 	u_long st_value;
 	const Elf_Sym* es;
@@ -1653,7 +1653,7 @@ link_elf_search_symbol(linker_file_t lf, vaddr_t value,
 	for (i = 0, es = ef->ddbsymtab; i < ef->ddbsymcnt; i++, es++) {
 		if (es->st_name == 0)
 			continue;
-		st_value = es->st_value + (uintptr_t) (void *) ef->address;
+		st_value = es->st_value + (uintptr_t) ef->address;
 		if (off >= st_value) {
 			if (off - st_value < diff) {
 				diff = off - st_value;
