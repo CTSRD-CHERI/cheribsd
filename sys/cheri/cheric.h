@@ -117,19 +117,14 @@ cheri_is_address_inbounds(const void * __capability cap, vaddr_t addr)
  * Test whether a capability is a subset of another.
  * This mimics the semantics of the experimental ctestsubset instruction.
  */
-static __inline bool
+static __inline _Bool
 cheri_is_subset(const void * __capability parent, const void * __capability ptr)
 {
-	if (cheri_gettag(parent) != cheri_gettag(ptr))
-		return false;
-	if (cheri_getbase(ptr) < cheri_getbase(parent))
-		return false;
-	if (cheri_getbase(ptr) + cheri_getlen(ptr) >
-	    cheri_getbase(parent) + cheri_getlen(parent))
-		return false;
-	if ((cheri_getperm(ptr) & cheri_getperm(parent)) != cheri_getperm(ptr))
-		return false;
-	return true;
+
+	return (cheri_gettag(parent) == cheri_gettag(ptr) &&
+		cheri_getbase(ptr) >= cheri_getbase(parent) &&
+		cheri_gettop(ptr) <= cheri_gettop(parent) &&
+		(cheri_getperm(ptr) & cheri_getperm(parent)) == cheri_getperm(ptr));
 }
 #endif
 
