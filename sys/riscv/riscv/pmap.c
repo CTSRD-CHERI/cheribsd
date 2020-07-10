@@ -1014,8 +1014,8 @@ pmap_kremove_device(vm_offset_t sva, vm_size_t size)
  *	update '*virt' with the first usable address after the mapped
  *	region.
  */
-vm_offset_t
-pmap_map(vm_offset_t *virt, vm_paddr_t start, vm_paddr_t end, int prot)
+vm_ptr_t
+pmap_map(vm_ptr_t *virt, vm_paddr_t start, vm_paddr_t end, int prot)
 {
 
 	return PHYS_TO_DMAP(start);
