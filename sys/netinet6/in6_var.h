@@ -286,7 +286,7 @@ struct	in6_ifreq {
 		int	ifru_flags;
 		int	ifru_flags6;
 		int	ifru_metric;
-		caddr_t	ifru_data;
+		void * __kerncap ifru_data;
 		struct in6_addrlifetime ifru_lifetime;
 		struct in6_ifstat ifru_stat;
 		struct icmp6_ifstat ifru_icmp6stat;
