@@ -36,6 +36,55 @@
 
 __FBSDID("$FreeBSD$");
 
+#ifdef __CHERI_PURE_CAPABILITY__
+ENTRY(generic_bs_r_1)
+	cincoffset ca3, ca1, a2
+	clbu	a0, 0(ca3)
+	cret
+END(generic_bs_r_1)
+
+ENTRY(generic_bs_r_2)
+	cincoffset ca3, ca1, a2
+	clhu	a0, 0(ca3)
+	cret
+END(generic_bs_r_2)
+
+ENTRY(generic_bs_r_4)
+	cincoffset ca3, ca1, a2
+	clw	a0, 0(ca3)
+	cret
+END(generic_bs_r_4)
+
+ENTRY(generic_bs_r_8)
+	cincoffset ca3, ca1, a2
+	cld	a0, 0(ca3)
+	cret
+END(generic_bs_r_8)
+
+ENTRY(generic_bs_w_1)
+	cincoffset ca4, ca1, a2
+	csb	a3, 0(ca4)
+	cret
+END(generic_bs_w_1)
+
+ENTRY(generic_bs_w_2)
+	cincoffset ca4, ca1, a2
+	csh	a3, 0(ca4)
+	cret
+END(generic_bs_w_2)
+
+ENTRY(generic_bs_w_4)
+	cincoffset ca4, ca1, a2
+	csw	a3, 0(ca4)
+	cret
+END(generic_bs_w_4)
+
+ENTRY(generic_bs_w_8)
+	cincoffset ca4, ca1, a2
+	csd	a3, 0(ca4)
+	cret
+END(generic_bs_w_8)
+#else
 ENTRY(generic_bs_r_1)
 	add	a3, a1, a2
 	lbu	a0, 0(a3)
@@ -83,3 +132,16 @@ ENTRY(generic_bs_w_8)
 	sd	a3, 0(a4)
 	ret
 END(generic_bs_w_8)
+#endif
+
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20200804,
+ *   "target_type": "kernel",
+ *   "changes_purecap": [
+ *     "support"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */
