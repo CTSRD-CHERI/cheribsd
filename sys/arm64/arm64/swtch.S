@@ -263,7 +263,8 @@ ENTRY(fork_trampoline)
 
 	/* Restore elr and spsr */
 #if __has_feature(capabilities)
-	ldp	c0, c1, [sp, #TF_ELR]
+	ldr	c0, [sp, #TF_ELR]
+	ldr	x1, [sp, #TF_SPSR]
 	cvtp	c0, x0
 	msr	celr_el1, c0
 #else
