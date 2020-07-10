@@ -3470,7 +3470,7 @@ pmap_copy_pages(vm_page_t ma[], vm_offset_t a_offset, vm_page_t mb[],
 	}
 }
 
-vm_offset_t
+vm_ptr_t
 pmap_quick_enter_page(vm_page_t m)
 {
 

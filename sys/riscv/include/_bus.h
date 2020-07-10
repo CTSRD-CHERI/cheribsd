@@ -33,7 +33,7 @@
 /*
  * Addresses (in bus space).
  */
-typedef uintptr_t bus_addr_t; // FIXME?
+typedef vm_paddr_t bus_addr_t; // FIXME?
 typedef u_long bus_size_t;
 
 /*
