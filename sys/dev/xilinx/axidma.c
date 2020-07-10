@@ -93,8 +93,8 @@ struct axidma_channel {
 	uint32_t		descs_num;
 
 	vm_size_t		mem_size;
-	vm_offset_t		mem_paddr;
-	vm_offset_t		mem_vaddr;
+	vmem_addr_t		mem_paddr;
+	vm_ptr_t		mem_vaddr;
 
 	uint32_t		descs_used_count;
 };
@@ -368,7 +368,7 @@ axidma_desc_alloc(struct axidma_softc *sc, struct xdma_channel *xchan,
 
 	for (i = 0; i < nsegments; i++) {
 		chan->descs[i] = (struct axidma_desc *)
-		    ((uint64_t)chan->mem_vaddr + desc_size * i);
+		    (chan->mem_vaddr + desc_size * i);
 		chan->descs_phys[i] = chan->mem_paddr + desc_size * i;
 	}
 
