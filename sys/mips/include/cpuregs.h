@@ -108,7 +108,6 @@
 /*
  * Global capabilities for various address-space segments.
  */
-extern caddr_t cheri_xuseg_capability;
 extern caddr_t cheri_xkphys_capability;
 extern caddr_t cheri_xkseg_capability;
 extern caddr_t cheri_kseg0_capability;
@@ -137,8 +136,6 @@ extern caddr_t cheri_kdata_capability;
 	(cheri_xkphys_capability + ((x) - MIPS_XKPHYS_START))
 #define MIPS_XKSEG(x)						\
 	(cheri_xkseg_capability + ((x) - MIPS_XKSEG_START))
-#define MIPS_XUSEG(x)						\
-	(cheri_xuseg_capability + ((x) - MIPS_XUSEG_START))
 #define MIPS_KSEG0(x)							\
 	(cheri_kseg0_capability + ((x) - (vm_offset_t)MIPS_KSEG0_START))
 #define MIPS_KSEG1(x)							\
@@ -155,7 +152,6 @@ extern caddr_t cheri_kdata_capability;
 #else /* ! CHERI_PURECAP_KERNEL */
 #define MIPS_XKPHYS(x) ((char *)(x))
 #define MIPS_XKSEG(x) ((char *)(x))
-#define MIPS_XUSEG(x) ((char *)(x))
 #define MIPS_KSEG0(x) ((char *)(x))
 #define MIPS_KSEG1(x) ((char *)(x))
 #define MIPS_KSEG2(x) ((char *)(x))

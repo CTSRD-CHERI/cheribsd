@@ -625,11 +625,11 @@ proc0_init(void *dummy __unused)
 	    p->p_sysent->sv_minuser, p->p_sysent->sv_maxuser);
 #else
 	/*
-	 * We provide capabilities in xuseg for the map, note that we strip
-	 * all access permission because proc0 is not expected to enter
-	 * usermode.
+	 * We provide capabilities in userspace for the map, note that
+	 * we strip all access permission because proc0 is not
+	 * expected to enter usermode.
 	 */
-	caddr_t minuser_cap = cheri_setoffset(cheri_xuseg_capability,
+	caddr_t minuser_cap = cheri_setaddress(userspace_cap,
 	    p->p_sysent->sv_minuser);
 	minuser_cap = cheri_setbounds(minuser_cap,
 	    p->p_sysent->sv_maxuser - p->p_sysent->sv_minuser);

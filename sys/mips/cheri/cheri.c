@@ -103,7 +103,6 @@ extern char etext[], end[];
 /*
  * Global capabilities for various address-space segments.
  */
-caddr_t cheri_xuseg_capability = (void *)(intcap_t)-1;
 caddr_t cheri_xkphys_capability = (void *)(intcap_t)-1;
 caddr_t cheri_xkseg_capability = (void *)(intcap_t)-1;
 caddr_t cheri_kseg0_capability = (void *)(intcap_t)-1;
@@ -233,10 +232,6 @@ cheri_init_capabilities(void * __capability kroot)
 	 * KROOT that covers only kernel .data/.rodata/.bss etc.
 	 * Those should fall both into kseg0.
 	 */
-	cheri_xuseg_capability = cheri_ptrperm(
-	    cheri_setoffset(kroot, MIPS_XUSEG_START),
-	    MIPS_XUSEG_END - MIPS_XUSEG_START,
-	    CHERI_CAP_USER_DATA_PERMS | CHERI_CAP_USER_CODE_PERMS);
 	cheri_xkphys_capability = cheri_ptrperm(
 	    cheri_setoffset(kroot, MIPS_XKPHYS_START),
 	    MIPS_XKPHYS_END - MIPS_XKPHYS_START,
