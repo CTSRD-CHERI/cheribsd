@@ -1087,7 +1087,8 @@ nonh6lookup:
 			dst = (struct sockaddr_in6 *)&ro->ro_dst;
 		else
 			dst = &sin6;
-		bcopy((fwd_tag+1), &dst_sa, sizeof(struct sockaddr_in6));
+		bcopy((struct sockaddr_in6 *)(fwd_tag+1), &dst_sa,
+		    sizeof(struct sockaddr_in6));
 		m->m_flags |= M_SKIP_FIREWALL;
 		m->m_flags &= ~M_IP6_NEXTHOP;
 		m_tag_delete(m, fwd_tag);
@@ -3333,3 +3334,13 @@ ip6_optlen(struct inpcb *inp)
 	return len;
 #undef elen
 }
+
+// CHERI CHANGES START
+// {
+//   "updated": 20200804,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_alignment"
+//   ]
+// }
+// CHERI CHANGES END

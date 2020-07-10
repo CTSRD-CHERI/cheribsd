@@ -185,7 +185,7 @@ ip6_tryforward(struct mbuf *m)
 		/*
 		 * Now we will find route to forwarded by pfil destination.
 		 */
-		bcopy((fwd_tag + 1), &dst, sizeof(dst));
+		bcopy((struct sockaddr_in6 *)(fwd_tag + 1), &dst, sizeof(dst));
 		m->m_flags &= ~M_IP6_NEXTHOP;
 		m_tag_delete(m, fwd_tag);
 	} else {
@@ -256,7 +256,8 @@ passin:
 	if (fwd_tag != NULL ||
 	    !IN6_ARE_ADDR_EQUAL(&dst.sin6_addr, &ip6->ip6_dst)) {
 		if (fwd_tag != NULL) {
-			bcopy((fwd_tag + 1), &dst, sizeof(dst));
+			bcopy((struct sockaddr_in6 *)(fwd_tag + 1), &dst,
+			    sizeof(dst));
 			m->m_flags &= ~M_IP6_NEXTHOP;
 			m_tag_delete(m, fwd_tag);
 		} else
@@ -303,3 +304,12 @@ drop:
 	return (NULL);
 }
 
+// CHERI CHANGES START
+// {
+//   "updated": 20200804,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_alignment"
+//   ]
+// }
+// CHERI CHANGES END

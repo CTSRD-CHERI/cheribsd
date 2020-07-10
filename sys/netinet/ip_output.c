@@ -198,7 +198,8 @@ ip_output_pfil(struct mbuf **mp, struct ifnet *ifp, int flags,
 	/* Or forward to some other address? */
 	if ((m->m_flags & M_IP_NEXTHOP) &&
 	    ((fwd_tag = m_tag_find(m, PACKET_TAG_IPFORWARD, NULL)) != NULL)) {
-		bcopy((fwd_tag+1), dst, sizeof(struct sockaddr_in));
+		bcopy((struct sockaddr_in *)(fwd_tag+1), dst,
+		    sizeof(struct sockaddr_in));
 		m->m_flags |= M_SKIP_FIREWALL;
 		m->m_flags &= ~M_IP_NEXTHOP;
 		m_tag_delete(m, fwd_tag);
@@ -1591,3 +1592,13 @@ ip_mloopback(struct ifnet *ifp, const struct mbuf *m, int hlen)
 		if_simloop(ifp, copym, AF_INET, 0);
 	}
 }
+
+// CHERI CHANGES START
+// {
+//   "updated": 20200804,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_alignment"
+//   ]
+// }
+// CHERI CHANGES END
