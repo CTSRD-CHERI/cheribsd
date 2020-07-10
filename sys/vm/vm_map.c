@@ -239,9 +239,8 @@ vm_map_make_ptr(vm_map_t map, vm_offset_t addr, vm_size_t size, vm_prot_t prot)
 {
 	void *mapped;
 
-	addr = addr - cheri_getbase(map->map_capability);
 	mapped = cheri_setbounds(
-		cheri_setoffset(map->map_capability, addr),
+		cheri_setaddress(map->map_capability, addr),
 		size);
 	mapped = cheri_andperm(mapped, vm_prot_to_cheri(prot));
 
