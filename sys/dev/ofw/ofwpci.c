@@ -582,7 +582,7 @@ ofw_pci_activate_resource(device_t bus, device_t child, int type, int rid,
 		return (ENOMEM);
 
 	rman_set_bushandle(res, handle);
-	rman_set_virtual(res, (void *)handle); /* XXX  for powerpc only ? */
+	rman_set_virtual(res, (void *)(uintptr_t)handle); /* XXX  for powerpc only ? */
 
 	return (rman_activate_resource(res));
 }
@@ -715,3 +715,13 @@ ofw_pci_get_rman(struct ofw_pci_softc *sc, int type, u_int flags)
 
 	return (NULL);
 }
+
+// CHERI CHANGES START
+// {
+//   "updated": 20200804,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_as_integer"
+//   ]
+// }
+// CHERI CHANGES END
