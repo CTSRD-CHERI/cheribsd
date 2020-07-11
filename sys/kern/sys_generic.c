@@ -90,7 +90,7 @@ __FBSDID("$FreeBSD$");
 #define	SYS_IOCTL_SMALL_SIZE	128	/* bytes */
 #define	SYS_IOCTL_SMALL_ALIGN	sizeof(void *)	/* bytes */
 
-#ifdef __LP64__
+#if defined(__LP64__) || defined(__CHERI_PURE_CAPABILITY__)
 static int iosize_max_clamp = 0;
 SYSCTL_INT(_debug, OID_AUTO, iosize_max_clamp, CTLFLAG_RW,
     &iosize_max_clamp, 0, "Clamp max i/o size to INT_MAX");
@@ -162,7 +162,7 @@ struct selfd {
 static uma_zone_t selfd_zone;
 static struct mtx_pool *mtxpool_select;
 
-#ifdef __LP64__
+#if defined(__LP64__) || defined(__CHERI_PURE_CAPABILITY__)
 size_t
 devfs_iosize_max(void)
 {
