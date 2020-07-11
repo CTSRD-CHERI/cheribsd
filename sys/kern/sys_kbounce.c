@@ -37,7 +37,6 @@ __FBSDID("$FreeBSD$");
 #include <sys/systm.h>
 #include <sys/sysproto.h>
 #include <sys/kbounce.h>
-#include <sys/limits.h>
 
 static int
 kern_kbounce(struct thread *td, const void * __capability src,
