@@ -236,6 +236,7 @@ dump_cheri_exception(struct trapframe *frame)
 {
 	struct thread *td;
 	struct proc *p;
+	uint64_t sccsr;
 
 	td = curthread;
 	p = td->td_proc;
@@ -249,9 +250,10 @@ dump_cheri_exception(struct trapframe *frame)
 		printf("STORE/AMO CAP page fault");
 		break;
 	case EXCP_CHERI:
+		sccsr = csr_read(sccsr);
 		printf("CHERI fault (type %#x), capidx %d",
-		    TVAL_CAP_CAUSE(frame->tf_stval),
-		    TVAL_CAP_IDX(frame->tf_stval));
+		    (sccsr & SCCSR_CAUSE_MASK) >> SCCSR_CAUSE_SHIFT,
+		    (sccsr & SCCSR_CAP_IDX_MASK) >> SCCSR_CAP_IDX_SHIFT);
 		break;
 	default:
 		printf("fault %d", frame->tf_scause & EXCP_MASK);
@@ -377,6 +379,9 @@ void
 do_trap_supervisor(struct trapframe *frame)
 {
 	uint64_t exception;
+#if __has_feature(capabilities)
+	uint64_t sccsr;
+#endif
 
 	/* Ensure we came from supervisor mode, interrupts disabled */
 	KASSERT((csr_read(sstatus) & (SSTATUS_SPP | SSTATUS_SIE)) ==
@@ -441,8 +446,9 @@ do_trap_supervisor(struct trapframe *frame)
 			    frame->tf_stval);
 			break;
 		case EXCP_CHERI:
+			sccsr = csr_read(sccsr);
 			panic("CHERI exception %#x at 0x%016lx\n",
-			    TVAL_CAP_CAUSE(frame->tf_stval),
+			    (sccsr & SCCSR_CAUSE_MASK) >> SCCSR_CAUSE_SHIFT,
 			    (__cheri_addr unsigned long)frame->tf_sepc);
 			break;
 		}
@@ -460,6 +466,9 @@ do_trap_user(struct trapframe *frame)
 	uint64_t exception;
 	struct thread *td;
 	struct pcb *pcb;
+#if __has_feature(capabilities)
+	uint64_t sccsr;
+#endif
 
 	td = curthread;
 	td->td_frame = frame;
@@ -540,10 +549,10 @@ do_trap_user(struct trapframe *frame)
 	case EXCP_CHERI:
 		if (log_user_cheri_exceptions)
 			dump_cheri_exception(frame);
-		call_trapsignal(td, SIGPROT,
-		    cheri_stval_to_sicode(frame->tf_stval),
+		sccsr = csr_read(sccsr);
+		call_trapsignal(td, SIGPROT, cheri_sccsr_to_sicode(sccsr),
 		    (void * __capability)frame->tf_sepc, exception,
-		    TVAL_CAP_IDX(frame->tf_stval));
+		    (sccsr & SCCSR_CAP_IDX_MASK) >> SCCSR_CAP_IDX_SHIFT);
 		userret(td, frame);
 		break;
 #endif

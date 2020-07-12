@@ -55,16 +55,45 @@ db_print_cap(const char* msg, void * __capability cap)
 	    _CHERI_PRINTF_CAP_ARG(cap));
 }
 
+static const char *scr_names[] = {
+	[0] = "pcc",
+	[1] = "ddc",
+	[4] = "utcc",
+	[5] = "utdc",
+	[6] = "uscratchc",
+	[7] = "uepcc",
+	[12] = "stcc",
+	[13] = "stdc",
+	[14] = "sscratchc",
+	[15] = "sepcc",
+	[28] = "mtcc",
+	[29] = "mtdc",
+	[30] = "mscratchc",
+	[31] = "mepcc"
+};
+
 /*
  * Show the special capability registers that aren't GPRs.
  */
 DB_SHOW_COMMAND(scr, ddb_dump_scr)
 {
 	uint64_t sccsr;
+	uint8_t cause, cap_idx;
 
 	sccsr = csr_read(sccsr);
-	db_printf("sccsr: %s, %s\n", sccsr & SCCSR_E ? "enabled" : "disabled",
-	    sccsr & SCCSR_D ? "dirty" : "clean");
+	cause = (sccsr & SCCSR_CAUSE_MASK) >> SCCSR_CAUSE_SHIFT;
+	cap_idx = (sccsr & SCCSR_CAP_IDX_MASK) >> SCCSR_CAP_IDX_SHIFT;
+	db_printf("sccsr: %s, %s, cause: 0x%02x,  ", sccsr & SCCSR_E ?
+	    "enabled" : "disabled", sccsr & SCCSR_D ? "dirty" : "clean",
+	    cause);
+	if (cap_idx < 32)
+		db_printf("reg: c%d ", cap_idx);
+	else if (cap_idx - 32 < nitems(scr_names) &&
+	    scr_names[cap_idx - 32] != NULL)
+		db_printf("reg: %s ", scr_names[cap_idx - 32]);
+	else
+		db_printf("reg: invalid (%d) ", cap_idx);
+	db_printf("(%s)\n", cheri_exccode_string(cause));
 
 	db_print_cap("ddc: ",  scr_read(ddc));
 	db_print_cap("pcc: ",  scr_read(pcc));
