@@ -36,13 +36,10 @@ SRCS+=	cheritest_bounds_globals.c					\
 	cheritest_tls.c							\
 	cheritest_util.c						\
 	cheritest_vm.c							\
-	cheritest_vm_swap.c						\
 	cheritest_zlib.c
 .if ${MACHINE_ABI:Mpurecap}
 SRCS+=	cheritest_sentries.c
 .endif
-# This test is broken
-CFLAGS.cheritest_vm_swap.c+=-Wno-cheri-capability-misuse
 
 CHERITEST_DIR:=	${.PARSEDIR}
 
@@ -50,6 +47,10 @@ CHERITEST_DIR:=	${.PARSEDIR}
 SRCS+=	cheritest_cheriabi.c
 SRCS+=	cheritest_cheriabi_open.c
 .endif
+
+# This test is broken as written
+#SRCS+=	cheritest_vm_swap.c
+#CFLAGS.cheritest_vm_swap.c+=-Wno-cheri-capability-misuse
 
 .if ${MACHINE} == mips
 .PATH: ${SRCTOP}/sys/mips/cheri
