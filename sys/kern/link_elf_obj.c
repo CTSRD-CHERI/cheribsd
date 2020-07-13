@@ -1241,15 +1241,15 @@ symbol_name(elf_file_t ef, Elf_Size r_info)
 		return NULL;
 }
 
-static Elf_Addr
+static char *
 findbase(elf_file_t ef, int sec)
 {
 	int i;
-	Elf_Addr base = 0;
+	char *base = NULL;
 
 	for (i = 0; i < ef->nprogtab; i++) {
 		if (sec == ef->progtab[i].sec) {
-			base = (Elf_Addr)ef->progtab[i].addr;
+			base = ef->progtab[i].addr;
 			break;
 		}
 	}
@@ -1267,7 +1267,7 @@ relocate_file(elf_file_t ef)
 	const Elf_Sym *sym;
 	int i;
 	Elf_Size symidx;
-	Elf_Addr base;
+	char *base;
 
 	/* Perform relocations without addend if there are any: */
 	for (i = 0; i < ef->nreltab; i++) {
@@ -1644,7 +1644,7 @@ link_elf_reloc_local(linker_file_t lf, bool ifuncs)
 	const Elf_Rela *relalim;
 	const Elf_Rela *rela;
 	const Elf_Sym *sym;
-	Elf_Addr base;
+	char *base;
 	int i;
 	Elf_Size symidx;
 

@@ -142,7 +142,7 @@ reloc_instr_imm(Elf32_Addr *where, Elf_Addr val, u_int msb, u_int lsb)
  * in order for the -zifunc-noplt optimization to work.
  */
 static int
-elf_reloc_internal(linker_file_t lf, Elf_Addr relocbase, const void *data,
+elf_reloc_internal(linker_file_t lf, char *relocbase, const void *data,
     int type, int local, elf_lookup_fn lookup)
 {
 	Elf_Addr *where, addr, addend, val;
@@ -172,7 +172,7 @@ elf_reloc_internal(linker_file_t lf, Elf_Addr relocbase, const void *data,
 
 	if (local) {
 		if (rtype == R_AARCH64_RELATIVE)
-			*where = elf_relocaddr(lf, relocbase + addend);
+			*where = elf_relocaddr(lf, (Elf_Addr)relocbase + addend);
 		return (0);
 	}
 
@@ -212,7 +212,7 @@ elf_reloc_internal(linker_file_t lf, Elf_Addr relocbase, const void *data,
 		*where = addr + addend;
 		break;
 	case R_AARCH64_IRELATIVE:
-		addr = relocbase + addend;
+		addr = (Elf_Addr)relocbase + addend;
 		val = ((Elf64_Addr (*)(void))addr)();
 		if (*where != val)
 			*where = val;
@@ -225,7 +225,7 @@ elf_reloc_internal(linker_file_t lf, Elf_Addr relocbase, const void *data,
 }
 
 int
-elf_reloc_local(linker_file_t lf, Elf_Addr relocbase, const void *data,
+elf_reloc_local(linker_file_t lf, char *relocbase, const void *data,
     int type, elf_lookup_fn lookup)
 {
 
@@ -234,7 +234,7 @@ elf_reloc_local(linker_file_t lf, Elf_Addr relocbase, const void *data,
 
 /* Process one elf relocation with addend. */
 int
-elf_reloc(linker_file_t lf, Elf_Addr relocbase, const void *data, int type,
+elf_reloc(linker_file_t lf, char *relocbase, const void *data, int type,
     elf_lookup_fn lookup)
 {
 
@@ -263,3 +263,13 @@ elf_cpu_parse_dynamic(caddr_t loadbase __unused, Elf_Dyn *dynamic __unused)
 
 	return (0);
 }
+
+// CHERI CHANGES START
+// {
+//   "updated": 20200804,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_as_integer"
+//   ]
+// }
+// CHERI CHANGES END
