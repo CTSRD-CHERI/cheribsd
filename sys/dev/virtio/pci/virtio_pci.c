@@ -297,7 +297,7 @@ vtpci_attach(device_t dev)
  * other parts of this file via functions
  * 'vtpci_[read|write]_header_[2|4]'
  */
-#if _BYTE_ORDER == _BIG_ENDIAN
+#if _BYTE_ORDER == _BIG_ENDIAN && defined(__powerpc__)
 	rman_set_bustag(sc->vtpci_res, &bs_be_tag);
 #endif
 
