@@ -337,6 +337,24 @@ ENTRY(cpu_throw)
 	clc	cs9, (PCB_S + 9 * 16)(c13)
 	clc	cs10, (PCB_S + 10 * 16)(c13)
 	clc	cs11, (PCB_S + 11 * 16)(c13)
+#elif __has_feature(capabilities)
+	/* Load registers */
+	clc	cra, (PCB_RA)(c13)
+	clc	csp, (PCB_SP)(c13)
+
+	/* s[0-11] */
+	clc	cs0, (PCB_S + 0 * 16)(c13)
+	clc	cs1, (PCB_S + 1 * 16)(c13)
+	clc	cs2, (PCB_S + 2 * 16)(c13)
+	clc	cs3, (PCB_S + 3 * 16)(c13)
+	clc	cs4, (PCB_S + 4 * 16)(c13)
+	clc	cs5, (PCB_S + 5 * 16)(c13)
+	clc	cs6, (PCB_S + 6 * 16)(c13)
+	clc	cs7, (PCB_S + 7 * 16)(c13)
+	clc	cs8, (PCB_S + 8 * 16)(c13)
+	clc	cs9, (PCB_S + 9 * 16)(c13)
+	clc	cs10, (PCB_S + 10 * 16)(c13)
+	clc	cs11, (PCB_S + 11 * 16)(c13)
 #else
 	/* Load registers */
 	ld	ra, (PCB_RA)(x13)
@@ -412,6 +430,24 @@ ENTRY(cpu_switch)
 #endif
 
 #ifdef __CHERI_PURE_CAPABILITY__
+	/* Store ra, sp and the callee-saved registers */
+	csc	cra, (PCB_RA)(c13)
+	csc	csp, (PCB_SP)(c13)
+
+	/* s[0-11] */
+	csc	cs0, (PCB_S + 0 * 16)(c13)
+	csc	cs1, (PCB_S + 1 * 16)(c13)
+	csc	cs2, (PCB_S + 2 * 16)(c13)
+	csc	cs3, (PCB_S + 3 * 16)(c13)
+	csc	cs4, (PCB_S + 4 * 16)(c13)
+	csc	cs5, (PCB_S + 5 * 16)(c13)
+	csc	cs6, (PCB_S + 6 * 16)(c13)
+	csc	cs7, (PCB_S + 7 * 16)(c13)
+	csc	cs8, (PCB_S + 8 * 16)(c13)
+	csc	cs9, (PCB_S + 9 * 16)(c13)
+	csc	cs10, (PCB_S + 10 * 16)(c13)
+	csc	cs11, (PCB_S + 11 * 16)(c13)
+#elif __has_feature(capabilities)
 	/* Store ra, sp and the callee-saved registers */
 	csc	cra, (PCB_RA)(c13)
 	csc	csp, (PCB_SP)(c13)
@@ -568,6 +604,24 @@ ENTRY(cpu_switch)
 #endif
 
 #ifdef __CHERI_PURE_CAPABILITY__
+	/* Restore the registers */
+	clc	cra, (PCB_RA)(c13)
+	clc	csp, (PCB_SP)(c13)
+
+	/* s[0-11] */
+	clc	cs0, (PCB_S + 0 * 16)(c13)
+	clc	cs1, (PCB_S + 1 * 16)(c13)
+	clc	cs2, (PCB_S + 2 * 16)(c13)
+	clc	cs3, (PCB_S + 3 * 16)(c13)
+	clc	cs4, (PCB_S + 4 * 16)(c13)
+	clc	cs5, (PCB_S + 5 * 16)(c13)
+	clc	cs6, (PCB_S + 6 * 16)(c13)
+	clc	cs7, (PCB_S + 7 * 16)(c13)
+	clc	cs8, (PCB_S + 8 * 16)(c13)
+	clc	cs9, (PCB_S + 9 * 16)(c13)
+	clc	cs10, (PCB_S + 10 * 16)(c13)
+	clc	cs11, (PCB_S + 11 * 16)(c13)
+#elif __has_feature(capabilities)
 	/* Restore the registers */
 	clc	cra, (PCB_RA)(c13)
 	clc	csp, (PCB_SP)(c13)
