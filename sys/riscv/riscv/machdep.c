@@ -424,8 +424,8 @@ exec_setregs(struct thread *td, struct image_params *imgp, uintcap_t stack)
 	} else
 #endif
 	{
-		tf->tf_a[0] = (__cheri_addr uintptr_t)stack;
-		tf->tf_sp = STACKALIGN((__cheri_addr uintptr_t)stack);
+		tf->tf_a[0] = (__cheri_addr vaddr_t)stack;
+		tf->tf_sp = STACKALIGN((__cheri_addr vaddr_t)stack);
 #if __has_feature(capabilities)
 		hybridabi_thread_setregs(td, imgp->entry_addr);
 #else
