@@ -528,8 +528,10 @@ freebsd64_szsigcode:
 	.align	12
 pagetable_l1:
 	.space	PAGE_SIZE
+	.type	pagetable_l2, @object
 pagetable_l2:
 	.space	PAGE_SIZE
+	.size	pagetable_l2, . - pagetable_l2
 pagetable_l2_devmap:
 	.space	PAGE_SIZE
 
@@ -541,7 +543,11 @@ hart_lottery:
 
 	.globl init_pt_va
 init_pt_va:
+#ifdef __CHERI_PURE_CAPABILITY__
+	.chericap pagetable_l2	/* XXX: Keep page tables VA */
+#else
 	.quad pagetable_l2	/* XXX: Keep page tables VA */
+#endif
 
 #ifndef SMP
 ENTRY(mpentry)
@@ -692,7 +698,8 @@ END(mpentry)
  *   "updated": 20200803,
  *   "target_type": "kernel",
  *   "changes_purecap": [
- *     "support"
+ *     "support",
+ *     "pointer_as_integer"
  *   ]
  * }
  * CHERI CHANGES END

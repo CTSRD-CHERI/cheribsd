@@ -265,7 +265,7 @@ extern void *dmap_capability;
 extern vm_offset_t dmap_max_addr;
 #endif
 extern vm_offset_t vm_max_kernel_address;
-extern vm_offset_t init_pt_va;
+extern void *init_pt_va;
 #endif
 
 #define	ZERO_REGION_SIZE	(64 * 1024)	/* 64KB */
