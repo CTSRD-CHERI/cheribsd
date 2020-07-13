@@ -256,7 +256,7 @@ elf_is_ifunc_reloc(Elf_Size r_info)
 
 /* Process one elf relocation with addend. */
 static int
-elf_reloc_internal(linker_file_t lf, Elf_Addr relocbase, const void *data,
+elf_reloc_internal(linker_file_t lf, char *relocbase, const void *data,
     int type, bool late_ifunc, elf_lookup_fn lookup)
 {
 	Elf64_Addr *where, val;
@@ -358,14 +358,14 @@ elf_reloc_internal(linker_file_t lf, Elf_Addr relocbase, const void *data,
 			break;
 
 		case R_X86_64_RELATIVE:	/* B + A */
-			addr = elf_relocaddr(lf, relocbase + addend);
+			addr = elf_relocaddr(lf, (Elf_Addr)relocbase + addend);
 			val = addr;
 			if (*where != val)
 				*where = val;
 			break;
 
 		case R_X86_64_IRELATIVE:
-			addr = relocbase + addend;
+			addr = (Elf_Addr)relocbase + addend;
 			val = ((Elf64_Addr (*)(void))addr)();
 			if (*where != val)
 				*where = val;
@@ -380,7 +380,7 @@ elf_reloc_internal(linker_file_t lf, Elf_Addr relocbase, const void *data,
 }
 
 int
-elf_reloc(linker_file_t lf, Elf_Addr relocbase, const void *data, int type,
+elf_reloc(linker_file_t lf, char *relocbase, const void *data, int type,
     elf_lookup_fn lookup)
 {
 
@@ -388,7 +388,7 @@ elf_reloc(linker_file_t lf, Elf_Addr relocbase, const void *data, int type,
 }
 
 int
-elf_reloc_local(linker_file_t lf, Elf_Addr relocbase, const void *data,
+elf_reloc_local(linker_file_t lf, char *relocbase, const void *data,
     int type, elf_lookup_fn lookup)
 {
 
@@ -396,7 +396,7 @@ elf_reloc_local(linker_file_t lf, Elf_Addr relocbase, const void *data,
 }
 
 int
-elf_reloc_late(linker_file_t lf, Elf_Addr relocbase, const void *data,
+elf_reloc_late(linker_file_t lf, char *relocbase, const void *data,
     int type, elf_lookup_fn lookup)
 {
 
@@ -423,3 +423,12 @@ elf_cpu_parse_dynamic(caddr_t loadbase __unused, Elf_Dyn *dynamic __unused)
 
 	return (0);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20200804,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_as_integer"
+//   ]
+// }
+// CHERI CHANGES END
