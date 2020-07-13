@@ -49,6 +49,10 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_param.h>
 #include <vm/vm_extern.h>
 
+#if __has_feature(capabilities)
+#include <cheri/cheric.h>
+#endif
+
 #include <machine/frame.h>
 #include <machine/pcb.h>
 #include <machine/pcpu.h>
@@ -322,6 +326,27 @@ data_abort(struct thread *td, struct trapframe *frame, uint64_t esr,
 		userret(td, frame);
 }
 
+#if __has_feature(capabilities)
+#define PRINT_REG(name, value)					\
+	printf(name ": " _CHERI_PRINTF_CAP_FMT "\n",		\
+	    _CHERI_PRINTF_CAP_ARG(value))
+#define PRINT_REG_N(array, n)					\
+	printf(" %sc%d: = " _CHERI_PRINTF_CAP_FMT "\n",		\
+	    ((n) < 10) ? " " : "", n, 				\
+	    _CHERI_PRINTF_CAP_ARG((array)[n]))
+#elif defined(MORELLO)
+#define PRINT_REG(name, value)					\
+	printf(name ": 0x%016lx\n", (uint64_t)value)
+#define PRINT_REG_N(array, n)					\
+	printf(" %sx%d: = 0x%016lx\n",				\
+	    ((n) < 10) ? " " : "", n, (uint64_t)(array)[n])
+#else
+#define PRINT_REG(name, value)	printf(name ": 0x%016lx\n", value)
+#define PRINT_REG_N(array, n)					\
+	printf(" %sx%d: = 0x%016lx\n",				\
+	    ((n) < 10) ? " " : "", n, (array)[n])
+#endif
+
 static void
 print_registers(struct trapframe *frame)
 {
@@ -332,12 +357,11 @@ print_registers(struct trapframe *frame)
 	 * use the macros to print the full capability.
 	 */
 	for (reg = 0; reg < nitems(frame->tf_x); reg++) {
-		printf(" %sx%d: %16lx\n", (reg < 10) ? " " : "", reg,
-		    (uint64_t)frame->tf_x[reg]);
+		PRINT_REG_N(frame->tf_x, reg);
 	}
-	printf("  sp: %16lx\n", (uint64_t)frame->tf_sp);
-	printf("  lr: %16lx\n", (uint64_t)frame->tf_lr);
-	printf(" elr: %16lx\n", (uint64_t)frame->tf_elr);
+	PRINT_REG("  sp", frame->tf_sp);
+	PRINT_REG("  lr", frame->tf_lr);
+	PRINT_REG(" elr", frame->tf_elr);
 	printf("spsr:         %8x\n", frame->tf_spsr);
 }
 
