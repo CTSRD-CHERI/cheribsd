@@ -722,7 +722,6 @@ exec_setregs(struct thread *td, struct image_params *imgp, uintcap_t stack)
 
 		td->td_frame->t9 = imgp->entry_addr & ~3; /* abicall req */
 #if __has_feature(capabilities)
-                td->td_md.md_tls = NULL;
 		hybridabi_exec_setregs(td, imgp->entry_addr & ~3);
 #else
 		/* For CHERI $pcc is set by hybridabi_exec_setregs() */
