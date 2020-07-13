@@ -65,7 +65,7 @@
     (*(volatile uint16_t *)(p) = (uint16_t)(v))
 #define	atomic_store_32(p, v)		\
     (*(volatile uint32_t *)(p) = (uint32_t)(v))
-#ifdef _LP64
+#if defined(_LP64) || __has_feature(capabilities)
 #define	atomic_store_64(p, v)		\
     (*(volatile uint64_t *)(p) = (uint64_t)(v))
 #endif
