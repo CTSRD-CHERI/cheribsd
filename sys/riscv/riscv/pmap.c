@@ -4482,7 +4482,7 @@ pmap_align_superpage(vm_object_t object, vm_ooffset_t offset,
  *
  */
 boolean_t
-pmap_map_io_transient(vm_page_t page[], vm_offset_t vaddr[], int count,
+pmap_map_io_transient(vm_page_t page[], vm_pointer_t vaddr[], int count,
     boolean_t can_fault)
 {
 	vm_paddr_t paddr;
@@ -4503,6 +4503,10 @@ pmap_map_io_transient(vm_page_t page[], vm_offset_t vaddr[], int count,
 			needs_mapping = TRUE;
 		} else {
 			vaddr[i] = PHYS_TO_DMAP(paddr);
+#ifdef __CHERI_PURE_CAPABILITY__
+			vaddr[i] = (vm_pointer_t)cheri_setboundsexact(
+			    (void *)vaddr[i], PAGE_SIZE);
+#endif
 		}
 	}
 
@@ -4524,7 +4528,7 @@ pmap_map_io_transient(vm_page_t page[], vm_offset_t vaddr[], int count,
 }
 
 void
-pmap_unmap_io_transient(vm_page_t page[], vm_offset_t vaddr[], int count,
+pmap_unmap_io_transient(vm_page_t page[], vm_pointer_t vaddr[], int count,
     boolean_t can_fault)
 {
 	vm_paddr_t paddr;
