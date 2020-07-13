@@ -98,7 +98,7 @@ sfence_vma(void)
 }
 
 static __inline void
-sfence_vma_page(uintptr_t addr)
+sfence_vma_page(register_t addr)
 {
 
 	__asm __volatile("sfence.vma %0" :: "r" (addr) : "memory");
@@ -133,3 +133,12 @@ void riscv_nullop(void);
 
 #endif	/* _KERNEL */
 #endif	/* _MACHINE_CPUFUNC_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20200804,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_as_integer"
+//   ]
+// }
+// CHERI CHANGES END
