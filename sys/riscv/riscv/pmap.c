@@ -160,9 +160,7 @@ __FBSDID("$FreeBSD$");
 #include <machine/pcb.h>
 #include <machine/sbi.h>
 
-#if __has_feature(capabilities)
 #include <cheri/cheric.h>
-#endif
 
 #define	NUL1E		(Ln_ENTRIES * Ln_ENTRIES)
 #define	NUL2E		(Ln_ENTRIES * NUL1E)
@@ -581,7 +579,7 @@ pmap_bootstrap_l3(vm_pointer_t l1pt, vm_offset_t va, vm_pointer_t l3_start)
 	}
 
 	/* Clean the L2 page table */
-	memset((void *)l3_start, 0, (vaddr_t)l3pt - (vaddr_t)l3_start);
+	memset((void *)l3_start, 0, (ptraddr_t)l3pt - (ptraddr_t)l3_start);
 
 	return (l3pt);
 }
