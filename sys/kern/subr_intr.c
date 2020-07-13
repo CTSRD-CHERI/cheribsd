@@ -1669,7 +1669,7 @@ SYSINIT(intr_map_init, SI_SUB_INTR, SI_ORDER_FIRST, intr_map_init, NULL);
 //   "updated": 20200706,
 //   "target_type": "kernel",
 //   "changes_purecap": [
-//     "pointer_as_integer"
+//     "uintcap_arithmetic"
 //   ]
 // }
 // CHERI CHANGES END
