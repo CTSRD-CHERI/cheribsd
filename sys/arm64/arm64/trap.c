@@ -171,8 +171,12 @@ static void
 align_abort(struct thread *td, struct trapframe *frame, uint64_t esr,
     uint64_t far, int lower)
 {
-	if (!lower)
+	if (!lower) {
+		print_registers(frame);
+		printf(" far: %16lx\n", far);
+		printf(" esr:         %.8lx\n", esr);
 		panic("Misaligned access from kernel space!");
+	}
 
 	call_trapsignal(td, SIGBUS, BUS_ADRALN,
 	    (void * __capability)frame->tf_elr);
@@ -368,6 +372,7 @@ do_el1h_sync(struct thread *td, struct trapframe *frame)
 		} else {
 			print_registers(frame);
 			printf(" far: %16lx\n", far);
+			printf(" esr:         %.8lx\n", esr);
 			panic("Unhandled EL1 %s abort: %x",
 			    exception == EXCP_INSN_ABORT ? "instruction" :
 			    "data", dfsc);
@@ -404,6 +409,7 @@ do_el1h_sync(struct thread *td, struct trapframe *frame)
 		/* FALLTHROUGH */
 	default:
 		print_registers(frame);
+		printf(" far: %16lx\n", READ_SPECIALREG(far_el1));
 		panic("Unknown kernel exception %x esr_el1 %lx\n", exception,
 		    esr);
 	}
@@ -473,10 +479,14 @@ do_el0_sync(struct thread *td, struct trapframe *frame)
 		if (dfsc < nitems(abort_handlers) &&
 		    abort_handlers[dfsc] != NULL)
 			abort_handlers[dfsc](td, frame, esr, far, 1);
-		else
+		else {
+			print_registers(frame);
+			printf(" far: %16lx\n", far);
+			printf(" esr:         %.8lx\n", esr);
 			panic("Unhandled EL0 %s abort: %x",
 			    exception == EXCP_INSN_ABORT_L ? "instruction" :
 			    "data", dfsc);
+		}
 		break;
 	case EXCP_UNKNOWN:
 		if (!undef_insn(0, frame))
