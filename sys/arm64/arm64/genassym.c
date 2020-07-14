@@ -71,6 +71,9 @@ ASSYM(PCB_ONFAULT, offsetof(struct pcb, pcb_onfault));
 ASSYM(PCB_FLAGS, offsetof(struct pcb, pcb_flags));
 
 ASSYM(SF_UC, offsetof(struct sigframe, sf_uc));
+#ifdef COMPAT_FREEBSD64
+ASSYM(SF_UC64, offsetof(struct sigframe64, sf_uc));
+#endif
 
 ASSYM(TD_PROC, offsetof(struct thread, td_proc));
 ASSYM(TD_PCB, offsetof(struct thread, td_pcb));
