@@ -322,8 +322,8 @@ va:
 	cllc	ct0, initstack_end
 	sub	t0, t0, s3
 	csetbounds cs3, cs3, t0
-	li	t0, CHERI_PERMS_KERNEL_DATA
-	candperm cs3, cs3, t0
+	li	t1, CHERI_PERMS_KERNEL_DATA
+	candperm cs3, cs3, t1
 	cincoffset csp, cs3, t0
 
 	/* Allocate space for thread0 PCB and riscv_bootparams */
