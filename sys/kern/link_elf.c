@@ -477,7 +477,8 @@ link_elf_init(void* arg)
 #ifndef CHERI_PURECAP_KERNEL
 			linker_kernel_file->address = *(caddr_t *)baseptr;
 #else
-			/* MODINFO_ADDR is really a virtual address,
+			/*
+			 * MODINFO_ADDR is really a virtual address,
 			 * not a pointer
 			 */
 			linker_kernel_file->address = cheri_setoffset(
@@ -492,14 +493,14 @@ link_elf_init(void* arg)
 		ctors_sizep = (Elf_Size *)preload_search_info(modptr,
 			MODINFO_METADATA | MODINFOMD_CTORS_SIZE);
 		if (ctors_addrp != NULL && ctors_sizep != NULL) {
-			linker_kernel_file->ctors_addr = cheri_bound(
+			linker_kernel_file->ctors_addr = cheri_setbounds(
 				ef->address + *ctors_addrp, *ctors_sizep);
 			linker_kernel_file->ctors_size = *ctors_sizep;
 		}
 	}
 	/* Set the bounds on load address */
-	linker_kernel_file->address = cheri_bound(linker_kernel_file->address,
-		linker_kernel_file->size);
+	linker_kernel_file->address = cheri_setbounds(
+	    linker_kernel_file->address, linker_kernel_file->size);
 	(void)link_elf_preload_parse_symbols(ef);
 
 #ifdef GDB
@@ -586,9 +587,9 @@ parse_dynamic(elf_file_t ef)
 			    (ef->address + dp->d_un.d_ptr);
 			ef->nbuckets = hashtab[0];
 			ef->nchains = hashtab[1];
-			ef->buckets = cheri_bound(hashtab + 2,
+			ef->buckets = cheri_setbounds(hashtab + 2,
 				ef->nbuckets * sizeof(Elf_Hashelt));
-			ef->chains = cheri_bound(hashtab + 2 + ef->nbuckets,
+			ef->chains = cheri_setbounds(hashtab + 2 + ef->nbuckets,
 				ef->nchains * sizeof(Elf_Hashelt));
 			break;
 		}
@@ -650,19 +651,21 @@ parse_dynamic(elf_file_t ef)
 	 * If we are not a cheri kernel these are no-ops.
 	 */
 	if (ef->strtab)
-		ef->strtab = cheri_bound(ef->strtab, ef->strsz);
+		ef->strtab = cheri_setbounds(ef->strtab, ef->strsz);
 	if (ef->rel)
-		ef->rel = cheri_bound(ef->rel, ef->relsize * sizeof(*ef->rel));
+		ef->rel = cheri_setbounds(ef->rel,
+		    ef->relsize * sizeof(*ef->rel));
 	if (ef->pltrel)
-		ef->pltrel = cheri_bound(ef->pltrel,
-			ef->pltrelsize * sizeof(*ef->pltrel));
+		ef->pltrel = cheri_setbounds(ef->pltrel,
+		    ef->pltrelsize * sizeof(*ef->pltrel));
 	if (ef->rela)
-		ef->rela = cheri_bound(ef->rela,
-			ef->relasize * sizeof(*ef->rela));
+		ef->rela = cheri_setbounds(ef->rela,
+		    ef->relasize * sizeof(*ef->rela));
 	if (ef->symtab)
-		ef->symtab = cheri_bound(ef->symtab,
-			ef->nchains * sizeof(Elf_Sym));
-	/* XXX-AM: How do we get .got size?
+		ef->symtab = cheri_setbounds(ef->symtab,
+		    ef->nchains * sizeof(Elf_Sym));
+	/*
+	 * XXX-AM: How do we get .got size?
 	 * We probably have to leave it like this or define
 	 * a symbol after GOT, in any case the got capability
 	 * would be limited by ef->address capability.

@@ -247,26 +247,14 @@ cheri_bytes_remaining(const void * __capability cap)
 
 #define CHERI_FPRINT_PTR(f, ptr)					\
 	fprintf(f, _CHERI_PRINT_PTR_FMT(ptr))
-#endif /* __has_feature(capabilities) || defined(__CHERI__) */
 
-/* Allow use of some cheri_ptr macros in the purecap kernel
- * without extra ifdefs.
- * These become a no-op when compiling an hybrid kernel or a
- * normal kernel.
- */
-#ifdef CHERI_PURECAP_KERNEL
-
-#define cheri_bound(ptr, size) cheri_ptr((ptr), size)
-#define cheri_perm(ptr, size, perm) cheri_ptrperm((ptr), size, perm)
-#define cheri_valid(ptr) (cheri_gettag((ptr)) == 1)
-
-#else /* ! CHERI_PURECAP_KERNEL */
-
-#define cheri_bound(ptr, size) (ptr)
-#define cheri_perm(ptr, size, perm) (ptr)
-#define cheri_valid(ptr) (1)
-
-#endif /* ! CHERI_PURECAP_KERNEL */
+#else /* ! (__has_feature(capabilities) || defined(__CHERI__)) */
+#define	cheri_gettag(x)			(1)
+#define	cheri_setbounds(x, y)		(x)
+#define	cheri_setboundsexact(x, y)	(x)
+#define	cheri_setaddress(x, y)	((void *)(y))
+#define	cheri_getaddress(x)	((uintptr_t)(x))
+#endif /* ! (__has_feature(capabilities) || defined(__CHERI__)) */
 
 /*
  * The cheri_{get,set,clear}_low_pointer_bits() functions work both with and
