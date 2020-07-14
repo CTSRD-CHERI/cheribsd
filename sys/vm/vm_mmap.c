@@ -223,8 +223,7 @@ mmap_retcap(struct thread *td, vm_offset_t addr,
 		    roundup2(mrp->mr_len + (addr - rounddown2(addr, PAGE_SIZE)),
 		    PAGE_SIZE));
 		/* Shift offset up if required */
-		cap_base = cheri_getbase(newcap);
-		newcap = cheri_setoffset(newcap, cap_base - addr);
+		newcap = cheri_setaddress(newcap, addr);
 	} else {
 		cap_base = cheri_getbase(newcap);
 		cap_len = cheri_getlen(newcap);
@@ -234,7 +233,7 @@ mmap_retcap(struct thread *td, vm_offset_t addr,
 		    "capability (%zx - %zx)", addr, addr + mrp->mr_len,
 		    cap_base, cap_base + cap_len));
 		newcap = cheri_setbounds(
-		    cheri_setoffset(newcap, addr - cap_base),
+		    cheri_setaddress(newcap, addr),
 		    roundup2(mrp->mr_len, PAGE_SIZE));
 	}
 
