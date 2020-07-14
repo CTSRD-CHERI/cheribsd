@@ -95,7 +95,7 @@ MK_CLANG_BOOTSTRAP=	no
 # running CC from bsd.compiler.mk.
 .if make(installworld) || make(installsysroot) || make(install) || \
     make(distributeworld) || make(stageworld) || make(distribution) || \
-    make(distrib-dirs)
+    make(distrib-dirs) || make(distributekernel) || make(stagekernel)
 .-include "${OBJTOP}/toolchain-metadata.mk"
 .if !defined(_LOADED_TOOLCHAIN_METADATA)
 .error A build is required first.  You may have the wrong MAKEOBJDIRPREFIX set.
