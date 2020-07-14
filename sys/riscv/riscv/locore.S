@@ -557,6 +557,11 @@ hart_lottery:
 
 	.globl init_pt_va
 	.type	init_pt_va, @object
+#ifdef __CHERI_PURE_CAPABILITY__
+	.align 4
+#else
+	.align 3
+#endif
 init_pt_va:
 #ifdef __CHERI_PURE_CAPABILITY__
 	.chericap pagetable_l2	/* XXX: Keep page tables VA */
