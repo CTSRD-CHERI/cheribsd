@@ -57,7 +57,7 @@ uma_small_alloc(uma_zone_t zone, vm_size_t bytes, int domain, u_int8_t *flags,
 	pa = m->phys_addr;
 	if ((wait & M_NODUMP) == 0)
 		dump_add_page(pa);
-	va = (void *)PHYS_TO_DMAP(pa);
+	va = cheri_bound((void *)PHYS_TO_DMAP(pa), PAGE_SIZE);
 	if ((wait & M_ZERO) && (m->flags & PG_ZERO) == 0)
 		bzero(va, PAGE_SIZE);
 	return (va);
@@ -75,3 +75,13 @@ uma_small_free(void *mem, vm_size_t size, u_int8_t flags)
 	vm_page_unwire_noq(m);
 	vm_page_free(m);
 }
+
+// CHERI CHANGES START
+// {
+//   "updated": 20200804,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "support"
+//   ]
+// }
+// CHERI CHANGES END
