@@ -1620,6 +1620,18 @@ link_elf_symbol_values(linker_file_t lf, c_linker_sym_t sym,
 		val = (caddr_t)ef->address + es->st_value;
 		if (ELF_ST_TYPE(es->st_info) == STT_GNU_IFUNC)
 			val = ((caddr_t (*)(void))val)();
+#ifdef __CHERI_PURE_CAPABILITY__
+		val = cheri_setbounds(val, es->st_size);
+		switch (ELF_ST_TYPE(es->st_info)) {
+		case STT_FUNC:
+		case STT_GNU_IFUNC:
+			val = cheri_andperm(val, CHERI_PERMS_KERNEL_CODE);
+			break;
+		default:
+			val = cheri_andperm(val, CHERI_PERMS_KERNEL_DATA);
+			break;
+		}
+#endif
 		symval->value = val;
 		symval->size = es->st_size;
 		return (0);
@@ -1631,6 +1643,18 @@ link_elf_symbol_values(linker_file_t lf, c_linker_sym_t sym,
 		val = (caddr_t)ef->address + es->st_value;
 		if (ELF_ST_TYPE(es->st_info) == STT_GNU_IFUNC)
 			val = ((caddr_t (*)(void))val)();
+#ifdef __CHERI_PURE_CAPABILITY__
+		val = cheri_setbounds(val, es->st_size);
+		switch (ELF_ST_TYPE(es->st_info)) {
+		case STT_FUNC:
+		case STT_GNU_IFUNC:
+			val = cheri_andperm(val, CHERI_PERMS_KERNEL_CODE);
+			break;
+		default:
+			val = cheri_andperm(val, CHERI_PERMS_KERNEL_DATA);
+			break;
+		}
+#endif
 		symval->value = val;
 		symval->size = es->st_size;
 		return (0);
