@@ -517,12 +517,16 @@ freebsd64_esigcode:
 	.data
 	.align	3
 	.global	szsigcode
+	.type	szsigcode, @object
 szsigcode:
 	.quad	esigcode - sigcode
+	.size	szsigcode, . - szsigcode
 #ifdef COMPAT_FREEBSD64
 	.global	freebsd64_szsigcode
+	.type	freebsd64_szsigcode, @object
 freebsd64_szsigcode:
 	.quad	freebsd64_esigcode - freebsd64_sigcode
+	.size	freebsd64_szsigcode, . - freebsd64_szsigcode
 #endif
 
 	.align	12
@@ -542,12 +546,14 @@ hart_lottery:
 	.space	4
 
 	.globl init_pt_va
+	.type	init_pt_va, @object
 init_pt_va:
 #ifdef __CHERI_PURE_CAPABILITY__
 	.chericap pagetable_l2	/* XXX: Keep page tables VA */
 #else
 	.quad pagetable_l2	/* XXX: Keep page tables VA */
 #endif
+	.size	init_pt_va, . - init_pt_va
 
 #ifndef SMP
 ENTRY(mpentry)
