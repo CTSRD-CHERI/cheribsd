@@ -89,13 +89,27 @@ void
 stack_save(struct stack *st)
 {
 	struct unwind_state frame;
-	uint64_t sp;
+	uintptr_t sp;
 
+#ifdef __CHERI_PURE_CAPABILITY__
+	__asm __volatile("cmove %0, csp" : "=&C" (sp));
+#else
 	__asm __volatile("mv %0, sp" : "=&r" (sp));
+#endif
 
 	frame.sp = sp;
-	frame.fp = (uint64_t)__builtin_frame_address(0);
-	frame.pc = (uint64_t)stack_save;
+	frame.fp = (uintptr_t)__builtin_frame_address(0);
+	frame.pc = (uintptr_t)stack_save;
 
 	stack_capture(curthread, st, &frame);
 }
+
+// CHERI CHANGES START
+// {
+//   "updated": 20200804,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "support"
+//   ]
+// }
+// CHERI CHANGES END
