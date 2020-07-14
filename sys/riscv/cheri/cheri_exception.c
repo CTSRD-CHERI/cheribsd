@@ -77,11 +77,11 @@ cheri_exccode_string(uint8_t exccode)
 }
 
 int
-cheri_sccsr_to_sicode(register_t sccsr)
+cheri_stval_to_sicode(register_t stval)
 {
 	uint8_t exccode;
 
-	exccode = (sccsr & SCCSR_CAUSE_MASK) >> SCCSR_CAUSE_SHIFT;
+	exccode = TVAL_CAP_CAUSE(stval);
 	switch (exccode) {
 	case CHERI_EXCCODE_LENGTH:
 		return (PROT_CHERI_BOUNDS);

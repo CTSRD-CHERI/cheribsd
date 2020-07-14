@@ -119,7 +119,7 @@ int
 cpu_fetch_syscall_args(struct thread *td)
 {
 	struct proc *p;
-	register_t *ap;
+	syscallarg_t *ap;
 	struct syscall_args *sa;
 	int nap;
 
@@ -141,7 +141,7 @@ cpu_fetch_syscall_args(struct thread *td)
 		sa->callp = &p->p_sysent->sv_table[sa->code];
 
 	sa->narg = sa->callp->sy_narg;
-	memcpy(sa->args, ap, nap * sizeof(register_t));
+	memcpy(sa->args, ap, nap * sizeof(syscallarg_t));
 	if (sa->narg > nap)
 		panic("ARM64TODO: Could we have more than 8 args?");
 
