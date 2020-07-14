@@ -161,7 +161,6 @@ db_trace_self(void)
 	frame.pc = (uintptr_t)db_trace_self;
 	db_stack_trace_cmd(curthread, &frame);
 }
-
 // CHERI CHANGES START
 // {
 //   "updated": 20200804,
