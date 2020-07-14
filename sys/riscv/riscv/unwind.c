@@ -51,7 +51,7 @@ unwind_frame(struct unwind_state *frame)
 
 	frame->sp = fp;
 	frame->fp = ((uintptr_t *)fp)[-2];
-	frame->pc = ((uintptr_t *)fp)[-1] - 4;
+	frame->pc = ((vaddr_t)((uintptr_t *)fp)[-1]) - 4;
 
 	return (0);
 }
@@ -61,7 +61,8 @@ unwind_frame(struct unwind_state *frame)
 //   "updated": 20200804,
 //   "target_type": "kernel",
 //   "changes_purecap": [
-//     "pointer_as_integer"
+//     "pointer_as_integer",
+//     "support"
 //   ]
 // }
 // CHERI CHANGES END
