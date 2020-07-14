@@ -51,8 +51,8 @@
 #define	END(sym) .cfi_endproc; .size sym, . - sym
 
 #define	EENTRY(sym)						\
-	.globl	sym; sym:
-#define	EEND(sym)
+	.globl	sym; .type sym,@function; sym:
+#define	EEND(sym) .size sym, . - sym
 
 #define	WEAK_REFERENCE(sym, alias)				\
 	.weak alias;						\
