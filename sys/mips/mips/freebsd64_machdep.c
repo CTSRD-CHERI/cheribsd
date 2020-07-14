@@ -324,7 +324,7 @@ freebsd64_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	 * non-unwind case.  Do this before we rewrite any general-purpose or
 	 * capability register state for the thread.
 	 */
-#if DDB
+#ifdef DDB
 	if (cheri_is_sandboxed && security_cheri_debugger_on_sandbox_signal)
 		kdb_enter(KDB_WHY_CHERI, "Signal delivery to CHERI sandbox");
 	else if (sig == SIGPROT && security_cheri_debugger_on_sigprot)
