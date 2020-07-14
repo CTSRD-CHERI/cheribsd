@@ -891,6 +891,32 @@ esigcode:
 szsigcode:
 	.quad	esigcode - sigcode
 
+#ifdef COMPAT_FREEBSD64
+ENTRY(freebsd64_sigcode)
+	mov	x0, sp
+	add	x0, x0, #SF_UC64
+
+1:
+	mov	x8, #SYS_sigreturn
+	svc	0
+
+	/* sigreturn failed, exit */
+	mov	x8, #SYS_exit
+	svc	0
+
+	b	1b
+END(freebsd64_sigcode)
+	/* This may be copied to the stack, keep it 16-byte aligned */
+	.align	3
+freebsd64_esigcode:
+
+	.data
+	.align	3
+	.global	freebsd64_szsigcode
+freebsd64_szsigcode:
+	.quad	freebsd64_esigcode - freebsd64_sigcode
+#endif
+
 ENTRY(aarch32_sigcode)
 	.word 0xe1a0000d	// mov r0, sp
 	.word 0xe2800040	// add r0, r0, #SIGF_UC
