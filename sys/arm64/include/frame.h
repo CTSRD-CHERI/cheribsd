@@ -82,6 +82,13 @@ struct frame {
 	int dummy;
 };
 
+#ifdef COMPAT_FREEBSD64
+struct sigframe64 {
+	struct siginfo64 sf_si;          /* actual saved siginfo */
+	ucontext64_t    sf_uc;          /* actual saved ucontext */
+};
+#endif
+
 #ifdef COMPAT_FREEBSD32
 struct sigframe32 {
 	struct siginfo32		sf_si;
