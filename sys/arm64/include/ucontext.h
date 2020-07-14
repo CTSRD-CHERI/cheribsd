@@ -61,6 +61,27 @@ struct __mcontext {
 
 typedef struct __mcontext mcontext_t;
 
+#ifdef COMPAT_FREEBSD64
+#include <compat/freebsd64/freebsd64_signal.h>
+typedef struct __mcontext64 {
+	struct gpregs	mc_gpregs;
+	struct fpregs	mc_fpregs;
+	int		mc_flags;
+#define	_MC_FP_VALID	0x1		/* Set when mc_fpregs has valid data */
+	int		mc_pad;		/* Padding */
+	__uint64_t	mc_spare[8];	/* Space for expansion, set to zero */
+} mcontext64_t;
+
+typedef struct __ucontext64 {
+	sigset_t		uc_sigmask;
+	mcontext64_t		uc_mcontext;
+	uint64_t		uc_link;
+	struct sigaltstack64	uc_stack;
+	int			uc_flags;
+	int			__spare__[4];
+} ucontext64_t;
+#endif
+
 #ifdef COMPAT_FREEBSD32
 #include <compat/freebsd32/freebsd32_signal.h>
 typedef struct __mcontext32 {
