@@ -110,6 +110,11 @@ XLEAF(FUNC_PREFIX(bcopy_c))
 	andi		t3, t1, (SZREG-1)
 	bne		t2, t3, .L.f_cannot_be_word_aligned
 	move		a1, a0		// a1: how much to copy
+	li		t9, SZREG	// enough bytes to copy for a word aligned copy?
+	dsub		t8, t9, t2
+	daddu		t9, t9, t8
+	slt		t9, a0, t9
+	bnez		t9, .L.f_cannot_be_word_aligned
 .L.f_can_be_word_aligned:
 	andi		t8, t0, (SZREG-1)
 	li		t9, SZREG
@@ -144,7 +149,10 @@ XLEAF(FUNC_PREFIX(bcopy_c))
 	andi		t3, t1, (CHERICAP_SIZE - 1)
 	and		a1, a0, -SZREG	// a1: amount we could copy
 	bne		t2, t3, .L.f_cannot_be_cap_aligned
-	nop
+	li		t9, CHERICAP_SIZE // enough bytes to copy for a cap aligned copy?
+	dsub		t9, t9, t2
+	slt		t9, a0, t9
+	bnez		t9, .L.f_cannot_be_cap_aligned
 .L.f_can_be_cap_aligned:
 	andi		t8, t0, (CHERICAP_SIZE - 1)	// just to capability
 	li		t9, CHERICAP_SIZE
@@ -218,7 +226,8 @@ XLEAF(FUNC_PREFIX(bcopy_c))
 	 */
 	andi		t2, t0, (SZREG-1)
 	andi		t3, t1, (SZREG-1)
-	li		t9, SZREG
+	li		t9, SZREG	// enough bytes to copy for a word aligned copy?
+	daddu		t9, t2, t9
 	slt		t9, a0, t9
 	bnez		t9, .L.b_cannot_be_dword_aligned
 	move		a1, a0		// a1: how much to copy
@@ -265,7 +274,10 @@ XLEAF(FUNC_PREFIX(bcopy_c))
 	andi		t3, t1, (CHERICAP_SIZE - 1)
 	and		a1, a0, -SZREG	// a1: mask off header
 	bne		t2, t3, .L.b_cannot_be_cap_aligned
-	nop
+	li		t9, CHERICAP_SIZE	// enough bytes to copy for a cap aligned copy?
+	daddu		t9, t9, t2
+	slt		t9, a0, t9
+	bnez		t9, .L.b_cannot_be_cap_aligned
 .L.b_can_be_cap_aligned:
 	andi		t8, t0, (CHERICAP_SIZE - 1)	// just to capability
 	beqz		t8, .L.b_cap_copy	// already aligned (common)

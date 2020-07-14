@@ -49,7 +49,11 @@ __FBSDID("$FreeBSD$");
 #include <stdarg.h>
 #include "libc_private.h"
 
+#ifndef __CHERI_PURE_CAPABILITY__
 __weak_reference(__sys_openat, __openat);
+#else
+__weak_reference(_openat, __openat);
+#endif
 __sym_compat(openat, __impl_openat, FBSD_1.1);
 __weak_reference(openat, __impl_openat);
 __sym_default(openat, openat, FBSD_1.2);
@@ -71,3 +75,23 @@ openat(int fd, const char *path, int flags, ...)
 	return (((int (*)(int, const char *, int, int))
 	    __libc_interposing[INTERPOS_openat])(fd, path, flags, mode));
 }
+
+#ifdef __CHERI_PURE_CAPABILITY__
+int _openat(int fd, const char *path, int flags, ...);
+#pragma weak _openat
+int
+_openat(int fd, const char *path, int flags, ...)
+{
+	va_list ap;
+	int mode;
+
+	if ((flags & O_CREAT) != 0) {
+		va_start(ap, flags);
+		mode = va_arg(ap, int);
+		va_end(ap);
+	} else {
+		mode = 0;
+	}
+	return (__sys_openat(fd, path, flags, mode));
+}
+#endif

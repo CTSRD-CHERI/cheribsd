@@ -279,6 +279,12 @@ MACHINE_CPU = ssse3 sse3
 MACHINE_CPU = sse3
 .  endif
 MACHINE_CPU += amd64 sse2 sse mmx
+########## arm64
+. elif ${MACHINE_CPUARCH} == "aarch64"
+.  if ${CPUTYPE} == "cheri"
+MACHINE_CPU = cheri
+.  endif
+MACHINE_CPU += arm64
 ########## Mips
 . elif ${MACHINE_CPUARCH} == "mips"
 .  if ${CPUTYPE} == "cheri"
@@ -357,10 +363,6 @@ LDFLAGS+=	-fuse-ld=lld
 # XXXBD: still needed?
 LDFLAGS+=	-Wl,-melf64btsmip_cheri_fbsd
 LDFLAGS+=	-Wl,-preemptible-caprelocs=elf
-# Work around cheri-unknown-freebsd-ld.lld: error: section: .init_array
-# is not contiguous with other relro sections
-# TODO: remove this once I've debugged the root cause
-LDFLAGS+=	-Wl,-z,norelro
 CFLAGS+=	-Qunused-arguments
 CFLAGS+=	-Werror=cheri-bitwise-operations
 # Don't remove CHERI symbols from the symbol table

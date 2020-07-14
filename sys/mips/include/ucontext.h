@@ -137,7 +137,7 @@ typedef struct	__mcontext64 {
 	int		mc_fpused;	/* fp has been used */
 	f_register_t	mc_fpregs[33];	/* fp regs 0 to 31 and csr */
 	__register_t	mc_fpc_eir;	/* fp exception instruction reg */
-	void		*mc_tls;	/* pointer to TLS area */
+	uint64_t	mc_tls;		/* (void *) pointer to TLS area */
 	__register_t	cause;		/* cause register */
 
         /*
@@ -164,13 +164,12 @@ typedef struct	__mcontext64 {
 typedef struct __ucontext64 {
 	sigset_t		uc_sigmask;
 	mcontext64_t		uc_mcontext;
-	void			*uc_link;
+	uint64_t		uc_link;	/* (void *) */
 	struct sigaltstack64	uc_stack;
 	int			uc_flags;
 	int			__spare__[4];
 } ucontext64_t;
 #endif
-
 #endif
 
 #ifndef SZREG

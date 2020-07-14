@@ -68,6 +68,7 @@ __FBSDID("$FreeBSD$");
 #include <compat/freebsd64/freebsd64_syscall.h>
 #include <compat/freebsd64/freebsd64_util.h>
 
+static const char *freebsd64_riscv_machine_arch(struct proc *p);
 static void	freebsd64_sendsig(sig_t, ksiginfo_t *, sigset_t *);
 
 extern const char *freebsd64_syscallnames[];
@@ -106,8 +107,19 @@ struct sysentvec elf_freebsd_freebsd64_sysvec = {
 	.sv_thread_detach = NULL,
 	.sv_trap	= NULL,
 	.sv_hwcap	= &elf_hwcap,
+	.sv_machine_arch = freebsd64_riscv_machine_arch,
 };
 INIT_SYSENTVEC(freebsd64_sysent, &elf_freebsd_freebsd64_sysvec);
+
+static const char *
+freebsd64_riscv_machine_arch(struct proc *p)
+{
+
+	if ((p->p_elf_flags & EF_RISCV_FLOAT_ABI_MASK) ==
+	    EF_RISCV_FLOAT_ABI_SOFT)
+		return (MACHINE_ARCH64SF);
+	return (MACHINE_ARCH64);
+}
 
 static Elf64_Brandinfo freebsd_freebsd64_brand_info = {
 	.brand		= ELFOSABI_FREEBSD,

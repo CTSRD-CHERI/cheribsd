@@ -145,14 +145,14 @@ struct md_ioctl64 {
 	unsigned	md_version;
 	unsigned	md_unit;
 	enum md_types	md_type;
-	uint64_t	md_file;
+	uint64_t	md_file;	/* (void *) */
 	off_t		md_mediasize;
 	unsigned	md_sectorsize;
 	unsigned	md_options;
 	uint64_t	md_base;
 	int		md_fwheads;
 	int		md_fwsectors;
-	uint64_t	md_label;
+	uint64_t	md_label;	/* (char *) */
 	int		md_pad[MDNPAD];
 };
 

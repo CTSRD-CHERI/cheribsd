@@ -50,7 +50,7 @@ struct mdproc {
 struct syscall_args {
 	u_int code;
 	struct sysent *callp;
-	register_t args[MAXARGS];
+	syscallarg_t args[MAXARGS];
 	int narg;
 };
 

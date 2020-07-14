@@ -850,10 +850,10 @@ struct restrict_u_tag {
 		res_addr6 v6;
 	} u;
 };
-#define	V4_SIZEOF_RESTRICT_U	(offsetof(restrict_u, u)	\
-				 + sizeof(res_addr4))
-#define	V6_SIZEOF_RESTRICT_U	(offsetof(restrict_u, u)	\
-				 + sizeof(res_addr6))
+#define	V4_SIZEOF_RESTRICT_U					\
+	ALIGNED_SIZE(offsetof(restrict_u, u) + sizeof(res_addr4))
+#define	V6_SIZEOF_RESTRICT_U					\
+	ALIGNED_SIZE(offsetof(restrict_u, u) + sizeof(res_addr6))
 
 typedef struct r4addr_tag	r4addr;
 struct r4addr_tag {

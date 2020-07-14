@@ -556,9 +556,11 @@ DECLARE_CHERI_TEST(cheritest_vm_cow_read);
 DECLARE_CHERI_TEST(cheritest_vm_cow_write);
 const char	*xfail_need_writable_tmp(const char *name);
 
+#if 0
 /* cheritest_vm_swap.c */
 DECLARE_CHERI_TEST(cheritest_vm_swap);
 const char	*xfail_swap_required(const char *name);
+#endif
 
 /* cheritest_zlib.c */
 DECLARE_CHERI_TEST(test_deflate_zeroes);

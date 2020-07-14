@@ -79,6 +79,7 @@ __FBSDID("$FreeBSD$");
 static struct	csum *fscs;
 #define	sblock	disk.d_fs
 #define	acg	disk.d_cg
+static struct	fs_summary_info fs_si;
 
 union dinode {
 	struct ufs1_dinode dp1;
@@ -614,7 +615,8 @@ restart:
 	/*
 	 * Reference the summary information so it will also be written.
 	 */
-	sblock.fs_csp = fscs;
+	sblock.fs_si = &fs_si;
+	sblock.fs_si->fs_csp = fscs;
 	if (sbput(disk.d_fd, &disk.d_fs, 0) != 0)
 		err(1, "sbput: %s", disk.d_error);
 	/*
@@ -1190,3 +1192,13 @@ newfs_random(void)
 		return (nextnum++);
 	return (arc4random());
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20190628,
+//   "target_type": "prog",
+//   "changes_purecap": [
+//     "pointer_shape"
+//   ],
+//   "change_comment": "embedded pointer storage in superblock"
+// }
+// CHERI CHANGES END

@@ -160,11 +160,11 @@ undef_insn(u_int el, struct trapframe *frame)
 	KASSERT(el < 2, ("Invalid exception level %u", el));
 
 	if (el == 0) {
-		ret = fueword32((uint32_t *)frame->tf_elr, &insn);
+		ret = fueword32((uint32_t * __capability)frame->tf_elr, &insn);
 		if (ret != 0)
 			panic("Unable to read userspace faulting instruction");
 	} else {
-		insn = *(uint32_t *)frame->tf_elr;
+		insn = *(uint32_t * __capability)frame->tf_elr;
 	}
 
 	LIST_FOREACH(uh, &undef_handlers[el], uh_link) {
