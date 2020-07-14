@@ -72,12 +72,22 @@ _alt_start:
 #endif
 
 #ifdef __CHERI_PURE_CAPABILITY__
-	/* Just in case, force capmode on. */
-	cllc	ct0, 1f
-	li	t1, 1
-	csetflags ct0, ct0, t1
-	cjr	ct0
+.option push
+.option nocapmode
+
+	/*
+	 * The boot loader may enter in non-capmode even though
+	 * our ELF header requests capmode.  The instructions below
+	 * should work in both modes.
+	 */
+	lla	t0, 1f
+	cspecialr ct1, pcc
+	csetaddr ct1, ct1, t0
+	li	t0, 1
+	csetflags ct1, ct1, t0
+	cjr	ct1
 1:
+.option pop
 #endif
 
 	/* Pick a hart to run the boot process. */
