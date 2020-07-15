@@ -76,13 +76,11 @@ NESTED(setjmp, SETJMP_FRAME_SIZE, _FRAME_RETURN_REG)
 	csc		$c17, zero, CALLFRAME_CRA($csp)
 	csc		$c3, zero, CALLFRAME_SIZ($csp)	# store env
 
-	li		t0, (SZREG * 96)
-	csetbounds	$c3, $c3, t0
-
 	/* Get the signal mask. */
 	li		t0, _JB_SIGMASK * SZREG
-	csetoffset	$c3, $c3, t0			# oset
-	cfromptr	$c4, $c3, zero			# set == NULL
+	cincoffset	$c4, $c3, t0			# oset
+	csetbounds	$c4, $c4, 16			# sizeof(sigset_t)=16
+	cgetnull	$c3				# set == NULL
 	li		a0, 1				# SIG_SETBLOCK
 	PIC_CALL_LOCAL(__libc_sigprocmask)		# get current signal mask
 
@@ -182,8 +180,9 @@ NESTED(longjmp, LONGJMP_FRAME_SIZE, _FRAME_RETURN_REG)
 
 	# set sigmask
 	li		t0, _JB_SIGMASK * SZREG
-	csetoffset	$c3, $c3, t0			# set
-	cfromptr	$c4, $c3, zero			# oset == NULL
+	cincoffset	$c3, $c3, t0			# set
+	csetbounds	$c3, $c3, 16			# sizeof(sigset_t)=16
+	cgetnull	$c4				# oset == NULL
 	li		a0, 3				# SIG_SETMASK
 	PIC_CALL_LOCAL(__libc_sigprocmask)		# set current signal mask
 
