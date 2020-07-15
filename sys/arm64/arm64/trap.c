@@ -128,12 +128,7 @@ int
 cpu_fetch_syscall_args(struct thread *td)
 {
 	struct proc *p;
-#if defined(MORELLO) && !__has_feature(capabilities)
-	__uint128_t *ap;
-	int i;
-#else
 	syscallarg_t *ap;
-#endif
 	struct syscall_args *sa;
 	int nap;
 
@@ -155,12 +150,7 @@ cpu_fetch_syscall_args(struct thread *td)
 		sa->callp = &p->p_sysent->sv_table[sa->code];
 
 	sa->narg = sa->callp->sy_narg;
-#if defined(MORELLO) && !__has_feature(capabilities)
-	for (i = 0; i < nap; i++)
-		sa->args[i] = ap[i];
-#else
 	memcpy(sa->args, ap, nap * sizeof(syscallarg_t));
-#endif
 	if (sa->narg > nap)
 		panic("ARM64TODO: Could we have more than 8 args?");
 
@@ -334,12 +324,6 @@ data_abort(struct thread *td, struct trapframe *frame, uint64_t esr,
 	printf(" %sc%d: = " _CHERI_PRINTF_CAP_FMT "\n",		\
 	    ((n) < 10) ? " " : "", n, 				\
 	    _CHERI_PRINTF_CAP_ARG((array)[n]))
-#elif defined(MORELLO)
-#define PRINT_REG(name, value)					\
-	printf(name ": 0x%016lx\n", (uint64_t)value)
-#define PRINT_REG_N(array, n)					\
-	printf(" %sx%d: = 0x%016lx\n",				\
-	    ((n) < 10) ? " " : "", n, (uint64_t)(array)[n])
 #else
 #define PRINT_REG(name, value)	printf(name ": 0x%016lx\n", value)
 #define PRINT_REG_N(array, n)					\
