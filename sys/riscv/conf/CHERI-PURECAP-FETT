@@ -1,0 +1,6 @@
+#NO_UNIVERSE
+
+include "FETT"
+include "std.CHERI-PURECAP"
+
+ident CHERI-PURECAP-FETT
