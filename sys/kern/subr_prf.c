@@ -798,6 +798,146 @@ reswitch:	switch (ch = (u_char)*fmt++) {
 			base = 8;
 			goto handle_nosign;
 		case 'p':
+#ifdef __CHERI_PURE_CAPABILITY__
+			if (sharpflag) {
+				void *ptr = va_arg(ap, void *);
+				int orig_width, orig_dwidth;
+
+				orig_width = width;
+				orig_dwidth = dwidth;
+
+				/* address */
+				num = cheri_getaddress(ptr);
+				PCHAR('0');
+				PCHAR('x');
+				p = ksprintn(nbuf, num, 16, &n, 0);
+				tmp = 0;
+				if (!ladjust && padc == '0')
+					dwidth = width - tmp;
+				width -= tmp + imax(dwidth, n);
+				dwidth -= n;
+				if (!ladjust)
+					while (width-- > 0)
+						PCHAR(' ');
+				while (dwidth-- > 0)
+					PCHAR('0');
+
+				while (*p)
+					PCHAR(*p--);
+
+				if (ladjust)
+					while (width-- > 0)
+						PCHAR(' ');
+
+				/* Skip attributes if NULL-derived. */
+				if (cheri_getperm(ptr) == 0 &&
+				    cheri_getflags(ptr) == 0 &&
+				    cheri_getbase(ptr) == 0 &&
+				    cheri_getlen(ptr) + 1 == 0 &&
+				    cheri_gettype(ptr) == CHERI_OTYPE_UNSEALED)
+					break;
+
+				PCHAR(' ');
+				PCHAR('[');
+
+				/* permissions */
+				num = cheri_getperm(ptr);
+				if (num & CHERI_PERM_LOAD)
+					PCHAR('r');
+				if (num & CHERI_PERM_STORE)
+					PCHAR('w');
+				if (num & CHERI_PERM_EXECUTE)
+					PCHAR('x');
+				if (num & CHERI_PERM_LOAD_CAP)
+					PCHAR('R');
+				if (num & CHERI_PERM_STORE_CAP)
+					PCHAR('W');
+				PCHAR(',');
+
+				/* bounds */
+				num = cheri_getbase(ptr);
+				PCHAR('0');
+				PCHAR('x');
+				p = ksprintn(nbuf, num, 16, &n, 0);
+				width = orig_width;
+				dwidth = orig_dwidth;
+				tmp = 0;
+				if (!ladjust && padc == '0')
+					dwidth = width - tmp;
+				width -= tmp + imax(dwidth, n);
+				dwidth -= n;
+				if (!ladjust)
+					while (width-- > 0)
+						PCHAR(' ');
+				while (dwidth-- > 0)
+					PCHAR('0');
+
+				while (*p)
+					PCHAR(*p--);
+
+				if (ladjust)
+					while (width-- > 0)
+						PCHAR(' ');
+
+				PCHAR('-');
+
+				num += cheri_getlen(ptr);
+				PCHAR('0');
+				PCHAR('x');
+				p = ksprintn(nbuf, num, 16, &n, 0);
+				while (*p)
+					PCHAR(*p--);
+				width = orig_width;
+				dwidth = orig_dwidth;
+				tmp = 0;
+				if (!ladjust && padc == '0')
+					dwidth = width - tmp;
+				width -= tmp + imax(dwidth, n);
+				dwidth -= n;
+				if (!ladjust)
+					while (width-- > 0)
+						PCHAR(' ');
+				while (dwidth-- > 0)
+					PCHAR('0');
+
+				while (*p)
+					PCHAR(*p--);
+
+				if (ladjust)
+					while (width-- > 0)
+						PCHAR(' ');
+
+				PCHAR(']');
+
+				/* tag and sealing */
+				switch (cheri_gettype(ptr)) {
+				case CHERI_OTYPE_UNSEALED:
+					if (cheri_gettag(ptr))
+						p = NULL;
+					else
+						p = "(invalid)";
+					break;
+				case CHERI_OTYPE_SENTRY:
+					if (cheri_gettag(ptr))
+						p = "(sentry)";
+					else
+						p = "(invalid,sentry)";
+					break;
+				default:
+					if (cheri_gettag(ptr))
+						p = "(sealed)";
+					else
+						p = "(invalid,sealed)";
+					break;
+				}
+				if (p != NULL) {
+					PCHAR(' ');
+					while (*p)
+						PCHAR(*p++);
+				}
+				break;
+			}
+#endif
 			base = 16;
 			sharpflag = (width == 0);
 			sign = 0;
@@ -1299,3 +1439,13 @@ sbuf_printf_drain(void *arg, const char *data, int len)
 
 	return (r);
 }
+
+// CHERI CHANGES START
+// {
+//   "updated": 20200804,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "support"
+//   ]
+// }
+// CHERI CHANGES END
