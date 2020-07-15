@@ -224,8 +224,8 @@ static struct pmaplist allpmaps = LIST_HEAD_INITIALIZER();
 
 struct pmap kernel_pmap_store;
 
-vm_offset_t virtual_avail;	/* VA of first avail page (after kernel bss) */
-vm_offset_t virtual_end;	/* VA of last avail page (end of kernel AS) */
+vm_ptr_t virtual_avail;		/* VA of first avail page (after kernel bss) */
+vm_ptr_t virtual_end;		/* VA of last avail page (end of kernel AS) */
 vm_offset_t kernel_vm_end = 0;
 
 vm_paddr_t dmap_phys_base;	/* The start of the dmap region */
@@ -687,6 +687,12 @@ pmap_bootstrap(vm_ptr_t l1pt, vm_paddr_t kernstart, vm_size_t kernlen)
 
 	virtual_avail = roundup2(freemempos, L2_SIZE);
 	virtual_end = VM_MAX_KERNEL_ADDRESS - L2_SIZE;
+#ifdef __CHERI_PURE_CAPABILITY__
+	virtual_avail = (vm_ptr_t)cheri_setbounds((void *)virtual_avail,
+	    (vaddr_t)virtual_end - (vaddr_t)virtual_avail);
+	virtual_end = (vm_ptr_t)cheri_setaddress((void *)virtual_avail,
+	    virtual_end);
+#endif
 	kernel_vm_end = virtual_avail;
 	
 	pa = pmap_early_vtophys(l1pt, freemempos);
