@@ -4304,11 +4304,11 @@ void *
 pmap_mapbios(vm_paddr_t pa, vm_size_t size)
 {
 
-        return ((void *)PHYS_TO_DMAP(pa));
+        return (cheri_kern_setbounds((void *)PHYS_TO_DMAP(pa), size));
 }
 
 void
-pmap_unmapbios(vm_paddr_t pa, vm_size_t size)
+pmap_unmapbios(vm_pointer_t pa, vm_size_t size)
 {
 }
 
