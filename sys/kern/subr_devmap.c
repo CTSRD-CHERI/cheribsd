@@ -323,7 +323,7 @@ pmap_mapdev_attr(vm_offset_t pa, vm_size_t size, vm_memattr_t ma)
  * Unmap device memory and free the kva space.
  */
 void
-pmap_unmapdev(vm_offset_t va, vm_size_t size)
+pmap_unmapdev(vm_pointer_t va, vm_size_t size)
 {
 	vm_offset_t offset;
 
