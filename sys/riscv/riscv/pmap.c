@@ -4322,11 +4322,11 @@ void *
 pmap_mapbios(vm_paddr_t pa, vm_size_t size)
 {
 
-        return ((void *)PHYS_TO_DMAP(pa));
+        return (cheri_bound((void *)PHYS_TO_DMAP(pa), size));
 }
 
 void
-pmap_unmapbios(vm_paddr_t pa, vm_size_t size)
+pmap_unmapbios(vm_ptr_t pa, vm_size_t size)
 {
 }
 
