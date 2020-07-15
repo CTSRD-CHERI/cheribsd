@@ -489,9 +489,6 @@ int	kern_shmctl(struct thread *td, int shmid, int cmd, void *buf,
 int	kern_shutdown(struct thread *td, int s, int how);
 int	kern_sigaction(struct thread *td, int sig, const struct sigaction *act,
 	    struct sigaction *oact, int flags);
-int	kern_sigaction_cap(struct thread *td, int sig,
-	    const struct sigaction *act, struct sigaction *oact, int flags,
-	    void * __capability *cap);
 int	kern_sigaltstack(struct thread *td, stack_t *ss, stack_t *oss);
 int	kern_sigfastblock(struct thread *td, int cmd,
 	    uint32_t * __capability ptr);
