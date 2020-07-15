@@ -694,7 +694,7 @@ pmap_bootstrap(vm_pointer_t l1pt, vm_paddr_t kernstart, vm_size_t kernlen)
 	virtual_end = VM_MAX_KERNEL_ADDRESS - L2_SIZE;
 #ifdef __CHERI_PURE_CAPABILITY__
 	virtual_avail = (vm_pointer_t)cheri_setbounds((void *)virtual_avail,
-	    (vaddr_t)virtual_end - (vaddr_t)virtual_avail);
+	    (ptraddr_t)virtual_end - (ptraddr_t)virtual_avail);
 	virtual_end = (vm_pointer_t)cheri_setaddress((void *)virtual_avail,
 	    virtual_end);
 #endif
