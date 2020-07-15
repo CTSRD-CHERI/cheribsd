@@ -18,7 +18,7 @@
 #
 # $FreeBSD$
 
-cpu		MORELLO
+cpu		CPU_CHERI
 ident		GENERIC
 
 makeoptions	DEBUG=-g		# Build kernel with gdb(1) debug symbols

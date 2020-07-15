@@ -28,7 +28,7 @@ S=	../../..
 INCLUDES+= -I$S/contrib/libfdt
 
 # TODO: This shouldn't be needed, we should be building with TAARGET_ARCH=morello
-MORELLO_ENABLED!=	grep MORELLO opt_global.h || true ; echo
+MORELLO_ENABLED!=	grep CPU_CHERI opt_global.h || true ; echo
 .if !empty(MORELLO_ENABLED)
 CFLAGS+=	-morello
 .endif
