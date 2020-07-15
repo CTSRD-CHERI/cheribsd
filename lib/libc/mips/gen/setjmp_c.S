@@ -104,9 +104,12 @@ NESTED(setjmp, SETJMP_FRAME_SIZE, _FRAME_RETURN_REG)
 	 * terms of caller/callee-save registers, despite some registers
 	 * seeing different use.
 	 *
-	 * NB: In the pure-capability ABI, we need to neither save nore restore
-	 * $ra and $sp, which are caller-save and not used for control flow.
+	 * NB: In the pure-capability ABI, we don't need to save or restore
+	 * $sp, which is caller-save and not used for control flow.
+	 *
+	 * See CSR_Cheri_Purecap in LLVM's lib/Target/Mips/MipsCallingConv.td
 	 */
+	csd		ra, zero, (_JB_REG_RA * SZREG)($c3)
 	csd		s0, zero, (_JB_REG_S0 * SZREG)($c3)
 	csd		s1, zero, (_JB_REG_S1 * SZREG)($c3)
 	csd		s2, zero, (_JB_REG_S2 * SZREG)($c3)
@@ -196,9 +199,12 @@ NESTED(longjmp, LONGJMP_FRAME_SIZE, _FRAME_RETURN_REG)
 	 * The fp (or s8) register is callee-saved.
 	 * The gp register is callee-saved (for n32/n64).
 	 *
-	 * NB: In the pure-capability ABI, we need to neither save nore restore
-	 * $ra and $sp, which are caller-save and not used for control flow.
+	 * NB: In the pure-capability ABI, we don't need to save or restore
+	 * $sp, which is caller-save and not used for control flow.
+	 *
+	 * See CSR_Cheri_Purecap in LLVM's lib/Target/Mips/MipsCallingConv.td
 	 */
+	cld		ra, zero, (_JB_REG_RA * SZREG)($c3)
 	cld		s0, zero, (_JB_REG_S0 * SZREG)($c3)
 	cld		s1, zero, (_JB_REG_S1 * SZREG)($c3)
 	cld		s2, zero, (_JB_REG_S2 * SZREG)($c3)
