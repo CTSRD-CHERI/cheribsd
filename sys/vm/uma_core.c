@@ -81,6 +81,8 @@ __FBSDID("$FreeBSD$");
 #include <sys/taskqueue.h>
 #include <sys/vmmeter.h>
 
+#include <cheri/cheric.h>
+
 #include <vm/vm.h>
 #include <vm/vm_domainset.h>
 #include <vm/vm_object.h>
@@ -95,7 +97,6 @@ __FBSDID("$FreeBSD$");
 #include <vm/uma.h>
 #include <vm/uma_int.h>
 #include <vm/uma_dbg.h>
-#include <vm/cheri.h>
 
 #include <ddb/ddb.h>
 
@@ -1570,7 +1571,7 @@ keg_alloc_slab(uma_keg_t keg, uma_zone_t zone, int domain, int flags,
 			    slab_tohashslab(slab), NULL, SKIP_NONE);
 		goto fail;
 	}
-	CHERI_VM_ASSERT_BOUNDS(mem, size);
+	CHERI_ASSERT_BOUNDS(mem, size);
 	uma_total_inc(size);
 
 	/* For HASH zones all pages go to the same uma_domain. */
@@ -1784,7 +1785,7 @@ pcpu_page_alloc(uma_zone_t zone, vm_size_t bytes, int domain, uint8_t *pflag,
 	if ((addr = kva_alloc(bytes)) == 0)
 #endif
 		goto fail;
-	CHERI_VM_ASSERT_BOUNDS(addr, bytes);
+	CHERI_ASSERT_BOUNDS(addr, bytes);
 	zkva = addr;
 	TAILQ_FOREACH(p, &alloctail, listq) {
 		pmap_qenter(zkva, &p, 1);
@@ -1857,7 +1858,7 @@ noobj_alloc(uma_zone_t zone, vm_size_t bytes, int domain, uint8_t *flags,
 		zkva += PAGE_SIZE;
 	}
 
-	CHERI_VM_ASSERT_VALID(retkva);
+	CHERI_ASSERT_VALID(retkva);
 	return (cheri_setboundsexact((void *)retkva, bytes));
 }
 
@@ -1945,7 +1946,7 @@ pcpu_page_free(void *mem, vm_size_t size, uint8_t flags)
 static int
 zero_init(void *mem, int size, int flags)
 {
-	CHERI_VM_ASSERT_VALID(mem);
+	CHERI_ASSERT_VALID(mem);
 	bzero(mem, size);
 	return (0);
 }
@@ -2638,7 +2639,7 @@ zone_ctor(void *mem, int size, void *udata, int flags)
 	 * This is a pure cache zone, no kegs.
 	 */
 	if (arg->import) {
-		CHERI_VM_ASSERT_VALID(arg->import);
+		CHERI_ASSERT_VALID(arg->import);
 		KASSERT((arg->flags & UMA_ZFLAG_CACHE) != 0,
 		    ("zone_ctor: Import specified for non-cache zone."));
 		zone->uz_flags = arg->flags;

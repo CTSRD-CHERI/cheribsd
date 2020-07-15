@@ -89,6 +89,8 @@ __FBSDID("$FreeBSD$");
 #include <machine/md_var.h>
 #endif
 
+#include <cheri/cheric.h>
+
 #include <security/audit/audit.h>
 #include <security/mac/mac_framework.h>
 
@@ -103,7 +105,6 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_extern.h>
 #include <vm/vm_page.h>
 #include <vm/vnode_pager.h>
-#include <vm/cheri.h>
 
 #ifdef HWPMC_HOOKS
 #include <sys/pmckern.h>
@@ -2069,7 +2070,7 @@ vm_mmap_object(vm_map_t map, vm_ptr_t *addr, vm_offset_t max_addr,
 	boolean_t curmap, fitit;
 	int docow, error, findspace, rv;
 
-	CHERI_VM_ASSERT_FIT_PTR(addr);
+	CHERI_ASSERT_PTRSIZE_BOUNDS(addr);
 
 	curmap = map == &td->td_proc->p_vmspace->vm_map;
 	if (curmap) {

@@ -86,6 +86,8 @@ __FBSDID("$FreeBSD$");
 #include <sys/sysent.h>
 #include <sys/shm.h>
 
+#include <cheri/cheric.h>
+
 #include <vm/vm.h>
 #include <vm/vm_param.h>
 #include <vm/pmap.h>
@@ -99,7 +101,6 @@ __FBSDID("$FreeBSD$");
 #include <vm/vnode_pager.h>
 #include <vm/swap_pager.h>
 #include <vm/uma.h>
-#include <vm/cheri.h>
 
 /*
  *	Virtual memory maps provide for the mapping, protection,
@@ -965,8 +966,8 @@ vm_map_create(pmap_t pmap, vm_ptr_t min, vm_ptr_t max)
 static void
 _vm_map_init(vm_map_t map, pmap_t pmap, vm_ptr_t min, vm_ptr_t max)
 {
-	CHERI_VM_ASSERT_VALID(min);
-	CHERI_VM_ASSERT_VALID(max);
+	CHERI_ASSERT_VALID(min);
+	CHERI_ASSERT_VALID(max);
 
 	map->header.eflags = MAP_ENTRY_HEADER;
 	map->needs_wakeup = FALSE;
@@ -2162,7 +2163,7 @@ vm_map_find(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 	    ("vm_map_find: non-NULL backing object for stack"));
 	MPASS((cow & MAP_REMAP) == 0 || (find_space == VMFS_NO_SPACE &&
 	    (cow & (MAP_STACK_GROWS_DOWN | MAP_STACK_GROWS_UP)) == 0));
-	CHERI_VM_ASSERT_FIT_PTR(addr);
+	CHERI_ASSERT_PTRSIZE_BOUNDS(addr);
 
 	if (find_space == VMFS_OPTIMAL_SPACE && (object == NULL ||
 	    (object->flags & OBJ_COLORED) == 0))
@@ -2294,7 +2295,7 @@ done:
 	vm_map_unlock(map);
 	if (rv == KERN_SUCCESS) {
 		*addr = vm_map_make_ptr(map, vaddr, length, prot);
-		CHERI_VM_ASSERT_VALID(*addr);
+		CHERI_ASSERT_VALID(*addr);
 	}
 	return (rv);
 }
@@ -2611,8 +2612,8 @@ vm_map_submap(
 	vm_map_entry_t entry;
 	int result = KERN_INVALID_ARGUMENT;
 
-	CHERI_VM_ASSERT_VALID(start);
-	CHERI_VM_ASSERT_VALID(end);
+	CHERI_ASSERT_VALID(start);
+	CHERI_ASSERT_VALID(end);
 
 	vm_map_lock(submap);
 	submap->flags |= MAP_IS_SUB_MAP;

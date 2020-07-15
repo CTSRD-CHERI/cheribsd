@@ -129,6 +129,40 @@ cheri_is_subset(const void * __capability parent, const void * __capability ptr)
 		cheri_gettop(ptr) <= cheri_gettop(parent) &&
 		(cheri_getperm(ptr) & cheri_getperm(parent)) == cheri_getperm(ptr));
 }
+
+/* Check that a capability is dereferenceable */
+#define	CHERI_ASSERT_VALID(ptr)						\
+	KASSERT(cheri_gettag((void *)(ptr)),				\
+	    ("Expect valid capability %s %s:%d", __func__,		\
+	        __FILE__, __LINE__))
+
+/*
+ * Check that bounds are within the given size, padded to
+ * representable size
+ */
+#define	CHERI_ASSERT_BOUNDS(ptr, expect) do {			\
+		KASSERT(cheri_getlen((void *)ptr) <=		\
+		    CHERI_REPRESENTABLE_LENGTH(expect),		\
+		    ("Invalid bounds on pointer in %s %s:%d "	\
+			"expected %lx, found %lx",		\
+			 __func__, __FILE__, __LINE__,		\
+			 (u_long)expect,			\
+			 (u_long)cheri_getlen((void *)ptr)));	\
+	} while (0)
+
+/* Check that bounds are exactly the given size */
+#define	CHERI_ASSERT_XBOUNDS(ptr, len) do {				\
+		KASSERT(cheri_getlen((void *)ptr) == len,		\
+		    ("Inexact bounds on pointer in %s %s:%d "		\
+			"expected %lx, found %lx",			\
+			__func__, __FILE__, __LINE__,			\
+			(u_long)len, cheri_getlen((void *)ptr)));	\
+	} while (0)
+
+/* Check that bounds are exactly the size of a pointer */
+#define	CHERI_ASSERT_PTRSIZE_BOUNDS(ptr)		\
+	CHERI_ASSERT_XBOUNDS(ptr, sizeof(void *))
+
 #endif
 
 /*
@@ -254,6 +288,13 @@ cheri_bytes_remaining(const void * __capability cap)
 #define	cheri_setboundsexact(x, y)	(x)
 #define	cheri_setaddress(x, y)	((void *)(y))
 #define	cheri_getaddress(x)	((uintptr_t)(x))
+
+#ifdef _KERNEL
+#define	CHERI_ASSERT_VALID(ptr)
+#define	CHERI_ASSERT_BOUNDS(ptr, expect)
+#define	CHERI_ASSERT_XBOUNDS(ptr, len)
+#define	CHERI_ASSERT_PTRSIZE_BOUNDS(ptr)
+#endif
 #endif /* ! (__has_feature(capabilities) || defined(__CHERI__)) */
 
 /*

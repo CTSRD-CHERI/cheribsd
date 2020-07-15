@@ -96,9 +96,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/sysproto.h>
 #include <sys/jail.h>
 
-#if __has_feature(capabilities)
 #include <cheri/cheric.h>
-#endif
 
 #include <security/audit/audit.h>
 #include <security/mac/mac_framework.h>
@@ -110,7 +108,6 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_map.h>
 #include <vm/vm_page.h>
 #include <vm/vm_pager.h>
-#include <vm/cheri.h>
 
 FEATURE(sysv_shm, "System V shared memory segments support");
 
@@ -561,7 +558,8 @@ kern_shmat_locked(struct thread *td, int shmid,
 		vm_object_deallocate(shmseg->object);
 		return (ENOMEM);
 	}
-	CHERI_VM_ASSERT_VALID(attach_addr);
+	CHERI_ASSERT_VALID(attach_addr);
+        // CHERI_ASSERT_XBOUNDS(attach_addr, size);
 
 	shmmap_s->va = attach_addr;
 	shmmap_s->shmid = shmid;

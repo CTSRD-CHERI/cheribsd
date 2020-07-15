@@ -61,6 +61,8 @@ __FBSDID("$FreeBSD$");
 #include <sys/vmem.h>
 #include <sys/vmmeter.h>
 
+#include <cheri/cheric.h>
+
 #include "opt_vm.h"
 
 #include <vm/uma.h>
@@ -73,7 +75,6 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_param.h>
 #include <vm/vm_page.h>
 #include <vm/vm_pageout.h>
-#include <vm/cheri.h>
 #include <vm/vm_phys.h>
 #include <vm/vm_pagequeue.h>
 #include <vm/uma_int.h>
@@ -876,8 +877,8 @@ vmem_import(vmem_t *vm, vmem_size_t size, vmem_size_t align, int flags)
 	vm->vm_nfreetags += BT_MAXALLOC;
 	if (error)
 		return (ENOMEM);
-	CHERI_VM_ASSERT_VALID(addr);
-	CHERI_VM_ASSERT_EXACT(addr, size);
+	CHERI_ASSERT_VALID(addr);
+	CHERI_ASSERT_XBOUNDS(addr, size);
 
 	vmem_add1(vm, addr, size, BT_TYPE_SPAN);
 
@@ -906,7 +907,7 @@ vmem_fit(const bt_t *bt, vmem_size_t size, vmem_size_t align,
 	 * unsigned integer of the same size.
 	 * XXX-AM: CHERI breaks the assumption!
 	 */
-	CHERI_VM_ASSERT_VALID(bt->bt_start);
+	CHERI_ASSERT_VALID(bt->bt_start);
 
 	start = bt->bt_start;
 	if (start < minaddr) {
@@ -923,8 +924,8 @@ vmem_fit(const bt_t *bt, vmem_size_t size, vmem_size_t align,
 	 * want to force the caller to hold a capability for
 	 * the whole address space.
 	 */
-	CHERI_VM_ASSERT_VALID(start);
-	CHERI_VM_ASSERT_VALID(end);
+	CHERI_ASSERT_VALID(start);
+	CHERI_ASSERT_VALID(end);
 	if (start > end) 
 		return (ENOMEM);
 
@@ -1145,12 +1146,12 @@ retry:
 	if (error == ENOMEM && vmem_try_fetch(vm, size, align, flags))
 		goto retry;
 
+	CHERI_ASSERT_VALID(*addrp);
+	*addrp = (vmem_addr_t)cheri_setboundsexact((void *)*addrp, size);
+
 out:
 	VMEM_UNLOCK(vm);
-#ifdef CHERI_PURECAP_KERNEL
-	CHERI_VM_ASSERT_VALID(*addrp);
-	*addrp = (vmem_addr_t)cheri_setboundsexact((void *)*addrp, size);
-#endif
+
 	return (error);
 }
 
@@ -1311,12 +1312,10 @@ vmem_alloc(vmem_t *vm, vmem_size_t size, int flags, vmem_addr_t *addrp)
 		*addrp = (vmem_addr_t)uma_zalloc(qc->qc_cache,
 		    (flags & ~M_WAITOK) | M_NOWAIT);
 		if (__predict_true(*addrp != 0)) {
-#ifdef CHERI_PURECAP_KERNEL
-			CHERI_VM_ASSERT_VALID(*addrp);
+			CHERI_ASSERT_VALID(*addrp);
 			*addrp = (vmem_addr_t)cheri_setbounds(
 			    (void *)*addrp, size);
-			CHERI_VM_ASSERT_BOUNDS(*addrp, size);
-#endif
+			CHERI_ASSERT_BOUNDS(*addrp, size);
 			return (0);
 		}
 	}
@@ -1374,7 +1373,7 @@ vmem_xalloc(vmem_t *vm, const vmem_size_t size0, vmem_size_t align,
 	MPASS(minaddr <= maxaddr);
 	MPASS(!VMEM_CROSS_P(phase, phase + size - 1, nocross));
 
-	CHERI_VM_ASSERT_FIT_PTR(addrp);
+	CHERI_ASSERT_PTRSIZE_BOUNDS(addrp);
 
 	if (strat == M_NEXTFIT)
 		MPASS(minaddr == VMEM_ADDR_MIN && maxaddr == VMEM_ADDR_MAX);
@@ -1462,10 +1461,8 @@ out:
 	VMEM_UNLOCK(vm);
 	if (error != 0 && (flags & M_NOWAIT) == 0)
 		panic("failed to allocate waiting allocation\n");
-#ifdef CHERI_PURECAP_KERNEL
-	CHERI_VM_ASSERT_VALID(*addrp);
+	CHERI_ASSERT_VALID(*addrp);
 	*addrp = (vmem_addr_t)cheri_setboundsexact((void *)*addrp, size);
-#endif
 
 	return (error);
 }
@@ -1478,7 +1475,7 @@ vmem_free(vmem_t *vm, vmem_addr_t addr, vmem_size_t size)
 {
 	qcache_t *qc;
 	MPASS(size > 0);
-	CHERI_VM_ASSERT_VALID(addr);
+	CHERI_ASSERT_VALID(addr);
 
 	if (size <= vm->vm_qcache_max &&
 	    __predict_true(addr >= VMEM_ADDR_QCACHE_MIN)) {
@@ -1495,7 +1492,7 @@ vmem_xfree(vmem_t *vm, vmem_addr_t addr, vmem_size_t size)
 	bt_t *t;
 
 	MPASS(size > 0);
-	CHERI_VM_ASSERT_VALID(addr);
+	CHERI_ASSERT_VALID(addr);
 
 	VMEM_LOCK(vm);
 	bt = bt_lookupbusy(vm, addr);
@@ -1540,7 +1537,7 @@ vmem_add(vmem_t *vm, vmem_addr_t addr, vmem_size_t size, int flags)
 {
 	int error;
 
-	CHERI_VM_ASSERT_EXACT(addr, size);
+	CHERI_ASSERT_XBOUNDS(addr, size);
 
 	error = 0;
 	flags &= VMEM_FLAGS;

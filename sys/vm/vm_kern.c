@@ -82,6 +82,8 @@ __FBSDID("$FreeBSD$");
 #include <sys/vmem.h>
 #include <sys/vmmeter.h>
 
+#include <cheri/cheric.h>
+
 #include <vm/vm.h>
 #include <vm/vm_param.h>
 #include <vm/vm_domainset.h>
@@ -96,7 +98,6 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_radix.h>
 #include <vm/vm_extern.h>
 #include <vm/uma.h>
-#include <vm/cheri.h>
 
 vm_map_t kernel_map;
 vm_map_t exec_map;
@@ -149,7 +150,7 @@ kva_alloc(vm_size_t size)
 	size = round_page(size);
 	if (vmem_alloc(kernel_arena, size, M_BESTFIT | M_NOWAIT, &addr))
 		return (0);
-	CHERI_VM_ASSERT_VALID(addr);
+	CHERI_ASSERT_VALID(addr);
 	return (addr);
 }
 
@@ -163,7 +164,7 @@ kva_alloc_aligned(vm_size_t size, vm_offset_t align)
 			VMEM_ADDR_MIN, VMEM_ADDR_MAX,
 			M_BESTFIT | M_NOWAIT, &addr))
 		return (0);
-	CHERI_VM_ASSERT_VALID(addr);
+	CHERI_ASSERT_VALID(addr);
 	return (addr);
 }
 
@@ -264,8 +265,8 @@ kmem_alloc_attr_domain(int domain, vm_size_t size, int flags, vm_paddr_t low,
 		    prot | PMAP_ENTER_WIRED, 0);
 	}
 	VM_OBJECT_WUNLOCK(object);
-	CHERI_VM_ASSERT_VALID(addr);
-	CHERI_VM_ASSERT_EXACT(addr, size);
+	CHERI_ASSERT_VALID(addr);
+	CHERI_ASSERT_XBOUNDS(addr, size);
 	return (addr);
 }
 
@@ -351,8 +352,8 @@ kmem_alloc_contig_domain(int domain, vm_size_t size, int flags, vm_paddr_t low,
 		tmp += PAGE_SIZE;
 	}
 	VM_OBJECT_WUNLOCK(object);
-	CHERI_VM_ASSERT_VALID(addr);
-	CHERI_VM_ASSERT_EXACT(addr, size);
+	CHERI_ASSERT_VALID(addr);
+	CHERI_ASSERT_XBOUNDS(addr, size);
 	return (addr);
 }
 
@@ -405,8 +406,8 @@ kmem_suballoc(vm_map_t parent, vm_ptr_t *min, vm_ptr_t *max,
 	int ret;
 	vm_map_t result;
 
-	CHERI_VM_ASSERT_VALID(min);
-	CHERI_VM_ASSERT_VALID(max);
+	CHERI_ASSERT_VALID(min);
+	CHERI_ASSERT_VALID(max);
 	size = round_page(size);
 
 	*min = vm_map_min(parent);
@@ -453,7 +454,7 @@ kmem_malloc_domain(int domain, vm_size_t size, int flags, vm_size_t align)
 		vmem_free(arena, addr, size);
 		return (0);
 	}
-	CHERI_VM_ASSERT_VALID(addr);
+	CHERI_ASSERT_VALID(addr);
 	return (addr);
 }
 
@@ -503,7 +504,7 @@ kmem_back_domain(int domain, vm_object_t object, vm_ptr_t addr,
 
 	KASSERT(object == kernel_object,
 	    ("kmem_back_domain: only supports kernel object."));
-	CHERI_VM_ASSERT_VALID(addr);
+	CHERI_ASSERT_VALID(addr);
 
 	offset = addr - VM_MIN_KERNEL_ADDRESS;
 	pflags = malloc2vm_flags(flags) | VM_ALLOC_WIRED;
@@ -699,7 +700,7 @@ kmap_alloc_wait(vm_map_t map, vm_size_t size)
 	vm_map_unlock(map);
 
 	mapped = vm_map_make_ptr(map, addr, size, VM_PROT_ALL);
-	CHERI_VM_ASSERT_VALID(mapped);
+	CHERI_ASSERT_VALID(mapped);
 	return (mapped);
 }
 
@@ -801,8 +802,8 @@ kmem_init(vm_ptr_t start, vm_ptr_t end)
 	int domain;
 	vm_ptr_t kern_map_start;
 
-	CHERI_VM_ASSERT_VALID(start);
-	CHERI_VM_ASSERT_VALID(end);
+	CHERI_ASSERT_VALID(start);
+	CHERI_ASSERT_VALID(end);
 #ifndef CHERI_PURECAP_KERNEL
 	kern_map_start = VM_MIN_KERNEL_ADDRESS;
 #else
