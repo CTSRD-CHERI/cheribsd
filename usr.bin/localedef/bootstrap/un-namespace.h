@@ -35,8 +35,8 @@
  *
  * $FreeBSD$
  */
-/*
- * This header only exists to avoid pulling in the host xlocale.h from
- * the libc-internal headers. This is required since newer Linux GLibc no
- * longer includes xlocale.h and older versions include an incompatible header.
- */
+#undef	locale_t
+#undef	xlocale_collate
+#undef	xlocale_component
+#undef	xlocale_monetary
+#undef	xlocale_numeric

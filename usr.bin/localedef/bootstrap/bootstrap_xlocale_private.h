@@ -35,8 +35,20 @@
  *
  * $FreeBSD$
  */
+
+#ifndef _LOCALDEF_BOOTSTRAP_XLOCALE_PRIVATE_H
+#define _LOCALDEF_BOOTSTRAP_XLOCALE_PRIVATE_H
 /*
- * This header only exists to avoid pulling in the host xlocale.h from
- * the libc-internal headers. This is required since newer Linux GLibc no
- * longer includes xlocale.h and older versions include an incompatible header.
+ * Avoid pulling in anything from the real xlocale_private.h.
+ * Unfortunately, we can't simply add a local xlocale_private.h to include
+ * it instead of the real file, since xlocale_private.h is included with double
+ * quotes from the same directory and therefore the real file will be selected.
  */
+#define _XLOCALE_PRIVATE__H_
+
+typedef struct _localedef_bootstrap_xlocale* localedef_bootstrap_locale_t;
+struct localedef_bootstrap_xlocale_component {
+	char unused;
+};
+
+#endif /* _LOCALDEF_BOOTSTRAP_XLOCALE_PRIVATE_H */

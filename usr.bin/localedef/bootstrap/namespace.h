@@ -35,8 +35,10 @@
  *
  * $FreeBSD$
  */
-/*
- * This header only exists to avoid pulling in the host xlocale.h from
- * the libc-internal headers. This is required since newer Linux GLibc no
- * longer includes xlocale.h and older versions include an incompatible header.
- */
+#include "bootstrap_xlocale_private.h"
+
+#define	locale_t	localedef_bootstrap_locale_t
+#define	xlocale_collate	localedef_bootstrap_xlocale_collate
+#define	xlocale_component	localedef_bootstrap_xlocale_component
+#define	xlocale_monetary	localedef_bootstrap_xlocale_monetary
+#define	xlocale_numeric	localedef_bootstrap_xlocale_numeric

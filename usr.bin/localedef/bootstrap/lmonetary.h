@@ -35,8 +35,7 @@
  *
  * $FreeBSD$
  */
-/*
- * This header only exists to avoid pulling in the host xlocale.h from
- * the libc-internal headers. This is required since newer Linux GLibc no
- * longer includes xlocale.h and older versions include an incompatible header.
- */
+#include "namespace.h"
+#define	lc_numeric_T	localedef_bootstrap_lc_numeric_T
+#include "../../../lib/libc/locale/lmonetary.h"
+#include "un-namespace.h"

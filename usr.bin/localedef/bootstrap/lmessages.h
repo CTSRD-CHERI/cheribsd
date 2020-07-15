@@ -35,8 +35,7 @@
  *
  * $FreeBSD$
  */
-/*
- * This header only exists to avoid pulling in the host xlocale.h from
- * the libc-internal headers. This is required since newer Linux GLibc no
- * longer includes xlocale.h and older versions include an incompatible header.
- */
+#include "namespace.h"
+#define	lc_messages_T	localedef_bootstrap_lc_messages_T
+#include "../../../lib/libc/locale/lmessages.h"
+#include "un-namespace.h"
