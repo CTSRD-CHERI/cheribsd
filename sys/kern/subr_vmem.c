@@ -1150,7 +1150,6 @@ out:
 #ifdef CHERI_PURECAP_KERNEL
 	CHERI_VM_ASSERT_VALID(*addrp);
 	*addrp = (vmem_addr_t)cheri_setboundsexact((void *)*addrp, size);
-	CHERI_VM_ASSERT_EXACT(*addrp, size);
 #endif
 	return (error);
 }
@@ -1466,7 +1465,6 @@ out:
 #ifdef CHERI_PURECAP_KERNEL
 	CHERI_VM_ASSERT_VALID(*addrp);
 	*addrp = (vmem_addr_t)cheri_setboundsexact((void *)*addrp, size);
-	CHERI_VM_ASSERT_EXACT(*addrp, size);
 #endif
 
 	return (error);
