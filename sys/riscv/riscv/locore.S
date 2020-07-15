@@ -472,11 +472,20 @@ initstack:
 	.space  (PAGE_SIZE * KSTACK_PAGES)
 initstack_end:
 
+/*
+ * sigcode has to be labeled as an @object type so that captable pointers
+ * to it will be able to read it.  This is fine as the code is never
+ * executed directly in the kernel, just copied to places for userland
+ * to execute.
+ */
+#define	SIGCODE(sym)						\
+	.text; .globl sym; .type sym,@object; .align 4; sym:
+
 .option push
 #if __has_feature(capabilities)
 .option capmode
 #endif
-ENTRY(sigcode)
+SIGCODE(sigcode)
 #if __has_feature(capabilities)
 	cincoffset ca0, csp, SF_UC
 #else
@@ -493,9 +502,9 @@ ENTRY(sigcode)
 	ecall
 
 	j	1b
-END(sigcode)
 	/* This may be copied to the stack, keep it 16-byte aligned */
 	.align	3
+END(sigcode)
 esigcode:
 .option pop
 
@@ -504,7 +513,7 @@ esigcode:
 #if __has_feature(capabilities)
 .option nocapmode
 #endif
-ENTRY(freebsd64_sigcode)
+SIGCODE(freebsd64_sigcode)
 	mv	a0, sp
 	addi	a0, a0, SF64_UC
 
@@ -517,9 +526,9 @@ ENTRY(freebsd64_sigcode)
 	ecall
 
 	j	1b
-END(freebsd64_sigcode)
 	/* This may be copied to the stack, keep it 16-byte aligned */
 	.align	3
+END(freebsd64_sigcode)
 freebsd64_esigcode:
 .option pop
 #endif
