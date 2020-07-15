@@ -136,8 +136,8 @@ extern struct pmap	kernel_pmap_store;
 #define	PMAP_TRYLOCK(pmap)	mtx_trylock(&(pmap)->pm_mtx)
 #define	PMAP_UNLOCK(pmap)	mtx_unlock(&(pmap)->pm_mtx)
 
-extern vm_offset_t virtual_avail;
-extern vm_offset_t virtual_end;
+extern vm_pointer_t virtual_avail;
+extern vm_pointer_t virtual_end;
 
 /*
  * Macros to test if a mapping is mappable with an L1 Section mapping
