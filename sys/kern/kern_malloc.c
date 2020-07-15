@@ -70,6 +70,8 @@ __FBSDID("$FreeBSD$");
 #include <sys/epoch.h>
 #endif
 
+#include <cheri/cheric.h>
+
 #include <vm/vm.h>
 #include <vm/pmap.h>
 #include <vm/vm_domainset.h>
@@ -84,7 +86,6 @@ __FBSDID("$FreeBSD$");
 #include <vm/uma.h>
 #include <vm/uma_int.h>
 #include <vm/uma_dbg.h>
-#include <vm/cheri.h>
 
 #ifdef DEBUG_MEMGUARD
 #include <vm/memguard.h>
@@ -99,9 +100,6 @@ __FBSDID("$FreeBSD$");
 
 #if __has_feature(capabilities)
 #include <machine/cherireg.h>
-#ifdef CHERI_PURECAP_KERNEL
-#include <cheri/cheric.h>
-#endif
 #endif
 
 #include <ddb/ddb.h>
@@ -464,7 +462,7 @@ contigmalloc(unsigned long size, struct malloc_type *type, int flags,
 	    boundary, VM_MEMATTR_DEFAULT);
 	if (ret != NULL)
 		malloc_type_allocated(type, round_page(size));
-	CHERI_VM_ASSERT_VALID(ret);
+	CHERI_ASSERT_VALID(ret);
 	return (ret);
 }
 
@@ -492,7 +490,7 @@ contigmalloc_domainset(unsigned long size, struct malloc_type *type,
 void
 contigfree(void *addr, unsigned long size, struct malloc_type *type)
 {
-	CHERI_VM_ASSERT_VALID(addr);
+	CHERI_ASSERT_VALID(addr);
 	kmem_free((vm_ptr_t)addr, size);
 	malloc_type_freed(type, round_page(size));
 }
@@ -597,7 +595,7 @@ malloc_large(size_t *size, struct domainset *policy, int flags)
 		vsetzoneslab(va, NULL, (void *)(uintptr_t)((sz << 1) | 1));
 		uma_total_inc(sz);
 		*size = sz;
-		CHERI_VM_ASSERT_BOUNDS(va, sz);
+		CHERI_ASSERT_BOUNDS(va, sz);
 	}
 	return ((caddr_t)va);
 }
@@ -658,7 +656,7 @@ void *
 	if (va != NULL)
 		va = redzone_setup(va, osize);
 #endif
-	CHERI_VM_ASSERT_BOUNDS(va, size);
+	CHERI_ASSERT_BOUNDS(va, size);
 	return ((void *) va);
 }
 
@@ -685,7 +683,7 @@ malloc_domain(size_t *sizep, int *indxp, struct malloc_type *mtp, int domain,
 	if (va != NULL)
 		*sizep = zone->uz_size;
 	*indxp = indx;
-	CHERI_VM_ASSERT_VALID(va);
+	CHERI_ASSERT_VALID(va);
 
 	return ((void *)va);
 }
@@ -789,7 +787,7 @@ free_dbg(void **addrp, struct malloc_type *mtp)
 	/* free(NULL, ...) does nothing */
 	if (addr == NULL)
 		return (EJUSTRETURN);
-	CHERI_VM_ASSERT_VALID(addr);
+	CHERI_ASSERT_VALID(addr);
 
 #ifdef DEBUG_MEMGUARD
 	if (is_memguard_addr(addr)) {
@@ -942,7 +940,7 @@ realloc(void *addr, size_t size, struct malloc_type *mtp, int flags)
 	/* realloc(NULL, ...) is equivalent to malloc(...) */
 	if (addr == NULL)
 		return (malloc(size, mtp, flags));
-	CHERI_VM_ASSERT_VALID(addr);
+	CHERI_ASSERT_VALID(addr);
 
 	/*
 	 * XXX: Should report free of old memory and alloc of new memory to

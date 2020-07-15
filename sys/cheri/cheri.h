@@ -93,6 +93,9 @@ void * __capability	_cheri_capability_build_user_rwx(uint32_t perms,
 	_cheri_capability_build_user_rwx(perms, basep, length, off,	\
 	    __func__, __LINE__)
 
+/* Root of all userspace capabilities. */
+extern void * __capability userspace_cap;
+
 /*
  * Global capabilities used to construct other capabilities.
  */
