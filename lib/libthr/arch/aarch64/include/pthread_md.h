@@ -57,7 +57,11 @@ static __inline void
 _tcb_set(struct tcb *tcb)
 {
 
+#ifdef __CHERI_PURE_CAPABILITY__
+	__asm __volatile("msr	ctpidr_el0, %0" :: "C" (tcb));
+#else
 	__asm __volatile("msr	tpidr_el0, %x0" :: "r" (tcb));
+#endif
 }
 
 /*
@@ -68,7 +72,11 @@ _tcb_get(void)
 {
 	struct tcb *tcb;
 
+#ifdef __CHERI_PURE_CAPABILITY__
+	__asm __volatile("mrs	%0, ctpidr_el0" : "=C" (tcb));
+#else
 	__asm __volatile("mrs	%x0, tpidr_el0" : "=r" (tcb));
+#endif
 	return (tcb);
 }
 
