@@ -4,6 +4,7 @@
 # https://git.linaro.org/toolchain/cortex-strings.git
 #
 
+.if ${MACHINE_ARCH} == "aarch64"
 .PATH: ${SRCTOP}/contrib/cortex-strings/src/aarch64
 
 MDSRCS+= \
@@ -18,3 +19,4 @@ MDSRCS+= \
 	strlen.S \
 	strncmp.S \
 	strnlen.S
+.endif
