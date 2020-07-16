@@ -150,8 +150,8 @@ typedef struct vm_reserv *vm_reserv_t;
 struct kva_md_info {
 	vm_offset_t	buffer_sva;
 	vm_offset_t	buffer_eva;
-	vm_offset_t	clean_sva;
-	vm_offset_t	clean_eva;
+	vm_offset_t	transient_sva;
+	vm_offset_t	transient_eva;
 };
 
 extern struct kva_md_info	kmi;
@@ -172,3 +172,12 @@ void swapper(void);
 #endif
 
 #endif				/* VM_H */
+// CHERI CHANGES START
+// {
+//   "updated": 20200804,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "support"
+//   ]
+// }
+// CHERI CHANGES END
