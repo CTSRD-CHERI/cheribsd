@@ -58,7 +58,11 @@ __weak_reference(__makecontext, makecontext);
 void
 __makecontext(ucontext_t *ucp, void (*func)(void), int argc, ...)
 {
+#ifdef __CHERI_PURE_CAPABILITY__
+	struct capregs *cap;
+#else
 	struct gpregs *gp;
+#endif
 	va_list ap;
 	int i;
 
@@ -69,14 +73,32 @@ __makecontext(ucontext_t *ucp, void (*func)(void), int argc, ...)
 	if ((argc < 0) || (argc > 8))
 		return;
 
+#ifdef __CHERI_PURE_CAPABILITY__
+	cap = &ucp->uc_mcontext.mc_capregs;
+#else
 	gp = &ucp->uc_mcontext.mc_gpregs;
+#endif
 
 	va_start(ap, argc);
 	/* Pass up to eight arguments in x0-7. */
-	for (i = 0; i < argc && i < 8; i++)
+	for (i = 0; i < argc && i < 8; i++) {
+#ifdef __CHERI_PURE_CAPABILITY__
+		cap->cap_x[i] = va_arg(ap, uintcap_t);
+#else
 		gp->gp_x[i] = va_arg(ap, uint64_t);
+#endif
+	}
 	va_end(ap);
 
+#ifdef __CHERI_PURE_CAPABILITY__
+	/* Set the stack */
+	cap->cap_sp = STACKALIGN((uintptr_t)ucp->uc_stack.ss_sp +
+	    ucp->uc_stack.ss_size);
+	/* Arrange for return via the trampoline code. */
+	cap->cap_elr = (uintptr_t)_ctx_start;
+	cap->cap_x[19] = (uintptr_t)func;
+	cap->cap_x[20] = (uintptr_t)ucp;
+#else
 	/* Set the stack */
 	gp->gp_sp = STACKALIGN((uintptr_t)ucp->uc_stack.ss_sp +
 	    ucp->uc_stack.ss_size);
@@ -84,4 +106,5 @@ __makecontext(ucontext_t *ucp, void (*func)(void), int argc, ...)
 	gp->gp_elr = (__register_t)_ctx_start;
 	gp->gp_x[19] = (__register_t)func;
 	gp->gp_x[20] = (__register_t)ucp;
+#endif
 }
