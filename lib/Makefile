@@ -50,7 +50,6 @@ SUBDIR=	${SUBDIR_BOOTSTRAP} \
 	libcasper \
 	libcompat \
 	libcrypt \
-	libdevctl \
 	libdevinfo \
 	libdevstat \
 	libdl \
@@ -109,6 +108,10 @@ SUBDIR=	${SUBDIR_BOOTSTRAP} \
 	libz \
 	libzstd \
 	ncurses
+
+.if ${MACHINE_ARCH} != "morello"
+SUBDIR+=	libdevctl
+.endif
 
 .if !${MACHINE_ABI:Mpurecap}
 # Needs changes to be useful for purecap and not used by anything (yet)
@@ -176,7 +179,9 @@ SUBDIR.${MK_CLANG}+=	clang
 .endif
 
 SUBDIR.${MK_CUSE}+= 	libcuse
+.if ${MACHINE_ARCH} != "morello"
 SUBDIR.${MK_CXX}+=	libdevdctl
+.endif
 SUBDIR.${MK_TOOLCHAIN}+=libpe
 SUBDIR.${MK_DIALOG}+=	libdpv
 SUBDIR.${MK_FILE}+=	libmagic
@@ -211,7 +216,9 @@ _libcplusplus=	libc++
 _libcplusplus+=	libc++experimental
 .endif
 
+.if ${MACHINE_ARCH} != "morello"
 SUBDIR.${MK_EFI}+=	libefivar
+.endif
 SUBDIR.${MK_GOOGLETEST}+=	googletest
 SUBDIR.${MK_LIBTHR}+=	libthr
 SUBDIR.${MK_NETGRAPH}+=	libnetgraph
@@ -222,7 +229,9 @@ _libvgl=	libvgl
 .endif
 
 .if ${MACHINE_CPUARCH} == "aarch64"
+.if ${MACHINE_ARCH} != "morello"
 SUBDIR.${MK_PMC}+=	libopencsd
+.endif
 .endif
 
 .if ${MACHINE_CPUARCH} == "amd64"
@@ -242,9 +251,11 @@ SUBDIR.${MK_PMC}+=	libpmc libpmcstat
 SUBDIR.${MK_RADIUS_SUPPORT}+=	libradius
 SUBDIR.${MK_SENDMAIL}+=	libmilter libsm libsmdb libsmutil
 SUBDIR.${MK_TELNET}+=	libtelnet
+.if ${MACHINE_ARCH} != "morello"
 SUBDIR.${MK_TESTS_SUPPORT}+=	atf
 SUBDIR.${MK_TESTS_SUPPORT}.${MK_CXX}+=	kyua
 SUBDIR.${MK_TESTS_SUPPORT}.${MK_CXX}+=	liblutok
+.endif
 SUBDIR.${MK_TESTS}+=	tests
 SUBDIR.${MK_UNBOUND}+=	libunbound
 SUBDIR.${MK_USB}+=	libusbhid libusb
