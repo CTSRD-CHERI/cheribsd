@@ -58,7 +58,17 @@
 #endif
 
 /* Alias for link register x30 */
+#ifdef __CHERI_PURE_CAPABILITY__
+#define	REG_WIDTH	16
+#define	REGN(n)		c ## n
+#define	REG(n)		c ## n
+#define	clr		c30
+#else
+#define	REG_WIDTH	8
+#define	REGN(n)		n
+#define	REG(n)		x ## n
 #define	lr		x30
+#endif
 
 /*
  * Switch into C64 mode to use instructions only available in Morello.
