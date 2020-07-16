@@ -84,6 +84,8 @@ __FBSDID("$FreeBSD$");
 #include <sys/vmem.h>
 #include <sys/vmmeter.h>
 
+#include <cheri/cheric.h>
+
 #include <vm/vm.h>
 #include <vm/vm_param.h>
 #include <vm/vm_kern.h>
@@ -150,7 +152,7 @@ vm_mem_init(void *dummy)
 void
 vm_ksubmap_init(struct kva_md_info *kmi)
 {
-	vm_offset_t firstaddr;
+	vm_pointer_t firstaddr;
 	caddr_t v;
 	vm_size_t size = 0;
 	long physmem_est;
@@ -210,36 +212,45 @@ again:
 		panic("startup: table size inconsistency");
 
 	/*
-	 * Allocate the clean map to hold all of I/O virtual memory.
-	 */
-	size = (long)nbuf * BKVASIZE + (long)bio_transient_maxcnt * MAXPHYS;
-	kmi->clean_sva = firstaddr = kva_alloc(size);
-	kmi->clean_eva = firstaddr + size;
-
-	/*
 	 * Allocate the buffer arena.
 	 *
 	 * Enable the quantum cache if we have more than 4 cpus.  This
 	 * avoids lock contention at the expense of some fragmentation.
 	 */
 	size = (long)nbuf * BKVASIZE;
-	kmi->buffer_sva = firstaddr;
+#ifdef __CHERI_PURE_CAPABILITY__
+	size = CHERI_REPRESENTABLE_LENGTH(size);
+#endif
+	firstaddr = kva_alloc(size);
+#ifdef __CHERI_PURE_CAPABILITY__
+	KASSERT(cheri_getlen(firstaddr) == size,
+	    ("Inexact bounds expected %zx found %zx",
+	    (size_t)size, (size_t)cheri_getlen(firstaddr)));
+#endif
+	kmi->buffer_sva = (vm_offset_t)firstaddr;
 	kmi->buffer_eva = kmi->buffer_sva + size;
-	vmem_init(buffer_arena, "buffer arena", kmi->buffer_sva, size,
+	vmem_init(buffer_arena, "buffer arena", firstaddr, size,
 	    PAGE_SIZE, (mp_ncpus > 4) ? BKVASIZE * 8 : 0, 0);
-	firstaddr += size;
 
 	/*
 	 * And optionally transient bio space.
 	 */
 	if (bio_transient_maxcnt != 0) {
 		size = (long)bio_transient_maxcnt * MAXPHYS;
+#ifdef __CHERI_PURE_CAPABILITY__
+		size = CHERI_REPRESENTABLE_LENGTH(size);
+#endif
+		firstaddr = kva_alloc(size);
+#ifdef __CHERI_PURE_CAPABILITY__
+		KASSERT(cheri_getlen(firstaddr) == size,
+		    ("Inexact bounds expected %zx found %zx",
+		    (size_t)size, (size_t)cheri_getlen(firstaddr)));
+#endif
+		kmi->transient_sva = (vm_offset_t)firstaddr;
+		kmi->transient_eva = kmi->transient_sva + size;
 		vmem_init(transient_arena, "transient arena",
 		    firstaddr, size, PAGE_SIZE, 0, 0);
-		firstaddr += size;
 	}
-	if (firstaddr != kmi->clean_eva)
-		panic("Clean map calculation incorrect");
 
 	/*
 	 * Allocate the pageable submaps.  We may cache an exec map entry per
