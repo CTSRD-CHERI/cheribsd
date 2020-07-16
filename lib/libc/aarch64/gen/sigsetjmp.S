@@ -43,7 +43,7 @@ END(sigsetjmp)
 ENTRY(siglongjmp)
 	/* Load the _setjmp magic */
 	ldr	x2, .Lmagic
-	ldr	x3, [x0]
+	ldr	x3, [REG(0)]
 
 	/* Check the magic */
 	cmp	x2, x3
