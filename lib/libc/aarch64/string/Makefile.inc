@@ -4,6 +4,7 @@
 # https://git.linaro.org/toolchain/cortex-strings.git
 #
 
+.if !${MACHINE_ABI:Mpurecap}
 .PATH: ${SRCTOP}/contrib/cortex-strings/src/aarch64
 
 MDSRCS+= \
@@ -22,4 +23,5 @@ MDSRCS+= \
 MDSRCS+= \
 	memcpy.S \
 	memmove.S
+.endif
 .endif
