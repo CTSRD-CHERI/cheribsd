@@ -29,9 +29,11 @@ SRCS_EXC+=	Unwind-EHABI.cpp
 SRCS_EXC+=	Unwind-sjlj.c
 SRCS_EXC+=	UnwindLevel1-gcc-ext.c
 SRCS_EXC+=	UnwindLevel1.c
+.if ${MACHINE_ARCH} != "morello"
 SRCS_EXC+=	UnwindRegistersRestore.S
 SRCS_EXC+=	UnwindRegistersSave.S
 SRCS_EXC+=	libunwind.cpp
+.endif
 
 SRCS+=		${SRCS_EXC}
 .for file in ${SRCS_EXC:M*.c}
