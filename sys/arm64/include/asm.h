@@ -58,7 +58,16 @@
 #endif
 
 /* Alias for link register x30 */
+#ifdef __CHERI_PURE_CAPABILITY__
+#define	REG_WIDTH	16
+#define	REG(n)		c ## n
+#define	lr		c30
+#define	sp		csp
+#else
+#define	REG_WIDTH	8
+#define	REG(n)		x ## n
 #define	lr		x30
+#endif
 
 /*
  * Sets the trap fault handler. The exception handler will return to the
