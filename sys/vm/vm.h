@@ -139,9 +139,13 @@ typedef struct vm_reserv *vm_reserv_t;
 struct kva_md_info {
 	vm_offset_t	buffer_sva;
 	vm_offset_t	buffer_eva;
-	vm_offset_t	clean_sva;
-	vm_offset_t	clean_eva;
+	vm_offset_t	transient_sva;
+	vm_offset_t	transient_eva;
 };
+
+#define VA_IS_CLEANMAP(va)					\
+	(((va) >= kmi.buffer_sva && ((va) < kmi.buffer_eva)) ||	\
+	 ((va) >= kmi.transient_sva && ((va) < kmi.transient_eva)))
 
 extern struct kva_md_info	kmi;
 extern void vm_ksubmap_init(struct kva_md_info *);
@@ -160,3 +164,12 @@ void swapper(void);
 
 #endif				/* VM_H */
 
+// CHERI CHANGES START
+// {
+//   "updated": 20200804,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "support"
+//   ]
+// }
+// CHERI CHANGES END

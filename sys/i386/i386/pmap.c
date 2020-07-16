@@ -3659,7 +3659,7 @@ __CONCAT(PMTYPE, enter)(pmap_t pmap, vm_offset_t va, vm_page_t m,
 	    ("pmap_enter: invalid to pmap_enter into trampoline (va: 0x%x)",
 	    va));
 	KASSERT(pmap != kernel_pmap || (m->oflags & VPO_UNMANAGED) != 0 ||
-	    va < kmi.clean_sva || va >= kmi.clean_eva,
+	    !VA_IS_CLEANMAP(va),
 	    ("pmap_enter: managed mapping within the clean submap"));
 	if ((m->oflags & VPO_UNMANAGED) == 0)
 		VM_PAGE_OBJECT_BUSY_ASSERT(m);
@@ -4113,8 +4113,8 @@ pmap_enter_quick_locked(pmap_t pmap, vm_offset_t va, vm_page_t m,
 {
 	pt_entry_t newpte, *pte;
 
-	KASSERT(pmap != kernel_pmap || va < kmi.clean_sva ||
-	    va >= kmi.clean_eva || (m->oflags & VPO_UNMANAGED) != 0,
+	KASSERT(pmap != kernel_pmap || !VA_IS_CLEANMAP(va) ||
+	    (m->oflags & VPO_UNMANAGED) != 0,
 	    ("pmap_enter_quick_locked: managed mapping within the clean submap"));
 	rw_assert(&pvh_global_lock, RA_WLOCKED);
 	PMAP_LOCK_ASSERT(pmap, MA_OWNED);
@@ -6410,3 +6410,13 @@ struct pmap_methods __CONCAT(PMTYPE, methods) = {
 	PMM(kremove)
 	PMM(sysctl_kmaps)
 };
+
+// CHERI CHANGES START
+// {
+//   "updated": 20200804,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "support"
+//   ]
+// }
+// CHERI CHANGES END

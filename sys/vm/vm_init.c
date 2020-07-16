@@ -152,8 +152,8 @@ vm_mem_init(void *dummy)
 void
 vm_ksubmap_init(struct kva_md_info *kmi)
 {
-	caddr_t firstaddr;
-	caddr_t v, tmpaddr;
+	vm_ptr_t firstaddr;
+	caddr_t v;
 	vm_size_t size = 0;
 	long physmem_est;
 	vm_ptr_t minaddr;
@@ -174,7 +174,7 @@ vm_ksubmap_init(struct kva_md_info *kmi)
 	 */
 	firstaddr = 0;
 again:
-	v = firstaddr;
+	v = (caddr_t)firstaddr;
 
 	/*
 	 * Discount the physical memory larger than the size of kernel_map
@@ -195,12 +195,11 @@ again:
 		 * Try to protect 32-bit DMAable memory from the largest
 		 * early alloc of wired mem.
 		 */
-		firstaddr = (caddr_t)kmem_alloc_attr(size, M_ZERO | M_NOWAIT,
+		firstaddr = kmem_alloc_attr(size, M_ZERO | M_NOWAIT,
 		    (vm_paddr_t)1 << 32, ~(vm_paddr_t)0, VM_MEMATTR_DEFAULT);
 		if (firstaddr == 0)
 #endif
-			firstaddr = (caddr_t)kmem_malloc(size,
-			    M_ZERO | M_WAITOK);
+			firstaddr = kmem_malloc(size, M_ZERO | M_WAITOK);
 		if (firstaddr == 0)
 			panic("startup: no room for tables");
 		goto again;
@@ -213,59 +212,37 @@ again:
 		panic("startup: table size inconsistency");
 
 	/*
-	 * Allocate the clean map to hold all of I/O virtual memory.
-	 * Note that on CHERI we need to separately align each region
-	 * for representability.
-	 */
-#ifdef CHERI_PURECAP_KERNEL
-	size = CHERI_REPRESENTABLE_LENGTH((long)nbuf * BKVASIZE) +
-	    CHERI_REPRESENTABLE_LENGTH((long)bio_transient_maxcnt * MAXPHYS);
-#else
-	size = (long)nbuf * BKVASIZE + (long)bio_transient_maxcnt * MAXPHYS;
-#endif
-	firstaddr = (caddr_t)kva_alloc(size);
-	kmi->clean_sva = (vm_offset_t)firstaddr;
-	kmi->clean_eva = kmi->clean_sva + size;
-
-	/*
 	 * Allocate the buffer arena.
 	 *
 	 * Enable the quantum cache if we have more than 4 cpus.  This
 	 * avoids lock contention at the expense of some fragmentation.
 	 */
-#ifdef CHERI_PURECAP_KERNEL
-	size = CHERI_REPRESENTABLE_LENGTH((long)nbuf * BKVASIZE);
-	tmpaddr = cheri_setbounds(firstaddr, size);
-	CHERI_VM_ASSERT_EXACT(tmpaddr, size);
-#else
 	size = (long)nbuf * BKVASIZE;
-	tmpaddr = firstaddr;
+#ifdef __CHERI_PURE_CAPABILITY__
+	size = CHERI_REPRESENTABLE_LENGTH(size);
 #endif
-	kmi->buffer_sva = (vm_offset_t)tmpaddr;
+	firstaddr = kva_alloc(size);
+	CHERI_VM_ASSERT_EXACT(firstaddr, size);
+	kmi->buffer_sva = (vm_offset_t)firstaddr;
 	kmi->buffer_eva = kmi->buffer_sva + size;
-	vmem_init(buffer_arena, "buffer arena", (vm_ptr_t)tmpaddr, size,
+	vmem_init(buffer_arena, "buffer arena", firstaddr, size,
 	    PAGE_SIZE, (mp_ncpus > 4) ? BKVASIZE * 8 : 0, 0);
-	firstaddr += size;
 
 	/*
 	 * And optionally transient bio space.
 	 */
 	if (bio_transient_maxcnt != 0) {
-#ifdef CHERI_PURECAP_KERNEL
-		size = CHERI_REPRESENTABLE_LENGTH(
-		    (long)bio_transient_maxcnt * MAXPHYS);
-		tmpaddr = cheri_setbounds(firstaddr, size);
-		CHERI_VM_ASSERT_EXACT(tmpaddr, size);
-#else
 		size = (long)bio_transient_maxcnt * MAXPHYS;
-		tmpaddr = firstaddr;
+#ifdef __CHERI_PURE_CAPABILITY__
+		size = CHERI_REPRESENTABLE_LENGTH(size);
 #endif
+		firstaddr = kva_alloc(size);
+		CHERI_VM_ASSERT_EXACT(firstaddr, size);
+		kmi->transient_sva = (vm_offset_t)firstaddr;
+		kmi->transient_eva = kmi->transient_sva + size;
 		vmem_init(transient_arena, "transient arena",
-		    (vm_ptr_t)tmpaddr, size, PAGE_SIZE, 0, 0);
-		firstaddr += size;
+		    firstaddr, size, PAGE_SIZE, 0, 0);
 	}
-	if ((vm_offset_t)firstaddr != kmi->clean_eva)
-		panic("Clean map calculation incorrect");
 
 	/*
 	 * Allocate the pageable submaps.  We may cache an exec map entry per
