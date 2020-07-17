@@ -432,9 +432,9 @@ int main(argc,argv)
 	else if (opts & OPT_STATETOP)
 		topipstates(saddr, daddr, sport, dport, protocol,
 #ifdef	USE_INET6
-			    use_inet6 && !use_inet4 ? 6 : 4,
+		use_inet6 && use_inet4 ? 0 : use_inet6 && !use_inet4 ? 6 : 4,
 #else
-			    4,
+		4,
 #endif
 #endif
 			    refreshtime, topclosed, filter);
@@ -1378,7 +1378,7 @@ static void topipstates(saddr, daddr, sport, dport, protocol, ver,
 			if (ipsstp->iss_list == NULL)
 				break;
 
-			if (ips.is_v != ver)
+			if (ver != 0 && ips.is_v != ver)
 				continue;
 
 			if ((filter != NULL) &&
