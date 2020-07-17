@@ -81,7 +81,9 @@ _tftp-proxy=	tftp-proxy
 _rtld-elf=	rtld-elf rtld-elf-debug
 SUBDIR.${MK_LIB32}+=	rtld-elf32
 SUBDIR.${MK_LIB64}+=	rtld-elf64
+.if ${MACHINE} != "arm64"
 SUBDIR.${MK_COMPAT_CHERIABI}+=	rtld-cheri-elf rtld-cheri-elf-debug
+.endif
 .endif
 
 .if ${MK_RBOOTD} != "no"
