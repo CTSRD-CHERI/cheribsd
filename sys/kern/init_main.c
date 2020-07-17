@@ -389,6 +389,24 @@ SYSINIT(diagwarn2, SI_SUB_LAST, SI_ORDER_FIFTH,
     print_caddr_t, diag_warn);
 #endif
 
+#ifdef ENABLE_PAST_LOCAL_VULNERABILITIES
+static char local_vuln_warn[] =
+    "WARNING: ENABLE_PAST_LOCAL_VULNERABILITIES option enabled.\nWARNING: Kernel contains locally-exploitable vulnerabilities.\n";
+SYSINIT(localvulnwarn, SI_SUB_COPYRIGHT, SI_ORDER_SIXTH,
+    print_caddr_t, local_vuln_warn);
+SYSINIT(localvulnwarn2, SI_SUB_LAST, SI_ORDER_SIXTH,
+    print_caddr_t, local_vuln_warn);
+#endif
+
+#ifdef ENABLE_PAST_REMOTE_VULNERABILITIES
+static char remote_vuln_warn[] =
+    "WARNING: ENABLE_PAST_REMOTE_VULNERABILITIES option enabled.\nWARNING: Kernel contains remotely-exploitable vulnerabilities!!!\n";
+SYSINIT(remotevulnwarn, SI_SUB_COPYRIGHT, SI_ORDER_SEVENTH,
+    print_caddr_t, remote_vuln_warn);
+SYSINIT(remotevulnwarn2, SI_SUB_LAST, SI_ORDER_SEVENTH,
+    print_caddr_t, remote_vuln_warn);
+#endif
+
 static int
 null_fetch_syscall_args(struct thread *td __unused)
 {
