@@ -1333,7 +1333,12 @@ itimer_find(struct proc *p, int timerid)
 
 	PROC_LOCK_ASSERT(p, MA_OWNED);
 	if ((p->p_itimers == NULL) ||
+#ifdef ENABLE_PAST_LOCAL_VULNERABILITIES
+	    /* FreeBSD-SA-09:06.ktimer */
+	    (timerid >= TIMER_MAX) ||
+#else
 	    (timerid < 0) || (timerid >= TIMER_MAX) ||
+#endif
 	    (it = p->p_itimers->its_timers[timerid]) == NULL) {
 		return (NULL);
 	}
