@@ -1021,3 +1021,15 @@ CPU_CHERI	opt_global.h
 # Disable system-call authorisation for compartmentalised user code.
 #
 CPU_CHERI_NO_SYSCALL_AUTHORIZE opt_global.h
+
+#
+# Enable resurected bugs for purecap kernel testing.  These vulnerabilities
+# are expected to be defeated by spatial memory safety.  The LOCAL ones
+# are believe to require local access such as a maliciously constructed
+# system call.  REMOTE ones may require a service (e.g. an nfs server) to
+# be configured.
+#
+# DO NOT ENABLE except in a controlled environment for research purposes.
+#
+ENABLE_PAST_LOCAL_VULNERABILITIES	opt_global.h
+ENABLE_PAST_REMOTE_VULNERABILITIES	opt_global.h
