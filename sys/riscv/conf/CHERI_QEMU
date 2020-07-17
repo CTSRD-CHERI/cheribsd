@@ -1,6 +1,3 @@
 #NO_UNIVERSE
 
-include "QEMU"
-include "std.CHERI"
-
-ident CHERI_QEMU
+include "CHERI-QEMU"
