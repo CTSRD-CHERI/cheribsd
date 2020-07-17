@@ -274,7 +274,7 @@ struct xo_handle_s {
     void *xo_private;		/* Private data for external encoders */
 };
 
-#ifdef __CHERI_PURE_CAPABILITY__
+#if defined(__CHERI_PURE_CAPABILITY__) && !defined(__aarch64__)
 #include <cheri/cheric.h>
 /*
  * We know that the purecap ABI represents a va_list as a single capabilty.
@@ -2931,7 +2931,7 @@ xo_format_string (xo_handle_t *xop, xo_buffer_t *xbp, xo_xff_flags_t flags,
 {
     static char null[] = "(null)";
     static char null_no_quotes[] = "null";
-#ifndef __CHERI_PURE_CAPABILITY__
+#if !defined(__CHERI_PURE_CAPABILITY__) || defined(__aarch64__)
     (void)fmt;
 #endif
 
