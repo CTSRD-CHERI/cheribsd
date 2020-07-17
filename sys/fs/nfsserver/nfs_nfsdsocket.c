@@ -828,6 +828,12 @@ nfsrvd_compound(struct nfsrv_descript *nd, int isdgram, u_char *tag,
 		*repp = *tl;
 		op = fxdr_unsigned(int, *tl);
 		NFSD_DEBUG(4, "op=%d\n", op);
+#ifdef ENABLE_PAST_REMOTE_VULNERABILITIES
+		/* FreeBSD-SA-18:13.nfs */
+		binuptime(&start_time);
+		nfsrvd_statstart(op, &start_time);
+		statsinprog = 1;
+#endif
 		if (op < NFSV4OP_ACCESS || op >= NFSV42_NOPS ||
 		    (op >= NFSV4OP_NOPS && (nd->nd_flag & ND_NFSV41) == 0) ||
 		    (op >= NFSV41_NOPS && (nd->nd_flag & ND_NFSV42) == 0)) {
@@ -840,9 +846,11 @@ nfsrvd_compound(struct nfsrv_descript *nd, int isdgram, u_char *tag,
 			repp++;
 		}
 
+#ifndef ENABLE_PAST_REMOTE_VULNERABILITIES
 		binuptime(&start_time);
 		nfsrvd_statstart(op, &start_time);
 		statsinprog = 1;
+#endif
 
 		if (i == 0)
 			op0 = op;
