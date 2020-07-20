@@ -97,6 +97,7 @@ struct image_params {
 	bool credential_setid;		/* true if becoming setid */
 	bool textset;
 	u_int map_flags;
+	void * __capability imgact_capability;	/* copyout and mapping cap */
 };
 
 #ifdef _KERNEL
