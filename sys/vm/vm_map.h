@@ -387,6 +387,7 @@ vm_ptr_t vm_map_make_ptr(vm_map_t map, vm_offset_t addr, vm_size_t size, vm_prot
 #define	MAP_CREATE_STACK_GAP_DN	0x00020000
 #define	MAP_VN_EXEC		0x00040000
 #define MAP_CREATE_UNMAPPED	0x00080000
+#define	MAP_CHERI_NOEXACT	0x00100000
 
 /*
  * vm_fault option flags
@@ -475,7 +476,7 @@ int vm_map_find(vm_map_t, vm_object_t, vm_ooffset_t, vm_ptr_t *, vm_size_t,
     vm_offset_t, int, vm_prot_t, vm_prot_t, int);
 int vm_map_find_min(vm_map_t, vm_object_t, vm_ooffset_t, vm_ptr_t *,
     vm_size_t, vm_offset_t, vm_offset_t, int, vm_prot_t, vm_prot_t, int);
-int vm_map_fixed(vm_map_t, vm_object_t, vm_ooffset_t, vm_offset_t, vm_size_t,
+int vm_map_fixed(vm_map_t, vm_object_t, vm_ooffset_t, vm_ptr_t, vm_size_t,
     vm_prot_t, vm_prot_t, int);
 vm_offset_t vm_map_findspace(vm_map_t, vm_offset_t, vm_size_t);
 int vm_map_inherit (vm_map_t, vm_offset_t, vm_offset_t, vm_inherit_t);

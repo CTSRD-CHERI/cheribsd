@@ -1993,12 +1993,23 @@ vm_map_findspace(vm_map_t map, vm_offset_t start, vm_size_t length)
 
 int
 vm_map_fixed(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
-    vm_offset_t start, vm_size_t length, vm_prot_t prot,
+    vm_ptr_t start, vm_size_t length, vm_prot_t prot,
     vm_prot_t max, int cow)
 {
 	vm_map_entry_t entry;
-	vm_offset_t end, reservation;
+	vm_ptr_t end, reservation;
 	int result;
+
+	CHERI_ASSERT_VALID(start);
+	KASSERT((cheri_getlen((void *)start) >= length),
+	    ("vm_map_fixed: source capability is too small"));
+	if ((cow & MAP_CHERI_NOEXACT) == 0) {
+		KASSERT((cheri_getlen((void *)start) >=
+		    CHERI_REPRESENTABLE_LENGTH(length)),
+		    ("vm_map_fixed: source capability is too small"));
+		KASSERT((CHERI_REPRESENTABLE_ALIGNMENT(length) != 0),
+		    ("vm_map_fixed: requested mapping is not representable"));
+	}
 
 	end = start + length;
 	KASSERT((cow & (MAP_STACK_GROWS_DOWN | MAP_STACK_GROWS_UP)) == 0 ||
@@ -2147,6 +2158,12 @@ vm_map_alignspace(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
  *
  *	If object is non-NULL, ref count must be bumped by caller
  *	prior to making call to account for the new entry.
+ *
+ *	In the purecap kernel we always promote the alignment
+ *	requirements to the cheri representable alignment.
+ *	It is currently assumed that cheri concentrate encoding does
+ *	not require the addition of extra flags to request sealable
+ *	and other forms of alignment.
  */
 int
 vm_map_find(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
@@ -2157,6 +2174,9 @@ vm_map_find(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 	vm_offset_t alignment, curr_min_addr, min_addr, vaddr;
 	int gap, pidx, rv, try;
 	bool cluster, en_aslr, update_anon;
+#ifdef CHERI_PURECAP_KERNEL
+	const vm_size_t unpadded_length = length;
+#endif
 
 	KASSERT((cow & (MAP_STACK_GROWS_DOWN | MAP_STACK_GROWS_UP)) == 0 ||
 	    object == NULL,
@@ -2173,6 +2193,14 @@ vm_map_find(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 		alignment = (vm_offset_t)1 << (find_space >> 8);
 	} else
 		alignment = 0;
+
+#ifdef CHERI_PURECAP_KERNEL
+	/* XXX-AM: RACCT */
+	length = CHERI_REPRESENTABLE_LENGTH(length);
+	alignment = MAX(alignment,
+	    CHERI_REPRESENTABLE_ALIGNMENT(unpadded_length));
+#endif
+
 	en_aslr = (map->flags & MAP_ASLR) != 0;
 	update_anon = cluster = clustering_anon_allowed(*addr) &&
 	    (map->flags & MAP_IS_SUB_MAP) == 0 && max_addr == 0 &&
@@ -2261,7 +2289,11 @@ again:
 			}
 		}
 
+#ifdef CHERI_PURECAP_KERNEL
+		if (alignment != 0 &&
+#else
 		if (find_space != VMFS_ANY_SPACE &&
+#endif
 		    (rv = vm_map_alignspace(map, object, offset, &vaddr, length,
 		    max_addr, alignment)) != KERN_SUCCESS) {
 			if (find_space == VMFS_OPTIMAL_SPACE) {
@@ -2286,16 +2318,29 @@ again:
 		rv = vm_map_stack_locked(map, vaddr, length, sgrowsiz, prot,
 		    max, cow);
 	} else {
+#ifdef CHERI_PURECAP_KERNEL
+		rv = vm_map_insert(map, object, offset, vaddr,
+		    vaddr + unpadded_length, prot, max, cow, vaddr);
+#else
 		rv = vm_map_insert(map, object, offset, vaddr, vaddr + length,
 		    prot, max, cow, vaddr);
+#endif
 	}
 	if (rv == KERN_SUCCESS && update_anon)
 		map->anon_loc = vaddr + length;
 done:
 	vm_map_unlock(map);
 	if (rv == KERN_SUCCESS) {
-		*addr = vm_map_make_ptr(map, vaddr, length, prot);
-		CHERI_ASSERT_VALID(*addr);
+#ifdef CHERI_PURECAP_KERNEL
+		void *mapped = cheri_setboundsexact(
+		    cheri_setaddress(map->map_capability, vaddr), length);
+		mapped = cheri_andperm(mapped, vm_prot_to_cheri(prot));
+		CHERI_ASSERT_VALID(mapped);
+		*addr = (vm_ptr_t)mapped;
+
+#else
+		*addr = vaddr;
+#endif
 	}
 	return (rv);
 }

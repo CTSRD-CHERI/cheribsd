@@ -1048,6 +1048,7 @@ exec_new_vmspace(struct image_params *imgp, struct sysentvec *sv)
 	vm_offset_t sv_minuser, stack_addr;
 	vm_map_t map;
 	u_long ssiz;
+        vm_ptr_t shared_page_addr;
 
 	imgp->vmspace_destroyed = 1;
 	imgp->sysent = sv;
@@ -1108,11 +1109,15 @@ exec_new_vmspace(struct image_params *imgp, struct sysentvec *sv)
 	obj = sv->sv_shared_page_obj;
 	if (obj != NULL) {
 		vm_object_reference(obj);
+                shared_page_addr = (vm_ptr_t)cheri_setbounds(
+		    cheri_setaddress(vm_map_rootcap(map),
+			sv->sv_shared_page_base), sv->sv_shared_page_len);
 		error = vm_map_fixed(map, obj, 0,
-		    sv->sv_shared_page_base, sv->sv_shared_page_len,
+		    shared_page_addr, sv->sv_shared_page_len,
 		    VM_PROT_READ | VM_PROT_EXECUTE,
 		    VM_PROT_READ | VM_PROT_EXECUTE,
-		    MAP_INHERIT_SHARE | MAP_ACC_NO_CHARGE);
+		    MAP_INHERIT_SHARE | MAP_ACC_NO_CHARGE |
+		    MAP_CHERI_NOEXACT);
 		if (error != KERN_SUCCESS) {
 			vm_object_deallocate(obj);
 			return (vm_mmap_to_errno(error));
