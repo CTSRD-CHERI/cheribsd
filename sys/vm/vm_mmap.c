@@ -796,6 +796,19 @@ kern_mmap_req(struct thread *td, struct mmap_req *mrp)
 			    lim_max(td, RLIMIT_DATA));
 	}
 
+#ifdef CHERI_PURECAP_KERNEL
+	/*
+	 * If MAP_FIXED with an invalid cap as a hint,
+	 * build a capability for the hinted mapping from the
+	 * designated source_cap.
+	 * XXX-AM: should check cheri_is_null_derived() instead of
+	 * just untagged.
+	 */
+	if ((flags & MAP_FIXED) && cheri_gettag((void *)addr) == 0) {
+		addr = (vm_ptr_t)cheri_setaddress(mrp->mr_source_cap, addr);
+	}
+#endif
+
 #if __has_feature(capabilities)
 	if (padded_size != 0) {
 		KASSERT(size != padded_size,
@@ -2069,22 +2082,24 @@ vm_mmap_object(vm_map_t map, vm_ptr_t *addr, vm_offset_t max_addr,
 {
 	boolean_t curmap, fitit;
 	int docow, error, findspace, rv;
+	vm_size_t padded_size;
 
 	CHERI_ASSERT_PTRSIZE_BOUNDS(addr);
 
 	curmap = map == &td->td_proc->p_vmspace->vm_map;
 	if (curmap) {
+		padded_size = CHERI_REPRESENTABLE_LENGTH(size);
 		RACCT_PROC_LOCK(td->td_proc);
-		if (map->size + size > lim_cur(td, RLIMIT_VMEM)) {
+		if (map->size + padded_size > lim_cur(td, RLIMIT_VMEM)) {
 			RACCT_PROC_UNLOCK(td->td_proc);
 			return (ENOMEM);
 		}
-		if (racct_set(td->td_proc, RACCT_VMEM, map->size + size)) {
+		if (racct_set(td->td_proc, RACCT_VMEM, map->size + padded_size)) {
 			RACCT_PROC_UNLOCK(td->td_proc);
 			return (ENOMEM);
 		}
 		if (!old_mlock && map->flags & MAP_WIREFUTURE) {
-			if (ptoa(pmap_wired_count(map->pmap)) + size >
+			if (ptoa(pmap_wired_count(map->pmap)) + padded_size >
 			    lim_cur(td, RLIMIT_MEMLOCK)) {
 				racct_set_force(td->td_proc, RACCT_VMEM,
 				    map->size);
@@ -2092,7 +2107,7 @@ vm_mmap_object(vm_map_t map, vm_ptr_t *addr, vm_offset_t max_addr,
 				return (ENOMEM);
 			}
 			error = racct_set(td->td_proc, RACCT_MEMLOCK,
-			    ptoa(pmap_wired_count(map->pmap)) + size);
+			    ptoa(pmap_wired_count(map->pmap)) + padded_size);
 			if (error != 0) {
 				racct_set_force(td->td_proc, RACCT_VMEM,
 				    map->size);
@@ -2175,15 +2190,6 @@ vm_mmap_object(vm_map_t map, vm_ptr_t *addr, vm_offset_t max_addr,
 			return (ENOMEM);
 		rv = vm_map_fixed(map, object, foff, *addr, size,
 		    prot, maxprot, docow);
-#ifdef CHERI_PURECAP_KERNEL
-		/*
-		 * In this case *addr is not changed by vm_map_fixed but we
-		 * need to return a valid capability for the mapping, so
-		 * we make one.
-		 */
-		if (rv == KERN_SUCCESS)
-			*addr = vm_map_make_ptr(map, *addr, size, prot);
-#endif
 	}
 
 	if (rv == KERN_SUCCESS) {
