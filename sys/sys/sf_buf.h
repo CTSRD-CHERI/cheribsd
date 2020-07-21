@@ -116,7 +116,7 @@ static inline vm_ptr_t
 sf_buf_kva(struct sf_buf *sf)
 {
 	if (PMAP_HAS_DMAP)
-		return ((vm_ptr_t)cheri_setbounds(
+		return ((vm_ptr_t)cheri_kern_setbounds(
 		    PHYS_TO_DMAP(VM_PAGE_TO_PHYS((vm_page_t)sf)),
 		    PAGE_SIZE));
 

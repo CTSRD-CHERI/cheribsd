@@ -100,7 +100,7 @@ sf_buf_init(void *arg)
 	sf_bufs = malloc(nsfbufs * sizeof(struct sf_buf), M_TEMP,
 	    M_WAITOK | M_ZERO);
 	for (i = 0; i < nsfbufs; i++) {
-		sf_bufs[i].kva = (vm_ptr_t)cheri_setbounds(
+		sf_bufs[i].kva = (vm_ptr_t)cheri_kern_setbounds(
 		    sf_base + i * PAGE_SIZE, PAGE_SIZE);
 		TAILQ_INSERT_TAIL(&sf_buf_freelist, &sf_bufs[i], free_entry);
 	}

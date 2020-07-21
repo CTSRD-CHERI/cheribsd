@@ -1680,7 +1680,7 @@ startup_alloc(uma_zone_t zone, vm_size_t bytes, int domain, uint8_t *pflag,
 	if ((wait & M_ZERO) != 0)
 		bzero(mem, pages * PAGE_SIZE);
 
-	return (cheri_setboundsexact(mem, bytes));
+	return (cheri_kern_setboundsexact(mem, bytes));
 }
 
 static void
@@ -1859,7 +1859,7 @@ noobj_alloc(uma_zone_t zone, vm_size_t bytes, int domain, uint8_t *flags,
 	}
 
 	CHERI_ASSERT_VALID(retkva);
-	return (cheri_setboundsexact((void *)retkva, bytes));
+	return (cheri_kern_setboundsexact((void *)retkva, bytes));
 }
 
 /*
@@ -3717,7 +3717,7 @@ slab_alloc_item(uma_keg_t keg, uma_slab_t slab)
 		LIST_REMOVE(slab, us_link);
 		LIST_INSERT_HEAD(&dom->ud_full_slab, slab, us_link);
 	}
-	item = cheri_setboundsexact(item, keg->uk_size);
+	item = cheri_kern_setboundsexact(item, keg->uk_size);
 
 	return (item);
 }
@@ -4024,7 +4024,7 @@ zone_alloc_item(uma_zone_t zone, void *udata, int domain, int flags)
 
 	if (zone->uz_import(zone->uz_arg, &item, 1, domain, flags) != 1)
 		goto fail_cnt;
-	item = cheri_setbounds(item, zone->uz_size);
+	item = cheri_kern_setbounds(item, zone->uz_size);
 
 	/*
 	 * We have to call both the zone's init (not the keg's init)

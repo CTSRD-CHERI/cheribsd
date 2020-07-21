@@ -1147,11 +1147,11 @@ kern_vfs_bio_buffer_alloc(caddr_t v, long physmem_est)
 	 * so we can not set bounds.
 	 * XXX-AM: this is hacky.
 	 */
-	if (!cheri_gettag(v)) {
+	if (!cheri_kern_gettag(v)) {
 	  return (v + nbuf * sizeof(*buf));
 	}
 
-	buf = (void *)cheri_setbounds(v, nbuf * sizeof(*buf));
+	buf = (void *)cheri_kern_setbounds(v, nbuf * sizeof(*buf));
 	v = (caddr_t)(v + nbuf * sizeof(*buf));
 
 	return(v);

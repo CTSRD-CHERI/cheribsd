@@ -493,13 +493,13 @@ link_elf_init(void* arg)
 		ctors_sizep = (Elf_Size *)preload_search_info(modptr,
 			MODINFO_METADATA | MODINFOMD_CTORS_SIZE);
 		if (ctors_addrp != NULL && ctors_sizep != NULL) {
-			linker_kernel_file->ctors_addr = cheri_setbounds(
+			linker_kernel_file->ctors_addr = cheri_kern_setbounds(
 				ef->address + *ctors_addrp, *ctors_sizep);
 			linker_kernel_file->ctors_size = *ctors_sizep;
 		}
 	}
 	/* Set the bounds on load address */
-	linker_kernel_file->address = cheri_setbounds(
+	linker_kernel_file->address = cheri_kern_setbounds(
 	    linker_kernel_file->address, linker_kernel_file->size);
 	(void)link_elf_preload_parse_symbols(ef);
 
@@ -587,9 +587,9 @@ parse_dynamic(elf_file_t ef)
 			    (ef->address + dp->d_un.d_ptr);
 			ef->nbuckets = hashtab[0];
 			ef->nchains = hashtab[1];
-			ef->buckets = cheri_setbounds(hashtab + 2,
+			ef->buckets = cheri_kern_setbounds(hashtab + 2,
 				ef->nbuckets * sizeof(Elf_Hashelt));
-			ef->chains = cheri_setbounds(hashtab + 2 + ef->nbuckets,
+			ef->chains = cheri_kern_setbounds(hashtab + 2 + ef->nbuckets,
 				ef->nchains * sizeof(Elf_Hashelt));
 			break;
 		}
@@ -651,18 +651,18 @@ parse_dynamic(elf_file_t ef)
 	 * If we are not a cheri kernel these are no-ops.
 	 */
 	if (ef->strtab)
-		ef->strtab = cheri_setbounds(ef->strtab, ef->strsz);
+		ef->strtab = cheri_kern_setbounds(ef->strtab, ef->strsz);
 	if (ef->rel)
-		ef->rel = cheri_setbounds(ef->rel,
+		ef->rel = cheri_kern_setbounds(ef->rel,
 		    ef->relsize * sizeof(*ef->rel));
 	if (ef->pltrel)
-		ef->pltrel = cheri_setbounds(ef->pltrel,
+		ef->pltrel = cheri_kern_setbounds(ef->pltrel,
 		    ef->pltrelsize * sizeof(*ef->pltrel));
 	if (ef->rela)
-		ef->rela = cheri_setbounds(ef->rela,
+		ef->rela = cheri_kern_setbounds(ef->rela,
 		    ef->relasize * sizeof(*ef->rela));
 	if (ef->symtab)
-		ef->symtab = cheri_setbounds(ef->symtab,
+		ef->symtab = cheri_kern_setbounds(ef->symtab,
 		    ef->nchains * sizeof(Elf_Sym));
 	/*
 	 * XXX-AM: How do we get .got size?

@@ -78,7 +78,7 @@ uma_small_alloc(uma_zone_t zone, vm_size_t bytes, int domain, u_int8_t *flags,
 	pa = VM_PAGE_TO_PHYS(m);
 	if ((wait & M_NODUMP) == 0)
 		dump_add_page(pa);
-	va = cheri_setbounds((void *)MIPS_PHYS_TO_DIRECT(pa), bytes);
+	va = cheri_kern_setbounds((void *)MIPS_PHYS_TO_DIRECT(pa), bytes);
 	if ((wait & M_ZERO) && (m->flags & PG_ZERO) == 0)
 		bzero(va, PAGE_SIZE);
 	return (va);

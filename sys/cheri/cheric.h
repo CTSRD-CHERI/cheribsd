@@ -283,12 +283,6 @@ cheri_bytes_remaining(const void * __capability cap)
 	fprintf(f, _CHERI_PRINT_PTR_FMT(ptr))
 
 #else /* ! (__has_feature(capabilities) || defined(__CHERI__)) */
-#define	cheri_gettag(x)			(1)
-#define	cheri_setbounds(x, y)		(x)
-#define	cheri_setboundsexact(x, y)	(x)
-#define	cheri_setaddress(x, y)	((void *)(y))
-#define	cheri_getaddress(x)	((uintptr_t)(x))
-
 #ifdef _KERNEL
 #define	CHERI_ASSERT_VALID(ptr)
 #define	CHERI_ASSERT_BOUNDS(ptr, expect)
@@ -296,6 +290,21 @@ cheri_bytes_remaining(const void * __capability cap)
 #define	CHERI_ASSERT_PTRSIZE_BOUNDS(ptr)
 #endif
 #endif /* ! (__has_feature(capabilities) || defined(__CHERI__)) */
+
+#if defined(_KERNEL) && defined(CHERI_PURECAP_KERNEL)
+#define	cheri_kern_gettag(x)		cheri_gettag(x)
+#define	cheri_kern_setbounds(x, y)	cheri_setbounds(x, y)
+#define	cheri_kern_setboundsexact(x, y)	cheri_setboundsexact(x, y)
+#define	cheri_kern_setaddress(x, y)	cheri_setaddress(x, y)
+#define	cheri_kern_getaddress(x)	cheri_setaddress(x)
+#else
+#define	cheri_kern_gettag(x)					\
+	(((x) == NULL || (vm_offset_t)(x) < 4096) ? 0 : 1)
+#define	cheri_kern_setbounds(x, y)	(x)
+#define	cheri_kern_setboundsexact(x, y)	(x)
+#define	cheri_kern_setaddress(x, y)	((__typeof__(x))(y))
+#define	cheri_kern_getaddress(x)	((uintptr_t)(x))
+#endif
 
 /*
  * The cheri_{get,set,clear}_low_pointer_bits() functions work both with and
