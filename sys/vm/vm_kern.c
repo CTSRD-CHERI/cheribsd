@@ -266,7 +266,7 @@ kmem_alloc_attr_domain(int domain, vm_size_t size, int flags, vm_paddr_t low,
 	}
 	VM_OBJECT_WUNLOCK(object);
 	CHERI_ASSERT_VALID(addr);
-	CHERI_ASSERT_XBOUNDS(addr, size);
+	CHERI_ASSERT_EXBOUNDS(addr, size);
 	return (addr);
 }
 
@@ -353,7 +353,7 @@ kmem_alloc_contig_domain(int domain, vm_size_t size, int flags, vm_paddr_t low,
 	}
 	VM_OBJECT_WUNLOCK(object);
 	CHERI_ASSERT_VALID(addr);
-	CHERI_ASSERT_XBOUNDS(addr, size);
+	CHERI_ASSERT_EXBOUNDS(addr, size);
 	return (addr);
 }
 

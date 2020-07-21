@@ -151,7 +151,7 @@ cheri_is_subset(const void * __capability parent, const void * __capability ptr)
 	} while (0)
 
 /* Check that bounds are exactly the given size */
-#define	CHERI_ASSERT_XBOUNDS(ptr, len) do {				\
+#define	CHERI_ASSERT_EXBOUNDS(ptr, len) do {				\
 		KASSERT(cheri_getlen((void *)ptr) == len,		\
 		    ("Inexact bounds on pointer in %s %s:%d "		\
 			"expected %lx, found %lx",			\
@@ -161,7 +161,7 @@ cheri_is_subset(const void * __capability parent, const void * __capability ptr)
 
 /* Check that bounds are exactly the size of a pointer */
 #define	CHERI_ASSERT_PTRSIZE_BOUNDS(ptr)		\
-	CHERI_ASSERT_XBOUNDS(ptr, sizeof(void *))
+	CHERI_ASSERT_EXBOUNDS(ptr, sizeof(void *))
 
 #endif
 
@@ -286,7 +286,7 @@ cheri_bytes_remaining(const void * __capability cap)
 #ifdef _KERNEL
 #define	CHERI_ASSERT_VALID(ptr)
 #define	CHERI_ASSERT_BOUNDS(ptr, expect)
-#define	CHERI_ASSERT_XBOUNDS(ptr, len)
+#define	CHERI_ASSERT_EXBOUNDS(ptr, len)
 #define	CHERI_ASSERT_PTRSIZE_BOUNDS(ptr)
 #endif
 #endif /* ! (__has_feature(capabilities) || defined(__CHERI__)) */

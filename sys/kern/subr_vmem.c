@@ -878,7 +878,7 @@ vmem_import(vmem_t *vm, vmem_size_t size, vmem_size_t align, int flags)
 	if (error)
 		return (ENOMEM);
 	CHERI_ASSERT_VALID(addr);
-	CHERI_ASSERT_XBOUNDS(addr, size);
+	CHERI_ASSERT_EXBOUNDS(addr, size);
 
 	vmem_add1(vm, addr, size, BT_TYPE_SPAN);
 
@@ -1537,7 +1537,7 @@ vmem_add(vmem_t *vm, vmem_addr_t addr, vmem_size_t size, int flags)
 {
 	int error;
 
-	CHERI_ASSERT_XBOUNDS(addr, size);
+	CHERI_ASSERT_EXBOUNDS(addr, size);
 
 	error = 0;
 	flags &= VMEM_FLAGS;

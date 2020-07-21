@@ -559,7 +559,7 @@ kern_shmat_locked(struct thread *td, int shmid,
 		return (ENOMEM);
 	}
 	CHERI_ASSERT_VALID(attach_addr);
-        // CHERI_ASSERT_XBOUNDS(attach_addr, size);
+        // CHERI_ASSERT_EXBOUNDS(attach_addr, size);
 
 	shmmap_s->va = attach_addr;
 	shmmap_s->shmid = shmid;
