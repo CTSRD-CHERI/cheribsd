@@ -99,7 +99,7 @@ find cheribsd-test-results
                 customGitCheckoutDir: 'cheribsd',
                 gitHubStatusContext: "ci/${suffix}",
                 // Delete stale compiler/sysroot
-                beforeBuild: { params -> dir('cherisdk') { deleteDir() }
+                beforeBuild: { params -> dir('cherisdk') { deleteDir() } },
                 /* Custom function to run tests since --test will not work (yet) */
                 runTests: false, afterBuild: { params -> buildImageAndRunTests(params, suffix) })
     }
