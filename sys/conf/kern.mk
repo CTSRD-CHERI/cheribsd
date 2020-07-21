@@ -265,6 +265,15 @@ CFLAGS+= -ftrivial-auto-var-init=pattern
 CFLAGS+=	-gdwarf-2
 .endif
 
+#
+# CHERI purecap kernel flags
+#
+.if ${MACHINE_ABI:Mpurecap}
+.ifdef CHERI_USE_CAP_TABLE
+CFLAGS+=	-cheri-cap-table-abi=${CHERI_USE_CAP_TABLE}
+.endif
+.endif
+
 CFLAGS+= ${CWARNFLAGS:M*} ${CWARNFLAGS.${.IMPSRC:T}}
 CFLAGS+= ${CWARNFLAGS.${COMPILER_TYPE}}
 CFLAGS+= ${CFLAGS.${COMPILER_TYPE}} ${CFLAGS.${.IMPSRC:T}}

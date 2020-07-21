@@ -12,10 +12,11 @@ machine		mips mips64c128
 
 nomakeoptions 	ARCH_FLAGS
 makeoptions 	ARCH_PIC_FLAGS="-fpic"
-makeoptions 	ARCH_FLAGS="-mcpu=cheri128 -cheri-cap-table-abi=plt -mxcaptable -Xclang -cheri-bounds=subobject-safe"
+makeoptions 	ARCH_FLAGS="-mcpu=cheri128 -mxcaptable -Xclang -cheri-bounds=subobject-safe"
 makeoptions 	CFLAGS+="-gdwarf-5"
 makeoptions 	WERROR="-Wno-error"
 makeoptions 	KERNLOADADDR=0xffffffff80100000
+makeoptions 	CHERI_USE_CAP_TABLE=plt
 makeoptions   LDSCRIPT_NAME=ldscript.mips.cheri
 
 # purecap kernel options
