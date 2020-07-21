@@ -91,7 +91,7 @@ find cheribsd-test-results
 
 ["mips-nocheri", "mips-hybrid", "mips-purecap", "riscv64", "riscv64-hybrid", "riscv64-purecap", "amd64", "aarch64"].each { suffix ->
     String name = "cheribsd-${suffix}"
-    jobs[suffix] = { ->        
+    jobs[suffix] = { ->
         cheribuildProject(target: "cheribsd-${suffix}", architecture: suffix,
                 extraArgs: '--cheribsd/build-options=-s --cheribsd/no-debug-info --keep-install-dir --install-prefix=/rootfs --cheribsd/build-tests',
                 skipArchiving: true, skipTarball: true,
