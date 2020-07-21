@@ -1048,7 +1048,7 @@ exec_new_vmspace(struct image_params *imgp, struct sysentvec *sv)
 	vm_offset_t sv_minuser, stack_addr;
 	vm_map_t map;
 	u_long ssiz;
-        vm_ptr_t shared_page_addr;
+	vm_ptr_t shared_page_addr;
 
 	imgp->vmspace_destroyed = 1;
 	imgp->sysent = sv;
