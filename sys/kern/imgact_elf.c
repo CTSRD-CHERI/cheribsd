@@ -523,10 +523,12 @@ static void * __capability
 __elfN(build_imgact_capability)(struct image_params *imgp, const Elf_Ehdr *hdr,
     const Elf_Phdr *phdr, u_long rbase)
 {
+	u_long perm = CHERI_PERM_STORE | CHERI_PERM_GLOBAL;
+#ifdef CHERI_PURECAP_KERNEL
+	perm |= CHERI_PERM_STORE_CAP;
+#endif
 
-	/* XXX-AM: Could use less permission */
-	return (cheri_capability_build_user_data(
-	    CHERI_CAP_USER_DATA_PERMS, CHERI_CAP_USER_DATA_BASE,
+	return (cheri_capability_build_user_data(perm, CHERI_CAP_USER_DATA_BASE,
 	    CHERI_CAP_USER_DATA_LENGTH, rbase));
 }
 
