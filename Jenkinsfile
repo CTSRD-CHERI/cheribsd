@@ -91,15 +91,15 @@ find cheribsd-test-results
 
 ["mips-nocheri", "mips-hybrid", "mips-purecap", "riscv64", "riscv64-hybrid", "riscv64-purecap", "amd64", "aarch64"].each { suffix ->
     String name = "cheribsd-${suffix}"
-    jobs[suffix] = { ->
-        // Delete stale compiler/sysroot
-        dir('cherisdk') { deleteDir() }
+    jobs[suffix] = { ->        
         cheribuildProject(target: "cheribsd-${suffix}", architecture: suffix,
                 extraArgs: '--cheribsd/build-options=-s --cheribsd/no-debug-info --keep-install-dir --install-prefix=/rootfs --cheribsd/build-tests',
                 skipArchiving: true, skipTarball: true,
                 sdkCompilerOnly: true, // We only need clang not the CheriBSD sysroot since we are building that.
                 customGitCheckoutDir: 'cheribsd',
                 gitHubStatusContext: "ci/${suffix}",
+                // Delete stale compiler/sysroot
+                beforeBuild: { params -> dir('cherisdk') { deleteDir() }
                 /* Custom function to run tests since --test will not work (yet) */
                 runTests: false, afterBuild: { params -> buildImageAndRunTests(params, suffix) })
     }
