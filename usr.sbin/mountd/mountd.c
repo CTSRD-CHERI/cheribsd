@@ -31,6 +31,17 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+// CHERI CHANGES START
+// {
+//   "updated": 20200721,
+//   "target_type": "prog"
+//   "changes": [
+//     "other"
+//   ],
+//   "change_comment": "Fix buffer underread"
+// }
+// CHERI CHANGES END
+
 
 #ifndef lint
 static const char copyright[] =
@@ -3141,7 +3152,7 @@ do_mount(struct exportlist *ep, struct grouplist *grp, int exflags,
 				/* back up over the last component */
 				while (*cp == '/' && cp > dirp)
 					cp--;
-				while (*(cp - 1) != '/' && cp > dirp)
+				while (cp > dirp && *(cp - 1) != '/')
 					cp--;
 				if (cp == dirp) {
 					if (debug)
