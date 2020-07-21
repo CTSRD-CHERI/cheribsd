@@ -1,15 +1,31 @@
 @Library('ctsrd-jenkins-scripts') _
 
-// Set the default job properties (work around properties() not being additive but replacing)
-setDefaultJobProperties([rateLimitBuilds([count: 1, durationName: 'hour', userBoost: true]),
-                         [$class: 'GithubProjectProperty', displayName: '', projectUrlStr: 'https://github.com/CTSRD-CHERI/cheribsd/'],
-                         copyArtifactPermission('*'), // Downstream jobs need the kernels/disk images
-])
+class GlobalVars { // "Groovy"
+    public static boolean archiveArtifacts = false;
+}
 
 if (env.CHANGE_ID && !shouldBuildPullRequest()) {
     echo "Not building this pull request."
     return
 }
+
+// Set job properties:
+def jobProperties = [rateLimitBuilds([count: 1, durationName: 'hour', userBoost: true]),
+                     [$class: 'GithubProjectProperty', displayName: '', projectUrlStr: 'https://github.com/CTSRD-CHERI/cheribsd/'],
+                     copyArtifactPermission('*'), // Downstream jobs need the kernels/disk images
+]
+// Don't archive sysroot/disk image/kernel images for pull requests and non-default branches:
+def archiveBranches = ['master', 'dev']
+if (/* !env.CHANGE_ID && archiveBranches.contains(env.BRANCH_NAME) */ true) {
+    GlobalVars.archiveArtifacts = true
+    cheribuildArgs.add("--use-all-cores")
+    // For branches other than the master branch, only keep the last two artifacts to save disk space
+    if (env.BRANCH_NAME != 'master') {
+        jobProperties.add(buildDiscarder(logRotator(artifactDaysToKeepStr: '', artifactNumToKeepStr: '2')))
+    }
+}
+// Set the default job properties (work around properties() not being additive but replacing)
+setDefaultJobProperties(jobProperties)
 
 jobs = [:]
 
@@ -58,11 +74,27 @@ find cheribsd-test-results
             }
         }
     }
+    if (GlobalVars.archiveArtifacts) {
+        stage("Archiving artifacts") {
+            // Archive disk image
+            dir('tarball') {
+                sh 'find . -maxdepth 2'
+                archiveArtifacts allowEmptyArchive: false, artifacts: "*.img kernel.*", fingerprint: true, onlyIfSuccessful: true
+                deleteDir()
+            }
+            // Archive sysroot (this is installed to cherisdk)
+            sh 'mkdir tarball && mv -f cherisdk/sysroot tarball/sysroot'
+            sh "./cheribuild/jenkins-cheri-build.py --tarball cheribsd-syroot-${suffix} --tarball-name cheribsd-sysroot"
+            archiveArtifacts allowEmptyArchive: false, artifacts: "cheribsd-sysroot.tar.xz", fingerprint: true, onlyIfSuccessful: true
+        }
+    }
 }
 
 ["mips-nocheri", "mips-hybrid", "mips-purecap", "riscv64", "riscv64-hybrid", "riscv64-purecap", "amd64", "aarch64"].each { suffix ->
     String name = "cheribsd-${suffix}"
     jobs[suffix] = { ->
+        // Delete stale compiler/sysroot
+        dir('cherisdk') { deleteDir() }
         cheribuildProject(target: "cheribsd-${suffix}", architecture: suffix,
                 extraArgs: '--cheribsd/build-options=-s --cheribsd/no-debug-info --keep-install-dir --install-prefix=/rootfs --cheribsd/build-tests',
                 skipArchiving: true, skipTarball: true,
