@@ -18,7 +18,6 @@ def jobProperties = [rateLimitBuilds([count: 1, durationName: 'hour', userBoost:
 def archiveBranches = ['master', 'dev']
 if (/* !env.CHANGE_ID && archiveBranches.contains(env.BRANCH_NAME) */ true) {
     GlobalVars.archiveArtifacts = true
-    cheribuildArgs.add("--use-all-cores")
     // For branches other than the master branch, only keep the last two artifacts to save disk space
     if (env.BRANCH_NAME != 'master') {
         jobProperties.add(buildDiscarder(logRotator(artifactDaysToKeepStr: '', artifactNumToKeepStr: '2')))
