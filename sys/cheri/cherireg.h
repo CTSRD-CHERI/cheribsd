@@ -120,10 +120,15 @@
 #define	CHERI_OTYPE_UNSEALED	(-1l)
 #define	CHERI_OTYPE_SENTRY	(-2l)
 
+#if __has_feature(capabilities)
 #define	CHERI_REPRESENTABLE_LENGTH(len) \
 	__builtin_cheri_round_representable_length(len)
 #define	CHERI_REPRESENTABLE_ALIGNMENT_MASK(len) \
 	__builtin_cheri_representable_alignment_mask(len)
+#else
+#define	CHERI_REPRESENTABLE_LENGTH(len) (len)
+#define	CHERI_REPRESENTABLE_ALIGNMENT_MASK(len) UINT64_MAX
+#endif
 
 /* Provide macros to make it easier to work with the raw CRAM/CRRL results: */
 #define	CHERI_REPRESENTABLE_ALIGNMENT(len) \
