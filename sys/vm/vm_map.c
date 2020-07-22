@@ -2195,7 +2195,6 @@ vm_map_find(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 		alignment = 0;
 
 #ifdef CHERI_PURECAP_KERNEL
-	/* XXX-AM: RACCT */
 	length = CHERI_REPRESENTABLE_LENGTH(length);
 	alignment = MAX(alignment,
 	    CHERI_REPRESENTABLE_ALIGNMENT(unpadded_length));
@@ -2290,6 +2289,10 @@ again:
 		}
 
 #ifdef CHERI_PURECAP_KERNEL
+                /*
+                 * In the purecap kernel case, we need to enforce CHERI alignment
+                 * for all find_space requests.
+                 */
 		if (alignment != 0 &&
 #else
 		if (find_space != VMFS_ANY_SPACE &&
