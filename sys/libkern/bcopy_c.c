@@ -67,9 +67,11 @@ memcpy_c(void * __capability dst0, const void * __capability src0, size_t len)
 			}
 
 			KASSERT((__cheri_addr vaddr_t)dst % sizeof(uintcap_t) == 0,
-			    ("dst %p not aligned", (__cheri_addr uintptr_t)dst));
+			    ("dst %p not aligned",
+			    (void *)(__cheri_addr uintptr_t)dst));
 			KASSERT((__cheri_addr vaddr_t)src % sizeof(uintcap_t) == 0,
-			    ("src %p not aligned", (__cheri_addr uintptr_t)src));
+			    ("src %p not aligned",
+			    (void *)(__cheri_addr uintptr_t)src));
 
 			/* Copy capabilities. */
 			while (len > sizeof(uintcap_t)) {
@@ -109,9 +111,9 @@ memcpy_c(void * __capability dst0, const void * __capability src0, size_t len)
 			}
 
 			KASSERT((__cheri_addr vaddr_t)dst % sizeof(uintcap_t) == 0,
-			    ("dst %p not aligned", (__cheri_addr uintptr_t)dst));
+			    ("dst %p not aligned", (void *)(__cheri_addr uintptr_t)dst));
 			KASSERT((__cheri_addr vaddr_t)src % sizeof(uintcap_t) == 0,
-			    ("src %p not aligned", (__cheri_addr uintptr_t)src));
+			    ("src %p not aligned", (void *)(__cheri_addr uintptr_t)src));
 
 			/* Copy capabilities. */
 			while (len > sizeof(uintcap_t)) {

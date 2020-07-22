@@ -48,8 +48,10 @@ __FBSDID("$FreeBSD$");
 #include <stddef.h>
 #include "libc_private.h"
 
+#ifndef __CHERI_PURE_CAPABILITY__
 __weak_reference(__sys_ioctl, __ioctl);
-#ifdef __CHERI_PURE_CAPABILITY__
+#else
+__weak_reference(_ioctl, __ioctl);
 __weak_reference(_ioctl, ioctl);
 #endif
 

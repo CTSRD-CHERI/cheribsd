@@ -58,11 +58,11 @@ procstat_vm(struct procstat *procstat, struct kinfo_proc *kipp)
 #endif
 	if ((procstat_opts & PS_OPT_NOHEADER) == 0) {
 		if ((procstat_opts & PS_OPT_VERBOSE) == 0)
-			xo_emit("{T:/%5s %*s %*s %3s %4s %4s %3s %3s %-5s %-2s %-s}\n",
+			xo_emit("{T:/%5s %*s %*s %-5s %4s %4s %3s %3s %-5s %-2s %-s}\n",
 			    "PID", ptrwidth, "START", ptrwidth, "END", "PRT",
 			    "RES", "PRES", "REF", "SHD", "FLAG", "TP", "PATH");
 		else
-			xo_emit("{T:/%5s %*s %*s %*s %3s %4s %4s %3s %3s %-5s %-2s %-s}\n",
+			xo_emit("{T:/%5s %*s %*s %*s %-5s %4s %4s %3s %3s %-5s %-2s %-s}\n",
 			    "PID", ptrwidth, "START", ptrwidth, "END",
 			    ptrwidth, "RESERV", "PRT",
 			    "RES", "PRES", "REF", "SHD", "FLAG", "TP", "PATH");
@@ -93,8 +93,12 @@ procstat_vm(struct procstat *procstat, struct kinfo_proc *kipp)
 		    "r" : "-");
 		xo_emit("{d:write/%s}", kve->kve_protection & KVME_PROT_WRITE ?
 		    "w" : "-");
-		xo_emit("{d:exec/%s} ", kve->kve_protection & KVME_PROT_EXEC ?
+		xo_emit("{d:exec/%s}", kve->kve_protection & KVME_PROT_EXEC ?
 		    "x" : "-");
+		xo_emit("{d:load_tags/%s}", kve->kve_protection &
+		    KVME_PROT_LOADTAGS ? "l" : "-");
+		xo_emit("{d:store_tags/%s} ", kve->kve_protection &
+		    KVME_PROT_STORETAGS ? "s" : "-");
 		xo_open_container("kve_protection");
 		xo_emit("{en:read/%s}", kve->kve_protection & KVME_PROT_READ ?
 		    "true" : "false");
@@ -102,6 +106,10 @@ procstat_vm(struct procstat *procstat, struct kinfo_proc *kipp)
 		    "true" : "false");
 		xo_emit("{en:exec/%s}", kve->kve_protection & KVME_PROT_EXEC ?
 		    "true" : "false");
+		xo_emit("{en:load_tags/%s}", kve->kve_protection &
+		    KVME_PROT_LOADTAGS ? "true" : "false");
+		xo_emit("{en:store_tags/%s}", kve->kve_protection &
+		    KVME_PROT_STORETAGS ? "true" : "false");
 		xo_close_container("kve_protection");
 		xo_emit("{:kve_resident/%4d/%d} ", kve->kve_resident);
 		xo_emit("{:kve_private_resident/%4d/%d} ",

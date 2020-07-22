@@ -121,7 +121,8 @@ g_label_ufs_taste_common(struct g_consumer *cp, char *label, size_t size, int wh
 		break;
 	}
 out:
-	g_free(fs->fs_csp);
+	g_free(fs->fs_si->fs_csp);
+	g_free(fs->fs_si);
 	g_free(fs);
 }
 
@@ -155,3 +156,12 @@ G_LABEL_INIT(ufsid, g_label_ufs_id, "Create device nodes for UFS file system IDs
 G_LABEL_INIT(ufs, g_label_ufs_volume, "Create device nodes for UFS volume names");
 
 MODULE_DEPEND(g_label, ufs, 1, 1, 1);
+// CHERI CHANGES START
+// {
+//   "updated": 20190628,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_shape"
+//   ]
+// }
+// CHERI CHANGES END

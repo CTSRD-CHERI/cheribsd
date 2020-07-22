@@ -1030,10 +1030,12 @@ static const struct cheri_test cheri_tests[] = {
 	  .ct_desc = "read capabilities from a faulted copy-on-write page",
 	  .ct_func = cheritest_vm_cow_write, },
 
+#if 0
 	{ .ct_name = "cheritest_vm_swap",
 	  .ct_desc = "check tags are swapped out by swap pager",
 	  .ct_func = cheritest_vm_swap,
 	  .ct_check_xfail = xfail_swap_required},
+#endif
 
 #ifdef CHERI_LIBCHERI_TESTS
 #if 0

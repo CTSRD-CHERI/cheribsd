@@ -128,7 +128,7 @@ static int sysctl_kern_ps_strings(SYSCTL_HANDLER_ARGS);
 static int sysctl_kern_usrstack(SYSCTL_HANDLER_ARGS);
 static int sysctl_kern_stackprot(SYSCTL_HANDLER_ARGS);
 static int do_execve(struct thread *td, struct image_args *args,
-    void * __capability mac_p, struct proc *cop);
+    void * __capability mac_p, struct proc *cop, bool opportunistic);
 
 /* XXX This should be vm_size_t. */
 SYSCTL_PROC(_kern, KERN_PS_STRINGS, ps_strings, CTLTYPE_ULONG|CTLFLAG_RD|
@@ -236,7 +236,7 @@ sys_coexecve(struct thread *td, struct coexecve_args *uap)
 	error = exec_copyin_args(&args, uap->fname,
 	    UIO_USERSPACE, uap->argv, uap->envv);
 	if (error == 0)
-		error = kern_coexecve(td, &args, NULL, p);
+		error = kern_coexecve(td, &args, NULL, p, false);
 	post_execve(td, error, oldvmspace);
 	PRELE(p);
 
@@ -389,14 +389,14 @@ post_execve(struct thread *td, int error, struct vmspace *oldvmspace)
  */
 int
 kern_coexecve(struct thread *td, struct image_args *args,
-    void * __capability mac_p, struct proc *cop)
+    void * __capability mac_p, struct proc *cop, bool opportunistic)
 {
 
 	AUDIT_ARG_ARGV(args->begin_argv, args->argc,
 	    exec_args_get_begin_envv(args) - args->begin_argv);
 	AUDIT_ARG_ENVV(exec_args_get_begin_envv(args), args->envc,
 	    args->endp - exec_args_get_begin_envv(args));
-	return (do_execve(td, args, mac_p, cop));
+	return (do_execve(td, args, mac_p, cop, opportunistic));
 }
 
 int
@@ -438,7 +438,7 @@ kern_execve(struct thread *td, struct image_args *args,
 		PROC_UNLOCK(cop);
 		PHOLD(cop);
 		sx_sunlock(&proctree_lock);
-		error = kern_coexecve(td, args, mac_p, cop);
+		error = kern_coexecve(td, args, mac_p, cop, true);
 		PRELE(cop);
 
 		KASSERT(error != 0, ("%s: kern_coexecve returned 0", __func__));
@@ -465,7 +465,7 @@ kern_execve(struct thread *td, struct image_args *args,
 	}
 
 fallback:
-	return (kern_coexecve(td, args, mac_p, NULL));
+	return (kern_coexecve(td, args, mac_p, NULL, false));
 }
 
 /*
@@ -474,7 +474,7 @@ fallback:
  */
 static int
 do_execve(struct thread *td, struct image_args *args,
-    void * __capability umac, struct proc *cop)
+    void * __capability umac, struct proc *cop, bool opportunistic)
 {
 	struct proc *p = td->td_proc;
 	struct nameidata nd;
@@ -1076,6 +1076,11 @@ exec_fail:
 		uifree(euip);
 
 	if (error && imgp->vmspace_destroyed) {
+		if (opportunistic) {
+			error = do_execve(td, args, umac, NULL, false);
+			if (error == EJUSTRETURN)
+				return (error);
+		}
 		/* sorry, no more process anymore. exit gracefully */
 		if (cop != NULL)
 			PRELE(cop);
@@ -1269,6 +1274,15 @@ exec_new_vmspace(struct image_params *imgp, struct sysentvec *sv)
 		do {
 			p->p_usrstack -= MAXSSIZ;
 			stack_addr = p->p_usrstack - ssiz;
+			if (stack_addr < VM_MIN_USER_ADDRESS ||
+			    stack_addr > VM_MAX_USER_ADDRESS) {
+#if 0
+				printf("%s: cannot allocate stack, "
+				    "not enough free virtual address space\n",
+				    __func__);
+#endif
+				return (ENOMEM);
+			}
 			dummy = vm_map_findspace(map, stack_addr, ssiz);
 		} while (dummy == vm_map_max(map) - ssiz + 1);
 	} else {

@@ -295,12 +295,12 @@ freebsd64_kevent(struct thread *td, struct freebsd64_kevent_args *uap)
 
 #ifdef COMPAT_FREEBSD11
 struct kevent_freebsd1164 {
-	__uintptr_t	ident;		/* identifier for this event */
-	short		filter;		/* filter for event */
+	uint64_t	ident;	/* (uintptr_t) identifier for this event */
+	short		filter;	/* filter for event */
 	unsigned short	flags;
 	unsigned int	fflags;
-	__intptr_t	data;
-	void		*udata;		/* opaque user data identifier */
+	int64_t		data;	/* (intptr_t) */
+	uint64_t	udata;	/* (void *) opaque user data identifier */
 };
 
 static int
@@ -314,12 +314,12 @@ kevent11_freebsd64_copyout(void *arg, struct kevent *kevp, int count)
 	uap = (struct freebsd11_freebsd64_kevent_args *)arg;
 
 	for (i = 0; i < count; i++) {
-		kev11.ident = kevp->ident;
+		kev11.ident = (__cheri_addr uint64_t)kevp->ident;
 		kev11.filter = kevp->filter;
 		kev11.flags = kevp->flags;
 		kev11.fflags = kevp->fflags;
 		kev11.data = kevp->data;
-		kev11.udata = (void *)(__cheri_addr vaddr_t)kevp->udata;
+		kev11.udata = (__cheri_addr uint64_t)kevp->udata;
 		error = copyout(&kev11, __USER_CAP_OBJ(uap->eventlist),
 		    sizeof(kev11));
 		if (error != 0)
@@ -348,11 +348,11 @@ kevent11_freebsd64_copyin(void *arg, struct kevent *kevp, int count)
 		    sizeof(kev11));
 		if (error != 0)
 			break;
-		kevp->ident = kev11.ident;
+		kevp->ident = (uintptr_t)kev11.ident;
 		kevp->filter = kev11.filter;
 		kevp->flags = kev11.flags;
 		kevp->fflags = kev11.fflags;
-		kevp->data = (uintptr_t)kev11.data;
+		kevp->data = kev11.data;
 		kevp->udata = (void * __capability)(uintcap_t)kev11.udata;
 		bzero(&kevp->ext, sizeof(kevp->ext));
 		uap->changelist++;
