@@ -128,7 +128,6 @@ file(WRITE ${CMAKE_BINARY_DIR}/kern_opt/opt_global.h "
 #undef __CHERI_PURE_CAPABILITY__
 #define KDB 1
 // #define COMPAT_FREEBSD11 1
-#define COMPAT_CHERIABI 1
 #define COMPAT_FREEBSD32 1
 #define COMPAT_FREEBSD64 1
 #define CPU_CHERI 1
@@ -161,10 +160,9 @@ add_subdirectory(libexec/rtld-cheri-elf)
 file(GLOB_RECURSE FAKE_KERNEL_SRCS_TARGET LIST_DIRECTORIES FALSE "sys/${TARGET}/*.c")
 file(GLOB_RECURSE FAKE_KERNEL_SRCS_DDB "sys/ddb/*.c")
 file(GLOB_RECURSE FAKE_KERNEL_SRCS_CHERI "sys/cheri/*.c")
-file(GLOB_RECURSE FAKE_KERNEL_SRCS_CHERIABI "sys/compat/cheriabi/*.c")
 file(GLOB_RECURSE FAKE_KERNEL_SRCS_KERN "sys/kern/*.c")
 file(GLOB_RECURSE FAKE_KERNEL_SRCS_LIBKERN "sys/libkern/*.c")
-add_library(fake_kernel STATIC ${FAKE_KERNEL_SRCS_TARGET} ${FAKE_KERNEL_SRCS_DDB} ${FAKE_KERNEL_SRCS_CHERI} ${FAKE_KERNEL_SRCS_CHERIABI} ${FAKE_KERNEL_SRCS_KERN} ${FAKE_KERNEL_SRCS_LIBKERN})
+add_library(fake_kernel STATIC ${FAKE_KERNEL_SRCS_TARGET} ${FAKE_KERNEL_SRCS_DDB} ${FAKE_KERNEL_SRCS_CHERI} ${FAKE_KERNEL_SRCS_KERN} ${FAKE_KERNEL_SRCS_LIBKERN})
 target_compile_definitions(fake_kernel PRIVATE _KERNEL=1)
 target_include_directories(fake_kernel PRIVATE ${CMAKE_BINARY_DIR}/kern_opt)
 target_include_directories(fake_kernel PRIVATE ${CMAKE_SOURCE_DIR}/sys/contrib/ck/include)

@@ -79,11 +79,6 @@ __FBSDID("$FreeBSD$");
 #include <compat/freebsd64/freebsd64_syscall.h>
 #include <compat/freebsd64/freebsd64_proto.h>
 #endif
-#ifdef COMPAT_CHERIABI
-#include <compat/cheriabi/cheriabi_proto.h>
-#include <compat/cheriabi/cheriabi_syscall.h>
-#include <compat/cheriabi/cheriabi_util.h>
-#endif
 
 #include <net/vnet.h>
 
@@ -117,16 +112,6 @@ static struct syscall_helper_data sctp_syscalls64[] = {
 	FREEBSD64_SYSCALL_INIT_HELPER(freebsd64_sctp_generic_sendmsg),
 	FREEBSD64_SYSCALL_INIT_HELPER(freebsd64_sctp_generic_sendmsg_iov),
 	FREEBSD64_SYSCALL_INIT_HELPER(freebsd64_sctp_generic_recvmsg),
-	SYSCALL_INIT_LAST
-};
-#endif
-
-#ifdef COMPAT_CHERIABI
-static struct syscall_helper_data sctp_syscalls_cheriabi[] = {
-	CHERIABI_SYSCALL_INIT_HELPER_COMPAT(sctp_peeloff),
-	CHERIABI_SYSCALL_INIT_HELPER(cheriabi_sctp_generic_sendmsg),
-	CHERIABI_SYSCALL_INIT_HELPER(cheriabi_sctp_generic_sendmsg_iov),
-	CHERIABI_SYSCALL_INIT_HELPER(cheriabi_sctp_generic_recvmsg),
 	SYSCALL_INIT_LAST
 };
 #endif
@@ -167,13 +152,6 @@ sctp_syscalls_init(void *unused __unused)
 	    SY_THR_STATIC);
 	KASSERT((error == 0),
 	    ("%s: freebsd64_syscall_helper_register failed for sctp syscalls",
-	    __func__));
-#endif
-#ifdef COMPAT_CHERIABI
-	error = cheriabi_syscall_helper_register(sctp_syscalls_cheriabi,
-	    SY_THR_STATIC);
-	KASSERT((error == 0),
-	    ("%s: cheriabi_helper_register failed for sctp syscalls",
 	    __func__));
 #endif
 }
@@ -291,17 +269,6 @@ freebsd64_sctp_generic_sendmsg(struct thread *td,
 	    __USER_CAP(uap->msg, uap->mlen), uap->mlen,
 	    __USER_CAP(uap->to, uap->tolen), uap->tolen,
 	    __USER_CAP_OBJ(uap->sinfo), uap->flags));
-}
-#endif
-
-#ifdef COMPAT_CHERIABI
-int
-cheriabi_sctp_generic_sendmsg(struct thread *td,
-    struct cheriabi_sctp_generic_sendmsg_args *uap)
-{
-
-	return (kern_sys_sctp_generic_sendmsg(td, uap->sd, uap->msg, uap->mlen,
-	    uap->to, uap->tolen, uap->sinfo, uap->flags));
 }
 #endif
 
@@ -455,18 +422,6 @@ freebsd64_sctp_generic_sendmsg_iov(struct thread *td,
 	    __USER_CAP(uap->to, uap->tolen), uap->tolen,
 	    __USER_CAP_OBJ(uap->sinfo), uap->flags,
 	    (copyiniov_t *)freebsd64_copyiniov));
-}
-#endif
-
-#ifdef COMPAT_CHERIABI
-int
-cheriabi_sctp_generic_sendmsg_iov(struct thread *td,
-    struct cheriabi_sctp_generic_sendmsg_iov_args *uap)
-{
-
-	return (kern_sctp_generic_sendmsg_iov(td, uap->sd, uap->iov,
-	    uap->iovlen, uap->to, uap->tolen, uap->sinfo, uap->flags,
-	    copyiniov));
 }
 #endif
 
@@ -633,18 +588,6 @@ freebsd64_sctp_generic_recvmsg(struct thread *td,
 	   __USER_CAP_UNBOUND(uap->from),
 	   __USER_CAP_OBJ(uap->fromlenaddr), __USER_CAP_OBJ(uap->sinfo),
 	   __USER_CAP_OBJ(uap->msg_flags), (copyiniov_t *)freebsd64_copyiniov));
-}
-#endif
-
-#ifdef COMPAT_CHERIABI
-int
-cheriabi_sctp_generic_recvmsg(struct thread *td,
-    struct cheriabi_sctp_generic_recvmsg_args *uap)
-{
-
-	return (kern_sctp_generic_recvmsg(td, uap->sd, uap->iov, uap->iovlen,
-	    uap->from, uap->fromlenaddr, uap->sinfo, uap->msg_flags,
-	    copyiniov));
 }
 #endif
 

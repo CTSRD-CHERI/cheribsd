@@ -74,10 +74,6 @@ __FBSDID("$FreeBSD$");
 #include <vm/uma.h>
 #include <sys/aio.h>
 
-#ifdef COMPAT_CHERIABI
-#include <compat/cheriabi/cheriabi_util.h>
-#endif
-
 /*
  * Counter for allocating reference ids to new jobs.  Wrapped to 1 on
  * overflow. (XXX will be removed soon.)
@@ -3572,116 +3568,6 @@ freebsd64_lio_listio(struct thread *td, struct freebsd64_lio_listio_args *uap)
 
 #endif /* COMPAT_FREEBSD64 */
 
-#ifdef COMPAT_CHERIABI
-#include <sys/user.h>
-
-#include <cheri/cheric.h>
-
-#include <compat/cheriabi/cheriabi.h>
-#include <compat/cheriabi/cheriabi_proto.h>
-#include <compat/cheriabi/cheriabi_signal.h>
-#include <compat/cheriabi/cheriabi_syscall.h>
-#include <compat/cheriabi/cheriabi_util.h>
-
-int
-cheriabi_aio_return(struct thread *td, struct cheriabi_aio_return_args *uap)
-{
-
-	return (kern_aio_return(td, uap->aiocbp, &aiocb_ops));
-}
-
-int
-cheriabi_aio_suspend(struct thread *td, struct cheriabi_aio_suspend_args *uap)
-{
-
-	return (sys_aio_suspend(td, (struct aio_suspend_args *)uap));
-}
-
-/*
- * This function exists soley to allow the size of uap->aiocbp to be
- * checked in the uap fill function.
- */
-int
-cheriabi_aio_cancel(struct thread *td, struct cheriabi_aio_cancel_args *uap)
-{
-
-	return(kern_aio_cancel(td, uap->fd,
-	    (struct aiocb * __capability)uap->aiocbp, &aiocb_ops));
-}
-
-int
-cheriabi_aio_error(struct thread *td, struct cheriabi_aio_error_args *uap)
-{
-
-	return (kern_aio_error(td,
-	    (struct aiocb * __capability)uap->aiocbp,
-	    &aiocb_ops));
-}
-
-int
-cheriabi_aio_read(struct thread *td, struct cheriabi_aio_read_args *uap)
-{
-
-	return (aio_aqueue(td,
-	    (struct aiocb * __capability)uap->aiocbp,
-	    &uap->aiocbp, NULL, LIO_READ, &aiocb_ops));
-}
-
-int
-cheriabi_aio_write(struct thread *td, struct cheriabi_aio_write_args *uap)
-{
-
-	return (aio_aqueue(td,
-	    (struct aiocb * __capability)uap->aiocbp,
-	    &uap->aiocbp, NULL, LIO_WRITE, &aiocb_ops));
-}
-
-int
-cheriabi_aio_mlock(struct thread *td, struct cheriabi_aio_mlock_args *uap)
-{
-
-	return (aio_aqueue(td,
-	    (struct aiocb * __capability)uap->aiocbp,
-	    &uap->aiocbp, NULL, LIO_MLOCK, &aiocb_ops));
-}
-
-int
-cheriabi_aio_waitcomplete(struct thread *td,
-    struct cheriabi_aio_waitcomplete_args *uap)
-{
-	struct timespec ts, *tsp;
-	int error;
-
-	if (uap->timeout) {
-		/* Get timespec struct. */
-		error = copyin(uap->timeout, &ts, sizeof(ts));
-		if (error)
-			return (error);
-		tsp = &ts;
-	} else
-		tsp = NULL;
-
-	return (kern_aio_waitcomplete(td,
-	    (struct aiocb ** __capability)uap->aiocbp, tsp,
-	    &aiocb_ops));
-}
-
-int
-cheriabi_aio_fsync(struct thread *td, struct cheriabi_aio_fsync_args *uap)
-{
-
-	return (kern_aio_fsync(td, uap->op,
-	    (struct aiocb * __capability)uap->aiocbp,
-	    &uap->aiocbp, &aiocb_ops));
-}
-
-int
-cheriabi_lio_listio(struct thread *td, struct cheriabi_lio_listio_args *uap)
-{
-
-	return (sys_lio_listio(td, (struct lio_listio_args *)uap));
-}
-#endif /* COMPAT_CHERIABI */
 // CHERI CHANGES START
 // {
 //   "updated": 20191025,

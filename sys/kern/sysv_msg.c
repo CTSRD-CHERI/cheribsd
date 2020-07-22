@@ -63,7 +63,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/sysproto.h>
-#if defined(COMPAT_CHERIABI) || defined(COMPAT_FREEBSD32) || defined(COMPAT_FREEBSD64)
+#if defined(COMPAT_FREEBSD32) || defined(COMPAT_FREEBSD64)
 #include <sys/abi_compat.h>
 #endif
 #include <sys/kernel.h>
@@ -316,43 +316,6 @@ static struct syscall_helper_data msg64_syscalls[] = {
 };
 #endif /* COMPAT_FREEBSD64 */
 
-#ifdef COMPAT_CHERIABI
-#include <compat/cheriabi/cheriabi_proto.h>
-#include <compat/cheriabi/cheriabi_syscall.h>
-#include <compat/cheriabi/cheriabi_util.h>
-
-struct msqid_ds_c {
-	struct ipc_perm	 		msg_perm;
-	struct msg * __capability	kmsg_first;
-	struct msg * __capability	kmsg_last;
-	msglen_t	 		msg_cbytes;
-	msgqnum_t	 		msg_qnum;
-	msglen_t	 		msg_qbytes;
-	pid_t		 		msg_lspid;
-	pid_t		 		msg_lrpid;
-	time_t		 		msg_stime;
-	time_t		 		msg_rtime;
-	time_t		 		msg_ctime;
-};
-
-struct msqid_kernel_c {
-	/* Data structure exposed to user space. */
-	struct msqid_ds_c			 u;
-
-	/* Kernel-private components of the message queue. */
-	struct label * __capability	label;
-	struct ucred * __capability	cred;
-};
-
-static struct syscall_helper_data cheriabi_msg_syscalls[] = {
-	CHERIABI_SYSCALL_INIT_HELPER(cheriabi_msgctl),
-	CHERIABI_SYSCALL_INIT_HELPER_COMPAT(msgget),
-	CHERIABI_SYSCALL_INIT_HELPER(cheriabi_msgsnd),
-	CHERIABI_SYSCALL_INIT_HELPER(cheriabi_msgrcv),
-	SYSCALL_INIT_LAST
-};
-#endif /* COMPAT_CHERIABI */
-
 static int
 msginit()
 {
@@ -459,12 +422,6 @@ msginit()
 	if (error != 0)
 		return (error);
 #endif
-#ifdef COMPAT_CHERIABI
-	error = cheriabi_syscall_helper_register(cheriabi_msg_syscalls,
-	    SY_THR_STATIC_KLD);
-	if (error != 0)
-		return (error);
-#endif
 	return (0);
 }
 
@@ -483,9 +440,6 @@ msgunload()
 #endif
 #ifdef COMPAT_FREEBSD64
 	freebsd64_syscall_helper_unregister(msg64_syscalls);
-#endif
-#ifdef COMPAT_CHERIABI
-	cheriabi_syscall_helper_unregister(cheriabi_msg_syscalls);
 #endif
 
 	for (msqid = 0; msqid < msginfo.msgmni; msqid++) {
@@ -1579,9 +1533,6 @@ sysctl_msqids(SYSCTL_HANDLER_ARGS)
 #ifdef COMPAT_FREEBSD64
 	struct msqid_kernel64 tmsqk64;
 #endif
-#ifdef COMPAT_CHERIABI
-	struct msqid_kernel_c tmsqk_c;
-#endif
 	struct prison *pr, *rpr;
 	void *outaddr;
 	size_t outsize;
@@ -1638,24 +1589,6 @@ sysctl_msqids(SYSCTL_HANDLER_ARGS)
 			outsize = sizeof(tmsqk64);
 		} else
 #endif
-#ifdef COMPAT_CHERIABI
-		{
-			bzero(&tmsqk_c, sizeof(tmsqk_c));
-			CP(tmsqk, tmsqk_c, u.msg_perm);
-			/* Don't copy u.msg_first or u.msg_last */
-			CP(tmsqk, tmsqk_c, u.msg_cbytes);
-			CP(tmsqk, tmsqk_c, u.msg_qnum);
-			CP(tmsqk, tmsqk_c, u.msg_qbytes);
-			CP(tmsqk, tmsqk_c, u.msg_lspid);
-			CP(tmsqk, tmsqk_c, u.msg_lrpid);
-			CP(tmsqk, tmsqk_c, u.msg_stime);
-			CP(tmsqk, tmsqk_c, u.msg_rtime);
-			CP(tmsqk, tmsqk_c, u.msg_ctime);
-			/* Don't copy label or cred */
-			outaddr = &tmsqk_c;
-			outsize = sizeof(tmsqk_c);
-		}
-#else
 		{
 			/* Don't leak kernel pointers */
 			tmsqk.u.__msg_first = NULL;
@@ -1670,7 +1603,6 @@ sysctl_msqids(SYSCTL_HANDLER_ARGS)
 			outaddr = &tmsqk;
 			outsize = sizeof(tmsqk);
 		}
-#endif
 		error = SYSCTL_OUT(req, outaddr, outsize);
 		if (error != 0)
 			break;
@@ -2168,88 +2100,6 @@ freebsd64_msgrcv(struct thread *td, struct freebsd64_msgrcv_args *uap)
 	    sizeof(mtype)));
 }
 #endif /* COMPAT_FREEBSD64 */
-
-#ifdef COMPAT_CHERIABI
-int
-cheriabi_msgctl(struct thread *td, struct cheriabi_msgctl_args *uap)
-{
-	struct msqid_ds msqbuf;
-	struct msqid_ds_c msqbuf_c;
-	int error;
-
-	if (uap->cmd == IPC_SET) {
-		error = copyin(uap->buf, &msqbuf_c, sizeof(msqbuf_c));
-		if (error)
-			return (error);
-		CP(msqbuf_c, msqbuf, msg_perm);
-		msqbuf.__msg_first = NULL;	/* Ignored */
-		msqbuf.__msg_last = NULL;	/* Ignored */
-		CP(msqbuf_c, msqbuf, msg_cbytes);
-		CP(msqbuf_c, msqbuf, msg_qnum);
-		CP(msqbuf_c, msqbuf, msg_qbytes);
-		CP(msqbuf_c, msqbuf, msg_lspid);
-		CP(msqbuf_c, msqbuf, msg_lrpid);
-		CP(msqbuf_c, msqbuf, msg_stime);
-		CP(msqbuf_c, msqbuf, msg_rtime);
-		CP(msqbuf_c, msqbuf, msg_ctime);
-	}
-	error = kern_msgctl(td, uap->msqid, uap->cmd, &msqbuf);
-	if (error)
-		return (error);
-	if (uap->cmd == IPC_STAT) {
-		CP(msqbuf, msqbuf_c, msg_perm);
-		msqbuf_c.kmsg_first = NULL;	/* Don't leak kernel ptr */
-		msqbuf_c.kmsg_last = NULL;	/* Don't leak kernel ptr */
-		CP(msqbuf, msqbuf_c, msg_cbytes);
-		CP(msqbuf, msqbuf_c, msg_qnum);
-		CP(msqbuf, msqbuf_c, msg_qbytes);
-		CP(msqbuf, msqbuf_c, msg_lspid);
-		CP(msqbuf, msqbuf_c, msg_lrpid);
-		CP(msqbuf, msqbuf_c, msg_stime);
-		CP(msqbuf, msqbuf_c, msg_rtime);
-		CP(msqbuf, msqbuf_c, msg_ctime);
-		error = copyout(&msqbuf_c, uap->buf,
-		    sizeof(struct msqid_ds_c));
-	}
-	return (error);
-}
-
-int
-cheriabi_msgrcv(struct thread *td, struct cheriabi_msgrcv_args *uap)
-{
-	int error;
-	long mtype;
-
-	DPRINTF(("call to msgrcv(%d, %p, %zu, %ld, %d)\n", uap->msqid,
-	    uap->msgp, uap->msgsz, uap->msgtyp, uap->msgflg));
-
-	if ((error = kern_msgrcv(td, uap->msqid,
-	    (char * __capability)uap->msgp + sizeof(mtype),
-	    uap->msgsz, uap->msgtyp, uap->msgflg, &mtype)) != 0)
-		return (error);
-	if ((error = copyout(&mtype, uap->msgp, sizeof(mtype))) != 0)
-		DPRINTF(("error %d copying the message type\n", error));
-	return (error);
-}
-
-int
-cheriabi_msgsnd(struct thread *td, struct cheriabi_msgsnd_args *uap)
-{
-	int error;
-	long mtype;
-
-	DPRINTF(("call to msgsnd(%d, %p, %zu, %d)\n", uap->msqid, uap->msgp,
-	    uap->msgsz, uap->msgflg));
-
-	if ((error = copyin(uap->msgp, &mtype, sizeof(mtype))) != 0) {
-		DPRINTF(("error %d copying the message type\n", error));
-		return (error);
-	}
-	return (kern_msgsnd(td, uap->msqid,
-	    (const char * __capability)uap->msgp + sizeof(mtype),
-	    uap->msgsz, uap->msgflg, mtype));
-}
-#endif /* COMPAT_CHERIABI */
 
 #if defined(COMPAT_FREEBSD4) || defined(COMPAT_FREEBSD5) || \
     defined(COMPAT_FREEBSD6) || defined(COMPAT_FREEBSD7)

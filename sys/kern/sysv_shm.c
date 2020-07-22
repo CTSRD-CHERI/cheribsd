@@ -100,13 +100,6 @@ __FBSDID("$FreeBSD$");
 #include <cheri/cheric.h>
 #endif
 
-#ifdef COMPAT_CHERIABI
-#include <sys/user.h>
-#include <compat/cheriabi/cheriabi_proto.h>
-#include <compat/cheriabi/cheriabi_syscall.h>
-#include <compat/cheriabi/cheriabi_util.h>
-#endif
-
 #include <security/audit/audit.h>
 #include <security/mac/mac_framework.h>
 
@@ -751,29 +744,6 @@ sys_shmctl(struct thread *td, struct shmctl_args *uap)
 	return (user_shmctl(td, uap->shmid, uap->cmd, uap->buf));
 }
 
-#ifdef COMPAT_CHERIABI
-int
-cheriabi_shmat(struct thread *td, struct cheriabi_shmat_args *uap)
-{
-
-	return (kern_shmat(td, uap->shmid, uap->shmaddr, uap->shmflg));
-}
-
-int
-cheriabi_shmdt(struct thread *td, struct cheriabi_shmdt_args *uap)
-{
-
-	return (kern_shmdt(td, uap->shmaddr));
-}
-
-int
-cheriabi_shmctl(struct thread *td, struct cheriabi_shmctl_args *uap)
-{
-
-	return (user_shmctl(td, uap->shmid, uap->cmd, uap->buf));
-}
-#endif
-
 static int
 user_shmctl(struct thread *td, int shmid, int cmd,
     struct shmid_ds * __capability ubuf)
@@ -1186,20 +1156,6 @@ static struct syscall_helper_data shm64_syscalls[] = {
 };
 #endif /* COMPAT_FREEBSD64 */
 
-#ifdef COMPAT_CHERIABI
-#include <compat/cheriabi/cheriabi.h>
-#include <compat/cheriabi/cheriabi_proto.h>
-#include <compat/cheriabi/cheriabi_syscall.h>
-
-static struct syscall_helper_data cheriabi_shm_syscalls[] = {
-	CHERIABI_SYSCALL_INIT_HELPER(cheriabi_shmat),
-	CHERIABI_SYSCALL_INIT_HELPER(cheriabi_shmdt),
-	CHERIABI_SYSCALL_INIT_HELPER_COMPAT(shmget),
-	CHERIABI_SYSCALL_INIT_HELPER(cheriabi_shmctl),
-	SYSCALL_INIT_LAST
-};
-#endif /* COMPAT_CHERIABI */
-
 static int
 shminit(void)
 {
@@ -1281,11 +1237,6 @@ shminit(void)
 	if (error != 0)
 		return (error);
 #endif
-#ifdef COMPAT_CHERIABI
-	error = cheriabi_syscall_helper_register(cheriabi_shm_syscalls, SY_THR_STATIC_KLD);
-	if (error != 0)
-		return (error);
-#endif
 	return (0);
 }
 
@@ -1302,9 +1253,6 @@ shmunload(void)
 #endif
 #ifdef COMPAT_FREEBSD64
 	freebsd64_syscall_helper_unregister(shm64_syscalls);
-#endif
-#ifdef COMPAT_CHERIABI
-	cheriabi_syscall_helper_unregister(cheriabi_shm_syscalls);
 #endif
 	syscall_helper_unregister(shm_syscalls);
 	if (shm_prison_slot != 0)
