@@ -117,9 +117,6 @@ LIBDIR_BASE:=	/usr/libcheri
 .info "Not overriding LIBDIR for CHERI since ${.CURDIR} is a test library"
 .endif
 ROOTOBJDIR=	${OBJTOP}/obj-libcheri
-.ifdef CHERI_USE_CAP_TABLE
-CFLAGS+=	-cheri-cap-table-abi=${CHERI_USE_CAP_TABLE}
-.endif
 STATIC_CFLAGS+=	-ftls-model=local-exec
 
 .ifdef NO_WERROR
