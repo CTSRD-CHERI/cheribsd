@@ -76,7 +76,7 @@ find cheribsd-test-results
     if (GlobalVars.archiveArtifacts) {
         stage("Archiving artifacts") {
             // Archive disk image
-	    sh 'rm -fv *.img *.xz && mv -v tarball/*.img /rootfs/boot/kernel/kernel .'
+	    sh 'rm -fv *.img *.xz && mv -v tarball/*.img tarball/rootfs/boot/kernel/kernel .'
             dir('tarball') {
                 sh 'find . -maxdepth 2'
                 deleteDir()
