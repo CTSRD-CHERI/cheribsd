@@ -83,11 +83,13 @@ find cheribsd-test-results
             }
             // Use xz -T0 to speed up compression by using multiple threads
             sh label: 'Compress kernel and images', script: 'xz -T0 *.img kernel*'
-	    sh 'find . -maxdepth 2'
+            // Create sysroot archive (this is installed to cherisdk rather than the tarball)
+            sh label: 'Create sysroot archive', script: """
+mkdir tarball && mv -f cherisdk/sysroot tarball/sysroot
+./cheribuild/jenkins-cheri-build.py --tarball cheribsd-sysroot-${suffix} --tarball-name cheribsd-sysroot
+ls -la
+"""
             archiveArtifacts allowEmptyArchive: false, artifacts: "*.img.xz, kernel*.xz", fingerprint: true, onlyIfSuccessful: true
-            // Archive sysroot (this is installed to cherisdk rather than the tarball)
-            sh 'mkdir tarball && mv -f cherisdk/sysroot tarball/sysroot'
-            sh "./cheribuild/jenkins-cheri-build.py --tarball cheribsd-sysroot-${suffix} --tarball-name cheribsd-sysroot"
             archiveArtifacts allowEmptyArchive: false, artifacts: "cheribsd-sysroot.tar.xz", fingerprint: true, onlyIfSuccessful: true
         }
     }
