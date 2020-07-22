@@ -333,7 +333,6 @@ MIPS_ABI?=	32
 .if ${MACHINE_ARCH:Mmips*c*}
 CFLAGS+=	-integrated-as
 CFLAGS+=	-fpic
-CFLAGS+=	-cheri-cap-table-abi=${CHERI_USE_CAP_TABLE:Upcrel}
 STATIC_CFLAGS+=	-ftls-model=local-exec
 .ifdef NO_WERROR
 # Implicit function declarations should always be an error in purecap
@@ -480,4 +479,10 @@ MACHINE_ABI+=	purecap
 MACHINE_ABI+=	ptr64
 .else
 MACHINE_ABI+=	ptr32
+.endif
+
+.if ${MACHINE_ABI:Mpurecap}
+.ifdef CHERI_USE_CAP_TABLE
+CFLAGS+=	-cheri-cap-table-abi=${CHERI_USE_CAP_TABLE}
+.endif
 .endif

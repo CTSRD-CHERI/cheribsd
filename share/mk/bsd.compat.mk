@@ -191,6 +191,12 @@ COMPAT_RISCV_MARCH:=	${COMPAT_RISCV_MARCH}xcheri
 LIBCHERICFLAGS+=	-DCOMPAT_CHERI
 LIBCHERIWMAKEFLAGS+=	COMPAT_CHERI=yes
 LIBCHERI_MACHINE_ABI=	${MACHINE_ABI} purecap
+
+# This duplicates some logic in bsd.cpu.mk that is needed for the
+# WANT_COMPAT/NEED_COMPAT case.
+.ifdef CHERI_USE_CAP_TABLE
+LIBCHERICFLAGS+=	-cheri-cap-table-abi=${CHERI_USE_CAP_TABLE}
+.endif
 .endif
 
 # -------------------------------------------------------------------
