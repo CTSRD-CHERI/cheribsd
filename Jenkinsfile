@@ -76,12 +76,15 @@ find cheribsd-test-results
     if (GlobalVars.archiveArtifacts) {
         stage("Archiving artifacts") {
             // Archive disk image
+	    sh 'rm -fv *.img *.xz && mv -v tarball/*.img /rootfs/boot/kernel/kernel .'
             dir('tarball') {
                 sh 'find . -maxdepth 2'
-                archiveArtifacts allowEmptyArchive: false, artifacts: "*.img kernel.*", fingerprint: true, onlyIfSuccessful: true
                 deleteDir()
             }
-            // Archive sysroot (this is installed to cherisdk)
+            // Use xz -T0 to speed up compression by using multiple threads
+            sh label: 'Compress kernel and images', script: 'xz -T0 *.img kernel*'
+            archiveArtifacts allowEmptyArchive: false, artifacts: "*.img.xz kernel*.xz", fingerprint: true, onlyIfSuccessful: true
+            // Archive sysroot (this is installed to cherisdk rather than the tarball)
             sh 'mkdir tarball && mv -f cherisdk/sysroot tarball/sysroot'
             sh "./cheribuild/jenkins-cheri-build.py --tarball cheribsd-syroot-${suffix} --tarball-name cheribsd-sysroot"
             archiveArtifacts allowEmptyArchive: false, artifacts: "cheribsd-sysroot.tar.xz", fingerprint: true, onlyIfSuccessful: true
