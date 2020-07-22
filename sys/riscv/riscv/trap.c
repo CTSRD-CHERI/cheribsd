@@ -412,7 +412,7 @@ do_trap_supervisor(struct trapframe *frame)
 	CTR3(KTR_TRAP, "do_trap_supervisor: curthread: %p, sepc: %lx, frame: %p",
 	    curthread, (__cheri_addr unsigned long)frame->tf_sepc, frame);
 
-	switch(exception) {
+	switch (exception) {
 	case EXCP_FAULT_LOAD:
 	case EXCP_FAULT_STORE:
 	case EXCP_FAULT_FETCH:
@@ -498,7 +498,7 @@ do_trap_user(struct trapframe *frame)
 	CTR3(KTR_TRAP, "do_trap_user: curthread: %p, sepc: %lx, frame: %p",
 	    curthread, (__cheri_addr unsigned long)frame->tf_sepc, frame);
 
-	switch(exception) {
+	switch (exception) {
 	case EXCP_FAULT_LOAD:
 	case EXCP_FAULT_STORE:
 	case EXCP_FAULT_FETCH:
