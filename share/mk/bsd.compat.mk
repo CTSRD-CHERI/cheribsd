@@ -197,6 +197,20 @@ LIBCHERI_MACHINE_ABI=	${MACHINE_ABI} purecap
 .ifdef CHERI_USE_CAP_TABLE
 LIBCHERICFLAGS+=	-cheri-cap-table-abi=${CHERI_USE_CAP_TABLE}
 .endif
+
+.if defined(CHERI_SUBOBJECT_BOUNDS)
+# Allow per-subdirectory overrides if we know that there is maximum that works
+.if defined(CHERI_SUBOBJECT_BOUNDS_MAX)
+LIBCHERICFLAGS+=	-Xclang -cheri-bounds=${CHERI_SUBOBJECT_BOUNDS_MAX}
+.else
+LIBCHERICFLAGS+=	-Xclang -cheri-bounds=${CHERI_SUBOBJECT_BOUNDS}
+.endif # CHERI_SUBOBJECT_BOUNDS_MAX
+CHERI_SUBOBJECT_BOUNDS_DEBUG?=yes
+.if ${CHERI_SUBOBJECT_BOUNDS_DEBUG} == "yes"
+# If debugging is enabled, clear SW permission bit 2 when the bounds are reduced
+LIBCHERICFLAGS+=	-mllvm -cheri-subobject-bounds-clear-swperm=2
+.endif # CHERI_SUBOBJECT_BOUNDS_DEBUG
+.endif # CHERI_SUBOBJECT_BOUNDS
 .endif
 
 # -------------------------------------------------------------------
