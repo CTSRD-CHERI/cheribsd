@@ -88,6 +88,15 @@ rm -rf tarball
 mkdir tarball && mv -f cherisdk/sysroot tarball/sysroot
 ./cheribuild/jenkins-cheri-build.py --tarball cheribsd-sysroot-${suffix} --tarball-name cheribsd-sysroot.tar.xz
 ls -la
+# Seems like some Java versions require write permissions:
+# java.nio.file.AccessDeniedException: /usr/local/jenkins/jobs/CheriBSD-pipeline/branches/PR-616/builds/14/archive/kernel.xz
+#	at sun.nio.fs.UnixException.translateToIOException(UnixException.java:84)
+#	at sun.nio.fs.UnixException.rethrowAsIOException(UnixException.java:102)
+#	at sun.nio.fs.UnixException.rethrowAsIOException(UnixException.java:107)
+#	at sun.nio.fs.UnixFileSystemProvider.newByteChannel(UnixFileSystemProvider.java:214)
+#	at java.nio.file.spi.FileSystemProvider.newOutputStream(FileSystemProvider.java:434)
+#	at java.nio.file.Files.newOutputStream(Files.java:216)
+chmod +w *.xz
 """
             archiveArtifacts allowEmptyArchive: false, artifacts: "cheribsd-sysroot.tar.xz, *.img.xz, kernel*.xz", fingerprint: true, onlyIfSuccessful: true
         }
