@@ -182,7 +182,7 @@ int	kern_cpuset_setid(struct thread *td, cpuwhich_t which,
 	    id_t id, cpusetid_t setid);
 int	kern_dup(struct thread *td, u_int mode, int flags, int old, int new);
 int	kern_coexecve(struct thread *td, struct image_args *args,
-	    void * __capability mac_p, struct proc *cop);
+	    void * __capability mac_p, struct proc *cop, bool opportunistic);
 int	kern_execve(struct thread *td, struct image_args *args,
 	    void * __capability mac_p);
 int	kern_extattrctl(struct thread *td, const char * __capability path,
