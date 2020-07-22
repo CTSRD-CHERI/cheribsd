@@ -87,7 +87,7 @@ find cheribsd-test-results
             archiveArtifacts allowEmptyArchive: false, artifacts: "*.img.xz, kernel*.xz", fingerprint: true, onlyIfSuccessful: true
             // Archive sysroot (this is installed to cherisdk rather than the tarball)
             sh 'mkdir tarball && mv -f cherisdk/sysroot tarball/sysroot'
-            sh "./cheribuild/jenkins-cheri-build.py --tarball cheribsd-syroot-${suffix} --tarball-name cheribsd-sysroot"
+            sh "./cheribuild/jenkins-cheri-build.py --tarball cheribsd-sysroot-${suffix} --tarball-name cheribsd-sysroot"
             archiveArtifacts allowEmptyArchive: false, artifacts: "cheribsd-sysroot.tar.xz", fingerprint: true, onlyIfSuccessful: true
         }
     }
