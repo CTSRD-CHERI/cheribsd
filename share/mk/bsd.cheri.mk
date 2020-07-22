@@ -89,20 +89,6 @@ _CHERI_CXX=		${CXX} ${_CHERI_COMMON_FLAGS}
 .endif
 _CHERI_CPP=		${CPP} ${_CHERI_COMMON_FLAGS}
 
-.if defined(CHERI_SUBOBJECT_BOUNDS)
-# Allow per-subdirectory overrides if we know that there is maximum that works
-.if defined(CHERI_SUBOBJECT_BOUNDS_MAX)
-_CHERI_COMMON_FLAGS+=	-Xclang -cheri-bounds=${CHERI_SUBOBJECT_BOUNDS_MAX}
-.else
-_CHERI_COMMON_FLAGS+=	-Xclang -cheri-bounds=${CHERI_SUBOBJECT_BOUNDS}
-.endif # CHERI_SUBOBJECT_BOUNDS_MAX
-CHERI_SUBOBJECT_BOUNDS_DEBUG?=yes
-.if ${CHERI_SUBOBJECT_BOUNDS_DEBUG} == "yes"
-# If debugging is enabled, clear SW permission bit 2 when the bounds are reduced
-_CHERI_COMMON_FLAGS+=	-mllvm -cheri-subobject-bounds-clear-swperm=2
-.endif # CHERI_SUBOBJECT_BOUNDS_DEBUG
-.endif # CHERI_SUBOBJECT_BOUNDS
-
 .if defined(SYSROOT)
 _CHERI_COMMON_FLAGS+=	--sysroot=${SYSROOT}
 .endif
