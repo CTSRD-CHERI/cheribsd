@@ -1606,7 +1606,6 @@ _sysent_PATH=	${TMPPATH}:/usr/libexec
 _sysent_dirs=	sys/kern
 _sysent_dirs+=	sys/compat/freebsd32
 _sysent_dirs+=	sys/compat/freebsd64
-_sysent_dirs+=	sys/compat/cheriabi
 _sysent_dirs+=	sys/compat/cloudabi32	\
 		sys/compat/cloudabi64
 _sysent_dirs+=	sys/amd64/linux		\

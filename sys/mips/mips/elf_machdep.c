@@ -125,9 +125,6 @@ mips_elf_header_supported(struct image_params * imgp)
 	const Elf_Ehdr *hdr = (const Elf_Ehdr *)imgp->image_header;
 	const uint32_t machine = hdr->e_flags & EF_MIPS_MACH;
 
-	if (use_cheriabi)
-		return FALSE;
-
 	if (machine == EF_MIPS_MACH_CHERI256) {
 		static struct timeval lastfail;
 		static int curfail;

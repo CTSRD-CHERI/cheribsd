@@ -75,10 +75,6 @@ __FBSDID("$FreeBSD$");
 #include <machine/atomic.h>
 #include <machine/cpu.h>
 
-#ifdef COMPAT_CHERIABI
-#include <compat/cheriabi/cheriabi_proto.h>
-#endif
-
 #ifdef COMPAT_FREEBSD32
 #include <compat/freebsd32/freebsd32_proto.h>
 #endif
@@ -4166,19 +4162,6 @@ sys__umtx_op(struct thread *td, struct _umtx_op_args *uap)
 		return (*op_table[uap->op])(td, uap);
 	return (EINVAL);
 }
-
-#ifdef COMPAT_CHERIABI
-int
-cheriabi__umtx_op(struct thread *td, struct cheriabi__umtx_op_args *uap)
-{
-
-	if ((unsigned)uap->op < nitems(op_table)) {
-		return (*op_table[uap->op])(td, (struct _umtx_op_args *)uap);
-	}
-	return (EINVAL);
-}
-
-#endif /* COMPAT_CHERIABI */
 
 #ifdef COMPAT_FREEBSD32
 
