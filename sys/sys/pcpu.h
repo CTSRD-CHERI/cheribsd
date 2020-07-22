@@ -59,7 +59,7 @@
  */
 extern uintptr_t *__start_set_pcpu __no_subobject_bounds;
 __GLOBL(__start_set_pcpu);
-extern uintptr_t *__stop_set_pcpu __no_subobject_bounds;
+extern uintptr_t *__stop_set_pcpu;
 __GLOBL(__stop_set_pcpu);
 
 /*
