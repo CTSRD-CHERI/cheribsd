@@ -1269,6 +1269,15 @@ exec_new_vmspace(struct image_params *imgp, struct sysentvec *sv)
 		do {
 			p->p_usrstack -= MAXSSIZ;
 			stack_addr = p->p_usrstack - ssiz;
+			if (stack_addr < VM_MIN_USER_ADDRESS ||
+			    stack_addr > VM_MAX_USER_ADDRESS) {
+#if 0
+				printf("%s: cannot allocate stack, "
+				    "not enough free virtual address space\n",
+				    __func__);
+#endif
+				return (ENOMEM);
+			}
 			dummy = vm_map_findspace(map, stack_addr, ssiz);
 		} while (dummy == vm_map_max(map) - ssiz + 1);
 	} else {
