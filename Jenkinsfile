@@ -83,7 +83,8 @@ find cheribsd-test-results
             }
             // Use xz -T0 to speed up compression by using multiple threads
             sh label: 'Compress kernel and images', script: 'xz -T0 *.img kernel*'
-            archiveArtifacts allowEmptyArchive: false, artifacts: "*.img.xz kernel*.xz", fingerprint: true, onlyIfSuccessful: true
+	    sh 'find . -maxdepth 2'
+            archiveArtifacts allowEmptyArchive: false, artifacts: "*.img.xz, kernel*.xz", fingerprint: true, onlyIfSuccessful: true
             // Archive sysroot (this is installed to cherisdk rather than the tarball)
             sh 'mkdir tarball && mv -f cherisdk/sysroot tarball/sysroot'
             sh "./cheribuild/jenkins-cheri-build.py --tarball cheribsd-syroot-${suffix} --tarball-name cheribsd-sysroot"
@@ -92,7 +93,8 @@ find cheribsd-test-results
     }
 }
 
-["mips-nocheri", "mips-hybrid", "mips-purecap", "riscv64", "riscv64-hybrid", "riscv64-purecap", "amd64", "aarch64"].each { suffix ->
+// ["mips-nocheri", "mips-hybrid", "mips-purecap", "riscv64", "riscv64-hybrid", "riscv64-purecap", "amd64", "aarch64"].each { suffix ->
+["mips-nocheri", "riscv64", "aarch64"].each { suffix ->
     String name = "cheribsd-${suffix}"
     jobs[suffix] = { ->
         cheribuildProject(target: "cheribsd-${suffix}", architecture: suffix,
