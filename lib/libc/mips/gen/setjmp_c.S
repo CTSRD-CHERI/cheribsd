@@ -70,27 +70,23 @@ NESTED(setjmp, SETJMP_FRAME_SIZE, _FRAME_RETURN_REG)
 	 * Prepare a proper stack frame so that we can call
 	 * __cheriabi_sigprocmask().
 	 */
-	dli		t0, -SETJMP_FRAME_SIZE	# allocate stack frame
-	cincoffset	$csp, $csp, t0
+	cincoffset	$csp, $csp, -SETJMP_FRAME_SIZE	# allocate stack frame
 
 	csc		$c17, zero, CALLFRAME_CRA($csp)
 	csc		$c3, zero, CALLFRAME_SIZ($csp)	# store env
 
-	li		t0, (SZREG * 96)
-	csetbounds	$c3, $c3, t0
-
 	/* Get the signal mask. */
 	li		t0, _JB_SIGMASK * SZREG
-	csetoffset	$c3, $c3, t0			# oset
-	cfromptr	$c4, $c3, zero			# set == NULL
+	cincoffset	$c4, $c3, t0			# oset
+	csetbounds	$c4, $c4, 16			# sizeof(sigset_t)=16
+	cgetnull	$c3				# set == NULL
 	li		a0, 1				# SIG_SETBLOCK
 	PIC_CALL_LOCAL(__libc_sigprocmask)		# get current signal mask
 
 	clc		$c3, zero, CALLFRAME_SIZ($csp)	# restore env pointer
 	clc		$c17, zero, CALLFRAME_CRA($csp)	# restore return cap
 
-	dli		t0, SETJMP_FRAME_SIZE		# pop stack frame
-	cincoffset	$csp, $csp, t0
+	cincoffset	$csp, $csp, SETJMP_FRAME_SIZE	# pop stack frame
 
 	REG_LI		v0, _JB_MAGIC_SETJMP
 	csd		v0, zero, (_JB_MAGIC  * SZREG)($c3)
@@ -106,9 +102,12 @@ NESTED(setjmp, SETJMP_FRAME_SIZE, _FRAME_RETURN_REG)
 	 * terms of caller/callee-save registers, despite some registers
 	 * seeing different use.
 	 *
-	 * NB: In the pure-capability ABI, we need to neither save nore restore
-	 * $ra and $sp, which are caller-save and not used for control flow.
+	 * NB: In the pure-capability ABI, we don't need to save or restore
+	 * $sp, which is caller-save and not used for control flow.
+	 *
+	 * See CSR_Cheri_Purecap in LLVM's lib/Target/Mips/MipsCallingConv.td
 	 */
+	csd		ra, zero, (_JB_REG_RA * SZREG)($c3)
 	csd		s0, zero, (_JB_REG_S0 * SZREG)($c3)
 	csd		s1, zero, (_JB_REG_S1 * SZREG)($c3)
 	csd		s2, zero, (_JB_REG_S2 * SZREG)($c3)
@@ -164,16 +163,15 @@ NESTED(longjmp, LONGJMP_FRAME_SIZE, _FRAME_RETURN_REG)
 	PIC_PROLOGUE(longjmp)
 	/* XXXRW: CFI annotations for debugger. */
 
-	dli		t0, -LONGJMP_FRAME_SIZE
-	cincoffset	$csp, $csp, t0
+	cincoffset	$csp, $csp, -LONGJMP_FRAME_SIZE
 
 	/*
 	 * Prepare a proper stack frame so that we can call
 	 * __cheriabi_sigprocmask().
 	 */
 	csc		$c17, zero, CALLFRAME_CRA($csp)
-	csd		a0, zero, CALLFRAME_S0($csp)
-	csc		$c3, zero, CALLFRAME_SIZ($csp)
+	csd		a0, zero, CALLFRAME_S0($csp)	# save return value
+	csc		$c3, zero, CALLFRAME_SIZ($csp)	# save env
 
 	cld		v0, zero, (_JB_MAGIC  * SZREG)($c3)
 	REG_LI		t0, _JB_MAGIC_SETJMP
@@ -182,12 +180,13 @@ NESTED(longjmp, LONGJMP_FRAME_SIZE, _FRAME_RETURN_REG)
 
 	# set sigmask
 	li		t0, _JB_SIGMASK * SZREG
-	csetoffset	$c3, $c3, t0			# set
-	cfromptr	$c4, $c3, zero			# oset == NULL
+	cincoffset	$c3, $c3, t0			# set
+	csetbounds	$c3, $c3, 16			# sizeof(sigset_t)=16
+	cgetnull	$c4				# oset == NULL
 	li		a0, 3				# SIG_SETMASK
 	PIC_CALL_LOCAL(__libc_sigprocmask)		# set current signal mask
 
-	clc		$c3, zero, CALLFRAME_SIZ($csp)
+	clc		$c3, zero, CALLFRAME_SIZ($csp)	# restore env
 	cld		a0, zero, CALLFRAME_S0($csp)	# restore return value
 
 	/*
@@ -197,9 +196,12 @@ NESTED(longjmp, LONGJMP_FRAME_SIZE, _FRAME_RETURN_REG)
 	 * The fp (or s8) register is callee-saved.
 	 * The gp register is callee-saved (for n32/n64).
 	 *
-	 * NB: In the pure-capability ABI, we need to neither save nore restore
-	 * $ra and $sp, which are caller-save and not used for control flow.
+	 * NB: In the pure-capability ABI, we don't need to save or restore
+	 * $sp, which is caller-save and not used for control flow.
+	 *
+	 * See CSR_Cheri_Purecap in LLVM's lib/Target/Mips/MipsCallingConv.td
 	 */
+	cld		ra, zero, (_JB_REG_RA * SZREG)($c3)
 	cld		s0, zero, (_JB_REG_S0 * SZREG)($c3)
 	cld		s1, zero, (_JB_REG_S1 * SZREG)($c3)
 	cld		s2, zero, (_JB_REG_S2 * SZREG)($c3)

@@ -2099,7 +2099,7 @@ cheritest_run_test(const struct cheri_test *ctp)
 	if (debugger_enabled) {
 		char command[256];
 		snprintf(
-		    command, sizeof(command), "gdb --pid=%d -ex=c", childpid);
+		    command, sizeof(command), "gdb --pid=%d", childpid);
 		if (verbose)
 			fprintf(stderr, "Running '%s' to debug %s\n", command,
 			    ctp->ct_name);

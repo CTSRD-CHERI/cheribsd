@@ -88,7 +88,7 @@ __FBSDID("$FreeBSD$");
  * should currently be sufficient for all supported platforms.
  */
 #define	SYS_IOCTL_SMALL_SIZE	128	/* bytes */
-#define	SYS_IOCTL_SMALL_ALIGN	sizeof(void *)	/* bytes */
+#define	SYS_IOCTL_SMALL_ALIGN	MAX(sizeof(void * __capability), 8)	/* bytes */
 
 #if defined(__LP64__) || defined(__CHERI_PURE_CAPABILITY__)
 static int iosize_max_clamp = 0;

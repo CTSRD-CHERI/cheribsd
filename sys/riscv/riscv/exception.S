@@ -135,12 +135,11 @@ __FBSDID("$FreeBSD$");
 	cspecialw ddc, ct0
 
 	/* Switch to non-capmode PCC. */
-1:	auipcc	ct0, %pcrel_hi(2f)
-	cincoffset ct0, ct0, %pcrel_lo(1b)
+	cllc	ct0, 1f
 	csetflags ct0, ct0, x0
 	cjr	ct0
 .option pop
-2:
+1:
 #else
 	sd	t0, (TF_T + 0 * 8)(sp)
 	sd	t1, (TF_T + 1 * 8)(sp)

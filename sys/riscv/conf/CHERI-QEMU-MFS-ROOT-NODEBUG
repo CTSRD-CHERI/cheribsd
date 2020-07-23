@@ -1,0 +1,6 @@
+#NO_UNIVERSE
+
+include "CHERI-QEMU-MFS-ROOT"
+include "std.NODEBUG"
+
+ident CHERI-QEMU-MFS-ROOT-NODEBUG

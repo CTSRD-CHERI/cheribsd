@@ -101,7 +101,7 @@ struct xucred {
 	short	cr_ngroups;		/* number of groups */
 	gid_t	cr_groups[XU_NGROUPS];	/* groups */
 	union {
-		void	*_cr_unused1;	/* compatibility with old ucred */
+		void * __kerncap _cr_unused1;	/* old ucred compat */
 		pid_t	cr_pid;
 	};
 };
