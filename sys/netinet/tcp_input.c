@@ -611,7 +611,7 @@ tcp_input(struct mbuf **mp, int *offp, int proto)
 {
 	struct mbuf *m = *mp;
 	struct tcphdr *th = NULL;
-	struct ip *ip = NULL;
+	struct ip *ip __no_subobject_bounds = NULL;
 	struct inpcb *inp = NULL;
 	struct tcpcb *tp = NULL;
 	struct socket *so = NULL;
@@ -629,7 +629,7 @@ tcp_input(struct mbuf **mp, int *offp, int proto)
 	uint8_t iptos;
 	struct m_tag *fwd_tag = NULL;
 #ifdef INET6
-	struct ip6_hdr *ip6 = NULL;
+	struct ip6_hdr *ip6 __no_subobject_bounds = NULL;
 	int isipv6;
 #else
 	const void *ip6 = NULL;
