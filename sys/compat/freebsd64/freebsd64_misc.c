@@ -296,7 +296,7 @@ freebsd64_kevent(struct thread *td, struct freebsd64_kevent_args *uap)
 #ifdef COMPAT_FREEBSD11
 struct kevent_freebsd1164 {
 	uint64_t	ident;	/* (uintptr_t) identifier for this event */
-	short		filter;		/* filter for event */
+	short		filter;	/* filter for event */
 	unsigned short	flags;
 	unsigned int	fflags;
 	int64_t		data;	/* (intptr_t) */

@@ -113,10 +113,6 @@ __FBSDID("$FreeBSD$");
 #include <cheri/cheric.h>
 #endif
 
-#ifdef COMPAT_CHERIABI
-#include <compat/cheriabi/cheriabi_util.h>
-#endif
-
 int old_mlock = 0;
 SYSCTL_INT(_vm, OID_AUTO, old_mlock, CTLFLAG_RWTUN, &old_mlock, 0,
     "Do not apply RLIMIT_MEMLOCK on mlockall");

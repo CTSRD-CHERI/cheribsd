@@ -1,0 +1,6 @@
+#NO_UNIVERSE
+
+include "GFE"
+include "std.NODEBUG"
+
+ident GFE-NODEBUG

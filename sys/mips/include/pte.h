@@ -227,9 +227,9 @@ typedef uint64_t pd_entry_t;
  *
  * Upper bits of a 64 bit PTE:
  *
- *   63-62   61-60  59   58 -- 56    55   54   53
+ *   63-62   61-----59   58 -- 56    55   54   53
  *   ---------------------------------------------
- *  |  RG  |      | SV | PG SZ IDX | MN | W  | RO |
+ *  |  RG  |           | PG SZ IDX | MN | W  | RO |
  *   ---------------------------------------------
  *
  * VM flags managed in software:
@@ -238,8 +238,6 @@ typedef uint64_t pd_entry_t;
  *      On CHERI, used for cap-store (63) and -load (62) inhibit bits and
  *      exposed to hardware.  In MIPS64, these are the Read Inhibit (63)
  *      and eXecute Inhibit (62) bits and are also exposed to hardware.
- *
- *  SV: Soft Valid bit.
  *
  *  PG SZ IDX: Page Size Index (0-7).
  *      Index   Page Mask (Binary)  HW Page Size

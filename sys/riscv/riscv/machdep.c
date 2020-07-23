@@ -424,8 +424,8 @@ exec_setregs(struct thread *td, struct image_params *imgp, uintcap_t stack)
 	} else
 #endif
 	{
-		tf->tf_a[0] = (__cheri_addr uintptr_t)stack;
-		tf->tf_sp = STACKALIGN((__cheri_addr uintptr_t)stack);
+		tf->tf_a[0] = (__cheri_addr vaddr_t)stack;
+		tf->tf_sp = STACKALIGN((__cheri_addr vaddr_t)stack);
 #if __has_feature(capabilities)
 		hybridabi_thread_setregs(td, imgp->entry_addr);
 #else
@@ -832,7 +832,7 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 #endif
 
 	CTR4(KTR_SIG, "sendsig: td=%p (%s) catcher=%p sig=%d", td, p->p_comm,
-	    catcher, sig);
+	    (__cheri_addr vaddr_t)catcher, sig);
 
 	/* Allocate and validate space for the signal handler context. */
 	if ((td->td_pflags & TDP_ALTSTACK) != 0 && !onstack &&
@@ -878,7 +878,8 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	/* Copy the sigframe out to the user's stack. */
 	if (copyoutcap(&frame, fp, sizeof(*fp)) != 0) {
 		/* Process has trashed its stack. Kill it. */
-		CTR2(KTR_SIG, "sendsig: sigexit td=%p fp=%p", td, fp);
+		CTR2(KTR_SIG, "sendsig: sigexit td=%p fp=%p", td,
+				(__cheri_addr vaddr_t)fp);
 		PROC_LOCK(p);
 		sigexit(td, SIGILL);
 	}

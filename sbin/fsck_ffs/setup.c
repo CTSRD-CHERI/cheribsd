@@ -217,7 +217,7 @@ setup(char *dev)
 	disk.d_ufs = (sblock.fs_magic == FS_UFS1_MAGIC) ? 1 : 2;
 	disk.d_bsize = sblock.fs_fsize / fsbtodb(&sblock, 1);
 	disk.d_sblock = sblock.fs_sblockloc / disk.d_bsize;
-	disk.d_sbcsum = sblock.fs_si->fs_csp;
+	disk.d_sbcsum = sblock.fs_csp;
 
 	if (skipclean && ckclean && sblock.fs_clean) {
 		pwarn("FILE SYSTEM CLEAN; SKIPPING CHECKS\n");
@@ -262,8 +262,8 @@ setup(char *dev)
 	 * read in the summary info.
 	 */
 	asked = 0;
-	sblock.fs_si->fs_csp = Calloc(1, sblock.fs_cssize);
-	if (sblock.fs_si->fs_csp == NULL) {
+	sblock.fs_csp = Calloc(1, sblock.fs_cssize);
+	if (sblock.fs_csp == NULL) {
 		printf("cannot alloc %u bytes for cg summary info\n",
 		    (unsigned)sblock.fs_cssize);
 		goto badsb;
@@ -271,7 +271,7 @@ setup(char *dev)
 	for (i = 0, j = 0; i < sblock.fs_cssize; i += sblock.fs_bsize, j++) {
 		size = MIN(sblock.fs_cssize - i, sblock.fs_bsize);
 		readcnt[sblk.b_type]++;
-		if (blread(fsreadfd, (char *)sblock.fs_si->fs_csp + i,
+		if (blread(fsreadfd, (char *)sblock.fs_csp + i,
 		    fsbtodb(&sblock, sblock.fs_csaddr + j * sblock.fs_frag),
 		    size) != 0 && !asked) {
 			pfatal("BAD SUMMARY INFORMATION");
