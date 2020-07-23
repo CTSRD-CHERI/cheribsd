@@ -33,7 +33,7 @@ def buildImageAndRunTests(params, String suffix) {
     stage("Building disk image") {
         sh "./cheribuild/jenkins-cheri-build.py --build disk-image-${suffix} ${params.extraArgs}"
     }
-    if (!suffix.startsWith('mips-') && !suffix.startsWith('riscv64')) {
+    if (suffix.startsWith('mips') || suffix.startsWith('riscv64')) {
         stage("Building minimal disk image") {
             sh "./cheribuild/jenkins-cheri-build.py --build disk-image-minimal-${suffix} ${params.extraArgs}"
         }
