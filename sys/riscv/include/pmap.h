@@ -109,7 +109,7 @@ struct pv_chunk {
 	TAILQ_ENTRY(pv_chunk)	pc_list;
 	uint64_t		pc_map[_NPCM];  /* bitmap; 1 = free */
 	TAILQ_ENTRY(pv_chunk)	pc_lru;
-	struct pv_entry		pc_pventry[_NPCPV];
+	struct pv_entry		pc_pventry[_NPCPV] __subobject_use_container_bounds;
 #ifdef __CHERI_PURE_CAPABILITY__
 	/* Ensure pv_chunk is a page. */
 	char			pc_pad[16];
@@ -189,7 +189,8 @@ pmap_vmspace_copy(pmap_t dst_pmap __unused, pmap_t src_pmap __unused)
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "pointer_as_integer",
-//     "pointer_shape"
+//     "pointer_shape",
+//     "subobject_bounds"
 //   ]
 // }
 // CHERI CHANGES END
