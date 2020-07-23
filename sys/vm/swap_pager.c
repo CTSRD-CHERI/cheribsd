@@ -180,7 +180,7 @@ static struct sx swdev_syscall_lock;	/* serialize swap(on|off) */
 void * __capability swap_restore_cap;
 #endif
 
-static u_long swap_reserved;
+static __exclusive_cache_line u_long swap_reserved;
 static u_long swap_total;
 static int sysctl_page_shift(SYSCTL_HANDLER_ARGS);
 
