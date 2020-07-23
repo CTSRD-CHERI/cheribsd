@@ -16,7 +16,7 @@ def jobProperties = [rateLimitBuilds([count: 1, durationName: 'hour', userBoost:
 ]
 // Don't archive sysroot/disk image/kernel images for pull requests and non-default branches:
 def archiveBranches = ['master', 'dev']
-if (/*!env.CHANGE_ID && archiveBranches.contains(env.BRANCH_NAME)*/true) {
+if (!env.CHANGE_ID && archiveBranches.contains(env.BRANCH_NAME)) {
     GlobalVars.archiveArtifacts = true
     // For branches other than the master branch, only keep the last two artifacts to save disk space
     if (env.BRANCH_NAME != 'master') {
@@ -29,7 +29,6 @@ setDefaultJobProperties(jobProperties)
 jobs = [:]
 
 def buildImageAndRunTests(params, String suffix) {
-
     stage("Building disk image") {
         sh "./cheribuild/jenkins-cheri-build.py --build disk-image-${suffix} ${params.extraArgs}"
     }
