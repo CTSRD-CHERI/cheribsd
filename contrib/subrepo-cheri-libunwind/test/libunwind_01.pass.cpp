@@ -10,13 +10,13 @@ void backtrace(int lower_bound) {
   unw_init_local(&cursor, &context);
 
   char buffer[1024];
-  unw_word_t offset = 0;
+  size_t offset = 0;
 
   int n = 0;
   while (1) {
     n++;
     if (unw_get_proc_name(&cursor, buffer, sizeof(buffer), &offset) == 0) {
-      fprintf(stderr, "Frame %d: %s+%p\n", n, buffer, (void*)offset);
+      fprintf(stderr, "Frame %d: %s+%p\n", n, buffer, (void*)(intptr_t)offset);
     } else {
       fprintf(stderr, "Frame %d: Could not get name for cursor\n", n);
     }

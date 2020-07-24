@@ -40,8 +40,6 @@ __FBSDID("$FreeBSD$");
 
 #include "opt_posix.h"
 
-#define	EXPLICIT_USER_ACCESS
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>

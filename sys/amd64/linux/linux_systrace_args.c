@@ -1261,6 +1261,11 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 0;
 		break;
 	}
+	/* linux_modify_ldt */
+	case 154: {
+		*n_args = 0;
+		break;
+	}
 	/* linux_pivot_root */
 	case 155: {
 		*n_args = 0;
@@ -1396,6 +1401,11 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 1;
 		break;
 	}
+	/* linux_ioperm */
+	case 173: {
+		*n_args = 0;
+		break;
+	}
 	/* linux_init_module */
 	case 175: {
 		*n_args = 0;
@@ -1413,6 +1423,11 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	}
 	/* linux_gettid */
 	case 186: {
+		*n_args = 0;
+		break;
+	}
+	/* linux_readahead */
+	case 187: {
 		*n_args = 0;
 		break;
 	}
@@ -1521,6 +1536,31 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 3;
 		break;
 	}
+	/* linux_io_setup */
+	case 206: {
+		*n_args = 0;
+		break;
+	}
+	/* linux_io_destroy */
+	case 207: {
+		*n_args = 0;
+		break;
+	}
+	/* linux_io_getevents */
+	case 208: {
+		*n_args = 0;
+		break;
+	}
+	/* linux_io_submit */
+	case 209: {
+		*n_args = 0;
+		break;
+	}
+	/* linux_io_cancel */
+	case 210: {
+		*n_args = 0;
+		break;
+	}
 	/* linux_lookup_dcookie */
 	case 212: {
 		*n_args = 0;
@@ -1552,6 +1592,11 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		struct linux_set_tid_address_args *p = params;
 		uarg[0] = (intptr_t) p->tidptr; /* l_int * */
 		*n_args = 1;
+		break;
+	}
+	/* linux_restart_syscall */
+	case 219: {
+		*n_args = 0;
 		break;
 	}
 	/* linux_semtimedop */
@@ -1977,7 +2022,12 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	}
 	/* linux_sync_file_range */
 	case 277: {
-		*n_args = 0;
+		struct linux_sync_file_range_args *p = params;
+		iarg[0] = p->fd; /* l_int */
+		iarg[1] = p->offset; /* l_loff_t */
+		iarg[2] = p->nbytes; /* l_loff_t */
+		uarg[3] = p->flags; /* unsigned int */
+		*n_args = 4;
 		break;
 	}
 	/* linux_vmsplice */
@@ -4554,6 +4604,9 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	/* linux_vhangup */
 	case 153:
 		break;
+	/* linux_modify_ldt */
+	case 154:
+		break;
 	/* linux_pivot_root */
 	case 155:
 		break;
@@ -4757,6 +4810,9 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
+	/* linux_ioperm */
+	case 173:
+		break;
 	/* linux_init_module */
 	case 175:
 		break;
@@ -4768,6 +4824,9 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		break;
 	/* linux_gettid */
 	case 186:
+		break;
+	/* linux_readahead */
+	case 187:
 		break;
 	/* linux_setxattr */
 	case 188:
@@ -4885,6 +4944,21 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
+	/* linux_io_setup */
+	case 206:
+		break;
+	/* linux_io_destroy */
+	case 207:
+		break;
+	/* linux_io_getevents */
+	case 208:
+		break;
+	/* linux_io_submit */
+	case 209:
+		break;
+	/* linux_io_cancel */
+	case 210:
+		break;
 	/* linux_lookup_dcookie */
 	case 212:
 		break;
@@ -4926,6 +5000,9 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		default:
 			break;
 		};
+		break;
+	/* linux_restart_syscall */
+	case 219:
 		break;
 	/* linux_semtimedop */
 	case 220:
@@ -5553,6 +5630,22 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		break;
 	/* linux_sync_file_range */
 	case 277:
+		switch(ndx) {
+		case 0:
+			p = "l_int";
+			break;
+		case 1:
+			p = "l_loff_t";
+			break;
+		case 2:
+			p = "l_loff_t";
+			break;
+		case 3:
+			p = "unsigned int";
+			break;
+		default:
+			break;
+		};
 		break;
 	/* linux_vmsplice */
 	case 278:
@@ -7142,6 +7235,8 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 152:
 	/* linux_vhangup */
 	case 153:
+	/* linux_modify_ldt */
+	case 154:
 	/* linux_pivot_root */
 	case 155:
 	/* linux_sysctl */
@@ -7220,6 +7315,8 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
+	/* linux_ioperm */
+	case 173:
 	/* linux_init_module */
 	case 175:
 	/* linux_delete_module */
@@ -7228,6 +7325,8 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 179:
 	/* linux_gettid */
 	case 186:
+	/* linux_readahead */
+	case 187:
 	/* linux_setxattr */
 	case 188:
 	/* linux_lsetxattr */
@@ -7277,6 +7376,16 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
+	/* linux_io_setup */
+	case 206:
+	/* linux_io_destroy */
+	case 207:
+	/* linux_io_getevents */
+	case 208:
+	/* linux_io_submit */
+	case 209:
+	/* linux_io_cancel */
+	case 210:
 	/* linux_lookup_dcookie */
 	case 212:
 	/* linux_epoll_create */
@@ -7296,6 +7405,8 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
+	/* linux_restart_syscall */
+	case 219:
 	/* linux_semtimedop */
 	case 220:
 	/* linux_fadvise64 */
@@ -7509,6 +7620,9 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 276:
 	/* linux_sync_file_range */
 	case 277:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
 	/* linux_vmsplice */
 	case 278:
 	/* linux_move_pages */

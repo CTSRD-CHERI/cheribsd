@@ -2,7 +2,7 @@
 
 PROG_CXX=	llvm-pdbutil
 
-SRCDIR=		tools/llvm-pdbutil
+SRCDIR=		llvm/tools/llvm-pdbutil
 SRCS+=		BytesOutputStyle.cpp
 SRCS+=		DumpOutputStyle.cpp
 SRCS+=		ExplainOutputStyle.cpp
@@ -26,5 +26,7 @@ SRCS+=		StreamUtil.cpp
 SRCS+=		TypeReferenceTracker.cpp
 SRCS+=		YAMLOutputStyle.cpp
 SRCS+=		llvm-pdbutil.cpp
+
+LIBADD+=	z
 
 .include "../llvm.prog.mk"

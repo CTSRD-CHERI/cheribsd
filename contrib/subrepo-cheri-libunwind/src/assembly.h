@@ -75,6 +75,7 @@
 #define EXPORT_SYMBOL(name)
 #define HIDDEN_SYMBOL(name) .hidden name
 #define WEAK_SYMBOL(name) .weak name
+#define EMIT_FUNCTION_SIZE(name) .size name, . - name
 #define WEAK_ALIAS(name, aliasname)                                            \
   WEAK_SYMBOL(aliasname) SEPARATOR                                             \
   SYMBOL_NAME(aliasname) = SYMBOL_NAME(name)
@@ -131,6 +132,10 @@
 
 #endif
 
+#ifndef EMIT_FUNCTION_SIZE
+#define EMIT_FUNCTION_SIZE(name)
+#endif
+
 #if defined(__mips__) && defined(__ELF__)
 #define FUNCTION_ENTRY_DIRECTIVE(name) .ent name
 #define FUNCTION_END_DIRECTIVE(name) .end name
@@ -138,6 +143,7 @@
 #define FUNCTION_ENTRY_DIRECTIVE(name)
 #define FUNCTION_END_DIRECTIVE(name)
 #endif
+
 
 #define DEFINE_LIBUNWIND_FUNCTION(name)                                        \
   .globl SYMBOL_NAME(name) SEPARATOR                                           \
@@ -149,6 +155,7 @@
   PPC64_OPD2
 
 #define END_LIBUNWIND_FUNCTION(name)                                           \
+  EMIT_FUNCTION_SIZE(SYMBOL_NAME(name)) SEPARATOR                              \
   FUNCTION_END_DIRECTIVE(SYMBOL_NAME(name))
 
 #if defined(__arm__)

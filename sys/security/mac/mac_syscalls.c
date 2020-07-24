@@ -47,8 +47,6 @@ __FBSDID("$FreeBSD$");
 
 #include "opt_mac.h"
 
-#define	EXPLICIT_USER_ACCESS
-
 #include <sys/param.h>
 #include <sys/capsicum.h>
 #include <sys/fcntl.h>
@@ -90,7 +88,7 @@ int
 kern_mac_get_pid(struct thread *td, pid_t pid, void * __capability mac_p)
 {
 	char *elements, *buffer;
-	kmac_t mac;
+	struct mac mac;
 	struct proc *tproc;
 	struct ucred *tcred;
 	int error;
@@ -146,7 +144,7 @@ int
 kern_mac_get_proc(struct thread *td, void * __capability mac_p)
 {
 	char *elements, *buffer;
-	kmac_t mac;
+	struct mac mac;
 	int error;
 
 	error = copyin_mac(mac_p, &mac);
@@ -188,7 +186,7 @@ kern_mac_set_proc(struct thread *td, void * __capability mac_p)
 	struct ucred *newcred, *oldcred;
 	struct label *intlabel;
 	struct proc *p;
-	kmac_t mac;
+	struct mac mac;
 	char *buffer;
 	int error;
 
@@ -256,7 +254,7 @@ kern_mac_get_fd(struct thread *td, int fd, void * __capability mac_p)
 	char *elements, *buffer;
 	struct label *intlabel;
 	struct file *fp;
-	kmac_t mac;
+	struct mac mac;
 	struct vnode *vp;
 	struct pipe *pipe;
 	struct socket *so;
@@ -294,7 +292,7 @@ kern_mac_get_fd(struct thread *td, int fd, void * __capability mac_p)
 		intlabel = mac_vnode_label_alloc();
 		vn_lock(vp, LK_EXCLUSIVE | LK_RETRY);
 		mac_vnode_copy_label(vp->v_label, intlabel);
-		VOP_UNLOCK(vp, 0);
+		VOP_UNLOCK(vp);
 		error = mac_vnode_externalize_label(intlabel, elements,
 		    buffer, mac.m_buflen);
 		mac_vnode_label_free(intlabel);
@@ -364,7 +362,7 @@ kern_mac_get_path(struct thread *td, const char * __capability path_p,
 	char *elements, *buffer;
 	struct nameidata nd;
 	struct label *intlabel;
-	kmac_t mac;
+	struct mac mac;
 	int error;
 
 	if (!(mac_labeled & MPC_OBJECT_VNODE))
@@ -424,7 +422,7 @@ kern_mac_set_fd(struct thread *td, int fd, void * __capability mac_p)
 	struct file *fp;
 	struct mount *mp;
 	struct vnode *vp;
-	kmac_t mac;
+	struct mac mac;
 	cap_rights_t rights;
 	char *buffer;
 	int error;
@@ -469,7 +467,7 @@ kern_mac_set_fd(struct thread *td, int fd, void * __capability mac_p)
 		}
 		vn_lock(vp, LK_EXCLUSIVE | LK_RETRY);
 		error = vn_setlabel(vp, intlabel, td->td_ucred);
-		VOP_UNLOCK(vp, 0);
+		VOP_UNLOCK(vp);
 		vn_finished_write(mp);
 		mac_vnode_label_free(intlabel);
 		break;
@@ -537,7 +535,7 @@ kern_mac_set_path(struct thread *td, const char * __capability path_p,
 	struct label *intlabel;
 	struct nameidata nd;
 	struct mount *mp;
-	kmac_t mac;
+	struct mac mac;
 	char *buffer;
 	int error;
 

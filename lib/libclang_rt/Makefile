@@ -1,7 +1,7 @@
 # $FreeBSD$
 
 .if ${MACHINE_CPUARCH} == "amd64" || ${MACHINE_CPUARCH} == "i386" || \
-    ${MACHINE_ARCH:Mmips64*} != ""
+    ${MACHINE_ARCH:Mmips64*}
 SUBDIR+=	include
 SUBDIR+=	asan
 SUBDIR+=	asan-preinit
@@ -12,7 +12,7 @@ SUBDIR+=	cfi_diag
 SUBDIR+=	safestack
 SUBDIR+=	stats
 SUBDIR+=	stats_client
-.if ${MACHINE_CPUARCH} == "amd64" || ${MACHINE_ARCH:Mmips64*} != ""
+.if ${MACHINE_CPUARCH} == "amd64" || ${MACHINE_ARCH:Mmips64*}
 SUBDIR+=	tsan
 SUBDIR+=	tsan_cxx
 .endif
@@ -27,8 +27,6 @@ SUBDIR+=	fuzzer
 SUBDIR+=	fuzzer_no_main
 SUBDIR+=	msan
 SUBDIR+=	msan_cxx
-SUBDIR+=	tsan
-SUBDIR+=	tsan_cxx
 SUBDIR+=	xray
 SUBDIR+=	xray-basic
 SUBDIR+=	xray-fdr

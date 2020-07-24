@@ -97,6 +97,7 @@ __FBSDID("$FreeBSD$");
 #include <net/if_llatbl.h>
 #include <net/if_types.h>
 #include <net/route.h>
+#include <net/route/nhop.h>
 
 #include <netinet/in.h>
 #include <netinet/in_var.h>
@@ -109,6 +110,7 @@ __FBSDID("$FreeBSD$");
 #include <netinet6/nd6.h>
 #include <netinet/in_pcb.h>
 #include <netinet6/in6_pcb.h>
+#include <netinet6/in6_fib.h>
 #include <netinet6/scope6_var.h>
 
 static struct inpcb *in6_pcblookup_hash_locked(struct inpcbinfo *,
@@ -411,7 +413,7 @@ in6_pcbladdr(struct inpcb *inp, struct sockaddr *nam,
  */
 int
 in6_pcbconnect_mbuf(struct inpcb *inp, struct sockaddr *nam,
-    struct ucred *cred, struct mbuf *m)
+    struct ucred *cred, struct mbuf *m, bool rehash)
 {
 	struct inpcbinfo *pcbinfo = inp->inp_pcbinfo;
 	struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *)nam;
@@ -437,6 +439,8 @@ in6_pcbconnect_mbuf(struct inpcb *inp, struct sockaddr *nam,
 	}
 	if (IN6_IS_ADDR_UNSPECIFIED(&inp->in6p_laddr)) {
 		if (inp->inp_lport == 0) {
+			KASSERT(rehash == true,
+			    ("Rehashing required for unbound inps"));
 			error = in6_pcbbind(inp, (struct sockaddr *)0, cred);
 			if (error)
 				return (error);
@@ -451,7 +455,11 @@ in6_pcbconnect_mbuf(struct inpcb *inp, struct sockaddr *nam,
 		inp->inp_flow |=
 		    (htonl(ip6_randomflowlabel()) & IPV6_FLOWLABEL_MASK);
 
-	in_pcbrehash_mbuf(inp, m);
+	if (rehash) {
+		in_pcbrehash_mbuf(inp, m);
+	} else {
+		in_pcbinshash_mbuf(inp, m);
+	}
 
 	return (0);
 }
@@ -460,7 +468,7 @@ int
 in6_pcbconnect(struct inpcb *inp, struct sockaddr *nam, struct ucred *cred)
 {
 
-	return (in6_pcbconnect_mbuf(inp, nam, cred, NULL));
+	return (in6_pcbconnect_mbuf(inp, nam, cred, NULL, true));
 }
 
 void

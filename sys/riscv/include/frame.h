@@ -46,6 +46,17 @@
  * NOTE: keep this structure in sync with struct reg and struct mcontext.
  */
 struct trapframe {
+#if __has_feature(capabilities)
+	uintcap_t tf_ra;
+	uintcap_t tf_sp;
+	uintcap_t tf_gp;
+	uintcap_t tf_tp;
+	uintcap_t tf_t[7];
+	uintcap_t tf_s[12];
+	uintcap_t tf_a[8];
+	uintcap_t tf_sepc;
+	uintcap_t tf_ddc;
+#else
 	uint64_t tf_ra;
 	uint64_t tf_sp;
 	uint64_t tf_gp;
@@ -54,6 +65,7 @@ struct trapframe {
 	uint64_t tf_s[12];
 	uint64_t tf_a[8];
 	uint64_t tf_sepc;
+#endif
 	uint64_t tf_sstatus;
 	uint64_t tf_stval;
 	uint64_t tf_scause;
@@ -71,6 +83,13 @@ struct sigframe {
 	siginfo_t	sf_si;	/* actual saved siginfo */
 	ucontext_t	sf_uc;	/* actual saved ucontext */
 };
+
+#ifdef COMPAT_FREEBSD64
+struct sigframe64 {
+	struct siginfo64 sf_si;	/* actual saved siginfo */
+	ucontext64_t	sf_uc;	/* actual saved ucontext */
+};
+#endif
 
 #endif /* !LOCORE */
 

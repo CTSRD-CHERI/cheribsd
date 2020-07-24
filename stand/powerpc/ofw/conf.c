@@ -69,6 +69,9 @@ struct fs_ops *file_system[] = {
 #if defined(LOADER_EXT2FS_SUPPORT)
     &ext2fs_fsops,
 #endif
+#if defined(LOADER_MSDOS_SUPPORT)
+    &dosfs_fsops,
+#endif
 #if defined(LOADER_NFS_SUPPORT)
     &nfs_fsops,
 #endif
@@ -97,8 +100,8 @@ struct netif_driver *netif_drivers[] = {
  * rather than reading the file go first.
  */
 
-struct file_format ofw_elf;
-struct file_format ofw_elf64;
+extern struct file_format ofw_elf;
+extern struct file_format ofw_elf64;
 
 struct file_format *file_formats[] = {
     &ofw_elf,

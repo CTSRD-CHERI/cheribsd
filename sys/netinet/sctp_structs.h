@@ -189,7 +189,7 @@ struct iterator_control {
 #define SCTP_ITERATOR_STOP_CUR_INP	0x00000008
 
 struct sctp_net_route {
-	sctp_rtentry_t *ro_rt;
+	struct nhop_object *ro_nh;
 	struct llentry *ro_lle;
 	char *ro_prepend;
 	uint16_t ro_plen;
@@ -275,7 +275,7 @@ struct sctp_nets {
 	int lastsa;
 	int lastsv;
 	uint64_t rtt;		/* last measured rtt value in us */
-	unsigned int RTO;
+	uint32_t RTO;
 
 	/* This is used for SHUTDOWN/SHUTDOWN-ACK/SEND or INIT timers */
 	struct sctp_timer rxt_timer;
@@ -806,7 +806,6 @@ struct sctp_association {
 	struct sctp_timer strreset_timer;	/* stream reset */
 	struct sctp_timer shut_guard_timer;	/* shutdown guard */
 	struct sctp_timer autoclose_timer;	/* automatic close timer */
-	struct sctp_timer delayed_event_timer;	/* timer for delayed events */
 	struct sctp_timer delete_prim_timer;	/* deleting primary dst */
 
 	/* list of restricted local addresses */
@@ -1063,7 +1062,7 @@ struct sctp_association {
 	uint32_t heart_beat_delay;
 
 	/* autoclose */
-	unsigned int sctp_autoclose_ticks;
+	uint32_t sctp_autoclose_ticks;
 
 	/* how many preopen streams we have */
 	unsigned int pre_open_streams;
@@ -1072,7 +1071,7 @@ struct sctp_association {
 	unsigned int max_inbound_streams;
 
 	/* the cookie life I award for any cookie, in seconds */
-	unsigned int cookie_life;
+	uint32_t cookie_life;
 	/* time to delay acks for */
 	unsigned int delayed_ack;
 	unsigned int old_delayed_ack;
@@ -1081,10 +1080,10 @@ struct sctp_association {
 
 	unsigned int numduptsns;
 	int dup_tsns[SCTP_MAX_DUP_TSNS];
-	unsigned int initial_init_rto_max;	/* initial RTO for INIT's */
-	unsigned int initial_rto;	/* initial send RTO */
-	unsigned int minrto;	/* per assoc RTO-MIN */
-	unsigned int maxrto;	/* per assoc RTO-MAX */
+	uint32_t initial_init_rto_max;	/* initial RTO for INIT's */
+	uint32_t initial_rto;	/* initial send RTO */
+	uint32_t minrto;	/* per assoc RTO-MIN */
+	uint32_t maxrto;	/* per assoc RTO-MAX */
 
 	/* authentication fields */
 	sctp_auth_chklist_t *local_auth_chunks;

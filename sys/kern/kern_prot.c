@@ -49,8 +49,6 @@ __FBSDID("$FreeBSD$");
 #include "opt_inet.h"
 #include "opt_inet6.h"
 
-#define	EXPLICIT_USER_ACCESS
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/acct.h>
@@ -67,7 +65,6 @@ __FBSDID("$FreeBSD$");
 #include <sys/sysent.h>
 #include <sys/sysproto.h>
 #include <sys/jail.h>
-#include <sys/pioctl.h>
 #include <sys/racct.h>
 #include <sys/rctl.h>
 #include <sys/resourcevar.h>
@@ -86,7 +83,8 @@ FEATURE(regression,
 
 static MALLOC_DEFINE(M_CRED, "cred", "credentials");
 
-SYSCTL_NODE(_security, OID_AUTO, bsd, CTLFLAG_RW, 0, "BSD security policy");
+SYSCTL_NODE(_security, OID_AUTO, bsd, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
+    "BSD security policy");
 
 static void crsetgroups_locked(struct ucred *cr, int ngrp, gid_t *groups);
 
@@ -1705,8 +1703,8 @@ sysctl_unprivileged_proc_debug(SYSCTL_HANDLER_ARGS)
  * systems.
  */
 SYSCTL_PROC(_security_bsd, OID_AUTO, unprivileged_proc_debug,
-    CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_PRISON | CTLFLAG_SECURE, 0, 0,
-    sysctl_unprivileged_proc_debug, "I",
+    CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_PRISON | CTLFLAG_SECURE |
+    CTLFLAG_MPSAFE, 0, 0, sysctl_unprivileged_proc_debug, "I",
     "Unprivileged processes may use process debugging facilities");
 
 /*-
@@ -2022,10 +2020,9 @@ proc_set_cred_init(struct proc *p, struct ucred *newcred)
  * only used when the process is about to be freed, at which point it should
  * not be visible anymore).
  */
-struct ucred *
+void
 proc_set_cred(struct proc *p, struct ucred *newcred)
 {
-	struct ucred *oldcred;
 
 	MPASS(p->p_ucred != NULL);
 	if (newcred == NULL)
@@ -2033,11 +2030,9 @@ proc_set_cred(struct proc *p, struct ucred *newcred)
 	else
 		PROC_LOCK_ASSERT(p, MA_OWNED);
 
-	oldcred = p->p_ucred;
 	p->p_ucred = newcred;
 	if (newcred != NULL)
 		PROC_UPDATE_COW(p);
-	return (oldcred);
 }
 
 struct ucred *
@@ -2084,7 +2079,7 @@ crextend(struct ucred *cr, int n)
 	 */
 	if ( n < PAGE_SIZE / sizeof(gid_t) ) {
 		if (cr->cr_agroups == 0)
-			cnt = MINALLOCSIZE / sizeof(gid_t);
+			cnt = MAX(1, MINALLOCSIZE / sizeof(gid_t));
 		else
 			cnt = cr->cr_agroups * 2;
 
@@ -2235,8 +2230,6 @@ setsugid(struct proc *p)
 
 	PROC_LOCK_ASSERT(p, MA_OWNED);
 	p->p_flag |= P_SUGID;
-	if (!(p->p_pfsflags & PF_ISUGID))
-		p->p_stops = 0;
 }
 
 /*-

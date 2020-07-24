@@ -33,8 +33,6 @@
  *
  */
 
-#define	EXPLICIT_USER_ACCESS
-
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
@@ -76,6 +74,8 @@ struct nfsdevicehead nfsrv_devidhead;
 volatile int nfsrv_devidcnt = 0;
 void (*nfsd_call_servertimer)(void) = NULL;
 void (*ncl_call_invalcaches)(struct vnode *) = NULL;
+vop_advlock_t *nfs_advlock_p = NULL;
+vop_reclaim_t *nfs_reclaim_p = NULL;
 
 int nfs_pnfsio(task_fn_t *, void *);
 
@@ -84,7 +84,8 @@ static int nfs_realign_count;
 static struct ext_nfsstats oldnfsstats;
 static struct nfsstatsov1 nfsstatsov1;
 
-SYSCTL_NODE(_vfs, OID_AUTO, nfs, CTLFLAG_RW, 0, "NFS filesystem");
+SYSCTL_NODE(_vfs, OID_AUTO, nfs, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
+    "NFS filesystem");
 SYSCTL_INT(_vfs_nfs, OID_AUTO, realign_test, CTLFLAG_RW, &nfs_realign_test,
     0, "Number of realign tests done");
 SYSCTL_INT(_vfs_nfs, OID_AUTO, realign_count, CTLFLAG_RW, &nfs_realign_count,
@@ -473,9 +474,9 @@ nfssvc_call(struct thread *p, struct nfssvc_args *uap, struct ucred *cred)
 
 	if (uap->flag & NFSSVC_IDNAME) {
 		if ((uap->flag & NFSSVC_NEWSTRUCT) != 0)
-			error = copyin(uap->argp, &nid, sizeof(nid));
+			error = copyincap(uap->argp, &nid, sizeof(nid));
 		else {
-			error = copyin(uap->argp, &onid, sizeof(onid));
+			error = copyincap(uap->argp, &onid, sizeof(onid));
 			if (error == 0) {
 				nid.nid_flag = onid.nid_flag;
 				nid.nid_uid = onid.nid_uid;

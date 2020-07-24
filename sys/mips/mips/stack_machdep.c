@@ -29,9 +29,10 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
-#include <sys/types.h>
-#include <sys/systm.h>
 #include <sys/param.h>
+#include <sys/systm.h>
+#include <sys/lock.h>
+#include <sys/mutex.h>
 #include <sys/proc.h>
 #include <sys/stack.h>
 
@@ -50,7 +51,7 @@ stack_register_fetch(u_register_t sp, u_register_t stack_pos)
 }
 
 static void
-stack_capture(struct stack *st, u_register_t pc, u_register_t sp)
+stack_capture(struct stack *st, vaddr_t pc, vaddr_t sp)
 {
 	u_register_t  ra = 0, i, stacksize;
 	short ra_stack_pos = 0;
@@ -128,27 +129,23 @@ done:
 	return;
 }
 
-void
+int
 stack_save_td(struct stack *st, struct thread *td)
 {
-	u_register_t pc, sp;
+	vaddr_t pc, sp;
 
-	if (TD_IS_SWAPPED(td))
-		panic("stack_save_td: swapped");
+	THREAD_LOCK_ASSERT(td, MA_OWNED);
+	KASSERT(!TD_IS_SWAPPED(td),
+	    ("stack_save_td: thread %p is swapped", td));
+
 	if (TD_IS_RUNNING(td))
-		panic("stack_save_td: running");
+		return (EOPNOTSUPP);
 
 	/* XXXRW: Should be pcb_context? */
-	pc = td->td_pcb->pcb_regs.pc;
-	sp = td->td_pcb->pcb_regs.sp;
+	pc = TRAPF_PC(&td->td_pcb->pcb_regs);
+	sp = td->td_pcb->pcb_regs.sp; // FIXME: use $c11 for CHERI purecap
 	stack_capture(st, pc, sp);
-}
-
-int
-stack_save_td_running(struct stack *st, struct thread *td)
-{
-
-	return (EOPNOTSUPP);
+	return (0);
 }
 
 void
@@ -160,7 +157,7 @@ stack_save(struct stack *st)
 		panic("stack_save: curthread == NULL");
 
 	/* XXXRW: Should be pcb_context? */
-	pc = curthread->td_pcb->pcb_regs.pc;
-	sp = curthread->td_pcb->pcb_regs.sp;
+	pc = TRAPF_PC(&curthread->td_pcb->pcb_regs);
+	sp = curthread->td_pcb->pcb_regs.sp; // FIXME: use $c11 for CHERI purecap
 	stack_capture(st, pc, sp);
 }

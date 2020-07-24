@@ -471,6 +471,10 @@ _mfr_print(netdissect_options *ndo,
  */
 
     ND_TCHECK2(*p, 4); /* minimum frame header length */
+    if (length < 4) {
+        ND_PRINT((ndo, "Message too short (%u bytes)", length));
+        return length;
+    }
 
     if ((p[0] & MFR_BEC_MASK) == MFR_CTRL_FRAME && p[1] == 0) {
         ND_PRINT((ndo, "FRF.16 Control, Flags [%s], %s, length %u",
@@ -507,6 +511,11 @@ _mfr_print(netdissect_options *ndo,
             switch (ie_type) {
 
             case MFR_CTRL_IE_MAGIC_NUM:
+                /* FRF.16.1 Section 3.4.3 Magic Number Information Element */
+                if (ie_len != 4) {
+                    ND_PRINT((ndo, "(invalid length)"));
+                    break;
+                }
                 ND_PRINT((ndo, "0x%08x", EXTRACT_32BITS(tptr)));
                 break;
 

@@ -163,7 +163,7 @@ _Unwind_Backtrace(_Unwind_Trace_Fn callback, void *ref) {
     if (_LIBUNWIND_TRACING_UNWINDING) {
       char functionName[512];
       unw_proc_info_t frame;
-      unw_word_t offset;
+      size_t offset;
       __unw_get_proc_name(&cursor, functionName, 512, &offset);
       __unw_get_proc_info(&cursor, &frame);
       _LIBUNWIND_TRACE_UNWINDING(

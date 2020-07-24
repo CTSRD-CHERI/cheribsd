@@ -37,8 +37,6 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
-#define	EXPLICIT_USER_ACCESS
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bio.h>
@@ -425,14 +423,11 @@ int
 ncl_bioread(struct vnode *vp, struct uio *uio, int ioflag, struct ucred *cred)
 {
 	struct nfsnode *np = VTONFS(vp);
-	int biosize, i;
 	struct buf *bp, *rabp;
 	struct thread *td;
 	struct nfsmount *nmp = VFSTONFS(vp->v_mount);
 	daddr_t lbn, rabn;
-	int bcount;
-	int seqcount;
-	int nra, error = 0, n = 0, on = 0;
+	int biosize, bcount, error, i, n, nra, on, save2, seqcount;
 	off_t tmp_off;
 
 	KASSERT(uio->uio_rw == UIO_READ, ("ncl_read mode"));
@@ -464,6 +459,8 @@ ncl_bioread(struct vnode *vp, struct uio *uio, int ioflag, struct ucred *cred)
 		/* No caching/ no readaheads. Just read data into the user buffer */
 		return ncl_readrpc(vp, uio, cred);
 
+	n = 0;
+	on = 0;
 	biosize = vp->v_bufobj.bo_bsize;
 	seqcount = (int)((off_t)(ioflag >> IO_SEQSHIFT) * biosize / BKVASIZE);
 
@@ -471,6 +468,7 @@ ncl_bioread(struct vnode *vp, struct uio *uio, int ioflag, struct ucred *cred)
 	if (error)
 		return error;
 
+	save2 = curthread_pflags2_set(TDP2_SBPAGES);
 	do {
 	    u_quad_t nsize;
 
@@ -495,7 +493,9 @@ ncl_bioread(struct vnode *vp, struct uio *uio, int ioflag, struct ucred *cred)
 			    rabp = nfs_getcacheblk(vp, rabn, biosize, td);
 			    if (!rabp) {
 				error = newnfs_sigintr(nmp, td);
-				return (error ? error : EINTR);
+				if (error == 0)
+					error = EINTR;
+				goto out;
 			    }
 			    if ((rabp->b_flags & (B_CACHE|B_DELWRI)) == 0) {
 				rabp->b_flags |= B_ASYNC;
@@ -526,7 +526,9 @@ ncl_bioread(struct vnode *vp, struct uio *uio, int ioflag, struct ucred *cred)
 
 		if (!bp) {
 			error = newnfs_sigintr(nmp, td);
-			return (error ? error : EINTR);
+			if (error == 0)
+				error = EINTR;
+			goto out;
 		}
 
 		/*
@@ -540,7 +542,7 @@ ncl_bioread(struct vnode *vp, struct uio *uio, int ioflag, struct ucred *cred)
 		    error = ncl_doio(vp, bp, cred, td, 0);
 		    if (error) {
 			brelse(bp);
-			return (error);
+			goto out;
 		    }
 		}
 
@@ -561,7 +563,9 @@ ncl_bioread(struct vnode *vp, struct uio *uio, int ioflag, struct ucred *cred)
 		bp = nfs_getcacheblk(vp, (daddr_t)0, NFS_MAXPATHLEN, td);
 		if (!bp) {
 			error = newnfs_sigintr(nmp, td);
-			return (error ? error : EINTR);
+			if (error == 0)
+				error = EINTR;
+			goto out;
 		}
 		if ((bp->b_flags & B_CACHE) == 0) {
 		    bp->b_iocmd = BIO_READ;
@@ -570,7 +574,7 @@ ncl_bioread(struct vnode *vp, struct uio *uio, int ioflag, struct ucred *cred)
 		    if (error) {
 			bp->b_ioflags |= BIO_ERROR;
 			brelse(bp);
-			return (error);
+			goto out;
 		    }
 		}
 		n = MIN(uio->uio_resid, NFS_MAXPATHLEN - bp->b_resid);
@@ -580,14 +584,17 @@ ncl_bioread(struct vnode *vp, struct uio *uio, int ioflag, struct ucred *cred)
 		NFSINCRGLOBAL(nfsstatsv1.biocache_readdirs);
 		if (np->n_direofoffset
 		    && uio->uio_offset >= np->n_direofoffset) {
-		    return (0);
+			error = 0;
+			goto out;
 		}
 		lbn = (uoff_t)uio->uio_offset / NFS_DIRBLKSIZ;
 		on = uio->uio_offset & (NFS_DIRBLKSIZ - 1);
 		bp = nfs_getcacheblk(vp, lbn, NFS_DIRBLKSIZ, td);
 		if (!bp) {
-		    error = newnfs_sigintr(nmp, td);
-		    return (error ? error : EINTR);
+			error = newnfs_sigintr(nmp, td);
+			if (error == 0)
+				error = EINTR;
+			goto out;
 		}
 		if ((bp->b_flags & B_CACHE) == 0) {
 		    bp->b_iocmd = BIO_READ;
@@ -612,12 +619,16 @@ ncl_bioread(struct vnode *vp, struct uio *uio, int ioflag, struct ucred *cred)
 			 */
 			for (i = 0; i <= lbn && !error; i++) {
 			    if (np->n_direofoffset
-				&& (i * NFS_DIRBLKSIZ) >= np->n_direofoffset)
-				    return (0);
+				&& (i * NFS_DIRBLKSIZ) >= np->n_direofoffset) {
+				    error = 0;
+				    goto out;
+			    }
 			    bp = nfs_getcacheblk(vp, i, NFS_DIRBLKSIZ, td);
 			    if (!bp) {
 				error = newnfs_sigintr(nmp, td);
-				return (error ? error : EINTR);
+				if (error == 0)
+					error = EINTR;
+				goto out;
 			    }
 			    if ((bp->b_flags & B_CACHE) == 0) {
 				    bp->b_iocmd = BIO_READ;
@@ -646,7 +657,7 @@ ncl_bioread(struct vnode *vp, struct uio *uio, int ioflag, struct ucred *cred)
 		     * we give up.
 		     */
 		    if (error)
-			    return (error);
+			    goto out;
 		}
 
 		/*
@@ -706,6 +717,12 @@ ncl_bioread(struct vnode *vp, struct uio *uio, int ioflag, struct ucred *cred)
 	    if (bp != NULL)
 		brelse(bp);
 	} while (error == 0 && uio->uio_resid > 0 && n > 0);
+out:
+	curthread_pflags2_restore(save2);
+	if ((curthread->td_pflags2 & TDP2_SBPAGES) == 0) {
+		NFSLOCKNODE(np);
+		ncl_pager_setsize(vp, NULL);
+	}
 	return (error);
 }
 

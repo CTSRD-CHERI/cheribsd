@@ -36,7 +36,6 @@ SRCS+= \
 	thr_mutex.c \
 	thr_mutexattr.c \
 	thr_once.c \
-	thr_printf.c \
 	thr_pshared.c \
 	thr_pspinlock.c \
 	thr_resume_np.c \
@@ -59,3 +58,6 @@ SRCS+= \
 	thr_symbols.c \
 	thr_umtx.c \
 	thr_yield.c
+
+SIMPLE_PRINTF_PREFIX=_thread
+.include "${SRCTOP}/lib/libsimple_printf/Makefile.inc"

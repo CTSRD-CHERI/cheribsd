@@ -898,13 +898,15 @@ ecap_vendor(int fd, struct pci_conf *p, uint16_t ptr, uint8_t ver)
 	if ((ver < 1) || (cap_level <= 1))
 		return;
 	for (i = 0; i < len; i += 4) {
-		val = read_config(fd, &p->pc_sel, ptr + PCIR_VSEC_DATA + i, 4);
+		val = read_config(fd, &p->pc_sel, ptr + i, 4);
 		if ((i % 16) == 0)
 			printf("                 ");
-		printf("%02x %02x %02x %02x ", val & 0xff, (val >> 8) & 0xff,
+		printf("%02x %02x %02x %02x", val & 0xff, (val >> 8) & 0xff,
 		    (val >> 16) & 0xff, (val >> 24) & 0xff);
 		if ((((i + 4) % 16) == 0 ) || ((i + 4) >= len))
 			printf("\n");
+		else
+			printf(" ");
 	}
 }
 
@@ -986,20 +988,49 @@ static struct {
 	uint16_t id;
 	const char *name;
 } ecap_names[] = {
+	{ PCIZ_AER, "AER" },
+	{ PCIZ_VC, "Virtual Channel" },
+	{ PCIZ_SERNUM, "Device Serial Number" },
 	{ PCIZ_PWRBDGT, "Power Budgeting" },
 	{ PCIZ_RCLINK_DCL, "Root Complex Link Declaration" },
 	{ PCIZ_RCLINK_CTL, "Root Complex Internal Link Control" },
 	{ PCIZ_RCEC_ASSOC, "Root Complex Event Collector ASsociation" },
 	{ PCIZ_MFVC, "MFVC" },
+	{ PCIZ_VC2, "Virtual Channel 2" },
 	{ PCIZ_RCRB, "RCRB" },
+	{ PCIZ_CAC, "Configuration Access Correction" },
 	{ PCIZ_ACS, "ACS" },
 	{ PCIZ_ARI, "ARI" },
 	{ PCIZ_ATS, "ATS" },
+	{ PCIZ_SRIOV, "SRIOV" },
+	{ PCIZ_MRIOV, "MRIOV" },
 	{ PCIZ_MULTICAST, "Multicast" },
+	{ PCIZ_PAGE_REQ, "Page Page Request" },
+	{ PCIZ_AMD, "AMD proprietary "},
 	{ PCIZ_RESIZE_BAR, "Resizable BAR" },
 	{ PCIZ_DPA, "DPA" },
 	{ PCIZ_TPH_REQ, "TPH Requester" },
 	{ PCIZ_LTR, "LTR" },
+	{ PCIZ_SEC_PCIE, "Secondary PCI Express" },
+	{ PCIZ_PMUX, "Protocol Multiplexing" },
+	{ PCIZ_PASID, "Process Address Space ID" },
+	{ PCIZ_LN_REQ, "LN Requester" },
+	{ PCIZ_DPC, "Downstream Port Containment" },
+	{ PCIZ_L1PM, "L1 PM Substates" },
+	{ PCIZ_PTM, "Precision Time Measurement" },
+	{ PCIZ_M_PCIE, "PCIe over M-PHY" },
+	{ PCIZ_FRS, "FRS Queuing" },
+	{ PCIZ_RTR, "Readiness Time Reporting" },
+	{ PCIZ_DVSEC, "Designated Vendor-Specific" },
+	{ PCIZ_VF_REBAR, "VF Resizable BAR" },
+	{ PCIZ_DLNK, "Data Link Feature" },
+	{ PCIZ_16GT, "Physical Layer 16.0 GT/s" },
+	{ PCIZ_LMR, "Lane Margining at Receiver" },
+	{ PCIZ_HIER_ID, "Hierarchy ID" },
+	{ PCIZ_NPEM, "Native PCIe Enclosure Management" },
+	{ PCIZ_PL32, "Physical Layer 32.0 GT/s" },
+	{ PCIZ_AP, "Alternate Protocol" },
+	{ PCIZ_SFI, "System Firmware Intermediary" },
 	{ 0, NULL }
 };
 

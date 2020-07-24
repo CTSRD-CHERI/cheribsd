@@ -145,8 +145,13 @@ db_show_cheri_trapframe(struct trapframe *frame)
  */
 DB_SHOW_COMMAND(cheri, ddb_dump_cheri)
 {
+	struct trapframe *frame;
 
-	db_show_cheri_trapframe(kdb_frame);
+	if (have_addr)
+		frame = (struct trapframe *)addr;
+	else
+		frame = kdb_frame;
+	db_show_cheri_trapframe(frame);
 }
 
 /*

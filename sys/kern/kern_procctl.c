@@ -30,8 +30,6 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
-#define	EXPLICIT_USER_ACCESS
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/capsicum.h>
@@ -460,7 +458,7 @@ protmax_status(struct thread *td, struct proc *p, int *data)
 
 	switch (p->p_flag2 & (P2_PROTMAX_ENABLE | P2_PROTMAX_DISABLE)) {
 	case 0:
-		d = PROC_ASLR_NOFORCE;
+		d = PROC_PROTMAX_NOFORCE;
 		break;
 	case P2_PROTMAX_ENABLE:
 		d = PROC_PROTMAX_FORCE_ENABLE;
@@ -640,7 +638,7 @@ user_procctl(struct thread *td, idtype_t idtype, id_t id, int com,
 		break;
 	case PROC_REAP_GETPIDS:
 		/* XXX: fix for cheriabi and freebsd32 */
-#ifdef COMPAT_CHERIABI
+#if __has_feature(capabilities)
 		if (SV_CURPROC_FLAG(SV_CHERI)) {
 			error = copyincap(udata, &x.rp, sizeof(x.rp));
 			if (error != 0)

@@ -57,6 +57,7 @@ __FBSDID("$FreeBSD$");
 #include <dev/pci/pcireg.h>
 #include <dev/pci/pcib_private.h>
 #include <dev/pci/pci_host_generic.h>
+#include <dev/pci/pci_host_generic_acpi.h>
 
 #include <machine/cpu.h>
 #include <machine/bus.h>
@@ -87,11 +88,6 @@ __FBSDID("$FreeBSD$");
 #define	SPACE_CODE_IO_SPACE	0x1
 #define	PROPS_CELL_SIZE		1
 #define	PCI_ADDR_CELL_SIZE	2
-
-struct generic_pcie_acpi_softc {
-	struct generic_pcie_core_softc base;
-	ACPI_BUFFER		ap_prt;		/* interrupt routing table */
-};
 
 /* Forward prototypes */
 
@@ -233,8 +229,8 @@ pci_host_acpi_get_ecam_resource(device_t dev)
 	return (0);
 }
 
-static int
-pci_host_generic_acpi_attach(device_t dev)
+int
+pci_host_generic_acpi_init(device_t dev)
 {
 	struct generic_pcie_acpi_softc *sc;
 	ACPI_HANDLE handle;
@@ -305,6 +301,18 @@ pci_host_generic_acpi_attach(device_t dev)
 			return (error);
 		}
 	}
+
+	return (0);
+}
+
+static int
+pci_host_generic_acpi_attach(device_t dev)
+{
+	int error;
+
+	error = pci_host_generic_acpi_init(dev);
+	if (error != 0)
+		return (error);
 
 	device_add_child(dev, "pci", -1);
 	return (bus_generic_attach(dev));

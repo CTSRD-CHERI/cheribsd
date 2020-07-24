@@ -37,7 +37,7 @@
 #endif
 
 #include <sys/types.h>
-
+#include <cheri/cherireg.h>
 
 /*
  * Canonical C-language representation of a CHERI object capability -- code and
@@ -95,28 +95,26 @@ void * __capability	_cheri_capability_build_user_rwx(uint32_t perms,
 	    __func__, __LINE__)
 
 /*
+ * Functions to create capabilities used in exec.
+ */
+struct image_params;
+struct thread;
+void * __capability cheri_auxv_capability(struct image_params *imgp,
+	    uintcap_t stack);
+void * __capability cheri_exec_pcc(struct image_params *imgp);
+void * __capability cheri_exec_stack_pointer(struct image_params *imgp,
+	    uintcap_t stack);
+void	cheri_set_mmap_capability(struct thread *td, struct image_params *imgp,
+	    void * __capability csp);
+void * __capability cheri_sigcode_capability(struct thread *td);
+
+/*
  * CHERI context management functions.
  */
-struct cheri_frame;
-struct thread;
-struct trapframe;
 const char	*cheri_exccode_string(uint8_t exccode);
-void	cheri_exec_setregs(struct thread *td, u_long entry_addr);
-void	cheri_log_cheri_frame(struct trapframe *frame);
-void	cheri_log_exception(struct trapframe *frame, int trap_type);
-void	cheri_log_exception_registers(struct trapframe *frame);
-void	cheri_newthread_setregs(struct thread *td, u_long entry_addr);
 int	cheri_syscall_authorize(struct thread *td, u_int code,
 	    int nargs, syscallarg_t *args);
 int	cheri_signal_sandboxed(struct thread *td);
-void	cheri_trapframe_from_cheriframe(struct trapframe *frame,
-	    struct cheri_frame *cfp);
-void	_cheri_trapframe_to_cheriframe(struct trapframe *frame,
-	    struct cheri_frame *cfp, bool strip_tags);
-#define	cheri_trapframe_to_cheriframe(tf, cf)			\
-	_cheri_trapframe_to_cheriframe((tf), (cf), false)
-#define	cheri_trapframe_to_cheriframe_strip(tf, cf)		\
-	_cheri_trapframe_to_cheriframe((tf), (cf), true)
 void	hybridabi_sendsig(struct thread *td);
 
 /*
@@ -124,12 +122,9 @@ void	hybridabi_sendsig(struct thread *td);
  */
 struct pcb;
 struct proc;
-struct sysarch_args;
 void	cheri_sealcap_copy(struct proc *dst, struct proc *src);
 void	cheri_signal_copy(struct pcb *dst, struct pcb *src);
 int	cheri_sysarch_getsealcap(struct thread *td, void * __capability ucap);
-int	cheri_sysarch_getstack(struct thread *td, struct sysarch_args *uap);
-int	cheri_sysarch_setstack(struct thread *td, struct sysarch_args *uap);
 
 /*
  * Functions to manage object types.
@@ -149,19 +144,6 @@ extern u_int	security_cheri_debugger_on_sigprot;
 extern u_int	security_cheri_sandboxed_signals;
 extern u_int	security_cheri_syscall_violations;
 extern u_int	security_cheri_bound_legacy_capabilities;
-
-/*
- * Functions exposed to machine-independent code that must interact with
- * CHERI-specific features; e.g., ktrace.
- */
-struct ktr_ccall;
-struct ktr_creturn;
-struct ktr_cexception;
-struct thr_param_c;
-void	ktrccall_mdfill(struct pcb *pcb, struct ktr_ccall *kc);
-void	ktrcreturn_mdfill(struct pcb *pcb, struct ktr_creturn *kr);
-void	ktrcexception_mdfill(struct trapframe *frame,
-	    struct ktr_cexception *ke);
 #endif /* !_KERNEL */
 
 /*

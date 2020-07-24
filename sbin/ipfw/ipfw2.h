@@ -220,6 +220,7 @@ enum tokens {
 	TOK_DENY_INC,
 	TOK_SAME_PORTS,
 	TOK_UNREG_ONLY,
+	TOK_UNREG_CGN,
 	TOK_SKIP_GLOBAL,
 	TOK_RESET_ADDR,
 	TOK_ALIAS_REV,
@@ -386,6 +387,7 @@ extern int resvd_set_number;
 /* first-level command handlers */
 void ipfw_add(char *av[]);
 void ipfw_show_nat(int ac, char **av);
+int ipfw_delete_nat(int i);
 void ipfw_config_pipe(int ac, char **av);
 void ipfw_config_nat(int ac, char **av);
 void ipfw_sets_handler(char *av[]);

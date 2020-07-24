@@ -108,7 +108,7 @@ lio_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		break;
 	case SIOCSIFMTU:
 		lio_dev_dbg(lio->oct_dev, "ioctl: SIOCSIFMTU\n");
-		error = lio_change_mtu(ifp, ifrequest->ifr_mtu);
+		error = lio_change_mtu(ifp, ifr_mtu_get(ifrequest));
 		break;
 	case SIOCSIFFLAGS:
 		lio_dev_dbg(lio->oct_dev, "ioctl: SIOCSIFFLAGS\n");
@@ -146,7 +146,7 @@ lio_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		break;
 	case SIOCSIFCAP:
 		{
-			int	features = ifrequest->ifr_reqcap ^
+			int	features = ifr_reqcap_get(ifrequest) ^
 					if_getcapenable(ifp);
 
 			lio_dev_dbg(lio->oct_dev, "ioctl: SIOCSIFCAP (Set Capabilities)\n");

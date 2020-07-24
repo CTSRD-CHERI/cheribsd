@@ -137,8 +137,9 @@ SYSCTL_ULONG(_kern, OID_AUTO, maxssiz, CTLFLAG_RWTUN | CTLFLAG_NOFETCH, &maxssiz
     "Maximum stack size");
 SYSCTL_ULONG(_kern, OID_AUTO, sgrowsiz, CTLFLAG_RWTUN | CTLFLAG_NOFETCH, &sgrowsiz, 0,
     "Amount to grow stack on a stack fault");
-SYSCTL_PROC(_kern, OID_AUTO, vm_guest, CTLFLAG_RD | CTLTYPE_STRING,
-    NULL, 0, sysctl_kern_vm_guest, "A",
+SYSCTL_PROC(_kern, OID_AUTO, vm_guest,
+    CTLFLAG_RD | CTLTYPE_STRING | CTLFLAG_MPSAFE, NULL, 0,
+    sysctl_kern_vm_guest, "A",
     "Virtual machine guest detected?");
 
 /*
@@ -166,7 +167,7 @@ void
 init_param1(void)
 {
 
-#if !defined(__mips__) && !defined(__arm64__) && !defined(__sparc64__)
+#if !defined(__mips__) && !defined(__arm64__)
 	TUNABLE_INT_FETCH("kern.kstack_pages", &kstack_pages);
 #endif
 	hz = -1;

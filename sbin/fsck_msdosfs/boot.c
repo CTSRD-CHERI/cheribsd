@@ -28,7 +28,7 @@
 
 #include <sys/cdefs.h>
 #ifndef lint
-__RCSID("$NetBSD: boot.c,v 1.11 2006/06/05 16:51:18 christos Exp ");
+__RCSID("$NetBSD: boot.c,v 1.22 2020/01/11 16:29:07 christos Exp $");
 static const char rcsid[] =
   "$FreeBSD$";
 #endif /* not lint */
@@ -152,9 +152,6 @@ readboot(int dosfs, struct bootblock *boot)
 		boot->NumSectors = boot->bpbHugeSectors;
 	}
 
-
-
-
 	if (boot->flags & FAT32) {
 		/* If the OEM Name field is EXFAT, it's not FAT32, so bail */
 		if (!memcmp(&block[3], "EXFAT   ", 8)) {
@@ -253,7 +250,7 @@ readboot(int dosfs, struct bootblock *boot)
 		boot->FATsecs = boot->bpbFATsmall;
 	}
 
-	if (boot->FATsecs > UINT32_MAX / boot->bpbFATs) {
+	if (boot->FATsecs < 1 || boot->FATsecs > UINT32_MAX / boot->bpbFATs) {
 		pfatal("Invalid FATs(%u) with FATsecs(%zu)",
 			boot->bpbFATs, (size_t)boot->FATsecs);
 		return FSFATAL;
@@ -269,16 +266,37 @@ readboot(int dosfs, struct bootblock *boot)
 		return FSFATAL;
 	}
 
-	boot->NumClusters = (boot->NumSectors - boot->FirstCluster) / boot->bpbSecPerClust +
-	    CLUST_FIRST;
+	/*
+	 * The number of clusters is derived from available data sectors,
+	 * divided by sectors per cluster.
+	 */
+	boot->NumClusters =
+	    (boot->NumSectors - boot->FirstCluster) / boot->bpbSecPerClust;
 
-	if (boot->flags & FAT32)
+	if (boot->flags & FAT32) {
+		if (boot->NumClusters > (CLUST_RSRVD & CLUST32_MASK)) {
+			pfatal("Filesystem too big (%u clusters) for FAT32 partition",
+			    boot->NumClusters);
+			return FSFATAL;
+		}
+		if (boot->NumClusters < (CLUST_RSRVD & CLUST16_MASK)) {
+			pfatal("Filesystem too small (%u clusters) for FAT32 partition",
+			    boot->NumClusters);
+			return FSFATAL;
+		}
 		boot->ClustMask = CLUST32_MASK;
-	else if (boot->NumClusters < (CLUST_RSRVD&CLUST12_MASK))
+
+		if (boot->bpbRootClust < CLUST_FIRST ||
+		    boot->bpbRootClust >= boot->NumClusters) {
+			pfatal("Root directory starts with cluster out of range(%u)",
+			       boot->bpbRootClust);
+			return FSFATAL;
+		}
+	} else if (boot->NumClusters < (CLUST_RSRVD&CLUST12_MASK)) {
 		boot->ClustMask = CLUST12_MASK;
-	else if (boot->NumClusters < (CLUST_RSRVD&CLUST16_MASK))
+	} else if (boot->NumClusters < (CLUST_RSRVD&CLUST16_MASK)) {
 		boot->ClustMask = CLUST16_MASK;
-	else {
+	} else {
 		pfatal("Filesystem too big (%u clusters) for non-FAT32 partition",
 		       boot->NumClusters);
 		return FSFATAL;
@@ -296,11 +314,19 @@ readboot(int dosfs, struct bootblock *boot)
 		break;
 	}
 
-	if (boot->NumFatEntries < boot->NumClusters - CLUST_FIRST) {
+	if (boot->NumFatEntries < boot->NumClusters) {
 		pfatal("FAT size too small, %u entries won't fit into %u sectors\n",
 		       boot->NumClusters, boot->FATsecs);
 		return FSFATAL;
 	}
+
+	/*
+	 * There are two reserved clusters. To avoid adding CLUST_FIRST every
+	 * time we perform boundary checks, we increment the NumClusters by 2,
+	 * which is CLUST_FIRST to denote the first out-of-range cluster number.
+	 */
+	boot->NumClusters += CLUST_FIRST;
+
 	boot->ClusterSize = boot->bpbBytesPerSec * boot->bpbSecPerClust;
 
 	boot->NumFiles = 1;
@@ -342,7 +368,7 @@ writefsinfo(int dosfs, struct bootblock *boot)
 	 * support for FAT32) doesn't maintain the FSINFO block
 	 * correctly, it has to be fixed pretty often.
 	 *
-	 * Therefor, we handle the FSINFO block only informally,
+	 * Therefore, we handle the FSINFO block only informally,
 	 * fixing it if necessary, but otherwise ignoring the
 	 * fact that it was incorrect.
 	 */

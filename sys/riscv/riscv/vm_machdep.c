@@ -41,6 +41,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/proc.h>
 #include <sys/sf_buf.h>
 #include <sys/signal.h>
+#include <sys/sysent.h>
 #include <sys/unistd.h>
 
 #include <vm/vm.h>
@@ -55,8 +56,10 @@ __FBSDID("$FreeBSD$");
 #include <machine/frame.h>
 #include <machine/sbi.h>
 
-#if __riscv_xlen == 64
-#define	TP_OFFSET	16	/* sizeof(struct tcb) */
+/* sizeof(struct tcb) */
+#define	TP_OFFSET	(2 * sizeof(void * __capability))
+#ifdef COMPAT_FREEBSD64
+#define	TP_OFFSET64	(2 * sizeof(uint64_t))
 #endif
 
 /*
@@ -69,6 +72,7 @@ cpu_fork(struct thread *td1, struct proc *p2, struct thread *td2, int flags)
 {
 	struct pcb *pcb2;
 	struct trapframe *tf;
+	char *p;
 
 	if ((flags & RFPROC) == 0)
 		return;
@@ -81,7 +85,22 @@ cpu_fork(struct thread *td1, struct proc *p2, struct thread *td2, int flags)
 	td2->td_pcb = pcb2;
 	bcopy(td1->td_pcb, pcb2, sizeof(*pcb2));
 
-	tf = (struct trapframe *)STACKALIGN((struct trapframe *)pcb2 - 1);
+#if __has_feature(capabilities)
+	p2->p_md.md_sigcode = td1->td_proc->p_md.md_sigcode;
+#endif
+
+	/*
+	 * The "top-most" trapframe uses a "hole" between the pcb and
+	 * trapframe to save the kernel's tp register used for per-CPU
+	 * data.  Leave a gap for the "hole" then align the stack and
+	 * use that as the top of the trapframe.
+	 */
+#if __has_feature(capabilities)
+	p = (char *)pcb2 - sizeof(register_t);
+#else
+	p = (char *)pcb2 - sizeof(uintcap_t);
+#endif
+	tf = (struct trapframe *)STACKALIGN(p) - 1;
 	bcopy(td1->td_frame, tf, sizeof(*tf));
 
 	/* Clear syscall error flag */
@@ -179,30 +198,42 @@ cpu_copy_thread(struct thread *td, struct thread *td0)
  * the entry function with the given argument.
  */
 void
-cpu_set_upcall(struct thread *td, void (*entry)(void *), void *arg,
-	stack_t *stack)
+cpu_set_upcall(struct thread *td, void (* __capability entry)(void *),
+    void * __capability arg, stack_t *stack)
 {
 	struct trapframe *tf;
 
 	tf = td->td_frame;
 
-	tf->tf_sp = STACKALIGN((uintptr_t)stack->ss_sp + stack->ss_size);
-	tf->tf_sepc = (register_t)entry;
-	tf->tf_a[0] = (register_t)arg;
+	tf->tf_sp = STACKALIGN((uintcap_t)stack->ss_sp + stack->ss_size);
+#if __has_feature(capabilities)
+	if (SV_PROC_FLAG(td->td_proc, SV_CHERI) == 0) {
+		tf->tf_sp = (uintcap_t)(__cheri_addr vaddr_t)tf->tf_sp;
+		hybridabi_thread_setregs(td, (__cheri_addr unsigned long)entry);
+	} else
+#endif
+		tf->tf_sepc = (uintcap_t)entry;
+	tf->tf_a[0] = (uintcap_t)arg;
 }
 
 int
-cpu_set_user_tls(struct thread *td, void *tls_base)
+cpu_set_user_tls(struct thread *td, void * __capability tls_base)
 {
 
-	if ((uintptr_t)tls_base >= VM_MAXUSER_ADDRESS)
+	if ((__cheri_addr vaddr_t)tls_base >= VM_MAXUSER_ADDRESS)
 		return (EINVAL);
 
 	/*
 	 * The user TLS is set by modifying the trapframe's tp value, which
 	 * will be restored when returning to userspace.
 	 */
-	td->td_frame->tf_tp = (register_t)tls_base + TP_OFFSET;
+#ifdef COMPAT_FREEBSD64
+	if (SV_PROC_FLAG(td->td_proc, SV_CHERI | SV_LP64) == SV_LP64)
+		td->td_frame->tf_tp = (__cheri_addr vaddr_t)tls_base +
+		    TP_OFFSET64;
+	else
+#endif
+		td->td_frame->tf_tp = (uintcap_t)tls_base + TP_OFFSET;
 
 	return (0);
 }
@@ -215,11 +246,18 @@ cpu_thread_exit(struct thread *td)
 void
 cpu_thread_alloc(struct thread *td)
 {
+	char *p;
 
 	td->td_pcb = (struct pcb *)(td->td_kstack +
 	    td->td_kstack_pages * PAGE_SIZE) - 1;
-	td->td_frame = (struct trapframe *)STACKALIGN(
-	    (caddr_t)td->td_pcb - 8 - sizeof(struct trapframe));
+
+	/* See comment in cpu_fork(). */
+#if __has_feature(capabilities)
+	p = (char *)td->td_pcb - sizeof(register_t);
+#else
+	p = (char *)td->td_pcb - sizeof(uintcap_t);
+#endif
+	td->td_frame = (struct trapframe *)STACKALIGN(p) - 1;
 }
 
 void

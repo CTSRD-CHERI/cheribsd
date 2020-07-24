@@ -32,7 +32,7 @@
 #define _MIPS_REGDEF_H
 #include <machine/asm.h>
 
-#include <machine/cherireg.h>
+#include <cheri/cherireg.h>
 #define _CHERI_INTERNAL
 #include <machine/cheriasm.h>
 
@@ -221,22 +221,10 @@ libcheri_set_errno:
 	# Get the address of the thread-local libcheri_errno variable.
 	#
 #ifdef HAVE_WORKING_TLS
-#ifdef __CHERI_CAPABILITY_TLS__
 	/* Note: initial-exec since we don't have captable pointer */
 	lui	$at, %tprel_hi(libcheri_errno)
 	daddiu	$at, $at, %tprel_lo(libcheri_errno)
 	creadhwr $c3, $chwr_userlocal
-#else
-	/* Legacy: we need a valid $ddc here */
-	lui	$at, %tprel_hi(libcheri_errno)
-	.set	push
-	.set	mips32r2
-	rdhwr	$t0, $29
-	.set	pop
-	daddiu	$at, $at, %tprel_lo(libcheri_errno)
-	daddu	$at, $t0, $at
-	cgetdefault $c3
-#endif
 	b	libcheri_invoke_restore_regs
 	csw	$a0, $at, 0($c3)
 #else

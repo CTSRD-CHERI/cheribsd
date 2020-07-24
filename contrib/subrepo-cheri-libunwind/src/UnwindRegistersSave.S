@@ -1091,6 +1091,111 @@ DEFINE_LIBUNWIND_FUNCTION(__unw_getcontext)
   std %i6, [%o0 + 120]
   jmp %o7
    clr %o0                   // return UNW_ESUCCESS
+
+#elif defined(__riscv) && __riscv_xlen == 64
+
+.macro save_fpr num
+#ifdef __CHERI_PURE_CAPABILITY__
+  cfsd    f\num, (__SIZEOF_CHERI_CAPABILITY__ * 32 + 8 * \num)(ca0)
+#else
+  fsd    f\num, (8 * 32 + 8 * \num)(a0)
+#endif
+.endm
+
+.macro save_gpr num
+#ifdef __CHERI_PURE_CAPABILITY__
+  csc   c\num, (__SIZEOF_CHERI_CAPABILITY__ * \num)(ca0)
+#else
+  sd    x\num, (8 * \num)(a0)
+#endif
+.endm
+
+#
+# extern int __unw_getcontext(unw_context_t* thread_state)
+#
+# On entry:
+#  thread_state pointer is in a0
+#
+DEFINE_LIBUNWIND_FUNCTION(__unw_getcontext)
+#ifdef __CHERI_PURE_CAPABILITY__
+#pragma message("TODO: save $ddc")
+#endif
+  // x0 is zero
+  save_gpr 1
+  save_gpr 2
+  save_gpr 3
+  save_gpr 4
+  save_gpr 5
+  save_gpr 6
+  save_gpr 7
+  save_gpr 8
+  save_gpr 9
+  save_gpr 10
+  save_gpr 11
+  save_gpr 12
+  save_gpr 13
+  save_gpr 14
+  save_gpr 15
+  save_gpr 16
+  save_gpr 17
+  save_gpr 18
+  save_gpr 19
+  save_gpr 20
+  save_gpr 21
+  save_gpr 22
+  save_gpr 23
+  save_gpr 24
+  save_gpr 25
+  save_gpr 26
+  save_gpr 27
+  save_gpr 28
+  save_gpr 29
+  save_gpr 30
+  save_gpr 31
+
+#if defined(__riscv_flen) && __riscv_flen == 64
+  save_fpr 0
+  save_fpr 1
+  save_fpr 2
+  save_fpr 3
+  save_fpr 4
+  save_fpr 5
+  save_fpr 6
+  save_fpr 7
+  save_fpr 8
+  save_fpr 9
+  save_fpr 10
+  save_fpr 11
+  save_fpr 12
+  save_fpr 13
+  save_fpr 14
+  save_fpr 15
+  save_fpr 16
+  save_fpr 17
+  save_fpr 18
+  save_fpr 19
+  save_fpr 20
+  save_fpr 21
+  save_fpr 22
+  save_fpr 23
+  save_fpr 24
+  save_fpr 25
+  save_fpr 26
+  save_fpr 27
+  save_fpr 28
+  save_fpr 29
+  save_fpr 30
+  save_fpr 31
+#endif
+
+  li     a0, 0  // return UNW_ESUCCESS
+#ifdef __CHERI_PURE_CAPABILITY__
+  cret          // jump to cra
+#else
+  ret           // jump to ra
+#endif
+END_LIBUNWIND_FUNCTION(__unw_getcontext)
+
 #endif
 
   WEAK_ALIAS(__unw_getcontext, unw_getcontext)

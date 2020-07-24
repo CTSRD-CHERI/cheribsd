@@ -59,13 +59,13 @@ db_addr_t	next_instr_address(db_addr_t, boolean_t);
 #define	IS_WATCHPOINT_TRAP(type, code)	(0)	/* XXX mips3 watchpoint */
 
 #define	PC_REGS()	((db_addr_t)kdb_thrctx->pcb_context[PCB_REG_PC])
-#define	BKPT_SKIP					\
-	do {							\
-		if((db_get_value(kdb_frame->pc, sizeof(int), FALSE) &	\
-		    ~MIPS_BREAK_VAL_MASK) == MIPS_BREAK_INSTR) {	\
-			kdb_frame->pc += BKPT_SIZE;			\
-			kdb_thrctx->pcb_regs.pc +=  BKPT_SIZE;		\
-		}							\
+#define	BKPT_SKIP								\
+	do {									\
+		if((db_get_value(TRAPF_PC(kdb_frame), sizeof(int), FALSE) &	\
+		    ~MIPS_BREAK_VAL_MASK) == MIPS_BREAK_INSTR) {		\
+			TRAPF_PC_INCREMENT(kdb_frame, BKPT_SIZE);		\
+			TRAPF_PC_INCREMENT(&kdb_thrctx->pcb_regs,  BKPT_SIZE);	\
+		}								\
 	} while (0);
 
 

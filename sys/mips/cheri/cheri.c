@@ -41,10 +41,8 @@
 
 #include <cheri/cheri.h>
 #include <cheri/cheric.h>
-#include <cheri/cheri_serial.h>
 
 #include <machine/atomic.h>
-#include <machine/cherireg.h>
 #include <machine/pcb.h>
 #include <machine/proc.h>
 #include <machine/sysarch.h>
@@ -69,36 +67,24 @@ CTASSERT(sizeof(struct cheri_frame) == (34 * CHERICAP_SIZE));
  * call, and reload them afterwards.
  */
 
-static union {
-	void * __capability	ct_cap;
-	uint8_t			ct_bytes[32];
-} cheri_testunion __aligned(32);
-
 /*
  * A set of compile-time assertions to ensure suitable alignment for
  * capabilities embedded within other MIPS data structures.  Otherwise changes
  * that work on other architectures might break alignment on CHERI.
  */
 CTASSERT(offsetof(struct trapframe, ddc) % CHERICAP_SIZE == 0);
-CTASSERT(offsetof(struct mdthread, md_cheri_mmap_cap) % CHERICAP_SIZE == 0);
+CTASSERT(offsetof(struct thread, td_cheri_mmap_cap) % CHERICAP_SIZE == 0);
 
 /*
  * Ensure that the compiler being used to build the kernel agrees with the
  * kernel configuration on the size of a capability, and that we are compiling
  * for the hybrid ABI.
  */
-#ifdef CPU_CHERI128
 CTASSERT(sizeof(void *) == 8);
 CTASSERT(sizeof(void * __capability) == 16);
 CTASSERT(sizeof(struct cheri_object) == 32);
-#else
-CTASSERT(sizeof(void *) == 8);
-CTASSERT(sizeof(void * __capability) == 32);
-CTASSERT(sizeof(struct cheri_object) == 64);
-#endif
 
 /* Set to -1 to prevent it from being zeroed with the rest of BSS */
-void * __capability userspace_cap = (void * __capability)(intcap_t)-1;
 void * __capability user_sealcap = (void * __capability)(intcap_t)-1;
 
 /*
@@ -109,24 +95,6 @@ void * __capability user_sealcap = (void * __capability)(intcap_t)-1;
 static void
 cheri_cpu_startup(void)
 {
-
-	/*
-	 * The pragmatic way to test that the kernel we're booting has a
-	 * capability size matching the CPU we're booting on is to store a
-	 * capability in memory and then check what its footprint was.  Panic
-	 * early if our assumptions are wrong.
-	 */
-	memset(&cheri_testunion, 0xff, sizeof(cheri_testunion));
-	cheri_testunion.ct_cap = NULL;
-#ifdef CPU_CHERI128
-	printf("CHERI: compiled for 128-bit capabilities\n");
-	if (cheri_testunion.ct_bytes[16] == 0)
-		panic("CPU implements 256-bit capabilities");
-#else
-	printf("CHERI: compiled for 256-bit capabilities\n");
-	if (cheri_testunion.ct_bytes[16] != 0)
-		panic("CPU implements 128-bit capabilities");
-#endif
 
 	/*
 	 * Documentary assertions for userspace_cap.  Default data and
@@ -148,123 +116,9 @@ cheri_cpu_startup(void)
 SYSINIT(cheri_cpu_startup, SI_SUB_CPU, SI_ORDER_FIRST, cheri_cpu_startup,
     NULL);
 
-/*
- * Build a new userspace capability derived from userspace_cap.
- * The resulting capability may include both read and execute permissions,
- * but not write.
- */
-void * __capability
-_cheri_capability_build_user_code(uint32_t perms, vaddr_t basep, size_t length,
-    off_t off, const char* func, int line)
-{
-
-	KASSERT((perms & ~CHERI_CAP_USER_CODE_PERMS) == 0,
-	    ("%s:%d: perms %x has permission not in CHERI_CAP_USER_CODE_PERMS %x",
-	    func, line, perms, CHERI_CAP_USER_CODE_PERMS));
-
-	return (_cheri_capability_build_user_rwx(
-	    perms & CHERI_CAP_USER_CODE_PERMS, basep, length, off, func, line));
-}
-
-/*
- * Build a new userspace capability derived from userspace_cap.
- * The resulting capability may include read and write permissions, but
- * not execute.
- */
-void * __capability
-_cheri_capability_build_user_data(uint32_t perms, vaddr_t basep, size_t length,
-    off_t off, const char* func, int line)
-{
-
-	KASSERT((perms & ~CHERI_CAP_USER_DATA_PERMS) == 0,
-	    ("%s:%d: perms %x has permission not in CHERI_CAP_USER_DATA_PERMS %x",
-	    func, line, perms, CHERI_CAP_USER_DATA_PERMS));
-
-	return (_cheri_capability_build_user_rwx(
-	    perms & CHERI_CAP_USER_DATA_PERMS, basep, length, off, func, line));
-}
-
-/*
- * Build a new userspace capability derived from userspace_cap.
- * The resulting capability may include read, write, and execute permissions.
- *
- * This function violates W^X and its use is discouraged and the reason for
- * use should be documented in a comment when it is used.
- */
-void * __capability
-_cheri_capability_build_user_rwx(uint32_t perms, vaddr_t basep, size_t length,
-    off_t off, const char* func __unused, int line __unused)
-{
-	void * __capability tmpcap;
-
-	tmpcap = cheri_setoffset(cheri_andperm(cheri_csetbounds(
-	    cheri_setoffset(userspace_cap, basep), length), perms), off);
-
-	KASSERT(cheri_getlen(tmpcap) == length,
-	    ("%s:%d: Constructed capability has wrong length 0x%zx != 0x%zx: "
-	    _CHERI_PRINTF_CAP_FMT, func, line, cheri_getlen(tmpcap), length,
-	    _CHERI_PRINTF_CAP_ARG(tmpcap)));
-
-	return (tmpcap);
-}
-
-void
-cheri_capability_set_user_sigcode(void * __capability *cp,
-    struct sysentvec *se)
-{
-	uintptr_t base;
-	int szsigcode = *se->sv_szsigcode;
-
-	if (se->sv_sigcode_base != 0) {
-		base = se->sv_sigcode_base;
-	} else {
-		/*
-		 * XXX: true for mips64 and mip64-cheriabi without shared-page
-		 * support...
-		 */
-		base = (uintptr_t)se->sv_psstrings - szsigcode;
-		base = rounddown2(base, sizeof(void * __capability));
-	}
-
-	*cp = cheri_capability_build_user_code(CHERI_CAP_USER_CODE_PERMS,
-	    base, szsigcode, 0);
-}
-
 void
 cheri_capability_set_user_sealcap(void * __capability *cp)
 {
 
 	*cp = user_sealcap;
-}
-
-void
-cheri_serialize(struct cheri_serial *csp, void * __capability cap)
-{
-
-#if CHERICAP_SIZE == 16
-	csp->cs_storage = 3;
-	csp->cs_typebits = 16;
-	csp->cs_permbits = 23;
-#else /* CHERICAP_SIZE == 32 */
-	csp->cs_storage = 4;
-	csp->cs_typebits = 24;
-	csp->cs_permbits = 31;
-#endif
-
-	KASSERT(csp != NULL, ("Can't serialize to a NULL pointer"));
-	if (cap == NULL) {
-		memset(csp, 0, sizeof(*csp));
-		return;
-	}
-
-	csp->cs_tag = __builtin_cheri_tag_get(cap);
-	if (csp->cs_tag) {
-		csp->cs_type = __builtin_cheri_type_get(cap);
-		csp->cs_perms = __builtin_cheri_perms_get(cap);
-		csp->cs_sealed = __builtin_cheri_sealed_get(cap);
-		csp->cs_base = __builtin_cheri_base_get(cap);
-		csp->cs_length = __builtin_cheri_length_get(cap);
-		csp->cs_offset = __builtin_cheri_offset_get(cap);
-	} else
-		memcpy(&csp->cs_data, &cap, CHERICAP_SIZE);
 }

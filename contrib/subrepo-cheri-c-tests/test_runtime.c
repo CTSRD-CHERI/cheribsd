@@ -323,14 +323,14 @@ emulateBranch(mcontext_t *context, register_t pc)
 				case CHERI_BRANCH_CBTU:
 				{
 					void * __capability cap = getCapReg(context, instr, 20);
-					bool tag = __builtin_mips_cheri_get_cap_tag(cap);
+					bool tag = __builtin_cheri_tag_get(cap);
 					context->mc_pc = (!tag ? branchPc : normalPc);
 					return true;
 				}
 				case CHERI_BRANCH_CBTS:
 				{
 					void * __capability cap = getCapReg(context, instr, 20);
-					bool tag = __builtin_mips_cheri_get_cap_tag(cap);
+					bool tag = __builtin_cheri_tag_get(cap);
 					context->mc_pc = (tag ? branchPc : normalPc);
 					return true;
 				}

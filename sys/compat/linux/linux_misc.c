@@ -47,6 +47,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/malloc.h>
 #include <sys/mman.h>
 #include <sys/mount.h>
+#include <sys/msgbuf.h>
 #include <sys/mutex.h>
 #include <sys/namei.h>
 #include <sys/priv.h>
@@ -395,7 +396,7 @@ linux_uselib(struct thread *td, struct linux_uselib_args *args)
 	 * Lock no longer needed
 	 */
 	locked = false;
-	VOP_UNLOCK(vp, 0);
+	VOP_UNLOCK(vp);
 
 	/*
 	 * Check if file_offset page aligned. Currently we cannot handle
@@ -468,7 +469,7 @@ linux_uselib(struct thread *td, struct linux_uselib_args *args)
 cleanup:
 	if (opened) {
 		if (locked)
-			VOP_UNLOCK(vp, 0);
+			VOP_UNLOCK(vp);
 		locked = false;
 		VOP_CLOSE(vp, FREAD, td->td_ucred, td);
 	}
@@ -480,7 +481,7 @@ cleanup:
 		VOP_UNSET_TEXT_CHECKED(vp);
 	}
 	if (locked)
-		VOP_UNLOCK(vp, 0);
+		VOP_UNLOCK(vp);
 
 	/* Release the temporary mapping. */
 	if (a_out)
@@ -1209,12 +1210,8 @@ linux_getitimer(struct thread *td, struct linux_getitimer_args *uap)
 int
 linux_nice(struct thread *td, struct linux_nice_args *args)
 {
-	struct setpriority_args bsd_args;
 
-	bsd_args.which = PRIO_PROCESS;
-	bsd_args.who = 0;		/* current process */
-	bsd_args.prio = args->inc;
-	return (sys_setpriority(td, &bsd_args));
+	return (kern_setpriority(td, PRIO_PROCESS, 0, args->inc));
 }
 #endif /* __i386__ || (__amd64__ && COMPAT_LINUX32) */
 
@@ -1425,6 +1422,33 @@ linux_sched_setscheduler(struct thread *td,
 	if (error)
 		return (error);
 
+	if (linux_map_sched_prio) {
+		switch (policy) {
+		case SCHED_OTHER:
+			if (sched_param.sched_priority != 0)
+				return (EINVAL);
+
+			sched_param.sched_priority =
+			    PRI_MAX_TIMESHARE - PRI_MIN_TIMESHARE;
+			break;
+		case SCHED_FIFO:
+		case SCHED_RR:
+			if (sched_param.sched_priority < 1 ||
+			    sched_param.sched_priority >= LINUX_MAX_RT_PRIO)
+				return (EINVAL);
+
+			/*
+			 * Map [1, LINUX_MAX_RT_PRIO - 1] to
+			 * [0, RTP_PRIO_MAX - RTP_PRIO_MIN] (rounding down).
+			 */
+			sched_param.sched_priority =
+			    (sched_param.sched_priority - 1) *
+			    (RTP_PRIO_MAX - RTP_PRIO_MIN + 1) /
+			    (LINUX_MAX_RT_PRIO - 1);
+			break;
+		}
+	}
+
 	tdt = linux_tdfind(td, args->pid, -1);
 	if (tdt == NULL)
 		return (ESRCH);
@@ -1468,6 +1492,20 @@ linux_sched_get_priority_max(struct thread *td,
 {
 	struct sched_get_priority_max_args bsd;
 
+	if (linux_map_sched_prio) {
+		switch (args->policy) {
+		case LINUX_SCHED_OTHER:
+			td->td_retval[0] = 0;
+			return (0);
+		case LINUX_SCHED_FIFO:
+		case LINUX_SCHED_RR:
+			td->td_retval[0] = LINUX_MAX_RT_PRIO - 1;
+			return (0);
+		default:
+			return (EINVAL);
+		}
+	}
+
 	switch (args->policy) {
 	case LINUX_SCHED_OTHER:
 		bsd.policy = SCHED_OTHER;
@@ -1489,6 +1527,20 @@ linux_sched_get_priority_min(struct thread *td,
     struct linux_sched_get_priority_min_args *args)
 {
 	struct sched_get_priority_min_args bsd;
+
+	if (linux_map_sched_prio) {
+		switch (args->policy) {
+		case LINUX_SCHED_OTHER:
+			td->td_retval[0] = 0;
+			return (0);
+		case LINUX_SCHED_FIFO:
+		case LINUX_SCHED_RR:
+			td->td_retval[0] = 1;
+			return (0);
+		default:
+			return (EINVAL);
+		}
+	}
 
 	switch (args->policy) {
 	case LINUX_SCHED_OTHER:
@@ -1619,12 +1671,9 @@ linux_nosys(struct thread *td, struct nosys_args *ignore)
 int
 linux_getpriority(struct thread *td, struct linux_getpriority_args *args)
 {
-	struct getpriority_args bsd_args;
 	int error;
 
-	bsd_args.which = args->which;
-	bsd_args.who = args->who;
-	error = sys_getpriority(td, &bsd_args);
+	error = kern_getpriority(td, args->which, args->who);
 	td->td_retval[0] = 20 - td->td_retval[0];
 	return (error);
 }
@@ -1873,7 +1922,7 @@ linux_sched_setparam(struct thread *td,
 {
 	struct sched_param sched_param;
 	struct thread *tdt;
-	int error;
+	int error, policy;
 
 	error = copyin(uap->param, &sched_param, sizeof(sched_param));
 	if (error)
@@ -1883,8 +1932,41 @@ linux_sched_setparam(struct thread *td,
 	if (tdt == NULL)
 		return (ESRCH);
 
+	if (linux_map_sched_prio) {
+		error = kern_sched_getscheduler(td, tdt, &policy);
+		if (error)
+			goto out;
+
+		switch (policy) {
+		case SCHED_OTHER:
+			if (sched_param.sched_priority != 0) {
+				error = EINVAL;
+				goto out;
+			}
+			sched_param.sched_priority =
+			    PRI_MAX_TIMESHARE - PRI_MIN_TIMESHARE;
+			break;
+		case SCHED_FIFO:
+		case SCHED_RR:
+			if (sched_param.sched_priority < 1 ||
+			    sched_param.sched_priority >= LINUX_MAX_RT_PRIO) {
+				error = EINVAL;
+				goto out;
+			}
+			/*
+			 * Map [1, LINUX_MAX_RT_PRIO - 1] to
+			 * [0, RTP_PRIO_MAX - RTP_PRIO_MIN] (rounding down).
+			 */
+			sched_param.sched_priority =
+			    (sched_param.sched_priority - 1) *
+			    (RTP_PRIO_MAX - RTP_PRIO_MIN + 1) /
+			    (LINUX_MAX_RT_PRIO - 1);
+			break;
+		}
+	}
+
 	error = kern_sched_setparam(td, tdt, &sched_param);
-	PROC_UNLOCK(tdt->td_proc);
+out:	PROC_UNLOCK(tdt->td_proc);
 	return (error);
 }
 
@@ -1894,17 +1976,45 @@ linux_sched_getparam(struct thread *td,
 {
 	struct sched_param sched_param;
 	struct thread *tdt;
-	int error;
+	int error, policy;
 
 	tdt = linux_tdfind(td, uap->pid, -1);
 	if (tdt == NULL)
 		return (ESRCH);
 
 	error = kern_sched_getparam(td, tdt, &sched_param);
-	PROC_UNLOCK(tdt->td_proc);
-	if (error == 0)
-		error = copyout(&sched_param, uap->param,
-		    sizeof(sched_param));
+	if (error) {
+		PROC_UNLOCK(tdt->td_proc);
+		return (error);
+	}
+
+	if (linux_map_sched_prio) {
+		error = kern_sched_getscheduler(td, tdt, &policy);
+		PROC_UNLOCK(tdt->td_proc);
+		if (error)
+			return (error);
+
+		switch (policy) {
+		case SCHED_OTHER:
+			sched_param.sched_priority = 0;
+			break;
+		case SCHED_FIFO:
+		case SCHED_RR:
+			/*
+			 * Map [0, RTP_PRIO_MAX - RTP_PRIO_MIN] to
+			 * [1, LINUX_MAX_RT_PRIO - 1] (rounding up).
+			 */
+			sched_param.sched_priority =
+			    (sched_param.sched_priority *
+			    (LINUX_MAX_RT_PRIO - 1) +
+			    (RTP_PRIO_MAX - RTP_PRIO_MIN - 1)) /
+			    (RTP_PRIO_MAX - RTP_PRIO_MIN) + 1;
+			break;
+		}
+	} else
+		PROC_UNLOCK(tdt->td_proc);
+
+	error = copyout(&sched_param, uap->param, sizeof(sched_param));
 	return (error);
 }
 
@@ -2264,7 +2374,7 @@ int
 linux_getrandom(struct thread *td, struct linux_getrandom_args *args)
 {
 	struct uio uio;
-	kiobec_t iov;
+	struct iovec iov;
 	int error;
 
 	if (args->flags & ~(LINUX_GRND_NONBLOCK|LINUX_GRND_RANDOM))
@@ -2296,6 +2406,85 @@ linux_mincore(struct thread *td, struct linux_mincore_args *args)
 		return (EINVAL);
 	return (kern_mincore(td, args->start, args->len,
 	    __USER_CAP(args->vec, args->len)));
+}
+
+#define	SYSLOG_TAG	"<6>"
+
+int
+linux_syslog(struct thread *td, struct linux_syslog_args *args)
+{
+	char buf[128], *src, *dst;
+	u_int seq;
+	int buflen, error;
+
+	if (args->type != LINUX_SYSLOG_ACTION_READ_ALL) {
+		linux_msg(td, "syslog unsupported type 0x%x", args->type);
+		return (EINVAL);
+	}
+
+	if (args->len < 6) {
+		td->td_retval[0] = 0;
+		return (0);
+	}
+
+	error = priv_check(td, PRIV_MSGBUF);
+	if (error)
+		return (error);
+
+	mtx_lock(&msgbuf_lock);
+	msgbuf_peekbytes(msgbufp, NULL, 0, &seq);
+	mtx_unlock(&msgbuf_lock);
+
+	dst = args->buf;
+	error = copyout(&SYSLOG_TAG, dst, sizeof(SYSLOG_TAG));
+	/* The -1 is to skip the trailing '\0'. */
+	dst += sizeof(SYSLOG_TAG) - 1;
+
+	while (error == 0) {
+		mtx_lock(&msgbuf_lock);
+		buflen = msgbuf_peekbytes(msgbufp, buf, sizeof(buf), &seq);
+		mtx_unlock(&msgbuf_lock);
+
+		if (buflen == 0)
+			break;
+
+		for (src = buf; src < buf + buflen && error == 0; src++) {
+			if (*src == '\0')
+				continue;
+
+			if (dst >= args->buf + args->len)
+				goto out;
+
+			error = copyout(src, dst, 1);
+			dst++;
+
+			if (*src == '\n' && *(src + 1) != '<' &&
+			    dst + sizeof(SYSLOG_TAG) < args->buf + args->len) {
+				error = copyout(&SYSLOG_TAG,
+				    dst, sizeof(SYSLOG_TAG));
+				dst += sizeof(SYSLOG_TAG) - 1;
+			}
+		}
+	}
+out:
+	td->td_retval[0] = dst - args->buf;
+	return (error);
+}
+
+int
+linux_getcpu(struct thread *td, struct linux_getcpu_args *args)
+{
+	int cpu, error, node;
+
+	cpu = td->td_oncpu; /* Make sure it doesn't change during copyout(9) */
+	error = 0;
+	node = cpuid_to_pcpu[cpu]->pc_domain;
+
+	if (args->cpu != NULL)
+		error = copyout(&cpu, args->cpu, sizeof(l_int));
+	if (args->node != NULL)
+		error = copyout(&node, args->node, sizeof(l_int));
+	return (error);
 }
 // CHERI CHANGES START
 // {

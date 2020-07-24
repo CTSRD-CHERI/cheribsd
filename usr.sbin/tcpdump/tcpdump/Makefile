@@ -32,7 +32,7 @@ CFLAGS+= -D_U_="__attribute__((unused))"
 CFLAGS+=	-DLBL_ALIGN
 .endif
 
-LIBADD=	l pcap
+LIBADD=	pcap
 .if ${MK_CASPER} != "no"
 LIBADD+=	casper
 LIBADD+=	cap_dns

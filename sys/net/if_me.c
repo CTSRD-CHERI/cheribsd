@@ -124,7 +124,7 @@ static int	me_set_tunnel(struct me_softc *, in_addr_t, in_addr_t);
 static void	me_delete_tunnel(struct me_softc *);
 
 SYSCTL_DECL(_net_link);
-static SYSCTL_NODE(_net_link, IFT_TUNNEL, me, CTLFLAG_RW, 0,
+static SYSCTL_NODE(_net_link, IFT_TUNNEL, me, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
     "Minimal Encapsulation for IP (RFC 2004)");
 #ifndef MAX_ME_NEST
 #define MAX_ME_NEST 1
@@ -194,7 +194,7 @@ me_clone_create(struct if_clone *ifc, int unit, void * __capability params)
 	ME2IFP(sc)->if_softc = sc;
 	if_initname(ME2IFP(sc), mename, unit);
 
-	ME2IFP(sc)->if_mtu = MEMTU;;
+	ME2IFP(sc)->if_mtu = MEMTU;
 	ME2IFP(sc)->if_flags = IFF_POINTOPOINT|IFF_MULTICAST;
 	ME2IFP(sc)->if_output = me_output;
 	ME2IFP(sc)->if_ioctl = me_ioctl;
@@ -326,7 +326,7 @@ me_lookup(const struct mbuf *m, int off, int proto, void **arg)
 	if (V_me_hashtbl == NULL)
 		return (0);
 
-	MPASS(in_epoch(net_epoch_preempt));
+	NET_EPOCH_ASSERT();
 	ip = mtod(m, const struct ip *);
 	CK_LIST_FOREACH(sc, &ME_HASH(ip->ip_dst.s_addr,
 	    ip->ip_src.s_addr), chain) {
@@ -370,7 +370,7 @@ me_srcaddr(void *arg __unused, const struct sockaddr *sa,
 	if (V_me_hashtbl == NULL)
 		return;
 
-	MPASS(in_epoch(net_epoch_preempt));
+	NET_EPOCH_ASSERT();
 	sin = (const struct sockaddr_in *)sa;
 	CK_LIST_FOREACH(sc, &ME_SRCHASH(sin->sin_addr.s_addr), srchash) {
 		if (sc->me_src.s_addr != sin->sin_addr.s_addr)

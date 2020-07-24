@@ -75,18 +75,13 @@ struct mdthread {
 #define	COP2_OWNER_KERNEL	0x0001		/* Kernel owns COP2 */
 	int		md_cop2owner;
 #endif
-#ifdef CPU_CHERI
-#ifdef COMPAT_CHERIABI
-	void * __capability	md_cheri_mmap_cap;
-#endif
-#endif
 };
 
 /* md_flags */
 #define	MDTD_FPUSED	0x0001		/* Process used the FPU */
 #define	MDTD_COP2USED	0x0002		/* Process used the COP2 */
 #ifdef CPU_QEMU_MALTA
-#define	MDTD_QTRACE	0x0004		/* Qemu-CHERI ISA-level tracing */
+#define	MDTD_QTRACE	0x0004		/* QEMU-CHERI ISA-level tracing */
 #endif
 
 struct mdproc {
@@ -110,7 +105,12 @@ struct syscall_args {
 };
 
 #ifdef __mips_n64
+#if __has_feature(capabilities)
+#define	KINFO_PROC_SIZE 1248
+#define	KINFO_PROC64_SIZE 1088
+#else
 #define	KINFO_PROC_SIZE 1088
+#endif
 #define	KINFO_PROC32_SIZE 816
 #else
 #define	KINFO_PROC_SIZE 816

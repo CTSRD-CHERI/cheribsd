@@ -37,19 +37,33 @@
 struct mdthread {
 	int	md_spinlock_count;	/* (k) */
 	register_t md_saved_sstatus_ie;	/* (k) */
+	int	md_flags;		/* (k) */
 };
 
+/* md_flags */
+#ifdef CPU_QEMU_RISCV
+#define	MDTD_QTRACE	0x0001		/* QEMU-CHERI ISA-level tracing */
+#endif
+
 struct mdproc {
+#if __has_feature(capabilities)
+	void * __capability md_sigcode;
+#endif
 	int dummy;
 };
 
+#if __has_feature(capabilities)
+#define	KINFO_PROC_SIZE		1248
+#define	KINFO_PROC64_SIZE	1088
+#else
 #define	KINFO_PROC_SIZE	1088
+#endif
 
 #define	MAXARGS		8
 struct syscall_args {
 	u_int code;
 	struct sysent *callp;
-	register_t args[MAXARGS];
+	syscallarg_t args[MAXARGS];
 	int narg;
 };
 

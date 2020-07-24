@@ -309,8 +309,8 @@ twa_attach(device_t dev)
 
 	sysctl_ctx_init(&sc->sysctl_ctxt);
 	sc->sysctl_tree = SYSCTL_ADD_NODE(&sc->sysctl_ctxt,
-		SYSCTL_STATIC_CHILDREN(_hw), OID_AUTO,
-		device_get_nameunit(dev), CTLFLAG_RD, 0, "");
+	    SYSCTL_STATIC_CHILDREN(_hw), OID_AUTO, device_get_nameunit(dev),
+	    CTLFLAG_RD | CTLFLAG_MPSAFE, 0, "");
 	if (sc->sysctl_tree == NULL) {
 		tw_osli_printf(sc, "error = %d",
 			TW_CL_SEVERITY_ERROR_STRING,
@@ -428,6 +428,7 @@ twa_attach(device_t dev)
 	callout_init(&(sc->watchdog_callout[0]), 1);
 	callout_init(&(sc->watchdog_callout[1]), 1);
 	callout_reset(&(sc->watchdog_callout[0]), 5*hz, twa_watchdog, &sc->ctlr_handle);
+	gone_in_dev(dev, 13, "twa(4) removed");
 
 	return(0);
 }

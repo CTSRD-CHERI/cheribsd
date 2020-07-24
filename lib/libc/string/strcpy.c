@@ -36,13 +36,20 @@ static char sccsid[] = "@(#)strcpy.c	8.1 (Berkeley) 6/4/93";
 __FBSDID("$FreeBSD$");
 
 #include <string.h>
-#include "cheri_private.h"
 
-char * __CAP
-__CAPSUFFIX(strcpy)(char * __CAP __restrict to,
-    const char * __CAP __restrict from)
+#ifdef WEAK_STRCPY
+__weak_reference(__strcpy, strcpy);
+#endif
+
+char *
+#ifdef WEAK_STRCPY
+__strcpy
+#else
+strcpy
+#endif
+(char * __restrict to, const char * __restrict from)
 {
-	char * __CAP save = to;
+	char *save = to;
 
 	for (; (*to = *from); ++from, ++to);
 	return(save);

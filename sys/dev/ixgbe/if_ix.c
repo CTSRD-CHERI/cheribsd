@@ -139,6 +139,7 @@ static void ixgbe_if_update_admin_status(if_ctx_t ctx);
 static void ixgbe_if_vlan_register(if_ctx_t ctx, u16 vtag);
 static void ixgbe_if_vlan_unregister(if_ctx_t ctx, u16 vtag);
 static int  ixgbe_if_i2c_req(if_ctx_t ctx, struct ifi2creq *req);
+static bool ixgbe_if_needs_restart(if_ctx_t ctx, enum iflib_restart_event event);
 int ixgbe_intr(void *arg);
 
 /************************************************************************
@@ -273,6 +274,7 @@ static device_method_t ixgbe_if_methods[] = {
 	DEVMETHOD(ifdi_vlan_unregister, ixgbe_if_vlan_unregister),
 	DEVMETHOD(ifdi_get_counter, ixgbe_if_get_counter),
 	DEVMETHOD(ifdi_i2c_req, ixgbe_if_i2c_req),
+	DEVMETHOD(ifdi_needs_restart, ixgbe_if_needs_restart),
 #ifdef PCI_IOV
 	DEVMETHOD(ifdi_iov_init, ixgbe_if_iov_init),
 	DEVMETHOD(ifdi_iov_uninit, ixgbe_if_iov_uninit),
@@ -285,7 +287,8 @@ static device_method_t ixgbe_if_methods[] = {
  * TUNEABLE PARAMETERS:
  */
 
-static SYSCTL_NODE(_hw, OID_AUTO, ix, CTLFLAG_RD, 0, "IXGBE driver parameters");
+static SYSCTL_NODE(_hw, OID_AUTO, ix, CTLFLAG_RD | CTLFLAG_MPSAFE, 0,
+    "IXGBE driver parameters");
 static driver_t ixgbe_if_driver = {
   "ixgbe_if", ixgbe_if_methods, sizeof(struct adapter)
 };
@@ -1234,6 +1237,25 @@ ixgbe_if_i2c_req(if_ctx_t ctx, struct ifi2creq *req)
 	return (0);
 } /* ixgbe_if_i2c_req */
 
+/* ixgbe_if_needs_restart - Tell iflib when the driver needs to be reinitialized
+ * @ctx: iflib context
+ * @event: event code to check
+ *
+ * Defaults to returning true for unknown events.
+ *
+ * @returns true if iflib needs to reinit the interface
+ */
+static bool
+ixgbe_if_needs_restart(if_ctx_t ctx __unused, enum iflib_restart_event event)
+{
+	switch (event) {
+	case IFLIB_RESTART_VLAN_CONFIG:
+		return (false);
+	default:
+		return (true);
+	}
+}
+
 /************************************************************************
  * ixgbe_add_media_types
  ************************************************************************/
@@ -1546,14 +1568,14 @@ ixgbe_add_hw_stats(struct adapter *adapter)
 		struct tx_ring *txr = &tx_que->txr;
 		snprintf(namebuf, QUEUE_NAME_LEN, "queue%d", i);
 		queue_node = SYSCTL_ADD_NODE(ctx, child, OID_AUTO, namebuf,
-		    CTLFLAG_RD, NULL, "Queue Name");
+		    CTLFLAG_RD | CTLFLAG_MPSAFE, NULL, "Queue Name");
 		queue_list = SYSCTL_CHILDREN(queue_node);
 
 		SYSCTL_ADD_PROC(ctx, queue_list, OID_AUTO, "txd_head",
-		    CTLTYPE_UINT | CTLFLAG_RD, txr, sizeof(txr),
+		    CTLTYPE_UINT | CTLFLAG_RD | CTLFLAG_NEEDGIANT, txr, 0,
 		    ixgbe_sysctl_tdh_handler, "IU", "Transmit Descriptor Head");
 		SYSCTL_ADD_PROC(ctx, queue_list, OID_AUTO, "txd_tail",
-		    CTLTYPE_UINT | CTLFLAG_RD, txr, sizeof(txr),
+		    CTLTYPE_UINT | CTLFLAG_RD | CTLFLAG_NEEDGIANT, txr, 0,
 		    ixgbe_sysctl_tdt_handler, "IU", "Transmit Descriptor Tail");
 		SYSCTL_ADD_UQUAD(ctx, queue_list, OID_AUTO, "tso_tx",
 		    CTLFLAG_RD, &txr->tso_tx, "TSO");
@@ -1566,22 +1588,22 @@ ixgbe_add_hw_stats(struct adapter *adapter)
 		struct rx_ring *rxr = &rx_que->rxr;
 		snprintf(namebuf, QUEUE_NAME_LEN, "queue%d", i);
 		queue_node = SYSCTL_ADD_NODE(ctx, child, OID_AUTO, namebuf,
-		    CTLFLAG_RD, NULL, "Queue Name");
+		    CTLFLAG_RD | CTLFLAG_MPSAFE, NULL, "Queue Name");
 		queue_list = SYSCTL_CHILDREN(queue_node);
 
 		SYSCTL_ADD_PROC(ctx, queue_list, OID_AUTO, "interrupt_rate",
-		    CTLTYPE_UINT | CTLFLAG_RW, &adapter->rx_queues[i],
-		    sizeof(&adapter->rx_queues[i]),
+		    CTLTYPE_UINT | CTLFLAG_RW | CTLFLAG_NEEDGIANT,
+		    &adapter->rx_queues[i], 0,
 		    ixgbe_sysctl_interrupt_rate_handler, "IU",
 		    "Interrupt Rate");
 		SYSCTL_ADD_UQUAD(ctx, queue_list, OID_AUTO, "irqs",
 		    CTLFLAG_RD, &(adapter->rx_queues[i].irqs),
 		    "irqs on this queue");
 		SYSCTL_ADD_PROC(ctx, queue_list, OID_AUTO, "rxd_head",
-		    CTLTYPE_UINT | CTLFLAG_RD, rxr, sizeof(rxr),
+		    CTLTYPE_UINT | CTLFLAG_RD | CTLFLAG_NEEDGIANT, rxr, 0,
 		    ixgbe_sysctl_rdh_handler, "IU", "Receive Descriptor Head");
 		SYSCTL_ADD_PROC(ctx, queue_list, OID_AUTO, "rxd_tail",
-		    CTLTYPE_UINT | CTLFLAG_RD, rxr, sizeof(rxr),
+		    CTLTYPE_UINT | CTLFLAG_RD | CTLFLAG_NEEDGIANT, rxr, 0,
 		    ixgbe_sysctl_rdt_handler, "IU", "Receive Descriptor Tail");
 		SYSCTL_ADD_UQUAD(ctx, queue_list, OID_AUTO, "rx_packets",
 		    CTLFLAG_RD, &rxr->rx_packets, "Queue Packets Received");
@@ -1596,7 +1618,7 @@ ixgbe_add_hw_stats(struct adapter *adapter)
 	/* MAC stats get their own sub node */
 
 	stat_node = SYSCTL_ADD_NODE(ctx, child, OID_AUTO, "mac_stats",
-	    CTLFLAG_RD, NULL, "MAC Statistics");
+	    CTLFLAG_RD | CTLFLAG_MPSAFE, NULL, "MAC Statistics");
 	stat_list = SYSCTL_CHILDREN(stat_node);
 
 	SYSCTL_ADD_UQUAD(ctx, stat_list, OID_AUTO, "crc_errs",
@@ -2529,37 +2551,42 @@ ixgbe_add_device_sysctls(if_ctx_t ctx)
 
 	/* Sysctls for all devices */
 	SYSCTL_ADD_PROC(ctx_list, child, OID_AUTO, "fc",
-	    CTLTYPE_INT | CTLFLAG_RW, adapter, 0, ixgbe_sysctl_flowcntl, "I",
+	    CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_NEEDGIANT,
+	    adapter, 0, ixgbe_sysctl_flowcntl, "I",
 	    IXGBE_SYSCTL_DESC_SET_FC);
 
 	SYSCTL_ADD_PROC(ctx_list, child, OID_AUTO, "advertise_speed",
-	    CTLTYPE_INT | CTLFLAG_RW, adapter, 0, ixgbe_sysctl_advertise, "I",
+	    CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_NEEDGIANT,
+	    adapter, 0, ixgbe_sysctl_advertise, "I",
 	    IXGBE_SYSCTL_DESC_ADV_SPEED);
 
 #ifdef IXGBE_DEBUG
 	/* testing sysctls (for all devices) */
 	SYSCTL_ADD_PROC(ctx_list, child, OID_AUTO, "power_state",
-	    CTLTYPE_INT | CTLFLAG_RW, adapter, 0, ixgbe_sysctl_power_state,
+	    CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_NEEDGIANT,
+	    adapter, 0, ixgbe_sysctl_power_state,
 	    "I", "PCI Power State");
 
 	SYSCTL_ADD_PROC(ctx_list, child, OID_AUTO, "print_rss_config",
-	    CTLTYPE_STRING | CTLFLAG_RD, adapter, 0,
+	    CTLTYPE_STRING | CTLFLAG_RD | CTLFLAG_NEEDGIANT, adapter, 0,
 	    ixgbe_sysctl_print_rss_config, "A", "Prints RSS Configuration");
 #endif
 	/* for X550 series devices */
 	if (hw->mac.type >= ixgbe_mac_X550)
 		SYSCTL_ADD_PROC(ctx_list, child, OID_AUTO, "dmac",
-		    CTLTYPE_U16 | CTLFLAG_RW, adapter, 0, ixgbe_sysctl_dmac,
+		    CTLTYPE_U16 | CTLFLAG_RW | CTLFLAG_NEEDGIANT,
+		    adapter, 0, ixgbe_sysctl_dmac,
 		    "I", "DMA Coalesce");
 
 	/* for WoL-capable devices */
 	if (hw->device_id == IXGBE_DEV_ID_X550EM_X_10G_T) {
 		SYSCTL_ADD_PROC(ctx_list, child, OID_AUTO, "wol_enable",
-		    CTLTYPE_INT | CTLFLAG_RW, adapter, 0,
+		    CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_NEEDGIANT, adapter, 0,
 		    ixgbe_sysctl_wol_enable, "I", "Enable/Disable Wake on LAN");
 
 		SYSCTL_ADD_PROC(ctx_list, child, OID_AUTO, "wufc",
-		    CTLTYPE_U32 | CTLFLAG_RW, adapter, 0, ixgbe_sysctl_wufc,
+		    CTLTYPE_U32 | CTLFLAG_RW | CTLFLAG_NEEDGIANT,
+		    adapter, 0, ixgbe_sysctl_wufc,
 		    "I", "Enable/Disable Wake Up Filters");
 	}
 
@@ -2569,22 +2596,24 @@ ixgbe_add_device_sysctls(if_ctx_t ctx)
 		struct sysctl_oid_list *phy_list;
 
 		phy_node = SYSCTL_ADD_NODE(ctx_list, child, OID_AUTO, "phy",
-		    CTLFLAG_RD, NULL, "External PHY sysctls");
+		    CTLFLAG_RD | CTLFLAG_MPSAFE, NULL, "External PHY sysctls");
 		phy_list = SYSCTL_CHILDREN(phy_node);
 
 		SYSCTL_ADD_PROC(ctx_list, phy_list, OID_AUTO, "temp",
-		    CTLTYPE_U16 | CTLFLAG_RD, adapter, 0, ixgbe_sysctl_phy_temp,
+		    CTLTYPE_U16 | CTLFLAG_RD | CTLFLAG_NEEDGIANT,
+		    adapter, 0, ixgbe_sysctl_phy_temp,
 		    "I", "Current External PHY Temperature (Celsius)");
 
 		SYSCTL_ADD_PROC(ctx_list, phy_list, OID_AUTO,
-		    "overtemp_occurred", CTLTYPE_U16 | CTLFLAG_RD, adapter, 0,
+		    "overtemp_occurred",
+		    CTLTYPE_U16 | CTLFLAG_RD | CTLFLAG_NEEDGIANT, adapter, 0,
 		    ixgbe_sysctl_phy_overtemp_occurred, "I",
 		    "External PHY High Temperature Event Occurred");
 	}
 
 	if (adapter->feat_cap & IXGBE_FEATURE_EEE) {
 		SYSCTL_ADD_PROC(ctx_list, child, OID_AUTO, "eee_state",
-		    CTLTYPE_INT | CTLFLAG_RW, adapter, 0,
+		    CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_NEEDGIANT, adapter, 0,
 		    ixgbe_sysctl_eee_state, "I", "EEE Power Save State");
 	}
 } /* ixgbe_add_device_sysctls */

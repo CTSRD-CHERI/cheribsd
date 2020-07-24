@@ -19,12 +19,13 @@ CFLAGS+=	-I${SYSDIR}/cddl/contrib/opensolaris/uts/intel
 .elif ${MACHINE_CPUARCH} == "powerpc"
 CFLAGS+=	-I${SYSDIR}/cddl/contrib/opensolaris/uts/powerpc
 .PATH:		${SYSDIR}/cddl/contrib/opensolaris/uts/powerpc/dtrace
+.elif ${MACHINE_CPUARCH} == "mips"
+CFLAGS+=	-I${SYSDIR}/cddl/contrib/opensolaris/uts/mips
+.PATH:		${SYSDIR}/cddl/contrib/opensolaris/uts/mips/dtrace
 .endif
 
 .PATH:		${SYSDIR}/cddl/contrib/opensolaris/common/unicode
 SRCS+=		u8_textprep.c
-
-CFLAGS+=	-DSMP
 
 .include <bsd.kmod.mk>
 

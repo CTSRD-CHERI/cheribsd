@@ -77,13 +77,13 @@ int bnxt_hwrm_nvm_find_dir_entry(struct bnxt_softc *softc, uint16_t type,
 int bnxt_hwrm_nvm_read(struct bnxt_softc *softc, uint16_t index,
     uint32_t offset, uint32_t length, struct iflib_dma_info *data);
 int bnxt_hwrm_nvm_modify(struct bnxt_softc *softc, uint16_t index,
-    uint32_t offset, void *data, bool cpyin, uint32_t length);
+    uint32_t offset, void * __capability data, bool cpyin, uint32_t length);
 int bnxt_hwrm_fw_reset(struct bnxt_softc *softc, uint8_t processor,
     uint8_t *selfreset);
 int bnxt_hwrm_fw_qstatus(struct bnxt_softc *softc, uint8_t type,
     uint8_t *selfreset);
-int bnxt_hwrm_nvm_write(struct bnxt_softc *softc, void *data, bool cpyin,
-    uint16_t type, uint16_t ordinal, uint16_t ext, uint16_t attr,
+int bnxt_hwrm_nvm_write(struct bnxt_softc *softc, void * __capability data,
+    bool cpyin, uint16_t type, uint16_t ordinal, uint16_t ext, uint16_t attr,
     uint16_t option, uint32_t data_length, bool keep, uint32_t *item_length,
     uint16_t *index);
 int bnxt_hwrm_nvm_erase_dir_entry(struct bnxt_softc *softc, uint16_t index);

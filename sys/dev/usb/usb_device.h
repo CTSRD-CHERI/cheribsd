@@ -2,7 +2,7 @@
 /*-
  * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
  *
- * Copyright (c) 2008 Hans Petter Selasky. All rights reserved.
+ * Copyright (c) 2008-2019 Hans Petter Selasky. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -177,10 +177,22 @@ union usb_device_scratch {
 };
 
 /*
+ * Helper structure to keep track of USB device statistics.
+ */
+struct usb_device_statistics {
+	uint32_t uds_requests[4];
+};
+
+/*
  * The following structure defines an USB device. There exists one of
  * these structures for every USB device.
  */
 struct usb_device {
+	/* statistics */
+	struct usb_device_statistics stats_err;
+	struct usb_device_statistics stats_ok;
+  	struct usb_device_statistics stats_cancelled;
+
 	/* generic clear stall message */
 	struct usb_udev_msg cs_msg[2];
 	struct sx enum_sx;
@@ -315,6 +327,9 @@ uint8_t	usb_peer_can_wakeup(struct usb_device *udev);
 struct usb_endpoint *usb_endpoint_foreach(struct usb_device *udev, struct usb_endpoint *ep);
 void	usb_set_device_state(struct usb_device *, enum usb_dev_state);
 enum usb_dev_state usb_get_device_state(struct usb_device *);
+
+void	usb_set_device_strings(struct usb_device *);
+void	usb_get_langid(struct usb_device *);
 
 uint8_t	usbd_enum_lock(struct usb_device *);
 #if USB_HAVE_UGEN

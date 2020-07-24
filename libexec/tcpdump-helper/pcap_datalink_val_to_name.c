@@ -124,7 +124,7 @@ static struct dlt_choice dlt_choices[] = {
 	DLT_CHOICE(DLT_SITA, "SITA pseudo-header"),
 	DLT_CHOICE(DLT_ERF, "Endace ERF header"),
 	DLT_CHOICE(DLT_RAIF1, "Ethernet with u10 Networks pseudo-header"),
-	DLT_CHOICE(DLT_IPMB, "IPMB"),
+	DLT_CHOICE(DLT_IPMB_KONTRON, "IPMB"),
 	DLT_CHOICE(DLT_JUNIPER_ST, "Juniper Secure Tunnel"),
 	DLT_CHOICE(DLT_BLUETOOTH_HCI_H4_WITH_PHDR, "Bluetooth HCI UART transport layer plus pseudo-header"),
 	DLT_CHOICE(DLT_AX25_KISS, "AX.25 with KISS header"),

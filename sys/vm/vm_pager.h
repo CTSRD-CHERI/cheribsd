@@ -168,7 +168,7 @@ vm_pager_populate(vm_object_t object, vm_pindex_t pidx, int fault_type,
 
 	MPASS((object->flags & OBJ_POPULATE) != 0);
 	MPASS(pidx < object->size);
-	MPASS(object->paging_in_progress > 0);
+	MPASS(blockcount_read(&object->paging_in_progress) > 0);
 	return ((*pagertab[object->type]->pgo_populate)(object, pidx,
 	    fault_type, max_prot, first, last));
 }
@@ -179,9 +179,6 @@ vm_pager_populate(vm_object_t object, vm_pindex_t pidx, int fault_type,
  * 
  *	Destroy swap associated with the page.
  * 
- *	The object containing the page must be locked.
- *      This function may not block.
- *
  *	XXX: A much better name would be "vm_pager_page_dirtied()"
  *	XXX: It is not obvious if this could be profitably used by any
  *	XXX: pagers besides the swap_pager or if it should even be a
@@ -191,7 +188,6 @@ static __inline void
 vm_pager_page_unswapped(vm_page_t m)
 {
 
-	VM_OBJECT_ASSERT_LOCKED(m->object);
 	if (pagertab[m->object->type]->pgo_pageunswapped)
 		(*pagertab[m->object->type]->pgo_pageunswapped)(m);
 }

@@ -35,8 +35,6 @@ __FBSDID("$FreeBSD$");
 
 #include "opt_ntp.h"
 
-#define	EXPLICIT_USER_ACCESS
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/sysproto.h>
@@ -318,7 +316,8 @@ ntp_sysctl(SYSCTL_HANDLER_ARGS)
 	return (sysctl_handle_opaque(oidp, &ntv, sizeof(ntv), req));
 }
 
-SYSCTL_NODE(_kern, OID_AUTO, ntp_pll, CTLFLAG_RW, 0, "");
+SYSCTL_NODE(_kern, OID_AUTO, ntp_pll, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
+    "");
 SYSCTL_PROC(_kern_ntp_pll, OID_AUTO, gettime, CTLTYPE_OPAQUE | CTLFLAG_RD |
     CTLFLAG_MPSAFE, 0, sizeof(struct ntptimeval) , ntp_sysctl, "S,ntptimeval",
     "");

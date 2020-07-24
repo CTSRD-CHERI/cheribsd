@@ -130,7 +130,7 @@ _thr_gc(struct pthread *curthread)
 #ifdef ISSUE301_HAS_BEEN_FIXED
 		_thr_free(curthread, td);
 #else
-		_thread_printf(STDERR_FILENO,
+		_thread_fdprintf(STDERR_FILENO,
 		    "Not freeing %p to work around "
 		    "https://github.com/CTSRD-CHERI/cheribsd/issues/301\n", td);
 #endif

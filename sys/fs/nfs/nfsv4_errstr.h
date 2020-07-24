@@ -36,7 +36,7 @@
  * a library of one function for this, since it is only currently used by
  * mount_newnfs.c.
  */
-static const char *nfsv4_errstr[48] = {
+static const char *nfsv4_errstr[NFSERR_XATTR2BIG - 10000] = {
 	"Illegal filehandle",
 	"Undefined NFSv4 err",
 	"READDIR cookie is stale",
@@ -57,7 +57,7 @@ static const char *nfsv4_errstr[48] = {
 	"resource exhaustion",
 	"filesystem relocated",
 	"current FH is not set",
-	"minor vers not supp",
+	"minor version not supported",
 	"server has rebooted",
 	"server has rebooted",
 	"state is out of sync",
@@ -84,7 +84,55 @@ static const char *nfsv4_errstr[48] = {
 	"file locking deadlock",
 	"open file blocks op",
 	"lockowner state revoked",
-	"callback path down"
+	"callback path down",
+	"bad IO mode",
+	"bad layout",
+	"bad session digest",
+	"bad session",
+	"bad slot",
+	"complete already",
+	"not bound to session",
+	"delegation already wanted",
+	"back channel busy",
+	"layout try later",
+	"layout unavailable",
+	"no matching layout",
+	"recall conflict",
+	"unknown layout type",
+	"sequence misordered",
+	"sequence position",
+	"request too big",
+	"reply too big",
+	"reply too big to cache",
+	"retry uncached reply",
+	"unsafe compound",
+	"too many operations",
+	"operation not in session",
+	"hash algorithm unsupported",
+	"unknown error",
+	"clientID busy",
+	"pNFS IO hole",
+	"sequence false retry",
+	"bad high slot",
+	"dead session",
+	"encrypt algorithm unsupported",
+	"pNFS no layout",
+	"not only operation",
+	"wrong credential",
+	"wrong type",
+	"directory delegation unavailable",
+	"reject delegation",
+	"return conflict",
+	"delegation revoked",
+	"partner not supported",
+	"partner no auth",
+	"union not supported",
+	"offload denied",
+	"wrong LFS",
+	"bad label",
+	"offload no request",
+	"no extended attribute",
+	"extended attribute too big",
 };
 
 /*
@@ -95,7 +143,7 @@ static const char *
 nfsv4_geterrstr(int errval)
 {
 
-	if (errval < NFSERR_BADHANDLE || errval > NFSERR_CBPATHDOWN)
+	if (errval < NFSERR_BADHANDLE || errval > NFSERR_XATTR2BIG)
 		return (NULL);
 	return (nfsv4_errstr[errval - NFSERR_BADHANDLE]);
 }

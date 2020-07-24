@@ -34,8 +34,6 @@
  *	from nfs_vfsops.c	8.12 (Berkeley) 5/20/95
  */
 
-#define	EXPLICIT_USER_ACCESS
-
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
@@ -154,7 +152,6 @@ MODULE_VERSION(nfs, 1);
 MODULE_DEPEND(nfs, nfscommon, 1, 1, 1);
 MODULE_DEPEND(nfs, krpc, 1, 1, 1);
 MODULE_DEPEND(nfs, nfssvc, 1, 1, 1);
-MODULE_DEPEND(nfs, nfslock, 1, 1, 1);
 
 /*
  * This structure is now defined in sys/nfs/nfs_diskless.c so that it
@@ -1548,10 +1545,8 @@ mountnfs(struct nfs_args *argp, struct mount *mp, struct sockaddr *nam,
 			if (error)
 				(void) nfs_catnap(PZERO, error, "nfsgetdirp");
 		} while (error && --trycnt > 0);
-		if (error) {
-			error = nfscl_maperr(td, error, (uid_t)0, (gid_t)0);
+		if (error)
 			goto bad;
-		}
 	}
 
 	/*
@@ -1630,7 +1625,7 @@ mountnfs(struct nfs_args *argp, struct mount *mp, struct sockaddr *nam,
 		/*
 		 * Lose the lock but keep the ref.
 		 */
-		NFSVOPUNLOCK(*vpp, 0);
+		NFSVOPUNLOCK(*vpp);
 		vfs_cache_root_set(mp, *vpp);
 		return (0);
 	}
@@ -1832,7 +1827,7 @@ loop:
 		error = VOP_FSYNC(vp, waitfor, td);
 		if (error)
 			allerror = error;
-		NFSVOPUNLOCK(vp, 0);
+		NFSVOPUNLOCK(vp);
 		vrele(vp);
 	}
 	return (allerror);

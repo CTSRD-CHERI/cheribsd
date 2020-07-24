@@ -54,9 +54,15 @@ typedef	void	(*systrace_probe_func_t)(struct syscall_args *,
 typedef	void	(*systrace_args_func_t)(int, void *, uint64_t *, int *);
 
 #ifdef _KERNEL
-extern bool			systrace_enabled;
-#endif
 extern systrace_probe_func_t	systrace_probe_func;
+extern bool			systrace_enabled;
+
+#ifdef KDTRACE_HOOKS
+#define	SYSTRACE_ENABLED()	(systrace_enabled)
+#else
+#define SYSTRACE_ENABLED()	(0)
+#endif
+#endif /* _KERNEL */
 
 struct sysent {			/* system call table */
 	int	sy_narg;	/* number of arguments */
@@ -88,6 +94,7 @@ struct sysent {			/* system call table */
 #endif
 
 struct image_params;
+struct proc;
 struct __sigset;
 struct trapframe;
 struct vnode;
@@ -109,7 +116,7 @@ struct sysentvec {
 	int		(*sv_coredump)(struct thread *, struct vnode *, off_t, int);
 					/* function to dump core, or NULL */
 	int		(*sv_imgact_try)(struct image_params *);
-	void		(*sv_stackgap)(struct image_params *, uintptr_t *);
+	void		(*sv_stackgap)(struct image_params *, uintcap_t *);
 	int		(*sv_copyout_auxargs)(struct image_params *,
 			    uintcap_t);
 	int		sv_minsigstksz;	/* minimum signal stack size */
@@ -138,6 +145,7 @@ struct sysentvec {
 	int		(*sv_trap)(struct thread *);
 	u_long		*sv_hwcap;	/* Value passed in AT_HWCAP. */
 	u_long		*sv_hwcap2;	/* Value passed in AT_HWCAP2. */
+	const char	*(*sv_machine_arch)(struct proc *);
 };
 
 #define	SV_ILP32	0x000100	/* 32-bit executable. */

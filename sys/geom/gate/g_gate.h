@@ -91,16 +91,15 @@ struct g_gate_softc {
 	uint32_t		 sc_queue_count;	/* P: sc_queue_mtx */
 	uint32_t		 sc_queue_size;		/* P: (read-only) */
 	u_int			 sc_timeout;		/* P: (read-only) */
-	struct g_consumer	*sc_readcons;		/* P: XXX */
-	off_t			 sc_readoffset;		/* P: XXX */
+	struct g_consumer	*sc_readcons;		/* P: sc_read_mtx */
+	off_t			 sc_readoffset;		/* P: sc_read_mtx */
 	struct callout		 sc_callout;		/* P: (modified only
 							       from callout
 							       thread) */
-	uintptr_t		 sc_seq;		/* P: (modified only
-							       from g_down
-							       thread) */
+	uintptr_t		 sc_seq;		/* P: sc_queue_mtx */
 	LIST_ENTRY(g_gate_softc) sc_next;		/* P: g_gate_list_mtx */
 	char			 sc_info[G_GATE_INFOSIZE]; /* P: (read-only) */
+	struct mtx		 sc_read_mtx;
 };
 
 #define	G_GATE_DEBUG(lvl, ...) \
@@ -158,7 +157,7 @@ struct g_gate_ctl_io {
 	u_int		 gctl_cmd;
 	off_t		 gctl_offset;
 	off_t		 gctl_length;
-	void		*gctl_data;
+	void * __kerncap gctl_data;
 	int		 gctl_error;
 };
 #endif	/* !_G_GATE_H_ */

@@ -87,15 +87,6 @@ static volatile u_int __read_mostly pace;
 
 static uma_zone_t __read_mostly biozone;
 
-/*
- * The head of the list of classifiers used in g_io_request.
- * Use g_register_classifier() and g_unregister_classifier()
- * to add/remove entries to the list.
- * Classifiers are invoked in registration order.
- */
-static TAILQ_HEAD(, g_classifier_hook) g_classifier_tailq __read_mostly =
-    TAILQ_HEAD_INITIALIZER(g_classifier_tailq);
-
 #include <machine/atomic.h>
 
 static void
@@ -224,9 +215,6 @@ g_clone_bio(struct bio *bp)
 		if (bp->bio_cmd == BIO_ZONE)
 			bcopy(&bp->bio_zone, &bp2->bio_zone,
 			    sizeof(bp->bio_zone));
-		/* Inherit classification info from the parent */
-		bp2->bio_classifier1 = bp->bio_classifier1;
-		bp2->bio_classifier2 = bp->bio_classifier2;
 #if defined(BUF_TRACKING) || defined(FULL_BUF_TRACKING)
 		bp2->bio_track_bp = bp->bio_track_bp;
 #endif
@@ -340,6 +328,42 @@ g_io_zonecmd(struct disk_zone_args *zone_args, struct g_consumer *cp)
 	return (error);
 }
 
+/*
+ * Send a BIO_SPEEDUP down the stack. This is used to tell the lower layers that
+ * the upper layers have detected a resource shortage. The lower layers are
+ * advised to stop delaying I/O that they might be holding for performance
+ * reasons and to schedule it (non-trims) or complete it successfully (trims) as
+ * quickly as it can. bio_length is the amount of the shortage.  This call
+ * should be non-blocking. bio_resid is used to communicate back if the lower
+ * layers couldn't find bio_length worth of I/O to schedule or discard. A length
+ * of 0 means to do as much as you can (schedule the h/w queues full, discard
+ * all trims). flags are a hint from the upper layers to the lower layers what
+ * operation should be done.
+ */
+int
+g_io_speedup(size_t shortage, u_int flags, size_t *resid, struct g_consumer *cp)
+{
+	struct bio *bp;
+	int error;
+
+	KASSERT((flags & (BIO_SPEEDUP_TRIM | BIO_SPEEDUP_WRITE)) != 0,
+	    ("Invalid flags passed to g_io_speedup: %#x", flags));
+	g_trace(G_T_BIO, "bio_speedup(%s, %zu, %#x)", cp->provider->name,
+	    shortage, flags);
+	bp = g_new_bio();
+	if (bp == NULL)
+		return (ENOMEM);
+	bp->bio_cmd = BIO_SPEEDUP;
+	bp->bio_length = shortage;
+	bp->bio_done = NULL;
+	bp->bio_flags |= flags;
+	g_io_request(bp, cp);
+	error = biowait(bp, "gflush");
+	*resid = bp->bio_resid;
+	g_destroy_bio(bp);
+	return (error);
+}
+
 int
 g_io_flush(struct g_consumer *cp)
 {
@@ -383,6 +407,7 @@ g_io_check(struct bio *bp)
 		break;
 	case BIO_WRITE:
 	case BIO_DELETE:
+	case BIO_SPEEDUP:
 	case BIO_FLUSH:
 		if (cp->acw == 0)
 			return (EPERM);
@@ -462,70 +487,10 @@ g_io_check(struct bio *bp)
 	return (EJUSTRETURN);
 }
 
-/*
- * bio classification support.
- *
- * g_register_classifier() and g_unregister_classifier()
- * are used to add/remove a classifier from the list.
- * The list is protected using the g_bio_run_down lock,
- * because the classifiers are called in this path.
- *
- * g_io_request() passes bio's that are not already classified
- * (i.e. those with bio_classifier1 == NULL) to g_run_classifiers().
- * Classifiers can store their result in the two fields
- * bio_classifier1 and bio_classifier2.
- * A classifier that updates one of the fields should
- * return a non-zero value.
- * If no classifier updates the field, g_run_classifiers() sets
- * bio_classifier1 = BIO_NOTCLASSIFIED to avoid further calls.
- */
-
-int
-g_register_classifier(struct g_classifier_hook *hook)
-{
-
-	g_bioq_lock(&g_bio_run_down);
-	TAILQ_INSERT_TAIL(&g_classifier_tailq, hook, link);
-	g_bioq_unlock(&g_bio_run_down);
-
-	return (0);
-}
-
-void
-g_unregister_classifier(struct g_classifier_hook *hook)
-{
-	struct g_classifier_hook *entry;
-
-	g_bioq_lock(&g_bio_run_down);
-	TAILQ_FOREACH(entry, &g_classifier_tailq, link) {
-		if (entry == hook) {
-			TAILQ_REMOVE(&g_classifier_tailq, hook, link);
-			break;
-		}
-	}
-	g_bioq_unlock(&g_bio_run_down);
-}
-
-static void
-g_run_classifiers(struct bio *bp)
-{
-	struct g_classifier_hook *hook;
-	int classified = 0;
-
-	biotrack(bp, __func__);
-
-	TAILQ_FOREACH(hook, &g_classifier_tailq, link)
-		classified |= hook->func(hook->arg, bp);
-
-	if (!classified)
-		bp->bio_classifier1 = BIO_NOTCLASSIFIED;
-}
-
 void
 g_io_request(struct bio *bp, struct g_consumer *cp)
 {
 	struct g_provider *pp;
-	struct mtx *mtxp;
 	int direct, error, first;
 	uint8_t cmd;
 
@@ -580,11 +545,19 @@ g_io_request(struct bio *bp, struct g_consumer *cp)
 
 	KASSERT(!(bp->bio_flags & BIO_ONQUEUE),
 	    ("Bio already on queue bp=%p", bp));
+
 	if ((g_collectstats & G_STATS_CONSUMERS) != 0 ||
 	    ((g_collectstats & G_STATS_PROVIDERS) != 0 && pp->stat != NULL))
 		binuptime(&bp->bio_t0);
 	else
 		getbinuptime(&bp->bio_t0);
+	if (g_collectstats & G_STATS_CONSUMERS)
+		devstat_start_transaction(cp->stat, &bp->bio_t0);
+	if (g_collectstats & G_STATS_PROVIDERS)
+		devstat_start_transaction(pp->stat, &bp->bio_t0);
+#ifdef INVARIANTS
+	atomic_add_int(&cp->nstart, 1);
+#endif
 
 #ifdef GET_STACK_USAGE
 	direct = (cp->flags & G_CF_DIRECT_SEND) != 0 &&
@@ -603,27 +576,6 @@ g_io_request(struct bio *bp, struct g_consumer *cp)
 #else
 	direct = 0;
 #endif
-
-	if (!TAILQ_EMPTY(&g_classifier_tailq) && !bp->bio_classifier1) {
-		g_bioq_lock(&g_bio_run_down);
-		g_run_classifiers(bp);
-		g_bioq_unlock(&g_bio_run_down);
-	}
-
-	/*
-	 * The statistics collection is lockless, as such, but we
-	 * can not update one instance of the statistics from more
-	 * than one thread at a time, so grab the lock first.
-	 */
-	mtxp = mtx_pool_find(mtxpool_sleep, pp);
-	mtx_lock(mtxp);
-	if (g_collectstats & G_STATS_PROVIDERS)
-		devstat_start_transaction(pp->stat, &bp->bio_t0);
-	if (g_collectstats & G_STATS_CONSUMERS)
-		devstat_start_transaction(cp->stat, &bp->bio_t0);
-	pp->nstart++;
-	cp->nstart++;
-	mtx_unlock(mtxp);
 
 	if (direct) {
 		error = g_io_check(bp);
@@ -732,8 +684,9 @@ g_io_deliver(struct bio *bp, int error)
 		devstat_end_transaction_bio_bt(pp->stat, bp, &now);
 	if (g_collectstats & G_STATS_CONSUMERS)
 		devstat_end_transaction_bio_bt(cp->stat, bp, &now);
+#ifdef INVARIANTS
 	cp->nend++;
-	pp->nend++;
+#endif
 	mtx_unlock(mtxp);
 
 	if (error != ENOMEM) {

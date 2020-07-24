@@ -12,11 +12,11 @@ CRTARCH?=	mips64
 .else
 CRTARCH?=	${MACHINE_ARCH:C/amd64/x86_64/}
 .endif
-CRTSRC=		${SRCTOP}/contrib/compiler-rt
+CRTSRC=		${SRCTOP}/contrib/llvm-project/compiler-rt
 
 .PATH:		${CRTSRC}/lib
 
-CLANGDIR=	/usr/lib/clang/9.0.0
+CLANGDIR=	/usr/lib/clang/10.0.0
 LIBDIR=		${CLANGDIR}/lib/freebsd
 SHLIBDIR=	${LIBDIR}
 
@@ -28,14 +28,13 @@ WARNS?=		0
 SSP_CFLAGS=
 CFLAGS+=	-DNDEBUG
 CFLAGS+=	-DHAVE_RPC_XDR_H=0
-CFLAGS+=	-DHAVE_TIRPC_RPC_XDR_H=0
 CFLAGS+=	-DSANITIZER_SUPPORTS_WEAK_HOOKS=0
 CFLAGS+=	-DUBSAN_CAN_USE_CXXABI
 CFLAGS+=	${PICFLAG}
 CFLAGS+=	-fno-builtin
 CFLAGS+=	-fno-exceptions
 CXXFLAGS+=	-fno-rtti
-.if ${COMPILER_TYPE} == clang && ${COMPILER_VERSION} >= 30700
+.if ${COMPILER_TYPE} == clang
 CFLAGS+=	-fno-sanitize=safe-stack
 .endif
 CFLAGS+=	-fno-stack-protector
@@ -44,4 +43,4 @@ CXXFLAGS+=	-fvisibility-inlines-hidden
 CXXFLAGS+=	-fvisibility=hidden
 CFLAGS+=	-I${CRTSRC}/include
 CFLAGS+=	-I${CRTSRC}/lib
-CXXSTD=		c++11
+CXXSTD=		c++14

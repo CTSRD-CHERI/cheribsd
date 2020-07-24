@@ -40,7 +40,6 @@ __FBSDID("$FreeBSD$");
  * Socket operations for use by the nfs server.
  */
 
-#ifndef APPLEKEXT
 #include <fs/nfs/nfsport.h>
 
 extern struct nfsstatsv1 nfsstatsv1;
@@ -374,7 +373,6 @@ int (*nfsrv4_ops2[NFSV42_NOPS])(struct nfsrv_descript *,
 	(int (*)(struct nfsrv_descript *, int, vnode_t , vnode_t , struct nfsexstuff *, struct nfsexstuff *))0,
 	(int (*)(struct nfsrv_descript *, int, vnode_t , vnode_t , struct nfsexstuff *, struct nfsexstuff *))0,
 };
-#endif	/* !APPLEKEXT */
 
 /*
  * Static array that defines which nfs rpc's are nonidempotent
@@ -531,7 +529,7 @@ nfsrvd_statend(int op, uint64_t bytes, struct bintime *now,
  * handle plus name or ...
  * The NFS V4 Compound RPC is performed separately by nfsrvd_compound().
  */
-APPLESTATIC void
+void
 nfsrvd_dorpc(struct nfsrv_descript *nd, int isdgram, u_char *tag, int taglen,
     u_int32_t minorvers)
 {
@@ -624,7 +622,7 @@ nfsrvd_dorpc(struct nfsrv_descript *nd, int isdgram, u_char *tag, int taglen,
 
 		if (nfs_retfh[nd->nd_procnum] == 1) {
 			if (vp)
-				NFSVOPUNLOCK(vp, 0);
+				NFSVOPUNLOCK(vp);
 			error = (*(nfsrv3_procs1[nd->nd_procnum]))(nd, isdgram,
 			    vp, NULL, (fhandle_t *)fh.nfsrvfh_data, &nes);
 		} else if (nfs_retfh[nd->nd_procnum] == 2) {
@@ -934,7 +932,7 @@ nfsrvd_compound(struct nfsrv_descript *nd, int isdgram, u_char *tag,
 					vrele(vp);
 				vp = nvp;
 				cur_fsid = vp->v_mount->mnt_stat.f_fsid;
-				NFSVOPUNLOCK(vp, 0);
+				NFSVOPUNLOCK(vp);
 				vpnes = nes;
 			}
 			break;
@@ -949,7 +947,7 @@ nfsrvd_compound(struct nfsrv_descript *nd, int isdgram, u_char *tag,
 					vrele(vp);
 				vp = nvp;
 				cur_fsid = vp->v_mount->mnt_stat.f_fsid;
-				NFSVOPUNLOCK(vp, 0);
+				NFSVOPUNLOCK(vp);
 				vpnes = nes;
 			}
 			break;
@@ -962,7 +960,7 @@ nfsrvd_compound(struct nfsrv_descript *nd, int isdgram, u_char *tag,
 						vrele(vp);
 					vp = nvp;
 					cur_fsid = vp->v_mount->mnt_stat.f_fsid;
-					NFSVOPUNLOCK(vp, 0);
+					NFSVOPUNLOCK(vp);
 					vpnes = nes;
 				}
 			} else
@@ -1079,7 +1077,7 @@ nfsrvd_compound(struct nfsrv_descript *nd, int isdgram, u_char *tag,
 				    }
 				}
 				/* Lookup ops return a locked vnode */
-				NFSVOPUNLOCK(nvp, 0);
+				NFSVOPUNLOCK(nvp);
 			    }
 			    if (!nd->nd_repstat) {
 				    vrele(vp);

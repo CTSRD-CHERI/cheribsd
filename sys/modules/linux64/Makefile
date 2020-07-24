@@ -46,14 +46,14 @@ OBJCOPY_TARGET=--output-target elf64-x86-64 --binary-architecture i386:x86-64
 ${VDSO}.so: linux_locore.o
 	${OBJCOPY} --input-target binary ${OBJCOPY_TARGET} -S -g \
 	    linux_locore.o ${.TARGET}
-	strip -N _binary_linux_locore_o_size ${.TARGET}
+	${STRIPBIN} -N _binary_linux_locore_o_size ${.TARGET}
 
 linux_support.o: assym.inc linux_assym.h
 	${CC} -c -x assembler-with-cpp -DLOCORE ${CFLAGS} \
 	    ${.IMPSRC} -o ${.TARGET}
 
 linux_genassym.o: offset.inc
-	${CC} -c ${CFLAGS:N-flto:N-fno-common} ${.IMPSRC}
+	${CC} -c ${CFLAGS:N-flto:N-fno-common} -fcommon ${.IMPSRC}
 
 .if !defined(KERNBUILDDIR)
 .warning Building Linuxulator outside of a kernel does not make sense

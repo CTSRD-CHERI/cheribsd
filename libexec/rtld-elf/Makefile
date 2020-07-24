@@ -52,7 +52,7 @@ MAN?=		rtld.1
 CSTD?=		gnu99
 CFLAGS+=	-Wall -DFREEBSD_ELF -DIN_RTLD -ffreestanding
 CFLAGS+=	-I${SRCTOP}/lib/csu/common
-.if ${MK_CHERI} != "no"
+.if ${MACHINE_CPU:Mcheri}
 CFLAGS+=	-DCHERI
 .endif
 .if exists(${RTLD_ELF_DIR}/${MACHINE_ARCH})
@@ -61,13 +61,6 @@ RTLD_ARCH=	${MACHINE_ARCH}
 RTLD_ARCH=	${MACHINE_CPUARCH}
 .endif
 CFLAGS+=	-I${RTLD_ELF_DIR}/${RTLD_ARCH} -I${RTLD_ELF_DIR}
-.if ${MACHINE_ARCH} == "powerpc64"
-LDFLAGS+=	-nostdlib -e _rtld_start
-.elif ${MACHINE_CPUARCH} == "mips"
-LDFLAGS+=	-nostdlib -e rtld_start
-.else
-LDFLAGS+=	-nostdlib -e .rtld_start
-.endif
 
 NO_WCAST_ALIGN=	yes
 WARNS?=		6
@@ -78,38 +71,17 @@ SYMLINKS=	../..${BINDIR}/${PROG} ${LIBEXECDIR}/${PROG}
 MLINKS?=	rtld.1 ld-elf.so.1.1 \
 		rtld.1 ld.so.1
 
-.if ${MACHINE_CPUARCH} == "sparc64"
-CFLAGS+=	-fPIC
-.else
-CFLAGS+=	-fpic
-.endif
-CFLAGS+=	-DPIC $(DEBUG)
-.if ${MACHINE_CPUARCH} == "amd64" || ${MACHINE_CPUARCH} == "i386"
-CFLAGS+=	-fvisibility=hidden
-.endif
-.if ${MACHINE_CPUARCH} == "mips"
-CFLAGS.reloc.c+=-fno-jump-tables
-.endif
+CFLAGS+=	-fpic -DPIC $(DEBUG)
 # Since we pass -shared, we shouldn't also pass -pie
 MK_PIE:=	no
-LDFLAGS+=	-shared -Wl,-Bsymbolic -Wl,-z,defs
+
+LDFLAGS+=	-shared -Wl,-Bsymbolic -Wl,-z,defs -nostdlib -e ${RTLD_ENTRY}
 # Pull in the dependencies that we use from libc
 .include "rtld-libc/Makefile.inc"
 .if ${MK_TOOLCHAIN} == "no"
 LDFLAGS+=	-L${LIBCDIR}
 .endif
 
-.if ${MACHINE_CPUARCH} == "arm"
-# Some of the required math functions (div & mod) are implemented in
-# libcompiler_rt on ARM. The library also needs to be placed first to be
-# correctly linked. As some of the functions are used before we have
-# shared libraries.
-LIBADD+=	compiler_rt
-.endif
-
-
-
-.if ${MK_SYMVER} == "yes"
 VERSION_DEF=	${LIBCSRCDIR}/Versions.def
 SYMBOL_MAPS=	${RTLD_ELF_DIR}/Symbol.map
 VERSION_MAP=	Version.map
@@ -118,9 +90,9 @@ LDFLAGS+=	-Wl,--version-script=${VERSION_MAP}
 .if exists(${RTLD_ELF_DIR}/${RTLD_ARCH}/Symbol.map)
 SYMBOL_MAPS+=	${RTLD_ELF_DIR}/${RTLD_ARCH}/Symbol.map
 .endif
-.endif
 
 .sinclude "${RTLD_ELF_DIR}/${RTLD_ARCH}/Makefile.inc"
+RTLD_ENTRY?=	.rtld_start
 
 # Since moving rtld-elf to /libexec, we need to create a symlink.
 # Fixup the existing binary that's there so we can symlink over it.
@@ -144,8 +116,4 @@ ${PROG_FULL}:	${VERSION_MAP}
 # GCC warns about redeclarations even though they have __exported
 # and are therefore not identical to the ones from the system headers.
 CFLAGS+=	-Wno-redundant-decls
-.if ${COMPILER_VERSION} < 40300
-# Silence -Wshadow false positives in ancient GCC
-CFLAGS+=	-Wno-shadow
-.endif
 .endif

@@ -171,7 +171,8 @@ init_amd(void)
 	 */
 	if (lower_sharedpage_init == 0) {
 		lower_sharedpage_init = 1;
-		if (CPUID_TO_FAMILY(cpu_id) == 0x17) {
+		if (CPUID_TO_FAMILY(cpu_id) == 0x17 ||
+		    CPUID_TO_FAMILY(cpu_id) == 0x18) {
 			hw_lower_amd64_sharedpage = 1;
 		}
 	}
@@ -254,11 +255,12 @@ initializecpu(void)
 		wrmsr(MSR_EFER, msr);
 		pg_nx = PG_NX;
 	}
-	hw_ibrs_recalculate();
+	hw_ibrs_recalculate(false);
 	hw_ssb_recalculate(false);
 	amd64_syscall_ret_flush_l1d_recalc();
 	switch (cpu_vendor_id) {
 	case CPU_VENDOR_AMD:
+	case CPU_VENDOR_HYGON:
 		init_amd();
 		break;
 	case CPU_VENDOR_CENTAUR:

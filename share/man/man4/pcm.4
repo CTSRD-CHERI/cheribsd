@@ -25,7 +25,7 @@
 .\"
 .\" $FreeBSD$
 .\"
-.Dd March 22, 2012
+.Dd May 5, 2020
 .Dt SOUND 4
 .Os
 .Sh NAME
@@ -83,8 +83,6 @@ The following bridge device drivers are available:
 .It
 .Xr snd_atiixp 4
 .It
-.Xr snd_audiocs 4 (enabled by default on sparc64)
-.It
 .Xr snd_cmi 4 (enabled by default on amd64, i386)
 .It
 .Xr snd_cs4281 4
@@ -103,7 +101,7 @@ The following bridge device drivers are available:
 .It
 .Xr snd_envy24ht 4
 .It
-.Xr snd_es137x 4 (enabled by default on amd64, i386, sparc64)
+.Xr snd_es137x 4 (enabled by default on amd64, i386)
 .It
 .Xr snd_ess 4
 .It
@@ -135,9 +133,7 @@ snd_sb8
 .It
 .Xr snd_spicds 4
 .It
-.Xr snd_t4dwave 4 (enabled by default on sparc64)
-.It
-.Xr snd_uaudio 4 (enabled by default on amd64, i386, powerpc, sparc64)
+.Xr snd_uaudio 4 (enabled by default on amd64, i386, powerpc)
 .It
 .Xr snd_via8233 4 (enabled by default on amd64, i386)
 .It
@@ -747,8 +743,8 @@ A device node is not created properly.
 .Xr mixer 8 ,
 .Xr sysctl 8
 .Rs
-.%T "Cookbook formulae for audio EQ biquad filter coefficients, by Robert Bristow-Johnson"
-.%U "http://www.musicdsp.org/files/Audio-EQ-Cookbook.txt"
+.%T "Cookbook formulae for audio EQ biquad filter coefficients (Audio-EQ-Cookbook.txt), by Robert Bristow-Johnson"
+.%U "https://www.musicdsp.org/en/latest/Filters/197-rbj-audio-eq-cookbook.html"
 .Re
 .Rs
 .%T "Julius O'Smith's Digital Audio Resampling"
@@ -756,7 +752,7 @@ A device node is not created properly.
 .Re
 .Rs
 .%T "Polynomial Interpolators for High-Quality Resampling of Oversampled Audio, by Olli Niemitalo"
-.%U "http://www.student.oulu.fi/~oniemita/dsp/deip.pdf"
+.%U "http://yehar.com/blog/wp-content/uploads/2009/08/deip.pdf"
 .Re
 .Rs
 .%T "The OSS API"

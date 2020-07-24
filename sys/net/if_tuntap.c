@@ -46,11 +46,8 @@
  * $FreeBSD$
  */
 
-
 #include "opt_inet.h"
 #include "opt_inet6.h"
-
-#define EXPLICIT_USER_ACCESS
 
 #include <sys/param.h>
 #include <sys/lock.h>
@@ -198,13 +195,13 @@ SX_SYSINIT(tun_ioctl_sx, &tun_ioctl_sx, "tun_ioctl");
 
 SYSCTL_DECL(_net_link);
 /* tun */
-static SYSCTL_NODE(_net_link, OID_AUTO, tun, CTLFLAG_RW, 0,
+static SYSCTL_NODE(_net_link, OID_AUTO, tun, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
     "IP tunnel software network interface");
 SYSCTL_INT(_net_link_tun, OID_AUTO, devfs_cloning, CTLFLAG_RWTUN, &tundclone, 0,
     "Enable legacy devfs interface creation");
 
 /* tap */
-static SYSCTL_NODE(_net_link, OID_AUTO, tap, CTLFLAG_RW, 0,
+static SYSCTL_NODE(_net_link, OID_AUTO, tap, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
     "Ethernet tunnel software network interface");
 SYSCTL_INT(_net_link_tap, OID_AUTO, user_open, CTLFLAG_RW, &tap_allow_uopen, 0,
     "Enable legacy devfs interface creation for all users");
@@ -1783,6 +1780,7 @@ static int
 tunwrite_l2(struct tuntap_softc *tp, struct mbuf *m,
 	    struct virtio_net_hdr_mrg_rxbuf *vhdr)
 {
+	struct epoch_tracker et;
 	struct ether_header *eh;
 	struct ifnet *ifp;
 
@@ -1813,7 +1811,9 @@ tunwrite_l2(struct tuntap_softc *tp, struct mbuf *m,
 
 	/* Pass packet up to parent. */
 	CURVNET_SET(ifp->if_vnet);
+	NET_EPOCH_ENTER(et);
 	(*ifp->if_input)(ifp, m);
+	NET_EPOCH_EXIT(et);
 	CURVNET_RESTORE();
 	/* ibytes are counted in parent */
 	if_inc_counter(ifp, IFCOUNTER_IPACKETS, 1);

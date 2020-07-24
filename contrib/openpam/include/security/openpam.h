@@ -378,7 +378,7 @@ struct pam_module {
 			[PAM_SM_CHAUTHTOK] = _PAM_SM_CHAUTHTOK		\
 		},							\
 	};								\
-	DATA_SET(_openpam_static_modules, _pam_module)
+	DATA_SET(openpam_static_modules, _pam_module)
 #else
 /* normal case */
 # define PAM_EXTERN

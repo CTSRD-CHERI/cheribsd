@@ -65,6 +65,11 @@ translate_vnhook_major_minor(struct vnode *vp, struct stat *sb)
 {
 	int major, minor;
 
+	if (vn_isdisk(vp, NULL)) {
+		sb->st_mode &= ~S_IFMT;
+		sb->st_mode |= S_IFBLK;
+	}
+
 	if (vp->v_type == VCHR && vp->v_rdev != NULL &&
 	    linux_driver_get_major_minor(devtoname(vp->v_rdev),
 	    &major, &minor) == 0) {
@@ -113,6 +118,10 @@ translate_fd_major_minor(struct thread *td, int fd, struct stat *buf)
 	    fget(td, fd, &cap_no_rights, &fp) != 0)
 		return;
 	vp = fp->f_vnode;
+	if (vp != NULL && vn_isdisk(vp, NULL)) {
+		buf->st_mode &= ~S_IFMT;
+		buf->st_mode |= S_IFBLK;
+	}
 	if (vp != NULL && vp->v_rdev != NULL &&
 	    linux_driver_get_major_minor(devtoname(vp->v_rdev),
 					 &major, &minor) == 0) {
@@ -658,7 +667,7 @@ linux_syncfs(struct thread *td, struct linux_syncfs_args *args)
 	if ((mp->mnt_flag & MNT_RDONLY) == 0 &&
 	    vn_start_write(NULL, &mp, V_NOWAIT) == 0) {
 		save = curthread_pflags_set(TDP_SYNCIO);
-		vfs_msync(mp, MNT_NOWAIT);
+		vfs_periodic(mp, MNT_NOWAIT);
 		VFS_SYNC(mp, MNT_NOWAIT);
 		curthread_pflags_restore(save);
 		vn_finished_write(mp);

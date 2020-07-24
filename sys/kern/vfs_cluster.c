@@ -802,7 +802,6 @@ cluster_write(struct vnode *vp, struct buf *bp, u_quad_t filesize, int seqcount,
 	vp->v_lasta = bp->b_blkno;
 }
 
-
 /*
  * This is an awful lot like cluster_rbuild...wish they could be combined.
  * The last lbn argument is the current block on which I/O is being
@@ -865,8 +864,7 @@ cluster_wbuild(struct vnode *vp, long size, daddr_t start_lbn, int len,
 		  (tbp->b_bcount != tbp->b_bufsize) ||
 		  (tbp->b_bcount != size) ||
 		  (len == 1) ||
-		  ((bp = uma_zalloc(cluster_pbuf_zone,
-		  (vp->v_vflag & VV_MD) != 0 ? M_NOWAIT : M_WAITOK)) == NULL)) {
+		  ((bp = uma_zalloc(cluster_pbuf_zone, M_NOWAIT)) == NULL)) {
 			totalwritten += tbp->b_bufsize;
 			bawrite(tbp);
 			++start_lbn;

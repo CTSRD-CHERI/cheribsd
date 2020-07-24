@@ -121,14 +121,14 @@
 struct kinfo_proc {
 	int	ki_structsize;		/* size of this structure */
 	int	ki_layout;		/* reserved: layout identifier */
-	struct	pargs *ki_args;		/* address of command arguments */
-	struct	proc *ki_paddr;		/* address of proc */
-	struct	user *ki_addr;		/* kernel virtual addr of u-area */
-	struct	vnode *ki_tracep;	/* pointer to trace file */
-	struct	vnode *ki_textvp;	/* pointer to executable file */
-	struct	filedesc *ki_fd;	/* pointer to open file info */
-	struct	vmspace *ki_vmspace;	/* pointer to kernel vmspace struct */
-	void	*ki_wchan;		/* sleep address */
+	struct pargs * __kerncap ki_args;	/* address of command arguments */
+	struct proc * __kerncap ki_paddr;	/* address of proc */
+	struct user * __kerncap ki_addr;	/* kernel virtual addr of u-area */
+	struct vnode * __kerncap ki_tracep;	/* pointer to trace file */
+	struct vnode * __kerncap ki_textvp;	/* pointer to executable file */
+	struct filedesc * __kerncap ki_fd;	/* pointer to open file info */
+	struct vmspace * __kerncap ki_vmspace;	/* pointer to kernel vmspace struct */
+	const void * __kerncap ki_wchan; /* sleep address */
 	pid_t	ki_pid;			/* Process identifier */
 	pid_t	ki_ppid;		/* parent process id */
 	pid_t	ki_pgid;		/* process group id */
@@ -204,16 +204,16 @@ struct kinfo_proc {
 	struct	rusage ki_rusage;	/* process rusage statistics */
 	/* XXX - most fields in ki_rusage_ch are not (yet) filled in */
 	struct	rusage ki_rusage_ch;	/* rusage of children processes */
-	struct	pcb *ki_pcb;		/* kernel virtual addr of pcb */
-	void	*ki_kstack;		/* kernel virtual addr of stack */
-	void	*ki_udata;		/* User convenience pointer */
-	struct	thread *ki_tdaddr;	/* address of thread */
+	struct pcb * __kerncap ki_pcb;	/* kernel virtual addr of pcb */
+	void * __kerncap ki_kstack;	/* kernel virtual addr of stack */
+	void * __kerncap ki_udata;	/* User convenience pointer */
+	struct thread * __kerncap ki_tdaddr;	/* address of thread */
 	/*
 	 * When adding new variables, take space for pointers from the
 	 * front of ki_spareptrs, and longs from the end of ki_sparelongs.
 	 * That way the spare room from both arrays will remain contiguous.
 	 */
-	void	*ki_spareptrs[KI_NSPARE_PTR];	/* spare room for growth */
+	void * __kerncap ki_spareptrs[KI_NSPARE_PTR];	/* spare room for growth */
 	long	ki_sparelongs[KI_NSPARE_LONG];	/* spare room for growth */
 	long	ki_sflag;		/* PS_* flags */
 	long	ki_tdflags;		/* XXXKSE kthread flag */
@@ -472,6 +472,8 @@ struct kinfo_file {
 #define	KVME_FLAG_GROWS_UP	0x00000010
 #define	KVME_FLAG_GROWS_DOWN	0x00000020
 #define	KVME_FLAG_USER_WIRED	0x00000040
+#define	KVME_FLAG_GUARD		0x00000080
+#define	KVME_FLAG_UNMAPPED	0x00000100
 
 #if defined(__amd64__)
 #define	KINFO_OVMENTRY_SIZE	1168
@@ -524,7 +526,8 @@ struct kinfo_vmentry {
 	uint16_t kve_status;			/* Status flags. */
 	uint64_t kve_vn_fsid;			/* dev_t of vnode location */
 	uint64_t kve_vn_rdev;			/* Device id if device. */
-	int	 _kve_ispare[8];		/* Space for more stuff. */
+	uint64_t kve_reservation;		/* Map reservation */
+	int	 _kve_ispare[6];		/* Space for more stuff. */
 	/* Truncated before copyout in sysctl */
 	char	 kve_path[PATH_MAX];		/* Path to VM obj, if any. */
 };
@@ -574,16 +577,16 @@ struct kinfo_kstack {
 };
 
 struct kinfo_sigtramp {
-	void	*ksigtramp_start;
-	void	*ksigtramp_end;
-	void	*ksigtramp_spare[4];
+	void * __kerncap ksigtramp_start;
+	void * __kerncap ksigtramp_end;
+	void * __kerncap ksigtramp_spare[4];
 };
 
 #ifdef _KERNEL
 /* Flags for kern_proc_out function. */
 #define KERN_PROC_NOTHREADS	0x1
 #define KERN_PROC_MASK32	0x2
-#define KERN_PROC_CHERIABI	0x4
+#define KERN_PROC_MASK64	0x4
 
 /* Flags for kern_proc_filedesc_out. */
 #define	KERN_FILEDESC_PACK_KINFO	0x00000001U

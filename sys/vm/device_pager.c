@@ -236,7 +236,6 @@ cdev_pager_free_page(vm_object_t object, vm_page_t m)
 		KASSERT((m->oflags & VPO_UNMANAGED) == 0, ("unmanaged %p", m));
 		pmap_remove_all(m);
 		(void)vm_page_remove(m);
-		vm_page_xunbusy(m);
 	} else if (object->type == OBJT_DEVICE)
 		dev_pager_free_page(object, m);
 }
@@ -271,8 +270,12 @@ dev_pager_dealloc(vm_object_t object)
 		 * Free up our fake pages.
 		 */
 		while ((m = TAILQ_FIRST(&object->un_pager.devp.devp_pglist))
-		    != NULL)
+		    != NULL) {
+			if (vm_page_busy_acquire(m, VM_ALLOC_WAITFAIL) == 0)
+				continue;
+
 			dev_pager_free_page(object, m);
+		}
 	}
 	object->handle = NULL;
 	object->type = OBJT_DEAD;
@@ -286,9 +289,9 @@ dev_pager_getpages(vm_object_t object, vm_page_t *ma, int count, int *rbehind,
 
 	/* Since our haspage reports zero after/before, the count is 1. */
 	KASSERT(count == 1, ("%s: count %d", __func__, count));
-	VM_OBJECT_ASSERT_WLOCKED(object);
 	if (object->un_pager.devp.ops->cdev_pg_fault == NULL)
 		return (VM_PAGER_FAIL);
+	VM_OBJECT_WLOCK(object);
 	error = object->un_pager.devp.ops->cdev_pg_fault(object,
 	    IDX_TO_OFF(ma[0]->pindex), PROT_READ, &ma[0]);
 
@@ -309,6 +312,7 @@ dev_pager_getpages(vm_object_t object, vm_page_t *ma, int count, int *rbehind,
 		if (rahead)
 			*rahead = 0;
 	}
+	VM_OBJECT_WUNLOCK(object);
 
 	return (error);
 }
@@ -391,8 +395,7 @@ old_dev_pager_fault(vm_object_t object, vm_ooffset_t offset, int prot,
 		 */
 		page = vm_page_getfake(paddr, memattr);
 		VM_OBJECT_WLOCK(object);
-		vm_page_replace_checked(page, object, (*mres)->pindex, *mres);
-		vm_page_free(*mres);
+		vm_page_replace(page, object, (*mres)->pindex, *mres);
 		*mres = page;
 	}
 	vm_page_valid(page);

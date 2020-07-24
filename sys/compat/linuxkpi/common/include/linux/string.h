@@ -56,7 +56,7 @@ match_string(const char *const *table, int n, const char *key)
 }
 
 static inline void *
-memdup_user(const void *ptr, size_t len)
+memdup_user(const void * __capability ptr, size_t len)
 {
 	void *retval;
 	int error;
@@ -71,7 +71,7 @@ memdup_user(const void *ptr, size_t len)
 }
 
 static inline void *
-memdup_user_nul(const void *ptr, size_t len)
+memdup_user_nul(const void * __capability ptr, size_t len)
 {
 	char *retval;
 	int error;
@@ -152,6 +152,15 @@ memchr_inv(const void *start, int c, size_t length)
 		ptr++;
 	}
 	return (NULL);
+}
+
+static inline size_t
+str_has_prefix(const char *str, const char *prefix)
+{
+	size_t len;
+
+	len = strlen(prefix);
+	return (strncmp(str, prefix, len) == 0 ? len : 0);
 }
 
 #endif					/* _LINUX_STRING_H_ */

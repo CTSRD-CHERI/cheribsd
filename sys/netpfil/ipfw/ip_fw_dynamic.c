@@ -453,14 +453,17 @@ SYSCTL_U32(_net_inet_ip_fw, OID_AUTO, curr_max_length,
     CTLFLAG_VNET | CTLFLAG_RD, &VNET_NAME(curr_max_length), 0,
     "Current maximum length of states chains in hash buckets.");
 SYSCTL_PROC(_net_inet_ip_fw, OID_AUTO, dyn_buckets,
-    CTLFLAG_VNET | CTLTYPE_U32 | CTLFLAG_RW, 0, 0, sysctl_dyn_buckets,
-    "IU", "Max number of buckets for dynamic states hash table.");
+    CTLFLAG_VNET | CTLTYPE_U32 | CTLFLAG_RW | CTLFLAG_NEEDGIANT,
+    0, 0, sysctl_dyn_buckets, "IU",
+    "Max number of buckets for dynamic states hash table.");
 SYSCTL_PROC(_net_inet_ip_fw, OID_AUTO, dyn_max,
-    CTLFLAG_VNET | CTLTYPE_U32 | CTLFLAG_RW, 0, 0, sysctl_dyn_max,
-    "IU", "Max number of dynamic states.");
+    CTLFLAG_VNET | CTLTYPE_U32 | CTLFLAG_RW | CTLFLAG_NEEDGIANT,
+    0, 0, sysctl_dyn_max, "IU",
+    "Max number of dynamic states.");
 SYSCTL_PROC(_net_inet_ip_fw, OID_AUTO, dyn_parent_max,
-    CTLFLAG_VNET | CTLTYPE_U32 | CTLFLAG_RW, 0, 0, sysctl_dyn_parent_max,
-    "IU", "Max number of parent dynamic states.");
+    CTLFLAG_VNET | CTLTYPE_U32 | CTLFLAG_RW | CTLFLAG_NEEDGIANT,
+    0, 0, sysctl_dyn_parent_max, "IU",
+    "Max number of parent dynamic states.");
 SYSCTL_U32(_net_inet_ip_fw, OID_AUTO, dyn_ack_lifetime,
     CTLFLAG_VNET | CTLFLAG_RW, &VNET_NAME(dyn_ack_lifetime), 0,
     "Lifetime of dynamic states for TCP ACK.");
@@ -2718,6 +2721,7 @@ dyn_grow_hashtable(struct ip_fw_chain *chain, uint32_t new)
 static void
 dyn_tick(void *vnetx)
 {
+	struct epoch_tracker et;
 	uint32_t buckets;
 
 	CURVNET_SET((struct vnet *)vnetx);
@@ -2740,10 +2744,12 @@ dyn_tick(void *vnetx)
 	if (V_dyn_keepalive != 0 &&
 	    V_dyn_keepalive_last + V_dyn_keepalive_period <= time_uptime) {
 		V_dyn_keepalive_last = time_uptime;
+		NET_EPOCH_ENTER(et);
 		dyn_send_keepalive_ipv4(&V_layer3_chain);
 #ifdef INET6
 		dyn_send_keepalive_ipv6(&V_layer3_chain);
 #endif
+		NET_EPOCH_EXIT(et);
 	}
 	/*
 	 * Check if we need to resize the hash:

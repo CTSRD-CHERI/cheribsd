@@ -70,6 +70,12 @@ struct pate {
 	u_int64_t proctab;
 };
 
+/* Process table entry */
+struct prte {
+	u_int64_t proctab0;
+	u_int64_t proctab1;
+};
+
 typedef	struct pte pte_t;
 typedef	struct lpte lpte_t;
 #endif	/* LOCORE */
@@ -145,6 +151,10 @@ typedef	struct lpte lpte_t;
 #define	RPTE_R			0x0000000000000100ULL
 #define	RPTE_C			0x0000000000000080ULL
 
+#define	RPTE_MANAGED		RPTE_SW1
+#define	RPTE_WIRED		RPTE_SW2
+#define	RPTE_PROMOTED		RPTE_SW3
+
 #define	RPTE_ATTR_MASK		0x0000000000000030ULL
 #define	RPTE_ATTR_MEM		0x0000000000000000ULL /* PTE M */
 #define	RPTE_ATTR_SAO		0x0000000000000010ULL /* PTE WIM */
@@ -159,10 +169,12 @@ typedef	struct lpte lpte_t;
 
 #define	RPDE_VALID		RPTE_VALID
 #define	RPDE_LEAF		RPTE_LEAF             /* is a PTE: always 0 */
-#define	RPDE_NLB_MASK		0x0FFFFFFFFFFFFF00ULL
+#define	RPDE_NLB_MASK		0x00FFFFFFFFFFFF00ULL
 #define	RPDE_NLB_SHIFT		8
 #define	RPDE_NLS_MASK		0x000000000000001FULL
 
+#define	PG_FRAME		(0x000ffffffffff000ul)
+#define	PG_PS_FRAME		(0x000fffffffe00000ul)
 /*
  * Extract bits from address
  */
@@ -241,24 +253,6 @@ typedef uint64_t pte_t;
 #define	PTE_PS_SHIFT	8
 #define	PTE_PS_4KB	(2 << PTE_PS_SHIFT)
 
-#elif defined(BOOKE_PPC4XX)
-
-#define PTE_WL1		TLB_WL1
-#define PTE_IL2I	TLB_IL2I
-#define PTE_IL2D	TLB_IL2D
-
-#define PTE_W		TLB_W
-#define PTE_I		TLB_I
-#define PTE_M		TLB_M
-#define PTE_G		TLB_G
-
-#define PTE_UX		TLB_UX
-#define PTE_SX		TLB_SX
-#define PTE_UW		TLB_UW
-#define PTE_SW		TLB_SW
-#define PTE_UR		TLB_UR
-#define PTE_SR		TLB_SR
-
 #endif
 
 /* Other PTE flags */
@@ -313,40 +307,52 @@ typedef uint64_t pte_t;
  * The virtual address is:
  *
  * 4K page size
- *   +-----+-----+-----+-------+-------------+-------------+----------------+
- *   |  -  |p2d#h|  -  | p2d#l |     dir#    |     pte#    | off in 4K page |
- *   +-----+-----+-----+-------+-------------+-------------+----------------+
- *    63 62 61 60 59 40 39   30 29    ^    21 20    ^    12 11             0
+ *   +-----+-----------+-------+-------------+-------------+----------------+
+ *   |  -  |  pg_root  |pdir_l1|     dir#    |     pte#    | off in 4K page |
+ *   +-----+-----------+-------+-------------+-------------+----------------+
+ *    63 52 51       39 38   30 29    ^    21 20    ^    12 11             0
  *                                    |             |
  *                                index in 1 page of pointers
  *
- * 1st level - pointers to page table directory (pp2d)
+ * 1st level - Root page table
  *
- * pp2d consists of PP2D_NENTRIES entries, each being a pointer to
+ * pp2d consists of PG_ROOT_NENTRIES entries, each being a pointer to
  * second level entity, i.e. the page table directory (pdir).
  */
-#define PP2D_H_H		61
-#define PP2D_H_L		60
-#define PP2D_L_H		39
-#define PP2D_L_L		30	/* >30 would work with no page table pool */
-#define PP2D_SIZE		(1 << PP2D_L_L)	/* va range mapped by pp2d */
-#define PP2D_L_SHIFT		PP2D_L_L
-#define PP2D_L_NUM		(PP2D_L_H-PP2D_L_L+1)
-#define PP2D_L_MASK		((1<<PP2D_L_NUM)-1)
-#define PP2D_H_SHIFT		(PP2D_H_L-PP2D_L_NUM)
-#define PP2D_H_NUM		(PP2D_H_H-PP2D_H_L+1)
-#define PP2D_H_MASK		(((1<<PP2D_H_NUM)-1)<<PP2D_L_NUM)
-#define PP2D_IDX(va)		(((va >> PP2D_H_SHIFT) & PP2D_H_MASK) | ((va >> PP2D_L_SHIFT) & PP2D_L_MASK))
-#define PP2D_NENTRIES		(1<<(PP2D_L_NUM+PP2D_H_NUM))
-#define PP2D_ENTRY_SHIFT	3	/* log2 (sizeof(struct pte_entry **)) */
+#define PG_ROOT_H		51
+#define PG_ROOT_L		39
+#define PG_ROOT_SIZE		(1UL << PG_ROOT_L)	/* va range mapped by pp2d */
+#define PG_ROOT_SHIFT		PG_ROOT_L
+#define PG_ROOT_NUM		(PG_ROOT_H - PG_ROOT_L + 1)
+#define PG_ROOT_MASK		((1 << PG_ROOT_NUM) - 1)
+#define PG_ROOT_IDX(va)		((va >> PG_ROOT_SHIFT) & PG_ROOT_MASK)
+#define PG_ROOT_NENTRIES	(1 << PG_ROOT_NUM)
+#define PG_ROOT_ENTRY_SHIFT	3	/* log2 (sizeof(struct pte_entry **)) */
 
 /*
- * 2nd level - page table directory (pdir)
+ * 2nd level - page directory directory (pdir l1)
  *
  * pdir consists of PDIR_NENTRIES entries, each being a pointer to
  * second level entity, i.e. the actual page table (ptbl).
  */
-#define PDIR_H			(PP2D_L_L-1)
+#define PDIR_L1_H		(PG_ROOT_L-1)
+#define PDIR_L1_L		30
+#define PDIR_L1_NUM		(PDIR_L1_H-PDIR_L1_L+1)
+#define PDIR_L1_SIZE		(1 << PDIR_L1_L)	/* va range mapped by pdir */
+#define PDIR_L1_MASK		((1<<PDIR_L1_NUM)-1)
+#define PDIR_L1_SHIFT		PDIR_L1_L
+#define PDIR_L1_NENTRIES	(1<<PDIR_L1_NUM)
+#define PDIR_L1_IDX(va)		(((va) >> PDIR_L1_SHIFT) & PDIR_L1_MASK)
+#define PDIR_L1_ENTRY_SHIFT	3	/* log2 (sizeof(struct pte_entry *)) */
+#define PDIR_L1_PAGES		((PDIR_L1_NENTRIES * (1<<PDIR_L1_ENTRY_SHIFT)) / PAGE_SIZE)
+
+/*
+ * 3rd level - page table directory (pdir)
+ *
+ * pdir consists of PDIR_NENTRIES entries, each being a pointer to
+ * second level entity, i.e. the actual page table (ptbl).
+ */
+#define PDIR_H			(PDIR_L1_L-1)
 #define PDIR_L			21
 #define PDIR_NUM		(PDIR_H-PDIR_L+1)
 #define PDIR_SIZE		(1 << PDIR_L)	/* va range mapped by pdir */
@@ -358,7 +364,7 @@ typedef uint64_t pte_t;
 #define PDIR_PAGES		((PDIR_NENTRIES * (1<<PDIR_ENTRY_SHIFT)) / PAGE_SIZE)
 
 /*
- * 3rd level - page table (ptbl)
+ * 4th level - page table (ptbl)
  *
  * Page table covers PTBL_NENTRIES page table entries. Page
  * table entry (pte) is 64 bit wide and defines mapping
@@ -375,7 +381,6 @@ typedef uint64_t pte_t;
 #define PTBL_ENTRY_SHIFT	 3	/* log2 (sizeof (struct pte_entry)) */
 #define PTBL_PAGES		((PTBL_NENTRIES * (1<<PTBL_ENTRY_SHIFT)) / PAGE_SIZE)
 
-#define KERNEL_LINEAR_MAX	0xc000000040000000
 #else
 /*
  * 1st level - page table directory (pdir)

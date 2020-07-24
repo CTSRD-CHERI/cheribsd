@@ -559,7 +559,6 @@ t3_sge_prep(adapter_t *adap, struct sge_params *p)
 	use_16k = cxgb_use_16k_clusters != -1 ? cxgb_use_16k_clusters :
 	    is_offload(adap);
 
-#if __FreeBSD_version >= 700111
 	if (use_16k) {
 		jumbo_q_size = min(nmbjumbo16/(3*nqsets), JUMBO_Q_SIZE);
 		jumbo_buf_size = MJUM16BYTES;
@@ -567,10 +566,6 @@ t3_sge_prep(adapter_t *adap, struct sge_params *p)
 		jumbo_q_size = min(nmbjumbo9/(3*nqsets), JUMBO_Q_SIZE);
 		jumbo_buf_size = MJUM9BYTES;
 	}
-#else
-	jumbo_q_size = min(nmbjumbop/(3*nqsets), JUMBO_Q_SIZE);
-	jumbo_buf_size = MJUMPAGESIZE;
-#endif
 	while (!powerof2(jumbo_q_size))
 		jumbo_q_size--;
 
@@ -3451,13 +3446,13 @@ t3_add_configured_sysctls(adapter_t *sc)
 
 	SYSCTL_ADD_PROC(ctx, children, OID_AUTO, 
 	    "intr_coal",
-	    CTLTYPE_INT|CTLFLAG_RW, sc,
+	    CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_NEEDGIANT, sc,
 	    0, t3_set_coalesce_usecs,
 	    "I", "interrupt coalescing timer (us)");
 
 	SYSCTL_ADD_PROC(ctx, children, OID_AUTO, 
 	    "pkt_timestamp",
-	    CTLTYPE_INT | CTLFLAG_RW, sc,
+	    CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_NEEDGIANT, sc,
 	    0, t3_pkt_timestamp,
 	    "I", "provide packet timestamp instead of connection hash");
 
@@ -3469,7 +3464,8 @@ t3_add_configured_sysctls(adapter_t *sc)
 		
 		snprintf(pi->namebuf, PORT_NAME_LEN, "port%d", i);
 		poid = SYSCTL_ADD_NODE(ctx, children, OID_AUTO, 
-		    pi->namebuf, CTLFLAG_RD, NULL, "port statistics");
+		    pi->namebuf, CTLFLAG_RD | CTLFLAG_MPSAFE, NULL,
+		    "port statistics");
 		poidlist = SYSCTL_CHILDREN(poid);
 		SYSCTL_ADD_UINT(ctx, poidlist, OID_AUTO,
 		    "nqsets", CTLFLAG_RD, &pi->nqsets,
@@ -3487,7 +3483,8 @@ t3_add_configured_sysctls(adapter_t *sc)
 			snprintf(qs->namebuf, QS_NAME_LEN, "qs%d", j);
 			
 			qspoid = SYSCTL_ADD_NODE(ctx, poidlist, OID_AUTO, 
-			    qs->namebuf, CTLFLAG_RD, NULL, "qset statistics");
+			    qs->namebuf, CTLFLAG_RD | CTLFLAG_MPSAFE, NULL,
+			    "qset statistics");
 			qspoidlist = SYSCTL_CHILDREN(qspoid);
 
 			SYSCTL_ADD_UINT(ctx, qspoidlist, OID_AUTO, "fl0_empty",
@@ -3498,19 +3495,23 @@ t3_add_configured_sysctls(adapter_t *sc)
 					"freelist #1 empty");
 
 			rspqpoid = SYSCTL_ADD_NODE(ctx, qspoidlist, OID_AUTO, 
-			    rspq_name, CTLFLAG_RD, NULL, "rspq statistics");
+			    rspq_name, CTLFLAG_RD | CTLFLAG_MPSAFE, NULL,
+			    "rspq statistics");
 			rspqpoidlist = SYSCTL_CHILDREN(rspqpoid);
 
 			txqpoid = SYSCTL_ADD_NODE(ctx, qspoidlist, OID_AUTO, 
-			    txq_names[0], CTLFLAG_RD, NULL, "txq statistics");
+			    txq_names[0], CTLFLAG_RD | CTLFLAG_MPSAFE, NULL,
+			    "txq statistics");
 			txqpoidlist = SYSCTL_CHILDREN(txqpoid);
 
 			ctrlqpoid = SYSCTL_ADD_NODE(ctx, qspoidlist, OID_AUTO, 
-			    txq_names[2], CTLFLAG_RD, NULL, "ctrlq statistics");
+			    txq_names[2], CTLFLAG_RD | CTLFLAG_MPSAFE, NULL,
+			    "ctrlq statistics");
 			ctrlqpoidlist = SYSCTL_CHILDREN(ctrlqpoid);
 
 			lropoid = SYSCTL_ADD_NODE(ctx, qspoidlist, OID_AUTO, 
-			    "lro_stats", CTLFLAG_RD, NULL, "LRO statistics");
+			    "lro_stats", CTLFLAG_RD | CTLFLAG_MPSAFE, NULL,
+			    "LRO statistics");
 			lropoidlist = SYSCTL_CHILDREN(lropoid);
 
 			SYSCTL_ADD_UINT(ctx, rspqpoidlist, OID_AUTO, "size",
@@ -3535,8 +3536,9 @@ t3_add_configured_sysctls(adapter_t *sc)
 			    CTLFLAG_RW, &qs->rspq.rspq_dump_count,
 			    0, "#rspq entries to dump");
 			SYSCTL_ADD_PROC(ctx, rspqpoidlist, OID_AUTO, "qdump",
-			    CTLTYPE_STRING | CTLFLAG_RD, &qs->rspq,
-			    0, t3_dump_rspq, "A", "dump of the response queue");
+			    CTLTYPE_STRING | CTLFLAG_RD | CTLFLAG_NEEDGIANT,
+			    &qs->rspq, 0, t3_dump_rspq, "A",
+			    "dump of the response queue");
 
 			SYSCTL_ADD_UQUAD(ctx, txqpoidlist, OID_AUTO, "dropped",
 			    CTLFLAG_RD, &qs->txq[TXQ_ETH].txq_mr->br_drops,
@@ -3595,8 +3597,9 @@ t3_add_configured_sysctls(adapter_t *sc)
 			    CTLFLAG_RW, &qs->txq[TXQ_ETH].txq_dump_count,
 			    0, "txq #entries to dump");			
 			SYSCTL_ADD_PROC(ctx, txqpoidlist, OID_AUTO, "qdump",
-			    CTLTYPE_STRING | CTLFLAG_RD, &qs->txq[TXQ_ETH],
-			    0, t3_dump_txq_eth, "A", "dump of the transmit queue");
+			    CTLTYPE_STRING | CTLFLAG_RD | CTLFLAG_NEEDGIANT,
+			    &qs->txq[TXQ_ETH], 0, t3_dump_txq_eth, "A",
+			    "dump of the transmit queue");
 
 			SYSCTL_ADD_UINT(ctx, ctrlqpoidlist, OID_AUTO, "dump_start",
 			    CTLFLAG_RW, &qs->txq[TXQ_CTRL].txq_dump_start,
@@ -3605,8 +3608,9 @@ t3_add_configured_sysctls(adapter_t *sc)
 			    CTLFLAG_RW, &qs->txq[TXQ_CTRL].txq_dump_count,
 			    0, "ctrl #entries to dump");			
 			SYSCTL_ADD_PROC(ctx, ctrlqpoidlist, OID_AUTO, "qdump",
-			    CTLTYPE_STRING | CTLFLAG_RD, &qs->txq[TXQ_CTRL],
-			    0, t3_dump_txq_ctrl, "A", "dump of the transmit queue");
+			    CTLTYPE_STRING | CTLFLAG_RD | CTLFLAG_NEEDGIANT,
+			    &qs->txq[TXQ_CTRL], 0, t3_dump_txq_ctrl, "A",
+			    "dump of the transmit queue");
 
 			SYSCTL_ADD_U64(ctx, lropoidlist, OID_AUTO, "lro_queued",
 			    CTLFLAG_RD, &qs->lro.ctrl.lro_queued, 0, NULL);
@@ -3620,7 +3624,7 @@ t3_add_configured_sysctls(adapter_t *sc)
 
 		/* Now add a node for mac stats. */
 		poid = SYSCTL_ADD_NODE(ctx, poidlist, OID_AUTO, "mac_stats",
-		    CTLFLAG_RD, NULL, "MAC statistics");
+		    CTLFLAG_RD | CTLFLAG_MPSAFE, NULL, "MAC statistics");
 		poidlist = SYSCTL_CHILDREN(poid);
 
 		/*
@@ -3636,8 +3640,8 @@ t3_add_configured_sysctls(adapter_t *sc)
 		 * all that here.
 		 */
 #define CXGB_SYSCTL_ADD_QUAD(a)	SYSCTL_ADD_OID(ctx, poidlist, OID_AUTO, #a, \
-    (CTLTYPE_U64 | CTLFLAG_RD), pi, offsetof(struct mac_stats, a), \
-    sysctl_handle_macstat, "QU", 0)
+    CTLTYPE_U64 | CTLFLAG_RD | CTLFLAG_NEEDGIANT, pi, \
+    offsetof(struct mac_stats, a), sysctl_handle_macstat, "QU", 0)
 		CXGB_SYSCTL_ADD_QUAD(tx_octets);
 		CXGB_SYSCTL_ADD_QUAD(tx_octets_bad);
 		CXGB_SYSCTL_ADD_QUAD(tx_frames);

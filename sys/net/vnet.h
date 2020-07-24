@@ -72,11 +72,12 @@ struct vnet {
 	u_int			 vnet_magic_n;
 	u_int			 vnet_ifcnt;
 	u_int			 vnet_sockcnt;
-	u_int			 vnet_shutdown; /* Shutdown in progress. */
+	u_int			 vnet_state;	/* SI_SUB_* */
 	void			*vnet_data_mem;
 	uintptr_t		 vnet_data_base;
-};
-#define	VNET_MAGIC_N	0x3e0d8f29
+	bool			 vnet_shutdown;	/* Shutdown in progress. */
+} __aligned(CACHE_LINE_SIZE);
+#define	VNET_MAGIC_N	0x5e4a6f28
 
 /*
  * These two virtual network stack allocator definitions are also required
@@ -141,7 +142,8 @@ array##_sysctl(SYSCTL_HANDLER_ARGS)					\
 		    sizeof(type) / sizeof(uint64_t));			\
 	return (SYSCTL_OUT(req, &s, sizeof(type)));			\
 }									\
-SYSCTL_PROC(parent, nbr, name, CTLFLAG_VNET | CTLTYPE_OPAQUE | CTLFLAG_RW, \
+SYSCTL_PROC(parent, nbr, name,						\
+    CTLFLAG_VNET | CTLTYPE_OPAQUE | CTLFLAG_RW | CTLFLAG_NEEDGIANT,	\
     NULL, 0, array ## _sysctl, "I", desc)
 #endif /* SYSCTL_OID */
 

@@ -103,7 +103,8 @@ TUNABLE_STR("kern.geom.uzip.noattach_to", g_uzip_noattach_to,
     sizeof(g_uzip_noattach_to));
 
 SYSCTL_DECL(_kern_geom);
-SYSCTL_NODE(_kern_geom, OID_AUTO, uzip, CTLFLAG_RW, 0, "GEOM_UZIP stuff");
+SYSCTL_NODE(_kern_geom, OID_AUTO, uzip, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
+    "GEOM_UZIP stuff");
 static u_int g_uzip_debug = GEOM_UZIP_DBG_DEFAULT;
 SYSCTL_UINT(_kern_geom_uzip, OID_AUTO, debug, CTLFLAG_RWTUN, &g_uzip_debug, 0,
     "Debug level (0-4)");
@@ -143,13 +144,12 @@ static void g_uzip_read_done(struct bio *bp);
 static void g_uzip_do(struct g_uzip_softc *, struct bio *bp);
 
 static void
-g_uzip_softc_free(struct g_uzip_softc *sc, struct g_geom *gp)
+g_uzip_softc_free(struct g_geom *gp)
 {
+	struct g_uzip_softc *sc = gp->softc;
 
-	if (gp != NULL) {
-		DPRINTF(GUZ_DBG_INFO, ("%s: %d requests, %d cached\n",
-		    gp->name, sc->req_total, sc->req_cached));
-	}
+	DPRINTF(GUZ_DBG_INFO, ("%s: %d requests, %d cached\n",
+	    gp->name, sc->req_total, sc->req_cached));
 
 	mtx_lock(&sc->queue_mtx);
 	sc->wrkthr_flags |= GUZ_SHUTDOWN;
@@ -166,6 +166,7 @@ g_uzip_softc_free(struct g_uzip_softc *sc, struct g_geom *gp)
 	mtx_destroy(&sc->last_mtx);
 	free(sc->last_buf, M_GEOM_UZIP);
 	free(sc, M_GEOM_UZIP);
+	gp->softc = NULL;
 }
 
 static int
@@ -507,13 +508,27 @@ g_uzip_orphan(struct g_consumer *cp)
 {
 	struct g_geom *gp;
 
-	g_trace(G_T_TOPOLOGY, "%s(%p/%s)", __func__, cp, cp->provider->name);
 	g_topology_assert();
-
+	G_VALID_CONSUMER(cp);
 	gp = cp->geom;
-	g_uzip_softc_free(gp->softc, gp);
-	gp->softc = NULL;
+	g_trace(G_T_TOPOLOGY, "%s(%p/%s)", __func__, cp, gp->name);
 	g_wither_geom(gp, ENXIO);
+
+	/*
+	 * We can safely free the softc now if there are no accesses,
+	 * otherwise g_uzip_access() will do that after the last close.
+	 */
+	if ((cp->acr + cp->acw + cp->ace) == 0)
+		g_uzip_softc_free(gp);
+}
+
+static void
+g_uzip_spoiled(struct g_consumer *cp)
+{
+
+	g_trace(G_T_TOPOLOGY, "%s(%p/%s)", __func__, cp, cp->geom->name);
+	cp->flags |= G_CF_ORPHAN;
+	g_uzip_orphan(cp);
 }
 
 static int
@@ -521,6 +536,7 @@ g_uzip_access(struct g_provider *pp, int dr, int dw, int de)
 {
 	struct g_geom *gp;
 	struct g_consumer *cp;
+	int error;
 
 	gp = pp->geom;
 	cp = LIST_FIRST(&gp->consumer);
@@ -529,22 +545,17 @@ g_uzip_access(struct g_provider *pp, int dr, int dw, int de)
 	if (cp->acw + dw > 0)
 		return (EROFS);
 
-	return (g_access(cp, dr, dw, de));
-}
+	error = g_access(cp, dr, dw, de);
 
-static void
-g_uzip_spoiled(struct g_consumer *cp)
-{
-	struct g_geom *gp;
+	/*
+	 * Free the softc if all providers have been closed and this geom
+	 * is being removed.
+	 */
+	if (error == 0 && (gp->flags & G_GEOM_WITHER) != 0 &&
+	    (cp->acr + cp->acw + cp->ace) == 0)
+		g_uzip_softc_free(gp);
 
-	G_VALID_CONSUMER(cp);
-	gp = cp->geom;
-	g_trace(G_T_TOPOLOGY, "%s(%p/%s)", __func__, cp, gp->name);
-	g_topology_assert();
-
-	g_uzip_softc_free(gp->softc, gp);
-	gp->softc = NULL;
-	g_wither_geom(gp, ENXIO);
+	return (error);
 }
 
 static int
@@ -666,6 +677,7 @@ g_uzip_taste(struct g_class *mp, struct g_provider *pp, int flags)
 	struct g_geom *gp;
 	struct g_provider *pp2;
 	struct g_uzip_softc *sc;
+	struct g_geom_alias *gap;
 	enum {
 		G_UZIP = 1,
 		G_ULZMA,
@@ -899,6 +911,8 @@ g_uzip_taste(struct g_class *mp, struct g_provider *pp, int flags)
 	pp2->mediasize = (off_t)sc->nblocks * sc->blksz;
 	pp2->stripesize = pp->stripesize;
 	pp2->stripeoffset = pp->stripeoffset;
+	LIST_FOREACH(gap, &pp->aliases, ga_next)
+		g_provider_add_alias(pp2, GUZ_DEV_NAME("%s"), gap->ga_alias);
 	g_error_provider(pp2, 0);
 	g_access(cp, -1, 0, 0);
 
@@ -954,10 +968,8 @@ g_uzip_destroy_geom(struct gctl_req *req, struct g_class *mp, struct g_geom *gp)
 	if (pp->acr > 0 || pp->acw > 0 || pp->ace > 0)
 		return (EBUSY);
 
-	g_uzip_softc_free(gp->softc, gp);
-	gp->softc = NULL;
 	g_wither_geom(gp, ENXIO);
-
+	g_uzip_softc_free(gp);
 	return (0);
 }
 

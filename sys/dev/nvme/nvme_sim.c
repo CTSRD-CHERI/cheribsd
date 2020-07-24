@@ -172,12 +172,6 @@ nvme_sim_action(struct cam_sim *sim, union ccb *ccb)
 		struct ccb_pathinq	*cpi = &ccb->cpi;
 		device_t		dev = ctrlr->dev;
 
-		/*
-		 * NVMe may have multiple LUNs on the same path. Current generation
-		 * of NVMe devives support only a single name space. Multiple name
-		 * space drives are coming, but it's unclear how we should report
-		 * them up the stack.
-		 */
 		cpi->version_num = 1;
 		cpi->hba_inquiry = 0;
 		cpi->target_sprt = 0;
@@ -203,6 +197,8 @@ nvme_sim_action(struct cam_sim *sim, union ccb *ccb)
 		cpi->xport_specific.nvme.slot = pci_get_slot(dev);
 		cpi->xport_specific.nvme.function = pci_get_function(dev);
 		cpi->xport_specific.nvme.extra = 0;
+		strncpy(cpi->xport_specific.nvme.dev_name, device_get_nameunit(ctrlr->dev),
+		    sizeof(cpi->xport_specific.nvme.dev_name));
 		cpi->ccb_h.status = CAM_REQ_CMP;
 		break;
 	}
@@ -319,7 +315,7 @@ err1:
 }
 
 static void *
-nvme_sim_new_ns(struct nvme_namespace *ns, void *sc_arg)
+nvme_sim_ns_change(struct nvme_namespace *ns, void *sc_arg)
 {
 	struct nvme_sim_softc *sc = sc_arg;
 	union ccb *ccb;
@@ -330,16 +326,20 @@ nvme_sim_new_ns(struct nvme_namespace *ns, void *sc_arg)
 		return (NULL);
 	}
 
+	/*
+	 * We map the NVMe namespace idea onto the CAM unit LUN. For
+	 * each new namespace, we create a new CAM path for it. We then
+	 * rescan the path to get it to enumerate.
+	 */
 	if (xpt_create_path(&ccb->ccb_h.path, /*periph*/NULL,
 	    cam_sim_path(sc->s_sim), 0, ns->id) != CAM_REQ_CMP) {
 		printf("unable to create path for rescan\n");
 		xpt_free_ccb(ccb);
 		return (NULL);
 	}
-
 	xpt_rescan(ccb);
 
-	return (ns);
+	return (sc_arg);
 }
 
 static void
@@ -362,7 +362,7 @@ nvme_sim_init(void)
 	if (nvme_use_nvd)
 		return;
 
-	consumer_cookie = nvme_register_consumer(nvme_sim_new_ns,
+	consumer_cookie = nvme_register_consumer(nvme_sim_ns_change,
 	    nvme_sim_new_controller, NULL, nvme_sim_controller_fail);
 }
 

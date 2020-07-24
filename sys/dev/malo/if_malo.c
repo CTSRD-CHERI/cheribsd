@@ -64,7 +64,7 @@ __FBSDID("$FreeBSD$");
 
 #include <dev/malo/if_malo.h>
 
-SYSCTL_NODE(_hw, OID_AUTO, malo, CTLFLAG_RD, 0,
+SYSCTL_NODE(_hw, OID_AUTO, malo, CTLFLAG_RD | CTLFLAG_MPSAFE, 0,
     "Marvell 88w8335 driver parameters");
 
 static	int malo_txcoalesce = 8;	/* # tx pkts to q before poking f/w*/
@@ -253,7 +253,7 @@ malo_attach(uint16_t devid, struct malo_softc *sc)
 	taskqueue_start_threads(&sc->malo_tq, 1, PI_NET,
 		"%s taskq", device_get_nameunit(sc->malo_dev));
 
-	TASK_INIT(&sc->malo_rxtask, 0, malo_rx_proc, sc);
+	NET_TASK_INIT(&sc->malo_rxtask, 0, malo_rx_proc, sc);
 	TASK_INIT(&sc->malo_txtask, 0, malo_tx_proc, sc);
 
 	ic->ic_softc = sc;
@@ -1939,6 +1939,7 @@ malo_set_channel(struct ieee80211com *ic)
 static void
 malo_rx_proc(void *arg, int npending)
 {
+	struct epoch_tracker et;
 	struct malo_softc *sc = arg;
 	struct ieee80211com *ic = &sc->malo_ic;
 	struct malo_rxbuf *bf;
@@ -2071,11 +2072,13 @@ malo_rx_proc(void *arg, int npending)
 		/* dispatch */
 		ni = ieee80211_find_rxnode(ic,
 		    (struct ieee80211_frame_min *)wh);
+		NET_EPOCH_ENTER(et);
 		if (ni != NULL) {
 			(void) ieee80211_input(ni, m, rssi, ds->nf);
 			ieee80211_free_node(ni);
 		} else
 			(void) ieee80211_input_all(ic, m, rssi, ds->nf);
+		NET_EPOCH_EXIT(et);
 rx_next:
 		/* NB: ignore ENOMEM so we process more descriptors */
 		(void) malo_rxbuf_init(sc, bf);

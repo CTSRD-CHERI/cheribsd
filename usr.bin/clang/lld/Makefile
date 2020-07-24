@@ -2,8 +2,9 @@
 
 .include <src.opts.mk>
 
-LLVM_SRCS=	${SRCTOP}/contrib/llvm
-LLD_SRCS=	${LLVM_SRCS}/tools/lld
+LLVM_BASE=	${SRCTOP}/contrib/llvm-project
+LLVM_SRCS=	${LLVM_BASE}/llvm
+LLD_SRCS=	${LLVM_BASE}/lld
 
 PACKAGE=	lld
 PROG_CXX=	ld.lld
@@ -24,8 +25,9 @@ CFLAGS+=	-I${LLD_SRCS}/include
 CFLAGS+=	-I${.OBJDIR}
 CFLAGS+=	-I${OBJTOP}/lib/clang/libllvm
 
-SRCDIR=		tools/lld
+SRCDIR=		lld
 SRCS+=		Common/Args.cpp
+SRCS+=		Common/DWARF.cpp
 SRCS+=		Common/ErrorHandler.cpp
 SRCS+=		Common/Filesystem.cpp
 SRCS+=		Common/Memory.cpp
@@ -35,6 +37,7 @@ SRCS+=		Common/TargetOptionsCommandFlags.cpp
 SRCS+=		Common/Threads.cpp
 SRCS+=		Common/Version.cpp
 SRCS+=		ELF/AArch64ErrataFix.cpp
+SRCS+=		ELF/ARMErrataFix.cpp
 SRCS+=		ELF/Arch/AArch64.cpp
 SRCS+=		ELF/Arch/AMDGPU.cpp
 SRCS+=		ELF/Arch/ARM.cpp

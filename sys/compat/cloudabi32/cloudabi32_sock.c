@@ -91,7 +91,7 @@ cloudabi32_sys_sock_send(struct thread *td,
 	cloudabi32_send_in_t si;
 	cloudabi32_send_out_t so = {};
 	cloudabi32_ciovec_t iovobj;
-	struct iovec iovec *iov;
+	struct iovec *iov;
 	const cloudabi32_ciovec_t *user_iov;
 	size_t datalen, i;
 	int error;

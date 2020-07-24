@@ -4,7 +4,7 @@
 GEOM_CLASS_DIR?=/usr/lib32/geom
 .elif defined(COMPAT_64BIT)
 GEOM_CLASS_DIR?=/usr/lib64/geom
-.elif defined(LIBCHERI)
+.elif defined(COMPAT_CHERI)
 GEOM_CLASS_DIR?=/usr/libcheri/geom
 .else
 GEOM_CLASS_DIR?=/lib/geom
@@ -24,7 +24,6 @@ GEOM_CLASSES+=	nop
 GEOM_CLASSES+=	part
 GEOM_CLASSES+=	raid
 GEOM_CLASSES+=	raid3
-GEOM_CLASSES+=	sched
 GEOM_CLASSES+=	shsec
 GEOM_CLASSES+=	stripe
 GEOM_CLASSES+=	virstor

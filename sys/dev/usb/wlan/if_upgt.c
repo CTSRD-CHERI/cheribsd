@@ -72,7 +72,7 @@
  * Sebastien Bourdeauducq <lekernel@prism54.org>.
  */
 
-static SYSCTL_NODE(_hw, OID_AUTO, upgt, CTLFLAG_RD, 0,
+static SYSCTL_NODE(_hw, OID_AUTO, upgt, CTLFLAG_RD | CTLFLAG_MPSAFE, 0,
     "USB PrismGT GW3887 driver parameters");
 
 #ifdef UPGT_DEBUG
@@ -2041,8 +2041,8 @@ upgt_sysctl_node(struct upgt_softc *sc)
 	ctx = device_get_sysctl_ctx(sc->sc_dev);
 	child = SYSCTL_CHILDREN(device_get_sysctl_tree(sc->sc_dev));
 
-	tree = SYSCTL_ADD_NODE(ctx, child, OID_AUTO, "stats", CTLFLAG_RD,
-	    NULL, "UPGT statistics");
+	tree = SYSCTL_ADD_NODE(ctx, child, OID_AUTO, "stats",
+	    CTLFLAG_RD | CTLFLAG_MPSAFE, NULL, "UPGT statistics");
 	child = SYSCTL_CHILDREN(tree);
 	UPGT_SYSCTL_STAT_ADD32(ctx, child, "tx_active",
 	    &stats->st_tx_active, "Active numbers in TX queue");
@@ -2211,6 +2211,7 @@ upgt_bulk_rx_callback(struct usb_xfer *xfer, usb_error_t error)
 	struct ieee80211com *ic = &sc->sc_ic;
 	struct ieee80211_frame *wh;
 	struct ieee80211_node *ni;
+	struct epoch_tracker et;
 	struct mbuf *m = NULL;
 	struct upgt_data *data;
 	int8_t nf;
@@ -2248,12 +2249,14 @@ setup:
 			ni = ieee80211_find_rxnode(ic,
 			    (struct ieee80211_frame_min *)wh);
 			nf = -95;	/* XXX */
+			NET_EPOCH_ENTER(et);
 			if (ni != NULL) {
 				(void) ieee80211_input(ni, m, rssi, nf);
 				/* node is no longer needed */
 				ieee80211_free_node(ni);
 			} else
 				(void) ieee80211_input_all(ic, m, rssi, nf);
+			NET_EPOCH_EXIT(et);
 			m = NULL;
 		}
 		UPGT_LOCK(sc);

@@ -50,7 +50,7 @@ __REQUIRE_CAPABILITIES
 static void * __capability libcheri_sealing_root;
 
 /* The number of bits in the type field of a capability. */
-static const int libcheri_cap_type_bits = 24;
+static const int libcheri_cap_type_bits = 18;
 
 /* The next non-system type number to allocate. */
 static _Atomic(uint64_t) libcheri_type_next = 1;

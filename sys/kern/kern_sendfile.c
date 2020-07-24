@@ -36,16 +36,14 @@ __FBSDID("$FreeBSD$");
 #include <sys/systm.h>
 #include <sys/capsicum.h>
 #include <sys/kernel.h>
-#include <netinet/in.h>
 #include <sys/lock.h>
 #include <sys/ktls.h>
 #include <sys/mutex.h>
-#include <sys/sysproto.h>
 #include <sys/malloc.h>
-#include <sys/proc.h>
 #include <sys/mman.h>
 #include <sys/mount.h>
 #include <sys/mbuf.h>
+#include <sys/proc.h>
 #include <sys/protosw.h>
 #include <sys/rwlock.h>
 #include <sys/sf_buf.h>
@@ -53,9 +51,11 @@ __FBSDID("$FreeBSD$");
 #include <sys/socketvar.h>
 #include <sys/syscallsubr.h>
 #include <sys/sysctl.h>
+#include <sys/sysproto.h>
 #include <sys/vnode.h>
 
 #include <net/vnet.h>
+#include <netinet/in.h>
 #include <netinet/tcp.h>
 
 #include <security/audit/audit.h>
@@ -64,6 +64,8 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm.h>
 #include <vm/vm_object.h>
 #include <vm/vm_pager.h>
+
+static MALLOC_DEFINE(M_SENDFILE, "sendfile", "sendfile dynamic memory");
 
 #define	EXT_FLAG_SYNC		EXT_FLAG_VENDOR1
 #define	EXT_FLAG_NOCACHE	EXT_FLAG_VENDOR2
@@ -89,6 +91,8 @@ struct sf_io {
 	int		npages;
 	struct socket	*so;
 	struct mbuf	*m;
+	vm_object_t	obj;
+	vm_pindex_t	pindex0;
 #ifdef KERN_TLS
 	struct ktls_session *tls;
 #endif
@@ -102,7 +106,35 @@ struct sendfile_sync {
 	struct mtx	mtx;
 	struct cv	cv;
 	unsigned	count;
+	bool		waiting;
 };
+
+static void
+sendfile_sync_destroy(struct sendfile_sync *sfs)
+{
+	KASSERT(sfs->count == 0, ("sendfile sync %p still busy", sfs));
+
+	cv_destroy(&sfs->cv);
+	mtx_destroy(&sfs->mtx);
+	free(sfs, M_SENDFILE);
+}
+
+static void
+sendfile_sync_signal(struct sendfile_sync *sfs)
+{
+	mtx_lock(&sfs->mtx);
+	KASSERT(sfs->count > 0, ("sendfile sync %p not busy", sfs));
+	if (--sfs->count == 0) {
+		if (!sfs->waiting) {
+			/* The sendfile() waiter was interrupted by a signal. */
+			sendfile_sync_destroy(sfs);
+			return;
+		} else {
+			cv_signal(&sfs->cv);
+		}
+	}
+	mtx_unlock(&sfs->mtx);
+}
 
 counter_u64_t sfstat[sizeof(struct sfstat) / sizeof(uint64_t)];
 
@@ -125,8 +157,10 @@ sfstat_sysctl(SYSCTL_HANDLER_ARGS)
 		COUNTER_ARRAY_ZERO(sfstat, sizeof(s) / sizeof(uint64_t));
 	return (SYSCTL_OUT(req, &s, sizeof(s)));
 }
-SYSCTL_PROC(_kern_ipc, OID_AUTO, sfstat, CTLTYPE_OPAQUE | CTLFLAG_RW,
-    NULL, 0, sfstat_sysctl, "I", "sendfile statistics");
+SYSCTL_PROC(_kern_ipc, OID_AUTO, sfstat,
+    CTLTYPE_OPAQUE | CTLFLAG_RW | CTLFLAG_NEEDGIANT, NULL, 0,
+    sfstat_sysctl, "I",
+    "sendfile statistics");
 
 static void
 sendfile_free_mext(struct mbuf *m)
@@ -147,45 +181,32 @@ sendfile_free_mext(struct mbuf *m)
 
 	if (m->m_ext.ext_flags & EXT_FLAG_SYNC) {
 		struct sendfile_sync *sfs = m->m_ext.ext_arg2;
-
-		mtx_lock(&sfs->mtx);
-		KASSERT(sfs->count > 0, ("Sendfile sync botchup count == 0"));
-		if (--sfs->count == 0)
-			cv_signal(&sfs->cv);
-		mtx_unlock(&sfs->mtx);
+		sendfile_sync_signal(sfs);
 	}
 }
 
 static void
 sendfile_free_mext_pg(struct mbuf *m)
 {
-	struct mbuf_ext_pgs *ext_pgs;
 	vm_page_t pg;
 	int flags, i;
 	bool cache_last;
 
-	KASSERT(m->m_flags & M_EXT && m->m_ext.ext_type == EXT_PGS,
-	    ("%s: m %p !M_EXT or !EXT_PGS", __func__, m));
+	M_ASSERTEXTPG(m);
 
 	cache_last = m->m_ext.ext_flags & EXT_FLAG_CACHE_LAST;
-	ext_pgs = m->m_ext.ext_pgs;
 	flags = (m->m_ext.ext_flags & EXT_FLAG_NOCACHE) != 0 ? VPR_TRYFREE : 0;
 
-	for (i = 0; i < ext_pgs->npgs; i++) {
-		if (cache_last && i == ext_pgs->npgs - 1)
+	for (i = 0; i < m->m_epg_npgs; i++) {
+		if (cache_last && i == m->m_epg_npgs - 1)
 			flags = 0;
-		pg = PHYS_TO_VM_PAGE(ext_pgs->pa[i]);
+		pg = PHYS_TO_VM_PAGE(m->m_epg_pa[i]);
 		vm_page_release(pg, flags);
 	}
 
 	if (m->m_ext.ext_flags & EXT_FLAG_SYNC) {
-		struct sendfile_sync *sfs = m->m_ext.ext_arg2;
-
-		mtx_lock(&sfs->mtx);
-		KASSERT(sfs->count > 0, ("Sendfile sync botchup count == 0"));
-		if (--sfs->count == 0)
-			cv_signal(&sfs->cv);
-		mtx_unlock(&sfs->mtx);
+		struct sendfile_sync *sfs = m->m_ext.ext_arg1;
+		sendfile_sync_signal(sfs);
 	}
 }
 
@@ -251,43 +272,104 @@ fixspace(int old, int new, off_t off, int *space)
 }
 
 /*
+ * Wait for all in-flight ios to complete, we must not unwire pages
+ * under them.
+ */
+static void
+sendfile_iowait(struct sf_io *sfio, const char *wmesg)
+{
+	while (atomic_load_int(&sfio->nios) != 1)
+		pause(wmesg, 1);
+}
+
+/*
  * I/O completion callback.
  */
 static void
-sendfile_iodone(void *arg, vm_page_t *pg, int count, int error)
+sendfile_iodone(void *arg, vm_page_t *pa, int count, int error)
 {
 	struct sf_io *sfio = arg;
-	struct socket *so = sfio->so;
+	struct socket *so;
+	int i;
 
-	for (int i = 0; i < count; i++)
-		if (pg[i] != bogus_page)
-			vm_page_xunbusy_unchecked(pg[i]);
-
-	if (error)
+	if (error != 0) {
 		sfio->error = error;
+		/*
+		 * Restore of the pg[] elements is done by
+		 * sendfile_swapin().
+		 */
+	} else {
+		/*
+		 * Restore the valid page pointers.  They are already
+		 * unbusied, but still wired.  For error != 0 case,
+		 * sendfile_swapin() handles unbusy.
+		 *
+		 * XXXKIB since pages are only wired, and we do not
+		 * own the object lock, other users might have
+		 * invalidated them in meantime.  Similarly, after we
+		 * unbusied the swapped-in pages, they can become
+		 * invalid under us.
+		 */
+		MPASS(count == 0 || pa[0] != bogus_page);
+		for (i = 0; i < count; i++) {
+			if (pa[i] == bogus_page) {
+				sfio->pa[(pa[0]->pindex - sfio->pindex0) + i] =
+				    pa[i] = vm_page_relookup(sfio->obj,
+				    pa[0]->pindex + i);
+				KASSERT(pa[i] != NULL,
+				    ("%s: page %p[%d] disappeared",
+				    __func__, pa, i));
+			} else {
+				vm_page_xunbusy_unchecked(pa[i]);
+			}
+		}
+	}
 
 	if (!refcount_release(&sfio->nios))
 		return;
 
-	if (__predict_false(sfio->error && sfio->m == NULL)) {
+#ifdef INVARIANTS
+	for (i = 1; i < sfio->npages; i++) {
+		if (sfio->pa[i] == NULL)
+			break;
+		KASSERT(vm_page_wired(sfio->pa[i]),
+		    ("sfio %p page %d %p not wired", sfio, i, sfio->pa[i]));
+		if (i == 0)
+			continue;
+		KASSERT(sfio->pa[0]->object == sfio->pa[i]->object,
+		    ("sfio %p page %d %p wrong owner %p %p", sfio, i,
+		    sfio->pa[i], sfio->pa[0]->object, sfio->pa[i]->object));
+		KASSERT(sfio->pa[0]->pindex + i == sfio->pa[i]->pindex,
+		    ("sfio %p page %d %p wrong index %jx %jx", sfio, i,
+		    sfio->pa[i], (uintmax_t)sfio->pa[0]->pindex,
+		    (uintmax_t)sfio->pa[i]->pindex));
+	}
+#endif
+
+	vm_object_pip_wakeup(sfio->obj);
+
+	if (sfio->m == NULL) {
 		/*
-		 * I/O operation failed, but pru_send hadn't been executed -
-		 * nothing had been sent to the socket.  The syscall has
-		 * returned error to the user.
+		 * Either I/O operation failed, or we failed to allocate
+		 * buffers, or we bailed out on first busy page, or we
+		 * succeeded filling the request without any I/Os. Anyway,
+		 * pru_send hadn't been executed - nothing had been sent
+		 * to the socket yet.
 		 */
-		free(sfio, M_TEMP);
+		MPASS((curthread->td_pflags & TDP_KTHREAD) == 0);
+		free(sfio, M_SENDFILE);
 		return;
 	}
 
 #if defined(KERN_TLS) && defined(INVARIANTS)
-	if ((sfio->m->m_flags & M_EXT) != 0 &&
-	    sfio->m->m_ext.ext_type == EXT_PGS)
-		KASSERT(sfio->tls == sfio->m->m_ext.ext_pgs->tls,
+	if ((sfio->m->m_flags & M_EXTPG) != 0)
+		KASSERT(sfio->tls == sfio->m->m_epg_tls,
 		    ("TLS session mismatch"));
 	else
 		KASSERT(sfio->tls == NULL,
 		    ("non-ext_pgs mbuf with TLS session"));
 #endif
+	so = sfio->so;
 	CURVNET_SET(so->so_vnet);
 	if (__predict_false(sfio->error)) {
 		/*
@@ -329,7 +411,7 @@ sendfile_iodone(void *arg, vm_page_t *pg, int count, int error)
 out_with_ref:
 #endif
 	CURVNET_RESTORE();
-	free(sfio, M_TEMP);
+	free(sfio, M_SENDFILE);
 }
 
 /*
@@ -339,19 +421,19 @@ static int
 sendfile_swapin(vm_object_t obj, struct sf_io *sfio, int *nios, off_t off,
     off_t len, int npages, int rhpages, int flags)
 {
-	vm_page_t *pa = sfio->pa;
-	int grabbed;
+	vm_page_t *pa;
+	int a, count, count1, grabbed, i, j, rv;
 
+	pa = sfio->pa;
 	*nios = 0;
 	flags = (flags & SF_NODISKIO) ? VM_ALLOC_NOWAIT : 0;
+	sfio->pindex0 = OFF_TO_IDX(off);
 
 	/*
 	 * First grab all the pages and wire them.  Note that we grab
 	 * only required pages.  Readahead pages are dealt with later.
 	 */
-	VM_OBJECT_WLOCK(obj);
-
-	grabbed = vm_page_grab_pages(obj, OFF_TO_IDX(off),
+	grabbed = vm_page_grab_pages_unlocked(obj, OFF_TO_IDX(off),
 	    VM_ALLOC_NORMAL | VM_ALLOC_WIRED | flags, pa, npages);
 	if (grabbed < npages) {
 		for (int i = grabbed; i < npages; i++)
@@ -360,9 +442,7 @@ sendfile_swapin(vm_object_t obj, struct sf_io *sfio, int *nios, off_t off,
 		rhpages = 0;
 	}
 
-	for (int i = 0; i < npages;) {
-		int j, a, count, rv;
-
+	for (i = 0; i < npages;) {
 		/* Skip valid pages. */
 		if (vm_page_is_valid(pa[i], vmoff(i, off) & PAGE_MASK,
 		    xfsize(i, npages, off, len))) {
@@ -382,15 +462,18 @@ sendfile_swapin(vm_object_t obj, struct sf_io *sfio, int *nios, off_t off,
 		 * stored in 'a', about how many pages we can pagein after
 		 * this page in a single I/O.
 		 */
+		VM_OBJECT_RLOCK(obj);
 		if (!vm_pager_has_page(obj, OFF_TO_IDX(vmoff(i, off)), NULL,
 		    &a)) {
+			VM_OBJECT_RUNLOCK(obj);
 			pmap_zero_page(pa[i]);
-			pa[i]->valid = VM_PAGE_BITS_ALL;
+			vm_page_valid(pa[i]);
 			MPASS(pa[i]->dirty == 0);
 			vm_page_xunbusy(pa[i]);
 			i++;
 			continue;
 		}
+		VM_OBJECT_RUNLOCK(obj);
 
 		/*
 		 * We want to pagein as many pages as possible, limited only
@@ -399,19 +482,41 @@ sendfile_swapin(vm_object_t obj, struct sf_io *sfio, int *nios, off_t off,
 		count = min(a + 1, npages - i);
 
 		/*
-		 * We should not pagein into a valid page, thus we first trim
-		 * any valid pages off the end of request, and substitute
-		 * to bogus_page those, that are in the middle.
+		 * We should not pagein into a valid page because
+		 * there might be still unfinished write tracked by
+		 * e.g. a buffer, thus we substitute any valid pages
+		 * with the bogus one.
+		 *
+		 * We must not leave around xbusy pages which are not
+		 * part of the run passed to vm_pager_getpages(),
+		 * otherwise pager might deadlock waiting for the busy
+		 * status of the page, e.g. if it constitues the
+		 * buffer needed to validate other page.
+		 *
+		 * First trim the end of the run consisting of the
+		 * valid pages, then replace the rest of the valid
+		 * with bogus.
 		 */
+		count1 = count;
 		for (j = i + count - 1; j > i; j--) {
 			if (vm_page_is_valid(pa[j], vmoff(j, off) & PAGE_MASK,
 			    xfsize(j, npages, off, len))) {
+				vm_page_xunbusy(pa[j]);
+				SFSTAT_INC(sf_pages_valid);
 				count--;
-				rhpages = 0;
-			} else
+			} else {
 				break;
+			}
 		}
-		for (j = i + 1; j < i + count - 1; j++)
+
+		/*
+		 * The last page in the run pa[i + count - 1] is
+		 * guaranteed to be invalid by the trim above, so it
+		 * is not replaced with bogus, thus -1 in the loop end
+		 * condition.
+		 */
+		MPASS(pa[i + count - 1]->valid != VM_PAGE_BITS_ALL);
+		for (j = i + 1; j < i + count - 1; j++) {
 			if (vm_page_is_valid(pa[j], vmoff(j, off) & PAGE_MASK,
 			    xfsize(j, npages, off, len))) {
 				vm_page_xunbusy(pa[j]);
@@ -419,23 +524,30 @@ sendfile_swapin(vm_object_t obj, struct sf_io *sfio, int *nios, off_t off,
 				SFSTAT_INC(sf_pages_bogus);
 				pa[j] = bogus_page;
 			}
+		}
 
 		refcount_acquire(&sfio->nios);
 		rv = vm_pager_get_pages_async(obj, pa + i, count, NULL,
 		    i + count == npages ? &rhpages : NULL,
 		    &sendfile_iodone, sfio);
 		if (__predict_false(rv != VM_PAGER_OK)) {
+			sendfile_iowait(sfio, "sferrio");
+
 			/*
 			 * Perform full pages recovery before returning EIO.
 			 * Pages from 0 to npages are wired.
-			 * Pages from i to npages are also busied.
 			 * Pages from (i + 1) to (i + count - 1) may be
 			 * substituted to bogus page, and not busied.
+			 * Pages from (i + count) to (i + count1 - 1) are
+			 * not busied.
+			 * Rest of the pages from i to npages are busied.
 			 */
 			for (j = 0; j < npages; j++) {
-				if (j > i && j < i + count - 1 &&
+				if (j >= i + count && j < i + count1)
+					;
+				else if (j > i && j < i + count - 1 &&
 				    pa[j] == bogus_page)
-					pa[j] = vm_page_lookup(obj,
+					pa[j] = vm_page_relookup(obj,
 					    OFF_TO_IDX(vmoff(j, off)));
 				else if (j >= i)
 					vm_page_xunbusy(pa[j]);
@@ -444,7 +556,6 @@ sendfile_swapin(vm_object_t obj, struct sf_io *sfio, int *nios, off_t off,
 				    __func__, pa, j));
 				vm_page_unwire(pa[j], PQ_INACTIVE);
 			}
-			VM_OBJECT_WUNLOCK(obj);
 			return (EIO);
 		}
 
@@ -453,23 +564,9 @@ sendfile_swapin(vm_object_t obj, struct sf_io *sfio, int *nios, off_t off,
 		if (i + count == npages)
 			SFSTAT_ADD(sf_rhpages_read, rhpages);
 
-		/*
-		 * Restore the valid page pointers.  They are already
-		 * unbusied, but still wired.
-		 */
-		for (j = i; j < i + count; j++)
-			if (pa[j] == bogus_page) {
-				pa[j] = vm_page_lookup(obj,
-				    OFF_TO_IDX(vmoff(j, off)));
-				KASSERT(pa[j], ("%s: page %p[%d] disappeared",
-				    __func__, pa, j));
-
-			}
-		i += count;
+		i += count1;
 		(*nios)++;
 	}
-
-	VM_OBJECT_WUNLOCK(obj);
 
 	if (*nios == 0 && npages != 0)
 		SFSTAT_INC(sf_noiocnt);
@@ -544,7 +641,7 @@ sendfile_getobj(struct thread *td, struct file *fp, vm_object_t *obj_res,
 
 out:
 	if (vp != NULL)
-		VOP_UNLOCK(vp, 0);
+		VOP_UNLOCK(vp);
 	return (error);
 }
 
@@ -567,6 +664,12 @@ sendfile_getsock(struct thread *td, int s, struct file **sock_fp,
 	*so = (*sock_fp)->f_data;
 	if ((*so)->so_type != SOCK_STREAM)
 		return (EINVAL);
+	/*
+	 * SCTP one-to-one style sockets currently don't work with
+	 * sendfile(). So indicate EINVAL for now.
+	 */
+	if ((*so)->so_proto->pr_protocol == IPPROTO_SCTP)
+		return (EINVAL);
 	if (SOLISTENING(*so))
 		return (ENOTCONN);
 	return (0);
@@ -580,11 +683,11 @@ vn_sendfile(struct file *fp, int sockfd, struct uio *hdr_uio,
 	struct file *sock_fp;
 	struct vnode *vp;
 	struct vm_object *obj;
+	vm_page_t pga;
 	struct socket *so;
 #ifdef KERN_TLS
 	struct ktls_session *tls;
 #endif
-	struct mbuf_ext_pgs *ext_pgs;
 	struct mbuf *m, *mh, *mhtail;
 	struct sf_buf *sf;
 	struct shmfd *shmfd;
@@ -626,9 +729,10 @@ vn_sendfile(struct file *fp, int sockfd, struct uio *hdr_uio,
 	SFSTAT_ADD(sf_rhpages_requested, SF_READAHEAD(flags));
 
 	if (flags & SF_SYNC) {
-		sfs = malloc(sizeof *sfs, M_TEMP, M_WAITOK | M_ZERO);
+		sfs = malloc(sizeof(*sfs), M_SENDFILE, M_WAITOK | M_ZERO);
 		mtx_init(&sfs->mtx, "sendfile", NULL, MTX_DEF);
 		cv_init(&sfs->cv, "sendfile");
+		sfs->waiting = true;
 	}
 
 	rem = nbytes ? omin(nbytes, obj_size - offset) : obj_size - offset;
@@ -658,7 +762,7 @@ vn_sendfile(struct file *fp, int sockfd, struct uio *hdr_uio,
 	for (off = offset; rem > 0; ) {
 		struct sf_io *sfio;
 		vm_page_t *pa;
-		struct mbuf *mtail;
+		struct mbuf *m0, *mtail;
 		int nios, space, npages, rhpages;
 
 		mtail = NULL;
@@ -739,7 +843,7 @@ retry_space:
 #ifdef KERN_TLS
 			if (tls != NULL)
 				mh = m_uiotombuf(hdr_uio, M_WAITOK, space,
-				    tls->params.max_frame_len, M_NOMAP);
+				    tls->params.max_frame_len, M_EXTPG);
 			else
 #endif
 				mh = m_uiotombuf(hdr_uio, M_WAITOK,
@@ -764,7 +868,7 @@ retry_space:
 				goto done;
 			error = VOP_GETATTR(vp, &va, td->td_ucred);
 			if (error != 0 || off >= va.va_size) {
-				VOP_UNLOCK(vp, 0);
+				VOP_UNLOCK(vp);
 				goto done;
 			}
 			if (va.va_size != obj_size) {
@@ -812,11 +916,11 @@ retry_space:
 		    npages, rhpages);
 
 		sfio = malloc(sizeof(struct sf_io) +
-		    npages * sizeof(vm_page_t), M_TEMP, M_WAITOK);
+		    npages * sizeof(vm_page_t), M_SENDFILE, M_WAITOK);
 		refcount_init(&sfio->nios, 1);
-		sfio->so = so;
+		sfio->obj = obj;
 		sfio->error = 0;
-
+		sfio->m = NULL;
 #ifdef KERN_TLS
 		/*
 		 * This doesn't use ktls_hold() because sfio->m will
@@ -825,13 +929,12 @@ retry_space:
 		 */
 		sfio->tls = tls;
 #endif
-
+		vm_object_pip_add(obj, 1);
 		error = sendfile_swapin(obj, sfio, &nios, off, space, npages,
 		    rhpages, flags);
 		if (error != 0) {
 			if (vp != NULL)
-				VOP_UNLOCK(vp, 0);
-			sfio->m = NULL;
+				VOP_UNLOCK(vp);
 			sendfile_iodone(sfio, NULL, 0, error);
 			goto done;
 		}
@@ -869,8 +972,6 @@ retry_space:
 		}
 
 		for (int i = 0; i < npages; i++) {
-			struct mbuf *m0;
-
 			/*
 			 * If a page wasn't grabbed successfully, then
 			 * trim the array. Can happen only with SF_NODISKIO.
@@ -882,13 +983,16 @@ retry_space:
 				softerr = EBUSY;
 				break;
 			}
+			pga = pa[i];
+			if (pga == bogus_page)
+				pga = vm_page_relookup(obj, sfio->pindex0 + i);
 
 			if (use_ext_pgs) {
 				off_t xfs;
 
 				ext_pgs_idx++;
 				if (ext_pgs_idx == max_pgs) {
-					m0 = mb_alloc_ext_pgs(M_WAITOK, false,
+					m0 = mb_alloc_ext_pgs(M_WAITOK,
 					    sendfile_free_mext_pg);
 
 					if (flags & SF_NOCACHE) {
@@ -909,14 +1013,11 @@ retry_space:
 					if (sfs != NULL) {
 						m0->m_ext.ext_flags |=
 						    EXT_FLAG_SYNC;
-						m0->m_ext.ext_arg2 = sfs;
+						m0->m_ext.ext_arg1 = sfs;
 						mtx_lock(&sfs->mtx);
 						sfs->count++;
 						mtx_unlock(&sfs->mtx);
 					}
-					ext_pgs = m0->m_ext.ext_pgs;
-					if (i == 0)
-						sfio->m = m0;
 					ext_pgs_idx = 0;
 
 					/* Append to mbuf chain. */
@@ -925,19 +1026,19 @@ retry_space:
 					else
 						m = m0;
 					mtail = m0;
-					ext_pgs->first_pg_off =
+					m0->m_epg_1st_off =
 					    vmoff(i, off) & PAGE_MASK;
 				}
 				if (nios) {
 					mtail->m_flags |= M_NOTREADY;
-					ext_pgs->nrdy++;
+					m0->m_epg_nrdy++;
 				}
 
-				ext_pgs->pa[ext_pgs_idx] = VM_PAGE_TO_PHYS(pa[i]);
-				ext_pgs->npgs++;
+				m0->m_epg_pa[ext_pgs_idx] = VM_PAGE_TO_PHYS(pga);
+				m0->m_epg_npgs++;
 				xfs = xfsize(i, npages, off, space);
-				ext_pgs->last_pg_len = xfs;
-				MBUF_EXT_PGS_ASSERT_SANITY(ext_pgs);
+				m0->m_epg_last_len = xfs;
+				MBUF_EXT_PGS_ASSERT_SANITY(m0);
 				mtail->m_len += xfs;
 				mtail->m_ext.ext_size += PAGE_SIZE;
 				continue;
@@ -952,10 +1053,11 @@ retry_space:
 			 * threads might exhaust the buffers and then
 			 * deadlock.
 			 */
-			sf = sf_buf_alloc(pa[i],
+			sf = sf_buf_alloc(pga,
 			    m != NULL ? SFB_NOWAIT : SFB_CATCH);
 			if (sf == NULL) {
 				SFSTAT_INC(sf_allocfail);
+				sendfile_iowait(sfio, "sfnosf");
 				for (int j = i; j < npages; j++)
 					vm_page_unwire(pa[j], PQ_INACTIVE);
 				if (m == NULL)
@@ -999,9 +1101,6 @@ retry_space:
 			    (vmoff(i, off) & PAGE_MASK);
 			m0->m_len = xfsize(i, npages, off, space);
 
-			if (i == 0)
-				sfio->m = m0;
-
 			/* Append to mbuf chain. */
 			if (mtail != NULL)
 				mtail->m_next = m0;
@@ -1011,24 +1110,28 @@ retry_space:
 		}
 
 		if (vp != NULL)
-			VOP_UNLOCK(vp, 0);
+			VOP_UNLOCK(vp);
 
 		/* Keep track of bytes processed. */
 		off += space;
 		rem -= space;
 
-		/* Prepend header, if any. */
+		/*
+		 * Prepend header, if any.  Save pointer to first mbuf
+		 * with a page.
+		 */
 		if (hdrlen) {
 prepend_header:
-			mhtail->m_next = m;
+			m0 = mhtail->m_next = m;
 			m = mh;
 			mh = NULL;
-		}
+		} else
+			m0 = m;
 
 		if (m == NULL) {
 			KASSERT(softerr, ("%s: m NULL, no error", __func__));
 			error = softerr;
-			free(sfio, M_TEMP);
+			sendfile_iodone(sfio, NULL, 0, 0);
 			goto done;
 		}
 
@@ -1039,21 +1142,19 @@ prepend_header:
 
 		CURVNET_SET(so->so_vnet);
 #ifdef KERN_TLS
-		if (tls != NULL) {
-			error = ktls_frame(m, tls, &tls_enq_cnt,
-			    TLS_RLTYPE_APP);
-			if (error != 0)
-				goto done;
-		}
+		if (tls != NULL)
+			ktls_frame(m, tls, &tls_enq_cnt, TLS_RLTYPE_APP);
 #endif
 		if (nios == 0) {
 			/*
 			 * If sendfile_swapin() didn't initiate any I/Os,
-			 * which happens if all data is cached in VM, then
-			 * we can send data right now without the
-			 * PRUS_NOTREADY flag.
+			 * which happens if all data is cached in VM, or if
+			 * the header consumed all socket buffer space and
+			 * sfio is NULL, then we can send data right now
+			 * without the PRUS_NOTREADY flag.
 			 */
-			free(sfio, M_TEMP);
+			if (sfio != NULL)
+				sendfile_iodone(sfio, NULL, 0, 0);
 #ifdef KERN_TLS
 			if (tls != NULL && tls->mode == TCP_TLS_MODE_SW) {
 				error = (*so->so_proto->pr_usrreqs->pru_send)
@@ -1065,6 +1166,8 @@ prepend_header:
 				error = (*so->so_proto->pr_usrreqs->pru_send)
 				    (so, 0, m, NULL, NULL, td);
 		} else {
+			sfio->so = so;
+			sfio->m = m0;
 			sfio->npages = npages;
 			soref(so);
 			error = (*so->so_proto->pr_usrreqs->pru_send)
@@ -1121,11 +1224,13 @@ out:
 	if (sfs != NULL) {
 		mtx_lock(&sfs->mtx);
 		if (sfs->count != 0)
-			cv_wait(&sfs->cv, &sfs->mtx);
-		KASSERT(sfs->count == 0, ("sendfile sync still busy"));
-		cv_destroy(&sfs->cv);
-		mtx_destroy(&sfs->mtx);
-		free(sfs, M_TEMP);
+			error = cv_wait_sig(&sfs->cv, &sfs->mtx);
+		if (sfs->count == 0) {
+			sendfile_sync_destroy(sfs);
+		} else {
+			sfs->waiting = false;
+			mtx_unlock(&sfs->mtx);
+		}
 	}
 #ifdef KERN_TLS
 	if (tls != NULL)
@@ -1139,20 +1244,10 @@ out:
 }
 
 static int
-copyin_hdtr(const struct sf_hdtr_native * __capability uhdtr, struct sf_hdtr *hdtr)
+copyin_hdtr(const struct sf_hdtr * __capability uhdtr, struct sf_hdtr *hdtr)
 {
-	struct sf_hdtr_native hdtr_n;
-	int error;
 
-	error = copyin_c(uhdtr, &hdtr_n, sizeof(hdtr_n));
-	if (error != 0)
-		return (error);
-	hdtr->headers = (void * __capability)__USER_CAP_ARRAY(hdtr_n.headers, hdtr_n.hdr_cnt);
-	hdtr->hdr_cnt = hdtr_n.hdr_cnt;
-	hdtr->trailers = (void * __capability)__USER_CAP_ARRAY(hdtr_n.trailers, hdtr_n.trl_cnt);
-	hdtr->hdr_cnt = hdtr_n.trl_cnt;
-
-	return (0);
+	return (copyincap(uhdtr, hdtr, sizeof(*hdtr)));
 }
 
 int
@@ -1221,7 +1316,7 @@ kern_sendfile(struct thread *td, int fd, int s, off_t offset, size_t nbytes,
 	fdrop(fp, td);
 
 	if (usbytes != NULL)
-		copyout_c(&sbytes, usbytes, sizeof(off_t));
+		copyout(&sbytes, usbytes, sizeof(off_t));
 
 out:
 	free(hdr_uio, M_IOV);

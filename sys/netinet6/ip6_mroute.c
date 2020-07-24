@@ -155,7 +155,9 @@ VNET_DEFINE_STATIC(int, ip6_mrouter_ver) = 0;
 
 SYSCTL_DECL(_net_inet6);
 SYSCTL_DECL(_net_inet6_ip6);
-static SYSCTL_NODE(_net_inet6, IPPROTO_PIM, pim, CTLFLAG_RW, 0, "PIM");
+static SYSCTL_NODE(_net_inet6, IPPROTO_PIM, pim,
+    CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
+    "PIM");
 
 static struct mrt6stat mrt6stat;
 SYSCTL_STRUCT(_net_inet6_ip6, OID_AUTO, mrt6stat, CTLFLAG_RW,
@@ -222,7 +224,8 @@ sysctl_mif6table(SYSCTL_HANDLER_ARGS)
 	free(out, M_TEMP);
 	return (error);
 }
-SYSCTL_PROC(_net_inet6_ip6, OID_AUTO, mif6table, CTLTYPE_OPAQUE | CTLFLAG_RD,
+SYSCTL_PROC(_net_inet6_ip6, OID_AUTO, mif6table,
+    CTLTYPE_OPAQUE | CTLFLAG_RD | CTLFLAG_NEEDGIANT,
     NULL, 0, sysctl_mif6table, "S,mif6_sctl[MAXMIFS]",
     "IPv6 Multicast Interfaces (struct mif6_sctl[MAXMIFS], "
     "netinet6/ip6_mroute.h)");
@@ -1372,19 +1375,6 @@ ip6_mdq(struct mbuf *m, struct ifnet *ifp, struct mf6c *rt)
 	u_int32_t iszone, idzone, oszone, odzone;
 	int error = 0;
 
-/*
- * Macro to send packet on mif.  Since RSVP packets don't get counted on
- * input, they shouldn't get counted on output, so statistics keeping is
- * separate.
- */
-
-#define MC6_SEND(ip6, mifp, m) do {				\
-	if ((mifp)->m6_flags & MIFF_REGISTER)			\
-		register_send((ip6), (mifp), (m));		\
-	else							\
-		phyint_send((ip6), (mifp), (m));		\
-} while (/*CONSTCOND*/ 0)
-
 	/*
 	 * Don't forward if it didn't arrive from the parent mif
 	 * for its origin.
@@ -1528,7 +1518,10 @@ ip6_mdq(struct mbuf *m, struct ifnet *ifp, struct mf6c *rt)
 
 			mifp->m6_pkt_out++;
 			mifp->m6_bytes_out += plen;
-			MC6_SEND(ip6, mifp, m);
+			if (mifp->m6_flags & MIFF_REGISTER)
+				register_send(ip6, mifp, m);
+			else
+				phyint_send(ip6, mifp, m);
 		}
 	}
 	return (0);
@@ -1569,13 +1562,16 @@ phyint_send(struct ip6_hdr *ip6, struct mif6 *mifp, struct mbuf *m)
 	 */
 	if (m->m_pkthdr.rcvif == NULL) {
 		struct ip6_moptions im6o;
+		struct epoch_tracker et;
 
 		im6o.im6o_multicast_ifp = ifp;
 		/* XXX: ip6_output will override ip6->ip6_hlim */
 		im6o.im6o_multicast_hlim = ip6->ip6_hlim;
 		im6o.im6o_multicast_loop = 1;
+		NET_EPOCH_ENTER(et);
 		error = ip6_output(mb_copy, NULL, NULL, IPV6_FORWARDING, &im6o,
 		    NULL, NULL);
+		NET_EPOCH_EXIT(et);
 
 		MRT6_DLOG(DEBUG_XMIT, "mif %u err %d",
 		    (uint16_t)(mifp - mif6table), error);

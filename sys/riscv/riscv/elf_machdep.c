@@ -58,9 +58,11 @@ __FBSDID("$FreeBSD$");
 #include <machine/elf.h>
 #include <machine/md_var.h>
 
+static const char *riscv_machine_arch(struct proc *p);
+
 u_long elf_hwcap;
 
-struct sysentvec elf64_freebsd_sysvec = {
+struct sysentvec elf_freebsd_sysvec = {
 	.sv_size	= SYS_MAXSYSCALL,
 	.sv_table	= sysent,
 	.sv_errsize	= 0,
@@ -70,7 +72,11 @@ struct sysentvec elf64_freebsd_sysvec = {
 	.sv_sendsig	= sendsig,
 	.sv_sigcode	= sigcode,
 	.sv_szsigcode	= &szsigcode,
+#if __has_feature(capabilities)
+	.sv_name	= "FreeBSD ELF64C",	/* CheriABI */
+#else
 	.sv_name	= "FreeBSD ELF64",
+#endif
 	.sv_coredump	= __elfN(coredump),
 	.sv_imgact_try	= NULL,
 	.sv_minsigstksz	= MINSIGSTKSZ,
@@ -84,7 +90,11 @@ struct sysentvec elf64_freebsd_sysvec = {
 	.sv_setregs	= exec_setregs,
 	.sv_fixlimit	= NULL,
 	.sv_maxssiz	= NULL,
+#if __has_feature(capabilities)
+	.sv_flags	= SV_ABI_FREEBSD | SV_LP64 | SV_SHP | SV_CHERI,
+#else
 	.sv_flags	= SV_ABI_FREEBSD | SV_LP64 | SV_SHP | SV_ASLR,
+#endif
 	.sv_set_syscall_retval = cpu_set_syscall_retval,
 	.sv_fetch_syscall_args = cpu_fetch_syscall_args,
 	.sv_syscallnames = syscallnames,
@@ -94,23 +104,38 @@ struct sysentvec elf64_freebsd_sysvec = {
 	.sv_thread_detach = NULL,
 	.sv_trap	= NULL,
 	.sv_hwcap	= &elf_hwcap,
+	.sv_machine_arch = riscv_machine_arch,
 };
-INIT_SYSENTVEC(elf64_sysvec, &elf64_freebsd_sysvec);
+INIT_SYSENTVEC(elf_sysvec, &elf_freebsd_sysvec);
 
-static Elf64_Brandinfo freebsd_brand_info = {
+static const char *
+riscv_machine_arch(struct proc *p)
+{
+
+	if ((p->p_elf_flags & EF_RISCV_FLOAT_ABI_MASK) ==
+	    EF_RISCV_FLOAT_ABI_SOFT)
+		return (MACHINE_ARCH "sf");
+	return (MACHINE_ARCH);
+}
+
+static __ElfN(Brandinfo) freebsd_brand_info = {
 	.brand		= ELFOSABI_FREEBSD,
 	.machine	= EM_RISCV,
 	.compat_3_brand	= "FreeBSD",
 	.emul_path	= NULL,
 	.interp_path	= "/libexec/ld-elf.so.1",
-	.sysvec		= &elf64_freebsd_sysvec,
+	.sysvec		= &elf_freebsd_sysvec,
+#if __has_feature(capabilities)
+	.interp_newpath	= "/libexec/ld-cheri-elf.so.1",
+#else
 	.interp_newpath	= NULL,
-	.brand_note	= &elf64_freebsd_brandnote,
+#endif
+	.brand_note	= &__elfN(freebsd_brandnote),
 	.flags		= BI_CAN_EXEC_DYN | BI_BRAND_NOTE
 };
 
-SYSINIT(elf64, SI_SUB_EXEC, SI_ORDER_FIRST,
-    (sysinit_cfunc_t)elf64_insert_brand_entry, &freebsd_brand_info);
+SYSINIT(elf, SI_SUB_EXEC, SI_ORDER_FIRST,
+    (sysinit_cfunc_t)__elfN(insert_brand_entry), &freebsd_brand_info);
 
 static bool debug_kld;
 SYSCTL_BOOL(_debug, OID_AUTO, kld_reloc, CTLFLAG_RW, &debug_kld, 0,
@@ -122,7 +147,7 @@ struct type2str_ent {
 };
 
 void
-elf64_dump_thread(struct thread *td, void *dst, size_t *off)
+__elfN(dump_thread)(struct thread *td, void *dst, size_t *off)
 {
 
 }
@@ -500,6 +525,13 @@ elf_cpu_load_file(linker_file_t lf __unused)
 
 int
 elf_cpu_unload_file(linker_file_t lf __unused)
+{
+
+	return (0);
+}
+
+int
+elf_cpu_parse_dynamic(caddr_t loadbase __unused, Elf_Dyn *dynamic __unused)
 {
 
 	return (0);

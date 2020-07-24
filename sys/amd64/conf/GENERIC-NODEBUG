@@ -1,5 +1,5 @@
 #
-# GENERIC-NODEBUG -- WITNESS and INVARIANTS free kernel configuration file 
+# GENERIC-NODEBUG -- WITNESS and INVARIANTS free kernel configuration file
 #		     for FreeBSD/amd64
 #
 # This configuration file removes several debugging options, including
@@ -40,3 +40,4 @@ nooptions       FULL_BUF_TRACKING
 nooptions	COVERAGE
 nooptions	KCOV
 nooptions	MALLOC_DEBUG_MAXZONES
+nooptions	QUEUE_MACRO_DEBUG_TRASH

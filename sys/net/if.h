@@ -67,7 +67,7 @@
 struct if_clonereq {
 	int	ifcr_total;		/* total cloners (out) */
 	int	ifcr_count;		/* room for this many in user buffer */
-	char	*ifcr_buffer;		/* buffer for cloner names */
+	char * __kerncap ifcr_buffer;	/* buffer for cloner names */
 };
 
 /*
@@ -144,7 +144,7 @@ struct if_data {
 #define	IFF_DEBUG	0x4		/* (n) turn on debugging */
 #define	IFF_LOOPBACK	0x8		/* (i) is a loopback net */
 #define	IFF_POINTOPOINT	0x10		/* (i) is a point-to-point link */
-/*			0x20		   was IFF_SMART */
+#define	IFF_KNOWSEPOCH	0x20		/* (i) calls if_input in net epoch */
 #define	IFF_DRV_RUNNING	0x40		/* (d) resources allocated */
 #define	IFF_NOARP	0x80		/* (n) no address resolution protocol */
 #define	IFF_PROMISC	0x100		/* (n) receive all packets */
@@ -178,7 +178,7 @@ struct if_data {
 #define	IFF_CANTCHANGE \
 	(IFF_BROADCAST|IFF_POINTOPOINT|IFF_DRV_RUNNING|IFF_DRV_OACTIVE|\
 	    IFF_SIMPLEX|IFF_MULTICAST|IFF_ALLMULTI|IFF_PROMISC|\
-	    IFF_DYING|IFF_CANTCONFIG)
+	    IFF_DYING|IFF_CANTCONFIG|IFF_KNOWSEPOCH)
 
 /*
  * Values for if_link_state.
@@ -382,7 +382,7 @@ struct if_announcemsghdr {
  */
 struct ifreq_buffer {
 	size_t	length;
-	void	*buffer;
+	void * __kerncap buffer;
 };
 
 /*
@@ -405,7 +405,7 @@ struct	ifreq {
 		int	ifru_mtu;
 		int	ifru_phys;
 		int	ifru_media;
-		caddr_t	ifru_data;
+		char * __kerncap ifru_data;
 		int	ifru_cap[2];
 		u_int	ifru_fib;
 		u_char	ifru_vlan_pcp;
@@ -435,34 +435,6 @@ struct	ifreq {
 #define	ifr_vlan_pcp	ifr_ifru.ifru_vlan_pcp	/* VLAN priority */
 #define	ifr_lan_pcp	ifr_ifru.ifru_vlan_pcp	/* VLAN priority */
 #endif /* !defined(_KERNEL) */
-
-#if defined(_KERNEL) && __has_feature(capabilities)
-struct ifreq_buffer_c {
-	size_t			length;		/* (size_t) */
-	void * __capability	buffer;		/* (void *) */
-};
-
-struct ifreq_c {
-	char	ifr_name[IFNAMSIZ];		/* if name, e.g. "en0" */
-	union {
-		struct sockaddr	ifru_addr;
-		struct sockaddr	ifru_dstaddr;
-		struct sockaddr	ifru_broadaddr;
-		struct ifreq_buffer_c ifru_buffer;
-		short		ifru_flags[2];
-		short		ifru_index;
-		int		ifru_jid;
-		int		ifru_metric;
-		int		ifru_mtu;
-		int		ifru_phys;
-		int		ifru_media;
-		void * __capability ifru_data;
-		int		ifru_cap[2];
-		u_int		ifru_fib;
-		u_char		ifru_vlan_pcp;
-	} ifr_ifru;
-};
-#endif /* defined(_KERNEL) && __has_feature(capabilities) */
 
 #define	_SIZEOF_ADDR_IFREQ(ifr) \
 	((ifr).ifr_addr.sa_len > sizeof(struct sockaddr) ? \
@@ -499,7 +471,7 @@ struct  ifdrv {
 	char            ifd_name[IFNAMSIZ];     /* if name, e.g. "en0" */
 	unsigned long   ifd_cmd;
 	size_t          ifd_len;
-	void            *ifd_data;
+	void            * __kerncap ifd_data;
 };
 
 /* 
@@ -556,7 +528,7 @@ struct ifgroupreq {
 	u_int	ifgr_len;
 	union {
 		char	ifgru_group[IFNAMSIZ];
-		struct	ifg_req *ifgru_groups;
+		struct ifg_req * __kerncap ifgru_groups;
 	} ifgr_ifgru;
 #ifndef _KERNEL
 #define ifgr_group	ifgr_ifgru.ifgru_group

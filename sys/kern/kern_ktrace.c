@@ -43,8 +43,6 @@ __FBSDID("$FreeBSD$");
 
 #include "opt_ktrace.h"
 
-#define	EXPLICIT_USER_ACCESS
-
 #include <sys/param.h>
 #include <sys/capsicum.h>
 #include <sys/systm.h>
@@ -121,11 +119,6 @@ struct ktr_request {
 		struct	ktr_fault ktr_fault;
 		struct	ktr_faultend ktr_faultend;
 		struct  ktr_struct_array ktr_struct_array;
-#ifdef CPU_CHERI
-		struct	ktr_ccall ktr_ccall;
-		struct	ktr_creturn ktr_creturn;
-		struct	ktr_cexception ktr_cexception;
-#endif
 	} ktr_data;
 	STAILQ_ENTRY(ktr_request) ktr_list;
 };
@@ -146,17 +139,13 @@ static int data_lengths[] = {
 	[KTR_FAULT] = sizeof(struct ktr_fault),
 	[KTR_FAULTEND] = sizeof(struct ktr_faultend),
 	[KTR_STRUCT_ARRAY] = sizeof(struct ktr_struct_array),
-#ifdef CPU_CHERI
-	[KTR_CCALL] = sizeof(struct ktr_ccall),
-	[KTR_CRETURN] = sizeof(struct ktr_creturn),
-	[KTR_CEXCEPTION] = sizeof(struct ktr_cexception),
-#endif
 	[KTR_SYSERRCAUSE] = 0,
 };
 
 static STAILQ_HEAD(, ktr_request) ktr_free;
 
-static SYSCTL_NODE(_kern, OID_AUTO, ktrace, CTLFLAG_RD, 0, "KTRACE options");
+static SYSCTL_NODE(_kern, OID_AUTO, ktrace, CTLFLAG_RD | CTLFLAG_MPSAFE, 0,
+    "KTRACE options");
 
 static u_int ktr_requestpool = KTRACE_REQUEST_POOL;
 TUNABLE_INT("kern.ktrace.request_pool", &ktr_requestpool);
@@ -258,8 +247,9 @@ sysctl_kern_ktrace_request_pool(SYSCTL_HANDLER_ARGS)
 		return (ENOSPC);
 	return (0);
 }
-SYSCTL_PROC(_kern_ktrace, OID_AUTO, request_pool, CTLTYPE_UINT|CTLFLAG_RW,
-    &ktr_requestpool, 0, sysctl_kern_ktrace_request_pool, "IU",
+SYSCTL_PROC(_kern_ktrace, OID_AUTO, request_pool,
+    CTLTYPE_UINT | CTLFLAG_RW | CTLFLAG_NEEDGIANT, &ktr_requestpool, 0,
+    sysctl_kern_ktrace_request_pool, "IU",
     "Pool buffer size for ktrace(1)");
 
 static u_int
@@ -479,7 +469,7 @@ ktrsyscall(int code, int narg, syscallarg_t args[])
 	buflen = sizeof(register_t) * narg;
 	if (buflen > 0) {
 		buf = malloc(buflen, M_KTRACE, M_WAITOK);
-#ifdef CPU_CHERI
+#if __has_feature(capabilities)
 		for (int i = 0; i < narg; i++)
 			buf[i] = (register_t)args[i];
 #else
@@ -809,6 +799,14 @@ ktrstruct(const char *name, const void *data, size_t datalen)
 }
 
 void
+ktrstruct_error(const char *name, const void *data, size_t datalen, int error)
+{
+
+	if (error == 0)
+		ktrstruct(name, data, datalen);
+}
+
+void
 ktrstructarray(const char *name, enum uio_seg seg,
     const void * __capability data, int num_items, size_t struct_size)
 {
@@ -925,60 +923,6 @@ ktrfaultend(int result)
 	ktrace_exit(td);
 }
 
-#ifdef CPU_CHERI
-void
-ktrccall(struct pcb *pcb)
-{
-	struct thread *td = curthread;
-	struct ktr_request *req;
-	struct ktr_ccall *kc;
-
-	if (!KTRPOINT(td, KTR_CCALL))
-		return;
-	req = ktr_getrequest(KTR_CCALL);
-	if (req == NULL)
-		return;
-	kc = &req->ktr_data.ktr_ccall;
-	ktrccall_mdfill(pcb, kc);
-	ktr_enqueuerequest(td, req);
-	ktrace_exit(td);
-}
-
-void
-ktrcreturn(struct pcb *pcb)
-{
-	struct thread *td = curthread;
-	struct ktr_request *req;
-	struct ktr_creturn *kr;
-
-	if (!KTRPOINT(td, KTR_CRETURN))
-		return;
-	req = ktr_getrequest(KTR_CRETURN);
-	if (req == NULL)
-		return;
-	kr = &req->ktr_data.ktr_creturn;
-	ktrcreturn_mdfill(pcb, kr);
-	ktr_enqueuerequest(td, req);
-	ktrace_exit(td);
-}
-
-void
-ktrcexception(struct trapframe *frame)
-{
-	struct thread *td = curthread;
-	struct ktr_request *req;
-	struct ktr_cexception *ke;
-
-	req = ktr_getrequest(KTR_CEXCEPTION);
-	if (req == NULL)
-		return;
-	ke = &req->ktr_data.ktr_cexception;
-	ktrcexception_mdfill(frame, ke);
-	ktr_enqueuerequest(td, req);
-	ktrace_exit(td);
-}
-#endif /* CPU_CHERI */
-
 void
 ktrsyserrcause(const char *format, ...)
 {
@@ -1064,7 +1008,7 @@ kern_ktrace(struct thread *td, const char * __capability fname, int uops,
 		}
 		NDFREE(&nd, NDF_ONLY_PNBUF);
 		vp = nd.ni_vp;
-		VOP_UNLOCK(vp, 0);
+		VOP_UNLOCK(vp);
 		if (vp->v_type != VREG) {
 			(void) vn_close(vp, FREAD|FWRITE, td->td_ucred, td);
 			ktrace_exit(td);
@@ -1368,7 +1312,7 @@ ktr_writerequest(struct thread *td, struct ktr_request *req)
 	if (error == 0)
 #endif
 		error = VOP_WRITE(vp, &auio, IO_UNIT | IO_APPEND, cred);
-	VOP_UNLOCK(vp, 0);
+	VOP_UNLOCK(vp);
 	vn_finished_write(mp);
 	crfree(cred);
 	if (!error) {

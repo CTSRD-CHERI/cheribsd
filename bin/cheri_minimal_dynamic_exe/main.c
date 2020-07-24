@@ -37,7 +37,6 @@ void __cerror(int) __hidden;
 extern void _DYNAMIC __hidden;
 extern void __start___cap_relocs __hidden;
 extern void _CHERI_CAPABILITY_TABLE_ __hidden;
-#pragma weak _CHERI_CAPABILITY_TABLE_
 
 #define PRINT_SYMBOL(sym) simple_printf("%25s = %#p\n", #sym, &sym);
 

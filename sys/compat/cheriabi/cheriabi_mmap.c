@@ -168,10 +168,10 @@ cheriabi_mmap(struct thread *td, struct cheriabi_mmap_args *uap)
 		}
 
 		/* Allocate from the per-thread capability. */
-		source_cap = td->td_md.md_cheri_mmap_cap;
+		source_cap = td->td_cheri_mmap_cap;
 	}
 	KASSERT(cheri_gettag(source_cap),
-	    ("td->td_md.md_cheri_mmap_cap is untagged!"));
+	    ("td->td_cheri_mmap_cap is untagged!"));
 
 	/*
 	 * If MAP_FIXED is specified, make sure that that the reqested
@@ -422,7 +422,7 @@ cheriabi_mmap_retcap(struct thread *td, vm_offset_t addr,
 		/* Set offset to vaddr of page */
 		newcap = cheri_setoffset(newcap,
 		    rounddown2(addr, PAGE_SIZE) - cap_base);
-		newcap = cheri_csetbounds(newcap,
+		newcap = cheri_setbounds(newcap,
 		    roundup2(mrp->mr_len + (addr - rounddown2(addr, PAGE_SIZE)),
 		    PAGE_SIZE));
 		/* Shift offset up if required */
@@ -438,7 +438,7 @@ cheriabi_mmap_retcap(struct thread *td, vm_offset_t addr,
 		    cap_base, cap_base + cap_len));
 		newcap = cheri_setoffset(newcap, addr - cap_base);
 		if (cheriabi_mmap_setbounds)
-			newcap = cheri_csetbounds(newcap,
+			newcap = cheri_setbounds(newcap,
 			    roundup2(mrp->mr_len, PAGE_SIZE));
 	}
 

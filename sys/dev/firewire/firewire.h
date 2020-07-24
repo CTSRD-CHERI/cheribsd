@@ -421,7 +421,7 @@ struct fw_speed_map {
 struct fw_crom_buf {
 	struct fw_eui64 eui;
 	uint32_t len;
-	void *ptr;
+	void * __kerncap ptr;
 };
 
 /*

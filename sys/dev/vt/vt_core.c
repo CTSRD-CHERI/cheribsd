@@ -120,7 +120,8 @@ const struct terminal_class vt_termclass = {
 #define	VT_UNIT(vw)	((vw)->vw_device->vd_unit * VT_MAXWINDOWS + \
 			(vw)->vw_number)
 
-static SYSCTL_NODE(_kern, OID_AUTO, vt, CTLFLAG_RD, 0, "vt(9) parameters");
+static SYSCTL_NODE(_kern, OID_AUTO, vt, CTLFLAG_RD | CTLFLAG_MPSAFE, 0,
+    "vt(9) parameters");
 static VT_SYSCTL_INT(enable_altgr, 1, "Enable AltGr key (Do not assume R.Alt as Alt)");
 static VT_SYSCTL_INT(enable_bell, 1, "Enable bell");
 static VT_SYSCTL_INT(debug, 0, "vt(9) debug level");
@@ -605,8 +606,7 @@ vt_window_switch(struct vt_window *vw)
 
 	/* Restore per-window keyboard mode. */
 	mtx_lock(&Giant);
-	kbd = kbd_get_keyboard(vd->vd_keyboard);
-	if (kbd != NULL) {
+	if ((kbd = vd->vd_keyboard) != NULL) {
 		if (curvw->vw_kbdmode == K_XLATE)
 			vt_save_kbd_state(curvw, kbd);
 
@@ -982,7 +982,7 @@ vt_kbdevent(keyboard_t *kbd, int event, void *arg)
 		break;
 	case KBDIO_UNLOADING:
 		mtx_lock(&Giant);
-		vd->vd_keyboard = -1;
+		vd->vd_keyboard = NULL;
 		kbd_release(kbd, (void *)vd);
 		mtx_unlock(&Giant);
 		return (0);
@@ -1042,9 +1042,11 @@ vt_allocate_keyboard(struct vt_device *vd)
 			DPRINTF(10, "%s: No keyboard found.\n", __func__);
 			return (-1);
 		}
+		k0 = kbd_get_keyboard(idx0);
 	}
-	vd->vd_keyboard = idx0;
-	DPRINTF(20, "%s: vd_keyboard = %d\n", __func__, vd->vd_keyboard);
+	vd->vd_keyboard = k0;
+	DPRINTF(20, "%s: vd_keyboard = %d\n", __func__,
+	    vd->vd_keyboard->kb_index);
 
 	if (vd->vd_curwindow == &vt_conswindow) {
 		for (i = 0; i < grabbed; ++i)
@@ -1300,7 +1302,7 @@ vt_flush(struct vt_device *vd)
 	/* Check if the cursor should be displayed or not. */
 	if ((vd->vd_flags & VDF_MOUSECURSOR) && /* Mouse support enabled. */
 	    !(vw->vw_flags & VWF_MOUSE_HIDE) && /* Cursor displayed.      */
-	    !kdb_active && panicstr == NULL) {  /* DDB inactive.          */
+	    !kdb_active && !KERNEL_PANICKED()) {  /* DDB inactive.          */
 		vd->vd_mshown = 1;
 	} else {
 		vd->vd_mshown = 0;
@@ -1397,7 +1399,7 @@ vtterm_done(struct terminal *tm)
 	struct vt_window *vw = tm->tm_softc;
 	struct vt_device *vd = vw->vw_device;
 
-	if (kdb_active || panicstr != NULL) {
+	if (kdb_active || KERNEL_PANICKED()) {
 		/* Switch to the debugger. */
 		if (vd->vd_curwindow != vw) {
 			vd->vd_curwindow = vw;
@@ -1533,8 +1535,7 @@ vtterm_cngetc(struct terminal *tm)
 	}
 
 	/* Stripped down keyboard handler. */
-	kbd = kbd_get_keyboard(vd->vd_keyboard);
-	if (kbd == NULL)
+	if ((kbd = vd->vd_keyboard) == NULL)
 		return (-1);
 
 	/* Force keyboard input mode to K_XLATE */
@@ -1610,8 +1611,7 @@ vtterm_cngrab(struct terminal *tm)
 	if (!cold)
 		vt_window_switch(vw);
 
-	kbd = kbd_get_keyboard(vd->vd_keyboard);
-	if (kbd == NULL)
+	if ((kbd = vd->vd_keyboard) == NULL)
 		return;
 
 	if (vw->vw_grabbed++ > 0)
@@ -1641,8 +1641,7 @@ vtterm_cnungrab(struct terminal *tm)
 	vw = tm->tm_softc;
 	vd = vw->vw_device;
 
-	kbd = kbd_get_keyboard(vd->vd_keyboard);
-	if (kbd == NULL)
+	if ((kbd = vd->vd_keyboard) == NULL)
 		return;
 
 	if (--vw->vw_grabbed > 0)
@@ -2182,8 +2181,7 @@ skip_thunk:
 		error = 0;
 
 		mtx_lock(&Giant);
-		kbd = kbd_get_keyboard(vd->vd_keyboard);
-		if (kbd != NULL)
+		if ((kbd = vd->vd_keyboard) != NULL)
 			error = kbdd_ioctl(kbd, cmd, data);
 		mtx_unlock(&Giant);
 		if (error == ENOIOCTL) {
@@ -2201,8 +2199,7 @@ skip_thunk:
 
 		if (vw == vd->vd_curwindow) {
 			mtx_lock(&Giant);
-			kbd = kbd_get_keyboard(vd->vd_keyboard);
-			if (kbd != NULL)
+			if ((kbd = vd->vd_keyboard) != NULL)
 				error = vt_save_kbd_state(vw, kbd);
 			mtx_unlock(&Giant);
 
@@ -2227,8 +2224,7 @@ skip_thunk:
 		error = 0;
 		if (vw == vd->vd_curwindow) {
 			mtx_lock(&Giant);
-			kbd = kbd_get_keyboard(vd->vd_keyboard);
-			if (kbd != NULL)
+			if ((kbd = vd->vd_keyboard) != NULL)
 				error = vt_update_kbd_state(vw, kbd);
 			mtx_unlock(&Giant);
 		}
@@ -2240,8 +2236,7 @@ skip_thunk:
 
 		if (vw == vd->vd_curwindow) {
 			mtx_lock(&Giant);
-			kbd = kbd_get_keyboard(vd->vd_keyboard);
-			if (kbd != NULL)
+			if ((kbd = vd->vd_keyboard) != NULL)
 				error = vt_save_kbd_leds(vw, kbd);
 			mtx_unlock(&Giant);
 
@@ -2266,8 +2261,7 @@ skip_thunk:
 		error = 0;
 		if (vw == vd->vd_curwindow) {
 			mtx_lock(&Giant);
-			kbd = kbd_get_keyboard(vd->vd_keyboard);
-			if (kbd != NULL)
+			if ((kbd = vd->vd_keyboard) != NULL)
 				error = vt_update_kbd_leds(vw, kbd);
 			mtx_unlock(&Giant);
 		}
@@ -2283,8 +2277,7 @@ skip_thunk:
 
 		if (vw == vd->vd_curwindow) {
 			mtx_lock(&Giant);
-			kbd = kbd_get_keyboard(vd->vd_keyboard);
-			if (kbd != NULL)
+			if ((kbd = vd->vd_keyboard) != NULL)
 				error = vt_save_kbd_mode(vw, kbd);
 			mtx_unlock(&Giant);
 
@@ -2309,8 +2302,7 @@ skip_thunk:
 			error = 0;
 			if (vw == vd->vd_curwindow) {
 				mtx_lock(&Giant);
-				kbd = kbd_get_keyboard(vd->vd_keyboard);
-				if (kbd != NULL)
+				if ((kbd = vd->vd_keyboard) != NULL)
 					error = vt_update_kbd_mode(vw, kbd);
 				mtx_unlock(&Giant);
 			}
@@ -2355,8 +2347,7 @@ skip_thunk:
 
 		if (vw == vd->vd_curwindow) {
 			mtx_lock(&Giant);
-			kbd = kbd_get_keyboard(vd->vd_keyboard);
-			if (kbd != NULL)
+			if ((kbd = vd->vd_keyboard) != NULL)
 				vt_save_kbd_state(vw, kbd);
 			mtx_unlock(&Giant);
 		}
@@ -2475,7 +2466,8 @@ skip_thunk:
 	case CONS_SETKBD:	/* set the new keyboard */
 		mtx_lock(&Giant);
 		error = 0;
-		if (vd->vd_keyboard != *(int *)data) {
+		if (vd->vd_keyboard == NULL ||
+		    vd->vd_keyboard->kb_index != *(int *)data) {
 			kbd = kbd_get_keyboard(*(int *)data);
 			if (kbd == NULL) {
 				mtx_unlock(&Giant);
@@ -2484,13 +2476,11 @@ skip_thunk:
 			i = kbd_allocate(kbd->kb_name, kbd->kb_unit,
 			    (void *)vd, vt_kbdevent, vd);
 			if (i >= 0) {
-				if (vd->vd_keyboard != -1) {
-					kbd = kbd_get_keyboard(vd->vd_keyboard);
+				if ((kbd = vd->vd_keyboard) != NULL) {
 					vt_save_kbd_state(vd->vd_curwindow, kbd);
 					kbd_release(kbd, (void *)vd);
 				}
-				kbd = kbd_get_keyboard(i);
-				vd->vd_keyboard = i;
+				kbd = vd->vd_keyboard = kbd_get_keyboard(i);
 
 				vt_update_kbd_mode(vd->vd_curwindow, kbd);
 				vt_update_kbd_state(vd->vd_curwindow, kbd);
@@ -2503,16 +2493,11 @@ skip_thunk:
 	case CONS_RELKBD:	/* release the current keyboard */
 		mtx_lock(&Giant);
 		error = 0;
-		if (vd->vd_keyboard != -1) {
-			kbd = kbd_get_keyboard(vd->vd_keyboard);
-			if (kbd == NULL) {
-				mtx_unlock(&Giant);
-				return (EINVAL);
-			}
+		if ((kbd = vd->vd_keyboard) != NULL) {
 			vt_save_kbd_state(vd->vd_curwindow, kbd);
 			error = kbd_release(kbd, (void *)vd);
 			if (error == 0) {
-				vd->vd_keyboard = -1;
+				vd->vd_keyboard = NULL;
 			}
 		}
 		mtx_unlock(&Giant);

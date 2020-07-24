@@ -71,6 +71,7 @@ __FBSDID("$FreeBSD$");
 #include <net/if.h>
 #include <net/if_var.h>
 #include <net/route.h>
+#include <net/route/nhop.h>
 #include <net/rss_config.h>
 
 #include <netinet/in.h>
@@ -116,9 +117,9 @@ VNET_DEFINE(int, udp_cksum) = 1;
 SYSCTL_INT(_net_inet_udp, UDPCTL_CHECKSUM, checksum, CTLFLAG_VNET | CTLFLAG_RW,
     &VNET_NAME(udp_cksum), 0, "compute udp checksum");
 
-int	udp_log_in_vain = 0;
-SYSCTL_INT(_net_inet_udp, OID_AUTO, log_in_vain, CTLFLAG_RW,
-    &udp_log_in_vain, 0, "Log all incoming UDP packets");
+VNET_DEFINE(int, udp_log_in_vain) = 0;
+SYSCTL_INT(_net_inet_udp, OID_AUTO, log_in_vain, CTLFLAG_VNET | CTLFLAG_RW,
+    &VNET_NAME(udp_log_in_vain), 0, "Log all incoming UDP packets");
 
 VNET_DEFINE(int, udp_blackhole) = 0;
 SYSCTL_INT(_net_inet_udp, OID_AUTO, blackhole, CTLFLAG_VNET | CTLFLAG_RW,
@@ -641,7 +642,7 @@ udp_input(struct mbuf **mp, int *offp, int proto)
 			UDPLITE_PROBE(receive, NULL, last, ip, last, uh);
 		else
 			UDP_PROBE(receive, NULL, last, ip, last, uh);
-		if (udp_append(last, ip, m, iphlen, udp_in) == 0) 
+		if (udp_append(last, ip, m, iphlen, udp_in) == 0)
 			INP_RUNLOCK(last);
 	inp_lost:
 		return (IPPROTO_DONE);
@@ -686,7 +687,7 @@ udp_input(struct mbuf **mp, int *offp, int proto)
 		    ip->ip_dst, uh->uh_dport, INPLOOKUP_WILDCARD |
 		    INPLOOKUP_RLOCKPCB, ifp, m);
 	if (inp == NULL) {
-		if (udp_log_in_vain) {
+		if (V_udp_log_in_vain) {
 			char src[INET_ADDRSTRLEN];
 			char dst[INET_ADDRSTRLEN];
 
@@ -741,7 +742,7 @@ udp_input(struct mbuf **mp, int *offp, int proto)
 		UDPLITE_PROBE(receive, NULL, inp, ip, inp, uh);
 	else
 		UDP_PROBE(receive, NULL, inp, ip, inp, uh);
-	if (udp_append(inp, ip, m, iphlen, udp_in) == 0) 
+	if (udp_append(inp, ip, m, iphlen, udp_in) == 0)
 		INP_RUNLOCK(inp);
 	return (IPPROTO_DONE);
 
@@ -761,9 +762,9 @@ udp_notify(struct inpcb *inp, int errno)
 
 	INP_WLOCK_ASSERT(inp);
 	if ((errno == EHOSTUNREACH || errno == ENETUNREACH ||
-	     errno == EHOSTDOWN) && inp->inp_route.ro_rt) {
-		RTFREE(inp->inp_route.ro_rt);
-		inp->inp_route.ro_rt = (struct rtentry *)NULL;
+	     errno == EHOSTDOWN) && inp->inp_route.ro_nh) {
+		NH_FREE(inp->inp_route.ro_nh);
+		inp->inp_route.ro_nh = (struct nhop_object *)NULL;
 	}
 
 	inp->inp_socket->so_error = errno;
@@ -916,8 +917,9 @@ udp_pcblist(SYSCTL_HANDLER_ARGS)
 }
 
 SYSCTL_PROC(_net_inet_udp, UDPCTL_PCBLIST, pcblist,
-    CTLTYPE_OPAQUE | CTLFLAG_RD, NULL, 0,
-    udp_pcblist, "S,xinpcb", "List of active UDP sockets");
+    CTLTYPE_OPAQUE | CTLFLAG_RD | CTLFLAG_MPSAFE, NULL, 0,
+    udp_pcblist, "S,xinpcb",
+    "List of active UDP sockets");
 
 #ifdef INET
 static int
@@ -957,8 +959,9 @@ udp_getcred(SYSCTL_HANDLER_ARGS)
 }
 
 SYSCTL_PROC(_net_inet_udp, OID_AUTO, getcred,
-    CTLTYPE_OPAQUE|CTLFLAG_RW|CTLFLAG_PRISON, 0, 0,
-    udp_getcred, "S,xucred", "Get the xucred of a UDP connection");
+    CTLTYPE_OPAQUE | CTLFLAG_RW | CTLFLAG_PRISON | CTLFLAG_MPSAFE,
+    0, 0, udp_getcred, "S,xucred",
+    "Get the xucred of a UDP connection");
 #endif /* INET */
 
 int
@@ -1078,7 +1081,7 @@ udp_ctloutput(struct socket *so, struct sockopt *sopt)
 	default:
 		error = EINVAL;
 		break;
-	}	
+	}
 	return (error);
 }
 
@@ -1609,6 +1612,7 @@ udp_close(struct socket *so)
 static int
 udp_connect(struct socket *so, struct sockaddr *nam, struct thread *td)
 {
+	struct epoch_tracker et;
 	struct inpcb *inp;
 	struct inpcbinfo *pcbinfo;
 	struct sockaddr_in *sin;
@@ -1628,9 +1632,11 @@ udp_connect(struct socket *so, struct sockaddr *nam, struct thread *td)
 		INP_WUNLOCK(inp);
 		return (error);
 	}
+	NET_EPOCH_ENTER(et);
 	INP_HASH_WLOCK(pcbinfo);
 	error = in_pcbconnect(inp, nam, td->td_ucred);
 	INP_HASH_WUNLOCK(pcbinfo);
+	NET_EPOCH_EXIT(et);
 	if (error == 0)
 		soisconnected(so);
 	INP_WUNLOCK(inp);

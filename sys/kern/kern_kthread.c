@@ -146,7 +146,8 @@ kproc_create(void (*func)(void *), void *arg,
 	/* Delay putting it on the run queue until now. */
 	if (!(flags & RFSTOPPED))
 		sched_add(td, SRQ_BORING); 
-	thread_unlock(td);
+	else
+		thread_unlock(td);
 
 	return 0;
 }
@@ -228,7 +229,6 @@ kproc_suspend_check(struct proc *p)
 	}
 	PROC_UNLOCK(p);
 }
-
 
 /*
  * Start a kernel thread.  
@@ -324,7 +324,6 @@ kthread_add(void (*func)(void *), void *arg, struct proc *p,
 	if (!(flags & RFSTOPPED)) {
 		thread_lock(newtd);
 		sched_add(newtd, SRQ_BORING); 
-		thread_unlock(newtd);
 	}
 	if (newtdp)
 		*newtdp = newtd;

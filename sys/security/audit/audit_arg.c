@@ -690,7 +690,7 @@ audit_arg_file(struct proc *p, struct file *fp)
 		vp = fp->f_vnode;
 		vn_lock(vp, LK_SHARED | LK_RETRY);
 		audit_arg_vnode1(vp);
-		VOP_UNLOCK(vp, 0);
+		VOP_UNLOCK(vp);
 		break;
 
 	case DTYPE_SOCKET:
@@ -764,6 +764,44 @@ audit_arg_upath2(struct thread *td, int dirfd, char *upath)
 		return;
 
 	audit_arg_upath(td, dirfd, upath, &ar->k_ar.ar_arg_upath2);
+	ARG_SET_VALID(ar, ARG_UPATH2);
+}
+
+static void
+audit_arg_upath_vp(struct thread *td, struct vnode *rdir, struct vnode *cdir,
+    char *upath, char **pathp)
+{
+
+	if (*pathp == NULL)
+		*pathp = malloc(MAXPATHLEN, M_AUDITPATH, M_WAITOK);
+	audit_canon_path_vp(td, rdir, cdir, upath, *pathp);
+}
+
+void
+audit_arg_upath1_vp(struct thread *td, struct vnode *rdir, struct vnode *cdir,
+    char *upath)
+{
+	struct kaudit_record *ar;
+
+	ar = currecord();
+	if (ar == NULL)
+		return;
+
+	audit_arg_upath_vp(td, rdir, cdir, upath, &ar->k_ar.ar_arg_upath1);
+	ARG_SET_VALID(ar, ARG_UPATH1);
+}
+
+void
+audit_arg_upath2_vp(struct thread *td, struct vnode *rdir, struct vnode *cdir,
+    char *upath)
+{
+	struct kaudit_record *ar;
+
+	ar = currecord();
+	if (ar == NULL)
+		return;
+
+	audit_arg_upath_vp(td, rdir, cdir, upath, &ar->k_ar.ar_arg_upath2);
 	ARG_SET_VALID(ar, ARG_UPATH2);
 }
 
@@ -978,6 +1016,6 @@ audit_sysclose(struct thread *td, int fd)
 	vp = fp->f_vnode;
 	vn_lock(vp, LK_SHARED | LK_RETRY);
 	audit_arg_vnode1(vp);
-	VOP_UNLOCK(vp, 0);
+	VOP_UNLOCK(vp);
 	fdrop(fp, td);
 }

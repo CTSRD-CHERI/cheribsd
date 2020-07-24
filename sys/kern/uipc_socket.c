@@ -110,8 +110,6 @@ __FBSDID("$FreeBSD$");
 #include "opt_kern_tls.h"
 #include "opt_sctp.h"
 
-#define	EXPLICIT_USER_ACCESS
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/fcntl.h>
@@ -132,6 +130,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/poll.h>
 #include <sys/proc.h>
 #include <sys/protosw.h>
+#include <sys/sbuf.h>
 #include <sys/socket.h>
 #include <sys/socketvar.h>
 #include <sys/resourcevar.h>
@@ -143,9 +142,12 @@ __FBSDID("$FreeBSD$");
 #include <sys/sysent.h>
 #include <sys/taskqueue.h>
 #include <sys/uio.h>
+#include <sys/un.h>
+#include <sys/unpcb.h>
 #include <sys/jail.h>
 #include <sys/syslog.h>
 #include <netinet/in.h>
+#include <netinet/in_pcb.h>
 #include <netinet/tcp.h>
 
 #include <net/vnet.h>
@@ -238,12 +240,13 @@ sysctl_somaxconn(SYSCTL_HANDLER_ARGS)
 	somaxconn = val;
 	return (0);
 }
-SYSCTL_PROC(_kern_ipc, OID_AUTO, soacceptqueue, CTLTYPE_UINT | CTLFLAG_RW,
-    0, sizeof(int), sysctl_somaxconn, "I",
+SYSCTL_PROC(_kern_ipc, OID_AUTO, soacceptqueue,
+    CTLTYPE_UINT | CTLFLAG_RW | CTLFLAG_NEEDGIANT, 0, sizeof(int),
+    sysctl_somaxconn, "I",
     "Maximum listen socket pending connection accept queue size");
 SYSCTL_PROC(_kern_ipc, KIPC_SOMAXCONN, somaxconn,
-    CTLTYPE_UINT | CTLFLAG_RW | CTLFLAG_SKIP,
-    0, sizeof(int), sysctl_somaxconn, "I",
+    CTLTYPE_UINT | CTLFLAG_RW | CTLFLAG_SKIP | CTLFLAG_NEEDGIANT, 0,
+    sizeof(int), sysctl_somaxconn, "I",
     "Maximum listen socket pending connection accept queue size (compat)");
 
 static int numopensockets;
@@ -268,7 +271,8 @@ MTX_SYSINIT(so_global_mtx, &so_global_mtx, "so_glabel", MTX_DEF);
  * General IPC sysctl name space, used by sockets and a variety of other IPC
  * types.
  */
-SYSCTL_NODE(_kern, KERN_IPC, ipc, CTLFLAG_RW, 0, "IPC");
+SYSCTL_NODE(_kern, KERN_IPC, ipc, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
+    "IPC");
 
 /*
  * Initialize the socket subsystem and set up the socket
@@ -372,8 +376,9 @@ sysctl_maxsockets(SYSCTL_HANDLER_ARGS)
 	}
 	return (error);
 }
-SYSCTL_PROC(_kern_ipc, OID_AUTO, maxsockets, CTLTYPE_INT|CTLFLAG_RW,
-    &maxsockets, 0, sysctl_maxsockets, "IU",
+SYSCTL_PROC(_kern_ipc, OID_AUTO, maxsockets,
+    CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_NEEDGIANT, &maxsockets, 0,
+    sysctl_maxsockets, "IU",
     "Maximum number of sockets available");
 
 /*
@@ -571,6 +576,11 @@ SYSCTL_INT(_regression, OID_AUTO, sonewconn_earlytest, CTLFLAG_RW,
     &regression_sonewconn_earlytest, 0, "Perform early sonewconn limit test");
 #endif
 
+static struct timeval overinterval = { 60, 0 };
+SYSCTL_TIMEVAL_SEC(_kern_ipc, OID_AUTO, sooverinterval, CTLFLAG_RW,
+    &overinterval,
+    "Delay in seconds between warnings for listen socket overflows");
+
 /*
  * When an attempt at a new connection is noted on a socket which accepts
  * connections, sonewconn is called.  If the connection is possible (subject
@@ -583,34 +593,123 @@ SYSCTL_INT(_regression, OID_AUTO, sonewconn_earlytest, CTLFLAG_RW,
 struct socket *
 sonewconn(struct socket *head, int connstatus)
 {
-	static struct timeval lastover;
-	static struct timeval overinterval = { 60, 0 };
-	static int overcount;
-
+	struct sbuf descrsb;
 	struct socket *so;
-	u_int over;
+	int len, overcount;
+	u_int qlen;
+	const char localprefix[] = "local:";
+	char descrbuf[SUNPATHLEN + sizeof(localprefix)];
+#if defined(INET6)
+	char addrbuf[INET6_ADDRSTRLEN];
+#elif defined(INET)
+	char addrbuf[INET_ADDRSTRLEN];
+#endif
+	bool dolog, over;
 
 	SOLISTEN_LOCK(head);
 	over = (head->sol_qlen > 3 * head->sol_qlimit / 2);
-	SOLISTEN_UNLOCK(head);
 #ifdef REGRESSION
 	if (regression_sonewconn_earlytest && over) {
 #else
 	if (over) {
 #endif
-		overcount++;
+		head->sol_overcount++;
+		dolog = !!ratecheck(&head->sol_lastover, &overinterval);
 
-		if (ratecheck(&lastover, &overinterval)) {
-			log(LOG_DEBUG, "%s: pcb %p: Listen queue overflow: "
+		/*
+		 * If we're going to log, copy the overflow count and queue
+		 * length from the listen socket before dropping the lock.
+		 * Also, reset the overflow count.
+		 */
+		if (dolog) {
+			overcount = head->sol_overcount;
+			head->sol_overcount = 0;
+			qlen = head->sol_qlen;
+		}
+		SOLISTEN_UNLOCK(head);
+
+		if (dolog) {
+			/*
+			 * Try to print something descriptive about the
+			 * socket for the error message.
+			 */
+			sbuf_new(&descrsb, descrbuf, sizeof(descrbuf),
+			    SBUF_FIXEDLEN);
+			switch (head->so_proto->pr_domain->dom_family) {
+#if defined(INET) || defined(INET6)
+#ifdef INET
+			case AF_INET:
+#endif
+#ifdef INET6
+			case AF_INET6:
+				if (head->so_proto->pr_domain->dom_family ==
+				    AF_INET6 ||
+				    (sotoinpcb(head)->inp_inc.inc_flags &
+				    INC_ISIPV6)) {
+					ip6_sprintf(addrbuf,
+					    &sotoinpcb(head)->inp_inc.inc6_laddr);
+					sbuf_printf(&descrsb, "[%s]", addrbuf);
+				} else
+#endif
+				{
+#ifdef INET
+					inet_ntoa_r(
+					    sotoinpcb(head)->inp_inc.inc_laddr,
+					    addrbuf);
+					sbuf_cat(&descrsb, addrbuf);
+#endif
+				}
+				sbuf_printf(&descrsb, ":%hu (proto %u)",
+				    ntohs(sotoinpcb(head)->inp_inc.inc_lport),
+				    head->so_proto->pr_protocol);
+				break;
+#endif /* INET || INET6 */
+			case AF_UNIX:
+				sbuf_cat(&descrsb, localprefix);
+				if (sotounpcb(head)->unp_addr != NULL)
+					len =
+					    sotounpcb(head)->unp_addr->sun_len -
+					    offsetof(struct sockaddr_un,
+					    sun_path);
+				else
+					len = 0;
+				if (len > 0)
+					sbuf_bcat(&descrsb,
+					    sotounpcb(head)->unp_addr->sun_path,
+					    len);
+				else
+					sbuf_cat(&descrsb, "(unknown)");
+				break;
+			}
+
+			/*
+			 * If we can't print something more specific, at least
+			 * print the domain name.
+			 */
+			if (sbuf_finish(&descrsb) != 0 ||
+			    sbuf_len(&descrsb) <= 0) {
+				sbuf_clear(&descrsb);
+				sbuf_cat(&descrsb,
+				    head->so_proto->pr_domain->dom_name ?:
+				    "unknown");
+				sbuf_finish(&descrsb);
+			}
+			KASSERT(sbuf_len(&descrsb) > 0,
+			    ("%s: sbuf creation failed", __func__));
+			log(LOG_DEBUG,
+			    "%s: pcb %p (%s): Listen queue overflow: "
 			    "%i already in queue awaiting acceptance "
 			    "(%d occurrences)\n",
-			    __func__, head->so_pcb, head->sol_qlen, overcount);
+			    __func__, head->so_pcb, sbuf_data(&descrsb),
+			    qlen, overcount);
+			sbuf_delete(&descrsb);
 
 			overcount = 0;
 		}
 
 		return (NULL);
 	}
+	SOLISTEN_UNLOCK(head);
 	VNET_ASSERT(head->so_vnet != NULL, ("%s: so %p vnet is NULL",
 	    __func__, head));
 	so = soalloc(head->so_vnet);
@@ -1459,8 +1558,10 @@ sosend_generic(struct socket *so, struct sockaddr *addr, struct uio *uio,
 #endif
 	if (uio != NULL)
 		resid = uio->uio_resid;
-	else
+	else if ((top->m_flags & M_PKTHDR) != 0)
 		resid = top->m_pkthdr.len;
+	else
+		resid = m_length(top, NULL);
 	/*
 	 * In theory resid should be unsigned.  However, space must be
 	 * signed, as it might be less than 0 if we over-committed, and we
@@ -1591,15 +1692,11 @@ restart:
 				if (tls != NULL) {
 					top = m_uiotombuf(uio, M_WAITOK, space,
 					    tls->params.max_frame_len,
-					    M_NOMAP |
+					    M_EXTPG |
 					    ((flags & MSG_EOR) ? M_EOR : 0));
 					if (top != NULL) {
-						error = ktls_frame(top, tls,
+						ktls_frame(top, tls,
 						    &tls_enq_cnt, tls_rtype);
-						if (error) {
-							m_freem(top);
-							goto release;
-						}
 					}
 					tls_rtype = TLS_RLTYPE_APP;
 				} else
@@ -2063,7 +2160,7 @@ dontblock:
 			SBLASTRECORDCHK(&so->so_rcv);
 			SBLASTMBUFCHK(&so->so_rcv);
 			SOCKBUF_UNLOCK(&so->so_rcv);
-			if ((m->m_flags & M_NOMAP) != 0)
+			if ((m->m_flags & M_EXTPG) != 0)
 				error = m_unmappedtouio(m, moff, uio, (int)len);
 			else
 				error = uiomove(mtod(m, char *) + moff,
@@ -2278,11 +2375,33 @@ soreceive_stream(struct socket *so, struct sockaddr **psa, struct uio *uio,
 
 	sb = &so->so_rcv;
 
+#ifdef KERN_TLS
+	/*
+	 * KTLS store TLS records as records with a control message to
+	 * describe the framing.
+	 *
+	 * We check once here before acquiring locks to optimize the
+	 * common case.
+	 */
+	if (sb->sb_tls_info != NULL)
+		return (soreceive_generic(so, psa, uio, mp0, controlp,
+		    flagsp));
+#endif
+
 	/* Prevent other readers from entering the socket. */
 	error = sblock(sb, SBLOCKWAIT(flags));
 	if (error)
 		return (error);
 	SOCKBUF_LOCK(sb);
+
+#ifdef KERN_TLS
+	if (sb->sb_tls_info != NULL) {
+		SOCKBUF_UNLOCK(sb);
+		sbunlock(sb);
+		return (soreceive_generic(so, psa, uio, mp0, controlp,
+		    flagsp));
+	}
+#endif
 
 	/* Easy one, no space to copyout anything. */
 	if (uio->uio_resid == 0) {
@@ -2800,10 +2919,12 @@ sooptcopyin(struct sockopt *sopt, void *buf, size_t len, size_t minlen)
 		sopt->sopt_valsize = valsize = len;
 
 	if (sopt->sopt_td != NULL) {
+#if __has_feature(capabilities)
 		if (sopt->sopt_dir == SOPT_SETCAP ||
 		    sopt->sopt_dir == SOPT_GETCAP)
 			return (copyincap(sopt->sopt_val, buf, valsize));
 		else
+#endif
 			return (copyin(sopt->sopt_val, buf, valsize));
 	}
 
@@ -2840,7 +2961,7 @@ sosetopt(struct socket *so, struct sockopt *sopt)
 	sbintime_t val;
 	uint32_t val32;
 #ifdef MAC
-	kmac_t extmac;
+	struct mac extmac;
 #endif
 
 	CURVNET_SET(so->so_vnet);
@@ -2992,21 +3113,25 @@ sosetopt(struct socket *so, struct sockopt *sopt)
 				error = EOPNOTSUPP;
 			else
 #endif
-#ifdef COMPAT_CHERIABI
-			if (SV_CURPROC_FLAG(SV_CHERI)) {
-				sopt->sopt_dir = SOPT_SETCAP;
-				error = sooptcopyin(sopt, &extmac,
-				    sizeof extmac, sizeof extmac);
-				sopt->sopt_dir = SOPT_SET;
-			} else
-#endif
-			{
-				struct mac_native tmpmac;
+#ifdef COMPAT_FREEBSD64
+			if (!SV_CURPROC_FLAG(SV_CHERI)) {
+				struct mac64 tmpmac;
 				error = sooptcopyin(sopt, &tmpmac,
 				    sizeof tmpmac, sizeof tmpmac);
 				extmac.m_buflen = tmpmac.m_buflen;
 				extmac.m_string = __USER_CAP(tmpmac.m_string,
 				    tmpmac.m_buflen);
+			} else
+#endif
+			{
+#if __has_feature(capabilities)
+				sopt->sopt_dir = SOPT_SETCAP;
+#endif
+				error = sooptcopyin(sopt, &extmac,
+				    sizeof extmac, sizeof extmac);
+#if __has_feature(capabilities)
+				sopt->sopt_dir = SOPT_SET;
+#endif
 			}
 			if (error)
 				goto bad;
@@ -3076,9 +3201,11 @@ sooptcopyout(struct sockopt *sopt, const void *buf, size_t len)
 	sopt->sopt_valsize = valsize;
 	if (sopt->sopt_val != NULL) {
 		if (sopt->sopt_td != NULL) {
+#if __has_feature(capabilities)
 			KASSERT(sopt->sopt_dir != SOPT_GETCAP &&
 			   sopt->sopt_dir != SOPT_SETCAP,
 			   ("exporting capabilities not supproted"));
+#endif
 			error = copyout(buf, sopt->sopt_val, valsize);
 		} else
 			bcopy(buf, (__cheri_fromcap void *)sopt->sopt_val,
@@ -3094,7 +3221,7 @@ sogetopt(struct socket *so, struct sockopt *sopt)
 	struct	linger l;
 	struct	timeval tv;
 #ifdef MAC
-	kmac_t extmac;
+	struct mac extmac;
 #endif
 
 	CURVNET_SET(so->so_vnet);
@@ -3200,21 +3327,25 @@ integer:
 				error = EOPNOTSUPP;
 			else
 #endif
-#ifdef COMPAT_CHERIABI
-			if (SV_CURPROC_FLAG(SV_CHERI)) {
-				sopt->sopt_dir = SOPT_GETCAP;
-				error = sooptcopyin(sopt, &extmac,
-				    sizeof extmac, sizeof extmac);
-				sopt->sopt_dir = SOPT_GET;
-			} else
-#endif
-			{
-				struct mac_native tmpmac;
+#ifdef COMPAT_FREEBSD64
+			if (!SV_CURPROC_FLAG(SV_CHERI)) {
+				struct mac64 tmpmac;
 				error = sooptcopyin(sopt, &tmpmac,
 				    sizeof tmpmac, sizeof tmpmac);
 				extmac.m_buflen = tmpmac.m_buflen;
 				extmac.m_string = __USER_CAP(tmpmac.m_string,
 				    tmpmac.m_buflen);
+			} else
+#endif
+			{
+#if __has_feature(capabilities)
+				sopt->sopt_dir = SOPT_GETCAP;
+#endif
+				error = sooptcopyin(sopt, &extmac,
+				    sizeof extmac, sizeof extmac);
+#if __has_feature(capabilities)
+				sopt->sopt_dir = SOPT_GET;
+#endif
 			}
 			if (error)
 				goto bad;
@@ -3235,21 +3366,25 @@ integer:
 				error = EOPNOTSUPP;
 			else
 #endif
-#ifdef COMPAT_CHERIABI
-			if (SV_CURPROC_FLAG(SV_CHERI)) {
-				sopt->sopt_dir = SOPT_GETCAP;
-				error = sooptcopyin(sopt, &extmac,
-				    sizeof extmac, sizeof extmac);
-				sopt->sopt_dir = SOPT_GET;
-			} else
-#endif
-			{
-				struct mac_native tmpmac;
+#ifdef COMPAT_FREEBSD64
+			if (!SV_CURPROC_FLAG(SV_CHERI)) {
+				struct mac64 tmpmac;
 				error = sooptcopyin(sopt, &tmpmac,
 				    sizeof tmpmac, sizeof tmpmac);
 				extmac.m_buflen = tmpmac.m_buflen;
 				extmac.m_string = __USER_CAP(tmpmac.m_string,
 				    tmpmac.m_buflen);
+			} else
+#endif
+			{
+#if __has_feature(capabilities)
+				sopt->sopt_dir = SOPT_GETCAP;
+#endif
+				error = sooptcopyin(sopt, &extmac,
+				    sizeof extmac, sizeof extmac);
+#if __has_feature(capabilities)
+				sopt->sopt_dir = SOPT_GET;
+#endif
 			}
 			if (error)
 				goto bad;

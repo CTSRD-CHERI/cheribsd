@@ -120,6 +120,10 @@ void	 audit_arg_upath1(struct thread *td, int dirfd, char *upath);
 void	 audit_arg_upath1_canon(char *upath);
 void	 audit_arg_upath2(struct thread *td, int dirfd, char *upath);
 void	 audit_arg_upath2_canon(char *upath);
+void	 audit_arg_upath1_vp(struct thread *td, struct vnode *rdir,
+	    struct vnode *cdir, char *upath);
+void	 audit_arg_upath2_vp(struct thread *td, struct vnode *rdir,
+	    struct vnode *cdir, char *upath);
 void	 audit_arg_vnode1(struct vnode *vp);
 void	 audit_arg_vnode2(struct vnode *vp);
 void	 audit_arg_text(const char *text);
@@ -362,6 +366,16 @@ void	 audit_thread_free(struct thread *td);
 		audit_arg_upath2_canon((upath));			\
 } while (0)
 
+#define	AUDIT_ARG_UPATH1_VP(td, rdir, cdir, upath) do {			\
+	if (AUDITING_TD(curthread))					\
+		audit_arg_upath1_vp((td), (rdir), (cdir), (upath));	\
+} while (0)
+
+#define	AUDIT_ARG_UPATH2_VP(td, rdir, cdir, upath) do {			\
+	if (AUDITING_TD(curthread))					\
+		audit_arg_upath2_vp((td), (rdir), (cdir), (upath));	\
+} while (0)
+
 #define	AUDIT_ARG_VALUE(value) do {					\
 	if (AUDITING_TD(curthread))					\
 		audit_arg_value((value));				\
@@ -377,11 +391,14 @@ void	 audit_thread_free(struct thread *td);
 		audit_arg_vnode2((vp));					\
 } while (0)
 
-#define	AUDIT_SYSCALL_ENTER(code, td)	do {				\
-	if (audit_syscalls_enabled) {					\
+#define	AUDIT_SYSCALL_ENTER(code, td)	({				\
+	bool _audit_entered = false;					\
+	if (__predict_false(audit_syscalls_enabled)) {			\
 		audit_syscall_enter(code, td);				\
+		_audit_entered = true;					\
 	}								\
-} while (0)
+	_audit_entered;							\
+})
 
 /*
  * Wrap the audit_syscall_exit() function so that it is called only when
@@ -445,11 +462,13 @@ void	 audit_thread_free(struct thread *td);
 #define	AUDIT_ARG_UPATH1_CANON(upath)
 #define	AUDIT_ARG_UPATH2(td, dirfd, upath)
 #define	AUDIT_ARG_UPATH2_CANON(upath)
+#define	AUDIT_ARG_UPATH1_VP(td, rdir, cdir, upath)
+#define	AUDIT_ARG_UPATH2_VP(td, rdir, cdir, upath)
 #define	AUDIT_ARG_VALUE(value)
 #define	AUDIT_ARG_VNODE1(vp)
 #define	AUDIT_ARG_VNODE2(vp)
 
-#define	AUDIT_SYSCALL_ENTER(code, td)
+#define	AUDIT_SYSCALL_ENTER(code, td)	0
 #define	AUDIT_SYSCALL_EXIT(error, td)
 
 #define	AUDIT_SYSCLOSE(p, fd)

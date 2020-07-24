@@ -442,11 +442,7 @@ sandbox_object_load(struct sandbox_class *sbcp, struct sandbox_object *sbop)
 	sbop->sbo_vtable = NULL;
 	sbop->sbo_ddc = idc;
 
-#ifdef __CHERI_CAPABILITY_TLS__
 	sbop->sbo_libcheri_tls = NULL;
-#else
-	sbop->sbo_libcheri_tls = cheri_getdefault();
-#endif
 
 	/*
 	 * Construct sealed rtld and invocation capabilities for use with

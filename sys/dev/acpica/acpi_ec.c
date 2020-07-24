@@ -179,7 +179,9 @@ struct acpi_ec_softc {
 
 ACPI_SERIAL_DECL(ec, "ACPI embedded controller");
 
-static SYSCTL_NODE(_debug_acpi, OID_AUTO, ec, CTLFLAG_RD, NULL, "EC debugging");
+static SYSCTL_NODE(_debug_acpi, OID_AUTO, ec,
+    CTLFLAG_RD | CTLFLAG_MPSAFE, NULL,
+    "EC debugging");
 
 static int	ec_burst_mode;
 SYSCTL_INT(_debug_acpi_ec, OID_AUTO, burst, CTLFLAG_RWTUN, &ec_burst_mode, 0,
@@ -342,7 +344,7 @@ acpi_ec_probe(device_t dev)
     device_t	peer;
     char	desc[64];
     int		ecdt;
-    int		ret;
+    int		ret, rc;
     struct acpi_ec_params *params;
     static char *ec_ids[] = { "PNP0C09", NULL };
 
@@ -366,9 +368,9 @@ acpi_ec_probe(device_t dev)
     } else
 	ecdt = 0;
 
-    ret = ACPI_ID_PROBE(device_get_parent(dev), dev, ec_ids, NULL);
-    if (ret > 0)
-	return (ret);
+    rc = ACPI_ID_PROBE(device_get_parent(dev), dev, ec_ids, NULL);
+    if (rc > 0)
+	return (rc);
 
     params = malloc(sizeof(struct acpi_ec_params), M_TEMP, M_WAITOK | M_ZERO);
 
@@ -396,7 +398,6 @@ acpi_ec_probe(device_t dev)
     peer = devclass_get_device(acpi_ec_devclass, params->uid);
     if (peer != NULL && device_is_alive(peer)) {
 	device_disable(dev);
-	ret = ENXIO;
 	goto out;
     }
 
@@ -442,6 +443,8 @@ acpi_ec_probe(device_t dev)
 
     if (buf.Pointer)
 	AcpiOsFree(buf.Pointer);
+
+    ret = rc;
 out:
     if (ret <= 0) {
 	snprintf(desc, sizeof(desc), "Embedded Controller: GPE %#x%s%s",

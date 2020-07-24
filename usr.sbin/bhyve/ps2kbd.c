@@ -32,15 +32,19 @@ __FBSDID("$FreeBSD$");
 
 #include <sys/types.h>
 
+#include <machine/vmm_snapshot.h>
+
 #include <assert.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <strings.h>
 #include <pthread.h>
 #include <pthread_np.h>
 
 #include "atkbdc.h"
+#include "debug.h"
 #include "console.h"
 
 /* keyboard device commands */
@@ -253,8 +257,8 @@ ps2kbd_write(struct ps2kbd_softc *sc, uint8_t val)
 			fifo_put(sc, PS2KC_ACK);
 			break;
 		default:
-			fprintf(stderr, "Unhandled ps2 keyboard current "
-			    "command byte 0x%02x\n", val);
+			EPRINTLN("Unhandled ps2 keyboard current "
+			    "command byte 0x%02x", val);
 			break;
 		}
 		sc->curcmd = 0;
@@ -298,8 +302,8 @@ ps2kbd_write(struct ps2kbd_softc *sc, uint8_t val)
 			fifo_put(sc, PS2KC_ACK);
 			break;
 		default:
-			fprintf(stderr, "Unhandled ps2 keyboard command "
-			    "0x%02x\n", val);
+			EPRINTLN("Unhandled ps2 keyboard command "
+			    "0x%02x", val);
 			break;
 		}
 	}
@@ -336,7 +340,7 @@ ps2kbd_keysym_queue(struct ps2kbd_softc *sc,
 	}
 
 	if (!found) {
-		fprintf(stderr, "Unhandled ps2 keyboard keysym 0x%x\n", keysym);
+		EPRINTLN("Unhandled ps2 keyboard keysym 0x%x", keysym);
 		return;
 	}
 
@@ -380,4 +384,18 @@ ps2kbd_init(struct atkbdc_softc *atkbdc_sc)
 
 	return (sc);
 }
+
+#ifdef BHYVE_SNAPSHOT
+int
+ps2kbd_snapshot(struct ps2kbd_softc *sc, struct vm_snapshot_meta *meta)
+{
+	int ret;
+
+	SNAPSHOT_VAR_OR_LEAVE(sc->enabled, meta, ret, done);
+	SNAPSHOT_VAR_OR_LEAVE(sc->curcmd, meta, ret, done);
+
+done:
+	return (ret);
+}
+#endif
 

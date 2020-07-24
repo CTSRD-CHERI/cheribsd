@@ -3,7 +3,7 @@
 .include "../lldb.pre.mk"
 
 LIB=		lldb
-SRCDIR=		tools/lldb/source
+SRCDIR=		lldb/source
 
 CFLAGS+=	-I${LLDB_SRCS}/include
 CFLAGS+=	-I${LLDB_SRCS}/source
@@ -13,7 +13,8 @@ CFLAGS+=	-I${LLDB_SRCS}/source/Plugins/Process/Utility
 CFLAGS+=	-I${OBJTOP}/lib/clang/libllvm
 CFLAGS+=	-I${OBJTOP}/lib/clang/libclang
 CFLAGS+=	-I${OBJTOP}/lib/clang/liblldb
-CFLAGS+=	-DLLDB_DISABLE_PYTHON
+CFLAGS+=	-I${SRCTOP}/contrib/lua/src
+CFLAGS+=	-I${SRCTOP}/lib/liblua
 
 SRCS+=		API/SBAddress.cpp
 SRCS+=		API/SBAttachInfo.cpp
@@ -34,6 +35,7 @@ SRCS+=		API/SBError.cpp
 SRCS+=		API/SBEvent.cpp
 SRCS+=		API/SBExecutionContext.cpp
 SRCS+=		API/SBExpressionOptions.cpp
+SRCS+=		API/SBFile.cpp
 SRCS+=		API/SBFileSpec.cpp
 SRCS+=		API/SBFileSpecList.cpp
 SRCS+=		API/SBFrame.cpp
@@ -110,7 +112,6 @@ SRCS+=		Commands/CommandCompletions.cpp
 SRCS+=		Commands/CommandObjectApropos.cpp
 SRCS+=		Commands/CommandObjectBreakpoint.cpp
 SRCS+=		Commands/CommandObjectBreakpointCommand.cpp
-SRCS+=		Commands/CommandObjectBugreport.cpp
 SRCS+=		Commands/CommandObjectCommands.cpp
 SRCS+=		Commands/CommandObjectDisassemble.cpp
 SRCS+=		Commands/CommandObjectExpression.cpp
@@ -153,6 +154,7 @@ SRCS+=		Core/FileSpecList.cpp
 SRCS+=		Core/FormatEntity.cpp
 SRCS+=		Core/Highlighter.cpp
 SRCS+=		Core/IOHandler.cpp
+SRCS+=		Core/IOHandlerCursesGUI.cpp
 SRCS+=		Core/Mangled.cpp
 SRCS+=		Core/Module.cpp
 SRCS+=		Core/ModuleChild.cpp
@@ -219,6 +221,7 @@ SRCS+=		Host/common/HostInfoBase.cpp
 SRCS+=		Host/common/HostNativeThreadBase.cpp
 SRCS+=		Host/common/HostProcess.cpp
 SRCS+=		Host/common/HostThread.cpp
+SRCS+=		Host/common/LZMA.cpp
 SRCS+=		Host/common/LockFileBase.cpp
 SRCS+=		Host/common/MainLoop.cpp
 SRCS+=		Host/common/MonitoringProcessLauncher.cpp
@@ -241,7 +244,7 @@ SRCS+=		Host/freebsd/Host.cpp
 SRCS+=		Host/freebsd/HostInfoFreeBSD.cpp
 SRCS+=		Host/posix/ConnectionFileDescriptorPosix.cpp
 SRCS+=		Host/posix/DomainSocket.cpp
-SRCS+=		Host/posix/FileSystem.cpp
+SRCS+=		Host/posix/FileSystemPosix.cpp
 SRCS+=		Host/posix/HostInfoPosix.cpp
 SRCS+=		Host/posix/HostProcessPosix.cpp
 SRCS+=		Host/posix/HostThreadPosix.cpp
@@ -266,6 +269,7 @@ SRCS+=		Interpreter/OptionGroupFile.cpp
 SRCS+=		Interpreter/OptionGroupFormat.cpp
 SRCS+=		Interpreter/OptionGroupOutputFile.cpp
 SRCS+=		Interpreter/OptionGroupPlatform.cpp
+SRCS+=		Interpreter/OptionGroupPythonClassWithDict.cpp
 SRCS+=		Interpreter/OptionGroupString.cpp
 SRCS+=		Interpreter/OptionGroupUInt64.cpp
 SRCS+=		Interpreter/OptionGroupUUID.cpp
@@ -280,7 +284,7 @@ SRCS+=		Interpreter/OptionValueChar.cpp
 SRCS+=		Interpreter/OptionValueDictionary.cpp
 SRCS+=		Interpreter/OptionValueEnumeration.cpp
 SRCS+=		Interpreter/OptionValueFileSpec.cpp
-SRCS+=		Interpreter/OptionValueFileSpecLIst.cpp
+SRCS+=		Interpreter/OptionValueFileSpecList.cpp
 SRCS+=		Interpreter/OptionValueFormat.cpp
 SRCS+=		Interpreter/OptionValueFormatEntity.cpp
 SRCS+=		Interpreter/OptionValueLanguage.cpp
@@ -309,11 +313,11 @@ SRCS+=		Plugins/Disassembler/llvm/DisassemblerLLVMC.cpp
 SRCS+=		Plugins/DynamicLoader/POSIX-DYLD/DYLDRendezvous.cpp
 SRCS+=		Plugins/DynamicLoader/POSIX-DYLD/DynamicLoaderPOSIXDYLD.cpp
 SRCS+=		Plugins/DynamicLoader/Static/DynamicLoaderStatic.cpp
-SRCS+=		Plugins/ExpressionParser/Clang/ASTDumper.cpp
 SRCS+=		Plugins/ExpressionParser/Clang/ASTResultSynthesizer.cpp
 SRCS+=		Plugins/ExpressionParser/Clang/ASTStructExtractor.cpp
 SRCS+=		Plugins/ExpressionParser/Clang/ASTUtils.cpp
 SRCS+=		Plugins/ExpressionParser/Clang/ClangASTSource.cpp
+SRCS+=		Plugins/ExpressionParser/Clang/ClangDeclVendor.cpp
 SRCS+=		Plugins/ExpressionParser/Clang/ClangExpressionDeclMap.cpp
 SRCS+=		Plugins/ExpressionParser/Clang/ClangExpressionParser.cpp
 SRCS+=		Plugins/ExpressionParser/Clang/ClangExpressionSourceCode.cpp
@@ -324,6 +328,7 @@ SRCS+=		Plugins/ExpressionParser/Clang/ClangModulesDeclVendor.cpp
 SRCS+=		Plugins/ExpressionParser/Clang/ClangPersistentVariables.cpp
 SRCS+=		Plugins/ExpressionParser/Clang/ClangUserExpression.cpp
 SRCS+=		Plugins/ExpressionParser/Clang/ClangUtilityFunction.cpp
+SRCS+=		Plugins/ExpressionParser/Clang/CppModuleConfiguration.cpp
 SRCS+=		Plugins/ExpressionParser/Clang/IRDynamicChecks.cpp
 SRCS+=		Plugins/ExpressionParser/Clang/IRForTarget.cpp
 SRCS+=		Plugins/Instruction/ARM/EmulateInstructionARM.cpp
@@ -459,6 +464,8 @@ SRCS+=		Plugins/Process/gdb-remote/GDBRemoteRegisterContext.cpp
 SRCS+=		Plugins/Process/gdb-remote/ProcessGDBRemote.cpp
 SRCS+=		Plugins/Process/gdb-remote/ProcessGDBRemoteLog.cpp
 SRCS+=		Plugins/Process/gdb-remote/ThreadGDBRemote.cpp
+SRCS+=		Plugins/ScriptInterpreter/Lua/Lua.cpp
+SRCS+=		Plugins/ScriptInterpreter/Lua/ScriptInterpreterLua.cpp
 SRCS+=		Plugins/ScriptInterpreter/None/ScriptInterpreterNone.cpp
 SRCS+=		Plugins/SymbolFile/Breakpad/SymbolFileBreakpad.cpp
 SRCS+=		Plugins/SymbolFile/DWARF/AppleDWARFIndex.cpp
@@ -477,7 +484,6 @@ SRCS+=		Plugins/SymbolFile/DWARF/DWARFDebugArangeSet.cpp
 SRCS+=		Plugins/SymbolFile/DWARF/DWARFDebugAranges.cpp
 SRCS+=		Plugins/SymbolFile/DWARF/DWARFDebugInfo.cpp
 SRCS+=		Plugins/SymbolFile/DWARF/DWARFDebugInfoEntry.cpp
-SRCS+=		Plugins/SymbolFile/DWARF/DWARFDebugLine.cpp
 SRCS+=		Plugins/SymbolFile/DWARF/DWARFDebugMacro.cpp
 SRCS+=		Plugins/SymbolFile/DWARF/DWARFDebugRanges.cpp
 SRCS+=		Plugins/SymbolFile/DWARF/DWARFDeclContext.cpp
@@ -505,8 +511,8 @@ SRCS+=		Symbol/ArmUnwindInfo.cpp
 SRCS+=		Symbol/Block.cpp
 SRCS+=		Symbol/ClangASTContext.cpp
 SRCS+=		Symbol/ClangASTImporter.cpp
+SRCS+=		Symbol/ClangASTMetadata.cpp
 SRCS+=		Symbol/ClangExternalASTSourceCallbacks.cpp
-SRCS+=		Symbol/ClangExternalASTSourceCommon.cpp
 SRCS+=		Symbol/ClangUtil.cpp
 SRCS+=		Symbol/CompactUnwindInfo.cpp
 SRCS+=		Symbol/CompileUnit.cpp
@@ -548,6 +554,7 @@ SRCS+=		Target/Language.cpp
 SRCS+=		Target/LanguageRuntime.cpp
 SRCS+=		Target/Memory.cpp
 SRCS+=		Target/MemoryHistory.cpp
+SRCS+=		Target/MemoryRegionInfo.cpp
 SRCS+=		Target/ModuleCache.cpp
 SRCS+=		Target/OperatingSystem.cpp
 SRCS+=		Target/PathMappingList.cpp
@@ -605,10 +612,9 @@ SRCS+=		Utility/DataEncoder.cpp
 SRCS+=		Utility/DataExtractor.cpp
 SRCS+=		Utility/Environment.cpp
 SRCS+=		Utility/Event.cpp
-SRCS+=		Utility/FileCollector.cpp
 SRCS+=		Utility/FileSpec.cpp
+SRCS+=		Utility/GDBRemote.cpp
 SRCS+=		Utility/IOObject.cpp
-SRCS+=		Utility/JSON.cpp
 SRCS+=		Utility/LLDBAssert.cpp
 SRCS+=		Utility/Listener.cpp
 SRCS+=		Utility/Log.cpp
@@ -626,7 +632,6 @@ SRCS+=		Utility/State.cpp
 SRCS+=		Utility/Status.cpp
 SRCS+=		Utility/Stream.cpp
 SRCS+=		Utility/StreamCallback.cpp
-SRCS+=		Utility/StreamGDBRemote.cpp
 SRCS+=		Utility/StreamString.cpp
 SRCS+=		Utility/StringExtractor.cpp
 SRCS+=		Utility/StringExtractorGDBRemote.cpp
@@ -641,16 +646,36 @@ SRCS+=		Utility/UserID.cpp
 SRCS+=		Utility/UserIDResolver.cpp
 SRCS+=		Utility/VASprintf.cpp
 SRCS+=		Utility/VMRange.cpp
+SRCS+=		LLDBWrapLua.cpp
 SRCS+=		lldb.cpp
 
 LLDB_TBLGEN?=	lldb-tblgen
-INCFILE=	CommandOptions.inc
-TDFILE=		${LLDB_SRCS}/source/Commands/Options.td
-GENOPT=		-gen-lldb-option-defs
-${INCFILE}: ${TDFILE}
-	${LLDB_TBLGEN} ${GENOPT} -I ${LLDB_SRCS}/source/Commands \
-	    -d ${.TARGET:C/$/.d/} -o ${.TARGET} ${TDFILE}
-TGHDRS+=	${INCFILE}
+
+CommandOptions.inc: ${LLDB_SRCS}/source/Commands/Options.td
+	${LLDB_TBLGEN} -gen-lldb-option-defs \
+	    -I ${LLDB_SRCS}/source/Commands -d ${.TARGET:C/$/.d/} \
+	    -o ${.TARGET} ${LLDB_SRCS}/source/Commands/Options.td
+TGHDRS+=	CommandOptions.inc
+
+.for path in \
+	Core/Core \
+	Interpreter/Interpreter \
+	Plugins/JITLoader/GDB/JITLoaderGDB \
+	Plugins/Process/gdb-remote/ProcessGDBRemote \
+	Plugins/SymbolFile/DWARF/SymbolFileDWARF \
+	Target/Target
+${path:T}Properties.inc: ${LLDB_SRCS}/source/${path}Properties.td
+	${LLDB_TBLGEN} -gen-lldb-property-defs \
+	    -I ${LLDB_SRCS}/source/${path:H} -d ${.TARGET:C/$/.d/} \
+	    -o ${.TARGET} ${LLDB_SRCS}/source/${path}Properties.td
+TGHDRS+=	${path:T}Properties.inc
+
+${path:T}PropertiesEnum.inc: ${LLDB_SRCS}/source/${path}Properties.td
+	${LLDB_TBLGEN} -gen-lldb-property-enum-defs \
+	    -I ${LLDB_SRCS}/source/${path:H} -d ${.TARGET:C/$/.d/} \
+	    -o ${.TARGET} ${LLDB_SRCS}/source/${path}Properties.td
+TGHDRS+=	${path:T}PropertiesEnum.inc
+.endfor
 
 DPSRCS+=	${TGHDRS}
 CLEANFILES+=	${TGHDRS} ${TGHDRS:C/$/.d/}
@@ -658,5 +683,18 @@ CLEANFILES+=	${TGHDRS} ${TGHDRS:C/$/.d/}
 .include "../clang.build.mk"
 
 INTERNALLIB=
+
+# Building lldb's bindings requires swig, but we do not want to include it in
+# the FreeBSD base system (as a build tool) because it has non-trivial
+# dependencies.  As a workaround we commit the generated file.  Requires the
+# swig30 package.
+#
+# After importing an updated llvm/lldb into FreeBSD run `make run-swig` in
+# this directory to generate generate LLDBWrapLua.cpp, and commit the result.
+.PHONY:	run-swig
+run-swig:
+	swig3.0 -I${LLDB_SRCS}/include \
+	    -c++ -features autodoc -lua -w503 \
+	    -o ${.CURDIR}/LLDBWrapLua.cpp ${LLDB_SRCS}/bindings/lua.swig
 
 .include <bsd.lib.mk>

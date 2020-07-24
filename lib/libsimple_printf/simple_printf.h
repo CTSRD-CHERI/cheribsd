@@ -47,6 +47,8 @@ int SIMPLE_PRINTF_FN(vsnprintf)(char *buf, size_t bufsize, const char *fmt,
     va_list ap) __printflike(3, 0);
 int SIMPLE_PRINTF_FN(vfdprintf)(int fd, const char *fmt, va_list ap)
     __printflike(2, 0);
+int SIMPLE_PRINTF_FN(vprintf)(const char *fmt, va_list ap)
+    __printflike(1, 0);
 int SIMPLE_PRINTF_FN(fdprintf)(int fd, const char *fmt, ...)
     __printflike(2, 3);
 int SIMPLE_PRINTF_FN(printf)(const char *fmt, ...) __printflike(1, 2);

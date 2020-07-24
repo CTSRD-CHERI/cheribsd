@@ -62,7 +62,11 @@ static __inline void
 _tcb_set(struct tcb *tcb)
 {
 
+#ifdef __CHERI_PURE_CAPABILITY__
+	__asm __volatile("cincoffset ctp, %0, %1" :: "C"(tcb), "I"(TP_OFFSET));
+#else
 	__asm __volatile("addi tp, %0, %1" :: "r"(tcb), "I"(TP_OFFSET));
+#endif
 }
 
 /*
@@ -73,7 +77,11 @@ _tcb_get(void)
 {
 	struct tcb *_tcb;
 
+#ifdef __CHERI_PURE_CAPABILITY__
+	__asm __volatile("cincoffset %0, ctp, %1" : "=C"(_tcb) : "I"(-TP_OFFSET));
+#else
 	__asm __volatile("addi %0, tp, %1" : "=r"(_tcb) : "I"(-TP_OFFSET));
+#endif
 
 	return (_tcb);
 }

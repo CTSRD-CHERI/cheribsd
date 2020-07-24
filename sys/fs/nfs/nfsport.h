@@ -98,16 +98,10 @@
 #include <netinet/tcp_timer.h>
 #include <netinet/tcp_var.h>
 #include <machine/in_cksum.h>
-#include <crypto/des/des.h>
 #include <sys/md5.h>
 #include <rpc/rpc.h>
 #include <rpc/rpcsec_gss.h>
 
-/*
- * For Darwin, these functions should be "static" when built in a kext.
- * (This is always defined as nil otherwise.)
- */
-#define	APPLESTATIC
 #include <ufs/ufs/dir.h>
 #include <ufs/ufs/quota.h>
 #include <ufs/ufs/inode.h>
@@ -172,7 +166,6 @@
 			MGETHDR((m), M_WAITOK, MT_DATA); 	\
 		} 						\
 	} while (0)
-#define	NFSMTOD	mtod
 
 /*
  * Client side constant for size of a lockowner name.
@@ -1116,7 +1109,7 @@ void nfsd_mntinit(void);
  * later, for debugging or stats, etc.
  */
 #define	NFSVOPLOCK(v, f)	vn_lock((v), (f))
-#define	NFSVOPUNLOCK(v, f)	VOP_UNLOCK((v), (f))
+#define	NFSVOPUNLOCK(v)		VOP_UNLOCK((v))
 #define	NFSVOPISLOCKED(v)	VOP_ISLOCKED((v))
 
 /*

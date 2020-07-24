@@ -212,6 +212,18 @@ if_clone_create(char *name, size_t len, void * __capability params)
 	return (if_clone_createif(ifc, name, len, params));
 }
 
+void
+if_clone_addif(struct if_clone *ifc, struct ifnet *ifp)
+{
+
+	if ((ifc->ifc_flags & IFC_NOGROUP) == 0)
+		if_addgroup(ifp, ifc->ifc_name);
+
+	IF_CLONE_LOCK(ifc);
+	IFC_IFLIST_INSERT(ifc, ifp);
+	IF_CLONE_UNLOCK(ifc);
+}
+
 /*
  * Create a clone network interface.
  */
@@ -235,12 +247,7 @@ if_clone_createif(struct if_clone *ifc, char *name, size_t len,
 		if (ifp == NULL)
 			panic("%s: lookup failed for %s", __func__, name);
 
-		if ((ifc->ifc_flags & IFC_NOGROUP) == 0)
-			if_addgroup(ifp, ifc->ifc_name);
-
-		IF_CLONE_LOCK(ifc);
-		IFC_IFLIST_INSERT(ifc, ifp);
-		IF_CLONE_UNLOCK(ifc);
+		if_clone_addif(ifc, ifp);
 	}
 
 	return (err);
@@ -473,7 +480,7 @@ if_clone_free(struct if_clone *ifc)
 int
 if_clone_list(struct if_clonereq *ifcr)
 {
-	char *buf, *dst, *outbuf = NULL;
+	char *buf, * __capability dst, *outbuf = NULL;
 	struct if_clone *ifc;
 	int buf_count, count, err = 0;
 

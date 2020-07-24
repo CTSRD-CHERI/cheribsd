@@ -13,7 +13,7 @@ CFLAGS+=	-DGEOM_CLASS_DIR=\"${GEOM_CLASS_DIR}\"
 
 LIBADD=		geom util
 
-.if defined(RESCUE) || defined(RELEASE_CRUNCH)
+.if defined(RESCUE)
 .PATH:	${SRCTOP}/lib/geom/part \
 	${SRCTOP}/lib/geom/label
 
@@ -24,7 +24,7 @@ WARNS?=	2
 CFLAGS+=-DSTATIC_GEOM_CLASSES
 .else
 .if ${MK_CHERI_PURE} == "yes"
-LIBCHERI=	hack to set GEOM_CLASS_DIR
+COMPAT_CHERI=	hack to set GEOM_CLASS_DIR
 .endif
 .include "${SRCTOP}/lib/geom/Makefile.classes"
 LINKS=		${GEOM_CLASSES:S|^|${BINDIR}/geom ${BINDIR}/g|}

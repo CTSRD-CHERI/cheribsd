@@ -152,8 +152,14 @@ const char *CFI_Parser<A>::decodeFDE(A &addressSpace, pc_t pc, pint_t fdeStart,
   pint_t _pcStart =
       addressSpace.getEncodedP(p, nextCFI, cieInfo->pointerEncoding);
 #ifdef __CHERI_PURE_CAPABILITY__
-  // This should not be a valid pointer:
-  assert(!__builtin_cheri_tag_get((void*)_pcStart));
+  // Values are now encoded as pc-relative; this means we should get a valid
+  // in-bounds capability back.
+  // FIXME: this will not work with fine-grained function bounds but we only
+  //  need the address so we don't really care that it's tagged.
+#if __CHERI_CAPABILITY_TABLE__ != 3
+#error This code will not work with fine-grained function bounds, we need to remove the assert_pointer_in_bounds there.
+#endif
+  assert(__builtin_cheri_tag_get((void*)_pcStart));
   addr_t pcStart = __builtin_cheri_address_get((void*)_pcStart);
 #else
   addr_t pcStart = (addr_t)_pcStart;
@@ -244,11 +250,15 @@ bool CFI_Parser<A>::findFDE(A &addressSpace, pc_t pc, pint_t ehSectionStart,
           // Parse pc begin and range.
           pint_t _pcStart =
               addressSpace.getEncodedP(p, nextCFI, cieInfo->pointerEncoding);
-          // NOTE: the pc addresses read from the DWARF are untagged values
-          // We must check only the address rather than the uintptr_t value
-          // since untagged values are ordered before tagged values!
 #ifdef __CHERI_PURE_CAPABILITY__
-          assert(!__builtin_cheri_tag_get((void*)_pcStart));
+          // Values are now encoded as pc-relative; this means we should get a valid
+          // in-bounds capability back.
+          // FIXME: this will not work with fine-grained function bounds but we only
+          //  need the address so we don't really care that it's tagged.
+#if __CHERI_CAPABILITY_TABLE__ != 3
+#error This code will not work with fine-grained function bounds, we need to remove the assert_pointer_in_bounds there.
+#endif
+          assert(__builtin_cheri_tag_get((void*)_pcStart));
           addr_t pcStart = __builtin_cheri_address_get((void*)_pcStart);
 #else
           addr_t pcStart = (addr_t)_pcStart;

@@ -1,6 +1,6 @@
 # $FreeBSD$
 
-.if ${MACHINE_ARCH:Mmips*c*}
+.if ${MACHINE_ABI:Mpurecap}
 PROG=ld-elf-debug.so.1
 .else
 PROG=ld-cheri-elf-debug.so.1

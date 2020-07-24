@@ -265,6 +265,8 @@ libzfs_error_description(libzfs_handle_t *hdl)
 	case EZFS_NO_INITIALIZE:
 		return (dgettext(TEXT_DOMAIN, "there is no active "
 		    "initialization"));
+	case EZFS_WRONG_PARENT:
+		return (dgettext(TEXT_DOMAIN, "invalid parent dataset"));
 	case EZFS_UNKNOWN:
 		return (dgettext(TEXT_DOMAIN, "unknown error"));
 	default:
@@ -537,6 +539,9 @@ zpool_standard_error_fmt(libzfs_handle_t *hdl, int error, const char *fmt, ...)
 	case ZFS_ERR_VDEV_TOO_BIG:
 		zfs_verror(hdl, EZFS_VDEV_TOO_BIG, fmt, ap);
 		break;
+	case ZFS_ERR_WRONG_PARENT:
+		zfs_verror(hdl, EZFS_WRONG_PARENT, fmt, ap);
+		break;
 	default:
 		zfs_error_aux(hdl, strerror(error));
 		zfs_verror(hdl, EZFS_UNKNOWN, fmt, ap);
@@ -807,7 +812,10 @@ zcmd_alloc_dst_nvlist(libzfs_handle_t *hdl, zfs_cmd_t *zc, size_t len)
 		len = 16 * 1024;
 	zc->zc_nvlist_dst_size = len;
 	zc->zc_nvlist_dst =
-	    (uint64_t)(uintptr_t)zfs_alloc(hdl, zc->zc_nvlist_dst_size);
+#ifndef __CHERI_PURE_CAPABILITY__
+	    (uint64_t)(uintptr_t)
+#endif
+	    zfs_alloc(hdl, zc->zc_nvlist_dst_size);
 	if (zc->zc_nvlist_dst == 0)
 		return (-1);
 
@@ -824,7 +832,10 @@ zcmd_expand_dst_nvlist(libzfs_handle_t *hdl, zfs_cmd_t *zc)
 {
 	free((void *)(uintptr_t)zc->zc_nvlist_dst);
 	zc->zc_nvlist_dst =
-	    (uint64_t)(uintptr_t)zfs_alloc(hdl, zc->zc_nvlist_dst_size);
+#ifndef __CHERI_PURE_CAPABILITY__
+	    (uint64_t)(uintptr_t)
+#endif
+	    zfs_alloc(hdl, zc->zc_nvlist_dst_size);
 	if (zc->zc_nvlist_dst == 0)
 		return (-1);
 
@@ -845,9 +856,15 @@ zcmd_free_nvlists(zfs_cmd_t *zc)
 	zc->zc_nvlist_dst = NULL;
 }
 
+#ifdef __CHERI_PURE_CAPABILITY__
+static int
+zcmd_write_nvlist_com(libzfs_handle_t *hdl, void **outnv, uint64_t *outlen,
+    nvlist_t *nvl)
+#else
 static int
 zcmd_write_nvlist_com(libzfs_handle_t *hdl, uint64_t *outnv, uint64_t *outlen,
     nvlist_t *nvl)
+#endif
 {
 	char *packed;
 	size_t len;
@@ -859,7 +876,11 @@ zcmd_write_nvlist_com(libzfs_handle_t *hdl, uint64_t *outnv, uint64_t *outlen,
 
 	verify(nvlist_pack(nvl, &packed, &len, NV_ENCODE_NATIVE, 0) == 0);
 
+#ifdef __CHERI_PURE_CAPABILITY__
+	*outnv = packed;
+#else
 	*outnv = (uint64_t)(uintptr_t)packed;
+#endif
 	*outlen = len;
 
 	return (0);

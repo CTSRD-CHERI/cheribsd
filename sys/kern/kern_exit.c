@@ -41,8 +41,6 @@ __FBSDID("$FreeBSD$");
 
 #include "opt_ktrace.h"
 
-#define	EXPLICIT_USER_ACCESS
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/sysproto.h>
@@ -55,7 +53,6 @@ __FBSDID("$FreeBSD$");
 #include <sys/mutex.h>
 #include <sys/proc.h>
 #include <sys/procdesc.h>
-#include <sys/pioctl.h>
 #include <sys/jail.h>
 #include <sys/tty.h>
 #include <sys/wait.h>
@@ -98,9 +95,6 @@ dtrace_execexit_func_t	dtrace_fasttrap_exit;
 
 SDT_PROVIDER_DECLARE(proc);
 SDT_PROBE_DEFINE1(proc, , , exit, "int");
-
-/* Hook for NFS teardown procedure. */
-void (*nlminfo_release_p)(struct proc *p);
 
 struct proc *
 proc_realparent(struct proc *child)
@@ -219,6 +213,7 @@ exit1(struct thread *td, int rval, int signo)
 	 * XXX in case we're rebooting we just let init die in order to
 	 * work around an unsolved stack overflow seen very late during
 	 * shutdown on sparc64 when the gmirror worker process exists.
+	 * XXX what to do now that sparc64 is gone... remove if?
 	 */
 	if (p == initproc && rebooting == 0) {
 		printf("init died (signal %d, exit %d)\n", signo, rval);
@@ -282,15 +277,6 @@ exit1(struct thread *td, int rval, int signo)
 	p->p_xsig = signo;
 
 	/*
-	 * Wakeup anyone in procfs' PIOCWAIT.  They should have a hold
-	 * on our vmspace, so we should block below until they have
-	 * released their reference to us.  Note that if they have
-	 * requested S_EXIT stops we will block here until they ack
-	 * via PIOCCONT.
-	 */
-	_STOPEVENT(p, S_EXIT, 0);
-
-	/*
 	 * Ignore any pending request to stop due to a stop signal.
 	 * Once P_WEXIT is set, future requests will be ignored as
 	 * well.
@@ -298,13 +284,8 @@ exit1(struct thread *td, int rval, int signo)
 	p->p_flag &= ~P_STOPPED_SIG;
 	KASSERT(!P_SHOULDSTOP(p), ("exiting process is stopped"));
 
-	/*
-	 * Note that we are exiting and do another wakeup of anyone in
-	 * PIOCWAIT in case they aren't listening for S_EXIT stops or
-	 * decided to wait again after we told them we are exiting.
-	 */
+	/* Note that we are exiting. */
 	p->p_flag |= P_WEXIT;
-	wakeup(&p->p_stype);
 
 	/*
 	 * Wait for any processes that have a hold on our vmspace to
@@ -380,12 +361,6 @@ exit1(struct thread *td, int rval, int signo)
 	 * F_SETOWN with our pid.
 	 */
 	funsetownlst(&p->p_sigiolst);
-
-	/*
-	 * If this process has an nlminfo data area (for lockd), release it
-	 */
-	if (nlminfo_release_p != NULL && p->p_nlminfo != NULL)
-		(*nlminfo_release_p)(p);
 
 	/*
 	 * Close open files and release open-file table.
@@ -688,7 +663,6 @@ exit1(struct thread *td, int rval, int signo)
 	thread_exit();
 }
 
-
 #ifndef _SYS_SYSPROTO_H_
 struct abort2_args {
 	char *why;
@@ -792,7 +766,6 @@ out:
 	return (0);
 }
 
-
 #ifdef COMPAT_43
 /*
  * The dirty work is handled by kern_wait().
@@ -842,8 +815,7 @@ kern_wait4(struct thread *td, int pid, int * __capability statusp, int options,
 int
 sys_wait6(struct thread *td, struct wait6_args *uap)
 {
-	_siginfo_t si, *sip;
-	struct siginfo_native si_n;
+	siginfo_t si, *sip;
 	int error;
 
 	if (uap->info != NULL) {
@@ -854,8 +826,13 @@ sys_wait6(struct thread *td, struct wait6_args *uap)
 	error = user_wait6(td, uap->idtype, uap->id, uap->status, uap->options,
 	    uap->wrusage, sip);
 	if (uap->info != NULL && error == 0) {
-		siginfo_to_siginfo_native(&si, &si_n);
-		error = copyout(&si_n, uap->info, sizeof(si_n));
+		/*
+		 * This does not use copyoutcap() as a fail-safe.  The
+		 * returned signal information object shouldn't
+		 * contain any capabilities as neither the si_addr nor
+		 * si_value fields are relevant for SIGCHLD.
+		 */
+		error = copyout(&si, uap->info, sizeof(si));
 	}
 	return (error);
 }
@@ -863,7 +840,7 @@ sys_wait6(struct thread *td, struct wait6_args *uap)
 int
 user_wait6(struct thread *td, idtype_t idtype, id_t id,
     int * __capability statusp, int options,
-    struct __wrusage * __capability wrusage, _siginfo_t *sip)
+    struct __wrusage * __capability wrusage, siginfo_t *sip)
 {
 	struct __wrusage wru, *wrup;
 	int error, status;
@@ -1029,7 +1006,7 @@ proc_reap(struct thread *td, struct proc *p, int *status, int options)
 
 static int
 proc_to_reap(struct thread *td, struct proc *p, idtype_t idtype, id_t id,
-    int *status, int options, struct __wrusage *wrusage, _siginfo_t *siginfo,
+    int *status, int options, struct __wrusage *wrusage, siginfo_t *siginfo,
     int check_only)
 {
 	struct rusage *rup;
@@ -1222,7 +1199,7 @@ kern_wait(struct thread *td, pid_t pid, int *status, int options,
 }
 
 static void
-report_alive_proc(struct thread *td, struct proc *p, _siginfo_t *siginfo,
+report_alive_proc(struct thread *td, struct proc *p, siginfo_t *siginfo,
     int *status, int options, int si_code)
 {
 	bool cont;
@@ -1255,7 +1232,7 @@ report_alive_proc(struct thread *td, struct proc *p, _siginfo_t *siginfo,
 
 int
 kern_wait6(struct thread *td, idtype_t idtype, id_t id, int *status,
-    int options, struct __wrusage *wrusage, _siginfo_t *siginfo)
+    int options, struct __wrusage *wrusage, siginfo_t *siginfo)
 {
 	struct proc *p, *q;
 	pid_t pid;

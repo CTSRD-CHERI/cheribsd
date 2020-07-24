@@ -28,7 +28,7 @@
 # SUCH DAMAGE.
 #
 
-#include <machine/cherireg.h>
+#include <cheri/cherireg.h>
 #define _CHERI_INTERNAL
 #include <machine/cheriasm.h>
 

@@ -143,7 +143,7 @@ mlx5e_tls_init(struct mlx5e_priv *priv)
 
 	node = SYSCTL_ADD_NODE(&priv->sysctl_ctx,
 	    SYSCTL_CHILDREN(priv->sysctl_ifnet), OID_AUTO,
-	    "tls", CTLFLAG_RW, NULL, "Hardware TLS offload");
+	    "tls", CTLFLAG_RW | CTLFLAG_MPSAFE, NULL, "Hardware TLS offload");
 	if (node == NULL)
 		return (0);
 
@@ -339,10 +339,6 @@ mlx5e_tls_snd_tag_alloc(struct ifnet *ifp,
 	case CRYPTO_AES_NIST_GCM_16:
 		switch (en->cipher_key_len) {
 		case 128 / 8:
-			if (en->auth_algorithm != CRYPTO_AES_128_NIST_GMAC) {
-				error = EINVAL;
-				goto failure;
-			}
 			if (en->tls_vminor == TLS_MINOR_VER_TWO) {
 				if (MLX5_CAP_TLS(priv->mdev, tls_1_2_aes_gcm_128) == 0) {
 					error = EPROTONOSUPPORT;
@@ -360,10 +356,6 @@ mlx5e_tls_snd_tag_alloc(struct ifnet *ifp,
 			break;
 
 		case 256 / 8:
-			if (en->auth_algorithm != CRYPTO_AES_256_NIST_GMAC) {
-				error = EINVAL;
-				goto failure;
-			}
 			if (en->tls_vminor == TLS_MINOR_VER_TWO) {
 				if (MLX5_CAP_TLS(priv->mdev, tls_1_2_aes_gcm_256) == 0) {
 					error = EPROTONOSUPPORT;
@@ -626,15 +618,14 @@ mlx5e_tls_send_nop(struct mlx5e_sq *sq, struct mlx5e_tls_tag *ptag)
 static struct mbuf *
 sbtls_recover_record(struct mbuf *mb, int wait, uint32_t tcp_old, uint32_t *ptcp_seq)
 {
-	struct mbuf *mr;
+	struct mbuf *mr, *top;
 	uint32_t offset;
 	uint32_t delta;
 
 	/* check format of incoming mbuf */
 	if (mb->m_next == NULL ||
-	    (mb->m_next->m_flags & (M_NOMAP | M_EXT)) != (M_NOMAP | M_EXT) ||
-	    mb->m_next->m_ext.ext_buf == NULL) {
-		mr = NULL;
+	    (mb->m_next->m_flags & (M_EXTPG | M_EXT)) != (M_EXTPG | M_EXT)) {
+		top = NULL;
 		goto done;
 	}
 
@@ -643,14 +634,23 @@ sbtls_recover_record(struct mbuf *mb, int wait, uint32_t tcp_old, uint32_t *ptcp
 
 	/* check if we don't need to re-transmit anything */
 	if (offset == 0) {
-		mr = SBTLS_MBUF_NO_DATA;
+		top = SBTLS_MBUF_NO_DATA;
 		goto done;
 	}
 
-	/* try to get a new mbufs with packet header */
-	mr = m_gethdr(wait, MT_DATA);
-	if (mr == NULL)
+	/* try to get a new  packet header */
+	top = m_gethdr(wait, MT_DATA);
+	if (top == NULL)
 		goto done;
+
+	mr = m_get(wait, MT_DATA);
+	if (mr == NULL) {
+		m_free(top);
+		top = NULL;
+		goto done;
+	}
+
+	top->m_next = mr;
 
 	mb_dupcl(mr, mb->m_next);
 
@@ -658,7 +658,7 @@ sbtls_recover_record(struct mbuf *mb, int wait, uint32_t tcp_old, uint32_t *ptcp
 	mr->m_data = NULL;
 
 	/* setup packet header length */
-	mr->m_pkthdr.len = mr->m_len = offset;
+	top->m_pkthdr.len = mr->m_len = offset;
 
 	/* check for partial re-transmit */
 	delta = *ptcp_seq - tcp_old;
@@ -674,19 +674,17 @@ sbtls_recover_record(struct mbuf *mb, int wait, uint32_t tcp_old, uint32_t *ptcp
 	 */
 	*ptcp_seq -= offset;
 done:
-	return (mr);
+	return (top);
 }
 
 static int
 mlx5e_sq_tls_populate(struct mbuf *mb, uint64_t *pseq)
 {
-	struct mbuf_ext_pgs *ext_pgs;
 
 	for (; mb != NULL; mb = mb->m_next) {
-		if (!(mb->m_flags & M_NOMAP))
+		if (!(mb->m_flags & M_EXTPG))
 			continue;
-		ext_pgs = (void *)mb->m_ext.ext_buf;
-		*pseq = ext_pgs->seqno;
+		*pseq = mb->m_epg_seqno;
 		return (1);
 	}
 	return (0);

@@ -82,7 +82,7 @@ __FBSDID("$FreeBSD$");
 #include <gdb/netgdb.h>
 
 FEATURE(netgdb, "NetGDB support");
-SYSCTL_NODE(_debug_gdb, OID_AUTO, netgdb, CTLFLAG_RD, NULL,
+SYSCTL_NODE(_debug_gdb, OID_AUTO, netgdb, CTLFLAG_RD | CTLFLAG_MPSAFE, NULL,
     "NetGDB parameters");
 
 static unsigned netgdb_debug;
@@ -340,7 +340,7 @@ DB_FUNC(netgdb, db_netgdb_cmd, db_cmd_table, CS_OWN, NULL)
 	struct debugnet_pcb *pcb;
 	int error;
 
-	if (panicstr == NULL) {
+	if (!KERNEL_PANICKED()) {
 		/* TODO: This limitation should be removed in future work. */
 		printf("%s: netgdb is currently limited to use only after a "
 		    "panic.  Sorry.\n", __func__);

@@ -508,7 +508,9 @@ SYSCTL_INT(_net_key, KEYCTL_AH_KEYMIN, ah_keymin,
 SYSCTL_INT(_net_key, KEYCTL_PREFERED_OLDSA, preferred_oldsa,
 	CTLFLAG_VNET | CTLFLAG_RW, &VNET_NAME(key_preferred_oldsa), 0, "");
 
-static SYSCTL_NODE(_net_key, OID_AUTO, spdcache, CTLFLAG_RW, 0, "SPD cache");
+static SYSCTL_NODE(_net_key, OID_AUTO, spdcache,
+    CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
+    "SPD cache");
 
 SYSCTL_UINT(_net_key_spdcache, OID_AUTO, maxentries,
 	CTLFLAG_VNET | CTLFLAG_RDTUN, &VNET_NAME(key_spdcache_maxentries), 0,
@@ -581,13 +583,8 @@ static struct supported_ealgs {
 	int sadb_alg;
 	const struct enc_xform *xform;
 } supported_ealgs[] = {
-	{ SADB_EALG_DESCBC,		&enc_xform_des },
-	{ SADB_EALG_3DESCBC,		&enc_xform_3des },
 	{ SADB_X_EALG_AES,		&enc_xform_rijndael128 },
-	{ SADB_X_EALG_BLOWFISHCBC,	&enc_xform_blf },
-	{ SADB_X_EALG_CAST128CBC,	&enc_xform_cast5 },
 	{ SADB_EALG_NULL,		&enc_xform_null },
-	{ SADB_X_EALG_CAMELLIACBC,	&enc_xform_camellia },
 	{ SADB_X_EALG_AESCTR,		&enc_xform_aes_icm },
 	{ SADB_X_EALG_AESGCM16,		&enc_xform_aes_nist_gcm },
 	{ SADB_X_EALG_AESGMAC,		&enc_xform_aes_nist_gmac },
@@ -598,11 +595,7 @@ static struct supported_aalgs {
 	const struct auth_hash *xform;
 } supported_aalgs[] = {
 	{ SADB_X_AALG_NULL,		&auth_hash_null },
-	{ SADB_AALG_MD5HMAC,		&auth_hash_hmac_md5 },
 	{ SADB_AALG_SHA1HMAC,		&auth_hash_hmac_sha1 },
-	{ SADB_X_AALG_RIPEMD160HMAC,	&auth_hash_hmac_ripemd_160 },
-	{ SADB_X_AALG_MD5,		&auth_hash_key_md5 },
-	{ SADB_X_AALG_SHA,		&auth_hash_key_sha1 },
 	{ SADB_X_AALG_SHA2_256,		&auth_hash_hmac_sha2_256 },
 	{ SADB_X_AALG_SHA2_384,		&auth_hash_hmac_sha2_384 },
 	{ SADB_X_AALG_SHA2_512,		&auth_hash_hmac_sha2_512 },
@@ -3128,7 +3121,7 @@ key_delsav(struct secasvar *sav)
 	if ((sav->flags & SADB_X_EXT_F_CLONED) == 0) {
 		mtx_destroy(sav->lock);
 		free(sav->lock, M_IPSEC_MISC);
-		uma_zfree(V_key_lft_zone, sav->lft_c);
+		uma_zfree_pcpu(V_key_lft_zone, sav->lft_c);
 	}
 	free(sav, M_IPSEC_SA);
 }
@@ -6379,8 +6372,6 @@ key_getsizes_ah(const struct auth_hash *ah, int alg, u_int16_t* min,
 		 * key size is restricted.  Enforce this here.
 		 */
 		switch (alg) {
-		case SADB_X_AALG_MD5:	*min = *max = 16; break;
-		case SADB_X_AALG_SHA:	*min = *max = 20; break;
 		case SADB_X_AALG_NULL:	*min = 1; *max = 256; break;
 		case SADB_X_AALG_SHA2_256: *min = *max = 32; break;
 		case SADB_X_AALG_SHA2_384: *min = *max = 48; break;
@@ -6411,7 +6402,6 @@ key_getcomb_ah()
 #if 1
 		/* we prefer HMAC algorithms, not old algorithms */
 		if (i != SADB_AALG_SHA1HMAC &&
-		    i != SADB_AALG_MD5HMAC  &&
 		    i != SADB_X_AALG_SHA2_256 &&
 		    i != SADB_X_AALG_SHA2_384 &&
 		    i != SADB_X_AALG_SHA2_512)

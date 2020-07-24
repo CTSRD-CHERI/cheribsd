@@ -703,8 +703,7 @@ sctp_handle_heartbeat_ack(struct sctp_heartbeat_chunk *cp,
 				sctp_move_chunks_from_net(stcb,
 				    stcb->asoc.deleted_primary);
 			}
-			sctp_delete_prim_timer(stcb->sctp_ep, stcb,
-			    stcb->asoc.deleted_primary);
+			sctp_delete_prim_timer(stcb->sctp_ep, stcb);
 		}
 	}
 }
@@ -826,7 +825,7 @@ sctp_handle_abort(struct sctp_abort_chunk *abort,
 		error = 0;
 	}
 	/* stop any receive timers */
-	sctp_timer_stop(SCTP_TIMER_TYPE_RECV, stcb->sctp_ep, stcb, net,
+	sctp_timer_stop(SCTP_TIMER_TYPE_RECV, stcb->sctp_ep, stcb, NULL,
 	    SCTP_FROM_SCTP_INPUT + SCTP_LOC_7);
 	/* notify user of the abort and clean up... */
 	sctp_abort_notification(stcb, 1, error, abort, SCTP_SO_NOT_LOCKED);
@@ -1110,13 +1109,12 @@ sctp_handle_shutdown_ack(struct sctp_shutdown_ack_chunk *cp SCTP_UNUSED,
 }
 
 static void
-sctp_process_unrecog_chunk(struct sctp_tcb *stcb, uint8_t chunk_type,
-    struct sctp_nets *net)
+sctp_process_unrecog_chunk(struct sctp_tcb *stcb, uint8_t chunk_type)
 {
 	switch (chunk_type) {
 	case SCTP_ASCONF_ACK:
 	case SCTP_ASCONF:
-		sctp_asconf_cleanup(stcb, net);
+		sctp_asconf_cleanup(stcb);
 		break;
 	case SCTP_IFORWARD_CUM_TSN:
 	case SCTP_FORWARD_CUM_TSN:
@@ -1294,7 +1292,7 @@ sctp_handle_error(struct sctp_chunkhdr *ch,
 				struct sctp_error_unrecognized_chunk *unrec_chunk;
 
 				unrec_chunk = (struct sctp_error_unrecognized_chunk *)cause;
-				sctp_process_unrecog_chunk(stcb, unrec_chunk->ch.chunk_type, net);
+				sctp_process_unrecog_chunk(stcb, unrec_chunk->ch.chunk_type);
 			}
 			break;
 		case SCTP_CAUSE_UNRECOG_PARAM:
@@ -1643,7 +1641,7 @@ sctp_process_cookie_existing(struct mbuf *m, int iphlen, int offset,
 			SCTP_SET_STATE(stcb, SCTP_STATE_OPEN);
 			if (asoc->state & SCTP_STATE_SHUTDOWN_PENDING) {
 				sctp_timer_start(SCTP_TIMER_TYPE_SHUTDOWNGUARD,
-				    stcb->sctp_ep, stcb, asoc->primary_destination);
+				    stcb->sctp_ep, stcb, NULL);
 			}
 			SCTP_STAT_INCR_GAUGE32(sctps_currestab);
 			sctp_stop_all_cookie_timers(stcb);
@@ -1886,7 +1884,7 @@ sctp_process_cookie_existing(struct mbuf *m, int iphlen, int offset,
 		SCTP_SET_STATE(stcb, SCTP_STATE_OPEN);
 		if (asoc->state & SCTP_STATE_SHUTDOWN_PENDING) {
 			sctp_timer_start(SCTP_TIMER_TYPE_SHUTDOWNGUARD,
-			    stcb->sctp_ep, stcb, asoc->primary_destination);
+			    stcb->sctp_ep, stcb, NULL);
 		}
 		sctp_stop_all_cookie_timers(stcb);
 		sctp_toss_old_cookies(stcb, asoc);
@@ -1956,7 +1954,7 @@ sctp_process_cookie_existing(struct mbuf *m, int iphlen, int offset,
 		if (asoc->state & SCTP_STATE_SHUTDOWN_PENDING) {
 			SCTP_SET_STATE(stcb, SCTP_STATE_OPEN);
 			sctp_timer_start(SCTP_TIMER_TYPE_SHUTDOWNGUARD,
-			    stcb->sctp_ep, stcb, asoc->primary_destination);
+			    stcb->sctp_ep, stcb, NULL);
 
 		} else if (SCTP_GET_STATE(stcb) != SCTP_STATE_SHUTDOWN_SENT) {
 			/* move to OPEN state, if not in SHUTDOWN_SENT */
@@ -2096,7 +2094,7 @@ sctp_process_cookie_new(struct mbuf *m, int iphlen, int offset,
 	int init_offset, initack_offset, initack_limit;
 	int retval;
 	int error = 0;
-	uint8_t auth_chunk_buf[SCTP_PARAM_BUFFER_SIZE];
+	uint8_t auth_chunk_buf[SCTP_CHUNK_BUFFER_SIZE];
 #if defined(__APPLE__) || defined(SCTP_SO_LOCK_TESTING)
 	struct socket *so;
 
@@ -2275,8 +2273,11 @@ sctp_process_cookie_new(struct mbuf *m, int iphlen, int offset,
 	if (auth_skipped) {
 		struct sctp_auth_chunk *auth;
 
-		auth = (struct sctp_auth_chunk *)
-		    sctp_m_getptr(m, auth_offset, auth_len, auth_chunk_buf);
+		if (auth_len <= SCTP_CHUNK_BUFFER_SIZE) {
+			auth = (struct sctp_auth_chunk *)sctp_m_getptr(m, auth_offset, auth_len, auth_chunk_buf);
+		} else {
+			auth = NULL;
+		}
 		if ((auth == NULL) || sctp_handle_auth(stcb, auth, m, auth_offset)) {
 			/* auth HMAC failed, dump the assoc and packet */
 			SCTPDBG(SCTP_DEBUG_AUTH1,
@@ -2352,7 +2353,7 @@ sctp_process_cookie_new(struct mbuf *m, int iphlen, int offset,
 	SCTP_SET_STATE(stcb, SCTP_STATE_OPEN);
 	if (asoc->state & SCTP_STATE_SHUTDOWN_PENDING) {
 		sctp_timer_start(SCTP_TIMER_TYPE_SHUTDOWNGUARD,
-		    stcb->sctp_ep, stcb, asoc->primary_destination);
+		    stcb->sctp_ep, stcb, NULL);
 	}
 	sctp_stop_all_cookie_timers(stcb);
 	SCTP_STAT_INCR_COUNTER32(sctps_passiveestab);
@@ -2602,7 +2603,7 @@ sctp_handle_cookie_echo(struct mbuf *m, int iphlen, int offset,
 	 */
 	(void)SCTP_GETTIME_TIMEVAL(&now);
 	/* Expire time is in Ticks, so we convert to seconds */
-	time_expires.tv_sec = cookie->time_entered.tv_sec + TICKS_TO_SEC(cookie->cookie_life);
+	time_expires.tv_sec = cookie->time_entered.tv_sec + sctp_ticks_to_secs(cookie->cookie_life);
 	time_expires.tv_usec = cookie->time_entered.tv_usec;
 	if (timevalcmp(&now, &time_expires, >)) {
 		/* cookie is stale! */
@@ -2955,6 +2956,7 @@ sctp_handle_cookie_ack(struct sctp_cookie_ack_chunk *cp SCTP_UNUSED,
 {
 	/* cp must not be used, others call this without a c-ack :-) */
 	struct sctp_association *asoc;
+	struct sctp_tmit_chunk *chk;
 
 	SCTPDBG(SCTP_DEBUG_INPUT2,
 	    "sctp_handle_cookie_ack: handling COOKIE-ACK\n");
@@ -2980,7 +2982,7 @@ sctp_handle_cookie_ack(struct sctp_cookie_ack_chunk *cp SCTP_UNUSED,
 		sctp_start_net_timers(stcb);
 		if (asoc->state & SCTP_STATE_SHUTDOWN_PENDING) {
 			sctp_timer_start(SCTP_TIMER_TYPE_SHUTDOWNGUARD,
-			    stcb->sctp_ep, stcb, asoc->primary_destination);
+			    stcb->sctp_ep, stcb, NULL);
 
 		}
 		/* update RTO */
@@ -3058,11 +3060,13 @@ sctp_handle_cookie_ack(struct sctp_cookie_ack_chunk *cp SCTP_UNUSED,
 closed_socket:
 	/* Toss the cookie if I can */
 	sctp_toss_old_cookies(stcb, asoc);
-	if (!TAILQ_EMPTY(&asoc->sent_queue)) {
-		/* Restart the timer if we have pending data */
-		struct sctp_tmit_chunk *chk;
-
-		chk = TAILQ_FIRST(&asoc->sent_queue);
+	/* Restart the timer if we have pending data */
+	TAILQ_FOREACH(chk, &asoc->sent_queue, sctp_next) {
+		if (chk->whoTo != NULL) {
+			break;
+		}
+	}
+	if (chk != NULL) {
 		sctp_timer_start(SCTP_TIMER_TYPE_SEND, stcb->sctp_ep, stcb, chk->whoTo);
 	}
 }
@@ -3660,7 +3664,7 @@ sctp_clean_up_stream_reset(struct sctp_tcb *stcb)
 	}
 	asoc->str_reset = NULL;
 	sctp_timer_stop(SCTP_TIMER_TYPE_STRRESET, stcb->sctp_ep, stcb,
-	    chk->whoTo, SCTP_FROM_SCTP_INPUT + SCTP_LOC_28);
+	    NULL, SCTP_FROM_SCTP_INPUT + SCTP_LOC_28);
 	TAILQ_REMOVE(&asoc->control_send_queue, chk, sctp_next);
 	asoc->ctrl_queue_cnt--;
 	if (chk->data) {
@@ -4669,11 +4673,13 @@ sctp_process_control(struct mbuf *m, int iphlen, int *offset, int length,
 			if (auth_skipped && (stcb != NULL)) {
 				struct sctp_auth_chunk *auth;
 
-				auth = (struct sctp_auth_chunk *)
-				    sctp_m_getptr(m, auth_offset,
-				    auth_len, chunk_buf);
-				got_auth = 1;
-				auth_skipped = 0;
+				if (auth_len <= SCTP_CHUNK_BUFFER_SIZE) {
+					auth = (struct sctp_auth_chunk *)sctp_m_getptr(m, auth_offset, auth_len, chunk_buf);
+					got_auth = 1;
+					auth_skipped = 0;
+				} else {
+					auth = NULL;
+				}
 				if ((auth == NULL) || sctp_handle_auth(stcb, auth, m,
 				    auth_offset)) {
 					/* auth HMAC failed so dump it */
@@ -5156,6 +5162,7 @@ process_control_chunks:
 			} else {
 				struct mbuf *ret_buf;
 				struct sctp_inpcb *linp;
+				struct sctp_tmit_chunk *chk;
 
 				if (stcb) {
 					linp = NULL;
@@ -5217,14 +5224,13 @@ process_control_chunks:
 					got_auth = 1;
 					auth_skipped = 0;
 				}
-				if (!TAILQ_EMPTY(&stcb->asoc.sent_queue)) {
-					/*
-					 * Restart the timer if we have
-					 * pending data
-					 */
-					struct sctp_tmit_chunk *chk;
-
-					chk = TAILQ_FIRST(&stcb->asoc.sent_queue);
+				/* Restart the timer if we have pending data */
+				TAILQ_FOREACH(chk, &stcb->asoc.sent_queue, sctp_next) {
+					if (chk->whoTo != NULL) {
+						break;
+					}
+				}
+				if (chk != NULL) {
 					sctp_timer_start(SCTP_TIMER_TYPE_SEND, stcb->sctp_ep, stcb, chk->whoTo);
 				}
 			}

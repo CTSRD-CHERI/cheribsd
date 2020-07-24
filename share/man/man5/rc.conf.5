@@ -24,7 +24,7 @@
 .\"
 .\" $FreeBSD$
 .\"
-.Dd September 9, 2019
+.Dd May 9, 2020
 .Dt RC.CONF 5
 .Os
 .Sh NAME
@@ -58,6 +58,11 @@ which specifies the default settings for all the available options.
 Options need only be specified in
 .Pa /etc/rc.conf
 when the system administrator wishes to override these defaults.
+The file
+.Pa /etc/defaults/vendor.conf
+allows vendors to override
+.Fx
+defaults.
 The file
 .Pa /etc/rc.conf.local
 is used to override settings in
@@ -425,7 +430,7 @@ is used to set the hostname via DHCP,
 this variable should be set to an empty string.
 Within a
 .Xr jail 8
-the hostname is generally already set and this variable may absent.
+the hostname is generally already set and this variable may be absent.
 If this value remains unset when the system is done booting
 your console login will display the default hostname of
 .Dq Amnesiac .
@@ -1182,11 +1187,20 @@ break some legitimate applications.
 .It Va icmp_drop_redirect
 .Pq Vt bool
 Set to
-.Dq Li NO
+.Dq Li AUTO
 by default.
+This setting will be identical to
+.Dq Li YES ,
+if a dynamicrouting daemon is enabled, because redirect processing may
+cause performance issues for large routing tables.
+If no such service is enabled, this setting behaves like a
+.Dq Li NO .
 Setting to
 .Dq Li YES
 will cause the kernel to ignore ICMP REDIRECT packets.
+Setting to
+.Dq Li NO
+will cause the kernel to process ICMP REDIRECT packets.
 Refer to
 .Xr icmp 4
 for more information.
@@ -1317,12 +1331,12 @@ ifconfig_em0_alias3="inet 192.0.2.1-5/28"
 .Pp
 and so on.
 .Pp
-Note that
+Note that deprecated
 .Va ipv4_addrs_ Ns Aq Ar interface
 variable was supported for IPv4 CIDR address notation.
-It is now deprecated because the functionality was integrated into
+The
 .Va ifconfig_ Ns Ao Ar interface Ac Ns Va _alias Ns Aq Ar n
-though
+variable replaces it, though
 .Va ipv4_addrs_ Ns Aq Ar interface
 is still supported for backward compatibility.
 .Pp
@@ -1665,7 +1679,8 @@ This static setting may be overridden by commands
 started with dynamic interface configuration utilities
 like
 .Xr dhclient 8
-hooks. The description can be seen with
+hooks.
+The description can be seen with
 .Xr ifconfig 8
 command and it may be exported with
 .Xr bsnmpd 1
@@ -3877,7 +3892,7 @@ When set to
 all configured jails in
 .Va jail_list
 are stopped in reverse order.
-.It Va jail_* variables
+.It Va jail_ Ns * variables
 Note that older releases supported per-jail configuration via
 .Nm
 variables.
@@ -4575,6 +4590,7 @@ files.
 .Sh FILES
 .Bl -tag -width ".Pa /etc/defaults/rc.conf" -compact
 .It Pa /etc/defaults/rc.conf
+.It Pa /etc/defaults/vendor.conf
 .It Pa /etc/rc.conf
 .It Pa /etc/rc.conf.local
 .El

@@ -147,6 +147,7 @@ device		cpufreq
 
 # Bus drivers
 device		pci
+device		pci_n1sdp	# ARM Neoverse N1 SDP PCI
 device		al_pci		# Annapurna Alpine PCI-E
 options 	PCI_HP			# PCI-Express native HotPlug
 options 	PCI_IOV		# PCI SR-IOV support
@@ -169,6 +170,7 @@ device		vnic		# Cavium ThunderX NIC
 device		al_eth		# Annapurna Alpine Ethernet NIC
 device		dwc_rk		# Rockchip Designware
 device		dwc_socfpga	# Altera SOCFPGA Ethernet MAC
+device		genet		# Broadcom on RPi4
 
 # Etherswitch devices
 device		etherswitch	# Enable etherswitch support
@@ -297,6 +299,7 @@ device		rk_spi		# RockChip SPI controller
 # PWM
 device		pwm
 device		aw_pwm
+device		rk_pwm
 
 # Console
 device		vt
@@ -330,6 +333,9 @@ device		nvmem
 device		regulator
 device		syscon
 device		aw_syscon
+
+# IO Domains
+device		rk_iodomain
 
 # The `bpf' device enables the Berkeley Packet Filter.
 # Be aware of the administrative consequences of enabling this!

@@ -201,6 +201,7 @@ static int
 show_iocfacts(int ac, char **av)
 {
 	MPI2_IOC_FACTS_REPLY *facts;
+	uint8_t *fb;
 	char tmpbuf[128];
 	int error, fd;
 
@@ -217,6 +218,8 @@ show_iocfacts(int ac, char **av)
 		return (errno);
 	}
 
+	fb = (uint8_t *)facts;
+
 #define IOCCAP "\3ScsiTaskFull" "\4DiagTrace" "\5SnapBuf" "\6ExtBuf" \
     "\7EEDP" "\10BiDirTarg" "\11Multicast" "\14TransRetry" "\15IR" \
     "\16EventReplay" "\17RaidAccel" "\20MSIXIndex" "\21HostDisc" \
@@ -225,7 +228,7 @@ show_iocfacts(int ac, char **av)
 	bzero(tmpbuf, sizeof(tmpbuf));
 	mps_parse_flags(facts->IOCCapabilities, IOCCAP, tmpbuf, sizeof(tmpbuf));
 
-	printf("          MsgVersion: %02d.%02d\n",
+	printf("          MsgVersion: %d.%d\n",
 	    facts->MsgVersion >> 8, facts->MsgVersion & 0xff);
 	printf("           MsgLength: %d\n", facts->MsgLength);
 	printf("            Function: 0x%x\n", facts->Function);
@@ -246,8 +249,12 @@ show_iocfacts(int ac, char **av)
 	printf("           ProductID: 0x%x\n", facts->ProductID);
 	printf("     IOCCapabilities: 0x%x %s\n", facts->IOCCapabilities,
 	    tmpbuf);
-	printf("           FWVersion: 0x%08x\n", facts->FWVersion.Word);
+	printf("           FWVersion: %02d.%02d.%02d.%02d\n",
+	    facts->FWVersion.Struct.Major, facts->FWVersion.Struct.Minor,
+	    facts->FWVersion.Struct.Unit, facts->FWVersion.Struct.Dev);
 	printf(" IOCRequestFrameSize: %d\n", facts->IOCRequestFrameSize);
+	if (is_mps == 0)
+		printf(" MaxChainSegmentSize: %d\n", (uint16_t)(fb[0x26]));
 	printf("       MaxInitiators: %d\n", facts->MaxInitiators);
 	printf("          MaxTargets: %d\n", facts->MaxTargets);
 	printf("     MaxSasExpanders: %d\n", facts->MaxSasExpanders);
@@ -265,6 +272,8 @@ show_iocfacts(int ac, char **av)
 	printf("        MaxDevHandle: %d\n", facts->MaxDevHandle);
 	printf("MaxPersistentEntries: %d\n", facts->MaxPersistentEntries);
 	printf("        MinDevHandle: %d\n", facts->MinDevHandle);
+	if (is_mps == 0)
+		printf(" CurrentHostPageSize: %d\n", (uint8_t)(fb[0x3e]));
 
 	free(facts);
 	return (0);

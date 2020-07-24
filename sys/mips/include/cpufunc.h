@@ -125,7 +125,7 @@ breakpoint(void)
 static __inline uint64_t					\
 mips_rd_ ## n (void)						\
 {								\
-	int v0;							\
+	uint64_t v0;						\
 	__asm __volatile ("dmfc0 %[v0], $"__XSTRING(r)";"	\
 			  : [v0] "=&r"(v0));			\
 	mips_barrier();						\
@@ -147,7 +147,7 @@ mips_wr_ ## n (uint64_t a0)					\
 static __inline uint64_t					\
 mips_rd_ ## n(void)						\
 {								\
-	int v0;							\
+	uint64_t v0;						\
 	__asm __volatile ("dmfc0 %[v0], $"__XSTRING(r)", "__XSTRING(s)";"	\
 			  : [v0] "=&r"(v0));			\
 	mips_barrier();						\
@@ -164,7 +164,17 @@ mips_wr_ ## n(uint64_t a0)					\
 } struct __hack
 
 #if defined(__mips_n64)
+#if !__has_feature(capabilities)
+/*
+ * While CHERI-MIPS exposes coprocessor 0's excpc register, we do not
+ * define the name here.  Instead, we use the capability analogue, EPCC.
+ * This ensures that we always use the capability register and avoids problems
+ * if the EPCC is a sealed capability: in that case writing to the EPC register
+ * will clear the tag bit on EPCC (even if it doesn't change the value).
+ * Also this avoids additional unnecessary instructions.
+ */
 MIPS_RW64_COP0(excpc, MIPS_COP_0_EXC_PC);
+#endif
 MIPS_RW64_COP0(entryhi, MIPS_COP_0_TLB_HI);
 MIPS_RW64_COP0(pagemask, MIPS_COP_0_TLB_PG_MASK);
 MIPS_RW64_COP0_SEL(userlocal, MIPS_COP_0_USERLOCAL, 2);
@@ -193,7 +203,7 @@ MIPS_RW64_COP0(xcontext, MIPS_COP_0_TLB_XCONTEXT);
 static __inline uint32_t					\
 mips_rd_ ## n (void)						\
 {								\
-	int v0;							\
+	uint32_t v0;						\
 	__asm __volatile ("mfc0 %[v0], $"__XSTRING(r)";"	\
 			  : [v0] "=&r"(v0));			\
 	mips_barrier();						\
@@ -215,7 +225,7 @@ mips_wr_ ## n (uint32_t a0)					\
 static __inline uint32_t					\
 mips_rd_ ## n(void)						\
 {								\
-	int v0;							\
+	uint32_t v0;						\
 	__asm __volatile ("mfc0 %[v0], $"__XSTRING(r)", "__XSTRING(s)";"	\
 			  : [v0] "=&r"(v0));			\
 	mips_barrier();						\

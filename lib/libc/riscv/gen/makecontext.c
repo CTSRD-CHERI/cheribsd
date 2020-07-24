@@ -60,10 +60,20 @@ ctx_done(ucontext_t *ucp)
 
 __weak_reference(__makecontext, makecontext);
 
+#ifdef __CHERI_PURE_CAPABILITY__
+#define CTX_REG(regs, name)  __CONCAT(__CONCAT(gp->cp_, c), name)
+#else
+#define CTX_REG(regs, name)  __CONCAT(gp->gp_, name)
+#endif
+
 void
 __makecontext(ucontext_t *ucp, void (*func)(void), int argc, ...)
 {
+#ifdef __CHERI_PURE_CAPABILITY__
+	struct capregs *gp;
+#else
 	struct gpregs *gp;
+#endif
 	va_list ap;
 	int i;
 
@@ -74,18 +84,27 @@ __makecontext(ucontext_t *ucp, void (*func)(void), int argc, ...)
 	if ((argc < 0) || (argc > 8))
 		return;
 
+#ifdef __CHERI_PURE_CAPABILITY__
+	gp = &ucp->uc_mcontext.mc_capregs;
+#else
 	gp = &ucp->uc_mcontext.mc_gpregs;
+#endif
 
 	va_start(ap, argc);
 	/* Pass up to eight arguments in a0-7. */
 	for (i = 0; i < argc && i < 8; i++)
-		gp->gp_a[i] = va_arg(ap, uint64_t);
+		CTX_REG(gp, a[i]) = va_arg(ap, uint64_t);
 	va_end(ap);
 
 	/* Set the stack */
-	gp->gp_sp = STACKALIGN(ucp->uc_stack.ss_sp + ucp->uc_stack.ss_size);
+	CTX_REG(gp, sp) = STACKALIGN((uintptr_t)ucp->uc_stack.ss_sp + ucp->uc_stack.ss_size);
 	/* Arrange for return via the trampoline code. */
+#ifdef __CHERI_PURE_CAPABILITY__
+	/* Can't use CTX_REG here since the c is a suffix instead of a prefix */
+	gp->cp_sepcc = (__uintcap_t)_ctx_start;
+#else
 	gp->gp_sepc = (__register_t)_ctx_start;
-	gp->gp_s[0] = (__register_t)func;
-	gp->gp_s[1] = (__register_t)ucp;
+#endif
+	CTX_REG(gp, s[0]) = (__register_t)func;
+	CTX_REG(gp, s[1]) = (__register_t)ucp;
 }

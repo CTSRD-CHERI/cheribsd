@@ -48,7 +48,7 @@ FEATURE(geom_concat, "GEOM concatenation support");
 static MALLOC_DEFINE(M_CONCAT, "concat_data", "GEOM_CONCAT Data");
 
 SYSCTL_DECL(_kern_geom);
-static SYSCTL_NODE(_kern_geom, OID_AUTO, concat, CTLFLAG_RW, 0,
+static SYSCTL_NODE(_kern_geom, OID_AUTO, concat, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
     "GEOM_CONCAT stuff");
 static u_int g_concat_debug = 0;
 SYSCTL_UINT(_kern_geom_concat, OID_AUTO, debug, CTLFLAG_RWTUN, &g_concat_debug, 0,
@@ -279,8 +279,11 @@ g_concat_done(struct bio *bp)
 	g_destroy_bio(bp);
 }
 
+/*
+ * Called for both BIO_FLUSH and BIO_SPEEDUP. Just pass the call down
+ */
 static void
-g_concat_flush(struct g_concat_softc *sc, struct bio *bp)
+g_concat_passdown(struct g_concat_softc *sc, struct bio *bp)
 {
 	struct bio_queue_head queue;
 	struct g_consumer *cp;
@@ -340,8 +343,9 @@ g_concat_start(struct bio *bp)
 	case BIO_WRITE:
 	case BIO_DELETE:
 		break;
+	case BIO_SPEEDUP:
 	case BIO_FLUSH:
-		g_concat_flush(sc, bp);
+		g_concat_passdown(sc, bp);
 		return;
 	case BIO_GETATTR:
 		if (strcmp("GEOM::kerneldump", bp->bio_attribute) == 0) {

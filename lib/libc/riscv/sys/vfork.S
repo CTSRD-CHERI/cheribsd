@@ -39,15 +39,14 @@ __FBSDID("$FreeBSD$");
 ENTRY(__sys_vfork)
 	WEAK_REFERENCE(__sys_vfork, vfork)
 	WEAK_REFERENCE(__sys_vfork, _vfork)
-	mv	a2, ra
+	MOVE_REG(a2, ra)
 
 	_SYSCALL(vfork)
 	bnez	t0, 1f
 	addi	a1, a1, -1
 	and	a0, a0, a1
-	mv	ra, a2
+	MOVE_REG(ra, a2)
 
-	ret
-1:	la	t1, cerror
-	jr	t1
+	RETURN
+1:	ASM_LOCAL_TAILCALL(t1, cerror)
 END(__sys_vfork)

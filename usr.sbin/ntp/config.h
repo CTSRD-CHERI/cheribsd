@@ -1468,7 +1468,7 @@
 #define PACKAGE_NAME "ntp"
 
 /* Define to the full name and version of this package. */
-#define PACKAGE_STRING "ntp 4.2.8p12"
+#define PACKAGE_STRING "ntp 4.2.8p14"
 
 /* Define to the one symbol short name of this package. */
 #define PACKAGE_TARNAME "ntp"
@@ -1477,7 +1477,7 @@
 #define PACKAGE_URL "http://www.ntp.org./"
 
 /* Define to the version of this package. */
-#define PACKAGE_VERSION "4.2.8p13"
+#define PACKAGE_VERSION "4.2.8p14"
 
 /* data dir */
 #define PERLLIBDIR "/usr/share/ntp/lib"
@@ -1578,11 +1578,7 @@
 /* #undef STRERROR_R_CHAR_P */
 
 /* canonical system (cpu-vendor-os) of where we should run */
-#if defined(__alpha__)
-#define STR_SYSTEM "alpha-undermydesk-freebsd"
-#elif defined(__sparc64__)
-#define STR_SYSTEM "sparc64-undermydesk-freebsd"
-#elif defined(__amd64__)
+#if defined(__amd64__)
 #define STR_SYSTEM "amd64-undermydesk-freebsd"
 #elif defined(__powerpc64__)
 #define STR_SYSTEM "powerpc64-undermydesk-freebsd"
@@ -1596,12 +1592,8 @@
 #define STR_SYSTEM "arm64-undermydesk-freebsd"
 #elif defined(__arm__)
 #define STR_SYSTEM "arm-undermydesk-freebsd"
-#elif defined(__sparc64__)
-#define STR_SYSTEM "sparc64-undermydesk-freebsd"
-#elif defined(__sparc__)
-#define STR_SYSTEM "sparc-undermydesk-freebsd"
-#elif defined(__ia64__)
-#define STR_SYSTEM "ia64-undermydesk-freebsd"
+#elif defined(__riscv)
+#define STR_SYSTEM "riscv64-undermydesk-freebsd"
 #else
 #define STR_SYSTEM "i386-undermydesk-freebsd"
 #endif
@@ -1669,7 +1661,7 @@ typedef unsigned int	uintptr_t;
 /* Define WORDS_BIGENDIAN to 1 if your processor stores words with the most
    significant byte first (like Motorola and SPARC, unlike Intel). */
 #if defined(__ARMEB__) || defined(__MIPSEB__) || defined(__powerpc__) || \
-    defined(__powerpc64__) || defined(__sparc64__)
+    defined(__powerpc64__)
 #define WORDS_BIGENDIAN 1
 #endif
 

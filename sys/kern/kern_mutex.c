@@ -140,19 +140,26 @@ struct lock_class lock_class_mtx_spin = {
 };
 
 #ifdef ADAPTIVE_MUTEXES
-static SYSCTL_NODE(_debug, OID_AUTO, mtx, CTLFLAG_RD, NULL, "mtx debugging");
+#ifdef MUTEX_CUSTOM_BACKOFF
+static SYSCTL_NODE(_debug, OID_AUTO, mtx, CTLFLAG_RD | CTLFLAG_MPSAFE, NULL,
+    "mtx debugging");
 
 static struct lock_delay_config __read_frequently mtx_delay;
 
-SYSCTL_INT(_debug_mtx, OID_AUTO, delay_base, CTLFLAG_RW, &mtx_delay.base,
+SYSCTL_U16(_debug_mtx, OID_AUTO, delay_base, CTLFLAG_RW, &mtx_delay.base,
     0, "");
-SYSCTL_INT(_debug_mtx, OID_AUTO, delay_max, CTLFLAG_RW, &mtx_delay.max,
+SYSCTL_U16(_debug_mtx, OID_AUTO, delay_max, CTLFLAG_RW, &mtx_delay.max,
     0, "");
 
 LOCK_DELAY_SYSINIT_DEFAULT(mtx_delay);
+#else
+#define mtx_delay	locks_delay
+#endif
 #endif
 
-static SYSCTL_NODE(_debug, OID_AUTO, mtx_spin, CTLFLAG_RD, NULL,
+#ifdef MUTEX_SPIN_CUSTOM_BACKOFF
+static SYSCTL_NODE(_debug, OID_AUTO, mtx_spin,
+    CTLFLAG_RD | CTLFLAG_MPSAFE, NULL,
     "mtx spin debugging");
 
 static struct lock_delay_config __read_frequently mtx_spin_delay;
@@ -163,6 +170,9 @@ SYSCTL_INT(_debug_mtx_spin, OID_AUTO, delay_max, CTLFLAG_RW,
     &mtx_spin_delay.max, 0, "");
 
 LOCK_DELAY_SYSINIT_DEFAULT(mtx_spin_delay);
+#else
+#define mtx_spin_delay	locks_delay
+#endif
 
 /*
  * System-wide mutexes
@@ -797,10 +807,9 @@ thread_lock_validate(struct mtx *m, int opts, const char *file, int line)
 	KASSERT(LOCK_CLASS(&m->lock_object) == &lock_class_mtx_spin,
 	    ("thread_lock() of sleep mutex %s @ %s:%d",
 	    m->lock_object.lo_name, file, line));
-	if (mtx_owned(m))
-		KASSERT((m->lock_object.lo_flags & LO_RECURSABLE) != 0,
-		    ("thread_lock: recursed on non-recursive mutex %s @ %s:%d\n",
-		    m->lock_object.lo_name, file, line));
+	KASSERT((m->lock_object.lo_flags & LO_RECURSABLE) == 0,
+	    ("thread_lock: got a recursive mutex %s @ %s:%d\n",
+	    m->lock_object.lo_name, file, line));
 	WITNESS_CHECKORDER(&m->lock_object,
 	    opts | LOP_NEWORDER | LOP_EXCLUSIVE, file, line, NULL);
 }
@@ -818,7 +827,7 @@ _thread_lock(struct thread *td)
 #endif
 {
 	struct mtx *m;
-	uintptr_t tid, v;
+	uintptr_t tid;
 
 	tid = (uintptr_t)curthread;
 
@@ -827,19 +836,14 @@ _thread_lock(struct thread *td)
 	spinlock_enter();
 	m = td->td_lock;
 	thread_lock_validate(m, 0, file, line);
-	v = MTX_READ_VALUE(m);
-	if (__predict_true(v == MTX_UNOWNED)) {
-		if (__predict_false(!_mtx_obtain_lock(m, tid)))
-			goto slowpath_unlocked;
-	} else if (v == tid) {
-		m->mtx_recurse++;
-	} else
+	if (__predict_false(m == &blocked_lock))
+		goto slowpath_unlocked;
+	if (__predict_false(!_mtx_obtain_lock(m, tid)))
 		goto slowpath_unlocked;
 	if (__predict_true(m == td->td_lock)) {
 		WITNESS_LOCK(&m->lock_object, LOP_EXCLUSIVE, file, line);
 		return;
 	}
-	MPASS(m->mtx_recurse == 0);
 	_mtx_release_lock_quick(m);
 slowpath_unlocked:
 	spinlock_exit();
@@ -907,11 +911,7 @@ retry:
 					break;
 				continue;
 			}
-			if (v == tid) {
-				m->mtx_recurse++;
-				MPASS(m == td->td_lock);
-				break;
-			}
+			MPASS(v != tid);
 			lock_profile_obtain_lock_failed(&m->lock_object,
 			    &contested, &waittime);
 			/* Give interrupts a chance while we spin. */
@@ -932,7 +932,6 @@ retry:
 		}
 		if (m == td->td_lock)
 			break;
-		MPASS(m->mtx_recurse == 0);
 		_mtx_release_lock_quick(m);
 	}
 	LOCK_LOG_LOCK("LOCK", &m->lock_object, opts, m->mtx_recurse, file,
@@ -946,9 +945,8 @@ retry:
 #ifdef KDTRACE_HOOKS
 	spin_time += lockstat_nsecs(&m->lock_object);
 #endif
-	if (m->mtx_recurse == 0)
-		LOCKSTAT_PROFILE_OBTAIN_LOCK_SUCCESS(spin__acquire, m,
-		    contested, waittime, file, line);
+	LOCKSTAT_PROFILE_OBTAIN_LOCK_SUCCESS(spin__acquire, m, contested,
+	    waittime, file, line);
 #ifdef KDTRACE_HOOKS
 	if (lda.spin_cnt != 0)
 		LOCKSTAT_RECORD1(thread__spin, m, spin_time);
@@ -960,10 +958,9 @@ thread_lock_block(struct thread *td)
 {
 	struct mtx *lock;
 
-	THREAD_LOCK_ASSERT(td, MA_OWNED);
 	lock = td->td_lock;
+	mtx_assert(lock, MA_OWNED);
 	td->td_lock = &blocked_lock;
-	mtx_unlock_spin(lock);
 
 	return (lock);
 }
@@ -971,9 +968,23 @@ thread_lock_block(struct thread *td)
 void
 thread_lock_unblock(struct thread *td, struct mtx *new)
 {
+
 	mtx_assert(new, MA_OWNED);
-	MPASS(td->td_lock == &blocked_lock);
+	KASSERT(td->td_lock == &blocked_lock,
+	    ("thread %p lock %p not blocked_lock %p",
+	    td, td->td_lock, &blocked_lock));
 	atomic_store_rel_ptr((volatile void *)&td->td_lock, (uintptr_t)new);
+}
+
+void
+thread_lock_block_wait(struct thread *td)
+{
+
+	while (td->td_lock == &blocked_lock)
+		cpu_spinwait();
+
+	/* Acquire fence to be certain that all thread state is visible. */
+	atomic_thread_fence_acq();
 }
 
 void
@@ -982,8 +993,8 @@ thread_lock_set(struct thread *td, struct mtx *new)
 	struct mtx *lock;
 
 	mtx_assert(new, MA_OWNED);
-	THREAD_LOCK_ASSERT(td, MA_OWNED);
 	lock = td->td_lock;
+	mtx_assert(lock, MA_OWNED);
 	td->td_lock = new;
 	mtx_unlock_spin(lock);
 }
@@ -1062,7 +1073,7 @@ __mtx_assert(const volatile uintptr_t *c, int what, const char *file, int line)
 {
 	const struct mtx *m;
 
-	if (panicstr != NULL || dumping || SCHEDULER_STOPPED())
+	if (KERNEL_PANICKED() || dumping || SCHEDULER_STOPPED())
 		return;
 
 	m = mtxlock2mtx(c);
@@ -1220,7 +1231,7 @@ _mtx_lock_indefinite_check(struct mtx *m, struct lock_delay_arg *ldap)
 	struct thread *td;
 
 	ldap->spin_cnt++;
-	if (ldap->spin_cnt < 60000000 || kdb_active || panicstr != NULL)
+	if (ldap->spin_cnt < 60000000 || kdb_active || KERNEL_PANICKED())
 		cpu_lock_delay();
 	else {
 		td = mtx_owner(m);

@@ -76,8 +76,6 @@
 /******************************************************************************/
 
 #ifdef __CHERI_PURE_CAPABILITY__
-#include <machine/cherireg.h>
-
 #include <cheri/cheric.h>
 #endif
 

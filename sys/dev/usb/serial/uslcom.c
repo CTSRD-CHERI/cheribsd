@@ -59,7 +59,8 @@ __FBSDID("$FreeBSD$");
 #ifdef USB_DEBUG
 static int uslcom_debug = 0;
 
-static SYSCTL_NODE(_hw_usb, OID_AUTO, uslcom, CTLFLAG_RW, 0, "USB uslcom");
+static SYSCTL_NODE(_hw_usb, OID_AUTO, uslcom, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
+    "USB uslcom");
 SYSCTL_INT(_hw_usb_uslcom, OID_AUTO, debug, CTLFLAG_RWTUN,
     &uslcom_debug, 0, "Debug level");
 #endif
@@ -313,6 +314,7 @@ static const STRUCT_USB_HOST_ID uslcom_devs[] = {
     USLCOM_DEV(SILABS, HAMLINKUSB),
     USLCOM_DEV(SILABS, HELICOM),
     USLCOM_DEV(SILABS, HUBZ),
+    USLCOM_DEV(SILABS, BV_AV2010_10),
     USLCOM_DEV(SILABS, IMS_USB_RS422),
     USLCOM_DEV(SILABS, INFINITY_MIC),
     USLCOM_DEV(SILABS, INGENI_ZIGBEE),

@@ -51,7 +51,7 @@
 # include <sys/stream.h>
 # include <sys/kmem.h>
 #endif
-#if __FreeBSD_version >= 300000
+#ifdef __FreeBSD_version
 # include <sys/queue.h>
 #endif
 #include <net/if.h>
@@ -730,7 +730,7 @@ ipf_proxy_ioctl(softc, data, cmd, mode, ctx)
 				IPFERROR(80003);
 				error = ENOMEM;
 			} else {
-				error = copyinptr(softc, ctl.apc_data, ptr,
+				error = copyinptr(softc, &ctl.apc_udata, ptr,
 						  ctl.apc_dsize);
 				if (error == 0)
 					ctl.apc_data = ptr;

@@ -145,6 +145,7 @@ static void	igmp_v3_suppress_group_record(struct in_multi *);
 static int	sysctl_igmp_default_version(SYSCTL_HANDLER_ARGS);
 static int	sysctl_igmp_gsr(SYSCTL_HANDLER_ARGS);
 static int	sysctl_igmp_ifinfo(SYSCTL_HANDLER_ARGS);
+static int	sysctl_igmp_stat(SYSCTL_HANDLER_ARGS);
 
 static const struct netisr_handler igmp_nh = {
 	.nh_name = "igmp",
@@ -260,8 +261,9 @@ VNET_DEFINE_STATIC(int, igmp_default_version) = IGMP_VERSION_3;
 /*
  * Virtualized sysctls.
  */
-SYSCTL_STRUCT(_net_inet_igmp, IGMPCTL_STATS, stats, CTLFLAG_VNET | CTLFLAG_RW,
-    &VNET_NAME(igmpstat), igmpstat, "");
+SYSCTL_PROC(_net_inet_igmp, IGMPCTL_STATS, stats,
+    CTLFLAG_VNET | CTLTYPE_STRUCT | CTLFLAG_RW | CTLFLAG_MPSAFE,
+    &VNET_NAME(igmpstat), 0, sysctl_igmp_stat, "S,igmpstat", "");
 SYSCTL_INT(_net_inet_igmp, OID_AUTO, recvifkludge, CTLFLAG_VNET | CTLFLAG_RW,
     &VNET_NAME(igmp_recvifkludge), 0,
     "Rewrite IGMPv1/v2 reports from 0.0.0.0 to contain subnet address");
@@ -303,6 +305,7 @@ igmp_save_context(struct mbuf *m, struct ifnet *ifp)
 #ifdef VIMAGE
 	m->m_pkthdr.PH_loc.ptr = ifp->if_vnet;
 #endif /* VIMAGE */
+	m->m_pkthdr.rcvif = ifp;
 	m->m_pkthdr.flowid = ifp->if_index;
 }
 
@@ -332,6 +335,59 @@ igmp_restore_context(struct mbuf *m)
 #endif
 #endif
 	return (m->m_pkthdr.flowid);
+}
+
+/*
+ * IGMP statistics.
+ */
+static int
+sysctl_igmp_stat(SYSCTL_HANDLER_ARGS)
+{
+	struct igmpstat igps0;
+	int error;
+	char *p;
+
+	error = sysctl_wire_old_buffer(req, sizeof(V_igmpstat));
+	if (error)
+		return (error);
+
+	if (req->oldptr != NULL) {
+		if (req->oldlen < sizeof(V_igmpstat))
+			error = ENOMEM;
+		else 
+			error = SYSCTL_OUT(req, &V_igmpstat,
+			    sizeof(V_igmpstat));
+	} else
+		req->validlen = sizeof(V_igmpstat);
+	if (error)
+		goto out;
+	if (req->newptr != NULL) {
+		if (req->newlen < sizeof(V_igmpstat))
+			error = ENOMEM;
+		else
+			error = SYSCTL_IN(req, &igps0,
+			    sizeof(igps0));
+		if (error)
+			goto out;
+		/*
+		 * igps0 must be "all zero".
+		 */
+		p = (char *)&igps0;
+		while (*p == '\0' && p < (char *)&igps0 + sizeof(igps0))
+			p++;
+		if (p != (char *)&igps0 + sizeof(igps0)) {
+			error = EINVAL;
+			goto out;
+		}
+		/*
+		 * Avoid overwrite of the version and length field.
+		 */
+		igps0.igps_version = V_igmpstat.igps_version;
+		igps0.igps_len = V_igmpstat.igps_len;
+		bcopy(&igps0, &V_igmpstat, sizeof(V_igmpstat));
+	}
+out:
+	return (error);
 }
 
 /*
@@ -877,7 +933,7 @@ out_locked:
  * We may be updating the group for the first time since we switched
  * to IGMPv3. If we are, then we must clear any recorded source lists,
  * and transition to REPORTING state; the group timer is overloaded
- * for group and group-source query responses. 
+ * for group and group-source query responses.
  *
  * Unlike IGMPv3, the delay per group should be jittered
  * to avoid bursts of IGMPv2 reports.
@@ -1981,7 +2037,7 @@ igmp_set_version(struct igmp_ifsoftc *igi, const int version)
 static void
 igmp_v3_cancel_link_timers(struct igmp_ifsoftc *igi)
 {
-	struct ifmultiaddr	*ifma;
+	struct ifmultiaddr	*ifma, *ifmatmp;
 	struct ifnet		*ifp;
 	struct in_multi		*inm;
 	struct in_multi_head inm_free_tmp;
@@ -2007,7 +2063,8 @@ igmp_v3_cancel_link_timers(struct igmp_ifsoftc *igi)
 	 * for all memberships scoped to this link.
 	 */
 	ifp = igi->igi_ifp;
-	CK_STAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link) {
+	IF_ADDR_WLOCK(ifp);
+	CK_STAILQ_FOREACH_SAFE(ifma, &ifp->if_multiaddrs, ifma_link, ifmatmp) {
 		if (ifma->ifma_addr->sa_family != AF_INET ||
 		    ifma->ifma_protospec == NULL)
 			continue;
@@ -2051,6 +2108,7 @@ igmp_v3_cancel_link_timers(struct igmp_ifsoftc *igi)
 		inm->inm_timer = 0;
 		mbufq_drain(&inm->inm_scq);
 	}
+	IF_ADDR_WUNLOCK(ifp);
 
 	inm_release_list_deferred(&inm_free_tmp);
 }
@@ -2322,7 +2380,7 @@ igmp_initial_join(struct in_multi *inm, struct igmp_ifsoftc *igi)
 	struct ifnet		*ifp;
 	struct mbufq		*mq;
 	int			 error, retval, syncstates;
- 
+
 	CTR4(KTR_IGMPV3, "%s: initial join 0x%08x on ifp %p(%s)", __func__,
 	    ntohl(inm->inm_addr.s_addr), inm->inm_ifp, inm->inm_ifp->if_xname);
 

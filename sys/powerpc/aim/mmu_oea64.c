@@ -65,6 +65,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/systm.h>
 #include <sys/vmmeter.h>
 #include <sys/smp.h>
+#include <sys/reboot.h>
 
 #include <sys/kdb.h>
 
@@ -119,8 +120,7 @@ uintptr_t moea64_get_unique_vsid(void);
  *
  */
 
-#define PV_LOCK_PER_DOM	(PA_LOCK_COUNT * 3)
-#define PV_LOCK_COUNT	(PV_LOCK_PER_DOM * MAXMEMDOM)
+#define PV_LOCK_COUNT	PA_LOCK_COUNT
 static struct mtx_padalign pv_lock[PV_LOCK_COUNT];
  
 /*
@@ -129,8 +129,7 @@ static struct mtx_padalign pv_lock[PV_LOCK_COUNT];
  * index at (N << 45).
  */
 #ifdef __powerpc64__
-#define PV_LOCK_IDX(pa)	(pa_index(pa) % PV_LOCK_PER_DOM + \
-			(((pa) >> 45) % MAXMEMDOM) * PV_LOCK_PER_DOM)
+#define PV_LOCK_IDX(pa)	((pa_index(pa) * (((pa) >> 45) + 1)) % PV_LOCK_COUNT)
 #else
 #define PV_LOCK_IDX(pa)	(pa_index(pa) % PV_LOCK_COUNT)
 #endif
@@ -184,11 +183,12 @@ uma_zone_t	moea64_pvo_zone; /* zone for pvo entries */
 
 static struct	pvo_entry *moea64_bpvo_pool;
 static int	moea64_bpvo_pool_index = 0;
-static int	moea64_bpvo_pool_size = 327680;
-TUNABLE_INT("machdep.moea64_bpvo_pool_size", &moea64_bpvo_pool_size);
+static int	moea64_bpvo_pool_size = 0;
 SYSCTL_INT(_machdep, OID_AUTO, moea64_allocated_bpvo_entries, CTLFLAG_RD, 
     &moea64_bpvo_pool_index, 0, "");
 
+#define	BPVO_POOL_SIZE	327680 /* Sensible historical default value */
+#define	BPVO_POOL_EXPANSION_FACTOR	3
 #define	VSID_NBPW	(sizeof(u_int32_t) * 8)
 #ifdef __powerpc64__
 #define	NVSIDS		(NPMAPS * 16)
@@ -303,6 +303,7 @@ void moea64_dumpsys_map(mmu_t mmu, vm_paddr_t pa, size_t sz,
 void moea64_scan_init(mmu_t mmu);
 vm_offset_t moea64_quick_enter_page(mmu_t mmu, vm_page_t m);
 void moea64_quick_remove_page(mmu_t mmu, vm_offset_t addr);
+boolean_t moea64_page_is_mapped(mmu_t mmu, vm_page_t m);
 static int moea64_map_user_ptr(mmu_t mmu, pmap_t pm,
     volatile const void *uaddr, void **kaddr, size_t ulen, size_t *klen);
 static int moea64_decode_kernel_ptr(mmu_t mmu, vm_offset_t addr,
@@ -351,6 +352,7 @@ static mmu_method_t moea64_methods[] = {
 	MMUMETHOD(mmu_page_set_memattr,	moea64_page_set_memattr),
 	MMUMETHOD(mmu_quick_enter_page, moea64_quick_enter_page),
 	MMUMETHOD(mmu_quick_remove_page, moea64_quick_remove_page),
+	MMUMETHOD(mmu_page_is_mapped,	moea64_page_is_mapped),
 #ifdef __powerpc64__
 	MMUMETHOD(mmu_page_array_startup,	moea64_page_array_startup),
 #endif
@@ -390,9 +392,11 @@ alloc_pvo_entry(int bootstrap)
 
 	if (!moea64_initialized || bootstrap) {
 		if (moea64_bpvo_pool_index >= moea64_bpvo_pool_size) {
-			panic("moea64_enter: bpvo pool exhausted, %d, %d, %zd",
-			      moea64_bpvo_pool_index, moea64_bpvo_pool_size,
-			      moea64_bpvo_pool_size * sizeof(struct pvo_entry));
+			panic("%s: bpvo pool exhausted, index=%d, size=%d, bytes=%zd."
+			    "Try setting machdep.moea64_bpvo_pool_size tunable",
+			    __func__, moea64_bpvo_pool_index,
+			    moea64_bpvo_pool_size,
+			    moea64_bpvo_pool_size * sizeof(struct pvo_entry));
 		}
 		pvo = &moea64_bpvo_pool[
 		    atomic_fetchadd_int(&moea64_bpvo_pool_index, 1)];
@@ -914,6 +918,21 @@ moea64_mid_bootstrap(mmu_t mmup, vm_offset_t kernelstart, vm_offset_t kernelend)
 	/*
 	 * Initialise the bootstrap pvo pool.
 	 */
+	TUNABLE_INT_FETCH("machdep.moea64_bpvo_pool_size", &moea64_bpvo_pool_size);
+	if (moea64_bpvo_pool_size == 0) {
+		if (!hw_direct_map)
+			moea64_bpvo_pool_size = ((ptoa((uintmax_t)physmem) * sizeof(struct vm_page)) /
+			    (PAGE_SIZE * PAGE_SIZE)) * BPVO_POOL_EXPANSION_FACTOR;
+		else
+			moea64_bpvo_pool_size = BPVO_POOL_SIZE;
+	}
+
+	if (boothowto & RB_VERBOSE) {
+		printf("mmu_oea64: bpvo pool entries = %d, bpvo pool size = %zu MB\n",
+		    moea64_bpvo_pool_size,
+		    moea64_bpvo_pool_size*sizeof(struct pvo_entry) / 1048576);
+	}
+
 	moea64_bpvo_pool = (struct pvo_entry *)moea64_bootstrap_alloc(
 		moea64_bpvo_pool_size*sizeof(struct pvo_entry), PAGE_SIZE);
 	moea64_bpvo_pool_index = 0;
@@ -1404,6 +1423,12 @@ moea64_quick_remove_page(mmu_t mmu, vm_offset_t addr)
 	    ("moea64_quick_remove_page: invalid address"));
 	mtx_unlock(PCPU_PTR(aim.qmap_lock));
 	sched_unpin();	
+}
+
+boolean_t
+moea64_page_is_mapped(mmu_t mmu, vm_page_t m)
+{
+	return (!LIST_EMPTY(&(m)->md.mdpg_pvoh));
 }
 
 /*

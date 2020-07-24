@@ -38,11 +38,12 @@ static const char * retsrt(void) {
         return str;
 }
 
+const char *(*fp)(void) = &retsrt;
+
 BEGIN_TEST(clang_purecap_funptr)
 #ifdef INCLUDE_XFAIL
 	assert_eq(sizeof(&retsrt), sizeof(void *));
 #endif
-	const char *(*fp)(void) = &retsrt;
 	assert_eq(sizeof(fp), sizeof(void *));
 	assert_eq(strcmp(fp(), STRVAL), 0);
 END_TEST

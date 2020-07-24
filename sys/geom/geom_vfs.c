@@ -139,7 +139,7 @@ g_vfs_done(struct bio *bip)
 
 	cp = bip->bio_from;
 	sc = cp->geom->softc;
-	if (bip->bio_error)
+	if (bip->bio_error && bip->bio_error != EOPNOTSUPP)
 		g_print_bio("g_vfs_done():", bip, "error = %d",
 		    bip->bio_error);
 	bp->b_error = bip->bio_error;
@@ -191,6 +191,8 @@ g_vfs_strategy(struct bufobj *bo, struct buf *bp)
 		bip->bio_flags |= BIO_ORDERED;
 		bp->b_flags &= ~B_BARRIER;
 	}
+	if (bp->b_iocmd == BIO_SPEEDUP)
+		bip->bio_flags |= bp->b_ioflags;
 	bip->bio_done = g_vfs_done;
 	bip->bio_caller2 = bp;
 #if defined(BUF_TRACKING) || defined(FULL_BUF_TRACKING)

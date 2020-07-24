@@ -1,4 +1,4 @@
-# CHERI_MALTA64 -- 64-bit kernel config for MALTA boards + 256-bit CHERI
+# CHERI_MALTA64 -- 64-bit kernel config for MALTA boards + CHERI
 #
 # $FreeBSD$
  
@@ -6,8 +6,6 @@ ident		CHERI_MALTA64
 
 include		"std.MALTA"
 include		"std.CHERI"
- 
-hints		"CHERI_MALTA64.hints"  #Default places to look for devices.
 
 machine		mips mips64	# Malta supports both, so it isn't in std.malta
  
@@ -19,6 +17,7 @@ options 	KTRACE
 # Features required for CHERI CPU and CheriBSD support.
 #
 options 	KSTACK_LARGE_PAGE
+options 	NO_SWAPPING
 options 	TMPFS
 
 #

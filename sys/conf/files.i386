@@ -25,7 +25,7 @@ cloudabi32_vdso_blob.o		optional	compat_cloudabi32	\
 #
 linux_genassym.o		optional	compat_linux		\
 	dependency 	"$S/i386/linux/linux_genassym.c offset.inc"		\
-	compile-with	"${CC} ${CFLAGS:N-flto:N-fno-common} -c ${.IMPSRC}" \
+	compile-with	"${CC} ${CFLAGS:N-flto:N-fno-common} -fcommon -c ${.IMPSRC}" \
 	no-obj no-implicit-rule						\
 	clean		"linux_genassym.o"
 #
@@ -46,16 +46,6 @@ linux_vdso.so			optional	compat_linux		\
 	compile-with	"${OBJCOPY} --input-target binary --output-target elf32-i386-freebsd --binary-architecture i386 linux_locore.o ${.TARGET}" \
 	no-implicit-rule						\
 	clean		"linux_vdso.so"
-#
-font.h				optional	sc_dflt_font		\
-	compile-with	"uudecode < /usr/share/syscons/fonts/${SC_DFLT_FONT}-8x16.fnt && file2c 'static u_char dflt_font_16[16*256] = {' '};' < ${SC_DFLT_FONT}-8x16 > font.h && uudecode < /usr/share/syscons/fonts/${SC_DFLT_FONT}-8x14.fnt && file2c 'static u_char dflt_font_14[14*256] = {' '};' < ${SC_DFLT_FONT}-8x14 >> font.h && uudecode < /usr/share/syscons/fonts/${SC_DFLT_FONT}-8x8.fnt && file2c 'static u_char dflt_font_8[8*256] = {' '};' < ${SC_DFLT_FONT}-8x8 >> font.h"										\
-	no-obj no-implicit-rule before-depend				\
-	clean		"font.h ${SC_DFLT_FONT}-8x14 ${SC_DFLT_FONT}-8x16 ${SC_DFLT_FONT}-8x8"
-#
-atkbdmap.h			optional	atkbd_dflt_keymap	\
-	compile-with	"kbdcontrol -P ${S:S/sys$/share/}/vt/keymaps -P ${S:S/sys$/share/}/syscons/keymaps -L ${ATKBD_DFLT_KEYMAP} | sed -e 's/^static keymap_t.* = /static keymap_t key_map = /' -e 's/^static accentmap_t.* = /static accentmap_t accent_map = /' > atkbdmap.h"			\
-	no-obj no-implicit-rule before-depend				\
-	clean		"atkbdmap.h"
 #
 cddl/contrib/opensolaris/common/atomic/i386/opensolaris_atomic.S	optional zfs | dtrace compile-with "${ZFS_S}"
 cddl/dev/dtrace/i386/dtrace_asm.S			optional dtrace compile-with "${DTRACE_S}"
@@ -85,12 +75,8 @@ compat/linux/linux_util.c	optional compat_linux
 compat/linux/linux_vdso.c	optional compat_linux
 compat/linux/linux.c		optional compat_linux
 compat/ndis/winx32_wrap.S	optional ndisapi pci
-bf_enc.o			optional crypto | ipsec	| ipsec_support \
-	dependency	"$S/crypto/blowfish/arch/i386/bf_enc.S $S/crypto/blowfish/arch/i386/bf_enc_586.S $S/crypto/blowfish/arch/i386/bf_enc_686.S" \
-	compile-with	"${CC} -c -I$S/crypto/blowfish/arch/i386 ${ASM_CFLAGS} ${WERROR} ${.IMPSRC}" \
-	no-implicit-rule
 crypto/aesni/aeskeys_i386.S	optional aesni
-crypto/des/arch/i386/des_enc.S	optional crypto | ipsec | ipsec_support | netsmb
+crypto/des/arch/i386/des_enc.S	optional netsmb
 dev/agp/agp_ali.c		optional agp
 dev/agp/agp_amd.c		optional agp
 dev/agp/agp_amd64.c		optional agp
@@ -103,15 +89,10 @@ dev/agp/agp_via.c		optional agp
 dev/ce/ceddk.c			optional ce
 dev/ce/if_ce.c			optional ce
 dev/ce/tau32-ddk.c		optional ce \
-	compile-with "${NORMAL_C} ${NO_WCONSTANT_CONVERSION}"
-dev/cp/cpddk.c			optional cp
+	compile-with "${NORMAL_C} ${NO_WCONSTANT_CONVERSION} ${NO_WMISLEADING_INDENTATION}"
+dev/cp/cpddk.c			optional cp \
+	compile-with "${NORMAL_C} ${NO_WMISLEADING_INDENTATION}"
 dev/cp/if_cp.c			optional cp
-dev/ctau/ctau.c			optional ctau
-dev/ctau/ctddk.c		optional ctau
-dev/ctau/if_ct.c		optional ctau
-dev/cx/csigma.c			optional cx
-dev/cx/cxddk.c			optional cx
-dev/cx/if_cx.c			optional cx
 dev/glxiic/glxiic.c		optional glxiic
 dev/glxsb/glxsb.c		optional glxsb
 dev/glxsb/glxsb_hash.c		optional glxsb

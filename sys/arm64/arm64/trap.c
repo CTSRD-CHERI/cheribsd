@@ -34,7 +34,6 @@ __FBSDID("$FreeBSD$");
 #include <sys/ktr.h>
 #include <sys/lock.h>
 #include <sys/mutex.h>
-#include <sys/pioctl.h>
 #include <sys/proc.h>
 #include <sys/ptrace.h>
 #include <sys/syscall.h>
@@ -357,12 +356,15 @@ do_el1h_sync(struct thread *td, struct trapframe *frame)
 		far = READ_SPECIALREG(far_el1);
 		dfsc = esr & ISS_DATA_DFSC_MASK;
 		if (dfsc < nitems(abort_handlers) &&
-		    abort_handlers[dfsc] != NULL)
+		    abort_handlers[dfsc] != NULL) {
 			abort_handlers[dfsc](td, frame, esr, far, 0);
-		else
+		} else {
+			print_registers(frame);
+			printf(" far: %16lx\n", far);
 			panic("Unhandled EL1 %s abort: %x",
 			    exception == EXCP_INSN_ABORT ? "instruction" :
 			    "data", dfsc);
+		}
 		break;
 	case EXCP_BRK:
 #ifdef KDTRACE_HOOKS

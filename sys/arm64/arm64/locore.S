@@ -153,18 +153,19 @@ virtdone:
 	sub	x26, x26, x29
 	sub	x24, x24, x29
 
-	sub	sp, sp, #(64 * 4)
+	sub	sp, sp, #BOOTPARAMS_SIZE
 	mov	x0, sp
 
 	/* Degate the delda so it is VA -> PA */
 	neg	x29, x29
 
-	str	x1,  [x0]	/* modulep */
-	str	x26, [x0, 8]	/* kern_l1pt */
-	str	x29, [x0, 16]	/* kern_delta */
+	str	x1,  [x0, #BP_MODULEP]
+	str	x26, [x0, #BP_KERN_L1PT]
+	str	x29, [x0, #BP_KERN_DELTA]
 	adr	x25, initstack
-	str	x25, [x0, 24]	/* kern_stack */
-	str	x24, [x0, 32]	/* kern_l0pt */
+	str	x25, [x0, #BP_KERN_STACK]
+	str	x24, [x0, #BP_KERN_L0PT]
+	str	x23, [x0, #BP_BOOT_EL]
 
 	/* trace back starts here */
 	mov	fp, #0
@@ -213,11 +214,10 @@ ENTRY(mpentry)
 	br	x15
 
 mp_virtdone:
-	ldr	x4, =secondary_stacks
-	mov	x5, #(PAGE_SIZE * KSTACK_PAGES)
-	mul	x5, x0, x5
-	add	sp, x4, x5
-
+	/* Start using the AP boot stack */
+	ldr	x4, =bootstack
+	ldr	x4, [x4]
+	mov	sp, x4
 	b	init_secondary
 END(mpentry)
 #endif
@@ -227,9 +227,9 @@ END(mpentry)
  * registers and drop to EL1.
  */
 drop_to_el1:
-	mrs	x1, CurrentEL
-	lsr	x1, x1, #2
-	cmp	x1, #0x2
+	mrs	x23, CurrentEL
+	lsr	x23, x23, #2
+	cmp	x23, #0x2
 	b.eq	1f
 	ret
 1:
@@ -461,7 +461,7 @@ common:
 	bl	link_l0_pagetable
 
 	/*
-	 * Build the TTBR0 maps.  As TTBR0 maps, they must specify ATTR_nG.
+	 * Build the TTBR0 maps.  As TTBR0 maps, they must specify ATTR_S1_nG.
 	 * They are only needed early on, so the VA = PA map is uncached.
 	 */
 	add	x27, x24, #PAGE_SIZE
@@ -469,7 +469,7 @@ common:
 	mov	x6, x27		/* The initial page table */
 #if defined(SOCDEV_PA) && defined(SOCDEV_VA)
 	/* Create a table for the UART */
-	mov	x7, #(ATTR_nG | ATTR_IDX(VM_MEMATTR_DEVICE))
+	mov	x7, #(ATTR_S1_nG | ATTR_S1_IDX(VM_MEMATTR_DEVICE))
 	mov	x8, #(SOCDEV_VA)	/* VA start */
 	mov	x9, #(SOCDEV_PA)	/* PA start */
 	mov	x10, #1
@@ -481,7 +481,7 @@ common:
 	cbz	x19, 1f
 
 	/* Create the identity mapping for FDT data (2 MiB max) */
-	mov	x7, #(ATTR_nG | ATTR_IDX(VM_MEMATTR_UNCACHEABLE))
+	mov	x7, #(ATTR_S1_nG | ATTR_S1_IDX(VM_MEMATTR_UNCACHEABLE))
 	mov	x9, x0
 	mov	x8, x0		/* VA start (== PA start) */
 	mov	x10, #1
@@ -491,7 +491,7 @@ common:
 #endif
 
 	/* Create the VA = PA map */
-	mov	x7, #(ATTR_nG | ATTR_IDX(VM_MEMATTR_UNCACHEABLE))
+	mov	x7, #(ATTR_S1_nG | ATTR_S1_IDX(VM_MEMATTR_UNCACHEABLE))
 	mov	x9, x27
 	mov	x8, x9		/* VA start (== PA start) */
 	mov	x10, #1
@@ -639,7 +639,7 @@ build_l2_block_pagetable:
 	lsl	x12, x7, #2
 	orr	x12, x12, #L2_BLOCK
 	orr	x12, x12, #(ATTR_AF)
-	orr	x12, x12, #(ATTR_UXN)
+	orr	x12, x12, #(ATTR_S1_UXN)
 #ifdef SMP
 	orr	x12, x12, ATTR_SH(ATTR_SH_IS)
 #endif
@@ -683,7 +683,8 @@ start_mmu:
 
 	/*
 	 * Setup TCR according to the PARange and ASIDBits fields
-	 * from ID_AA64MMFR0_EL1.  More precisely, set TCR_EL1.AS
+	 * from ID_AA64MMFR0_EL1 and the HAFDBS field from the
+	 * ID_AA64MMFR1_EL1.  More precisely, set TCR_EL1.AS
 	 * to 1 only if the ASIDBits field equals 0b0010.
 	 */
 	ldr	x2, tcr
@@ -700,6 +701,21 @@ start_mmu:
 	/* Set TCR.AS with x3 */
 	bfi	x2, x3, #(TCR_ASID_SHIFT), #(TCR_ASID_WIDTH)
 
+	/*
+	 * Check if the HW supports access flag and dirty state updates,
+	 * and set TCR_EL1.HA and TCR_EL1.HD accordingly.
+	 */
+	mrs	x3, id_aa64mmfr1_el1
+	and	x3, x3, #(ID_AA64MMFR1_HAFDBS_MASK)
+	cmp	x3, #1
+	b.ne	1f
+	orr 	x2, x2, #(TCR_HA)
+	b	2f
+1:
+	cmp	x3, #2
+	b.ne	2f
+	orr 	x2, x2, #(TCR_HA | TCR_HD)
+2:
 	msr	tcr_el1, x2
 
 	/*

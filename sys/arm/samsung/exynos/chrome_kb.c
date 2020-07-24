@@ -81,7 +81,7 @@ __FBSDID("$FreeBSD$");
  */
 #define	CKB_CTX_LOCK_ASSERT()			 	\
 	do {						\
-		if (!kdb_active && panicstr == NULL)	\
+		if (!kdb_active && !KERNEL_PANICKED())	\
 			mtx_assert(&Giant, MA_OWNED);	\
 	} while (0)
 #else
@@ -662,9 +662,7 @@ keyboard_switch_t ckbdsw = {
 	.clear_state = &ckb_clear_state,
 	.get_state = &ckb_get_state,
 	.set_state = &ckb_set_state,
-	.get_fkeystr = &genkbd_get_fkeystr,
 	.poll = &ckb_poll,
-	.diag = &genkbd_diag,
 };
 
 static int

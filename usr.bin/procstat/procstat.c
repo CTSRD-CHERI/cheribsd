@@ -94,13 +94,15 @@ static const struct procstat_cmd cmd_table[] = {
 	    PS_CMP_NORMAL },
 	{ "rusage", "rusage", "[-Ht]", &procstat_rusage, &cmdopt_rusage,
 	    PS_CMP_NORMAL },
+	{ "sigfastblock", "sigfastblock", NULL, &procstat_sigfastblock,
+	    &cmdopt_none, PS_CMP_NORMAL },
 	{ "signal", "signals", "[-n]", &procstat_sigs, &cmdopt_signals,
 	    PS_CMP_PLURAL | PS_CMP_SUBSTR },
 	{ "thread", "threads", NULL, &procstat_threads, &cmdopt_none,
 	    PS_CMP_PLURAL },
 	{ "tsignal", "thread_signals", "[-n]", &procstat_threads_sigs,
 	    &cmdopt_signals, PS_CMP_PLURAL | PS_CMP_SUBSTR },
-	{ "vm", "vm", NULL, &procstat_vm, &cmdopt_none, PS_CMP_NORMAL }
+	{ "vm", "vm", NULL, &procstat_vm, &cmdopt_verbose, PS_CMP_NORMAL }
 };
 
 static void

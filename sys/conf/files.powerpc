@@ -9,18 +9,13 @@
 #
 #
 
-font.h				optional	sc			\
-	compile-with	"uudecode < /usr/share/syscons/fonts/${SC_DFLT_FONT}-8x16.fnt && file2c 'u_char dflt_font_16[16*256] = {' '};' < ${SC_DFLT_FONT}-8x16 > font.h && uudecode < /usr/share/syscons/fonts/${SC_DFLT_FONT}-8x14.fnt && file2c 'u_char dflt_font_14[14*256] = {' '};' < ${SC_DFLT_FONT}-8x14 >> font.h && uudecode < /usr/share/syscons/fonts/${SC_DFLT_FONT}-8x8.fnt && file2c 'u_char dflt_font_8[8*256] = {' '};' < ${SC_DFLT_FONT}-8x8 >> font.h" \
-	no-obj no-implicit-rule before-depend				\
-	clean	"font.h ${SC_DFLT_FONT}-8x14 ${SC_DFLT_FONT}-8x16 ${SC_DFLT_FONT}-8x8"
-#
 # There is only an asm version on ppc64.
 cddl/compat/opensolaris/kern/opensolaris_atomic.c			optional zfs powerpc | dtrace powerpc | zfs powerpcspe | dtrace powerpcspe compile-with "${ZFS_C}"
 cddl/dev/dtrace/powerpc/dtrace_asm.S		optional dtrace compile-with "${DTRACE_S}"
 cddl/dev/dtrace/powerpc/dtrace_subr.c		optional dtrace compile-with "${DTRACE_C}"
 cddl/dev/fbt/powerpc/fbt_isa.c			optional dtrace_fbt | dtraceall compile-with "${FBT_C}"
-crypto/blowfish/bf_enc.c	optional	crypto | ipsec | ipsec_support
-crypto/des/des_enc.c		optional	crypto | ipsec | ipsec_support | netsmb
+crypto/des/des_enc.c		optional	netsmb
+dev/aacraid/aacraid_endian.c	optional	aacraid
 dev/adb/adb_bus.c		optional	adb
 dev/adb/adb_kbd.c		optional	adb
 dev/adb/adb_mouse.c		optional	adb
@@ -42,6 +37,43 @@ dev/iicbus/max6690.c		optional	max6690 powermac
 dev/iicbus/ofw_iicbus.c		optional	iicbus aim
 dev/ipmi/ipmi.c			optional	ipmi
 dev/ipmi/ipmi_opal.c		optional	powernv ipmi
+dev/ixl/if_ixl.c		optional	ixl pci powerpc64 \
+	compile-with "${NORMAL_C} -I$S/dev/ixl"
+dev/ixl/ixl_pf_main.c		optional	ixl pci powerpc64 \
+	compile-with "${NORMAL_C} -I$S/dev/ixl"
+dev/ixl/ixl_pf_qmgr.c		optional	ixl pci powerpc64 \
+	compile-with "${NORMAL_C} -I$S/dev/ixl"
+dev/ixl/ixl_pf_iov.c		optional	ixl pci pci_iov powerpc64 \
+	compile-with "${NORMAL_C} -I$S/dev/ixl"
+dev/ixl/ixl_pf_i2c.c		optional	ixl pci powerpc64 \
+	compile-with "${NORMAL_C} -I$S/dev/ixl"
+dev/ixl/if_iavf.c		optional	iavf pci powerpc64 \
+	compile-with "${NORMAL_C} -I$S/dev/ixl"
+dev/ixl/iavf_vc.c		optional	iavf pci powerpc64 \
+	compile-with "${NORMAL_C} -I$S/dev/ixl"
+dev/ixl/ixl_txrx.c		optional	ixl pci powerpc64 | \
+						iavf pci powerpc64 \
+	compile-with "${NORMAL_C} -I$S/dev/ixl"
+dev/ixl/i40e_osdep.c		optional	ixl pci powerpc64 | \
+						iavf pci powerpc64 \
+	compile-with "${NORMAL_C} -I$S/dev/ixl"
+dev/ixl/i40e_lan_hmc.c		optional	ixl pci powerpc64 | \
+						iavf pci powerpc64 \
+	compile-with "${NORMAL_C} -I$S/dev/ixl"
+dev/ixl/i40e_hmc.c		optional	ixl pci powerpc64 | \
+						iavf pci powerpc64 \
+	compile-with "${NORMAL_C} -I$S/dev/ixl"
+dev/ixl/i40e_common.c		optional	ixl pci powerpc64 | \
+						iavf pci powerpc64 \
+	compile-with "${NORMAL_C} -I$S/dev/ixl"
+dev/ixl/i40e_nvm.c		optional	ixl pci powerpc64 | \
+						iavf pci powerpc64 \
+	compile-with "${NORMAL_C} -I$S/dev/ixl"
+dev/ixl/i40e_adminq.c		optional	ixl pci powerpc64 | \
+						iavf pci powerpc64 \
+	compile-with "${NORMAL_C} -I$S/dev/ixl"
+dev/ixl/i40e_dcb.c		optional	ixl pci powerpc64 \
+	compile-with "${NORMAL_C} -I$S/dev/ixl"
 # Most ofw stuff below is brought in by conf/files for options FDT, but
 # we always want it, even on non-FDT platforms.
 dev/fdt/simplebus.c		standard
@@ -76,6 +108,7 @@ dev/uart/uart_cpu_powerpc.c	optional	uart
 dev/usb/controller/ehci_fsl.c	optional	ehci mpc85xx
 dev/vt/hw/ofwfb/ofwfb.c		optional	vt aim
 kern/kern_clocksource.c		standard
+kern/subr_atomic64.c		optional	powerpc | powerpcspe
 kern/subr_dummy_vdso_tc.c	standard
 kern/syscalls.c			optional	ktr
 kern/subr_sfbuf.c		standard
@@ -101,11 +134,14 @@ powerpc/aim/locore.S		optional	aim no-obj
 powerpc/aim/aim_machdep.c	optional	aim
 powerpc/aim/mmu_oea.c		optional	aim powerpc
 powerpc/aim/mmu_oea64.c		optional	aim
+powerpc/aim/mmu_radix.c		optional	aim powerpc64
 powerpc/aim/moea64_if.m		optional	aim
 powerpc/aim/moea64_native.c	optional	aim
 powerpc/aim/mp_cpudep.c		optional	aim
 powerpc/aim/slb.c		optional	aim powerpc64
 powerpc/amigaone/platform_amigaone.c	optional	amigaone
+powerpc/amigaone/cpld_a1222.c	optional	powerpc amigaone | powerpcspe amigaone
+powerpc/amigaone/cpld_x5000.c	optional	powerpc amigaone | powerpc64 amigaone
 powerpc/booke/locore.S		optional	booke no-obj
 powerpc/booke/booke_machdep.c	optional	booke
 powerpc/booke/machdep_e500.c	optional	booke_e500
@@ -139,7 +175,7 @@ powerpc/mpc85xx/ds1553_core.c	optional	ds1553
 powerpc/mpc85xx/fsl_diu.c	optional	mpc85xx diu
 powerpc/mpc85xx/fsl_espi.c	optional	mpc85xx spibus
 powerpc/mpc85xx/fsl_sata.c	optional	mpc85xx ata
-powerpc/mpc85xx/i2c.c		optional	iicbus
+powerpc/mpc85xx/i2c.c		optional	mpc85xx iicbus
 powerpc/mpc85xx/isa.c		optional	mpc85xx isa
 powerpc/mpc85xx/lbc.c		optional	mpc85xx
 powerpc/mpc85xx/mpc85xx.c	optional	mpc85xx
@@ -205,7 +241,6 @@ powerpc/powerpc/bus_machdep.c	standard
 powerpc/powerpc/busdma_machdep.c standard
 powerpc/powerpc/clock.c		standard
 powerpc/powerpc/copyinout.c	standard
-powerpc/powerpc/copystr.c	standard
 powerpc/powerpc/cpu.c		standard
 powerpc/powerpc/cpu_subr64.S	optional	powerpc64
 powerpc/powerpc/db_disasm.c	optional	ddb

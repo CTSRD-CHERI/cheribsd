@@ -4,8 +4,10 @@
 # machine-independent gen sources
 .PATH: ${LIBC_SRCTOP}/${LIBC_ARCH}/gen ${LIBC_SRCTOP}/gen ${SRCTOP}/etc
 
-.if ${MACHINE_ARCH:Mmips*c*}
+.if ${MACHINE_ABI:Mpurecap}
 CFLAGS+=	-DNO_COMPAT7
+.endif
+.if ${MACHINE_ARCH:Mmips*c*}
 CFLAGS.getpwent.c=	-mxgot
 .endif
 
@@ -162,8 +164,7 @@ SRCS+=	__getosreldate.c \
 	waitpid.c \
 	waitid.c \
 	wordexp.c
-.if ${MK_SYMVER} == yes && \
-    ! ${MACHINE_ARCH:Mmips*c*}
+.if !${MACHINE_ABI:Mpurecap}
 SRCS+=	devname-compat11.c \
 	fts-compat.c \
 	fts-compat11.c \
@@ -557,11 +558,13 @@ MLINKS+=vis.3 nvis.3 \
 
 MLINKS+=wordexp.3 wordfree.3
 
+.include <src.tools.mk>
+
 afterinstallconfig:
 .if ${MK_TCSH} == "no"
 	sed -i "" -e 's;/bin/csh;/bin/sh;' ${DESTDIR}/etc/master.passwd
 .endif
-	pwd_mkdb -i -p -d ${DESTDIR}/etc ${DESTDIR}/etc/master.passwd
+	${PWD_MKDB_CMD} -i -p -d ${DESTDIR}/etc ${DESTDIR}/etc/master.passwd
 .if defined(NO_ROOT) && defined(METALOG)
 	( \
 		echo "./etc/pwd.db type=file mode=0644 uname=root gname=wheel"; \

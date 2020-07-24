@@ -263,6 +263,9 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 		case R_386_TLS_DTPOFF32:
 			*where += (Elf_Addr) def->st_value;
 			break;
+		case R_386_IRELATIVE:
+			obj->irelative_nonplt = true;
+			break;
 		default:
 			_rtld_error("%s: Unsupported relocation type %d"
 			    " in non-PLT relocations\n", obj->path,
@@ -365,29 +368,51 @@ reloc_jmpslot(Elf_Addr *where, Elf_Addr target,
 	return (target);
 }
 
+static void
+reloc_iresolve_one(Obj_Entry *obj, const Elf_Rel *rel,
+    RtldLockState *lockstate)
+{
+	Elf_Addr *where, target;
+
+	where = (Elf_Addr *)(obj->relocbase + rel->r_offset);
+	lock_release(rtld_bind_lock, lockstate);
+	target = call_ifunc_resolver(obj->relocbase + *where);
+	wlock_acquire(rtld_bind_lock, lockstate);
+	*where = target;
+}
+
 int
 reloc_iresolve(Obj_Entry *obj, RtldLockState *lockstate)
 {
-    const Elf_Rel *rellim;
-    const Elf_Rel *rel;
-    Elf_Addr *where, target;
+	const Elf_Rel *rellim;
+	const Elf_Rel *rel;
 
-    if (!obj->irelative)
-	return (0);
-    rellim = (const Elf_Rel *)((const char *)obj->pltrel + obj->pltrelsize);
-    for (rel = obj->pltrel;  rel < rellim;  rel++) {
-	switch (ELF_R_TYPE(rel->r_info)) {
-	case R_386_IRELATIVE:
-	  where = (Elf_Addr *)(obj->relocbase + rel->r_offset);
-	  lock_release(rtld_bind_lock, lockstate);
-	  target = call_ifunc_resolver(obj->relocbase + *where);
-	  wlock_acquire(rtld_bind_lock, lockstate);
-	  *where = target;
-	  break;
+	if (!obj->irelative)
+		return (0);
+	obj->irelative = false;
+	rellim = (const Elf_Rel *)((const char *)obj->pltrel + obj->pltrelsize);
+	for (rel = obj->pltrel;  rel < rellim;  rel++) {
+		if (ELF_R_TYPE(rel->r_info) == R_386_IRELATIVE)
+			reloc_iresolve_one(obj, rel, lockstate);
 	}
-    }
-    obj->irelative = false;
-    return (0);
+	return (0);
+}
+
+int
+reloc_iresolve_nonplt(Obj_Entry *obj, RtldLockState *lockstate)
+{
+	const Elf_Rel *rellim;
+	const Elf_Rel *rel;
+
+	if (!obj->irelative_nonplt)
+		return (0);
+	obj->irelative_nonplt = false;
+	rellim = (const Elf_Rel *)((const char *)obj->rel + obj->relsize);
+	for (rel = obj->rel;  rel < rellim;  rel++) {
+		if (ELF_R_TYPE(rel->r_info) == R_386_IRELATIVE)
+			reloc_iresolve_one(obj, rel, lockstate);
+	}
+	return (0);
 }
 
 int
@@ -517,4 +542,34 @@ void *__tls_get_addr(tls_index *ti)
     __asm __volatile("movl %%gs:0, %0" : "=r" (segbase));
 
     return tls_get_addr_common(&segbase[1], ti->ti_module, ti->ti_offset);
+}
+
+size_t
+calculate_first_tls_offset(size_t size, size_t align, size_t offset)
+{
+	size_t res;
+
+	res = roundup(size, align);
+	offset &= align - 1;
+	if (offset != 0)
+		res += align - offset;
+	return (res);
+}
+
+size_t
+calculate_tls_offset(size_t prev_offset, size_t prev_size __unused, size_t size,
+    size_t align, size_t offset)
+{
+	size_t res;
+
+	res = roundup(prev_offset + size, align);
+	offset &= align - 1;
+	if (offset != 0)
+		res += align - offset;
+	return (res);
+}
+size_t
+calculate_tls_end(size_t off, size_t size __unused)
+{
+	return (off);
 }

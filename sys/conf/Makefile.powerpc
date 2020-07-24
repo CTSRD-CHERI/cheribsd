@@ -37,7 +37,8 @@ INCLUDES+= -I$S/contrib/libfdt
 
 .if "${MACHINE_ARCH}" == "powerpcspe"
 # Force __SPE__, since the builtin will be removed later with -mno-spe
-CFLAGS+= -mabi=spe -D__SPE__
+CFLAGS.gcc+= -mabi=spe -D__SPE__
+CFLAGS.clang+= -mspe -D__SPE__ -m32
 .endif
 CFLAGS+= -msoft-float
 CFLAGS.gcc+= -Wa,-many
@@ -50,7 +51,7 @@ DPAAWARNFLAGS += \
         -Wno-error=incompatible-pointer-types-discards-qualifiers \
         -Wno-error=non-literal-null-conversion \
         -Wno-error=enum-conversion
-.elif "${COMPILER_TYPE}" == "gcc" && ${COMPILER_VERSION} >= 50200
+.elif "${COMPILER_TYPE}" == "gcc"
 DPAAWARNFLAGS += \
 	-Wno-error=redundant-decls \
 	-Wno-error=int-in-bool-context

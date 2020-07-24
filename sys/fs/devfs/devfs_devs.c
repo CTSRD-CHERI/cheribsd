@@ -63,7 +63,8 @@ static MALLOC_DEFINE(M_DEVFS2, "DEVFS2", "DEVFS data 2");
 static MALLOC_DEFINE(M_DEVFS3, "DEVFS3", "DEVFS data 3");
 static MALLOC_DEFINE(M_CDEVP, "DEVFS1", "DEVFS cdev_priv storage");
 
-SYSCTL_NODE(_vfs, OID_AUTO, devfs, CTLFLAG_RW, 0, "DEVFS filesystem");
+SYSCTL_NODE(_vfs, OID_AUTO, devfs, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
+    "DEVFS filesystem");
 
 static unsigned devfs_generation;
 SYSCTL_UINT(_vfs_devfs, OID_AUTO, generation, CTLFLAG_RD,
@@ -407,7 +408,7 @@ devfs_delete(struct devfs_mount *dm, struct devfs_dirent *de, int flags)
 			VI_UNLOCK(vp);
 		vgone(vp);
 		if ((flags & DEVFS_DEL_VNLOCKED) == 0)
-			VOP_UNLOCK(vp, 0);
+			VOP_UNLOCK(vp);
 		vdrop(vp);
 		sx_xlock(&dm->dm_lock);
 	} else

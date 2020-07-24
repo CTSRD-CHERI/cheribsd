@@ -1237,7 +1237,8 @@ atse_sysctl_stats_attach(device_t dev)
 		}
 
 		SYSCTL_ADD_PROC(sctx, SYSCTL_CHILDREN(soid), OID_AUTO,
-		    atse_mac_stats_regs[i].name, CTLTYPE_UINT|CTLFLAG_RD,
+		    atse_mac_stats_regs[i].name,
+		    CTLTYPE_UINT | CTLFLAG_RD | CTLFLAG_NEEDGIANT,
 		    sc, i, sysctl_atse_mac_stats_proc, "IU",
 		    atse_mac_stats_regs[i].descr);
 	}
@@ -1250,7 +1251,8 @@ atse_sysctl_stats_attach(device_t dev)
 		}
 
 		SYSCTL_ADD_PROC(sctx, SYSCTL_CHILDREN(soid), OID_AUTO,
-		    atse_rx_err_stats_regs[i].name, CTLTYPE_UINT|CTLFLAG_RD,
+		    atse_rx_err_stats_regs[i].name,
+		    CTLTYPE_UINT | CTLFLAG_RD | CTLFLAG_NEEDGIANT,
 		    sc, i, sysctl_atse_rx_err_stats_proc, "IU",
 		    atse_rx_err_stats_regs[i].descr);
 	}
@@ -1293,7 +1295,8 @@ atse_attach(device_t dev)
 	}
 
 	/* Setup interrupt handler. */
-	error = xdma_setup_intr(sc->xchan_tx, atse_xdma_tx_intr, sc, &sc->ih_tx);
+	error = xdma_setup_intr(sc->xchan_tx, 0,
+	    atse_xdma_tx_intr, sc, &sc->ih_tx);
 	if (error) {
 		device_printf(sc->dev,
 		    "Can't setup xDMA interrupt handler.\n");
@@ -1324,7 +1327,8 @@ atse_attach(device_t dev)
 	}
 
 	/* Setup interrupt handler. */
-	error = xdma_setup_intr(sc->xchan_rx, atse_xdma_rx_intr, sc, &sc->ih_rx);
+	error = xdma_setup_intr(sc->xchan_rx, XDMA_INTR_NET,
+	    atse_xdma_rx_intr, sc, &sc->ih_rx);
 	if (error) {
 		device_printf(sc->dev,
 		    "Can't setup xDMA interrupt handler.\n");

@@ -291,10 +291,11 @@ msgring_process_fast_intr(void *arg)
 		msgring_wakeup_sleep[cpu]++;
 		TD_CLR_IWAIT(td);
 		sched_add(td, SRQ_INTR);
-	} else
+	} else {
+		thread_unlock(td);
 		msgring_wakeup_nosleep[cpu]++;
+	}
 
-	thread_unlock(td);
 
 	return (FILTER_HANDLED);
 }
@@ -355,8 +356,7 @@ msgring_process(void * arg)
 			}
 			sched_class(td, PRI_ITHD);
 			TD_SET_IWAIT(td);
-			mi_switch(SW_VOL, NULL);
-			thread_unlock(td);
+			mi_switch(SW_VOL);
 		} else
 			pause("wmsg", 1);
 
@@ -382,7 +382,6 @@ create_msgring_thread(int hwtid)
 	thread_lock(td);
 	sched_class(td, PRI_ITHD);
 	sched_add(td, SRQ_INTR);
-	thread_unlock(td);
 }
 
 int
@@ -494,5 +493,7 @@ sys_print_debug(SYSCTL_HANDLER_ARGS)
 	return (error);
 }
 
-SYSCTL_PROC(_debug, OID_AUTO, msgring, CTLTYPE_STRING | CTLFLAG_RD, 0, 0,
-    sys_print_debug, "A", "msgring debug info");
+SYSCTL_PROC(_debug, OID_AUTO, msgring,
+    CTLTYPE_STRING | CTLFLAG_RD | CTLFLAG_NEEDGIANT, 0, 0,
+    sys_print_debug, "A",
+    "msgring debug info");

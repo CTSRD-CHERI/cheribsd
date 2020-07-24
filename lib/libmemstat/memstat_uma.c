@@ -311,10 +311,12 @@ memstat_kvm_uma(struct memory_type_list *list, void *kvm_handle)
 	LIST_HEAD(, uma_keg) uma_kegs;
 	struct memory_type *mtp;
 	struct uma_zone_domain uzd;
+	struct uma_domain ukd;
 	struct uma_bucket *ubp, ub;
 	struct uma_cache *ucp, *ucp_array;
 	struct uma_zone *uzp, uz;
 	struct uma_keg *kzp, kz;
+	uint64_t kegfree;
 	int hint_dontsearch, i, mp_maxid, ndomains, ret;
 	char name[MEMTYPE_MAXNAME];
 	cpuset_t all_cpus;
@@ -423,12 +425,13 @@ memstat_kvm_uma(struct memory_type_list *list, void *kvm_handle)
 			    (unsigned long )uz.uz_frees);
 			mtp->mt_failures = kvm_counter_u64_fetch(kvm,
 			    (unsigned long )uz.uz_fails);
+			mtp->mt_xdomain = kvm_counter_u64_fetch(kvm,
+			    (unsigned long )uz.uz_xdomain);
 			mtp->mt_sleeps = uz.uz_sleeps;
 			/* See comment above in memstat_sysctl_uma(). */
 			if (mtp->mt_numallocs < mtp->mt_numfrees)
 				mtp->mt_numallocs = mtp->mt_numfrees;
 
-			mtp->mt_xdomain = uz.uz_xdomain;
 			if (kz.uk_flags & UMA_ZFLAG_INTERNAL)
 				goto skip_percpu;
 			for (i = 0; i < mp_maxid + 1; i++) {
@@ -438,28 +441,9 @@ memstat_kvm_uma(struct memory_type_list *list, void *kvm_handle)
 				mtp->mt_numallocs += ucp->uc_allocs;
 				mtp->mt_numfrees += ucp->uc_frees;
 
-				if (ucp->uc_allocbucket != NULL) {
-					ret = kread(kvm, ucp->uc_allocbucket,
-					    &ub, sizeof(ub), 0);
-					if (ret != 0) {
-						free(ucp_array);
-						_memstat_mtl_empty(list);
-						list->mtl_error = ret;
-						return (-1);
-					}
-					mtp->mt_free += ub.ub_cnt;
-				}
-				if (ucp->uc_freebucket != NULL) {
-					ret = kread(kvm, ucp->uc_freebucket,
-					    &ub, sizeof(ub), 0);
-					if (ret != 0) {
-						free(ucp_array);
-						_memstat_mtl_empty(list);
-						list->mtl_error = ret;
-						return (-1);
-					}
-					mtp->mt_free += ub.ub_cnt;
-				}
+				mtp->mt_free += ucp->uc_allocbucket.ucb_cnt;
+				mtp->mt_free += ucp->uc_freebucket.ucb_cnt;
+				mtp->mt_free += ucp->uc_crossbucket.ucb_cnt;
 			}
 skip_percpu:
 			mtp->mt_size = kz.uk_size;
@@ -471,20 +455,32 @@ skip_percpu:
 			mtp->mt_byteslimit = mtp->mt_countlimit * mtp->mt_size;
 			mtp->mt_count = mtp->mt_numallocs - mtp->mt_numfrees;
 			for (i = 0; i < ndomains; i++) {
-				ret = kread(kvm, &uz.uz_domain[i], &uzd,
-				   sizeof(uzd), 0);
+				ret = kread(kvm,
+				    &uz.uz_cpu[mp_maxid + 1] + i * sizeof(uzd),
+				    &uzd, sizeof(uzd), 0);
+				if (ret != 0)
+					continue;
 				for (ubp =
-				    TAILQ_FIRST(&uzd.uzd_buckets);
+				    STAILQ_FIRST(&uzd.uzd_buckets);
 				    ubp != NULL;
-				    ubp = TAILQ_NEXT(&ub, ub_link)) {
+				    ubp = STAILQ_NEXT(&ub, ub_link)) {
 					ret = kread(kvm, ubp, &ub,
 					   sizeof(ub), 0);
+					if (ret != 0)
+						continue;
 					mtp->mt_zonefree += ub.ub_cnt;
 				}
 			}
 			if (!((kz.uk_flags & UMA_ZONE_SECONDARY) &&
 			    LIST_FIRST(&kz.uk_zones) != uzp)) {
-				mtp->mt_kegfree = kz.uk_free;
+				kegfree = 0;
+				for (i = 0; i < ndomains; i++) {
+					ret = kread(kvm, &kzp->uk_domain[i],
+					    &ukd, sizeof(ukd), 0);
+					if (ret != 0)
+						kegfree += ukd.ud_free_items;
+				}
+				mtp->mt_kegfree = kegfree;
 				mtp->mt_free += mtp->mt_kegfree;
 			}
 			mtp->mt_free += mtp->mt_zonefree;

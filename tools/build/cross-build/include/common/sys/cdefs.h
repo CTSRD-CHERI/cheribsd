@@ -1,5 +1,53 @@
+/*-
+ * SPDX-License-Identifier: BSD-2-Clause
+ *
+ * Copyright 2018-2020 Alex Richardson <arichardson@FreeBSD.org>
+ *
+ * This software was developed by SRI International and the University of
+ * Cambridge Computer Laboratory (Department of Computer Science and
+ * Technology) under DARPA contract HR0011-18-C-0016 ("ECATS"), as part of the
+ * DARPA SSITH research programme.
+ *
+ * This software was developed by SRI International and the University of
+ * Cambridge Computer Laboratory under DARPA/AFRL contract (FA8750-10-C-0237)
+ * ("CTSRD"), as part of the DARPA CRASH research programme.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ */
 #pragma once
+/* musl libc does not provide a sys/cdefs.h header */
+#if __has_include_next(<sys/cdefs.h>)
 #include_next <sys/cdefs.h>
+#else
+/* No sys/cdefs.h header exists so we have to provide some basic macros */
+#ifdef  __cplusplus
+#define __BEGIN_DECLS extern "C" {
+#define __END_DECLS }
+#else
+#define __BEGIN_DECLS
+#define __END_DECLS
+#endif
+
+#endif
 
 #ifndef __FBSDID
 #define __FBSDID(id)
@@ -16,11 +64,6 @@
 #define	roundup(x, y)	((((x)+((y)-1))/(y))*(y))  /* to any y */
 #define	roundup2(x, y)	(((x)+((y)-1))&(~((y)-1))) /* if y is powers of two */
 #define powerof2(x)	((((x)-1)&(x))==0)
-#endif
-
-#ifndef __va_list
-#include <stdarg.h>
-#define __va_list va_list
 #endif
 
 #ifndef __pure
@@ -66,6 +109,13 @@
 	    __attribute__((__format__ (__printf0__, fmtarg, firstvararg)))
 #endif
 
+#ifndef __predict_true
+#define	__predict_true(exp)     __builtin_expect((exp), 1)
+#endif
+#ifndef __predict_false
+#define	__predict_false(exp)    __builtin_expect((exp), 0)
+#endif
+
 #ifndef __weak_reference
 #ifdef __ELF__
 #define	__weak_reference(sym,alias)	\
@@ -75,6 +125,18 @@
 #define __weak_reference(sym,alias)	\
     static int alias() __attribute__ ((weakref (#sym)));
 #endif
+#endif
+
+/* Some files built as part of the bootstrap libegacy use these macros, but
+ * since we aren't actually building libc.so, we can defined them to be empty */
+#ifndef __sym_compat
+#define	__sym_compat(sym,impl,verid)	/* not needed for bootstrapping */
+#endif
+#ifndef __sym_default
+#define	__sym_default(sym,impl,verid)	/* not needed for bootstrapping */
+#endif
+#ifndef __sym_default
+#define	__warn_references(sym,msg)	/* not needed for bootstrapping */
 #endif
 
 #ifndef __malloc_like

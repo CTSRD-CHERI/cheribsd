@@ -26,24 +26,24 @@
 #define	MS_TO_US(t)  ((t) * THOUSAND)	/* Convert milliseconds to microseconds. */
 #define	US_TO_NS(t)  ((t) * THOUSAND)	/* Convert microseconds to nanoseconds. */
 
-int kqfd;
 
 /* Get the current time with microsecond precision. Used for
  * sub-second timing to make some timer tests run faster.
  */
-static long
+static uint64_t
 now(void)
 {
     struct timeval tv;
 
     gettimeofday(&tv, NULL);
-    return SEC_TO_US(tv.tv_sec) + tv.tv_usec;
+    /* Promote potentially 32-bit time_t to uint64_t before conversion. */
+    return SEC_TO_US((uint64_t)tv.tv_sec) + tv.tv_usec;
 }
 
 /* Sleep for a given number of milliseconds. The timeout is assumed to
  * be less than 1 second.
  */
-void
+static void
 mssleep(int t)
 {
     struct timespec stime = {
@@ -57,7 +57,7 @@ mssleep(int t)
 /* Sleep for a given number of microseconds. The timeout is assumed to
  * be less than 1 second.
  */
-void
+static void
 ussleep(int t)
 {
     struct timespec stime = {
@@ -68,7 +68,7 @@ ussleep(int t)
     nanosleep(&stime, NULL);
 }
 
-void
+static void
 test_kevent_timer_add(void)
 {
     const char *test_id = "kevent(EVFILT_TIMER, EV_ADD)";
@@ -83,7 +83,7 @@ test_kevent_timer_add(void)
     success();
 }
 
-void
+static void
 test_kevent_timer_del(void)
 {
     const char *test_id = "kevent(EVFILT_TIMER, EV_DELETE)";
@@ -100,7 +100,7 @@ test_kevent_timer_del(void)
     success();
 }
 
-void
+static void
 test_kevent_timer_get(void)
 {
     const char *test_id = "kevent(EVFILT_TIMER, wait)";
@@ -217,17 +217,17 @@ test_abstime(void)
 {
     const char *test_id = "kevent(EVFILT_TIMER, EV_ONESHOT, NOTE_ABSTIME)";
     struct kevent kev;
-    time_t start;
-    time_t stop;
-    const int timeout = 3;
+    uint64_t end, start, stop;
+    const int timeout_sec = 3;
 
     test_begin(test_id);
 
     test_no_kevents();
 
-    start = time(NULL);
+    start = now();
+    end = start + SEC_TO_US(timeout_sec);
     EV_SET(&kev, vnode_fd, EVFILT_TIMER, EV_ADD | EV_ONESHOT,
-      NOTE_ABSTIME | NOTE_SECONDS, start + timeout, NULL);
+      NOTE_ABSTIME | NOTE_USECONDS, end, NULL);
     if (kevent(kqfd, &kev, 1, NULL, 0, NULL) < 0)
         err(1, "%s", test_id);
 
@@ -236,10 +236,10 @@ test_abstime(void)
     kev.data = 1;
     kev.fflags = 0;
     kevent_cmp(&kev, kevent_get(kqfd));
-    stop = time(NULL);
-    if (stop < start + timeout)
-        err(1, "too early %jd %jd", (intmax_t)stop, (intmax_t)(start + timeout));
 
+    stop = now();
+    if (stop < end)
+        err(1, "too early %jd %jd", (intmax_t)stop, (intmax_t)end);
     /* Check if the event occurs again */
     sleep(3);
     test_no_kevents();
@@ -253,7 +253,7 @@ test_update(void)
     const char *test_id = "kevent(EVFILT_TIMER (UPDATE), EV_ADD | EV_ONESHOT)";
     struct kevent kev;
     long elapsed;
-    long start;
+    uint64_t start;
 
     test_begin(test_id);
 
@@ -298,7 +298,7 @@ test_update_equal(void)
     const char *test_id = "kevent(EVFILT_TIMER (UPDATE=), EV_ADD | EV_ONESHOT)";
     struct kevent kev;
     long elapsed;
-    long start;
+    uint64_t start;
 
     test_begin(test_id);
 
@@ -342,7 +342,7 @@ test_update_expired(void)
     const char *test_id = "kevent(EVFILT_TIMER (UPDATE EXP), EV_ADD | EV_ONESHOT)";
     struct kevent kev;
     long elapsed;
-    long start;
+    uint64_t start;
 
     test_begin(test_id);
 
@@ -393,8 +393,7 @@ test_update_periodic(void)
     const char *test_id = "kevent(EVFILT_TIMER (UPDATE), periodic)";
     struct kevent kev;
     long elapsed;
-    long start;
-    long stop;
+    uint64_t start, stop;
 
     test_begin(test_id);
 
@@ -451,8 +450,7 @@ test_update_timing(void)
     int iteration;
     int sleeptime;
     long elapsed;
-    long start;
-    long stop;
+    uint64_t start, stop;
 
     test_begin(test_id);
 
@@ -510,7 +508,7 @@ test_update_timing(void)
 }
 
 void
-test_evfilt_timer()
+test_evfilt_timer(void)
 {
     kqfd = kqueue();
     test_kevent_timer_add();

@@ -38,13 +38,18 @@ __FBSDID("$FreeBSD$");
 #include <string.h>
 #include <sys/types.h>
 
-#include <machine/sysarch.h>
-
 #include <stdlib.h>
+
+/* NB: size of 'struct tcb'. */
+#define	TP_OFFSET	(sizeof(void *) * 2)
 
 void
 _set_tp(void *tp)
 {
 
-	__asm __volatile("mv  tp, %0" :: "r"((char*)tp + 0x10));
+#ifdef __CHERI_PURE_CAPABILITY__
+	__asm __volatile("cincoffset ctp, %0, %1" :: "C" (tp), "I" (TP_OFFSET));
+#else
+	__asm __volatile("addi  tp, %0, %1" :: "r" (tp), "I" (TP_OFFSET));
+#endif
 }

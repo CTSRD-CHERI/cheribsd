@@ -4,13 +4,11 @@
 
 PACKAGE=	lldb
 PROG_CXX=	lldb
-# Man page directory
-.PATH:		${LLDB_SRCS}/docs
 
 CFLAGS+=	-I${LLDB_SRCS}/include
 CFLAGS+=	-I${.OBJDIR}
 
-SRCDIR=		tools/lldb/tools/driver
+SRCDIR=		lldb/tools/driver
 SRCS+=		Driver.cpp
 
 .include "${SRCTOP}/lib/clang/clang.build.mk"
@@ -38,8 +36,10 @@ CLEANFILES+=	${TGHDRS} ${TGHDRS:C/$/.d/}
 
 LIBADD+=	edit
 LIBADD+=	execinfo
-LIBADD+=	panel
+LIBADD+=	lua
+LIBADD+=	lzma
 LIBADD+=	ncursesw
+LIBADD+=	panel
 LIBADD+=	pthread
 LIBADD+=	z
 

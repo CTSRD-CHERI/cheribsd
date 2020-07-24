@@ -147,7 +147,7 @@ private:
 		dbg_assert(__builtin_is_aligned(next, sizeof(void*)));
 		current_offset += size;
 		dbg_assert(current_offset <= BLOCK_SIZE);
-		return cheri_csetbounds(next, size);
+		return cheri_setbounds(next, size);
 	}
 public:
 	template<typename T> T* allocate() {
@@ -222,11 +222,13 @@ _mips_rtld_bind(void* _plt_stub)
 		// We can use tight bounds (but can't update .captable to point
 		// to the target function directly)
 		// TODO: actually we should be able to for local calls!
-		target = make_code_pointer(def, defobj, /*tight_bounds=*/true);
+		target = make_code_pointer(
+		    def, defobj, /*tight_bounds=*/true, /*addend=*/0);
 	} else {
 		// PC-relative/legacy does not need any trampolines and uses the
 		// full DSO bounds (or full addrspace for legacy)
-		target = make_code_pointer(def, defobj, /*tight_bounds=*/false);
+		target = make_code_pointer(
+		    def, defobj, /*tight_bounds=*/false, /*addend=*/0);
 		// TODO: update .captable entry to avoid future trampoline jumps
 		// TODO: could also free the stub, but that probably just wastes time
 	}
@@ -317,7 +319,7 @@ add_cheri_plt_stub(const Obj_Entry* obj, const Obj_Entry *rtldobj,
 	plt->_r_symndx = r_symndx; // FIXME: remove
 	// The target cap will span the whole plt stub:
 
-	// void* target_cap = cheri_csetbounds(plt, sizeof(CheriPltStub));
+	// void* target_cap = cheri_setbounds(plt, sizeof(CheriPltStub));
 	void* target_cap = plt;
 	// currently use a self-reference (to beginning of struct) as data cap
 	plt->trampoline.init(target_cap, _rtld_bind_start_local_fn_ptr);
@@ -387,7 +389,8 @@ reloc_plt_bind_now(Obj_Entry *obj, int flags, const Obj_Entry *rtldobj __unused,
 		} else {
 			// No trampoline needed for PCREL or legacy
 			// TODO: can we have any addends for plt relocations?
-			target = make_code_pointer(def, defobj, /*tight_bounds=*/false);
+			target = make_code_pointer(
+			    def, defobj, /*tight_bounds=*/false, /*addend=*/0);
 		}
 		dbg_cheri_plt_verbose("BIND_NOW: %p <-- %#p (%s)", where, target,
 		    symname(obj, r_symndx));
@@ -512,8 +515,9 @@ private:
 };
 
 extern "C" dlfunc_t
-find_external_call_thunk(const Elf_Sym* symbol, const Obj_Entry* obj)
+find_external_call_thunk(const Elf_Sym* symbol, const Obj_Entry* obj, size_t addend)
 {
+	assert(addend == 0 && "Not supported yet");
 	// This should be called with a global RTLD lock held so there should
 	// not be any races.
 	// FIXME: verify that this assumption is correct
@@ -675,7 +679,8 @@ allocate_function_pointer_trampoline(dlfunc_t target_func, const Obj_Entry *obj)
 
 SimpleExternalCallTrampoline*
 SimpleExternalCallTrampoline::create(const Obj_Entry* defobj, const Elf_Sym *sym, bool tight_bounds) {
-	dlfunc_t target_func = make_code_pointer(sym, defobj, tight_bounds);
+	dlfunc_t target_func =
+	    make_code_pointer(sym, defobj, tight_bounds, /*addend=*/0);
 	const void *target_cgp = target_cgp_for_func(defobj, target_func);
 	return create(target_cgp, target_func);
 }
@@ -706,7 +711,7 @@ find_per_function_cgp(const Obj_Entry *obj, const void* func) {
 	    " len=%#zx", (int)(it - obj->captable_mapping),
 	    (size_t)it->cap_table_offset, (size_t)it->sub_table_size);
 	// __builtin_dump_struct(it, &rtld_printf);
-	const void* captable_subset = cheri_csetbounds(
+	const void* captable_subset = cheri_setbounds(
 	    cheri_incoffset(obj->_target_cgp, it->cap_table_offset), it->sub_table_size);
 	dbg_cheri_plt("captable subset for function %p is %#p. Full table is %#p",
 	    func, captable_subset, obj->_target_cgp);

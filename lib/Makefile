@@ -18,10 +18,13 @@ SUBDIR_BOOTSTRAP= \
 	${_libc_cheri} \
 	${_libcheri} \
 	${_libclang_rt} \
-	${_libunwind} \
+	libgcc_eh \
+	libgcc_s \
 	${_libcplusplus} \
 	${_libcxxrt} \
 	libelf \
+	libssp \
+	libssp_nonshared \
 	msun
 
 # The main list; please keep these sorted alphabetically.
@@ -63,6 +66,7 @@ SUBDIR=	${SUBDIR_BOOTSTRAP} \
 	libjpeg \
 	libkiconv \
 	libkvm \
+	liblua \
 	liblzma \
 	libmemstat \
 	${_libstatcounters} \
@@ -77,13 +81,13 @@ SUBDIR=	${SUBDIR_BOOTSTRAP} \
 	libpcap \
 	libpjdlog \
 	libpng \
-	${_libproc} \
+	libproc \
 	libprocstat \
 	libregex \
 	librpcsvc \
 	librss \
 	librt \
-	${_librtld_db} \
+	librtld_db \
 	libsbuf \
 	libsmb \
 	libsqlite3 \
@@ -91,7 +95,6 @@ SUBDIR=	${SUBDIR_BOOTSTRAP} \
 	libstdthreads \
 	libsysdecode \
 	libtacplus \
-	libthread_db \
 	libucl \
 	libufs \
 	libugidfw \
@@ -105,6 +108,11 @@ SUBDIR=	${SUBDIR_BOOTSTRAP} \
 	libzstd \
 	ncurses
 
+.if !${MACHINE_ABI:Mpurecap}
+# Needs changes to be useful for purecap and not used by anything (yet)
+SUBDIR+=	libthread_db
+.endif
+
 # Inter-library dependencies.  When the makefile for a library contains LDADD
 # libraries, those libraries should be listed as build order dependencies here.
 
@@ -113,7 +121,9 @@ SUBDIR_DEPEND_libarchive= libz libbz2 libexpat liblzma libmd libzstd
 SUBDIR_DEPEND_libauditdm= libbsm
 SUBDIR_DEPEND_libbsnmp= ${_libnetgraph}
 SUBDIR_DEPEND_libc++:= libcxxrt
-SUBDIR_DEPEND_libc= libcompiler_rt
+# libssp_nonshared doesn't need to be linked into libc on every arch, but it is
+# small enough to build that this bit of serialization is likely insignificant.
+SUBDIR_DEPEND_libc= libcompiler_rt libssp_nonshared
 SUBDIR_DEPEND_libcam= libsbuf
 SUBDIR_DEPEND_libcasper= libnv
 SUBDIR_DEPEND_libdevstat= libkvm
@@ -145,19 +155,19 @@ SUBDIR.${MK_BLACKLIST}+=libblacklist
 SUBDIR.${MK_BLUETOOTH}+=libbluetooth libsdp
 SUBDIR.${MK_BSNMP}+=	libbsnmp
 
-SUBDIR.${MK_CHERI}+=	libhelloworld
+SUBDIR.${MK_LIBCHERI}+=	libhelloworld
 SUBDIR.${MK_CHERI}+=	libsyscalls
 
-.if (${MACHINE_ARCH:Mmips*c*} || ${MK_CHERI} != "no") && ${MACHINE_ARCH} != "mips"
+.if ${MK_LIBCHERI} == "yes" && ${MACHINE_ARCH} != "mips"
 _libc_cheri=	libc_cheri
 _libcheri=	libcheri
 .endif
 
-.if ${MACHINE_CPUARCH} == mips
+.if ${MACHINE_CPUARCH} == "mips" || ${MACHINE_CPUARCH} == "riscv"
 SUBDIR+= libsimple_printf
 .endif
 
-.if !defined(COMPAT_32BIT) && !defined(COMPAT_64BIT) && !defined(COMPAT_SOFTFP)
+.if !defined(COMPAT_32BIT) && !defined(COMPAT_64BIT) && !defined(COMPAT_SOFTFP) && !defined(COMPAT_CHERI)
 SUBDIR.${MK_CLANG}+=	clang
 .endif
 
@@ -183,9 +193,10 @@ SUBDIR.${MK_STATS}+=	libstats
     ${MACHINE_CPUARCH} == "arm" || ${MACHINE_CPUARCH} == "i386" || \
     ${MACHINE_CPUARCH} == "powerpc" || \
     ${MACHINE_ARCH:Mmips64*}) && \
-    ! ${MACHINE_ARCH:Mmips*c*}
+    !${MACHINE_ABI:Mpurecap}
 _libclang_rt=	libclang_rt
-.elif ! ${MACHINE_ARCH:Mmips*c*} && ${MACHINE_ARCH} != "mips"
+.elif !${MACHINE_ABI:Mpurecap} && ${MACHINE_ARCH} != "mips" && \
+    ! ${MACHINE_ARCH:Mriscv*}
 .error "NOT BUILDING libclang_rt for ${MACHINE_ARCH}"
 .endif
 .endif # ${COMPILER_TYPE} == "clang"
@@ -194,13 +205,6 @@ _libclang_rt=	libclang_rt
 _libcxxrt=	libcxxrt
 _libcplusplus=	libc++
 _libcplusplus+=	libc++experimental
-.endif
-
-.if ${MK_LLVM_LIBUNWIND} != "no"
-# When building with LLVM libunwind we must build libgcc_s/libgcc_eh as part
-# of SUBDIR_BOOTSTRAP to avoid build failures due to other libraries linking
-# against -lgcc_s
-_libunwind=	libgcc_s libgcc_eh
 .endif
 
 SUBDIR.${MK_EFI}+=	libefivar
@@ -226,11 +230,6 @@ SUBDIR.${MK_BHYVE}+=	libvmmapi
 _libstatcounters=	libstatcounters
 .endif
 
-.if ${MACHINE_CPUARCH} != "sparc64"
-_libproc=	libproc
-_librtld_db=	librtld_db
-.endif
-
 .if ${MACHINE_ARCH} != "powerpc"
 SUBDIR.${MK_OPENMP}+=	libomp
 .endif
@@ -239,11 +238,9 @@ SUBDIR.${MK_PMC}+=	libpmc libpmcstat
 SUBDIR.${MK_RADIUS_SUPPORT}+=	libradius
 SUBDIR.${MK_SENDMAIL}+=	libmilter libsm libsmdb libsmutil
 SUBDIR.${MK_TELNET}+=	libtelnet
-
-.if ${MK_TESTS_SUPPORT} != "no" || defined(LIBCHERI)
-SUBDIR+=		atf
-.endif
-
+SUBDIR.${MK_TESTS_SUPPORT}+=	atf
+SUBDIR.${MK_TESTS_SUPPORT}.${MK_CXX}+=	kyua
+SUBDIR.${MK_TESTS_SUPPORT}.${MK_CXX}+=	liblutok
 SUBDIR.${MK_TESTS}+=	tests
 SUBDIR.${MK_UNBOUND}+=	libunbound
 SUBDIR.${MK_USB}+=	libusbhid libusb
@@ -260,10 +257,12 @@ SUBDIR_PARALLEL=
 SUBDIR:=	${SUBDIR:Nlibc++experimental}
 .endif
 
-.if ${MACHINE_ARCH:Mmips*c*}
+.if ${MACHINE_ABI:Mpurecap}
 SUBDIR+=	libmalloc_simple
-SUBDIR+=	libcheri_syscalls
-SUBDIR+=	libcheri_support
+.endif
+.if ${MK_LIBCHERI} == "yes"
+SUBDIR.${MK_LIBCHERI}+=	libcheri_syscalls
+SUBDIR.${MK_LIBCHERI}+=	libcheri_support
 .endif
 
 .include <bsd.subdir.mk>

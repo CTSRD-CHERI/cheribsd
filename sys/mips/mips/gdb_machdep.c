@@ -150,7 +150,7 @@ gdb_cpu_setreg(int regnum, void *val)
 	case GDB_REG_PC:
 		kdb_thrctx->pcb_context[10] = *(register_t *)val;
 		if (kdb_thread == curthread)
-			kdb_frame->pc = *(register_t *)val;
+			TRAPF_PC_SET_ADDR(kdb_frame, *(register_t *)val);
 	}
 }
 

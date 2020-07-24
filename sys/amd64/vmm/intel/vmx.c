@@ -32,6 +32,8 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
+#include "opt_bhyve_snapshot.h"
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/smp.h>
@@ -56,6 +58,8 @@ __FBSDID("$FreeBSD$");
 #include <machine/vmm.h>
 #include <machine/vmm_dev.h>
 #include <machine/vmm_instruction_emul.h>
+#include <machine/vmm_snapshot.h>
+
 #include "vmm_lapic.h"
 #include "vmm_host.h"
 #include "vmm_ioport.h"
@@ -123,7 +127,8 @@ static MALLOC_DEFINE(M_VMX, "vmx", "vmx");
 static MALLOC_DEFINE(M_VLAPIC, "vlapic", "vlapic");
 
 SYSCTL_DECL(_hw_vmm);
-SYSCTL_NODE(_hw_vmm, OID_AUTO, vmx, CTLFLAG_RW, NULL, NULL);
+SYSCTL_NODE(_hw_vmm, OID_AUTO, vmx, CTLFLAG_RW | CTLFLAG_MPSAFE, NULL,
+    NULL);
 
 int vmxon_enabled[MAXCPU];
 static char vmxon_region[MAXCPU][PAGE_SIZE] __aligned(PAGE_SIZE);
@@ -150,7 +155,9 @@ SYSCTL_INT(_hw_vmm_vmx, OID_AUTO, initialized, CTLFLAG_RD,
 /*
  * Optional capabilities
  */
-static SYSCTL_NODE(_hw_vmm_vmx, OID_AUTO, cap, CTLFLAG_RW, NULL, NULL);
+static SYSCTL_NODE(_hw_vmm_vmx, OID_AUTO, cap,
+    CTLFLAG_RW | CTLFLAG_MPSAFE, NULL,
+    NULL);
 
 static int cap_halt_exit;
 SYSCTL_INT(_hw_vmm_vmx_cap, OID_AUTO, halt_exit, CTLFLAG_RD, &cap_halt_exit, 0,
@@ -171,6 +178,10 @@ SYSCTL_INT(_hw_vmm_vmx_cap, OID_AUTO, monitor_trap, CTLFLAG_RD,
 static int cap_invpcid;
 SYSCTL_INT(_hw_vmm_vmx_cap, OID_AUTO, invpcid, CTLFLAG_RD, &cap_invpcid,
     0, "Guests are allowed to use INVPCID");
+
+static int tpr_shadowing;
+SYSCTL_INT(_hw_vmm_vmx_cap, OID_AUTO, tpr_shadowing, CTLFLAG_RD,
+    &tpr_shadowing, 0, "TPR shadowing support");
 
 static int virtual_interrupt_delivery;
 SYSCTL_INT(_hw_vmm_vmx_cap, OID_AUTO, virtual_interrupt_delivery, CTLFLAG_RD,
@@ -288,6 +299,9 @@ static int vmx_getdesc(void *arg, int vcpu, int reg, struct seg_desc *desc);
 static int vmx_getreg(void *arg, int vcpu, int reg, uint64_t *retval);
 static int vmxctx_setreg(struct vmxctx *vmxctx, int reg, uint64_t val);
 static void vmx_inject_pir(struct vlapic *vlapic);
+#ifdef BHYVE_SNAPSHOT
+static int vmx_restore_tsc(void *arg, int vcpu, uint64_t now);
+#endif
 
 #ifdef KTR
 static const char *
@@ -627,7 +641,7 @@ vmx_restore(void)
 static int
 vmx_init(int ipinum)
 {
-	int error, use_tpr_shadow;
+	int error;
 	uint64_t basic, fixed0, fixed1, feature_control;
 	uint32_t tmp, procbased2_vid_bits;
 
@@ -751,6 +765,24 @@ vmx_init(int ipinum)
 	    &tmp) == 0);
 
 	/*
+	 * Check support for TPR shadow.
+	 */
+	error = vmx_set_ctlreg(MSR_VMX_PROCBASED_CTLS,
+	    MSR_VMX_TRUE_PROCBASED_CTLS, PROCBASED_USE_TPR_SHADOW, 0,
+	    &tmp);
+	if (error == 0) {
+		tpr_shadowing = 1;
+		TUNABLE_INT_FETCH("hw.vmm.vmx.use_tpr_shadowing",
+		    &tpr_shadowing);
+	}
+
+	if (tpr_shadowing) {
+		procbased_ctls |= PROCBASED_USE_TPR_SHADOW;
+		procbased_ctls &= ~PROCBASED_CR8_LOAD_EXITING;
+		procbased_ctls &= ~PROCBASED_CR8_STORE_EXITING;
+	}
+
+	/*
 	 * Check support for virtual interrupt delivery.
 	 */
 	procbased2_vid_bits = (PROCBASED2_VIRTUALIZE_APIC_ACCESSES |
@@ -758,13 +790,9 @@ vmx_init(int ipinum)
 	    PROCBASED2_APIC_REGISTER_VIRTUALIZATION |
 	    PROCBASED2_VIRTUAL_INTERRUPT_DELIVERY);
 
-	use_tpr_shadow = (vmx_set_ctlreg(MSR_VMX_PROCBASED_CTLS,
-	    MSR_VMX_TRUE_PROCBASED_CTLS, PROCBASED_USE_TPR_SHADOW, 0,
-	    &tmp) == 0);
-
 	error = vmx_set_ctlreg(MSR_VMX_PROCBASED_CTLS2, MSR_VMX_PROCBASED_CTLS2,
 	    procbased2_vid_bits, 0, &tmp);
-	if (error == 0 && use_tpr_shadow) {
+	if (error == 0 && tpr_shadowing) {
 		virtual_interrupt_delivery = 1;
 		TUNABLE_INT_FETCH("hw.vmm.vmx.use_apic_vid",
 		    &virtual_interrupt_delivery);
@@ -774,13 +802,6 @@ vmx_init(int ipinum)
 		procbased_ctls |= PROCBASED_USE_TPR_SHADOW;
 		procbased_ctls2 |= procbased2_vid_bits;
 		procbased_ctls2 &= ~PROCBASED2_VIRTUALIZE_X2APIC_MODE;
-
-		/*
-		 * No need to emulate accesses to %CR8 if virtual
-		 * interrupt delivery is enabled.
-		 */
-		procbased_ctls &= ~PROCBASED_CR8_LOAD_EXITING;
-		procbased_ctls &= ~PROCBASED_CR8_STORE_EXITING;
 
 		/*
 		 * Check for Posted Interrupts only if Virtual Interrupt
@@ -1051,10 +1072,13 @@ vmx_vminit(struct vm *vm, pmap_t pmap)
 		vmx->ctx[i].guest_dr6 = DBREG_DR6_RESERVED1;
 		error += vmwrite(VMCS_GUEST_DR7, DBREG_DR7_RESERVED1);
 
-		if (virtual_interrupt_delivery) {
-			error += vmwrite(VMCS_APIC_ACCESS, APIC_ACCESS_ADDRESS);
+		if (tpr_shadowing) {
 			error += vmwrite(VMCS_VIRTUAL_APIC,
 			    vtophys(&vmx->apic_page[i]));
+		}
+
+		if (virtual_interrupt_delivery) {
+			error += vmwrite(VMCS_APIC_ACCESS, APIC_ACCESS_ADDRESS);
 			error += vmwrite(VMCS_EOI_EXIT0, 0);
 			error += vmwrite(VMCS_EOI_EXIT1, 0);
 			error += vmwrite(VMCS_EOI_EXIT2, 0);
@@ -1282,7 +1306,10 @@ vmx_set_tsc_offset(struct vmx *vmx, int vcpu, uint64_t offset)
 	}
 
 	error = vmwrite(VMCS_TSC_OFFSET, offset);
-
+#ifdef BHYVE_SNAPSHOT
+	if (error == 0)
+		error = vm_set_tsc_offset(vmx->vm, vcpu, offset);
+#endif
 	return (error);
 }
 
@@ -2658,6 +2685,12 @@ vmx_exit_process(struct vmx *vmx, int vcpu, struct vm_exit *vmexit)
 		SDT_PROBE3(vmm, vmx, exit, mwait, vmx, vcpu, vmexit);
 		vmexit->exitcode = VM_EXITCODE_MWAIT;
 		break;
+	case EXIT_REASON_TPR:
+		vlapic = vm_lapic(vmx->vm, vcpu);
+		vlapic_sync_tpr(vlapic);
+		vmexit->inst_length = 0;
+		handled = HANDLED;
+		break;
 	case EXIT_REASON_VMCALL:
 	case EXIT_REASON_VMCLEAR:
 	case EXIT_REASON_VMLAUNCH:
@@ -2941,6 +2974,16 @@ vmx_run(void *arg, int vcpu, register_t rip, pmap_t pmap,
 			enable_intr();
 			vm_exit_debug(vmx->vm, vcpu, rip);
 			break;
+		}
+
+		/*
+		 * If TPR Shadowing is enabled, the TPR Threshold
+		 * must be updated right before entering the guest.
+		 */
+		if (tpr_shadowing && !virtual_interrupt_delivery) {
+			if ((vmx->cap[vcpu].proc_ctls & PROCBASED_USE_TPR_SHADOW) != 0) {
+				vmcs_write(VMCS_TPR_THRESHOLD, vlapic_get_cr8(vlapic));
+			}
 		}
 
 		/*
@@ -3631,7 +3674,30 @@ vmx_set_tmr(struct vlapic *vlapic, int vector, bool level)
 }
 
 static void
-vmx_enable_x2apic_mode(struct vlapic *vlapic)
+vmx_enable_x2apic_mode_ts(struct vlapic *vlapic)
+{
+	struct vmx *vmx;
+	struct vmcs *vmcs;
+	uint32_t proc_ctls;
+	int vcpuid;
+
+	vcpuid = vlapic->vcpuid;
+	vmx = ((struct vlapic_vtx *)vlapic)->vmx;
+	vmcs = &vmx->vmcs[vcpuid];
+
+	proc_ctls = vmx->cap[vcpuid].proc_ctls;
+	proc_ctls &= ~PROCBASED_USE_TPR_SHADOW;
+	proc_ctls |= PROCBASED_CR8_LOAD_EXITING;
+	proc_ctls |= PROCBASED_CR8_STORE_EXITING;
+	vmx->cap[vcpuid].proc_ctls = proc_ctls;
+
+	VMPTRLD(vmcs);
+	vmcs_write(VMCS_PRI_PROC_BASED_CTLS, proc_ctls);
+	VMCLEAR(vmcs);
+}
+
+static void
+vmx_enable_x2apic_mode_vid(struct vlapic *vlapic)
 {
 	struct vmx *vmx;
 	struct vmcs *vmcs;
@@ -3792,12 +3858,16 @@ vmx_vlapic_init(void *arg, int vcpuid)
 	vlapic_vtx->pir_desc = &vmx->pir_desc[vcpuid];
 	vlapic_vtx->vmx = vmx;
 
+	if (tpr_shadowing) {
+		vlapic->ops.enable_x2apic_mode = vmx_enable_x2apic_mode_ts;
+	}
+
 	if (virtual_interrupt_delivery) {
 		vlapic->ops.set_intr_ready = vmx_set_intr_ready;
 		vlapic->ops.pending_intr = vmx_pending_intr;
 		vlapic->ops.intr_accepted = vmx_intr_accepted;
 		vlapic->ops.set_tmr = vmx_set_tmr;
-		vlapic->ops.enable_x2apic_mode = vmx_enable_x2apic_mode;
+		vlapic->ops.enable_x2apic_mode = vmx_enable_x2apic_mode_vid;
 	}
 
 	if (posted_interrupts)
@@ -3816,6 +3886,153 @@ vmx_vlapic_cleanup(void *arg, struct vlapic *vlapic)
 	free(vlapic, M_VLAPIC);
 }
 
+#ifdef BHYVE_SNAPSHOT
+static int
+vmx_snapshot_vmi(void *arg, struct vm_snapshot_meta *meta)
+{
+	struct vmx *vmx;
+	struct vmxctx *vmxctx;
+	int i;
+	int ret;
+
+	vmx = arg;
+
+	KASSERT(vmx != NULL, ("%s: arg was NULL", __func__));
+
+	for (i = 0; i < VM_MAXCPU; i++) {
+		SNAPSHOT_BUF_OR_LEAVE(vmx->guest_msrs[i],
+		      sizeof(vmx->guest_msrs[i]), meta, ret, done);
+
+		vmxctx = &vmx->ctx[i];
+		SNAPSHOT_VAR_OR_LEAVE(vmxctx->guest_rdi, meta, ret, done);
+		SNAPSHOT_VAR_OR_LEAVE(vmxctx->guest_rsi, meta, ret, done);
+		SNAPSHOT_VAR_OR_LEAVE(vmxctx->guest_rdx, meta, ret, done);
+		SNAPSHOT_VAR_OR_LEAVE(vmxctx->guest_rcx, meta, ret, done);
+		SNAPSHOT_VAR_OR_LEAVE(vmxctx->guest_r8, meta, ret, done);
+		SNAPSHOT_VAR_OR_LEAVE(vmxctx->guest_r9, meta, ret, done);
+		SNAPSHOT_VAR_OR_LEAVE(vmxctx->guest_rax, meta, ret, done);
+		SNAPSHOT_VAR_OR_LEAVE(vmxctx->guest_rbx, meta, ret, done);
+		SNAPSHOT_VAR_OR_LEAVE(vmxctx->guest_rbp, meta, ret, done);
+		SNAPSHOT_VAR_OR_LEAVE(vmxctx->guest_r10, meta, ret, done);
+		SNAPSHOT_VAR_OR_LEAVE(vmxctx->guest_r11, meta, ret, done);
+		SNAPSHOT_VAR_OR_LEAVE(vmxctx->guest_r12, meta, ret, done);
+		SNAPSHOT_VAR_OR_LEAVE(vmxctx->guest_r13, meta, ret, done);
+		SNAPSHOT_VAR_OR_LEAVE(vmxctx->guest_r14, meta, ret, done);
+		SNAPSHOT_VAR_OR_LEAVE(vmxctx->guest_r15, meta, ret, done);
+		SNAPSHOT_VAR_OR_LEAVE(vmxctx->guest_cr2, meta, ret, done);
+		SNAPSHOT_VAR_OR_LEAVE(vmxctx->guest_dr0, meta, ret, done);
+		SNAPSHOT_VAR_OR_LEAVE(vmxctx->guest_dr1, meta, ret, done);
+		SNAPSHOT_VAR_OR_LEAVE(vmxctx->guest_dr2, meta, ret, done);
+		SNAPSHOT_VAR_OR_LEAVE(vmxctx->guest_dr3, meta, ret, done);
+		SNAPSHOT_VAR_OR_LEAVE(vmxctx->guest_dr6, meta, ret, done);
+	}
+
+done:
+	return (ret);
+}
+
+static int
+vmx_snapshot_vmcx(void *arg, struct vm_snapshot_meta *meta, int vcpu)
+{
+	struct vmcs *vmcs;
+	struct vmx *vmx;
+	int err, run, hostcpu;
+
+	vmx = (struct vmx *)arg;
+	err = 0;
+
+	KASSERT(arg != NULL, ("%s: arg was NULL", __func__));
+	vmcs = &vmx->vmcs[vcpu];
+
+	run = vcpu_is_running(vmx->vm, vcpu, &hostcpu);
+	if (run && hostcpu != curcpu) {
+		printf("%s: %s%d is running", __func__, vm_name(vmx->vm), vcpu);
+		return (EINVAL);
+	}
+
+	err += vmcs_snapshot_reg(vmcs, run, VM_REG_GUEST_CR0, meta);
+	err += vmcs_snapshot_reg(vmcs, run, VM_REG_GUEST_CR3, meta);
+	err += vmcs_snapshot_reg(vmcs, run, VM_REG_GUEST_CR4, meta);
+	err += vmcs_snapshot_reg(vmcs, run, VM_REG_GUEST_DR7, meta);
+	err += vmcs_snapshot_reg(vmcs, run, VM_REG_GUEST_RSP, meta);
+	err += vmcs_snapshot_reg(vmcs, run, VM_REG_GUEST_RIP, meta);
+	err += vmcs_snapshot_reg(vmcs, run, VM_REG_GUEST_RFLAGS, meta);
+
+	/* Guest segments */
+	err += vmcs_snapshot_reg(vmcs, run, VM_REG_GUEST_ES, meta);
+	err += vmcs_snapshot_desc(vmcs, run, VM_REG_GUEST_ES, meta);
+
+	err += vmcs_snapshot_reg(vmcs, run, VM_REG_GUEST_CS, meta);
+	err += vmcs_snapshot_desc(vmcs, run, VM_REG_GUEST_CS, meta);
+
+	err += vmcs_snapshot_reg(vmcs, run, VM_REG_GUEST_SS, meta);
+	err += vmcs_snapshot_desc(vmcs, run, VM_REG_GUEST_SS, meta);
+
+	err += vmcs_snapshot_reg(vmcs, run, VM_REG_GUEST_DS, meta);
+	err += vmcs_snapshot_desc(vmcs, run, VM_REG_GUEST_DS, meta);
+
+	err += vmcs_snapshot_reg(vmcs, run, VM_REG_GUEST_FS, meta);
+	err += vmcs_snapshot_desc(vmcs, run, VM_REG_GUEST_FS, meta);
+
+	err += vmcs_snapshot_reg(vmcs, run, VM_REG_GUEST_GS, meta);
+	err += vmcs_snapshot_desc(vmcs, run, VM_REG_GUEST_GS, meta);
+
+	err += vmcs_snapshot_reg(vmcs, run, VM_REG_GUEST_TR, meta);
+	err += vmcs_snapshot_desc(vmcs, run, VM_REG_GUEST_TR, meta);
+
+	err += vmcs_snapshot_reg(vmcs, run, VM_REG_GUEST_LDTR, meta);
+	err += vmcs_snapshot_desc(vmcs, run, VM_REG_GUEST_LDTR, meta);
+
+	err += vmcs_snapshot_reg(vmcs, run, VM_REG_GUEST_EFER, meta);
+
+	err += vmcs_snapshot_desc(vmcs, run, VM_REG_GUEST_IDTR, meta);
+	err += vmcs_snapshot_desc(vmcs, run, VM_REG_GUEST_GDTR, meta);
+
+	/* Guest page tables */
+	err += vmcs_snapshot_reg(vmcs, run, VM_REG_GUEST_PDPTE0, meta);
+	err += vmcs_snapshot_reg(vmcs, run, VM_REG_GUEST_PDPTE1, meta);
+	err += vmcs_snapshot_reg(vmcs, run, VM_REG_GUEST_PDPTE2, meta);
+	err += vmcs_snapshot_reg(vmcs, run, VM_REG_GUEST_PDPTE3, meta);
+
+	/* Other guest state */
+	err += vmcs_snapshot_any(vmcs, run, VMCS_GUEST_IA32_SYSENTER_CS, meta);
+	err += vmcs_snapshot_any(vmcs, run, VMCS_GUEST_IA32_SYSENTER_ESP, meta);
+	err += vmcs_snapshot_any(vmcs, run, VMCS_GUEST_IA32_SYSENTER_EIP, meta);
+	err += vmcs_snapshot_any(vmcs, run, VMCS_GUEST_INTERRUPTIBILITY, meta);
+	err += vmcs_snapshot_any(vmcs, run, VMCS_GUEST_ACTIVITY, meta);
+	err += vmcs_snapshot_any(vmcs, run, VMCS_ENTRY_CTLS, meta);
+	err += vmcs_snapshot_any(vmcs, run, VMCS_EXIT_CTLS, meta);
+
+	return (err);
+}
+
+static int
+vmx_restore_tsc(void *arg, int vcpu, uint64_t offset)
+{
+	struct vmcs *vmcs;
+	struct vmx *vmx = (struct vmx *)arg;
+	int error, running, hostcpu;
+
+	KASSERT(arg != NULL, ("%s: arg was NULL", __func__));
+	vmcs = &vmx->vmcs[vcpu];
+
+	running = vcpu_is_running(vmx->vm, vcpu, &hostcpu);
+	if (running && hostcpu != curcpu) {
+		printf("%s: %s%d is running", __func__, vm_name(vmx->vm), vcpu);
+		return (EINVAL);
+	}
+
+	if (!running)
+		VMPTRLD(vmcs);
+
+	error = vmx_set_tsc_offset(vmx, vcpu, offset);
+
+	if (!running)
+		VMCLEAR(vmcs);
+	return (error);
+}
+#endif
+
 struct vmm_ops vmm_ops_intel = {
 	.init		= vmx_init,
 	.cleanup	= vmx_cleanup,
@@ -3833,4 +4050,9 @@ struct vmm_ops vmm_ops_intel = {
 	.vmspace_free	= ept_vmspace_free,
 	.vlapic_init	= vmx_vlapic_init,
 	.vlapic_cleanup	= vmx_vlapic_cleanup,
+#ifdef BHYVE_SNAPSHOT
+	.vmsnapshot	= vmx_snapshot_vmi,
+	.vmcx_snapshot	= vmx_snapshot_vmcx,
+	.vm_restore_tsc	= vmx_restore_tsc,
+#endif
 };

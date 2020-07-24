@@ -118,7 +118,6 @@ SRCS+=		atoi.c			\
 		qsort.c 		\
 		reallocf.c		\
 		strtol.c		\
-		strtol_c.c		\
 		strtoll.c		\
 		strtoul.c		\
 		strtoull.c		\
@@ -131,12 +130,9 @@ SRCS+=		bcopy.S			\
 		explicit_bzero.c	\
 		ffs.c			\
 		memchr.c		\
-		memchr_c.c		\
 		memcmp.c		\
-		memcmp_c.c		\
 		memcpy.c		\
 		memcpy_c.c		\
-		memcpy_c_tofrom.c	\
 		memset.c		\
 		memset_c.c		\
 		memmove.c		\
@@ -145,12 +141,9 @@ SRCS+=		bcopy.S			\
 		strcasecmp.c		\
 		strcasestr.c		\
 		strchr.S		\
-		strchr_c.c		\
 		strcmp.c		\
-		strcmp_c.c		\
 		strcoll.c		\
 		strcpy.c		\
-		strcpy_c.c		\
 		strcspn.c		\
 		strdup.c		\
 		strerror.c		\
@@ -158,12 +151,9 @@ SRCS+=		bcopy.S			\
 		strlcpy.c		\
 		strlen.c		\
 		strncmp.c		\
-		strncmp_c.c		\
 		strncpy.c		\
-		strncpy_c.c		\
 		strndup.c		\
 		strnlen.c		\
-		strnlen_c.c		\
 		strpbrk.c		\
 		strrchr.c		\
 		strspn.c		\
@@ -310,7 +300,7 @@ CFLAGS+=	-I${LIBC_DIR}/include			\
 .PATH: ${LIBC_DIR}/softfloat/bits64
 .PATH: ${LIBC_DIR}/stdlib
 .PATH: ${LIBC_DIR}/stdtime
-.PATH: ${.CURDIR}/../../contrib/compiler-rt/lib/builtins
+.PATH: ${.CURDIR}/../../contrib/llvm-project/compiler-rt/lib/builtins
 .PATH: ${.CURDIR}/../../contrib/gdtoa
 .PATH: ${.CURDIR}/../../sys/kern
 .PATH: ${.CURDIR}/../../contrib/tzcode/stdtime

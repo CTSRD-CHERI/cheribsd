@@ -69,16 +69,16 @@ linux${SFX}_support.o: linux${SFX}_assym.h assym.inc
 ${VDSO}.so: linux${SFX}_locore.o
 	${OBJCOPY} --input-target binary --output-target elf64-x86-64-freebsd			\
 	    --binary-architecture i386 linux${SFX}_locore.o ${.TARGET}
-	strip -N _binary_linux${SFX}_locore_o_size ${.TARGET}
+	${STRIPBIN} -N _binary_linux${SFX}_locore_o_size ${.TARGET}
 .else
 ${VDSO}.so: linux${SFX}_locore.o
 	${OBJCOPY} --input-target binary --output-target elf32-i386-freebsd			\
 	    --binary-architecture i386 linux${SFX}_locore.o ${.TARGET}
-	strip -N _binary_linux_locore_o_size ${.TARGET}
+	${STRIPBIN} -N _binary_linux_locore_o_size ${.TARGET}
 .endif
 
 linux${SFX}_genassym.o: offset.inc
-	${CC} -c ${CFLAGS:N-flto:N-fno-common} ${.IMPSRC}
+	${CC} -c ${CFLAGS:N-flto:N-fno-common} -fcommon ${.IMPSRC}
 
 .if !defined(KERNBUILDDIR)
 .warning Building Linuxulator outside of a kernel does not make sense

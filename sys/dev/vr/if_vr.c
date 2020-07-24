@@ -626,8 +626,8 @@ vr_attach(device_t dev)
 	callout_init_mtx(&sc->vr_stat_callout, &sc->vr_mtx, 0);
 	SYSCTL_ADD_PROC(device_get_sysctl_ctx(dev),
 	    SYSCTL_CHILDREN(device_get_sysctl_tree(dev)),
-	    OID_AUTO, "stats", CTLTYPE_INT | CTLFLAG_RW, sc, 0,
-	    vr_sysctl_stats, "I", "Statistics");
+	    OID_AUTO, "stats", CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_NEEDGIANT,
+	    sc, 0, vr_sysctl_stats, "I", "Statistics");
 
 	error = 0;
 
@@ -676,7 +676,7 @@ vr_attach(device_t dev)
 	ifp->if_snd.ifq_maxlen = VR_TX_RING_CNT - 1;
 	IFQ_SET_READY(&ifp->if_snd);
 
-	TASK_INIT(&sc->vr_inttask, 0, vr_int_task, sc);
+	NET_TASK_INIT(&sc->vr_inttask, 0, vr_int_task, sc);
 
 	/* Configure Tx FIFO threshold. */
 	sc->vr_txthresh = VR_TXTHRESH_MIN;

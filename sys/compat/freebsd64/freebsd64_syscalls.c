@@ -515,7 +515,7 @@ const char *freebsd64_syscallnames[] = {
 	"freebsd64_jail_get",			/* 506 = freebsd64_jail_get */
 	"freebsd64_jail_set",			/* 507 = freebsd64_jail_set */
 	"jail_remove",			/* 508 = jail_remove */
-	"closefrom",			/* 509 = closefrom */
+	"compat12.closefrom",		/* 509 = freebsd12 closefrom */
 	"freebsd64___semctl",			/* 510 = freebsd64___semctl */
 	"freebsd64_msgctl",			/* 511 = freebsd64_msgctl */
 	"freebsd64_shmctl",			/* 512 = freebsd64_shmctl */
@@ -579,4 +579,7 @@ const char *freebsd64_syscallnames[] = {
 	"freebsd64___sysctlbyname",			/* 570 = freebsd64___sysctlbyname */
 	"freebsd64_shm_open2",			/* 571 = freebsd64_shm_open2 */
 	"freebsd64_shm_rename",			/* 572 = freebsd64_shm_rename */
+	"freebsd64_sigfastblock",			/* 573 = freebsd64_sigfastblock */
+	"freebsd64___realpathat",			/* 574 = freebsd64___realpathat */
+	"close_range",			/* 575 = close_range */
 };

@@ -5,7 +5,9 @@
 .include <bsd.init.mk>
 .include <bsd.compiler.mk>
 .include <bsd.linker.mk>
-
+.if defined(_CRUNCHGEN)
+.include <bsd.compat.mk>
+.endif
 .include <bsd.cheri.mk>
 
 .if defined(LIB_CXX) || defined(SHLIB_CXX)
@@ -113,6 +115,10 @@ STATIC_CFLAGS+= -ftls-model=initial-exec
 STATIC_CXXFLAGS+= -ftls-model=initial-exec
 .endif
 
+.if ${MACHINE_CPUARCH} == "riscv" && ${LINKER_FEATURES:Mriscv-relaxations} == ""
+CFLAGS += -mno-relax
+.endif
+
 .include <bsd.libnames.mk>
 
 # prefer .s to a .c, add .po, remove stuff not used in the BSD libraries
@@ -122,13 +128,8 @@ STATIC_CXXFLAGS+= -ftls-model=initial-exec
 .SUFFIXES: .out .o .bc .ll .po .pico .nossppico .pieo .S .asm .s .c .cc .cpp .cxx .C .f .y .l .ln
 
 .if !defined(PICFLAG)
-.if ${MACHINE_CPUARCH} == "sparc64"
-PICFLAG=-fPIC
-PIEFLAG=-fPIE
-.else
 PICFLAG=-fpic
 PIEFLAG=-fpie
-.endif
 .endif
 
 PO_FLAG=-pg
@@ -255,7 +256,7 @@ SHLIB_NAME_INSTALL=${SHLIB_NAME}
 
 # Allow libraries to specify their own version map or have it
 # automatically generated (see bsd.symver.mk above).
-.if ${MK_SYMVER} == "yes" && !empty(VERSION_MAP)
+.if !empty(VERSION_MAP)
 ${SHLIB_NAME_FULL}:	${VERSION_MAP}
 LDFLAGS+=	-Wl,--version-script=${VERSION_MAP}
 .endif
@@ -314,10 +315,6 @@ CLEANFILES+=	${SOBJS}
 .if defined(SHLIB_NAME)
 _LIBS+=		${SHLIB_NAME_INSTALL}
 
-.if ${CFLAGS:M-fexceptions} || defined(SHLIB_CXX) || defined(LIB_CXX)
-ALLOW_MIPS_SHARED_TEXTREL=
-.endif
-
 SOLINKOPTS+=	-shared -Wl,-x
 .if !defined(ALLOW_SHARED_TEXTREL)
 .if defined(LD_FATAL_WARNINGS) && ${LD_FATAL_WARNINGS} == "no"
@@ -327,15 +324,6 @@ SOLINKOPTS+=	-Wl,--fatal-warnings
 .endif
 SOLINKOPTS+=	-Wl,--warn-shared-textrel
 .elif ${ALLOW_SHARED_TEXTREL} != "no"
-SOLINKOPTS+=	-Wl,-z,notext
-.endif
-
-.if defined(ALLOW_MIPS_SHARED_TEXTREL) && ${MACHINE_CPUARCH:Mmips} && !${MACHINE_ARCH:Mmips*c*}
-# Check if we should be defining ALLOW_SHARED_TEXTREL... basically, C++
-# or -fexceptions in CFLAGS on MIPS.  This works around clang/lld attempting
-# to generate text relocations in read-only .eh_frame.  A future version of
-# clang/lld should instead transform them into relative references at link
-# time, and then we can stop doing this.
 SOLINKOPTS+=	-Wl,-z,notext
 .endif
 
@@ -386,7 +374,7 @@ ${SHLIB_NAME}.debug: ${SHLIB_NAME_FULL}
 
 .if ${SHLIB_NAME} != ${SHLIB_NAME_INSTALL}
 ${SHLIB_NAME_INSTALL}: ${SHLIB_NAME}
-	${STRIPBIN:Ustrip} -o ${.TARGET} ${STRIP_FLAGS} ${SHLIB_NAME}
+	${STRIPBIN} -o ${.TARGET} ${STRIP_FLAGS} ${SHLIB_NAME}
 .endif
 .endif #defined(SHLIB_NAME)
 
@@ -482,7 +470,7 @@ _libinstall:
 	    ${_INSTALLFLAGS} lib${LIB_PRIVATE}${LIB}.a ${DESTDIR}${_LIBDIR}/
 .endif
 .if ${MK_PROFILE} != "no" && defined(LIB) && !empty(LIB)
-	${INSTALL} ${TAG_ARGS:D${TAG_ARGS},profile} -C -o ${LIBOWN} -g ${LIBGRP} -m ${LIBMODE} \
+	${INSTALL} ${TAG_ARGS:D${TAG_ARGS},development} -C -o ${LIBOWN} -g ${LIBGRP} -m ${LIBMODE} \
 	    ${_INSTALLFLAGS} lib${LIB_PRIVATE}${LIB}_p.a ${DESTDIR}${_LIBDIR}/
 .endif
 .if defined(SHLIB_NAME)
@@ -539,7 +527,10 @@ _libinstall:
 .include <bsd.nls.mk>
 .include <bsd.confs.mk>
 .include <bsd.files.mk>
+#No need to install header for INTERNALLIB
+.if !defined(INTERNALLIB)
 .include <bsd.incs.mk>
+.endif
 .endif
 
 LINKOWN?=	${LIBOWN}

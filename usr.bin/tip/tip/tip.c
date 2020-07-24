@@ -54,6 +54,7 @@ static const char rcsid[] = "$OpenBSD: tip.c,v 1.30 2006/08/18 03:06:18 jason Ex
  * or
  *  cu phone-number [-s speed] [-l line] [-a acu]
  */
+#define	EXTERN
 #include "tip.h"
 #include "pathnames.h"
 
@@ -423,11 +424,12 @@ tipin(void)
 			if (boolean(value(HALFDUPLEX)))
 				printf("\r\n");
 			continue;
-		} else if (!cumode && gch == character(value(FORCE)))
+		} else if (!cumode && gch == character(value(FORCE))) {
 			gch = getchar();
 			if (gch == EOF)
 				return;
 			gch = gch & STRIP_PAR;
+		}
 		bol = any(gch, value(EOL));
 		if (boolean(value(RAISE)) && islower(gch))
 			gch = toupper(gch);

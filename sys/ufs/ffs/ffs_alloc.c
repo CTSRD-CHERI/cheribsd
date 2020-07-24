@@ -202,9 +202,9 @@ retry:
 		delta = btodb(size);
 		DIP_SET(ip, i_blocks, DIP(ip, i_blocks) + delta);
 		if (flags & IO_EXT)
-			ip->i_flag |= IN_CHANGE;
+			UFS_INODE_SET_FLAG(ip, IN_CHANGE);
 		else
-			ip->i_flag |= IN_CHANGE | IN_UPDATE;
+			UFS_INODE_SET_FLAG(ip, IN_CHANGE | IN_UPDATE);
 		*bnp = bno;
 		return (0);
 	}
@@ -329,9 +329,9 @@ retry:
 		delta = btodb(nsize - osize);
 		DIP_SET(ip, i_blocks, DIP(ip, i_blocks) + delta);
 		if (flags & IO_EXT)
-			ip->i_flag |= IN_CHANGE;
+			UFS_INODE_SET_FLAG(ip, IN_CHANGE);
 		else
-			ip->i_flag |= IN_CHANGE | IN_UPDATE;
+			UFS_INODE_SET_FLAG(ip, IN_CHANGE | IN_UPDATE);
 		allocbuf(bp, nsize);
 		bp->b_flags |= B_DONE;
 		vfs_bio_bzero_buf(bp, osize, nsize - osize);
@@ -413,9 +413,9 @@ retry:
 		delta = btodb(nsize - osize);
 		DIP_SET(ip, i_blocks, DIP(ip, i_blocks) + delta);
 		if (flags & IO_EXT)
-			ip->i_flag |= IN_CHANGE;
+			UFS_INODE_SET_FLAG(ip, IN_CHANGE);
 		else
-			ip->i_flag |= IN_CHANGE | IN_UPDATE;
+			UFS_INODE_SET_FLAG(ip, IN_CHANGE | IN_UPDATE);
 		allocbuf(bp, nsize);
 		bp->b_flags |= B_DONE;
 		vfs_bio_bzero_buf(bp, osize, nsize - osize);
@@ -476,7 +476,8 @@ nospace:
  * allocation will be used.
  */
 
-SYSCTL_NODE(_vfs, OID_AUTO, ffs, CTLFLAG_RW, 0, "FFS filesystem");
+SYSCTL_NODE(_vfs, OID_AUTO, ffs, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
+    "FFS filesystem");
 
 static int doasyncfree = 1;
 SYSCTL_INT(_vfs_ffs, OID_AUTO, doasyncfree, CTLFLAG_RW, &doasyncfree, 0,
@@ -743,7 +744,7 @@ ffs_reallocblks_ufs1(ap)
 		else
 			bwrite(sbp);
 	} else {
-		ip->i_flag |= IN_CHANGE | IN_UPDATE;
+		UFS_INODE_SET_FLAG(ip, IN_CHANGE | IN_UPDATE);
 		if (!doasyncfree)
 			ffs_update(vp, 1);
 	}
@@ -1007,7 +1008,7 @@ ffs_reallocblks_ufs2(ap)
 		else
 			bwrite(sbp);
 	} else {
-		ip->i_flag |= IN_CHANGE | IN_UPDATE;
+		UFS_INODE_SET_FLAG(ip, IN_CHANGE | IN_UPDATE);
 		if (!doasyncfree)
 			ffs_update(vp, 1);
 	}
@@ -1150,7 +1151,7 @@ retry:
 			ip = VTOI(*vpp);
 			if (ip->i_mode)
 				goto dup_alloc;
-			ip->i_flag |= IN_MODIFIED;
+			UFS_INODE_SET_FLAG(ip, IN_MODIFIED);
 			vput(*vpp);
 		}
 		return (error);
@@ -1185,7 +1186,7 @@ dup_alloc:
 	(*vpp)->v_type = VNON;
 	if (fs->fs_magic == FS_UFS2_MAGIC) {
 		(*vpp)->v_op = &ffs_vnodeops2;
-		ip->i_flag |= IN_UFS2;
+		UFS_INODE_SET_FLAG(ip, IN_UFS2);
 	} else {
 		(*vpp)->v_op = &ffs_vnodeops1;
 	}
@@ -3085,81 +3086,76 @@ ffs_fserr(fs, inum, cp)
  *	in the current directory is oldvalue then change it to newvalue.
  * unlink(nameptr, oldvalue) - Verify that the inode number associated
  *	with nameptr in the current directory is oldvalue then unlink it.
- *
- * The following functions may only be used on a quiescent filesystem
- * by the soft updates journal. They are not safe to be run on an active
- * filesystem.
- *
- * setinode(inode, dip) - the specified disk inode is replaced with the
- *	contents pointed to by dip.
- * setbufoutput(fd, flags) - output associated with the specified file
- *	descriptor (which must reference the character device supporting
- *	the filesystem) switches from using physio to running through the
- *	buffer cache when flags is set to 1. The descriptor reverts to
- *	physio for output when flags is set to zero.
  */
 
 static int sysctl_ffs_fsck(SYSCTL_HANDLER_ARGS);
 
-SYSCTL_PROC(_vfs_ffs, FFS_ADJ_REFCNT, adjrefcnt, CTLFLAG_WR|CTLTYPE_STRUCT,
-	0, 0, sysctl_ffs_fsck, "S,fsck", "Adjust Inode Reference Count");
+SYSCTL_PROC(_vfs_ffs, FFS_ADJ_REFCNT, adjrefcnt,
+    CTLFLAG_WR | CTLTYPE_STRUCT | CTLFLAG_NEEDGIANT,
+    0, 0, sysctl_ffs_fsck, "S,fsck",
+    "Adjust Inode Reference Count");
 
-static SYSCTL_NODE(_vfs_ffs, FFS_ADJ_BLKCNT, adjblkcnt, CTLFLAG_WR,
-	sysctl_ffs_fsck, "Adjust Inode Used Blocks Count");
+static SYSCTL_NODE(_vfs_ffs, FFS_ADJ_BLKCNT, adjblkcnt,
+    CTLFLAG_WR | CTLFLAG_NEEDGIANT, sysctl_ffs_fsck,
+    "Adjust Inode Used Blocks Count");
 
-static SYSCTL_NODE(_vfs_ffs, FFS_SET_SIZE, setsize, CTLFLAG_WR,
-	sysctl_ffs_fsck, "Set the inode size");
+static SYSCTL_NODE(_vfs_ffs, FFS_SET_SIZE, setsize,
+    CTLFLAG_WR | CTLFLAG_NEEDGIANT, sysctl_ffs_fsck,
+    "Set the inode size");
 
-static SYSCTL_NODE(_vfs_ffs, FFS_ADJ_NDIR, adjndir, CTLFLAG_WR,
-	sysctl_ffs_fsck, "Adjust number of directories");
+static SYSCTL_NODE(_vfs_ffs, FFS_ADJ_NDIR, adjndir,
+    CTLFLAG_WR | CTLFLAG_NEEDGIANT, sysctl_ffs_fsck,
+    "Adjust number of directories");
 
-static SYSCTL_NODE(_vfs_ffs, FFS_ADJ_NBFREE, adjnbfree, CTLFLAG_WR,
-	sysctl_ffs_fsck, "Adjust number of free blocks");
+static SYSCTL_NODE(_vfs_ffs, FFS_ADJ_NBFREE, adjnbfree,
+    CTLFLAG_WR | CTLFLAG_NEEDGIANT, sysctl_ffs_fsck,
+    "Adjust number of free blocks");
 
-static SYSCTL_NODE(_vfs_ffs, FFS_ADJ_NIFREE, adjnifree, CTLFLAG_WR,
-	sysctl_ffs_fsck, "Adjust number of free inodes");
+static SYSCTL_NODE(_vfs_ffs, FFS_ADJ_NIFREE, adjnifree,
+    CTLFLAG_WR | CTLFLAG_NEEDGIANT, sysctl_ffs_fsck,
+    "Adjust number of free inodes");
 
-static SYSCTL_NODE(_vfs_ffs, FFS_ADJ_NFFREE, adjnffree, CTLFLAG_WR,
-	sysctl_ffs_fsck, "Adjust number of free frags");
+static SYSCTL_NODE(_vfs_ffs, FFS_ADJ_NFFREE, adjnffree,
+    CTLFLAG_WR | CTLFLAG_NEEDGIANT, sysctl_ffs_fsck,
+    "Adjust number of free frags");
 
-static SYSCTL_NODE(_vfs_ffs, FFS_ADJ_NUMCLUSTERS, adjnumclusters, CTLFLAG_WR,
-	sysctl_ffs_fsck, "Adjust number of free clusters");
+static SYSCTL_NODE(_vfs_ffs, FFS_ADJ_NUMCLUSTERS, adjnumclusters,
+    CTLFLAG_WR | CTLFLAG_NEEDGIANT, sysctl_ffs_fsck,
+    "Adjust number of free clusters");
 
-static SYSCTL_NODE(_vfs_ffs, FFS_DIR_FREE, freedirs, CTLFLAG_WR,
-	sysctl_ffs_fsck, "Free Range of Directory Inodes");
+static SYSCTL_NODE(_vfs_ffs, FFS_DIR_FREE, freedirs,
+    CTLFLAG_WR | CTLFLAG_NEEDGIANT, sysctl_ffs_fsck,
+    "Free Range of Directory Inodes");
 
-static SYSCTL_NODE(_vfs_ffs, FFS_FILE_FREE, freefiles, CTLFLAG_WR,
-	sysctl_ffs_fsck, "Free Range of File Inodes");
+static SYSCTL_NODE(_vfs_ffs, FFS_FILE_FREE, freefiles,
+    CTLFLAG_WR | CTLFLAG_NEEDGIANT, sysctl_ffs_fsck,
+    "Free Range of File Inodes");
 
-static SYSCTL_NODE(_vfs_ffs, FFS_BLK_FREE, freeblks, CTLFLAG_WR,
-	sysctl_ffs_fsck, "Free Range of Blocks");
+static SYSCTL_NODE(_vfs_ffs, FFS_BLK_FREE, freeblks,
+    CTLFLAG_WR | CTLFLAG_NEEDGIANT, sysctl_ffs_fsck,
+    "Free Range of Blocks");
 
-static SYSCTL_NODE(_vfs_ffs, FFS_SET_FLAGS, setflags, CTLFLAG_WR,
-	sysctl_ffs_fsck, "Change Filesystem Flags");
+static SYSCTL_NODE(_vfs_ffs, FFS_SET_FLAGS, setflags,
+    CTLFLAG_WR | CTLFLAG_NEEDGIANT, sysctl_ffs_fsck,
+    "Change Filesystem Flags");
 
-static SYSCTL_NODE(_vfs_ffs, FFS_SET_CWD, setcwd, CTLFLAG_WR,
-	sysctl_ffs_fsck, "Set Current Working Directory");
+static SYSCTL_NODE(_vfs_ffs, FFS_SET_CWD, setcwd,
+    CTLFLAG_WR | CTLFLAG_NEEDGIANT, sysctl_ffs_fsck,
+    "Set Current Working Directory");
 
-static SYSCTL_NODE(_vfs_ffs, FFS_SET_DOTDOT, setdotdot, CTLFLAG_WR,
-	sysctl_ffs_fsck, "Change Value of .. Entry");
+static SYSCTL_NODE(_vfs_ffs, FFS_SET_DOTDOT, setdotdot,
+    CTLFLAG_WR | CTLFLAG_NEEDGIANT, sysctl_ffs_fsck,
+    "Change Value of .. Entry");
 
-static SYSCTL_NODE(_vfs_ffs, FFS_UNLINK, unlink, CTLFLAG_WR,
-	sysctl_ffs_fsck, "Unlink a Duplicate Name");
-
-static SYSCTL_NODE(_vfs_ffs, FFS_SET_INODE, setinode, CTLFLAG_WR,
-	sysctl_ffs_fsck, "Update an On-Disk Inode");
-
-static SYSCTL_NODE(_vfs_ffs, FFS_SET_BUFOUTPUT, setbufoutput, CTLFLAG_WR,
-	sysctl_ffs_fsck, "Set Buffered Writing for Descriptor");
+static SYSCTL_NODE(_vfs_ffs, FFS_UNLINK, unlink,
+    CTLFLAG_WR | CTLFLAG_NEEDGIANT, sysctl_ffs_fsck,
+    "Unlink a Duplicate Name");
 
 #ifdef DIAGNOSTIC
 static int fsckcmds = 0;
 SYSCTL_INT(_debug, OID_AUTO, ffs_fsckcmds, CTLFLAG_RW, &fsckcmds, 0,
 	"print out fsck_ffs-based filesystem update commands");
 #endif /* DIAGNOSTIC */
-
-static int buffered_write(struct file *, struct uio *, struct ucred *,
-	int, struct thread *);
 
 static int
 sysctl_ffs_fsck(SYSCTL_HANDLER_ARGS)
@@ -3171,13 +3167,13 @@ sysctl_ffs_fsck(SYSCTL_HANDLER_ARGS)
 	struct inode *ip, *dp;
 	struct mount *mp;
 	struct fs *fs;
+	struct pwd *pwd;
 	ufs2_daddr_t blkno;
 	long blkcnt, blksize;
 	u_long key;
-	struct file *fp, *vfp;
+	struct file *fp;
 	cap_rights_t rights;
 	int filetype, error;
-	static struct fileops *origops, bufferedops;
 
 	if (req->newlen > sizeof cmd)
 		return (EBADRPC);
@@ -3238,7 +3234,7 @@ sysctl_ffs_fsck(SYSCTL_HANDLER_ARGS)
 		ip->i_nlink += cmd.size;
 		DIP_SET(ip, i_nlink, ip->i_nlink);
 		ip->i_effnlink += cmd.size;
-		ip->i_flag |= IN_CHANGE | IN_MODIFIED;
+		UFS_INODE_SET_FLAG(ip, IN_CHANGE | IN_MODIFIED);
 		error = ffs_update(vp, 1);
 		if (DOINGSOFTDEP(vp))
 			softdep_change_linkcnt(ip);
@@ -3257,7 +3253,7 @@ sysctl_ffs_fsck(SYSCTL_HANDLER_ARGS)
 			break;
 		ip = VTOI(vp);
 		DIP_SET(ip, i_blocks, DIP(ip, i_blocks) + cmd.size);
-		ip->i_flag |= IN_CHANGE | IN_MODIFIED;
+		UFS_INODE_SET_FLAG(ip, IN_CHANGE | IN_MODIFIED);
 		error = ffs_update(vp, 1);
 		vput(vp);
 		break;
@@ -3274,7 +3270,7 @@ sysctl_ffs_fsck(SYSCTL_HANDLER_ARGS)
 			break;
 		ip = VTOI(vp);
 		DIP_SET(ip, i_size, cmd.size);
-		ip->i_flag |= IN_CHANGE | IN_MODIFIED;
+		UFS_INODE_SET_FLAG(ip, IN_CHANGE | IN_MODIFIED);
 		error = ffs_update(vp, 1);
 		vput(vp);
 		break;
@@ -3407,7 +3403,7 @@ sysctl_ffs_fsck(SYSCTL_HANDLER_ARGS)
 			vput(vp);
 			break;
 		}
-		VOP_UNLOCK(vp, 0);
+		VOP_UNLOCK(vp);
 		pwd_chdir(td, vp);
 		break;
 
@@ -3429,11 +3425,11 @@ sysctl_ffs_fsck(SYSCTL_HANDLER_ARGS)
 		/*
 		 * Now we get and lock the child directory containing "..".
 		 */
-		FILEDESC_SLOCK(td->td_proc->p_fd);
-		dvp = td->td_proc->p_fd->fd_cdir;
-		FILEDESC_SUNLOCK(td->td_proc->p_fd);
+		pwd = pwd_hold(td);
+		dvp = pwd->pwd_cdir;
 		if ((error = vget(dvp, LK_EXCLUSIVE, td)) != 0) {
 			vput(fdvp);
+			pwd_drop(pwd);
 			break;
 		}
 		dp = VTOI(dvp);
@@ -3444,6 +3440,7 @@ sysctl_ffs_fsck(SYSCTL_HANDLER_ARGS)
 		cache_purge(dvp);
 		vput(dvp);
 		vput(fdvp);
+		pwd_drop(pwd);
 		break;
 
 	case FFS_UNLINK:
@@ -3469,76 +3466,6 @@ sysctl_ffs_fsck(SYSCTL_HANDLER_ARGS)
 		    UIO_USERSPACE, 0, (ino_t)cmd.size);
 		break;
 
-	case FFS_SET_INODE:
-		if (ump->um_fsckpid != td->td_proc->p_pid) {
-			error = EPERM;
-			break;
-		}
-#ifdef DIAGNOSTIC
-		if (fsckcmds) {
-			printf("%s: update inode %jd\n",
-			    mp->mnt_stat.f_mntonname, (intmax_t)cmd.value);
-		}
-#endif /* DIAGNOSTIC */
-		if ((error = ffs_vget(mp, (ino_t)cmd.value, LK_EXCLUSIVE, &vp)))
-			break;
-		AUDIT_ARG_VNODE1(vp);
-		ip = VTOI(vp);
-		if (I_IS_UFS1(ip))
-			error = copyin((void *)(intptr_t)cmd.size, ip->i_din1,
-			    sizeof(struct ufs1_dinode));
-		else
-			error = copyin((void *)(intptr_t)cmd.size, ip->i_din2,
-			    sizeof(struct ufs2_dinode));
-		if (error) {
-			vput(vp);
-			break;
-		}
-		ip->i_flag |= IN_CHANGE | IN_MODIFIED;
-		error = ffs_update(vp, 1);
-		vput(vp);
-		break;
-
-	case FFS_SET_BUFOUTPUT:
-		if (ump->um_fsckpid != td->td_proc->p_pid) {
-			error = EPERM;
-			break;
-		}
-		if (ITOUMP(VTOI(vp)) != ump) {
-			error = EINVAL;
-			break;
-		}
-#ifdef DIAGNOSTIC
-		if (fsckcmds) {
-			printf("%s: %s buffered output for descriptor %jd\n",
-			    mp->mnt_stat.f_mntonname,
-			    cmd.size == 1 ? "enable" : "disable",
-			    (intmax_t)cmd.value);
-		}
-#endif /* DIAGNOSTIC */
-		if ((error = getvnode(td, cmd.value,
-		    cap_rights_init(&rights, CAP_FSCK), &vfp)) != 0)
-			break;
-		if (vfp->f_vnode->v_type != VCHR) {
-			fdrop(vfp, td);
-			error = EINVAL;
-			break;
-		}
-		if (origops == NULL) {
-			origops = vfp->f_ops;
-			bcopy((void *)origops, (void *)&bufferedops,
-			    sizeof(bufferedops));
-			bufferedops.fo_write = buffered_write;
-		}
-		if (cmd.size == 1)
-			atomic_store_rel_ptr((volatile uintptr_t *)&vfp->f_ops,
-			    (uintptr_t)&bufferedops);
-		else
-			atomic_store_rel_ptr((volatile uintptr_t *)&vfp->f_ops,
-			    (uintptr_t)origops);
-		fdrop(vfp, td);
-		break;
-
 	default:
 #ifdef DIAGNOSTIC
 		if (fsckcmds) {
@@ -3552,90 +3479,6 @@ sysctl_ffs_fsck(SYSCTL_HANDLER_ARGS)
 	}
 	fdrop(fp, td);
 	vn_finished_write(mp);
-	return (error);
-}
-
-/*
- * Function to switch a descriptor to use the buffer cache to stage
- * its I/O. This is needed so that writes to the filesystem device
- * will give snapshots a chance to copy modified blocks for which it
- * needs to retain copies.
- */
-static int
-buffered_write(fp, uio, active_cred, flags, td)
-	struct file *fp;
-	struct uio *uio;
-	struct ucred *active_cred;
-	int flags;
-	struct thread *td;
-{
-	struct vnode *devvp, *vp;
-	struct inode *ip;
-	struct buf *bp;
-	struct fs *fs;
-	struct filedesc *fdp;
-	int error;
-	daddr_t lbn;
-
-	/*
-	 * The devvp is associated with the /dev filesystem. To discover
-	 * the filesystem with which the device is associated, we depend
-	 * on the application setting the current directory to a location
-	 * within the filesystem being written. Yes, this is an ugly hack.
-	 */
-	devvp = fp->f_vnode;
-	if (!vn_isdisk(devvp, NULL))
-		return (EINVAL);
-	fdp = td->td_proc->p_fd;
-	FILEDESC_SLOCK(fdp);
-	vp = fdp->fd_cdir;
-	vref(vp);
-	FILEDESC_SUNLOCK(fdp);
-	vn_lock(vp, LK_SHARED | LK_RETRY);
-	/*
-	 * Check that the current directory vnode indeed belongs to
-	 * UFS before trying to dereference UFS-specific v_data fields.
-	 */
-	if (vp->v_op != &ffs_vnodeops1 && vp->v_op != &ffs_vnodeops2) {
-		vput(vp);
-		return (EINVAL);
-	}
-	ip = VTOI(vp);
-	if (ITODEVVP(ip) != devvp) {
-		vput(vp);
-		return (EINVAL);
-	}
-	fs = ITOFS(ip);
-	vput(vp);
-	foffset_lock_uio(fp, uio, flags);
-	vn_lock(devvp, LK_EXCLUSIVE | LK_RETRY);
-#ifdef DIAGNOSTIC
-	if (fsckcmds) {
-		printf("%s: buffered write for block %jd\n",
-		    fs->fs_fsmnt, (intmax_t)btodb(uio->uio_offset));
-	}
-#endif /* DIAGNOSTIC */
-	/*
-	 * All I/O must be contained within a filesystem block, start on
-	 * a fragment boundary, and be a multiple of fragments in length.
-	 */
-	if (uio->uio_resid > fs->fs_bsize - (uio->uio_offset % fs->fs_bsize) ||
-	    fragoff(fs, uio->uio_offset) != 0 ||
-	    fragoff(fs, uio->uio_resid) != 0) {
-		error = EINVAL;
-		goto out;
-	}
-	lbn = numfrags(fs, uio->uio_offset);
-	bp = getblk(devvp, lbn, uio->uio_resid, 0, 0, 0);
-	bp->b_flags |= B_RELBUF;
-	if ((error = uiomove((char *)bp->b_data, uio->uio_resid, uio)) != 0) {
-		brelse(bp);
-		goto out;
-	}
-	error = bwrite(bp);
-out:
-	VOP_UNLOCK(devvp, 0);
-	foffset_unlock_uio(fp, uio, flags | FOF_NEXTOFF);
 	return (error);
 }
 // CHERI CHANGES START

@@ -119,9 +119,9 @@ SYSCTL_INT(_kern, OID_AUTO, panic_reboot_wait_time, CTLFLAG_RWTUN,
 
 #ifdef KDB
 #ifdef KDB_UNATTENDED
-static int debugger_on_panic = 0;
+int debugger_on_panic = 0;
 #else
-static int debugger_on_panic = 1;
+int debugger_on_panic = 1;
 #endif
 SYSCTL_INT(_debug, OID_AUTO, debugger_on_panic,
     CTLFLAG_RWTUN | CTLFLAG_SECURE,
@@ -158,7 +158,7 @@ static bool powercycle_on_panic = 0;
 SYSCTL_BOOL(_kern, OID_AUTO, powercycle_on_panic, CTLFLAG_RWTUN,
 	&powercycle_on_panic, 0, "Do a power cycle instead of a reboot on a panic");
 
-static SYSCTL_NODE(_kern, OID_AUTO, shutdown, CTLFLAG_RW, 0,
+static SYSCTL_NODE(_kern, OID_AUTO, shutdown, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
     "Shutdown environment");
 
 #ifndef DIAGNOSTIC
@@ -167,7 +167,8 @@ static int show_busybufs;
 static int show_busybufs = 1;
 #endif
 SYSCTL_INT(_kern_shutdown, OID_AUTO, show_busybufs, CTLFLAG_RW,
-	&show_busybufs, 0, "");
+    &show_busybufs, 0,
+    "Show busy buffers during shutdown");
 
 int suspend_blocked = 0;
 SYSCTL_INT(_kern, OID_AUTO, suspend_blocked, CTLFLAG_RW,
@@ -217,7 +218,8 @@ SYSCTL_INT(_kern, OID_AUTO, kerneldump_gzlevel, CTLFLAG_RWTUN,
  * Variable panicstr contains argument to first call to panic; used as flag
  * to indicate that the kernel has already called panic.
  */
-const char __read_mostly *panicstr;
+const char *panicstr;
+bool __read_frequently panicked;
 
 int __read_mostly dumping;		/* system is dumping */
 int rebooting;				/* system is rebooting */
@@ -516,21 +518,21 @@ kern_reroot(void)
 	error = vfs_busy(mp, MBF_NOWAIT);
 	if (error != 0) {
 		vfs_ref(mp);
-		VOP_UNLOCK(vp, 0);
+		VOP_UNLOCK(vp);
 		error = vfs_busy(mp, 0);
 		vn_lock(vp, LK_SHARED | LK_RETRY);
 		vfs_rel(mp);
 		if (error != 0) {
-			VOP_UNLOCK(vp, 0);
+			VOP_UNLOCK(vp);
 			return (ENOENT);
 		}
 		if (VN_IS_DOOMED(vp)) {
-			VOP_UNLOCK(vp, 0);
+			VOP_UNLOCK(vp);
 			vfs_unbusy(mp);
 			return (ENOENT);
 		}
 	}
-	VOP_UNLOCK(vp, 0);
+	VOP_UNLOCK(vp);
 
 	/*
 	 * Remove the filesystem containing currently-running executable
@@ -692,7 +694,8 @@ static int kassert_log_panic_at = 0;
 static int kassert_suppress_in_panic = 0;
 static int kassert_warnings = 0;
 
-SYSCTL_NODE(_debug, OID_AUTO, kassert, CTLFLAG_RW, NULL, "kassert options");
+SYSCTL_NODE(_debug, OID_AUTO, kassert, CTLFLAG_RW | CTLFLAG_MPSAFE, NULL,
+    "kassert options");
 
 #ifdef KASSERT_PANIC_OPTIONAL
 #define KASSERT_RWTUN	CTLFLAG_RWTUN
@@ -739,8 +742,9 @@ SYSCTL_INT(_debug_kassert, OID_AUTO, suppress_in_panic, KASSERT_RWTUN,
 static int kassert_sysctl_kassert(SYSCTL_HANDLER_ARGS);
 
 SYSCTL_PROC(_debug_kassert, OID_AUTO, kassert,
-    CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_SECURE, NULL, 0,
-    kassert_sysctl_kassert, "I", "set to trigger a test kassert");
+    CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_SECURE | CTLFLAG_NEEDGIANT, NULL, 0,
+    kassert_sysctl_kassert, "I",
+    "set to trigger a test kassert");
 
 static int
 kassert_sysctl_kassert(SYSCTL_HANDLER_ARGS)
@@ -891,6 +895,7 @@ vpanic(const char *fmt, va_list ap)
 	else {
 		bootopt |= RB_DUMP;
 		panicstr = fmt;
+		panicked = true;
 		newpanic = 1;
 	}
 
@@ -1027,8 +1032,9 @@ dumpdevname_sysctl_handler(SYSCTL_HANDLER_ARGS)
 	sbuf_delete(&sb);
 	return (error);
 }
-SYSCTL_PROC(_kern_shutdown, OID_AUTO, dumpdevname, CTLTYPE_STRING | CTLFLAG_RD,
-    &dumper_configs, 0, dumpdevname_sysctl_handler, "A",
+SYSCTL_PROC(_kern_shutdown, OID_AUTO, dumpdevname,
+    CTLTYPE_STRING | CTLFLAG_RD | CTLFLAG_NEEDGIANT, &dumper_configs, 0,
+    dumpdevname_sysctl_handler, "A",
     "Device(s) for kernel dumps");
 
 static int	_dump_append(struct dumperinfo *di, void *virtual,
@@ -1243,6 +1249,7 @@ dumper_insert(const struct dumperinfo *di_template, const char *devname,
 #endif
 	}
 	if (kda->kda_compression != KERNELDUMP_COMP_NONE) {
+#ifdef EKCD
 		/*
 		 * We can't support simultaneous unpadded block cipher
 		 * encryption and compression because there is no guarantee the
@@ -1253,6 +1260,7 @@ dumper_insert(const struct dumperinfo *di_template, const char *devname,
 			error = EOPNOTSUPP;
 			goto cleanup;
 		}
+#endif
 		newdi->kdcomp = kerneldumpcomp_create(newdi,
 		    kda->kda_compression);
 		if (newdi->kdcomp == NULL) {
@@ -1730,7 +1738,7 @@ dump_finish(struct dumperinfo *di, struct kerneldumpheader *kdh)
 
 void
 dump_init_header(const struct dumperinfo *di, struct kerneldumpheader *kdh,
-    char *magic, uint32_t archver, uint64_t dumplen)
+    const char *magic, uint32_t archver, uint64_t dumplen)
 {
 	size_t dstsize;
 

@@ -41,6 +41,8 @@
 #include <sys/fcntl.h>
 #include <sys/sysent.h>
 #include <sys/imgact_elf.h>
+#include <sys/jail.h>
+#include <sys/smp.h>
 #include <sys/syscall.h>
 #include <sys/sysctl.h>
 #include <sys/signalvar.h>
@@ -57,6 +59,8 @@
 #include <machine/reg.h>
 #include <machine/md_var.h>
 
+#include <powerpc/powerpc/elf_common.c>
+
 #ifdef __powerpc64__
 #include <compat/freebsd32/freebsd32_proto.h>
 #include <compat/freebsd32/freebsd32_util.h>
@@ -64,7 +68,8 @@
 extern const char *freebsd32_syscallnames[];
 static void ppc32_fixlimit(struct rlimit *rl, int which);
 
-static SYSCTL_NODE(_compat, OID_AUTO, ppc32, CTLFLAG_RW, 0, "32-bit mode");
+static SYSCTL_NODE(_compat, OID_AUTO, ppc32, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
+    "32-bit mode");
 
 #define PPC32_MAXDSIZ (1024*1024*1024)
 static u_long ppc32_maxdsiz = PPC32_MAXDSIZ;
@@ -74,6 +79,8 @@ SYSCTL_ULONG(_compat_ppc32, OID_AUTO, maxdsiz, CTLFLAG_RWTUN, &ppc32_maxdsiz,
 u_long ppc32_maxssiz = PPC32_MAXSSIZ;
 SYSCTL_ULONG(_compat_ppc32, OID_AUTO, maxssiz, CTLFLAG_RWTUN, &ppc32_maxssiz,
              0, "");
+#else
+static void ppc32_runtime_resolve(void);
 #endif
 
 struct sysentvec elf32_freebsd_sysvec = {
@@ -87,7 +94,7 @@ struct sysentvec elf32_freebsd_sysvec = {
 	.sv_errtbl	= NULL,
 	.sv_transtrap	= NULL,
 	.sv_fixup	= __elfN(freebsd_fixup),
-	.sv_copyout_auxargs = __elfN(freebsd_copyout_auxargs),
+	.sv_copyout_auxargs = __elfN(powerpc_copyout_auxargs),
 	.sv_sendsig	= sendsig,
 	.sv_sigcode	= sigcode32,
 	.sv_szsigcode	= &szsigcode32,
@@ -214,10 +221,10 @@ elf32_dump_thread(struct thread *td, void *dst, size_t *off)
 
 #ifndef __powerpc64__
 bool
-elf_is_ifunc_reloc(Elf_Size r_info __unused)
+elf_is_ifunc_reloc(Elf_Size r_info)
 {
 
-	return (false);
+	return (ELF_R_TYPE(r_info) == R_PPC_IRELATIVE);
 }
 
 /* Process one elf relocation with addend. */
@@ -228,7 +235,7 @@ elf_reloc_internal(linker_file_t lf, Elf_Addr relocbase, const void *data,
 	Elf_Addr *where;
 	Elf_Half *hwhere;
 	Elf_Addr addr;
-	Elf_Addr addend;
+	Elf_Addr addend, val;
 	Elf_Word rtype, symidx;
 	const Elf_Rela *rela;
 	int error;
@@ -296,6 +303,27 @@ elf_reloc_internal(linker_file_t lf, Elf_Addr relocbase, const void *data,
 		*where = elf_relocaddr(lf, relocbase + addend);
 		break;
 
+	case R_PPC_JMP_SLOT: /* PLT jump slot entry */
+		/*
+		 * We currently only support Secure-PLT jump slots.
+		 * Given that we reject BSS-PLT modules during load, we
+		 * don't need to check again.
+		 * The method we are using here is equivilent to
+		 * LD_BIND_NOW.
+		 */
+		error = lookup(lf, symidx, 1, &addr);
+		if (error != 0)
+			return -1;
+		*where = elf_relocaddr(lf, addr + addend);
+		break;
+
+	case R_PPC_IRELATIVE:
+		addr = relocbase + addend;
+		val = ((Elf32_Addr (*)(void))addr)();
+		if (*where != val)
+			*where = val;
+		break;
+
 	default:
 		printf("kldload: unexpected relocation type %d\n",
 		    (int) rtype);
@@ -356,6 +384,7 @@ elf_reloc_local(linker_file_t lf, Elf_Addr relocbase, const void *data,
 int
 elf_cpu_load_file(linker_file_t lf)
 {
+
 	/* Only sync the cache for non-kernel modules */
 	if (lf->id != 1)
 		__syncicache(lf->address, lf->size);
@@ -366,6 +395,47 @@ int
 elf_cpu_unload_file(linker_file_t lf __unused)
 {
 
+	return (0);
+}
+
+static void
+ppc32_runtime_resolve()
+{
+
+	/*
+	 * Since we don't support lazy binding, panic immediately if anyone
+	 * manages to call the runtime resolver.
+	 */
+	panic("kldload: Runtime resolver was called unexpectedly!");
+}
+
+int
+elf_cpu_parse_dynamic(caddr_t loadbase, Elf_Dyn *dynamic)
+{
+	Elf_Dyn *dp;
+	bool has_plt = false;
+	bool secure_plt = false;
+	Elf_Addr *got;
+
+	for (dp = dynamic; dp->d_tag != DT_NULL; dp++) {
+		switch (dp->d_tag) {
+		case DT_PPC_GOT:
+			secure_plt = true;
+			got = (Elf_Addr *)(loadbase + dp->d_un.d_ptr);
+			/* Install runtime resolver canary. */
+			got[1] = (Elf_Addr)ppc32_runtime_resolve;
+			got[2] = (Elf_Addr)0;
+			break;
+		case DT_PLTGOT:
+			has_plt = true;
+			break;
+		}
+	}
+
+	if (has_plt && !secure_plt) {
+		printf("kldload: BSS-PLT modules are not supported.\n");
+		return (-1);
+	}
 	return (0);
 }
 #endif

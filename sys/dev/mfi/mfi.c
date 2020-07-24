@@ -58,6 +58,7 @@ __FBSDID("$FreeBSD$");
 #include "opt_mfi.h"
 
 #include <sys/param.h>
+#include <sys/abi_compat.h>
 #include <sys/systm.h>
 #include <sys/sysctl.h>
 #include <sys/malloc.h>
@@ -70,6 +71,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/rman.h>
 #include <sys/bio.h>
 #include <sys/ioccom.h>
+#include <sys/mount.h>
 #include <sys/uio.h>
 #include <sys/proc.h>
 #include <sys/signalvar.h>
@@ -130,7 +132,8 @@ static int mfi_check_command_pre(struct mfi_softc *sc, struct mfi_command *cm);
 static void mfi_check_command_post(struct mfi_softc *sc, struct mfi_command *cm);
 static int mfi_check_for_sscd(struct mfi_softc *sc, struct mfi_command *cm);
 
-SYSCTL_NODE(_hw, OID_AUTO, mfi, CTLFLAG_RD, 0, "MFI driver parameters");
+SYSCTL_NODE(_hw, OID_AUTO, mfi, CTLFLAG_RD | CTLFLAG_MPSAFE, 0,
+    "MFI driver parameters");
 static int	mfi_event_locale = MFI_EVT_LOCALE_ALL;
 SYSCTL_INT(_hw_mfi, OID_AUTO, event_locale, CTLFLAG_RWTUN, &mfi_event_locale,
            0, "event message locale");
@@ -2152,7 +2155,9 @@ mfi_build_syspdio(struct mfi_softc *sc, struct bio *bio)
 		break;
 	default:
 		/* TODO: what about BIO_DELETE??? */
-		panic("Unsupported bio command %x\n", bio->bio_cmd);
+		biofinish(bio, NULL, EOPNOTSUPP);
+		mfi_enqueue_free(cm);
+		return (NULL);
 	}
 
 	/* Cheat with the sector length to avoid a non-constant division */
@@ -2211,7 +2216,9 @@ mfi_build_ldio(struct mfi_softc *sc, struct bio *bio)
 		break;
 	default:
 		/* TODO: what about BIO_DELETE??? */
-		panic("Unsupported bio command %x\n", bio->bio_cmd);
+		biofinish(bio, NULL, EOPNOTSUPP);
+		mfi_enqueue_free(cm);
+		return (NULL);
 	}
 
 	/* Cheat with the sector length to avoid a non-constant division */
@@ -3085,8 +3092,6 @@ out:
 	return (error);
 }
 
-#define	PTRIN(p)		((void *)(uintptr_t)(p))
-
 static int
 mfi_ioctl(struct cdev *dev, u_long cmd, caddr_t arg, int flag, struct thread *td)
 {
@@ -3096,16 +3101,25 @@ mfi_ioctl(struct cdev *dev, u_long cmd, caddr_t arg, int flag, struct thread *td
 #ifdef COMPAT_FREEBSD32
 	struct mfi_ioc_packet32 *ioc32;
 #endif
+#ifdef COMPAT_FREEBSD64
+	struct mfi_ioc_packet64 *ioc64;
+#endif
 	struct mfi_ioc_aen *aen;
 	struct mfi_command *cm = NULL;
 	uint32_t context = 0;
 	union mfi_sense_ptr sense_ptr;
-	uint8_t *data = NULL, *temp, *addr, skip_pre_post = 0;
+	uint8_t *data = NULL, *temp, skip_pre_post = 0;
+	uint8_t * __capability addr;
 	size_t len;
 	int i, res;
 	struct mfi_ioc_passthru *iop = (struct mfi_ioc_passthru *)arg;
 #ifdef COMPAT_FREEBSD32
 	struct mfi_ioc_passthru32 *iop32 = (struct mfi_ioc_passthru32 *)arg;
+#endif
+#ifdef COMPAT_FREEBSD64
+	struct mfi_ioc_passthru64 *iop64 = (struct mfi_ioc_passthru64 *)arg;
+#endif
+#if defined(COMPAT_FREEBSD32) || defined(COMPAT_FREEBSD64)
 	struct mfi_ioc_passthru iop_swab;
 #endif
 	int error, locked;
@@ -3166,6 +3180,9 @@ mfi_ioctl(struct cdev *dev, u_long cmd, caddr_t arg, int flag, struct thread *td
 #ifdef COMPAT_FREEBSD32
 	case MFI_CMD32:
 #endif
+#ifdef COMPAT_FREEBSD64
+	case MFI_CMD64:
+#endif
 		{
 		devclass_t devclass;
 		ioc = (struct mfi_ioc_packet *)arg;
@@ -3212,18 +3229,26 @@ mfi_ioctl(struct cdev *dev, u_long cmd, caddr_t arg, int flag, struct thread *td
 			cm->cm_flags |= MFI_CMD_DATAIN | MFI_CMD_DATAOUT;
 		cm->cm_len = cm->cm_frame->header.data_len;
 		if (cm->cm_frame->header.cmd == MFI_CMD_STP) {
-#ifdef COMPAT_FREEBSD32
-			if (cmd == MFI_CMD) {
-#endif
+			switch (cmd) {
+			case MFI_CMD:
 				/* Native */
 				cm->cm_stp_len = ioc->mfi_sgl[0].iov_len;
+				break;
 #ifdef COMPAT_FREEBSD32
-			} else {
+			case MFI_CMD32:
 				/* 32bit on 64bit */
 				ioc32 = (struct mfi_ioc_packet32 *)ioc;
 				cm->cm_stp_len = ioc32->mfi_sgl[0].iov_len;
-			}
+				break;
 #endif
+#ifdef COMPAT_FREEBSD64
+			case MFI_CMD64:
+				/* 64bit on CHERI */
+				ioc64 = (struct mfi_ioc_packet64 *)ioc;
+				cm->cm_stp_len = ioc64->mfi_sgl[0].iov_len;
+				break;
+#endif
+			}
 			cm->cm_len += cm->cm_stp_len;
 		}
 		if (cm->cm_len &&
@@ -3246,20 +3271,29 @@ mfi_ioctl(struct cdev *dev, u_long cmd, caddr_t arg, int flag, struct thread *td
 			if ((cm->cm_flags & MFI_CMD_DATAOUT) ||
 			    (cm->cm_frame->header.cmd == MFI_CMD_STP)) {
 				for (i = 0; i < ioc->mfi_sge_count; i++) {
-#ifdef COMPAT_FREEBSD32
-					if (cmd == MFI_CMD) {
-#endif
+					switch (cmd) {
+					case MFI_CMD:
 						/* Native */
 						addr = ioc->mfi_sgl[i].iov_base;
 						len = ioc->mfi_sgl[i].iov_len;
+						break;
 #ifdef COMPAT_FREEBSD32
-					} else {
+					case MFI_CMD32:
 						/* 32bit on 64bit */
 						ioc32 = (struct mfi_ioc_packet32 *)ioc;
-						addr = PTRIN(ioc32->mfi_sgl[i].iov_base);
 						len = ioc32->mfi_sgl[i].iov_len;
-					}
+						addr = __USER_CAP(PTRIN(ioc32->mfi_sgl[i].iov_base), len);
+						break;
 #endif
+#ifdef COMPAT_FREEBSD64
+					case MFI_CMD64:
+						/* 64bit on CHERI */
+						ioc64 = (struct mfi_ioc_packet64 *)ioc;
+						len = ioc64->mfi_sgl[i].iov_len;
+						addr = __USER_CAP(ioc64->mfi_sgl[i].iov_base, len);
+						break;
+#endif
+					}
 					error = copyin(addr, temp, len);
 					if (error != 0) {
 						device_printf(sc->mfi_dev,
@@ -3306,20 +3340,26 @@ mfi_ioctl(struct cdev *dev, u_long cmd, caddr_t arg, int flag, struct thread *td
 			if ((cm->cm_flags & MFI_CMD_DATAIN) ||
 			    (cm->cm_frame->header.cmd == MFI_CMD_STP)) {
 				for (i = 0; i < ioc->mfi_sge_count; i++) {
-#ifdef COMPAT_FREEBSD32
-					if (cmd == MFI_CMD) {
-#endif
+					switch (cmd) {
+					case MFI_CMD:
 						/* Native */
 						addr = ioc->mfi_sgl[i].iov_base;
 						len = ioc->mfi_sgl[i].iov_len;
 #ifdef COMPAT_FREEBSD32
-					} else {
+					case MFI_CMD32:
 						/* 32bit on 64bit */
 						ioc32 = (struct mfi_ioc_packet32 *)ioc;
-						addr = PTRIN(ioc32->mfi_sgl[i].iov_base);
 						len = ioc32->mfi_sgl[i].iov_len;
-					}
+						addr = __USER_CAP(PTRIN(ioc32->mfi_sgl[i].iov_base), len);
 #endif
+#ifdef COMPAT_FREEBSD64
+					case MFI_CMD64:
+						/* 64bit on CHERI */
+						ioc64 = (struct mfi_ioc_packet64 *)ioc;
+						len = ioc64->mfi_sgl[i].iov_len;
+						addr = __USER_CAP(ioc64->mfi_sgl[i].iov_base, len);
+#endif
+					}
 					error = copyout(temp, addr, len);
 					if (error != 0) {
 						device_printf(sc->mfi_dev,
@@ -3337,7 +3377,7 @@ mfi_ioctl(struct cdev *dev, u_long cmd, caddr_t arg, int flag, struct thread *td
 			    &sense_ptr.sense_ptr_data[0],
 			    sizeof(sense_ptr.sense_ptr_data));
 #ifdef COMPAT_FREEBSD32
-			if (cmd != MFI_CMD) {
+			if (cmd == MFI_CMD32) {
 				/*
 				 * not 64bit native so zero out any address
 				 * over 32bit */
@@ -3394,6 +3434,7 @@ out:
 		mtx_unlock(&sc->mfi_io_lock);
 
 		break;
+#if !__has_feature(capabilities)
 	case MFI_LINUX_CMD_2: /* Firmware Linux ioctl shim */
 		{
 			devclass_t devclass;
@@ -3436,6 +3477,7 @@ out:
 			    cmd, arg, flag, td));
 			break;
 		}
+#endif
 #ifdef COMPAT_FREEBSD32
 	case MFIIO_PASSTHRU32:
 		if (!SV_CURPROC_FLAG(SV_ILP32)) {
@@ -3444,16 +3486,28 @@ out:
 		}
 		iop_swab.ioc_frame	= iop32->ioc_frame;
 		iop_swab.buf_size	= iop32->buf_size;
-		iop_swab.buf		= PTRIN(iop32->buf);
-		iop			= &iop_swab;
-		/* FALLTHROUGH */
+		iop_swab.buf		= __USER_CAP(PTRIN(iop32->buf),
+		    iop32->buf_size);
+		error = mfi_user_command(sc, &iop_swab);
+		iop32->ioc_frame = iop_swab.ioc_frame;
+		break;
+#endif
+#ifdef COMPAT_FREEBSD64
+	case MFIIO_PASSTHRU64:
+		if (SV_CURPROC_FLAG(SV_LP64 | SV_CHERI) != SV_LP64) {
+			error = ENOTTY;
+			break;
+		}
+		iop_swab.ioc_frame	= iop64->ioc_frame;
+		iop_swab.buf_size	= iop64->buf_size;
+		iop_swab.buf		= __USER_CAP(iop64->buf,
+		    iop64->buf_size);
+		error = mfi_user_command(sc, &iop_swab);
+		iop64->ioc_frame = iop_swab.ioc_frame;
+		break;
 #endif
 	case MFIIO_PASSTHRU:
 		error = mfi_user_command(sc, iop);
-#ifdef COMPAT_FREEBSD32
-		if (cmd == MFIIO_PASSTHRU32)
-			iop32->ioc_frame = iop_swab.ioc_frame;
-#endif
 		break;
 	default:
 		device_printf(sc->mfi_dev, "IOCTL 0x%lx not handled\n", cmd);
@@ -3464,6 +3518,7 @@ out:
 	return (error);
 }
 
+#if !__has_feature(capabilities)
 static int
 mfi_linux_ioctl_int(struct cdev *dev, u_long cmd, caddr_t arg, int flag, struct thread *td)
 {
@@ -3662,6 +3717,7 @@ out:
 
 	return (error);
 }
+#endif
 
 static int
 mfi_poll(struct cdev *dev, int poll_events, struct thread *td)

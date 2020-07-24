@@ -1,4 +1,0 @@
-.\" $FreeBSD$
-Set to build
-.Xr amd 8 ,
-and related programs.

@@ -153,7 +153,8 @@ __FBSDID("$FreeBSD$");
 
 SYSCTL_DECL(_net_inet);
 SYSCTL_DECL(_net_inet_ip);
-SYSCTL_NODE(_net_inet_ip, OID_AUTO, alias, CTLFLAG_RW, NULL, "Libalias sysctl API");
+SYSCTL_NODE(_net_inet_ip, OID_AUTO, alias, CTLFLAG_RW | CTLFLAG_MPSAFE, NULL,
+    "Libalias sysctl API");
 
 #endif
 
@@ -441,10 +442,15 @@ fragment contained in ICMP data section */
 static int
 IcmpAliasIn(struct libalias *la, struct ip *pip)
 {
-	int iresult;
 	struct icmp *ic;
+	int dlen, iresult;
 
 	LIBALIAS_LOCK_ASSERT(la);
+
+	dlen = ntohs(pip->ip_len) - (pip->ip_hl << 2);
+	if (dlen < ICMP_MINLEN)
+		return (PKT_ALIAS_IGNORED);
+
 /* Return if proxy-only mode is enabled */
 	if (la->packetAliasMode & PKT_ALIAS_PROXY_ONLY)
 		return (PKT_ALIAS_OK);
@@ -463,6 +469,9 @@ IcmpAliasIn(struct libalias *la, struct ip *pip)
 	case ICMP_SOURCEQUENCH:
 	case ICMP_TIMXCEED:
 	case ICMP_PARAMPROB:
+		if (dlen < ICMP_ADVLENMIN ||
+		    dlen < ICMP_ADVLEN(ic))
+			return (PKT_ALIAS_IGNORED);
 		iresult = IcmpAliasIn2(la, pip);
 		break;
 	case ICMP_ECHO:
@@ -731,10 +740,17 @@ UdpAliasIn(struct libalias *la, struct ip *pip)
 {
 	struct udphdr *ud;
 	struct alias_link *lnk;
+	int dlen;
 
 	LIBALIAS_LOCK_ASSERT(la);
 
+	dlen = ntohs(pip->ip_len) - (pip->ip_hl << 2);
+	if (dlen < sizeof(struct udphdr))
+		return (PKT_ALIAS_IGNORED);
+
 	ud = (struct udphdr *)ip_next(pip);
+	if (dlen < ntohs(ud->uh_ulen))
+		return (PKT_ALIAS_IGNORED);
 
 	lnk = FindUdpTcpIn(la, pip->ip_src, pip->ip_dst,
 	    ud->uh_sport, ud->uh_dport,
@@ -823,12 +839,19 @@ UdpAliasOut(struct libalias *la, struct ip *pip, int maxpacketsize, int create)
 	u_short dest_port;
 	u_short proxy_server_port;
 	int proxy_type;
-	int error;
+	int dlen, error;
 
 	LIBALIAS_LOCK_ASSERT(la);
 
 /* Return if proxy-only mode is enabled and not proxyrule found.*/
+	dlen = ntohs(pip->ip_len) - (pip->ip_hl << 2);
+	if (dlen < sizeof(struct udphdr))
+		return (PKT_ALIAS_IGNORED);
+
 	ud = (struct udphdr *)ip_next(pip);
+	if (dlen < ntohs(ud->uh_ulen))
+		return (PKT_ALIAS_IGNORED);
+
 	proxy_type = ProxyCheck(la, &proxy_server_address, 
 		&proxy_server_port, pip->ip_src, pip->ip_dst, 
 		ud->uh_dport, pip->ip_p);
@@ -921,8 +944,13 @@ TcpAliasIn(struct libalias *la, struct ip *pip)
 {
 	struct tcphdr *tc;
 	struct alias_link *lnk;
+	int dlen;
 
 	LIBALIAS_LOCK_ASSERT(la);
+
+	dlen = ntohs(pip->ip_len) - (pip->ip_hl << 2);
+	if (dlen < sizeof(struct tcphdr))
+		return (PKT_ALIAS_IGNORED);
 	tc = (struct tcphdr *)ip_next(pip);
 
 	lnk = FindUdpTcpIn(la, pip->ip_src, pip->ip_dst,
@@ -1041,7 +1069,7 @@ TcpAliasIn(struct libalias *la, struct ip *pip)
 static int
 TcpAliasOut(struct libalias *la, struct ip *pip, int maxpacketsize, int create)
 {
-	int proxy_type, error;
+	int dlen, proxy_type, error;
 	u_short dest_port;
 	u_short proxy_server_port;
 	struct in_addr dest_address;
@@ -1050,6 +1078,10 @@ TcpAliasOut(struct libalias *la, struct ip *pip, int maxpacketsize, int create)
 	struct alias_link *lnk;
 
 	LIBALIAS_LOCK_ASSERT(la);
+
+	dlen = ntohs(pip->ip_len) - (pip->ip_hl << 2);
+	if (dlen < sizeof(struct tcphdr))
+		return (PKT_ALIAS_IGNORED);
 	tc = (struct tcphdr *)ip_next(pip);
 
 	if (create)
@@ -1413,6 +1445,10 @@ getout:
 #define UNREG_ADDR_C_LOWER 0xc0a80000
 #define UNREG_ADDR_C_UPPER 0xc0a8ffff
 
+/* 100.64.0.0  -> 100.127.255.255 (RFC 6598 - Carrier Grade NAT) */
+#define UNREG_ADDR_CGN_LOWER 0x64400000
+#define UNREG_ADDR_CGN_UPPER 0x647fffff
+
 int
 LibAliasOut(struct libalias *la, char *ptr, int maxpacketsize)
 {
@@ -1464,7 +1500,8 @@ LibAliasOutLocked(struct libalias *la, char *ptr,	/* valid IP packet */
 	}
 
 	addr_save = GetDefaultAliasAddress(la);
-	if (la->packetAliasMode & PKT_ALIAS_UNREGISTERED_ONLY) {
+	if (la->packetAliasMode & PKT_ALIAS_UNREGISTERED_ONLY ||
+	    la->packetAliasMode & PKT_ALIAS_UNREGISTERED_CGN) {
 		u_long addr;
 		int iclass;
 
@@ -1476,6 +1513,9 @@ LibAliasOutLocked(struct libalias *la, char *ptr,	/* valid IP packet */
 			iclass = 2;
 		else if (addr >= UNREG_ADDR_A_LOWER && addr <= UNREG_ADDR_A_UPPER)
 			iclass = 1;
+		else if (addr >= UNREG_ADDR_CGN_LOWER && addr <= UNREG_ADDR_CGN_UPPER &&
+		    la->packetAliasMode & PKT_ALIAS_UNREGISTERED_CGN)
+			iclass = 4;
 
 		if (iclass == 0) {
 			SetDefaultAliasAddress(la, pip->ip_src);

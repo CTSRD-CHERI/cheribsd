@@ -67,9 +67,7 @@ __FBSDID("$FreeBSD$");
 #include <netinet/in.h>
 #include <netinet/ip.h>
 #include <netinet/if_ether.h>
-#if __FreeBSD_version >= 700000
 #include <netinet/tcp.h>
-#endif
 #include <netinet/ip_icmp.h>
 #include <netinet/udp.h>
 #include <machine/in_cksum.h>
@@ -780,7 +778,7 @@ xnb_connect_comms(struct xnb_softc *xnb)
 					  xnb->evtchn,
 					  /*filter*/NULL,
 					  xnb_intr, /*arg*/xnb,
-					  INTR_TYPE_BIO | INTR_MPSAFE,
+					  INTR_TYPE_NET | INTR_MPSAFE,
 					  &xnb->xen_intr_handle);
 	if (error != 0) {
 		(void)xnb_disconnect(xnb);
@@ -1157,7 +1155,7 @@ xnb_setup_sysctl(struct xnb_softc *xnb)
 			SYSCTL_CHILDREN(sysctl_tree),
 			OID_AUTO,
 			"unit_test_results",
-			CTLTYPE_STRING | CTLFLAG_RD,
+			CTLTYPE_STRING | CTLFLAG_RD | CTLFLAG_NEEDGIANT,
 			xnb,
 			0,
 			xnb_unit_test_main,
@@ -1168,7 +1166,7 @@ xnb_setup_sysctl(struct xnb_softc *xnb)
 			SYSCTL_CHILDREN(sysctl_tree),
 			OID_AUTO,
 			"dump_rings",
-			CTLTYPE_STRING | CTLFLAG_RD,
+			CTLTYPE_STRING | CTLFLAG_RD | CTLFLAG_NEEDGIANT,
 			xnb,
 			0,
 			xnb_dump_rings,

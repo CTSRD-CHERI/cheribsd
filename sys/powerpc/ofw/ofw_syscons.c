@@ -60,7 +60,8 @@ __FBSDID("$FreeBSD$");
 
 static int ofwfb_ignore_mmap_checks = 1;
 static int ofwfb_reset_on_switch = 1;
-static SYSCTL_NODE(_hw, OID_AUTO, ofwfb, CTLFLAG_RD, 0, "ofwfb");
+static SYSCTL_NODE(_hw, OID_AUTO, ofwfb, CTLFLAG_RD | CTLFLAG_MPSAFE, 0,
+    "ofwfb");
 SYSCTL_INT(_hw_ofwfb, OID_AUTO, relax_mmap, CTLFLAG_RW,
     &ofwfb_ignore_mmap_checks, 0, "relaxed mmap bounds checking");
 SYSCTL_INT(_hw_ofwfb, OID_AUTO, reset_on_mode_switch, CTLFLAG_RW,
@@ -1047,25 +1048,6 @@ static driver_t ofwfb_sc_driver = {
 static devclass_t	sc_devclass;
 
 DRIVER_MODULE(ofwfb, nexus, ofwfb_sc_driver, sc_devclass, 0, 0);
-
-/*
- * Define a stub keyboard driver in case one hasn't been
- * compiled into the kernel
- */
-#include <sys/kbio.h>
-#include <dev/kbd/kbdreg.h>
-
-static int dummy_kbd_configure(int flags);
-
-keyboard_switch_t dummysw;
-
-static int
-dummy_kbd_configure(int flags)
-{
-
-	return (0);
-}
-KEYBOARD_DRIVER(dummy, dummysw, dummy_kbd_configure);
 
 /*
  * Utility routines from <dev/fb/fbreg.h>

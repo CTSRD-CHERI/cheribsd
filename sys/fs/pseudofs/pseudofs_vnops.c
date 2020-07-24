@@ -291,7 +291,7 @@ pfs_ioctl(struct vop_ioctl_args *va)
 	vn = va->a_vp;
 	vn_lock(vn, LK_SHARED | LK_RETRY);
 	if (VN_IS_DOOMED(vn)) {
-		VOP_UNLOCK(vn, 0);
+		VOP_UNLOCK(vn);
 		return (EBADF);
 	}
 	pvd = vn->v_data;
@@ -301,13 +301,13 @@ pfs_ioctl(struct vop_ioctl_args *va)
 	pfs_assert_not_owned(pn);
 
 	if (vn->v_type != VREG) {
-		VOP_UNLOCK(vn, 0);
+		VOP_UNLOCK(vn);
 		PFS_RETURN (EINVAL);
 	}
 	KASSERT_PN_IS_FILE(pn);
 
 	if (pn->pn_ioctl == NULL) {
-		VOP_UNLOCK(vn, 0);
+		VOP_UNLOCK(vn);
 		PFS_RETURN (ENOTTY);
 	}
 
@@ -316,7 +316,7 @@ pfs_ioctl(struct vop_ioctl_args *va)
 	 * have changed since the open() call.
 	 */
 	if (!pfs_visible(curthread, pn, pvd->pvd_pid, &proc)) {
-		VOP_UNLOCK(vn, 0);
+		VOP_UNLOCK(vn);
 		PFS_RETURN (EIO);
 	}
 
@@ -325,7 +325,7 @@ pfs_ioctl(struct vop_ioctl_args *va)
 	if (proc != NULL)
 		PROC_UNLOCK(proc);
 
-	VOP_UNLOCK(vn, 0);
+	VOP_UNLOCK(vn);
 	PFS_RETURN (error);
 }
 
@@ -377,7 +377,7 @@ pfs_vptocnp(struct vop_vptocnp_args *ap)
 	struct pfs_node *pn;
 	struct mount *mp;
 	char *buf = ap->a_buf;
-	int *buflen = ap->a_buflen;
+	size_t *buflen = ap->a_buflen;
 	char pidbuf[PFS_NAMELEN];
 	pid_t pid = pvd->pvd_pid;
 	int len, i, error, locked;
@@ -422,7 +422,7 @@ pfs_vptocnp(struct vop_vptocnp_args *ap)
 	 * vp is held by caller.
 	 */
 	locked = VOP_ISLOCKED(vp);
-	VOP_UNLOCK(vp, 0);
+	VOP_UNLOCK(vp);
 
 	error = pfs_vncache_alloc(mp, dvp, pn, pid);
 	if (error) {
@@ -432,7 +432,7 @@ pfs_vptocnp(struct vop_vptocnp_args *ap)
 	}
 
 	*buflen = i;
-	VOP_UNLOCK(*dvp, 0);
+	VOP_UNLOCK(*dvp);
 	vn_lock(vp, locked | LK_RETRY);
 	vfs_unbusy(mp);
 
@@ -465,10 +465,6 @@ pfs_lookup(struct vop_cachedlookup_args *va)
 	if (vn->v_type != VDIR)
 		PFS_RETURN (ENOTDIR);
 	KASSERT_PN_IS_DIR(pd);
-
-	error = VOP_ACCESS(vn, VEXEC, cnp->cn_cred, cnp->cn_thread);
-	if (error)
-		PFS_RETURN (error);
 
 	/*
 	 * Don't support DELETE or RENAME.  CREATE is supported so
@@ -506,7 +502,7 @@ pfs_lookup(struct vop_cachedlookup_args *va)
 		error = vfs_busy(mp, MBF_NOWAIT);
 		if (error != 0) {
 			vfs_ref(mp);
-			VOP_UNLOCK(vn, 0);
+			VOP_UNLOCK(vn);
 			error = vfs_busy(mp, 0);
 			vn_lock(vn, LK_EXCLUSIVE | LK_RETRY);
 			vfs_rel(mp);
@@ -517,7 +513,7 @@ pfs_lookup(struct vop_cachedlookup_args *va)
 				PFS_RETURN(ENOENT);
 			}
 		}
-		VOP_UNLOCK(vn, 0);
+		VOP_UNLOCK(vn);
 		KASSERT(pd->pn_parent != NULL,
 		    ("%s(): non-root directory has no parent", __func__));
 		/*
@@ -666,7 +662,7 @@ pfs_read(struct vop_read_args *va)
 
 	vhold(vn);
 	locked = VOP_ISLOCKED(vn);
-	VOP_UNLOCK(vn, 0);
+	VOP_UNLOCK(vn);
 
 	if (pn->pn_flags & PFS_RAWRD) {
 		PFS_TRACE(("%zd resid", uio->uio_resid));
@@ -944,7 +940,7 @@ pfs_readlink(struct vop_readlink_args *va)
 	}
 	vhold(vn);
 	locked = VOP_ISLOCKED(vn);
-	VOP_UNLOCK(vn, 0);
+	VOP_UNLOCK(vn);
 
 	/* sbuf_new() can't fail with a static buffer */
 	sbuf_new(&sb, buf, sizeof buf, 0);
@@ -1095,3 +1091,4 @@ struct vop_vector pfs_vnodeops = {
 	.vop_write =		pfs_write,
 	/* XXX I've probably forgotten a few that need VOP_EOPNOTSUPP */
 };
+VFS_VOP_VECTOR_REGISTER(pfs_vnodeops);

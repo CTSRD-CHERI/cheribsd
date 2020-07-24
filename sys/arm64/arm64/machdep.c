@@ -50,6 +50,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/linker.h>
 #include <sys/msgbuf.h>
 #include <sys/pcpu.h>
+#include <sys/physmem.h>
 #include <sys/proc.h>
 #include <sys/ptrace.h>
 #include <sys/reboot.h>
@@ -82,8 +83,6 @@ __FBSDID("$FreeBSD$");
 #include <machine/undefined.h>
 #include <machine/vmparam.h>
 
-#include <arm/include/physmem.h>
-
 #ifdef VFP
 #include <machine/vfp.h>
 #endif
@@ -98,6 +97,8 @@ __FBSDID("$FreeBSD$");
 #include <dev/ofw/openfirm.h>
 #endif
 
+static void get_fpcontext(struct thread *td, mcontext_t *mcp);
+static void set_fpcontext(struct thread *td, mcontext_t *mcp);
 
 enum arm64_bus arm64_bus_method = ARM64_BUS_NONE;
 
@@ -107,12 +108,10 @@ static struct trapframe proc0_tf;
 
 int early_boot = 1;
 int cold = 1;
+static int boot_el;
 
 struct kva_md_info kmi;
 
-int64_t dcache_line_size;	/* The minimum D cache line size */
-int64_t icache_line_size;	/* The minimum I cache line size */
-int64_t idcache_line_size;	/* The minimum cache line size */
 int64_t dczva_line_size;	/* The size of cache line the dc zva zeroes */
 int has_pan;
 
@@ -158,6 +157,13 @@ pan_enable(void)
 		    READ_SPECIALREG(sctlr_el1) & ~SCTLR_SPAN);
 		__asm __volatile(".inst 0xd500409f | (0x1 << 8)");
 	}
+}
+
+bool
+has_hyp(void)
+{
+
+	return (boot_el == 2);
 }
 
 static void
@@ -473,6 +479,7 @@ get_mcontext(struct thread *td, mcontext_t *mcp, int clear_ret)
 	mcp->mc_gpregs.gp_sp = tf->tf_sp;
 	mcp->mc_gpregs.gp_lr = tf->tf_lr;
 	mcp->mc_gpregs.gp_elr = tf->tf_elr;
+	get_fpcontext(td, mcp);
 
 	return (0);
 }
@@ -495,6 +502,7 @@ set_mcontext(struct thread *td, mcontext_t *mcp)
 	tf->tf_lr = mcp->mc_gpregs.gp_lr;
 	tf->tf_elr = mcp->mc_gpregs.gp_elr;
 	tf->tf_spsr = mcp->mc_gpregs.gp_spsr;
+	set_fpcontext(td, mcp);
 
 	return (0);
 }
@@ -635,9 +643,9 @@ spinlock_enter(void)
 		daif = intr_disable();
 		td->td_md.md_spinlock_count = 1;
 		td->td_md.md_saved_daif = daif;
+		critical_enter();
 	} else
 		td->td_md.md_spinlock_count++;
-	critical_enter();
 }
 
 void
@@ -647,11 +655,12 @@ spinlock_exit(void)
 	register_t daif;
 
 	td = curthread;
-	critical_exit();
 	daif = td->td_md.md_saved_daif;
 	td->td_md.md_spinlock_count--;
-	if (td->td_md.md_spinlock_count == 0)
+	if (td->td_md.md_spinlock_count == 0) {
+		critical_exit();
 		intr_restore(daif);
+	}
 }
 
 #ifndef	_SYS_SYSPROTO_H_
@@ -666,15 +675,12 @@ sys_sigreturn(struct thread *td, struct sigreturn_args *uap)
 	ucontext_t uc;
 	int error;
 
-	if (uap == NULL)
-		return (EFAULT);
 	if (copyin(uap->sigcntxp, &uc, sizeof(uc)))
 		return (EFAULT);
 
 	error = set_mcontext(td, &uc.uc_mcontext);
 	if (error != 0)
 		return (error);
-	set_fpcontext(td, &uc.uc_mcontext);
 
 	/* Restore signal mask. */
 	kern_sigprocmask(td, SIG_SETMASK, &uc.uc_sigmask, NULL, 0);
@@ -746,7 +752,6 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	/* Fill in the frame to copy out */
 	bzero(&frame, sizeof(frame));
 	get_mcontext(td, &frame.sf_uc.uc_mcontext, 0);
-	get_fpcontext(td, &frame.sf_uc.uc_mcontext);
 	frame.sf_si = ksi->ksi_info;
 	frame.sf_uc.uc_sigmask = *mask;
 	frame.sf_uc.uc_stack = td->td_sigstk;
@@ -849,7 +854,7 @@ exclude_efi_map_entry(struct efi_md *p)
 		 */
 		break;
 	default:
-		arm_physmem_exclude_region(p->md_phys, p->md_pages * PAGE_SIZE,
+		physmem_exclude_region(p->md_phys, p->md_pages * PAGE_SIZE,
 		    EXFLAG_NOALLOC);
 	}
 }
@@ -880,7 +885,7 @@ add_efi_map_entry(struct efi_md *p)
 		/*
 		 * We're allowed to use any entry with these types.
 		 */
-		arm_physmem_hardware_region(p->md_phys,
+		physmem_hardware_region(p->md_phys,
 		    p->md_pages * PAGE_SIZE);
 		break;
 	}
@@ -1046,22 +1051,10 @@ bus_probe(void)
 static void
 cache_setup(void)
 {
-	int dcache_line_shift, icache_line_shift, dczva_line_shift;
-	uint32_t ctr_el0;
+	int dczva_line_shift;
 	uint32_t dczid_el0;
 
-	ctr_el0 = READ_SPECIALREG(ctr_el0);
-
-	/* Read the log2 words in each D cache line */
-	dcache_line_shift = CTR_DLINE_SIZE(ctr_el0);
-	/* Get the D cache line size */
-	dcache_line_size = sizeof(int) << dcache_line_shift;
-
-	/* And the same for the I cache */
-	icache_line_shift = CTR_ILINE_SIZE(ctr_el0);
-	icache_line_size = sizeof(int) << icache_line_shift;
-
-	idcache_line_size = MIN(dcache_line_size, icache_line_size);
+	identify_cache(READ_SPECIALREG(ctr_el0));
 
 	dczid_el0 = READ_SPECIALREG(dczid_el0);
 
@@ -1093,6 +1086,8 @@ initarm(struct arm64_bootparams *abp)
 	caddr_t kmdp;
 	bool valid;
 
+	boot_el = abp->boot_el;
+
 	/* Parse loader or FDT boot parametes. Determine last used address. */
 	lastaddr = parse_boot_param(abp);
 
@@ -1117,10 +1112,10 @@ initarm(struct arm64_bootparams *abp)
 		if (fdt_get_mem_regions(mem_regions, &mem_regions_sz,
 		    NULL) != 0)
 			panic("Cannot get physical memory regions");
-		arm_physmem_hardware_regions(mem_regions, mem_regions_sz);
+		physmem_hardware_regions(mem_regions, mem_regions_sz);
 	}
 	if (fdt_get_reserved_mem(mem_regions, &mem_regions_sz) == 0)
-		arm_physmem_exclude_regions(mem_regions, mem_regions_sz,
+		physmem_exclude_regions(mem_regions, mem_regions_sz,
 		    EXFLAG_NODUMP | EXFLAG_NOALLOC);
 #endif
 
@@ -1128,7 +1123,7 @@ initarm(struct arm64_bootparams *abp)
 	efifb = (struct efi_fb *)preload_search_info(kmdp,
 	    MODINFO_METADATA | MODINFOMD_EFI_FB);
 	if (efifb != NULL)
-		arm_physmem_exclude_region(efifb->fb_addr, efifb->fb_size,
+		physmem_exclude_region(efifb->fb_addr, efifb->fb_size,
 		    EXFLAG_NOALLOC);
 
 	/* Set the pcpu data, this is needed by pmap_bootstrap */
@@ -1157,7 +1152,7 @@ initarm(struct arm64_bootparams *abp)
 	/* Exclude entries neexed in teh DMAP region, but not phys_avail */
 	if (efihdr != NULL)
 		exclude_efi_map_entries(efihdr);
-	arm_physmem_init_kernel_globals();
+	physmem_init_kernel_globals();
 
 	devmap_bootstrap(0, NULL);
 
@@ -1186,7 +1181,7 @@ initarm(struct arm64_bootparams *abp)
 
 	if (boothowto & RB_VERBOSE) {
 		print_efi_map_entries(efihdr);
-		arm_physmem_print_tables();
+		physmem_print_tables();
 	}
 
 	early_boot = 0;

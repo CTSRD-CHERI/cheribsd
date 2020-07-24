@@ -112,13 +112,6 @@ __FBSDID("$FreeBSD$");
 #include "miidevs.h"
 #include <dev/mii/brgphyreg.h>
 
-#ifdef __sparc64__
-#include <dev/ofw/ofw_bus.h>
-#include <dev/ofw/openfirm.h>
-#include <machine/ofw_machdep.h>
-#include <machine/ver.h>
-#endif
-
 #include <dev/pci/pcireg.h>
 #include <dev/pci/pcivar.h>
 
@@ -553,51 +546,14 @@ DRIVER_MODULE(miibus, bge, miibus_driver, miibus_devclass, 0, 0);
 
 static int bge_allow_asf = 1;
 
-static SYSCTL_NODE(_hw, OID_AUTO, bge, CTLFLAG_RD, 0, "BGE driver parameters");
+static SYSCTL_NODE(_hw, OID_AUTO, bge, CTLFLAG_RD | CTLFLAG_MPSAFE, 0,
+    "BGE driver parameters");
 SYSCTL_INT(_hw_bge, OID_AUTO, allow_asf, CTLFLAG_RDTUN, &bge_allow_asf, 0,
 	"Allow ASF mode if available");
-
-#define	SPARC64_BLADE_1500_MODEL	"SUNW,Sun-Blade-1500"
-#define	SPARC64_BLADE_1500_PATH_BGE	"/pci@1f,700000/network@2"
-#define	SPARC64_BLADE_2500_MODEL	"SUNW,Sun-Blade-2500"
-#define	SPARC64_BLADE_2500_PATH_BGE	"/pci@1c,600000/network@3"
-#define	SPARC64_OFW_SUBVENDOR		"subsystem-vendor-id"
 
 static int
 bge_has_eaddr(struct bge_softc *sc)
 {
-#ifdef __sparc64__
-	char buf[sizeof(SPARC64_BLADE_1500_PATH_BGE)];
-	device_t dev;
-	uint32_t subvendor;
-
-	dev = sc->bge_dev;
-
-	/*
-	 * The on-board BGEs found in sun4u machines aren't fitted with
-	 * an EEPROM which means that we have to obtain the MAC address
-	 * via OFW and that some tests will always fail.  We distinguish
-	 * such BGEs by the subvendor ID, which also has to be obtained
-	 * from OFW instead of the PCI configuration space as the latter
-	 * indicates Broadcom as the subvendor of the netboot interface.
-	 * For early Blade 1500 and 2500 we even have to check the OFW
-	 * device path as the subvendor ID always defaults to Broadcom
-	 * there.
-	 */
-	if (OF_getprop(ofw_bus_get_node(dev), SPARC64_OFW_SUBVENDOR,
-	    &subvendor, sizeof(subvendor)) == sizeof(subvendor) &&
-	    (subvendor == FJTSU_VENDORID || subvendor == SUN_VENDORID))
-		return (0);
-	memset(buf, 0, sizeof(buf));
-	if (OF_package_to_path(ofw_bus_get_node(dev), buf, sizeof(buf)) > 0) {
-		if (strcmp(sparc64_model, SPARC64_BLADE_1500_MODEL) == 0 &&
-		    strcmp(buf, SPARC64_BLADE_1500_PATH_BGE) == 0)
-			return (0);
-		if (strcmp(sparc64_model, SPARC64_BLADE_2500_MODEL) == 0 &&
-		    strcmp(buf, SPARC64_BLADE_2500_PATH_BGE) == 0)
-			return (0);
-	}
-#endif
 	return (1);
 }
 
@@ -3351,7 +3307,7 @@ bge_attach(device_t dev)
 	sc->bge_dev = dev;
 
 	BGE_LOCK_INIT(sc, device_get_nameunit(dev));
-	TASK_INIT(&sc->bge_intr_task, 0, bge_intr_task, sc);
+	NET_TASK_INIT(&sc->bge_intr_task, 0, bge_intr_task, sc);
 	callout_init_mtx(&sc->bge_stat_ch, &sc->bge_mtx, 0);
 
 	pci_enable_busmaster(dev);
@@ -6292,20 +6248,20 @@ bge_add_sysctls(struct bge_softc *sc)
 
 #ifdef BGE_REGISTER_DEBUG
 	SYSCTL_ADD_PROC(ctx, children, OID_AUTO, "debug_info",
-	    CTLTYPE_INT | CTLFLAG_RW, sc, 0, bge_sysctl_debug_info, "I",
-	    "Debug Information");
+	    CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_NEEDGIANT, sc, 0,
+	    bge_sysctl_debug_info, "I", "Debug Information");
 
 	SYSCTL_ADD_PROC(ctx, children, OID_AUTO, "reg_read",
-	    CTLTYPE_INT | CTLFLAG_RW, sc, 0, bge_sysctl_reg_read, "I",
-	    "MAC Register Read");
+	    CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_NEEDGIANT, sc, 0,
+	    bge_sysctl_reg_read, "I", "MAC Register Read");
 
 	SYSCTL_ADD_PROC(ctx, children, OID_AUTO, "ape_read",
-	    CTLTYPE_INT | CTLFLAG_RW, sc, 0, bge_sysctl_ape_read, "I",
-	    "APE Register Read");
+	    CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_NEEDGIANT, sc, 0,
+	    bge_sysctl_ape_read, "I", "APE Register Read");
 
 	SYSCTL_ADD_PROC(ctx, children, OID_AUTO, "mem_read",
-	    CTLTYPE_INT | CTLFLAG_RW, sc, 0, bge_sysctl_mem_read, "I",
-	    "Memory Read");
+	    CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_NEEDGIANT, sc, 0,
+	    bge_sysctl_mem_read, "I", "Memory Read");
 
 #endif
 
@@ -6355,9 +6311,9 @@ bge_add_sysctls(struct bge_softc *sc)
 }
 
 #define BGE_SYSCTL_STAT(sc, ctx, desc, parent, node, oid) \
-	SYSCTL_ADD_PROC(ctx, parent, OID_AUTO, oid, CTLTYPE_UINT|CTLFLAG_RD, \
-	    sc, offsetof(struct bge_stats, node), bge_sysctl_stats, "IU", \
-	    desc)
+    SYSCTL_ADD_PROC(ctx, parent, OID_AUTO, oid, \
+        CTLTYPE_UINT | CTLFLAG_RD | CTLFLAG_NEEDGIANT, sc, \
+	offsetof(struct bge_stats, node), bge_sysctl_stats, "IU", desc)
 
 static void
 bge_add_sysctl_stats(struct bge_softc *sc, struct sysctl_ctx_list *ctx,
@@ -6366,8 +6322,8 @@ bge_add_sysctl_stats(struct bge_softc *sc, struct sysctl_ctx_list *ctx,
 	struct sysctl_oid *tree;
 	struct sysctl_oid_list *children, *schildren;
 
-	tree = SYSCTL_ADD_NODE(ctx, parent, OID_AUTO, "stats", CTLFLAG_RD,
-	    NULL, "BGE Statistics");
+	tree = SYSCTL_ADD_NODE(ctx, parent, OID_AUTO, "stats",
+	    CTLFLAG_RD | CTLFLAG_MPSAFE, NULL, "BGE Statistics");
 	schildren = children = SYSCTL_CHILDREN(tree);
 	BGE_SYSCTL_STAT(sc, ctx, "Frames Dropped Due To Filters",
 	    children, COSFramesDroppedDueToFilters,
@@ -6401,8 +6357,8 @@ bge_add_sysctl_stats(struct bge_softc *sc, struct sysctl_ctx_list *ctx,
 	BGE_SYSCTL_STAT(sc, ctx, "NIC Send Threshold Hit",
 	    children, nicSendThresholdHit, "SendThresholdHit");
 
-	tree = SYSCTL_ADD_NODE(ctx, schildren, OID_AUTO, "rx", CTLFLAG_RD,
-	    NULL, "BGE RX Statistics");
+	tree = SYSCTL_ADD_NODE(ctx, schildren, OID_AUTO, "rx",
+	    CTLFLAG_RD | CTLFLAG_MPSAFE, NULL, "BGE RX Statistics");
 	children = SYSCTL_CHILDREN(tree);
 	BGE_SYSCTL_STAT(sc, ctx, "Inbound Octets",
 	    children, rxstats.ifHCInOctets, "ifHCInOctets");
@@ -6437,8 +6393,8 @@ bge_add_sysctl_stats(struct bge_softc *sc, struct sysctl_ctx_list *ctx,
 	BGE_SYSCTL_STAT(sc, ctx, "Outbound Range Length Errors",
 	    children, rxstats.outRangeLengthError, "outRangeLengthError");
 
-	tree = SYSCTL_ADD_NODE(ctx, schildren, OID_AUTO, "tx", CTLFLAG_RD,
-	    NULL, "BGE TX Statistics");
+	tree = SYSCTL_ADD_NODE(ctx, schildren, OID_AUTO, "tx",
+	    CTLFLAG_RD | CTLFLAG_MPSAFE, NULL, "BGE TX Statistics");
 	children = SYSCTL_CHILDREN(tree);
 	BGE_SYSCTL_STAT(sc, ctx, "Outbound Octets",
 	    children, txstats.ifHCOutOctets, "ifHCOutOctets");
@@ -6497,8 +6453,8 @@ bge_add_sysctl_stats_regs(struct bge_softc *sc, struct sysctl_ctx_list *ctx,
 	struct bge_mac_stats *stats;
 
 	stats = &sc->bge_mac_stats;
-	tree = SYSCTL_ADD_NODE(ctx, parent, OID_AUTO, "stats", CTLFLAG_RD,
-	    NULL, "BGE Statistics");
+	tree = SYSCTL_ADD_NODE(ctx, parent, OID_AUTO, "stats",
+	    CTLFLAG_RD | CTLFLAG_MPSAFE, NULL, "BGE Statistics");
 	schild = child = SYSCTL_CHILDREN(tree);
 	BGE_SYSCTL_STAT_ADD64(ctx, child, "FramesDroppedDueToFilters",
 	    &stats->FramesDroppedDueToFilters, "Frames Dropped Due to Filters");
@@ -6516,8 +6472,8 @@ bge_add_sysctl_stats_regs(struct bge_softc *sc, struct sysctl_ctx_list *ctx,
 	BGE_SYSCTL_STAT_ADD64(ctx, child, "RecvThresholdHit",
 	    &stats->RecvThresholdHit, "NIC Recv Threshold Hit");
 
-	tree = SYSCTL_ADD_NODE(ctx, schild, OID_AUTO, "rx", CTLFLAG_RD,
-	    NULL, "BGE RX Statistics");
+	tree = SYSCTL_ADD_NODE(ctx, schild, OID_AUTO, "rx",
+	    CTLFLAG_RD | CTLFLAG_MPSAFE, NULL, "BGE RX Statistics");
 	child = SYSCTL_CHILDREN(tree);
 	BGE_SYSCTL_STAT_ADD64(ctx, child, "ifHCInOctets",
 	    &stats->ifHCInOctets, "Inbound Octets");
@@ -6548,8 +6504,8 @@ bge_add_sysctl_stats_regs(struct bge_softc *sc, struct sysctl_ctx_list *ctx,
 	BGE_SYSCTL_STAT_ADD64(ctx, child, "UndersizePkts",
 	    &stats->etherStatsUndersizePkts, "Undersized Packets");
 
-	tree = SYSCTL_ADD_NODE(ctx, schild, OID_AUTO, "tx", CTLFLAG_RD,
-	    NULL, "BGE TX Statistics");
+	tree = SYSCTL_ADD_NODE(ctx, schild, OID_AUTO, "tx",
+	    CTLFLAG_RD | CTLFLAG_MPSAFE, NULL, "BGE TX Statistics");
 	child = SYSCTL_CHILDREN(tree);
 	BGE_SYSCTL_STAT_ADD64(ctx, child, "ifHCOutOctets",
 	    &stats->ifHCOutOctets, "Outbound Octets");
@@ -6741,15 +6697,7 @@ bge_sysctl_mem_read(SYSCTL_HANDLER_ARGS)
 static int
 bge_get_eaddr_fw(struct bge_softc *sc, uint8_t ether_addr[])
 {
-#ifdef __sparc64__
-	if (sc->bge_flags & BGE_FLAG_EADDR)
-		return (1);
-
-	OF_getetheraddr(sc->bge_dev, ether_addr);
-	return (0);
-#else
 	return (1);
-#endif
 }
 
 static int

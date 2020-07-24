@@ -61,6 +61,7 @@ def bootstrap_bmake(source_root, objdir_prefix):
 
     if (bmake_install_dir / "bin/bmake").exists():
         return bmake_binary
+    print("Bootstrapping bmake...")
     # TODO: check if the host system bmake is new enough and use that instead
     if not bmake_build_dir.exists():
         os.makedirs(str(bmake_build_dir))
@@ -78,11 +79,18 @@ def bootstrap_bmake(source_root, objdir_prefix):
         "--with-default-sys-path=" + str(bmake_install_dir / "share/mk"),
         "--with-machine=amd64",  # TODO? "--with-machine-arch=amd64",
         "--without-filemon", "--prefix=" + str(bmake_install_dir)]
-    run(["sh", bmake_source_dir / "boot-strap"] + configure_args,
-        cwd=str(bmake_build_dir), env=env)
+    try:
+        run(["sh", bmake_source_dir / "boot-strap"] + configure_args,
+            cwd=str(bmake_build_dir), env=env)
+    except subprocess.CalledProcessError:
+        print("Failed to configure bmake. Trying to read config.log")
+        for logfile in bmake_build_dir.glob("*/config.log"):
+            print(logfile.read_text(encoding="utf-8"))
+        raise
 
     run(["sh", bmake_source_dir / "boot-strap", "op=install"] + configure_args,
         cwd=str(bmake_build_dir))
+    print("Finished bootstrapping bmake...")
     return bmake_binary
 
 

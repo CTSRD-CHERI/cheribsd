@@ -782,8 +782,8 @@
 #if __has_feature(capabilities)
 #define __CAP_CHECK(cap, len) ({					\
 	int ret = 1;							\
-	size_t caplen = __builtin_mips_cheri_get_cap_length(cap);	\
-	size_t capoff = __builtin_mips_cheri_cap_offset_get(cap);	\
+	size_t caplen = __builtin_cheri_length_get(cap);		\
+	size_t capoff = __builtin_cheri_offset_get(cap);		\
 	if (capoff < 0 || capoff > caplen || caplen - capoff < (len))	\
 		ret = 0;						\
 	ret;								\
@@ -1038,8 +1038,12 @@
 /* Function should not be analyzed. */
 #define	__no_lock_analysis	__lock_annotate(no_thread_safety_analysis)
 
-/* Function or variable should not be sanitized, ie. by AddressSanitizer */
-#if __has_attribute(no_sanitize)
+/*
+ * Function or variable should not be sanitized, i.e. by AddressSanitizer.
+ * GCC has the nosanitize attribute, but as a function attribute only, and
+ * warns on use as a variable attribute.
+ */
+#if __has_attribute(no_sanitize) && defined(__clang__)
 #define __nosanitizeaddress	__attribute__((no_sanitize("address")))
 #else
 #define __nosanitizeaddress
@@ -1081,12 +1085,17 @@
 #define __cheri_addr
 #endif
 
+#if 0
 #define __static_assert_if_constant(val, expr, message) \
 	_Static_assert(__builtin_choose_expr(__builtin_constant_p(val), \
 	    expr, 1), message)
 #define __static_assert_power_of_two(val) \
 	__static_assert_if_constant(val, (val & ((val)-1)) == 0, \
 	     "Alignment must be a power-of-two")
+#else
+// XXX-BD: riscv64c bringup, failing with const variable with llvm 9.0
+#define	__static_assert_power_of_two(val)
+#endif
 
 /* Allow use of __builtin_is_aligned/align_up/align_down unconditionally */
 #if !__has_builtin(__builtin_is_aligned)

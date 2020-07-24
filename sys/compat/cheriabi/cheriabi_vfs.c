@@ -145,8 +145,15 @@ int
 cheriabi___getcwd(struct thread *td, struct cheriabi___getcwd_args *uap)
 {
 
-	return (kern___getcwd(td, uap->buf, UIO_USERSPACE, uap->buflen,
-	    MAXPATHLEN));
+	return (kern___getcwd(td, uap->buf, uap->buflen));
+}
+
+int
+cheriabi___realpathat(struct thread *td, struct cheriabi___realpathat_args *uap)
+{
+
+	return (kern___realpathat(td, uap->fd, uap->path, uap->buf, uap->size,
+	    uap->flags, UIO_USERSPACE));
 }
 
 /*

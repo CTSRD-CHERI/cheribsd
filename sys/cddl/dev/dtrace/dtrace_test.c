@@ -75,10 +75,13 @@ dtrace_test_sdttest(SYSCTL_HANDLER_ARGS)
 	return (error);
 }
 
-static SYSCTL_NODE(_debug, OID_AUTO, dtracetest, CTLFLAG_RD, 0, "");
+static SYSCTL_NODE(_debug, OID_AUTO, dtracetest,
+    CTLFLAG_RD | CTLFLAG_MPSAFE, 0,
+    "");
 
-SYSCTL_PROC(_debug_dtracetest, OID_AUTO, sdttest, CTLTYPE_INT | CTLFLAG_RW,
-    NULL, 0, dtrace_test_sdttest, "I", "Trigger the SDT test probe");
+SYSCTL_PROC(_debug_dtracetest, OID_AUTO, sdttest,
+    CTLTYPE_INT | CTLFLAG_MPSAFE | CTLFLAG_RW, NULL, 0, dtrace_test_sdttest,
+    "I", "Trigger the SDT test probe");
 
 static int
 dtrace_test_modevent(module_t mod, int type, void *data)

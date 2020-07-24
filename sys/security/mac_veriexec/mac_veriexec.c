@@ -76,7 +76,7 @@ static int sysctl_mac_veriexec_db(SYSCTL_HANDLER_ARGS);
 
 SYSCTL_DECL(_security_mac);
 
-SYSCTL_NODE(_security_mac, OID_AUTO, veriexec, CTLFLAG_RW, 0,
+SYSCTL_NODE(_security_mac, OID_AUTO, veriexec, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
     "MAC/veriexec policy controls");
 
 int	mac_veriexec_debug;
@@ -85,11 +85,13 @@ SYSCTL_INT(_security_mac_veriexec, OID_AUTO, debug, CTLFLAG_RW,
 
 static int	mac_veriexec_state;
 SYSCTL_PROC(_security_mac_veriexec, OID_AUTO, state,
-    CTLTYPE_STRING | CTLFLAG_RD, 0, 0, sysctl_mac_veriexec_state, "A",
+    CTLTYPE_STRING | CTLFLAG_RD | CTLFLAG_NEEDGIANT,
+    0, 0, sysctl_mac_veriexec_state, "A",
     "Verified execution subsystem state");
 
 SYSCTL_PROC(_security_mac_veriexec, OID_AUTO, db,
-    CTLTYPE_STRING | CTLFLAG_RD | CTLFLAG_SKIP, 0, 0, sysctl_mac_veriexec_db,
+    CTLTYPE_STRING | CTLFLAG_RD | CTLFLAG_SKIP | CTLFLAG_NEEDGIANT,
+    0, 0, sysctl_mac_veriexec_db,
     "A", "Verified execution fingerprint database");
 
 static int mac_veriexec_slot;
@@ -691,7 +693,7 @@ mac_veriexec_syscall(struct thread *td, int call, void * __capability arg)
 		    ((va.va_mode & (S_IXUSR|S_IXGRP|S_IXOTH)) == 0), td);
 check_done:
 		/* Release the lock we obtained earlier */
-		VOP_UNLOCK(img.vp, 0);
+		VOP_UNLOCK(img.vp);
 cleanup_file:
 		fdrop(fp, td);
 		break;
@@ -737,6 +739,22 @@ MAC_POLICY_SET(&mac_veriexec_ops, mac_veriexec, MAC_VERIEXEC_FULLNAME,
     MPC_LOADTIME_FLAG_NOTLATE, &mac_veriexec_slot);
 MODULE_VERSION(mac_veriexec, 1);
 
+static struct vnode *
+mac_veriexec_bottom_vnode(struct vnode *vp)
+{
+	struct vnode *ldvp = NULL;
+
+	/*
+	 * XXX This code is bogus. nullfs is not the only stacking
+	 * filesystem. Less bogus code would add a VOP to reach bottom
+	 * vnode and would not make assumptions how to get there.
+	 */
+	if (vp->v_mount != NULL &&
+	    strcmp(vp->v_mount->mnt_vfc->vfc_name, "nullfs") == 0)
+		ldvp = NULLVPTOLOWERVP(vp);
+	return (ldvp);
+}
+
 /**
  * @brief Get the fingerprint status set on a vnode.
  *
@@ -748,6 +766,7 @@ fingerprint_status_t
 mac_veriexec_get_fingerprint_status(struct vnode *vp)
 {
 	fingerprint_status_t fps;
+	struct vnode *ldvp;
 
 	fps = SLOT(vp->v_label);
 	switch (fps) {
@@ -757,12 +776,9 @@ mac_veriexec_get_fingerprint_status(struct vnode *vp)
 		break;
 	default:
 		/* we may need to recurse */
-		if (strcmp(vp->v_tag, "null") == 0) {
-			struct vnode *ldvp;
-
-			ldvp = NULLVPTOLOWERVP(vp);
+		ldvp = mac_veriexec_bottom_vnode(vp);
+		if (ldvp != NULL)
 			return mac_veriexec_get_fingerprint_status(ldvp);
-		}
 		break;
 	}
 	return fps;
@@ -808,12 +824,11 @@ void
 mac_veriexec_set_fingerprint_status(struct vnode *vp,
     fingerprint_status_t fp_status)
 {
+	struct vnode *ldvp;
 
 	/* recurse until we find the real storage */
-	if (strcmp(vp->v_tag, "null") == 0) {
-		struct vnode *ldvp;
-
-		ldvp = NULLVPTOLOWERVP(vp);
+	ldvp = mac_veriexec_bottom_vnode(vp);
+	if (ldvp != NULL) {
 		mac_veriexec_set_fingerprint_status(ldvp, fp_status);
 		return;
 	}

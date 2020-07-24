@@ -556,7 +556,7 @@ found:
 		ufs_dirbad(dp, i_offset, "i_size too small");
 		dp->i_size = i_offset + DIRSIZ(OFSFMT(vdp), ep);
 		DIP_SET(dp, i_size, dp->i_size);
-		dp->i_flag |= IN_CHANGE | IN_UPDATE;
+		UFS_INODE_SET_FLAG(dp, IN_CHANGE | IN_UPDATE);
 	}
 	brelse(bp);
 
@@ -918,7 +918,7 @@ ufs_direnter(dvp, tvp, dirp, cnp, newdirbp, isrename)
 		dp->i_size = dp->i_offset + DIRBLKSIZ;
 		DIP_SET(dp, i_size, dp->i_size);
 		dp->i_endoff = dp->i_size;
-		dp->i_flag |= IN_CHANGE | IN_UPDATE;
+		UFS_INODE_SET_FLAG(dp, IN_CHANGE | IN_UPDATE);
 		dirp->d_reclen = DIRBLKSIZ;
 		blkoff = dp->i_offset &
 		    (VFSTOUFS(dvp->v_mount)->um_mountp->mnt_stat.f_iosize - 1);
@@ -946,7 +946,7 @@ ufs_direnter(dvp, tvp, dirp, cnp, newdirbp, isrename)
 			}
 			if (softdep_setup_directory_add(bp, dp, dp->i_offset,
 			    dirp->d_ino, newdirbp, 1))
-				dp->i_flag |= IN_NEEDSYNC;
+				UFS_INODE_SET_FLAG(dp, IN_NEEDSYNC);
 			if (newdirbp)
 				bdwrite(newdirbp);
 			bdwrite(bp);
@@ -968,7 +968,7 @@ ufs_direnter(dvp, tvp, dirp, cnp, newdirbp, isrename)
 			if (isrename)
 				return (0);
 			if (tvp != NULL)
-				VOP_UNLOCK(tvp, 0);
+				VOP_UNLOCK(tvp);
 			(void) VOP_FSYNC(dvp, MNT_WAIT, td);
 			if (tvp != NULL)
 				vn_lock(tvp, LK_EXCLUSIVE | LK_RETRY);
@@ -1118,7 +1118,7 @@ ufs_direnter(dvp, tvp, dirp, cnp, newdirbp, isrename)
 			error = bwrite(bp);
 		}
 	}
-	dp->i_flag |= IN_CHANGE | IN_UPDATE;
+	UFS_INODE_SET_FLAG(dp, IN_CHANGE | IN_UPDATE);
 	/*
 	 * If all went well, and the directory can be shortened, proceed
 	 * with the truncation. Note that we have to unlock the inode for
@@ -1129,7 +1129,7 @@ ufs_direnter(dvp, tvp, dirp, cnp, newdirbp, isrename)
 	if (isrename == 0 && error == 0 &&
 	    dp->i_endoff && dp->i_endoff < dp->i_size) {
 		if (tvp != NULL)
-			VOP_UNLOCK(tvp, 0);
+			VOP_UNLOCK(tvp);
 		error = UFS_TRUNCATE(dvp, (off_t)dp->i_endoff,
 		    IO_NORMAL | (DOINGASYNC(dvp) ? 0 : IO_SYNC), cr);
 		if (error != 0)
@@ -1169,6 +1169,7 @@ ufs_dirremove(dvp, ip, flags, isrmdir)
 	struct inode *dp;
 	struct direct *ep, *rep;
 	struct buf *bp;
+	off_t offset;
 	int error;
 
 	dp = VTOI(dvp);
@@ -1178,31 +1179,41 @@ ufs_dirremove(dvp, ip, flags, isrmdir)
 	 */
 	if (ip) {
 		ip->i_effnlink--;
-		ip->i_flag |= IN_CHANGE;
+		UFS_INODE_SET_FLAG(ip, IN_CHANGE);
 		if (DOINGSOFTDEP(dvp)) {
 			softdep_setup_unlink(dp, ip);
 		} else {
 			ip->i_nlink--;
 			DIP_SET(ip, i_nlink, ip->i_nlink);
-			ip->i_flag |= IN_CHANGE;
+			UFS_INODE_SET_FLAG(ip, IN_CHANGE);
 		}
+	}
+	if (flags & DOWHITEOUT)
+		offset = dp->i_offset;
+	else
+		offset = dp->i_offset - dp->i_count;
+	if ((error = UFS_BLKATOFF(dvp, offset, (char **)&ep, &bp)) != 0) {
+		if (ip) {
+			ip->i_effnlink++;
+			UFS_INODE_SET_FLAG(ip, IN_CHANGE);
+			if (DOINGSOFTDEP(dvp)) {
+				softdep_change_linkcnt(ip);
+			} else {
+				ip->i_nlink++;
+				DIP_SET(ip, i_nlink, ip->i_nlink);
+				UFS_INODE_SET_FLAG(ip, IN_CHANGE);
+			}
+		}
+		return (error);
 	}
 	if (flags & DOWHITEOUT) {
 		/*
 		 * Whiteout entry: set d_ino to UFS_WINO.
 		 */
-		if ((error =
-		    UFS_BLKATOFF(dvp, (off_t)dp->i_offset, (char **)&ep, &bp)) != 0)
-			return (error);
 		ep->d_ino = UFS_WINO;
 		ep->d_type = DT_WHT;
 		goto out;
 	}
-
-	if ((error = UFS_BLKATOFF(dvp,
-	    (off_t)(dp->i_offset - dp->i_count), (char **)&ep, &bp)) != 0)
-		return (error);
-
 	/* Set 'rep' to the entry being removed. */
 	if (dp->i_count == 0)
 		rep = ep;
@@ -1258,7 +1269,7 @@ out:
 		else
 			error = bwrite(bp);
 	}
-	dp->i_flag |= IN_CHANGE | IN_UPDATE;
+	UFS_INODE_SET_FLAG(dp, IN_CHANGE | IN_UPDATE);
 	/*
 	 * If the last named reference to a snapshot goes away,
 	 * drop its snapshot reference so that it will be reclaimed
@@ -1292,22 +1303,32 @@ ufs_dirrewrite(dp, oip, newinum, newtype, isrmdir)
 	 * necessary.
 	 */
 	oip->i_effnlink--;
-	oip->i_flag |= IN_CHANGE;
+	UFS_INODE_SET_FLAG(oip, IN_CHANGE);
 	if (DOINGSOFTDEP(vdp)) {
 		softdep_setup_unlink(dp, oip);
 	} else {
 		oip->i_nlink--;
 		DIP_SET(oip, i_nlink, oip->i_nlink);
-		oip->i_flag |= IN_CHANGE;
+		UFS_INODE_SET_FLAG(oip, IN_CHANGE);
 	}
 
 	error = UFS_BLKATOFF(vdp, (off_t)dp->i_offset, (char **)&ep, &bp);
-	if (error)
-		return (error);
-	if (ep->d_namlen == 2 && ep->d_name[1] == '.' && ep->d_name[0] == '.' &&
-	    ep->d_ino != oip->i_number) {
+	if (error == 0 && ep->d_namlen == 2 && ep->d_name[1] == '.' &&
+	    ep->d_name[0] == '.' && ep->d_ino != oip->i_number) {
 		brelse(bp);
-		return (EIDRM);
+		error = EIDRM;
+	}
+	if (error) {
+		oip->i_effnlink++;
+		UFS_INODE_SET_FLAG(oip, IN_CHANGE);
+		if (DOINGSOFTDEP(vdp)) {
+			softdep_change_linkcnt(oip);
+		} else {
+			oip->i_nlink++;
+			DIP_SET(oip, i_nlink, oip->i_nlink);
+			UFS_INODE_SET_FLAG(oip, IN_CHANGE);
+		}
+		return (error);
 	}
 	ep->d_ino = newinum;
 	if (!OFSFMT(vdp))
@@ -1323,7 +1344,7 @@ ufs_dirrewrite(dp, oip, newinum, newtype, isrmdir)
 			error = bwrite(bp);
 		}
 	}
-	dp->i_flag |= IN_CHANGE | IN_UPDATE;
+	UFS_INODE_SET_FLAG(dp, IN_CHANGE | IN_UPDATE);
 	/*
 	 * If the last named reference to a snapshot goes away,
 	 * drop its snapshot reference so that it will be reclaimed

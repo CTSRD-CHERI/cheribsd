@@ -251,11 +251,20 @@ cheriabi_getpeername(struct thread *td, struct cheriabi_getpeername_args *uap)
  */
 
 int
+freebsd12_cheriabi_shm_open(struct thread *td,
+    struct freebsd12_cheriabi_shm_open_args *uap)
+{
+
+	return (kern_shm_open(td, uap->path, uap->flags | O_CLOEXEC,
+	    uap->mode, NULL));
+}
+
+int
 cheriabi_shm_open2(struct thread *td, struct cheriabi_shm_open2_args *uap)
 {
 
 	return (kern_shm_open2(td, uap->path, uap->flags, uap->mode,
-	    uap->shmflags, uap->name));
+	    uap->shmflags, NULL, uap->name));
 }
 
 int

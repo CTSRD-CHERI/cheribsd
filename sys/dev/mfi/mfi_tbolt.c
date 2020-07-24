@@ -52,6 +52,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/sysctl.h>
 #include <sys/systm.h>
 #include <sys/malloc.h>
+#include <sys/mount.h>
 
 #include <dev/mfi/mfireg.h>
 #include <dev/mfi/mfi_ioctl.h>
@@ -1109,7 +1110,7 @@ mfi_tbolt_send_frame(struct mfi_softc *sc, struct mfi_command *cm)
 
 	if (hdr->cmd == MFI_CMD_PD_SCSI_IO) {
 		/* check for inquiry commands coming from CLI */
-		if (cdb[0] != 0x28 || cdb[0] != 0x2A) {
+		if (cdb[0] != 0x28 && cdb[0] != 0x2A) {
 			if ((req_desc = mfi_tbolt_build_mpt_cmd(sc, cm)) ==
 			    NULL) {
 				device_printf(sc->mfi_dev, "Mapping from MFI "

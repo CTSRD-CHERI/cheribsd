@@ -44,14 +44,8 @@
 #include <cheri/cheri.h>
 #include <cheri/cheric.h>
 
-#include <machine/cpuregs.h>
 #include <machine/sysarch.h>
 
-#include <cheri/libcheri_enter.h>
-#include <cheri/libcheri_fd.h>
-#include <cheri/libcheri_sandbox.h>
-
-#include <cheritest-helper.h>
 #include <err.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -70,6 +64,7 @@
 #define	PERM_EXEC	CHERI_PERM_EXECUTE
 #define	PERM_RWX	(PERM_READ|PERM_WRITE|PERM_EXEC)
 
+#ifdef CHERI_MMAP_SETBOUNDS
 void
 test_cheriabi_mmap_nospace(const struct cheri_test *ctp __unused)
 {
@@ -88,7 +83,9 @@ test_cheriabi_mmap_nospace(const struct cheri_test *ctp __unused)
 
 	cheritest_success();
 }
+#endif
 
+#ifdef CHERI_MMAP_GETPERM
 void
 test_cheriabi_mmap_perms(const struct cheri_test *ctp __unused)
 {
@@ -217,20 +214,40 @@ test_cheriabi_mmap_perms(const struct cheri_test *ctp __unused)
 
 	cheritest_success();
 }
+#endif	/* CHERI_MMAP_GETPERM */
 
+#ifdef CHERI_BASELEN_BITS
 void
 test_cheriabi_mmap_unrepresentable(const struct cheri_test *ctp __unused)
 {
-#ifdef CHERI_BASELEN_BITS
 	size_t len = ((size_t)PAGE_SIZE << CHERI_BASELEN_BITS) + 1;
+	size_t expected_len;
 	void *cap;
 
+	expected_len = __builtin_cheri_round_representable_length(len);
 	if ((cap = mmap(0, len, PROT_READ|PROT_WRITE|PROT_EXEC,
-	    MAP_ANON, -1, 0)) != MAP_FAILED)
-		cheritest_failure_errx("mmap() returned a pointer when "
-		    "given an unrepresentable length (%zu): %#p", len, cap);
+	    MAP_ANON, -1, 0)) == MAP_FAILED)
+
+		cheritest_failure_errx("mmap() failed to return a pointer "
+		   "when given an unrepresentable length (%zu)", len);
+	if (cheri_getlen(cap) != expected_len)
+		cheritest_failure_errx("mmap() returned a pointer with "
+		    "an unexpected length (%zu vs %zu) when given an "
+		    "unrepresentable length (%zu): %#p", cheri_getlen(cap),
+		    expected_len, len, cap);
+
 	cheritest_success();
+}
 #endif
 
+void
+test_cheriabi_malloc_zero_size(const struct cheri_test *ctp __unused)
+{
+	void *cap;
+
+	cap = malloc(0);
+	if (cap != NULL && cheri_getlength(cap) != 0)
+		cheritest_failure_errx("malloc(0) returned a non-NULL capability with "
+		    "non-zero length (%zu)", cheri_getlength(cap));
 	cheritest_success();
 }

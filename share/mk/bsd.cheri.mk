@@ -34,11 +34,15 @@ WANT_CHERI?=	pure
 .endif
 .endif
 
-.if ! ${MACHINE_ARCH:Mmips*c*} || defined(LIBCHERI)
+.if defined(NEED_COMPAT) && ${NEED_COMPAT:MCHERI}
+NEED_CHERI=	pure
+.endif
+
+.if ${MACHINE_ARCH:Mmips*} && (!${MACHINE_ARCH:Mmips*c*} || defined(COMPAT_CHERI))
 .if !${.TARGETS:Mbuild-tools} && !defined(BOOTSTRAPPING)
 .if defined(NEED_CHERI)
 .if ${MK_CHERI} == "no"
-.error NEED_CHERI defined, but CHERI is not enabled
+.error NEED_CHERI defined, but CHERI is not enabled (MACHINE_ARCH=${MACHINE_ARCH})
 .endif
 .if ${NEED_CHERI} != "hybrid" && ${NEED_CHERI} != "pure" && ${NEED_CHERI} != "sandbox"
 .error NEED_CHERI must be 'hybrid', 'pure', or 'sandbox'
@@ -57,27 +61,21 @@ LDFLAGS+=	-stdlib=libc++
 
 .endif
 
-.if ${MK_CHERI} != "no" && (!defined(WANT_CHERI) || ${WANT_CHERI} == "none" || ${WANT_CHERI} == "variables")
+.if ${MK_CHERI} != "no" && (!defined(WANT_CHERI) || ${WANT_CHERI} == "none")
 # When building MIPS code for CHERI ensure 16/32 byte stack alignment
 # for libraries because it could also be used by hybrid code
-# Note: libc sets WANT_CHERI=variables when building for MIPS so we also need to
-# handle that case.
 # TODO: should be only for libraries and not programs
 .if ${COMPILER_TYPE} == "clang"
 # GCC doesn't support -mstack-alignment but I think it has been patched
 # to use 32 bytes anyway
-.if ${MK_CHERI256} == "yes"
-CFLAGS+=	-mstack-alignment=32
-.else
 CFLAGS+=	-mstack-alignment=16
-.endif
 .endif # $COMPILER_TYPE == clang
 .endif # MIPS, not hybrid (adjust stack alignment)
 
 .if ${MK_CHERI} != "no" && defined(WANT_CHERI) && ${WANT_CHERI} != "none"
 _CHERI_COMMON_FLAGS=	-integrated-as --target=cheri-unknown-freebsd \
 			-msoft-float \
-			-cheri-uintcap=${CHERI_UINTCAP_MODE:Uoffset}
+			-cheri-uintcap=${CHERI_UINTCAP_MODE:Uaddr}
 .ifdef WANT_AFL_FUZZ
 # Build binaries static when fuzzing
 .if defined(__BSD_PROG_MK)
@@ -144,11 +142,7 @@ _LIB_OBJTOP=	${ROOTOBJDIR}
 STATIC_CFLAGS+= -ftls-model=local-exec # MIPS/hybrid case
 .endif
 
-.if ${MK_CHERI128} == "yes"
 _CHERI_COMMON_FLAGS+=	-cheri=128
-.else
-_CHERI_COMMON_FLAGS+=	-cheri=256
-.endif
 
 CFLAGS+=	${CHERI_OPTIMIZATION_FLAGS:U-O2}
 # We now need LLD to link any code that uses capabilities:
@@ -165,7 +159,6 @@ LDFLAGS+=	-Wl,-z,norelro
 _CHERI_CFLAGS+=	-Qunused-arguments
 _CHERI_CFLAGS+=	-Werror=cheri-bitwise-operations
 
-.if ${WANT_CHERI} != "variables"
 .if ${WANT_CHERI} == "sandbox"
 # Force position-dependent sandboxes; PIEs aren't supported
 NO_SHARED=	yes
@@ -181,7 +174,6 @@ CXXFLAGS+=	-stdlib=libc++
 # Don't remove CHERI symbols from the symbol table
 STRIP_FLAGS+=	-w --keep-symbol=__cheri_callee_method.\* \
 		--keep-symbol=__cheri_method.\*
-.endif
 .endif
 .endif
 .endif

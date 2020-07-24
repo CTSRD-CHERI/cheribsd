@@ -34,7 +34,7 @@
 #define __attribute__(x)
 #endif
 
-#if __has_feature(capabilities)
+#if __has_feature(capabilities) && defined(CHERI_TCPDUMP)
 #include <cheri/cheri.h>
 #include <cheri/cheric.h>
 #endif
@@ -143,7 +143,7 @@ typedef struct netdissect_options netdissect_options;
 
 typedef u_int (*if_printer) IF_PRINTER_ARGS;
 
-#if __has_feature(capabilities)
+#if __has_feature(capabilities) && defined(CHERI_TCPDUMP)
 #pragma pointer_interpretation capability
 #endif
 struct netdissect_options {
@@ -215,7 +215,7 @@ struct netdissect_options {
 #endif
 		     ;
 };
-#if __has_feature(capabilities)
+#if __has_feature(capabilities) && defined(CHERI_TCPDUMP)
 #pragma pointer_interpretation default
 #endif
 
@@ -524,6 +524,7 @@ extern void hsrp_print(netdissect_options *, const u_char *, u_int);
 extern void http_print(netdissect_options *, const u_char *, u_int);
 extern void icmp6_print(netdissect_options *, const u_char *, u_int, const u_char *, int);
 extern void icmp_print(netdissect_options *, const u_char *, u_int, const u_char *, int);
+extern u_int ieee802_11_radio_print(netdissect_options *, const u_char *, u_int, u_int);
 extern void igmp_print(netdissect_options *, const u_char *, u_int);
 extern void igrp_print(netdissect_options *, const u_char *, u_int);
 extern void ip6_print(netdissect_options *, const u_char *, u_int);
@@ -992,7 +993,6 @@ extern int nextproto6_cksum(netdissect_options *, const struct ip6_hdr *, const 
 extern int mask2plen(uint32_t);
 extern int mask62plen(const u_char *);
 
-extern const char *dnname_string(netdissect_options *, u_short);
 extern const char *dnnum_string(netdissect_options *, u_short);
 
 extern char *smb_errstr(int, int);

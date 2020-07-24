@@ -22,12 +22,9 @@ TESTS_SUBDIRS+=	termios
 TESTS_SUBDIRS+=	time
 TESTS_SUBDIRS+=	ttyio
 
-.if ! ${MACHINE_ARCH:Mmips*c*}
-# Fails to link
 SUBDIR=		tls_dso
 TESTS_SUBDIRS+=	tls
 SUBDIR_DEPEND_tls= tls_dso
-.endif
 
 .if ${MK_ICONV} != "no"
 TESTS_SUBDIRS+=	iconv
@@ -37,7 +34,7 @@ TESTS_SUBDIRS+=	iconv
 TESTS_SUBDIRS+=	locale
 .endif
 
-.if ${MK_SSP} != "no"
+.if ${MK_SSP} != "no" && !${MACHINE_ABI:Mpurecap}
 TESTS_SUBDIRS+=	ssp
 .endif
 

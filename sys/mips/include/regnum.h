@@ -133,7 +133,17 @@
 #define	MULHI	34
 #define	BADVADDR 35
 #define	CAUSE	36
+#if __has_feature(capabilities) && defined(_KERNEL)
+/*
+ * Ensure that we don't use the PC macro for CHERI, use PCC instead.
+ * However, we do need to expose it to userland since it is used e.g. by ASAN.
+ */
+#pragma GCC poison PC
+/* Define a macro that can be used for the PT_GETREGS/PT_SETREGS implementation. */
+#define	PT_REGS_PC	37
+#else
 #define	PC	37
+#endif
 
 /* XXXAR: These two seem unused so I repurposed them for BadInstr + BadInstrP */
 #if 0

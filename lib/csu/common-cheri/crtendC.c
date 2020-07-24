@@ -28,12 +28,12 @@
  * SUCH DAMAGE.
  */
 
-typedef unsigned long long mips_function_ptr;
+typedef unsigned long long integer_function_ptr;
 
-mips_function_ptr __attribute__((used))
+integer_function_ptr __attribute__((used))
     __attribute__((section(".ctors")))
-    __CTOR_END__[1] = { (mips_function_ptr)(-1) };
+    __CTOR_END__[1] = { (integer_function_ptr)(-1) };
 
-mips_function_ptr __attribute__((used))
+integer_function_ptr __attribute__((used))
     __attribute__((section(".dtors")))
-    __DTOR_END__[1] = { (mips_function_ptr)(-1) };
+    __DTOR_END__[1] = { (integer_function_ptr)(-1) };

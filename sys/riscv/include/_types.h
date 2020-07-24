@@ -60,9 +60,14 @@ typedef	__int64_t	__critical_t;
 typedef	double		__double_t;
 typedef	float		__float_t;
 #endif
+#ifdef __CHERI_PURE_CAPABILITY__
+typedef	__intcap_t	__intfptr_t;
+typedef	__intcap_t	__intptr_t;
+#else
 typedef	__int64_t	__intfptr_t;
-typedef	__int64_t	__intmax_t;
 typedef	__int64_t	__intptr_t;
+#endif
+typedef	__int64_t	__intmax_t;
 typedef	__int32_t	__int_fast8_t;
 typedef	__int32_t	__int_fast16_t;
 typedef	__int32_t	__int_fast32_t;
@@ -77,9 +82,14 @@ typedef	__int64_t	__segsz_t;		/* segment size (in pages) */
 typedef	__uint64_t	__size_t;		/* sizeof() */
 typedef	__int64_t	__ssize_t;		/* byte count or error */
 typedef	__int64_t	__time_t;		/* time()... */
+#ifdef __CHERI_PURE_CAPABILITY__
+typedef	__uintcap_t	__uintfptr_t;
+typedef	__uintcap_t	__uintptr_t;
+#else
 typedef	__uint64_t	__uintfptr_t;
-typedef	__uint64_t	__uintmax_t;
 typedef	__uint64_t	__uintptr_t;
+#endif
+typedef	__uint64_t	__uintmax_t;
 typedef	__uint32_t	__uint_fast8_t;
 typedef	__uint32_t	__uint_fast16_t;
 typedef	__uint32_t	__uint_fast32_t;

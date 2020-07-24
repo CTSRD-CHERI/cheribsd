@@ -34,8 +34,6 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
-#define	EXPLICIT_USER_ACCESS
-
 #include <sys/param.h>
 #include <sys/bus.h>
 #include <sys/malloc.h>
@@ -99,7 +97,8 @@ static int rctl_throttle_max_sysctl(SYSCTL_HANDLER_ARGS);
 static int rctl_throttle_pct_sysctl(SYSCTL_HANDLER_ARGS);
 static int rctl_throttle_pct2_sysctl(SYSCTL_HANDLER_ARGS);
 
-SYSCTL_NODE(_kern_racct, OID_AUTO, rctl, CTLFLAG_RW, 0, "Resource Limits");
+SYSCTL_NODE(_kern_racct, OID_AUTO, rctl, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
+    "Resource Limits");
 SYSCTL_UINT(_kern_racct_rctl, OID_AUTO, maxbufsize, CTLFLAG_RWTUN,
     &rctl_maxbufsize, 0, "Maximum output buffer size");
 SYSCTL_UINT(_kern_racct_rctl, OID_AUTO, log_rate_limit, CTLFLAG_RW,
@@ -107,19 +106,23 @@ SYSCTL_UINT(_kern_racct_rctl, OID_AUTO, log_rate_limit, CTLFLAG_RW,
 SYSCTL_UINT(_kern_racct_rctl, OID_AUTO, devctl_rate_limit, CTLFLAG_RWTUN,
     &rctl_devctl_rate_limit, 0, "Maximum number of devctl messages per second");
 SYSCTL_PROC(_kern_racct_rctl, OID_AUTO, throttle_min,
-    CTLTYPE_UINT | CTLFLAG_RWTUN, 0, 0, &rctl_throttle_min_sysctl, "IU",
+    CTLTYPE_UINT | CTLFLAG_RWTUN | CTLFLAG_MPSAFE, 0, 0,
+    &rctl_throttle_min_sysctl, "IU",
     "Shortest throttling duration, in hz");
 TUNABLE_INT("kern.racct.rctl.throttle_min", &rctl_throttle_min);
 SYSCTL_PROC(_kern_racct_rctl, OID_AUTO, throttle_max,
-    CTLTYPE_UINT | CTLFLAG_RWTUN, 0, 0, &rctl_throttle_max_sysctl, "IU",
+    CTLTYPE_UINT | CTLFLAG_RWTUN | CTLFLAG_MPSAFE, 0, 0,
+    &rctl_throttle_max_sysctl, "IU",
     "Longest throttling duration, in hz");
 TUNABLE_INT("kern.racct.rctl.throttle_max", &rctl_throttle_max);
 SYSCTL_PROC(_kern_racct_rctl, OID_AUTO, throttle_pct,
-    CTLTYPE_UINT | CTLFLAG_RWTUN, 0, 0, &rctl_throttle_pct_sysctl, "IU",
+    CTLTYPE_UINT | CTLFLAG_RWTUN | CTLFLAG_MPSAFE, 0, 0,
+    &rctl_throttle_pct_sysctl, "IU",
     "Throttling penalty for process consumption, in percent");
 TUNABLE_INT("kern.racct.rctl.throttle_pct", &rctl_throttle_pct);
 SYSCTL_PROC(_kern_racct_rctl, OID_AUTO, throttle_pct2,
-    CTLTYPE_UINT | CTLFLAG_RWTUN, 0, 0, &rctl_throttle_pct2_sysctl, "IU",
+    CTLTYPE_UINT | CTLFLAG_RWTUN | CTLFLAG_MPSAFE, 0, 0,
+    &rctl_throttle_pct2_sysctl, "IU",
     "Throttling penalty for container consumption, in percent");
 TUNABLE_INT("kern.racct.rctl.throttle_pct2", &rctl_throttle_pct2);
 
@@ -1609,9 +1612,8 @@ int
 sys_rctl_get_racct(struct thread *td, struct rctl_get_racct_args *uap)
 {
 
-	return (kern_rctl_get_racct(td, __USER_CAP(uap->inbufp, uap->inbuflen),
-	    uap->inbuflen, __USER_CAP(uap->outbufp, uap->outbuflen),
-	    uap->outbuflen));
+	return (kern_rctl_get_racct(td, uap->inbufp, uap->inbuflen,
+	    uap->outbufp, uap->outbuflen));
 }
 
 int
@@ -1715,9 +1717,8 @@ int
 sys_rctl_get_rules(struct thread *td, struct rctl_get_rules_args *uap)
 {
 
-	return (kern_rctl_get_rules(td, __USER_CAP(uap->inbufp, uap->inbuflen),
-	    uap->inbuflen, __USER_CAP(uap->outbufp, uap->outbuflen),
-	    uap->outbuflen));
+	return (kern_rctl_get_rules(td, uap->inbufp, uap->inbuflen,
+	    uap->outbufp, uap->outbuflen));
 }
 
 int
@@ -1811,9 +1812,8 @@ int
 sys_rctl_get_limits(struct thread *td, struct rctl_get_limits_args *uap)
 {
 
-	return (kern_rctl_get_limits(td, __USER_CAP(uap->inbufp, uap->inbuflen),
-	    uap->inbuflen, __USER_CAP(uap->outbufp, uap->outbuflen),
-	    uap->outbuflen));
+	return (kern_rctl_get_limits(td, uap->inbufp, uap->inbuflen,
+	    uap->outbufp, uap->outbuflen));
 }
 
 int
@@ -1904,9 +1904,8 @@ int
 sys_rctl_add_rule(struct thread *td, struct rctl_add_rule_args *uap)
 {
 
-	return (kern_rctl_add_rule(td, __USER_CAP(uap->inbufp, uap->inbuflen),
-	    uap->inbuflen, __USER_CAP(uap->outbufp, uap->outbuflen),
-	    uap->outbuflen));
+	return (kern_rctl_add_rule(td, uap->inbufp, uap->inbuflen,
+	    uap->outbufp, uap->outbuflen));
 }
 
 int
@@ -1959,9 +1958,8 @@ int
 sys_rctl_remove_rule(struct thread *td, struct rctl_remove_rule_args *uap)
 {
 
-	return (kern_rctl_remove_rule(td, __USER_CAP(uap->inbufp, uap->inbuflen),
-	    uap->inbuflen, __USER_CAP(uap->outbufp, uap->outbuflen),
-	    uap->outbuflen));
+	return (kern_rctl_remove_rule(td, uap->inbufp, uap->inbuflen,
+	    uap->outbufp, uap->outbuflen));
 }
 
 int

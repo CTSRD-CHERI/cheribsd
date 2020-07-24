@@ -33,8 +33,6 @@
  *
  */
 
-#define	EXPLICIT_USER_ACCESS
-
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
@@ -46,7 +44,6 @@ __FBSDID("$FreeBSD$");
 #include <rpc/rpc.h>
 #include <rpc/rpcsec_gss.h>
 
-#include <nfs/nfs_fha.h>
 #include <fs/nfsserver/nfs_fha_new.h>
 
 #include <security/mac/mac_framework.h>
@@ -395,8 +392,7 @@ nfs_proc(struct nfsrv_descript *nd, u_int32_t xid, SVCXPRT *xprt,
 			} else
 				m = NULL;
 			if ((nd->nd_flag & ND_HASSEQUENCE) != 0)
-				nfsrv_cache_session(nd->nd_sessionid,
-				    nd->nd_slotid, nd->nd_repstat, &m);
+				nfsrv_cache_session(nd, &m);
 			if (nd->nd_repstat == NFSERR_REPLYFROMCACHE)
 				nd->nd_repstat = 0;
 			cacherep = RC_REPLY;
@@ -592,7 +588,7 @@ nfsrvd_init(int terminating)
 		    SYSCTL_STATIC_CHILDREN(_vfs_nfsd));
 		nfsrvd_pool->sp_rcache = NULL;
 		nfsrvd_pool->sp_assign = fhanew_assign;
-		nfsrvd_pool->sp_done = fha_nd_complete;
+		nfsrvd_pool->sp_done = fhanew_nd_complete;
 		NFSD_LOCK();
 	}
 }

@@ -42,7 +42,6 @@ __FBSDID("$FreeBSD$");
 #include <sys/mutex.h>
 #include <sys/mman.h>
 #include <sys/namei.h>
-#include <sys/pioctl.h>
 #include <sys/proc.h>
 #include <sys/procfs.h>
 #include <sys/resourcevar.h>
@@ -86,7 +85,8 @@ CTASSERT(sizeof(struct ia32_sigframe4) == 408);
 
 extern const char *freebsd32_syscallnames[];
 
-static SYSCTL_NODE(_compat, OID_AUTO, ia32, CTLFLAG_RW, 0, "ia32 mode");
+static SYSCTL_NODE(_compat, OID_AUTO, ia32, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
+    "ia32 mode");
 
 static u_long	ia32_maxdsiz = IA32_MAXDSIZ;
 SYSCTL_ULONG(_compat_ia32, OID_AUTO, maxdsiz, CTLFLAG_RWTUN, &ia32_maxdsiz, 0, "");

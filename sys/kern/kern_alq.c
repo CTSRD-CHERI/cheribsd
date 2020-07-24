@@ -120,7 +120,6 @@ static void alq_shutdown(struct alq *);
 static void alq_destroy(struct alq *);
 static int alq_doio(struct alq *);
 
-
 /*
  * Add a new queue to the global list.  Fail if we're shutting down.
  */
@@ -379,7 +378,7 @@ alq_doio(struct alq *alq)
 	if (mac_vnode_check_write(alq->aq_cred, NOCRED, vp) == 0)
 #endif
 		VOP_WRITE(vp, &auio, IO_UNIT | IO_APPEND, alq->aq_cred);
-	VOP_UNLOCK(vp, 0);
+	VOP_UNLOCK(vp);
 	vn_finished_write(mp);
 
 	ALQ_LOCK(alq);
@@ -425,7 +424,6 @@ static struct kproc_desc ald_kp = {
 SYSINIT(aldthread, SI_SUB_KTHREAD_IDLE, SI_ORDER_ANY, kproc_start, &ald_kp);
 SYSINIT(ald, SI_SUB_LOCK, SI_ORDER_ANY, ald_startup, NULL);
 
-
 /* User visible queue functions */
 
 /*
@@ -456,7 +454,7 @@ alq_open_flags(struct alq **alqp, const char *file, struct ucred *cred, int cmod
 
 	NDFREE(&nd, NDF_ONLY_PNBUF);
 	/* We just unlock so we hold a reference */
-	VOP_UNLOCK(nd.ni_vp, 0);
+	VOP_UNLOCK(nd.ni_vp);
 
 	alq = malloc(sizeof(*alq), M_ALD, M_WAITOK|M_ZERO);
 	alq->aq_vp = nd.ni_vp;
@@ -504,7 +502,6 @@ alq_open(struct alq **alqp, const char *file, struct ucred *cred, int cmode,
 
 	return (ret);
 }
-
 
 /*
  * Copy a new entry into the queue.  If the operation would block either

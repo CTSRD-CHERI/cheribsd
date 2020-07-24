@@ -185,13 +185,13 @@ vm_pager_bufferinit(void)
 	/* Main zone for paging bufs. */
 	pbuf_zone = uma_zcreate("pbuf", sizeof(struct buf),
 	    pbuf_ctor, pbuf_dtor, pbuf_init, NULL, UMA_ALIGN_CACHE,
-	    UMA_ZONE_VM | UMA_ZONE_NOFREE);
+	    UMA_ZONE_NOFREE);
 	/* Few systems may still use this zone directly, so it needs a limit. */
 	nswbuf_max += uma_zone_set_max(pbuf_zone, NSWBUF_MIN);
 }
 
 uma_zone_t
-pbuf_zsecond_create(char *name, int max)
+pbuf_zsecond_create(const char *name, int max)
 {
 	uma_zone_t zone;
 
@@ -263,7 +263,8 @@ vm_pager_assert_in(vm_object_t object, vm_page_t *m, int count)
 	 * bogus page, but the first and last pages must be a real ones.
 	 */
 
-	VM_OBJECT_ASSERT_WLOCKED(object);
+	VM_OBJECT_ASSERT_UNLOCKED(object);
+	VM_OBJECT_ASSERT_PAGING(object);
 	KASSERT(count > 0, ("%s: 0 count", __func__));
 	for (int i = 0 ; i < count; i++) {
 		if (m[i] == bogus_page) {
@@ -311,9 +312,13 @@ vm_pager_get_pages(vm_object_t object, vm_page_t *m, int count, int *rbehind,
 		 * If pager has replaced a page, assert that it had
 		 * updated the array.
 		 */
+#ifdef INVARIANTS
+		VM_OBJECT_RLOCK(object);
 		KASSERT(m[i] == vm_page_lookup(object, pindex++),
 		    ("%s: mismatch page %p pindex %ju", __func__,
 		    m[i], (uintmax_t )pindex - 1));
+		VM_OBJECT_RUNLOCK(object);
+#endif
 		/*
 		 * Zero out partially filled data.
 		 */

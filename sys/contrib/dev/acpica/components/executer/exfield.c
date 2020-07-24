@@ -8,7 +8,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2019, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2020, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -167,7 +167,7 @@
 #define ACPI_INVALID_PROTOCOL_ID        0x80
 #define ACPI_MAX_PROTOCOL_ID            0x0F
 
-const UINT8     AcpiProtocolLengths[] =
+static const UINT8      AcpiProtocolLengths[] =
 {
     ACPI_INVALID_PROTOCOL_ID,   /* 0 - reserved */
     ACPI_INVALID_PROTOCOL_ID,   /* 1 - reserved */

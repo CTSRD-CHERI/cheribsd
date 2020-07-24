@@ -40,8 +40,6 @@ __FBSDID("$FreeBSD$");
 #include <cheri/cheri.h>
 #include <cheri/cheric.h>
 
-#include <machine/cherireg.h>
-
 static struct mtx cheri_otype_lock;
 static struct unrhdr *cheri_otypes;
 /* Initialized in _start() */

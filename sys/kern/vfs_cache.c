@@ -40,10 +40,9 @@ __FBSDID("$FreeBSD$");
 #include "opt_ddb.h"
 #include "opt_ktrace.h"
 
-#define	EXPLICIT_USER_ACCESS
-
 #include <sys/param.h>
 #include <sys/systm.h>
+#include <sys/capsicum.h>
 #include <sys/counter.h>
 #include <sys/filedesc.h>
 #include <sys/fnv_hash.h>
@@ -207,7 +206,6 @@ SYSCTL_ULONG(_vfs, OID_AUTO, ncnegfactor, CTLFLAG_RW, &ncnegfactor, 0,
     "Ratio of negative namecache entries");
 static u_long __exclusive_cache_line	numneg;	/* number of negative entries allocated */
 static u_long __exclusive_cache_line	numcache;/* number of cache entries allocated */
-static u_long __exclusive_cache_line	numcachehv;/* number of cache entries with vnodes held */
 u_int ncsizefactor = 2;
 SYSCTL_UINT(_vfs, OID_AUTO, ncsizefactor, CTLFLAG_RW, &ncsizefactor, 0,
     "Size factor for namecache");
@@ -345,16 +343,17 @@ SYSCTL_INT(_debug_sizeof, OID_AUTO, namecache, CTLFLAG_RD, SYSCTL_NULL_INT_PTR,
 /*
  * The new name cache statistics
  */
-static SYSCTL_NODE(_vfs, OID_AUTO, cache, CTLFLAG_RW, 0,
+static SYSCTL_NODE(_vfs, OID_AUTO, cache, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
     "Name cache statistics");
-#define STATNODE_ULONG(name, descr)	\
+#define STATNODE_ULONG(name, descr)					\
 	SYSCTL_ULONG(_vfs_cache, OID_AUTO, name, CTLFLAG_RD, &name, 0, descr);
-#define STATNODE_COUNTER(name, descr)	\
-	static counter_u64_t __read_mostly name; \
-	SYSCTL_COUNTER_U64(_vfs_cache, OID_AUTO, name, CTLFLAG_RD, &name, descr);
+#define STATNODE_COUNTER(name, descr)					\
+	static COUNTER_U64_DEFINE_EARLY(name);				\
+	SYSCTL_COUNTER_U64(_vfs_cache, OID_AUTO, name, CTLFLAG_RD, &name, \
+	    descr);
 STATNODE_ULONG(numneg, "Number of negative cache entries");
 STATNODE_ULONG(numcache, "Number of cache entries");
-STATNODE_ULONG(numcachehv, "Number of namecache entries with vnodes held");
+STATNODE_COUNTER(numcachehv, "Number of namecache entries with vnodes held");
 STATNODE_COUNTER(numcalls, "Number of cache lookups");
 STATNODE_COUNTER(dothits, "Number of '.' hits");
 STATNODE_COUNTER(dotdothits, "Number of '..' hits");
@@ -367,7 +366,7 @@ STATNODE_COUNTER(numposhits, "Number of cache hits (positive)");
 STATNODE_COUNTER(numnegzaps,
     "Number of cache hits (negative) we do not want to cache");
 STATNODE_COUNTER(numneghits, "Number of cache hits (negative)");
-/* These count for kern___getcwd(), too. */
+/* These count for vn_getcwd(), too. */
 STATNODE_COUNTER(numfullpathcalls, "Number of fullpath search calls");
 STATNODE_COUNTER(numfullpathfail1, "Number of fullpath search errors (ENOTDIR)");
 STATNODE_COUNTER(numfullpathfail2,
@@ -390,8 +389,12 @@ STATNODE_COUNTER(shrinking_skipped,
     "Number of times shrinking was already in progress");
 
 static void cache_zap_locked(struct namecache *ncp, bool neg_locked);
-static int vn_fullpath1(struct thread *td, struct vnode *vp, struct vnode *rdir,
-    char *buf, char **retbuf, u_int buflen);
+static int vn_fullpath_hardlink(struct thread *td, struct nameidata *ndp, char **retbuf,
+    char **freebuf, size_t *buflen);
+static int vn_fullpath_any(struct thread *td, struct vnode *vp, struct vnode *rdir,
+    char *buf, char **retbuf, size_t *buflen);
+static int vn_fullpath_dir(struct thread *td, struct vnode *vp, struct vnode *rdir,
+    char *buf, char **retbuf, size_t *len, bool slash_prefixed, size_t addend);
 
 static MALLOC_DEFINE(M_VFSCACHE, "vfscache", "VFS name cache entries");
 
@@ -579,7 +582,8 @@ SYSCTL_PROC(_vfs_cache, OID_AUTO, nchstats, CTLTYPE_OPAQUE | CTLFLAG_RD |
 /*
  * Grab an atomic snapshot of the name cache hash chain lengths
  */
-static SYSCTL_NODE(_debug, OID_AUTO, hashstat, CTLFLAG_RW, NULL,
+static SYSCTL_NODE(_debug, OID_AUTO, hashstat,
+    CTLFLAG_RW | CTLFLAG_MPSAFE, NULL,
     "hash table stats");
 
 static int
@@ -875,7 +879,7 @@ cache_zap_locked(struct namecache *ncp, bool neg_locked)
 		LIST_REMOVE(ncp, nc_src);
 		if (LIST_EMPTY(&ncp->nc_dvp->v_cache_src)) {
 			ncp->nc_flag |= NCF_DVDROP;
-			atomic_subtract_rel_long(&numcachehv, 1);
+			counter_u64_add(numcachehv, -1);
 		}
 	}
 	atomic_subtract_rel_long(&numcache, 1);
@@ -1396,7 +1400,7 @@ success:
 	ltype = 0;	/* silence gcc warning */
 	if (cnp->cn_flags & ISDOTDOT) {
 		ltype = VOP_ISLOCKED(dvp);
-		VOP_UNLOCK(dvp, 0);
+		VOP_UNLOCK(dvp);
 	}
 	vs = vget_prep(*vpp);
 	cache_lookup_unlock(blp, dvlp);
@@ -1704,7 +1708,6 @@ cache_enter_time(struct vnode *dvp, struct vnode *vp, struct componentname *cnp,
 	uint32_t hash;
 	int flag;
 	int len;
-	bool held_dvp;
 	u_long lnumcache;
 
 	CTR3(KTR_VFS, "cache_enter(%p, %p, %s)", dvp, vp, cnp->cn_nameptr);
@@ -1740,13 +1743,6 @@ cache_enter_time(struct vnode *dvp, struct vnode *vp, struct componentname *cnp,
 	cache_celockstate_init(&cel);
 	ndd = NULL;
 	ncp_ts = NULL;
-
-	held_dvp = false;
-	if (LIST_EMPTY(&dvp->v_cache_src) && flag != NCF_ISDOTDOT) {
-		vhold(dvp);
-		atomic_add_long(&numcachehv, 1);
-		held_dvp = true;
-	}
 
 	/*
 	 * Calculate the hash key and setup as much of the new
@@ -1837,21 +1833,8 @@ cache_enter_time(struct vnode *dvp, struct vnode *vp, struct componentname *cnp,
 
 	if (flag != NCF_ISDOTDOT) {
 		if (LIST_EMPTY(&dvp->v_cache_src)) {
-			if (!held_dvp) {
-				vhold(dvp);
-				atomic_add_long(&numcachehv, 1);
-			}
-		} else {
-			if (held_dvp) {
-				/*
-				 * This will not take the interlock as someone
-				 * else already holds the vnode on account of
-				 * the namecache and we hold locks preventing
-				 * this from changing.
-				 */
-				vdrop(dvp);
-				atomic_subtract_long(&numcachehv, 1);
-			}
+			vhold(dvp);
+			counter_u64_add(numcachehv, 1);
 		}
 		LIST_INSERT_HEAD(&dvp->v_cache_src, ncp, nc_src);
 	}
@@ -1886,10 +1869,6 @@ cache_enter_time(struct vnode *dvp, struct vnode *vp, struct componentname *cnp,
 out_unlock_free:
 	cache_enter_unlock(&cel);
 	cache_free(ncp);
-	if (held_dvp) {
-		vdrop(dvp);
-		atomic_subtract_long(&numcachehv, 1);
-	}
 	return;
 }
 
@@ -1958,36 +1937,17 @@ nchinit(void *dummy __unused)
 	TAILQ_INIT(&ncneg_hot.nl_list);
 
 	mtx_init(&ncneg_shrink_lock, "ncnegs", NULL, MTX_DEF);
-
-	numcalls = counter_u64_alloc(M_WAITOK);
-	dothits = counter_u64_alloc(M_WAITOK);
-	dotdothits = counter_u64_alloc(M_WAITOK);
-	numchecks = counter_u64_alloc(M_WAITOK);
-	nummiss = counter_u64_alloc(M_WAITOK);
-	nummisszap = counter_u64_alloc(M_WAITOK);
-	numposzaps = counter_u64_alloc(M_WAITOK);
-	numposhits = counter_u64_alloc(M_WAITOK);
-	numnegzaps = counter_u64_alloc(M_WAITOK);
-	numneghits = counter_u64_alloc(M_WAITOK);
-	numfullpathcalls = counter_u64_alloc(M_WAITOK);
-	numfullpathfail1 = counter_u64_alloc(M_WAITOK);
-	numfullpathfail2 = counter_u64_alloc(M_WAITOK);
-	numfullpathfail4 = counter_u64_alloc(M_WAITOK);
-	numfullpathfound = counter_u64_alloc(M_WAITOK);
-	zap_and_exit_bucket_relock_success = counter_u64_alloc(M_WAITOK);
-	numneg_evicted = counter_u64_alloc(M_WAITOK);
-	shrinking_skipped = counter_u64_alloc(M_WAITOK);
 }
 SYSINIT(vfs, SI_SUB_VFS, SI_ORDER_SECOND, nchinit, NULL);
 
 void
-cache_changesize(int newmaxvnodes)
+cache_changesize(u_long newmaxvnodes)
 {
 	struct nchashhead *new_nchashtbl, *old_nchashtbl;
 	u_long new_nchash, old_nchash;
 	struct namecache *ncp;
 	uint32_t hash;
-	int newncsize;
+	u_long newncsize;
 	int i;
 
 	newncsize = newmaxvnodes * ncsizefactor;
@@ -2168,9 +2128,7 @@ vfs_cache_lookup(struct vop_lookup_args *ap)
 	int error;
 	struct vnode **vpp = ap->a_vpp;
 	struct componentname *cnp = ap->a_cnp;
-	struct ucred *cred = cnp->cn_cred;
 	int flags = cnp->cn_flags;
-	struct thread *td = cnp->cn_thread;
 
 	*vpp = NULL;
 	dvp = ap->a_dvp;
@@ -2182,8 +2140,8 @@ vfs_cache_lookup(struct vop_lookup_args *ap)
 	    (cnp->cn_nameiop == DELETE || cnp->cn_nameiop == RENAME))
 		return (EROFS);
 
-	error = VOP_ACCESS(dvp, VEXEC, cred, td);
-	if (error)
+	error = vn_dir_check_exec(dvp, cnp);
+	if (error != 0)
 		return (error);
 
 	error = cache_lookup(dvp, vpp, cnp, NULL, NULL);
@@ -2194,71 +2152,81 @@ vfs_cache_lookup(struct vop_lookup_args *ap)
 	return (error);
 }
 
-/*
- * XXX All of these sysctls would probably be more productive dead.
- */
-static int __read_mostly disablecwd;
-SYSCTL_INT(_debug, OID_AUTO, disablecwd, CTLFLAG_RW, &disablecwd, 0,
-   "Disable the getcwd syscall");
-
 /* Implementation of the getcwd syscall. */
 int
 sys___getcwd(struct thread *td, struct __getcwd_args *uap)
 {
 
-	return (kern___getcwd(td, uap->buf, UIO_USERSPACE, uap->buflen,
-	    MAXPATHLEN));
+	return (kern___getcwd(td, uap->buf, uap->buflen));
 }
 
 int
-kern___getcwd(struct thread *td, char * __capability buf, enum uio_seg bufseg,
-    size_t buflen, size_t path_max)
+kern___getcwd(struct thread *td, char * __capability ubuf, size_t buflen)
 {
-	char *bp, *tmpbuf;
-	struct filedesc *fdp;
-	struct vnode *cdir, *rdir;
+	char *buf, *retbuf;
 	int error;
 
-	if (__predict_false(disablecwd))
-		return (ENODEV);
 	if (__predict_false(buflen < 2))
 		return (EINVAL);
-	if (buflen > path_max)
-		buflen = path_max;
+	if (buflen > MAXPATHLEN)
+		buflen = MAXPATHLEN;
 
-	tmpbuf = malloc(buflen, M_TEMP, M_WAITOK);
-	fdp = td->td_proc->p_fd;
-	FILEDESC_SLOCK(fdp);
-	cdir = fdp->fd_cdir;
-	vrefact(cdir);
-	rdir = fdp->fd_rdir;
-	vrefact(rdir);
-	FILEDESC_SUNLOCK(fdp);
-	error = vn_fullpath1(td, cdir, rdir, tmpbuf, &bp, buflen);
-	vrele(rdir);
-	vrele(cdir);
-
-	if (!error) {
-		if (bufseg == UIO_SYSSPACE)
-			bcopy(bp, (__cheri_fromcap char *)buf, strlen(bp) + 1);
-		else
-			error = copyout(bp, buf, strlen(bp) + 1);
-#ifdef KTRACE
-	if (KTRPOINT(curthread, KTR_NAMEI))
-		ktrnamei(bp);
-#endif
-	}
-	free(tmpbuf, M_TEMP);
+	buf = malloc(buflen, M_TEMP, M_WAITOK);
+	error = vn_getcwd(td, buf, &retbuf, &buflen);
+	if (error == 0)
+		error = copyout(retbuf, ubuf, buflen);
+	free(buf, M_TEMP);
 	return (error);
 }
 
-/*
- * Thus begins the fullpath magic.
- */
+int
+vn_getcwd(struct thread *td, char *buf, char **retbuf, size_t *buflen)
+{
+	struct pwd *pwd;
+	int error;
 
-static int __read_mostly disablefullpath;
-SYSCTL_INT(_debug, OID_AUTO, disablefullpath, CTLFLAG_RW, &disablefullpath, 0,
-    "Disable the vn_fullpath function");
+	pwd = pwd_hold(td);
+	error = vn_fullpath_any(td, pwd->pwd_cdir, pwd->pwd_rdir, buf, retbuf, buflen);
+	pwd_drop(pwd);
+
+#ifdef KTRACE
+	if (KTRPOINT(curthread, KTR_NAMEI) && error == 0)
+		ktrnamei(*retbuf);
+#endif
+	return (error);
+}
+
+int
+kern___realpathat(struct thread *td, int fd, const char * __capability path,
+    char * __capability buf, size_t size, int flags, enum uio_seg pathseg)
+{
+	struct nameidata nd;
+	char *retbuf, *freebuf;
+	int error;
+
+	if (flags != 0)
+		return (EINVAL);
+	NDINIT_ATRIGHTS_C(&nd, LOOKUP,
+	    FOLLOW | SAVENAME | WANTPARENT | AUDITVNODE1,
+	    pathseg, path, fd, &cap_fstat_rights, td);
+	if ((error = namei(&nd)) != 0)
+		return (error);
+	error = vn_fullpath_hardlink(td, &nd, &retbuf, &freebuf, &size);
+	if (error == 0) {
+		error = copyout(retbuf, buf, size);
+		free(freebuf, M_TEMP);
+	}
+	NDFREE(&nd, 0);
+	return (error);
+}
+
+int
+sys___realpathat(struct thread *td, struct __realpathat_args *uap)
+{
+
+	return (kern___realpathat(td, uap->fd, uap->path, uap->buf, uap->size,
+	    uap->flags, UIO_USERSPACE));
+}
 
 /*
  * Retrieve the full filesystem path that correspond to a vnode from the name
@@ -2267,24 +2235,19 @@ SYSCTL_INT(_debug, OID_AUTO, disablefullpath, CTLFLAG_RW, &disablefullpath, 0,
 int
 vn_fullpath(struct thread *td, struct vnode *vn, char **retbuf, char **freebuf)
 {
+	struct pwd *pwd;
 	char *buf;
-	struct filedesc *fdp;
-	struct vnode *rdir;
+	size_t buflen;
 	int error;
 
-	if (__predict_false(disablefullpath))
-		return (ENODEV);
 	if (__predict_false(vn == NULL))
 		return (EINVAL);
 
-	buf = malloc(MAXPATHLEN, M_TEMP, M_WAITOK);
-	fdp = td->td_proc->p_fd;
-	FILEDESC_SLOCK(fdp);
-	rdir = fdp->fd_rdir;
-	vrefact(rdir);
-	FILEDESC_SUNLOCK(fdp);
-	error = vn_fullpath1(td, vn, rdir, buf, retbuf, MAXPATHLEN);
-	vrele(rdir);
+	buflen = MAXPATHLEN;
+	buf = malloc(buflen, M_TEMP, M_WAITOK);
+	pwd = pwd_hold(td);
+	error = vn_fullpath_any(td, vn, pwd->pwd_rdir, buf, retbuf, &buflen);
+	pwd_drop(pwd);
 
 	if (!error)
 		*freebuf = buf;
@@ -2304,14 +2267,14 @@ vn_fullpath_global(struct thread *td, struct vnode *vn,
     char **retbuf, char **freebuf)
 {
 	char *buf;
+	size_t buflen;
 	int error;
 
-	if (__predict_false(disablefullpath))
-		return (ENODEV);
 	if (__predict_false(vn == NULL))
 		return (EINVAL);
-	buf = malloc(MAXPATHLEN, M_TEMP, M_WAITOK);
-	error = vn_fullpath1(td, vn, rootvnode, buf, retbuf, MAXPATHLEN);
+	buflen = MAXPATHLEN;
+	buf = malloc(buflen, M_TEMP, M_WAITOK);
+	error = vn_fullpath_any(td, vn, rootvnode, buf, retbuf, &buflen);
 	if (!error)
 		*freebuf = buf;
 	else
@@ -2320,7 +2283,7 @@ vn_fullpath_global(struct thread *td, struct vnode *vn,
 }
 
 int
-vn_vptocnp(struct vnode **vp, struct ucred *cred, char *buf, u_int *buflen)
+vn_vptocnp(struct vnode **vp, struct ucred *cred, char *buf, size_t *buflen)
 {
 	struct vnode *dvp;
 	struct namecache *ncp;
@@ -2382,37 +2345,40 @@ vn_vptocnp(struct vnode **vp, struct ucred *cred, char *buf, u_int *buflen)
 }
 
 /*
- * The magic behind kern___getcwd() and vn_fullpath().
+ * Resolve a directory to a pathname.
+ *
+ * The name of the directory can always be found in the namecache or fetched
+ * from the filesystem. There is also guaranteed to be only one parent, meaning
+ * we can just follow vnodes up until we find the root.
+ *
+ * The vnode must be referenced.
  */
 static int
-vn_fullpath1(struct thread *td, struct vnode *vp, struct vnode *rdir,
-    char *buf, char **retbuf, u_int buflen)
+vn_fullpath_dir(struct thread *td, struct vnode *vp, struct vnode *rdir,
+    char *buf, char **retbuf, size_t *len, bool slash_prefixed, size_t addend)
 {
-	int error, slash_prefixed;
 #ifdef KDTRACE_HOOKS
 	struct vnode *startvp = vp;
 #endif
 	struct vnode *vp1;
+	size_t buflen;
+	int error;
 
-	buflen--;
-	buf[buflen] = '\0';
+	VNPASS(vp->v_type == VDIR || VN_IS_DOOMED(vp), vp);
+	VNPASS(vp->v_usecount > 0, vp);
+
+	buflen = *len;
+
+	if (!slash_prefixed) {
+		MPASS(*len >= 2);
+		buflen--;
+		buf[buflen] = '\0';
+	}
+
 	error = 0;
-	slash_prefixed = 0;
 
 	SDT_PROBE1(vfs, namecache, fullpath, entry, vp);
 	counter_u64_add(numfullpathcalls, 1);
-	vref(vp);
-	if (vp->v_type != VDIR) {
-		error = vn_vptocnp(&vp, td->td_ucred, buf, &buflen);
-		if (error)
-			return (error);
-		if (buflen == 0) {
-			vrele(vp);
-			return (ENOMEM);
-		}
-		buf[--buflen] = '/';
-		slash_prefixed = 1;
-	}
 	while (vp != rdir && vp != rootvnode) {
 		/*
 		 * The vp vnode must be already fully constructed,
@@ -2465,7 +2431,7 @@ vn_fullpath1(struct thread *td, struct vnode *vp, struct vnode *rdir,
 			break;
 		}
 		buf[--buflen] = '/';
-		slash_prefixed = 1;
+		slash_prefixed = true;
 	}
 	if (error)
 		return (error);
@@ -2482,9 +2448,122 @@ vn_fullpath1(struct thread *td, struct vnode *vp, struct vnode *rdir,
 	counter_u64_add(numfullpathfound, 1);
 	vrele(vp);
 
-	SDT_PROBE3(vfs, namecache, fullpath, return, 0, startvp, buf + buflen);
 	*retbuf = buf + buflen;
+	SDT_PROBE3(vfs, namecache, fullpath, return, 0, startvp, *retbuf);
+	*len -= buflen;
+	*len += addend;
 	return (0);
+}
+
+/*
+ * Resolve an arbitrary vnode to a pathname.
+ *
+ * Note 2 caveats:
+ * - hardlinks are not tracked, thus if the vnode is not a directory this can
+ *   resolve to a different path than the one used to find it
+ * - namecache is not mandatory, meaning names are not guaranteed to be added
+ *   (in which case resolving fails)
+ */
+static int
+vn_fullpath_any(struct thread *td, struct vnode *vp, struct vnode *rdir,
+    char *buf, char **retbuf, size_t *buflen)
+{
+	size_t orig_buflen;
+	bool slash_prefixed;
+	int error;
+
+	if (*buflen < 2)
+		return (EINVAL);
+
+	orig_buflen = *buflen;
+
+	vref(vp);
+	slash_prefixed = false;
+	if (vp->v_type != VDIR) {
+		*buflen -= 1;
+		buf[*buflen] = '\0';
+		error = vn_vptocnp(&vp, td->td_ucred, buf, buflen);
+		if (error)
+			return (error);
+		if (*buflen == 0) {
+			vrele(vp);
+			return (ENOMEM);
+		}
+		*buflen -= 1;
+		buf[*buflen] = '/';
+		slash_prefixed = true;
+	}
+
+	return (vn_fullpath_dir(td, vp, rdir, buf, retbuf, buflen, slash_prefixed,
+	    orig_buflen - *buflen));
+}
+
+/*
+ * Resolve an arbitrary vnode to a pathname (taking care of hardlinks).
+ *
+ * Since the namecache does not track handlings, the caller is expected to first
+ * look up the target vnode with SAVENAME | WANTPARENT flags passed to namei.
+ *
+ * Then we have 2 cases:
+ * - if the found vnode is a directory, the path can be constructed just by
+ *   fullowing names up the chain
+ * - otherwise we populate the buffer with the saved name and start resolving
+ *   from the parent
+ */
+static int
+vn_fullpath_hardlink(struct thread *td, struct nameidata *ndp, char **retbuf,
+    char **freebuf, size_t *buflen)
+{
+	char *buf, *tmpbuf;
+	struct pwd *pwd;
+	struct componentname *cnp;
+	struct vnode *vp;
+	size_t addend;
+	int error;
+	bool slash_prefixed;
+
+	if (*buflen < 2)
+		return (EINVAL);
+	if (*buflen > MAXPATHLEN)
+		*buflen = MAXPATHLEN;
+
+	slash_prefixed = false;
+
+	buf = malloc(*buflen, M_TEMP, M_WAITOK);
+	pwd = pwd_hold(td);
+
+	addend = 0;
+	vp = ndp->ni_vp;
+	if (vp->v_type != VDIR) {
+		cnp = &ndp->ni_cnd;
+		addend = cnp->cn_namelen + 2;
+		if (*buflen < addend) {
+			error = ENOMEM;
+			goto out_bad;
+		}
+		*buflen -= addend;
+		tmpbuf = buf + *buflen;
+		tmpbuf[0] = '/';
+		memcpy(&tmpbuf[1], cnp->cn_nameptr, cnp->cn_namelen);
+		tmpbuf[addend - 1] = '\0';
+		slash_prefixed = true;
+		vp = ndp->ni_dvp;
+	}
+
+	vref(vp);
+	error = vn_fullpath_dir(td, vp, pwd->pwd_rdir, buf, retbuf, buflen,
+	    slash_prefixed, addend);
+	if (error != 0)
+		goto out_bad;
+
+	pwd_drop(pwd);
+	*freebuf = buf;
+
+	return (0);
+out_bad:
+	pwd_drop(pwd);
+	free(buf, M_TEMP);
+	return (error);
 }
 
 struct vnode *
@@ -2542,9 +2621,6 @@ vn_commname(struct vnode *vp, char *buf, u_int buflen)
  * Requires a locked, referenced vnode.
  * Vnode is re-locked on success or ENODEV, otherwise unlocked.
  *
- * If sysctl debug.disablefullpath is set, ENODEV is returned,
- * vnode is left locked and path remain untouched.
- *
  * If vp is a directory, the call to vn_fullpath_global() always succeeds
  * because it falls back to the ".." lookup if the namecache lookup fails.
  */
@@ -2559,12 +2635,8 @@ vn_path_to_global_path(struct thread *td, struct vnode *vp, char *path,
 
 	ASSERT_VOP_ELOCKED(vp, __func__);
 
-	/* Return ENODEV if sysctl debug.disablefullpath==1 */
-	if (__predict_false(disablefullpath))
-		return (ENODEV);
-
 	/* Construct global filesystem path from vp. */
-	VOP_UNLOCK(vp, 0);
+	VOP_UNLOCK(vp);
 	error = vn_fullpath_global(td, vp, &rpath, &fbuf);
 
 	if (error != 0) {

@@ -1,5 +1,5 @@
 .\" $FreeBSD$
-Set to install the GCC compiler as
+Do not install links to the Clang C/C++ compiler as
 .Pa /usr/bin/cc ,
 .Pa /usr/bin/c++
 and

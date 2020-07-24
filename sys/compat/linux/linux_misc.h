@@ -105,6 +105,8 @@ extern const char *linux_kplatform;
 #define	LINUX_SCHED_FIFO	1
 #define	LINUX_SCHED_RR		2
 
+#define	LINUX_MAX_RT_PRIO	100
+
 struct l_new_utsname {
 	char	sysname[LINUX_MAX_UTSNAME];
 	char	nodename[LINUX_MAX_UTSNAME];
@@ -148,6 +150,9 @@ extern int stclohz;
 /* Linux getrandom flags */
 #define	LINUX_GRND_NONBLOCK	0x0001
 #define	LINUX_GRND_RANDOM	0x0002
+
+/* Linux syslog flags */
+#define	LINUX_SYSLOG_ACTION_READ_ALL	3
 
 #if defined(__amd64__) && !defined(COMPAT_LINUX32)
 int linux_ptrace_status(struct thread *td, int pid, int status);

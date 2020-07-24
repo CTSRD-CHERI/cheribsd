@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2015-2018 Ruslan Bukin <br@bsdpad.com>
+ * Copyright (c) 2015-2020 Ruslan Bukin <br@bsdpad.com>
  * All rights reserved.
  *
  * Portions of this software were developed by SRI International and the
@@ -52,7 +52,7 @@ fsu_fault_nopcb:
 END(fsu_fault)
 
 /*
- * int casueword32(volatile uint32_t *, uint32_t, uint32_t *, uint32_t)
+ * int casueword32(volatile uint32_t * __capability, uint32_t, uint32_t *, uint32_t)
  */
 ENTRY(casueword32)
 	li	a4, (VM_MAXUSER_ADDRESS-3)
@@ -60,9 +60,18 @@ ENTRY(casueword32)
 	la	a6, fsu_fault		/* Load the fault handler */
 	SET_FAULT_HANDLER(a6, a4)	/* And set it */
 	ENTER_USER_ACCESS(a4)
+#if __has_feature(capabilities)
+	lr.w.cap a4, 0(ca0)		/* Load-exclusive the data */
+#else
 	lr.w	a4, 0(a0)		/* Load-exclusive the data */
+#endif
 	bne	a4, a1, 1f		/* If not equal then exit */
+#if __has_feature(capabilities)
+	move	a5, a3
+	sc.w.cap a5, 0(ca0)		/* Store the new data */
+#else
 	sc.w	a5, a3, 0(a0)		/* Store the new data */
+#endif
 	beqz	a5, 2f			/* Success */
 1:	li	a5, 1			/* Normalize failure result */
 2:	EXIT_USER_ACCESS(a6)
@@ -73,7 +82,7 @@ ENTRY(casueword32)
 END(casueword32)
 
 /*
- * int casueword(volatile u_long *, u_long, u_long *, u_long)
+ * int casueword(volatile u_long * __capability, u_long, u_long *, u_long)
  */
 ENTRY(casueword)
 	li	a4, (VM_MAXUSER_ADDRESS-7)
@@ -81,9 +90,18 @@ ENTRY(casueword)
 	la	a6, fsu_fault		/* Load the fault handler */
 	SET_FAULT_HANDLER(a6, a4)	/* And set it */
 	ENTER_USER_ACCESS(a4)
+#if __has_feature(capabilities)
+	lr.d.cap a4, 0(ca0)		/* Load-exclusive the data */
+#else
 	lr.d	a4, 0(a0)		/* Load-exclusive the data */
+#endif
 	bne	a4, a1, 1f		/* If not equal then exit */
+#if __has_feature(capabilities)
+	move	a5, a3
+	sc.d.cap a5, 0(ca0)		/* Store the new data */
+#else
 	sc.d	a5, a3, 0(a0)		/* Store the new data */
+#endif
 	beqz	a5, 2f			/* Success */
 1:	li	a5, 1			/* Normalize failure result */
 2:	EXIT_USER_ACCESS(a6)
@@ -94,7 +112,7 @@ ENTRY(casueword)
 END(casueword)
 
 /*
- * int fubyte(volatile const void *)
+ * int fubyte(volatile const void * __capability)
  */
 ENTRY(fubyte)
 	li	a1, VM_MAXUSER_ADDRESS
@@ -102,14 +120,18 @@ ENTRY(fubyte)
 	la	a6, fsu_fault		/* Load the fault handler */
 	SET_FAULT_HANDLER(a6, a1)	/* And set it */
 	ENTER_USER_ACCESS(a1)
-	lb	a0, 0(a0)		/* Try loading the data */
+#if __has_feature(capabilities)
+	lbu.cap	a0, 0(ca0)		/* Try loading the data */
+#else
+	lbu	a0, 0(a0)		/* Try loading the data */
+#endif
 	EXIT_USER_ACCESS(a1)
 	SET_FAULT_HANDLER(x0, a1)	/* Reset the fault handler */
 	ret				/* Return */
 END(fubyte)
 
 /*
- * int fuword(volatile const void *)
+ * int fuword16(volatile const void * __capability)
  */
 ENTRY(fuword16)
 	li	a1, (VM_MAXUSER_ADDRESS-1)
@@ -117,14 +139,18 @@ ENTRY(fuword16)
 	la	a6, fsu_fault		/* Load the fault handler */
 	SET_FAULT_HANDLER(a6, a1)	/* And set it */
 	ENTER_USER_ACCESS(a1)
-	lh	a0, 0(a0)		/* Try loading the data */
+#if __has_feature(capabilities)
+	lhu.cap	a0, 0(ca0)		/* Try loading the data */
+#else
+	lhu	a0, 0(a0)		/* Try loading the data */
+#endif
 	EXIT_USER_ACCESS(a1)
 	SET_FAULT_HANDLER(x0, a1)	/* Reset the fault handler */
 	ret				/* Return */
 END(fuword16)
 
 /*
- * int32_t fueword32(volatile const void *, int32_t *)
+ * int32_t fueword32(volatile const void * __capability, int32_t *)
  */
 ENTRY(fueword32)
 	li	a2, (VM_MAXUSER_ADDRESS-3)
@@ -132,7 +158,11 @@ ENTRY(fueword32)
 	la	a6, fsu_fault		/* Load the fault handler */
 	SET_FAULT_HANDLER(a6, a2)	/* And set it */
 	ENTER_USER_ACCESS(a2)
+#if __has_feature(capabilities)
+	lw.cap	a0, 0(ca0)		/* Try loading the data */
+#else
 	lw	a0, 0(a0)		/* Try loading the data */
+#endif
 	EXIT_USER_ACCESS(a2)
 	SET_FAULT_HANDLER(x0, a2)	/* Reset the fault handler */
 	sw	a0, 0(a1)		/* Save the data in kernel space */
@@ -141,8 +171,8 @@ ENTRY(fueword32)
 END(fueword32)
 
 /*
- * long fueword(volatile const void *, int64_t *)
- * int64_t fueword64(volatile const void *, int64_t *)
+ * long fueword(volatile const void __capability *, int64_t *)
+ * int64_t fueword64(volatile const void __capability *, int64_t *)
  */
 ENTRY(fueword)
 EENTRY(fueword64)
@@ -151,7 +181,11 @@ EENTRY(fueword64)
 	la	a6, fsu_fault		/* Load the fault handler */
 	SET_FAULT_HANDLER(a6, a2)	/* And set it */
 	ENTER_USER_ACCESS(a2)
+#if __has_feature(capabilities)
+	ld.cap	a0, 0(ca0)		/* Try loading the data */
+#else
 	ld	a0, 0(a0)		/* Try loading the data */
+#endif
 	EXIT_USER_ACCESS(a2)
 	SET_FAULT_HANDLER(x0, a2)	/* Reset the fault handler */
 	sd	a0, 0(a1)		/* Save the data in kernel space */
@@ -160,8 +194,27 @@ EENTRY(fueword64)
 EEND(fueword64)
 END(fueword)
 
+#if __has_feature(capabilities)
 /*
- * int subyte(volatile void *, int)
+ * int fuecap(volatile const void __capability *, intcap_t *)
+ */
+ENTRY(fuecap)
+	li	a2, (VM_MAXUSER_ADDRESS-7)
+	bgt	a0, a2, fsu_fault_nopcb
+	la	a6, fsu_fault		/* Load the fault handler */
+	SET_FAULT_HANDLER(a6, a2)	/* And set it */
+	ENTER_USER_ACCESS(a2)
+	lc.cap	ca0, 0(ca0)		/* Try loading the data */
+	EXIT_USER_ACCESS(a2)
+	SET_FAULT_HANDLER(x0, a2)	/* Reset the fault handler */
+	sc.ddc	ca0, 0(a1)		/* Save the data in kernel space */
+	li	a0, 0			/* Success */
+	ret				/* Return */
+END(fuecap)
+#endif
+
+/*
+ * int subyte(volatile void * __capability, int)
  */
 ENTRY(subyte)
 	li	a2, VM_MAXUSER_ADDRESS
@@ -169,7 +222,11 @@ ENTRY(subyte)
 	la	a6, fsu_fault		/* Load the fault handler */
 	SET_FAULT_HANDLER(a6, a2)	/* And set it */
 	ENTER_USER_ACCESS(a2)
+#if __has_feature(capabilities)
+	sb.cap	a1, 0(ca0)		/* Try storing the data */
+#else
 	sb	a1, 0(a0)		/* Try storing the data */
+#endif
 	EXIT_USER_ACCESS(a2)
 	SET_FAULT_HANDLER(x0, a2)	/* Reset the fault handler */
 	li	a0, 0			/* Success */
@@ -177,7 +234,7 @@ ENTRY(subyte)
 END(subyte)
 
 /*
- * int suword16(volatile void *, int)
+ * int suword16(volatile void * __capability, int)
  */
 ENTRY(suword16)
 	li	a2, (VM_MAXUSER_ADDRESS-1)
@@ -185,7 +242,11 @@ ENTRY(suword16)
 	la	a6, fsu_fault		/* Load the fault handler */
 	SET_FAULT_HANDLER(a6, a2)	/* And set it */
 	ENTER_USER_ACCESS(a2)
+#if __has_feature(capabilities)
+	sh.cap	a1, 0(ca0)		/* Try storing the data */
+#else
 	sh	a1, 0(a0)		/* Try storing the data */
+#endif
 	EXIT_USER_ACCESS(a2)
 	SET_FAULT_HANDLER(x0, a2)	/* Reset the fault handler */
 	li	a0, 0			/* Success */
@@ -193,7 +254,7 @@ ENTRY(suword16)
 END(suword16)
 
 /*
- * int suword32(volatile void *, int)
+ * int suword32(volatile void * __capability, int)
  */
 ENTRY(suword32)
 	li	a2, (VM_MAXUSER_ADDRESS-3)
@@ -201,7 +262,11 @@ ENTRY(suword32)
 	la	a6, fsu_fault		/* Load the fault handler */
 	SET_FAULT_HANDLER(a6, a2)	/* And set it */
 	ENTER_USER_ACCESS(a2)
+#if __has_feature(capabilities)
+	sw.cap	a1, 0(ca0)		/* Try storing the data */
+#else
 	sw	a1, 0(a0)		/* Try storing the data */
+#endif
 	EXIT_USER_ACCESS(a2)
 	SET_FAULT_HANDLER(x0, a2)	/* Reset the fault handler */
 	li	a0, 0			/* Success */
@@ -209,7 +274,7 @@ ENTRY(suword32)
 END(suword32)
 
 /*
- * int suword(volatile void *, long)
+ * int suword(volatile void * __capability, long)
  */
 ENTRY(suword)
 EENTRY(suword64)
@@ -218,7 +283,11 @@ EENTRY(suword64)
 	la	a6, fsu_fault		/* Load the fault handler */
 	SET_FAULT_HANDLER(a6, a2)	/* And set it */
 	ENTER_USER_ACCESS(a2)
+#if __has_feature(capabilities)
+	sd.cap	a1, 0(ca0)		/* Try storing the data */
+#else
 	sd	a1, 0(a0)		/* Try storing the data */
+#endif
 	EXIT_USER_ACCESS(a2)
 	SET_FAULT_HANDLER(x0, a2)	/* Reset the fault handler */
 	li	a0, 0			/* Success */
@@ -226,6 +295,25 @@ EENTRY(suword64)
 EEND(suword64)
 END(suword)
 
+#if __has_feature(capabilities)
+/*
+ * int sucap(volatile void * __capability, intcap_t)
+ */
+ENTRY(sucap)
+	li	a2, (VM_MAXUSER_ADDRESS-3)
+	bgt	a0, a2, fsu_fault_nopcb
+	la	a6, fsu_fault		/* Load the fault handler */
+	SET_FAULT_HANDLER(a6, a2)	/* And set it */
+	ENTER_USER_ACCESS(a2)
+	sc.cap	ca1, 0(ca0)		/* Try storing the data */
+	EXIT_USER_ACCESS(a2)
+	SET_FAULT_HANDLER(x0, a2)	/* Reset the fault handler */
+	li	a0, 0			/* Success */
+	ret				/* Return */
+END(sucap)
+#endif
+
+/* XXX: CHERI TODO: Save/restore cap registers. */
 ENTRY(setjmp)
 	/* Store the stack pointer */
 	sd	sp, 0(a0)

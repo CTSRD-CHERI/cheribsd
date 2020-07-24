@@ -164,7 +164,11 @@ lzc_ioctl(zfs_ioc_t ioc, const char *name,
 
 	if (source != NULL) {
 		packed = fnvlist_pack(source, &size);
+#ifdef __CHERI_PURE_CAPABILITY__
+		zc.zc_nvlist_src = packed;
+#else
 		zc.zc_nvlist_src = (uint64_t)(uintptr_t)packed;
+#endif
 		zc.zc_nvlist_src_size = size;
 	}
 
@@ -176,7 +180,11 @@ lzc_ioctl(zfs_ioc_t ioc, const char *name,
 		} else {
 			zc.zc_nvlist_dst_size = MAX(size * 2, 128 * 1024);
 		}
+#ifdef __CHERI_PURE_CAPABILITY__
+		zc.zc_nvlist_dst =
+#else
 		zc.zc_nvlist_dst = (uint64_t)(uintptr_t)
+#endif
 		    malloc(zc.zc_nvlist_dst_size);
 #ifdef illumos
 		if (zc.zc_nvlist_dst == NULL) {
@@ -200,7 +208,11 @@ lzc_ioctl(zfs_ioc_t ioc, const char *name,
 		    ioc != ZFS_IOC_CHANNEL_PROGRAM) {
 			free((void *)(uintptr_t)zc.zc_nvlist_dst);
 			zc.zc_nvlist_dst_size *= 2;
+#ifdef __CHERI_PURE_CAPABILITY__
+			zc.zc_nvlist_dst =
+#else
 			zc.zc_nvlist_dst = (uint64_t)(uintptr_t)
+#endif
 			    malloc(zc.zc_nvlist_dst_size);
 #ifdef illumos
 			if (zc.zc_nvlist_dst == NULL) {
@@ -739,7 +751,11 @@ recv_impl(const char *snapname, nvlist_t *props, const char *origin,
 	if (props != NULL) {
 		/* zc_nvlist_src is props to set */
 		packed = fnvlist_pack(props, &size);
+#ifdef __CHERI_PURE_CAPABILITY__
+		zc.zc_nvlist_src = packed;
+#else
 		zc.zc_nvlist_src = (uint64_t)(uintptr_t)packed;
+#endif
 		zc.zc_nvlist_src_size = size;
 	}
 

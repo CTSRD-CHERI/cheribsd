@@ -64,7 +64,8 @@ __FBSDID("$FreeBSD$");
 #include <vm/uma_int.h>
 #include <vm/memguard.h>
 
-static SYSCTL_NODE(_vm, OID_AUTO, memguard, CTLFLAG_RW, NULL, "MemGuard data");
+static SYSCTL_NODE(_vm, OID_AUTO, memguard, CTLFLAG_RW | CTLFLAG_MPSAFE, NULL,
+    "MemGuard data");
 /*
  * The vm_memguard_divisor variable controls how much of kernel_arena should be
  * reserved for MemGuard.
@@ -237,7 +238,7 @@ memguard_sysinit(void)
 	    CTLFLAG_RD, &memguard_mapsize,
 	    "MemGuard KVA size");
 	SYSCTL_ADD_PROC(NULL, parent, OID_AUTO, "mapused",
-	    CTLFLAG_RD | CTLTYPE_ULONG, NULL, 0, memguard_sysctl_mapused, "LU",
+	    CTLFLAG_RD | CTLFLAG_MPSAFE | CTLTYPE_ULONG, NULL, 0, memguard_sysctl_mapused, "LU",
 	    "MemGuard KVA used");
 }
 SYSINIT(memguard, SI_SUB_KLD, SI_ORDER_ANY, memguard_sysinit, NULL);

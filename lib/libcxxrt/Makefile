@@ -5,13 +5,10 @@
 PACKAGE=	clibs
 .if ${MK_CHERI} != "no"
 WANT_CHERI?=	hybrid
-SRCDIR=		${SRCTOP}/contrib/subrepo-cheri-libcxxrt/src
-.else
-SRCDIR=		${SRCTOP}/contrib/subrepo-cheri-libcxxrt/src
 .endif
+SRCDIR=		${SRCTOP}/contrib/subrepo-cheri-libcxxrt/src
 SHLIB_MAJOR=	1
 SHLIBDIR?=	/lib
-ALLOW_MIPS_SHARED_TEXTREL=
 
 .PATH: ${SRCDIR}
 

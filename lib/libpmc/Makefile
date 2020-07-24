@@ -5,7 +5,7 @@ LIB=	pmc
 SRCS=	libpmc.c pmclog.c libpmc_pmu_util.c libpmc_json.cc
 INCS=	pmc.h pmclog.h pmcformat.h
 
-ALLOW_MIPS_SHARED_TEXTREL=
+CFLAGS+= -I${SRCTOP}/${RELDIR:H}/libpmcstat
 
 .if ${MACHINE_ARCH} == "aarch64" || ${MACHINE_ARCH} == "amd64" || \
     ${MACHINE_ARCH} == "i386"
@@ -20,7 +20,6 @@ EVENT_ARCH="powerpc"
 
 .if ${MK_DIRDEPS_BUILD} == "yes"
 # avoid circular dependency
-CFLAGS+= -I${RELDIR:H}/libpmcstat
 GENDIRDEPS_FILTER+= N${RELDIR:H}/libpmcstat
 JEVENTS?= ${HOST_OBJTOP}/${RELDIR}/pmu-events/jevents
 .else
@@ -33,9 +32,15 @@ SUBDIR+= pmu-events
 .endif
 .endif
 
-libpmc_events.c: ${JEVENTS}
-	${JEVENTS} ${EVENT_ARCH} ${.CURDIR}/pmu-events/arch libpmc_events.c
-SRCS+= libpmc_events.c
+libpmc_events.c.tmp: ${JEVENTS} .META
+	${JEVENTS} ${EVENT_ARCH} ${.CURDIR}/pmu-events/arch ${.TARGET}
+
+libpmc_events.c: libpmc_events.c.tmp
+	if [ ! -e ${.TARGET} ] || ! cmp -s ${.TARGET} ${.TARGET}.tmp; then \
+		mv -f ${.TARGET}.tmp ${.TARGET}; \
+	fi
+CLEANFILES+=	libpmc_events.c.tmp libpmc_events.c
+SRCS+=	libpmc_events.c
 .endif
 
 WARNS?=	3

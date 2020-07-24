@@ -31,12 +31,23 @@
  *
  * $FreeBSD$
  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20200507,
+ *   "changes": [
+ *     "bounds_compression"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */
 
 #include <sys/types.h>
 #include <machine/elf.h>
 
 #include <err.h>
 #include <errno.h>
+#include <stddef.h>
 
 #include "ef.h"
 
@@ -54,20 +65,21 @@ ef_reloc(struct elf_file *ef, const void *reldata, int reltype, Elf_Off relbase,
 	const Elf_Rela *rela;
 	Elf_Addr addend, addr;
 	Elf_Size rtype, symidx;
+	ptrdiff_t dest_offset;
 
 	switch (reltype) {
 	case EF_RELOC_REL:
 		rel = (const Elf_Rel *)reldata;
-		where = (Elf_Addr *)((char *)dest + relbase + rel->r_offset -
-		    dataoff);
+		dest_offset = relbase + rel->r_offset - dataoff;
+		where = (Elf_Addr *)((char *)dest + dest_offset);
 		addend = 0;
 		rtype = ELF_R_TYPE(rel->r_info);
 		symidx = ELF_R_SYM(rel->r_info);
 		break;
 	case EF_RELOC_RELA:
 		rela = (const Elf_Rela *)reldata;
-		where = (Elf_Addr *)((char *)dest + relbase + rela->r_offset -
-		    dataoff);
+		dest_offset = relbase + rela->r_offset - dataoff;
+		where = (Elf_Addr *)((char *)dest + dest_offset);
 		addend = rela->r_addend;
 		rtype = ELF_R_TYPE(rela->r_info);
 		symidx = ELF_R_SYM(rela->r_info);

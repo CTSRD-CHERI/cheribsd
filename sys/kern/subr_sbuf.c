@@ -31,8 +31,6 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
-#define	EXPLICIT_USER_ACCESS
-
 #include <sys/param.h>
 
 #ifdef _KERNEL
@@ -303,7 +301,6 @@ sbuf_clear_flags(struct sbuf *s, int flags)
 void
 sbuf_set_flags(struct sbuf *s, int flags)
 {
-
 
 	s->s_flags |= (flags & SBUF_USRFLAGMSK);
 }

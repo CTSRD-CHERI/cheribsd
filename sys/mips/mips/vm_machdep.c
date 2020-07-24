@@ -70,8 +70,9 @@ __FBSDID("$FreeBSD$");
 #include <machine/pcb.h>
 #include <machine/tls.h>
 
-#ifdef CPU_CHERI
+#if __has_feature(capabilities)
 #include <cheri/cheri.h>
+#include <cheri/cheric.h>
 #endif
 
 #include <vm/vm.h>
@@ -114,10 +115,8 @@ cpu_fork(struct thread *td1, struct proc *p2, struct thread *td2, int flags)
 	 * of the td_frame, for us that's not needed any
 	 * longer (this copy does them both) 
 	 */
-#ifndef CPU_CHERI
 	bcopy(td1->td_pcb, pcb2, sizeof(*pcb2));
-#else
-	cheri_bcopy(td1->td_pcb, pcb2, sizeof(*pcb2));
+#ifdef CPU_CHERI
 	cheri_signal_copy(pcb2, td1->td_pcb);
 	cheri_sealcap_copy(p2, td1->td_proc);
 #endif
@@ -167,16 +166,18 @@ cpu_fork(struct thread *td1, struct proc *p2, struct thread *td2, int flags)
 	td2->td_md.md_tls_tcb_offset = td1->td_md.md_tls_tcb_offset;
 	td2->td_md.md_saved_intr = MIPS_SR_INT_IE;
 	td2->td_md.md_spinlock_count = 1;
-#ifdef CPU_CHERI
-#ifdef COMPAT_CHERIABI
-	td2->td_md.md_cheri_mmap_cap = td1->td_md.md_cheri_mmap_cap;
-#endif
+
+#if __has_feature(capabilities)
 	/*
-	 * XXXRW: Ensure capability coprocessor is enabled for both kernel and
-	 * userspace in child.
+	 * XXXRW: Ensure capability coprocessor is enabled for the
+	 * kernel.  in child.  It should already be enabled for
+	 * userspace in the inherited trapframe for user processes.
+	 * Kernel processes don't use the trapframe.
 	 */
-	td2->td_frame->sr |= MIPS_SR_COP_2_BIT;
 	pcb2->pcb_context[PCB_REG_SR] |= MIPS_SR_COP_2_BIT;
+	if (td1 != &thread0)
+		KASSERT((td2->td_frame->sr & MIPS_SR_COP_2_BIT) != 0,
+		    ("%s: COP2 not enabled in trapframe", __func__));
 #endif
 #ifdef CPU_CNMIPS
 	if (td1->td_md.md_flags & MDTD_COP2USED) {
@@ -355,18 +356,17 @@ cpu_set_syscall_retval(struct thread *td, int error)
 		quad_syscall = 1;
 #endif
 
-	if (code == SYS_syscall)
-		code = locr0->a0;
-	else if (code == SYS___syscall) {
-		if (quad_syscall)
-			code = _QUAD_LOWWORD ? locr0->a1 : locr0->a0;
-		else
-			code = locr0->a0;
-	}
-
 	switch (error) {
 	case 0:
-		if (quad_syscall && code != SYS_lseek) {
+#if __has_feature(capabilities)
+		KASSERT(cheri_gettag((void * __capability)td->td_retval[0]) == 0 ||
+		    td->td_sa.code == SYS_mmap ||
+		    td->td_sa.code == SYS_shmat,
+		    ("trying to return capability from integer returning "
+		    "syscall (%u)", td->td_sa.code));
+#endif
+
+		if (quad_syscall && td->td_sa.code != SYS_lseek) {
 			/*
 			 * System call invoked through the
 			 * SYS___syscall interface but the
@@ -381,6 +381,11 @@ cpu_set_syscall_retval(struct thread *td, int error)
 			locr0->v0 = td->td_retval[0];
 			locr0->v1 = td->td_retval[1];
 			locr0->a3 = 0;
+#if __has_feature(capabilities)
+			if (SV_PROC_FLAG(td->td_proc, SV_CHERI))
+				locr0->c3 =
+				    (void * __capability)td->td_retval[0];
+#endif
 		}
 		break;
 
@@ -392,7 +397,7 @@ cpu_set_syscall_retval(struct thread *td, int error)
 		break;	/* nothing to do */
 
 	default:
-		if (quad_syscall && code != SYS_lseek) {
+		if (quad_syscall && td->td_sa.code != SYS_lseek) {
 			locr0->v0 = error;
 			if (_QUAD_LOWWORD)
 				locr0->v1 = error;
@@ -433,10 +438,8 @@ cpu_copy_thread(struct thread *td, struct thread *td0)
 	 * and gets copied when we copy the PCB. No separate copy
 	 * is needed.
 	 */
-#ifndef CPU_CHERI
 	bcopy(td0->td_pcb, pcb2, sizeof(*pcb2));
-#else
-	cheri_bcopy(td0->td_pcb, pcb2, sizeof(*pcb2));
+#ifdef CPU_CHERI
 	cheri_signal_copy(pcb2, td0->td_pcb);
 #endif
 
@@ -462,10 +465,8 @@ cpu_copy_thread(struct thread *td, struct thread *td0)
 
 #ifdef CPU_CHERI
 	/*
-	 * XXXRW: Interesting that we just set pcb_context here and not also
-	 * the trap frame.
-	 *
-	 * XXXRW: With CPU_CNMIPS parts moved, does this still belong here?
+	 * XXXRW: Only set the kernel context here.  The trapframe for
+	 * user threads is managed in cpu_set_upcall.
 	 */
 	pcb2->pcb_context[PCB_REG_SR] |= MIPS_SR_COP_2_BIT;
 #endif
@@ -479,9 +480,6 @@ cpu_copy_thread(struct thread *td, struct thread *td0)
 	/* Setup to release spin count in in fork_exit(). */
 	td->td_md.md_spinlock_count = 1;
 	td->td_md.md_saved_intr = MIPS_SR_INT_IE;
-#if defined(CPU_CHERI) && defined(COMPAT_CHERIABI)
-	td->td_md.md_cheri_mmap_cap = td0->td_md.md_cheri_mmap_cap;
-#endif
 #if 0
 	    /* Maybe we need to fix this? */
 	td->td_md.md_saved_sr = ( (MIPS_SR_COP_2_BIT | MIPS_SR_COP_0_BIT) |
@@ -495,11 +493,11 @@ cpu_copy_thread(struct thread *td, struct thread *td0)
  * the entry function with the given argument.
  */
 void
-cpu_set_upcall(struct thread *td, void (*entry)(void *), void *arg,
-    stack_t *stack)
+cpu_set_upcall(struct thread *td, void (* __capability entry)(void *),
+    void * __capability arg, stack_t *stack)
 {
 	struct trapframe *tf;
-	register_t sp;
+	register_t sp, sr;
 
 	sp = (((__cheri_addr vaddr_t)stack->ss_sp + stack->ss_size) & ~(STACK_ALIGN - 1)) -
 	    CALLFRAME_SIZ;
@@ -509,46 +507,88 @@ cpu_set_upcall(struct thread *td, void (*entry)(void *), void *arg,
 	 * function.
 	 */
 	tf = td->td_frame;
+	sr = tf->sr;
 	bzero(tf, sizeof(struct trapframe));
 	tf->sp = sp;
-	tf->pc = (register_t)(intptr_t)entry;
-	/* 
-	 * MIPS ABI requires T9 to be the same as PC 
-	 * in subroutine entry point
-	 */
-	tf->t9 = (register_t)(intptr_t)entry; 
-	tf->a0 = (register_t)(intptr_t)arg;
+	tf->sr = sr;
 
-	/*
-	 * Keep interrupt mask
-	 *
-	 * XXXRW: I'm a bit puzzled by the code below and feel that even if it
-	 * works, it can't really be right.
-	 */
-	td->td_frame->sr = MIPS_SR_KSU_USER | MIPS_SR_EXL | MIPS_SR_INT_IE |
-	    (mips_rd_status() & MIPS_SR_INT_MASK);
-#if defined(__mips_n32) 
-	td->td_frame->sr |= MIPS_SR_PX;
-#elif  defined(__mips_n64)
-	td->td_frame->sr |= MIPS_SR_PX | MIPS_SR_UX | MIPS_SR_KX;
+#if __has_feature(capabilities)
+	if (SV_PROC_FLAG(td->td_proc, SV_CHERI)) {
+		struct cheri_signal *csigp;
+
+		tf->pcc = (void * __capability)entry;
+		tf->c12 = entry;
+		tf->c3 = arg;
+
+		/*
+		 * Copy the $cgp for the current thread to the new
+		 * one. This will work both if the target function is
+		 * in the current shared object (so the $cgp value
+		 * will be the same) or in a different one (in which
+		 * case it will point to a PLT stub that loads $cgp).
+		 *
+		 * XXXAR: could this break anything if sandboxes
+		 * create threads?
+		 */
+		tf->idc = curthread->td_frame->idc;
+
+		/*
+		 * Set up CHERI-related state: register state, signal
+		 * delivery, sealing capabilities, trusted stack.
+		 */
+		cheriabi_newthread_init(td);
+
+		/*
+		 * We don't perform validation on the new pcc or stack
+		 * capabilities and just let the caller fail on return
+		 * if they are bogus.
+		 */
+		tf->csp = (char * __capability)stack->ss_sp + stack->ss_size;
+
+		/*
+		 * Update privileged signal-delivery environment for
+		 * actual stack.
+		 *
+		 * XXXRW: Not entirely clear whether we want an offset
+		 * of 'stacklen' for csig_csp here.  Maybe we don't
+		 * want to use csig_csp at all?  Possibly csig_csp
+		 * should default to NULL...?
+		 */
+		csigp = &td->td_pcb->pcb_cherisignal;
+		csigp->csig_csp = td->td_frame->csp;
+		csigp->csig_default_stack = csigp->csig_csp;
+	} else
+#endif
+	{
+#if __has_feature(capabilities)
+		/*
+		 * For the MIPS ABI, we can derive any required CHERI state from
+		 * the completed MIPS trapframe and existing process state.
+		 */
+		hybridabi_newthread_setregs(td, (__cheri_addr vaddr_t)entry);
+#else
+		/* For CHERI $pcc is set by hybridabi_newthread_setregs() */
+		TRAPF_PC_SET_ADDR(tf, (vaddr_t)(intptr_t)entry);
 #endif
 
-	/* XXXRW: With CNMIPS moved, does this still belong here? */
-#ifdef CPU_CHERI
-	/*
-	 * For the MIPS ABI, we can derive any required CHERI state from
-	 * the completed MIPS trapframe and existing process state.
-	 */
-	tf->sr |= MIPS_SR_COP_2_BIT;
-	hybridabi_newthread_setregs(td, (uintptr_t)entry);
-#endif
-/*	tf->sr |= (ALL_INT_MASK & idle_mask) | SR_INT_ENAB; */
-	/**XXX the above may now be wrong -- mips2 implements this as panic */
+		/*
+		 * MIPS ABI requires T9 to be the same as PC
+		 * in subroutine entry point
+		 */
+		tf->t9 = TRAPF_PC_OFFSET(tf);
+		tf->a0 = (register_t)(__cheri_addr vaddr_t)arg;
+	}
+
 	/*
 	 * FREEBSD_DEVELOPERS_FIXME:
 	 * Setup any other CPU-Specific registers (Not MIPS Standard)
 	 * that are needed.
 	 */
+
+#if __has_feature(capabilities)
+	KASSERT((tf->sr & MIPS_SR_COP_2_BIT) != 0,
+	    ("%s: COP2 not enabled in trapframe", __func__));
+#endif
 }
 
 bool
@@ -578,28 +618,45 @@ swi_vm(void *dummy)
 }
 
 int
-cpu_set_user_tls(struct thread *td, void *tls_base)
+cpu_set_user_tls(struct thread *td, void * __capability tls_base)
 {
 
-#if defined(__mips_n64) && defined(COMPAT_FREEBSD32)
-	if (td->td_proc && SV_PROC_FLAG(td->td_proc, SV_ILP32))
-		td->td_md.md_tls_tcb_offset = TLS_TP_OFFSET + TLS_TCB_SIZE32;
+#ifdef COMPAT_FREEBSD32
+	if (SV_PROC_FLAG(td->td_proc, SV_ILP32))
+		td->td_md.md_tls_tcb_offset = TLS_TP_OFFSET32 + TLS_TCB_SIZE32;
 	else
 #endif
-#if defined (COMPAT_CHERIABI)
-	/*
-	 * XXX-AR: should cheriabi_set_user_tls just delegate to this
-	 * function?
-	 */
-	if (td->td_proc && SV_PROC_FLAG(td->td_proc, SV_CHERI))
-		panic("cpu_set_user_tls(%p) should not be called from CHERIABI\n", td);
+#ifdef COMPAT_FREEBSD64
+	if (!SV_PROC_FLAG(td->td_proc, SV_CHERI))
+		td->td_md.md_tls_tcb_offset = TLS_TP_OFFSET64 + TLS_TCB_SIZE64;
 	else
 #endif
-	td->td_md.md_tls_tcb_offset = TLS_TP_OFFSET + TLS_TCB_SIZE;
-	td->td_md.md_tls = __USER_CAP_UNBOUND(tls_base);
-	if (td == curthread && cpuinfo.userlocal_reg == true) {
-		mips_wr_userlocal((unsigned long)tls_base +
-		    td->td_md.md_tls_tcb_offset);
+		td->td_md.md_tls_tcb_offset = TLS_TP_OFFSET + TLS_TCB_SIZE;
+	td->td_md.md_tls = tls_base;
+	if (td == curthread) {
+		/*
+		 * If there is an user local register implementation (ULRI)
+		 * update it as well.  Add the TLS and TCB offsets so the
+		 * value in this register is adjusted like in the case of the
+		 * rdhwr trap() instruction handler.
+		 *
+		 * The user local register needs the TLS and TCB offsets
+		 * because the compiler simply generates a 'rdhwr reg, $29'
+		 * instruction to access thread local storage (i.e., variables
+		 * with the '_thread' attribute).
+		 */
+#if __has_feature(capabilities)
+		if (SV_PROC_FLAG(td->td_proc, SV_CHERI))
+			__asm __volatile ("cwritehwr %0, $chwr_userlocal"
+			    :
+			    : "C" ((char * __capability)td->td_md.md_tls +
+				td->td_md.md_tls_tcb_offset));
+		else
+#endif
+		if (cpuinfo.userlocal_reg == true) {
+			mips_wr_userlocal((__cheri_addr u_long)tls_base +
+			    td->td_md.md_tls_tcb_offset);
+		}
 	}
 
 	return (0);
@@ -668,7 +725,9 @@ dump_trapframe(struct trapframe *trapframe)
 	DB_PRINT_REG(trapframe, mulhi);
 	DB_PRINT_REG(trapframe, badvaddr);
 	DB_PRINT_REG(trapframe, cause);
+#if !__has_feature(capabilities)
 	DB_PRINT_REG(trapframe, pc);
+#endif
 }
 
 DB_SHOW_COMMAND(pcb, ddb_dump_pcb)

@@ -38,6 +38,68 @@ __FBSDID("$FreeBSD$");
 #include <machine/setjmp.h>
 
 ENTRY(setjmp)
+#ifdef __CHERI_PURE_CAPABILITY__
+	cincoffset csp, csp, -(2 * 16)
+	csc	ca0, 0(csp)
+	csc	cra, 16(csp)
+
+	/* Store the signal mask */
+	cincoffset ca2, ca0, (_JB_SIGMASK * 8)	/* oset */
+	li	a1, 0				/* set */
+	li	a0, 1				/* SIG_BLOCK */
+	clgc	ct0, _C_LABEL(sigprocmask)
+	cjalr	ct0
+
+	clc	ca0, 0(csp)
+	clc	cra, 16(csp)
+	cincoffset csp, csp, (2 * 16)
+
+	/* Store the magic value and stack pointer */
+	cllc	ct0, .Lmagic
+	cld	t0, (ct0)
+	csc	ct0, (0 * 16)(ca0)
+	csc	csp, (1 * 16)(ca0)
+	cincoffset ca0, ca0, (2 * 16)
+
+	/* Store the general purpose registers and ra */
+	csc	cs0, (0 * 16)(ca0)
+	csc	cs1, (1 * 16)(ca0)
+	csc	cs2, (2 * 16)(ca0)
+	csc	cs3, (3 * 16)(ca0)
+	csc	cs4, (4 * 16)(ca0)
+	csc	cs5, (5 * 16)(ca0)
+	csc	cs6, (6 * 16)(ca0)
+	csc	cs7, (7 * 16)(ca0)
+	csc	cs8, (8 * 16)(ca0)
+	csc	cs9, (9 * 16)(ca0)
+	csc	cs10, (10 * 16)(ca0)
+	csc	cs11, (11 * 16)(ca0)
+	csc	cra, (12 * 16)(ca0)
+	cspecialr ct0, ddc
+	csc	ct0, (13 * 16)(ca0)
+	cincoffset ca0, ca0, (14 * 16)
+
+#ifdef __riscv_float_abi_double
+	/* Store the fpe registers */
+	cfsd	fs0, (0 * 8)(ca0)
+	cfsd	fs1, (1 * 8)(ca0)
+	cfsd	fs2, (2 * 8)(ca0)
+	cfsd	fs3, (3 * 8)(ca0)
+	cfsd	fs4, (4 * 8)(ca0)
+	cfsd	fs5, (5 * 8)(ca0)
+	cfsd	fs6, (6 * 8)(ca0)
+	cfsd	fs7, (7 * 8)(ca0)
+	cfsd	fs8, (8 * 8)(ca0)
+	cfsd	fs9, (9 * 8)(ca0)
+	cfsd	fs10, (10 * 8)(ca0)
+	cfsd	fs11, (11 * 8)(ca0)
+	cincoffset ca0, ca0, (12 * 8)
+#endif
+
+	/* Return value */
+	li	a0, 0
+	cret
+#else
 	addi	sp, sp, -(2 * 8)
 	sd	a0, 0(sp)
 	sd	ra, 8(sp)
@@ -94,12 +156,91 @@ ENTRY(setjmp)
 	/* Return value */
 	li	a0, 0
 	ret
+#endif
 	.align	3
 .Lmagic:
 	.quad	_JB_MAGIC_SETJMP
 END(setjmp)
 
 ENTRY(longjmp)
+#ifdef __CHERI_PURE_CAPABILITY__
+	/* Check the magic value */
+	cld	t0, 0(ca0)
+	cllc	ct1, .Lmagic
+	cld	t1, (ct1)
+	bne	t0, t1, botch
+
+	cincoffset csp, csp, -(3 * 16)
+	csc	ca0, (0 * 16)(csp)
+	csc	cra, (1 * 16)(csp)
+	csc	ca1, (2 * 16)(csp)
+
+	/* Restore the signal mask */
+	li	a2, 0				/* oset */
+	cincoffset ca1, ca0, (_JB_SIGMASK * 8)	/* set */
+	li	a0, 3				/* SIG_BLOCK */
+	clgc	ct0, _C_LABEL(sigprocmask)
+	cjalr	ct0
+
+	clc	ca1, (2 * 16)(csp)
+	clc	cra, (1 * 16)(csp)
+	clc	ca0, (0 * 16)(csp)
+	cincoffset csp, csp, (3 * 16)
+
+	/* Restore the stack pointer */
+	clc	csp, 16(ca0)
+	cincoffset ca0, ca0, (2 * 16)
+
+	/* Restore the general purpose registers and ra */
+	clc	cs0, (0 * 16)(ca0)
+	clc	cs1, (1 * 16)(ca0)
+	clc	cs2, (2 * 16)(ca0)
+	clc	cs3, (3 * 16)(ca0)
+	clc	cs4, (4 * 16)(ca0)
+	clc	cs5, (5 * 16)(ca0)
+	clc	cs6, (6 * 16)(ca0)
+	clc	cs7, (7 * 16)(ca0)
+	clc	cs8, (8 * 16)(ca0)
+	clc	cs9, (9 * 16)(ca0)
+	clc	cs10, (10 * 16)(ca0)
+	clc	cs11, (11 * 16)(ca0)
+	clc	cra, (12 * 16)(ca0)
+	clc	ct0, (13 * 16)(ca0)
+	cspecialw ddc, ct0
+	cincoffset ca0, ca0, (14 * 16)
+
+#ifdef __riscv_float_abi_double
+	/* Restore the fpe registers */
+	cfld	fs0, (0 * 8)(ca0)
+	cfld	fs1, (1 * 8)(ca0)
+	cfld	fs2, (2 * 8)(ca0)
+	cfld	fs3, (3 * 8)(ca0)
+	cfld	fs4, (4 * 8)(ca0)
+	cfld	fs5, (5 * 8)(ca0)
+	cfld	fs6, (6 * 8)(ca0)
+	cfld	fs7, (7 * 8)(ca0)
+	cfld	fs8, (8 * 8)(ca0)
+	cfld	fs9, (9 * 8)(ca0)
+	cfld	fs10, (10 * 8)(ca0)
+	cfld	fs11, (11 * 8)(ca0)
+	cincoffset ca0, ca0, (12 * 8)
+#endif
+
+	/* Load the return value */
+	mv	a0, a1
+	cret
+
+botch:
+	clgc	ct0, _C_LABEL(longjmperror)
+	cjalr	ct0
+	clgc	ct0, _C_LABEL(abort)
+	cjalr	ct0
+#else
+	/* Check the magic value */
+	ld	t0, 0(a0)
+	ld	t1, .Lmagic
+	bne	t0, t1, botch
+
 	addi	sp, sp, -(4 * 8)
 	sd	a0, (0 * 8)(sp)
 	sd	ra, (1 * 8)(sp)
@@ -115,11 +256,6 @@ ENTRY(longjmp)
 	ld	ra, (1 * 8)(sp)
 	ld	a0, (0 * 8)(sp)
 	addi	sp, sp, (4 * 8)
-
-	/* Check the magic value */
-	ld	t0, 0(a0)
-	ld	t1, .Lmagic
-	bne	t0, t1, botch
 
 	/* Restore the stack pointer */
 	ld	t0, 8(a0)
@@ -166,4 +302,5 @@ ENTRY(longjmp)
 botch:
 	call	_C_LABEL(longjmperror)
 	call	_C_LABEL(abort)
+#endif
 END(longjmp)

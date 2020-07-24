@@ -104,6 +104,7 @@ __FBSDID("$FreeBSD$");
 
 #include <vm/vm.h>
 #include <vm/vm_param.h>
+#include <vm/vm_kern.h>
 #include <vm/vm_object.h>
 #include <vm/vm_page.h>
 #include <vm/vm_map.h>
@@ -173,51 +174,24 @@ static void vm_thread_swapout(struct thread *td);
 static void
 vm_swapout_object_deactivate_page(pmap_t pmap, vm_page_t m, bool unmap)
 {
-	int act_delta;
-
-	if (vm_page_tryxbusy(m) == 0)
-		return;
-	VM_CNT_INC(v_pdpages);
 
 	/*
-	 * The page may acquire a wiring after this check.
-	 * The page daemon handles wired pages, so there is
-	 * no harm done if a wiring appears while we are
-	 * attempting to deactivate the page.
+	 * Ignore unreclaimable wired pages.  Repeat the check after busying
+	 * since a busy holder may wire the page.
 	 */
+	if (vm_page_wired(m) || !vm_page_tryxbusy(m))
+		return;
+
 	if (vm_page_wired(m) || !pmap_page_exists_quick(pmap, m)) {
 		vm_page_xunbusy(m);
 		return;
 	}
-	act_delta = pmap_ts_referenced(m);
-	vm_page_lock(m);
-	if ((m->a.flags & PGA_REFERENCED) != 0) {
-		if (act_delta == 0)
-			act_delta = 1;
-		vm_page_aflag_clear(m, PGA_REFERENCED);
+	if (!pmap_is_referenced(m)) {
+		if (!vm_page_active(m))
+			(void)vm_page_try_remove_all(m);
+		else if (unmap && vm_page_try_remove_all(m))
+			vm_page_deactivate(m);
 	}
-	if (!vm_page_active(m) && act_delta != 0) {
-		vm_page_activate(m);
-		m->a.act_count += act_delta;
-	} else if (vm_page_active(m)) {
-		/*
-		 * The page daemon does not requeue pages
-		 * after modifying their activation count.
-		 */
-		if (act_delta == 0) {
-			m->a.act_count -= min(m->a.act_count, ACT_DECLINE);
-			if (unmap && m->a.act_count == 0) {
-				(void)vm_page_try_remove_all(m);
-				vm_page_deactivate(m);
-			}
-		} else {
-			vm_page_activate(m);
-			if (m->a.act_count < ACT_MAX - ACT_ADVANCE)
-				m->a.act_count += ACT_ADVANCE;
-		}
-	} else if (vm_page_inactive(m))
-		(void)vm_page_try_remove_all(m);
-	vm_page_unlock(m);
 	vm_page_xunbusy(m);
 }
 
@@ -245,7 +219,7 @@ vm_swapout_object_deactivate(pmap_t pmap, vm_object_t first_object,
 			goto unlock_return;
 		VM_OBJECT_ASSERT_LOCKED(object);
 		if ((object->flags & OBJ_UNMANAGED) != 0 ||
-		    REFCOUNT_COUNT(object->paging_in_progress) > 0)
+		    blockcount_read(&object->paging_in_progress) > 0)
 			goto unlock_return;
 
 		unmap = true;
@@ -553,23 +527,26 @@ again:
 static void
 vm_thread_swapout(struct thread *td)
 {
-	vm_object_t ksobj;
 	vm_page_t m;
+	vm_offset_t kaddr;
+	vm_pindex_t pindex;
 	int i, pages;
 
 	cpu_thread_swapout(td);
+	kaddr = td->td_kstack;
 	pages = td->td_kstack_pages;
-	ksobj = td->td_kstack_obj;
-	pmap_qremove(td->td_kstack, pages);
-	VM_OBJECT_WLOCK(ksobj);
+	pindex = atop(kaddr - VM_MIN_KERNEL_ADDRESS);
+	pmap_qremove(kaddr, pages);
+	VM_OBJECT_WLOCK(kstack_object);
 	for (i = 0; i < pages; i++) {
-		m = vm_page_lookup(ksobj, i);
+		m = vm_page_lookup(kstack_object, pindex + i);
 		if (m == NULL)
 			panic("vm_thread_swapout: kstack already missing?");
 		vm_page_dirty(m);
+		vm_page_xunbusy_unchecked(m);
 		vm_page_unwire(m, PQ_LAUNDRY);
 	}
-	VM_OBJECT_WUNLOCK(ksobj);
+	VM_OBJECT_WUNLOCK(kstack_object);
 }
 
 /*
@@ -578,39 +555,36 @@ vm_thread_swapout(struct thread *td)
 static void
 vm_thread_swapin(struct thread *td, int oom_alloc)
 {
-	vm_object_t ksobj;
 	vm_page_t ma[KSTACK_MAX_PAGES];
+	vm_offset_t kaddr;
 	int a, count, i, j, pages, rv;
 
+	kaddr = td->td_kstack;
 	pages = td->td_kstack_pages;
-	ksobj = td->td_kstack_obj;
-	VM_OBJECT_WLOCK(ksobj);
-	(void)vm_page_grab_pages(ksobj, 0, oom_alloc | VM_ALLOC_WIRED, ma,
-	    pages);
+	vm_thread_stack_back(td->td_domain.dr_policy, kaddr, ma, pages,
+	    oom_alloc);
 	for (i = 0; i < pages;) {
 		vm_page_assert_xbusied(ma[i]);
 		if (vm_page_all_valid(ma[i])) {
-			vm_page_xunbusy(ma[i]);
 			i++;
 			continue;
 		}
-		vm_object_pip_add(ksobj, 1);
+		vm_object_pip_add(kstack_object, 1);
 		for (j = i + 1; j < pages; j++)
 			if (vm_page_all_valid(ma[j]))
 				break;
-		rv = vm_pager_has_page(ksobj, ma[i]->pindex, NULL, &a);
+		VM_OBJECT_WLOCK(kstack_object);
+		rv = vm_pager_has_page(kstack_object, ma[i]->pindex, NULL, &a);
+		VM_OBJECT_WUNLOCK(kstack_object);
 		KASSERT(rv == 1, ("%s: missing page %p", __func__, ma[i]));
 		count = min(a + 1, j - i);
-		rv = vm_pager_get_pages(ksobj, ma + i, count, NULL, NULL);
+		rv = vm_pager_get_pages(kstack_object, ma + i, count, NULL, NULL);
 		KASSERT(rv == VM_PAGER_OK, ("%s: cannot get kstack for proc %d",
 		    __func__, td->td_proc->p_pid));
-		vm_object_pip_wakeup(ksobj);
-		for (j = i; j < i + count; j++)
-			vm_page_xunbusy(ma[j]);
+		vm_object_pip_wakeup(kstack_object);
 		i += count;
 	}
-	VM_OBJECT_WUNLOCK(ksobj);
-	pmap_qenter(td->td_kstack, ma, pages);
+	pmap_qenter(kaddr, ma, pages);
 	cpu_thread_swapin(td);
 }
 
@@ -901,8 +875,8 @@ swapclear(struct proc *p)
 		td->td_flags |= TDF_INMEM;
 		td->td_flags &= ~TDF_SWAPINREQ;
 		TD_CLR_SWAPPED(td);
-		if (TD_CAN_RUN(td))
-			if (setrunnable(td)) {
+		if (TD_CAN_RUN(td)) {
+			if (setrunnable(td, 0)) {
 #ifdef INVARIANTS
 				/*
 				 * XXX: We just cleared TDI_SWAPPED
@@ -912,7 +886,8 @@ swapclear(struct proc *p)
 				panic("not waking up swapper");
 #endif
 			}
-		thread_unlock(td);
+		} else
+			thread_unlock(td);
 	}
 	p->p_flag &= ~(P_SWAPPINGIN | P_SWAPPINGOUT);
 	p->p_flag |= P_INMEM;

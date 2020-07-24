@@ -71,7 +71,8 @@ __FBSDID("$FreeBSD$");
 
 #ifdef USB_DEBUG
 static int rsu_debug = 0;
-SYSCTL_NODE(_hw_usb, OID_AUTO, rsu, CTLFLAG_RW, 0, "USB rsu");
+SYSCTL_NODE(_hw_usb, OID_AUTO, rsu, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
+    "USB rsu");
 SYSCTL_INT(_hw_usb_rsu, OID_AUTO, debug, CTLFLAG_RWTUN, &rsu_debug, 0,
     "Debug level");
 #define	RSU_DPRINTF(_sc, _flg, ...)					\
@@ -2552,6 +2553,7 @@ rsu_rxeof(struct usb_xfer *xfer, struct rsu_data *data)
 static void
 rsu_bulk_rx_callback(struct usb_xfer *xfer, usb_error_t error)
 {
+	struct epoch_tracker et;
 	struct rsu_softc *sc = usbd_xfer_softc(xfer);
 	struct ieee80211com *ic = &sc->sc_ic;
 	struct ieee80211_node *ni;
@@ -2586,6 +2588,7 @@ tr_setup:
 		 * ieee80211_input() because here is at the end of a USB
 		 * callback and safe to unlock.
 		 */
+		NET_EPOCH_ENTER(et);
 		while (m != NULL) {
 			next = m->m_next;
 			m->m_next = NULL;
@@ -2604,6 +2607,7 @@ tr_setup:
 			RSU_LOCK(sc);
 			m = next;
 		}
+		NET_EPOCH_EXIT(et);
 		break;
 	default:
 		/* needs it to the inactive queue due to a error. */

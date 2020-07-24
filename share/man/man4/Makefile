@@ -80,7 +80,6 @@ MAN=	aac.4 \
 	bhnd_pmu.4 \
 	bhndb.4 \
 	bhndb_pci.4 \
-	bktr.4 \
 	blackhole.4 \
 	bnxt.4 \
 	bpf.4 \
@@ -193,6 +192,7 @@ MAN=	aac.4 \
 	${_hv_vmbus.4} \
 	${_hv_vss.4} \
 	hwpmc.4 \
+	${_hwpstate_intel.4} \
 	iavf.4 \
 	ichsmb.4 \
 	${_ichwd.4} \
@@ -205,8 +205,10 @@ MAN=	aac.4 \
 	ig4.4 \
 	igmp.4 \
 	iic.4 \
+	iic_gpiomux.4 \
 	iicbb.4 \
 	iicbus.4 \
+	iicmux.4 \
 	iicsmb.4 \
 	iir.4 \
 	${_imcsmb.4} \
@@ -259,6 +261,7 @@ MAN=	aac.4 \
 	lp.4 \
 	lpbb.4 \
 	lpt.4 \
+	ltc430x.4 \
 	mac.4 \
 	mac_biba.4 \
 	mac_bsdextended.4 \
@@ -402,6 +405,7 @@ MAN=	aac.4 \
 	pccard.4 \
 	pccbb.4 \
 	pcf.4 \
+	${_pchtherm.4} \
 	pci.4 \
 	pcib.4 \
 	pcic.4 \
@@ -468,6 +472,7 @@ MAN=	aac.4 \
 	sk.4 \
 	${_smartpqi.4} \
 	smb.4 \
+	smbios.4 \
 	smbus.4 \
 	smp.4 \
 	smsc.4 \
@@ -552,7 +557,6 @@ MAN=	aac.4 \
 	${_vmd.4} \
 	${_vmm.4} \
 	${_vmx.4} \
-	vpo.4 \
 	vr.4 \
 	vt.4 \
 	vte.4 \
@@ -600,7 +604,6 @@ MLINKS+=axe.4 if_axe.4
 MLINKS+=bce.4 if_bce.4
 MLINKS+=bfe.4 if_bfe.4
 MLINKS+=bge.4 if_bge.4
-MLINKS+=bktr.4 brooktree.4
 MLINKS+=bnxt.4 if_bnxt.4
 MLINKS+=bridge.4 if_bridge.4
 MLINKS+=bwi.4 if_bwi.4
@@ -728,7 +731,9 @@ MLINKS+=stf.4 if_stf.4
 MLINKS+=stge.4 if_stge.4
 MLINKS+=syncache.4 syncookies.4
 MLINKS+=syscons.4 sc.4
-MLINKS+=tap.4 if_tap.4
+MLINKS+=tap.4 if_tap.4 \
+	tap.4 vmnet.4 \
+	tap.4 if_vmnet.4
 MLINKS+=terasic_de4led.4 de4led.4
 MLINKS+=tdfx.4 tdfx_linux.4
 MLINKS+=ti.4 if_ti.4
@@ -738,7 +743,6 @@ MLINKS+=vge.4 if_vge.4
 MLINKS+=vlan.4 if_vlan.4
 MLINKS+=vxlan.4 if_vxlan.4
 MLINKS+=${_vmx.4} ${_if_vmx.4}
-MLINKS+=vpo.4 imm.4
 MLINKS+=vr.4 if_vr.4
 MLINKS+=vte.4 if_vte.4
 MLINKS+=${_vtnet.4} ${_if_vtnet.4}
@@ -787,6 +791,7 @@ _hv_storvsc.4=	hv_storvsc.4
 _hv_utils.4=	hv_utils.4
 _hv_vmbus.4=	hv_vmbus.4
 _hv_vss.4=	hv_vss.4
+_hwpstate_intel.4=	hwpstate_intel.4
 _i8254.4=	i8254.4
 _ichwd.4=	ichwd.4
 _if_bxe.4=	if_bxe.4
@@ -815,6 +820,7 @@ _nvd.4=		nvd.4
 _nvme.4=	nvme.4
 _nvram.4=	nvram.4
 _padlock.4=	padlock.4
+_pchtherm.4=	pchtherm.4
 _rr232x.4=	rr232x.4
 _speaker.4=	speaker.4
 _spkr.4=	spkr.4
@@ -866,8 +872,16 @@ _nvram2env.4=	nvram2env.4
 .endif
 
 .if ${MACHINE_CPUARCH} == "powerpc"
+_if_vtnet.4=    if_vtnet.4
 _nvd.4= 	nvd.4
 _nvme.4=	nvme.4
+_virtio.4=	virtio.4
+_virtio_balloon.4=virtio_balloon.4
+_virtio_blk.4=	virtio_blk.4
+_virtio_console.4=virtio_console.4
+_virtio_random.4= virtio_random.4
+_virtio_scsi.4=	virtio_scsi.4
+_vtnet.4=	vtnet.4
 .endif
 
 .if empty(MAN_ARCH)
@@ -955,7 +969,6 @@ MAN+=	\
 	uart.4 \
 	uath.4 \
 	ubsa.4 \
-	ubsec.4 \
 	ubser.4 \
 	ubtbcmfw.4 \
 	uchcom.4 \

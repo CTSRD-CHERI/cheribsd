@@ -89,7 +89,7 @@ struct cma_device {
 };
 
 struct cma_id_private {
-	struct rdma_cm_id	id;
+	struct rdma_cm_id	id __subobject_use_container_bounds;
 	struct cma_device	*cma_dev;
 	void			*connect;
 	size_t			connect_len;
@@ -118,7 +118,7 @@ struct cma_multicast {
 };
 
 struct cma_event {
-	struct rdma_cm_event	event;
+	struct rdma_cm_event	event __subobject_use_container_bounds;
 	uint8_t			private_data[RDMA_MAX_PRIVATE_DATA];
 	struct cma_id_private	*id_priv;
 	struct cma_multicast	*mc;

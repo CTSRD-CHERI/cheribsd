@@ -514,21 +514,17 @@ struct mlx5_core_health {
 	struct workqueue_struct	       *wq_cmd;
 };
 
-#ifdef RATELIMIT
-#define	MLX5_CQ_LINEAR_ARRAY_SIZE	(128 * 1024)
-#else
 #define	MLX5_CQ_LINEAR_ARRAY_SIZE	1024
-#endif
 
 struct mlx5_cq_linear_array_entry {
-	spinlock_t	lock;
 	struct mlx5_core_cq * volatile cq;
 };
 
 struct mlx5_cq_table {
 	/* protect radix tree
 	 */
-	spinlock_t		lock;
+	spinlock_t		writerlock;
+	atomic_t		writercount;
 	struct radix_tree_root	tree;
 	struct mlx5_cq_linear_array_entry linear_array[MLX5_CQ_LINEAR_ARRAY_SIZE];
 };
@@ -632,6 +628,8 @@ struct mlx5_priv {
 	struct mlx5_rl_table	rl_table;
 #endif
 	struct mlx5_pme_stats pme_stats;
+
+	struct mlx5_eswitch	*eswitch;
 };
 
 enum mlx5_device_state {
@@ -1183,5 +1181,8 @@ static inline bool mlx5_rl_is_supported(struct mlx5_core_dev *dev)
 	return !!(dev->priv.rl_table.max_size);
 }
 #endif
+
+void mlx5_disable_interrupts(struct mlx5_core_dev *);
+void mlx5_poll_interrupts(struct mlx5_core_dev *);
 
 #endif /* MLX5_DRIVER_H */

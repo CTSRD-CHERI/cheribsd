@@ -2,7 +2,6 @@
  * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
  *
  * Copyright (c) 2017 Kyle J. Kneitinger <kyle@kneit.in>
- * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -60,6 +59,7 @@ typedef enum be_error {
 	BE_ERR_NOMEM,		/* insufficient memory */
 	BE_ERR_UNKNOWN,         /* unknown error */
 	BE_ERR_INVORIGIN,       /* invalid origin */
+	BE_ERR_HASCLONES,	/* snapshot has clones */
 } be_error_t;
 
 

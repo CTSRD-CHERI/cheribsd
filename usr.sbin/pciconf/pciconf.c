@@ -76,7 +76,7 @@ static struct pcisel getsel(const char *str);
 static void list_bridge(int fd, struct pci_conf *p);
 static void list_bars(int fd, struct pci_conf *p);
 static void list_devs(const char *name, int verbose, int bars, int bridge,
-    int caps, int errors, int vpd);
+    int caps, int errors, int vpd, int listmode);
 static void list_verbose(struct pci_conf *p);
 static void list_vpd(int fd, struct pci_conf *p);
 static const char *guess_class(struct pci_conf *p);
@@ -147,7 +147,7 @@ main(int argc, char **argv)
 			break;
 
 		case 'l':
-			listmode = 1;
+			listmode++;
 			break;
 
 		case 'r':
@@ -185,7 +185,7 @@ main(int argc, char **argv)
 
 	if (listmode) {
 		list_devs(optind + 1 == argc ? argv[optind] : NULL, verbose,
-		    bars, bridge, caps, errors, vpd);
+		    bars, bridge, caps, errors, vpd, listmode);
 	} else if (attachedmode) {
 		chkattached(argv[optind]);
 	} else if (readmode) {
@@ -207,7 +207,7 @@ main(int argc, char **argv)
 
 static void
 list_devs(const char *name, int verbose, int bars, int bridge, int caps,
-    int errors, int vpd)
+    int errors, int vpd, int listmode)
 {
 	int fd;
 	struct pci_conf_io pc;
@@ -260,21 +260,37 @@ list_devs(const char *name, int verbose, int bars, int bridge, int caps,
 			close(fd);
 			return;
 		}
+		if (listmode == 2)
+			printf("drv\tselector\tclass    rev  hdr  "
+			    "vendor device subven subdev\n");
 		for (p = conf; p < &conf[pc.num_matches]; p++) {
-			printf("%s%d@pci%d:%d:%d:%d:"
-			    "\tclass=0x%06x rev=0x%02x hdr=0x%02x "
-			    "vendor=0x%04x device=0x%04x "
-			    "subvendor=0x%04x subdevice=0x%04x\n",
-			    *p->pd_name ? p->pd_name :
-			    "none",
-			    *p->pd_name ? (int)p->pd_unit :
-			    none_count++, p->pc_sel.pc_domain,
-			    p->pc_sel.pc_bus, p->pc_sel.pc_dev,
-			    p->pc_sel.pc_func, (p->pc_class << 16) |
-			    (p->pc_subclass << 8) | p->pc_progif,
-			    p->pc_revid, p->pc_hdr,
-			    p->pc_vendor, p->pc_device,
-			    p->pc_subvendor, p->pc_subdevice);
+			if (listmode == 2)
+				printf("%s%d@pci%d:%d:%d:%d:"
+				    "\t%06x   %02x   %02x   "
+				    "%04x   %04x   %04x   %04x\n",
+				    *p->pd_name ? p->pd_name : "none",
+				    *p->pd_name ? (int)p->pd_unit :
+				    none_count++, p->pc_sel.pc_domain,
+				    p->pc_sel.pc_bus, p->pc_sel.pc_dev,
+				    p->pc_sel.pc_func, (p->pc_class << 16) |
+				    (p->pc_subclass << 8) | p->pc_progif,
+				    p->pc_revid, p->pc_hdr,
+				    p->pc_vendor, p->pc_device,
+				    p->pc_subvendor, p->pc_subdevice);
+			else
+				printf("%s%d@pci%d:%d:%d:%d:"
+				    "\tclass=0x%06x rev=0x%02x hdr=0x%02x "
+				    "vendor=0x%04x device=0x%04x "
+				    "subvendor=0x%04x subdevice=0x%04x\n",
+				    *p->pd_name ? p->pd_name : "none",
+				    *p->pd_name ? (int)p->pd_unit :
+				    none_count++, p->pc_sel.pc_domain,
+				    p->pc_sel.pc_bus, p->pc_sel.pc_dev,
+				    p->pc_sel.pc_func, (p->pc_class << 16) |
+				    (p->pc_subclass << 8) | p->pc_progif,
+				    p->pc_revid, p->pc_hdr,
+				    p->pc_vendor, p->pc_device,
+				    p->pc_subvendor, p->pc_subdevice);
 			if (verbose)
 				list_verbose(p);
 			if (bars)
@@ -649,12 +665,17 @@ static struct
 	{PCIC_STORAGE,		PCIS_STORAGE_SATA,	"SATA"},
 	{PCIC_STORAGE,		PCIS_STORAGE_SAS,	"SAS"},
 	{PCIC_STORAGE,		PCIS_STORAGE_NVM,	"NVM"},
+	{PCIC_STORAGE,		PCIS_STORAGE_UFS,	"UFS"},
 	{PCIC_NETWORK,		-1,			"network"},
 	{PCIC_NETWORK,		PCIS_NETWORK_ETHERNET,	"ethernet"},
 	{PCIC_NETWORK,		PCIS_NETWORK_TOKENRING,	"token ring"},
 	{PCIC_NETWORK,		PCIS_NETWORK_FDDI,	"fddi"},
 	{PCIC_NETWORK,		PCIS_NETWORK_ATM,	"ATM"},
 	{PCIC_NETWORK,		PCIS_NETWORK_ISDN,	"ISDN"},
+	{PCIC_NETWORK,		PCIS_NETWORK_WORLDFIP,	"WorldFip"},
+	{PCIC_NETWORK,		PCIS_NETWORK_PICMG,	"PICMG"},
+	{PCIC_NETWORK,		PCIS_NETWORK_INFINIBAND,	"InfiniBand"},
+	{PCIC_NETWORK,		PCIS_NETWORK_HFC,	"host fabric"},
 	{PCIC_DISPLAY,		-1,			"display"},
 	{PCIC_DISPLAY,		PCIS_DISPLAY_VGA,	"VGA"},
 	{PCIC_DISPLAY,		PCIS_DISPLAY_XGA,	"XGA"},
@@ -677,6 +698,11 @@ static struct
 	{PCIC_BRIDGE,		PCIS_BRIDGE_NUBUS,	"PCI-NuBus"},
 	{PCIC_BRIDGE,		PCIS_BRIDGE_CARDBUS,	"PCI-CardBus"},
 	{PCIC_BRIDGE,		PCIS_BRIDGE_RACEWAY,	"PCI-RACEway"},
+	{PCIC_BRIDGE,		PCIS_BRIDGE_PCI_TRANSPARENT,
+	    "Semi-transparent PCI-to-PCI"},
+	{PCIC_BRIDGE,		PCIS_BRIDGE_INFINIBAND,	"InfiniBand-PCI"},
+	{PCIC_BRIDGE,		PCIS_BRIDGE_AS_PCI,
+	    "AdvancedSwitching-PCI"},
 	{PCIC_SIMPLECOMM,	-1,			"simple comms"},
 	{PCIC_SIMPLECOMM,	PCIS_SIMPLECOMM_UART,	"UART"},	/* could detect 16550 */
 	{PCIC_SIMPLECOMM,	PCIS_SIMPLECOMM_PAR,	"parallel port"},
@@ -690,6 +716,8 @@ static struct
 	{PCIC_BASEPERIPH,	PCIS_BASEPERIPH_PCIHOT,	"PCI hot-plug controller"},
 	{PCIC_BASEPERIPH,	PCIS_BASEPERIPH_SDHC,	"SD host controller"},
 	{PCIC_BASEPERIPH,	PCIS_BASEPERIPH_IOMMU,	"IOMMU"},
+	{PCIC_BASEPERIPH,	PCIS_BASEPERIPH_RCEC,
+	    "Root Complex Event Collector"},
 	{PCIC_INPUTDEV,		-1,			"input device"},
 	{PCIC_INPUTDEV,		PCIS_INPUTDEV_KEYBOARD,	"keyboard"},
 	{PCIC_INPUTDEV,		PCIS_INPUTDEV_DIGITIZER,"digitizer"},
@@ -705,10 +733,23 @@ static struct
 	{PCIC_SERIALBUS,	PCIS_SERIALBUS_USB,	"USB"},
 	{PCIC_SERIALBUS,	PCIS_SERIALBUS_FC,	"Fibre Channel"},
 	{PCIC_SERIALBUS,	PCIS_SERIALBUS_SMBUS,	"SMBus"},
+	{PCIC_SERIALBUS,	PCIS_SERIALBUS_INFINIBAND,	"InfiniBand"},
+	{PCIC_SERIALBUS,	PCIS_SERIALBUS_IPMI,	"IPMI"},
+	{PCIC_SERIALBUS,	PCIS_SERIALBUS_SERCOS,	"SERCOS"},
+	{PCIC_SERIALBUS,	PCIS_SERIALBUS_CANBUS,	"CANbus"},
+	{PCIC_SERIALBUS,	PCIS_SERIALBUS_MIPI_I3C,	"MIPI I3C"},
 	{PCIC_WIRELESS,		-1,			"wireless controller"},
 	{PCIC_WIRELESS,		PCIS_WIRELESS_IRDA,	"iRDA"},
 	{PCIC_WIRELESS,		PCIS_WIRELESS_IR,	"IR"},
 	{PCIC_WIRELESS,		PCIS_WIRELESS_RF,	"RF"},
+	{PCIC_WIRELESS,		PCIS_WIRELESS_BLUETOOTH,	"bluetooth"},
+	{PCIC_WIRELESS,		PCIS_WIRELESS_BROADBAND,	"broadband"},
+	{PCIC_WIRELESS,		PCIS_WIRELESS_80211A,	"ethernet 802.11a"},
+	{PCIC_WIRELESS,		PCIS_WIRELESS_80211B,	"ethernet 802.11b"},
+	{PCIC_WIRELESS,		PCIS_WIRELESS_CELL,
+	    "cellular controller/modem"},
+	{PCIC_WIRELESS,		PCIS_WIRELESS_CELL_E,
+	    "cellular controller/modem plus ethernet"},
 	{PCIC_INTELLIIO,	-1,			"intelligent I/O controller"},
 	{PCIC_INTELLIIO,	PCIS_INTELLIIO_I2O,	"I2O"},
 	{PCIC_SATCOM,		-1,			"satellite communication"},

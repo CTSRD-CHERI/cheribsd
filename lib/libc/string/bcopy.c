@@ -73,6 +73,9 @@ typedef	int word;		/* "word" used for optimal copy speed */
 #if defined(MEMCOPY) || defined(MEMMOVE)
 #include <string.h>
 
+#ifdef IN_LIBSYSCALLS
+__attribute__((weak, visibility("hidden")))
+#endif
 __CAP void *
 #ifdef MEMCOPY
 __CAPSUFFIX(memcpy)

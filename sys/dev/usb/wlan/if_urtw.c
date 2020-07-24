@@ -67,7 +67,8 @@ __FBSDID("$FreeBSD$");
 #define	URTW_RIDX_OFDM6		4
 #define	URTW_RIDX_OFDM24	8
 
-static SYSCTL_NODE(_hw_usb, OID_AUTO, urtw, CTLFLAG_RW, 0, "USB Realtek 8187L");
+static SYSCTL_NODE(_hw_usb, OID_AUTO, urtw, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
+    "USB Realtek 8187L");
 #ifdef URTW_DEBUG
 int urtw_debug = 0;
 SYSCTL_INT(_hw_usb_urtw, OID_AUTO, debug, CTLFLAG_RWTUN, &urtw_debug, 0,
@@ -4042,6 +4043,7 @@ urtw_bulk_rx_callback(struct usb_xfer *xfer, usb_error_t error)
 	struct urtw_softc *sc = usbd_xfer_softc(xfer);
 	struct ieee80211com *ic = &sc->sc_ic;
 	struct ieee80211_node *ni;
+	struct epoch_tracker et;
 	struct mbuf *m = NULL;
 	struct urtw_data *data;
 	int8_t nf = -95;
@@ -4085,12 +4087,14 @@ setup:
 			} else
 				ni = NULL;
 
+			NET_EPOCH_ENTER(et);
 			if (ni != NULL) {
 				(void) ieee80211_input(ni, m, rssi, nf);
 				/* node is no longer needed */
 				ieee80211_free_node(ni);
 			} else
 				(void) ieee80211_input_all(ic, m, rssi, nf);
+			NET_EPOCH_EXIT(et);
 			m = NULL;
 		}
 		URTW_LOCK(sc);
@@ -4382,13 +4386,13 @@ urtw_sysctl_node(struct urtw_softc *sc)
 	ctx = device_get_sysctl_ctx(sc->sc_dev);
 	child = SYSCTL_CHILDREN(device_get_sysctl_tree(sc->sc_dev));
 
-	tree = SYSCTL_ADD_NODE(ctx, child, OID_AUTO, "stats", CTLFLAG_RD,
-	    NULL, "URTW statistics");
+	tree = SYSCTL_ADD_NODE(ctx, child, OID_AUTO, "stats",
+	    CTLFLAG_RD | CTLFLAG_MPSAFE, NULL, "URTW statistics");
 	parent = SYSCTL_CHILDREN(tree);
 
 	/* Tx statistics. */
-	tree = SYSCTL_ADD_NODE(ctx, parent, OID_AUTO, "tx", CTLFLAG_RD,
-	    NULL, "Tx MAC statistics");
+	tree = SYSCTL_ADD_NODE(ctx, parent, OID_AUTO, "tx",
+	    CTLFLAG_RD | CTLFLAG_MPSAFE, NULL, "Tx MAC statistics");
 	child = SYSCTL_CHILDREN(tree);
 	URTW_SYSCTL_STAT_ADD32(ctx, child, "1m", &stats->txrates[0],
 	    "1 Mbit/s");

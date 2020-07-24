@@ -47,8 +47,6 @@ __FBSDID("$FreeBSD$");
 
 #include "opt_mac.h"
 
-#define	EXPLICIT_USER_ACCESS
-
 #include <sys/param.h>
 #include <sys/kernel.h>
 #include <sys/lock.h>
@@ -409,7 +407,7 @@ mac_ifnet_ioctl_get(struct ucred *cred, struct ifreq *ifr,
 {
 	char *elements, *buffer;
 	struct label *intlabel;
-	kmac_t mac;
+	struct mac mac;
 	int error, locked;
 
 	if (!(mac_labeled & MPC_OBJECT_IFNET))
@@ -451,7 +449,7 @@ int
 mac_ifnet_ioctl_set(struct ucred *cred, struct ifreq *ifr, struct ifnet *ifp)
 {
 	struct label *intlabel;
-	kmac_t mac;
+	struct mac mac;
 	char *buffer;
 	int error, locked;
 

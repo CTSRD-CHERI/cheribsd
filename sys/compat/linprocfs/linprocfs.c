@@ -422,7 +422,7 @@ linprocfs_domtab(PFS_FILL_ARGS)
 	char *dlep, *flep, *mntto, *mntfrom, *fstype;
 	size_t lep_len;
 	int error;
-	struct statfs * __capability buf
+	struct statfs * __capability buf;
 	struct statfs *sp;
 	size_t count;
 
@@ -1030,23 +1030,16 @@ linprocfs_doprocstatus(PFS_FILL_ARGS)
 static int
 linprocfs_doproccwd(PFS_FILL_ARGS)
 {
-	struct filedesc *fdp;
-	struct vnode *vp;
+	struct pwd *pwd;
 	char *fullpath = "unknown";
 	char *freepath = NULL;
 
-	fdp = p->p_fd;
-	FILEDESC_SLOCK(fdp);
-	vp = fdp->fd_cdir;
-	if (vp != NULL)
-		VREF(vp);
-	FILEDESC_SUNLOCK(fdp);
-	vn_fullpath(td, vp, &fullpath, &freepath);
-	if (vp != NULL)
-		vrele(vp);
+	pwd = pwd_hold(td);
+	vn_fullpath(td, pwd->pwd_cdir, &fullpath, &freepath);
 	sbuf_printf(sb, "%s", fullpath);
 	if (freepath)
 		free(freepath, M_TEMP);
+	pwd_drop(pwd);
 	return (0);
 }
 
@@ -1056,23 +1049,18 @@ linprocfs_doproccwd(PFS_FILL_ARGS)
 static int
 linprocfs_doprocroot(PFS_FILL_ARGS)
 {
-	struct filedesc *fdp;
+	struct pwd *pwd;
 	struct vnode *vp;
 	char *fullpath = "unknown";
 	char *freepath = NULL;
 
-	fdp = p->p_fd;
-	FILEDESC_SLOCK(fdp);
-	vp = jailed(p->p_ucred) ? fdp->fd_jdir : fdp->fd_rdir;
-	if (vp != NULL)
-		VREF(vp);
-	FILEDESC_SUNLOCK(fdp);
+	pwd = pwd_hold(td);
+	vp = jailed(p->p_ucred) ? pwd->pwd_jdir : pwd->pwd_rdir;
 	vn_fullpath(td, vp, &fullpath, &freepath);
-	if (vp != NULL)
-		vrele(vp);
 	sbuf_printf(sb, "%s", fullpath);
 	if (freepath)
 		free(freepath, M_TEMP);
+	pwd_drop(pwd);
 	return (0);
 }
 
@@ -1148,7 +1136,7 @@ linprocfs_doprocmaps(PFS_FILL_ARGS)
 	vm_map_entry_t entry, tmp_entry;
 	vm_object_t obj, tobj, lobj;
 	vm_offset_t e_start, e_end;
-	vm_ooffset_t off = 0;
+	vm_ooffset_t off;
 	vm_prot_t e_prot;
 	unsigned int last_timestamp;
 	char *name = "", *freename = NULL;
@@ -1158,6 +1146,7 @@ linprocfs_doprocmaps(PFS_FILL_ARGS)
 	int error;
 	struct vnode *vp;
 	struct vattr vat;
+	bool private;
 
 	PROC_LOCK(p);
 	error = p_candebug(td, p);
@@ -1188,17 +1177,20 @@ linprocfs_doprocmaps(PFS_FILL_ARGS)
 		e_start = entry->start;
 		e_end = entry->end;
 		obj = entry->object.vm_object;
-		for (lobj = tobj = obj; tobj; tobj = tobj->backing_object) {
+		off = entry->offset;
+		for (lobj = tobj = obj; tobj != NULL;
+		    lobj = tobj, tobj = tobj->backing_object) {
 			VM_OBJECT_RLOCK(tobj);
+			off += lobj->backing_object_offset;
 			if (lobj != obj)
 				VM_OBJECT_RUNLOCK(lobj);
-			lobj = tobj;
 		}
+		private = (entry->eflags & MAP_ENTRY_COW) != 0 || obj == NULL ||
+		    (obj->flags & OBJ_ANON) != 0;
 		last_timestamp = map->timestamp;
 		vm_map_unlock_read(map);
 		ino = 0;
 		if (lobj) {
-			off = IDX_TO_OFF(lobj->size);
 			vp = vm_object_vnode(lobj);
 			if (vp != NULL)
 				vref(vp);
@@ -1235,7 +1227,7 @@ linprocfs_doprocmaps(PFS_FILL_ARGS)
 		    (e_prot & VM_PROT_READ)?"r":"-",
 		    (e_prot & VM_PROT_WRITE)?"w":"-",
 		    (e_prot & VM_PROT_EXECUTE)?"x":"-",
-		    "p",
+		    private ? "p" : "s",
 		    (u_long)off,
 		    0,
 		    0,
@@ -1506,22 +1498,22 @@ linprocfs_dofilesystems(PFS_FILL_ARGS)
 	return(0);
 }
 
-#if 0
 /*
  * Filler function for proc/modules
  */
 static int
 linprocfs_domodules(PFS_FILL_ARGS)
 {
+#if 0
 	struct linker_file *lf;
 
 	TAILQ_FOREACH(lf, &linker_files, link) {
 		sbuf_printf(sb, "%-20s%8lu%4d\n", lf->filename,
 		    (unsigned long)lf->size, lf->refs);
 	}
+#endif
 	return (0);
 }
-#endif
 
 /*
  * Filler function for proc/pid/fd
@@ -1715,10 +1707,8 @@ linprocfs_init(PFS_INIT_ARGS)
 	    NULL, NULL, NULL, PFS_RD);
 	pfs_create_file(root, "meminfo", &linprocfs_domeminfo,
 	    NULL, NULL, NULL, PFS_RD);
-#if 0
 	pfs_create_file(root, "modules", &linprocfs_domodules,
 	    NULL, NULL, NULL, PFS_RD);
-#endif
 	pfs_create_file(root, "mounts", &linprocfs_domtab,
 	    NULL, NULL, NULL, PFS_RD);
 	pfs_create_file(root, "mtab", &linprocfs_domtab,

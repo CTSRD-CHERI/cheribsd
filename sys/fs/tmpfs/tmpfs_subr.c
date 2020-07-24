@@ -68,7 +68,8 @@ __FBSDID("$FreeBSD$");
 #include <fs/tmpfs/tmpfs_fifoops.h>
 #include <fs/tmpfs/tmpfs_vnops.h>
 
-SYSCTL_NODE(_vfs, OID_AUTO, tmpfs, CTLFLAG_RW, 0, "tmpfs file system");
+SYSCTL_NODE(_vfs, OID_AUTO, tmpfs, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
+    "tmpfs file system");
 
 static long tmpfs_pages_reserved = TMPFS_PAGES_MINRESERVED;
 
@@ -160,8 +161,9 @@ sysctl_mem_reserved(SYSCTL_HANDLER_ARGS)
 	return (0);
 }
 
-SYSCTL_PROC(_vfs_tmpfs, OID_AUTO, memory_reserved, CTLTYPE_LONG|CTLFLAG_RW,
-    &tmpfs_pages_reserved, 0, sysctl_mem_reserved, "L",
+SYSCTL_PROC(_vfs_tmpfs, OID_AUTO, memory_reserved,
+    CTLTYPE_LONG|CTLFLAG_MPSAFE|CTLFLAG_RW, &tmpfs_pages_reserved, 0,
+    sysctl_mem_reserved, "L",
     "Amount of available memory and swap below which tmpfs growth stops");
 
 static __inline int tmpfs_dirtree_cmp(struct tmpfs_dirent *a,
@@ -1479,8 +1481,12 @@ retry:
 				    VM_ALLOC_WAITFAIL);
 				if (m == NULL)
 					goto retry;
+				vm_object_pip_add(uobj, 1);
+				VM_OBJECT_WUNLOCK(uobj);
 				rv = vm_pager_get_pages(uobj, &m, 1, NULL,
 				    NULL);
+				VM_OBJECT_WLOCK(uobj);
+				vm_object_pip_wakeup(uobj);
 				if (rv == VM_PAGER_OK) {
 					/*
 					 * Since the page was not resident,
@@ -1490,9 +1496,7 @@ retry:
 					 * current operation is not regarded
 					 * as an access.
 					 */
-					vm_page_lock(m);
 					vm_page_launder(m);
-					vm_page_unlock(m);
 				} else {
 					vm_page_free(m);
 					if (ignerr)
@@ -1505,9 +1509,8 @@ retry:
 			}
 			if (m != NULL) {
 				pmap_zero_page_area(m, base, PAGE_SIZE - base);
-				vm_page_dirty(m);
+				vm_page_set_dirty(m);
 				vm_page_xunbusy(m);
-				vm_pager_page_unswapped(m);
 			}
 		}
 
@@ -1885,13 +1888,6 @@ tmpfs_itimes(struct vnode *vp, const struct timespec *acc,
 
 	/* XXX: FIX? The entropy here is desirable, but the harvesting may be expensive */
 	random_harvest_queue(node, sizeof(*node), RANDOM_FS_ATIME);
-}
-
-void
-tmpfs_update(struct vnode *vp)
-{
-
-	tmpfs_itimes(vp, NULL, NULL);
 }
 
 int

@@ -812,10 +812,10 @@ tftp_xmitfile(int peer, const char *mode)
 	if (debug&DEBUG_SIMPLE)
 		tftp_log(LOG_DEBUG, "Transmitting file");
 
-	read_init(0, file, mode);
+	tftp_read_init(0, file, mode);
 	block = 1;
 	tftp_send(peer, &block, &ts);
-	read_close();
+	tftp_read_close();
 	if (debug&DEBUG_SIMPLE)
 		tftp_log(LOG_INFO, "Sent %jd bytes in %jd seconds",
 		    (intmax_t)ts.amount, (intmax_t)time(NULL) - now);

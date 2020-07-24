@@ -32,8 +32,6 @@
  * Copyright (c) 2015, Joyent, Inc. All rights reserved.
  */
 
-#define	EXPLICIT_USER_ACCESS
-
 #include <sys/atomic.h>
 #include <sys/errno.h>
 #include <sys/stat.h>
@@ -238,7 +236,8 @@ static unsigned long tpoints_hash_size = FASTTRAP_TPOINTS_DEFAULT_SIZE;
 
 #ifdef __FreeBSD__
 SYSCTL_DECL(_kern_dtrace);
-SYSCTL_NODE(_kern_dtrace, OID_AUTO, fasttrap, CTLFLAG_RD, 0, "DTrace fasttrap parameters");
+SYSCTL_NODE(_kern_dtrace, OID_AUTO, fasttrap, CTLFLAG_RD | CTLFLAG_MPSAFE, 0,
+    "DTrace fasttrap parameters");
 SYSCTL_UINT(_kern_dtrace_fasttrap, OID_AUTO, max_probes, CTLFLAG_RWTUN, &fasttrap_max,
     FASTTRAP_MAX_DEFAULT, "Maximum number of fasttrap probes");
 SYSCTL_ULONG(_kern_dtrace_fasttrap, OID_AUTO, tpoints_hash_size, CTLFLAG_RDTUN, &tpoints_hash_size,
@@ -2248,13 +2247,13 @@ fasttrap_ioctl(struct cdev *dev, u_long cmd, caddr_t arg, int fflag,
 		size_t size;
 		int ret, err;
 
-#ifdef COMPAT_CHERIABI
-		if (SV_PROC_FLAG(td->td_proc, SV_CHERI))
-			uprobe = *(fasttrap_probe_spec_t * __capability *)arg;
+#if __has_feature(capabilities)
+		if (!SV_PROC_FLAG(td->td_proc, SV_CHERI))
+			uprobe = __USER_CAP(*(uint64_t *)arg,
+			    sizeof(fasttrap_probe_spec_t));
 		else
 #endif
-			uprobe = __USER_CAP(*(void **)arg,
-			    sizeof(fasttrap_probe_spec_t));
+			uprobe = *(fasttrap_probe_spec_t * __capability *)arg;
 		if (copyin(&uprobe->ftps_noffs, &noffs,
 		    sizeof (uprobe->ftps_noffs)))
 			return (EFAULT);

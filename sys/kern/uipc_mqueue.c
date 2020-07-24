@@ -55,8 +55,6 @@ __FBSDID("$FreeBSD$");
 
 #include "opt_capsicum.h"
 
-#define	EXPLICIT_USER_ACCESS
-
 #include <sys/param.h>
 #include <sys/kernel.h>
 #include <sys/systm.h>
@@ -171,7 +169,7 @@ struct mqueue;
 
 struct mqueue_notifier {
 	LIST_ENTRY(mqueue_notifier)	nt_link;
-	ksigevent_t			nt_sigev;
+	struct sigevent			nt_sigev;
 	ksiginfo_t			nt_ksi;
 	struct proc			*nt_proc;
 };
@@ -201,7 +199,7 @@ struct mqueue_msg {
 	/* following real data... */
 };
 
-static SYSCTL_NODE(_kern, OID_AUTO, mqueue, CTLFLAG_RW, 0,
+static SYSCTL_NODE(_kern, OID_AUTO, mqueue, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
 	"POSIX real time message queue");
 
 static int	default_maxmsg  = 10;
@@ -743,7 +741,7 @@ do_recycle(void *context, int pending __unused)
 
 	vn_lock(vp, LK_EXCLUSIVE | LK_RETRY);
 	vrecycle(vp);
-	VOP_UNLOCK(vp, 0);
+	VOP_UNLOCK(vp);
 	vdrop(vp);
 }
 
@@ -911,7 +909,7 @@ mqfs_lookupx(struct vop_cachedlookup_args *ap)
 			return (EIO);
 		if ((flags & ISLASTCN) && nameiop != LOOKUP)
 			return (EINVAL);
-		VOP_UNLOCK(dvp, 0);
+		VOP_UNLOCK(dvp);
 		KASSERT(pd->mn_parent, ("non-root directory has no parent"));
 		pn = pd->mn_parent;
 		error = mqfs_allocv(dvp->v_mount, vpp, pn);
@@ -2386,7 +2384,7 @@ out:
 }
 
 static int
-kern_kmq_notify(struct thread *td, int mqd, ksigevent_t *sigev)
+kern_kmq_notify(struct thread *td, int mqd, struct sigevent *sigev)
 {
 	struct filedesc *fdp;
 	struct proc *p;
@@ -2491,17 +2489,15 @@ out:
 int
 sys_kmq_notify(struct thread *td, struct kmq_notify_args *uap)
 {
-	struct sigevent_native ev_n;
-	ksigevent_t ev, *evp;
+	struct sigevent ev, *evp;
 	int error;
 
 	if (uap->sigev == NULL) {
 		evp = NULL;
 	} else {
-		error = copyin(uap->sigev, &ev_n, sizeof(ev));
+		error = copyincap(uap->sigev, &ev, sizeof(ev));
 		if (error != 0)
 			return (error);
-		convert_sigevent(&ev_n, &ev);
 		evp = &ev;
 	}
 	return (kern_kmq_notify(td, uap->mqd, evp));
@@ -2734,6 +2730,7 @@ static struct fileops mqueueops = {
 	.fo_chown		= mqf_chown,
 	.fo_sendfile		= invfo_sendfile,
 	.fo_fill_kinfo		= mqf_fill_kinfo,
+	.fo_flags		= DFLAG_PASSABLE,
 };
 
 static struct vop_vector mqfs_vnodeops = {
@@ -2755,6 +2752,7 @@ static struct vop_vector mqfs_vnodeops = {
 	.vop_mkdir		= VOP_EOPNOTSUPP,
 	.vop_rmdir		= VOP_EOPNOTSUPP
 };
+VFS_VOP_VECTOR_REGISTER(mqfs_vnodeops);
 
 static struct vfsops mqfs_vfsops = {
 	.vfs_init 		= mqfs_init,
@@ -2919,7 +2917,7 @@ out:
 int
 freebsd32_kmq_notify(struct thread *td, struct freebsd32_kmq_notify_args *uap)
 {
-	ksigevent_t ev, *evp;
+	struct sigevent ev, *evp;
 	struct sigevent32 ev32;
 	int error;
 
@@ -2996,13 +2994,13 @@ cheriabi_kmq_timedreceive(struct thread *td,
 int
 cheriabi_kmq_notify(struct thread *td, struct cheriabi_kmq_notify_args *uap)
 {
-	struct sigevent_c ev, *evp;
+	struct sigevent ev, *evp;
 	int error;
 
 	if (uap->sigev == NULL) {
 		evp = NULL;
 	} else {
-		error = copyin(uap->sigev, &ev, sizeof(ev));
+		error = copyincap(uap->sigev, &ev, sizeof(ev));
 		if (error != 0)
 			return (error);
 		evp = &ev;

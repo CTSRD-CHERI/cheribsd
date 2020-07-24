@@ -34,7 +34,7 @@
 #include <sys/cdefs.h>
 #include <sys/types.h>
 
-#include <machine/cherireg.h>	/* Permission definitions. */
+#include <cheri/cherireg.h>	/* Permission definitions. */
 
 #if __has_feature(capabilities) || defined(__CHERI__)
 
@@ -43,9 +43,11 @@
  * CHERI-aware Clang/LLVM, and full capability context switching.
  */
 #define	cheri_getlen(x)		__builtin_cheri_length_get((x))
+#define	cheri_getlength(x)	__builtin_cheri_length_get((x))
 #define	cheri_getbase(x)	__builtin_cheri_base_get((x))
 #define	cheri_getoffset(x)	__builtin_cheri_offset_get((x))
 #define	cheri_getaddress(x)	__builtin_cheri_address_get((x))
+#define	cheri_getflags(x)	__builtin_cheri_flags_get((x))
 #define	cheri_getperm(x)	__builtin_cheri_perms_get((x))
 #define	cheri_getsealed(x)	__builtin_cheri_sealed_get((x))
 #define	cheri_gettag(x)		__builtin_cheri_tag_get((x))
@@ -57,35 +59,27 @@
 #define	cheri_incoffset(x, y)	__builtin_cheri_offset_increment((x), (y))
 #define	cheri_setoffset(x, y)	__builtin_cheri_offset_set((x), (y))
 #define	cheri_setaddress(x, y)	__builtin_cheri_address_set((x), (y))
+#define	cheri_setflags(x, y)	__builtin_cheri_flags_set((x), (y))
 
 #define	cheri_seal(x, y)	__builtin_cheri_seal((x), (y))
 #define	cheri_unseal(x, y)	__builtin_cheri_unseal((x), (y))
-
-#define	cheri_getcause()	__builtin_mips_cheri_get_cause()
-#define	cheri_setcause(x)	__builtin_mips_cheri_set_cause(x)
 
 #define	cheri_ccheckperm(c, p)	__builtin_cheri_perms_check((c), (p))
 #define	cheri_cchecktype(c, t)	__builtin_cheri_type_check((c), (t))
 
 #define	cheri_getdefault()	__builtin_cheri_global_data_get()
-#define	cheri_getidc()		__builtin_mips_cheri_get_invoke_data_cap()
-#define	cheri_getkr1c()		__builtin_mips_cheri_get_kernel_cap1()
-#define	cheri_getkr2c()		__builtin_mips_cheri_get_kernel_cap2()
-#define	cheri_getkcc()		__builtin_mips_cheri_get_kernel_code_cap()
-#define	cheri_getkdc()		__builtin_mips_cheri_get_kernel_data_cap()
-#define	cheri_getepcc()		__builtin_mips_cheri_get_exception_program_counter_cap()
 #define	cheri_getpcc()		__builtin_cheri_program_counter_get()
 #define	cheri_getstack()	__builtin_cheri_stack_get()
 
 #define	cheri_local(c)		cheri_andperm((c), ~CHERI_PERM_GLOBAL)
 
-#define	cheri_csetbounds(x, y)	__builtin_cheri_bounds_set((x), (y))
-#define	cheri_csetboundsexact(x, y)	__builtin_cheri_bounds_set_exact((x), (y))
-/* XXXAR: shouldn't this be the default and we add cheri_csetbounds_untyped? */
-#define	cheri_csetbounds_changetype(type, x, y)	\
-	(type)cheri_csetbounds((x), (y)))
-#define	cheri_csetbounds_sametype(x, y)	\
-	((__typeof__(x))cheri_csetbounds((x), (y)))
+#define	cheri_setbounds(x, y)	__builtin_cheri_bounds_set((x), (y))
+#define	cheri_setboundsexact(x, y)	__builtin_cheri_bounds_set_exact((x), (y))
+/* XXXAR: shouldn't this be the default and we add cheri_setbounds_untyped? */
+#define	cheri_setbounds_changetype(type, x, y)	\
+	(type)cheri_setbounds((x), (y)))
+#define	cheri_setbounds_sametype(x, y)	\
+	((__typeof__(x))cheri_setbounds((x), (y)))
 
 /* Create an untagged capability from an integer */
 #define cheri_fromint(x)	cheri_incoffset(NULL, x)
@@ -139,7 +133,7 @@ cheri_codeptr(const void *ptr, size_t len)
 #endif
 
 	/* Assume CFromPtr without base set, availability of CSetBounds. */
-	return (cheri_csetbounds(c, len));
+	return (cheri_setbounds(c, len));
 }
 
 static __inline void * __capability
@@ -155,7 +149,7 @@ cheri_ptr(const void *ptr, size_t len)
 {
 
 	/* Assume CFromPtr without base set, availability of CSetBounds. */
-	return (cheri_csetbounds((__cheri_tocap const void * __capability)ptr, len));
+	return (cheri_setbounds((__cheri_tocap const void * __capability)ptr, len));
 }
 
 static __inline void * __capability
@@ -188,7 +182,7 @@ cheri_maketype(void * __capability root_type, register_t type)
 
 	c = root_type;
 	c = cheri_setoffset(c, type);	/* Set type as desired. */
-	c = cheri_csetbounds(c, 1);	/* ISA implies length of 1. */
+	c = cheri_setbounds(c, 1);	/* ISA implies length of 1. */
 	c = cheri_andperm(c, CHERI_PERM_GLOBAL | CHERI_PERM_SEAL); /* Perms. */
 	return (c);
 }
@@ -239,11 +233,12 @@ cheri_bytes_remaining(const void * __capability cap)
 #define cheri_cap_to_typed_ptr(cap, type)				\
 	(type *)cheri_cap_to_ptr(cap, sizeof(type))
 
-#define _CHERI_PRINTF_CAP_FMT  "v:%lu s:%lu p:%08lx b:%016jx l:%016zx o:%jx t:%ld"
+#define _CHERI_PRINTF_CAP_FMT  "v:%lu s:%lu p:%08lx f:%01lx b:%016jx l:%016zx o:%jx t:%ld"
 #define _CHERI_PRINTF_CAP_ARG(ptr)					\
 	    (unsigned long)cheri_gettag((const void * __capability)(ptr)),		\
 	    (unsigned long)cheri_getsealed((const void * __capability)(ptr)),		\
 	    cheri_getperm((const void * __capability)(ptr)),		\
+	    cheri_getflags((const void * __capability)(ptr)),		\
 	    cheri_getbase((const void * __capability)(ptr)),		\
 	    cheri_getlen((const void * __capability)(ptr)),		\
 	    cheri_getoffset((const void * __capability)(ptr)),		\
@@ -309,14 +304,11 @@ __cheri_clear_low_ptr_bits(uintptr_t ptr, size_t bits_mask) {
 
 /* Turn on the checking by default for now (until we have fixed everything)*/
 #define __check_low_ptr_bits_assignment
-#if defined(_KERNEL) /* Don't pull in assert.h when building the kernel */
+#if defined(_KERNEL) || !defined(assert) /* Don't pull in assert.h when building the kernel */
 #define _cheri_bits_assert(e) (void)0
 #endif
 #ifdef __check_low_ptr_bits_assignment
 #ifndef _cheri_bits_assert
-#ifndef assert
-#include <assert.h>
-#endif
 #define _cheri_bits_assert(e) assert(e)
 #endif
 #define __runtime_assert_sensible_low_bits(bits)                               \

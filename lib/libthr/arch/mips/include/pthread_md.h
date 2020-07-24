@@ -49,9 +49,6 @@
 #define	_PTHREAD_MD_H_
 
 #include <sys/types.h>
-#ifdef __CHERI_PURE_CAPABILITY__
-#include <cheri/cheric.h>
-#endif
 #include <machine/sysarch.h>
 #include <machine/tls.h>
 #include <stddef.h>
@@ -101,7 +98,7 @@ _tcb_get(void)
 static __inline struct tcb *
 _tcb_get(void)
 {
-#ifdef __CHERI_CAPABILITY_TLS__
+#ifdef __CHERI_PURE_CAPABILITY__
 	uintcap_t _rv;
 
 	__asm__ __volatile__ (
@@ -125,12 +122,7 @@ _tcb_get(void)
 	 * pointer via sysarch() (in theory).  Of course, this may go away
 	 * once the TLS code is rewritten.
 	 */
-#if !defined(__CHERI_PURE_CAPABILITY__) || defined(__CHERI_CAPABILITY_TLS__)
 	return (struct tcb *)(_rv - TLS_TP_OFFSET - TLS_TCB_SIZE);
-#else
-	return (struct tcb *)cheri_setaddress(cheri_getdefault(),
-	    _rv - TLS_TP_OFFSET - TLS_TCB_SIZE);
-#endif
 }
 #  else /* mips 32 */
 static __inline struct tcb *

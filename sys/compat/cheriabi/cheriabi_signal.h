@@ -46,6 +46,5 @@ struct sigaltstack_c {
 	size_t		ss_size;	/* signal stack length */
 	int		ss_flags;	/* SS_DISABLE and/or SS_ONSTACK */
 };
-typedef struct sigaltstack_c cheriabi_stack_t;
 
 #endif /* _COMPAT_CHERIABI_CHERIABI_SIGNAL_H_ */

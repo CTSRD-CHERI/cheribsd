@@ -45,6 +45,7 @@ __FBSDID("$FreeBSD$");
 
 #include <sys/param.h>
 #include <sys/boot.h>
+#include <sys/elf.h>
 #include <sys/jail.h>
 #include <sys/kernel.h>
 #include <sys/limits.h>
@@ -55,43 +56,44 @@ __FBSDID("$FreeBSD$");
 #include <sys/sbuf.h>
 #include <sys/smp.h>
 #include <sys/sx.h>
+#include <sys/sysent.h>
 #include <sys/vmmeter.h>
 #include <sys/sysctl.h>
 #include <sys/systm.h>
 #include <sys/unistd.h>
 
-SYSCTL_ROOT_NODE(0,	  sysctl, CTLFLAG_RW, 0,
-	"Sysctl internal magic");
-SYSCTL_ROOT_NODE(CTL_KERN,	  kern,   CTLFLAG_RW|CTLFLAG_CAPRD, 0,
-	"High kernel, proc, limits &c");
-SYSCTL_ROOT_NODE(CTL_VM,	  vm,     CTLFLAG_RW, 0,
-	"Virtual memory");
-SYSCTL_ROOT_NODE(CTL_VFS,	  vfs,     CTLFLAG_RW, 0,
-	"File system");
-SYSCTL_ROOT_NODE(CTL_NET,	  net,    CTLFLAG_RW, 0,
-	"Network, (see socket.h)");
-SYSCTL_ROOT_NODE(CTL_DEBUG,  debug,  CTLFLAG_RW, 0,
-	"Debugging");
-SYSCTL_NODE(_debug, OID_AUTO,  sizeof,  CTLFLAG_RW, 0,
-	"Sizeof various things");
-SYSCTL_ROOT_NODE(CTL_HW,	  hw,     CTLFLAG_RW, 0,
-	"hardware");
-SYSCTL_ROOT_NODE(CTL_MACHDEP, machdep, CTLFLAG_RW, 0,
-	"machine dependent");
-SYSCTL_NODE(_machdep, OID_AUTO, mitigations, CTLFLAG_RW, 0,
-	"Machine dependent platform mitigations.");
-SYSCTL_ROOT_NODE(CTL_USER,	  user,   CTLFLAG_RW, 0,
-	"user-level");
-SYSCTL_ROOT_NODE(CTL_P1003_1B,  p1003_1b,   CTLFLAG_RW, 0,
-	"p1003_1b, (see p1003_1b.h)");
+SYSCTL_ROOT_NODE(0, sysctl, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
+    "Sysctl internal magic");
+SYSCTL_ROOT_NODE(CTL_KERN, kern, CTLFLAG_RW | CTLFLAG_CAPRD | CTLFLAG_MPSAFE, 0,
+    "High kernel, proc, limits &c");
+SYSCTL_ROOT_NODE(CTL_VM, vm, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
+    "Virtual memory");
+SYSCTL_ROOT_NODE(CTL_VFS, vfs, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
+    "File system");
+SYSCTL_ROOT_NODE(CTL_NET, net, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
+    "Network, (see socket.h)");
+SYSCTL_ROOT_NODE(CTL_DEBUG, debug, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
+    "Debugging");
+SYSCTL_NODE(_debug, OID_AUTO,  sizeof,  CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
+    "Sizeof various things");
+SYSCTL_ROOT_NODE(CTL_HW, hw, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
+    "hardware");
+SYSCTL_ROOT_NODE(CTL_MACHDEP, machdep, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
+    "machine dependent");
+SYSCTL_NODE(_machdep, OID_AUTO, mitigations, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
+    "Machine dependent platform mitigations.");
+SYSCTL_ROOT_NODE(CTL_USER, user, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
+    "user-level");
+SYSCTL_ROOT_NODE(CTL_P1003_1B, p1003_1b, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
+    "p1003_1b, (see p1003_1b.h)");
 
-SYSCTL_ROOT_NODE(OID_AUTO,  compat, CTLFLAG_RW, 0,
-	"Compatibility code");
-SYSCTL_ROOT_NODE(OID_AUTO, security, CTLFLAG_RW, 0, 
-     	"Security");
+SYSCTL_ROOT_NODE(OID_AUTO, compat, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
+    "Compatibility code");
+SYSCTL_ROOT_NODE(OID_AUTO, security, CTLFLAG_RW | CTLFLAG_MPSAFE, 0, 
+    "Security");
 #ifdef REGRESSION
-SYSCTL_ROOT_NODE(OID_AUTO, regression, CTLFLAG_RW, 0,
-     "Regression test MIB");
+SYSCTL_ROOT_NODE(OID_AUTO, regression, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
+    "Regression test MIB");
 #endif
 
 SYSCTL_STRING(_kern, OID_AUTO, ident, CTLFLAG_RD|CTLFLAG_MPSAFE,
@@ -182,8 +184,9 @@ sysctl_hw_physmem(SYSCTL_HANDLER_ARGS)
 	val = ctob(p);
 	return (sysctl_handle_long(oidp, &val, 0, req));
 }
-SYSCTL_PROC(_hw, HW_PHYSMEM, physmem, CTLTYPE_ULONG | CTLFLAG_RD,
-    0, 0, sysctl_hw_physmem, "LU",
+SYSCTL_PROC(_hw, HW_PHYSMEM, physmem,
+    CTLTYPE_ULONG | CTLFLAG_RD | CTLFLAG_MPSAFE, 0, 0,
+    sysctl_hw_physmem, "LU",
     "Amount of physical memory (in bytes)");
 
 static int
@@ -197,8 +200,9 @@ sysctl_hw_realmem(SYSCTL_HANDLER_ARGS)
 	val = ctob(p);
 	return (sysctl_handle_long(oidp, &val, 0, req));
 }
-SYSCTL_PROC(_hw, HW_REALMEM, realmem, CTLTYPE_ULONG | CTLFLAG_RD,
-    0, 0, sysctl_hw_realmem, "LU",
+SYSCTL_PROC(_hw, HW_REALMEM, realmem,
+    CTLTYPE_ULONG | CTLFLAG_RD | CTLFLAG_MPSAFE, 0, 0,
+    sysctl_hw_realmem, "LU",
     "Amount of memory (in bytes) reported by the firmware");
 
 static int
@@ -213,8 +217,9 @@ sysctl_hw_usermem(SYSCTL_HANDLER_ARGS)
 	val = ctob(p);
 	return (sysctl_handle_long(oidp, &val, 0, req));
 }
-SYSCTL_PROC(_hw, HW_USERMEM, usermem, CTLTYPE_ULONG | CTLFLAG_RD,
-    0, 0, sysctl_hw_usermem, "LU",
+SYSCTL_PROC(_hw, HW_USERMEM, usermem,
+    CTLTYPE_ULONG | CTLFLAG_RD | CTLFLAG_MPSAFE, 0, 0,
+    sysctl_hw_usermem, "LU",
     "Amount of memory (in bytes) which is not wired");
 
 SYSCTL_LONG(_hw, OID_AUTO, availpages, CTLFLAG_RD, &physmem, 0,
@@ -226,6 +231,7 @@ static int
 sysctl_hw_pagesizes(SYSCTL_HANDLER_ARGS)
 {
 	int error;
+	size_t len;
 #ifdef SCTL_MASK32
 	int i;
 	uint32_t pagesizes32[MAXPAGESIZES];
@@ -238,48 +244,68 @@ sysctl_hw_pagesizes(SYSCTL_HANDLER_ARGS)
 		for (i = 0; i < MAXPAGESIZES; i++)
 			pagesizes32[i] = (uint32_t)pagesizes[i];
 
-		error = SYSCTL_OUT(req, pagesizes32, sizeof(pagesizes32));
+		len = sizeof(pagesizes32);
+		if (len > req->oldlen)
+			len = req->oldlen;
+		error = SYSCTL_OUT(req, pagesizes32, len);
 	} else
 #endif
-		error = SYSCTL_OUT(req, pagesizes, sizeof(pagesizes));
+	{
+		len = sizeof(pagesizes);
+		if (len > req->oldlen)
+			len = req->oldlen;
+		error = SYSCTL_OUT(req, pagesizes, len);
+	}
 	return (error);
 }
-SYSCTL_PROC(_hw, OID_AUTO, pagesizes, CTLTYPE_ULONG | CTLFLAG_RD,
-    NULL, 0, sysctl_hw_pagesizes, "LU", "Supported page sizes");
+SYSCTL_PROC(_hw, OID_AUTO, pagesizes,
+    CTLTYPE_ULONG | CTLFLAG_RD | CTLFLAG_MPSAFE, NULL, 0, 
+    sysctl_hw_pagesizes, "LU",
+    "Supported page sizes");
 
-#ifdef SCTL_MASK32
 int adaptive_machine_arch = 1;
 SYSCTL_INT(_debug, OID_AUTO, adaptive_machine_arch, CTLFLAG_RW,
     &adaptive_machine_arch, 1,
     "Adapt reported machine architecture to the ABI of the binary");
+
+static const char *
+proc_machine_arch(struct proc *p)
+{
+
+	if (p->p_sysent->sv_machine_arch != NULL)
+		return (p->p_sysent->sv_machine_arch(p));
+#ifdef COMPAT_FREEBSD32
+	if (SV_PROC_FLAG(p, SV_ILP32))
+		return (MACHINE_ARCH32);
 #endif
+	return (MACHINE_ARCH);
+}
 
 static int
 sysctl_hw_machine_arch(SYSCTL_HANDLER_ARGS)
 {
-	int error;
-	static const char machine_arch[] = MACHINE_ARCH;
-#ifdef SCTL_MASK32
-	static const char machine_arch32[] = MACHINE_ARCH32;
+	const char *machine_arch;
 
-	if ((req->flags & SCTL_MASK32) != 0 && adaptive_machine_arch)
-		error = SYSCTL_OUT(req, machine_arch32, sizeof(machine_arch32));
+	if (adaptive_machine_arch)
+		machine_arch = proc_machine_arch(curproc);
 	else
-#endif
-		error = SYSCTL_OUT(req, machine_arch, sizeof(machine_arch));
-	return (error);
-
+		machine_arch = MACHINE_ARCH;
+	return (SYSCTL_OUT(req, machine_arch, strlen(machine_arch) + 1));
 }
 SYSCTL_PROC(_hw, HW_MACHINE_ARCH, machine_arch, CTLTYPE_STRING | CTLFLAG_RD |
     CTLFLAG_MPSAFE, NULL, 0, sysctl_hw_machine_arch, "A",
     "System architecture");
 
-SYSCTL_STRING(_kern, OID_AUTO, supported_archs, CTLFLAG_RD | CTLFLAG_MPSAFE,
+#ifndef MACHINE_ARCHES
 #ifdef COMPAT_FREEBSD32
-    MACHINE_ARCH " " MACHINE_ARCH32, 0, "Supported architectures for binaries");
+#define	MACHINE_ARCHES	MACHINE_ARCH " " MACHINE_ARCH32
 #else
-    MACHINE_ARCH, 0, "Supported architectures for binaries");
+#define	MACHINE_ARCHES	MACHINE_ARCH
 #endif
+#endif
+
+SYSCTL_STRING(_kern, OID_AUTO, supported_archs, CTLFLAG_RD | CTLFLAG_MPSAFE,
+    MACHINE_ARCHES, 0, "Supported architectures for binaries");
 
 static int
 sysctl_hostname(SYSCTL_HANDLER_ARGS)
@@ -393,8 +419,9 @@ sysctl_kern_securelvl(SYSCTL_HANDLER_ARGS)
 }
 
 SYSCTL_PROC(_kern, KERN_SECURELVL, securelevel,
-    CTLTYPE_INT|CTLFLAG_RW|CTLFLAG_PRISON, 0, 0, sysctl_kern_securelvl,
-    "I", "Current secure level");
+    CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_PRISON | CTLFLAG_MPSAFE, 0, 0,
+    sysctl_kern_securelvl, "I",
+    "Current secure level");
 
 #ifdef INCLUDE_CONFIG_FILE
 /* Actual kernel configuration options. */
@@ -441,6 +468,32 @@ sysctl_hostid(SYSCTL_HANDLER_ARGS)
 SYSCTL_PROC(_kern, KERN_HOSTID, hostid,
     CTLTYPE_ULONG | CTLFLAG_RW | CTLFLAG_PRISON | CTLFLAG_MPSAFE | CTLFLAG_CAPRD,
     NULL, 0, sysctl_hostid, "LU", "Host ID");
+
+static struct mtx bootid_lk;
+MTX_SYSINIT(bootid_lock, &bootid_lk, "bootid generator lock", MTX_DEF);
+
+static int
+sysctl_bootid(SYSCTL_HANDLER_ARGS)
+{
+	static uint8_t boot_id[16];
+	static bool initialized = false;
+
+	mtx_lock(&bootid_lk);
+	if (!initialized) {
+		if (!is_random_seeded()) {
+			mtx_unlock(&bootid_lk);
+			return (ENXIO);
+		}
+		arc4random_buf(boot_id, sizeof(boot_id));
+		initialized = true;
+	}
+	mtx_unlock(&bootid_lk);
+
+	return (SYSCTL_OUT(req, boot_id, sizeof(boot_id)));
+}
+SYSCTL_PROC(_kern, OID_AUTO, boot_id,
+    CTLTYPE_STRUCT | CTLFLAG_RD | CTLFLAG_MPSAFE | CTLFLAG_CAPRD,
+    NULL, 0, sysctl_bootid, "", "Random boot ID");
 
 /*
  * The osrelease string is copied from the global (osrelease in vers.c) into
@@ -518,7 +571,6 @@ sysctl_build_id(SYSCTL_HANDLER_ARGS)
 		return (ENOENT);
 	}
 
-
 	hashlen = sectionlen - BUILD_ID_HEADER_LEN;
 	for (int i = 0; i < hashlen; i++) {
 		uint8_t c = __build_id_start[i+BUILD_ID_HEADER_LEN];
@@ -532,7 +584,8 @@ SYSCTL_PROC(_kern, OID_AUTO, build_id,
     CTLTYPE_STRING | CTLFLAG_CAPRD | CTLFLAG_RD | CTLFLAG_MPSAFE,
     NULL, 0, sysctl_build_id, "A", "Operating system build-id");
 
-SYSCTL_NODE(_kern, OID_AUTO, features, CTLFLAG_RD, 0, "Kernel Features");
+SYSCTL_NODE(_kern, OID_AUTO, features, CTLFLAG_RD | CTLFLAG_MPSAFE, 0,
+    "Kernel Features");
 
 #ifdef COMPAT_FREEBSD4
 FEATURE(compat_freebsd4, "Compatible with FreeBSD 4");

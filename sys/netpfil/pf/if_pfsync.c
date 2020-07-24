@@ -66,8 +66,6 @@ __FBSDID("$FreeBSD$");
 #include "opt_inet6.h"
 #include "opt_pf.h"
 
-#define	EXPLICIT_USER_ACCESS
-
 #include <sys/param.h>
 #include <sys/bus.h>
 #include <sys/endian.h>
@@ -275,7 +273,8 @@ static void	pfsync_uninit(void);
 
 static unsigned long pfsync_buckets;
 
-SYSCTL_NODE(_net, OID_AUTO, pfsync, CTLFLAG_RW, 0, "PFSYNC");
+SYSCTL_NODE(_net, OID_AUTO, pfsync, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
+    "PFSYNC");
 SYSCTL_STRUCT(_net_pfsync, OID_AUTO, stats, CTLFLAG_VNET | CTLFLAG_RW,
     &VNET_NAME(pfsyncstats), pfsyncstats,
     "PFSYNC statistics (struct pfsyncstats, net/if_pfsync.h)");
@@ -1809,6 +1808,7 @@ pfsync_undefer(struct pfsync_deferral *pd, int drop)
 static void
 pfsync_defer_tmo(void *arg)
 {
+	struct epoch_tracker et;
 	struct pfsync_deferral *pd = arg;
 	struct pfsync_softc *sc = pd->pd_sc;
 	struct mbuf *m = pd->pd_m;
@@ -1817,6 +1817,7 @@ pfsync_defer_tmo(void *arg)
 
 	PFSYNC_BUCKET_LOCK_ASSERT(b);
 
+	NET_EPOCH_ENTER(et);
 	CURVNET_SET(m->m_pkthdr.rcvif->if_vnet);
 
 	TAILQ_REMOVE(&b->b_deferrals, pd, pd_entry);
@@ -1831,6 +1832,7 @@ pfsync_defer_tmo(void *arg)
 	pf_release_state(st);
 
 	CURVNET_RESTORE();
+	NET_EPOCH_EXIT(et);
 }
 
 static void
@@ -2310,11 +2312,13 @@ pfsync_push_all(struct pfsync_softc *sc)
 static void
 pfsyncintr(void *arg)
 {
+	struct epoch_tracker et;
 	struct pfsync_softc *sc = arg;
 	struct pfsync_bucket *b;
 	struct mbuf *m, *n;
 	int c;
 
+	NET_EPOCH_ENTER(et);
 	CURVNET_SET(sc->sc_ifp->if_vnet);
 
 	for (c = 0; c < pfsync_buckets; c++) {
@@ -2348,6 +2352,7 @@ pfsyncintr(void *arg)
 		}
 	}
 	CURVNET_RESTORE();
+	NET_EPOCH_EXIT(et);
 }
 
 static int

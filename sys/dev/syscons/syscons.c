@@ -65,8 +65,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/power.h>
 
 #include <machine/clock.h>
-#if defined(__arm__) || defined(__mips__) || defined(__powerpc__) || \
-    defined(__sparc64__)
+#if defined(__arm__) || defined(__mips__) || defined(__powerpc__)
 #include <machine/sc_machdep.h>
 #else
 #include <machine/pc/display.h>
@@ -147,8 +146,11 @@ static int sc_no_suspend_vtswitch = 0;
 #endif
 static int sc_susp_scr;
 
-static SYSCTL_NODE(_hw, OID_AUTO, syscons, CTLFLAG_RD, 0, "syscons");
-static SYSCTL_NODE(_hw_syscons, OID_AUTO, saver, CTLFLAG_RD, 0, "saver");
+static SYSCTL_NODE(_hw, OID_AUTO, syscons, CTLFLAG_RD | CTLFLAG_MPSAFE, 0,
+    "syscons");
+static SYSCTL_NODE(_hw_syscons, OID_AUTO, saver,
+    CTLFLAG_RD | CTLFLAG_MPSAFE, 0,
+    "saver");
 SYSCTL_INT(_hw_syscons_saver, OID_AUTO, keybonly, CTLFLAG_RW,
     &sc_saver_keyb_only, 0, "screen saver interrupted by input only");
 SYSCTL_INT(
@@ -536,10 +538,8 @@ sc_set_vesa_mode(scr_stat *scp, sc_softc_t *sc, int unit)
 	scp->end = 0;
 	scp->cursor_pos = scp->cursor_oldpos = scp->xsize * scp->xsize;
 	scp->mode = sc->initial_mode = vmode;
-#ifndef __sparc64__
 	sc_vtb_init(&scp->scr, VTB_FRAMEBUFFER, scp->xsize, scp->ysize,
 	    (void *)sc->adp->va_window, FALSE);
-#endif
 	sc_alloc_scr_buffer(scp, FALSE, FALSE);
 	sc_init_emulator(scp, NULL);
 #ifndef SC_NO_CUTPASTE
@@ -635,8 +635,8 @@ sc_attach_unit(int unit, int flags)
 		printf("%s%d:", SC_DRIVER_NAME, unit);
 		if (sc->adapter >= 0)
 			printf(" fb%d", sc->adapter);
-		if (sc->keyboard >= 0)
-			printf(", kbd%d", sc->keyboard);
+		if (sc->kbd != NULL)
+			printf(", kbd%d", sc->kbd->kb_index);
 		if (scp->tsw)
 			printf(", terminal emulator: %s (%s)",
 			    scp->tsw->te_name, scp->tsw->te_desc);
@@ -725,9 +725,7 @@ sctty_open(struct tty *tp)
 	int unit = scdevtounit(tp);
 	sc_softc_t *sc;
 	scr_stat *scp;
-#ifndef __sparc64__
 	keyarg_t key;
-#endif
 
 	DPRINTF(5,
 	    ("scopen: dev:%s, unit:%d, vty:%d\n", devtoname(tp->t_dev), unit,
@@ -741,13 +739,11 @@ sctty_open(struct tty *tp)
 	if (!tty_opened(tp)) {
 		/* Use the current setting of the <-- key as default VERASE. */
 		/* If the Delete key is preferable, an stty is necessary     */
-#ifndef __sparc64__
 		if (sc->kbd != NULL) {
 			key.keynum = KEYCODE_BS;
 			(void)kbdd_ioctl(sc->kbd, GIO_KEYMAPENT, (caddr_t)&key);
 			tp->t_termios.c_cc[VERASE] = key.key.map[0];
 		}
-#endif
 	}
 
 	scp = sc_get_stat(tp);
@@ -789,9 +785,7 @@ sctty_close(struct tty *tp)
 			scp->smode.mode = VT_AUTO;
 		} else {
 			sc_vtb_destroy(&scp->vtb);
-#ifndef __sparc64__
 			sc_vtb_destroy(&scp->scr);
-#endif
 			sc_free_history_buffer(scp, scp->ysize);
 			SC_STAT(tp) = NULL;
 			free(scp, M_DEVBUF);
@@ -838,8 +832,7 @@ sckbdevent(keyboard_t *thiskbd, int event, void *arg)
 		break;
 	case KBDIO_UNLOADING:
 		sc->kbd = NULL;
-		sc->keyboard = -1;
-		kbd_release(thiskbd, (void *)&sc->keyboard);
+		kbd_release(thiskbd, (void *)&sc->kbd);
 		goto done;
 	default:
 		error = EINVAL;
@@ -1523,17 +1516,16 @@ sctty_ioctl(struct tty *tp, u_long cmd, caddr_t data, struct thread *td)
 		error = 0;
 		if (sc->kbd != newkbd) {
 			i = kbd_allocate(newkbd->kb_name, newkbd->kb_unit,
-			    (void *)&sc->keyboard, sckbdevent, sc);
+			    (void *)&sc->kbd, sckbdevent, sc);
 			/* i == newkbd->kb_index */
 			if (i >= 0) {
 				if (sc->kbd != NULL) {
 					save_kbd_state(sc->cur_scp);
 					kbd_release(
-					    sc->kbd, (void *)&sc->keyboard);
+					    sc->kbd, (void *)&sc->kbd);
 				}
 				sc->kbd =
 				    kbd_get_keyboard(i); /* sc->kbd == newkbd */
-				sc->keyboard = i;
 				(void)kbdd_ioctl(sc->kbd, KDSKBMODE,
 				    (caddr_t)&sc->cur_scp->kbd_mode);
 				update_kbd_state(sc->cur_scp,
@@ -1551,11 +1543,9 @@ sctty_ioctl(struct tty *tp, u_long cmd, caddr_t data, struct thread *td)
 		error = 0;
 		if (sc->kbd != NULL) {
 			save_kbd_state(sc->cur_scp);
-			error = kbd_release(sc->kbd, (void *)&sc->keyboard);
-			if (error == 0) {
+			error = kbd_release(sc->kbd, (void *)&sc->kbd);
+			if (error == 0)
 				sc->kbd = NULL;
-				sc->keyboard = -1;
-			}
 		}
 		splx(s);
 		return error;
@@ -2167,7 +2157,7 @@ sccnupdate(scr_stat *scp)
 	if (suspend_in_progress || scp->sc->font_loading_in_progress)
 		return;
 
-	if (kdb_active || panicstr || shutdown_in_progress) {
+	if (kdb_active || KERNEL_PANICKED() || shutdown_in_progress) {
 		sc_touch_scrn_saver();
 	} else if (scp != scp->sc->cur_scp) {
 		return;
@@ -2200,6 +2190,7 @@ scrn_timer(void *arg)
 	sc_softc_t *sc;
 	scr_stat *scp;
 	int again, rate;
+	int kbdidx;
 
 	again = (arg != NULL);
 	if (arg != NULL)
@@ -2220,9 +2211,9 @@ scrn_timer(void *arg)
 		/* try to allocate a keyboard automatically */
 		if (kbd_time_stamp != time_uptime) {
 			kbd_time_stamp = time_uptime;
-			sc->keyboard = sc_allocate_keyboard(sc, -1);
-			if (sc->keyboard >= 0) {
-				sc->kbd = kbd_get_keyboard(sc->keyboard);
+			kbdidx = sc_allocate_keyboard(sc, -1);
+			if (kbdidx >= 0) {
+				sc->kbd = kbd_get_keyboard(kbdidx);
 				(void)kbdd_ioctl(sc->kbd, KDSKBMODE,
 				    (caddr_t)&sc->cur_scp->kbd_mode);
 				update_kbd_state(sc->cur_scp,
@@ -2232,7 +2223,7 @@ scrn_timer(void *arg)
 	}
 
 	/* should we stop the screen saver? */
-	if (kdb_active || panicstr || shutdown_in_progress)
+	if (kdb_active || KERNEL_PANICKED() || shutdown_in_progress)
 		sc_touch_scrn_saver();
 	if (run_scrn_saver) {
 		if (time_uptime > sc->scrn_time_stamp + scrn_blank_time)
@@ -3006,11 +2997,9 @@ exchange_scr(sc_softc_t *sc)
 	scp = sc->cur_scp = sc->new_scp;
 	if (sc->old_scp->mode != scp->mode || ISUNKNOWNSC(sc->old_scp))
 		set_mode(scp);
-#ifndef __sparc64__
 	else
 		sc_vtb_init(&scp->scr, VTB_FRAMEBUFFER, scp->xsize, scp->ysize,
 		    (void *)sc->adp->va_window, FALSE);
-#endif
 	scp->status |= MOUSE_HIDDEN;
 	sc_move_cursor(scp, scp->xpos, scp->ypos);
 	if (!ISGRAPHSC(scp))
@@ -3229,6 +3218,7 @@ scinit(int unit, int flags)
 	scr_stat *scp;
 	video_adapter_t *adp;
 	int col;
+	int kbdidx;
 	int row;
 	int i;
 
@@ -3256,9 +3246,10 @@ scinit(int unit, int flags)
 		adp = sc->adp;
 		sc->adp = NULL;
 	}
-	if (sc->keyboard >= 0) {
-		DPRINTF(5, ("sc%d: releasing kbd%d\n", unit, sc->keyboard));
-		i = kbd_release(sc->kbd, (void *)&sc->keyboard);
+	if (sc->kbd != NULL) {
+		DPRINTF(5, ("sc%d: releasing kbd%d\n", unit,
+		    sc->kbd->kb_index));
+		i = kbd_release(sc->kbd, (void *)&sc->kbd);
 		DPRINTF(5, ("sc%d: kbd_release returned %d\n", unit, i));
 		if (sc->kbd != NULL) {
 			DPRINTF(5,
@@ -3272,10 +3263,10 @@ scinit(int unit, int flags)
 	sc->adp = vid_get_adapter(sc->adapter);
 	/* assert((sc->adapter >= 0) && (sc->adp != NULL)) */
 
-	sc->keyboard = sc_allocate_keyboard(sc, unit);
-	DPRINTF(1, ("sc%d: keyboard %d\n", unit, sc->keyboard));
+	kbdidx = sc_allocate_keyboard(sc, unit);
+	DPRINTF(1, ("sc%d: keyboard %d\n", unit, kbdidx));
 
-	sc->kbd = kbd_get_keyboard(sc->keyboard);
+	sc->kbd = kbd_get_keyboard(kbdidx);
 	if (sc->kbd != NULL) {
 		DPRINTF(1,
 		    ("sc%d: kbd index:%d, unit:%d, flags:0x%x\n", unit,
@@ -3335,14 +3326,12 @@ scinit(int unit, int flags)
 		}
 		sc->cur_scp = scp;
 
-#ifndef __sparc64__
 		/* copy screen to temporary buffer */
 		sc_vtb_init(&scp->scr, VTB_FRAMEBUFFER, scp->xsize, scp->ysize,
 		    (void *)scp->sc->adp->va_window, FALSE);
 		if (ISTEXTSC(scp))
 			sc_vtb_copy(&scp->scr, 0, &scp->vtb, 0,
 			    scp->xsize * scp->ysize);
-#endif
 
 		/* Sync h/w cursor position to s/w (sc and teken). */
 		if (col >= scp->xsize)
@@ -3463,8 +3452,8 @@ scterm(int unit, int flags)
 #endif
 
 	/* release the keyboard and the video card */
-	if (sc->keyboard >= 0)
-		kbd_release(sc->kbd, &sc->keyboard);
+	if (sc->kbd != NULL)
+		kbd_release(sc->kbd, &sc->kbd);
 	if (sc->adapter >= 0)
 		vid_release(sc->adp, &sc->adapter);
 
@@ -3491,7 +3480,6 @@ scterm(int unit, int flags)
 		/* XXX vtb, history */
 	}
 	bzero(sc, sizeof(*sc));
-	sc->keyboard = -1;
 	sc->adapter = -1;
 }
 
@@ -3668,9 +3656,7 @@ init_scp(sc_softc_t *sc, int vty, scr_stat *scp)
 #endif
 
 	sc_vtb_init(&scp->vtb, VTB_MEMORY, 0, 0, NULL, FALSE);
-#ifndef __sparc64__
 	sc_vtb_init(&scp->scr, VTB_FRAMEBUFFER, 0, 0, NULL, FALSE);
-#endif
 	scp->xoff = scp->yoff = 0;
 	scp->xpos = scp->ypos = 0;
 	scp->start = scp->xsize * scp->ysize - 1;
@@ -4194,10 +4180,8 @@ set_mode(scr_stat *scp)
 	/* setup video hardware for the given mode */
 	vidd_set_mode(scp->sc->adp, scp->mode);
 	scp->rndr->init(scp);
-#ifndef __sparc64__
 	sc_vtb_init(&scp->scr, VTB_FRAMEBUFFER, scp->xsize, scp->ysize,
 	    (void *)scp->sc->adp->va_window, FALSE);
-#endif
 
 	update_font(scp);
 
@@ -4362,7 +4346,7 @@ sc_allocate_keyboard(sc_softc_t *sc, int unit)
 	keyboard_info_t ki;
 
 	idx0 =
-	    kbd_allocate("kbdmux", -1, (void *)&sc->keyboard, sckbdevent, sc);
+	    kbd_allocate("kbdmux", -1, (void *)&sc->kbd, sckbdevent, sc);
 	if (idx0 != -1) {
 		k0 = kbd_get_keyboard(idx0);
 
@@ -4381,7 +4365,7 @@ sc_allocate_keyboard(sc_softc_t *sc, int unit)
 		}
 	} else
 		idx0 = kbd_allocate(
-		    "*", unit, (void *)&sc->keyboard, sckbdevent, sc);
+		    "*", unit, (void *)&sc->kbd, sckbdevent, sc);
 
 	return (idx0);
 }

@@ -132,7 +132,9 @@ struct l_ucred {
 	uint32_t	gid;
 };
 
-#if defined(__i386__) || (defined(__amd64__) && defined(COMPAT_LINUX32))
+#if defined(__i386__) || defined(__arm__) || \
+    (defined(__amd64__) && defined(COMPAT_LINUX32))
+
 struct linux_accept_args {
 	register_t s;
 	register_t addr;
@@ -162,7 +164,9 @@ int linux_accept(struct thread *td, struct linux_accept_args *args);
 #define	LINUX_ACCEPT4		18
 #define	LINUX_RECVMMSG		19
 #define	LINUX_SENDMMSG		20
-#endif /* __i386__ || (__amd64__ && COMPAT_LINUX32) */
+#define	LINUX_SENDFILE		21
+
+#endif /* __i386__ || __arm__ || (__amd64__ && COMPAT_LINUX32) */
 
 /* Socket defines */
 #define	LINUX_SOL_SOCKET	1
@@ -202,6 +206,7 @@ int linux_accept(struct thread *td, struct linux_accept_args *args);
 #define	LINUX_IP_TTL		2
 #define	LINUX_IP_HDRINCL	3
 #define	LINUX_IP_OPTIONS	4
+#define	LINUX_IP_RECVERR	11
 
 #define	LINUX_IP_MULTICAST_IF		32
 #define	LINUX_IP_MULTICAST_TTL		33
@@ -236,6 +241,7 @@ int linux_accept(struct thread *td, struct linux_accept_args *args);
 
 #define	LINUX_TCP_NODELAY	1
 #define	LINUX_TCP_MAXSEG	2
+#define	LINUX_TCP_CORK		3
 #define	LINUX_TCP_KEEPIDLE	4
 #define	LINUX_TCP_KEEPINTVL	5
 #define	LINUX_TCP_KEEPCNT	6

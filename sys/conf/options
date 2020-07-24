@@ -55,17 +55,19 @@ DDB_CAPTURE_DEFAULTBUFSIZE	opt_ddb.h
 DDB_CAPTURE_MAXBUFSIZE	opt_ddb.h
 DDB_CTF		opt_ddb.h
 DDB_NUMSYM	opt_ddb.h
+EARLY_PRINTF	opt_global.h
 FULL_BUF_TRACKING	opt_global.h
 GDB
 KDB		opt_global.h
 KDB_TRACE	opt_kdb.h
 KDB_UNATTENDED	opt_kdb.h
 KLD_DEBUG	opt_kld.h
+NUM_CORE_FILES	opt_global.h
+QUEUE_MACRO_DEBUG_TRACE	opt_global.h
+QUEUE_MACRO_DEBUG_TRASH	opt_global.h
 SYSCTL_DEBUG	opt_sysctl.h
-EARLY_PRINTF	opt_global.h
 TEXTDUMP_PREFERRED	opt_ddb.h
 TEXTDUMP_VERBOSE	opt_ddb.h
-NUM_CORE_FILES	opt_global.h
 TSLOG	opt_global.h
 TSLOGSIZE	opt_global.h
 
@@ -470,6 +472,7 @@ TCP_RFC7413_MAX_KEYS	opt_inet.h
 TCP_RFC7413_MAX_PSKS	opt_inet.h
 TCP_SIGNATURE		opt_ipsec.h
 VLAN_ARRAY		opt_vlan.h
+XDR
 XBONEHACK
 
 #
@@ -572,7 +575,6 @@ TI_JUMBO_HDRSPLIT	opt_ti.h
 # with 'make CC="cc -DDEBUG"'.
 CLUSTERDEBUG		opt_debug_cluster.h
 DEBUG_1284		opt_ppb_1284.h
-VP0_DEBUG		opt_vpo.h
 LPT_DEBUG		opt_lpt.h
 PLIP_DEBUG		opt_plip.h
 LOCKF_DEBUG		opt_debug_lockf.h
@@ -624,8 +626,6 @@ NO_SWAPPING		opt_vm.h
 MALLOC_MAKE_FAILURES	opt_vm.h
 MALLOC_PROFILE		opt_vm.h
 MALLOC_DEBUG_MAXZONES	opt_vm.h
-UMA_XDOMAIN		opt_vm.h
-UMA_FIRSTTOUCH		opt_vm.h
 
 # The MemGuard replacement allocator used for tamper-after-free detection
 DEBUG_MEMGUARD		opt_vm.h
@@ -650,27 +650,6 @@ NFS_DEBUG		opt_nfs.h
 
 # TMPFS options
 TMPFS_PAGES_MINRESERVED		opt_tmpfs.h
-
-# For the Bt848/Bt848A/Bt849/Bt878/Bt879 driver
-OVERRIDE_CARD			opt_bktr.h
-OVERRIDE_TUNER			opt_bktr.h
-OVERRIDE_DBX			opt_bktr.h
-OVERRIDE_MSP			opt_bktr.h
-BROOKTREE_SYSTEM_DEFAULT	opt_bktr.h
-BROOKTREE_ALLOC_PAGES		opt_bktr.h
-BKTR_OVERRIDE_CARD		opt_bktr.h
-BKTR_OVERRIDE_TUNER		opt_bktr.h
-BKTR_OVERRIDE_DBX		opt_bktr.h
-BKTR_OVERRIDE_MSP		opt_bktr.h
-BKTR_SYSTEM_DEFAULT		opt_bktr.h
-BKTR_ALLOC_PAGES		opt_bktr.h
-BKTR_USE_PLL			opt_bktr.h	
-BKTR_GPIO_ACCESS		opt_bktr.h
-BKTR_NO_MSP_RESET		opt_bktr.h
-BKTR_430_FX_MODE		opt_bktr.h
-BKTR_SIS_VIA_MODE		opt_bktr.h
-BKTR_USE_FREEBSD_SMBUS		opt_bktr.h
-BKTR_NEW_MSP34XX_DRIVER		opt_bktr.h
 
 # Options for uart(4)
 UART_PPS_ON_CTS		opt_uart.h
@@ -757,11 +736,6 @@ BCE_NVRAM_WRITE_SUPPORT	opt_bce.h
 
 SOCKBUF_DEBUG		opt_global.h
 
-
-# options for ubsec driver
-UBSEC_DEBUG		opt_ubsec.h
-UBSEC_RNDTEST		opt_ubsec.h
-UBSEC_NO_RNG		opt_ubsec.h
 
 # options for hifn driver
 HIFN_DEBUG		opt_hifn.h
@@ -1038,3 +1012,11 @@ AMDSBWD_DEBUG	opt_amdsbwd.h
 # gcov support
 GCOV		opt_global.h
 LINDEBUGFS
+
+# CHERI
+CPU_CHERI	opt_global.h
+
+#
+# Disable system-call authorisation for compartmentalised user code.
+#
+CPU_CHERI_NO_SYSCALL_AUTHORIZE opt_global.h

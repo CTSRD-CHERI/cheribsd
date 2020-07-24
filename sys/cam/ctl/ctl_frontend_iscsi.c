@@ -88,7 +88,7 @@ FEATURE(cfiscsi_kernel_proxy, "iSCSI target built with ICL_KERNEL_PROXY");
 static MALLOC_DEFINE(M_CFISCSI, "cfiscsi", "Memory used for CTL iSCSI frontend");
 static uma_zone_t cfiscsi_data_wait_zone;
 
-SYSCTL_NODE(_kern_cam_ctl, OID_AUTO, iscsi, CTLFLAG_RD, 0,
+SYSCTL_NODE(_kern_cam_ctl, OID_AUTO, iscsi, CTLFLAG_RD | CTLFLAG_MPSAFE, 0,
     "CAM Target Layer iSCSI Frontend");
 static int debug = 1;
 SYSCTL_INT(_kern_cam_ctl_iscsi, OID_AUTO, debug, CTLFLAG_RWTUN,
@@ -1582,8 +1582,10 @@ cfiscsi_ioctl_handoff(struct ctl_iscsi *ci)
 	mtx_lock(&softc->lock);
 	if (ct->ct_online == 0) {
 		mtx_unlock(&softc->lock);
+		CFISCSI_SESSION_LOCK(cs);
 		cs->cs_handoff_in_progress = false;
 		cfiscsi_session_terminate(cs);
+		CFISCSI_SESSION_UNLOCK(cs);
 		cfiscsi_target_release(ct);
 		ci->status = CTL_ISCSI_ERROR;
 		snprintf(ci->error_str, sizeof(ci->error_str),
@@ -1629,8 +1631,10 @@ restart:
 #endif
 		error = icl_conn_handoff(cs->cs_conn, cihp->socket);
 		if (error != 0) {
+			CFISCSI_SESSION_LOCK(cs);
 			cs->cs_handoff_in_progress = false;
 			cfiscsi_session_terminate(cs);
+			CFISCSI_SESSION_UNLOCK(cs);
 			ci->status = CTL_ISCSI_ERROR;
 			snprintf(ci->error_str, sizeof(ci->error_str),
 			    "%s: icl_conn_handoff failed with error %d",
@@ -1692,10 +1696,8 @@ cfiscsi_ioctl_list(struct ctl_iscsi *ci)
 	sbuf_printf(sb, "<ctlislist>\n");
 	mtx_lock(&softc->lock);
 	TAILQ_FOREACH(cs, &softc->sessions, cs_next) {
-#ifdef ICL_KERNEL_PROXY
 		if (cs->cs_target == NULL)
 			continue;
-#endif
 		error = sbuf_printf(sb, "<connection id=\"%d\">"
 		    "<initiator>%s</initiator>"
 		    "<initiator_addr>%s</initiator_addr>"

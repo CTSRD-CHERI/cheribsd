@@ -58,6 +58,22 @@ struct dbreg {
 	int dummy;
 };
 
+#if __has_feature(capabilities)
+struct capreg {
+	uintcap_t cra;		/* return address */
+	uintcap_t csp;		/* stack pointer */
+	uintcap_t cgp;		/* global pointer */
+	uintcap_t ctp;		/* thread pointer */
+	uintcap_t ct[7];	/* temporaries */
+	uintcap_t cs[12];	/* saved registers */
+	uintcap_t ca[8];	/* function arguments */
+	uintcap_t sepcc;	/* exception program counter */
+	uintcap_t ddc;
+	uint64_t tagmask;
+	uint64_t pad;
+};
+#endif
+
 #ifdef _KERNEL
 /*
  * XXX these interfaces are MI, so they should be declared in a MI place.
@@ -68,6 +84,10 @@ int	fill_fpregs(struct thread *, struct fpreg *);
 int	set_fpregs(struct thread *, struct fpreg *);
 int	fill_dbregs(struct thread *, struct dbreg *);
 int	set_dbregs(struct thread *, struct dbreg *);
+#if __has_feature(capabilities)
+int	fill_capregs(struct thread *, struct capreg *);
+int	set_capregs(struct thread *, struct capreg *);
+#endif
 #endif
 
 #endif /* !_MACHINE_REG_H_ */

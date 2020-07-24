@@ -71,7 +71,7 @@ struct g_class g_stripe_class = {
 };
 
 SYSCTL_DECL(_kern_geom);
-static SYSCTL_NODE(_kern_geom, OID_AUTO, stripe, CTLFLAG_RW, 0,
+static SYSCTL_NODE(_kern_geom, OID_AUTO, stripe, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
     "GEOM_STRIPE stuff");
 static u_int g_stripe_debug = 0;
 SYSCTL_UINT(_kern_geom_stripe, OID_AUTO, debug, CTLFLAG_RWTUN, &g_stripe_debug, 0,
@@ -88,8 +88,10 @@ g_sysctl_stripe_fast(SYSCTL_HANDLER_ARGS)
 		g_stripe_fast = fast;
 	return (error);
 }
-SYSCTL_PROC(_kern_geom_stripe, OID_AUTO, fast, CTLTYPE_INT | CTLFLAG_RWTUN,
-    NULL, 0, g_sysctl_stripe_fast, "I", "Fast, but memory-consuming, mode");
+SYSCTL_PROC(_kern_geom_stripe, OID_AUTO, fast,
+    CTLTYPE_INT | CTLFLAG_RWTUN | CTLFLAG_NEEDGIANT, NULL, 0,
+    g_sysctl_stripe_fast, "I",
+    "Fast, but memory-consuming, mode");
 static u_int g_stripe_maxmem = MAXPHYS * 100;
 SYSCTL_UINT(_kern_geom_stripe, OID_AUTO, maxmem, CTLFLAG_RDTUN, &g_stripe_maxmem,
     0, "Maximum memory that can be allocated in \"fast\" mode (in bytes)");
@@ -298,6 +300,8 @@ g_stripe_done(struct bio *bp)
 		mtx_unlock(&sc->sc_lock);
 		if (pbp->bio_driver1 != NULL)
 			uma_zfree(g_stripe_zone, pbp->bio_driver1);
+		if (bp->bio_cmd == BIO_SPEEDUP)
+			pbp->bio_completed = pbp->bio_length;
 		g_io_deliver(pbp, pbp->bio_error);
 	} else
 		mtx_unlock(&sc->sc_lock);
@@ -535,7 +539,7 @@ failure:
 }
 
 static void
-g_stripe_flush(struct g_stripe_softc *sc, struct bio *bp)
+g_stripe_pushdown(struct g_stripe_softc *sc, struct bio *bp)
 {
 	struct bio_queue_head queue;
 	struct g_consumer *cp;
@@ -594,8 +598,9 @@ g_stripe_start(struct bio *bp)
 	case BIO_WRITE:
 	case BIO_DELETE:
 		break;
+	case BIO_SPEEDUP:
 	case BIO_FLUSH:
-		g_stripe_flush(sc, bp);
+		g_stripe_pushdown(sc, bp);
 		return;
 	case BIO_GETATTR:
 		/* To which provider it should be delivered? */

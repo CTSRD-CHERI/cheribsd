@@ -54,6 +54,8 @@ __FBSDID("$FreeBSD$");
 #include <cam/cam.h>
 #include <cam/cam_ccb.h>
 
+#include <opencrypto/cryptodev.h>
+
 #include <machine/bus.h>
 
 /*
@@ -75,7 +77,7 @@ _bus_dmamap_load_vlist(bus_dma_tag_t dmat, bus_dmamap_t map,
 
 		KASSERT((offset < list->ds_len),
 		    ("Invalid mid-segment offset"));
-		addr = (char *)(uintptr_t)list->ds_addr + offset;
+		addr = (char *)list->ds_vaddr + offset;
 		ds_len = list->ds_len - offset;
 		offset = 0;
 		if (ds_len > length)
@@ -114,14 +116,12 @@ _bus_dmamap_load_plist(bus_dma_tag_t dmat, bus_dmamap_t map,
  * Load an unmapped mbuf
  */
 static int
-_bus_dmamap_load_unmapped_mbuf_sg(bus_dma_tag_t dmat, bus_dmamap_t map,
+_bus_dmamap_load_mbuf_epg(bus_dma_tag_t dmat, bus_dmamap_t map,
     struct mbuf *m, bus_dma_segment_t *segs, int *nsegs, int flags)
 {
-	struct mbuf_ext_pgs *ext_pgs;
 	int error, i, off, len, pglen, pgoff, seglen, segoff;
 
-	MBUF_EXT_PGS_ASSERT(m);
-	ext_pgs = m->m_ext.ext_pgs;
+	M_ASSERTEXTPG(m);
 
 	len = m->m_len;
 	error = 0;
@@ -129,23 +129,23 @@ _bus_dmamap_load_unmapped_mbuf_sg(bus_dma_tag_t dmat, bus_dmamap_t map,
 	/* Skip over any data removed from the front. */
 	off = mtod(m, vm_offset_t);
 
-	if (ext_pgs->hdr_len != 0) {
-		if (off >= ext_pgs->hdr_len) {
-			off -= ext_pgs->hdr_len;
+	if (m->m_epg_hdrlen != 0) {
+		if (off >= m->m_epg_hdrlen) {
+			off -= m->m_epg_hdrlen;
 		} else {
-			seglen = ext_pgs->hdr_len - off;
+			seglen = m->m_epg_hdrlen - off;
 			segoff = off;
 			seglen = min(seglen, len);
 			off = 0;
 			len -= seglen;
 			error = _bus_dmamap_load_buffer(dmat, map,
-			    &ext_pgs->hdr[segoff], seglen, kernel_pmap,
+			    &m->m_epg_hdr[segoff], seglen, kernel_pmap,
 			    flags, segs, nsegs);
 		}
 	}
-	pgoff = ext_pgs->first_pg_off;
-	for (i = 0; i < ext_pgs->npgs && error == 0 && len > 0; i++) {
-		pglen = mbuf_ext_pg_len(ext_pgs, i, pgoff);
+	pgoff = m->m_epg_1st_off;
+	for (i = 0; i < m->m_epg_npgs && error == 0 && len > 0; i++) {
+		pglen = m_epg_pagelen(m, i, pgoff);
 		if (off >= pglen) {
 			off -= pglen;
 			pgoff = 0;
@@ -157,15 +157,15 @@ _bus_dmamap_load_unmapped_mbuf_sg(bus_dma_tag_t dmat, bus_dmamap_t map,
 		seglen = min(seglen, len);
 		len -= seglen;
 		error = _bus_dmamap_load_phys(dmat, map,
-		    ext_pgs->pa[i] + segoff, seglen, flags, segs, nsegs);
+		    m->m_epg_pa[i] + segoff, seglen, flags, segs, nsegs);
 		pgoff = 0;
 	};
 	if (len != 0 && error == 0) {
-		KASSERT((off + len) <= ext_pgs->trail_len,
+		KASSERT((off + len) <= m->m_epg_trllen,
 		    ("off + len > trail (%d + %d > %d)", off, len,
-		    ext_pgs->trail_len));
+		    m->m_epg_trllen));
 		error = _bus_dmamap_load_buffer(dmat, map,
-		    &ext_pgs->trail[off], len, kernel_pmap, flags, segs,
+		    &m->m_epg_trail[off], len, kernel_pmap, flags, segs,
 		    nsegs);
 	}
 	return (error);
@@ -184,8 +184,8 @@ _bus_dmamap_load_mbuf_sg(bus_dma_tag_t dmat, bus_dmamap_t map,
 	error = 0;
 	for (m = m0; m != NULL && error == 0; m = m->m_next) {
 		if (m->m_len > 0) {
-			if ((m->m_flags & M_NOMAP) != 0)
-				error = _bus_dmamap_load_unmapped_mbuf_sg(dmat,
+			if ((m->m_flags & M_EXTPG) != 0)
+				error = _bus_dmamap_load_mbuf_epg(dmat,
 				    map, m, segs, nsegs, flags);
 			else
 				error = _bus_dmamap_load_buffer(dmat, map,
@@ -609,6 +609,55 @@ bus_dmamap_load_mem(bus_dma_tag_t dmat, bus_dmamap_t map,
 		break;
 	case MEMDESC_CCB:
 		error = _bus_dmamap_load_ccb(dmat, map, mem->u.md_ccb, &nsegs,
+		    flags);
+		break;
+	}
+	nsegs++;
+
+	CTR5(KTR_BUSDMA, "%s: tag %p tag flags 0x%x error %d nsegs %d",
+	    __func__, dmat, flags, error, nsegs);
+
+	if (error == EINPROGRESS)
+		return (error);
+
+	segs = _bus_dmamap_complete(dmat, map, NULL, nsegs, error);
+	if (error)
+		(*callback)(callback_arg, segs, 0, error);
+	else
+		(*callback)(callback_arg, segs, nsegs, 0);
+
+	/*
+	 * Return ENOMEM to the caller so that it can pass it up the stack.
+	 * This error only happens when NOWAIT is set, so deferral is disabled.
+	 */
+	if (error == ENOMEM)
+		return (error);
+
+	return (0);
+}
+
+int
+bus_dmamap_load_crp(bus_dma_tag_t dmat, bus_dmamap_t map, struct cryptop *crp,
+    bus_dmamap_callback_t *callback, void *callback_arg, int flags)
+{
+	bus_dma_segment_t *segs;
+	int error;
+	int nsegs;
+
+	flags |= BUS_DMA_NOWAIT;
+	nsegs = -1;
+	error = 0;
+	switch (crp->crp_buf_type) {
+	case CRYPTO_BUF_CONTIG:
+		error = _bus_dmamap_load_buffer(dmat, map, crp->crp_buf,
+		    crp->crp_ilen, kernel_pmap, flags, NULL, &nsegs);
+		break;
+	case CRYPTO_BUF_MBUF:
+		error = _bus_dmamap_load_mbuf_sg(dmat, map, crp->crp_mbuf,
+		    NULL, &nsegs, flags);
+		break;
+	case CRYPTO_BUF_UIO:
+		error = _bus_dmamap_load_uio(dmat, map, crp->crp_uio, &nsegs,
 		    flags);
 		break;
 	}

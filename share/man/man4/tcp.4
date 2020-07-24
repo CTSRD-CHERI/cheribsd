@@ -34,7 +34,7 @@
 .\"     From: @(#)tcp.4	8.1 (Berkeley) 6/5/93
 .\" $FreeBSD$
 .\"
-.Dd December 2, 2019
+.Dd April 27, 2020
 .Dt TCP 4
 .Os
 .Sh NAME
@@ -319,14 +319,11 @@ control message.
 The payload of this control message is a single byte holding the desired
 TLS record type.
 .Pp
-Data read from this socket will still be encrypted and must be parsed by
-a TLS-aware consumer.
-.Pp
-At present, only a single key may be set on a socket.
+At present, only a single transmit key may be set on a socket.
 As such, users of this option must disable rekeying.
 .It Dv TCP_TXTLS_MODE
-The integer argument can be used to get or set the current TLS mode of a
-socket.
+The integer argument can be used to get or set the current TLS transmit mode
+of a socket.
 Setting the mode can only used to toggle between software and NIC TLS after
 TLS has been initially enabled via the
 .Dv TCP_TXTLS_ENABLE
@@ -341,7 +338,36 @@ socket buffer.
 Typically this encryption is performed in software.
 .It Dv TCP_TLS_MODE_IFNET
 TLS records are encrypted by the network interface card (NIC).
+.It Dv TCP_TLS_MODE_TOE
+TLS records are encrypted by the NIC using a TCP offload engine (TOE).
 .El
+.It Dv TCP_RXTLS_ENABLE
+Enable in-kernel TLS for data read from this socket.
+The
+.Vt struct tls_so_enable
+argument defines the encryption and authentication algorithms and keys
+used to decrypt the socket data.
+.Pp
+Each received TLS record must be read from the socket using
+.Xr recvmsg 2 .
+Each received TLS record will contain a
+.Dv TLS_GET_RECORD
+control message along with the decrypted payload.
+The control message contains a
+.Vt struct tls_get_record
+which includes fields from the TLS record header.
+If a corrupted TLS record is received,
+recvmsg 2
+will fail with
+.Dv EBADMSG .
+.Pp
+At present, only a single receive key may be set on a socket.
+As such, users of this option must disable rekeying.
+.It Dv TCP_RXTLS_MODE
+The integer argument can be used to get the current TLS receive mode
+of a socket.
+The available modes are the same as for
+.Dv TCP_TXTLS_MODE .
 .El
 .Pp
 The option level for the
@@ -628,27 +654,35 @@ specific connection.
 This is needed to help with connection establishment
 when a broken firewall is in the network path.
 .It Va pmtud_blackhole_detection
-Turn on automatic path MTU blackhole detection.
-In case of retransmits OS will
-lower the MSS to check if it's MTU problem.
-If current MSS is greater than
-configured value to try, it will be set to configured value, otherwise,
-MSS will be set to default values
+Enable automatic path MTU blackhole detection.
+In case of retransmits of MSS sized segments,
+the OS will lower the MSS to check if it's an MTU problem.
+If the current MSS is greater than the configured value to try
+.Po Va net.inet.tcp.pmtud_blackhole_mss
+and
+.Va net.inet.tcp.v6pmtud_blackhole_mss
+.Pc ,
+it will be set to this value, otherwise,
+the MSS will be set to the default values
 .Po Va net.inet.tcp.mssdflt
 and
 .Va net.inet.tcp.v6mssdflt
 .Pc .
+Settings:
+.Bl -tag -compact
+.It 0
+Disable path MTU blackhole detection.
+.It 1
+Enable path MTU blackhole detection for IPv4 and IPv6.
+.It 2
+Enable path MTU blackhole detection only for IPv4.
+.It 3
+Enable path MTU blackhole detection only for IPv6.
+.El
 .It Va pmtud_blackhole_mss
 MSS to try for IPv4 if PMTU blackhole detection is turned on.
 .It Va v6pmtud_blackhole_mss
 MSS to try for IPv6 if PMTU blackhole detection is turned on.
-.It Va pmtud_blackhole_activated
-Number of times configured values were used in an attempt to downshift.
-.It Va pmtud_blackhole_activated_min_mss
-Number of times default MSS was used in an attempt to downshift.
-.It Va pmtud_blackhole_failed
-Number of connections for which retransmits continued even after MSS
-downshift.
 .It Va functions_available
 List of available TCP function blocks (TCP stacks).
 .It Va functions_default

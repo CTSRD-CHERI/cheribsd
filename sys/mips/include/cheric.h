@@ -49,4 +49,16 @@
 } while (0)
 #endif
 
+#if __has_feature(capabilities)
+#define	cheri_getcause()	__builtin_mips_cheri_get_cause()
+#define	cheri_setcause(x)	__builtin_mips_cheri_set_cause(x)
+
+#define	cheri_getidc()		__builtin_mips_cheri_get_invoke_data_cap()
+#define	cheri_getkr1c()		__builtin_mips_cheri_get_kernel_cap1()
+#define	cheri_getkr2c()		__builtin_mips_cheri_get_kernel_cap2()
+#define	cheri_getkcc()		__builtin_mips_cheri_get_kernel_code_cap()
+#define	cheri_getkdc()		__builtin_mips_cheri_get_kernel_data_cap()
+#define	cheri_getepcc()		__builtin_mips_cheri_get_exception_program_counter_cap()
+#endif
+
 #endif /* _MIPS_INCLUDE_CHERIC_H_ */

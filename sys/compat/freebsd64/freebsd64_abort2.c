@@ -42,7 +42,8 @@ freebsd64_abort2(struct thread *td, struct freebsd64_abort2_args *uap)
 {
 	void * __capability uargs[16];
 	void *uargsp;
-	long ptr;
+	uint64_t * __capability uargscap;
+	uint64_t ptr;
 	int i, nargs;
 
 	nargs = uap->nargs;
@@ -51,8 +52,9 @@ freebsd64_abort2(struct thread *td, struct freebsd64_abort2_args *uap)
 	uargsp = NULL;
 	if (nargs > 0) {
 		if (uap->args != NULL) {
+			uargscap = __USER_CAP_ARRAY(uap->args, nargs);
 			for (i = 0; i < nargs; i++) {
-				if (fueword(uap->args + i, &ptr) != 0) {
+				if (fueword64(uargscap + i, &ptr) != 0) {
 					nargs = -1;
 					break;
 				} else

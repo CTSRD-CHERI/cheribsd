@@ -36,7 +36,6 @@ options 	KDTRACE_HOOKS
 # You must specify at least one CPU (the one you intend to run on).
 cpu		AIM
 #cpu		BOOKE_E500
-#cpu		BOOKE_PPC440
 
 options 	FPU_EMU
 
@@ -72,7 +71,6 @@ device		adm1030		# Apple G4 MDD fan controller
 #####################################################################
 # Devices we don't want to deal with
 
-nodevice	bktr
 nodevice	ccr
 nodevice	cxgbe		# XXX: builds on powerpc64 only.
 nodevice	cxgbev

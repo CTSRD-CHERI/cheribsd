@@ -708,6 +708,22 @@ axp2xx_regnode_voltage_to_reg(struct axp2xx_reg_sc *sc, int min_uvolt,
 }
 
 static int
+axp2xx_regnode_status(struct regnode *regnode, int *status)
+{
+	struct axp2xx_reg_sc *sc;
+	uint8_t val;
+
+	sc = regnode_get_softc(regnode);
+
+	*status = 0;
+	axp2xx_read(sc->base_dev, sc->def->enable_reg, &val, 1);
+	if (val & sc->def->enable_mask)
+		*status = REGULATOR_STATUS_ENABLED;
+
+	return (0);
+}
+
+static int
 axp2xx_regnode_set_voltage(struct regnode *regnode, int min_uvolt,
     int max_uvolt, int *udelay)
 {
@@ -750,6 +766,7 @@ static regnode_method_t axp2xx_regnode_methods[] = {
 	/* Regulator interface */
 	REGNODEMETHOD(regnode_init,		axp2xx_regnode_init),
 	REGNODEMETHOD(regnode_enable,		axp2xx_regnode_enable),
+	REGNODEMETHOD(regnode_status,		axp2xx_regnode_status),
 	REGNODEMETHOD(regnode_set_voltage,	axp2xx_regnode_set_voltage),
 	REGNODEMETHOD(regnode_get_voltage,	axp2xx_regnode_get_voltage),
 	REGNODEMETHOD(regnode_check_voltage,	regnode_method_check_voltage),
@@ -1251,7 +1268,7 @@ axp2xx_start(void *pdev)
 		SYSCTL_ADD_PROC(device_get_sysctl_ctx(dev),
 		    SYSCTL_CHILDREN(device_get_sysctl_tree(dev)),
 		    OID_AUTO, sc->sensors[i].name,
-		    CTLTYPE_INT | CTLFLAG_RD,
+		    CTLTYPE_INT | CTLFLAG_RD | CTLFLAG_NEEDGIANT,
 		    dev, sc->sensors[i].id, axp2xx_sysctl,
 		    sc->sensors[i].format,
 		    sc->sensors[i].desc);

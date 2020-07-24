@@ -112,8 +112,8 @@ static int use_doorbell = 0;
 static int sbp_tags = 0;
 
 SYSCTL_DECL(_hw_firewire);
-static SYSCTL_NODE(_hw_firewire, OID_AUTO, sbp, CTLFLAG_RD, 0,
-	"SBP-II Subsystem");
+static SYSCTL_NODE(_hw_firewire, OID_AUTO, sbp, CTLFLAG_RD | CTLFLAG_MPSAFE, 0,
+    "SBP-II Subsystem");
 SYSCTL_INT(_debug, OID_AUTO, sbp_debug, CTLFLAG_RWTUN, &debug, 0,
 	"SBP debug flag");
 SYSCTL_INT(_hw_firewire_sbp, OID_AUTO, auto_login, CTLFLAG_RWTUN, &auto_login, 0,
@@ -134,11 +134,7 @@ SYSCTL_INT(_hw_firewire_sbp, OID_AUTO, tags, CTLFLAG_RWTUN, &sbp_tags, 0,
 #define NEED_RESPONSE 0
 
 #define SBP_SEG_MAX rounddown(0xffff, PAGE_SIZE)
-#ifdef __sparc64__ /* iommu */
-#define SBP_IND_MAX howmany(SBP_MAXPHYS, SBP_SEG_MAX)
-#else
 #define SBP_IND_MAX howmany(SBP_MAXPHYS, PAGE_SIZE)
-#endif
 struct sbp_ocb {
 	STAILQ_ENTRY(sbp_ocb)	ocb;
 	union ccb	*ccb;

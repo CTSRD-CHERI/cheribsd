@@ -33,8 +33,6 @@
  *
  */
 
-#define	EXPLICIT_USER_ACCESS
-
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
@@ -338,7 +336,7 @@ nfscl_ngetreopen(struct mount *mntp, u_int8_t *fhp, int fhsize,
 	error = vfs_hash_get(mntp, hash, (LK_EXCLUSIVE | LK_NOWAIT), td, &nvp,
 	    newnfs_vncmpf, nfhp);
 	if (error == 0 && nvp != NULL) {
-		NFSVOPUNLOCK(nvp, 0);
+		NFSVOPUNLOCK(nvp);
 	} else if (error == EBUSY) {
 		/*
 		 * It is safe so long as a vflush() with
@@ -599,7 +597,8 @@ ncl_pager_setsize(struct vnode *vp, u_quad_t *nsizep)
 	setnsize = false;
 
 	if (object != NULL && nsize != object->un_pager.vnp.vnp_size) {
-		if (VOP_ISLOCKED(vp) == LK_EXCLUSIVE)
+		if (VOP_ISLOCKED(vp) == LK_EXCLUSIVE &&
+		    (curthread->td_pflags2 & TDP2_SBPAGES) == 0)
 			setnsize = true;
 		else
 			np->n_flag |= NVNSETSZSKIP;
@@ -1109,7 +1108,7 @@ nfscl_checksattr(struct vattr *vap, struct nfsvattr *nvap)
  * error should only be returned for the Open, Create and Setattr Ops.
  * As such, most calls can just pass in 0 for those arguments.
  */
-APPLESTATIC int
+int
 nfscl_maperr(struct thread *td, int error, uid_t uid, gid_t gid)
 {
 	struct proc *p;
@@ -1233,7 +1232,7 @@ nfssvc_nfscl(struct thread *td, struct nfssvc_args *uap)
 	struct nfsmount *nmp;
 
 	if (uap->flag & NFSSVC_CBADDSOCK) {
-		error = copyin(uap->argp, (caddr_t)&nfscbdarg, sizeof(nfscbdarg));
+		error = copyincap(uap->argp, &nfscbdarg, sizeof(nfscbdarg));
 		if (error)
 			return (error);
 		/*
@@ -1258,8 +1257,7 @@ nfssvc_nfscl(struct thread *td, struct nfssvc_args *uap)
 	} else if (uap->flag & NFSSVC_NFSCBD) {
 		if (uap->argp == NULL) 
 			return (EINVAL);
-		error = copyin(uap->argp, (caddr_t)&nfscbdarg2,
-		    sizeof(nfscbdarg2));
+		error = copyincap(uap->argp, &nfscbdarg2, sizeof(nfscbdarg2));
 		if (error)
 			return (error);
 		error = nfscbd_nfsd(td, &nfscbdarg2);
@@ -1413,5 +1411,4 @@ MODULE_VERSION(nfscl, 1);
 MODULE_DEPEND(nfscl, nfscommon, 1, 1, 1);
 MODULE_DEPEND(nfscl, krpc, 1, 1, 1);
 MODULE_DEPEND(nfscl, nfssvc, 1, 1, 1);
-MODULE_DEPEND(nfscl, nfslock, 1, 1, 1);
 

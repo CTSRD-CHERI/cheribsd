@@ -25,12 +25,12 @@
 
 #include "test_macros.h"
 
-struct Clock
+struct TestClock
 {
     typedef std::chrono::milliseconds duration;
     typedef duration::rep             rep;
     typedef duration::period          period;
-    typedef std::chrono::time_point<Clock> time_point;
+    typedef std::chrono::time_point<TestClock> time_point;
     static const bool is_steady =  true;
 
     static time_point now()
@@ -50,25 +50,26 @@ int test2 = 0;
 
 int runs = 0;
 
+template <typename Clock>
 void f()
 {
 #if TEST_SLOW_HOST()
-    auto sleepTime = Clock::duration(750);
-    auto tolerance = Clock::duration(150);
+    auto sleepTime = std::chrono::milliseconds(750);
+    auto tolerance = std::chrono::milliseconds(150);
 #else
-    auto sleepTime = Clock::duration(250);
-    auto tolerance = Clock::duration(50);
+    auto sleepTime = std::chrono::milliseconds(250);
+    auto tolerance = std::chrono::milliseconds(50);
 #endif
 
     std::unique_lock<std::mutex> lk(mut);
     assert(test2 == 0);
     test1 = 1;
     cv.notify_one();
-    Clock::time_point t0 = Clock::now();
-    Clock::time_point t = t0 + sleepTime;
+    typename Clock::time_point t0 = Clock::now();
+    typename Clock::time_point t = t0 + sleepTime;
     while (test2 == 0 && cv.wait_until(lk, t) == std::cv_status::no_timeout)
         ;
-    Clock::time_point t1 = Clock::now();
+    typename Clock::time_point t1 = Clock::now();
     if (runs == 0)
     {
         assert(t1 - t0 < sleepTime);
@@ -82,11 +83,15 @@ void f()
     ++runs;
 }
 
-int main(int, char**)
+template <typename Clock>
+void run_test()
 {
+    runs = 0;
+    test1 = 0;
+    test2 = 0;
     {
         std::unique_lock<std::mutex>lk(mut);
-        std::thread t(f);
+        std::thread t(f<Clock>);
         assert(test1 == 0);
         while (test1 == 0)
             cv.wait(lk);
@@ -100,7 +105,7 @@ int main(int, char**)
     test2 = 0;
     {
         std::unique_lock<std::mutex>lk(mut);
-        std::thread t(f);
+        std::thread t(f<Clock>);
         assert(test1 == 0);
         while (test1 == 0)
             cv.wait(lk);
@@ -108,6 +113,12 @@ int main(int, char**)
         lk.unlock();
         t.join();
     }
+}
 
-  return 0;
+int main(int, char**)
+{
+    run_test<TestClock>();
+    run_test<std::chrono::steady_clock>();
+    run_test<std::chrono::system_clock>();
+    return 0;
 }

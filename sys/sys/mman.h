@@ -107,6 +107,9 @@
 #ifdef __LP64__
 #define	MAP_32BIT	 0x00080000 /* map in the low 2GB of address space */
 #endif
+#ifdef _KERNEL
+#define	MAP_UNMAPPED	 0x00100000
+#endif
 
 /*
  * Request specific alignment (n == log2 of the desired alignment).
@@ -263,22 +266,6 @@ typedef	__off_t		off_t;
 #ifndef _SIZE_T_DECLARED
 typedef	__size_t	size_t;
 #define	_SIZE_T_DECLARED
-#endif
-
-#ifdef _KERNEL
-struct mmap_req {
-	vm_offset_t	mr_hint;
-	vm_offset_t	mr_max_addr;
-	vm_size_t	mr_len;
-	int		mr_prot;
-	int		mr_flags;
-	int		mr_fd;
-	int		_int_pad;
-	off_t		mr_pos;
-#if __has_feature(capabilities)
-	void * __capability mr_source_cap;
-#endif
-	};
 #endif
 
 #if defined(_KERNEL) || defined(_WANT_FILE)

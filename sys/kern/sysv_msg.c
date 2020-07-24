@@ -60,11 +60,12 @@ __FBSDID("$FreeBSD$");
 
 #include "opt_sysvipc.h"
 
-#define	EXPLICIT_USER_ACCESS
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/sysproto.h>
+#if defined(COMPAT_CHERIABI) || defined(COMPAT_FREEBSD32) || defined(COMPAT_FREEBSD64)
+#include <sys/abi_compat.h>
+#endif
 #include <sys/kernel.h>
 #include <sys/priv.h>
 #include <sys/proc.h>
@@ -85,10 +86,6 @@ __FBSDID("$FreeBSD$");
 #include <security/audit/audit.h>
 #include <security/mac/mac_framework.h>
 
-#if defined(COMPAT_CHERIABI) || defined(COMPAT_FREEBSD32) || defined(COMPAT_FREEBSD64)
-#define CP(src,dst,fld) do { (dst).fld = (src).fld; } while (0)
-#endif
-
 FEATURE(sysv_msg, "System V message queues support");
 
 static MALLOC_DEFINE(M_MSG, "msg", "SVID compatible message queues");
@@ -104,7 +101,6 @@ static int msg_prison_set(void *, void *);
 static int msg_prison_get(void *, void *);
 static int msg_prison_remove(void *, void *);
 static void msg_prison_cleanup(struct prison *);
-
 
 #ifdef MSG_DEBUG
 #define DPRINTF(a)	printf a
@@ -516,7 +512,6 @@ msgunload()
 	mtx_destroy(&msq_mtx);
 	return (0);
 }
-
 
 static int
 sysvmsg_modload(struct module *module, int cmd, void *arg)
@@ -1628,7 +1623,7 @@ sysctl_msqids(SYSCTL_HANDLER_ARGS)
 #ifdef COMPAT_FREEBSD64
 		if (!SV_CURPROC_FLAG(SV_CHERI)) {
 			bzero(&tmsqk64, sizeof(tmsqk64));
-			CP(tmsqk, tmsqk_c, u.msg_perm);
+			CP(tmsqk, tmsqk64, u.msg_perm);
 			/* Don't copy u.msg_first or u.msg_last */
 			CP(tmsqk, tmsqk64, u.msg_cbytes);
 			CP(tmsqk, tmsqk64, u.msg_qnum);
@@ -2311,8 +2306,7 @@ freebsd7_msgctl(struct thread *td, struct freebsd7_msgctl_args *uap)
 	DPRINTF(("call to freebsd7_msgctl(%d, %d, %p)\n", uap->msqid, uap->cmd,
 	    uap->buf));
 	if (uap->cmd == IPC_SET) {
-		error = copyin(__USER_CAP_OBJ(uap->buf), &msqold,
-		    sizeof(msqold));
+		error = copyin(uap->buf, &msqold, sizeof(msqold));
 		if (error)
 			return (error);
 		ipcperm_old2new(&msqold.msg_perm, &msqbuf.msg_perm);
@@ -2343,8 +2337,7 @@ freebsd7_msgctl(struct thread *td, struct freebsd7_msgctl_args *uap)
 		CP(msqbuf, msqold, msg_stime);
 		CP(msqbuf, msqold, msg_rtime);
 		CP(msqbuf, msqold, msg_ctime);
-		error = copyout(&msqold, __USER_CAP_OBJ(uap->buf),
-		    sizeof(struct msqid_ds_old));
+		error = copyout(&msqold, uap->buf, sizeof(msqold));
 	}
 	return (error);
 }

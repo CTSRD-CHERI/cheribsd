@@ -1,9 +1,10 @@
 # $FreeBSD$
 
+.include <src.opts.mk>
+
 PROG?=	cheritest
 SRCS=	cheritest.c
 
-.ifndef BOOTSTRAPPING
 SRCS+=	cheritest_bounds_globals.c					\
 	cheritest_bounds_globals_x.c					\
 	cheritest_bounds_heap.c						\
@@ -12,7 +13,6 @@ SRCS+=	cheritest_bounds_globals.c					\
 	cheritest_kbounce.c						\
 	cheritest_longjmp.c						\
 	cheritest_registers.c						\
-	cheritest_sandbox.S						\
 	cheritest_sealcap.c						\
 	cheritest_signal.c						\
 	cheritest_string.c						\
@@ -24,26 +24,23 @@ SRCS+=	cheritest_bounds_globals.c					\
 	cheritest_zlib.c
 # This test is broken
 CFLAGS.cheritest_vm_swap.c+=-Wno-cheri-capability-misuse
-.endif
 
 CHERITEST_DIR:=	${.PARSEDIR}
 
 .ifdef CHERIABI_TESTS
-.ifndef BOOTSTRAPPING
 SRCS+=	cheritest_cheriabi.c
 SRCS+=	cheritest_cheriabi_open.c
-.endif
 CFLAGS+=	-DCHERIABI_TESTS
 .endif
 
-.ifndef BOOTSTRAPPING
+.if ${MACHINE} == mips
 .PATH: ${SRCTOP}/sys/mips/cheri
 SRCS+=	cheri_memcpy_c.S
 CFLAGS.cheri_memcpy_c.S=-D__KERN_FUNC_PREFIX -D_KERNEL -DINVARIANTS
 CFLAGS+=	-DKERNEL_MEMCPY_TESTS
-.else
 .endif
 
+.if ${MACHINE} == "mips"
 .ifdef CHERI_C_TESTS
 CHERI_C_TESTS_DIR=	${SRCTOP}/contrib/subrepo-cheri-c-tests
 .if exists(${CHERI_C_TESTS_DIR}/Makefile)
@@ -53,8 +50,6 @@ CHERI_C_TESTS_DIR=	${SRCTOP}/contrib/subrepo-cheri-c-tests
 		${CHERI_C_TESTS_DIR}/libc
 CFLAGS+=	-DCHERI_C_TESTS \
 		-I${CHERI_C_TESTS_DIR}
-
-.ifndef BOOTSTRAPPING
 
 CFLAGS+=	-DTEST_CUSTOM_FRAMEWORK -I${CHERITEST_DIR} \
 		-DHAVE_MALLOC_USUABLE_SIZE
@@ -78,26 +73,34 @@ CFLAGS+=	-DCHERITHREAD_TESTS
 
 MAN=
 
-.ifndef BOOTSTRAPPING
 .if ${PROG:Mcheritest*}
-NEED_CHERI=	hybrid
+.if ${MACHINE_ABI:Mpurecap}
+NEED_COMPAT=	64
+.include <bsd.compat.mk>
+.endif
 .elif ${PROG:Mcheriabitest*}
-WANT_CHERI=	pure
+.if !${MACHINE_ABI:Mpurecap}
+NEED_COMPAT=	CHERI
+.include <bsd.compat.mk>
+.endif
 .else
 .error Unknown cheritest variant ${PROG}
 .endif
-LIBADD= 	z
-.endif
 
+LIBADD= 	z
 LIBADD+=	xo util
+
+.if ${MK_LIBCHERI} == "yes"
+SRCS+=	cheritest_sandbox.S
+.endif
 
 .ifdef CHERI_DYNAMIC_TESTS
 CFLAGS+=	-DCHERI_DYNAMIC_TESTS
 .else
 NO_SHARED?=	YES
 # XXX-JC: Enable unconditionally once we have a dynamic libcheri
+.if ${MK_LIBCHERI} == "yes"
 CFLAGS+=	-DCHERI_LIBCHERI_TESTS
-.ifndef BOOTSTRAPPING
 LIBADD+=	cheri
 SRCS+=		cheritest_ccall.c					\
 		cheritest_fd.c						\
@@ -112,28 +115,13 @@ SRCS+=		cheritest_ccall.c					\
 
 .ifdef CHERITHREAD_TESTS
 LIBADD+=	pthread
-.ifndef BOOTSTRAPPING
 SRCS+=		cheritest_tls_threads.c
 # XXX-JC: Enable unconditionally once we have a dynamic libcheri
 .ifndef CHERI_DYNAMIC_TESTS
+.if ${MK_LIBCHERI} == "yes"
 SRCS+=		cheritest_libcheri_pthreads.c
 .endif
 .endif
-.endif
-
-.ifdef BOOTSTRAPPING
-CFLAGS+=	-DLIST_ONLY \
-		-I${SRCTOP}/libexec/cheritest-helper \
-		-I${SRCTOP}/contrib/libxo \
-		-I${.OBJDIR}
-LDFLAGS+=	-L${.OBJDIR}/../../lib/libxo
-CLEAN_FILES+=	cheritest_list_only.h
-SRCS+=		cheritest_list_only.h
-# XXX-BD: .PARSEDIR should work for SRCDIR, but sometimes is ""
-SRCDIR?=	${.CURDIR}
-cheritest_list_only.h:	cheritest.c gen_cheritest_list_only.awk
-	awk -f ${SRCDIR}/gen_cheritest_list_only.awk \
-	    ${SRCDIR}/cheritest.c > ${.TARGET} || rm -f ${.TARGET}
 .endif
 
 .include <bsd.prog.mk>

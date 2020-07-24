@@ -188,8 +188,9 @@ sysctl_acct_chkfreq(SYSCTL_HANDLER_ARGS)
 	acctchkfreq = value;
 	return (0);
 }
-SYSCTL_PROC(_kern, OID_AUTO, acct_chkfreq, CTLTYPE_INT|CTLFLAG_RW,
-    &acctchkfreq, 0, sysctl_acct_chkfreq, "I",
+SYSCTL_PROC(_kern, OID_AUTO, acct_chkfreq,
+    CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_NEEDGIANT, &acctchkfreq, 0,
+    sysctl_acct_chkfreq, "I",
     "frequency for checking the free space");
 
 SYSCTL_INT(_kern, OID_AUTO, acct_configured, CTLFLAG_RD, &acct_configured, 0,
@@ -234,12 +235,12 @@ kern_acct(struct thread *td, const char * __capability path)
 #ifdef MAC
 		error = mac_system_check_acct(td->td_ucred, nd.ni_vp);
 		if (error) {
-			VOP_UNLOCK(nd.ni_vp, 0);
+			VOP_UNLOCK(nd.ni_vp);
 			vn_close(nd.ni_vp, flags, td->td_ucred, td);
 			return (error);
 		}
 #endif
-		VOP_UNLOCK(nd.ni_vp, 0);
+		VOP_UNLOCK(nd.ni_vp);
 		if (nd.ni_vp->v_type != VREG) {
 			vn_close(nd.ni_vp, flags, td->td_ucred, td);
 			return (EACCES);

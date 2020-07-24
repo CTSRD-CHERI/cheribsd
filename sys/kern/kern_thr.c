@@ -26,8 +26,6 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#define	EXPLICIT_USER_ACCESS
-
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
@@ -66,7 +64,7 @@ __FBSDID("$FreeBSD$");
 
 #include <security/audit/audit.h>
 
-static SYSCTL_NODE(_kern, OID_AUTO, threads, CTLFLAG_RW, 0,
+static SYSCTL_NODE(_kern, OID_AUTO, threads, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
     "thread allocation");
 
 static int max_threads_per_proc = 1500;
@@ -169,10 +167,9 @@ thr_new_initthr(struct thread *td, void *thunk)
 	stack.ss_sp = param->stack_base;
 	stack.ss_size = param->stack_size;
 	/* Set upcall address to user thread entry function. */
-	cpu_set_upcall(td, param->start_func,
-	    (__cheri_fromcap void *)param->arg, &stack);
+	cpu_set_upcall(td, param->start_func, param->arg, &stack);
 	/* Setup user TLS address and TLS pointer register. */
-	return (cpu_set_user_tls(td, (__cheri_fromcap void *)param->tls_base));
+	return (cpu_set_user_tls(td, param->tls_base));
 }
 
 int
@@ -274,17 +271,14 @@ thread_create(struct thread *td, struct rtprio *rtp,
 
 	tidhash_add(newtd);
 
+	/* ignore timesharing class */
+	if (rtp != NULL && !(td->td_pri_class == PRI_TIMESHARE &&
+	    rtp->type == RTP_PRIO_NORMAL))
+		rtp_to_pri(rtp, newtd);
+
 	thread_lock(newtd);
-	if (rtp != NULL) {
-		if (!(td->td_pri_class == PRI_TIMESHARE &&
-		      rtp->type == RTP_PRIO_NORMAL)) {
-			rtp_to_pri(rtp, newtd);
-			sched_prio(newtd, newtd->td_user_pri);
-		} /* ignore timesharing class */
-	}
 	TD_SET_CAN_RUN(newtd);
 	sched_add(newtd, SRQ_BORING);
-	thread_unlock(newtd);
 
 	return (0);
 
@@ -597,10 +591,10 @@ kern_thr_set_name(struct thread *td, lwpid_t id,
 	error = 0;
 	name[0] = '\0';
 	if (uname != NULL) {
-		error = copyinstr_c(uname, name, sizeof(name),
+		error = copyinstr(uname, name, sizeof(name),
 		    NULL);
 		if (error == ENAMETOOLONG) {
-			error = copyin_c(uname, &name[0], sizeof(name) - 1);
+			error = copyin(uname, &name[0], sizeof(name) - 1);
 			name[sizeof(name) - 1] = '\0';
 		}
 		if (error)

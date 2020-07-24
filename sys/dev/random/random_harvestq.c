@@ -34,7 +34,9 @@ __FBSDID("$FreeBSD$");
 
 #include <sys/param.h>
 #include <sys/systm.h>
+#include <sys/ck.h>
 #include <sys/conf.h>
+#include <sys/epoch.h>
 #include <sys/eventhandler.h>
 #include <sys/hash.h>
 #include <sys/kernel.h>
@@ -48,11 +50,6 @@ __FBSDID("$FreeBSD$");
 #include <sys/sbuf.h>
 #include <sys/sysctl.h>
 #include <sys/unistd.h>
-
-#if defined(RANDOM_LOADABLE)
-#include <sys/lock.h>
-#include <sys/sx.h>
-#endif
 
 #include <machine/atomic.h>
 #include <machine/cpu.h>
@@ -81,6 +78,14 @@ static void random_sources_feed(void);
 static u_int read_rate;
 
 /*
+ * Random must initialize much earlier than epoch, but we can initialize the
+ * epoch code before SMP starts.  Prior to SMP, we can safely bypass
+ * concurrency primitives.
+ */
+static __read_mostly bool epoch_inited;
+static __read_mostly epoch_t rs_epoch;
+
+/*
  * How many events to queue up. We create this many items in
  * an 'empty' queue, then transfer them to the 'harvest' queue with
  * supplied junk. When used, they are transferred back to the
@@ -99,14 +104,14 @@ volatile int random_kthread_control;
 __read_frequently u_int hc_source_mask;
 
 struct random_sources {
-	LIST_ENTRY(random_sources)	 rrs_entries;
+	CK_LIST_ENTRY(random_sources)	 rrs_entries;
 	struct random_source		*rrs_source;
 };
 
-static LIST_HEAD(sources_head, random_sources) source_list =
-    LIST_HEAD_INITIALIZER(source_list);
+static CK_LIST_HEAD(sources_head, random_sources) source_list =
+    CK_LIST_HEAD_INITIALIZER(source_list);
 
-SYSCTL_NODE(_kern_random, OID_AUTO, harvest, CTLFLAG_RW, 0,
+SYSCTL_NODE(_kern_random, OID_AUTO, harvest, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
     "Entropy Device Parameters");
 
 /*
@@ -163,14 +168,7 @@ static struct kproc_desc random_proc_kp = {
 static __inline void
 random_harvestq_fast_process_event(struct harvest_event *event)
 {
-#if defined(RANDOM_LOADABLE)
-	RANDOM_CONFIG_S_LOCK();
-	if (p_random_alg_context)
-#endif
 	p_random_alg_context->ra_event_processor(event);
-#if defined(RANDOM_LOADABLE)
-	RANDOM_CONFIG_S_UNLOCK();
-#endif
 	explicit_bzero(event, sizeof(*event));
 }
 
@@ -223,6 +221,14 @@ random_kthread(void)
 SYSINIT(random_device_h_proc, SI_SUB_KICK_SCHEDULER, SI_ORDER_ANY, kproc_start,
     &random_proc_kp);
 
+static void
+rs_epoch_init(void *dummy __unused)
+{
+	rs_epoch = epoch_alloc("Random Sources", EPOCH_PREEMPT);
+	epoch_inited = true;
+}
+SYSINIT(rs_epoch_init, SI_SUB_EPOCH, SI_ORDER_ANY, rs_epoch_init, NULL);
+
 /*
  * Run through all fast sources reading entropy for the given
  * number of rounds, which should be a multiple of the number
@@ -232,24 +238,25 @@ static void
 random_sources_feed(void)
 {
 	uint32_t entropy[HARVESTSIZE];
+	struct epoch_tracker et;
 	struct random_sources *rrs;
 	u_int i, n, local_read_rate;
+	bool rse_warm;
+
+	rse_warm = epoch_inited;
 
 	/*
 	 * Step over all of live entropy sources, and feed their output
 	 * to the system-wide RNG.
 	 */
-#if defined(RANDOM_LOADABLE)
-	RANDOM_CONFIG_S_LOCK();
-	if (p_random_alg_context) {
-	/* It's an indenting error. Yeah, Yeah. */
-#endif
 	local_read_rate = atomic_readandclear_32(&read_rate);
 	/* Perform at least one read per round */
 	local_read_rate = MAX(local_read_rate, 1);
 	/* But not exceeding RANDOM_KEYSIZE_WORDS */
 	local_read_rate = MIN(local_read_rate, RANDOM_KEYSIZE_WORDS);
-	LIST_FOREACH(rrs, &source_list, rrs_entries) {
+	if (rse_warm)
+		epoch_enter_preempt(rs_epoch, &et);
+	CK_LIST_FOREACH(rrs, &source_list, rrs_entries) {
 		for (i = 0; i < p_random_alg_context->ra_poolcount*local_read_rate; i++) {
 			n = rrs->rrs_source->rs_read(entropy, sizeof(entropy));
 			KASSERT((n <= sizeof(entropy)), ("%s: rs_read returned too much data (%u > %zu)", __func__, n, sizeof(entropy)));
@@ -269,11 +276,9 @@ random_sources_feed(void)
 			random_harvest_direct(entropy, n, rrs->rrs_source->rs_source);
 		}
 	}
+	if (rse_warm)
+		epoch_exit_preempt(rs_epoch, &et);
 	explicit_bzero(entropy, sizeof(entropy));
-#if defined(RANDOM_LOADABLE)
-	}
-	RANDOM_CONFIG_S_UNLOCK();
-#endif
 }
 
 void
@@ -313,8 +318,10 @@ random_check_uint_harvestmask(SYSCTL_HANDLER_ARGS)
 	    (orig_value & user_immutable_mask);
 	return (0);
 }
-SYSCTL_PROC(_kern_random_harvest, OID_AUTO, mask, CTLTYPE_UINT | CTLFLAG_RW,
-    NULL, 0, random_check_uint_harvestmask, "IU", "Entropy harvesting mask");
+SYSCTL_PROC(_kern_random_harvest, OID_AUTO, mask,
+    CTLTYPE_UINT | CTLFLAG_RW | CTLFLAG_NEEDGIANT, NULL, 0,
+    random_check_uint_harvestmask, "IU",
+    "Entropy harvesting mask");
 
 /* ARGSUSED */
 static int
@@ -334,7 +341,8 @@ random_print_harvestmask(SYSCTL_HANDLER_ARGS)
 	return (error);
 }
 SYSCTL_PROC(_kern_random_harvest, OID_AUTO, mask_bin,
-    CTLTYPE_STRING | CTLFLAG_RD, NULL, 0, random_print_harvestmask, "A",
+    CTLTYPE_STRING | CTLFLAG_RD | CTLFLAG_MPSAFE, NULL, 0,
+    random_print_harvestmask, "A",
     "Entropy harvesting mask (printable)");
 
 static const char *random_source_descr[ENTROPYSOURCE] = {
@@ -352,7 +360,6 @@ static const char *random_source_descr[ENTROPYSOURCE] = {
 	[RANDOM_PURE_OCTEON] = "PURE_OCTEON", /* PURE_START */
 	[RANDOM_PURE_SAFE] = "PURE_SAFE",
 	[RANDOM_PURE_GLXSB] = "PURE_GLXSB",
-	[RANDOM_PURE_UBSEC] = "PURE_UBSEC",
 	[RANDOM_PURE_HIFN] = "PURE_HIFN",
 	[RANDOM_PURE_RDRAND] = "PURE_RDRAND",
 	[RANDOM_PURE_NEHEMIAH] = "PURE_NEHEMIAH",
@@ -362,6 +369,7 @@ static const char *random_source_descr[ENTROPYSOURCE] = {
 	[RANDOM_PURE_CCP] = "PURE_CCP",
 	[RANDOM_PURE_DARN] = "PURE_DARN",
 	[RANDOM_PURE_TPM] = "PURE_TPM",
+	[RANDOM_PURE_VMGENID] = "VMGENID",
 	/* "ENTROPYSOURCE" */
 };
 
@@ -394,8 +402,9 @@ random_print_harvestmask_symbolic(SYSCTL_HANDLER_ARGS)
 	return (error);
 }
 SYSCTL_PROC(_kern_random_harvest, OID_AUTO, mask_symbolic,
-    CTLTYPE_STRING | CTLFLAG_RD, NULL, 0, random_print_harvestmask_symbolic,
-    "A", "Entropy harvesting mask (symbolic)");
+    CTLTYPE_STRING | CTLFLAG_RD | CTLFLAG_MPSAFE, NULL, 0,
+    random_print_harvestmask_symbolic, "A",
+    "Entropy harvesting mask (symbolic)");
 
 /* ARGSUSED */
 static void
@@ -409,7 +418,7 @@ random_harvestq_init(void *unused __unused)
 	RANDOM_HARVEST_INIT_LOCK();
 	harvest_context.hc_entropy_ring.in = harvest_context.hc_entropy_ring.out = 0;
 }
-SYSINIT(random_device_h_init, SI_SUB_RANDOM, SI_ORDER_SECOND, random_harvestq_init, NULL);
+SYSINIT(random_device_h_init, SI_SUB_RANDOM, SI_ORDER_THIRD, random_harvestq_init, NULL);
 
 /*
  * Subroutine to slice up a contiguous chunk of 'entropy' and feed it into the
@@ -498,7 +507,7 @@ random_harvestq_deinit(void *unused __unused)
 	while (random_kthread_control >= 0)
 		tsleep(&harvest_context.hc_kthread_proc, 0, "harvqterm", hz/5);
 }
-SYSUNINIT(random_device_h_init, SI_SUB_RANDOM, SI_ORDER_SECOND, random_harvestq_deinit, NULL);
+SYSUNINIT(random_device_h_init, SI_SUB_RANDOM, SI_ORDER_THIRD, random_harvestq_deinit, NULL);
 
 /*-
  * Entropy harvesting queue routine.
@@ -607,7 +616,10 @@ random_source_register(struct random_source *rsource)
 	random_harvest_register_source(rsource->rs_source);
 
 	printf("random: registering fast source %s\n", rsource->rs_ident);
-	LIST_INSERT_HEAD(&source_list, rrs, rrs_entries);
+
+	RANDOM_HARVEST_LOCK();
+	CK_LIST_INSERT_HEAD(&source_list, rrs, rrs_entries);
+	RANDOM_HARVEST_UNLOCK();
 }
 
 void
@@ -619,29 +631,40 @@ random_source_deregister(struct random_source *rsource)
 
 	random_harvest_deregister_source(rsource->rs_source);
 
-	LIST_FOREACH(rrs, &source_list, rrs_entries)
+	RANDOM_HARVEST_LOCK();
+	CK_LIST_FOREACH(rrs, &source_list, rrs_entries)
 		if (rrs->rrs_source == rsource) {
-			LIST_REMOVE(rrs, rrs_entries);
+			CK_LIST_REMOVE(rrs, rrs_entries);
 			break;
 		}
-	if (rrs != NULL)
-		free(rrs, M_ENTROPY);
+	RANDOM_HARVEST_UNLOCK();
+
+	if (rrs != NULL && epoch_inited)
+		epoch_wait_preempt(rs_epoch);
+	free(rrs, M_ENTROPY);
 }
 
 static int
 random_source_handler(SYSCTL_HANDLER_ARGS)
 {
+	struct epoch_tracker et;
 	struct random_sources *rrs;
 	struct sbuf sbuf;
 	int error, count;
 
+	error = sysctl_wire_old_buffer(req, 0);
+	if (error != 0)
+		return (error);
+
 	sbuf_new_for_sysctl(&sbuf, NULL, 64, req);
 	count = 0;
-	LIST_FOREACH(rrs, &source_list, rrs_entries) {
+	epoch_enter_preempt(rs_epoch, &et);
+	CK_LIST_FOREACH(rrs, &source_list, rrs_entries) {
 		sbuf_cat(&sbuf, (count++ ? ",'" : "'"));
 		sbuf_cat(&sbuf, rrs->rrs_source->rs_ident);
 		sbuf_cat(&sbuf, "'");
 	}
+	epoch_exit_preempt(rs_epoch, &et);
 	error = sbuf_finish(&sbuf);
 	sbuf_delete(&sbuf);
 	return (error);

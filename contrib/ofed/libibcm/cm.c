@@ -105,7 +105,7 @@ do {                                        \
 } while (0)
 
 struct cm_id_private {
-	struct ib_cm_id id;
+	struct ib_cm_id id __subobject_use_container_bounds;
 	int events_completed;
 	pthread_cond_t cond;
 	pthread_mutex_t mut;

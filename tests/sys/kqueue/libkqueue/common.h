@@ -40,10 +40,10 @@
 
 #include <sys/event.h>
 
-extern char *cur_test_id;
-int vnode_fd;
+extern int vnode_fd;
+extern int kqfd;
 
-extern char * kevent_to_str(struct kevent *);
+char * kevent_to_str(struct kevent *);
 struct kevent * kevent_get(int);
 struct kevent * kevent_get_timeout(int, int);
 
@@ -70,10 +70,19 @@ kevent_add(int kqfd, struct kevent *kev,
 } while (0);
 
 /* Checks if any events are pending, which is an error. */
-extern void test_no_kevents(void);
-extern void test_no_kevents_quietly(void);
+void test_no_kevents(void);
+void test_no_kevents_quietly(void);
 
-extern void test_begin(const char *);
-extern void success(void);
+void test_begin(const char *);
+void success(void);
+
+void test_evfilt_read(void);
+void test_evfilt_signal(void);
+void test_evfilt_vnode(void);
+void test_evfilt_timer(void);
+void test_evfilt_proc(void);
+#if HAVE_EVFILT_USER
+void test_evfilt_user(void);
+#endif
 
 #endif  /* _COMMON_H */

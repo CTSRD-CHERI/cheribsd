@@ -48,7 +48,6 @@ __FBSDID("$FreeBSD$");
  * For nfsv4, these functions are called for each Op within the Compound RPC.
  */
 
-#ifndef APPLEKEXT
 #include <fs/nfs/nfsport.h>
 #include <sys/extattr.h>
 #include <sys/filio.h>
@@ -68,7 +67,6 @@ extern u_long sb_max_adj;
 extern int nfsrv_pnfsatime;
 extern int nfsrv_maxpnfsmirror;
 extern int nfs_maxcopyrange;
-#endif	/* !APPLEKEXT */
 
 static int	nfs_async = 0;
 SYSCTL_DECL(_vfs_nfsd);
@@ -81,6 +79,10 @@ static int	nfsrv_linux42server = 1;
 SYSCTL_INT(_vfs_nfsd, OID_AUTO, linux42server, CTLFLAG_RW,
     &nfsrv_linux42server, 0,
     "Enable Linux style NFSv4.2 server (non-RFC compliant)");
+static bool	nfsrv_openaccess = true;
+SYSCTL_BOOL(_vfs_nfsd, OID_AUTO, v4openaccess, CTLFLAG_RW,
+    &nfsrv_openaccess, 0,
+    "Enable Linux style NFSv4 Open access check");
 
 /*
  * This list defines the GSS mechanisms supported.
@@ -108,7 +110,7 @@ static void nfsrvd_mkdirsub(struct nfsrv_descript *nd, struct nameidata *ndp,
 /*
  * nfs access service (not a part of NFS V2)
  */
-APPLESTATIC int
+int
 nfsrvd_access(struct nfsrv_descript *nd, __unused int isdgram,
     vnode_t vp, struct nfsexstuff *exp)
 {
@@ -215,7 +217,7 @@ nfsmout:
 /*
  * nfs getattr service
  */
-APPLESTATIC int
+int
 nfsrvd_getattr(struct nfsrv_descript *nd, int isdgram,
     vnode_t vp, __unused struct nfsexstuff *exp)
 {
@@ -298,7 +300,7 @@ nfsrvd_getattr(struct nfsrv_descript *nd, int isdgram,
 				} else
 					at_root = 0;
 				vfs_ref(mp);
-				NFSVOPUNLOCK(vp, 0);
+				NFSVOPUNLOCK(vp);
 				if (at_root != 0) {
 					if ((nd->nd_repstat =
 					     NFSVOPLOCK(tvp, LK_SHARED)) == 0) {
@@ -342,7 +344,7 @@ out:
 /*
  * nfs setattr service
  */
-APPLESTATIC int
+int
 nfsrvd_setattr(struct nfsrv_descript *nd, __unused int isdgram,
     vnode_t vp, struct nfsexstuff *exp)
 {
@@ -556,7 +558,7 @@ nfsmout:
  * nfs lookup rpc
  * (Also performs lookup parent for v4)
  */
-APPLESTATIC int
+int
 nfsrvd_lookup(struct nfsrv_descript *nd, __unused int isdgram,
     vnode_t dp, vnode_t *vpp, fhandle_t *fhp, struct nfsexstuff *exp)
 {
@@ -656,12 +658,12 @@ out:
 /*
  * nfs readlink service
  */
-APPLESTATIC int
+int
 nfsrvd_readlink(struct nfsrv_descript *nd, __unused int isdgram,
     vnode_t vp, __unused struct nfsexstuff *exp)
 {
 	u_int32_t *tl;
-	mbuf_t mp = NULL, mpend = NULL;
+	struct mbuf *mp = NULL, *mpend = NULL;
 	int getret = 1, len;
 	struct nfsvattr nva;
 	struct thread *p = curthread;
@@ -688,9 +690,9 @@ nfsrvd_readlink(struct nfsrv_descript *nd, __unused int isdgram,
 		goto out;
 	NFSM_BUILD(tl, u_int32_t *, NFSX_UNSIGNED);
 	*tl = txdr_unsigned(len);
-	mbuf_setnext(nd->nd_mb, mp);
+	nd->nd_mb->m_next = mp;
 	nd->nd_mb = mpend;
-	nd->nd_bpos = NFSMTOD(mpend, caddr_t) + mbuf_len(mpend);
+	nd->nd_bpos = mtod(mpend, caddr_t) + mpend->m_len;
 
 out:
 	NFSEXITCODE2(0, nd);
@@ -700,13 +702,13 @@ out:
 /*
  * nfs read service
  */
-APPLESTATIC int
+int
 nfsrvd_read(struct nfsrv_descript *nd, __unused int isdgram,
     vnode_t vp, struct nfsexstuff *exp)
 {
 	u_int32_t *tl;
 	int error = 0, cnt, getret = 1, gotproxystateid, reqlen, eof = 0;
-	mbuf_t m2, m3;
+	struct mbuf *m2, *m3;
 	struct nfsvattr nva;
 	off_t off = 0x0;
 	struct nfsstate st, *stp = &st;
@@ -845,7 +847,7 @@ nfsrvd_read(struct nfsrv_descript *nd, __unused int isdgram,
 		if (nd->nd_repstat) {
 			vput(vp);
 			if (m3)
-				mbuf_freem(m3);
+				m_freem(m3);
 			if (nd->nd_flag & ND_NFSV3)
 				nfsrv_postopattr(nd, getret, &nva);
 			goto out;
@@ -869,9 +871,9 @@ nfsrvd_read(struct nfsrv_descript *nd, __unused int isdgram,
 	}
 	*tl = txdr_unsigned(cnt);
 	if (m3) {
-		mbuf_setnext(nd->nd_mb, m3);
+		nd->nd_mb->m_next = m3;
 		nd->nd_mb = m2;
-		nd->nd_bpos = NFSMTOD(m2, caddr_t) + mbuf_len(m2);
+		nd->nd_bpos = mtod(m2, caddr_t) + m2->m_len;
 	}
 
 out:
@@ -886,7 +888,7 @@ nfsmout:
 /*
  * nfs write service
  */
-APPLESTATIC int
+int
 nfsrvd_write(struct nfsrv_descript *nd, __unused int isdgram,
     vnode_t vp, struct nfsexstuff *exp)
 {
@@ -1068,7 +1070,7 @@ nfsmout:
  * The core creation routine has been extracted out into nfsrv_creatsub(),
  * so it can also be used by nfsrv_open() for V4.
  */
-APPLESTATIC int
+int
 nfsrvd_create(struct nfsrv_descript *nd, __unused int isdgram,
     vnode_t dp, struct nfsexstuff *exp)
 {
@@ -1238,7 +1240,7 @@ nfsmout:
 /*
  * nfs v3 mknod service (and v4 create)
  */
-APPLESTATIC int
+int
 nfsrvd_mknod(struct nfsrv_descript *nd, __unused int isdgram,
     vnode_t dp, vnode_t *vpp, fhandle_t *fhp, struct nfsexstuff *exp)
 {
@@ -1409,7 +1411,7 @@ nfsrvd_mknod(struct nfsrv_descript *nd, __unused int isdgram,
 			nd->nd_repstat = nfsvno_getattr(vp, &nva, nd, p, 1,
 			    NULL);
 		if (vpp != NULL && nd->nd_repstat == 0) {
-			NFSVOPUNLOCK(vp, 0);
+			NFSVOPUNLOCK(vp);
 			*vpp = vp;
 		} else
 			vput(vp);
@@ -1456,7 +1458,7 @@ nfsmout:
 /*
  * nfs remove service
  */
-APPLESTATIC int
+int
 nfsrvd_remove(struct nfsrv_descript *nd, __unused int isdgram,
     vnode_t dp, struct nfsexstuff *exp)
 {
@@ -1539,7 +1541,7 @@ out:
 /*
  * nfs rename service
  */
-APPLESTATIC int
+int
 nfsrvd_rename(struct nfsrv_descript *nd, int isdgram,
     vnode_t dp, vnode_t todp, struct nfsexstuff *exp, struct nfsexstuff *toexp)
 {
@@ -1584,14 +1586,14 @@ nfsrvd_rename(struct nfsrv_descript *nd, int isdgram,
 		tdp = todp;
 		tnes = *toexp;
 		if (dp != tdp) {
-			NFSVOPUNLOCK(dp, 0);
+			NFSVOPUNLOCK(dp);
 			/* Might lock tdp. */
 			tdirfor_ret = nfsvno_getattr(tdp, &tdirfor, nd, p, 0,
 			    NULL);
 		} else {
 			tdirfor_ret = nfsvno_getattr(tdp, &tdirfor, nd, p, 1,
 			    NULL);
-			NFSVOPUNLOCK(dp, 0);
+			NFSVOPUNLOCK(dp);
 		}
 	} else {
 		tfh.nfsrvfh_len = 0;
@@ -1613,16 +1615,16 @@ nfsrvd_rename(struct nfsrv_descript *nd, int isdgram,
 			tnes = *exp;
 			tdirfor_ret = nfsvno_getattr(tdp, &tdirfor, nd, p, 1,
 			    NULL);
-			NFSVOPUNLOCK(dp, 0);
+			NFSVOPUNLOCK(dp);
 		} else {
-			NFSVOPUNLOCK(dp, 0);
+			NFSVOPUNLOCK(dp);
 			nd->nd_cred->cr_uid = nd->nd_saveduid;
 			nfsd_fhtovp(nd, &tfh, LK_EXCLUSIVE, &tdp, &tnes, NULL,
 			    0);	/* Locks tdp. */
 			if (tdp) {
 				tdirfor_ret = nfsvno_getattr(tdp, &tdirfor, nd,
 				    p, 1, NULL);
-				NFSVOPUNLOCK(tdp, 0);
+				NFSVOPUNLOCK(tdp);
 			}
 		}
 	}
@@ -1709,7 +1711,7 @@ out:
 /*
  * nfs link service
  */
-APPLESTATIC int
+int
 nfsrvd_link(struct nfsrv_descript *nd, int isdgram,
     vnode_t vp, vnode_t tovp, struct nfsexstuff *exp, struct nfsexstuff *toexp)
 {
@@ -1729,7 +1731,7 @@ nfsrvd_link(struct nfsrv_descript *nd, int isdgram,
 		nfsrv_wcc(nd, dirfor_ret, &dirfor, diraft_ret, &diraft);
 		goto out;
 	}
-	NFSVOPUNLOCK(vp, 0);
+	NFSVOPUNLOCK(vp);
 	if (vnode_vtype(vp) == VDIR) {
 		if (nd->nd_flag & ND_NFSV4)
 			nd->nd_repstat = NFSERR_ISDIR;
@@ -1751,7 +1753,7 @@ nfsrvd_link(struct nfsrv_descript *nd, int isdgram,
 			}
 			nfsd_fhtovp(nd, &dfh, LK_EXCLUSIVE, &dp, &tnes, NULL, 0);
 			if (dp)
-				NFSVOPUNLOCK(dp, 0);
+				NFSVOPUNLOCK(dp);
 		}
 	}
 	NFSNAMEICNDSET(&named.ni_cnd, nd->nd_cred, CREATE,
@@ -1812,7 +1814,7 @@ out:
 /*
  * nfs symbolic link service
  */
-APPLESTATIC int
+int
 nfsrvd_symlink(struct nfsrv_descript *nd, __unused int isdgram,
     vnode_t dp, vnode_t *vpp, fhandle_t *fhp, struct nfsexstuff *exp)
 {
@@ -1908,7 +1910,7 @@ nfsrvd_symlinksub(struct nfsrv_descript *nd, struct nameidata *ndp,
 				    nvap, nd, p, 1, NULL);
 		}
 		if (vpp != NULL && nd->nd_repstat == 0) {
-			NFSVOPUNLOCK(ndp->ni_vp, 0);
+			NFSVOPUNLOCK(ndp->ni_vp);
 			*vpp = ndp->ni_vp;
 		} else
 			vput(ndp->ni_vp);
@@ -1932,7 +1934,7 @@ nfsrvd_symlinksub(struct nfsrv_descript *nd, struct nameidata *ndp,
 /*
  * nfs mkdir service
  */
-APPLESTATIC int
+int
 nfsrvd_mkdir(struct nfsrv_descript *nd, __unused int isdgram,
     vnode_t dp, vnode_t *vpp, fhandle_t *fhp, struct nfsexstuff *exp)
 {
@@ -2041,7 +2043,7 @@ nfsrvd_mkdirsub(struct nfsrv_descript *nd, struct nameidata *ndp,
 			nd->nd_repstat = nfsvno_getattr(vp, nvap, nd, p, 1,
 			    NULL);
 		if (vpp && !nd->nd_repstat) {
-			NFSVOPUNLOCK(vp, 0);
+			NFSVOPUNLOCK(vp);
 			*vpp = vp;
 		} else {
 			vput(vp);
@@ -2066,7 +2068,7 @@ nfsrvd_mkdirsub(struct nfsrv_descript *nd, struct nameidata *ndp,
 /*
  * nfs commit service
  */
-APPLESTATIC int
+int
 nfsrvd_commit(struct nfsrv_descript *nd, __unused int isdgram,
     vnode_t vp, __unused struct nfsexstuff *exp)
 {
@@ -2124,7 +2126,7 @@ nfsmout:
 /*
  * nfs statfs service
  */
-APPLESTATIC int
+int
 nfsrvd_statfs(struct nfsrv_descript *nd, __unused int isdgram,
     vnode_t vp, __unused struct nfsexstuff *exp)
 {
@@ -2184,7 +2186,7 @@ out:
 /*
  * nfs fsinfo service
  */
-APPLESTATIC int
+int
 nfsrvd_fsinfo(struct nfsrv_descript *nd, int isdgram,
     vnode_t vp, __unused struct nfsexstuff *exp)
 {
@@ -2224,7 +2226,7 @@ out:
 /*
  * nfs pathconf service
  */
-APPLESTATIC int
+int
 nfsrvd_pathconf(struct nfsrv_descript *nd, __unused int isdgram,
     vnode_t vp, __unused struct nfsexstuff *exp)
 {
@@ -2276,7 +2278,7 @@ out:
 /*
  * nfsv4 lock service
  */
-APPLESTATIC int
+int
 nfsrvd_lock(struct nfsrv_descript *nd, __unused int isdgram,
     vnode_t vp, struct nfsexstuff *exp)
 {
@@ -2504,7 +2506,7 @@ nfsmout:
 /*
  * nfsv4 lock test service
  */
-APPLESTATIC int
+int
 nfsrvd_lockt(struct nfsrv_descript *nd, __unused int isdgram,
     vnode_t vp, struct nfsexstuff *exp)
 {
@@ -2619,7 +2621,7 @@ nfsmout:
 /*
  * nfsv4 unlock service
  */
-APPLESTATIC int
+int
 nfsrvd_locku(struct nfsrv_descript *nd, __unused int isdgram,
     vnode_t vp, struct nfsexstuff *exp)
 {
@@ -2735,14 +2737,14 @@ nfsmout:
 /*
  * nfsv4 open service
  */
-APPLESTATIC int
+int
 nfsrvd_open(struct nfsrv_descript *nd, __unused int isdgram,
     vnode_t dp, vnode_t *vpp, __unused fhandle_t *fhp, struct nfsexstuff *exp)
 {
 	u_int32_t *tl;
 	int i, retext;
 	struct nfsstate *stp = NULL;
-	int error = 0, create, claim, exclusive_flag = 0;
+	int error = 0, create, claim, exclusive_flag = 0, override;
 	u_int32_t rflags = NFSV4OPEN_LOCKTYPEPOSIX, acemask;
 	int how = NFSCREATE_UNCHECKED;
 	int32_t cverf[2], tverf[2] = { 0, 0 };
@@ -3046,15 +3048,38 @@ nfsrvd_open(struct nfsrv_descript *nd, __unused int isdgram,
 		 */
 		nd->nd_repstat = (vp->v_type == VDIR) ? NFSERR_ISDIR : NFSERR_SYMLINK;
 	}
+
+	/*
+	 * If the Open is being done for a file that already exists, apply
+	 * normal permission checking including for the file owner, if
+	 * vfs.nfsd.v4openaccess is set.
+	 * Previously, the owner was always allowed to open the file to
+	 * be consistent with the NFS tradition of always allowing the
+	 * owner of the file to write to the file regardless of permissions.
+	 * It now appears that the Linux client expects the owner
+	 * permissions to be checked for opens that are not creating the
+	 * file.  I believe the correct approach is to use the Access
+	 * operation's results to be consistent with NFSv3, but that is
+	 * not what the current Linux client appears to be doing.
+	 * Since both the Linux and OpenSolaris NFSv4 servers do this check,
+	 * I have enabled it by default.
+	 * If this semantic change causes a problem, it can be disabled by
+	 * setting the sysctl vfs.nfsd.v4openaccess to 0 to re-enable the
+	 * previous semantics.
+	 */
+	if (nfsrv_openaccess && create == NFSV4OPEN_NOCREATE)
+		override = NFSACCCHK_NOOVERRIDE;
+	else
+		override = NFSACCCHK_ALLOWOWNER;
 	if (!nd->nd_repstat && (stp->ls_flags & NFSLCK_WRITEACCESS))
 	    nd->nd_repstat = nfsvno_accchk(vp, VWRITE, nd->nd_cred,
-	        exp, p, NFSACCCHK_ALLOWOWNER, NFSACCCHK_VPISLOCKED, NULL);
+	        exp, p, override, NFSACCCHK_VPISLOCKED, NULL);
 	if (!nd->nd_repstat && (stp->ls_flags & NFSLCK_READACCESS)) {
 	    nd->nd_repstat = nfsvno_accchk(vp, VREAD, nd->nd_cred,
-	        exp, p, NFSACCCHK_ALLOWOWNER, NFSACCCHK_VPISLOCKED, NULL);
+	        exp, p, override, NFSACCCHK_VPISLOCKED, NULL);
 	    if (nd->nd_repstat)
 		nd->nd_repstat = nfsvno_accchk(vp, VEXEC,
-		    nd->nd_cred, exp, p, NFSACCCHK_ALLOWOWNER,
+		    nd->nd_cred, exp, p, override,
 		    NFSACCCHK_VPISLOCKED, NULL);
 	}
 
@@ -3081,7 +3106,7 @@ nfsrvd_open(struct nfsrv_descript *nd, __unused int isdgram,
 	 * (ie: Leave the NFSVOPUNLOCK() about here.)
 	 */
 	if (vp)
-		NFSVOPUNLOCK(vp, 0);
+		NFSVOPUNLOCK(vp);
 	if (stp)
 		free(stp, M_NFSDSTATE);
 	if (!nd->nd_repstat && dirp)
@@ -3191,7 +3216,7 @@ nfsmout:
 /*
  * nfsv4 close service
  */
-APPLESTATIC int
+int
 nfsrvd_close(struct nfsrv_descript *nd, __unused int isdgram,
     vnode_t vp, __unused struct nfsexstuff *exp)
 {
@@ -3272,7 +3297,7 @@ nfsmout:
 /*
  * nfsv4 delegpurge service
  */
-APPLESTATIC int
+int
 nfsrvd_delegpurge(struct nfsrv_descript *nd, __unused int isdgram,
     __unused vnode_t vp, __unused struct nfsexstuff *exp)
 {
@@ -3309,7 +3334,7 @@ nfsmout:
 /*
  * nfsv4 delegreturn service
  */
-APPLESTATIC int
+int
 nfsrvd_delegreturn(struct nfsrv_descript *nd, __unused int isdgram,
     vnode_t vp, __unused struct nfsexstuff *exp)
 {
@@ -3350,7 +3375,7 @@ nfsmout:
 /*
  * nfsv4 get file handle service
  */
-APPLESTATIC int
+int
 nfsrvd_getfh(struct nfsrv_descript *nd, __unused int isdgram,
     vnode_t vp, __unused struct nfsexstuff *exp)
 {
@@ -3368,7 +3393,7 @@ nfsrvd_getfh(struct nfsrv_descript *nd, __unused int isdgram,
 /*
  * nfsv4 open confirm service
  */
-APPLESTATIC int
+int
 nfsrvd_openconfirm(struct nfsrv_descript *nd, __unused int isdgram,
     vnode_t vp, __unused struct nfsexstuff *exp)
 {
@@ -3422,7 +3447,7 @@ nfsmout:
 /*
  * nfsv4 open downgrade service
  */
-APPLESTATIC int
+int
 nfsrvd_opendowngrade(struct nfsrv_descript *nd, __unused int isdgram,
     vnode_t vp, __unused struct nfsexstuff *exp)
 {
@@ -3533,7 +3558,7 @@ nfsmout:
 /*
  * nfsv4 renew lease service
  */
-APPLESTATIC int
+int
 nfsrvd_renew(struct nfsrv_descript *nd, __unused int isdgram,
     __unused vnode_t vp, __unused struct nfsexstuff *exp)
 {
@@ -3574,7 +3599,7 @@ nfsmout:
 /*
  * nfsv4 security info service
  */
-APPLESTATIC int
+int
 nfsrvd_secinfo(struct nfsrv_descript *nd, int isdgram,
     vnode_t dp, struct nfsexstuff *exp)
 {
@@ -3678,7 +3703,7 @@ out:
 /*
  * nfsv4 set client id service
  */
-APPLESTATIC int
+int
 nfsrvd_setclientid(struct nfsrv_descript *nd, __unused int isdgram,
     __unused vnode_t vp, __unused struct nfsexstuff *exp)
 {
@@ -3839,7 +3864,7 @@ nfsmout:
 /*
  * nfsv4 set client id confirm service
  */
-APPLESTATIC int
+int
 nfsrvd_setclientidcfrm(struct nfsrv_descript *nd,
     __unused int isdgram, __unused vnode_t vp,
     __unused struct nfsexstuff *exp)
@@ -3877,7 +3902,7 @@ nfsmout:
 /*
  * nfsv4 verify service
  */
-APPLESTATIC int
+int
 nfsrvd_verify(struct nfsrv_descript *nd, int isdgram,
     vnode_t vp, __unused struct nfsexstuff *exp)
 {
@@ -3917,7 +3942,7 @@ nfsrvd_verify(struct nfsrv_descript *nd, int isdgram,
 /*
  * nfs openattr rpc
  */
-APPLESTATIC int
+int
 nfsrvd_openattr(struct nfsrv_descript *nd, __unused int isdgram,
     vnode_t dp, __unused vnode_t *vpp, __unused fhandle_t *fhp,
     __unused struct nfsexstuff *exp)
@@ -3937,7 +3962,7 @@ nfsmout:
 /*
  * nfsv4 release lock owner service
  */
-APPLESTATIC int
+int
 nfsrvd_releaselckown(struct nfsrv_descript *nd, __unused int isdgram,
     __unused vnode_t vp, __unused struct nfsexstuff *exp)
 {
@@ -3998,7 +4023,7 @@ nfsmout:
 /*
  * nfsv4 exchange_id service
  */
-APPLESTATIC int
+int
 nfsrvd_exchangeid(struct nfsrv_descript *nd, __unused int isdgram,
     __unused vnode_t vp, __unused struct nfsexstuff *exp)
 {
@@ -4164,7 +4189,7 @@ nfsmout:
 /*
  * nfsv4 create session service
  */
-APPLESTATIC int
+int
 nfsrvd_createsession(struct nfsrv_descript *nd, __unused int isdgram,
     __unused vnode_t vp, __unused struct nfsexstuff *exp)
 {
@@ -4277,7 +4302,7 @@ nfsmout:
 /*
  * nfsv4 sequence service
  */
-APPLESTATIC int
+int
 nfsrvd_sequence(struct nfsrv_descript *nd, __unused int isdgram,
     __unused vnode_t vp, __unused struct nfsexstuff *exp)
 {
@@ -4321,7 +4346,7 @@ nfsmout:
 /*
  * nfsv4 reclaim complete service
  */
-APPLESTATIC int
+int
 nfsrvd_reclaimcomplete(struct nfsrv_descript *nd, __unused int isdgram,
     __unused vnode_t vp, __unused struct nfsexstuff *exp)
 {
@@ -4354,7 +4379,7 @@ nfsmout:
 /*
  * nfsv4 destroy clientid service
  */
-APPLESTATIC int
+int
 nfsrvd_destroyclientid(struct nfsrv_descript *nd, __unused int isdgram,
     __unused vnode_t vp, __unused struct nfsexstuff *exp)
 {
@@ -4379,7 +4404,7 @@ nfsmout:
 /*
  * nfsv4 bind connection to session service
  */
-APPLESTATIC int
+int
 nfsrvd_bindconnsess(struct nfsrv_descript *nd, __unused int isdgram,
     __unused vnode_t vp, __unused struct nfsexstuff *exp)
 {
@@ -4418,7 +4443,7 @@ nfsmout:
 /*
  * nfsv4 destroy session service
  */
-APPLESTATIC int
+int
 nfsrvd_destroysession(struct nfsrv_descript *nd, __unused int isdgram,
     __unused vnode_t vp, __unused struct nfsexstuff *exp)
 {
@@ -4440,7 +4465,7 @@ nfsmout:
 /*
  * nfsv4 free stateid service
  */
-APPLESTATIC int
+int
 nfsrvd_freestateid(struct nfsrv_descript *nd, __unused int isdgram,
     __unused vnode_t vp, __unused struct nfsexstuff *exp)
 {
@@ -4488,7 +4513,7 @@ nfsmout:
 /*
  * nfsv4 layoutget service
  */
-APPLESTATIC int
+int
 nfsrvd_layoutget(struct nfsrv_descript *nd, __unused int isdgram,
     vnode_t vp, struct nfsexstuff *exp)
 {
@@ -4586,7 +4611,7 @@ nfsmout:
 /*
  * nfsv4 layoutcommit service
  */
-APPLESTATIC int
+int
 nfsrvd_layoutcommit(struct nfsrv_descript *nd, __unused int isdgram,
     vnode_t vp, struct nfsexstuff *exp)
 {
@@ -4672,7 +4697,7 @@ nfsmout:
 /*
  * nfsv4 layoutreturn service
  */
-APPLESTATIC int
+int
 nfsrvd_layoutreturn(struct nfsrv_descript *nd, __unused int isdgram,
     vnode_t vp, struct nfsexstuff *exp)
 {
@@ -4758,7 +4783,7 @@ nfsmout:
 /*
  * nfsv4 layout error service
  */
-APPLESTATIC int
+int
 nfsrvd_layouterror(struct nfsrv_descript *nd, __unused int isdgram,
     vnode_t vp, struct nfsexstuff *exp)
 {
@@ -4825,7 +4850,7 @@ nfsmout:
 /*
  * nfsv4 layout stats service
  */
-APPLESTATIC int
+int
 nfsrvd_layoutstats(struct nfsrv_descript *nd, __unused int isdgram,
     vnode_t vp, struct nfsexstuff *exp)
 {
@@ -4887,7 +4912,7 @@ nfsmout:
 /*
  * nfsv4 io_advise service
  */
-APPLESTATIC int
+int
 nfsrvd_ioadvise(struct nfsrv_descript *nd, __unused int isdgram,
     vnode_t vp, struct nfsexstuff *exp)
 {
@@ -4947,7 +4972,7 @@ nfsrvd_ioadvise(struct nfsrv_descript *nd, __unused int isdgram,
 	    !NFSISSET_ATTRBIT(&hints, NFSV4IOHINT_DONTNEED)) ||
 	    (NFSISSET_ATTRBIT(&hints, NFSV4IOHINT_DONTNEED) &&
 	    !NFSISSET_ATTRBIT(&hints, NFSV4IOHINT_WILLNEED))) {
-		NFSVOPUNLOCK(vp, 0);
+		NFSVOPUNLOCK(vp);
 		if (NFSISSET_ATTRBIT(&hints, NFSV4IOHINT_WILLNEED)) {
 			ret = VOP_ADVISE(vp, offset, len, POSIX_FADV_WILLNEED);
 			NFSZERO_ATTRBIT(&hints);
@@ -4981,7 +5006,7 @@ nfsmout:
 /*
  * nfsv4 getdeviceinfo service
  */
-APPLESTATIC int
+int
 nfsrvd_getdevinfo(struct nfsrv_descript *nd, __unused int isdgram,
     __unused vnode_t vp, __unused struct nfsexstuff *exp)
 {
@@ -5053,7 +5078,7 @@ nfsmout:
 /*
  * nfsv4 test stateid service
  */
-APPLESTATIC int
+int
 nfsrvd_teststateid(struct nfsrv_descript *nd, __unused int isdgram,
     __unused vnode_t vp, __unused struct nfsexstuff *exp)
 {
@@ -5098,7 +5123,7 @@ nfsmout:
 /*
  * nfs allocate service
  */
-APPLESTATIC int
+int
 nfsrvd_allocate(struct nfsrv_descript *nd, __unused int isdgram,
     vnode_t vp, struct nfsexstuff *exp)
 {
@@ -5191,7 +5216,7 @@ nfsmout:
 /*
  * nfs copy service
  */
-APPLESTATIC int
+int
 nfsrvd_copy_file_range(struct nfsrv_descript *nd, __unused int isdgram,
     vnode_t vp, vnode_t tovp, struct nfsexstuff *exp, struct nfsexstuff *toexp)
 {
@@ -5294,7 +5319,7 @@ nfsrvd_copy_file_range(struct nfsrv_descript *nd, __unused int isdgram,
 	if (nd->nd_repstat == 0)
 		nd->nd_repstat = nfsrv_lockctrl(vp, &instp, &inlop, NULL,
 		    clientid, &stateid, exp, nd, curthread);
-	NFSVOPUNLOCK(vp, 0);
+	NFSVOPUNLOCK(vp);
 	if (nd->nd_repstat != 0)
 		goto out;
 
@@ -5316,7 +5341,7 @@ nfsrvd_copy_file_range(struct nfsrv_descript *nd, __unused int isdgram,
 	if (nd->nd_repstat == 0)
 		nd->nd_repstat = nfsrv_lockctrl(tovp, &outstp, &outlop, NULL,
 		    clientid, &stateid, toexp, nd, curthread);
-	NFSVOPUNLOCK(tovp, 0);
+	NFSVOPUNLOCK(tovp);
 
 	/* Range lock the byte ranges for both invp and outvp. */
 	if (nd->nd_repstat == 0) {
@@ -5372,7 +5397,7 @@ nfsrvd_copy_file_range(struct nfsrv_descript *nd, __unused int isdgram,
 					nd->nd_repstat = NFSERR_INVAL;
 				}
 			}
-			NFSVOPUNLOCK(vp, 0);
+			NFSVOPUNLOCK(vp);
 			if (ret != 0 && nd->nd_repstat == 0)
 				nd->nd_repstat = ret;
 		} else if (nd->nd_repstat == 0)
@@ -5427,7 +5452,7 @@ nfsmout:
 /*
  * nfs seek service
  */
-APPLESTATIC int
+int
 nfsrvd_seek(struct nfsrv_descript *nd, __unused int isdgram,
     vnode_t vp, struct nfsexstuff *exp)
 {
@@ -5500,12 +5525,12 @@ nfsmout:
 /*
  * nfs get extended attribute service
  */
-APPLESTATIC int
+int
 nfsrvd_getxattr(struct nfsrv_descript *nd, __unused int isdgram,
     vnode_t vp, __unused struct nfsexstuff *exp)
 {
 	uint32_t *tl;
-	mbuf_t mp = NULL, mpend = NULL;
+	struct mbuf *mp = NULL, *mpend = NULL;
 	int error, len;
 	char *name;
 	struct thread *p = curthread;
@@ -5537,9 +5562,11 @@ nfsrvd_getxattr(struct nfsrv_descript *nd, __unused int isdgram,
 	if (nd->nd_repstat == 0) {
 		NFSM_BUILD(tl, uint32_t *, NFSX_UNSIGNED);
 		*tl = txdr_unsigned(len);
-		mbuf_setnext(nd->nd_mb, mp);
-		nd->nd_mb = mpend;
-		nd->nd_bpos = NFSMTOD(mpend, caddr_t) + mbuf_len(mpend);
+		if (len > 0) {
+			nd->nd_mb->m_next = mp;
+			nd->nd_mb = mpend;
+			nd->nd_bpos = mtod(mpend, caddr_t) + mpend->m_len;
+		}
 	}
 	free(name, M_TEMP);
 
@@ -5554,7 +5581,7 @@ nfsmout:
 /*
  * nfs set extended attribute service
  */
-APPLESTATIC int
+int
 nfsrvd_setxattr(struct nfsrv_descript *nd, __unused int isdgram,
     vnode_t vp, __unused struct nfsexstuff *exp)
 {
@@ -5589,7 +5616,7 @@ nfsrvd_setxattr(struct nfsrv_descript *nd, __unused int isdgram,
 		goto nfsmout;
 	NFSM_DISSECT(tl, uint32_t *, NFSX_UNSIGNED);
 	len = fxdr_unsigned(int, *tl);
-	if (len <= 0 || len > IOSIZE_MAX) {
+	if (len < 0 || len > IOSIZE_MAX) {
 		nd->nd_repstat = NFSERR_XATTR2BIG;
 		goto nfsmout;
 	}
@@ -5625,7 +5652,7 @@ nfsrvd_setxattr(struct nfsrv_descript *nd, __unused int isdgram,
 		if (nd->nd_repstat == ENXIO)
 			nd->nd_repstat = NFSERR_XATTR2BIG;
 	}
-	if (nd->nd_repstat == 0)
+	if (nd->nd_repstat == 0 && len > 0)
 		nd->nd_repstat = nfsm_advance(nd, NFSM_RNDUP(len), -1);
 	if (nd->nd_repstat == 0)
 		nd->nd_repstat = nfsvno_getattr(vp, &nva, nd, p, 1, &attrbits);
@@ -5648,7 +5675,7 @@ nfsmout:
 /*
  * nfs remove extended attribute service
  */
-APPLESTATIC int
+int
 nfsrvd_rmxattr(struct nfsrv_descript *nd, __unused int isdgram,
     vnode_t vp, __unused struct nfsexstuff *exp)
 {
@@ -5700,7 +5727,8 @@ nfsrvd_rmxattr(struct nfsrv_descript *nd, __unused int isdgram,
 	if (nd->nd_repstat == 0)
 		nd->nd_repstat = nfsvno_getattr(vp, &nva, nd, p, 1, &attrbits);
 	if (nd->nd_repstat == 0) {
-		NFSM_BUILD(tl, uint32_t *, 2 * NFSX_HYPER);
+		NFSM_BUILD(tl, uint32_t *, 2 * NFSX_HYPER + NFSX_UNSIGNED);
+		*tl++ = newnfs_true;
 		txdr_hyper(ova.na_filerev, tl); tl += 2;
 		txdr_hyper(nva.na_filerev, tl);
 	}
@@ -5717,7 +5745,7 @@ nfsmout:
 /*
  * nfs list extended attribute service
  */
-APPLESTATIC int
+int
 nfsrvd_listxattr(struct nfsrv_descript *nd, __unused int isdgram,
     vnode_t vp, __unused struct nfsexstuff *exp)
 {
@@ -5829,7 +5857,7 @@ nfsmout:
 /*
  * nfsv4 service not supported
  */
-APPLESTATIC int
+int
 nfsrvd_notsupp(struct nfsrv_descript *nd, __unused int isdgram,
     __unused vnode_t vp, __unused struct nfsexstuff *exp)
 {

@@ -76,7 +76,8 @@ int mp_maxcpus = MAXCPU;
 volatile int smp_started;
 u_int mp_maxid;
 
-static SYSCTL_NODE(_kern, OID_AUTO, smp, CTLFLAG_RD|CTLFLAG_CAPRD, NULL,
+static SYSCTL_NODE(_kern, OID_AUTO, smp,
+    CTLFLAG_RD | CTLFLAG_CAPRD | CTLFLAG_MPSAFE, NULL,
     "Kernel SMP");
 
 SYSCTL_INT(_kern_smp, OID_AUTO, maxid, CTLFLAG_RD|CTLFLAG_CAPRD, &mp_maxid, 0,
@@ -195,7 +196,7 @@ forward_signal(struct thread *td)
 
 	CTR1(KTR_SMP, "forward_signal(%p)", td->td_proc);
 
-	if (!smp_started || cold || panicstr)
+	if (!smp_started || cold || KERNEL_PANICKED())
 		return;
 	if (!forward_signal_enabled)
 		return;
@@ -550,7 +551,7 @@ smp_rendezvous_cpus(cpuset_t map,
 {
 	int curcpumap, i, ncpus = 0;
 
-	/* Look comments in the !SMP case. */
+	/* See comments in the !SMP case. */
 	if (!smp_started) {
 		spinlock_enter();
 		if (setup_func != NULL)
@@ -562,6 +563,12 @@ smp_rendezvous_cpus(cpuset_t map,
 		spinlock_exit();
 		return;
 	}
+
+	/*
+	 * Make sure we come here with interrupts enabled.  Otherwise we
+	 * livelock if smp_ipi_mtx is owned by a thread which sent us an IPI.
+	 */
+	MPASS(curthread->td_md.md_spinlock_count == 0);
 
 	CPU_FOREACH(i) {
 		if (CPU_ISSET(i, &map))
@@ -797,7 +804,6 @@ smp_topo_2level(int l2share, int l2count, int l1share, int l1count,
 	return (top);
 }
 
-
 struct cpu_group *
 smp_topo_find(struct cpu_group *top, int cpu)
 {
@@ -877,6 +883,47 @@ smp_no_rendezvous_barrier(void *dummy)
 #ifdef SMP
 	KASSERT((!smp_started),("smp_no_rendezvous called and smp is started"));
 #endif
+}
+
+void
+smp_rendezvous_cpus_retry(cpuset_t map,
+	void (* setup_func)(void *),
+	void (* action_func)(void *),
+	void (* teardown_func)(void *),
+	void (* wait_func)(void *, int),
+	struct smp_rendezvous_cpus_retry_arg *arg)
+{
+	int cpu;
+
+	/*
+	 * Execute an action on all specified CPUs while retrying until they
+	 * all acknowledge completion.
+	 */
+	CPU_COPY(&map, &arg->cpus);
+	for (;;) {
+		smp_rendezvous_cpus(
+		    arg->cpus,
+		    setup_func,
+		    action_func,
+		    teardown_func,
+		    arg);
+
+		if (CPU_EMPTY(&arg->cpus))
+			break;
+
+		CPU_FOREACH(cpu) {
+			if (!CPU_ISSET(cpu, &arg->cpus))
+				continue;
+			wait_func(arg, cpu);
+		}
+	}
+}
+
+void
+smp_rendezvous_cpus_done(struct smp_rendezvous_cpus_retry_arg *arg)
+{
+
+	CPU_CLR_ATOMIC(curcpu, &arg->cpus);
 }
 
 /*
@@ -999,7 +1046,6 @@ sysctl_kern_smp_active(SYSCTL_HANDLER_ARGS)
 	error = SYSCTL_OUT(req, &active, sizeof(active));
 	return (error);
 }
-
 
 #ifdef SMP
 void

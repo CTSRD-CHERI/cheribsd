@@ -81,7 +81,8 @@ __FBSDID("$FreeBSD$");
 #include <net/vnet.h>
 
 SYSCTL_DECL(_net_link);
-static SYSCTL_NODE(_net_link, OID_AUTO, epair, CTLFLAG_RW, 0, "epair sysctl");
+static SYSCTL_NODE(_net_link, OID_AUTO, epair, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
+    "epair sysctl");
 
 #ifdef EPAIR_DEBUG
 static int epair_debug = 0;
@@ -133,8 +134,9 @@ sysctl_epair_netisr_maxqlen(SYSCTL_HANDLER_ARGS)
 		return (EINVAL);
 	return (netisr_setqlimit(&epair_nh, qlimit));
 }
-SYSCTL_PROC(_net_link_epair, OID_AUTO, netisr_maxqlen, CTLTYPE_INT|CTLFLAG_RW,
-    0, 0, sysctl_epair_netisr_maxqlen, "I",
+SYSCTL_PROC(_net_link_epair, OID_AUTO, netisr_maxqlen,
+    CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_MPSAFE, 0, 0,
+    sysctl_epair_netisr_maxqlen, "I",
     "Maximum if_epair(4) netisr \"hw\" queue length");
 
 struct epair_softc {
@@ -712,6 +714,21 @@ epair_clone_match(struct if_clone *ifc, const char *name)
 	return (1);
 }
 
+static void
+epair_clone_add(struct if_clone *ifc, struct epair_softc *scb)
+{
+	struct ifnet *ifp;
+	uint8_t eaddr[ETHER_ADDR_LEN];	/* 00:00:00:00:00:00 */
+
+	ifp = scb->ifp;
+	/* Copy epairNa etheraddr and change the last byte. */
+	memcpy(eaddr, scb->oifp->if_hw_addr, ETHER_ADDR_LEN);
+	eaddr[5] = 0x0b;
+	ether_ifattach(ifp, eaddr);
+
+	if_clone_addif(ifc, ifp);
+}
+
 static int
 epair_clone_create(struct if_clone *ifc, char *name, size_t len,
     void * __capability params)
@@ -724,24 +741,6 @@ epair_clone_create(struct if_clone *ifc, char *name, size_t len,
 	uint32_t key[3];
 	uint32_t hash;
 	uint8_t eaddr[ETHER_ADDR_LEN];	/* 00:00:00:00:00:00 */
-
-	/*
-	 * We are abusing params to create our second interface.
-	 * Actually we already created it and called if_clone_create()
-	 * for it to do the official insertion procedure the moment we knew
-	 * it cannot fail anymore. So just do attach it here.
-	 */
-	if (params) {
-		scb = (__cheri_fromcap struct epair_softc *)params;
-		ifp = scb->ifp;
-		/* Copy epairNa etheraddr and change the last byte. */
-		memcpy(eaddr, scb->oifp->if_hw_addr, ETHER_ADDR_LEN);
-		eaddr[5] = 0x0b;
-		ether_ifattach(ifp, eaddr);
-		/* Correctly set the name for the cloner list. */
-		strlcpy(name, ifp->if_xname, len);
-		return (0);
-	}
 
 	/* Try to see if a special unit was requested. */
 	error = ifc_name2unit(name, &unit);
@@ -893,11 +892,11 @@ epair_clone_create(struct if_clone *ifc, char *name, size_t len,
 	if_setsendqready(ifp);
 	/* We need to play some tricks here for the second interface. */
 	strlcpy(name, epairname, len);
-	error = if_clone_create(name, len,
-	    (__cheri_tocap void * __capability)scb);
-	if (error)
-		panic("%s: if_clone_create() for our 2nd iface failed: %d",
-		    __func__, error);
+
+	/* Correctly set the name for the cloner list. */
+	strlcpy(name, scb->ifp->if_xname, len);
+	epair_clone_add(ifc, scb);
+
 	scb->if_qflush = ifp->if_qflush;
 	ifp->if_qflush = epair_qflush;
 	ifp->if_transmit = epair_transmit;

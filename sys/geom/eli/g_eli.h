@@ -163,6 +163,7 @@ extern u_int g_eli_batch;
 struct g_eli_worker {
 	struct g_eli_softc	*w_softc;
 	struct proc		*w_proc;
+	void			*w_first_key;
 	u_int			 w_number;
 	crypto_session_t	 w_sid;
 	boolean_t		 w_active;
@@ -416,18 +417,10 @@ g_eli_str2ealgo(const char *name)
 		return (CRYPTO_AES_CBC);
 	else if (strcasecmp("aes-xts", name) == 0)
 		return (CRYPTO_AES_XTS);
-	else if (strcasecmp("blowfish", name) == 0)
-		return (CRYPTO_BLF_CBC);
-	else if (strcasecmp("blowfish-cbc", name) == 0)
-		return (CRYPTO_BLF_CBC);
 	else if (strcasecmp("camellia", name) == 0)
 		return (CRYPTO_CAMELLIA_CBC);
 	else if (strcasecmp("camellia-cbc", name) == 0)
 		return (CRYPTO_CAMELLIA_CBC);
-	else if (strcasecmp("3des", name) == 0)
-		return (CRYPTO_3DES_CBC);
-	else if (strcasecmp("3des-cbc", name) == 0)
-		return (CRYPTO_3DES_CBC);
 	return (CRYPTO_ALGORITHM_MIN - 1);
 }
 
@@ -435,9 +428,7 @@ static __inline u_int
 g_eli_str2aalgo(const char *name)
 {
 
-	if (strcasecmp("hmac/md5", name) == 0)
-		return (CRYPTO_MD5_HMAC);
-	else if (strcasecmp("hmac/sha1", name) == 0)
+	if (strcasecmp("hmac/sha1", name) == 0)
 		return (CRYPTO_SHA1_HMAC);
 	else if (strcasecmp("hmac/ripemd160", name) == 0)
 		return (CRYPTO_RIPEMD160_HMAC);
@@ -461,14 +452,8 @@ g_eli_algo2str(u_int algo)
 		return ("AES-CBC");
 	case CRYPTO_AES_XTS:
 		return ("AES-XTS");
-	case CRYPTO_BLF_CBC:
-		return ("Blowfish-CBC");
 	case CRYPTO_CAMELLIA_CBC:
 		return ("CAMELLIA-CBC");
-	case CRYPTO_3DES_CBC:
-		return ("3DES-CBC");
-	case CRYPTO_MD5_HMAC:
-		return ("HMAC/MD5");
 	case CRYPTO_SHA1_HMAC:
 		return ("HMAC/SHA1");
 	case CRYPTO_RIPEMD160_HMAC:
@@ -521,6 +506,36 @@ eli_metadata_dump(const struct g_eli_metadata *md)
 	printf("  MD5 hash: %s\n", str);
 }
 
+#ifdef _KERNEL
+static __inline bool
+eli_metadata_crypto_supported(const struct g_eli_metadata *md)
+{
+
+	switch (md->md_ealgo) {
+	case CRYPTO_NULL_CBC:
+	case CRYPTO_AES_CBC:
+	case CRYPTO_CAMELLIA_CBC:
+	case CRYPTO_AES_XTS:
+		break;
+	default:
+		return (false);
+	}
+	if (md->md_flags & G_ELI_FLAG_AUTH) {
+		switch (md->md_aalgo) {
+		case CRYPTO_SHA1_HMAC:
+		case CRYPTO_RIPEMD160_HMAC:
+		case CRYPTO_SHA2_256_HMAC:
+		case CRYPTO_SHA2_384_HMAC:
+		case CRYPTO_SHA2_512_HMAC:
+			break;
+		default:
+			return (false);
+		}
+	}
+	return (true);
+}
+#endif
+
 static __inline u_int
 g_eli_keylen(u_int algo, u_int keylen)
 {
@@ -556,21 +571,24 @@ g_eli_keylen(u_int algo, u_int keylen)
 		default:
 			return (0);
 		}
-	case CRYPTO_BLF_CBC:
-		if (keylen == 0)
-			return (128);
-		if (keylen < 128 || keylen > 448)
-			return (0);
-		if ((keylen % 32) != 0)
-			return (0);
-		return (keylen);
-	case CRYPTO_3DES_CBC:
-		if (keylen == 0 || keylen == 192)
-			return (192);
-		return (0);
 	default:
 		return (0);
 	}
+}
+
+static __inline u_int
+g_eli_ivlen(u_int algo)
+{
+
+	switch (algo) {
+	case CRYPTO_AES_XTS:
+		return (AES_XTS_IV_LEN);
+	case CRYPTO_AES_CBC:
+		return (AES_BLOCK_LEN);
+	case CRYPTO_CAMELLIA_CBC:
+		return (CAMELLIA_BLOCK_LEN);
+	}
+	return (0);
 }
 
 static __inline u_int
@@ -578,8 +596,6 @@ g_eli_hashlen(u_int algo)
 {
 
 	switch (algo) {
-	case CRYPTO_MD5_HMAC:
-		return (16);
 	case CRYPTO_SHA1_HMAC:
 		return (20);
 	case CRYPTO_RIPEMD160_HMAC:

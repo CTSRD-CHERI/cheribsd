@@ -65,7 +65,7 @@ static char *rcsid = "$FreeBSD$";
 #define	error_printf(...)	rtld_fdprintf(STDERR_FILENO, __VA_ARGS__)
 #elif defined(IN_LIBTHR)
 #include "thr_private.h"
-#define	error_printf(...)	_thread_printf(STDERR_FILENO, __VA_ARGS__)
+#define	error_printf(...)	_thread_fdprintf(STDERR_FILENO, __VA_ARGS__)
 #else
 #include <stdio.h>
 #define	error_printf(...)	fprintf(stderr, __VA_ARGS__)
@@ -125,7 +125,7 @@ bound_ptr(void *mem, size_t nbytes)
 {
 	void *ptr;
 
-	ptr = cheri_csetbounds(mem, nbytes);
+	ptr = cheri_setbounds(mem, nbytes);
 	ptr = cheri_andperm(ptr,
 	    CHERI_PERMS_USERSPACE_DATA & ~CHERI_PERM_CHERIABI_VMMAP);
 	return (ptr);
@@ -262,16 +262,16 @@ morecore(int bucket)
 		if (__morepages(amt/pagesz) == 0)
 			return;
 
-	buf = cheri_csetbounds(pagepool_start, amt);
+	buf = cheri_setbounds(pagepool_start, amt);
 	pagepool_start += amt;
 
 	/*
 	 * Add new memory allocated to that on
 	 * free list for this hash bucket.
 	 */
-	nextf[bucket] = op = cheri_csetbounds(buf, sz);
+	nextf[bucket] = op = cheri_setbounds(buf, sz);
 	while (--nblks > 0) {
-		op->ov_next = (union overhead *)cheri_csetbounds(buf + sz, sz);
+		op->ov_next = (union overhead *)cheri_setbounds(buf + sz, sz);
 		buf += sz;
 		op = op->ov_next;
 	}
@@ -385,7 +385,7 @@ __simple_realloc(void *cp, size_t nbytes)
 	}
 
 	res = __simple_malloc(nbytes);
-	if (res == NULL);
+	if (res == NULL)
 		return (NULL);
 	/*
 	 * Only copy data the caller had access to even if this is less

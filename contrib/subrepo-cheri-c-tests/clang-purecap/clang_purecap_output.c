@@ -31,7 +31,7 @@
 #define TEST_EXPECTED_FAULTS 1
 #include "cheri_c_test.h"
 
-static int  __attribute__((noinline)) foo(__output int* x)
+static int  __attribute__((noinline)) foo(__cheri_output int* x)
 {
 	// Check that a load causes a fault.  This will trap to the handler and
 	// increment the fault count.

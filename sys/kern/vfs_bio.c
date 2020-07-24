@@ -779,7 +779,6 @@ bufspace_wait(struct bufdomain *bd, struct vnode *vp, int gbflags,
 	BD_UNLOCK(bd);
 }
 
-
 /*
  *	bufspace_daemon:
  *
@@ -941,7 +940,6 @@ waitrunningbufspace(void)
 	}
 	mtx_unlock(&rbreqlock);
 }
-
 
 /*
  *	vfs_buf_test_cache:
@@ -1383,8 +1381,7 @@ bufshutdown(int show_busybufs)
 		 */
 		for (subiter = 0; subiter < 50 * iter; subiter++) {
 			thread_lock(curthread);
-			mi_switch(SW_VOL, NULL);
-			thread_unlock(curthread);
+			mi_switch(SW_VOL);
 			DELAY(1000);
 		}
 #endif
@@ -1432,7 +1429,7 @@ bufshutdown(int show_busybufs)
 		/*
 		 * Unmount filesystems
 		 */
-		if (panicstr == NULL)
+		if (!KERNEL_PANICKED())
 			vfs_unmountall();
 	}
 	swapoff_all();
@@ -2857,15 +2854,13 @@ vfs_vmio_iodone(struct buf *bp)
 	bool bogus;
 
 	obj = bp->b_bufobj->bo_object;
-	KASSERT(REFCOUNT_COUNT(obj->paging_in_progress) >= bp->b_npages,
+	KASSERT(blockcount_read(&obj->paging_in_progress) >= bp->b_npages,
 	    ("vfs_vmio_iodone: paging in progress(%d) < b_npages(%d)",
-	    REFCOUNT_COUNT(obj->paging_in_progress), bp->b_npages));
+	    blockcount_read(&obj->paging_in_progress), bp->b_npages));
 
 	vp = bp->b_vp;
-	KASSERT(vp->v_holdcnt > 0,
-	    ("vfs_vmio_iodone: vnode %p has zero hold count", vp));
-	KASSERT(vp->v_object != NULL,
-	    ("vfs_vmio_iodone: vnode %p has no vm_object", vp));
+	VNPASS(vp->v_holdcnt > 0, vp);
+	VNPASS(vp->v_object != NULL, vp);
 
 	foff = bp->b_offset;
 	KASSERT(bp->b_offset != NOOFFSET,
@@ -2883,11 +2878,8 @@ vfs_vmio_iodone(struct buf *bp)
 		 */
 		m = bp->b_pages[i];
 		if (m == bogus_page) {
-			if (bogus == false) {
-				bogus = true;
-				VM_OBJECT_RLOCK(obj);
-			}
-			m = vm_page_lookup(obj, OFF_TO_IDX(foff));
+			bogus = true;
+			m = vm_page_relookup(obj, OFF_TO_IDX(foff));
 			if (m == NULL)
 				panic("biodone: page disappeared!");
 			bp->b_pages[i] = m;
@@ -2910,8 +2902,6 @@ vfs_vmio_iodone(struct buf *bp)
 		foff = (foff + PAGE_SIZE) & ~(off_t)PAGE_MASK;
 		iosize -= resid;
 	}
-	if (bogus)
-		VM_OBJECT_RUNLOCK(obj);
 	vm_object_pip_wakeupn(obj, bp->b_npages);
 	if (bogus && buf_mapped(bp)) {
 		BUF_CHECK_MAPPED(bp);
@@ -3051,13 +3041,11 @@ vfs_vmio_extend(struct buf *bp, int desiredpages, int size)
 		 * deadlocks once allocbuf() is called after
 		 * pages are vfs_busy_pages().
 		 */
-		VM_OBJECT_WLOCK(obj);
-		(void)vm_page_grab_pages(obj,
+		(void)vm_page_grab_pages_unlocked(obj,
 		    OFF_TO_IDX(bp->b_offset) + bp->b_npages,
 		    VM_ALLOC_SYSTEM | VM_ALLOC_IGN_SBUSY |
 		    VM_ALLOC_NOBUSY | VM_ALLOC_WIRED,
 		    &bp->b_pages[bp->b_npages], desiredpages - bp->b_npages);
-		VM_OBJECT_WUNLOCK(obj);
 		bp->b_npages = desiredpages;
 	}
 
@@ -3555,7 +3543,7 @@ flushbufqueues(struct vnode *lvp, struct bufdomain *bd, int target,
 			}
 			vn_finished_write(mp);
 			if (unlock)
-				VOP_UNLOCK(vp, 0);
+				VOP_UNLOCK(vp);
 			flushwithdeps += hasdeps;
 			flushed++;
 
@@ -4477,22 +4465,16 @@ vfs_unbusy_pages(struct buf *bp)
 	int i;
 	vm_object_t obj;
 	vm_page_t m;
-	bool bogus;
 
 	runningbufwakeup(bp);
 	if (!(bp->b_flags & B_VMIO))
 		return;
 
 	obj = bp->b_bufobj->bo_object;
-	bogus = false;
 	for (i = 0; i < bp->b_npages; i++) {
 		m = bp->b_pages[i];
 		if (m == bogus_page) {
-			if (bogus == false) {
-				bogus = true;
-				VM_OBJECT_RLOCK(obj);
-			}
-			m = vm_page_lookup(obj, OFF_TO_IDX(bp->b_offset) + i);
+			m = vm_page_relookup(obj, OFF_TO_IDX(bp->b_offset) + i);
 			if (!m)
 				panic("vfs_unbusy_pages: page missing\n");
 			bp->b_pages[i] = m;
@@ -4505,8 +4487,6 @@ vfs_unbusy_pages(struct buf *bp)
 		}
 		vm_page_sunbusy(m);
 	}
-	if (bogus)
-		VM_OBJECT_RUNLOCK(obj);
 	vm_object_pip_wakeupn(obj, bp->b_npages);
 }
 
@@ -5174,12 +5154,16 @@ vfs_bio_getpages(struct vnode *vp, vm_page_t *ma, int count,
 	br_flags = (mp != NULL && (mp->mnt_kern_flag & MNTK_UNMAPPED_BUFS)
 	    != 0) ? GB_UNMAPPED : 0;
 again:
-	for (i = 0; i < count; i++)
-		vm_page_busy_downgrade(ma[i]);
+	for (i = 0; i < count; i++) {
+		if (ma[i] != bogus_page)
+			vm_page_busy_downgrade(ma[i]);
+	}
 
 	lbnp = -1;
 	for (i = 0; i < count; i++) {
 		m = ma[i];
+		if (m == bogus_page)
+			continue;
 
 		/*
 		 * Pages are shared busy and the object lock is not
@@ -5207,6 +5191,10 @@ again:
 			    br_flags, &bp);
 			if (error != 0)
 				goto end_pages;
+			if (bp->b_rcred == curthread->td_ucred) {
+				crfree(bp->b_rcred);
+				bp->b_rcred = NOCRED;
+			}
 			if (LIST_EMPTY(&bp->b_dep)) {
 				/*
 				 * Invalidation clears m->valid, but
@@ -5242,11 +5230,15 @@ next_page:;
 	}
 end_pages:
 
-	VM_OBJECT_WLOCK(object);
 	redo = false;
 	for (i = 0; i < count; i++) {
-		vm_page_sunbusy(ma[i]);
-		ma[i] = vm_page_grab(object, ma[i]->pindex, VM_ALLOC_NORMAL);
+		if (ma[i] == bogus_page)
+			continue;
+		if (vm_page_busy_tryupgrade(ma[i]) == 0) {
+			vm_page_sunbusy(ma[i]);
+			ma[i] = vm_page_grab_unlocked(object, ma[i]->pindex,
+			    VM_ALLOC_NORMAL);
+		}
 
 		/*
 		 * Since the pages were only sbusy while neither the
@@ -5264,7 +5256,6 @@ end_pages:
 		if (!vm_page_all_valid(ma[i]))
 			redo = true;
 	}
-	VM_OBJECT_WUNLOCK(object);
 	if (redo && error == 0)
 		goto again;
 	return (error != 0 ? VM_PAGER_ERROR : VM_PAGER_OK);

@@ -25,7 +25,7 @@
 .\"
 .\" $FreeBSD$
 .\"
-.Dd November 21, 2019
+.Dd February 6, 2020
 .Dt BSDINSTALL 8
 .Os
 .Sh NAME
@@ -118,8 +118,10 @@ is set, also configures the network interfaces of the current system to match.
 Provides the installer's interactive guided disk partitioner for single-disk
 installations.
 Defaults to UFS.
+.It Cm bootconfig
+Detects an appropriate partition and installs UEFI boot loader files.
 .It Cm zfsboot
-Provides an alternative ZFS-only automatic interactive disk partitioner.
+Provides a ZFS-only automatic interactive disk partitioner.
 Creates a single
 .Ic zpool
 with separate datasets for
@@ -259,8 +261,21 @@ for most installation scenarios.
 Others are set by various interactive user prompts, and can be usefully
 overridden when making scripted or customized installers.
 .Bl -tag -width ".Ev BSDINSTALL_DISTSITE"
+.It Ev TMPDIR
+The directory to use for temporary files.
+Default:
+.Dq Pa /tmp
 .It Ev DISTRIBUTIONS
 The set of distributions to install, e.g., "base.txz kernel.txz ports.txz".
+Default: unset
+.It Ev PARTITIONS
+The partitioning of the disk onto which the system is being installed.
+See
+.Cm scriptedpart
+of
+the
+.Sx TARGETS
+section for format details.
 Default: unset
 .It Ev BSDINSTALL_DISTDIR
 The directory in which the distribution files can be found (or to which they
@@ -291,7 +306,7 @@ Default:
 .It Ev BSDINSTALL_LOG
 Path to a log file for the installation.
 Default:
-.Dq Pa /tmp/bsdinstall_log
+.Dq Pa $TMPDIR/bsdinstall_log
 .It Ev BSDINSTALL_TMPETC
 Directory where files destined for the new system's
 .Pa /etc
@@ -300,7 +315,7 @@ will be stored until the
 target is executed.
 If this directory does not already exist, it will be created.
 Default:
-.Dq Pa /tmp/bsdinstall_etc
+.Dq Pa $TMPDIR/bsdinstall_etc
 .It Ev BSDINSTALL_TMPBOOT
 Directory where files destined for the new system's
 .Pa /boot
@@ -309,7 +324,7 @@ will be stored until the
 target is executed.
 If this directory does not already exist, it will be created.
 Default:
-.Dq Pa /tmp/bsdinstall_boot
+.Dq Pa $TMPDIR/bsdinstall_boot
 .It Ev ZFSBOOT_POOL_NAME
 Name for the pool containing the base system.
 Default:
@@ -336,8 +351,8 @@ Default:
 The type of pool to be created for the base system.
 This variable can take one of this values: stripe (No redundacy),
 mirror (n-Way mirroring), raid10 (RAID 1+0 - n x 2-Way Mirrors),
-raidz1 (RAID-Z1 - Single Redundacy RAID), raidz2 (RAID-Z2 - Double Redundacy RAID)
-or raidz3 (RAID-Z3 Triple Redundacy RAID).
+raidz1 (RAID-Z1 - Single Redundancy RAID), raidz2 (RAID-Z2 - Double Redundancy RAID)
+or raidz3 (RAID-Z3 Triple Redundancy RAID).
 Default:
 .Dq stripe
 .It Ev ZFSBOOT_FORCE_4K_SECTORS
@@ -439,6 +454,7 @@ PARTITIONS=ada0
 DISTRIBUTIONS="kernel.txz base.txz"
 
 #!/bin/sh
+gpart bootcode -b /boot/pmbr -p /boot/gptboot -i 1 ada0
 sysrc ifconfig_em0=DHCP
 sysrc sshd_enable=YES
 pkg install puppet
@@ -505,7 +521,7 @@ ZFSBOOT_DISKS="ada0 ada1"
 ZFSBOOT_VDEV_TYPE=mirror
 .Ed
 .Pp
-Remenber to export all the variables for the
+Remember to export all the variables for the
 .Cm zfsboot
 command, otherwise it will not get set.
 .Ss SETUP SCRIPT

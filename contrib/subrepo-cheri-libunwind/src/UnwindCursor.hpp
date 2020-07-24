@@ -440,7 +440,7 @@ public:
   virtual bool isSignalFrame() {
     _LIBUNWIND_ABORT("isSignalFrame not implemented");
   }
-  virtual bool getFunctionName(char *, size_t, unw_word_t *) {
+  virtual bool getFunctionName(char *, size_t, size_t *) {
     _LIBUNWIND_ABORT("getFunctionName not implemented");
   }
   virtual void setInfoBasedOnIPRegister(bool = false) {
@@ -476,7 +476,7 @@ public:
   virtual void        getInfo(unw_proc_info_t *);
   virtual void        jumpto();
   virtual bool        isSignalFrame();
-  virtual bool        getFunctionName(char *buf, size_t len, unw_word_t *off);
+  virtual bool        getFunctionName(char *buf, size_t len, size_t *off);
   virtual void        setInfoBasedOnIPRegister(bool isReturnAddress = false);
   virtual const char *getRegisterName(int num);
 #ifdef __arm__
@@ -899,7 +899,7 @@ public:
   virtual void        getInfo(unw_proc_info_t *);
   virtual void        jumpto();
   virtual bool        isSignalFrame();
-  virtual bool        getFunctionName(char *buf, size_t len, unw_word_t *off);
+  virtual bool        getFunctionName(char *buf, size_t len, size_t *off);
   virtual void        setInfoBasedOnIPRegister(bool isReturnAddress = false);
   virtual const char *getRegisterName(int num);
 #ifdef __arm__
@@ -1002,6 +1002,12 @@ private:
   int stepWithCompactEncoding(Registers_sparc &) { return UNW_EINVAL; }
 #endif
 
+#if defined (_LIBUNWIND_TARGET_RISCV)
+  int stepWithCompactEncoding(Registers_riscv &) {
+    return UNW_EINVAL;
+  }
+#endif
+
   bool compactSaysUseDwarf(uint32_t *offset=NULL) const {
     R dummy;
     return compactSaysUseDwarf(dummy, offset);
@@ -1074,6 +1080,12 @@ private:
   bool compactSaysUseDwarf(Registers_sparc &, uint32_t *) const { return true; }
 #endif
 
+#if defined (_LIBUNWIND_TARGET_RISCV)
+  bool compactSaysUseDwarf(Registers_riscv &, uint32_t *) const {
+    return true;
+  }
+#endif
+
 #endif // defined(_LIBUNWIND_SUPPORT_COMPACT_UNWIND)
 
 #if defined(_LIBUNWIND_SUPPORT_DWARF_UNWIND)
@@ -1144,6 +1156,12 @@ private:
 
 #if defined(_LIBUNWIND_TARGET_SPARC)
   compact_unwind_encoding_t dwarfEncoding(Registers_sparc &) const { return 0; }
+#endif
+
+#if defined (_LIBUNWIND_TARGET_RISCV)
+  compact_unwind_encoding_t dwarfEncoding(Registers_riscv &) const {
+    return 0;
+  }
 #endif
 
 #endif // defined(_LIBUNWIND_SUPPORT_DWARF_UNWIND)
@@ -2043,7 +2061,7 @@ void UnwindCursor<A, R>::getInfo(unw_proc_info_t *info) {
 
 template <typename A, typename R>
 bool UnwindCursor<A, R>::getFunctionName(char *buf, size_t bufLen,
-                                                           unw_word_t *offset) {
+                                         size_t *offset) {
   return _addressSpace.findFunctionName(this->getIP(), buf, bufLen, offset);
 }
 

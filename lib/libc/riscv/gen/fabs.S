@@ -38,6 +38,6 @@ __FBSDID("$FreeBSD$");
 #ifdef __riscv_float_abi_double
 ENTRY(fabs)
 	fabs.d	fa0, fa0
-	ret
+	RETURN
 END(fabs)
 #endif

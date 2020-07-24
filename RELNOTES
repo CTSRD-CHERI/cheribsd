@@ -10,6 +10,40 @@ newline.  Entries should be separated by a newline.
 
 Changes to this file should not be MFCed.
 
+r360920,r360923,r360924,r360927,r360928,r360931,r360933,r360936:
+	Remove support for ARC4, Blowfish, Cast, DES, Triple DES, MD5,
+	MD5-KPDK, MD5-HMAC, SHA1-KPDK, and Skipjack algorithms from
+	the kernel open cryptographic framework (OCF).
+
+r360562:
+	Remove support for ARC4, Blowfish, Cast, DES, Triple DES,
+	MD5-HMAC, and Skipjack algorithms from /dev/crypto.
+
+r360557:
+	Remove support for DES, Triple DES, Blowfish, Cast, and
+	Camellia ciphers from IPsec(4).  Remove support for MD5-HMAC,
+	Keyed MD5, Keyed SHA1, and RIPEMD160-HMAC from IPsec(4).
+
+r359945:
+	Remove support for Triple DES, Blowfish, and MD5 HMAC from
+	geli(4).
+
+r359786-r359787:
+	Remove support for DES, Triple DES, and RC4 from in-kernel GSS
+	authentication.
+
+r357627:
+	remove elf2aout.
+
+r357560-r357565:
+	init(8), service(8), and cron(8) will now adopt user/class environment
+	variables (excluding PATH, by default, which will be overwritten) by
+	default.  Notably, environment variables for all cron jobs and rc
+	services can now be set via login.conf(5).
+
+r357455:
+	sparc64 has been removed from FreeBSD.
+
 r355677:
 	Adds support for NFSv4.2 (RFC-7862) and Extended Attributes
 	(RFC-8276) to the NFS client and server.
@@ -31,6 +65,9 @@ r355677:
 	server.
 	Setting vfs.nfsd.server_max_minorversion4 to 0 or 1 will disable NFSv4.2
 	on the server.
+
+r356263:
+	armv5 support has been removed from FreeBSD.
 
 r354517:
 	iwm(4) now supports most Intel 9260, 9460 and 9560 Wi-Fi devices.

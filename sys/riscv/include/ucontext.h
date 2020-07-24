@@ -56,15 +56,65 @@ struct fpregs {
 	int		pad;
 };
 
+#if __has_feature(capabilities)
+struct capregs {
+	__uintcap_t	cp_cra;
+	__uintcap_t	cp_csp;
+	__uintcap_t	cp_cgp;
+	__uintcap_t	cp_ctp;
+	__uintcap_t	cp_ct[7];
+	__uintcap_t	cp_cs[12];
+	__uintcap_t	cp_ca[8];
+	__uintcap_t	cp_sepcc;
+	__uintcap_t	cp_ddc;
+	__register_t	cp_sstatus;
+	__register_t	cp_pad;
+};
+#endif
+
 struct __mcontext {
+#if (defined(_KERNEL) && __has_feature(capabilities)) || \
+    defined(__CHERI_PURE_CAPABILITY__)
+	struct capregs	mc_capregs;
+#else
 	struct gpregs	mc_gpregs;
+#endif
 	struct fpregs	mc_fpregs;
 	int		mc_flags;
 #define	_MC_FP_VALID	0x1		/* Set when mc_fpregs has valid data */
+#define	_MC_CAP_VALID	0x2		/* Set when mc_capregs has valid data */
 	int		mc_pad;
-	__uint64_t	mc_spare[8];	/* Space for expansion */
+#if (defined(_KERNEL) && __has_feature(capabilities)) || \
+    defined(__CHERI_PURE_CAPABILITY__)
+	__uint64_t	mc_spare[8];
+#else
+	__uint64_t	mc_capregs;
+	__uint64_t	mc_spare[7];	/* Space for expansion */
+#endif
 };
 
 typedef struct __mcontext mcontext_t;
+
+#ifdef COMPAT_FREEBSD64
+#include <compat/freebsd64/freebsd64_signal.h>
+
+typedef struct	__mcontext64 {
+	struct gpregs	mc_gpregs;
+	struct fpregs	mc_fpregs;
+	int		mc_flags;
+	int		mc_pad;
+	__uint64_t	mc_capregs;
+	__uint64_t	mc_spare[7];
+} mcontext64_t;
+
+typedef struct __ucontext64 {
+	sigset_t		uc_sigmask;
+	mcontext64_t		uc_mcontext;
+	uint64_t		uc_link;
+	struct sigaltstack64	uc_stack;
+	int			uc_flags;
+	int			__spare__[4];
+} ucontext64_t;
+#endif
 
 #endif	/* !_MACHINE_UCONTEXT_H_ */

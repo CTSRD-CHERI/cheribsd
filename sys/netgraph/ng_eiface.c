@@ -385,7 +385,7 @@ ng_eiface_constructor(node_p node)
 {
 	struct ifnet *ifp;
 	priv_p priv;
-	u_char eaddr[6] = {0,0,0,0,0,0};
+	struct ether_addr eaddr;
 
 	/* Allocate node and interface private structures */
 	priv = malloc(sizeof(*priv), M_NETGRAPH, M_WAITOK | M_ZERO);
@@ -435,7 +435,8 @@ ng_eiface_constructor(node_p node)
 		    ifp->if_xname);
 
 	/* Attach the interface */
-	ether_ifattach(ifp, eaddr);
+	ether_gen_addr(ifp, &eaddr);
+	ether_ifattach(ifp, eaddr.octet);
 	ifp->if_baudrate = ifmedia_baudrate(IFM_ETHER | IFM_1000_T);
 
 	/* Done */
@@ -622,8 +623,8 @@ ng_eiface_rmnode(node_p node)
 	 * hence we have to change the current vnet context here.
 	 */
 	CURVNET_SET_QUIET(ifp->if_vnet);
-	ifmedia_removeall(&priv->media);
 	ether_ifdetach(ifp);
+	ifmedia_removeall(&priv->media);
 	if_free(ifp);
 	CURVNET_RESTORE();
 	free_unr(V_ng_eiface_unit, priv->unit);

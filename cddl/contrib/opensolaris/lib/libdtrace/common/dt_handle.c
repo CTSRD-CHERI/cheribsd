@@ -409,8 +409,8 @@ dt_handle_status(dtrace_hdl_t *dtp, dtrace_status_t *old, dtrace_status_t *new)
 		return (dt_set_errno(dtp, EDT_BRICKED));
 
 	for (i = 0; _dt_droptab[i].dtdrt_str != NULL; i++) {
-		uintptr_t naddr = base + _dt_droptab[i].dtdrt_offset;
-		uintptr_t oaddr = obase + _dt_droptab[i].dtdrt_offset;
+		uintptr_t naddr = base + (size_t)_dt_droptab[i].dtdrt_offset;
+		uintptr_t oaddr = obase + (size_t)_dt_droptab[i].dtdrt_offset;
 
 		uint64_t nval = *((uint64_t *)naddr);
 		uint64_t oval = *((uint64_t *)oaddr);

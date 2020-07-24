@@ -87,7 +87,7 @@ typedef struct {
 	struct osigcontext si_sc;
 	int		si_signo;
 	int		si_code;
-	ksigval_union	si_value;
+	union sigval	si_value;
 } osiginfo_t;
 
 struct osigaction {
@@ -215,14 +215,14 @@ struct osigevent {
 		int	__sigev_signo;	/* Signal number */
 		int	__sigev_notify_kqueue;
 	} __sigev_u;
-	ksigval_union sigev_value;	/* Signal value */
+	union sigval sigev_value;	/* Signal value */
 };
 #endif
 
 #ifdef _KERNEL
 typedef struct ksiginfo {
 	TAILQ_ENTRY(ksiginfo)	ksi_link;
-	_siginfo_t		ksi_info;
+	siginfo_t		ksi_info;
 	int			ksi_flags;
 	struct sigqueue		*ksi_sigq;
 } ksiginfo_t;
@@ -266,7 +266,24 @@ typedef struct sigqueue {
 /* Flags for ksi_flags */
 #define	SQ_INIT	0x01
 
+/*
+ * Fast_sigblock
+ */
+#define	SIGFASTBLOCK_SETPTR	1
+#define	SIGFASTBLOCK_UNBLOCK	2
+#define	SIGFASTBLOCK_UNSETPTR	3
+
+#define	SIGFASTBLOCK_PEND	0x1
+#define	SIGFASTBLOCK_FLAGS	0xf
+#define	SIGFASTBLOCK_INC	0x10
+
+#ifndef _KERNEL
+int __sys_sigfastblock(int cmd, void *ptr);
+#endif
+
 #ifdef _KERNEL
+extern sigset_t fastblock_mask;
+extern bool sigfastblock_fetch_always;
 
 /* Return nonzero if process p has an unmasked pending signal. */
 #define	SIGPENDING(td)							\
@@ -275,20 +292,20 @@ typedef struct sigqueue {
 	 (!SIGISEMPTY((td)->td_proc->p_siglist) &&			\
 	    !sigsetmasked(&(td)->td_proc->p_siglist, &(td)->td_sigmask)))
 /*
- * Return the value of the pseudo-expression ((*set & ~*mask) != 0).  This
+ * Return the value of the pseudo-expression ((*set & ~*mask) == 0).  This
  * is an optimized version of SIGISEMPTY() on a temporary variable
  * containing SIGSETNAND(*set, *mask).
  */
-static __inline int
+static __inline bool
 sigsetmasked(sigset_t *set, sigset_t *mask)
 {
 	int i;
 
 	for (i = 0; i < _SIG_WORDS; i++) {
 		if (set->__bits[i] & ~mask->__bits[i])
-			return (0);
+			return (false);
 	}
-	return (1);
+	return (true);
 }
 
 #define	ksiginfo_init(ksi)			\
@@ -311,11 +328,10 @@ ksiginfo_copy(ksiginfo_t *src, ksiginfo_t *dst)
 }
 
 static __inline void
-ksiginfo_set_sigev(ksiginfo_t *dst, ksigevent_t *sigev)
+ksiginfo_set_sigev(ksiginfo_t *dst, struct sigevent *sigev)
 {
 	dst->ksi_signo = sigev->sigev_signo;
-	__builtin_memcpy(&dst->ksi_value, &sigev->sigev_value,
-	    sizeof(dst->ksi_value));
+	dst->ksi_value = sigev->sigev_value;
 }
 
 struct pgrp;
@@ -339,6 +355,7 @@ extern struct mtx	sigio_lock;
 #define	SIGPROCMASK_OLD		0x0001
 #define	SIGPROCMASK_PROC_LOCKED	0x0002
 #define	SIGPROCMASK_PS_LOCKED	0x0004
+#define	SIGPROCMASK_FASTBLK	0x0008
 
 /* Signal properties returned by sigprop(). */
 #define	SIGPROP_KILL		0x01	/* terminates process by default */
@@ -387,7 +404,7 @@ sigallowstop(int prev)
 int	cursig(struct thread *td);
 void	execsigs(struct proc *p);
 void	gsignal(int pgid, int sig, ksiginfo_t *ksi);
-void	killproc(struct proc *p, char *why);
+void	killproc(struct proc *p, const char *why);
 ksiginfo_t * ksiginfo_alloc(int wait);
 void	ksiginfo_free(ksiginfo_t *ksi);
 int	pksignal(struct proc *p, int sig, ksiginfo_t *ksi);
@@ -404,13 +421,11 @@ struct sigacts *sigacts_hold(struct sigacts *ps);
 int	sigacts_shared(struct sigacts *ps);
 void	sig_drop_caught(struct proc *p);
 void	sigexit(struct thread *td, int sig) __dead2;
-int	sigev_findtd(struct proc *p, ksigevent_t *sigev, struct thread **);
+int	sigev_findtd(struct proc *p, struct sigevent *sigev, struct thread **);
 int	sig_ffs(sigset_t *set);
-void	siginfo_to_siginfo_native(const _siginfo_t *si,
-	    struct siginfo_native *si_n);
-int	copyout_siginfo_native(const _siginfo_t *si, void * __capability info);
-void	siginfo_native_to_siginfo(const struct siginfo_native *si_n,
-	    _siginfo_t *si);
+void	sigfastblock_clear(struct thread *td);
+void	sigfastblock_fetch(struct thread *td);
+void	sigfastblock_setpend(struct thread *td, bool resched);
 void	siginit(struct proc *p);
 void	signotify(struct thread *td);
 int	sigprop(int sig);

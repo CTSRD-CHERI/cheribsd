@@ -33,10 +33,16 @@
  * ELF definitions for the RISC-V architecture.
  */
 
+#ifndef __ELF_WORD_SIZE
+#define	__ELF_WORD_SIZE	64
+#if defined(__CHERI_PURE_CAPABILITY__) || \
+    (__has_feature(capabilities) && defined(_KERNEL))
+#define	__ELF_CHERI
+#endif
+#endif
+
 #include <sys/elf32.h>	/* Definitions common to all 32 bit architectures. */
 #include <sys/elf64.h>	/* Definitions common to all 64 bit architectures. */
-
-#define	__ELF_WORD_SIZE	64	/* Used by <sys/elf_generic.h> */
 #include <sys/elf_generic.h>
 
 /*
@@ -51,19 +57,38 @@ typedef struct {	/* Auxiliary vector entry on initial stack */
 } Elf32_Auxinfo;
 
 typedef struct {	/* Auxiliary vector entry on initial stack */
-	long	a_type;			/* Entry type. */
+	int64_t	a_type;			/* Entry type. */
 	union {
-		long	a_val;		/* Integer value. */
+		int64_t	a_val;		/* Integer value. */
+#if __ELF_WORD_SIZE == 64 && !defined(__CHERI_PURE_CAPABILITY__)
 		void	*a_ptr;		/* Address. */
 		void	(*a_fcn)(void);	/* Function pointer (not used). */
+#endif
 	} a_un;
 } Elf64_Auxinfo;
 
+#if __has_feature(capabilities)
+typedef struct {	/* Auxiliary vector entry on initial stack */
+	int64_t	a_type;			/* Entry type. */
+	union {
+		int64_t	a_val;		/* Integer value. */
+		void * __capability a_ptr; /* Address. */
+		void	(* __capability a_fcn)(void); /* Function pointer (not used). */
+	} a_un;
+} Elf64C_Auxinfo;
+#endif
+
+#ifdef __ELF_CHERI
+typedef Elf64C_Auxinfo Elf_Auxinfo;
+#else
 __ElfType(Auxinfo);
+#endif
 
 #define	ELF_ARCH	EM_RISCV
 
 #define	ELF_MACHINE_OK(x) ((x) == (ELF_ARCH))
+
+#define	ELF_IS_CHERI(hdr) (((hdr)->e_flags & EF_RISCV_CHERIABI) != 0)
 
 /* Define "machine" characteristics */
 #define	ELF_TARG_CLASS	ELFCLASS64

@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2019 James Clarke
+ * Copyright (c) 2019 Jessica Clarke
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -28,9 +28,9 @@
  * SUCH DAMAGE.
  */
 
+#include <stdbool.h>
 
 #include "crtbrand.c"
-#define CRT_INIT_ARRAY_ENTRIES_ARE_OFFSETS
 #include "ignore_init.c"
 #define CHERI_INIT_GLOBALS_USE_OFFSET
 #include "crt_init_globals.c"

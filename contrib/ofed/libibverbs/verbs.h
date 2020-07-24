@@ -537,7 +537,7 @@ enum ibv_rereg_mr_flags {
 };
 
 struct ibv_mr {
-	struct ibv_context     *context;
+	struct ibv_context     *context __subobject_use_container_bounds;
 	struct ibv_pd	       *pd;
 	void		       *addr;
 	size_t			length;
@@ -552,7 +552,7 @@ enum ibv_mw_type {
 };
 
 struct ibv_mw {
-	struct ibv_context     *context;
+	struct ibv_context     *context __subobject_use_container_bounds;
 	struct ibv_pd	       *pd;
 	uint32_t		rkey;
 	uint32_t		handle;
@@ -1022,7 +1022,7 @@ struct ibv_srq {
  *   requests (WRs) to its receive queue.
  */
 struct ibv_wq {
-	struct ibv_context     *context;
+	struct ibv_context     *context __subobject_use_container_bounds;
 	void		       *wq_context;
 	struct	ibv_pd	       *pd;
 	struct	ibv_cq	       *cq;
@@ -1562,7 +1562,7 @@ struct verbs_context {
 	int			(*close_xrcd)(struct ibv_xrcd *xrcd);
 	uint64_t has_comp_mask;
 	size_t   sz;			/* Must be immediately before struct ibv_context */
-	struct ibv_context context;	/* Must be last field in the struct */
+	struct ibv_context context __subobject_use_container_bounds;	/* Must be last field in the struct */
 };
 
 static inline struct verbs_context *verbs_get_ctx(struct ibv_context *ctx)

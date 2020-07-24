@@ -34,6 +34,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/uio.h>
 
 #include <machine/atomic.h>
+#include <machine/vmm_snapshot.h>
 
 #include <stdio.h>
 #include <stdint.h>
@@ -41,6 +42,7 @@ __FBSDID("$FreeBSD$");
 #include <pthread_np.h>
 
 #include "bhyverun.h"
+#include "debug.h"
 #include "pci_emul.h"
 #include "virtio.h"
 
@@ -294,8 +296,8 @@ vq_getchain(struct vqueue_info *vq, uint16_t *pidx,
 		return (0);
 	if (ndesc > vq->vq_qsize) {
 		/* XXX need better way to diagnose issues */
-		fprintf(stderr,
-		    "%s: ndesc (%u) out of range, driver confused?\r\n",
+		EPRINTLN(
+		    "%s: ndesc (%u) out of range, driver confused?",
 		    name, (u_int)ndesc);
 		return (-1);
 	}
@@ -313,9 +315,9 @@ vq_getchain(struct vqueue_info *vq, uint16_t *pidx,
 	vq->vq_last_avail++;
 	for (i = 0; i < VQ_MAX_DESCRIPTORS; next = vdir->vd_next) {
 		if (next >= vq->vq_qsize) {
-			fprintf(stderr,
+			EPRINTLN(
 			    "%s: descriptor index %u out of range, "
-			    "driver confused?\r\n",
+			    "driver confused?",
 			    name, next);
 			return (-1);
 		}
@@ -325,17 +327,17 @@ vq_getchain(struct vqueue_info *vq, uint16_t *pidx,
 			i++;
 		} else if ((vs->vs_vc->vc_hv_caps &
 		    VIRTIO_RING_F_INDIRECT_DESC) == 0) {
-			fprintf(stderr,
+			EPRINTLN(
 			    "%s: descriptor has forbidden INDIRECT flag, "
-			    "driver confused?\r\n",
+			    "driver confused?",
 			    name);
 			return (-1);
 		} else {
 			n_indir = vdir->vd_len / 16;
 			if ((vdir->vd_len & 0xf) || n_indir == 0) {
-				fprintf(stderr,
+				EPRINTLN(
 				    "%s: invalid indir len 0x%x, "
-				    "driver confused?\r\n",
+				    "driver confused?",
 				    name, (u_int)vdir->vd_len);
 				return (-1);
 			}
@@ -352,9 +354,9 @@ vq_getchain(struct vqueue_info *vq, uint16_t *pidx,
 			for (;;) {
 				vp = &vindir[next];
 				if (vp->vd_flags & VRING_DESC_F_INDIRECT) {
-					fprintf(stderr,
+					EPRINTLN(
 					    "%s: indirect desc has INDIR flag,"
-					    " driver confused?\r\n",
+					    " driver confused?",
 					    name);
 					return (-1);
 				}
@@ -365,9 +367,9 @@ vq_getchain(struct vqueue_info *vq, uint16_t *pidx,
 					break;
 				next = vp->vd_next;
 				if (next >= n_indir) {
-					fprintf(stderr,
+					EPRINTLN(
 					    "%s: invalid next %u > %u, "
-					    "driver confused?\r\n",
+					    "driver confused?",
 					    name, (u_int)next, n_indir);
 					return (-1);
 				}
@@ -377,8 +379,8 @@ vq_getchain(struct vqueue_info *vq, uint16_t *pidx,
 			return (i);
 	}
 loopy:
-	fprintf(stderr,
-	    "%s: descriptor loop? count > %d - driver confused?\r\n",
+	EPRINTLN(
+	    "%s: descriptor loop? count > %d - driver confused?",
 	    name, i);
 	return (-1);
 }
@@ -609,12 +611,12 @@ bad:
 	if (cr == NULL || cr->cr_size != size) {
 		if (cr != NULL) {
 			/* offset must be OK, so size must be bad */
-			fprintf(stderr,
-			    "%s: read from %s: bad size %d\r\n",
+			EPRINTLN(
+			    "%s: read from %s: bad size %d",
 			    name, cr->cr_name, size);
 		} else {
-			fprintf(stderr,
-			    "%s: read from bad offset/size %jd/%d\r\n",
+			EPRINTLN(
+			    "%s: read from bad offset/size %jd/%d",
 			    name, (uintmax_t)offset, size);
 		}
 		goto done;
@@ -729,16 +731,16 @@ bad:
 		if (cr != NULL) {
 			/* offset must be OK, wrong size and/or reg is R/O */
 			if (cr->cr_size != size)
-				fprintf(stderr,
-				    "%s: write to %s: bad size %d\r\n",
+				EPRINTLN(
+				    "%s: write to %s: bad size %d",
 				    name, cr->cr_name, size);
 			if (cr->cr_ro)
-				fprintf(stderr,
-				    "%s: write to read-only reg %s\r\n",
+				EPRINTLN(
+				    "%s: write to read-only reg %s",
 				    name, cr->cr_name);
 		} else {
-			fprintf(stderr,
-			    "%s: write to bad offset/size %jd/%d\r\n",
+			EPRINTLN(
+			    "%s: write to bad offset/size %jd/%d",
 			    name, (uintmax_t)offset, size);
 		}
 		goto done;
@@ -766,7 +768,7 @@ bad:
 		break;
 	case VTCFG_R_QNOTIFY:
 		if (value >= vc->vc_nvq) {
-			fprintf(stderr, "%s: queue %d notify out of range\r\n",
+			EPRINTLN("%s: queue %d notify out of range",
 				name, (int)value);
 			goto done;
 		}
@@ -776,8 +778,8 @@ bad:
 		else if (vc->vc_qnotify)
 			(*vc->vc_qnotify)(DEV_SOFTC(vs), vq);
 		else
-			fprintf(stderr,
-			    "%s: qnotify queue %d: missing vq/vc notify\r\n",
+			EPRINTLN(
+			    "%s: qnotify queue %d: missing vq/vc notify",
 				name, (int)value);
 		break;
 	case VTCFG_R_STATUS:
@@ -798,10 +800,157 @@ bad:
 	goto done;
 
 bad_qindex:
-	fprintf(stderr,
-	    "%s: write config reg %s: curq %d >= max %d\r\n",
+	EPRINTLN(
+	    "%s: write config reg %s: curq %d >= max %d",
 	    name, cr->cr_name, vs->vs_curq, vc->vc_nvq);
 done:
 	if (vs->vs_mtx)
 		pthread_mutex_unlock(vs->vs_mtx);
 }
+
+#ifdef BHYVE_SNAPSHOT
+int
+vi_pci_pause(struct vmctx *ctx, struct pci_devinst *pi)
+{
+	struct virtio_softc *vs;
+	struct virtio_consts *vc;
+
+	vs = pi->pi_arg;
+	vc = vs->vs_vc;
+
+	vc = vs->vs_vc;
+	assert(vc->vc_pause != NULL);
+	(*vc->vc_pause)(DEV_SOFTC(vs));
+
+	return (0);
+}
+
+int
+vi_pci_resume(struct vmctx *ctx, struct pci_devinst *pi)
+{
+	struct virtio_softc *vs;
+	struct virtio_consts *vc;
+
+	vs = pi->pi_arg;
+	vc = vs->vs_vc;
+
+	vc = vs->vs_vc;
+	assert(vc->vc_resume != NULL);
+	(*vc->vc_resume)(DEV_SOFTC(vs));
+
+	return (0);
+}
+
+static int
+vi_pci_snapshot_softc(struct virtio_softc *vs, struct vm_snapshot_meta *meta)
+{
+	int ret;
+
+	SNAPSHOT_VAR_OR_LEAVE(vs->vs_flags, meta, ret, done);
+	SNAPSHOT_VAR_OR_LEAVE(vs->vs_negotiated_caps, meta, ret, done);
+	SNAPSHOT_VAR_OR_LEAVE(vs->vs_curq, meta, ret, done);
+	SNAPSHOT_VAR_OR_LEAVE(vs->vs_status, meta, ret, done);
+	SNAPSHOT_VAR_OR_LEAVE(vs->vs_isr, meta, ret, done);
+	SNAPSHOT_VAR_OR_LEAVE(vs->vs_msix_cfg_idx, meta, ret, done);
+
+done:
+	return (ret);
+}
+
+static int
+vi_pci_snapshot_consts(struct virtio_consts *vc, struct vm_snapshot_meta *meta)
+{
+	int ret;
+
+	SNAPSHOT_VAR_CMP_OR_LEAVE(vc->vc_nvq, meta, ret, done);
+	SNAPSHOT_VAR_CMP_OR_LEAVE(vc->vc_cfgsize, meta, ret, done);
+	SNAPSHOT_VAR_CMP_OR_LEAVE(vc->vc_hv_caps, meta, ret, done);
+
+done:
+	return (ret);
+}
+
+static int
+vi_pci_snapshot_queues(struct virtio_softc *vs, struct vm_snapshot_meta *meta)
+{
+	int i;
+	int ret;
+	struct virtio_consts *vc;
+	struct vqueue_info *vq;
+	uint64_t addr_size;
+
+	vc = vs->vs_vc;
+
+	/* Save virtio queue info */
+	for (i = 0; i < vc->vc_nvq; i++) {
+		vq = &vs->vs_queues[i];
+
+		SNAPSHOT_VAR_CMP_OR_LEAVE(vq->vq_qsize, meta, ret, done);
+		SNAPSHOT_VAR_CMP_OR_LEAVE(vq->vq_num, meta, ret, done);
+
+		SNAPSHOT_VAR_OR_LEAVE(vq->vq_flags, meta, ret, done);
+		SNAPSHOT_VAR_OR_LEAVE(vq->vq_last_avail, meta, ret, done);
+		SNAPSHOT_VAR_OR_LEAVE(vq->vq_next_used, meta, ret, done);
+		SNAPSHOT_VAR_OR_LEAVE(vq->vq_save_used, meta, ret, done);
+		SNAPSHOT_VAR_OR_LEAVE(vq->vq_msix_idx, meta, ret, done);
+
+		SNAPSHOT_VAR_OR_LEAVE(vq->vq_pfn, meta, ret, done);
+
+		addr_size = vq->vq_qsize * sizeof(struct virtio_desc);
+		SNAPSHOT_GUEST2HOST_ADDR_OR_LEAVE(vq->vq_desc, addr_size,
+			false, meta, ret, done);
+
+		addr_size = (2 + vq->vq_qsize + 1) * sizeof(uint16_t);
+		SNAPSHOT_GUEST2HOST_ADDR_OR_LEAVE(vq->vq_avail, addr_size,
+			false, meta, ret, done);
+
+		addr_size  = (2 + 2 * vq->vq_qsize + 1) * sizeof(uint16_t);
+		SNAPSHOT_GUEST2HOST_ADDR_OR_LEAVE(vq->vq_used, addr_size,
+			false, meta, ret, done);
+
+		SNAPSHOT_BUF_OR_LEAVE(vq->vq_desc, vring_size(vq->vq_qsize),
+			meta, ret, done);
+	}
+
+done:
+	return (ret);
+}
+
+int
+vi_pci_snapshot(struct vm_snapshot_meta *meta)
+{
+	int ret;
+	struct pci_devinst *pi;
+	struct virtio_softc *vs;
+	struct virtio_consts *vc;
+
+	pi = meta->dev_data;
+	vs = pi->pi_arg;
+	vc = vs->vs_vc;
+
+	/* Save virtio softc */
+	ret = vi_pci_snapshot_softc(vs, meta);
+	if (ret != 0)
+		goto done;
+
+	/* Save virtio consts */
+	ret = vi_pci_snapshot_consts(vc, meta);
+	if (ret != 0)
+		goto done;
+
+	/* Save virtio queue info */
+	ret = vi_pci_snapshot_queues(vs, meta);
+	if (ret != 0)
+		goto done;
+
+	/* Save device softc, if needed */
+	if (vc->vc_snapshot != NULL) {
+		ret = (*vc->vc_snapshot)(DEV_SOFTC(vs), meta);
+		if (ret != 0)
+			goto done;
+	}
+
+done:
+	return (ret);
+}
+#endif

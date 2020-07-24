@@ -8,6 +8,8 @@ SUBDIR_PARALLEL=
 # Modules that include binary-only blobs of microcode should be selectable by
 # MK_SOURCELESS_UCODE option (see below).
 
+.include "${SYSDIR}/conf/config.mk"
+
 .if defined(MODULES_OVERRIDE) && !defined(ALL_MODULES)
 SUBDIR=${MODULES_OVERRIDE}
 .else
@@ -57,7 +59,6 @@ SUBDIR=	\
 	ath_rate \
 	ath_pci \
 	${_autofs} \
-	${_auxio} \
 	${_bce} \
 	${_bcm283x_clkman} \
 	${_bcm283x_pwm} \
@@ -66,7 +67,6 @@ SUBDIR=	\
 	bhnd \
 	${_bxe} \
 	${_bios} \
-	${_bktr} \
 	${_blake2} \
 	bnxt \
 	bridgestp \
@@ -98,7 +98,6 @@ SUBDIR=	\
 	${_cpufreq} \
 	${_crypto} \
 	${_cryptodev} \
-	${_ctau} \
 	ctl \
 	${_cxgb} \
 	${_cxgbe} \
@@ -110,7 +109,6 @@ SUBDIR=	\
 	${_efirt} \
 	${_em} \
 	${_ena} \
-	${_epic} \
 	esp \
 	${_et} \
 	evdev \
@@ -261,7 +259,6 @@ SUBDIR=	\
 	nfscl \
 	nfscommon \
 	nfsd \
-	nfslock \
 	nfslockd \
 	nfssvc \
 	nge \
@@ -280,6 +277,7 @@ SUBDIR=	\
 	${_padlock} \
 	${_padlock_rng} \
 	${_pccard} \
+	${_pchtherm} \
 	${_pcfclock} \
 	${_pf} \
 	${_pflog} \
@@ -356,7 +354,6 @@ SUBDIR=	\
 	twe \
 	tws \
 	${_uart} \
-	ubsec \
 	udf \
 	udf_iconv \
 	ufs \
@@ -372,7 +369,6 @@ SUBDIR=	\
 	${_vmd} \
 	${_vmm} \
 	${_vmware} \
-	${_vpo} \
 	vr \
 	vte \
 	${_wbwd} \
@@ -388,6 +384,7 @@ SUBDIR=	\
 	${_wpi} \
 	${_wpifw} \
 	${_x86bios} \
+	xdr \
 	xl \
 	xz \
 	zlib
@@ -402,10 +399,10 @@ _autofs=	autofs
 .endif
 
 .if ${MK_CDDL} != "no" || defined(ALL_MODULES)
-.if (${MACHINE_CPUARCH} != "arm" || ${MACHINE_ARCH:Marmv[67]*} != "") && \
-	${MACHINE_CPUARCH} != "mips" && \
-	${MACHINE_CPUARCH} != "sparc64"
+.if (${MACHINE_CPUARCH} != "arm" || ${MACHINE_ARCH:Marmv[67]*} != "")
+.if ${KERN_OPTS:MKDTRACE_HOOKS}
 SUBDIR+=	dtrace
+.endif
 .endif
 SUBDIR+=	opensolaris
 .endif
@@ -567,7 +564,6 @@ _hwpmc_mips74k=	hwpmc_mips74k
 	${MACHINE_CPUARCH} != "mips" && ${MACHINE_CPUARCH} != "powerpc" && \
 	${MACHINE_CPUARCH} != "riscv"
 _syscons=	syscons
-_vpo=		vpo
 .endif
 
 .if ${MACHINE_CPUARCH} != "mips"
@@ -593,7 +589,6 @@ _agp=		agp
 _an=		an
 _aout=		aout
 _bios=		bios
-_bktr=		bktr
 .if ${MK_SOURCELESS_UCODE} != "no"
 _bxe=		bxe
 .endif
@@ -633,9 +628,7 @@ _aac=		aac
 _aacraid=	aacraid
 _acpi=		acpi
 .if ${MK_CRYPT} != "no" || defined(ALL_MODULES)
-.if ${COMPILER_TYPE} != "gcc" || ${COMPILER_VERSION} > 40201
 _aesni=		aesni
-.endif
 .endif
 _amd_ecc_inject=amd_ecc_inject
 _amdsbwd=	amdsbwd
@@ -689,6 +682,7 @@ _padlock=	padlock
 _padlock_rng=	padlock_rng
 _rdrand_rng=	rdrand_rng
 .endif
+_pchtherm = pchtherm
 _s3=		s3
 _sdhci_acpi=	sdhci_acpi
 _superio=	superio
@@ -726,7 +720,9 @@ _sgx_linux=	sgx_linux
 _smartpqi=	smartpqi
 
 .if ${MK_BHYVE} != "no" || defined(ALL_MODULES)
+.if ${KERN_OPTS:MSMP}
 _vmm=		vmm
+.endif
 .endif
 .endif
 
@@ -736,7 +732,7 @@ _vmm=		vmm
 _3dfx=		3dfx
 _3dfx_linux=	3dfx_linux
 _apm=		apm
-.if ${MK_SOURCELESS_UCODE} != "no"
+.if ${MK_SOURCELESS_HOST} != "no"
 _ce=		ce
 .endif
 .if ${MK_SOURCELESS_UCODE} != "no"
@@ -747,9 +743,6 @@ _glxsb=		glxsb
 _pcfclock=	pcfclock
 _pst=		pst
 _sbni=		sbni
-.if ${MK_SOURCELESS_UCODE} != "no"
-_ctau=		ctau
-.endif
 .endif
 
 .if ${MACHINE_CPUARCH} == "arm"
@@ -758,6 +751,7 @@ _cpsw=		cpsw
 .endif
 
 .if ${MACHINE_CPUARCH} == "powerpc"
+_aacraid=	aacraid
 _agp=		agp
 _an=		an
 _cardbus=	cardbus
@@ -770,21 +764,17 @@ _nvd=		nvd
 _nvme=		nvme
 _pccard=	pccard
 _wi=		wi
+_virtio=	virtio
 .endif
 
 .if ${MACHINE_ARCH} == "powerpc64"
 _ipmi=		ipmi
+_ixl=		ixl
 _nvram=		opal_nvram
 .endif
 .if ${MACHINE_ARCH} == "powerpc64" || ${MACHINE_ARCH} == "powerpc"
 # Don't build powermac_nvram for powerpcspe, it's never supported.
 _nvram+=	powermac_nvram
-.endif
-
-.if ${MACHINE_CPUARCH} == "sparc64"
-_auxio=		auxio
-_em=		em
-_epic=		epic
 .endif
 
 .if (${MACHINE_CPUARCH} == "aarch64" || ${MACHINE_CPUARCH} == "amd64" || \
@@ -817,8 +807,6 @@ afterinstall: .PHONY
 		${KLDXREF_CMD} ${DESTDIR}${KMODDIR}; \
 	fi
 .endif
-
-.include "${SYSDIR}/conf/config.mk"
 
 SUBDIR:= ${SUBDIR:u:O}
 

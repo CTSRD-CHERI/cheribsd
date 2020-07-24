@@ -73,18 +73,12 @@ typedef	__uint64_t		uint64_t;
 #endif
 
 #ifndef _INTCAP_T_DECLARED
-#if __has_feature(capabilities)
 typedef	__intcap_t		intcap_t;
-#else
-typedef	__intptr_t		intcap_t;
-#endif
+#define	_INTCAP_T_DECLARED
 #endif
 #ifndef _UINTCAP_T_DECLARED
-#if __has_feature(capabilities)
 typedef	__uintcap_t		uintcap_t;
-#else
-typedef	__uintptr_t		uintcap_t;
-#endif
+#define	_UINTCAP_T_DECLARED
 #endif
 #ifndef _INTPTR_T_DECLARED
 typedef	__intptr_t		intptr_t;
@@ -101,6 +95,22 @@ typedef	__intmax_t		intmax_t;
 #ifndef _UINTMAX_T_DECLARED
 typedef	__uintmax_t		uintmax_t;
 #define	_UINTMAX_T_DECLARED
+#endif
+#ifndef _KINTCAP_T_DECLARED
+#ifdef _KERNEL
+typedef __intcap_t	kintcap_t;
+#else
+typedef __intptr_t	kintcap_t;
+#endif
+#define	_KINTCAP_T_DECLARED
+#endif
+#ifndef _KUINTCAP_T_DECLARED
+#ifdef _KERNEL
+typedef __uintcap_t	kuintcap_t;
+#else
+typedef __uintptr_t	kuintcap_t;
+#endif
+#define	_KUINTCAP_T_DECLARED
 #endif
 
 #ifndef _VADDR_T_DECLARED

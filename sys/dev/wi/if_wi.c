@@ -171,8 +171,8 @@ wi_write_val(struct wi_softc *sc, int rid, u_int16_t val)
 	return wi_write_rid(sc, rid, &val, sizeof(val));
 }
 
-static SYSCTL_NODE(_hw, OID_AUTO, wi, CTLFLAG_RD, 0,
-	    "Wireless driver parameters");
+static SYSCTL_NODE(_hw, OID_AUTO, wi, CTLFLAG_RD | CTLFLAG_MPSAFE, 0,
+    "Wireless driver parameters");
 
 static	struct timeval lasttxerror;	/* time of last tx error msg */
 static	int curtxeps;			/* current tx error msgs/sec */
@@ -1254,6 +1254,7 @@ wi_sync_bssid(struct wi_softc *sc, u_int8_t new_bssid[IEEE80211_ADDR_LEN])
 static __noinline void
 wi_rx_intr(struct wi_softc *sc)
 {
+	struct epoch_tracker et;
 	struct ieee80211com *ic = &sc->sc_ic;
 	struct wi_frame frmhdr;
 	struct mbuf *m;
@@ -1349,11 +1350,14 @@ wi_rx_intr(struct wi_softc *sc)
 	WI_UNLOCK(sc);
 
 	ni = ieee80211_find_rxnode(ic, mtod(m, struct ieee80211_frame_min *));
+
+	NET_EPOCH_ENTER(et);
 	if (ni != NULL) {
 		(void) ieee80211_input(ni, m, rssi, nf);
 		ieee80211_free_node(ni);
 	} else
 		(void) ieee80211_input_all(ic, m, rssi, nf);
+	NET_EPOCH_EXIT(et);
 
 	WI_LOCK(sc);
 }

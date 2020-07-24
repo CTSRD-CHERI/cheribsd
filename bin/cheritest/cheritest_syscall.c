@@ -41,7 +41,6 @@
 #include <sys/time.h>
 #include <sys/ptrace.h>
 
-#include <machine/cpuregs.h>
 #include <machine/sysarch.h>
 
 #include <cheri/cheri.h>
@@ -116,9 +115,9 @@ test_sig_dfl_neq_ign(const struct cheri_test *ctp __unused)
 	int eq = (SIG_IGN == SIG_DFL);
 
 	CHERI_FPRINT_PTR(stderr, sic);
-	fprintf(stderr, "IGN=%d(%p) DFL=%d(%p) EQ=%d(%d)\n",
-		(int)SIG_IGN, SIG_IGN,
-		(int)SIG_DFL, SIG_DFL, SIG_IGN == SIG_DFL, eq);
+	fprintf(stderr, "IGN=%ld(%p) DFL=%ld(%p) EQ=%d(%d)\n",
+		(long)SIG_IGN, SIG_IGN,
+		(long)SIG_DFL, SIG_DFL, SIG_IGN == SIG_DFL, eq);
 
 	if (SIG_IGN == SIG_DFL)
 		cheritest_failure_errx("SIG_{IGN,DFL} conflated");

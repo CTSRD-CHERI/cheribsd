@@ -36,6 +36,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/systm.h>
 #include <sys/ctype.h>
 #include <sys/linker.h>
+#include <sys/physmem.h>
 #include <sys/reboot.h>
 #include <sys/sysctl.h>
 #if defined(LINUX_BOOT_ABI)
@@ -46,7 +47,6 @@ __FBSDID("$FreeBSD$");
 #include <machine/cpu.h>
 #include <machine/machdep.h>
 #include <machine/metadata.h>
-#include <machine/physmem.h>
 #include <machine/vmparam.h>	/* For KERNVIRTADDR */
 
 #ifdef FDT
@@ -88,7 +88,8 @@ static char linux_command_line[LBABI_MAX_COMMAND_LINE + 1];
 static char atags[LBABI_MAX_COMMAND_LINE * 2];
 #endif /* defined(LINUX_BOOT_ABI) */
 
-SYSCTL_NODE(_hw, OID_AUTO, board, CTLFLAG_RD, 0, "Board attributes");
+SYSCTL_NODE(_hw, OID_AUTO, board, CTLFLAG_RD | CTLFLAG_MPSAFE, 0,
+    "Board attributes");
 SYSCTL_UINT(_hw_board, OID_AUTO, revision, CTLFLAG_RD,
     &board_revision, 0, "Board revision");
 SYSCTL_STRING(_hw_board, OID_AUTO, serial, CTLFLAG_RD,
@@ -227,7 +228,7 @@ linux_parse_boot_param(struct arm_boot_params *abp)
 		case ATAG_CORE:
 			break;
 		case ATAG_MEM:
-			arm_physmem_hardware_region(walker->u.tag_mem.start,
+			physmem_hardware_region(walker->u.tag_mem.start,
 			    walker->u.tag_mem.size);
 			break;
 		case ATAG_INITRD2:

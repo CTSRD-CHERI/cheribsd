@@ -32,6 +32,7 @@ __FBSDID("$FreeBSD$");
 
 #include "namespace.h"
 #include <sys/param.h>
+#include <sys/elf_common.h>
 #include <sys/exec.h>
 #include <sys/sysctl.h>
 
@@ -126,11 +127,9 @@ setproctitle_internal(const char *fmt, va_list ap)
 		/* Nothing to restore */
 		return (NULL);
 
-#ifdef AT_PS_STRINGS
 	if (ps_strings == NULL)
 		(void)_elf_aux_info(AT_PS_STRINGS, &ps_strings,
 		    sizeof(ps_strings));
-#endif
 
 #ifndef __CHERI_PURE_CAPABILITY__
 	if (ps_strings == NULL) {

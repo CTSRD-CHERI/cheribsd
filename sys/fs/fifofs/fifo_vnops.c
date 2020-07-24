@@ -102,6 +102,7 @@ struct vop_vector fifo_specops = {
 	.vop_symlink =		VOP_PANIC,
 	.vop_write =		VOP_PANIC,
 };
+VFS_VOP_VECTOR_REGISTER(fifo_specops);
 
 /*
  * Dispose of fifo resources.
@@ -150,7 +151,9 @@ fifo_open(ap)
 	if (fp == NULL || (ap->a_mode & FEXEC) != 0)
 		return (EINVAL);
 	if ((fip = vp->v_fifoinfo) == NULL) {
-		pipe_named_ctor(&fpipe, td);
+		error = pipe_named_ctor(&fpipe, td);
+		if (error != 0)
+			return (error);
 		fip = malloc(sizeof(*fip), M_VNODE, M_WAITOK);
 		fip->fi_pipe = fpipe;
 		fpipe->pipe_wgen = fip->fi_readers = fip->fi_writers = 0;
@@ -171,8 +174,10 @@ fifo_open(ap)
 		fip->fi_rgen++;
 		if (fip->fi_readers == 1) {
 			fpipe->pipe_state &= ~PIPE_EOF;
-			if (fip->fi_writers > 0)
+			if (fip->fi_writers > 0) {
 				wakeup(&fip->fi_writers);
+				pipeselwakeup(fpipe);
+			}
 		}
 		fp->f_pipegen = fpipe->pipe_wgen - fip->fi_writers;
 	}
@@ -187,14 +192,16 @@ fifo_open(ap)
 		fip->fi_wgen++;
 		if (fip->fi_writers == 1) {
 			fpipe->pipe_state &= ~PIPE_EOF;
-			if (fip->fi_readers > 0)
+			if (fip->fi_readers > 0) {
 				wakeup(&fip->fi_readers);
+				pipeselwakeup(fpipe);
+			}
 		}
 	}
 	if ((ap->a_mode & O_NONBLOCK) == 0) {
 		if ((ap->a_mode & FREAD) && fip->fi_writers == 0) {
 			gen = fip->fi_wgen;
-			VOP_UNLOCK(vp, 0);
+			VOP_UNLOCK(vp);
 			stops_deferred = sigdeferstop(SIGDEFERSTOP_OFF);
 			error = msleep(&fip->fi_readers, PIPE_MTX(fpipe),
 			    PDROP | PCATCH | PSOCK, "fifoor", 0);
@@ -207,6 +214,7 @@ fifo_open(ap)
 					fpipe->pipe_state |= PIPE_EOF;
 					if (fpipe->pipe_state & PIPE_WANTW)
 						wakeup(fpipe);
+					pipeselwakeup(fpipe);
 					PIPE_UNLOCK(fpipe);
 					fifo_cleanup(vp);
 				}
@@ -221,7 +229,7 @@ fifo_open(ap)
 		}
 		if ((ap->a_mode & FWRITE) && fip->fi_readers == 0) {
 			gen = fip->fi_rgen;
-			VOP_UNLOCK(vp, 0);
+			VOP_UNLOCK(vp);
 			stops_deferred = sigdeferstop(SIGDEFERSTOP_OFF);
 			error = msleep(&fip->fi_writers, PIPE_MTX(fpipe),
 			    PDROP | PCATCH | PSOCK, "fifoow", 0);
@@ -235,6 +243,7 @@ fifo_open(ap)
 					if (fpipe->pipe_state & PIPE_WANTR)
 						wakeup(fpipe);
 					fpipe->pipe_wgen++;
+					pipeselwakeup(fpipe);
 					PIPE_UNLOCK(fpipe);
 					fifo_cleanup(vp);
 				}

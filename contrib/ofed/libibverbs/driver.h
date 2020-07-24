@@ -61,7 +61,7 @@ enum verbs_xrcd_mask {
 };
 
 struct verbs_xrcd {
-	struct ibv_xrcd		xrcd;
+	struct ibv_xrcd		xrcd __subobject_use_container_bounds;
 	uint32_t		comp_mask;
 	uint32_t		handle;
 };
@@ -75,7 +75,7 @@ enum verbs_srq_mask {
 };
 
 struct verbs_srq {
-	struct ibv_srq		srq;
+	struct ibv_srq		srq __subobject_use_container_bounds;
 	uint32_t		comp_mask;
 	enum ibv_srq_type	srq_type;
 	struct verbs_xrcd      *xrcd;
@@ -94,7 +94,7 @@ enum ibv_gid_type {
 };
 
 struct verbs_qp {
-	struct ibv_qp		qp;
+	struct ibv_qp		qp __subobject_use_container_bounds;
 	uint32_t		comp_mask;
 	struct verbs_xrcd       *xrcd;
 };
@@ -115,7 +115,7 @@ struct verbs_device_ops {
 
 /* Must change the PRIVATE IBVERBS_PRIVATE_ symbol if this is changed */
 struct verbs_device {
-	struct ibv_device device; /* Must be first */
+	struct ibv_device device __subobject_use_container_bounds; /* Must be first */
 	const struct verbs_device_ops *ops;
 	size_t	sz;
 	size_t	size_of_context;

@@ -49,8 +49,6 @@ __FBSDID("$FreeBSD$");
 #include "opt_capsicum.h"
 #include "opt_ktrace.h"
 
-#define	EXPLICIT_USER_ACCESS
-
 #include <sys/param.h>
 #include <sys/capsicum.h>
 #include <sys/conf.h>
@@ -140,6 +138,7 @@ static fo_fill_kinfo_t	shm_fill_kinfo;
 static fo_mmap_t	shm_mmap;
 static fo_get_seals_t	shm_get_seals;
 static fo_add_seals_t	shm_add_seals;
+static fo_fallocate_t	shm_fallocate;
 
 /* File descriptor operations. */
 struct fileops shm_ops = {
@@ -159,6 +158,7 @@ struct fileops shm_ops = {
 	.fo_mmap = shm_mmap,
 	.fo_get_seals = shm_get_seals,
 	.fo_add_seals = shm_add_seals,
+	.fo_fallocate = shm_fallocate,
 	.fo_flags = DFLAG_PASSABLE | DFLAG_SEEKABLE
 };
 
@@ -176,23 +176,25 @@ uiomove_object_page(vm_object_t obj, size_t len, struct uio *uio)
 	offset = uio->uio_offset & PAGE_MASK;
 	tlen = MIN(PAGE_SIZE - offset, len);
 
-	VM_OBJECT_WLOCK(obj);
+	rv = vm_page_grab_valid_unlocked(&m, obj, idx,
+	    VM_ALLOC_SBUSY | VM_ALLOC_IGN_SBUSY | VM_ALLOC_NOCREAT);
+	if (rv == VM_PAGER_OK)
+		goto found;
 
 	/*
 	 * Read I/O without either a corresponding resident page or swap
 	 * page: use zero_region.  This is intended to avoid instantiating
 	 * pages on read from a sparse region.
 	 */
-	if (uio->uio_rw == UIO_READ && vm_page_lookup(obj, idx) == NULL &&
+	VM_OBJECT_WLOCK(obj);
+	m = vm_page_lookup(obj, idx);
+	if (uio->uio_rw == UIO_READ && m == NULL &&
 	    !vm_pager_has_page(obj, idx, NULL, NULL)) {
 		VM_OBJECT_WUNLOCK(obj);
 		return (uiomove(__DECONST(void *, zero_region), tlen, uio));
 	}
 
 	/*
-	 * Parallel reads of the page content from disk are prevented
-	 * by exclusive busy.
-	 *
 	 * Although the tmpfs vnode lock is held here, it is
 	 * nonetheless safe to sleep waiting for a free page.  The
 	 * pageout daemon does not need to acquire the tmpfs vnode
@@ -200,7 +202,7 @@ uiomove_object_page(vm_object_t obj, size_t len, struct uio *uio)
 	 * type object.
 	 */
 	rv = vm_page_grab_valid(&m, obj, idx,
-	    VM_ALLOC_NORMAL | VM_ALLOC_WIRED | VM_ALLOC_NOBUSY);
+	    VM_ALLOC_NORMAL | VM_ALLOC_SBUSY | VM_ALLOC_IGN_SBUSY);
 	if (rv != VM_PAGER_OK) {
 		VM_OBJECT_WUNLOCK(obj);
 		printf("uiomove_object: vm_obj %p idx %jd pager error %d\n",
@@ -208,14 +210,13 @@ uiomove_object_page(vm_object_t obj, size_t len, struct uio *uio)
 		return (EIO);
 	}
 	VM_OBJECT_WUNLOCK(obj);
+
+found:
 	error = uiomove_fromphys(&m, offset, tlen, uio);
-	if (uio->uio_rw == UIO_WRITE && error == 0) {
-		VM_OBJECT_WLOCK(obj);
-		vm_page_dirty(m);
-		vm_pager_page_unswapped(m);
-		VM_OBJECT_WUNLOCK(obj);
-	}
-	vm_page_unwire(m, PQ_ACTIVE);
+	if (uio->uio_rw == UIO_WRITE && error == 0)
+		vm_page_set_dirty(m);
+	vm_page_activate(m);
+	vm_page_sunbusy(m);
 
 	return (error);
 }
@@ -508,8 +509,12 @@ retry:
 				    VM_ALLOC_NORMAL | VM_ALLOC_WAITFAIL);
 				if (m == NULL)
 					goto retry;
+				vm_object_pip_add(object, 1);
+				VM_OBJECT_WUNLOCK(object);
 				rv = vm_pager_get_pages(object, &m, 1, NULL,
 				    NULL);
+				VM_OBJECT_WLOCK(object);
+				vm_object_pip_wakeup(object);
 				if (rv == VM_PAGER_OK) {
 					/*
 					 * Since the page was not resident,
@@ -530,9 +535,8 @@ retry:
 				pmap_zero_page_area(m, base, PAGE_SIZE - base);
 				KASSERT(vm_page_all_valid(m),
 				    ("shm_dotruncate: page %p is invalid", m));
-				vm_page_dirty(m);
+				vm_page_set_dirty(m);
 				vm_page_xunbusy(m);
-				vm_pager_page_unswapped(m);
 			}
 		}
 		delta = IDX_TO_OFF(object->size - nobjsize);
@@ -738,8 +742,9 @@ shm_remove(char *path, Fnv32_t fnv, struct ucred *ucred)
 }
 
 int
-kern_shm_open(struct thread *td, const char * __capability userpath, int flags,
-    mode_t mode, struct filecaps *fcaps, int initial_seals)
+kern_shm_open2(struct thread *td, const char * __capability userpath,
+    int flags, mode_t mode, int shmflags, struct filecaps *fcaps,
+    const char * __capability name __unused)
 {
 	struct filedesc *fdp;
 	struct shmfd *shmfd;
@@ -748,7 +753,14 @@ kern_shm_open(struct thread *td, const char * __capability userpath, int flags,
 	void *rl_cookie;
 	Fnv32_t fnv;
 	mode_t cmode;
-	int fd, error;
+	int error, fd, initial_seals;
+
+	if ((shmflags & ~SHM_ALLOW_SEALING) != 0)
+		return (EINVAL);
+
+	initial_seals = F_SEAL_SEAL;
+	if ((shmflags & SHM_ALLOW_SEALING) != 0)
+		initial_seals &= ~F_SEAL_SEAL;
 
 #ifdef CAPABILITY_MODE
 	/*
@@ -930,8 +942,8 @@ int
 freebsd12_shm_open(struct thread *td, struct freebsd12_shm_open_args *uap)
 {
 
-	return (kern_shm_open(td, uap->path,
-	    uap->flags | O_CLOEXEC, uap->mode, NULL, F_SEAL_SEAL));
+	return (kern_shm_open(td, uap->path, uap->flags | O_CLOEXEC,
+	    uap->mode, NULL));
 }
 #endif
 
@@ -958,7 +970,7 @@ kern_shm_unlink(struct thread *td, const char * __capability userpath)
 	sx_xlock(&shm_dict_lock);
 	error = shm_remove(path, fnv, td->td_ucred);
 	sx_xunlock(&shm_dict_lock);
-	free(path, M_TEMP);
+	free(path, M_SHMFD);
 
 	return (error);
 }
@@ -1138,20 +1150,33 @@ shm_mmap(struct file *fp, vm_map_t map, vm_offset_t *addr,
 	/* FREAD should always be set. */
 	if ((fp->f_flag & FREAD) != 0)
 		maxprot |= VM_PROT_EXECUTE | VM_PROT_READ;
-	if ((fp->f_flag & FWRITE) != 0)
+
+	/*
+	 * If FWRITE's set, we can allow VM_PROT_WRITE unless it's a shared
+	 * mapping with a write seal applied.  Private mappings are always
+	 * writeable.
+	 */
+	if ((flags & MAP_SHARED) == 0) {
+		cap_maxprot |= VM_PROT_WRITE;
 		maxprot |= VM_PROT_WRITE;
+		writecnt = false;
+	} else {
+		if ((fp->f_flag & FWRITE) != 0 &&
+		    (shmfd->shm_seals & F_SEAL_WRITE) == 0)
+			maxprot |= VM_PROT_WRITE;
 
-	writecnt = (flags & MAP_SHARED) != 0 && (prot & VM_PROT_WRITE) != 0;
-
-	if (writecnt && (shmfd->shm_seals & F_SEAL_WRITE) != 0) {
-		error = EPERM;
-		goto out;
-	}
-
-	/* Don't permit shared writable mappings on read-only descriptors. */
-	if (writecnt && (maxprot & VM_PROT_WRITE) == 0) {
-		error = EACCES;
-		goto out;
+		/*
+		 * Any mappings from a writable descriptor may be upgraded to
+		 * VM_PROT_WRITE with mprotect(2), unless a write-seal was
+		 * applied between the open and subsequent mmap(2).  We want to
+		 * reject application of a write seal as long as any such
+		 * mapping exists so that the seal cannot be trivially bypassed.
+		 */
+		writecnt = (maxprot & VM_PROT_WRITE) != 0;
+		if (!writecnt && (prot & VM_PROT_WRITE) != 0) {
+			error = EACCES;
+			goto out;
+		}
 	}
 	maxprot &= cap_maxprot;
 
@@ -1447,6 +1472,42 @@ shm_get_seals(struct file *fp, int *seals)
 }
 
 static int
+shm_fallocate(struct file *fp, off_t offset, off_t len, struct thread *td)
+{
+	void *rl_cookie;
+	struct shmfd *shmfd;
+	size_t size;
+	int error;
+
+	/* This assumes that the caller already checked for overflow. */
+	error = 0;
+	shmfd = fp->f_data;
+	size = offset + len;
+
+	/*
+	 * Just grab the rangelock for the range that we may be attempting to
+	 * grow, rather than blocking read/write for regions we won't be
+	 * touching while this (potential) resize is in progress.  Other
+	 * attempts to resize the shmfd will have to take a write lock from 0 to
+	 * OFF_MAX, so this being potentially beyond the current usable range of
+	 * the shmfd is not necessarily a concern.  If other mechanisms are
+	 * added to grow a shmfd, this may need to be re-evaluated.
+	 */
+	rl_cookie = rangelock_wlock(&shmfd->shm_rl, offset, size,
+	    &shmfd->shm_mtx);
+	if (size > shmfd->shm_size) {
+		VM_OBJECT_WLOCK(shmfd->shm_object);
+		error = shm_dotruncate_locked(shmfd, size, rl_cookie);
+		VM_OBJECT_WUNLOCK(shmfd->shm_object);
+	}
+	rangelock_unlock(&shmfd->shm_rl, rl_cookie, &shmfd->shm_mtx);
+	/* Translate to posix_fallocate(2) return value as needed. */
+	if (error == ENOMEM)
+		error = ENOSPC;
+	return (error);
+}
+
+static int
 sysctl_posix_shm_list(SYSCTL_HANDLER_ARGS)
 {
 	struct shm_mapping *shmm;
@@ -1492,18 +1553,11 @@ SYSCTL_PROC(_kern_ipc, OID_AUTO, posix_shm_list,
     "POSIX SHM list");
 
 int
-kern_shm_open2(struct thread *td, const char * __capability path, int flags,
-    mode_t mode, int shmflags, const char * __capability name __unused)
+kern_shm_open(struct thread *td, const char * __capability path, int flags,
+    mode_t mode, struct filecaps *caps)
 {
-	int initial_seals;
 
-	if ((shmflags & ~SHM_ALLOW_SEALING) != 0)
-		return (EINVAL);
-
-	initial_seals = F_SEAL_SEAL;
-	if ((shmflags & SHM_ALLOW_SEALING) != 0)
-		initial_seals &= ~F_SEAL_SEAL;
-	return (kern_shm_open(td, path, flags, mode, NULL, initial_seals));
+	return (kern_shm_open2(td, path, flags, mode, 0, caps, NULL));
 }
 
 /*
@@ -1520,8 +1574,8 @@ int
 sys_shm_open2(struct thread *td, struct shm_open2_args *uap)
 {
 
-	return (kern_shm_open2(td, uap->path, uap->flags,
-	    uap->mode, uap->shmflags, uap->name));
+	return (kern_shm_open2(td, uap->path, uap->flags, uap->mode,
+	    uap->shmflags, NULL, uap->name));
 }
 // CHERI CHANGES START
 // {

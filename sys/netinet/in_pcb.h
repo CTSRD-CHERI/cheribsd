@@ -51,8 +51,6 @@
 #include <sys/lock.h>
 #include <sys/rwlock.h>
 #include <net/vnet.h>
-#include <net/if.h>
-#include <net/if_var.h>
 #include <vm/uma.h>
 #endif
 #include <sys/ck.h>
@@ -165,22 +163,22 @@ struct in_conninfo {
  * (h) - Protected by the pcbhash lock for the inpcb
  * (s) - Protected by another subsystem's locks
  * (x) - Undefined locking
- * 
+ *
  * Notes on the tcp_hpts:
- * 
+ *
  * First Hpts lock order is
  * 1) INP_WLOCK()
- * 2) HPTS_LOCK() i.e. hpts->pmtx 
+ * 2) HPTS_LOCK() i.e. hpts->pmtx
  *
- * To insert a TCB on the hpts you *must* be holding the INP_WLOCK(). 
- * You may check the inp->inp_in_hpts flag without the hpts lock. 
- * The hpts is the only one that will clear this flag holding 
+ * To insert a TCB on the hpts you *must* be holding the INP_WLOCK().
+ * You may check the inp->inp_in_hpts flag without the hpts lock.
+ * The hpts is the only one that will clear this flag holding
  * only the hpts lock. This means that in your tcp_output()
- * routine when you test for the inp_in_hpts flag to be 1 
- * it may be transitioning to 0 (by the hpts). 
- * That's ok since that will just mean an extra call to tcp_output 
+ * routine when you test for the inp_in_hpts flag to be 1
+ * it may be transitioning to 0 (by the hpts).
+ * That's ok since that will just mean an extra call to tcp_output
  * that most likely will find the call you executed
- * (when the mis-match occured) will have put the TCB back 
+ * (when the mis-match occured) will have put the TCB back
  * on the hpts and it will return. If your
  * call did not add the inp back to the hpts then you will either
  * over-send or the cwnd will block you from sending more.
@@ -191,7 +189,7 @@ struct in_conninfo {
  * the INP_WLOCK() or from destroying your TCB where again
  * you should already have the INP_WLOCK().
  *
- * The inp_hpts_cpu, inp_hpts_cpu_set, inp_input_cpu and 
+ * The inp_hpts_cpu, inp_hpts_cpu_set, inp_input_cpu and
  * inp_input_cpu_set fields are controlled completely by
  * the hpts. Do not ever set these. The inp_hpts_cpu_set
  * and inp_input_cpu_set fields indicate if the hpts has
@@ -245,14 +243,14 @@ struct inpcb {
 					 * fits in the pacing window (i&b). */
 	/*
 	 * Note the next fields are protected by a
-	 * different lock (hpts-lock). This means that 
+	 * different lock (hpts-lock). This means that
 	 * they must correspond in size to the smallest
 	 * protectable bit field (uint8_t on x86, and
 	 * other platfomrs potentially uint32_t?). Also
 	 * since CPU switches can occur at different times the two
 	 * fields can *not* be collapsed into a signal bit field.
 	 */
-#if defined(__amd64__) || defined(__i386__)	
+#if defined(__amd64__) || defined(__i386__)
 	volatile uint8_t inp_in_hpts; /* on output hpts (lock b) */
 	volatile uint8_t inp_in_input; /* on input hpts (lock b) */
 #else
@@ -832,7 +830,7 @@ int	in_pcbbind_setup(struct inpcb *, struct sockaddr *, in_addr_t *,
 	    u_short *, struct ucred *);
 int	in_pcbconnect(struct inpcb *, struct sockaddr *, struct ucred *);
 int	in_pcbconnect_mbuf(struct inpcb *, struct sockaddr *, struct ucred *,
-	    struct mbuf *);
+	    struct mbuf *, bool);
 int	in_pcbconnect_setup(struct inpcb *, struct sockaddr *, in_addr_t *,
 	    u_short *, in_addr_t *, u_short *, struct inpcb **,
 	    struct ucred *);
@@ -841,7 +839,7 @@ void	in_pcbdisconnect(struct inpcb *);
 void	in_pcbdrop(struct inpcb *);
 void	in_pcbfree(struct inpcb *);
 int	in_pcbinshash(struct inpcb *);
-int	in_pcbinshash_nopcbgroup(struct inpcb *);
+int	in_pcbinshash_mbuf(struct inpcb *, struct mbuf *);
 int	in_pcbladdr(struct inpcb *, struct in_addr *, struct in_addr *,
 	    struct ucred *);
 struct inpcb *

@@ -131,15 +131,17 @@ static eventhandler_tag nd_detach_cookie;
 
 FEATURE(netdump, "Netdump client support");
 
-static SYSCTL_NODE(_net, OID_AUTO, netdump, CTLFLAG_RD, NULL,
+static SYSCTL_NODE(_net, OID_AUTO, netdump, CTLFLAG_RD | CTLFLAG_MPSAFE, NULL,
     "netdump parameters");
 
 static int nd_debug;
 SYSCTL_INT(_net_netdump, OID_AUTO, debug, CTLFLAG_RWTUN,
     &nd_debug, 0,
     "Debug message verbosity");
-SYSCTL_PROC(_net_netdump, OID_AUTO, enabled, CTLFLAG_RD | CTLTYPE_INT, NULL, 0,
-    netdump_enabled_sysctl, "I", "netdump configuration status");
+SYSCTL_PROC(_net_netdump, OID_AUTO, enabled,
+    CTLFLAG_RD | CTLTYPE_INT | CTLFLAG_MPSAFE, NULL, 0,
+    netdump_enabled_sysctl, "I",
+    "netdump configuration status");
 static char nd_path[MAXPATHLEN];
 SYSCTL_STRING(_net_netdump, OID_AUTO, path, CTLFLAG_RW,
     nd_path, sizeof(nd_path),
@@ -277,7 +279,7 @@ netdump_dumper(void *priv __unused, void *virtual,
 }
 
 /*
- * Perform any initalization needed prior to transmitting the kernel core.
+ * Perform any initialization needed prior to transmitting the kernel core.
  */
 static int
 netdump_start(struct dumperinfo *di)
@@ -293,7 +295,7 @@ netdump_start(struct dumperinfo *di)
 	if (!netdump_enabled())
 		return (EINVAL);
 
-	if (panicstr == NULL) {
+	if (!KERNEL_PANICKED()) {
 		printf(
 		    "netdump_start: netdump may only be used after a panic\n");
 		return (EINVAL);

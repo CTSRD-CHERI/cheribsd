@@ -10,13 +10,31 @@ MK_PIE=	no
 PROG=	cheribsdbox
 CHERIBSDBOX_DIR?=	/bin
 BINDIR?=${CHERIBSDBOX_DIR}
-# We want to build all these tools as statically linked MIPS binaries to save size
+
+.if ${MK_LIB64} == "yes"
+# We want to build all these tools as statically linked 64-bit binaries.
+# For MIPS we don't want to build this as purecap yet (it generates a captable
+# that is too large to link).
+NEED_COMPAT=	64
 WANT_CHERI=		none
-CRUNCH_BUILDOPTS+=	WANT_CHERI=none -DWITHOUT_TESTS MK_TESTS=no
+CRUNCH_BUILDOPTS+=	WANT_CHERI=none NEED_COMPAT=64
+.endif
+CRUNCH_BUILDOPTS+=	-DWITHOUT_TESTS MK_TESTS=no -D_CRUNCHGEN
 # Avoid linking against libcasper for tcpdump/traceroute/kdump:
 CRUNCH_BUILDOPTS+=	-DWITHOUT_CASPER MK_CASPER=no
 # Try to reduce size by avoiding locale support
 CRUNCH_BUILDOPTS+=	-DWITHOUT_LOCALES MK_LOCALES=no
+# Disable kerberos support
+CRUNCH_BUILDOPTS+=	MK_KERBEROS=no MK_KERBEROS_SUPPORT=no MK_GSSAPI=no
+# Smaller PAM:
+CRUNCH_BUILDOPTS+=	MK_RADIUS_SUPPORT=no
+# Smaller SSH
+CRUNCH_BUILDOPTS+=	MK_LDNS_UTILS=no MK_LDNS=no
+# Avoid redundant libs
+CRUNCH_BUILDOPTS+=	MK_PROFILE=no
+# Avoid dependency on audit
+CRUNCH_BUILDOPTS+=	MK_AUDIT=no
+
 
 
 # Do not do hardlinks as part of the install since we want to be able to install
@@ -75,9 +93,6 @@ CRUNCH_SHLIBS+=	-pthread
 # ktrace:
 CRUNCH_LIBS+=	-lsysdecode
 
-# login/su (could theoretically use static_libpam but that will probably not work)
-CRUNCH_SHLIBS+= -lpam -lbsm
-
 # needed by ifconfig
 CRUNCH_LIBS+=	-l80211
 # needed by fetch:
@@ -96,7 +111,7 @@ CRUNCH_BUILDOPTS_netstat+=MK_NETGRAPH_SUPPORT=no -j1
 
 
 # Misc libs copied from recue/bsdbox:
-CRUNCH_LIBS+= -ledit -ll -ltermcapw
+CRUNCH_LIBS+= -ledit -ltermcapw
 
 ###################################################################
 # Programs from stock /bin
@@ -271,7 +286,8 @@ CRUNCH_ALIAS_hexdump=	hd od
 CRUNCH_ALIAS_w=	uptime
 CRUNCH_PROGS_usr.bin+=su
 
-.if ${MK_CHERI} != "no"
+# Tracing currently only implemented for CHERI-QEMU architectures
+.if ${MACHINE} == "mips" || ${MACHINE} == "riscv"
 CRUNCH_PROGS_usr.bin+=	qtrace
 .endif
 .if ${MACHINE_ARCH:Mmips64*}
@@ -378,14 +394,6 @@ CRUNCH_PROGS_secure/usr.sbin+=	sshd
 # TODO: should we link libssh static and use ${LIBSSH}?
 CRUNCH_SHLIBS+=	-lpam -lutil
 
-# Build ssh deps static?
-CRUNCH_LIBS+=	${LIBSSH}
-.if ${MK_LDNS} != "no"
-# needed by LIBSSH
-CRUNCH_LIBS+=	${LIBLDNS}
-.endif
-
-
 CRUNCH_SRCDIRS+= secure/usr.bin
 CRUNCH_PROGS_secure/usr.bin+=	scp sftp ssh ssh-keygen
 
@@ -476,8 +484,30 @@ check_crunchgen:
 	fi
 all: check_crunchgen
 
+.if ${MACHINE_ABI:Mpurecap} && ${MACHINE_ARCH:Mriscv*}
+# No RTLD yet!
+NO_SHARED=yes
+.endif
+
+.if defined(NO_RTLD) || defined(NO_SHARED)
+# Force empty shlibs if we are building without RTLD/NO_SHARED
+# See top_makefile_rules(FILE *outmk) in crunchgen.c
+CRUNCH_LIBS:=${CRUNCH_LIBS} ${CRUNCH_SHLIBS} -Wl,--verbose -v
+.undef CRUNCH_SHLIBS
+# TODO: CRUNCH_BUILDOPTS+=-DNO_SHARED
+.endif
+
+# Build PAM with only minimal modules support
+CRUNCH_CUSTOM_LIBS+=lib/libpam
+CRUNCH_BUILDOPTS_lib/libpam+=-DPAM_MINIMAL
+# Also build a version of libssh without optional deps
+CRUNCH_CUSTOM_LIBS+=secure/lib/libssh
+CRUNCH_BUILDOPTS_secure/lib/libssh+="SSHDIR=${SRCTOP}/crypto/openssh"
+CRUNCH_LIBS+=-lprivatessh
+
 # the crunchgen build environment
 .include <bsd.crunchgen.mk>
 
+.include <bsd.compat.mk>
 # and since it creates a program..
 .include <bsd.prog.mk>

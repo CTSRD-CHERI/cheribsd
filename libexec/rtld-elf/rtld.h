@@ -51,7 +51,6 @@
 #include <elf-hints.h>
 #include <link.h>
 #include <stdarg.h>
-/* We might as well do booleans like C++. */
 #include <stdbool.h>
 #include <setjmp.h>
 #include <stddef.h>
@@ -112,6 +111,13 @@ typedef struct Struct_Objlist_Entry {
 typedef STAILQ_HEAD(Struct_Objlist, Struct_Objlist_Entry) Objlist;
 
 /* Types of init and fini functions */
+#ifdef __CHERI_PURE_CAPABILITY__
+typedef struct { uintcap_t value; } InitArrayEntry;
+#define initfini_array_addr(entry)	((entry).value)
+#else
+typedef struct { Elf_Addr value; } InitArrayEntry;
+#define initfini_array_addr(entry)	(entry)
+#endif
 typedef void (*InitFunc)(void);
 typedef void (*InitArrFunc)(int, char **, char **);
 
@@ -195,8 +201,8 @@ typedef struct Struct_Obj_Entry {
      * By having these additional members we can remove execute permissions from
      * relocbase and mapbase.
      */
-    Elf_Addr text_rodata_start;
-    Elf_Addr text_rodata_end;
+    Elf_Addr text_rodata_start_offset;
+    Elf_Addr text_rodata_end_offset;
     const char* text_rodata_cap;	/* Capability for the executable mapping */
     struct CheriExports *cheri_exports;	/* Unique thunks for function pointers */
     struct CheriPlt *cheri_plt_stubs;	/* PLT stubs for external calls */
@@ -216,6 +222,7 @@ typedef struct Struct_Obj_Entry {
     size_t tlssize;		/* Size of TLS block for this module */
     size_t tlsoffset;		/* Offset of static TLS block for this module */
     size_t tlsalign;		/* Alignment of static TLS block */
+    size_t tlspoffset;		/* p_offset of the static TLS block */
 
     caddr_t relro_page;
     size_t relro_size;
@@ -233,16 +240,18 @@ typedef struct Struct_Obj_Entry {
     const Elf_Sym *symtab;	/* Symbol table */
     const char *strtab;		/* String table */
     unsigned long strsize;	/* Size in bytes of string table */
-#ifdef __mips__
 #ifdef __CHERI_PURE_CAPABILITY__
     caddr_t cap_relocs;		/* start of the __cap_relocs section */
+    size_t cap_relocs_size;	/* size of the __cap_relocs section */
+#endif
+#ifdef __mips__
+#ifdef __CHERI_PURE_CAPABILITY__
     /*
      * Two pointers to the start of the .cap_table section: one writable
      * for use by RTLD and one read-only for use as the target $cgp in plt stubs.
      */
     struct CheriCapTableEntry* writable_captable;
     const struct CheriCapTableEntry* _target_cgp;
-    size_t cap_relocs_size;	/* size of the __cap_relocs section */
     size_t captable_size;	/* size of the .cap_table section */
 #if RTLD_SUPPORT_PER_FUNCTION_CAPTABLE == 1
     const struct CheriCapTableMappingEntry* captable_mapping;
@@ -295,9 +304,9 @@ typedef struct Struct_Obj_Entry {
 
     void* init_ptr;		/* Initialization function to call */
     void* fini_ptr;		/* Termination function to call */
-    Elf_Addr* preinit_array_ptr;	/* Pre-initialization array of functions */
-    Elf_Addr* init_array_ptr;	/* Initialization array of functions */
-    Elf_Addr* fini_array_ptr;	/* Termination array of functions */
+    InitArrayEntry* preinit_array_ptr;	/* Pre-initialization array of functions */
+    InitArrayEntry* init_array_ptr;	/* Initialization array of functions */
+    InitArrayEntry* fini_array_ptr;	/* Termination array of functions */
     int preinit_array_num;	/* Number of entries in preinit_array */
     int init_array_num; 	/* Number of entries in init_array */
     int fini_array_num; 	/* Number of entries in fini_array */
@@ -332,6 +341,7 @@ typedef struct Struct_Obj_Entry {
     bool dag_inited : 1;	/* Object has its DAG initialized. */
     bool filtees_loaded : 1;	/* Filtees loaded */
     bool irelative : 1;		/* Object has R_MACHDEP_IRELATIVE relocs */
+    bool irelative_nonplt : 1;	/* Object has R_MACHDEP_IRELATIVE non-plt relocs */
     bool gnu_ifunc : 1;		/* Object has references to STT_GNU_IFUNC */
     bool non_plt_gnu_ifunc : 1;	/* Object has non-plt IFUNC references */
     bool ifuncs_resolved : 1;	/* Object ifuncs were already resolved */
@@ -386,6 +396,7 @@ TAILQ_HEAD(obj_entry_q, Struct_Obj_Entry);
 #define	RTLD_LO_FILTEES 0x10	/* Loading filtee. */
 #define	RTLD_LO_EARLY	0x20	/* Do not call ctors, postpone it to the
 				   initialization during the image start. */
+#define	RTLD_LO_IGNSTLS 0x40	/* Do not allocate static TLS */
 
 /*
  * Symbol cache entry used during relocation to avoid multiple lookups
@@ -450,11 +461,12 @@ Obj_Entry *map_object(int, const char *, const struct stat *, const char *);
 void *xcalloc(size_t, size_t);
 void *xmalloc(size_t);
 char *xstrdup(const char *);
-void *malloc_aligned(size_t size, size_t align);
+void *malloc_aligned(size_t size, size_t align, size_t offset);
 void free_aligned(void *ptr);
 extern Elf_Addr _GLOBAL_OFFSET_TABLE_[];
 extern Elf_Sym sym_zero;	/* For resolving undefined weak refs. */
 extern bool ld_bind_not;
+extern bool ld_fast_sigblock;
 
 void dump_relocations(Obj_Entry *);
 void dump_obj_relocations(Obj_Entry *);
@@ -468,11 +480,11 @@ __END_DECLS
 
 /* Archictectures other than CHERI can just call the pointer */
 #ifndef call_init_array_pointer
-#define call_init_array_pointer(obj, target) call_init_pointer(obj, target)
+#define call_init_array_pointer(obj, target) call_init_pointer(obj, (target).value)
 #endif
 
 #ifndef call_fini_array_pointer
-#define call_fini_array_pointer(obj, target) call_initfini_pointer(obj, target)
+#define call_fini_array_pointer(obj, target) call_initfini_pointer(obj, (target).value)
 #endif
 
 #ifndef make_rtld_function_pointer
@@ -520,7 +532,7 @@ int convert_prot(int elfflags);
 int do_copy_relocations(Obj_Entry *);
 int reloc_non_plt(Obj_Entry *, Obj_Entry *, int flags,
     struct Struct_RtldLockState *);
-#ifdef __CHERI_PURE_CAPABILITY__
+#if defined(__mips__) && defined(__CHERI_PURE_CAPABILITY__)
 int reloc_plt(Obj_Entry *obj, bool bind_now, int flags, const Obj_Entry *rtldobj,
     struct Struct_RtldLockState *lockstate);
 #else
@@ -528,6 +540,7 @@ int reloc_plt(Obj_Entry *, int flags, struct Struct_RtldLockState *);
 #endif
 int reloc_jmpslots(Obj_Entry *, int flags, struct Struct_RtldLockState *);
 int reloc_iresolve(Obj_Entry *, struct Struct_RtldLockState *);
+int reloc_iresolve_nonplt(Obj_Entry *, struct Struct_RtldLockState *);
 int reloc_gnu_ifunc(Obj_Entry *, int flags, struct Struct_RtldLockState *);
 void ifunc_init(Elf_Auxinfo[__min_size(AT_COUNT)]);
 void pre_init(void);

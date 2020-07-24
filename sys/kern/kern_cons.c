@@ -52,6 +52,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/conf.h>
 #include <sys/cons.h>
 #include <sys/fcntl.h>
+#include <sys/kbio.h>
 #include <sys/kdb.h>
 #include <sys/kernel.h>
 #include <sys/malloc.h>
@@ -68,6 +69,8 @@ __FBSDID("$FreeBSD$");
 #include <sys/vnode.h>
 
 #include <ddb/ddb.h>
+
+#include <dev/kbd/kbdreg.h>
 
 #include <machine/cpu.h>
 #include <machine/clock.h>
@@ -95,7 +98,7 @@ static char *consbuf;			/* buffer used by `consmsgbuf' */
 static struct callout conscallout;	/* callout for outputting to constty */
 struct msgbuf consmsgbuf;		/* message buffer for console tty */
 static u_char console_pausing;		/* pause after each line during probe */
-static char *console_pausestr=
+static const char console_pausestr[] =
 "<pause; press any key to proceed to next line or '.' to end pause mode>";
 struct tty *constty;			/* pointer to console "window" tty */
 static struct mtx cnputs_mtx;		/* Mutex for cnputs(). */
@@ -106,6 +109,19 @@ static void constty_timeout(void *arg);
 static struct consdev cons_consdev;
 DATA_SET(cons_set, cons_consdev);
 SET_DECLARE(cons_set, struct consdev);
+
+/*
+ * Stub for configurations that don't actually have a keyboard driver. Inclusion
+ * of kbd.c is contingent on any number of keyboard/console drivers being
+ * present in the kernel; rather than trying to catch them all, we'll just
+ * maintain this weak kbdinit that will be overridden by the strong version in
+ * kbd.c if it's present.
+ */
+__weak_symbol void
+kbdinit(void)
+{
+
+}
 
 void
 cninit(void)
@@ -122,6 +138,14 @@ cninit(void)
 			|RB_SINGLE
 			|RB_VERBOSE
 			|RB_ASKNAME)) == RB_MUTE);
+
+	/*
+	 * Bring up the kbd layer just in time for cnprobe.  Console drivers
+	 * have a dependency on kbd being ready, so this fits nicely between the
+	 * machdep callers of cninit() and MI probing/initialization of consoles
+	 * here.
+	 */
+	kbdinit();
 
 	/*
 	 * Find the first console with the highest priority.
@@ -336,8 +360,10 @@ sysctl_kern_console(SYSCTL_HANDLER_ARGS)
 	return (error);
 }
 
-SYSCTL_PROC(_kern, OID_AUTO, console, CTLTYPE_STRING|CTLFLAG_RW,
-	0, 0, sysctl_kern_console, "A", "Console device control");
+SYSCTL_PROC(_kern, OID_AUTO, console,
+    CTLTYPE_STRING | CTLFLAG_RW | CTLFLAG_NEEDGIANT, 0, 0,
+    sysctl_kern_console, "A",
+    "Console device control");
 
 /*
  * User has changed the state of the console muting.
@@ -354,9 +380,10 @@ sysctl_kern_consmute(SYSCTL_HANDLER_ARGS)
 	return (error);
 }
 
-SYSCTL_PROC(_kern, OID_AUTO, consmute, CTLTYPE_INT|CTLFLAG_RW,
-	0, sizeof(cn_mute), sysctl_kern_consmute, "I",
-	"State of the console muting");
+SYSCTL_PROC(_kern, OID_AUTO, consmute,
+    CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_NEEDGIANT, 0, sizeof(cn_mute),
+    sysctl_kern_consmute, "I",
+    "State of the console muting");
 
 void
 cngrab()
@@ -486,7 +513,7 @@ cnputc(int c)
 {
 	struct cn_device *cnd;
 	struct consdev *cn;
-	char *cp;
+	const char *cp;
 
 #ifdef EARLY_PRINTF
 	if (early_putc != NULL) {
@@ -547,7 +574,7 @@ cnputsn(const char *p, size_t n)
 }
 
 void
-cnputs(char *p)
+cnputs(const char *p)
 {
 	cnputsn(p, strlen(p));
 }

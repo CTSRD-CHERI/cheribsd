@@ -152,7 +152,7 @@ autofs_trigger_vn(struct vnode *vp, const char *path, int pathlen,
 	 */
 	lock_flags = VOP_ISLOCKED(vp);
 	vref(vp);
-	VOP_UNLOCK(vp, 0);
+	VOP_UNLOCK(vp);
 
 	sx_xlock(&autofs_softc->sc_lock);
 
@@ -554,6 +554,7 @@ struct vop_vector autofs_vnodeops = {
 	.vop_write =		VOP_EOPNOTSUPP,
 	.vop_reclaim =		autofs_reclaim,
 };
+VFS_VOP_VECTOR_REGISTER(autofs_vnodeops);
 
 int
 autofs_node_new(struct autofs_node *parent, struct autofs_mount *amp,

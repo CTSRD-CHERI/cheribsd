@@ -78,7 +78,7 @@ copyin_path(const char *uaddr, size_t len, char **result)
 	if (len >= PATH_MAX)
 		return (ENAMETOOLONG);
 	buf = malloc(len + 1, M_CLOUDABI_PATH, M_WAITOK);
-	error = copyin(uaddr, buf, len);
+	error = copyin(__USER_CAP(uaddr, len), buf, len);
 	if (error != 0) {
 		free(buf, M_CLOUDABI_PATH);
 		return (error);
@@ -209,7 +209,7 @@ cloudabi_sys_file_open(struct thread *td,
 	int error, fd, fflags;
 	bool read, write;
 
-	error = copyin(uap->fds, &fds, sizeof(fds));
+	error = copyin(__USER_CAP_OBJ(uap->fds), &fds, sizeof(fds));
 	if (error != 0)
 		return (error);
 
@@ -218,7 +218,7 @@ cloudabi_sys_file_open(struct thread *td,
 	    fds.fs_rights_base | fds.fs_rights_inheriting, &rights);
 	if (error != 0)
 		return (error);
-	cap_rights_set(&rights, CAP_LOOKUP);
+	cap_rights_set_one(&rights, CAP_LOOKUP);
 
 	/* Convert rights to corresponding access mode. */
 	read = (fds.fs_rights_base & (CLOUDABI_RIGHT_FD_READ |
@@ -231,7 +231,7 @@ cloudabi_sys_file_open(struct thread *td,
 	/* Convert open flags. */
 	if ((uap->oflags & CLOUDABI_O_CREAT) != 0) {
 		fflags |= O_CREAT;
-		cap_rights_set(&rights, CAP_CREATE);
+		cap_rights_set_one(&rights, CAP_CREATE);
 	}
 	if ((uap->oflags & CLOUDABI_O_DIRECTORY) != 0)
 		fflags |= O_DIRECTORY;
@@ -239,7 +239,7 @@ cloudabi_sys_file_open(struct thread *td,
 		fflags |= O_EXCL;
 	if ((uap->oflags & CLOUDABI_O_TRUNC) != 0) {
 		fflags |= O_TRUNC;
-		cap_rights_set(&rights, CAP_FTRUNCATE);
+		cap_rights_set_one(&rights, CAP_FTRUNCATE);
 	}
 	if ((fds.fs_flags & CLOUDABI_FDFLAG_APPEND) != 0)
 		fflags |= O_APPEND;
@@ -248,12 +248,12 @@ cloudabi_sys_file_open(struct thread *td,
 	if ((fds.fs_flags & (CLOUDABI_FDFLAG_SYNC | CLOUDABI_FDFLAG_DSYNC |
 	    CLOUDABI_FDFLAG_RSYNC)) != 0) {
 		fflags |= O_SYNC;
-		cap_rights_set(&rights, CAP_FSYNC);
+		cap_rights_set_one(&rights, CAP_FSYNC);
 	}
 	if ((uap->dirfd.flags & CLOUDABI_LOOKUP_SYMLINK_FOLLOW) == 0)
 		fflags |= O_NOFOLLOW;
 	if (write && (fflags & (O_APPEND | O_TRUNC)) == 0)
-		cap_rights_set(&rights, CAP_SEEK);
+		cap_rights_set_one(&rights, CAP_SEEK);
 
 	/* Allocate new file descriptor. */
 	error = falloc_noinstall(td, &fp);
@@ -295,7 +295,7 @@ cloudabi_sys_file_open(struct thread *td,
 		finit(fp, (fflags & FMASK) | (fp->f_flag & FHASLOCK),
 		    DTYPE_VNODE, vp, &vnops);
 	}
-	VOP_UNLOCK(vp, 0);
+	VOP_UNLOCK(vp);
 
 	/* Truncate file. */
 	if (fflags & O_TRUNC) {
@@ -434,14 +434,14 @@ cloudabi_sys_file_readdir(struct thread *td,
 		/* Validate file type. */
 		vn_lock(vp, LK_SHARED | LK_RETRY);
 		if (vp->v_type != VDIR) {
-			VOP_UNLOCK(vp, 0);
+			VOP_UNLOCK(vp);
 			error = ENOTDIR;
 			goto done;
 		}
 #ifdef MAC
 		error = mac_vnode_check_readdir(td->td_ucred, vp);
 		if (error != 0) {
-			VOP_UNLOCK(vp, 0);
+			VOP_UNLOCK(vp);
 			goto done;
 		}
 #endif /* MAC */
@@ -451,7 +451,7 @@ cloudabi_sys_file_readdir(struct thread *td,
 		ncookies = 0;
 		error = VOP_READDIR(vp, &readuio, fp->f_cred, &eof,
 		    &ncookies, &cookies);
-		VOP_UNLOCK(vp, 0);
+		VOP_UNLOCK(vp);
 		if (error != 0)
 			goto done;
 
@@ -580,7 +580,7 @@ cloudabi_sys_file_stat_fget(struct thread *td,
 	/* Convert attributes to CloudABI's format. */
 	convert_stat(&sb, &csb);
 	csb.st_filetype = filetype;
-	return (copyout(&csb, uap->buf, sizeof(csb)));
+	return (copyout(&csb, __USER_CAP_OBJ(uap->buf), sizeof(csb)));
 }
 
 /* Converts timestamps to arguments to futimens() and utimensat(). */
@@ -616,7 +616,7 @@ cloudabi_sys_file_stat_fput(struct thread *td,
 	struct timespec ts[2];
 	int error;
 
-	error = copyin(uap->buf, &fs, sizeof(fs));
+	error = copyin(__USER_CAP_OBJ(uap->buf), &fs, sizeof(fs));
 	if (error != 0)
 		return (error);
 
@@ -685,7 +685,7 @@ cloudabi_sys_file_stat_get(struct thread *td,
 		csb.st_filetype = CLOUDABI_FILETYPE_SYMBOLIC_LINK;
 	else
 		csb.st_filetype = CLOUDABI_FILETYPE_UNKNOWN;
-	return (copyout(&csb, uap->buf, sizeof(csb)));
+	return (copyout(&csb, __USER_CAP_OBJ(uap->buf), sizeof(csb)));
 }
 
 int
@@ -706,7 +706,7 @@ cloudabi_sys_file_stat_put(struct thread *td,
 	    CLOUDABI_FILESTAT_MTIM_NOW)) != 0)
 		return (EINVAL);
 
-	error = copyin(uap->buf, &fs, sizeof(fs));
+	error = copyin(__USER_CAP_OBJ(uap->buf), &fs, sizeof(fs));
 	if (error != 0)
 		return (error);
 	error = copyin_path(uap->path, uap->path_len, &path);

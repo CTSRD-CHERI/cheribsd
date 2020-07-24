@@ -64,7 +64,6 @@ __DEFAULT_YES_OPTIONS = \
     PIE \
     PROFILE \
     SSP \
-    SYMVER \
     TESTS \
     TOOLCHAIN \
     WARNS
@@ -80,9 +79,7 @@ __DEFAULT_NO_OPTIONS = \
 
 __DEFAULT_NO_OPTIONS+= \
     CHERI_PURE \
-    CHERI128 \
-    CHERI256 \
-    CHERIBSDBOX \
+    CHERI \
     DEMO_VULNERABILITIES
 
 __DEFAULT_DEPENDENT_OPTIONS = \
@@ -91,35 +88,38 @@ __DEFAULT_DEPENDENT_OPTIONS = \
     STAGING_PROG/STAGING \
     STALE_STAGED/STAGING \
 
-.if defined(WITH_CHERI)
-.warning WITH_CHERI should not be set directly.
-.warning Use WITH_CHERI128 or WITH_CHERI256 instead.
-.if !defined(WITH_CHERI128) && !defined(CHERI256)
-WITH_CHERI256:=	yes
+#
+# Default behaviour of some options depends on the architecture.  Unfortunately
+# this means that we have to test TARGET_ARCH (the buildworld case) as well
+# as MACHINE_ARCH (the non-buildworld case).  Normally TARGET_ARCH is not
+# used at all in bsd.*.mk, but we have to make an exception here if we want
+# to allow defaults for some things like clang to vary by target architecture.
+# Additional, per-target behavior should be rarely added only after much
+# gnashing of teeth and grinding of gears.
+#
+.if defined(TARGET_ARCH)
+__T=${TARGET_ARCH}
+.else
+__T=${MACHINE_ARCH}
 .endif
+.if defined(TARGET)
+__TT=${TARGET}
+.else
+__TT=${MACHINE}
+.endif
+
+.if !defined(WITH_CHERI) && defined(WITH_CHERI128)
+.if defined(WITHOUT_CHERI)
+.error WITHOUT_CHERI and WITH_CHERI128 makes no sense
+.endif
+.warning WITH_CHERI128 is obsolete, use WITH_CHERI instead.
+WITH_CHERI:=	yes
 .endif
 
 .include <bsd.mkopt.mk>
 
-.if ${MK_CHERI128} == "yes" && ${MK_CHERI256} == "yes"
-.error WITH_CHERI128 and WITH_CHERI256 are incompatible.
-.endif
-
-.if ${MK_CHERI128} == "yes" || ${MK_CHERI256} == "yes"
-MK_CHERI:=	yes
+.if ${__TT:Mmips*} && ${MK_CHERI} == "yes"
 MK_CLANG:=	no
-# We want to use libc++ for CHERI (even when targeting MIPS)
-MK_GNUCXX:=	no
-MK_LIBCPLUSPLUS:=yes
-# LLVM libunwind is needed for libc++
-MK_LLVM_LIBUNWIND:=	yes
-# Build cheribsdbox by default so that we have a emergency MIPS tool if the
-# CHERI world is broken
-.if !defined(WITHOUT_CHERIBSDBOX)
-MK_CHERIBSDBOX:=	yes
-.endif
-.else
-MK_CHERI:=	no
 .endif
 
 #
@@ -136,7 +136,7 @@ MK_CHERI:=	no
     PROFILE \
     WARNS
 .if defined(NO_${var})
-.warning "NO_${var} is defined, but deprecated. Please use MK_${var}=no instead."
+.error "NO_${var} is defined, but deprecated. Please use MK_${var}=no instead."
 MK_${var}:=no
 .endif
 .endfor

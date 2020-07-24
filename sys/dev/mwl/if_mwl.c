@@ -41,8 +41,6 @@ __FBSDID("$FreeBSD$");
 #include "opt_mwl.h"
 #include "opt_wlan.h"
 
-#define	EXPLICIT_USER_ACCESS
-
 #include <sys/param.h>
 #include <sys/systm.h> 
 #include <sys/sysctl.h>
@@ -190,7 +188,8 @@ static int	mwl_getchannels(struct mwl_softc *);
 static void	mwl_sysctlattach(struct mwl_softc *);
 static void	mwl_announce(struct mwl_softc *);
 
-SYSCTL_NODE(_hw, OID_AUTO, mwl, CTLFLAG_RD, 0, "Marvell driver parameters");
+SYSCTL_NODE(_hw, OID_AUTO, mwl, CTLFLAG_RD | CTLFLAG_MPSAFE, 0,
+    "Marvell driver parameters");
 
 static	int mwl_rxdesc = MWL_RXDESC;		/* # rx desc's to allocate */
 SYSCTL_INT(_hw_mwl, OID_AUTO, rxdesc, CTLFLAG_RW, &mwl_rxdesc,
@@ -362,7 +361,7 @@ mwl_attach(uint16_t devid, struct mwl_softc *sc)
 	taskqueue_start_threads(&sc->sc_tq, 1, PI_NET,
 		"%s taskq", device_get_nameunit(sc->sc_dev));
 
-	TASK_INIT(&sc->sc_rxtask, 0, mwl_rx_proc, sc);
+	NET_TASK_INIT(&sc->sc_rxtask, 0, mwl_rx_proc, sc);
 	TASK_INIT(&sc->sc_radartask, 0, mwl_radar_proc, sc);
 	TASK_INIT(&sc->sc_chanswitchtask, 0, mwl_chanswitch_proc, sc);
 	TASK_INIT(&sc->sc_bawatchdogtask, 0, mwl_bawatchdog_proc, sc);
@@ -2610,6 +2609,7 @@ cvtrssi(uint8_t ssi)
 static void
 mwl_rx_proc(void *arg, int npending)
 {
+	struct epoch_tracker et;
 	struct mwl_softc *sc = arg;
 	struct ieee80211com *ic = &sc->sc_ic;
 	struct mwl_rxbuf *bf;
@@ -2798,6 +2798,8 @@ mwl_rx_proc(void *arg, int npending)
 		/* dispatch */
 		ni = ieee80211_find_rxnode(ic,
 		    (const struct ieee80211_frame_min *) wh);
+
+		NET_EPOCH_ENTER(et);
 		if (ni != NULL) {
 			mn = MWL_NODE(ni);
 #ifdef MWL_ANT_INFO_SUPPORT
@@ -2813,6 +2815,7 @@ mwl_rx_proc(void *arg, int npending)
 			ieee80211_free_node(ni);
 		} else
 			(void) ieee80211_input_all(ic, m, rssi, nf);
+		NET_EPOCH_EXIT(et);
 rx_next:
 		/* NB: ignore ENOMEM so we process more descriptors */
 		(void) mwl_rxbuf_init(sc, bf);
@@ -4785,9 +4788,9 @@ mwl_sysctlattach(struct mwl_softc *sc)
 	struct sysctl_oid *tree = device_get_sysctl_tree(sc->sc_dev);
 
 	sc->sc_debug = mwl_debug;
-	SYSCTL_ADD_PROC(ctx, SYSCTL_CHILDREN(tree), OID_AUTO,
-		"debug", CTLTYPE_INT | CTLFLAG_RW, sc, 0,
-		mwl_sysctl_debug, "I", "control debugging printfs");
+	SYSCTL_ADD_PROC(ctx, SYSCTL_CHILDREN(tree), OID_AUTO, "debug",
+	    CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_NEEDGIANT, sc, 0,
+	    mwl_sysctl_debug, "I", "control debugging printfs");
 #endif
 }
 

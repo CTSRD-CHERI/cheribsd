@@ -89,8 +89,7 @@ void __libc_free_tls(void *tls, size_t tcbsize, size_t tcbalign);
 #elif __has_feature(capabilities)
 #define TLS_TCB_ALIGN	sizeof(void * __capability)
 #elif defined(__aarch64__) || defined(__arm__) || defined(__i386__) || \
-    defined(__mips__) || defined(__powerpc__) || defined(__riscv) || \
-    defined(__sparc64__)
+    defined(__mips__) || defined(__powerpc__) || defined(__riscv)
 #define TLS_TCB_ALIGN	sizeof(void *)
 #else
 #error TLS_TCB_ALIGN undefined for target architecture
@@ -100,7 +99,7 @@ void __libc_free_tls(void *tls, size_t tcbsize, size_t tcbalign);
     defined(__powerpc__) || defined(__riscv)
 #define TLS_VARIANT_I
 #endif
-#if defined(__i386__) || defined(__amd64__) || defined(__sparc64__)
+#if defined(__i386__) || defined(__amd64__)
 #define TLS_VARIANT_II
 #endif
 
@@ -472,7 +471,7 @@ _init_tls(void)
 #ifndef __CHERI_PURE_CAPABILITY__
 			tls_init = (void*) phdr[i].p_vaddr;
 #else
-			tls_init = cheri_csetbounds(cheri_setaddress(phdr,
+			tls_init = cheri_setbounds(cheri_setaddress(phdr,
 			    phdr[i].p_vaddr), tls_init_size);
 #endif
 			break;

@@ -34,6 +34,13 @@ main() {
 	outname="$(echo ${outname} | tr '-' '_')"
 
 	case "${outname}" in
+		clibs)
+			# clibs should not have any dependencies or anything
+			# else imposed on it.
+			;;
+		caroot)
+			pkgdeps="utilities"
+			;;
 		runtime)
 			outname="runtime"
 			uclfile="${uclfile}"
@@ -64,11 +71,6 @@ main() {
 			_descr="32-bit Libraries, Debugging Symbols"
 			pkgdeps="${outname}"
 			;;
-		*_lib32_profile)
-			outname="${outname%%_lib32_profile}"
-			_descr="32-bit Libraries, Profiling"
-			pkgdeps="${outname}"
-			;;
 		*_lib32)
 			outname="${outname%%_lib32}"
 			_descr="32-bit Libraries"
@@ -77,11 +79,6 @@ main() {
 		*_development)
 			outname="${outname%%_development}"
 			_descr="Development Files"
-			pkgdeps="${outname}"
-			;;
-		*_profile)
-			outname="${outname%%_profile}"
-			_descr="Profiling Libraries"
 			pkgdeps="${outname}"
 			;;
 		*_debug)
@@ -131,13 +128,22 @@ main() {
 	[ -z "${desc}" ] && desc="${outname} package"
 
 	cp "${uclsource}" "${uclfile}"
+	if [ ! -z "${pkgdeps}" ]; then
+		cat <<EOF >> ${uclfile}
+deps: {
+	FreeBSD-${pkgdeps}: {
+		origin: "base",
+		version: "${PKG_VERSION}"
+	}
+}
+EOF
+	fi
 	cap_arg="$( make -f ${srctree}/share/mk/bsd.endian.mk -VCAP_MKDB_ENDIAN )"
 	sed -i '' -e "s/%VERSION%/${PKG_VERSION}/" \
 		-e "s/%PKGNAME%/${origname}/" \
 		-e "s/%COMMENT%/${comment}/" \
 		-e "s/%DESC%/${desc}/" \
 		-e "s/%CAP_MKDB_ENDIAN%/${cap_arg}/g" \
-		-e "s/%PKGDEPS%/${pkgdeps}/" \
 		${uclfile}
 	return 0
 }

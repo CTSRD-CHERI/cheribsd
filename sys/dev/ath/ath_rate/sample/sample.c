@@ -482,8 +482,9 @@ ath_rate_pick_seed_rate_ht(struct ath_softc *sc, struct ath_node *an,
 
 void
 ath_rate_findrate(struct ath_softc *sc, struct ath_node *an,
-		  int shortPreamble, size_t frameLen,
-		  u_int8_t *rix0, int *try0, u_int8_t *txrate)
+		  int shortPreamble, size_t frameLen, int tid,
+		  bool is_aggr, u_int8_t *rix0, int *try0,
+		  u_int8_t *txrate, int *maxdur)
 {
 #define	DOT11RATE(ix)	(rt->info[ix].dot11Rate & IEEE80211_RATE_VAL)
 #define	MCS(ix)		(rt->info[ix].dot11Rate | IEEE80211_RATE_MCS)
@@ -497,6 +498,10 @@ ath_rate_findrate(struct ath_softc *sc, struct ath_node *an,
 	unsigned average_tx_time;
 
 	ath_rate_update_static_rix(sc, &an->an_node);
+
+	/* For now don't take TID, is_aggr into account */
+	/* Also for now don't calculate a max duration; that'll come later */
+	*maxdur = -1;
 
 	if (sn->currates != sc->sc_currates) {
 		device_printf(sc->sc_dev, "%s: currates != sc_currates!\n",
@@ -1364,17 +1369,17 @@ ath_rate_sysctlattach(struct ath_softc *sc, struct sample_softc *ssc)
 	struct sysctl_oid *tree = device_get_sysctl_tree(sc->sc_dev);
 
 	SYSCTL_ADD_PROC(ctx, SYSCTL_CHILDREN(tree), OID_AUTO,
-	    "smoothing_rate", CTLTYPE_INT | CTLFLAG_RW, ssc, 0,
-	    ath_rate_sysctl_smoothing_rate, "I",
+	    "smoothing_rate", CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_MPSAFE,
+	    ssc, 0, ath_rate_sysctl_smoothing_rate, "I",
 	    "sample: smoothing rate for avg tx time (%%)");
 	SYSCTL_ADD_PROC(ctx, SYSCTL_CHILDREN(tree), OID_AUTO,
-	    "sample_rate", CTLTYPE_INT | CTLFLAG_RW, ssc, 0,
-	    ath_rate_sysctl_sample_rate, "I",
+	    "sample_rate", CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_MPSAFE,
+	    ssc, 0, ath_rate_sysctl_sample_rate, "I",
 	    "sample: percent air time devoted to sampling new rates (%%)");
 	/* XXX max_successive_failures, stale_failure_timeout, min_switch */
 	SYSCTL_ADD_PROC(ctx, SYSCTL_CHILDREN(tree), OID_AUTO,
-	    "sample_stats", CTLTYPE_INT | CTLFLAG_RW, sc, 0,
-	    ath_rate_sysctl_stats, "I", "sample: print statistics");
+	    "sample_stats", CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_MPSAFE,
+	    sc, 0, ath_rate_sysctl_stats, "I", "sample: print statistics");
 }
 
 struct ath_ratectrl *

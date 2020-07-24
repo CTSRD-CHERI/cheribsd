@@ -200,6 +200,7 @@ static struct vop_vector newnfs_vnodeops_nosig = {
 	.vop_listextattr =	nfs_listextattr,
 	.vop_deleteextattr =	nfs_deleteextattr,
 };
+VFS_VOP_VECTOR_REGISTER(newnfs_vnodeops_nosig);
 
 static int
 nfs_vnodeops_bypass(struct vop_generic_args *a)
@@ -212,6 +213,7 @@ struct vop_vector newnfs_vnodeops = {
 	.vop_default =		&default_vnodeops,
 	.vop_bypass =		nfs_vnodeops_bypass,
 };
+VFS_VOP_VECTOR_REGISTER(newnfs_vnodeops);
 
 static struct vop_vector newnfs_fifoops_nosig = {
 	.vop_default =		&fifo_specops,
@@ -227,6 +229,7 @@ static struct vop_vector newnfs_fifoops_nosig = {
 	.vop_setattr =		nfs_setattr,
 	.vop_write =		nfsfifo_write,
 };
+VFS_VOP_VECTOR_REGISTER(newnfs_fifoops_nosig);
 
 static int
 nfs_fifoops_bypass(struct vop_generic_args *a)
@@ -239,6 +242,7 @@ struct vop_vector newnfs_fifoops = {
 	.vop_default =		&default_vnodeops,
 	.vop_bypass =		nfs_fifoops_bypass,
 };
+VFS_VOP_VECTOR_REGISTER(newnfs_fifoops);
 
 static int nfs_mknodrpc(struct vnode *dvp, struct vnode **vpp,
     struct componentname *cnp, struct vattr *vap);
@@ -349,7 +353,7 @@ nfs_lock(struct vop_lock1_args *ap)
 		 * sleepable call to vnode_pager_setsize().
 		 */
 		NFSUNLOCKNODE(np);
-		VOP_UNLOCK(vp, 0);
+		VOP_UNLOCK(vp);
 		return (EBUSY);
 	}
 	if ((ap->a_flags & LK_NOWAIT) != 0 ||
@@ -359,7 +363,7 @@ nfs_lock(struct vop_lock1_args *ap)
 	}
 	if (lktype == LK_SHARED) {
 		NFSUNLOCKNODE(np);
-		VOP_UNLOCK(vp, 0);
+		VOP_UNLOCK(vp);
 		ap->a_flags &= ~(LK_TYPE_MASK | LK_INTERLOCK);
 		ap->a_flags |= LK_EXCLUSIVE;
 		error = VOP_LOCK1_APV(&default_vnodeops, ap);
@@ -1190,7 +1194,8 @@ nfs_lookup(struct vop_lookup_args *ap)
 	}
 	NFSUNLOCKNODE(np);
 
-	if ((error = VOP_ACCESS(dvp, VEXEC, cnp->cn_cred, td)) != 0)
+	error = vn_dir_check_exec(dvp, cnp);
+	if (error != 0)
 		return (error);
 	error = cache_lookup(dvp, vpp, cnp, &nctime, &ncticks);
 	if (error > 0 && error != ENOENT)
@@ -1353,7 +1358,7 @@ nfs_lookup(struct vop_lookup_args *ap)
 		error = vfs_busy(mp, MBF_NOWAIT);
 		if (error != 0) {
 			vfs_ref(mp);
-			NFSVOPUNLOCK(dvp, 0);
+			NFSVOPUNLOCK(dvp);
 			error = vfs_busy(mp, 0);
 			NFSVOPLOCK(dvp, ltype | LK_RETRY);
 			vfs_rel(mp);
@@ -1364,7 +1369,7 @@ nfs_lookup(struct vop_lookup_args *ap)
 			if (error != 0)
 				return (error);
 		}
-		NFSVOPUNLOCK(dvp, 0);
+		NFSVOPUNLOCK(dvp);
 		error = nfscl_nget(mp, dvp, nfhp, cnp, td, &np, NULL,
 		    cnp->cn_lkflags);
 		if (error == 0)
@@ -1930,7 +1935,7 @@ nfs_rename(struct vop_rename_args *ap)
 	 * this condition can result in potential (silent) data loss.
 	 */
 	error = VOP_FSYNC(fvp, MNT_WAIT, fcnp->cn_thread);
-	NFSVOPUNLOCK(fvp, 0);
+	NFSVOPUNLOCK(fvp);
 	if (!error && tvp)
 		error = VOP_FSYNC(tvp, MNT_WAIT, tcnp->cn_thread);
 	if (error)
@@ -3180,7 +3185,7 @@ nfs_advlock(struct vop_advlock_args *ap)
 			    ap->a_fl, 0, cred, td, ap->a_id, ap->a_flags);
 			if (ret == NFSERR_DENIED && (ap->a_flags & F_WAIT) &&
 			    ap->a_op == F_SETLK) {
-				NFSVOPUNLOCK(vp, 0);
+				NFSVOPUNLOCK(vp);
 				error = nfs_catnap(PZERO | PCATCH, ret,
 				    "ncladvl");
 				if (error)
@@ -3234,13 +3239,13 @@ nfs_advlock(struct vop_advlock_args *ap)
 	} else if (!NFS_ISV4(vp)) {
 		if ((VFSTONFS(vp->v_mount)->nm_flag & NFSMNT_NOLOCKD) != 0) {
 			size = VTONFS(vp)->n_size;
-			NFSVOPUNLOCK(vp, 0);
+			NFSVOPUNLOCK(vp);
 			error = lf_advlock(ap, &(vp->v_lockf), size);
 		} else {
 			if (nfs_advlock_p != NULL)
 				error = nfs_advlock_p(ap);
 			else {
-				NFSVOPUNLOCK(vp, 0);
+				NFSVOPUNLOCK(vp);
 				error = ENOLCK;
 			}
 		}
@@ -3251,14 +3256,14 @@ nfs_advlock(struct vop_advlock_args *ap)
 				NFSLOCKNODE(np);
 				np->n_flag |= NHASBEENLOCKED;
 				NFSUNLOCKNODE(np);
-				NFSVOPUNLOCK(vp, 0);
+				NFSVOPUNLOCK(vp);
 			}
 		}
 		return (error);
 	} else
 		error = EOPNOTSUPP;
 out:
-	NFSVOPUNLOCK(vp, 0);
+	NFSVOPUNLOCK(vp);
 	return (error);
 }
 
@@ -3279,10 +3284,10 @@ nfs_advlockasync(struct vop_advlockasync_args *ap)
 		return (error);
 	if ((VFSTONFS(vp->v_mount)->nm_flag & NFSMNT_NOLOCKD) != 0) {
 		size = VTONFS(vp)->n_size;
-		NFSVOPUNLOCK(vp, 0);
+		NFSVOPUNLOCK(vp);
 		error = lf_advlockasync(ap, &(vp->v_lockf), size);
 	} else {
-		NFSVOPUNLOCK(vp, 0);
+		NFSVOPUNLOCK(vp);
 		error = EOPNOTSUPP;
 	}
 	return (error);
@@ -3662,13 +3667,13 @@ nfs_copy_file_range(struct vop_copy_file_range_args *ap)
 				error = vn_lock(invp, LK_SHARED | LK_NOWAIT);
 				if (error == 0)
 					break;
-				VOP_UNLOCK(outvp, 0);
+				VOP_UNLOCK(outvp);
 				if (mp != NULL)
 					vn_finished_write(mp);
 				mp = NULL;
 				error = vn_lock(invp, LK_SHARED);
 				if (error == 0)
-					VOP_UNLOCK(invp, 0);
+					VOP_UNLOCK(invp);
 			}
 		}
 		if (mp != NULL)
@@ -3797,8 +3802,8 @@ nfs_copy_file_range(struct vop_copy_file_range_args *ap)
 			error = 0;
 		}
 	}
-	VOP_UNLOCK(invp, 0);
-	VOP_UNLOCK(outvp, 0);
+	VOP_UNLOCK(invp);
+	VOP_UNLOCK(outvp);
 	if (mp != NULL)
 		vn_finished_write(mp);
 	if (error == NFSERR_NOTSUPP || error == NFSERR_OFFLOADNOREQS ||
@@ -3888,7 +3893,7 @@ nfs_ioctl(struct vop_ioctl_args *ap)
 		if (error == 0 && ret != 0)
 			error = ret;
 	}
-	NFSVOPUNLOCK(vp, 0);
+	NFSVOPUNLOCK(vp);
 
 	if (error != 0)
 		error = ENXIO;
@@ -3976,7 +3981,7 @@ nfs_setextattr(struct vop_setextattr_args *ap)
 	}
 	mtx_unlock(&nmp->nm_mtx);
 
-	if (ap->a_uio->uio_resid <= 0)
+	if (ap->a_uio->uio_resid < 0)
 		return (EINVAL);
 	cred = ap->a_cred;
 	if (cred == NULL)

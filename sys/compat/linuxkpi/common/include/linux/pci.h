@@ -37,8 +37,10 @@
 
 #include <sys/param.h>
 #include <sys/bus.h>
+#include <sys/nv.h>
 #include <sys/pciio.h>
 #include <sys/rman.h>
+#include <sys/bus.h>
 #include <dev/pci/pcivar.h>
 #include <dev/pci/pcireg.h>
 #include <dev/pci/pci_private.h>
@@ -201,6 +203,11 @@ struct pci_driver {
 	struct device_driver		driver;
 	const struct pci_error_handlers       *err_handler;
 	bool				isdrm;
+	int  (*bsd_iov_init)(device_t dev, uint16_t num_vfs,
+	    const nvlist_t *pf_config);
+	void  (*bsd_iov_uninit)(device_t dev);
+	int  (*bsd_iov_add_vf)(device_t dev, uint16_t vfnum,
+	    const nvlist_t *vf_config);
 };
 
 struct pci_bus {
@@ -214,6 +221,13 @@ extern struct list_head pci_devices;
 extern spinlock_t pci_lock;
 
 #define	__devexit_p(x)	x
+
+struct pci_mmio_region {
+	TAILQ_ENTRY(pci_mmio_region)	next;
+	struct resource			*res;
+	int				rid;
+	int				type;
+};
 
 struct pci_dev {
 	struct device		dev;
@@ -229,6 +243,8 @@ struct pci_dev {
 	uint32_t		class;
 	uint8_t			revision;
 	bool			msi_enabled;
+
+	TAILQ_HEAD(, pci_mmio_region)	mmio;
 };
 
 static inline struct resource_list_entry *
@@ -652,6 +668,41 @@ static inline void pci_disable_sriov(struct pci_dev *dev)
 {
 }
 
+static inline void *
+pci_iomap(struct pci_dev *dev, int mmio_bar, int mmio_size __unused)
+{
+	struct pci_mmio_region *mmio;
+
+	mmio = malloc(sizeof(*mmio), M_DEVBUF, M_WAITOK | M_ZERO);
+	mmio->rid = PCIR_BAR(mmio_bar);
+	mmio->type = pci_resource_type(dev, mmio_bar);
+	mmio->res = bus_alloc_resource_any(dev->dev.bsddev, mmio->type,
+	    &mmio->rid, RF_ACTIVE);
+	if (mmio->res == NULL) {
+		free(mmio, M_DEVBUF);
+		return (NULL);
+	}
+	TAILQ_INSERT_TAIL(&dev->mmio, mmio, next);
+
+	return ((void *)rman_get_bushandle(mmio->res));
+}
+
+static inline void
+pci_iounmap(struct pci_dev *dev, void *res)
+{
+	struct pci_mmio_region *mmio, *p;
+
+	TAILQ_FOREACH_SAFE(mmio, &dev->mmio, next, p) {
+		if (res != (void *)rman_get_bushandle(mmio->res))
+			continue;
+		bus_release_resource(dev->dev.bsddev,
+		    mmio->type, mmio->rid, mmio->res);
+		TAILQ_REMOVE(&dev->mmio, mmio, next);
+		free(mmio, M_DEVBUF);
+		return;
+	}
+}
+
 #define DEFINE_PCI_DEVICE_TABLE(_table) \
 	const struct pci_device_id _table[] __devinitdata
 
@@ -946,5 +997,57 @@ pcie_get_width_cap(struct pci_dev *dev)
 
 	return (PCIE_LNK_WIDTH_UNKNOWN);
 }
+
+static inline int
+pcie_get_mps(struct pci_dev *dev)
+{
+	return (pci_get_max_payload(dev->dev.bsddev));
+}
+
+static inline uint32_t
+PCIE_SPEED2MBS_ENC(enum pci_bus_speed spd)
+{
+
+	switch(spd) {
+	case PCIE_SPEED_16_0GT:
+		return (16000 * 128 / 130);
+	case PCIE_SPEED_8_0GT:
+		return (8000 * 128 / 130);
+	case PCIE_SPEED_5_0GT:
+		return (5000 * 8 / 10);
+	case PCIE_SPEED_2_5GT:
+		return (2500 * 8 / 10);
+	default:
+		return (0);
+	}
+}
+
+static inline uint32_t
+pcie_bandwidth_available(struct pci_dev *pdev,
+    struct pci_dev **limiting,
+    enum pci_bus_speed *speed,
+    enum pcie_link_width *width)
+{
+	enum pci_bus_speed nspeed = pcie_get_speed_cap(pdev);
+	enum pcie_link_width nwidth = pcie_get_width_cap(pdev);
+
+	if (speed)
+		*speed = nspeed;
+	if (width)
+		*width = nwidth;
+
+	return (nwidth * PCIE_SPEED2MBS_ENC(nspeed));
+}
+
+/*
+ * The following functions can be used to attach/detach the LinuxKPI's
+ * PCI device runtime. The pci_driver and pci_device_id pointer is
+ * allowed to be NULL. Other pointers must be all valid.
+ * The pci_dev structure should be zero-initialized before passed
+ * to the linux_pci_attach_device function.
+ */
+extern int linux_pci_attach_device(device_t, struct pci_driver *,
+    const struct pci_device_id *, struct pci_dev *);
+extern int linux_pci_detach_device(struct pci_dev *);
 
 #endif	/* _LINUX_PCI_H_ */

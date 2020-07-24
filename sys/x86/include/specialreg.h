@@ -511,6 +511,7 @@
 #define	SIS_VENDOR_ID		"SiS SiS SiS "
 #define	TRANSMETA_VENDOR_ID	"GenuineTMx86"
 #define	UMC_VENDOR_ID		"UMC UMC UMC "
+#define	HYGON_VENDOR_ID		"HygonGenuine"
 
 /*
  * Model-specific registers for the i386 family
@@ -565,6 +566,7 @@
 #define	MSR_IA32_TEMPERATURE_TARGET	0x1a2
 #define	MSR_TURBO_RATIO_LIMIT	0x1ad
 #define	MSR_TURBO_RATIO_LIMIT1	0x1ae
+#define	MSR_IA32_ENERGY_PERF_BIAS	0x1b0
 #define	MSR_DEBUGCTLMSR		0x1d9
 #define	MSR_LASTBRANCHFROMIP	0x1db
 #define	MSR_LASTBRANCHTOIP	0x1dc
@@ -809,6 +811,9 @@
 #define	IA32_HWP_DESIRED_PERFORMANCE			(0xffULL << 16)
 #define	IA32_HWP_REQUEST_MAXIMUM_PERFORMANCE		(0xffULL << 8)
 #define	IA32_HWP_MINIMUM_PERFORMANCE			(0xffULL << 0)
+
+/* MSR IA32_ENERGY_PERF_BIAS */
+#define	IA32_ENERGY_PERF_BIAS_POLICY_HINT_MASK		(0xfULL << 0)
 
 /*
  * PAT modes.

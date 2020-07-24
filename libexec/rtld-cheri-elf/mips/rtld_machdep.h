@@ -78,7 +78,7 @@ get_codesegment(const struct Struct_Obj_Entry *obj) {
 	return obj->text_rodata_cap;
 }
 
-extern dlfunc_t find_external_call_thunk(const Elf_Sym* def, const Obj_Entry* defobj);
+extern dlfunc_t find_external_call_thunk(const Elf_Sym* def, const Obj_Entry* defobj, size_t addend);
 
 static inline bool
 can_use_tight_pcc_bounds(const struct Struct_Obj_Entry *defobj)
@@ -87,9 +87,6 @@ can_use_tight_pcc_bounds(const struct Struct_Obj_Entry *defobj)
 	case DF_MIPS_CHERI_ABI_PLT:
 	case DF_MIPS_CHERI_ABI_FNDESC:
 		return true;
-#ifndef __CHERI_CAPABILITY_TABLE__
-	case DF_MIPS_CHERI_ABI_LEGACY:
-#endif
 	case DF_MIPS_CHERI_ABI_PCREL:
 		return false;
 	default:
@@ -107,8 +104,8 @@ allocate_function_pointer_trampoline(dlfunc_t target_func, const Obj_Entry *obj)
 static inline dlfunc_t
 _make_rtld_function_pointer(dlfunc_t target_func) {
 	extern struct Struct_Obj_Entry obj_rtld;
-#if !defined(__CHERI_CAPABILITY_TABLE__) || __CHERI_CAPABILITY_TABLE__ == 3
-	/* PC-rel/legacy */
+#if __CHERI_CAPABILITY_TABLE__ == 3
+	/* PC-relative */
 	dbg_assert(!can_use_tight_pcc_bounds(&obj_rtld));
 	return target_func;
 #else
@@ -118,8 +115,8 @@ _make_rtld_function_pointer(dlfunc_t target_func) {
 #endif
 }
 
-#if !defined(__CHERI_CAPABILITY_TABLE__) || __CHERI_CAPABILITY_TABLE__ == 3
-/* Legacy/pc-rel can just use &func since there is no need for a trampoline */
+#if __CHERI_CAPABILITY_TABLE__ == 3
+/* PC-relative can just use &func since there is no need for a trampoline */
 #define _make_local_only_fn_pointer(func) (dlfunc_t)(&func)
 #else
 /*
@@ -150,29 +147,20 @@ _make_rtld_function_pointer(dlfunc_t target_func) {
  */
 static inline dlfunc_t
 make_code_pointer(const Elf_Sym *def, const struct Struct_Obj_Entry *defobj,
-    bool tight_bounds)
+    bool tight_bounds, size_t addend)
 {
 	const void *ret = get_codesegment(defobj) + def->st_value;
-#ifndef __CHERI_CAPABILITY_TABLE__
-	if (defobj->cheri_captable_abi == DF_MIPS_CHERI_ABI_LEGACY) {
-		/*
-		 * Legacy abi: we need to give it full address space range
-		 * (including the full permissions mask) to support legacy binaries.
-		 */
-		assert(cheri_getbase(cheri_getpcc()) == 0);
-		return (dlfunc_t)cheri_setaddress(cheri_getpcc(), (vaddr_t)ret);
-	}
-#endif
 	/* Remove store and seal permissions */
 	ret = cheri_clearperm(ret, FUNC_PTR_REMOVE_PERMS);
 	dbg_assert(defobj->cheri_captable_abi != DF_MIPS_CHERI_ABI_LEGACY);
 	if (tight_bounds) {
 		dbg_assert(defobj->cheri_captable_abi != DF_MIPS_CHERI_ABI_PCREL);
-		ret = cheri_csetbounds(ret, def->st_size);
+		ret = cheri_setbounds(ret, def->st_size);
 	} else {
 		/* PC-relative ABI needs full DSO bounds */
 		dbg_assert(defobj->cheri_captable_abi == DF_MIPS_CHERI_ABI_PCREL);
 	}
+	ret = cheri_incoffset(ret, addend); // TODO: remove addend support
 	/* All code pointers should be sentries: */
 #if __has_builtin(__builtin_cheri_seal_entry)
 	ret = __builtin_cheri_seal_entry(ret);
@@ -184,18 +172,26 @@ make_code_pointer(const Elf_Sym *def, const struct Struct_Obj_Entry *defobj,
 
 /*
  * Create a function pointer that can be called anywhere (i.e. for the PLT ABI
- * this will be a pointer to a trampoline that loads the correct $cgp.
+ * this will be a pointer to a trampoline that loads the correct $cgp).
  */
+
 static inline dlfunc_t
-make_function_pointer(const Elf_Sym *def, const struct Struct_Obj_Entry *defobj)
+make_function_pointer_with_addend(
+    const Elf_Sym *def, const struct Struct_Obj_Entry *defobj, size_t addend)
 {
 	// Add a trampoline if the target ABI is not PCREL
 	if (can_use_tight_pcc_bounds(defobj)) {
-		return find_external_call_thunk(def, defobj);
+		return find_external_call_thunk(def, defobj, addend);
 	} else {
 		/* No need for a function pointer trampoline in the legacy/pcrel ABI */
-		return make_code_pointer(def, defobj, /*tight_bounds=*/false);
+		return make_code_pointer(def, defobj, /*tight_bounds=*/false, addend);
 	}
+}
+
+static inline dlfunc_t
+make_function_pointer(const Elf_Sym *def, const struct Struct_Obj_Entry *defobj)
+{
+	return make_function_pointer_with_addend(def, defobj, /*addend=*/0);
 }
 
 static inline void*
@@ -205,7 +201,7 @@ make_data_pointer(const Elf_Sym* def, const struct Struct_Obj_Entry *defobj)
 	/* Remove execute and seal permissions */
 	ret = cheri_clearperm(ret, DATA_PTR_REMOVE_PERMS);
 	/* TODO: can we always set bounds here or does it break compat? */
-	ret = cheri_csetbounds(ret, def->st_size);
+	ret = cheri_setbounds(ret, def->st_size);
 	return ret;
 }
 
@@ -226,25 +222,16 @@ static inline const void* target_cgp_for_func(const struct Struct_Obj_Entry *obj
 	return obj->_target_cgp;
 }
 
-static inline dlfunc_t
-vaddr_to_code_pointer(const struct Struct_Obj_Entry *obj, vaddr_t code_addr) {
-	const void* text = get_codesegment(obj);
-	dbg_assert(code_addr >= (vaddr_t)text);
-	dbg_assert(code_addr < (vaddr_t)text + cheri_getlen(text));
-	return (dlfunc_t)cheri_copyaddress(text, cheri_fromint(code_addr));
-}
-
 #define set_bounds_if_nonnull(ptr, size)	\
-	do { if (ptr) { ptr = cheri_csetbounds_sametype(ptr, size); } } while(0)
+	do { if (ptr) { ptr = cheri_setbounds_sametype(ptr, size); } } while(0)
 
 // ignore _init/_fini
 #define call_initfini_pointer(obj, target) rtld_fatal("%s: _init or _fini used!", obj->path)
 
 static inline void
-_call_init_fini_array_pointer(const struct Struct_Obj_Entry *obj, vaddr_t target, int argc, char** argv, char** env) {
+_call_init_fini_array_pointer(const struct Struct_Obj_Entry *obj, InitArrayEntry entry, int argc, char** argv, char** env) {
 
-	InitArrFunc func = (InitArrFunc)vaddr_to_code_pointer(obj, target);
-#if defined(__CHERI_CAPABILITY_TABLE__)
+	InitArrFunc func = (InitArrFunc)entry.value;
 	/* Set the target object $cgp when calling the pointer:
 	 * Note: we use target_cgp_for_func() to support per-function captable */
 	const void *init_fini_cgp = target_cgp_for_func(obj, (dlfunc_t)func);
@@ -265,9 +252,6 @@ _call_init_fini_array_pointer(const struct Struct_Obj_Entry *obj, vaddr_t target
 	func(argc, argv, env);
 	/* Ensure that the function call is not reordered before/after asm */
 	__compiler_membar();
-#else
-	func(argc, argv, env);
-#endif
 }
 
 #define call_init_array_pointer(obj, target)			\
@@ -286,9 +270,9 @@ typedef struct {
 
 #define round(size, align) \
     (((size) + (align) - 1) & ~((align) - 1))
-#define calculate_first_tls_offset(size, align) \
+#define calculate_first_tls_offset(size, align, offset) \
     TLS_TCB_SIZE
-#define calculate_tls_offset(prev_offset, prev_size, size, align) \
+#define calculate_tls_offset(prev_offset, prev_size, size, align, offset) \
     round(prev_offset + prev_size, align)
 #define calculate_tls_end(off, size)    ((off) + (size))
 #define	calculate_tls_post_size(align)	0
@@ -313,6 +297,14 @@ static inline void init_pltgot(Obj_Entry *obj __unused) { /* Do nothing */ }
 
 static inline  int
 reloc_iresolve(Obj_Entry *obj __unused, struct Struct_RtldLockState *lockstate __unused)
+{
+	_rtld_error("%s: not implemented!", __func__);
+	return (0);
+}
+
+static inline int
+reloc_iresolve_nonplt(Obj_Entry *obj __unused,
+    struct Struct_RtldLockState *lockstate __unused)
 {
 	_rtld_error("%s: not implemented!", __func__);
 	return (0);

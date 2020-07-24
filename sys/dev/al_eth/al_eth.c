@@ -1639,10 +1639,8 @@ al_eth_rx_recv_work(void *arg, int pending)
 			al_eth_rx_checksum(rx_ring->adapter, hal_pkt, mbuf);
 		}
 
-#if __FreeBSD_version >= 800000
 		mbuf->m_pkthdr.flowid = qid;
 		M_HASHTYPE_SET(mbuf, M_HASHTYPE_OPAQUE);
-#endif
 
 		/*
 		 * LRO is only for IP/TCP packets and TCP checksum of the packet
@@ -2512,7 +2510,7 @@ al_eth_setup_rx_resources(struct al_eth_adapter *adapter, unsigned int qid)
 		return (ENOMEM);
 
 	/* Allocate taskqueues */
-	TASK_INIT(&rx_ring->enqueue_task, 0, al_eth_rx_recv_work, rx_ring);
+	NET_TASK_INIT(&rx_ring->enqueue_task, 0, al_eth_rx_recv_work, rx_ring);
 	rx_ring->enqueue_tq = taskqueue_create_fast("al_rx_enque", M_NOWAIT,
 	    taskqueue_thread_enqueue, &rx_ring->enqueue_tq);
 	taskqueue_start_threads(&rx_ring->enqueue_tq, 1, PI_NET, "%s rxeq",

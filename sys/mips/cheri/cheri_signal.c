@@ -54,7 +54,7 @@ void
 cheri_signal_copy(struct pcb *dst, struct pcb *src)
 {
 
-	cheri_memcpy(&dst->pcb_cherisignal, &src->pcb_cherisignal,
+	memcpy(&dst->pcb_cherisignal, &src->pcb_cherisignal,
 	    sizeof(dst->pcb_cherisignal));
 }
 

@@ -7112,7 +7112,7 @@ scsi_attrib_vendser_sbuf(struct sbuf *sb, struct scsi_mam_attribute_header *hdr,
 	case SCSI_ATTR_OUTPUT_NONASCII_ESC:
 	default:
 		strvis_flags = CAM_STRVIS_FLAG_NONASCII_ESC;
-		break;;
+		break;
 	}
 	cam_strvis_sbuf(sb, vendser->vendor, sizeof(vendser->vendor),
 	    strvis_flags);
@@ -9234,8 +9234,8 @@ sysctl_scsi_delay(SYSCTL_HANDLER_ARGS)
 		return (error);
 	return (set_scsi_delay(delay));
 }
-SYSCTL_PROC(_kern_cam, OID_AUTO, scsi_delay, CTLTYPE_INT|CTLFLAG_RW,
-    0, 0, sysctl_scsi_delay, "I",
+SYSCTL_PROC(_kern_cam, OID_AUTO, scsi_delay,
+    CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_NEEDGIANT, 0, 0, sysctl_scsi_delay, "I",
     "Delay to allow devices to settle after a SCSI bus reset (ms)");
 
 static int

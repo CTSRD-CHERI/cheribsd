@@ -11,7 +11,8 @@
 
 include "std.BERI"
 
-options	KSTACK_LARGE_PAGE	# Use a 16K page for kernel stack
+options 	KSTACK_LARGE_PAGE	# Use a 16K page for kernel stack
+options 	NO_SWAPPING
 
 #options 	NFSCL			# Network Filesystem Client
 #options 	NFSLOCKD		# Network Lock Manager

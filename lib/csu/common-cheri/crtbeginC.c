@@ -41,14 +41,14 @@ void	crt_call_constructors(void);
  * that contain function pointers so (until we have proper linker support) we
  * are still generating them as a sequence of PCC-relative integers.
  */
-typedef unsigned long long mips_function_ptr;
+typedef vaddr_t integer_function_ptr;
 typedef void (*cheri_function_ptr)(void);
 
-extern mips_function_ptr __ctors_start[];
-extern mips_function_ptr __ctors_end;
+extern integer_function_ptr __ctors_start[];
+extern integer_function_ptr __ctors_end;
 
-extern mips_function_ptr __dtors_start[];
-extern mips_function_ptr __dtors_end;
+extern integer_function_ptr __dtors_start[];
+extern integer_function_ptr __dtors_end;
 
 extern void *__dso_handle;
 void *__dso_handle;
@@ -70,14 +70,14 @@ crt_call_constructors(void)
 	 * TODO: once lld converts ctors to init_array print a warning
 	 * message that the binary should be relinked
 	 */
-	mips_function_ptr *func = &__ctors_start[0];
-	mips_function_ptr *end = __builtin_cheri_offset_set(func,
-	    (char*)&__ctors_end - (char*)func);
+	integer_function_ptr *func = &__ctors_start[0];
+	integer_function_ptr *end =
+	    __builtin_cheri_address_set(func, (vaddr_t)&__ctors_end);
 	for (; func != end; func++) {
-		if (*func != (mips_function_ptr)-1) {
+		if (*func != (integer_function_ptr)-1) {
 			cheri_function_ptr cheri_func =
-				(cheri_function_ptr)__builtin_cheri_offset_set(
-						__builtin_cheri_program_counter_get(), *func);
+			    (cheri_function_ptr)__builtin_cheri_offset_set(
+				__builtin_cheri_program_counter_get(), *func);
 			cheri_func();
 		}
 	}

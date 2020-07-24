@@ -132,7 +132,8 @@ struct usb_fifo_methods usb_ugen_methods = {
 #ifdef USB_DEBUG
 static int ugen_debug = 0;
 
-static SYSCTL_NODE(_hw_usb, OID_AUTO, ugen, CTLFLAG_RW, 0, "USB generic");
+static SYSCTL_NODE(_hw_usb, OID_AUTO, ugen, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
+    "USB generic");
 SYSCTL_INT(_hw_usb_ugen, OID_AUTO, debug, CTLFLAG_RWTUN, &ugen_debug,
     0, "Debug level");
 #endif
@@ -936,7 +937,7 @@ ugen_do_request(struct usb_fifo *f, struct usb_ctl_request *ur)
 	}
 	/* do the USB request */
 	error = usbd_do_request_flags
-	    (f->udev, NULL, &ur->ucr_request, ur->ucr_data,
+	    (f->udev, NULL, &ur->ucr_request, &ur->ucr_data,
 	    (ur->ucr_flags & USB_SHORT_XFER_OK) |
 	    USB_USER_DATA_PTR, &actlen,
 	    USB_DEFAULT_TIMEOUT);
@@ -1048,7 +1049,7 @@ ugen_fs_copy_in(struct usb_fifo *f, uint8_t ep_index)
 	struct usb_device_request *req;
 	struct usb_xfer *xfer;
 	struct usb_fs_endpoint fs_ep;
-	void *uaddr;			/* userland pointer */
+	void * __capability uaddr;	/* userland pointer */
 	void *kaddr;
 	usb_frlength_t offset;
 	usb_frlength_t rem;
@@ -1219,7 +1220,7 @@ complete:
 }
 
 static int
-ugen_fs_copy_out_cancelled(struct usb_fs_endpoint *fs_ep_uptr)
+ugen_fs_copy_out_cancelled(struct usb_fs_endpoint * __capability fs_ep_uptr)
 {
 	struct usb_fs_endpoint fs_ep;
 	int error;
@@ -1258,8 +1259,8 @@ ugen_fs_copy_out(struct usb_fifo *f, uint8_t ep_index)
 	struct usb_device_request *req;
 	struct usb_xfer *xfer;
 	struct usb_fs_endpoint fs_ep;
-	struct usb_fs_endpoint *fs_ep_uptr;	/* userland ptr */
-	void *uaddr;			/* userland ptr */
+	struct usb_fs_endpoint * __capability fs_ep_uptr; /* userland ptr */
+	void * __capability uaddr;		/* userland ptr */
 	void *kaddr;
 	usb_frlength_t offset;
 	usb_frlength_t rem;
@@ -2223,10 +2224,9 @@ ugen_ioctl_post(struct usb_fifo *f, u_long cmd, void *addr, int fflags)
 		for (n = 0; n != 4; n++) {
 
 			u.stat->uds_requests_fail[n] =
-			    f->udev->bus->stats_err.uds_requests[n];
-
+			    f->udev->stats_err.uds_requests[n];
 			u.stat->uds_requests_ok[n] =
-			    f->udev->bus->stats_ok.uds_requests[n];
+			    f->udev->stats_ok.uds_requests[n];
 		}
 		break;
 

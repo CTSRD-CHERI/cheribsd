@@ -38,6 +38,8 @@
 #include <sys/fcntl.h>
 #include <sys/sysent.h>
 #include <sys/imgact_elf.h>
+#include <sys/jail.h>
+#include <sys/smp.h>
 #include <sys/syscall.h>
 #include <sys/signalvar.h>
 #include <sys/vnode.h>
@@ -51,6 +53,8 @@
 #include <machine/fpu.h>
 #include <machine/elf.h>
 #include <machine/md_var.h>
+
+#include <powerpc/powerpc/elf_common.c>
 
 static void exec_setregs_funcdesc(struct thread *td, struct image_params *imgp,
     uintptr_t stack);
@@ -74,7 +78,7 @@ struct sysentvec elf64_freebsd_sysvec_v1 = {
 	.sv_usrstack	= USRSTACK,
 	.sv_psstrings	= PS_STRINGS,
 	.sv_stackprot	= VM_PROT_ALL,
-	.sv_copyout_auxargs = __elfN(freebsd_copyout_auxargs),
+	.sv_copyout_auxargs = __elfN(powerpc_copyout_auxargs),
 	.sv_copyout_strings = exec_copyout_strings,
 	.sv_setregs	= exec_setregs_funcdesc,
 	.sv_fixlimit	= NULL,
@@ -112,7 +116,7 @@ struct sysentvec elf64_freebsd_sysvec_v2 = {
 	.sv_usrstack	= USRSTACK,
 	.sv_psstrings	= PS_STRINGS,
 	.sv_stackprot	= VM_PROT_ALL,
-	.sv_copyout_auxargs = __elfN(freebsd_copyout_auxargs),
+	.sv_copyout_auxargs = __elfN(powerpc_copyout_auxargs),
 	.sv_copyout_strings = exec_copyout_strings,
 	.sv_setregs	= exec_setregs,
 	.sv_fixlimit	= NULL,
@@ -278,10 +282,10 @@ elf64_dump_thread(struct thread *td, void *dst, size_t *off)
 }
 
 bool
-elf_is_ifunc_reloc(Elf_Size r_info __unused)
+elf_is_ifunc_reloc(Elf_Size r_info)
 {
 
-	return (false);
+	return (ELF_R_TYPE(r_info) == R_PPC_IRELATIVE);
 }
 
 /* Process one elf relocation with addend. */
@@ -291,7 +295,7 @@ elf_reloc_internal(linker_file_t lf, Elf_Addr relocbase, const void *data,
 {
 	Elf_Addr *where;
 	Elf_Addr addr;
-	Elf_Addr addend;
+	Elf_Addr addend, val;
 	Elf_Word rtype, symidx;
 	const Elf_Rela *rela;
 	int error;
@@ -336,6 +340,13 @@ elf_reloc_internal(linker_file_t lf, Elf_Addr relocbase, const void *data,
 		*where = addr;
 #endif
 		__asm __volatile("dcbst 0,%0; sync" :: "r"(where) : "memory");
+		break;
+
+	case R_PPC_IRELATIVE:
+		addr = relocbase + addend;
+		val = ((Elf64_Addr (*)(void))addr)();
+		if (*where != val)
+			*where = val;
 		break;
 
 	default:
@@ -406,6 +417,13 @@ elf_cpu_load_file(linker_file_t lf)
 
 int
 elf_cpu_unload_file(linker_file_t lf __unused)
+{
+
+	return (0);
+}
+
+int
+elf_cpu_parse_dynamic(caddr_t loadbase __unused, Elf_Dyn *dynamic __unused)
 {
 
 	return (0);

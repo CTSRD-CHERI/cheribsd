@@ -25,7 +25,7 @@
 .\"
 .\" $FreeBSD$
 .\"
-.Dd February 15, 2019
+.Dd March 30, 2020
 .Dt SENDFILE 2
 .Os
 .Sh NAME
@@ -351,6 +351,9 @@ is negative.
 .It Bq Er EIO
 An error occurred while reading from
 .Fa fd .
+.It Bq Er EINTEGRITY
+Corrupted data was detected while reading from
+.Fa fd .
 .It Bq Er ENOTCAPABLE
 The
 .Fa fd
@@ -431,3 +434,12 @@ to
 .Er EFAULT ,
 if provided an invalid address for
 .Fa sbytes .
+The
+.Fn sendfile
+system call does not support SCTP sockets,
+it will return
+.Dv -1
+and set
+.Va errno
+to
+.Er EINVAL.

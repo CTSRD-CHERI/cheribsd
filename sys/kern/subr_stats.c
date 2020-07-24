@@ -1583,9 +1583,7 @@ stats_v1_blob_iter(struct statsblobv1 *sb, stats_v1_blob_itercb_t icb,
 	int i, j, firstvoi;
 
 	ctx.usrctx = usrctx;
-	ctx.flags |= SB_IT_FIRST_CB;
-	ctx.flags &= ~(SB_IT_FIRST_VOI | SB_IT_LAST_VOI | SB_IT_FIRST_VOISTAT |
-	    SB_IT_LAST_VOISTAT);
+	ctx.flags = SB_IT_FIRST_CB;
 	firstvoi = 1;
 
 	for (i = 0; i < NVOIS(sb); i++) {
@@ -1734,7 +1732,6 @@ stats_voistatdata_tdgst_tostr(enum vsd_dtype voi_dtype __unused,
 		Q_TOSTR((is32bit ? ctd32->mu : ctd64->mu), -1, 10, qstr,
 		    sizeof(qstr));
 		sbuf_cat(buf, qstr);
-
 
 		switch (fmt) {
 		case SB_STRFMT_FREEFORM:
@@ -2963,7 +2960,14 @@ stats_v1_vsd_tdgst_compress(enum vsd_dtype vs_dtype,
 	 * re-inserting the mu/cnt of each as a value and corresponding weight.
 	 */
 
-#define	bitsperrand 31 /* Per random(3). */
+	/*
+	 * XXXCEM: random(9) is currently rand(3), not random(3).  rand(3)
+	 * RAND_MAX happens to be approximately 31 bits (range [0,
+	 * 0x7ffffffd]), so the math kinda works out.  When/if this portion of
+	 * the code is compiled in userspace, it gets the random(3) behavior,
+	 * which has expected range [0, 0x7fffffff].
+	 */
+#define	bitsperrand 31
 	ebits = 0;
 	nebits = 0;
 	bitsperidx = fls(maxctds);
@@ -2971,7 +2975,6 @@ stats_v1_vsd_tdgst_compress(enum vsd_dtype vs_dtype,
 	    ("%s: bitsperidx=%d, ebits=%d",
 	    __func__, bitsperidx, (int)(sizeof(ebits) << 3)));
 	idxmask = (UINT64_C(1) << bitsperidx) - 1;
-	srandom(stats_sbinuptime());
 
 	/* Initialise the free list with randomised centroid indices. */
 	for (; remctds > 0; remctds--) {
@@ -3887,11 +3890,12 @@ done:
 	return (err);
 }
 
-SYSCTL_NODE(_kern, OID_AUTO, stats, CTLFLAG_RW, NULL,
+SYSCTL_NODE(_kern, OID_AUTO, stats, CTLFLAG_RW | CTLFLAG_MPSAFE, NULL,
     "stats(9) MIB");
 
-SYSCTL_PROC(_kern_stats, OID_AUTO, templates, CTLTYPE_STRING|CTLFLAG_RD,
-    NULL, 0, stats_tpl_list_available, "A",
+SYSCTL_PROC(_kern_stats, OID_AUTO, templates,
+    CTLTYPE_STRING | CTLFLAG_RD | CTLFLAG_MPSAFE, NULL, 0,
+    stats_tpl_list_available, "A",
     "list the name/hash of all available stats(9) templates");
 
 #else /* ! _KERNEL */

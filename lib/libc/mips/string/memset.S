@@ -101,7 +101,7 @@ LEAF(memset)
 	sb	a1, -1(a0)
 2:
 .Lmemset_return:
-#if defined(CHECK_MEMSET_CLEARED_CORRECTLY) || 1
+#if defined(CHECK_MEMSET_CLEARED_CORRECTLY)
 	/* Check it's all set correctly: */
 .Lcheck_all_set:
 	ble	a2, zero, .Lmemset_real_return

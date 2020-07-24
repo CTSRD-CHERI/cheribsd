@@ -33,7 +33,7 @@
 #include <machine/asm.h>
 
 #include <machine/cheriasm.h>
-#include <machine/cherireg.h>
+#include <cheri/cherireg.h>
 
 .set noat
 .set noreorder

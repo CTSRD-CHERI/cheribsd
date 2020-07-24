@@ -21,6 +21,6 @@ CLEANFILES=	${FILES}
 CFLAGS+=-mxgot -mllvm -mxmxgot
 CFLAGS+=	-DCRT_IRELOC_SUPPRESS -DCRT_ATEXIT_SUPPRESS
 
-NEED_CHERI=	pure
-
+NEED_COMPAT=	CHERI
+.include <bsd.compat.mk>
 .include <bsd.lib.mk>

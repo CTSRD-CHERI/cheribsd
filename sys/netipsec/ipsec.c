@@ -175,8 +175,9 @@ SYSCTL_DECL(_net_inet_ipsec);
 
 /* net.inet.ipsec */
 SYSCTL_PROC(_net_inet_ipsec, IPSECCTL_DEF_POLICY, def_policy,
-	CTLTYPE_INT | CTLFLAG_VNET | CTLFLAG_RW, 0, 0, sysctl_def_policy, "I",
-	"IPsec default policy.");
+    CTLTYPE_INT | CTLFLAG_VNET | CTLFLAG_RW | CTLFLAG_NEEDGIANT,
+    0, 0, sysctl_def_policy, "I",
+    "IPsec default policy.");
 SYSCTL_INT(_net_inet_ipsec, IPSECCTL_DEF_ESP_TRANSLEV, esp_trans_deflev,
 	CTLFLAG_VNET | CTLFLAG_RW, &VNET_NAME(ip4_esp_trans_deflev), 0,
 	"Default ESP transport mode level");
@@ -215,11 +216,6 @@ SYSCTL_INT(_net_inet_ipsec, OID_AUTO, filtertunnel,
 	"If set, filter packets from an IPsec tunnel.");
 SYSCTL_VNET_PCPUSTAT(_net_inet_ipsec, OID_AUTO, ipsecstats, struct ipsecstat,
     ipsec4stat, "IPsec IPv4 statistics.");
-
-struct timeval ipsec_warn_interval = { .tv_sec = 1, .tv_usec = 0 };
-SYSCTL_TIMEVAL_SEC(_net_inet_ipsec, OID_AUTO, crypto_warn_interval, CTLFLAG_RW,
-    &ipsec_warn_interval,
-    "Delay in seconds between warnings of deprecated IPsec crypto algorithms.");
 
 #ifdef REGRESSION
 /*
@@ -261,8 +257,9 @@ SYSCTL_DECL(_net_inet6_ipsec6);
 
 /* net.inet6.ipsec6 */
 SYSCTL_PROC(_net_inet6_ipsec6, IPSECCTL_DEF_POLICY, def_policy,
-	CTLTYPE_INT | CTLFLAG_VNET | CTLFLAG_RW, 0, 0, sysctl_def_policy, "I",
-	"IPsec default policy.");
+    CTLTYPE_INT | CTLFLAG_VNET | CTLFLAG_RW | CTLFLAG_NEEDGIANT,
+    0, 0, sysctl_def_policy, "I",
+    "IPsec default policy.");
 SYSCTL_INT(_net_inet6_ipsec6, IPSECCTL_DEF_ESP_TRANSLEV, esp_trans_deflev,
 	CTLFLAG_VNET | CTLFLAG_RW, &VNET_NAME(ip6_esp_trans_deflev), 0,
 	"Default ESP transport mode level.");

@@ -22,4 +22,6 @@ SRCS+=	adddi3.c anddi3.c ashldi3.c ashrdi3.c cmpdi2.c divdi3.c fixdfdi.c \
 
 .endif
 
+CFLAGS.fixsfdi.c=	-Wno-error-implicit-int-float-conversion
+
 SYM_MAPS+=${LIBC_SRCTOP}/quad/Symbol.map

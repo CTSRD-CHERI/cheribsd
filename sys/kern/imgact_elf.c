@@ -50,7 +50,6 @@ __FBSDID("$FreeBSD$");
 #include <sys/mount.h>
 #include <sys/mman.h>
 #include <sys/namei.h>
-#include <sys/pioctl.h>
 #include <sys/proc.h>
 #include <sys/procfs.h>
 #include <sys/ptrace.h>
@@ -121,7 +120,7 @@ static boolean_t __elfN(check_note)(struct image_params *imgp,
 static vm_prot_t __elfN(trans_prot)(Elf_Word);
 static Elf_Word __elfN(untrans_prot)(vm_prot_t);
 
-SYSCTL_NODE(_kern, OID_AUTO, ELF_ABI_ID, CTLFLAG_RW, 0,
+SYSCTL_NODE(_kern, OID_AUTO, ELF_ABI_ID, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
     "");
 
 #define	CORE_BUF_SIZE	(16 * 1024)
@@ -177,7 +176,7 @@ SYSCTL_PROC(ELF_NODE_OID, OID_AUTO, pie_base,
     sysctl_pie_base, "LU",
     "PIE load base without randomization");
 
-SYSCTL_NODE(ELF_NODE_OID, OID_AUTO, aslr, CTLFLAG_RW, 0,
+SYSCTL_NODE(ELF_NODE_OID, OID_AUTO, aslr, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
     "");
 #define	ASLR_NODE_OID	__CONCAT(ELF_NODE_OID, _aslr)
 
@@ -203,6 +202,15 @@ SYSCTL_INT(ASLR_NODE_OID, OID_AUTO, stack_gap, CTLFLAG_RW,
     &__elfN(aslr_stack_gap), 0,
     ELF_ABI_NAME
     ": maximum percentage of main stack to waste on a random gap");
+
+#ifdef __ELF_CHERI
+static int __elfN(sigfastblock) = 0;
+#else
+static int __elfN(sigfastblock) = 1;
+#endif
+SYSCTL_INT(ELF_NODE_OID, OID_AUTO, sigfastblock,
+    CTLFLAG_RWTUN, &__elfN(sigfastblock), 0,
+    "enable sigfastblock for new processes");
 
 static Elf_Brandinfo *elf_brand_list[MAX_BRANDS];
 
@@ -593,7 +601,7 @@ __elfN(map_insert)(struct image_params *imgp, vm_map_t map, vm_object_t object,
 		    (object != NULL ? MAP_VN_EXEC : 0));
 		if (rv != KERN_SUCCESS) {
 			locked = VOP_ISLOCKED(imgp->vp);
-			VOP_UNLOCK(imgp->vp, 0);
+			VOP_UNLOCK(imgp->vp);
 			vm_object_deallocate(object);
 			vn_lock(imgp->vp, locked | LK_RETRY);
 			return (rv);
@@ -665,7 +673,6 @@ __elfN(load_section)(struct image_params *imgp, vm_ooffset_t offset,
 		if (memsz == filsz)
 			return (0);
 	}
-
 
 	/*
 	 * We have to get the remaining bit of the file into the first part
@@ -918,6 +925,9 @@ __elfN(enforce_limits)(struct image_params *imgp, const Elf_Ehdr *hdr,
 	err_str = NULL;
 	text_size = data_size = total_size = text_addr = data_addr = 0;
 
+	/* Initialize start_addr so that MIN() produces something useful. */
+	imgp->start_addr = ~0UL;
+
 	for (i = 0; i < hdr->e_phnum; i++) {
 		if (phdr[i].p_type != PT_LOAD || phdr[i].p_memsz == 0)
 			continue;
@@ -1020,7 +1030,7 @@ __elfN(get_interp)(struct image_params *imgp, const Elf_Phdr *phdr,
 		 */
 		interp = malloc(interp_name_len + 1, M_TEMP, M_NOWAIT);
 		if (interp == NULL) {
-			VOP_UNLOCK(imgp->vp, 0);
+			VOP_UNLOCK(imgp->vp);
 			interp = malloc(interp_name_len + 1, M_TEMP, M_WAITOK);
 			vn_lock(imgp->vp, LK_SHARED | LK_RETRY);
 		}
@@ -1241,7 +1251,7 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 	 * The VV_TEXT flag prevents modifications to the executable while
 	 * the vnode is unlocked.
 	 */
-	VOP_UNLOCK(imgp->vp, 0);
+	VOP_UNLOCK(imgp->vp);
 
 	/*
 	 * Decide whether to enable randomization of user mappings.
@@ -1330,7 +1340,7 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 	imgp->interp_end = 0;
 
 	if (interp != NULL) {
-		VOP_UNLOCK(imgp->vp, 0);
+		VOP_UNLOCK(imgp->vp);
 		if ((map->flags & MAP_ASLR) != 0) {
 			/* Assume that interpeter fits into 1/4 of AS */
 			maxv1 = maxv / 2 + addr / 2;
@@ -1351,7 +1361,7 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 	 */
 	elf_auxargs = malloc(sizeof(Elf_Auxargs), M_TEMP, M_NOWAIT);
 	if (elf_auxargs == NULL) {
-		VOP_UNLOCK(imgp->vp, 0);
+		VOP_UNLOCK(imgp->vp);
 		elf_auxargs = malloc(sizeof(Elf_Auxargs), M_TEMP, M_WAITOK);
 		vn_lock(imgp->vp, LK_SHARED | LK_RETRY);
 	}
@@ -1449,6 +1459,7 @@ __elfN(freebsd_copyout_auxargs)(struct image_params *imgp, uintcap_t base)
 	Elf_Auxinfo *argarray, *pos;
 #ifdef __ELF_CHERI
 	void * __capability exec_base;
+	void * __capability entry;
 #endif
 	int error;
 
@@ -1473,9 +1484,16 @@ __elfN(freebsd_copyout_auxargs)(struct image_params *imgp, uintcap_t base)
 	AUXARGS_ENTRY(pos, AT_PAGESZ, args->pagesz);
 	AUXARGS_ENTRY(pos, AT_FLAGS, args->flags);
 #ifdef __ELF_CHERI
-	AUXARGS_ENTRY_PTR(pos, AT_ENTRY, cheri_setaddress(prog_cap(imgp,
-	    CHERI_CAP_USER_DATA_PERMS | CHERI_CAP_USER_CODE_PERMS),
-	    args->entry));
+	entry = cheri_setaddress(prog_cap(imgp, CHERI_CAP_USER_CODE_PERMS),
+	    args->entry);
+#ifdef CHERI_FLAGS_CAP_MODE
+	/*
+	 * On architectures with a mode flag bit, we must ensure the flag is set in
+	 * AT_ENTRY for RTLD to be able to jump to it.
+	 */
+	entry = cheri_setflags(entry, CHERI_FLAGS_CAP_MODE);
+#endif
+	AUXARGS_ENTRY_PTR(pos, AT_ENTRY, entry);
 
 	/*
 	 * XXX: AT_BASE is both writable and executable to permit textrel
@@ -1521,6 +1539,8 @@ __elfN(freebsd_copyout_auxargs)(struct image_params *imgp, uintcap_t base)
 		AUXARGS_ENTRY(pos, AT_HWCAP, *imgp->sysent->sv_hwcap);
 	if (imgp->sysent->sv_hwcap2 != NULL)
 		AUXARGS_ENTRY(pos, AT_HWCAP2, *imgp->sysent->sv_hwcap2);
+	AUXARGS_ENTRY(pos, AT_BSDFLAGS, __elfN(sigfastblock) ?
+	    ELF_BSDF_SIGFASTBLK : 0);
 	AUXARGS_ENTRY(pos, AT_ARGC, imgp->args->argc);
 	AUXARGS_ENTRY_PTR(pos, AT_ARGV, imgp->argv);
 	AUXARGS_ENTRY(pos, AT_ENVC, imgp->args->envc);
@@ -1546,7 +1566,7 @@ __elfN(freebsd_fixup)(uintcap_t *stack_base, struct image_params *imgp)
 
 	base = (Elf_Addr * __capability)*stack_base;
 	base--;
-	if (suword_c(base, imgp->args->argc) == -1)
+	if (suword(base, imgp->args->argc) == -1)
 		return (EFAULT);
 	*stack_base = (uintcap_t)base;
 #endif
@@ -1633,11 +1653,13 @@ static void note_procstat_vmmap(void *, struct sbuf *, size_t *);
  * Write out a core segment to the compression stream.
  */
 static int
-compress_chunk(struct coredump_params *p, char *base, char *buf, u_int len)
+compress_chunk(struct coredump_params *p, char *base_vaddr, char *buf, u_int len)
 {
+	char * __capability base;
 	u_int chunk_len;
 	int error;
 
+	base = __USER_CAP(base_vaddr, len);
 	while (len > 0) {
 		chunk_len = MIN(len, CORE_BUF_SIZE);
 
@@ -2270,6 +2292,17 @@ typedef struct thrmisc32 elf_thrmisc_t;
 #define ELF_KERN_PROC_MASK	KERN_PROC_MASK32
 typedef struct kinfo_proc32 elf_kinfo_proc_t;
 typedef uint32_t elf_ps_strings_t;
+#elif defined(COMPAT_FREEBSD64) && __ELF_WORD_SIZE == 64 && !defined(__ELF_CHERI)
+#include <compat/freebsd64/freebsd64.h>
+typedef prstatus_t elf_prstatus_t;
+typedef prpsinfo_t elf_prpsinfo_t;
+typedef prfpregset_t elf_prfpregset_t;
+typedef prfpregset_t elf_fpregset_t;
+typedef gregset_t elf_gregset_t;
+typedef thrmisc_t elf_thrmisc_t;
+#define ELF_KERN_PROC_MASK	KERN_PROC_MASK64
+typedef struct kinfo_proc64 elf_kinfo_proc_t;
+typedef vm_offset_t elf_ps_strings_t;
 #else
 typedef prstatus_t elf_prstatus_t;
 typedef prpsinfo_t elf_prpsinfo_t;
@@ -2438,8 +2471,8 @@ __elfN(note_ptlwpinfo)(void *arg, struct sbuf *sb, size_t *sizep)
 	int structsize;
 #if defined(COMPAT_FREEBSD32) && __ELF_WORD_SIZE == 32
 	struct ptrace_lwpinfo32 pl;
-#elif defined(__ELF_CHERI)
-	struct ptrace_lwpinfo_c pl;
+#elif defined(COMPAT_FREEBSD64) && __ELF_WORD_SIZE == 64 && !defined(__ELF_CHERI)
+	struct ptrace_lwpinfo64 pl;
 #else
 	struct ptrace_lwpinfo pl;
 #endif
@@ -2460,14 +2493,10 @@ __elfN(note_ptlwpinfo)(void *arg, struct sbuf *sb, size_t *sizep)
 			pl.pl_flags |= PL_FLAG_SI;
 #if defined(COMPAT_FREEBSD32) && __ELF_WORD_SIZE == 32
 			siginfo_to_siginfo32(&td->td_si, &pl.pl_siginfo);
-#elif defined(__ELF_CHERI)
-			_Static_assert(
-			    sizeof(pl.pl_siginfo) == sizeof(td->td_si),
-			    "_siginfo_t and siginfo_c mismatch");
-			memcpy(&pl.pl_siginfo, &td->td_si,
-			    sizeof(pl.pl_siginfo));
+#elif defined(COMPAT_FREEBSD64) && __ELF_WORD_SIZE == 64 && !defined(__ELF_CHERI)
+			siginfo_to_siginfo64(&td->td_si, &pl.pl_siginfo);
 #else
-			siginfo_to_siginfo_native(&td->td_si, &pl.pl_siginfo);
+			pl.pl_siginfo = td->td_si;
 #endif
 		}
 		strcpy(pl.pl_tdname, td->td_name);
@@ -2502,10 +2531,6 @@ __elfN(note_threadmd)(void *arg, struct sbuf *sb, size_t *sizep)
 	free(buf, M_TEMP);
 	*sizep = size;
 }
-
-#ifdef KINFO_PROC_SIZE
-CTASSERT(sizeof(struct kinfo_proc) == KINFO_PROC_SIZE);
-#endif
 
 static void
 __elfN(note_procstat_proc)(void *arg, struct sbuf *sb, size_t *sizep)
@@ -2765,7 +2790,7 @@ __elfN(parse_notes)(struct image_params *imgp, Elf_Note *checknote,
 	    pnote->p_filesz > PAGE_SIZE - pnote->p_offset) {
 		buf = malloc(pnote->p_filesz, M_TEMP, M_NOWAIT);
 		if (buf == NULL) {
-			VOP_UNLOCK(imgp->vp, 0);
+			VOP_UNLOCK(imgp->vp);
 			buf = malloc(pnote->p_filesz, M_TEMP, M_WAITOK);
 			vn_lock(imgp->vp, LK_SHARED | LK_RETRY);
 		}
@@ -2946,7 +2971,7 @@ __elfN(untrans_prot)(vm_prot_t prot)
 }
 
 void
-__elfN(stackgap)(struct image_params *imgp, uintptr_t *stack_base)
+__elfN(stackgap)(struct image_params *imgp, uintcap_t *stack_base)
 {
 	uintptr_t range, rbase, gap;
 	int pct;

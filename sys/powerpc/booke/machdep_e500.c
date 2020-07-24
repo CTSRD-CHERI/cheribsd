@@ -53,12 +53,6 @@ extern void l2cache_inval(void);
 extern void bpred_enable(void);
 
 void
-booke_init_tlb(vm_paddr_t fdt_immr_pa)
-{
-
-}
-
-void
 booke_enable_l1_cache(void)
 {
 	uint32_t csr;
@@ -124,4 +118,16 @@ booke_enable_bpred(void)
 void
 booke_disable_l2_cache(void)
 {
+}
+
+/* Return 0 on handled success, otherwise signal number. */
+int
+cpu_machine_check(struct thread *td, struct trapframe *frame, int *ucode)
+{
+	register_t mcsr;
+
+	mcsr = mfspr(SPR_MCSR);
+
+	*ucode = BUS_OBJERR;
+	return (SIGBUS);
 }

@@ -53,6 +53,7 @@ __FBSDID("$FreeBSD$");
 
 #include <net/debugnet.h>
 #include <net/ethernet.h>
+#include <net/pfil.h>
 #include <net/if.h>
 #include <net/if_var.h>
 #include <net/if_arp.h>
@@ -233,7 +234,8 @@ static int	vtnet_tunable_int(struct vtnet_softc *, const char *, int);
 DEBUGNET_DEFINE(vtnet);
 
 /* Tunables. */
-static SYSCTL_NODE(_hw, OID_AUTO, vtnet, CTLFLAG_RD, 0, "VNET driver parameters");
+static SYSCTL_NODE(_hw, OID_AUTO, vtnet, CTLFLAG_RD | CTLFLAG_MPSAFE, 0,
+    "VNET driver parameters");
 static int vtnet_csum_disable = 0;
 TUNABLE_INT("hw.vtnet.csum_disable", &vtnet_csum_disable);
 SYSCTL_INT(_hw_vtnet, OID_AUTO, csum_disable, CTLFLAG_RDTUN,
@@ -337,10 +339,21 @@ vtnet_modevent(module_t mod, int type, void *unused)
 
 	switch (type) {
 	case MOD_LOAD:
-		if (loaded++ == 0)
+		if (loaded++ == 0) {
 			vtnet_tx_header_zone = uma_zcreate("vtnet_tx_hdr",
 				sizeof(struct vtnet_tx_header),
 				NULL, NULL, NULL, NULL, 0, 0);
+#ifdef DEBUGNET
+			/*
+			 * We need to allocate from this zone in the transmit path, so ensure
+			 * that we have at least one item per header available.
+			 * XXX add a separate zone like we do for mbufs? otherwise we may alloc
+			 * buckets
+			 */
+			uma_zone_reserve(vtnet_tx_header_zone, DEBUGNET_MAX_IN_FLIGHT * 2);
+			uma_prealloc(vtnet_tx_header_zone, DEBUGNET_MAX_IN_FLIGHT * 2);
+#endif
+		}
 		break;
 	case MOD_QUIESCE:
 		if (uma_zone_get_cur(vtnet_tx_header_zone) > 0)
@@ -705,7 +718,7 @@ vtnet_init_rxq(struct vtnet_softc *sc, int id)
 	if (rxq->vtnrx_sg == NULL)
 		return (ENOMEM);
 
-	TASK_INIT(&rxq->vtnrx_intrtask, 0, vtnet_rxq_tq_intr, rxq);
+	NET_TASK_INIT(&rxq->vtnrx_intrtask, 0, vtnet_rxq_tq_intr, rxq);
 	rxq->vtnrx_tq = taskqueue_create(rxq->vtnrx_name, M_NOWAIT,
 	    taskqueue_thread_enqueue, &rxq->vtnrx_tq);
 
@@ -924,6 +937,7 @@ static int
 vtnet_setup_interface(struct vtnet_softc *sc)
 {
 	device_t dev;
+	struct pfil_head_args pa;
 	struct ifnet *ifp;
 
 	dev = sc->vtnet_dev;
@@ -937,7 +951,8 @@ vtnet_setup_interface(struct vtnet_softc *sc)
 	if_initname(ifp, device_get_name(dev), device_get_unit(dev));
 	ifp->if_baudrate = IF_Gbps(10);	/* Approx. */
 	ifp->if_softc = sc;
-	ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST;
+	ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST |
+	    IFF_KNOWSEPOCH;
 	ifp->if_init = vtnet_init;
 	ifp->if_ioctl = vtnet_ioctl;
 	ifp->if_get_counter = vtnet_get_counter;
@@ -1026,6 +1041,12 @@ vtnet_setup_interface(struct vtnet_softc *sc)
 	vtnet_set_tx_intr_threshold(sc);
 
 	DEBUGNET_SET(ifp, vtnet);
+
+	pa.pa_version = PFIL_VERSION;
+	pa.pa_flags = PFIL_IN;
+	pa.pa_type = PFIL_TYPE_ETHERNET;
+	pa.pa_headname = ifp->if_xname;
+	sc->vtnet_pfil = pfil_head_register(&pa);
 
 	return (0);
 }
@@ -1762,9 +1783,11 @@ vtnet_rxq_eof(struct vtnet_rxq *rxq)
 	struct vtnet_softc *sc;
 	struct ifnet *ifp;
 	struct virtqueue *vq;
-	struct mbuf *m;
+	struct mbuf *m, *mr;
 	struct virtio_net_hdr_mrg_rxbuf *mhdr;
 	int len, deq, nbufs, adjsz, count;
+	pfil_return_t pfil;
+	bool pfil_done;
 
 	sc = rxq->vtnrx_sc;
 	vq = rxq->vtnrx_vq;
@@ -1801,6 +1824,35 @@ vtnet_rxq_eof(struct vtnet_rxq *rxq)
 			adjsz = sizeof(struct virtio_net_hdr_mrg_rxbuf);
 		}
 
+		/*
+		 * If we have enough data in first mbuf, run it through
+		 * pfil as a memory buffer before dequeueing the rest.
+		 */
+		if (PFIL_HOOKED_IN(sc->vtnet_pfil) &&
+		    len - adjsz >= ETHER_HDR_LEN + max_protohdr) {
+			pfil = pfil_run_hooks(sc->vtnet_pfil,
+			    m->m_data + adjsz, ifp,
+			    (len - adjsz) | PFIL_MEMPTR | PFIL_IN, NULL);
+			switch (pfil) {
+			case PFIL_REALLOCED:
+				mr = pfil_mem2mbuf(m->m_data + adjsz);
+				vtnet_rxq_input(rxq, mr, hdr);
+				/* FALLTHROUGH */
+			case PFIL_DROPPED:
+			case PFIL_CONSUMED:
+				vtnet_rxq_discard_buf(rxq, m);
+				if (nbufs > 1)
+					vtnet_rxq_discard_merged_bufs(rxq,
+					    nbufs);
+				continue;
+			default:
+				KASSERT(pfil == PFIL_PASS,
+				    ("Filter returned %d!\n", pfil));
+			};
+			pfil_done = true;
+		} else
+			pfil_done = false;
+
 		if (vtnet_rxq_replace_buf(rxq, m, len) != 0) {
 			rxq->vtnrx_stats.vrxs_iqdrops++;
 			vtnet_rxq_discard_buf(rxq, m);
@@ -1830,6 +1882,19 @@ vtnet_rxq_eof(struct vtnet_rxq *rxq)
 		 */
 		memcpy(hdr, mtod(m, void *), sizeof(struct virtio_net_hdr));
 		m_adj(m, adjsz);
+
+		if (PFIL_HOOKED_IN(sc->vtnet_pfil) && pfil_done == false) {
+			pfil = pfil_run_hooks(sc->vtnet_pfil, &m, ifp, PFIL_IN,
+			    NULL);
+			switch (pfil) {
+			case PFIL_DROPPED:
+			case PFIL_CONSUMED:
+				continue;
+			default:
+				KASSERT(pfil == PFIL_PASS,
+				    ("Filter returned %d!\n", pfil));
+			}
+		}
 
 		vtnet_rxq_input(rxq, m, hdr);
 
@@ -3687,7 +3752,7 @@ vtnet_setup_rxq_sysctl(struct sysctl_ctx_list *ctx,
 
 	snprintf(namebuf, sizeof(namebuf), "rxq%d", rxq->vtnrx_id);
 	node = SYSCTL_ADD_NODE(ctx, child, OID_AUTO, namebuf,
-	    CTLFLAG_RD, NULL, "Receive Queue");
+	    CTLFLAG_RD | CTLFLAG_MPSAFE, NULL, "Receive Queue");
 	list = SYSCTL_CHILDREN(node);
 
 	stats = &rxq->vtnrx_stats;
@@ -3720,7 +3785,7 @@ vtnet_setup_txq_sysctl(struct sysctl_ctx_list *ctx,
 
 	snprintf(namebuf, sizeof(namebuf), "txq%d", txq->vtntx_id);
 	node = SYSCTL_ADD_NODE(ctx, child, OID_AUTO, namebuf,
-	    CTLFLAG_RD, NULL, "Transmit Queue");
+	    CTLFLAG_RD | CTLFLAG_MPSAFE, NULL, "Transmit Queue");
 	list = SYSCTL_CHILDREN(node);
 
 	stats = &txq->vtntx_stats;
@@ -3982,15 +4047,6 @@ vtnet_debugnet_init(struct ifnet *ifp, int *nrxr, int *ncl, int *clsize)
 	*ncl = DEBUGNET_MAX_IN_FLIGHT;
 	*clsize = sc->vtnet_rx_clsize;
 	VTNET_CORE_UNLOCK(sc);
-
-	/*
-	 * We need to allocate from this zone in the transmit path, so ensure
-	 * that we have at least one item per header available.
-	 * XXX add a separate zone like we do for mbufs? otherwise we may alloc
-	 * buckets
-	 */
-	uma_zone_reserve(vtnet_tx_header_zone, DEBUGNET_MAX_IN_FLIGHT * 2);
-	uma_prealloc(vtnet_tx_header_zone, DEBUGNET_MAX_IN_FLIGHT * 2);
 }
 
 static void

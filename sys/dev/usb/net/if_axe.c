@@ -63,7 +63,7 @@ __FBSDID("$FreeBSD$");
  *   to send any packets.
  *
  * Note that this device appears to only support loading the station
- * address via autload from the EEPROM (i.e. there's no way to manaully
+ * address via autload from the EEPROM (i.e. there's no way to manually
  * set it).
  *
  * (Adam Weinberger wanted me to name this driver if_gir.c.)
@@ -138,7 +138,8 @@ __FBSDID("$FreeBSD$");
 #ifdef USB_DEBUG
 static int axe_debug = 0;
 
-static SYSCTL_NODE(_hw_usb, OID_AUTO, axe, CTLFLAG_RW, 0, "USB axe");
+static SYSCTL_NODE(_hw_usb, OID_AUTO, axe, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
+    "USB axe");
 SYSCTL_INT(_hw_usb_axe, OID_AUTO, debug, CTLFLAG_RWTUN, &axe_debug, 0,
     "Debug level");
 #endif

@@ -803,6 +803,20 @@ kaudit_to_bsm(struct kaudit_record *kar, struct au_record **pau)
 		UPATH1_VNODE1_TOKENS;
 		break;
 
+	/*
+	 * NB: We may want to verify that the appropriate
+	 * audit args are being processed here, but I think
+	 * a bit analysis is required.
+	 *
+	 * Process AUE_JAIL_SET in the next block so we can pickup any path
+	 * related tokens that might exist.
+	 */
+	case AUE_JAIL_GET:
+	case AUE_JAIL_ATTACH:
+	case AUE_JAIL_REMOVE:
+		break;
+
+	case AUE_JAIL_SET:
 	case AUE_CHDIR:
 	case AUE_CHROOT:
 	case AUE_FSTATAT:
@@ -830,6 +844,7 @@ kaudit_to_bsm(struct kaudit_record *kar, struct au_record **pau)
 	case AUE_UNLINK:
 	case AUE_UNLINKAT:
 	case AUE_UTIMES:
+	case AUE_REALPATHAT:
 		ATFD1_TOKENS(1);
 		UPATH1_VNODE1_TOKENS;
 		break;
@@ -1473,6 +1488,9 @@ kaudit_to_bsm(struct kaudit_record *kar, struct au_record **pau)
 		}
 		break;
 
+	case AUE_SETLOGINCLASS:
+		break;
+
 	case AUE_SETPRIORITY:
 		if (ARG_IS_VALID(kar, ARG_CMD)) {
 			tok = au_to_arg32(1, "which", ar->ar_arg_cmd);
@@ -1726,6 +1744,9 @@ kaudit_to_bsm(struct kaudit_record *kar, struct au_record **pau)
 
 	case AUE_CAP_ENTER:
 	case AUE_CAP_GETMODE:
+		break;
+
+	case AUE_THR_NEW:
 		break;
 
 	case AUE_NULL:

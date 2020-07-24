@@ -33,7 +33,7 @@
 
 #define	_CHERI_INTERNAL
 #include <machine/cheriasm.h>
-#include <machine/cherireg.h>
+#include <cheri/cherireg.h>
 
 #define	LIBCHERI_ERRNO_ASM
 #include <cheri/libcheri_errno.h>
@@ -84,7 +84,6 @@
 	 * required -- e.g., once we have dynamically linked pure-capability
 	 * binaries using.
 	 */
-#ifdef __CHERI_CAPABILITY_TLS__
 	/*
 	 * Note: captab_tprel_hi() relocation returns the captable index where
 	 * we can find the offset that should be added to the TLS pointer.
@@ -97,26 +96,12 @@
 	// daddiu	$at, $at, %captab_tprel_lo(__libcheri_stack_tls_storage)
 	lui	\dst_reg, %tprel_hi(__libcheri_stack_tls_storage)
 	daddiu	\dst_reg, \dst_reg, %tprel_lo(__libcheri_stack_tls_storage)
-#else
-	lui	\dst_reg, %tprel_hi(__libcheri_stack_tls_storage)
-	.set	push
-	.set	mips32r2
-	rdhwr	\tmp_reg, $29
-	.set	pop
-	daddiu	\dst_reg, \dst_reg, %tprel_lo(__libcheri_stack_tls_storage)
-	daddu	\dst_reg, \tmp_reg, \dst_reg
-#endif
 .endm
 
 .macro compute_libcheri_trusted_stack dst_cap, sbop_cap, tmp_reg1, tmp_reg2
 	compute_libcheri_trusted_stack_tls_offset \tmp_reg1, \tmp_reg2
-#ifdef __CHERI_CAPABILITY_TLS__
 	creadhwr	\dst_cap, $chwr_userlocal
 	cincoffset	\dst_cap, \dst_cap, \tmp_reg1
-#else
-	clc		\dst_cap, $zero, (5*CHERICAP_SIZE)(\sbop_cap)
-	csetoffset	\dst_cap, \dst_cap, \tmp_reg1
-#endif
 	# Check that the value is still tagged and in bounds
 	CAssertInBounds \dst_cap, 8
 .endm
@@ -911,12 +896,8 @@ libcheri_creturn_fetch_stack:
 	 * XXXRW: Read note above on TLS and testing.
 	 */
 	compute_libcheri_trusted_stack_tls_offset $at, $t0
-#ifdef __CHERI_CAPABILITY_TLS__
 	creadhwr	$c14, $chwr_userlocal
 	cincoffset	$c14, $c14, $at
-#else
-	csetoffset	$c14, $c26, $at
-#endif
 
 libcheri_creturn_pop_stack_unlock_sandbox:
 	/*

@@ -4,7 +4,6 @@
 AIM			opt_global.h
 BOOKE			opt_global.h
 BOOKE_E500		opt_global.h
-BOOKE_PPC4XX		opt_global.h
 CELL
 
 POWERPC
@@ -37,3 +36,5 @@ OFWCONS_POLL_HZ		opt_ofw.h
 # AGP debugging support
 AGP_DEBUG		opt_agp.h
 
+# iWARP client interface support in ixl
+IXL_IW			opt_ixl.h

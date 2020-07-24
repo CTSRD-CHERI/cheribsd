@@ -90,8 +90,12 @@
 #  define LG_SIZEOF_PTR		2
 #endif
 #ifdef __riscv
-#  define LG_VADDR		64
+#  define LG_VADDR		48
 #  define LG_SIZEOF_PTR		3
+#endif
+
+#if LG_VADDR > 32
+#  define JEMALLOC_RETAIN
 #endif
 
 #ifndef JEMALLOC_TLS_MODEL

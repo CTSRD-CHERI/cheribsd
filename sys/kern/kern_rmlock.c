@@ -53,6 +53,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/turnstile.h>
 #include <sys/lock_profile.h>
 #include <machine/cpu.h>
+#include <vm/uma.h>
 
 #ifdef DDB
 #include <ddb/ddb.h>
@@ -853,3 +854,233 @@ db_show_rm(const struct lock_object *lock)
 	lc->lc_ddb_show(&rm->rm_wlock_object);
 }
 #endif
+
+/*
+ * Read-mostly sleepable locks.
+ *
+ * These primitives allow both readers and writers to sleep. However, neither
+ * readers nor writers are tracked and subsequently there is no priority
+ * propagation.
+ *
+ * They are intended to be only used when write-locking is almost never needed
+ * (e.g., they can guard against unloading a kernel module) while read-locking
+ * happens all the time.
+ *
+ * Concurrent writers take turns taking the lock while going off cpu. If this is
+ * of concern for your usecase, this is not the right primitive.
+ *
+ * Neither rms_rlock nor rms_runlock use fences. Instead compiler barriers are
+ * inserted to prevert reordering of generated code. Execution ordering is
+ * provided with the use of an IPI handler.
+ */
+
+void
+rms_init(struct rmslock *rms, const char *name)
+{
+
+	rms->writers = 0;
+	rms->readers = 0;
+	mtx_init(&rms->mtx, name, NULL, MTX_DEF | MTX_NEW);
+	rms->readers_pcpu = uma_zalloc_pcpu(pcpu_zone_int, M_WAITOK | M_ZERO);
+	rms->readers_influx = uma_zalloc_pcpu(pcpu_zone_int, M_WAITOK | M_ZERO);
+}
+
+void
+rms_destroy(struct rmslock *rms)
+{
+
+	MPASS(rms->writers == 0);
+	MPASS(rms->readers == 0);
+	mtx_destroy(&rms->mtx);
+	uma_zfree_pcpu(pcpu_zone_int, rms->readers_pcpu);
+	uma_zfree_pcpu(pcpu_zone_int, rms->readers_influx);
+}
+
+static void __noinline
+rms_rlock_fallback(struct rmslock *rms)
+{
+
+	zpcpu_set_protected(rms->readers_influx, 0);
+	critical_exit();
+
+	mtx_lock(&rms->mtx);
+	MPASS(*zpcpu_get(rms->readers_pcpu) == 0);
+	while (rms->writers > 0)
+		msleep(&rms->readers, &rms->mtx, PUSER - 1, mtx_name(&rms->mtx), 0);
+	critical_enter();
+	zpcpu_add_protected(rms->readers_pcpu, 1);
+	mtx_unlock(&rms->mtx);
+	critical_exit();
+}
+
+void
+rms_rlock(struct rmslock *rms)
+{
+
+	WITNESS_WARN(WARN_GIANTOK | WARN_SLEEPOK, NULL, __func__);
+
+	critical_enter();
+	zpcpu_set_protected(rms->readers_influx, 1);
+	__compiler_membar();
+	if (__predict_false(rms->writers > 0)) {
+		rms_rlock_fallback(rms);
+		return;
+	}
+	__compiler_membar();
+	zpcpu_add_protected(rms->readers_pcpu, 1);
+	__compiler_membar();
+	zpcpu_set_protected(rms->readers_influx, 0);
+	critical_exit();
+}
+
+int
+rms_try_rlock(struct rmslock *rms)
+{
+
+	critical_enter();
+	zpcpu_set_protected(rms->readers_influx, 1);
+	__compiler_membar();
+	if (__predict_false(rms->writers > 0)) {
+		__compiler_membar();
+		zpcpu_set_protected(rms->readers_influx, 0);
+		critical_exit();
+		return (0);
+	}
+	__compiler_membar();
+	zpcpu_add_protected(rms->readers_pcpu, 1);
+	__compiler_membar();
+	zpcpu_set_protected(rms->readers_influx, 0);
+	critical_exit();
+	return (1);
+}
+
+static void __noinline
+rms_runlock_fallback(struct rmslock *rms)
+{
+
+	zpcpu_set_protected(rms->readers_influx, 0);
+	critical_exit();
+
+	mtx_lock(&rms->mtx);
+	MPASS(*zpcpu_get(rms->readers_pcpu) == 0);
+	MPASS(rms->writers > 0);
+	MPASS(rms->readers > 0);
+	rms->readers--;
+	if (rms->readers == 0)
+		wakeup_one(&rms->writers);
+	mtx_unlock(&rms->mtx);
+}
+
+void
+rms_runlock(struct rmslock *rms)
+{
+
+	critical_enter();
+	zpcpu_set_protected(rms->readers_influx, 1);
+	__compiler_membar();
+	if (__predict_false(rms->writers > 0)) {
+		rms_runlock_fallback(rms);
+		return;
+	}
+	__compiler_membar();
+	zpcpu_sub_protected(rms->readers_pcpu, 1);
+	__compiler_membar();
+	zpcpu_set_protected(rms->readers_influx, 0);
+	critical_exit();
+}
+
+struct rmslock_ipi {
+	struct rmslock *rms;
+	struct smp_rendezvous_cpus_retry_arg srcra;
+};
+
+static void
+rms_action_func(void *arg)
+{
+	struct rmslock_ipi *rmsipi;
+	struct rmslock *rms;
+	int readers;
+
+	rmsipi = __containerof(arg, struct rmslock_ipi, srcra);
+	rms = rmsipi->rms;
+
+	if (*zpcpu_get(rms->readers_influx))
+		return;
+	readers = zpcpu_replace(rms->readers_pcpu, 0);
+	if (readers != 0)
+		atomic_add_int(&rms->readers, readers);
+	smp_rendezvous_cpus_done(arg);
+}
+
+static void
+rms_wait_func(void *arg, int cpu)
+{
+	struct rmslock_ipi *rmsipi;
+	struct rmslock *rms;
+	int *in_op;
+
+	rmsipi = __containerof(arg, struct rmslock_ipi, srcra);
+	rms = rmsipi->rms;
+
+	in_op = zpcpu_get_cpu(rms->readers_influx, cpu);
+	while (atomic_load_int(in_op))
+		cpu_spinwait();
+}
+
+static void
+rms_wlock_switch(struct rmslock *rms)
+{
+	struct rmslock_ipi rmsipi;
+
+	MPASS(rms->readers == 0);
+	MPASS(rms->writers == 1);
+
+	rmsipi.rms = rms;
+
+	smp_rendezvous_cpus_retry(all_cpus,
+	    smp_no_rendezvous_barrier,
+	    rms_action_func,
+	    smp_no_rendezvous_barrier,
+	    rms_wait_func,
+	    &rmsipi.srcra);
+}
+
+void
+rms_wlock(struct rmslock *rms)
+{
+
+	WITNESS_WARN(WARN_GIANTOK | WARN_SLEEPOK, NULL, __func__);
+
+	mtx_lock(&rms->mtx);
+	rms->writers++;
+	if (rms->writers > 1) {
+		msleep(&rms->writers, &rms->mtx, (PUSER - 1) | PDROP,
+		    mtx_name(&rms->mtx), 0);
+		MPASS(rms->readers == 0);
+		return;
+	}
+
+	rms_wlock_switch(rms);
+
+	if (rms->readers > 0)
+		msleep(&rms->writers, &rms->mtx, (PUSER - 1) | PDROP,
+		    mtx_name(&rms->mtx), 0);
+	else
+		mtx_unlock(&rms->mtx);
+	MPASS(rms->readers == 0);
+}
+
+void
+rms_wunlock(struct rmslock *rms)
+{
+
+	mtx_lock(&rms->mtx);
+	MPASS(rms->writers >= 1);
+	MPASS(rms->readers == 0);
+	rms->writers--;
+	if (rms->writers > 0)
+		wakeup_one(&rms->writers);
+	else
+		wakeup(&rms->readers);
+	mtx_unlock(&rms->mtx);
+}

@@ -65,7 +65,7 @@
 
 #ifdef CPU_CHERI
 #include <machine/cheriasm.h>
-#include <machine/cherireg.h>
+#include <cheri/cherireg.h>
 .set cheri_sysregs_accessible
 #endif
 
@@ -100,8 +100,7 @@ LEAF(fork_trampoline)
 
 #ifdef CPU_CHERI
 	/*
-	 * Note: This restores does not restore EPCC, since that is restored
-	 * by RESTORE_U_PCB_PC() below.
+	 * Note: This restores EPCC (RESTORE_REGS_FROM_PCB does not touch EPC)
 	 */
 	RESTORE_CREGS_FROM_PCB(k1, t0)
 #endif
@@ -109,7 +108,9 @@ LEAF(fork_trampoline)
 	RESTORE_U_PCB_REG(t1, MULHI, k1)
 	mtlo	t0
 	mthi	t1
-	RESTORE_U_PCB_PC(a0, t0, k1)	# set return address
+	# Set return address (EPC). This is a no-op for CHERI since it is done
+	# in RESTORE_CREGS_FROM_PCB.
+	RESTORE_U_PCB_PC(a0, k1)
 	RESTORE_U_PCB_REG(AT, AST, k1)
 	RESTORE_U_PCB_REG(v0, V0, k1)
 
@@ -319,13 +320,13 @@ mips_sw1:
 	nop
 
 	/*
-	 * If per-thread tracing is enabled, update Qemu-internal state to
+	 * If per-thread tracing is enabled, update QEMU-internal state to
 	 * reflect the thread we are switching to.  Don't disable before
 	 * checking, so we can ensure that we get a full trace if both the
 	 * 'old' and 'new' threads have tracing enabled.
 	 */
 	lw	t2, TD_MDFLAGS(a1)			# Get new->md_flags
-	andi	t2, t2, MDTD_QTRACE			# Mask Qemu trace bit
+	andi	t2, t2, MDTD_QTRACE			# Mask QEMU trace bit
 	beqz	t2, disable_qemu_tracing		# Branch if not set
 	nop
 
@@ -781,7 +782,11 @@ END(MipsSaveCurFPState)
  */
 	.globl	_C_LABEL(sigcode)
 _C_LABEL(sigcode):
+#if __has_feature(capabilities)
+	cincoffsetimm	$c3, $c11, SIGF_UC	# address of ucontext
+#else
 	PTR_ADDU	a0, sp, SIGF_UC		# address of ucontext
+#endif
 	li		v0, SYS_sigreturn
 # sigreturn (ucp)
 	syscall
@@ -798,7 +803,7 @@ szsigcode:
 #if defined(__mips_n64) && defined(COMPAT_FREEBSD64)
 	.globl	_C_LABEL(freebsd64_sigcode)
 _C_LABEL(freebsd64_sigcode):
-	PTR_ADDU	a0, sp, SIGF_UC		# address of ucontext
+	PTR_ADDU	a0, sp, SIGF64_UC		# address of ucontext
 	li		v0, SYS_sigreturn
 # sigreturn (ucp)
 	syscall
@@ -828,25 +833,6 @@ _C_LABEL(esigcode32):
 	.globl	szsigcode32
 szsigcode32:
 	.long	esigcode32-sigcode32
-	.text
-#endif
-
-#ifdef COMPAT_CHERIABI
-	.globl	_C_LABEL(cheri_sigcode)
-_C_LABEL(cheri_sigcode):
-	dli		t0, SIGF_C_UC
-	cincoffset	$c3, $c11, t0		# In the hybrid ABI named $c11,
-	li		v0, SYS_sigreturn	# but we really mean $csp.
-# sigreturn (ucp)
-	syscall
-	break	0				# just in case sigreturn fails
-	.globl	_C_LABEL(echeri_sigcode)
-_C_LABEL(echeri_sigcode):
-
-	.data
-	.globl	szcheri_sigcode
-szcheri_sigcode:
-	.long	echeri_sigcode-cheri_sigcode
 	.text
 #endif
 // CHERI CHANGES START

@@ -29,7 +29,7 @@
 __FBSDID("$FreeBSD$");
 
 /*
- * Driver for extra ACPI-controlled gadgets found on IBM ThinkPad laptops.
+ * Driver for extra ACPI-controlled gadgets found on ThinkPad laptops.
  * Inspired by the ibm-acpi and tpb projects which implement these features
  * on Linux.
  *
@@ -75,6 +75,7 @@ ACPI_MODULE_NAME("IBM")
 #define ACPI_IBM_METHOD_THERMAL		13
 #define ACPI_IBM_METHOD_HANDLEREVENTS	14
 #define ACPI_IBM_METHOD_MIC_LED		15
+#define ACPI_IBM_METHOD_PRIVACYGUARD	16
 
 /* Hotkeys/Buttons */
 #define IBM_RTC_HOTKEY1			0x64
@@ -123,6 +124,8 @@ ACPI_MODULE_NAME("IBM")
 #define   IBM_NAME_MASK_WLAN		(1 << 2)
 #define IBM_NAME_THERMAL_GET		"TMP7"
 #define IBM_NAME_THERMAL_UPDT		"UPDT"
+#define IBM_NAME_PRIVACYGUARD_GET	"GSSS"
+#define IBM_NAME_PRIVACYGUARD_SET	"SSSS"
 
 #define IBM_NAME_EVENTS_STATUS_GET	"DHKC"
 #define IBM_NAME_EVENTS_MASK_GET	"DHKN"
@@ -145,6 +148,10 @@ ACPI_MODULE_NAME("IBM")
 #define IBM_EVENT_VOLUME_DOWN		0x16
 #define IBM_EVENT_MUTE			0x17
 #define IBM_EVENT_ACCESS_IBM_BUTTON	0x18
+
+/* Device-specific register flags */
+#define IBM_FLAG_PRIVACYGUARD_DEVICE_PRESENT	0x10000
+#define IBM_FLAG_PRIVACYGUARD_ON	0x1
 
 #define ABS(x) (((x) < 0)? -(x) : (x))
 
@@ -268,6 +275,11 @@ static struct {
 		.method		= ACPI_IBM_METHOD_MIC_LED,
 		.description	= "Mic led",
 	},
+	{
+		.name		= "privacyguard",
+		.method		= ACPI_IBM_METHOD_PRIVACYGUARD,
+		.description	= "PrivacyGuard enable",
+	},
 	{ NULL, 0, NULL, 0 }
 };
 
@@ -302,7 +314,7 @@ struct acpi_ibm_models {
 	}
 };
 
-ACPI_SERIAL_DECL(ibm, "ACPI IBM extras");
+ACPI_SERIAL_DECL(ibm, "ThinkPad ACPI Extras");
 
 static int	acpi_ibm_probe(device_t dev);
 static int	acpi_ibm_attach(device_t dev);
@@ -327,6 +339,11 @@ static int	acpi_ibm_bluetooth_set(struct acpi_ibm_softc *sc, int arg);
 static int	acpi_ibm_thinklight_set(struct acpi_ibm_softc *sc, int arg);
 static int	acpi_ibm_volume_set(struct acpi_ibm_softc *sc, int arg);
 static int	acpi_ibm_mute_set(struct acpi_ibm_softc *sc, int arg);
+static int	acpi_ibm_privacyguard_get(struct acpi_ibm_softc *sc);
+static ACPI_STATUS	acpi_ibm_privacyguard_set(struct acpi_ibm_softc *sc, int arg);
+static ACPI_STATUS	acpi_ibm_privacyguard_acpi_call(struct acpi_ibm_softc *sc, bool write, int *arg);
+
+static int	acpi_status_to_errno(ACPI_STATUS status);
 
 static device_method_t acpi_ibm_methods[] = {
 	/* Device interface */
@@ -346,15 +363,27 @@ static driver_t	acpi_ibm_driver = {
 
 static devclass_t acpi_ibm_devclass;
 
-DRIVER_MODULE(acpi_ibm, acpi, acpi_ibm_driver, acpi_ibm_devclass,
-	      0, 0);
+DRIVER_MODULE(acpi_ibm, acpi, acpi_ibm_driver, acpi_ibm_devclass, 0, 0);
 MODULE_DEPEND(acpi_ibm, acpi, 1, 1, 1);
 static char    *ibm_ids[] = {"IBM0068", "LEN0068", "LEN0268", NULL};
+
+static int
+acpi_status_to_errno(ACPI_STATUS status)
+{
+	switch (status) {
+	case AE_OK:
+		return (0);
+	case AE_BAD_PARAMETER:
+		return (EINVAL);
+	default:
+		return (ENODEV);
+	}
+}
 
 static void
 ibm_led(void *softc, int onoff)
 {
-	struct acpi_ibm_softc* sc = (struct acpi_ibm_softc*) softc;
+	struct acpi_ibm_softc *sc = softc;
 
 	ACPI_FUNCTION_TRACE((char *)(uintptr_t)__func__);
 
@@ -380,7 +409,7 @@ ibm_led_task(struct acpi_ibm_softc *sc, int pending __unused)
 }
 
 static int
-acpi_ibm_mic_led_set (struct acpi_ibm_softc *sc, int arg)
+acpi_ibm_mic_led_set(struct acpi_ibm_softc *sc, int arg)
 {
 	ACPI_OBJECT_LIST input;
 	ACPI_OBJECT params[1];
@@ -399,10 +428,10 @@ acpi_ibm_mic_led_set (struct acpi_ibm_softc *sc, int arg)
 		input.Pointer = params;
 		input.Count = 1;
 
-		status = AcpiEvaluateObject (sc->handle, "MMTS", &input, NULL);
+		status = AcpiEvaluateObject(sc->handle, "MMTS", &input, NULL);
 		if (ACPI_SUCCESS(status))
 			sc->mic_led_state = arg;
-		return(status);
+		return (status);
 	}
 
 	return (0);
@@ -413,14 +442,13 @@ acpi_ibm_probe(device_t dev)
 {
 	int rv;
 
-	if (acpi_disabled("ibm") ||
-	    device_get_unit(dev) != 0)
+	if (acpi_disabled("ibm") || device_get_unit(dev) != 0)
 		return (ENXIO);
 	rv = ACPI_ID_PROBE(device_get_parent(dev), dev, ibm_ids, NULL);
 
-	if (rv <= 0) 
-		device_set_desc(dev, "IBM ThinkPad ACPI Extras");
-	
+	if (rv <= 0)
+		device_set_desc(dev, "ThinkPad ACPI Extras");
+
 	return (rv);
 }
 
@@ -429,7 +457,7 @@ acpi_ibm_attach(device_t dev)
 {
 	int i;
 	int hkey;
-	struct acpi_ibm_softc	*sc;
+	struct acpi_ibm_softc *sc;
 	char *maker, *product;
 	ACPI_OBJECT_LIST input;
 	ACPI_OBJECT params[1];
@@ -444,12 +472,12 @@ acpi_ibm_attach(device_t dev)
 	sc->handle = acpi_get_handle(dev);
 
 	/* Look for the first embedded controller */
-        if (!(ec_devclass = devclass_find ("acpi_ec"))) {
+	if (!(ec_devclass = devclass_find ("acpi_ec"))) {
 		if (bootverbose)
 			device_printf(dev, "Couldn't find acpi_ec devclass\n");
 		return (EINVAL);
 	}
-        if (!(sc->ec_dev = devclass_get_device(ec_devclass, 0))) {
+	if (!(sc->ec_dev = devclass_get_device(ec_devclass, 0))) {
 		if (bootverbose)
 			device_printf(dev, "Couldn't find acpi_ec device\n");
 		return (EINVAL);
@@ -466,14 +494,13 @@ acpi_ibm_attach(device_t dev)
 
 	if (sc->events_mask_supported) {
 		SYSCTL_ADD_UINT(sc->sysctl_ctx,
-		    SYSCTL_CHILDREN(sc->sysctl_tree), OID_AUTO,
-		    "initialmask", CTLFLAG_RD,
-		    &sc->events_initialmask, 0, "Initial eventmask");
+		    SYSCTL_CHILDREN(sc->sysctl_tree), OID_AUTO, "initialmask",
+		    CTLFLAG_RD, &sc->events_initialmask, 0,
+		    "Initial eventmask");
 
 		if (ACPI_SUCCESS (acpi_GetInteger(sc->handle, "MHKV", &hkey))) {
 			device_printf(dev, "Firmware version is 0x%X\n", hkey);
-			switch(hkey >> 8)
-			{
+			switch (hkey >> 8) {
 			case 1:
 				/* The availmask is the bitmask of supported events */
 				if (ACPI_FAILURE(acpi_GetInteger(sc->handle,
@@ -516,13 +543,15 @@ acpi_ibm_attach(device_t dev)
 		if (acpi_ibm_sysctls[i].flag_rdonly != 0) {
 			SYSCTL_ADD_PROC(sc->sysctl_ctx,
 			    SYSCTL_CHILDREN(sc->sysctl_tree), OID_AUTO,
-			    acpi_ibm_sysctls[i].name, CTLTYPE_INT | CTLFLAG_RD,
+			    acpi_ibm_sysctls[i].name,
+			    CTLTYPE_INT | CTLFLAG_RD | CTLFLAG_NEEDGIANT,
 			    sc, i, acpi_ibm_sysctl, "I",
 			    acpi_ibm_sysctls[i].description);
 		} else {
 			SYSCTL_ADD_PROC(sc->sysctl_ctx,
 			    SYSCTL_CHILDREN(sc->sysctl_tree), OID_AUTO,
-			    acpi_ibm_sysctls[i].name, CTLTYPE_INT | CTLFLAG_RW,
+			    acpi_ibm_sysctls[i].name,
+			    CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_NEEDGIANT,
 			    sc, i, acpi_ibm_sysctl, "I",
 			    acpi_ibm_sysctls[i].description);
 		}
@@ -531,18 +560,17 @@ acpi_ibm_attach(device_t dev)
 	/* Hook up thermal node */
 	if (acpi_ibm_sysctl_init(sc, ACPI_IBM_METHOD_THERMAL)) {
 		SYSCTL_ADD_PROC(sc->sysctl_ctx,
-		    SYSCTL_CHILDREN(sc->sysctl_tree), OID_AUTO,
-		    "thermal", CTLTYPE_INT | CTLFLAG_RD,
-		    sc, 0, acpi_ibm_thermal_sysctl, "I",
-		    "Thermal zones");
+		    SYSCTL_CHILDREN(sc->sysctl_tree), OID_AUTO, "thermal",
+		    CTLTYPE_INT | CTLFLAG_RD | CTLFLAG_NEEDGIANT, sc, 0,
+		    acpi_ibm_thermal_sysctl, "I", "Thermal zones");
 	}
 
 	/* Hook up handlerevents node */
 	if (acpi_ibm_sysctl_init(sc, ACPI_IBM_METHOD_HANDLEREVENTS)) {
 		SYSCTL_ADD_PROC(sc->sysctl_ctx,
-		    SYSCTL_CHILDREN(sc->sysctl_tree), OID_AUTO,
-		    "handlerevents", CTLTYPE_STRING | CTLFLAG_RW,
-		    sc, 0, acpi_ibm_handlerevents_sysctl, "I",
+		    SYSCTL_CHILDREN(sc->sysctl_tree), OID_AUTO, "handlerevents",
+		    CTLTYPE_STRING | CTLFLAG_RW | CTLFLAG_NEEDGIANT, sc, 0,
+		    acpi_ibm_handlerevents_sysctl, "I",
 		    "devd(8) events handled by acpi_ibm");
 	}
 
@@ -579,7 +607,6 @@ nosmbios:
 	ACPI_SERIAL_BEGIN(ibm);
 	acpi_ibm_sysctl_set(sc, ACPI_IBM_METHOD_EVENTS, 1);
 	ACPI_SERIAL_END(ibm);
-
 
 	return (0);
 }
@@ -647,7 +674,7 @@ acpi_ibm_eventmask_set(struct acpi_ibm_softc *sc, int val)
 	arg[1].Type = ACPI_TYPE_INTEGER;
 
 	for (int i = 0; i < 32; ++i) {
-		arg[0].Integer.Value = i+1;
+		arg[0].Integer.Value = i + 1;
 		arg[1].Integer.Value = (((1 << i) & val) != 0);
 		status = AcpiEvaluateObject(sc->handle,
 		    IBM_NAME_EVENTS_MASK_SET, &args, NULL);
@@ -784,8 +811,7 @@ acpi_ibm_sysctl_get(struct acpi_ibm_softc *sc, int method)
 		if (sc->fan_handle) {
 			if(ACPI_FAILURE(acpi_GetInteger(sc->fan_handle, NULL, &val)))
 				val = -1;
-		}
-		else {
+		} else {
 			ACPI_EC_READ(sc->ec_dev, IBM_EC_FANSPEED, &val_ec, 2);
 			val = val_ec;
 		}
@@ -811,15 +837,19 @@ acpi_ibm_sysctl_get(struct acpi_ibm_softc *sc, int method)
 		if (!sc->fan_handle) {
 			ACPI_EC_READ(sc->ec_dev, IBM_EC_FANSTATUS, &val_ec, 1);
 			val = (val_ec & IBM_EC_MASK_FANSTATUS) == IBM_EC_MASK_FANSTATUS;
-		}
-		else
+		} else
 			val = -1;
 		break;
+
 	case ACPI_IBM_METHOD_MIC_LED:
 		if (sc->mic_led_handle)
 			return sc->mic_led_state;
 		else
 			val = -1;
+		break;
+
+	case ACPI_IBM_METHOD_PRIVACYGUARD:
+		val = acpi_ibm_privacyguard_get(sc);
 		break;
 	}
 
@@ -866,7 +896,7 @@ acpi_ibm_sysctl_set(struct acpi_ibm_softc *sc, int method, int arg)
 		break;
 
 	case ACPI_IBM_METHOD_MIC_LED:
-		return acpi_ibm_mic_led_set (sc, arg);
+		return acpi_ibm_mic_led_set(sc, arg);
 		break;
 
 	case ACPI_IBM_METHOD_THINKLIGHT:
@@ -875,6 +905,10 @@ acpi_ibm_sysctl_set(struct acpi_ibm_softc *sc, int method, int arg)
 
 	case ACPI_IBM_METHOD_BLUETOOTH:
 		return acpi_ibm_bluetooth_set(sc, arg);
+		break;
+
+	case ACPI_IBM_METHOD_PRIVACYGUARD:
+		return (acpi_status_to_errno(acpi_ibm_privacyguard_set(sc, arg)));
 		break;
 
 	case ACPI_IBM_METHOD_FANLEVEL:
@@ -932,10 +966,9 @@ acpi_ibm_sysctl_init(struct acpi_ibm_softc *sc, int method)
 		if (ACPI_SUCCESS(AcpiGetHandle(sc->handle, "MMTS", &sc->mic_led_handle)))
 		{
 			/* Turn off mic led by default */
-			acpi_ibm_mic_led_set (sc, 0);
-			return(TRUE);
-		}
-		else
+			acpi_ibm_mic_led_set(sc, 0);
+			return (TRUE);
+		} else
 			sc->mic_led_handle = NULL;
 		return (FALSE);
 
@@ -956,8 +989,7 @@ acpi_ibm_sysctl_init(struct acpi_ibm_softc *sc, int method)
 		else if (ACPI_SUCCESS(AcpiGetHandle(sc->handle, "\\LGHT", &sc->light_handle))) {
 			sc->light_cmd_on = 1;
 			sc->light_cmd_off = 0;
-		}
-		else
+		} else
 			sc->light_handle = NULL;
 
 		sc->light_set_supported = (sc->light_handle &&
@@ -1008,6 +1040,9 @@ acpi_ibm_sysctl_init(struct acpi_ibm_softc *sc, int method)
 
 	case ACPI_IBM_METHOD_HANDLEREVENTS:
 		return (TRUE);
+
+	case ACPI_IBM_METHOD_PRIVACYGUARD:
+		return (acpi_ibm_privacyguard_get(sc) != -1);
 	}
 	return (FALSE);
 }
@@ -1225,6 +1260,61 @@ acpi_ibm_thinklight_set(struct acpi_ibm_softc *sc, int arg)
 	return (0);
 }
 
+/*
+ * Helper function to make a get or set ACPI call to the PrivacyGuard handle.
+ * Only meant to be used internally by the get/set functions below.
+ */
+static ACPI_STATUS
+acpi_ibm_privacyguard_acpi_call(struct acpi_ibm_softc *sc, bool write, int *arg)
+{
+	ACPI_OBJECT		Arg;
+	ACPI_OBJECT_LIST	Args;
+	ACPI_STATUS		status;
+	ACPI_OBJECT		out_obj;
+	ACPI_BUFFER		result;
+
+	Arg.Type = ACPI_TYPE_INTEGER;
+	Arg.Integer.Value = (write ? *arg : 0);
+	Args.Count = 1;
+	Args.Pointer = &Arg;
+	result.Length = sizeof(out_obj);
+	result.Pointer = &out_obj;
+
+	status = AcpiEvaluateObject(sc->handle,
+	    (write ? IBM_NAME_PRIVACYGUARD_SET : IBM_NAME_PRIVACYGUARD_GET),
+	    &Args, &result);
+	if (ACPI_SUCCESS(status) && !write)
+		*arg = out_obj.Integer.Value;
+
+	return (status);
+}
+
+/*
+ * Returns -1 if the device is not present.
+ */
+static int
+acpi_ibm_privacyguard_get(struct acpi_ibm_softc *sc)
+{
+	ACPI_STATUS status;
+	int val;
+
+	status = acpi_ibm_privacyguard_acpi_call(sc, false, &val);
+	if (ACPI_SUCCESS(status) &&
+	    (val & IBM_FLAG_PRIVACYGUARD_DEVICE_PRESENT))
+		return (val & IBM_FLAG_PRIVACYGUARD_ON);
+
+	return (-1);
+}
+
+static ACPI_STATUS
+acpi_ibm_privacyguard_set(struct acpi_ibm_softc *sc, int arg)
+{
+	if (arg < 0 || arg > 1)
+		return (AE_BAD_PARAMETER);
+
+	return (acpi_ibm_privacyguard_acpi_call(sc, true, &arg));
+}
+
 static int
 acpi_ibm_volume_set(struct acpi_ibm_softc *sc, int arg)
 {
@@ -1387,7 +1477,6 @@ acpi_ibm_notify(ACPI_HANDLE h, UINT32 notify, void *context)
 		acpi_GetInteger(acpi_get_handle(dev), IBM_NAME_EVENTS_GET, &event);
 		if (event == 0)
 			break;
-
 
 		type = (event >> 12) & 0xf;
 		arg = event & 0xfff;

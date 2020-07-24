@@ -11,12 +11,6 @@ BUILD_TOOLS_CFLAGS=${CFLAGS:N-Q*:N-W*}
 BUILD_TOOLS_LDFLAGS=${LDFLAGS}
 
 .if ${.MAKE.OS} != "FreeBSD"
-# libfreebsd will depend on some symbols in libegacy so we need to add it to
-# the end of the linker command line in case the bootstrap tools are being
-# linked with bfd which is not smart enough to resolve symbols otherwise.
-LDADD+=		-lfreebsd -legacy
-DPADD+=		${WORLDTMP}/legacy/usr/lib/libfreebsd.a
-
 # On MacOS using a non-mac ar will fail the build, similarly on Linux using
 # nm may not work as expected if the nm for the target architecture comes in
 # $PATH before a nm that supports the host architecture.

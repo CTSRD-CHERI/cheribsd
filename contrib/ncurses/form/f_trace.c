@@ -1,5 +1,6 @@
 /****************************************************************************
- * Copyright (c) 2004,2010 Free Software Foundation, Inc.                   *
+ * Copyright 2018,2020 Thomas E. Dickey                                     *
+ * Copyright 2004-2010,2016 Free Software Foundation, Inc.                  *
  *                                                                          *
  * Permission is hereby granted, free of charge, to any person obtaining a  *
  * copy of this software and associated documentation files (the            *
@@ -32,7 +33,7 @@
 
 #include "form.priv.h"
 
-MODULE_ID("$Id: f_trace.c,v 1.2 2010/01/23 21:14:36 tom Exp $")
+MODULE_ID("$Id: f_trace.c,v 1.5 2020/02/02 23:34:34 tom Exp $")
 
 NCURSES_EXPORT(FIELD **)
 _nc_retrace_field_ptr(FIELD **code)
@@ -65,6 +66,7 @@ _nc_retrace_form(FORM *code)
 NCURSES_EXPORT(Form_Hook)
 _nc_retrace_form_hook(Form_Hook code)
 {
-  T((T_RETURN("%p"), code));
+  TR_FUNC_BFR(1);
+  T((T_RETURN("%s"), TR_FUNC_ARG(0, code)));
   return code;
 }

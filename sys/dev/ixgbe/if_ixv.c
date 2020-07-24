@@ -110,6 +110,7 @@ static void     ixv_if_register_vlan(if_ctx_t, u16);
 static void     ixv_if_unregister_vlan(if_ctx_t, u16);
 
 static uint64_t ixv_if_get_counter(if_ctx_t, ift_counter);
+static bool	ixv_if_needs_restart(if_ctx_t, enum iflib_restart_event);
 
 static void     ixv_save_stats(struct adapter *);
 static void     ixv_init_stats(struct adapter *);
@@ -172,6 +173,7 @@ static device_method_t ixv_if_methods[] = {
 	DEVMETHOD(ifdi_vlan_register, ixv_if_register_vlan),
 	DEVMETHOD(ifdi_vlan_unregister, ixv_if_unregister_vlan),
 	DEVMETHOD(ifdi_get_counter, ixv_if_get_counter),
+	DEVMETHOD(ifdi_needs_restart, ixv_if_needs_restart),
 	DEVMETHOD_END
 };
 
@@ -418,8 +420,8 @@ ixv_if_attach_pre(if_ctx_t ctx)
 	/* SYSCTL APIs */
 	SYSCTL_ADD_PROC(device_get_sysctl_ctx(dev),
 	    SYSCTL_CHILDREN(device_get_sysctl_tree(dev)), OID_AUTO, "debug",
-	    CTLTYPE_INT | CTLFLAG_RW, adapter, 0, ixv_sysctl_debug, "I",
-	    "Debug Info");
+	    CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_NEEDGIANT,
+	    adapter, 0, ixv_sysctl_debug, "I", "Debug Info");
 
 	/* Determine hardware revision */
 	ixv_identify_hardware(ctx);
@@ -1187,6 +1189,25 @@ ixv_if_get_counter(if_ctx_t ctx, ift_counter cnt)
 	}
 } /* ixv_if_get_counter */
 
+/* ixv_if_needs_restart - Tell iflib when the driver needs to be reinitialized
+ * @ctx: iflib context
+ * @event: event code to check
+ *
+ * Defaults to returning true for every event.
+ *
+ * @returns true if iflib needs to reinit the interface
+ */
+static bool
+ixv_if_needs_restart(if_ctx_t ctx __unused, enum iflib_restart_event event)
+{
+	switch (event) {
+	case IFLIB_RESTART_VLAN_CONFIG:
+		/* XXX: This may not need to return true */
+	default:
+		return (true);
+	}
+}
+
 /************************************************************************
  * ixv_initialize_transmit_units - Enable transmit unit.
  ************************************************************************/
@@ -1803,7 +1824,7 @@ ixv_add_stats_sysctls(struct adapter *adapter)
 		struct tx_ring *txr = &tx_que->txr;
 		snprintf(namebuf, QUEUE_NAME_LEN, "queue%d", i);
 		queue_node = SYSCTL_ADD_NODE(ctx, child, OID_AUTO, namebuf,
-		    CTLFLAG_RD, NULL, "Queue Name");
+		    CTLFLAG_RD | CTLFLAG_MPSAFE, NULL, "Queue Name");
 		queue_list = SYSCTL_CHILDREN(queue_node);
 
 		SYSCTL_ADD_UQUAD(ctx, queue_list, OID_AUTO, "tso_tx",
@@ -1816,7 +1837,7 @@ ixv_add_stats_sysctls(struct adapter *adapter)
 		struct rx_ring *rxr = &rx_que->rxr;
 		snprintf(namebuf, QUEUE_NAME_LEN, "queue%d", i);
 		queue_node = SYSCTL_ADD_NODE(ctx, child, OID_AUTO, namebuf,
-		    CTLFLAG_RD, NULL, "Queue Name");
+		    CTLFLAG_RD | CTLFLAG_MPSAFE, NULL, "Queue Name");
 		queue_list = SYSCTL_CHILDREN(queue_node);
 
 		SYSCTL_ADD_UQUAD(ctx, queue_list, OID_AUTO, "irqs",
@@ -1830,7 +1851,8 @@ ixv_add_stats_sysctls(struct adapter *adapter)
 	}
 
 	stat_node = SYSCTL_ADD_NODE(ctx, child, OID_AUTO, "mac",
-	    CTLFLAG_RD, NULL, "VF Statistics (read from HW registers)");
+	    CTLFLAG_RD | CTLFLAG_MPSAFE, NULL,
+	    "VF Statistics (read from HW registers)");
 	stat_list = SYSCTL_CHILDREN(stat_node);
 
 	SYSCTL_ADD_UQUAD(ctx, stat_list, OID_AUTO, "good_pkts_rcvd",

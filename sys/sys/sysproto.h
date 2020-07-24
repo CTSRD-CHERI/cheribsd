@@ -29,15 +29,6 @@ struct thread;
 #if BYTE_ORDER == LITTLE_ENDIAN
 #define	PADL_(t)	0
 #define	PADR_(t)	PAD_(t)
-#elif defined(_MIPS_SZCAP) && _MIPS_SZCAP == 256
-/*
- * For non-capability arguments, the syscall argument is stored in the
- * cursor field in the second word.
- */
-#define	PADL_(t)	(sizeof (t) > sizeof(register_t) ? \
-		0 : 2 * sizeof(register_t) - sizeof(t))
-#define	PADR_(t)	(sizeof (t) > sizeof(register_t) ? \
-		0 : 2 * sizeof(register_t))
 #else
 #define	PADL_(t)	PAD_(t)
 #define	PADR_(t)	0
@@ -131,12 +122,12 @@ struct ptrace_args {
 };
 struct recvmsg_args {
 	char s_l_[PADL_(int)]; int s; char s_r_[PADR_(int)];
-	char msg_l_[PADL_(struct msghdr_native * __capability)]; struct msghdr_native * __capability msg; char msg_r_[PADR_(struct msghdr_native * __capability)];
+	char msg_l_[PADL_(struct msghdr * __capability)]; struct msghdr * __capability msg; char msg_r_[PADR_(struct msghdr * __capability)];
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
 };
 struct sendmsg_args {
 	char s_l_[PADL_(int)]; int s; char s_r_[PADR_(int)];
-	char msg_l_[PADL_(const struct msghdr_native * __capability)]; const struct msghdr_native * __capability msg; char msg_r_[PADR_(const struct msghdr_native * __capability)];
+	char msg_l_[PADL_(const struct msghdr * __capability)]; const struct msghdr * __capability msg; char msg_r_[PADR_(const struct msghdr * __capability)];
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
 };
 struct recvfrom_args {
@@ -332,7 +323,7 @@ struct dup2_args {
 struct fcntl_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
 	char cmd_l_[PADL_(int)]; int cmd; char cmd_r_[PADR_(int)];
-	char arg_l_[PADL_(intptr_t)]; intptr_t arg; char arg_r_[PADR_(intptr_t)];
+	char arg_l_[PADL_(intcap_t)]; intcap_t arg; char arg_r_[PADR_(intcap_t)];
 };
 struct select_args {
 	char nd_l_[PADL_(int)]; int nd; char nd_r_[PADR_(int)];
@@ -396,12 +387,12 @@ struct getsockopt_args {
 };
 struct readv_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char iovp_l_[PADL_(struct iovec_native * __capability)]; struct iovec_native * __capability iovp; char iovp_r_[PADR_(struct iovec_native * __capability)];
+	char iovp_l_[PADL_(struct iovec * __capability)]; struct iovec * __capability iovp; char iovp_r_[PADR_(struct iovec * __capability)];
 	char iovcnt_l_[PADL_(u_int)]; u_int iovcnt; char iovcnt_r_[PADR_(u_int)];
 };
 struct writev_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char iovp_l_[PADL_(struct iovec_native * __capability)]; struct iovec_native * __capability iovp; char iovp_r_[PADR_(struct iovec_native * __capability)];
+	char iovp_l_[PADL_(struct iovec * __capability)]; struct iovec * __capability iovp; char iovp_r_[PADR_(struct iovec * __capability)];
 	char iovcnt_l_[PADL_(u_int)]; u_int iovcnt; char iovcnt_r_[PADR_(u_int)];
 };
 struct settimeofday_args {
@@ -514,24 +505,24 @@ struct rtprio_args {
 };
 struct semsys_args {
 	char which_l_[PADL_(int)]; int which; char which_r_[PADR_(int)];
-	char a2_l_[PADL_(intptr_t)]; intptr_t a2; char a2_r_[PADR_(intptr_t)];
-	char a3_l_[PADL_(intptr_t)]; intptr_t a3; char a3_r_[PADR_(intptr_t)];
-	char a4_l_[PADL_(intptr_t)]; intptr_t a4; char a4_r_[PADR_(intptr_t)];
-	char a5_l_[PADL_(intptr_t)]; intptr_t a5; char a5_r_[PADR_(intptr_t)];
+	char a2_l_[PADL_(intcap_t)]; intcap_t a2; char a2_r_[PADR_(intcap_t)];
+	char a3_l_[PADL_(intcap_t)]; intcap_t a3; char a3_r_[PADR_(intcap_t)];
+	char a4_l_[PADL_(intcap_t)]; intcap_t a4; char a4_r_[PADR_(intcap_t)];
+	char a5_l_[PADL_(intcap_t)]; intcap_t a5; char a5_r_[PADR_(intcap_t)];
 };
 struct msgsys_args {
 	char which_l_[PADL_(int)]; int which; char which_r_[PADR_(int)];
-	char a2_l_[PADL_(intptr_t)]; intptr_t a2; char a2_r_[PADR_(intptr_t)];
-	char a3_l_[PADL_(intptr_t)]; intptr_t a3; char a3_r_[PADR_(intptr_t)];
-	char a4_l_[PADL_(intptr_t)]; intptr_t a4; char a4_r_[PADR_(intptr_t)];
-	char a5_l_[PADL_(intptr_t)]; intptr_t a5; char a5_r_[PADR_(intptr_t)];
-	char a6_l_[PADL_(intptr_t)]; intptr_t a6; char a6_r_[PADR_(intptr_t)];
+	char a2_l_[PADL_(intcap_t)]; intcap_t a2; char a2_r_[PADR_(intcap_t)];
+	char a3_l_[PADL_(intcap_t)]; intcap_t a3; char a3_r_[PADR_(intcap_t)];
+	char a4_l_[PADL_(intcap_t)]; intcap_t a4; char a4_r_[PADR_(intcap_t)];
+	char a5_l_[PADL_(intcap_t)]; intcap_t a5; char a5_r_[PADR_(intcap_t)];
+	char a6_l_[PADL_(intcap_t)]; intcap_t a6; char a6_r_[PADR_(intcap_t)];
 };
 struct shmsys_args {
 	char which_l_[PADL_(int)]; int which; char which_r_[PADR_(int)];
-	char a2_l_[PADL_(intptr_t)]; intptr_t a2; char a2_r_[PADR_(intptr_t)];
-	char a3_l_[PADL_(intptr_t)]; intptr_t a3; char a3_r_[PADR_(intptr_t)];
-	char a4_l_[PADL_(intptr_t)]; intptr_t a4; char a4_r_[PADR_(intptr_t)];
+	char a2_l_[PADL_(intcap_t)]; intcap_t a2; char a2_r_[PADR_(intcap_t)];
+	char a3_l_[PADL_(intcap_t)]; intcap_t a3; char a3_r_[PADR_(intcap_t)];
+	char a4_l_[PADL_(intcap_t)]; intcap_t a4; char a4_r_[PADR_(intcap_t)];
 };
 struct setfib_args {
 	char fibnum_l_[PADL_(int)]; int fibnum; char fibnum_r_[PADR_(int)];
@@ -649,7 +640,7 @@ struct clock_getres_args {
 };
 struct ktimer_create_args {
 	char clock_id_l_[PADL_(clockid_t)]; clockid_t clock_id; char clock_id_r_[PADR_(clockid_t)];
-	char evp_l_[PADL_(struct sigevent_native * __capability)]; struct sigevent_native * __capability evp; char evp_r_[PADR_(struct sigevent_native * __capability)];
+	char evp_l_[PADL_(struct sigevent * __capability)]; struct sigevent * __capability evp; char evp_r_[PADR_(struct sigevent * __capability)];
 	char timerid_l_[PADL_(int * __capability)]; int * __capability timerid; char timerid_r_[PADR_(int * __capability)];
 };
 struct ktimer_delete_args {
@@ -712,16 +703,16 @@ struct lchown_args {
 	char gid_l_[PADL_(int)]; int gid; char gid_r_[PADR_(int)];
 };
 struct aio_read_args {
-	char aiocbp_l_[PADL_(struct aiocb_native * __capability)]; struct aiocb_native * __capability aiocbp; char aiocbp_r_[PADR_(struct aiocb_native * __capability)];
+	char aiocbp_l_[PADL_(struct aiocb * __capability)]; struct aiocb * __capability aiocbp; char aiocbp_r_[PADR_(struct aiocb * __capability)];
 };
 struct aio_write_args {
-	char aiocbp_l_[PADL_(struct aiocb_native * __capability)]; struct aiocb_native * __capability aiocbp; char aiocbp_r_[PADR_(struct aiocb_native * __capability)];
+	char aiocbp_l_[PADL_(struct aiocb * __capability)]; struct aiocb * __capability aiocbp; char aiocbp_r_[PADR_(struct aiocb * __capability)];
 };
 struct lio_listio_args {
 	char mode_l_[PADL_(int)]; int mode; char mode_r_[PADR_(int)];
-	char acb_list_l_[PADL_(struct aiocb_native * __capability const * __capability)]; struct aiocb_native * __capability const * __capability acb_list; char acb_list_r_[PADR_(struct aiocb_native * __capability const * __capability)];
+	char acb_list_l_[PADL_(struct aiocb * __capability const * __capability)]; struct aiocb * __capability const * __capability acb_list; char acb_list_r_[PADR_(struct aiocb * __capability const * __capability)];
 	char nent_l_[PADL_(int)]; int nent; char nent_r_[PADR_(int)];
-	char sig_l_[PADL_(struct sigevent_native * __capability)]; struct sigevent_native * __capability sig; char sig_r_[PADR_(struct sigevent_native * __capability)];
+	char sig_l_[PADL_(struct sigevent * __capability)]; struct sigevent * __capability sig; char sig_r_[PADR_(struct sigevent * __capability)];
 };
 struct kbounce_args {
 	char src_l_[PADL_(const void * __capability)]; const void * __capability src; char src_r_[PADR_(const void * __capability)];
@@ -739,13 +730,13 @@ struct lutimes_args {
 };
 struct preadv_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char iovp_l_[PADL_(struct iovec_native * __capability)]; struct iovec_native * __capability iovp; char iovp_r_[PADR_(struct iovec_native * __capability)];
+	char iovp_l_[PADL_(struct iovec * __capability)]; struct iovec * __capability iovp; char iovp_r_[PADR_(struct iovec * __capability)];
 	char iovcnt_l_[PADL_(u_int)]; u_int iovcnt; char iovcnt_r_[PADR_(u_int)];
 	char offset_l_[PADL_(off_t)]; off_t offset; char offset_r_[PADR_(off_t)];
 };
 struct pwritev_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char iovp_l_[PADL_(struct iovec_native * __capability)]; struct iovec_native * __capability iovp; char iovp_r_[PADR_(struct iovec_native * __capability)];
+	char iovp_l_[PADL_(struct iovec * __capability)]; struct iovec * __capability iovp; char iovp_r_[PADR_(struct iovec * __capability)];
 	char iovcnt_l_[PADL_(u_int)]; u_int iovcnt; char iovcnt_r_[PADR_(u_int)];
 	char offset_l_[PADL_(off_t)]; off_t offset; char offset_r_[PADR_(off_t)];
 };
@@ -799,19 +790,19 @@ struct setresgid_args {
 	char sgid_l_[PADL_(gid_t)]; gid_t sgid; char sgid_r_[PADR_(gid_t)];
 };
 struct aio_return_args {
-	char aiocbp_l_[PADL_(struct aiocb_native * __capability)]; struct aiocb_native * __capability aiocbp; char aiocbp_r_[PADR_(struct aiocb_native * __capability)];
+	char aiocbp_l_[PADL_(struct aiocb * __capability)]; struct aiocb * __capability aiocbp; char aiocbp_r_[PADR_(struct aiocb * __capability)];
 };
 struct aio_suspend_args {
-	char aiocbp_l_[PADL_(struct aiocb_native * __capability const * __capability)]; struct aiocb_native * __capability const * __capability aiocbp; char aiocbp_r_[PADR_(struct aiocb_native * __capability const * __capability)];
+	char aiocbp_l_[PADL_(struct aiocb * __capability const * __capability)]; struct aiocb * __capability const * __capability aiocbp; char aiocbp_r_[PADR_(struct aiocb * __capability const * __capability)];
 	char nent_l_[PADL_(int)]; int nent; char nent_r_[PADR_(int)];
 	char timeout_l_[PADL_(const struct timespec * __capability)]; const struct timespec * __capability timeout; char timeout_r_[PADR_(const struct timespec * __capability)];
 };
 struct aio_cancel_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char aiocbp_l_[PADL_(struct aiocb_native * __capability)]; struct aiocb_native * __capability aiocbp; char aiocbp_r_[PADR_(struct aiocb_native * __capability)];
+	char aiocbp_l_[PADL_(struct aiocb * __capability)]; struct aiocb * __capability aiocbp; char aiocbp_r_[PADR_(struct aiocb * __capability)];
 };
 struct aio_error_args {
-	char aiocbp_l_[PADL_(struct aiocb_native * __capability)]; struct aiocb_native * __capability aiocbp; char aiocbp_r_[PADR_(struct aiocb_native * __capability)];
+	char aiocbp_l_[PADL_(struct aiocb * __capability)]; struct aiocb * __capability aiocbp; char aiocbp_r_[PADR_(struct aiocb * __capability)];
 };
 struct yield_args {
 	register_t dummy;
@@ -887,12 +878,12 @@ struct sigpending_args {
 };
 struct sigtimedwait_args {
 	char set_l_[PADL_(const sigset_t * __capability)]; const sigset_t * __capability set; char set_r_[PADR_(const sigset_t * __capability)];
-	char info_l_[PADL_(struct siginfo_native * __capability)]; struct siginfo_native * __capability info; char info_r_[PADR_(struct siginfo_native * __capability)];
+	char info_l_[PADL_(struct siginfo * __capability)]; struct siginfo * __capability info; char info_r_[PADR_(struct siginfo * __capability)];
 	char timeout_l_[PADL_(const struct timespec * __capability)]; const struct timespec * __capability timeout; char timeout_r_[PADR_(const struct timespec * __capability)];
 };
 struct sigwaitinfo_args {
 	char set_l_[PADL_(const sigset_t * __capability)]; const sigset_t * __capability set; char set_r_[PADR_(const sigset_t * __capability)];
-	char info_l_[PADL_(struct siginfo_native * __capability)]; struct siginfo_native * __capability info; char info_r_[PADR_(struct siginfo_native * __capability)];
+	char info_l_[PADL_(struct siginfo * __capability)]; struct siginfo * __capability info; char info_r_[PADR_(struct siginfo * __capability)];
 };
 struct __acl_get_file_args {
 	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
@@ -959,7 +950,7 @@ struct extattr_delete_file_args {
 	char attrname_l_[PADL_(const char * __capability)]; const char * __capability attrname; char attrname_r_[PADR_(const char * __capability)];
 };
 struct aio_waitcomplete_args {
-	char aiocbp_l_[PADL_(struct aiocb_native * __capability * __capability)]; struct aiocb_native * __capability * __capability aiocbp; char aiocbp_r_[PADR_(struct aiocb_native * __capability * __capability)];
+	char aiocbp_l_[PADL_(struct aiocb * __capability * __capability)]; struct aiocb * __capability * __capability aiocbp; char aiocbp_r_[PADR_(struct aiocb * __capability * __capability)];
 	char timeout_l_[PADL_(struct timespec * __capability)]; struct timespec * __capability timeout; char timeout_r_[PADR_(struct timespec * __capability)];
 };
 struct getresuid_args {
@@ -1011,31 +1002,31 @@ struct afs3_syscall_args {
 	char parm6_l_[PADL_(long)]; long parm6; char parm6_r_[PADR_(long)];
 };
 struct nmount_args {
-	char iovp_l_[PADL_(struct iovec_native * __capability)]; struct iovec_native * __capability iovp; char iovp_r_[PADR_(struct iovec_native * __capability)];
+	char iovp_l_[PADL_(struct iovec * __capability)]; struct iovec * __capability iovp; char iovp_r_[PADR_(struct iovec * __capability)];
 	char iovcnt_l_[PADL_(unsigned int)]; unsigned int iovcnt; char iovcnt_r_[PADR_(unsigned int)];
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
 };
 struct __mac_get_proc_args {
-	char mac_p_l_[PADL_(struct mac_native * __capability)]; struct mac_native * __capability mac_p; char mac_p_r_[PADR_(struct mac_native * __capability)];
+	char mac_p_l_[PADL_(struct mac * __capability)]; struct mac * __capability mac_p; char mac_p_r_[PADR_(struct mac * __capability)];
 };
 struct __mac_set_proc_args {
-	char mac_p_l_[PADL_(struct mac_native * __capability)]; struct mac_native * __capability mac_p; char mac_p_r_[PADR_(struct mac_native * __capability)];
+	char mac_p_l_[PADL_(struct mac * __capability)]; struct mac * __capability mac_p; char mac_p_r_[PADR_(struct mac * __capability)];
 };
 struct __mac_get_fd_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char mac_p_l_[PADL_(struct mac_native * __capability)]; struct mac_native * __capability mac_p; char mac_p_r_[PADR_(struct mac_native * __capability)];
+	char mac_p_l_[PADL_(struct mac * __capability)]; struct mac * __capability mac_p; char mac_p_r_[PADR_(struct mac * __capability)];
 };
 struct __mac_get_file_args {
 	char path_p_l_[PADL_(const char * __capability)]; const char * __capability path_p; char path_p_r_[PADR_(const char * __capability)];
-	char mac_p_l_[PADL_(struct mac_native * __capability)]; struct mac_native * __capability mac_p; char mac_p_r_[PADR_(struct mac_native * __capability)];
+	char mac_p_l_[PADL_(struct mac * __capability)]; struct mac * __capability mac_p; char mac_p_r_[PADR_(struct mac * __capability)];
 };
 struct __mac_set_fd_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char mac_p_l_[PADL_(struct mac_native * __capability)]; struct mac_native * __capability mac_p; char mac_p_r_[PADR_(struct mac_native * __capability)];
+	char mac_p_l_[PADL_(struct mac * __capability)]; struct mac * __capability mac_p; char mac_p_r_[PADR_(struct mac * __capability)];
 };
 struct __mac_set_file_args {
 	char path_p_l_[PADL_(const char * __capability)]; const char * __capability path_p; char path_p_r_[PADR_(const char * __capability)];
-	char mac_p_l_[PADL_(struct mac_native * __capability)]; struct mac_native * __capability mac_p; char mac_p_r_[PADR_(struct mac_native * __capability)];
+	char mac_p_l_[PADL_(struct mac * __capability)]; struct mac * __capability mac_p; char mac_p_r_[PADR_(struct mac * __capability)];
 };
 struct kenv_args {
 	char what_l_[PADL_(int)]; int what; char what_r_[PADR_(int)];
@@ -1056,7 +1047,7 @@ struct sendfile_args {
 	char s_l_[PADL_(int)]; int s; char s_r_[PADR_(int)];
 	char offset_l_[PADL_(off_t)]; off_t offset; char offset_r_[PADR_(off_t)];
 	char nbytes_l_[PADL_(size_t)]; size_t nbytes; char nbytes_r_[PADR_(size_t)];
-	char hdtr_l_[PADL_(struct sf_hdtr_native * __capability)]; struct sf_hdtr_native * __capability hdtr; char hdtr_r_[PADR_(struct sf_hdtr_native * __capability)];
+	char hdtr_l_[PADL_(struct sf_hdtr * __capability)]; struct sf_hdtr * __capability hdtr; char hdtr_r_[PADR_(struct sf_hdtr * __capability)];
 	char sbytes_l_[PADL_(off_t * __capability)]; off_t * __capability sbytes; char sbytes_r_[PADR_(off_t * __capability)];
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
 };
@@ -1100,15 +1091,15 @@ struct ksem_destroy_args {
 };
 struct __mac_get_pid_args {
 	char pid_l_[PADL_(pid_t)]; pid_t pid; char pid_r_[PADR_(pid_t)];
-	char mac_p_l_[PADL_(struct mac_native * __capability)]; struct mac_native * __capability mac_p; char mac_p_r_[PADR_(struct mac_native * __capability)];
+	char mac_p_l_[PADL_(struct mac * __capability)]; struct mac * __capability mac_p; char mac_p_r_[PADR_(struct mac * __capability)];
 };
 struct __mac_get_link_args {
 	char path_p_l_[PADL_(const char * __capability)]; const char * __capability path_p; char path_p_r_[PADR_(const char * __capability)];
-	char mac_p_l_[PADL_(struct mac_native * __capability)]; struct mac_native * __capability mac_p; char mac_p_r_[PADR_(struct mac_native * __capability)];
+	char mac_p_l_[PADL_(struct mac * __capability)]; struct mac * __capability mac_p; char mac_p_r_[PADR_(struct mac * __capability)];
 };
 struct __mac_set_link_args {
 	char path_p_l_[PADL_(const char * __capability)]; const char * __capability path_p; char path_p_r_[PADR_(const char * __capability)];
-	char mac_p_l_[PADL_(struct mac_native * __capability)]; struct mac_native * __capability mac_p; char mac_p_r_[PADR_(struct mac_native * __capability)];
+	char mac_p_l_[PADL_(struct mac * __capability)]; struct mac * __capability mac_p; char mac_p_r_[PADR_(struct mac * __capability)];
 };
 struct extattr_set_link_args {
 	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
@@ -1133,7 +1124,7 @@ struct __mac_execve_args {
 	char fname_l_[PADL_(const char * __capability)]; const char * __capability fname; char fname_r_[PADR_(const char * __capability)];
 	char argv_l_[PADL_(char * __capability * __capability)]; char * __capability * __capability argv; char argv_r_[PADR_(char * __capability * __capability)];
 	char envv_l_[PADL_(char * __capability * __capability)]; char * __capability * __capability envv; char envv_r_[PADR_(char * __capability * __capability)];
-	char mac_p_l_[PADL_(struct mac_native * __capability)]; struct mac_native * __capability mac_p; char mac_p_r_[PADR_(struct mac_native * __capability)];
+	char mac_p_l_[PADL_(struct mac * __capability)]; struct mac * __capability mac_p; char mac_p_r_[PADR_(struct mac * __capability)];
 };
 struct sigaction_args {
 	char sig_l_[PADL_(int)]; int sig; char sig_r_[PADR_(int)];
@@ -1304,7 +1295,7 @@ struct kmq_timedsend_args {
 };
 struct kmq_notify_args {
 	char mqd_l_[PADL_(int)]; int mqd; char mqd_r_[PADR_(int)];
-	char sigev_l_[PADL_(const struct sigevent_native * __capability)]; const struct sigevent_native * __capability sigev; char sigev_r_[PADR_(const struct sigevent_native * __capability)];
+	char sigev_l_[PADL_(const struct sigevent * __capability)]; const struct sigevent * __capability sigev; char sigev_r_[PADR_(const struct sigevent * __capability)];
 };
 struct kmq_unlink_args {
 	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
@@ -1320,7 +1311,7 @@ struct thr_set_name_args {
 };
 struct aio_fsync_args {
 	char op_l_[PADL_(int)]; int op; char op_r_[PADR_(int)];
-	char aiocbp_l_[PADL_(struct aiocb_native * __capability)]; struct aiocb_native * __capability aiocbp; char aiocbp_r_[PADR_(struct aiocb_native * __capability)];
+	char aiocbp_l_[PADL_(struct aiocb * __capability)]; struct aiocb * __capability aiocbp; char aiocbp_r_[PADR_(struct aiocb * __capability)];
 };
 struct rtprio_thread_args {
 	char function_l_[PADL_(int)]; int function; char function_r_[PADR_(int)];
@@ -1342,7 +1333,7 @@ struct sctp_generic_sendmsg_args {
 };
 struct sctp_generic_sendmsg_iov_args {
 	char sd_l_[PADL_(int)]; int sd; char sd_r_[PADR_(int)];
-	char iov_l_[PADL_(struct iovec_native * __capability)]; struct iovec_native * __capability iov; char iov_r_[PADR_(struct iovec_native * __capability)];
+	char iov_l_[PADL_(struct iovec * __capability)]; struct iovec * __capability iov; char iov_r_[PADR_(struct iovec * __capability)];
 	char iovlen_l_[PADL_(int)]; int iovlen; char iovlen_r_[PADR_(int)];
 	char to_l_[PADL_(const struct sockaddr * __capability)]; const struct sockaddr * __capability to; char to_r_[PADR_(const struct sockaddr * __capability)];
 	char tolen_l_[PADL_(__socklen_t)]; __socklen_t tolen; char tolen_r_[PADR_(__socklen_t)];
@@ -1351,7 +1342,7 @@ struct sctp_generic_sendmsg_iov_args {
 };
 struct sctp_generic_recvmsg_args {
 	char sd_l_[PADL_(int)]; int sd; char sd_r_[PADR_(int)];
-	char iov_l_[PADL_(struct iovec_native * __capability)]; struct iovec_native * __capability iov; char iov_r_[PADR_(struct iovec_native * __capability)];
+	char iov_l_[PADL_(struct iovec * __capability)]; struct iovec * __capability iov; char iov_r_[PADR_(struct iovec * __capability)];
 	char iovlen_l_[PADL_(int)]; int iovlen; char iovlen_r_[PADR_(int)];
 	char from_l_[PADL_(struct sockaddr * __capability)]; struct sockaddr * __capability from; char from_r_[PADR_(struct sockaddr * __capability)];
 	char fromlenaddr_l_[PADL_(__socklen_t * __capability)]; __socklen_t * __capability fromlenaddr; char fromlenaddr_r_[PADR_(__socklen_t * __capability)];
@@ -1508,26 +1499,23 @@ struct gssd_syscall_args {
 	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
 };
 struct jail_get_args {
-	char iovp_l_[PADL_(struct iovec_native * __capability)]; struct iovec_native * __capability iovp; char iovp_r_[PADR_(struct iovec_native * __capability)];
+	char iovp_l_[PADL_(struct iovec * __capability)]; struct iovec * __capability iovp; char iovp_r_[PADR_(struct iovec * __capability)];
 	char iovcnt_l_[PADL_(unsigned int)]; unsigned int iovcnt; char iovcnt_r_[PADR_(unsigned int)];
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
 };
 struct jail_set_args {
-	char iovp_l_[PADL_(struct iovec_native * __capability)]; struct iovec_native * __capability iovp; char iovp_r_[PADR_(struct iovec_native * __capability)];
+	char iovp_l_[PADL_(struct iovec * __capability)]; struct iovec * __capability iovp; char iovp_r_[PADR_(struct iovec * __capability)];
 	char iovcnt_l_[PADL_(unsigned int)]; unsigned int iovcnt; char iovcnt_r_[PADR_(unsigned int)];
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
 };
 struct jail_remove_args {
 	char jid_l_[PADL_(int)]; int jid; char jid_r_[PADR_(int)];
 };
-struct closefrom_args {
-	char lowfd_l_[PADL_(int)]; int lowfd; char lowfd_r_[PADR_(int)];
-};
 struct __semctl_args {
 	char semid_l_[PADL_(int)]; int semid; char semid_r_[PADR_(int)];
 	char semnum_l_[PADL_(int)]; int semnum; char semnum_r_[PADR_(int)];
 	char cmd_l_[PADL_(int)]; int cmd; char cmd_r_[PADR_(int)];
-	char arg_l_[PADL_(union semun_native * __capability)]; union semun_native * __capability arg; char arg_r_[PADR_(union semun_native * __capability)];
+	char arg_l_[PADL_(union semun * __capability)]; union semun * __capability arg; char arg_r_[PADR_(union semun * __capability)];
 };
 struct msgctl_args {
 	char msqid_l_[PADL_(int)]; int msqid; char msqid_r_[PADR_(int)];
@@ -1628,7 +1616,7 @@ struct wait6_args {
 	char status_l_[PADL_(int * __capability)]; int * __capability status; char status_r_[PADR_(int * __capability)];
 	char options_l_[PADL_(int)]; int options; char options_r_[PADR_(int)];
 	char wrusage_l_[PADL_(struct __wrusage * __capability)]; struct __wrusage * __capability wrusage; char wrusage_r_[PADR_(struct __wrusage * __capability)];
-	char info_l_[PADL_(struct siginfo_native * __capability)]; struct siginfo_native * __capability info; char info_r_[PADR_(struct siginfo_native * __capability)];
+	char info_l_[PADL_(struct siginfo * __capability)]; struct siginfo * __capability info; char info_r_[PADR_(struct siginfo * __capability)];
 };
 struct cap_rights_limit_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
@@ -1681,7 +1669,7 @@ struct pipe2_args {
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
 };
 struct aio_mlock_args {
-	char aiocbp_l_[PADL_(struct aiocb_native * __capability)]; struct aiocb_native * __capability aiocbp; char aiocbp_r_[PADR_(struct aiocb_native * __capability)];
+	char aiocbp_l_[PADL_(struct aiocb * __capability)]; struct aiocb * __capability aiocbp; char aiocbp_r_[PADR_(struct aiocb * __capability)];
 };
 struct procctl_args {
 	char idtype_l_[PADL_(idtype_t)]; idtype_t idtype; char idtype_r_[PADR_(idtype_t)];
@@ -1753,9 +1741,9 @@ struct mknodat_args {
 };
 struct kevent_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char changelist_l_[PADL_(const struct kevent_native * __capability)]; const struct kevent_native * __capability changelist; char changelist_r_[PADR_(const struct kevent_native * __capability)];
+	char changelist_l_[PADL_(const struct kevent * __capability)]; const struct kevent * __capability changelist; char changelist_r_[PADR_(const struct kevent * __capability)];
 	char nchanges_l_[PADL_(int)]; int nchanges; char nchanges_r_[PADR_(int)];
-	char eventlist_l_[PADL_(struct kevent_native * __capability)]; struct kevent_native * __capability eventlist; char eventlist_r_[PADR_(struct kevent_native * __capability)];
+	char eventlist_l_[PADL_(struct kevent * __capability)]; struct kevent * __capability eventlist; char eventlist_r_[PADR_(struct kevent * __capability)];
 	char nevents_l_[PADL_(int)]; int nevents; char nevents_r_[PADR_(int)];
 	char timeout_l_[PADL_(const struct timespec * __capability)]; const struct timespec * __capability timeout; char timeout_r_[PADR_(const struct timespec * __capability)];
 };
@@ -1832,6 +1820,22 @@ struct shm_open2_args {
 struct shm_rename_args {
 	char path_from_l_[PADL_(const char * __capability)]; const char * __capability path_from; char path_from_r_[PADR_(const char * __capability)];
 	char path_to_l_[PADL_(const char * __capability)]; const char * __capability path_to; char path_to_r_[PADR_(const char * __capability)];
+	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
+};
+struct sigfastblock_args {
+	char cmd_l_[PADL_(int)]; int cmd; char cmd_r_[PADR_(int)];
+	char ptr_l_[PADL_(uint32_t * __capability)]; uint32_t * __capability ptr; char ptr_r_[PADR_(uint32_t * __capability)];
+};
+struct __realpathat_args {
+	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
+	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
+	char buf_l_[PADL_(char * __capability)]; char * __capability buf; char buf_r_[PADR_(char * __capability)];
+	char size_l_[PADL_(size_t)]; size_t size; char size_r_[PADR_(size_t)];
+	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
+};
+struct close_range_args {
+	char lowfd_l_[PADL_(u_int)]; u_int lowfd; char lowfd_r_[PADR_(u_int)];
+	char highfd_l_[PADL_(u_int)]; u_int highfd; char highfd_r_[PADR_(u_int)];
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
 };
 int	nosys(struct thread *, struct nosys_args *);
@@ -2163,7 +2167,6 @@ int	sys_gssd_syscall(struct thread *, struct gssd_syscall_args *);
 int	sys_jail_get(struct thread *, struct jail_get_args *);
 int	sys_jail_set(struct thread *, struct jail_set_args *);
 int	sys_jail_remove(struct thread *, struct jail_remove_args *);
-int	sys_closefrom(struct thread *, struct closefrom_args *);
 int	sys___semctl(struct thread *, struct __semctl_args *);
 int	sys_msgctl(struct thread *, struct msgctl_args *);
 int	sys_shmctl(struct thread *, struct shmctl_args *);
@@ -2223,6 +2226,9 @@ int	sys_copy_file_range(struct thread *, struct copy_file_range_args *);
 int	sys___sysctlbyname(struct thread *, struct __sysctlbyname_args *);
 int	sys_shm_open2(struct thread *, struct shm_open2_args *);
 int	sys_shm_rename(struct thread *, struct shm_rename_args *);
+int	sys_sigfastblock(struct thread *, struct sigfastblock_args *);
+int	sys___realpathat(struct thread *, struct __realpathat_args *);
+int	sys_close_range(struct thread *, struct close_range_args *);
 
 #ifdef COMPAT_43
 
@@ -2436,7 +2442,7 @@ struct freebsd4_sendfile_args {
 	char s_l_[PADL_(int)]; int s; char s_r_[PADR_(int)];
 	char offset_l_[PADL_(off_t)]; off_t offset; char offset_r_[PADR_(off_t)];
 	char nbytes_l_[PADL_(size_t)]; size_t nbytes; char nbytes_r_[PADR_(size_t)];
-	char hdtr_l_[PADL_(struct sf_hdtr_native * __capability)]; struct sf_hdtr_native * __capability hdtr; char hdtr_r_[PADR_(struct sf_hdtr_native * __capability)];
+	char hdtr_l_[PADL_(struct sf_hdtr * __capability)]; struct sf_hdtr * __capability hdtr; char hdtr_r_[PADR_(struct sf_hdtr * __capability)];
 	char sbytes_l_[PADL_(off_t * __capability)]; off_t * __capability sbytes; char sbytes_r_[PADR_(off_t * __capability)];
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
 };
@@ -2675,7 +2681,11 @@ struct freebsd12_shm_open_args {
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
 	char mode_l_[PADL_(mode_t)]; mode_t mode; char mode_r_[PADR_(mode_t)];
 };
+struct freebsd12_closefrom_args {
+	char lowfd_l_[PADL_(int)]; int lowfd; char lowfd_r_[PADR_(int)];
+};
 int	freebsd12_shm_open(struct thread *, struct freebsd12_shm_open_args *);
+int	freebsd12_closefrom(struct thread *, struct freebsd12_closefrom_args *);
 
 #endif /* COMPAT_FREEBSD12 */
 
@@ -3087,7 +3097,7 @@ int	freebsd12_shm_open(struct thread *, struct freebsd12_shm_open_args *);
 #define	SYS_AUE_jail_get	AUE_JAIL_GET
 #define	SYS_AUE_jail_set	AUE_JAIL_SET
 #define	SYS_AUE_jail_remove	AUE_JAIL_REMOVE
-#define	SYS_AUE_closefrom	AUE_CLOSEFROM
+#define	SYS_AUE_freebsd12_closefrom	AUE_CLOSEFROM
 #define	SYS_AUE___semctl	AUE_SEMCTL
 #define	SYS_AUE_msgctl	AUE_MSGCTL
 #define	SYS_AUE_shmctl	AUE_SHMCTL
@@ -3147,6 +3157,9 @@ int	freebsd12_shm_open(struct thread *, struct freebsd12_shm_open_args *);
 #define	SYS_AUE___sysctlbyname	AUE_SYSCTL
 #define	SYS_AUE_shm_open2	AUE_SHMOPEN
 #define	SYS_AUE_shm_rename	AUE_SHMRENAME
+#define	SYS_AUE_sigfastblock	AUE_NULL
+#define	SYS_AUE___realpathat	AUE_REALPATHAT
+#define	SYS_AUE_close_range	AUE_CLOSERANGE
 
 #undef PAD_
 #undef PADL_

@@ -63,8 +63,6 @@ __FBSDID("$FreeBSD$");
 #include "opt_capsicum.h"
 #include "opt_ktrace.h"
 
-#define	EXPLICIT_USER_ACCESS
-
 #include <sys/param.h>
 #include <sys/capsicum.h>
 #include <sys/file.h>
@@ -188,13 +186,24 @@ cap_check(const cap_rights_t *havep, const cap_rights_t *needp)
 	return (_cap_check(havep, needp, CAPFAIL_NOTCAPABLE));
 }
 
+int
+cap_check_failed_notcapable(const cap_rights_t *havep, const cap_rights_t *needp)
+{
+
+#ifdef KTRACE
+	if (KTRPOINT(curthread, KTR_CAPFAIL))
+		ktrcapfail(CAPFAIL_NOTCAPABLE, needp, havep);
+#endif
+	return (ENOTCAPABLE);
+}
+
 /*
  * Convert capability rights into VM access flags.
  */
-u_char
+vm_prot_t
 cap_rights_to_vmprot(const cap_rights_t *havep)
 {
-	u_char maxprot;
+	vm_prot_t maxprot;
 
 	maxprot = VM_PROT_NONE;
 	if (cap_rights_is_set(havep, CAP_MMAP_R))
@@ -232,6 +241,7 @@ kern_cap_rights_limit(struct thread *td, int fd, cap_rights_t *rights)
 {
 	struct filedesc *fdp;
 	struct filedescent *fdep;
+	u_long *ioctls;
 	int error;
 
 	fdp = td->td_proc->p_fd;
@@ -241,18 +251,22 @@ kern_cap_rights_limit(struct thread *td, int fd, cap_rights_t *rights)
 		FILEDESC_XUNLOCK(fdp);
 		return (EBADF);
 	}
+	ioctls = NULL;
 	error = _cap_check(cap_rights(fdp, fd), rights, CAPFAIL_INCREASE);
 	if (error == 0) {
+		seqc_write_begin(&fdep->fde_seqc);
 		fdep->fde_rights = *rights;
 		if (!cap_rights_is_set(rights, CAP_IOCTL)) {
-			free(fdep->fde_ioctls, M_FILECAPS);
+			ioctls = fdep->fde_ioctls;
 			fdep->fde_ioctls = NULL;
 			fdep->fde_nioctls = 0;
 		}
 		if (!cap_rights_is_set(rights, CAP_FCNTL))
 			fdep->fde_fcntls = 0;
+		seqc_write_end(&fdep->fde_seqc);
 	}
 	FILEDESC_XUNLOCK(fdp);
+	free(ioctls, M_FILECAPS);
 	return (error);
 }
 
@@ -273,7 +287,7 @@ user_cap_rights_limit(struct thread *td, int fd,
 	cap_rights_t rights;
 	int error, version;
 
-	cap_rights_init(&rights);
+	cap_rights_init_zero(&rights);
 
 	error = copyin(rightsp, &rights, sizeof(rights.cr_rights[0]));
 	if (error != 0)
@@ -451,8 +465,10 @@ kern_cap_ioctls_limit(struct thread *td, int fd, u_long *cmds, size_t ncmds)
 		goto out;
 
 	ocmds = fdep->fde_ioctls;
+	seqc_write_begin(&fdep->fde_seqc);
 	fdep->fde_ioctls = cmds;
 	fdep->fde_nioctls = ncmds;
+	seqc_write_end(&fdep->fde_seqc);
 
 	cmds = ocmds;
 	error = 0;
@@ -618,7 +634,9 @@ sys_cap_fcntls_limit(struct thread *td, struct cap_fcntls_limit_args *uap)
 		return (ENOTCAPABLE);
 	}
 
+	seqc_write_begin(&fdep->fde_seqc);
 	fdep->fde_fcntls = fcntlrights;
+	seqc_write_end(&fdep->fde_seqc);
 	FILEDESC_XUNLOCK(fdp);
 
 	return (0);

@@ -41,23 +41,107 @@ __FBSDID("$FreeBSD$");
 #include <machine/riscvreg.h>
 
 .macro save_registers el
+#if __has_feature(capabilities)
+.option push
+.option capmode
+.if \el == 1
+	/*
+	 * Build a capability for 'csp' using 'sp' as an address
+	 * in the kernel DDC.  We haven't saved any registers yet,
+	 * so store 'ct0' in 'scratchc' temporarily.
+	 *
+	 * XXX: Bounds?  Maybe could use TF_SIZE + 16 as length?
+	 * A purecap kernel would have proper bounds on csp already.
+	 */
+	cspecialw sscratchc, ct0
+	cspecialr ct0, stdc
+	csetaddr ct0, ct0, sp
+	cmove	csp, ct0
+	cspecialr ct0, sscratchc
+.endif
+	cincoffset csp, csp, -(TF_SIZE)
+
+	csc	cra, (TF_RA)(csp)
+#else
 	addi	sp, sp, -(TF_SIZE)
 
 	sd	ra, (TF_RA)(sp)
+#endif
 
 .if \el == 0	/* We came from userspace. */
+#if __has_feature(capabilities)
+	csc	cgp, (TF_GP)(csp)
+
+	/* Load our pcpu */
+	csc	ctp, (TF_TP)(csp)
+	clc	ctp, (TF_SIZE)(csp)
+#else
 	sd	gp, (TF_GP)(sp)
-.option push
-.option norelax
-	/* Load the kernel's global pointer */
-	la	gp, __global_pointer$
-.option pop
 
 	/* Load our pcpu */
 	sd	tp, (TF_TP)(sp)
 	ld	tp, (TF_SIZE)(sp)
+#endif
 .endif
 
+#if __has_feature(capabilities)
+	csc	ct0, (TF_T + 0 * 16)(csp)
+	csc	ct1, (TF_T + 1 * 16)(csp)
+	csc	ct2, (TF_T + 2 * 16)(csp)
+	csc	ct3, (TF_T + 3 * 16)(csp)
+	csc	ct4, (TF_T + 4 * 16)(csp)
+	csc	ct5, (TF_T + 5 * 16)(csp)
+	csc	ct6, (TF_T + 6 * 16)(csp)
+
+	csc	cs0, (TF_S + 0 * 16)(csp)
+	csc	cs1, (TF_S + 1 * 16)(csp)
+	csc	cs2, (TF_S + 2 * 16)(csp)
+	csc	cs3, (TF_S + 3 * 16)(csp)
+	csc	cs4, (TF_S + 4 * 16)(csp)
+	csc	cs5, (TF_S + 5 * 16)(csp)
+	csc	cs6, (TF_S + 6 * 16)(csp)
+	csc	cs7, (TF_S + 7 * 16)(csp)
+	csc	cs8, (TF_S + 8 * 16)(csp)
+	csc	cs9, (TF_S + 9 * 16)(csp)
+	csc	cs10, (TF_S + 10 * 16)(csp)
+	csc	cs11, (TF_S + 11 * 16)(csp)
+
+	csc	ca0, (TF_A + 0 * 16)(csp)
+	csc	ca1, (TF_A + 1 * 16)(csp)
+	csc	ca2, (TF_A + 2 * 16)(csp)
+	csc	ca3, (TF_A + 3 * 16)(csp)
+	csc	ca4, (TF_A + 4 * 16)(csp)
+	csc	ca5, (TF_A + 5 * 16)(csp)
+	csc	ca6, (TF_A + 6 * 16)(csp)
+	csc	ca7, (TF_A + 7 * 16)(csp)
+
+.if \el == 1
+	/* Store kernel sp */
+	li	t1, TF_SIZE
+	cincoffset ct0, csp, t1
+	csc	ct0, (TF_SP)(csp)
+.else
+	/* Store user sp */
+	cspecialr ct0, sscratchc
+	csc	ct0, (TF_SP)(csp)
+.endif
+	cmove	ct0, cnull
+	cspecialw sscratchc, ct0
+	cspecialr ct0, sepcc
+	csc	ct0, (TF_SEPC)(csp)
+	cspecialr ct0, ddc
+	csc	ct0, (TF_DDC)(csp)
+	cspecialr ct0, stdc
+	cspecialw ddc, ct0
+
+	/* Switch to non-capmode PCC. */
+1:	auipcc	ct0, %pcrel_hi(2f)
+	cincoffset ct0, ct0, %pcrel_lo(1b)
+	csetflags ct0, ct0, x0
+	cjr	ct0
+.option pop
+2:
+#else
 	sd	t0, (TF_T + 0 * 8)(sp)
 	sd	t1, (TF_T + 1 * 8)(sp)
 	sd	t2, (TF_T + 2 * 8)(sp)
@@ -102,12 +186,21 @@ __FBSDID("$FreeBSD$");
 	csrw	sscratch, t0
 	csrr	t0, sepc
 	sd	t0, (TF_SEPC)(sp)
+#endif
 	csrr	t0, sstatus
 	sd	t0, (TF_SSTATUS)(sp)
 	csrr	t0, stval
 	sd	t0, (TF_STVAL)(sp)
 	csrr	t0, scause
 	sd	t0, (TF_SCAUSE)(sp)
+
+.if \el == 0
+.option push
+.option norelax
+	/* Load the kernel's global pointer */
+	lla	gp, __global_pointer$
+.option pop
+.endif
 .endm
 
 .macro load_registers el
@@ -127,6 +220,85 @@ __FBSDID("$FreeBSD$");
 .endif
 	csrw	sstatus, t0
 
+#if __has_feature(capabilities)
+	/* Switch to capmode PCC. */
+	lla	t1, 1f
+	cspecialr ct0, pcc
+	csetaddr ct0, ct0, t1
+	li	t1, 1
+	csetflags ct0, ct0, t1
+	cjr	ct0
+.option push
+.option capmode
+1:
+	/*
+	 * Build a capability for 'csp' using 'sp' as an address
+	 * in the kernel DDC.
+	 *
+	 * XXX: Bounds?  Maybe could use TF_SIZE + 16 as length?
+	 * A purecap kernel would have proper bounds on csp already.
+	 */
+	cspecialr ct0, ddc
+	csetaddr ct0, ct0, sp
+	cmove	csp, ct0
+
+	/*
+	 * Switch to user DDC.  After this point, all stack accesses
+	 * must use 'csp' instead of 'sp'.
+	 */
+	clc	ct0, (TF_DDC)(csp)
+	cspecialw ddc, ct0
+	clc	ct0, (TF_SEPC)(csp)
+	cspecialw sepcc, ct0
+
+.if \el == 0
+	/* We go to userspace. Load user csp */
+	clc	ct0, (TF_SP)(csp)
+	cspecialw sscratchc, ct0
+
+	/* Store our pcpu */
+	csc	ctp, (TF_SIZE)(csp)
+	clc	ctp, (TF_TP)(csp)
+
+	/* And restore the user's global pointer */
+	clc	cgp, (TF_GP)(csp)
+.endif
+
+	clc	cra, (TF_RA)(csp)
+
+	clc	ct0, (TF_T + 0 * 16)(csp)
+	clc	ct1, (TF_T + 1 * 16)(csp)
+	clc	ct2, (TF_T + 2 * 16)(csp)
+	clc	ct3, (TF_T + 3 * 16)(csp)
+	clc	ct4, (TF_T + 4 * 16)(csp)
+	clc	ct5, (TF_T + 5 * 16)(csp)
+	clc	ct6, (TF_T + 6 * 16)(csp)
+
+	clc	cs0, (TF_S + 0 * 16)(csp)
+	clc	cs1, (TF_S + 1 * 16)(csp)
+	clc	cs2, (TF_S + 2 * 16)(csp)
+	clc	cs3, (TF_S + 3 * 16)(csp)
+	clc	cs4, (TF_S + 4 * 16)(csp)
+	clc	cs5, (TF_S + 5 * 16)(csp)
+	clc	cs6, (TF_S + 6 * 16)(csp)
+	clc	cs7, (TF_S + 7 * 16)(csp)
+	clc	cs8, (TF_S + 8 * 16)(csp)
+	clc	cs9, (TF_S + 9 * 16)(csp)
+	clc	cs10, (TF_S + 10 * 16)(csp)
+	clc	cs11, (TF_S + 11 * 16)(csp)
+
+	clc	ca0, (TF_A + 0 * 16)(csp)
+	clc	ca1, (TF_A + 1 * 16)(csp)
+	clc	ca2, (TF_A + 2 * 16)(csp)
+	clc	ca3, (TF_A + 3 * 16)(csp)
+	clc	ca4, (TF_A + 4 * 16)(csp)
+	clc	ca5, (TF_A + 5 * 16)(csp)
+	clc	ca6, (TF_A + 6 * 16)(csp)
+	clc	ca7, (TF_A + 7 * 16)(csp)
+
+	cincoffset csp, csp, (TF_SIZE)
+.option pop
+#else
 	ld	t0, (TF_SEPC)(sp)
 	csrw	sepc, t0
 
@@ -176,6 +348,7 @@ __FBSDID("$FreeBSD$");
 	ld	a7, (TF_A + 7 * 8)(sp)
 
 	addi	sp, sp, (TF_SIZE)
+#endif
 .endm
 
 .macro	do_ast
@@ -205,14 +378,21 @@ __FBSDID("$FreeBSD$");
 .endm
 
 ENTRY(cpu_exception_handler)
+#if __has_feature(capabilities)
+	cspecialrw csp, sscratchc, csp
+#else
 	csrrw	sp, sscratch, sp
+#endif
 	beqz	sp, 1f
 	/* User mode detected */
-	csrrw	sp, sscratch, sp
 	j	cpu_exception_handler_user
 1:
 	/* Supervisor mode detected */
+#if __has_feature(capabilities)
+	cspecialrw csp, sscratchc, csp
+#else
 	csrrw	sp, sscratch, sp
+#endif
 	j	cpu_exception_handler_supervisor
 END(cpu_exception_handler)
 
@@ -225,12 +405,15 @@ ENTRY(cpu_exception_handler_supervisor)
 END(cpu_exception_handler_supervisor)
 
 ENTRY(cpu_exception_handler_user)
-	csrrw	sp, sscratch, sp
 	save_registers 0
 	mv	a0, sp
 	call	_C_LABEL(do_trap_user)
 	do_ast
 	load_registers 0
+#if __has_feature(capabilities)
+	cspecialrw csp, sscratchc, csp
+#else
 	csrrw	sp, sscratch, sp
+#endif
 	sret
 END(cpu_exception_handler_user)

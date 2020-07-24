@@ -41,8 +41,6 @@
  *	mkdir: want it ?
  */
 
-#define	EXPLICIT_USER_ACCESS
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/conf.h>
@@ -244,7 +242,7 @@ devfs_populate_vp(struct vnode *vp)
 	DEVFS_DMP_HOLD(dmp);
 
 	/* Can't call devfs_populate() with the vnode lock held. */
-	VOP_UNLOCK(vp, 0);
+	VOP_UNLOCK(vp);
 	devfs_populate(dmp);
 
 	sx_xunlock(&dmp->dm_lock);
@@ -277,7 +275,7 @@ devfs_vptocnp(struct vop_vptocnp_args *ap)
 	struct vnode **dvp = ap->a_vpp;
 	struct devfs_mount *dmp;
 	char *buf = ap->a_buf;
-	int *buflen = ap->a_buflen;
+	size_t *buflen = ap->a_buflen;
 	struct devfs_dirent *dd, *de;
 	int i, error;
 
@@ -482,8 +480,7 @@ loop:
 		dev_refl(dev);
 		/* XXX: v_rdev should be protect by vnode lock */
 		vp->v_rdev = dev;
-		KASSERT(vp->v_usecount == 1,
-		    ("%s %d (%d)\n", __func__, __LINE__, vp->v_usecount));
+		VNPASS(vp->v_usecount == 1, vp);
 		dev->si_usecount++;
 		/* Special casing of ttys for deadfs.  Probably redundant. */
 		dsw = dev->si_devsw;
@@ -638,7 +635,7 @@ devfs_close(struct vop_close_args *ap)
 	vholdnz(vp);
 	VI_UNLOCK(vp);
 	vp_locked = VOP_ISLOCKED(vp);
-	VOP_UNLOCK(vp, 0);
+	VOP_UNLOCK(vp);
 	KASSERT(dev->si_refcount > 0,
 	    ("devfs_close() on un-referenced struct cdev *(%s)", devtoname(dev)));
 	error = dsw->d_close(dev, ap->a_fflag | dflags, S_IFCHR, td);
@@ -766,26 +763,27 @@ fiodgname_buf_get_ptr(void *fgnp, u_long com)
 {
 	union {
 		struct fiodgname_arg	fgn;
-#ifdef COMPAT_CHERIABI
-		struct fiodgname_arg_c	fgn_c;
-#endif
 #ifdef COMPAT_FREEBSD32
 		struct fiodgname_arg32	fgn32;
+#endif
+#ifdef COMPAT_FREEBSD64
+		struct fiodgname_arg64	fgn64;
 #endif
 	} *fgnup;
 
 	fgnup = fgnp;
 	switch (com) {
 	case FIODGNAME:
-		return (__USER_CAP(fgnup->fgn.buf, fgnup->fgn.len));
-#ifdef COMPAT_CHERIABI
-	case FIODGNAME_C:
-		return (fgnup->fgn_c.buf);
-#endif
+		return (fgnup->fgn.buf);
 #ifdef COMPAT_FREEBSD32
 	case FIODGNAME_32:
 		return (__USER_CAP((void *)(uintptr_t)fgnup->fgn32.buf,
 		    fgnup->fgn32.len));
+#endif
+#ifdef COMPAT_FREEBSD64
+	case FIODGNAME_64:
+		return (__USER_CAP((void *)(uintptr_t)fgnup->fgn64.buf,
+		    fgnup->fgn64.len));
 #endif
 	default:
 		panic("Unhandled ioctl command %ld", com);
@@ -820,11 +818,11 @@ devfs_ioctl(struct vop_ioctl_args *ap)
 		error = 0;
 		break;
 	case FIODGNAME:
-#ifdef COMPAT_CHERIABI
-	case FIODGNAME_C:
-#endif
 #ifdef	COMPAT_FREEBSD32
 	case FIODGNAME_32:
+#endif
+#ifdef	COMPAT_FREEBSD64
+	case FIODGNAME_64:
 #endif
 		fgn = ap->a_data;
 		p = devtoname(dev);
@@ -960,8 +958,8 @@ devfs_lookupx(struct vop_lookup_args *ap, int *dm_unlock)
 	if ((flags & ISDOTDOT) && (dvp->v_vflag & VV_ROOT))
 		return (EIO);
 
-	error = VOP_ACCESS(dvp, VEXEC, cnp->cn_cred, td);
-	if (error)
+	error = vn_dir_check_exec(dvp, cnp);
+	if (error != 0)
 		return (error);
 
 	if (cnp->cn_namelen == 1 && *pname == '.') {
@@ -979,7 +977,7 @@ devfs_lookupx(struct vop_lookup_args *ap, int *dm_unlock)
 		if (de == NULL)
 			return (ENOENT);
 		dvplocked = VOP_ISLOCKED(dvp);
-		VOP_UNLOCK(dvp, 0);
+		VOP_UNLOCK(dvp);
 		error = devfs_allocv(de, mp, cnp->cn_lkflags & LK_TYPE_MASK,
 		    vpp);
 		*dm_unlock = 0;
@@ -1167,7 +1165,7 @@ devfs_open(struct vop_open_args *ap)
 	}
 
 	vlocked = VOP_ISLOCKED(vp);
-	VOP_UNLOCK(vp, 0);
+	VOP_UNLOCK(vp);
 
 	fpop = td->td_fpop;
 	td->td_fpop = fp;
@@ -1478,9 +1476,9 @@ devfs_remove(struct vop_remove_args *ap)
 				de_covered->de_flags &= ~DE_COVERED;
 		}
 		/* We need to unlock dvp because devfs_delete() may lock it. */
-		VOP_UNLOCK(vp, 0);
+		VOP_UNLOCK(vp);
 		if (dvp != vp)
-			VOP_UNLOCK(dvp, 0);
+			VOP_UNLOCK(dvp);
 		devfs_delete(dmp, de, 0);
 		sx_xunlock(&dmp->dm_lock);
 		if (dvp != vp)
@@ -1521,7 +1519,7 @@ devfs_revoke(struct vop_revoke_args *ap)
 	vgone(vp);
 	vdrop(vp);
 
-	VOP_UNLOCK(vp,0);
+	VOP_UNLOCK(vp);
  loop:
 	for (;;) {
 		mtx_lock(&devfs_de_interlock);
@@ -1577,12 +1575,12 @@ devfs_rioctl(struct vop_ioctl_args *ap)
 	vp = ap->a_vp;
 	vn_lock(vp, LK_SHARED | LK_RETRY);
 	if (VN_IS_DOOMED(vp)) {
-		VOP_UNLOCK(vp, 0);
+		VOP_UNLOCK(vp);
 		return (EBADF);
 	}
 	dmp = VFSTODEVFS(vp->v_mount);
 	sx_xlock(&dmp->dm_lock);
-	VOP_UNLOCK(vp, 0);
+	VOP_UNLOCK(vp);
 	DEVFS_DMP_HOLD(dmp);
 	devfs_populate(dmp);
 	if (DEVFS_DMP_DROP(dmp)) {
@@ -1943,6 +1941,7 @@ static struct vop_vector devfs_vnodeops = {
 	.vop_symlink =		devfs_symlink,
 	.vop_vptocnp =		devfs_vptocnp,
 };
+VFS_VOP_VECTOR_REGISTER(devfs_vnodeops);
 
 /* Vops for VCHR vnodes in /dev. */
 static struct vop_vector devfs_specops = {
@@ -1980,6 +1979,7 @@ static struct vop_vector devfs_specops = {
 	.vop_vptocnp =		devfs_vptocnp,
 	.vop_write =		dead_write,
 };
+VFS_VOP_VECTOR_REGISTER(devfs_specops);
 
 /*
  * Our calling convention to the device drivers used to be that we passed

@@ -224,7 +224,7 @@ pwd_id_func(char *buffer, size_t *buffer_size, va_list ap, void *cache_mdata)
 	int	res = NS_UNAVAIL;
 	enum nss_lookup_type lookup_type;
 
-	lookup_type = (enum nss_lookup_type)cache_mdata;
+	lookup_type = (enum nss_lookup_type)(uintptr_t)cache_mdata;
 	switch (lookup_type) {
 	case nss_lt_name:
 		name = va_arg(ap, char *);
@@ -278,7 +278,9 @@ pwd_marshal_func(char *buffer, size_t *buffer_size, void *retval, va_list ap,
 	size_t desired_size, size;
 	char *p;
 
-	switch ((enum nss_lookup_type)cache_mdata) {
+	buffer = __builtin_assume_aligned(buffer, _Alignof(struct passwd));
+
+	switch ((enum nss_lookup_type)(uintptr_t)cache_mdata) {
 	case nss_lt_name:
 		name = va_arg(ap, char *);
 		break;
@@ -381,7 +383,9 @@ pwd_unmarshal_func(char *buffer, size_t buffer_size, void *retval, va_list ap,
 
 	char *p;
 
-	switch ((enum nss_lookup_type)cache_mdata) {
+	buffer = __builtin_assume_aligned(buffer, _Alignof(struct passwd));
+
+	switch ((enum nss_lookup_type)(uintptr_t)cache_mdata) {
 	case nss_lt_name:
 		name = va_arg(ap, char *);
 		break;
@@ -775,7 +779,7 @@ files_setpwent(void *retval, void *mdata, va_list ap)
 	rv = files_getstate(&st);
 	if (rv != 0)
 		return (NS_UNAVAIL);
-	switch ((enum constants)mdata) {
+	switch ((enum constants)(uintptr_t)mdata) {
 	case SETPWENT:
 		stayopen = va_arg(ap, int);
 		st->keynum = 0;
@@ -813,7 +817,7 @@ files_passwd(void *retval, void *mdata, va_list ap)
 
 	name = NULL;
 	uid = (uid_t)-1;
-	how = (enum nss_lookup_type)mdata;
+	how = (enum nss_lookup_type)(uintptr_t)mdata;
 	switch (how) {
 	case nss_lt_name:
 		name = va_arg(ap, const char *);
@@ -1305,7 +1309,7 @@ nis_passwd(void *retval, void *mdata, va_list ap)
 
 	name = NULL;
 	uid = (uid_t)-1;
-	how = (enum nss_lookup_type)mdata;
+	how = (enum nss_lookup_type)(uintptr_t)mdata;
 	switch (how) {
 	case nss_lt_name:
 		name = va_arg(ap, const char *);
@@ -1704,7 +1708,7 @@ compat_setpwent(void *retval, void *mdata, va_list ap)
 	rv = compat_getstate(&st);
 	if (rv != 0)
 		return (NS_UNAVAIL);
-	switch ((enum constants)mdata) {
+	switch ((enum constants)(uintptr_t)mdata) {
 	case SETPWENT:
 		stayopen = va_arg(ap, int);
 		st->keynum = 0;
@@ -1751,7 +1755,7 @@ compat_passwd(void *retval, void *mdata, va_list ap)
 	from_compat = 0;
 	name = NULL;
 	uid = (uid_t)-1;
-	how = (enum nss_lookup_type)mdata;
+	how = (enum nss_lookup_type)(uintptr_t)mdata;
 	switch (how) {
 	case nss_lt_name:
 		name = va_arg(ap, const char *);

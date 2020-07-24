@@ -53,12 +53,11 @@
 	.text
 	.globl _start
 _start:
-	/* Get the physical address kernel loaded to */
-	la	t0, virt_map
-	ld	t1, 0(t0)
-	sub	t1, t1, t0
-	li	t2, KERNBASE
-	sub	s9, t2, t1	/* s9 = physmem base */
+	/* Set the global pointer */
+.option push
+.option norelax
+	lla	gp, __global_pointer$
+.option pop
 
 	/*
 	 * a0 = hart id
@@ -66,7 +65,7 @@ _start:
 	 */
 
 	/* Pick a hart to run the boot process. */
-	la	t0, hart_lottery
+	lla	t0, hart_lottery
 	li	t1, 1
 	amoadd.w t0, t1, 0(t0)
 
@@ -81,9 +80,12 @@ _start:
 	 * Page tables
 	 */
 1:
+	/* Get the kernel's load address */
+	jal	get_physmem
+
 	/* Add L1 entry for kernel */
-	la	s1, pagetable_l1
-	la	s2, pagetable_l2	/* Link to next level PN */
+	lla	s1, pagetable_l1
+	lla	s2, pagetable_l2	/* Link to next level PN */
 	srli	s2, s2, PAGE_SHIFT
 
 	li	a5, KERNBASE
@@ -100,7 +102,7 @@ _start:
 	sd	t6, (t0)
 
 	/* Level 2 superpages (512 x 2MiB) */
-	la	s1, pagetable_l2
+	lla	s1, pagetable_l2
 	srli	t4, s9, 21		/* Div physmem base by 2 MiB */
 	li	t2, 512			/* Build 512 entries */
 	add	t3, t4, t2
@@ -116,8 +118,8 @@ _start:
 	bltu	t4, t3, 2b
 
 	/* Create an L1 page for early devmap */
-	la	s1, pagetable_l1
-	la	s2, pagetable_l2_devmap	/* Link to next level PN */
+	lla	s1, pagetable_l1
+	lla	s2, pagetable_l2_devmap	/* Link to next level PN */
 	srli	s2, s2, PAGE_SHIFT
 
 	li	a5, (VM_MAX_KERNEL_ADDRESS - L2_SIZE)
@@ -134,7 +136,7 @@ _start:
 	sd	t6, (t0)
 
 	/* Create an L2 page superpage for DTB */
-	la	s1, pagetable_l2_devmap
+	lla	s1, pagetable_l2_devmap
 	mv	s2, a1
 	srli	s2, s2, PAGE_SHIFT
 
@@ -152,14 +154,14 @@ _start:
 	/* Page tables END */
 
 	/* Setup supervisor trap vector */
-	la	t0, va
+	lla	t0, va
 	sub	t0, t0, s9
 	li	t1, KERNBASE
 	add	t0, t0, t1
 	csrw	stvec, t0
 
 	/* Set page tables base register */
-	la	s2, pagetable_l1
+	lla	s2, pagetable_l1
 	srli	s2, s2, PAGE_SHIFT
 	li	t0, SATP_MODE_SV39
 	or	s2, s2, t0
@@ -168,25 +170,41 @@ _start:
 
 	.align 2
 va:
+	/* Set the global pointer again, this time with the virtual address. */
+.option push
+.option norelax
+	lla	gp, __global_pointer$
+.option pop
 
 	/* Setup supervisor trap vector */
 	la	t0, cpu_exception_handler
+#if __has_feature(capabilities)
+	cspecialr ct1, pcc
+	csetaddr ct1, ct1, t0
+	li	t0, 1
+	csetflags ct1, ct1, t0
+	cspecialw stcc, ct1
+	cspecialr ct1, ddc
+	cspecialw stdc, ct1
+#else
 	csrw	stvec, t0
+#endif
 
 	/* Ensure sscratch is zero */
+#if __has_feature(capabilities)
+	cmove	ct0, cnull
+	cspecialw sscratchc, ct0
+#else
 	li	t0, 0
 	csrw	sscratch, t0
-
-	/* Set the global pointer */
-.option push
-.option norelax
-	la	gp, __global_pointer$
-.option pop
+#endif
 
 	/* Initialize stack pointer */
 	la	s3, initstack_end
 	mv	sp, s3
-	addi	sp, sp, -PCB_SIZE
+
+	/* Allocate space for thread0 PCB and riscv_bootparams */
+	addi	sp, sp, -(PCB_SIZE + RISCV_BOOTPARAMS_SIZE) & ~STACKALIGNBYTES
 
 	/* Clear BSS */
 	la	s0, _C_LABEL(__bss_start)
@@ -203,22 +221,30 @@ va:
 #endif
 
 	/* Fill riscv_bootparams */
-	addi	sp, sp, -40
-
 	la	t0, pagetable_l1
-	sd	t0, 0(sp) /* kern_l1pt */
-	sd	s9, 8(sp) /* kern_phys */
+	sd	t0, RISCV_BOOTPARAMS_KERN_L1PT(sp)
+	sd	s9, RISCV_BOOTPARAMS_KERN_PHYS(sp)
 
 	la	t0, initstack
-	sd	t0, 16(sp) /* kern_stack */
+	sd	t0, RISCV_BOOTPARAMS_KERN_STACK(sp)
 
-	li	t0, (VM_MAX_KERNEL_ADDRESS - 2 * L2_SIZE)
-	sd	t0, 24(sp) /* dtbp_virt */
-	sd	a1, 32(sp) /* dtbp_phys */
+	li	t0, (VM_EARLY_DTB_ADDRESS)
+	sd	t0, RISCV_BOOTPARAMS_DTBP_VIRT(sp)
 
 	mv	a0, sp
 	call	_C_LABEL(initriscv)	/* Off we go */
 	call	_C_LABEL(mi_startup)
+
+/*
+ * Get the physical address the kernel is loaded to. Returned in s9.
+ */
+get_physmem:
+	lla	t0, virt_map	/* physical address of virt_map */
+	ld	t1, 0(t0)	/* virtual address of virt_map */
+	sub	t1, t1, t0	/* calculate phys->virt delta */
+	li	t2, KERNBASE
+	sub	s9, t2, t1	/* s9 = physmem base */
+	ret
 
 	.align  4
 initstack:
@@ -226,8 +252,12 @@ initstack:
 initstack_end:
 
 ENTRY(sigcode)
+#if __has_feature(capabilities)
+	cincoffset ca0, csp, SF_UC
+#else
 	mv	a0, sp
 	addi	a0, a0, SF_UC
+#endif
 
 1:
 	li	t0, SYS_sigreturn
@@ -243,11 +273,36 @@ END(sigcode)
 	.align	3
 esigcode:
 
+#ifdef COMPAT_FREEBSD64
+ENTRY(freebsd64_sigcode)
+	mv	a0, sp
+	addi	a0, a0, SF64_UC
+
+1:
+	li	t0, SYS_sigreturn
+	ecall
+
+	/* sigreturn failed, exit */
+	li	t0, SYS_exit
+	ecall
+
+	j	1b
+END(freebsd64_sigcode)
+	/* This may be copied to the stack, keep it 16-byte aligned */
+	.align	3
+freebsd64_esigcode:
+#endif
+
 	.data
 	.align	3
 	.global	szsigcode
 szsigcode:
 	.quad	esigcode - sigcode
+#ifdef COMPAT_FREEBSD64
+	.global	freebsd64_szsigcode
+freebsd64_szsigcode:
+	.quad	freebsd64_esigcode - freebsd64_sigcode
+#endif
 
 	.align	12
 pagetable_l1:
@@ -287,7 +342,7 @@ ENTRY(mpentry)
 	li	t1, 4
 	mulw	t1, t1, a0
 	/* Get the pointer */
-	la	t0, __riscv_boot_ap
+	lla	t0, __riscv_boot_ap
 	add	t0, t0, t1
 
 1:
@@ -296,24 +351,21 @@ ENTRY(mpentry)
 	beqz	t1, 1b
 
 	/* Setup stack pointer */
-	la	t0, secondary_stacks
-	li	t1, (PAGE_SIZE * KSTACK_PAGES)
-	mulw	t2, t1, a0
-	add	t0, t0, t2
-	add	t0, t0, t1
-	sub	t0, t0, s9
-	li	t1, KERNBASE
-	add	sp, t0, t1
+	lla	t0, bootstack
+	ld	sp, 0(t0)
+
+	/* Get the kernel's load address */
+	jal get_physmem
 
 	/* Setup supervisor trap vector */
-	la	t0, mpva
+	lla	t0, mpva
 	sub	t0, t0, s9
 	li	t1, KERNBASE
 	add	t0, t0, t1
 	csrw	stvec, t0
 
 	/* Set page tables base register */
-	la	s2, pagetable_l1
+	lla	s2, pagetable_l1
 	srli	s2, s2, PAGE_SHIFT
 	li	t0, SATP_MODE_SV39
 	or	s2, s2, t0
@@ -322,19 +374,29 @@ ENTRY(mpentry)
 
 	.align 2
 mpva:
+	/* Set the global pointer again, this time with the virtual address. */
+.option push
+.option norelax
+	lla	gp, __global_pointer$
+.option pop
+
 	/* Setup supervisor trap vector */
 	la	t0, cpu_exception_handler
+#if __has_feature(capabilities)
+	cspecialr ct1, pcc
+	csetaddr ct1, ct1, t0
+	li	t0, 1
+	csetflags ct1, ct1, t0
+	cspecialw stcc, ct1
+	cspecialr ct1, ddc
+	cspecialw stdc, ct1
+#else
 	csrw	stvec, t0
+#endif
 
 	/* Ensure sscratch is zero */
 	li	t0, 0
 	csrw	sscratch, t0
-
-	/* Set the global pointer */
-.option push
-.option norelax
-	la	gp, __global_pointer$
-.option pop
 
 	call	init_secondary
 END(mpentry)

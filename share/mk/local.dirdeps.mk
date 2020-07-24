@@ -38,7 +38,6 @@ DIRDEPS_FILTER.host = \
 	Nlib/csu* \
 	Nlib/libc \
 	Nlib/[mn]* \
-	Ngnu/lib/csu* \
 	Ngnu/lib/lib[a-r]* \
 	Nsecure/lib* \
 	Nusr.bin/xinstall* \
@@ -74,8 +73,8 @@ DIRDEPS_FILTER.xtras+= Nusr.bin/clang/clang.host
 # this is how we can handle optional dependencies
 .if ${DEP_RELDIR} == "lib/libc"
 DIRDEPS += lib/libc_nonshared
-.if ${MK_SSP:Uno} != "no" 
-DIRDEPS += gnu/lib/libssp/libssp_nonshared
+.if ${MK_SSP:Uno} != "no" && !${MACHINE_ABI:Mpurecap}
+DIRDEPS += lib/libssp_nonshared
 .endif
 .else
 DIRDEPS_FILTER.xtras+= Nlib/libc_nonshared
@@ -92,13 +91,9 @@ DIRDEPS += \
 # Add both gcc_s and gcc_eh as dependencies as the decision to build
 # -static or not is not known here.
 .if ${DEP_RELDIR:M*libgcc*} == "" && ${DIRDEPS:U:Mlib/libc} != ""
-.if ${MK_LLVM_LIBUNWIND} == "yes"
 DIRDEPS+= \
 	lib/libgcc_eh \
 	lib/libgcc_s
-.else
-DIRDEPS+= gnu/lib/libgcc
-.endif
 .endif
 
 # Bootstrap support.  Give hints to DIRDEPS if there is no Makefile.depend*
@@ -173,8 +168,6 @@ DIRDEPS+= ${C_DIRDEPS}
 DIRDEPS+= ${C_DIRDEPS}
 .if ${MK_CLANG} == "yes"
 DIRDEPS+= lib/libc++ lib/libcxxrt
-.else
-DIRDEPS+= gnu/lib/libstdc++ gnu/lib/libsupc++
 .endif
 # XXX: Clang and GCC always adds -lm currently, even when not needed.
 DIRDEPS+= lib/msun
@@ -219,11 +212,6 @@ DIRDEPS+= ${_lib${_lib}reldir}
 .if ${DEP_RELDIR} != "targets/pseudo/stage"
 DIRDEPS += targets/pseudo/stage
 .endif
-.endif
-
-# this one is too pervasive
-.if ${MK_BSD_CRTBEGIN} == "no" && ${DEP_RELDIR} != "gnu/lib/csu"
-DIRDEPS+= gnu/lib/csu
 .endif
 
 DEP_MACHINE_ARCH = ${MACHINE_ARCH.${DEP_MACHINE}}

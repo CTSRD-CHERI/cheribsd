@@ -92,6 +92,7 @@ static void	 iavf_if_vlan_register(if_ctx_t ctx, u16 vtag);
 static void	 iavf_if_vlan_unregister(if_ctx_t ctx, u16 vtag);
 static uint64_t	 iavf_if_get_counter(if_ctx_t ctx, ift_counter cnt);
 static void	 iavf_if_stop(if_ctx_t ctx);
+static bool	 iavf_if_needs_restart(if_ctx_t ctx, enum iflib_restart_event event);
 
 static int	iavf_allocate_pci_resources(struct iavf_sc *);
 static int	iavf_reset_complete(struct i40e_hw *);
@@ -190,6 +191,7 @@ static device_method_t iavf_if_methods[] = {
 	DEVMETHOD(ifdi_vlan_register, iavf_if_vlan_register),
 	DEVMETHOD(ifdi_vlan_unregister, iavf_if_vlan_unregister),
 	DEVMETHOD(ifdi_get_counter, iavf_if_get_counter),
+	DEVMETHOD(ifdi_needs_restart, iavf_if_needs_restart),
 	DEVMETHOD_END
 };
 
@@ -201,7 +203,7 @@ static driver_t iavf_if_driver = {
 ** TUNEABLE PARAMETERS:
 */
 
-static SYSCTL_NODE(_hw, OID_AUTO, iavf, CTLFLAG_RD, 0,
+static SYSCTL_NODE(_hw, OID_AUTO, iavf, CTLFLAG_RD | CTLFLAG_MPSAFE, 0,
     "iavf driver parameters");
 
 /*
@@ -705,7 +707,7 @@ iavf_if_init(if_ctx_t ctx)
 }
 
 /*
- * iavf_attach() helper function; initalizes the admin queue
+ * iavf_attach() helper function; initializes the admin queue
  * and attempts to establish contact with the PF by
  * retrying the initial "API version" message several times
  * or until the PF responds.
@@ -1467,7 +1469,27 @@ iavf_if_get_counter(if_ctx_t ctx, ift_counter cnt)
 	}
 }
 
- 
+/* iavf_if_needs_restart - Tell iflib when the driver needs to be reinitialized
+ * @ctx: iflib context
+ * @event: event code to check
+ *
+ * Defaults to returning true for every event.
+ *
+ * @returns true if iflib needs to reinit the interface
+ */
+static bool
+iavf_if_needs_restart(if_ctx_t ctx __unused, enum iflib_restart_event event)
+{
+	switch (event) {
+	case IFLIB_RESTART_VLAN_CONFIG:
+		/* This case must return true if VLAN anti-spoof checks are
+		 * enabled by the PF driver for the VF.
+		 */
+	default:
+		return (true);
+	}
+}
+
 static void
 iavf_free_pci_resources(struct iavf_sc *sc)
 {
@@ -2049,23 +2071,27 @@ iavf_add_device_sysctls(struct iavf_sc *sc)
 	struct sysctl_oid_list *debug_list;
 
 	SYSCTL_ADD_PROC(ctx, ctx_list,
-	    OID_AUTO, "current_speed", CTLTYPE_STRING | CTLFLAG_RD,
+	    OID_AUTO, "current_speed",
+	    CTLTYPE_STRING | CTLFLAG_RD | CTLFLAG_NEEDGIANT,
 	    sc, 0, iavf_sysctl_current_speed, "A", "Current Port Speed");
 
 	SYSCTL_ADD_PROC(ctx, ctx_list,
-	    OID_AUTO, "tx_itr", CTLTYPE_INT | CTLFLAG_RW,
+	    OID_AUTO, "tx_itr",
+	    CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_NEEDGIANT,
 	    sc, 0, iavf_sysctl_tx_itr, "I",
 	    "Immediately set TX ITR value for all queues");
 
 	SYSCTL_ADD_PROC(ctx, ctx_list,
-	    OID_AUTO, "rx_itr", CTLTYPE_INT | CTLFLAG_RW,
+	    OID_AUTO, "rx_itr",
+	    CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_NEEDGIANT,
 	    sc, 0, iavf_sysctl_rx_itr, "I",
 	    "Immediately set RX ITR value for all queues");
 
 	/* Add sysctls meant to print debug information, but don't list them
 	 * in "sysctl -a" output. */
 	debug_node = SYSCTL_ADD_NODE(ctx, ctx_list,
-	    OID_AUTO, "debug", CTLFLAG_RD | CTLFLAG_SKIP, NULL, "Debug Sysctls");
+	    OID_AUTO, "debug", CTLFLAG_RD | CTLFLAG_SKIP | CTLFLAG_NEEDGIANT,
+	    NULL, "Debug Sysctls");
 	debug_list = SYSCTL_CHILDREN(debug_node);
 
 	SYSCTL_ADD_UINT(ctx, debug_list,
@@ -2077,19 +2103,23 @@ iavf_add_device_sysctls(struct iavf_sc *sc)
 	    &sc->dbg_mask, 0, "Non-shared code debug message level");
 
 	SYSCTL_ADD_PROC(ctx, debug_list,
-	    OID_AUTO, "filter_list", CTLTYPE_STRING | CTLFLAG_RD,
+	    OID_AUTO, "filter_list",
+	    CTLTYPE_STRING | CTLFLAG_RD | CTLFLAG_NEEDGIANT,
 	    sc, 0, iavf_sysctl_sw_filter_list, "A", "SW Filter List");
 
 	SYSCTL_ADD_PROC(ctx, debug_list,
-	    OID_AUTO, "queue_interrupt_table", CTLTYPE_STRING | CTLFLAG_RD,
+	    OID_AUTO, "queue_interrupt_table",
+	    CTLTYPE_STRING | CTLFLAG_RD | CTLFLAG_NEEDGIANT,
 	    sc, 0, iavf_sysctl_queue_interrupt_table, "A", "View MSI-X indices for TX/RX queues");
 
 	SYSCTL_ADD_PROC(ctx, debug_list,
-	    OID_AUTO, "do_vf_reset", CTLTYPE_INT | CTLFLAG_WR,
+	    OID_AUTO, "do_vf_reset",
+	    CTLTYPE_INT | CTLFLAG_WR | CTLFLAG_NEEDGIANT,
 	    sc, 0, iavf_sysctl_vf_reset, "A", "Request a VF reset from PF");
 
 	SYSCTL_ADD_PROC(ctx, debug_list,
-	    OID_AUTO, "do_vflr_reset", CTLTYPE_INT | CTLFLAG_WR,
+	    OID_AUTO, "do_vflr_reset",
+	    CTLTYPE_INT | CTLFLAG_WR | CTLFLAG_NEEDGIANT,
 	    sc, 0, iavf_sysctl_vflr_reset, "A", "Request a VFLR reset from HW");
 
 	/* Add stats sysctls */

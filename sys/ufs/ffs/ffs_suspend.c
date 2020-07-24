@@ -34,8 +34,6 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
-#define	EXPLICIT_USER_ACCESS
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/buf.h>
@@ -196,10 +194,10 @@ ffs_susp_suspend(struct mount *mp)
 	 * device.  The permissions can change after we unlock the vnode;
 	 * it's harmless.
 	 */
-	vn_lock(ump->um_devvp, LK_EXCLUSIVE | LK_RETRY);
-	error = VOP_ACCESS(ump->um_devvp, VREAD | VWRITE,
+	vn_lock(ump->um_odevvp, LK_EXCLUSIVE | LK_RETRY);
+	error = VOP_ACCESS(ump->um_odevvp, VREAD | VWRITE,
 	    curthread->td_ucred, curthread);
-	VOP_UNLOCK(ump->um_devvp, 0);
+	VOP_UNLOCK(ump->um_odevvp);
 	if (error != 0)
 		return (error);
 #ifdef MAC

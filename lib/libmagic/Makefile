@@ -15,6 +15,7 @@ MAN=	libmagic.3 magic.5
 
 SRCS=	apprentice.c apptype.c ascmagic.c buffer.c cdf.c cdf_time.c \
 	compress.c der.c encoding.c fsmagic.c funcs.c is_json.c \
+	is_csv.c \
 	is_tar.c magic.c print.c readcdf.c readelf.c seccomp.c softmagic.c
 INCS=	magic.h
 
@@ -39,7 +40,7 @@ MAGFILES=	${CONTRDIR}/magic/Header \
 magic: ${MAGFILES}
 	cat ${.ALLSRC:O} > ${.TARGET}
 
-magic.mgc: mkmagic magic
+magic.mgc: magic
 	${BTOOLSPATH:U.}/mkmagic magic
 
 .if ${MACHINE} == "host" || ${MK_DIRDEPS_BUILD} == "no"
@@ -53,6 +54,8 @@ mkmagic: apprentice.c cdf_time.c encoding.c funcs.c magic.c print.c ${INCS} ${BU
 .endif
 .if ${MK_DIRDEPS_BUILD} == "yes"
 BTOOLSPATH= ${HOST_OBJTOP}/${RELDIR}
+.else
+magic.mgc: mkmagic
 .endif
 
 FILEVER!= awk '$$1 == "\#define" && $$2 == "VERSION" { print $$3; exit }' \

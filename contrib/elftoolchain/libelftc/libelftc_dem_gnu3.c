@@ -1659,7 +1659,8 @@ cpp_demangle_read_local_name(struct cpp_demangle_data *ddata)
 	if (*(++ddata->cur) == '\0')
 		return (0);
 
-	vector_str_init(&local_name);
+	if (!vector_str_init(&local_name))
+		return (0);
 	ddata->cur_output = &local_name;
 
 	if (!cpp_demangle_read_encoding(ddata)) {
@@ -2911,7 +2912,7 @@ again:
 		if (len <= 0)
 			goto clean;
 		if (!vector_str_push(&v.ext_name, ddata->cur, len))
-			return (0);
+			goto clean;
 		ddata->cur += len;
 		if (!vector_type_qualifier_push(&v, TYPE_EXT))
 			goto clean;
@@ -3953,7 +3954,7 @@ vector_type_qualifier_init(struct vector_type_qualifier *v)
 
 	assert(v->q_container != NULL);
 
-	if (vector_str_init(&v->ext_name) == false) {
+	if (!vector_str_init(&v->ext_name)) {
 		free(v->q_container);
 		return (0);
 	}

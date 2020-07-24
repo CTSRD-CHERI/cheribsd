@@ -5,7 +5,7 @@
 
 SUBDIR=	tcpdump
 
-.if ${MK_CHERI} != "no"
+.if ${MK_LIBCHERI} != "no"
 SUBDIR+=	cheri_tcpdump
 .endif
 

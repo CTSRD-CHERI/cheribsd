@@ -96,7 +96,7 @@ cloudabi_sys_fd_create1(struct thread *td,
 		cap_rights_init(&fcaps.fc_rights, CAP_FSTAT, CAP_FTRUNCATE,
 		    CAP_MMAP_RWX);
 		return (kern_shm_open(td, SHM_ANON, O_RDWR | O_CLOEXEC, 0,
-		    &fcaps, F_SEAL_SEAL));
+		    &fcaps));
 	default:
 		return (EINVAL);
 	}
@@ -411,7 +411,7 @@ cloudabi_sys_fd_stat_get(struct thread *td,
 	convert_capabilities(&fcaps.fc_rights, fsb.fs_filetype,
 	    &fsb.fs_rights_base, &fsb.fs_rights_inheriting);
 	filecaps_free(&fcaps);
-	return (copyout(&fsb, (void *)uap->buf, sizeof(fsb)));
+	return (copyout(&fsb, __USER_CAP_OBJ(uap->buf), sizeof(fsb)));
 }
 
 /* Converts CloudABI rights to a set of Capsicum capabilities. */
@@ -441,7 +441,7 @@ cloudabi_sys_fd_stat_put(struct thread *td,
 	cap_rights_t rights;
 	int error, oflags;
 
-	error = copyin(uap->buf, &fsb, sizeof(fsb));
+	error = copyin(__USER_CAP_OBJ(uap->buf), &fsb, sizeof(fsb));
 	if (error != 0)
 		return (error);
 

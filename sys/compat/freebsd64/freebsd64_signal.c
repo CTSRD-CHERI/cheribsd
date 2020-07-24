@@ -56,7 +56,7 @@ __FBSDID("$FreeBSD$");
 #include <compat/freebsd64/freebsd64_proto.h>
 
 int
-convert_sigevent64(const struct sigevent64 *sig64, ksigevent_t *sig)
+convert_sigevent64(const struct sigevent64 *sig64, struct sigevent *sig)
 {
 
 	CP(*sig64, *sig, sigev_notify);
@@ -69,15 +69,15 @@ convert_sigevent64(const struct sigevent64 *sig64, ksigevent_t *sig)
 	case SIGEV_SIGNAL:
 		CP(*sig64, *sig, sigev_signo);
 		memset(&sig->sigev_value, 0, sizeof(sig->sigev_value));
-		sig->sigev_value.sival_ptr64 =
-		    sig64->sigev_value.sival_ptr;
+		sig->sigev_value.sival_ptr =
+		    cheri_fromint(sig64->sigev_value.sival_ptr);
 		break;
 	case SIGEV_KEVENT:
 		CP(*sig64, *sig, sigev_notify_kqueue);
 		CP(*sig64, *sig, sigev_notify_kevent_flags);
 		memset(&sig->sigev_value, 0, sizeof(sig->sigev_value));
-		sig->sigev_value.sival_ptr64 =
-		    sig64->sigev_value.sival_ptr;
+		sig->sigev_value.sival_ptr =
+		    cheri_fromint(sig64->sigev_value.sival_ptr);
 		break;
 	default:
 		return (EINVAL);
@@ -96,25 +96,24 @@ freebsd64_sigaction(struct thread *td, struct freebsd64_sigaction_args *uap)
 	actp = (uap->act != NULL) ? &act : NULL;
 	oactp = (uap->oact != NULL) ? &oact : NULL;
 	if (actp) {
-		error = copyin(uap->act, &act64, sizeof(act64));
+		error = copyin(__USER_CAP_OBJ(uap->act), &act64, sizeof(act64));
 		if (error)
 			return (error);
-		if (is_magic_sighandler_constant(act64.sa_handler))
-			actp->sa_handler =
-			    cheri_fromint((vaddr_t)act64.sa_handler);
+		if (is_magic_sighandler_constant(act64.sa_u))
+			actp->sa_handler = cheri_fromint(act64.sa_u);
 		else
-			actp->sa_handler = __USER_CODE_CAP(act64.sa_handler);
+			actp->sa_handler = __USER_CODE_CAP((void *)act64.sa_u);
 		actp->sa_flags = act64.sa_flags;
 		actp->sa_mask = act64.sa_mask;
 	}
 	error = kern_sigaction(td, uap->sig, actp, oactp, 0);
 	if (oactp && !error) {
 		memset(&oact64, 0, sizeof(oact64));
-		oact64.sa_handler =
-		    (void *)(__cheri_addr vaddr_t)oactp->sa_handler;
+		oact64.sa_u = (__cheri_addr vaddr_t)oactp->sa_handler;
 		oact64.sa_flags = oactp->sa_flags;
 		oact64.sa_mask = oactp->sa_mask;
-		error = copyout(&oact64, uap->oact, sizeof(oact64));
+		error = copyout(&oact64, __USER_CAP_OBJ(uap->oact),
+		    sizeof(oact64));
 	}
 	return (error);
 }
@@ -135,7 +134,7 @@ freebsd64_sigwait(struct thread *td, struct freebsd64_sigwait_args *uap)
 }
 
 void
-siginfo_to_siginfo64(const _siginfo_t *si, struct siginfo64 *si64)
+siginfo_to_siginfo64(const siginfo_t *si, struct siginfo64 *si64)
 {
 	memset(si64, 0, sizeof(*si64));
 	si64->si_signo = si->si_signo;
@@ -144,17 +143,20 @@ siginfo_to_siginfo64(const _siginfo_t *si, struct siginfo64 *si64)
 	si64->si_pid = si->si_pid;
 	si64->si_uid = si->si_uid;
 	si64->si_status = si->si_status;
-	si64->si_addr = (__cheri_fromcap void *)si->si_addr;
-	si64->si_value.sival_ptr_native = si->si_value.sival_ptr_native;
+	si64->si_addr = (__cheri_addr uint64_t)si->si_addr;
+	si64->si_value.sival_ptr = (__cheri_addr uint64_t)si->si_value.sival_ptr;
+	_Static_assert(sizeof(si64->_reason) == sizeof(si->_reason),
+	    "siginfo _reason size mismatch");
+	memcpy(&si64->_reason, &si->_reason, sizeof(si64->_reason));
 }
 
 static int
-freebsd64_copyout_siginfo(const _siginfo_t *si, void * __capability info)
+freebsd64_copyout_siginfo(const siginfo_t *si, void * __capability info)
 {
 	struct siginfo64 si64;
 	
 	siginfo_to_siginfo64(si, &si64);
-	return (copyout_c(&si64, info, sizeof(struct siginfo64)));
+	return (copyout(&si64, info, sizeof(struct siginfo64)));
 }
 
 int
@@ -173,7 +175,7 @@ freebsd64_sigwaitinfo(struct thread *td, struct freebsd64_sigwaitinfo_args *uap)
 
 	return (user_sigwaitinfo(td, __USER_CAP_OBJ(uap->set),
 	    __USER_CAP_OBJ(uap->info),
-	    (copyout_siginfo_t *)copyout_siginfo_native));
+	    (copyout_siginfo_t *)freebsd64_copyout_siginfo));
 }
 
 int
@@ -199,7 +201,7 @@ freebsd64_sigaltstack(struct thread *td,
 	int error;
 
 	if (uap->ss != NULL) {
-		error = copyin(uap->ss, &ss64, sizeof(ss64));
+		error = copyin(__USER_CAP_OBJ(uap->ss), &ss64, sizeof(ss64));
 		if (error != 0)
 			return (error);
 		ss.ss_sp = __USER_CAP_UNBOUND(ss64.ss_sp);
@@ -212,10 +214,10 @@ freebsd64_sigaltstack(struct thread *td,
 		return (error);
 	if (uap->oss != NULL) {
 		memset(&ss64, 0, sizeof(ss64));
-		ss64.ss_sp = (__cheri_fromcap void *)oss.ss_sp;
+		ss64.ss_sp = (__cheri_addr uint64_t)oss.ss_sp;
 		ss64.ss_size = oss.ss_size;
 		ss64.ss_flags = oss.ss_flags;
-		error = copyout(&ss64, uap->oss, sizeof(ss64));
+		error = copyout(&ss64, __USER_CAP_OBJ(uap->oss), sizeof(ss64));
 	}
 	return (error);
 }
@@ -223,10 +225,21 @@ freebsd64_sigaltstack(struct thread *td,
 int
 freebsd64_sigqueue(struct thread *td, struct freebsd64_sigqueue_args *uap)
 {
-	ksigval_union sv;
+	union sigval sv;
 
+	/*
+	 * Store the 64-bit value (either int or address) in the
+	 * capability's address.
+	 */
 	memset(&sv, 0, sizeof(sv));
-	sv.sival_ptr_native = uap->value;
+	sv.sival_ptr = cheri_fromint((uintptr_t)uap->value);
 
-	return (kern_sigqueue(td, uap->pid, uap->signum, &sv, 0));
+	return (kern_sigqueue(td, uap->pid, uap->signum, &sv));
+}
+
+int freebsd64_sigfastblock(struct thread *td,
+    struct freebsd64_sigfastblock_args *uap)
+{
+
+	return (kern_sigfastblock(td, uap->cmd, __USER_CAP_OBJ(uap->ptr)));
 }

@@ -95,6 +95,7 @@ pcpu_init(struct pcpu *pcpu, int cpuid, size_t size)
 	cpu_pcpu_init(pcpu, cpuid, size);
 	pcpu->pc_rm_queue.rmq_next = &pcpu->pc_rm_queue;
 	pcpu->pc_rm_queue.rmq_prev = &pcpu->pc_rm_queue;
+	pcpu->pc_zpcpu_offset = zpcpu_offset_cpu(cpuid);
 }
 
 void
@@ -147,7 +148,7 @@ pcpu_zones_startup(void)
 	pcpu_zone_64 = uma_zcreate("64 pcpu", sizeof(uint64_t),
 	    NULL, NULL, NULL, NULL, UMA_ALIGN_PTR, UMA_ZONE_PCPU);
 }
-SYSINIT(pcpu_zones, SI_SUB_VM, SI_ORDER_ANY, pcpu_zones_startup, NULL);
+SYSINIT(pcpu_zones, SI_SUB_COUNTER, SI_ORDER_FIRST, pcpu_zones_startup, NULL);
 
 /*
  * First-fit extent based allocator for allocating space in the per-cpu
@@ -352,8 +353,9 @@ show_pcpu(struct pcpu *pc)
 	db_printf("curthread    = ");
 	td = pc->pc_curthread;
 	if (td != NULL)
-		db_printf("%p: pid %d tid %d \"%s\"\n", td, td->td_proc->p_pid,
-		    td->td_tid, td->td_name);
+		db_printf("%p: pid %d tid %d critnest %d \"%s\"\n", td,
+		    td->td_proc->p_pid, td->td_tid, td->td_critnest,
+		    td->td_name);
 	else
 		db_printf("none\n");
 	db_printf("curpcb       = %p\n", pc->pc_curpcb);

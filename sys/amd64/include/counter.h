@@ -33,28 +33,29 @@
 
 #include <sys/pcpu.h>
 
-#define	EARLY_COUNTER	&temp_bsp_pcpu.pc_early_dummy_counter
+#define	EARLY_COUNTER	(void *)__offsetof(struct pcpu, pc_early_dummy_counter)
 
 #define	counter_enter()	do {} while (0)
 #define	counter_exit()	do {} while (0)
 
 #ifdef IN_SUBR_COUNTER_C
 static inline uint64_t
-counter_u64_read_one(uint64_t *p, int cpu)
+counter_u64_read_one(counter_u64_t c, int cpu)
 {
 
-	return (*(uint64_t *)((char *)p + UMA_PCPU_ALLOC_SIZE * cpu));
+	MPASS(c != EARLY_COUNTER);
+	return (*zpcpu_get_cpu(c, cpu));
 }
 
 static inline uint64_t
-counter_u64_fetch_inline(uint64_t *p)
+counter_u64_fetch_inline(uint64_t *c)
 {
 	uint64_t r;
-	int i;
+	int cpu;
 
 	r = 0;
-	CPU_FOREACH(i)
-		r += counter_u64_read_one((uint64_t *)p, i);
+	CPU_FOREACH(cpu)
+		r += counter_u64_read_one(c, cpu);
 
 	return (r);
 }
@@ -62,9 +63,11 @@ counter_u64_fetch_inline(uint64_t *p)
 static void
 counter_u64_zero_one_cpu(void *arg)
 {
+	counter_u64_t c;
 
-	*((uint64_t *)((char *)arg + UMA_PCPU_ALLOC_SIZE *
-	    PCPU_GET(cpuid))) = 0;
+	c = arg;
+	MPASS(c != EARLY_COUNTER);
+	*(zpcpu_get(c)) = 0;
 }
 
 static inline void
@@ -83,10 +86,7 @@ counter_u64_add(counter_u64_t c, int64_t inc)
 {
 
 	KASSERT(IS_BSP() || c != EARLY_COUNTER, ("EARLY_COUNTER used on AP"));
-	__asm __volatile("addq\t%1,%%gs:(%0)"
-	    :
-	    : "r" ((char *)c - (char *)&__pcpu[0]), "ri" (inc)
-	    : "memory", "cc");
+	zpcpu_add(c, inc);
 }
 
 #endif	/* ! __MACHINE_COUNTER_H__ */

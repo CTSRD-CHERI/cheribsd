@@ -43,6 +43,41 @@
 #include <sys/mbuf.h>
 #endif
 
+#define TCP_END_BYTE_INFO 8	/* Bytes that makeup the "end information array" */
+/* Types of ending byte info */
+#define TCP_EI_EMPTY_SLOT	0
+#define TCP_EI_STATUS_CLIENT_FIN	0x1
+#define TCP_EI_STATUS_CLIENT_RST	0x2
+#define TCP_EI_STATUS_SERVER_FIN	0x3
+#define TCP_EI_STATUS_SERVER_RST	0x4
+#define TCP_EI_STATUS_RETRAN		0x5
+#define TCP_EI_STATUS_PROGRESS		0x6
+#define TCP_EI_STATUS_PERSIST_MAX	0x7
+#define TCP_EI_STATUS_KEEP_MAX		0x8
+#define TCP_EI_STATUS_DATA_A_CLOSE	0x9
+#define TCP_EI_STATUS_RST_IN_FRONT	0xa
+#define TCP_EI_STATUS_2MSL		0xb
+#define TCP_EI_STATUS_MAX_VALUE		0xb
+
+/************************************************/
+/* Status bits we track to assure no duplicates,
+ * the bits here are not used by the code but
+ * for human representation. To check a bit we
+ * take and shift over by 1 minus the value (1-8).
+ */
+/************************************************/
+#define TCP_EI_BITS_CLIENT_FIN	0x001
+#define TCP_EI_BITS_CLIENT_RST	0x002
+#define TCP_EI_BITS_SERVER_FIN	0x004
+#define TCP_EI_BITS_SERVER_RST	0x008
+#define TCP_EI_BITS_RETRAN	0x010
+#define TCP_EI_BITS_PROGRESS	0x020
+#define TCP_EI_BITS_PRESIST_MAX	0x040
+#define TCP_EI_BITS_KEEP_MAX	0x080
+#define TCP_EI_BITS_DATA_A_CLO  0x100
+#define TCP_EI_BITS_RST_IN_FR	0x200	/* a front state reset */
+#define TCP_EI_BITS_2MS_TIMER	0x400	/* 2 MSL timer expired */
+
 #if defined(_KERNEL) || defined(_WANT_TCPCB)
 /* TCP segment queue entry */
 struct tseg_qent {
@@ -103,7 +138,8 @@ struct tcpcb {
 		t_idle_reduce : 1,
 		t_delayed_ack: 7,	/* Delayed ack variable */
 		t_fin_is_rst: 1,	/* Are fin's treated as resets */
-		bits_spare : 3;
+		t_log_state_set: 1,
+		bits_spare : 2;
 	u_int	t_flags;
 	tcp_seq	snd_una;		/* sent but unacknowledged */
 	tcp_seq	snd_max;		/* highest sequence number sent;
@@ -168,6 +204,8 @@ struct tcpcb {
 	u_int	t_starttime;		/* time connection was established */
 
 	u_int	t_pmtud_saved_maxseg;	/* pre-blackhole MSS */
+	int	t_blackhole_enter;	/* when to enter blackhole detection */
+	int	t_blackhole_exit;	/* when to exit blackhole detection */
 	u_int	t_rttmin;		/* minimum rtt allowed */
 
 	u_int	t_rttbest;		/* best rtt we've seen */
@@ -185,8 +223,6 @@ struct tcpcb {
 	TAILQ_HEAD(sackhole_head, sackhole) snd_holes;
 					/* SACK scoreboard (sorted) */
 	tcp_seq	snd_fack;		/* last seq number(+1) sack'd by rcv'r*/
-	tcp_seq sack_newdata;		/* New data xmitted in this recovery
-					   episode starts at this seq number */
 	struct sackblk sackblks[MAX_SACK_BLKS]; /* seq nos. of sack blocks */
 	struct sackhint	sackhint;	/* SACK scoreboard hint */
 	int	t_rttlow;		/* smallest observerved RTT */
@@ -206,6 +242,7 @@ struct tcpcb {
 	u_int	t_keepcnt;		/* number of keepalives before close */
 	int	t_dupacks;		/* consecutive dup acks recd */
 	int	t_lognum;		/* Number of log entries */
+	int	t_loglimit;		/* Maximum number of log entries */
 	struct tcp_log_stailq t_logs;	/* Log buffer */
 	struct tcp_log_id_node *t_lin;
 	struct tcp_log_id_bucket *t_lib;
@@ -217,11 +254,16 @@ struct tcpcb {
 	tcp_seq gput_ack;		/* Inbound measurement ack */
 	int32_t t_stats_gput_prev;	/* XXXLAS: Prev gput measurement */
 	uint8_t t_tfo_client_cookie_len; /* TCP Fast Open client cookie length */
+	uint32_t t_end_info_status;	/* Status flag of end info */
 	unsigned int *t_tfo_pending;	/* TCP Fast Open server pending counter */
 	union {
 		uint8_t client[TCP_FASTOPEN_MAX_COOKIE_LEN];
 		uint64_t server;
 	} t_tfo_cookie;			/* TCP Fast Open cookie to send */
+	union {
+		uint8_t t_end_info_bytes[TCP_END_BYTE_INFO];
+		uint64_t t_end_info;
+	};
 #ifdef TCPPCAP
 	struct mbufq t_inpkts;		/* List of saved input packets. */
 	struct mbufq t_outpkts;		/* List of saved output packets. */
@@ -235,7 +277,10 @@ struct tcptemp {
 	struct	tcphdr tt_t;
 };
 
-/* 
+/* Minimum map entries limit value, if set */
+#define TCP_MIN_MAP_ENTRIES_LIMIT	128
+
+/*
  * TODO: We yet need to brave plowing in
  * to tcp_input() and the pru_usrreq() block.
  * Right now these go to the old standards which
@@ -300,6 +345,7 @@ struct tcp_function_block {
 	void	(*tfb_tcp_rexmit_tmr)(struct tcpcb *);
 	int	(*tfb_tcp_handoff_ok)(struct tcpcb *);
 	void	(*tfb_tcp_mtu_chg)(struct tcpcb *);
+	int	(*tfb_pru_options)(struct tcpcb *, int);
 	volatile uint32_t tfb_refcnt;
 	uint32_t  tfb_flags;
 	uint8_t	tfb_id;
@@ -607,7 +653,7 @@ struct	tcpstat {
 	uint64_t tcps_sack_rcv_blocks;	    /* SACK blocks (options) received */
 	uint64_t tcps_sack_send_blocks;	    /* SACK blocks (options) sent     */
 	uint64_t tcps_sack_sboverflow;	    /* times scoreboard overflowed */
-	
+
 	/* ECN related stats */
 	uint64_t tcps_ecn_ce;		/* ECN Congestion Experienced */
 	uint64_t tcps_ecn_ect0;		/* ECN Capable Transport */
@@ -649,9 +695,10 @@ VNET_PCPUSTAT_DECLARE(struct tcpstat, tcpstat);	/* tcp statistics */
 /*
  * Kernel module consumers must use this accessor macro.
  */
-void	kmod_tcpstat_inc(int statnum);
-#define	KMOD_TCPSTAT_INC(name)						\
-    kmod_tcpstat_inc(offsetof(struct tcpstat, name) / sizeof(uint64_t))
+void	kmod_tcpstat_add(int statnum, int val);
+#define	KMOD_TCPSTAT_ADD(name, val)					\
+    kmod_tcpstat_add(offsetof(struct tcpstat, name) / sizeof(uint64_t), val)
+#define	KMOD_TCPSTAT_INC(name)	KMOD_TCPSTAT_ADD(name, 1)
 
 /*
  * Running TCP connection count by state.
@@ -762,7 +809,8 @@ SYSCTL_DECL(_net_inet_tcp_sack);
 MALLOC_DECLARE(M_TCPLOG);
 #endif
 
-extern	int tcp_log_in_vain;
+VNET_DECLARE(int, tcp_log_in_vain);
+#define	V_tcp_log_in_vain		VNET(tcp_log_in_vain)
 
 /*
  * Global TCP tunables shared between different stacks.
@@ -790,6 +838,8 @@ VNET_DECLARE(int, tcp_ecn_maxretries);
 VNET_DECLARE(int, tcp_initcwnd_segments);
 VNET_DECLARE(int, tcp_insecure_rst);
 VNET_DECLARE(int, tcp_insecure_syn);
+VNET_DECLARE(uint32_t, tcp_map_entries_limit);
+VNET_DECLARE(uint32_t, tcp_map_split_limit);
 VNET_DECLARE(int, tcp_minmss);
 VNET_DECLARE(int, tcp_mssdflt);
 #ifdef STATS
@@ -830,6 +880,8 @@ VNET_DECLARE(struct inpcbinfo, tcbinfo);
 #define	V_tcp_initcwnd_segments		VNET(tcp_initcwnd_segments)
 #define	V_tcp_insecure_rst		VNET(tcp_insecure_rst)
 #define	V_tcp_insecure_syn		VNET(tcp_insecure_syn)
+#define	V_tcp_map_entries_limit		VNET(tcp_map_entries_limit)
+#define	V_tcp_map_split_limit		VNET(tcp_map_split_limit)
 #define	V_tcp_minmss			VNET(tcp_minmss)
 #define	V_tcp_mssdflt			VNET(tcp_mssdflt)
 #ifdef STATS
@@ -844,7 +896,6 @@ VNET_DECLARE(struct inpcbinfo, tcbinfo);
 #define	V_tcp_sendspace			VNET(tcp_sendspace)
 #define	V_tcp_udp_tunneling_overhead	VNET(tcp_udp_tunneling_overhead)
 #define	V_tcp_udp_tunneling_port	VNET(tcp_udp_tunneling_port)
-
 
 #ifdef TCP_HHOOK
 VNET_DECLARE(struct hhook_head *, tcp_hhh[HHOOK_TCP_LAST + 1]);
@@ -883,6 +934,7 @@ void	cc_ack_received(struct tcpcb *tp, struct tcphdr *th,
 			    uint16_t nsegs, uint16_t type);
 void 	cc_conn_init(struct tcpcb *tp);
 void 	cc_post_recovery(struct tcpcb *tp, struct tcphdr *th);
+void    cc_ecnpkt_handler(struct tcpcb *tp, struct tcphdr *th, uint8_t iptos);
 void	cc_cong_signal(struct tcpcb *tp, struct tcphdr *th, uint32_t type);
 #ifdef TCP_HHOOK
 void	hhook_run_tcp_est_in(struct tcpcb *tp,
@@ -914,6 +966,19 @@ extern counter_u64_t tcp_inp_lro_compressed;
 extern counter_u64_t tcp_inp_lro_single_push;
 extern counter_u64_t tcp_inp_lro_locks_taken;
 extern counter_u64_t tcp_inp_lro_sack_wake;
+
+#ifdef NETFLIX_EXP_DETECTION
+/* Various SACK attack thresholds */
+extern int32_t tcp_force_detection;
+extern int32_t tcp_sack_to_ack_thresh;
+extern int32_t tcp_sack_to_move_thresh;
+extern int32_t tcp_restoral_thresh;
+extern int32_t tcp_sad_decay_val;
+extern int32_t tcp_sad_pacing_interval;
+extern int32_t tcp_sad_low_pps;
+extern int32_t tcp_map_minimum;
+extern int32_t tcp_attack_on_turns_on_logging;
+#endif
 
 uint32_t tcp_maxmtu(struct in_conninfo *, struct tcp_ifcap *);
 uint32_t tcp_maxmtu6(struct in_conninfo *, struct tcp_ifcap *);
@@ -986,6 +1051,7 @@ struct mbuf *
 	   int32_t seglimit, int32_t segsize, struct sockbuf *sb, bool hw_tls);
 
 int	tcp_stats_init(void);
+void tcp_log_end_status(struct tcpcb *tp, uint8_t status);
 
 static inline void
 tcp_fields_to_host(struct tcphdr *th)

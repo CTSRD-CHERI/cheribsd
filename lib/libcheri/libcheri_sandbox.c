@@ -620,11 +620,7 @@ sandbox_object_new_system_object(void * __capability private_data,
 	(*sbopp)->sbo_ddc = cheri_getdefault();
 	(*sbopp)->sbo_private_data = private_data;
 
-#ifdef __CHERI_CAPABILITY_TLS__
 	(*sbopp)->sbo_libcheri_tls = NULL;
-#else
-	(*sbopp)->sbo_libcheri_tls = cheri_getdefault();
-#endif
 
 	/*
 	 * Construct sealed invocation capabilities for use with

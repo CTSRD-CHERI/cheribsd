@@ -100,7 +100,7 @@
 #define	SHAREDPAGE		(VM_MAXUSER_ADDRESS - PAGE_SIZE)
 /*
  * To ensure that the stack base address that is sufficiently aligned to create
- * a bounded capability we must round down by 16 pages to get to 0x7ffbff0000.
+ * a precisely bounded capability we must round down by 16 pages (0x7ffbff0000).
  */
 #define	USRSTACK		(SHAREDPAGE - (15 * PAGE_SIZE))
 #ifdef __mips_n64

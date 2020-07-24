@@ -106,7 +106,7 @@ OCTEON_VENDOR_GEFES		opt_cvmx.h
 OCTEON_BOARD_CAPK_0100ND	opt_cvmx.h
 
 #
-# Options relating to Qemu-CHERI.
+# Options relating to QEMU-CHERI.
 #
 CPU_QEMU_MALTA			opt_global.h
 
@@ -119,29 +119,8 @@ PLATFORM_INIT_SECONDARY		opt_global.h
 FDT_DTB_STATIC_ONLY		opt_platform.h
 
 #
-# Enable CHERI MIPS support.
+# CHERI MIPS support.
 #
-CPU_CHERI	opt_global.h
-
-#
-# Access user space through kernel DDC (via legacy load/store instructions)
-#
-CHERI_IMPLICIT_USER_DDC	opt_global.h
-
-#
-# Support legacy CheriABI binaries
-#
-CHERIABI_LEGACY_SUPPORT	opt_global.h
-
-#
-# Experimental support for 128-bit capabilities.
-#
-CPU_CHERI128			opt_global.h
-
-#
-# Disable system-call authorisation for compartmentalised user code.
-#
-CPU_CHERI_NO_SYSCALL_AUTHORIZE opt_global.h
 
 #
 # Options that control the NetFPGA-10G Embedded CPU Ethernet Core.

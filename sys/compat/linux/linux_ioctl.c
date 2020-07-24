@@ -34,6 +34,9 @@ __FBSDID("$FreeBSD$");
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/sysproto.h>
+#ifdef COMPAT_LINUX32
+#include <sys/abi_compat.h>
+#endif
 #include <sys/capsicum.h>
 #include <sys/cdio.h>
 #include <sys/dvdio.h>
@@ -278,6 +281,7 @@ linux_ioctl_disk(struct thread *td, struct linux_ioctl_args *args)
 	struct file *fp;
 	int error;
 	u_int sectorsize;
+	uint64_t blksize64;
 	off_t mediasize;
 
 	error = fget(td, args->fd, &cap_ioctl_rights, &fp);
@@ -300,6 +304,15 @@ linux_ioctl_disk(struct thread *td, struct linux_ioctl_args *args)
 		return (copyout(&sectorsize, (void *)args->arg,
 		    sizeof(sectorsize)));
 		break;
+	case LINUX_BLKGETSIZE64:
+		error = fo_ioctl(fp, DIOCGMEDIASIZE,
+		    (caddr_t)&mediasize, td->td_ucred, td);
+		fdrop(fp, td);
+		if (error)
+			return (error);
+		blksize64 = mediasize;;
+		return (copyout(&blksize64, (void *)args->arg,
+		    sizeof(blksize64)));
 	case LINUX_BLKSSZGET:
 		error = fo_ioctl(fp, DIOCGSECTORSIZE,
 		    (caddr_t)&sectorsize, td->td_ucred, td);
@@ -500,6 +513,8 @@ bsd_to_linux_termios(struct termios *bios, struct linux_termios *lios)
 	lios->c_cc[LINUX_VDISCARD] = bios->c_cc[VDISCARD];
 	lios->c_cc[LINUX_VWERASE] = bios->c_cc[VWERASE];
 	lios->c_cc[LINUX_VLNEXT] = bios->c_cc[VLNEXT];
+	if (linux_preserve_vstatus)
+		lios->c_cc[LINUX_VSTATUS] = bios->c_cc[VSTATUS];
 
 	for (i=0; i<LINUX_NCCS; i++) {
 		if (i != LINUX_VMIN && i != LINUX_VTIME &&
@@ -614,6 +629,8 @@ linux_to_bsd_termios(struct linux_termios *lios, struct termios *bios)
 	bios->c_cc[VDISCARD] = lios->c_cc[LINUX_VDISCARD];
 	bios->c_cc[VWERASE] = lios->c_cc[LINUX_VWERASE];
 	bios->c_cc[VLNEXT] = lios->c_cc[LINUX_VLNEXT];
+	if (linux_preserve_vstatus)
+		bios->c_cc[VSTATUS] = lios->c_cc[LINUX_VSTATUS];
 
 	for (i=0; i<NCCS; i++) {
 		if (i != VMIN && i != VTIME &&
@@ -2193,9 +2210,10 @@ again:
 			struct sockaddr *sa = ifa->ifa_addr;
 
 			if (sa->sa_family == AF_INET) {
-				ifr.ifr_addr.sa_family = LINUX_AF_INET;
-				memcpy(ifr.ifr_addr.sa_data, sa->sa_data,
-				    sizeof(ifr.ifr_addr.sa_data));
+				ifr_addr_get_sa(&ifr)->sa_family =
+				    LINUX_AF_INET;
+				memcpy(ifr_addr_get_data(&ifr), sa->sa_data,
+				    sizeof(sa->sa_data));
 				sbuf_bcat(sb, &ifr, sizeof(ifr));
 				max_len += sizeof(ifr);
 				addrs++;
@@ -2205,7 +2223,7 @@ again:
 				valid_len = sbuf_len(sb);
 		}
 		if (addrs == 0) {
-			bzero((caddr_t)&ifr.ifr_addr, sizeof(ifr.ifr_addr));
+			bzero(&ifr.ifr_ifru.ifru_addr, sizeof(ifr.ifr_ifru.ifru_addr));
 			sbuf_bcat(sb, &ifr, sizeof(ifr));
 			max_len += sizeof(ifr);
 
@@ -2268,7 +2286,7 @@ bsd_to_linux_ifreq(struct ifreq *arg)
 	if ((error = copyin(arg, &ifr, ifr_len)))
 		return (error);
 
-	*(u_short *)&ifr.ifr_addr = ifr.ifr_addr.sa_family;
+	*(u_short *)ifr_addr_get_sa(&ifr) = ifr_addr_get_family(&ifr);
 
 	error = copyout(&ifr, arg, ifr_len);
 
@@ -2529,12 +2547,6 @@ linux_ioctl_drm(struct thread *td, struct linux_ioctl_args *args)
 }
 
 #ifdef COMPAT_LINUX32
-#define CP(src,dst,fld) do { (dst).fld = (src).fld; } while (0)
-#define PTRIN_CP(src,dst,fld) \
-	do { (dst).fld = PTRIN((src).fld); } while (0)
-#define PTROUT_CP(src,dst,fld) \
-	do { (dst).fld = PTROUT((src).fld); } while (0)
-
 static int
 linux_ioctl_sg_io(struct thread *td, struct linux_ioctl_args *args)
 {
@@ -3473,6 +3485,9 @@ linux_ioctl_fbsd_usb(struct thread *td, struct linux_ioctl_args *args)
 		break;
 	case FBSD_LUSB_GET_POWER_USAGE:
 		args->cmd = USB_GET_POWER_USAGE;
+		break;
+	case FBSD_LUSB_DEVICESTATS:
+		args->cmd = USB_DEVICESTATS;
 		break;
 	default:
 		error = ENOIOCTL;

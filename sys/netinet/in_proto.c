@@ -62,9 +62,6 @@ __FBSDID("$FreeBSD$");
 #include <net/if.h>
 #include <net/if_var.h>
 #include <net/route.h>
-#ifdef RADIX_MPATH
-#include <net/radix_mpath.h>
-#endif
 #include <net/vnet.h>
 #endif /* INET */
 
@@ -146,7 +143,7 @@ struct protosw inetsw[] = {
 	.pr_usrreqs =		&tcp_usrreqs
 },
 #ifdef SCTP
-{ 
+{
 	.pr_type =		SOCK_SEQPACKET,
 	.pr_domain =		&inetdomain,
 	.pr_protocol =		IPPROTO_SCTP,
@@ -158,7 +155,7 @@ struct protosw inetsw[] = {
 	.pr_drain =		sctp_drain,
 	.pr_usrreqs =		&sctp_usrreqs
 },
-{ 
+{
 	.pr_type =		SOCK_STREAM,
 	.pr_domain =		&inetdomain,
 	.pr_protocol =		IPPROTO_SCTP,
@@ -166,7 +163,7 @@ struct protosw inetsw[] = {
 	.pr_input =		sctp_input,
 	.pr_ctlinput =		sctp_ctlinput,
 	.pr_ctloutput =		sctp_ctloutput,
-	.pr_drain =		sctp_drain,
+	.pr_drain =		NULL, /* Covered by the SOCK_SEQPACKET entry. */
 	.pr_usrreqs =		&sctp_usrreqs
 },
 #endif /* SCTP */
@@ -297,7 +294,7 @@ IPPROTOSPACER,
 },
 };
 
-extern int in_inithead(void **, int);
+extern int in_inithead(void **, int, u_int);
 extern int in_detachhead(void **, int);
 
 struct domain inetdomain = {
@@ -305,11 +302,7 @@ struct domain inetdomain = {
 	.dom_name =		"internet",
 	.dom_protosw =		inetsw,
 	.dom_protoswNPROTOSW =	&inetsw[nitems(inetsw)],
-#ifdef RADIX_MPATH
-	.dom_rtattach =		rn4_mpath_inithead,
-#else
 	.dom_rtattach =		in_inithead,
-#endif
 #ifdef VIMAGE
 	.dom_rtdetach =		in_detachhead,
 #endif
@@ -320,25 +313,37 @@ struct domain inetdomain = {
 VNET_DOMAIN_SET(inet);
 #endif /* INET */
 
-SYSCTL_NODE(_net,      PF_INET,		inet,	CTLFLAG_RW, 0,
-	"Internet Family");
+SYSCTL_NODE(_net, PF_INET, inet, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
+    "Internet Family");
 
-SYSCTL_NODE(_net_inet, IPPROTO_IP,	ip,	CTLFLAG_RW, 0,	"IP");
-SYSCTL_NODE(_net_inet, IPPROTO_ICMP,	icmp,	CTLFLAG_RW, 0,	"ICMP");
-SYSCTL_NODE(_net_inet, IPPROTO_UDP,	udp,	CTLFLAG_RW, 0,	"UDP");
-SYSCTL_NODE(_net_inet, IPPROTO_TCP,	tcp,	CTLFLAG_RW, 0,	"TCP");
+SYSCTL_NODE(_net_inet, IPPROTO_IP, ip, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
+    "IP");
+SYSCTL_NODE(_net_inet, IPPROTO_ICMP, icmp, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
+    "ICMP");
+SYSCTL_NODE(_net_inet, IPPROTO_UDP, udp, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
+    "UDP");
+SYSCTL_NODE(_net_inet, IPPROTO_TCP, tcp, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
+    "TCP");
 #ifdef SCTP
-SYSCTL_NODE(_net_inet, IPPROTO_SCTP,	sctp,	CTLFLAG_RW, 0,	"SCTP");
+SYSCTL_NODE(_net_inet, IPPROTO_SCTP, sctp, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
+    "SCTP");
 #endif
-SYSCTL_NODE(_net_inet, IPPROTO_IGMP,	igmp,	CTLFLAG_RW, 0,	"IGMP");
+SYSCTL_NODE(_net_inet, IPPROTO_IGMP, igmp, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
+    "IGMP");
 #if defined(IPSEC) || defined(IPSEC_SUPPORT)
 /* XXX no protocol # to use, pick something "reserved" */
-SYSCTL_NODE(_net_inet, 253,		ipsec,	CTLFLAG_RW, 0,	"IPSEC");
-SYSCTL_NODE(_net_inet, IPPROTO_AH,	ah,	CTLFLAG_RW, 0,	"AH");
-SYSCTL_NODE(_net_inet, IPPROTO_ESP,	esp,	CTLFLAG_RW, 0,	"ESP");
-SYSCTL_NODE(_net_inet, IPPROTO_IPCOMP,	ipcomp,	CTLFLAG_RW, 0,	"IPCOMP");
-SYSCTL_NODE(_net_inet, IPPROTO_IPIP,	ipip,	CTLFLAG_RW, 0,	"IPIP");
+SYSCTL_NODE(_net_inet, 253, ipsec, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
+    "IPSEC");
+SYSCTL_NODE(_net_inet, IPPROTO_AH, ah, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
+    "AH");
+SYSCTL_NODE(_net_inet, IPPROTO_ESP, esp, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
+    "ESP");
+SYSCTL_NODE(_net_inet, IPPROTO_IPCOMP, ipcomp, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
+    "IPCOMP");
+SYSCTL_NODE(_net_inet, IPPROTO_IPIP, ipip, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
+    "IPIP");
 #endif /* IPSEC */
-SYSCTL_NODE(_net_inet, IPPROTO_RAW,	raw,	CTLFLAG_RW, 0,	"RAW");
-SYSCTL_NODE(_net_inet, OID_AUTO,	accf,	CTLFLAG_RW, 0,
+SYSCTL_NODE(_net_inet, IPPROTO_RAW, raw, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
+    "RAW");
+SYSCTL_NODE(_net_inet, OID_AUTO, accf, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
     "Accept filters");

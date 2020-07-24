@@ -31,16 +31,14 @@ NO_WTAUTOLOGICAL_POINTER_COMPARE= -Wno-tautological-pointer-compare
 CWARNEXTRA?=	-Wno-error-tautological-compare -Wno-error-empty-body \
 		-Wno-error-parentheses-equality -Wno-error-unused-function \
 		-Wno-error-pointer-sign
-.if ${COMPILER_VERSION} >= 30700
 CWARNEXTRA+=	-Wno-error-shift-negative-value
-.endif
-.if ${COMPILER_VERSION} >= 40000
 CWARNEXTRA+=	-Wno-address-of-packed-member
+.if ${COMPILER_VERSION} >= 100000
+NO_WMISLEADING_INDENTATION=	-Wno-misleading-indentation
 .endif
-.endif
+.endif	# clang
 
 .if ${COMPILER_TYPE} == "gcc"
-.if ${COMPILER_VERSION} >= 40800
 # Catch-all for all the things that are in our tree, but for which we're
 # not yet ready for this compiler.
 NO_WUNUSED_BUT_SET_VARIABLE = -Wno-unused-but-set-variable
@@ -52,15 +50,13 @@ CWARNEXTRA?=	-Wno-error=address				\
 		-Wno-error=enum-compare				\
 		-Wno-error=inline				\
 		-Wno-error=maybe-uninitialized			\
+		-Wno-error=misleading-indentation		\
+		-Wno-error=nonnull-compare			\
 		-Wno-error=overflow				\
 		-Wno-error=sequence-point			\
-		-Wno-unused-but-set-variable
-.if ${COMPILER_VERSION} >= 60100
-CWARNEXTRA+=	-Wno-error=misleading-indentation		\
-		-Wno-error=nonnull-compare			\
 		-Wno-error=shift-overflow			\
-		-Wno-error=tautological-compare
-.endif
+		-Wno-error=tautological-compare			\
+		-Wno-unused-but-set-variable
 .if ${COMPILER_VERSION} >= 70100
 CWARNEXTRA+=	-Wno-error=stringop-overflow
 .endif
@@ -70,15 +66,10 @@ CWARNEXTRA+=	-Wno-error=memset-elt-size
 .if ${COMPILER_VERSION} >= 80000
 CWARNEXTRA+=	-Wno-error=packed-not-aligned
 .endif
-.else
-# For gcc 4.2, eliminate the too-often-wrong warnings about uninitialized vars.
-CWARNEXTRA?=	-Wno-uninitialized
-# GCC 4.2 doesn't have -Wno-error=cast-qual, so just disable the warning for
-# the few files that are already known to generate cast-qual warnings.
-NO_WCAST_QUAL= -Wno-cast-qual
-NO_WNONNULL=	-Wno-nonnull
+.if ${COMPILER_VERSION} >= 90100
+CWARNEXTRA+=	-Wno-address-of-packed-member
 .endif
-.endif
+.endif	# gcc
 
 # This warning is utter nonsense
 CWARNFLAGS+=	-Wno-format-zero-length
@@ -87,7 +78,7 @@ CWARNFLAGS+=	-Wno-format-zero-length
 # to be disabled.  WARNING: format checking is disabled in this case.
 .if ${MK_FORMAT_EXTENSIONS} == "no"
 FORMAT_EXTENSIONS=	-Wno-format
-.elif ${COMPILER_TYPE} == "clang" && ${COMPILER_VERSION} >= 30600
+.elif ${COMPILER_TYPE} == "clang"
 FORMAT_EXTENSIONS=	-D__printf__=__freebsd_kprintf__
 .else
 FORMAT_EXTENSIONS=	-fformat-extensions
@@ -133,14 +124,32 @@ INLINE_LIMIT?=	8000
 
 #
 # For RISC-V we specify the soft-float ABI (lp64) to avoid the use of floating
-# point registers within the kernel. We also specify the "medium" code model,
-# which generates code suitable for a 2GiB addressing range located at any
-# offset, allowing modules to be located anywhere in the 64-bit address space.
-# Note that clang and GCC refer to this code model as "medium" and "medany"
-# respectively.
+# point registers within the kernel. However, for kernels supporting hardware
+# float (FPE), we have to include that in the march so we can have limited
+# floating point support in context switching needed for that. This is different
+# than userland where we use a hard-float ABI (lp64d).
+#
+# We also specify the "medium" code model, which generates code suitable for a
+# 2GiB addressing range located at any offset, allowing modules to be located
+# anywhere in the 64-bit address space.  Note that clang and GCC refer to this
+# code model as "medium" and "medany" respectively.
 #
 .if ${MACHINE_CPUARCH} == "riscv"
-CFLAGS+=	-march=rv64imafdc -mabi=lp64
+.if ${MACHINE_ARCH:Mriscv*sf}
+RISCV_MARCH=	rv64imac
+.else
+RISCV_MARCH=	rv64imafdc
+.endif
+.if ${MACHINE_CPU:Mcheri}
+RISCV_MARCH:=	${RISCV_MARCH}xcheri
+.endif
+
+RISCV_ABI=	lp64
+.if ${MACHINE_ARCH:Mriscv*c*}
+RISCV_ABI=	l64pc128
+.endif
+
+CFLAGS+=	-march=${RISCV_MARCH} -mabi=${RISCV_ABI}
 CFLAGS.clang+=	-mcmodel=medium
 CFLAGS.gcc+=	-mcmodel=medany
 INLINE_LIMIT?=	8000
@@ -148,18 +157,6 @@ INLINE_LIMIT?=	8000
 .if ${LINKER_FEATURES:Mriscv-relaxations} == ""
 CFLAGS+=	-mno-relax
 .endif
-.endif
-
-#
-# For sparc64 we want the medany code model so modules may be located
-# anywhere in the 64-bit address space.  We also tell GCC to use floating
-# point emulation.  This avoids using floating point registers for integer
-# operations which it has a tendency to do.
-#
-.if ${MACHINE_CPUARCH} == "sparc64"
-CFLAGS.clang+=	-mcmodel=large -fno-dwarf2-cfi-asm
-CFLAGS.gcc+=	-mcmodel=medany -msoft-float
-INLINE_LIMIT?=	15000
 .endif
 
 #
@@ -202,12 +199,7 @@ CFLAGS.gcc+=	-mno-spe
 # DDB happy. ELFv2, if available, has some other efficiency benefits.
 #
 .if ${MACHINE_ARCH} == "powerpc64"
-.if ${COMPILER_VERSION} >= 40900
-CFLAGS.gcc+=	-mabi=elfv2
-.else
-CFLAGS.gcc+=	-mcall-aixdesc
-.endif
-CFLAGS.clang+=	-mabi=elfv2
+CFLAGS+=	-mabi=elfv2
 .endif
 
 #
@@ -238,7 +230,7 @@ CFLAGS+=	-fwrapv
 #
 # GCC SSP support
 #
-.if ${MK_SSP} != "no" && \
+.if ${MK_SSP} != "no" && !${MACHINE_ABI:Mpurecap} && \
     ${MACHINE_CPUARCH} != "arm" && ${MACHINE_CPUARCH} != "mips"
 CFLAGS+=	-fstack-protector
 .endif
@@ -326,5 +318,5 @@ LD_EMULATION_powerpc= elf32ppc_fbsd
 LD_EMULATION_powerpcspe= elf32ppc_fbsd
 LD_EMULATION_powerpc64= elf64ppc_fbsd
 LD_EMULATION_riscv64= elf64lriscv
-LD_EMULATION_sparc64= elf64_sparc_fbsd
+LD_EMULATION_riscv64sf= elf64lriscv
 LD_EMULATION=${LD_EMULATION_${MACHINE_ARCH}}

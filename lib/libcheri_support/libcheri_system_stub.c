@@ -61,7 +61,7 @@ sbrk(int incr)
 	if (heapcap == NULL) {
 		if (_sb_heapbase == 0 || _sb_heaplen == 0)
 			return (NULL);
-		heapcap = cheri_csetbounds(cheri_setoffset(cheri_getdefault(),
+		heapcap = cheri_setbounds(cheri_setoffset(cheri_getdefault(),
 		    _sb_heapbase), _sb_heaplen);
 		assert(heapcap != NULL);
 	}

@@ -32,6 +32,8 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
+#include "opt_bhyve_snapshot.h"
+
 #include <sys/param.h>
 #include <sys/queue.h>
 #include <sys/lock.h>
@@ -42,6 +44,7 @@ __FBSDID("$FreeBSD$");
 
 #include <x86/apicreg.h>
 #include <machine/vmm.h>
+#include <machine/vmm_snapshot.h>
 
 #include "vmm_ktr.h"
 #include "vmm_lapic.h"
@@ -353,7 +356,7 @@ vioapic_write(struct vioapic *vioapic, int vcpuid, uint32_t addr, uint32_t data)
 			    "vlapic trigger-mode register", pin);
 			VIOAPIC_UNLOCK(vioapic);
 			allvcpus = vm_active_cpus(vioapic->vm);
-			vm_smp_rendezvous(vioapic->vm, vcpuid, allvcpus,
+			(void)vm_smp_rendezvous(vioapic->vm, vcpuid, allvcpus,
 			    vioapic_update_tmr, NULL);
 			VIOAPIC_LOCK(vioapic);
 		}
@@ -499,3 +502,22 @@ vioapic_pincount(struct vm *vm)
 
 	return (REDIR_ENTRIES);
 }
+
+#ifdef BHYVE_SNAPSHOT
+int
+vioapic_snapshot(struct vioapic *vioapic, struct vm_snapshot_meta *meta)
+{
+	int ret;
+	int i;
+
+	SNAPSHOT_VAR_OR_LEAVE(vioapic->ioregsel, meta, ret, done);
+
+	for (i = 0; i < nitems(vioapic->rtbl); i++) {
+		SNAPSHOT_VAR_OR_LEAVE(vioapic->rtbl[i].reg, meta, ret, done);
+		SNAPSHOT_VAR_OR_LEAVE(vioapic->rtbl[i].acnt, meta, ret, done);
+	}
+
+done:
+	return (ret);
+}
+#endif

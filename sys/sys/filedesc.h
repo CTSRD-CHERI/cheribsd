@@ -42,6 +42,8 @@
 #include <sys/priority.h>
 #include <sys/seqc.h>
 #include <sys/sx.h>
+#include <sys/_smr.h>
+#include <sys/smr_types.h>
 
 #include <machine/_limits.h>
 
@@ -76,11 +78,23 @@ struct fdescenttbl {
  */
 #define NDSLOTTYPE	u_long
 
+/*
+ * This struct is copy-on-write and allocated from an SMR zone.
+ * All fields are constant after initialization apart from the reference count.
+ *
+ * Check pwd_* routines for usage.
+ */
+struct pwd {
+	volatile u_int pwd_refcount;
+	struct	vnode *pwd_cdir;		/* current directory */
+	struct	vnode *pwd_rdir;		/* root directory */
+	struct	vnode *pwd_jdir;		/* jail root directory */
+};
+typedef SMR_POINTER(struct pwd *) smrpwd_t;
+
 struct filedesc {
 	struct	fdescenttbl *fd_files;	/* open files table */
-	struct	vnode *fd_cdir;		/* current directory */
-	struct	vnode *fd_rdir;		/* root directory */
-	struct	vnode *fd_jdir;		/* jail root directory */
+	smrpwd_t fd_pwd;		/* directories */
 	NDSLOTTYPE *fd_map;		/* bitmap of free fds */
 	int	fd_lastfile;		/* high-water mark of fd_ofiles */
 	int	fd_freefile;		/* approx. next free file */
@@ -135,6 +149,38 @@ struct filedesc_to_leader {
 #define	FILEDESC_XLOCK_ASSERT(fdp)	sx_assert(&(fdp)->fd_sx, SX_XLOCKED | \
 					    SX_NOTRECURSED)
 #define	FILEDESC_UNLOCK_ASSERT(fdp)	sx_assert(&(fdp)->fd_sx, SX_UNLOCKED)
+
+#define	FILEDESC_LOCKED_LOAD_PWD(fdp)	({					\
+	struct filedesc *_fdp = (fdp);						\
+	struct pwd *_pwd;							\
+	_pwd = smr_serialized_load(&(_fdp)->fd_pwd,				\
+	    (FILEDESC_LOCK_ASSERT(_fdp), true));				\
+	_pwd;									\
+})
+
+#define	FILEDESC_XLOCKED_LOAD_PWD(fdp)	({					\
+	struct filedesc *_fdp = (fdp);						\
+	struct pwd *_pwd;							\
+	_pwd = smr_serialized_load(&(_fdp)->fd_pwd,				\
+	    (FILEDESC_XLOCK_ASSERT(_fdp), true));				\
+	_pwd;									\
+})
+
+#else
+
+/*
+ * Accessor for libkvm et al.
+ */
+#define	FILEDESC_KVM_LOAD_PWD(fdp)	({					\
+	struct filedesc *_fdp = (fdp);						\
+	struct pwd *_pwd;							\
+	_pwd = smr_kvm_load(&(_fdp)->fd_pwd);					\
+	_pwd;									\
+})
+
+#endif
+
+#ifdef _KERNEL
 
 /* Operation types for kern_dup(). */
 enum {
@@ -204,8 +250,10 @@ int	fget_cap(struct thread *td, int fd, cap_rights_t *needrightsp,
 	    struct file **fpp, struct filecaps *havecapsp);
 
 /* Return a referenced file from an unlocked descriptor. */
-int	fget_unlocked(struct filedesc *fdp, int fd, cap_rights_t *needrightsp,
+int	fget_unlocked_seq(struct filedesc *fdp, int fd, cap_rights_t *needrightsp,
 	    struct file **fpp, seqc_t *seqp);
+int	fget_unlocked(struct filedesc *fdp, int fd, cap_rights_t *needrightsp,
+	    struct file **fpp);
 
 /* Requires a FILEDESC_{S,X}LOCK held and returns without a ref. */
 static __inline struct file *
@@ -250,6 +298,18 @@ fd_modified(struct filedesc *fdp, int fd, seqc_t seqc)
 void	pwd_chdir(struct thread *td, struct vnode *vp);
 int	pwd_chroot(struct thread *td, struct vnode *vp);
 void	pwd_ensure_dirs(void);
+void	pwd_set_rootvnode(void);
+
+struct pwd *pwd_hold_filedesc(struct filedesc *fdp);
+struct pwd *pwd_hold(struct thread *td);
+void	pwd_drop(struct pwd *pwd);
+static inline void
+pwd_set(struct filedesc *fdp, struct pwd *newpwd)
+{
+
+	smr_serialized_store(&fdp->fd_pwd, newpwd,
+	    (FILEDESC_XLOCK_ASSERT(fdp), true));
+}
 
 #endif /* _KERNEL */
 

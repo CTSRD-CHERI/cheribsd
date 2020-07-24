@@ -41,14 +41,15 @@ struct nhop6_basic {
 	struct in6_addr	nh_addr;	/* GW/DST IPv4 address */
 };
 
-/* Does not differ from nhop6_basic */
+/* Extended nexthop info used for control protocols. */
 struct nhop6_extended {
 	struct ifnet	*nh_ifp;	/* Logical egress interface */
+	struct in6_ifaddr *nh_ia;	/* Associated address. */
 	uint16_t	nh_mtu;		/* nexthop mtu */
 	uint16_t	nh_flags;	/* nhop flags */
 	uint8_t		spare[4];
 	struct in6_addr	nh_addr;	/* GW/DST IPv6 address */
-	uint64_t	spare2[2];
+	uint64_t	spare2[1];
 };
 
 int fib6_lookup_nh_basic(uint32_t fibnum, const struct in6_addr *dst,
@@ -57,5 +58,13 @@ int fib6_lookup_nh_ext(uint32_t fibnum, const struct in6_addr *dst,
     uint32_t scopeid, uint32_t flags, uint32_t flowid,
     struct nhop6_extended *pnh6);
 void fib6_free_nh_ext(uint32_t fibnum, struct nhop6_extended *pnh6);
+
+struct nhop_object *fib6_lookup(uint32_t fibnum,
+    const struct in6_addr *dst6, uint32_t scopeid, uint32_t flags,
+    uint32_t flowid);
+int fib6_check_urpf(uint32_t fibnum, const struct in6_addr *dst6,
+    uint32_t scopeid, uint32_t flags, const struct ifnet *src_if);
+struct nhop_object *fib6_lookup_debugnet(uint32_t fibnum,
+    const struct in6_addr *dst6, uint32_t scopeid, uint32_t flags);
 #endif
 

@@ -54,7 +54,7 @@ static eventhandler_tag pfs_exit_tag;
 static void pfs_exit(void *arg, struct proc *p);
 static void pfs_purge_all(void);
 
-static SYSCTL_NODE(_vfs_pfs, OID_AUTO, vncache, CTLFLAG_RW, 0,
+static SYSCTL_NODE(_vfs_pfs, OID_AUTO, vncache, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
     "pseudofs vnode cache");
 
 static int pfs_vncache_entries;
@@ -291,7 +291,7 @@ pfs_purge_one(struct vnode *vnp)
 
 	VOP_LOCK(vnp, LK_EXCLUSIVE);
 	vgone(vnp);
-	VOP_UNLOCK(vnp, 0);
+	VOP_UNLOCK(vnp);
 	vdrop(vnp);
 }
 

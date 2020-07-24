@@ -1,0 +1,12 @@
+#NO_UNIVERSE
+
+include "GENERIC"
+# Spike does not have a disk device so we need a MFS root
+include "std.MFS_ROOT"
+
+ident SPIKE
+
+options 	HZ=100
+
+options 	BREAK_TO_DEBUGGER
+options 	ALT_BREAK_TO_DEBUGGER

@@ -78,7 +78,7 @@ __FBSDID("$FreeBSD$");
 #include <netinet/udp.h>
 
 #include <machine/bus.h>
-#if defined(__powerpc__) || defined(__sparc64__)
+#if defined(__powerpc__)
 #include <dev/ofw/ofw_bus.h>
 #include <dev/ofw/openfirm.h>
 #include <machine/ofw_machdep.h>
@@ -208,7 +208,7 @@ cas_attach(struct cas_softc *sc)
 	callout_init_mtx(&sc->sc_tick_ch, &sc->sc_mtx, 0);
 	callout_init_mtx(&sc->sc_rx_ch, &sc->sc_mtx, 0);
 	/* Create local taskq. */
-	TASK_INIT(&sc->sc_intr_task, 0, cas_intr_task, sc);
+	NET_TASK_INIT(&sc->sc_intr_task, 0, cas_intr_task, sc);
 	TASK_INIT(&sc->sc_tx_task, 1, cas_tx_task, ifp);
 	sc->sc_tq = taskqueue_create_fast("cas_taskq", M_WAITOK,
 	    taskqueue_thread_enqueue, &sc->sc_tq);
@@ -1045,14 +1045,10 @@ cas_init_locked(struct cas_softc *sc)
 
 	/*
 	 * Enable infinite bursts for revisions without PCI issues if
-	 * applicable.  Doing so greatly improves the TX performance on
-	 * !__sparc64__ (on sparc64, setting CAS_INF_BURST improves TX
-	 * performance only marginally but hurts RX throughput quite a bit).
+	 * applicable.  Doing so greatly improves the TX performance.
 	 */
 	CAS_WRITE_4(sc, CAS_INF_BURST,
-#if !defined(__sparc64__)
 	    (sc->sc_flags & CAS_TABORT) == 0 ? CAS_INF_BURST_EN :
-#endif
 	    0);
 
 	/* Set up interrupts. */
@@ -1612,11 +1608,14 @@ cas_tint(struct cas_softc *sc)
 static void
 cas_rint_timeout(void *arg)
 {
+	struct epoch_tracker et;
 	struct cas_softc *sc = arg;
 
 	CAS_LOCK_ASSERT(sc, MA_OWNED);
 
+	NET_EPOCH_ENTER(et);
 	cas_rint(sc);
+	NET_EPOCH_EXIT(et);
 }
 
 static void
@@ -2652,7 +2651,7 @@ cas_pci_attach(device_t dev)
 	char buf[sizeof(CAS_LOCAL_MAC_ADDRESS)];
 	struct cas_softc *sc;
 	int i;
-#if !(defined(__powerpc__) || defined(__sparc64__))
+#if !defined(__powerpc__)
 	u_char enaddr[4][ETHER_ADDR_LEN];
 	u_int j, k, lma, pcs[4], phy;
 #endif
@@ -2696,7 +2695,7 @@ cas_pci_attach(device_t dev)
 
 	CAS_LOCK_INIT(sc, device_get_nameunit(dev));
 
-#if defined(__powerpc__) || defined(__sparc64__)
+#if defined(__powerpc__)
 	OF_getetheraddr(dev, sc->sc_enaddr);
 	if (OF_getprop(ofw_bus_get_node(dev), CAS_PHY_INTERFACE, buf,
 	    sizeof(buf)) > 0 || OF_getprop(ofw_bus_get_node(dev),

@@ -62,11 +62,22 @@ __FBSDID("$FreeBSD$");
 static void linux_fixup_prot(struct thread *td, int *prot);
 #endif
 
+static int
+linux_mmap_check_fp(struct file *fp, int flags, int prot, int maxprot)
+{
+
+	/* Linux mmap() just fails for O_WRONLY files */
+	if ((fp->f_flag & FREAD) == 0)
+		return (EACCES);
+
+	return (0);
+}
 
 int
 linux_mmap_common(struct thread *td, uintptr_t addr, size_t len, int prot,
     int flags, int fd, off_t pos)
 {
+	struct mmap_req mr, mr_fixed;
 	struct proc *p = td->td_proc;
 	struct vmspace *vms = td->td_proc->p_vmspace;
 	int bsd_flags, error;
@@ -103,6 +114,14 @@ linux_mmap_common(struct thread *td, uintptr_t addr, size_t len, int prot,
 	if (flags & LINUX_MAP_GROWSDOWN)
 		bsd_flags |= MAP_STACK;
 
+#if defined(__amd64__)
+	/*
+	 * According to the Linux mmap(2) man page, "MAP_32BIT flag
+	 * is ignored when MAP_FIXED is set."
+	 */
+	if ((flags & LINUX_MAP_32BIT) && (flags & LINUX_MAP_FIXED) == 0)
+		bsd_flags |= MAP_32BIT;
+
 	/*
 	 * PROT_READ, PROT_WRITE, or PROT_EXEC implies PROT_READ and PROT_EXEC
 	 * on Linux/i386 if the binary requires executable stack.
@@ -111,37 +130,11 @@ linux_mmap_common(struct thread *td, uintptr_t addr, size_t len, int prot,
 	 *
 	 * XXX. Linux checks that the file system is not mounted with noexec.
 	 */
-#if defined(__amd64__)
 	linux_fixup_prot(td, &prot);
 #endif
 
 	/* Linux does not check file descriptor when MAP_ANONYMOUS is set. */
 	fd = (bsd_flags & MAP_ANON) ? -1 : fd;
-	if (fd != -1) {
-		/*
-		 * Linux follows Solaris mmap(2) description:
-		 * The file descriptor fildes is opened with
-		 * read permission, regardless of the
-		 * protection options specified.
-		 */
-
-		error = fget(td, fd, &cap_mmap_rights, &fp);
-		if (error != 0)
-			return (error);
-		if (fp->f_type != DTYPE_VNODE && fp->f_type != DTYPE_DEV) {
-			fdrop(fp, td);
-			return (EINVAL);
-		}
-
-		/* Linux mmap() just fails for O_WRONLY files */
-		if (!(fp->f_flag & FREAD)) {
-			fdrop(fp, td);
-			return (EACCES);
-		}
-
-		fdrop(fp, td);
-	}
-
 	if (flags & LINUX_MAP_GROWSDOWN) {
 		/*
 		 * The Linux MAP_GROWSDOWN option does not limit auto
@@ -209,15 +202,25 @@ linux_mmap_common(struct thread *td, uintptr_t addr, size_t len, int prot,
 	 * address is not zero, try with MAP_FIXED and MAP_EXCL first,
 	 * and fall back to the normal behaviour if that fails.
 	 */
+	mr = (struct mmap_req) {
+		.mr_hint = addr,
+		.mr_len = len,
+		.mr_prot = prot,
+		.mr_flags = bsd_flags,
+		.mr_fd = fd,
+		.mr_pos = pos,
+		.mr_check_fp_fn = linux_mmap_check_fp,
+	};
 	if (addr != 0 && (bsd_flags & MAP_FIXED) == 0 &&
 	    (bsd_flags & MAP_EXCL) == 0) {
-		error = kern_mmap(td, addr, len, prot,
-		    bsd_flags | MAP_FIXED | MAP_EXCL, fd, pos);
+		mr_fixed = mr;
+		mr_fixed.mr_flags |= MAP_FIXED | MAP_EXCL;
+		error = kern_mmap_req(td, &mr_fixed);
 		if (error == 0)
 			goto out;
 	}
 
-	error = kern_mmap(td, addr, 0, len, prot, bsd_flags, fd, pos);
+	error = kern_mmap_req(td, &mr);
 out:
 	LINUX_CTR2(mmap2, "return: %d (%p)", error, td->td_retval[0]);
 

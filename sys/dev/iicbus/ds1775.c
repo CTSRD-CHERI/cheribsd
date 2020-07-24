@@ -2,7 +2,6 @@
  * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
  *
  * Copyright (c) 2010 Andreas Tobler
- * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -104,7 +103,7 @@ ds1775_read_2(device_t dev, uint32_t addr, uint8_t reg, uint16_t *data)
 
 	for (;;)
 	{
-		err = iicbus_transfer(dev, msg, 2);
+		err = iicbus_transfer(dev, msg, nitems(msg));
 		if (err != 0)
 			goto retry;
 
@@ -189,7 +188,7 @@ ds1775_start(void *xdev)
 	ctx = device_get_sysctl_ctx(dev);
 	sensroot_oid = SYSCTL_ADD_NODE(ctx,
 	    SYSCTL_CHILDREN(device_get_sysctl_tree(dev)), OID_AUTO, "sensor",
-	    CTLFLAG_RD, 0, "DS1775 Sensor Information");
+	    CTLFLAG_RD | CTLFLAG_MPSAFE, 0, "DS1775 Sensor Information");
 
 	if (OF_getprop(child, "hwsensor-zone", &sc->sc_sensor.zone,
 		       sizeof(int)) < 0)
@@ -225,8 +224,8 @@ ds1775_start(void *xdev)
 
 	sprintf(sysctl_desc,"%s %s", sc->sc_sensor.name, "(C)");
 	oid = SYSCTL_ADD_NODE(ctx, SYSCTL_CHILDREN(sensroot_oid),
-			      OID_AUTO, sysctl_name, CTLFLAG_RD, 0,
-			      "Sensor Information");
+	    OID_AUTO, sysctl_name, CTLFLAG_RD | CTLFLAG_MPSAFE, 0,
+	    "Sensor Information");
 	SYSCTL_ADD_PROC(ctx, SYSCTL_CHILDREN(oid), OID_AUTO, "temp",
 			CTLTYPE_INT | CTLFLAG_RD | CTLFLAG_MPSAFE, dev,
 			0, ds1775_sensor_sysctl, "IK", sysctl_desc);

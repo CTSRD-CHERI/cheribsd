@@ -39,18 +39,15 @@ static char sccsid[] = "@(#)memcmp.c	8.1 (Berkeley) 6/4/93";
 __FBSDID("$FreeBSD$");
 
 #include <string.h>
-#include "cheri_private.h"
 
 /*
  * Compare memory regions.
  */
 int
-__CAPSUFFIX(memcmp)(const void * __CAP s1, const void * __CAP s2,
-    size_t n)
+memcmp(const void *s1, const void *s2, size_t n)
 {
 	if (n != 0) {
-		const unsigned char * __CAP p1 = s1;
-		const unsigned char * __CAP p2 = s2;
+		const unsigned char *p1 = s1, *p2 = s2;
 
 		do {
 			if (*p1++ != *p2++)

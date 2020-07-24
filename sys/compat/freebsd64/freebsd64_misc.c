@@ -140,8 +140,8 @@ struct sf_hdtr64 {
 
 FEATURE(compat_freebsd64_abi, "Compatible 64-bit FreeBSD system call ABI");
 
-static int freebsd64_kevent_copyout(void *arg, kkevent_t *kevp, int count);
-static int freebsd64_kevent_copyin(void *arg, kkevent_t *kevp, int count);
+static int freebsd64_kevent_copyout(void *arg, struct kevent *kevp, int count);
+static int freebsd64_kevent_copyin(void *arg, struct kevent *kevp, int count);
 
 int
 freebsd64_wait4(struct thread *td, struct freebsd64_wait4_args *uap)
@@ -154,7 +154,7 @@ freebsd64_wait4(struct thread *td, struct freebsd64_wait4_args *uap)
 int
 freebsd64_wait6(struct thread *td, struct freebsd64_wait6_args *uap)
 {
-	_siginfo_t si, *sip;
+	siginfo_t si, *sip;
 	struct siginfo64 si64;
 	int error;
 	
@@ -168,7 +168,7 @@ freebsd64_wait6(struct thread *td, struct freebsd64_wait6_args *uap)
 	    __USER_CAP_OBJ(uap->wrusage), sip);
 	if (uap->info != NULL && error == 0) {
 		siginfo_to_siginfo64(&si, &si64);
-		error = copyout(&si64, uap->info, sizeof(si64));
+		error = copyout(&si64, __USER_CAP_OBJ(uap->info), sizeof(si64));
 	}
 	return (error);
 }
@@ -216,7 +216,7 @@ freebsd64_fexecve(struct thread *td, struct freebsd64_fexecve_args *uap)
  * Copy 'count' items into the destination list pointed to by uap->eventlist.
  */
 static int
-freebsd64_kevent_copyout(void *arg, kkevent_t *kevp, int count)
+freebsd64_kevent_copyout(void *arg, struct kevent *kevp, int count)
 {
 	struct freebsd64_kevent_args *uap;
 	struct kevent64 ks64[KQ_NEVENTS];
@@ -231,10 +231,11 @@ freebsd64_kevent_copyout(void *arg, kkevent_t *kevp, int count)
 		ks64[i].flags = kevp[i].flags;
 		ks64[i].fflags = kevp[i].fflags;
 		ks64[i].data = kevp[i].data;
-		ks64[i].udata = (void *)(__cheri_addr vaddr_t)kevp[i].udata;
+		ks64[i].udata = (__cheri_addr uint64_t)kevp[i].udata;
 		memcpy(&ks64[i].ext[0], &kevp->ext[0], sizeof(kevp->ext));
 	}
-	error = copyout(ks64, uap->eventlist, count * sizeof(*ks64));
+	error = copyout(ks64, __USER_CAP_ARRAY(uap->eventlist, count),
+	    count * sizeof(*ks64));
 	if (error == 0)
 		uap->eventlist += count;
 	return (error);
@@ -244,7 +245,7 @@ freebsd64_kevent_copyout(void *arg, kkevent_t *kevp, int count)
  * Copy 'count' items from the list pointed to by uap->changelist.
  */
 static int
-freebsd64_kevent_copyin(void *arg, kkevent_t *kevp, int count)
+freebsd64_kevent_copyin(void *arg, struct kevent *kevp, int count)
 {
 	struct freebsd64_kevent_args *uap;
 	struct kevent64 ks64[KQ_NEVENTS];
@@ -253,7 +254,8 @@ freebsd64_kevent_copyin(void *arg, kkevent_t *kevp, int count)
 	KASSERT(count <= KQ_NEVENTS, ("count (%d) > KQ_NEVENTS", count));
 	uap = (struct freebsd64_kevent_args *)arg;
 
-	error = copyin(uap->changelist, ks64, count * sizeof(*ks64));
+	error = copyin(__USER_CAP_ARRAY(uap->changelist, count), ks64,
+	    count * sizeof(*ks64));
 	if (error != 0)
 		return (error);
 	for (i = 0; i < count; i++) {
@@ -280,7 +282,7 @@ freebsd64_kevent(struct thread *td, struct freebsd64_kevent_args *uap)
 	int error;
 
 	if (uap->timeout) {
-		error = copyin(uap->timeout, &ts, sizeof(ts));
+		error = copyin(__USER_CAP_OBJ(uap->timeout), &ts, sizeof(ts));
 		if (error)
 			return (error);
 		tsp = &ts;
@@ -302,7 +304,7 @@ struct kevent_freebsd1164 {
 };
 
 static int
-kevent11_freebsd64_copyout(void *arg, kkevent_t *kevp, int count)
+kevent11_freebsd64_copyout(void *arg, struct kevent *kevp, int count)
 {
 	struct freebsd11_freebsd64_kevent_args *uap;
 	struct kevent_freebsd1164 kev11;
@@ -318,7 +320,7 @@ kevent11_freebsd64_copyout(void *arg, kkevent_t *kevp, int count)
 		kev11.fflags = kevp->fflags;
 		kev11.data = kevp->data;
 		kev11.udata = (void *)(__cheri_addr vaddr_t)kevp->udata;
-		error = copyout_c(&kev11, __USER_CAP_OBJ(uap->eventlist),
+		error = copyout(&kev11, __USER_CAP_OBJ(uap->eventlist),
 		    sizeof(kev11));
 		if (error != 0)
 			break;
@@ -332,7 +334,7 @@ kevent11_freebsd64_copyout(void *arg, kkevent_t *kevp, int count)
  * Copy 'count' items from the list pointed to by uap->changelist.
  */
 static int
-kevent11_freebsd64_copyin(void *arg, kkevent_t *kevp, int count)
+kevent11_freebsd64_copyin(void *arg, struct kevent *kevp, int count)
 {
 	struct freebsd11_freebsd64_kevent_args *uap;
 	struct kevent_freebsd1164 kev11;
@@ -342,7 +344,7 @@ kevent11_freebsd64_copyin(void *arg, kkevent_t *kevp, int count)
 	uap = (struct freebsd11_freebsd64_kevent_args *)arg;
 
 	for (i = 0; i < count; i++) {
-		error = copyin_c(__USER_CAP_OBJ(uap->changelist), &kev11,
+		error = copyin(__USER_CAP_OBJ(uap->changelist), &kev11,
 		    sizeof(kev11));
 		if (error != 0)
 			break;
@@ -371,9 +373,9 @@ freebsd11_freebsd64_kevent(struct thread *td,
 	};
 	struct g_kevent_args gk_args = {
 		.fd = uap->fd,
-		.changelist = __USER_CAP_UNBOUND(uap->changelist),
+		.changelist = __USER_CAP_ARRAY(uap->changelist, uap->nchanges),
 		.nchanges = uap->nchanges,
-		.eventlist = __USER_CAP_UNBOUND(uap->eventlist),
+		.eventlist = __USER_CAP_ARRAY(uap->eventlist, uap->nevents),
 		.nevents = uap->nevents,
 		.timeout = __USER_CAP_OBJ(uap->timeout),
 	};
@@ -400,12 +402,13 @@ freebsd64_copyinuio(struct iovec64 * __capability iovp, u_int iovcnt,
 	uio = malloc(iovlen + sizeof(*uio), M_IOV, M_WAITOK);
 	iov = (struct iovec *)(uio + 1);
 	for (i = 0; i < iovcnt; i++) {
-		error = copyin_c(&iovp[i], &iov64, sizeof(iov64));
+		error = copyin(&iovp[i], &iov64, sizeof(iov64));
 		if (error) {
 			free(uio, M_IOV);
 			return (error);
 		}
-		IOVEC_INIT(&iov[i], iov64.iov_base, iov64.iov_len);
+		IOVEC_INIT_C(&iov[i], __USER_CAP(iov64.iov_base, iov64.iov_len),
+		    iov64.iov_len);
 	}
 	uio->uio_iov = iov;
 	uio->uio_iovcnt = iovcnt;
@@ -427,7 +430,7 @@ int
 freebsd64_copyiniov(struct iovec64 * __capability iov64, u_int iovcnt,
     struct iovec **iovp, int error)
 {
-	struct iovec_native useriov;
+	struct iovec64 useriov;
 	struct iovec *iovs;
 	size_t iovlen;
 	int i;
@@ -438,12 +441,14 @@ freebsd64_copyiniov(struct iovec64 * __capability iov64, u_int iovcnt,
 	iovlen = iovcnt * sizeof(struct iovec);
 	iovs = malloc(iovlen, M_IOV, M_WAITOK);
 	for (i = 0; i < iovcnt; i++) {
-		error = copyin_c(iov64 + i, &useriov, sizeof(useriov));
+		error = copyin(iov64 + i, &useriov, sizeof(useriov));
 		if (error) {
 			free(iovs, M_IOV);
 			return (error);
 		}
-		IOVEC_INIT(iovs + i, useriov.iov_base, useriov.iov_len);
+		IOVEC_INIT_C(iovs + i,
+		    __USER_CAP(useriov.iov_base, useriov.iov_len),
+		    useriov.iov_len);
 	}
 	*iovp = iovs;
 	return (0);
@@ -456,7 +461,7 @@ freebsd64_copyin_hdtr(const struct sf_hdtr64 * __capability uhdtr,
 	struct sf_hdtr64 hdtr64;
 	int error;
 
-	error = copyin_c(uhdtr, &hdtr64, sizeof(hdtr64));
+	error = copyin(uhdtr, &hdtr64, sizeof(hdtr64));
 	if (error != 0)
 		return (error);
 	hdtr->headers = (void * __capability)__USER_CAP_ARRAY(hdtr64.headers,
@@ -469,7 +474,8 @@ freebsd64_copyin_hdtr(const struct sf_hdtr64 * __capability uhdtr,
 	return (0);
 }
 
-int freebsd64_sendfile(struct thread *td, struct freebsd64_sendfile_args *uap)
+int
+freebsd64_sendfile(struct thread *td, struct freebsd64_sendfile_args *uap)
 {
 
 	return (kern_sendfile(td, uap->fd, uap->s, uap->offset, uap->nbytes,
@@ -477,13 +483,6 @@ int freebsd64_sendfile(struct thread *td, struct freebsd64_sendfile_args *uap)
 	    uap->flags, 0, (copyin_hdtr_t *)freebsd64_copyin_hdtr,
 	    (copyinuio_t *)freebsd64_copyinuio));
 }
-
-#if 0
-int
-cheriabi_jail(struct thread *td, struct cheriabi_jail_args *uap)
-{
-}
-#endif
 
 int
 freebsd64_jail_set(struct thread *td, struct freebsd64_jail_set_args *uap)
@@ -499,7 +498,7 @@ freebsd64_updateiov(const struct uio *uiop, struct iovec64 * __capability iovp)
 	int i, error;
 
 	for (i = 0; i < uiop->uio_iovcnt; i++) {
-		error = suword_c(&iovp[i].iov_len, uiop->uio_iov[i].iov_len);
+		error = suword(&iovp[i].iov_len, uiop->uio_iov[i].iov_len);
 		if (error != 0)
 			return (error);
 	}
@@ -515,26 +514,7 @@ freebsd64_jail_get(struct thread *td, struct freebsd64_jail_get_args *uap)
 	    (updateiov_t *)freebsd64_updateiov));
 }
 
-int
-freebsd64_sigreturn(struct thread *td, struct freebsd64_sigreturn_args *uap)
-{
-	ucontext64_t uc;
-	int error;
-
-	error = copyin(uap->sigcntxp, &uc, sizeof(uc));
-	if (error != 0)
-		return (error);
-
-	error = freebsd64_set_mcontext(td, &uc.uc_mcontext);
-	if (error != 0)
-		return (error);
-
-	kern_sigprocmask(td, SIG_SETMASK, &uc.uc_sigmask, NULL, 0);
-
-	return (EJUSTRETURN);
-}
-
-#define UCC_COPY_SIZE	offsetof(ucontext64_t, uc_link)
+#define UC_COPY_SIZE	offsetof(ucontext64_t, uc_link)
 
 int
 freebsd64_getcontext(struct thread *td, struct freebsd64_getcontext_args *uap)
@@ -549,7 +529,7 @@ freebsd64_getcontext(struct thread *td, struct freebsd64_getcontext_args *uap)
 	PROC_LOCK(td->td_proc);
 	uc.uc_sigmask = td->td_sigmask;
 	PROC_UNLOCK(td->td_proc);
-	return (copyout(&uc, uap->ucp, UCC_COPY_SIZE));
+	return (copyout(&uc, __USER_CAP_OBJ(uap->ucp), UC_COPY_SIZE));
 }
 
 int
@@ -560,7 +540,7 @@ freebsd64_setcontext(struct thread *td, struct freebsd64_setcontext_args *uap)
 
 	if (uap->ucp == NULL)
 		return (EINVAL);
-	if ((ret = copyin(uap->ucp, &uc, UCC_COPY_SIZE)) != 0)
+	if ((ret = copyin(__USER_CAP_OBJ(uap->ucp), &uc, UC_COPY_SIZE)) != 0)
 		return (ret);
 	if ((ret = freebsd64_set_mcontext(td, &uc.uc_mcontext)) != 0)
 		return (ret);
@@ -584,9 +564,10 @@ freebsd64_swapcontext(struct thread *td, struct freebsd64_swapcontext_args *uap)
 	PROC_LOCK(td->td_proc);
 	uc.uc_sigmask = td->td_sigmask;
 	PROC_UNLOCK(td->td_proc);
-	if ((ret = copyout(&uc, uap->oucp, UCC_COPY_SIZE)) != 0)
+	if ((ret = copyout(&uc, __USER_CAP_OBJ(uap->oucp), UC_COPY_SIZE)) !=
+	    0)
 		return (ret);
-	if ((ret = copyin(uap->ucp, &uc, UCC_COPY_SIZE)) != 0)
+	if ((ret = copyin(__USER_CAP_OBJ(uap->ucp), &uc, UC_COPY_SIZE)) != 0)
 		return (ret);
 	if ((ret = freebsd64_set_mcontext(td, &uc.uc_mcontext)) != 0)
 		return (ret);
@@ -615,14 +596,16 @@ int
 freebsd64_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 {
 	int argc, envc;
-	uint64_t *vectp;
+	uint64_t * __capability vectp;
 	char *stringp;
-	uintptr_t destp, ustringp;
-	struct freebsd64_ps_strings *arginfo;
+	char * __capability destp, * __capability ustringp;
+	struct freebsd64_ps_strings * __capability arginfo;
 	struct proc *p;
 	size_t execpath_len;
 	int error, szsigcode, szps;
 	char canary[sizeof(long) * 8];
+	size_t ssiz;
+	vm_offset_t stack_vaddr, rounded_stack_vaddr, stack_offset;
 
 	szps = sizeof(pagesizes[0]) * MAXPAGESIZES;
 	/*
@@ -635,13 +618,30 @@ freebsd64_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 		execpath_len = 0;
 	p = imgp->proc;
 	szsigcode = 0;
-	arginfo = (struct freebsd64_ps_strings *)p->p_sysent->sv_psstrings;
-	imgp->ps_strings = cheri_fromint((uintptr_t)arginfo);
+	/*
+	 * Here we do not care about the representability of the
+	 * resulting stack as the capability will not be handed out
+	 * to userspace.
+	 */
+	stack_vaddr = (vm_offset_t)p->p_vmspace->vm_maxsaddr;
+	ssiz = p->p_sysent->sv_usrstack - stack_vaddr;
+	stack_offset = 0;
+	do {
+		rounded_stack_vaddr = CHERI_REPRESENTABLE_BASE(stack_vaddr,
+		    ssiz + stack_offset);
+		stack_offset = stack_vaddr - rounded_stack_vaddr;
+	} while (rounded_stack_vaddr != CHERI_REPRESENTABLE_BASE(stack_vaddr,
+	    ssiz + stack_offset));
+	destp = cheri_capability_build_user_data(CHERI_CAP_USER_DATA_PERMS,
+	    rounded_stack_vaddr,
+	    CHERI_REPRESENTABLE_LENGTH(ssiz + stack_offset), stack_offset);
+	destp = cheri_setaddress(destp, p->p_sysent->sv_psstrings);
+	arginfo = cheri_setbounds(destp, sizeof(*arginfo));
+	imgp->ps_strings = arginfo;
 	if (p->p_sysent->sv_sigcode_base == 0)
 		szsigcode = *(p->p_sysent->sv_szsigcode);
 	else
 		szsigcode = 0;
-	destp =	(uintptr_t)arginfo;
 
 	/*
 	 * install sigcode
@@ -649,8 +649,7 @@ freebsd64_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	if (szsigcode != 0) {
 		destp -= szsigcode;
 		destp = __builtin_align_down(destp, sizeof(uint64_t));
-		error = copyout(p->p_sysent->sv_sigcode, (void *)destp,
-		    szsigcode);
+		error = copyout(p->p_sysent->sv_sigcode, destp, szsigcode);
 		if (error != 0)
 			return (error);
 	}
@@ -660,8 +659,8 @@ freebsd64_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	 */
 	if (execpath_len != 0) {
 		destp -= execpath_len;
-		imgp->execpathp = cheri_fromint(destp);
-		error = copyout(imgp->execpath, (void *)destp, execpath_len);
+		imgp->execpathp = cheri_setbounds(destp, execpath_len);
+		error = copyout(imgp->execpath, destp, execpath_len);
 		if (error != 0)
 			return(error);
 	}
@@ -671,8 +670,8 @@ freebsd64_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	 */
 	arc4rand(canary, sizeof(canary), 0);
 	destp -= sizeof(canary);
-	imgp->canary = cheri_fromint(destp);
-	error = copyout(canary, (void *)destp, sizeof(canary));
+	imgp->canary = cheri_setbounds(destp, sizeof(canary));
+	error = copyout(canary, destp, sizeof(canary));
 	if (error != 0)
 		return (error);
 	imgp->canarylen = sizeof(canary);
@@ -682,8 +681,8 @@ freebsd64_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	 */
 	destp -= szps;
 	destp = __builtin_align_down(destp, sizeof(uint64_t));
-	imgp->pagesizes = cheri_fromint(destp);
-	error = copyout(pagesizes, (void *)destp, szps);
+	imgp->pagesizes = cheri_setbounds(destp, szps);
+	error = copyout(pagesizes, destp, szps);
 	if (error != 0)
 		return (error);
 	imgp->pagesizeslen = szps;
@@ -696,7 +695,7 @@ freebsd64_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	ustringp = destp;
 
 	if (imgp->sysent->sv_stackgap != NULL)
-		imgp->sysent->sv_stackgap(imgp, &destp);
+		imgp->sysent->sv_stackgap(imgp, (uintcap_t *)&destp);
 
 	if (imgp->auxargs) {
 		/*
@@ -707,7 +706,7 @@ freebsd64_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 		destp = __builtin_align_down(destp, sizeof(uint64_t));
 	}
 
-	vectp = (uint64_t *)destp;
+	vectp = (uint64_t * __capability)destp;
 
 	/*
 	 * Allocate room for the argv[] and env vectors including the
@@ -718,9 +717,7 @@ freebsd64_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	/*
 	 * vectp also becomes our initial stack base
 	 */
-	*stack_base = (uintcap_t)cheri_capability_build_user_data(
-	    CHERI_CAP_USER_DATA_PERMS, CHERI_CAP_USER_DATA_BASE,
-	    CHERI_CAP_USER_DATA_LENGTH, (uintptr_t)vectp);
+	*stack_base = (uintcap_t)vectp; // XXX-AM: should bound?
 
 	stringp = imgp->args->begin_argv;
 	argc = imgp->args->argc;
@@ -729,7 +726,7 @@ freebsd64_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	/*
 	 * Copy out strings - arguments and environment.
 	 */
-	error = copyout(stringp, (void *)ustringp,
+	error = copyout(stringp, ustringp,
 	    ARG_MAX - imgp->args->stringspace);
 	if (error != 0)
 		return (error);
@@ -737,8 +734,8 @@ freebsd64_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	/*
 	 * Fill in "ps_strings" struct for ps, w, etc.
 	 */
-	imgp->argv = cheri_fromint((intptr_t)vectp);
-	if (suword(&arginfo->ps_argvstr, (uint64_t)(intptr_t)vectp) != 0 ||
+	imgp->argv = cheri_setbounds(vectp, (argc + 1) * sizeof(*vectp));
+	if (suword(&arginfo->ps_argvstr, (__cheri_addr uint64_t)vectp) != 0 ||
 	    suword32(&arginfo->ps_nargvstr, argc) != 0)
 		return (EFAULT);
 
@@ -746,7 +743,7 @@ freebsd64_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	 * Fill in argument portion of vector table.
 	 */
 	for (; argc > 0; --argc) {
-		if (suword(vectp++, ustringp) != 0)
+		if (suword(vectp++, (__cheri_addr uint64_t)ustringp) != 0)
 			return (EFAULT);
 		while (*stringp++ != 0)
 			ustringp++;
@@ -757,8 +754,8 @@ freebsd64_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	if (suword(vectp++, 0) != 0)
 		return (EFAULT);
 
-	imgp->envv = cheri_fromint((intptr_t)vectp);
-	if (suword(&arginfo->ps_envstr, (uint64_t)(intptr_t)vectp) != 0 ||
+	imgp->envv = cheri_setbounds(vectp, (envc + 1) * sizeof(*vectp));
+	if (suword(&arginfo->ps_envstr, (__cheri_addr uint64_t)vectp) != 0 ||
 	    suword32(&arginfo->ps_nenvstr, envc) != 0)
 		return (EFAULT);
 
@@ -766,7 +763,7 @@ freebsd64_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	 * Fill in environment portion of vector table.
 	 */
 	for (; envc > 0; --envc) {
-		if (suword(vectp++, ustringp) != 0)
+		if (suword(vectp++, (__cheri_addr uint64_t)ustringp) != 0)
 			return (EFAULT);
 		while (*stringp++ != 0)
 			ustringp++;
@@ -780,9 +777,8 @@ freebsd64_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	if (imgp->auxargs) {
 		vectp++;
 		error = imgp->sysent->sv_copyout_auxargs(imgp,
-		    (uintcap_t)cheri_capability_build_user_data(
-			CHERI_CAP_USER_DATA_PERMS, (uintptr_t)vectp,
-			AT_COUNT * sizeof(Elf64_Auxinfo), 0));
+		    (uintcap_t)cheri_setbounds(vectp,
+		        AT_COUNT * sizeof(Elf64_Auxinfo)));
 		if (error != 0)
 			return (error);
 	}
@@ -810,8 +806,8 @@ int
 freebsd64_kbounce(struct thread *td, struct freebsd64_kbounce_args *uap)
 {
 	void * bounce;
-	void * dst = uap->dst;
-	const void * src = uap->src;
+	void * __capability dst = __USER_CAP(uap->dst, uap->len);
+	const void * __capability src = __USER_CAP(uap->src, uap->len);
 	size_t len = uap->len;
 	int flags = uap->flags;
 	int error;
@@ -1099,7 +1095,8 @@ freebsd64_kldstat(struct thread *td, struct freebsd64_kldstat_args *uap)
         struct kld_file_stat64 stat64;
         int error, version;
 
-        error = copyin(&uap->stat->version, &version, sizeof(version));
+        error = copyin(__USER_CAP_OBJ(&uap->stat->version), &version,
+	    sizeof(version));
 	if (error != 0)
                 return (error);
         if (version != sizeof(struct kld_file_stat64))
@@ -1112,10 +1109,10 @@ freebsd64_kldstat(struct thread *td, struct freebsd64_kldstat_args *uap)
         bcopy(&stat.name[0], &stat64.name[0], sizeof(stat.name));
         CP(stat, stat64, refs);
         CP(stat, stat64, id);
-	stat64.address = stat.address;
+	stat64.address = (__cheri_addr uint64_t)stat.address;
         CP(stat, stat64, size);
         bcopy(&stat.pathname[0], &stat64.pathname[0], sizeof(stat.pathname));
-        return (copyout(&stat64, uap->stat, version));
+        return (copyout(&stat64, __USER_CAP_OBJ(uap->stat), version));
 }
 
 int
@@ -1123,8 +1120,9 @@ freebsd64_kldsym(struct thread *td, struct freebsd64_kldsym_args *uap)
 {
 	struct kld_sym_lookup64 lookup;
 	int error;
+	void * __capability data = __USER_CAP(uap->data, sizeof(lookup));
 
-	error = copyin(uap->data, &lookup, sizeof(lookup));
+	error = copyin(data, &lookup, sizeof(lookup));
 	if (error != 0)
 		return (error);
 	if (lookup.version != sizeof(lookup) ||
@@ -1134,7 +1132,7 @@ freebsd64_kldsym(struct thread *td, struct freebsd64_kldsym_args *uap)
 	    __USER_CAP_STR(lookup.symname), &lookup.symvalue, &lookup.symsize);
 	if (error != 0)
 		return (error);
-	error = copyout(&lookup, uap->data, sizeof(lookup));
+	error = copyout(&lookup, data, sizeof(lookup));
 
 	return (error);
 }
@@ -1333,7 +1331,7 @@ freebsd64_setrlimit(struct thread *td, struct freebsd64___setrlimit_args *uap)
 	struct rlimit alim;
 	int error;
 
-	error = copyin(uap->rlp, &alim, sizeof(struct rlimit));
+	error = copyin(__USER_CAP_OBJ(uap->rlp), &alim, sizeof(struct rlimit));
 	if (error != 0)
 		return (error);
 	return (kern_setrlimit(td, uap->which, &alim));
@@ -1348,7 +1346,7 @@ freebsd64_getrlimit(struct thread *td, struct freebsd64___getrlimit_args *uap)
 	if (uap->which >= RLIM_NLIMITS)
 		return (EINVAL);
 	lim_rlimit(td, uap->which, &rlim);
-	error = copyout(&rlim, uap->rlp, sizeof(struct rlimit));
+	error = copyout(&rlim, __USER_CAP_OBJ(uap->rlp), sizeof(struct rlimit));
 	return (error);
 }
 
@@ -1360,7 +1358,8 @@ freebsd64_getrusage(struct thread *td, struct freebsd64_getrusage_args *uap)
 
 	error = kern_getrusage(td, uap->who, &ru);
 	if (error == 0)
-		error = copyout(&ru, uap->rusage, sizeof(struct rusage));
+		error = copyout(&ru, __USER_CAP_OBJ(uap->rusage),
+		    sizeof(struct rusage));
 	return (error);
 }
 
@@ -1371,28 +1370,53 @@ freebsd64_getrusage(struct thread *td, struct freebsd64_getrusage_args *uap)
 int
 freebsd64___sysctl(struct thread *td, struct freebsd64___sysctl_args *uap)
 {
+	size_t oldlen;
+
+	/*
+	 * Fetch the oldlen so we can bound the old capability.
+	 * While there is a race between here and kern_sysctl's use,
+	 * the caller will get what they deserve if they increase the
+	 * value at uap->oldlenp between now its later use.
+	 */
+	if (uap->oldlenp == NULL)
+		oldlen = 0;
+	else
+		if (fueword(__USER_CAP_OBJ(uap->oldlenp), &oldlen) == -1)
+			return (EFAULT);
 
 	return (kern_sysctl(td, __USER_CAP_ARRAY(uap->name, uap->namelen),
-	    uap->namelen, __USER_CAP_UNBOUND(uap->old),
+	    uap->namelen, __USER_CAP(uap->old, oldlen),
 	    __USER_CAP_OBJ(uap->oldlenp), __USER_CAP(uap->new, uap->newlen),
-	    uap->newlen, 0));
+	    uap->newlen, SCTL_MASK64));
 }
 
 int
 freebsd64___sysctlbyname(struct thread *td, struct
     freebsd64___sysctlbyname_args *uap)
 {
-	size_t rv;
+	size_t rv, oldlen;
 	int error;
 
+	/*
+	 * Fetch the oldlen so we can bound the old capability.
+	 * This avoids a race between here and kern_sysctl's use, if the
+	 * caller increases the value at uap->oldlenp between now its later use.
+	 */
+	if (uap->oldlenp == NULL)
+		oldlen = 0;
+	else
+		if (fueword(__USER_CAP_OBJ(uap->oldlenp), &oldlen) == -1)
+			return (EFAULT);
+
 	error = kern___sysctlbyname(td, __USER_CAP(uap->name, uap->namelen),
-	    uap->namelen, __USER_CAP_UNBOUND(uap->old),
-	    __USER_CAP_OBJ(uap->oldlenp), __USER_CAP(uap->new, uap->newlen),
-	    uap->newlen, &rv, 0, 0);
+	    uap->namelen, __USER_CAP(uap->old, oldlen),
+	    &oldlen, __USER_CAP(uap->new, uap->newlen),
+	    uap->newlen, &rv, SCTL_MASK64, 1);
 	if (error != 0)
 		return (error);
 	if (uap->oldlenp != NULL)
-		error = copyout(&rv, uap->oldlenp, sizeof(rv));
+		error = copyout(&rv, __USER_CAP(uap->oldlenp, sizeof(rv)),
+		    sizeof(rv));
 
 	return (error);
 }
@@ -1412,7 +1436,8 @@ freebsd64_thr_create_initthr(struct thread *td, void *thunk)
 	struct thr_create_initthr_args64 *args;
 
 	args = thunk;
-	if (args->tid != NULL && suword(args->tid, td->td_tid) != 0)
+	if (args->tid != NULL &&
+	    suword(__USER_CAP_OBJ(args->tid), td->td_tid) != 0)
 		return (EFAULT);
 
 	return (freebsd64_set_mcontext(td, &args->ctx.uc_mcontext));
@@ -1424,7 +1449,7 @@ freebsd64_thr_create(struct thread *td, struct freebsd64_thr_create_args *uap)
 	struct thr_create_initthr_args64 args;
 	int error;
 
-	if ((error = copyin(uap->ctx, &args.ctx, sizeof(args.ctx))))
+	if ((error = copyin(__USER_CAP_OBJ(uap->ctx), &args.ctx, sizeof(args.ctx))))
 		return (error);
 	args.tid = uap->id;
 	return (thread_create(td, NULL, freebsd64_thr_create_initthr, &args));
@@ -1435,7 +1460,7 @@ freebsd64_thr_self(struct thread *td, struct freebsd64_thr_self_args *uap)
 {
 	int error;
 
-	error = suword(uap->id, td->td_tid);
+	error = suword(__USER_CAP_OBJ(uap->id), td->td_tid);
 	if (error == -1)
 		return (EFAULT);
 	return (0);
@@ -1449,7 +1474,7 @@ freebsd64_thr_exit(struct thread *td, struct freebsd64_thr_exit_args *uap)
 
 	/* Signal userland that it can free the stack. */
 	if (uap->state != NULL) {
-		suword(uap->state, 1);
+		suword(__USER_CAP_OBJ(uap->state), 1);
 		kern_umtx_wake(td, __USER_CAP_OBJ(uap->state), INT_MAX, 0);
 	}
 
@@ -1486,16 +1511,21 @@ freebsd64_thr_new_initthr(struct thread *td, void *thunk)
 {
 	stack_t stack;
 	struct thr_param64 *param = thunk;
+	long * __capability child_tid = __USER_CAP(param->child_tid,
+	    sizeof(long));
+	long * __capability parent_tid = __USER_CAP(param->parent_tid,
+	    sizeof(long));
 
-	if ((param->child_tid != NULL &&
-	    suword(param->child_tid, td->td_tid)) ||
-	    (param->parent_tid != NULL &&
-	    suword(param->parent_tid, td->td_tid)))
+	if ((child_tid != NULL && suword(child_tid, td->td_tid)) ||
+	    (parent_tid != NULL && suword(parent_tid, td->td_tid)))
 		return (EFAULT);
 	stack.ss_sp = __USER_CAP_UNBOUND(param->stack_base);
 	stack.ss_size = param->stack_size;
-	cpu_set_upcall(td, param->start_func, param->arg, &stack);
-	return (cpu_set_user_tls(td, param->tls_base));
+	cpu_set_upcall(td,
+	    (void (* __capability)(void *))(uintcap_t)param->start_func,
+	    (void * __capability)(uintcap_t)param->arg, &stack);
+	return (cpu_set_user_tls(td,
+		(void * __capability)(uintcap_t)param->tls_base));
 }
 
 int
@@ -1508,12 +1538,13 @@ freebsd64_thr_new(struct thread *td, struct freebsd64_thr_new_args *uap)
 	if (uap->param_size != sizeof(struct thr_param64))
 		return (EINVAL);
 
-	error = copyin(uap->param, &param64, uap->param_size);
+	error = copyin(__USER_CAP_OBJ(uap->param), &param64, uap->param_size);
 	if (error != 0)
 		return (error);
 
-	if (param64.rtp != NULL) {
-		error = copyin(param64.rtp, &rtp, sizeof(struct rtprio));
+	if (param64.rtp != 0) {
+		error = copyin(__USER_CAP(param64.rtp, sizeof(struct rtprio)),
+		    &rtp, sizeof(struct rtprio));
 		if (error)
 			return (error);
 		rtpp = &rtp;
@@ -1616,7 +1647,7 @@ freebsd64_cap_rights_limit(struct thread *td,
 {
 
 	return (user_cap_rights_limit(td, uap->fd,
-	    __USER_CAP_UNBOUND(uap->rightsp)));
+	    __USER_CAP_OBJ(uap->rightsp)));
 }
 
 int
@@ -1625,7 +1656,7 @@ freebsd64___cap_rights_get(struct thread *td,
 {
 
 	return (kern_cap_rights_get(td, uap->version, uap->fd,
-	    __USER_CAP_UNBOUND(uap->rightsp)));
+	    __USER_CAP_OBJ(uap->rightsp)));
 }
 
 int

@@ -34,8 +34,6 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
-#define	EXPLICIT_USER_ACCESS
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/sysproto.h>
@@ -389,7 +387,9 @@ sysctl_kern_prof(SYSCTL_HANDLER_ARGS)
 	/* NOTREACHED */
 }
 
-static SYSCTL_NODE(_kern, KERN_PROF, prof, CTLFLAG_RW, sysctl_kern_prof, "");
+static SYSCTL_NODE(_kern, KERN_PROF, prof,
+    CTLFLAG_RW | CTLFLAG_MPSAFE, sysctl_kern_prof,
+    "");
 #endif /* GPROF */
 
 /*

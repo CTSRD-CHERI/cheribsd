@@ -191,7 +191,7 @@ struct rs_iomap {
 struct rs_iomap_mr {
 	uint64_t offset;
 	struct ibv_mr *mr;
-	dlist_entry entry;
+	dlist_entry entry __subobject_use_container_bounds;
 	_Atomic(int) refcnt;
 	int index;	/* -1 if mapping is local and not in iomap_list */
 };

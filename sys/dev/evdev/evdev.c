@@ -66,10 +66,16 @@ enum evdev_sparse_result
 
 MALLOC_DEFINE(M_EVDEV, "evdev", "evdev memory");
 
-int evdev_rcpt_mask = EVDEV_RCPT_SYSMOUSE | EVDEV_RCPT_KBDMUX;
+/* adb keyboard driver used on powerpc does not support evdev yet */
+#if defined(__powerpc__) && !defined(__powerpc64__)
+int evdev_rcpt_mask = EVDEV_RCPT_KBDMUX | EVDEV_RCPT_HW_MOUSE;
+#else
+int evdev_rcpt_mask = EVDEV_RCPT_HW_MOUSE | EVDEV_RCPT_HW_KBD;
+#endif
 int evdev_sysmouse_t_axis = 0;
 
-SYSCTL_NODE(_kern, OID_AUTO, evdev, CTLFLAG_RW, 0, "Evdev args");
+SYSCTL_NODE(_kern, OID_AUTO, evdev, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
+    "Evdev args");
 #ifdef EVDEV_SUPPORT
 SYSCTL_INT(_kern_evdev, OID_AUTO, rcpt_mask, CTLFLAG_RW, &evdev_rcpt_mask, 0,
     "Who is receiving events: bit0 - sysmouse, bit1 - kbdmux, "
@@ -77,7 +83,7 @@ SYSCTL_INT(_kern_evdev, OID_AUTO, rcpt_mask, CTLFLAG_RW, &evdev_rcpt_mask, 0,
 SYSCTL_INT(_kern_evdev, OID_AUTO, sysmouse_t_axis, CTLFLAG_RW,
     &evdev_sysmouse_t_axis, 0, "Extract T-axis from 0-none, 1-ums, 2-psm");
 #endif
-SYSCTL_NODE(_kern_evdev, OID_AUTO, input, CTLFLAG_RD, 0,
+SYSCTL_NODE(_kern_evdev, OID_AUTO, input, CTLFLAG_RD | CTLFLAG_MPSAFE, 0,
     "Evdev input devices");
 
 static void evdev_start_repeat(struct evdev_dev *, uint16_t);
@@ -209,7 +215,8 @@ evdev_sysctl_create(struct evdev_dev *evdev)
 
 	ev_sysctl_tree = SYSCTL_ADD_NODE_WITH_LABEL(&evdev->ev_sysctl_ctx,
 	    SYSCTL_STATIC_CHILDREN(_kern_evdev_input), OID_AUTO,
-	    ev_unit_str, CTLFLAG_RD, NULL, "", "device index");
+	    ev_unit_str, CTLFLAG_RD | CTLFLAG_MPSAFE, NULL, "",
+	    "device index");
 
 	SYSCTL_ADD_STRING(&evdev->ev_sysctl_ctx,
 	    SYSCTL_CHILDREN(ev_sysctl_tree), OID_AUTO, "name", CTLFLAG_RD,
@@ -293,7 +300,7 @@ evdev_register_common(struct evdev_dev *evdev)
 	if (evdev_event_supported(evdev, EV_REP) &&
 	    bit_test(evdev->ev_flags, EVDEV_FLAG_SOFTREPEAT)) {
 		/* Initialize callout */
-		callout_init_mtx(&evdev->ev_rep_callout, &evdev->ev_mtx, 0);
+		callout_init_mtx(&evdev->ev_rep_callout, evdev->ev_lock, 0);
 
 		if (evdev->ev_rep[REP_DELAY] == 0 &&
 		    evdev->ev_rep[REP_PERIOD] == 0) {
@@ -356,7 +363,7 @@ evdev_register_mtx(struct evdev_dev *evdev, struct mtx *mtx)
 int
 evdev_unregister(struct evdev_dev *evdev)
 {
-	struct evdev_client *client;
+	struct evdev_client *client, *tmp;
 	int ret;
 	debugf(evdev, "%s: unregistered evdev provider: %s\n",
 	    evdev->ev_shortname, evdev->ev_name);
@@ -366,7 +373,7 @@ evdev_unregister(struct evdev_dev *evdev)
 	EVDEV_LOCK(evdev);
 	evdev->ev_cdev->si_drv1 = NULL;
 	/* Wake up sleepers */
-	LIST_FOREACH(client, &evdev->ev_clients, ec_link) {
+	LIST_FOREACH_SAFE(client, &evdev->ev_clients, ec_link, tmp) {
 		evdev_revoke_client(client);
 		evdev_dispose_client(evdev, client);
 		EVDEV_CLIENT_LOCKQ(client);

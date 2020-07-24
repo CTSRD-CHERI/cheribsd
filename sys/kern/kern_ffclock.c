@@ -34,8 +34,6 @@ __FBSDID("$FreeBSD$");
 
 #include "opt_ffclock.h"
 
-#define	EXPLICIT_USER_ACCESS
-
 #include <sys/param.h>
 #include <sys/bus.h>
 #include <sys/kernel.h>
@@ -158,9 +156,9 @@ ffclock_difftime(ffcounter ffdelta, struct bintime *bt,
  * live under the ffclock subnode.
  */
 
-SYSCTL_NODE(_kern, OID_AUTO, sysclock, CTLFLAG_RW, 0,
+SYSCTL_NODE(_kern, OID_AUTO, sysclock, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
     "System clock related configuration");
-SYSCTL_NODE(_kern_sysclock, OID_AUTO, ffclock, CTLFLAG_RW, 0,
+SYSCTL_NODE(_kern_sysclock, OID_AUTO, ffclock, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
     "Feed-forward clock configuration");
 
 static char *sysclocks[] = {"feedback", "feed-forward"};
@@ -194,8 +192,9 @@ sysctl_kern_sysclock_available(SYSCTL_HANDLER_ARGS)
 	return (error);
 }
 
-SYSCTL_PROC(_kern_sysclock, OID_AUTO, available, CTLTYPE_STRING | CTLFLAG_RD,
-    0, 0, sysctl_kern_sysclock_available, "A",
+SYSCTL_PROC(_kern_sysclock, OID_AUTO, available,
+    CTLTYPE_STRING | CTLFLAG_RD | CTLFLAG_NEEDGIANT, 0, 0,
+    sysctl_kern_sysclock_available, "A",
     "List of available system clocks");
 
 /*
@@ -234,8 +233,9 @@ done:
 	return (error);
 }
 
-SYSCTL_PROC(_kern_sysclock, OID_AUTO, active, CTLTYPE_STRING | CTLFLAG_RW,
-    0, 0, sysctl_kern_sysclock_active, "A",
+SYSCTL_PROC(_kern_sysclock, OID_AUTO, active,
+    CTLTYPE_STRING | CTLFLAG_RW | CTLFLAG_NEEDGIANT, 0, 0,
+    sysctl_kern_sysclock_active, "A",
     "Name of the active system clock which is currently serving time");
 
 static int sysctl_kern_ffclock_ffcounter_bypass = 0;
@@ -420,7 +420,7 @@ int
 sys_ffclock_setestimate(struct thread *td, struct ffclock_setestimate_args *uap)
 {
 
-	return (kern_ffclock_setestimate(td, __USER_CAP_OBJ(uap->cest)));
+	return (kern_ffclock_setestimate(td, uap->cest));
 }
 
 int
@@ -460,7 +460,7 @@ int
 sys_ffclock_getestimate(struct thread *td, struct ffclock_getestimate_args *uap)
 {
 
-	return (kern_ffclock_getestimate(td, __USER_CAP_OBJ(uap->cest)));
+	return (kern_ffclock_getestimate(td, uap->cest));
 }
 
 int

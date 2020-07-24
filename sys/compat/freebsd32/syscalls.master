@@ -103,7 +103,7 @@
 23	AUE_SETUID	NOPROTO	{ int setuid(uid_t uid); }
 24	AUE_GETUID	NOPROTO	{ uid_t getuid(void); }
 25	AUE_GETEUID	NOPROTO	{ uid_t geteuid(void); }
-26	AUE_PTRACE	NOPROTO	{ int ptrace(int req, pid_t pid, \
+26	AUE_PTRACE	STD	{ int freebsd32_ptrace(int req, pid_t pid, \
 				    caddr_t addr, int data); }
 27	AUE_RECVMSG	STD	{ int freebsd32_recvmsg(int s, struct msghdr32 *msg, \
 				    int flags); }
@@ -863,10 +863,10 @@
 				    int sd, void *msg, int mlen, \
 				    struct sockaddr *to, __socklen_t tolen, \
 				    struct sctp_sndrcvinfo *sinfo, int flags); }
-473	AUE_SCTP_GENERIC_SENDMSG_IOV	NOPROTO|NOSTD	{ int sctp_generic_sendmsg_iov(int sd, struct iovec *iov, int iovlen, \
+473	AUE_SCTP_GENERIC_SENDMSG_IOV	NOSTD	{ int freebsd32_sctp_generic_sendmsg_iov(int sd, struct iovec32 *iov, int iovlen, \
 				    struct sockaddr *to, __socklen_t tolen, \
 				    struct sctp_sndrcvinfo *sinfo, int flags); }
-474	AUE_SCTP_GENERIC_RECVMSG	NOPROTO|NOSTD	{ int sctp_generic_recvmsg(int sd, struct iovec *iov, int iovlen, \
+474	AUE_SCTP_GENERIC_RECVMSG	NOSTD	{ int freebsd32_sctp_generic_recvmsg(int sd, struct iovec32 *iov, int iovlen, \
 				    struct sockaddr * from, __socklen_t *fromlenaddr, \
 				    struct sctp_sndrcvinfo *sinfo, int *msg_flags); }
 #ifdef PAD64_REQUIRED
@@ -981,7 +981,7 @@
 507	AUE_JAIL_SET	STD	{ int freebsd32_jail_set(struct iovec32 *iovp, \
 				    unsigned int iovcnt, int flags); }
 508	AUE_JAIL_REMOVE	NOPROTO	{ int jail_remove(int jid); }
-509	AUE_CLOSEFROM	NOPROTO	{ int closefrom(int lowfd); }
+509	AUE_CLOSEFROM	COMPAT12|NOPROTO	{ int closefrom(int lowfd); }
 510	AUE_SEMCTL	NOSTD { int freebsd32_semctl(int semid, int semnum, \
 				    int cmd, union semun32 *arg); }
 511	AUE_MSGCTL	NOSTD	{ int freebsd32_msgctl(int msqid, int cmd, \
@@ -1160,5 +1160,10 @@
 				    int shmflags, const char *name); }
 572	AUE_SHMRENAME	NOPROTO { int shm_rename(const char *path_from, \
 				    const char *path_to, int flags); }
+573	AUE_NULL	NOPROTO	{ int sigfastblock(int cmd, uint32_t *ptr); }
+574	AUE_REALPATHAT	NOPROTO { int __realpathat(int fd, const char *path, \
+				    char *buf, size_t size, int flags); }
+575	AUE_CLOSERANGE	NOPROTO	{ int close_range(u_int lowfd, u_int highfd, \
+				    int flags); }
 
 ; vim: syntax=off

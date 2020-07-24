@@ -214,10 +214,10 @@ static void ti_setmulti(struct ti_softc *);
 static void ti_mem_read(struct ti_softc *, uint32_t, uint32_t, void *);
 static void ti_mem_write(struct ti_softc *, uint32_t, uint32_t, void *);
 static void ti_mem_zero(struct ti_softc *, uint32_t, uint32_t);
-static int ti_copy_mem(struct ti_softc *, uint32_t, uint32_t, caddr_t, int,
-    int);
-static int ti_copy_scratch(struct ti_softc *, uint32_t, uint32_t, caddr_t,
-    int, int, int);
+static int ti_copy_mem(struct ti_softc *, uint32_t, uint32_t,
+    char * __capability, int, int);
+static int ti_copy_scratch(struct ti_softc *, uint32_t, uint32_t,
+    char * __capability, int, int, int);
 static int ti_bcopy_swap(const void *, void *, size_t, ti_swap_type);
 static void ti_loadfw(struct ti_softc *);
 static void ti_cmd(struct ti_softc *, struct ti_cmd_desc *);
@@ -503,10 +503,10 @@ ti_mem_zero(struct ti_softc *sc, uint32_t addr, uint32_t len)
 
 static int
 ti_copy_mem(struct ti_softc *sc, uint32_t tigon_addr, uint32_t len,
-    caddr_t buf, int useraddr, int readdata)
+    char * __capability buf, int useraddr, int readdata)
 {
 	int segptr, segsize, cnt;
-	caddr_t ptr;
+	char * __capability ptr;
 	uint32_t origwin;
 	int resid, segresid;
 	int first_pass;
@@ -592,12 +592,12 @@ ti_copy_mem(struct ti_softc *sc, uint32_t tigon_addr, uint32_t len,
 					    sc->ti_membuf2, segsize,
 					    TI_SWAP_NTOH);
 					TI_UNLOCK(sc);
-					bcopy(&sc->ti_membuf2[segresid], ptr,
+					bcopy(&sc->ti_membuf2[segresid], (__cheri_fromcap void *)ptr,
 					    segsize - segresid);
 					TI_LOCK(sc);
 					first_pass = 0;
 				} else
-					ti_bcopy_swap(sc->ti_membuf, ptr,
+					ti_bcopy_swap(sc->ti_membuf, (__cheri_fromcap void *)ptr,
 					    segsize, TI_SWAP_NTOH);
 			}
 
@@ -609,7 +609,7 @@ ti_copy_mem(struct ti_softc *sc, uint32_t tigon_addr, uint32_t len,
 				ti_bcopy_swap(sc->ti_membuf2, sc->ti_membuf,
 				    segsize, TI_SWAP_HTON);
 			} else
-				ti_bcopy_swap(ptr, sc->ti_membuf, segsize,
+				ti_bcopy_swap((__cheri_fromcap void *)ptr, sc->ti_membuf, segsize,
 				    TI_SWAP_HTON);
 
 			bus_space_write_region_4(sc->ti_btag, sc->ti_bhandle,
@@ -659,7 +659,7 @@ ti_copy_mem(struct ti_softc *sc, uint32_t tigon_addr, uint32_t len,
 				copyout(&tmpval2, ptr, resid);
 				TI_LOCK(sc);
 			} else
-				bcopy(&tmpval2, ptr, resid);
+				bcopy(&tmpval2, (__cheri_fromcap void *)ptr, resid);
 		} else {
 			/*
 			 * If we're writing, first copy the bytes to be
@@ -677,7 +677,7 @@ ti_copy_mem(struct ti_softc *sc, uint32_t tigon_addr, uint32_t len,
 				copyin(ptr, &tmpval2, resid);
 				TI_LOCK(sc);
 			} else
-				bcopy(ptr, &tmpval2, resid);
+				bcopy((__cheri_fromcap void *)ptr, &tmpval2, resid);
 
 			tmpval = htonl(tmpval2);
 
@@ -693,12 +693,12 @@ ti_copy_mem(struct ti_softc *sc, uint32_t tigon_addr, uint32_t len,
 
 static int
 ti_copy_scratch(struct ti_softc *sc, uint32_t tigon_addr, uint32_t len,
-    caddr_t buf, int useraddr, int readdata, int cpu)
+    char * __capability buf, int useraddr, int readdata, int cpu)
 {
 	uint32_t segptr;
 	int cnt;
 	uint32_t tmpval, tmpval2;
-	caddr_t ptr;
+	char * __capability ptr;
 
 	TI_LOCK_ASSERT(sc);
 
@@ -765,12 +765,12 @@ ti_copy_scratch(struct ti_softc *sc, uint32_t tigon_addr, uint32_t len,
 			if (useraddr)
 				copyout(&tmpval, ptr, 4);
 			else
-				bcopy(&tmpval, ptr, 4);
+				bcopy(&tmpval, (__cheri_fromcap void *)ptr, 4);
 		} else {
 			if (useraddr)
 				copyin(ptr, &tmpval2, 4);
 			else
-				bcopy(ptr, &tmpval2, 4);
+				bcopy((__cheri_fromcap void *)ptr, &tmpval2, 4);
 
 			tmpval = htonl(tmpval2);
 
@@ -3753,7 +3753,7 @@ ti_ioctl2(struct cdev *dev, u_long cmd, caddr_t addr, int flag,
 		       trace_buf->buf_len);
 #endif
 		error = ti_copy_mem(sc, trace_start, min(trace_len,
-		    trace_buf->buf_len), (caddr_t)trace_buf->buf, 1, 1);
+		    trace_buf->buf_len), (char * __capability)trace_buf->buf, 1, 1);
 		if (error == 0) {
 			trace_buf->fill_len = min(trace_len,
 			    trace_buf->buf_len);

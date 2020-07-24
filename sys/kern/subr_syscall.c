@@ -73,7 +73,7 @@ syscallenter(struct thread *td)
 	if (__predict_false(td->td_cowgen != p->p_cowgen))
 		thread_cow_update(td);
 	traced = (p->p_flag & P_TRACED) != 0;
-	if (traced || td->td_dbgflags & TDB_USERWR) {
+	if (__predict_false(traced || td->td_dbgflags & TDB_USERWR)) {
 		PROC_LOCK(p);
 		td->td_dbgflags &= ~TDB_USERWR;
 		if (traced)
@@ -89,7 +89,7 @@ syscallenter(struct thread *td)
 	    (uintptr_t)td, "pid:%d", td->td_proc->p_pid, "arg0:%p", sa->args[0],
 	    "arg1:%p", sa->args[1], "arg2:%p", sa->args[2]);
 
-	if (error != 0) {
+	if (__predict_false(error != 0)) {
 		td->td_errno = error;
 		goto retval;
 	}
@@ -104,14 +104,13 @@ syscallenter(struct thread *td)
 		goto retval;
 #endif
 
-	STOPEVENT(p, S_SCE, sa->narg);
-	if ((p->p_flag & P_TRACED) != 0) {
+	if (__predict_false((p->p_flag & P_TRACED) != 0)) {
 		PROC_LOCK(p);
 		if (p->p_ptevents & PTRACE_SCE)
 			ptracestop((td), SIGTRAP, NULL);
 		PROC_UNLOCK(p);
 	}
-	if ((td->td_dbgflags & TDB_USERWR) != 0) {
+	if (__predict_false((td->td_dbgflags & TDB_USERWR) != 0)) {
 		/*
 		 * Reread syscall number and arguments if debugger
 		 * modified registers or memory.
@@ -132,8 +131,8 @@ syscallenter(struct thread *td)
 	 * In capability mode, we only allow access to system calls
 	 * flagged with SYF_CAPENABLED.
 	 */
-	if (IN_CAPABILITY_MODE(td) &&
-	    !(sa->callp->sy_flags & SYF_CAPENABLED)) {
+	if (__predict_false(IN_CAPABILITY_MODE(td) &&
+	    !(sa->callp->sy_flags & SYF_CAPENABLED))) {
 		td->td_errno = error = ECAPMODE;
 		goto retval;
 	}
@@ -145,29 +144,40 @@ syscallenter(struct thread *td)
 		goto retval;
 	}
 
-#ifdef KDTRACE_HOOKS
-	/* Give the syscall:::entry DTrace probe a chance to fire. */
-	if (__predict_false(systrace_enabled && sa->callp->sy_entry != 0))
-		(*systrace_probe_func)(sa, SYSTRACE_ENTRY, 0);
-#endif
+	/*
+	 * Fetch fast sigblock value at the time of syscall entry to
+	 * handle sleepqueue primitives which might call cursig().
+	 */
+	if (__predict_false(sigfastblock_fetch_always))
+		(void)sigfastblock_fetch(td);
 
 	/* Let system calls set td_errno directly. */
 	td->td_pflags &= ~TDP_NERRNO;
 
-	AUDIT_SYSCALL_ENTER(sa->code, td);
-	error = (sa->callp->sy_call)(td, sa->args);
-	AUDIT_SYSCALL_EXIT(error, td);
-
-	/* Save the latest error return value. */
-	if ((td->td_pflags & TDP_NERRNO) == 0)
-		td->td_errno = error;
-
+	if (__predict_false(SYSTRACE_ENABLED() ||
+	    AUDIT_SYSCALL_ENTER(sa->code, td))) {
 #ifdef KDTRACE_HOOKS
-	/* Give the syscall:::return DTrace probe a chance to fire. */
-	if (__predict_false(systrace_enabled && sa->callp->sy_return != 0))
-		(*systrace_probe_func)(sa, SYSTRACE_RETURN,
-		    error ? -1 : td->td_retval[0]);
+		/* Give the syscall:::entry DTrace probe a chance to fire. */
+		if (__predict_false(sa->callp->sy_entry != 0))
+			(*systrace_probe_func)(sa, SYSTRACE_ENTRY, 0);
 #endif
+		error = (sa->callp->sy_call)(td, sa->args);
+		/* Save the latest error return value. */
+		if (__predict_false((td->td_pflags & TDP_NERRNO) == 0))
+			td->td_errno = error;
+		AUDIT_SYSCALL_EXIT(error, td);
+#ifdef KDTRACE_HOOKS
+		/* Give the syscall:::return DTrace probe a chance to fire. */
+		if (__predict_false(sa->callp->sy_return != 0))
+			(*systrace_probe_func)(sa, SYSTRACE_RETURN,
+			    error ? -1 : td->td_retval[0]);
+#endif
+	} else {
+		error = (sa->callp->sy_call)(td, sa->args);
+		/* Save the latest error return value. */
+		if (__predict_false((td->td_pflags & TDP_NERRNO) == 0))
+			td->td_errno = error;
+	}
 	syscall_thread_exit(td, sa->callp);
 
  retval:
@@ -175,7 +185,7 @@ syscallenter(struct thread *td)
 	    (uintptr_t)td, "pid:%d", td->td_proc->p_pid, "error:%d", error,
 	    "retval0:%#lx", td->td_retval[0], "retval1:%#lx",
 	    td->td_retval[1]);
-	if (traced) {
+	if (__predict_false(traced)) {
 		PROC_LOCK(p);
 		td->td_dbgflags &= ~TDB_SCE;
 		PROC_UNLOCK(p);
@@ -196,9 +206,10 @@ syscallret(struct thread *td)
 
 	p = td->td_proc;
 	sa = &td->td_sa;
-	if ((trap_enotcap || (p->p_flag2 & P2_TRAPCAP) != 0) &&
-	    IN_CAPABILITY_MODE(td)) {
-		if (td->td_errno == ENOTCAPABLE || td->td_errno == ECAPMODE) {
+	if (__predict_false(td->td_errno == ENOTCAPABLE ||
+	    td->td_errno == ECAPMODE)) {
+		if ((trap_enotcap ||
+		    (p->p_flag2 & P2_TRAPCAP) != 0) && IN_CAPABILITY_MODE(td)) {
 			ksiginfo_init_trap(&ksi);
 			ksi.ksi_signo = SIGTRAP;
 			ksi.ksi_errno = td->td_errno;
@@ -218,20 +229,15 @@ syscallret(struct thread *td)
 	}
 #endif
 
-	if (p->p_flag & P_TRACED) {
+	traced = 0;
+	if (__predict_false(p->p_flag & P_TRACED)) {
 		traced = 1;
 		PROC_LOCK(p);
 		td->td_dbgflags |= TDB_SCX;
 		PROC_UNLOCK(p);
-	} else
-		traced = 0;
-	/*
-	 * This works because errno is findable through the
-	 * register set.  If we ever support an emulation where this
-	 * is not the case, this code will need to be revisited.
-	 */
-	STOPEVENT(p, S_SCX, sa->code);
-	if (traced || (td->td_dbgflags & (TDB_EXEC | TDB_FORK)) != 0) {
+	}
+	if (__predict_false(traced ||
+	    (td->td_dbgflags & (TDB_EXEC | TDB_FORK)) != 0)) {
 		PROC_LOCK(p);
 		/*
 		 * If tracing the execed process, trap to the debugger

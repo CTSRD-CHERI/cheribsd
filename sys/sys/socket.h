@@ -416,6 +416,7 @@ struct sockproto {
 #define	NET_RT_IFMALIST	4		/* return multicast address list */
 #define	NET_RT_IFLISTL	5		/* Survey interface list, using 'l'en
 					 * versions of msghdr structs. */
+#define NET_RT_NHOP	6		/* dump routing nexthops */
 #endif /* __BSD_VISIBLE */
 
 /*
@@ -437,26 +438,17 @@ struct msghdr {
 	int		 msg_flags;		/* flags on received message */
 };
 #ifdef _KERNEL
-#if __has_feature(capabilities)
+#ifdef COMPAT_FREEBSD64
 struct msghdr64 {
-	void		*msg_name;		/* optional address */
-	socklen_t	 msg_namelen;		/* size of address */
-	struct iovec_native	*msg_iov;	/* scatter/gather array */
-	int		 msg_iovlen;		/* # elements in msg_iov */
-	void		*msg_control;		/* ancillary data, see below */
-	socklen_t	 msg_controllen;	/* ancillary data buffer len */
-	int		 msg_flags;		/* flags on received message */
+	uint64_t	msg_name;	/* (void *) optional address */
+	socklen_t	msg_namelen;	/* size of address */
+	uint64_t	msg_iov;	/* (struct iovec64 *) scatter/gather array */
+	int		msg_iovlen;	/* # elements in msg_iov */
+	uint64_t	msg_control;	/* (void *) ancillary data, see below */
+	socklen_t	msg_controllen;	/* ancillary data buffer len */
+	int		msg_flags;	/* flags on received message */
 };
 #endif
-struct msghdr_native {
-	void		*msg_name;		/* optional address */
-	socklen_t	 msg_namelen;		/* size of address */
-	struct iovec_native	*msg_iov;	/* scatter/gather array */
-	int		 msg_iovlen;		/* # elements in msg_iov */
-	void		*msg_control;		/* ancillary data, see below */
-	socklen_t	 msg_controllen;	/* ancillary data buffer len */
-	int		 msg_flags;		/* flags on received message */
-};
 #endif	/* _KERNEL */
 
 #define	MSG_OOB		 0x00000001	/* process out-of-band data */
@@ -548,14 +540,18 @@ struct sockcred {
 
 #endif /* __BSD_VISIBLE */
 
-#ifndef __CHERI_PURE_CAPABILITY__
-#define	_CMSG_ALIGN(n)	_ALIGN(n)
-#else
 /*
- * Don't align for capabilities in CheriABI.  Sending them makes little
+ * We should not need to align for capabilities in CheriABI. Sending them makes little
  * sense and would be a major potential security hole.
+ * However within the kernel control messages may contain pointers (see SCM_RIGHTS),
+ * therefore we need to align to pointer size within the kernel.
+ * Aligning to capability size should remove the need for realignment in the hybrid kernel/
+ * purecap userspace combination.
  */
-#define	_CMSG_ALIGN(n)	__builtin_align_up((n), sizeof(u_long))
+#if __has_feature(capabilities) && defined(_KERNEL)
+#define	_CMSG_ALIGN(n)	__builtin_align_up((n), sizeof(void * __capability))
+#else
+#define	_CMSG_ALIGN(n)	_ALIGN(n)
 #endif
 
 /* given pointer to struct cmsghdr, return pointer to data */
@@ -635,11 +631,11 @@ struct osockaddr {
  * 4.3-compat message header (move to compat file later).
  */
 struct omsghdr {
-	char	*msg_name;		/* optional address */
+	char * __kerncap msg_name;	/* optional address */
 	int	msg_namelen;		/* size of address */
-	struct	iovec_native *msg_iov;		/* scatter/gather array */
+	struct iovec * __kerncap msg_iov; /* scatter/gather array */
 	int	msg_iovlen;		/* # elements in msg_iov */
-	char	*msg_accrights;		/* access rights sent/received */
+	char * __kerncap msg_accrights;	/* access rights sent/received */
 	int	msg_accrightslen;
 };
 #endif
@@ -671,12 +667,6 @@ struct sf_hdtr {
 	int trl_cnt;		/* number of trailer iovec's */
 };
 #ifdef _KERNEL
-struct sf_hdtr_native {
-	struct iovec_native *headers;	/* pointer to an array of header struct iovec's */
-	int hdr_cnt;		/* number of header iovec's */
-	struct iovec_native *trailers;	/* pointer to an array of trailer struct iovec's */
-	int trl_cnt;		/* number of trailer iovec's */
-};
 typedef	int copyin_hdtr_t(const void * __capability hdtrp, struct sf_hdtr *hdtr);
 #endif /* _KERNEL */
 
@@ -702,12 +692,6 @@ struct mmsghdr {
 	struct msghdr	msg_hdr;		/* message header */
 	ssize_t		msg_len;		/* message length */
 };
-#ifdef _KERNEL
-struct mmsghdr_native {
-	struct msghdr_native	msg_hdr;		/* message header */
-	ssize_t		msg_len;		/* message length */
-};
-#endif /* _KERNEL */
 #endif /* __BSD_VISIBLE */
 
 #ifndef	_KERNEL

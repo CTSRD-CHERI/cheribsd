@@ -77,7 +77,7 @@ struct iconv_add_in {
 	char	ia_to[ICONV_CSNMAXLEN];
 	char	ia_from[ICONV_CSNMAXLEN];
 	int	ia_datalen;
-	const void *ia_data;
+	const void * __kerncap ia_data;
 };
 
 struct iconv_add_out {

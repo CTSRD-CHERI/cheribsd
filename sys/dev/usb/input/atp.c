@@ -170,7 +170,8 @@ __FBSDID("$FreeBSD$");
 /* end of driver specific options */
 
 /* Tunables */
-static SYSCTL_NODE(_hw_usb, OID_AUTO, atp, CTLFLAG_RW, 0, "USB ATP");
+static SYSCTL_NODE(_hw_usb, OID_AUTO, atp, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
+    "USB ATP");
 
 #ifdef USB_DEBUG
 enum atp_log_level {
@@ -196,9 +197,11 @@ SYSCTL_UINT(_hw_usb_atp, OID_AUTO, double_tap_threshold, CTLFLAG_RWTUN,
 
 static u_int atp_mickeys_scale_factor = ATP_SCALE_FACTOR;
 static int atp_sysctl_scale_factor_handler(SYSCTL_HANDLER_ARGS);
-SYSCTL_PROC(_hw_usb_atp, OID_AUTO, scale_factor, CTLTYPE_UINT | CTLFLAG_RWTUN,
+SYSCTL_PROC(_hw_usb_atp, OID_AUTO, scale_factor,
+    CTLTYPE_UINT | CTLFLAG_RWTUN | CTLFLAG_MPSAFE,
     &atp_mickeys_scale_factor, sizeof(atp_mickeys_scale_factor),
-    atp_sysctl_scale_factor_handler, "IU", "movement scale factor");
+    atp_sysctl_scale_factor_handler, "IU",
+    "movement scale factor");
 
 static u_int atp_small_movement_threshold = ATP_SMALL_MOVEMENT_THRESHOLD;
 SYSCTL_UINT(_hw_usb_atp, OID_AUTO, small_movement, CTLFLAG_RWTUN,
@@ -2216,6 +2219,9 @@ atp_attach(device_t dev)
 		return (ENXIO);
 	}
 
+	di = USB_GET_DRIVER_INFO(uaa);
+	sc->sc_family = DECODE_FAMILY_FROM_DRIVER_INFO(di);
+
 	/*
 	 * By default the touchpad behaves like an HID device, sending
 	 * packets with reportID = 2. Such reports contain only
@@ -2224,17 +2230,18 @@ atp_attach(device_t dev)
 	 * sensors. The device input mode can be switched from HID
 	 * reports to raw sensor data using vendor-specific USB
 	 * control commands.
+	 * FOUNTAIN devices will give an error when trying to switch
+	 * input mode, so we skip this command
 	 */
-	if ((err = atp_set_device_mode(sc, RAW_SENSOR_MODE)) != 0) {
+	if ((sc->sc_family == TRACKPAD_FAMILY_FOUNTAIN_GEYSER) &&
+		(DECODE_PRODUCT_FROM_DRIVER_INFO(di) == FOUNTAIN))
+		DPRINTF("device mode switch skipped: Fountain device\n");
+	else if ((err = atp_set_device_mode(sc, RAW_SENSOR_MODE)) != 0) {
 		DPRINTF("failed to set mode to 'RAW_SENSOR' (%d)\n", err);
 		return (ENXIO);
 	}
 
 	mtx_init(&sc->sc_mutex, "atpmtx", NULL, MTX_DEF | MTX_RECURSE);
-
-	di = USB_GET_DRIVER_INFO(uaa);
-
-	sc->sc_family = DECODE_FAMILY_FROM_DRIVER_INFO(di);
 
 	switch(sc->sc_family) {
 	case TRACKPAD_FAMILY_FOUNTAIN_GEYSER:

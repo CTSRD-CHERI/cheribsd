@@ -10,7 +10,7 @@ ${PACKAGE}FILES+=		README
 
 KYUAFILE= yes
 
-SUBDIR.${MK_CHERI}+=	cheri
+SUBDIR.${MK_COMPAT_CHERIABI}+=	cheri
 SUBDIR+= etc
 SUBDIR+= sys
 
@@ -18,7 +18,8 @@ SUBDIR_PARALLEL=
 
 afterinstall: install-tests-local
 install-tests-local: .PHONY
-	${INSTALL_SYMLINK} ../local/tests ${DESTDIR}${TESTSDIR}/local
+	${INSTALL_SYMLINK} -T 'package=tests' \
+	    ../local/tests ${DESTDIR}${TESTSDIR}/local
 
 .include "Makefile.inc0"
 .include <bsd.test.mk>

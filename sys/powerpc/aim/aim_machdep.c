@@ -136,6 +136,8 @@ __FBSDID("$FreeBSD$");
 struct bat	battable[16];
 #endif
 
+int radix_mmu = 0;
+
 #ifndef __powerpc64__
 /* Bits for running on 64-bit systems in 32-bit mode. */
 extern void	*testppc64, *testppc64size;
@@ -161,6 +163,7 @@ extern void	*dsmisstrap, *dsmisssize;
 
 extern void *ap_pcpu;
 extern void __restartkernel(vm_offset_t, vm_offset_t, vm_offset_t, void *, uint32_t, register_t offset, register_t msr);
+extern void __restartkernel_virtual(vm_offset_t, vm_offset_t, vm_offset_t, void *, uint32_t, register_t offset, register_t msr);
 
 void aim_early_init(vm_offset_t fdt, vm_offset_t toc, vm_offset_t ofentry,
     void *mdp, uint32_t mdp_cookie);
@@ -184,13 +187,22 @@ aim_early_init(vm_offset_t fdt, vm_offset_t toc, vm_offset_t ofentry, void *mdp,
 
 #ifdef __powerpc64__
 	/*
-	 * If in real mode, relocate to high memory so that the kernel
+	 * Relocate to high memory so that the kernel
 	 * can execute from the direct map.
+	 *
+	 * If we are in virtual mode already, use a special entry point
+	 * that sets up a temporary DMAP to execute from until we can
+	 * properly set up the MMU.
 	 */
-	if (!(mfmsr() & PSL_DR) &&
-	    (vm_offset_t)&aim_early_init < DMAP_BASE_ADDRESS)
-		__restartkernel(fdt, 0, ofentry, mdp, mdp_cookie,
-		    DMAP_BASE_ADDRESS, mfmsr());
+	if ((vm_offset_t)&aim_early_init < DMAP_BASE_ADDRESS) {
+		if (mfmsr() & PSL_DR) {
+			__restartkernel_virtual(fdt, 0, ofentry, mdp,
+			    mdp_cookie, DMAP_BASE_ADDRESS, mfmsr());
+		} else {
+			__restartkernel(fdt, 0, ofentry, mdp, mdp_cookie,
+			    DMAP_BASE_ADDRESS, mfmsr());
+		}
+	}
 #endif
 
 	/* Various very early CPU fix ups */
@@ -251,8 +263,25 @@ aim_cpu_init(vm_offset_t toc)
 	psl_userset32 = psl_userset & ~PSL_SF;
 #endif
 
-	/* Bits that users aren't allowed to change */
-	psl_userstatic = ~(PSL_VEC | PSL_FP | PSL_FE0 | PSL_FE1);
+	/*
+	 * Zeroed bits in this variable signify that the value of the bit
+	 * in its position is allowed to vary between userspace contexts.
+	 *
+	 * All other bits are required to be identical for every userspace
+	 * context. The actual *value* of the bit is determined by
+	 * psl_userset and/or psl_userset32, and is not allowed to change.
+	 *
+	 * Remember to update this set when implementing support for
+	 * *conditionally* enabling a processor facility. Failing to do
+	 * this will cause swapcontext() in userspace to break when a
+	 * process uses a conditionally-enabled facility.
+	 *
+	 * When *unconditionally* implementing support for a processor
+	 * facility, update psl_userset / psl_userset32 instead.
+	 *
+	 * See the access control check in set_mcontext().
+	 */
+	psl_userstatic = ~(PSL_VSX | PSL_VEC | PSL_FP | PSL_FE0 | PSL_FE1);
 	/*
 	 * Mask bits from the SRR1 that aren't really the MSR:
 	 * Bits 1-4, 10-15 (ppc32), 33-36, 42-47 (ppc64)
@@ -388,16 +417,18 @@ aim_cpu_init(vm_offset_t toc)
 	bcopy(&dsitrap,  (void *)(EXC_DSI + trap_offset),  (size_t)&dsiend -
 	    (size_t)&dsitrap);
 
+	/* Set address of generictrap for self-reloc calculations */
+	*((void **)TRAP_GENTRAP) = &generictrap;
 	#ifdef __powerpc64__
 	/* Set TOC base so that the interrupt code can get at it */
-	*((void **)TRAP_GENTRAP) = &generictrap;
+	*((void **)TRAP_ENTRY) = &generictrap;
 	*((register_t *)TRAP_TOCBASE) = toc;
 	#else
 	/* Set branch address for trap code */
 	if (cpu_features & PPC_FEATURE_64)
-		*((void **)TRAP_GENTRAP) = &generictrap64;
+		*((void **)TRAP_ENTRY) = &generictrap64;
 	else
-		*((void **)TRAP_GENTRAP) = &generictrap;
+		*((void **)TRAP_ENTRY) = &generictrap;
 	*((void **)TRAP_TOCBASE) = _GLOBAL_OFFSET_TABLE_;
 
 	/* G2-specific TLB miss helper handlers */
@@ -422,7 +453,14 @@ aim_cpu_init(vm_offset_t toc)
 	 * in case the platform module had a better idea of what we
 	 * should do.
 	 */
-	if (cpu_features & PPC_FEATURE_64)
+	if (cpu_features2 & PPC_FEATURE2_ARCH_3_00) {
+		radix_mmu = 0;
+		TUNABLE_INT_FETCH("radix_mmu", &radix_mmu);
+		if (radix_mmu)
+			pmap_mmu_install(MMU_TYPE_RADIX, BUS_PROBE_GENERIC);
+		else
+			pmap_mmu_install(MMU_TYPE_G5, BUS_PROBE_GENERIC);
+	} else if (cpu_features & PPC_FEATURE_64)
 		pmap_mmu_install(MMU_TYPE_G5, BUS_PROBE_GENERIC);
 	else
 		pmap_mmu_install(MMU_TYPE_OEA, BUS_PROBE_GENERIC);
@@ -485,6 +523,32 @@ cpu_pcpu_init(struct pcpu *pcpu, int cpuid, size_t sz)
 memcpy(pcpu->pc_aim.slb, PCPU_GET(aim.slb), sizeof(pcpu->pc_aim.slb));
 #endif
 }
+
+/* Return 0 on handled success, otherwise signal number. */
+int
+cpu_machine_check(struct thread *td, struct trapframe *frame, int *ucode)
+{
+#ifdef __powerpc64__
+	/*
+	 * This block is 64-bit CPU specific currently.  Punt running in 32-bit
+	 * mode on 64-bit CPUs.
+	 */
+	/* Check if the important information is in DSISR */
+	if ((frame->srr1 & SRR1_MCHK_DATA) != 0) {
+		printf("Machine check, DSISR: %016lx\n", frame->cpu.aim.dsisr);
+		/* SLB multi-hit is recoverable. */
+		if ((frame->cpu.aim.dsisr & DSISR_MC_SLB_MULTIHIT) != 0)
+			return (0);
+		/* TODO: Add other machine check recovery procedures. */
+	} else {
+		if ((frame->srr1 & SRR1_MCHK_IFETCH_M) == SRR1_MCHK_IFETCH_SLBMH)
+			return (0);
+	}
+#endif
+	*ucode = BUS_OBJERR;
+	return (SIGBUS);
+}
+
 
 #ifndef __powerpc64__
 uint64_t

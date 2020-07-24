@@ -39,51 +39,48 @@
 #ifndef _COMPAT_FREEBSD64_FREEBSD64_H_
 #define _COMPAT_FREEBSD64_FREEBSD64_H_
 
-#include "opt_ktrace.h"
+#include <sys/abi_compat.h>
 #include <sys/uio.h>
-#include <sys/ktrace.h>
 #include <sys/proc.h>
 #include <sys/user.h>
 
-#define CP(src,dst,fld) do { (dst).fld = (src).fld; } while (0)
-
 struct jail64 {
 	uint32_t	version;
-	char		*path;
-	char		*hostname;
-	char		*jailname;
+	uint64_t	path;		/* char* */
+	uint64_t	hostname;	/* char* */
+	uint64_t	jailname;	/* char* */
 	uint32_t	ip4s;
 	uint32_t	ip6s;
-	struct in_addr	*ip4;
-	struct in6_addr	*ip6;
+	uint64_t	ip4;		/* struct in_addr* */
+	uint64_t	ip6;		/* struct in6_addr* */
 };
 
 struct thr_param64 {
-	void		*start_func;
-	void		*arg;
-	char		*stack_base;
+	uint64_t	start_func;	/* void* */
+	uint64_t	arg;		/* void* */
+	uint64_t	stack_base;	/* char* */
 	size_t		stack_size;
-	char		*tls_base;
+	uint64_t	tls_base;	/* char* */
 	size_t		tls_size;
-	long		*child_tid;
-	long		*parent_tid;
+	uint64_t	child_tid;	/* long* */
+	uint64_t	parent_tid;	/* long* */
 	int		flags;
-	struct rtprio	*rtp;
-	void		*ddc;
-	void		*spare[2];
+	uint64_t	rtp;		/* struct rtprio* */
+	uint64_t	ddc;		/* void* */
+	uint64_t	spare[2];	/* (void*)[2] */
 };
 
 struct kinfo_proc64 {
 	int	ki_structsize;
 	int	ki_layout;
-	void	*ki_args;		/* struct pargs */
-	void	*ki_paddr;		/* struct proc */
-	void	*ki_addr;		/* struct user */
-	void	*ki_tracep;		/* struct vnode */
-	void	*ki_textvp;		/* struct vnode */
-	void	*ki_fd;			/* struct filedesc */
-	void	*ki_vmspace;		/* struct vmspace */
-	void	*ki_wchan;		/* void */
+	uint64_t ki_args;		/* struct pargs* */
+	uint64_t ki_paddr;		/* struct proc* */
+	uint64_t ki_addr;		/* struct user* */
+	uint64_t ki_tracep;		/* struct vnode* */
+	uint64_t ki_textvp;		/* struct vnode* */
+	uint64_t ki_fd;			/* struct filedesc* */
+	uint64_t ki_vmspace;		/* struct vmspace* */
+	uint64_t ki_wchan;		/* void* */
 	pid_t	ki_pid;
 	pid_t	ki_ppid;
 	pid_t	ki_pgid;
@@ -159,43 +156,44 @@ struct kinfo_proc64 {
 	struct	rusage ki_rusage;
 	/* XXX - most fields in ki_rusage_ch are not (yet) filled in */
 	struct	rusage ki_rusage_ch;
-	void	*ki_pcb;			/* struct pcb */
-	void	*ki_kstack;		/* void	*/
-	void	*ki_udata;		/* void	*/
-	void	*ki_tdaddr;		/* struct thread  */
-	void	*ki_spareptrs[KI_NSPARE_PTR];	/* void */
+	uint64_t ki_pcb;			/* struct pcb* */
+	uint64_t ki_kstack;		/* void* */
+	uint64_t ki_udata;		/* void* */
+	uint64_t ki_tdaddr;		/* struct thread*  */
+	uint64_t ki_spareptrs[KI_NSPARE_PTR];	/* void* */
 	long	ki_sparelongs[KI_NSPARE_LONG];
 	long	ki_sflag;
 	long	ki_tdflags;
 };
+
+struct kinfo_sigtramp64 {
+	uint64_t ksigtramp_start;
+	uint64_t ksigtramp_end;
+	uint64_t ksigtramp_spare[4];
+};
+
 
 struct kld_file_stat64 {
     int		version;	/* set to sizeof(struct kld_file_stat64) */
     char        name[MAXPATHLEN];
     int		refs;
     int		id;
-    void	*address;	/* load address */
+    uint64_t	address;	/* load address (void *) */
     size_t	size;		/* size in bytes */
     char        pathname[MAXPATHLEN];
 };
 
 struct kld_sym_lookup64 {
 	int		version; /* set to sizeof(struct kld_sym_lookup64) */
-	char		*symname; /* Symbol name we are looking up */
+	uint64_t	symname; /* Symbol name we are looking up (char *) */
 	u_long		symvalue;
 	size_t		symsize;
 };
 
 struct procctl_reaper_pids64 {
-	u_int				rp_count;
-	u_int				rp_pad0[15];
-	struct procctl_reaper_pidinfo	*rp_pids;
-};
-
-union semun64 {
-	int		val;
-	struct semid_ds	*buf;
-	unsigned short 	*array;
+	u_int		rp_count;
+	u_int		rp_pad0[15];
+	uint64_t	rp_pids;	/* struct procctl_reaper_pidinfo* */
 };
 
 #include <sys/ipc.h>
@@ -216,8 +214,8 @@ struct msqid_ds64 {
 };
 
 struct iovec64 {
-	void 	*iov_base;
+	uint64_t iov_base;	/* void* */
 	size_t	iov_len;
 };
 
-#endif /* !_COMPAT_CHERIABI_CHERIABI_H_ */
+#endif /* !_COMPAT_FREEBSD64_FREEBSD64_H_ */

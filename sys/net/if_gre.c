@@ -41,8 +41,6 @@ __FBSDID("$FreeBSD$");
 #include "opt_inet6.h"
 #include "opt_rss.h"
 
-#define	EXPLICIT_USER_ACCESS
-
 #include <sys/param.h>
 #include <sys/kernel.h>
 #include <sys/lock.h>
@@ -117,7 +115,7 @@ static int	gre_output(struct ifnet *, struct mbuf *,
 static void	gre_delete_tunnel(struct gre_softc *);
 
 SYSCTL_DECL(_net_link);
-static SYSCTL_NODE(_net_link, IFT_TUNNEL, gre, CTLFLAG_RW, 0,
+static SYSCTL_NODE(_net_link, IFT_TUNNEL, gre, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
     "Generic Routing Encapsulation");
 #ifndef MAX_GRE_NEST
 /*
@@ -389,7 +387,7 @@ gre_delete_tunnel(struct gre_softc *sc)
 	if ((gs = sc->gre_so) != NULL && CK_LIST_EMPTY(&gs->list)) {
 		CK_LIST_REMOVE(gs, chain);
 		soclose(gs->so);
-		epoch_call(net_epoch_preempt, &gs->epoch_ctx, gre_sofree);
+		NET_EPOCH_CALL(gre_sofree, &gs->epoch_ctx);
 		sc->gre_so = NULL;
 	}
 	GRE2IFP(sc)->if_drv_flags &= ~IFF_DRV_RUNNING;

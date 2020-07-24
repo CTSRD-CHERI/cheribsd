@@ -117,6 +117,7 @@ static void	 ixl_if_vlan_unregister(if_ctx_t ctx, u16 vtag);
 static uint64_t	 ixl_if_get_counter(if_ctx_t ctx, ift_counter cnt);
 static int	 ixl_if_i2c_req(if_ctx_t ctx, struct ifi2creq *req);
 static int	 ixl_if_priv_ioctl(if_ctx_t ctx, u_long command, caddr_t data);
+static bool	 ixl_if_needs_restart(if_ctx_t ctx, enum iflib_restart_event event);
 #ifdef PCI_IOV
 static void	 ixl_if_vflr_handle(if_ctx_t ctx);
 #endif
@@ -187,6 +188,7 @@ static device_method_t ixl_if_methods[] = {
 	DEVMETHOD(ifdi_get_counter, ixl_if_get_counter),
 	DEVMETHOD(ifdi_i2c_req, ixl_if_i2c_req),
 	DEVMETHOD(ifdi_priv_ioctl, ixl_if_priv_ioctl),
+	DEVMETHOD(ifdi_needs_restart, ixl_if_needs_restart),
 #ifdef PCI_IOV
 	DEVMETHOD(ifdi_iov_init, ixl_if_iov_init),
 	DEVMETHOD(ifdi_iov_uninit, ixl_if_iov_uninit),
@@ -206,7 +208,7 @@ static driver_t ixl_if_driver = {
 ** TUNEABLE PARAMETERS:
 */
 
-static SYSCTL_NODE(_hw, OID_AUTO, ixl, CTLFLAG_RD, 0,
+static SYSCTL_NODE(_hw, OID_AUTO, ixl, CTLFLAG_RD | CTLFLAG_MPSAFE, 0,
     "ixl driver parameters");
 
 /*
@@ -398,10 +400,10 @@ ixl_if_attach_pre(if_ctx_t ctx)
 	enum i40e_status_code status;
 	int error = 0;
 
-	INIT_DBG_DEV(dev, "begin");
-
 	dev = iflib_get_dev(ctx);
 	pf = iflib_get_softc(ctx);
+
+	INIT_DBG_DEV(dev, "begin");
 
 	vsi = &pf->vsi;
 	vsi->back = pf;
@@ -588,10 +590,11 @@ ixl_if_attach_post(if_ctx_t ctx)
 	int error = 0;
 	enum i40e_status_code status;
 
-	INIT_DBG_DEV(dev, "begin");
-
 	dev = iflib_get_dev(ctx);
 	pf = iflib_get_softc(ctx);
+
+	INIT_DBG_DEV(dev, "begin");
+
 	vsi = &pf->vsi;
 	vsi->ifp = iflib_get_ifp(ctx);
 	hw = &pf->hw;
@@ -1624,13 +1627,49 @@ ixl_if_priv_ioctl(if_ctx_t ctx, u_long command, caddr_t data)
 	struct ifdrv *ifd = (struct ifdrv *)data;
 	int error = 0;
 
-	/* NVM update command */
-	if (ifd->ifd_cmd == I40E_NVM_ACCESS)
-		error = ixl_handle_nvmupd_cmd(pf, ifd);
-	else
-		error = EINVAL;
+	/*
+	 * The iflib_if_ioctl forwards SIOCxDRVSPEC and SIOGPRIVATE_0 without
+	 * performing privilege checks. It is important that this function
+	 * perform the necessary checks for commands which should only be
+	 * executed by privileged threads.
+	 */
+
+	switch(command) {
+	case SIOCGDRVSPEC:
+	case SIOCSDRVSPEC:
+		/* NVM update command */
+		if (ifd->ifd_cmd == I40E_NVM_ACCESS) {
+			error = priv_check(curthread, PRIV_DRIVER);
+			if (error)
+				break;
+			error = ixl_handle_nvmupd_cmd(pf, ifd);
+		} else {
+			error = EINVAL;
+		}
+		break;
+	default:
+		error = EOPNOTSUPP;
+	}
 
 	return (error);
+}
+
+/* ixl_if_needs_restart - Tell iflib when the driver needs to be reinitialized
+ * @ctx: iflib context
+ * @event: event code to check
+ *
+ * Defaults to returning false for every event.
+ *
+ * @returns true if iflib needs to reinit the interface, false otherwise
+ */
+static bool
+ixl_if_needs_restart(if_ctx_t ctx __unused, enum iflib_restart_event event)
+{
+	switch (event) {
+	case IFLIB_RESTART_VLAN_CONFIG:
+	default:
+		return (false);
+	}
 }
 
 static u_int

@@ -744,7 +744,7 @@ aic_attach(device_t dev)
 	pcm_setflags(dev, pcm_getflags(dev) | SD_F_MPSAFE);
 
 	/* Setup interrupt handler. */
-	err = xdma_setup_intr(sc->xchan, aic_intr, scp, &sc->ih);
+	err = xdma_setup_intr(sc->xchan, 0, aic_intr, scp, &sc->ih);
 	if (err) {
 		device_printf(sc->dev,
 		    "Can't setup xDMA interrupt handler.\n");
@@ -769,7 +769,8 @@ aic_attach(device_t dev)
 	/* Create device sysctl node. */
 	SYSCTL_ADD_PROC(device_get_sysctl_ctx(dev),
 	    SYSCTL_CHILDREN(device_get_sysctl_tree(dev)),
-	    OID_AUTO, "internal_codec", CTLTYPE_INT | CTLFLAG_RW,
+	    OID_AUTO, "internal_codec",
+	    CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_NEEDGIANT,
 	    scp, 0, sysctl_hw_pcm_internal_codec, "I",
 	    "use internal audio codec");
 

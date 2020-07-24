@@ -24,7 +24,7 @@ M make (Init vals)
 {
     M ret;
     for (int v : vals)
-        ret[v] = v + 10;
+        ret[static_cast<typename M::key_type>(v)] = static_cast<typename M::mapped_type>(v + 10);
     return ret;
 }
 
@@ -48,7 +48,7 @@ void test()
     auto is4 = [](auto v) { return v.first == 4;};
     auto True  = [](auto) { return true; };
     auto False = [](auto) { return false; };
-    
+
     test0<S>({}, is1, {});
 
     test0<S>({1}, is1, {});
@@ -78,4 +78,3 @@ int main(int, char**)
 
   return 0;
 }
-

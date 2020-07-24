@@ -28,8 +28,6 @@
  * $FreeBSD$
  */
 
-#define	EXPLICIT_USER_ACCESS
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/proc.h>
@@ -58,7 +56,8 @@ static int smbfs_debuglevel = 0;
 
 static int smbfs_version = SMBFS_VERSION;
 
-SYSCTL_NODE(_vfs, OID_AUTO, smbfs, CTLFLAG_RW, 0, "SMB/CIFS filesystem");
+SYSCTL_NODE(_vfs, OID_AUTO, smbfs, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
+    "SMB/CIFS filesystem");
 SYSCTL_INT(_vfs_smbfs, OID_AUTO, version, CTLFLAG_RD, &smbfs_version, 0, "");
 SYSCTL_INT(_vfs_smbfs, OID_AUTO, debuglevel, CTLFLAG_RW, &smbfs_debuglevel, 0, "");
 
@@ -236,7 +235,7 @@ smbfs_mount(struct mount *mp)
 		vfs_mount_error(mp, "smbfs_root error: %d", error);
 		goto bad;
 	}
-	VOP_UNLOCK(vp, 0);
+	VOP_UNLOCK(vp);
 	SMBVDEBUG("root.v_usecount = %d\n", vrefcnt(vp));
 
 #ifdef DIAGNOSTIC

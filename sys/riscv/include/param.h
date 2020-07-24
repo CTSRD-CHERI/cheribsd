@@ -40,22 +40,31 @@
 #include <machine/_align.h>
 
 #define	STACKALIGNBYTES	(16 - 1)
-#define	STACKALIGN(p)	((uint64_t)(p) & ~STACKALIGNBYTES)
+#define	STACKALIGN(p)	(__builtin_align_down((p), STACKALIGNBYTES + 1))
 
 #ifndef MACHINE
 #define	MACHINE		"riscv"
 #endif
 #ifndef MACHINE_ARCH
+
+/* Always use the hard-float arch for the kernel. */
+#if !defined(_KERNEL) && defined(__riscv_float_abi_soft)
+#define	MACHINE_ARCH	"riscv64sf"
+#else
 #define	MACHINE_ARCH	"riscv64"
 #endif
+#endif
+#ifdef _KERNEL
+#define	MACHINE_ARCHES	"riscv64 riscv64sf"
+#endif
 
-#if defined(SMP) || defined(KLD_MODULE)
+#ifdef SMP
 #ifndef MAXCPU
 #define	MAXCPU		16
 #endif
 #else
 #define	MAXCPU		1
-#endif /* SMP || KLD_MODULE */
+#endif
 
 #ifndef MAXMEMDOM
 #define	MAXMEMDOM	1
@@ -90,6 +99,16 @@
 
 #define	KSTACK_GUARD_PAGES	1	/* pages of kstack guard; 0 disables */
 #define	PCPU_PAGES		1
+
+/*
+ * CHERI specific define required by SysV shared memory.  Depends
+ * on physically addressable memory.
+ *
+ * XXX-JHB: Just copied from MIPS
+ */
+/* 1MB allows all sizes for 40-bit address spaces with ISA v5 128-bit caps. */
+/* XXX-BD: only increase for compressed capabilities? */
+#define	CHERI_SHMLBA	(1 << 20)
 
 /*
  * Mach derived conversion macros

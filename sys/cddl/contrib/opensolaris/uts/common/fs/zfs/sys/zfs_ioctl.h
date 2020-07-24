@@ -359,9 +359,17 @@ typedef enum zfs_case {
  */
 typedef struct zfs_cmd {
 	char		zc_name[MAXPATHLEN];	/* name of pool or dataset */
+#if defined(_KERNEL) || defined(__CHERI_PURE_CAPABILITY__)
+	void * __capability zc_nvlist_src;
+#else
 	uint64_t	zc_nvlist_src;		/* really (char *) */
+#endif
 	uint64_t	zc_nvlist_src_size;
+#if defined(_KERNEL) || defined(__CHERI_PURE_CAPABILITY__)
+	void * __capability zc_nvlist_dst;
+#else
 	uint64_t	zc_nvlist_dst;		/* really (char *) */
+#endif
 	uint64_t	zc_nvlist_dst_size;
 	boolean_t	zc_nvlist_dst_filled;	/* put an nvlist in dst? */
 	int		zc_pad2;
@@ -370,11 +378,19 @@ typedef struct zfs_cmd {
 	 * The following members are for legacy ioctls which haven't been
 	 * converted to the new method.
 	 */
+#if defined(_KERNEL) || defined(__CHERI_PURE_CAPABILITY__)
+	void * __capability zc_history;
+#else
 	uint64_t	zc_history;		/* really (char *) */
+#endif
 	char		zc_value[MAXPATHLEN * 2];
 	char		zc_string[MAXNAMELEN];
 	uint64_t	zc_guid;
+#if defined(_KERNEL) || defined(__CHERI_PURE_CAPABILITY__)
+	void * __capability zc_nvlist_conf;
+#else
 	uint64_t	zc_nvlist_conf;		/* really (char *) */
+#endif
 	uint64_t	zc_nvlist_conf_size;
 	uint64_t	zc_cookie;
 	uint64_t	zc_objset_type;

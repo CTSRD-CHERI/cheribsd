@@ -49,6 +49,6 @@
  * and must be cast to any desired pointer type.
  */
 #define	_ALIGNBYTES	(sizeof(__register_t) - 1)
-#define	_ALIGN(p)	(((__uintptr_t)(p) + _ALIGNBYTES) & ~_ALIGNBYTES)
+#define	_ALIGN(p)	((__typeof__(p))(((__uintptr_t)(p) + _ALIGNBYTES) & ~_ALIGNBYTES))
 
 #endif /* !_X86_INCLUDE__ALIGN_H_ */

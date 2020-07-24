@@ -576,12 +576,16 @@ SYSCTL_INT(_hw_hn, OID_AUTO, tx_agg_pkts, CTLFLAG_RDTUN,
     &hn_tx_agg_pkts, 0, "Packet transmission aggregation packet limit");
 
 /* VF list */
-SYSCTL_PROC(_hw_hn, OID_AUTO, vflist, CTLFLAG_RD | CTLTYPE_STRING,
-    0, 0, hn_vflist_sysctl, "A", "VF list");
+SYSCTL_PROC(_hw_hn, OID_AUTO, vflist,
+    CTLFLAG_RD | CTLTYPE_STRING | CTLFLAG_NEEDGIANT, 0, 0,
+    hn_vflist_sysctl, "A",
+    "VF list");
 
 /* VF mapping */
-SYSCTL_PROC(_hw_hn, OID_AUTO, vfmap, CTLFLAG_RD | CTLTYPE_STRING,
-    0, 0, hn_vfmap_sysctl, "A", "VF mapping");
+SYSCTL_PROC(_hw_hn, OID_AUTO, vfmap,
+    CTLFLAG_RD | CTLTYPE_STRING | CTLFLAG_NEEDGIANT, 0, 0,
+    hn_vfmap_sysctl, "A",
+    "VF mapping");
 
 /* Transparent VF */
 static int			hn_xpnt_vf = 1;
@@ -1264,7 +1268,7 @@ hn_xpnt_vf_iocsetcaps(struct hn_softc *sc, struct ifreq *ifr)
 	 * Fix up requested capabilities w/ supported capabilities,
 	 * since the supported capabilities could have been changed.
 	 */
-	ifr->ifr_reqcap &= ifp->if_capabilities;
+	ifr_reqcap_set(ifr, ifr_reqcap_get(ifr) & ifp->if_capabilities);
 	/* Pass SIOCSIFCAP to VF. */
 	error = vf_ifp->if_ioctl(vf_ifp, SIOCSIFCAP, (caddr_t)ifr);
 
@@ -1317,8 +1321,8 @@ hn_xpnt_vf_iocsetflags(struct hn_softc *sc)
 
 	memset(&ifr, 0, sizeof(ifr));
 	strlcpy(ifr.ifr_name, vf_ifp->if_xname, sizeof(ifr.ifr_name));
-	ifr.ifr_flags = vf_ifp->if_flags & 0xffff;
-	ifr.ifr_flagshigh = vf_ifp->if_flags >> 16;
+	ifr_flags_set(&ifr, vf_ifp->if_flags & 0xffff);
+	ifr_flagshigh_set(&ifr, vf_ifp->if_flags >> 16);
 	return (vf_ifp->if_ioctl(vf_ifp, SIOCSIFFLAGS, (caddr_t)&ifr));
 }
 
@@ -1506,7 +1510,7 @@ hn_vf_rss_fixup(struct hn_softc *sc, bool reconf)
 	strlcpy(ifrk.ifrk_name, vf_ifp->if_xname, sizeof(ifrk.ifrk_name));
 	error = vf_ifp->if_ioctl(vf_ifp, SIOCGIFRSSKEY, (caddr_t)&ifrk);
 	if (error) {
-		if_printf(ifp, "%s SIOCGRSSKEY failed: %d\n",
+		if_printf(ifp, "%s SIOCGIFRSSKEY failed: %d\n",
 		    vf_ifp->if_xname, error);
 		goto done;
 	}
@@ -1714,7 +1718,7 @@ hn_xpnt_vf_setready(struct hn_softc *sc)
 	 */
 	memset(&ifr, 0, sizeof(ifr));
 	strlcpy(ifr.ifr_name, vf_ifp->if_xname, sizeof(ifr.ifr_name));
-	ifr.ifr_reqcap = ifp->if_capenable;
+	ifr_reqcap_set(&ifr, ifp->if_capenable);
 	hn_xpnt_vf_iocsetcaps(sc, &ifr);
 
 	if (ifp->if_mtu != ETHERMTU) {

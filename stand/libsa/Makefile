@@ -46,14 +46,10 @@ SRCS+=	subr_boot.c
 # Do not generate movt/movw, because the relocation fixup for them does not
 # translate to the -Bsymbolic -pie format required by self_reloc() in loader(8).
 # Also, the fpu is not available in a standalone environment.
-.if ${COMPILER_VERSION} < 30800
-CFLAGS.clang+=	-mllvm -arm-use-movt=0
-.else
 CFLAGS.clang+=	-mno-movt
-.endif
 CFLAGS.clang+=	-mfpu=none
 
-.PATH: ${SRCTOP}/contrib/compiler-rt/lib/builtins/arm/
+.PATH: ${SRCTOP}/contrib/llvm-project/compiler-rt/lib/builtins/arm/
 SRCS+=	aeabi_idivmod.S aeabi_ldivmod.S aeabi_uidivmod.S aeabi_uldivmod.S
 SRCS+=	aeabi_memcmp.S aeabi_memcpy.S aeabi_memmove.S aeabi_memset.S
 .endif
@@ -63,7 +59,7 @@ SRCS+=	aeabi_memcmp.S aeabi_memcpy.S aeabi_memmove.S aeabi_memset.S
 .endif
 
 # Compiler support functions
-.PATH: ${SRCTOP}/contrib/compiler-rt/lib/builtins/
+.PATH: ${SRCTOP}/contrib/llvm-project/compiler-rt/lib/builtins/
 # __clzsi2 and ctzsi2 for various builtin functions
 SRCS+=	clzsi2.c ctzsi2.c
 # Divide and modulus functions called by the compiler
@@ -136,6 +132,20 @@ CLEANFILES+= ${SAFE_INCS} ${STAND_H_INC} ${OTHER_INC}
 # io routines
 SRCS+=	closeall.c dev.c ioctl.c nullfs.c stat.c \
 	fstat.c close.c lseek.c open.c read.c write.c readdir.c
+
+# SMBios routines
+SRCS+=	smbios.c
+.if !defined(BOOT_HIDE_SERIAL_NUMBERS)
+# Export serial numbers, UUID, and asset tag from loader.
+CFLAGS.smbios.c+= -DSMBIOS_SERIAL_NUMBERS
+.if defined(BOOT_LITTLE_ENDIAN_UUID)
+# Use little-endian UUID format as defined in SMBIOS 2.6.
+CFLAGS.smbios.c+= -DSMBIOS_LITTLE_ENDIAN_UUID
+.elif defined(BOOT_NETWORK_ENDIAN_UUID)
+# Use network-endian UUID format for backward compatibility.
+CFLAGS.smbios.c+= -DSMBIOS_NETWORK_ENDIAN_UUID
+.endif
+.endif
 
 # network routines
 SRCS+=	arp.c ether.c ip.c inet_ntoa.c in_cksum.c net.c udp.c netif.c rpc.c

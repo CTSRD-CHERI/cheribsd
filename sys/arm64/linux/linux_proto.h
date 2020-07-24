@@ -29,15 +29,6 @@ struct thread;
 #if BYTE_ORDER == LITTLE_ENDIAN
 #define	PADL_(t)	0
 #define	PADR_(t)	PAD_(t)
-#elif defined(_MIPS_SZCAP) && _MIPS_SZCAP == 256
-/*
- * For non-capability arguments, the syscall argument is stored in the
- * cursor field in the second word.
- */
-#define	PADL_(t)	(sizeof (t) > sizeof(register_t) ? \
-		0 : 2 * sizeof(register_t) - sizeof(t))
-#define	PADR_(t)	(sizeof (t) > sizeof(register_t) ? \
-		0 : 2 * sizeof(register_t))
 #else
 #define	PADL_(t)	PAD_(t)
 #define	PADR_(t)	0
@@ -326,7 +317,10 @@ struct linux_fdatasync_args {
 	char fd_l_[PADL_(l_uint)]; l_uint fd; char fd_r_[PADR_(l_uint)];
 };
 struct linux_sync_file_range_args {
-	register_t dummy;
+	char fd_l_[PADL_(l_int)]; l_int fd; char fd_r_[PADR_(l_int)];
+	char offset_l_[PADL_(l_loff_t)]; l_loff_t offset; char offset_r_[PADR_(l_loff_t)];
+	char nbytes_l_[PADL_(l_loff_t)]; l_loff_t nbytes; char nbytes_r_[PADR_(l_loff_t)];
+	char flags_l_[PADL_(unsigned int)]; unsigned int flags; char flags_r_[PADR_(unsigned int)];
 };
 struct linux_timerfd_create_args {
 	char clockid_l_[PADL_(l_int)]; l_int clockid; char clockid_r_[PADR_(l_int)];

@@ -168,8 +168,8 @@ struct ifbreq {
 struct ifbifconf {
 	uint32_t	ifbic_len;	/* buffer size */
 	union {
-		caddr_t	ifbicu_buf;
-		struct ifbreq *ifbicu_req;
+		char * __kerncap ifbicu_buf;
+		struct ifbreq * __kerncap ifbicu_req;
 	} ifbic_ifbicu;
 #define	ifbic_buf	ifbic_ifbicu.ifbicu_buf
 #define	ifbic_req	ifbic_ifbicu.ifbicu_req
@@ -199,8 +199,8 @@ struct ifbareq {
 struct ifbaconf {
 	uint32_t	ifbac_len;	/* buffer size */
 	union {
-		caddr_t ifbacu_buf;
-		struct ifbareq *ifbacu_req;
+		char * __kerncap ifbacu_buf;
+		struct ifbareq * __kerncap ifbacu_req;
 	} ifbac_ifbacu;
 #define	ifbac_buf	ifbac_ifbacu.ifbacu_buf
 #define	ifbac_req	ifbac_ifbacu.ifbacu_req
@@ -262,52 +262,14 @@ struct ifbpstpreq {
 struct ifbpstpconf {
 	uint32_t	ifbpstp_len;	/* buffer size */
 	union {
-		caddr_t	ifbpstpu_buf;
-		struct ifbpstpreq *ifbpstpu_req;
+		char * __kerncap ifbpstpu_buf;
+		struct ifbpstpreq * __kerncap ifbpstpu_req;
 	} ifbpstp_ifbpstpu;
 #define	ifbpstp_buf	ifbpstp_ifbpstpu.ifbpstpu_buf
 #define	ifbpstp_req	ifbpstp_ifbpstpu.ifbpstpu_req
 };
 
 #ifdef _KERNEL
-
-#define BRIDGE_LOCK_INIT(_sc)		do {			\
-	mtx_init(&(_sc)->sc_mtx, "if_bridge", NULL, MTX_DEF);	\
-	cv_init(&(_sc)->sc_cv, "if_bridge_cv");			\
-} while (0)
-#define BRIDGE_LOCK_DESTROY(_sc)	do {	\
-	mtx_destroy(&(_sc)->sc_mtx);		\
-	cv_destroy(&(_sc)->sc_cv);		\
-} while (0)
-#define BRIDGE_LOCK(_sc)		mtx_lock(&(_sc)->sc_mtx)
-#define BRIDGE_UNLOCK(_sc)		mtx_unlock(&(_sc)->sc_mtx)
-#define BRIDGE_LOCK_ASSERT(_sc)		mtx_assert(&(_sc)->sc_mtx, MA_OWNED)
-#define BRIDGE_UNLOCK_ASSERT(_sc)	mtx_assert(&(_sc)->sc_mtx, MA_NOTOWNED)
-#define	BRIDGE_LOCK2REF(_sc, _err)	do {	\
-	mtx_assert(&(_sc)->sc_mtx, MA_OWNED);	\
-	if ((_sc)->sc_iflist_xcnt > 0)		\
-		(_err) = EBUSY;			\
-	else					\
-		(_sc)->sc_iflist_ref++;		\
-	mtx_unlock(&(_sc)->sc_mtx);		\
-} while (0)
-#define	BRIDGE_UNREF(_sc)		do {				\
-	mtx_lock(&(_sc)->sc_mtx);					\
-	(_sc)->sc_iflist_ref--;						\
-	if (((_sc)->sc_iflist_xcnt > 0) && ((_sc)->sc_iflist_ref == 0))	\
-		cv_broadcast(&(_sc)->sc_cv);				\
-	mtx_unlock(&(_sc)->sc_mtx);					\
-} while (0)
-#define	BRIDGE_XLOCK(_sc)		do {		\
-	mtx_assert(&(_sc)->sc_mtx, MA_OWNED);		\
-	(_sc)->sc_iflist_xcnt++;			\
-	while ((_sc)->sc_iflist_ref > 0)		\
-		cv_wait(&(_sc)->sc_cv, &(_sc)->sc_mtx);	\
-} while (0)
-#define	BRIDGE_XDROP(_sc)		do {	\
-	mtx_assert(&(_sc)->sc_mtx, MA_OWNED);	\
-	(_sc)->sc_iflist_xcnt--;		\
-} while (0)
 
 #define BRIDGE_INPUT(_ifp, _m)		do {			\
 		KASSERT((_ifp)->if_bridge_input != NULL,		\

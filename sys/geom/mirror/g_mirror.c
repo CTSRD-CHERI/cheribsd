@@ -55,7 +55,7 @@ FEATURE(geom_mirror, "GEOM mirroring support");
 static MALLOC_DEFINE(M_MIRROR, "mirror_data", "GEOM_MIRROR Data");
 
 SYSCTL_DECL(_kern_geom);
-static SYSCTL_NODE(_kern_geom, OID_AUTO, mirror, CTLFLAG_RW, 0,
+static SYSCTL_NODE(_kern_geom, OID_AUTO, mirror, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
     "GEOM_MIRROR stuff");
 int g_mirror_debug = 0;
 SYSCTL_INT(_kern_geom_mirror, OID_AUTO, debug, CTLFLAG_RWTUN, &g_mirror_debug, 0,
@@ -925,7 +925,8 @@ g_mirror_regular_request_error(struct g_mirror_softc *sc,
     struct g_mirror_disk *disk, struct bio *bp)
 {
 
-	if (bp->bio_cmd == BIO_FLUSH && bp->bio_error == EOPNOTSUPP)
+	if ((bp->bio_cmd == BIO_FLUSH || bp->bio_cmd == BIO_SPEEDUP) &&
+	    bp->bio_error == EOPNOTSUPP)
 		return;
 
 	if ((disk->d_flags & G_MIRROR_DISK_FLAG_BROKEN) == 0) {
@@ -988,6 +989,10 @@ g_mirror_regular_request(struct g_mirror_softc *sc, struct bio *bp)
 		KFAIL_POINT_ERROR(DEBUG_FP, g_mirror_regular_request_flush,
 		    bp->bio_error);
 		break;
+	case BIO_SPEEDUP:
+		KFAIL_POINT_ERROR(DEBUG_FP, g_mirror_regular_request_speedup,
+		    bp->bio_error);
+		break;
 	}
 
 	pbp->bio_inbed++;
@@ -1018,6 +1023,7 @@ g_mirror_regular_request(struct g_mirror_softc *sc, struct bio *bp)
 		case BIO_DELETE:
 		case BIO_WRITE:
 		case BIO_FLUSH:
+		case BIO_SPEEDUP:
 			pbp->bio_inbed--;
 			pbp->bio_children--;
 			break;
@@ -1043,6 +1049,7 @@ g_mirror_regular_request(struct g_mirror_softc *sc, struct bio *bp)
 	case BIO_DELETE:
 	case BIO_WRITE:
 	case BIO_FLUSH:
+	case BIO_SPEEDUP:
 		if (pbp->bio_children == 0) {
 			/*
 			 * All requests failed.
@@ -1149,6 +1156,7 @@ g_mirror_start(struct bio *bp)
 	case BIO_READ:
 	case BIO_WRITE:
 	case BIO_DELETE:
+	case BIO_SPEEDUP:
 	case BIO_FLUSH:
 		break;
 	case BIO_GETATTR:
@@ -1783,6 +1791,7 @@ g_mirror_register_request(struct g_mirror_softc *sc, struct bio *bp)
 		 */
 		TAILQ_INSERT_TAIL(&sc->sc_inflight, bp, bio_queue);
 		return;
+	case BIO_SPEEDUP:
 	case BIO_FLUSH:
 		TAILQ_INIT(&queue);
 		LIST_FOREACH(disk, &sc->sc_disks, d_next) {
@@ -3481,7 +3490,7 @@ g_mirror_shutdown_post_sync(void *arg, int howto)
 	struct g_mirror_softc *sc;
 	int error;
 
-	if (panicstr != NULL)
+	if (KERNEL_PANICKED())
 		return;
 
 	mp = arg;

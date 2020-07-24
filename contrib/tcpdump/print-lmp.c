@@ -31,6 +31,8 @@
 #include "addrtoname.h"
 #include "gmpls.h"
 
+static const char tstr[] = " [|LMP]";
+
 /*
  * LMP common header
  *
@@ -367,8 +369,9 @@ lmp_print_data_link_subobjs(netdissect_options *ndo, const u_char *obj_tptr,
     } bw;
 
     while (total_subobj_len > 0 && hexdump == FALSE ) {
-	subobj_type = EXTRACT_8BITS(obj_tptr+offset);
-	subobj_len  = EXTRACT_8BITS(obj_tptr+offset+1);
+	ND_TCHECK_16BITS(obj_tptr + offset);
+	subobj_type = EXTRACT_8BITS(obj_tptr + offset);
+	subobj_len  = EXTRACT_8BITS(obj_tptr + offset + 1);
 	ND_PRINT((ndo, "\n\t    Subobject, Type: %s (%u), Length: %u",
 		tok2str(lmp_data_link_subobj,
 			"Unknown",
@@ -389,24 +392,29 @@ lmp_print_data_link_subobjs(netdissect_options *ndo, const u_char *obj_tptr,
 	}
 	switch(subobj_type) {
 	case INT_SWITCHING_TYPE_SUBOBJ:
+	    ND_TCHECK_8BITS(obj_tptr + offset + 2);
 	    ND_PRINT((ndo, "\n\t      Switching Type: %s (%u)",
 		tok2str(gmpls_switch_cap_values,
 			"Unknown",
-			EXTRACT_8BITS(obj_tptr+offset+2)),
-		EXTRACT_8BITS(obj_tptr+offset+2)));
+			EXTRACT_8BITS(obj_tptr + offset + 2)),
+			EXTRACT_8BITS(obj_tptr + offset + 2)));
+	    ND_TCHECK_8BITS(obj_tptr + offset + 3);
 	    ND_PRINT((ndo, "\n\t      Encoding Type: %s (%u)",
 		tok2str(gmpls_encoding_values,
 			"Unknown",
-			EXTRACT_8BITS(obj_tptr+offset+3)),
-		EXTRACT_8BITS(obj_tptr+offset+3)));
+			EXTRACT_8BITS(obj_tptr + offset + 3)),
+			EXTRACT_8BITS(obj_tptr + offset + 3)));
+	    ND_TCHECK_32BITS(obj_tptr + offset + 4);
 	    bw.i = EXTRACT_32BITS(obj_tptr+offset+4);
 	    ND_PRINT((ndo, "\n\t      Min Reservable Bandwidth: %.3f Mbps",
                 bw.f*8/1000000));
+	    ND_TCHECK_32BITS(obj_tptr + offset + 8);
 	    bw.i = EXTRACT_32BITS(obj_tptr+offset+8);
 	    ND_PRINT((ndo, "\n\t      Max Reservable Bandwidth: %.3f Mbps",
                 bw.f*8/1000000));
 	    break;
 	case WAVELENGTH_SUBOBJ:
+	    ND_TCHECK_32BITS(obj_tptr + offset + 4);
 	    ND_PRINT((ndo, "\n\t      Wavelength: %u",
 		EXTRACT_32BITS(obj_tptr+offset+4)));
 	    break;
@@ -419,6 +427,8 @@ lmp_print_data_link_subobjs(netdissect_options *ndo, const u_char *obj_tptr,
 	offset+=subobj_len;
     }
     return (hexdump);
+trunc:
+    return -1;
 }
 
 void
@@ -436,7 +446,7 @@ _lmp_print(netdissect_options *ndo,
     const struct lmp_object_header *lmp_obj_header;
     const u_char *tptr,*obj_tptr;
     u_int tlen,lmp_obj_len,lmp_obj_ctype,obj_tlen;
-    int hexdump;
+    int hexdump, ret;
     u_int offset;
     u_int link_type;
 
@@ -738,7 +748,10 @@ _lmp_print(netdissect_options *ndo,
                        ipaddr_string(ndo, obj_tptr+8),
                        EXTRACT_32BITS(obj_tptr+8)));
 
-		if (lmp_print_data_link_subobjs(ndo, obj_tptr, obj_tlen - 12, 12))
+		ret = lmp_print_data_link_subobjs(ndo, obj_tptr, obj_tlen - 12, 12);
+		if (ret == -1)
+		    goto trunc;
+		if (ret == TRUE)
 		    hexdump=TRUE;
 		break;
 
@@ -758,7 +771,10 @@ _lmp_print(netdissect_options *ndo,
                        ip6addr_string(ndo, obj_tptr+20),
                        EXTRACT_32BITS(obj_tptr+20)));
 
-		if (lmp_print_data_link_subobjs(ndo, obj_tptr, obj_tlen - 36, 36))
+		ret = lmp_print_data_link_subobjs(ndo, obj_tptr, obj_tlen - 36, 36);
+		if (ret == -1)
+		    goto trunc;
+		if (ret == TRUE)
 		    hexdump=TRUE;
 		break;
 
@@ -778,7 +794,10 @@ _lmp_print(netdissect_options *ndo,
                        EXTRACT_32BITS(obj_tptr+8),
                        EXTRACT_32BITS(obj_tptr+8)));
 
-		if (lmp_print_data_link_subobjs(ndo, obj_tptr, obj_tlen - 12, 12))
+		ret = lmp_print_data_link_subobjs(ndo, obj_tptr, obj_tlen - 12, 12);
+		if (ret == -1)
+		    goto trunc;
+		if (ret == TRUE)
 		    hexdump=TRUE;
 		break;
 
@@ -1019,7 +1038,7 @@ _lmp_print(netdissect_options *ndo,
 				  EXTRACT_8BITS(obj_tptr))));
 
 		ND_PRINT((ndo, "\n\t  UNI Version: %u",
-		       EXTRACT_8BITS(obj_tptr+1)));
+		       EXTRACT_8BITS(obj_tptr + 1)));
 
 		break;
 
@@ -1041,28 +1060,28 @@ _lmp_print(netdissect_options *ndo,
 		    ND_PRINT((ndo, "\n\t Signal Type: %s (%u)",
 			   tok2str(lmp_sd_service_config_cpsa_signal_type_sdh_values,
 				   "Unknown",
-				   EXTRACT_8BITS(obj_tptr+1)),
-			   EXTRACT_8BITS(obj_tptr+1)));
+				   EXTRACT_8BITS(obj_tptr + 1)),
+				   EXTRACT_8BITS(obj_tptr + 1)));
 		    break;
 
 		case LMP_SD_SERVICE_CONFIG_CPSA_LINK_TYPE_SONET:
 		    ND_PRINT((ndo, "\n\t Signal Type: %s (%u)",
 			   tok2str(lmp_sd_service_config_cpsa_signal_type_sonet_values,
 				   "Unknown",
-				   EXTRACT_8BITS(obj_tptr+1)),
-			   EXTRACT_8BITS(obj_tptr+1)));
+				   EXTRACT_8BITS(obj_tptr + 1)),
+				   EXTRACT_8BITS(obj_tptr + 1)));
 		    break;
 		}
 
 		ND_PRINT((ndo, "\n\t Transparency: %s",
 		       bittok2str(lmp_obj_service_config_cpsa_tp_flag_values,
 				  "none",
-				  EXTRACT_8BITS(obj_tptr+2))));
+				  EXTRACT_8BITS(obj_tptr + 2))));
 
 		ND_PRINT((ndo, "\n\t Contiguous Concatenation Types: %s",
 		       bittok2str(lmp_obj_service_config_cpsa_cct_flag_values,
 				  "none",
-				  EXTRACT_8BITS(obj_tptr+3))));
+				  EXTRACT_8BITS(obj_tptr + 3))));
 
 		ND_PRINT((ndo, "\n\t Minimum NCC: %u",
 		       EXTRACT_16BITS(obj_tptr+4)));
@@ -1098,7 +1117,7 @@ _lmp_print(netdissect_options *ndo,
 		       bittok2str(
 			   lmp_obj_service_config_nsa_tcm_flag_values,
 			   "none",
-			   EXTRACT_8BITS(obj_tptr+7))));
+			   EXTRACT_8BITS(obj_tptr + 7))));
 
 		break;
 
@@ -1112,7 +1131,7 @@ _lmp_print(netdissect_options *ndo,
 		       bittok2str(
 			   lmp_obj_service_config_nsa_network_diversity_flag_values,
 			   "none",
-			   EXTRACT_8BITS(obj_tptr+3))));
+			   EXTRACT_8BITS(obj_tptr + 3))));
 		break;
 
 	    default:
@@ -1136,7 +1155,7 @@ _lmp_print(netdissect_options *ndo,
     }
     return;
 trunc:
-    ND_PRINT((ndo, "\n\t\t packet exceeded snapshot"));
+    ND_PRINT((ndo, "%s", tstr));
 }
 /*
  * Local Variables:

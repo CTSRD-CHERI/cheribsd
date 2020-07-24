@@ -174,6 +174,7 @@ struct vop_vector fuse_fifoops = {
 	.vop_write =		VOP_PANIC,
 	.vop_vptofh =		fuse_vnop_vptofh,
 };
+VFS_VOP_VECTOR_REGISTER(fuse_fifoops);
 
 struct vop_vector fuse_vnops = {
 	.vop_allocate =	VOP_EINVAL,
@@ -223,6 +224,7 @@ struct vop_vector fuse_vnops = {
 	.vop_print = fuse_vnop_print,
 	.vop_vptofh = fuse_vnop_vptofh,
 };
+VFS_VOP_VECTOR_REGISTER(fuse_vnops);
 
 uma_zone_t fuse_pbuf_zone;
 
@@ -959,6 +961,8 @@ fuse_lookup_alloc(struct mount *mp, void *arg, int lkflags, struct vnode **vpp)
 
 SDT_PROBE_DEFINE3(fusefs, , vnops, cache_lookup,
 	"int", "struct timespec*", "struct timespec*");
+SDT_PROBE_DEFINE2(fusefs, , vnops, lookup_cache_incoherent,
+	"struct vnode*", "struct fuse_entry_out*");
 /*
     struct vnop_lookup_args {
 	struct vnodeop_desc *a_desc;
@@ -1004,7 +1008,9 @@ fuse_vnop_lookup(struct vop_lookup_args *ap)
 	if (islastcn && vfs_isrdonly(mp) && (nameiop != LOOKUP))
 		return EROFS;
 
-	if ((err = fuse_internal_access(dvp, VEXEC, td, cred)))
+	if ((cnp->cn_flags & NOEXECCHECK) != 0)
+		cnp->cn_flags &= ~NOEXECCHECK;
+	else if ((err = fuse_internal_access(dvp, VEXEC, td, cred)))
 		return err;
 
 	if (flags & ISDOTDOT) {
@@ -1133,6 +1139,7 @@ fuse_vnop_lookup(struct vop_lookup_args *ap)
 			*vpp = dvp;
 		} else {
 			struct fuse_vnode_data *fvdat;
+			struct vattr *vap;
 
 			err = fuse_vnode_get(vnode_mount(dvp), feo, nid, dvp,
 			    &vp, cnp, vtyp);
@@ -1153,22 +1160,27 @@ fuse_vnop_lookup(struct vop_lookup_args *ap)
 			 */
 			fvdat = VTOFUD(vp);
 			if (vnode_isreg(vp) &&
-			    filesize != fvdat->cached_attrs.va_size &&
-			    fvdat->flag & FN_SIZECHANGE) {
-				/*
-				 * The FN_SIZECHANGE flag reflects a dirty
-				 * append.  If userspace lets us know our cache
-				 * is invalid, that write was lost.  (Dirty
-				 * writes that do not cause append are also
-				 * lost, but we don't detect them here.)
-				 *
-				 * XXX: Maybe disable WB caching on this mount.
-				 */
-				printf("%s: WB cache incoherent on %s!\n",
-				    __func__,
-				    vnode_mount(vp)->mnt_stat.f_mntonname);
-
+			    ((filesize != fvdat->cached_attrs.va_size &&
+			      fvdat->flag & FN_SIZECHANGE) ||
+			     ((vap = VTOVA(vp)) &&
+			      filesize != vap->va_size)))
+			{
+				SDT_PROBE2(fusefs, , vnops, lookup_cache_incoherent, vp, feo);
 				fvdat->flag &= ~FN_SIZECHANGE;
+				/*
+				 * The server changed the file's size even
+				 * though we had it cached, or had dirty writes
+				 * in the WB cache!
+				 */
+				printf("%s: cache incoherent on %s!  "
+		    		    "Buggy FUSE server detected.  To prevent "
+				    "data corruption, disable the data cache "
+				    "by mounting with -o direct_io, or as "
+				    "directed otherwise by your FUSE server's "
+		    		    "documentation\n", __func__,
+				    vnode_mount(vp)->mnt_stat.f_mntonname);
+				int iosize = fuse_iosize(vp);
+				v_inval_buf_range(vp, 0, INT64_MAX, iosize);
 			}
 
 			MPASS(feo != NULL);

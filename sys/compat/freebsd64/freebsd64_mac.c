@@ -49,11 +49,6 @@ __FBSDID("$FreeBSD$");
 
 #include <security/mac/mac_framework.h>
 
-struct mac64 {
-	size_t	m_buflen;
-	void	*m_string;
-};
-
 #ifdef MAC
 int
 freebsd64___mac_get_pid(struct thread *td,

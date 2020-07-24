@@ -414,6 +414,18 @@ options 	DDB_NUMSYM
 options 	GDB
 
 #
+# Trashes list pointers when they become invalid (i.e., the element is
+# removed from a list).  Relatively inexpensive to enable.
+#
+options 	QUEUE_MACRO_DEBUG_TRASH
+
+#
+# Stores information about the last caller to modify the list object
+# in the list object.  Requires additional memory overhead.
+#
+#options 	QUEUE_MACRO_DEBUG_TRACE
+
+#
 # SYSCTL_DEBUG enables a 'sysctl' debug tree that can be used to dump the
 # contents of the registered sysctl nodes on the console.  It is disabled by
 # default because it generates excessively verbose console output that can
@@ -1490,6 +1502,8 @@ options		TERMINAL_KERN_ATTR=(FG_LIGHTRED|BG_BLACK)
 #
 # SCSI host adapters:
 #
+# aacraid: Adaptec by PMC RAID controllers, Series 6/7/8 and upcoming
+#          families. Container interface, CAM required.
 # ahc: Adaptec 274x/284x/2910/293x/294x/394x/3950x/3960x/398X/4944/
 #      19160x/29160x, aic7770/aic78xx
 # ahd: Adaptec 29320/39320 Controllers.
@@ -1512,6 +1526,7 @@ options		TERMINAL_KERN_ATTR=(FG_LIGHTRED|BG_BLACK)
 #      53C876, 53C885,  53C895, 53C895A, 53C896,  53C897, 53C1510D,
 #      53C1010-33, 53C1010-66.
 
+device		aacraid
 device		ahc
 device		ahd
 device		esp
@@ -1783,6 +1798,7 @@ device  	axphy		# Asix Semiconductor AX88x9x
 device  	bmtphy		# Broadcom BCM5201/BCM5202 and 3Com 3c905C
 device		bnxt		# Broadcom NetXtreme-C/NetXtreme-E
 device  	brgphy		# Broadcom BCM54xx/57xx 1000baseTX
+device  	cgem		# Cadence GEM Gigabit Ethernet
 device  	ciphy		# Cicada/Vitesse CS/VSC8xxx
 device  	e1000phy	# Marvell 88E1000 1000/100/10-BT
 device  	gentbi		# Generic 10-bit 1000BASE-{LX,SX} fiber ifaces
@@ -2045,8 +2061,6 @@ device		sound
 # snd_ad1816:		Analog Devices AD1816 ISA PnP/non-PnP.
 # snd_als4000:		Avance Logic ALS4000 PCI.
 # snd_atiixp:		ATI IXP 200/300/400 PCI.
-# snd_audiocs:		Crystal Semiconductor CS4231 SBus/EBus. Only
-#			for sparc64.
 # snd_cmi:		CMedia CMI8338/CMI8738 PCI.
 # snd_cs4281:		Crystal Semiconductor CS4281 PCI.
 # snd_csa:		Crystal Semiconductor CS461x/428x PCI. (except
@@ -2089,7 +2103,6 @@ device		sound
 device		snd_ad1816
 device		snd_als4000
 device		snd_atiixp
-#device		snd_audiocs
 device		snd_cmi
 device		snd_cs4281
 device		snd_csa
@@ -2175,72 +2188,10 @@ options		SND_OLDSTEREO
 #
 # Miscellaneous hardware:
 #
-# bktr: Brooktree bt848/848a/849a/878/879 video capture and TV Tuner board
 # cmx: OmniKey CardMan 4040 pccard smartcard reader
 
 device		cmx
 
-#
-# The 'bktr' device is a PCI video capture device using the Brooktree
-# bt848/bt848a/bt849a/bt878/bt879 chipset. When used with a TV Tuner it forms a
-# TV card, e.g. Miro PC/TV, Hauppauge WinCast/TV WinTV, VideoLogic Captivator,
-# Intel Smart Video III, AverMedia, IMS Turbo, FlyVideo.
-#
-# options 	OVERRIDE_CARD=xxx
-# options 	OVERRIDE_TUNER=xxx
-# options 	OVERRIDE_MSP=1
-# options 	OVERRIDE_DBX=1
-# These options can be used to override the auto detection
-# The current values for xxx are found in src/sys/dev/bktr/bktr_card.h
-# Using sysctl(8) run-time overrides on a per-card basis can be made
-#
-# options 	BROOKTREE_SYSTEM_DEFAULT=BROOKTREE_PAL
-# or
-# options 	BROOKTREE_SYSTEM_DEFAULT=BROOKTREE_NTSC
-# Specifies the default video capture mode.
-# This is required for Dual Crystal (28&35MHz) boards where PAL is used
-# to prevent hangs during initialization, e.g. VideoLogic Captivator PCI.
-#
-# options 	BKTR_USE_PLL
-# This is required for PAL or SECAM boards with a 28MHz crystal and no 35MHz
-# crystal, e.g. some new Bt878 cards.
-#
-# options 	BKTR_GPIO_ACCESS
-# This enables IOCTLs which give user level access to the GPIO port.
-#
-# options 	BKTR_NO_MSP_RESET
-# Prevents the MSP34xx reset. Good if you initialize the MSP in another OS first
-#
-# options 	BKTR_430_FX_MODE
-# Switch Bt878/879 cards into Intel 430FX chipset compatibility mode.
-#
-# options 	BKTR_SIS_VIA_MODE
-# Switch Bt878/879 cards into SIS/VIA chipset compatibility mode which is
-# needed for some old SiS and VIA chipset motherboards.
-# This also allows Bt878/879 chips to work on old OPTi (<1997) chipset
-# motherboards and motherboards with bad or incomplete PCI 2.1 support.
-# As a rough guess, old = before 1998
-#
-# options 	BKTR_NEW_MSP34XX_DRIVER
-# Use new, more complete initialization scheme for the msp34* soundchip.
-# Should fix stereo autodetection if the old driver does only output
-# mono sound.
-
-#
-# options 	BKTR_USE_FREEBSD_SMBUS
-# Compile with FreeBSD SMBus implementation
-#
-# Brooktree driver has been ported to the new I2C framework. Thus,
-# you'll need to have the following 3 lines in the kernel config.
-#     device smbus
-#     device iicbus
-#     device iicbb
-#     device iicsmb
-# The iic and smb devices are only needed if you want to control other
-# I2C slaves connected to the external connector of some cards.
-#
-device		bktr
- 
 #
 # PC Card/PCMCIA and Cardbus
 #
@@ -2274,7 +2225,6 @@ device		sdhci
 #
 # Supported SMB interfaces:
 # iicsmb	I2C to SMB bridge with any iicbus interface
-# bktr		brooktree848 I2C hardware interface
 # intpm		Intel PIIX4 (82371AB, 82443MX) Power Management Unit
 # alpm		Acer Aladdin-IV/V/Pro2 Power Management Unit
 # ichsmb	Intel ICH SMBus controller chips (82801AA, 82801AB, 82801BA)
@@ -2315,19 +2265,21 @@ device		jedec_dimm
 # iicsmb i2c to smb bridge. Allow i2c i/o with smb commands.
 # iicoc simple polling driver for OpenCores I2C controller
 #
-# Supported interfaces:
-# bktr	brooktree848 I2C software interface
-#
 # Other:
-# iicbb	generic I2C bit-banging code (needed by lpbb, bktr)
+# iicbb	generic I2C bit-banging code (needed by lpbb)
 #
 device		iicbus		# Bus support, required for ic/iic/iicsmb below.
-device		iicbb
+device		iicbb		# bitbang driver; implements i2c on a pair of gpio pins
 
 device		ic
-device		iic
+device		iic		# userland access to i2c slave devices via ioctl(8)
 device		iicsmb		# smb over i2c bridge
 device		iicoc		# OpenCores I2C controller support
+
+# I2C bus multiplexer (mux) devices
+device		iicmux		# i2c mux core driver
+device		iic_gpiomux	# i2c mux hardware controlled via gpio pins
+device		ltc430x		# LTC4305 and LTC4306 i2c mux chips
 
 # I2C peripheral devices
 #
@@ -2353,9 +2305,6 @@ device		syr827		# Silergy Corp. DC/DC regulator
 # are automatically probed and attached when found.
 #
 # Supported devices:
-# vpo	Iomega Zip Drive
-#	Requires SCSI disk support ('scbus' and 'da'), best
-#	performance is achieved with ports in EPP 1.9 mode.
 # lpt	Parallel Printer
 # plip	Parallel network interface
 # ppi	General-purpose I/O ("Geek Port") + IEEE1284 I/O
@@ -2373,7 +2322,6 @@ options 	DEBUG_1284	# IEEE1284 signaling protocol debug
 options 	PERIPH_1284	# Makes your computer act as an IEEE1284
 				# compliant peripheral
 options 	DONTPROBE_1284	# Avoid boot detection of PnP parallel devices
-options 	VP0_DEBUG	# ZIP/ZIP+ debug
 options 	LPT_DEBUG	# Printer driver debug
 options 	PPC_DEBUG	# Parallel chipset level debug
 options 	PLIP_DEBUG	# Parallel network IP interface debug
@@ -2384,7 +2332,6 @@ device		ppc
 hint.ppc.0.at="isa"
 hint.ppc.0.irq="7"
 device		ppbus
-device		vpo
 device		lpt
 device		plip
 device		ppi
@@ -2683,10 +2630,6 @@ device		hifn		# Hifn 7951, 7781, etc.
 options 	HIFN_DEBUG	# enable debugging support: hw.hifn.debug
 options 	HIFN_RNDTEST	# enable rndtest support
 
-device		ubsec		# Broadcom 5501, 5601, 58xx
-options 	UBSEC_DEBUG	# enable debugging support: hw.ubsec.debug
-options 	UBSEC_RNDTEST	# enable rndtest support
-
 #####################################################################
 
 
@@ -2824,11 +2767,6 @@ options 	RACCT
 options 	RCTL
 
 # Yet more undocumented options for linting.
-# BKTR_ALLOC_PAGES has no effect except to cause warnings, and
-# BROOKTREE_ALLOC_PAGES hasn't actually been superseded by it, since the
-# driver still mostly spells this option BROOKTREE_ALLOC_PAGES.
-##options 	BKTR_ALLOC_PAGES=(217*4+1)
-options 	BROOKTREE_ALLOC_PAGES=(217*4+1)
 options 	MAXFILES=999
 
 # Random number generator

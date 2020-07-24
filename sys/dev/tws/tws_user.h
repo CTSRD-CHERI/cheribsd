@@ -107,12 +107,22 @@ struct tws_ioctl_packet {
  * in size.  This is because, we don't expect requests from user
  * land requiring 2048 (273 sg elements) byte cmd pkts.
  */
+
+#define	PDATA_PADDING							\
+	(sizeof(struct tws_driver_packet) % sizeof(void *__kerncap) == 0 ? \
+	    0 :								\
+	    sizeof(void * __kerncap) -					\
+	    sizeof(struct tws_driver_packet) % sizeof(void * __kerncap))
+
 struct tws_ioctl_no_data_buf {
     struct tws_driver_packet     driver_pkt;
-    void                         *pdata; /* points to data_buf */
-    char                         padding[488 - sizeof(void *)];
+    char                         pdata_padding[PDATA_PADDING];
+    void * __kerncap             pdata; /* points to data_buf */
+    char                         padding[488 - sizeof(void * __kerncap) - PDATA_PADDING];
     struct tws_command_packet    cmd_pkt;
-};
+} __aligned(sizeof(void * __kerncap));
+
+#undef PDATA_PADDING
 
 #pragma pack()
 

@@ -54,18 +54,22 @@ static pthread_mutex_t global_mutex;
 static inline vaddr_t
 read_tls_register(void) {
 	vaddr_t tls = 0;
+#ifdef __mips
 	__asm__ volatile("rdhwr %0, $29\n" : "=r"(tls));
+#elif defined(__riscv)
+	__asm__ volatile("mv %0, tp\n" : "=r"(tls));
+#else
+#error "Unknown arch"
+#endif
 	return tls;
 }
 
-#ifdef __CHERI_CAPABILITY_TLS__
 static inline void *
 read_cap_tls_register(void) {
 	void *tls = NULL;
 	__asm__ volatile("creadhwr %0, $chwr_userlocal\n" : "=C"(tls));
 	return tls;
 }
-#endif
 
 static __thread volatile int thread_local_var = -2;
 static __thread volatile struct thread_args* thread_local_args = NULL;
@@ -83,10 +87,8 @@ thread_func(void *_arg)
 	fprintf(stderr, "Thread %d pthread_self() = %#p\n", arg->num, self);
 	fprintf(stderr, " TLS register for thread %d: 0x%lx\n", arg->num,
 	    read_tls_register());
-#ifdef __CHERI_CAPABILITY_TLS__
 	fprintf(stderr, " Cap TLS register for thread %d: %#p\n", arg->num,
 	    read_cap_tls_register());
-#endif
 
 	tlsval = thread_local_var;
 	fprintf(stderr, "Value of thread local var for thread %d is %d (should"
@@ -180,10 +182,8 @@ main(void)
 	fprintf(stderr, "Main thread is %p\n", self);
 	fprintf(stderr, "TLS register for main thread: 0x%lx\n",
 	    read_tls_register());
-#ifdef __CHERI_CAPABILITY_TLS__
 	fprintf(stderr, "Cap TLS register for main thread: %#p\n",
 	    read_cap_tls_register());
-#endif
 
 	if ((result = pthread_mutex_init(&global_mutex, NULL)) != 0) {
 		errc(1, result, "pthread_mutex_init");

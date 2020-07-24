@@ -240,14 +240,14 @@
 27	AUE_RECVMSG	STD {
 		ssize_t recvmsg(
 		    int s,
-		    _Inout_ _Contains_ptr_ struct msghdr_native *msg,
+		    _Inout_ _Contains_ptr_ struct msghdr *msg,
 		    int flags
 		);
 	}
 28	AUE_SENDMSG	STD {
 		ssize_t sendmsg(
 		    int s,
-		    _In_ _Contains_ptr_ const struct msghdr_native *msg,
+		    _In_ _Contains_ptr_ const struct msghdr *msg,
 		    int flags
 		);
 	}
@@ -760,14 +760,14 @@
 120	AUE_READV	STD {
 		int readv(
 		    int fd,
-		    _Inout_updates_(iovcnt) _Contains_long_ptr_ struct iovec_native *iovp,
+		    _Inout_updates_(iovcnt) _Contains_long_ptr_ struct iovec *iovp,
 		    u_int iovcnt
 		);
 	}
 121	AUE_WRITEV	STD {
 		int writev(
 		    int fd,
-		    _In_reads_opt_(iovcnt) _Contains_long_ptr_ struct iovec_native *iovp,
+		    _In_reads_opt_(iovcnt) _Contains_long_ptr_ struct iovec *iovp,
 		    u_int iovcnt
 		);
 	}
@@ -1360,7 +1360,7 @@
 235	AUE_NULL	STD {
 		int ktimer_create(
 		    clockid_t clock_id,
-		    _In_ _Contains_long_ptr_ struct sigevent_native *evp,
+		    _In_ _Contains_long_ptr_ struct sigevent *evp,
 		    _Out_ int *timerid
 		);
 	}
@@ -1457,20 +1457,20 @@
 	}
 255	AUE_AIO_READ	STD {
 		int aio_read(
-		    _Inout_ _Contains_long_ptr_ struct aiocb_native *aiocbp
+		    _Inout_ _Contains_long_ptr_ struct aiocb *aiocbp
 		);
 	}
 256	AUE_AIO_WRITE	STD {
 		int aio_write(
-		    _Inout_ _Contains_long_ptr_ struct aiocb_native *aiocbp
+		    _Inout_ _Contains_long_ptr_ struct aiocb *aiocbp
 		);
 	}
 257	AUE_LIO_LISTIO	STD {
 		int lio_listio(
 		    int mode,
-		    _Inout_updates_(nent) _Contains_long_ptr_ struct aiocb_native * const *acb_list,
+		    _Inout_updates_(nent) _Contains_long_ptr_ struct aiocb * const *acb_list,
 		    int nent,
-		    _In_opt_ _Contains_long_ptr_ struct sigevent_native *sig
+		    _In_opt_ _Contains_long_ptr_ struct sigevent *sig
 		);
 	}
 258	AUE_NULL	STD {
@@ -1526,7 +1526,7 @@
 289	AUE_PREADV	STD {
 		ssize_t preadv(
 		    int fd,
-		    _In_reads_(iovcnt) _Contains_long_ptr_ struct iovec_native *iovp,
+		    _In_reads_(iovcnt) _Contains_long_ptr_ struct iovec *iovp,
 		    u_int iovcnt,
 		    off_t offset
 		);
@@ -1534,7 +1534,7 @@
 290	AUE_PWRITEV	STD {
 		ssize_t pwritev(
 		    int fd,
-		    _In_reads_(iovcnt) _Contains_long_ptr_ struct iovec_native *iovp,
+		    _In_reads_(iovcnt) _Contains_long_ptr_ struct iovec *iovp,
 		    u_int iovcnt,
 		    off_t offset
 		);
@@ -1632,12 +1632,12 @@
 313	AUE_NULL	OBSOL	signanosleep
 314	AUE_AIO_RETURN	STD {
 		ssize_t aio_return(
-		    _Inout_ _Contains_long_ptr_ struct aiocb_native *aiocbp
+		    _Inout_ _Contains_long_ptr_ struct aiocb *aiocbp
 		);
 	}
 315	AUE_AIO_SUSPEND	STD {
 		int aio_suspend(
-		    _Inout_updates_(nent) _Contains_long_ptr_ struct aiocb_native * const *aiocbp,
+		    _Inout_updates_(nent) _Contains_long_ptr_ struct aiocb * const *aiocbp,
 		    int nent,
 		    _In_opt_ _Contains_long_timet_ const struct timespec *timeout
 		);
@@ -1645,12 +1645,12 @@
 316	AUE_AIO_CANCEL	STD {
 		int aio_cancel(
 		    int fd,
-		    _In_opt_ _Contains_long_ptr_ struct aiocb_native *aiocbp
+		    _In_opt_ _Contains_long_ptr_ struct aiocb *aiocbp
 		);
 	}
 317	AUE_AIO_ERROR	STD {
 		int aio_error(
-		    _In_ _Contains_long_ptr_ struct aiocb_native *aiocbp
+		    _In_ _Contains_long_ptr_ struct aiocb *aiocbp
 		);
 	}
 318	AUE_AIO_READ	COMPAT6 {
@@ -1745,7 +1745,7 @@
 		    int s,
 		    off_t offset,
 		    size_t nbytes,
-		    _In_opt_ _Contains_ptr_ struct sf_hdtr_native *hdtr,
+		    _In_opt_ _Contains_ptr_ struct sf_hdtr *hdtr,
 		    _Out_opt_ off_t *sbytes,
 		    int flags
 		);
@@ -1803,14 +1803,14 @@
 345	AUE_SIGWAIT	STD {
 		int sigtimedwait(
 		    _In_ const sigset_t *set,
-		    _Out_opt_ _Contains_long_ptr_ struct siginfo_native *info,
+		    _Out_opt_ _Contains_long_ptr_ struct siginfo *info,
 		    _In_opt_ _Contains_long_timet_ const struct timespec *timeout
 		);
 	}
 346	AUE_NULL	STD {
 		int sigwaitinfo(
 		    _In_ const sigset_t *set,
-		    _Out_opt_ _Contains_long_ptr_ struct siginfo_native *info
+		    _Out_opt_ _Contains_long_ptr_ struct siginfo *info
 		);
 	}
 347	AUE_ACL_GET_FILE	STD {
@@ -1903,7 +1903,7 @@
 	}
 359	AUE_AIO_WAITCOMPLETE	STD {
 		ssize_t aio_waitcomplete(
-		    _Outptr_result_maybenull_ _Contains_long_ptr_ struct aiocb_native **aiocbp,
+		    _Outptr_result_maybenull_ _Contains_long_ptr_ struct aiocb **aiocbp,
 		    _In_opt_ _Contains_long_timet_ struct timespec *timeout
 		);
 	}
@@ -1991,7 +1991,7 @@
 	}
 378	AUE_NMOUNT	STD {
 		int nmount(
-		    _In_reads_(iovcnt) _Contains_long_ptr_ struct iovec_native *iovp,
+		    _In_reads_(iovcnt) _Contains_long_ptr_ struct iovec *iovp,
 		    unsigned int iovcnt,
 		    int flags
 		);
@@ -2003,36 +2003,36 @@
 383	AUE_NULL	OBSOL	kse_release
 384	AUE_NULL	STD {
 		int __mac_get_proc(
-		    _In_ _Contains_long_ptr_ struct mac_native *mac_p
+		    _In_ _Contains_long_ptr_ struct mac *mac_p
 		);
 	}
 385	AUE_NULL	STD {
 		int __mac_set_proc(
-		    _In_ _Contains_long_ptr_ struct mac_native *mac_p
+		    _In_ _Contains_long_ptr_ struct mac *mac_p
 		);
 	}
 386	AUE_NULL	STD {
 		int __mac_get_fd(
 		    int fd,
-		    _In_ _Contains_long_ptr_ struct mac_native *mac_p
+		    _In_ _Contains_long_ptr_ struct mac *mac_p
 		);
 	}
 387	AUE_NULL	STD {
 		int __mac_get_file(
 		    _In_z_ const char *path_p,
-		    _In_ _Contains_long_ptr_ struct mac_native *mac_p
+		    _In_ _Contains_long_ptr_ struct mac *mac_p
 		);
 	}
 388	AUE_NULL	STD {
 		int __mac_set_fd(
 		    int fd,
-		    _In_ _Contains_long_ptr_ struct mac_native *mac_p
+		    _In_ _Contains_long_ptr_ struct mac *mac_p
 		);
 	}
 389	AUE_NULL	STD {
 		int __mac_set_file(
 		    _In_z_ const char *path_p,
-		    _In_ _Contains_long_ptr_ struct mac_native *mac_p
+		    _In_ _Contains_long_ptr_ struct mac *mac_p
 		);
 	}
 390	AUE_NULL	STD {
@@ -2061,7 +2061,7 @@
 		    int s,
 		    off_t offset,
 		    size_t nbytes,
-		    _In_opt_ _Contains_ptr_ struct sf_hdtr_native *hdtr,
+		    _In_opt_ _Contains_ptr_ struct sf_hdtr *hdtr,
 		    _Out_opt_ off_t *sbytes,
 		    int flags
 		);
@@ -2153,19 +2153,19 @@
 409	AUE_NULL	STD {
 		int __mac_get_pid(
 		    pid_t pid,
-		    _In_ _Contains_long_ptr_ struct mac_native *mac_p
+		    _In_ _Contains_long_ptr_ struct mac *mac_p
 		);
 	}
 410	AUE_NULL	STD {
 		int __mac_get_link(
 		    _In_z_ const char *path_p,
-		    _In_ _Contains_long_ptr_ struct mac_native *mac_p
+		    _In_ _Contains_long_ptr_ struct mac *mac_p
 		);
 	}
 411	AUE_NULL	STD {
 		int __mac_set_link(
 		    _In_z_ const char *path_p,
-		    _In_ _Contains_long_ptr_ struct mac_native *mac_p
+		    _In_ _Contains_long_ptr_ struct mac *mac_p
 		);
 	}
 412	AUE_EXTATTR_SET_LINK	STD {
@@ -2198,7 +2198,7 @@
 		    _In_z_ const char *fname,
 		    _In_ char **argv,
 		    _In_ char **envv,
-		    _In_ _Contains_long_ptr_ struct mac_native *mac_p
+		    _In_ _Contains_long_ptr_ struct mac *mac_p
 		);
 	}
 416	AUE_SIGACTION	STD {
@@ -2454,7 +2454,7 @@
 461	AUE_MQ_NOTIFY	NOSTD {
 		int kmq_notify(
 		    int mqd,
-		    _In_opt_ _Contains_long_ptr_ const struct sigevent_native *sigev
+		    _In_opt_ _Contains_long_ptr_ const struct sigevent *sigev
 		);
 	}
 462	AUE_MQ_UNLINK	NOSTD {
@@ -2478,7 +2478,7 @@
 465	AUE_AIO_FSYNC	STD {
 		int aio_fsync(
 		    int op,
-		    _In_ _Contains_long_ptr_ struct aiocb_native *aiocbp
+		    _In_ _Contains_long_ptr_ struct aiocb *aiocbp
 		);
 	}
 466	AUE_RTPRIO	STD {
@@ -2511,7 +2511,7 @@
 473	AUE_SCTP_GENERIC_SENDMSG_IOV	NOSTD {
 		int sctp_generic_sendmsg_iov(
 		    int sd,
-		    _In_reads_(iovlen) _Contains_long_ptr_ struct iovec_native *iov,
+		    _In_reads_(iovlen) _Contains_long_ptr_ struct iovec *iov,
 		    int iovlen,
 		    _In_reads_bytes_(tolen) const struct sockaddr *to,
 		    __socklen_t tolen,
@@ -2522,7 +2522,7 @@
 474	AUE_SCTP_GENERIC_RECVMSG	NOSTD {
 		int sctp_generic_recvmsg(
 		    int sd,
-		    _In_reads_(iovlen) _Contains_long_ptr_ struct iovec_native *iov,
+		    _In_reads_(iovlen) _Contains_long_ptr_ struct iovec *iov,
 		    int iovlen,
 		    _Out_writes_bytes_(*fromlenaddr) struct sockaddr *from,
 		    _Out_ __socklen_t *fromlenaddr,
@@ -2761,14 +2761,14 @@
 	}
 506	AUE_JAIL_GET	STD {
 		int jail_get(
-		    _In_reads_(iovcnt) _Contains_long_ptr_ struct iovec_native *iovp,
+		    _In_reads_(iovcnt) _Contains_long_ptr_ struct iovec *iovp,
 		    unsigned int iovcnt,
 		    int flags
 		);
 	}
 507	AUE_JAIL_SET	STD {
 		int jail_set(
-		    _In_reads_(iovcnt) _Contains_long_ptr_ struct iovec_native *iovp,
+		    _In_reads_(iovcnt) _Contains_long_ptr_ struct iovec *iovp,
 		    unsigned int iovcnt,
 		    int flags
 		);
@@ -2778,7 +2778,7 @@
 		    int jid
 		);
 	}
-509	AUE_CLOSEFROM	STD {
+509	AUE_CLOSEFROM	COMPAT12 {
 		int closefrom(
 		    int lowfd
 		);
@@ -2788,7 +2788,7 @@
 		    int semid,
 		    int semnum,
 		    int cmd,
-		    _Inout_ _Contains_ptr_ union semun_native *arg
+		    _Inout_ _Contains_ptr_ union semun *arg
 		);
 	}
 511	AUE_MSGCTL	NOSTD {
@@ -2929,7 +2929,7 @@
 		    _Out_opt_ int *status,
 		    int options,
 		    _Out_opt_ _Contains_long_ struct __wrusage *wrusage,
-		    _Out_opt_ _Contains_long_ptr_ struct siginfo_native *info
+		    _Out_opt_ _Contains_long_ptr_ struct siginfo *info
 		);
 	}
 533	AUE_CAP_RIGHTS_LIMIT	STD {
@@ -3004,7 +3004,7 @@
 	}
 543	AUE_AIO_MLOCK	STD {
 		int aio_mlock(
-		    _In_ _Contains_long_ptr_ struct aiocb_native *aiocbp
+		    _In_ _Contains_long_ptr_ struct aiocb *aiocbp
 		);
 	}
 544	AUE_PROCCTL	STD {
@@ -3108,9 +3108,9 @@
 560	AUE_KEVENT	STD {
 		int kevent(
 		    int fd,
-		    _In_reads_opt_(nchanges) _Contains_ptr_ const struct kevent_native *changelist,
+		    _In_reads_opt_(nchanges) _Contains_ptr_ const struct kevent *changelist,
 		    int nchanges,
-		    _Out_writes_opt_(nevents) _Contains_ptr_ struct kevent_native *eventlist,
+		    _Out_writes_opt_(nevents) _Contains_ptr_ struct kevent *eventlist,
 		    int nevents,
 		    _In_opt_ _Contains_long_timet_ const struct timespec *timeout
 		);
@@ -3211,6 +3211,28 @@
 		int shm_rename(
 		    _In_z_ const char *path_from,
 		    _In_z_ const char *path_to,
+		    int flags
+		);
+	}
+573	AUE_NULL	STD {
+		int sigfastblock(
+		    int cmd,
+		    _Inout_opt_ uint32_t *ptr
+		);
+	}
+574	AUE_REALPATHAT	STD {
+		int __realpathat(
+		    int fd,
+		    _In_z_ const char *path,
+		    _Out_writes_z_(size) char *buf,
+		    size_t size,
+		    int flags
+		);
+	}
+575	AUE_CLOSERANGE	STD {
+		int close_range(
+		    u_int lowfd,
+		    u_int highfd,
 		    int flags
 		);
 	}

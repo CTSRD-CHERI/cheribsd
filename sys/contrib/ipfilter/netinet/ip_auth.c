@@ -1000,7 +1000,7 @@ ipf_auth_wait(softc, softa, data)
 	frauth_t auth, *au = &auth;
 	int error, len, i;
 	mb_t *m;
-	char *t;
+	char * __capability t;
 	SPL_INT(s);
 
 ipf_auth_ioctlloop:

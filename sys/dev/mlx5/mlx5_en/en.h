@@ -627,6 +627,7 @@ struct mlx5e_rq_stats {
   m(+1, u64, csum_offload_none, "csum_offload_none", "Transmitted packets")	\
   m(+1, u64, defragged, "defragged", "Transmitted packets")		\
   m(+1, u64, dropped, "dropped", "Transmitted packets")			\
+  m(+1, u64, enobuf, "enobuf", "Transmitted packets")			\
   m(+1, u64, nop, "nop", "Transmitted packets")
 
 #define	MLX5E_SQ_STATS_NUM (0 MLX5E_SQ_STATS(MLX5E_STATS_COUNT))
@@ -727,6 +728,8 @@ struct mlx5e_params_ethtool {
 	u16	fec_avail_50x[MLX5E_MAX_FEC_50X];
 	u32	fec_mode_active;
 	u32	hw_mtu_msb;
+	s32	hw_val_temp[MLX5_MAX_TEMPERATURE];
+	u32	hw_num_temp;
 };
 
 struct mlx5e_cq {
@@ -826,7 +829,6 @@ struct mlx5e_sq {
 
 	/* pointers to per packet info: write@xmit, read@completion */
 	struct	mlx5e_sq_mbuf *mbuf;
-	struct	buf_ring *br;
 
 	/* read only */
 	struct	mlx5_wq_cyc wq;
@@ -1199,6 +1201,7 @@ void	mlx5e_update_sq_inline(struct mlx5e_sq *sq);
 void	mlx5e_refresh_sq_inline(struct mlx5e_priv *priv);
 int	mlx5e_update_buf_lossy(struct mlx5e_priv *priv);
 int	mlx5e_fec_update(struct mlx5e_priv *priv);
+int	mlx5e_hw_temperature_update(struct mlx5e_priv *priv);
 
 if_snd_tag_alloc_t mlx5e_ul_snd_tag_alloc;
 if_snd_tag_modify_t mlx5e_ul_snd_tag_modify;

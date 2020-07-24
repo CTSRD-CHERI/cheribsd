@@ -587,15 +587,19 @@ copy_from_tempfile(const char *src, const char *dst, int infd, int *outfd,
 	if ((tmpfd = open(dst, O_CREAT | O_TRUNC | O_WRONLY, 0755)) < 0)
 		return (-1);
 
-	if (elftc_copyfile(infd, tmpfd) < 0)
+	if (elftc_copyfile(infd, tmpfd) < 0) {
+		(void) close(tmpfd);
 		return (-1);
+	}
 
 	/*
 	 * Remove the temporary file from the file system
 	 * namespace, and close its file descriptor.
 	 */
-	if (unlink(src) < 0)
+	if (unlink(src) < 0) {
+		(void) close(tmpfd);
 		return (-1);
+	}
 
 	(void) close(infd);
 
@@ -1390,6 +1394,7 @@ set_output_target(struct elfcopy *ecp, const char *target_name)
 		ecp->oec = elftc_bfd_target_class(tgt);
 		ecp->oed = elftc_bfd_target_byteorder(tgt);
 		ecp->oem = elftc_bfd_target_machine(tgt);
+		ecp->abi = elftc_bfd_target_osabi(tgt);
 	}
 	if (ecp->otf == ETF_EFI || ecp->otf == ETF_PE)
 		ecp->oem = elftc_bfd_target_machine(tgt);

@@ -32,6 +32,8 @@
 #ifndef _CHERITEST_H_
 #define	_CHERITEST_H_
 
+#include <cheri/cheric.h>
+
 #define	CHERI_CAP_PRINT(cap) do {					\
 	printf("tag %ju s %ju perms %08jx type %016jx\n",		\
 	    (uintmax_t)cheri_gettag(cap),				\
@@ -151,6 +153,43 @@ void	signal_handler_clear(int sig);
 #define CHERITEST_VERIFY(cond) \
 	CHERITEST_VERIFY2(cond, "%s", "\'" #cond "\' is FALSE!")
 
+#define CHERITEST_CHECK_EQ(type, fmt, a, b, a_str, b_str)	do {	\
+		type __a = (a);						\
+		type __b = (b);						\
+		CHERITEST_VERIFY2(__a == __b, "%s (" fmt ") == %s ("	\
+		    fmt ") failed!", a_str, __a, b_str, __b);		\
+	} while (0)
+
+#define CHERITEST_CHECK_EQ_BOOL(a, b)	\
+	CHERITEST_CHECK_EQ(_Bool, "%d", a, b, __STRING(a), __STRING(b))
+#define CHERITEST_CHECK_EQ_INT(a, b)	\
+	CHERITEST_CHECK_EQ(int, "0x%lx", a, b, __STRING(a), __STRING(b))
+#define CHERITEST_CHECK_EQ_LONG(a, b)	\
+	CHERITEST_CHECK_EQ(long, "0x%lx", a, b, __STRING(a), __STRING(b))
+#define CHERITEST_CHECK_EQ_SIZE(a, b)	\
+	CHERITEST_CHECK_EQ(size_t, "0x%zx", a, b, __STRING(a), __STRING(b))
+
+static inline void
+_cheritest_check_cap_eq(void *__capability a, void *__capability b,
+    const char *a_str, const char *b_str)
+{
+	/* TODO: This should use CExEq instead once RISC-V has it */
+#define CHECK_CAP_ATTR(accessor, fmt)						\
+	CHERITEST_VERIFY2(accessor(a) == accessor(b),				\
+	    __STRING(accessor) "(%s) (" fmt ") == " __STRING(accessor)		\
+	    "(%s) (" fmt ") failed!", a_str, accessor(a), b_str, accessor(b))
+	CHECK_CAP_ATTR(cheri_getaddress, "0x%lx");
+	CHECK_CAP_ATTR(cheri_gettag, "%d");
+	CHECK_CAP_ATTR(cheri_getoffset, "0x%lx");
+	CHECK_CAP_ATTR(cheri_getlength, "0x%lx");
+	CHECK_CAP_ATTR(cheri_getperm, "0x%lx");
+	CHECK_CAP_ATTR(cheri_gettype, "%ld");
+	CHECK_CAP_ATTR(cheri_getflags, "0x%lx");
+#undef CHECK_CAP_ATTR
+}
+#define CHERITEST_CHECK_EQ_CAP(a, b)	\
+	_cheritest_check_cap_eq(a, b, __STRING(a), __STRING(b))
+
 /**
  * Like CHERITEST_CHECK_SYSCALL but instead of printing call details prints
  * the provided printf-like message @p fmtargs
@@ -169,12 +208,7 @@ void	signal_handler_clear(int sig);
 #define CHERITEST_CHECK_SYSCALL(call) \
 	CHERITEST_CHECK_SYSCALL2(call, "Call \'" #call "\' failed")
 
-#ifdef LIST_ONLY
-#define DECLARE_CHERI_TEST_IMPL(name, args...) \
-	static inline void name(args) {}
-#else
 #define DECLARE_CHERI_TEST_IMPL(name, args...) void name(args)
-#endif
 #define DECLARE_CHERI_TEST_WITH_ARGS(name, args...) \
 	DECLARE_CHERI_TEST_IMPL(name, const struct cheri_test *ctp, args)
 #define DECLARE_CHERI_TEST(name) \
@@ -302,6 +336,7 @@ DECLARE_CHERI_TEST(test_fault_ccall_data_execute);
 DECLARE_CHERI_TEST(test_cheriabi_mmap_nospace);
 DECLARE_CHERI_TEST(test_cheriabi_mmap_perms);
 DECLARE_CHERI_TEST(test_cheriabi_mmap_unrepresentable);
+DECLARE_CHERI_TEST(test_cheriabi_malloc_zero_size);
 
 /* cheritest_cheriabi_open.c */
 DECLARE_CHERI_TEST(test_cheriabi_open_ordinary);

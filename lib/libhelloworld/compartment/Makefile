@@ -14,7 +14,7 @@ PROG=	${COMPARTMENT_NAME}.co.0
 SRCS=	${COMPARTMENT_NAME}.c
 MAN=
 
-.ifdef LIBCHERI
+.ifdef COMPAT_CHERI
 BINDIR=	/usr/libcheri
 .else
 BINDIR=	/usr/lib

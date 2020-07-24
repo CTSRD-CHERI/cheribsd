@@ -27,8 +27,6 @@
  * SUCH DAMAGE.
  */
 
-#define	EXPLICIT_USER_ACCESS
-
 #include "opt_inet6.h"
 
 #include <sys/cdefs.h>
@@ -42,9 +40,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/lockf.h>
 #include <sys/malloc.h>
 #include <sys/mount.h>
-#if __FreeBSD_version >= 700000
 #include <sys/priv.h>
-#endif
 #include <sys/proc.h>
 #include <sys/socket.h>
 #include <sys/socketvar.h>
@@ -88,9 +84,11 @@ MALLOC_DEFINE(M_NLM, "NLM", "Network Lock Manager");
 /*
  * Support for sysctl vfs.nlm.sysid
  */
-static SYSCTL_NODE(_vfs, OID_AUTO, nlm, CTLFLAG_RW, NULL,
+static SYSCTL_NODE(_vfs, OID_AUTO, nlm, CTLFLAG_RW | CTLFLAG_MPSAFE, NULL,
     "Network Lock Manager");
-static SYSCTL_NODE(_vfs_nlm, OID_AUTO, sysid, CTLFLAG_RW, NULL, "");
+static SYSCTL_NODE(_vfs_nlm, OID_AUTO, sysid,
+    CTLFLAG_RW | CTLFLAG_MPSAFE, NULL,
+    "");
 
 /*
  * Syscall hooks
@@ -852,7 +850,8 @@ nlm_create_host(const char* caller_name)
 	sysctl_ctx_init(&host->nh_sysctl);
 	oid = SYSCTL_ADD_NODE(&host->nh_sysctl,
 	    SYSCTL_STATIC_CHILDREN(_vfs_nlm_sysid),
-	    OID_AUTO, host->nh_sysid_string, CTLFLAG_RD, NULL, "");
+	    OID_AUTO, host->nh_sysid_string, CTLFLAG_RD | CTLFLAG_MPSAFE,
+	    NULL, "");
 	SYSCTL_ADD_STRING(&host->nh_sysctl, SYSCTL_CHILDREN(oid), OID_AUTO,
 	    "hostname", CTLFLAG_RD, host->nh_caller_name, 0, "");
 	SYSCTL_ADD_UINT(&host->nh_sysctl, SYSCTL_CHILDREN(oid), OID_AUTO,
@@ -860,11 +859,11 @@ nlm_create_host(const char* caller_name)
 	SYSCTL_ADD_UINT(&host->nh_sysctl, SYSCTL_CHILDREN(oid), OID_AUTO,
 	    "monitored", CTLFLAG_RD, &host->nh_monstate, 0, "");
 	SYSCTL_ADD_PROC(&host->nh_sysctl, SYSCTL_CHILDREN(oid), OID_AUTO,
-	    "lock_count", CTLTYPE_INT | CTLFLAG_RD, host, 0,
-	    nlm_host_lock_count_sysctl, "I", "");
+	    "lock_count", CTLTYPE_INT | CTLFLAG_RD | CTLFLAG_MPSAFE, host,
+	    0, nlm_host_lock_count_sysctl, "I", "");
 	SYSCTL_ADD_PROC(&host->nh_sysctl, SYSCTL_CHILDREN(oid), OID_AUTO,
-	    "client_lock_count", CTLTYPE_INT | CTLFLAG_RD, host, 0,
-	    nlm_host_client_lock_count_sysctl, "I", "");
+	    "client_lock_count", CTLTYPE_INT | CTLFLAG_RD | CTLFLAG_MPSAFE,
+	    host, 0, nlm_host_client_lock_count_sysctl, "I", "");
 
 	mtx_lock(&nlm_global_lock);
 
@@ -1688,11 +1687,7 @@ sys_nlm_syscall(struct thread *td, struct nlm_syscall_args *uap)
 {
 	int error;
 
-#if __FreeBSD_version >= 700000
 	error = priv_check(td, PRIV_NFS_LOCKD);
-#else
-	error = suser(td);
-#endif
 	if (error)
 		return (error);
 
@@ -1797,11 +1792,7 @@ nlm_get_vfs_state(struct nlm_host *host, struct svc_req *rqstp,
 			goto out;
 	}
 
-#if __FreeBSD_version < 800011
-	VOP_UNLOCK(vs->vs_vp, 0, curthread);
-#else
-	VOP_UNLOCK(vs->vs_vp, 0);
-#endif
+	VOP_UNLOCK(vs->vs_vp);
 	vs->vs_vnlocked = FALSE;
 
 out:
@@ -2420,6 +2411,7 @@ static moduledata_t nfslockd_mod = {
 DECLARE_MODULE(nfslockd, nfslockd_mod, SI_SUB_VFS, SI_ORDER_ANY);
 
 /* So that loader and kldload(2) can find us, wherever we are.. */
+MODULE_DEPEND(nfslockd, xdr, 1, 1, 1);
 MODULE_DEPEND(nfslockd, krpc, 1, 1, 1);
-MODULE_DEPEND(nfslockd, nfslock, 1, 1, 1);
+MODULE_DEPEND(nfslockd, nfscommon, 1, 1, 1);
 MODULE_VERSION(nfslockd, 1);

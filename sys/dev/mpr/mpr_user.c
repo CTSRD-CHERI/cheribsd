@@ -74,6 +74,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/bus.h>
 #include <sys/conf.h>
 #include <sys/bio.h>
+#include <sys/abi_compat.h>
 #include <sys/malloc.h>
 #include <sys/uio.h>
 #include <sys/sysctl.h>
@@ -161,12 +162,12 @@ static int mpr_diag_unregister(struct mpr_softc *sc,
 static int mpr_diag_query(struct mpr_softc *sc, mpr_fw_diag_query_t *diag_query,
     uint32_t *return_code);
 static int mpr_diag_read_buffer(struct mpr_softc *sc,
-    mpr_diag_read_buffer_t *diag_read_buffer, uint8_t *ioctl_buf,
+    mpr_diag_read_buffer_t *diag_read_buffer, uint8_t * __capability ioctl_buf,
     uint32_t *return_code);
 static int mpr_diag_release(struct mpr_softc *sc,
     mpr_fw_diag_release_t *diag_release, uint32_t *return_code);
 static int mpr_do_diag_action(struct mpr_softc *sc, uint32_t action,
-    uint8_t *diag_action, uint32_t length, uint32_t *return_code);
+    uint8_t * __capability diag_action, uint32_t length, uint32_t *return_code);
 static int mpr_user_diag_action(struct mpr_softc *sc, mpr_diag_action_t *data);
 static void mpr_user_event_query(struct mpr_softc *sc, mpr_event_query_t *data);
 static void mpr_user_event_enable(struct mpr_softc *sc,
@@ -177,16 +178,6 @@ static int mpr_user_reg_access(struct mpr_softc *sc, mpr_reg_access_t *data);
 static int mpr_user_btdh(struct mpr_softc *sc, mpr_btdh_mapping_t *data);
 
 static MALLOC_DEFINE(M_MPRUSER, "mpr_user", "Buffers for mpr(4) ioctls");
-
-/* Macros from compat/freebsd32/freebsd32.h */
-#define	PTRIN(v)	(void *)(uintptr_t)(v)
-#define	PTROUT(v)	(uint32_t)(uintptr_t)(v)
-
-#define	CP(src,dst,fld) do { (dst).fld = (src).fld; } while (0)
-#define	PTRIN_CP(src,dst,fld)				\
-	do { (dst).fld = PTRIN((src).fld); } while (0)
-#define	PTROUT_CP(src,dst,fld) \
-	do { (dst).fld = PTROUT((src).fld); } while (0)
 
 /*
  * MPI functions that support IEEE SGLs for SAS3.
@@ -796,8 +787,8 @@ mpr_user_pass_thru(struct mpr_softc *sc, mpr_pass_thru_t *data)
 		goto RetFreeUnlocked;
 	}
 
-	mpr_dprint(sc, MPR_USER, "%s: req 0x%jx %d  rpl 0x%jx %d "
-	    "data in 0x%jx %d data out 0x%jx %d data dir %d\n", __func__,
+	mpr_dprint(sc, MPR_USER, "%s: req %p %d  rpl %p %d "
+	    "data in %p %d data out %p %d data dir %d\n", __func__,
 	    data->PtrRequest, data->RequestSize, data->PtrReply,
 	    data->ReplySize, data->PtrData, data->DataSize,
 	    data->PtrDataOut, data->DataOutSize, data->DataDirection);
@@ -806,7 +797,7 @@ mpr_user_pass_thru(struct mpr_softc *sc, mpr_pass_thru_t *data)
 	 * copy in the header so we know what we're dealing with before we
 	 * commit to allocating a command for it.
 	 */
-	err = copyin(PTRIN(data->PtrRequest), &tmphdr, data->RequestSize);
+	err = copyin(data->PtrRequest, &tmphdr, data->RequestSize);
 	if (err != 0)
 		goto RetFreeUnlocked;
 
@@ -871,7 +862,7 @@ mpr_user_pass_thru(struct mpr_softc *sc, mpr_pass_thru_t *data)
 				    __func__, data->ReplySize, sz);
 			}
 			mpr_unlock(sc);
-			copyout(cm->cm_reply, PTRIN(data->PtrReply),
+			copyout(cm->cm_reply, data->PtrReply,
 			    data->ReplySize);
 			mpr_lock(sc);
 		}
@@ -917,12 +908,12 @@ mpr_user_pass_thru(struct mpr_softc *sc, mpr_pass_thru_t *data)
 		cm->cm_flags = MPR_CM_FLAGS_DATAIN;
 		if (data->DataOutSize) {
 			cm->cm_flags |= MPR_CM_FLAGS_DATAOUT;
-			err = copyin(PTRIN(data->PtrDataOut),
+			err = copyin(data->PtrDataOut,
 			    cm->cm_data, data->DataOutSize);
 		} else if (data->DataDirection ==
 		    MPR_PASS_THRU_DIRECTION_WRITE) {
 			cm->cm_flags = MPR_CM_FLAGS_DATAOUT;
-			err = copyin(PTRIN(data->PtrData),
+			err = copyin(data->PtrData,
 			    cm->cm_data, data->DataSize);
 		}
 		if (err != 0)
@@ -1076,7 +1067,7 @@ mpr_user_pass_thru(struct mpr_softc *sc, mpr_pass_thru_t *data)
 		if (cm->cm_flags & MPR_CM_FLAGS_DATAIN) {
 			mpr_unlock(sc);
 			err = copyout(cm->cm_data,
-			    PTRIN(data->PtrData), data->DataSize);
+			    data->PtrData, data->DataSize);
 			mpr_lock(sc);
 			if (err != 0)
 				mpr_dprint(sc, MPR_FAULT, "%s: failed to copy "
@@ -1097,7 +1088,7 @@ mpr_user_pass_thru(struct mpr_softc *sc, mpr_pass_thru_t *data)
 			    data->ReplySize, sz);
 		}
 		mpr_unlock(sc);
-		copyout(cm->cm_reply, PTRIN(data->PtrReply), data->ReplySize);
+		copyout(cm->cm_reply, data->PtrReply, data->ReplySize);
 		mpr_lock(sc);
 
 		if ((function == MPI2_FUNCTION_SCSI_IO_REQUEST) ||
@@ -1109,8 +1100,8 @@ mpr_user_pass_thru(struct mpr_softc *sc, mpr_pass_thru_t *data)
 				    SenseCount)), sizeof(struct
 				    scsi_sense_data));
 				mpr_unlock(sc);
-				copyout(cm->cm_sense, (PTRIN(data->PtrReply +
-				    sizeof(MPI2_SCSI_IO_REPLY))), sense_len);
+				copyout(cm->cm_sense, (char * __capability)data->PtrReply +
+				    sizeof(MPI2_SCSI_IO_REPLY), sense_len);
 				mpr_lock(sc);
 			}
 		}
@@ -1144,8 +1135,8 @@ mpr_user_pass_thru(struct mpr_softc *sc, mpr_pass_thru_t *data)
 			    NVME_ERROR_RESPONSE_SIZE);
 			mpr_unlock(sc);
 			copyout(cm->cm_sense,
-			    (PTRIN(data->PtrReply +
-			    sizeof(MPI2_SCSI_IO_REPLY))), sz);
+			    (char * __capability)data->PtrReply +
+			    sizeof(MPI2_SCSI_IO_REPLY), sz);
 			mpr_lock(sc);
 		}
 	}
@@ -1452,6 +1443,7 @@ static int
 mpr_diag_register(struct mpr_softc *sc, mpr_fw_diag_register_t *diag_register,
     uint32_t *return_code)
 {
+	bus_dma_tag_template_t		t;
 	mpr_fw_diagnostic_buffer_t	*pBuffer;
 	struct mpr_busdma_context	*ctx;
 	uint8_t				extended_type, buffer_type, i;
@@ -1514,17 +1506,11 @@ mpr_diag_register(struct mpr_softc *sc, mpr_fw_diag_register_t *diag_register,
 		*return_code = MPR_FW_DIAG_ERROR_NO_BUFFER;
 		return (MPR_DIAG_FAILURE);
 	}
-	if (bus_dma_tag_create( sc->mpr_parent_dmat,    /* parent */
-				1, 0,			/* algnmnt, boundary */
-				BUS_SPACE_MAXADDR_32BIT,/* lowaddr */
-				BUS_SPACE_MAXADDR,	/* highaddr */
-				NULL, NULL,		/* filter, filterarg */
-                                buffer_size,		/* maxsize */
-                                1,			/* nsegments */
-                                buffer_size,		/* maxsegsize */
-                                0,			/* flags */
-                                NULL, NULL,		/* lockfunc, lockarg */
-                                &sc->fw_diag_dmat)) {
+	bus_dma_template_init(&t, sc->mpr_parent_dmat);
+	t.lowaddr = BUS_SPACE_MAXADDR_32BIT;
+	t.maxsize = t.maxsegsize = buffer_size;
+	t.nsegments = 1;
+	if (bus_dma_template_tag(&t, &sc->fw_diag_dmat)) {
 		mpr_dprint(sc, MPR_ERROR,
 		    "Cannot allocate FW diag buffer DMA tag\n");
 		*return_code = MPR_FW_DIAG_ERROR_NO_BUFFER;
@@ -1781,7 +1767,7 @@ mpr_diag_query(struct mpr_softc *sc, mpr_fw_diag_query_t *diag_query,
 
 static int
 mpr_diag_read_buffer(struct mpr_softc *sc,
-    mpr_diag_read_buffer_t *diag_read_buffer, uint8_t *ioctl_buf,
+    mpr_diag_read_buffer_t *diag_read_buffer, uint8_t * __capability ioctl_buf,
     uint32_t *return_code)
 {
 	mpr_fw_diagnostic_buffer_t	*pBuffer;
@@ -1890,7 +1876,7 @@ mpr_diag_release(struct mpr_softc *sc, mpr_fw_diag_release_t *diag_release,
 }
 
 static int
-mpr_do_diag_action(struct mpr_softc *sc, uint32_t action, uint8_t *diag_action,
+mpr_do_diag_action(struct mpr_softc *sc, uint32_t action, uint8_t * __capability diag_action,
     uint32_t length, uint32_t *return_code)
 {
 	mpr_fw_diag_register_t		diag_register;
@@ -1961,7 +1947,7 @@ mpr_do_diag_action(struct mpr_softc *sc, uint32_t action, uint8_t *diag_action,
 				break;
 			}
 			status = mpr_diag_read_buffer(sc, &diag_read_buffer,
-			    PTRIN(diag_read_buffer.PtrDataBuffer),
+			    diag_read_buffer.PtrDataBuffer,
 			    return_code);
 			if (status == MPR_DIAG_SUCCESS) {
 				if (copyout(&diag_read_buffer, diag_action,
@@ -2024,7 +2010,7 @@ mpr_user_diag_action(struct mpr_softc *sc, mpr_diag_action_t *data)
 	    data->Action == MPR_FW_DIAG_TYPE_READ_BUFFER ||
 	    data->Action == MPR_FW_DIAG_TYPE_RELEASE) {
 		status = mpr_do_diag_action(sc, data->Action,
-		    PTRIN(data->PtrDiagAction), data->Length,
+		    data->PtrDiagAction, data->Length,
 		    &data->ReturnCode);
 	} else
 		status = EINVAL;
@@ -2087,7 +2073,7 @@ mpr_user_event_report(struct mpr_softc *sc, mpr_event_report_t *data)
 	if ((size >= sizeof(sc->recorded_events)) && (status == 0)) {
 		mpr_unlock(sc);
 		if (copyout((void *)sc->recorded_events,
-		    PTRIN(data->PtrEvents), size) != 0)
+		    data->PtrEvents, size) != 0)
 			status = EFAULT;
 		mpr_lock(sc);
 	} else {

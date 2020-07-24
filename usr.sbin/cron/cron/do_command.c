@@ -38,10 +38,11 @@ static const char rcsid[] =
 #endif
 
 
-static void		child_process(entry *, user *),
-			do_univ(user *);
+static void		child_process(entry *, user *);
 
 static WAIT_T		wait_on_child(PID_T, const char *);
+
+extern char	*environ;
 
 void
 do_command(e, u)
@@ -56,9 +57,6 @@ do_command(e, u)
 	/* fork to become asynchronous -- parent process is done immediately,
 	 * and continues to run the normal cron code, which means return to
 	 * tick().  the child and grandchild don't leave this function, alive.
-	 *
-	 * vfork() is unsuitable, since we have much to do, and the parent
-	 * needs to be able to run off and fork other processes.
 	 */
 	switch ((pid = fork())) {
 	case -1:
@@ -99,6 +97,7 @@ child_process(e, u)
 	register FILE	*mail;
 	register int	bytes = 1;
 	int		status = 0;
+	const char	*homedir = NULL;
 # if defined(LOGIN_CAP)
 	struct passwd	*pwd;
 	login_cap_t *lc;
@@ -220,13 +219,13 @@ child_process(e, u)
 
 	/* fork again, this time so we can exec the user's command.
 	 */
-	switch (jobpid = vfork()) {
+	switch (jobpid = fork()) {
 	case -1:
-		log_it("CRON",getpid(),"error","can't vfork");
+		log_it("CRON",getpid(),"error","can't fork");
 		exit(ERROR_EXIT);
 		/*NOTREACHED*/
 	case 0:
-		Debug(DPROC, ("[%d] grandchild process Vfork()'ed\n",
+		Debug(DPROC, ("[%d] grandchild process fork()'ed\n",
 			      getpid()))
 
 		if (e->uid == ROOT_UID)
@@ -279,27 +278,31 @@ child_process(e, u)
 		close(stdin_pipe[READ_PIPE]);
 		close(stdout_pipe[WRITE_PIPE]);
 
-		/* set our login universe.  Do this in the grandchild
-		 * so that the child can invoke /usr/lib/sendmail
-		 * without surprises.
-		 */
-		do_univ(u);
+		environ = NULL;
 
 # if defined(LOGIN_CAP)
-		/* Set user's entire context, but skip the environment
-		 * as cron provides a separate interface for this
+		/* Set user's entire context, but note that PATH will
+		 * be overridden later
 		 */
 		if ((pwd = getpwnam(usernm)) == NULL)
 			pwd = getpwuid(e->uid);
 		lc = NULL;
 		if (pwd != NULL) {
+			if (pwd->pw_dir != NULL
+			    && pwd->pw_dir[0] != '\0') {
+				homedir = strdup(pwd->pw_dir);
+				if (homedir == NULL) {
+					warn("strdup");
+					_exit(ERROR_EXIT);
+				}
+			}
 			pwd->pw_gid = e->gid;
 			if (e->class != NULL)
 				lc = login_getclass(e->class);
 		}
 		if (pwd &&
 		    setusercontext(lc, pwd, e->uid,
-			    LOGIN_SETALL & ~(LOGIN_SETPATH|LOGIN_SETENV)) == 0)
+			    LOGIN_SETALL) == 0)
 			(void) endpwent();
 		else {
 			/* fall back to the old method */
@@ -311,24 +314,24 @@ child_process(e, u)
 			if (setgid(e->gid) != 0) {
 				log_it(usernm, getpid(),
 				    "error", "setgid failed");
-				exit(ERROR_EXIT);
+				_exit(ERROR_EXIT);
 			}
 # if defined(BSD)
 			if (initgroups(usernm, e->gid) != 0) {
 				log_it(usernm, getpid(),
 				    "error", "initgroups failed");
-				exit(ERROR_EXIT);
+				_exit(ERROR_EXIT);
 			}
 # endif
 			if (setlogin(usernm) != 0) {
 				log_it(usernm, getpid(),
 				    "error", "setlogin failed");
-				exit(ERROR_EXIT);
+				_exit(ERROR_EXIT);
 			}
 			if (setuid(e->uid) != 0) {
 				log_it(usernm, getpid(),
 				    "error", "setuid failed");
-				exit(ERROR_EXIT);
+				_exit(ERROR_EXIT);
 			}
 			/* we aren't root after this..*/
 #if defined(LOGIN_CAP)
@@ -336,12 +339,64 @@ child_process(e, u)
 		if (lc != NULL)
 			login_close(lc);
 #endif
-		chdir(env_get("HOME", e->envp));
 
-		/* exec the command.
+		/* For compatibility, we chdir to the value of HOME if it was
+		 * specified explicitly in the crontab file, but not if it was
+		 * set in the environment by some other mechanism. We chdir to
+		 * the homedir given by the pw entry otherwise.
+		 *
+		 * If !LOGIN_CAP, then HOME is always set in e->envp.
+		 *
+		 * XXX: probably should also consult PAM.
+		 */
+		{
+			char	*new_home = env_get("HOME", e->envp);
+			if (new_home != NULL && new_home[0] != '\0')
+				chdir(new_home);
+			else if (homedir != NULL)
+				chdir(homedir);
+			else
+				chdir("/");
+		}
+
+		/* exec the command. Note that SHELL is not respected from
+		 * either login.conf or pw_shell, only an explicit setting
+		 * in the crontab. (default of _PATH_BSHELL is supplied when
+		 * setting up the entry)
 		 */
 		{
 			char	*shell = env_get("SHELL", e->envp);
+			char	**p;
+
+			/* Apply the environment from the entry, overriding
+			 * existing values (this will always set LOGNAME and
+			 * SHELL). putenv should not fail unless malloc does.
+			 */
+			for (p = e->envp; *p; ++p) {
+				if (putenv(*p) != 0) {
+					warn("putenv");
+					_exit(ERROR_EXIT);
+				}
+			}
+
+			/* HOME in login.conf overrides pw, and HOME in the
+			 * crontab overrides both. So set pw's value only if
+			 * nothing was already set (overwrite==0).
+			 */
+			if (homedir != NULL
+			    && setenv("HOME", homedir, 0) < 0) {
+				warn("setenv(HOME)");
+				_exit(ERROR_EXIT);
+			}
+
+			/* PATH in login.conf is respected, but the crontab
+			 * overrides; set a default value only if nothing
+			 * already set.
+			 */
+			if (setenv("PATH", _PATH_DEFPATH, 0) < 0) {
+				warn("setenv(PATH)");
+				_exit(ERROR_EXIT);
+			}
 
 # if DEBUGGING
 			if (DebugFlags & DTEST) {
@@ -352,9 +407,8 @@ child_process(e, u)
 				_exit(OK_EXIT);
 			}
 # endif /*DEBUGGING*/
-			execle(shell, shell, "-c", e->cmd, (char *)NULL,
-			    e->envp);
-			warn("execle: couldn't exec `%s'", shell);
+			execl(shell, shell, "-c", e->cmd, (char *)NULL);
+			warn("execl: couldn't exec `%s'", shell);
 			_exit(ERROR_EXIT);
 		}
 		break;
@@ -460,6 +514,8 @@ child_process(e, u)
 			_exit(ERROR_EXIT);
 		}
 
+		mail = NULL;
+
 		ch = getc(in);
 		if (ch != EOF) {
 			Debug(DPROC|DEXT,
@@ -531,7 +587,7 @@ child_process(e, u)
 
 			while (EOF != (ch = getc(in))) {
 				bytes++;
-				if (mailto)
+				if (mail)
 					putc(ch, mail);
 			}
 		}
@@ -555,12 +611,12 @@ child_process(e, u)
 		 */
 		if (WIFEXITED(waiter) && WEXITSTATUS(waiter) == 0
 		    && (e->flags & MAIL_WHEN_ERR) == MAIL_WHEN_ERR
-		    && mailto) {
+		    && mail) {
 			Debug(DPROC, ("[%d] %s executed successfully, mail suppressed\n",
 				getpid(), "grandchild command job"))
 			kill(mailpid, SIGKILL);
 			(void)fclose(mail);
-			mailto = NULL;
+			mail = NULL;
 		}
 
 
@@ -568,7 +624,7 @@ child_process(e, u)
 		 * mailing...
 		 */
 
-		if (mailto) {
+		if (mail) {
 			Debug(DPROC, ("[%d] closing pipe to mail\n",
 				getpid()))
 			/* Note: the pclose will probably see
@@ -624,42 +680,4 @@ wait_on_child(PID_T childpid, const char *name) {
 	Debug(DPROC, ("\n"))
 
 	return waiter;
-}
-
-
-static void
-do_univ(u)
-	user	*u;
-{
-#if defined(sequent)
-/* Dynix (Sequent) hack to put the user associated with
- * the passed user structure into the ATT universe if
- * necessary.  We have to dig the gecos info out of
- * the user's password entry to see if the magic
- * "universe(att)" string is present.
- */
-
-	struct	passwd	*p;
-	char	*s;
-	int	i;
-
-	p = getpwuid(u->uid);
-	(void) endpwent();
-
-	if (p == NULL)
-		return;
-
-	s = p->pw_gecos;
-
-	for (i = 0; i < 4; i++)
-	{
-		if ((s = strchr(s, ',')) == NULL)
-			return;
-		s++;
-	}
-	if (strcmp(s, "universe(att)"))
-		return;
-
-	(void) universe(U_ATT);
-#endif
 }

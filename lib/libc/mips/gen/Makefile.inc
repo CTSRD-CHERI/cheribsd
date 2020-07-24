@@ -10,7 +10,7 @@ SRCS+=	_ctx_start.S _set_tp.c makecontext.c \
 	signalcontext.c sigsetjmp.S \
 	trivial-getcontextx.c
 
-.if ${MACHINE_ARCH:Mmips*c*}
+.if ${MACHINE_ABI:Mpurecap}
 SRCS+=	_setjmp_c.S setjmp_c.S
 .else
 SRCS+=	_setjmp.S setjmp.S

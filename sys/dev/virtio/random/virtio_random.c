@@ -96,6 +96,8 @@ static driver_t vtrnd_driver = {
 };
 static devclass_t vtrnd_devclass;
 
+DRIVER_MODULE(virtio_random, virtio_mmio, vtrnd_driver, vtrnd_devclass,
+    vtrnd_modevent, 0);
 DRIVER_MODULE(virtio_random, virtio_pci, vtrnd_driver, vtrnd_devclass,
     vtrnd_modevent, 0);
 MODULE_VERSION(virtio_random, 1);
@@ -104,6 +106,7 @@ MODULE_DEPEND(virtio_random, random_device, 1, 1, 1);
 
 VIRTIO_SIMPLE_PNPTABLE(virtio_random, VIRTIO_ID_ENTROPY,
     "VirtIO Entropy Adapter");
+VIRTIO_SIMPLE_PNPINFO(virtio_mmio, virtio_random);
 VIRTIO_SIMPLE_PNPINFO(virtio_pci, virtio_random);
 
 static int
@@ -176,14 +179,6 @@ vtrnd_detach(device_t dev)
 
 	random_source_deregister(&random_vtrnd);
 	atomic_store_explicit(&g_vtrnd_softc, NULL, memory_order_release);
-
-	/*
-	 * Unfortunately, deregister does not guarantee our source callback
-	 * will not be invoked after it returns.  Use a kludge to prevent some,
-	 * but not all, possible races.
-	 */
-	tsleep_sbt(&g_vtrnd_softc, 0, "vtrnddet", mstosbt(50), 0, C_HARDCLOCK);
-
 	return (0);
 }
 

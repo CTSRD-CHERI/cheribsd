@@ -50,6 +50,8 @@ __FBSDID("$FreeBSD$");
 #include <string.h>
 #endif
 
+#include <cheri/cheric.h>
+
 #undef memcpy
 #undef memmove
 #undef bcopy
@@ -58,7 +60,11 @@ __FBSDID("$FreeBSD$");
  * sizeof(word) MUST BE A POWER OF TWO
  * SO THAT wmask BELOW IS ALL ONES
  */
+#if __has_feature(capabilities)
+typedef	uintcap_t word;
+#else
 typedef	long	word;		/* "word" used for optimal copy speed */
+#endif
 
 #define	wsize	sizeof(word)
 #define wmask	(wsize - 1)
@@ -68,8 +74,8 @@ typedef	long	word;		/* "word" used for optimal copy speed */
  * This is the routine that actually implements
  * (the portable versions of) bcopy, memcpy, and memmove.
  */
-void *
-memcpy(void *dst0, const void *src0, size_t length)
+static void *
+_memcpy(void *dst0, const void *src0, size_t length, bool keeptags)
 {
 	char		*dst;
 	const char	*src;
@@ -112,8 +118,15 @@ memcpy(void *dst0, const void *src0, size_t length)
 		 * Copy whole words, then mop up any trailing bytes.
 		 */
 		t = length / wsize;
-		TLOOP(*(word *)dst = *(const word *)src; src += wsize;
-		    dst += wsize);
+#if __has_feature(capabilities)
+		if (!keeptags) {
+			TLOOP(*(word *)dst = (word)cheri_cleartag(
+			        (void * __capability)*(const word *)src);
+			    src += wsize; dst += wsize);
+		} else
+#endif
+			TLOOP(*(word *)dst = *(const word *)src; src += wsize;
+			    dst += wsize);
 		t = length & wmask;
 		TLOOP(*dst++ = *src++);
 	} else {
@@ -137,13 +150,26 @@ memcpy(void *dst0, const void *src0, size_t length)
 			TLOOP1(*--dst = *--src);
 		}
 		t = length / wsize;
-		TLOOP(src -= wsize; dst -= wsize;
-		    *(word *)dst = *(const word *)src);
+#if __has_feature(capabilities)
+		if (!keeptags) {
+			TLOOP(src -= wsize; dst -= wsize;
+			    *(word *)dst = (word)cheri_cleartag(
+			        (void * __capability)*(const word *)src));
+		} else
+#endif
+			TLOOP(src -= wsize; dst -= wsize;
+			    *(word *)dst = *(const word *)src);
 		t = length & wmask;
 		TLOOP(*--dst = *--src);
 	}
 done:
 	return (dst0);
+}
+
+void *
+memcpy(void *dst0, const void *src0, size_t length)
+{
+	return _memcpy(dst0, src0, length, true);
 }
 
 __strong_reference(memcpy, memmove);
@@ -152,6 +178,13 @@ void
 (bcopy)(const void *src0, void *dst0, size_t length)
 {
 
-	memcpy(dst0, src0, length);
+	_memcpy(dst0, src0, length, true);
 }
 
+#if __has_feature(capabilities)
+void
+bcopynocap(const void *src0, void *dst0, size_t length)
+{
+	_memcpy(dst0, src0, length, false);
+}
+#endif

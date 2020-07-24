@@ -61,9 +61,12 @@ __FBSDID("$FreeBSD$");
 #include <rpcsvc/nfs_prot.h>
 #include <rpcsvc/mount.h>
 
-#include <nfsclient/nfs.h>
+#include <fs/nfs/nfsproto.h>
+#include <fs/nfs/nfsv4_errstr.h>
 
 #include <arpa/inet.h>
+#include <net/route.h>
+#include <net/if.h>
 
 #include <ctype.h>
 #include <err.h>
@@ -155,7 +158,7 @@ main(int argc, char *argv[])
 	char *mntname, *p, *spec, *tmp;
 	char mntpath[MAXPATHLEN], errmsg[255];
 	char hostname[MAXHOSTNAMELEN + 1], gssn[MAXHOSTNAMELEN + 50];
-	const char *gssname;
+	const char *gssname, *nmount_errstr;
 
 	iov = NULL;
 	iovlen = 0;
@@ -462,9 +465,14 @@ main(int argc, char *argv[])
 	build_iovec(&iov, &iovlen, "fspath", mntpath, (size_t)-1);
 	build_iovec(&iov, &iovlen, "errmsg", errmsg, sizeof(errmsg));
 
-	if (nmount(iov, iovlen, 0))
-		err(1, "nmount: %s%s%s", mntpath, errmsg[0] ? ", " : "",
-		    errmsg);
+	if (nmount(iov, iovlen, 0)) {
+		nmount_errstr = nfsv4_geterrstr(errno);
+		if (mountmode == V4 && nmount_errstr != NULL)
+			errx(1, "nmount: %s, %s", mntpath, nmount_errstr);
+		else
+			err(1, "nmount: %s%s%s", mntpath, errmsg[0] ? ", " : "",
+			    errmsg);
+	}
 
 	exit(0);
 }
@@ -497,6 +505,59 @@ sec_num_to_name(int flavor)
 		return ("sys");
 	}
 	return (NULL);
+}
+
+/*
+ * Wait for RTM_IFINFO message with interface that is IFF_UP and with
+ * link on, or until timeout expires.  Returns seconds left.
+ */
+static time_t
+rtm_ifinfo_sleep(time_t sec)
+{
+	char buf[2048] __aligned(__alignof(struct if_msghdr));
+	fd_set rfds;
+	struct timeval tv, start;
+	ssize_t nread;
+	int n, s;
+
+	s = socket(PF_ROUTE, SOCK_RAW, 0);
+	if (s < 0)
+		err(EX_OSERR, "socket");
+	(void)gettimeofday(&start, NULL);
+
+	for (tv.tv_sec = sec, tv.tv_usec = 0;
+	    tv.tv_sec > 0;
+	    (void)gettimeofday(&tv, NULL),
+	    tv.tv_sec = sec - (tv.tv_sec - start.tv_sec)) {
+		FD_ZERO(&rfds);
+		FD_SET(s, &rfds);
+		n = select(s + 1, &rfds, NULL, NULL, &tv);
+		if (n == 0)
+			continue;
+		if (n == -1) {
+			if (errno == EINTR)
+				continue;
+			else
+				err(EX_SOFTWARE, "select");
+		}
+		nread = read(s, buf, 2048);
+		if (nread < 0)
+			err(EX_OSERR, "read");
+		if ((size_t)nread >= sizeof(struct if_msghdr)) {
+			struct if_msghdr *ifm;
+
+			ifm = (struct if_msghdr *)buf;
+			if (ifm->ifm_version == RTM_VERSION &&
+			    ifm->ifm_type == RTM_IFINFO &&
+			    (ifm->ifm_flags & IFF_UP) &&
+			    ifm->ifm_data.ifi_link_state != LINK_STATE_DOWN)
+				break;
+		}
+	}
+
+	close(s);
+
+	return (tv.tv_sec);
 }
 
 static int
@@ -632,7 +693,12 @@ getnfsargs(char *spec, struct iovec **iov, int *iovlen)
 			if (daemon(0, 0) != 0)
 				err(1, "daemon");
 		}
-		sleep(60);
+		/*
+		 * If rtm_ifinfo_sleep() returns non-zero, don't count
+		 * that as a retry attempt.
+		 */
+		if (rtm_ifinfo_sleep(60) && retrycnt != 0)
+			retrycnt++;
 	}
 	freeaddrinfo(ai_nfs);
 

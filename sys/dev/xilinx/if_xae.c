@@ -64,6 +64,8 @@ __FBSDID("$FreeBSD$");
 #include <dev/xilinx/if_xaereg.h>
 #include <dev/xilinx/if_xaevar.h>
 
+#include <dev/xilinx/axidma.h>
+
 #include "miibus_if.h"
 
 #define	READ4(_sc, _reg) \
@@ -595,7 +597,7 @@ xae_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 
 	error = 0;
 	switch (cmd) {
-	case SIOCSIFFLAGS:
+	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		XAE_LOCK(sc);
 		if (ifp->if_flags & IFF_UP) {
 			if (ifp->if_drv_flags & IFF_DRV_RUNNING) {
@@ -613,21 +615,21 @@ xae_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		sc->if_flags = ifp->if_flags;
 		XAE_UNLOCK(sc);
 		break;
-	case SIOCADDMULTI:
-	case SIOCDELMULTI:
+	case CASE_IOC_IFREQ(SIOCADDMULTI):
+	case CASE_IOC_IFREQ(SIOCDELMULTI):
 		if (ifp->if_drv_flags & IFF_DRV_RUNNING) {
 			XAE_LOCK(sc);
 			xae_setup_rxfilter(sc);
 			XAE_UNLOCK(sc);
 		}
 		break;
-	case SIOCSIFMEDIA:
+	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
 	case SIOCGIFMEDIA:
 		mii = sc->mii_softc;
 		error = ifmedia_ioctl(ifp, ifr, &mii->mii_media, cmd);
 		break;
-	case SIOCSIFCAP:
-		mask = ifp->if_capenable ^ ifr->ifr_reqcap;
+	case CASE_IOC_IFREQ(SIOCSIFCAP):
+		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
 		if (mask & IFCAP_VLAN_MTU) {
 			/* No work to do except acknowledge the change took */
 			ifp->if_capenable ^= IFCAP_VLAN_MTU;
@@ -775,6 +777,68 @@ xae_phy_fixup(struct xae_softc *sc)
 }
 
 static int
+get_xdma_std(struct xae_softc *sc)
+{
+
+	sc->xdma_tx = xdma_ofw_get(sc->dev, "tx");
+	if (sc->xdma_tx == NULL)
+		return (ENXIO);
+
+	sc->xdma_rx = xdma_ofw_get(sc->dev, "rx");
+	if (sc->xdma_rx == NULL) {
+		xdma_put(sc->xdma_tx);
+		return (ENXIO);
+	}
+
+	return (0);
+}
+
+static int
+get_xdma_axistream(struct xae_softc *sc)
+{
+	struct axidma_fdt_data *data;
+	device_t dma_dev;
+	phandle_t node;
+	pcell_t prop;
+	size_t len;
+
+	node = ofw_bus_get_node(sc->dev);
+	len = OF_getencprop(node, "axistream-connected", &prop, sizeof(prop));
+	if (len != sizeof(prop)) {
+		device_printf(sc->dev,
+		    "%s: Couldn't get axistream-connected prop.\n", __func__);
+		return (ENXIO);
+	}
+	dma_dev = OF_device_from_xref(prop);
+	if (dma_dev == NULL) {
+		device_printf(sc->dev, "Could not get DMA device by xref.\n");
+		return (ENXIO);
+	}
+
+	sc->xdma_tx = xdma_get(sc->dev, dma_dev);
+	if (sc->xdma_tx == NULL) {
+		device_printf(sc->dev, "Could not find DMA controller.\n");
+		return (ENXIO);
+	}
+	data = malloc(sizeof(struct axidma_fdt_data),
+	    M_DEVBUF, (M_WAITOK | M_ZERO));
+	data->id = AXIDMA_TX_CHAN;
+	sc->xdma_tx->data = data;
+
+	sc->xdma_rx = xdma_get(sc->dev, dma_dev);
+	if (sc->xdma_rx == NULL) {
+		device_printf(sc->dev, "Could not find DMA controller.\n");
+		return (ENXIO);
+	}
+	data = malloc(sizeof(struct axidma_fdt_data),
+	    M_DEVBUF, (M_WAITOK | M_ZERO));
+	data->id = AXIDMA_RX_CHAN;
+	sc->xdma_rx->data = data;
+
+	return (0);
+}
+
+static int
 setup_xdma(struct xae_softc *sc)
 {
 	device_t dev;
@@ -784,15 +848,16 @@ setup_xdma(struct xae_softc *sc)
 	dev = sc->dev;
 
 	/* Get xDMA controller */   
-	sc->xdma_tx = xdma_ofw_get(sc->dev, "tx");
-	if (sc->xdma_tx == NULL) {
-		device_printf(dev, "Could not find DMA controller.\n");
-		return (ENXIO);
+	error = get_xdma_std(sc);
+
+	if (error) {
+		device_printf(sc->dev,
+		    "Fallback to axistream-connected property\n");
+		error = get_xdma_axistream(sc);
 	}
 
-	sc->xdma_rx = xdma_ofw_get(sc->dev, "rx");
-	if (sc->xdma_rx == NULL) {
-		device_printf(dev, "Could not find DMA controller.\n");
+	if (error) {
+		device_printf(dev, "Could not find xDMA controllers.\n");
 		return (ENXIO);
 	}
 
@@ -804,7 +869,7 @@ setup_xdma(struct xae_softc *sc)
 	}
 
 	/* Setup interrupt handler. */
-	error = xdma_setup_intr(sc->xchan_tx,
+	error = xdma_setup_intr(sc->xchan_tx, 0,
 	    xae_xdma_tx_intr, sc, &sc->ih_tx);
 	if (error) {
 		device_printf(sc->dev,
@@ -820,7 +885,7 @@ setup_xdma(struct xae_softc *sc)
 	}
 
 	/* Setup interrupt handler. */
-	error = xdma_setup_intr(sc->xchan_rx,
+	error = xdma_setup_intr(sc->xchan_rx, XDMA_INTR_NET,
 	    xae_xdma_rx_intr, sc, &sc->ih_rx);
 	if (error) {
 		device_printf(sc->dev,

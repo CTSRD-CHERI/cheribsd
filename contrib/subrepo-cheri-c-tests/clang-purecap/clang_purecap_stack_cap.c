@@ -51,7 +51,7 @@ __noinline static void check_sizes(void)
 	}
 }
 
-BEGIN_TEST(clang_purecap_stack_cap)
+__noinline static void do_test(void) {
 	char foo[sizes[0]], bar[sizes[1]], baz[sizes[2]];
 	ptrs[0] = foo;
 	ptrs[1] = bar;
@@ -62,5 +62,9 @@ BEGIN_TEST(clang_purecap_stack_cap)
 	check_overlap(foo, baz);
 	// Check that we have as much space as we asked for.
 	check_sizes();
+}
+
+BEGIN_TEST(clang_purecap_stack_cap)
+	do_test();
 END_TEST
 

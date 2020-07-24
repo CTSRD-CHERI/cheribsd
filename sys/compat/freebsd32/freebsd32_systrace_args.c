@@ -168,9 +168,9 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 0;
 		break;
 	}
-	/* ptrace */
+	/* freebsd32_ptrace */
 	case 26: {
-		struct ptrace_args *p = params;
+		struct freebsd32_ptrace_args *p = params;
 		iarg[0] = p->req; /* int */
 		iarg[1] = p->pid; /* pid_t */
 		uarg[2] = (intptr_t) p->addr; /* caddr_t */
@@ -2331,11 +2331,11 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 7;
 		break;
 	}
-	/* sctp_generic_sendmsg_iov */
+	/* freebsd32_sctp_generic_sendmsg_iov */
 	case 473: {
-		struct sctp_generic_sendmsg_iov_args *p = params;
+		struct freebsd32_sctp_generic_sendmsg_iov_args *p = params;
 		iarg[0] = p->sd; /* int */
-		uarg[1] = (intptr_t) p->iov; /* struct iovec * */
+		uarg[1] = (intptr_t) p->iov; /* struct iovec32 * */
 		iarg[2] = p->iovlen; /* int */
 		uarg[3] = (intptr_t) p->to; /* struct sockaddr * */
 		iarg[4] = p->tolen; /* __socklen_t */
@@ -2344,11 +2344,11 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 7;
 		break;
 	}
-	/* sctp_generic_recvmsg */
+	/* freebsd32_sctp_generic_recvmsg */
 	case 474: {
-		struct sctp_generic_recvmsg_args *p = params;
+		struct freebsd32_sctp_generic_recvmsg_args *p = params;
 		iarg[0] = p->sd; /* int */
-		uarg[1] = (intptr_t) p->iov; /* struct iovec * */
+		uarg[1] = (intptr_t) p->iov; /* struct iovec32 * */
 		iarg[2] = p->iovlen; /* int */
 		uarg[3] = (intptr_t) p->from; /* struct sockaddr * */
 		uarg[4] = (intptr_t) p->fromlenaddr; /* __socklen_t * */
@@ -2736,13 +2736,6 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 508: {
 		struct jail_remove_args *p = params;
 		iarg[0] = p->jid; /* int */
-		*n_args = 1;
-		break;
-	}
-	/* closefrom */
-	case 509: {
-		struct closefrom_args *p = params;
-		iarg[0] = p->lowfd; /* int */
 		*n_args = 1;
 		break;
 	}
@@ -3372,6 +3365,34 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 3;
 		break;
 	}
+	/* sigfastblock */
+	case 573: {
+		struct sigfastblock_args *p = params;
+		iarg[0] = p->cmd; /* int */
+		uarg[1] = (intptr_t) p->ptr; /* uint32_t * */
+		*n_args = 2;
+		break;
+	}
+	/* __realpathat */
+	case 574: {
+		struct __realpathat_args *p = params;
+		iarg[0] = p->fd; /* int */
+		uarg[1] = (intptr_t) p->path; /* const char * */
+		uarg[2] = (intptr_t) p->buf; /* char * */
+		uarg[3] = p->size; /* size_t */
+		iarg[4] = p->flags; /* int */
+		*n_args = 5;
+		break;
+	}
+	/* close_range */
+	case 575: {
+		struct close_range_args *p = params;
+		uarg[0] = p->lowfd; /* u_int */
+		uarg[1] = p->highfd; /* u_int */
+		iarg[2] = p->flags; /* int */
+		*n_args = 3;
+		break;
+	}
 	default:
 		*n_args = 0;
 		break;
@@ -3611,7 +3632,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	/* geteuid */
 	case 25:
 		break;
-	/* ptrace */
+	/* freebsd32_ptrace */
 	case 26:
 		switch(ndx) {
 		case 0:
@@ -7150,14 +7171,14 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* sctp_generic_sendmsg_iov */
+	/* freebsd32_sctp_generic_sendmsg_iov */
 	case 473:
 		switch(ndx) {
 		case 0:
 			p = "int";
 			break;
 		case 1:
-			p = "userland struct iovec *";
+			p = "userland struct iovec32 *";
 			break;
 		case 2:
 			p = "int";
@@ -7178,14 +7199,14 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* sctp_generic_recvmsg */
+	/* freebsd32_sctp_generic_recvmsg */
 	case 474:
 		switch(ndx) {
 		case 0:
 			p = "int";
 			break;
 		case 1:
-			p = "userland struct iovec *";
+			p = "userland struct iovec32 *";
 			break;
 		case 2:
 			p = "int";
@@ -7914,16 +7935,6 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		break;
 	/* jail_remove */
 	case 508:
-		switch(ndx) {
-		case 0:
-			p = "int";
-			break;
-		default:
-			break;
-		};
-		break;
-	/* closefrom */
-	case 509:
 		switch(ndx) {
 		case 0:
 			p = "int";
@@ -9087,6 +9098,57 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
+	/* sigfastblock */
+	case 573:
+		switch(ndx) {
+		case 0:
+			p = "int";
+			break;
+		case 1:
+			p = "userland uint32_t *";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* __realpathat */
+	case 574:
+		switch(ndx) {
+		case 0:
+			p = "int";
+			break;
+		case 1:
+			p = "userland const char *";
+			break;
+		case 2:
+			p = "userland char *";
+			break;
+		case 3:
+			p = "size_t";
+			break;
+		case 4:
+			p = "int";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* close_range */
+	case 575:
+		switch(ndx) {
+		case 0:
+			p = "u_int";
+			break;
+		case 1:
+			p = "u_int";
+			break;
+		case 2:
+			p = "int";
+			break;
+		default:
+			break;
+		};
+		break;
 	default:
 		break;
 	};
@@ -9191,7 +9253,7 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 24:
 	/* geteuid */
 	case 25:
-	/* ptrace */
+	/* freebsd32_ptrace */
 	case 26:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
@@ -10449,12 +10511,12 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* sctp_generic_sendmsg_iov */
+	/* freebsd32_sctp_generic_sendmsg_iov */
 	case 473:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* sctp_generic_recvmsg */
+	/* freebsd32_sctp_generic_recvmsg */
 	case 474:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
@@ -10652,11 +10714,6 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		break;
 	/* jail_remove */
 	case 508:
-		if (ndx == 0 || ndx == 1)
-			p = "int";
-		break;
-	/* closefrom */
-	case 509:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
@@ -10983,6 +11040,21 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		break;
 	/* shm_rename */
 	case 572:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* sigfastblock */
+	case 573:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* __realpathat */
+	case 574:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* close_range */
+	case 575:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;

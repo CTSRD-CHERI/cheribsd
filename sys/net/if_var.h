@@ -44,7 +44,7 @@
  * received from its medium.
  *
  * Output occurs when the routine if_output is called, with three parameters:
- *	(*ifp->if_output)(ifp, m, dst, rt)
+ *	(*ifp->if_output)(ifp, m, dst, ro)
  * Here m is the mbuf chain to be sent and dst is the destination address.
  * The output routine encapsulates the supplied datagram if necessary,
  * and then transmits it on its medium.
@@ -61,6 +61,7 @@
  */
 
 struct	rtentry;		/* ifa_rtrequest */
+struct	nhop_object;		/* ifa_rtrequest */
 struct	rt_addrinfo;		/* ifa_rtrequest */
 struct	socket;
 struct	carp_if;
@@ -107,8 +108,6 @@ VNET_DECLARE(struct hhook_head *, ipsec_hhh_in[HHOOK_IPSEC_COUNT]);
 VNET_DECLARE(struct hhook_head *, ipsec_hhh_out[HHOOK_IPSEC_COUNT]);
 #define	V_ipsec_hhh_in	VNET(ipsec_hhh_in)
 #define	V_ipsec_hhh_out	VNET(ipsec_hhh_out)
-extern epoch_t net_epoch_preempt;
-extern epoch_t net_epoch;
 #endif /* _KERNEL */
 
 typedef enum {
@@ -200,6 +199,7 @@ struct if_snd_tag_alloc_header {
 	uint32_t type;		/* send tag type, see IF_SND_TAG_XXX */
 	uint32_t flowid;	/* mbuf hash value */
 	uint32_t flowtype;	/* mbuf hash type */
+	uint8_t numa_domain;	/* numa domain of associated inp */
 };
 
 struct if_snd_tag_alloc_rate_limit {
@@ -254,6 +254,7 @@ union if_snd_tag_query_params {
 					 */
 #define RT_IS_FIXED_TABLE 0x00000004	/* A fixed table is attached */
 #define RT_IS_UNUSABLE	  0x00000008	/* It is not usable for this */
+#define RT_IS_SETUP_REQ	  0x00000010	/* The interface setup must be called before use */
 
 struct if_ratelimit_query_results {
 	const uint64_t *rate_table;	/* Pointer to table if present */
@@ -270,7 +271,7 @@ typedef int (if_snd_tag_query_t)(struct m_snd_tag *, union if_snd_tag_query_para
 typedef void (if_snd_tag_free_t)(struct m_snd_tag *);
 typedef void (if_ratelimit_query_t)(struct ifnet *,
     struct if_ratelimit_query_results *);
-
+typedef int (if_ratelimit_setup_t)(struct ifnet *, uint64_t, uint32_t);
 
 /*
  * Structure defining a network interface.
@@ -370,7 +371,7 @@ struct ifnet {
 	if_init_fn_t	if_init;	/* Init routine */
 	int	(*if_resolvemulti)	/* validate/resolve multicast */
 		(struct ifnet *, struct sockaddr **, struct sockaddr *);
-	if_qflush_fn_t	if_qflush;	/* flush any queue */	
+	if_qflush_fn_t	if_qflush;	/* flush any queue */
 	if_transmit_fn_t if_transmit;   /* initiate output routine */
 
 	void	(*if_reassign)		/* reassign to vnet routine */
@@ -413,6 +414,7 @@ struct ifnet {
 	if_snd_tag_query_t *if_snd_tag_query;
 	if_snd_tag_free_t *if_snd_tag_free;
 	if_ratelimit_query_t *if_ratelimit_query;
+	if_ratelimit_setup_t *if_ratelimit_setup;
 
 	/* Ethernet PCP */
 	uint8_t if_pcp;
@@ -445,10 +447,6 @@ struct ifnet {
 #define	IF_ADDR_WUNLOCK(if)	mtx_unlock(&(if)->if_addr_lock)
 #define	IF_ADDR_LOCK_ASSERT(if)	MPASS(in_epoch(net_epoch_preempt) || mtx_owned(&(if)->if_addr_lock))
 #define	IF_ADDR_WLOCK_ASSERT(if) mtx_assert(&(if)->if_addr_lock, MA_OWNED)
-#define	NET_EPOCH_ENTER(et)	epoch_enter_preempt(net_epoch_preempt, &(et))
-#define	NET_EPOCH_EXIT(et)	epoch_exit_preempt(net_epoch_preempt, &(et))
-#define	NET_EPOCH_WAIT()	epoch_wait_preempt(net_epoch_preempt)
-#define	NET_EPOCH_ASSERT()	MPASS(in_epoch(net_epoch_preempt))
 
 #ifdef _KERNEL
 /* interface link layer address change event */
@@ -554,14 +552,15 @@ struct ifaddr {
 	struct	carp_softc *ifa_carp;	/* pointer to CARP data */
 	CK_STAILQ_ENTRY(ifaddr) ifa_link;	/* queue macro glue */
 	void	(*ifa_rtrequest)	/* check or clean routes (+ or -)'d */
-		(int, struct rtentry *, struct rt_addrinfo *);
+		(int, struct rtentry *, struct nhop_object *,
+		 struct rt_addrinfo *);
 	u_short	ifa_flags;		/* mostly rt_flags for cloning */
 #define	IFA_ROUTE	RTF_UP		/* route installed */
 #define	IFA_RTSELF	RTF_HOST	/* loopback route to self installed */
 	u_int	ifa_refcnt;		/* references to this structure */
 
 	counter_u64_t	ifa_ipackets;
-	counter_u64_t	ifa_opackets;	 
+	counter_u64_t	ifa_opackets;
 	counter_u64_t	ifa_ibytes;
 	counter_u64_t	ifa_obytes;
 	struct	epoch_context	ifa_epoch_ctx;
@@ -775,7 +774,7 @@ void if_setstartfn(if_t ifp, void (*)(if_t));
 void if_settransmitfn(if_t ifp, if_transmit_fn_t);
 void if_setqflushfn(if_t ifp, if_qflush_fn_t);
 void if_setgetcounterfn(if_t ifp, if_get_counter_t);
- 
+
 /* Revisit the below. These are inline functions originally */
 int drbr_inuse_drv(if_t ifp, struct buf_ring *br);
 struct mbuf* drbr_dequeue_drv(if_t ifp, struct buf_ring *br);
@@ -786,25 +785,62 @@ int drbr_enqueue_drv(if_t ifp, struct buf_ring *br, struct mbuf *m);
 void if_hw_tsomax_common(if_t ifp, struct ifnet_hw_tsomax *);
 int if_hw_tsomax_update(if_t ifp, struct ifnet_hw_tsomax *);
 
+#ifdef COMPAT_FREEBSD64
+struct ifreq_buffer64 {
+	uint64_t	length;		/* (size_t) */
+	uint64_t	buffer;		/* (void *) */
+};
+
+/*
+ * Interface request structure used for socket
+ * ioctl's.  All interface ioctl's must have parameter
+ * definitions which begin with ifr_name.  The
+ * remainder may be interface specific.
+ */
+struct ifreq64 {
+	char	ifr_name[IFNAMSIZ];		/* if name, e.g. "en0" */
+	union {
+		struct sockaddr	ifru_addr;
+		struct sockaddr	ifru_dstaddr;
+		struct sockaddr	ifru_broadaddr;
+		struct ifreq_buffer64 ifru_buffer;
+		short		ifru_flags[2];
+		short		ifru_index;
+		int		ifru_jid;
+		int		ifru_metric;
+		int		ifru_mtu;
+		int		ifru_phys;
+		int		ifru_media;
+		uint64_t	ifru_data;
+		int		ifru_cap[2];
+		u_int		ifru_fib;
+		u_char		ifru_vlan_pcp;
+	} ifr_ifru;
+};
+
 /* Helper macro for struct ifreq ioctls */
-#if __has_feature(capabilities)
 #define	CASE_IOC_IFREQ(cmd)					\
     (cmd):							\
-    case _IOC_NEWTYPE((cmd), struct ifreq_c)
-#else
+    case _IOC_NEWTYPE((cmd), struct ifreq64)
+#else /* !COMPAT_FREEBSD64 */
 #define	CASE_IOC_IFREQ(cmd)					\
     (cmd)
-#endif
+#endif /* !COMPAT_FREEBSD64 */
 
 /* accessors for struct ifreq */
 char *ifr_addr_get_data(void *ifrp);
 sa_family_t ifr_addr_get_family(void *ifrp);
 unsigned char ifr_addr_get_len(void *ifrp);
 struct sockaddr *ifr_addr_get_sa(void *ifrp);
+void * __capability ifr_buffer_get_buffer(void *data);
+size_t ifr_buffer_get_length(void *data);
 void * __capability ifr_data_get_ptr(void *ifrp);
 u_int ifr_fib_get(void *ifrp);
 void ifr_fib_set(void *ifrp, u_int fib);
 short ifr_flags_get(void *ifrp);
+void ifr_flags_set(void *ifrp, short val);
+void ifr_flagshigh_set(void *ifrp, short val);
+void ifr_reqcap_set(void *ifrp, int val);
 int ifr_media_get(void *ifrp);
 int ifr_mtu_get(void *ifrp);
 void ifr_mtu_set(void *ifrp, int val);

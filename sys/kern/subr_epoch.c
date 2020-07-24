@@ -92,8 +92,10 @@ struct epoch {
 #define MAX_EPOCHS 64
 
 CTASSERT(sizeof(ck_epoch_entry_t) == sizeof(struct epoch_context));
-SYSCTL_NODE(_kern, OID_AUTO, epoch, CTLFLAG_RW, 0, "epoch information");
-SYSCTL_NODE(_kern_epoch, OID_AUTO, stats, CTLFLAG_RW, 0, "epoch stats");
+SYSCTL_NODE(_kern, OID_AUTO, epoch, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
+    "epoch information");
+SYSCTL_NODE(_kern_epoch, OID_AUTO, stats, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
+    "epoch stats");
 
 /* Stats. */
 static counter_u64_t block_count;
@@ -357,7 +359,7 @@ static epoch_record_t
 epoch_currecord(epoch_t epoch)
 {
 
-	return (zpcpu_get_cpu(epoch->e_pcpu_record, curcpu));
+	return (zpcpu_get(epoch->e_pcpu_record));
 }
 
 #define INIT_CHECK(epoch)					\
@@ -577,15 +579,14 @@ epoch_block_handler_preempt(struct ck_epoch *global __unused,
 	 * so we have nothing to do except context switch away.
 	 */
 	counter_u64_add(switch_count, 1);
-	mi_switch(SW_VOL | SWT_RELINQUISH, NULL);
-
+	mi_switch(SW_VOL | SWT_RELINQUISH);
 	/*
-	 * Release the thread lock while yielding to
-	 * allow other threads to acquire the lock
-	 * pointed to by TDQ_LOCKPTR(td). Else a
-	 * deadlock like situation might happen. (HPS)
+	 * It is important the thread lock is dropped while yielding
+	 * to allow other threads to acquire the lock pointed to by
+	 * TDQ_LOCKPTR(td). Currently mi_switch() will unlock the
+	 * thread lock before returning. Else a deadlock like
+	 * situation might happen.
 	 */
-	thread_unlock(td);
 	thread_lock(td);
 }
 
@@ -611,8 +612,8 @@ epoch_wait_preempt(epoch_t epoch)
 	KASSERT(!in_epoch(epoch), ("epoch_wait_preempt() called in the middle "
 	    "of an epoch section of the same epoch"));
 #endif
-	thread_lock(td);
 	DROP_GIANT();
+	thread_lock(td);
 
 	old_cpu = PCPU_GET(cpuid);
 	old_pinned = td->td_pinned;
@@ -665,7 +666,7 @@ epoch_wait(epoch_t epoch)
 }
 
 void
-epoch_call(epoch_t epoch, epoch_context_t ctx, void (*callback) (epoch_context_t))
+epoch_call(epoch_t epoch, epoch_callback_t callback, epoch_context_t ctx)
 {
 	epoch_record_t er;
 	ck_epoch_entry_t *cb;
@@ -820,7 +821,7 @@ epoch_drain_callbacks(epoch_t epoch)
 	CPU_FOREACH(cpu) {
 		er = zpcpu_get_cpu(epoch->e_pcpu_record, cpu);
 		sched_bind(td, cpu);
-		epoch_call(epoch, &er->er_drain_ctx, &epoch_drain_cb);
+		epoch_call(epoch, &epoch_drain_cb, &er->er_drain_ctx);
 	}
 
 	/* restore CPU binding, if any */

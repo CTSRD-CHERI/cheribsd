@@ -311,7 +311,7 @@ struct ata_params {
 /*223*/ u_int16_t       transport_minor;
 	u_int16_t       reserved224[31];
 /*255*/ u_int16_t       integrity;
-} __packed;
+} __packed __aligned(2);
 
 /* ATA Dataset Management */
 #define ATA_DSM_BLK_SIZE	512
@@ -507,7 +507,6 @@ struct ata_params {
 #define         ATA_SF_DIS_SRVIRQ       0xde    /* disable service interrupt */
 #define 	ATA_SF_LPSAERC		0x62	/* Long Phys Sect Align ErrRep*/
 #define 	ATA_SF_DSN		0x63	/* Device Stats Notification */
-#define ATA_CHECK_POWER_MODE		0xe5	/* Check Power Mode */
 #define ATA_SECURITY_SET_PASSWORD       0xf1    /* set drive password */
 #define ATA_SECURITY_UNLOCK             0xf2    /* unlock drive using passwd */
 #define ATA_SECURITY_ERASE_PREPARE      0xf3    /* prepare to erase drive */

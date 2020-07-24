@@ -156,7 +156,8 @@ static const char *errmsg[] =
 	"NO MEMORY"
 };
 
-static SYSCTL_NODE(_hw, OID_AUTO, mmcsd, CTLFLAG_RD, NULL, "mmcsd driver");
+static SYSCTL_NODE(_hw, OID_AUTO, mmcsd, CTLFLAG_RD | CTLFLAG_MPSAFE, NULL,
+    "mmcsd driver");
 
 static int mmcsd_cache = 1;
 SYSCTL_INT(_hw_mmcsd, OID_AUTO, cache, CTLFLAG_RDTUN, &mmcsd_cache, 0,
@@ -862,7 +863,7 @@ mmcsd_ioctl(struct mmcsd_part *part, u_long cmd, void *data, int fflag,
 		cnt = mimc->num_of_cmds;
 		size = sizeof(*mic) * cnt;
 		mic = malloc(size, M_TEMP, M_WAITOK);
-		err = copyin((const void *)mimc->cmds, mic, size);
+		err = copyin(mimc->cmds, mic, size);
 		if (err == 0) {
 			for (i = 0; i < cnt; i++) {
 				err = mmcsd_ioctl_cmd(part, &mic[i], fflag);
@@ -924,7 +925,7 @@ mmcsd_ioctl_cmd(struct mmcsd_part *part, struct mmc_ioc_cmd *mic, int fflag)
 	}
 	if (len != 0) {
 		dp = malloc(len, M_TEMP, M_WAITOK);
-		err = copyin((void *)(uintptr_t)mic->data_ptr, dp, len);
+		err = copyin((void * __capability)(uintcap_t)mic->data_ptr, dp, len);
 		if (err != 0)
 			goto out;
 	}
@@ -1054,7 +1055,7 @@ switch_back:
 	}
 	memcpy(mic->response, cmd.resp, 4 * sizeof(uint32_t));
 	if (mic->write_flag == 0 && len != 0) {
-		err = copyout(dp, (void *)(uintptr_t)mic->data_ptr, len);
+		err = copyout(dp, (void * __capability)(uintcap_t)mic->data_ptr, len);
 		if (err != 0)
 			goto out;
 	}
@@ -1431,7 +1432,7 @@ mmcsd_task(void *arg)
 	struct mmcsd_softc *sc;
 	struct bio *bp;
 	device_t dev, mmcbus;
-	int err, sz;
+	int bio_error, err, sz;
 
 	part = arg;
 	sc = part->sc;
@@ -1482,11 +1483,14 @@ mmcsd_task(void *arg)
 			block = mmcsd_rw(part, bp);
 		} else if (bp->bio_cmd == BIO_DELETE) {
 			block = mmcsd_delete(part, bp);
+		} else {
+			bio_error = EOPNOTSUPP;
+			goto release;
 		}
 release:
 		MMCBUS_RELEASE_BUS(mmcbus, dev);
 		if (block < end) {
-			bp->bio_error = EIO;
+			bp->bio_error = (bio_error == 0) ? EIO : bio_error;
 			bp->bio_resid = (end - block) * sz;
 			bp->bio_flags |= BIO_ERROR;
 		} else {

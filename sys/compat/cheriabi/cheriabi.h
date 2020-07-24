@@ -35,14 +35,13 @@
 #define _COMPAT_CHERIABI_CHERIABI_H_
 
 #include "opt_ktrace.h"
+#include <sys/abi_compat.h>
 #include <sys/uio.h>
 #include <sys/ktrace.h>
 #include <sys/proc.h>
 
 #include <cheri/cheri.h>
 #include <cheri/cheric.h>
-
-#define CP(src,dst,fld) do { (dst).fld = (src).fld; } while (0)
 
 struct jail_c {
 	uint32_t			version;

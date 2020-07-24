@@ -55,8 +55,8 @@ END(copyio_fault)
 /*
  * copycommon - common copy routine
  *
- * a0 - Source address
- * a1 - Destination address
+ * [c]a0 - Source address
+ * [c]a1 - Destination address
  * a2 - Size of copy
  */
 	.macro copycommon
@@ -77,20 +77,36 @@ END(copyio_fault)
 	beqz	t0, 2f			/* Already word-aligned, skip ahead */
 
 	/* Byte copy until the first word-aligned address */
-1:	lb	a4, 0(a0)		/* Load byte from src */
+1:
+#if __has_feature(capabilities)
+	lb.cap	a4, 0(ca0)		/* Load byte from src */
+	cincoffset	ca0, ca0, 1
+	sb.cap	a4, 0(ca1)		/* Store byte in dest */
+	cincoffset	ca1, ca1, 1
+#else
+	lb	a4, 0(a0)		/* Load byte from src */
 	addi	a0, a0, 1
 	sb	a4, 0(a1)		/* Store byte in dest */
 	addi	a1, a1, 1
+#endif
 	addi	a2, a2, -1		/* len-- */
 	andi	t0, a0, (XLEN_BYTES-1)
 	bnez	t0, 1b
 	j	3f
 
 	/* Copy words */
-2:	ld	a4, 0(a0)		/* Load word from src */
+2:
+#if __has_feature(capabilities)
+	ld.cap	a4, 0(ca0)		/* Load word from src */
+	cincoffset	ca0, ca0, XLEN_BYTES
+	sd.cap	a4, 0(ca1)		/* Store word in dest */
+	cincoffset	ca1, ca1, XLEN_BYTES
+#else
+	ld	a4, 0(a0)		/* Load word from src */
 	addi	a0, a0, XLEN_BYTES
 	sd	a4, 0(a1)		/* Store word in dest */
 	addi	a1, a1, XLEN_BYTES
+#endif
 	addi	a2, a2, -XLEN_BYTES	/* len -= XLEN_BYTES */
 3:	bgeu	a2, t2, 2b		/* Again if len >= XLEN_BYTES */
 
@@ -98,10 +114,18 @@ END(copyio_fault)
 	beqz	a2, 5f
 
 	/* Copy any remaining bytes */
-4:	lb	a4, 0(a0)		/* Load byte from src */
+4:
+#if __has_feature(capabilities)
+	lb.cap	a4, 0(ca0)		/* Load byte from src */
+	cincoffset	ca0, ca0, 1
+	sb.cap	a4, 0(ca1)		/* Store byte in dest */
+	cincoffset	ca1, ca1, 1
+#else
+	lb	a4, 0(a0)		/* Load byte from src */
 	addi	a0, a0, 1
 	sb	a4, 0(a1)		/* Store byte in dest */
 	addi	a1, a1, 1
+#endif
 	addi	a2, a2, -1		/* len-- */
 	bnez	a2, 4b
 
@@ -112,13 +136,19 @@ END(copyio_fault)
 /*
  * Copies from a kernel to user address
  *
- * int copyout(const void *kaddr, void *udaddr, size_t len)
+ * int copyout(const void *kaddr, void * __capability udaddr, size_t len)
  */
 ENTRY(copyout)
 	beqz	a2, copyout_end	/* If len == 0 then skip loop */
 	add	a3, a1, a2
 	li	a4, VM_MAXUSER_ADDRESS
 	bgt	a3, a4, copyio_fault_nopcb
+
+#if __has_feature(capabilities)
+	cspecialr	ca3, ddc
+	csetoffset	ca3, ca3, a0
+	csetbounds	ca0, ca3, a2
+#endif
 
 	copycommon
 
@@ -130,13 +160,19 @@ END(copyout)
 /*
  * Copies from a user to kernel address
  *
- * int copyin(const void *uaddr, void *kaddr, size_t len)
+ * int copyin(const void * __capability uaddr, void *kaddr, size_t len)
  */
 ENTRY(copyin)
 	beqz	a2, copyin_end	/* If len == 0 then skip loop */
 	add	a3, a0, a2
 	li	a4, VM_MAXUSER_ADDRESS
 	bgt	a3, a4, copyio_fault_nopcb
+
+#if __has_feature(capabilities)
+	cspecialr	ca3, ddc
+	csetoffset	ca3, ca3, a1
+	csetbounds	ca1, ca3, a2
+#endif
 
 	copycommon
 
@@ -148,7 +184,8 @@ END(copyin)
 /*
  * Copies a string from a user to kernel address
  *
- * int copyinstr(const void *udaddr, void *kaddr, size_t len, size_t *done)
+ * int copyinstr(const void * __capability udaddr, void *kaddr, size_t len,
+ *	size_t *done)
  */
 ENTRY(copyinstr)
 	mv	a5, x0		/* count = 0 */
@@ -158,12 +195,25 @@ ENTRY(copyinstr)
 	SET_FAULT_HANDLER(a6, a7) /* Set the handler */
 	ENTER_USER_ACCESS(a7)
 
+#if __has_feature(capabilities)
+	cspecialr	ca4, ddc
+	csetoffset	ca4, ca4, a1
+	csetbounds	ca1, ca4, a2
+#endif
+
 	li	a7, VM_MAXUSER_ADDRESS
 1:	bgt	a0, a7, copyio_fault
+#if __has_feature(capabilities)
+	lb.cap	a4, 0(ca0)	/* Load from uaddr */
+	cincoffset	ca0, ca0, 1
+	sb.cap	a4, 0(ca1)	/* Store in kaddr */
+	cincoffset	ca1, ca1, 1
+#else
 	lb	a4, 0(a0)	/* Load from uaddr */
 	addi	a0, a0, 1
 	sb	a4, 0(a1)	/* Store in kaddr */
 	addi	a1, a1, 1
+#endif
 	beqz	a4, 2f
 	addi	a2, a2, -1	/* len-- */
 	addi	a5, a5, 1	/* count++ */
@@ -182,3 +232,109 @@ ENTRY(copyinstr)
 5:
 	ret
 END(copyinstr)
+
+#if __has_feature(capabilities)
+/*
+ * copycapcommon - common capcopy routine
+ *
+ * ca0 - Source address
+ * ca1 - Destination address
+ * a2 - Size of copy
+ */
+	.macro copycapcommon
+	la	a6, copyio_fault	/* Get the handler address */
+	SET_FAULT_HANDLER(a6, a7)	/* Set the handler */
+	ENTER_USER_ACCESS(a7)
+
+	li	t2, CLEN_BYTES
+	blt	a2, t2, 4f		/* Byte-copy if len < CLEN_BYTES */
+
+	/*
+	 * Compare lower bits of src and dest.
+	 * If they are aligned with each other, we can do capability copy.
+	 */
+	andi	t0, a0, (CLEN_BYTES-1)	/* Low bits of src */
+	andi	t1, a1, (CLEN_BYTES-1)	/* Low bits of dest */
+	bne	t0, t1, 4f		/* Misaligned. Go to byte copy */
+	beqz	t0, 2f			/* Already cap-aligned, skip ahead */
+
+	/* Byte copy until the first capability-aligned address */
+1:
+	lb.cap	a4, 0(ca0)		/* Load byte from src */
+	cincoffset	ca0, ca0, 1
+	sb.cap	a4, 0(ca1)		/* Store byte in dest */
+	cincoffset	ca1, ca1, 1
+	addi	a2, a2, -1		/* len-- */
+	andi	t0, a0, (CLEN_BYTES-1)
+	bnez	t0, 1b
+	j	3f
+
+	/* Copy capabilities */
+2:
+	lc.cap	ca4, 0(ca0)		/* Load capability from src */
+	cincoffset	ca0, ca0, CLEN_BYTES
+	sc.cap	ca4, 0(ca1)		/* Store capability in dest */
+	cincoffset	ca1, ca1, CLEN_BYTES
+	addi	a2, a2, -CLEN_BYTES	/* len -= CLEN_BYTES */
+3:	bgeu	a2, t2, 2b		/* Again if len >= CLEN_BYTES */
+
+	/* Check if we're finished */
+	beqz	a2, 5f
+
+	/* Copy any remaining bytes */
+4:
+	lb.cap	a4, 0(ca0)		/* Load byte from src */
+	cincoffset	ca0, ca0, 1
+	sb.cap	a4, 0(ca1)		/* Store byte in dest */
+	cincoffset	ca1, ca1, 1
+	addi	a2, a2, -1		/* len-- */
+	bnez	a2, 4b
+
+5:	EXIT_USER_ACCESS(a7)
+	SET_FAULT_HANDLER(x0, a7)	/* Clear the handler */
+	.endm
+
+/*
+ * Copies from a kernel to user address preserving tags
+ *
+ * int copyoutcap(const void *kaddr, void * __capability udaddr, size_t len)
+ */
+ENTRY(copyoutcap)
+	beqz	a2, copyoutcap_end	/* If len == 0 then skip loop */
+	add	a3, a1, a2
+	li	a4, VM_MAXUSER_ADDRESS
+	bgt	a3, a4, copyio_fault_nopcb
+
+	cspecialr	ca3, ddc
+	csetoffset	ca3, ca3, a0
+	csetbounds	ca0, ca3, a2
+
+	copycapcommon
+
+copyoutcap_end:
+	li	a0, 0		/* return 0 */
+	ret
+END(copyoutcap)
+
+/*
+ * Copies from a user to kernel address preserving tags
+ *
+ * int copyincap(const void * __capability uaddr, void *kaddr, size_t len)
+ */
+ENTRY(copyincap)
+	beqz	a2, copyincap_end	/* If len == 0 then skip loop */
+	add	a3, a0, a2
+	li	a4, VM_MAXUSER_ADDRESS
+	bgt	a3, a4, copyio_fault_nopcb
+
+	cspecialr	ca3, ddc
+	csetoffset	ca3, ca3, a1
+	csetbounds	ca1, ca3, a2
+
+	copycapcommon
+
+copyincap_end:
+	li	a0, 0		/* return 0 */
+	ret
+END(copyincap)
+#endif

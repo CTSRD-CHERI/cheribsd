@@ -128,7 +128,8 @@ __FBSDID("$FreeBSD$");
 VNET_DECLARE(struct uma_zone *, sack_hole_zone);
 #define	V_sack_hole_zone		VNET(sack_hole_zone)
 
-SYSCTL_NODE(_net_inet_tcp, OID_AUTO, sack, CTLFLAG_RW, 0, "TCP SACK");
+SYSCTL_NODE(_net_inet_tcp, OID_AUTO, sack, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
+    "TCP SACK");
 VNET_DEFINE(int, tcp_do_sack) = 1;
 #define	V_tcp_do_sack			VNET(tcp_do_sack)
 SYSCTL_INT(_net_inet_tcp_sack, OID_AUTO, enable, CTLFLAG_VNET | CTLFLAG_RW,
@@ -141,7 +142,7 @@ SYSCTL_INT(_net_inet_tcp_sack, OID_AUTO, maxholes, CTLFLAG_VNET | CTLFLAG_RW,
 
 VNET_DEFINE(int, tcp_sack_globalmaxholes) = 65536;
 SYSCTL_INT(_net_inet_tcp_sack, OID_AUTO, globalmaxholes, CTLFLAG_VNET | CTLFLAG_RW,
-    &VNET_NAME(tcp_sack_globalmaxholes), 0, 
+    &VNET_NAME(tcp_sack_globalmaxholes), 0,
     "Global maximum number of TCP SACK holes");
 
 VNET_DEFINE(int, tcp_sack_globalholes) = 0;
@@ -164,11 +165,6 @@ tcp_update_dsack_list(struct tcpcb *tp, tcp_seq rcv_start, tcp_seq rcv_end)
 	INP_WLOCK_ASSERT(tp->t_inpcb);
 
 	KASSERT(SEQ_LT(rcv_start, rcv_end), ("rcv_start < rcv_end"));
-
-	if (tp->t_inpcb->inp_socket->so_options & SO_DEBUG) {
-		log(LOG_DEBUG, "\nDSACK update: %d..%d, rcv_nxt: %u\n",
-		rcv_start, rcv_end, tp->rcv_nxt);
-	}
 
 	if (SEQ_LT(rcv_end, tp->rcv_nxt) ||
 	    ((rcv_end == tp->rcv_nxt) &&
@@ -243,7 +239,7 @@ tcp_update_dsack_list(struct tcpcb *tp, tcp_seq rcv_start, tcp_seq rcv_end)
 	}
 	j = 0;
 	for (i = 0; i < n; i++) {
-		/* we can end up with a stale inital entry */
+		/* we can end up with a stale initial entry */
 		if (SEQ_LT(saved_blks[i].start, saved_blks[i].end)) {
 			tp->sackblks[j++] = saved_blks[i];
 		}
@@ -402,7 +398,7 @@ tcp_clean_dsack_blocks(struct tcpcb *tp)
 	/*
 	 * Clean up any DSACK blocks that
 	 * are in our queue of sack blocks.
-	 * 
+	 *
 	 */
 	num_saved = 0;
 	for (i = 0; i < tp->rcv_numsacks; i++) {
@@ -643,18 +639,18 @@ tcp_sack_doack(struct tcpcb *tp, struct tcpopt *to, tcp_seq th_ack)
 			sblkp--;
 			sack_changed = 1;
 		} else {
-			/* 
-			 * We failed to add a new hole based on the current 
-			 * sack block.  Skip over all the sack blocks that 
+			/*
+			 * We failed to add a new hole based on the current
+			 * sack block.  Skip over all the sack blocks that
 			 * fall completely to the right of snd_fack and
 			 * proceed to trim the scoreboard based on the
 			 * remaining sack blocks.  This also trims the
 			 * scoreboard for th_ack (which is sack_blocks[0]).
 			 */
-			while (sblkp >= sack_blocks && 
+			while (sblkp >= sack_blocks &&
 			       SEQ_LT(tp->snd_fack, sblkp->start))
 				sblkp--;
-			if (sblkp >= sack_blocks && 
+			if (sblkp >= sack_blocks &&
 			    SEQ_LT(tp->snd_fack, sblkp->end))
 				tp->snd_fack = sblkp->end;
 		}
@@ -785,7 +781,7 @@ tcp_sack_partialack(struct tcpcb *tp, struct tcphdr *th)
 	if ((BYTES_THIS_ACK(tp, th) / tp->t_maxseg) >= 2)
 		num_segs = 2;
 	tp->snd_cwnd = (tp->sackhint.sack_bytes_rexmit +
-	    (tp->snd_nxt - tp->sack_newdata) + num_segs * tp->t_maxseg);
+	    (tp->snd_nxt - tp->snd_recover) + num_segs * tp->t_maxseg);
 	if (tp->snd_cwnd > tp->snd_ssthresh)
 		tp->snd_cwnd = tp->snd_ssthresh;
 	tp->t_flags |= TF_ACKNOW;

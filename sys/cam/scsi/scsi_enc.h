@@ -187,7 +187,7 @@ typedef struct encioc_elm_status {
 typedef struct encioc_string {
 	size_t bufsiz;		/* IN/OUT: length of string provided/returned */
 #define	ENC_STRING_MAX	0xffff
-	uint8_t *buf;		/* IN/OUT: string */
+	uint8_t * __kerncap buf; /* IN/OUT: string */
 } encioc_string_t;
 
 /*============================================================================*/
@@ -199,7 +199,7 @@ typedef struct encioc_string {
 typedef struct encioc_elm_desc {
 	unsigned int	 elm_idx;       /* IN: elment requested */
 	uint16_t	 elm_desc_len; /* IN: buffer size; OUT: bytes written */
-	char		*elm_desc_str; /* IN/OUT: buffer for descriptor data */
+	char * __kerncap elm_desc_str; /* IN/OUT: buffer for descriptor data */
 } encioc_elm_desc_t;
 
 /*
@@ -214,7 +214,7 @@ typedef struct  encioc_elm_devnames {
 	 * IN/OUT: comma separated list of peripheral driver
 	 * instances servicing this element.
 	 */
-	char		*elm_devnames;
+	char * __kerncap elm_devnames;
 } encioc_elm_devnames_t;
 
 /* ioctl structure for requesting FC info for a port */

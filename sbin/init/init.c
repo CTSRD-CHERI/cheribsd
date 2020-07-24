@@ -1629,12 +1629,14 @@ transition_handler(int sig)
 		    current_state == clean_ttys || current_state == catatonia)
 			requested_transition = clean_ttys;
 		break;
-	case SIGWINCH:
 	case SIGUSR2:
-		howto = sig == SIGUSR2 ? RB_POWEROFF : RB_POWERCYCLE;
+		howto = RB_POWEROFF;
 	case SIGUSR1:
 		howto |= RB_HALT;
+	case SIGWINCH:
 	case SIGINT:
+		if (sig == SIGWINCH)
+			howto |= RB_POWERCYCLE;
 		Reboot = TRUE;
 	case SIGTERM:
 		if (current_state == read_ttys || current_state == multi_user ||
@@ -2051,6 +2053,7 @@ setprocresources(const char *cname)
 	login_cap_t *lc;
 	if ((lc = login_getclassbyname(cname, NULL)) != NULL) {
 		setusercontext(lc, (struct passwd*)NULL, 0,
+		    LOGIN_SETENV |
 		    LOGIN_SETPRIORITY | LOGIN_SETRESOURCES |
 		    LOGIN_SETLOGINCLASS | LOGIN_SETCPUMASK);
 		login_close(lc);

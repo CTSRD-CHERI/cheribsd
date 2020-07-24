@@ -29,8 +29,6 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
-#define	EXPLICIT_USER_ACCESS
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -46,7 +44,8 @@ __FBSDID("$FreeBSD$");
 
 SYSCTL_DECL(_kern_iconv);
 
-SYSCTL_NODE(_kern, OID_AUTO, iconv, CTLFLAG_RW, NULL, "kernel iconv interface");
+SYSCTL_NODE(_kern, OID_AUTO, iconv, CTLFLAG_RW | CTLFLAG_MPSAFE, NULL,
+    "kernel iconv interface");
 
 MALLOC_DEFINE(M_ICONV, "iconv", "ICONV structures");
 static MALLOC_DEFINE(M_ICONVDATA, "iconv_data", "ICONV data");
@@ -352,8 +351,10 @@ iconv_sysctl_drvlist(SYSCTL_HANDLER_ARGS)
 	return error;
 }
 
-SYSCTL_PROC(_kern_iconv, OID_AUTO, drvlist, CTLFLAG_RD | CTLTYPE_OPAQUE,
-	    NULL, 0, iconv_sysctl_drvlist, "S,xlat", "registered converters");
+SYSCTL_PROC(_kern_iconv, OID_AUTO, drvlist,
+    CTLFLAG_RD | CTLTYPE_OPAQUE | CTLFLAG_MPSAFE, NULL, 0,
+    iconv_sysctl_drvlist, "S,xlat",
+    "registered converters");
 
 /*
  * List all available charset pairs.
@@ -383,8 +384,10 @@ iconv_sysctl_cslist(SYSCTL_HANDLER_ARGS)
 	return error;
 }
 
-SYSCTL_PROC(_kern_iconv, OID_AUTO, cslist, CTLFLAG_RD | CTLTYPE_OPAQUE,
-	    NULL, 0, iconv_sysctl_cslist, "S,xlat", "registered charset pairs");
+SYSCTL_PROC(_kern_iconv, OID_AUTO, cslist,
+    CTLFLAG_RD | CTLTYPE_OPAQUE | CTLFLAG_MPSAFE, NULL, 0,
+    iconv_sysctl_cslist, "S,xlat",
+    "registered charset pairs");
 
 int
 iconv_add(const char *converter, const char *to, const char *from)
@@ -398,17 +401,6 @@ iconv_add(const char *converter, const char *to, const char *from)
 	return iconv_register_cspair(to, from, dcp, NULL, &csp);
 }
 
-#ifdef COMPAT_CHERIABI
-struct iconv_add_c {
-	int	ia_version;
-	char	ia_converter[ICONV_CNVNMAXLEN];
-	char	ia_to[ICONV_CSNMAXLEN];
-	char	ia_from[ICONV_CSNMAXLEN];
-	int	ia_datalen;
-	const void * __capability ia_data;
-};
-#endif
-
 #ifdef COMPAT_FREEBSD32
 struct iconv_add32 {
 	int	ia_version;
@@ -417,6 +409,17 @@ struct iconv_add32 {
 	char	ia_from[ICONV_CSNMAXLEN];
 	int	ia_datalen;
 	uint32_t ia_data;
+};
+#endif
+
+#ifdef COMPAT_FREEBSD64
+struct iconv_add64 {
+	int	ia_version;
+	char	ia_converter[ICONV_CNVNMAXLEN];
+	char	ia_to[ICONV_CSNMAXLEN];
+	char	ia_from[ICONV_CSNMAXLEN];
+	int	ia_datalen;
+	uint64_t ia_data;
 };
 #endif
 
@@ -430,23 +433,17 @@ iconv_sysctl_add(SYSCTL_HANDLER_ARGS)
 	struct iconv_cspair *csp;
 	union {
 		struct iconv_add_in din;
-#ifdef COMPAT_CHERIABI
-		struct iconv_add_c din_c;
-#endif
 #ifdef COMPAT_FREEBSD32
 		struct iconv_add32 din32;
+#endif
+#ifdef COMPAT_FREEBSD64
+		struct iconv_add64 din64;
 #endif
 	} du;
 	const void * __capability ia_data;
 	struct iconv_add_out dout;
 	int error;
 
-#ifdef COMPAT_CHERIABI
-	if (req->flags & SCTL_CHERIABI) {
-		error = SYSCTL_IN(req, &du.din_c, sizeof(du.din_c));
-		ia_data = du.din_c.ia_data;
-	} else
-#endif
 #ifdef COMPAT_FREEBSD32
 	if (req->flags & SCTL_MASK32) {
 		error = SYSCTL_IN(req, &du.din32, sizeof(du.din32));
@@ -454,9 +451,16 @@ iconv_sysctl_add(SYSCTL_HANDLER_ARGS)
 		    du.din32.ia_datalen);
 	} else
 #endif
+#ifdef COMPAT_FREEBSD64
+	if (req->flags & SCTL_MASK64) {
+		error = SYSCTL_IN(req, &du.din64, sizeof(du.din64));
+		ia_data = __USER_CAP((void*)(uintptr_t)du.din64.ia_data,
+		    du.din64.ia_datalen);
+	} else
+#endif
 	{
 		error = SYSCTL_IN(req, &du.din, sizeof(du.din));
-		ia_data = __USER_CAP(du.din.ia_data, du.din.ia_datalen);
+		ia_data = du.din.ia_data;
 	}
 	if (error)
 		return error;
@@ -500,8 +504,9 @@ bad:
 }
 
 SYSCTL_PROC(_kern_iconv, OID_AUTO, add,
-    CTLFLAG_RW | CTLTYPE_OPAQUE | CTLFLAG_PTRIN,
-    NULL, 0, iconv_sysctl_add, "S,xlat", "register charset pair");
+    CTLFLAG_RW | CTLTYPE_OPAQUE | CTLFLAG_MPSAFE | CTLFLAG_PTRIN, NULL, 0,
+    iconv_sysctl_add, "S,xlat",
+    "register charset pair");
 
 /*
  * Default stubs for converters

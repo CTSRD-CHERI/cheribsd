@@ -16,40 +16,44 @@ On Mac OS 10.7 (Lion) and later, the easiest way to get this library is to insta
 Xcode 4.2 or later.  However if you want to install tip-of-trunk from here
 (getting the bleeding edge), read on.
 
-The basic steps needed to build libc++ are:
+The following instructions describe how to checkout, build, test and
+(optionally) install libc++ and libc++abi.
 
-#. Checkout and configure LLVM (including libc++ and libc++abi), according to the `LLVM
-   getting started <https://llvm.org/docs/GettingStarted.html>`_ documentation. Make sure
-   to include ``libcxx`` and ``libcxxabi`` in the ``LLVM_ENABLE_PROJECTS`` option passed
-   to CMake.
+If your system already provides a libc++ installation it is important to be
+careful not to replace it. Remember Use the CMake option
+``CMAKE_INSTALL_PREFIX`` to select a safe place to install libc++.
 
-   For more information about configuring libc++ see :ref:`CMake Options`.
+.. warning::
+  * Replacing your systems libc++ installation could render the system non-functional.
+  * macOS will not boot without a valid copy of ``libc++.1.dylib`` in ``/usr/lib``.
 
-   * ``make cxx`` --- will build libc++ and libc++abi.
-   * ``make check-cxx check-cxxabi`` --- will run the test suites.
+.. code-block:: bash
 
-   Shared libraries for libc++ and libc++ abi should now be present in llvm/build/lib.
-   See :ref:`using an alternate libc++ installation <alternate libcxx>`
+  $ git clone https://github.com/llvm/llvm-project.git
+  $ cd llvm-project
+  $ mkdir build && cd build
+  $ cmake -DCMAKE_C_COMPILER=clang \
+          -DCMAKE_CXX_COMPILER=clang++ \
+          -DLLVM_ENABLE_PROJECTS="libcxx;libcxxabi" \
+          ../llvm
+  $ make # Build
+  $ make check-cxx # Test
+  $ make install-cxx install-cxxabi # Install
 
-#. **Optional**: Install libc++ and libc++abi
+For more information about configuring libc++ see :ref:`CMake Options`. You may
+also want to read the `LLVM getting started
+<https://llvm.org/docs/GettingStarted.html>`_ documentation.
 
-   If your system already provides a libc++ installation it is important to be
-   careful not to replace it. Remember Use the CMake option ``CMAKE_INSTALL_PREFIX`` to
-   select a safe place to install libc++.
-
-   * ``make install-cxx install-cxxabi`` --- Will install the libraries and the headers
-
-   .. warning::
-     * Replacing your systems libc++ installation could render the system non-functional.
-     * macOS will not boot without a valid copy of ``libc++.1.dylib`` in ``/usr/lib``.
-
+Shared libraries for libc++ and libc++ abi should now be present in
+``build/lib``.  See :ref:`using an alternate libc++ installation <alternate
+libcxx>` for information on how to use this libc++.
 
 The instructions are for building libc++ on
 FreeBSD, Linux, or Mac using `libc++abi`_ as the C++ ABI library.
 On Linux, it is also possible to use :ref:`libsupc++ <libsupcxx>` or libcxxrt.
 
-It is sometimes beneficial to build separately from the full LLVM build. An
-out-of-tree build would look like this:
+It is possible to keep your LLVM and libc++ trees separate so you can avoid
+rebuilding LLVM as often. An out-of-tree build would look like this:
 
 .. code-block:: bash
 
@@ -204,7 +208,7 @@ libc++ specific options
   Do not export any symbols from the static libc++ library.
   This is useful when the static libc++ library is being linked into shared
   libraries that may be used in with other shared libraries that use different
-  C++ library. We want to avoid avoid exporting any libc++ symbols in that case.
+  C++ library. We want to avoid exporting any libc++ symbols in that case.
 
 .. option:: LIBCXX_ENABLE_FILESYSTEM:BOOL
 
@@ -288,6 +292,12 @@ libc++ Feature Options
 
   Build libc++ with run time type information.
 
+.. option:: LIBCXX_INCLUDE_TESTS:BOOL
+
+  **Default**: ``ON`` (or value of ``LLVM_INCLUDE_DIR``)
+
+  Build the libc++ tests.
+
 .. option:: LIBCXX_INCLUDE_BENCHMARKS:BOOL
 
   **Default**: ``ON``
@@ -311,7 +321,7 @@ libc++ Feature Options
   **Values**:: ``libc++``, ``libstdc++``
 
   Build the libc++ benchmark tests and Google Benchmark library against the
-  specified standard library on the platform. On linux this can be used to
+  specified standard library on the platform. On Linux this can be used to
   compare libc++ to libstdc++ by building the benchmark tests against both
   standard libraries.
 
@@ -398,7 +408,7 @@ LLVM-specific options
 .. option:: LLVM_BUILD_32_BITS:BOOL
 
   Build 32-bits executables and libraries on 64-bits systems. This option is
-  available only on some 64-bits unix systems. Defaults to OFF.
+  available only on some 64-bits Unix systems. Defaults to OFF.
 
 .. option:: LLVM_LIT_ARGS:STRING
 
@@ -521,7 +531,7 @@ These instructions should only be used when you can't install your ABI library.
 
 Normally you must link libc++ against a ABI shared library that the
 linker can find.  If you want to build and test libc++ against an ABI
-library not in the linker's path you needq to set
+library not in the linker's path you need to set
 ``-DLIBCXX_CXX_ABI_LIBRARY_PATH=/path/to/abi/lib`` when configuring CMake.
 
 An example build using libc++abi would look like:

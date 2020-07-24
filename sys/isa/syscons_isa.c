@@ -117,7 +117,6 @@ sc_softc_t
 	}
 	sc->unit = unit;
 	if ((sc->flags & SC_INIT_DONE) == 0) {
-		sc->keyboard = -1;
 		sc->adapter = -1;
 		sc->cursor_char = SC_CURSOR_CHAR;
 		sc->mouse_char = SC_MOUSE_CHAR;

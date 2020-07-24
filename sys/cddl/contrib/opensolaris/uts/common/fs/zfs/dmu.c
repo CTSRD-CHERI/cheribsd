@@ -1737,11 +1737,10 @@ dmu_read_pages(objset_t *os, uint64_t object, vm_page_t *ma, int count,
 #endif
 
 	vmobj = ma[0]->object;
-	zfs_vmobject_wlock(vmobj);
 
 	db = dbp[0];
 	for (i = 0; i < *rbehind; i++) {
-		m = vm_page_grab(vmobj, ma[0]->pindex - 1 - i,
+		m = vm_page_grab_unlocked(vmobj, ma[0]->pindex - 1 - i,
 		    VM_ALLOC_NORMAL | VM_ALLOC_NOWAIT |
 		    VM_ALLOC_SBUSY | VM_ALLOC_IGN_SBUSY);
 		if (m == NULL)
@@ -1752,7 +1751,7 @@ dmu_read_pages(objset_t *os, uint64_t object, vm_page_t *ma, int count,
 			break;
 		}
 		ASSERT(m->dirty == 0);
-		ASSERT(!pmap_page_is_mapped(m));
+		ASSERT(!pmap_page_is_write_mapped(m));
 
 		ASSERT(db->db_size > PAGE_SIZE);
 		bufoff = IDX_TO_OFF(m->pindex) % db->db_size;
@@ -1760,12 +1759,10 @@ dmu_read_pages(objset_t *os, uint64_t object, vm_page_t *ma, int count,
 		bcopy((char *)db->db_data + bufoff, va, PAGESIZE);
 		zfs_unmap_page(sf);
 		vm_page_valid(m);
-		vm_page_lock(m);
 		if ((m->busy_lock & VPB_BIT_WAITERS) != 0)
 			vm_page_activate(m);
 		else
 			vm_page_deactivate(m);
-		vm_page_unlock(m);
 		vm_page_sunbusy(m);
 	}
 	*rbehind = i;
@@ -1858,7 +1855,7 @@ dmu_read_pages(objset_t *os, uint64_t object, vm_page_t *ma, int count,
 	}
 
 	for (i = 0; i < *rahead; i++) {
-		m = vm_page_grab(vmobj, ma[count - 1]->pindex + 1 + i,
+		m = vm_page_grab_unlocked(vmobj, ma[count - 1]->pindex + 1 + i,
 		    VM_ALLOC_NORMAL | VM_ALLOC_NOWAIT |
 		    VM_ALLOC_SBUSY | VM_ALLOC_IGN_SBUSY);
 		if (m == NULL)
@@ -1869,7 +1866,7 @@ dmu_read_pages(objset_t *os, uint64_t object, vm_page_t *ma, int count,
 			break;
 		}
 		ASSERT(m->dirty == 0);
-		ASSERT(!pmap_page_is_mapped(m));
+		ASSERT(!pmap_page_is_write_mapped(m));
 
 		ASSERT(db->db_size > PAGE_SIZE);
 		bufoff = IDX_TO_OFF(m->pindex) % db->db_size;
@@ -1883,16 +1880,13 @@ dmu_read_pages(objset_t *os, uint64_t object, vm_page_t *ma, int count,
 		}
 		zfs_unmap_page(sf);
 		vm_page_valid(m);
-		vm_page_lock(m);
 		if ((m->busy_lock & VPB_BIT_WAITERS) != 0)
 			vm_page_activate(m);
 		else
 			vm_page_deactivate(m);
-		vm_page_unlock(m);
 		vm_page_sunbusy(m);
 	}
 	*rahead = i;
-	zfs_vmobject_wunlock(vmobj);
 
 	dmu_buf_rele_array(dbp, numbufs, FTAG);
 	return (0);

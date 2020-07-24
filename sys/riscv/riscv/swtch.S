@@ -151,7 +151,6 @@ ENTRY(fpe_state_save)
 	__fpe_state_save a0
 	ret
 END(fpe_state_save)
-#endif /* FPE */
 
 /*
  * void
@@ -205,6 +204,7 @@ ENTRY(fpe_state_clear)
 
 	ret
 END(fpe_state_clear)
+#endif /* FPE */
 	
 /*
  * void cpu_throw(struct thread *old __unused, struct thread *new)
@@ -222,6 +222,25 @@ ENTRY(cpu_throw)
 	ld	x13, TD_PCB(a0)
 	sd	x13, PC_CURPCB(tp)
 
+#if __has_feature(capabilities)
+	/* Load registers */
+	lc	cra, (PCB_RA)(x13)
+	lc	csp, (PCB_SP)(x13)
+
+	/* s[0-11] */
+	lc	cs0, (PCB_S + 0 * 16)(x13)
+	lc	cs1, (PCB_S + 1 * 16)(x13)
+	lc	cs2, (PCB_S + 2 * 16)(x13)
+	lc	cs3, (PCB_S + 3 * 16)(x13)
+	lc	cs4, (PCB_S + 4 * 16)(x13)
+	lc	cs5, (PCB_S + 5 * 16)(x13)
+	lc	cs6, (PCB_S + 6 * 16)(x13)
+	lc	cs7, (PCB_S + 7 * 16)(x13)
+	lc	cs8, (PCB_S + 8 * 16)(x13)
+	lc	cs9, (PCB_S + 9 * 16)(x13)
+	lc	cs10, (PCB_S + 10 * 16)(x13)
+	lc	cs11, (PCB_S + 11 * 16)(x13)
+#else
 	/* Load registers */
 	ld	ra, (PCB_RA)(x13)
 	ld	sp, (PCB_SP)(x13)
@@ -239,6 +258,7 @@ ENTRY(cpu_throw)
 	ld	s9, (PCB_S + 9 * 8)(x13)
 	ld	s10, (PCB_S + 10 * 8)(x13)
 	ld	s11, (PCB_S + 11 * 8)(x13)
+#endif
 
 #ifdef FPE
 	/* Is FPE enabled for new thread? */
@@ -274,6 +294,25 @@ ENTRY(cpu_switch)
 	/* Save the old context. */
 	ld	x13, TD_PCB(a0)
 
+#if __has_feature(capabilities)
+	/* Store ra, sp and the callee-saved registers */
+	sc	cra, (PCB_RA)(x13)
+	sc	csp, (PCB_SP)(x13)
+
+	/* s[0-11] */
+	sc	cs0, (PCB_S + 0 * 16)(x13)
+	sc	cs1, (PCB_S + 1 * 16)(x13)
+	sc	cs2, (PCB_S + 2 * 16)(x13)
+	sc	cs3, (PCB_S + 3 * 16)(x13)
+	sc	cs4, (PCB_S + 4 * 16)(x13)
+	sc	cs5, (PCB_S + 5 * 16)(x13)
+	sc	cs6, (PCB_S + 6 * 16)(x13)
+	sc	cs7, (PCB_S + 7 * 16)(x13)
+	sc	cs8, (PCB_S + 8 * 16)(x13)
+	sc	cs9, (PCB_S + 9 * 16)(x13)
+	sc	cs10, (PCB_S + 10 * 16)(x13)
+	sc	cs11, (PCB_S + 11 * 16)(x13)
+#else
 	/* Store ra, sp and the callee-saved registers */
 	sd	ra, (PCB_RA)(x13)
 	sd	sp, (PCB_SP)(x13)
@@ -291,6 +330,7 @@ ENTRY(cpu_switch)
 	sd	s9, (PCB_S + 9 * 8)(x13)
 	sd	s10, (PCB_S + 10 * 8)(x13)
 	sd	s11, (PCB_S + 11 * 8)(x13)
+#endif
 
 #ifdef FPE
 	/*
@@ -332,11 +372,51 @@ ENTRY(cpu_switch)
 	ld	t0, TD_LOCK(a1)
 	beq	t0, s2, 1b
 #endif
+
+#ifdef CPU_QEMU_RISCV
+	/*
+	 * Check if per-thread tracing is enabled, if so pause/resume
+	 * QEMU instruction tracing to reflect the new thread tracing
+	 * flag.
+	 */
+	lw	t0, _C_LABEL(qemu_trace_perthread)
+	beqz	t0, .Lout_qemu_tracing
+
+	lw	t0, TD_MDFLAGS(a1)
+	andi	t0, t0, MDTD_QTRACE
+	beqz	t0, .Ldisable_qemu_tracing
+.Lenable_qemu_tracing:
+	slti	x0, x0, 0x1b
+	j	.Lout_qemu_tracing
+.Ldisable_qemu_tracing:
+	slti	x0, x0, 0x1e
+.Lout_qemu_tracing:
+#endif
+
 	/*
 	 * Restore the saved context.
 	 */
 	ld	x13, TD_PCB(a1)
 
+#if __has_feature(capabilities)
+	/* Restore the registers */
+	lc	cra, (PCB_RA)(x13)
+	lc	csp, (PCB_SP)(x13)
+
+	/* s[0-11] */
+	lc	cs0, (PCB_S + 0 * 16)(x13)
+	lc	cs1, (PCB_S + 1 * 16)(x13)
+	lc	cs2, (PCB_S + 2 * 16)(x13)
+	lc	cs3, (PCB_S + 3 * 16)(x13)
+	lc	cs4, (PCB_S + 4 * 16)(x13)
+	lc	cs5, (PCB_S + 5 * 16)(x13)
+	lc	cs6, (PCB_S + 6 * 16)(x13)
+	lc	cs7, (PCB_S + 7 * 16)(x13)
+	lc	cs8, (PCB_S + 8 * 16)(x13)
+	lc	cs9, (PCB_S + 9 * 16)(x13)
+	lc	cs10, (PCB_S + 10 * 16)(x13)
+	lc	cs11, (PCB_S + 11 * 16)(x13)
+#else
 	/* Restore the registers */
 	ld	ra, (PCB_RA)(x13)
 	ld	sp, (PCB_SP)(x13)
@@ -354,6 +434,7 @@ ENTRY(cpu_switch)
 	ld	s9, (PCB_S + 9 * 8)(x13)
 	ld	s10, (PCB_S + 10 * 8)(x13)
 	ld	s11, (PCB_S + 11 * 8)(x13)
+#endif
 
 #ifdef FPE
 	/* Is FPE enabled for new thread? */
@@ -391,6 +472,89 @@ ENTRY(fork_trampoline)
 	and	t0, t0, t1
 	csrw	sstatus, t0
 
+#if __has_feature(capabilities)
+	/* Switch to capmode PCC. */
+	lla	t1, 1f
+	cspecialr ct0, pcc
+	csetaddr ct0, ct0, t1
+	li	t1, 1
+	csetflags ct0, ct0, t1
+	cjr	ct0
+.option push
+.option capmode
+1:
+	/*
+	 * Build a capability for 'csp' using 'sp' as an address
+	 * in the kernel DDC.
+	 *
+	 * XXX: Bounds?  Maybe could use TF_SIZE + 8 as length?
+	 * A purecap kernel would have proper bounds on csp already.
+	 */
+	cspecialr ct0, ddc
+	csetaddr ct0, ct0, sp
+	cmove	csp, ct0
+
+	/*
+	 * Switch to user DDC.  After this point, all stack accesses
+	 * must use 'csp' instead of 'sp'.
+	 */
+	clc	ct0, (TF_DDC)(csp)
+	cspecialw ddc, ct0
+
+	/* Restore exception program counter */
+	clc	ct0, (TF_SEPC)(csp)
+	cspecialw sepcc, ct0
+
+	/* Restore the registers */
+	clc	ct0, (TF_T + 0 * 16)(csp)
+	clc	ct1, (TF_T + 1 * 16)(csp)
+	clc	ct2, (TF_T + 2 * 16)(csp)
+	clc	ct3, (TF_T + 3 * 16)(csp)
+	clc	ct4, (TF_T + 4 * 16)(csp)
+	clc	ct5, (TF_T + 5 * 16)(csp)
+	clc	ct6, (TF_T + 6 * 16)(csp)
+
+	clc	cs0, (TF_S + 0 * 16)(csp)
+	clc	cs1, (TF_S + 1 * 16)(csp)
+	clc	cs2, (TF_S + 2 * 16)(csp)
+	clc	cs3, (TF_S + 3 * 16)(csp)
+	clc	cs4, (TF_S + 4 * 16)(csp)
+	clc	cs5, (TF_S + 5 * 16)(csp)
+	clc	cs6, (TF_S + 6 * 16)(csp)
+	clc	cs7, (TF_S + 7 * 16)(csp)
+	clc	cs8, (TF_S + 8 * 16)(csp)
+	clc	cs9, (TF_S + 9 * 16)(csp)
+	clc	cs10, (TF_S + 10 * 16)(csp)
+	clc	cs11, (TF_S + 11 * 16)(csp)
+
+	clc	ca0, (TF_A + 0 * 16)(csp)
+	clc	ca1, (TF_A + 1 * 16)(csp)
+	clc	ca2, (TF_A + 2 * 16)(csp)
+	clc	ca3, (TF_A + 3 * 16)(csp)
+	clc	ca4, (TF_A + 4 * 16)(csp)
+	clc	ca5, (TF_A + 5 * 16)(csp)
+	clc	ca6, (TF_A + 6 * 16)(csp)
+	clc	ca7, (TF_A + 7 * 16)(csp)
+
+	/* Load user ra and gp */
+	clc	cra, (TF_RA)(csp)
+	clc	cgp, (TF_GP)(csp)
+
+	/*
+	 * Store our pcpup on stack, we will load it back
+	 * on kernel mode trap.
+	 */
+	csc	ctp, (TF_SIZE)(csp)
+	clc	ctp, (TF_TP)(csp)
+
+	/* Save kernel stack so we can use it doing a user trap */
+	cincoffset csp, csp, TF_SIZE
+	cspecialw sscratchc, csp
+
+	/* Load user stack */
+	clc	csp, (TF_SP - TF_SIZE)(csp)
+.option pop
+#else
 	/* Restore exception program counter */
 	ld	t0, (TF_SEPC)(sp)
 	csrw	sepc, t0
@@ -443,11 +607,33 @@ ENTRY(fork_trampoline)
 
 	/* Load user stack */
 	ld	sp, (TF_SP - TF_SIZE)(sp)
+#endif
 
 	sret
 END(fork_trampoline)
 
 ENTRY(savectx)
+#if __has_feature(capabilities)
+	/* Store ra, sp and the callee-saved registers */
+	sc	cra, (PCB_RA)(a0)
+	sc	csp, (PCB_SP)(a0)
+	sc	ctp, (PCB_TP)(a0)
+	sc	cgp, (PCB_GP)(a0)
+
+	/* s[0-11] */
+	sc	cs0, (PCB_S + 0 * 16)(a0)
+	sc	cs1, (PCB_S + 1 * 16)(a0)
+	sc	cs2, (PCB_S + 2 * 16)(a0)
+	sc	cs3, (PCB_S + 3 * 16)(a0)
+	sc	cs4, (PCB_S + 4 * 16)(a0)
+	sc	cs5, (PCB_S + 5 * 16)(a0)
+	sc	cs6, (PCB_S + 6 * 16)(a0)
+	sc	cs7, (PCB_S + 7 * 16)(a0)
+	sc	cs8, (PCB_S + 8 * 16)(a0)
+	sc	cs9, (PCB_S + 9 * 16)(a0)
+	sc	cs10, (PCB_S + 10 * 16)(a0)
+	sc	cs11, (PCB_S + 11 * 16)(a0)
+#else
 	/* Store ra, sp and the callee-saved registers */
 	sd	ra, (PCB_RA)(a0)
 	sd	sp, (PCB_SP)(a0)
@@ -467,6 +653,7 @@ ENTRY(savectx)
 	sd	s9, (PCB_S + 9 * 8)(a0)
 	sd	s10, (PCB_S + 10 * 8)(a0)
 	sd	s11, (PCB_S + 11 * 8)(a0)
+#endif
 
 #ifdef FPE
 	__fpe_state_save a0

@@ -446,7 +446,7 @@
 #define	FREEBSD64_SYS_freebsd64_jail_get	506
 #define	FREEBSD64_SYS_freebsd64_jail_set	507
 #define	FREEBSD64_SYS_jail_remove	508
-#define	FREEBSD64_SYS_closefrom	509
+#define	FREEBSD64_SYS_freebsd12_closefrom	509
 #define	FREEBSD64_SYS_freebsd64___semctl	510
 #define	FREEBSD64_SYS_freebsd64_msgctl	511
 #define	FREEBSD64_SYS_freebsd64_shmctl	512
@@ -509,4 +509,7 @@
 #define	FREEBSD64_SYS_freebsd64___sysctlbyname	570
 #define	FREEBSD64_SYS_freebsd64_shm_open2	571
 #define	FREEBSD64_SYS_freebsd64_shm_rename	572
-#define	FREEBSD64_SYS_MAXSYSCALL	573
+#define	FREEBSD64_SYS_freebsd64_sigfastblock	573
+#define	FREEBSD64_SYS_freebsd64___realpathat	574
+#define	FREEBSD64_SYS_close_range	575
+#define	FREEBSD64_SYS_MAXSYSCALL	576

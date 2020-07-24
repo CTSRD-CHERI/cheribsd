@@ -91,8 +91,12 @@ enum arp_llinfo_state {
 };
 
 SYSCTL_DECL(_net_link_ether);
-static SYSCTL_NODE(_net_link_ether, PF_INET, inet, CTLFLAG_RW, 0, "");
-static SYSCTL_NODE(_net_link_ether, PF_ARP, arp, CTLFLAG_RW, 0, "");
+static SYSCTL_NODE(_net_link_ether, PF_INET, inet,
+    CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
+    "");
+static SYSCTL_NODE(_net_link_ether, PF_ARP, arp,
+    CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
+    "");
 
 /* timer values */
 VNET_DEFINE_STATIC(int, arpt_keep) = (20*60);	/* once resolved, good for 20
@@ -211,7 +215,7 @@ arptimer(void *arg)
 	LLE_WLOCK(lle);
 	if (callout_pending(&lle->lle_timer)) {
 		/*
-		 * Here we are a bit odd here in the treatment of 
+		 * Here we are a bit odd here in the treatment of
 		 * active/pending. If the pending bit is set, it got
 		 * rescheduled before I ran. The active
 		 * bit we ignore, since if it was stopped
@@ -709,7 +713,7 @@ arpintr(struct mbuf *m)
 		layer = "ethernet";
 		break;
 	case ARPHRD_INFINIBAND:
-		hlen = 20;	/* RFC 4391, INFINIBAND_ALEN */ 
+		hlen = 20;	/* RFC 4391, INFINIBAND_ALEN */
 		layer = "infiniband";
 		break;
 	case ARPHRD_IEEE1394:
@@ -1040,7 +1044,11 @@ reply:
 		(void)memcpy(ar_tha(ah), ar_sha(ah), ah->ar_hln);
 		(void)memcpy(ar_sha(ah), enaddr, ah->ar_hln);
 	} else {
-		struct llentry *lle = NULL;
+		/*
+		 * Destination address is not ours. Check if
+		 * proxyarp entry exists or proxyarp is turned on globally.
+		 */
+		struct llentry *lle;
 
 		sin.sin_addr = itaddr;
 		lle = lla_lookup(LLTABLE(ifp), 0, (struct sockaddr *)&sin);
@@ -1057,8 +1065,8 @@ reply:
 			if (!V_arp_proxyall)
 				goto drop;
 
-			/* XXX MRT use table 0 for arp reply  */
-			if (fib4_lookup_nh_basic(0, itaddr, 0, 0, &nh4) != 0)
+			if (fib4_lookup_nh_basic(ifp->if_fib, itaddr, 0, 0,
+			    &nh4) != 0)
 				goto drop;
 
 			/*
@@ -1079,8 +1087,8 @@ reply:
 			 * wrong network.
 			 */
 
-			/* XXX MRT use table 0 for arp checks */
-			if (fib4_lookup_nh_basic(0, isaddr, 0, 0, &nh4) != 0)
+			if (fib4_lookup_nh_basic(ifp->if_fib, isaddr, 0, 0,
+			    &nh4) != 0)
 				goto drop;
 			if (nh4.nh_ifp != ifp) {
 				ARP_LOG(LOG_INFO, "proxy: ignoring request"

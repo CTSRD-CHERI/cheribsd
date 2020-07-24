@@ -88,8 +88,7 @@ struct cfcs_softc {
  * handle physical addresses yet.  That would require mapping things in
  * order to do the copy.
  */
-#define	CFCS_BAD_CCB_FLAGS (CAM_DATA_ISPHYS | CAM_MSG_BUF_PHYS |	\
-	CAM_SNS_BUF_PHYS | CAM_CDB_PHYS | CAM_SENSE_PTR |		\
+#define	CFCS_BAD_CCB_FLAGS (CAM_DATA_ISPHYS | CAM_CDB_PHYS | CAM_SENSE_PTR |		\
 	CAM_SENSE_PHYS)
 
 static int cfcs_init(void);
@@ -109,8 +108,8 @@ struct cfcs_softc cfcs_softc;
  */
 static int cfcs_max_sense = sizeof(struct scsi_sense_data);
 
-SYSCTL_NODE(_kern_cam, OID_AUTO, ctl2cam, CTLFLAG_RD, 0,
-	    "CAM Target Layer SIM frontend");
+SYSCTL_NODE(_kern_cam, OID_AUTO, ctl2cam, CTLFLAG_RD | CTLFLAG_MPSAFE, 0,
+    "CAM Target Layer SIM frontend");
 SYSCTL_INT(_kern_cam_ctl2cam, OID_AUTO, max_sense, CTLFLAG_RW,
            &cfcs_max_sense, 0, "Maximum sense data size");
 
@@ -333,7 +332,7 @@ cfcs_datamove(union ctl_io *io)
 	case CAM_DATA_VADDR:
 		cam_sglist = &cam_sg_entry;
 		cam_sglist[0].ds_len = ccb->csio.dxfer_len;
-		cam_sglist[0].ds_addr = (bus_addr_t)(uintptr_t)ccb->csio.data_ptr;
+		cam_sglist[0].ds_vaddr = ccb->csio.data_ptr;
 		cam_sg_count = 1;
 		cam_sg_start = 0;
 		cam_sg_offset = io->scsiio.kern_rel_offset;
@@ -361,7 +360,7 @@ cfcs_datamove(union ctl_io *io)
 		len_to_copy = MIN(cam_sglist[i].ds_len - cam_watermark,
 				  ctl_sglist[j].len - ctl_watermark);
 
-		cam_ptr = (uint8_t *)(uintptr_t)cam_sglist[i].ds_addr;
+		cam_ptr = cam_sglist[i].ds_vaddr;
 		cam_ptr = cam_ptr + cam_watermark;
 		if (io->io_hdr.flags & CTL_FLAG_BUS_ADDR) {
 			/*

@@ -31,10 +31,8 @@
 
 #include <sys/cdefs.h>
 
-#ifndef LIST_ONLY
 #if !__has_feature(capabilities)
 #error "This code requires a CHERI-aware compiler"
-#endif
 #endif
 
 #include <sys/param.h>
@@ -45,12 +43,12 @@
 #include <sys/ucontext.h>
 #include <sys/wait.h>
 
-#ifndef LIST_ONLY
 #include <cheri/cheri.h>
 #include <cheri/cheric.h>
 
-#include <machine/cherireg.h>
+#ifdef __mips__
 #include <machine/cpuregs.h>
+#endif
 #include <machine/frame.h>
 #include <machine/trap.h>
 
@@ -61,7 +59,6 @@
 #endif
 
 #include <machine/sysarch.h>
-#endif
 
 #include <assert.h>
 #ifdef CHERI_LIBCHERI_TESTS
@@ -86,9 +83,6 @@
 
 #include "cheritest.h"
 #include "cheritest.h"
-#ifdef LIST_ONLY
-#include "cheritest_list_only.h"
-#endif
 
 #ifndef SIGPROT
 #define	SIGPROT				0
@@ -128,14 +122,17 @@ static const struct cheri_test cheri_tests[] = {
 	  .ct_xfail_reason = "CHERI_PERM_CHERIABI_VMMAP "
 	    "unnecessarily set in stack capability" },
 #endif
+#ifdef __mips__
 	{ .ct_name = "test_initregs_idc",
 	  .ct_desc = "Test initial value of invoked data capability",
 	  .ct_func = test_initregs_idc },
+#endif
 
 	{ .ct_name = "test_initregs_pcc",
 	  .ct_desc = "Test initial value of program-counter capability",
 	  .ct_func = test_initregs_pcc },
 
+#ifdef __mips__
 	{ .ct_name = "test_copyregs",
 	  .ct_desc = "Exercise CP2 register assignments",
 	  .ct_func = test_copyregs },
@@ -144,11 +141,13 @@ static const struct cheri_test cheri_tests[] = {
 	  .ct_desc = "Print out a list of CP2 registers and values",
 	  .ct_func = test_listregs,
 	  .ct_flags = CT_FLAG_STDOUT_IGNORE },
+#endif
 
 	/*
 	 * Capability manipulation and use tests that sometimes generate
 	 * signals.
 	 */
+#ifdef __mips__
 	{ .ct_name = "test_fault_cgetcause",
 	  .ct_desc = "Ensure CGetCause is unavailable in userspace",
 	  .ct_func = test_fault_cgetcause,
@@ -182,11 +181,13 @@ static const struct cheri_test cheri_tests[] = {
 	  .ct_si_code = PROT_CHERI_PERM,
 	  .ct_mips_exccode = T_C2E,
 	  .ct_cp2_exccode = CHERI_EXCCODE_PERM_LOAD },
+#endif
 
 	{ .ct_name = "test_nofault_perm_load",
 	  .ct_desc = "Exercise capability load permission success",
 	  .ct_func = test_nofault_perm_load },
 
+#ifdef __mips__
 	{ .ct_name = "test_fault_perm_seal",
 	  .ct_desc = "Exercise capability seal permission failure",
 	  .ct_func = test_fault_perm_seal,
@@ -206,11 +207,13 @@ static const struct cheri_test cheri_tests[] = {
 	  .ct_si_code = PROT_CHERI_PERM,
 	  .ct_mips_exccode = T_C2E,
 	  .ct_cp2_exccode = CHERI_EXCCODE_PERM_STORE },
+#endif
 
 	{ .ct_name = "test_nofault_perm_store",
 	  .ct_desc = "Exercise capability store permission success",
 	  .ct_func = test_nofault_perm_store },
 
+#ifdef __mips__
 	{ .ct_name = "test_fault_perm_unseal",
 	  .ct_desc = "Exercise capability unseal permission failure",
 	  .ct_func = test_fault_perm_unseal,
@@ -294,10 +297,12 @@ static const struct cheri_test cheri_tests[] = {
 	  .ct_si_code = PROT_CHERI_SYSREG,
 	  .ct_mips_exccode = T_C2E,
 	  .ct_cp2_exccode = CHERI_EXCCODE_SYSTEM_REGS },
+#endif
 
 	/*
 	 * Tests on the kernel-provided sealing capability (sealcap).
 	 */
+#ifdef CHERI_GET_SEALCAP
 	{ .ct_name = "test_sealcap_sysarch",
 	  .ct_desc = "Retrieve sealcap using sysarch(2)",
 	  .ct_func = test_sealcap_sysarch, },
@@ -309,6 +314,7 @@ static const struct cheri_test cheri_tests[] = {
 	{ .ct_name = "test_sealcap_seal_unseal",
 	  .ct_desc = "Use sealcap to seal and unseal a capability",
 	  .ct_func = test_sealcap_seal_unseal, },
+#endif
 
 	/*
 	 * Test bounds on globals in the same file they are allocated in.
@@ -1007,6 +1013,7 @@ static const struct cheri_test cheri_tests[] = {
 	  .ct_desc = "check tags are stored for /dev/zero MAP_PRIVATE pages",
 	  .ct_func = cheritest_vm_tag_dev_zero_private, },
 
+#ifdef __mips__
 	/* XXXRW: I wonder if we also need some sort of load-related test? */
 	{ .ct_name = "cheritest_vm_notag_tmpfile_shared",
 	  .ct_desc = "check tags are not stored for tmpfile() MAP_SHARED pages",
@@ -1018,6 +1025,7 @@ static const struct cheri_test cheri_tests[] = {
 	  .ct_mips_exccode = T_C2E,
 	  .ct_cp2_exccode = CHERI_EXCCODE_TLBSTORE,
 	  .ct_check_xfail = xfail_need_writable_non_tmpfs_tmp, },
+#endif
 
 	{ .ct_name = "cheritest_vm_tag_tmpfile_private",
 	  .ct_desc = "check tags are stored for tmpfile() MAP_PRIVATE pages",
@@ -1632,29 +1640,29 @@ static const struct cheri_test cheri_tests[] = {
 	{ .ct_name = "test_string_memcpy",
 	  .ct_desc = "Test implicit capability memcpy",
 	  .ct_func = test_string_memcpy },
+#ifdef __mips__
 	{ .ct_name = "test_string_memcpy_c",
 	  .ct_desc = "Test explicit capability memcpy",
 	  .ct_func = test_string_memcpy_c },
+#endif
 	{ .ct_name = "test_string_memmove",
 	  .ct_desc = "Test implicit capability memmove",
 	  .ct_func = test_string_memmove },
+#ifdef __mips__
 	{ .ct_name = "test_string_memmove_c",
 	  .ct_desc = "Test explicit capability memmove",
 	  .ct_func = test_string_memmove_c },
+#endif
 
 	/* Unaligned memcpy/memmove with capabilities */
 	{ .ct_name = "test_unaligned_capability_copy_memcpy",
 	  .ct_desc = "Check that a memcpy() of valid capabilities to an "
-		     "unaligned destination fails",
-	  .ct_func = test_unaligned_capability_copy_memcpy,
-	  .ct_flags = CT_FLAG_SIGEXIT,
-	  .ct_signum = SIGABRT },
+		     "unaligned destination strips tags",
+	  .ct_func = test_unaligned_capability_copy_memcpy },
 	{ .ct_name = "test_unaligned_capability_copy_memmove",
 	  .ct_desc = "Check that a memmove() of valid capabilities to an "
-		     "unaligned destination fails",
-	  .ct_func = test_unaligned_capability_copy_memmove,
-	  .ct_flags = CT_FLAG_SIGEXIT,
-	  .ct_signum = SIGABRT },
+		     "unaligned destination strips tags",
+	  .ct_func = test_unaligned_capability_copy_memmove },
 
 	/*
 	 * Thread-Local Storage (TLS) tests.
@@ -1699,17 +1707,27 @@ static const struct cheri_test cheri_tests[] = {
 	 * CheriABI specific tests.
 	 */
 #ifdef CHERIABI_TESTS
+#ifdef CHERI_MMAP_SETBOUNDS
 	{ .ct_name = "test_cheriabi_mmap_nospace",
 	  .ct_desc = "Test CheriABI mmap() with no space in default capability",
 	  .ct_func = test_cheriabi_mmap_nospace },
+#endif
 
+#ifdef CHERI_MMAP_GETPERM
 	{ .ct_name = "test_cheriabi_mmap_perms",
 	  .ct_desc = "Test CheriABI mmap() permissions",
 	  .ct_func = test_cheriabi_mmap_perms },
+#endif
 
+#ifdef CHERI_BASELEN_BITS
 	{ .ct_name = "test_cheriabi_mmap_unrepresentable",
 	  .ct_desc = "Test CheriABI mmap() with unrepresentable lengths",
 	  .ct_func = test_cheriabi_mmap_unrepresentable },
+#endif
+
+	{ .ct_name = "test_cheriabi_malloc_zero_size",
+	  .ct_desc = "Check that zero-sized mallocs are properly bounded",
+	  .ct_func = test_cheriabi_malloc_zero_size },
 
 	/*
 	 * Tests for pathname handling in open(2).
@@ -1750,9 +1768,11 @@ static const struct cheri_test cheri_tests[] = {
 	  .ct_desc = "Path with CHERI_PERM_LOAD permission missing",
 	  .ct_func = test_cheriabi_open_bad_perm, },
 
+#ifdef CHERI_GET_SEALCAP
 	{ .ct_name = "test_cheriabi_open_sealed",
 	  .ct_desc = "Sealed path",
 	  .ct_func = test_cheriabi_open_sealed, },
+#endif
 #endif
 #ifdef CHERI_C_TESTS
 #define	DECLARE_TEST(name, desc)			\
@@ -1768,6 +1788,7 @@ static const u_int cheri_tests_len = sizeof(cheri_tests) /
 	    sizeof(cheri_tests[0]);
 static StringList* cheri_failed_tests;
 static StringList* cheri_xfailed_tests;
+static StringList* cheri_xpassed_tests;
 
 /* Shared memory page with child process. */
 struct cheritest_child_state *ccsp;
@@ -1792,23 +1813,20 @@ usage(void)
 	fprintf(stderr,
 "usage:\n"
 "    cheritest [options] -l               -- List tests\n"
-#ifndef LIST_ONLY
 "    cheritest [options] -a               -- Run all tests\n"
 "    cheritest [options] <test> [...]     -- Run specified tests\n"
 "    cheritest [options] -g <glob> [...]  -- Run matching tests\n"
-#endif
 "\n"
 "options:\n"
 "    -f  -- Only include \"fast\" tests\n"
-#ifndef LIST_ONLY
 "    -c  -- Enable core dumps\n"
 "    -d  -- Attach debugger before running test\n"
 "    -s  -- Sleep one second after each test\n"
 "    -q  -- Enable qemu tracing in test process\n"
 "    -Q  -- Enable qemu tracing in test process (user-mode only)\n"
-#endif
 "    -u  -- Only include unsandboxed tests\n"
 "    -v  -- Increase verbosity\n"
+"    -x  -- Output JUnit XML format\n"
 	     );
 	exit(EX_USAGE);
 }
@@ -1820,7 +1838,7 @@ list_tests(void)
 	const char *xfail_reason;
 
 	xo_open_container("testsuite");
-	xo_open_list("test");
+	xo_open_list("testcase");
 	for (i = 0; i < cheri_tests_len; i++) {
 		if (fast_tests_only &&
 		    (cheri_tests[i].ct_flags & CT_FLAG_SLOW))
@@ -1828,7 +1846,7 @@ list_tests(void)
 		if (unsandboxed_tests_only &&
 		    (cheri_tests[i].ct_flags & CT_FLAG_SANDBOX))
 			continue;
-		xo_open_instance("test");
+		xo_open_instance("testcase");
 		if (verbose)
 			xo_emit("{cw:name/%s}{:description/%s}",
 			    cheri_tests[i].ct_name,
@@ -1848,20 +1866,21 @@ list_tests(void)
 		if (cheri_tests[i].ct_flags & CT_FLAG_SLOW)
 			xo_emit("{e:timeout/%s}", "LONG");
 		xo_emit("\n");
-		xo_close_instance("test");
+		xo_close_instance("testcase");
 	}
-	xo_close_list("test");
+	xo_close_list("testcase");
 	xo_close_container("testsuite");
 	xo_finish();
 
 	exit(EX_OK);
 }
 
-#ifndef LIST_ONLY
 static void
 signal_handler(int signum, siginfo_t *info, void *vuap)
 {
+#ifdef __mips__
 	struct cheri_frame *cfp;
+#endif
 	ucontext_t *uap;
 #ifdef CHERI_LIBCHERI_TESTS
 	u_int numframes;
@@ -1869,6 +1888,7 @@ signal_handler(int signum, siginfo_t *info, void *vuap)
 #endif
 
 	uap = (ucontext_t *)vuap;
+#ifdef __mips__
 	if (uap->uc_mcontext.mc_regs[0] != /* UCONTEXT_MAGIC */ 0xACEDBADE) {
 		ccsp->ccs_signum = -1;
 		fprintf(stderr, "%s: missing UCONTEXT_MAGIC\n", __func__);
@@ -1885,10 +1905,13 @@ signal_handler(int signum, siginfo_t *info, void *vuap)
 		ccsp->ccs_signum = -1;
 		_exit(EX_OSERR);
 	}
+#endif	/* __mips__ */
 	ccsp->ccs_signum = signum;
 	ccsp->ccs_si_code = info->si_code;
+#ifdef __mips__
 	ccsp->ccs_mips_cause = uap->uc_mcontext.cause;
 	ccsp->ccs_cp2_cause = cfp->cf_capcause;
+#endif
 
 #ifdef CHERI_LIBCHERI_TESTS
 	/*
@@ -1948,6 +1971,7 @@ signal_handler_clear(int sig)
 static inline void
 set_thread_tracing(void)
 {
+#ifdef CHERI_START_TRACE
 	int error, intval;
 
 	intval = 1;
@@ -1960,7 +1984,10 @@ set_thread_tracing(void)
 	 */
 	CHERI_START_TRACE;
 	if (qtrace_user_mode_only)
-		__asm__ __volatile__("li $0, 0xdeaf");
+		CHERI_START_USER_TRACE;
+#else
+	err(EX_OSERR, "%s", __func__);
+#endif
 }
 
 /* Maximum size of stdout data we will check if called for by a test. */
@@ -1977,21 +2004,24 @@ cheritest_run_test(const struct cheri_test *ctp)
 	char buffer[TEST_BUFFER_LEN];
 	const char *xfail_reason;
 	char* failure_message;
+#ifdef __mips__
 	register_t cp2_exccode, mips_exccode;
+#endif
 	ssize_t len;
-
-	xo_open_instance("test");
+	xo_attr("classname", "%s", ctp->ct_name);
+	xo_attr("name", "%s", ctp->ct_desc);
+	xo_open_instance("testcase");
 	bzero(ccsp, sizeof(*ccsp));
-	xo_emit("TEST: {:name/%s}: {:description/%s}\n",
-	   ctp->ct_name, ctp->ct_desc);
+	xo_emit("TEST: {d:name/%s}: {d:description/%s}\n", ctp->ct_name,
+		    ctp->ct_desc);
+	reason[0] = '\0';
+	visreason[0] = '\0';
 
 	if (ctp->ct_check_xfail != NULL)
 		xfail_reason = ctp->ct_check_xfail(ctp->ct_name);
 	else
 		xfail_reason = ctp->ct_xfail_reason;
 	if (xfail_reason != NULL) {
-		xo_emit("{e:expected-failure-reason/%s}",
-		    xfail_reason);
 		expected_failures++;
 	}
 
@@ -2162,6 +2192,7 @@ cheritest_run_test(const struct cheri_test *ctp)
 		    "unwind");
 		goto fail;
 	}
+#ifdef __mips__
 	if (ctp->ct_flags & CT_FLAG_MIPS_EXCCODE) {
 		mips_exccode = (ccsp->ccs_mips_cause & MIPS_CR_EXC_CODE) >>
 		    MIPS_CR_EXC_CODE_SHIFT;
@@ -2183,6 +2214,7 @@ cheritest_run_test(const struct cheri_test *ctp)
 			goto fail;
 		}
 	}
+#endif
 
 	/*
 	 * Next, we are concerned with whether the test itself reports a
@@ -2222,18 +2254,18 @@ cheritest_run_test(const struct cheri_test *ctp)
 	 */
 	len = read(pipefd_stdout[0], buffer, sizeof(buffer) - 1);
 	if (len < 0) {
-		xo_attr("error", strerror(errno));
-		xo_emit("{e:stdout/%s}", "");
+		xo_attr("message", "%s", strerror(errno));
+		xo_attr("type", "%d", errno);
+		xo_emit("{e:error/%s}", "read() failed");
 	} else {
 		buffer[len] = '\0';
 		if (len > 0) {
 			if (ctp->ct_flags & CT_FLAG_STDOUT_IGNORE)
 				xo_attr("ignored", "true");
-			xo_emit("{e:stdout/%s}", buffer);
+			xo_emit("{e:system-out/%s}", buffer);
 		}
 	}
 	if (ctp->ct_flags & CT_FLAG_STDOUT_STRING) {
-		xo_emit("{e:expected-stdout/%s}", ctp->ct_stdout_string);
 		if (len < 0) {
 			snprintf(reason, sizeof(reason),
 			    "read() on test stdout failed with -1 (%d)",
@@ -2267,18 +2299,20 @@ cheritest_run_test(const struct cheri_test *ctp)
 	}
 
 pass:
-	if (xfail_reason == NULL)
-		xo_emit("{:status/%s}: {d:name/%s}\n", "PASS", ctp->ct_name);
-	else {
-		xo_attr("expected", "false");
-		xo_emit("{:status/%s}: {d:name/%s} (Expected failure due to "
-		    "{d:expected-failure-reason/%s})\n",
-		    "PASS", ctp->ct_name, xfail_reason);
+	if (xfail_reason != NULL) {
+		// Passed but we expected failure:
+		xo_emit("XPASS: {d:name/%s} (Expected failure due to "
+			"{d:reason/%s}) {e:failure/XPASS: %s}\n", ctp->ct_name,
+		    xfail_reason, xfail_reason);
+		asprintf(&failure_message, "%s: %s", ctp->ct_name, xfail_reason);
+		sl_add(cheri_xpassed_tests, failure_message);
+	} else {
+		xo_emit("{d:status/%s}: {d:name/%s}\n", "PASS", ctp->ct_name);
 	}
 	tests_passed++;
 	close(pipefd_stdin[1]);
 	close(pipefd_stdout[0]);
-	xo_close_instance("test");
+	xo_close_instance("testcase");
 	xo_flush();
 	return;
 
@@ -2289,19 +2323,24 @@ fail:
 	strnvis(visreason, sizeof(visreason), reason, VIS_TAB);
 	asprintf(&failure_message, "%s: %s", ctp->ct_name, visreason);
 	if (xfail_reason == NULL) {
-		xo_emit("{:status/%s}: {d:name/%s}: {:failure-reason/%s}\n",
-		    "FAIL", ctp->ct_name, visreason);
+		xo_emit("FAIL: {d:name/%s}: {:failure/%s}\n",
+		    ctp->ct_name, visreason);
 		sl_add(cheri_failed_tests, failure_message);
 	} else {
-		xo_attr("expected", "true");
-		xo_emit("{d:/%s}{:status/%s}: {d:name/%s}: "
-		    "{:failure-reason/%s} ({d:expected-failure-reason/%s})\n",
-		    "X", "FAIL", ctp->ct_name, visreason, xfail_reason);
+		if (xo_get_style(NULL) == XO_STYLE_XML) {
+			xo_attr("message", "%s", xfail_reason);
+			xo_emit("{e:skipped/%s}", "");
+		} else {
+			xo_emit(
+			    "{d:status/%s}: {d:name/%s}: "
+			    "{:failure-reason/%s} ({d:expected-failure-reason/%s})\n",
+			    "XFAIL", ctp->ct_name, visreason, xfail_reason);
+		}
 		tests_xfailed++;
 		sl_add(cheri_xfailed_tests, failure_message);
 	}
 	tests_failed++;
-	xo_close_instance("test");
+	xo_close_instance("testcase");
 	xo_flush();
 	close(pipefd_stdin[1]);
 	close(pipefd_stdout[0]);
@@ -2332,7 +2371,6 @@ cheritest_memmove(void *dst, const void *src, size_t n)
 {
 	return memmove(dst, src, n);
 }
-#endif /* !LIST_ONLY */
 
 int
 main(int argc, char *argv[])
@@ -2340,18 +2378,16 @@ main(int argc, char *argv[])
 	struct rlimit rl;
 	int opt;
 	int glob = 0;
-#ifndef LIST_ONLY
 	stack_t stack;
 	int i;
 	u_int t;
-#endif
 	uint qemu_trace_perthread;
 	size_t len;
 
 	argc = xo_parse_args(argc, argv);
 	if (argc < 0)
 		errx(1, "xo_parse_args failed\n");
-	while ((opt = getopt(argc, argv, "acdfglQqsuv")) != -1) {
+	while ((opt = getopt(argc, argv, "acdfglQqsuvx")) != -1) {
 		switch (opt) {
 		case 'a':
 			run_all = 1;
@@ -2395,6 +2431,11 @@ main(int argc, char *argv[])
 		case 'v':
 			verbose++;
 			break;
+		case 'x': /* JUnit XML output */
+			/* XXX: allow an argument to specify output file? */
+			xo_set_style(NULL, XO_STYLE_XML);
+			xo_set_flags(NULL, XOF_PRETTY);
+			break;
 		default:
 			warnx("unknown argument %c\n", opt);
 			usage();
@@ -2417,10 +2458,6 @@ main(int argc, char *argv[])
 		warnx("-l and a list of tests are incompatible");
 		usage();
 	}
-#ifdef LIST_ONLY
-	else
-		usage();
-#else /* LIST_ONLY */
 	if (argc == 0 && !run_all)
 		usage();
 	if (argc > 0 && run_all) {
@@ -2479,6 +2516,7 @@ main(int argc, char *argv[])
 
 	cheri_failed_tests = sl_init();
 	cheri_xfailed_tests = sl_init();
+	cheri_xpassed_tests = sl_init();
 	/* Run the actual tests. */
 #ifdef CHERI_LIBCHERI_TESTS
 #if 0
@@ -2489,6 +2527,8 @@ main(int argc, char *argv[])
 			err(EX_SOFTWARE, "cheritest_libcheri_setup");
 	}
 #endif
+	xo_open_container("testsuites");
+	xo_attr("name", "%s", "cheritest");
 	xo_open_container("testsuite");
 	xo_open_list("test");
 	if (run_all) {
@@ -2533,38 +2573,44 @@ main(int argc, char *argv[])
 	}
 	xo_close_list("test");
 	xo_close_container("testsuite");
-	xo_finish();
+	xo_close_container("testsuites");
 
 	/* print a summary which tests failed */
-	/* XXXAR: use xo_emit? */
-	if (tests_xfailed > 0) {
-		fprintf(stderr, "Expected failures:\n");
+	if (cheri_xfailed_tests->sl_cur != 0) {
+		xo_emit("Expected failures:\n");
 		for (i = 0; (size_t)i < cheri_xfailed_tests->sl_cur; i++)
-			fprintf(stderr, "  %s\n",
-			    cheri_xfailed_tests->sl_str[i]);
-		sl_free(cheri_xfailed_tests, true);
+			xo_emit("  {d:%s}\n", cheri_xfailed_tests->sl_str[i]);
 	}
-	if (tests_failed > tests_xfailed) {
-		fprintf(stderr, "Unexpected failures:\n");
+	if (cheri_failed_tests->sl_cur != 0) {
+		xo_emit("Unexpected failures:\n");
 		for (i = 0; (size_t)i < cheri_failed_tests->sl_cur; i++)
-			fprintf(stderr, "  %s\n",
-			    cheri_failed_tests->sl_str[i]);
-		sl_free(cheri_failed_tests, true);
+			xo_emit("  {d:%s}\n", cheri_failed_tests->sl_str[i]);
 	}
+	if (cheri_xpassed_tests->sl_cur != 0) {
+		xo_emit("Unexpected passes:\n");
+		for (i = 0; (size_t)i < cheri_xpassed_tests->sl_cur; i++)
+			xo_emit("  {d:%s}\n", cheri_xpassed_tests->sl_str[i]);
+	}
+	sl_free(cheri_failed_tests, true);
+	sl_free(cheri_xfailed_tests, true);
+	sl_free(cheri_xpassed_tests, true);
 	if (tests_passed + tests_failed > 1) {
-		if (expected_failures == 0)
-			fprintf(stderr, "SUMMARY: passed %d failed %d\n",
+		if (expected_failures == 0 && tests_xfailed == 0)
+			xo_emit("SUMMARY: passed {d:/%d} failed {d:/%d}\n",
 			    tests_passed, tests_failed);
 		else if (expected_failures == tests_xfailed)
-			fprintf(stderr, "SUMMARY: passed %d failed %d "
-			    "(%d expected)\n",
+			xo_emit("SUMMARY: passed {d:/%d} failed {d:/%d} "
+			    "({d:/%d} expected {Np:failure,failures})\n",
 			    tests_passed, tests_failed, expected_failures);
 		else
-			fprintf(stderr, "SUMMARY: passed %d failed %d "
-			    "(%d expected) (%d unexpected passes)\n",
+			xo_emit("SUMMARY: passed {d:/%d} failed {d:/%d} "
+			    "({d:/%d} expected {Np:failure,failures}) "
+			    "({d:/%d} unexpected {Np:pass,passes})\n",
 			    tests_passed, tests_failed, tests_xfailed,
 			    expected_failures - tests_xfailed);
 	}
+	xo_finish();
+
 
 #ifdef CHERI_LIBCHERI_TESTS
 	if (!unsandboxed_tests_only)
@@ -2573,5 +2619,4 @@ main(int argc, char *argv[])
 	if (tests_failed > tests_xfailed)
 		exit(-1);
 	exit(EX_OK);
-#endif /* !LIST_ONLY */
 }

@@ -35,7 +35,6 @@
 #include <cheri/cheri.h>
 #include <cheri/cheric.h>
 
-#include <machine/cherireg.h>
 #include <machine/pcb.h>
 #include <machine/proc.h>
 #include <machine/vmparam.h>
@@ -93,7 +92,7 @@ hybridabi_capability_set_user_entry(void * __capability *cp,
 {
 
 	/*
-	 * Set the jump target regigster for the pure capability calling
+	 * Set the jump target register for the pure capability calling
 	 * convention.
 	 */
 	*cp = cheri_capability_build_user_code(CHERI_CAP_USER_CODE_PERMS,
@@ -117,9 +116,9 @@ hybridabi_thread_init(struct thread *td, unsigned long entry_addr)
 	 * the future.
 	 */
 	frame = &td->td_pcb->pcb_regs;
-	KASSERT(*(uint64_t *)&frame->ddc == 0, ("%s: non-zero initial $ddc",
+	KASSERT(frame->ddc == 0, ("%s: non-zero initial $ddc",
 	    __func__));
-	KASSERT(*(uint64_t *)&frame->pcc == 0, ("%s: non-zero initial $epcc",
+	KASSERT(frame->pc == 0, ("%s: non-zero initial $epcc",
 	    __func__));
 
 	/*
@@ -131,7 +130,7 @@ hybridabi_thread_init(struct thread *td, unsigned long entry_addr)
 	hybridabi_capability_set_user_ddc(&frame->ddc);
 	hybridabi_capability_set_user_csp(&frame->csp);
 	hybridabi_capability_set_user_idc(&frame->idc);
-	hybridabi_capability_set_user_entry(&frame->pcc, entry_addr);
+	hybridabi_capability_set_user_entry((void * __capability *)&frame->pc, entry_addr);
 	hybridabi_capability_set_user_entry(&frame->c12, entry_addr);
 
 	/*
@@ -147,8 +146,7 @@ hybridabi_thread_init(struct thread *td, unsigned long entry_addr)
 	hybridabi_capability_set_user_csp(&csigp->csig_default_stack);
 	hybridabi_capability_set_user_idc(&csigp->csig_idc);
 	hybridabi_capability_set_user_pcc(&csigp->csig_pcc);
-	cheri_capability_set_user_sigcode(&csigp->csig_sigcode,
-	    td->td_proc->p_sysent);
+	csigp->csig_sigcode = cheri_sigcode_capability(td);
 
         /*
          * Set up root for the userspace object-type sealing capability tree.

@@ -121,12 +121,16 @@ gctl_error(struct gctl_req *req, const char *fmt, ...)
  * XXX: this should really be a standard function in the kernel.
  */
 static void *
-geom_alloc_copyin(struct gctl_req *req, void *uaddr, size_t len)
+geom_alloc_copyin(struct gctl_req *req, void * __capability uaddr, size_t len,
+    bool preserve_tags)
 {
 	void *ptr;
 
 	ptr = g_malloc(len, M_WAITOK);
-	req->nerror = copyin(uaddr, ptr, len);
+	if (preserve_tags)
+		req->nerror = copyincap(uaddr, ptr, len);
+	else
+		req->nerror = copyin(uaddr, ptr, len);
 	if (!req->nerror)
 		return (ptr);
 	g_free(ptr);
@@ -146,7 +150,8 @@ gctl_copyin(struct gctl_req *req)
 		return;
 	}
 
-	ap = geom_alloc_copyin(req, req->arg, req->narg * sizeof(*ap));
+	ap = geom_alloc_copyin(req, req->user_arg, req->narg * sizeof(*ap),
+	    true);
 	if (ap == NULL) {
 		gctl_error(req, "bad control request");
 		req->arg = NULL;
@@ -166,7 +171,7 @@ gctl_copyin(struct gctl_req *req)
 			    "wrong param name length %d: %d", i, ap[i].nlen);
 			break;
 		}
-		p = geom_alloc_copyin(req, ap[i].name, ap[i].nlen);
+		p = geom_alloc_copyin(req, ap[i].user_name, ap[i].nlen, false);
 		if (p == NULL)
 			break;
 		if (p[ap[i].nlen - 1] != '\0') {
@@ -180,7 +185,8 @@ gctl_copyin(struct gctl_req *req)
 			gctl_error(req, "negative param length");
 			break;
 		}
-		p = geom_alloc_copyin(req, ap[i].value, ap[i].len);
+		p = geom_alloc_copyin(req, ap[i].value, ap[i].len,
+		    (ap[i].flag & GCTL_PARAM_ASCII) == 0);
 		if (p == NULL)
 			break;
 		if ((ap[i].flag & GCTL_PARAM_ASCII) &&
@@ -254,7 +260,8 @@ gctl_dump(struct gctl_req *req)
 	for (i = 0; i < req->narg; i++) {
 		ap = &req->arg[i];
 		if (!(ap->flag & GCTL_PARAM_NAMEKERNEL))
-			printf("  param:\t%d@%p", ap->nlen, ap->name);
+			printf("  param:\t%d@%p", ap->nlen,
+			    (void *)(__cheri_addr uintptr_t)ap->user_name);
 		else
 			printf("  param:\t\"%s\"", ap->name);
 		printf(" [%s%s%d] = ",
@@ -262,7 +269,7 @@ gctl_dump(struct gctl_req *req)
 		    ap->flag & GCTL_PARAM_WR ? "W" : "",
 		    ap->len);
 		if (!(ap->flag & GCTL_PARAM_VALUEKERNEL)) {
-			printf(" =@ %p", ap->value);
+			printf(" =@ %p", (void *)(__cheri_addr uintptr_t)ap->value);
 		} else if (ap->flag & GCTL_PARAM_ASCII) {
 			printf("\"%s\"", (char *)ap->kvalue);
 		} else if (ap->len > 0) {
@@ -483,8 +490,7 @@ g_ctl_ioctl_ctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag, struct th
 	/* It is an error if we cannot return an error text */
 	if (req->lerror < 2)
 		return (EINVAL);
-	if (!useracc(__USER_CAP(req->error, req->lerror), req->lerror,
-	    VM_PROT_WRITE))
+	if (!useracc(req->error, req->lerror, VM_PROT_WRITE))
 		return (EINVAL);
 
 	req->serror = sbuf_new_auto();

@@ -7,6 +7,9 @@ __BSD_PROG_MK=yes
 .include <bsd.cheri.mk>
 .include <bsd.compiler.mk>
 .include <bsd.linker.mk>
+.if defined(_CRUNCHGEN)
+.include <bsd.compat.mk>
+.endif
 
 .SUFFIXES: .out .o .bc .c .cc .cpp .cxx .C .m .y .l .ll .ln .s .S .asm
 
@@ -67,6 +70,10 @@ LDFLAGS+=	-Wl,--no-fatal-warnings
 .else
 LDFLAGS+=	-Wl,--fatal-warnings
 .endif
+.endif
+
+.if ${MACHINE_CPUARCH} == "riscv" && ${LINKER_FEATURES:Mriscv-relaxations} == ""
+CFLAGS += -mno-relax
 .endif
 
 .if defined(CRUNCH_CFLAGS)
@@ -221,7 +228,7 @@ ${PROGNAME}.debug: ${PROG_FULL}
 
 .if ${PROG_INSTALL} != ${PROG}
 ${PROG_INSTALL}: ${PROG}
-	${STRIPBIN:Ustrip} -o ${.TARGET} ${STRIP_FLAGS} ${PROG}
+	${STRIPBIN} -o ${.TARGET} ${STRIP_FLAGS} ${PROG}
 .endif
 
 .if defined(LLVM_LINK)

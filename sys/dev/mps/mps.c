@@ -110,7 +110,8 @@ static int mps_debug_sysctl(SYSCTL_HANDLER_ARGS);
 static int mps_dump_reqs(SYSCTL_HANDLER_ARGS);
 static void mps_parse_debug(struct mps_softc *sc, char *list);
 
-SYSCTL_NODE(_hw, OID_AUTO, mps, CTLFLAG_RD, 0, "MPS Driver Parameters");
+SYSCTL_NODE(_hw, OID_AUTO, mps, CTLFLAG_RD | CTLFLAG_MPSAFE, 0,
+    "MPS Driver Parameters");
 
 MALLOC_DEFINE(M_MPT2, "mps", "mpt2 driver memory");
 MALLOC_DECLARE(M_MPSUSER);
@@ -497,6 +498,12 @@ mps_iocfacts_allocate(struct mps_softc *sc, uint8_t attaching)
 	    sc->facts->FWVersion.Struct.Minor,
 	    sc->facts->FWVersion.Struct.Unit,
 	    sc->facts->FWVersion.Struct.Dev);
+
+	snprintf(sc->msg_version, sizeof(sc->msg_version), "%d.%d",
+	    (sc->facts->MsgVersion & MPI2_IOCFACTS_MSGVERSION_MAJOR_MASK) >>
+	    MPI2_IOCFACTS_MSGVERSION_MAJOR_SHIFT, 
+	    (sc->facts->MsgVersion & MPI2_IOCFACTS_MSGVERSION_MINOR_MASK) >>
+	    MPI2_IOCFACTS_MSGVERSION_MINOR_SHIFT);
 
 	mps_dprint(sc, MPS_INFO, "Firmware: %s, Driver: %s\n", sc->fw_version,
 	    MPS_DRIVER_VERSION);
@@ -1698,7 +1705,7 @@ mps_setup_sysctl(struct mps_softc *sc)
 		sysctl_ctx_init(&sc->sysctl_ctx);
 		sc->sysctl_tree = SYSCTL_ADD_NODE(&sc->sysctl_ctx,
 		    SYSCTL_STATIC_CHILDREN(_hw_mps), OID_AUTO, tmpstr2,
-		    CTLFLAG_RD, 0, tmpstr);
+		    CTLFLAG_RD | CTLFLAG_MPSAFE, 0, tmpstr);
 		if (sc->sysctl_tree == NULL)
 			return;
 		sysctl_ctx = &sc->sysctl_ctx;
@@ -1742,12 +1749,16 @@ mps_setup_sysctl(struct mps_softc *sc)
 	    "Total number of event frames allocated");
 
 	SYSCTL_ADD_STRING(sysctl_ctx, SYSCTL_CHILDREN(sysctl_tree),
-	    OID_AUTO, "firmware_version", CTLFLAG_RW, sc->fw_version,
+	    OID_AUTO, "firmware_version", CTLFLAG_RD, sc->fw_version,
 	    strlen(sc->fw_version), "firmware version");
 
 	SYSCTL_ADD_STRING(sysctl_ctx, SYSCTL_CHILDREN(sysctl_tree),
-	    OID_AUTO, "driver_version", CTLFLAG_RW, MPS_DRIVER_VERSION,
+	    OID_AUTO, "driver_version", CTLFLAG_RD, MPS_DRIVER_VERSION,
 	    strlen(MPS_DRIVER_VERSION), "driver version");
+
+	SYSCTL_ADD_STRING(sysctl_ctx, SYSCTL_CHILDREN(sysctl_tree),
+	    OID_AUTO, "msg_version", CTLFLAG_RD, sc->msg_version,
+	    strlen(sc->msg_version), "message interface version");
 
 	SYSCTL_ADD_INT(sysctl_ctx, SYSCTL_CHILDREN(sysctl_tree),
 	    OID_AUTO, "io_cmds_active", CTLFLAG_RD,
@@ -1788,16 +1799,19 @@ mps_setup_sysctl(struct mps_softc *sc)
 	    "spinup after SATA ID error");
 
 	SYSCTL_ADD_PROC(sysctl_ctx, SYSCTL_CHILDREN(sysctl_tree),
-	    OID_AUTO, "mapping_table_dump", CTLTYPE_STRING | CTLFLAG_RD, sc, 0,
+	    OID_AUTO, "mapping_table_dump",
+	    CTLTYPE_STRING | CTLFLAG_RD | CTLFLAG_NEEDGIANT, sc, 0,
 	    mps_mapping_dump, "A", "Mapping Table Dump");
 
 	SYSCTL_ADD_PROC(sysctl_ctx, SYSCTL_CHILDREN(sysctl_tree),
-	    OID_AUTO, "encl_table_dump", CTLTYPE_STRING | CTLFLAG_RD, sc, 0,
+	    OID_AUTO, "encl_table_dump",
+	    CTLTYPE_STRING | CTLFLAG_RD | CTLFLAG_NEEDGIANT, sc, 0,
 	    mps_mapping_encl_dump, "A", "Enclosure Table Dump");
 
 	SYSCTL_ADD_PROC(sysctl_ctx, SYSCTL_CHILDREN(sysctl_tree),
-	    OID_AUTO, "dump_reqs", CTLTYPE_OPAQUE | CTLFLAG_RD | CTLFLAG_SKIP, sc, 0,
-	    mps_dump_reqs, "I", "Dump Active Requests");
+	    OID_AUTO, "dump_reqs",
+	    CTLTYPE_OPAQUE | CTLFLAG_RD | CTLFLAG_SKIP | CTLFLAG_NEEDGIANT,
+	    sc, 0, mps_dump_reqs, "I", "Dump Active Requests");
 
 	SYSCTL_ADD_INT(sysctl_ctx, SYSCTL_CHILDREN(sysctl_tree),
 	    OID_AUTO, "use_phy_num", CTLFLAG_RD, &sc->use_phynum, 0,
