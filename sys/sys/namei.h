@@ -108,6 +108,11 @@ struct nameidata {
 	struct vnode *ni_beneath_latch;
 };
 
+enum cache_fpl_status { CACHE_FPL_STATUS_ABORTED, CACHE_FPL_STATUS_PARTIAL,
+    CACHE_FPL_STATUS_HANDLED, CACHE_FPL_STATUS_UNSET };
+int	cache_fplookup(struct nameidata *ndp, enum cache_fpl_status *status,
+    struct pwd **pwdp);
+
 /*
  * namei operations
  */
