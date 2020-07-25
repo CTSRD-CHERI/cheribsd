@@ -3361,6 +3361,7 @@ pwd_hold(struct thread *td)
 	FILEDESC_SLOCK(fdp);
 	pwd = pwd_hold_filedesc(fdp);
 	MPASS(pwd != NULL);
+	FILEDESC_SUNLOCK(fdp);
 	return (pwd);
 }
 
