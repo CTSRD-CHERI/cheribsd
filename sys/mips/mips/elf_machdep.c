@@ -51,6 +51,10 @@ __FBSDID("$FreeBSD$");
 #include <machine/md_var.h>
 #include <machine/cache.h>
 
+#if __has_feature(capabilities) && !defined(MIPS_SHAREDPAGE)
+#error "CheriABI requires MIPS_SHAREDPAGE"
+#endif
+
 static struct sysentvec elf_freebsd_sysvec = {
 	.sv_size	= SYS_MAXSYSCALL,
 	.sv_table	= sysent,
