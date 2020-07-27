@@ -1077,7 +1077,7 @@ bool ncl_pager_setsize(struct vnode *vp, u_quad_t *nsizep);
  * Define a structure similar to ufs_args for use in exporting the V4 root.
  */
 struct nfsex_args {
-	char	*fspec;
+	char * __kerncap	fspec;
 	struct export_args	export;
 };
 
