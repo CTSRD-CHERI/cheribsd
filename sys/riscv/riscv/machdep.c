@@ -97,6 +97,10 @@ __FBSDID("$FreeBSD$");
 #include <machine/fpe.h>
 #endif
 
+#ifdef DDB
+#include <ddb/ddb.h>
+#endif
+
 #if __has_feature(capabilities)
 #include <cheri/cheric.h>
 #endif
