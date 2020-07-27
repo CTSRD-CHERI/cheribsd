@@ -3270,7 +3270,7 @@ nfsrv_v4rootexport(void *argp, struct ucred *cred, struct thread *p)
 		/*
 		 * If fspec != NULL, this is the v4root path.
 		 */
-		NDINIT(&nd, LOOKUP, FOLLOW, UIO_USERSPACE,
+		NDINIT_C(&nd, LOOKUP, FOLLOW, UIO_USERSPACE,
 		    nfsexargp->fspec, p);
 		if ((error = namei(&nd)) != 0)
 			goto out;
@@ -3679,7 +3679,7 @@ nfssvc_srvcall(struct thread *p, struct nfssvc_args *uap, struct ucred *cred)
 		if (!error)
 			nfs_pubfhset = 1;
 	} else if (uap->flag & NFSSVC_V4ROOTEXPORT) {
-		error = copyin(uap->argp,(caddr_t)&export,
+		error = copyincap(uap->argp,(caddr_t)&export,
 		    sizeof (struct nfsex_args));
 		if (!error)
 			error = nfsrv_v4rootexport(&export, cred, p);
