@@ -1080,6 +1080,7 @@ dofault:
 			va = addr;
 			if (DELAYBRANCH(trapframe->cause))
 				va += sizeof(int);
+			addr = va;
 
 			if (td->td_md.md_ss_addr != (__cheri_addr uintptr_t)va) {
 				addr = va;
