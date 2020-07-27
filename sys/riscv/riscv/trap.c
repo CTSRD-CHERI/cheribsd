@@ -360,7 +360,7 @@ data_abort(struct trapframe *frame, int usermode)
 	error = vm_fault_trap(map, va, ftype, VM_FAULT_NORMAL, &sig, &ucode);
 	if (error != KERN_SUCCESS) {
 		if (usermode) {
-			call_trapsignal(td, sig, ucode, (uintcap_t)stval,
+			call_trapsignal(td, sig, ucode, stval,
 			    frame->tf_scause & EXCP_MASK, 0);
 		} else {
 			if (pcb->pcb_onfault != 0) {
