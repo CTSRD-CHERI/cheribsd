@@ -20,8 +20,6 @@ makeoptions	DEBUG=-g		#Build kernel with gdb(1) debug symbols
 
 makeoptions	MODULES_OVERRIDE=""
 
-options 	MIPS_SHAREDPAGE
-
 options 	DDB
 options 	KDB
 options 	ALT_BREAK_TO_DEBUGGER
@@ -34,6 +32,7 @@ options 	CAPABILITIES
 options 	COMPAT_FREEBSD10
 options 	COMPAT_FREEBSD11
 options 	COMPAT_FREEBSD12
+options 	MIPS_SHAREDPAGE		# Enable shared page support
 
 options 	INTRNG
 options 	SCHED_ULE

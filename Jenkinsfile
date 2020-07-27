@@ -29,18 +29,18 @@ setDefaultJobProperties(jobProperties)
 jobs = [:]
 
 def buildImageAndRunTests(params, String suffix) {
-    if (!suffix.startsWith('mips-') && !suffix.startsWith('riscv64')) {
-        echo("Cannot run tests for ${suffix} yet")
-        return
-    }
     stage("Building disk image") {
         sh "./cheribuild/jenkins-cheri-build.py --build disk-image-${suffix} ${params.extraArgs}"
     }
-    stage("Building minimal disk image") {
-        sh "./cheribuild/jenkins-cheri-build.py --build disk-image-minimal-${suffix} ${params.extraArgs}"
-    }
-    stage("Building MFS_ROOT kernels") {
-        sh "./cheribuild/jenkins-cheri-build.py --build cheribsd-mfs-root-kernel-${suffix} --cheribsd-mfs-root-kernel-${suffix}/build-fpga-kernels ${params.extraArgs}"
+    if (suffix.startsWith('mips') || suffix.startsWith('riscv64')) {
+        stage("Building minimal disk image") {
+            sh "./cheribuild/jenkins-cheri-build.py --build disk-image-minimal-${suffix} ${params.extraArgs}"
+        }
+        stage("Building MFS_ROOT kernels") {
+            sh "./cheribuild/jenkins-cheri-build.py --build cheribsd-mfs-root-kernel-${suffix} --cheribsd-mfs-root-kernel-${suffix}/build-fpga-kernels ${params.extraArgs}"
+        }
+    } else {
+	echo("Cannot build MFS_ROOT kernels for ${suffix} yet")
     }
     stage("Running tests") {
         def haveCheritest = suffix.endsWith('-hybrid') || suffix.endsWith('-purecap')
