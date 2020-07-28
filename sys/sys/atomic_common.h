@@ -45,7 +45,7 @@
 #define	atomic_load_8(p)	(*(volatile uint8_t *)(p))
 #define	atomic_load_16(p)	(*(volatile uint16_t *)(p))
 #define	atomic_load_32(p)	(*(volatile uint32_t *)(p))
-#ifdef _LP64
+#if __SIZEOF_LONG__ >= 8
 #define	atomic_load_64(p)	(*(volatile uint64_t *)(p))
 #endif
 
@@ -65,7 +65,7 @@
     (*(volatile uint16_t *)(p) = (uint16_t)(v))
 #define	atomic_store_32(p, v)		\
     (*(volatile uint32_t *)(p) = (uint32_t)(v))
-#ifdef _LP64
+#if __SIZEOF_LONG__ >= 8
 #define	atomic_store_64(p, v)		\
     (*(volatile uint64_t *)(p) = (uint64_t)(v))
 #endif
