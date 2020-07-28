@@ -267,8 +267,8 @@ cloudabi_sys_file_open(struct thread *td,
 		fdrop(fp, td);
 		return (error);
 	}
-	NDINIT_ATRIGHTS(&nd, LOOKUP, FOLLOW, UIO_SYSSPACE, path, uap->dirfd.fd,
-	    &rights, td);
+	NDINIT_ATRIGHTS(&nd, LOOKUP, FOLLOW, UIO_SYSSPACE, PTR2CAP(path),
+	    uap->dirfd.fd, &rights, td);
 	error = vn_open(&nd, &fflags, 0777 & ~td->td_proc->p_fd->fd_cmask, fp);
 	cloudabi_freestr(path);
 	if (error != 0) {
