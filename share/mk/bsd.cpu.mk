@@ -348,13 +348,8 @@ CFLAGS+=	-Werror=implicit-function-declaration
 # XXXBD: is this still needed?
 CFLAGS+=	-Wno-deprecated-declarations
 # XXXBD: is -mstack-alignment needed here?
-. if ${MACHINE_ARCH:Mmips*c128}
 CFLAGS+=	-cheri=128
 CFLAGS+=	-mstack-alignment=16
-. elif ${MACHINE_ARCH:Mmips*c256}
-CFLAGS+=	-cheri=256
-CFLAGS+=	-mstack-alignment=32
-. endif
 # Clang no longer defines __LP64__ for Cheri purecap ABI but there are a
 # lot of files that use it to check for not 32-bit
 # XXXAR: Remove this once we have checked all the #ifdef __LP64__ uses
