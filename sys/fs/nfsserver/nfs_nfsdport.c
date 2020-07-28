@@ -3270,7 +3270,7 @@ nfsrv_v4rootexport(void *argp, struct ucred *cred, struct thread *p)
 		/*
 		 * If fspec != NULL, this is the v4root path.
 		 */
-		NDINIT_C(&nd, LOOKUP, FOLLOW, UIO_USERSPACE,
+		NDINIT(&nd, LOOKUP, FOLLOW, UIO_USERSPACE,
 		    nfsexargp->fspec, p);
 		if ((error = namei(&nd)) != 0)
 			goto out;
