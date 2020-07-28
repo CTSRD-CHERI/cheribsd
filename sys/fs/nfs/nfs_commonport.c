@@ -242,7 +242,7 @@ nfsrv_lookupfilename(struct nameidata *ndp, char * __capability fname, NFSPROC_T
 {
 	int error;
 
-	NDINIT_C(ndp, LOOKUP, FOLLOW | LOCKLEAF, UIO_USERSPACE, fname,
+	NDINIT(ndp, LOOKUP, FOLLOW | LOCKLEAF, UIO_USERSPACE, fname,
 	    p);
 	error = namei(ndp);
 	if (!error) {

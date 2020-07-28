@@ -515,7 +515,7 @@ quotaon(struct thread *td, struct mount *mp, int type, void * __capability fname
 	ump = VFSTOUFS(mp);
 	dq = NODQUOT;
 
-	NDINIT_C(&nd, LOOKUP, FOLLOW, UIO_USERSPACE, fname, td);
+	NDINIT(&nd, LOOKUP, FOLLOW, UIO_USERSPACE, fname, td);
 	flags = FREAD | FWRITE;
 	vfs_ref(mp);
 	vfs_unbusy(mp);

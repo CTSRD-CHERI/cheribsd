@@ -182,7 +182,7 @@ kern_quotactl(struct thread *td, const char * __capability path, int cmd,
 	AUDIT_ARG_UID(uid);
 	if (!prison_allow(td->td_ucred, PR_ALLOW_QUOTAS))
 		return (EPERM);
-	NDINIT_C(&nd, LOOKUP, FOLLOW | LOCKLEAF | AUDITVNODE1, UIO_USERSPACE,
+	NDINIT(&nd, LOOKUP, FOLLOW | LOCKLEAF | AUDITVNODE1, UIO_USERSPACE,
 	    path, td);
 	if ((error = namei(&nd)) != 0)
 		return (error);
@@ -323,7 +323,7 @@ kern_statfs(struct thread *td, const char * __capability path,
 	struct nameidata nd;
 	int error;
 
-	NDINIT_C(&nd, LOOKUP, FOLLOW | LOCKSHARED | LOCKLEAF | AUDITVNODE1,
+	NDINIT(&nd, LOOKUP, FOLLOW | LOCKSHARED | LOCKLEAF | AUDITVNODE1,
 	    pathseg, path, td);
 	error = namei(&nd);
 	if (error != 0)
@@ -913,7 +913,7 @@ kern_chdir(struct thread *td, const char * __capability path,
 	struct nameidata nd;
 	int error;
 
-	NDINIT_C(&nd, LOOKUP, FOLLOW | LOCKSHARED | LOCKLEAF | AUDITVNODE1,
+	NDINIT(&nd, LOOKUP, FOLLOW | LOCKSHARED | LOCKLEAF | AUDITVNODE1,
 	    pathseg, path, td);
 	if ((error = namei(&nd)) != 0)
 		return (error);
@@ -952,7 +952,7 @@ kern_chroot(struct thread *td, const char * __capability path)
 	error = priv_check(td, PRIV_VFS_CHROOT);
 	if (error != 0)
 		return (error);
-	NDINIT_C(&nd, LOOKUP, FOLLOW | LOCKSHARED | LOCKLEAF | AUDITVNODE1,
+	NDINIT(&nd, LOOKUP, FOLLOW | LOCKSHARED | LOCKLEAF | AUDITVNODE1,
 	    UIO_USERSPACE, path, td);
 	error = namei(&nd);
 	if (error != 0)
@@ -1748,7 +1748,7 @@ kern_undelete(struct thread *td, const char * __capability path, enum uio_seg pa
 
 restart:
 	bwillwrite();
-	NDINIT_C(&nd, DELETE, LOCKPARENT | DOWHITEOUT | AUDITVNODE1,
+	NDINIT(&nd, DELETE, LOCKPARENT | DOWHITEOUT | AUDITVNODE1,
 	    pathseg, path, td);
 	error = namei(&nd);
 	if (error != 0)
@@ -2537,7 +2537,7 @@ kern_pathconf(struct thread *td, const char * __capability path,
 	struct nameidata nd;
 	int error;
 
-	NDINIT_C(&nd, LOOKUP, LOCKSHARED | LOCKLEAF | AUDITVNODE1 | flags,
+	NDINIT(&nd, LOOKUP, LOCKSHARED | LOCKLEAF | AUDITVNODE1 | flags,
 	    pathseg, path, td);
 	if ((error = namei(&nd)) != 0)
 		return (error);
@@ -3241,7 +3241,7 @@ kern_lutimes(struct thread *td,
 
 	if ((error = getutimes(tptr, tptrseg, ts)) != 0)
 		return (error);
-	NDINIT_C(&nd, LOOKUP, NOFOLLOW | AUDITVNODE1, pathseg, path, td);
+	NDINIT(&nd, LOOKUP, NOFOLLOW | AUDITVNODE1, pathseg, path, td);
 	if ((error = namei(&nd)) != 0)
 		return (error);
 	NDFREE(&nd, NDF_ONLY_PNBUF);
@@ -3396,7 +3396,7 @@ kern_truncate(struct thread *td, const char * __capability path,
 
 	if (length < 0)
 		return(EINVAL);
-	NDINIT_C(&nd, LOOKUP, FOLLOW | AUDITVNODE1, pathseg, path, td);
+	NDINIT(&nd, LOOKUP, FOLLOW | AUDITVNODE1, pathseg, path, td);
 	if ((error = namei(&nd)) != 0)
 		return (error);
 	vp = nd.ni_vp;
@@ -4210,7 +4210,7 @@ kern_revoke(struct thread *td, const char * __capability path,
 	struct nameidata nd;
 	int error;
 
-	NDINIT_C(&nd, LOOKUP, FOLLOW | LOCKLEAF | AUDITVNODE1, pathseg,
+	NDINIT(&nd, LOOKUP, FOLLOW | LOCKLEAF | AUDITVNODE1, pathseg,
 	    path, td);
 	if ((error = namei(&nd)) != 0)
 		return (error);
