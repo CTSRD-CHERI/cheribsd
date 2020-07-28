@@ -179,7 +179,8 @@ vn_openat(char *pnamep, enum uio_seg seg, int filemode, int createmode,
 
 	if (startvp != NULL)
 		vref(startvp);
-	NDINIT_ATVP(&nd, operation, 0, UIO_SYSSPACE, pnamep, startvp, td);
+	NDINIT_ATVP(&nd, operation, 0, UIO_SYSSPACE, PTR2CAP(pnamep), startvp,
+	    td);
 	filemode |= O_NOFOLLOW;
 	error = vn_open_cred(&nd, &filemode, createmode, 0, td->td_ucred, NULL);
 	NDFREE(&nd, NDF_ONLY_PNBUF);
