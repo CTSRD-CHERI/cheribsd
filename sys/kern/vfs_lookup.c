@@ -1317,17 +1317,6 @@ bad:
 
 void
 NDINIT_ALL(struct nameidata *ndp, u_long op, u_long flags, enum uio_seg segflg,
-    const char *namep, int dirfd, struct vnode *startdir, cap_rights_t *rightsp,
-    struct thread *td)
-{
-
-	NDINIT_ALL_C(ndp, op, flags, segflg,
-	    (__cheri_tocap const char * __capability)namep,
-	    dirfd, startdir, rightsp, td);
-}
-
-void
-NDINIT_ALL_C(struct nameidata *ndp, u_long op, u_long flags, enum uio_seg segflg,
     const char * __capability namep, int dirfd, struct vnode *startdir, cap_rights_t *rightsp,
     struct thread *td)
 {

@@ -182,24 +182,21 @@ struct nameidata {
  * Initialization of a nameidata structure.
  */
 #define	NDINIT(ndp, op, flags, segflg, namep, td)			\
-	NDINIT_ALL_C(ndp, op, flags, segflg, namep, AT_FDCWD, NULL, 0, td)
+	NDINIT_ALL(ndp, op, flags, segflg, namep, AT_FDCWD, NULL, 0, td)
 #define	NDINIT_C(ndp, op, flags, segflg, namep, td)			\
-	NDINIT_ALL_C(ndp, op, flags, segflg, namep, AT_FDCWD, NULL, 0, td)
+	NDINIT_ALL(ndp, op, flags, segflg, namep, AT_FDCWD, NULL, 0, td)
 #define	NDINIT_AT(ndp, op, flags, segflg, namep, dirfd, td)		\
-	NDINIT_ALL_C(ndp, op, flags, segflg, namep, dirfd, NULL, 0, td)
+	NDINIT_ALL(ndp, op, flags, segflg, namep, dirfd, NULL, 0, td)
 #define	NDINIT_AT_C(ndp, op, flags, segflg, namep, dirfd, td)		\
-	NDINIT_ALL_C(ndp, op, flags, segflg, namep, dirfd, NULL, 0, td)
+	NDINIT_ALL(ndp, op, flags, segflg, namep, dirfd, NULL, 0, td)
 #define	NDINIT_ATRIGHTS(ndp, op, flags, segflg, namep, dirfd, rightsp, td) \
-	NDINIT_ALL_C(ndp, op, flags, segflg, namep, dirfd, NULL, rightsp, td)
+	NDINIT_ALL(ndp, op, flags, segflg, namep, dirfd, NULL, rightsp, td)
 #define	NDINIT_ATVP(ndp, op, flags, segflg, namep, vp, td)		\
-	NDINIT_ALL_C(ndp, op, flags, segflg, namep, AT_FDCWD, vp, 0, td)
+	NDINIT_ALL(ndp, op, flags, segflg, namep, AT_FDCWD, vp, 0, td)
 #define	NDINIT_ATRIGHTS_C(ndp, op, flags, segflg, namep, dirfd, rightsp, td) \
-	NDINIT_ALL_C(ndp, op, flags, segflg, namep, dirfd, NULL, rightsp, td)
+	NDINIT_ALL(ndp, op, flags, segflg, namep, dirfd, NULL, rightsp, td)
 
 void NDINIT_ALL(struct nameidata *ndp, u_long op, u_long flags,
-    enum uio_seg segflg, const char *namep, int dirfd, struct vnode *startdir,
-    cap_rights_t *rightsp, struct thread *td);
-void NDINIT_ALL_C(struct nameidata *ndp, u_long op, u_long flags,
     enum uio_seg segflg, const char * __capability namep, int dirfd, struct vnode *startdir,
     cap_rights_t *rightsp, struct thread *td);
 
