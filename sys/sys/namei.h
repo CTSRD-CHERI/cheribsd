@@ -192,7 +192,7 @@ struct nameidata {
 #define	NDINIT_ATRIGHTS(ndp, op, flags, segflg, namep, dirfd, rightsp, td) \
 	NDINIT_ALL(ndp, op, flags, segflg, namep, dirfd, NULL, rightsp, td)
 #define	NDINIT_ATVP(ndp, op, flags, segflg, namep, vp, td)		\
-	NDINIT_ALL(ndp, op, flags, segflg, namep, AT_FDCWD, vp, 0, td)
+	NDINIT_ALL_C(ndp, op, flags, segflg, namep, AT_FDCWD, vp, 0, td)
 #define	NDINIT_ATRIGHTS_C(ndp, op, flags, segflg, namep, dirfd, rightsp, td) \
 	NDINIT_ALL_C(ndp, op, flags, segflg, namep, dirfd, NULL, rightsp, td)
 
