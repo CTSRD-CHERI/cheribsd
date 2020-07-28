@@ -2593,7 +2593,7 @@ kern_readlinkat(struct thread *td, int fd, const char * __capability path,
 	if (count > IOSIZE_MAX)
 		return (EINVAL);
 
-	NDINIT_AT_C(&nd, LOOKUP, NOFOLLOW | LOCKSHARED | LOCKLEAF | AUDITVNODE1,
+	NDINIT_AT(&nd, LOOKUP, NOFOLLOW | LOCKSHARED | LOCKLEAF | AUDITVNODE1,
 	    pathseg, path, fd, td);
 
 	if ((error = namei(&nd)) != 0)
@@ -4344,7 +4344,7 @@ kern_getfhat(struct thread *td, int flags, int fd,
 	error = priv_check(td, PRIV_VFS_GETFH);
 	if (error != 0)
 		return (error);
-	NDINIT_AT_C(&nd, LOOKUP,
+	NDINIT_AT(&nd, LOOKUP,
 	    ((flags & AT_SYMLINK_NOFOLLOW) != 0 ? NOFOLLOW : FOLLOW) |
 	    ((flags & AT_BENEATH) != 0 ? BENEATH : 0) | LOCKLEAF | AUDITVNODE1,
 	    pathseg, path, fd, td);
