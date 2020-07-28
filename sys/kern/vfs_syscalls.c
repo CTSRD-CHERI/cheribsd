@@ -1115,7 +1115,7 @@ kern_openat(struct thread *td, int fd, char const * __capability path,
 	/* Set the flags early so the finit in devfs can pick them up. */
 	fp->f_flag = flags & FMASK;
 	cmode = ((mode & ~fdp->fd_cmask) & ALLPERMS) & ~S_ISTXT;
-	NDINIT_ATRIGHTS_C(&nd, LOOKUP, FOLLOW | AUDITVNODE1, pathseg, path, fd,
+	NDINIT_ATRIGHTS(&nd, LOOKUP, FOLLOW | AUDITVNODE1, pathseg, path, fd,
 	    &rights, td);
 	td->td_dupfd = -1;		/* XXX check for fdopen */
 	error = vn_open(&nd, &flags, cmode, fp);
@@ -1301,7 +1301,7 @@ kern_mknodat(struct thread *td, int fd, const char * __capability path,
 		return (error);
 restart:
 	bwillwrite();
-	NDINIT_ATRIGHTS_C(&nd, CREATE, LOCKPARENT | SAVENAME | AUDITVNODE1 |
+	NDINIT_ATRIGHTS(&nd, CREATE, LOCKPARENT | SAVENAME | AUDITVNODE1 |
 	    NOCACHE, pathseg, path, fd, &cap_mknodat_rights,
 	    td);
 	if ((error = namei(&nd)) != 0)
@@ -1408,7 +1408,7 @@ kern_mkfifoat(struct thread *td, int fd, const char * __capability path,
 	AUDIT_ARG_MODE(mode);
 restart:
 	bwillwrite();
-	NDINIT_ATRIGHTS_C(&nd, CREATE, LOCKPARENT | SAVENAME | AUDITVNODE1 |
+	NDINIT_ATRIGHTS(&nd, CREATE, LOCKPARENT | SAVENAME | AUDITVNODE1 |
 	    NOCACHE, pathseg, path, fd, &cap_mkfifoat_rights,
 	    td);
 	if ((error = namei(&nd)) != 0)
@@ -1539,7 +1539,7 @@ kern_linkat(struct thread *td, int fd1, int fd2,
 
 	do {
 		bwillwrite();
-		NDINIT_ATRIGHTS_C(&nd, LOOKUP, follow | AUDITVNODE1, segflag,
+		NDINIT_ATRIGHTS(&nd, LOOKUP, follow | AUDITVNODE1, segflag,
 		    path1, fd1, &cap_linkat_source_rights, td);
 		if ((error = namei(&nd)) != 0)
 			return (error);
@@ -1561,7 +1561,7 @@ kern_linkat_vp(struct thread *td, struct vnode *vp, int fd,
 		vrele(vp);
 		return (EPERM);		/* POSIX */
 	}
-	NDINIT_ATRIGHTS_C(&nd, CREATE,
+	NDINIT_ATRIGHTS(&nd, CREATE,
 	    LOCKPARENT | SAVENAME | AUDITVNODE2 | NOCACHE, segflag, path, fd,
 	    &cap_linkat_target_rights, td);
 	if ((error = namei(&nd)) == 0) {
@@ -1678,7 +1678,7 @@ kern_symlinkat(struct thread *td, const char * __capability path1, int fd,
 	AUDIT_ARG_TEXT(syspath);
 restart:
 	bwillwrite();
-	NDINIT_ATRIGHTS_C(&nd, CREATE, LOCKPARENT | SAVENAME | AUDITVNODE1 |
+	NDINIT_ATRIGHTS(&nd, CREATE, LOCKPARENT | SAVENAME | AUDITVNODE1 |
 	    NOCACHE, segflg, path2, fd, &cap_symlinkat_rights,
 	    td);
 	if ((error = namei(&nd)) != 0)
@@ -1859,7 +1859,7 @@ kern_funlinkat(struct thread *td, int dfd, const char * __capability path,
 
 restart:
 	bwillwrite();
-	NDINIT_ATRIGHTS_C(&nd, DELETE, LOCKPARENT | LOCKLEAF | AUDITVNODE1 |
+	NDINIT_ATRIGHTS(&nd, DELETE, LOCKPARENT | LOCKLEAF | AUDITVNODE1 |
 	    ((flag & AT_BENEATH) != 0 ? BENEATH : 0),
 	    pathseg, path, dfd, &cap_unlinkat_rights, td);
 	if ((error = namei(&nd)) != 0) {
@@ -2083,7 +2083,7 @@ kern_accessat(struct thread *td, int fd, const char * __capability path,
 	} else
 		usecred = cred;
 	AUDIT_ARG_VALUE(amode);
-	NDINIT_ATRIGHTS_C(&nd, LOOKUP, FOLLOW | LOCKSHARED | LOCKLEAF |
+	NDINIT_ATRIGHTS(&nd, LOOKUP, FOLLOW | LOCKSHARED | LOCKLEAF |
 	    AUDITVNODE1 | ((flag & AT_BENEATH) != 0 ? BENEATH : 0),
 	    pathseg, path, fd, &cap_fstat_rights, td);
 	if ((error = namei(&nd)) != 0)
@@ -2386,7 +2386,7 @@ kern_statat(struct thread *td, int flag, int fd, const char * __capability path,
 	if ((flag & ~(AT_SYMLINK_NOFOLLOW | AT_BENEATH)) != 0)
 		return (EINVAL);
 
-	NDINIT_ATRIGHTS_C(&nd, LOOKUP, ((flag & AT_SYMLINK_NOFOLLOW) != 0 ?
+	NDINIT_ATRIGHTS(&nd, LOOKUP, ((flag & AT_SYMLINK_NOFOLLOW) != 0 ?
 	    NOFOLLOW : FOLLOW) | ((flag & AT_BENEATH) != 0 ? BENEATH : 0) |
 	    LOCKSHARED | LOCKLEAF | AUDITVNODE1, pathseg, path, fd,
 	    &cap_fstat_rights, td);
@@ -2744,7 +2744,7 @@ kern_chflagsat(struct thread *td, int fd, const char * __capability path,
 	AUDIT_ARG_FFLAGS(flags);
 	follow = (atflag & AT_SYMLINK_NOFOLLOW) ? NOFOLLOW : FOLLOW;
 	follow |= (atflag & AT_BENEATH) != 0 ? BENEATH : 0;
-	NDINIT_ATRIGHTS_C(&nd, LOOKUP, follow | AUDITVNODE1, pathseg, path, fd,
+	NDINIT_ATRIGHTS(&nd, LOOKUP, follow | AUDITVNODE1, pathseg, path, fd,
 	    &cap_fchflags_rights, td);
 	if ((error = namei(&nd)) != 0)
 		return (error);
@@ -2873,7 +2873,7 @@ kern_fchmodat(struct thread *td, int fd, const char * __capability path,
 	AUDIT_ARG_MODE(mode);
 	follow = (flag & AT_SYMLINK_NOFOLLOW) != 0 ? NOFOLLOW : FOLLOW;
 	follow |= (flag & AT_BENEATH) != 0 ? BENEATH : 0;
-	NDINIT_ATRIGHTS_C(&nd, LOOKUP, follow | AUDITVNODE1, pathseg, path, fd,
+	NDINIT_ATRIGHTS(&nd, LOOKUP, follow | AUDITVNODE1, pathseg, path, fd,
 	    &cap_fchmod_rights, td);
 	if ((error = namei(&nd)) != 0)
 		return (error);
@@ -2985,7 +2985,7 @@ kern_fchownat(struct thread *td, int fd, const char * __capability path,
 	AUDIT_ARG_OWNER(uid, gid);
 	follow = (flag & AT_SYMLINK_NOFOLLOW) ? NOFOLLOW : FOLLOW;
 	follow |= (flag & AT_BENEATH) != 0 ? BENEATH : 0;
-	NDINIT_ATRIGHTS_C(&nd, LOOKUP, follow | AUDITVNODE1, pathseg, path, fd,
+	NDINIT_ATRIGHTS(&nd, LOOKUP, follow | AUDITVNODE1, pathseg, path, fd,
 	    &cap_fchown_rights, td);
 
 	if ((error = namei(&nd)) != 0)
@@ -3202,7 +3202,7 @@ kern_utimesat(struct thread *td, int fd,
 
 	if ((error = getutimes(tptr, tptrseg, ts)) != 0)
 		return (error);
-	NDINIT_ATRIGHTS_C(&nd, LOOKUP, FOLLOW | AUDITVNODE1, pathseg, path, fd,
+	NDINIT_ATRIGHTS(&nd, LOOKUP, FOLLOW | AUDITVNODE1, pathseg, path, fd,
 	    &cap_futimes_rights, td);
 
 	if ((error = namei(&nd)) != 0)
@@ -3347,7 +3347,7 @@ kern_utimensat(struct thread *td, int fd,
 
 	if ((error = getutimens(tptr, tptrseg, ts, &flags)) != 0)
 		return (error);
-	NDINIT_ATRIGHTS_C(&nd, LOOKUP,
+	NDINIT_ATRIGHTS(&nd, LOOKUP,
 	    ((flag & AT_SYMLINK_NOFOLLOW) ? NOFOLLOW : FOLLOW) |
 	    ((flag & AT_BENEATH) != 0 ? BENEATH : 0) | AUDITVNODE1,
 	    pathseg, path, fd, &cap_futimes_rights, td);
@@ -3571,11 +3571,11 @@ kern_renameat(struct thread *td, int oldfd, const char * __capability old,
 again:
 	bwillwrite();
 #ifdef MAC
-	NDINIT_ATRIGHTS_C(&fromnd, DELETE, LOCKPARENT | LOCKLEAF | SAVESTART |
+	NDINIT_ATRIGHTS(&fromnd, DELETE, LOCKPARENT | LOCKLEAF | SAVESTART |
 	    AUDITVNODE1, pathseg, old, oldfd,
 	    &cap_renameat_source_rights, td);
 #else
-	NDINIT_ATRIGHTS_C(&fromnd, DELETE, WANTPARENT | SAVESTART | AUDITVNODE1,
+	NDINIT_ATRIGHTS(&fromnd, DELETE, WANTPARENT | SAVESTART | AUDITVNODE1,
 	    pathseg, old, oldfd,
 	    &cap_renameat_source_rights, td);
 #endif
@@ -3590,7 +3590,7 @@ again:
 		VOP_UNLOCK(fromnd.ni_vp);
 #endif
 	fvp = fromnd.ni_vp;
-	NDINIT_ATRIGHTS_C(&tond, RENAME, LOCKPARENT | LOCKLEAF | NOCACHE |
+	NDINIT_ATRIGHTS(&tond, RENAME, LOCKPARENT | LOCKLEAF | NOCACHE |
 	    SAVESTART | AUDITVNODE2, pathseg, new, newfd,
 	    &cap_renameat_target_rights, td);
 	if (fromnd.ni_vp->v_type == VDIR)
@@ -3734,7 +3734,7 @@ kern_mkdirat(struct thread *td, int fd, const char * __capability path,
 	AUDIT_ARG_MODE(mode);
 restart:
 	bwillwrite();
-	NDINIT_ATRIGHTS_C(&nd, CREATE, LOCKPARENT | SAVENAME | AUDITVNODE1 |
+	NDINIT_ATRIGHTS(&nd, CREATE, LOCKPARENT | SAVENAME | AUDITVNODE1 |
 	    NOCACHE, segflg, path, fd, &cap_mkdirat_rights,
 	    td);
 	nd.ni_cnd.cn_flags |= WILLBEDIR;
@@ -3820,7 +3820,7 @@ kern_frmdirat(struct thread *td, int dfd, const char * __capability path,
 
 restart:
 	bwillwrite();
-	NDINIT_ATRIGHTS_C(&nd, DELETE, LOCKPARENT | LOCKLEAF | AUDITVNODE1 |
+	NDINIT_ATRIGHTS(&nd, DELETE, LOCKPARENT | LOCKLEAF | AUDITVNODE1 |
 	    ((flag & AT_BENEATH) != 0 ? BENEATH : 0),
 	    pathseg, path, dfd, &cap_unlinkat_rights, td);
 	if ((error = namei(&nd)) != 0)
