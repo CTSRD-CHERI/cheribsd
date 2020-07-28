@@ -73,7 +73,7 @@ kobj_open_file_vnode(const char *file)
 	pwd_ensure_dirs();
 
 	flags = FREAD | O_NOFOLLOW;
-	NDINIT(&nd, LOOKUP, 0, UIO_SYSSPACE, file, td);
+	NDINIT(&nd, LOOKUP, 0, UIO_SYSSPACE, PTR2CAP(file), td);
 	error = vn_open_cred(&nd, &flags, 0, 0, curthread->td_ucred, NULL);
 	if (error != 0)
 		return (NULL);

@@ -360,13 +360,13 @@ vfs_mountroot_shuffle(struct thread *td, struct mount *mpdevfs)
 		/* Remount old root under /.mount or /mnt */
 		fspath = "/.mount";
 		NDINIT(&nd, LOOKUP, FOLLOW | LOCKLEAF, UIO_SYSSPACE,
-		    fspath, td);
+		    PTR2CAP(fspath), td);
 		error = namei(&nd);
 		if (error) {
 			NDFREE(&nd, NDF_ONLY_PNBUF);
 			fspath = "/mnt";
 			NDINIT(&nd, LOOKUP, FOLLOW | LOCKLEAF, UIO_SYSSPACE,
-			    fspath, td);
+			    PTR2CAP(fspath), td);
 			error = namei(&nd);
 		}
 		if (!error) {
@@ -714,7 +714,8 @@ parse_mount_dev_present(const char *dev)
 	struct nameidata nd;
 	int error;
 
-	NDINIT(&nd, LOOKUP, FOLLOW | LOCKLEAF, UIO_SYSSPACE, dev, curthread);
+	NDINIT(&nd, LOOKUP, FOLLOW | LOCKLEAF, UIO_SYSSPACE, PTR2CAP(dev),
+	    curthread);
 	error = namei(&nd);
 	if (!error)
 		vput(nd.ni_vp);

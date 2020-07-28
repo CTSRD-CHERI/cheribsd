@@ -1472,13 +1472,13 @@ kern_alternate_path(struct thread *td, const char *prefix,
 		for (cp = &ptr[len] - 1; *cp != '/'; cp--);
 		*cp = '\0';
 
-		NDINIT(&nd, LOOKUP, NOFOLLOW, UIO_SYSSPACE, buf, td);
+		NDINIT(&nd, LOOKUP, NOFOLLOW, UIO_SYSSPACE, PTR2CAP(buf), td);
 		error = namei(&nd);
 		*cp = '/';
 		if (error != 0)
 			goto keeporig;
 	} else {
-		NDINIT(&nd, LOOKUP, NOFOLLOW, UIO_SYSSPACE, buf, td);
+		NDINIT(&nd, LOOKUP, NOFOLLOW, UIO_SYSSPACE, PTR2CAP(buf), td);
 
 		error = namei(&nd);
 		if (error != 0)
@@ -1492,7 +1492,7 @@ kern_alternate_path(struct thread *td, const char *prefix,
 		 * root directory and never finding it, because "/" resolves
 		 * to the emulation root directory. This is expensive :-(
 		 */
-		NDINIT(&ndroot, LOOKUP, FOLLOW, UIO_SYSSPACE, prefix,
+		NDINIT(&ndroot, LOOKUP, FOLLOW, UIO_SYSSPACE, PTR2CAP(prefix),
 		    td);
 
 		/* We shouldn't ever get an error from this namei(). */

@@ -2145,7 +2145,8 @@ ctl_be_block_open(struct ctl_be_block_lun *be_lun, struct ctl_lun_req *req)
 		flags |= FWRITE;
 
 again:
-	NDINIT(&nd, LOOKUP, FOLLOW, UIO_SYSSPACE, be_lun->dev_path, curthread);
+	NDINIT(&nd, LOOKUP, FOLLOW, UIO_SYSSPACE, PTR2CAP(be_lun->dev_path),
+	    curthread);
 	error = vn_open(&nd, &flags, 0, NULL);
 	if ((error == EROFS || error == EACCES) && (flags & FWRITE)) {
 		flags &= ~FWRITE;
