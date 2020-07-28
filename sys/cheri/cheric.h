@@ -87,6 +87,13 @@
 /* Create an untagged capability from an integer */
 #define cheri_fromint(x)	cheri_incoffset(NULL, x)
 
+/*
+ * XXX-AM: Ugly thing to make this importable from linux compat,
+ * which redefines __always_inline
+ */
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wduplicate-decl-specifier"
+
 /* Increment @p dst to have the address of @p src */
 #define cheri_copyaddress(dst, src)	(cheri_setaddress(dst, cheri_getaddress(src)))
 
