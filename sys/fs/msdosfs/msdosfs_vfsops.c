@@ -338,7 +338,8 @@ msdosfs_mount(struct mount *mp)
 	 */
 	if (vfs_getopt(mp->mnt_optnew, "from", (void **)&from, NULL))
 		return (EINVAL);
-	NDINIT(&ndp, LOOKUP, FOLLOW | LOCKLEAF, UIO_SYSSPACE, from, td);
+	NDINIT(&ndp, LOOKUP, FOLLOW | LOCKLEAF, UIO_SYSSPACE, PTR2CAP(from),
+	    td);
 	error = namei(&ndp);
 	if (error)
 		return (error);
