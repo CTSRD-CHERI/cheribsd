@@ -2206,7 +2206,7 @@ kern___realpathat(struct thread *td, int fd, const char * __capability path,
 
 	if (flags != 0)
 		return (EINVAL);
-	NDINIT_ATRIGHTS_C(&nd, LOOKUP,
+	NDINIT_ATRIGHTS(&nd, LOOKUP,
 	    FOLLOW | SAVENAME | WANTPARENT | AUDITVNODE1,
 	    pathseg, path, fd, &cap_fstat_rights, td);
 	if ((error = namei(&nd)) != 0)

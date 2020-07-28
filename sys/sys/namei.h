@@ -193,8 +193,6 @@ struct nameidata {
 	NDINIT_ALL(ndp, op, flags, segflg, namep, dirfd, NULL, rightsp, td)
 #define	NDINIT_ATVP(ndp, op, flags, segflg, namep, vp, td)		\
 	NDINIT_ALL(ndp, op, flags, segflg, namep, AT_FDCWD, vp, 0, td)
-#define	NDINIT_ATRIGHTS_C(ndp, op, flags, segflg, namep, dirfd, rightsp, td) \
-	NDINIT_ALL(ndp, op, flags, segflg, namep, dirfd, NULL, rightsp, td)
 
 void NDINIT_ALL(struct nameidata *ndp, u_long op, u_long flags,
     enum uio_seg segflg, const char * __capability namep, int dirfd, struct vnode *startdir,
