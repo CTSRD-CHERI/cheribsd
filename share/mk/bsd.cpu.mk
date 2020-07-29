@@ -7,7 +7,10 @@
 .if !defined(CPUTYPE) || empty(CPUTYPE)
 _CPUCFLAGS =
 . if ${MACHINE_CPUARCH} == "aarch64"
-MACHINE_CPU = arm64
+.  if ${MACHINE_ARCH} == "morello"
+MACHINE_CPU = cheri
+.endif
+MACHINE_CPU += arm64
 . elif ${MACHINE_CPUARCH} == "amd64"
 MACHINE_CPU = amd64 sse2 sse mmx
 . elif ${MACHINE_CPUARCH} == "arm"
@@ -154,8 +157,10 @@ _CPUCFLAGS = -march=${CPUTYPE:S/^mips//}
 . endif
 . elif ${MACHINE_CPUARCH} == "aarch64"
 .  if ${CPUTYPE:Marmv*} != "" || ${CPUTYPE:Mmorello*} != ""
+.   if !defined(NO_CHERI)
 # Use -march when the CPU type is an architecture value, e.g. armv8.1-a
 _CPUCFLAGS = -march=${CPUTYPE}
+.   endif
 .  else
 # Otherwise assume we have a CPU type
 _CPUCFLAGS = -mcpu=${CPUTYPE}
@@ -287,7 +292,7 @@ MACHINE_CPU = sse3
 MACHINE_CPU += amd64 sse2 sse mmx
 ########## arm64
 . elif ${MACHINE_CPUARCH} == "aarch64"
-.  if ${CPUTYPE} == "cheri"
+.  if ${CPUTYPE} == "morello"
 MACHINE_CPU = cheri
 .  endif
 MACHINE_CPU += arm64
@@ -308,6 +313,12 @@ MACHINE_CPU = booke softfp
 MACHINE_CPU = cheri
 .  endif
 MACHINE_CPU += riscv
+. endif
+.endif
+
+.if ${MACHINE_CPUARCH} == "aarch64"
+. if ${MACHINE_ARCH} == "morello"
+CFLAGS += -morello -mc64 -femulated-tls
 . endif
 .endif
 

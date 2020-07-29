@@ -104,6 +104,16 @@ LIB32_MACHINE_ABI=	${MACHINE_ABI}
 # -------------------------------------------------------------------
 # 64 bit world
 .if ${MK_LIB64} != "no"
+.if ${COMPAT_ARCH} == "morello"
+HAS_COMPAT=64
+LIB64_MACHINE=	arm64
+LIB64_MACHINE_ARCH=aarch64
+LIB64WMAKEENV=	MACHINE_CPU="arm64 cheri"
+LIB64WMAKEFLAGS= LD="${XLD}" CPUTYPE=morello
+# XXX: clang specific
+LIB64CPUFLAGS=	-target aarch64-unknown-freebsd13.0
+.endif
+
 .if ${COMPAT_ARCH:Mmips64*c*}
 HAS_COMPAT=64
 # XXX: clang specific

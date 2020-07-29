@@ -341,7 +341,7 @@ __DEFAULT_YES_OPTIONS+=LIB32
 BROKEN_OPTIONS+=LIB32
 .endif
 # LIB64 on mips64*c* and riscv64*c*
-.if ${__T:Mmips64*c*} || ${__T:Mriscv64*c*}
+.if ${__T} == "morello" || ${__T:Mmips64*c*} || ${__T:Mriscv64*c*}
 __DEFAULT_YES_OPTIONS+=LIB64
 # In principle, LIB32 could work on architectures where it's supported, but
 # Makefile.libcompat only supports one compat layer.
