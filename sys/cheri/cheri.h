@@ -101,6 +101,14 @@ void * __capability	_cheri_capability_build_user_rwx(uint32_t perms,
 extern void * __capability userspace_cap;
 
 /*
+ * Omnipotent capability for restoring swapped capabilities.
+ *
+ * XXXBD: These should be a way to do this without storing such a potent
+ * capability.  Splitting sealed and unsealed caps would be a start.
+ */
+extern void * __capability swap_restore_cap;
+
+/*
  * Functions to create capabilities used in exec.
  */
 struct image_params;

@@ -177,12 +177,6 @@ int swap_pager_avail;
 static struct sx swdev_syscall_lock;	/* serialize swap(on|off) */
 
 #if __has_feature(capabilities)
-/*
- * Omnipotent capability for restoring swapped capabilities.
- *
- * XXXBD: These should be a way to do this without storing such a potent
- * capability.  Splitting sealed and unsealed caps would be a start.
- */
 void * __capability swap_restore_cap;
 #endif
 
