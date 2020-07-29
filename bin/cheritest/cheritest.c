@@ -84,7 +84,9 @@
 #include "cheritest.h"
 #include "cheritest.h"
 
-#ifdef __mips__
+#if defined(__aarch64__)
+#define	TRAPNO_CHERI	0
+#elif defined(__mips__)
 #define	TRAPNO_CHERI	(T_C2E)
 #elif defined(__riscv)
 #define	TRAPNO_CHERI	(EXCP_CHERI)
