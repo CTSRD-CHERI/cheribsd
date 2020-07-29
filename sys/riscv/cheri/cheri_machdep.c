@@ -53,6 +53,8 @@ cheri_init_capabilities(void * __capability kroot)
 	ctemp = cheri_andperm(ctemp, CHERI_CAP_USER_DATA_PERMS |
 	    CHERI_CAP_USER_CODE_PERMS);
 	userspace_cap = ctemp;
+
+	swap_restore_cap = kroot;
 }
 
 void
