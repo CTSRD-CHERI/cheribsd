@@ -120,6 +120,11 @@ SSP_CFLAGS=
 CFLAGS+=	-ffreestanding ${CFLAGS_NO_SIMD}
 .if ${MACHINE_CPUARCH} == "aarch64"
 CFLAGS+=	-mgeneral-regs-only -ffixed-x18 -fPIC
+# Disable Morello support in the bootloader. EFI needs to understand
+# capabilities before we can enable this as it may have interrupts enabled
+# so will need to save/restore the full capability registers
+NO_CHERI=1
+CFLAGS:=	${CFLAGS:N-morello}
 .elif ${MACHINE_CPUARCH} == "riscv"
 CFLAGS+=	-march=rv64imac -mabi=lp64
 .else
