@@ -108,6 +108,9 @@ extern void * __capability userspace_cap;
  */
 extern void * __capability swap_restore_cap;
 
+/* Root of all sealed kernel capabilities. */
+extern void * __capability kernel_sealcap;
+
 /*
  * Functions to create capabilities used in exec.
  */
