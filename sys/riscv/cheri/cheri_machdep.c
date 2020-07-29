@@ -41,7 +41,7 @@
 #include <machine/riscvreg.h>
 #include <machine/vmparam.h>
 
-extern void * __capability userspace_cap;
+void *cheri_kall_capability = (void *)(intcap_t)-1;
 
 void
 cheri_init_capabilities(void * __capability kroot)
