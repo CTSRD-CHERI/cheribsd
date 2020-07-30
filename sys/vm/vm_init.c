@@ -223,7 +223,7 @@ again:
 	size = CHERI_REPRESENTABLE_LENGTH(size);
 #endif
 	firstaddr = kva_alloc(size);
-	CHERI_VM_ASSERT_EXACT(firstaddr, size);
+	CHERI_ASSERT_EXBOUNDS(firstaddr, size);
 	kmi->buffer_sva = (vm_offset_t)firstaddr;
 	kmi->buffer_eva = kmi->buffer_sva + size;
 	vmem_init(buffer_arena, "buffer arena", firstaddr, size,
@@ -238,7 +238,7 @@ again:
 		size = CHERI_REPRESENTABLE_LENGTH(size);
 #endif
 		firstaddr = kva_alloc(size);
-		CHERI_VM_ASSERT_EXACT(firstaddr, size);
+		CHERI_ASSERT_EXBOUNDS(firstaddr, size);
 		kmi->transient_sva = (vm_offset_t)firstaddr;
 		kmi->transient_eva = kmi->transient_sva + size;
 		vmem_init(transient_arena, "transient arena",
