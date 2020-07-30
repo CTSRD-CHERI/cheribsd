@@ -15,10 +15,13 @@ MDSRCS+= \
 .endif
 
 .if ${MACHINE_CPU:Mcheri}
+.if !${MACHINE_ABI:Mpurecap}
 CHERI_MDSRCS=	\
 		memcpy_c.c \
 		memmove_c.c \
 		memset_c.c
+.endif
+
 CHERI_MISRCS=	\
 		bcopy.c \
 		memcpy.c \

@@ -80,7 +80,6 @@ struct cheri_object cheri_bench;
 #else
 
 #define __capability
-#define memcpy_c memcpy
 #define cheri_ptr(c,l) c
 
 // Manually assembled due to gcc/gas refusing to recognise custom rdhwr registers:

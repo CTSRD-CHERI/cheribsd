@@ -27,7 +27,7 @@ MISRCS+=bcmp.c bcopy.c bzero.c explicit_bzero.c \
 	wmemcmp.c \
 	wmemcpy.c wmemmove.c wmemset.c
 
-.if ${MACHINE_CPU:Mcheri}
+.if ${MACHINE_CPU:Mcheri} && !${MACHINE_ABI:Mpurecap}
 MISRCS+=memcpy_c.c memmove_c.c memset_c.c
 .endif
 
