@@ -122,7 +122,6 @@ MAN=	aac.4 \
 	cxgb.4 \
 	cxgbe.4 \
 	cxgbev.4 \
-	cy.4 \
 	cyapa.4 \
 	da.4 \
 	dc.4 \
@@ -435,7 +434,6 @@ MAN=	aac.4 \
 	${_qlnxe.4} \
 	ral.4 \
 	random.4 \
-	rc.4 \
 	rctl.4 \
 	re.4 \
 	rgephy.4 \
@@ -443,7 +441,6 @@ MAN=	aac.4 \
 	rl.4 \
 	rndtest.4 \
 	route.4 \
-	rp.4 \
 	rtwn.4 \
 	rtwnfw.4 \
 	rtwn_pci.4 \
