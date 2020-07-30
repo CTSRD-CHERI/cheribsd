@@ -1147,7 +1147,7 @@ retry:
 		goto retry;
 
 	CHERI_ASSERT_VALID(*addrp);
-	*addrp = (vmem_addr_t)cheri_setboundsexact((void *)*addrp, size);
+	*addrp = (vmem_addr_t)cheri_kern_setboundsexact((void *)*addrp, size);
 
 out:
 	VMEM_UNLOCK(vm);
@@ -1313,7 +1313,7 @@ vmem_alloc(vmem_t *vm, vmem_size_t size, int flags, vmem_addr_t *addrp)
 		    (flags & ~M_WAITOK) | M_NOWAIT);
 		if (__predict_true(*addrp != 0)) {
 			CHERI_ASSERT_VALID(*addrp);
-			*addrp = (vmem_addr_t)cheri_setbounds(
+			*addrp = (vmem_addr_t)cheri_kern_setboundsexact(
 			    (void *)*addrp, size);
 			CHERI_ASSERT_BOUNDS(*addrp, size);
 			return (0);
@@ -1462,7 +1462,7 @@ out:
 	if (error != 0 && (flags & M_NOWAIT) == 0)
 		panic("failed to allocate waiting allocation\n");
 	CHERI_ASSERT_VALID(*addrp);
-	*addrp = (vmem_addr_t)cheri_setboundsexact((void *)*addrp, size);
+	*addrp = (vmem_addr_t)cheri_kern_setboundsexact((void *)*addrp, size);
 
 	return (error);
 }
