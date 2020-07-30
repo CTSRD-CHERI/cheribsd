@@ -67,6 +67,7 @@ struct malloc_type;
 #include <sys/bio.h>
 #include <sys/buf.h>
 #include <sys/ucred.h>
+#include <sys/taskqueue.h>
 
 #include <ufs/ufs/quota.h>
 #include <ufs/ufs/inode.h>
@@ -136,7 +137,8 @@ ffs_load_inode(struct buf *bp, struct inode *ip, struct fs *fs, ino_t ino)
 		return (0);
 	}
 	dip2 = ((struct ufs2_dinode *)bp->b_data + ino_to_fsbo(fs, ino));
-	if ((error = ffs_verify_dinode_ckhash(fs, dip2)) != 0) {
+	if ((error = ffs_verify_dinode_ckhash(fs, dip2)) != 0 &&
+	    !ffs_fsfail_cleanup(ITOUMP(ip), error)) {
 		printf("%s: inode %jd: check-hash failed\n", fs->fs_fsmnt,
 		    (intmax_t)ino);
 		return (error);
@@ -201,6 +203,93 @@ ffs_check_blkno(struct mount *mp, ino_t inum, ufs2_daddr_t daddr, int blksize)
 	} else if (!havemtx)
 		UFS_UNLOCK(ump);
 	return (EINTEGRITY);
+}
+
+/*
+ * Initiate a forcible unmount.
+ * Used to unmount filesystems whose underlying media has gone away.
+ */
+static void
+ffs_fsfail_unmount(void *v, int pending)
+{
+	struct fsfail_task *etp;
+	struct mount *mp;
+
+	etp = v;
+
+	/*
+	 * Find our mount and get a ref on it, then try to unmount.
+	 */
+	mp = vfs_getvfs(&etp->fsid);
+	if (mp != NULL)
+		dounmount(mp, MNT_FORCE, curthread);
+	free(etp, M_UFSMNT);
+}
+
+/*
+ * On first ENXIO error, start a task that forcibly unmounts the filesystem.
+ *
+ * Return true if a cleanup is in progress.
+ */
+int
+ffs_fsfail_cleanup(struct ufsmount *ump, int error)
+{
+	int retval;
+
+	UFS_LOCK(ump);
+	retval = ffs_fsfail_cleanup_locked(ump, error);
+	UFS_UNLOCK(ump);
+	return (retval);
+}
+
+int
+ffs_fsfail_cleanup_locked(struct ufsmount *ump, int error)
+{
+	struct fsfail_task *etp;
+	struct task *tp;
+
+	mtx_assert(UFS_MTX(ump), MA_OWNED);
+	if (error == ENXIO && (ump->um_flags & UM_FSFAIL_CLEANUP) == 0) {
+		ump->um_flags |= UM_FSFAIL_CLEANUP;
+		/*
+		 * Queue an async forced unmount.
+		 */
+		etp = ump->um_fsfail_task;
+		ump->um_fsfail_task = NULL;
+		if (etp != NULL) {
+			tp = &etp->task;
+			TASK_INIT(tp, 0, ffs_fsfail_unmount, etp);
+			taskqueue_enqueue(taskqueue_thread, tp);
+			printf("UFS: forcibly unmounting %s from %s\n",
+			    ump->um_mountp->mnt_stat.f_mntfromname,
+			    ump->um_mountp->mnt_stat.f_mntonname);
+		}
+	}
+	return ((ump->um_flags & UM_FSFAIL_CLEANUP) != 0);
+}
+
+/*
+ * Wrapper used during ENXIO cleanup to allocate empty buffers when
+ * the kernel is unable to read the real one. They are needed so that
+ * the soft updates code can use them to unwind its dependencies.
+ */
+int
+ffs_breadz(struct ufsmount *ump, struct vnode *vp, daddr_t lblkno,
+    daddr_t dblkno, int size, daddr_t *rablkno, int *rabsize, int cnt,
+    struct ucred *cred, int flags, void (*ckhashfunc)(struct buf *),
+    struct buf **bpp)
+{
+	int error;
+
+	flags |= GB_CVTENXIO;
+	error = breadn_flags(vp, lblkno, dblkno, size, rablkno, rabsize, cnt,
+	    cred, flags, ckhashfunc, bpp);
+	if (error != 0 && ffs_fsfail_cleanup(ump, error)) {
+		error = getblkx(vp, lblkno, dblkno, size, 0, 0, flags, bpp);
+		KASSERT(error == 0, ("getblkx failed"));
+		vfs_bio_bzero_buf(*bpp, 0, size);
+	}
+	return (error);
 }
 #endif /* _KERNEL */
 
@@ -280,6 +369,7 @@ ffs_sbget(void *devfd, struct fs **fsp, off_t altsblock,
     int (*readfunc)(void *devfd, off_t loc, void **bufp, int size))
 {
 	struct fs *fs;
+	struct fs_summary_info *fs_si;
 	int i, error, size, blks;
 	uint8_t *space;
 	int32_t *lp;
@@ -323,11 +413,18 @@ ffs_sbget(void *devfd, struct fs **fsp, off_t altsblock,
 		size += fs->fs_ncg * sizeof(int32_t);
 	size += fs->fs_ncg * sizeof(u_int8_t);
 	/* When running in libufs or libsa, UFS_MALLOC may fail */
-	if ((space = UFS_MALLOC(size, filltype, M_WAITOK)) == NULL) {
+	if ((fs_si = UFS_MALLOC(sizeof(*fs_si), filltype, M_WAITOK)) == NULL) {
 		UFS_FREE(fs, filltype);
 		return (ENOSPC);
 	}
-	fs->fs_csp = (struct csum *)space;
+	bzero(fs_si, sizeof(*fs_si));
+	fs->fs_si = fs_si;
+	if ((space = UFS_MALLOC(size, filltype, M_WAITOK)) == NULL) {
+		UFS_FREE(fs->fs_si, filltype);
+		UFS_FREE(fs, filltype);
+		return (ENOSPC);
+	}
+	fs_csp = (struct csum *)space;
 	for (i = 0; i < blks; i += fs->fs_frag) {
 		size = fs->fs_bsize;
 		if (i + fs->fs_frag > blks)
@@ -339,6 +436,7 @@ ffs_sbget(void *devfd, struct fs **fsp, off_t altsblock,
 			if (buf != NULL)
 				UFS_FREE(buf, filltype);
 			UFS_FREE(fs->fs_csp, filltype);
+			UFS_FREE(fs->fs_si, filltype);
 			UFS_FREE(fs, filltype);
 			return (error);
 		}
@@ -347,14 +445,14 @@ ffs_sbget(void *devfd, struct fs **fsp, off_t altsblock,
 		space += size;
 	}
 	if (fs->fs_contigsumsize > 0) {
-		fs->fs_maxcluster = lp = (int32_t *)space;
+		fs_maxcluster = lp = (int32_t *)space;
 		for (i = 0; i < fs->fs_ncg; i++)
 			*lp++ = fs->fs_contigsumsize;
 		space = (uint8_t *)lp;
 	}
 	size = fs->fs_ncg * sizeof(u_int8_t);
-	fs->fs_contigdirs = (u_int8_t *)space;
-	bzero(fs->fs_contigdirs, size);
+	fs_contigdirs = (u_int8_t *)space;
+	bzero(fs_contigdirs, size);
 	*fsp = fs;
 	return (0);
 }
@@ -421,7 +519,7 @@ readsuper(void *devfd, struct fs **fsp, off_t sblockloc, int isaltsblk,
 		/* Have to set for old filesystems that predate this field */
 		fs->fs_sblockactualloc = sblockloc;
 		/* Not yet any summary information */
-		fs->fs_csp = NULL;
+		fs->fs_si = NULL;
 		return (0);
 	}
 	return (ENOENT);
@@ -447,7 +545,7 @@ ffs_sbput(void *devfd, struct fs *fs, off_t loc,
 	 * If there is summary information, write it first, so if there
 	 * is an error, the superblock will not be marked as clean.
 	 */
-	if (fs->fs_csp != NULL) {
+	if (fs->fs_si != NULL && fs->fs_csp != NULL) {
 		blks = howmany(fs->fs_cssize, fs->fs_fsize);
 		space = (uint8_t *)fs->fs_csp;
 		for (i = 0; i < blks; i += fs->fs_frag) {
@@ -737,3 +835,13 @@ ffs_clusteracct(struct fs *fs, struct cg *cgp, ufs1_daddr_t blkno, int cnt)
 			break;
 	fs->fs_maxcluster[cgp->cg_cgx] = i;
 }
+
+// CHERI CHANGES START
+// {
+//   "updated": 20190628,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_shape"
+//   ]
+// }
+// CHERI CHANGES END

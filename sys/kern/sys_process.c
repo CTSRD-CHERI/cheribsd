@@ -68,7 +68,6 @@ __FBSDID("$FreeBSD$");
 
 #ifdef COMPAT_FREEBSD32
 #include <sys/procfs.h>
-#include <compat/freebsd32/freebsd32_signal.h>
 #endif
 
 /*
@@ -523,31 +522,31 @@ sys_ptrace(struct thread *td, struct ptrace_args *uap)
 	case PT_GET_SC_RET:
 		break;
 	case PT_GETREGS:
-		bzero(&r.reg, sizeof r.reg);
+		bzero(&r.reg, sizeof(r.reg));
 		break;
 	case PT_GETFPREGS:
-		bzero(&r.fpreg, sizeof r.fpreg);
+		bzero(&r.fpreg, sizeof(r.fpreg));
 		break;
 #if __has_feature(capabilities)
 	case PT_GETCAPREGS:
-		bzero(&r.capreg, sizeof r.capreg);
+		bzero(&r.capreg, sizeof(r.capreg));
 		break;
 #endif
 	case PT_GETDBREGS:
-		bzero(&r.dbreg, sizeof r.dbreg);
+		bzero(&r.dbreg, sizeof(r.dbreg));
 		break;
 	case PT_SETREGS:
-		error = copyin(uap->addr, &r.reg, sizeof r.reg);
+		error = copyin(uap->addr, &r.reg, sizeof(r.reg));
 		break;
 	case PT_SETFPREGS:
-		error = copyin(uap->addr, &r.fpreg, sizeof r.fpreg);
+		error = copyin(uap->addr, &r.fpreg, sizeof(r.fpreg));
 		break;
 	case PT_SETDBREGS:
-		error = copyin(uap->addr, &r.dbreg, sizeof r.dbreg);
+		error = copyin(uap->addr, &r.dbreg, sizeof(r.dbreg));
 		break;
 #if __has_feature(capabilities)
 	case PT_SETCAPREGS:
-		error = copyin(uap->addr, &r.capreg, sizeof r.capreg);
+		error = copyin(uap->addr, &r.capreg, sizeof(r.capreg));
 		break;
 #endif
 	case PT_SET_EVENT_MASK:
@@ -560,7 +559,7 @@ sys_ptrace(struct thread *td, struct ptrace_args *uap)
 		error = copyincap(uap->addr, &r.piod, sizeof(r.piod));
 		break;
 	case PT_VM_ENTRY:
-		error = copyincap(uap->addr, &r.pve, sizeof r.pve);
+		error = copyincap(uap->addr, &r.pve, sizeof(r.pve));
 		break;
 	default:
 		addr = (__cheri_tocap void * __capability)uap->addr;
@@ -592,17 +591,17 @@ sys_ptrace(struct thread *td, struct ptrace_args *uap)
 		    sizeof(r.piod.piod_len));
 		break;
 	case PT_GETREGS:
-		error = copyout(&r.reg, uap->addr, sizeof r.reg);
+		error = copyout(&r.reg, uap->addr, sizeof(r.reg));
 		break;
 	case PT_GETFPREGS:
-		error = copyout(&r.fpreg, uap->addr, sizeof r.fpreg);
+		error = copyout(&r.fpreg, uap->addr, sizeof(r.fpreg));
 		break;
 	case PT_GETDBREGS:
-		error = copyout(&r.dbreg, uap->addr, sizeof r.dbreg);
+		error = copyout(&r.dbreg, uap->addr, sizeof(r.dbreg));
 		break;
 #if __has_feature(capabilities)
 	case PT_GETCAPREGS:
-		error = copyout(&r.capreg, uap->addr, sizeof r.capreg);
+		error = copyout(&r.capreg, uap->addr, sizeof(r.capreg));
 		break;
 #endif
 	case PT_GET_EVENT_MASK:

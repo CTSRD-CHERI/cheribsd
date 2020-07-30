@@ -68,6 +68,7 @@ __FBSDID("$FreeBSD$");
 #include <compat/freebsd64/freebsd64_syscall.h>
 #include <compat/freebsd64/freebsd64_util.h>
 
+static const char *freebsd64_riscv_machine_arch(struct proc *p);
 static void	freebsd64_sendsig(sig_t, ksiginfo_t *, sigset_t *);
 
 extern const char *freebsd64_syscallnames[];
@@ -106,8 +107,19 @@ struct sysentvec elf_freebsd_freebsd64_sysvec = {
 	.sv_thread_detach = NULL,
 	.sv_trap	= NULL,
 	.sv_hwcap	= &elf_hwcap,
+	.sv_machine_arch = freebsd64_riscv_machine_arch,
 };
 INIT_SYSENTVEC(freebsd64_sysent, &elf_freebsd_freebsd64_sysvec);
+
+static const char *
+freebsd64_riscv_machine_arch(struct proc *p)
+{
+
+	if ((p->p_elf_flags & EF_RISCV_FLOAT_ABI_MASK) ==
+	    EF_RISCV_FLOAT_ABI_SOFT)
+		return (MACHINE_ARCH64SF);
+	return (MACHINE_ARCH64);
+}
 
 static Elf64_Brandinfo freebsd_freebsd64_brand_info = {
 	.brand		= ELFOSABI_FREEBSD,
@@ -211,14 +223,14 @@ freebsd64_set_mcontext(struct thread *td, mcontext64_t *mcp)
 static void
 freebsd64_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 {
-	struct sigframe64 *fp, frame;
+	struct sigframe64 frame;
 	mcontext_t mc;
 	struct sysentvec *sysent;
 	struct trapframe *tf;
 	struct sigacts *psp;
 	struct thread *td;
 	struct proc *p;
-	vm_offset_t sp, capregs;
+	vm_offset_t capregs, fp, sp;
 	int onstack;
 	int sig;
 
@@ -234,15 +246,15 @@ freebsd64_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	onstack = sigonstack(tf->tf_sp);
 
 	CTR4(KTR_SIG, "sendsig: td=%p (%s) catcher=%p sig=%d", td, p->p_comm,
-	    catcher, sig);
+	    (__cheri_addr vaddr_t)catcher, sig);
 
 	/* Allocate and validate space for the signal handler context. */
 	if ((td->td_pflags & TDP_ALTSTACK) != 0 && !onstack &&
 	    SIGISMEMBER(psp->ps_sigonstack, sig)) {
-		sp = ((__cheri_addr uintptr_t)td->td_sigstk.ss_sp +
+		sp = ((__cheri_addr vaddr_t)td->td_sigstk.ss_sp +
 		    td->td_sigstk.ss_size);
 	} else {
-		sp = (__cheri_addr uintptr_t)td->td_frame->tf_sp;
+		sp = (__cheri_addr vaddr_t)td->td_frame->tf_sp;
 	}
 
 	/* Allocate room for the capability register context. */
@@ -251,9 +263,9 @@ freebsd64_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	capregs = sp;
 
 	/* Make room, keeping the stack aligned */
-	sp -= sizeof(*fp);
+	sp -= sizeof(frame);
 	sp = STACKALIGN(sp);
-	fp = (struct sigframe64 *)sp;
+	fp = sp;
 
 	/* Fill in the frame to copy out */
 	bzero(&frame, sizeof(frame));
@@ -263,7 +275,7 @@ freebsd64_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	frame.sf_uc.uc_mcontext.mc_capregs = capregs;
 	siginfo_to_siginfo64(&ksi->ksi_info, &frame.sf_si);
 	frame.sf_uc.uc_sigmask = *mask;
-	frame.sf_uc.uc_stack.ss_sp = (__cheri_addr uintptr_t)td->td_sigstk.ss_sp;
+	frame.sf_uc.uc_stack.ss_sp = (__cheri_addr vaddr_t)td->td_sigstk.ss_sp;
 	frame.sf_uc.uc_stack.ss_size = td->td_sigstk.ss_size;
 	frame.sf_uc.uc_stack.ss_flags = (td->td_pflags & TDP_ALTSTACK) != 0 ?
 	    (onstack ? SS_ONSTACK : 0) : SS_DISABLE;
@@ -281,7 +293,8 @@ freebsd64_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	}
 
 	/* Copy the sigframe out to the user's stack. */
-	if (copyoutcap(&frame, __USER_CAP_OBJ(fp), sizeof(*fp)) != 0) {
+	if (copyoutcap(&frame, __USER_CAP(fp, sizeof(frame)), sizeof(frame)) !=
+	    0) {
 		/* Process has trashed its stack. Kill it. */
 		CTR2(KTR_SIG, "sendsig: sigexit td=%p fp=%p", td, fp);
 		PROC_LOCK(p);
@@ -289,8 +302,8 @@ freebsd64_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	}
 
 	tf->tf_a[0] = sig;
-	tf->tf_a[1] = (register_t)&fp->sf_si;
-	tf->tf_a[2] = (register_t)&fp->sf_uc;
+	tf->tf_a[1] = (register_t)fp + offsetof(struct sigframe64, sf_si);
+	tf->tf_a[2] = (register_t)fp + offsetof(struct sigframe64, sf_uc);
 
 	tf->tf_sepc = (uintcap_t)catcher;
 	tf->tf_sp = (register_t)fp;

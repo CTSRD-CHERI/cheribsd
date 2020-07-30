@@ -6,12 +6,7 @@
 
 # Include the generated makefile containing the *complete* list
 # of syscall names in MIASM.
-.if ${MACHINE_ABI:Mpurecap}
-.include "${SRCTOP}/sys/compat/cheriabi/cheriabi_syscall.mk"
-MIASM:=	${MIASM:S/cheriabi_//}
-.else
 .include "${SRCTOP}/sys/sys/syscall.mk"
-.endif
 
 # Include machine dependent definitions.
 #
@@ -23,6 +18,7 @@ MIASM:=	${MIASM:S/cheriabi_//}
 # declarations in common:
 #
 NOASM=	exit.o \
+	flag_captured.o \
 	getlogin.o \
 	sstk.o \
 	yield.o
@@ -92,7 +88,7 @@ INTERPOSED = \
 
 .if ${MACHINE_ABI:Mpurecap}
 # Var-args calling convention different for purecap
-NO_UNDERSCORE=	fcntl ioctl open
+NO_UNDERSCORE=	fcntl ioctl open openat
 .for _nu in ${NO_UNDERSCORE}
 INTERPOSED:=	${INTERPOSED:N${_nu}}
 .endfor
@@ -204,6 +200,7 @@ MAN+=	abort2.2 \
 	fhlink.2 \
 	fhopen.2 \
 	fhreadlink.2 \
+	flag_captured.2 \
 	flock.2 \
 	fork.2 \
 	fsync.2 \

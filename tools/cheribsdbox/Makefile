@@ -11,10 +11,10 @@ PROG=	cheribsdbox
 CHERIBSDBOX_DIR?=	/bin
 BINDIR?=${CHERIBSDBOX_DIR}
 
-.if ${MK_LIB64} == "yes"
-# We want to build all these tools as statically linked 64-bit binaries.
-# For MIPS we don't want to build this as purecap yet (it generates a captable
-# that is too large to link).
+# We want to build all these tools as statically linked binaries, but for MIPS
+# we don't want to build this as purecap yet since it generates a captable that
+# is too large to link.
+.if ${MACHINE_ARCH:Mmips64*} && ${MK_LIB64} == "yes"
 NEED_COMPAT=	64
 WANT_CHERI=		none
 CRUNCH_BUILDOPTS+=	WANT_CHERI=none NEED_COMPAT=64
@@ -238,6 +238,7 @@ CRUNCH_PROGS_usr.bin+= \
 		false \
 		fetch \
 		find \
+		fsync \
 		grep \
 		head \
 		hexdump \

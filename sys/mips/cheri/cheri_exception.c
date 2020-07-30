@@ -69,11 +69,6 @@ static const char *cheri_exccode_descr[] = {
 	[CHERI_EXCCODE_CCALL_IDC] = "access ccall IDC violation",
 	[CHERI_EXCCODE_PERM_UNSEAL] = "permit unseal violation",
 	[CHERI_EXCCODE_PERM_SET_CID] = "permit CSetCID violation",
-	[CHERI_EXCCODE_SW_LOCALARG] = "local capability in argument",
-	[CHERI_EXCCODE_SW_LOCALRET] = "local capability in return value",
-	[CHERI_EXCCODE_SW_CCALLREGS] = "incorrect CCall registers",
-	[CHERI_EXCCODE_SW_OVERFLOW] = "trusted stack overflow",
-	[CHERI_EXCCODE_SW_UNDERFLOW] = "trusted stack underflow",
 };
 
 const char *
@@ -346,9 +341,8 @@ cheri_log_exception(struct trapframe *frame, int trap_type)
 #endif
 	if ((trap_type == T_C2E) || (trap_type == T_C2E + T_USER)) {
 		cause = frame->capcause;
-		exccode = (cause & CHERI_CAPCAUSE_EXCCODE_MASK) >>
-		    CHERI_CAPCAUSE_EXCCODE_SHIFT;
-		regnum = cause & CHERI_CAPCAUSE_REGNUM_MASK;
+		exccode = CHERI_CAPCAUSE_EXCCODE(cause);
+		regnum = CHERI_CAPCAUSE_REGNUM(cause);
 		printf("CHERI cause: ExcCode: 0x%02x ", exccode);
 		if (regnum < 32)
 			printf("RegNum: $c%02d ", regnum);
@@ -366,8 +360,7 @@ cheri_capcause_to_sicode(register_t capcause)
 {
 	uint8_t exccode;
 
-	exccode = (capcause & CHERI_CAPCAUSE_EXCCODE_MASK) >>
-	    CHERI_CAPCAUSE_EXCCODE_SHIFT;
+	exccode = CHERI_CAPCAUSE_EXCCODE(capcause);
 	switch (exccode) {
 	case CHERI_EXCCODE_LENGTH:
 		return (PROT_CHERI_BOUNDS);
@@ -393,7 +386,7 @@ cheri_capcause_to_sicode(register_t capcause)
 		return (PROT_CHERI_PERM);
 
 	case CHERI_EXCCODE_TLBSTORE:
-		return (PROT_CHERI_STORETAG);
+		panic("TLBSTORE uses SIGSEGV");
 
 	case CHERI_EXCCODE_IMPRECISE:
 		return (PROT_CHERI_IMPRECISE);
@@ -410,21 +403,6 @@ cheri_capcause_to_sicode(register_t capcause)
 
 	case CHERI_EXCCODE_SYSTEM_REGS:
 		return (PROT_CHERI_SYSREG);
-
-	case CHERI_EXCCODE_SW_OVERFLOW:
-		return (PROT_CHERI_OVERFLOW);
-
-	case CHERI_EXCCODE_SW_UNDERFLOW:
-		return (PROT_CHERI_UNDERFLOW);
-
-	case CHERI_EXCCODE_SW_CCALLREGS:
-		return (PROT_CHERI_CCALLREGS);
-
-	case CHERI_EXCCODE_SW_LOCALARG:
-		return (PROT_CHERI_LOCALARG);
-
-	case CHERI_EXCCODE_SW_LOCALRET:
-		return (PROT_CHERI_LOCALRET);
 
 	case CHERI_EXCCODE_NONE:
 	default:

@@ -76,6 +76,13 @@ __FBSDID("$FreeBSD$");
 #include <sys/dtrace_bsd.h>
 #endif
 
+#if __has_feature(capabilities)
+int log_user_cheri_exceptions = 0;
+SYSCTL_INT(_machdep, OID_AUTO, log_user_cheri_exceptions, CTLFLAG_RWTUN,
+    &log_user_cheri_exceptions, 0,
+    "Print registers and process details on user CHERI exceptions");
+#endif
+
 int (*dtrace_invop_jump_addr)(struct trapframe *);
 
 extern register_t fsu_intr_fault;
@@ -86,7 +93,7 @@ void do_trap_user(struct trapframe *);
 
 static __inline void
 call_trapsignal(struct thread *td, int sig, int code, void * __capability addr,
-    int capreg)
+    int trapno, int capreg)
 {
 	ksiginfo_t ksi;
 
@@ -95,6 +102,7 @@ call_trapsignal(struct thread *td, int sig, int code, void * __capability addr,
 	ksi.ksi_code = code;
 	ksi.ksi_addr = addr;
 	ksi.ksi_capreg = capreg;
+	ksi.ksi_trapno = trapno;
 	trapsignal(td, &ksi);
 }
 
@@ -222,6 +230,52 @@ dump_regs(struct trapframe *frame)
 	printf("stval == 0x%016lx\n", frame->tf_stval);
 }
 
+#if __has_feature(capabilities)
+static void
+dump_cheri_exception(struct trapframe *frame)
+{
+	struct thread *td;
+	struct proc *p;
+
+	td = curthread;
+	p = td->td_proc;
+	printf("pid %d tid %ld (%s), uid %d: ", p->p_pid, td->td_tid,
+	    p->p_comm, td->td_ucred->cr_uid);
+	switch (frame->tf_scause & EXCP_MASK) {
+	case EXCP_LOAD_CAP_PAGE_FAULT:
+		printf("LOAD CAP page fault");
+		break;
+	case EXCP_STORE_AMO_CAP_PAGE_FAULT:
+		printf("STORE/AMO CAP page fault");
+		break;
+	case EXCP_CHERI:
+		printf("CHERI fault (type %#x), capidx %d",
+		    TVAL_CAP_CAUSE(frame->tf_stval),
+		    TVAL_CAP_IDX(frame->tf_stval));
+		break;
+	default:
+		printf("fault %d", frame->tf_scause & EXCP_MASK);
+		break;
+	}
+	printf("\n");
+	if (p->p_args != NULL) {
+		char *args;
+		unsigned len;
+
+		args = p->p_args->ar_args;
+		len = p->p_args->ar_length;
+		for (unsigned i = 0; i < len; i++) {
+			if (args[i] == '\0')
+				printf(" ");
+			else
+				printf("%c", args[i]);
+		}
+		printf("\n");
+	}
+	dump_regs(frame);
+}
+#endif
+
 static void
 svc_handler(struct trapframe *frame)
 {
@@ -291,7 +345,8 @@ data_abort(struct trapframe *frame, int usermode)
 	if (error != KERN_SUCCESS) {
 		if (usermode) {
 			call_trapsignal(td, sig, ucode,
-			    (void * __capability)(uintcap_t)stval, 0);
+			    (void * __capability)(uintcap_t)stval,
+			    frame->tf_scause & EXCP_MASK, 0);
 		} else {
 			if (pcb->pcb_onfault != 0) {
 				frame->tf_a[0] = error;
@@ -322,9 +377,6 @@ void
 do_trap_supervisor(struct trapframe *frame)
 {
 	uint64_t exception;
-#if __has_feature(capabilities)
-	uint64_t sccsr;
-#endif
 
 	/* Ensure we came from supervisor mode, interrupts disabled */
 	KASSERT((csr_read(sstatus) & (SSTATUS_SPP | SSTATUS_SIE)) ==
@@ -355,10 +407,9 @@ do_trap_supervisor(struct trapframe *frame)
 		break;
 	case EXCP_BREAKPOINT:
 #ifdef KDTRACE_HOOKS
-		if (dtrace_invop_jump_addr != 0) {
-			dtrace_invop_jump_addr(frame);
-			break;
-		}
+		if (dtrace_invop_jump_addr != NULL &&
+		    dtrace_invop_jump_addr(frame) == 0)
+				break;
 #endif
 #ifdef KDB
 		kdb_trap(exception, 0, frame);
@@ -373,6 +424,8 @@ do_trap_supervisor(struct trapframe *frame)
 		    (__cheri_addr unsigned long)frame->tf_sepc);
 		break;
 #if __has_feature(capabilities)
+	case EXCP_LOAD_CAP_PAGE_FAULT:
+	case EXCP_STORE_AMO_CAP_PAGE_FAULT:
 	case EXCP_CHERI:
 		if (curthread->td_pcb->pcb_onfault != 0) {
 			frame->tf_a[0] = EPROT;
@@ -381,11 +434,18 @@ do_trap_supervisor(struct trapframe *frame)
 			break;
 		}
 		dump_regs(frame);
-		sccsr = csr_read(sccsr);
-		panic("CHERI exception %#x at 0x%016lx\n",
-		    (sccsr & SCCSR_CAUSE_MASK) >> SCCSR_CAUSE_SHIFT,
-		    (__cheri_addr unsigned long)frame->tf_sepc);
-		break;
+		switch (exception) {
+		default:
+			panic("Fatal capability page fault %#lx: %#016lx",
+			    (__cheri_addr unsigned long)frame->tf_sepc,
+			    frame->tf_stval);
+			break;
+		case EXCP_CHERI:
+			panic("CHERI exception %#x at 0x%016lx\n",
+			    TVAL_CAP_CAUSE(frame->tf_stval),
+			    (__cheri_addr unsigned long)frame->tf_sepc);
+			break;
+		}
 #endif
 	default:
 		dump_regs(frame);
@@ -400,9 +460,6 @@ do_trap_user(struct trapframe *frame)
 	uint64_t exception;
 	struct thread *td;
 	struct pcb *pcb;
-#if __has_feature(capabilities)
-	uint64_t sccsr;
-#endif
 
 	td = curthread;
 	td->td_frame = frame;
@@ -450,21 +507,43 @@ do_trap_user(struct trapframe *frame)
 		}
 #endif
 		call_trapsignal(td, SIGILL, ILL_ILLTRP,
-		    (void * __capability)frame->tf_sepc, 0);
+		    (void * __capability)frame->tf_sepc, exception, 0);
 		userret(td, frame);
 		break;
 	case EXCP_BREAKPOINT:
 		call_trapsignal(td, SIGTRAP, TRAP_BRKPT,
-		    (void * __capability)frame->tf_sepc, 0);
+		    (void * __capability)frame->tf_sepc, exception, 0);
 		userret(td, frame);
 		break;
 #if __has_feature(capabilities)
+	/* M-mode emulates alignment of non-CHERI instructions */
+	case EXCP_MISALIGNED_LOAD:
+	case EXCP_MISALIGNED_STORE:
+		call_trapsignal(td, SIGBUS, BUS_ADRALN,
+		    (void * __capability)(uintcap_t)frame->tf_stval, exception,
+		    0);
+		break;
+	case EXCP_LOAD_CAP_PAGE_FAULT:
+		if (log_user_cheri_exceptions)
+			dump_cheri_exception(frame);
+		call_trapsignal(td, SIGSEGV, SEGV_LOADTAG,
+		    (void * __capability)(uintcap_t)frame->tf_stval, exception,
+		    0);
+		break;
+	case EXCP_STORE_AMO_CAP_PAGE_FAULT:
+		if (log_user_cheri_exceptions)
+			dump_cheri_exception(frame);
+		call_trapsignal(td, SIGSEGV, SEGV_STORETAG,
+		    (void * __capability)(uintcap_t)frame->tf_stval, exception,
+		    0);
+		break;
 	case EXCP_CHERI:
-		sccsr = csr_read(sccsr);
-
-		call_trapsignal(td, SIGPROT, cheri_sccsr_to_sicode(sccsr),
-		    (void * __capability)frame->tf_sepc,
-		    (sccsr & SCCSR_CAP_IDX_MASK) >> SCCSR_CAP_IDX_SHIFT);
+		if (log_user_cheri_exceptions)
+			dump_cheri_exception(frame);
+		call_trapsignal(td, SIGPROT,
+		    cheri_stval_to_sicode(frame->tf_stval),
+		    (void * __capability)frame->tf_sepc, exception,
+		    TVAL_CAP_IDX(frame->tf_stval));
 		userret(td, frame);
 		break;
 #endif

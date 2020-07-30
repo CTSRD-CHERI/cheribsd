@@ -372,18 +372,18 @@ SYSINIT(version, SI_SUB_COPYRIGHT, SI_ORDER_THIRD, print_version, NULL);
 #ifdef WITNESS
 static char wit_warn[] =
      "WARNING: WITNESS option enabled, expect reduced performance.\n";
-SYSINIT(witwarn, SI_SUB_COPYRIGHT, SI_ORDER_THIRD + 1,
+SYSINIT(witwarn, SI_SUB_COPYRIGHT, SI_ORDER_FOURTH,
    print_caddr_t, wit_warn);
-SYSINIT(witwarn2, SI_SUB_LAST, SI_ORDER_THIRD + 1,
+SYSINIT(witwarn2, SI_SUB_LAST, SI_ORDER_FOURTH,
    print_caddr_t, wit_warn);
 #endif
 
 #ifdef DIAGNOSTIC
 static char diag_warn[] =
      "WARNING: DIAGNOSTIC option enabled, expect reduced performance.\n";
-SYSINIT(diagwarn, SI_SUB_COPYRIGHT, SI_ORDER_THIRD + 2,
+SYSINIT(diagwarn, SI_SUB_COPYRIGHT, SI_ORDER_FIFTH,
     print_caddr_t, diag_warn);
-SYSINIT(diagwarn2, SI_SUB_LAST, SI_ORDER_THIRD + 2,
+SYSINIT(diagwarn2, SI_SUB_LAST, SI_ORDER_FIFTH,
     print_caddr_t, diag_warn);
 #endif
 
@@ -541,7 +541,10 @@ proc0_init(void *dummy __unused)
 	/* End hack. creds get properly set later with thread_cow_get_proc */
 	curthread->td_ucred = NULL;
 	newcred->cr_prison = &prison0;
+	newcred->cr_users++; /* avoid assertion failure */
 	proc_set_cred_init(p, newcred);
+	newcred->cr_users--;
+	crfree(newcred);
 #ifdef AUDIT
 	audit_cred_kproc0(newcred);
 #endif
@@ -812,8 +815,9 @@ create_init(const void *udata __unused)
 #endif
 	proc_set_cred(initproc, newcred);
 	td = FIRST_THREAD_IN_PROC(initproc);
-	crfree(td->td_ucred);
-	td->td_ucred = crhold(initproc->p_ucred);
+	crcowfree(td);
+	td->td_realucred = crcowget(initproc->p_ucred);
+	td->td_ucred = td->td_realucred;
 	PROC_UNLOCK(initproc);
 	sx_xunlock(&proctree_lock);
 	crfree(oldcred);

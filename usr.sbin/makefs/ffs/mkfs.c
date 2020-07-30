@@ -86,6 +86,8 @@ static union {
 } fsun;
 #define	sblock	fsun.fs
 
+static struct fs_summary_info sblock_summary_info;
+
 static union {
 	struct cg cg;
 	char pad[FFS_MAXBSIZE];
@@ -408,6 +410,7 @@ ffs_mkfs(const char *fsys, const fsinfo_t *fsopts, time_t tstamp)
 	if (sblock.fs_contigsumsize > 0)
 		size += sblock.fs_ncg * sizeof(int32_t);
 	space = ecalloc(1, size);
+	sblock.fs_si = &sblock_summary_info;
 	sblock.fs_csp = space;
 	space = (char *)space + sblock.fs_cssize;
 	if (sblock.fs_contigsumsize > 0) {
@@ -835,3 +838,13 @@ ilog2(int val)
 			return (n);
 	errx(1, "%s: %d is not a power of 2", __func__, val);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20190628,
+//   "target_type": "prog",
+//   "changes_purecap": [
+//     "pointer_shape"
+//   ],
+//   "change_comment": "embedded pointer storage in superblock"
+// }
+// CHERI CHANGES END

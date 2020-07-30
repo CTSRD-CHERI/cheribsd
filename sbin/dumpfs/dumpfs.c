@@ -305,6 +305,7 @@ dumpfs(const char *name)
 		afs.fs_volname, (uintmax_t)afs.fs_swuid,
 		(uintmax_t)afs.fs_providersize);
 	printf("\ncs[].cs_(nbfree,ndir,nifree,nffree):\n\t");
+	afs.fs_si = calloc(1, sizeof(*afs.fs_si));
 	afs.fs_csp = calloc(1, afs.fs_cssize);
 	if (bread(&disk, fsbtodb(&afs, afs.fs_csaddr), afs.fs_csp, afs.fs_cssize) == -1)
 		goto err;
@@ -531,3 +532,13 @@ usage(void)
 	(void)fprintf(stderr, "usage: dumpfs [-flm] filesys | device\n");
 	exit(1);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20190628,
+//   "target_type": "prog",
+//   "changes_purecap": [
+//     "pointer_shape"
+//   ],
+//   "change_comment": "embedded pointer storage in superblock"
+// }
+// CHERI CHANGES END

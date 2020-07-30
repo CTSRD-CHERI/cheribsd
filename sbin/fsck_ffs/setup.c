@@ -61,6 +61,7 @@ __FBSDID("$FreeBSD$");
 struct inoinfo **inphead, **inpsort;
 
 struct uufsd disk;
+struct fs_summary_info ufs_summary_info;
 struct bufarea asblk;
 #define altsblock (*asblk.b_un.b_fs)
 #define POWEROF2(num)	(((num) & ((num) - 1)) == 0)
@@ -446,6 +447,10 @@ sblock_init(void)
 	asblk.b_un.b_buf = Malloc(SBLOCKSIZE);
 	if (sblk.b_un.b_buf == NULL || asblk.b_un.b_buf == NULL)
 		errx(EEXIT, "cannot allocate space for superblock");
+	sblock.fs_si = Malloc(sizeof(*sblock.fs_si));
+	altsblock.fs_si = Malloc(sizeof(*altsblock.fs_si));
+	if (sblock.fs_si == NULL || altsblock.fs_si == NULL)
+		errx(EEXIT, "cannot allocate space for superblock summary info");
 	dev_bsize = secsize = DEV_BSIZE;
 }
 
@@ -566,3 +571,13 @@ saverecovery(int readfd, int writefd)
 	blwrite(writefd, fsrbuf, (SBLOCK_UFS2 - secsize) / secsize, secsize);
 	free(fsrbuf);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20200706,
+//   "target_type": "prog",
+//   "changes_purecap": [
+//     "pointer_shape"
+//   ],
+//   "change_comment": "embedded pointer storage in superblock"
+// }
+// CHERI CHANGES END

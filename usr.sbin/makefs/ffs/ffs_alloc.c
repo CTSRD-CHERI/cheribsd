@@ -681,3 +681,13 @@ ffs_clusteracct(struct fs *fs, struct cg *cgp, int32_t blkno, int cnt)
 			break;
 	fs->fs_maxcluster[ufs_rw32(cgp->cg_cgx, needswap)] = i;
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20190628,
+//   "target_type": "prog",
+//   "changes_purecap": [
+//     "pointer_shape"
+//   ],
+//   "change_comment": "embedded pointer storage in superblock"
+// }
+// CHERI CHANGES END

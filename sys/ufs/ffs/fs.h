@@ -129,19 +129,22 @@
 /*
  * There is a 128-byte region in the superblock reserved for in-core
  * pointers to summary information. Originally this included an array
- * of pointers to blocks of struct csum; now there are just a few
- * pointers and the remaining space is padded with fs_ocsp[].
+ * of pointers to blocks of struct csum; now there is just on pointer
+ * and 64-bits of padding for align it to 16-bytes and the remaining
+ * space is padded with fs_ocsp[].
  *
- * NOCSPTRS determines the size of this padding. One pointer (fs_csp)
- * is taken away to point to a contiguous array of struct csum for
- * all cylinder groups; a second (fs_maxcluster) points to an array
- * of cluster sizes that is computed as cylinder groups are inspected,
- * and the third points to an array that tracks the creation of new
- * directories. A fourth pointer, fs_active, is used when creating
- * snapshots; it points to a bitmap of cylinder groups for which the
- * free-block bitmap has changed since the snapshot operation began.
+ * NOCSP determines the size of this padding. Historically this
+ * space was used to store pointers to structures that summaried
+ * filesystem usage and layout information. However, these pointers
+ * left various kernel pointers in the superblock which made otherwise
+ * identical superblocks appear to have differences. So, all the
+ * pointers in the superblock were moved to a fs_summary_info structure
+ * reducing the superblock to having only a single pointer to this
+ * structure. When writing the superblock to disk, this pointer is
+ * temporarily NULL'ed out so that the kernel pointer will not appear
+ * in the on-disk copy of the superblock.
  */
-#define	NOCSPTRS	((128 / sizeof(void *)) - 4)
+#define	NOCSP	(128 - sizeof(void *) - sizeof(uint64_t))
 
 /*
  * A summary of contiguous blocks of various sizes is maintained
@@ -270,6 +273,32 @@ struct csum_total {
 };
 
 /*
+ * Pointers to super block summary information. Placed in a separate
+ * structure so there is just one pointer in the superblock.
+ *
+ * The pointers in this structure are used as follows:
+ *   fs_contigdirs references an array that tracks the creation of new
+ *	directories
+ *   fs_csp references a contiguous array of struct csum for
+ *	all cylinder groups
+ *   fs_maxcluster references an array of cluster sizes that is computed
+ *	as cylinder groups are inspected
+ *   fs_active is used when creating snapshots; it points to a bitmap
+ *	of cylinder groups for which the free-block bitmap has changed
+ *	since the snapshot operation began.
+ */
+struct fs_summary_info {
+	uint8_t	*si_contigdirs;		/* (u) # of contig. allocated dirs */
+	struct	csum *si_csp;		/* (u) cg summary info buffer */
+	int32_t	*si_maxcluster;		/* (u) max cluster in each cyl group */
+	u_int	*si_active;		/* (u) used by snapshots to track fs */
+};
+#define fs_contigdirs	fs_si->si_contigdirs
+#define fs_csp		fs_si->si_csp
+#define fs_maxcluster	fs_si->si_maxcluster
+#define fs_active	fs_si->si_active
+
+/*
  * Super block for an FFS filesystem.
  */
 struct fs {
@@ -339,19 +368,9 @@ struct fs {
 	int32_t  fs_pad;		/* due to alignment of fs_swuid */
 /* these fields retain the current block allocation info */
 	int32_t	 fs_cgrotor;		/* last cg searched */
-#ifndef __CHERI_PURE_CAPABILITY__
-	void 	*fs_ocsp[NOCSPTRS];	/* padding; was list of fs_cs buffers */
-	u_int8_t *fs_contigdirs;	/* (u) # of contig. allocated dirs */
-	struct	csum *fs_csp;		/* (u) cg summary info buffer */
-	int32_t	*fs_maxcluster;		/* (u) max cluster in each cyl group */
-	u_int	*fs_active;		/* (u) used by snapshots to track fs */
-#else
-	u_int64_t cheri_align_pad;	/* Pad to 32-byte alignment */
-	u_int8_t *fs_contigdirs;	/* (u) # of contig. allocated dirs */
-	struct	csum *fs_csp;		/* Used by fsck */
-	int32_t	*fs_maxcluster;		/* Used by libufs */
-	char	fs_ocsp[128 - (3*sizeof(void *)) - 8];
-#endif
+	u_int64_t cheri_align_pad;	/* pad to 16-byte alignment */
+	struct fs_summary_info *fs_si;	/* In-core pointer to summary info */
+	char	 fs_ocsp[NOCSP];
 	int32_t	 fs_old_cpc;		/* cyl per cycle in postbl */
 	int32_t	 fs_maxbsize;		/* maximum blocking factor permitted */
 	int64_t	 fs_unrefs;		/* number of unreferenced inodes */
@@ -392,10 +411,10 @@ struct fs {
 };
 
 /* Sanity checking. */
-#ifdef __CHERI_PURE_CAPABILITY__
+//#ifdef __CHERI_PURE_CAPABILITY__
 _Static_assert(!(sizeof(struct fs) < 1376), "struct fs is too small");
 _Static_assert(!(sizeof(struct fs) > 1376), "struct fs is too large");
-#endif
+//#endif
 #ifdef CTASSERT
 CTASSERT(sizeof(struct fs) == 1376);
 #endif
@@ -853,9 +872,12 @@ extern u_char *fragtbl[];
 #endif
 // CHERI CHANGES START
 // {
-//   "updated": 20181121,
+//   "updated": 20190628,
 //   "target_type": "header",
 //   "changes": [
+//     "pointer_shape"
+//   ],
+//   "changes_purecap": [
 //     "pointer_shape"
 //   ],
 //   "change_comment": "embedded pointer storage in superblock"

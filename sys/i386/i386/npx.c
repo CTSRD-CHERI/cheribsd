@@ -201,7 +201,7 @@ uint64_t xsave_mask;
 static	uma_zone_t fpu_save_area_zone;
 static	union savefpu *npx_initialstate;
 
-struct xsave_area_elm_descr {
+static struct xsave_area_elm_descr {
 	u_int	offset;
 	u_int	size;
 } *xsave_area_desc;
@@ -479,8 +479,20 @@ npxinitstate(void *arg __unused)
 	if (!hw_float)
 		return;
 
-	npx_initialstate = malloc(cpu_max_ext_state_size, M_DEVBUF,
-	    M_WAITOK | M_ZERO);
+	/* Do potentially blocking operations before disabling interrupts. */
+	fpu_save_area_zone = uma_zcreate("FPU_save_area",
+	    cpu_max_ext_state_size, NULL, NULL, NULL, NULL,
+	    XSAVE_AREA_ALIGN - 1, 0);
+	npx_initialstate = uma_zalloc(fpu_save_area_zone, M_WAITOK | M_ZERO);
+	if (use_xsave) {
+		if (xsave_mask >> 32 != 0)
+			max_ext_n = fls(xsave_mask >> 32) + 32;
+		else
+			max_ext_n = fls(xsave_mask);
+		xsave_area_desc = malloc(max_ext_n * sizeof(struct
+		    xsave_area_elm_descr), M_DEVBUF, M_WAITOK | M_ZERO);
+	}
+
 	saveintr = intr_disable();
 	stop_emulating();
 
@@ -522,12 +534,6 @@ npxinitstate(void *arg __unused)
 		    offsetof(struct xstate_hdr, xstate_bv));
 		*xstate_bv = XFEATURE_ENABLED_X87 | XFEATURE_ENABLED_SSE;
 
-		if (xsave_mask >> 32 != 0)
-			max_ext_n = fls(xsave_mask >> 32) + 32;
-		else
-			max_ext_n = fls(xsave_mask);
-		xsave_area_desc = malloc(max_ext_n * sizeof(struct
-		    xsave_area_elm_descr), M_DEVBUF, M_WAITOK | M_ZERO);
 		/* x87 state */
 		xsave_area_desc[0].offset = 0;
 		xsave_area_desc[0].size = 160;
@@ -541,10 +547,6 @@ npxinitstate(void *arg __unused)
 			xsave_area_desc[i].size = cp[0];
 		}
 	}
-
-	fpu_save_area_zone = uma_zcreate("FPU_save_area",
-	    cpu_max_ext_state_size, NULL, NULL, NULL, NULL,
-	    XSAVE_AREA_ALIGN - 1, 0);
 
 	start_emulating();
 	intr_restore(saveintr);

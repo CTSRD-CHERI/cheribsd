@@ -38,6 +38,7 @@ __FBSDID("$FreeBSD$");
 #ifdef __CHERI_PURE_CAPABILITY__
 #include <cheri/cheric.h>
 #endif
+#include <assert.h>
 #include <dlfcn.h>
 #include <link.h>
 #include <stdarg.h>
@@ -202,9 +203,9 @@ dl_init_phdr_info(void)
 		case AT_BASE:
 			phdr_info.dlpi_addr =
 #ifdef __CHERI_PURE_CAPABILITY__
-			    /* XXXAR: currently needs load_cap for libunwind */
-			    (uintptr_t)cheri_andperm(auxp->a_un.a_ptr,
-			        CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP);
+			    (uintptr_t)(Elf_Addr)auxp->a_un.a_ptr;
+			assert(phdr_info.dlpi_addr == 0 &&
+			    "Should be zero for static binaries");
 #else
 			    (Elf_Addr)auxp->a_un.a_ptr;
 #endif
@@ -236,8 +237,7 @@ dl_init_phdr_info(void)
 #else
 			    cheri_setbounds(cheri_setaddress(phdr_info.dlpi_phdr,
 				phdr_info.dlpi_phdr[i].p_vaddr),
-				phdr_info.dlpi_phdr[i].p_filesz);
-
+				phdr_info.dlpi_phdr[i].p_memsz);
 #endif
 		}
 	}

@@ -208,13 +208,6 @@ union sigval64 {
 	uint64_t sival_ptr;
 };
 #endif
-
-#if defined(_KERNEL) && defined(COMPAT_CHERIABI)
-union sigval_c {
-	int	sival_int;
-	void * __capability sival_ptr;
-};
-#endif
 #endif /* __POSIX_VISIBLE >= 199309 || __XSI_VISIBLE >= 500 */
 
 #if __POSIX_VISIBLE >= 199309
@@ -235,23 +228,6 @@ struct sigevent {
 		long __spare__[8];
 	} _sigev_un;
 };
-
-#if defined(_KERNEL) && defined(COMPAT_CHERIABI)
-struct sigevent_c {
-	int	sigev_notify;		/* Notification type */
-	int	sigev_signo;		/* Signal number */
-	union sigval sigev_value;	/* Signal value */
-	union {
-		__lwpid_t	_threadid;
-		struct {
-			void (* __capability _function)(union sigval);
-			struct pthread_attr * __capability * __capability _attribute;
-		} _sigev_thread;
-		unsigned short _kevent_flags;
-		long __spare__[8];
-	} _sigev_un;
-};
-#endif
 
 #if __BSD_VISIBLE
 #define	sigev_notify_kqueue		sigev_signo
@@ -310,45 +286,6 @@ typedef	struct __siginfo {
 } siginfo_t;
 
 #ifdef _KERNEL
-#ifdef COMPAT_CHERIABI
-struct siginfo_c {
-	int	si_signo;		/* signal number */
-	int	si_errno;		/* errno association */
-	/*
-	 * Cause of signal, one of the SI_ macros or signal-specific
-	 * values, i.e. one of the FPE_... values for SIGFPE.  This
-	 * value is equivalent to the second argument to an old-style
-	 * FreeBSD signal handler.
-	 */
-	int	si_code;		/* signal code */
-	__pid_t	si_pid;			/* sending process */
-	__uid_t	si_uid;			/* sender's ruid */
-	int	si_status;		/* exit value */
-	void* __capability si_addr;	/* faulting instruction */
-	union sigval_c si_value;
-	union	{
-		struct {
-			int	_trapno;/* machine specific trap code */
-			int	_capreg;/* only for SIGPROT */
-		} _fault;
-		struct {
-			int	_timerid;
-			int	_overrun;
-		} _timer;
-		struct {
-			int	_mqd;
-		} _mesgq;
-		struct {
-			long	_band;		/* band event for SIGPOLL */
-		} _poll;			/* was this ever used ? */
-		struct {
-			long	__spare1__;
-			int	__spare2__[7];
-		} __spare__;
-	} _reason;
-};
-#endif
-
 typedef int (copyout_siginfo_t)(const siginfo_t *si, void * __capability info);
 #endif /* _KERNEL */
 
@@ -447,6 +384,8 @@ struct siginfo64 {
 #define SEGV_ACCERR	2	/* Invalid permissions for mapped	*/
 				/* object.				*/
 #define	SEGV_PKUERR	100	/* x86: PKU violation			*/
+#define	SEGV_LOADTAG	101	/* Tag-load page fault.                 */
+#define	SEGV_STORETAG	102	/* Tag-store page fault.                */
 
 /* codes for SIGFPE */
 #define FPE_INTOVF	1	/* Integer overflow.			*/
@@ -488,18 +427,11 @@ struct siginfo64 {
 #define	PROT_CHERI_SEALED	3	/* Capability sealed fault	*/
 #define	PROT_CHERI_TYPE		4	/* Type mismatch fault		*/
 #define	PROT_CHERI_PERM		5	/* Capability permission fault	*/
-#define	PROT_CHERI_STORETAG	6	/* Tag-store page fault		*/
 #define	PROT_CHERI_IMPRECISE	7	/* Imprecise bounds fault	*/
 #define	PROT_CHERI_STORELOCAL	8	/* Store-local fault		*/
 #define	PROT_CHERI_CCALL	9	/* CCall fault			*/
 #define	PROT_CHERI_CRETURN	10	/* CReturn fault		*/
 #define	PROT_CHERI_SYSREG	11	/* Capability system register fault */
-#define	PROT_CHERI_UNSEALED	61	/* CCall unsealed argument fault */
-#define	PROT_CHERI_OVERFLOW	62	/* Trusted stack oveflow fault	*/
-#define	PROT_CHERI_UNDERFLOW	63	/* Trusted stack underflow fault */
-#define	PROT_CHERI_CCALLREGS	64	/* CCall argument fault		*/
-#define	PROT_CHERI_LOCALARG	65	/* CCall local argument fault	*/
-#define	PROT_CHERI_LOCALRET	66	/* CReturn local retval fault	*/
 #endif
 
 #if __POSIX_VISIBLE || __XSI_VISIBLE

@@ -92,10 +92,9 @@ static int
 linux_to_bsd_sockopt_level(int level)
 {
 
-	switch (level) {
-	case LINUX_SOL_SOCKET:
+	if (level == LINUX_SOL_SOCKET)
 		return (SOL_SOCKET);
-	}
+	/* Remaining values are RFC-defined protocol numbers. */
 	return (level);
 }
 
@@ -103,10 +102,8 @@ static int
 bsd_to_linux_sockopt_level(int level)
 {
 
-	switch (level) {
-	case SOL_SOCKET:
+	if (level == SOL_SOCKET)
 		return (LINUX_SOL_SOCKET);
-	}
 	return (level);
 }
 
@@ -212,8 +209,10 @@ linux_to_bsd_so_sockopt(int opt)
 	case LINUX_SO_BROADCAST:
 		return (SO_BROADCAST);
 	case LINUX_SO_SNDBUF:
+	case LINUX_SO_SNDBUFFORCE:
 		return (SO_SNDBUF);
 	case LINUX_SO_RCVBUF:
+	case LINUX_SO_RCVBUFFORCE:
 		return (SO_RCVBUF);
 	case LINUX_SO_KEEPALIVE:
 		return (SO_KEEPALIVE);
@@ -221,6 +220,8 @@ linux_to_bsd_so_sockopt(int opt)
 		return (SO_OOBINLINE);
 	case LINUX_SO_LINGER:
 		return (SO_LINGER);
+	case LINUX_SO_REUSEPORT:
+		return (SO_REUSEPORT_LB);
 	case LINUX_SO_PEERCRED:
 		return (LOCAL_PEERCRED);
 	case LINUX_SO_RCVLOWAT:
@@ -939,7 +940,7 @@ linux_sendmsg_common(struct thread *td, l_int s, struct l_msghdr *msghdr,
 	struct msghdr msg;
 	struct l_cmsghdr linux_cmsg;
 	struct l_cmsghdr *ptr_cmsg;
-	struct l_msghdr linux_msg;
+	struct l_msghdr linux_msghdr;
 	struct iovec *iov;
 	socklen_t datalen;
 	struct sockaddr *sa;
@@ -951,7 +952,7 @@ linux_sendmsg_common(struct thread *td, l_int s, struct l_msghdr *msghdr,
 	l_size_t clen;
 	int error, fflag;
 
-	error = copyin(msghdr, &linux_msg, sizeof(linux_msg));
+	error = copyin(msghdr, &linux_msghdr, sizeof(linux_msghdr));
 	if (error != 0)
 		return (error);
 
@@ -962,10 +963,11 @@ linux_sendmsg_common(struct thread *td, l_int s, struct l_msghdr *msghdr,
 	 * order to handle this case.  This should be checked, but allows the
 	 * Linux ping to work.
 	 */
-	if (PTRIN(linux_msg.msg_control) != NULL && linux_msg.msg_controllen == 0)
-		linux_msg.msg_control = PTROUT(NULL);
+	if (PTRIN(linux_msghdr.msg_control) != NULL &&
+	    linux_msghdr.msg_controllen == 0)
+		linux_msghdr.msg_control = PTROUT(NULL);
 
-	error = linux_to_bsd_msghdr(&msg, &linux_msg);
+	error = linux_to_bsd_msghdr(&msg, &linux_msghdr);
 	if (error != 0)
 		return (error);
 
@@ -1003,7 +1005,7 @@ linux_sendmsg_common(struct thread *td, l_int s, struct l_msghdr *msghdr,
 			goto bad;
 	}
 
-	if (linux_msg.msg_controllen >= sizeof(struct l_cmsghdr)) {
+	if (linux_msghdr.msg_controllen >= sizeof(struct l_cmsghdr)) {
 
 		error = ENOBUFS;
 		control = m_get(M_WAITOK, MT_CONTROL);
@@ -1011,8 +1013,8 @@ linux_sendmsg_common(struct thread *td, l_int s, struct l_msghdr *msghdr,
 		data = mtod(control, void *);
 		datalen = 0;
 
-		ptr_cmsg = PTRIN(linux_msg.msg_control);
-		clen = linux_msg.msg_controllen;
+		ptr_cmsg = PTRIN(linux_msghdr.msg_control);
+		clen = linux_msghdr.msg_controllen;
 		do {
 			error = copyin(ptr_cmsg, &linux_cmsg,
 			    sizeof(struct l_cmsghdr));
@@ -1147,7 +1149,7 @@ linux_recvmsg_common(struct thread *td, l_int s, struct l_msghdr *msghdr,
 	struct l_cmsghdr *linux_cmsg = NULL;
 	struct l_ucred linux_ucred;
 	socklen_t datalen, maxlen, outlen;
-	struct l_msghdr linux_msg;
+	struct l_msghdr linux_msghdr;
 	struct iovec *iov, *uiov;
 	struct mbuf *control = NULL;
 	struct mbuf **controlp;
@@ -1159,11 +1161,11 @@ linux_recvmsg_common(struct thread *td, l_int s, struct l_msghdr *msghdr,
 	void *data;
 	int error, i, fd, fds, *fdp;
 
-	error = copyin(msghdr, &linux_msg, sizeof(linux_msg));
+	error = copyin(msghdr, &linux_msghdr, sizeof(linux_msghdr));
 	if (error != 0)
 		return (error);
 
-	error = linux_to_bsd_msghdr(msg, &linux_msg);
+	error = linux_to_bsd_msghdr(msg, &linux_msghdr);
 	if (error != 0)
 		return (error);
 
@@ -1191,7 +1193,7 @@ linux_recvmsg_common(struct thread *td, l_int s, struct l_msghdr *msghdr,
 		goto bad;
 
 	if (msg->msg_name) {
-		msg->msg_name = PTRIN(linux_msg.msg_name);
+		msg->msg_name = PTRIN(linux_msghdr.msg_name);
 		error = bsd_to_linux_sockaddr(sa, &lsa, msg->msg_namelen);
 		if (error == 0)
 			error = copyout(lsa, PTRIN(msg->msg_name),
@@ -1201,12 +1203,12 @@ linux_recvmsg_common(struct thread *td, l_int s, struct l_msghdr *msghdr,
 			goto bad;
 	}
 
-	error = bsd_to_linux_msghdr(msg, &linux_msg);
+	error = bsd_to_linux_msghdr(msg, &linux_msghdr);
 	if (error != 0)
 		goto bad;
 
-	maxlen = linux_msg.msg_controllen;
-	linux_msg.msg_controllen = 0;
+	maxlen = linux_msghdr.msg_controllen;
+	linux_msghdr.msg_controllen = 0;
 	if (control) {
 		linux_cmsg = malloc(L_CMSG_HDRSZ, M_LINUX, M_WAITOK | M_ZERO);
 
@@ -1214,7 +1216,7 @@ linux_recvmsg_common(struct thread *td, l_int s, struct l_msghdr *msghdr,
 		msg->msg_controllen = control->m_len;
 
 		cm = CMSG_FIRSTHDR(msg);
-		outbuf = PTRIN(linux_msg.msg_control);
+		outbuf = PTRIN(linux_msghdr.msg_control);
 		outlen = 0;
 		while (cm != NULL) {
 			linux_cmsg->cmsg_type =
@@ -1280,7 +1282,7 @@ linux_recvmsg_common(struct thread *td, l_int s, struct l_msghdr *msghdr,
 					error = EMSGSIZE;
 					goto bad;
 				} else {
-					linux_msg.msg_flags |= LINUX_MSG_CTRUNC;
+					linux_msghdr.msg_flags |= LINUX_MSG_CTRUNC;
 					m_dispose_extcontrolm(control);
 					goto out;
 				}
@@ -1302,11 +1304,11 @@ linux_recvmsg_common(struct thread *td, l_int s, struct l_msghdr *msghdr,
 
 			cm = CMSG_NXTHDR(msg, cm);
 		}
-		linux_msg.msg_controllen = outlen;
+		linux_msghdr.msg_controllen = outlen;
 	}
 
 out:
-	error = copyout(&linux_msg, msghdr, sizeof(linux_msg));
+	error = copyout(&linux_msghdr, msghdr, sizeof(linux_msghdr));
 
 bad:
 	if (control != NULL) {
@@ -1803,7 +1805,7 @@ linux_socketcall(struct thread *td, struct linux_socketcall_args *args)
 		return (linux_sendfile(td, arg));
 	}
 
-	uprintf("LINUX: 'socket' typ=%d not implemented\n", args->what);
+	linux_msg(td, "socket type %d not implemented", args->what);
 	return (ENOSYS);
 }
 #endif /* __i386__ || __arm__ || (__amd64__ && COMPAT_LINUX32) */

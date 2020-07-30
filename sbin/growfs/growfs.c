@@ -95,6 +95,10 @@ static union {
 } fsun1, fsun2;
 #define	sblock	fsun1.fs	/* the new superblock */
 #define	osblock	fsun2.fs	/* the old superblock */
+/* The new superblock summary info */
+static struct fs_summary_info sblock_summary_info;
+/* The old superblock summary info */
+static struct fs_summary_info osblock_summary_info;
 
 static union {
 	struct cg	cg;
@@ -1458,8 +1462,13 @@ main(int argc, char **argv)
 		}
 	}
 	memcpy(&osblock, fs, fs->fs_sbsize);
+	osblock.fs_si = &osblock_summary_info;
+	memcpy(osblock.fs_si, fs->fs_si, sizeof(*fs->fs_si));
+	free(fs->fs_si);
 	free(fs);
 	memcpy((void *)&fsun1, (void *)&fsun2, osblock.fs_sbsize);
+	sblock.fs_si = &sblock_summary_info;
+	memcpy(sblock.fs_si, osblock.fs_si, sizeof(*sblock.fs_si));
 
 	DBG_OPEN("/tmp/growfs.debug"); /* already here we need a superblock */
 	DBG_DUMP_FS(&sblock, "old sblock");
@@ -1753,3 +1762,13 @@ cgckhash(struct cg *cgp)
 	cgp->cg_ckhash = 0;
 	cgp->cg_ckhash = calculate_crc32c(~0L, (void *)cgp, sblock.fs_cgsize);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20200706,
+//   "target_type": "prog",
+//   "changes_purecap": [
+//     "pointer_shape"
+//   ],
+//   "change_comment": "embedded pointer storage in superblock"
+// }
+// CHERI CHANGES END

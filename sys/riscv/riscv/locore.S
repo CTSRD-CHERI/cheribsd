@@ -108,7 +108,7 @@ _start:
 	add	t3, t4, t2
 	li	t5, 0
 2:
-	li	t0, (PTE_KERN | PTE_X)
+	li	t0, (PTE_KERN_CAP | PTE_X)
 	slli	t2, t4, PTE_PPN1_S	/* << PTE_PPN1_S */
 	or	t5, t0, t2
 	sd	t5, (s1)		/* Store PTE entry to position */
@@ -139,6 +139,8 @@ _start:
 	lla	s1, pagetable_l2_devmap
 	mv	s2, a1
 	srli	s2, s2, PAGE_SHIFT
+	/* Mask off any bits that aren't aligned */
+	andi	s2, s2, ~((1 << (PTE_PPN1_S - PTE_PPN0_S)) - 1)
 
 	li	t0, (PTE_KERN)
 	slli	t2, s2, PTE_PPN0_S	/* << PTE_PPN0_S */
@@ -229,7 +231,12 @@ va:
 	sd	t0, RISCV_BOOTPARAMS_KERN_STACK(sp)
 
 	li	t0, (VM_EARLY_DTB_ADDRESS)
+	/* Add offset of DTB within superpage */
+	li	t1, (L2_OFFSET)
+	and	t1, a1, t1
+	add	t0, t0, t1
 	sd	t0, RISCV_BOOTPARAMS_DTBP_VIRT(sp)
+	sd	a1, RISCV_BOOTPARAMS_DTBP_PHYS(sp)
 
 	mv	a0, sp
 	call	_C_LABEL(initriscv)	/* Off we go */
@@ -251,6 +258,10 @@ initstack:
 	.space  (PAGE_SIZE * KSTACK_PAGES)
 initstack_end:
 
+.option push
+#if __has_feature(capabilities)
+.option capmode
+#endif
 ENTRY(sigcode)
 #if __has_feature(capabilities)
 	cincoffset ca0, csp, SF_UC
@@ -272,8 +283,13 @@ END(sigcode)
 	/* This may be copied to the stack, keep it 16-byte aligned */
 	.align	3
 esigcode:
+.option pop
 
 #ifdef COMPAT_FREEBSD64
+.option push
+#if __has_feature(capabilities)
+.option nocapmode
+#endif
 ENTRY(freebsd64_sigcode)
 	mv	a0, sp
 	addi	a0, a0, SF64_UC
@@ -291,6 +307,7 @@ END(freebsd64_sigcode)
 	/* This may be copied to the stack, keep it 16-byte aligned */
 	.align	3
 freebsd64_esigcode:
+.option pop
 #endif
 
 	.data

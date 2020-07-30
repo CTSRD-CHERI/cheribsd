@@ -75,10 +75,6 @@ __FBSDID("$FreeBSD$");
 #include <machine/atomic.h>
 #include <machine/cpu.h>
 
-#ifdef COMPAT_CHERIABI
-#include <compat/cheriabi/cheriabi_proto.h>
-#endif
-
 #ifdef COMPAT_FREEBSD32
 #include <compat/freebsd32/freebsd32_proto.h>
 #endif
@@ -509,7 +505,7 @@ umtxq_hash(struct umtx_key *key)
 {
 	unsigned n;
 
-	n = (uintptr_t)key->info.both.a + key->info.both.b;
+	n = (vaddr_t)key->info.both.a + (vaddr_t)key->info.both.b;
 	key->hash = ((n * GOLDEN_RATIO_PRIME) >> UMTX_SHIFTS) % UMTX_CHAINS;
 }
 
@@ -4167,19 +4163,6 @@ sys__umtx_op(struct thread *td, struct _umtx_op_args *uap)
 	return (EINVAL);
 }
 
-#ifdef COMPAT_CHERIABI
-int
-cheriabi__umtx_op(struct thread *td, struct cheriabi__umtx_op_args *uap)
-{
-
-	if ((unsigned)uap->op < nitems(op_table)) {
-		return (*op_table[uap->op])(td, (struct _umtx_op_args *)uap);
-	}
-	return (EINVAL);
-}
-
-#endif /* COMPAT_CHERIABI */
-
 #ifdef COMPAT_FREEBSD32
 
 struct timespec32 {
@@ -4470,11 +4453,11 @@ __umtx_op_robust_lists_compat32(struct thread *td, struct _umtx_op_args *uap)
 	if (error != 0)
 		return (error);
 	rb.robust_list_offset =
-	    (intcap_t)__USER_CAP_UNBOUND((void *)rb.robust_list_offset);
+	    (intcap_t)__USER_CAP_UNBOUND(rb.robust_list_offset);
 	rb.robust_priv_list_offset =
-	    (intcap_t)__USER_CAP_UNBOUND((void *)rb.robust_priv_list_offset);
+	    (intcap_t)__USER_CAP_UNBOUND(rb.robust_priv_list_offset);
 	rb.robust_inact_offset =
-	    (intcap_t)__USER_CAP_UNBOUND((void *)rb.robust_inact_offset);
+	    (intcap_t)__USER_CAP_UNBOUND(rb.robust_inact_offset);
 	return (umtx_robust_lists(td, &rb));
 }
 
@@ -4879,11 +4862,11 @@ __umtx_op_robust_lists64(struct thread *td, struct freebsd64__umtx_op_args *uap)
 	if (error != 0)
 		return (error);
 	rb.robust_list_offset =
-	    (intcap_t)__USER_CAP_UNBOUND((void *)rb64.robust_list_offset);
+	    (intcap_t)__USER_CAP_UNBOUND(rb64.robust_list_offset);
 	rb.robust_priv_list_offset =
-	    (intcap_t)__USER_CAP_UNBOUND((void *)rb64.robust_priv_list_offset);
+	    (intcap_t)__USER_CAP_UNBOUND(rb64.robust_priv_list_offset);
 	rb.robust_inact_offset =
-	    (intcap_t)__USER_CAP_UNBOUND((void *)rb64.robust_inact_offset);
+	    (intcap_t)__USER_CAP_UNBOUND(rb64.robust_inact_offset);
 	return (umtx_robust_lists(td, &rb));
 }
 

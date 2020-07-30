@@ -83,7 +83,7 @@ kern_extattrctl(struct thread *td, const char * __capability path, int cmd,
 	struct vnode *filename_vp;
 	struct nameidata nd;
 	struct mount *mp, *mp_writable;
-	char attrname[EXTATTR_MAXNAMELEN];
+	char attrname[EXTATTR_MAXNAMELEN + 1];
 	int error;
 
 	AUDIT_ARG_CMD(cmd);
@@ -93,7 +93,7 @@ kern_extattrctl(struct thread *td, const char * __capability path, int cmd,
 	 * invoke the VFS call so as to pass in NULL there if needed.
 	 */
 	if (uattrname != NULL) {
-		error = copyinstr(uattrname, attrname, EXTATTR_MAXNAMELEN,
+		error = copyinstr(uattrname, attrname, sizeof(attrname),
 		    NULL);
 		if (error)
 			return (error);
@@ -241,13 +241,13 @@ kern_extattr_set_fd(struct thread *td, int fd, int attrnamespace,
     size_t nbytes)
 {
 	struct file *fp;
-	char attrname[EXTATTR_MAXNAMELEN];
+	char attrname[EXTATTR_MAXNAMELEN + 1];
 	cap_rights_t rights;
 	int error;
 
 	AUDIT_ARG_FD(fd);
 	AUDIT_ARG_VALUE(attrnamespace);
-	error = copyinstr(uattrname, attrname, EXTATTR_MAXNAMELEN, NULL);
+	error = copyinstr(uattrname, attrname, sizeof(attrname), NULL);
 	if (error)
 		return (error);
 	AUDIT_ARG_TEXT(attrname);
@@ -305,11 +305,11 @@ kern_extattr_set_path(struct thread *td,
     size_t nbytes, int follow)
 {
 	struct nameidata nd;
-	char attrname[EXTATTR_MAXNAMELEN];
+	char attrname[EXTATTR_MAXNAMELEN + 1];
 	int error;
 
 	AUDIT_ARG_VALUE(attrnamespace);
-	error = copyinstr(uattrname, attrname, EXTATTR_MAXNAMELEN, NULL);
+	error = copyinstr(uattrname, attrname, sizeof(attrname), NULL);
 	if (error)
 		return (error);
 	AUDIT_ARG_TEXT(attrname);
@@ -419,13 +419,13 @@ kern_extattr_get_fd(struct thread *td, int fd, int attrnamespace,
     size_t nbytes)
 {
 	struct file *fp;
-	char attrname[EXTATTR_MAXNAMELEN];
+	char attrname[EXTATTR_MAXNAMELEN + 1];
 	cap_rights_t rights;
 	int error;
 
 	AUDIT_ARG_FD(fd);
 	AUDIT_ARG_VALUE(attrnamespace);
-	error = copyinstr(uattrname, attrname, EXTATTR_MAXNAMELEN, NULL);
+	error = copyinstr(uattrname, attrname, sizeof(attrname), NULL);
 	if (error)
 		return (error);
 	AUDIT_ARG_TEXT(attrname);
@@ -480,11 +480,11 @@ kern_extattr_get_path(struct thread *td, const char * __capability path,
     void * __capability data, size_t nbytes, int follow)
 {
 	struct nameidata nd;
-	char attrname[EXTATTR_MAXNAMELEN];
+	char attrname[EXTATTR_MAXNAMELEN + 1];
 	int error;
 
 	AUDIT_ARG_VALUE(attrnamespace);
-	error = copyinstr(uattrname, attrname, EXTATTR_MAXNAMELEN, NULL);
+	error = copyinstr(uattrname, attrname, sizeof(attrname), NULL);
 	if (error)
 		return (error);
 	AUDIT_ARG_TEXT(attrname);
@@ -564,13 +564,13 @@ kern_extattr_delete_fd(struct thread *td, int fd, int attrnamespace,
     const char * __capability uattrname)
 {
 	struct file *fp;
-	char attrname[EXTATTR_MAXNAMELEN];
+	char attrname[EXTATTR_MAXNAMELEN + 1];
 	cap_rights_t rights;
 	int error;
 
 	AUDIT_ARG_FD(fd);
 	AUDIT_ARG_VALUE(attrnamespace);
-	error = copyinstr(uattrname, attrname, EXTATTR_MAXNAMELEN, NULL);
+	error = copyinstr(uattrname, attrname, sizeof(attrname), NULL);
 	if (error)
 		return (error);
 	AUDIT_ARG_TEXT(attrname);
@@ -621,11 +621,11 @@ kern_extattr_delete_path(struct thread *td, const char * __capability path,
     int attrnamespace, const char * __capability uattrname, int follow)
 {
 	struct nameidata nd;
-	char attrname[EXTATTR_MAXNAMELEN];
+	char attrname[EXTATTR_MAXNAMELEN + 1];
 	int error;
 
 	AUDIT_ARG_VALUE(attrnamespace);
-	error = copyinstr(uattrname, attrname, EXTATTR_MAXNAMELEN, NULL);
+	error = copyinstr(uattrname, attrname, sizeof(attrname), NULL);
 	if (error)
 		return(error);
 	AUDIT_ARG_TEXT(attrname);

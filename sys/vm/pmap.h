@@ -138,9 +138,10 @@ void		 pmap_copy_pages(vm_page_t ma[], vm_offset_t a_offset,
 int		 pmap_enter(pmap_t pmap, vm_offset_t va, vm_page_t m,
 		    vm_prot_t prot, u_int flags, int8_t psind);
 void		 pmap_enter_object(pmap_t pmap, vm_offset_t start,
-		    vm_offset_t end, vm_page_t m_start, vm_prot_t prot);
+		    vm_offset_t end, vm_page_t m_start, vm_prot_t prot,
+		    u_int flags);
 void		 pmap_enter_quick(pmap_t pmap, vm_offset_t va, vm_page_t m,
-		    vm_prot_t prot);
+		    vm_prot_t prot, u_int flags);
 vm_paddr_t	 pmap_extract(pmap_t pmap, vm_offset_t va);
 vm_page_t	 pmap_extract_and_hold(pmap_t pmap, vm_offset_t va,
 		    vm_prot_t prot);

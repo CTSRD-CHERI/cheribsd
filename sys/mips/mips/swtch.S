@@ -499,6 +499,8 @@ sw2:
  * Note that this code is removed if the CPU doesn't support ULRI by
  * remove_userlocal_code() in cpu.c.
  */
+	.globl	cpu_switch_set_userlocal
+cpu_switch_set_userlocal:
 #ifdef CPU_CHERI
 	# Get TLS address
 	clc	$c3, a1, TD_MDTLS($ddc)

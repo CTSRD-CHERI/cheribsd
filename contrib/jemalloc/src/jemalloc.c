@@ -91,6 +91,7 @@ bool	opt_junk_free =
 bool	opt_utrace = false;
 bool	opt_xmalloc = false;
 bool	opt_zero = false;
+bool	opt_zero_free = false;
 unsigned	opt_narenas = 0;
 
 unsigned	ncpus;
@@ -132,7 +133,8 @@ enum {
 	flag_opt_junk_free	= (1U << 1),
 	flag_opt_zero		= (1U << 2),
 	flag_opt_utrace		= (1U << 3),
-	flag_opt_xmalloc	= (1U << 4)
+	flag_opt_xmalloc	= (1U << 4),
+	flag_opt_zero_free	= (1U << 5)
 };
 static uint8_t	malloc_slow_flags;
 
@@ -207,24 +209,6 @@ typedef struct {
 } while (0)
 #else
 #  define UTRACE(a, b, c)
-#endif
-
-#ifndef __CHERI_PURE_CAPABILITY__
-#define	BOUND_PTR(ptr, size)	(ptr)
-#define	ROUND_SIZE(size)		(size)
-#else
-#define	BOUND_PTR(ptr, size)						\
-    (ptr == NULL) ? NULL :						\
-    cheri_andperm(cheri_setboundsexact((ptr), (size)),			\
-	CHERI_PERMS_USERSPACE_DATA & ~CHERI_PERM_CHERIABI_VMMAP)
-#define roundup2(x, y)	(((x)+((y)-1))&(~((y)-1)))
-
-/*
- * XXX-BD: In theory this poses an overflow risk.  It's overflow
- * handling is probalby needed in each individual function, returning
- * an appropriate error value.
- */
-#define	ROUND_SIZE(size)	CHERI_REPRESENTABLE_LENGTH(size)
 #endif
 
 /* Whether encountered any invalid config options. */
@@ -981,7 +965,8 @@ malloc_slow_flag_init(void) {
 	    | (opt_junk_free ? flag_opt_junk_free : 0)
 	    | (opt_zero ? flag_opt_zero : 0)
 	    | (opt_utrace ? flag_opt_utrace : 0)
-	    | (opt_xmalloc ? flag_opt_xmalloc : 0);
+	    | (opt_xmalloc ? flag_opt_xmalloc : 0)
+	    | (opt_zero_free ? flag_opt_zero_free : 0);
 
 	malloc_slow = (malloc_slow_flags != 0);
 }
@@ -1335,6 +1320,7 @@ malloc_conf_init_helper(sc_data_t *sc_data, unsigned bin_shard_sizes[SC_NBINS],
 					CONF_CONTINUE;
 				}
 				CONF_HANDLE_BOOL(opt_zero, "zero")
+				CONF_HANDLE_BOOL(opt_zero_free, "zero_free")
 			}
 			if (config_utrace) {
 				CONF_HANDLE_BOOL(opt_utrace, "utrace")

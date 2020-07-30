@@ -192,6 +192,7 @@ SYSCTL_ULONG(_vm, OID_AUTO, uma_kmem_total, CTLFLAG_RD, &uma_kmem_total, 0,
 static enum {
 	BOOT_COLD,
 	BOOT_KVA,
+	BOOT_PCPU,
 	BOOT_RUNNING,
 	BOOT_SHUTDOWN,
 } booted = BOOT_COLD;
@@ -304,7 +305,6 @@ static int hash_alloc(struct uma_hash *, u_int);
 static int hash_expand(struct uma_hash *, struct uma_hash *);
 static void hash_free(struct uma_hash *hash);
 static void uma_timeout(void *);
-static void uma_startup3(void);
 static void uma_shutdown(void);
 static void *zone_alloc_item(uma_zone_t, void *, int, int);
 static void zone_free_item(uma_zone_t, void *, void *, enum zfreeskip);
@@ -359,8 +359,6 @@ SYSCTL_COUNTER_U64(_vm_debug, OID_AUTO, trashed, CTLFLAG_RD,
 SYSCTL_COUNTER_U64(_vm_debug, OID_AUTO, skipped, CTLFLAG_RD,
     &uma_skip_cnt, "memory items skipped, not debugged");
 #endif
-
-SYSINIT(uma_startup3, SI_SUB_VM_CONF, SI_ORDER_SECOND, uma_startup3, NULL);
 
 SYSCTL_NODE(_vm, OID_AUTO, uma, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
     "Universal Memory Allocator");
@@ -2658,9 +2656,10 @@ zone_ctor(void *mem, int size, void *udata, int flags)
 	    (UMA_ZONE_INHERIT | UMA_ZFLAG_INHERIT));
 
 out:
-	if (__predict_true(booted >= BOOT_RUNNING)) {
+	if (booted >= BOOT_PCPU) {
 		zone_alloc_counters(zone, NULL);
-		zone_alloc_sysctl(zone, NULL);
+		if (booted >= BOOT_RUNNING)
+			zone_alloc_sysctl(zone, NULL);
 	} else {
 		zone->uz_allocs = EARLY_COUNTER;
 		zone->uz_frees = EARLY_COUNTER;
@@ -2811,6 +2810,7 @@ uma_startup1(vm_offset_t virtual_avail)
 	size_t ksize, zsize, size;
 	uma_keg_t masterkeg;
 	uintptr_t m;
+	int domain;
 	uint8_t pflag;
 
 	bootstart = bootmem = virtual_avail;
@@ -2828,7 +2828,12 @@ uma_startup1(vm_offset_t virtual_avail)
 
 	/* Allocate the zone of zones, zone of kegs, and zone of zones keg. */
 	size = (zsize * 2) + ksize;
-	m = (uintptr_t)startup_alloc(NULL, size, 0, &pflag, M_NOWAIT | M_ZERO);
+	for (domain = 0; domain < vm_ndomains; domain++) {
+		m = (uintptr_t)startup_alloc(NULL, size, domain, &pflag,
+		    M_NOWAIT | M_ZERO);
+		if (m != 0)
+			break;
+	}
 	zones = (uma_zone_t)m;
 	m += zsize;
 	kegs = (uma_zone_t)m;
@@ -2904,10 +2909,23 @@ uma_startup2(void)
 }
 
 /*
+ * Allocate counters as early as possible so that boot-time allocations are
+ * accounted more precisely.
+ */
+static void
+uma_startup_pcpu(void *arg __unused)
+{
+
+	zone_foreach_unlocked(zone_alloc_counters, NULL);
+	booted = BOOT_PCPU;
+}
+SYSINIT(uma_startup_pcpu, SI_SUB_COUNTER, SI_ORDER_ANY, uma_startup_pcpu, NULL);
+
+/*
  * Finish our initialization steps.
  */
 static void
-uma_startup3(void)
+uma_startup3(void *arg __unused)
 {
 
 #ifdef INVARIANTS
@@ -2915,7 +2933,6 @@ uma_startup3(void)
 	uma_dbg_cnt = counter_u64_alloc(M_WAITOK);
 	uma_skip_cnt = counter_u64_alloc(M_WAITOK);
 #endif
-	zone_foreach_unlocked(zone_alloc_counters, NULL);
 	zone_foreach_unlocked(zone_alloc_sysctl, NULL);
 	callout_init(&uma_callout, 1);
 	callout_reset(&uma_callout, UMA_TIMEOUT * hz, uma_timeout, NULL);
@@ -2924,6 +2941,7 @@ uma_startup3(void)
 	EVENTHANDLER_REGISTER(shutdown_post_sync, uma_shutdown, NULL,
 	    EVENTHANDLER_PRI_FIRST);
 }
+SYSINIT(uma_startup3, SI_SUB_VM_CONF, SI_ORDER_SECOND, uma_startup3, NULL);
 
 static void
 uma_shutdown(void)
@@ -3178,6 +3196,19 @@ item_dtor(uma_zone_t zone, void *item, int size, void *udata,
 #endif
 	}
 }
+
+#ifdef NUMA
+static int
+item_domain(void *item)
+{
+	int domain;
+
+	domain = _vm_phys_domain(vtophys(item));
+	KASSERT(domain >= 0 && domain < vm_ndomains,
+	    ("%s: unknown domain for item %p", __func__, item));
+	return (domain);
+}
+#endif
 
 #if defined(INVARIANTS) || defined(DEBUG_MEMGUARD) || defined(WITNESS)
 #define	UMA_ZALLOC_DEBUG
@@ -3989,7 +4020,7 @@ uma_zfree_smr(uma_zone_t zone, void *item)
 	itemdomain = 0;
 #ifdef NUMA
 	if ((uz_flags & UMA_ZONE_FIRSTTOUCH) != 0)
-		itemdomain = _vm_phys_domain(pmap_kextract((vm_offset_t)item));
+		itemdomain = item_domain(item);
 #endif
 	critical_enter();
 	do {
@@ -4073,7 +4104,7 @@ uma_zfree_arg(uma_zone_t zone, void *item, void *udata)
 	itemdomain = 0;
 #ifdef NUMA
 	if ((uz_flags & UMA_ZONE_FIRSTTOUCH) != 0)
-		itemdomain = _vm_phys_domain(pmap_kextract((vm_offset_t)item));
+		itemdomain = item_domain(item);
 #endif
 	critical_enter();
 	do {
@@ -4147,7 +4178,7 @@ zone_free_cross(uma_zone_t zone, uma_bucket_t bucket, void *udata)
 	ZONE_CROSS_LOCK(zone);
 	while (bucket->ub_cnt > 0) {
 		item = bucket->ub_bucket[bucket->ub_cnt - 1];
-		domain = _vm_phys_domain(pmap_kextract((vm_offset_t)item));
+		domain = item_domain(item);
 		zdom = ZDOM_GET(zone, domain);
 		if (zdom->uzd_cross == NULL) {
 			zdom->uzd_cross = bucket_alloc(zone, udata, M_NOWAIT);
@@ -4170,8 +4201,7 @@ zone_free_cross(uma_zone_t zone, uma_bucket_t bucket, void *udata)
 
 	while ((b = STAILQ_FIRST(&fullbuckets)) != NULL) {
 		STAILQ_REMOVE_HEAD(&fullbuckets, ub_link);
-		domain = _vm_phys_domain(pmap_kextract(
-		    (vm_offset_t)b->ub_bucket[0]));
+		domain = item_domain(b->ub_bucket[0]);
 		zone_put_bucket(zone, domain, b, udata, true);
 	}
 }

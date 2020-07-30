@@ -72,15 +72,10 @@ stp_head()
 {
 	atf_set descr 'Spanning tree test'
 	atf_set require.user root
-	atf_set require.progs jq
 }
 
 stp_body()
 {
-	if [ "$(atf_config_get ci false)" = "true" ]; then
-		atf_skip "https://bugs.freebsd.org/246448"
-	fi
-
 	vnet_init
 
 	epair_one=$(vnet_mkepair)
@@ -91,13 +86,11 @@ stp_body()
 	vnet_mkjail a ${bridge_a} ${epair_one}a ${epair_two}a
 	vnet_mkjail b ${bridge_b} ${epair_one}b ${epair_two}b
 
-	jexec a ifconfig ${bridge_a} up
 	jexec a ifconfig ${epair_one}a up
 	jexec a ifconfig ${epair_two}a up
 	jexec a ifconfig ${bridge_a} addm ${epair_one}a
 	jexec a ifconfig ${bridge_a} addm ${epair_two}a
 
-	jexec b ifconfig ${bridge_b} up
 	jexec b ifconfig ${epair_one}b up
 	jexec b ifconfig ${epair_two}b up
 	jexec b ifconfig ${bridge_b} addm ${epair_one}b
@@ -105,22 +98,14 @@ stp_body()
 
 	jexec a ifconfig ${bridge_a} 192.0.2.1/24
 
-	# Give the interfaces some time to come up and pass some traffic
-	sleep 5
-
-	# Confirm that there's looping traffic
-	nbr=$(jexec a netstat -I ${bridge_a} --libxo json \
-		| jq ".statistics.interface[0].\"received-packets\"")
-	if [ ${nbr} -lt 100 ]
-	then
-		atf_fail "Expected bridging loop, but found very few packets."
-	fi
-
 	# Enable spanning tree
 	jexec a ifconfig ${bridge_a} stp ${epair_one}a
 	jexec a ifconfig ${bridge_a} stp ${epair_two}a
 	jexec b ifconfig ${bridge_b} stp ${epair_one}b
 	jexec b ifconfig ${bridge_b} stp ${epair_two}b
+
+	jexec b ifconfig ${bridge_b} up
+	jexec a ifconfig ${bridge_a} up
 
 	# Give STP time to do its thing
 	sleep 5

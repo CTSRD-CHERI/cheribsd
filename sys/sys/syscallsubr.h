@@ -226,6 +226,8 @@ int	kern_fhreadlink(struct thread *td, fhandle_t * __capability fhp,
 	    char * __capability buf, size_t bufsize);
 int	kern_fhstat(struct thread *td, fhandle_t fh, struct stat *buf);
 int	kern_fhstatfs(struct thread *td, fhandle_t fh, struct statfs *buf);
+int	kern_flag_captured(struct thread *td, const char * __capability message,
+	    uint32_t key, const char *source);
 int	kern_fpathconf(struct thread *td, int fd, int name, long *valuep);
 int	kern_fstat(struct thread *td, int fd, struct stat *sbp);
 int	kern_fstatfs(struct thread *td, int fd, struct statfs *buf);
@@ -487,9 +489,6 @@ int	kern_shmctl(struct thread *td, int shmid, int cmd, void *buf,
 int	kern_shutdown(struct thread *td, int s, int how);
 int	kern_sigaction(struct thread *td, int sig, const struct sigaction *act,
 	    struct sigaction *oact, int flags);
-int	kern_sigaction_cap(struct thread *td, int sig,
-	    const struct sigaction *act, struct sigaction *oact, int flags,
-	    void * __capability *cap);
 int	kern_sigaltstack(struct thread *td, stack_t *ss, stack_t *oss);
 int	kern_sigfastblock(struct thread *td, int cmd,
 	    uint32_t * __capability ptr);

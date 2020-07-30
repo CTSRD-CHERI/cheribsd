@@ -238,8 +238,9 @@ sysctl_hw_pagesizes(SYSCTL_HANDLER_ARGS)
 
 	if (req->flags & SCTL_MASK32) {
 		/*
-		 * Recreate the "pagesizes" array with 32-bit elements.  Truncate
-		 * any page size greater than UINT32_MAX to zero.
+		 * Recreate the "pagesizes" array with 32-bit elements.
+		 * Truncate any page size greater than UINT32_MAX to zero,
+		 * which assumes that page sizes are powers of two.
 		 */
 		for (i = 0; i < MAXPAGESIZES; i++)
 			pagesizes32[i] = (uint32_t)pagesizes[i];
@@ -278,6 +279,10 @@ proc_machine_arch(struct proc *p)
 	if (SV_PROC_FLAG(p, SV_ILP32))
 		return (MACHINE_ARCH32);
 #endif
+#ifdef COMPAT_FREEBSD64
+	if (!SV_PROC_FLAG(p, SV_CHERI))
+		return (MACHINE_ARCH64);
+#endif
 	return (MACHINE_ARCH);
 }
 
@@ -297,8 +302,10 @@ SYSCTL_PROC(_hw, HW_MACHINE_ARCH, machine_arch, CTLTYPE_STRING | CTLFLAG_RD |
     "System architecture");
 
 #ifndef MACHINE_ARCHES
-#ifdef COMPAT_FREEBSD32
+#if defined(COMPAT_FREEBSD32)
 #define	MACHINE_ARCHES	MACHINE_ARCH " " MACHINE_ARCH32
+#elif defined(COMPAT_FREEBSD64)
+#define	MACHINE_ARCHES	MACHINE_ARCH " " MACHINE_ARCH64
 #else
 #define	MACHINE_ARCHES	MACHINE_ARCH
 #endif

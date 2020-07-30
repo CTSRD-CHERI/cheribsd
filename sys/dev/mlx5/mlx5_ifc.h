@@ -690,7 +690,8 @@ struct mlx5_ifc_qos_cap_bits {
 	u8         esw_rate_limit[0x1];
 	u8         hll[0x1];
 	u8         packet_pacing_burst_bound[0x1];
-	u8         reserved_at_6[0x1a];
+	u8         packet_pacing_typical_size[0x1];
+	u8         reserved_at_7[0x19];
 
 	u8         reserved_at_20[0x20];
 
@@ -1296,14 +1297,15 @@ struct mlx5_ifc_cmd_hca_cap_bits {
 	u8         reserved_at_440[0x8];
 	u8         create_qp_start_hint[0x18];
 
-	u8         tls[0x1];
-	u8         reserved_at_461[0x2];
+	u8         reserved_at_460[0x3];
 	u8         log_max_uctx[0x5];
 	u8         reserved_at_468[0x3];
 	u8         log_max_umem[0x5];
 	u8         max_num_eqs[0x10];
 
-	u8         reserved_63[0x3];
+	u8         reserved_at_480[0x1];
+	u8         tls_tx[0x1];
+	u8         reserved_at_482[0x1];
 	u8         log_max_l2_table[0x5];
 	u8         reserved_64[0x8];
 	u8         log_uar_page_sz[0x10];
@@ -7789,7 +7791,13 @@ struct mlx5_ifc_set_rate_limit_in_bits {
 	u8         reserved_at_60[0x20];
 
 	u8         rate_limit[0x20];
+
 	u8         burst_upper_bound[0x20];
+
+	u8         reserved_at_c0[0x10];
+	u8         typical_packet_size[0x10];
+
+	u8         reserved_at_e0[0x120];
 };
 
 struct mlx5_ifc_access_register_out_bits {

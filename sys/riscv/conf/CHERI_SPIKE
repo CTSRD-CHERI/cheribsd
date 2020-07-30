@@ -1,6 +1,3 @@
 #NO_UNIVERSE
 
-include "SPIKE"
-include "std.CHERI"
-
-ident CHERI_SPIKE
+include "CHERI-SPIKE"

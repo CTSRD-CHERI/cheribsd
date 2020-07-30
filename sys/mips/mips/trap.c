@@ -123,9 +123,10 @@ SYSCTL_INT(_machdep, OID_AUTO, stop_vm_trace_on_fault, CTLFLAG_RW,
     &stop_vm_trace_on_fault, 0,
     "Disable VM instruction tracing when a fault is logged");
 #ifdef CPU_CHERI
-int log_cheri_exceptions = 1;
-SYSCTL_INT(_machdep, OID_AUTO, log_cheri_exceptions, CTLFLAG_RW,
-    &log_cheri_exceptions, 1, "Print trap frame on CHERI exceptions");
+int log_user_cheri_exceptions = 1;
+SYSCTL_INT(_machdep, OID_AUTO, log_user_cheri_exceptions, CTLFLAG_RW,
+    &log_user_cheri_exceptions, 0,
+    "Print registers and process details on user CHERI exceptions");
 
 int log_cheri_registers = 1;
 SYSCTL_INT(_machdep, OID_AUTO, log_cheri_registers, CTLFLAG_RW,
@@ -144,22 +145,22 @@ SYSCTL_INT(_machdep, OID_AUTO, log_cheri_registers, CTLFLAG_RW,
 
 #define	lwl_macro(data, addr)						\
 	__asm __volatile ("lwl %0, 0x0(%1)"				\
-			: "=r" (data)	/* outputs */			\
+			: "+r" (data)	/* outputs */			\
 			: "r" (addr));	/* inputs */
 
 #define	lwr_macro(data, addr)						\
 	__asm __volatile ("lwr %0, 0x0(%1)"				\
-			: "=r" (data)	/* outputs */			\
+			: "+r" (data)	/* outputs */			\
 			: "r" (addr));	/* inputs */
 
 #define	ldl_macro(data, addr)						\
 	__asm __volatile ("ldl %0, 0x0(%1)"				\
-			: "=r" (data)	/* outputs */			\
+			: "+r" (data)	/* outputs */			\
 			: "r" (addr));	/* inputs */
 
 #define	ldr_macro(data, addr)						\
 	__asm __volatile ("ldr %0, 0x0(%1)"				\
-			: "=r" (data)	/* outputs */			\
+			: "+r" (data)	/* outputs */			\
 			: "r" (addr));	/* inputs */
 
 #define	sb_macro(data, addr)						\
@@ -972,6 +973,8 @@ dofault:
 				}
 				goto err;
 			}
+			addr = (void * __capability)(intcap_t)
+			    trapframe->badvaddr;
 
 			msg = "BAD_PAGE_FAULT";
 			log_bad_page_fault(msg, trapframe, type);
@@ -1159,9 +1162,18 @@ dofault:
 	case T_C2E + T_USER:
 		msg = "USER_CHERI_EXCEPTION";
 		fetch_bad_instr(trapframe);
-		log_c2e_exception(msg, trapframe, type);
-		i = SIGPROT;
-		ucode = cheri_capcause_to_sicode(trapframe->capcause);
+		if (log_user_cheri_exceptions)
+			log_c2e_exception(msg, trapframe, type);
+		if (CHERI_CAPCAUSE_EXCCODE(trapframe->capcause) ==
+		    CHERI_EXCCODE_TLBSTORE) {
+			i = SIGSEGV;
+			ucode = SEGV_STORETAG;
+			addr = (void * __capability)(intcap_t)
+			    trapframe->badvaddr;
+		} else {
+			i = SIGPROT;
+			ucode = cheri_capcause_to_sicode(trapframe->capcause);
+		}
 		break;
 
 #else
@@ -1383,8 +1395,8 @@ err:
 	ksi.ksi_signo = i;
 	ksi.ksi_code = ucode;
 	/* XXXBD: probably not quite right for CheriABI */
-	ksi.ksi_addr = (void * __capability)(intcap_t)addr;
-	ksi.ksi_trapno = type;
+	ksi.ksi_addr = addr;
+	ksi.ksi_trapno = type & ~T_USER;
 #if defined(CPU_CHERI)
 	if (i == SIGPROT)
 		ksi.ksi_capreg = trapframe->capcause &
@@ -1982,9 +1994,6 @@ static void
 log_c2e_exception(const char *msg, struct trapframe *frame, int trap_type)
 {
 
-	if (!log_cheri_exceptions)
-		return;
-
 #ifdef SMP
 	printf("cpuid = %d\n", PCPU_GET(cpuid));
 #endif
@@ -2021,7 +2030,7 @@ static int
 mips_unaligned_load_store(struct trapframe *frame, int mode, register_t addr, uint32_t inst)
 {
 	register_t *reg = (register_t *) frame;
-	register_t value;
+	register_t value = 0;
 	unsigned size;
 	int src_regno;
 	int op_type = 0;

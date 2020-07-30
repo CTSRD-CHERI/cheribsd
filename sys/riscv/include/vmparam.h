@@ -199,8 +199,6 @@
 #define	USRSTACK		SHAREDPAGE
 #endif
 
-#define	KERNENTRY		(0)
-
 #define	VM_EARLY_DTB_ADDRESS	(VM_MAX_KERNEL_ADDRESS - (2 * L2_SIZE))
 
 /*

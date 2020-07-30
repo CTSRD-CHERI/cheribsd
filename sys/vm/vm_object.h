@@ -282,7 +282,7 @@ struct vnode;
  *	The object must be locked or thread private.
  */
 static __inline void
-vm_object_set_flag(vm_object_t object, u_short bits)
+vm_object_set_flag(vm_object_t object, u_int bits)
 {
 
 	object->flags |= bits;
@@ -338,7 +338,7 @@ vm_object_mightbedirty(vm_object_t object)
 	return (object->generation != object->cleangeneration);
 }
 
-void vm_object_clear_flag(vm_object_t object, u_short bits);
+void vm_object_clear_flag(vm_object_t object, u_int bits);
 void vm_object_pip_add(vm_object_t object, short i);
 void vm_object_pip_wakeup(vm_object_t object);
 void vm_object_pip_wakeupn(vm_object_t object, short i);

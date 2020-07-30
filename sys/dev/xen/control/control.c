@@ -303,7 +303,6 @@ xctrl_suspend()
 	 * Warm up timecounter again and reset system clock.
 	 */
 	timecounter->tc_get_timecount(timecounter);
-	timecounter->tc_get_timecount(timecounter);
 	inittodr(time_second);
 
 #ifdef EARLY_AP_STARTUP
@@ -360,7 +359,7 @@ xctrl_on_watch_event(struct xs_watch *watch, const char **vec, unsigned int len)
 	
 	error = xs_read(XST_NIL, "control", "shutdown",
 			&result_len, (void **)&result);
-	if (error != 0)
+	if (error != 0 || result_len == 0)
 		return;
 
 	/* Acknowledge the request by writing back an empty string. */

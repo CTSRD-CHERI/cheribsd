@@ -31,6 +31,17 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+// CHERI CHANGES START
+// {
+//   "updated": 20200721,
+//   "target_type": "prog"
+//   "changes": [
+//     "other"
+//   ],
+//   "change_comment": "Fix buffer underread"
+// }
+// CHERI CHANGES END
+
 
 #ifndef lint
 static const char copyright[] =
@@ -183,6 +194,12 @@ struct fhreturn {
 };
 
 #define	GETPORT_MAXTRY	20	/* Max tries to get a port # */
+
+/*
+ * How long to delay a reload of exports when there are RPC request(s)
+ * to process, in usec.  Must be less than 1second.
+ */
+#define	RELOADDELAY	250000
 
 /* Global defs */
 static char	*add_expdir(struct dirlist **, char *, int);
@@ -410,6 +427,10 @@ main(int argc, char **argv)
 	int maxrec = RPC_MAXDATASIZE;
 	int attempt_cnt, port_len, port_pos, ret;
 	char **port_list;
+	uint64_t curtime, nexttime;
+	struct timeval tv;
+	struct timespec tp;
+	sigset_t sighup_mask;
 
 	/* Check that another mountd isn't already running. */
 	pfh = pidfile_open(_PATH_MOUNTDPID, 0600, &otherpid);
@@ -665,19 +686,49 @@ main(int argc, char **argv)
 	}
 
 	/* Expand svc_run() here so that we can call get_exportlist(). */
+	curtime = nexttime = 0;
+	sigemptyset(&sighup_mask);
+	sigaddset(&sighup_mask, SIGHUP);
 	for (;;) {
-		if (got_sighup) {
-			get_exportlist(1);
+		clock_gettime(CLOCK_MONOTONIC, &tp);
+		curtime = tp.tv_sec;
+		curtime = curtime * 1000000 + tp.tv_nsec / 1000;
+		sigprocmask(SIG_BLOCK, &sighup_mask, NULL);
+		if (got_sighup && curtime >= nexttime) {
 			got_sighup = 0;
-		}
+			sigprocmask(SIG_UNBLOCK, &sighup_mask, NULL);
+			get_exportlist(1);
+			clock_gettime(CLOCK_MONOTONIC, &tp);
+			nexttime = tp.tv_sec;
+			nexttime = nexttime * 1000000 + tp.tv_nsec / 1000 +
+			    RELOADDELAY;
+		} else
+			sigprocmask(SIG_UNBLOCK, &sighup_mask, NULL);
+
+		/*
+		 * If a reload is pending, poll for received request(s),
+		 * otherwise set a RELOADDELAY timeout, since a SIGHUP
+		 * could be processed between the got_sighup test and
+		 * the select() system call.
+		 */
+		tv.tv_sec = 0;
+		if (got_sighup)
+			tv.tv_usec = 0;
+		else
+			tv.tv_usec = RELOADDELAY;
 		readfds = svc_fdset;
-		switch (select(svc_maxfd + 1, &readfds, NULL, NULL, NULL)) {
+		switch (select(svc_maxfd + 1, &readfds, NULL, NULL, &tv)) {
 		case -1:
-			if (errno == EINTR)
-                                continue;
+			if (errno == EINTR) {
+				/* Allow a reload now. */
+				nexttime = 0;
+				continue;
+			}
 			syslog(LOG_ERR, "mountd died: select: %m");
 			exit(1);
 		case 0:
+			/* Allow a reload now. */
+			nexttime = 0;
 			continue;
 		default:
 			svc_getreqset(&readfds);
@@ -1047,7 +1098,8 @@ mntsrv(struct svc_req *rqstp, SVCXPRT *transp)
 	struct sockaddr *saddr;
 	u_short sport;
 	char rpcpath[MNTPATHLEN + 1], dirpath[MAXPATHLEN];
-	int bad = 0, defset, hostset;
+	int defset, hostset;
+	long bad = 0;
 	sigset_t sighup_mask;
 	int numsecflavors, *secflavorsp;
 
@@ -1568,10 +1620,8 @@ get_exportlist_one(int passno)
 				    ep = get_exp();
 				} else {
 				    if (ep) {
-					if (ep->ex_fs.val[0] !=
-					    fsb.f_fsid.val[0] ||
-					    ep->ex_fs.val[1] !=
-					    fsb.f_fsid.val[1]) {
+					if (fsidcmp(&ep->ex_fs, &fsb.f_fsid)
+					    != 0) {
 						getexp_err(ep, tgrp,
 						    "fsid mismatch");
 						goto nextline;
@@ -2088,8 +2138,7 @@ compare_nmount_exportlist(struct iovec *iov, int iovlen, char *errmsg)
 			if ((oep->ex_flag & EX_DONE) == 0) {
 				LOGDEBUG("not done delete=%s", oep->ex_fsdir);
 				if (statfs(oep->ex_fsdir, &ofs) >= 0 &&
-				    oep->ex_fs.val[0] == ofs.f_fsid.val[0] &&
-				    oep->ex_fs.val[1] == ofs.f_fsid.val[1]) {
+				    fsidcmp(&oep->ex_fs, &ofs.f_fsid) == 0) {
 					LOGDEBUG("do delete");
 					/*
 					 * Clear has_publicfh if if was set
@@ -2353,8 +2402,7 @@ ex_search(fsid_t *fsid, struct exportlisthead *exhp)
 
 	i = EXPHASH(fsid);
 	SLIST_FOREACH(ep, &exhp[i], entries) {
-		if (ep->ex_fs.val[0] == fsid->val[0] &&
-		    ep->ex_fs.val[1] == fsid->val[1])
+		if (fsidcmp(&ep->ex_fs, fsid) == 0)
 			return (ep);
 	}
 
@@ -3105,7 +3153,7 @@ do_mount(struct exportlist *ep, struct grouplist *grp, int exflags,
 				/* back up over the last component */
 				while (*cp == '/' && cp > dirp)
 					cp--;
-				while (*(cp - 1) != '/' && cp > dirp)
+				while (cp > dirp && *(cp - 1) != '/')
 					cp--;
 				if (cp == dirp) {
 					if (debug)
@@ -3122,8 +3170,7 @@ do_mount(struct exportlist *ep, struct grouplist *grp, int exflags,
 				 * filesystem.
 				 */
 				if (statfs(dirp, &fsb1) != 0 ||
-				    bcmp(&fsb1.f_fsid, &fsb->f_fsid,
-				    sizeof (fsb1.f_fsid)) != 0) {
+				    fsidcmp(&fsb1.f_fsid, &fsb->f_fsid) != 0) {
 					*cp = savedc;
 					syslog(LOG_ERR,
 					    "can't export %s %s", dirp,
@@ -3439,10 +3486,18 @@ parsecred(char *namelist, struct xucred *cr)
 		/*
 		 * Compress out duplicate.
 		 */
-		cr->cr_ngroups = ngroups - 1;
 		cr->cr_groups[0] = groups[0];
-		for (cnt = 2; cnt < ngroups; cnt++)
-			cr->cr_groups[cnt - 1] = groups[cnt];
+		if (ngroups > 1 && groups[0] == groups[1]) {
+			cr->cr_ngroups = ngroups - 1;
+			for (cnt = 2; cnt < ngroups; cnt++)
+				cr->cr_groups[cnt - 1] = groups[cnt];
+		} else {
+			cr->cr_ngroups = ngroups;
+			if (cr->cr_ngroups > XU_NGROUPS)
+				cr->cr_ngroups = XU_NGROUPS;
+			for (cnt = 1; cnt < ngroups; cnt++)
+				cr->cr_groups[cnt] = groups[cnt];
+		}
 		return;
 	}
 	/*

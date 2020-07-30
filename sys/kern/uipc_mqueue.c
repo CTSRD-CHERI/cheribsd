@@ -2946,79 +2946,6 @@ static struct syscall_helper_data mq32_syscalls[] = {
 };
 #endif
 
-#ifdef COMPAT_CHERIABI
-#include <compat/cheriabi/cheriabi_proto.h>
-#include <compat/cheriabi/cheriabi_syscall.h>
-#include <compat/cheriabi/cheriabi_util.h>
-
-int
-cheriabi_kmq_open(struct thread *td, struct cheriabi_kmq_open_args *uap)
-{
-
-	return (user_kmq_open(td, uap->path, uap->flags,
-	    uap->mode, uap->attr));
-}
-
-int
-cheriabi_kmq_unlink(struct thread *td, struct cheriabi_kmq_unlink_args *uap)
-{
-
-	return (kern_kmq_unlink(td, uap->path));
-}
-
-int
-cheriabi_kmq_setattr(struct thread *td, struct cheriabi_kmq_setattr_args *uap)
-{
-
-	return (user_kmq_setattr(td, uap->mqd, uap->attr, uap->oattr));
-}
-
-int
-cheriabi_kmq_timedsend(struct thread *td,
-    struct cheriabi_kmq_timedsend_args *uap)
-{
-
-	return (kern_kmq_timedsend(td, uap->mqd, uap->msg_ptr, uap->msg_len,
-	    uap->msg_prio, uap->abs_timeout));
-}
-
-int
-cheriabi_kmq_timedreceive(struct thread *td,
-    struct cheriabi_kmq_timedreceive_args *uap)
-{
-
-	return (kern_timedreceive(td, uap->mqd, uap->msg_ptr, uap->msg_len,
-	    uap->msg_prio, uap->abs_timeout));
-}
-
-int
-cheriabi_kmq_notify(struct thread *td, struct cheriabi_kmq_notify_args *uap)
-{
-	struct sigevent ev, *evp;
-	int error;
-
-	if (uap->sigev == NULL) {
-		evp = NULL;
-	} else {
-		error = copyincap(uap->sigev, &ev, sizeof(ev));
-		if (error != 0)
-			return (error);
-		evp = &ev;
-	}
-	return (kern_kmq_notify(td, uap->mqd, evp));
-}
-
-static struct syscall_helper_data cheriabi_mq_syscalls[] = {
-	CHERIABI_SYSCALL_INIT_HELPER(cheriabi_kmq_open),
-	CHERIABI_SYSCALL_INIT_HELPER(cheriabi_kmq_unlink),
-	CHERIABI_SYSCALL_INIT_HELPER(cheriabi_kmq_setattr),
-	CHERIABI_SYSCALL_INIT_HELPER(cheriabi_kmq_timedsend),
-	CHERIABI_SYSCALL_INIT_HELPER(cheriabi_kmq_timedreceive),
-	CHERIABI_SYSCALL_INIT_HELPER(cheriabi_kmq_notify),
-	SYSCALL_INIT_LAST
-};
-#endif
-
 static int
 mqinit(void)
 {
@@ -3032,12 +2959,6 @@ mqinit(void)
 	if (error != 0)
 		return (error);
 #endif
-#ifdef COMPAT_CHERIABI
-	error = cheriabi_syscall_helper_register(cheriabi_mq_syscalls,
-	    SY_THR_STATIC_KLD);
-	if (error != 0)
-		return (error);
-#endif
 	return (0);
 }
 
@@ -3045,9 +2966,6 @@ static int
 mqunload(void)
 {
 
-#ifdef COMPAT_CHERIABI
-	cheriabi_syscall_helper_unregister(cheriabi_mq_syscalls);
-#endif
 #ifdef COMPAT_FREEBSD32
 	syscall32_helper_unregister(mq32_syscalls);
 #endif

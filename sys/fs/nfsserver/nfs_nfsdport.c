@@ -3270,7 +3270,7 @@ nfsrv_v4rootexport(void *argp, struct ucred *cred, struct thread *p)
 		/*
 		 * If fspec != NULL, this is the v4root path.
 		 */
-		NDINIT(&nd, LOOKUP, FOLLOW, UIO_USERSPACE,
+		NDINIT_C(&nd, LOOKUP, FOLLOW, UIO_USERSPACE,
 		    nfsexargp->fspec, p);
 		if ((error = namei(&nd)) != 0)
 			goto out;
@@ -3679,7 +3679,7 @@ nfssvc_srvcall(struct thread *p, struct nfssvc_args *uap, struct ucred *cred)
 		if (!error)
 			nfs_pubfhset = 1;
 	} else if (uap->flag & NFSSVC_V4ROOTEXPORT) {
-		error = copyin(uap->argp,(caddr_t)&export,
+		error = copyincap(uap->argp,(caddr_t)&export,
 		    sizeof (struct nfsex_args));
 		if (!error)
 			error = nfsrv_v4rootexport(&export, cred, p);
@@ -4021,11 +4021,8 @@ nfsrv_pnfscreate(struct vnode *vp, struct vattr *vap, struct ucred *cred,
 		if (tds->nfsdev_nmp != NULL) {
 			if (tds->nfsdev_mdsisset == 0 && ds == NULL)
 				ds = tds;
-			else if (tds->nfsdev_mdsisset != 0 &&
-			    mp->mnt_stat.f_fsid.val[0] ==
-			    tds->nfsdev_mdsfsid.val[0] &&
-			    mp->mnt_stat.f_fsid.val[1] ==
-			    tds->nfsdev_mdsfsid.val[1]) {
+			else if (tds->nfsdev_mdsisset != 0 && fsidcmp(
+			    &mp->mnt_stat.f_fsid, &tds->nfsdev_mdsfsid) == 0) {
 				ds = fds = tds;
 				break;
 			}
@@ -4045,10 +4042,8 @@ nfsrv_pnfscreate(struct vnode *vp, struct vattr *vap, struct ucred *cred,
 			if (tds->nfsdev_nmp != NULL &&
 			    ((tds->nfsdev_mdsisset == 0 && fds == NULL) ||
 			     (tds->nfsdev_mdsisset != 0 && fds != NULL &&
-			      mp->mnt_stat.f_fsid.val[0] ==
-			      tds->nfsdev_mdsfsid.val[0] &&
-			      mp->mnt_stat.f_fsid.val[1] ==
-			      tds->nfsdev_mdsfsid.val[1]))) {
+			      fsidcmp(&mp->mnt_stat.f_fsid,
+			      &tds->nfsdev_mdsfsid) == 0))) {
 				dsdir[mirrorcnt] = i;
 				dvp[mirrorcnt] = tds->nfsdev_dsdir[i];
 				mirrorcnt++;
@@ -4780,10 +4775,8 @@ nfsrv_dsgetsockmnt(struct vnode *vp, int lktype, char *buf, int *buflenp,
 					      fndds->nfsdev_mdsisset == 0) ||
 					     (tds->nfsdev_mdsisset != 0 &&
 					      fndds->nfsdev_mdsisset != 0 &&
-					      tds->nfsdev_mdsfsid.val[0] ==
-					      mp->mnt_stat.f_fsid.val[0] &&
-					      tds->nfsdev_mdsfsid.val[1] ==
-					      mp->mnt_stat.f_fsid.val[1]))) {
+					      fsidcmp(&tds->nfsdev_mdsfsid,
+					      &mp->mnt_stat.f_fsid) == 0))) {
 						*newnmpp = tds->nfsdev_nmp;
 						break;
 					}
@@ -5082,7 +5075,7 @@ nfsrv_writedsdorpc(struct nfsmount *nmp, fhandle_t *fhp, off_t off, int len,
 	while (m->m_next != NULL)
 		m = m->m_next;
 	nd->nd_mb = m;
-	nd->nd_bpos = mtod(m, char *) + m->m_len;
+	nfsm_set(nd, m->m_len);
 	NFSD_DEBUG(4, "nfsrv_writedsdorpc: lastmb len=%d\n", m->m_len);
 
 	/* Do a Getattr for the attributes that change upon writing. */
@@ -5970,8 +5963,7 @@ nfsrv_pnfsstatfs(struct statfs *sf, struct mount *mp)
 	/* First, search for matches for same file system. */
 	TAILQ_FOREACH(ds, &nfsrv_devidhead, nfsdev_list) {
 		if (ds->nfsdev_nmp != NULL && ds->nfsdev_mdsisset != 0 &&
-		    ds->nfsdev_mdsfsid.val[0] == mp->mnt_stat.f_fsid.val[0] &&
-		    ds->nfsdev_mdsfsid.val[1] == mp->mnt_stat.f_fsid.val[1]) {
+		    fsidcmp(&ds->nfsdev_mdsfsid, &mp->mnt_stat.f_fsid) == 0) {
 			if (++i > nfsrv_devidcnt)
 				break;
 			*tdvpp++ = ds->nfsdev_dvp;

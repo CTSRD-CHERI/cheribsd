@@ -8,7 +8,7 @@ ident QEMU
 
 options 	CPU_QEMU_RISCV
 options 	HZ=100
-options 	ROOTDEVNAME=\"ufs:/dev/vtbd0\"
+options 	ROOTDEVNAME=\"ufs:/dev/ufs/root\nufs:/dev/vtbd0\"
 
 # Access host files on QEMU
 options 	SMBFS

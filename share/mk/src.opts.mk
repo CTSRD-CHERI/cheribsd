@@ -322,19 +322,9 @@ BROKEN_OPTIONS+=LIB32
 BROKEN_OPTIONS+=OFED
 .endif
 
-# In-tree binutils/gcc are older versions without modern architecture support.
+# In-tree gdb is an older versions without modern architecture support.
 .if ${__T} == "aarch64" || ${__T:Mriscv*} != ""
-BROKEN_OPTIONS+=BINUTILS BINUTILS_BOOTSTRAP GDB
-.endif
-# BINUTILS is enabled on x86 to provide as for ports - PR 205250
-# BINUTILS_BOOTSTRAP is needed on amd64 only, for skein_block_asm.s
-.if ${__T} == "amd64"
-__DEFAULT_YES_OPTIONS+=BINUTILS BINUTILS_BOOTSTRAP
-.elif ${__T} == "i386"
-__DEFAULT_YES_OPTIONS+=BINUTILS
-__DEFAULT_NO_OPTIONS+=BINUTILS_BOOTSTRAP
-.else
-__DEFAULT_NO_OPTIONS+=BINUTILS BINUTILS_BOOTSTRAP
+BROKEN_OPTIONS+=GDB
 .endif
 .if ${__T:Mriscv*} != ""
 BROKEN_OPTIONS+=OFED
@@ -350,11 +340,11 @@ __DEFAULT_YES_OPTIONS+=LIB32
 .else
 BROKEN_OPTIONS+=LIB32
 .endif
-# LIB64 on mips64*c*
-.if ${__T:Mmips64*c*}
+# LIB64 on mips64*c* and riscv64*c*
+.if ${__T:Mmips64*c*} || ${__T:Mriscv64*c*}
 __DEFAULT_YES_OPTIONS+=LIB64
-# In principal, LIB32 could work, but Makefile.libcompat only supports
-# one compat layer.
+# In principle, LIB32 could work on architectures where it's supported, but
+# Makefile.libcompat only supports one compat layer.
 BROKEN_OPTIONS+=LIB32
 .else
 BROKEN_OPTIONS+=LIB64
@@ -379,9 +369,6 @@ BROKEN_OPTIONS+=NS_CACHING
 .endif
 
 .if ${__T:Mriscv*c*}
-# Compiler crash:
-# Skip until https://github.com/CTSRD-CHERI/llvm-project/issues/379 is fixed.
-BROKEN_OPTIONS+=LIBCPLUSPLUS CXX
 # Crash in ZFS code. TODO: investigate
 BROKEN_OPTIONS+=CDDL
 
@@ -577,14 +564,12 @@ MK_ZONEINFO_LEAPSECONDS_SUPPORT:= no
 .endif
 
 .if ${MK_CROSS_COMPILER} == "no"
-MK_BINUTILS_BOOTSTRAP:= no
 MK_CLANG_BOOTSTRAP:= no
 MK_ELFTOOLCHAIN_BOOTSTRAP:= no
 MK_LLD_BOOTSTRAP:= no
 .endif
 
 .if ${MK_TOOLCHAIN} == "no"
-MK_BINUTILS:=	no
 MK_CLANG:=	no
 MK_GDB:=	no
 MK_INCLUDES:=	no

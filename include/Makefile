@@ -70,10 +70,6 @@ LSUBSUBDIRS=	dev/mpt/mpilib
 LSUBSUBDIRS+=	netgraph/bluetooth/include
 .endif
 
-.if ${MACHINE_ABI:Mpurecap} || ${MK_COMPAT_CHERIABI} == "yes" || ${MK_CHERI} != "no"
-LSUBDIRS+=	compat/cheriabi
-.endif
-
 .if ${MK_CUSE} != "no"
 LSUBDIRS+=	fs/cuse
 .endif
@@ -238,6 +234,9 @@ copies: .PHONY .META
 .endif
 .endfor
 	cd ${SRCTOP}/sys/rpc; \
+	${INSTALL} -C ${TAG_ARGS} -o ${BINOWN} -g ${BINGRP} -m 444 rpcsec_tls.h \
+	    ${SDESTDIR}${INCLUDEDIR}/rpc
+	cd ${SRCTOP}/sys/rpc; \
 	${INSTALL} -C ${TAG_ARGS} -o ${BINOWN} -g ${BINGRP} -m 444 types.h \
 	    ${SDESTDIR}${INCLUDEDIR}/rpc
 	cd ${SRCTOP}/sys/teken; \
@@ -371,7 +370,7 @@ symlinks: .PHONY .META
 		    ${SDESTDIR}${INCLUDEDIR}/isofs/cd9660; \
 	done
 	cd ${SRCTOP}/sys/rpc; \
-	for h in types.h; do \
+	for h in rpcsec_tls.h types.h; do \
 		${INSTALL_SYMLINK} ${TAG_ARGS} ../../../sys/rpc/$$h \
 		    ${SDESTDIR}${INCLUDEDIR}/rpc; \
 	done

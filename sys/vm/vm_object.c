@@ -234,7 +234,7 @@ vm_object_zinit(void *mem, int size, int flags)
 }
 
 static void
-_vm_object_allocate(objtype_t type, vm_pindex_t size, u_short flags,
+_vm_object_allocate(objtype_t type, vm_pindex_t size, u_int flags,
     vm_object_t object, void *handle)
 {
 
@@ -262,9 +262,16 @@ _vm_object_allocate(objtype_t type, vm_pindex_t size, u_short flags,
 	 * and perhaps (eventually) filesystem-backed pages if any filesystems
 	 * grow tagging support.
 	 */
-	if (!((type == OBJT_DEFAULT) || (type == OBJT_SWAP)))
+	switch(type)
+	{
+	case OBJT_DEFAULT:
+	case OBJT_SWAP:
+	case OBJT_PHYS:
+		break;
+	default:
 		object->flags |= OBJ_NOLOADTAGS | OBJ_NOSTORETAGS;
-
+		break;
+	}
 #endif
 	object->size = size;
 	object->domain.dr_policy = NULL;
@@ -319,7 +326,7 @@ vm_object_init(void)
 }
 
 void
-vm_object_clear_flag(vm_object_t object, u_short bits)
+vm_object_clear_flag(vm_object_t object, u_int bits)
 {
 
 	VM_OBJECT_ASSERT_WLOCKED(object);
@@ -425,7 +432,7 @@ vm_object_t
 vm_object_allocate(objtype_t type, vm_pindex_t size)
 {
 	vm_object_t object;
-	u_short flags;
+	u_int flags;
 
 	switch (type) {
 	case OBJT_DEAD:

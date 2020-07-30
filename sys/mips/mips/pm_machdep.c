@@ -160,7 +160,7 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	 * non-unwind case.  Do this before we rewrite any general-purpose or
 	 * capability register state for the thread.
 	 */
-#if DDB
+#ifdef DDB
 	if (cheri_is_sandboxed && security_cheri_debugger_on_sandbox_signal)
 		kdb_enter(KDB_WHY_CHERI, "Signal delivery to CHERI sandbox");
 	else if (sig == SIGPROT && security_cheri_debugger_on_sigprot)
@@ -641,7 +641,7 @@ exec_setregs(struct thread *td, struct image_params *imgp, uintcap_t stack)
 
 		td->td_frame->csp = cheri_exec_stack_pointer(imgp, stack);
 		cheri_set_mmap_capability(td, imgp, td->td_frame->csp);
-		td->td_frame->pcc = cheri_exec_pcc(imgp);
+		td->td_frame->pcc = cheri_exec_pcc(td, imgp);
 		td->td_frame->c12 = td->td_frame->pc;
 
 		/*

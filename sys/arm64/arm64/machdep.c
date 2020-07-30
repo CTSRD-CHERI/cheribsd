@@ -442,7 +442,7 @@ ptrace_clear_single_step(struct thread *td)
 }
 
 void
-exec_setregs(struct thread *td, struct image_params *imgp, uintptr_t stack)
+exec_setregs(struct thread *td, struct image_params *imgp, uintcap_t stack)
 {
 	struct trapframe *tf = td->td_frame;
 

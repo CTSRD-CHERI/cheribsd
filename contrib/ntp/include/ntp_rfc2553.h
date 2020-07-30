@@ -108,7 +108,7 @@ struct addrinfo *copy_addrinfo_list_impl(const struct addrinfo *
 #if !defined(_SS_MAXSIZE) && !defined(_SS_ALIGNSIZE)
 
 # define	_SS_MAXSIZE	128
-# define	_SS_ALIGNSIZE	(sizeof(ntp_uint64_t))
+# define	_SS_ALIGNSIZE	(sizeof(max_alignment))
 # ifdef ISC_PLATFORM_HAVESALEN
 #  define	_SS_PAD1SIZE	(_SS_ALIGNSIZE - sizeof(u_char) - sizeof(ntp_u_int8_t))
 #  define	_SS_PAD2SIZE	(_SS_MAXSIZE - sizeof(u_char) - sizeof(ntp_u_int8_t) - \
@@ -138,7 +138,7 @@ struct sockaddr_storage {
 	short		ss_family;	/* address family */
 #endif
 	char		__ss_pad1[_SS_PAD1SIZE];
-	ntp_uint64_t	__ss_align;	/* force desired structure storage alignment */
+	max_alignment	__ss_align;	/* force desired structure storage alignment */
 	char		__ss_pad2[_SS_PAD2SIZE];
 };
 #endif

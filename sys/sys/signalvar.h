@@ -40,13 +40,6 @@
 #include <sys/_mutex.h>
 #include <sys/signal.h>
 
-#ifdef _KERNEL
-#ifdef COMPAT_CHERIABI
-#include <sys/malloc.h>
-#include <cheri/cheri.h>
-#endif
-#endif
-
 /*
  * Kernel signal definitions and data structures.
  */

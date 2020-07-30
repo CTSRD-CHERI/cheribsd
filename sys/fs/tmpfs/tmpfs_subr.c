@@ -342,6 +342,9 @@ tmpfs_alloc_node(struct mount *mp, struct tmpfs_mount *tmp, enum vtype type,
 		VM_OBJECT_WLOCK(obj);
 		/* OBJ_TMPFS is set together with the setting of vp->v_object */
 		vm_object_set_flag(obj, OBJ_TMPFS_NODE);
+#if __has_feature(capabilities)
+		vm_object_set_flag(obj, OBJ_NOLOADTAGS | OBJ_NOSTORETAGS);
+#endif
 		VM_OBJECT_WUNLOCK(obj);
 		break;
 

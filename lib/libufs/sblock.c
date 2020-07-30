@@ -207,3 +207,13 @@ use_pwrite(void *devfd, off_t loc, void *buf, int size)
 		return (EIO);
 	return (0);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20190628,
+//   "target_type": "lib",
+//   "changes_purecap": [
+//     "pointer_shape"
+//   ],
+//   "change_comment": "embedded pointer storage in superblock"
+// }
+// CHERI CHANGES END

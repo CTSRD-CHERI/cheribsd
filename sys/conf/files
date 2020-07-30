@@ -319,17 +319,6 @@ cheri/cheri_sysctl.c			optional cpu_cheri
 cheri/cheri_otype.c			optional cpu_cheri
 cheri/cheri_syscall.c			optional cpu_cheri
 cheri/cheri_usercap.c			optional cpu_cheri
-compat/cheriabi/cheriabi_abort2.c	optional compat_cheriabi
-compat/cheriabi/cheriabi_generic.c	optional compat_cheriabi
-compat/cheriabi/cheriabi_mac.c		optional compat_cheriabi
-compat/cheriabi/cheriabi_mmap.c		optional compat_cheriabi
-compat/cheriabi/cheriabi_misc.c		optional compat_cheriabi
-compat/cheriabi/cheriabi_signal.c	optional compat_cheriabi
-compat/cheriabi/cheriabi_syscalls.c	optional compat_cheriabi
-compat/cheriabi/cheriabi_sysent.c	optional compat_cheriabi
-compat/cheriabi/cheriabi_time.c		optional compat_cheriabi
-compat/cheriabi/cheriabi_uipc.c		optional compat_cheriabi
-compat/cheriabi/cheriabi_vfs.c		optional compat_cheriabi
 
 # dtrace specific
 cddl/contrib/opensolaris/uts/common/dtrace/dtrace.c	optional dtrace compile-with "${DTRACE_C}" \
@@ -694,6 +683,7 @@ contrib/zstd/lib/common/xxhash.c		optional zstdio compile-with ${ZSTD_C}
 contrib/zstd/lib/compress/zstd_compress.c	optional zstdio compile-with ${ZSTD_C}
 contrib/zstd/lib/compress/zstd_compress_literals.c	optional zstdio compile-with ${ZSTD_C}
 contrib/zstd/lib/compress/zstd_compress_sequences.c	optional zstdio compile-with ${ZSTD_C}
+contrib/zstd/lib/compress/zstd_compress_superblock.c	optional zstdio compile-with ${ZSTD_C}
 contrib/zstd/lib/compress/fse_compress.c	optional zstdio compile-with ${ZSTD_C}
 contrib/zstd/lib/compress/hist.c		optional zstdio compile-with ${ZSTD_C}
 contrib/zstd/lib/compress/huf_compress.c	optional zstdio compile-with ${ZSTD_C}
@@ -1738,6 +1728,7 @@ dev/extres/regulator/regulator_fixed.c	optional ext_resources regulator fdt
 dev/extres/syscon/syscon.c		optional ext_resources syscon
 dev/extres/syscon/syscon_generic.c	optional ext_resources syscon fdt
 dev/extres/syscon/syscon_if.m		optional ext_resources syscon
+dev/extres/syscon/syscon_power.c	optional ext_resources syscon syscon_power fdt
 dev/fb/fbd.c			optional fbd | vt
 dev/fb/fb_if.m			standard
 dev/fb/splash.c			optional sc splash
@@ -1772,6 +1763,7 @@ dev/fxp/if_fxp.c		optional fxp
 dev/fxp/inphy.c			optional fxp
 dev/gem/if_gem.c		optional gem
 dev/gem/if_gem_pci.c		optional gem pci
+dev/goldfish/goldfish_rtc.c	optional goldfish_rtc fdt
 dev/gpio/dwgpio/dwgpio.c	optional gpio dwgpio fdt
 dev/gpio/dwgpio/dwgpio_bus.c	optional gpio dwgpio fdt
 dev/gpio/dwgpio/dwgpio_if.m	optional gpio dwgpio fdt
@@ -1840,8 +1832,10 @@ dev/iicbus/mux/ltc430x.c	optional ltc430x
 dev/iicbus/nxprtc.c		optional nxprtc | pcf8563
 dev/iicbus/ofw_iicbus.c		optional fdt iicbus
 dev/iicbus/rtc8583.c		optional rtc8583
+dev/iicbus/rtc/rx8803.c		optional rx8803 iicbus fdt
 dev/iicbus/s35390a.c		optional s35390a
 dev/iicbus/sy8106a.c		optional sy8106a ext_resources fdt
+dev/iicbus/gpio/tca6416.c	optional tca6416 fdt
 dev/iir/iir.c			optional iir
 dev/iir/iir_ctrl.c		optional iir
 dev/iir/iir_pci.c		optional iir pci
@@ -3758,6 +3752,7 @@ kern/kern_exec.c		standard
 kern/kern_exit.c		standard
 kern/kern_fail.c		standard
 kern/kern_ffclock.c		standard
+kern/kern_flag.c		standard
 kern/kern_fork.c		standard
 kern/kern_hhook.c		standard
 kern/kern_idle.c		standard
@@ -3994,6 +3989,7 @@ kgssapi/gsstest.c		optional kgssapi_debug
 # the file should be moved to conf/files.<arch> from here.
 #
 libkern/arc4random.c		standard
+libkern/arc4random_uniform.c	standard
 libkern/asprintf.c		standard
 libkern/bcd.c			standard
 libkern/bsearch.c		standard

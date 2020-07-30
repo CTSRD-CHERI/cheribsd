@@ -1,0 +1,86 @@
+.\"-
+.\" SPDX-License-Identifier: BSD-2-Clause
+.\"
+.\" Copyright (c) 2020 SRI International
+.\"
+.\" This software was developed by SRI International and the University of
+.\" Cambridge Computer Laboratory (Department of Computer Science and
+.\" Technology) under DARPA contract HR0011-18-C-0016 ("ECATS"), as part of the
+.\" DARPA SSITH research programme.
+.\"
+.\" Redistribution and use in source and binary forms, with or without
+.\" modification, are permitted provided that the following conditions
+.\" are met:
+.\" 1. Redistributions of source code must retain the above copyright
+.\"    notice, this list of conditions and the following disclaimer.
+.\" 2. Redistributions in binary form must reproduce the above copyright
+.\"    notice, this list of conditions and the following disclaimer in the
+.\"    documentation and/or other materials provided with the distribution.
+.\"
+.\" THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+.\" ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+.\" IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+.\" ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+.\" FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+.\" DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+.\" OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+.\" HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+.\" LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+.\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+.\" SUCH DAMAGE.
+.\"
+.Dd June 28, 2020
+.Dt FLAG_CAPTURED 2
+.Os
+.Sh NAME
+.Nm flag_captured
+.Nd Demostrate arbitrary code executation
+.Sh LIBRARY
+.Lb libc
+.Sh SYNOPSIS
+.Fd #define FLAG_CAPURED_KEY 0xfe77c0de
+.In sys/syscalls.h
+.Ft int
+.Fn flag_captured "const char *message" "uint32_t key"
+.Sh DESCRIPTION
+The
+.Fn flag_captured
+system call is intended to provide capture-the-flag participants and
+red team members a harmless way to demonstrating arbitrary code
+execution.
+In the current implementation
+.Sy does not provide a stub in the C standard library
+and must be called by injecting appropriate shell code or calling via
+.Xr syscall 2 .
+When called,
+.Fn flag_captured
+logs a message indicated the process and user that called it and
+increments the counter reported by the
+.Va security.flags_captured
+sysctl MIB entry.
+The
+.Fa message
+argument is an optional message to be logged along with notice that the
+syscall has been called.
+If the
+.Fa key
+argument is set to
+.Dv 0xfe77c0de
+then the log will indicate that the correct key was used and the counter
+reported by the
+.Va security.flags_captured_key
+sysctl MIB entry will be incremented.
+.Sh HISTORY
+The
+.Fn flag_captured
+system call was first implemented CheriBSD to support the DARPA
+FETT bug bounty.
+.Sh AUTHORS
+This software and this manual page were
+developed by SRI International and the University of Cambridge Computer
+Laboratory (Department of Computer Science and Technology) under contract
+.Pq HR0011-18-C-0016
+.Pq Do ECATS Dc ,
+as part of the DARPA SSITH research programme.
+.Sh SEE ALSO
+.Xr sysctl 2

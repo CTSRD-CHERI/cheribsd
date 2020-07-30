@@ -95,7 +95,7 @@ MK_CLANG_BOOTSTRAP=	no
 # running CC from bsd.compiler.mk.
 .if make(installworld) || make(installsysroot) || make(install) || \
     make(distributeworld) || make(stageworld) || make(distribution) || \
-    make(distrib-dirs)
+    make(distrib-dirs) || make(distributekernel) || make(stagekernel)
 .-include "${OBJTOP}/toolchain-metadata.mk"
 .if !defined(_LOADED_TOOLCHAIN_METADATA)
 .error A build is required first.  You may have the wrong MAKEOBJDIRPREFIX set.
@@ -156,10 +156,10 @@ TARGET_ABI=	gnueabi
 .endif
 .endif
 _MACHINE_ABI?=	unknown
-MACHINE_MACHINE=${MACHINE_ARCH:S/amd64/x86_64/:C/[hs]f$//:S/mipsn32/mips64/:C/mips.*c.*/cheri/:S/riscv64c/riscv64/}
+MACHINE_MACHINE=${MACHINE_ARCH:S/amd64/x86_64/:C/[hs]f$//:S/mipsn32/mips64/:C/mips.*c.*/mips64/:S/riscv64c/riscv64/}
 MACHINE_TRIPLE?=${MACHINE_MACHINE}-${_MACHINE_ABI}-freebsd13.0
 TARGET_ABI?=	unknown
-TARGET_MACHINE=	${TARGET_ARCH:S/amd64/x86_64/:C/[hs]f$//:S/mipsn32/mips64/:C/mips.*c.*/cheri/:S/riscv64c/riscv64/}
+TARGET_MACHINE=	${TARGET_ARCH:S/amd64/x86_64/:C/[hs]f$//:S/mipsn32/mips64/:C/mips.*c.*/mips64/:S/riscv64c/riscv64/}
 TARGET_TRIPLE?=	${TARGET_MACHINE}-${TARGET_ABI}-freebsd13.0
 KNOWN_ARCHES?=	aarch64/arm64 \
 		amd64 \
@@ -280,9 +280,6 @@ USING_SYSTEM_COMPILER=	yes
 # Which linker is expected to be used?
 .if ${MK_LLD_BOOTSTRAP} == "yes"
 WANT_LINKER_TYPE=		lld
-.elif ${MK_BINUTILS_BOOTSTRAP} == "yes"
-# Note that there's no support for bfd in WITH_SYSTEM_LINKER.
-WANT_LINKER_TYPE=	bfd
 .else
 WANT_LINKER_TYPE=
 .endif
@@ -335,7 +332,7 @@ TEST_SYSTEM_COMPILER_VARS= \
 	X_COMPILER_FREEBSD_VERSION
 TEST_SYSTEM_LINKER_VARS= \
 	USING_SYSTEM_LINKER MK_SYSTEM_LINKER \
-	MK_LLD_BOOTSTRAP MK_BINUTILS_BOOTSTRAP \
+	MK_LLD_BOOTSTRAP \
 	WANT_LINKER_TYPE WANT_LINKER_VERSION WANT_LINKER_VERSION_FILE \
 	WANT_LINKER_FREEBSD_VERSION WANT_LINKER_FREEBSD_VERSION_FILE \
 	LD LINKER_TYPE LINKER_FEATURES LINKER_VERSION \
@@ -1569,16 +1566,6 @@ distributeworld installworld stageworld installsysroot: _installcheck_world .PHO
 	${DESTDIR}/${DISTDIR}/${dist}.debug.meta
 .endfor
 .endif
-.elif make(installworld) && ${MK_CAROOT} != "no"
-	# We could make certctl a bootstrap tool, but it requires OpenSSL and
-	# friends, which we likely don't want.  We'll rehash on a best-effort
-	# basis, otherwise we'll just mention that we're not doing it to raise
-	# awareness.
-	@if which certctl>/dev/null; then \
-		certctl rehash; \
-	else \
-		echo "No certctl on the host, not rehashing target -- /etc/ssl may not be populated."; \
-	fi
 .endif
 
 packageworld: .PHONY
@@ -1619,7 +1606,6 @@ _sysent_PATH=	${TMPPATH}:/usr/libexec
 _sysent_dirs=	sys/kern
 _sysent_dirs+=	sys/compat/freebsd32
 _sysent_dirs+=	sys/compat/freebsd64
-_sysent_dirs+=	sys/compat/cheriabi
 _sysent_dirs+=	sys/compat/cloudabi32	\
 		sys/compat/cloudabi64
 _sysent_dirs+=	sys/amd64/linux		\
@@ -1660,6 +1646,25 @@ restage reinstall reinstallsysroot: .MAKE .PHONY
 	${_+_}cd ${.CURDIR}; ${MAKE} -f Makefile.inc1 install
 .if defined(_LIBCOMPAT)
 	${_+_}cd ${.CURDIR}; ${MAKE} -f Makefile.inc1 install${libcompat}
+.endif
+	@echo
+	@echo "--------------------------------------------------------------"
+	@echo ">>> Adding symlinks for native ABI libdir: ${MACHINE_ABI}"
+	@echo "--------------------------------------------------------------"
+.if ${MACHINE_ABI:Mpurecap}
+	@echo "Purecap ABI: creating libcheri links"
+	ln -sfnv lib ${DESTDIR}/libcheri
+	ln -sfnv lib ${DESTDIR}/usr/libcheri
+.elif ${MACHINE_ABI:Mptr64}
+	@echo "64-bit ABI: creating lib64 links"
+	ln -sfnv lib ${DESTDIR}/lib64
+	ln -sfnv lib ${DESTDIR}/usr/lib64
+.elif ${MACHINE_ABI:Mptr32}
+	@echo "32-bit ABI: creating lib32 links"
+	ln -sfnv lib ${DESTDIR}/lib32
+	ln -sfnv lib ${DESTDIR}/usr/lib32
+.else
+.error "MACHINE_ABI incorrect? ${MACHINE_ABI}"
 .endif
 .if make(reinstallsysroot)
 	@echo "Removing $$(find ${DESTDIR} -type d -empty -print | wc -l) empty directories from ${DESTDIR}"
@@ -1749,12 +1754,6 @@ INSTALLKERNEL= ${_kernel}
 .endfor
 
 _cleankernobj_fast_depend_hack: .PHONY
-# 20180320 remove stale generated assym.s after renaming to .inc in r331254
-	@if [ -e "${OBJTOP}/sys/${KERNCONF}/assym.s" ]; then \
-		echo "Removing stale generated assym files"; \
-		rm -f ${OBJTOP}/sys/${KERNCONF}/assym.* \
-		    ${OBJTOP}/sys/${KERNCONF}/.depend.assym.*; \
-	fi
 # 20191009  r353340  removal of opensolaris_atomic.S (also r353381)
 .if ${MACHINE} != i386
 .for f in opensolaris_atomic
@@ -2076,7 +2075,7 @@ create-world-package-${pkgname}: .PHONY
 _default_flavor=	-default
 .if make(*package*) && exists(${KSTAGEDIR}/kernel.meta)
 . if ${MK_DEBUG_FILES} != "no"
-_debug=-debug
+_debug=-dbg
 . endif
 create-kernel-packages:	.PHONY
 . for flavor in "" ${_debug}
@@ -2110,7 +2109,7 @@ create-kernel-packages-flavor${flavor:C,^""$,${_default_flavor},}: _pkgbootstrap
 . for _kernel in ${BUILDKERNELS:[2..-1]}
 .  if exists(${KSTAGEDIR}/kernel.${_kernel}.meta)
 .   if ${MK_DEBUG_FILES} != "no"
-_debug=-debug
+_debug=-dbg
 .   endif
 .   for flavor in "" ${_debug}
 create-kernel-packages: create-kernel-packages-extra-flavor${flavor:C,^""$,${_default_flavor},}-${_kernel}
@@ -2661,9 +2660,6 @@ _dtrace_tools= cddl/lib/libctf cddl/usr.bin/ctfconvert \
 
 # If we're given an XAS, don't build binutils.
 .if ${XAS:M/*} == ""
-.if ${MK_BINUTILS_BOOTSTRAP} != "no"
-_binutils=	gnu/usr.bin/binutils
-.endif
 .if ${MK_ELFTOOLCHAIN_BOOTSTRAP} != "no"
 _elftctools=	lib/libelftc \
 		lib/libpe \
@@ -2707,7 +2703,6 @@ cross-tools: .MAKE .PHONY
     ${_clang_libs} \
     ${_clang} \
     ${_lld} \
-    ${_binutils} \
     ${_elftctools} \
     ${_dtrace_tools} \
     ${_btxld} \
@@ -2804,9 +2799,6 @@ SUBDIR_DEPEND_usr.bin/clang=	lib/clang
 .if ${MK_CLANG} != "no"
 NXBDIRS+=	lib/clang
 NXBDIRS+=	usr.bin/clang
-.endif
-.if ${MK_BINUTILS} != "no"
-NXBDIRS+=	gnu/usr.bin/binutils
 .endif
 # XXX: native-xtools passes along ${NXBDIRS} in SUBDIR_OVERRIDE that needs
 # to be evaluated after NXBDIRS is set.
@@ -3529,7 +3521,6 @@ _xb-build-tools: .PHONY
 XDEVDIRS= \
     ${_clang_libs} \
     ${_lld} \
-    ${_binutils} \
     ${_elftctools} \
     usr.bin/ar \
     ${_clang}

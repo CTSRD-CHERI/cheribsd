@@ -201,7 +201,7 @@ freebsd64_get_mcontext(struct thread *td, mcontext64_t *mcp, int flags)
 	for (i = 0; i < 33; i++)
 		mcp->mc_fpregs[i] = mc.mc_fpregs[i];
 	mcp->mc_fpc_eir = mc.mc_fpc_eir;
-	mcp->mc_tls = (__cheri_fromcap void *)mc.mc_tls;
+	mcp->mc_tls = (__cheri_addr uint64_t)mc.mc_tls;
 	mcp->cause = mc.cause;
 
 	/*
@@ -324,7 +324,7 @@ freebsd64_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	 * non-unwind case.  Do this before we rewrite any general-purpose or
 	 * capability register state for the thread.
 	 */
-#if DDB
+#ifdef DDB
 	if (cheri_is_sandboxed && security_cheri_debugger_on_sandbox_signal)
 		kdb_enter(KDB_WHY_CHERI, "Signal delivery to CHERI sandbox");
 	else if (sig == SIGPROT && security_cheri_debugger_on_sigprot)
@@ -358,8 +358,7 @@ freebsd64_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	sf.sf_uc.uc_mcontext.mc_pc = TRAPF_PC_OFFSET(regs);
 	sf.sf_uc.uc_mcontext.mullo = regs->mullo;
 	sf.sf_uc.uc_mcontext.mulhi = regs->mulhi;
-	sf.sf_uc.uc_mcontext.mc_tls =
-	    (__cheri_fromcap void *)td->td_md.md_tls;
+	sf.sf_uc.uc_mcontext.mc_tls = (__cheri_addr uint64_t)td->td_md.md_tls;
 	sf.sf_uc.uc_mcontext.mc_regs[0] = UCONTEXT_MAGIC;  /* magic number */
 	bcopy((void *)&regs->ast, (void *)&sf.sf_uc.uc_mcontext.mc_regs[1],
 	    sizeof(sf.sf_uc.uc_mcontext.mc_regs) - sizeof(register_t));

@@ -63,7 +63,6 @@
 static char array[ARRAY_LEN];
 static char sink;
 
-#ifdef __mips__
 void
 test_fault_bounds(const struct cheri_test *ctp __unused)
 {
@@ -86,7 +85,6 @@ test_fault_perm_load(const struct cheri_test *ctp __unused)
 
 	cheritest_failure_errx("access without required permissions did not fault");
 }
-#endif	/* __mips__ */
 
 void
 test_nofault_perm_load(const struct cheri_test *ctp __unused)
@@ -121,7 +119,6 @@ test_fault_perm_seal(const struct cheri_test *ctp __unused)
 }
 #endif
 
-#ifdef __mips__
 void
 test_fault_perm_store(const struct cheri_test *ctp __unused)
 {
@@ -129,7 +126,6 @@ test_fault_perm_store(const struct cheri_test *ctp __unused)
 
 	arrayp[0] = sink;
 }
-#endif	/* __mips__ */
 
 void
 test_nofault_perm_store(const struct cheri_test *ctp __unused)
@@ -168,7 +164,6 @@ test_fault_perm_unseal(const struct cheri_test *ctp __unused)
 }
 #endif
 
-#ifdef __mips__
 void
 test_fault_tag(const struct cheri_test *ctp __unused)
 {
@@ -179,6 +174,7 @@ test_fault_tag(const struct cheri_test *ctp __unused)
 	*chp = '\0';
 }
 
+#ifdef __mips__
 void
 test_fault_ccheck_user_fail(const struct cheri_test *ctp __unused)
 {
@@ -208,26 +204,22 @@ test_fault_cgetcause(const struct cheri_test *ctp __unused)
 	cause = cheri_getcause();
 	printf("CP2 cause register: %ju\n", (uintmax_t)cause);
 }
+#endif
 
 void
 test_nofault_cfromptr(const struct cheri_test *ctp __unused)
 {
 	char buf[256];
-	void * __capability cd; /* stored into here */
 	void * __capability cb; /* derived from here */
-	int rt;
+	char * __capability cd; /* stored into here */
 
-	/*
-	 * XXX: Could we be using cheri_cap_from_pointer() here to
-	 * avoid explicit inline assembly?
-	 */
 	cb = cheri_ptr(buf, 256);
-	rt = 10;
-	__asm__ __volatile__ ("cfromptr %0, %1, %2" : "=r"(cd) : "r"(cb),
-	    "r"(rt) : "memory");
+	cd = __builtin_cheri_cap_from_pointer(cb, (void *)(uintptr_t)10);
+	*cd = '\0';
 	cheritest_success();
 }
 
+#ifdef __mips__
 void
 test_fault_read_kr1c(const struct cheri_test *ctp __unused)
 {
