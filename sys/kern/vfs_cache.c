@@ -3008,7 +3008,8 @@ cache_fpl_handled_impl(struct cache_fpl *fpl, int error, int line)
 #define cache_fpl_handled(x, e)	cache_fpl_handled_impl((x), (e), __LINE__)
 
 #define CACHE_FPL_SUPPORTED_CN_FLAGS \
-	(LOCKLEAF | FOLLOW | LOCKSHARED | SAVENAME | ISOPEN | AUDITVNODE1)
+	(LOCKLEAF | FOLLOW | LOCKSHARED | SAVENAME | ISOPEN | NOMACCHECK | \
+	 AUDITVNODE1 | AUDITVNODE2)
 
 static bool
 cache_can_fplookup(struct cache_fpl *fpl)
