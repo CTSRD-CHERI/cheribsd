@@ -27,6 +27,10 @@ MISRCS+=bcmp.c bcopy.c bzero.c explicit_bzero.c \
 	wmemcmp.c \
 	wmemcpy.c wmemmove.c wmemset.c
 
+.if ${MACHINE_CPU:Mcheri}
+MISRCS+=memcpy_c.c memmove_c.c memset_c.c
+.endif
+
 SYM_MAPS+=	${LIBC_SRCTOP}/string/Symbol.map
 
 

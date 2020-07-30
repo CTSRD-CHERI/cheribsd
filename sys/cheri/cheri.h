@@ -70,11 +70,10 @@ struct cheri_signal {
 	void * __capability	csig_sigcode;
 };
 
-/*
- * APIs that act on C language representations of capabilities -- but not
- * capabilities themselves.
- */
 #ifdef _KERNEL
+/*
+ * Functions to construct userspace capabilities.
+ */
 void * __capability	_cheri_capability_build_user_code(struct thread *td,
 			    uint32_t perms, vaddr_t basep, size_t length,
 			    off_t off, const char* func, int line);
@@ -93,6 +92,24 @@ void * __capability	_cheri_capability_build_user_rwx(uint32_t perms,
 #define cheri_capability_build_user_rwx(perms, basep, length, off)	\
 	_cheri_capability_build_user_rwx(perms, basep, length, off,	\
 	    __func__, __LINE__)
+
+/*
+ * Global capabilities used to construct other capabilities.
+ */
+
+/* Root of all userspace capabilities. */
+extern void * __capability userspace_cap;
+
+/*
+ * Omnipotent capability for restoring swapped capabilities.
+ *
+ * XXXBD: These should be a way to do this without storing such a potent
+ * capability.  Splitting sealed and unsealed caps would be a start.
+ */
+extern void * __capability swap_restore_cap;
+
+/* Root of all sealed kernel capabilities. */
+extern void * __capability kernel_sealcap;
 
 /*
  * Functions to create capabilities used in exec.

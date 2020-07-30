@@ -1,12 +1,10 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause
- *
- * Copyright (c) 2020 John Baldwin
+ * Copyright (c) 2014 SRI International
+ * All rights reserved.
  *
  * This software was developed by SRI International and the University of
- * Cambridge Computer Laboratory (Department of Computer Science and
- * Technology) under DARPA contract HR0011-18-C-0016 ("ECATS"), as part of the
- * DARPA SSITH research programme.
+ * Cambridge Computer Laboratory under DARPA/AFRL contract (FA8750-10-C-0237)
+ * ("CTSRD"), as part of the DARPA CRASH research programme.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -30,39 +28,5 @@
  * SUCH DAMAGE.
  */
 
-#ifndef _MACHINE_CHERI_H_
-#define	_MACHINE_CHERI_H_
-
-#ifdef _KERNEL
-/* Return userspace DDC and PCC of current thread. */
-#define	__USER_DDC	((void * __capability)curthread->td_frame->tf_ddc)
-#define	__USER_PCC	((void * __capability)curthread->td_frame->tf_sepc)
-
-/*
- * CHERI-RISC-V-specific kernel utility functions.
- */
-void	cheri_init_capabilities(void * __capability kroot);
-int	cheri_stval_to_sicode(register_t stval);
-void	hybridabi_thread_setregs(struct thread *td, unsigned long entry_addr);
-#endif
-
-/*
- * Special marker NOPs for QEMU to start / stop region
- * of interest in trace.
- */
-#define	CHERI_START_TRACE	do {					\
-	__asm__ __volatile__("slti zero, zero, 0x1b");                  \
-} while(0)
-#define	CHERI_STOP_TRACE	do {					\
-	__asm__ __volatile__("slti zero, zero, 0x1e");                  \
-} while(0)
-
-#define	CHERI_START_USER_TRACE	do {					\
-	__asm__ __volatile__("slti zero, zero, 0x2b");			\
-} while(0)
-
-#define	CHERI_STOP_USER_TRACE	do {					\
-	__asm__ __volatile__("slti zero, zero, 0x2e");			\
-} while(0)
-
-#endif /* !_MACHINE_CHERI_H_ */
+#define CAPABILITY_VERSION
+#include "memmove.c"

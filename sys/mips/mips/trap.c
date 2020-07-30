@@ -989,6 +989,8 @@ dofault:
 				}
 				goto err;
 			}
+			addr = (void * __capability)(intcap_t)
+			    trapframe->badvaddr;
 
 			msg = "BAD_PAGE_FAULT";
 			log_bad_page_fault(msg, trapframe, type);
@@ -1182,6 +1184,8 @@ dofault:
 		    CHERI_EXCCODE_TLBSTORE) {
 			i = SIGSEGV;
 			ucode = SEGV_STORETAG;
+			addr = (void * __capability)(intcap_t)
+			    trapframe->badvaddr;
 		} else {
 			i = SIGPROT;
 			ucode = cheri_capcause_to_sicode(trapframe->capcause);
@@ -1427,8 +1431,6 @@ err:
 	ksiginfo_init_trap(&ksi);
 	ksi.ksi_signo = i;
 	ksi.ksi_code = ucode;
-	if (i == SIGSEGV)
-		addr = (void * __capability)(intcap_t)trapframe->badvaddr;
 	/* XXXBD: probably not quite right for CheriABI */
 	ksi.ksi_addr = addr;
 	ksi.ksi_trapno = type & ~T_USER;

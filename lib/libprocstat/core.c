@@ -70,9 +70,6 @@ __FBSDID("$FreeBSD$");
 #ifndef EF_MIPS_MACH_CHERI128
 #define	EF_MIPS_MACH_CHERI128	0x00C10000
 #endif
-#ifndef	EF_MIPS_MACH_CHERI256
-#define EF_MIPS_MACH_CHERI256	0x00C20000
-#endif
 #ifndef EF_MIPS_MACH
 #define	EF_MIPS_MACH		0x00FF0000
 #endif
@@ -100,14 +97,6 @@ struct _cap128 {
 } __packed;
 typedef struct _cap128 cap128_t;
 
-struct _cap256 {
-	uint64_t tps;		/* type, permission, and sealed bits */
-	uint64_t cursor;
-	uint64_t base;
-	uint64_t length;
-} __packed;
-typedef struct _cap256 cap256_t;
-
 /* XXXss Should be moved to elf.h? */
 typedef struct {
 	long	a_type;
@@ -116,15 +105,6 @@ typedef struct {
 		cap128_t	a_ptr __aligned(16);	/* Address. */
 	} a_un;
 } ElfCheriABI128_Auxinfo;
-
-/* XXXss Should be moved to elf.h? */
-typedef struct {
-	long	a_type;
-	union {
-		long		a_val;			/* Integer value */
-		cap256_t	a_ptr __aligned(32);	/* Address. */
-	} a_un;
-} ElfCheriABI256_Auxinfo;
 
 struct _cap128_ps_strings {
 	cap128_t	ps_argvstr __aligned(16);
@@ -139,20 +119,6 @@ struct _cap128_ps_strings {
 	size_t		ps_sbobjectslen;
 };
 typedef struct _cap128_ps_strings cap128_ps_strings_t;
-
-struct _cap256_ps_strings {
-	cap256_t	ps_argvstr __aligned(32);
-	int		ps_nargvstr;
-	cap256_t	ps_envstr __aligned(32);
-	int		ps_nenvstr;
-	cap256_t	ps_sbclasses __aligned(32);
-	size_t		ps_sbclasseslen;
-	cap256_t	ps_sbmethods __aligned(32);
-	size_t		ps_sbmethodslen;
-	cap256_t	ps_sbobjects __aligned(32);
-	size_t		ps_sbobjectslen;
-};
-typedef struct _cap256_ps_strings cap256_ps_strings_t;
 
 static struct psc_type_info {
 	unsigned int	n_type;
@@ -187,21 +153,6 @@ static struct psc_type_info cheri128_type_info[PSC_TYPE_MAX] = {
 	{ .n_type = NT_PTLWPINFO, .structsize = sizeof(struct ptrace_lwpinfo) },
 };
 
-static struct psc_type_info cheri256_type_info[PSC_TYPE_MAX] = {
-	{ .n_type = NT_PROCSTAT_PROC, .structsize = sizeof(struct kinfo_proc) },
-	{ .n_type = NT_PROCSTAT_FILES, .structsize = sizeof(struct kinfo_file) },
-	{ .n_type = NT_PROCSTAT_VMMAP, .structsize = sizeof(struct kinfo_vmentry) },
-	{ .n_type = NT_PROCSTAT_GROUPS, .structsize = sizeof(gid_t) },
-	{ .n_type = NT_PROCSTAT_UMASK, .structsize = sizeof(u_short) },
-	{ .n_type = NT_PROCSTAT_RLIMIT, .structsize = sizeof(struct rlimit) * RLIM_NLIMITS },
-	{ .n_type = NT_PROCSTAT_OSREL, .structsize = sizeof(int) },
-	{ .n_type = NT_PROCSTAT_PSSTRINGS, .structsize = sizeof(vm_offset_t) },
-	{ .n_type = NT_PROCSTAT_PSSTRINGS, .structsize = sizeof(vm_offset_t) },
-	{ .n_type = NT_PROCSTAT_PSSTRINGS, .structsize = sizeof(vm_offset_t) },
-	{ .n_type = NT_PROCSTAT_AUXV, .structsize = sizeof(ElfCheriABI256_Auxinfo) },
-	{ .n_type = NT_PTLWPINFO, .structsize = sizeof(struct ptrace_lwpinfo) },
-};
-
 static bool	core_offset(struct procstat_core *core, off_t offset);
 static bool	core_read(struct procstat_core *core, void *buf, size_t len);
 static ssize_t	core_read_mem(struct procstat_core *core, void *buf,
@@ -218,22 +169,12 @@ core_is_cheri128(struct procstat_core *core)
 	    (EF_MIPS_ABI_CHERIABI | EF_MIPS_MACH_CHERI128));
 }
 
-static bool
-core_is_cheri256(struct procstat_core *core)
-{
-
-	return ((core->pc_ehdr.e_flags & (EF_MIPS_ABI | EF_MIPS_MACH)) ==
-	    (EF_MIPS_ABI_CHERIABI | EF_MIPS_MACH_CHERI256));
-}
-
 static struct psc_type_info *
 core_psc_type_info(struct procstat_core *core)
 {
 
 	if (core_is_cheri128(core))
 		return (cheri128_type_info);
-	if (core_is_cheri256(core))
-		return (cheri256_type_info);
 	return (default_type_info);
 }
 
@@ -515,17 +456,6 @@ core_read_ps_strings(struct procstat_core *core, vm_offset_t psstrings,
 		argaddr = (vm_offset_t)pss.ps_argvstr.cursor;
 		envaddr = (vm_offset_t)pss.ps_envstr.cursor;
 		*size = sizeof(cap128_t);
-	} else if (core_is_cheri256(core)) {
-		cap256_ps_strings_t pss;
-
-		if (core_read_mem(core, &pss, sizeof(pss), psstrings, true) ==
-		    -1)
-			return ((vm_offset_t)0);
-		nargstr = pss.ps_nargvstr;
-		nenvstr = pss.ps_nenvstr;
-		argaddr = (vm_offset_t)pss.ps_argvstr.cursor;
-		envaddr = (vm_offset_t)pss.ps_envstr.cursor;
-		*size = sizeof(cap256_t);
 	} else {
 		struct ps_strings pss;
 
@@ -554,10 +484,6 @@ core_image_off(struct procstat_core *core, char **ptr, int i)
 
 	if (core_is_cheri128(core)) {
 		cap128_t *cap = (cap128_t *)(ptr + (i * sizeof(cap128_t) / 8));
-
-		return (cap->cursor);
-	} else if (core_is_cheri256(core)) {
-		cap256_t *cap = (cap256_t *)(ptr + (i * sizeof(cap256_t) / 8));
 
 		return (cap->cursor);
 	} else
@@ -668,27 +594,6 @@ get_auxv(struct procstat_core *core, void *auxv, size_t *lenp)
 		ElfCheriABI128_Auxinfo *auxv_cheri = auxv;
 
 		count = *lenp / sizeof(ElfCheriABI128_Auxinfo);
-		*lenp = count * sizeof(Elf_Auxinfo);
-		buf = (Elf_Auxinfo *)malloc(*lenp);
-		if (buf == NULL) {
-			free(auxv);
-			*lenp = 0;
-			return (NULL);
-		}
-		for (i = 0; i < count; i++) {
-			buf[i].a_type = auxv_cheri[i].a_type;
-			if (is_auxv_ptr(auxv_cheri[i].a_type))
-				buf[i].a_un.a_ptr = (void *)(uintptr_t)
-				    auxv_cheri[i].a_un.a_ptr.cursor;
-			else
-				buf[i].a_un.a_val = auxv_cheri[i].a_un.a_val;
-		}
-		free(auxv);
-		return ((void *)buf);
-	} else if (core_is_cheri256(core)) {
-		ElfCheriABI256_Auxinfo *auxv_cheri = auxv;
-
-		count = *lenp / sizeof(ElfCheriABI256_Auxinfo);
 		*lenp = count * sizeof(Elf_Auxinfo);
 		buf = (Elf_Auxinfo *)malloc(*lenp);
 		if (buf == NULL) {

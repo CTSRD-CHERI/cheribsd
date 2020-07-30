@@ -41,17 +41,26 @@
 #include <machine/riscvreg.h>
 #include <machine/vmparam.h>
 
-/* XXX: CHERI TODO: Probably should init this in locore on the BSP. */
-extern void * __capability userspace_cap;
+void *cheri_kall_capability = (void *)(intcap_t)-1;
 
-static void
-cheri_cpu_startup(void)
+void
+cheri_init_capabilities(void * __capability kroot)
 {
+	void * __capability ctemp;
 
-	userspace_cap = scr_read(ddc);
+	ctemp = cheri_setaddress(kroot, CHERI_SEALCAP_KERNEL_BASE);
+	ctemp = cheri_setbounds(kroot, CHERI_SEALCAP_KERNEL_LENGTH);
+	ctemp = cheri_andperm(kroot, CHERI_SEALCAP_KERNEL_PERMS);
+	kernel_sealcap = ctemp;
+
+	ctemp = cheri_setaddress(kroot, CHERI_CAP_USER_DATA_BASE);
+	ctemp = cheri_setbounds(ctemp, CHERI_CAP_USER_DATA_LENGTH);
+	ctemp = cheri_andperm(ctemp, CHERI_CAP_USER_DATA_PERMS |
+	    CHERI_CAP_USER_CODE_PERMS);
+	userspace_cap = ctemp;
+
+	swap_restore_cap = kroot;
 }
-SYSINIT(cheri_cpu_startup, SI_SUB_CPU, SI_ORDER_FIRST, cheri_cpu_startup,
-    NULL);
 
 void
 hybridabi_thread_setregs(struct thread *td, unsigned long entry_addr)
