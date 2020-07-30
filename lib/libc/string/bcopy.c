@@ -76,13 +76,13 @@ typedef	int word;		/* "word" used for optimal copy speed */
 #ifdef IN_LIBSYSCALLS
 __attribute__((weak, visibility("hidden")))
 #endif
-__CAP void *
+void * __CAP
 #ifdef MEMCOPY
 __CAPSUFFIX(memcpy)
 #else
 __CAPSUFFIX(memmove)
 #endif
-(__CAP void *dst0, __CAP const void *src0, size_t length)
+(void * __CAP dst0, const void * __CAP src0, size_t length)
 #else
 #include <strings.h>
 
@@ -90,8 +90,8 @@ void
 bcopy(const void *src0, void *dst0, size_t length)
 #endif
 {
-	__CAP char *dst = dst0;
-	__CAP const char *src = src0;
+	char * __CAP dst = dst0;
+	const char * __CAP src = src0;
 	size_t t;
 
 	if (length == 0 || dst == src)		/* nothing to do */
@@ -107,13 +107,13 @@ bcopy(const void *src0, void *dst0, size_t length)
 		/*
 		 * Copy forward.
 		 */
-		t = (size_t)src;	/* only need low bits */
-		if ((t | (size_t)dst) & wmask) {
+		t = (__cheri_addr size_t)src;	/* only need low bits */
+		if ((t | (__cheri_addr size_t)dst) & wmask) {
 			/*
 			 * Try to align operands.  This cannot be done
 			 * unless the low bits match.
 			 */
-			if ((t ^ (size_t)dst) & wmask || length < wsize)
+			if ((t ^ (__cheri_addr size_t)dst) & wmask || length < wsize)
 				t = length;
 			else
 				t = wsize - (t & wmask);
@@ -135,9 +135,9 @@ bcopy(const void *src0, void *dst0, size_t length)
 		 */
 		src += length;
 		dst += length;
-		t = (size_t)src;
-		if ((t | (size_t)dst) & wmask) {
-			if ((t ^ (size_t)dst) & wmask || length <= wsize)
+		t = (__cheri_addr size_t)src;
+		if ((t | (__cheri_addr size_t)dst) & wmask) {
+			if ((t ^ (__cheri_addr size_t)dst) & wmask || length <= wsize)
 				t = length;
 			else
 				t &= wmask;
