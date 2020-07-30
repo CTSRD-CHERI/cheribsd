@@ -50,6 +50,14 @@ SYSCTL_COUNTER_U64(_security, OID_AUTO, flags_captured, CTLFLAG_RD,
 COUNTER_U64_DEFINE_EARLY(flags_captured_key);
 SYSCTL_COUNTER_U64(_security, OID_AUTO, flags_captured_key, CTLFLAG_RD,
      &flags_captured_key, "Calls to flag_captured(2) with correct key");
+COUNTER_U64_DEFINE_EARLY(kernel_flags_captured);
+SYSCTL_COUNTER_U64(_security, OID_AUTO, kernel_flags_captured, CTLFLAG_RD,
+     &flags_captured, "Calls to flag_captured(9)");
+COUNTER_U64_DEFINE_EARLY(kernel_flags_captured_key);
+SYSCTL_COUNTER_U64(_security, OID_AUTO, kernel_flags_captured_key, CTLFLAG_RD,
+     &flags_captured_key, "Calls to flag_captured(9) with correct key");
+
+void flag_captured(const char *message, uint32_t key);
 
 int
 sys_flag_captured(struct thread *td, struct flag_captured_args *uap)
@@ -103,4 +111,41 @@ kern_flag_captured(struct thread *td, const char * __capability message,
 	    msg_buf, key_buf);
 
 	return (0);
+}
+
+void
+flag_captured(const char *message, uint32_t key)
+{
+	struct thread *td = curthread;
+	struct proc *p = td->td_proc;
+	char msg_buf[256];
+	char key_buf[32];
+
+	counter_u64_add(kernel_flags_captured, 1);
+
+	if (key == 0xfe77c0de) {
+		counter_u64_add(kernel_flags_captured_key, 1);
+		strlcpy(key_buf, "correct", sizeof(key_buf));
+	} else {
+		snprintf(key_buf, sizeof(key_buf), "incorrect (0x%x)",
+		    key);
+	}
+
+	/*
+	 * Try to obtain the string and avoid faults where possible.
+	 */
+	if (message == NULL)
+		strlcpy(msg_buf, "<null>", sizeof(msg_buf));
+#ifdef __CHERI_PURE_CAPABILITY__
+	else if (!cheri_gettag(message))
+		snprintf(msg_buf, sizeof(msg_buf), "<untagged> %#p", message);
+#endif
+	else
+		strlcpy(msg_buf, message, sizeof(msg_buf));
+
+	log(LOG_ALERT,
+	    "pid %d (%s), jid %d, uid %d: message: (%s) key: %s\n",
+	    p->p_pid, p->p_comm, p->p_ucred->cr_prison->pr_id,
+	    td->td_ucred->cr_uid,
+	    msg_buf, key_buf);
 }
