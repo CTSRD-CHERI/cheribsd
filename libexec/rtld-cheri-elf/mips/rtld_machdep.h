@@ -327,19 +327,14 @@ reloc_jmpslot(Elf_Addr *where __unused, Elf_Addr target, const Obj_Entry *defobj
 }
 
 // Validating e_flags (and ABI version):
-#if _MIPS_SZCAP == 128
-#define _RTLD_EXPECTED_MIPS_MACH EF_MIPS_MACH_CHERI128
-#else
-static_assert(_MIPS_SZCAP == 256, "CHERI bits != 256?");
-#define _RTLD_EXPECTED_MIPS_MACH EF_MIPS_MACH_CHERI256
-#endif
+static_assert(_MIPS_SZCAP == 128, "CHERI bits != 128?");
 
 #define rtld_validate_target_eflags(path, hdr, main_path)	\
 	_rtld_validate_target_eflags(path, hdr, main_path)
 static inline bool
 _rtld_validate_target_eflags(const char* path, Elf_Ehdr *hdr, const char* main_path)
 {
-	if ((hdr->e_flags & EF_MIPS_MACH) != _RTLD_EXPECTED_MIPS_MACH) {
+	if ((hdr->e_flags & EF_MIPS_MACH) != EF_MIPS_MACH_CHERI128) {
 		_rtld_error("%s: cannot load %s since it is not CHERI-" __XSTRING(_MIPS_SZCAP)
 		    " (e_flags=0x%zx)", main_path, path, (size_t)hdr->e_flags);
 		return false;
