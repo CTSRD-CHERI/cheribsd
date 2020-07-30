@@ -4024,7 +4024,7 @@ zone_alloc_item(uma_zone_t zone, void *udata, int domain, int flags)
 
 	if (zone->uz_import(zone->uz_arg, &item, 1, domain, flags) != 1)
 		goto fail_cnt;
-	item = cheri_kern_setbounds(item, zone->uz_size);
+	item = cheri_kern_setboundsexact(item, zone->uz_size);
 
 	/*
 	 * We have to call both the zone's init (not the keg's init)
