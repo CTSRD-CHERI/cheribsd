@@ -404,8 +404,8 @@ __FBSDID("$FreeBSD$");
 	/* Handle the ast */
 #ifdef __CHERI_PURE_CAPABILITY__
 	cmove	ca0, csp
-	clgc	ct0, _C_LABEL(ast)
-	cjalr	ct0
+	clgc	cra, _C_LABEL(ast)
+	cjalr	cra
 #else
 	mv	a0, sp
 	call	_C_LABEL(ast)
@@ -439,8 +439,8 @@ ENTRY(cpu_exception_handler_supervisor)
 	save_registers 1
 #ifdef __CHERI_PURE_CAPABILITY__
 	cmove	ca0, csp
-	clgc	ct0, _C_LABEL(do_trap_supervisor)
-	cjalr	ct0
+	clgc	cra, _C_LABEL(do_trap_supervisor)
+	cjalr	cra
 #else
 	mv	a0, sp
 	call	_C_LABEL(do_trap_supervisor)
@@ -453,8 +453,8 @@ ENTRY(cpu_exception_handler_user)
 	save_registers 0
 #ifdef __CHERI_PURE_CAPABILITY__
 	cmove	ca0, csp
-	clgc	ct0, _C_LABEL(do_trap_user)
-	cjalr	ct0
+	clgc	cra, _C_LABEL(do_trap_user)
+	cjalr	cra
 #else
 	mv	a0, sp
 	call	_C_LABEL(do_trap_user)
