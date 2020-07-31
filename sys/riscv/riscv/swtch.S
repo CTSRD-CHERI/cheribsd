@@ -296,8 +296,8 @@ ENTRY(cpu_throw)
 	/* Activate the new thread's pmap. */
 	cmove	cs0, ca1
 	cmove	ca0, ca1
-	clgc	ct0, _C_LABEL(pmap_activate_sw)
-	cjalr	ct0
+	clgc	cra, _C_LABEL(pmap_activate_sw)
+	cjalr	cra
 	cmove	ca0, cs0
 
 	/* Store the new curthread */
@@ -527,8 +527,8 @@ ENTRY(cpu_switch)
 	cmove	cs1, ca1
 	cmove	cs2, ca2
 	cmove	ca0, ca1
-	clgc	ct0, _C_LABEL(pmap_activate_sw)
-	cjalr	ct0
+	clgc	cra, _C_LABEL(pmap_activate_sw)
+	cjalr	cra
 	cmove	ca1, cs1
 #else
 	mv	s0, a0
@@ -691,8 +691,8 @@ ENTRY(fork_trampoline)
 	cmove	ca0, cs0
 	cmove	ca1, cs1
 	cmove	ca2, csp
-	clgc	ct0, _C_LABEL(fork_exit)
-	cjalr	ct0
+	clgc	cra, _C_LABEL(fork_exit)
+	cjalr	cra
 #else
 	mv	a0, s0
 	mv	a1, s1

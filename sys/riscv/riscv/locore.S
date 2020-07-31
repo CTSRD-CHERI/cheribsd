@@ -106,8 +106,8 @@ _start:
 	 */
 	beqz	t0, 1f
 #ifdef __CHERI_PURE_CAPABILITY__
-	cllc	ct0, mpentry
-	cjr	ct0
+	cllc	cra, mpentry
+	cjr	cra
 #else
 	j	mpentry
 #endif
@@ -118,8 +118,8 @@ _start:
 1:
 	/* Get the kernel's load address */
 #ifdef __CHERI_PURE_CAPABILITY__
-	cllc	ct0, get_physmem
-	cjalr	ct0
+	cllc	cra, get_physmem
+	cjalr	cra
 #else
 	jal	get_physmem
 #endif
@@ -359,8 +359,8 @@ va:
 
 	/* Initialize capabilities. */
 	cmove	ca0, cs0
-	clgc	ct0, _C_LABEL(cheri_init_capabilities)
-	cjalr	ct0
+	clgc	cra, _C_LABEL(cheri_init_capabilities)
+	cjalr	cra
 
 	/* Fill riscv_bootparams */
 	cllc	ct0, pagetable_l1
@@ -395,10 +395,10 @@ va:
 	cmove	cs3, cnull
 
 	csetbounds ca0, csp, RISCV_BOOTPARAMS_SIZE
-	clgc	ct0, _C_LABEL(initriscv)
-	cjalr	ct0			/* Off we go */
-	clgc	ct0, _C_LABEL(mi_startup)
-	cjalr	ct0
+	clgc	cra, _C_LABEL(initriscv)
+	cjalr	cra			/* Off we go */
+	clgc	cra, _C_LABEL(mi_startup)
+	cjalr	cra
 #else
 	/* Initialize stack pointer */
 	la	s3, initstack_end
@@ -613,8 +613,8 @@ ENTRY(mpentry)
 	clc	csp, 0(ct0)
 
 	/* Get the kernel's load address */
-	cllc	ct0, get_physmem
-	cjalr	ct0
+	cllc	cra, get_physmem
+	cjalr	cra
 
 	/* Setup supervisor trap vector */
 	cllc	ct0, mpva
@@ -714,8 +714,8 @@ mpva:
 #endif
 
 #ifdef __CHERI_PURE_CAPABILITY__
-	clgc	ct0, init_secondary
-	cjalr	ct0
+	clgc	cra, init_secondary
+	cjalr	cra
 #else
 	call	init_secondary
 #endif
