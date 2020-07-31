@@ -122,7 +122,7 @@ ls -la "artifacts-${suffix}/"
     }
 }
 
-["mips-hybrid", "mips-purecap"].each { suffix ->
+["mips-hybrid", "mips-purecap", "riscv64-hybrid", "riscv64-purecap"].each { suffix ->
     String name = "cheribsd-purecap-kern-${suffix}"
     jobs[name] = { ->
         cheribuildProject(target: "cheribsd-${suffix}", architecture: suffix,
