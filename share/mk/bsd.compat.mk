@@ -108,11 +108,11 @@ LIB32_MACHINE_ABI=	${MACHINE_ABI}
 HAS_COMPAT=64
 # XXX: clang specific
 .if ${COMPAT_ARCH:Mmips64el*}
-LIB64CPUFLAGS=  -target mipsel-unknown-freebsd13.0
+LIB64CPUFLAGS=  -target mips64el-unknown-freebsd13.0
 .else
-LIB64CPUFLAGS=  -target mips-unknown-freebsd13.0
+LIB64CPUFLAGS=  -target mips64-unknown-freebsd13.0
 .endif
-LIB64CPUFLAGS+=	-mabi=64
+LIB64CPUFLAGS+=	-cheri -mabi=64
 LIB64_MACHINE=	mips
 LIB64_MACHINE_ARCH=	mips64
 LIB32WMAKEENV=	MACHINE_CPU="mips cheri"
