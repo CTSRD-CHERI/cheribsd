@@ -467,7 +467,7 @@ MACHINE_ABI+=	soft-float
 .else
 MACHINE_ABI+=	hard-float
 .endif
-.if (${MACHINE_ARCH:Mmips*c*} || ${MACHINE_ARCH:Mriscv*c*})
+.if (${MACHINE_ARCH:Mmips*c*} || ${MACHINE_ARCH:Mriscv*c*} || ${MACHINE_ARCH} == "morello")
 MACHINE_ABI+=	purecap
 .endif
 # Currently all 64-bit architectures include 64 in their name (see arch(7)).
