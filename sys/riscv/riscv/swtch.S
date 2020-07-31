@@ -292,6 +292,20 @@ END(fpe_state_clear)
  * void cpu_throw(struct thread *old __unused, struct thread *new)
  */
 ENTRY(cpu_throw)
+#ifdef __CHERI_PURE_CAPABILITY__
+	/* Activate the new thread's pmap. */
+	cmove	cs0, ca1
+	cmove	ca0, ca1
+	clgc	cra, _C_LABEL(pmap_activate_sw)
+	cjalr	cra
+	cmove	ca0, cs0
+
+	/* Store the new curthread */
+	csc	ca0, PC_CURTHREAD(ctp)
+	/* And the new pcb */
+	clc	c13, TD_PCB(ca0)
+	csc	c13, PC_CURPCB(ctp)
+#else
 	/* Activate the new thread's pmap. */
 	mv	s0, a1
 	mv	a0, a1
@@ -508,6 +522,15 @@ ENTRY(cpu_switch)
 #endif
 
 	/* Activate the new thread's pmap */
+#ifdef __CHERI_PURE_CAPABILITY__
+	cmove	cs0, ca0
+	cmove	cs1, ca1
+	cmove	cs2, ca2
+	cmove	ca0, ca1
+	clgc	cra, _C_LABEL(pmap_activate_sw)
+	cjalr	cra
+	cmove	ca1, cs1
+#else
 	mv	s0, a0
 	mv	s1, a1
 	mv	s2, a2
@@ -669,6 +692,13 @@ END(cpu_switch)
  */
 
 ENTRY(fork_trampoline)
+#ifdef __CHERI_PURE_CAPABILITY__
+	cmove	ca0, cs0
+	cmove	ca1, cs1
+	cmove	ca2, csp
+	clgc	cra, _C_LABEL(fork_exit)
+	cjalr	cra
+#else
 	mv	a0, s0
 	mv	a1, s1
 	mv	a2, sp
