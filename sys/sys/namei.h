@@ -70,7 +70,7 @@ struct nameidata {
 	 */
 	const char * __capability	ni_dirp;	/* pathname pointer */
 	enum	uio_seg ni_segflg;	/* location of pathname */
-	cap_rights_t ni_rightsneeded;	/* rights required to look up vnode */
+	cap_rights_t *ni_rightsneeded;	/* rights required to look up vnode */
 	/*
 	 * Arguments to lookup.
 	 */
