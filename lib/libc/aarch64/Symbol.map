@@ -34,4 +34,5 @@ FBSD_1.0 {
 FBSDprivate_1.0 {
 	_set_tp;
 	__makecontext;
+	__emutls_get_address;
 };
