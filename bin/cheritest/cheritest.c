@@ -988,6 +988,31 @@ static const struct cheri_test cheri_tests[] = {
 	  .ct_func = cheritest_vm_cap_share_sigaction,
 	  .ct_xfail_reason =
 	    "Tags currently survive cross-AS shared sigaction table", },
+
+        { .ct_name = "cheritest_vm_reservation_access_fault",
+	  .ct_desc = "check that we fault when accessing padding of a reservation",
+	  .ct_func = cheritest_vm_reservation_access_fault,
+          .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE,
+	  .ct_signum = SIGSEGV,
+	  .ct_si_code = SEGV_ACCERR},
+        {
+         .ct_name = "cheritest_vm_reservation_reuse",
+         .ct_desc =
+             "check that we can not remap over a partially-unmapped reservation",
+         .ct_func = cheritest_vm_reservation_reuse, },
+        {
+         .ct_name = "cheritest_vm_reservation_align",
+         .ct_desc = "check that mmap correctly align mappings",
+         .ct_func = cheritest_vm_reservation_align, },
+        {
+         .ct_name = "cheritest_vm_reservation_mmap_after_free",
+         .ct_desc = "check that an old capability can not be used"
+         "to MAP_FIXED after the reservation has been deleted",
+         .ct_func = cheritest_vm_reservation_mmap_after_free, },
+        {
+         .ct_name = "cheritest_vm_reservation_mmap_shared",
+         .ct_desc = "check reservation alignment and bounds for shared mappings",
+         .ct_func = cheritest_vm_reservation_mmap_shared, },
 #endif
 
 	{ .ct_name = "cheritest_vm_tag_dev_zero_shared",
@@ -1036,6 +1061,7 @@ static const struct cheri_test cheri_tests[] = {
 	  .ct_func = cheritest_vm_swap,
 	  .ct_check_xfail = xfail_swap_required},
 #endif
+
 
 #ifdef CHERI_LIBCHERI_TESTS
 #if 0
