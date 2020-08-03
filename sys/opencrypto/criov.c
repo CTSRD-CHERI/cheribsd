@@ -71,8 +71,8 @@ cuio_copydata(struct uio* uio, int off, int len, caddr_t cp)
 	while (len > 0) {
 		KASSERT(iol >= 0, ("%s: empty", __func__));
 		count = min(iov->iov_len - off, len);
-		bcopy_c(((char * __capability)iov->iov_base) + off,
-		    (__cheri_tocap char * __capability)cp, count);
+		bcopy_c(((char * __capability)iov->iov_base) + off, PTR2CAP(cp),
+		    count);
 		len -= count;
 		cp += count;
 		off = 0;
@@ -92,8 +92,8 @@ cuio_copyback(struct uio* uio, int off, int len, c_caddr_t cp)
 	while (len > 0) {
 		KASSERT(iol >= 0, ("%s: empty", __func__));
 		count = min(iov->iov_len - off, len);
-		bcopy_c((__cheri_tocap const char * __capability)cp,
-		    ((char * __capability)iov->iov_base) + off, count);
+		bcopy_c(PTR2CAP(cp), ((char * __capability)iov->iov_base) + off,
+		    count);
 		len -= count;
 		cp += count;
 		off = 0;

@@ -82,8 +82,7 @@ linux_kern_statat(struct thread *td, int flag, int fd, char *path,
     struct stat *sbp)
 {
 
-	return (kern_statat(td, flag, fd,
-	    (__cheri_tocap char * __capability)path, UIO_SYSSPACE, sbp,
+	return (kern_statat(td, flag, fd, PTR2CAP(path), UIO_SYSSPACE, sbp,
 	    translate_vnhook_major_minor));
 }
 
@@ -397,8 +396,7 @@ linux_statfs(struct thread *td, struct linux_statfs_args *args)
 	LCONVPATHEXIST(td, args->path, &path);
 
 	bsd_statfs = malloc(sizeof(struct statfs), M_STATFS, M_WAITOK);
-	error = kern_statfs(td, (__cheri_tocap char * __capability)path,
-	    UIO_SYSSPACE, bsd_statfs);
+	error = kern_statfs(td, PTR2CAP(path), UIO_SYSSPACE, bsd_statfs);
 	LFREEPATH(path);
 	if (error == 0)
 		error = bsd_to_linux_statfs(bsd_statfs, &linux_statfs);
@@ -442,8 +440,7 @@ linux_statfs64(struct thread *td, struct linux_statfs64_args *args)
 	LCONVPATHEXIST(td, args->path, &path);
 
 	bsd_statfs = malloc(sizeof(struct statfs), M_STATFS, M_WAITOK);
-	error = kern_statfs(td, (__cheri_tocap char * __capability)path,
-	    UIO_SYSSPACE, bsd_statfs);
+	error = kern_statfs(td, PTR2CAP(path), UIO_SYSSPACE, bsd_statfs);
 	LFREEPATH(path);
 	if (error == 0)
 		bsd_to_linux_statfs64(bsd_statfs, &linux_statfs);

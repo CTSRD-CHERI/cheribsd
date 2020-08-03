@@ -261,7 +261,7 @@ static inline void * __capability
 malloc_c(unsigned long size, struct malloc_type *type, int flags)
 {
 
-	return ((__cheri_tocap void * __capability)malloc(size, type, flags));
+	return (PTR2CAP(malloc(size, type, flags)));
 }
 
 struct malloc_type *malloc_desc2type(const char *desc);
