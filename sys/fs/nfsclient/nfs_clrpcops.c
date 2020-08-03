@@ -5922,7 +5922,7 @@ nfscl_doiods(vnode_t vp, struct uio *uiop, int *iomode, int *must_commit,
 				 */
 				uiop->uio_offset = offs;
 				uiop->uio_resid = resid;
-				IOVEC_INIT(uiop->uio_iov, iovbase, iovlen);
+				IOVEC_INIT_C(uiop->uio_iov, iovbase, iovlen);
 			}
 		}
 	}
