@@ -546,6 +546,8 @@ DECLARE_CHERI_TEST(cheritest_vm_shm_open_anon_unix_surprise);
 #ifdef __CHERI_PURE_CAPABILITY__
 DECLARE_CHERI_TEST(cheritest_vm_cap_share_fd_kqueue);
 DECLARE_CHERI_TEST(cheritest_vm_cap_share_sigaction);
+DECLARE_CHERI_TEST(cheritest_vm_reservation_access_fault);
+DECLARE_CHERI_TEST(cheritest_vm_reservation_reuse);
 #endif
 DECLARE_CHERI_TEST(cheritest_vm_tag_dev_zero_shared);
 DECLARE_CHERI_TEST(cheritest_vm_tag_dev_zero_private);

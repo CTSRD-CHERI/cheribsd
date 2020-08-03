@@ -602,3 +602,64 @@ cheritest_vm_cow_write(const struct cheri_test *ctp __unused)
 	CHERITEST_CHECK_SYSCALL(close(fd));
 	cheritest_success();
 }
+
+#ifdef __CHERI_PURE_CAPABILITY__
+
+static int __used sink;
+
+#ifdef CHERI_BASELEN_BITS
+/*
+ * Check that the padding of a reservation faults on access
+ */
+void
+cheritest_vm_reservation_access_fault(const struct cheri_test *ctp __unused)
+{
+	size_t len = ((size_t)PAGE_SIZE << CHERI_BASELEN_BITS) + 1;
+	size_t expected_len;
+	void *map;
+	int *padding;
+
+	expected_len = __builtin_cheri_round_representable_length(len);
+	CHERITEST_VERIFY2(expected_len > round_page(len),
+	    "test precondition failed: padding for length (%lx) must "
+	    "exceed one page, found %lx", len, expected_len);
+	map = CHERITEST_CHECK_SYSCALL(mmap(NULL, len, PROT_READ | PROT_WRITE,
+	    MAP_ANON, -1, 0));
+	CHERITEST_VERIFY2(cheri_gettag(map) != 0, "mmap() failed to return "
+	    "a pointer when given unrepresentable length (%zu)", len);
+	CHERITEST_VERIFY2(cheri_getlen(map) == expected_len,
+	    "mmap() returned a pointer with an unrepresentable length "
+	    "(%zu vs %zu): %#p", cheri_getlen(map), expected_len, map);
+
+	padding = (int *)((uintcap_t)map + expected_len - sizeof(int));
+	sink = *padding;
+	cheritest_failure_errx("reservation padding access allowed");
+}
+#endif
+
+/*
+ * Check that a reserved range can not be reused for another mapping,
+ * until the whole mapping is freed.
+ */
+void
+cheritest_vm_reservation_reuse(const struct cheri_test *ctp __unused)
+{
+	void *map;
+	void *map2;
+
+	map = CHERITEST_CHECK_SYSCALL(mmap(NULL, PAGE_SIZE * 2,
+	    PROT_READ | PROT_WRITE, MAP_ANON, -1, 0));
+	CHERITEST_VERIFY2(cheri_gettag(map) != 0, "mmap() failed to return "
+	    "a pointer");
+
+	CHERITEST_CHECK_SYSCALL(munmap((char *)map + PAGE_SIZE, PAGE_SIZE));
+	map2 = mmap((void *)(uintptr_t)((vaddr_t)map + PAGE_SIZE),
+	    PAGE_SIZE * 2, PROT_READ | PROT_WRITE, MAP_ANON | MAP_FIXED, -1, 0);
+	if (map2 == MAP_FAILED)
+		cheritest_success();
+
+	cheritest_failure_errx("mmap over reservation succeeded");
+}
+
+
+#endif
