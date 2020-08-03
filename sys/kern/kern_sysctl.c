@@ -1846,11 +1846,11 @@ sysctl_old_kernel(struct sysctl_req *req, const void *p, size_t l)
 				memcpy_c((char * __capability)req->oldptr +
 				    req->oldidx,
 				    (__cheri_tocap const char * __capability)p,
-				    l);
+				    i);
 			else
 #endif
 				memcpy((__cheri_fromcap char *)req->oldptr +
-				    req->oldidx, p, l);
+				    req->oldidx, p, i);
 		}
 	}
 	req->oldidx += l;
