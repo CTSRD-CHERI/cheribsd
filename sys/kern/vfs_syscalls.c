@@ -3049,7 +3049,6 @@ getutimes(const struct timeval * __capability usrtvp, enum uio_seg tvpseg,
 {
 	struct timeval tv[2];
 	const struct timeval * __capability tvp;
-	struct timeval *tmptvp;
 	int error;
 
 	if (usrtvp == NULL) {
@@ -3059,11 +3058,9 @@ getutimes(const struct timeval * __capability usrtvp, enum uio_seg tvpseg,
 		if (tvpseg == UIO_SYSSPACE) {
 			tvp = usrtvp;
 		} else {
-			tmptvp = &tv[0];
-			if ((error = copyin(usrtvp, tmptvp, sizeof(tv))) != 0)
+			if ((error = copyin(usrtvp, tv, sizeof(tv))) != 0)
 				return (error);
-			tvp = (__cheri_tocap struct timeval * __capability)
-			    tmptvp;
+			tvp = tv;
 		}
 
 		if (tvp[0].tv_usec < 0 || tvp[0].tv_usec >= 1000000 ||
