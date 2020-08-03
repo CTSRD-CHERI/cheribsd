@@ -602,3 +602,167 @@ cheritest_vm_cow_write(const struct cheri_test *ctp __unused)
 	CHERITEST_CHECK_SYSCALL(close(fd));
 	cheritest_success();
 }
+
+#ifdef __CHERI_PURE_CAPABILITY__
+
+static int __used sink;
+
+#ifdef CHERI_BASELEN_BITS
+/*
+ * Check that the padding of a reservation faults on access
+ */
+void
+cheritest_vm_reservation_access_fault(const struct cheri_test *ctp __unused)
+{
+	size_t len = ((size_t)PAGE_SIZE << CHERI_BASELEN_BITS) + 1;
+	size_t expected_len;
+	void *map;
+	int *padding;
+
+	expected_len = __builtin_cheri_round_representable_length(len);
+	CHERITEST_VERIFY2(expected_len > round_page(len),
+	    "test precondition failed: padding for length (%lx) must "
+	    "exceed one page, found %lx", len, expected_len);
+	map = CHERITEST_CHECK_SYSCALL(mmap(NULL, len, PROT_READ | PROT_WRITE,
+	    MAP_ANON, -1, 0));
+	CHERITEST_VERIFY2(cheri_gettag(map) != 0, "mmap() failed to return "
+	    "a pointer when given unrepresentable length (%zu)", len);
+	CHERITEST_VERIFY2(cheri_getlen(map) == expected_len,
+	    "mmap() returned a pointer with an unrepresentable length "
+	    "(%zu vs %zu): %#p", cheri_getlen(map), expected_len, map);
+
+	padding = (int *)((uintcap_t)map + expected_len - sizeof(int));
+	sink = *padding;
+	cheritest_failure_errx("reservation padding access allowed");
+}
+#endif
+
+/*
+ * Check that a reserved range can not be reused for another mapping,
+ * until the whole mapping is freed.
+ */
+void
+cheritest_vm_reservation_reuse(const struct cheri_test *ctp __unused)
+{
+	void *map;
+	void *map2;
+
+	map = CHERITEST_CHECK_SYSCALL(mmap(NULL, PAGE_SIZE * 2,
+	    PROT_READ | PROT_WRITE, MAP_ANON, -1, 0));
+	CHERITEST_VERIFY2(cheri_gettag(map) != 0, "mmap() failed to return "
+	    "a pointer");
+
+	CHERITEST_CHECK_SYSCALL(munmap((char *)map + PAGE_SIZE, PAGE_SIZE));
+	/*
+	 * XXX-AM: is this checking the right thing?
+	 * We may be failing because the reservation length is not enough.
+	 */
+	map2 = mmap((void *)(uintptr_t)((vaddr_t)map + PAGE_SIZE),
+	    PAGE_SIZE * 2, PROT_READ | PROT_WRITE, MAP_ANON | MAP_FIXED, -1, 0);
+	if (map2 == MAP_FAILED) {
+		CHERITEST_VERIFY2(errno == ENOMEM,
+		    "Unexpected errno %d instead of ENOMEM", errno);
+		cheritest_success();
+	}
+
+	cheritest_failure_errx("mmap over reservation succeeded");
+}
+
+/*
+ * Check that alignment is promoted automatically to the first
+ * representable boundary.
+ */
+void
+cheritest_vm_reservation_align(const struct cheri_test *ctp __unused)
+{
+	void *map;
+	size_t len = ((size_t)PAGE_SIZE << CHERI_BASELEN_BITS) + 1;
+	size_t align_shift = CHERI_ALIGN_SHIFT(len);
+	size_t align_mask = CHERI_ALIGN_MASK(len);
+
+	/* No alignment */
+	map = CHERITEST_CHECK_SYSCALL(mmap(NULL, len,
+	    PROT_READ | PROT_WRITE, MAP_ANON, -1, 0));
+	CHERITEST_VERIFY2(((vaddr_t)(map) & align_mask) == 0,
+	    "mmap failed to align representable region for %p", map);
+
+	/* Underaligned */
+	map = CHERITEST_CHECK_SYSCALL(mmap(NULL, len,
+	    PROT_READ | PROT_WRITE, MAP_ANON | MAP_ALIGNED(align_shift - 1),
+	    -1, 0));
+	CHERITEST_VERIFY2(((vaddr_t)(map) & align_mask) == 0,
+	    "mmap failed to align representable region with requested "
+	    "alignment %lx for %p", align_shift - 1, map);
+
+	/* Overaligned */
+	map = CHERITEST_CHECK_SYSCALL(mmap(NULL, len,
+	    PROT_READ | PROT_WRITE, MAP_ANON | MAP_ALIGNED(align_shift + 1),
+	    -1, 0));
+	CHERITEST_VERIFY2(
+	    ((vaddr_t)(map) & ((1 << (align_shift + 1)) - 1)) == 0,
+	    "mmap failed to align representable region with requested "
+	    "alignment %lx for %p", align_shift + 1, map);
+
+	/* Explicit cheri alignment */
+	map = CHERITEST_CHECK_SYSCALL(mmap(NULL, len,
+	    PROT_READ | PROT_WRITE, MAP_ANON | MAP_ALIGNED_CHERI, -1, 0));
+	CHERITEST_VERIFY2(((vaddr_t)(map) & align_mask) == 0,
+	    "mmap failed to align representable region with requested "
+	    "cheri alignment for %p", map);
+
+	map = CHERITEST_CHECK_SYSCALL(mmap(NULL, len,
+	    PROT_READ | PROT_WRITE, MAP_ANON | MAP_ALIGNED_CHERI_SEAL, -1, 0));
+	CHERITEST_VERIFY2(((vaddr_t)(map) & align_mask) == 0,
+	    "mmap failed to align representable region with requested "
+	    "cheri seal alignment for %p", map);
+	cheritest_success();
+}
+
+/*
+ * Check that it is not possible to explicitly mmap on an
+ * unmapped reservation.
+ */
+void
+cheritest_vm_reservation_mmap_after_free(const struct cheri_test *ctp __unused)
+{
+	void *map;
+	map = CHERITEST_CHECK_SYSCALL(mmap(NULL, PAGE_SIZE,
+	    PROT_READ | PROT_WRITE, MAP_ANON, -1, 0));
+
+	CHERITEST_CHECK_SYSCALL(munmap((char *)map, PAGE_SIZE));
+
+	map = mmap(map, PAGE_SIZE, PROT_READ | PROT_WRITE,
+	    MAP_ANON | MAP_FIXED, -1, 0);
+	CHERITEST_VERIFY2(map == MAP_FAILED, "mmap after free succeeded");
+	CHERITEST_VERIFY2(errno == EACCES,
+	    "mmap after free failed with %d instead of EACCES", errno);
+	cheritest_success();
+}
+
+/*
+ * Check that reservations are aligned and padded correctly for shared mappings.
+ */
+void
+cheritest_vm_reservation_mmap_shared(const struct cheri_test *ctp __unused)
+{
+	void *map;
+	size_t len = ((size_t)PAGE_SIZE << CHERI_BASELEN_BITS) + 1;
+	size_t expected_len;
+	size_t align_mask = CHERI_ALIGN_MASK(len);
+	int fd;
+
+	expected_len = __builtin_cheri_round_representable_length(len);
+	fd = CHERITEST_CHECK_SYSCALL(shm_open(SHM_ANON, O_RDWR, 0600));
+	CHERITEST_CHECK_SYSCALL(ftruncate(fd, len));
+
+	map = CHERITEST_CHECK_SYSCALL(mmap(NULL, len,
+	    PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0));
+
+	CHERITEST_VERIFY2(((vaddr_t)(map) & align_mask) == 0,
+	    "mmap failed to align shared regiont for representability");
+	CHERITEST_VERIFY2(cheri_getlen(map) == expected_len,
+	    "mmap returned pointer with unrepresentable length");
+	cheritest_success();
+}
+
+#endif
