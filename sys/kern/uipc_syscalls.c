@@ -691,7 +691,7 @@ user_sendit(struct thread *td, int s, struct msghdr *mp, int flags)
 			to = NULL;
 			goto bad;
 		}
-		mp->msg_name = (__cheri_tocap struct sockaddr * __capability)to;
+		mp->msg_name = PTR2CAP(to);
 	} else {
 		to = NULL;
 	}
@@ -915,7 +915,7 @@ sys_sendmsg(struct thread *td, struct sendmsg_args *uap)
 	error = copyiniov(msg.msg_iov, msg.msg_iovlen, &iov, EMSGSIZE);
 	if (error != 0)
 		return (error);
-	msg.msg_iov = (__cheri_tocap struct iovec * __capability)iov;
+	msg.msg_iov = PTR2CAP(iov);
 #ifdef COMPAT_OLDSOCK
 	if (SV_PROC_FLAG(td->td_proc, SV_AOUT))
 		msg.msg_flags = 0;
@@ -1220,7 +1220,7 @@ sys_recvmsg(struct thread *td, struct recvmsg_args *uap)
 		msg.msg_flags &= ~MSG_COMPAT;
 #endif
 	uiov = msg.msg_iov;
-	msg.msg_iov = (__cheri_tocap struct iovec * __capability)iov;
+	msg.msg_iov = PTR2CAP(iov);
 	error = recvit(td, uap->s, &msg, NULL);
 	if (error == 0) {
 		msg.msg_iov = uiov;

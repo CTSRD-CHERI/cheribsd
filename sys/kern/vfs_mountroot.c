@@ -592,8 +592,8 @@ parse_dir_md(char **conf)
 		return (error);
 
 	/* Get file status. */
-	error = kern_statat(td, 0, AT_FDCWD,
-	    (__cheri_tocap char * __capability)path, UIO_SYSSPACE, &sb, NULL);
+	error = kern_statat(td, 0, AT_FDCWD, PTR2CAP(path), UIO_SYSSPACE, &sb,
+	    NULL);
 	if (error)
 		goto out;
 
@@ -606,7 +606,7 @@ parse_dir_md(char **conf)
 		root_mount_mddev = -1;
 	}
 
-	mdr.md_file = (__cheri_tocap char * __capability)path;
+	mdr.md_file = PTR2CAP(path);
 	mdr.md_file_seg = UIO_SYSSPACE;
 	mdr.md_options = MD_AUTOUNIT | MD_READONLY;
 	mdr.md_mediasize = sb.st_size;

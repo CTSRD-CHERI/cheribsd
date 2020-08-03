@@ -106,8 +106,7 @@ linux_execve(struct thread *td, struct linux_execve_args *args)
 
 	LCONVPATHEXIST(td, args->path, &newpath);
 
-	error = exec_copyin_args(&eargs,
-	    (__cheri_tocap char * __capability)newpath, UIO_SYSSPACE,
+	error = exec_copyin_args(&eargs, PTR2CAP(newpath), UIO_SYSSPACE,
 	    __USER_CAP_UNBOUND(args->argp), __USER_CAP_UNBOUND(args->envp));
 	free(newpath, M_TEMP);
 	if (error == 0)

@@ -3524,7 +3524,7 @@ nfssvc_nfsd(struct thread *td, struct nfssvc_args *uap)
 				goto out;
 			}
 			cp[nfsdarg.addrlen] = '\0';	/* Ensure nul term. */
-			nfsdarg.addr = (__cheri_tocap char * __capability)cp;
+			nfsdarg.addr = PTR2CAP(cp);
 			cp = malloc(nfsdarg.dnshostlen + 1, M_TEMP, M_WAITOK);
 			error = copyin(nfsdarg.dnshost, cp, nfsdarg.dnshostlen);
 			if (error != 0) {
@@ -3534,7 +3534,7 @@ nfssvc_nfsd(struct thread *td, struct nfssvc_args *uap)
 				goto out;
 			}
 			cp[nfsdarg.dnshostlen] = '\0';	/* Ensure nul term. */
-			nfsdarg.dnshost = (__cheri_tocap char * __capability)cp;
+			nfsdarg.dnshost = PTR2CAP(cp);
 			cp = malloc(nfsdarg.dspathlen + 1, M_TEMP, M_WAITOK);
 			error = copyin(nfsdarg.dspath, cp, nfsdarg.dspathlen);
 			if (error != 0) {
@@ -3546,7 +3546,7 @@ nfssvc_nfsd(struct thread *td, struct nfssvc_args *uap)
 				goto out;
 			}
 			cp[nfsdarg.dspathlen] = '\0';	/* Ensure nul term. */
-			nfsdarg.dspath = (__cheri_tocap char * __capability)cp;
+			nfsdarg.dspath = PTR2CAP(cp);
 			cp = malloc(nfsdarg.mdspathlen + 1, M_TEMP, M_WAITOK);
 			error = copyin(nfsdarg.mdspath, cp, nfsdarg.mdspathlen);
 			if (error != 0) {
@@ -3560,7 +3560,7 @@ nfssvc_nfsd(struct thread *td, struct nfssvc_args *uap)
 				goto out;
 			}
 			cp[nfsdarg.mdspathlen] = '\0';	/* Ensure nul term. */
-			nfsdarg.mdspath = (__cheri_tocap char * __capability)cp;
+			nfsdarg.mdspath = PTR2CAP(cp);
 		} else {
 			nfsdarg.addr = NULL;
 			nfsdarg.addrlen = 0;
