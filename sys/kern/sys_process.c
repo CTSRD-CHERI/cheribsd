@@ -562,7 +562,7 @@ sys_ptrace(struct thread *td, struct ptrace_args *uap)
 		error = copyincap(uap->addr, &r.pve, sizeof(r.pve));
 		break;
 	default:
-		addr = (__cheri_tocap void * __capability)uap->addr;
+		addr = uap->addr;
 		break;
 	}
 	if (error)

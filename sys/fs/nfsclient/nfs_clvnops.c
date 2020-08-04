@@ -569,7 +569,7 @@ nfs_access(struct vop_access_args *ap)
 			char buf[1];
 
 			NFSUNLOCKNODE(np);
-			IOVEC_INIT(&aiov, buf, 1);
+			IOVEC_INIT_C(&aiov, buf, 1);
 			auio.uio_iov = &aiov;
 			auio.uio_iovcnt = 1;
 			auio.uio_offset = 0;

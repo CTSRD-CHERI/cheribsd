@@ -864,7 +864,7 @@ nsmb_dev_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int flag, struct thre
 		} else
 #endif
 			rwrq = (struct smbioc_rw *)data;
-		IOVEC_INIT(&iov, rwrq->ioc_base, rwrq->ioc_cnt);
+		IOVEC_INIT_C(&iov, rwrq->ioc_base, rwrq->ioc_cnt);
 		auio.uio_iov = &iov;
 		auio.uio_iovcnt = 1;
 		auio.uio_offset = rwrq->ioc_offset;

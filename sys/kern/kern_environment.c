@@ -98,9 +98,7 @@ int
 sys_kenv(struct thread *td, struct kenv_args *uap)
 {
 
-	return (kern_kenv(td, uap->what,
-	    (__cheri_tocap const char * __capability)uap->name,
-	    (__cheri_tocap char * __capability)uap->value, uap->len));
+	return (kern_kenv(td, uap->what, uap->name, uap->value, uap->len));
 }
 
 int

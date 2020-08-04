@@ -367,6 +367,23 @@ __END_DECLS
 #define __PAST_END(array, offset)	\
     (((__typeof__(*(array)) *)__builtin_no_change_bounds(array))[offset])
 
+#ifdef _KERNEL
+#if __has_feature(capabilities)
+/*
+ * Convenience wrapper to convert an in-kernel pointer to a DDC-derived
+ * capability.  NB: For purecap kernels this is a no-op.
+ */
+#define	PTR2CAP(p)	({					\
+	KASSERT((vaddr_t)((p)) == 0 ||				\
+	    (vaddr_t)((p)) >= VM_MAXUSER_ADDRESS,		\
+	    ("PTR2CAP on user address: %p", (p)));		\
+	(__cheri_tocap __typeof__((p)) __capability)(p);	\
+	})
+#else
+#define	PTR2CAP(p)	(p)
+#endif
+#endif
+
 #endif	/* _SYS_PARAM_H_ */
 // CHERI CHANGES START
 // {

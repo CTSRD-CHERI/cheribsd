@@ -77,7 +77,7 @@ linux_creat(struct thread *td, struct linux_creat_args *args)
 
 	LCONVPATHEXIST(td, args->path, &path);
 
-	error = kern_openat(td, AT_FDCWD, path, UIO_SYSSPACE,
+	error = kern_openat(td, AT_FDCWD, PTR2CAP(path), UIO_SYSSPACE,
 	    O_WRONLY | O_CREAT | O_TRUNC, args->mode);
 	LFREEPATH(path);
 	return (error);
@@ -131,7 +131,7 @@ linux_common_open(struct thread *td, int dirfd, char *path, int l_flags, int mod
 		bsd_flags |= O_DIRECTORY;
 	/* XXX LINUX_O_NOATIME: unable to be easily implemented. */
 
-	error = kern_openat(td, dirfd, path, UIO_SYSSPACE, bsd_flags, mode);
+	error = kern_openat(td, dirfd, PTR2CAP(path), UIO_SYSSPACE, bsd_flags, mode);
 	if (error != 0) {
 		if (error == EMLINK)
 			error = ELOOP;
@@ -308,8 +308,7 @@ linux_getdents(struct thread *td, struct linux_getdents_args *args)
 	buflen = min(args->count, MAXBSIZE);
 	buf = malloc(buflen, M_TEMP, M_WAITOK);
 
-	error = kern_getdirentries(td, args->fd,
-	    (__cheri_tocap char * __capability)buf, buflen,
+	error = kern_getdirentries(td, args->fd, PTR2CAP(buf), buflen,
 	    &base, NULL, UIO_SYSSPACE);
 	if (error != 0) {
 		error = linux_getdents_error(td, args->fd, error);
@@ -386,8 +385,7 @@ linux_getdents64(struct thread *td, struct linux_getdents64_args *args)
 	buflen = min(args->count, MAXBSIZE);
 	buf = malloc(buflen, M_TEMP, M_WAITOK);
 
-	error = kern_getdirentries(td, args->fd,
-	    (__cheri_tocap char * __capability)buf, buflen,
+	error = kern_getdirentries(td, args->fd, PTR2CAP(buf), buflen,
 	    &base, NULL, UIO_SYSSPACE);
 	if (error != 0) {
 		error = linux_getdents_error(td, args->fd, error);
@@ -458,8 +456,7 @@ linux_readdir(struct thread *td, struct linux_readdir_args *args)
 	buflen = LINUX_RECLEN(LINUX_NAME_MAX);
 	buf = malloc(buflen, M_TEMP, M_WAITOK);
 
-	error = kern_getdirentries(td, args->fd,
-	    (__cheri_tocap char * __capability)buf, buflen,
+	error = kern_getdirentries(td, args->fd, PTR2CAP(buf), buflen,
 	    &base, NULL, UIO_SYSSPACE);
 	if (error != 0) {
 		error = linux_getdents_error(td, args->fd, error);
@@ -508,7 +505,7 @@ linux_access(struct thread *td, struct linux_access_args *args)
 
 	LCONVPATHEXIST(td, args->path, &path);
 
-	error = kern_accessat(td, AT_FDCWD, path, UIO_SYSSPACE, 0,
+	error = kern_accessat(td, AT_FDCWD, PTR2CAP(path), UIO_SYSSPACE, 0,
 	    args->amode);
 	LFREEPATH(path);
 
@@ -529,7 +526,7 @@ linux_faccessat(struct thread *td, struct linux_faccessat_args *args)
 	dfd = (args->dfd == LINUX_AT_FDCWD) ? AT_FDCWD : args->dfd;
 	LCONVPATHEXIST_AT(td, args->filename, &path, dfd);
 
-	error = kern_accessat(td, dfd, path, UIO_SYSSPACE, 0, args->amode);
+	error = kern_accessat(td, dfd, PTR2CAP(path), UIO_SYSSPACE, 0, args->amode);
 	LFREEPATH(path);
 
 	return (error);
@@ -545,11 +542,11 @@ linux_unlink(struct thread *td, struct linux_unlink_args *args)
 
 	LCONVPATHEXIST(td, args->path, &path);
 
-	error = kern_funlinkat(td, AT_FDCWD, path, FD_NONE, UIO_SYSSPACE, 0, 0);
+	error = kern_funlinkat(td, AT_FDCWD, PTR2CAP(path), FD_NONE,
+	    UIO_SYSSPACE, 0, 0);
 	if (error == EPERM) {
 		/* Introduce POSIX noncompliant behaviour of Linux */
-		if (kern_statat(td, 0, AT_FDCWD,
-		    (__cheri_tocap char * __capability)path, UIO_SYSSPACE, &st,
+		if (kern_statat(td, 0, AT_FDCWD, PTR2CAP(path), UIO_SYSSPACE, &st,
 		    NULL) == 0) {
 			if (S_ISDIR(st.st_mode))
 				error = EISDIR;
@@ -574,14 +571,14 @@ linux_unlinkat(struct thread *td, struct linux_unlinkat_args *args)
 	LCONVPATHEXIST_AT(td, args->pathname, &path, dfd);
 
 	if (args->flag & LINUX_AT_REMOVEDIR)
-		error = kern_frmdirat(td, dfd, path, FD_NONE, UIO_SYSSPACE, 0);
+		error = kern_frmdirat(td, dfd, PTR2CAP(path), FD_NONE,
+		    UIO_SYSSPACE, 0);
 	else
-		error = kern_funlinkat(td, dfd, path, FD_NONE, UIO_SYSSPACE, 0,
-		    0);
+		error = kern_funlinkat(td, dfd, PTR2CAP(path), FD_NONE,
+		    UIO_SYSSPACE, 0, 0);
 	if (error == EPERM && !(args->flag & LINUX_AT_REMOVEDIR)) {
 		/* Introduce POSIX noncompliant behaviour of Linux */
-		if (kern_statat(td, AT_SYMLINK_NOFOLLOW, dfd,
-		    (__cheri_tocap char * __capability)path,
+		if (kern_statat(td, AT_SYMLINK_NOFOLLOW, dfd, PTR2CAP(path),
 		    UIO_SYSSPACE, &st, NULL) == 0 && S_ISDIR(st.st_mode))
 			error = EISDIR;
 	}
@@ -596,7 +593,7 @@ linux_chdir(struct thread *td, struct linux_chdir_args *args)
 
 	LCONVPATHEXIST(td, args->path, &path);
 
-	error = kern_chdir(td, (char * __capability)path, UIO_SYSSPACE);
+	error = kern_chdir(td, PTR2CAP(path), UIO_SYSSPACE);
 	LFREEPATH(path);
 	return (error);
 }
@@ -610,8 +607,8 @@ linux_chmod(struct thread *td, struct linux_chmod_args *args)
 
 	LCONVPATHEXIST(td, args->path, &path);
 
-	error = kern_fchmodat(td, AT_FDCWD, (__cheri_tocap char *)path,
-	    UIO_SYSSPACE, args->mode, 0);
+	error = kern_fchmodat(td, AT_FDCWD, PTR2CAP(path), UIO_SYSSPACE,
+	    args->mode, 0);
 	LFREEPATH(path);
 	return (error);
 }
@@ -626,8 +623,7 @@ linux_fchmodat(struct thread *td, struct linux_fchmodat_args *args)
 	dfd = (args->dfd == LINUX_AT_FDCWD) ? AT_FDCWD : args->dfd;
 	LCONVPATHEXIST_AT(td, args->filename, &path, dfd);
 
-	error = kern_fchmodat(td, dfd, (__cheri_tocap char *)path,
-	    UIO_SYSSPACE, args->mode, 0);
+	error = kern_fchmodat(td, dfd, PTR2CAP(path), UIO_SYSSPACE, args->mode, 0);
 	LFREEPATH(path);
 	return (error);
 }
@@ -641,7 +637,7 @@ linux_mkdir(struct thread *td, struct linux_mkdir_args *args)
 
 	LCONVPATHCREAT(td, args->path, &path);
 
-	error = kern_mkdirat(td, AT_FDCWD, path, UIO_SYSSPACE, args->mode);
+	error = kern_mkdirat(td, AT_FDCWD, PTR2CAP(path), UIO_SYSSPACE, args->mode);
 	LFREEPATH(path);
 	return (error);
 }
@@ -656,7 +652,7 @@ linux_mkdirat(struct thread *td, struct linux_mkdirat_args *args)
 	dfd = (args->dfd == LINUX_AT_FDCWD) ? AT_FDCWD : args->dfd;
 	LCONVPATHCREAT_AT(td, args->pathname, &path, dfd);
 
-	error = kern_mkdirat(td, dfd, path, UIO_SYSSPACE, args->mode);
+	error = kern_mkdirat(td, dfd, PTR2CAP(path), UIO_SYSSPACE, args->mode);
 	LFREEPATH(path);
 	return (error);
 }
@@ -670,7 +666,7 @@ linux_rmdir(struct thread *td, struct linux_rmdir_args *args)
 
 	LCONVPATHEXIST(td, args->path, &path);
 
-	error = kern_frmdirat(td, AT_FDCWD, path, FD_NONE, UIO_SYSSPACE, 0);
+	error = kern_frmdirat(td, AT_FDCWD, PTR2CAP(path), FD_NONE, UIO_SYSSPACE, 0);
 	LFREEPATH(path);
 	return (error);
 }
@@ -689,7 +685,8 @@ linux_rename(struct thread *td, struct linux_rename_args *args)
 		return (error);
 	}
 
-	error = kern_renameat(td, AT_FDCWD, from, AT_FDCWD, to, UIO_SYSSPACE);
+	error = kern_renameat(td, AT_FDCWD, PTR2CAP(from), AT_FDCWD,
+	    PTR2CAP(to), UIO_SYSSPACE);
 	LFREEPATH(from);
 	LFREEPATH(to);
 	return (error);
@@ -739,7 +736,8 @@ linux_renameat2(struct thread *td, struct linux_renameat2_args *args)
 		return (error);
 	}
 
-	error = kern_renameat(td, olddfd, from, newdfd, to, UIO_SYSSPACE);
+	error = kern_renameat(td, olddfd, PTR2CAP(from), newdfd, PTR2CAP(to),
+	    UIO_SYSSPACE);
 	LFREEPATH(from);
 	LFREEPATH(to);
 	return (error);
@@ -760,7 +758,7 @@ linux_symlink(struct thread *td, struct linux_symlink_args *args)
 		return (error);
 	}
 
-	error = kern_symlinkat(td, path, AT_FDCWD, to, UIO_SYSSPACE);
+	error = kern_symlinkat(td, PTR2CAP(path), AT_FDCWD, to, UIO_SYSSPACE);
 	LFREEPATH(path);
 	LFREEPATH(to);
 	return (error);
@@ -782,7 +780,7 @@ linux_symlinkat(struct thread *td, struct linux_symlinkat_args *args)
 		return (error);
 	}
 
-	error = kern_symlinkat(td, path, dfd, to, UIO_SYSSPACE);
+	error = kern_symlinkat(td, PTR2CAP(path), dfd, to, UIO_SYSSPACE);
 	LFREEPATH(path);
 	LFREEPATH(to);
 	return (error);
@@ -797,7 +795,7 @@ linux_readlink(struct thread *td, struct linux_readlink_args *args)
 
 	LCONVPATHEXIST(td, args->name, &name);
 
-	error = kern_readlinkat(td, AT_FDCWD, name, UIO_SYSSPACE,
+	error = kern_readlinkat(td, AT_FDCWD, PTR2CAP(name), UIO_SYSSPACE,
 	    args->buf, UIO_USERSPACE, args->count);
 	LFREEPATH(name);
 	return (error);
@@ -813,7 +811,7 @@ linux_readlinkat(struct thread *td, struct linux_readlinkat_args *args)
 	dfd = (args->dfd == LINUX_AT_FDCWD) ? AT_FDCWD : args->dfd;
 	LCONVPATHEXIST_AT(td, args->path, &name, dfd);
 
-	error = kern_readlinkat(td, dfd, name, UIO_SYSSPACE, args->buf,
+	error = kern_readlinkat(td, dfd, PTR2CAP(name), UIO_SYSSPACE, args->buf,
 	    UIO_USERSPACE, args->bufsiz);
 	LFREEPATH(name);
 	return (error);
@@ -826,7 +824,7 @@ linux_truncate(struct thread *td, struct linux_truncate_args *args)
 	int error;
 
 	LCONVPATHEXIST(td, args->path, &path);
-	error = kern_truncate(td, path, UIO_SYSSPACE, args->length);
+	error = kern_truncate(td, PTR2CAP(path), UIO_SYSSPACE, args->length);
 	LFREEPATH(path);
 	return (error);
 }
@@ -846,7 +844,7 @@ linux_truncate64(struct thread *td, struct linux_truncate64_args *args)
 #endif
 
 	LCONVPATHEXIST(td, args->path, &path);
-	error = kern_truncate(td, path, UIO_SYSSPACE, length);
+	error = kern_truncate(td, PTR2CAP(path), UIO_SYSSPACE, length);
 	LFREEPATH(path);
 	return (error);
 }
@@ -890,8 +888,8 @@ linux_link(struct thread *td, struct linux_link_args *args)
 		return (error);
 	}
 
-	error = kern_linkat(td, AT_FDCWD, AT_FDCWD, path, to, UIO_SYSSPACE,
-	    FOLLOW);
+	error = kern_linkat(td, AT_FDCWD, AT_FDCWD, PTR2CAP(path), PTR2CAP(to),
+	    UIO_SYSSPACE, FOLLOW);
 	LFREEPATH(path);
 	LFREEPATH(to);
 	return (error);
@@ -919,7 +917,8 @@ linux_linkat(struct thread *td, struct linux_linkat_args *args)
 
 	follow = (args->flag & LINUX_AT_SYMLINK_FOLLOW) == 0 ? NOFOLLOW :
 	    FOLLOW;
-	error = kern_linkat(td, olddfd, newdfd, path, to, UIO_SYSSPACE, follow);
+	error = kern_linkat(td, olddfd, newdfd, PTR2CAP(path), PTR2CAP(to),
+	    UIO_SYSSPACE, follow);
 	LFREEPATH(path);
 	LFREEPATH(to);
 	return (error);
@@ -1448,9 +1447,8 @@ linux_chown(struct thread *td, struct linux_chown_args *args)
 
 	LCONVPATHEXIST(td, args->path, &path);
 
-	error = kern_fchownat(td, AT_FDCWD,
-	    (__cheri_tocap const char * __capability)path,
-	    UIO_SYSSPACE, args->uid, args->gid, 0);
+	error = kern_fchownat(td, AT_FDCWD, PTR2CAP(path), UIO_SYSSPACE, args->uid,
+	    args->gid, 0);
 	LFREEPATH(path);
 	return (error);
 }
@@ -1470,9 +1468,8 @@ linux_fchownat(struct thread *td, struct linux_fchownat_args *args)
 
 	flag = (args->flag & LINUX_AT_SYMLINK_NOFOLLOW) == 0 ? 0 :
 	    AT_SYMLINK_NOFOLLOW;
-	error = kern_fchownat(td, dfd,
-	    (__cheri_tocap const char * __capability)path,
-	    UIO_SYSSPACE, args->uid, args->gid, flag);
+	error = kern_fchownat(td, dfd, PTR2CAP(path), UIO_SYSSPACE, args->uid,
+	    args->gid, flag);
 	LFREEPATH(path);
 	return (error);
 }
@@ -1486,9 +1483,8 @@ linux_lchown(struct thread *td, struct linux_lchown_args *args)
 
 	LCONVPATHEXIST(td, args->path, &path);
 
-	error = kern_fchownat(td, AT_FDCWD,
-	    (__cheri_tocap const char * __capability)path,
-	    UIO_SYSSPACE, args->uid, args->gid, AT_SYMLINK_NOFOLLOW);
+	error = kern_fchownat(td, AT_FDCWD, PTR2CAP(path), UIO_SYSSPACE, args->uid,
+	    args->gid, AT_SYMLINK_NOFOLLOW);
 	LFREEPATH(path);
 	return (error);
 }

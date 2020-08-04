@@ -103,7 +103,7 @@ kern_extattrctl(struct thread *td, const char * __capability path, int cmd,
 	mp = NULL;
 	filename_vp = NULL;
 	if (filename != NULL) {
-		NDINIT_C(&nd, LOOKUP, FOLLOW | AUDITVNODE2,
+		NDINIT(&nd, LOOKUP, FOLLOW | AUDITVNODE2,
 		    UIO_USERSPACE, filename, td);
 		error = namei(&nd);
 		if (error)
@@ -113,7 +113,7 @@ kern_extattrctl(struct thread *td, const char * __capability path, int cmd,
 	}
 
 	/* path is always defined. */
-	NDINIT_C(&nd, LOOKUP, FOLLOW | LOCKLEAF | AUDITVNODE1,
+	NDINIT(&nd, LOOKUP, FOLLOW | LOCKLEAF | AUDITVNODE1,
 	    UIO_USERSPACE, path, td);
 	error = namei(&nd);
 	if (error)
@@ -314,7 +314,7 @@ kern_extattr_set_path(struct thread *td,
 		return (error);
 	AUDIT_ARG_TEXT(attrname);
 
-	NDINIT_C(&nd, LOOKUP, follow | AUDITVNODE1, UIO_USERSPACE, path, td);
+	NDINIT(&nd, LOOKUP, follow | AUDITVNODE1, UIO_USERSPACE, path, td);
 	error = namei(&nd);
 	if (error)
 		return (error);
@@ -489,7 +489,7 @@ kern_extattr_get_path(struct thread *td, const char * __capability path,
 		return (error);
 	AUDIT_ARG_TEXT(attrname);
 
-	NDINIT_C(&nd, LOOKUP, follow | AUDITVNODE1, UIO_USERSPACE, path, td);
+	NDINIT(&nd, LOOKUP, follow | AUDITVNODE1, UIO_USERSPACE, path, td);
 	error = namei(&nd);
 	if (error)
 		return (error);
@@ -630,7 +630,7 @@ kern_extattr_delete_path(struct thread *td, const char * __capability path,
 		return(error);
 	AUDIT_ARG_TEXT(attrname);
 
-	NDINIT_C(&nd, LOOKUP, follow | AUDITVNODE1, UIO_USERSPACE, path, td);
+	NDINIT(&nd, LOOKUP, follow | AUDITVNODE1, UIO_USERSPACE, path, td);
 	error = namei(&nd);
 	if (error)
 		return(error);
@@ -780,7 +780,7 @@ kern_extattr_list_path(struct thread *td, const char * __capability path,
 	int error;
 
 	AUDIT_ARG_VALUE(attrnamespace);
-	NDINIT_C(&nd, LOOKUP, follow | AUDITVNODE1, UIO_USERSPACE, path, td);
+	NDINIT(&nd, LOOKUP, follow | AUDITVNODE1, UIO_USERSPACE, path, td);
 	error = namei(&nd);
 	if (error)
 		return (error);

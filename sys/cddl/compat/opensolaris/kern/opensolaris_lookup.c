@@ -35,7 +35,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/vnode.h>
 
 int
-lookupname(char *dirname, enum uio_seg seg, enum symfollow follow,
+lookupname(char * __capability dirname, enum uio_seg seg, enum symfollow follow,
     vnode_t **dirvpp, vnode_t **compvpp)
 {
 
@@ -43,7 +43,7 @@ lookupname(char *dirname, enum uio_seg seg, enum symfollow follow,
 }
 
 int
-lookupnameat(char *dirname, enum uio_seg seg, enum symfollow follow,
+lookupnameat(char * __capability dirname, enum uio_seg seg, enum symfollow follow,
     vnode_t **dirvpp, vnode_t **compvpp, vnode_t *startvp)
 {
 	struct nameidata nd;

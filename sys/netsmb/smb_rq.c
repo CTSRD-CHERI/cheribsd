@@ -630,9 +630,7 @@ smb_t2_request_int(struct smb_t2rq *t2p)
 	smb_rq_bstart(rqp);
 	/* TDUNICODE */
 	if (t2p->t_name)
-		mb_put_mem(mbp,
-		    (__cheri_tocap const char * __capability)t2p->t_name,
-		    nmlen, MB_MSYSTEM);
+		mb_put_mem(mbp, PTR2CAP(t2p->t_name), nmlen, MB_MSYSTEM);
 	mb_put_uint8(mbp, 0);	/* terminating zero */
 	len = mb_fixhdr(mbp);
 	if (txpcount) {

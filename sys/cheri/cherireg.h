@@ -120,27 +120,10 @@
 #define	CHERI_OTYPE_UNSEALED	(-1l)
 #define	CHERI_OTYPE_SENTRY	(-2l)
 
-#if defined(_MIPS_SZCAP) && _MIPS_SZCAP == 256
-/*
- * XXXAR: __builtin_cheri_round_representable_length and
- * __builtin_cheri_representable_alignment_mask are currently not constant
- * evaluated by the compiler for CHERI256 so we use different macros here
- * instead.
- *
- * CHERI256 capabilities are precise so we can return the length unchanged
- * and use a mask of all ones.
- */
-#define	CHERI_REPRESENTABLE_LENGTH(len) (len)
-#define	CHERI_REPRESENTABLE_ALIGNMENT_MASK(len) UINT64_MAX
-
-#else /* (!(_MIPS_SZCAP == 256)) */
-
 #define	CHERI_REPRESENTABLE_LENGTH(len) \
 	__builtin_cheri_round_representable_length(len)
 #define	CHERI_REPRESENTABLE_ALIGNMENT_MASK(len) \
 	__builtin_cheri_representable_alignment_mask(len)
-
-#endif /* (!(_MIPS_SZCAP == 256)) */
 
 /* Provide macros to make it easier to work with the raw CRAM/CRRL results: */
 #define	CHERI_REPRESENTABLE_ALIGNMENT(len) \
@@ -165,10 +148,6 @@
 #define	CHERI_SEAL_ALIGN_MASK(l)	~(CHERI_SEALABLE_ALIGNMENT_MASK(l))
 #define	CHERI_ALIGN_MASK(l)		~(CHERI_REPRESENTABLE_ALIGNMENT_MASK(l))
 
-#if defined(_MIPS_SZCAP) && _MIPS_SZCAP == 256
-#define	CHERI_ALIGN_SHIFT(l)	0ULL
-#define	CHERI_SEAL_ALIGN_SHIFT(l)	0ULL
-#else
 /*
  * TODO: avoid using these since count leading/trailing zeroes is expensive on
  * BERI/CHERI
@@ -177,6 +156,5 @@
 	__builtin_ctzll(CHERI_REPRESENTABLE_ALIGNMENT_MASK(l))
 #define	CHERI_SEAL_ALIGN_SHIFT(l)	\
 	__builtin_ctzll(CHERI_SEALABLE_ALIGNMENT_MASK(l))
-#endif
 
 #endif /* !__SYS_CHERIREG_H__ */
