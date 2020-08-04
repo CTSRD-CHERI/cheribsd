@@ -105,6 +105,10 @@ __FBSDID("$FreeBSD$");
 #include <vm/swap_pager.h>
 #include <vm/uma.h>
 
+#ifdef CHERI_CAPREVOKE
+#include <cheri/revoke.h>
+#endif
+
 /*
  *	Virtual memory maps provide for the mapping, protection,
  *	and sharing of virtual memory objects.  In addition,
@@ -366,6 +370,12 @@ vmspace_zinit(void *mem, int size, int flags)
 	    MTX_DEF | MTX_DUPOK);
 	sx_init(&map->lock, "vm map (user)");
 	PMAP_LOCK_INIT(vmspace_pmap(vm));
+#ifdef CHERI_CAPREVOKE
+	cv_init(&map->vm_cheri_revoke_cv, "vmcherirev");
+#ifdef CHERI_CAPREVOKE_STATS
+	sx_init(&map->vm_cheri_revoke_stats_sx, "vmcrstats");
+#endif
+#endif
 	return (0);
 }
 
@@ -985,6 +995,10 @@ _vm_map_init(vm_map_t map, pmap_t pmap, vm_pointer_t min, vm_pointer_t max)
 #endif
 #ifdef DIAGNOSTIC
 	map->nupdates = 0;
+#endif
+
+#ifdef CHERI_CAPREVOKE
+	map->vm_cheri_revoke_st = CHERI_REVOKE_ST_NONE; /* and epoch 0 */
 #endif
 }
 
@@ -4791,6 +4805,14 @@ vmspace_fork(struct vmspace *vm1, vm_ooffset_t *fork_charge)
 	new_map = &vm2->vm_map;
 	locked = vm_map_trylock(new_map); /* trylock to silence WITNESS */
 	KASSERT(locked, ("vmspace_fork: lock failed"));
+
+#ifdef CHERI_CAPREVOKE
+	/*
+	 * Revocation holds the map busy, so if we're here, there isn't a state
+	 * transition in progress (but an epoch might be open).
+	 */
+	vm2->vm_map.vm_cheri_revoke_st = vm1->vm_map.vm_cheri_revoke_st;
+#endif
 
 	error = pmap_vmspace_copy(new_map->pmap, old_map->pmap);
 	if (error != 0) {
