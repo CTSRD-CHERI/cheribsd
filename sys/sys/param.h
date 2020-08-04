@@ -374,7 +374,8 @@ __END_DECLS
  * capability.  NB: For purecap kernels this is a no-op.
  */
 #define	PTR2CAP(p)	({					\
-	KASSERT((vaddr_t)((p)) >= VM_MAXUSER_ADDRESS,		\
+	KASSERT((vaddr_t)((p)) == 0 ||				\
+	    (vaddr_t)((p)) >= VM_MAXUSER_ADDRESS,		\
 	    ("PTR2CAP on user address: %p", (p)));		\
 	(__cheri_tocap __typeof__((p)) __capability)(p);	\
 	})
