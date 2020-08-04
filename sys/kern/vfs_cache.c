@@ -1513,7 +1513,7 @@ success:
 		}
 		vs = vget_prep_smr(*vpp);
 		vfs_smr_exit();
-		if (vs == VGET_NONE) {
+		if (__predict_false(vs == VGET_NONE)) {
 			*vpp = NULL;
 			goto retry;
 		}
@@ -3205,7 +3205,7 @@ cache_fplookup_partial_setup(struct cache_fpl *fpl)
 	dvp_seqc = fpl->dvp_seqc;
 
 	dvs = vget_prep_smr(dvp);
-	if (dvs == VGET_NONE) {
+	if (__predict_false(dvs == VGET_NONE)) {
 		cache_fpl_smr_exit(fpl);
 		return (cache_fpl_aborted(fpl));
 	}
@@ -3226,6 +3226,7 @@ cache_fplookup_partial_setup(struct cache_fpl *fpl)
 	}
 
 	fpl->ndp->ni_startdir = dvp;
+
 	return (0);
 }
 
@@ -3264,8 +3265,8 @@ cache_fplookup_final_child(struct cache_fpl *fpl, enum vgetstate tvs)
 static int __noinline
 cache_fplookup_final_withparent(struct cache_fpl *fpl)
 {
-	enum vgetstate dvs, tvs;
 	struct componentname *cnp;
+	enum vgetstate dvs, tvs;
 	struct vnode *dvp, *tvp;
 	seqc_t dvp_seqc, tvp_seqc;
 	int error;
@@ -3282,11 +3283,11 @@ cache_fplookup_final_withparent(struct cache_fpl *fpl)
 	 * This is less efficient than it can be for simplicity.
 	 */
 	dvs = vget_prep_smr(dvp);
-	if (dvs == VGET_NONE) {
+	if (__predict_false(dvs == VGET_NONE)) {
 		return (cache_fpl_aborted(fpl));
 	}
 	tvs = vget_prep_smr(tvp);
-	if (tvs == VGET_NONE) {
+	if (__predict_false(tvs == VGET_NONE)) {
 		cache_fpl_smr_exit(fpl);
 		vget_abort(dvp, dvs);
 		return (cache_fpl_aborted(fpl));
@@ -3348,7 +3349,7 @@ cache_fplookup_final(struct cache_fpl *fpl)
 		return (cache_fplookup_final_withparent(fpl));
 
 	tvs = vget_prep_smr(tvp);
-	if (tvs == VGET_NONE) {
+	if (__predict_false(tvs == VGET_NONE)) {
 		return (cache_fpl_partial(fpl));
 	}
 
@@ -3592,7 +3593,7 @@ cache_fplookup_parse(struct cache_fpl *fpl)
 	for (cp = cnp->cn_nameptr; *cp != 0 && *cp != '/'; cp++)
 		continue;
 	cnp->cn_namelen = cp - cnp->cn_nameptr;
-	if (cnp->cn_namelen > NAME_MAX) {
+	if (__predict_false(cnp->cn_namelen > NAME_MAX)) {
 		cache_fpl_smr_exit(fpl);
 		return (cache_fpl_handled(fpl, ENAMETOOLONG));
 	}
@@ -3785,6 +3786,7 @@ out:
 			cache_fpl_smr_exit(fpl);
 		return (CACHE_FPL_FAILED);
 	case CACHE_FPL_STATUS_HANDLED:
+		MPASS(error != CACHE_FPL_FAILED);
 		cache_fpl_smr_assert_not_entered(fpl);
 		if (__predict_false(error != 0)) {
 			ndp->ni_dvp = NULL;
