@@ -71,6 +71,7 @@
 #include <sys/lock.h>
 #include <sys/sx.h>
 #include <sys/_mutex.h>
+#include <sys/condvar.h>
 
 /*
  *	Types defined:
@@ -202,6 +203,8 @@ struct vm_map {
 	struct vm_map_entry header;	/* List of entries */
 	struct sx lock;			/* Lock for map data */
 	struct mtx system_mtx;
+	struct cv vm_caprev_cv;		/* (c) Cap. rev. is single file */
+	uint64_t vm_caprev_st;		/* Capability revocation state */
 	int nentries;			/* Number of entries */
 	vm_size_t size;			/* virtual size */
 	u_int timestamp;		/* Version number */
