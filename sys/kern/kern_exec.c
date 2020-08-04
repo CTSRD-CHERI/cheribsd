@@ -97,6 +97,10 @@ __FBSDID("$FreeBSD$");
 #include <cheri/cheric.h>
 #endif
 
+#ifdef CHERI_CAPREVOKE
+#include <vm/vm_caprevoke.h>
+#endif
+
 #ifdef KDTRACE_HOOKS
 #include <sys/dtrace_bsd.h>
 dtrace_execexit_func_t	dtrace_fasttrap_exec;
@@ -1072,6 +1076,11 @@ exec_new_vmspace(struct image_params *imgp, struct sysentvec *sv)
 	    cpu_exec_vmspace_reuse(p, map)) {
 		shmexit(vmspace);
 		pmap_remove_pages(vmspace_pmap(vmspace));
+
+#ifdef CHERI_CAPREVOKE
+		map->vm_caprev_sh = NULL;
+#endif
+
 		vm_map_remove(map, vm_map_min(map), vm_map_max(map));
 		/*
 		 * An exec terminates mlockall(MCL_FUTURE), ASLR state
@@ -1145,6 +1154,22 @@ exec_new_vmspace(struct image_params *imgp, struct sysentvec *sv)
 	    sv->sv_stackprot, VM_PROT_ALL, MAP_STACK_GROWS_DOWN);
 	if (error != KERN_SUCCESS)
 		return (vm_mmap_to_errno(error));
+
+#ifdef CHERI_CAPREVOKE
+	/*
+	 * For CheriABI, create an anonymous, CoW mapping for the revocation
+	 * bitmaps.
+	 *
+	 * XXX This almost surely belongs elsewhere, but I don't immediately
+	 * see a per-sv hook here.
+	 */
+	if (sv->sv_flags & SV_CHERI) {
+		error = vm_map_install_caprevoke_shadow(map);
+
+		if (error != KERN_SUCCESS)
+			return (vm_mmap_to_errno(error));
+	}
+#endif
 
 	/*
 	 * vm_ssize and vm_maxsaddr are somewhat antiquated concepts, but they
