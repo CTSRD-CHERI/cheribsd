@@ -71,6 +71,7 @@
 #include <sys/lock.h>
 #include <sys/sx.h>
 #include <sys/_mutex.h>
+#include <sys/condvar.h>
 
 /*
  *	Types defined:
@@ -186,6 +187,23 @@ vm_map_entry_system_wired_count(vm_map_entry_t entry)
 }
 #endif	/* _KERNEL */
 
+#ifdef CHERI_CAPREVOKE
+/*
+ * To support optimization as to which bitmap(s) we look at, given revocation
+ * runs may use different predicates on capabilities under test.
+ *
+ * Takes cutperm = cheri_getperm(cut) as an argument for optimization reasons.
+ *
+ * Returns any nonzero value to indicate revocation required.
+ */
+typedef unsigned long (*vm_caprevoke_test_fn)(
+    const uint8_t * __capability shadow, uintcap_t cut, unsigned long cutperm);
+
+#ifdef CHERI_CAPREVOKE_STATS
+struct caprevoke_stats;
+#endif
+#endif
+
 /*
  *	A map is a set of map entries.  These map entries are
  *	organized as a threaded binary search tree.  Both structures
@@ -215,6 +233,32 @@ struct vm_map {
 	struct vm_map_entry header;	/* List of entries */
 	struct sx lock;			/* Lock for map data */
 	struct mtx system_mtx;
+#ifdef CHERI_CAPREVOKE
+	struct cv vm_caprev_cv;		/* (c) Cap. rev. is single file */
+	uint64_t vm_caprev_st;		/* Capability revocation state */
+	vm_object_t vm_caprev_sh;	/* My caprevoke shadow object */
+	vm_offset_t vm_caprev_shva;	/* caprevoke shadow posn. in map */
+
+	/*
+	 * If revocation is in progress (as determined by vm_caprev_st,
+	 * this holds our current test predicate.
+	 */
+	vm_caprevoke_test_fn vm_caprev_test;
+#ifdef CHERI_CAPREVOKE_STATS
+	/*
+	 * A slight abuse of an sx lock: readers may perform atomic ops on
+	 * the stat structure, but a write lock is necessary to zero out
+	 * the structure itself (CAPREVOKE_TAKE_STATS).
+	 */
+	struct sx vm_caprev_stats_sx;
+	/*
+	 * This is actually a struct caprevoke_stats, but that's not easily
+	 * brought into scope here.  There's an assertion in
+	 * sys/kern/kern_caprevoke.c that this is the same size.
+	 */
+	uint64_t vm_caprev_stats[12];
+#endif
+#endif
 	int nentries;			/* Number of entries */
 	vm_size_t size;			/* virtual size */
 	u_int timestamp;		/* Version number */
