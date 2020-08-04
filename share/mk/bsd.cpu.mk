@@ -334,9 +334,6 @@ MIPS_ABI?=	32
 CFLAGS+=	-integrated-as
 CFLAGS+=	-fpic
 CFLAGS+=	-cheri-cap-table-abi=${CHERI_USE_CAP_TABLE:Upcrel}
-.ifdef CHERI_USE_CAP_TLS
-CFLAGS+=	-cheri-cap-tls-abi=${CHERI_USE_CAP_TLS}
-.endif
 STATIC_CFLAGS+=	-ftls-model=local-exec
 .ifdef NO_WERROR
 # Implicit function declarations should always be an error in purecap
