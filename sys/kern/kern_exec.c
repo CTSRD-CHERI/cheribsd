@@ -1093,6 +1093,11 @@ exec_new_vmspace(struct image_params *imgp, struct sysentvec *sv)
 	    cpu_exec_vmspace_reuse(p, map)) {
 		shmexit(vmspace);
 		pmap_remove_pages(vmspace_pmap(vmspace));
+
+#ifdef CHERI_CAPREVOKE
+		map->vm_caprev_sh = NULL;
+#endif
+
 		vm_map_remove(map, vm_map_min(map), vm_map_max(map));
 		/*
 		 * An exec terminates mlockall(MCL_FUTURE), ASLR state
