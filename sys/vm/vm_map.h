@@ -203,8 +203,12 @@ struct vm_map {
 	struct vm_map_entry header;	/* List of entries */
 	struct sx lock;			/* Lock for map data */
 	struct mtx system_mtx;
+#ifdef CHERI_CAPREVOKE
 	struct cv vm_caprev_cv;		/* (c) Cap. rev. is single file */
 	uint64_t vm_caprev_st;		/* Capability revocation state */
+	vm_object_t vm_caprev_sh;	/* My caprevoke shadow object */
+	vm_offset_t vm_caprev_shva;	/* caprevoke shadow posn. in map */
+#endif
 	int nentries;			/* Number of entries */
 	vm_size_t size;			/* virtual size */
 	u_int timestamp;		/* Version number */
