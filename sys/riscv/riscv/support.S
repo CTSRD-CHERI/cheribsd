@@ -101,10 +101,8 @@ ENTRY(casueword32)
 	SET_FAULT_HANDLER(a6, a4)	/* And set it */
 #endif
 	ENTER_USER_ACCESS(a4)
-#ifdef __CHERI_PURE_CAPABILITY__
-	clr.w	a4, 0(ca0)		/* Load-exclusive the data */
-#elif __has_feature(capabilities)
-	lr.w.cap a4, 0(ca0)		/* Load-exclusive the data */
+#if __has_feature(capabilities)
+	CLR_W	a4, 0(ca0)		/* Load-exclusive the data */
 #else
 	lr.w	a4, 0(a0)		/* Load-exclusive the data */
 #endif
@@ -145,10 +143,8 @@ ENTRY(casueword)
 	SET_FAULT_HANDLER(a6, a4)	/* And set it */
 #endif
 	ENTER_USER_ACCESS(a4)
-#ifdef __CHERI_PURE_CAPABILITY__
-	clr.d	a4, 0(ca0)		/* Load-exclusive the data */
-#elif __has_feature(capabilities)
-	lr.d.cap a4, 0(ca0)		/* Load-exclusive the data */
+#if __has_feature(capabilities)
+	CLR_D	a4, 0(ca0)		/* Load-exclusive the data */
 #else
 	lr.d	a4, 0(a0)		/* Load-exclusive the data */
 #endif
@@ -189,10 +185,8 @@ ENTRY(fubyte)
 	SET_FAULT_HANDLER(a6, a1)	/* And set it */
 #endif
 	ENTER_USER_ACCESS(a1)
-#ifdef __CHERI_PURE_CAPABILITY__
-	clbu	a0, 0(ca0)		/* Try loading the data */
-#elif __has_feature(capabilities)
-	lbu.cap	a0, 0(ca0)		/* Try loading the data */
+#if __has_feature(capabilities)
+	CLBU	a0, 0(ca0)		/* Try loading the data */
 #else
 	lbu	a0, 0(a0)		/* Try loading the data */
 #endif
@@ -247,10 +241,8 @@ ENTRY(fueword32)
 	SET_FAULT_HANDLER(a6, a2)	/* And set it */
 #endif
 	ENTER_USER_ACCESS(a2)
-#ifdef __CHERI_PURE_CAPABILITY__
-	clw	a0, 0(ca0)		/* Try loading the data */
-#elif __has_feature(capabilities)
-	lw.cap	a0, 0(ca0)		/* Try loading the data */
+#if __has_feature(capabilities)
+	CLW	a0, 0(ca0)		/* Try loading the data */
 #else
 	lw	a0, 0(a0)		/* Try loading the data */
 #endif
@@ -282,10 +274,8 @@ EENTRY(fueword64)
 	SET_FAULT_HANDLER(a6, a2)	/* And set it */
 #endif
 	ENTER_USER_ACCESS(a2)
-#ifdef __CHERI_PURE_CAPABILITY__
-	cld	a0, 0(ca0)		/* Try loading the data */
-#elif __has_feature(capabilities)
-	ld.cap	a0, 0(ca0)		/* Try loading the data */
+#if __has_feature(capabilities)
+	CLD	a0, 0(ca0)		/* Try loading the data */
 #else
 	ld	a0, 0(a0)		/* Try loading the data */
 #endif
@@ -317,11 +307,7 @@ ENTRY(fuecap)
 	SET_FAULT_HANDLER(a6, a2)	/* And set it */
 #endif
 	ENTER_USER_ACCESS(a2)
-#ifdef __CHERI_PURE_CAPABILITY__
-	clc	ca0, 0(ca0)		/* Try loading the data */
-#else
-	lc.cap	ca0, 0(ca0)		/* Try loading the data */
-#endif
+	CLC	ca0, 0(ca0)		/* Try loading the data */
 	EXIT_USER_ACCESS(a2)
 #ifdef __CHERI_PURE_CAPABILITY__
 	SET_FAULT_HANDLER(cnull, ca2)	/* Reset the fault handler */
@@ -349,10 +335,8 @@ ENTRY(subyte)
 	SET_FAULT_HANDLER(a6, a2)	/* And set it */
 #endif
 	ENTER_USER_ACCESS(a2)
-#ifdef __CHERI_PURE_CAPABILITY__
-	csb	a1, 0(ca0)		/* Try storing the data */
-#elif __has_feature(capabilities)
-	sb.cap	a1, 0(ca0)		/* Try storing the data */
+#if __has_feature(capabilities)
+	CSB	a1, 0(ca0)		/* Try storing the data */
 #else
 	sb	a1, 0(a0)		/* Try storing the data */
 #endif
@@ -380,10 +364,8 @@ ENTRY(suword16)
 	SET_FAULT_HANDLER(a6, a2)	/* And set it */
 #endif
 	ENTER_USER_ACCESS(a2)
-#ifdef __CHERI_PURE_CAPABILITY__
-	csh	a1, 0(ca0)		/* Try storing the data */
-#elif __has_feature(capabilities)
-	sh.cap	a1, 0(ca0)		/* Try storing the data */
+#if __has_feature(capabilities)
+	CSH	a1, 0(ca0)		/* Try storing the data */
 #else
 	sh	a1, 0(a0)		/* Try storing the data */
 #endif
@@ -411,10 +393,8 @@ ENTRY(suword32)
 	SET_FAULT_HANDLER(a6, a2)	/* And set it */
 #endif
 	ENTER_USER_ACCESS(a2)
-#ifdef __CHERI_PURE_CAPABILITY__
-	csw	a1, 0(ca0)		/* Try storing the data */
-#elif __has_feature(capabilities)
-	sw.cap	a1, 0(ca0)		/* Try storing the data */
+#if __has_feature(capabilities)
+	CSW	a1, 0(ca0)		/* Try storing the data */
 #else
 	sw	a1, 0(a0)		/* Try storing the data */
 #endif
@@ -443,10 +423,8 @@ EENTRY(suword64)
 	SET_FAULT_HANDLER(a6, a2)	/* And set it */
 #endif
 	ENTER_USER_ACCESS(a2)
-#ifdef __CHERI_PURE_CAPABILITY__
-	csd	a1, 0(ca0)		/* Try storing the data */
-#elif __has_feature(capabilities)
-	sd.cap	a1, 0(ca0)		/* Try storing the data */
+#if __has_feature(capabilities)
+	CSD	a1, 0(ca0)		/* Try storing the data */
 #else
 	sd	a1, 0(a0)		/* Try storing the data */
 #endif
@@ -476,11 +454,7 @@ ENTRY(sucap)
 	SET_FAULT_HANDLER(a6, a2)	/* And set it */
 #endif
 	ENTER_USER_ACCESS(a2)
-#ifdef __CHERI_PURE_CAPABILITY__
-	csc	ca1, 0(ca0)		/* Try storing the data */
-#else
-	sc.cap	ca1, 0(ca0)		/* Try storing the data */
-#endif
+	CSC	ca1, 0(ca0)		/* Try storing the data */
 	EXIT_USER_ACCESS(a2)
 #ifdef __CHERI_PURE_CAPABILITY__
 	SET_FAULT_HANDLER(cnull, ca2)	/* Reset the fault handler */
