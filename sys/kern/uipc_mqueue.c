@@ -1194,8 +1194,8 @@ mqfs_access(struct vop_access_args *ap)
 	error = VOP_GETATTR(vp, &vattr, ap->a_cred);
 	if (error)
 		return (error);
-	error = vaccess(vp->v_type, vattr.va_mode, vattr.va_uid,
-	    vattr.va_gid, ap->a_accmode, ap->a_cred, NULL);
+	error = vaccess(vp->v_type, vattr.va_mode, vattr.va_uid, vattr.va_gid,
+	    ap->a_accmode, ap->a_cred);
 	return (error);
 }
 
@@ -2105,7 +2105,7 @@ kern_kmq_open(struct thread *td, const char * __capability upath, int flags,
 			if (flags & FWRITE)
 				accmode |= VWRITE;
 			error = vaccess(VREG, pn->mn_mode, pn->mn_uid,
-				    pn->mn_gid, accmode, td->td_ucred, NULL);
+			    pn->mn_gid, accmode, td->td_ucred);
 		}
 	}
 
@@ -2627,7 +2627,7 @@ mqf_chmod(struct file *fp, mode_t mode, struct ucred *active_cred,
 	pn = fp->f_data;
 	sx_xlock(&mqfs_data.mi_lock);
 	error = vaccess(VREG, pn->mn_mode, pn->mn_uid, pn->mn_gid, VADMIN,
-	    active_cred, NULL);
+	    active_cred);
 	if (error != 0)
 		goto out;
 	pn->mn_mode = mode & ACCESSPERMS;
