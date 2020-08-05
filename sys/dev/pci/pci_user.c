@@ -997,7 +997,7 @@ pci_bar_mmap(device_t pcidev, struct pci_bar_mmap *pbm)
 		vm_object_deallocate(obj);
 		goto out;
 	}
-	pbm->pbm_map_base = (void *)addr;
+	pbm->pbm_map_base = (void *)(uintptr_t)addr;
 	pbm->pbm_map_length = plen;
 	pbm->pbm_bar_off = membase - pbase;
 	pbm->pbm_bar_length = (pci_addr_t)1 << pm->pm_size;

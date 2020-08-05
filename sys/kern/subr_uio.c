@@ -496,7 +496,7 @@ copyout_map(struct thread *td, vm_ptr_t *addr, size_t sz)
  * Unmap memory in user space.
  */
 int
-copyout_unmap(struct thread *td, vm_offset_t addr, size_t sz)
+copyout_unmap(struct thread *td, vm_ptr_t addr, size_t sz)
 {
 	vm_map_t map;
 	vm_size_t size;

@@ -30,6 +30,7 @@ options 	KTRACE
 options 	KDB
 options		KDB_TRACE # stacktrace on panic
 nooptions	DDB
+options 	KTR
 
 # disable raid, we don't need it
 nooptions	GEOM_RAID
