@@ -90,6 +90,12 @@
 /* Increment @p dst to have the address of @p src */
 #define cheri_copyaddress(dst, src)	(cheri_setaddress(dst, cheri_getaddress(src)))
 
+/*
+ * XXX-AM: Ugly thing to make this importable from linux compat,
+ * which redefines __always_inline
+ */
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wduplicate-decl-specifier"
 /* Get the top of a capability (i.e. one byte past the last accessible one) */
 static __always_inline inline vaddr_t
 cheri_gettop(const void * __capability cap)
@@ -107,6 +113,7 @@ cheri_is_address_inbounds(const void * __capability cap, vaddr_t addr)
 {
 	return (addr >= cheri_getbase(cap) && addr < cheri_gettop(cap));
 }
+#pragma clang diagnostic pop
 
 #ifdef _KERNEL
 /*
