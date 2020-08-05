@@ -119,24 +119,13 @@ cheri_is_address_inbounds(const void * __capability cap, vaddr_t addr)
  * appears not currently to be the case, so manually derive using
  * cheri_getpcc() for now.
  */
-static __inline void * __capability
-cheri_codeptr(void *ptr, size_t len)
-{
-#ifdef NOTYET
-	void (* __capability c)(void) = ptr;
-#else
-	void * __capability c = cheri_setaddress(cheri_getpcc(),
-	    (register_t)ptr);
-#endif
-
-	/* Assume CFromPtr without base set, availability of CSetBounds. */
-	return (cheri_setbounds(c, len));
-}
+#define cheri_codeptr(ptr, len)	\
+	cheri_setbounds(__builtin_cheri_cap_from_pointer(cheri_getpcc(), ptr), len));
 
 #define cheri_codeptrperm(ptr, len, perm)	\
 	cheri_andperm(cheri_codeptr(ptr, len), perm | CHERI_PERM_GLOBAL)
 
-#define cheri_ptr(ptr, len) \
+#define cheri_ptr(ptr, len)	\
 	cheri_setbounds(    \
 	    (__cheri_tocap __typeof__((ptr)[0]) *__capability)ptr, len)
 
