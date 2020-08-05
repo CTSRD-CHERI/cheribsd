@@ -636,7 +636,7 @@ freebsd64_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	    rounded_stack_vaddr,
 	    CHERI_REPRESENTABLE_LENGTH(ssiz + stack_offset), stack_offset);
 	destp = cheri_setaddress(destp, p->p_sysent->sv_psstrings);
-	arginfo = cheri_setbounds(destp, sizeof(*arginfo));
+	arginfo = cheri_setbounds((void * __capability)destp, sizeof(*arginfo));
 	imgp->ps_strings = arginfo;
 	if (p->p_sysent->sv_sigcode_base == 0)
 		szsigcode = *(p->p_sysent->sv_szsigcode);

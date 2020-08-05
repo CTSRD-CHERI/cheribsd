@@ -86,11 +86,7 @@
 #define cheri_fromint(x)	cheri_incoffset(NULL, x)
 
 /* Increment @p dst to have the address of @p src */
-static __always_inline inline void * __capability
-cheri_copyaddress(const void * __capability dst, const void * __capability src)
-{
-	return (cheri_setaddress(dst, cheri_getaddress(src)));
-}
+#define cheri_copyaddress(dst, src)	(cheri_setaddress(dst, cheri_getaddress(src)))
 
 /* Get the top of a capability (i.e. one byte past the last accessible one) */
 static __always_inline inline vaddr_t
@@ -124,7 +120,7 @@ cheri_is_address_inbounds(const void * __capability cap, vaddr_t addr)
  * cheri_getpcc() for now.
  */
 static __inline void * __capability
-cheri_codeptr(const void *ptr, size_t len)
+cheri_codeptr(void *ptr, size_t len)
 {
 #ifdef NOTYET
 	void (* __capability c)(void) = ptr;
@@ -137,35 +133,18 @@ cheri_codeptr(const void *ptr, size_t len)
 	return (cheri_setbounds(c, len));
 }
 
-static __inline void * __capability
-cheri_codeptrperm(const void *ptr, size_t len, register_t perm)
-{
+#define cheri_codeptrperm(ptr, len, perm)	\
+	cheri_andperm(cheri_codeptr(ptr, len), perm | CHERI_PERM_GLOBAL)
 
-	return (cheri_andperm(cheri_codeptr(ptr, len),
-	    perm | CHERI_PERM_GLOBAL));
-}
+#define cheri_ptr(ptr, len) \
+	cheri_setbounds(    \
+	    (__cheri_tocap __typeof__((ptr)[0]) *__capability)ptr, len)
 
-static __inline void * __capability
-cheri_ptr(const void *ptr, size_t len)
-{
+#define cheri_ptrperm(ptr, len, perm)	\
+	cheri_andperm(cheri_ptr(ptr, len), perm | CHERI_PERM_GLOBAL)
 
-	/* Assume CFromPtr without base set, availability of CSetBounds. */
-	return (cheri_setbounds((__cheri_tocap const void * __capability)ptr, len));
-}
-
-static __inline void * __capability
-cheri_ptrperm(const void *ptr, size_t len, register_t perm)
-{
-
-	return (cheri_andperm(cheri_ptr(ptr, len), perm | CHERI_PERM_GLOBAL));
-}
-
-static __inline void * __capability
-cheri_ptrpermoff(const void *ptr, size_t len, register_t perm, off_t off)
-{
-
-	return (cheri_setoffset(cheri_ptrperm(ptr, len, perm), off));
-}
+#define cheri_ptrpermoff(ptr, len, perm, off)	\
+	cheri_setoffset(cheri_ptrperm(ptr, len, perm), off)
 
 /*
  * Construct a capability suitable to describe a type identified by 'ptr';
