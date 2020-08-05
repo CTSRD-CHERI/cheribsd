@@ -344,10 +344,6 @@ CFLAGS+=	-Werror=implicit-function-declaration
 # XXXBD: is this still needed?
 CFLAGS+=	-Wno-deprecated-declarations
 CFLAGS+=	-cheri=128
-# Clang no longer defines __LP64__ for Cheri purecap ABI but there are a
-# lot of files that use it to check for not 32-bit
-# XXXAR: Remove this once we have checked all the #ifdef __LP64__ uses
-CFLAGS+=	-D__LP64__=1
 LDFLAGS+=	-fuse-ld=lld
 # XXXBD: still needed?
 LDFLAGS+=	-Wl,-melf64btsmip_cheri_fbsd
@@ -416,10 +412,6 @@ RISCV_MARCH:=	${RISCV_MARCH}xcheri
 
 .if ${MACHINE_ARCH:Mriscv*c*}
 RISCV_ABI=	l64pc128
-# Clang no longer defines __LP64__ for Cheri purecap ABI but there are a
-# lot of files that use it to check for not 32-bit
-# XXXAR: Remove this once we have checked all the #ifdef __LP64__ uses
-CFLAGS+=	-D__LP64__=1
 .else
 RISCV_ABI=	lp64
 .endif
@@ -482,6 +474,11 @@ MACHINE_ABI+=	ptr32
 .endif
 
 .if ${MACHINE_ABI:Mpurecap}
+# Clang no longer defines __LP64__ for Cheri purecap ABI but there are a
+# lot of files that use it to check for not 32-bit
+# XXXAR: Remove this once we have checked all the #ifdef __LP64__ uses
+CFLAGS+=	-D__LP64__=1
+
 .ifdef CHERI_USE_CAP_TABLE
 CFLAGS+=	-cheri-cap-table-abi=${CHERI_USE_CAP_TABLE}
 .endif

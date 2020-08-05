@@ -110,10 +110,6 @@ STATIC_CFLAGS+=	-ftls-model=local-exec
 # we will probably generate wrong code for calling them
 CFLAGS+=-Werror=implicit-function-declaration
 .endif
-# Clang no longer defines __LP64__ for Cheri purecap ABI but there are a
-# lot of files that use it to check for not 32-bit
-# XXXAR: Remove this once we have checked all the #ifdef __LP64__ uses
-CFLAGS+=	-D__LP64__=1
 LDFLAGS+=	-Wl,-melf64btsmip_cheri_fbsd
 .if defined(__BSD_PROG_MK)
 _LIB_OBJTOP=	${ROOTOBJDIR}

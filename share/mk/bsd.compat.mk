@@ -194,6 +194,8 @@ LIBCHERI_MACHINE_ABI=	${MACHINE_ABI} purecap
 
 # This duplicates some logic in bsd.cpu.mk that is needed for the
 # WANT_COMPAT/NEED_COMPAT case.
+LIBCHERICFLAGS+=	-D__LP64__=1
+
 .ifdef CHERI_USE_CAP_TABLE
 LIBCHERICFLAGS+=	-cheri-cap-table-abi=${CHERI_USE_CAP_TABLE}
 .endif
