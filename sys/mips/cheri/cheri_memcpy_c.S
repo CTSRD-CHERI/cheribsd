@@ -69,10 +69,6 @@ XLEAF(FUNC_PREFIX(memmove_c))
 	cmove	$c4, $c1
 	b FUNC_PREFIX(bcopy_c)		/* skip stripping LOAD_CAP */
 	nop
-#ifdef CHERI_PURECAP_KERNEL
-XLEAF(FUNC_PREFIX(memcpynocap))
-XLEAF(FUNC_PREFIX(memmovenocap))
-#endif
 XLEAF(FUNC_PREFIX(memcpynocap_c))
 XLEAF(FUNC_PREFIX(memmovenocap_c))
 	cmove	$c1, $c3
