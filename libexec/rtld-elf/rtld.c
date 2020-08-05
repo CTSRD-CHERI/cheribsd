@@ -1877,7 +1877,7 @@ digest_phdr(const Elf_Phdr *phdr, int phnum, dlfunc_t entry, const char *path)
      * Derive text_rodata cap from AT_ENTRY (but set the address to the beginning
      * of the object). Note: csetbounds is done after parsing .dynamic
      */
-    obj->text_rodata_cap = cheri_copyaddress(entry, obj->relocbase);
+    obj->text_rodata_cap = (const char *)cheri_copyaddress(entry, obj->relocbase);
     fix_obj_mapping_cap_permissions(obj, path);
 #endif
 

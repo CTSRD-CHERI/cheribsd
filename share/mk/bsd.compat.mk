@@ -108,11 +108,11 @@ LIB32_MACHINE_ABI=	${MACHINE_ABI}
 HAS_COMPAT=64
 # XXX: clang specific
 .if ${COMPAT_ARCH:Mmips64el*}
-LIB64CPUFLAGS=  -target mipsel-unknown-freebsd13.0
+LIB64CPUFLAGS=  -target mips64el-unknown-freebsd13.0
 .else
-LIB64CPUFLAGS=  -target mips-unknown-freebsd13.0
+LIB64CPUFLAGS=  -target mips64-unknown-freebsd13.0
 .endif
-LIB64CPUFLAGS+=	-mabi=64
+LIB64CPUFLAGS+=	-cheri -mabi=64
 LIB64_MACHINE=	mips
 LIB64_MACHINE_ARCH=	mips64
 LIB32WMAKEENV=	MACHINE_CPU="mips cheri"
@@ -191,6 +191,28 @@ COMPAT_RISCV_MARCH:=	${COMPAT_RISCV_MARCH}xcheri
 LIBCHERICFLAGS+=	-DCOMPAT_CHERI
 LIBCHERIWMAKEFLAGS+=	COMPAT_CHERI=yes
 LIBCHERI_MACHINE_ABI=	${MACHINE_ABI} purecap
+
+# This duplicates some logic in bsd.cpu.mk that is needed for the
+# WANT_COMPAT/NEED_COMPAT case.
+LIBCHERICFLAGS+=	-D__LP64__=1
+
+.ifdef CHERI_USE_CAP_TABLE
+LIBCHERICFLAGS+=	-cheri-cap-table-abi=${CHERI_USE_CAP_TABLE}
+.endif
+
+.if defined(CHERI_SUBOBJECT_BOUNDS)
+# Allow per-subdirectory overrides if we know that there is maximum that works
+.if defined(CHERI_SUBOBJECT_BOUNDS_MAX)
+LIBCHERICFLAGS+=	-Xclang -cheri-bounds=${CHERI_SUBOBJECT_BOUNDS_MAX}
+.else
+LIBCHERICFLAGS+=	-Xclang -cheri-bounds=${CHERI_SUBOBJECT_BOUNDS}
+.endif # CHERI_SUBOBJECT_BOUNDS_MAX
+CHERI_SUBOBJECT_BOUNDS_DEBUG?=yes
+.if ${CHERI_SUBOBJECT_BOUNDS_DEBUG} == "yes"
+# If debugging is enabled, clear SW permission bit 2 when the bounds are reduced
+LIBCHERICFLAGS+=	-mllvm -cheri-subobject-bounds-clear-swperm=2
+.endif # CHERI_SUBOBJECT_BOUNDS_DEBUG
+.endif # CHERI_SUBOBJECT_BOUNDS
 .endif
 
 # -------------------------------------------------------------------

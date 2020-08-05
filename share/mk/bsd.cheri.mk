@@ -89,20 +89,6 @@ _CHERI_CXX=		${CXX} ${_CHERI_COMMON_FLAGS}
 .endif
 _CHERI_CPP=		${CPP} ${_CHERI_COMMON_FLAGS}
 
-.if defined(CHERI_SUBOBJECT_BOUNDS)
-# Allow per-subdirectory overrides if we know that there is maximum that works
-.if defined(CHERI_SUBOBJECT_BOUNDS_MAX)
-_CHERI_COMMON_FLAGS+=	-Xclang -cheri-bounds=${CHERI_SUBOBJECT_BOUNDS_MAX}
-.else
-_CHERI_COMMON_FLAGS+=	-Xclang -cheri-bounds=${CHERI_SUBOBJECT_BOUNDS}
-.endif # CHERI_SUBOBJECT_BOUNDS_MAX
-CHERI_SUBOBJECT_BOUNDS_DEBUG?=yes
-.if ${CHERI_SUBOBJECT_BOUNDS_DEBUG} == "yes"
-# If debugging is enabled, clear SW permission bit 2 when the bounds are reduced
-_CHERI_COMMON_FLAGS+=	-mllvm -cheri-subobject-bounds-clear-swperm=2
-.endif # CHERI_SUBOBJECT_BOUNDS_DEBUG
-.endif # CHERI_SUBOBJECT_BOUNDS
-
 .if defined(SYSROOT)
 _CHERI_COMMON_FLAGS+=	--sysroot=${SYSROOT}
 .endif
@@ -117,12 +103,6 @@ LIBDIR_BASE:=	/usr/libcheri
 .info "Not overriding LIBDIR for CHERI since ${.CURDIR} is a test library"
 .endif
 ROOTOBJDIR=	${OBJTOP}/obj-libcheri
-.ifdef CHERI_USE_CAP_TABLE
-CFLAGS+=	-cheri-cap-table-abi=${CHERI_USE_CAP_TABLE}
-.endif
-.ifdef CHERI_USE_CAP_TLS
-CFLAGS+=	-cheri-cap-tls-abi=${CHERI_USE_CAP_TLS}
-.endif
 STATIC_CFLAGS+=	-ftls-model=local-exec
 
 .ifdef NO_WERROR
@@ -130,10 +110,6 @@ STATIC_CFLAGS+=	-ftls-model=local-exec
 # we will probably generate wrong code for calling them
 CFLAGS+=-Werror=implicit-function-declaration
 .endif
-# Clang no longer defines __LP64__ for Cheri purecap ABI but there are a
-# lot of files that use it to check for not 32-bit
-# XXXAR: Remove this once we have checked all the #ifdef __LP64__ uses
-CFLAGS+=	-D__LP64__=1
 LDFLAGS+=	-Wl,-melf64btsmip_cheri_fbsd
 .if defined(__BSD_PROG_MK)
 _LIB_OBJTOP=	${ROOTOBJDIR}

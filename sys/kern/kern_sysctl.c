@@ -1847,8 +1847,8 @@ sysctl_old_kernel(struct sysctl_req *req, const void *p, size_t l)
 				    req->oldidx, PTR2CAP(p), i);
 			else
 #endif
-				memcpy((__cheri_fromcap char *)req->oldptr +
-				    req->oldidx, p, i);
+				memcpynocap_c((char * __capability)req->oldptr +
+				    req->oldidx, PTR2CAP(p), i);
 		}
 	}
 	req->oldidx += l;
@@ -1870,7 +1870,8 @@ sysctl_new_kernel(struct sysctl_req *req, void *p, size_t l)
 		    (const char * __capability)req->newptr + req->newidx, l);
 	else
 #endif
-		memcpy(p, (__cheri_fromcap const char *)req->newptr + req->newidx, l);
+		memcpynocap_c(PTR2CAP(p),
+		    (const char * __capability)req->newptr + req->newidx, l);
 	req->newidx += l;
 	return (0);
 }

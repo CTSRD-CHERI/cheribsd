@@ -204,9 +204,6 @@ CFLAGS+=	-mabi=elfv2
 .if ${MACHINE_CPUARCH} == "mips"
 CFLAGS+=	-msoft-float
 INLINE_LIMIT?=	8000
-# XXX: Workaround for:
-#      /usr/home/en322/cheri/cheribsd/sys/mips/cheri/cheri_debug.c:103:2: error: Direct access to KR1C is deprecated. Use C(Get/Set)KR1C instead. [-Werror,-Winline-asm]
-CWARNEXTRA+=	-Wno-error=inline-asm
 .endif
 
 #
@@ -237,6 +234,24 @@ CFLAGS+=	-fstack-protector
 .if defined(COMPILER_FEATURES) && ${COMPILER_FEATURES:Mretpoline} != "" && \
     ${MK_KERNEL_RETPOLINE} != "no"
 CFLAGS+=	-mretpoline
+.endif
+
+#
+# Initialize stack variables on function entry
+#
+.if ${MK_INIT_ALL_ZERO} == "yes"
+.if ${COMPILER_FEATURES:Minit-all}
+CFLAGS+= -ftrivial-auto-var-init=zero \
+    -enable-trivial-auto-var-init-zero-knowing-it-will-be-removed-from-clang
+.else
+.warning InitAll (zeros) requested but not support by compiler
+.endif
+.elif ${MK_INIT_ALL_PATTERN} == "yes"
+.if ${COMPILER_FEATURES:Minit-all}
+CFLAGS+= -ftrivial-auto-var-init=pattern
+.else
+.warning InitAll (pattern) requested but not support by compiler
+.endif
 .endif
 
 #

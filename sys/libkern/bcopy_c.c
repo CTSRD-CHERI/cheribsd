@@ -33,6 +33,8 @@
 #include <sys/param.h>
 #include <sys/systm.h>
 
+#include <cheri/cheric.h>
+
 void * __capability
 memcpy_c(void * __capability dst0, const void * __capability src0, size_t len)
 {
@@ -143,3 +145,12 @@ bcopy_c(const void * __capability src, void * __capability dst, size_t len)
 
 	memcpy_c(dst, src, len);
 }
+
+void * __capability
+memcpynocap_c(void * __capability dst, const void *  __capability src,
+    size_t len)
+{
+	return (memcpy_c(dst, cheri_andperm(src, ~CHERI_PERM_LOAD_CAP), len));
+}
+
+__strong_reference(memcpynocap_c, memmovenocap_c);

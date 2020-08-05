@@ -41,6 +41,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/kernel.h>
 #include <sys/proc.h>
 #include <sys/syscallsubr.h>
+#include <sys/sysent.h>
 #include <sys/syslog.h>
 #include <sys/sysproto.h>
 
@@ -105,10 +106,10 @@ kern_flag_captured(struct thread *td, const char * __capability message,
 	}
 
 	log(LOG_ALERT,
-	    "pid %d (%s), jid %d, uid %d: captured flag source: (%s) "
+	    "pid %d (%s), ABI: %s, jid %d, uid %d: captured flag source: (%s) "
 	    "message: (%s) key: %s\n", p->p_pid, p->p_comm,
-	    p->p_ucred->cr_prison->pr_id, td->td_ucred->cr_uid, src_buf,
-	    msg_buf, key_buf);
+	    p->p_sysent->sv_name, p->p_ucred->cr_prison->pr_id,
+	    td->td_ucred->cr_uid, src_buf, msg_buf, key_buf);
 
 	return (0);
 }
@@ -144,8 +145,8 @@ flag_captured(const char *message, uint32_t key)
 		strlcpy(msg_buf, message, sizeof(msg_buf));
 
 	log(LOG_ALERT,
-	    "pid %d (%s), jid %d, uid %d: message: (%s) key: %s\n",
-	    p->p_pid, p->p_comm, p->p_ucred->cr_prison->pr_id,
-	    td->td_ucred->cr_uid,
+	    "pid %d (%s), ABI: %s, jid %d, uid %d: message: (%s) key: %s\n",
+	    p->p_pid, p->p_comm, p->p_sysent->sv_name,
+	    p->p_ucred->cr_prison->pr_id, td->td_ucred->cr_uid,
 	    msg_buf, key_buf);
 }
