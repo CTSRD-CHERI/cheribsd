@@ -59,3 +59,5 @@ HAS_TESTS=
 SUBDIR.${MK_TESTS}+= tests
 
 .include <bsd.prog.mk>
+
+CWARNFLAGS.clang+=	-Wno-error=address-of-packed-member

@@ -269,9 +269,9 @@ morecore(int bucket)
 	 * Add new memory allocated to that on
 	 * free list for this hash bucket.
 	 */
-	nextf[bucket] = op = cheri_setbounds(buf, sz);
+	nextf[bucket] = op = (union overhead *)(void *)cheri_setbounds(buf, sz);
 	while (--nblks > 0) {
-		op->ov_next = (union overhead *)cheri_setbounds(buf + sz, sz);
+		op->ov_next = (union overhead *)(void *)cheri_setbounds(buf + sz, sz);
 		buf += sz;
 		op = op->ov_next;
 	}

@@ -73,14 +73,14 @@ struct SimpleExternalCallTrampoline {
 	static SimpleExternalCallTrampoline*
 	create(const Obj_Entry* defobj, const Elf_Sym *sym, bool tight_bounds);
 	inline dlfunc_t pcc_value() const {
-		void* result = cheri_incoffset(this, offsetof(SimpleExternalCallTrampoline, code));
+		const void* result = cheri_incoffset(this, offsetof(SimpleExternalCallTrampoline, code));
 		result = cheri_clearperm(result, FUNC_PTR_REMOVE_PERMS);
 #if __has_builtin(__builtin_cheri_seal_entry)
 		result = __builtin_cheri_seal_entry(result);
 #else
 #warning "__builtin_cheri_seal_entry not supported, please update LLVM"
 #endif
-		return (dlfunc_t)result;
+		return __DECONST(dlfunc_t, result);
 	}
 };
 
