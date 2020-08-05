@@ -491,6 +491,10 @@ void vm_map_lookup_done (vm_map_t, vm_map_entry_t);
 boolean_t vm_map_lookup_entry (vm_map_t, vm_offset_t, vm_map_entry_t *);
 bool vm_map_reservation_is_unmapped(vm_map_t, vm_offset_t);
 int vm_map_reservation_delete(vm_map_t, vm_offset_t);
+int vm_map_reservation_delete_locked(vm_map_t, vm_offset_t);
+int vm_map_reservation_create(vm_map_t, vm_ptr_t *, vm_size_t, vm_offset_t, int);
+int vm_map_reservation_create_locked(vm_map_t, vm_ptr_t *, vm_size_t,
+    vm_offset_t, int);
 
 static inline vm_map_entry_t
 vm_map_entry_first(vm_map_t map)
@@ -518,7 +522,9 @@ vm_map_entry_succ(vm_map_entry_t entry)
 	    (it) != &(map)->header;		\
 	    (it) = vm_map_entry_succ(it))
 int vm_map_protect (vm_map_t, vm_offset_t, vm_offset_t, vm_prot_t, boolean_t);
+int vm_map_remove_locked(vm_map_t, vm_offset_t, vm_offset_t);
 int vm_map_remove (vm_map_t, vm_offset_t, vm_offset_t);
+int vm_map_clear(vm_map_t);
 void vm_map_try_merge_entries(vm_map_t map, vm_map_entry_t prev,
     vm_map_entry_t entry);
 void vm_map_startup (void);

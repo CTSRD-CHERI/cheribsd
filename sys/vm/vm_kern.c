@@ -715,7 +715,9 @@ kmap_free_wakeup(vm_map_t map, vm_offset_t addr, vm_size_t size)
 {
 
 	vm_map_lock(map);
-	(void) vm_map_delete(map, trunc_page(addr), round_page(addr + size));
+	(void) vm_map_remove_locked(map, trunc_page(addr),
+	    round_page(addr + size));
+
 	if (map->needs_wakeup) {
 		map->needs_wakeup = FALSE;
 		vm_map_wakeup(map);
