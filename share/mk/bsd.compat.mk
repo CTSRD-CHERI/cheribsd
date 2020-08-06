@@ -115,7 +115,7 @@ LIB64CPUFLAGS=  -target mips64-unknown-freebsd13.0
 LIB64CPUFLAGS+=	-cheri -mabi=64
 LIB64_MACHINE=	mips
 LIB64_MACHINE_ARCH=	mips64
-LIB32WMAKEENV=	MACHINE_CPU="mips cheri"
+LIB64WMAKEENV=	MACHINE_CPU="mips cheri"
 .if ${COMPAT_ARCH:Mmips64el*}
 _EMULATION=	elf64ltsmip_fbsd
 .else
@@ -133,7 +133,7 @@ COMPAT_RISCV_ABI:=	${COMPAT_RISCV_ABI}d
 .endif
 LIB64_MACHINE=	riscv
 LIB64_MACHINE_ARCH=riscv64
-LIB32WMAKEENV=	MACHINE_CPU="riscv cheri"
+LIB64WMAKEENV=	MACHINE_CPU="riscv cheri"
 LIB64WMAKEFLAGS= LD="${XLD}" CPUTYPE=cheri
 # XXX: clang specific
 LIB64CPUFLAGS=	-target riscv64-unknown-freebsd13.0
