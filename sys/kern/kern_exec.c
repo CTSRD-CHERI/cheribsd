@@ -1089,7 +1089,7 @@ exec_new_vmspace(struct image_params *imgp, struct sysentvec *sv)
 		map = &vmspace->vm_map;
 	}
 	map->flags |= imgp->map_flags;
-	if (SV_PROC_FLAG(p, SV_CHERI))
+	if (sv->sv_flags & SV_CHERI)
 		map->flags |= MAP_RESERVATIONS;
 	else
 		map->flags &= ~MAP_RESERVATIONS;
