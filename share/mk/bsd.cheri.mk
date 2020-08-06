@@ -79,10 +79,6 @@ STATIC_CFLAGS+= -ftls-model=local-exec # MIPS/hybrid case
 .endif
 
 CFLAGS+=	${CHERI_OPTIMIZATION_FLAGS:U-O2}
-# We now need LLD to link any code that uses capabilities:
-# We are expanding $LDFLAGS here so this must come after MIPS_ABI has been set!
-LDFLAGS:=${LDFLAGS:N-fuse-ld=*}
-LDFLAGS+=	-fuse-ld=lld
 LDFLAGS+=	-Wl,-preemptible-caprelocs=elf
 # Work around cheri-unknown-freebsd-ld.lld: error: section: .init_array is not contiguous with other relro sections
 # TODO: remove this once I've debugged the root cause

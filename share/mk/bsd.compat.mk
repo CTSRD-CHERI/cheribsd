@@ -160,7 +160,7 @@ LIBCHERICPUFLAGS=  -target mips64-unknown-freebsd13.0 -cheri -mabi=purecap
 LIBCHERICPUFLAGS+=	-fpic
 LIBCHERI_MACHINE=	mips
 LIBCHERI_MACHINE_ARCH=	mips64c128
-
+LIBCHERILDFLAGS=	-fuse-ld=lld
 .elif ${COMPAT_ARCH:Mriscv64*} && !${COMPAT_ARCH:Mriscv64*c*}
 HAS_COMPAT+=CHERI
 LIBCHERI_MACHINE=	riscv
