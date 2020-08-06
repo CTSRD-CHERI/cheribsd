@@ -107,6 +107,62 @@ vm_caprevoke_publish(
 }
 
 /*
+ * Grant access to a capability shadow
+ */
+void * __capability
+vm_caprevoke_shadow_cap(int sel, vm_offset_t base, vm_offset_t size, int pmask)
+{
+	switch (sel) {
+	/* Accessible to userspace */
+	case CAPREVOKE_SHADOW_NOVMMAP: {
+		vm_offset_t shadow_base, shadow_size;
+
+		/* Require at least byte granularity in the shadow space */
+		if ((base & ((VM_CAPREVOKE_GSZ_MEM_NOMAP * 8) - 1)) != 0)
+			return (void * __capability)(uintptr_t)EINVAL;
+		if ((size & ((VM_CAPREVOKE_GSZ_MEM_NOMAP * 8) - 1)) != 0)
+			return (void * __capability)(uintptr_t)EINVAL;
+
+		shadow_base = VM_CAPREVOKE_BM_MEM_NOMAP +
+		    (base / VM_CAPREVOKE_GSZ_MEM_NOMAP / 8);
+		shadow_size = size / VM_CAPREVOKE_GSZ_MEM_NOMAP / 8;
+
+		return cheri_capability_build_user_data(
+		    (pmask & (CHERI_PERM_LOAD | CHERI_PERM_STORE)) |
+			CHERI_PERM_GLOBAL,
+		    shadow_base, shadow_size, 0);
+	}
+	case CAPREVOKE_SHADOW_OTYPE: {
+		vm_offset_t shadow_base, shadow_size;
+
+		shadow_base =
+		    VM_CAPREVOKE_BM_OTYPE + (base / VM_CAPREVOKE_GSZ_OTYPE / 8);
+		shadow_size = size / VM_CAPREVOKE_GSZ_OTYPE / 8;
+
+		/* Require at least byte granularity in the shadow space */
+		if ((base & ((VM_CAPREVOKE_GSZ_OTYPE * 8) - 1)) != 0)
+			return (void * __capability)(uintptr_t)EINVAL;
+		if ((size & ((VM_CAPREVOKE_GSZ_OTYPE * 8) - 1)) != 0)
+			return (void * __capability)(uintptr_t)EINVAL;
+
+		return cheri_capability_build_user_data(
+		    CHERI_PERM_LOAD | CHERI_PERM_STORE | CHERI_PERM_GLOBAL,
+		    shadow_base, shadow_size, 0);
+	}
+	case CAPREVOKE_SHADOW_INFO_STRUCT: {
+		return cheri_capability_build_user_data(
+		    CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP | CHERI_PERM_GLOBAL,
+		    VM_CAPREVOKE_INFO_PAGE, sizeof(struct caprevoke_info), 0);
+	}
+	/* Kernel-only */
+	// XXX CAPREVOKE_SHADOW_MAP:
+	//
+	default:
+		return (void * __capability)(uintptr_t)EINVAL;
+	}
+}
+
+/*
  * Revocation test predicates
  */
 
