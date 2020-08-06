@@ -79,8 +79,6 @@ CFLAGS+=-Werror=implicit-function-declaration
 STATIC_CFLAGS+= -ftls-model=local-exec # MIPS/hybrid case
 .endif
 
-_CHERI_COMMON_FLAGS+=	-cheri=128
-
 CFLAGS+=	${CHERI_OPTIMIZATION_FLAGS:U-O2}
 # We now need LLD to link any code that uses capabilities:
 # We are expanding $LDFLAGS here so this must come after MIPS_ABI has been set!
