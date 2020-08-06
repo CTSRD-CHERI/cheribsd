@@ -75,7 +75,6 @@ STATIC_CFLAGS+=	-ftls-model=local-exec
 # we will probably generate wrong code for calling them
 CFLAGS+=-Werror=implicit-function-declaration
 .endif
-LDFLAGS+=	-Wl,-melf64btsmip_cheri_fbsd
 .else
 STATIC_CFLAGS+= -ftls-model=local-exec # MIPS/hybrid case
 .endif

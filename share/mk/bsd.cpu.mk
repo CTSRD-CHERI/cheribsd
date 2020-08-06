@@ -344,8 +344,6 @@ CFLAGS+=	-Werror=implicit-function-declaration
 CFLAGS+=	-Wno-deprecated-declarations
 CFLAGS+=	-cheri=128
 LDFLAGS+=	-fuse-ld=lld
-# XXXBD: still needed?
-LDFLAGS+=	-Wl,-melf64btsmip_cheri_fbsd
 LDFLAGS+=	-Wl,-preemptible-caprelocs=elf
 CFLAGS+=	-Qunused-arguments
 CFLAGS+=	-Werror=cheri-bitwise-operations
