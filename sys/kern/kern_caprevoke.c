@@ -16,6 +16,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/lock.h>
 #include <sys/mutex.h>
 #include <sys/proc.h>
+#include <sys/sysent.h>
 
 #include <vm/vm.h>
 #include <vm/vm_extern.h>
@@ -499,7 +500,67 @@ static int
 kern_caprevoke_shadow(int flags, void * __capability arena,
 		      void * __capability * __capability shadow)
 {
-	return ENOSYS;
+	int arena_perms, error;
+	void * __capability cres;
+	vm_offset_t base, size;
+	int sel = flags & CAPREVOKE_SHADOW_SPACE_MASK;
+
+	if (!SV_CURPROC_FLAG(SV_CHERI)) {
+		return ENOSYS;
+	}
+
+	switch (sel) {
+	case CAPREVOKE_SHADOW_NOVMMAP:
+
+		if (cheri_gettag(arena) == 0)
+			return EINVAL;
+
+		arena_perms = cheri_getperm(arena);
+
+		if ((arena_perms & CHERI_PERM_CHERIABI_VMMAP) == 0)
+			return EPERM;
+
+		base = cheri_getbase(arena);
+		size = cheri_getlen(arena);
+
+		cres = vm_caprevoke_shadow_cap(sel, base, size, arena_perms);
+
+		break;
+
+	case CAPREVOKE_SHADOW_OTYPE: {
+		int reqperms;
+
+		if (cheri_gettag(arena) == 0)
+			return EINVAL;
+
+		/* XXX Require all of VMMAP, SEAL, and UNSEAL permissions? */
+		reqperms = CHERI_PERM_SEAL | CHERI_PERM_UNSEAL
+			     | CHERI_PERM_CHERIABI_VMMAP;
+		arena_perms = cheri_getperm(arena);
+		if ((arena_perms & reqperms) != reqperms)
+			return EPERM;
+
+		base = cheri_getbase(arena);
+		size = cheri_getlen(arena);
+
+		cres = vm_caprevoke_shadow_cap(sel, base, size, 0);
+
+		}
+		break;
+
+	case CAPREVOKE_SHADOW_INFO_STRUCT: {
+		/* Anyone's allowed to ask, I guess; ->arena ignored. */
+		cres = vm_caprevoke_shadow_cap(sel, 0, 0, 0);
+
+		break;
+	}
+	default:
+		return EINVAL;
+	}
+	
+	error = copyoutcap(&cres, shadow, sizeof(cres));
+
+	return error;
 }
 
 int
