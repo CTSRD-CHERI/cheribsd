@@ -67,7 +67,6 @@ _CHERI_CPP=		${CPP} ${_CHERI_COMMON_FLAGS}
 
 .if ${WANT_CHERI} == "pure" || ${WANT_CHERI} == "sandbox"
 MIPS_ABI:=	purecap
-_CHERI_COMMON_FLAGS+=	-fpic
 STATIC_CFLAGS+=	-ftls-model=local-exec
 
 .ifdef NO_WERROR
