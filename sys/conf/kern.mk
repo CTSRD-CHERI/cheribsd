@@ -265,6 +265,18 @@ CFLAGS+= -ftrivial-auto-var-init=pattern
 CFLAGS+=	-gdwarf-2
 .endif
 
+#
+# CHERI purecap kernel flags
+#
+.if ${MACHINE_ABI:Mpurecap}
+
+.if defined(CHERI_SUBOBJECT_BOUNDS_STATS)
+CHERI_SUBOBJECT_BOUNDS_STATS_FILE?=kernel-subobject-bounds-stats.csv
+CFLAGS+=	-mllvm -collect-csetbounds-stats=csv \
+	-Xclang -cheri-stats-file="${CHERI_SUBOBJECT_BOUNDS_STATS_FILE}"
+.endif
+.endif
+
 CFLAGS+= ${CWARNFLAGS:M*} ${CWARNFLAGS.${.IMPSRC:T}}
 CFLAGS+= ${CWARNFLAGS.${COMPILER_TYPE}}
 CFLAGS+= ${CFLAGS.${COMPILER_TYPE}} ${CFLAGS.${.IMPSRC:T}}
