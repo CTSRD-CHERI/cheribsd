@@ -1679,7 +1679,7 @@ startup_alloc(uma_zone_t zone, vm_size_t bytes, int domain, uint8_t *pflag,
 	if ((wait & M_ZERO) != 0)
 		bzero(mem, pages * PAGE_SIZE);
 
-	return (cheri_bound(mem, bytes));
+	return (cheri_setbounds(mem, bytes));
 }
 
 static void
@@ -1858,7 +1858,7 @@ noobj_alloc(uma_zone_t zone, vm_size_t bytes, int domain, uint8_t *flags,
 	}
 
 	CHERI_VM_ASSERT_VALID(retkva);
-	return (cheri_bound((void *)retkva, bytes));
+	return (cheri_setbounds((void *)retkva, bytes));
 }
 
 /*
@@ -4025,7 +4025,7 @@ zone_alloc_item(uma_zone_t zone, void *udata, int domain, int flags)
 
 	if (zone->uz_import(zone->uz_arg, &item, 1, domain, flags) != 1)
 		goto fail_cnt;
-	item = cheri_bound(item, zone->uz_size);
+	item = cheri_setbounds(item, zone->uz_size);
 
 	/*
 	 * We have to call both the zone's init (not the keg's init)
