@@ -68,7 +68,6 @@ _CHERI_CPP=		${CPP} ${_CHERI_COMMON_FLAGS}
 .if ${WANT_CHERI} == "pure" || ${WANT_CHERI} == "sandbox"
 MIPS_ABI:=	purecap
 _CHERI_COMMON_FLAGS+=	-fpic
-ROOTOBJDIR=	${OBJTOP}/obj-libcheri
 STATIC_CFLAGS+=	-ftls-model=local-exec
 
 .ifdef NO_WERROR
@@ -77,9 +76,6 @@ STATIC_CFLAGS+=	-ftls-model=local-exec
 CFLAGS+=-Werror=implicit-function-declaration
 .endif
 LDFLAGS+=	-Wl,-melf64btsmip_cheri_fbsd
-.if defined(__BSD_PROG_MK)
-_LIB_OBJTOP=	${ROOTOBJDIR}
-.endif
 .else
 STATIC_CFLAGS+= -ftls-model=local-exec # MIPS/hybrid case
 .endif
