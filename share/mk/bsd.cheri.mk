@@ -68,12 +68,6 @@ _CHERI_CPP=		${CPP} ${_CHERI_COMMON_FLAGS}
 .if ${WANT_CHERI} == "pure" || ${WANT_CHERI} == "sandbox"
 MIPS_ABI:=	purecap
 _CHERI_COMMON_FLAGS+=	-fpic
-# Don't override libdir for tests since that causes the dlopen tests to fail
-.if !defined(LIBDIR) || ${LIBDIR:S/^${TESTSBASE}//} == ${LIBDIR}
-LIBDIR_BASE:=	/usr/libcheri
-.else
-.info "Not overriding LIBDIR for CHERI since ${.CURDIR} is a test library"
-.endif
 ROOTOBJDIR=	${OBJTOP}/obj-libcheri
 STATIC_CFLAGS+=	-ftls-model=local-exec
 
