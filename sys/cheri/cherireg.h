@@ -41,6 +41,8 @@
 #ifndef __SYS_CHERIREG_H__
 #define	__SYS_CHERIREG_H__
 
+#if __has_feature(capabilities)
+
 #include <machine/cherireg.h>
 
 /* Machine-independent capability field values. */
@@ -120,15 +122,24 @@
 #define	CHERI_OTYPE_UNSEALED	(-1l)
 #define	CHERI_OTYPE_SENTRY	(-2l)
 
-#if __has_feature(capabilities)
 #define	CHERI_REPRESENTABLE_LENGTH(len) \
 	__builtin_cheri_round_representable_length(len)
 #define	CHERI_REPRESENTABLE_ALIGNMENT_MASK(len) \
 	__builtin_cheri_representable_alignment_mask(len)
-#else
+
+/*
+ * TODO: avoid using these since count leading/trailing zeroes is expensive on
+ * BERI/CHERI
+ */
+#define	CHERI_ALIGN_SHIFT(l)	\
+	__builtin_ctzll(CHERI_REPRESENTABLE_ALIGNMENT_MASK(l))
+#define	CHERI_SEAL_ALIGN_SHIFT(l)	\
+	__builtin_ctzll(CHERI_SEALABLE_ALIGNMENT_MASK(l))
+
+#else /* !__has_feature(capabilities) */
 #define	CHERI_REPRESENTABLE_LENGTH(len) (len)
 #define	CHERI_REPRESENTABLE_ALIGNMENT_MASK(len) UINT64_MAX
-#endif
+#endif /* !__has_feature(capabilities) */
 
 /* Provide macros to make it easier to work with the raw CRAM/CRRL results: */
 #define	CHERI_REPRESENTABLE_ALIGNMENT(len) \
@@ -152,14 +163,5 @@
 /* A mask for the lower bits, i.e. the negated alignment mask */
 #define	CHERI_SEAL_ALIGN_MASK(l)	~(CHERI_SEALABLE_ALIGNMENT_MASK(l))
 #define	CHERI_ALIGN_MASK(l)		~(CHERI_REPRESENTABLE_ALIGNMENT_MASK(l))
-
-/*
- * TODO: avoid using these since count leading/trailing zeroes is expensive on
- * BERI/CHERI
- */
-#define	CHERI_ALIGN_SHIFT(l)	\
-	__builtin_ctzll(CHERI_REPRESENTABLE_ALIGNMENT_MASK(l))
-#define	CHERI_SEAL_ALIGN_SHIFT(l)	\
-	__builtin_ctzll(CHERI_SEALABLE_ALIGNMENT_MASK(l))
 
 #endif /* !__SYS_CHERIREG_H__ */
