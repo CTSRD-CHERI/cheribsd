@@ -46,6 +46,37 @@ struct vm_map;
 struct vm_page;
 struct vmspace;
 
+/***************************** REVOCATION ITSELF *****************************/
+
+/* sys/cheri/cheri_otype.c */
+uintcap_t cheri_revoke_sealed(uintcap_t);
+
+/*
+ * The revoked image of a capability is a *tagged* quantity with zero
+ * permissions.
+ *
+ * If the input is sealed, the revoked image is, at present, the unsealed,
+ * zero-permission variant, so that software that uses sealing types for
+ * tokens will notice the type mismatch and architectural usage will fail.
+ * This is almost certainly a sufficiently subtle point that this is not
+ * entirely the right answer, though I hope it's not entirely wrong, either.
+ */
+static __always_inline inline uintcap_t
+cheri_revoke_cap(uintcap_t c)
+{
+#ifndef CHERI_CAPREVOKE_CLEARTAGS
+	if (__builtin_expect(cheri_gettype(c) == -1, 1)) {
+		return cheri_andperm(c, 0);
+	}
+	return cheri_revoke_sealed(c);
+#else
+	/* No need to handle sealed things specially */
+	return cheri_cleartag(c);
+
+	/* TODO: Also replace-with-NULL */
+#endif
+}
+
 /***************************** KERNEL MI LAYER ******************************/
 
 struct vm_caprevoke_cookie {
