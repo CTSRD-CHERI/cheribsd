@@ -342,7 +342,7 @@ CFLAGS+=	-Werror=implicit-function-declaration
 # Turn off deprecated warnings
 # XXXBD: is this still needed?
 CFLAGS+=	-Wno-deprecated-declarations
-CFLAGS+=	-cheri=128
+CFLAGS+=	-cheri
 LDFLAGS+=	-fuse-ld=lld
 LDFLAGS+=	-Wl,-preemptible-caprelocs=elf
 CFLAGS+=	-Qunused-arguments
