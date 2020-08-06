@@ -50,17 +50,6 @@ NEED_CHERI=	pure
 WANT_CHERI:= ${NEED_CHERI}
 .endif
 
-.if ${MK_CHERI} != "no" && (!defined(WANT_CHERI) || ${WANT_CHERI} == "none")
-# When building MIPS code for CHERI ensure 16/32 byte stack alignment
-# for libraries because it could also be used by hybrid code
-# TODO: should be only for libraries and not programs
-.if ${COMPILER_TYPE} == "clang"
-# GCC doesn't support -mstack-alignment but I think it has been patched
-# to use 32 bytes anyway
-CFLAGS+=	-mstack-alignment=16
-.endif # $COMPILER_TYPE == clang
-.endif # MIPS, not hybrid (adjust stack alignment)
-
 .if ${MK_CHERI} != "no" && defined(WANT_CHERI) && ${WANT_CHERI} != "none"
 _CHERI_COMMON_FLAGS=	-integrated-as --target=mips64-unknown-freebsd \
 			-msoft-float \
