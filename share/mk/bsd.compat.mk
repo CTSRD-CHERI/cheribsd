@@ -158,6 +158,8 @@ LIB64_MACHINE_ABI=	${MACHINE_ABI:Npurecap}
 HAS_COMPAT+=CHERI
 LIBCHERICPUFLAGS=  -target mips64-unknown-freebsd13.0 -cheri -mabi=purecap
 LIBCHERICPUFLAGS+=	-fpic
+LIBCHERICPUFLAGS+=	-Qunused-arguments
+LIBCHERICPUFLAGS+=	-Werror=cheri-bitwise-operations
 LIBCHERI_MACHINE=	mips
 LIBCHERI_MACHINE_ARCH=	mips64c128
 LIBCHERILDFLAGS=	-fuse-ld=lld

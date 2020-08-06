@@ -83,11 +83,6 @@ CFLAGS+=	${CHERI_OPTIMIZATION_FLAGS:U-O2}
 # TODO: remove this once I've debugged the root cause
 LDFLAGS+=	-Wl,-z,norelro
 
-# XXX: Needed as Clang rejects -mllvm -cheri128 when using $CC to link:
-# warning: argument unused during compilation: '-cheri=128'
-_CHERI_CFLAGS+=	-Qunused-arguments
-_CHERI_CFLAGS+=	-Werror=cheri-bitwise-operations
-
 .if ${WANT_CHERI} == "sandbox"
 # Force position-dependent sandboxes; PIEs aren't supported
 NO_SHARED=	yes
@@ -95,8 +90,6 @@ NO_SHARED=	yes
 CC:=	${_CHERI_CC}
 CXX:=   ${_CHERI_CXX}
 CPP:=	${_CHERI_CPP}
-CFLAGS+=	${_CHERI_CFLAGS}
-CXXFLAGS+=	${_CHERI_CFLAGS}
 # Don't remove CHERI symbols from the symbol table
 STRIP_FLAGS+=	-w --keep-symbol=__cheri_callee_method.\* \
 		--keep-symbol=__cheri_method.\*
