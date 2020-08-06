@@ -1,0 +1,6 @@
+#NO_UNIVERSE
+
+include "CHERI-PURECAP-FETT"
+include "std.NODEBUG"
+
+ident CHERI-PURECAP-FETT-NODEBUG
