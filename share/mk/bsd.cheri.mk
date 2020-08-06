@@ -79,7 +79,6 @@ STATIC_CFLAGS+= -ftls-model=local-exec # MIPS/hybrid case
 .endif
 
 CFLAGS+=	${CHERI_OPTIMIZATION_FLAGS:U-O2}
-LDFLAGS+=	-Wl,-preemptible-caprelocs=elf
 # Work around cheri-unknown-freebsd-ld.lld: error: section: .init_array is not contiguous with other relro sections
 # TODO: remove this once I've debugged the root cause
 LDFLAGS+=	-Wl,-z,norelro
