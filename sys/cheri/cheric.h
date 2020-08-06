@@ -196,7 +196,7 @@ cheri_is_subset(const void * __capability parent, const void * __capability ptr)
 
 #define cheri_ptr(ptr, len)	\
 	cheri_setbounds(    \
-	    (__cheri_tocap __typeof__((ptr)[0]) *__capability)ptr, len)
+	    (__cheri_tocap __typeof__(&*(ptr)) __capability)ptr, len)
 
 #define cheri_ptrperm(ptr, len, perm)	\
 	cheri_andperm(cheri_ptr(ptr, len), perm | CHERI_PERM_GLOBAL)
