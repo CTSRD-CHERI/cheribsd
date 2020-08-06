@@ -762,8 +762,7 @@ start_init(void *dummy)
 	free_init_path = tmp_init_path = strdup(init_path, M_TEMP);
 
 	while ((path = strsep(&tmp_init_path, ":")) != NULL) {
-		if (bootverbose)
-			printf("start_init: trying %s\n", path);
+		printf("start_init: trying %s\n", path);
 
 		memset(&args, 0, sizeof(args));
 		error = exec_alloc_args(&args);
