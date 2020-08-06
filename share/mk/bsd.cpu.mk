@@ -331,7 +331,6 @@ MIPS_ABI?=	n32
 MIPS_ABI?=	32
 . endif
 .if ${MACHINE_ARCH:Mmips*c*}
-CFLAGS+=	-integrated-as
 CFLAGS+=	-fpic
 STATIC_CFLAGS+=	-ftls-model=local-exec
 .ifdef NO_WERROR
