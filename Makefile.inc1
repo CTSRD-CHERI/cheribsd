@@ -2385,6 +2385,7 @@ _yacc=		usr.bin/yacc
 _gensnmptree=	usr.sbin/bsnmpd/gensnmptree
 .endif
 
+
 # We need to build tblgen when we're building clang or lld, either as
 # bootstrap tools, or as the part of the normal build.
 .if ${MK_CLANG_BOOTSTRAP} != "no" || ${MK_CLANG} != "no" || \
