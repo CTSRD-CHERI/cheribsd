@@ -564,14 +564,24 @@ exec_setregs(struct thread *td, struct image_params *imgp, uintcap_t stack)
 
 	memset(tf, 0, sizeof(struct trapframe));
 
-	tf->tf_x[0] = stack;
-	tf->tf_sp = STACKALIGN(stack);
-	tf->tf_lr = imgp->entry_addr;
 #if __has_feature(capabilities)
-	hybridabi_thread_setregs(td, imgp->entry_addr);
-#else
-	tf->tf_elr = imgp->entry_addr;
+	if (SV_PROC_FLAG(td->td_proc, SV_CHERI)) {
+		tf->tf_x[0] = (uintcap_t)imgp->auxv;
+		tf->tf_sp = stack;
+		tf->tf_lr = (uintcap_t)cheri_exec_pcc(td, imgp);
+		trapframe_set_elr(tf, tf->tf_lr);
+	} else
 #endif
+	{
+		tf->tf_x[0] = (register_t)stack;
+		tf->tf_sp = STACKALIGN((register_t)stack);
+		tf->tf_lr = imgp->entry_addr;
+#if __has_feature(capabilities)
+		hybridabi_thread_setregs(td, imgp->entry_addr);
+#else
+		tf->tf_elr = imgp->entry_addr;
+#endif
+	}
 
 	td->td_pcb->pcb_tpidr_el0 = 0;
 	td->td_pcb->pcb_tpidrro_el0 = 0;
