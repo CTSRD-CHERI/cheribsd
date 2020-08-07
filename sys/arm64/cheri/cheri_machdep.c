@@ -1,10 +1,12 @@
 /*-
- * Copyright (c) 2016 Andrew Turner
- * All rights reserved.
+ * SPDX-License-Identifier: BSD-2-Clause
+ *
+ * Copyright (c) 2020 John Baldwin
  *
  * This software was developed by SRI International and the University of
- * Cambridge Computer Laboratory under DARPA/AFRL contract FA8750-10-C-0237
- * ("CTSRD"), as part of the DARPA CRASH research programme.
+ * Cambridge Computer Laboratory (Department of Computer Science and
+ * Technology) under DARPA contract HR0011-18-C-0016 ("ECATS"), as part of the
+ * DARPA SSITH research programme.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -26,21 +28,32 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
-#ifndef _MACHINE_CHERI_H_
-#define _MACHINE_CHERI_H_
+#include <sys/param.h>
+#include <sys/kernel.h>
+#include <sys/proc.h>
 
-#ifdef _KERNEL
-#define	__USER_DDC	((void * __capability)curthread->td_frame->tf_ddc)
-#define	__USER_PCC	((void * __capability)curthread->td_frame->tf_elr)
+#include <cheri/cheri.h>
+#include <cheri/cheric.h>
 
-/*
- * Morello specific kernel utility functions.
- */
-void	hybridabi_thread_setregs(struct thread *td, unsigned long entry_addr);
-#endif
+#include <machine/frame.h>
+#include <machine/vmparam.h>
 
-#endif /* _MACHINE_CHERI_H_ */
+void
+hybridabi_thread_setregs(struct thread *td, unsigned long entry_addr)
+{
+	struct trapframe *tf;
+
+	tf = td->td_frame;
+
+	/* Set DDC to full user privilege. */
+	tf->tf_ddc = (uintcap_t)cheri_capability_build_user_data(
+	    CHERI_CAP_USER_DATA_PERMS, CHERI_CAP_USER_DATA_BASE,
+	    CHERI_CAP_USER_DATA_LENGTH, CHERI_CAP_USER_DATA_OFFSET);
+
+	/* Use 'entry_addr' as offset of PCC. */
+	trapframe_set_elr(tf, (uintcap_t)cheri_capability_build_user_code(
+	    td, CHERI_CAP_USER_CODE_PERMS, CHERI_CAP_USER_CODE_BASE,
+	    CHERI_CAP_USER_CODE_LENGTH, entry_addr));
+}
