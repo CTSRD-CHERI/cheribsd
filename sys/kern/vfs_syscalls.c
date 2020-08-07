@@ -1913,7 +1913,7 @@ restart:
 	if (vp->v_type == VDIR && oldinum == 0) {
 		error = EPERM;		/* POSIX */
 	} else if (oldinum != 0 &&
-		  ((error = vn_stat(vp, &sb, td->td_ucred, NOCRED, td)) == 0) &&
+		  ((error = VOP_STAT(vp, &sb, td->td_ucred, NOCRED, td)) == 0) &&
 		  sb.st_ino != oldinum) {
 		error = EIDRM;	/* Identifier removed */
 	} else if (fp != NULL && fp->f_vnode != vp) {
@@ -2435,7 +2435,7 @@ kern_statat(struct thread *td, int flag, int fd, const char * __capability path,
 
 	if ((error = namei(&nd)) != 0)
 		return (error);
-	error = vn_stat(nd.ni_vp, sbp, td->td_ucred, NOCRED, td);
+	error = VOP_STAT(nd.ni_vp, sbp, td->td_ucred, NOCRED, td);
 	if (error == 0) {
 		SDT_PROBE2(vfs, , stat, mode, path, sbp->st_mode);
 		if (S_ISREG(sbp->st_mode))
@@ -4667,7 +4667,7 @@ kern_fhstat(struct thread *td, struct fhandle fh, struct stat *sb)
 	vfs_unbusy(mp);
 	if (error != 0)
 		return (error);
-	error = vn_stat(vp, sb, td->td_ucred, NOCRED, td);
+	error = VOP_STAT(vp, sb, td->td_ucred, NOCRED, td);
 	vput(vp);
 	return (error);
 }
