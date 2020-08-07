@@ -493,10 +493,27 @@ exec_setregs(struct thread *td, struct image_params *imgp, uintcap_t stack)
 
 	memset(tf, 0, sizeof(struct trapframe));
 
-	tf->tf_x[0] = stack;
-	tf->tf_sp = STACKALIGN(stack);
-	tf->tf_lr = imgp->entry_addr;
-	tf->tf_elr = imgp->entry_addr;
+
+#if __has_feature(capabilities)
+	if (SV_PROC_FLAG(td->td_proc, SV_CHERI)) {
+		tf->tf_x[0] = (uintcap_t)cheri_auxv_capability(imgp, stack);
+		tf->tf_sp = (uintcap_t)cheri_exec_stack_pointer(imgp, stack);
+		tf->tf_lr = cheri_clear_low_ptr_bits(imgp->entry_addr, 1);
+		tf->tf_elr = cheri_clear_low_ptr_bits(imgp->entry_addr, 1);
+		tf->tf_spsr |= PSR_C64;
+	} else
+#endif
+	{
+		tf->tf_x[0] = stack;
+		tf->tf_sp = STACKALIGN(stack);
+#if __has_feature(capabilities)
+		hybridabi_thread_setregs(td, imgp->entry_addr);
+#else
+		tf->tf_elr = imgp->entry_addr;
+#endif
+		tf->tf_lr = tf->tf_lr;
+		tf->tf_spsr &= ~PSR_C64;
+	}
 }
 
 /* Sanity check these are the same size, they will be memcpy'd to and fro */
@@ -762,6 +779,9 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	struct sigframe * __capability fp, frame;
 	struct sigacts *psp;
 	struct sysentvec *sysent;
+#if __has_feature(capabilities)
+	int cheri_is_sandboxed;
+#endif
 	int onstack, sig;
 
 	td = curthread;
@@ -774,6 +794,53 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 
 	tf = td->td_frame;
 	onstack = sigonstack(tf->tf_sp);
+
+#if __has_feature(capabilities)
+	/*
+	 * CHERI affects signal delivery in the following ways:
+	 *
+	 * (1) Additional capability state is exposed via extensions
+	 *     to the context frame placed on the stack.
+	 *
+	 * (2) If the user $pcc doesn't include CHERI_PERM_SYSCALL,
+	 *     then we consider user state to be 'sandboxed'.
+	 *
+	 * (3) If an alternative signal stack is not defined, and we
+	 *     are in a 'sandboxed' state, then we will terminate the
+	 *     process unconditionally.
+	 */
+	cheri_is_sandboxed = cheri_signal_sandboxed(td);
+
+	/*
+	 * We provide the ability to drop into the debugger in two different
+	 * circumstances: (1) if the code running is sandboxed; and (2) if the
+	 * fault is a CHERI protection fault.  Handle both here for the
+	 * non-unwind case.  Do this before we rewrite any general-purpose or
+	 * capability register state for the thread.
+	 */
+#ifdef DDB
+	if (cheri_is_sandboxed && security_cheri_debugger_on_sandbox_signal)
+		kdb_enter(KDB_WHY_CHERI, "Signal delivery to CHERI sandbox");
+	else if (sig == SIGPROT && security_cheri_debugger_on_sigprot)
+		kdb_enter(KDB_WHY_CHERI,
+		    "SIGPROT delivered outside sandbox");
+#endif
+
+	/*
+	 * If a thread is running sandboxed, we can't rely on $sp which may
+	 * not point at a valid stack in the ambient context, or even be
+	 * maliciously manipulated.  We must therefore always use the
+	 * alternative stack.  We are also therefore unable to tell whether we
+	 * are on the alternative stack, so must clear 'oonstack' here.
+	 *
+	 * XXXRW: This requires significant further thinking; however, the net
+	 * upshot is that it is not a good idea to do an object-capability
+	 * invoke() from a signal handler, as with so many other things in
+	 * life.
+	 */
+	if (cheri_is_sandboxed != 0)
+		onstack = 0;
+#endif
 
 	CTR4(KTR_SIG, "sendsig: td=%p (%s) catcher=%p sig=%d", td, p->p_comm,
 	    catcher, sig);

@@ -194,11 +194,20 @@ cpu_set_upcall(struct thread *td, void (* __capability entry)(void *),
 	struct trapframe *tf = td->td_frame;
 
 	/* 32bits processes use r13 for sp */
-	if (td->td_frame->tf_spsr & PSR_M_32)
+	if (td->td_frame->tf_spsr & PSR_M_32) {
 		tf->tf_x[13] = STACKALIGN((uintcap_t)stack->ss_sp + stack->ss_size);
-	else
+		tf->tf_elr = (uintcap_t)entry;
+	}
+#if __has_feature(capabilities)
+	else if (SV_PROC_FLAG(td->td_proc, SV_CHERI) == 0) {
 		tf->tf_sp = STACKALIGN((uintcap_t)stack->ss_sp + stack->ss_size);
-	tf->tf_elr = (uintcap_t)entry;
+		hybridabi_thread_setregs(td, (__cheri_addr unsigned long)entry);
+	}
+#endif
+	else {
+		tf->tf_sp = STACKALIGN((uintcap_t)stack->ss_sp + stack->ss_size);
+		tf->tf_elr = (uintcap_t)entry;
+	}
 	tf->tf_x[0] = (uintcap_t)arg;
 }
 
