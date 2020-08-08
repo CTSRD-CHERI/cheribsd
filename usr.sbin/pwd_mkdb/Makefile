@@ -10,7 +10,7 @@ SRCS=	pw_scan.c pwd_mkdb.c
 
 CFLAGS+= -I${SRCTOP}/lib/libc/gen		# for pw_scan.h
 .if defined(BOOTSTRAPPING)
-CFLAGS+=-I${.CURDIR}
+CFLAGS+=-I${.CURDIR}/bootstrap
 .endif
 
 # This is needed to bootstrap on a Linux host:
