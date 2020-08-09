@@ -96,6 +96,8 @@ CRUNCH_LIBS+= -lprocstat -lelf
 
 # needed by ifconfig
 CRUNCH_LIBS+=	-l80211
+CRUNCH_LIBS+=		${OBJTOP}/lib/libifconfig/libifconfig.a
+CRUNCH_BUILDOPTS+=	CRUNCH_CFLAGS+=-I${OBJTOP}/lib/libifconfig
 # needed by fetch:
 CRUNCH_LIBS+= -lfetch
 # devinfo
