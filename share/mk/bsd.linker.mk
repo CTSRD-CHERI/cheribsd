@@ -135,16 +135,12 @@ ${X_}LINKER_FEATURES+=	riscv-relaxations
 .if ${${X_}LINKER_TYPE} == "lld" && ${${X_}LINKER_VERSION} >= 60000
 ${X_}LINKER_FEATURES+=	retpoline
 .endif
-
+.if ${${X_}LINKER_TYPE} == "lld" && ${${X_}LINKER_VERSION} >= 90000
+${X_}LINKER_FEATURES+=	ifunc-noplt
+.endif
 .if ${${X_}LINKER_TYPE} == "lld" && ${${X_}LINKER_VERSION} >= 100000
 # If we are using lld 10.0 or newer we can use -Wl,--gdb-index without crashing
 ${X_}LINKER_FEATURES+=	gdb-index
-.endif
-# Upstream lld does not have support for ifunc-noplt so check the FreeBSD
-# version to check if the flag is supported.
-# TODO: what is the correct version number to check for?
-.if !empty(${X_}LINKER_FREEBSD_VERSION) && ${${X_}LINKER_FREEBSD_VERSION:S/-/ /:[2]} >= 1300000
-${X_}LINKER_FEATURES+=	ifunc-noplt
 .endif
 .endif
 .else

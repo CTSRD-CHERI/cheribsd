@@ -161,14 +161,13 @@ LDFLAGS+=	--build-id=sha1
     defined(LINKER_FEATURES) && ${LINKER_FEATURES:Mifunc} == ""
 .error amd64/arm64/i386/ppc* kernel requires linker ifunc support
 .endif
-
 .if ${MACHINE_CPUARCH} == "amd64"
 LDFLAGS+=	-z max-page-size=2097152
 .if ${LINKER_TYPE} != "lld"
 LDFLAGS+=	-z common-page-size=4096
 .else
-.if defined(LINKER_FEATURES) && ${LINKER_FEATURES:Mifunc-noplt} == ""
-.warning "linker ${LD} does not support -z ifunc-noplt. Kernel will be slower!"
+.if defined(LINKER_FEATURES) && !${LINKER_FEATURES:Mifunc-noplt}
+.warning "Linker ${LD} does not support -z ifunc-noplt -> ifunc calls are unoptimized."
 .else
 LDFLAGS+=	-z notext -z ifunc-noplt
 .endif
