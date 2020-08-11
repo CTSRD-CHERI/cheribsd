@@ -24,19 +24,14 @@
 # Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 set -e
 
-BSDECHO=-e
+printf "%s" "
+/*
+ * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
 
-echo ${BSDECHO} "\
-/*\n\
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.\n\
- * Use is subject to license terms.\n\
- */\n\
-\n\
-#pragma ident\t\"%Z%%M%\t%I%\t%E% SMI\"\n\
-\n\
 #include <dt_errtags.h>
 
 static const char *const _dt_errtags[] = {
