@@ -34,7 +34,7 @@
 #include <sys/cdefs.h>
 #include <sys/types.h>
 
-#if __has_feature(capabilities) || defined(__CHERI__)
+#if __has_feature(capabilities)
 #include <cheri/cherireg.h>	/* Permission definitions. */
 
 /*
@@ -221,7 +221,7 @@ cheri_bytes_remaining(const void * __capability cap)
 
 #define CHERI_FPRINT_PTR(f, ptr)					\
 	fprintf(f, _CHERI_PRINT_PTR_FMT(ptr))
-#endif
+#endif	/* __has_feature(capabilities) */
 
 /*
  * The cheri_{get,set,clear}_low_pointer_bits() functions work both with and
