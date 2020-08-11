@@ -237,6 +237,7 @@ SYSINCS+=	${SRCTOP}/sys/sys/elf32.h
 SYSINCS+=	${SRCTOP}/sys/sys/elf64.h
 SYSINCS+=	${SRCTOP}/sys/sys/elf_common.h
 SYSINCS+=	${SRCTOP}/sys/sys/elf_generic.h
+
 SYSINCS+=	${SRCTOP}/sys/sys/queue.h
 SYSINCS+=	${SRCTOP}/sys/sys/md5.h
 SYSINCS+=	${SRCTOP}/sys/sys/sbuf.h
@@ -246,7 +247,8 @@ SYSINCS+=	${SRCTOP}/sys/sys/tree.h
 SYSINCS+=	${SRCTOP}/sys/sys/consio.h
 # for gencat:
 INCS+=	${SRCTOP}/include/nl_types.h
-# for vtfontcvt:
+
+# vtfontcvt is using sys/font.h
 SYSINCS+=	${SRCTOP}/sys/sys/font.h
 SYSINCS+=	${SRCTOP}/sys/sys/fnv_hash.h
 # opensolaris compatibility
