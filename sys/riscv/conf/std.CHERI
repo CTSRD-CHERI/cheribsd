@@ -4,3 +4,7 @@ options 	COMPAT_FREEBSD64
 
 # DTrace doesn't work with CHERI yet
 nooptions 	KDTRACE_HOOKS		# Kernel DTrace hooks
+
+options		CHERI_CAPREVOKE
+options		CHERI_CAPREVOKE_STATS
+options		CHERI_CAPREVOKE_FAST_COPYIN
