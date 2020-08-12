@@ -78,8 +78,6 @@ CFLAGS+=-Werror=implicit-function-declaration
 STATIC_CFLAGS+= -ftls-model=local-exec # MIPS/hybrid case
 .endif
 
-CFLAGS+=	${CHERI_OPTIMIZATION_FLAGS:U-O2}
-
 .if ${WANT_CHERI} == "sandbox"
 # Force position-dependent sandboxes; PIEs aren't supported
 NO_SHARED=	yes
