@@ -262,10 +262,27 @@ caprev_shadow_nomap_set_len(uint64_t * __capability sb,
        "t0", "t1", "memory"
   );
 #elif defined(__riscv)
-#  error WIP
 
   __asm__ __volatile__ (
-      ""
+      "1:\n\t"
+      "clr.d t0, (%[fw])\n\t"		// Load reserve first word
+
+      "and t1, t0, %[fwm]\n\t"		// Jump out if shadow set
+      "bne x0, t1, 2f\n\t"
+
+      "cgettag t1, %[obj]\n\t"		// Jump out if object degatted
+      "beq x0, t1, 2f\n\t"
+
+      "cgetperm t1, %[obj]\n\t"		// Jump out if zero perms
+      "beq x0, t1, 2f\n\t"
+
+      "or t0, t0, %[fwm]\n\t"		// bitwise or in the mask
+
+      "csc.d %[asmres], t0, (%[fw])\n\t"	// SC the updated mask
+      "bne x0, %[asmres], 2f\n\t"
+      "j 1b\n\t"
+
+      "2:\n\t"
     : // outputs
       [asmres] "+r" (asmres)
     : // inputs
