@@ -666,6 +666,8 @@ get_cyclecount()
 {
 #if defined(__mips__)
 	return cheri_get_cyclecount();
+#elif defined(__riscv)
+	return __builtin_readcyclecounter();
 #else
 	return 0;
 #endif
