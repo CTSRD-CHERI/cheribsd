@@ -732,6 +732,10 @@ get_cyclecount()
 {
 #if defined(__mips__)
 	return cheri_get_cyclecount();
+#elif defined(__riscv)
+	uint64_t res;
+	__asm __volatile("csrr %0, cycle" : "=r"(res));
+	return res;
 #else
 	return 0;
 #endif
