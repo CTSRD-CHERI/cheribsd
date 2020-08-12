@@ -3384,6 +3384,73 @@ pmap_enter_quick_locked(pmap_t pmap, vm_offset_t va, vm_page_t m,
 	return (mpte);
 }
 
+#if __has_feature(capabilities)
+/*
+ * Atomically push all the in-PTE, MD capdirty bits up to the MI layer.
+ *
+ * While this is a fairly long-running operation under the current pmap
+ * lock, it's going to be called only from single-threaded context, so there
+ * should be minimal contention (perhaps from the page daemon or updates to
+ * shared mappings) as no other cores are going to have this pmap active.
+ *
+ * XREF pmap_remove_pages
+ */
+void
+pmap_sync_capdirty(pmap_t pmap)
+{
+	pd_entry_t ptepde;
+	pt_entry_t *pte, tpte;
+	vm_page_t m;
+	pv_entry_t pv;
+	struct pv_chunk *pc, *npc;
+	int64_t bit;
+	uint64_t inuse, bitmask;
+	int field, idx;
+
+	PMAP_LOCK(pmap);
+
+	TAILQ_FOREACH_SAFE(pc, &pmap->pm_pvchunk, pc_list, npc) {
+		for (field = 0; field < _NPCM; field++) {
+			inuse = ~pc->pc_map[field] & pc_freemask[field];
+			while (inuse != 0) {
+				bit = ffsl(inuse) - 1;
+				bitmask = 1UL << bit;
+				idx = field * 64 + bit;
+				pv = &pc->pc_pventry[idx];
+				inuse &= ~bitmask;
+
+				pte = pmap_l1(pmap, pv->pv_va);
+				ptepde = pmap_load(pte);
+				pte = pmap_l1_to_l2(pte, pv->pv_va);
+				tpte = pmap_load(pte);
+				if ((tpte & PTE_RWX) == 0) {
+					ptepde = tpte;
+					pte = pmap_l2_to_l3(pte, pv->pv_va);
+					tpte = pmap_load(pte);
+				}
+
+				if ((tpte & PTE_SW_MANAGED) == 0)
+					continue;
+
+				if ((tpte & PTE_CD) != 0) {
+					m = PHYS_TO_VM_PAGE(PTE_TO_PHYS(tpte));
+					KASSERT(m != NULL,
+					  ("pmap_sync_capdirty: bad tpte %#jx",
+					   (uintmax_t)(tpte)));
+
+					vm_page_capdirty(m);
+					pmap_clear_bits(pte, PTE_CD);
+				}
+			}
+		}
+	}
+
+	pmap_invalidate_all(pmap);
+
+	PMAP_UNLOCK(pmap);
+}
+#endif
+
 /*
  * This code maps large physical mmap regions into the
  * processor address space.  Note that some shortcuts
