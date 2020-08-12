@@ -113,6 +113,8 @@ caprevoke_just(struct thread *td, struct vm_caprevoke_cookie *vmcrc,
 		uintcap_t sp;
 #if defined(__mips__)
 		sp = (uintcap_t)td->td_frame->csp;
+#elif defined(__riscv)
+		sp = td->td_frame->tf_sp;
 #else
 #error "Can't get stack frame on this architecture"
 #endif
