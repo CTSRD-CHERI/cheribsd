@@ -181,6 +181,31 @@ typedef struct {
 #define UTRACE(a, b, c)
 #endif
 
+/* -------------------------- Compiler features ----------------------------- */
+
+
+#ifndef __CHERI_PURE_CAPABILITY__
+/* These replacements for alignment builtins are not meant for CHERI purecap
+ * due to the potential trouble of recasting to a pointer type. */
+
+#if !__has_builtin(__builtin_align_down)
+#define __builtin_align_down(p, a)   (((a) & ((a) - 1)) == 0 ? \
+   (__typeof(p))((uintptr_t)(p) & ~((a) - 1)) :                           \
+   (__typeof(p))((uintptr_t)(p) - (uintptr_t)(p) % (a)))
+#endif   /* !__has_builtin(__builtin_align_down) */
+
+#if !__has_builtin(__builtin_align_up)
+#define __builtin_align_up(p, a)   \
+   __builtin_align_down((__typeof(p))((uintptr_t)(p) + (a) - 1), a)
+#endif   /* !__has_builtin(__builtin_align_up) */
+
+#if !__has_builtin(__builtin_is_aligned)
+#define __builtin_is_aligned(p, a)   ((((a) & ((a) - 1)) == 0 ? \
+    (uintptr_t)(p) & ((a) - 1) : (uintptr_t)(p) % (a)) == 0)
+#endif   /* !__has_builtin(__builtin_is_aligned) */
+
+#endif   /* !__CHERI_PURE_CAPABILITY__ */
+
 /* ------------------- size_t and alignment properties -------------------- */
 
 /* The byte and bit size of a size_t */
@@ -225,7 +250,6 @@ typedef struct {
 #if HAVE_MMAP
 
 #define MUNMAP_DEFAULT(a, s)  munmap((a), (s))
-#define MUNMAP_SHADOW(a, s)  munmap((void*)((size_t)(a)>>MALLOC_ALIGN_BITSHIFT), (s)>>MALLOC_ALIGN_BITSHIFT)
 #define MMAP_PROT            (PROT_READ|PROT_WRITE)
 
 #if !defined(MAP_ANONYMOUS) && !defined(MAP_ANON)
@@ -237,8 +261,11 @@ typedef struct {
 #define MMAP_FLAGS           (MAP_PRIVATE|MAP_ANONYMOUS|MAP_ALIGNED(PAGE_SHIFT+MALLOC_ALIGN_BITSHIFT))
 #define MMAP_DEFAULT(s)       mmap(0, (s), MMAP_PROT, MMAP_FLAGS, -1, 0)
 
+#if defined(REVOKE) && !defined(__CHERI_PURE_CAPABILITY__)
 #define MMAP_SHADOW_FLAGS    (MAP_PRIVATE|MAP_ANONYMOUS|MAP_32BIT|MAP_FIXED)
 #define MMAP_SHADOW(addr, s)       mmap((void*)((size_t)(addr)>>MALLOC_ALIGN_BITSHIFT), (s)>>MALLOC_ALIGN_BITSHIFT, MMAP_PROT, MMAP_SHADOW_FLAGS, -1, 0)
+#define MUNMAP_SHADOW(a, s)  munmap((void*)((size_t)(a)>>MALLOC_ALIGN_BITSHIFT), (s)>>MALLOC_ALIGN_BITSHIFT)
+#endif   /* defined(REVOKE) && !defined(__CHERI_PURE_CAPABILITY__) */
 
 #define DIRECT_MMAP_DEFAULT(s) MMAP_DEFAULT(s)
 #endif /* HAVE_MMAP */
@@ -1052,6 +1079,7 @@ struct malloc_state {
   binmap_t   smallmap;
   binmap_t   treemap;
   size_t     freebufbytes;
+  size_t     freebufbytes_unmapped; /* freebufbytes - freebufbytes_mapped */
   size_t     freebufsize;
   size_t     dvsize;
   size_t     topsize;
@@ -1330,6 +1358,14 @@ static inline void *unbound_ptr(mstate m, msegmentptr *spp, void *mem)
 }
 #endif
 
+#ifndef __CHERI__
+
+#ifndef MAP_CHERI_NOSETBOUNDS
+#define MAP_CHERI_NOSETBOUNDS   0x0
+#endif /*  MAP_CHERI_NOSETBOUNDS  */
+
+#endif /*  ! __CHERI__  */
+
 /* -------------------------- Debugging setup ---------------------------- */
 
 #if ! DEBUG
@@ -1606,12 +1642,12 @@ static int init_mparams(void) {
 
     /* Sanity-check configuration:
        ints must be at least 4 bytes.
-       alignment must be at least 8.
+       alignment must be at least 32.
        Alignment, min chunk size, and page size must all be powers of 2.
     */
     if ((MAX_SIZE_T < MIN_CHUNK_SIZE)  ||
         (sizeof(int) < 4)  ||
-        (MALLOC_ALIGNMENT < (size_t)8U) ||
+        (MALLOC_ALIGNMENT < (size_t)32U) ||
         ((MALLOC_ALIGNMENT & (MALLOC_ALIGNMENT-SIZE_T_ONE)) != 0) ||
         ((MCHUNK_SIZE      & (MCHUNK_SIZE-SIZE_T_ONE))      != 0) ||
         ((gsize            & (gsize-SIZE_T_ONE))            != 0) ||
@@ -1643,15 +1679,14 @@ static int init_mparams(void) {
     } else
       mparams.min_freebufbytes = DEFAULT_MIN_FREEBUFBYTES;
 
+    mparams.max_freebuf_percent = DEFAULT_FREEBUF_PERCENT;
     if ((valuestr = getenv("MALLOC_MAX_FREEBUF_PERCENT")) != NULL) {
       value = strtol(valuestr, &endp, 0);
-      if (value == 0 && *endp != '\0')
-	value = DEFAULT_FREEBUF_PERCENT;
       if (value < 0)
 	value = MAX_SIZE_T;
-      mparams.max_freebuf_percent = (double)value / 100.0;
-    } else
-      mparams.max_freebuf_percent = DEFAULT_FREEBUF_PERCENT;
+      if (value != 0 || *endp == '\0')
+        mparams.max_freebuf_percent = (double)value / 100.0;
+    }
 
 #if SUPPORT_UNMAP
     if ((valuestr = getenv("MALLOC_UNMAP_THRESHOLD")) != NULL) {
@@ -1729,7 +1764,7 @@ static int change_mparam(int param_number, ssize_t value) {
     /* Values over 100 are all infinity */
     mparams.max_freebuf_percent = val / 100.0;
     return 1;
-#ifdef SUPPORT_UNMAP
+#if SUPPORT_UNMAP
   case M_UNMAP_THRESHOLD:
     mparams.unmap_threshold = value < 0 || value > MAX_UNMAP_THRESHOLD ?
 	MAX_UNMAP_THRESHOLD : (size_t)value;
@@ -2434,11 +2469,11 @@ static void* mmap_alloc(mstate m, size_t nb) {
   if (mmsize > nb) {     /* Check for wrap around 0 */
     char* mm = (char*)(CALL_DIRECT_MMAP(mmsize));
     if (mm != CMFAIL) {
-#ifndef __CHERI_PURE_CAPABILITY__
+#if defined(REVOKE) && !defined(__CHERI_PURE_CAPABILITY__)
       if(MMAP_SHADOW(mm, mmsize) != (void*)((size_t)mm>>MALLOC_ALIGN_BITSHIFT)) {
         ABORT;
       }
-#endif
+#endif   /* defined(REVOKE) && !defined(__CHERI_PURE_CAPABILITY__) */
       size_t offset = align_offset(chunk2mem(mm));
       size_t psize = mmsize - offset - MMAP_FOOT_PAD;
       mchunkptr p = (mchunkptr)(mm + offset);
@@ -2616,7 +2651,9 @@ print_sweep_stats() {
   malloc_printf("Free bytes: %zd.\n", gm->freeBytes);
   malloc_printf("Bits painted: %zd.\n", gm->bitsPainted);
   malloc_printf("Bits cleared: %zd.\n", gm->bitsCleared);
+#if !NO_MALLOC_STATS
   dlmalloc_stats();
+#endif
 }
 #endif // SWEEP_STATS
 
@@ -2660,7 +2697,7 @@ static void* sys_alloc(mstate m, size_t nb) {
 
   if (HAVE_MMAP && tbase == CMFAIL) {  /* Try MMAP */
     char* mp = (char*)(CALL_MMAP(asize));
-#ifndef __CHERI_PURE_CAPABILITY__
+#if defined(REVOKE) && !defined(__CHERI_PURE_CAPABILITY__)
     if(MMAP_SHADOW(mp, asize) != (void*)((size_t)mp>>MALLOC_ALIGN_BITSHIFT)) {
       ABORT;
     }
@@ -2780,7 +2817,7 @@ static size_t release_unused_segments(mstate m) {
           unlink_large_chunk(m, tp);
         }
         if (CALL_MUNMAP(base, size) == 0) {
-#ifndef __CHERI_PURE_CAPABILITY__
+#if defined(REVOKE) && !defined(__CHERI_PURE_CAPABILITY__)
           MUNMAP_SHADOW(base, size);
 #endif
           released += size;
@@ -2828,7 +2865,7 @@ static int sys_trim(mstate m, size_t pad) {
             /* Prefer mremap, fall back to munmap */
             if ((CALL_MREMAP(sp->base, sp->size, newsize, 0) != MFAIL) ||
                 (CALL_MUNMAP(sp->base + newsize, extra) == 0)) {
-#ifndef __CHERI_PURE_CAPABILITY__
+#if defined(REVOKE) && !defined(__CHERI_PURE_CAPABILITY__)
               MUNMAP_SHADOW(sp->base+newsize, extra);
 #endif
               released = extra;
@@ -2868,7 +2905,7 @@ static void dispose_chunk(mstate m, mchunkptr p, size_t psize) {
     if (is_mmapped(p)) {
       psize += prevsize + MMAP_FOOT_PAD;
       if (CALL_MUNMAP((char*)p - prevsize, psize) == 0) {
-#ifndef __CHERI_PURE_CAPABILITY__
+#if defined(REVOKE) && !defined(__CHERI_PURE_CAPABILITY__)
         MUNMAP_SHADOW((char*)p - prevsize, psize);
 #endif
         m->footprint -= psize;
@@ -3241,7 +3278,7 @@ dlfree_internal(void* mem) {
     if (cunmapped(p)) {
       remap_base = __builtin_align_up(chunk2mem(p), mparams.page_size);
       remap_end = __builtin_align_down((char *)p + chunksize(p),
-				       mparams.page_size);
+                                       mparams.page_size);
       ptrdiff_t remap_len = remap_end - remap_base;
       assert(remap_len > 0 && remap_len % mparams.page_size == 0);
 #ifdef VERBOSE
@@ -3251,6 +3288,8 @@ dlfree_internal(void* mem) {
 	       MAP_FIXED | MAP_ANON | MAP_CHERI_NOSETBOUNDS, -1, 0) ==
           MAP_FAILED)
         ABORT;
+      assert(fm->freebufbytes_unmapped >= remap_len);
+      fm->freebufbytes_unmapped -= remap_len;
     }
 #endif /* SUPPORT_UNMAP */
 
@@ -3302,7 +3341,7 @@ dlfree_internal(void* mem) {
           if (is_mmapped(p)) {
             psize += prevsize + MMAP_FOOT_PAD;
             if (CALL_MUNMAP((char*)p - prevsize, psize) == 0) {
-#ifndef __CHERI_PURE_CAPABILITY__
+#if defined(REVOKE) && !defined(__CHERI_PURE_CAPABILITY__)
               MUNMAP_SHADOW((char*)p - prevsize, psize);
 #endif
               fm->footprint -= psize;
@@ -3398,7 +3437,7 @@ dlfree_internal(void* mem) {
 #undef fm
 }
 
-#ifndef __CHERI_PURE_CAPABILITY__
+#if defined(REVOKE) && !defined(__CHERI_PURE_CAPABILITY__)
 // The following two functions assume 8 bits in a byte.
 static void
 shadow_paint(void* start, size_t size) {
@@ -3467,36 +3506,37 @@ shadow_clear(void* start, size_t size) {
     }
   }
 }
-#endif
+#endif   /* defined(REVOKE) && !defined(__CHERI_PURE_CAPABILITY__) */
 
 static void malloc_revoke_internal(const char *cause);
 
 void
 dlfree(void* mem) {
-  if(mem != 0) {
-    msegmentptr sp;
-    mchunkptr p  = mem2chunk(unbound_ptr(gm, &sp, mem));
-    gm->allocated -= chunksize(p);
-#if SUPPORT_UNMAP
-    void *unmap_base = NULL;
-    void *unmap_end = NULL;
-#endif
-
+    if (mem == 0) return;
 #define fm gm
-#ifdef __CHERI_PURE_CAPABILITY__
-    /*
-     * Replace the pointer to the allocation.  This allows us to catch
-     * double-free()s in unbound_ptr().  In the CAPREVOKE case, it also
-     * allows us to cache the shadow pointer for later use.
-     */
-#ifdef CAPREVOKE
-    p->pad = sp->shadow;
-#else
-    p->pad = NULL;
-#endif
-#endif /* __CHERI_PURE_CAPABILITY__ */
+
     UTRACE(mem, 0, 0);
     if(!PREACTION(fm)) {
+      msegmentptr sp;
+      mchunkptr p  = mem2chunk(unbound_ptr(gm, &sp, mem));
+      gm->allocated -= chunksize(p);
+#if SUPPORT_UNMAP
+      void *unmap_base = NULL;
+      void *unmap_end = NULL;
+#endif
+
+#ifdef __CHERI_PURE_CAPABILITY__
+      /*
+       * Replace the pointer to the allocation.  This allows us to catch
+       * double-free()s in unbound_ptr().  In the CAPREVOKE case, it also
+       * allows us to cache the shadow pointer for later use.
+       */
+#ifdef CAPREVOKE
+      p->pad = sp->shadow;
+#else
+      p->pad = NULL;
+#endif
+#endif /* __CHERI_PURE_CAPABILITY__ */
       check_inuse_chunk(fm, p);
 #if SWEEP_STATS
       fm->freeTimes++;
@@ -3512,14 +3552,14 @@ dlfree(void* mem) {
             mchunkptr prev = chunk_minus_offset(p, prevsize);
             psize += prevsize;
 #if SUPPORT_UNMAP
-	    if (cunmapped(prev)) {
-	      /*
-	       * The previous chunk is unmapped up to the page contining our
-	       * chunk header.  We must unmap that page if we can to
-	       * join the unmapped region.
-	       */
+            if (cunmapped(prev)) {
+              /*
+               * The previous chunk is unmapped up to the page contining our
+               * chunk header.  We must unmap that page if we can to
+               * join the unmapped region.
+               */
               unmap_base = __builtin_align_down(p, mparams.page_size);
-	    }
+            }
 #endif
             p = prev;
             if(RTCHECK(ok_address(fm, prev))) {
@@ -3537,15 +3577,15 @@ dlfree(void* mem) {
               unlink_freebuf_chunk(fm, next);
               set_size_and_clear_pdirty_of_dirty_chunk(p, psize);
 #if SUPPORT_UNMAP
-	      if (cunmapped(next)) {
-		/*
-		 * The page after our allocation is unmapped and we
-		 * must join it if we can and consume remainder of the
-		 * next chunk.
-		 */
-		set_cunmapped(p);
-		unmap_end = __builtin_align_up(next, mparams.page_size);
-	      }
+              if (cunmapped(next)) {
+                /*
+                 * The page after our allocation is unmapped and we
+                 * must join it if we can and consume remainder of the
+                 * next chunk.
+                 */
+                set_cunmapped(p);
+                unmap_end = __builtin_align_up(chunk2mem(next), mparams.page_size);
+              }
 #endif
             }
             else {
@@ -3567,34 +3607,50 @@ dlfree(void* mem) {
         unmap_end = __builtin_align_down((char *)p + chunksize(p), mparams.page_size);
       ptrdiff_t unmap_len = (char *)unmap_end - (char *)unmap_base;
       if (unmap_len > 0 && (size_t)unmap_len >= mparams.unmap_threshold) {
-	set_cunmapped(p);
+        set_cunmapped(p);
       }
+      /*
+       * cunmapped(p) may be set by the threshold check above or be
+       * inherited from an ajoining region containing which has previously
+       * unmapped.  This means the unmaps smaller than the threshold may
+       * occur, but ensures that all of a chunk's potentially
+       * unmapable pages are unmapped.
+       */
       if (cunmapped(p) && unmap_end > unmap_base) {
 #ifdef VERBOSE
-	malloc_printf("%s: unmapping %ti from %#p\n", __func__, unmap_len, unmap_base);
+        malloc_printf("%s: unmapping %ti from %#p\n", __func__, unmap_len, unmap_base);
 #endif
-	/*
-	 * We'd like to unmap the memory, but that could lead to reuse.
-	 * Instead, map it MAP_GUARD.
-	 */
+        /*
+         * We'd like to unmap the memory, but that could lead to reuse.
+         * Instead, map it MAP_GUARD.
+         */
+#if EMULATE_MADV_REVOKE
+        if (madvise(unmap_base, unmap_len, MADV_FREE) != 0)
+          CORRUPTION_ERROR_ACTION(fm);
+#else
         if (mmap(unmap_base, unmap_len, PROT_NONE,
-	         MAP_FIXED | MAP_GUARD | MAP_CHERI_NOSETBOUNDS, -1, 0) ==
+            MAP_FIXED | MAP_GUARD | MAP_CHERI_NOSETBOUNDS, -1, 0) ==
             MAP_FAILED)
           CORRUPTION_ERROR_ACTION(fm);
+#endif
+        fm->freebufbytes_unmapped += unmap_len;
+        assert(fm->freebufbytes_unmapped <= fm->freebufbytes);
       }
 #endif
 
-      if (fm->freebufbytes > mparams.max_freebufbytes) {
+      size_t freebufbytes_mapped = fm->freebufbytes - fm->freebufbytes_unmapped;
+      /* fm->freebufbytes is included in fm->footprint, so adjust it there as well */
+      size_t footprint_mapped = fm->footprint - fm->freebufbytes_unmapped;
+      if (freebufbytes_mapped > mparams.max_freebufbytes) {
         malloc_revoke_internal("mparams.max_freebufbytes exceeded");
-      } else if (fm->freebufbytes > mparams.min_freebufbytes &&
-	         fm->freebufbytes >
-                 (size_t)(fm->footprint * mparams.max_freebuf_percent)) {
+      } else if (freebufbytes_mapped > mparams.min_freebufbytes &&
+                 freebufbytes_mapped >
+                 (size_t)(footprint_mapped * mparams.max_freebuf_percent)) {
         malloc_revoke_internal("mparams.max_freebuf_percent and "
 	                       "mparams.min_freebufbytes exceeded");
       }
       POSTACTION(fm);
     }
-  }
 }
 
 static void
@@ -3608,14 +3664,14 @@ malloc_revoke_internal(const char *reason) {
 #endif // SWEEP_STATS
   mchunkptr freebin = &gm->freebufbin;
   for (mchunkptr thePtr = freebin->fd; thePtr != freebin; thePtr = thePtr->fd) {
-#ifndef __CHERI_PURE_CAPABILITY__
+#if defined(REVOKE) && !defined(__CHERI_PURE_CAPABILITY__)
     shadow_paint(thePtr, chunksize(thePtr));
 #else
 #ifdef CAPREVOKE
     vaddr_t addr = __builtin_cheri_address_get(chunk2mem(thePtr));
     caprev_shadow_nomap_set_raw(thePtr->pad, addr, addr + chunksize(thePtr));
 #endif
-#endif
+#endif   /* defined(REVOKE) && !defined(__CHERI_PURE_CAPABILITY__) */
   }
 
 #ifdef CAPREVOKE
@@ -3634,14 +3690,14 @@ malloc_revoke_internal(const char *reason) {
 #if CONSOLIDATE_ON_FREE == 1 || !defined(__CHERI_PURE_CAPABILITY__)
     size_t theSize = chunksize(thePtr);
 #endif
-#ifndef __CHERI_PURE_CAPABILITY__
+#if defined(REVOKE) && !defined(__CHERI_PURE_CAPABILITY__)
     shadow_clear(thePtr, theSize);
 #else
 #ifdef CAPREVOKE
     vaddr_t addr = __builtin_cheri_address_get(chunk2mem(thePtr));
     caprev_shadow_nomap_clear_raw(thePtr->pad, addr, addr + chunksize(thePtr));
 #endif
-#endif
+#endif   /* defined(REVOKE) && !defined(__CHERI_PURE_CAPABILITY__) */
 #if CONSOLIDATE_ON_FREE == 1
     mchunkptr theNext = chunk_plus_offset(thePtr, theSize);
     if(!is_mmapped(thePtr)) {
@@ -3656,6 +3712,9 @@ malloc_revoke_internal(const char *reason) {
     // list of freebufbin will get corrupted.
     dlfree_internal(chunk2mem(thePtr));
   }
+#ifdef SUPPORT_UNMAP
+  assert(fm->freebufbytes_unmapped == 0);
+#endif /* SUPPORT_UNMAP */
 }
 
 void
@@ -4065,15 +4124,43 @@ int dlmallopt(int param_number, int value) {
   return change_mparam(param_number, value);
 }
 
-size_t dlmalloc_usable_size(void* mem) {
-#ifndef __CHERI_PURE_CAPABILITY__
-  if (mem != 0) {
-    mchunkptr p = mem2chunk(mem);
-    if (is_inuse(p))
-      return chunksize(p) - overhead_for(p);
+__attribute__((always_inline))
+void *dlmalloc_underlying_allocation(void *mem) {
+  /*
+   * unbound_ptr only succeeds if mem points to the beginning of a legitimate
+   * allocation (because a consumer can't forge a "pad" capability with VMMAP
+   * permissions).
+   */
+  if (mem != NULL) {
+    void *ptr = unbound_ptr(gm, NULL, mem);
+    mchunkptr chunk = mem2chunk(ptr);
+    if (is_inuse(chunk)) {
+      /* bound the pointer without remove VMMAP permission */
+      void *bounded = ptr;
+#ifdef CHERI_SET_BOUNDS
+      bounded = __builtin_cheri_bounds_set(bounded, chunksize(chunk) - overhead_for(chunk));
+#endif
+      bounded = __builtin_cheri_perms_and(bounded, CHERI_PERMS_USERSPACE_DATA);
+      chunk->pad = ptr;
+      return bounded;
+      /*return bound_ptr(ptr, chunksize(chunk) - overhead_for(chunk));*/
+    }
   }
-  return 0;
+  return NULL;
+}
+
+size_t dlmalloc_usable_size(void* mem) {
+  size_t allocation_size = 0;
+  if (mem != NULL) {
+    mchunkptr p = mem2chunk(unbound_ptr(gm, NULL, mem));
+    if (is_inuse(p))
+      allocation_size = chunksize(p) - overhead_for(p);
+  }
+
+#ifndef __CHERI_PURE_CAPABILITY__
+  return allocation_size;
 #else
-  return __builtin_cheri_length_get(mem);
+  size_t cap_length = __builtin_cheri_length_get(mem);
+  return cap_length < allocation_size ? cap_length : allocation_size;
 #endif
 }
