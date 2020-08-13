@@ -51,17 +51,8 @@ WANT_CHERI:= ${NEED_CHERI}
 .endif
 
 .if ${MK_CHERI} != "no" && defined(WANT_CHERI) && ${WANT_CHERI} != "none"
-.ifdef WANT_AFL_FUZZ
-# Build binaries static when fuzzing
-.if defined(__BSD_PROG_MK)
-NO_SHARED=yes
-.endif
-_CHERI_CC=		AFL_PATH=${CC:H}/../afl/usr/local/lib/afl/ ${CC:H}/../afl/usr/local/bin/afl-clang-fast
-_CHERI_CXX=		AFL_PATH=${CC:H}/../afl/usr/local/lib/afl/ ${CXX:H}/../afl/usr/local/bin/afl-clang-fast++
-.else
 _CHERI_CC=		${CC}
 _CHERI_CXX=		${CXX}
-.endif
 _CHERI_CPP=		${CPP}
 
 .if ${WANT_CHERI} == "pure" || ${WANT_CHERI} == "sandbox"
