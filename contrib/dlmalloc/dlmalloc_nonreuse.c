@@ -69,10 +69,10 @@
 #define DEBUG 0
 #endif /* DEBUG */
 #ifdef __CHERI_PURE_CAPABILITY__
-#include <machine/cherireg.h>
+#include <cheri/cherireg.h>
 #ifdef CAPREVOKE
 #include <sys/caprevoke.h>
-#include <cheri/caprevoke.h>
+#include <cheri/libcaprevoke.h>
 #endif /* CAPREVOKE */
 #endif /* __CHERI_PURE_CAPABILITY__ */
 #if !defined(LACKS_TIME_H)
@@ -4048,7 +4048,7 @@ int dlposix_memalign(void** pp, size_t alignment, size_t bytes) {
 }
 
 void *
-dlalloc_aligned(size_t alignment, size_t size) {
+dlaligned_alloc(size_t alignment, size_t size) {
   int error;
   void *mem;
 

@@ -810,7 +810,7 @@ DLMALLOC_EXPORT int dlposix_memalign(void**, size_t, size_t);
   void *aligned_alloc(size_t alignment, size_t size);
   C11 interface to allocate aligned memory.
 */
-DLMALLOC_EXPORT void *aligned_alloc(size_t, size_t);
+DLMALLOC_EXPORT void *dlaligned_alloc(size_t, size_t);
 
 /*
   mallopt(int parameter_number, int parameter_value)
