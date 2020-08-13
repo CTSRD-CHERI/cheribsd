@@ -56,13 +56,13 @@ WANT_CHERI:= ${NEED_CHERI}
 .if defined(__BSD_PROG_MK)
 NO_SHARED=yes
 .endif
-_CHERI_CC=		AFL_PATH=${CC:H}/../afl/usr/local/lib/afl/ ${CC:H}/../afl/usr/local/bin/afl-clang-fast ${_CHERI_COMMON_FLAGS}
-_CHERI_CXX=		AFL_PATH=${CC:H}/../afl/usr/local/lib/afl/ ${CXX:H}/../afl/usr/local/bin/afl-clang-fast++ ${_CHERI_COMMON_FLAGS}
+_CHERI_CC=		AFL_PATH=${CC:H}/../afl/usr/local/lib/afl/ ${CC:H}/../afl/usr/local/bin/afl-clang-fast
+_CHERI_CXX=		AFL_PATH=${CC:H}/../afl/usr/local/lib/afl/ ${CXX:H}/../afl/usr/local/bin/afl-clang-fast++
 .else
-_CHERI_CC=		${CC} ${_CHERI_COMMON_FLAGS}
-_CHERI_CXX=		${CXX} ${_CHERI_COMMON_FLAGS}
+_CHERI_CC=		${CC}
+_CHERI_CXX=		${CXX}
 .endif
-_CHERI_CPP=		${CPP} ${_CHERI_COMMON_FLAGS}
+_CHERI_CPP=		${CPP}
 
 .if ${WANT_CHERI} == "pure" || ${WANT_CHERI} == "sandbox"
 MIPS_ABI:=	purecap
