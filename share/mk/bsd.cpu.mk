@@ -344,7 +344,6 @@ CFLAGS+=	-Werror=implicit-function-declaration
 CFLAGS+=	-Wno-deprecated-declarations
 CFLAGS+=	-cheri
 LDFLAGS+=	-fuse-ld=lld
-LDFLAGS+=	-Wl,-preemptible-caprelocs=elf
 
 CFLAGS+=	-Werror=cheri-bitwise-operations
 # Don't remove CHERI symbols from the symbol table
