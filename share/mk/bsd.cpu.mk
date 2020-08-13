@@ -339,9 +339,6 @@ STATIC_CFLAGS+=	-ftls-model=local-exec
 # XXXBD: move to WARNS?
 CFLAGS+=	-Werror=implicit-function-declaration
 .endif
-# Turn off deprecated warnings
-# XXXBD: is this still needed?
-CFLAGS+=	-Wno-deprecated-declarations
 CFLAGS+=	-cheri
 LDFLAGS+=	-fuse-ld=lld
 
