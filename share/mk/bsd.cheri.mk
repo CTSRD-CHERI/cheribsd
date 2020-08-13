@@ -51,7 +51,6 @@ WANT_CHERI:= ${NEED_CHERI}
 .endif
 
 .if ${MK_CHERI} != "no" && defined(WANT_CHERI) && ${WANT_CHERI} != "none"
-_CHERI_COMMON_FLAGS=	-cheri-uintcap=${CHERI_UINTCAP_MODE:Uaddr}
 .ifdef WANT_AFL_FUZZ
 # Build binaries static when fuzzing
 .if defined(__BSD_PROG_MK)
