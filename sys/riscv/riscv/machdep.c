@@ -139,6 +139,10 @@ cpuset_t all_harts;
 
 extern int *end;
 
+#ifdef FDT
+static char static_kenv[4096];
+#endif
+
 /*
  * When emulating RISC-V boards under QEMU, ISA-level tracing can be enabled and
  * disabled using special NOP instructions. By default this is a simple global
@@ -1100,8 +1104,10 @@ parse_metadata(void)
 #endif
 #ifdef FDT
 	try_load_dtb(kmdp);
-	if (kern_envp == NULL)
+	if (kern_envp == NULL) {
+		init_static_kenv(static_kenv, sizeof(static_kenv));
 		parse_fdt_bootargs();
+	}
 #endif
 	return (lastaddr);
 }
