@@ -346,9 +346,6 @@ CFLAGS+=	-cheri
 LDFLAGS+=	-fuse-ld=lld
 LDFLAGS+=	-Wl,-preemptible-caprelocs=elf
 
-# XXX: Needed as Clang rejects -mllvm -cheri128 when using $CC to link:
-# warning: argument unused during compilation: '-cheri=128'
-CFLAGS+=	-Qunused-arguments
 CFLAGS+=	-Werror=cheri-bitwise-operations
 # Don't remove CHERI symbols from the symbol table
 STRIP_FLAGS+=	-w --keep-symbol=__cheri_callee_method.\* \
