@@ -101,8 +101,6 @@ ${X_}LINKER_FREEBSD_VERSION:=	${_ld_version:[4]:C/.*-([^-]*)\)/\1/}
 .else
 ${X_}LINKER_FREEBSD_VERSION=	0
 .endif
-.elif ${_ld_version:[1]} == "@(#)PROGRAM:ld"
-${X_}LINKER_TYPE=	mac
 .elif ${_ld_version:[1]} == "@(\#)PROGRAM:ld"
 # bootstrap linker on MacOS
 ${X_}LINKER_TYPE=        mac
@@ -119,7 +117,6 @@ _v:=${_v}.0.0
 ${X_}LINKER_TYPE=	bfd
 _v=	2.17.50
 .endif
-# See bsd.compiler.mk
 ${X_}LINKER_VERSION!=	echo "${_v:M[1-9]*.[0-9]*}" | \
 			  awk -F. '{print $$1 * 10000 + $$2 * 100 + $$3;}'
 .undef _ld_version
