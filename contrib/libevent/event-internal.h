@@ -394,6 +394,10 @@ struct event_config {
 } while (0)
 #endif
 
+#ifndef	LIST_END
+#define	LIST_END(head)			NULL
+#endif
+
 #define N_ACTIVE_CALLBACKS(base)					\
 	((base)->event_count_active)
 
