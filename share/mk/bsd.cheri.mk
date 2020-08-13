@@ -51,9 +51,6 @@ WANT_CHERI:= ${NEED_CHERI}
 .endif
 
 .if ${MK_CHERI} != "no" && defined(WANT_CHERI) && ${WANT_CHERI} != "none"
-_CHERI_CC=		${CC}
-_CHERI_CXX=		${CXX}
-_CHERI_CPP=		${CPP}
 
 .if ${WANT_CHERI} == "pure" || ${WANT_CHERI} == "sandbox"
 MIPS_ABI:=	purecap
@@ -72,9 +69,7 @@ STATIC_CFLAGS+= -ftls-model=local-exec # MIPS/hybrid case
 # Force position-dependent sandboxes; PIEs aren't supported
 NO_SHARED=	yes
 .endif
-CC:=	${_CHERI_CC}
-CXX:=   ${_CHERI_CXX}
-CPP:=	${_CHERI_CPP}
+
 # Don't remove CHERI symbols from the symbol table
 STRIP_FLAGS+=	-w --keep-symbol=__cheri_callee_method.\* \
 		--keep-symbol=__cheri_method.\*
