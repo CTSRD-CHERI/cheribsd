@@ -333,12 +333,6 @@ MIPS_ABI?=	32
 .if ${MACHINE_ARCH:Mmips*c*}
 CFLAGS+=	-fpic
 STATIC_CFLAGS+=	-ftls-model=local-exec
-.ifdef NO_WERROR
-# Implicit function declarations should always be an error in purecap
-# mode as we will probably generate wrong code for calling them.
-# XXXBD: move to WARNS?
-CFLAGS+=	-Werror=implicit-function-declaration
-.endif
 CFLAGS+=	-cheri
 LDFLAGS+=	-fuse-ld=lld
 
@@ -471,6 +465,10 @@ MACHINE_ABI+=	ptr32
 # lot of files that use it to check for not 32-bit
 # XXXAR: Remove this once we have checked all the #ifdef __LP64__ uses
 CFLAGS+=	-D__LP64__=1
+
+# Implicit function declarations should always be an error in purecap
+# mode as we will probably generate wrong code for calling them.
+CWARNFLAGS+=	-Werror=implicit-function-declaration
 
 .ifdef CHERI_USE_CAP_TABLE
 CFLAGS+=	-cheri-cap-table-abi=${CHERI_USE_CAP_TABLE}

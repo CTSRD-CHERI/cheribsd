@@ -198,6 +198,8 @@ LIBCHERI_MACHINE_ABI=	${MACHINE_ABI} purecap
 # WANT_COMPAT/NEED_COMPAT case.
 LIBCHERICFLAGS+=	-D__LP64__=1
 
+LIBCHERICFLAGS+=	-Werror=implicit-function-declaration
+
 .ifdef CHERI_USE_CAP_TABLE
 LIBCHERICFLAGS+=	-cheri-cap-table-abi=${CHERI_USE_CAP_TABLE}
 .endif
