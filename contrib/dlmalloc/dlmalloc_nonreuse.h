@@ -70,7 +70,7 @@
        than pointers, you can use a previous release of this malloc
        (e.g. 2.7.2) supporting these.)
 
-  Alignment:                                     8 bytes (minimum)
+  Alignment:                                     32 bytes (minimum)
        This suffices for nearly all current machines and C compilers.
        However, you can define MALLOC_ALIGNMENT to be wider than this
        if necessary (up to 128bytes), at the expense of using more space.
@@ -211,7 +211,7 @@ DLMALLOC_EXPORT       default: extern
 
 MALLOC_ALIGNMENT         default: (size_t)(2 * sizeof(void *))
   Controls the minimum alignment for malloc'ed chunks.  It must be a
-  power of two and at least 8, even on machines for which smaller
+  power of two and at least 32, even on machines for which smaller
   alignments would suffice. It may be defined as larger than this
   though. Note however that code and data structures are optimized for
   the case of 8-byte alignment.
@@ -449,7 +449,7 @@ DEFAULT_UNMAP_THRESHOLD	default: MAX_SIZE_T / PAGESIZE
 // FIXME: These are partially hardcoded values.
 #define BYTE_ALIGN_MASK (7U)
 #define PAGE_SHIFT (12U)
-#define MALLOC_ALIGN_BYTESHIFT (4U)
+#define MALLOC_ALIGN_BYTESHIFT (6U)
 #define MALLOC_ALIGN_BITSHIFT (MALLOC_ALIGN_BYTESHIFT+3U)
 
 #define DEFAULT_GRANULARITY (16 * 1024 * 1024)
@@ -482,6 +482,9 @@ DEFAULT_UNMAP_THRESHOLD	default: MAX_SIZE_T / PAGESIZE
 #ifndef SUPPORT_UNMAP
 #define SUPPORT_UNMAP 1
 #endif
+#ifndef EMULATE_MADV_REVOKE
+#define	EMULATE_MADV_REVOKE 0
+#endif
 
 #ifndef ZERO_MEMORY
 #ifdef CAPREVOKE
@@ -513,7 +516,7 @@ DEFAULT_UNMAP_THRESHOLD	default: MAX_SIZE_T / PAGESIZE
 #define HAVE_MMAP 1
 /* OSX allocators provide 16 byte alignment */
 #ifndef MALLOC_ALIGNMENT
-#define MALLOC_ALIGNMENT ((size_t)16U)
+#define MALLOC_ALIGNMENT ((size_t)32U)
 #endif
 #endif  /* DARWIN */
 
@@ -545,7 +548,9 @@ DEFAULT_UNMAP_THRESHOLD	default: MAX_SIZE_T / PAGESIZE
 #endif /* USE_LOCKS */
 
 #ifndef MALLOC_ALIGNMENT
-#define MALLOC_ALIGNMENT ((size_t)(2 * sizeof(void *)))
+#define MALLOC_ALIGNMENT_DEFAULT ((size_t)(2 * sizeof(void *)))
+#define MALLOC_ALIGNMENT \
+    ((size_t)(MALLOC_ALIGNMENT_DEFAULT >= 32 ? MALLOC_ALIGNMENT_DEFAULT : 32))
 #endif  /* MALLOC_ALIGNMENT */
 #ifndef ABORT
 #define ABORT  abort()
@@ -725,6 +730,7 @@ extern "C" {
 #define dlmallopt              mallopt
 #define dlmalloc_trim          malloc_trim
 #define dlmalloc_stats         malloc_stats
+#define dlmalloc_underlying_allocation malloc_underlying_allocation
 #define dlmalloc_usable_size   malloc_usable_size
 #define dlmalloc_footprint     malloc_footprint
 #define dlmalloc_max_footprint malloc_max_footprint
@@ -984,6 +990,21 @@ DLMALLOC_EXPORT int  dlmalloc_trim(size_t);
 DLMALLOC_EXPORT void  dlmalloc_stats(void);
 
 /*
+  malloc_underlying_allocation(void* p);
+
+  Given a pointer allocated by dlmalloc that may have had
+  its bounds reduced, return a capability with the bounds of
+  the original allocation. Without CHERI, just return the
+  passed-in pointer.
+
+  Returns NULL or errors out if the passed-in capability was
+  not allocated by this allocator or if the passed-in
+  capability's base does not correspond to the original
+  allocation's.
+*/
+DLMALLOC_EXPORT void *dlmalloc_underlying_allocation(void*);
+
+/*
   malloc_usable_size(void* p);
 
   Returns the number of bytes you can actually use in
@@ -996,8 +1017,11 @@ DLMALLOC_EXPORT void  dlmalloc_stats(void);
 
   p = malloc(n);
   assert(malloc_usable_size(p) >= 256);
+
+  In purecap CHERI, the returned value is the minimum of the number of bytes
+  underlying the allocated chunk and the length of the passed-in capability.
 */
-size_t dlmalloc_usable_size(void*);
+DLMALLOC_EXPORT size_t dlmalloc_usable_size(void*);
 
 DLMALLOC_EXPORT void  dlmalloc_revoke(void);
 
