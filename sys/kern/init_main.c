@@ -407,6 +407,17 @@ SYSINIT(remotevulnwarn2, SI_SUB_LAST, SI_ORDER_SEVENTH,
     print_caddr_t, remote_vuln_warn);
 #endif
 
+#if __has_feature(capabilities)
+static char cheri_notice[] =
+#ifdef __CHERI_PURE_CAPABILITY__
+    "CHERI pure-capability kernel.\n";
+#else
+    "CHERI hybrid kernel.\n";
+#endif
+SYSINIT(cherinotice, SI_SUB_COPYRIGHT, SI_ORDER_ANY, print_caddr_t,
+    cheri_notice);
+#endif
+
 static int
 null_fetch_syscall_args(struct thread *td __unused)
 {

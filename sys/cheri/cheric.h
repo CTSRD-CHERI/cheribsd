@@ -36,8 +36,7 @@
 #include <sys/cdefs.h>
 #include <sys/types.h>
 
-#if __has_feature(capabilities) || defined(__CHERI__)
-
+#if __has_feature(capabilities)
 #include <cheri/cherireg.h>	/* Permission definitions. */
 
 /*
@@ -247,7 +246,7 @@ cheri_bytes_remaining(const void * __capability cap)
 
 #define CHERI_FPRINT_PTR(f, ptr)					\
 	fprintf(f, _CHERI_PRINT_PTR_FMT(ptr))
-#endif /* __has_feature(capabilities) || defined(__CHERI__) */
+#endif	/* __has_feature(capabilities) */
 
 /* Allow use of some cheri_ptr macros in the purecap kernel
  * without extra ifdefs.

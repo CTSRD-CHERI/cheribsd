@@ -276,7 +276,13 @@ CFLAGS+=	-cheri-cap-table-abi=${CHERI_USE_CAP_TABLE}
 .if defined(CHERI_SUBOBJECT_BOUNDS)
 CFLAGS+=	-Xclang -cheri-bounds=${CHERI_SUBOBJECT_BOUNDS}
 .endif
+
+.if defined(CHERI_SUBOBJECT_BOUNDS_STATS)
+CHERI_SUBOBJECT_BOUNDS_STATS_FILE?=kernel-subobject-bounds-stats.csv
+CFLAGS+=	-mllvm -collect-csetbounds-stats=csv \
+	-Xclang -cheri-stats-file="${CHERI_SUBOBJECT_BOUNDS_STATS_FILE}"
 .endif
+.endif # ${MACHINE_ABI:Mpurecap}
 
 CFLAGS+= ${CWARNFLAGS:M*} ${CWARNFLAGS.${.IMPSRC:T}}
 CFLAGS+= ${CWARNFLAGS.${COMPILER_TYPE}}

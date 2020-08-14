@@ -49,13 +49,18 @@
 	.globl	kernbase
 	.set	kernbase, KERNBASE
 
-	/* Trap entries */
 	.text
-
-	/* Reset vector */
-	.text
-	.globl _start
-_start:
+/*
+ * Alternate entry point. Used when booting via SBI firmware. It must be placed
+ * at the beginning of the .text section. Arguments are as follows:
+ *  - a0 = hart ID
+ *  - a1 = dtbp
+ *
+ * Multiple CPUs might enter from this point, so we perform a hart lottery and
+ * send the losers to mpentry.
+ */
+	.globl _alt_start
+_alt_start:
 	/* Set the global pointer */
 #ifdef __CHERI_PURE_CAPABILITY__
 	cmove	cgp, cnull
@@ -84,10 +89,6 @@ _start:
 1:
 .option pop
 #endif
-	/*
-	 * a0 = hart id
-	 * a1 = dtbp
-	 */
 
 	/* Pick a hart to run the boot process. */
 #ifdef __CHERI_PURE_CAPABILITY__
@@ -111,11 +112,52 @@ _start:
 #else
 	j	mpentry
 #endif
+1:
+#ifdef __CHERI_PURE_CAPABILITY__
+	/* Store the boot hart */
+	cllc	ct0, boot_hart
+	csw	a0, 0(ct0)
+#else
+	/* Store the boot hart */
+	lla	t0, boot_hart
+	sw	a0, 0(t0)
+#endif
+	/* Load zero as modulep */
+	mv	a0, zero
+	j	pagetables
+
+/*
+ * Main entry point. This routine is marked as the ELF entry, and is where
+ * loader(8) will enter the kernel. Arguments are as follows:
+ *  - a0 = modulep
+ *  - a1 = ???
+ *
+ * It is expected that only a single CPU will enter here.
+ */
+	.globl _start
+_start:
+	/* Set the global pointer */
+#ifdef __CHERI_PURE_CAPABILITY__
+	cmove	cgp, cnull
+#else
+.option push
+.option norelax
+	lla	gp, __global_pointer$
+.option pop
+#endif
 
 	/*
-	 * Page tables
+	 * Zero a1 to indicate that we have no DTB pointer. It is already
+	 * included in the loader(8) metadata.
 	 */
-1:
+	mv	a1, zero
+
+	/*
+	 * Page tables setup
+	 *  a0 - modulep or zero
+	 *  a1 - zero or dtbp
+	 */
+pagetables:
 	/* Get the kernel's load address */
 #ifdef __CHERI_PURE_CAPABILITY__
 	cllc	cra, get_physmem
@@ -162,7 +204,7 @@ _start:
 	li	t2, 512			/* Build 512 entries */
 	add	t3, t4, t2
 	li	t5, 0
-2:
+1:
 	li	t0, (PTE_KERN_CAP | PTE_X)
 	slli	t2, t4, PTE_PPN1_S	/* << PTE_PPN1_S */
 	or	t5, t0, t2
@@ -175,7 +217,7 @@ _start:
 #endif
 
 	addi	t4, t4, 1
-	bltu	t4, t3, 2b
+	bltu	t4, t3, 1b
 
 	/* Create an L1 page for early devmap */
 #ifdef __CHERI_PURE_CAPABILITY__
@@ -204,6 +246,9 @@ _start:
 	add	t0, s1, a5
 	sd	t6, (t0)
 #endif
+
+	/* Check if we have a DTB that needs to be mapped */
+	beqz	a1, 2f
 
 	/* Create an L2 page superpage for DTB */
 #ifdef __CHERI_PURE_CAPABILITY__
@@ -235,6 +280,7 @@ _start:
 	/* Page tables END */
 
 	/* Setup supervisor trap vector */
+2:
 #ifdef __CHERI_PURE_CAPABILITY__
 	cllc	ct0, va
 	li	t1, KERNBASE
@@ -415,12 +461,6 @@ va:
 	addi	s0, s0, 8
 	bltu	s0, s1, 1b
 
-#ifdef SMP
-	/* Store boot hart id. */
-	la	t0, boot_hart
-	sw	a0, 0(t0)
-#endif
-
 	/* Save DTB physical pointer in s1. */
 	mv	s1, a1
 
@@ -445,6 +485,8 @@ va:
 	add	t0, t0, t1
 	sd	t0, RISCV_BOOTPARAMS_DTBP_VIRT(sp)
 	sd	s1, RISCV_BOOTPARAMS_DTBP_PHYS(sp)
+
+	sd	a0, RISCV_BOOTPARAMS_MODULEP(sp)
 
 	mv	a0, sp
 	call	_C_LABEL(initriscv)	/* Off we go */

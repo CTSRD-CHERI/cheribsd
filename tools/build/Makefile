@@ -201,7 +201,7 @@ _host_tools_to_symlink:=${_host_tools_to_symlink:Nsh}
 host-symlinks:
 	@echo "Linking host tools into ${DESTDIR}/bin"
 .for _tool in ${_host_tools_to_symlink}
-	@if [ ! -e "${DESTDIR}/bin/${_tool}" ]; then \
+	@export PATH=$${PATH}:/usr/local/bin; if [ ! -e "${DESTDIR}/bin/${_tool}" ]; then \
 		source_path=`which ${_tool} || true`; \
 		if [ ! -e "$${source_path}" ] ; then \
 			echo "Cannot find host tool '${_tool}'" >&2; false; \
