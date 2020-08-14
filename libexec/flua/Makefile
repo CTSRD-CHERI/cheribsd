@@ -32,8 +32,6 @@ CFLAGS+=	-I${SRCTOP}/lib/libedit -I${SRCTOP}/contrib/libedit
 LIBADD+=	edit
 LDFLAGS+=	-Wl,-E
 .else
-# We don't support dynamic libs on bootstrap builds.
-CFLAGS+=	-DBOOTSTRAPPING
 # Work around Linux glibc+ld.bfd --fatal-warnings error:
 # the use of `tmpnam' is dangerous, better use `mkstemp'
 LD_FATAL_WARNINGS=no
