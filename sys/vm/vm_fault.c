@@ -664,7 +664,7 @@ int
 vm_fault_trap(vm_map_t map, vm_offset_t vaddr, vm_prot_t fault_type,
     int fault_flags, int *signo, int *ucode)
 {
-	int result;
+	int result, segv_ucode;
 
 	MPASS(signo == NULL || ucode != NULL);
 #ifdef KTRACE
@@ -699,6 +699,11 @@ vm_fault_trap(vm_map_t map, vm_offset_t vaddr, vm_prot_t fault_type,
 			*ucode = BUS_OBJERR;
 			break;
 		case KERN_PROTECTION_FAILURE:
+			if ((fault_type & VM_PROT_WRITE_CAP) != 0)
+				segv_ucode = SEGV_STORETAG;
+			else
+				segv_ucode = SEGV_ACCERR;
+
 			if (prot_fault_translation == 0) {
 				/*
 				 * Autodetect.  This check also covers
@@ -708,7 +713,7 @@ vm_fault_trap(vm_map_t map, vm_offset_t vaddr, vm_prot_t fault_type,
 				if (SV_CURPROC_ABI() == SV_ABI_FREEBSD &&
 				    curproc->p_osrel >= P_OSREL_SIGSEGV) {
 					*signo = SIGSEGV;
-					*ucode = SEGV_ACCERR;
+					*ucode = segv_ucode;
 				} else {
 					*signo = SIGBUS;
 					*ucode = UCODE_PAGEFLT;
@@ -720,7 +725,7 @@ vm_fault_trap(vm_map_t map, vm_offset_t vaddr, vm_prot_t fault_type,
 			} else {
 				/* Always SIGSEGV mode. */
 				*signo = SIGSEGV;
-				*ucode = SEGV_ACCERR;
+				*ucode = segv_ucode;
 			}
 			break;
 		default:
