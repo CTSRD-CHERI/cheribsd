@@ -84,6 +84,10 @@ typedef u_char vm_prot_t;	/* protection codes */
 #define	VM_PROT_FAULT_LOOKUP	VM_PROT_PRIV_FLAG
 #define	VM_PROT_QUICK_NOFAULT	VM_PROT_PRIV_FLAG	/* same to save bits */
 
+#if __has_feature(capabilities)
+#define	VM_PROT_WRITE_CAP	((vm_prot_t) 0x40)
+#endif
+
 #define	VM_PROT_ALL		(VM_PROT_READ|VM_PROT_WRITE|VM_PROT_EXECUTE)
 #define VM_PROT_RW		(VM_PROT_READ|VM_PROT_WRITE)
 #define	VM_PROT_DEFAULT		VM_PROT_ALL

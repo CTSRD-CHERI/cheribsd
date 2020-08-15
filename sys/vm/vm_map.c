@@ -5090,6 +5090,22 @@ RetryLookupLocked:
 		vm_map_lock_downgrade(map);
 	}
 
+#if __has_feature(capabilities)
+	/*
+	 * Currently, the rights to store capabilities are not managed in prot,
+	 * but rather in the object.  This is a little belated relative to the
+	 * other permission checks, but so it goes.
+	 */
+	if ((fault_typea & VM_PROT_WRITE_CAP) && !map->system_map) {
+		KASSERT(entry->object.vm_object != NULL,
+			("PROT_WRITE_CAP lookup w/o object"));
+		if ((entry->object.vm_object->flags & OBJ_NOSTORETAGS) != 0) {
+			vm_map_unlock_read(map);
+			return (KERN_PROTECTION_FAILURE);
+		}
+	}
+#endif
+
 	/*
 	 * Return the object/offset from this entry.  If the entry was
 	 * copy-on-write or empty, it has been fixed up.
