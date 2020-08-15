@@ -249,8 +249,8 @@ typedef uint64_t pd_entry_t;
  * CHERI EntryLo extensions that limit storing loading and storing tagged
  * values.  Note that these are *inhibit* bits, not permission bits!
  */
-#define	PTE_SC			(0x1ULL << 63)
-#define	PTE_LC			(0x1ULL << 62)
+#define	PTE_SCN			(0x1ULL << 63)
+#define	PTE_LCN			(0x1ULL << 62)
 #endif
 
 /*

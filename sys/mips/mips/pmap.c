@@ -2153,9 +2153,9 @@ pmap_enter(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot,
 	PMAP_PTE_SET_CACHE_BITS(newpte, pa, m);
 #ifdef CPU_CHERI
 	if ((flags & PMAP_ENTER_NOLOADTAGS) != 0)
-		newpte |= PTE_LC;
+		newpte |= PTE_LCN;
 	if ((flags & PMAP_ENTER_NOSTORETAGS) != 0)
-		newpte |= PTE_SC;
+		newpte |= PTE_SCN;
 #endif
 	if ((m->oflags & VPO_UNMANAGED) == 0)
 		newpte |= PTE_MANAGED;
@@ -2433,9 +2433,9 @@ pmap_enter_quick_locked(pmap_t pmap, vm_offset_t va, vm_page_t m,
 	npte = PTE_RO | TLBLO_PA_TO_PFN(pa) | PTE_V;
 #ifdef CPU_CHERI
 	if ((flags & PMAP_ENTER_NOLOADTAGS) != 0)
-		npte |= PTE_LC;
+		npte |= PTE_LCN;
 	if ((flags & PMAP_ENTER_NOSTORETAGS) != 0)
-		npte |= PTE_SC;
+		npte |= PTE_SCN;
 #endif
 	if ((m->oflags & VPO_UNMANAGED) == 0)
 		npte |= PTE_MANAGED;
