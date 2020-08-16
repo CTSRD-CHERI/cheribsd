@@ -99,6 +99,7 @@ _LIBRARIES=	\
 		cap_dns \
 		cap_fileargs \
 		cap_grp \
+		cap_net \
 		cap_pwd \
 		cap_sysctl \
 		cap_syslog \
