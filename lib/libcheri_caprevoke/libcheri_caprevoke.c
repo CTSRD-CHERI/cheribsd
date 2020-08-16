@@ -20,6 +20,12 @@
 
 #if defined(__mips__)
 #include "asm/mips.h"
+#elif defined(__riscv)
+#if defined(__CHERI_PURE_CAPABILITY__)
+#include "asm/riscv_purecap.h"
+#else
+#include "asm/riscv_hybrid.h"
+#endif
 #else
 #error "Need libcheri_caprevoke architecture-specific header"
 #endif
