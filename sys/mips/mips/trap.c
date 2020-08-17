@@ -904,6 +904,11 @@ trap(struct trapframe *trapframe)
 		}
 		break;
 	case T_TLB_MOD:
+		if (td->td_critnest != 0 || td->td_intr_nesting_level != 0 ||
+		    WITNESS_CHECK(WARN_SLEEPOK | WARN_GIANTOK, NULL,
+		    "Kernel page fault") != 0)
+			goto err;
+
 		/* check for kernel address */
 		if (KERNLAND(trapframe->badvaddr)) {
 			if (pmap_emulate_modified(kernel_pmap, 
@@ -927,6 +932,11 @@ trap(struct trapframe *trapframe)
 
 	case T_TLB_LD_MISS:
 	case T_TLB_ST_MISS:
+		if (td->td_critnest != 0 || td->td_intr_nesting_level != 0 ||
+		    WITNESS_CHECK(WARN_SLEEPOK | WARN_GIANTOK, NULL,
+		    "Kernel page fault") != 0)
+			goto err;
+
 		ftype = (type == T_TLB_ST_MISS) ? VM_PROT_WRITE : VM_PROT_READ;
 		/* check for kernel address */
 		if (KERNLAND(trapframe->badvaddr)) {
