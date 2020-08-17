@@ -93,10 +93,18 @@ __makecontext(ucontext_t *ucp, void (*func)(void), int argc, ...)
 #endif
 	sp = __builtin_align_down(sp, STACK_ALIGN);
 
+#ifdef __CHERI_PURE_CAPABILITY__
+	mc->mc_cheriframe.cf_csp = sp;
+	mc->mc_cheriframe.cf_c16 = ucp;
+	mc->mc_cheriframe.cf_c12 = func;
+	mc->mc_cheriframe.cf_pcc = _ctx_start;
+	mc->mc_pc = (__cheri_offset register_t)mc->mc_cheriframe.cf_pcc;
+#else
 	mc->mc_regs[SP] = (intptr_t)sp;
 	mc->mc_regs[S0] = (intptr_t)ucp;
 	mc->mc_regs[T9] = (intptr_t)func;
 	mc->mc_pc = (intptr_t)_ctx_start;
+#endif
 
 	/* Construct argument list. */
 	va_start(ap, argc);
