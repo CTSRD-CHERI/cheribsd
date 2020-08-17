@@ -1400,6 +1400,13 @@ DB_SHOW_COMMAND(specialregs, db_show_spregs)
 #define	PRINT_REG(reg)	\
     db_printf(__STRING(reg) " = %#016lx\n", READ_SPECIALREG(reg))
 
+#if __has_feature(capabilities)
+#include <cheri/cheric.h>
+#define	PRINT_REG_CAP(reg)	\
+    db_printf(__STRING(reg) " = " _CHERI_PRINTF_CAP_FMT "\n", \
+        _CHERI_PRINTF_CAP_ARG((void *__capability)READ_SPECIALREG_CAP(reg)))
+#endif
+
 	PRINT_REG(actlr_el1);
 	PRINT_REG(afsr0_el1);
 	PRINT_REG(afsr1_el1);
@@ -1468,6 +1475,11 @@ DB_SHOW_COMMAND(specialregs, db_show_spregs)
 	PRINT_REG(ttbr1_el1);
 	PRINT_REG(vbar_el1);
 #undef PRINT_REG
+#if __has_feature(capabilities)
+	/* TODO: Print other cap registers of interest. */
+	PRINT_REG_CAP(cvbar_el1);
+#undef PRINT_REG_CAP
+#endif
 }
 
 DB_SHOW_COMMAND(vtop, db_show_vtop)

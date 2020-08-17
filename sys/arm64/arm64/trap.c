@@ -326,7 +326,7 @@ data_abort(struct thread *td, struct trapframe *frame, uint64_t esr,
 	printf(name ": " _CHERI_PRINTF_CAP_FMT "\n",		\
 	    _CHERI_PRINTF_CAP_ARG(value))
 #define PRINT_REG_N(array, n)					\
-	printf(" %sc%d: = " _CHERI_PRINTF_CAP_FMT "\n",		\
+	printf(" %sc%d: " _CHERI_PRINTF_CAP_FMT "\n",		\
 	    ((n) < 10) ? " " : "", n, 				\
 	    _CHERI_PRINTF_CAP_ARG((array)[n]))
 #else
@@ -348,6 +348,9 @@ print_registers(struct trapframe *frame)
 	for (reg = 0; reg < nitems(frame->tf_x); reg++) {
 		PRINT_REG_N(frame->tf_x, reg);
 	}
+#if __has_feature(capabilities)
+	PRINT_REG(" ddc", frame->tf_ddc);
+#endif
 	PRINT_REG("  sp", frame->tf_sp);
 	PRINT_REG("  lr", frame->tf_lr);
 	PRINT_REG(" elr", frame->tf_elr);
