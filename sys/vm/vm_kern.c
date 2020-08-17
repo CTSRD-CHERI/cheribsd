@@ -754,21 +754,19 @@ kva_import_domain(void *arena, vmem_size_t size, int flags, vmem_addr_t *addrp)
 void
 kmem_init(vm_offset_t start, vm_offset_t end)
 {
-	vm_map_t m;
 	vm_offset_t addr;
 	int domain;
 
-	m = vm_map_create(kernel_pmap, VM_MIN_KERNEL_ADDRESS, end);
-	m->system_map = 1;
-	vm_map_lock(m);
+	vm_map_init(kernel_map, kernel_pmap, VM_MIN_KERNEL_ADDRESS, end);
+	kernel_map->system_map = 1;
+	vm_map_lock(kernel_map);
 	/* N.B.: cannot use kgdb to debug, starting with this assignment ... */
-	kernel_map = m;
 #ifdef __amd64__
 	addr = KERNBASE;
 #else
 	addr = VM_MIN_KERNEL_ADDRESS;
 #endif
-	(void)vm_map_insert(m, NULL, 0, addr, start, VM_PROT_ALL,
+	(void)vm_map_insert(kernel_map, NULL, 0, addr, start, VM_PROT_ALL,
 	    VM_PROT_ALL, MAP_NOFAULT, VM_MIN_KERNEL_ADDRESS);
 	/* ... and ending with the completion of the above `insert' */
 
