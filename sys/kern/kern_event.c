@@ -2752,15 +2752,21 @@ SYSINIT(knote, SI_SUB_PSEUDO, SI_ORDER_ANY, knote_init, NULL);
 static struct knote *
 knote_alloc(int mflag)
 {
+	struct knote *kn;
 
-	return (uma_zalloc(knote_zone, mflag | M_ZERO));
+	kn = uma_zalloc(knote_zone, mflag | M_ZERO);
+	refcount_init(&kn->kn_refcount, 1);
+	return kn;
 }
 
 static void
 knote_free(struct knote *kn)
 {
 
-	uma_zfree(knote_zone, kn);
+	if (kn == NULL)
+		return;
+	if (refcount_release(&kn->kn_refcount))
+		uma_zfree(knote_zone, kn);
 }
 
 /*
