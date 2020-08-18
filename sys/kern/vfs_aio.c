@@ -340,6 +340,8 @@ static int	filt_lioattach(struct knote *kn);
 static void	filt_liodetach(struct knote *kn);
 static int	filt_lio(struct knote *kn, long hint);
 
+static void	aiocb_free_kaiocb(struct kaiocb *);
+
 /*
  * Zones for:
  * 	kaio	Per process async io info
@@ -563,7 +565,7 @@ aio_free_entry(struct kaiocb *job)
 	if (job->fd_file)
 		fdrop(job->fd_file, curthread);
 	crfree(job->cred);
-	uma_zfree(aiocb_zone, job);
+	aiocb_free_kaiocb(job);
 	AIO_LOCK(ki);
 
 	return (0);
@@ -1399,6 +1401,16 @@ aiocb_fetch_error(void * __capability ujobp)
 	return (fuword(&ujob->_aiocb_private.error));
 }
 
+static void
+aiocb_free_kaiocb(struct kaiocb *kjob)
+{
+
+	if (kjob == NULL)
+		return;
+	if (refcount_release(&kjob->refcount))
+		uma_zfree(aiocb_zone, kjob);
+}
+
 static int
 aiocb_store_status(void * __capability ujobp, long status)
 {
@@ -1500,6 +1512,7 @@ aio_aqueue(struct thread *td, struct aiocb * __capability ujob,
 	}
 
 	job = uma_zalloc(aiocb_zone, M_WAITOK | M_ZERO);
+	refcount_init(&job->refcount, 1);
 	knlist_init_mtx(&job->klist, AIO_MTX(ki));
 
 	error = ops->aio_copyin(ujob, &job->uaiocb);
