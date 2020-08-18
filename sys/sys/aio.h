@@ -147,6 +147,7 @@ struct kaiocb {
 	uint64_t seqno;			/* (*) job number */
 	aio_cancel_fn_t *cancel_fn;	/* (a) backend cancel function */
 	aio_handle_fn_t *handle_fn;	/* (c) backend handle function */
+	volatile u_int refcount;
 	union {				/* Backend-specific data fields */
 		struct {		/* BIO backend */
 			int	nbio;	/* Number of remaining bios */
