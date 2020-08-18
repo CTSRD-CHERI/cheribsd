@@ -70,7 +70,7 @@ linux_execve(struct thread *td, struct linux_execve_args *uap)
 
 	error = exec_copyin_args(&eargs, PTR2CAP(path), UIO_SYSSPACE,
 	    __USER_CAP_UNBOUND(uap->argp), __USER_CAP_UNBOUND(uap->envp));
-	free(path, M_TEMP);
+	LFREEPATH(path);
 	if (error == 0)
 		error = linux_common_execve(td, &eargs);
 	return (error);

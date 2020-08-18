@@ -108,7 +108,7 @@ linux_execve(struct thread *td, struct linux_execve_args *args)
 
 	error = exec_copyin_args(&eargs, PTR2CAP(newpath), UIO_SYSSPACE,
 	    __USER_CAP_UNBOUND(args->argp), __USER_CAP_UNBOUND(args->envp));
-	free(newpath, M_TEMP);
+	LFREEPATH(newpath);
 	if (error == 0)
 		error = linux_common_execve(td, &eargs);
 	return (error);
