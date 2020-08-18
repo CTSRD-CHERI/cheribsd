@@ -115,7 +115,7 @@ enum cheri_branch_ops
 static inline struct cheri_frame *
 getCHERIFrame(mcontext_t *context)
 {
-#ifdef __CHERI_SANDBOX__
+#ifdef __CHERI_PURE_CAPABILITY__
 	return &context->mc_cheriframe;
 #else
 	assert_eq(context->mc_cp2state_len, sizeof(struct cheri_frame));
@@ -239,6 +239,18 @@ isInDelaySlot(mcontext_t *context)
 	return getImm(context->cause, 31, 1);
 }
 
+static inline void
+setPc(mcontext_t *context, register_t pc)
+{
+#ifdef __CHERI_PURE_CAPABILITY__
+	struct cheri_frame *frame = getCHERIFrame(context);
+
+	frame->cf_pcc = __builtin_cheri_offset_set(frame->cf_pcc, pc);
+#else
+	context->mc_pc = pc;
+#endif
+}
+
 /**
  * If we are in a branch delay slot, work out what the next instruction will
  * be.  This is either the branch target or the instruction immediately
@@ -279,7 +291,7 @@ emulateBranch(mcontext_t *context, register_t pc)
 					       "In delay slot for not-taken likely branch!");
 				case MIPS_BRANCH_BLTZ:
 				case MIPS_BRANCH_BLTZAL:
-					context->mc_pc = ((regVal < 0) ? branchPc : normalPc);
+					setPc(context, (regVal < 0) ? branchPc : normalPc);
 					return true;
 				case MIPS_BRANCH_BGEZL:
 				case MIPS_BRANCH_BGEZ:
@@ -287,34 +299,34 @@ emulateBranch(mcontext_t *context, register_t pc)
 					       "In delay slot for not-taken likely branch!");
 				case MIPS_BRANCH_BGEZAL:
 				case MIPS_BRANCH_BGEZALL:
-					context->mc_pc = ((regVal >= 0) ? branchPc : normalPc);
+					setPc(context, (regVal >= 0) ? branchPc : normalPc);
 					return true;
 			}
 			break;
 		}
 		case MIPS_BRANCH_J:
 		case MIPS_BRANCH_JAL:
-			context->mc_pc = (getImm(instr, 25, 0)<<2) & ((pc >> 28) << 28);
+			setPc(context, (getImm(instr, 25, 0)<<2) & ((pc >> 28) << 28));
 			return true;
 		case MIPS_BRANCH_JR:
 		case MIPS_BRANCH_JALR:
-			context->mc_pc = getReg(context, instr, 25);
+			setPc(context, getReg(context, instr, 25));
 			return true;
 		case MIPS_BRANCH_BEQL:
 		case MIPS_BRANCH_BEQ:
-			context->mc_pc = ((regVal == regVal2) ? branchPc : normalPc);
+			setPc(context, (regVal == regVal2) ? branchPc : normalPc);
 			return true;
 		case MIPS_BRANCH_BNEL:
 		case MIPS_BRANCH_BNE:
-			context->mc_pc = ((regVal != regVal2) ? branchPc : normalPc);
+			setPc(context, (regVal != regVal2) ? branchPc : normalPc);
 			return true;
 		case MIPS_BRANCH_BLEZL:
 		case MIPS_BRANCH_BLEZ:
-			context->mc_pc = ((regVal <= 0) ? branchPc : normalPc);
+			setPc(context, (regVal <= 0) ? branchPc : normalPc);
 			return true;
 		case MIPS_BRANCH_BGTZL:
 		case MIPS_BRANCH_BGTZ:
-			context->mc_pc = ((regVal > 0) ? branchPc : normalPc);
+			setPc(context, (regVal > 0) ? branchPc : normalPc);
 			return true;
 		case MIPS_BRANCH_CHERI:
 		{
@@ -324,28 +336,26 @@ emulateBranch(mcontext_t *context, register_t pc)
 				{
 					void * __capability cap = getCapReg(context, instr, 20);
 					bool tag = __builtin_cheri_tag_get(cap);
-					context->mc_pc = (!tag ? branchPc : normalPc);
+					setPc(context, !tag ? branchPc : normalPc);
 					return true;
 				}
 				case CHERI_BRANCH_CBTS:
 				{
 					void * __capability cap = getCapReg(context, instr, 20);
 					bool tag = __builtin_cheri_tag_get(cap);
-					context->mc_pc = (tag ? branchPc : normalPc);
+					setPc(context, tag ? branchPc : normalPc);
 					return true;
 				}
 				case CHERI_BRANCH_CJR:
 				case CHERI_BRANCH_CJALR:
 				{
-					context->mc_pc = getReg(context, instr, 10);
 					// FIXME: This is very ugly, but to fix it we need to
 					// define a new structure to replace cheri_frame.
 					struct cheri_frame *frame = getCHERIFrame(context);
-					// Note: The /cap_size is safe here because if this is not
-					// aligned then the load will fail anyway...
-					int regno = offsetof(struct cheri_frame, cf_pcc) / cap_size;
-					(((void * __capability*)frame)[regno]) =
-						getCapReg(context, instr, 15);
+					frame->cf_pcc = getCapReg(context, instr, 15);
+#ifndef __CHERI_PURE_CAPABILITY__
+					context->mc_pc = __builtin_cheri_offset_get(frame->cf_pcc);
+#endif
 					return true;
 				}
 			}
@@ -363,8 +373,12 @@ capsighandler(int signo, siginfo_t *info __unused, ucontext_t *uap)
 {
 	mcontext_t *context = &uap->uc_mcontext;
 	bool isDelaySlot = isInDelaySlot(context);
-	register_t pc = context->mc_pc;
 	struct cheri_frame *frame = getCHERIFrame(context);
+#ifdef __CHERI_PURE_CAPABILITY__
+	register_t pc = __builtin_cheri_offset_get(frame->cf_pcc);
+#else
+	register_t pc = context->mc_pc;
+#endif
 	void * __capability reg = getCapRegAtIndex(context, frame->cf_capcause & 0xff);
 	assert_eq(signo, SIGPROT);
 	assert(test_fault_handler);
@@ -386,7 +400,7 @@ capsighandler(int signo, siginfo_t *info __unused, ucontext_t *uap)
 	}
 	else
 	{
-		context->mc_pc += 4;
+		setPc(context, pc + 4);
 	}
 }
 

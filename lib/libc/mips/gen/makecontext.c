@@ -98,7 +98,6 @@ __makecontext(ucontext_t *ucp, void (*func)(void), int argc, ...)
 	mc->mc_cheriframe.cf_c16 = ucp;
 	mc->mc_cheriframe.cf_c12 = func;
 	mc->mc_cheriframe.cf_pcc = _ctx_start;
-	mc->mc_pc = (__cheri_offset register_t)mc->mc_cheriframe.cf_pcc;
 #else
 	mc->mc_regs[SP] = (intptr_t)sp;
 	mc->mc_regs[S0] = (intptr_t)ucp;
