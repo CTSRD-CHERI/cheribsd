@@ -330,6 +330,7 @@ struct knote {
 		void		*p_v;		/* generic other pointer */
 	} kn_ptr;
 	const struct		filterops *kn_fop;
+	volatile u_int		kn_refcount;
 
 #define kn_id		kn_kevent.ident
 #define kn_filter	kn_kevent.filter
