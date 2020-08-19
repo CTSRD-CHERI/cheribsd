@@ -1115,7 +1115,6 @@ mqfs_inactive(struct vop_inactive_args *ap)
 struct vop_reclaim_args {
 	struct vop_generic_args a_gen;
 	struct vnode *a_vp;
-	struct thread *a_td;
 };
 #endif
 
