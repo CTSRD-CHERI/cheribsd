@@ -566,6 +566,7 @@ get_mcontext(struct thread *td, mcontext_t *mcp, int clear_ret)
 	mcp->mc_capregs.cap_sp = tf->tf_sp;
 	mcp->mc_capregs.cap_lr = tf->tf_lr;
 	mcp->mc_capregs.cap_elr = tf->tf_elr;
+	mcp->mc_capregs.cap_ddc = tf->tf_ddc;
 	get_fpcontext(td, mcp);
 
 	return (0);
@@ -581,13 +582,14 @@ set_mcontext(struct thread *td, mcontext_t *mcp)
 	if ((spsr & PSR_M_MASK) != PSR_M_EL0t ||
 	    (spsr & PSR_AARCH32) != 0 ||
 	    (spsr & PSR_DAIF) != (td->td_frame->tf_spsr & PSR_DAIF))
-		return (EINVAL); 
+		return (EINVAL);
 
 	memcpy(tf->tf_x, mcp->mc_capregs.cap_x, sizeof(tf->tf_x));
 
 	tf->tf_sp = mcp->mc_capregs.cap_sp;
 	tf->tf_lr = mcp->mc_capregs.cap_lr;
 	tf->tf_elr = mcp->mc_capregs.cap_elr;
+	tf->tf_ddc = mcp->mc_capregs.cap_ddc;
 	tf->tf_spsr = mcp->mc_spsr;
 	set_fpcontext(td, mcp);
 
@@ -964,6 +966,11 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	tf->tf_x[2] = (register_t)&fp->sf_uc;
 #endif
 
+	/*
+	 * TODO in CheriABI catcher will be a sentry and
+	 * should be unsealed by some privileged kernel
+	 * capability before being put into ELR.
+	 */
 	tf->tf_elr = (uintcap_t)catcher;
 	tf->tf_sp = (uintcap_t)fp;
 	sysent = p->p_sysent;

@@ -57,26 +57,31 @@ struct capregs {
 	__uintcap_t	cap_lr;
 	__uintcap_t	cap_sp;
 	__uintcap_t	cap_elr;
-};
-
-struct __mcontext {
-	struct capregs	mc_capregs;
-	struct fpregs	mc_fpregs;
-	int		mc_flags;
-#define	_MC_FP_VALID	0x1		/* Set when mc_fpregs has valid data */
-	__uint32_t	mc_spsr;
-	__uint64_t	mc_spare[8];	/* Space for expansion, set to zero */
-};
-#else
-struct __mcontext {
-	struct gpregs	mc_gpregs;
-	struct fpregs	mc_fpregs;
-	int		mc_flags;
-#define	_MC_FP_VALID	0x1		/* Set when mc_fpregs has valid data */
-	int		mc_pad;		/* Padding */
-	__uint64_t	mc_spare[8];	/* Space for expansion, set to zero */
+	__uintcap_t	cap_ddc;
 };
 #endif
+
+struct __mcontext {
+#if (defined(_KERNEL) && __has_feature(capabilities)) || \
+    defined(__CHERI_PURE_CAPABILITY__)
+	struct capregs	mc_capregs;
+#else
+	struct gpregs	mc_gpregs;
+#endif
+	struct fpregs	mc_fpregs;
+	int		mc_flags;
+#define	_MC_FP_VALID	0x1		/* Set when mc_fpregs has valid data */
+#define	_MC_CAP_VALID	0x2		/* Set when mc_capregs has valid data */
+#if (defined(_KERNEL) && __has_feature(capabilities)) || \
+    defined(__CHERI_PURE_CAPABILITY__)
+	__uint32_t	mc_spsr;
+	__uint64_t	mc_spare[8];	/* Space for expansion, set to zero */
+#else
+	int		mc_pad;		/* Padding */
+	__uint64_t	mc_capregs;
+	__uint64_t	mc_spare[7];	/* Space for expansion, set to zero */
+#endif
+};
 
 typedef struct __mcontext mcontext_t;
 
@@ -87,8 +92,10 @@ typedef struct __mcontext64 {
 	struct fpregs	mc_fpregs;
 	int		mc_flags;
 #define	_MC_FP_VALID	0x1		/* Set when mc_fpregs has valid data */
+#define	_MC_CAP_VALID	0x2		/* Set when mc_capregs has valid data */
 	int		mc_pad;		/* Padding */
-	__uint64_t	mc_spare[8];	/* Space for expansion, set to zero */
+	__uint64_t	mc_capregs;
+	__uint64_t	mc_spare[7];	/* Space for expansion, set to zero */
 } mcontext64_t;
 
 typedef struct __ucontext64 {

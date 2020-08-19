@@ -8,6 +8,7 @@
  * Copyright (c) 2016 Yukishige Shibata <y-shibat@mtd.biglobe.ne.jp>
  * All rights reserved.
  * Copyright (c) 2020 John Baldwin
+ * Copyright (c) 2020 Brett F. Gutstein
  *
  * Portions of this software were developed by SRI International and the
  * University of Cambridge Computer Laboratory under DARPA/AFRL contract
@@ -128,130 +129,102 @@ SYSINIT(freebsd64, SI_SUB_EXEC, SI_ORDER_ANY,
     (sysinit_cfunc_t) elf64_insert_brand_entry,
     &freebsd_freebsd64_brand_info);
 
-static void
-get_fpcontext64(struct thread *td, mcontext64_t *mcp)
-{
-#ifdef VFP
-	struct pcb *curpcb;
-
-	critical_enter();
-
-	curpcb = curthread->td_pcb;
-
-	if ((curpcb->pcb_fpflags & PCB_FP_STARTED) != 0) {
-		/*
-		 * If we have just been running VFP instructions we will
-		 * need to save the state to memcpy it below.
-		 */
-		vfp_save_state(td, curpcb);
-
-		KASSERT(curpcb->pcb_fpusaved == &curpcb->pcb_fpustate,
-		    ("Called get_fpcontext while the kernel is using the VFP"));
-		KASSERT((curpcb->pcb_fpflags & ~PCB_FP_USERMASK) == 0,
-		    ("Non-userspace FPU flags set in get_fpcontext"));
-		memcpy(mcp->mc_fpregs.fp_q, curpcb->pcb_fpustate.vfp_regs,
-		    sizeof(mcp->mc_fpregs));
-		mcp->mc_fpregs.fp_cr = curpcb->pcb_fpustate.vfp_fpcr;
-		mcp->mc_fpregs.fp_sr = curpcb->pcb_fpustate.vfp_fpsr;
-		mcp->mc_fpregs.fp_flags = curpcb->pcb_fpflags;
-		mcp->mc_flags |= _MC_FP_VALID;
-	}
-
-	critical_exit();
-#endif
-}
+/*
+ * Number of registers in gpregs that are mirrored in capregs
+ * up to, but not including elr.
+ */
+#define	CONTEXT64_COPYREGS	(offsetof(struct gpregs, gp_elr) / sizeof(register_t))
 
 static void
-set_fpcontext64(struct thread *td, mcontext64_t *mcp)
+mcontext_to_mcontext64(mcontext_t *mc, mcontext64_t *mc64)
 {
-#ifdef VFP
-	struct pcb *curpcb;
+	const uintcap_t *creg;
+	register_t *greg;
+	u_int i;
 
-	critical_enter();
-
-	if ((mcp->mc_flags & _MC_FP_VALID) != 0) {
-		curpcb = curthread->td_pcb;
-
-		/*
-		 * Discard any vfp state for the current thread, we
-		 * are about to override it.
-		 */
-		vfp_discard(td);
-
-		KASSERT(curpcb->pcb_fpusaved == &curpcb->pcb_fpustate,
-		    ("Called set_fpcontext while the kernel is using the VFP"));
-		memcpy(curpcb->pcb_fpustate.vfp_regs, mcp->mc_fpregs.fp_q,
-		    sizeof(mcp->mc_fpregs));
-		curpcb->pcb_fpustate.vfp_fpcr = mcp->mc_fpregs.fp_cr;
-		curpcb->pcb_fpustate.vfp_fpsr = mcp->mc_fpregs.fp_sr;
-		curpcb->pcb_fpflags = mcp->mc_fpregs.fp_flags & PCB_FP_USERMASK;
-	}
-
-	critical_exit();
-#endif
+	memset(mc64, 0, sizeof(*mc64));
+	creg = (uintcap_t *)&mc->mc_capregs;
+	greg = (register_t *)&mc64->mc_gpregs;
+	for (i = 0; i < CONTEXT64_COPYREGS; i++)
+		greg[i] = (__cheri_addr register_t)creg[i];
+	mc64->mc_gpregs.gp_elr =
+	    (__cheri_offset register_t)mc->mc_capregs.cap_elr;
+	mc64->mc_gpregs.gp_spsr = mc->mc_spsr;
+	mc64->mc_flags = mc->mc_flags;
+	if (mc->mc_flags & _MC_FP_VALID)
+		mc64->mc_fpregs = mc->mc_fpregs;
 }
 
 int
 freebsd64_get_mcontext(struct thread *td, mcontext64_t *mcp, int flags)
 {
-	struct trapframe *tf = td->td_frame;
-	int i;
+	mcontext_t mc;
+	int error;
 
-	if (flags & GET_MC_CLEAR_RET) {
-		mcp->mc_gpregs.gp_x[0] = 0;
-		mcp->mc_gpregs.gp_spsr = tf->tf_spsr & ~PSR_C;
-	} else {
-		mcp->mc_gpregs.gp_x[0] = tf->tf_x[0];
-		mcp->mc_gpregs.gp_spsr = tf->tf_spsr;
-	}
+	error = get_mcontext(td, &mc, flags);
+	if (error != 0)
+		return (error);
 
-	for (i = 1; i < nitems(tf->tf_x); i++)
-		mcp->mc_gpregs.gp_x[i] = tf->tf_x[i];
-
-	mcp->mc_gpregs.gp_sp = tf->tf_sp;
-	mcp->mc_gpregs.gp_lr = tf->tf_lr;
-	mcp->mc_gpregs.gp_elr = tf->tf_elr;
-	get_fpcontext64(td, mcp);
-
+	mcontext_to_mcontext64(&mc, mcp);
 	return (0);
 }
 
 int
 freebsd64_set_mcontext(struct thread *td, mcontext64_t *mcp)
 {
-	struct trapframe *tf = td->td_frame;
-	uint32_t spsr;
-	int i;
+	mcontext_t mc;
+	uintcap_t *creg;
+	const register_t *greg;
+	int error;
+	u_int i;
 
-	spsr = mcp->mc_gpregs.gp_spsr;
-	if ((spsr & PSR_M_MASK) != PSR_M_EL0t ||
-	    (spsr & PSR_AARCH32) != 0 ||
-	    (spsr & PSR_DAIF) != (td->td_frame->tf_spsr & PSR_DAIF))
-		return (EINVAL);
+	memset(&mc, 0, sizeof(mc));
+	if (mcp->mc_flags & _MC_CAP_VALID) {
+		error = copyincap(__USER_CAP(mcp->mc_capregs,
+		    sizeof(mc.mc_capregs)), &mc.mc_capregs,
+		    sizeof(mc.mc_capregs));
+		if (error)
+			return (error);
 
-	for (i = 0; i < nitems(tf->tf_x); i++)
-		tf->tf_x[i] = mcp->mc_gpregs.gp_x[i];
+		/* XXX: Permit userland to change GPRs for sigreturn? */
 
-	tf->tf_sp = mcp->mc_gpregs.gp_sp;
-	tf->tf_lr = mcp->mc_gpregs.gp_lr;
-	tf->tf_elr = mcp->mc_gpregs.gp_elr;
-	tf->tf_spsr = mcp->mc_gpregs.gp_spsr;
-	set_fpcontext64(td, mcp);
+		/* Honor 64-bit PC. */
+		mc.mc_capregs.cap_elr = (uintcap_t)cheri_setoffset(
+		    (void * __capability)mc.mc_capregs.cap_elr,
+		    mcp->mc_gpregs.gp_elr);
+	} else {
+		creg = (uintcap_t *)&mc.mc_capregs;
+		greg = (register_t *)&mcp->mc_gpregs;
+		for (i = 0; i < CONTEXT64_COPYREGS; i++)
+			creg[i] = (uintcap_t)greg[i];
 
-	return (0);
+		mc.mc_capregs.cap_elr = (uintcap_t)cheri_setoffset(
+		    (void * __capability)td->td_frame->tf_elr,
+		    mcp->mc_gpregs.gp_elr);
+		mc.mc_capregs.cap_ddc = td->td_frame->tf_ddc;
+	}
+
+	/* spsr is stored outside of capregs. */
+	mc.mc_spsr = mcp->mc_gpregs.gp_spsr;
+
+	mc.mc_flags = mcp->mc_flags & ~_MC_CAP_VALID;
+	if (mcp->mc_flags & _MC_FP_VALID)
+		mc.mc_fpregs = mcp->mc_fpregs;
+
+	return (set_mcontext(td, &mc));
 }
 
 static void
 freebsd64_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 {
 	struct sigframe64 *fp, frame;
-	//mcontext64_t mc;
+	mcontext_t mc;
 	struct sysentvec *sysent;
 	struct trapframe *tf;
 	struct sigacts *psp;
 	struct thread *td;
 	struct proc *p;
-	vm_offset_t sp; //, capregs;
+	vm_offset_t sp, capregs;
 	int onstack;
 	int sig;
 
@@ -267,23 +240,21 @@ freebsd64_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	onstack = sigonstack(tf->tf_sp);
 
 	CTR4(KTR_SIG, "sendsig: td=%p (%s) catcher=%p sig=%d", td, p->p_comm,
-	    catcher, sig);
+	    (__cheri_addr vaddr_t) catcher, sig);
 
 	/* Allocate and validate space for the signal handler context. */
 	if ((td->td_pflags & TDP_ALTSTACK) != 0 && !onstack &&
 	    SIGISMEMBER(psp->ps_sigonstack, sig)) {
-		sp = ((__cheri_addr uintptr_t)td->td_sigstk.ss_sp +
+		sp = ((__cheri_addr vaddr_t)td->td_sigstk.ss_sp +
 		    td->td_sigstk.ss_size);
 	} else {
-		sp = (__cheri_addr uintptr_t)td->td_frame->tf_sp;
+		sp = (__cheri_addr vaddr_t)td->td_frame->tf_sp;
 	}
 
-#if 0
 	/* Allocate room for the capability register context. */
 	sp -= sizeof(mc.mc_capregs);
 	sp = rounddown2(sp, sizeof(uintcap_t));
 	capregs = sp;
-#endif
 
 	/* Make room, keeping the stack aligned */
 	sp -= sizeof(*fp);
@@ -292,19 +263,19 @@ freebsd64_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 
 	/* Fill in the frame to copy out */
 	bzero(&frame, sizeof(frame));
-	freebsd64_get_mcontext(td, &frame.sf_uc.uc_mcontext, 0);
-	//frame.sf_uc.uc_mcontext.mc_flags |= _MC_CAP_VALID;
-	//frame.sf_uc.uc_mcontext.mc_capregs = capregs;
+	get_mcontext(td, &mc, 0);
+	mcontext_to_mcontext64(&mc, &frame.sf_uc.uc_mcontext);
+	frame.sf_uc.uc_mcontext.mc_flags |= _MC_CAP_VALID;
+	frame.sf_uc.uc_mcontext.mc_capregs = capregs;
 	siginfo_to_siginfo64(&ksi->ksi_info, &frame.sf_si);
 	frame.sf_uc.uc_sigmask = *mask;
-	frame.sf_uc.uc_stack.ss_sp = (__cheri_addr uintptr_t)td->td_sigstk.ss_sp;
+	frame.sf_uc.uc_stack.ss_sp = (__cheri_addr vaddr_t)td->td_sigstk.ss_sp;
 	frame.sf_uc.uc_stack.ss_size = td->td_sigstk.ss_size;
 	frame.sf_uc.uc_stack.ss_flags = (td->td_pflags & TDP_ALTSTACK) != 0 ?
 	    (onstack ? SS_ONSTACK : 0) : SS_DISABLE;
 	mtx_unlock(&psp->ps_mtx);
 	PROC_UNLOCK(td->td_proc);
 
-#if 0
 	/* Copy the capability registers out to the user's stack. */
 	if (copyoutcap(&mc.mc_capregs, __USER_CAP(capregs,
 	    sizeof(mc.mc_capregs)), sizeof(mc.mc_capregs)) != 0) {
@@ -314,7 +285,6 @@ freebsd64_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 		sigexit(td, SIGILL);
 		/* NOTREACHED */
 	}
-#endif
 
 	/* Copy the sigframe out to the user's stack. */
 	if (copyoutcap(&frame, __USER_CAP_OBJ(fp), sizeof(*fp)) != 0) {
@@ -338,7 +308,7 @@ freebsd64_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 		tf->tf_lr = (register_t)(sysent->sv_psstrings -
 		    *(sysent->sv_szsigcode));
 
-	CTR3(KTR_SIG, "sendsig: return td=%p pc=%#x sp=%#x", td, tf->tf_sepc,
+	CTR3(KTR_SIG, "sendsig: return td=%p pc=%#x sp=%#x", td, tf->tf_elr,
 	    tf->tf_sp);
 
 	PROC_LOCK(p);
