@@ -265,8 +265,10 @@ ENTRY(fork_trampoline)
 #if __has_feature(capabilities)
 	ldr	c0, [sp, #TF_ELR]
 	ldr	x1, [sp, #TF_SPSR]
-	cvtp	c0, x0
 	msr	celr_el1, c0
+	/* Restore ddc */
+	ldr	c0, [sp, #TF_DDC]
+	msr	ddc_el0, c0
 #else
 	ldp	x0, x1, [sp, #TF_ELR]
 	msr	elr_el1, x0
