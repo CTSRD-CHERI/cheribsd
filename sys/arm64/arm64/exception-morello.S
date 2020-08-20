@@ -106,16 +106,20 @@ __FBSDID("$FreeBSD$");
 	ldp	c18, clr, [sp, #(TF_SP)]
 	ldr	c10, [sp, #(TF_ELR)]
 	ldr	c9, [sp, #(TF_DDC)]
-	/* TODO: Remove when the kernel understands capabilities */
+	/*
+	 * XXX Fix invalid PCCs from kernel space until the
+	 * kernel understands capabilities better.
+	 */
+.if \el == 1
 	cvtp	c10, x10
+.endif
 	ldr	w11, [sp, #(TF_SPSR)]
 .if \el == 0
 	msr	csp_el0, c18
 .endif
 	msr	spsr_el1, x11
 	msr	celr_el1, c10
-	/* TODO: Enable when we set a per-proces DDC */
-	/*msr	ddc_el0, c9*/
+	msr	ddc_el0, c9
 	ldp	c0,  c1,  [sp, #(TF_X + 0  * 16)]
 	ldp	c2,  c3,  [sp, #(TF_X + 2  * 16)]
 	ldp	c4,  c5,  [sp, #(TF_X + 4  * 16)]
