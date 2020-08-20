@@ -91,8 +91,12 @@
 	(CHERI_PERM_GLOBAL | CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP |	\
 	(CHERI_PERMS_SWALL & ~CHERI_PERM_CHERIABI_VMMAP))
 
+/*
+ * XXX Will probaby want non-executive PCC when we add comparmentalization
+ * support, but make all code caps executive for now.
+ */
 #define	CHERI_PERMS_USERSPACE_CODE					\
-	(CHERI_PERMS_USERSPACE | CHERI_PERM_EXECUTE)
+	(CHERI_PERMS_USERSPACE | CHERI_PERM_EXECUTE | CHERI_PERM_EXECUTIVE)
 
 #define	CHERI_PERMS_USERSPACE_SEALCAP					\
 	(CHERI_PERM_GLOBAL | CHERI_PERM_SEAL | CHERI_PERM_UNSEAL)
@@ -116,8 +120,12 @@
 #define	CHERI_PERMS_KERNEL						\
 	(CHERI_PERM_GLOBAL | CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP)	\
 
+/*
+ * XXX Will probaby want non-executive PCC when we add comparmentalization
+ * support, but make all code caps executive for now.
+ */
 #define	CHERI_PERMS_KERNEL_CODE						\
-	(CHERI_PERMS_KERNEL | CHERI_PERM_EXECUTE | CHERI_PERM_SYSTEM_REGS)
+	(CHERI_PERMS_KERNEL | CHERI_PERM_EXECUTE | CHERI_PERM_SYSTEM_REGS | CHERI_PERM_EXECUTIVE)
 
 #define	CHERI_PERMS_KERNEL_DATA						\
 	(CHERI_PERMS_KERNEL | CHERI_PERM_STORE | CHERI_PERM_STORE_CAP |	\
