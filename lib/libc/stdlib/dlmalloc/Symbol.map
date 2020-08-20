@@ -10,6 +10,7 @@ FBSD_1.0 {
 	realloc;
 	free;
 	malloc_usable_size;
+	malloc_revoke;
 };
 
 FBSDprivate_1.0 {
