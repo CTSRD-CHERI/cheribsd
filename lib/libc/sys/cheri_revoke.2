@@ -1,0 +1,265 @@
+.\" Copyright (c) 2020 Microsoft, Inc.
+.\" All rights reserved.
+.\"
+.\" This documentation was written by
+.\" Nathaniel Filardo <nfilardo@microsoft.com>
+.\"
+.\" Redistribution and use in source and binary forms, with or without
+.\" modification, are permitted provided that the following conditions
+.\" are met:
+.\" 1. Redistributions of source code must retain the above copyright
+.\"    notice, this list of conditions and the following disclaimer.
+.\" 2. Redistributions in binary form must reproduce the above copyright
+.\"    notice, this list of conditions and the following disclaimer in the
+.\"    documentation and/or other materials provided with the distribution.
+.\"
+.\" THIS SOFTWARE IS PROVIDED BY THE AUTHORS AND CONTRIBUTORS ``AS IS'' AND
+.\" ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+.\" IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+.\" ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHORS OR CONTRIBUTORS BE LIABLE
+.\" FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+.\" DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+.\" OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+.\" HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+.\" LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+.\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+.\" SUCH DAMAGE.
+.\"
+.\" $FreeBSD$
+.\"
+.Dd August 20, 2020
+.Dt CHERI_REVOKE 2
+.Os
+.Sh NAME
+.Nm cheri_revoke
+.Nm cheri_revoke_shadow
+.Nd interface to sweeping revocation of CHERI capabilities
+.Sh LIBRARY
+.Lb libc
+.Sh SYNOPSIS
+.In cheri/revoke.h
+.Ft int
+.Fn cheri_revoke_shadow "int flags" "void * __capability arena" "void * __capability * shadow"
+.Ft int
+.Fn cheri_revoke "int flags" "cheri_revoke_epoch start" "struct cheri_revoke_stats *"
+.Sh DESCRIPTION
+The kernel exposes a CHERI capability revocation service,
+a mechanism to revoke capabilities to regions of the address space.
+Requests for revocation are made by setting bits
+in the shadow bitmap and
+invokving the
+.Fn cheri_revoke
+system call.
+.Pp
+The
+.Fn cheri_revoke_shadow
+system call is used to obtain access to segments of the shadow bitmap
+and to global revocation metadata.
+The
+.Fa flags
+argument governs the behavior of the call:
+.Bl -tag
+.It Bq CHERI_REVOKE_SHADOW_NOVMMAP
+.Fa arena
+should be a capability bearing the
+.Dv VMMAP
+software permission,
+as returned by, for example,
+.Xr mmap 2 ,
+and it will store to its
+.Fa shadow
+argument a capability authorizing access to the shadow of the
+.Fa arena .
+A bit set in the region authorized by
+.Fa shadow
+corresponds to a request for revocation of capabilities lacking the
+.Dv VMMAP
+permission and whose
+.Em base
+points to the granule corresponding to that bit.
+.It Bq CHERI_REVOKE_SHADOW_INFO_STRUCT
+.Fa arena
+is ignored and
+.Fa shadow
+will be set to a pointer to the global
+.Dv cheri_revoke_info
+structure,
+which the kernel maintains with the current epoch counters.
+.El
+.Pp
+The
+.Fn cheri_revoke
+system call
+interfaces with this CHERI capability revocation service
+to advance or synchronize with
+the revocation state machine and revocation epoch clock.
+Its
+.Fa start
+argument is used for relaxed synchronization
+between multiple users of the revocation service.
+If the epoch clock has advanced beyond the provided value,
+the function will generally return immediately.
+The
+.Fa cheri_revoke_stats
+argument is provided mostly for experimentation
+and may be
+.Dv NULL .
+Its
+.Fa flags
+argument is,
+for the moment,
+mostly reserved for experimentation.
+The sole value that may be of interest is
+.Dv CHERI_REVOKE_IGNORE_START
+which causes the
+.Fa start
+argument to be ignored
+and the epoch counter
+obtained by synchronizing with the revocation service
+to be used instead.
+Callers should always pass
+.Dv CHERI_REVOKE_LAST_PASS
+as well unless they are engaging in multi-pass experiments;
+see the source.
+.Sh EXAMPLES
+.Pp
+At allocator startup or upon first need, obtain a capability to the global
+.Dv cheri_revoke_info
+structure,
+and store it to an allocator local variable:
+.Bd -literal
+    static struct cheri_revoke_info *cri;
+
+    int res = cheri_revoke_shadow(CHERI_REVOKE_SHADOW_INFO_STRUCT, NULL, &cri);
+    assert(res == 0);
+.Ed
+.Pp
+For a very simple allocator,
+it suffices to collect
+.Fn free
+memory into quarantine and then revoke it all at once:
+.Bd -literal
+    cheri_revoke_shadow(CHERI_REVOKE_SHADOW_NOVMMAP, arena, &shadow);
+    /* elided: set bits in shadow corresponding to quarantine */
+
+    atomic_thread_fence(memory_order_acq_rel);
+    cheri_revoke_epoch epoch_start = cri->epochs.enqueue;
+
+    while(!cheri_revoke_epoch_clears(cri->epochs.dequeue, epoch_start)) {
+      cheri_revoke(CHERI_REVOKE_LAST_PASS, epoch_start, NULL);
+    }
+
+    /* elided: clear bits in shadow corresponding to quarantine */
+    atomic_thread_fence(memory_order_rel);
+
+    /* It is now safe to reuse quarantined memory */
+.Ed
+.Pp
+The release fence may be merged into a subsequent lock release, but the
+acquire-release fence is requisite in almost all cases.
+.Pp
+For more complex allocators, several steps are necessary.
+.Pp
+Whenever allocating a new arena using
+.Xr mmap 2
+also obtain access to the shadow space:
+.Bd -literal
+    struct arena_meta *meta = // ...
+    meta->ptr = mmap(/* ... */);
+ 
+    int res = cheri_revoke_shadow(CHERI_REVOKE_SHADOW_NOVMMAP, meta->ptr,
+                               &meta->caprev_sh);
+    assert(res == 0);
+.Ed
+.Pp
+When a chunk of quarantine fills,
+label it with its
+.Em enqueue
+epoch counter:
+.Bd -literal
+    // elided: fill out the shadow bitmap prior to here
+    atomic_thread_fence(memory_order_acq_rel); // publish shadow
+    chunk->caprev_enq = cri->epochs.enqueue; // label this chunk
+.Ed
+.Pp
+When revocation becomes necessary,
+loop until the
+.Em dequeue
+epoch counter clears the eldest chunk,
+and then return all usable chunks to service:
+.Bd -literal
+    while(!cheri_revoke_epoch_clears(cri->epochs.dequeue, chunk->caprev_enq)) {
+      cheri_revoke(CHERI_REVOKE_LAST_PASS, chunk->caprev_enq, NULL);
+    }
+    more = chunk->next;
+    /* This chunk is certainly reusable now */
+    reusable(chunk);
+
+    /* And others may be as well */
+    for(chunk = more; 
+        chunk && caprev_epoch_clears(cri->epochs.dequeue, chunk->caprev_enq);
+        chunk = chunk->next) {
+      reusable(chunk);
+    }
+.Ed
+.Pp
+The
+.Fn reusable
+function in this example is responsible for clearing shadow bits.
+The allocator as a whole,
+but not necessarily the
+.Fn reusable
+function itself,
+must, as before,
+execute a release fence
+before actually reusing memory.
+.Sh ERRORS
+.Fn cheri_revoke_info
+fails with
+.Bl -tag -width Er
+.It Bq Er EPERM
+if the
+.Fa arena
+for
+.DV CHERI_REVOKE_SHADOW_MEM
+does not cary the
+.Dv VMMAP
+permission.
+.It Bq Er EINVAL
+if the
+.Fa arena
+for
+.Dv CHERI_REVOKE_SHADOW_MEM
+is not sufficiently aligned and sized.
+.It Bq Er EINVAL
+if the
+.Fa shadow
+parameter for either
+.Dv CHERI_REVOKE_SHADOW_MEM
+or
+.Dv CHERI_REVOKE_SHADOW_INFO
+points to an invalid address.
+.El
+.Pp
+.Fn cheri_revoke
+will return 0 if the
+.Fa start
+epoch has been cleared by time of return;
+otherwise, it reutrns
+.Bl -tag -width Er
+.It Bq Er EAGAIN
+if the
+.Fa start
+epoch is presently open or in the future
+.It Bq Er EINVAL
+if invalid
+.Fa flags
+have been specified
+.It Bq Er EINVAL
+if
+.Fa start
+does not describe an epoch and
+.Dv CHERI_REVOKE_IGNORE_START
+was not given in
+.Fa flags .
+.El
