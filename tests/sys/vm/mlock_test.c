@@ -100,6 +100,9 @@ ATF_TC_BODY(mlock__copy_on_write_anon, tc)
 ATF_TC_WITHOUT_HEAD(mlock__copy_on_write_vnode);
 ATF_TC_BODY(mlock__copy_on_write_vnode, tc)
 {
+#ifdef __CHERI_PURE_CAPABILITY__
+	atf_tc_skip("Cannot get a usable pointer to a function in CheriABI");
+#else
 	void *addr;
 	int len;
 
@@ -107,6 +110,7 @@ ATF_TC_BODY(mlock__copy_on_write_vnode, tc)
 	addr = __builtin_align_down((void *)test_wired_copy_on_write, len);
 
 	test_wired_copy_on_write(addr, len);
+#endif
 }
 
 /*
