@@ -65,8 +65,10 @@ vm_caprevoke_test_mem_map(const uint8_t * __capability crshadow,
 	{
 		int bmbits_ext = fubyte(bmloc);
 		if (bmbits_ext == -1) {
-			printf("caprevoke: failed to read shadow for %#p;"
-				"assuming not revoked!\n", cut);
+			printf("%s: failed to read shadow for "
+			    _CHERI_PRINTF_CAP_FMT
+			    "; assuming not revoked!\n", __func__,
+			    _CHERI_PRINTF_CAP_ARG(cut));
 			return 0;
 		}
 		bmbits = bmbits_ext & 0xFF;
@@ -102,8 +104,10 @@ vm_caprevoke_test_mem_nomap(const uint8_t * __capability crshadow,
 	{
 		int bmbits_ext = fubyte(bmloc);
 		if (bmbits_ext == -1) {
-			printf("caprevoke: failed to read shadow for %#p;"
-				"assuming not revoked!\n", cut);
+			printf("%s: failed to read shadow for "
+			    _CHERI_PRINTF_CAP_FMT
+			    "; assuming not revoked!\n", __func__,
+			    _CHERI_PRINTF_CAP_ARG(cut));
 			return 0;
 		}
 		bmbits = bmbits_ext & 0xFF;
