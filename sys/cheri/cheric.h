@@ -201,16 +201,22 @@ cheri_bytes_remaining(const void * __capability cap)
 #define cheri_cap_to_typed_ptr(cap, type)				\
 	(type *)cheri_cap_to_ptr(cap, sizeof(type))
 
-#define _CHERI_PRINTF_CAP_FMT  "v:%lu s:%lu p:%08lx f:%01lx b:%016jx l:%016zx o:%jx t:%ld"
+#define _CHERI_PRINTF_CAP_FMT  "0x%016lx [%s%s%s%s%s,0x%016lx-0x%016lx]%s"
 #define _CHERI_PRINTF_CAP_ARG(ptr)					\
-	    (unsigned long)cheri_gettag((const void * __capability)(ptr)),		\
-	    (unsigned long)cheri_getsealed((const void * __capability)(ptr)),		\
-	    cheri_getperm((const void * __capability)(ptr)),		\
-	    cheri_getflags((const void * __capability)(ptr)),		\
+	    cheri_getaddress((const void * __capability)(ptr)),		\
+	    cheri_getperm((const void * __capability)(ptr)) &		\
+		CHERI_PERM_LOAD ? "r" : "",				\
+	    cheri_getperm((const void * __capability)(ptr)) &		\
+		CHERI_PERM_STORE ? "w" : "",				\
+	    cheri_getperm((const void * __capability)(ptr)) &		\
+		CHERI_PERM_EXECUTE ? "x" : "",				\
+	    cheri_getperm((const void * __capability)(ptr)) &		\
+		CHERI_PERM_LOAD_CAP ? "R" : "",				\
+	    cheri_getperm((const void * __capability)(ptr)) &		\
+		CHERI_PERM_STORE_CAP ? "W" : "",			\
 	    cheri_getbase((const void * __capability)(ptr)),		\
-	    cheri_getlen((const void * __capability)(ptr)),		\
-	    cheri_getoffset((const void * __capability)(ptr)),		\
-	    (long)cheri_gettype((const void * __capability)(ptr))
+	    cheri_gettop((const void * __capability)(ptr)),		\
+	    _cheri_attrstring((const void * __capability)(ptr))
 
 #define _CHERI_PRINT_PTR_FMT(ptr)					\
 	    "%s: " #ptr " " _CHERI_PRINTF_CAP_FMT "\n", __func__,	\
@@ -221,6 +227,32 @@ cheri_bytes_remaining(const void * __capability cap)
 
 #define CHERI_FPRINT_PTR(f, ptr)					\
 	fprintf(f, _CHERI_PRINT_PTR_FMT(ptr))
+
+static inline const char *
+_cheri_attrstring(const void * __capability ptr)
+{
+
+	switch (cheri_gettype(ptr)) {
+	case CHERI_OTYPE_UNSEALED:
+		if (cheri_gettag(ptr))
+			return ("");
+		else
+			return (" (invalid)");
+		break;
+	case CHERI_OTYPE_SENTRY:
+		if (cheri_gettag(ptr))
+			return (" (sentry)");
+		else
+			return (" (invalid,sentry)");
+		break;
+	default:
+		if (cheri_gettag(ptr))
+			return (" (sealed)");
+		else
+			return (" (invalid,sealed)");
+	}
+}
+
 #endif	/* __has_feature(capabilities) */
 
 /*
