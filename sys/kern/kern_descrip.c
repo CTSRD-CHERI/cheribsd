@@ -3964,7 +3964,6 @@ kern_proc_filedesc_out(struct proc *p,  struct sbuf *sb, ssize_t maxlen,
 			vrefact(pwd->pwd_jdir);
 			export_vnode_to_sb(pwd->pwd_jdir, KF_FD_TYPE_JAIL, FREAD, efbuf);
 		}
-		pwd_drop(pwd);
 	}
 	lastfile = fdlastfile(fdp);
 	for (i = 0; fdp->fd_refcnt > 0 && i <= lastfile; i++) {
@@ -3986,6 +3985,8 @@ kern_proc_filedesc_out(struct proc *p,  struct sbuf *sb, ssize_t maxlen,
 			break;
 	}
 	FILEDESC_SUNLOCK(fdp);
+	if (pwd != NULL)
+		pwd_drop(pwd);
 	fddrop(fdp);
 fail:
 	free(efbuf, M_TEMP);
@@ -4107,7 +4108,6 @@ sysctl_kern_proc_ofiledesc(SYSCTL_HANDLER_ARGS)
 		if (pwd->pwd_jdir != NULL)
 			export_vnode_for_osysctl(pwd->pwd_jdir, KF_FD_TYPE_JAIL, kif,
 			    okif, fdp, req);
-		pwd_drop(pwd);
 	}
 	lastfile = fdlastfile(fdp);
 	for (i = 0; fdp->fd_refcnt > 0 && i <= lastfile; i++) {
@@ -4123,6 +4123,8 @@ sysctl_kern_proc_ofiledesc(SYSCTL_HANDLER_ARGS)
 			break;
 	}
 	FILEDESC_SUNLOCK(fdp);
+	if (pwd != NULL)
+		pwd_drop(pwd);
 	fddrop(fdp);
 	free(kif, M_TEMP);
 	free(okif, M_TEMP);
