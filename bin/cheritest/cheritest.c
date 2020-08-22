@@ -1715,6 +1715,10 @@ static const struct cheri_test cheri_tests[] = {
 	  .ct_desc = "Check that zero-sized mallocs are properly bounded",
 	  .ct_func = test_cheriabi_malloc_zero_size },
 
+	{ .ct_name = "test_cheriabi_printf_cap",
+	  .ct_desc = "Various checks of %#p",
+	  .ct_func = test_cheriabi_printf_cap },
+
 	/*
 	 * Tests for pathname handling in open(2).
 	 */

@@ -920,9 +920,10 @@ fp_common:
 			pointer = GETARG(void *);
 			if (flags & ALT) {
 				cp = buf + BUF;
-				cp = __cheri_ptr_alt(pointer, cp,
-				xdigs_lower);
+				cp = __cheri_ptr_alt(pointer, cp, xdigs_lower,
+				    prec);
 				size = buf + BUF - cp;
+				flags &= ~ZEROPAD;
 				break;
 			}
 			ujval = cheri_getbase(pointer) +
