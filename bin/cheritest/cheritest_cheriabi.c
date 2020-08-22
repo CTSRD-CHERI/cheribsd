@@ -46,6 +46,7 @@
 
 #include <machine/sysarch.h>
 
+#include <assert.h>
 #include <err.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -249,5 +250,163 @@ test_cheriabi_malloc_zero_size(const struct cheri_test *ctp __unused)
 	if (cap != NULL && cheri_getlength(cap) != 0)
 		cheritest_failure_errx("malloc(0) returned a non-NULL capability with "
 		    "non-zero length (%zu)", cheri_getlength(cap));
+	cheritest_success();
+}
+
+static void
+test_cheriabi_printf_cap_one(void *p, int expected_tokens, const char *descr)
+{
+	char perms[16], *permsp;
+	char attr[32];
+	char *str;
+	unsigned long addr, base, top;
+	int tokens;
+
+	assert(expected_tokens == 1 || expected_tokens == 4 ||
+	    expected_tokens == 5);
+
+	asprintf(&str, "%#p", p);
+	tokens = sscanf(str, "%lx [%15[^,],%lx-%lx] %31s", &addr, perms, &base,
+	    &top, attr);
+	free(str);
+	if (tokens != expected_tokens)
+		cheritest_failure_errx("Mismatched tokens for %s, "
+		    "expected %d got %d", descr, expected_tokens, tokens);
+
+	if (addr != cheri_getaddress(p))
+		cheritest_failure_errx("Mismatched address for %s", descr);
+
+	if (tokens == 1)
+		return;
+
+	permsp = perms;
+	if ((cheri_getperm(p) & CHERI_PERM_LOAD) != 0) {
+		if (*permsp != 'r')
+			cheritest_failure_errx("Missing 'r' permission for %s",
+			    descr);
+		permsp++;
+	}
+	if ((cheri_getperm(p) & CHERI_PERM_STORE) != 0) {
+		if (*permsp != 'w')
+			cheritest_failure_errx("Missing 'w' permission for %s",
+			    descr);
+		permsp++;
+	}
+	if ((cheri_getperm(p) & CHERI_PERM_EXECUTE) != 0) {
+		if (*permsp != 'x')
+			cheritest_failure_errx("Missing 'x' permission for %s",
+			    descr);
+		permsp++;
+	}
+	if ((cheri_getperm(p) & CHERI_PERM_LOAD) != 0) {
+		if (*permsp != 'R')
+			cheritest_failure_errx("Missing 'R' permission for %s",
+			    descr);
+		permsp++;
+	}
+	if ((cheri_getperm(p) & CHERI_PERM_STORE) != 0) {
+		if (*permsp != 'W')
+			cheritest_failure_errx("Missing 'W' permission for %s",
+			    descr);
+		permsp++;
+	}
+	if (*permsp != '\0')
+		cheritest_failure_errx("Extra permissions '%s' for %s", permsp,
+		    descr);
+
+	if (base != cheri_getbase(p))
+		cheritest_failure_errx("Mismatched base for %s", descr);
+	if (top != cheri_getbase(p) + cheri_getlength(p))
+		cheritest_failure_errx("Mismatched top for %s", descr);
+
+	if (tokens == 4)
+		return;
+
+	if (cheri_gettag(p)) {
+		if (strstr(attr, "invalid") != NULL)
+			cheritest_failure_errx("Tagged cap marked invalid "
+			    "for %s", descr);
+	} else {
+		if (strstr(attr, "invalid") == NULL)
+			cheritest_failure_errx("Untagged cap not marked "
+			    "invalid for %s", descr);
+	}
+
+	switch (cheri_gettype(p)) {
+	case CHERI_OTYPE_UNSEALED:
+		if (strstr(attr, "sealed") != NULL)
+			cheritest_failure_errx("Unsealed cap marked as "
+			    "sealed for %s", descr);
+		if (strstr(attr, "sentry") != NULL)
+			cheritest_failure_errx("Unsealed cap marked as "
+			    "sentry for %s", descr);
+		break;
+	case CHERI_OTYPE_SENTRY:
+		if (strstr(attr, "sealed") != NULL)
+			cheritest_failure_errx("Sentry cap marked as "
+			    "sealed for %s", descr);
+		if (strstr(attr, "sentry") == NULL)
+			cheritest_failure_errx("Sentry cap not marked as "
+			    "sentry for %s", descr);
+		break;
+	default:
+		if (strstr(attr, "sealed") == NULL)
+			cheritest_failure_errx("Sealed cap not marked as "
+			    "sealed for %s", descr);
+		if (strstr(attr, "sentry") != NULL)
+			cheritest_failure_errx("Sealed cap marked as "
+			    "sentry for %s", descr);
+		break;
+	}
+}
+
+void
+test_cheriabi_printf_cap(const struct cheri_test *ctp __unused)
+{
+	char data[64];
+
+	snprintf(data, sizeof(data), "%#p", (void *)(uintcap_t)4);
+	if (strcmp(data, "0x4") != 0)
+		cheritest_failure_errx("Wrong output for simple scalar");
+
+	snprintf(data, sizeof(data), "%#.4p", (void *)(uintcap_t)4);
+	if (strcmp(data, "0x0004") != 0)
+		cheritest_failure_errx("Wrong output for simple scalar "
+		    "with precision");
+
+	snprintf(data, sizeof(data), "%#8p", (void *)(uintcap_t)4);
+	if (strcmp(data, "     0x4") != 0)
+		cheritest_failure_errx("Wrong output for simple scalar "
+		    "with padding");
+
+	snprintf(data, sizeof(data), "%#-8p", (void *)(uintcap_t)4);
+	if (strcmp(data, "0x4     ") != 0)
+		cheritest_failure_errx("Wrong output for simple scalar "
+		    "with left adjust padding");
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wformat"
+	snprintf(data, sizeof(data), "%#08p", (void *)(uintcap_t)4);
+	if (strcmp(data, "     0x4") != 0)
+		cheritest_failure_errx("Wrong output for simple scalar "
+		    "with zero (ignored) padding");
+#pragma clang diagnostic pop
+
+	snprintf(data, sizeof(data), "%#8.4p", (void *)(uintcap_t)4);
+	if (strcmp(data, "  0x0004") != 0)
+		cheritest_failure_errx("Wrong output for simple scalar "
+		    "with precision and padding");
+
+	test_cheriabi_printf_cap_one(__builtin_return_address(0), 5,
+	    "return address");
+
+	test_cheriabi_printf_cap_one((void *)(uintcap_t)4, 1,
+	    "null-derived capability");
+
+	test_cheriabi_printf_cap_one(data, 4, "stack array");
+
+	test_cheriabi_printf_cap_one(cheri_cleartag(data), 5,
+	    "untagged stack array");
+
 	cheritest_success();
 }
