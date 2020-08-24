@@ -801,9 +801,8 @@ reswitch:	switch (ch = (u_char)*fmt++) {
 #ifdef __CHERI_PURE_CAPABILITY__
 			if (sharpflag) {
 				void *ptr = va_arg(ap, void *);
-				int orig_width, orig_dwidth;
+				int orig_dwidth;
 
-				orig_width = width;
 				orig_dwidth = dwidth;
 
 				/* address */
@@ -811,17 +810,9 @@ reswitch:	switch (ch = (u_char)*fmt++) {
 				PCHAR('0');
 				PCHAR('x');
 				p = ksprintn(nbuf, num, 16, &n, 0);
-				tmp = 0;
-				if (!ladjust && padc == '0')
-					dwidth = width - tmp;
-				width -= tmp + imax(dwidth, n);
 				dwidth -= n;
-				if (!ladjust)
-					while (width-- > 0)
-						PCHAR(' ');
 				while (dwidth-- > 0)
 					PCHAR('0');
-
 				while (*p)
 					PCHAR(*p--);
 
@@ -859,25 +850,11 @@ reswitch:	switch (ch = (u_char)*fmt++) {
 				PCHAR('0');
 				PCHAR('x');
 				p = ksprintn(nbuf, num, 16, &n, 0);
-				width = orig_width;
-				dwidth = orig_dwidth;
-				tmp = 0;
-				if (!ladjust && padc == '0')
-					dwidth = width - tmp;
-				width -= tmp + imax(dwidth, n);
-				dwidth -= n;
-				if (!ladjust)
-					while (width-- > 0)
-						PCHAR(' ');
+				dwidth = orig_dwidth - n;
 				while (dwidth-- > 0)
 					PCHAR('0');
-
 				while (*p)
 					PCHAR(*p--);
-
-				if (ladjust)
-					while (width-- > 0)
-						PCHAR(' ');
 
 				PCHAR('-');
 
@@ -885,27 +862,11 @@ reswitch:	switch (ch = (u_char)*fmt++) {
 				PCHAR('0');
 				PCHAR('x');
 				p = ksprintn(nbuf, num, 16, &n, 0);
-				while (*p)
-					PCHAR(*p--);
-				width = orig_width;
-				dwidth = orig_dwidth;
-				tmp = 0;
-				if (!ladjust && padc == '0')
-					dwidth = width - tmp;
-				width -= tmp + imax(dwidth, n);
-				dwidth -= n;
-				if (!ladjust)
-					while (width-- > 0)
-						PCHAR(' ');
+				dwidth = orig_dwidth - n;
 				while (dwidth-- > 0)
 					PCHAR('0');
-
 				while (*p)
 					PCHAR(*p--);
-
-				if (ladjust)
-					while (width-- > 0)
-						PCHAR(' ');
 
 				PCHAR(']');
 
