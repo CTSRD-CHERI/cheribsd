@@ -670,12 +670,17 @@ kmem_free(vm_ptr_t addr, vm_size_t size)
 vm_ptr_t
 kmap_alloc_wait(vm_map_t map, vm_size_t size)
 {
+	int error;
+	vm_size_t padded_size;
+	vm_offset_t alignment;
 	vm_offset_t addr;
 	vm_ptr_t mapped;
 
 	size = round_page(size);
 	if (!swap_reserve(size))
 		return (0);
+	padded_size = CHERI_REPRESENTABLE_LENGTH(size);
+	alignment = CHERI_REPRESENTABLE_ALIGNMENT(size);
 
 	for (;;) {
 		/*
@@ -683,9 +688,16 @@ kmap_alloc_wait(vm_map_t map, vm_size_t size)
 		 * to lock out sleepers/wakers.
 		 */
 		vm_map_lock(map);
-		addr = vm_map_findspace(map, vm_map_min(map), size);
-		if (addr + size <= vm_map_max(map))
+		addr = vm_map_findspace(map, vm_map_min(map), padded_size);
+		if (addr + padded_size <= vm_map_max(map) && alignment == 0)
 			break;
+		if (alignment > 0) {
+			error = vm_map_alignspace(map, NULL, 0, &addr,
+			    padded_size, vm_map_max(map), alignment);
+			if (error == KERN_SUCCESS)
+				break;
+		}
+
 		/* no space now; see if we can ever get space */
 		if (vm_map_max(map) - vm_map_min(map) < size) {
 			vm_map_unlock(map);
@@ -695,12 +707,15 @@ kmap_alloc_wait(vm_map_t map, vm_size_t size)
 		map->needs_wakeup = TRUE;
 		vm_map_unlock_and_wait(map, 0);
 	}
-	vm_map_insert(map, NULL, 0, addr, addr + size, VM_PROT_RW, VM_PROT_RW,
-	    MAP_ACC_CHARGED, VM_MIN_KERNEL_ADDRESS);
+
+	mapped = addr;
+	if (vm_map_reservation_create_locked(map, &mapped, padded_size,
+	    MAP_ACC_CHARGED))
+		return (0);
+	vm_map_insert(map, NULL, 0, mapped, mapped + size, VM_PROT_RW,
+	    VM_PROT_RW, MAP_ACC_CHARGED, mapped);
 	vm_map_unlock(map);
 
-	mapped = vm_map_make_ptr(map, addr, size, VM_PROT_ALL);
-	CHERI_ASSERT_VALID(mapped);
 	return (mapped);
 }
 

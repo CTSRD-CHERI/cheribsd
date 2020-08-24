@@ -1385,6 +1385,8 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 	}
 
 	vn_lock(imgp->vp, LK_SHARED | LK_RETRY);
+	if (error != 0)
+		goto ret;
 #if __has_feature(capabilities)
 	error = __elfN(build_imgact_capability)(imgp, &imgp->imgact_capability,
 	    hdr, phdr, et_dyn_addr);

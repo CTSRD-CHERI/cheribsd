@@ -188,7 +188,7 @@ kern_break(struct thread *td, uintptr_t *addr)
 			rv = vm_map_wire_locked(map, old, new,
 			    VM_MAP_WIRE_USER | VM_MAP_WIRE_NOHOLES);
 			if (rv != KERN_SUCCESS)
-				vm_map_delete(map, old, new);
+				vm_map_delete(map, old, new, false);
 		}
 		if (rv != KERN_SUCCESS) {
 #ifdef RACCT
@@ -211,7 +211,7 @@ kern_break(struct thread *td, uintptr_t *addr)
 		}
 		vm->vm_dsize += btoc(new - old);
 	} else if (new < old) {
-		rv = vm_map_delete(map, new, old);
+		rv = vm_map_delete(map, new, old, false);
 		if (rv != KERN_SUCCESS) {
 			error = ENOMEM;
 			goto done;
