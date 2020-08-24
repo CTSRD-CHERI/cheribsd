@@ -1045,7 +1045,8 @@ exec_new_vmspace(struct image_params *imgp, struct sysentvec *sv)
 	struct thread *td = curthread;
 	vm_object_t obj;
 	struct rlimit rlim_stack;
-	vm_offset_t sv_minuser, stack_addr;
+	vm_offset_t sv_minuser;
+	vm_ptr_t stack_addr;
 	vm_map_t map;
 	u_long ssiz;
 	vm_ptr_t shared_page_addr;
@@ -1153,12 +1154,25 @@ exec_new_vmspace(struct image_params *imgp, struct sysentvec *sv)
 	imgp->eff_stack_sz = lim_cur(curthread, RLIMIT_STACK);
 	if (ssiz < imgp->eff_stack_sz)
 		imgp->eff_stack_sz = ssiz;
+	/*
+	 * We reserve more space to ensure representablity while
+	 * maintaining
+	 */
 	stack_addr = sv->sv_usrstack - ssiz;
+	error = vm_map_reservation_create_fixed(map, &stack_addr, ssiz,
+	    PAGE_SIZE, MAP_STACK_GROWS_DOWN);
+	if (error != KERN_SUCCESS)
+		return (vm_mmap_to_errno(error));
+
 	error = vm_map_stack(map, stack_addr, (vm_size_t)ssiz,
 	    obj != NULL && imgp->stack_prot != 0 ? imgp->stack_prot :
 	    sv->sv_stackprot, VM_PROT_ALL, MAP_STACK_GROWS_DOWN);
-	if (error != KERN_SUCCESS)
+	if (error != KERN_SUCCESS) {
+		vm_map_reservation_delete(map,
+		    cheri_kern_getbase((void *)stack_addr));
 		return (vm_mmap_to_errno(error));
+	}
+	imgp->ustack_capability = (void *)stack_addr;
 
 	/*
 	 * vm_ssize and vm_maxsaddr are somewhat antiquated concepts, but they
@@ -1620,11 +1634,6 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	int argc, envc;
 	char * __capability * __capability vectp;
 	char *stringp;
-#if __has_feature(capabilities)
-	char * __capability ustackp;
-	vaddr_t rounded_stack_vaddr, stack_vaddr, stack_offset;
-	size_t ssiz;
-#endif
 	char * __capability destp, * __capability ustringp;
 	struct ps_strings * __capability arginfo;
 	struct proc *p;
@@ -1645,25 +1654,8 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	szsigcode = 0;
 
 #if __has_feature(capabilities)
-	/*
-	 * ustackp must cover all of the smaller buffers copied out
-	 * onto the stack, so roundup the length to be representable
-	 * even if it means the capability extends beyond the stack
-	 * bounds.
-	 */
-	stack_vaddr = (vaddr_t)p->p_vmspace->vm_maxsaddr;
-	ssiz = p->p_sysent->sv_usrstack - stack_vaddr;
-	stack_offset = 0;
-	do {
-		rounded_stack_vaddr = CHERI_REPRESENTABLE_BASE(stack_vaddr,
-		    ssiz + stack_offset);
-		stack_offset = stack_vaddr - rounded_stack_vaddr;
-	} while (rounded_stack_vaddr != CHERI_REPRESENTABLE_BASE(stack_vaddr,
-	    ssiz + stack_offset));
-	ustackp = cheri_capability_build_user_data(
-	    CHERI_CAP_USER_DATA_PERMS, rounded_stack_vaddr,
-	    CHERI_REPRESENTABLE_LENGTH(ssiz + stack_offset), stack_offset);
-	destp = cheri_setaddress(ustackp, p->p_sysent->sv_psstrings);
+	destp = cheri_setaddress(imgp->ustack_capability,
+	    p->p_sysent->sv_psstrings);
 	arginfo = (struct ps_strings * __capability)cheri_setbounds(destp,
 	    sizeof(*arginfo));
 #else
