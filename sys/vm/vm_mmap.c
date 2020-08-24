@@ -686,6 +686,13 @@ kern_mmap_req(struct thread *td, struct mmap_req *mrp)
 				return (EINVAL);
 			}
 		}
+#if __has_feature(capabilities)
+                /*
+                 * If MAP_FIXED we use the source capability to authorize the
+                 * fixed mapping. What we do for hybrid userland is dubious.
+                 */
+		addr = (vm_ptr_t)cheri_setaddress(mrp->mr_source_cap, addr);
+#endif
 	} else if (flags & MAP_32BIT) {
 		KASSERT(!SV_CURPROC_FLAG(SV_CHERI),
 		    ("MAP_32BIT on a CheriABI process"));
@@ -714,21 +721,6 @@ kern_mmap_req(struct thread *td, struct mmap_req *mrp)
 			addr = round_page((vm_offset_t)vms->vm_daddr +
 			    lim_max(td, RLIMIT_DATA));
 	}
-
-#ifdef CHERI_PURECAP_KERNEL
-	/*
-	 * If MAP_FIXED with an invalid cap as a hint,
-	 * build a capability for the hinted mapping from the
-	 * designated source_cap.
-	 * XXX-AM: should check cheri_is_null_derived() instead of
-	 * just untagged.
-	 * XXX-AM: Here we expect that an invalid cap hint would point
-	 * to an already-reserved address, otherwise we should fail?
-	 */
-	if ((flags & MAP_FIXED) && cheri_gettag((void *)addr) == 0) {
-		addr = (vm_ptr_t)cheri_setaddress(mrp->mr_source_cap, addr);
-	}
-#endif
 
 	if (len == 0) {
 		/*
@@ -2081,7 +2073,6 @@ vm_mmap_object(vm_map_t map, vm_ptr_t *addr, vm_offset_t max_addr,
 		if (max_addr != 0 && *addr + size > max_addr)
 			return (ENOMEM);
 
-		CHERI_ASSERT_VALID(*addr);
 		rv = vm_map_fixed(map, object, foff, *addr, size,
 		    prot, maxprot, docow);
 	}

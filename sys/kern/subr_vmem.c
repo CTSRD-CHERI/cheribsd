@@ -1537,6 +1537,7 @@ vmem_add(vmem_t *vm, vmem_addr_t addr, vmem_size_t size, int flags)
 {
 	int error;
 
+	CHERI_ASSERT_VALID(addr);
 	CHERI_ASSERT_EXBOUNDS(addr, size);
 
 	error = 0;

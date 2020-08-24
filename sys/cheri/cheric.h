@@ -302,6 +302,7 @@ cheri_bytes_remaining(const void * __capability cap)
 #define	cheri_kern_setboundsexact(x, y)	cheri_setboundsexact(x, y)
 #define	cheri_kern_setaddress(x, y)	cheri_setaddress(x, y)
 #define	cheri_kern_getaddress(x)	cheri_setaddress(x)
+#define	cheri_kern_getbase(x)		cheri_getbase(x)
 #else
 #define	cheri_kern_gettag(x)					\
 	(((x) == NULL || (vm_offset_t)(x) < 4096) ? 0 : 1)
@@ -309,6 +310,7 @@ cheri_bytes_remaining(const void * __capability cap)
 #define	cheri_kern_setboundsexact(x, y)	(x)
 #define	cheri_kern_setaddress(x, y)	((__typeof__(x))(y))
 #define	cheri_kern_getaddress(x)	((uintptr_t)(x))
+#define	cheri_kern_getbase(x)		((uintptr_t)(x))
 #endif
 
 /*
