@@ -28,6 +28,7 @@ SRCS+=	cheritest_bounds_globals.c					\
 	cheritest_flag_captured.c					\
 	cheritest_kbounce.c						\
 	cheritest_longjmp.c						\
+	cheritest_printf.c						\
 	cheritest_registers.c						\
 	cheritest_sealcap.c						\
 	cheritest_signal.c						\

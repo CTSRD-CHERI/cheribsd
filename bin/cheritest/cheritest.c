@@ -1165,6 +1165,10 @@ static const struct cheri_test cheri_tests[] = {
 	  .ct_desc = "Test pointer passing through AIO signals",
 	  .ct_func = test_aio_sival, },
 
+	{ .ct_name = "test_printf_cap",
+	  .ct_desc = "Various checks of %#p",
+	  .ct_func = test_printf_cap },
+
 #ifdef CHERI_LIBCHERI_TESTS
 	/*
 	 * Test libcheri sandboxing -- and kernel sandbox unwind.
@@ -1714,10 +1718,6 @@ static const struct cheri_test cheri_tests[] = {
 	{ .ct_name = "test_cheriabi_malloc_zero_size",
 	  .ct_desc = "Check that zero-sized mallocs are properly bounded",
 	  .ct_func = test_cheriabi_malloc_zero_size },
-
-	{ .ct_name = "test_cheriabi_printf_cap",
-	  .ct_desc = "Various checks of %#p",
-	  .ct_func = test_cheriabi_printf_cap },
 
 	/*
 	 * Tests for pathname handling in open(2).

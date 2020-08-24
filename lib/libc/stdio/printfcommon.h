@@ -279,7 +279,7 @@ __ujtoa(uintmax_t val, CHAR *endp, int base, int octzero, const char *xdigs)
 	return (cp);
 }
 
-#ifdef __CHERI_PURE_CAPABILITY__
+#if __has_feature(capabilities)
 /**
  * Print the pointer details.
  * <address> [<permissions>,<base>-<top>] <attr>
@@ -298,7 +298,8 @@ __ujtoa(uintmax_t val, CHAR *endp, int base, int octzero, const char *xdigs)
  */
 
 static CHAR *
-__cheri_ptr_alt(void *pointer, CHAR *cp, const char *xdigs, int precision)
+__cheri_ptr_alt(void * __capability pointer, CHAR *cp, const char *xdigs,
+    int precision)
 {
 	uintmax_t ujval;
 	CHAR *scp;
@@ -402,7 +403,7 @@ address:
 
 	return (cp);
 }
-#endif /* __CHERI_PURE_CAPABILITY__ */
+#endif /* __has_feature(capabilities) */
 
 #ifndef NO_FLOATING_POINT
 
