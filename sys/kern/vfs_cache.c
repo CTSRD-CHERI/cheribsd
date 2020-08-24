@@ -480,12 +480,12 @@ STATNODE_COUNTER(shrinking_skipped,
     "Number of times shrinking was already in progress");
 
 static void cache_zap_locked(struct namecache *ncp);
-static int vn_fullpath_hardlink(struct thread *td, struct nameidata *ndp, char **retbuf,
+static int vn_fullpath_hardlink(struct nameidata *ndp, char **retbuf,
     char **freebuf, size_t *buflen);
-static int vn_fullpath_any(struct thread *td, struct vnode *vp, struct vnode *rdir,
-    char *buf, char **retbuf, size_t *buflen);
-static int vn_fullpath_dir(struct thread *td, struct vnode *vp, struct vnode *rdir,
-    char *buf, char **retbuf, size_t *len, bool slash_prefixed, size_t addend);
+static int vn_fullpath_any(struct vnode *vp, struct vnode *rdir, char *buf,
+    char **retbuf, size_t *buflen);
+static int vn_fullpath_dir(struct vnode *vp, struct vnode *rdir, char *buf,
+    char **retbuf, size_t *len, bool slash_prefixed, size_t addend);
 
 static MALLOC_DEFINE(M_VFSCACHE, "vfscache", "VFS name cache entries");
 
@@ -2473,7 +2473,7 @@ kern___getcwd(struct thread *td, char * __capability ubuf, size_t buflen)
 		buflen = MAXPATHLEN;
 
 	buf = uma_zalloc(namei_zone, M_WAITOK);
-	error = vn_getcwd(td, buf, &retbuf, &buflen);
+	error = vn_getcwd(buf, &retbuf, &buflen);
 	if (error == 0)
 		error = copyout(retbuf, ubuf, buflen);
 	uma_zfree(namei_zone, buf);
@@ -2481,13 +2481,13 @@ kern___getcwd(struct thread *td, char * __capability ubuf, size_t buflen)
 }
 
 int
-vn_getcwd(struct thread *td, char *buf, char **retbuf, size_t *buflen)
+vn_getcwd(char *buf, char **retbuf, size_t *buflen)
 {
 	struct pwd *pwd;
 	int error;
 
-	pwd = pwd_hold(td);
-	error = vn_fullpath_any(td, pwd->pwd_cdir, pwd->pwd_rdir, buf, retbuf, buflen);
+	pwd = pwd_hold(curthread);
+	error = vn_fullpath_any(pwd->pwd_cdir, pwd->pwd_rdir, buf, retbuf, buflen);
 	pwd_drop(pwd);
 
 #ifdef KTRACE
@@ -2512,7 +2512,7 @@ kern___realpathat(struct thread *td, int fd, const char * __capability path,
 	    pathseg, path, fd, &cap_fstat_rights, td);
 	if ((error = namei(&nd)) != 0)
 		return (error);
-	error = vn_fullpath_hardlink(td, &nd, &retbuf, &freebuf, &size);
+	error = vn_fullpath_hardlink(&nd, &retbuf, &freebuf, &size);
 	if (error == 0) {
 		error = copyout(retbuf, buf, size);
 		free(freebuf, M_TEMP);
@@ -2534,23 +2534,22 @@ sys___realpathat(struct thread *td, struct __realpathat_args *uap)
  * cache (if available)
  */
 int
-vn_fullpath(struct thread *td, struct vnode *vn, char **retbuf, char **freebuf)
+vn_fullpath(struct vnode *vp, char **retbuf, char **freebuf)
 {
 	struct pwd *pwd;
 	char *buf;
 	size_t buflen;
 	int error;
 
-	if (__predict_false(vn == NULL))
+	if (__predict_false(vp == NULL))
 		return (EINVAL);
 
 	buflen = MAXPATHLEN;
 	buf = malloc(buflen, M_TEMP, M_WAITOK);
-	pwd = pwd_hold(td);
-	error = vn_fullpath_any(td, vn, pwd->pwd_rdir, buf, retbuf, &buflen);
+	pwd = pwd_hold(curthread);
+	error = vn_fullpath_any(vp, pwd->pwd_rdir, buf, retbuf, &buflen);
 	pwd_drop(pwd);
-
-	if (!error)
+	if (error == 0)
 		*freebuf = buf;
 	else
 		free(buf, M_TEMP);
@@ -2564,19 +2563,18 @@ vn_fullpath(struct thread *td, struct vnode *vn, char **retbuf, char **freebuf)
  * global root mount point.
  */
 int
-vn_fullpath_global(struct thread *td, struct vnode *vn,
-    char **retbuf, char **freebuf)
+vn_fullpath_global(struct vnode *vp, char **retbuf, char **freebuf)
 {
 	char *buf;
 	size_t buflen;
 	int error;
 
-	if (__predict_false(vn == NULL))
+	if (__predict_false(vp == NULL))
 		return (EINVAL);
 	buflen = MAXPATHLEN;
 	buf = malloc(buflen, M_TEMP, M_WAITOK);
-	error = vn_fullpath_any(td, vn, rootvnode, buf, retbuf, &buflen);
-	if (!error)
+	error = vn_fullpath_any(vp, rootvnode, buf, retbuf, &buflen);
+	if (error == 0)
 		*freebuf = buf;
 	else
 		free(buf, M_TEMP);
@@ -2672,8 +2670,8 @@ vn_vptocnp(struct vnode **vp, struct ucred *cred, char *buf, size_t *buflen)
  * The vnode must be referenced.
  */
 static int
-vn_fullpath_dir(struct thread *td, struct vnode *vp, struct vnode *rdir,
-    char *buf, char **retbuf, size_t *len, bool slash_prefixed, size_t addend)
+vn_fullpath_dir(struct vnode *vp, struct vnode *rdir, char *buf, char **retbuf,
+    size_t *len, bool slash_prefixed, size_t addend)
 {
 #ifdef KDTRACE_HOOKS
 	struct vnode *startvp = vp;
@@ -2738,7 +2736,7 @@ vn_fullpath_dir(struct thread *td, struct vnode *vp, struct vnode *rdir,
 			    error, vp, NULL);
 			break;
 		}
-		error = vn_vptocnp(&vp, td->td_ucred, buf, &buflen);
+		error = vn_vptocnp(&vp, curthread->td_ucred, buf, &buflen);
 		if (error)
 			break;
 		if (buflen == 0) {
@@ -2783,8 +2781,8 @@ vn_fullpath_dir(struct thread *td, struct vnode *vp, struct vnode *rdir,
  *   (in which case resolving fails)
  */
 static int
-vn_fullpath_any(struct thread *td, struct vnode *vp, struct vnode *rdir,
-    char *buf, char **retbuf, size_t *buflen)
+vn_fullpath_any(struct vnode *vp, struct vnode *rdir, char *buf, char **retbuf,
+    size_t *buflen)
 {
 	size_t orig_buflen;
 	bool slash_prefixed;
@@ -2800,7 +2798,7 @@ vn_fullpath_any(struct thread *td, struct vnode *vp, struct vnode *rdir,
 	if (vp->v_type != VDIR) {
 		*buflen -= 1;
 		buf[*buflen] = '\0';
-		error = vn_vptocnp(&vp, td->td_ucred, buf, buflen);
+		error = vn_vptocnp(&vp, curthread->td_ucred, buf, buflen);
 		if (error)
 			return (error);
 		if (*buflen == 0) {
@@ -2812,7 +2810,7 @@ vn_fullpath_any(struct thread *td, struct vnode *vp, struct vnode *rdir,
 		slash_prefixed = true;
 	}
 
-	return (vn_fullpath_dir(td, vp, rdir, buf, retbuf, buflen, slash_prefixed,
+	return (vn_fullpath_dir(vp, rdir, buf, retbuf, buflen, slash_prefixed,
 	    orig_buflen - *buflen));
 }
 
@@ -2829,8 +2827,8 @@ vn_fullpath_any(struct thread *td, struct vnode *vp, struct vnode *rdir,
  *   from the parent
  */
 static int
-vn_fullpath_hardlink(struct thread *td, struct nameidata *ndp, char **retbuf,
-    char **freebuf, size_t *buflen)
+vn_fullpath_hardlink(struct nameidata *ndp, char **retbuf, char **freebuf,
+    size_t *buflen)
 {
 	char *buf, *tmpbuf;
 	struct pwd *pwd;
@@ -2849,7 +2847,7 @@ vn_fullpath_hardlink(struct thread *td, struct nameidata *ndp, char **retbuf,
 	slash_prefixed = false;
 
 	buf = malloc(*buflen, M_TEMP, M_WAITOK);
-	pwd = pwd_hold(td);
+	pwd = pwd_hold(curthread);
 
 	addend = 0;
 	vp = ndp->ni_vp;
@@ -2894,7 +2892,7 @@ vn_fullpath_hardlink(struct thread *td, struct nameidata *ndp, char **retbuf,
 	}
 
 	vref(vp);
-	error = vn_fullpath_dir(td, vp, pwd->pwd_rdir, buf, retbuf, buflen,
+	error = vn_fullpath_dir(vp, pwd->pwd_rdir, buf, retbuf, buflen,
 	    slash_prefixed, addend);
 	if (error != 0)
 		goto out_bad;
@@ -2980,7 +2978,7 @@ vn_path_to_global_path(struct thread *td, struct vnode *vp, char *path,
 
 	/* Construct global filesystem path from vp. */
 	VOP_UNLOCK(vp);
-	error = vn_fullpath_global(td, vp, &rpath, &fbuf);
+	error = vn_fullpath_global(vp, &rpath, &fbuf);
 
 	if (error != 0) {
 		vrele(vp);
