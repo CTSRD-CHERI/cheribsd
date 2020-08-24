@@ -521,6 +521,10 @@ get_mcontext(struct thread *td, mcontext_t *mcp, int flags)
 	PROC_UNLOCK(curthread->td_proc);
 	bcopy((void *)&td->td_frame->zero, (void *)&mcp->mc_regs,
 	    sizeof(mcp->mc_regs));
+#if __has_feature(capabilities)
+	cheri_trapframe_to_cheriframe(&td->td_pcb->pcb_regs,
+	    &mcp->mc_cheriframe);
+#endif
 
 	mcp->mc_fpused = td->td_md.md_flags & MDTD_FPUSED;
 	if (mcp->mc_fpused) {
@@ -541,11 +545,6 @@ get_mcontext(struct thread *td, mcontext_t *mcp, int flags)
 	mcp->mulhi = td->td_frame->mulhi;
 	mcp->mc_tls = td->td_md.md_tls;
 
-#if __has_feature(capabilities)
-	cheri_trapframe_to_cheriframe(&td->td_pcb->pcb_regs,
-	    &mcp->mc_cheriframe);
-#endif
-
 	return (0);
 }
 
@@ -557,6 +556,9 @@ set_mcontext(struct thread *td, mcontext_t *mcp)
 	tp = td->td_frame;
 	bcopy((void *)&mcp->mc_regs, (void *)&td->td_frame->zero,
 	    sizeof(mcp->mc_regs));
+#if __has_feature(capabilities)
+	cheri_trapframe_from_cheriframe(tp, &mcp->mc_cheriframe);
+#endif
 
 	td->td_md.md_flags = (mcp->mc_fpused & MDTD_FPUSED)
 #ifdef CPU_QEMU_MALTA
@@ -577,10 +579,6 @@ set_mcontext(struct thread *td, mcontext_t *mcp)
 	td->td_frame->mulhi = mcp->mulhi;
 	td->td_md.md_tls = mcp->mc_tls;
 	/* Dont let user to set any bits in status and cause registers. */
-
-#if __has_feature(capabilities)
-	cheri_trapframe_from_cheriframe(tp, &mcp->mc_cheriframe);
-#endif
 
 	return (0);
 }
