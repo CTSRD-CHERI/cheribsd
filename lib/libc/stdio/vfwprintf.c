@@ -66,7 +66,7 @@ __FBSDID("$FreeBSD$");
 #include "namespace.h"
 #include <sys/types.h>
 
-#ifdef __CHERI_PURE_CAPABILITY__
+#if __has_feature(capabilities)
 #include <cheri/cheri.h>
 #include <cheri/cheric.h>
 #endif
@@ -396,11 +396,11 @@ vfwprintf(FILE * __restrict fp, const wchar_t * __restrict fmt0, va_list ap)
  * write a uintmax_t in octal (plus one byte).
  */
 #if UINTMAX_MAX <= UINT64_MAX
-#ifndef __CHERI_PURE_CAPABILITY__
+#if !__has_feature(capabilities)
 #define	BUF	32
 #else
-/* For the CHERI sandbox ABI we need enough space to print a capability dump */
-#define	BUF	84
+/* For CHERI we need enough space to print a capability dump */
+#define	BUF	128
 #endif
 #else
 #error "BUF must be large enough to format a uintmax_t"
@@ -468,8 +468,8 @@ __vfwprintf(FILE *fp, locale_t locale, const wchar_t *fmt0, va_list ap)
 	va_list orgap;		/* original argument pointer */
 	wchar_t *convbuf;	/* multibyte to wide conversion result */
 	int savserr;
-#ifdef __CHERI_PURE_CAPABILITY__
-	void *pointer;
+#if __has_feature(capabilities)
+	void * __capability cap;
 #endif
 
 	static const char xdigs_lower[16] = "0123456789abcdef";
@@ -914,20 +914,29 @@ fp_common:
 			 * defined manner.''
 			 *	-- ANSI X3J11
 			 */
-#ifndef __CHERI_PURE_CAPABILITY__
-			ujval = (uintmax_t)(uintptr_t)GETARG(void *);
+#if __has_feature(capabilities)
+#ifdef __CHERI_PURE_CAPABILITY__
+			cap = GETARG(void *);
+			ujval = cheri_getaddress(cap);
 #else
-			pointer = GETARG(void *);
+			if (flags & LONGINT) {
+				cap = *GETARG(void * __capability *);
+				ujval = cheri_getaddress(cap);
+			} else {
+				ujval = (uintmax_t)(uintptr_t)GETARG(void *);
+				flags &= ~ALT;
+			}
+#endif
 			if (flags & ALT) {
 				cp = buf + BUF;
-				cp = __cheri_ptr_alt(pointer, cp, xdigs_lower,
+				cp = __cheri_ptr_alt(cap, cp, xdigs_lower,
 				    prec);
 				size = buf + BUF - cp;
 				flags &= ~ZEROPAD;
 				break;
 			}
-			ujval = cheri_getbase(pointer) +
-			    cheri_getoffset(pointer);
+#else
+			ujval = (uintmax_t)(uintptr_t)GETARG(void *);
 #endif
 			base = 16;
 			xdigs = xdigs_lower;

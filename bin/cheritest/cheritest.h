@@ -337,7 +337,6 @@ DECLARE_CHERI_TEST(test_cheriabi_mmap_nospace);
 DECLARE_CHERI_TEST(test_cheriabi_mmap_perms);
 DECLARE_CHERI_TEST(test_cheriabi_mmap_unrepresentable);
 DECLARE_CHERI_TEST(test_cheriabi_malloc_zero_size);
-DECLARE_CHERI_TEST(test_cheriabi_printf_cap);
 
 /* cheritest_cheriabi_open.c */
 DECLARE_CHERI_TEST(test_cheriabi_open_ordinary);
@@ -477,6 +476,9 @@ DECLARE_CHERI_TEST(test_sandbox_var_constructor);
 /* cheritest_longjmp.c */
 DECLARE_CHERI_TEST(cheritest_setjmp);
 DECLARE_CHERI_TEST(cheritest_setjmp_longjmp);
+
+/* cheritest_printf.c */
+DECLARE_CHERI_TEST(test_printf_cap);
 
 /* cheritest_sealcap.c */
 DECLARE_CHERI_TEST(test_sealcap_sysarch);
