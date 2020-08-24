@@ -189,12 +189,18 @@ cpu_fetch_syscall_args(struct thread *td)
 #include "../../kern/subr_syscall.c"
 
 #if __has_feature(capabilities)
+/* This cannot use _CHERI_PRINTF_CAP_ARG due to the cast for purecap. */
+#ifdef __CHERI_PURE_CAPABILITY__
+#define	PRINT_REG_ARG(value)	((void * __capability)(value))
+#else
+#define	PRINT_REG_ARG(value)	(&(value))
+#endif
 #define PRINT_REG(name, value)					\
 	printf(name " = " _CHERI_PRINTF_CAP_FMT "\n",		\
-	    _CHERI_PRINTF_CAP_ARG((void *__capability)value));
+	    PRINT_REG_ARG(value));
 #define PRINT_REG_N(name, n, array)				\
 	printf(name "[%d] = " _CHERI_PRINTF_CAP_FMT "\n", n,	\
-	    _CHERI_PRINTF_CAP_ARG((void *__capability)(array)[n]));
+	    PRINT_REG_ARG((array)[n]));
 #else
 #define PRINT_REG(name, value)	printf(name " = 0x%016lx\n", value)
 #define PRINT_REG_N(name, n, array)	\
