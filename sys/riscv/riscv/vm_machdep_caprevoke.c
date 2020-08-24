@@ -334,6 +334,7 @@ vm_caprevoke_page_iter(const struct vm_caprevoke_cookie *crc,
 		       vm_offset_t mve)
 {
 	int res = 0;
+	bool weird_caps = false;
 
 	/* Load once up front, which is almost as good as const */
 	vm_caprevoke_test_fn ctp = crc->caprevoke_test_int;
@@ -347,6 +348,12 @@ vm_caprevoke_page_iter(const struct vm_caprevoke_cookie *crc,
 	for (; cheri_getaddress(mvu) < mve; mvu++) {
 		uintcap_t cut = *mvu;
 		if (cheri_gettag(cut)) {
+			if (cheri_getsealed(cut) &&
+			    cheri_gettype(cut) != CHERI_OTYPE_SENTRY) {
+				CHERI_PRINT_PTR(mvu);
+				CHERI_PRINT_PTR(cut);
+				weird_caps = true;
+			}
 			if (cb(&res, crc, crshadow, ctp, mvu, cut))
 				goto out;
 		}
@@ -357,6 +364,8 @@ out:
 	disable_user_memory_access();
 	curthread->td_pcb->pcb_onfault = 0;
 #endif
+	if (weird_caps)
+		res |= VM_CAPREVOKE_PAGE_WEIRD_CAPS;
 	return res;
 }
 
@@ -365,6 +374,10 @@ vm_caprevoke_test(const struct vm_caprevoke_cookie *crc, uintcap_t cut)
 {
 	if (cheri_gettag(cut)) {
 		int res;
+		if (cheri_getsealed(cut) &&
+		    cheri_gettype(cut) != CHERI_OTYPE_SENTRY) {
+			CHERI_PRINT_PTR(cut);
+		}
 #ifdef CHERI_CAPREVOKE_FAST_COPYIN
 		curthread->td_pcb->pcb_onfault = (vm_offset_t)vm_caprevoke_tlb_fault;
 		enable_user_memory_access();

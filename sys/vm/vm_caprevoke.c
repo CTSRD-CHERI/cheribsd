@@ -63,7 +63,8 @@ vm_caprevoke_should_visit_page(vm_page_t m, int flags)
 enum vm_cro_visit {
 	VM_CAPREVOKE_VIS_DONE  = 0,
 	VM_CAPREVOKE_VIS_DIRTY = 1,
-	VM_CAPREVOKE_VIS_BUSY  = 2
+	VM_CAPREVOKE_VIS_BUSY  = 2,
+	VM_CAPREVOKE_VIS_WEIRD_CAPS = 3
 };
 
 /*
@@ -118,6 +119,8 @@ retry:
 	}
 #endif
 
+	if (hascaps & VM_CAPREVOKE_PAGE_WEIRD_CAPS)
+		return VM_CAPREVOKE_VIS_WEIRD_CAPS;
 	return VM_CAPREVOKE_VIS_DONE;
 }
 
@@ -195,7 +198,8 @@ vm_caprevoke_unwire_in_situ(vm_page_t m)
 enum vm_cro_at {
 	VM_CAPREVOKE_AT_OK    = 0,
 	VM_CAPREVOKE_AT_TICK  = 1,
-	VM_CAPREVOKE_AT_VMERR = 2
+	VM_CAPREVOKE_AT_VMERR = 2,
+	VM_CAPREVOKE_AT_WEIRD = 3,
 };
 
 /*
@@ -219,6 +223,7 @@ vm_caprevoke_object_at(const struct vm_caprevoke_cookie *crc, int flags,
 			vm_map_entry_t entry, vm_offset_t ioff,
 			vm_offset_t *ooff, int *vmres)
 {
+	bool print_weird_caps = false;
 	CAPREVOKE_STATS_FOR(crst, crc);
 	vm_map_t    map = crc->map;
 	vm_object_t obj = entry->object.vm_object;
@@ -327,6 +332,9 @@ vm_caprevoke_object_at(const struct vm_caprevoke_cookie *crc, int flags,
 
 	switch(vm_caprevoke_visit_ro(crc, flags, m))
 	{
+	case VM_CAPREVOKE_VIS_WEIRD_CAPS:
+		print_weird_caps = true;
+		/* FALLTHROUGH */
 	case VM_CAPREVOKE_VIS_DONE:
 		/* We were able to conclude that the page was clean */
 		*ooff = ioff + pagesizes[m->psind];
@@ -334,6 +342,8 @@ vm_caprevoke_object_at(const struct vm_caprevoke_cookie *crc, int flags,
 			VM_OBJECT_WUNLOCK(m->object);
 			VM_OBJECT_WLOCK(obj);
 		}
+		if (print_weird_caps)
+			return VM_CAPREVOKE_AT_WEIRD;
 		return VM_CAPREVOKE_AT_OK;
 	case VM_CAPREVOKE_VIS_BUSY:
 		/*
@@ -388,6 +398,9 @@ visit_rw:
 	vm_page_aflag_clear(m, PGA_CAPDIRTY);
 	switch(vm_caprevoke_visit_rw(crc, flags, m))
 	{
+	case VM_CAPREVOKE_VIS_WEIRD_CAPS:
+		print_weird_caps = true;
+		/* FALLTHROUGH */
 	case VM_CAPREVOKE_VIS_DONE:
 visit_rw_ok:
 
@@ -415,6 +428,8 @@ visit_rw_ok:
 			VM_OBJECT_WUNLOCK(m->object);
 			VM_OBJECT_WLOCK(obj);
 		}
+		if (print_weird_caps)
+			return VM_CAPREVOKE_AT_WEIRD;
 		return VM_CAPREVOKE_AT_OK;
 	case VM_CAPREVOKE_VIS_BUSY:
 		VM_OBJECT_WUNLOCK(m->object);
@@ -511,6 +526,12 @@ vm_caprevoke_map_entry(const struct vm_caprevoke_cookie *crc, int flags,
 		case VM_CAPREVOKE_AT_TICK:
 			/* Have the caller retranslate the map */
 			return KERN_SUCCESS;
+		case VM_CAPREVOKE_AT_WEIRD:
+			/* XXX: bad hack */
+			VM_OBJECT_WUNLOCK(obj);
+			printf("%s: pid %d weird cap at 0x%zx\n", __func__,
+			    curproc->p_pid, *addr);
+			VM_OBJECT_WLOCK(obj);
 		case VM_CAPREVOKE_AT_OK:
 			break;
 		}

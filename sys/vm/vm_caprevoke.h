@@ -150,6 +150,7 @@ void vm_caprevoke_publish(const struct vm_caprevoke_cookie *,
 /*  Walking a particular page */
 #define VM_CAPREVOKE_PAGE_HASCAPS	0x01
 #define VM_CAPREVOKE_PAGE_DIRTY		0x02
+#define VM_CAPREVOKE_PAGE_WEIRD_CAPS		0x04
 int vm_caprevoke_page(const struct vm_caprevoke_cookie * c,
 		      struct vm_page * m);
 int vm_caprevoke_page_ro(const struct vm_caprevoke_cookie * c,
