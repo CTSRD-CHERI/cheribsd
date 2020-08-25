@@ -35,7 +35,8 @@
  *
  * $FreeBSD$
  */
-#include <limits.h>
-#if __has_include_next(<sys/limits.h>)
-#include_next(<sys/limits.h>)
-#endif
+#pragma once
+
+/* Ensure that we use the FreeBSD version of the db functions */
+#define dbopen __freebsd_dbopen
+#include_next <db.h>

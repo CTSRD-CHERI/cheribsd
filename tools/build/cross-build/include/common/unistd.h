@@ -32,6 +32,8 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
+ *
+ * $FreeBSD$
  */
 #pragma once
 #include_next <unistd.h>
@@ -50,3 +52,6 @@ check_utility_compat(const char *utility)
 	 */
 	return (1);
 }
+
+/* Just needs to be declared, doesn't actually have to be implemented */
+void closefrom(int lowfd);

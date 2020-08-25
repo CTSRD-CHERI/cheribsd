@@ -32,6 +32,8 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
+ *
+ * $FreeBSD$
  */
 #pragma once
 
@@ -40,5 +42,5 @@
 #define sysctlbyname __freebsd_sysctlbyname
 #define sysctl __freebsd_sysctl
 
-int	sysctl(const int *, u_int, void *, size_t *, const void *, size_t);
-int	sysctlbyname(const char *, void *, size_t *, const void *, size_t);
+int sysctl(const int *, u_int, void *, size_t *, const void *, size_t);
+int sysctlbyname(const char *, void *, size_t *, const void *, size_t);

@@ -32,11 +32,14 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
+ *
+ * $FreeBSD$
  */
 #include_next <sys/stat.h>
 
 #ifndef UTIME_NOW
-int utimensat(int fd, const char *file, const struct timespec *ts, int flag)
+int
+utimensat(int fd, const char *file, const struct timespec *ts, int flag)
 #endif
 
 #define st_atim st_atimespec

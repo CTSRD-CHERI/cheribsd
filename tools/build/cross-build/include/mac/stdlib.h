@@ -32,15 +32,19 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
+ *
+ * $FreeBSD$
  */
 #pragma once
 #include_next <stdlib.h>
 
+__BEGIN_DECLS
+
 int rpmatch(const char *response);
 
-long long
-strtonum(const char *numstr, long long minval, long long maxval,
-         const char **errstrp);
+long long strtonum(const char *numstr, long long minval, long long maxval,
+    const char **errstrp);
 
-void *
-reallocarray(void *optr, size_t nmemb, size_t size);
+void *reallocarray(void *optr, size_t nmemb, size_t size);
+
+__END_DECLS

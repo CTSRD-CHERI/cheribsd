@@ -32,12 +32,17 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
+ *
+ * $FreeBSD$
  */
 #pragma once
 
-// <netdb.h> which contains a member called __unused
+/* <netdb.h> contains a member called __unused */
 #include "__unused_workaround_start.h"
 #include_next <netdb.h>
 #include "__unused_workaround_end.h"
 
-static inline void freehostent(void* arg __unused) {}
+static inline void
+freehostent(void *arg __unused)
+{
+}
