@@ -91,7 +91,7 @@ ASSYM(TD_MD, offsetof(struct thread, td_md));
 ASSYM(TD_LOCK, offsetof(struct thread, td_lock));
 ASSYM(TD_MDFLAGS, offsetof(struct thread, td_md.md_flags));
 
-ASSYM(TF_SIZE, sizeof(struct trapframe));
+ASSYM(TF_SIZE, roundup2(sizeof(struct trapframe), STACKALIGNBYTES + 1));
 ASSYM(TF_RA, offsetof(struct trapframe, tf_ra));
 ASSYM(TF_SP, offsetof(struct trapframe, tf_sp));
 ASSYM(TF_GP, offsetof(struct trapframe, tf_gp));
