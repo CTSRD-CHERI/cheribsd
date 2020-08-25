@@ -5,11 +5,6 @@ DPADD+=		${WORLDTMP}/legacy/usr/lib/libegacy.a
 LDADD+=		-legacy
 LDFLAGS+=	-L${WORLDTMP}/legacy/usr/lib
 
-# Remove all warning flags that a potentially different compiler might not understand
-BUILD_TOOLS_CC=${CC}
-BUILD_TOOLS_CFLAGS=${CFLAGS:N-Q*:N-W*}
-BUILD_TOOLS_LDFLAGS=${LDFLAGS}
-
 .if ${.MAKE.OS} != "FreeBSD"
 # On MacOS using a non-mac ar will fail the build, similarly on Linux using
 # nm may not work as expected if the nm for the target architecture comes in
@@ -35,6 +30,7 @@ LIBM:=
 LIBUTIL:=
 LIBCPLUSPLUS:=
 LIBARCHIVE:=
+LIBPTHREAD:=
 LIBMD:=${WORLDTMP}/legacy/usr/lib/libmd.a
 LIBNV:=${WORLDTMP}/legacy/usr/lib/libmd.a
 LIBSBUF:=${WORLDTMP}/legacy/usr/lib/libsbuf.a
@@ -66,14 +62,12 @@ CFLAGS+=	-D_DARWIN_C_SOURCE=1
 CFLAGS+=	-I${SRCTOP}/tools/build/cross-build/include/mac
 # The macOS ar and ranlib don't understand all the flags supported by the
 # FreeBSD and Linux ar/ranlib
-ARFLAGS:=	-cr
+ARFLAGS:=	-crs
 RANLIBFLAGS:=
 
 # to get libarchive (needed for elftoolchain)
-# MacOS ships /usr/lib/libarchive.dylib but doesn't have the headers
-CFLAGS+=	-idirafter /usr/local/opt/libarchive/include
-LDFLAGS+=	-L/usr/local/opt/libarchive/lib
-
+# MacOS ships /usr/lib/libarchive.dylib but doesn't provide the headers
+CFLAGS+=	-idirafter ${SRCTOP}/contrib/libarchive/libarchive
 .else
 .error "Unsupported build OS: ${.MAKE.OS}"
 .endif
