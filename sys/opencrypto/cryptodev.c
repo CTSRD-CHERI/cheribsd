@@ -441,7 +441,7 @@ cryptof_ioctl(
 		struct crypt_aead aeadc;
 		struct crypt_kop kopc;
 #endif
-	};
+	} thunk;
 #ifdef COMPAT_FREEBSD32
 	u_long cmd32;
 	void *data32;
@@ -453,29 +453,30 @@ cryptof_ioctl(
 		cmd32 = cmd;
 		data32 = data;
 		cmd = CIOCGSESSION;
-		data = &sopc;
-		session_op_from_32((struct session_op32 *)data32, &sopc);
+		data = &thunk.sopc;
+		session_op_from_32((struct session_op32 *)data32, &thunk.sopc);
 		break;
 	case CIOCGSESSION232:
 		cmd32 = cmd;
 		data32 = data;
 		cmd = CIOCGSESSION2;
-		data = &sopc;
-		session2_op_from_32((struct session2_op32 *)data32, &sopc);
+		data = &thunk.sopc;
+		session2_op_from_32((struct session2_op32 *)data32,
+		    &thunk.sopc);
 		break;
 	case CIOCCRYPT32:
 		cmd32 = cmd;
 		data32 = data;
 		cmd = CIOCCRYPT;
-		data = &copc;
-		crypt_op_from_32((struct crypt_op32 *)data32, &copc);
+		data = &thunk.copc;
+		crypt_op_from_32((struct crypt_op32 *)data32, &thunk.copc);
 		break;
 	case CIOCCRYPTAEAD32:
 		cmd32 = cmd;
 		data32 = data;
 		cmd = CIOCCRYPTAEAD;
-		data = &aeadc;
-		crypt_aead_from_32((struct crypt_aead32 *)data32, &aeadc);
+		data = &thunk.aeadc;
+		crypt_aead_from_32((struct crypt_aead32 *)data32, &thunk.aeadc);
 		break;
 	case CIOCKEY32:
 	case CIOCKEY232:
@@ -485,8 +486,8 @@ cryptof_ioctl(
 			cmd = CIOCKEY;
 		else
 			cmd = CIOCKEY2;
-		data = &kopc;
-		crypt_kop_from_32((struct crypt_kop32 *)data32, &kopc);
+		data = &thunk.kopc;
+		crypt_kop_from_32((struct crypt_kop32 *)data32, &thunk.kopc);
 		break;
 	}
 #endif
@@ -495,8 +496,8 @@ cryptof_ioctl(
 	case CIOCGSESSION:
 	case CIOCGSESSION2:
 		if (cmd == CIOCGSESSION) {
-			session2_op_from_op(data, &sopc);
-			sop = &sopc;
+			session2_op_from_op(data, &thunk.sopc);
+			sop = &thunk.sopc;
 		} else
 			sop = (struct session2_op *)data;
 
