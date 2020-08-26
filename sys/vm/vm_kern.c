@@ -128,6 +128,7 @@ SYSCTL_ULONG(_vm, OID_AUTO, max_kernel_address, CTLFLAG_RD,
 #define	KVA_QUANTUM_SHIFT	(8 + PAGE_SHIFT)
 #endif
 #define	KVA_QUANTUM		(1 << KVA_QUANTUM_SHIFT)
+#define	KVA_NUMA_IMPORT_QUANTUM	(KVA_QUANTUM * 128)
 
 extern void     uma_startup2(void);
 
@@ -755,6 +756,7 @@ void
 kmem_init(vm_offset_t start, vm_offset_t end)
 {
 	vm_offset_t addr;
+	vm_size_t quantum;
 	int domain;
 
 	vm_map_init(kernel_map, kernel_pmap, VM_MIN_KERNEL_ADDRESS, end);
@@ -784,10 +786,20 @@ kmem_init(vm_offset_t start, vm_offset_t end)
 	vm_map_unlock(kernel_map);
 
 	/*
+	 * Use a large import quantum on NUMA systems.  This helps minimize
+	 * interleaving of superpages, reducing internal fragmentation within
+	 * the per-domain arenas.
+	 */
+	if (vm_ndomains > 1 && PMAP_HAS_DMAP)
+		quantum = KVA_NUMA_IMPORT_QUANTUM;
+	else
+		quantum = KVA_QUANTUM;
+
+	/*
 	 * Initialize the kernel_arena.  This can grow on demand.
 	 */
 	vmem_init(kernel_arena, "kernel arena", 0, 0, PAGE_SIZE, 0, 0);
-	vmem_set_import(kernel_arena, kva_import, NULL, NULL, KVA_QUANTUM);
+	vmem_set_import(kernel_arena, kva_import, NULL, NULL, quantum);
 
 	for (domain = 0; domain < vm_ndomains; domain++) {
 		/*
@@ -799,13 +811,15 @@ kmem_init(vm_offset_t start, vm_offset_t end)
 		vm_dom[domain].vmd_kernel_arena = vmem_create(
 		    "kernel arena domain", 0, 0, PAGE_SIZE, 0, M_WAITOK);
 		vmem_set_import(vm_dom[domain].vmd_kernel_arena,
-		    kva_import_domain, NULL, kernel_arena, KVA_QUANTUM);
+		    kva_import_domain, NULL, kernel_arena, quantum);
 
 		/*
 		 * In architectures with superpages, maintain separate arenas
 		 * for allocations with permissions that differ from the
 		 * "standard" read/write permissions used for kernel memory,
 		 * so as not to inhibit superpage promotion.
+		 *
+		 * Use the base import quantum since this arena is rarely used.
 		 */
 #if VM_NRESERVLEVEL > 0
 		vm_dom[domain].vmd_kernel_rwx_arena = vmem_create(
