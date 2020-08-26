@@ -644,7 +644,7 @@ STRICTTMPPATH=	${XPATH}:${BPATH}:${UNIVERSE_TOOLCHAIN_PATH}
 # Currently strict $PATH can cause build failures and does not work yet with
 # USING_SYSTEM_LINKER/USING_SYSTEM_COMPILER. Once these issues have been
 # resolved it will be turned on by default.
-BUILD_WITH_STRICT_TMPPATH?=0
+BUILD_WITH_STRICT_TMPPATH?=1
 .if defined(CROSSBUILD_HOST)
 # When building on non-FreeBSD we can't rely on the tools in /usr/bin being compatible
 # with what FreeBSD expects. Therefore we only use tools from STRICTTMPPATH
@@ -754,7 +754,7 @@ BSARGS= 	DESTDIR= \
 		MK_HTML=no NO_LINT=yes MK_MAN=no \
 		-DNO_PIC MK_PROFILE=no -DNO_SHARED \
 		-DNO_CPU_CFLAGS MK_WARNS=no MK_CTF=no \
-		MK_CLANG_EXTRAS=no MK_CLANG_FORMAT=no MK_CLANG_FULL=no \
+		MK_CLANG_EXTRAS=no MK_CLANG_FULL=no \
 		MK_LLDB=no MK_RETPOLINE=no MK_TESTS=no \
 		MK_INCLUDES=yes
 
@@ -775,7 +775,7 @@ TMAKE=		\
 		SSP_CFLAGS= \
 		-DNO_LINT \
 		-DNO_CPU_CFLAGS MK_WARNS=no MK_CTF=no \
-		MK_CLANG_EXTRAS=no MK_CLANG_FORMAT=no MK_CLANG_FULL=no \
+		MK_CLANG_EXTRAS=no MK_CLANG_FULL=no \
 		BUILD_TOOLS_CC="env PATH=${PATH}:/usr/bin:/bin ${COMPILER_ABSOLUTE_PATH}" \
 		MK_LLDB=no MK_RETPOLINE=no MK_TESTS=no
 
