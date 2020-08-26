@@ -252,11 +252,13 @@
  */
 #define	USRSTACK		(SHAREDPAGE & ~0xFFFFF)
 
-#else /* CHERI_CAPREVOKE */
+#else /* !__has_features(capabilities) */
+
+#define	SHAREDPAGE		(VM_MAXUSER_ADDRESS - PAGE_SIZE)
 
 #define	USRSTACK		SHAREDPAGE
 
-#endif
+#endif /* !__has_features(capabilities) */
 
 #define	VM_EARLY_DTB_ADDRESS	(VM_MAX_KERNEL_ADDRESS - (2 * L2_SIZE))
 
