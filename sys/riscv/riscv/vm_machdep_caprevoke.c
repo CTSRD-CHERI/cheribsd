@@ -55,12 +55,18 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_param.h>
 #include <vm/vm_caprevoke.h>
 
+static bool caprevoke_core_shadow = 0;
+SYSCTL_BOOL(_vm, OID_AUTO, caprevoke_core_shadow, CTLFLAG_RW,
+    &caprevoke_core_shadow, 0,
+    "Include the caprevoke shadow in core dumps");
+
 /*
  * Map a capability revocation shadow
  */
 int
 vm_map_install_caprevoke_shadow(vm_map_t map)
 {
+	int cow;
 	int error = KERN_SUCCESS;
 	vm_object_t vmo;
 	vm_offset_t start = VM_CAPREVOKE_BM_BASE;
@@ -76,10 +82,12 @@ vm_map_install_caprevoke_shadow(vm_map_t map)
 		goto out;
 	}
 
+	cow = caprevoke_core_shadow ? 0 : MAP_DISABLE_COREDUMP;
+
 	error = vm_map_insert(map, vmo, 0, start, end,
 				VM_PROT_READ | VM_PROT_WRITE,
 				VM_PROT_READ | VM_PROT_WRITE,
-				0, start);
+				cow, start);
 
 	if (error != KERN_SUCCESS) {
 		goto out;
