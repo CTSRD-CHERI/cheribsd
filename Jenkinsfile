@@ -147,7 +147,7 @@ ls -la "artifacts-${suffix}/"
                 skipArchiving: true, skipTarball: true,
                 sdkCompilerOnly: true, // We only need clang not the CheriBSD sysroot since we are building that.
                 customGitCheckoutDir: 'cheribsd',
-                gitHubStatusContext: "ci/${suffix}",
+                gitHubStatusContext: GlobalVars.isTestSuiteJob ? "testsuite/${suffix}" : "ci/${suffix}",
                 // Delete stale compiler/sysroot
                 beforeBuild: { params -> dir('cherisdk') { deleteDir() } },
                 /* Custom function to run tests since --test will not work (yet) */
