@@ -19,6 +19,8 @@ DLMALLOC_CFLAGS+=	-DSUPPORT_UNMAP=1
 # but that gets included now as part of the tls_malloc goo and doing
 # so again here results in duplicate symbol definitions.
 DLMALLOC_CFLAGS+=	-DCAPREVOKE -DDEFAULT_MAX_FREEBUFBYTES=0x2000000
+# All revocation to be disabled
+DLMALLOC_CFLAGS+=	-DALLOW_DISABLING_REVOCATION
 .endif
 CFLAGS.dlmalloc_nonreuse.c+=	${DLMALLOC_CFLAGS}
 .endif
