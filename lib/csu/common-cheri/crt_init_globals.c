@@ -52,12 +52,12 @@
 CRT_INIT_GLOBALS_STATIC void crt_init_globals(void) __hidden;
 #endif
 CRT_INIT_GLOBALS_STATIC void crt_init_globals_3(
-    void *, const void *, const void *) __hidden;
+    void * __capability, const void * __capability, const void * __capability) __hidden;
 
 __attribute__((weak)) extern int _DYNAMIC __no_subobject_bounds;
 
 CRT_INIT_GLOBALS_STATIC void
-crt_init_globals_3(void *data_cap, const void *code_cap, const void *rodata_cap)
+crt_init_globals_3(void * __capability data_cap, const void * __capability code_cap, const void * __capability rodata_cap)
 {
 	/* Otherwise we need to initialize globals manually */
 	cheri_init_globals_3(data_cap, code_cap, rodata_cap);
@@ -77,9 +77,9 @@ crt_init_globals(void)
 #ifndef POSITION_INDEPENDENT_STARTUP
 /* This is __always_inline since it is called before globals have been set up */
 static __always_inline void
-do_crt_init_globals(const Elf_Phdr *phdr, long phnum)
+do_crt_init_globals(const Elf_Phdr * __capability phdr, long phnum)
 {
-	const Elf_Phdr *phlimit = phdr + phnum;
+	const Elf_Phdr * __capability phlimit = phdr + phnum;
 	Elf_Addr text_start = (Elf_Addr)-1l;
 	Elf_Addr text_end = 0;
 	Elf_Addr readonly_start = (Elf_Addr)-1l;
@@ -92,7 +92,7 @@ do_crt_init_globals(const Elf_Phdr *phdr, long phnum)
 	bool have_data_segment = false;
 
 	/* Attempt to bound the data capability to only the writable segment */
-	for (const Elf_Phdr *ph = phdr; ph < phlimit; ph++) {
+	for (const Elf_Phdr * __capability ph = phdr; ph < phlimit; ph++) {
 		if (ph->p_type != PT_LOAD && ph->p_type != PT_GNU_RELRO) {
 			/* Static binaries should not have a PT_DYNAMIC phdr */
 			if (ph->p_type == PT_DYNAMIC) {
@@ -134,8 +134,8 @@ do_crt_init_globals(const Elf_Phdr *phdr, long phnum)
 		/* No text segment??? Must be an error somewhere else. */
 		__builtin_trap();
 	}
-	const void *code_cap = cheri_getpcc();
-	const void *rodata_cap = NULL;
+	const void * __capability code_cap = cheri_getpcc();
+	const void * __capability rodata_cap = NULL;
 	if (!have_rodata_segment) {
 		/*
 		 * Note: If we don't have a separate rodata segment we also
@@ -153,7 +153,7 @@ do_crt_init_globals(const Elf_Phdr *phdr, long phnum)
 	rodata_cap =
 	    cheri_setbounds(rodata_cap, readonly_end - readonly_start);
 
-	void *data_cap = NULL;
+	void * __capability data_cap = NULL;
 	if (!have_data_segment) {
 		/*
 		 * There cannot be any capabilities to initialize if there
