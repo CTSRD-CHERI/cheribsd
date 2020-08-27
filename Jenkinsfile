@@ -44,15 +44,14 @@ def buildImageAndRunTests(params, String suffix) {
     stage("Building disk image") {
         sh "./cheribuild/jenkins-cheri-build.py --build disk-image-${suffix} ${params.extraArgs}"
     }
-    if (suffix.startsWith('mips') || suffix.startsWith('riscv64')) {
+    // No need for minimal images when running the testsuite
+    if (!GlobalVars.isTestSuiteJob && (suffix.startsWith('mips') || suffix.startsWith('riscv64'))) {
         stage("Building minimal disk image") {
             sh "./cheribuild/jenkins-cheri-build.py --build disk-image-minimal-${suffix} ${params.extraArgs}"
         }
         stage("Building MFS_ROOT kernels") {
             sh "./cheribuild/jenkins-cheri-build.py --build cheribsd-mfs-root-kernel-${suffix} --cheribsd-mfs-root-kernel-${suffix}/build-fpga-kernels ${params.extraArgs}"
         }
-    } else {
-        echo("Cannot build MFS_ROOT kernels for ${suffix} yet")
     }
     stage("Running tests") {
         def haveCheritest = suffix.endsWith('-hybrid') || suffix.endsWith('-purecap')
