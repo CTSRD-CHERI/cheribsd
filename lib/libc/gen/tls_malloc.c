@@ -112,7 +112,6 @@ struct pagepool_header {
 	size_t			 ph_size;
 #ifdef __CHERI_PURE_CAPABILITY__
 	size_t			 ph_pad1;
-	/* XXXBD: more padding on 256-bit... */
 #endif
 	struct pagepool_header	*ph_next;
 #ifdef CAPREVOKE
