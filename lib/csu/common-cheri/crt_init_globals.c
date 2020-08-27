@@ -51,13 +51,14 @@
 #ifndef CRT_INIT_GLOBALS_GDC_ONLY
 CRT_INIT_GLOBALS_STATIC void crt_init_globals(void) __hidden;
 #endif
-CRT_INIT_GLOBALS_STATIC void crt_init_globals_3(
-    void *, const void *, const void *) __hidden;
+CRT_INIT_GLOBALS_STATIC void crt_init_globals_3(void * __capability,
+    const void * __capability, const void * __capability) __hidden;
 
 __attribute__((weak)) extern int _DYNAMIC __no_subobject_bounds;
 
 CRT_INIT_GLOBALS_STATIC void
-crt_init_globals_3(void *data_cap, const void *code_cap, const void *rodata_cap)
+crt_init_globals_3(void * __capability data_cap,
+    const void * __capability code_cap, const void * __capability rodata_cap)
 {
 	/* Otherwise we need to initialize globals manually */
 	cheri_init_globals_3(data_cap, code_cap, rodata_cap);
@@ -89,9 +90,9 @@ do_crt_init_globals(const Elf_Phdr *phdr, long phnum)
 	bool have_rodata_segment = false;
 	bool have_text_segment = false;
 	bool have_data_segment = false;
-	void *data_cap;
-	const void *code_cap;
-	const void *rodata_cap;
+	void * __capability data_cap;
+	const void * __capability code_cap;
+	const void * __capability rodata_cap;
 
 	/* Attempt to bound the data capability to only the writable segment */
 	for (const Elf_Phdr *ph = phdr; ph < phlimit; ph++) {
@@ -170,7 +171,11 @@ do_crt_init_globals(const Elf_Phdr *phdr, long phnum)
 			__builtin_trap();
 		}
 
+#ifdef __CHERI_PURE_CAPABILITY__
 		data_cap = __DECONST(void *, phdr);
+#else
+		data_cap = cheri_getdefault();
+#endif
 		data_cap = cheri_clearperm(data_cap, CHERI_PERM_EXECUTE);
 
 		code_cap = cheri_getpcc();
