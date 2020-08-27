@@ -18,7 +18,7 @@ DLMALLOC_CFLAGS+=	-DSUPPORT_UNMAP=1
 # We used to need to add libcheri_caprevoke.c as a source file, too,
 # but that gets included now as part of the tls_malloc goo and doing
 # so again here results in duplicate symbol definitions.
-DLMALLOC_CFLAGS+=	-DCAPREVOKE -DDEFAULT_MAX_FREEBUFBYTES=8388608
+DLMALLOC_CFLAGS+=	-DCAPREVOKE -DDEFAULT_MAX_FREEBUFBYTES=0x2000000
 .endif
 CFLAGS.dlmalloc_nonreuse.c+=	${DLMALLOC_CFLAGS}
 .endif
