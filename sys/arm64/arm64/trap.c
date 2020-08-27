@@ -198,8 +198,8 @@ cap_abort(struct thread *td, struct trapframe *frame, uint64_t esr,
 		printf(" esr:         %.8lx\n", esr);
 		panic("Capability abort from kernel space!");
 	}
-
-	call_trapsignal(td, SIGPROT, 0, (void * __capability)frame->tf_elr);
+	call_trapsignal(td, SIGPROT, cheri_esr_to_sicode(esr),
+	    (void * __capability)frame->tf_elr);
 	userret(td, frame);
 }
 
