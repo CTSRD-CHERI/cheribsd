@@ -6,8 +6,11 @@ SRCS=		crt1.c crti.S crtn.S
 OBJS=		${SRCS:N*.h:R:S/$/.o/g}
 OBJS+=		Scrt1.o gcrt1.o
 CFLAGS+=	-I${.CURDIR:H}/common \
+		-I${.CURDIR}/../common-cheri	\
 		-I${SRCTOP}/lib/libc/include
 CFLAGS+=	-DCRT_IRELOC_SUPPRESS
+
+PICFLAG+=-DPOSITION_INDEPENDENT_STARTUP=1
 
 FILES=		${OBJS}
 FILESMODE=	${LIBMODE}
@@ -38,7 +41,7 @@ gcrt1.o: gcrt1.s
 	${CC} ${CFLAGS:N-g} ${ACFLAGS} -c -o ${.TARGET} gcrt1.s
 
 Scrt1.s: crt1.c
-	${CC} ${CFLAGS} -fPIC -DPIC -S -o ${.TARGET} ${.CURDIR}/crt1.c
+	${CC} ${CFLAGS} -fPIC -DPIC ${PICFLAG} -S -o ${.TARGET} ${.CURDIR}/crt1.c
 	sed ${SED_FIX_NOTE} ${.TARGET}
 
 Scrt1.o: Scrt1.s

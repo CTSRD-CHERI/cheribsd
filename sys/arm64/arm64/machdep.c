@@ -524,6 +524,16 @@ exec_setregs(struct thread *td, struct image_params *imgp, uintcap_t stack)
 		tf->tf_sp = STACKALIGN(stack);
 #if __has_feature(capabilities)
 		hybridabi_thread_setregs(td, imgp->entry_addr);
+		/*
+		 * For the hybrid ABI, give csu a capability to the auxiliary vector so it
+		 * can process capability relocations. The lower registers are used by the
+		 * existing non-purecap csu code. Use the address calculation corresponding
+		 * to the auxiliary vector from copyout_strings in freebsd64_misc.c because
+		 * this is hybrid.
+		 */
+		uint64_t * __capability auxv = (uint64_t * __capability)stack + imgp->args->argc + 1 + imgp->args->envc + 1 + 1;
+		auxv = cheri_setbounds(auxv, AT_COUNT * sizeof(Elf64_Auxinfo));
+		tf->tf_x[4] = (uintcap_t)(auxv);
 #else
 		tf->tf_elr = imgp->entry_addr;
 #endif
