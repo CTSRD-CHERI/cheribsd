@@ -311,6 +311,8 @@ typedef struct {
 /* segment bit set in create_mspace_with_base */
 #define EXTERN_BIT            (8U)
 
+/* mparam bit indiciaing if we should quarantine or just free */
+#define DO_REVOCATION_BIT    (16U)
 
 /* --------------------------- Lock preliminaries ------------------------ */
 
@@ -1180,6 +1182,14 @@ static volatile const struct caprevoke_info *cri;
 #define use_noncontiguous(M)  ((M)->mflags &   USE_NONCONTIGUOUS_BIT)
 #define disable_contiguous(M) ((M)->mflags |=  USE_NONCONTIGUOUS_BIT)
 
+#define do_revocation(M)      ((M)->mflags &   DO_REVOCATION_BIT)
+#define enable_revocation(M)  ((M)->mflags |=  DO_REVOCATION_BIT)
+#ifdef ALLOW_DISABLING_REVOCATION
+#define disable_revocation(M) ((M)->mflags &= ~DO_REVOCATION_BIT)
+#else
+#define disable_revocation(M)
+#endif
+
 #define set_lock(M,L)\
  ((M)->mflags = (L)?\
   ((M)->mflags | USE_LOCK_BIT) :\
@@ -1662,7 +1672,7 @@ static int init_mparams(void) {
     mparams.page_size = psize;
     mparams.mmap_threshold = DEFAULT_MMAP_THRESHOLD;
     mparams.trim_threshold = DEFAULT_TRIM_THRESHOLD;
-    mparams.default_mflags = USE_LOCK_BIT|USE_MMAP_BIT|USE_NONCONTIGUOUS_BIT;
+    mparams.default_mflags = USE_LOCK_BIT|USE_MMAP_BIT|USE_NONCONTIGUOUS_BIT|DO_REVOCATION_BIT;
 
     if ((valuestr = getenv("MALLOC_MAX_FREEBUF_BYTES")) != NULL) {
       value = strtol(valuestr, &endp, 0);
@@ -1711,6 +1721,14 @@ static int init_mparams(void) {
 #if LOCK_AT_FORK
     pthread_atfork(&pre_fork, &post_fork_parent, &post_fork_child);
 #endif
+
+    /*
+     * Allow revocation to be disabled if MALLOC_DISABLE_REVOCATION is
+     * defined in the environment.  Don't allow if we're obviously SUID.
+     */
+    if(getenv("MALLOC_DISABLE_REVOCATION") != NULL &&
+       getuid() == geteuid())
+      disable_revocation(gm);
 
     {
 #if USE_DEV_RANDOM
@@ -2617,7 +2635,8 @@ static void add_segment(mstate m, char* tbase, size_t tsize, flag_t mmapped) {
   m->seg.sflags = mmapped;
   m->seg.next = ss;
 #ifdef CAPREVOKE
-  if (caprevoke_shadow(CAPREVOKE_SHADOW_NOVMMAP, tbase, &m->seg.shadow) != 0)
+  if (do_revocation(m) &&
+      caprevoke_shadow(CAPREVOKE_SHADOW_NOVMMAP, tbase, &m->seg.shadow) != 0)
     ABORT;
 #endif
 
@@ -2726,7 +2745,8 @@ static void* sys_alloc(mstate m, size_t nb) {
       m->seg.size = tsize;
       m->seg.sflags = mmap_flag;
 #ifdef CAPREVOKE
-      if (caprevoke_shadow(CAPREVOKE_SHADOW_NOVMMAP, tbase, &m->seg.shadow) != 0)
+      if (do_revocation(m) &&
+          caprevoke_shadow(CAPREVOKE_SHADOW_NOVMMAP, tbase, &m->seg.shadow) != 0)
         ABORT;
 #endif
       m->magic = mparams.magic;
@@ -3548,6 +3568,11 @@ dlfree(void* mem) {
       fm->freeBytes += chunksize(p);
 #endif // SWEEP_STATS
       check_freebuf_corrupt(fm, p);
+      if(!do_revocation(fm)) {
+        dlfree_internal(chunk2mem(p));
+        POSTACTION(fm);
+        return;
+      }
 #if CONSOLIDATE_ON_FREE == 1
       if(!is_mmapped(p)) {
         if(RTCHECK(ok_address(fm, p) && ok_inuse(p))) {
