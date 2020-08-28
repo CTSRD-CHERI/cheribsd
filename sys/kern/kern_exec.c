@@ -1050,6 +1050,7 @@ exec_new_vmspace(struct image_params *imgp, struct sysentvec *sv)
 	vm_map_t map;
 	u_long ssiz;
 	vm_ptr_t shared_page_addr;
+        vm_prot_t stack_prot;
 
 	imgp->vmspace_destroyed = 1;
 	imgp->sysent = sv;
@@ -1114,7 +1115,7 @@ exec_new_vmspace(struct image_params *imgp, struct sysentvec *sv)
 #if __has_feature(capabilities)
 		error = vm_map_reservation_create(map, &shared_page_addr,
 		    sv->sv_shared_page_len, PAGE_SIZE,
-		    MAP_INHERIT_SHARE | MAP_ACC_NO_CHARGE);
+		    VM_PROT_READ | VM_PROT_EXECUTE);
 		if (error != KERN_SUCCESS) {
 			vm_object_deallocate(obj);
 			return (vm_mmap_to_errno(error));
@@ -1154,19 +1155,17 @@ exec_new_vmspace(struct image_params *imgp, struct sysentvec *sv)
 	imgp->eff_stack_sz = lim_cur(curthread, RLIMIT_STACK);
 	if (ssiz < imgp->eff_stack_sz)
 		imgp->eff_stack_sz = ssiz;
-	/*
-	 * We reserve more space to ensure representablity while
-	 * maintaining
-	 */
+	/* We reserve the whole max stack size with restricted permission */
 	stack_addr = sv->sv_usrstack - ssiz;
+        stack_prot = (obj != NULL && imgp->stack_prot != 0) ? imgp->stack_prot :
+	    sv->sv_stackprot;
 	error = vm_map_reservation_create_fixed(map, &stack_addr, ssiz,
-	    PAGE_SIZE, MAP_STACK_GROWS_DOWN);
+	    PAGE_SIZE, stack_prot);
 	if (error != KERN_SUCCESS)
 		return (vm_mmap_to_errno(error));
 
-	error = vm_map_stack(map, stack_addr, (vm_size_t)ssiz,
-	    obj != NULL && imgp->stack_prot != 0 ? imgp->stack_prot :
-	    sv->sv_stackprot, VM_PROT_ALL, MAP_STACK_GROWS_DOWN);
+	error = vm_map_stack(map, stack_addr, (vm_size_t)ssiz, stack_prot,
+	    stack_prot, MAP_STACK_GROWS_DOWN);
 	if (error != KERN_SUCCESS) {
 		vm_map_reservation_delete(map,
 		    cheri_kern_getbase((void *)stack_addr));

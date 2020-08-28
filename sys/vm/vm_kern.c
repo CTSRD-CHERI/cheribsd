@@ -710,7 +710,7 @@ kmap_alloc_wait(vm_map_t map, vm_size_t size)
 
 	mapped = addr;
 	if (vm_map_reservation_create_locked(map, &mapped, padded_size,
-	    MAP_ACC_CHARGED))
+	    VM_PROT_RW))
 		return (0);
 	vm_map_insert(map, NULL, 0, mapped, mapped + size, VM_PROT_RW,
 	    VM_PROT_RW, MAP_ACC_CHARGED, mapped);

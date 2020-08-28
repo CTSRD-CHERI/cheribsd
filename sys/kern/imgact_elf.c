@@ -545,7 +545,7 @@ __elfN(build_imgact_capability)(struct image_params *imgp,
 
 	reservation = start;
 	result = vm_map_reservation_create(map, &reservation, end - start,
-	    PAGE_SIZE, 0);
+	    PAGE_SIZE, VM_PROT_RW);
 	if (result != KERN_SUCCESS)
 		return (result);
 
