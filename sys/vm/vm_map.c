@@ -87,6 +87,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/shm.h>
 
 #include <cheri/cheric.h>
+#include <cheri/cheri.h>
 
 #include <vm/vm.h>
 #include <vm/vm_param.h>
@@ -153,8 +154,6 @@ static int vm_map_stack_locked(vm_map_t map, vm_ptr_t addrbos,
 static void vm_map_wire_entry_failure(vm_map_t map, vm_map_entry_t entry,
     vm_offset_t failed_addr);
 static void vm_map_reservation_init_entry(vm_map_entry_t entry);
-static vm_ptr_t vm_map_reservation_cap(vm_map_t map, vm_offset_t addr,
-    vm_size_t length);
 static vm_map_entry_t vm_map_reservation_insert(vm_map_t map, vm_offset_t addr,
     vm_size_t length, vm_offset_t reservation);
 static inline void _vm_map_clip_end(vm_map_t map, vm_map_entry_t entry,
@@ -221,42 +220,6 @@ vm_map_log(const char *prefix, vm_map_entry_t entry)
 #else
 #define	vm_map_log(prefix, entry)
 #endif
-
-#ifdef CHERI_PURECAP_KERNEL
-/*
- * Convert VM protection flags to CHERI pointer permission bits.
- */
-static int
-vm_prot_to_cheri(vm_prot_t prot)
-{
-	int perms = CHERI_PERM_GLOBAL;
-
-	if (prot & (VM_PROT_READ | VM_PROT_COPY))
-		perms |= (CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP);
-	if (prot & VM_PROT_WRITE)
-		perms |= (CHERI_PERM_STORE | CHERI_PERM_STORE_CAP |
-			  CHERI_PERM_STORE_LOCAL_CAP | CHERI_PERM_SEAL);
-	if (prot & VM_PROT_EXECUTE)
-		perms |= (CHERI_PERM_EXECUTE | CHERI_PERM_CCALL | CHERI_PERM_SEAL);
-	return perms;
-}
-
-/*
- * Create a valid pointer for the given region in a map.
- */
-vm_ptr_t
-vm_map_make_ptr(vm_map_t map, vm_offset_t addr, vm_size_t size, vm_prot_t prot)
-{
-	void *mapped;
-
-	mapped = cheri_setbounds(
-		cheri_setaddress(map->map_capability, addr),
-		size);
-	mapped = cheri_andperm(mapped, vm_prot_to_cheri(prot));
-
-	return ((vm_ptr_t)mapped);
-}
-#endif /* CHERI_PURECAP_KERNEL */
 
 /*
  *	vm_map_clip_start:	[ internal use only ]
@@ -2421,9 +2384,17 @@ again:
 
 	reservation = vaddr;
 	rv = vm_map_reservation_create_locked(map, &reservation,
-	    length, cow);
+	    length, max);
 	if (rv != KERN_SUCCESS)
 		goto done;
+
+	/*
+	 * The guard mapping must have PROT_NONE maxprot but the capability we
+	 * allocate for it must comply with the requested maxprot so that
+	 * it can be used to remap over the guard pages.
+	 */
+        if (cow & MAP_CREATE_GUARD)
+            prot = max = VM_PROT_NONE;
 
 	if ((cow & (MAP_STACK_GROWS_DOWN | MAP_STACK_GROWS_UP)) != 0) {
 		rv = vm_map_stack_locked(map, reservation, unpadded_length,
@@ -5043,8 +5014,9 @@ retry:
 	 * in the map entry?
 	 */
 	if (grow_down) {
-		stack_reservation = vm_map_reservation_cap(map, gap_entry->start,
-		    stack_entry->end - gap_entry->start);
+		stack_reservation = vm_map_buildcap(map, gap_entry->start,
+		    stack_entry->end - gap_entry->start,
+		    stack_entry->max_protection);
 
 		grow_start = (vm_ptr_t)cheri_kern_setaddress(
 		    stack_reservation, gap_entry->end - grow_amount);
@@ -5064,7 +5036,7 @@ retry:
 				    grow_amount, stack_entry->reservation);
 			gap_deleted = false;
 		}
-		/* XXX-AM: Why can't we increment/decrement as below? */
+		/* XXX-AM: Would be nice to just grow the object as below */
 		rv = vm_map_insert(map, NULL, 0, grow_start,
 		    grow_start + grow_amount,
 		    stack_entry->protection, stack_entry->max_protection,
@@ -5084,8 +5056,9 @@ retry:
 			}
 		}
 	} else {
-		stack_reservation = vm_map_reservation_cap(map,
-		    stack_entry->start, gap_entry->end - stack_entry->start);
+		stack_reservation = vm_map_buildcap(map, stack_entry->start,
+		    gap_entry->end - stack_entry->start,
+		    stack_entry->max_protection);
 		grow_start = (vm_ptr_t)cheri_kern_setaddress(
 		    stack_reservation, stack_entry->end);
 		cred = stack_entry->cred;
@@ -5180,8 +5153,9 @@ vmspace_exec(struct proc *p, vm_offset_t minuser, vm_offset_t maxuser)
 	    ("Unrepresentable length for new vmspace"));
 
 	user_length = CHERI_REPRESENTABLE_LENGTH(user_length);
-	minuser_cap = (vm_ptr_t)cheri_capability_build_user_data(
-	    CHERI_CAP_USER_DATA_PERMS, padded_minuser, user_length, minuser);
+	minuser_cap = (vm_ptr_t)cheri_capability_build_user_rwx(
+	    CHERI_CAP_USER_CODE_PERMS | CHERI_CAP_USER_DATA_PERMS,
+	    padded_minuser, user_length, minuser);
 	maxuser_cap = (vm_ptr_t)cheri_setaddress((void *)minuser_cap, maxuser);
 	newvmspace = vmspace_alloc(minuser_cap, maxuser_cap, pmap_pinit);
 #else
@@ -5560,17 +5534,37 @@ vm_map_reservation_init_entry(vm_map_entry_t new_entry)
 	new_entry->read_ahead = VM_FAULT_READ_AHEAD_INIT;
 }
 
+#define	PERM_READ	(CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP)
+#define	PERM_WRITE	(CHERI_PERM_STORE | CHERI_PERM_STORE_CAP | \
+			    CHERI_PERM_STORE_LOCAL_CAP)
+#define	PERM_EXEC	CHERI_PERM_EXECUTE
+#define	PERM_RWX	(PERM_READ | PERM_WRITE | PERM_EXEC)
 /*
- * Create a capability for a reservation, derived from the map root
+ * Create a capability for the given map, derived from the map root
  * capability.
- * XXX-AM: reduce permission based on vm_prot_t?
  */
-static vm_ptr_t
-vm_map_reservation_cap(vm_map_t map, vm_offset_t addr, vm_size_t length)
+vm_ptr_t
+vm_map_buildcap(vm_map_t map, vm_offset_t addr, vm_size_t length,
+    vm_prot_t prot)
 {
+
 #ifdef CHERI_PURECAP_KERNEL
-	return ((vm_ptr_t)cheri_setbounds(
-	    cheri_setaddress(vm_map_rootcap(map), addr), length));
+	void *retcap;
+	int perms = ~(PERM_RWX);
+
+	/* These should match mmap_prot2perms until they are merged */
+	if (prot & (VM_PROT_READ | VM_PROT_COPY))
+		perms |= (CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP);
+	if (prot & VM_PROT_WRITE)
+		perms |= (CHERI_PERM_STORE | CHERI_PERM_STORE_CAP |
+			  CHERI_PERM_STORE_LOCAL_CAP);
+	if (prot & VM_PROT_EXECUTE)
+		perms |= CHERI_PERM_EXECUTE;
+
+	retcap = cheri_setbounds(cheri_setaddress(vm_map_rootcap(map),
+	    addr), length);
+
+	return ((vm_ptr_t)cheri_andperm(retcap, perms));
 #else
 	return (addr);
 #endif
@@ -5605,7 +5599,7 @@ vm_map_reservation_insert(vm_map_t map, vm_offset_t addr, vm_size_t length, vm_o
  * length must be representable.
  */
 int
-vm_map_reservation_create_locked(vm_map_t map, vm_ptr_t *addr, vm_size_t length, int cow)
+vm_map_reservation_create_locked(vm_map_t map, vm_ptr_t *addr, vm_size_t length, vm_prot_t max_prot)
 {
 	vm_offset_t start = *addr;
 	vm_offset_t end = start + length;
@@ -5615,7 +5609,7 @@ vm_map_reservation_create_locked(vm_map_t map, vm_ptr_t *addr, vm_size_t length,
 	CHERI_ASSERT_PTRSIZE_BOUNDS(addr);
 
 	if ((map->flags & MAP_RESERVATIONS) == 0) {
-		*addr = vm_map_reservation_cap(map, start, length);
+		*addr = vm_map_buildcap(map, start, length, max_prot);
 		return (KERN_SUCCESS);
 	}
 
@@ -5639,7 +5633,7 @@ vm_map_reservation_create_locked(vm_map_t map, vm_ptr_t *addr, vm_size_t length,
         vm_map_reservation_insert(map, start, length, start);
 	CTR3(KTR_VM, "%s: reserve %lx-%lx", __func__, start, end);
 
-	*addr = vm_map_reservation_cap(map, start, length);
+	*addr = vm_map_buildcap(map, start, length, max_prot);
 	CHERI_ASSERT_VALID(*addr);
 	CHERI_ASSERT_EXBOUNDS(*addr, length);
 
@@ -5655,14 +5649,14 @@ vm_map_reservation_create_locked(vm_map_t map, vm_ptr_t *addr, vm_size_t length,
  */
 int
 vm_map_reservation_create(vm_map_t map, vm_ptr_t *addr, vm_size_t length,
-    vm_offset_t alignment, int cow)
+    vm_offset_t alignment, vm_prot_t max_prot)
 {
 	int result;
 	vm_size_t padded_length = CHERI_REPRESENTABLE_LENGTH(length);
 	vm_ptr_t start = *addr;
 
 	if ((map->flags & MAP_RESERVATIONS) == 0) {
-		*addr = vm_map_reservation_cap(map, start, length);
+		*addr = vm_map_buildcap(map, start, length, max_prot);
 		return (KERN_SUCCESS);
 	}
 
@@ -5677,7 +5671,7 @@ vm_map_reservation_create(vm_map_t map, vm_ptr_t *addr, vm_size_t length,
 	if (start < vm_map_min(map) && vm_map_min(map) <= PAGE_SIZE)
 		start = vm_map_min(map);
 	result = vm_map_reservation_create_locked(map, &start, padded_length,
-	    cow);
+	    max_prot);
 	vm_map_unlock(map);
 
 	if (result == KERN_SUCCESS)
@@ -5695,7 +5689,7 @@ vm_map_reservation_create(vm_map_t map, vm_ptr_t *addr, vm_size_t length,
  */
 int
 vm_map_reservation_create_fixed(vm_map_t map, vm_ptr_t *addr, vm_size_t length,
-    vm_offset_t alignment, int cow)
+    vm_offset_t alignment, vm_prot_t max_prot)
 {
 	int result;
 	vm_size_t padded_length;
@@ -5705,7 +5699,7 @@ vm_map_reservation_create_fixed(vm_map_t map, vm_ptr_t *addr, vm_size_t length,
 	vm_offset_t hint_align;
 
 	if ((map->flags & MAP_RESERVATIONS) == 0) {
-		*addr = vm_map_reservation_cap(map, *addr, length);
+		*addr = vm_map_buildcap(map, *addr, length, max_prot);
 		return (KERN_SUCCESS);
 	}
 
@@ -5726,7 +5720,7 @@ vm_map_reservation_create_fixed(vm_map_t map, vm_ptr_t *addr, vm_size_t length,
 	if (rounded_addr < vm_map_min(map) && vm_map_min(map) <= PAGE_SIZE)
 		rounded_addr = vm_map_min(map);
 	result = vm_map_reservation_create_locked(map, &rounded_addr,
-	    padded_length, cow);
+	    padded_length, max_prot);
 	vm_map_unlock(map);
 
 	if (result == KERN_SUCCESS)

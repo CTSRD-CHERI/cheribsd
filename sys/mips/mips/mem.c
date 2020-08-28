@@ -124,12 +124,8 @@ memrw(struct cdev *dev, struct uio *uio, int flags)
 			prot = (uio->uio_rw == UIO_READ)
 			    ? VM_PROT_READ : VM_PROT_WRITE;
 
-#ifdef CHERI_PURECAP_KERNEL
-			kva = vm_map_make_ptr(kernel_map, uio->uio_offset,
+			kva = vm_map_buildcap(kernel_map, uio->uio_offset,
 			    iov->iov_len, prot);
-#else
-			kva = uio->uio_offset;
-#endif
 
 			/* 
 			 * Make sure that all the pages are currently resident

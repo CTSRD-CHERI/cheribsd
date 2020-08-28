@@ -176,7 +176,7 @@ mmap_prot2perms(int prot)
 }
 
 static void * __capability
-mmap_retcap(struct thread *td, vm_offset_t addr,
+mmap_retcap(struct thread *td, vm_ptr_t addr,
     const struct mmap_req *mrp)
 {
 	void * __capability newcap;
@@ -193,7 +193,14 @@ mmap_retcap(struct thread *td, vm_offset_t addr,
 	if (mrp->mr_flags & MAP_CHERI_NOSETBOUNDS)
 		return (mrp->mr_source_cap);
 
+#ifdef CHERI_PURECAP_KERNEL
+	CHERI_ASSERT_VALID(addr);
+	newcap = (void *)addr;
+	/* Enforce per-thread mmap capability permission */
+	newcap = cheri_andperm(newcap, cheri_getperm(mrp->mr_source_cap));
+#else
 	newcap = mrp->mr_source_cap;
+#endif
 	perms = cheri_getperm(newcap);
 
 	/*
@@ -210,6 +217,8 @@ mmap_retcap(struct thread *td, vm_offset_t addr,
 	newcap = cheri_andperm(newcap, ~PERM_RWX |
 	    mmap_prot2perms(cap_prot));
 
+#ifndef CHERI_PURECAP_KERNEL
+	/* Reservations in the kernel ensure this */
 	if (mrp->mr_flags & MAP_FIXED) {
 		/*
 		 * If hint was under aligned, we need to return a
@@ -238,6 +247,7 @@ mmap_retcap(struct thread *td, vm_offset_t addr,
 		    cheri_setaddress(newcap, addr),
 		    roundup2(mrp->mr_len, PAGE_SIZE));
 	}
+#endif
 
 	return (newcap);
 }
@@ -732,7 +742,7 @@ kern_mmap_req(struct thread *td, struct mmap_req *mrp)
 		error = 0;
 	} else if ((flags & MAP_GUARD) != 0) {
 		error = vm_mmap_object(&vms->vm_map, &addr, max_addr, size,
-		    VM_PROT_NONE, VM_PROT_NONE, flags, NULL, pos, FALSE, td);
+		    VM_PROT_NONE, max_prot, flags, NULL, pos, FALSE, td);
 	} else if ((flags & MAP_ANON) != 0) {
 		/*
 		 * Mapping blank space is trivial.
@@ -782,13 +792,7 @@ kern_mmap_req(struct thread *td, struct mmap_req *mrp)
 		    prot, max_prot & cap_maxprot, flags, pos, td);
 	}
 
-	// XXX-AM: TODO honor NOSETBOUNDS
-
 	if (error == 0) {
-#ifndef CHERI_PURECAP_KERNEL
-		// XXX-AM do mmap_retcap, otherwise we have our capability
-		// in addr already.
-#endif
 #if __has_feature(capabilities)
 		if (SV_CURPROC_FLAG(SV_CHERI))
 			td->td_retval[0] = (uintcap_t)mmap_retcap(td,
@@ -2072,6 +2076,8 @@ vm_mmap_object(vm_map_t map, vm_ptr_t *addr, vm_offset_t max_addr,
 	} else {
 		if (max_addr != 0 && *addr + size > max_addr)
 			return (ENOMEM);
+		if (docow & MAP_GUARD)
+			maxprot = PROT_NONE;
 
 		rv = vm_map_fixed(map, object, foff, *addr, size,
 		    prot, maxprot, docow);

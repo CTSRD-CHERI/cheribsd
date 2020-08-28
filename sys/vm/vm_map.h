@@ -349,15 +349,6 @@ pmap_t vm_map_pmap_KBI(vm_map_t map);
 
 long vmspace_resident_count(struct vmspace *vmspace);
 
-#ifdef CHERI_PURECAP_KERNEL
-/*
- * Derive a pointer from the map capability.
- */
-vm_ptr_t vm_map_make_ptr(vm_map_t map, vm_offset_t addr, vm_size_t size, vm_prot_t prot);
-#else /* ! CHERI_PURECAP_KERNEL */
-#define vm_map_make_ptr(map, addr, size, prot) (addr)
-#endif /* ! CHERI_PURECAP_KERNEL */
-
 #endif	/* _KERNEL */
 
 
@@ -493,10 +484,13 @@ boolean_t vm_map_lookup_entry (vm_map_t, vm_offset_t, vm_map_entry_t *);
 bool vm_map_reservation_is_unmapped(vm_map_t, vm_offset_t);
 int vm_map_reservation_delete(vm_map_t, vm_offset_t);
 int vm_map_reservation_delete_locked(vm_map_t, vm_offset_t);
-int vm_map_reservation_create(vm_map_t, vm_ptr_t *, vm_size_t, vm_offset_t, int);
+int vm_map_reservation_create(vm_map_t, vm_ptr_t *, vm_size_t, vm_offset_t,
+    vm_prot_t);
 int vm_map_reservation_create_fixed(vm_map_t, vm_ptr_t *, vm_size_t,
-    vm_offset_t, int);
-int vm_map_reservation_create_locked(vm_map_t, vm_ptr_t *, vm_size_t, int);
+    vm_offset_t, vm_prot_t);
+int vm_map_reservation_create_locked(vm_map_t, vm_ptr_t *, vm_size_t, vm_prot_t);
+vm_ptr_t vm_map_buildcap(vm_map_t map, vm_offset_t addr, vm_size_t length,
+    vm_prot_t prot);
 
 static inline vm_map_entry_t
 vm_map_entry_first(vm_map_t map)
