@@ -175,6 +175,7 @@ SUBDIR=	alias \
 	uuencode \
 	vis \
 	vmstat \
+	vmmap_dump \
 	w \
 	wall \
 	wc \
