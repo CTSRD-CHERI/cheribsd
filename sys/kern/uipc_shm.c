@@ -836,6 +836,7 @@ kern_shm_open2(struct thread *td, const char * __capability userpath,
 		}
 		shmfd = shm_alloc(td->td_ucred, cmode);
 		shmfd->shm_seals = initial_seals;
+		shmfd->shm_flags = shmflags;
 	} else {
 		error = shm_copyin_path(td, userpath, &path);
 		if (error != 0) {
@@ -858,6 +859,7 @@ kern_shm_open2(struct thread *td, const char * __capability userpath,
 #endif
 					shmfd = shm_alloc(td->td_ucred, cmode);
 					shmfd->shm_seals = initial_seals;
+					shmfd->shm_flags = shmflags;
 					shm_insert(path, fnv, shmfd);
 #ifdef MAC
 				}
@@ -901,6 +903,8 @@ kern_shm_open2(struct thread *td, const char * __capability userpath,
 			else if ((flags & (O_CREAT | O_EXCL)) ==
 			    (O_CREAT | O_EXCL))
 				error = EEXIST;
+			else if (shmflags != 0 && shmflags != shmfd->shm_flags)
+				error = EINVAL;
 			else {
 #ifdef MAC
 				error = mac_posixshm_check_open(td->td_ucred,
@@ -950,7 +954,6 @@ kern_shm_open2(struct thread *td, const char * __capability userpath,
 		}
 	}
 
-	shmfd->shm_flags = shmflags;
 	finit(fp, FFLAGS(flags & O_ACCMODE), DTYPE_SHM, shmfd, &shm_ops);
 
 	td->td_retval[0] = fd;
