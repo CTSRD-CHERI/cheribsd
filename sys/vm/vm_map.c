@@ -2049,8 +2049,8 @@ vm_map_fixed(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 
 #ifdef CHERI_PURECAP_KERNEL
 	CHERI_ASSERT_VALID(start);
-	KASSERT((cheri_getlen((void * __capability)start) >= length),
-	    ("vm_map_fixed: source capability is too small"));
+	if (cheri_getlen((void *)start) < length)
+		return (KERN_INVALID_ARGUMENT);
 #endif
 
 	end = start + length;
@@ -2072,14 +2072,8 @@ vm_map_fixed(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 			while ((entry->eflags & MAP_ENTRY_HEADER) == 0 &&
 			    entry->start <= end) {
 				next_entry = vm_map_entry_succ(entry);
-				/*
-				 * XXX-AM: the EXCL check is redundant with
-				 * what is being done in vm_map_insert?
-				 */
 				if (entry->reservation != reservation ||
-				    (next_entry->start > end && entry->end < end) ||
-				    ((cow & MAP_CHECK_EXCL) != 0 &&
-				    (entry->eflags & MAP_ENTRY_UNMAPPED) == 0)) {
+				    (next_entry->start > end && entry->end < end)) {
 					result = KERN_NO_SPACE;
 					goto done;
 				}
@@ -2087,7 +2081,7 @@ vm_map_fixed(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 			}
 		}
 		else {
-			result = KERN_INVALID_ARGUMENT;
+			result = KERN_PROTECTION_FAILURE;
 			goto done;
 		}
 	}
