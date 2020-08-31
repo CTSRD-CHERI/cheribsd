@@ -200,6 +200,12 @@ _memstat_mt_reset_stats(struct memory_type *mtp, int maxcpus)
 	mtp->mt_zonefree = 0;
 	mtp->mt_kegfree = 0;
 
+#if __has_feature(capabilities)
+        mtp->mt_memreserved = 0;
+        mtp->mt_memunreserved = 0;
+        mtp->mt_reserved_bytes = 0;
+#endif
+
 	for (i = 0; i < maxcpus; i++) {
 		mtp->mt_percpu_alloc[i].mtp_memalloced = 0;
 		mtp->mt_percpu_alloc[i].mtp_memfreed = 0;
@@ -207,6 +213,10 @@ _memstat_mt_reset_stats(struct memory_type *mtp, int maxcpus)
 		mtp->mt_percpu_alloc[i].mtp_numfrees = 0;
 		mtp->mt_percpu_alloc[i].mtp_sizemask = 0;
 		mtp->mt_percpu_cache[i].mtp_free = 0;
+#if __has_feature(capabilities)
+		mtp->mt_percpu_alloc[i].mtp_memreserved = 0;
+		mtp->mt_percpu_alloc[i].mtp_memunreserved = 0;
+#endif
 	}
 }
 
@@ -269,6 +279,8 @@ memstat_get_memalloced(const struct memory_type *mtp)
 
 	return (mtp->mt_memalloced);
 }
+
+uint64_t	 memstat_get_reserved_bytes(const struct memory_type *mtp);
 
 uint64_t
 memstat_get_memfreed(const struct memory_type *mtp)
@@ -448,3 +460,26 @@ memstat_get_percpu_free(const struct memory_type *mtp, int cpu)
 
 	return (mtp->mt_percpu_cache[cpu].mtp_free);
 }
+
+#if __has_feature(capabilities)
+uint64_t
+memstat_get_reserved_bytes(const struct memory_type *mtp)
+{
+
+	return (mtp->mt_reserved_bytes);
+}
+
+uint64_t
+memstat_get_memreserved(const struct memory_type *mtp)
+{
+
+	return (mtp->mt_memreserved);
+}
+
+uint64_t
+memstat_get_memunreserved(const struct memory_type *mtp)
+{
+
+	return (mtp->mt_memunreserved);
+}
+#endif

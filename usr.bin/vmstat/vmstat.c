@@ -1432,8 +1432,13 @@ domemstat_malloc(void)
 		}
 	}
 	xo_open_container("malloc-statistics");
+#if __has_feature(capabilities)
+	xo_emit("{T:/%13s} {T:/%5s} {T:/%6s} {T:/%7s} {T:/%8s} {T:/%8s}  {T:Size(s)}\n",
+	    "Type", "InUse", "MemUse", "HighUse", "Requests", "ReservUse");
+#else
 	xo_emit("{T:/%13s} {T:/%5s} {T:/%6s} {T:/%7s} {T:/%8s}  {T:Size(s)}\n",
 	    "Type", "InUse", "MemUse", "HighUse", "Requests");
+#endif
 	xo_open_list("memory");
 	for (mtp = memstat_mtl_first(mtlp); mtp != NULL;
 	    mtp = memstat_mtl_next(mtp)) {
@@ -1441,12 +1446,22 @@ domemstat_malloc(void)
 		    memstat_get_count(mtp) == 0)
 			continue;
 		xo_open_instance("memory");
+#if __has_feature(capabilities)
+		xo_emit("{k:type/%13s/%s} {:in-use/%5ju} "
+		    "{:memory-use/%5ju}{U:K} {:high-use/%7s} "
+		    "{:requests/%8ju} {:reservation-use/%8ju}{U:K}  ",
+		    memstat_get_name(mtp), (uintmax_t)memstat_get_count(mtp),
+		    ((uintmax_t)memstat_get_bytes(mtp) + 1023) / 1024, "-",
+		    (uintmax_t)memstat_get_numallocs(mtp),
+		    ((uintmax_t)memstat_get_reserved_bytes(mtp) + 1023) / 1024);
+#else
 		xo_emit("{k:type/%13s/%s} {:in-use/%5ju} "
 		    "{:memory-use/%5ju}{U:K} {:high-use/%7s} "
 		    "{:requests/%8ju}  ",
 		    memstat_get_name(mtp), (uintmax_t)memstat_get_count(mtp),
 		    ((uintmax_t)memstat_get_bytes(mtp) + 1023) / 1024, "-",
 		    (uintmax_t)memstat_get_numallocs(mtp));
+#endif
 		first = 1;
 		xo_open_list("size");
 		for (i = 0; i < 32; i++) {

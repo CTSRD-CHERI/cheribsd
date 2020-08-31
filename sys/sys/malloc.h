@@ -86,8 +86,13 @@ struct malloc_type_stats {
 	uint64_t	mts_numallocs;	/* Number of allocates on CPU. */
 	uint64_t	mts_numfrees;	/* number of frees on CPU. */
 	uint64_t	mts_size;	/* Bitmask of sizes allocated on CPU. */
+#if __has_feature(capabilities)
+	uint64_t	mts_memreserved; /* Bytes reserved on CPU */
+	uint64_t	mts_memunreserved; /* Reservation bytes released on CPU */
+#else
 	uint64_t	_mts_reserved1;	/* Reserved field. */
 	uint64_t	_mts_reserved2;	/* Reserved field. */
+#endif
 	uint64_t	_mts_reserved3;	/* Reserved field. */
 };
 
@@ -241,8 +246,10 @@ void	*mallocarray(size_t nmemb, size_t size, struct malloc_type *type,
 	    __alloc_size2(1, 2);
 void	malloc_init(void *);
 int	malloc_last_fail(void);
-void	malloc_type_allocated(struct malloc_type *type, unsigned long size);
-void	malloc_type_freed(struct malloc_type *type, unsigned long size);
+void	malloc_type_allocated(struct malloc_type *type, void *addr,
+    unsigned long size);
+void	malloc_type_freed(struct malloc_type *type, void *addr,
+    unsigned long size);
 void	malloc_type_list(malloc_type_list_func_t *, void *);
 void	malloc_uninit(void *);
 void	*realloc(void *addr, size_t size, struct malloc_type *type, int flags)

@@ -201,6 +201,10 @@ retry:
 			mtp->mt_numallocs += mtsp->mts_numallocs;
 			mtp->mt_numfrees += mtsp->mts_numfrees;
 			mtp->mt_sizemask |= mtsp->mts_size;
+#if __has_feature(capabilities)
+			mtp->mt_memreserved += mtsp->mts_memreserved;
+			mtp->mt_memunreserved += mtsp->mts_memunreserved;
+#endif
 
 			/*
 			 * Copies of per-CPU statistics.
@@ -215,6 +219,12 @@ retry:
 			    mtsp->mts_numfrees;
 			mtp->mt_percpu_alloc[j].mtp_sizemask =
 			    mtsp->mts_size;
+#if __has_feature(capabilities)
+			mtp->mt_percpu_alloc[j].mtp_memreserved =
+			    mtsp->mts_memreserved;
+			mtp->mt_percpu_alloc[j].mtp_memunreserved =
+			    mtsp->mts_memunreserved;
+#endif
 		}
 
 		/*
@@ -222,6 +232,10 @@ retry:
 		 */
 		mtp->mt_bytes = mtp->mt_memalloced - mtp->mt_memfreed;
 		mtp->mt_count = mtp->mt_numallocs - mtp->mt_numfrees;
+#if __has_feature(capabilities)
+		mtp->mt_reserved_bytes = mtp->mt_memreserved -
+		    mtp->mt_memunreserved;
+#endif
 	}
 
 	free(buffer);
@@ -390,6 +404,10 @@ memstat_kvm_malloc(struct memory_type_list *list, void *kvm_handle)
 			}
 			mtp->mt_memalloced += mts.mts_memalloced;
 			mtp->mt_memfreed += mts.mts_memfreed;
+#if __has_feature(capabilities)
+			mtp->mt_memreserved += mts.mts_memreserved;
+			mtp->mt_memunreserved += mts.mts_memunreserved;
+#endif
 			mtp->mt_numallocs += mts.mts_numallocs;
 			mtp->mt_numfrees += mts.mts_numfrees;
 			mtp->mt_sizemask |= mts.mts_size;
@@ -398,6 +416,12 @@ memstat_kvm_malloc(struct memory_type_list *list, void *kvm_handle)
 			    mts.mts_memalloced;
 			mtp->mt_percpu_alloc[j].mtp_memfreed =
 			    mts.mts_memfreed;
+#if __has_feature(capabilities)
+			mtp->mt_percpu_alloc[j].mtp_memreserved =
+			    mts.mts_memreserved;
+			mtp->mt_percpu_alloc[j].mtp_memunreserved =
+			    mts.mts_memunreserved;
+#endif
 			mtp->mt_percpu_alloc[j].mtp_numallocs =
 			    mts.mts_numallocs;
 			mtp->mt_percpu_alloc[j].mtp_numfrees =
@@ -412,6 +436,10 @@ memstat_kvm_malloc(struct memory_type_list *list, void *kvm_handle)
 
 		mtp->mt_bytes = mtp->mt_memalloced - mtp->mt_memfreed;
 		mtp->mt_count = mtp->mt_numallocs - mtp->mt_numfrees;
+#if __has_feature(capabilities)
+		mtp->mt_reserved_bytes = mtp->mt_memreserved -
+		    mtp->mt_memunreserved;
+#endif
 	}
 
 	return (0);
