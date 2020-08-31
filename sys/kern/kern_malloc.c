@@ -375,8 +375,8 @@ malloc_last_fail(void)
  * statistics.
  */
 static void
-malloc_type_zone_allocated(struct malloc_type *mtp, unsigned long size,
-    int zindx)
+malloc_type_zone_allocated(struct malloc_type *mtp, void *addr,
+    unsigned long size, int zindx)
 {
 	struct malloc_type_internal *mtip;
 	struct malloc_type_stats *mtsp;
@@ -387,6 +387,11 @@ malloc_type_zone_allocated(struct malloc_type *mtp, unsigned long size,
 	if (size > 0) {
 		mtsp->mts_memalloced += size;
 		mtsp->mts_numallocs++;
+#ifdef CHERI_PURECAP_KERNEL
+		mtsp->mts_memreserved += cheri_getlen(addr);
+#elif __has_feature(capabilities)
+		mtsp->mts_memreserved += size;
+#endif
 	}
 	if (zindx != -1)
 		mtsp->mts_size |= 1 << zindx;
@@ -405,11 +410,11 @@ malloc_type_zone_allocated(struct malloc_type *mtp, unsigned long size,
 }
 
 void
-malloc_type_allocated(struct malloc_type *mtp, unsigned long size)
+malloc_type_allocated(struct malloc_type *mtp, void *addr, unsigned long size)
 {
 
 	if (size > 0)
-		malloc_type_zone_allocated(mtp, size, -1);
+		malloc_type_zone_allocated(mtp, addr, size, -1);
 }
 
 /*
@@ -419,7 +424,7 @@ malloc_type_allocated(struct malloc_type *mtp, unsigned long size)
  * statistics.
  */
 void
-malloc_type_freed(struct malloc_type *mtp, unsigned long size)
+malloc_type_freed(struct malloc_type *mtp, void *addr, unsigned long size)
 {
 	struct malloc_type_internal *mtip;
 	struct malloc_type_stats *mtsp;
@@ -429,6 +434,11 @@ malloc_type_freed(struct malloc_type *mtp, unsigned long size)
 	mtsp = zpcpu_get(mtip->mti_stats);
 	mtsp->mts_memfreed += size;
 	mtsp->mts_numfrees++;
+#ifdef CHERI_PURECAP_KERNEL
+	mtsp->mts_memunreserved += cheri_getlen(addr);
+#elif __has_feature(capabilities)
+	mtsp->mts_memunreserved += size;
+#endif
 
 #ifdef KDTRACE_HOOKS
 	if (__predict_false(dtrace_malloc_enabled)) {
@@ -461,7 +471,7 @@ contigmalloc(unsigned long size, struct malloc_type *type, int flags,
 	ret = (void *)kmem_alloc_contig(size, flags, low, high, alignment,
 	    boundary, VM_MEMATTR_DEFAULT);
 	if (ret != NULL)
-		malloc_type_allocated(type, round_page(size));
+		malloc_type_allocated(type, ret, round_page(size));
 	CHERI_ASSERT_VALID(ret);
 	return (ret);
 }
@@ -476,7 +486,7 @@ contigmalloc_domainset(unsigned long size, struct malloc_type *type,
 	ret = (void *)kmem_alloc_contig_domainset(ds, size, flags, low, high,
 	    alignment, boundary, VM_MEMATTR_DEFAULT);
 	if (ret != NULL)
-		malloc_type_allocated(type, round_page(size));
+		malloc_type_allocated(type, ret, round_page(size));
 	return (ret);
 }
 
@@ -492,7 +502,7 @@ contigfree(void *addr, unsigned long size, struct malloc_type *type)
 {
 	CHERI_ASSERT_VALID(addr);
 	kmem_free((vm_ptr_t)addr, size);
-	malloc_type_freed(type, round_page(size));
+	malloc_type_freed(type, addr, round_page(size));
 }
 
 #ifdef MALLOC_DEBUG
@@ -643,10 +653,10 @@ void *
 		va = uma_zalloc(zone, flags);
 		if (va != NULL)
 			size = zone->uz_size;
-		malloc_type_zone_allocated(mtp, va == NULL ? 0 : size, indx);
+		malloc_type_zone_allocated(mtp, va, va == NULL ? 0 : size, indx);
 	} else {
 		va = malloc_large(&size, DOMAINSET_RR(), flags);
-		malloc_type_allocated(mtp, va == NULL ? 0 : size);
+		malloc_type_allocated(mtp, va, va == NULL ? 0 : size);
 	}
 	if (flags & M_WAITOK)
 		KASSERT(va != NULL, ("malloc(M_WAITOK) returned NULL"));
@@ -711,11 +721,12 @@ malloc_domainset(size_t size, struct malloc_type *mtp, struct domainset *ds,
 			ret = malloc_domain(&size, &indx, mtp, domain, flags);
 		} while (ret == NULL &&
 		    vm_domainset_iter_policy(&di, &domain) == 0);
-		malloc_type_zone_allocated(mtp, ret == NULL ? 0 : size, indx);
+		malloc_type_zone_allocated(mtp, ret, ret == NULL ? 0 : size,
+		    indx);
 	} else {
 		/* Policy is handled by kmem. */
 		ret = malloc_large(&size, ds, flags);
-		malloc_type_allocated(mtp, ret == NULL ? 0 : size);
+		malloc_type_allocated(mtp, ret, ret == NULL ? 0 : size);
 	}
 
 	if (flags & M_WAITOK)
@@ -826,6 +837,7 @@ free(void *addr, struct malloc_type *mtp)
 	/* free(NULL, ...) does nothing */
 	if (addr == NULL)
 		return;
+	CHERI_ASSERT_VALID(addr);
 
 	vtozoneslab((vm_offset_t)addr & (~UMA_SLAB_MASK), &zone, &slab);
 	if (slab == NULL)
@@ -834,15 +846,17 @@ free(void *addr, struct malloc_type *mtp)
 
 	if (__predict_true(!malloc_large_slab(slab))) {
 		size = zone->uz_size;
+		CHERI_ASSERT_BOUNDS(addr, size);
 #ifdef INVARIANTS
 		free_save_type(addr, mtp, size);
 #endif
 		uma_zfree_arg(zone, addr, slab);
 	} else {
 		size = malloc_large_size(slab);
+		CHERI_ASSERT_BOUNDS(addr, size);
 		free_large(addr, size);
 	}
-	malloc_type_freed(mtp, size);
+	malloc_type_freed(mtp, addr, size);
 }
 
 /*
@@ -884,7 +898,7 @@ zfree(void *addr, struct malloc_type *mtp)
 		explicit_bzero(addr, size);
 		free_large(addr, size);
 	}
-	malloc_type_freed(mtp, size);
+	malloc_type_freed(mtp, addr, size);
 }
 
 void
@@ -918,7 +932,7 @@ free_domain(void *addr, struct malloc_type *mtp)
 		size = malloc_large_size(slab);
 		free_large(addr, size);
 	}
-	malloc_type_freed(mtp, size);
+	malloc_type_freed(mtp, addr, size);
 }
 
 /*
