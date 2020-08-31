@@ -180,7 +180,9 @@ mmap_retcap(struct thread *td, vm_ptr_t addr,
     const struct mmap_req *mrp)
 {
 	void * __capability newcap;
+#ifndef CHERI_PURECAP_KERNEL
 	size_t cap_base, cap_len;
+#endif
 	register_t perms, cap_prot;
 
 	/*
@@ -422,7 +424,9 @@ sys_mmap(struct thread *td, struct mmap_args *uap)
 		}
 #endif
 	}
-	else if ((flags & MAP_ALIGNMENT_MASK) != MAP_ALIGNED(0)) {
+	else if ((flags & MAP_ALIGNMENT_MASK) != MAP_ALIGNED(0) &&
+		 (flags & MAP_ALIGNMENT_MASK) != MAP_ALIGNED_CHERI &&
+		 (flags & MAP_ALIGNMENT_MASK) != MAP_ALIGNED_CHERI_SEAL) {
 		/* Reject nonsensical sub-page alignment requests */
 		if ((flags >> MAP_ALIGNMENT_SHIFT) < PAGE_SHIFT) {
 			SYSERRCAUSE("subpage alignment request");
@@ -639,6 +643,44 @@ kern_mmap_req(struct thread *td, struct mmap_req *mrp)
 	if (align == MAP_ALIGNED_CHERI || align == MAP_ALIGNED_CHERI_SEAL) {
 		flags &= ~MAP_ALIGNMENT_MASK;
 		align = 0;
+	}
+#else
+	/*
+	 * Convert MAP_ALIGNED_CHERI(_SEAL) into explicit alignment
+	 * requests and pad lengths.  The combination of alignment (via
+	 * the updated, explicit alignment flags) and padding is required
+	 * for any request that would otherwise be unrepresentable due
+	 * to compressed capability bounds.
+	 *
+	 * XXX: With CHERI Concentrate, there is no difference in
+	 * precision between sealed and unsealed capabilities.  We
+	 * retain the duplicate code paths in case other otype tradeoffs
+	 * are made at a later date.
+	 */
+	if (align == MAP_ALIGNED_CHERI) {
+		flags &= ~MAP_ALIGNMENT_MASK;
+		if (CHERI_REPRESENTABLE_ALIGNMENT(size) > PAGE_SIZE) {
+			flags |= MAP_ALIGNED(CHERI_ALIGN_SHIFT(size));
+
+			if (size != CHERI_REPRESENTABLE_LENGTH(size))
+				size = CHERI_REPRESENTABLE_LENGTH(size);
+
+			if (CHERI_ALIGN_MASK(size) != 0)
+				addr_mask = CHERI_ALIGN_MASK(size);
+		}
+		align = flags & MAP_ALIGNMENT_MASK;
+	} else if (align == MAP_ALIGNED_CHERI_SEAL) {
+		flags &= ~MAP_ALIGNMENT_MASK;
+		if (CHERI_SEALABLE_ALIGNMENT(size) > (1UL << PAGE_SHIFT)) {
+			flags |= MAP_ALIGNED(CHERI_SEAL_ALIGN_SHIFT(size));
+
+			if (size != CHERI_SEALABLE_LENGTH(size))
+				size = CHERI_SEALABLE_LENGTH(size);
+
+			if (CHERI_SEAL_ALIGN_MASK(size) != 0)
+				addr_mask = CHERI_SEAL_ALIGN_MASK(size);
+		}
+		align = flags & MAP_ALIGNMENT_MASK;
 	}
 #endif
 
@@ -2064,6 +2106,7 @@ vm_mmap_object(vm_map_t map, vm_ptr_t *addr, vm_offset_t max_addr,
 			    MAP_ALIGNMENT_SHIFT);
 		else
 			findspace = VMFS_OPTIMAL_SPACE;
+
 		if (curmap) {
 			rv = vm_map_find_min(map, object, foff, addr, size,
 			    round_page((vm_offset_t)td->td_proc->p_vmspace->
