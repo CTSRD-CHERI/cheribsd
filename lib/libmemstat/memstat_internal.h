@@ -63,6 +63,11 @@ struct memory_type {
 	uint64_t	 mt_memalloced;	/* Bytes allocated over life time. */
 	uint64_t	 mt_memfreed;	/* Bytes freed over life time. */
 	uint64_t	 mt_numallocs;	/* Allocations over life time. */
+#if __has_feature(capabilities)
+	uint64_t	 mt_memreserved;	 /* Bytes reserved over life time. */
+	uint64_t	 mt_memunreserved;	 /* Bytes unreserved over life time. */
+	uint64_t	 mt_reserved_bytes;	 /* Bytes currently reserved */
+#endif
 	uint64_t	 mt_numfrees;	/* Frees over life time. */
 	uint64_t	 mt_bytes;	/* Bytes currently allocated. */
 	uint64_t	 mt_count;	/* Number of current allocations. */
@@ -99,6 +104,10 @@ struct memory_type {
 	struct mt_percpu_alloc_s {
 		uint64_t	 mtp_memalloced;/* Per-CPU mt_memalloced. */
 		uint64_t	 mtp_memfreed;	/* Per-CPU mt_memfreed. */
+#if __has_feature(capabilities)
+		uint64_t	 mtp_memreserved;/* Per-CPU mt_memreserved. */
+		uint64_t	 mtp_memunreserved;/* Per-CPU mt_memunreserved. */
+#endif
 		uint64_t	 mtp_numallocs;	/* Per-CPU mt_numallocs. */
 		uint64_t	 mtp_numfrees;	/* Per-CPU mt_numfrees. */
 		uint64_t	 mtp_sizemask;	/* Per-CPU mt_sizemask. */
