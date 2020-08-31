@@ -1000,6 +1000,15 @@ static const struct cheri_test cheri_tests[] = {
          .ct_desc =
              "check that we can not remap over a partially-unmapped reservation",
          .ct_func = cheritest_vm_reservation_reuse, },
+        {
+         .ct_name = "cheritest_vm_reservation_align",
+         .ct_desc = "check that mmap correctly align mappings",
+         .ct_func = cheritest_vm_reservation_align, },
+        {
+         .ct_name = "cheritest_vm_reservation_mmap_after_free",
+         .ct_desc = "check that an old capability can not be used"
+         "to MAP_FIXED after the reservation has been deleted",
+         .ct_func = cheritest_vm_reservation_mmap_after_free, },
 #endif
 
 	{ .ct_name = "cheritest_vm_tag_dev_zero_shared",

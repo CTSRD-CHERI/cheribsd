@@ -653,13 +653,90 @@ cheritest_vm_reservation_reuse(const struct cheri_test *ctp __unused)
 	    "a pointer");
 
 	CHERITEST_CHECK_SYSCALL(munmap((char *)map + PAGE_SIZE, PAGE_SIZE));
+	/*
+	 * XXX-AM: is this checking the right thing?
+	 * We may be failing because the reservation length is not enough.
+	 */
 	map2 = mmap((void *)(uintptr_t)((vaddr_t)map + PAGE_SIZE),
 	    PAGE_SIZE * 2, PROT_READ | PROT_WRITE, MAP_ANON | MAP_FIXED, -1, 0);
-	if (map2 == MAP_FAILED)
+	if (map2 == MAP_FAILED) {
+		CHERITEST_VERIFY2(errno == ENOMEM,
+		    "Unexpected errno %d instead of ENOMEM", errno);
 		cheritest_success();
+	}
 
 	cheritest_failure_errx("mmap over reservation succeeded");
 }
 
+/*
+ * Check that alignment is promoted automatically to the first
+ * representable boundary.
+ */
+void
+cheritest_vm_reservation_align(const struct cheri_test *ctp __unused)
+{
+	void *map;
+	size_t len = ((size_t)PAGE_SIZE << CHERI_BASELEN_BITS) + 1;
+	size_t align_shift = CHERI_ALIGN_SHIFT(len);
+	size_t align_mask = CHERI_ALIGN_MASK(len);
+
+	/* No alignment */
+	map = CHERITEST_CHECK_SYSCALL(mmap(NULL, len,
+	    PROT_READ | PROT_WRITE, MAP_ANON, -1, 0));
+	CHERITEST_VERIFY2(((vaddr_t)(map) & align_mask) == 0,
+	    "mmap failed to align representable region for %p", map);
+
+	/* Underaligned */
+	map = CHERITEST_CHECK_SYSCALL(mmap(NULL, len,
+	    PROT_READ | PROT_WRITE, MAP_ANON | MAP_ALIGNED(align_shift - 1),
+	    -1, 0));
+	CHERITEST_VERIFY2(((vaddr_t)(map) & align_mask) == 0,
+	    "mmap failed to align representable region with requested "
+	    "alignment %lx for %p", align_shift - 1, map);
+
+	/* Overaligned */
+	map = CHERITEST_CHECK_SYSCALL(mmap(NULL, len,
+	    PROT_READ | PROT_WRITE, MAP_ANON | MAP_ALIGNED(align_shift + 1),
+	    -1, 0));
+	CHERITEST_VERIFY2(
+	    ((vaddr_t)(map) & ((1 << (align_shift + 1)) - 1)) == 0,
+	    "mmap failed to align representable region with requested "
+	    "alignment %lx for %p", align_shift + 1, map);
+
+	/* Explicit cheri alignment */
+	map = CHERITEST_CHECK_SYSCALL(mmap(NULL, len,
+	    PROT_READ | PROT_WRITE, MAP_ANON | MAP_ALIGNED_CHERI, -1, 0));
+	CHERITEST_VERIFY2(((vaddr_t)(map) & align_mask) == 0,
+	    "mmap failed to align representable region with requested "
+	    "cheri alignment for %p", map);
+
+	map = CHERITEST_CHECK_SYSCALL(mmap(NULL, len,
+	    PROT_READ | PROT_WRITE, MAP_ANON | MAP_ALIGNED_CHERI_SEAL, -1, 0));
+	CHERITEST_VERIFY2(((vaddr_t)(map) & align_mask) == 0,
+	    "mmap failed to align representable region with requested "
+	    "cheri seal alignment for %p", map);
+	cheritest_success();
+}
+
+/*
+ * Check that it is not possible to explicitly mmap on an
+ * unmapped reservation.
+ */
+void
+cheritest_vm_reservation_mmap_after_free(const struct cheri_test *ctp __unused)
+{
+	void *map;
+	map = CHERITEST_CHECK_SYSCALL(mmap(NULL, PAGE_SIZE,
+	    PROT_READ | PROT_WRITE, MAP_ANON, -1, 0));
+
+	CHERITEST_CHECK_SYSCALL(munmap((char *)map, PAGE_SIZE));
+
+	map = mmap(map, PAGE_SIZE, PROT_READ | PROT_WRITE,
+	    MAP_ANON | MAP_FIXED, -1, 0);
+	CHERITEST_VERIFY2(map == MAP_FAILED, "mmap after free succeeded");
+	CHERITEST_VERIFY2(errno == EACCES,
+	    "mmap after free failed with %d instead of EACCES", errno);
+	cheritest_success();
+}
 
 #endif

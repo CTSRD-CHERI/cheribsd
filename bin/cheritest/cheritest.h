@@ -548,6 +548,8 @@ DECLARE_CHERI_TEST(cheritest_vm_cap_share_fd_kqueue);
 DECLARE_CHERI_TEST(cheritest_vm_cap_share_sigaction);
 DECLARE_CHERI_TEST(cheritest_vm_reservation_access_fault);
 DECLARE_CHERI_TEST(cheritest_vm_reservation_reuse);
+DECLARE_CHERI_TEST(cheritest_vm_reservation_align);
+DECLARE_CHERI_TEST(cheritest_vm_reservation_mmap_after_free);
 #endif
 DECLARE_CHERI_TEST(cheritest_vm_tag_dev_zero_shared);
 DECLARE_CHERI_TEST(cheritest_vm_tag_dev_zero_private);
