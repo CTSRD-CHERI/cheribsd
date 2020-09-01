@@ -116,7 +116,6 @@ __FBSDID("$FreeBSD$");
  *        access.
  */
 
-
 /*
  * File organization:
  *  - private structures
@@ -478,7 +477,6 @@ typedef struct if_rxd_info_pad {
 CTASSERT(sizeof(struct if_pkt_info_pad) == sizeof(struct if_pkt_info));
 CTASSERT(sizeof(struct if_rxd_info_pad) == sizeof(struct if_rxd_info));
 
-
 static inline void
 pkt_info_zero(if_pkt_info_t pi)
 {
@@ -591,7 +589,6 @@ static int iflib_no_tx_batch = 0;
 SYSCTL_INT(_net_iflib, OID_AUTO, no_tx_batch, CTLFLAG_RW,
 		   &iflib_no_tx_batch, 0, "minimize transmit latency at the possible expense of throughput");
 
-
 #if IFLIB_DEBUG_COUNTERS
 
 static int iflib_tx_seen;
@@ -617,7 +614,6 @@ SYSCTL_INT(_net_iflib, OID_AUTO, fl_refills, CTLFLAG_RD,
 SYSCTL_INT(_net_iflib, OID_AUTO, fl_refills_large, CTLFLAG_RD,
 		   &iflib_fl_refills_large, 0, "# large refills");
 
-
 static int iflib_txq_drain_flushing;
 static int iflib_txq_drain_oactive;
 static int iflib_txq_drain_notready;
@@ -628,7 +624,6 @@ SYSCTL_INT(_net_iflib, OID_AUTO, txq_drain_oactive, CTLFLAG_RD,
 		   &iflib_txq_drain_oactive, 0, "# drain oactives");
 SYSCTL_INT(_net_iflib, OID_AUTO, txq_drain_notready, CTLFLAG_RD,
 		   &iflib_txq_drain_notready, 0, "# drain notready");
-
 
 static int iflib_encap_load_mbuf_fail;
 static int iflib_encap_pad_mbuf_fail;
@@ -1212,7 +1207,6 @@ iflib_netmap_intr(struct netmap_adapter *na, int onoff)
 	CTX_UNLOCK(ctx);
 }
 
-
 static int
 iflib_netmap_attach(if_ctx_t ctx)
 {
@@ -1246,7 +1240,6 @@ iflib_netmap_txq_init(if_ctx_t ctx, iflib_txq_t txq)
 	if (slot == NULL)
 		return (0);
 	for (int i = 0; i < ctx->ifc_softc_ctx.isc_ntxd[0]; i++) {
-
 		/*
 		 * In netmap mode, set the map for the packet buffer.
 		 * NOTE: Some drivers (not this one) also need to set
@@ -1540,7 +1533,6 @@ iflib_fast_intr_rxtx(void *arg)
 		IFDI_INTR_ENABLE(ctx);
 	return (FILTER_HANDLED);
 }
-
 
 static int
 iflib_fast_intr_ctx(void *arg)
@@ -1938,7 +1930,6 @@ fail:
 	return (err);
 }
 
-
 /*
  * Internal service routines
  */
@@ -2223,7 +2214,6 @@ iflib_fl_setup(iflib_fl_t fl)
 		ctx->ifc_max_fl_buf_size = fl->ifl_buf_size;
 	fl->ifl_cltype = m_gettype(fl->ifl_buf_size);
 	fl->ifl_zone = m_getzone(fl->ifl_buf_size);
-
 
 	/*
 	 * Avoid pre-allocating zillions of clusters to an idle card
@@ -2556,7 +2546,6 @@ prefetch_pkts(iflib_fl_t fl, int cidx)
 	int nextptr;
 	int nrxd = fl->ifl_size;
 	caddr_t next_rxd;
-
 
 	nextptr = (cidx + CACHE_PTR_INCREMENT) & (nrxd-1);
 	prefetch(&fl->ifl_sds.ifsd_m[nextptr]);
@@ -3608,7 +3597,6 @@ iflib_completed_tx_reclaim(iflib_txq_t txq, int thresh)
 			printf("%s processed=%ju cleaned=%ju tx_nsegments=%d reclaim=%d thresh=%d\n", __FUNCTION__,
 			       txq->ift_processed, txq->ift_cleaned, txq->ift_ctx->ifc_softc_ctx.isc_tx_nsegments,
 			       reclaim, thresh);
-
 		}
 #endif
 		return (0);
@@ -3947,7 +3935,6 @@ _task_fn_admin(void *context)
 		iflib_txq_check_drain(txq, IFLIB_RESTART_BUDGET);
 }
 
-
 static void
 _task_fn_iov(void *context)
 {
@@ -3991,7 +3978,6 @@ iflib_if_init_locked(if_ctx_t ctx)
 	iflib_stop(ctx);
 	iflib_init_locked(ctx);
 }
-
 
 static void
 iflib_if_init(void *arg)
@@ -4110,7 +4096,7 @@ iflib_altq_if_start(if_t ifp)
 {
 	struct ifaltq *ifq = &ifp->if_snd;
 	struct mbuf *m;
-	
+
 	IFQ_LOCK(ifq);
 	IFQ_DEQUEUE_NOLOCK(ifq, m);
 	while (m != NULL) {
@@ -4159,7 +4145,6 @@ iflib_if_qflush(if_t ifp)
 	 */
 	if_qflush(ifp);
 }
-
 
 #define IFCAP_FLAGS (IFCAP_HWCSUM_IPV6 | IFCAP_HWCSUM | IFCAP_LRO | \
 		     IFCAP_TSO | IFCAP_VLAN_HWTAGGING | IFCAP_HWSTATS | \
@@ -4454,7 +4439,6 @@ iflib_device_probe(device_t dev)
 		     (ent->pvi_subdevice_id == 0)) &&
 		    ((pci_rev_id == ent->pvi_rev_id) ||
 		     (ent->pvi_rev_id == 0))) {
-
 			device_set_desc_copy(dev, ent->pvi_name);
 			/* this needs to be changed to zero if the bus probing code
 			 * ever stops re-probing on best match because the sctx
@@ -5282,7 +5266,6 @@ iflib_device_shutdown(device_t dev)
 	return bus_generic_suspend(dev);
 }
 
-
 int
 iflib_device_resume(device_t dev)
 {
@@ -5376,7 +5359,6 @@ iflib_module_event_handler(module_t mod, int what, void *arg)
  *     ordered as in iflib.h
  *
  **********************************************************************/
-
 
 static void
 _iflib_assert(if_shared_ctx_t sctx)
@@ -6808,7 +6790,6 @@ iflib_add_device_sysctl_post(if_ctx_t ctx)
 					CTLFLAG_RD,
 					&fl->ifl_cl_dequeued, "clusters freed");
 #endif
-
 		}
 	}
 

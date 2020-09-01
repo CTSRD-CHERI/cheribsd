@@ -168,7 +168,6 @@ struct nhop_object {
 	_nh = NULL;						\
 } while (0)
 
-
 void nhop_free(struct nhop_object *nh);
 
 struct sysctl_req;
@@ -224,7 +223,4 @@ struct mpath_external {
 	uint32_t	mp_group_size;
 };
 
-
 #endif
-
-

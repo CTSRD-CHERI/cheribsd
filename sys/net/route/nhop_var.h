@@ -47,7 +47,6 @@ CHT_SLIST_DEFINE(nhops, struct nhop_priv);
 /* next object accessor */
 #define	nhops_next(_obj)	(_obj)->nh_next
 
-
 struct nh_control {
 	struct nhops_head	nh_head;	/* hash table head */
 	struct bitmask_head	nh_idx_head;	/* nhop index head */
@@ -63,7 +62,6 @@ struct nh_control {
 #define	NHOPS_LOCK_INIT(ctl)	rw_init(&(ctl)->ctl_lock, "nhop_ctl")
 #define	NHOPS_LOCK_DESTROY(ctl)	rw_destroy(&(ctl)->ctl_lock)
 #define	NHOPS_WLOCK_ASSERT(ctl)	rw_assert(&(ctl)->ctl_lock, RA_WLOCKED)
-
 
 /* Control plane-only nhop data */
 struct nhop_object;

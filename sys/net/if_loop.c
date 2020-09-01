@@ -394,7 +394,6 @@ loioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			break;
 		}
 		switch (ifr_addr_get_family(ifr)) {
-
 #ifdef INET
 		case AF_INET:
 			break;
