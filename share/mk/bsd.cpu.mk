@@ -292,7 +292,7 @@ MACHINE_CPU = sse3
 MACHINE_CPU += amd64 sse2 sse mmx
 ########## arm64
 . elif ${MACHINE_CPUARCH} == "aarch64"
-.  if ${CPUTYPE} == "morello"
+.  if ${CPUTYPE:Mmorello} != ""
 MACHINE_CPU = cheri
 .  endif
 MACHINE_CPU += arm64
@@ -317,8 +317,14 @@ MACHINE_CPU += riscv
 .endif
 
 .if ${MACHINE_CPUARCH} == "aarch64"
+# Morello purecap
 . if ${MACHINE_ARCH} == "morello"
-CFLAGS += -morello -mc64 -femulated-tls
+CFLAGS += -march=morello+c64 -mabi=purecap -femulated-tls
+LDFLAGS += -march=morello+c64 -mabi=purecap -femulated-tls
+# Morello hybrid
+. elif ${CPUTYPE} == "morello"
+CFLAGS += -march=morello
+LDFLAGS += -march=morello
 . endif
 .endif
 
