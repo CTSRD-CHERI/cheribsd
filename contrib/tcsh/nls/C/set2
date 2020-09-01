@@ -108,3 +108,4 @@ $set 2
 106 exeeded RLG1 limit
 107 exeeded RLG2 limit
 108 exeeded RLG3 limit
+109 Thread cancellation signal used by libthread
