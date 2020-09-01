@@ -104,7 +104,6 @@ ufs_quotactl(struct mount *mp, int cmds, uid_t id, void * __capability arg)
 	type = cmds & SUBCMDMASK;
 	if (id == -1) {
 		switch (type) {
-
 		case USRQUOTA:
 			id = td->td_ucred->cr_ruid;
 			break;

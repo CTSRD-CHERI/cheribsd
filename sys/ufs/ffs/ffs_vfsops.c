@@ -874,7 +874,7 @@ ffs_reload(struct mount *mp, struct thread *td, int flags)
 		return (EINVAL);
 	}
 	MNT_IUNLOCK(mp);
-	
+
 	/*
 	 * Step 1: invalidate all cached meta-data.
 	 */
@@ -2420,7 +2420,6 @@ ffs_backgroundwritedone(struct buf *bp)
 	BO_UNLOCK(bufobj);
 }
 
-
 /*
  * Write, release buffer on completion.  (Done by iodone
  * if async).  Do not bother writing anything if the buffer
@@ -2534,7 +2533,6 @@ ffs_bufwrite(struct buf *bp)
 		/* Mark the buffer clean */
 		bundirty(bp);
 
-
 	/* Let the normal bufwrite do the rest for us */
 normal_write:
 	/*
@@ -2546,7 +2544,6 @@ normal_write:
 	}
 	return (bufwrite(bp));
 }
-
 
 static void
 ffs_geom_strategy(struct bufobj *bo, struct buf *bp)
