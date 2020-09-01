@@ -898,7 +898,6 @@ swp_pager_strategy(struct buf *bp)
 	panic("Swapdev not found");
 }
 
-
 /*
  * SWP_PAGER_FREESWAPSPACE() -	free raw swap space
  *
@@ -2908,7 +2907,6 @@ static struct g_class g_swap_class = {
 
 DECLARE_GEOM_CLASS(g_swap_class, g_class);
 
-
 static void
 swapgeom_close_ev(void *arg, int flags)
 {
@@ -3171,7 +3169,6 @@ swapdev_close(struct thread *td, struct swdevt *sp)
 	VOP_CLOSE(sp->sw_vp, FREAD | FWRITE, td->td_ucred, td);
 	vrele(sp->sw_vp);
 }
-
 
 static int
 swaponvp(struct thread *td, struct vnode *vp, u_long nblks)

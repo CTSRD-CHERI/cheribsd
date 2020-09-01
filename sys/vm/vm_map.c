@@ -3067,7 +3067,6 @@ vm_map_madvise(
 	return (0);
 }
 
-
 /*
  *	vm_map_inherit:
  *
@@ -3362,7 +3361,6 @@ vm_map_wire(vm_map_t map, vm_offset_t start, vm_offset_t end, int flags)
 	vm_map_unlock(map);
 	return (rv);
 }
-
 
 /*
  *	vm_map_wire_locked:
@@ -4062,7 +4060,6 @@ vm_map_check_protection(vm_map_t map, vm_offset_t start, vm_offset_t end,
 	}
 	return (TRUE);
 }
-
 
 /*
  *
