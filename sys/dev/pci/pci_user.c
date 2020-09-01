@@ -1186,7 +1186,6 @@ pci_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int flag, struct thread *t
 				 dinfo = STAILQ_FIRST(devlist_head);
 		     dinfo != NULL;
 		     dinfo = STAILQ_NEXT(dinfo, pci_links), i++) {
-
 			if (i < cio->offset)
 				continue;
 
