@@ -279,7 +279,6 @@ restart:
 	 * Perform each task, and continue on to the next task.
 	 */
 	for (sipp = sysinit; sipp < sysinit_end; sipp++) {
-
 		if ((*sipp)->subsystem == SI_SUB_DUMMY)
 			continue;	/* skip dummy task(s)*/
 

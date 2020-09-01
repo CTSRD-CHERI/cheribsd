@@ -2276,7 +2276,6 @@ unp_internalize(struct mbuf **controlp, struct thread *td)
 					error = EOPNOTSUPP;
 					goto out;
 				}
-
 			}
 
 			/*
@@ -2649,7 +2648,6 @@ unp_gc(__unused void *arg, int pending)
 
 	for (head = heads; *head != NULL; head++)
 		LIST_FOREACH(unp, *head, unp_link) {
-
 			KASSERT((unp->unp_gcflag & ~UNPGC_IGNORE_RIGHTS) == 0,
 			    ("%s: unp %p has unexpected gc flags 0x%x",
 			    __func__, unp, (unsigned int)unp->unp_gcflag));

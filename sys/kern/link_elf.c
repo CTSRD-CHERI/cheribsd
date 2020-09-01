@@ -214,7 +214,6 @@ elf_set_add(struct elf_set_head *list, caddr_t start, caddr_t stop, caddr_t base
 	set->es_base = base;
 
 	TAILQ_FOREACH(iter, list, es_link) {
-
 		KASSERT((set->es_start < iter->es_start && set->es_stop < iter->es_stop) ||
 		    (set->es_start > iter->es_start && set->es_stop > iter->es_stop),
 		    ("linker sets intersection: to insert: %p-%p; inserted: %p-%p",
