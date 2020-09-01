@@ -3895,7 +3895,7 @@ nosys(struct thread *td, struct nosys_args *args)
 		uprintf("pid %d comm %s: nosys %d\n", p->p_pid, p->p_comm,
 		    td->td_sa.code);
 	}
-	if (kern_lognosys == 2 || kern_lognosys == 3) {
+	if (p->p_pid == 1 || kern_lognosys == 2 || kern_lognosys == 3) {
 		printf("pid %d comm %s: nosys %d\n", p->p_pid, p->p_comm,
 		    td->td_sa.code);
 	}
