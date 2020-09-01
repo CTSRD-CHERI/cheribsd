@@ -179,7 +179,7 @@ static void
 malta_lcd_print(char *str)
 {
 	int i;
-	
+
 	if (str == NULL)
 		return;
 

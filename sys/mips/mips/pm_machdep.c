@@ -461,7 +461,6 @@ out:
 	return (error);
 }
 
-
 void
 makectx(struct trapframe *tf, struct pcb *pcb)
 {
