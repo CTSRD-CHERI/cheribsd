@@ -1066,4 +1066,12 @@ mesginit(void)
 	mesg[SIGXRLG3].pname = CSAVS(2, 108, "exeeded RLG3 limit");
     }
 #endif /* SIGXRLG3 */
+
+#ifdef SIGPROT
+    /* CHERI */
+    if (mesg[SIGPROT].pname == NULL) {
+	mesg[SIGPROT].iname = "PROT";
+	mesg[SIGPROT].pname = CSAVS(2, 110, "In-address space security exception");
+    }
+#endif /* SIGPROT */
 }
