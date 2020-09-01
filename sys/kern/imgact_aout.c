@@ -163,11 +163,13 @@ exec_aout_imgact(struct image_params *imgp)
 	struct vmspace *vmspace;
 	vm_map_t map;
 	vm_object_t object;
-	vm_offset_t text_end, data_end;
+	vm_ptr_t text_end, data_end;
 	unsigned long virtual_offset;
 	unsigned long file_offset;
 	unsigned long bss_size;
 	int error;
+	vm_ptr_t reservation;
+	vm_size_t reserv_size;
 
 	/*
 	 * Linux and *BSD binaries look very much alike,
@@ -284,13 +286,24 @@ exec_aout_imgact(struct image_params *imgp)
 
 	object = imgp->object;
 	map = &vmspace->vm_map;
+	reservation = virtual_offset;
+	reserv_size = a_out->a_text + a_out->a_data + bss_size;
+
 	vm_map_lock(map);
 	vm_object_reference(object);
 
-	text_end = virtual_offset + a_out->a_text;
+	error = vm_map_reservation_create_locked(map, &reservation,
+	    reserv_size, VM_PROT_RW);
+	if (error) {
+		vm_map_unlock(map);
+		vm_object_deallocate(object);
+		return (error);
+	}
+
+	text_end = reservation + a_out->a_text;
 	error = vm_map_insert(map, object,
 		file_offset,
-		virtual_offset, text_end,
+		reservation, text_end,
 		VM_PROT_READ | VM_PROT_EXECUTE, VM_PROT_ALL,
 		MAP_COPY_ON_WRITE | MAP_PREFAULT | MAP_VN_EXEC,
 		virtual_offset);
