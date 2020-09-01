@@ -98,7 +98,9 @@ struct image_params {
 	bool textset;
 	u_int map_flags;
 	void * __capability imgact_capability;	/* copyout and mapping cap */
+#if __has_feature(capabilities)
 	void * __capability ustack_capability;	/* user stack reservation */
+#endif
 };
 
 #ifdef _KERNEL

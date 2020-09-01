@@ -738,7 +738,7 @@ kern_mmap_req(struct thread *td, struct mmap_req *mrp)
 				return (EINVAL);
 			}
 		}
-#if __has_feature(capabilities)
+#ifdef CHERI_PURECAP_KERNEL
                 /*
                  * If MAP_FIXED we use the source capability to authorize the
                  * fixed mapping. What we do for hybrid userland is dubious.
