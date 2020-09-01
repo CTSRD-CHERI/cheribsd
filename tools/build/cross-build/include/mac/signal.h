@@ -32,9 +32,13 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
+ *
+ * $FreeBSD$
  */
 #pragma once
 #include_next <signal.h>
 
-/* MacOS does not provide sys_nsig. It uses a NSIG/__DARWIN_NSIG macro instead */
+/*
+ * MacOS does not provide sys_nsig. It uses a NSIG/__DARWIN_NSIG macro instead.
+ */
 #define sys_nsig NSIG

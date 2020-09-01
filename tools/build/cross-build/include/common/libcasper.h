@@ -32,9 +32,11 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
+ *
+ * $FreeBSD$
  */
 #pragma once
 
-#include "../../../../../lib/libcasper/libcasper/libcasper.h"
+#include_next <libcasper.h>
 
 _Static_assert(CASPER_SUPPORT == 0, "Should not have casper support");

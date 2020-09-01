@@ -32,8 +32,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
+ *
+ * $FreeBSD$
  */
-#pragma once
-#include_next <vis.h>
-// libbsd shippend with Ubuntu 16.04 is missing some prototypes:1
-int strsvis(char *dst, const char *src, int flag, const char *extra);
+#include "namespace.h"
+#define	lc_numeric_T	localedef_bootstrap_lc_numeric_T
+#include "../../../lib/libc/locale/lmonetary.h"
+#include "un-namespace.h"

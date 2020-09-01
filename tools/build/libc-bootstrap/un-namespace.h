@@ -32,9 +32,9 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
+ *
+ * $FreeBSD$
  */
 #pragma once
+/* This can be empty when building the FreeBSD compatible bootstrap files */
 
-/* Work around #include cycle error between unistd and getopt with libbsd */
-#include <getopt.h>
-#include_next <archive.h>

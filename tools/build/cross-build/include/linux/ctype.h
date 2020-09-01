@@ -32,16 +32,20 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
+ *
+ * $FreeBSD$
  */
 #pragma once
 #include_next <ctype.h>
 #include <stdlib.h>
 
 #ifndef digittoint
-static inline int digittoint(char c) {
+static inline int
+digittoint(char c)
+{
 	if (!isxdigit(c))
-		return 0;
-	char buffer[] = {c, '\0' };
+		return (0);
+	char buffer[] = { c, '\0' };
 	return strtol(buffer, 0, 16);
 }
 #endif

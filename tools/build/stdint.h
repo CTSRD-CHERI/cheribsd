@@ -32,22 +32,18 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
+ *
+ * $FreeBSD$
  */
 #pragma once
 
-#ifndef __BUILDING_LOCALEDEF_BOOTSTRAP
-#error "Should only be used when building localedef"
+#include_next <stdint.h>
+
+#ifndef _VADDR_T_DECLARED
+#ifndef __CHERI_PURE_CAPABILITY__
+typedef	uintptr_t		vaddr_t;
+#else
+typedef	unsigned long		vaddr_t;
 #endif
-
-static inline long
-atomic_fetchadd_long(volatile long *p, long v)
-{
-
-	return __atomic_fetch_add(p, v, __ATOMIC_SEQ_CST);
-}
-
-static inline void
-atomic_add_long(volatile long *p, long v)
-{
-	atomic_fetchadd_long(p, v);
-}
+#define _VADDR_T_DECLARED
+#endif

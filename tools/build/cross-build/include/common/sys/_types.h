@@ -32,6 +32,8 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
+ *
+ * $FreeBSD$
  */
 #pragma once
 
@@ -41,10 +43,7 @@
 #include <sys/types.h>
 #endif
 
-/* Neither GLibc nor macOS define __va_list but many FreeBSD headers require it */
+/*
+ * Neither GLibc nor macOS define __va_list but many FreeBSD headers require it.
+ */
 typedef __builtin_va_list __va_list;
-
-/* Needed for e.g. sys/tree.h */
-typedef __UINTPTR_TYPE__ __uintptr_t;
-typedef __INTPTR_TYPE__ __intptr_t;
-

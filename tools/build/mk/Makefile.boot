@@ -35,6 +35,7 @@ LIBM:=
 LIBUTIL:=
 LIBCPLUSPLUS:=
 LIBARCHIVE:=
+LIBPTHREAD:=
 LIBMD:=${WORLDTMP}/legacy/usr/lib/libmd.a
 LIBNV:=${WORLDTMP}/legacy/usr/lib/libmd.a
 LIBSBUF:=${WORLDTMP}/legacy/usr/lib/libsbuf.a
@@ -66,14 +67,12 @@ CFLAGS+=	-D_DARWIN_C_SOURCE=1
 CFLAGS+=	-I${SRCTOP}/tools/build/cross-build/include/mac
 # The macOS ar and ranlib don't understand all the flags supported by the
 # FreeBSD and Linux ar/ranlib
-ARFLAGS:=	-cr
+ARFLAGS:=	-crs
 RANLIBFLAGS:=
 
 # to get libarchive (needed for elftoolchain)
-# MacOS ships /usr/lib/libarchive.dylib but doesn't have the headers
-CFLAGS+=	-idirafter /usr/local/opt/libarchive/include
-LDFLAGS+=	-L/usr/local/opt/libarchive/lib
-
+# MacOS ships /usr/lib/libarchive.dylib but doesn't provide the headers
+CFLAGS+=	-idirafter ${SRCTOP}/contrib/libarchive/libarchive
 .else
 .error "Unsupported build OS: ${.MAKE.OS}"
 .endif

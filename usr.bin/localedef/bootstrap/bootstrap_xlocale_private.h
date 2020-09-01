@@ -32,11 +32,23 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
+ *
+ * $FreeBSD$
  */
-#include_next <stdint.h>
 
-#ifndef _VADDR_T_DECLARED
-/* To bootstrap awk: */
-#define _VADDR_T_DECLARED
-typedef unsigned long vaddr_t;
-#endif
+#ifndef _LOCALDEF_BOOTSTRAP_XLOCALE_PRIVATE_H
+#define _LOCALDEF_BOOTSTRAP_XLOCALE_PRIVATE_H
+/*
+ * Avoid pulling in anything from the real xlocale_private.h.
+ * Unfortunately, we can't simply add a local xlocale_private.h to include
+ * it instead of the real file, since xlocale_private.h is included with double
+ * quotes from the same directory and therefore the real file will be selected.
+ */
+#define _XLOCALE_PRIVATE__H_
+
+typedef struct _localedef_bootstrap_xlocale* localedef_bootstrap_locale_t;
+struct localedef_bootstrap_xlocale_component {
+	char unused;
+};
+
+#endif /* _LOCALDEF_BOOTSTRAP_XLOCALE_PRIVATE_H */

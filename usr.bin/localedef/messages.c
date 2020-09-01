@@ -42,8 +42,7 @@ __FBSDID("$FreeBSD$");
 #include <unistd.h>
 #include "localedef.h"
 #include "parser.h"
-
-#include "../../lib/libc/locale/lmessages.h"
+#include "lmessages.h"
 
 static struct lc_messages_T msgs;
 

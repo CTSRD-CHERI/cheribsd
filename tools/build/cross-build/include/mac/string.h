@@ -32,13 +32,17 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
+ *
+ * $FreeBSD$
  */
 #pragma once
 
 #include_next <string.h>
 
-/* strchrnul is not provided by macOS and the strchrnul.c implementation
- * can not be compiled on macOS so just provide it inline here */
+/*
+ * strchrnul is not provided by macOS and the strchrnul.c implementation
+ * can not be compiled on macOS so just provide it inline here
+ */
 static inline char *
 strchrnul(const char *p, int ch)
 {

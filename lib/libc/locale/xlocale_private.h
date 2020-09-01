@@ -54,18 +54,6 @@
 #include <machine/atomic.h>
 #include "setlocale.h"
 
-
-/*
- * When building the host tool localedef we mustn't use target structures (since
- * they might be incompatible) but we do need the constants.
- */
-#ifdef __BUILDING_LOCALEDEF_BOOTSTRAP
-#define XLOCALE_NAMESPACED(name) __CONCAT(_bootstrap_xlocale_,name)
-#else
-#define XLOCALE_NAMESPACED(name) __CONCAT(xlocale_,name)
-#endif
-#define XLOCALE_STRUCT(name) struct XLOCALE_NAMESPACED(name)
-
 /**
  * The XLC_ values are indexes into the components array.  They are defined in
  * the same order as the LC_ values in locale.h, but without the LC_ALL zero
@@ -85,7 +73,6 @@ enum {
 };
 
 _Static_assert(XLC_LAST - XLC_COLLATE == 6, "XLC values should be contiguous");
-#ifndef __BUILDING_LOCALEDEF_BOOTSTRAP
 _Static_assert(XLC_COLLATE == LC_COLLATE - 1,
                "XLC_COLLATE doesn't match the LC_COLLATE value.");
 _Static_assert(XLC_CTYPE == LC_CTYPE - 1,
@@ -98,7 +85,6 @@ _Static_assert(XLC_TIME == LC_TIME - 1,
                "XLC_TIME doesn't match the LC_TIME value.");
 _Static_assert(XLC_MESSAGES == LC_MESSAGES - 1,
                "XLC_MESSAGES doesn't match the LC_MESSAGES value.");
-#endif
 
 /**
  * Header used for objects that are reference counted.  Objects may optionally
@@ -111,7 +97,7 @@ _Static_assert(XLC_MESSAGES == LC_MESSAGES - 1,
  * count of 1 when they are created, but the retain count is 0.  When the
  * retain count is less than 0, they are freed.
  */
-XLOCALE_STRUCT(refcounted) {
+struct xlocale_refcounted {
 	/** Number of references to this component.  */
 	long retain_count;
 	/** Function used to destroy this component, if one is required*/
@@ -121,8 +107,8 @@ XLOCALE_STRUCT(refcounted) {
  * Header for a locale component.  All locale components must begin with this
  * header.
  */
-XLOCALE_STRUCT(component) {
-	XLOCALE_STRUCT(refcounted) header;
+struct xlocale_component {
+	struct xlocale_refcounted header;
 	/** Name of the locale used for this component. */
 	char locale[ENCODING_LEN+1];
 };
@@ -131,9 +117,9 @@ XLOCALE_STRUCT(component) {
  * xlocale structure, stores per-thread locale information.  
  */
 struct _xlocale {
-	XLOCALE_STRUCT(refcounted) header;
+	struct xlocale_refcounted header;
 	/** Components for the locale.  */
-	XLOCALE_STRUCT(component) *components[XLC_LAST];
+	struct xlocale_component *components[XLC_LAST];
 	/** Flag indicating if components[XLC_MONETARY] has changed since the
 	 * last call to localeconv_l() with this locale. */
 	int monetary_locale_changed;
@@ -157,15 +143,14 @@ struct _xlocale {
 	/** Buffer used by nl_langinfo_l() */
 	char *csym;
 };
-typedef struct _xlocale* XLOCALE_NAMESPACED(locale_t);
 
 /**
  * Increments the reference count of a reference-counted structure.
  */
 __attribute__((unused)) static void*
-XLOCALE_NAMESPACED(retain)(void *val)
+xlocale_retain(void *val)
 {
-	XLOCALE_STRUCT(refcounted) *obj = val;
+	struct xlocale_refcounted *obj = val;
 	atomic_add_long(&(obj->retain_count), 1);
 	return (val);
 }
@@ -174,9 +159,9 @@ XLOCALE_NAMESPACED(retain)(void *val)
  * if this is the last reference, calling its destructor if it has one.
  */
 __attribute__((unused)) static void
-XLOCALE_NAMESPACED(release)(void *val)
+xlocale_release(void *val)
 {
-	XLOCALE_STRUCT(refcounted) *obj = val;
+	struct xlocale_refcounted *obj = val;
 	long count;
 
 	count = atomic_fetchadd_long(&(obj->retain_count), -1) - 1;
@@ -188,12 +173,12 @@ XLOCALE_NAMESPACED(release)(void *val)
  * Load functions.  Each takes the name of a locale and a pointer to the data
  * to be initialised as arguments.  Two special values are allowed for the 
  */
-extern void* __collate_load(const char*, XLOCALE_NAMESPACED(locale_t));
-extern void* __ctype_load(const char*, XLOCALE_NAMESPACED(locale_t));
-extern void* __messages_load(const char*, XLOCALE_NAMESPACED(locale_t));
-extern void* __monetary_load(const char*, XLOCALE_NAMESPACED(locale_t));
-extern void* __numeric_load(const char*, XLOCALE_NAMESPACED(locale_t));
-extern void* __time_load(const char*, XLOCALE_NAMESPACED(locale_t));
+extern void* __collate_load(const char*, locale_t);
+extern void* __ctype_load(const char*, locale_t);
+extern void* __messages_load(const char*, locale_t);
+extern void* __monetary_load(const char*, locale_t);
+extern void* __numeric_load(const char*, locale_t);
+extern void* __time_load(const char*, locale_t);
 
 extern struct _xlocale __xlocale_global_locale;
 extern struct _xlocale __xlocale_C_locale;
@@ -201,7 +186,7 @@ extern struct _xlocale __xlocale_C_locale;
 /**
  * Caches the rune table in TLS for fast access.
  */
-void __set_thread_rune_locale(XLOCALE_NAMESPACED(locale_t) loc);
+void __set_thread_rune_locale(locale_t loc);
 /**
  * Flag indicating whether a per-thread locale has been set.  If no per-thread
  * locale has ever been set, then we always use the global locale.
@@ -212,7 +197,7 @@ extern int __has_thread_locale;
  * The per-thread locale.  Avoids the need to use pthread lookup functions when
  * getting the per-thread locale.
  */
-extern _Thread_local XLOCALE_NAMESPACED(locale_t) __thread_locale;
+extern _Thread_local locale_t __thread_locale;
 
 /**
  * Returns the current locale for this thread, or the global locale if none is
@@ -220,7 +205,7 @@ extern _Thread_local XLOCALE_NAMESPACED(locale_t) __thread_locale;
  * this call is not guaranteed to remain valid after the locale changes.  As
  * such, this should only be called within libc functions.
  */
-static inline XLOCALE_NAMESPACED(locale_t) __get_locale(void)
+static inline locale_t __get_locale(void)
 {
 
 #ifdef FORCE_C_LOCALE
@@ -233,15 +218,14 @@ static inline XLOCALE_NAMESPACED(locale_t) __get_locale(void)
 #endif
 }
 #else
-XLOCALE_NAMESPACED(locale_t) __get_locale(void);
+locale_t __get_locale(void);
 #endif
 
 /**
  * Two magic values are allowed for locale_t objects.  NULL and -1.  This
  * function maps those to the real locales that they represent.
  */
-static inline XLOCALE_NAMESPACED(locale_t)
-get_real_locale(XLOCALE_NAMESPACED(locale_t) locale)
+static inline locale_t get_real_locale(locale_t locale)
 {
 	switch ((size_t)locale) {
 		case 0: return (&__xlocale_C_locale);

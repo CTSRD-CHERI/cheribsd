@@ -32,11 +32,13 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
+ *
+ * $FreeBSD$
  */
 #pragma once
 
 
-// <bits/fcntl.h> includes <bits/stat.h> which contains a member __unused
+/* <bits/fcntl.h> includes <bits/stat.h> which contains a member __unused */
 #include "__unused_workaround_start.h"
 #include_next <fcntl.h>
 #include "__unused_workaround_end.h"
@@ -48,14 +50,12 @@
 
 #include <sys/file.h>
 
-
 #ifndef O_EXLOCK
 #define O_EXLOCK (1 << 30)
 #endif
 #ifndef O_SHLOCK
 #define O_SHLOCK (1 << 31)
 #endif
-
 
 #undef open
 #define open(path, flags, ...) ({ \

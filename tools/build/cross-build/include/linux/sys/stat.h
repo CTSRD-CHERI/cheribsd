@@ -32,16 +32,18 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
+ *
+ * $FreeBSD$
  */
 #pragma once
 /*
  * glibc shipped with Ubuntu 16.04 doesn't include a definition of
- * struct timespec when sys/stat.h is included
- * */
+ * struct timespec when sys/stat.h is included.
+ */
 #define __need_timespec
 #include <time.h>
 
-// <bits/stat.h> contains a member __unused
+/* <bits/stat.h> contains a member named __unused. */
 #include "../__unused_workaround_start.h"
 #include_next <sys/stat.h>
 #include "../__unused_workaround_end.h"

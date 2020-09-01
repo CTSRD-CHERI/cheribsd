@@ -32,6 +32,8 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
+ *
+ * $FreeBSD$
  */
 #pragma once
 
@@ -48,8 +50,10 @@
 #define _BIG_ENDIAN __BIG_ENDIAN
 #define _BYTE_ORDER __BYTE_ORDER
 
-/* Ensure all these are constant expressions (which is not the case for some
- * of the glibc versions depending on compiler optimization level) */
+/*
+ * Ensure all these are constant expressions (which is not the case for some
+ * of the glibc versions depending on compiler optimization level)
+ */
 
 #undef bswap64
 #define bswap64(a) __builtin_bswap64(a)
@@ -68,7 +72,6 @@
 
 #undef __bswap_16
 #define __bswap_16(a) __builtin_bswap16(a)
-
 
 /* Alignment-agnostic encode/decode bytestream to/from little/big endian. */
 

@@ -5,7 +5,7 @@
 LIB=		egacy
 SRC=
 INCSGROUPS=	INCS SYSINCS CASPERINC UFSINCS FFSINCS MSDOSFSINCS DISKINCS
-INCSGROUPS+=	MACHINESYSINCS X86INCS RPCINCS
+INCSGROUPS+=	MACHINESYSINCS RPCINCS
 INCS=
 
 SYSINCSDIR=	${INCLUDEDIR}/sys
@@ -16,7 +16,7 @@ FFSINCSDIR=	${INCLUDEDIR}/ufs/ffs
 MSDOSFSINCSDIR=	${INCLUDEDIR}/fs/msdosfs
 DISKINCSDIR=	${INCLUDEDIR}/sys/disk
 MACHINESYSINCSDIR=	${INCLUDEDIR}/machine
-X86INCSDIR=	${INCLUDEDIR}/x86
+RPCINCSDIR=	${INCLUDEDIR}/rpc
 
 BOOTSTRAPPING?=	0
 
@@ -40,11 +40,15 @@ HOST_INCLUDE_ROOT=${_MACOS_SDK_DIR}/usr/include
 HOST_INCLUDE_ROOT=/usr/include
 .endif
 
+# Allow building libc-internal files (also on non-FreeBSD hosts)
+CFLAGS+=	-I${.CURDIR}/libc-bootstrap
+# Symbol versioning is not required for -legacy (and macOS bootstrap)
+MK_SYMVER=	no
+
 _WITH_PWCACHEDB!= grep -c pwcache_groupdb ${HOST_INCLUDE_ROOT}/grp.h || true
 .if ${_WITH_PWCACHEDB} == 0
 .PATH: ${.CURDIR}/../../contrib/libc-pwcache
 CFLAGS.pwcache.c+=	-I${.CURDIR}/../../contrib/libc-pwcache
-CFLAGS.pwcache.c+=	-I${.CURDIR}/cross-build/libc-bootstrap
 SRCS+=		pwcache.c
 .endif
 
@@ -53,8 +57,8 @@ _WITH_STRSVIS!=	grep -c strsvis ${HOST_INCLUDE_ROOT}/vis.h 2>/dev/null || true
 .PATH: ${.CURDIR}/../../contrib/libc-vis
 INCS+=		vis.h
 SRCS+=		vis.c unvis.c
-CFLAGS.vis.c+=	-I${.CURDIR}/../../contrib/libc-vis -I${.CURDIR}/cross-build/libc-bootstrap
-CFLAGS.unvis.c+=	-I${.CURDIR}/../../contrib/libc-vis -I${.CURDIR}/cross-build/libc-bootstrap
+CFLAGS.vis.c+=	-I${.CURDIR}/../../contrib/libc-vis
+CFLAGS.unvis.c+=	-I${.CURDIR}/../../contrib/libc-vis
 .endif
 
 _WITH_REALLOCARRAY!= grep -c reallocarray ${HOST_INCLUDE_ROOT}/stdlib.h || true
@@ -62,7 +66,6 @@ _WITH_REALLOCARRAY!= grep -c reallocarray ${HOST_INCLUDE_ROOT}/stdlib.h || true
 .PATH: ${.CURDIR}/../../lib/libc/stdlib
 INCS+=		stdlib.h
 SRCS+=		reallocarray.c
-CFLAGS.reallocarray.c+=	-I${.CURDIR}/cross-build/libc-bootstrap
 .endif
 
 _WITH_UTIMENS!= grep -c utimensat ${HOST_INCLUDE_ROOT}/sys/stat.h || true
@@ -75,6 +78,8 @@ _WITH_NO_SUBOBJECT_BOUNDS!= grep -c __no_subobject_bounds ${HOST_INCLUDE_ROOT}/s
 .if ${_WITH_NO_SUBOBJECT_BOUNDS} == 0
 SYSINCS+=	cdefs.h
 .endif
+# Define vaddr_t for bootstrapping
+INCS+=	stdint.h
 
 _WITH_EXPLICIT_BZERO!= grep -c explicit_bzero ${HOST_INCLUDE_ROOT}/strings.h || true
 .if ${_WITH_EXPLICIT_BZERO} == 0
@@ -105,15 +110,100 @@ INCS+=		libcasper.h
 # rpcgen should build against the source tree rpc/types.h and not the host.
 # This is especially important on non-FreeBSD systems where the types may
 # not match.
-# TODO: should this be done only for non-FreeBSD?
-RPCINCSDIR=	${INCLUDEDIR}/rpc
 RPCINCS+=	${SRCTOP}/sys/rpc/types.h
 
 .if ${.MAKE.OS} != "FreeBSD"
-# don't copy stdlib.h when cross-building since it will cause
-# conflicts with the host system's headers
-INCS:=	${INCS:Nstdlib.h}
-.include "cross-build/libfreebsd/Makefile.inc"
+.PATH: ${.CURDIR}/cross-build
+
+INCS+=	${SRCTOP}/include/mpool.h
+INCS+=	${SRCTOP}/include/ndbm.h
+INCS+=	${SRCTOP}/include/err.h
+INCS+=	${SRCTOP}/include/stringlist.h
+
+# Needed to build arc4random.c
+INCSGROUPS+=	CHACHA20INCS
+CHACHA20INCSDIR=	${INCLUDEDIR}/crypto/chacha20
+CHACHA20INCS+=	${SRCTOP}/sys/crypto/chacha20/_chacha.h \
+	${SRCTOP}/sys/crypto/chacha20/chacha.h
+
+_host_arch=${MACHINE}
+.if ${_host_arch} == "x86_64"
+# bmake on Linux/mac often prints that instead of amd64
+_host_arch=amd64
+.endif
+.if ${_host_arch} == "unknown"
+# HACK: If MACHINE is unknown, assume we are building on x86
+_host_arch=amd64
+.endif
+MACHINESYSINCS+=	${SRCTOP}/sys/${_host_arch}/include/elf.h
+.if ${_host_arch} == "amd64" || ${_host_arch} == "i386"
+INCSGROUPS+=	X86INCS
+X86INCSDIR=	${INCLUDEDIR}/x86
+X86INCS+=	${SRCTOP}/sys/x86/include/elf.h
+.endif
+
+# needed for btxld:
+MACHINESYSINCS+=	${SRCTOP}/sys/${_host_arch}/include/exec.h
+MACHINESYSINCS+=	${SRCTOP}/sys/${_host_arch}/include/reloc.h
+INCS+=	${SRCTOP}/include/a.out.h
+INCS+=	${SRCTOP}/include/nlist.h
+SYSINCS+=	${SRCTOP}/sys/sys/imgact_aout.h
+SYSINCS+=	${SRCTOP}/sys/sys/nlist_aout.h
+
+# dbopen() behaves differently on Linux and FreeBSD so we ensure that we
+# bootstrap the FreeBSD db code. The cross-build headers #define dbopen() to
+# __freebsd_dbopen() so that we don't ever use the host version
+INCS+=	${SRCTOP}/include/db.h
+LIBC_SRCTOP=	${SRCTOP}/lib/libc/
+.include "${LIBC_SRCTOP}/db/Makefile.inc"
+# Do the same as we did for dbopen() for getopt() on since it's not compatible
+# on Linux (and to avoid surprises also compile the FreeBSD code on macOS)
+.PATH: ${LIBC_SRCTOP}/stdlib
+SRCS+=	getopt.c getopt_long.c
+INCS+=	 ${SRCTOP}/include/getopt.h
+
+# getcap.c is needed for cap_mkdb:
+.PATH: ${LIBC_SRCTOP}/gen
+SRCS+=	getcap.c
+# Add various libbc functions that are not available in glibc:
+SRCS+=	stringlist.c setmode.c
+SRCS+=	strtonum.c merge.c heapsort.c reallocf.c
+.PATH: ${LIBC_SRCTOP}/locale
+SRCS+=	rpmatch.c
+
+.if ${.MAKE.OS} == "Linux"
+# On Linux, glibc does not provide strlcpy,strlcat or strmode.
+.PATH: ${LIBC_SRCTOP}/string
+SRCS+=	strlcpy.c strlcat.c strmode.c
+# Compile the fgetln/fgetwln/closefrom fallback code from libbsd:
+SRCS+=	fgetln_fallback.c fgetwln_fallback.c closefrom.c
+CFLAGS.closefrom.c+=	-DSTDC_HEADERS -DHAVE_SYS_DIR_H -DHAVE_DIRENT_H \
+	-DHAVE_DIRFD -DHAVE_SYSCONF
+# Provide warnc/errc/getprogname/setprograme
+SRCS+=	err.c progname.c
+.endif
+# Provide the same arc4random implementation on Linux/macOS
+CFLAGS.arc4random.c+=	-I${SRCTOP}/sys/crypto/chacha20 -D__isthreaded=1
+SRCS+=	arc4random.c arc4random_uniform.c
+
+# expand_number() is not provided by either Linux or MacOS libutil
+.PATH: ${SRCTOP}/lib/libutil
+SRCS+=	expand_number.c
+# Linux libutil also doesn't have fparseln
+SRCS+=	fparseln.c
+# A dummy sysctl for tzsetup:
+SRCS+=	fake_sysctl.c
+
+# capsicum support
+SYSINCS+=	${SRCTOP}/sys/sys/capsicum.h
+SYSINCS+=	${SRCTOP}/sys/sys/caprights.h
+SRCS+=	capsicum_stubs.c
+# XXX: we can't add ${SRCTOP}/sys/kern to .PATH since that will causes
+# conflicts with other files. Instead copy subr_capability to the build dir.
+subr_capability.c: ${SRCTOP}/sys/kern/subr_capability.c
+	cp ${.ALLSRC} ${.TARGET}
+SRCS+=	subr_capability.c
+CLEANFILES+=	subr_capability.c
 .endif
 
 CASPERINC+=	${SRCTOP}/lib/libcasper/services/cap_fileargs/cap_fileargs.h
@@ -123,7 +213,7 @@ SRCS=		dummy.c
 .endif
 
 .if defined(CROSS_BUILD_TESTING)
-SUBDIR+=		cross-build
+SUBDIR=		cross-build
 .endif
 
 # To allow bootstrapping makefs on FreeBSD 11 or non-FreeBSD systems:
@@ -143,6 +233,26 @@ DISKINCS+=	${SRCTOP}/sys/sys/disk/bsd.h
 SYSINCS+=	${SRCTOP}/sys/sys/nv.h ${SRCTOP}/sys/sys/cnv.h \
 		${SRCTOP}/sys/sys/dnv.h
 
+# Needed when bootstrapping ldd (since it uses DF_1_PIE)
+SYSINCS+=	${SRCTOP}/sys/sys/elf32.h
+SYSINCS+=	${SRCTOP}/sys/sys/elf64.h
+SYSINCS+=	${SRCTOP}/sys/sys/elf_common.h
+SYSINCS+=	${SRCTOP}/sys/sys/elf_generic.h
+SYSINCS+=	${SRCTOP}/sys/sys/queue.h
+SYSINCS+=	${SRCTOP}/sys/sys/md5.h
+SYSINCS+=	${SRCTOP}/sys/sys/sbuf.h
+SYSINCS+=	${SRCTOP}/sys/sys/tree.h
+
+# For mkscrfil.c:
+SYSINCS+=	${SRCTOP}/sys/sys/consio.h
+# for gencat:
+INCS+=	${SRCTOP}/include/nl_types.h
+# for vtfontcvt:
+SYSINCS+=	${SRCTOP}/sys/sys/fnv_hash.h
+# opensolaris compatibility
+INCS+=	${SRCTOP}/include/elf.h
+SYSINCS+=	${SRCTOP}/sys/sys/elf.h
+
 # We want to run the build with only ${WORLDTMP} in $PATH to ensure we don't
 # accidentally run tools that are incompatible but happen to be in $PATH.
 # This is especially important when building on Linux/MacOS where many of the
@@ -155,15 +265,8 @@ SYSINCS+=	${SRCTOP}/sys/sys/nv.h ${SRCTOP}/sys/sys/cnv.h \
 # Linux/MacOS since we only use flags that are supported by all of them.
 _host_tools_to_symlink=	basename bzip2 bunzip2 chmod chown cmp comm cp date dd \
 	dirname echo env false find fmt gzip gunzip head hostname id ln ls \
-	mkdir mv nice patch rm sh sleep stat tee touch tr true uname \
-	uniq wc which
-
-.include <src.opts.mk>
-
-.if ${MK_BOOT} != "no"
-# xz/unxz is used by EFI
-_host_tools_to_symlink+=xz unxz
-.endif
+	mkdir mv nice patch rm sh sleep stat tee touch tr true uname uniq unxz \
+	wc which xz
 
 # We also need a symlink to the absolute path to the make binary used for
 # the toplevel makefile. This is not necessarily the same as `which make`
@@ -172,20 +275,6 @@ _make_abs!=	which "${MAKE}"
 _host_abs_tools_to_symlink=	${_make_abs}:make ${_make_abs}:bmake
 
 .if ${.MAKE.OS} != "FreeBSD"
-_py3_abs=${PYTHON3_BINARY}
-.if empty(_py3_abs)
-_py3_abs!=	which python3 2>/dev/null || echo "/invalid/path/to/python3"
-.if !exists(${_py3_abs})
-# Fall back to /usr/local/bin/python3 (macOS) if /usr/local/bin is not in $PATH
-# or fail the build if that doesn't exist either
-_py3_abs=/usr/local/bin/python3
-.endif
-.endif
-.if empty(_py3_abs) || !exists(${_py3_abs})
-.error "Could not determine path to python3. Please set PYTHON3_BINARY"
-.endif
-_host_abs_tools_to_symlink+=	${_py3_abs}:python3
-
 _make_abs!=	which "${MAKE}"
 _host_abs_tools_to_symlink+=	${_make_abs}:make ${_make_abs}:bmake
 .if ${.MAKE.OS} == "Darwin"
@@ -201,26 +290,25 @@ _host_tools_to_symlink:=${_host_tools_to_symlink:Nsh}
 host-symlinks:
 	@echo "Linking host tools into ${DESTDIR}/bin"
 .for _tool in ${_host_tools_to_symlink}
-	@export PATH=$${PATH}:/usr/local/bin; if [ ! -e "${DESTDIR}/bin/${_tool}" ]; then \
-		source_path=`which ${_tool} || true`; \
-		if [ ! -e "$${source_path}" ] ; then \
-			echo "Cannot find host tool '${_tool}'" >&2; false; \
-		fi; \
-		ln -sfnv "$${source_path}" "${DESTDIR}/bin/${_tool}"; \
-	fi
+	@export PATH=$${PATH}:/usr/local/bin; source_path=`which ${_tool}`; \
+	if [ ! -e "$${source_path}" ] ; then \
+		echo "Cannot find host tool '${_tool}' in PATH ($$PATH)." >&2; false; \
+	fi; \
+	rm -f "${DESTDIR}/bin/${_tool}"; \
+	cp -pf "$${source_path}" "${DESTDIR}/bin/${_tool}"
 .endfor
 .for _tool in ${_host_abs_tools_to_symlink}
 	@source_path="${_tool:S/:/ /:[1]}"; \
 	target_path="${DESTDIR}/bin/${_tool:S/:/ /:[2]}"; \
-	if [ ! -e "$${target_path}" ] ; then \
-		if [ ! -e "$${source_path}" ] ; then \
-			echo "Host tool '${src_path}' is missing"; false; \
-		fi; \
-		ln -sfnv "$${source_path}" "$${target_path}"; \
-	fi
+	if [ ! -e "$${source_path}" ] ; then \
+		echo "Host tool '${src_path}' is missing"; false; \
+	fi; \
+	rm -f "$${target_path}"; \
+	cp -pf "$${source_path}" "$${target_path}"
 .endfor
 .if exists(/usr/libexec/flua)
-	ln -sf /usr/libexec/flua ${DESTDIR}/usr/libexec/flua
+	rm -f ${DESTDIR}/usr/libexec/flua
+	cp -pf /usr/libexec/flua ${DESTDIR}/usr/libexec/flua
 .endif
 
 # Create all the directories that are needed during the legacy, bootstrap-tools
@@ -231,6 +319,7 @@ INSTALLDIR_LIST= \
 	lib/casper \
 	lib/geom \
 	usr/include/casper \
+	usr/include/private/ucl \
 	usr/include/private/zstd \
 	usr/lib \
 	usr/libexec
