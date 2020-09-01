@@ -215,9 +215,9 @@
 #if __has_feature(capabilities)
 /*
  * To ensure that the stack base address that is sufficiently aligned to create
- * a precisely bounded capability we must round down by 256 pages (0x3ffff00000).
+ * a precisely bounded capability we must round down by 512 pages (0x3fffe00000).
  */
-#define	USRSTACK		(SHAREDPAGE - (255 * PAGE_SIZE))
+#define	USRSTACK		(SHAREDPAGE - (511 * PAGE_SIZE))
 #else
 #define	USRSTACK		SHAREDPAGE
 #endif
