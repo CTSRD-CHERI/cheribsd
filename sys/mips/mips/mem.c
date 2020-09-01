@@ -67,7 +67,7 @@ __FBSDID("$FreeBSD$");
 #include <vm/pmap.h>
 #include <vm/vm_extern.h>
 #include <vm/vm_page.h>
-#ifdef CHERI_PURECAP_KERNEL
+#if __has_feature(capabilities)
 #include <vm/vm_map.h>
 #include <vm/vm_kern.h>
 #endif

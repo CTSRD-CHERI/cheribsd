@@ -4698,7 +4698,6 @@ vm_map_stack(vm_map_t map, vm_ptr_t addrbos, vm_size_t max_ssize,
 	vm_size_t growsize, init_ssize;
 	rlim_t vmemlim;
 	int rv;
-	vm_ptr_t stack_reservation = addrbos;
 
 	MPASS((map->flags & MAP_WIREFUTURE) == 0);
 	growsize = sgrowsiz;
@@ -5528,22 +5527,18 @@ vm_map_reservation_init_entry(vm_map_entry_t new_entry)
 	new_entry->read_ahead = VM_FAULT_READ_AHEAD_INIT;
 }
 
+#if __has_feature(capabilities)
 #define	PERM_READ	(CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP)
 #define	PERM_WRITE	(CHERI_PERM_STORE | CHERI_PERM_STORE_CAP | \
 			    CHERI_PERM_STORE_LOCAL_CAP)
 #define	PERM_EXEC	CHERI_PERM_EXECUTE
 #define	PERM_RWX	(PERM_READ | PERM_WRITE | PERM_EXEC)
 /*
- * Create a capability for the given map, derived from the map root
- * capability.
+ * Convert vm_prot_t to capability permission bits.
  */
-vm_ptr_t
-vm_map_buildcap(vm_map_t map, vm_offset_t addr, vm_size_t length,
-    vm_prot_t prot)
+int
+vm_map_prot2perms(vm_prot_t prot)
 {
-
-#ifdef CHERI_PURECAP_KERNEL
-	void *retcap;
 	int perms = ~(PERM_RWX);
 
 	/* These should match mmap_prot2perms until they are merged */
@@ -5555,14 +5550,28 @@ vm_map_buildcap(vm_map_t map, vm_offset_t addr, vm_size_t length,
 	if (prot & VM_PROT_EXECUTE)
 		perms |= CHERI_PERM_EXECUTE;
 
+	return (perms);
+}
+
+#ifdef CHERI_PURECAP_KERNEL
+/*
+ * Create a capability for the given map, derived from the map root
+ * capability.
+ */
+vm_ptr_t
+_vm_map_buildcap(vm_map_t map, vm_offset_t addr, vm_size_t length,
+    vm_prot_t prot)
+{
+	void *retcap;
+	int perms = vm_map_prot2perms(prot);
+
 	retcap = cheri_setbounds(cheri_setaddress(vm_map_rootcap(map),
 	    addr), length);
 
 	return ((vm_ptr_t)cheri_andperm(retcap, perms));
-#else
-	return (addr);
-#endif
 }
+#endif /* CHERI_PURECAP_KERNEL */
+#endif /* has_feature(capabilities) */
 
 /*
  * Create a reservation entry for the given address and reservation ID
@@ -5597,7 +5606,7 @@ vm_map_reservation_create_locked(vm_map_t map, vm_ptr_t *addr, vm_size_t length,
 {
 	vm_offset_t start = *addr;
 	vm_offset_t end = start + length;
-	vm_map_entry_t new_entry, entry;
+	vm_map_entry_t entry;
 
 	VM_MAP_ASSERT_LOCKED(map);
 	CHERI_ASSERT_PTRSIZE_BOUNDS(addr);
