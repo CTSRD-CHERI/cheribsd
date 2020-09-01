@@ -1171,7 +1171,16 @@ exec_new_vmspace(struct image_params *imgp, struct sysentvec *sv)
 		    cheri_kern_getbase((void *)stack_addr));
 		return (vm_mmap_to_errno(error));
 	}
+#if __has_feature(capabilities)
+#ifdef CHERI_PURECAP_KERNEL
 	imgp->ustack_capability = (void *)stack_addr;
+#else
+	imgp->ustack_capability = cheri_capability_build_user_data(
+	    vm_map_prot2perms(stack_prot) & CHERI_CAP_USER_DATA_PERMS,
+	    CHERI_REPRESENTABLE_BASE(stack_addr, ssiz),
+	    CHERI_REPRESENTABLE_LENGTH(ssiz), 0);
+#endif
+#endif
 
 	/*
 	 * vm_ssize and vm_maxsaddr are somewhat antiquated concepts, but they
