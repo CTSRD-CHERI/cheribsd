@@ -57,7 +57,7 @@ uma_small_alloc(uma_zone_t zone, vm_size_t bytes, int domain, u_int8_t *flags,
 	pa = m->phys_addr;
 	if ((wait & M_NODUMP) == 0)
 		dump_add_page(pa);
-	va = cheri_bound((void *)PHYS_TO_DMAP(pa), PAGE_SIZE);
+	va = cheri_kern_setbounds((void *)PHYS_TO_DMAP(pa), PAGE_SIZE);
 	if ((wait & M_ZERO) && (m->flags & PG_ZERO) == 0)
 		bzero(va, PAGE_SIZE);
 	return (va);

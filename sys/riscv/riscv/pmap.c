@@ -4322,7 +4322,7 @@ void *
 pmap_mapbios(vm_paddr_t pa, vm_size_t size)
 {
 
-        return (cheri_bound((void *)PHYS_TO_DMAP(pa), size));
+        return (cheri_kern_setbounds((void *)PHYS_TO_DMAP(pa), size));
 }
 
 void
