@@ -414,7 +414,6 @@ set_regs32(struct thread *td, struct reg32 *regs)
 	tf->tf_elr = regs->r_pc;
 	tf->tf_spsr = regs->r_cpsr;
 
-
 	return (0);
 }
 
