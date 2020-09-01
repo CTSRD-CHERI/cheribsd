@@ -98,7 +98,6 @@ kern_audit(struct thread *td, const void * __capability record, u_int length)
 	 * commit the user audit record.
 	 */
 	if (ar == NULL) {
-
 		/*
 		 * This is not very efficient; we're required to allocate a
 		 * complete kernel audit record just so the user record can
