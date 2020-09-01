@@ -109,3 +109,4 @@ $set 2
 107 exeeded RLG2 limit
 108 exeeded RLG3 limit
 109 Thread cancellation signal used by libthread
+110 In-address space security exception
