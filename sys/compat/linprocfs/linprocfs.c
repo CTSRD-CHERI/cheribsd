@@ -1043,7 +1043,6 @@ linprocfs_doprocstatus(PFS_FILL_ARGS)
 	return (0);
 }
 
-
 /*
  * Filler function for proc/pid/cwd
  */
