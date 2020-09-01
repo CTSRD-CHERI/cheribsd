@@ -489,8 +489,17 @@ int vm_map_reservation_create(vm_map_t, vm_ptr_t *, vm_size_t, vm_offset_t,
 int vm_map_reservation_create_fixed(vm_map_t, vm_ptr_t *, vm_size_t,
     vm_offset_t, vm_prot_t);
 int vm_map_reservation_create_locked(vm_map_t, vm_ptr_t *, vm_size_t, vm_prot_t);
-vm_ptr_t vm_map_buildcap(vm_map_t map, vm_offset_t addr, vm_size_t length,
+#if __has_feature(capabilities)
+int vm_map_prot2perms(vm_prot_t prot);
+vm_ptr_t _vm_map_buildcap(vm_map_t map, vm_offset_t addr, vm_size_t length,
     vm_prot_t prot);
+#ifdef CHERI_PURECAP_KERNEL
+#define vm_map_buildcap(map, addr, length, prot)        \
+    _vm_map_buildcap(map, addr, length, prot)
+#else
+#define vm_map_buildcap(map, addr, length, prot) (addr)
+#endif
+#endif
 
 static inline vm_map_entry_t
 vm_map_entry_first(vm_map_t map)
