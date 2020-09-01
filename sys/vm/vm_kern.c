@@ -815,20 +815,15 @@ void
 kmem_init(vm_ptr_t start, vm_ptr_t end)
 {
 	vm_map_t m;
-	vm_offset_t addr;
+	vm_ptr_t addr;
+	vm_size_t size;
 	int domain;
-	vm_ptr_t kern_map_start;
 
 	CHERI_ASSERT_VALID(start);
 	CHERI_ASSERT_VALID(end);
-#ifndef CHERI_PURECAP_KERNEL
-	kern_map_start = VM_MIN_KERNEL_ADDRESS;
-#else
-	kern_map_start = (vm_ptr_t)cheri_setaddress((void *)start,
-	    VM_MIN_KERNEL_ADDRESS);
-#endif
 
-	m = vm_map_create(kernel_pmap, kern_map_start, end);
+	m = vm_map_create(kernel_pmap,
+	    cheri_kern_setaddress(start, VM_MIN_KERNEL_ADDRESS), end);
 	m->system_map = 1;
 	vm_map_lock(m);
 	/* N.B.: cannot use kgdb to debug, starting with this assignment ... */
@@ -836,8 +831,11 @@ kmem_init(vm_ptr_t start, vm_ptr_t end)
 #ifdef __amd64__
 	addr = KERNBASE;
 #else
-	addr = kern_map_start;
+	addr = VM_MIN_KERNEL_ADDRESS;
 #endif
+
+	size = (vaddr_t)start - (vaddr_t)addr;
+	(void)vm_map_reservation_create_locked(m, &addr, size, VM_PROT_ALL);
 	(void)vm_map_insert(m, NULL, 0, addr, start, VM_PROT_ALL,
 	    VM_PROT_ALL, MAP_NOFAULT, VM_MIN_KERNEL_ADDRESS);
 	/* ... and ending with the completion of the above `insert' */
@@ -848,10 +846,11 @@ kmem_init(vm_ptr_t start, vm_ptr_t end)
 	 * that handle vm_page_array allocation can simply adjust virtual_avail
 	 * instead.
 	 */
-	(void)vm_map_insert(m, NULL, 0, (vm_offset_t)vm_page_array,
-	    (vm_offset_t)vm_page_array + round_2mpage(vm_page_array_size *
-	    sizeof(struct vm_page)),
-	    VM_PROT_RW, VM_PROT_RW, MAP_NOFAULT, VM_MIN_KERNEL_ADDRESS);
+	addr = (vm_offset_t)vm_page_array;
+	size = round_2mpage(vm_page_array_size * sizeof(struct vm_page));
+	(void)vm_map_reservation_create_locked(m, &addr, size, VM_PROT_RW);
+	(void)vm_map_insert(m, NULL, 0, addr, addr + size, VM_PROT_RW,
+	    VM_PROT_RW, MAP_NOFAULT, addr);
 #endif
 	vm_map_unlock(m);
 
