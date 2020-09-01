@@ -2949,10 +2949,13 @@ extern void vm_radix_reserve_kva(void);
 void
 uma_startup2(void)
 {
+	vm_ptr_t bootreserv = bootstart;
 
 	if (bootstart != bootmem) {
 		vm_map_lock(kernel_map);
-		(void)vm_map_insert(kernel_map, NULL, 0, bootstart, bootmem,
+		(void)vm_map_reservation_create_locked(kernel_map, &bootreserv,
+		    bootmem - bootstart, VM_PROT_RW);
+		(void)vm_map_insert(kernel_map, NULL, 0, bootreserv, bootmem,
 		    VM_PROT_RW, VM_PROT_RW, MAP_NOFAULT, bootstart);
 		vm_map_unlock(kernel_map);
 	}
