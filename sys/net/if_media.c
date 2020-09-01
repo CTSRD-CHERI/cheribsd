@@ -234,7 +234,6 @@ ifmedia_ioctl(ifp, ifr, ifm, cmd)
 		return(EINVAL);
 
 	switch (cmd) {
-
 	/*
 	 * Set the current media.
 	 */
@@ -391,7 +390,7 @@ ifmedia_baudrate(int mword)
 	/* Not known. */
 	return (0);
 }
- 
+
 #ifdef IFMEDIA_DEBUG
 static const struct ifmedia_description ifm_type_descriptions[] =
     IFM_TYPE_DESCRIPTIONS;

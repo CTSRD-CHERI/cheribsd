@@ -490,7 +490,7 @@ epair_transmit_locked(struct ifnet *ifp, struct mbuf *m)
 
 	if (m == NULL)
 		return (0);
-	
+
 	/*
 	 * We are not going to use the interface en/dequeue mechanism
 	 * on the TX side. We are called from ether_output_frame()
@@ -610,7 +610,7 @@ static void
 epair_qflush(struct ifnet *ifp)
 {
 	struct epair_softc *sc;
-	
+
 	sc = ifp->if_softc;
 	KASSERT(sc != NULL, ("%s: ifp=%p, epair_softc gone? sc=%p\n",
 	    __func__, ifp, sc));
@@ -681,7 +681,6 @@ static void
 epair_init(void *dummy __unused)
 {
 }
-
 
 /*
  * Interface cloning functions.
@@ -802,7 +801,7 @@ epair_clone_create(struct if_clone *ifc, char *name, size_t len,
 		ifc_free_unit(ifc, unit);
 		return (ENOSPC);
 	}
-	
+
 	/*
 	 * Cross-reference the interfaces so we will be able to free both.
 	 */
@@ -827,7 +826,7 @@ epair_clone_create(struct if_clone *ifc, char *name, size_t len,
 	ifmedia_init(&scb->media, 0, epair_media_change, epair_media_status);
 	ifmedia_add(&scb->media, IFM_ETHER | IFM_10G_T, 0, NULL);
 	ifmedia_set(&scb->media, IFM_ETHER | IFM_10G_T);
-	
+
 	/* Finish initialization of interface <n>a. */
 	ifp = sca->ifp;
 	ifp->if_softc = sca;
@@ -934,7 +933,7 @@ epair_clone_destroy(struct if_clone *ifc, struct ifnet *ifp)
 	 */
 	if (ifp->if_softc == NULL)
 		return (0);
-	
+
 	unit = ifp->if_dunit;
 	sca = ifp->if_softc;
 	oifp = sca->oifp;
