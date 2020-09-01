@@ -176,7 +176,6 @@ void swapper(void);
 #endif
 
 #endif				/* VM_H */
-
 // CHERI CHANGES START
 // {
 //   "updated": 20200804,

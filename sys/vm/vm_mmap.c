@@ -894,7 +894,6 @@ ommap(struct thread *td, struct ommap_args *uap)
 }
 #endif				/* COMPAT_43 */
 
-
 #ifndef _SYS_SYSPROTO_H_
 struct msync_args {
 	void *addr;
@@ -1307,7 +1306,6 @@ RestartScan:
 	 */
 	lastvecindex = -1;
 	while (entry->start < end) {
-
 		/*
 		 * check for contiguity
 		 */
