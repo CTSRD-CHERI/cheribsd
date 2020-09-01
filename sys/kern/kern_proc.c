@@ -1768,7 +1768,6 @@ sysctl_kern_proc_iterate(struct proc *p, void *origarg)
 	 * do by session.
 	 */
 	switch (oid_number) {
-
 	case KERN_PROC_GID:
 		if (p->p_ucred->cr_gid != (gid_t)name[0])
 			goto skip;
@@ -1822,7 +1821,6 @@ sysctl_kern_proc_iterate(struct proc *p, void *origarg)
 
 	default:
 		break;
-
 	}
 	error = sysctl_out_proc(p, req, flags);
 	PROC_LOCK_ASSERT(p, MA_NOTOWNED);

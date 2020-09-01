@@ -1181,7 +1181,7 @@ kern_select(struct thread *td, int nd, fd_set * __capability fd_in,
 	swizzle_fdset(ibits[0]);
 	swizzle_fdset(ibits[1]);
 	swizzle_fdset(ibits[2]);
-	
+
 	if (nbufbytes != 0)
 		bzero(selbits, nbufbytes / 2);
 

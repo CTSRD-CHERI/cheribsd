@@ -1406,7 +1406,7 @@ int
 cr_canseeothergids(struct ucred *u1, struct ucred *u2)
 {
 	int i, match;
-	
+
 	if (!see_other_gids) {
 		match = 0;
 		for (i = 0; i < u1->cr_ngroups; i++) {
@@ -2252,7 +2252,7 @@ crsetgroups_locked(struct ucred *cr, int ngrp, gid_t *groups)
 	int i;
 	int j;
 	gid_t g;
-	
+
 	KASSERT(cr->cr_agroups >= ngrp, ("cr_ngroups is too small"));
 
 	bcopy(groups, cr->cr_groups, ngrp * sizeof(gid_t));

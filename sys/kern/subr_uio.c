@@ -270,7 +270,6 @@ uiomove_flags(void *cp, int n, struct uio *uio, bool nofault,
 			cnt = n;
 
 		switch (uio->uio_segflg) {
-
 		case UIO_USERSPACE:
 			maybe_yield();
 			if (preserve_tags) {
@@ -356,7 +355,6 @@ again:
 		goto again;
 	}
 	switch (uio->uio_segflg) {
-
 	case UIO_USERSPACE:
 		if (subyte(iov->iov_base, c) < 0)
 			return (EFAULT);
