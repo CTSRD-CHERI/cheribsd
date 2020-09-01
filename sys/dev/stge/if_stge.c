@@ -407,7 +407,6 @@ stge_read_eeprom(struct stge_softc *sc, int offset, uint16_t *data)
 	*data = CSR_READ_2(sc, STGE_EepromData);
 }
 
-
 static int
 stge_probe(device_t dev)
 {
@@ -1816,7 +1815,6 @@ stge_poll(struct ifnet *ifp, enum poll_cmd cmd, int count)
 				}
 			}
 		}
-
 	}
 
 	if (!IFQ_DRV_IS_EMPTY(&ifp->if_snd))
