@@ -68,8 +68,8 @@ def buildImageAndRunTests(params, String suffix) {
                               '--no-run-cheritest', // only run kyua tests
             ]
         } else {
-            // Run a few tests as a basic regression test (since the full testsuite takes too long)
-            testExtraArgs += ['--kyua-tests-files', '/usr/tests/bin/sh/Kyuafile']
+            // Run a small subset of tests to check that we didn't break running tests (since the full testsuite takes too long)
+            testExtraArgs += ['--kyua-tests-files', '/usr/tests/bin/cat/Kyuafile']
         }
         def exitCode = sh returnStatus: true, label: "Run tests in QEMU", script: """
 rm -rf cheribsd-test-results && mkdir cheribsd-test-results
