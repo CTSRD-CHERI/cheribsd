@@ -10,7 +10,7 @@ if (env.CHANGE_ID && !shouldBuildPullRequest()) {
 }
 
 // Set job properties:
-def jobProperties = [rateLimitBuilds([count: 1, durationName: 'hour', userBoost: true]),
+def jobProperties = [rateLimitBuilds(throttle: [count: 1, durationName: 'hour', userBoost: true]),
                      [$class: 'GithubProjectProperty', displayName: '', projectUrlStr: 'https://github.com/CTSRD-CHERI/cheribsd/'],
                      copyArtifactPermission('*'), // Downstream jobs need the kernels/disk images
 ]
