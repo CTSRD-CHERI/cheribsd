@@ -131,6 +131,8 @@ SYSCTL_INT(_vm, OID_AUTO, log_wxrequests, CTLFLAG_RWTUN, &log_wxrequests, 0,
 #define	MAP_32BIT_MAX_ADDR	((vm_offset_t)1 << 31)
 #endif
 
+_Static_assert(MAXPAGESIZES <= 4, "MINCORE_SUPER too narrow");
+
 #if __has_feature(capabilities)
 static int
 cap_covers_pages(const void * __capability cap, size_t size)
