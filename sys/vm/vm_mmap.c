@@ -147,34 +147,6 @@ cap_covers_pages(const void * __capability cap, size_t size)
 	return (__CAP_CHECK(__DECONST_CAP(void * __capability, addr), size));
 }
 
-#define	PERM_READ	(CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP)
-#define	PERM_WRITE	(CHERI_PERM_STORE | CHERI_PERM_STORE_CAP | \
-			    CHERI_PERM_STORE_LOCAL_CAP)
-#define	PERM_EXEC	CHERI_PERM_EXECUTE
-#define	PERM_RWX	(PERM_READ | PERM_WRITE | PERM_EXEC)
-/*
- * Given a starting set of CHERI permissions (operms), set (not AND) the load,
- * store, and execute permissions based on the mmap permissions (prot).
- *
- * This function is intended to be used when creating a capability to a
- * new region or rederiving a capability when upgrading a sub-region.
- */
-static register_t
-mmap_prot2perms(int prot)
-{
-	register_t perms = 0;
-
-	if (prot & PROT_READ)
-		perms |= CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP;
-	if (prot & PROT_WRITE)
-		perms |= CHERI_PERM_STORE | CHERI_PERM_STORE_CAP |
-		CHERI_PERM_STORE_LOCAL_CAP;
-	if (prot & PROT_EXEC)
-		perms |= CHERI_PERM_EXECUTE;
-
-	return (perms);
-}
-
 static void * __capability
 mmap_retcap(struct thread *td, vm_ptr_t addr,
     const struct mmap_req *mrp)
@@ -216,8 +188,10 @@ mmap_retcap(struct thread *td, vm_ptr_t addr,
 	 * Set the permissions to PROT_MAX to allow a full
 	 * range of access subject to page permissions.
 	 */
-	newcap = cheri_andperm(newcap, ~PERM_RWX |
-	    mmap_prot2perms(cap_prot));
+	newcap = cheri_andperm(newcap,
+	    ~(CHERI_PERM_LOAD | CHERI_PERM_STORE | CHERI_PERM_LOAD_CAP |
+	    CHERI_PERM_STORE_CAP | CHERI_PERM_STORE_LOCAL_CAP |
+	    CHERI_PERM_EXECUTE) | vm_map_prot2perms(cap_prot));
 
 #ifndef CHERI_PURECAP_KERNEL
 	/* Reservations in the kernel ensure this */
@@ -400,7 +374,7 @@ sys_mmap(struct thread *td, struct mmap_args *uap)
 	}
 
 	perms = cheri_getperm(source_cap);
-	reqperms = mmap_prot2perms(uap->prot);
+	reqperms = vm_map_prot2perms(uap->prot);
 	if ((perms & reqperms) != reqperms) {
 		SYSERRCAUSE("capability has insufficient perms (0x%lx)"
 		    "for request (0x%lx)", perms, reqperms);

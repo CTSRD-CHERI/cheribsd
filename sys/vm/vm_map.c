@@ -5539,7 +5539,7 @@ vm_map_reservation_init_entry(vm_map_entry_t new_entry)
 int
 vm_map_prot2perms(vm_prot_t prot)
 {
-	int perms = ~(PERM_RWX);
+	int perms = 0;
 
 	/* These should match mmap_prot2perms until they are merged */
 	if (prot & (VM_PROT_READ | VM_PROT_COPY))
@@ -5563,7 +5563,7 @@ _vm_map_buildcap(vm_map_t map, vm_offset_t addr, vm_size_t length,
     vm_prot_t prot)
 {
 	void *retcap;
-	int perms = vm_map_prot2perms(prot);
+	int perms = ~(PERM_RWX) | vm_map_prot2perms(prot);
 
 	retcap = cheri_setbounds(cheri_setaddress(vm_map_rootcap(map),
 	    addr), length);
