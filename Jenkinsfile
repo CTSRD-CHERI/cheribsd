@@ -77,7 +77,7 @@ rm -rf cheribsd-test-results && mkdir cheribsd-test-results
 ./cheribuild/jenkins-cheri-build.py --test run-${suffix} '--test-extra-args=${testExtraArgs.join(" ")}' ${params.extraArgs} --test-ssh-key \$WORKSPACE/id_ed25519.pub
 find cheribsd-test-results
 """
-        def summary = junit allowEmptyResults: false, keepLongStdio: true, testResults: 'cheribsd-test-results/*.xml'
+        def summary = junitReturnCurrentSummary allowEmptyResults: false, keepLongStdio: true, testResults: 'cheribsd-test-results/*.xml'
         def testResultMessage = "Test summary: ${summary.totalCount}, Failures: ${summary.failCount}, Skipped: ${summary.skipCount}, Passed: ${summary.passCount}"
         echo("${suffix}: ${testResultMessage}")
         if (exitCode != 0 || summary.failCount != 0) {
