@@ -112,11 +112,15 @@ LIB64WMAKEENV=	MACHINE_CPU="arm64 cheri"
 LIB64WMAKEFLAGS= LD="${XLD}" CPUTYPE=morello
 # XXX: clang specific
 #LIB64CPUFLAGS=	-target aarch64-unknown-freebsd13.0
-# XXXBFG: "cheri" in machine cpu causes libc to build
-# memcpy_c and friends, which requires march=morello.
-# the above --target option does not support --gdb-index,
-# so do not use it at all
+# XXXBFG: some compat64 targets (libc, cheritest) requre capability support, so
+# pass -march=morello. this makes compat binaries hybrid, so we will need to do
+# something else if that is not desired.  the above --target option does not
+# support --gdb-index, so do not use it at all.
 LIB64CPUFLAGS=	-march=morello
+# strip existing CFLAGS switches that would force the
+# compiler to emit purecap code
+LIB64_STRIP_CFLAGS=	-mabi=purecap -march=morello+c64 -femulated-tls
+LIB64_STRIP_LDFLAGS=	-mabi=purecap -march=morello+c64 -femulated-tls
 .endif
 
 .if ${COMPAT_ARCH:Mmips64*c*}

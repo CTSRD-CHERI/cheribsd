@@ -322,7 +322,7 @@ MACHINE_CPU += riscv
 CFLAGS += -march=morello+c64 -mabi=purecap -femulated-tls
 LDFLAGS += -march=morello+c64 -mabi=purecap -femulated-tls
 # Morello hybrid
-. elif ${CPUTYPE} == "morello"
+. elif defined(CPUTYPE) && ${CPUTYPE} == "morello"
 CFLAGS += -march=morello
 LDFLAGS += -march=morello
 . endif

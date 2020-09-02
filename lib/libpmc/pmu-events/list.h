@@ -49,7 +49,7 @@
 
 #ifndef LIST_HEAD_DEF
 #define	LIST_HEAD_DEF
-__subobject_use_container_bounds struct list_head {
+struct __subobject_use_container_bounds list_head {
 	struct list_head *next;
 	struct list_head *prev;
 };
