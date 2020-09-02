@@ -5528,11 +5528,6 @@ vm_map_reservation_init_entry(vm_map_entry_t new_entry)
 }
 
 #if __has_feature(capabilities)
-#define	PERM_READ	(CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP)
-#define	PERM_WRITE	(CHERI_PERM_STORE | CHERI_PERM_STORE_CAP | \
-			    CHERI_PERM_STORE_LOCAL_CAP)
-#define	PERM_EXEC	CHERI_PERM_EXECUTE
-#define	PERM_RWX	(PERM_READ | PERM_WRITE | PERM_EXEC)
 /*
  * Convert vm_prot_t to capability permission bits.
  */
@@ -5543,12 +5538,11 @@ vm_map_prot2perms(vm_prot_t prot)
 
 	/* These should match mmap_prot2perms until they are merged */
 	if (prot & (VM_PROT_READ | VM_PROT_COPY))
-		perms |= (CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP);
+		perms |= CHERI_CAP_PERM_READ;
 	if (prot & VM_PROT_WRITE)
-		perms |= (CHERI_PERM_STORE | CHERI_PERM_STORE_CAP |
-			  CHERI_PERM_STORE_LOCAL_CAP);
+		perms |= CHERI_CAP_PERM_WRITE;
 	if (prot & VM_PROT_EXECUTE)
-		perms |= CHERI_PERM_EXECUTE;
+		perms |= CHERI_CAP_PERM_EXEC;
 
 	return (perms);
 }
@@ -5563,7 +5557,7 @@ _vm_map_buildcap(vm_map_t map, vm_offset_t addr, vm_size_t length,
     vm_prot_t prot)
 {
 	void *retcap;
-	int perms = ~(PERM_RWX) | vm_map_prot2perms(prot);
+	int perms = ~CHERI_CAP_PERM_RWX | vm_map_prot2perms(prot);
 
 	retcap = cheri_setbounds(cheri_setaddress(vm_map_rootcap(map),
 	    addr), length);

@@ -189,9 +189,7 @@ mmap_retcap(struct thread *td, vm_ptr_t addr,
 	 * range of access subject to page permissions.
 	 */
 	newcap = cheri_andperm(newcap,
-	    ~(CHERI_PERM_LOAD | CHERI_PERM_STORE | CHERI_PERM_LOAD_CAP |
-	    CHERI_PERM_STORE_CAP | CHERI_PERM_STORE_LOCAL_CAP |
-	    CHERI_PERM_EXECUTE) | vm_map_prot2perms(cap_prot));
+	    ~CHERI_CAP_PERM_RWX | vm_map_prot2perms(cap_prot));
 
 #ifndef CHERI_PURECAP_KERNEL
 	/* Reservations in the kernel ensure this */
