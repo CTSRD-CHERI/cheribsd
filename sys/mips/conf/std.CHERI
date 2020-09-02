@@ -7,6 +7,9 @@
 nomakeoptions	ARCH_FLAGS
 makeoptions	ARCH_FLAGS="-target mips64-unknown-freebsd -march=beri -mabi=64 -mcpu=beri -cheri -Wno-unused-command-line-argument"
 options 	CPU_CHERI
+nooptions	COMPAT_FREEBSD32
 options 	COMPAT_FREEBSD64
 
+options 	KSTACK_LARGE_PAGE	# Use a 16K page for kernel stack
+options 	NO_SWAPPING
 options 	TMPFS
