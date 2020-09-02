@@ -123,9 +123,12 @@ memrw(struct cdev *dev, struct uio *uio, int flags)
 			    + iov->iov_len);
 			prot = (uio->uio_rw == UIO_READ)
 			    ? VM_PROT_READ : VM_PROT_WRITE;
-
+#if __has_feature(capabilities)
 			kva = vm_map_buildcap(kernel_map, uio->uio_offset,
 			    iov->iov_len, prot);
+#else
+			kva = uio->uio_offset;
+#endif
 
 			/* 
 			 * Make sure that all the pages are currently resident
