@@ -122,6 +122,15 @@
 #define	CHERI_OTYPE_UNSEALED	(-1l)
 #define	CHERI_OTYPE_SENTRY	(-2l)
 
+/* Shorthand for RWX permission bits */
+#define	CHERI_CAP_PERM_READ	(CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP)
+#define	CHERI_CAP_PERM_WRITE                                            \
+    (CHERI_PERM_STORE | CHERI_PERM_STORE_CAP | CHERI_PERM_STORE_LOCAL_CAP)
+#define CHERI_CAP_PERM_EXEC	(CHERI_PERM_EXECUTE)
+#define	CHERI_CAP_PERM_RWX                                              \
+    (CHERI_CAP_PERM_READ | CHERI_CAP_PERM_WRITE | CHERI_CAP_PERM_EXEC)
+
+
 #define	CHERI_REPRESENTABLE_LENGTH(len) \
 	__builtin_cheri_round_representable_length(len)
 #define	CHERI_REPRESENTABLE_ALIGNMENT_MASK(len) \
