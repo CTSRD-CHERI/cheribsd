@@ -87,7 +87,9 @@ __FBSDID("$FreeBSD$");
 #include <sys/shm.h>
 
 #include <cheri/cheric.h>
+#if __has_feature(capabilities)
 #include <cheri/cheri.h>
+#endif
 
 #include <vm/vm.h>
 #include <vm/vm_param.h>
