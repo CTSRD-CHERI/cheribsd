@@ -2495,7 +2495,7 @@ MmAllocateContiguousMemorySpecifyCache(size, lowest, highest,
 	ret = (void *)kmem_alloc_contig(size, M_ZERO | M_NOWAIT, lowest,
 	    highest, PAGE_SIZE, boundary, memattr);
 	if (ret != NULL)
-		malloc_type_allocated(M_DEVBUF, round_page(size));
+		malloc_type_allocated(M_DEVBUF, ret, round_page(size));
 	return (ret);
 }
 
