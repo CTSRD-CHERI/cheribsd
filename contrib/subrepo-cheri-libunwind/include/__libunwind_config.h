@@ -61,11 +61,27 @@
 #  define _LIBUNWIND_HIGHEST_DWARF_REGISTER _LIBUNWIND_HIGHEST_DWARF_REGISTER_PPC
 # elif defined(__aarch64__)
 #  define _LIBUNWIND_TARGET_AARCH64 1
+/*
 #  define _LIBUNWIND_CONTEXT_SIZE 66
 #  if defined(__SEH__)
 #    define _LIBUNWIND_CURSOR_SIZE 164
 #  else
 #    define _LIBUNWIND_CURSOR_SIZE 78
+#  endif
+*/
+/*
+ * Note: We define _LIBUNWIND_CONTEXT_SIZE so that CHERI registers can always
+ * fit in unw_context_t even when compiling without CHERI support.
+ * Note: Assumes merged register file
+ */
+#  ifdef __SEH__
+#    error "aarch64 SEH not supported yet"
+#  endif
+#  define _LIBUNWIND_CONTEXT_SIZE 102
+#  ifdef __CHERI_PURE_CAPABILITY__
+#    define _LIBUNWIND_CURSOR_SIZE 126
+#  else
+#    define _LIBUNWIND_CURSOR_SIZE 114
 #  endif
 #  define _LIBUNWIND_HIGHEST_DWARF_REGISTER _LIBUNWIND_HIGHEST_DWARF_REGISTER_ARM64
 # elif defined(__arm__)

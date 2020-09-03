@@ -664,6 +664,77 @@ Lnovec:
 //
   .p2align 2
 DEFINE_LIBUNWIND_FUNCTION(_ZN9libunwind15Registers_arm646jumptoEv)
+#if __has_feature(capabilities)
+#ifdef __CHERI_PURE_CAPABILITY__
+#define THREAD_STATE_PTR c0
+#else
+#define THREAD_STATE_PTR x0
+#endif
+  // skip restore of c0,c1 for now
+  ldp    c2, c3,  [THREAD_STATE_PTR, #0x020]
+  ldp    c4, c5,  [THREAD_STATE_PTR, #0x040]
+  ldp    c6, c7,  [THREAD_STATE_PTR, #0x060]
+  ldp    c8, c9,  [THREAD_STATE_PTR, #0x080]
+  ldp    c10,c11, [THREAD_STATE_PTR, #0x0A0]
+  ldp    c12,c13, [THREAD_STATE_PTR, #0x0C0]
+  ldp    c14,c15, [THREAD_STATE_PTR, #0x0E0]
+  // c16 and c17 were clobbered by the call into the unwinder, so no point in
+  // restoring them.
+  ldp    c18,c19, [THREAD_STATE_PTR, #0x120]
+  ldp    c20,c21, [THREAD_STATE_PTR, #0x140]
+  ldp    c22,c23, [THREAD_STATE_PTR, #0x160]
+  ldp    c24,c25, [THREAD_STATE_PTR, #0x180]
+  ldp    c26,c27, [THREAD_STATE_PTR, #0x1A0]
+  ldp    c28,c29, [THREAD_STATE_PTR, #0x1C0]
+  // offset 0x1E0 skipped, 0x1F0 loaded later
+  ldr    c30,     [THREAD_STATE_PTR, #0x200]  // restore pc into lr
+  ldr    c16,     [THREAD_STATE_PTR, #0x210]  // restore ddc
+  msr    ddc,c16
+  // skip cpsr
+  // XXX use str instead of stp below because
+  // of immediate range restrictions
+  str    d0,      [THREAD_STATE_PTR, #0x228]
+  str    d1,      [THREAD_STATE_PTR, #0x230]
+  str    d2,      [THREAD_STATE_PTR, #0x238]
+  str    d3,      [THREAD_STATE_PTR, #0x240]
+  str    d4,      [THREAD_STATE_PTR, #0x248]
+  str    d5,      [THREAD_STATE_PTR, #0x250]
+  str    d6,      [THREAD_STATE_PTR, #0x258]
+  str    d7,      [THREAD_STATE_PTR, #0x260]
+  str    d8,      [THREAD_STATE_PTR, #0x268]
+  str    d9,      [THREAD_STATE_PTR, #0x270]
+  str    d10,     [THREAD_STATE_PTR, #0x278]
+  str    d11,     [THREAD_STATE_PTR, #0x280]
+  str    d12,     [THREAD_STATE_PTR, #0x288]
+  str    d13,     [THREAD_STATE_PTR, #0x290]
+  str    d14,     [THREAD_STATE_PTR, #0x298]
+  str    d15,     [THREAD_STATE_PTR, #0x2A0]
+  str    d16,     [THREAD_STATE_PTR, #0x2A8]
+  str    d17,     [THREAD_STATE_PTR, #0x2B0]
+  str    d18,     [THREAD_STATE_PTR, #0x2B8]
+  str    d19,     [THREAD_STATE_PTR, #0x2C0]
+  str    d20,     [THREAD_STATE_PTR, #0x2C8]
+  str    d21,     [THREAD_STATE_PTR, #0x2D0]
+  str    d22,     [THREAD_STATE_PTR, #0x2D8]
+  str    d23,     [THREAD_STATE_PTR, #0x2E0]
+  str    d24,     [THREAD_STATE_PTR, #0x2E8]
+  str    d25,     [THREAD_STATE_PTR, #0x2F0]
+  str    d26,     [THREAD_STATE_PTR, #0x2F8]
+  str    d27,     [THREAD_STATE_PTR, #0x300]
+  str    d28,     [THREAD_STATE_PTR, #0x308]
+  str    d29,     [THREAD_STATE_PTR, #0x310]
+  str    d30,     [THREAD_STATE_PTR, #0x318]
+  str    d31,     [THREAD_STATE_PTR, #0x320]
+
+  // Finally, restore sp. This must be done after the the last read from the
+  // context struct, because it is allocated on the stack, and an exception
+  // could clobber the de-allocated portion of the stack after sp has been
+  // restored.
+  ldr    c16,     [THREAD_STATE_PTR, #0x1F0]
+  ldp    c0, c1,  [THREAD_STATE_PTR, #0x000]  // restore c0,c1
+  mov    csp,c16                 // restore sp
+  ret    c30                    // jump to pc
+#else
   // skip restore of x0,x1 for now
   ldp    x2, x3,  [x0, #0x010]
   ldp    x4, x5,  [x0, #0x020]
@@ -708,6 +779,7 @@ DEFINE_LIBUNWIND_FUNCTION(_ZN9libunwind15Registers_arm646jumptoEv)
   ldp    x0, x1,  [x0, #0x000]  // restore x0,x1
   mov    sp,x16                 // restore sp
   ret    x30                    // jump to pc
+#endif
 
 #elif defined(__arm__) && !defined(__APPLE__)
 

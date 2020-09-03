@@ -824,6 +824,71 @@ DEFINE_LIBUNWIND_FUNCTION(__unw_getcontext)
 //
   .p2align 2
 DEFINE_LIBUNWIND_FUNCTION(__unw_getcontext)
+#if __has_feature(capabilities)
+#ifdef __CHERI_PURE_CAPABILITY__
+#define THREAD_STATE_PTR c0
+#else
+#define THREAD_STATE_PTR x0
+#endif
+  stp    c0, c1,  [THREAD_STATE_PTR, #0x000]
+  stp    c2, c3,  [THREAD_STATE_PTR, #0x020]
+  stp    c4, c5,  [THREAD_STATE_PTR, #0x040]
+  stp    c6, c7,  [THREAD_STATE_PTR, #0x060]
+  stp    c8, c9,  [THREAD_STATE_PTR, #0x080]
+  stp    c10,c11, [THREAD_STATE_PTR, #0x0A0]
+  stp    c12,c13, [THREAD_STATE_PTR, #0x0C0]
+  stp    c14,c15, [THREAD_STATE_PTR, #0x0E0]
+  stp    c16,c17, [THREAD_STATE_PTR, #0x100]
+  stp    c18,c19, [THREAD_STATE_PTR, #0x120]
+  stp    c20,c21, [THREAD_STATE_PTR, #0x140]
+  stp    c22,c23, [THREAD_STATE_PTR, #0x160]
+  stp    c24,c25, [THREAD_STATE_PTR, #0x180]
+  stp    c26,c27, [THREAD_STATE_PTR, #0x1A0]
+  stp    c28,c29, [THREAD_STATE_PTR, #0x1C0]
+  str    c30,     [THREAD_STATE_PTR, #0x1E0]
+  mov    c1,csp
+  str    c1,      [THREAD_STATE_PTR, #0x1F0]
+  str    c30,     [THREAD_STATE_PTR, #0x200]    // store return address as pc
+  mrs    c1, ddc
+  str    c1,     [THREAD_STATE_PTR, #0x210]    // store ddc
+  // skip cpsr
+  // XXX use str instead of stp below because
+  // of immediate range restrictions
+  str    d0,      [THREAD_STATE_PTR, #0x228]
+  str    d1,      [THREAD_STATE_PTR, #0x230]
+  str    d2,      [THREAD_STATE_PTR, #0x238]
+  str    d3,      [THREAD_STATE_PTR, #0x240]
+  str    d4,      [THREAD_STATE_PTR, #0x248]
+  str    d5,      [THREAD_STATE_PTR, #0x250]
+  str    d6,      [THREAD_STATE_PTR, #0x258]
+  str    d7,      [THREAD_STATE_PTR, #0x260]
+  str    d8,      [THREAD_STATE_PTR, #0x268]
+  str    d9,      [THREAD_STATE_PTR, #0x270]
+  str    d10,     [THREAD_STATE_PTR, #0x278]
+  str    d11,     [THREAD_STATE_PTR, #0x280]
+  str    d12,     [THREAD_STATE_PTR, #0x288]
+  str    d13,     [THREAD_STATE_PTR, #0x290]
+  str    d14,     [THREAD_STATE_PTR, #0x298]
+  str    d15,     [THREAD_STATE_PTR, #0x2A0]
+  str    d16,     [THREAD_STATE_PTR, #0x2A8]
+  str    d17,     [THREAD_STATE_PTR, #0x2B0]
+  str    d18,     [THREAD_STATE_PTR, #0x2B8]
+  str    d19,     [THREAD_STATE_PTR, #0x2C0]
+  str    d20,     [THREAD_STATE_PTR, #0x2C8]
+  str    d21,     [THREAD_STATE_PTR, #0x2D0]
+  str    d22,     [THREAD_STATE_PTR, #0x2D8]
+  str    d23,     [THREAD_STATE_PTR, #0x2E0]
+  str    d24,     [THREAD_STATE_PTR, #0x2E8]
+  str    d25,     [THREAD_STATE_PTR, #0x2F0]
+  str    d26,     [THREAD_STATE_PTR, #0x2F8]
+  str    d27,     [THREAD_STATE_PTR, #0x300]
+  str    d28,     [THREAD_STATE_PTR, #0x308]
+  str    d29,     [THREAD_STATE_PTR, #0x310]
+  str    d30,     [THREAD_STATE_PTR, #0x318]
+  str    d31,     [THREAD_STATE_PTR, #0x320]
+  mov    x0, #0                   // return UNW_ESUCCESS
+  ret
+#else
   stp    x0, x1,  [x0, #0x000]
   stp    x2, x3,  [x0, #0x010]
   stp    x4, x5,  [x0, #0x020]
@@ -863,6 +928,7 @@ DEFINE_LIBUNWIND_FUNCTION(__unw_getcontext)
   str    d31,     [x0, #0x208]
   mov    x0, #0                   // return UNW_ESUCCESS
   ret
+#endif
 
 #elif defined(__arm__) && !defined(__APPLE__)
 

@@ -558,6 +558,10 @@ enum {
   UNW_ARM64_D29 = 93,
   UNW_ARM64_D30 = 94,
   UNW_ARM64_D31 = 95,
+#if __has_feature(capabilities)
+  // XXXBFG use different number?
+  UNW_ARM64_DDC = 96,
+#endif
 };
 
 // 32-bit ARM registers. Numbers match DWARF for ARM spec #3.1 Table 1.
