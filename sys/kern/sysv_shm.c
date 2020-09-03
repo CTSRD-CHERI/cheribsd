@@ -469,10 +469,10 @@ kern_shmat_locked(struct thread *td, int shmid,
 	KASSERT(size == CHERI_REPRESENTABLE_LENGTH(size),
 	    ("shmget left unrepresentable size %zu", size));
 #endif
-	prot = VM_PROT_READ;
+	prot = VM_PROT_READ | VM_PROT_READ_CAP;
 	cow = MAP_INHERIT_SHARE | MAP_PREFAULT_PARTIAL;
 	if ((shmflg & SHM_RDONLY) == 0)
-		prot |= VM_PROT_WRITE;
+		prot |= VM_PROT_WRITE | VM_PROT_WRITE_CAP;
 	if (shmaddr != NULL) {
 		attach_va = (__cheri_addr vm_offset_t)shmaddr;
 		if ((shmflg & SHM_RND) != 0)
@@ -843,7 +843,7 @@ shmget_allocate_segment(struct thread *td, struct shmget_args *uap, int mode)
 	 * to.
 	 */
 	shm_object = vm_pager_allocate(shm_use_phys ? OBJT_PHYS : OBJT_SWAP,
-	    0, size, VM_PROT_DEFAULT, 0, cred);
+	    0, size, VM_PROT_DEFAULT | VM_PROT_CAP, 0, cred);
 	if (shm_object == NULL) {
 #ifdef RACCT
 		if (racct_enable) {

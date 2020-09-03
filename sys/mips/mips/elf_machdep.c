@@ -84,7 +84,7 @@ static struct sysentvec elf_freebsd_sysvec = {
 	.sv_usrstack	= USRSTACK,
 	.sv_psstrings	= PS_STRINGS,
 #if __has_feature(capabilities)
-	.sv_stackprot	= VM_PROT_READ | VM_PROT_WRITE,
+	.sv_stackprot	= VM_PROT_RW_CAP,
 #else
 	.sv_stackprot	= VM_PROT_ALL,
 #endif

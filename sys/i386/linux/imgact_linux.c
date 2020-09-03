@@ -158,7 +158,8 @@ exec_linux_imgact(struct image_params *imgp)
 		 * remove write enable on the 'text' part
 		 */
 		error = vm_map_protect(&vmspace->vm_map, vmaddr,
-		    vmaddr + a_out->a_text, VM_PROT_EXECUTE|VM_PROT_READ, TRUE);
+		    vmaddr + a_out->a_text, VM_PROT_EXECUTE|VM_PROT_READ, TRUE,
+		    FALSE);
 		if (error)
 			goto fail;
 	} else {

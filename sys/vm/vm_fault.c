@@ -294,25 +294,6 @@ vm_fault_dirty(struct faultstate *fs, vm_page_t m)
 }
 
 /*
- * Determine extra flags to pmap_enter to control pmap tag
- * permissions.
- */
-static u_int
-pmap_tag_flags(vm_object_t obj)
-{
-	u_int flags;
-
-	flags = 0;
-#if __has_feature(capabilities)
-	if (obj->flags & OBJ_NOLOADTAGS)
-		flags |= PMAP_ENTER_NOLOADTAGS;
-	if (obj->flags & OBJ_NOSTORETAGS)
-		flags |= PMAP_ENTER_NOSTORETAGS;
-#endif
-	return (flags);
-}
-
-/*
  * Unlocks fs.first_object and fs.map on success.
  */
 static int
@@ -369,8 +350,7 @@ vm_fault_soft_fast(struct faultstate *fs)
 	}
 #endif
 	rv = pmap_enter(fs->map->pmap, vaddr, m_map, fs->prot, fs->fault_type |
-	    PMAP_ENTER_NOSLEEP | (fs->wired ? PMAP_ENTER_WIRED : 0) |
-	    pmap_tag_flags(fs->first_object), psind);
+	    PMAP_ENTER_NOSLEEP | (fs->wired ? PMAP_ENTER_WIRED : 0), psind);
 	if (rv != KERN_SUCCESS)
 		goto out;
 	if (fs->m_hold != NULL) {
@@ -534,15 +514,13 @@ vm_fault_populate(struct faultstate *fs)
 		}
 		VM_OBJECT_WUNLOCK(fs->first_object);
 		rv = pmap_enter(fs->map->pmap, vaddr, m, fs->prot, fs->fault_type |
-		    (fs->wired ? PMAP_ENTER_WIRED : 0) |
-		    pmap_tag_flags(fs->first_object), psind);
+		    (fs->wired ? PMAP_ENTER_WIRED : 0), psind);
 #if defined(__amd64__)
 		if (psind > 0 && rv == KERN_FAILURE) {
 			for (i = 0; i < npages; i++) {
 				rv = pmap_enter(fs->map->pmap, vaddr + ptoa(i),
 				    &m[i], fs->prot, fs->fault_type |
-				    (fs->wired ? PMAP_ENTER_WIRED : 0) |
-				    pmap_tag_flags(fs->first_object), 0);
+				    (fs->wired ? PMAP_ENTER_WIRED : 0), 0);
 				MPASS(rv == KERN_SUCCESS);
 			}
 		}
@@ -1486,7 +1464,7 @@ RetryFault:
 				faultcount = 1;
 
 		} else {
-			fs.prot &= ~VM_PROT_WRITE;
+			fs.prot &= ~(VM_PROT_WRITE | VM_PROT_WRITE_CAP);
 		}
 	}
 
@@ -1531,8 +1509,7 @@ RetryFault:
 	 * won't find it (yet).
 	 */
 	pmap_enter(fs.map->pmap, vaddr, fs.m, fs.prot,
-	    fs.fault_type | (fs.wired ? PMAP_ENTER_WIRED : 0) |
-	    pmap_tag_flags(fs.object), 0);
+	    fs.fault_type | (fs.wired ? PMAP_ENTER_WIRED : 0), 0);
 	if (faultcount != 1 && (fs.fault_flags & VM_FAULT_WIRE) == 0 &&
 	    fs.wired == 0)
 		vm_fault_prefault(&fs, vaddr,
@@ -1728,8 +1705,7 @@ vm_fault_prefault(const struct faultstate *fs, vm_offset_t addra,
 
 		if (vm_page_all_valid(m) &&
 		    (m->flags & PG_FICTITIOUS) == 0)
-			pmap_enter_quick(pmap, addr, m, entry->protection,
-			    pmap_tag_flags(entry->object.vm_object));
+			pmap_enter_quick(pmap, addr, m, entry->protection, 0);
 		if (!obj_locked || lobject != entry->object.vm_object)
 			VM_OBJECT_RUNLOCK(lobject);
 	}
@@ -2009,8 +1985,7 @@ again:
 		 */
 		if (vm_page_all_valid(dst_m)) {
 			pmap_enter(dst_map->pmap, vaddr, dst_m, prot,
-			    access | (upgrade ? PMAP_ENTER_WIRED : 0) |
-			    pmap_tag_flags(dst_object), 0);
+			    access | (upgrade ? PMAP_ENTER_WIRED : 0), 0);
 		}
 
 		/*

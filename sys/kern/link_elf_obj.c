@@ -216,7 +216,7 @@ link_elf_protect_range(elf_file_t ef, vm_offset_t start, vm_offset_t end,
 #endif
 		return;
 	}
-	error = vm_map_protect(kernel_map, start, end, prot, FALSE);
+	error = vm_map_protect(kernel_map, start, end, prot, FALSE, FALSE);
 	KASSERT(error == KERN_SUCCESS,
 	    ("link_elf_protect_range: vm_map_protect() returned %d", error));
 }
@@ -237,6 +237,8 @@ link_elf_protect(elf_file_t ef)
 	 * data which may need to be writeable.  ELF files are always
 	 * page-aligned, but other preloaded data, such as entropy or CPU
 	 * microcode may be loaded with a smaller alignment.
+	 *
+	 * XXX: VM_PROT_CAP?
 	 */
 	gapprot = ef->preloaded ? VM_PROT_RW : VM_PROT_READ;
 
@@ -257,6 +259,8 @@ link_elf_protect(elf_file_t ef)
 		segstart = trunc_page((vm_offset_t)ef->progtab[i].addr);
 		segend = round_page((vm_offset_t)ef->progtab[i].addr +
 		    ef->progtab[i].size);
+
+		/* XXX: VM_PROT_READ_CAP or VM_PROT_WRITE_CAP? */
 		segprot = VM_PROT_READ;
 		if ((ef->progtab[i].flags & SHF_WRITE) != 0)
 			segprot |= VM_PROT_WRITE;

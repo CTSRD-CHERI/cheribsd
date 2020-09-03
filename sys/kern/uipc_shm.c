@@ -602,7 +602,7 @@ shm_alloc(struct ucred *ucred, mode_t mode)
 	shmfd->shm_gid = ucred->cr_gid;
 	shmfd->shm_mode = mode;
 	shmfd->shm_object = vm_pager_allocate(OBJT_SWAP, NULL,
-	    shmfd->shm_size, VM_PROT_DEFAULT, 0, ucred);
+	    shmfd->shm_size, VM_PROT_DEFAULT | VM_PROT_CAP, 0, ucred);
 	KASSERT(shmfd->shm_object != NULL, ("shm_create: vm_pager_allocate"));
 	vfs_timestamp(&shmfd->shm_birthtime);
 	shmfd->shm_atime = shmfd->shm_mtime = shmfd->shm_ctime =
@@ -1180,6 +1180,9 @@ shm_mmap(struct file *fp, vm_map_t map, vm_offset_t *addr,
 	}
 	maxprot &= cap_maxprot;
 
+	prot = VM_PROT_ADD_CAP(prot);
+	maxprot = VM_PROT_ADD_CAP(prot);
+
 	/* See comment in vn_mmap(). */
 	if (
 #ifdef _LP64
@@ -1312,8 +1315,7 @@ shm_map(struct file *fp, size_t size, off_t offset, void **memp)
 	offset = trunc_page(offset);
 	size = round_page(size + ofs);
 	rv = vm_map_find(kernel_map, obj, offset, &kva, size, 0,
-	    VMFS_OPTIMAL_SPACE, VM_PROT_READ | VM_PROT_WRITE,
-	    VM_PROT_READ | VM_PROT_WRITE, 0);
+	    VMFS_OPTIMAL_SPACE, VM_PROT_RW_CAP, VM_PROT_RW_CAP, 0);
 	if (rv == KERN_SUCCESS) {
 		rv = vm_map_wire(kernel_map, kva, kva + size,
 		    VM_MAP_WIRE_SYSTEM | VM_MAP_WIRE_NOHOLES);

@@ -1199,6 +1199,7 @@ link_elf_load_file(linker_class_t cls, const char* filename,
 		if (segs[i]->p_type != PT_LOAD)
 			continue;
 
+		/* XXX: VM_PROT_READ_CAP or VM_PROT_WRITE_CAP? */
 		prot = VM_PROT_READ;
 		if ((segs[i]->p_flags & PF_W) != 0)
 			prot |= VM_PROT_WRITE;
@@ -1208,7 +1209,7 @@ link_elf_load_file(linker_class_t cls, const char* filename,
 		error = vm_map_protect(kernel_map,
 		    (vm_offset_t)segbase,
 		    (vm_offset_t)segbase + round_page(segs[i]->p_memsz),
-		    prot, FALSE);
+		    prot, FALSE, FALSE);
 		if (error != KERN_SUCCESS) {
 			error = ENOMEM;
 			goto out;

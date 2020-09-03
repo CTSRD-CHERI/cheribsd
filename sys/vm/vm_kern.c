@@ -224,7 +224,10 @@ kmem_alloc_attr_domain(int domain, vm_size_t size, int flags, vm_paddr_t low,
 		return (0);
 	offset = addr - VM_MIN_KERNEL_ADDRESS;
 	pflags = malloc2vm_flags(flags) | VM_ALLOC_WIRED;
-	prot = (flags & M_EXEC) != 0 ? VM_PROT_ALL : VM_PROT_RW;
+	prot = (flags & M_EXEC) != 0 ? VM_PROT_RWX : VM_PROT_RW;
+
+	/* XXX: Do we want a M_CAP? */
+	prot |= VM_PROT_CAP;
 	VM_OBJECT_WLOCK(object);
 	for (i = 0; i < size; i += PAGE_SIZE) {
 		m = kmem_alloc_contig_pages(object, atop(offset + i),
@@ -321,8 +324,8 @@ kmem_alloc_contig_domain(int domain, vm_size_t size, int flags, vm_paddr_t low,
 		if ((flags & M_ZERO) && (m->flags & PG_ZERO) == 0)
 			pmap_zero_page(m);
 		vm_page_valid(m);
-		pmap_enter(kernel_pmap, tmp, m, VM_PROT_RW,
-		    VM_PROT_RW | PMAP_ENTER_WIRED, 0);
+		pmap_enter(kernel_pmap, tmp, m, VM_PROT_RW_CAP,
+		    VM_PROT_RW_CAP | PMAP_ENTER_WIRED, 0);
 		tmp += PAGE_SIZE;
 	}
 	VM_OBJECT_WUNLOCK(object);
@@ -470,7 +473,10 @@ kmem_back_domain(int domain, vm_object_t object, vm_offset_t addr,
 	pflags &= ~(VM_ALLOC_NOWAIT | VM_ALLOC_WAITOK | VM_ALLOC_WAITFAIL);
 	if (flags & M_WAITOK)
 		pflags |= VM_ALLOC_WAITFAIL;
-	prot = (flags & M_EXEC) != 0 ? VM_PROT_ALL : VM_PROT_RW;
+	prot = (flags & M_EXEC) != 0 ? VM_PROT_RWX : VM_PROT_RW;
+
+	/* XXX: Do we want a M_CAP? */
+	prot |= VM_PROT_CAP;
 
 	i = 0;
 	VM_OBJECT_WLOCK(object);
@@ -651,8 +657,8 @@ kmap_alloc_wait(vm_map_t map, vm_size_t size)
 		map->needs_wakeup = TRUE;
 		vm_map_unlock_and_wait(map, 0);
 	}
-	vm_map_insert(map, NULL, 0, addr, addr + size, VM_PROT_RW, VM_PROT_RW,
-	    MAP_ACC_CHARGED, VM_MIN_KERNEL_ADDRESS);
+	vm_map_insert(map, NULL, 0, addr, addr + size, VM_PROT_RW_CAP,
+	    VM_PROT_RW_CAP, MAP_ACC_CHARGED, VM_MIN_KERNEL_ADDRESS);
 	vm_map_unlock(map);
 	return (addr);
 }
