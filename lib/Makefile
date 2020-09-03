@@ -166,7 +166,9 @@ _libcheri=	libcheri
 .endif
 
 .if ${MACHINE_CPUARCH} == "mips" || ${MACHINE_CPUARCH} == "riscv"
+.if !${MACHINE_ABI:Mptr32}
 SUBDIR+= libsimple_printf
+.endif
 .endif
 
 .if !defined(COMPAT_32BIT) && !defined(COMPAT_64BIT) && !defined(COMPAT_SOFTFP) && !defined(COMPAT_CHERI)
