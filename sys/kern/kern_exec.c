@@ -195,10 +195,11 @@ static int
 sysctl_kern_stackprot(SYSCTL_HANDLER_ARGS)
 {
 	struct proc *p;
+	int stackprot;
 
 	p = curproc;
-	return (SYSCTL_OUT(req, &p->p_sysent->sv_stackprot,
-	    sizeof(p->p_sysent->sv_stackprot)));
+	stackprot = p->p_sysent->sv_stackprot & VM_PROT_RWX;
+	return (SYSCTL_OUT(req, &stackprot, sizeof(stackprot)));
 }
 
 /*

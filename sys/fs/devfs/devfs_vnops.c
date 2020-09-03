@@ -1878,7 +1878,7 @@ devfs_mmap_f(struct file *fp, vm_map_t map, vm_offset_t *addr,
 	if (error != 0)
 		return (error);
 
-	error = vm_mmap_cdev(td, size, prot, &maxprot, &flags, dev, dsw, &foff,
+	error = vm_mmap_cdev(td, size, &prot, &maxprot, &flags, dev, dsw, &foff,
 	    &object);
 	td->td_fpop = fpop;
 	dev_relthread(dev, ref);

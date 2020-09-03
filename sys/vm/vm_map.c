@@ -185,7 +185,7 @@ static void
 vm_map_log(const char *prefix, vm_map_entry_t entry)
 {
 	char buffer[128];
-	char prt[4];
+	char prt[6];
 
 	if (!(curthread->td_md.md_flags & MDTD_QTRACE))
 		return;
@@ -201,7 +201,15 @@ vm_map_log(const char *prefix, vm_map_entry_t entry)
 		prt[2] = 'x';
 	else
 		prt[2] = '-';
-	prt[3] = '\0';
+	if (entry->protection & VM_PROT_READ_CAP)
+		prt[3] = 'R';
+	else
+		prt[3] = '-';
+	if (entry->protection & VM_PROT_WRITE_CAP)
+		prt[4] = 'W';
+	else
+		prt[4] = '-';
+	prt[5] = '\0';
 	snprintf(buffer, sizeof(buffer), "VMMAP %d: %s: start=%p end=%p prt=%s",
 	    curproc->p_pid, prefix, (void *)entry->start, (void *)entry->end,
 	    prt);
@@ -1616,6 +1624,17 @@ vm_map_lookup_entry(
 	return (FALSE);
 }
 
+#define	VM_PROT_SANITY(prot) do {					\
+	if (((prot) & VM_PROT_WRITE_CAP) != 0)				\
+		KASSERT(((prot) & VM_PROT_WRITE) != 0,			\
+		    ("%s: VM_PROT_WRITE_CAP without VM_PROT_WRITE",	\
+		    __func__));						\
+	if (((prot) & VM_PROT_READ_CAP) != 0)				\
+		KASSERT(((prot) & VM_PROT_READ) != 0,			\
+		    ("%s: VM_PROT_READ_CAP without VM_PROT_READ",	\
+		    __func__));						\
+	} while (0)
+
 /*
  *	vm_map_insert:
  *
@@ -1646,6 +1665,8 @@ vm_map_insert(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 	    ("vm_map_insert: paradoxical MAP_NOFAULT request"));
 	KASSERT((prot & ~max) == 0,
 	    ("prot %#x is not subset of max_prot %#x", prot, max));
+	VM_PROT_SANITY(prot);
+	VM_PROT_SANITY(max);
 
 	/*
 	 * Check that the start and end points are not bogus.
@@ -2613,7 +2634,6 @@ vm_map_pmap_enter(vm_map_t map, vm_offset_t addr, vm_prot_t prot,
 	vm_offset_t start;
 	vm_page_t p, p_start;
 	vm_pindex_t mask, psize, threshold, tmpidx;
-	u_int pmap_flags;
 
 	if ((prot & (VM_PROT_READ | VM_PROT_EXECUTE)) == 0 || object == NULL)
 		return;
@@ -2641,13 +2661,6 @@ vm_map_pmap_enter(vm_map_t map, vm_offset_t addr, vm_prot_t prot,
 	start = 0;
 	p_start = NULL;
 	threshold = MAX_INIT_PT;
-	pmap_flags = 0;
-#if __has_feature(capabilities)
-	if (object->flags & OBJ_NOLOADTAGS)
-		pmap_flags |= PMAP_ENTER_NOLOADTAGS;
-	if (object->flags & OBJ_NOSTORETAGS)
-		pmap_flags |= PMAP_ENTER_NOSTORETAGS;
-#endif
 
 	p = vm_page_find_least(object, pindex);
 	/*
@@ -2686,13 +2699,13 @@ vm_map_pmap_enter(vm_map_t map, vm_offset_t addr, vm_prot_t prot,
 			}
 		} else if (p_start != NULL) {
 			pmap_enter_object(map->pmap, start, addr +
-			    ptoa(tmpidx), p_start, prot, pmap_flags);
+			    ptoa(tmpidx), p_start, prot, 0);
 			p_start = NULL;
 		}
 	}
 	if (p_start != NULL)
 		pmap_enter_object(map->pmap, start, addr + ptoa(psize),
-		    p_start, prot, pmap_flags);
+		    p_start, prot, 0);
 	VM_OBJECT_RUNLOCK(object);
 }
 
@@ -2706,13 +2719,15 @@ vm_map_pmap_enter(vm_map_t map, vm_offset_t addr, vm_prot_t prot,
  */
 int
 vm_map_protect(vm_map_t map, vm_offset_t start, vm_offset_t end,
-	       vm_prot_t new_prot, boolean_t set_max)
+    vm_prot_t new_prot, boolean_t set_max, boolean_t keep_cap)
 {
 	vm_map_entry_t entry, first_entry, in_tran, prev_entry;
 	vm_object_t obj;
 	struct ucred *cred;
 	vm_prot_t old_prot;
 	int rv;
+
+	VM_PROT_SANITY(new_prot);
 
 	if (start == end)
 		return (KERN_SUCCESS);
@@ -2737,6 +2752,7 @@ again:
 	/*
 	 * Make a first pass to check for protection violations.
 	 */
+restart_checks:
 	for (entry = first_entry; entry->start < end;
 	    entry = vm_map_entry_succ(entry)) {
 		if ((entry->eflags &
@@ -2746,6 +2762,28 @@ again:
 			vm_map_unlock(map);
 			return (KERN_INVALID_ARGUMENT);
 		}
+
+		/*
+		 * When keep_cap is used (for mprotect()), upgrade
+		 * new_prot to include the associated VM_PROT_CAP bits
+		 * and retry the the scan.  This means that the
+		 * mprotect will fail if it spans map entries with and
+		 * without VM_PROT_CAP set.
+		 *
+		 * Alternatively, keep_cap could be applied to
+		 * individual map entries.  The current approach gives
+		 * more conservative semantics at the cost of
+		 * potential compatibility breakage.  The alternative
+		 * would maximize compatibility.
+		 */
+		if (keep_cap &&
+		    ((set_max && (entry->max_protection & VM_PROT_CAP) != 0) ||
+		    (!set_max && (entry->protection & VM_PROT_CAP) != 0))) {
+			new_prot = VM_PROT_ADD_CAP(new_prot);
+			keep_cap = FALSE;
+			goto restart_checks;
+		}
+
 		if ((new_prot & entry->max_protection) != new_prot) {
 			vm_map_unlock(map);
 			return (KERN_PROTECTION_FAILURE);
@@ -2872,7 +2910,7 @@ again:
 		 * about copy-on-write here.
 		 */
 		if ((old_prot & ~entry->protection) != 0) {
-#define MASK(entry)	(((entry)->eflags & MAP_ENTRY_COW) ? ~VM_PROT_WRITE : \
+#define MASK(entry)	(((entry)->eflags & MAP_ENTRY_COW) ? ~(VM_PROT_WRITE | VM_PROT_WRITE_CAP) : \
 							VM_PROT_ALL)
 			pmap_protect(map->pmap, entry->start,
 			    entry->end,
@@ -5073,7 +5111,7 @@ RetryLookupLocked:
 			 * We're attempting to read a copy-on-write page --
 			 * don't allow writes.
 			 */
-			prot &= ~VM_PROT_WRITE;
+			prot &= ~(VM_PROT_WRITE | VM_PROT_WRITE_CAP);
 		}
 	}
 
@@ -5140,7 +5178,8 @@ vm_map_lookup_locked(vm_map_t *var_map,		/* IN/OUT */
 	 * Check whether this task is allowed to have this page.
 	 */
 	prot = entry->protection;
-	fault_type &= VM_PROT_READ | VM_PROT_WRITE | VM_PROT_EXECUTE;
+	fault_type &= VM_PROT_READ | VM_PROT_WRITE | VM_PROT_EXECUTE |
+	    VM_PROT_READ_CAP | VM_PROT_WRITE_CAP;
 	if ((fault_type & prot) != fault_type)
 		return (KERN_PROTECTION_FAILURE);
 
@@ -5162,7 +5201,7 @@ vm_map_lookup_locked(vm_map_t *var_map,		/* IN/OUT */
 		 * We're attempting to read a copy-on-write page --
 		 * don't allow writes.
 		 */
-		prot &= ~VM_PROT_WRITE;
+		prot &= ~(VM_PROT_WRITE | VM_PROT_WRITE_CAP);
 	}
 
 	/*

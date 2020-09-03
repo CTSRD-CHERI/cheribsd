@@ -2151,12 +2151,6 @@ pmap_enter(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot,
 	if (is_kernel_pmap(pmap))
 		newpte |= PTE_G;
 	PMAP_PTE_SET_CACHE_BITS(newpte, pa, m);
-#ifdef CPU_CHERI
-	if ((flags & PMAP_ENTER_NOLOADTAGS) != 0)
-		newpte |= PTE_LC;
-	if ((flags & PMAP_ENTER_NOSTORETAGS) != 0)
-		newpte |= PTE_SC;
-#endif
 	if ((m->oflags & VPO_UNMANAGED) == 0)
 		newpte |= PTE_MANAGED;
 
@@ -2432,10 +2426,9 @@ pmap_enter_quick_locked(pmap_t pmap, vm_offset_t va, vm_page_t m,
 	 */
 	npte = PTE_RO | TLBLO_PA_TO_PFN(pa) | PTE_V;
 #ifdef CPU_CHERI
-	if ((flags & PMAP_ENTER_NOLOADTAGS) != 0)
+	if ((prot & VM_PROT_READ_CAP) == 0)
 		npte |= PTE_LC;
-	if ((flags & PMAP_ENTER_NOSTORETAGS) != 0)
-		npte |= PTE_SC;
+	npte |= PTE_SC;
 #endif
 	if ((m->oflags & VPO_UNMANAGED) == 0)
 		npte |= PTE_MANAGED;
@@ -3562,6 +3555,12 @@ init_pte_prot(vm_page_t m, vm_prot_t access, vm_prot_t prot)
 	} else
 		/* Needn't emulate a modified bit for unmanaged pages. */
 		rw = PTE_V | PTE_D;
+#ifdef CPU_CHERI
+	if ((prot & VM_PROT_READ_CAP) == 0)
+		rw |= PTE_LC;
+	if ((prot & VM_PROT_WRITE_CAP) == 0)
+		rw |= PTE_SC;
+#endif
 	return (rw);
 }
 

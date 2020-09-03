@@ -2932,7 +2932,7 @@ fget_mmap(struct thread *td, int fd, cap_rights_t *rightsp, vm_prot_t *maxprotp,
 #ifndef CAPABILITIES
 	error = _fget(td, fd, fpp, 0, rightsp);
 	if (maxprotp != NULL)
-		*maxprotp = VM_PROT_ALL;
+		*maxprotp = VM_PROT_RWX;
 	return (error);
 #else
 	cap_rights_t fdrights;

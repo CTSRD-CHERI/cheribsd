@@ -2660,9 +2660,9 @@ pmap_enter(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot,
 	if (va < VM_MAX_USER_ADDRESS)
 		new_l3 |= PTE_U;
 #if __has_feature(capabilities)
-	if ((flags & PMAP_ENTER_NOLOADTAGS) == 0)
+	if (prot & VM_PROT_READ_CAP)
 		new_l3 |= PTE_LC;
-	if ((flags & PMAP_ENTER_NOSTORETAGS) == 0)
+	if (prot & VM_PROT_WRITE_CAP)
 		new_l3 |= PTE_SC;
 #endif
 
@@ -2929,9 +2929,9 @@ pmap_enter_2mpage(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot,
 	if (va < VM_MAXUSER_ADDRESS)
 		new_l2 |= PTE_U;
 #if __has_feature(capabilities)
-	if ((flags & PMAP_ENTER_NOLOADTAGS) == 0)
+	if ((prot & VM_PROT_READ_CAP) != 0)
 		new_l2 |= PTE_LC;
-	if ((flags & PMAP_ENTER_NOSTORETAGS) == 0)
+	if ((prot & VM_PROT_WRITE_CAP) != 0)
 		new_l2 |= PTE_SC;
 #endif
 	return (pmap_enter_l2(pmap, va, new_l2, PMAP_ENTER_NOSLEEP |
@@ -3223,9 +3223,9 @@ pmap_enter_quick_locked(pmap_t pmap, vm_offset_t va, vm_page_t m,
 	if (va < VM_MAX_USER_ADDRESS)
 		newl3 |= PTE_U;
 #if __has_feature(capabilities)
-	if ((flags & PMAP_ENTER_NOLOADTAGS) == 0)
+	if ((prot & VM_PROT_READ_CAP) != 0)
 		newl3 |= PTE_LC;
-	if ((flags & PMAP_ENTER_NOSTORETAGS) == 0)
+	if ((prot & VM_PROT_WRITE_CAP) != 0)
 		newl3 |= PTE_SC;
 #endif
 

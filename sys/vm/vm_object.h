@@ -197,10 +197,6 @@ struct vm_object {
 #define	OBJ_ONEMAPPING	0x2000		/* One USE (a single, non-forked) mapping flag */
 #define	OBJ_SHADOWLIST	0x4000		/* Object is on the shadow list. */
 #define	OBJ_TMPFS	0x8000		/* has tmpfs vnode allocated */
-#if __has_feature(capabilities)
-#define	OBJ_NOLOADTAGS	0x00010000	/* no tagged loads via pages */
-#define	OBJ_NOSTORETAGS	0x00020000	/* no tagged stores via pages */
-#endif
 
 /*
  * Helpers to perform conversion between vm_object page indexes and offsets.

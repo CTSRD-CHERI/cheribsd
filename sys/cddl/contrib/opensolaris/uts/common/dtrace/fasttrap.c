@@ -330,6 +330,8 @@ fasttrap_scraddr(struct thread *td, fasttrap_proc_t *fprc)
 		/*
 		 * No scratch space is available, so we'll map a new scratch
 		 * space block into the traced process' address space.
+		 *
+		 * XXX: Ok to use VM_PROT_ALL rather than VM_PROT_RWX?
 		 */
 		addr = 0;
 		error = vm_map_find(&p->p_vmspace->vm_map, NULL, 0, &addr,

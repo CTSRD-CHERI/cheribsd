@@ -223,7 +223,7 @@ static __inline const char *
 prot2str(vm_prot_t prot)
 {
 
-	switch (prot & VM_PROT_ALL) {
+	switch (prot & VM_PROT_RWX) {
 	case VM_PROT_READ:
 		return ("r--");
 	case VM_PROT_READ | VM_PROT_WRITE:

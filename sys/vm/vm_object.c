@@ -254,25 +254,6 @@ _vm_object_allocate(objtype_t type, vm_pindex_t size, u_int flags,
 
 	object->pg_color = 0;
 	object->flags = flags;
-#if __has_feature(capabilities)
-	/*
-	 * XXXRW: For now, allow tags to be associated only with words stored
-	 * in anonymously backed pages.  There's also an argument that they
-	 * should be enabled for other types, such as device-backed pages,
-	 * and perhaps (eventually) filesystem-backed pages if any filesystems
-	 * grow tagging support.
-	 */
-	switch(type)
-	{
-	case OBJT_DEFAULT:
-	case OBJT_SWAP:
-	case OBJT_PHYS:
-		break;
-	default:
-		object->flags |= OBJ_NOLOADTAGS | OBJ_NOSTORETAGS;
-		break;
-	}
-#endif
 	object->size = size;
 	object->domain.dr_policy = NULL;
 	object->generation = 1;

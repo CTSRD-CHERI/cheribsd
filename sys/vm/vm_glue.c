@@ -170,9 +170,13 @@ useracc(void * __capability cap, int len, int rw)
 		return (FALSE);
 	reqperm = CHERI_PERM_GLOBAL;
 	if (prot & VM_PROT_READ)
-		reqperm |= CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP;
+		reqperm |= CHERI_PERM_LOAD;
+	if (prot & VM_PROT_READ_CAP)
+		reqperm |= CHERI_PERM_LOAD_CAP;
 	if (prot & VM_PROT_WRITE)
-		reqperm |= CHERI_PERM_STORE | CHERI_PERM_STORE_CAP;
+		reqperm |= CHERI_PERM_STORE;
+	if (prot & VM_PROT_WRITE_CAP)
+		reqperm |= CHERI_PERM_STORE_CAP;
 	if (prot & VM_PROT_EXECUTE)
 		reqperm |= CHERI_PERM_EXECUTE;
 	if ((cheri_getperm(cap) & reqperm) != reqperm)
