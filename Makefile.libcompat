@@ -20,16 +20,19 @@ _lc_distribute _lc_install: .PHONY
 	${_+_}cd ${.CURDIR}/${_dir}; ${MAKE} ${.TARGET:S/^_lc_//}
 .endfor
 
-.if defined(_LIBCOMPAT)
+.if defined(_LIBCOMPATS)
 
 .include <bsd.compat.mk>
 
+.for i in ${_LIBCOMPATS:range}
+.for LIBCOMPAT libcompat in LIB${_LIBCOMPATS:[$i]} ${_LIBCOMPATS:[$i]:tl}
+
 # Yes, the flags are redundant.
-LIBCOMPAT_COMPILERS= \
-		CC="${XCC} ${LIBCOMPATCFLAGS}" \
-		CXX="${XCXX} ${LIBCOMPATCXXFLAGS} ${LIBCOMPATCFLAGS}" \
-		CPP="${XCPP} ${LIBCOMPATCFLAGS}"
-LIBCOMPATWMAKEENV+= \
+${LIBCOMPAT}_COMPILERS= \
+		CC="${XCC} ${${LIBCOMPAT}CFLAGS}" \
+		CXX="${XCXX} ${${LIBCOMPAT}CXXFLAGS} ${${LIBCOMPAT}CFLAGS}" \
+		CPP="${XCPP} ${${LIBCOMPAT}CFLAGS}"
+${LIBCOMPAT}WMAKEENV+= \
 		INSTALL="sh ${.CURDIR}/tools/install.sh" \
 		PATH=${TMPPATH} \
 		SYSROOT=${WORLDTMP} \
@@ -38,10 +41,10 @@ LIBCOMPATWMAKEENV+= \
 		DTRACE="${LIB$COMPATDTRACE:U${DTRACE}}"
 .if ${MK_META_MODE} != "no"
 # Don't rebuild build-tools targets during normal build.
-LIBCOMPATWMAKEENV+=	BUILD_TOOLS_META=.NOMETA
+${LIBCOMPAT}WMAKEENV+=	BUILD_TOOLS_META=.NOMETA
 .endif
-LIBCOMPATWMAKEFLAGS+= \
-		${LIBCOMPAT_COMPILERS} \
+${LIBCOMPAT}WMAKEFLAGS+= \
+		${${LIBCOMPAT}_COMPILERS} \
 		DESTDIR=${WORLDTMP} \
 		-DNO_CPU_CFLAGS \
 		MK_CTF=no \
@@ -57,16 +60,17 @@ LIBCOMPATWMAKEFLAGS+= \
 # bsd.linker.mk. This provides a noticeable speed-up as it avoids multiple
 # processes from being spawned in each subdirectory.
 .for _var in ${_TOOLCHAIN_METADATA_VARS}
-LIBCOMPATWMAKEFLAGS+=	${_var}="${X_${_var}}"
+${LIBCOMPAT}WMAKEFLAGS+=	${_var}="${X_${_var}}"
 .endfor
-LIBCOMPATWMAKEFLAGS+=_NO_INCLUDE_LINKERMK=yes _NO_INCLUDE_COMPILERMK=yes
+${LIBCOMPAT}WMAKEFLAGS+=_NO_INCLUDE_LINKERMK=yes _NO_INCLUDE_COMPILERMK=yes
 
-LIBCOMPATWMAKE+=	${LIBCOMPATWMAKEENV} ${MAKE} ${LIBCOMPATWMAKEFLAGS} \
-			OBJTOP=${LIBCOMPAT_OBJTOP} \
+${LIBCOMPAT}WMAKE+=	${${LIBCOMPAT}WMAKEENV} ${MAKE} \
+			${${LIBCOMPAT}WMAKEFLAGS} \
+			OBJTOP=${${LIBCOMPAT}_OBJTOP} \
 			OBJROOT='$${OBJTOP}/' \
 			MAKEOBJDIRPREFIX= \
 			MK_MAN=no MK_HTML=no
-LIBCOMPATIMAKE+=	${LIBCOMPATWMAKE:NINSTALL=*:NDESTDIR=*} \
+${LIBCOMPAT}IMAKE+=	${${LIBCOMPAT}WMAKE:NINSTALL=*:NDESTDIR=*} \
 			${IMAKE_INSTALL} \
 			-DLIBRARIES_ONLY
 
@@ -82,7 +86,7 @@ _jevents=	lib/libpmc/pmu-events
 build${libcompat}: .PHONY
 	@echo
 	@echo "--------------------------------------------------------------"
-	@echo ">>> stage 4.3: building lib${libcompat} shim libraries"
+	@echo ">>> stage 4.3.${i}: building lib${libcompat} shim libraries"
 	@echo "--------------------------------------------------------------"
 
 	${WORLDTMP_MTREE} -f ${.CURDIR}/etc/mtree/BSD.lib${libcompat}.dist \
@@ -97,7 +101,7 @@ build${libcompat}: .PHONY
 	    WORLDTMP=${WORLDTMP} \
 	    MAKEFLAGS="-m ${.CURDIR}/tools/build/mk ${.MAKEFLAGS}" \
 	    ${MAKE} SSP_CFLAGS= DESTDIR= \
-	    OBJTOP=${LIBCOMPAT_OBJTOP} \
+	    OBJTOP=${${LIBCOMPAT}_OBJTOP} \
 	    OBJROOT='$${OBJTOP}/' \
 	    MAKEOBJDIRPREFIX= \
 	    DIRPRFX=${_dir}/ -DNO_LINT -DNO_CPU_CFLAGS \
@@ -106,7 +110,7 @@ build${libcompat}: .PHONY
 .endfor
 .endfor
 	${_+_}cd ${.CURDIR}; \
-	    ${LIBCOMPATWMAKE} -f Makefile.inc1 -DNO_FSCHG libraries
+	    ${${LIBCOMPAT}WMAKE} -f Makefile.inc1 -DNO_FSCHG libraries
 .if ${MK_COMPAT_CHERIABI} == "yes" && ${MK_CHERI_PURE} == "yes"
 # To build a purecap world against /usr/libcheri, we need internal libs.
 # Skip amu because it needs unifdef which isn't available here and we
@@ -114,13 +118,13 @@ build${libcompat}: .PHONY
 # We've locally removed gdb.
 .for _lib in ${_INTERNALLIBS:Namu:Ngdb}
 	${_+_}cd ${.CURDIR}${LIB${_lib:tu}DIR:S|${_LIB_OBJTOP}||}; \
-	    ${LIBCOMPATWMAKE} all
+	    ${${LIBCOMPAT}WMAKE} all
 .endfor
 .endif
 
 distribute${libcompat} install${libcompat}: .PHONY
 	${_+_}cd ${.CURDIR}; \
-	    ${LIBCOMPATIMAKE} -f Makefile.inc1 _lc_${.TARGET:S/${libcompat}$//}
+	    ${${LIBCOMPAT}IMAKE} -f Makefile.inc1 _lc_${.TARGET:S/${libcompat}$//}
 
 .if ${.TARGETS:Mlib${libcompat}buildenv}
 .if ${.MAKEFLAGS:M-j}
@@ -135,12 +139,15 @@ lib${libcompat}buildenv: .PHONY
 	# Note: we have to remove TARGET and TARGET_ARCH from MAKEFLAGS since
 	# otherwise src.opts.mk will pick the wrong MK_FOO values.
 	@cd ${BUILDENV_DIR} && \
-	    env ${LIBCOMPATWMAKEENV} ${LIBCOMPAT_COMPILERS} BUILDENV=1 \
-	    TARGET=${LIBCOMPAT_MACHINE} TARGET_ARCH=${LIBCOMPAT_MACHINE_ARCH} \
+	    env ${${LIBCOMPAT}WMAKEENV} ${${LIBCOMPAT}_COMPILERS} BUILDENV=1 \
+	    TARGET=${${LIBCOMPAT}_MACHINE} TARGET_ARCH=${${LIBCOMPAT}_MACHINE_ARCH} \
 	    INSTALL="${INSTALL_CMD} ${INSTALLFLAGS}" \
 	    MTREE_CMD="${MTREE_CMD} ${MTREEFLAGS}" \
 	    "MAKEFLAGS=${MAKEFLAGS:NTARGET*}" ${BUILDENV_SHELL} || true
 .endif
+
+.endfor # .for LIBCOMPAT libcompat in LIB${_LIBCOMPATS:[$i]} ${_LIBCOMPATS:[$i]:tl}
+.endfor # .for i in ${LIBCOMPATS:range}
 
 .endif # defined(_LIBCOMPAT)
 

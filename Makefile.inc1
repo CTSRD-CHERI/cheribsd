@@ -860,13 +860,16 @@ XCFLAGS+=	${BFLAGS}
 .endif
 
 .if ${MK_COMPAT_CHERIABI} == "yes"
-_LIBCOMPAT=CHERI
-.elif ${MK_LIB32} == "yes"
-_LIBCOMPAT= 32
-.elif ${MK_LIB64} == "yes"
-_LIBCOMPAT=64
-.elif ${MK_LIBSOFT} == "yes"
-_LIBCOMPAT= SOFT
+_LIBCOMPATS+=	CHERI
+.endif
+.if ${MK_LIB32} == "yes"
+_LIBCOMPATS+=	32
+.endif
+.if ${MK_LIB64} == "yes"
+_LIBCOMPATS+=	64
+.endif
+.if ${MK_LIBSOFT} == "yes"
+_LIBCOMPATS+=	SOFT
 .endif
 .include "Makefile.libcompat"
 
@@ -1032,9 +1035,15 @@ _cleanobj_fast_depend_hack: .PHONY
 	@if [ -e "${OBJTOP}/cddl/lib/libzpool/.depend.${f}.o" ] && \
 	    egrep -qw 'opensolaris_atomic\.S' ${OBJTOP}/cddl/lib/libzpool/.depend.${f}.o; then \
 		echo "Removing stale dependencies for opensolaris_atomic"; \
-		rm -f ${OBJTOP}/cddl/lib/libzpool/.depend.${f}.* \
-		   ${LIBCOMPAT:D${LIBCOMPAT_OBJTOP}/cddl/lib/libzpool/.depend.${f}.*}; \
+		rm -f ${OBJTOP}/cddl/lib/libzpool/.depend.${f}.*; \
 	fi
+.for LIBCOMPAT in ${_LIBCOMPATS}
+	@if [ -e "${LIB${LIBCOMPAT}_OBJTOP}/cddl/lib/libzpool/.depend.${f}.o" ] && \
+	    egrep -qw 'opensolaris_atomic\.S' ${OBJTOP}/cddl/lib/libzpool/.depend.${f}.o; then \
+		echo "Removing stale dependencies for opensolaris_atomic"; \
+		rm -f ${LIB${LIBCOMPAT}_OBJTOP}/cddl/lib/libzpool/.depend.${f}.*; \
+	fi
+.endfor
 .endfor
 .endif
 # 20190925  r352689  removal of obsolete i386 memchr.S
@@ -1044,13 +1053,13 @@ _cleanobj_fast_depend_hack: .PHONY
 		echo "Removing stale dependencies for memchr"; \
 		rm -f ${OBJTOP}/lib/libc/.depend.${f}.*; \
 	fi
-.if defined(_LIBCOMPAT)
-	@if [ -e "${LIBCOMPAT_OBJTOP}/lib/libc/.depend.${f}.o" ] && \
-	    egrep -qw 'i386/string/memchr\.S' ${LIBCOMPAT_OBJTOP}/lib/libc/.depend.${f}.o; then \
+.for LIBCOMPAT in ${_LIBCOMPATS}
+	@if [ -e "${LIB${LIBCOMPAT}_OBJTOP}/lib/libc/.depend.${f}.o" ] && \
+	    egrep -qw 'i386/string/memchr\.S' ${LIB${LIBCOMPAT}_OBJTOP}/lib/libc/.depend.${f}.o; then \
 		echo "Removing stale dependencies for memchr"; \
-		rm -f ${LIBCOMPAT_OBJTOP}/lib/libc/.depend.${f}.*; \
+		rm -f ${LIB${LIBCOMPAT}_OBJTOP}/lib/libc/.depend.${f}.*; \
 	fi
-.endif
+.endfor
 .endfor
 
 .if ${TARGET:Mmips*}
@@ -1058,9 +1067,15 @@ _cleanobj_fast_depend_hack: .PHONY
 	set +x; if [ -e "${OBJTOP}/lib/libc/.depend.${f}.o" ] && \
 	    egrep -qw '${f}\.[c]' ${OBJTOP}/lib/libc/.depend.${f}.o; then \
 		echo "Removing stale dependencies for ${f} C implementation (now written in assembly)"; \
-		rm -f ${OBJTOP}/lib/libc/.depend.${f}.* \
-		   ${LIBCOMPAT:D${LIBCOMPAT_OBJTOP}/lib/libc/.depend.${f}.*}; \
+		rm -f ${OBJTOP}/lib/libc/.depend.${f}.*; \
 	fi
+.for LIBCOMPAT in ${_LIBCOMPATS}
+	set +x; if [ -e "${LIB${LIBCOMPAT}_OBJTOP}/lib/libc/.depend.${f}.o" ] && \
+	    egrep -qw '${f}\.[c]' ${LIB${LIBCOMPAT}_OBJTOP}/lib/libc/.depend.${f}.o; then \
+		echo "Removing stale dependencies for ${f} C implementation (now written in assembly)"; \
+		rm -f ${LIB${LIBCOMPAT}_OBJTOP}/lib/libc/.depend.${f}.*}; \
+	fi
+.endfor
 .endfor
 .endif
 
@@ -1141,9 +1156,9 @@ _cleanobj:
 	# Avoid including bsd.compiler.mk in clean and obj with _NO_INCLUDE_COMPILERMK
 	# since the restricted $PATH might not contain a valid cc binary
 	${_+_}cd ${.CURDIR}; ${WMAKE} _NO_INCLUDE_COMPILERMK=t ${CLEANDIR}
-.if defined(_LIBCOMPAT)
-	${_+_}cd ${.CURDIR}; ${LIBCOMPATWMAKE} _NO_INCLUDE_COMPILERMK=t -f Makefile.inc1 ${CLEANDIR}
-.endif
+.for LIBCOMPAT in ${_LIBCOMPATS}
+	${_+_}cd ${.CURDIR}; ${LIB${LIBCOMPAT}WMAKE} _NO_INCLUDE_COMPILERMK=t -f Makefile.inc1 ${CLEANDIR}
+.endfor
 .else
 	${_+_}cd ${.CURDIR}; ${WMAKE} _NO_INCLUDE_COMPILERMK=t _cleanobj_fast_depend_hack
 .endif	# !defined(NO_CLEAN)
@@ -1218,8 +1233,10 @@ WMAKE_TGTS+=	_includes
 .endif
 .if !defined(NO_LIBS)
 WMAKE_TGTS+=	_libraries
-.if defined(_LIBCOMPAT) && empty(SUBDIR_OVERRIDE)
+.if empty(SUBDIR_OVERRIDE)
+.for libcompat in ${libcompats}
 WMAKE_TGTS+=	build${libcompat}
+.endfor
 .endif
 .endif
 .if !defined(SYSROOT_ONLY)
@@ -1283,7 +1300,10 @@ buildenv: .PHONY
 	INSTALL="${INSTALL_CMD} ${INSTALLFLAGS}" \
 	MTREE_CMD="${MTREE_CMD} ${MTREEFLAGS}" BUILDENV=1 ${BUILDENV_SHELL}
 
-TOOLCHAIN_TGTS=	${WMAKE_TGTS:Neverything:Nbuild${libcompat}}
+TOOLCHAIN_TGTS:=	${WMAKE_TGTS:Neverything}
+.for libcompat in ${libcompats}
+TOOLCHAIN_TGTS:=	${TOOLCHAIN_TGTS:Nbuild${libcompat}}
+.endfor
 toolchain: ${TOOLCHAIN_TGTS} .PHONY
 KERNEL_TOOLCHAIN_TGTS=	${TOOLCHAIN_TGTS:N_obj:N_cleanobj:N_includes:N_libraries}
 .if make(kernel-toolchain)
@@ -1423,9 +1443,9 @@ ITOOLS+=makewhatis
 
 # Non-base distributions produced by the base system
 EXTRA_DISTRIBUTIONS=
-.if defined(_LIBCOMPAT)
+.for libcompat in ${libcompats}
 EXTRA_DISTRIBUTIONS+=	lib${libcompat}
-.endif
+.endfor
 .if ${MK_TESTS} != "no"
 EXTRA_DISTRIBUTIONS+=	tests
 .endif
@@ -1478,14 +1498,14 @@ distributeworld installworld stageworld installsysroot: _installcheck_world .PHO
 	${DESTDIR_MTREE} -f ${.CURDIR}/etc/mtree/BSD.debug.dist \
 	    -p ${DESTDIR}/${DISTDIR}/${dist}/usr/lib >/dev/null
 .endif
-.if defined(_LIBCOMPAT)
+.for libcompat in ${libcompats}
 	${DESTDIR_MTREE} -f ${.CURDIR}/etc/mtree/BSD.lib${libcompat}.dist \
 	    -p ${DESTDIR}/${DISTDIR}/${dist}/usr >/dev/null
 .if ${MK_DEBUG_FILES} != "no"
 	${DESTDIR_MTREE} -f ${.CURDIR}/etc/mtree/BSD.lib${libcompat}.dist \
 	    -p ${DESTDIR}/${DISTDIR}/${dist}/usr/lib/debug/usr >/dev/null
 .endif
-.endif
+.endfor
 .if ${MK_TESTS} != "no" && ${dist} == "tests"
 	-mkdir -p ${DESTDIR}/${DISTDIR}/${dist}${TESTSBASE}
 	${DESTDIR_MTREE} -f ${.CURDIR}/etc/mtree/BSD.tests.dist \
@@ -1502,10 +1522,10 @@ distributeworld installworld stageworld installsysroot: _installcheck_world .PHO
 	    sed -e 's#^\./#./${dist}/usr/#' >> ${METALOG}
 	${IMAKEENV} ${DISTR_MTREE} -C -f ${.CURDIR}/etc/mtree/BSD.include.dist | \
 	    sed -e 's#^\./#./${dist}/usr/include/#' >> ${METALOG}
-.if defined(_LIBCOMPAT)
+.for libcompat in ${libcompats}
 	${IMAKEENV} ${DISTR_MTREE} -C -f ${.CURDIR}/etc/mtree/BSD.lib${libcompat}.dist | \
 	    sed -e 's#^\./#./${dist}/usr/#' >> ${METALOG}
-.endif
+.endfor
 .endif
 .endfor
 	-mkdir ${DESTDIR}/${DISTDIR}/base
@@ -1621,9 +1641,9 @@ restage reinstall reinstallsysroot: .MAKE .PHONY
 	@echo ">>> Installing everything started on `LC_ALL=C date`"
 	@echo "--------------------------------------------------------------"
 	${_+_}cd ${.CURDIR}; ${MAKE} -f Makefile.inc1 install
-.if defined(_LIBCOMPAT)
+.for libcompat in ${libcompats}
 	${_+_}cd ${.CURDIR}; ${MAKE} -f Makefile.inc1 install${libcompat}
-.endif
+.endfor
 	@echo "--------------------------------------------------------------"
 	@echo ">>> Adding symlinks for native ABI libdir: ${MACHINE_ABI}"
 	@echo "--------------------------------------------------------------"
@@ -1656,10 +1676,10 @@ redistribute: .MAKE .PHONY
 	@echo ">>> Distributing everything"
 	@echo "--------------------------------------------------------------"
 	${_+_}cd ${.CURDIR}; ${MAKE} -f Makefile.inc1 distribute
-.if defined(_LIBCOMPAT)
+.for libcompat in ${libcompats}
 	${_+_}cd ${.CURDIR}; ${MAKE} -f Makefile.inc1 distribute${libcompat} \
 	    DISTRIBUTION=lib${libcompat}
-.endif
+.endfor
 
 distrib-dirs distribution: .MAKE .PHONY
 .if defined(SYSROOT_ONLY)
@@ -1743,7 +1763,11 @@ _cleankernobj_fast_depend_hack: .PHONY
 .endfor
 .endif
 
-${WMAKE_TGTS:N_worldtmp:Nbuild${libcompat}} ${.ALLTARGETS:M_*:N_worldtmp}: .MAKE .PHONY
+WMAKE_NOCOMPAT_TGTS:=	${WMAKE_TGTS}
+.for libcompat in ${libcompats}
+WMAKE_NOCOMPAT_TGTS:=	${WMAKE_NOCOMPAT_TGTS:Nbuild${libcompat}}
+.endfor
+${WMAKE_NOCOMPAT_TGTS:N_worldtmp} ${.ALLTARGETS:M_*:N_worldtmp}: .MAKE .PHONY
 
 # record kernel(s) build time in seconds
 .if make(buildkernel)
@@ -3520,10 +3544,10 @@ _xi-mtree: .PHONY
 	    -p ${XDDESTDIR}/usr >/dev/null
 	${DESTDIR_MTREE} -f ${.CURDIR}/etc/mtree/BSD.include.dist \
 	    -p ${XDDESTDIR}/usr/include >/dev/null
-.if defined(_LIBCOMPAT)
+.for libcompat in ${libcompats}
 	${DESTDIR_MTREE} -f ${.CURDIR}/etc/mtree/BSD.lib${libcompat}.dist \
 	    -p ${XDDESTDIR}/usr >/dev/null
-.endif
+.endfor
 .if ${MK_TESTS} != "no"
 	mkdir -p ${XDDESTDIR}${TESTSBASE}
 	${DESTDIR_MTREE} -f ${.CURDIR}/etc/mtree/BSD.tests.dist \

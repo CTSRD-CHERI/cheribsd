@@ -311,12 +311,9 @@ BROKEN_OPTIONS+=BOOT
 BROKEN_OPTIONS+=RESCUE
 # ofed needs work
 BROKEN_OPTIONS+=OFED
-# lib32 could probalby be made to work, but makes little sense
-# Must be broken for LIB64 to work while we can have only one LIBCOMPAT
-BROKEN_OPTIONS+=LIB32
 .endif
 
-.ifdef COMPAT_64BIT
+.if defined(COMPAT_32BIT) || defined(COMPAT_64BIT)
 # ofed needs to be part of the default build for headers to be available.
 # Since it isn't yet working under purecap, disable it here.
 BROKEN_OPTIONS+=OFED
@@ -343,9 +340,6 @@ BROKEN_OPTIONS+=LIB32
 # LIB64 on mips64*c* and riscv64*c*
 .if ${__T:Mmips64*c*} || ${__T:Mriscv64*c*}
 __DEFAULT_YES_OPTIONS+=LIB64
-# In principle, LIB32 could work on architectures where it's supported, but
-# Makefile.libcompat only supports one compat layer.
-BROKEN_OPTIONS+=LIB32
 .else
 BROKEN_OPTIONS+=LIB64
 .endif
