@@ -72,12 +72,18 @@ typedef	uintptr_t ptr;
 #define	pmask	(psize - 1)
 #define bigptr	(psize>wsize)
 
+#if _MIPS_SZLONG == 32
+#define ADDIU "addiu"
+#else
+#define ADDIU "daddiu"
+#endif
+
 #define MIPSLOOP(index, last, cStatements, increment)			\
 {									\
 	index -= increment;						\
 	do {								\
 		asm (							\
-			"daddiu %[indexIn], %[indexIn], %[incrementIn]\n"	\
+			ADDIU " %[indexIn], %[indexIn], %[incrementIn]\n"	\
 			:[indexIn] "+r"(index)				\
 			:[incrementIn] "i"(increment)			\
 		);							\
