@@ -167,7 +167,7 @@ static pv_entry_t pmap_pvh_remove(struct md_page *pvh, pmap_t pmap,
     vm_offset_t va);
 static vm_page_t pmap_alloc_direct_page(unsigned int index, int req);
 static vm_page_t pmap_enter_quick_locked(pmap_t pmap, vm_offset_t va,
-    vm_page_t m, vm_prot_t prot, u_int flags, vm_page_t mpte);
+    vm_page_t m, vm_prot_t prot, vm_page_t mpte);
 static void pmap_grow_direct_page(int req);
 static int pmap_remove_pte(struct pmap *pmap, pt_entry_t *ptq, vm_offset_t va,
     pd_entry_t pde);
@@ -2330,20 +2330,19 @@ validate:
  */
 
 void
-pmap_enter_quick(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot,
-    u_int flags)
+pmap_enter_quick(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot)
 {
 
 	rw_wlock(&pvh_global_lock);
 	PMAP_LOCK(pmap);
-	(void)pmap_enter_quick_locked(pmap, va, m, prot, flags, NULL);
+	(void)pmap_enter_quick_locked(pmap, va, m, prot, NULL);
 	rw_wunlock(&pvh_global_lock);
 	PMAP_UNLOCK(pmap);
 }
 
 static vm_page_t
 pmap_enter_quick_locked(pmap_t pmap, vm_offset_t va, vm_page_t m,
-    vm_prot_t prot, u_int flags, vm_page_t mpte)
+    vm_prot_t prot, vm_page_t mpte)
 {
 	pt_entry_t *pte, npte;
 	vm_paddr_t pa;
@@ -2517,7 +2516,7 @@ pmap_kenter_temporary_free(vm_paddr_t pa)
  */
 void
 pmap_enter_object(pmap_t pmap, vm_offset_t start, vm_offset_t end,
-    vm_page_t m_start, vm_prot_t prot, u_int flags)
+    vm_page_t m_start, vm_prot_t prot)
 {
 	vm_page_t m, mpte;
 	vm_pindex_t diff, psize;
@@ -2531,7 +2530,7 @@ pmap_enter_object(pmap_t pmap, vm_offset_t start, vm_offset_t end,
 	PMAP_LOCK(pmap);
 	while (m != NULL && (diff = m->pindex - m_start->pindex) < psize) {
 		mpte = pmap_enter_quick_locked(pmap, start + ptoa(diff), m,
-		    prot, flags, mpte);
+		    prot, mpte);
 		m = TAILQ_NEXT(m, listq);
 	}
 	rw_wunlock(&pvh_global_lock);

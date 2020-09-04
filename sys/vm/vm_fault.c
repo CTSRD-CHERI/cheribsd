@@ -1705,7 +1705,7 @@ vm_fault_prefault(const struct faultstate *fs, vm_offset_t addra,
 
 		if (vm_page_all_valid(m) &&
 		    (m->flags & PG_FICTITIOUS) == 0)
-			pmap_enter_quick(pmap, addr, m, entry->protection, 0);
+			pmap_enter_quick(pmap, addr, m, entry->protection);
 		if (!obj_locked || lobject != entry->object.vm_object)
 			VM_OBJECT_RUNLOCK(lobject);
 	}
