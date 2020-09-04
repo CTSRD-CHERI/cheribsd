@@ -2699,13 +2699,13 @@ vm_map_pmap_enter(vm_map_t map, vm_offset_t addr, vm_prot_t prot,
 			}
 		} else if (p_start != NULL) {
 			pmap_enter_object(map->pmap, start, addr +
-			    ptoa(tmpidx), p_start, prot, 0);
+			    ptoa(tmpidx), p_start, prot);
 			p_start = NULL;
 		}
 	}
 	if (p_start != NULL)
 		pmap_enter_object(map->pmap, start, addr + ptoa(psize),
-		    p_start, prot, 0);
+		    p_start, prot);
 	VM_OBJECT_RUNLOCK(object);
 }
 
