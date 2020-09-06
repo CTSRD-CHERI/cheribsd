@@ -10,7 +10,7 @@ MK_SSP=		no
 RTLD_CHERI_ELF_DIR=${SRCTOP}/libexec/rtld-cheri-elf
 RTLD_ELF_DIR=${SRCTOP}/libexec/rtld-elf
 
-.PATH: ${RTLD_CHERI_ELF_DIR} ${SRCTOP}/lib/libmalloc_simple
+.PATH: ${RTLD_ELF_DIR}/cheri ${SRCTOP}/lib/libmalloc_simple
 
 # Disable DEBUG to get a fair performance comparison to rtld-elf
 # DEBUG=-DDEBUG
@@ -66,7 +66,7 @@ RTLD_ARCH=	${MACHINE_ARCH}
 .else
 RTLD_ARCH=	${MACHINE_CPUARCH}
 .endif
-CFLAGS+=	-I${RTLD_CHERI_ELF_DIR}/${RTLD_ARCH} -I${RTLD_CHERI_ELF_DIR} -I${RTLD_ELF_DIR}
+CFLAGS+=	-I${RTLD_CHERI_ELF_DIR}/${RTLD_ARCH} -I${RTLD_ELF_DIR} -I${RTLD_ELF_DIR}/cheri
 LDFLAGS+=	-nostdlib -e ${RTLD_ENTRY}
 NO_WCAST_ALIGN=	yes
 WARNS?=		6
