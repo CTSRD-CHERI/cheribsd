@@ -112,7 +112,7 @@ RTLD_ENTRY?=	.rtld_start
 .PATH: ${RTLD_CHERI_ELF_DIR}/${RTLD_ARCH} ${RTLD_ELF_DIR}/${RTLD_ARCH}
 
 HAS_TESTS=
-SUBDIR.${MK_TESTS}+= tests
+SUBDIR.${MK_TESTS}+= ../rtld-elf/tests/cheri
 
 .include <bsd.prog.mk>
 ${PROG_FULL}:	${VERSION_MAP}
