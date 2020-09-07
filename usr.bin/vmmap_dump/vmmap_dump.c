@@ -52,7 +52,12 @@ static xo_handle_t *xop = NULL;
 static void
 usage(void)
 {
-	warnx("usage: vmmap_dump (entry|exit) syscall_number command");
+	warnx("usage: vmmap_dump [options] command");
+	warnx("options:");
+	warnx("-d entry|exit\tdump vmmap at entry or exit of syscall");
+	warnx("-i\t\t\ttrace forked processes");
+	warnx("-j logfile\t\tJSON logfile to dump to");
+	warnx("-s sysno\t\tsyscall number to trigger a dump");
 	exit (1);
 }
 
@@ -203,46 +208,69 @@ dump_vm(pid_t pid)
 	procstat_close(ps);
 }
 
+/*
+ * Setup tracing for a new process.
+ * The traced process must be stopped.
+ */
 static void
-run_command(char **argv, bool entry, u_int sysnum)
+new_proc(pid_t pid, bool entry, bool follow)
+{
+	int request = (entry) ? PT_TO_SCE : PT_TO_SCX;
+
+	if (follow && ptrace(PT_FOLLOW_FORK, pid, NULL, 1) == -1)
+		errx(EX_OSERR, "ptrace can not follow fork errno=%d", errno);
+
+	if (ptrace(request, pid, (caddr_t)1, 0) == -1)
+		errx(EX_OSERR, "ptrace syscall %d", errno);
+}
+
+static void
+run_command(char **argv, bool entry, u_int sysnum, bool follow)
 {
 	int status;
 	pid_t pid;
-	int request = (entry) ? PT_TO_SCE : PT_TO_SCX;
 	int flag = (entry) ? PL_FLAG_SCE : PL_FLAG_SCX;
 	struct ptrace_lwpinfo lwpi;
 
 	pid = fork();
 	if (pid < 0)
-		err(EX_OSERR, "fork");
+		err(EX_OSERR, "fork errno=%d", errno);
 	if (pid == 0) {
 		/* Setup tracing for the child */
 		if (ptrace(PT_TRACE_ME, 0, NULL, 0) == -1)
-			errx(EX_OSERR, "ptrace trace-me");
+			errx(EX_OSERR, "ptrace trace-me errno=%d", errno);
 		if (execvp(argv[0], argv) == -1)
-			err(EX_OSERR, "execvp");
+			err(EX_OSERR, "execvp errno=%d", errno);
 	}
 
 	waitpid(pid, &status, 0);
 	if (!WIFSTOPPED(status))
 		errx(EX_OSERR, "traced process did not stop");
 
-	if (ptrace(request, pid, (caddr_t)1, 0) == -1)
-		errx(EX_OSERR, "ptrace syscall");
-	
+	new_proc(pid, entry, follow);
+
 	do {
 		waitpid(pid, &status, 0);
 		if (WIFSTOPPED(status)) {
 			if (ptrace(PT_LWPINFO, pid, (caddr_t)&lwpi,
 			    sizeof(lwpi)) == -1)
-				errx(EX_OSERR, "ptrace lwpinfo");
+				errx(EX_OSERR, "ptrace lwpinfo errno=%d", errno);
 			if (lwpi.pl_flags & flag) {
 				if (lwpi.pl_syscall_code == sysnum)
 					dump_vm(pid);
 			}
+			if ((lwpi.pl_flags & PL_FLAG_FORKED) && follow) {
+				if (ptrace(PT_DETACH, pid, (caddr_t)1, 0))
+					errx(EX_OSERR, "ptrace detach errno=%d", errno);
+				pid = lwpi.pl_child_pid;
+				continue;
+			}
+			if ((lwpi.pl_flags & PL_FLAG_CHILD) && follow) {
+				new_proc(pid, entry, follow);
+				continue;
+			}
 			if (ptrace(PT_CONTINUE, pid, (caddr_t)1, 0) == -1)
-				errx(EX_OSERR, "ptrace continue");
-			
+				errx(EX_OSERR, "ptrace continue errno=%d", errno);
 		}
 	} while (!(WIFEXITED(status) || WIFSIGNALED(status)));
 }
@@ -250,54 +278,44 @@ run_command(char **argv, bool entry, u_int sysnum)
 int
 main(int argc, char **argv)
 {
-	char *file;
 	FILE *logfile;
-	bool sysentry = false;
-	int sysnum;
+	bool sysentry = true;
+	bool follow = false;
+	int sysnum = 1; // SYS_exit
+	int opt;
 
-	/* Adjust argc and argv as though we've used getopt. */
-	argc--;
-	argv++;
-
-	if (argc == 0)
-		usage();
-
-	if (strcmp("-j", argv[0]) == 0) {
-		argv++;
-		argc--;
-		if (argc == 0)
+	while ((opt = getopt(argc, argv, "hij:d:s:")) != -1) {
+		switch(opt) {
+		case 'j':
+			logfile = fopen(optarg, "w+");
+			if (logfile == NULL)
+				err(EX_OSERR, "can not open logfile");
+			xop = xo_create_to_file(logfile, XO_STYLE_JSON,
+			    XOF_CLOSE_FP);
+			break;
+		case 'i':
+			follow = true;
+			break;
+		case 'd':
+			if (strcmp("entry", optarg) == 0)
+				sysentry = true;
+			else if (strcmp("exit", optarg) == 0)
+				sysentry = false;
+			break;
+		case 's':
+			sysnum = atoi(optarg);
+			break;
+		case 'h':
+		default:
 			usage();
-		file = argv[0];
-		argv++;
-		argc--;
-		if (argc == 0)
-			usage();
-		logfile = fopen(file, "w+");
-		if (logfile == NULL)
-			err(EX_OSERR, "can not open logfile");
-		xop = xo_create_to_file(logfile, XO_STYLE_JSON,
-		    XOF_CLOSE_FP);
+		}
 	}
 
-	if (strcmp("entry", argv[0]) == 0)
-		sysentry = true;
-	else if (strcmp("exit", argv[0]) == 0)
-		sysentry = false;
-	else
+	if (optind == argc)
 		usage();
 
-	argv++;
-	argc--;
-	if (argc == 0)
-		usage();
-	sysnum = atoi(argv[0]);
-
-	argv++;
-	argc--;
-	if (argc == 0)
-		usage();
 	xo_open_container_h(xop, "vmmap_dump");
-	run_command(argv, sysentry, sysnum);
+	run_command(&argv[optind], sysentry, sysnum, follow);
 	xo_close_container_h(xop, "vmmap_dump");
 	xo_finish_h(xop);
 }
