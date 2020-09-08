@@ -149,10 +149,6 @@ __FBSDID("$FreeBSD$");
 #include <machine/md_var.h>
 #include <machine/pcb.h>
 
-#if __has_feature(capabilities)
-#include <cheri/cheric.h>
-#endif
-
 #define	PMAP_ASSERT_STAGE1(pmap)	MPASS((pmap)->pm_stage == PM_STAGE1)
 #define	PMAP_ASSERT_STAGE2(pmap)	MPASS((pmap)->pm_stage == PM_STAGE2)
 
@@ -407,21 +403,6 @@ pagecopy(void *s, void *d)
 
 	memcpy(d, s, PAGE_SIZE);
 }
-
-#if __has_feature(capabilities)
-static __inline void
-pagecopy_cleartags(void *s, void *d)
-{
-	void * __capability *dst;
-	void * __capability *src;
-	u_int i;
-
-	dst = d;
-	src = s;
-	for (i = 0; i < PAGE_SIZE / sizeof(*dst); i++)
-		*dst++ = cheri_cleartag(*src++);
-}
-#endif
 
 static __inline pd_entry_t *
 pmap_l0(pmap_t pmap, vm_offset_t va)
@@ -4375,17 +4356,6 @@ pmap_copy_page(vm_page_t msrc, vm_page_t mdst)
 	vm_offset_t src = PHYS_TO_DMAP(VM_PAGE_TO_PHYS(msrc));
 	vm_offset_t dst = PHYS_TO_DMAP(VM_PAGE_TO_PHYS(mdst));
 
-#if __has_feature(capabilities)
-	pagecopy_cleartags((void *)src, (void *)dst);
-}
-
-void
-pmap_copy_page_tags(vm_page_t msrc, vm_page_t mdst)
-{
-	vm_offset_t src = PHYS_TO_DMAP(VM_PAGE_TO_PHYS(msrc));
-	vm_offset_t dst = PHYS_TO_DMAP(VM_PAGE_TO_PHYS(mdst));
-
-#endif
 	pagecopy((void *)src, (void *)dst);
 }
 
