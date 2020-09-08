@@ -1989,6 +1989,39 @@ vm_mmap(vm_map_t map, vm_ptr_t *addr, vm_size_t size, vm_prot_t prot,
 	return (error);
 }
 
+int
+kern_mmap_racct_check(struct thread *td, vm_map_t map, vm_size_t size)
+{
+	int error;
+
+	RACCT_PROC_LOCK(td->td_proc);
+	if (map->size + size > lim_cur(td, RLIMIT_VMEM)) {
+		RACCT_PROC_UNLOCK(td->td_proc);
+		return (ENOMEM);
+	}
+	if (racct_set(td->td_proc, RACCT_VMEM, map->size + size)) {
+		RACCT_PROC_UNLOCK(td->td_proc);
+		return (ENOMEM);
+	}
+	if (!old_mlock && map->flags & MAP_WIREFUTURE) {
+		if (ptoa(pmap_wired_count(map->pmap)) + size >
+		    lim_cur(td, RLIMIT_MEMLOCK)) {
+			racct_set_force(td->td_proc, RACCT_VMEM, map->size);
+			RACCT_PROC_UNLOCK(td->td_proc);
+			return (ENOMEM);
+		}
+		error = racct_set(td->td_proc, RACCT_MEMLOCK,
+		    ptoa(pmap_wired_count(map->pmap)) + size);
+		if (error != 0) {
+			racct_set_force(td->td_proc, RACCT_VMEM, map->size);
+			RACCT_PROC_UNLOCK(td->td_proc);
+			return (error);
+		}
+	}
+	RACCT_PROC_UNLOCK(td->td_proc);
+	return (0);
+}
+
 /*
  * Internal version of mmap that maps a specific VM object into an
  * map.  Called by mmap for MAP_ANON, vm_mmap, shm_mmap, and vn_mmap.
@@ -1999,8 +2032,8 @@ vm_mmap_object(vm_map_t map, vm_ptr_t *addr, vm_offset_t max_addr,
     vm_prot_t maxprot, int flags, vm_object_t object, vm_ooffset_t foff,
     boolean_t writecounted, struct thread *td)
 {
-	boolean_t curmap, fitit, new_reservation;
 	int docow, error, findspace, rv;
+	bool curmap, fitit, new_reservation;
 	vm_size_t padded_size;
 	vm_ptr_t reservation;
 
@@ -2009,33 +2042,9 @@ vm_mmap_object(vm_map_t map, vm_ptr_t *addr, vm_offset_t max_addr,
 	curmap = map == &td->td_proc->p_vmspace->vm_map;
 	if (curmap) {
 		padded_size = CHERI_REPRESENTABLE_LENGTH(size);
-		RACCT_PROC_LOCK(td->td_proc);
-		if (map->size + padded_size > lim_cur(td, RLIMIT_VMEM)) {
-			RACCT_PROC_UNLOCK(td->td_proc);
-			return (ENOMEM);
-		}
-		if (racct_set(td->td_proc, RACCT_VMEM, map->size + padded_size)) {
-			RACCT_PROC_UNLOCK(td->td_proc);
-			return (ENOMEM);
-		}
-		if (!old_mlock && map->flags & MAP_WIREFUTURE) {
-			if (ptoa(pmap_wired_count(map->pmap)) + padded_size >
-			    lim_cur(td, RLIMIT_MEMLOCK)) {
-				racct_set_force(td->td_proc, RACCT_VMEM,
-				    map->size);
-				RACCT_PROC_UNLOCK(td->td_proc);
-				return (ENOMEM);
-			}
-			error = racct_set(td->td_proc, RACCT_MEMLOCK,
-			    ptoa(pmap_wired_count(map->pmap)) + padded_size);
-			if (error != 0) {
-				racct_set_force(td->td_proc, RACCT_VMEM,
-				    map->size);
-				RACCT_PROC_UNLOCK(td->td_proc);
-				return (error);
-			}
-		}
-		RACCT_PROC_UNLOCK(td->td_proc);
+		error = kern_mmap_racct_check(td, map, size);
+		if (error != 0)
+			return (error);
 	}
 
 	/*
