@@ -747,7 +747,7 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
       aux_info[AT_STACKPROT]->a_un.a_val != 0)
 	    stack_prot = aux_info[AT_STACKPROT]->a_un.a_val;
 
-#if !defined(COMPAT_32BIT) && !defined(COMPAT_64BIT)
+#if !defined(COMPAT_32BIT) && !defined(COMPAT_64BIT) && !defined(COMPAT_CHERI)
     /*
      * Get the actual dynamic linker pathname from the executable if
      * possible.  (It should always be possible.)  That ensures that
