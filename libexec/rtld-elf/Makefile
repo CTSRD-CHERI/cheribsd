@@ -52,9 +52,6 @@ MAN?=		rtld.1
 CSTD?=		gnu99
 CFLAGS+=	-Wall -DFREEBSD_ELF -DIN_RTLD -ffreestanding
 CFLAGS+=	-I${SRCTOP}/lib/csu/common
-.if ${MACHINE_CPU:Mcheri}
-CFLAGS+=	-DCHERI
-.endif
 .if exists(${RTLD_ELF_DIR}/${MACHINE_ARCH})
 RTLD_ARCH=	${MACHINE_ARCH}
 .else
