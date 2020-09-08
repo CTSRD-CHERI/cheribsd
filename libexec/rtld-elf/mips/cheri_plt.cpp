@@ -45,7 +45,7 @@
 #include "rtld_small_vector.h"
 
 static constexpr uint8_t simple_plt_code[] = {
-#include "plt_code.inc"
+#include "cheri_plt_code.inc"
 };
 
 #undef dbg

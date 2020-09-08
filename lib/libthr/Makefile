@@ -22,13 +22,12 @@ CFLAGS+=-I${.CURDIR}/thread
 CFLAGS+=-I${SRCTOP}/include
 CFLAGS+=-I${.CURDIR}/arch/${MACHINE_CPUARCH}/include
 CFLAGS+=-I${.CURDIR}/sys
-CFLAGS+=-I${SRCTOP}/libexec/rtld-elf
 .if ${MACHINE_ABI:Mpurecap}
 CFLAGS+=-I${SRCTOP}/libexec/rtld-cheri-elf
 CFLAGS+=-I${SRCTOP}/libexec/rtld-cheri-elf/${MACHINE_CPUARCH}
-.else
-CFLAGS+=-I${SRCTOP}/libexec/rtld-elf/${MACHINE_CPUARCH}
 .endif
+CFLAGS+=-I${SRCTOP}/libexec/rtld-elf
+CFLAGS+=-I${SRCTOP}/libexec/rtld-elf/${MACHINE_CPUARCH}
 CFLAGS+=-I${SRCTOP}/lib/libthread_db
 CFLAGS+=-Winline
 
