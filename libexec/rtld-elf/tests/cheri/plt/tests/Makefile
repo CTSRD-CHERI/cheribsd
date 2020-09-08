@@ -1,6 +1,6 @@
 # $FreeBSD$
 
-# TESTSDIR=	${TESTSBASE}/libexec/rtld-cheri-elf/plt
+# TESTSDIR=	${TESTSBASE}/libexec/rtld-elf/cheri/plt
 
 PLAIN_TESTS_C=	test_write \
 	load_global_int_call \

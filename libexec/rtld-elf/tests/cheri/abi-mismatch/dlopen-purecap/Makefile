@@ -1,6 +1,6 @@
 # $FreeBSD$
 
-TESTSDIR=	${TESTSBASE}/libexec/rtld-cheri-elf/abi-mismatch/dlopen-purecap
+TESTSDIR=	${TESTSBASE}/libexec/rtld-elf/cheri/abi-mismatch/dlopen-purecap
 NEED_COMPAT=	CHERI
 .include <bsd.compat.mk>
 ATF_TESTS_C+=dlopen-purecap

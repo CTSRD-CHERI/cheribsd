@@ -2,7 +2,7 @@
 
 .include <src.opts.mk>
 
-TESTSDIR=	${TESTSBASE}/libexec/rtld-cheri-elf/abi-mismatch
+TESTSDIR=	${TESTSBASE}/libexec/rtld-elf/cheri/abi-mismatch
 
 # Disable when building a pure-cap world as we don't support
 # bsd.cheri.mk hacks there. Alternative workaround needed.
