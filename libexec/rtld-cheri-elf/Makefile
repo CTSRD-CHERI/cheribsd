@@ -66,7 +66,7 @@ RTLD_ARCH=	${MACHINE_ARCH}
 .else
 RTLD_ARCH=	${MACHINE_CPUARCH}
 .endif
-CFLAGS+=	-I${RTLD_CHERI_ELF_DIR}/${RTLD_ARCH} -I${RTLD_ELF_DIR} -I${RTLD_ELF_DIR}/cheri
+CFLAGS+=	-I${RTLD_CHERI_ELF_DIR}/${RTLD_ARCH} -I${RTLD_ELF_DIR} -I${RTLD_ELF_DIR}/cheri -I${RTLD_ELF_DIR}/${RTLD_ARCH}
 LDFLAGS+=	-nostdlib -e ${RTLD_ENTRY}
 NO_WCAST_ALIGN=	yes
 WARNS?=		6
@@ -106,7 +106,7 @@ LDFLAGS+=	-Wl,--version-script=${VERSION_MAP}
 SYMBOL_MAPS+=	${RTLD_CHERI_ELF_DIR}/${RTLD_ARCH}/Symbol.map
 .endif
 
-.sinclude "${RTLD_CHERI_ELF_DIR}/${RTLD_ARCH}/Makefile.inc"
+.sinclude "${RTLD_ELF_DIR}/${RTLD_ARCH}/Makefile.inc"
 RTLD_ENTRY?=	.rtld_start
 
 .PATH: ${RTLD_CHERI_ELF_DIR}/${RTLD_ARCH} ${RTLD_ELF_DIR}/${RTLD_ARCH}
