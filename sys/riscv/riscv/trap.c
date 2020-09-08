@@ -454,7 +454,7 @@ do_trap_supervisor(struct trapframe *frame)
 #endif
 	default:
 		dump_regs(frame);
-		panic("Unknown kernel exception %x trap value %lx\n",
+		panic("Unknown kernel exception %lx trap value %lx\n",
 		    exception, frame->tf_stval);
 	}
 }
@@ -550,7 +550,7 @@ do_trap_user(struct trapframe *frame)
 #endif
 	default:
 		dump_regs(frame);
-		panic("Unknown userland exception %x, trap value %lx\n",
+		panic("Unknown userland exception %lx, trap value %lx\n",
 		    exception, frame->tf_stval);
 	}
 }
