@@ -2022,7 +2022,7 @@ vm_map_fixed(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 				if (entry->reservation != reservation ||
 				    (next_entry->start > end && entry->end < end)) {
 					result = KERN_NO_SPACE;
-					goto done;
+					goto out;
 				}
 				entry = next_entry;
 			}
@@ -2044,7 +2044,9 @@ vm_map_fixed(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 		 * If reservations are disabled vm_map_delete will
 		 * always delete the mapping.
 		 */
-		vm_map_delete(map, start, end, true);
+		result = vm_map_delete(map, start, end, true);
+		if (result != KERN_SUCCESS)
+			goto out;
 	}
 
 	if ((cow & (MAP_STACK_GROWS_DOWN | MAP_STACK_GROWS_UP)) != 0) {
@@ -2054,7 +2056,7 @@ vm_map_fixed(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 		result = vm_map_insert(map, object, offset, start, end,
 		    prot, max, cow, reservation);
 	}
-done:
+out:
 	vm_map_unlock(map);
 	return (result);
 }
@@ -2318,7 +2320,9 @@ again:
 			rv = KERN_INVALID_ADDRESS;
 			goto done;
 		}
-		vm_map_delete(map, vaddr, vaddr + length, true);
+		rv = vm_map_delete(map, vaddr, vaddr + length, true);
+		if (rv != KERN_SUCCESS)
+			goto done;
 	}
 
 	reservation = vaddr;
