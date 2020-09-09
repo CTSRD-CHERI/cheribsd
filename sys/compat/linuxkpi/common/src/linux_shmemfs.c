@@ -90,6 +90,7 @@ linux_shmem_file_setup(const char *name, loff_t size, unsigned long flags)
 		error = -ENOMEM;
 		goto err_1;
 	}
+	vm_object_set_flag(filp->f_shmem, OBJ_HASCAP);
 	return (filp);
 err_1:
 	kfree(filp);

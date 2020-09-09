@@ -856,6 +856,7 @@ shmget_allocate_segment(struct thread *td, struct shmget_args *uap, int mode)
 		return (ENOMEM);
 	}
 
+	vm_object_set_flag(shm_object, OBJ_HASCAP);
 	shmseg->object = shm_object;
 	shmseg->u.shm_perm.cuid = shmseg->u.shm_perm.uid = cred->cr_uid;
 	shmseg->u.shm_perm.cgid = shmseg->u.shm_perm.gid = cred->cr_gid;

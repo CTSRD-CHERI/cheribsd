@@ -914,6 +914,7 @@ link_elf_load_file(linker_class_t cls, const char *filename,
 		error = ENOMEM;
 		goto out;
 	}
+	vm_object_set_flag(ef->object, OBJ_HASCAP);
 
 	/*
 	 * In order to satisfy amd64's architectural requirements on the

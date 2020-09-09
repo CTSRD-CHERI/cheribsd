@@ -349,6 +349,7 @@ vm_fault_soft_fast(struct faultstate *fs)
 		}
 	}
 #endif
+	VM_OBJECT_ASSERT_CAP(fs->first_object, fs->prot);
 	rv = pmap_enter(fs->map->pmap, vaddr, m_map, fs->prot, fs->fault_type |
 	    PMAP_ENTER_NOSLEEP | (fs->wired ? PMAP_ENTER_WIRED : 0), psind);
 	if (rv != KERN_SUCCESS)
@@ -493,6 +494,7 @@ vm_fault_populate(struct faultstate *fs)
 		    pager_last);
 		pager_last = map_last;
 	}
+	VM_OBJECT_ASSERT_CAP(fs->first_object, fs->prot);
 	for (pidx = pager_first, m = vm_page_lookup(fs->first_object, pidx);
 	    pidx <= pager_last;
 	    pidx += npages, m = vm_page_next(&m[npages - 1])) {
@@ -1508,6 +1510,7 @@ RetryFault:
 	 * back on the active queue until later so that the pageout daemon
 	 * won't find it (yet).
 	 */
+	VM_OBJECT_ASSERT_CAP(fs.object, fs.prot);
 	pmap_enter(fs.map->pmap, vaddr, fs.m, fs.prot,
 	    fs.fault_type | (fs.wired ? PMAP_ENTER_WIRED : 0), 0);
 	if (faultcount != 1 && (fs.fault_flags & VM_FAULT_WIRE) == 0 &&
@@ -1704,8 +1707,15 @@ vm_fault_prefault(const struct faultstate *fs, vm_offset_t addra,
 		}
 
 		if (vm_page_all_valid(m) &&
-		    (m->flags & PG_FICTITIOUS) == 0)
+		    (m->flags & PG_FICTITIOUS) == 0) {
+			/*
+			 * NB: The lack of VM_OBJECT_ASSERT_CAP() is
+			 * intentional.  pmap_enter_quick() only
+			 * establishes read-only mappings, so
+			 * VM_PROT_WRITE_CAP is ignored.
+			 */
 			pmap_enter_quick(pmap, addr, m, entry->protection);
+		}
 		if (!obj_locked || lobject != entry->object.vm_object)
 			VM_OBJECT_RUNLOCK(lobject);
 	}
@@ -1984,6 +1994,7 @@ again:
 		 * backing pages.
 		 */
 		if (vm_page_all_valid(dst_m)) {
+			VM_OBJECT_ASSERT_CAP(dst_object, prot);
 			pmap_enter(dst_map->pmap, vaddr, dst_m, prot,
 			    access | (upgrade ? PMAP_ENTER_WIRED : 0), 0);
 		}
