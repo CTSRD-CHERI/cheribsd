@@ -1,0 +1,7 @@
+#NO_UNIVERSE
+
+include "CHERI-PURECAP-QEMU"
+include "std.MFS-ROOT"
+
+
+ident CHERI-PURECAP-QEMU-MFS-ROOT
