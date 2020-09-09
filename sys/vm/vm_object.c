@@ -289,6 +289,7 @@ vm_object_init(void)
 	kernel_object->flags |= OBJ_COLORED;
 	kernel_object->pg_color = (u_short)atop(VM_MIN_KERNEL_ADDRESS);
 #endif
+	vm_object_set_flag(kernel_object, OBJ_HASCAP);
 
 	/*
 	 * The lock portion of struct vm_object must be type stable due
@@ -464,7 +465,8 @@ vm_object_allocate_anon(vm_pindex_t size, vm_object_t backing_object,
 	else
 		handle = backing_object;
 	object = uma_zalloc(obj_zone, M_WAITOK);
-	_vm_object_allocate(OBJT_DEFAULT, size, OBJ_ANON | OBJ_ONEMAPPING,
+	_vm_object_allocate(OBJT_DEFAULT, size, OBJ_ANON | OBJ_ONEMAPPING |
+	    OBJ_HASCAP,
 	    object, handle);
 	object->cred = cred;
 	object->charge = cred != NULL ? charge : 0;

@@ -2662,6 +2662,12 @@ vm_map_pmap_enter(vm_map_t map, vm_offset_t addr, vm_prot_t prot,
 	p_start = NULL;
 	threshold = MAX_INIT_PT;
 
+	/*
+	 * NB: The lack of VM_OBJECT_ASSERT_CAP() is intentional.
+	 * pmap_enter_object() only establishes read-only mappings, so
+	 * VM_PROT_WRITE_CAP is ignored.
+	 */
+
 	p = vm_page_find_least(object, pindex);
 	/*
 	 * Assert: the variable p is either (1) the page with the

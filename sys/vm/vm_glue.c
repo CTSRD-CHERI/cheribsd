@@ -538,6 +538,7 @@ kstack_cache_init(void *null)
 {
 	kstack_object = vm_object_allocate(OBJT_SWAP,
 	    atop(VM_MAX_KERNEL_ADDRESS - VM_MIN_KERNEL_ADDRESS));
+	vm_object_set_flag(kstack_object, OBJ_HASCAP);
 	kstack_cache = uma_zcache_create("kstack_cache",
 	    kstack_pages * PAGE_SIZE, NULL, NULL, NULL, NULL,
 	    kstack_import, kstack_release, NULL,

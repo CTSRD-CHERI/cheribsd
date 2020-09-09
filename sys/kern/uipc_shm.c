@@ -604,6 +604,7 @@ shm_alloc(struct ucred *ucred, mode_t mode)
 	shmfd->shm_object = vm_pager_allocate(OBJT_SWAP, NULL,
 	    shmfd->shm_size, VM_PROT_DEFAULT | VM_PROT_CAP, 0, ucred);
 	KASSERT(shmfd->shm_object != NULL, ("shm_create: vm_pager_allocate"));
+	vm_object_set_flag(shmfd->shm_object, OBJ_HASCAP);
 	vfs_timestamp(&shmfd->shm_birthtime);
 	shmfd->shm_atime = shmfd->shm_mtime = shmfd->shm_ctime =
 	    shmfd->shm_birthtime;
