@@ -1950,12 +1950,14 @@ vm_map_fixed(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 				if (entry->reservation != reservation ||
 				    ((entry->eflags & MAP_UNMAPPED) != 0)) {
 					result = KERN_NO_SPACE;
-					goto done;
+					goto out;
 				}
 				entry = vm_map_entry_succ(entry);
 			}
 		}
-		vm_map_delete(map, start, end);
+		result = vm_map_delete(map, start, end);
+		if (result != KERN_SUCCESS)
+			goto out;
 	}
 	if ((cow & (MAP_STACK_GROWS_DOWN | MAP_STACK_GROWS_UP)) != 0) {
 		result = vm_map_stack_locked(map, start, length, sgrowsiz,
@@ -1964,7 +1966,7 @@ vm_map_fixed(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 		result = vm_map_insert(map, object, offset, start, end,
 		    prot, max, cow, reservation);
 	}
-done:
+out:
 	vm_map_unlock(map);
 	return (result);
 }
@@ -2203,7 +2205,9 @@ again:
 			rv = KERN_INVALID_ADDRESS;
 			goto done;
 		}
-		vm_map_delete(map, *addr, *addr + length);
+		rv = vm_map_delete(map, *addr, *addr + length);
+		if (rv != KERN_SUCCESS)
+			goto done;
 	}
 	if ((cow & (MAP_STACK_GROWS_DOWN | MAP_STACK_GROWS_UP)) != 0) {
 		rv = vm_map_stack_locked(map, *addr, length, sgrowsiz, prot,
