@@ -2089,8 +2089,6 @@ SYSCTL_LONG(_vm, OID_AUTO, aslr_restarts, CTLFLAG_RD,
     &aslr_restarts, 0,
     "Number of aslr failures");
 
-#define	MAP_32BIT_MAX_ADDR	((vm_offset_t)1 << 31)
-
 /*
  * [Internal use only]
  *
@@ -2158,6 +2156,19 @@ vm_map_alignspace(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 			return (KERN_SUCCESS);
 		}
 	}
+}
+
+int
+vm_map_find_aligned(vm_map_t map, vm_offset_t *addr, vm_size_t length,
+    vm_offset_t max_addr, vm_offset_t alignment)
+{
+	/* XXXKIB ASLR eh ? */
+	*addr = vm_map_findspace(map, *addr, length);
+	if (*addr + length > vm_map_max(map) ||
+	    (max_addr != 0 && *addr + length > max_addr))
+		return (KERN_NO_SPACE);
+	return (vm_map_alignspace(map, NULL, 0, addr, length, max_addr,
+	    alignment));
 }
 
 /*
