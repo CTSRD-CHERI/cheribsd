@@ -995,11 +995,11 @@ kern_munmap(struct thread *td, uintptr_t addr0, size_t size)
 	struct pmckern_map_out pkm;
 	bool pmc_handled;
 	vm_map_entry_t entry;
-	int rv;
 #endif
 	vm_offset_t addr, end;
 	vm_size_t pageoff;
 	vm_map_t map;
+        int rv = KERN_SUCCESS;
 
 	if (size == 0)
 		return (EINVAL);
