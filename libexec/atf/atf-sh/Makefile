@@ -62,7 +62,7 @@ MLINKS+=	\
 CFLAGS+=	-DHAVE_CONFIG_H
 CFLAGS+=	-DATF_LIBEXECDIR='"${LIBEXECDIR}"'
 CFLAGS+=	-DATF_PKGDATADIR='"${SHAREDIR}/atf"'
-CFLAGS+=	-DATF_SHELL='"/bin/sh"'
+CFLAGS+=	-DATF_SHELL='"/usr/libexec/sh_static"'
 CFLAGS+=	-I${ATF}
 
 # Silence warnings about usage of deprecated std::auto_ptr
