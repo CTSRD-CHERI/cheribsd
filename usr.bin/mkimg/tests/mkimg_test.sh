@@ -142,6 +142,18 @@ atf_init_test_cases()
 {
     local B F G S nm
 
+    # Note: These tests take 2.5 minutes each on purecap CHERI-RISC-V, so if the
+    # unless the include_slow_tests option is set, we skip most of these tests
+    # to reduce test run time by almost 6 hours.
+    # FIXME: vhdx seems broken on RISC-V purecap so we run one of the failing
+    # tests (mbr_63x255_4096_vhdx) instead of the full matrix
+    if [ "$(atf_config_get include_slow_tests false)" != "true" ]; then
+	mkimg_blksz_list="4096"
+	mkimg_format_list="vhdx"
+	mkimg_geom_list="63x255"
+	mkimg_scheme_list="mbr"
+    fi
+
     for G in $mkimg_geom_list; do
 	for B in $mkimg_blksz_list; do
 	    for S in $mkimg_scheme_list; do
