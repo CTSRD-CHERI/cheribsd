@@ -136,6 +136,8 @@ struct cheri_test {
  * the error.
  */
 void	cheritest_failure_err(const char *msg, ...) __dead2  __printflike(1, 2);
+void	cheritest_failure_errc(int code, const char *msg, ...) __dead2
+    __printflike(2, 3);
 void	cheritest_failure_errx(const char *msg, ...) __dead2  __printflike(1, 2);
 void	cheritest_success(void) __dead2;
 void	signal_handler_clear(int sig);
