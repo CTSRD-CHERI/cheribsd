@@ -28,6 +28,15 @@
 .include <src.opts.mk>
 .include <bsd.init.mk>
 
+# We build atf-sh statically linked and non-CHERI to speed up testsuite runs.
+# This is noticeably faster on QEMU since we don't have to emulate CHERI and
+# also means we don't have to process capability relocations on startup.
+.if ${MACHINE_ABI:Mpurecap}
+NEED_COMPAT=	64
+.include <bsd.compat.mk>
+.endif
+NO_SHARED=	yes
+
 ATF=		${SRCTOP}/contrib/atf
 .PATH:		${ATF}/atf-sh
 
@@ -77,13 +86,6 @@ SUBR=		libatf-sh.subr
 
 HAS_TESTS=
 SUBDIR.${MK_TESTS}+= tests
-
-# Allow building atf as a static MIPS binary to speed up running tests
-# on QEMU (since QEMU it can only 'JIT' plain MIPS instructions)
-.if ${MK_CHERI_PURE} != "no" && defined(ATF_BUILD_STATIC_MIPS)
-WANT_CHERI:=hybrid
-NO_SHARED:=yes
-.endif
 
 .include "../../../lib/atf/common.mk"
 .include <bsd.prog.mk>
