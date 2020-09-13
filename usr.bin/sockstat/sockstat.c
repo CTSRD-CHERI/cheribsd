@@ -74,6 +74,7 @@ __FBSDID("$FreeBSD$");
 
 static int	 opt_4;		/* Show IPv4 sockets */
 static int	 opt_6;		/* Show IPv6 sockets */
+static int	 opt_C;		/* Show congestion control */
 static int	 opt_c;		/* Show connected sockets */
 static int	 opt_j;		/* Show specified jail */
 static int	 opt_L;		/* Don't show IPv4 or IPv6 loopback sockets */
@@ -119,6 +120,7 @@ struct sock {
 	int state;
 	const char *protoname;
 	char stack[TCP_FUNCTION_NAME_LEN_MAX];
+	char cc[TCP_CA_NAME_MAX];
 	struct addr *laddr;
 	struct addr *faddr;
 	struct sock *next;
@@ -715,6 +717,7 @@ gather_inet(int proto)
 			sock->state = xtp->t_state;
 			memcpy(sock->stack, xtp->xt_stack,
 			    TCP_FUNCTION_NAME_LEN_MAX);
+			memcpy(sock->cc, xtp->xt_cc, TCP_CA_NAME_MAX);
 		}
 		sock->protoname = protoname;
 		hash = (int)(sock->socket % HASHSIZE);
@@ -1129,11 +1132,23 @@ displaysock(struct sock *s, int pos)
 				}
 				offset += 13;
 			}
-			if (opt_S && s->proto == IPPROTO_TCP) {
-				while (pos < offset)
-					pos += xprintf(" ");
-				xprintf("%.*s", TCP_FUNCTION_NAME_LEN_MAX,
-				    s->stack);
+			if (opt_S) {
+				if (s->proto == IPPROTO_TCP) {
+					while (pos < offset)
+						pos += xprintf(" ");
+					pos += xprintf("%.*s",
+					    TCP_FUNCTION_NAME_LEN_MAX,
+					    s->stack);
+				}
+				offset += TCP_FUNCTION_NAME_LEN_MAX + 1;
+			}
+			if (opt_C) {
+				if (s->proto == IPPROTO_TCP) {
+					while (pos < offset)
+						pos += xprintf(" ");
+					xprintf("%.*s", TCP_CA_NAME_MAX, s->cc);
+				}
+				offset += TCP_CA_NAME_MAX + 1;
 			}
 		}
 		if (laddr != NULL)
@@ -1169,7 +1184,10 @@ display(void)
 			printf(" %-12s", "CONN STATE");
 		}
 		if (opt_S)
-			printf(" %.*s", TCP_FUNCTION_NAME_LEN_MAX, "STACK");
+			printf(" %-*.*s", TCP_FUNCTION_NAME_LEN_MAX,
+			    TCP_FUNCTION_NAME_LEN_MAX, "STACK");
+		if (opt_C)
+			printf(" %-.*s", TCP_CA_NAME_MAX, "CC");
 		printf("\n");
 	}
 	setpassent(1);
@@ -1285,13 +1303,16 @@ main(int argc, char *argv[])
 	int o, i;
 
 	opt_j = -1;
-	while ((o = getopt(argc, argv, "46cj:Llp:P:qSsUuvw")) != -1)
+	while ((o = getopt(argc, argv, "46Ccj:Llp:P:qSsUuvw")) != -1)
 		switch (o) {
 		case '4':
 			opt_4 = 1;
 			break;
 		case '6':
 			opt_6 = 1;
+			break;
+		case 'C':
+			opt_C = 1;
 			break;
 		case 'c':
 			opt_c = 1;
