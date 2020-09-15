@@ -395,8 +395,7 @@ enum e1000_serdes_link_state {
 /* Receive Descriptor */
 struct e1000_rx_desc {
 #if defined(E1000_DESC_CAP)
-	__le64 buffer_addr_lo;
-	__le64 buffer_addr_hi;
+	void * __capability	buffer_addr;
 #else
 	__le64 buffer_addr; /* Address of the descriptor's data buffer */
 #endif
@@ -411,8 +410,7 @@ struct e1000_rx_desc {
 union e1000_rx_desc_extended {
 	struct {
 #if defined(E1000_DESC_CAP)
-		__le64 buffer_addr_lo;
-		__le64 buffer_addr_hi;
+		void * __capability buffer_addr;
 #else
 		__le64 buffer_addr;
 #endif
@@ -446,7 +444,7 @@ union e1000_rx_desc_extended {
 union e1000_rx_desc_packet_split {
 	struct {
 #if defined(E1000_DESC_CAP)
-		__le64 buffer_addr[MAX_PS_BUFFERS * 2];
+		void * __capability buffer_addr[MAX_PS_BUFFERS];
 #else
 		/* one buffer for protocol header(s), three data buffers */
 		__le64 buffer_addr[MAX_PS_BUFFERS];
@@ -480,8 +478,7 @@ union e1000_rx_desc_packet_split {
 /* Transmit Descriptor */
 struct e1000_tx_desc {
 #if defined(E1000_DESC_CAP)
-	__le64 buffer_addr_lo;
-	__le64 buffer_addr_hi;
+	void * __capability buffer_addr;
 #else
 	__le64 buffer_addr;   /* Address of the descriptor's data buffer */
 #endif
@@ -535,8 +532,7 @@ struct e1000_context_desc {
 /* Offload data descriptor */
 struct e1000_data_desc {
 #if defined(E1000_DESC_CAP)
-	__le64 buffer_addr_lo;
-	__le64 buffer_addr_hi;
+	void * __capability buffer_addr;
 #else
 	__le64 buffer_addr;  /* Address of the descriptor's buffer address */
 #endif

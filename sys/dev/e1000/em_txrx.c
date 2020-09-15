@@ -311,6 +311,9 @@ em_isc_txd_encap(void *arg, if_pkt_info_t pi)
 	int csum_flags = pi->ipi_csum_flags;
 	int i, j, first, pidx_last;
 	u32 txd_flags, txd_upper = 0, txd_lower = 0;
+#if defined(E1000_DESC_CAP)
+	void * __capability cap;
+#endif
 
 	struct e1000_tx_desc *ctxd = NULL;
 	bool do_tso, tso_desc;
@@ -370,8 +373,9 @@ em_isc_txd_encap(void *arg, if_pkt_info_t pi)
 		if (tso_desc && (j == (nsegs - 1)) && (seg_len > 8)) {
 			seg_len -= TSO_WORKAROUND;
 #if defined(E1000_DESC_CAP)
-			ctxd->buffer_addr_hi = 0;
-			ctxd->buffer_addr_lo = htole64(seg_addr);
+			cap = cheri_getdefault();
+			cap = cheri_setoffset(cap, seg_addr);
+			ctxd->buffer_addr = cap;
 #else
 			ctxd->buffer_addr = htole64(seg_addr);
 #endif
@@ -384,8 +388,9 @@ em_isc_txd_encap(void *arg, if_pkt_info_t pi)
 			/* Now make the sentinel */
 			ctxd = &txr->tx_base[i];
 #if defined(E1000_DESC_CAP)
-			ctxd->buffer_addr_hi = 0;
-			ctxd->buffer_addr_lo = htole64(seg_addr + seg_len);
+			cap = cheri_getdefault();
+			cap = cheri_setoffset(cap, seg_addr + seg_len);
+			ctxd->buffer_addr = cap;
 #else
 			ctxd->buffer_addr = htole64(seg_addr + seg_len);
 #endif
@@ -397,8 +402,9 @@ em_isc_txd_encap(void *arg, if_pkt_info_t pi)
 			DPRINTF(iflib_get_dev(sc->ctx), "TSO path pidx_last=%d i=%d ntxd[0]=%d\n", pidx_last, i, scctx->isc_ntxd[0]);
 		} else {
 #if defined(E1000_DESC_CAP)
-			ctxd->buffer_addr_hi = 0;
-			ctxd->buffer_addr_lo = htole64(seg_addr);
+			cap = cheri_getdefault();
+			cap = cheri_setoffset(cap, seg_addr);
+			ctxd->buffer_addr = cap;
 #else
 			ctxd->buffer_addr = htole64(seg_addr);
 #endif
@@ -507,6 +513,7 @@ lem_isc_rxd_refill(void *arg, if_rxd_update_t iru)
 	uint64_t *paddrs;
 	uint32_t next_pidx, pidx;
 	uint16_t count;
+	void * __capability cap;
 	int i;
 
 	paddrs = iru->iru_paddrs;
@@ -516,8 +523,9 @@ lem_isc_rxd_refill(void *arg, if_rxd_update_t iru)
 	for (i = 0, next_pidx = pidx; i < count; i++) {
 		rxd = (struct e1000_rx_desc *)&rxr->rx_base[next_pidx];
 #if defined(E1000_DESC_CAP)
-		rxd->buffer_addr_hi = 0;
-		rxd->buffer_addr_lo = htole64(paddrs[i]);
+		cap = cheri_getdefault();
+		cap = cheri_setoffset(cap, paddrs[i]);
+		rxd->buffer_addr = cap;
 #else
 		rxd->buffer_addr = htole64(paddrs[i]);
 #endif
@@ -541,6 +549,7 @@ em_isc_rxd_refill(void *arg, if_rxd_update_t iru)
 	uint64_t *paddrs;
 	uint32_t next_pidx, pidx;
 	uint16_t count;
+	void * __capability cap;
 	int i;
 
 	paddrs = iru->iru_paddrs;
@@ -550,8 +559,9 @@ em_isc_rxd_refill(void *arg, if_rxd_update_t iru)
 	for (i = 0, next_pidx = pidx; i < count; i++) {
 		rxd = &rxr->rx_base[next_pidx];
 #if defined(E1000_DESC_CAP)
-		rxd->read.buffer_addr_hi = 0;
-		rxd->read.buffer_addr_lo = htole64(paddrs[i]);
+		cap = cheri_getdefault();
+		cap = cheri_setoffset(cap, paddrs[i]);
+		rxd->read.buffer_addr = cap;
 #else
 		rxd->read.buffer_addr = htole64(paddrs[i]);
 #endif
