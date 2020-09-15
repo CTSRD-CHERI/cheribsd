@@ -443,7 +443,8 @@ do_execve(struct thread *td, struct image_args *args,
 	 */
 	if (args->fname != NULL) {
 		NDINIT(&nd, LOOKUP, ISOPEN | LOCKLEAF | LOCKSHARED | FOLLOW |
-		    SAVENAME | AUDITVNODE1, UIO_SYSSPACE, args->fname, td);
+		    SAVENAME | AUDITVNODE1, UIO_SYSSPACE, PTR2CAP(args->fname),
+		    td);
 	}
 
 	SDT_PROBE1(proc, , , exec, args->fname);
@@ -664,7 +665,8 @@ interpret:
 		imgp->freepath = NULL;
 		/* set new name to that of the interpreter */
 		NDINIT(&nd, LOOKUP, ISOPEN | LOCKLEAF | LOCKSHARED | FOLLOW |
-		    SAVENAME, UIO_SYSSPACE, imgp->interpreter_name, td);
+		    SAVENAME, UIO_SYSSPACE, PTR2CAP(imgp->interpreter_name),
+		    td);
 		args->fname = imgp->interpreter_name;
 		goto interpret;
 	}
@@ -1087,7 +1089,7 @@ exec_new_vmspace(struct image_params *imgp, struct sysentvec *sv)
 		map = &vmspace->vm_map;
 	}
 	map->flags |= imgp->map_flags;
-	if (SV_PROC_FLAG(p, SV_CHERI))
+	if (sv->sv_flags & SV_CHERI)
 		map->flags |= MAP_RESERVATIONS;
 	else
 		map->flags &= ~MAP_RESERVATIONS;

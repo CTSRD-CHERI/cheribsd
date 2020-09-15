@@ -78,7 +78,7 @@ cloudabi_sock_recv(struct thread *td, cloudabi_fd_t fd, struct iovec *data,
     cloudabi_roflags_t *rflags)
 {
 	struct msghdr hdr = {
-		.msg_iov = (__cheri_tocap struct iovec * __capability)data,
+		.msg_iov = PTR2CAP(data),
 		.msg_iovlen = datalen,
 	};
 	struct mbuf *control;
@@ -111,8 +111,7 @@ cloudabi_sock_recv(struct thread *td, cloudabi_fd_t fd, struct iovec *data,
 	if (control != NULL) {
 		struct cmsghdr *chdr;
 
-		hdr.msg_control =
-		    (__cheri_tocap void * __capability)mtod(control, void *);
+		hdr.msg_control = PTR2CAP(mtod(control, void *));
 		hdr.msg_controllen = control->m_len;
 		for (chdr = CMSG_FIRSTHDR(&hdr); chdr != NULL;
 		    chdr = CMSG_NXTHDR(&hdr, chdr)) {
@@ -152,7 +151,7 @@ cloudabi_sock_send(struct thread *td, cloudabi_fd_t fd, struct iovec *data,
     size_t datalen, const cloudabi_fd_t *fds, size_t fdslen, size_t *rdatalen)
 {
 	struct msghdr hdr = {
-		.msg_iov = (__cheri_tocap struct iovec * __capability)data,
+		.msg_iov = PTR2CAP(data),
 		.msg_iovlen = datalen,
 	};
 	struct mbuf *control;

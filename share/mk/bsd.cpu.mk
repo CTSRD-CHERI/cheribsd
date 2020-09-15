@@ -331,39 +331,11 @@ MIPS_ABI?=	n32
 MIPS_ABI?=	32
 . endif
 .if ${MACHINE_ARCH:Mmips*c*}
-CFLAGS+=	-integrated-as
 CFLAGS+=	-fpic
-CFLAGS+=	-cheri-cap-table-abi=${CHERI_USE_CAP_TABLE:Upcrel}
-.ifdef CHERI_USE_CAP_TLS
-CFLAGS+=	-cheri-cap-tls-abi=${CHERI_USE_CAP_TLS}
-.endif
 STATIC_CFLAGS+=	-ftls-model=local-exec
-.ifdef NO_WERROR
-# Implicit function declarations should always be an error in purecap
-# mode as we will probably generate wrong code for calling them.
-# XXXBD: move to WARNS?
-CFLAGS+=	-Werror=implicit-function-declaration
-.endif
-# Turn off deprecated warnings
-# XXXBD: is this still needed?
-CFLAGS+=	-Wno-deprecated-declarations
-# XXXBD: is -mstack-alignment needed here?
-. if ${MACHINE_ARCH:Mmips*c128}
-CFLAGS+=	-cheri=128
-CFLAGS+=	-mstack-alignment=16
-. elif ${MACHINE_ARCH:Mmips*c256}
-CFLAGS+=	-cheri=256
-CFLAGS+=	-mstack-alignment=32
-. endif
-# Clang no longer defines __LP64__ for Cheri purecap ABI but there are a
-# lot of files that use it to check for not 32-bit
-# XXXAR: Remove this once we have checked all the #ifdef __LP64__ uses
-CFLAGS+=	-D__LP64__=1
+CFLAGS+=	-cheri
 LDFLAGS+=	-fuse-ld=lld
-# XXXBD: still needed?
-LDFLAGS+=	-Wl,-melf64btsmip_cheri_fbsd
-LDFLAGS+=	-Wl,-preemptible-caprelocs=elf
-CFLAGS+=	-Qunused-arguments
+
 CFLAGS+=	-Werror=cheri-bitwise-operations
 # Don't remove CHERI symbols from the symbol table
 STRIP_FLAGS+=	-w --keep-symbol=__cheri_callee_method.\* \
@@ -427,10 +399,6 @@ RISCV_MARCH:=	${RISCV_MARCH}xcheri
 
 .if ${MACHINE_ARCH:Mriscv*c*}
 RISCV_ABI=	l64pc128
-# Clang no longer defines __LP64__ for Cheri purecap ABI but there are a
-# lot of files that use it to check for not 32-bit
-# XXXAR: Remove this once we have checked all the #ifdef __LP64__ uses
-CFLAGS+=	-D__LP64__=1
 .else
 RISCV_ABI=	lp64
 .endif
@@ -490,4 +458,33 @@ MACHINE_ABI+=	purecap
 MACHINE_ABI+=	ptr64
 .else
 MACHINE_ABI+=	ptr32
+.endif
+
+.if ${MACHINE_ABI:Mpurecap}
+# Clang no longer defines __LP64__ for Cheri purecap ABI but there are a
+# lot of files that use it to check for not 32-bit
+# XXXAR: Remove this once we have checked all the #ifdef __LP64__ uses
+CFLAGS+=	-D__LP64__=1
+
+# Implicit function declarations should always be an error in purecap
+# mode as we will probably generate wrong code for calling them.
+CWARNFLAGS+=	-Werror=implicit-function-declaration
+
+.ifdef CHERI_USE_CAP_TABLE
+CFLAGS+=	-cheri-cap-table-abi=${CHERI_USE_CAP_TABLE}
+.endif
+
+.if defined(CHERI_SUBOBJECT_BOUNDS)
+# Allow per-subdirectory overrides if we know that there is maximum that works
+.if defined(CHERI_SUBOBJECT_BOUNDS_MAX)
+CFLAGS+=	-Xclang -cheri-bounds=${CHERI_SUBOBJECT_BOUNDS_MAX}
+.else
+CFLAGS+=	-Xclang -cheri-bounds=${CHERI_SUBOBJECT_BOUNDS}
+.endif # CHERI_SUBOBJECT_BOUNDS_MAX
+CHERI_SUBOBJECT_BOUNDS_DEBUG?=yes
+.if ${CHERI_SUBOBJECT_BOUNDS_DEBUG} == "yes"
+# If debugging is enabled, clear SW permission bit 2 when the bounds are reduced
+CFLAGS+=	-mllvm -cheri-subobject-bounds-clear-swperm=2
+.endif # CHERI_SUBOBJECT_BOUNDS_DEBUG
+.endif # CHERI_SUBOBJECT_BOUNDS
 .endif

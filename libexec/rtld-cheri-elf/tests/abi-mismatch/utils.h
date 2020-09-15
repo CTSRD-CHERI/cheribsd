@@ -63,11 +63,11 @@ get_executable_dir(void)
 }
 
 #ifdef __mips__
-#if _MIPS_SZCAP != 128 && _MIPS_SZCAP != 256
+#if _MIPS_SZCAP != 128
 #error BAD _MIPS_SZCAP
 #endif
-#define GOOD_CHERI_MACH (_MIPS_SZCAP == 128 ? 0xc1 : 0xc2)
-#define BAD_CHERI_MACH (_MIPS_SZCAP == 128 ? 0xc2 : 0xc1)
+#define GOOD_CHERI_MACH (0xc1)
+#define BAD_CHERI_MACH (0xc2)
 #endif
 
 #define CHECK_DLERROR_NULL()	do { \

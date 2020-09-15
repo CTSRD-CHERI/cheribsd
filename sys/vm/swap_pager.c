@@ -177,12 +177,6 @@ int swap_pager_avail;
 static struct sx swdev_syscall_lock;	/* serialize swap(on|off) */
 
 #if __has_feature(capabilities)
-/*
- * Omnipotent capability for restoring swapped capabilities.
- *
- * XXXBD: These should be a way to do this without storing such a potent
- * capability.  Splitting sealed and unsealed caps would be a start.
- */
 void * __capability swap_restore_cap;
 #endif
 
@@ -2439,7 +2433,7 @@ kern_swapon(struct thread *td, const char * __capability name)
 		goto done;
 	}
 
-	NDINIT_C(&nd, LOOKUP, ISOPEN | FOLLOW | AUDITVNODE1, UIO_USERSPACE,
+	NDINIT(&nd, LOOKUP, ISOPEN | FOLLOW | AUDITVNODE1, UIO_USERSPACE,
 	    name, td);
 	error = namei(&nd);
 	if (error)
@@ -2597,7 +2591,7 @@ kern_swapoff(struct thread *td, const char * __capability name)
 
 	sx_xlock(&swdev_syscall_lock);
 
-	NDINIT_C(&nd, LOOKUP, FOLLOW | AUDITVNODE1, UIO_USERSPACE, name, td);
+	NDINIT(&nd, LOOKUP, FOLLOW | AUDITVNODE1, UIO_USERSPACE, name, td);
 	error = namei(&nd);
 	if (error)
 		goto done;

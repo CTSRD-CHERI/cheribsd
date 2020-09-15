@@ -337,16 +337,13 @@ smb_put_dmem(struct mbchain *mbp, struct smb_vc *vcp, const char *src,
 	if (size == 0)
 		return 0;
 	if (dp == NULL) {
-		return mb_put_mem(mbp,
-		    (__cheri_tocap const char * __capability)src, size,
-		    MB_MSYSTEM);
+		return mb_put_mem(mbp, PTR2CAP(src), size, MB_MSYSTEM);
 	}
 	mbp->mb_copy = smb_copy_iconv;
 	mbp->mb_udata = dp;
 	if (SMB_UNICODE_STRINGS(vcp))
 		mb_put_padbyte(mbp);
-	return mb_put_mem(mbp, (__cheri_tocap const char * __capability)src,
-	    size, MB_MCUSTOM);
+	return mb_put_mem(mbp, PTR2CAP(src), size, MB_MCUSTOM);
 }
 
 int

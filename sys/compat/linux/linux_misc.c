@@ -530,11 +530,9 @@ linux_select(struct thread *td, struct linux_select_args *args)
 	} else
 		tvp = NULL;
 
-	error = kern_select(td, args->nfds,
-	    (__cheri_tocap fd_set * __capability)args->readfds,
-	    (__cheri_tocap fd_set * __capability)args->writefds,
-	    (__cheri_tocap fd_set * __capability)args->exceptfds,
-	    tvp, LINUX_NFDBITS);
+	error = kern_select(td, args->nfds, __USER_CAP_UNBOUND(args->readfds),
+	    __USER_CAP_UNBOUND(args->writefds),
+	    __USER_CAP_UNBOUND(args->exceptfds), tvp, LINUX_NFDBITS);
 	if (error)
 		goto select_out;
 
@@ -2189,11 +2187,9 @@ linux_pselect6(struct thread *td, struct linux_pselect6_args *args)
 	} else
 		tvp = NULL;
 
-	error = kern_pselect(td, args->nfds,
-	    (__cheri_tocap fd_set * __capability)args->readfds,
-	    (__cheri_tocap fd_set * __capability)args->writefds,
-	    (__cheri_tocap fd_set * __capability)args->exceptfds,
-	    tvp, ssp, LINUX_NFDBITS);
+	error = kern_pselect(td, args->nfds, __USER_CAP_UNBOUND(args->readfds),
+	    __USER_CAP_UNBOUND(args->writefds),
+	    __USER_CAP_UNBOUND(args->exceptfds), tvp, ssp, LINUX_NFDBITS);
 
 	if (error == 0 && args->tsp != NULL) {
 		if (td->td_retval[0] != 0) {
@@ -2256,9 +2252,8 @@ linux_ppoll(struct thread *td, struct linux_ppoll_args *args)
 	} else
 		tsp = NULL;
 
-	error = kern_poll(td,
-	    (__cheri_tocap struct pollfd * __capability)args->fds, args->nfds,
-	    tsp, ssp);
+	error = kern_poll(td, __USER_CAP_ARRAY(args->fds, args->nfds),
+	    args->nfds, tsp, ssp);
 
 	if (error == 0 && args->tsp != NULL) {
 		if (td->td_retval[0]) {

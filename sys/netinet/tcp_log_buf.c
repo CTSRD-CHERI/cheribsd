@@ -2111,8 +2111,7 @@ tcp_log_expandlogbuf(struct tcp_log_dev_queue *param)
 #endif
 		return (NULL);
 	}
-	sopt.sopt_val =
-	    (__cheri_tocap struct tcp_log_header * __capability)hdr + 1;
+	sopt.sopt_val = PTR2CAP(hdr + 1);
 	sopt.sopt_valsize -= sizeof(struct tcp_log_header);
 	sopt.sopt_td = NULL;
 

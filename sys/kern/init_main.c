@@ -387,6 +387,17 @@ SYSINIT(diagwarn2, SI_SUB_LAST, SI_ORDER_FIFTH,
     print_caddr_t, diag_warn);
 #endif
 
+#if __has_feature(capabilities)
+static char cheri_notice[] =
+#ifdef __CHERI_PURE_CAPABILITY__
+    "CHERI pure-capability kernel.\n";
+#else
+    "CHERI hybrid kernel.\n";
+#endif
+SYSINIT(cherinotice, SI_SUB_COPYRIGHT, SI_ORDER_ANY, print_caddr_t,
+    cheri_notice);
+#endif
+
 static int
 null_fetch_syscall_args(struct thread *td __unused)
 {
@@ -734,12 +745,10 @@ start_init(void *dummy)
 			panic("%s: Can't allocate space for init arguments %d",
 			    __func__, error);
 
-		error = exec_args_add_fname(&args,
-		    (__cheri_tocap char * __capability)path, UIO_SYSSPACE);
+		error = exec_args_add_fname(&args, PTR2CAP(path), UIO_SYSSPACE);
 		if (error != 0)
 			panic("%s: Can't add fname %d", __func__, error);
-		error = exec_args_add_arg(&args,
-		    (__cheri_tocap char * __capability)path, UIO_SYSSPACE);
+		error = exec_args_add_arg(&args, PTR2CAP(path), UIO_SYSSPACE);
 		if (error != 0)
 			panic("%s: Can't add argv[0] %d", __func__, error);
 		if (boothowto & RB_SINGLE)

@@ -1,0 +1,6 @@
+#NO_UNIVERSE
+
+include "CHERI-QEMU"
+makeoptions	NO_MODULES=yes
+
+ident CHERI-QEMU-FETT

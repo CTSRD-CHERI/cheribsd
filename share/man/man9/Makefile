@@ -141,6 +141,7 @@ MAN=	accept_filter.9 \
 	fdt_pinctrl.9 \
 	fetch.9 \
 	firmware.9 \
+	flag_captured.9 \
 	fpu_kern.9 \
 	g_access.9 \
 	g_attach.9 \

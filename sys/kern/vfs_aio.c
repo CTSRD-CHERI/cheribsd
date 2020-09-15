@@ -1381,7 +1381,7 @@ aiocb_copyin_old_sigevent(void * __capability ujob, struct aiocb *kjob)
 static int
 aiocb_copyin(void * __capability ujob, struct aiocb *kjob)
 {
-	return (copyincap(ujob, kjob, sizeof(kjob)));
+	return (copyincap(ujob, kjob, sizeof(struct aiocb)));
 }
 
 static long
