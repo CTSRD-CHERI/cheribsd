@@ -1009,6 +1009,10 @@ static const struct cheri_test cheri_tests[] = {
          .ct_desc = "check that an old capability can not be used"
          "to MAP_FIXED after the reservation has been deleted",
          .ct_func = cheritest_vm_reservation_mmap_after_free, },
+        {
+         .ct_name = "cheritest_vm_reservation_mmap_shared",
+         .ct_desc = "check reservation alignment and bounds for shared mappings",
+         .ct_func = cheritest_vm_reservation_mmap_shared, },
 #endif
 
 	{ .ct_name = "cheritest_vm_tag_dev_zero_shared",

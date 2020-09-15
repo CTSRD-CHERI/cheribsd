@@ -739,4 +739,30 @@ cheritest_vm_reservation_mmap_after_free(const struct cheri_test *ctp __unused)
 	cheritest_success();
 }
 
+/*
+ * Check that reservations are aligned and padded correctly for shared mappings.
+ */
+void
+cheritest_vm_reservation_mmap_shared(const struct cheri_test *ctp __unused)
+{
+	void *map;
+	size_t len = ((size_t)PAGE_SIZE << CHERI_BASELEN_BITS) + 1;
+	size_t expected_len;
+	size_t align_mask = CHERI_ALIGN_MASK(len);
+	int fd;
+
+	expected_len = __builtin_cheri_round_representable_length(len);
+	fd = CHERITEST_CHECK_SYSCALL(shm_open(SHM_ANON, O_RDWR, 0600));
+	CHERITEST_CHECK_SYSCALL(ftruncate(fd, len));
+
+	map = CHERITEST_CHECK_SYSCALL(mmap(NULL, len,
+	    PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0));
+
+	CHERITEST_VERIFY2(((vaddr_t)(map) & align_mask) == 0,
+	    "mmap failed to align shared regiont for representability");
+	CHERITEST_VERIFY2(cheri_getlen(map) == expected_len,
+	    "mmap returned pointer with unrepresentable length");
+	cheritest_success();
+}
+
 #endif
