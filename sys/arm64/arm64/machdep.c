@@ -203,7 +203,12 @@ fill_regs(struct thread *td, struct reg *regs)
 	regs->elr = frame->tf_elr;
 	regs->spsr = frame->tf_spsr;
 
+#if __has_feature(capabilities)
+	for (int i = 0; i < nitems(regs->x); i++)
+		regs->x[i] = frame->tf_x[i];
+#else
 	memcpy(regs->x, frame->tf_x, sizeof(regs->x));
+#endif
 
 #ifdef COMPAT_FREEBSD32
 	/*
@@ -230,7 +235,12 @@ set_regs(struct thread *td, struct reg *regs)
 	frame->tf_spsr &= ~PSR_FLAGS;
 	frame->tf_spsr |= regs->spsr & PSR_FLAGS;
 
+#if __has_feature(capabilities)
+	for (int i = 0; i < nitems(regs->x); i++)
+		frame->tf_x[i] = regs->x[i];
+#else
 	memcpy(frame->tf_x, regs->x, sizeof(frame->tf_x));
+#endif
 
 #ifdef COMPAT_FREEBSD32
 	if (SV_PROC_FLAG(td->td_proc, SV_ILP32)) {
@@ -499,11 +509,13 @@ exec_setregs(struct thread *td, struct image_params *imgp, uintcap_t stack)
 	tf->tf_elr = imgp->entry_addr;
 }
 
+#if !__has_feature(capabilities)
 /* Sanity check these are the same size, they will be memcpy'd to and fro */
 CTASSERT(sizeof(((struct trapframe *)0)->tf_x) ==
     sizeof((struct gpregs *)0)->gp_x);
 CTASSERT(sizeof(((struct trapframe *)0)->tf_x) ==
     sizeof((struct reg *)0)->x);
+#endif
 
 int
 get_mcontext(struct thread *td, mcontext_t *mcp, int clear_ret)
@@ -518,8 +530,13 @@ get_mcontext(struct thread *td, mcontext_t *mcp, int clear_ret)
 		mcp->mc_gpregs.gp_spsr = tf->tf_spsr;
 	}
 
+#if __has_feature(capabilities)
+	for (int i = 1; i < nitems(mcp->mc_gpregs.gp_x); i++)
+		mcp->mc_gpregs.gp_x[i] = tf->tf_x[i];
+#else
 	memcpy(&mcp->mc_gpregs.gp_x[1], &tf->tf_x[1],
 	    sizeof(mcp->mc_gpregs.gp_x[1]) * (nitems(mcp->mc_gpregs.gp_x) - 1));
+#endif
 
 	mcp->mc_gpregs.gp_sp = tf->tf_sp;
 	mcp->mc_gpregs.gp_lr = tf->tf_lr;
@@ -541,7 +558,12 @@ set_mcontext(struct thread *td, mcontext_t *mcp)
 	    (spsr & PSR_DAIF) != (td->td_frame->tf_spsr & PSR_DAIF))
 		return (EINVAL); 
 
+#if __has_feature(capabilities)
+	for (int i = 1; i < nitems(mcp->mc_gpregs.gp_x); i++)
+		tf->tf_x[i] = mcp->mc_gpregs.gp_x[i];
+#else
 	memcpy(tf->tf_x, mcp->mc_gpregs.gp_x, sizeof(tf->tf_x));
+#endif
 
 	tf->tf_sp = mcp->mc_gpregs.gp_sp;
 	tf->tf_lr = mcp->mc_gpregs.gp_lr;
