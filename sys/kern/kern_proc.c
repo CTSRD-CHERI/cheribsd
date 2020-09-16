@@ -916,6 +916,7 @@ fixjobc_kill(struct proc *p)
 	pgrp = p->p_pgrp;
 	PGRP_LOCK_ASSERT(pgrp, MA_NOTOWNED);
 	SESS_LOCK_ASSERT(pgrp->pg_session, MA_NOTOWNED);
+	check_pgrp_jobc(pgrp);
 
 	/*
 	 * p no longer affects process group orphanage for children.
@@ -951,6 +952,8 @@ fixjobc_kill(struct proc *p)
 	}
 	LIST_FOREACH(q, &p->p_orphans, p_orphan)
 		fixjobc_kill_q(p, q, false);
+
+	check_pgrp_jobc(pgrp);
 }
 
 void
