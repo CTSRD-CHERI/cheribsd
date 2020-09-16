@@ -1608,11 +1608,10 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	char * __capability * __capability vectp;
 	char *stringp;
 #if __has_feature(capabilities)
-	char * __capability ustackp;
 	vaddr_t rounded_stack_vaddr, stack_vaddr, stack_offset;
 	size_t ssiz;
 #endif
-	char * __capability destp, * __capability ustringp;
+	uintcap_t destp, ustringp;
 	struct ps_strings * __capability arginfo;
 	struct proc *p;
 	size_t execpath_len, len;
@@ -1633,7 +1632,7 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 
 #if __has_feature(capabilities)
 	/*
-	 * ustackp must cover all of the smaller buffers copied out
+	 * destp must cover all of the smaller buffers copied out
 	 * onto the stack, so roundup the length to be representable
 	 * even if it means the capability extends beyond the stack
 	 * bounds.
@@ -1647,15 +1646,15 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 		stack_offset = stack_vaddr - rounded_stack_vaddr;
 	} while (rounded_stack_vaddr != CHERI_REPRESENTABLE_BASE(stack_vaddr,
 	    ssiz + stack_offset));
-	ustackp = cheri_capability_build_user_data(
+	destp = (uintcap_t)cheri_capability_build_user_data(
 	    CHERI_CAP_USER_DATA_PERMS, rounded_stack_vaddr,
 	    CHERI_REPRESENTABLE_LENGTH(ssiz + stack_offset), stack_offset);
-	destp = cheri_setaddress(ustackp, p->p_sysent->sv_psstrings);
+	destp = cheri_setaddress(destp, p->p_sysent->sv_psstrings);
 	arginfo = (struct ps_strings * __capability)cheri_setbounds(destp,
 	    sizeof(*arginfo));
 #else
-	destp = (void *)p->p_sysent->sv_psstrings;
-	arginfo = (struct ps_strings *)destp;
+	arginfo = (struct ps_strings *)p->p_sysent->sv_psstrings;
+	destp = (uintptr_t)arginfo;
 #endif
 	imgp->ps_strings = arginfo;
 	if (p->p_sysent->sv_sigcode_base == 0) {
@@ -1670,7 +1669,8 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 		destp -= szsigcode;
 		destp = __builtin_align_down(destp,
 		    sizeof(void * __capability));
-		error = copyout(p->p_sysent->sv_sigcode, destp, szsigcode);
+		error = copyout(p->p_sysent->sv_sigcode,
+		    (void * __capability)destp, szsigcode);
 		if (error != 0)
 			return (error);
 	}
@@ -1683,9 +1683,10 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 		destp = __builtin_align_down(destp,
 		    sizeof(void * __capability));
 #if __has_feature(capabilities)
-		imgp->execpathp = cheri_setbounds(destp, execpath_len);
+		imgp->execpathp = (void * __capability)
+		    cheri_setbounds(destp, execpath_len);
 #else
-		imgp->execpathp = destp;
+		imgp->execpathp = (void *)destp;
 #endif
 		error = copyout(imgp->execpath, imgp->execpathp, execpath_len);
 		if (error != 0)
@@ -1698,9 +1699,10 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	arc4rand(canary, sizeof(canary), 0);
 	destp -= sizeof(canary);
 #if __has_feature(capabilities)
-	imgp->canary = cheri_setbounds(destp, sizeof(canary));
+	imgp->canary = (void * __capability)cheri_setbounds(destp,
+	    sizeof(canary));
 #else
-	imgp->canary = destp;
+	imgp->canary = (void *)destp;
 #endif
 	error = copyout(canary, imgp->canary, sizeof(canary));
 	if (error != 0)
@@ -1713,9 +1715,9 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	destp -= szps;
 	destp = __builtin_align_down(destp, sizeof(void * __capability));
 #if __has_feature(capabilities)
-	imgp->pagesizes = cheri_setbounds(destp, szps);
+	imgp->pagesizes = (void * __capability)cheri_setbounds(destp, szps);
 #else
-	imgp->pagesizes = destp;
+	imgp->pagesizes = (void *)destp;
 #endif
 	error = copyout(pagesizes, imgp->pagesizes, szps);
 	if (error != 0)
@@ -1733,9 +1735,8 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	ustringp = destp;
 #endif
 
-	if (imgp->sysent->sv_stackgap != NULL) {
-		imgp->sysent->sv_stackgap(imgp, (uintcap_t *)&destp);
-	}
+	if (imgp->sysent->sv_stackgap != NULL)
+		imgp->sysent->sv_stackgap(imgp, &destp);
 
 	if (imgp->auxargs) {
 		/*
@@ -1780,9 +1781,8 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 #else
 	imgp->argv = vectp;
 #endif
-	if (sucap(&arginfo->ps_argvstr, (intcap_t)imgp->argv) != 0)
-		return (EFAULT);
-	if (suword32(&arginfo->ps_nargvstr, argc) != 0)
+	if (sucap(&arginfo->ps_argvstr, (intcap_t)imgp->argv) != 0 ||
+	    suword32(&arginfo->ps_nargvstr, argc) != 0)
 		return (EFAULT);
 
 	/*
@@ -1791,11 +1791,10 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	for (; argc > 0; --argc) {
 		len = strlen(stringp) + 1;
 #if __has_feature(capabilities)
-		if (sucap(vectp++, (intcap_t)cheri_setbounds(ustringp,
-		    len)) != 0)
+		if (sucap(vectp++, cheri_setbounds(ustringp, len)) != 0)
 			return (EFAULT);
 #else
-		if (suword(vectp++, (uintptr_t)ustringp) != 0)
+		if (suword(vectp++, ustringp) != 0)
 			return (EFAULT);
 #endif
 		stringp += len;
@@ -1811,9 +1810,8 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 #else
 	imgp->envv = vectp;
 #endif
-	if (sucap(&arginfo->ps_envstr, (intcap_t)imgp->envv) != 0)
-		return (EFAULT);
-	if (suword32(&arginfo->ps_nenvstr, envc) != 0)
+	if (sucap(&arginfo->ps_envstr, (intcap_t)imgp->envv) != 0 ||
+	    suword32(&arginfo->ps_nenvstr, envc) != 0)
 		return (EFAULT);
 
 	/*
@@ -1822,11 +1820,10 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	for (; envc > 0; --envc) {
 		len = strlen(stringp) + 1;
 #if __has_feature(capabilities)
-		if (sucap(vectp++, (intcap_t)cheri_setbounds(ustringp,
-		    len)) != 0)
+		if (sucap(vectp++, cheri_setbounds(ustringp, len)) != 0)
 			return (EFAULT);
 #else
-		if (suword(vectp++, (uintptr_t)ustringp) != 0)
+		if (suword(vectp++, ustringp) != 0)
 			return (EFAULT);
 #endif
 		stringp += len;
@@ -1840,7 +1837,12 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	if (imgp->auxargs) {
 		vectp++;
 		error = imgp->sysent->sv_copyout_auxargs(imgp,
-		    (uintcap_t)vectp);
+#if __has_feature(capabilities)
+		    (uintcap_t)cheri_setbounds(vectp,
+		    AT_COUNT * sizeof(Elf_Auxinfo)));
+#else
+		    (uintptr_t)vectp);
+#endif
 		if (error != 0)
 			return (error);
 	}
