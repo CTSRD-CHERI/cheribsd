@@ -68,10 +68,10 @@ typedef	uint64_t	pn_t;			/* page number */
 
 #if __has_feature(capabilities)
 /* CHERI uses reserved bits in 55:63 */
-#define	PTE_SC		(1UL << 63) /* Store Capability */
-#define	PTE_LC		(1UL << 62) /* Load Capability */
-#define	PTE_KERN_CHERI	(PTE_LC | PTE_SC)
-#define	PTE_PROMOTE_CHERI (PTE_LC | PTE_SC)
+#define	PTE_CW		(1UL << 63) /* Capability Write */
+#define	PTE_CR		(1UL << 62) /* Capability Read */
+#define	PTE_KERN_CHERI	(PTE_CR | PTE_CW)
+#define	PTE_PROMOTE_CHERI (PTE_CR | PTE_CW)
 #else
 #define	PTE_KERN_CHERI	0
 #define	PTE_PROMOTE_CHERI 0

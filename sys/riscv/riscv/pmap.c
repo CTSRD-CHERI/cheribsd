@@ -2660,9 +2660,9 @@ pmap_enter(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot,
 		new_l3 |= PTE_U;
 #if __has_feature(capabilities)
 	if (prot & VM_PROT_READ_CAP)
-		new_l3 |= PTE_LC;
+		new_l3 |= PTE_CR;
 	if (prot & VM_PROT_WRITE_CAP)
-		new_l3 |= PTE_SC;
+		new_l3 |= PTE_CW;
 #endif
 
 	new_l3 |= (pn << PTE_PPN0_S);
@@ -2929,7 +2929,7 @@ pmap_enter_2mpage(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot,
 		new_l2 |= PTE_U;
 #if __has_feature(capabilities)
 	if ((prot & VM_PROT_READ_CAP) != 0)
-		new_l2 |= PTE_LC;
+		new_l2 |= PTE_CR;
 #endif
 	return (pmap_enter_l2(pmap, va, new_l2, PMAP_ENTER_NOSLEEP |
 	    PMAP_ENTER_NOREPLACE | PMAP_ENTER_NORECLAIM, NULL, lockp) ==
@@ -3220,7 +3220,7 @@ pmap_enter_quick_locked(pmap_t pmap, vm_offset_t va, vm_page_t m,
 		newl3 |= PTE_U;
 #if __has_feature(capabilities)
 	if ((prot & VM_PROT_READ_CAP) != 0)
-		newl3 |= PTE_LC;
+		newl3 |= PTE_CR;
 #endif
 
 	/*
