@@ -745,7 +745,7 @@ main()
             ;;
         esac
     done
-    shift `expr ${OPTIND} - 1`
+    shift $((OPTIND - 1))
 
     case ${Source_Dir} in
         /*)
