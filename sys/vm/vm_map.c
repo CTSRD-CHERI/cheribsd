@@ -2667,6 +2667,7 @@ vm_map_pmap_enter(vm_map_t map, vm_offset_t addr, vm_prot_t prot,
 	 * pmap_enter_object() only establishes read-only mappings, so
 	 * VM_PROT_WRITE_CAP is ignored.
 	 */
+	prot = VM_OBJECT_MASK_CAP_PROT(object, prot);
 
 	p = vm_page_find_least(object, pindex);
 	/*
