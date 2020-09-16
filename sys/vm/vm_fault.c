@@ -350,7 +350,9 @@ vm_fault_soft_fast(struct faultstate *fs)
 	}
 #endif
 	VM_OBJECT_ASSERT_CAP(fs->first_object, fs->prot);
-	rv = pmap_enter(fs->map->pmap, vaddr, m_map, fs->prot, fs->fault_type |
+	rv = pmap_enter(fs->map->pmap, vaddr, m_map,
+	    VM_OBJECT_MASK_CAP_PROT(fs->first_object, fs->prot),
+	    fs->fault_type |
 	    PMAP_ENTER_NOSLEEP | (fs->wired ? PMAP_ENTER_WIRED : 0), psind);
 	if (rv != KERN_SUCCESS)
 		goto out;
@@ -421,6 +423,7 @@ vm_fault_populate(struct faultstate *fs)
 {
 	vm_offset_t vaddr;
 	vm_page_t m;
+	vm_prot_t prot;
 	vm_pindex_t map_first, map_last, pager_first, pager_last, pidx;
 	int i, npages, psind, rv;
 
@@ -514,14 +517,15 @@ vm_fault_populate(struct faultstate *fs)
 			vm_fault_populate_check_page(&m[i]);
 			vm_fault_dirty(fs, &m[i]);
 		}
+		prot = VM_OBJECT_MASK_CAP_PROT(fs->first_object, fs->prot);
 		VM_OBJECT_WUNLOCK(fs->first_object);
-		rv = pmap_enter(fs->map->pmap, vaddr, m, fs->prot, fs->fault_type |
+		rv = pmap_enter(fs->map->pmap, vaddr, m, prot, fs->fault_type |
 		    (fs->wired ? PMAP_ENTER_WIRED : 0), psind);
 #if defined(__amd64__)
 		if (psind > 0 && rv == KERN_FAILURE) {
 			for (i = 0; i < npages; i++) {
 				rv = pmap_enter(fs->map->pmap, vaddr + ptoa(i),
-				    &m[i], fs->prot, fs->fault_type |
+				    &m[i], prot, fs->fault_type |
 				    (fs->wired ? PMAP_ENTER_WIRED : 0), 0);
 				MPASS(rv == KERN_SUCCESS);
 			}
@@ -1511,7 +1515,8 @@ RetryFault:
 	 * won't find it (yet).
 	 */
 	VM_OBJECT_ASSERT_CAP(fs.object, fs.prot);
-	pmap_enter(fs.map->pmap, vaddr, fs.m, fs.prot,
+	pmap_enter(fs.map->pmap, vaddr, fs.m,
+	    VM_OBJECT_MASK_CAP_PROT(fs.object, fs.prot),
 	    fs.fault_type | (fs.wired ? PMAP_ENTER_WIRED : 0), 0);
 	if (faultcount != 1 && (fs.fault_flags & VM_FAULT_WIRE) == 0 &&
 	    fs.wired == 0)
@@ -1714,7 +1719,9 @@ vm_fault_prefault(const struct faultstate *fs, vm_offset_t addra,
 			 * establishes read-only mappings, so
 			 * VM_PROT_WRITE_CAP is ignored.
 			 */
-			pmap_enter_quick(pmap, addr, m, entry->protection);
+			pmap_enter_quick(pmap, addr, m,
+			    VM_OBJECT_MASK_CAP_PROT(lobject,
+			    entry->protection));
 		}
 		if (!obj_locked || lobject != entry->object.vm_object)
 			VM_OBJECT_RUNLOCK(lobject);
@@ -1995,7 +2002,8 @@ again:
 		 */
 		if (vm_page_all_valid(dst_m)) {
 			VM_OBJECT_ASSERT_CAP(dst_object, prot);
-			pmap_enter(dst_map->pmap, vaddr, dst_m, prot,
+			pmap_enter(dst_map->pmap, vaddr, dst_m,
+			    VM_OBJECT_MASK_CAP_PROT(dst_object, prot),
 			    access | (upgrade ? PMAP_ENTER_WIRED : 0), 0);
 		}
 
