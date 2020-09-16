@@ -2426,8 +2426,8 @@ pmap_enter_quick_locked(pmap_t pmap, vm_offset_t va, vm_page_t m,
 	npte = PTE_RO | TLBLO_PA_TO_PFN(pa) | PTE_V;
 #ifdef CPU_CHERI
 	if ((prot & VM_PROT_READ_CAP) == 0)
-		npte |= PTE_LC;
-	npte |= PTE_SC;
+		npte |= PTE_LCI;
+	npte |= PTE_SCI;
 #endif
 	if ((m->oflags & VPO_UNMANAGED) == 0)
 		npte |= PTE_MANAGED;
@@ -3556,9 +3556,9 @@ init_pte_prot(vm_page_t m, vm_prot_t access, vm_prot_t prot)
 		rw = PTE_V | PTE_D;
 #ifdef CPU_CHERI
 	if ((prot & VM_PROT_READ_CAP) == 0)
-		rw |= PTE_LC;
+		rw |= PTE_LCI;
 	if ((prot & VM_PROT_WRITE_CAP) == 0)
-		rw |= PTE_SC;
+		rw |= PTE_SCI;
 #endif
 	return (rw);
 }
