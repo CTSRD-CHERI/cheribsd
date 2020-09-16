@@ -536,7 +536,18 @@ _atf_list_tcs()
 #
 _atf_normalize()
 {
-    echo ${1} | tr .- __
+    # Check if the string contains any of the forbidden characters using
+    # POSIX parameter expansion (the ${var//} string substitution is
+    # unfortunately not supported in POSIX sh) and only use tr(1) then.
+    # tr(1) is generally not a builtin, so doing the substring check first
+    # avoids unnecessary fork()+execve() calls. As this function is called
+    # many times in each test script startup, those overheads add up
+    # (especially when running on emulated platforms such as QEMU).
+    if [ "${1#*[.-]}" != "$1" ]; then
+        echo "$1" | tr .- __
+    else
+        echo "$1"
+    fi
 }
 
 #
