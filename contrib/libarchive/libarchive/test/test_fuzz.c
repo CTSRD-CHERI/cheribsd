@@ -23,6 +23,8 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #include "test.h"
+#include <unistd.h>
+#include <stdio.h>
 __FBSDID("$FreeBSD$");
 
 /*
@@ -52,6 +54,30 @@ struct files {
 };
 
 static void
+save_to_file(const void* image, size_t size) {
+	FILE *f;
+	int trycnt;
+
+	for (trycnt = 0; trycnt < 3; trycnt++) {
+		f = fopen("after.test.failure.send.this.file."
+			  "to.libarchive.maintainers.with.system.details", "wb");
+		if (f != NULL)
+			break;
+#if defined(_WIN32) && !defined(__CYGWIN__)
+		/*
+		 * Sometimes previous close operation does not completely
+		 * end at this time. So we should take a wait while
+		 * the operation running.
+		 */
+		Sleep(100);
+#endif
+	}
+	assert(f != NULL);
+	assertEqualInt(size, fwrite(image, 1, size, f));
+	fclose(f);
+}
+
+static void
 test_fuzz(const struct files *filesets)
 {
 	const void *blk;
@@ -59,8 +85,11 @@ test_fuzz(const struct files *filesets)
 	int64_t blk_offset;
 	int n;
 	const char *skip_fuzz_tests;
+	int fuzz_basic;
 
 	skip_fuzz_tests = getenv("SKIP_TEST_FUZZ");
+	fuzz_basic = getenv("BASIC_TEST_FUZZ") != NULL ||
+	    getenv("TEST_SLOW_HOST") != NULL;
 	if (skip_fuzz_tests != NULL) {
 		skipping("Skipping fuzz tests due to SKIP_TEST_FUZZ "
 		    "environment variable");
@@ -153,9 +182,8 @@ test_fuzz(const struct files *filesets)
 
 		srand((unsigned)time(NULL));
 
-		for (i = 0; i < 1000; ++i) {
-			FILE *f;
-			int j, numbytes, trycnt;
+		for (i = 0; i < (fuzz_basic ? 10 : 1000); ++i) {
+			int j, numbytes;
 
 			/* Fuzz < 1% of the bytes in the archive. */
 			memcpy(image, rawimage, size);
@@ -168,24 +196,9 @@ test_fuzz(const struct files *filesets)
 
 			/* Save the messed-up image to a file.
 			 * If we crash, that file will be useful. */
-			for (trycnt = 0; trycnt < 3; trycnt++) {
-				f = fopen("after.test.failure.send.this.file."
-				    "to.libarchive.maintainers.with.system.details", "wb");
-				if (f != NULL)
-					break;
-#if defined(_WIN32) && !defined(__CYGWIN__)
-				/*
-				 * Sometimes previous close operation does not completely
-				 * end at this time. So we should take a wait while
-				 * the operation running.
-				 */
-				Sleep(100);
-#endif
+			if (!fuzz_basic) {
+				save_to_file(image, (size_t)size);
 			}
-			assert(f != NULL);
-			assertEqualInt((size_t)size, fwrite(image, 1, (size_t)size, f));
-			fclose(f);
-
 			// Try to read all headers and bodies.
 			assert((a = archive_read_new()) != NULL);
 			assertEqualIntA(a, ARCHIVE_OK,

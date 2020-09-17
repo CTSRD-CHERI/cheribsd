@@ -1,4 +1,4 @@
-#
+#!/bin/sh
 # Copyright 2015 EMC Corp.
 # All rights reserved.
 #
@@ -32,6 +32,13 @@ TESTER="${SRCDIR}/libarchive_test"
 check()
 {
 	local testcase=${1}; shift
+	if [ "$(atf_config_get include_slow_tests false)" != "true" ]; then
+		# Skip fuzz tests and reduce size for the large tests since
+		# otherwise these tests time out on slow platforms such as
+		# QEMU RISC-V.
+		export TEST_SLOW_HOST=1
+		export SKIP_TEST_FUZZ=1
+	fi
 
 	atf_check -o ignore -s exit:0 ${TESTER} -d -r "${SRCDIR}" -v "${testcase}"
 }
