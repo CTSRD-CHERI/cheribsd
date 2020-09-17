@@ -394,6 +394,22 @@ linux_set_socket_flags(int lflags, int *flags)
 }
 
 static int
+linux_copyout_sockaddr(const struct sockaddr *sa, void *uaddr, size_t len)
+{
+	struct l_sockaddr *lsa;
+	int error;
+
+	error = bsd_to_linux_sockaddr(sa, &lsa, len);
+	if (error != 0)
+		return (error);
+	
+	error = copyout(lsa, uaddr, len);
+	free(lsa, M_SONAME);
+
+	return (error);
+}
+
+static int
 linux_sendit(struct thread *td, int s, struct msghdr *mp, int flags,
     struct mbuf *control, enum uio_seg segflg)
 {
@@ -608,7 +624,6 @@ static int
 linux_accept_common(struct thread *td, int s, l_uintptr_t addr,
     l_uintptr_t namelen, int flags)
 {
-	struct l_sockaddr *lsa;
 	struct sockaddr *sa;
 	struct file *fp, *fp1;
 	int bflags, len;
@@ -664,10 +679,7 @@ linux_accept_common(struct thread *td, int s, l_uintptr_t addr,
 	}
 
 	if (len != 0) {
-		error = bsd_to_linux_sockaddr(sa, &lsa, len);
-		if (error == 0)
-			error = copyout(lsa, PTRIN(addr), len);
-		free(lsa, M_SONAME);
+		error = linux_copyout_sockaddr(sa, PTRIN(addr), len);
 
 		/*
 		 * XXX: We should also copyout the len, shouldn't we?
@@ -703,7 +715,6 @@ linux_accept4(struct thread *td, struct linux_accept4_args *args)
 int
 linux_getsockname(struct thread *td, struct linux_getsockname_args *args)
 {
-	struct l_sockaddr *lsa;
 	struct sockaddr *sa;
 	int len, error;
 
@@ -715,13 +726,8 @@ linux_getsockname(struct thread *td, struct linux_getsockname_args *args)
 	if (error != 0)
 		return (error);
 
-	if (len != 0) {
-		error = bsd_to_linux_sockaddr(sa, &lsa, len);
-		if (error == 0)
-			error = copyout(lsa, PTRIN(args->addr),
-			    len);
-		free(lsa, M_SONAME);
-	}
+	if (len != 0)
+		error = linux_copyout_sockaddr(sa, PTRIN(args->addr), len);
 
 	free(sa, M_SONAME);
 	if (error == 0)
@@ -732,7 +738,6 @@ linux_getsockname(struct thread *td, struct linux_getsockname_args *args)
 int
 linux_getpeername(struct thread *td, struct linux_getpeername_args *args)
 {
-	struct l_sockaddr *lsa;
 	struct sockaddr *sa;
 	int len, error;
 
@@ -746,13 +751,8 @@ linux_getpeername(struct thread *td, struct linux_getpeername_args *args)
 	if (error != 0)
 		return (error);
 
-	if (len != 0) {
-		error = bsd_to_linux_sockaddr(sa, &lsa, len);
-		if (error == 0)
-			error = copyout(lsa, PTRIN(args->addr),
-			    len);
-		free(lsa, M_SONAME);
-	}
+	if (len != 0)
+		error = linux_copyout_sockaddr(sa, PTRIN(args->addr), len);
 
 	free(sa, M_SONAME);
 	if (error == 0)
@@ -893,7 +893,6 @@ linux_sendto(struct thread *td, struct linux_sendto_args *args)
 int
 linux_recvfrom(struct thread *td, struct linux_recvfrom_args *args)
 {
-	struct l_sockaddr *lsa;
 	struct sockaddr *sa;
 	struct msghdr msg;
 	struct iovec aiov;
@@ -924,13 +923,8 @@ linux_recvfrom(struct thread *td, struct linux_recvfrom_args *args)
 	if (error != 0)
 		goto out;
 
-	if (PTRIN(args->from) != NULL) {
-		error = bsd_to_linux_sockaddr(sa, &lsa, msg.msg_namelen);
-		if (error == 0)
-			error = copyout(lsa, PTRIN(args->from),
-			    msg.msg_namelen);
-		free(lsa, M_SONAME);
-	}
+	if (PTRIN(args->from) != NULL)
+		error = linux_copyout_sockaddr(sa, PTRIN(args->from), msg.msg_namelen);
 
 	if (error == 0 && PTRIN(args->fromlen) != NULL)
 		error = copyout(&msg.msg_namelen, PTRIN(args->fromlen),
@@ -1167,7 +1161,6 @@ linux_recvmsg_common(struct thread *td, l_int s, struct l_msghdr *msghdr,
 	struct mbuf *control = NULL;
 	struct mbuf **controlp;
 	struct timeval *ftmvl;
-	struct l_sockaddr *lsa;
 	struct sockaddr *sa;
 	l_timeval ltmvl;
 	caddr_t outbuf;
@@ -1213,11 +1206,8 @@ linux_recvmsg_common(struct thread *td, l_int s, struct l_msghdr *msghdr,
 	 */
 	if (msg->msg_name != NULL && msg->msg_namelen > 0) {
 		msg->msg_name = PTRIN(linux_msghdr.msg_name);
-		error = bsd_to_linux_sockaddr(sa, &lsa, msg->msg_namelen);
-		if (error == 0)
-			error = copyout(lsa, PTRIN(msg->msg_name),
-			    msg->msg_namelen);
-		free(lsa, M_SONAME);
+		error = linux_copyout_sockaddr(sa,
+		    PTRIN(msg->msg_name), msg->msg_namelen);
 		if (error != 0)
 			goto bad;
 	}
@@ -1502,7 +1492,6 @@ linux_getsockopt(struct thread *td, struct linux_getsockopt_args *args)
 	l_timeval linux_tv;
 	struct timeval tv;
 	socklen_t tv_len, xulen, len;
-	struct l_sockaddr *lsa;
 	struct sockaddr *sa;
 	struct xucred xu;
 	struct l_ucred lxu;
@@ -1588,10 +1577,7 @@ linux_getsockopt(struct thread *td, struct linux_getsockopt_args *args)
 		if (error != 0)
 			goto out;
 
-		error = bsd_to_linux_sockaddr(sa, &lsa, len);
-		if (error == 0)
-			error = copyout(lsa, PTRIN(args->optval), len);
-		free(lsa, M_SONAME);
+		error = linux_copyout_sockaddr(sa, PTRIN(args->optval), len);
 		if (error == 0)
 			error = copyout(&len, PTRIN(args->optlen),
 			    sizeof(len));
