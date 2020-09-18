@@ -2638,7 +2638,7 @@ vn_mmap(struct file *fp, vm_map_t map, vm_ptr_t *addr,
 #ifdef _LP64
 	    size > OFF_MAX ||
 #endif
-	    foff < 0 || foff > OFF_MAX - size)
+	    foff > OFF_MAX - size)
 		return (EINVAL);
 
 	writecounted = FALSE;
