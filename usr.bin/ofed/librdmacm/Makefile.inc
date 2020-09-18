@@ -7,4 +7,4 @@ BINDIR?=	/usr/bin
 CFLAGS+=	-I${SRCTOP}/contrib/ofed
 LIBADD+=	ibverbs rdmacm mlx4 mlx5 cxgb4 pthread
 
-WANT_CHERI=	none
+WARNS?=	0

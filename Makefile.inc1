@@ -2355,16 +2355,11 @@ _crunchide=	usr.sbin/crunch/crunchide
 _bootstrap_tools_links+=crunchide
 .endif
 
-# r285986 crunchen: use STRIPBIN rather than STRIP
-# 1100113: Support MK_AUTO_OBJ
-# 1200006: META_MODE fixes
-# 1400000: CheriBSD changes to use sysctl:
 .if 1
 # TODO: enable version check once patch has been upstreamed
-#.if ${BOOTSTRAPPING} < 1100078 || \
-#    (${MK_AUTO_OBJ} == "yes" && ${BOOTSTRAPPING} < 1100114) || \
-#    (${MK_META_MODE} == "yes" && ${BOOTSTRAPPING} < 1200006) || \
-#    ${BOOTSTRAPPING} < 1400000
+# 1300115: Higher WARNS fixes
+#.if ${BOOTSTRAPPING} < 1202502 || \
+#	(${BOOTSTRAPPING} > 1300000 && ${BOOTSTRAPPING} < 1300115)
 _crunchgen=	usr.sbin/crunch/crunchgen
 .else
 _bootstrap_tools_links+=crunchgen
