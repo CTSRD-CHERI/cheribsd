@@ -91,8 +91,13 @@ coredump_phnum_body()
 	atf_check -o "match: 00000(0000000000)?1 .* 66[0-9]{3} " \
 	    -x 'readelf -S coredump_phnum_helper.core | grep -A1 "^  \[ 0\] "'
 
-	atf_check -o "match:66[0-9]{3}" \
-	    -x 'procstat -v coredump_phnum_helper.core | wc -l'
+	if [ "$(atf_config_get include_slow_tests false)" = "true" ]; then
+		# Running procstat -v takes a many minutes to format the 66K
+		# output lines on QEMU RISC-V purecap
+		atf_check -o "match:66[0-9]{3}" \
+		    -x 'procstat -v coredump_phnum_helper.core | wc -l'
+	fi
+
 }
 coredump_phnum_cleanup()
 {
