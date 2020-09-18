@@ -405,9 +405,7 @@ MLINKS+=	archive_write_set_options.3 archive_write_set_format_option.3
 MLINKS+=	archive_write_set_options.3 archive_write_set_option.3
 MLINKS+=	libarchive.3 archive.3
 
-.if ! ${MACHINE_ARCH:Mmips64*}
 HAS_TESTS=
 SUBDIR.${MK_TESTS}+= tests
-.endif
 
 .include <bsd.lib.mk>
