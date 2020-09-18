@@ -505,7 +505,9 @@ DECLARE_CHERI_TEST(test_string_memmove);
 DECLARE_CHERI_TEST(test_string_memmove_c);
 
 DECLARE_CHERI_TEST(test_unaligned_capability_copy_memcpy);
+DECLARE_CHERI_TEST(test_unaligned_capability_copy_memcpy_abort);
 DECLARE_CHERI_TEST(test_unaligned_capability_copy_memmove);
+DECLARE_CHERI_TEST(test_unaligned_capability_copy_memmove_abort);
 
 /* cheritest_syscall.c */
 DECLARE_CHERI_TEST(test_sandbox_syscall);

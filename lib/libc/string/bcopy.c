@@ -50,6 +50,10 @@ static char sccsid[] = "@(#)bcopy.c	8.1 (Berkeley) 6/4/93";
 __FBSDID("$FreeBSD$");
 
 #include <sys/types.h>
+#include <sys/sysctl.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include "cheri_private.h"
 
 /*
@@ -64,6 +68,12 @@ typedef	int word;		/* "word" used for optimal copy speed */
 
 #define	wsize	sizeof(word)
 #define	wmask	(wsize - 1)
+
+#if !defined(NDEBUG) && __has_feature(capabilities) && !defined(IN_LIBSYSCALLS)
+#include "tag_strip_dbg.inc"
+#else
+#define check_no_tagged_capabilities_in_copy(...) (void)0
+#endif
 
 /*
  * Copy a block of memory, handling overlap.
@@ -113,10 +123,12 @@ bcopy(const void *src0, void *dst0, size_t length)
 			 * Try to align operands.  This cannot be done
 			 * unless the low bits match.
 			 */
-			if ((t ^ (__cheri_addr size_t)dst) & wmask || length < wsize)
+			if ((t ^ (__cheri_addr size_t)dst) & wmask || length < wsize) {
 				t = length;
-			else
+				check_no_tagged_capabilities_in_copy(src, dst, length);
+			} else {
 				t = wsize - (t & wmask);
+			}
 			length -= t;
 			TLOOP1(*dst++ = *src++);
 		}
@@ -137,10 +149,13 @@ bcopy(const void *src0, void *dst0, size_t length)
 		dst += length;
 		t = (__cheri_addr size_t)src;
 		if ((t | (__cheri_addr size_t)dst) & wmask) {
-			if ((t ^ (__cheri_addr size_t)dst) & wmask || length <= wsize)
+			if ((t ^ (__cheri_addr size_t)dst) & wmask || length <= wsize) {
+				check_no_tagged_capabilities_in_copy(
+				    src - length, dst - length, length);
 				t = length;
-			else
+			} else {
 				t &= wmask;
+			}
 			length -= t;
 			TLOOP1(*--dst = *--src);
 		}

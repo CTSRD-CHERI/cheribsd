@@ -65,6 +65,7 @@ typedef	__uintcap_t ptr;
 typedef	uintptr_t ptr;
 #define CAPABILITY
 #endif
+#define __CAP CAPABILITY
 
 #define PWIDTH __POINTER_WIDTH__/8
 
@@ -91,68 +92,8 @@ typedef	uintptr_t ptr;
 	} while (index!=last);						\
 }
 
-#if defined(__CHERI__)
-/*
- * Check that we aren't attempting to copy a capabilities to a misaligned
- * destination (which would strip the tag bit instead of raising an exception).
- */
-static __noinline __attribute__((optnone)) void
-check_no_tagged_capabilities_in_copy(
-    const char *__capability src, const char *__capability dst, size_t len)
-{
-	static int error_logged = 0;
-
-	if (len < sizeof(void *__capability)) {
-		return; /* return early if copying less than a capability */
-	}
-	const vaddr_t src_addr = (__cheri_addr vaddr_t)src;
-	const vaddr_t to_first_cap =
-	    __builtin_align_up(src_addr, sizeof(void *__capability)) - src_addr;
-	const vaddr_t last_clc_offset = len - sizeof(void *__capability);
-	for (vaddr_t offset = to_first_cap; offset <= last_clc_offset;
-	     offset += sizeof(void *__capability)) {
-		const void *__capability *__capability aligned_src =
-		    (const void *__capability *__capability)(src + offset);
-		if (__predict_true(!__builtin_cheri_tag_get(*aligned_src))) {
-			continue; /* untagged values are fine */
-		}
-
-		if (error_logged)
-			continue;
-		error_logged = 1;
-		/* Got a tagged value, this is always an error! */
-		/* XXXAR: can we safely use printf here? */
-		dprintf(STDERR_FILENO,
-		    "Attempting to copy a tagged capability"
-		    " (%#p) from 0x%jx to underaligned destination 0x%jx."
-		    /* XXXAR: These functions do not exist yet... */
-		    " Use memmove_nocap()/memcpy_nocap() if you intended to"
-		    " strip tags.\n",
-#ifdef __CHERI_PURE_CAPABILITY__
-		    *aligned_src,
-#else
-		    /* Can't use capabilities in fprintf in hybrid mode */
-		    (void *)(uintptr_t)(__cheri_addr vaddr_t)(*aligned_src),
-#endif
-		    (__cheri_addr uintmax_t)(src + offset),
-		    (__cheri_addr uintmax_t)(dst + offset));
-#ifndef BUILDING_LIBC_CHERI
-		static uint32_t abort_on_tag_loss = -1;
-		if (abort_on_tag_loss == -1) {
-			size_t olen = sizeof(abort_on_tag_loss);
-			if (sysctlbyname("security.cheri.abort_on_memcpy_tag_loss",
-			    &abort_on_tag_loss, &olen, NULL, 0) == -1) {
-				dprintf(STDERR_FILENO,
-				    "ERROR: could not determine whether tag "
-				    "stripping is fatal. Assuming it isn't.\n");
-				abort_on_tag_loss = 0;
-			}
-		}
-		if (abort_on_tag_loss)
-			abort();
-#endif
-	}
-}
+#if !defined(NDEBUG) && __has_feature(capabilities)
+#include "../../string/tag_strip_dbg.inc"
 #else
 #define check_no_tagged_capabilities_in_copy(...) (void)0
 #endif
