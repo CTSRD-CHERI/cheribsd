@@ -466,8 +466,8 @@ kern_shmat_locked(struct thread *td, int shmid,
 	KASSERT(is_aligned(size, PAGE_SIZE),
 	    ("shmget should have rounded size %zu", size));
 #if __has_feature(capabilities)
-	if (SV_CURPROC_FLAG(SV_CHERI))
-		size = CHERI_REPRESENTABLE_LENGTH(size);
+	KASSERT(size == CHERI_REPRESENTABLE_LENGTH(size),
+	    ("shmget left unrepresentable size %zu", size));
 #endif
 	prot = VM_PROT_READ;
 	cow = MAP_INHERIT_SHARE | MAP_PREFAULT_PARTIAL;
