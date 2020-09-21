@@ -568,10 +568,8 @@ kern_shmat_locked(struct thread *td, int shmid,
 	shmseg->u.shm_nattch++;
 #if __has_feature(capabilities)
 	if (SV_CURPROC_FLAG(SV_CHERI)) {
-		shmaddr = cheri_setoffset(shmaddr,
-		    attach_va - cheri_getbase(shmaddr));
-		shmaddr = cheri_setbounds(shmaddr,
-		    CHERI_REPRESENTABLE_LENGTH(shmseg->u.shm_segsz));
+		shmaddr = cheri_setboundsexact(cheri_setaddress(shmaddr,
+		     attach_va), size);
 		/* XXX: set perms */
 		td->td_retval[0] = (uintcap_t)__DECONST_CAP(void * __capability,
 		    shmaddr);
