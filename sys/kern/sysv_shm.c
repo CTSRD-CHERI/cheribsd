@@ -462,7 +462,9 @@ kern_shmat_locked(struct thread *td, int shmid,
 	}
 	if (i >= shminfo.shmseg)
 		return (EMFILE);
-	size = round_page(shmseg->u.shm_segsz);
+	size = shmseg->u.shm_segsz;
+	KASSERT(is_aligned(size, PAGE_SIZE),
+	    ("shmget should have rounded size %zu", size));
 #if __has_feature(capabilities)
 	if (SV_CURPROC_FLAG(SV_CHERI))
 		size = CHERI_REPRESENTABLE_LENGTH(size);
