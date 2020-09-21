@@ -204,6 +204,11 @@
 #define	PHYS_TO_DMAP(x)	MIPS_PHYS_TO_DIRECT(x)
 #define	DMAP_TO_PHYS(x)	MIPS_DIRECT_TO_PHYS(x)
 
+/*
+ * Need a page dump array for minidump.
+ */
+#define MINIDUMP_PAGE_TRACKING	1
+
 #endif /* !_MACHINE_VMPARAM_H_ */
 // CHERI CHANGES START
 // {
