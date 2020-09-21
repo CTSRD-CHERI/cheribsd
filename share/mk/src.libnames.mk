@@ -218,6 +218,7 @@ _LIBRARIES=	\
 		z \
 		zfs_core \
 		zfs \
+		zfsbootenv \
 		zpool \
 		zutil
 
@@ -404,11 +405,12 @@ _DP_tpool=	spl
 _DP_uutil=	avl nvpair spl
 _DP_zfs=	md pthread umem util uutil m avl bsdxml crypto geom nvpair \
 	z zfs_core zutil
+_DP_zfsbootenv= zfs nvpair
 _DP_zfs_core=	nvpair
 _DP_avl=	nvpair
 _DP_zpool=	md pthread z icp spl nvpair avl umem
 _DP_zutil=	avl tpool
-_DP_be=		zfs spl nvpair
+_DP_be=		zfs spl nvpair zfsbootenv
 _DP_netmap=
 _DP_ifconfig=	m
 
@@ -623,6 +625,7 @@ LIBUMEMDIR=	${_LIB_OBJTOP}/cddl/lib/libumem
 LIBUUTILDIR=	${_LIB_OBJTOP}/cddl/lib/libuutil
 LIBZFSDIR=	${_LIB_OBJTOP}/cddl/lib/libzfs
 LIBZFS_COREDIR=	${_LIB_OBJTOP}/cddl/lib/libzfs_core
+LIBZFSBOOTENVDIR=	${_LIB_OBJTOP}/cddl/lib/libzfsbootenv
 LIBZPOOLDIR=	${_LIB_OBJTOP}/cddl/lib/libzpool
 LIBZUTILDIR=	${_LIB_OBJTOP}/cddl/lib/libzutil
 LIBTPOOLDIR=	${_LIB_OBJTOP}/cddl/lib/libtpool
