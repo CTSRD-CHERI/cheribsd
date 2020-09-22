@@ -822,8 +822,14 @@ kmem_init(vm_ptr_t start, vm_ptr_t end)
 	CHERI_ASSERT_VALID(start);
 	CHERI_ASSERT_VALID(end);
 
+#ifdef CHERI_PURECAP_KERNEL
 	m = vm_map_create(kernel_pmap,
-	    cheri_kern_setaddress(start, VM_MIN_KERNEL_ADDRESS), end);
+	    (vm_ptr_t)cheri_kern_setaddress(cheri_kall_capability,
+		VM_MIN_KERNEL_ADDRESS),
+	    (vm_ptr_t)cheri_kern_setaddress(cheri_kall_capability, end));
+#else
+        m = vm_map_create(kernel_pmap, VM_MIN_KERNEL_ADDRESS, end);
+#endif
 	m->system_map = 1;
 	vm_map_lock(m);
 	/* N.B.: cannot use kgdb to debug, starting with this assignment ... */

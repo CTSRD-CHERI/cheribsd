@@ -1,0 +1,7 @@
+# Pure capability kernel with profiling support enabled
+
+include "CHERI-PURECAP-QEMU"
+
+options 	TSLOG
+
+ident CHERI-PURECAP-QEMU-PROFILE

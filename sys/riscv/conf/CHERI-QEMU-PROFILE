@@ -1,0 +1,7 @@
+# Hybrid kernel with profiling support enabled
+
+include "CHERI-QEMU"
+
+options 	TSLOG
+
+ident CHERI-QEMU-PROFILE

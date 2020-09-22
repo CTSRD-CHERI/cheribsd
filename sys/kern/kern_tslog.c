@@ -49,6 +49,10 @@ static struct timestamp {
 	uint64_t tsc;
 } timestamps[TSLOGSIZE];
 
+static bool tslog_overflowed = false;
+SYSCTL_BOOL(_debug, OID_AUTO, tslog_overflowed, CTLFLAG_RD, &tslog_overflowed, 0,
+    "Check whether the boot timestamp profile buffer dropped entries");
+
 void
 tslog(void * td, int type, const char * f, const char * s)
 {
@@ -65,6 +69,8 @@ tslog(void * td, int type, const char * f, const char * s)
 		timestamps[pos].f = f;
 		timestamps[pos].s = s;
 		timestamps[pos].tsc = tsc;
+	} else {
+		atomic_store_int(&tslog_overflowed, true);
 	}
 }
 
