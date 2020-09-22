@@ -919,8 +919,24 @@ vm_fault_cow(struct faultstate *fs)
 		 * anonymously backed.  But is this always true?
 		 * XXX-AM: We must at least propagate tags for
 		 * anonymously backed objects.
+		 *
+		 * XXXJHB: To answer Robert's question, the top object
+		 * is always anonymously backed, and currently all
+		 * anonymous objects are OBJ_HASCAP.  In theory it
+		 * should be safe to always use pmap_copy_page_tags()
+		 * here, but checking OBJ_HASCAP on the source object
+		 * is just extra paranoia.  It should perhaps just be
+		 * an assertion that the source page has no tags
+		 * instead if OBJ_HASCAP is not set.
+		 *
+		 * Preserve tags if the source page contains tags.
+		 * The destination page will always belong to a
+		 * tag-bearing VM object.
 		 */
-		if (fs->first_object->flags & OBJ_ANON)
+		KASSERT(fs->first_object->flags & OBJ_HASCAP,
+		    ("%s: destination object %p doesn't have OBJ_HASCAP",
+		    __func__, fs->first_object));
+		if (fs->object->flags & OBJ_HASCAP)
 			pmap_copy_page_tags(fs->m, fs->first_m);
 		else
 #endif
@@ -1966,10 +1982,16 @@ again:
 				goto again;
 			}
 
+#if __has_feature(capabilities)
 			/*
-			 * XXXRW: VM preserves tags across copy-on-write.
+			 * Preserve tags if the source page contains tags.
+			 * See longer discussion in vm_fault_cow.
 			 */
-			pmap_copy_page_tags(src_m, dst_m);
+			if (object->flags & OBJ_HASCAP)
+				pmap_copy_page_tags(src_m, dst_m);
+			else
+#endif
+				pmap_copy_page(src_m, dst_m);
 			VM_OBJECT_RUNLOCK(object);
 			dst_m->dirty = dst_m->valid = src_m->valid;
 		} else {
