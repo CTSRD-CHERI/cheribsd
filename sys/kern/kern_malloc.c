@@ -1482,6 +1482,30 @@ SYSCTL_OID(_kern, OID_AUTO, mprof,
     sysctl_kern_mprof, "A",
     "Malloc Profiling");
 #endif /* MALLOC_PROFILE */
+
+static int
+sysctl_vm_contigmalloc(SYSCTL_HANDLER_ARGS)
+{
+	unsigned long size;
+	void *p;
+	int error;
+
+	size = 0;
+	error = sysctl_handle_long(oidp, &size, 0, req);
+	if (error != 0 || req->newptr == NULL)
+		return (error);
+
+	p = contigmalloc(size, M_TEMP, M_NOWAIT, 0, ~(vm_paddr_t)0, 1, 0);
+	if (p != NULL)
+		printf("%s: allocated %zu bytes\n", __func__, size);
+	else
+		printf("%s: failed to allocate %zu bytes\n", __func__, size);
+	contigfree(p, size, M_TEMP);
+	return (0);
+}
+SYSCTL_PROC(_vm, OID_AUTO, contigmalloc, CTLTYPE_ULONG | CTLFLAG_RW, NULL, 0,
+    sysctl_vm_contigmalloc, "LU", "contigmalloc requested bytes then free");
+
 // CHERI CHANGES START
 // {
 //   "updated": 20181121,
