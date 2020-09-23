@@ -1070,10 +1070,8 @@ kern_shm_open2(struct thread *td, const char * __capability userpath,
 		return (EINVAL);
 
 	largepage = (shmflags & SHM_LARGEPAGE) != 0;
-#if !defined(__amd64__)
-	if (largepage)
+	if (largepage && !PMAP_HAS_LARGEPAGES)
 		return (ENOTTY);
-#endif
 
 	/*
 	 * Currently only F_SEAL_SEAL may be set when creating or opening shmfd.
