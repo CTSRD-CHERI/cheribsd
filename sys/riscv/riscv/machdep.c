@@ -1108,7 +1108,7 @@ parse_metadata(void)
 	caddr_t kmdp;
 	vm_offset_t lastaddr;
 #ifdef DDB
-	vm_offset_t ksym_start, ksym_end;
+	vm_ptr_t ksym_start, ksym_end;
 #endif
 	char *kern_envp;
 
