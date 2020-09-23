@@ -106,12 +106,7 @@ _alt_start:
 	 * too large to fit in a 12-bit branch immediate.
 	 */
 	beqz	t0, 1f
-#ifdef __CHERI_PURE_CAPABILITY__
-	cllc	cra, mpentry
-	cjr	cra
-#else
 	j	mpentry
-#endif
 1:
 	/* Store the boot hart */
 #ifdef __CHERI_PURE_CAPABILITY__
