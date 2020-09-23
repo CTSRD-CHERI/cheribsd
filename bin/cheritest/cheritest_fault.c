@@ -214,6 +214,14 @@ test_nofault_cfromptr(const struct cheri_test *ctp __unused)
 	char * __capability cd; /* stored into here */
 
 	cb = cheri_ptr(buf, 256);
+#if defined(__aarch64__)
+	/*
+	 * morello-llvm emits cvtz for this intrinsic, which has an
+	 * address interpretation by default (unlike CFromPtr, which
+	 * has an offset interpretation).
+	 */
+	cd = __builtin_cheri_cap_from_pointer(cb, (vaddr_t)buf + 10);
+#else
 	/*
 	 * This pragma is require to allow compiling this file both with and
 	 * without overloaded CHERI builtins.
@@ -222,6 +230,7 @@ test_nofault_cfromptr(const struct cheri_test *ctp __unused)
 	 */
 #pragma clang diagnostic ignored "-Wint-conversion"
 	cd = __builtin_cheri_cap_from_pointer(cb, 10);
+#endif
 	*cd = '\0';
 	cheritest_success();
 }
