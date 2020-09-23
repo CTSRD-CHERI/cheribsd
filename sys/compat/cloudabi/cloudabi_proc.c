@@ -58,7 +58,7 @@ cloudabi_sys_proc_exec(struct thread *td,
 	    __USER_CAP_ARRAY(uap->fds, uap->fds_len), uap->fds_len);
 	if (error == 0) {
 		args.fd = uap->fd;
-		error = kern_execve(td, &args, NULL);
+		error = kern_execve(td, &args, NULL, oldvmspace);
 	}
 	post_execve(td, error, oldvmspace);
 	return (error);

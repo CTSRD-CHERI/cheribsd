@@ -187,7 +187,7 @@ freebsd64_execve(struct thread *td, struct freebsd64_execve_args *uap)
 	    UIO_USERSPACE, __USER_CAP_UNBOUND(uap->argv),
 	    __USER_CAP_UNBOUND(uap->envv));
 	if (error == 0)
-		error = kern_execve(td, &eargs, NULL);
+		error = kern_execve(td, &eargs, NULL, oldvmspace);
 	post_execve(td, error, oldvmspace);
 	return (error);
 }
@@ -206,7 +206,7 @@ freebsd64_fexecve(struct thread *td, struct freebsd64_fexecve_args *uap)
 	    __USER_CAP_UNBOUND(uap->argv), __USER_CAP_UNBOUND(uap->envv));
 	if (error == 0) {
 		eargs.fd = uap->fd;
-		error = kern_execve(td, &eargs, NULL);
+		error = kern_execve(td, &eargs, NULL, oldvmspace);
 	}
 	post_execve(td, error, oldvmspace);
 	return (error);
