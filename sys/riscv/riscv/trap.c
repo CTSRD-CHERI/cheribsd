@@ -112,23 +112,22 @@ cpu_fetch_syscall_args(struct thread *td)
 	struct proc *p;
 	syscallarg_t *ap;
 	struct syscall_args *sa;
-	int nap;
 #if __has_feature(capabilities)
 	char * __capability stack_args = NULL;
 	u_int i;
 	int error;
 #endif
+	bool shift_args;
 
-	nap = NARGREG;
 	p = td->td_proc;
 	sa = &td->td_sa;
 	ap = &td->td_frame->tf_a[0];
 
 	sa->code = td->td_frame->tf_t[0];
 
-	if (sa->code == SYS_syscall || sa->code == SYS___syscall) {
+	if (__predict_false(sa->code == SYS_syscall || sa->code == SYS___syscall)) {
 		sa->code = *ap++;
-		nap--;
+		shift_args = true;
 
 #if __has_feature(capabilities)
 		/*
@@ -138,14 +137,17 @@ cpu_fetch_syscall_args(struct thread *td)
 		if (SV_PROC_FLAG(td->td_proc, SV_CHERI))
 			stack_args = (char * __capability)td->td_frame->tf_sp;
 #endif
+	} else {
+		shift_args = false;
 	}
 
-	if (sa->code >= p->p_sysent->sv_size)
+	if (__predict_false(sa->code >= p->p_sysent->sv_size))
 		sa->callp = &p->p_sysent->sv_table[0];
 	else
 		sa->callp = &p->p_sysent->sv_table[sa->code];
 
 	sa->narg = sa->callp->sy_narg;
+	KASSERT(sa->callp->sy_narg <= nitems(sa->args), ("Too many syscall arguments!"));
 #if __has_feature(capabilities)
 	if (stack_args != NULL) {
 		register_t intval;
@@ -174,10 +176,10 @@ cpu_fetch_syscall_args(struct thread *td)
 	} else
 #endif
 	{
-		memcpy(sa->args, ap, nap * sizeof(syscallarg_t));
-		if (sa->narg > nap)
-			panic("TODO: Could we have more then %d args?",
-			    NARGREG);
+		if (__predict_false(shift_args))
+			memcpy(sa->args, ap, (NARGREG - 1) * sizeof(syscallarg_t));
+		else
+			memcpy(sa->args, ap, NARGREG * sizeof(syscallarg_t));
 	}
 
 	td->td_retval[0] = 0;
