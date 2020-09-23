@@ -87,16 +87,9 @@
 	CHERI_PERM_SYSTEM_REGS | CHERI_PERM_SET_CID)
 
 /*
- * Root "object-type" capability for the kernel.  This can be used neither as
- * a data nor code capability.
- */
-#define	CHERI_PERM_KERN_TYPE	(CHERI_PERM_GLOBAL | CHERI_PERM_SEAL |	\
-	CHERI_PERM_UNSEAL)
-
-/*
  * Basic userspace permission mask; CHERI_PERM_EXECUTE will be added for
  * executable capabilities ($pcc); CHERI_PERM_STORE, CHERI_PERM_STORE_CAP,
- * and CHERI_PERM_STORE_LOCAL_CAP will be added for data permissions ($c0).
+ * and CHERI_PERM_STORE_LOCAL_CAP will be added for data permissions ($ddc).
  *
  * All user software permissions are included along with
  * CHERI_PERM_SYSCALL.  CHERI_PERM_CHERIABI_VMMAP will be added for
@@ -121,11 +114,9 @@
  * CHERI_CAP_USER_MMAP_PERMS
  */
 #define	CHERI_PERMS_USERSPACE_DATA					\
-				(CHERI_PERMS_USERSPACE |		\
-				CHERI_PERM_STORE |			\
-				CHERI_PERM_STORE_CAP |			\
-				CHERI_PERM_STORE_LOCAL_CAP |		\
-				CHERI_PERM_CHERIABI_VMMAP)
+	(CHERI_PERMS_USERSPACE | CHERI_PERM_STORE |			\
+	CHERI_PERM_STORE_CAP | CHERI_PERM_STORE_LOCAL_CAP |		\
+	CHERI_PERM_CHERIABI_VMMAP)
 
 /*
  * Corresponding permission masks for kernel code and data; these are

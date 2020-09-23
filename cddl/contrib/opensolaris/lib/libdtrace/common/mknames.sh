@@ -24,7 +24,6 @@
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 set -e
 
 printf "%s" "
@@ -32,8 +31,6 @@ printf "%s" "
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident\t\"%Z%%M%\t%I%\t%E% SMI\"
 
 #include <dtrace.h>
 

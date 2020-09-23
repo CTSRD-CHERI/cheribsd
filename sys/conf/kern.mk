@@ -275,6 +275,11 @@ CFLAGS+=	-cheri-cap-table-abi=${CHERI_USE_CAP_TABLE}
 
 .if defined(CHERI_SUBOBJECT_BOUNDS)
 CFLAGS+=	-Xclang -cheri-bounds=${CHERI_SUBOBJECT_BOUNDS}
+.if defined(CHERI_SUBOBJECT_BOUNDS_STATS)
+CHERI_SUBOBJECT_BOUNDS_STATS_FILE?=kernel-subobject-bounds-stats.csv
+CFLAGS+=	-mllvm -collect-csetbounds-stats=csv \
+	-Xclang -cheri-stats-file="${CHERI_SUBOBJECT_BOUNDS_STATS_FILE}"
+.endif
 .endif
 .endif
 
@@ -310,13 +315,19 @@ CFLAGS+=        -std=iso9899:1999
 CFLAGS+=        -std=${CSTD}
 .endif # CSTD
 
+# Please keep this if in sync with bsd.sys.mk
 .if ${LD} != "ld" && (${CC:[1]:H} != ${LD:[1]:H} || ${LD:[1]:T} != "ld")
-# Add -fuse-ld=${LD} if LD is in a different directory or not called "ld".
+# Add -fuse-ld=${LD} if $LD is in a different directory or not called "ld".
+# Note: Clang 12+ will prefer --ld-path= over -fuse-ld=.
 .if ${COMPILER_TYPE} == "clang"
-CC+=	-fuse-ld=${LD:[1]} -Qunused-arguments
+# Note: unlike bsd.sys.mk we can't use LDFLAGS here since that is used for the
+# flags required when linking the kernel. We don't need those flags when
+# building the vdsos. However, we do need -fuse-ld, so use ${CCLDFLAGS} instead.
+# Note: Clang does not like relative paths in -fuse-ld so we map ld.lld -> lld.
+CCLDFLAGS+=	-fuse-ld=${LD:[1]:S/^ld.//1W}
 .else
 # GCC does not support an absolute path for -fuse-ld so we just print this
-# warning instead and let the user add the required symlinks
+# warning instead and let the user add the required symlinks.
 .warning LD (${LD}) is not the default linker for ${CC} but -fuse-ld= is not supported
 .endif
 .endif

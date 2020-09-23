@@ -650,7 +650,7 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 				val += got[obj->local_gotno + r_symndx - obj->gotsym];
 #if defined(DEBUG_VERBOSE) || defined(DEBUG_MIPS_GOT)
 				dbg("REL32/G(%p/0x%lx) %p --> %p (%s) in %s",
-				    where, (caddr_t)where - obj->relocbase,
+				    where, (u_long)((caddr_t)where - obj->relocbase),
 				    (void *)(uintptr_t)old, (void *)(uintptr_t)val,
 				    obj->strtab + def->st_name,
 				    obj->path);
@@ -689,7 +689,7 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 
 				if (__predict_false(r_symndx != 0)) {
 					_rtld_error("%s: local R_MIPS_REL32 relocation references symbol %s (%d). st_value=0x%lx, st_info=%x, st_shndx=%d",
-					    obj->path, obj->strtab + def->st_name, r_symndx, def->st_value, def->st_info, def->st_shndx);
+					    obj->path, obj->strtab + def->st_name, r_symndx, (u_long)def->st_value, def->st_info, def->st_shndx);
 					return (-1);
 				}
 				val += (Elf_Addr)obj->relocbase;
@@ -703,8 +703,8 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 #endif
 				if (print_local_reloc_dbg)
 					dbg("REL32/L(%p/0x%lx) %p -> %p (%s) in %s, st_value = 0x%lx, st_info=%x, r_symndx=%d, st_shndx=%d",
-					    where, rel->r_offset, (void *)(uintptr_t)old, (void *)(uintptr_t)val,
-					    obj->strtab + def->st_name, obj->path, def->st_value, def->st_info, r_symndx, def->st_shndx);
+					    where, (u_long)rel->r_offset, (void *)(uintptr_t)old, (void *)(uintptr_t)val,
+					    obj->strtab + def->st_name, obj->path, (u_long)def->st_value, def->st_info, r_symndx, def->st_shndx);
 #endif
 			}
 			store_ptr(where, val, rlen);
@@ -831,7 +831,7 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 			val += symval;
 			store_ptr(where, val, rlen);
 			dbg("ABS(%p/0x%lx) %s in %s %p --> %p in %s",
-			    where, rel->r_offset, symname(obj, r_symndx),
+			    where, (u_long)rel->r_offset, symname(obj, r_symndx),
 			    obj->path, (void*)(uintptr_t)old, (void *)(uintptr_t)val, defobj->path);
 			break;
 		}
@@ -858,7 +858,7 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 			val += size;
 			store_ptr(where, val, rlen);
 			dbg("SIZE(%p/0x%lx) %s in %s %p --> %p in %s",
-			    where, rel->r_offset, symname(obj, r_symndx),
+			    where, (u_long)rel->r_offset, symname(obj, r_symndx),
 			    obj->path, (void*)(uintptr_t)old, (void *)(uintptr_t)val, defobj->path);
 			break;
 		}

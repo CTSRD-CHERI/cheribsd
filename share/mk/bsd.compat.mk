@@ -115,7 +115,7 @@ LIB64CPUFLAGS=  -target mips64-unknown-freebsd13.0
 LIB64CPUFLAGS+=	-cheri -mabi=64
 LIB64_MACHINE=	mips
 LIB64_MACHINE_ARCH=	mips64
-LIB32WMAKEENV=	MACHINE_CPU="mips cheri"
+LIB64WMAKEENV=	MACHINE_CPU="mips cheri"
 .if ${COMPAT_ARCH:Mmips64el*}
 _EMULATION=	elf64ltsmip_fbsd
 .else
@@ -133,7 +133,7 @@ COMPAT_RISCV_ABI:=	${COMPAT_RISCV_ABI}d
 .endif
 LIB64_MACHINE=	riscv
 LIB64_MACHINE_ARCH=riscv64
-LIB32WMAKEENV=	MACHINE_CPU="riscv cheri"
+LIB64WMAKEENV=	MACHINE_CPU="riscv cheri"
 LIB64WMAKEFLAGS= LD="${XLD}" CPUTYPE=cheri
 # XXX: clang specific
 LIB64CPUFLAGS=	-target riscv64-unknown-freebsd13.0
@@ -157,9 +157,11 @@ LIB64_MACHINE_ABI=	${MACHINE_ABI:Npurecap}
 .endif
 HAS_COMPAT+=CHERI
 LIBCHERICPUFLAGS=  -target mips64-unknown-freebsd13.0 -cheri -mabi=purecap
+LIBCHERICPUFLAGS+=	-fpic
+LIBCHERICPUFLAGS+=	-Werror=cheri-bitwise-operations
 LIBCHERI_MACHINE=	mips
 LIBCHERI_MACHINE_ARCH=	mips64c128
-
+LIBCHERILDFLAGS=	-fuse-ld=lld
 .elif ${COMPAT_ARCH:Mriscv64*} && !${COMPAT_ARCH:Mriscv64*c*}
 HAS_COMPAT+=CHERI
 LIBCHERI_MACHINE=	riscv
@@ -195,6 +197,8 @@ LIBCHERI_MACHINE_ABI=	${MACHINE_ABI} purecap
 # This duplicates some logic in bsd.cpu.mk that is needed for the
 # WANT_COMPAT/NEED_COMPAT case.
 LIBCHERICFLAGS+=	-D__LP64__=1
+
+LIBCHERICFLAGS+=	-Werror=implicit-function-declaration
 
 .ifdef CHERI_USE_CAP_TABLE
 LIBCHERICFLAGS+=	-cheri-cap-table-abi=${CHERI_USE_CAP_TABLE}
@@ -278,9 +282,10 @@ LIBCOMPAT${_var}?=	${LIB${_LIBCOMPAT}${_var}}
 LIBCOMPAT_OBJTOP?=	${OBJTOP}/obj-lib${libcompat}
 
 LIBCOMPATCFLAGS+=	${LIBCOMPATCPUFLAGS} \
-			-L${WORLDTMP}/usr/lib${libcompat} \
 			--sysroot=${WORLDTMP} \
 			${BFLAGS}
+
+LIBCOMPATLDFLAGS+=	-L${WORLDTMP}/usr/lib${libcompat}
 
 LIBCOMPATWMAKEENV+=	MACHINE=${LIBCOMPAT_MACHINE}
 LIBCOMPATWMAKEENV+=	MACHINE_ARCH=${LIBCOMPAT_MACHINE_ARCH}

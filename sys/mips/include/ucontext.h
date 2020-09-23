@@ -53,7 +53,12 @@ typedef struct	__mcontext {
 	 * struct sigcontext and ucontext_t at the same time.
 	 */
 	int		mc_onstack;	/* sigstack state to restore */
+#if (defined(_KERNEL) && __has_feature(capabilities)) || \
+    defined(__CHERI_PURE_CAPABILITY__)
+	__register_t	__unused_pc;	/* purecap only uses pcc */
+#else
 	__register_t	mc_pc;		/* pc at time of signal */
+#endif
 	__register_t	mc_regs[32];	/* processor regs 0 to 31 */
 	__register_t	sr;		/* status register */
 	__register_t	mullo, mulhi;	/* mullo and mulhi registers... */

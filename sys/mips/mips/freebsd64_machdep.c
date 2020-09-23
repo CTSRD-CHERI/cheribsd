@@ -68,6 +68,7 @@
 #include <cheri/cheric.h>
 
 #include <machine/abi.h>
+#include <machine/cheri_machdep.h>
 #include <machine/cpuinfo.h>
 #include <machine/md_var.h>
 #include <machine/pcb.h>
@@ -191,7 +192,7 @@ freebsd64_get_mcontext(struct thread *td, mcontext64_t *mcp, int flags)
 		return (error);
 
 	mcp->mc_onstack = mc.mc_onstack;
-	mcp->mc_pc = mc.mc_pc;
+	mcp->mc_pc = cheri_getoffset(mc.mc_cheriframe.cf_pcc);
 	for (i = 0; i < 32; i++)
 		mcp->mc_regs[i] = mc.mc_regs[i];
 	mcp->sr = mc.sr;
@@ -247,7 +248,8 @@ freebsd64_set_mcontext(struct thread *td, mcontext64_t *mcp)
 	}
 
 	mc.mc_onstack = mcp->mc_onstack;
-	mc.mc_pc = mcp->mc_pc;
+	mc.mc_cheriframe.cf_pcc = update_pcc_offset(mc.mc_cheriframe.cf_pcc,
+	    mcp->mc_pc);
 	for (i = 0; i < 32; i++)
 		mc.mc_regs[i] = mcp->mc_regs[i];
 	mc.sr = mcp->sr;

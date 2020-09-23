@@ -3,9 +3,6 @@
 # Use the following command to build local debug version of dynamic
 # linker:
 # make DEBUG_FLAGS=-g WITHOUT_TESTS=yes all
-# Not adapted for CHERI
-
-WANT_CHERI=none
 
 RTLD_ELF_DIR:=	${.PARSEDIR}
 
@@ -42,19 +39,19 @@ SRCS= \
 	reloc.c \
 	rtld.c \
 	rtld_lock.c \
-	rtld_malloc.c \
-	rtld_printf.c \
 	map_object.c \
 	xmalloc.c \
 	debug.c \
 	libmap.c
+.if !${MACHINE_ABI:Mpurecap}
+SRCS+= \
+	rtld_malloc.c \
+	rtld_printf.c
+.endif
 MAN?=		rtld.1
 CSTD?=		gnu99
 CFLAGS+=	-Wall -DFREEBSD_ELF -DIN_RTLD -ffreestanding
 CFLAGS+=	-I${SRCTOP}/lib/csu/common
-.if ${MACHINE_CPU:Mcheri}
-CFLAGS+=	-DCHERI
-.endif
 .if exists(${RTLD_ELF_DIR}/${MACHINE_ARCH})
 RTLD_ARCH=	${MACHINE_ARCH}
 .else
@@ -103,7 +100,32 @@ beforeinstall:
 
 .PATH: ${RTLD_ELF_DIR}/${RTLD_ARCH}
 
-.if ${.CURDIR} == ${RTLD_ELF_DIR} || defined(RTLD_CHERI_ELF_DIR)
+.if ${MACHINE_ABI:Mpurecap}
+.PATH: ${RTLD_ELF_DIR}/cheri
+
+# Make per-file captable opt-in since it slows down normal code that doesn't
+# use it and increases the size of plt stubs.
+# This could be optimized to use different stubs for per-file stubs but for
+# now making it opt-in is easier.
+# TODO: add a make options for this (e.g. MK_BENCHMARK_OPTIONS)?
+.if defined(RTLD_PER_FUNCTION_CAPTABLE_SUPPORT) && ${MACHINE_CPUARCH} == "mips"
+CFLAGS+=	-DRTLD_SUPPORT_PER_FUNCTION_CAPTABLE=1
+.else
+CFLAGS+=	-DRTLD_SUPPORT_PER_FUNCTION_CAPTABLE=0
+.endif
+
+.PATH: ${SRCTOP}/lib/libmalloc_simple
+SRCS+=		heap.c malloc.c cheri_reloc.c
+
+CFLAGS+=	-I${SRCTOP}/lib/libc/${RTLD_ARCH}
+CFLAGS+=	-I${RTLD_ELF_DIR}/cheri
+CXXFLAGS+=	-Wall -Wextra
+
+SIMPLE_PRINTF_PREFIX=rtld
+.include "${SRCTOP}/lib/libsimple_printf/Makefile.inc"
+.endif
+
+.if ${.CURDIR} == ${RTLD_ELF_DIR}
 HAS_TESTS=
 SUBDIR.${MK_TESTS}+= tests
 .endif

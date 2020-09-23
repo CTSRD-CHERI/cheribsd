@@ -136,6 +136,8 @@ struct cheri_test {
  * the error.
  */
 void	cheritest_failure_err(const char *msg, ...) __dead2  __printflike(1, 2);
+void	cheritest_failure_errc(int code, const char *msg, ...) __dead2
+    __printflike(2, 3);
 void	cheritest_failure_errx(const char *msg, ...) __dead2  __printflike(1, 2);
 void	cheritest_success(void) __dead2;
 void	signal_handler_clear(int sig);
@@ -477,6 +479,9 @@ DECLARE_CHERI_TEST(test_sandbox_var_constructor);
 DECLARE_CHERI_TEST(cheritest_setjmp);
 DECLARE_CHERI_TEST(cheritest_setjmp_longjmp);
 
+/* cheritest_printf.c */
+DECLARE_CHERI_TEST(test_printf_cap);
+
 /* cheritest_sealcap.c */
 DECLARE_CHERI_TEST(test_sealcap_sysarch);
 DECLARE_CHERI_TEST(test_sealcap_seal);
@@ -507,6 +512,7 @@ DECLARE_CHERI_TEST(test_sandbox_syscall);
 DECLARE_CHERI_TEST(test_sig_dfl_neq_ign);
 DECLARE_CHERI_TEST(test_sig_dfl_ign);
 DECLARE_CHERI_TEST(test_ptrace_basic);
+DECLARE_CHERI_TEST(test_aio_sival);
 
 /* cheritest_registers.c */
 DECLARE_CHERI_TEST(test_initregs_default);

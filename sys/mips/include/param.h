@@ -223,16 +223,6 @@
 #endif /* ! KSTACK_LARGE_PAGE */
 
 /*
- * CHERI specific define required by SysV shared memory.  Depends
- * on physically addressable memory.
- */
-#ifdef __mips_n64
-/* 1MB allows all sizes for 40-bit address spaces with ISA v5 128-bit caps. */
-/* XXX-BD: only increase for compressed capabilities? */
-#define	CHERI_SHMLBA	(1 << 20)
-#endif
-
-/*
  * Mach derived conversion macros
  */
 #define	round_page(x)		__builtin_align_down(((x) + PAGE_MASK), PAGE_SIZE)
@@ -248,7 +238,7 @@
 #endif /* !_MIPS_INCLUDE_PARAM_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20200706,
+//   "updated": 20200921,
 //   "target_type": "header",
 //   "changes": [
 //     "support"
@@ -257,6 +247,6 @@
 //     "support",
 //     "pointer_alignment"
 //   ],
-//   "change_comment": "sysv shm. purecap: kstack"
+//   "change_comment": "MACHINE_ARCH for CheriABI and freebsd64.  purecap: kstack"
 // }
 // CHERI CHANGES END

@@ -464,63 +464,39 @@ kern_shmat_locked(struct thread *td, int shmid,
 	}
 	if (i >= shminfo.shmseg)
 		return (EMFILE);
-	size = round_page(shmseg->u.shm_segsz);
+	size = shmseg->u.shm_segsz;
+	KASSERT(is_aligned(size, PAGE_SIZE),
+	    ("shmget should have rounded size %zu", size));
 #if __has_feature(capabilities)
-	if (SV_CURPROC_FLAG(SV_CHERI))
-		size = CHERI_REPRESENTABLE_LENGTH(size);
+	KASSERT(size == CHERI_REPRESENTABLE_LENGTH(size),
+	    ("shmget left unrepresentable size %zu", size));
 #endif
 	prot = VM_PROT_READ;
 	cow = MAP_INHERIT_SHARE | MAP_PREFAULT_PARTIAL;
 	if ((shmflg & SHM_RDONLY) == 0)
 		prot |= VM_PROT_WRITE;
 	if (shmaddr != NULL) {
-#if __has_feature(capabilities)
-		if (SV_CURPROC_FLAG(SV_CHERI)) {
-			if ((shmflg & SHM_RND) != 0)
-				attach_va = rounddown2((__cheri_addr vm_offset_t)shmaddr,
-				    CHERI_SHMLBA);
-			else if (((__cheri_addr vm_offset_t)shmaddr & (SHMLBA-1)) == 0 &&
-			    ((__cheri_addr vm_offset_t)shmaddr & CHERI_ALIGN_MASK(size))
-			    == 0)
-				attach_va = (__cheri_addr vm_offset_t)shmaddr;
-			else
-				return (EINVAL);
-		} else
-#endif /* __has_feature(capabilities) */
-		{
-			if ((shmflg & SHM_RND) != 0)
-				attach_va = rounddown2((__cheri_addr vm_offset_t)shmaddr, SHMLBA);
-			else if (((__cheri_addr vm_offset_t)shmaddr & (SHMLBA-1)) == 0)
-				attach_va = (__cheri_addr vm_offset_t)shmaddr;
-			else
-				return (EINVAL);
-		}
+		attach_va = (__cheri_addr vm_offset_t)shmaddr;
 		if ((shmflg & SHM_RND) != 0)
-			attach_va = rounddown2((__cheri_addr vm_offset_t)shmaddr, SHMLBA);
+			attach_va = rounddown2(attach_va, SHMLBA);
 		else if (((__cheri_addr vm_offset_t)shmaddr & (SHMLBA-1)) == 0)
 			attach_va = (__cheri_addr vm_offset_t)shmaddr;
 		else
 			return (EINVAL);
-		shmaddr = (const char * __capability)shmaddr -
-		    ((__cheri_addr vm_offset_t)shmaddr - attach_va);
+#if __has_feature(capabilities)
+		if (CHERI_REPRESENTABLE_BASE(attach_va, size) != attach_va)
+			return (EINVAL);
+		if (cheri_gettag(shmaddr))
+			shmaddr = cheri_setaddress(shmaddr, attach_va);
+		else
+			return (EINVAL);	/* XXX support this? */
+		if (!__CAP_CHECK(shmaddr, size))
+		    return (EINVAL);
+#endif
 		if ((shmflg & SHM_REMAP) != 0)
 			cow |= MAP_REMAP;
 		find_space = VMFS_NO_SPACE;
 	} else {
-		/*
-		 * Check that shmaddr (as adjusted for SHM_RND) has
-		 * enough space for a mapping.  For CheriABI this means
-		 * that we alread control this address space.  For
-		 * hybrid code this ensures we're inside DDC (as our
-		 * capability is DDC derived).  For existing programs
-		 * this is a nop, but for in address space compartments
-		 * where ddc is reduced, it is a security feature.
-		 *
-		 * NOTE: for CheriABI this means shmaddr must have
-		 * previously allocated so a capability exists.
-		 */
-		if (!__CAP_CHECK(shmaddr, size))
-			return (EINVAL);
 #if __has_feature(capabilities)
 		if (SV_CURPROC_FLAG(SV_CHERI)) {
 			/*
@@ -576,9 +552,8 @@ kern_shmat_locked(struct thread *td, int shmid,
 		 * capability. However we could directly return the capability
 		 * given by vm_map_find().
 		 */
-		shmaddr = cheri_setaddress(shmaddr, attach_addr);
-		shmaddr = cheri_setbounds(shmaddr,
-		    CHERI_REPRESENTABLE_LENGTH(shmseg->u.shm_segsz));
+		shmaddr = cheri_setboundsexact(cheri_setaddress(shmaddr,
+		     attach_addr), size);
 		/* XXX: set perms */
 		td->td_retval[0] = (uintcap_t)__DECONST_CAP(void * __capability,
 		    shmaddr);

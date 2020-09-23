@@ -42,8 +42,7 @@ __FBSDID("$FreeBSD$");
 #include <unistd.h>
 #include "localedef.h"
 #include "parser.h"
-
-#include "../../lib/libc/stdtime/timelocal.h"
+#include "timelocal.h"
 
 struct lc_time_T tm;
 

@@ -42,8 +42,7 @@ __FBSDID("$FreeBSD$");
 #include <unistd.h>
 #include "localedef.h"
 #include "parser.h"
-
-#include "../../lib/libc/locale/lnumeric.h"
+#include "lnumeric.h"
 
 static struct lc_numeric_T numeric;
 

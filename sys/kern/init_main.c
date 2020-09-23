@@ -389,6 +389,17 @@ SYSINIT(diagwarn2, SI_SUB_LAST, SI_ORDER_FIFTH,
     print_caddr_t, diag_warn);
 #endif
 
+#if __has_feature(capabilities)
+static char cheri_notice[] =
+#ifdef __CHERI_PURE_CAPABILITY__
+    "CHERI pure-capability kernel.\n";
+#else
+    "CHERI hybrid kernel.\n";
+#endif
+SYSINIT(cherinotice, SI_SUB_COPYRIGHT, SI_ORDER_ANY, print_caddr_t,
+    cheri_notice);
+#endif
+
 #ifdef ENABLE_PAST_LOCAL_VULNERABILITIES
 static char local_vuln_warn[] =
     "WARNING: ENABLE_PAST_LOCAL_VULNERABILITIES option enabled.\nWARNING: Kernel contains locally-exploitable vulnerabilities.\n";

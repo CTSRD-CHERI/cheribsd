@@ -160,7 +160,7 @@ nvpair_append(nvpair_t *nvp, const void *value, size_t valsize, size_t datasize)
 	valp = (unsigned char *)data + oldlen;
 	memcpy(valp, value, valsize);
 
-	nvp->nvp_data = (uint64_t)(uintptr_t)data;
+	nvp->nvp_data = (uintptr_t)data;
 	nvp->nvp_datasize += datasize;
 	nvp->nvp_nitems++;
 	return (0);

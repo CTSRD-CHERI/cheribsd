@@ -189,7 +189,9 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	sf.sf_uc.uc_sigmask = *mask;
 	sf.sf_uc.uc_stack = td->td_sigstk;
 	sf.sf_uc.uc_mcontext.mc_onstack = (oonstack) ? 1 : 0;
+#if !__has_feature(capabilities)
 	sf.sf_uc.uc_mcontext.mc_pc = TRAPF_PC_OFFSET(regs);
+#endif
 	sf.sf_uc.uc_mcontext.mullo = regs->mullo;
 	sf.sf_uc.uc_mcontext.mulhi = regs->mulhi;
 	sf.sf_uc.uc_mcontext.mc_tls = td->td_md.md_tls;
@@ -522,6 +524,10 @@ get_mcontext(struct thread *td, mcontext_t *mcp, int flags)
 	PROC_UNLOCK(curthread->td_proc);
 	bcopy(__unbounded_addressof(td->td_frame->zero), (void *)&mcp->mc_regs,
 	    sizeof(mcp->mc_regs));
+#if __has_feature(capabilities)
+	cheri_trapframe_to_cheriframe(&td->td_pcb->pcb_regs,
+	    &mcp->mc_cheriframe);
+#endif
 
 	mcp->mc_fpused = td->td_md.md_flags & MDTD_FPUSED;
 	if (mcp->mc_fpused) {
@@ -538,15 +544,12 @@ get_mcontext(struct thread *td, mcontext_t *mcp, int flags)
 #endif
 	}
 
+#if !__has_feature(capabilities)
 	mcp->mc_pc = TRAPF_PC_OFFSET(td->td_frame);
+#endif
 	mcp->mullo = td->td_frame->mullo;
 	mcp->mulhi = td->td_frame->mulhi;
 	mcp->mc_tls = td->td_md.md_tls;
-
-#if __has_feature(capabilities)
-	cheri_trapframe_to_cheriframe(&td->td_pcb->pcb_regs,
-	    &mcp->mc_cheriframe);
-#endif
 
 	return (0);
 }
@@ -559,6 +562,9 @@ set_mcontext(struct thread *td, mcontext_t *mcp)
 	tp = td->td_frame;
 	bcopy((void *)&mcp->mc_regs, (void *)&td->td_frame->zero,
 	    sizeof(mcp->mc_regs));
+#if __has_feature(capabilities)
+	cheri_trapframe_from_cheriframe(tp, &mcp->mc_cheriframe);
+#endif
 
 	td->td_md.md_flags = (mcp->mc_fpused & MDTD_FPUSED)
 #ifdef CPU_QEMU_MALTA
@@ -569,20 +575,13 @@ set_mcontext(struct thread *td, mcontext_t *mcp)
 		bcopy((void *)&mcp->mc_fpregs, (void *)&td->td_frame->f0,
 		    sizeof(mcp->mc_fpregs));
 	}
-#if __has_feature(capabilities)
-	td->td_frame->pc =
-	    update_pcc_offset(mcp->mc_cheriframe.cf_pcc, mcp->mc_pc);
-#else
+#if !__has_feature(capabilities)
 	td->td_frame->pc = (trapf_pc_t) mcp->mc_pc;
 #endif
 	td->td_frame->mullo = mcp->mullo;
 	td->td_frame->mulhi = mcp->mulhi;
 	td->td_md.md_tls = mcp->mc_tls;
 	/* Dont let user to set any bits in status and cause registers. */
-
-#if __has_feature(capabilities)
-	cheri_trapframe_from_cheriframe(tp, &mcp->mc_cheriframe);
-#endif
 
 	return (0);
 }

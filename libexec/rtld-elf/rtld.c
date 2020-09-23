@@ -747,7 +747,7 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
       aux_info[AT_STACKPROT]->a_un.a_val != 0)
 	    stack_prot = aux_info[AT_STACKPROT]->a_un.a_val;
 
-#if !defined(COMPAT_32BIT) && !defined(COMPAT_64BIT)
+#if !defined(COMPAT_32BIT) && !defined(COMPAT_64BIT) && !defined(COMPAT_CHERI)
     /*
      * Get the actual dynamic linker pathname from the executable if
      * possible.  (It should always be possible.)  That ensures that
@@ -5265,11 +5265,11 @@ tls_get_addr_slow(uintptr_t **dtvp, int index, size_t offset)
     /* Check dtv generation in case new modules have arrived */
     if (dtv[0] != tls_dtv_generation) {
 	wlock_acquire(rtld_bind_lock, &lockstate);
-	newdtv = xcalloc(tls_max_index + 2, sizeof(Elf_Addr));
+	newdtv = xcalloc(tls_max_index + 2, sizeof(newdtv[0]));
 	to_copy = dtv[1];
 	if (to_copy > tls_max_index)
 	    to_copy = tls_max_index;
-	memcpy(&newdtv[2], &dtv[2], to_copy * sizeof(Elf_Addr));
+	memcpy(&newdtv[2], &dtv[2], to_copy * sizeof(newdtv[0]));
 	newdtv[0] = tls_dtv_generation;
 	newdtv[1] = tls_max_index;
 	free(dtv);
@@ -5282,7 +5282,7 @@ tls_get_addr_slow(uintptr_t **dtvp, int index, size_t offset)
 	/* Signal safe, wlock will block out signals. */
 	wlock_acquire(rtld_bind_lock, &lockstate);
 	if (!dtv[index + 1])
-	    dtv[index + 1] = (Elf_Addr)allocate_module_tls(index);
+	    dtv[index + 1] = (uintptr_t)allocate_module_tls(index);
 	lock_release(rtld_bind_lock, &lockstate);
     }
     return ((void *)(dtv[index + 1] + offset));

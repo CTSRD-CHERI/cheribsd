@@ -42,8 +42,7 @@ __FBSDID("$FreeBSD$");
 #include <unistd.h>
 #include "localedef.h"
 #include "parser.h"
-
-#include "../../lib/libc/locale/lmonetary.h"
+#include "lmonetary.h"
 
 static struct lc_monetary_T mon;
 

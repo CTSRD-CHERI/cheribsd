@@ -549,7 +549,12 @@ vn_rdwr(enum uio_rw rw, struct vnode *vp, void *base, int len, off_t offset,
 		return (EINVAL);
 	auio.uio_iov = &aiov;
 	auio.uio_iovcnt = 1;
-	IOVEC_INIT(&aiov, base, len);
+#if __has_feature(capabilities) && !defined(__CHERI_PURE_CAPABILITY__)
+	if (segflg == UIO_USERSPACE)
+		IOVEC_INIT_C(&aiov, __USER_CAP(base, len), len);
+	else
+#endif
+		IOVEC_INIT(&aiov, base, len);
 	auio.uio_resid = len;
 	auio.uio_offset = offset;
 	auio.uio_segflg = segflg;

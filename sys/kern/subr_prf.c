@@ -68,6 +68,10 @@ __FBSDID("$FreeBSD$");
 #include <sys/ctype.h>
 #include <sys/sbuf.h>
 
+#if __has_feature(capabilities)
+#include <cheri/cheric.h>
+#endif
+
 #ifdef DDB
 #include <ddb/ddb.h>
 #endif
@@ -651,6 +655,9 @@ kvprintf(char const *fmt, void (*func)(int, void*), void *arg, int radix, va_lis
 	int bconv, dwidth, upper;
 	char padc;
 	int stop = 0, retval = 0;
+#if __has_feature(capabilities)
+	void * __capability cap;
+#endif
 
 	num = 0;
 	q = NULL;
@@ -798,30 +805,32 @@ reswitch:	switch (ch = (u_char)*fmt++) {
 			base = 8;
 			goto handle_nosign;
 		case 'p':
+#if __has_feature(capabilities)
 #ifdef __CHERI_PURE_CAPABILITY__
+			cap = va_arg(ap, void *);
+			num = cheri_getaddress(cap);
+#else
+			if (lflag) {
+				cap = *va_arg(ap, void * __capability *);
+				num = cheri_getaddress(cap);
+			} else {
+				num = (uintptr_t)va_arg(ap, void *);
+				sharpflag = 0;
+			}
+#endif
 			if (sharpflag) {
-				void *ptr = va_arg(ap, void *);
-				int orig_width, orig_dwidth;
+				int orig_dwidth;
 
-				orig_width = width;
 				orig_dwidth = dwidth;
 
 				/* address */
-				num = cheri_getaddress(ptr);
+				num = cheri_getaddress(cap);
 				PCHAR('0');
 				PCHAR('x');
 				p = ksprintn(nbuf, num, 16, &n, 0);
-				tmp = 0;
-				if (!ladjust && padc == '0')
-					dwidth = width - tmp;
-				width -= tmp + imax(dwidth, n);
 				dwidth -= n;
-				if (!ladjust)
-					while (width-- > 0)
-						PCHAR(' ');
 				while (dwidth-- > 0)
 					PCHAR('0');
-
 				while (*p)
 					PCHAR(*p--);
 
@@ -830,18 +839,18 @@ reswitch:	switch (ch = (u_char)*fmt++) {
 						PCHAR(' ');
 
 				/* Skip attributes if NULL-derived. */
-				if (cheri_getperm(ptr) == 0 &&
-				    cheri_getflags(ptr) == 0 &&
-				    cheri_getbase(ptr) == 0 &&
-				    cheri_getlen(ptr) + 1 == 0 &&
-				    cheri_gettype(ptr) == CHERI_OTYPE_UNSEALED)
+				if (cheri_getperm(cap) == 0 &&
+				    cheri_getflags(cap) == 0 &&
+				    cheri_getbase(cap) == 0 &&
+				    cheri_getlen(cap) + 1 == 0 &&
+				    cheri_gettype(cap) == CHERI_OTYPE_UNSEALED)
 					break;
 
 				PCHAR(' ');
 				PCHAR('[');
 
 				/* permissions */
-				num = cheri_getperm(ptr);
+				num = cheri_getperm(cap);
 				if (num & CHERI_PERM_LOAD)
 					PCHAR('r');
 				if (num & CHERI_PERM_STORE)
@@ -855,76 +864,46 @@ reswitch:	switch (ch = (u_char)*fmt++) {
 				PCHAR(',');
 
 				/* bounds */
-				num = cheri_getbase(ptr);
+				num = cheri_getbase(cap);
 				PCHAR('0');
 				PCHAR('x');
 				p = ksprintn(nbuf, num, 16, &n, 0);
-				width = orig_width;
-				dwidth = orig_dwidth;
-				tmp = 0;
-				if (!ladjust && padc == '0')
-					dwidth = width - tmp;
-				width -= tmp + imax(dwidth, n);
-				dwidth -= n;
-				if (!ladjust)
-					while (width-- > 0)
-						PCHAR(' ');
+				dwidth = orig_dwidth - n;
 				while (dwidth-- > 0)
 					PCHAR('0');
-
 				while (*p)
 					PCHAR(*p--);
-
-				if (ladjust)
-					while (width-- > 0)
-						PCHAR(' ');
 
 				PCHAR('-');
 
-				num += cheri_getlen(ptr);
+				num += cheri_getlen(cap);
 				PCHAR('0');
 				PCHAR('x');
 				p = ksprintn(nbuf, num, 16, &n, 0);
-				while (*p)
-					PCHAR(*p--);
-				width = orig_width;
-				dwidth = orig_dwidth;
-				tmp = 0;
-				if (!ladjust && padc == '0')
-					dwidth = width - tmp;
-				width -= tmp + imax(dwidth, n);
-				dwidth -= n;
-				if (!ladjust)
-					while (width-- > 0)
-						PCHAR(' ');
+				dwidth = orig_dwidth - n;
 				while (dwidth-- > 0)
 					PCHAR('0');
-
 				while (*p)
 					PCHAR(*p--);
-
-				if (ladjust)
-					while (width-- > 0)
-						PCHAR(' ');
 
 				PCHAR(']');
 
 				/* tag and sealing */
-				switch (cheri_gettype(ptr)) {
+				switch (cheri_gettype(cap)) {
 				case CHERI_OTYPE_UNSEALED:
-					if (cheri_gettag(ptr))
+					if (cheri_gettag(cap))
 						p = NULL;
 					else
 						p = "(invalid)";
 					break;
 				case CHERI_OTYPE_SENTRY:
-					if (cheri_gettag(ptr))
+					if (cheri_gettag(cap))
 						p = "(sentry)";
 					else
 						p = "(invalid,sentry)";
 					break;
 				default:
-					if (cheri_gettag(ptr))
+					if (cheri_gettag(cap))
 						p = "(sealed)";
 					else
 						p = "(invalid,sealed)";
@@ -937,11 +916,12 @@ reswitch:	switch (ch = (u_char)*fmt++) {
 				}
 				break;
 			}
+#else
+			num = (uintptr_t)va_arg(ap, void *);
 #endif
 			base = 16;
 			sharpflag = (width == 0);
 			sign = 0;
-			num = (uintptr_t)va_arg(ap, void *);
 			goto number;
 		case 'q':
 			qflag = 1;

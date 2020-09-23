@@ -44,10 +44,6 @@ _blacklistd-helper+=	blacklistd-helper
 SUBDIR+=	bootpd
 .endif
 
-.if !defined(NO_PIC) && !defined(NO_RTLD) && (${MACHINE_ABI:Mpurecap} || ${MK_COMPAT_CHERIABI} != "no")
-SUBDIR+=	rtld-cheri-elf rtld-cheri-elf-debug
-.endif
-
 SUBDIR.${MK_LIBCHERI}+=	cheri_bench-helper
 SUBDIR.${MK_LIBCHERI}+=	cheritest-helper
 SUBDIR.${MK_LIBCHERI}+=	tcpdump-helper
@@ -81,12 +77,11 @@ _pppoed=	pppoed
 _tftp-proxy=	tftp-proxy
 .endif
 
-.if !defined(NO_PIC) && !defined(NO_RTLD) && !${MACHINE_ABI:Mpurecap}
+.if !defined(NO_PIC) && !defined(NO_RTLD)
 _rtld-elf=	rtld-elf rtld-elf-debug
 SUBDIR.${MK_LIB32}+=	rtld-elf32
-.endif
-.if !defined(NO_PIC) && !defined(NO_RTLD)
 SUBDIR.${MK_LIB64}+=	rtld-elf64
+SUBDIR.${MK_COMPAT_CHERIABI}+=	rtld-cheri-elf rtld-cheri-elf-debug
 .endif
 
 .if ${MK_RBOOTD} != "no"

@@ -236,19 +236,8 @@ cheri_log_exception_registers(struct trapframe *frame)
 static inline void
 cheri_cap_print(void* __capability cap)
 {
-	uintmax_t c_perms, c_otype, c_base, c_length, c_offset;
-	u_int ctag, c_sealed;
 
-	ctag = cheri_gettag(cap);
-	c_sealed = cheri_getsealed(cap);
-	c_perms = cheri_getperm(cap);
-	c_otype = cheri_gettype(cap);
-	c_base = cheri_getbase(cap);
-	c_length = cheri_getlen(cap);
-	c_offset = cheri_getoffset(cap);
-	printf("v:%u s:%u p:%08jx b:%016jx l:%016jx o:%jx t:%s%jx\n",
-	    ctag, c_sealed, c_perms, c_base, c_length, c_offset,
-	    (c_otype == - 1 ? "-" : ""), (c_otype == -1 ? 1 : c_otype));
+	printf(_CHERI_PRINTF_CAP_FMT "\n", _CHERI_PRINTF_CAP_ARG(cap));
 }
 
 #define	CHERI_REG_PRINT(cap, num) do {					\
