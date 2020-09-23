@@ -3,7 +3,7 @@
 #
 # Warning flags for compiling the kernel and components of the kernel:
 #
-CWARNFLAGS?=	-Wall -Wredundant-decls -Wnested-externs -Wstrict-prototypes \
+CWARNFLAGS=	-Wall -Wredundant-decls -Wnested-externs -Wstrict-prototypes \
 		-Wmissing-prototypes -Wpointer-arith -Wcast-qual \
 		-Wundef -Wno-pointer-sign ${FORMAT_EXTENSIONS} \
 		-Wmissing-include-dirs -fdiagnostics-show-option \
@@ -269,6 +269,8 @@ CFLAGS+=	-gdwarf-2
 # CHERI purecap kernel flags
 #
 .if ${MACHINE_ABI:Mpurecap}
+CWARNFLAGS+=	-Werror=implicit-function-declaration
+
 .ifdef CHERI_USE_CAP_TABLE
 CFLAGS+=	-cheri-cap-table-abi=${CHERI_USE_CAP_TABLE}
 .endif
