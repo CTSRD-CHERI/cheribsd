@@ -42,7 +42,8 @@ struct mdthread {
 
 /* md_flags */
 #ifdef CPU_QEMU_RISCV
-#define	MDTD_QTRACE	0x0001		/* QEMU-CHERI ISA-level tracing */
+#define	MDTD_QTRACE		0x0001		/* QEMU-CHERI ISA-level tracing */
+#define	MDTD_QTRACE_USERMODE	0x0002		/* QEMU-CHERI user-only tracing */
 #endif
 
 struct mdproc {

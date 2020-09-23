@@ -133,6 +133,10 @@ SYSCTL_INT(_machdep, OID_AUTO, log_cheri_registers, CTLFLAG_RW,
     &log_cheri_registers, 1, "Print CHERI registers for non-CHERI exceptions");
 #endif
 
+#ifdef CPU_QEMU_MALTA
+extern u_int qemu_trace_buffered;
+#endif
+
 #define	lbu_macro(data, addr)						\
 	__asm __volatile ("lbu %0, 0x0(%1)"				\
 			: "=r" (data)	/* outputs */			\
@@ -1401,6 +1405,10 @@ err:
 	if (i == SIGPROT)
 		ksi.ksi_capreg = trapframe->capcause &
 		    CHERI_CAPCAUSE_REGNUM_MASK;
+#endif
+#ifdef CPU_QEMU_MALTA
+	if (qemu_trace_buffered)
+		QEMU_FLUSH_TRACE_BUFFER;
 #endif
 	trapsignal(td, &ksi);
 out:

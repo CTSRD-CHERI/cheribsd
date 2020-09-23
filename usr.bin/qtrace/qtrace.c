@@ -42,6 +42,7 @@
 #include <string.h>
 #include <sysexits.h>
 #include <unistd.h>
+#include <getopt.h>
 
 #include <stdio.h>
 
@@ -82,8 +83,23 @@ set_thread_tracing(void)
 	error = sysarch(QEMU_SET_QTRACE, &intval);
 	if (error)
 		err(EX_OSERR, "QEMU_SET_QTRACE");
-	if (user_mode_only)
+	if (user_mode_only) {
+		error = sysarch(QEMU_SET_QTRACE_USER, &intval);
+		if (error)
+			err(EX_OSERR, "QEMU_SET_QTRACE_USER");
 		CHERI_START_USER_TRACE;
+	}
+}
+
+static inline void
+set_buffered_tracing(void)
+{
+	uint intval;
+
+	intval = 1;
+	if (sysctlbyname("hw.qemu_trace_buffered", NULL, NULL,
+	    &intval, sizeof(intval)) < 0)
+		err(EX_OSERR, "sysctlbyname(\"hw.qemu_trace_buffered\")");
 }
 
 int
@@ -93,20 +109,29 @@ main(int argc, char **argv)
 	uint qemu_trace_perthread;
 	int status;
 	pid_t pid;
+	int opt;
+	int opt_index;
 
-	/* Adjust argc and argv as though we've used getopt. */
-	argc--;
-	argv++;
+	while (1) {
+		static struct option long_options[] = {
+			{"user-mode", no_argument, 0, 'u'},
+			{0, 0, 0, 0},
+		};
 
-	if (argc == 0)
-		usage();
-
-	if (strcmp("-u", argv[0]) == 0 || strcmp("--user-mode", argv[0]) == 0) {
-		argv++;
-		argc--;
-		user_mode_only = true;
-		if (argc == 0)
+		opt = getopt_long(argc, argv, "ub",
+				  long_options, &opt_index);
+		if (opt == -1)
+			break;
+		switch (opt) {
+		case 'u':
+			user_mode_only = true;
+			break;
+		case 'b':
+			set_buffered_tracing();
+			break;
+		default:
 			usage();
+		}
 	}
 
 	len = sizeof(qemu_trace_perthread);
@@ -115,11 +140,12 @@ main(int argc, char **argv)
 		err(EX_OSERR, "sysctlbyname(\"hw.qemu_trace_perthread\")");
 
 	if (qemu_trace_perthread &&
-	    (strcmp(argv[0], "start") == 0 || strcmp(argv[0], "stop") == 0))
+	    (strcmp(argv[optind], "start") == 0 ||
+	    strcmp(argv[optind], "stop") == 0))
 		errx(EX_OSERR, "start and stop unavailable when "
 		    "hw.qemu_trace_perthread is set");
 
-	if (strcmp("exec", argv[0]) == 0) {
+	if (strcmp("exec", argv[optind]) == 0) {
 		pid = fork();
 		if (pid < 0)
 			err(EX_OSERR, "fork");
@@ -129,7 +155,7 @@ main(int argc, char **argv)
 			else
 				start_trace();
 			argv++;
-			if (execvp(argv[0], argv) == -1)
+			if (execvp(argv[optind], &argv[optind]) == -1)
 				err(EX_OSERR, "execvp");
 		}
 
@@ -145,16 +171,16 @@ main(int argc, char **argv)
 		exit(WEXITSTATUS(status));
 	}
 
-	if (argc > 1)
+	if (argc - optind > 1)
 		usage();
-	if (strcmp("start", argv[0]) == 0) {
+	if (strcmp("start", argv[optind]) == 0) {
 		start_trace();
 		exit(0);
-	} else if (strcmp("stop", argv[0]) == 0) {
+	} else if (strcmp("stop", argv[optind]) == 0) {
 		stop_trace();
 		exit(0);
 	} else {
-		warnx("Unknown command %s\n", argv[0]);
+		warnx("Unknown command %s\n", argv[optind]);
 		usage();
 	}
 }

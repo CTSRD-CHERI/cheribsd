@@ -82,6 +82,7 @@
  */
 #define	QEMU_GET_QTRACE		100	/* Get QEMU tracing. */
 #define	QEMU_SET_QTRACE		101	/* Set (or clear) QEMU tracing. */
+#define	QEMU_SET_QTRACE_USER	102	/* Set (or clear) QEMU per-thread user-only tracing mode */
 
 #ifndef _KERNEL
 #include <sys/cdefs.h>

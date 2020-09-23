@@ -326,15 +326,20 @@ mips_sw1:
 	 * 'old' and 'new' threads have tracing enabled.
 	 */
 	lw	t2, TD_MDFLAGS(a1)			# Get new->md_flags
-	andi	t2, t2, MDTD_QTRACE			# Mask QEMU trace bit
-	beqz	t2, disable_qemu_tracing		# Branch if not set
+	andi	t1, t2, MDTD_QTRACE			# Mask QEMU trace bit
+	beqz	t1, disable_qemu_tracing		# Branch if not set
+	andi	t2, t2, MDTD_QTRACE_USERMODE		# Mask QEMU USER trace bit
+	bnez	t2, enable_qemu_user_tracing
 	nop
 
 enable_qemu_tracing:
 	li	$0, 0xbeef
 	b	done_qemu_tracing
 	nop
-
+enable_qemu_user_tracing:
+	li	$0, 0xdeaf
+	b	done_qemu_tracing
+	nop
 disable_qemu_tracing:
 	li	$0, 0xdead
 

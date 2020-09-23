@@ -87,6 +87,15 @@ sysarch(struct thread *td, struct sysarch_args *uap)
 		else
 			td->td_md.md_flags &= ~MDTD_QTRACE;
 		return (0);
+	case QEMU_SET_QTRACE_USER:
+		error = copyin(uap->parms, &intval, sizeof(intval));
+		if (error)
+			return (error);
+		if (intval)
+			td->td_md.md_flags |= MDTD_QTRACE_USERMODE;
+		else
+			td->td_md.md_flags &= ~MDTD_QTRACE_USERMODE;
+		return (0);
 #endif
 
 #ifdef CPU_CHERI

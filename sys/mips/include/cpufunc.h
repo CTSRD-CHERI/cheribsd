@@ -387,6 +387,20 @@ get_intr_mask(void)
 	return (mips_rd_status() & MIPS_SR_INT_MASK);
 }
 
+#ifdef CPU_QEMU_MALTA
+#define	QEMU_SET_TRACE_BUFFERED_MODE	do {				\
+	__asm__ __volatile__("ori $zero, $zero, 0x01");			\
+} while(0)
+
+#define	QEMU_CLEAR_TRACE_BUFFERED_MODE	do {				\
+	__asm__ __volatile__("ori $zero, $zero, 0x02");			\
+} while(0)
+
+#define	QEMU_FLUSH_TRACE_BUFFER	do {					\
+	__asm__ __volatile__("ori $zero, $zero, 0x03");			\
+} while(0)
+#endif
+
 #endif /* _KERNEL */
 
 #define	readb(va)	(*(volatile uint8_t *) (va))
