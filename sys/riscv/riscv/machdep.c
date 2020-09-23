@@ -102,6 +102,7 @@ __FBSDID("$FreeBSD$");
 #endif
 
 #if __has_feature(capabilities)
+#include <machine/cheri.h>
 #include <cheri/cheric.h>
 #endif
 
@@ -158,6 +159,31 @@ static char static_kenv[4096];
 u_int	qemu_trace_perthread;
 SYSCTL_UINT(_hw, OID_AUTO, qemu_trace_perthread, CTLFLAG_RW,
     &qemu_trace_perthread, 0, "Per-thread Qemu ISA-level tracing configured");
+
+/*
+ * QEMU ISA-level tracing in buffered mode.
+ * The trace entries are stored in a ring buffer and only emitted
+ * upon request. This is currently done on trap.
+ */
+u_int	qemu_trace_buffered;
+
+static int
+sysctl_hw_qemu_buffered(SYSCTL_HANDLER_ARGS)
+{
+	int error;
+
+	error = sysctl_handle_int(oidp, &qemu_trace_buffered, 0, req);
+	if (error || !req->newptr)
+		return (error);
+	if (qemu_trace_buffered)
+		QEMU_SET_TRACE_BUFFERED_MODE;
+	else
+		QEMU_CLEAR_TRACE_BUFFERED_MODE;
+	return (0);
+}
+
+SYSCTL_PROC(_hw, OID_AUTO, qemu_trace_buffered, CTLTYPE_INT | CTLFLAG_RW,
+    0, 0, sysctl_hw_qemu_buffered, "", "Qemu tracing runs in buffered mode");
 #endif
 
 static void
