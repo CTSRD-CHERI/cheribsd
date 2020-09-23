@@ -846,7 +846,7 @@ cache_negative_insert(struct namecache *ncp)
 	mtx_lock(&neglist->nl_lock);
 	TAILQ_INSERT_TAIL(&neglist->nl_list, ncp, nc_dst);
 	mtx_unlock(&neglist->nl_lock);
-	atomic_add_rel_long(&numneg, 1);
+	atomic_add_long(&numneg, 1);
 }
 
 static void
@@ -892,7 +892,7 @@ cache_negative_remove(struct namecache *ncp)
 		mtx_unlock(&neglist->nl_lock);
 	if (hot_locked)
 		mtx_unlock(&ncneg_hot.nl_lock);
-	atomic_subtract_rel_long(&numneg, 1);
+	atomic_subtract_long(&numneg, 1);
 }
 
 static void
@@ -1035,7 +1035,7 @@ cache_zap_locked(struct namecache *ncp)
 			counter_u64_add(numcachehv, -1);
 		}
 	}
-	atomic_subtract_rel_long(&numcache, 1);
+	atomic_subtract_long(&numcache, 1);
 }
 
 static void
@@ -1964,7 +1964,7 @@ cache_enter_time(struct vnode *dvp, struct vnode *vp, struct componentname *cnp,
 	 */
 	lnumcache = atomic_fetchadd_long(&numcache, 1) + 1;
 	if (__predict_false(lnumcache >= ncsize)) {
-		atomic_add_long(&numcache, -1);
+		atomic_subtract_long(&numcache, 1);
 		counter_u64_add(numdrops, 1);
 		return;
 	}
@@ -2130,7 +2130,7 @@ cache_enter_time(struct vnode *dvp, struct vnode *vp, struct componentname *cnp,
 	return;
 out_unlock_free:
 	cache_enter_unlock(&cel);
-	atomic_add_long(&numcache, -1);
+	atomic_subtract_long(&numcache, 1);
 	cache_free(ncp);
 	return;
 }
