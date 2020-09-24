@@ -3434,8 +3434,7 @@ freebsd6_freebsd64_lio_listio(struct thread *td,
 	}
 	acb_list = malloc(sizeof(struct aiocb *) * nent, M_LIO, M_WAITOK);
 	for (i = 0; i < nent; i++)
-		acb_list[i] = __USER_CAP(PTRIN(acb_list64[i]),
-		    sizeof(struct aiocb64));
+		acb_list[i] = __USER_CAP(acb_list64[i], sizeof(struct aiocb64));
 	free(acb_list64, M_LIO);
 
 	error = kern_lio_listio(td, uap->mode, (intcap_t)uap->acb_list,
