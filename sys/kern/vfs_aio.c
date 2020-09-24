@@ -2707,13 +2707,14 @@ aiocb32_copyin_old_sigevent(void * __capability ujob,
 
 	CP(job32, *kjob, aio_fildes);
 	CP(job32, *kjob, aio_offset);
-	PTRIN_CP(job32, *kjob, aio_buf);
+	kjob->aio_buf = __USER_CAP(job32.aio_buf, job32.aio_nbytes);
 	CP(job32, *kjob, aio_nbytes);
 	CP(job32, *kjob, aio_lio_opcode);
 	CP(job32, *kjob, aio_reqprio);
 	CP(job32, *kjob, _aiocb_private.status);
 	CP(job32, *kjob, _aiocb_private.error);
-	PTRIN_CP(job32, *kjob, _aiocb_private.kernelinfo);
+	kjob->_aiocb_private.kernelinfo =
+	    (void * __capability)(uintcap_t)job32._aiocb_private.kernelinfo;
 	return (convert_old_sigevent32(&job32.aio_sigevent,
 	    &kjob->aio_sigevent));
 }
@@ -2730,13 +2731,14 @@ aiocb32_copyin(void * __capability ujob, struct aiocb *kjob)
 		return (error);
 	CP(job32, *kjob, aio_fildes);
 	CP(job32, *kjob, aio_offset);
-	PTRIN_CP(job32, *kjob, aio_buf);
+	kjob->aio_buf = __USER_CAP(job32.aio_buf, job32.aio_nbytes);
 	CP(job32, *kjob, aio_nbytes);
 	CP(job32, *kjob, aio_lio_opcode);
 	CP(job32, *kjob, aio_reqprio);
 	CP(job32, *kjob, _aiocb_private.status);
 	CP(job32, *kjob, _aiocb_private.error);
-	PTRIN_CP(job32, *kjob, _aiocb_private.kernelinfo);
+	kjob->_aiocb_private.kernelinfo =
+	    (void * __capability)(uintcap_t)job32._aiocb_private.kernelinfo;
 	return (convert_sigevent32(&job32.aio_sigevent, &kjob->aio_sigevent));
 }
 
