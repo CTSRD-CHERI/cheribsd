@@ -652,7 +652,6 @@ struct malloc_chunk {
   /*
    * It is a documented requirement that struct malloc_chunk be a power
    * of two in size.
-   * On 256-bit, there will be 16-bytes of padding before pad.
    */
   void* pad;
 #endif
@@ -796,6 +795,10 @@ typedef unsigned int flag_t;           /* The type of various bit flag sets */
 #define calloc_must_clear(p) (1)
 #endif /* MMAP_CLEARS */
 
+#define clear_meta(P, S)\
+  if (is_small(S)) memset(P, 0, sizeof(mchunk));\
+  else memset((P), 0, sizeof(tchunk));
+
 /* ---------------------- Overlaid data structures ----------------------- */
 
 /*
@@ -895,7 +898,6 @@ struct malloc_tree_chunk {
   /*
    * It is a documented requirement that struct malloc_chunk be a power
    * of two in size.
-   * On 256-bit, there will be 16-bytes of padding before pad.
    */
   void* pad;
 #endif
@@ -1832,6 +1834,7 @@ static void do_check_top_chunk(mstate m, mchunkptr p) {
   assert(sz == ((sp->base + sp->size) - (char*)p) - TOP_FOOT_SIZE);
   assert(pinuse(p));
   assert(!pinuse(chunk_plus_offset(p, sz)));
+  assert(!cdirty(p));
 }
 
 /* Check properties of (inuse) mmapped chunks */
@@ -2459,8 +2462,11 @@ static void unlink_large_chunk(mstate M, tchunkptr X) {
   else { tchunkptr TP = (tchunkptr)(P); insert_large_chunk(M, TP, S); }
 
 #define unlink_chunk(M, P, S)\
-  if (is_small(S)) unlink_small_chunk(M, P, S);\
-  else { tchunkptr TP = (tchunkptr)(P); unlink_large_chunk(M, TP); }
+  do {\
+    if (is_small(S)) unlink_small_chunk(M, P, S);\
+    else { tchunkptr TP = (tchunkptr)(P); unlink_large_chunk(M, TP); }\
+    clear_meta((P), (S));\
+  } while(0)
 
 
 /* Relays to internal calls to malloc/free from realloc, memalign etc */
@@ -2962,6 +2968,7 @@ static void dispose_chunk(mstate m, mchunkptr p, size_t psize) {
       check_freebuf_corrupt(m, next);
       if (next == m->top) {
         size_t tsize = m->topsize += psize;
+        clear_meta(m->top, m->topsize);
         m->top = p;
         p->head = tsize | PINUSE_BIT;
         if (p == m->dv) {
@@ -3402,8 +3409,7 @@ dlfree_internal(void* mem) {
           if(!cinuse(next)) {
             check_freebuf_corrupt(fm, next);
             if (next == fm->top) {
-	      /* Don't leek allocator pointers */
-	      memset(next, 0, sizeof(tchunk));
+              clear_meta(next, fm->topsize);
               size_t tsize = fm->topsize += psize;
               fm->top = p;
               p->head = dirtybits(p) | tsize | PINUSE_BIT;
@@ -3416,9 +3422,8 @@ dlfree_internal(void* mem) {
               goto postaction;
             }
             else if (next == fm->dv) {
-	      /* Don't leek allocator pointers */
-	      memset(next, 0, sizeof(tchunk));
               size_t dsize = fm->dvsize += psize;
+              clear_meta(next, fm->dvsize);
               fm->dv = p;
               set_size_and_pinuse_of_free_chunk(p, dsize);
               goto postaction;
@@ -3427,8 +3432,6 @@ dlfree_internal(void* mem) {
               size_t nsize = chunksize(next);
               psize += nsize;
               unlink_chunk(fm, next, nsize);
-	      /* Don't leek allocator pointers */
-	      memset(next, 0, sizeof(tchunk));
               set_size_and_pinuse_of_free_chunk(p, psize);
               if (p == fm->dv) {
                 fm->dvsize = psize;
@@ -3809,9 +3812,11 @@ static mchunkptr try_realloc_chunk(mstate m, mchunkptr p, size_t nb) {
 #endif
     }
     else if (next == m->top) {  /* extend into top */
+      assert(!cdirty(next));
       if (oldsize + m->topsize > nb) {
         size_t newsize = oldsize + m->topsize;
         size_t newtopsize = newsize - nb;
+        clear_meta(next, m->topsize);
         mchunkptr newtop = chunk_plus_offset(p, nb);
         set_inuse(m, p, nb);
         newtop->head = newtopsize |PINUSE_BIT;
@@ -3824,6 +3829,7 @@ static mchunkptr try_realloc_chunk(mstate m, mchunkptr p, size_t nb) {
       size_t dvs = m->dvsize;
       if (oldsize + dvs >= nb) {
         size_t dsize = oldsize + dvs - nb;
+        clear_meta(next, dvs);
         if (dsize >= MIN_CHUNK_SIZE) {
           mchunkptr r = chunk_plus_offset(p, nb);
           mchunkptr n = chunk_plus_offset(r, dsize);
@@ -3843,6 +3849,7 @@ static mchunkptr try_realloc_chunk(mstate m, mchunkptr p, size_t nb) {
       }
     }
     else if(!cinuse(next)) {
+      assert(!cdirty(next));
       size_t nextsize = chunksize(next);
       if (oldsize + nextsize >= nb) {
         size_t rsize = oldsize + nextsize - nb;
