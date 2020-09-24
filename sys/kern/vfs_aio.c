@@ -2861,7 +2861,8 @@ freebsd32_aio_suspend(struct thread *td, struct freebsd32_aio_suspend_args *uap)
 	    sizeof(ujoblist32[0]));
 	if (error == 0) {
 		for (i = uap->nent - 1; i >= 0; i--)
-			ujoblist[i] = __USER_CAP_UNBOUND(PTRIN(ujoblist32[i]));
+			ujoblist[i] = __USER_CAP(PTRIN(ujoblist32[i]),
+			    sizeof(struct aiocb32));
 
 		error = kern_aio_suspend(td, uap->nent, ujoblist, tsp);
 	}
@@ -3295,7 +3296,8 @@ freebsd64_aio_suspend(struct thread *td, struct freebsd64_aio_suspend_args *uap)
 	    uap->nent * sizeof(ujoblist64[0]));
 	if (error == 0) {
 		for (i = uap->nent - 1; i >= 0; i--)
-			ujoblist[i] = __USER_CAP_UNBOUND(ujoblist64[i]);
+			ujoblist[i] = __USER_CAP(ujoblist64[i],
+			    sizeof(struct aiocb64));
 
 		error = kern_aio_suspend(td, uap->nent, ujoblist, tsp);
 	}
