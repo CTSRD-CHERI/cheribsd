@@ -110,24 +110,23 @@ int
 cpu_fetch_syscall_args(struct thread *td)
 {
 	struct proc *p;
-	syscallarg_t *ap;
+	syscallarg_t *ap, *dst_ap;
 	struct syscall_args *sa;
 #if __has_feature(capabilities)
 	char * __capability stack_args = NULL;
 	u_int i;
 	int error;
 #endif
-	bool shift_args;
 
 	p = td->td_proc;
 	sa = &td->td_sa;
 	ap = &td->td_frame->tf_a[0];
+	dst_ap = &sa->args[0];
 
 	sa->code = td->td_frame->tf_t[0];
 
 	if (__predict_false(sa->code == SYS_syscall || sa->code == SYS___syscall)) {
 		sa->code = *ap++;
-		shift_args = true;
 
 #if __has_feature(capabilities)
 		/*
@@ -138,7 +137,8 @@ cpu_fetch_syscall_args(struct thread *td)
 			stack_args = (char * __capability)td->td_frame->tf_sp;
 #endif
 	} else {
-		shift_args = false;
+		*dst_ap = *ap++;
+		dst_ap++;
 	}
 
 	if (__predict_false(sa->code >= p->p_sysent->sv_size))
@@ -176,10 +176,7 @@ cpu_fetch_syscall_args(struct thread *td)
 	} else
 #endif
 	{
-		if (__predict_false(shift_args))
-			memcpy(sa->args, ap, (NARGREG - 1) * sizeof(syscallarg_t));
-		else
-			memcpy(sa->args, ap, NARGREG * sizeof(syscallarg_t));
+		memcpy(dst_ap, ap, (NARGREG - 1) * sizeof(syscallarg_t));
 	}
 
 	td->td_retval[0] = 0;
