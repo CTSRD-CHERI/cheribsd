@@ -295,7 +295,6 @@ struct aiocb_ops {
 	int	(*aio_copyin)(void * __capability ujob, struct aiocb *kjob);
 	long	(*fetch_status)(void * __capability ujob);
 	long	(*fetch_error)(void * __capability ujob);
-	void	(*free_kaiocb)(struct kaiocb *kjob);
 	int	(*store_status)(void * __capability ujob, long status);
 	int	(*store_error)(void * __capability ujob, long error);
 	int	(*store_kernelinfo)(void * __capability ujob, long jobref);
@@ -1402,13 +1401,6 @@ aiocb_fetch_error(void * __capability ujobp)
 	return (fuword(&ujob->_aiocb_private.error));
 }
 
-static void
-aiocb_free_kaiocb(struct kaiocb *kjob)
-{
-
-	uma_zfree(aiocb_zone, kjob);
-}
-
 static int
 aiocb_store_status(void * __capability ujobp, long status)
 {
@@ -1470,7 +1462,6 @@ static struct aiocb_ops aiocb_ops = {
 	.aio_copyin = aiocb_copyin,
 	.fetch_status = aiocb_fetch_status,
 	.fetch_error = aiocb_fetch_error,
-	.free_kaiocb = aiocb_free_kaiocb,
 	.store_status = aiocb_store_status,
 	.store_error = aiocb_store_error,
 	.store_kernelinfo = aiocb_store_kernelinfo,
@@ -1484,7 +1475,6 @@ static struct aiocb_ops aiocb_ops_osigevent = {
 	.aio_copyin = aiocb_copyin_old_sigevent,
 	.fetch_status = aiocb_fetch_status,
 	.fetch_error = aiocb_fetch_error,
-	.free_kaiocb = aiocb_free_kaiocb,
 	.store_status = aiocb_store_status,
 	.store_error = aiocb_store_error,
 	.store_kernelinfo = aiocb_store_kernelinfo,
@@ -1534,12 +1524,12 @@ aio_aqueue(struct thread *td, struct aiocb * __capability ujob, void *ujobptrp,
 	error = ops->aio_copyin(ujob, &job->uaiocb);
 	if (error) {
 		ops->store_error(ujob, error);
-		ops->free_kaiocb(job);
+		uma_zfree(aiocb_zone, job);
 		return (error);
 	}
 
 	if (job->uaiocb.aio_nbytes > IOSIZE_MAX) {
-		ops->free_kaiocb(job);
+		uma_zfree(aiocb_zone, job);
 		return (EINVAL);
 	}
 
@@ -1548,14 +1538,14 @@ aio_aqueue(struct thread *td, struct aiocb * __capability ujob, void *ujobptrp,
 	    job->uaiocb.aio_sigevent.sigev_notify != SIGEV_THREAD_ID &&
 	    job->uaiocb.aio_sigevent.sigev_notify != SIGEV_NONE) {
 		ops->store_error(ujob, EINVAL);
-		ops->free_kaiocb(job);
+		uma_zfree(aiocb_zone, job);
 		return (EINVAL);
 	}
 
 	if ((job->uaiocb.aio_sigevent.sigev_notify == SIGEV_SIGNAL ||
 	     job->uaiocb.aio_sigevent.sigev_notify == SIGEV_THREAD_ID) &&
 		!_SIG_VALID(job->uaiocb.aio_sigevent.sigev_signo)) {
-		ops->free_kaiocb(job);
+		uma_zfree(aiocb_zone, job);
 		return (EINVAL);
 	}
 
@@ -1600,7 +1590,7 @@ aio_aqueue(struct thread *td, struct aiocb * __capability ujob, void *ujobptrp,
 		error = EINVAL;
 	}
 	if (error) {
-		ops->free_kaiocb(job);
+		uma_zfree(aiocb_zone, job);
 		ops->store_error(ujob, error);
 		return (error);
 	}
@@ -1633,7 +1623,7 @@ aio_aqueue(struct thread *td, struct aiocb * __capability ujob, void *ujobptrp,
 
 	if (opcode == LIO_NOP) {
 		fdrop(fp, td);
-		ops->free_kaiocb(job);
+		uma_zfree(aiocb_zone, job);
 		return (0);
 	}
 
@@ -1697,7 +1687,7 @@ aqueue_fail:
 	knlist_delete(&job->klist, curthread, 0);
 	if (fp)
 		fdrop(fp, td);
-	ops->free_kaiocb(job);
+	uma_zfree(aiocb_zone, job);
 	ops->store_error(ujob, error);
 	return (error);
 }
@@ -2860,7 +2850,6 @@ static struct aiocb_ops aiocb32_ops = {
 	.aio_copyin = aiocb32_copyin,
 	.fetch_status = aiocb32_fetch_status,
 	.fetch_error = aiocb32_fetch_error,
-	.free_kaiocb = aiocb_free_kaiocb,	/* Identical to 64-bit */
 	.store_status = aiocb32_store_status,
 	.store_error = aiocb32_store_error,
 	.store_kernelinfo = aiocb32_store_kernelinfo,
@@ -2874,7 +2863,6 @@ static struct aiocb_ops aiocb32_ops_osigevent = {
 	.aio_copyin = aiocb32_copyin_old_sigevent,
 	.fetch_status = aiocb32_fetch_status,
 	.fetch_error = aiocb32_fetch_error,
-	.free_kaiocb = aiocb_free_kaiocb,	/* Identical to 64-bit */
 	.store_status = aiocb32_store_status,
 	.store_error = aiocb32_store_error,
 	.store_kernelinfo = aiocb32_store_kernelinfo,
@@ -3316,7 +3304,6 @@ static struct aiocb_ops aiocb64_ops = {
 	.aio_copyin = aiocb64_copyin,
 	.fetch_status = aiocb64_fetch_status,
 	.fetch_error = aiocb64_fetch_error,
-	.free_kaiocb = aiocb_free_kaiocb,	/* Identical to 64-bit */
 	.store_status = aiocb64_store_status,
 	.store_error = aiocb64_store_error,
 	.store_kernelinfo = aiocb64_store_kernelinfo,
@@ -3330,7 +3317,6 @@ static struct aiocb_ops aiocb64_ops_osigevent = {
 	.aio_copyin = aiocb64_copyin_old_sigevent,
 	.fetch_status = aiocb64_fetch_status,
 	.fetch_error = aiocb64_fetch_error,
-	.free_kaiocb = aiocb_free_kaiocb,	/* Identical to 64-bit */
 	.store_status = aiocb64_store_status,
 	.store_error = aiocb64_store_error,
 	.store_kernelinfo = aiocb64_store_kernelinfo,
