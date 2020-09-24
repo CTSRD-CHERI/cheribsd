@@ -525,6 +525,7 @@ MAN=	aac.4 \
 	tap.4 \
 	targ.4 \
 	tcp.4 \
+	tcp_bbr.4 \
 	tdfx.4 \
 	terasic_de4led.4 \
 	terasic_mtl.4 \
