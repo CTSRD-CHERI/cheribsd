@@ -3274,7 +3274,7 @@ freebsd64_aio_suspend(struct thread *td, struct freebsd64_aio_suspend_args *uap)
 {
 	struct timespec ts, *tsp;
 	struct aiocb * __capability * ujoblist;
-	void * /* __ptr64 */ *ujoblist64;
+	uint64_t *ujoblist64;
 	int error, i;
 
 	if (uap->nent < 0 || uap->nent > max_aio_queue_per_proc)
@@ -3290,7 +3290,7 @@ freebsd64_aio_suspend(struct thread *td, struct freebsd64_aio_suspend_args *uap)
 		tsp = NULL;
 
 	ujoblist = malloc(uap->nent * sizeof(ujoblist[0]), M_AIOS, M_WAITOK);
-	ujoblist64 = (void **)ujoblist;
+	ujoblist64 = (uint64_t *)ujoblist;
 	error = copyin(__USER_CAP_ARRAY(uap->aiocbp, uap->nent), ujoblist64,
 	    uap->nent * sizeof(ujoblist64[0]));
 	if (error == 0) {
