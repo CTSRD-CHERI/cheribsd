@@ -3135,7 +3135,7 @@ freebsd32_lio_listio(struct thread *td, struct freebsd32_lio_listio_args *uap)
 struct __aiocb_private64 {
 	int64_t	status;
 	int64_t	error;
-	void *kernelinfo;
+	uint64_t kernelinfo;
 };
 
 #ifdef COMPAT_FREEBSD6
@@ -3154,10 +3154,10 @@ typedef struct oaiocb64 {
 typedef struct aiocb64 {
 	int	aio_fildes;		/* File descriptor */
 	off_t	aio_offset;		/* File offset for I/O */
-	volatile void *aio_buf;		/* I/O buffer in process space */
+	uint64_t aio_buf;		/* I/O buffer in process space */
 	size_t	aio_nbytes;		/* Number of bytes for I/O */
 	int	__spare__[2];
-	void	*__spare2__;
+	uint64_t __spare2__;
 	int	aio_lio_opcode;		/* LIO opcode */
 	int	aio_reqprio;		/* Request priority -- ignored */
 	struct	__aiocb_private64 _aiocb_private;
@@ -3206,13 +3206,14 @@ aiocb64_copyin_old_sigevent(void * __capability ujob,
 
 	CP(job64, *kjob, aio_fildes);
 	CP(job64, *kjob, aio_offset);
-	CP(job64, *kjob, aio_buf);
+	kjob->aio_buf = __USER_CAP(job64.aio_buf, job64.aio_nbytes);
 	CP(job64, *kjob, aio_nbytes);
 	CP(job64, *kjob, aio_lio_opcode);
 	CP(job64, *kjob, aio_reqprio);
 	CP(job64, *kjob, _aiocb_private.status);
 	CP(job64, *kjob, _aiocb_private.error);
-	PTRIN_CP(job64, *kjob, _aiocb_private.kernelinfo);
+	kjob->_aiocb_private.kernelinfo =
+	    __USER_CAP_UNBOUND(job64._aiocb_private.kernelinfo);
 	return (convert_old_sigevent64(&job64.aio_sigevent,
 	    &kjob->aio_sigevent));
 }
