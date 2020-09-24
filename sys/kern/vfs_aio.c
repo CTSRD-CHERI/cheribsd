@@ -1433,7 +1433,7 @@ aiocb_store_kernelinfo(void * __capability ujobp, long jobref)
 	struct aiocb * __capability ujob;
 
 	ujob = ujobp;
-	return (suword(&ujob->_aiocb_private.kernelinfo, jobref));
+	return (sucap(&ujob->_aiocb_private.kernelinfo, jobref));
 }
 
 static void
@@ -3209,7 +3209,7 @@ aiocb64_copyin_old_sigevent(void * __capability ujob,
 	CP(job64, *kjob, _aiocb_private.status);
 	CP(job64, *kjob, _aiocb_private.error);
 	kjob->_aiocb_private.kernelinfo =
-	    __USER_CAP_UNBOUND(job64._aiocb_private.kernelinfo);
+	    (void * __capability)(uintcap_t)job64._aiocb_private.kernelinfo;
 	return (convert_old_sigevent64(&job64.aio_sigevent,
 	    &kjob->aio_sigevent));
 }
@@ -3233,7 +3233,7 @@ aiocb64_copyin(void * __capability ujob, struct aiocb *kjob)
 	CP(job64, *kjob, _aiocb_private.status);
 	CP(job64, *kjob, _aiocb_private.error);
 	kjob->_aiocb_private.kernelinfo =
-	    __USER_CAP_UNBOUND(job64._aiocb_private.kernelinfo);
+	    (void * __capability)(uintcap_t)job64._aiocb_private.kernelinfo;
 	return (convert_sigevent64(&job64.aio_sigevent, &kjob->aio_sigevent));
 }
 
