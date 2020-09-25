@@ -714,7 +714,7 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	struct thread *td;
 	struct proc *p;
 	struct trapframe *tf;
-	struct sigframe * __capability fp, frame;
+	struct sigframe *fp, frame;
 	struct sigacts *psp;
 	struct sysentvec *sysent;
 	int onstack, sig;
@@ -736,18 +736,18 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	/* Allocate and validate space for the signal handler context. */
 	if ((td->td_pflags & TDP_ALTSTACK) != 0 && !onstack &&
 	    SIGISMEMBER(psp->ps_sigonstack, sig)) {
-		fp = (struct sigframe * __capability)((uintcap_t)td->td_sigstk.ss_sp +
+		fp = (struct sigframe *)((uintptr_t)td->td_sigstk.ss_sp +
 		    td->td_sigstk.ss_size);
 #if defined(COMPAT_43)
 		td->td_sigstk.ss_flags |= SS_ONSTACK;
 #endif
 	} else {
-		fp = (struct sigframe * __capability)td->td_frame->tf_sp;
+		fp = (struct sigframe *)td->td_frame->tf_sp;
 	}
 
 	/* Make room, keeping the stack aligned */
 	fp--;
-	fp = (struct sigframe * __capability)STACKALIGN(fp);
+	fp = (struct sigframe *)STACKALIGN(fp);
 
 	/* Fill in the frame to copy out */
 	bzero(&frame, sizeof(frame));
@@ -769,18 +769,11 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	}
 
 	tf->tf_x[0]= sig;
-#if __has_feature(capabilities)
-	tf->tf_x[1] = (uintcap_t)cheri_setbounds(&fp->sf_si,
-	    sizeof(fp->sf_si));
-	tf->tf_x[2] = (uintcap_t)cheri_setbounds(&fp->sf_uc,
-	    sizeof(fp->sf_uc));
-#else
 	tf->tf_x[1] = (register_t)&fp->sf_si;
 	tf->tf_x[2] = (register_t)&fp->sf_uc;
-#endif
 
-	tf->tf_elr = (uintcap_t)catcher;
-	tf->tf_sp = (uintcap_t)fp;
+	tf->tf_elr = (register_t)catcher;
+	tf->tf_sp = (register_t)fp;
 	sysent = p->p_sysent;
 	if (sysent->sv_sigcode_base != 0)
 		tf->tf_lr = (register_t)sysent->sv_sigcode_base;
