@@ -281,6 +281,13 @@ pmap_lmem_unmap(void)
 	critical_exit();
 }
 
+static __inline register_t
+pmap_clg(pmap_t pmap)
+{
+
+	return (0);
+}
+
 #else  /* __mips_n64 */
 
 static __inline void
@@ -304,6 +311,13 @@ pmap_lmem_map2(vm_paddr_t phys1, vm_paddr_t phys2)
 
 static __inline vm_offset_t
 pmap_lmem_unmap(void)
+{
+
+	return (0);
+}
+
+static __inline register_t
+pmap_clg(pmap_t pmap)
 {
 
 	return (0);
@@ -3479,7 +3493,8 @@ pmap_activate(struct thread *td)
 	pmap_asid_alloc(pmap);
 	if (td == curthread) {
 		PCPU_SET(segbase, pmap->pm_segtab);
-		mips_wr_entryhi(pmap->pm_asid[cpuid].asid);
+		mips_wr_entryhi(TLBHI_ENTRY(0, pmap_clg(pmap),
+					pmap->pm_asid[cpuid].asid));
 	}
 
 	PCPU_SET(curpmap, pmap);
