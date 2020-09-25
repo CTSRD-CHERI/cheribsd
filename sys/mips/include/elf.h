@@ -117,7 +117,7 @@
 typedef struct {	/* Auxiliary vector entry on initial stack */
 	int32_t	a_type;			/* Entry type. */
 	union {
-		int32_t	a_val;		/* Integer value. */
+		int	a_val;		/* Integer value. */
 #if __ELF_WORD_SIZE == 32
 		void	*a_ptr;		/* Address. */
 		void	(*a_fcn)(void); /* Function pointer (not used). */
