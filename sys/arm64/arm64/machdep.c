@@ -87,10 +87,6 @@ __FBSDID("$FreeBSD$");
 #include <machine/vfp.h>
 #endif
 
-#if __has_feature(capabilities)
-#include <cheri/cheric.h>
-#endif
-
 #ifdef DEV_ACPI
 #include <contrib/dev/acpica/include/acpi.h>
 #include <machine/acpica_machdep.h>
@@ -416,47 +412,6 @@ set_dbregs32(struct thread *td, struct dbreg32 *regs)
 
 	printf("ARM64TODO: set_dbregs32");
 	return (EDOOFUS);
-}
-#endif
-
-#if __has_feature(capabilities)
-int
-fill_capregs(struct thread *td, struct capreg *regs)
-{
-	struct trapframe *frame;
-	int i;
-
-	frame = td->td_frame;
-	regs->sp = frame->tf_sp;
-	regs->lr = frame->tf_lr;
-	regs->elr = frame->tf_elr;
-	regs->ddc = frame->tf_ddc;
-
-	for (i = 0; i < nitems(frame->tf_x); i++) {
-		regs->x[i] = frame->tf_x[i];
-		if (cheri_gettag((void * __capability)frame->tf_x[i]))
-			regs->tagmask |= (uint64_t)1 << i;
-	}
-	if (cheri_gettag((void * __capability)frame->tf_lr))
-		regs->tagmask |= (uint64_t)1 << i;
-	i++;
-	if (cheri_gettag((void * __capability)frame->tf_sp))
-		regs->tagmask |= (uint64_t)1 << i;
-	i++;
-	if (cheri_gettag((void * __capability)frame->tf_elr))
-		regs->tagmask |= (uint64_t)1 << i;
-	i++;
-	if (cheri_gettag((void * __capability)frame->tf_ddc))
-		regs->tagmask |= (uint64_t)1 << i;
-
-	return (0);
-}
-
-int
-set_capregs(struct thread *td, struct capreg *regs)
-{
-
-	return (EOPNOTSUPP);
 }
 #endif
 
