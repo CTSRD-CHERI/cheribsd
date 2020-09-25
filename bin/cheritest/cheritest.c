@@ -1996,7 +1996,7 @@ cheritest_run_test(const struct cheri_test *ctp)
 	const char *xfail_reason;
 	char* failure_message;
 	ssize_t len;
-	xo_attr("classname", "%s", ctp->ct_name);
+	xo_attr("classname", "%s.%s", PROG, ctp->ct_name);
 	xo_attr("name", "%s", ctp->ct_desc);
 	xo_open_instance("testcase");
 	bzero(ccsp, sizeof(*ccsp));
