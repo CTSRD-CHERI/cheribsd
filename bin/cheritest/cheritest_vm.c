@@ -194,7 +194,7 @@ cheritest_vm_shm_open_anon_unix_surprise(const struct cheri_test *ctp __unused)
 		c = *map;
 
 		fprintf(stderr, "rx cap: ", _CHERI_PRINTF_CAP_FMT "\n",
-			_CHERI_PRINTF_CAP_ARG(c));
+		    _CHERI_PRINTF_CAP_ARG(c));
 
 		tag = cheri_gettag(c);
 		CHERITEST_VERIFY2(tag == 0, "tag read");
@@ -229,7 +229,7 @@ cheritest_vm_shm_open_anon_unix_surprise(const struct cheri_test *ctp __unused)
 		CHERITEST_VERIFY2(cheri_gettag(c) != 0, "tag written");
 
 		fprintf(stderr, "tx cap: ", _CHERI_PRINTF_CAP_FMT "\n",
-			_CHERI_PRINTF_CAP_ARG(c));
+		    _CHERI_PRINTF_CAP_ARG(c));
 
 		CHERITEST_CHECK_SYSCALL(munmap(map, getpagesize()));
 
@@ -615,7 +615,7 @@ test_cloadtags_mapped(const struct cheri_test *ctp __unused)
 	void * __capability * p;
 
 	p = CHERITEST_CHECK_SYSCALL(mmap(0, PAGE_SIZE, PROT_READ | PROT_WRITE,
-					 MAP_ANON, -1, 0));
+	    MAP_ANON, -1, 0));
 	c = (__cheri_tocap void * __capability * __capability)p;
 
 	p[1] = c;
@@ -624,7 +624,7 @@ test_cloadtags_mapped(const struct cheri_test *ctp __unused)
 	tags = __builtin_cheri_cap_load_tags(c);
 
 	CHERITEST_VERIFY2(tags == 0x6,
-		"incorrect result from cloadtags, 0x%" PRIx64 "\n", tags);
+	    "incorrect result from cloadtags, 0x%" PRIx64 "\n", tags);
 
 	munmap(p, PAGE_SIZE);
 	cheritest_success();
@@ -633,12 +633,12 @@ test_cloadtags_mapped(const struct cheri_test *ctp __unused)
 void
 test_fault_cloadtags_unmapped(const struct cheri_test *ctp __unused)
 {
-	uint64_t tags = 0;
+	uint64_t tags;
 	void * __capability c;
 	void * p;
 
 	p = CHERITEST_CHECK_SYSCALL(mmap(0, PAGE_SIZE, PROT_READ | PROT_WRITE,
-					 MAP_ANON, -1, 0));
+	    MAP_ANON, -1, 0));
 	munmap(p, PAGE_SIZE);
 	c = (__cheri_tocap void * __capability)p;
 
