@@ -149,16 +149,31 @@ pde_page_bound(vm_pointer_t ptr)
 #define	TLBHI_R_KERNEL		(0x03UL << TLBHI_R_SHIFT)
 #define	TLBHI_R_MASK		(0x03UL << TLBHI_R_SHIFT)
 #define	TLBHI_VA_R(va)		((va) & TLBHI_R_MASK)
+#if defined(CPU_CHERI)
+#define TLBHI_CLG_SHIFT		59
+#define TLBHI_CLG_USER		0x1ULL
+#define TLBHI_CLG_SUPER		0x2ULL
+#define TLBHI_CLG_KERN		0x4ULL
+#define TLBHI_CLG_MASK		(0x7ULL << TLBHI_CLG_SHIFT)
+#define TLBHI_CLG_OF(hi)	(((hi) && TLBHI_CLG_MASK) >> TLBHI_CLG_SHIFT)
+#else
+#define TLBHI_CLG_SHIFT		0
+#define TLBHI_CLG_MASK		0
+#endif
 #define	TLBHI_FILL_SHIFT	40
 #define	TLBHI_VPN2_SHIFT	(TLB_PAGE_SHIFT + 1)
 #define	TLBHI_VPN2_MASK		(((~((1UL << TLBHI_VPN2_SHIFT) - 1)) << (63 - TLBHI_FILL_SHIFT)) >> (63 - TLBHI_FILL_SHIFT))
 #define	TLBHI_VA_TO_VPN2(va)	((va) & TLBHI_VPN2_MASK)
-#define	TLBHI_ENTRY(va, asid)	((TLBHI_VA_R((va))) /* Region. */ | \
+#define	TLBHI_ENTRY(va, clg, asid) \
+				((TLBHI_VA_R((va))) /* Region. */ | \
+				 ((clg) << TLBHI_CLG_SHIFT) | \
 				 (TLBHI_VA_TO_VPN2((va))) /* VPN2. */ | \
 				 ((asid) & TLBHI_ASID_MASK))
 #else /* !defined(__mips_n64) */
 #define	TLBHI_PAGE_MASK		(2 * PAGE_SIZE - 1)
-#define	TLBHI_ENTRY(va, asid)	(((va) & ~TLBHI_PAGE_MASK) | ((asid) & TLBHI_ASID_MASK))
+#define	TLBHI_ENTRY(va, clg, asid) \
+				(((va) & ~TLBHI_PAGE_MASK) | \
+				 ((asid) & TLBHI_ASID_MASK))
 #endif /* defined(__mips_n64) */
 
 /*

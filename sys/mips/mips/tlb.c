@@ -94,12 +94,26 @@ tlb_write_indexed(void)
 	mips_cp0_sync();
 }
 
-static void tlb_invalidate_one(unsigned);
+static void tlb_invalidate_one(unsigned, register_t);
+
+static inline void
+tlb_pmap_asserts(pmap_t pmap, register_t clg)
+{
+#ifdef INVARIANTS
+	if (pmap != PCPU_GET(curpmap))
+		return;
+
+#ifdef CHERI_CAPREVOKE
+	KASSERT(pmap->flags.clg == !!(clg & TLBHI_CLG_USER),
+		("read bad CLG from TLB"));
+#endif
+#endif
+}
 
 void
 tlb_insert_wired(unsigned i, vm_offset_t va, pt_entry_t pte0, pt_entry_t pte1)
 {
-	register_t asid;
+	register_t oentryhi, clg;
 	register_t s;
 	uint32_t pagemask;
 	unsigned long mask, size;
@@ -115,16 +129,17 @@ tlb_insert_wired(unsigned i, vm_offset_t va, pt_entry_t pte0, pt_entry_t pte1)
 	va &= ~mask;
 
 	s = intr_disable();
-	asid = mips_rd_entryhi() & TLBHI_ASID_MASK;
+	oentryhi = mips_rd_entryhi();
+	clg = (oentryhi & TLBHI_CLG_MASK) >> TLBHI_CLG_SHIFT;
 
 	mips_wr_index(i);
 	mips_wr_pagemask(pagemask);
-	mips_wr_entryhi(TLBHI_ENTRY(va, 0));
+	mips_wr_entryhi(TLBHI_ENTRY(va, clg, 0));
 	mips_wr_entrylo0(pte0);
 	mips_wr_entrylo1(pte1);
 	tlb_write_indexed();
 
-	mips_wr_entryhi(asid);
+	mips_wr_entryhi(oentryhi & (TLBHI_ASID_MASK | TLBHI_CLG_MASK));
 	mips_wr_pagemask(0);
 	intr_restore(s);
 }
@@ -132,51 +147,58 @@ tlb_insert_wired(unsigned i, vm_offset_t va, pt_entry_t pte0, pt_entry_t pte1)
 void
 tlb_invalidate_address(struct pmap *pmap, vm_offset_t va)
 {
-	register_t asid;
+	register_t oentryhi, clg;
 	register_t s;
 	int i;
 
 	va &= ~PAGE_MASK;
 
 	s = intr_disable();
-	asid = mips_rd_entryhi() & TLBHI_ASID_MASK;
+	oentryhi = mips_rd_entryhi();
+	clg = (oentryhi & TLBHI_CLG_MASK) >> TLBHI_CLG_SHIFT;
+
+	tlb_pmap_asserts(pmap, clg);
 
 	mips_wr_pagemask(0);
-	mips_wr_entryhi(TLBHI_ENTRY(va, pmap_asid(pmap)));
+	mips_wr_entryhi(TLBHI_ENTRY(va, clg, pmap_asid(pmap)));
 	tlb_probe();
 	i = mips_rd_index();
 	if (i >= 0)
-		tlb_invalidate_one(i);
-	mips_wr_entryhi(asid);
+		tlb_invalidate_one(i, clg);
+	mips_wr_entryhi(oentryhi & (TLBHI_CLG_MASK | TLBHI_ASID_MASK));
 	intr_restore(s);
 }
 
 void
 tlb_invalidate_all(void)
 {
-	register_t asid;
+	register_t oentryhi, clg;
 	register_t s;
 	unsigned i;
 
 	s = intr_disable();
-	asid = mips_rd_entryhi() & TLBHI_ASID_MASK;
+	oentryhi = mips_rd_entryhi();
+	clg = (oentryhi & TLBHI_CLG_MASK) >> TLBHI_CLG_SHIFT;
 
 	for (i = mips_rd_wired(); i < num_tlbentries; i++)
-		tlb_invalidate_one(i);
+		tlb_invalidate_one(i, clg);
 
-	mips_wr_entryhi(asid);
+	mips_wr_entryhi(oentryhi & (TLBHI_CLG_MASK | TLBHI_ASID_MASK));
 	intr_restore(s);
 }
 
 void
 tlb_invalidate_all_user(struct pmap *pmap)
 {
-	register_t asid;
+	register_t oentryhi, clg;
 	register_t s;
 	unsigned i;
 
 	s = intr_disable();
-	asid = mips_rd_entryhi() & TLBHI_ASID_MASK;
+	oentryhi = mips_rd_entryhi();
+	clg = (oentryhi & TLBHI_CLG_MASK) >> TLBHI_CLG_SHIFT;
+
+	tlb_pmap_asserts(pmap, clg);
 
 	for (i = mips_rd_wired(); i < num_tlbentries; i++) {
 		register_t uasid;
@@ -198,10 +220,10 @@ tlb_invalidate_all_user(struct pmap *pmap)
 			if (uasid != pmap_asid(pmap))
 				continue;
 		}
-		tlb_invalidate_one(i);
+		tlb_invalidate_one(i, clg);
 	}
 
-	mips_wr_entryhi(asid);
+	mips_wr_entryhi(oentryhi & (TLBHI_CLG_MASK | TLBHI_ASID_MASK));
 	intr_restore(s);
 }
 
@@ -213,7 +235,7 @@ tlb_invalidate_all_user(struct pmap *pmap)
 void
 tlb_invalidate_range(pmap_t pmap, vm_offset_t start, vm_offset_t end)
 {
-	register_t asid, end_hi, hi, hi_pagemask, s, save_asid, start_hi;
+	register_t asid, clg, end_hi, hi, hi_pagemask, oentryhi, s, start_hi;
 	int i;
 
 	KASSERT(start < end || (end == 0 && start > 0),
@@ -227,11 +249,14 @@ tlb_invalidate_range(pmap_t pmap, vm_offset_t start, vm_offset_t end)
 	end = roundup2(end, 1 << TLBMASK_SHIFT);
 
 	s = intr_disable();
-	save_asid = mips_rd_entryhi() & TLBHI_ASID_MASK;
+	oentryhi = mips_rd_entryhi();
+	clg = (oentryhi & TLBHI_CLG_MASK) >> TLBHI_CLG_SHIFT;
+
+	tlb_pmap_asserts(pmap, clg);
 
 	asid = pmap_asid(pmap);
-	start_hi = TLBHI_ENTRY(start, asid);
-	end_hi = TLBHI_ENTRY(end, asid);
+	start_hi = TLBHI_ENTRY(start, clg, asid);
+	end_hi = TLBHI_ENTRY(end, clg, asid);
 
 	/*
 	 * Select the fastest method for invalidating the TLB entries.
@@ -249,7 +274,7 @@ tlb_invalidate_range(pmap_t pmap, vm_offset_t start, vm_offset_t end)
 			tlb_probe();
 			i = mips_rd_index();
 			if (i >= 0)
-				tlb_invalidate_one(i);
+				tlb_invalidate_one(i, clg);
 		}
 	} else {
 		/*
@@ -269,12 +294,12 @@ tlb_invalidate_range(pmap_t pmap, vm_offset_t start, vm_offset_t end)
 				hi_pagemask = mips_rd_pagemask();
 				if (hi >= (start_hi & ~(hi_pagemask <<
 				    TLBMASK_SHIFT)))
-					tlb_invalidate_one(i);
+					tlb_invalidate_one(i, clg);
 			}
 		}
 	}
 
-	mips_wr_entryhi(save_asid);
+	mips_wr_entryhi(oentryhi & (TLBHI_CLG_MASK | TLBHI_ASID_MASK));
 	intr_restore(s);
 }
 
@@ -304,7 +329,7 @@ tlb_save(void)
 void
 tlb_update(struct pmap *pmap, vm_offset_t va, pt_entry_t pte)
 {
-	register_t asid;
+	register_t oentryhi, clg;
 	register_t s;
 	int i;
 	uint32_t pagemask;
@@ -320,10 +345,13 @@ tlb_update(struct pmap *pmap, vm_offset_t va, pt_entry_t pte)
 	pte &= ~TLBLO_SWBITS_MASK;
 
 	s = intr_disable();
-	asid = mips_rd_entryhi() & TLBHI_ASID_MASK;
+	oentryhi = mips_rd_entryhi();
+	clg = (oentryhi & TLBHI_CLG_MASK) >> TLBHI_CLG_SHIFT;
+
+	tlb_pmap_asserts(pmap, clg);
 
 	mips_wr_pagemask(pagemask);
-	mips_wr_entryhi(TLBHI_ENTRY(va, pmap_asid(pmap)));
+	mips_wr_entryhi(TLBHI_ENTRY(va, clg, pmap_asid(pmap)));
 	tlb_probe();
 	i = mips_rd_index();
 	if (i >= 0) {
@@ -352,16 +380,17 @@ tlb_update(struct pmap *pmap, vm_offset_t va, pt_entry_t pte)
 		tlb_write_indexed();
 	}
 
-	mips_wr_entryhi(asid);
+	mips_wr_entryhi(oentryhi & (TLBHI_CLG_MASK | TLBHI_ASID_MASK));
 	mips_wr_pagemask(0);
 	intr_restore(s);
 }
 
 static void
-tlb_invalidate_one(unsigned i)
+tlb_invalidate_one(unsigned i, register_t clg)
 {
 	/* XXX an invalid ASID? */
-	mips_wr_entryhi(TLBHI_ENTRY(MIPS_KSEG0_START + (2 * i * PAGE_SIZE), 0));
+	mips_wr_entryhi(TLBHI_ENTRY(MIPS_KSEG0_START + (2 * i * PAGE_SIZE),
+					clg, 0));
 	mips_wr_entrylo0(0);
 	mips_wr_entrylo1(0);
 	mips_wr_pagemask(0);
