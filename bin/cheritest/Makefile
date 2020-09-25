@@ -42,6 +42,8 @@ SRCS+=	cheritest_bounds_globals.c					\
 SRCS+=	cheritest_sentries.c
 .endif
 
+CFLAGS+=	'-DPROG="${PROG}"'
+
 CHERITEST_DIR:=	${.PARSEDIR}
 
 .if ${MACHINE_ABI:Mpurecap}

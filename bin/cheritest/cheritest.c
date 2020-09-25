@@ -1802,10 +1802,10 @@ usage(void)
 
 	fprintf(stderr,
 "usage:\n"
-"    cheritest [options] -l               -- List tests\n"
-"    cheritest [options] -a               -- Run all tests\n"
-"    cheritest [options] <test> [...]     -- Run specified tests\n"
-"    cheritest [options] -g <glob> [...]  -- Run matching tests\n"
+"    " PROG " [options] -l               -- List tests\n"
+"    " PROG " [options] -a               -- Run all tests\n"
+"    " PROG " [options] <test> [...]     -- Run specified tests\n"
+"    " PROG " [options] -g <glob> [...]  -- Run matching tests\n"
 "\n"
 "options:\n"
 "    -f  -- Only include \"fast\" tests\n"
@@ -1827,6 +1827,7 @@ list_tests(void)
 	u_int i;
 	const char *xfail_reason;
 
+	xo_attr("name", "%s", PROG);
 	xo_open_container("testsuite");
 	xo_open_list("testcase");
 	for (i = 0; i < cheri_tests_len; i++) {
@@ -2499,7 +2500,7 @@ main(int argc, char *argv[])
 	}
 #endif
 	xo_open_container("testsuites");
-	xo_attr("name", "%s", "cheritest");
+	xo_attr("name", "%s", PROG);
 	xo_open_container("testsuite");
 	xo_open_list("test");
 	if (run_all) {
