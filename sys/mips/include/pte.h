@@ -209,9 +209,9 @@ typedef uint64_t pd_entry_t;
  *
  * Upper bits of a 64 bit PTE:
  *
- *   63-62   61-60    59   58 -- 56    55   54   53
+ *   63-62  61  60    59   58 -- 56    55   54   53
  *   ------------------------------------------------
- *  |  RG  |       | CRO | PG SZ IDX | MN | W  | RO |
+ *  |  RG  |CLG|   | CRO | PG SZ IDX | MN | W  | RO |
  *   ------------------------------------------------
  *
  * VM flags managed in software:
@@ -220,6 +220,9 @@ typedef uint64_t pd_entry_t;
  *      On CHERI, used for cap-store (63) and -load (62) inhibit bits and
  *      exposed to hardware.  In MIPS64, these are the Read Inhibit (63)
  *      and eXecute Inhibit (62) bits and are also exposed to hardware.
+ *
+ *  CLG: CHERI-only.  Capability Load Generation.  Understood by hardware,
+ *       like the cal flow inhibit bits inside RG.
  *
  *  PG SZ IDX: Page Size Index (0-7).
  *      Index   Page Mask (Binary)  HW Page Size
@@ -273,6 +276,7 @@ typedef uint64_t pd_entry_t;
  */
 #define	PTE_SCI			(0x1ULL << 63)
 #define	PTE_LCI			(0x1ULL << 62)
+#define	PTE_CLG			(0x1ULL << 61)
 #endif
 
 /*
