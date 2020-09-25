@@ -90,17 +90,6 @@ _start:
 	/* Drop to EL1 */
 	bl	drop_to_el1
 
-#if __has_feature(capabilities)
-	/*
-	 * Enable Morello instructions at EL1. We will enable them at EL0
-	 * later when we know userspace is expecting to use them.
-	 */
-	mrs	x2, cpacr_el1
-	bic	x2, x2, CPACR_CEN_MASK
-	orr	x2, x2, CPACR_CEN_TRAP_EL0
-	msr	cpacr_el1, x2
-#endif
-
 	/*
 	 * Disable the MMU. We may have entered the kernel with it on and
 	 * will need to update the tables later. If this has been set up
@@ -277,12 +266,7 @@ drop_to_el1:
 
 	/* Hypervisor trap functions */
 	adr	x2, hyp_vectors
-#if __has_feature(capabilities)
-	cvtp	c2, x2
-	msr	cvbar_el2, c2
-#else
 	msr	vbar_el2, x2
-#endif
 
 	mov	x2, #(PSR_F | PSR_I | PSR_A | PSR_D | PSR_M_EL1h)
 	msr	spsr_el2, x2
@@ -302,12 +286,7 @@ drop_to_el1:
 2:
 
 	/* Set the address to return to our return address */
-#if __has_feature(capabilities)
-	cvtp	c30, x30
-	msr	celr_el2, c30
-#else
 	msr	elr_el2, x30
-#endif
 	isb
 
 	eret
@@ -618,12 +597,7 @@ build_l1_block_pagetable:
 
 	/* Build the L1 block entry */
 	orr	x12, x7, #L1_BLOCK
-#ifdef ATTR_DEFAULT_LOW
-	orr	x12, x12, #(ATTR_DEFAULT_LOW)
-	orr	x12, x12, #(ATTR_DEFAULT_HIGH)
-#else
 	orr	x12, x12, #(ATTR_DEFAULT)
-#endif
 
 	/* Only use the output address bits */
 	lsr	x9, x9, #L1_SHIFT
@@ -661,12 +635,7 @@ build_l2_block_pagetable:
 	/* Build the L2 block entry */
 	lsl	x12, x7, #2
 	orr	x12, x12, #L2_BLOCK
-#ifdef ATTR_DEFAULT_LOW
-	orr	x12, x12, #(ATTR_DEFAULT_LOW)
-	orr	x12, x12, #(ATTR_DEFAULT_HIGH)
-#else
 	orr	x12, x12, #(ATTR_DEFAULT)
-#endif
 	orr	x12, x12, #(ATTR_S1_UXN)
 
 	/* Only use the output address bits */
@@ -690,12 +659,7 @@ start_mmu:
 
 	/* Load the exception vectors */
 	ldr	x2, =exception_vectors
-#if __has_feature(capabilities)
-	cvtp	c2, x2
-	msr	cvbar_el1, c2
-#else
 	msr	vbar_el1, x2
-#endif
 
 	/* Load ttbr0 and ttbr1 */
 	msr	ttbr0_el1, x27
@@ -768,13 +732,8 @@ mair:
 		MAIR_ATTR(MAIR_NORMAL_WB, VM_MEMATTR_WRITE_BACK)    |	\
 		MAIR_ATTR(MAIR_NORMAL_WT, VM_MEMATTR_WRITE_THROUGH)
 tcr:
-#if __has_feature(capabilities)
-#define	TCR_MORELLO	(TCR_HPD1 | TCR_HWU1)
-#else
-#define	TCR_MORELLO	0
-#endif
 	.quad (TCR_TxSZ(64 - VIRT_BITS) | TCR_TG1_4K | \
-	    TCR_CACHE_ATTRS | TCR_SMP_ATTRS | TCR_MORELLO)
+	    TCR_CACHE_ATTRS | TCR_SMP_ATTRS)
 sctlr_set:
 	/* Bits to set */
 	.quad (SCTLR_LSMAOE | SCTLR_nTLSMD | SCTLR_UCI | SCTLR_SPAN | \
