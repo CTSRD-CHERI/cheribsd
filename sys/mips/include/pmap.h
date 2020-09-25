@@ -94,6 +94,17 @@ struct pmap {
 		u_int32_t gen:ASIDGEN_BITS;	/* its generation number */
 	}      pm_asid[MAXSMPCPU];
 	struct pmap_statistics pm_stats;	/* pmap statistics */
+
+#ifdef CHERI_CAPREVOKE
+	struct {
+		/*
+		 * Capability load generation bit.  The hardware kernel CLG
+		 * reflects this bit in the kernel_pmap, while the hardware
+		 * user CLG reflects this bit in the activated pmap.
+		 */
+		unsigned clg:1;
+	} flags;
+#endif
 };
 
 typedef struct pmap *pmap_t;
