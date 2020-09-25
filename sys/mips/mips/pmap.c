@@ -189,7 +189,8 @@ static void _pmap_unwire_ptp(pmap_t pmap, vm_offset_t va, vm_page_t m);
 static vm_page_t pmap_allocpte(pmap_t pmap, vm_offset_t va, u_int flags);
 static vm_page_t _pmap_allocpte(pmap_t pmap, unsigned ptepindex, u_int flags);
 static int pmap_unuse_pt(pmap_t, vm_offset_t, pd_entry_t);
-static pt_entry_t init_pte_prot(vm_page_t m, vm_prot_t access, vm_prot_t prot);
+static pt_entry_t init_pte_prot(pmap_t pmap, vm_page_t m, vm_prot_t access,
+    vm_prot_t prot);
 
 static void pmap_invalidate_page_action(void *arg);
 static void pmap_invalidate_range_action(void *arg);
@@ -321,12 +322,24 @@ pmap_lmem_unmap(void)
 	return (0);
 }
 
+#ifdef CHERI_CAPREVOKE
+static __inline register_t
+pmap_clg(pmap_t pmap)
+{
+
+        KASSERT(pmap != kernel_pmap, ("clg of kernel_pmap"));
+
+        return (pmap->flags.clg ? TLBHI_CLG_USER : 0) |
+                (kernel_pmap->flags.clg ? TLBHI_CLG_KERN : 0);
+}
+#else
 static __inline register_t
 pmap_clg(pmap_t pmap)
 {
 
 	return (0);
 }
+#endif
 #endif /* !__mips_n64 */
 
 static __inline int
@@ -1158,6 +1171,10 @@ pmap_pinit0(pmap_t pmap)
 	PCPU_SET(curpmap, pmap);
 	TAILQ_INIT(&pmap->pm_pvchunk);
 	bzero(&pmap->pm_stats, sizeof pmap->pm_stats);
+
+#ifdef CHERI_CAPREVOKE
+	pmap->flags.clg = 0;
+#endif
 }
 
 static void
@@ -1217,6 +1234,10 @@ pmap_pinit(pmap_t pmap)
 	}
 	TAILQ_INIT(&pmap->pm_pvchunk);
 	bzero(&pmap->pm_stats, sizeof pmap->pm_stats);
+
+#ifdef CHERI_CAPREVOKE
+	pmap->flags.clg = 0;
+#endif
 
 	return (1);
 }
@@ -2219,7 +2240,7 @@ pmap_enter(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot,
 	if ((m->oflags & VPO_UNMANAGED) == 0)
 		VM_PAGE_OBJECT_BUSY_ASSERT(m);
 	pa = VM_PAGE_TO_PHYS(m);
-	newpte = TLBLO_PA_TO_PFN(pa) | init_pte_prot(m, flags, prot);
+	newpte = TLBLO_PA_TO_PFN(pa) | init_pte_prot(pmap, m, flags, prot);
 	if ((flags & PMAP_ENTER_WIRED) != 0)
 		newpte |= PTE_W;
 	if (is_kernel_pmap(pmap))
@@ -3503,6 +3524,11 @@ pmap_activate(struct thread *td)
 	oldpmap = PCPU_GET(curpmap);
 	cpuid = PCPU_GET(cpuid);
 
+	/*
+	 * XXX: does anything go wrong if we elide this down to the
+	 * mips_wr_entryhi if pmap == oldpmap && td == curthread?
+	 */
+
 	if (oldpmap)
 		CPU_CLR_ATOMIC(cpuid, &oldpmap->pm_active);
 	CPU_SET_ATOMIC(cpuid, &pmap->pm_active);
@@ -3649,7 +3675,7 @@ pmap_asid_alloc(pmap)
 }
 
 static pt_entry_t
-init_pte_prot(vm_page_t m, vm_prot_t access, vm_prot_t prot)
+init_pte_prot(pmap_t pmap, vm_page_t m, vm_prot_t access, vm_prot_t prot)
 {
 	pt_entry_t rw;
 
@@ -3685,6 +3711,11 @@ init_pte_prot(vm_page_t m, vm_prot_t access, vm_prot_t prot)
 #ifdef CPU_CHERI
 	if ((prot & VM_PROT_READ_CAP) == 0)
 		rw |= PTE_LCI;
+#ifdef CHERI_CAPREVOKE
+	else {
+		rw |= (pmap->flags.clg) ? PTE_CLG : 0;
+	}
+#endif
 #endif
 	return (rw);
 }
@@ -3894,6 +3925,237 @@ pmap_emulate_capdirty(pmap_t pmap, vm_offset_t va)
 	PMAP_UNLOCK(pmap);
 	return (0);
 }
+
+#ifdef CHERI_CAPREVOKE
+void
+pmap_caploadgen_next(pmap_t pmap)
+{
+
+	PMAP_LOCK(pmap);
+	/*
+	 * OK to do it this way around here because we won't install new
+	 * entries until the lock is dropped.  This simplifies the job of
+	 * tlb_pmap_asserts.
+	 */
+	pmap_invalidate_all(pmap);
+	pmap->flags.clg++;
+	PMAP_UNLOCK(pmap);
+}
+
+static void
+pmap_caploadgen_test_all_clean(vm_page_t m)
+{
+	pv_entry_t pv;
+	pt_entry_t *pte;
+	bool all_clean = true;
+	pmap_t pmap = NULL;
+
+	rw_rlock(&pvh_global_lock);
+	TAILQ_FOREACH(pv, &m->md.pv_list, pv_list) {
+		if (PV_PMAP(pv) != pmap) {
+			if (pmap)
+				PMAP_UNLOCK(pmap);
+			pmap = PV_PMAP(pv);
+			PMAP_LOCK(pmap);
+		}
+
+		pte = pmap_pte(pmap, pv->pv_va);
+		KASSERT((pte != NULL) && (pte_test(pte, PTE_V)),
+		    ("pmap_caploadgen_test_all_clean: bad PTE"));
+
+		if (!pte_test(pte, PTE_CRO)) {
+			all_clean = false;
+			break;
+		}
+	}
+
+	rw_runlock(&pvh_global_lock);
+
+	/*
+	 * It is possible, amusingly enough, that we raced a removal of the
+	 * last PTE for this page.  If that's true, we won't have acquired
+	 * a pmap lock.
+	 */
+	if (pmap)
+		PMAP_UNLOCK(pmap);
+
+	/*
+	 * It's important that we test the PGA_CAPDIRTY flag again *after*
+	 * we've looked at all the PTEs: we might have raced a removal of a PTE
+	 * that had PTE_SCI clear.
+	 *
+	 * Despite not holding pmap LOCKed right now, something is preventing
+	 * new mappings (PMAP_CAPLOADGEN_EXCLUSIVE) and so we don't need to
+	 * worry that we're missing something here.
+	 */
+	if (all_clean && !(vm_page_astate_load(m).flags & PGA_CAPDIRTY)) {
+		vm_page_aflag_clear(m, PGA_CAPSTORE);
+	}
+}
+
+int
+pmap_caploadgen_update(pmap_t pmap, vm_offset_t va, vm_page_t *mp, int flags)
+{
+	enum pmap_caploadgen_res res;
+	pt_entry_t *pte, npte = 0; // opte = 0
+	vm_page_t m;
+
+	PMAP_LOCK(pmap);
+	pte = pmap_pte(pmap, va);
+	if (pte == NULL) {
+		m = NULL;
+		res = PMAP_CAPLOADGEN_UNABLE;
+		goto out;
+	}
+
+	npte = *pte;
+
+	/*
+	 * Being UNABLE to update a page that isn't here isn't surprising.
+	 * Returning UNABLE for LCI might be: there's a page here, so we could
+	 * scan it and even could update it.  But either we're CLG faulting on
+	 * a LCI page, which is unusual, or we're sweeping through a VM object
+	 * that looks like it shouldn't have LCI set (because we would have
+	 * skipped out sooner, otherwise), which is also unusual.  Play it safe
+	 * and make the VM figure it out.
+	 */
+	if (!pte_test(&npte, PTE_V) || pte_test(&npte, PTE_LCI)) {
+		m = NULL;
+		res = PMAP_CAPLOADGEN_UNABLE;
+		goto out;
+	}
+
+	if (!!pte_test(&npte, PTE_CLG) == pmap->flags.clg) {
+		/* Page already scanned, just update TLB (maybe redundantly) */
+		if (flags & PMAP_CAPLOADGEN_UPDATETLB)
+			tlb_update(pmap, va, npte);
+
+		m = NULL;
+		res = PMAP_CAPLOADGEN_ALREADY;
+		goto out;
+	}
+
+	KASSERT(!pte_test(&npte, PTE_G), ("PTE_G w/ CLG mismatch va=%lx", va));
+
+	m = PHYS_TO_VM_PAGE(TLBLO_PTE_TO_PA(npte));
+	if (*mp == m) {
+		/*
+		 * We expected this page here (i.e., this is the page we just
+		 * scanned), so go ahead and update.  We know that the CLG bits
+		 * must still be wrong in light of the earlier test.
+		 */
+		res = PMAP_CAPLOADGEN_OK;
+		if (pmap->flags.clg) {
+			pte_set(&npte, PTE_CLG);
+		} else {
+			pte_clear(&npte, PTE_CLG);
+		}
+		if (!(flags & PMAP_CAPLOADGEN_HASCAPS)) {
+			/*
+			 * We didn't see a capability on this page; step this
+			 * PTE closer to being cap-clean or take the per-page
+			 * PGA_CAPDIRTY flag down.
+			 *
+			 * This code is simpler than the RISC-V equivalent
+			 * as we don't have PTWs that might do async updates of
+			 * the PTEs and our TLB miss handler paths are read-only
+			 * until grabbing the pmap lock, which we hold.
+			 */
+			if (!pte_test(&npte, PTE_SCI)) {
+				/* Raise PTE inhibit; CAP-DIRTY -> DIRTYABLE */
+				pte_set(&npte, PTE_SCI);
+			} else if (!pte_test(&npte, PTE_CRO)) {
+				/* PTE CAP-DIRTYABLE -> CAP-CLEAN */
+				pte_set(&npte, PTE_CRO);
+			} else if (flags & PMAP_CAPLOADGEN_EXCLUSIVE) {
+				/* No new mappings possible */
+				vm_page_astate_t mas = vm_page_astate_load(m);
+
+				if (mas.flags & PGA_CAPDIRTY) {
+					/* Page-level cleaning: -?> VACANT */
+					vm_page_aflag_clear(m, PGA_CAPDIRTY);
+				} else if (mas.flags & PGA_CAPSTORE) {
+					/* PTE CAP-CLEAN; page -?> IDLE */
+					*pte = npte;
+					if (flags & PMAP_CAPLOADGEN_UPDATETLB) {
+						tlb_update(pmap, va, npte);
+					}
+					PMAP_UNLOCK(pmap);
+					pmap_caploadgen_test_all_clean(m);
+					goto out_unlocked;
+				}
+			}
+		} else {
+			/*
+			 * Page has caps; may as well mark it dirty if we're
+			 * allowed to store here.
+			 *
+			 * We could clear PGA_CAPDIRTY here, too, but it
+			 * probably doesn't get set often ough to merit.
+			 */
+			if (!pte_test(&npte, PTE_CRO)) {
+				pte_clear(&npte, PTE_SCI);
+			}
+		}
+		*pte = npte;
+		if (flags & PMAP_CAPLOADGEN_UPDATETLB) {
+			tlb_update(pmap, va, npte);
+		}
+	} else if (!(vm_page_astate_load(m).flags & PGA_CAPSTORE)) {
+		KASSERT(pte_test(&npte, PTE_CRO), ("!PGA_CAPSTORE but !CRO?"));
+		KASSERT(pte_test(&npte, PTE_SCI), ("!PGA_CAPSTORE but !SCI?"));
+
+		if (flags & PMAP_CAPLOADGEN_UPDATETLB) {
+			/*
+			 * For tag-independent faults, we might still raise a
+			 * fault for !PGA_CAPSTORE pages if the TLB is holding
+			 * a stale LCLG.  Since the page really ought to be
+			 * capability clean at this point, we should be OK to
+			 * arbitarily manipulate the LCLG, so appease the TLB.
+			 */
+			if (pmap->flags.clg) {
+				pte_set(&npte, PTE_CLG);
+			} else {
+				pte_clear(&npte, PTE_CLG);
+			}
+			*pte = npte;
+			tlb_update(pmap, va, npte);
+		}
+
+		m = NULL;
+		res = PMAP_CAPLOADGEN_CLEAN;
+	} else if ((flags & PMAP_CAPLOADGEN_WIRE) && !vm_page_wire_mapped(m)) {
+		/* Can't wire this one; give up */
+		m = NULL;
+		res = PMAP_CAPLOADGEN_TEARDOWN;
+	} else if (pte_test(&npte, PTE_CRO)) {
+		KASSERT(pte_test(&npte, PTE_SCI), ("CRO but !SCI?"));
+		res = pte_test(&npte, PTE_D) ?
+		    PMAP_CAPLOADGEN_SCAN_CLEAN_RW :
+		    PMAP_CAPLOADGEN_SCAN_CLEAN_RO;
+	} else if (pte_test(&npte, PTE_D)) {
+		res = PMAP_CAPLOADGEN_SCAN_RW;
+	} else {
+		res = PMAP_CAPLOADGEN_SCAN_RO;
+	}
+
+
+out:
+	PMAP_UNLOCK(pmap);
+out_unlocked:
+
+	if ((flags & PMAP_CAPLOADGEN_WIRE) && (*mp != NULL)) {
+		/*
+		 * Unwire any existing page we were given if we are asked to
+		 * wire the returned page.
+		 */
+		vm_page_unwire(*mp, PQ_INACTIVE);
+	}
+	*mp = m;
+
+	return res;
+}
+#endif
 #endif
 
 /*
