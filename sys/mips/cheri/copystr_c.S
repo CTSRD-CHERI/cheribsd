@@ -59,9 +59,6 @@
  * a0 - maximum length
  */
 LEAF(copystr_c)
-#ifdef CHERI_PURECAP_KERNEL
-XLEAF(copystr)
-#endif
 	li		v0, 0	/* Hopefully we succeed */
 	beqz		a0, cstr_return_toolong /* Return if zero-length. */	
 	li		t1, 1	/* Length we will have copied in loop */
@@ -89,7 +86,6 @@ cstr_return:
 #ifdef CHERI_PURECAP_KERNEL
 	cjr	$c17
 	nop
-XEND(copystr)
 #else
 	jr	ra
 	nop
