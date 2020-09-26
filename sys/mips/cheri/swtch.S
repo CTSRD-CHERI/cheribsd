@@ -219,7 +219,6 @@ NESTED(cpu_throw, CALLFRAME_SIZ, ra)
 						# thread's context, so jump
 						# right to action
 	nop					# BDSLOT
-END(cpu_throw)
 /*
  * Force size 0 so that we do not set the capability bounds in relocations.
  * this is needed to allow the branch to mips_sw1.
@@ -264,7 +263,7 @@ END(cpu_throw)
  *	c5 - mtx
  * Find the highest priority process and resume it.
  */
-NESTED(cpu_switch, CALLFRAME_SIZ, ra)
+XNESTED(cpu_switch)
 	mfc0	t1, MIPS_COP_0_STATUS		# t1 = saved status register
 	nop
 	nop
@@ -497,10 +496,12 @@ cpu_switch_set_userlocal:
 	cwritehwr $c3, $chwr_userlocal
 	cgetaddr t0, $c3
 	MTC0	t0, MIPS_COP_0_USERLOCAL, 2	# write it to ULR for rdhwr
+	.size	cpu_switch_set_userlocal, . - cpu_switch_set_userlocal
 
 	cjr	$c17
 	nop
-	END(cpu_switch)
+XEND(cpu_switch)
+END(cpu_throw)
 
 /*----------------------------------------------------------------------------
  *
@@ -562,59 +563,76 @@ LEAF(MipsFPID)
 END(MipsFPID)
 
 /*
+ * sigcode has to be labeled as an @object type so that captable pointers
+ * to it will be able to read it.  This is fine as the code is never
+ * executed directly in the kernel, just copied to places for userland
+ * to execute.
+ */
+#define	SIGCODE(sym)						\
+	.text; .globl _C_LABEL(sym);				\
+	.type _C_LABEL(sym),@object; .align 4;			\
+_C_LABEL(sym):
+
+/*
  * This code is copied the user's stack for returning from signal handlers
  * (see sendsig() and sigreturn()). We have to compute the address
  * of the sigcontext struct for the sigreturn call.
- */
-	.globl	_C_LABEL(sigcode)
-_C_LABEL(sigcode):
+*/
+SIGCODE(sigcode)
 	cincoffsetimm	$c3, $c11, SIGF_UC	# address of ucontext
 	li		v0, SYS_sigreturn
 # sigreturn (ucp)
 	syscall
 	break	0				# just in case sigreturn fails
+XEND(sigcode)
 	.globl	_C_LABEL(esigcode)
 _C_LABEL(esigcode):
 
 	.data
 	.globl	szsigcode
+	.type	szsigcode, @object
 szsigcode:
 	.long	esigcode-sigcode
+	.size	szsigcode, . - szsigcode
 	.text
 
 #if defined(__mips_n64) && defined(COMPAT_FREEBSD64)
-	.globl	_C_LABEL(freebsd64_sigcode)
-_C_LABEL(freebsd64_sigcode):
+SIGCODE(freebsd64_sigcode)
 	PTR_ADDU	a0, sp, SIGF64_UC		# address of ucontext
 	li		v0, SYS_sigreturn
 # sigreturn (ucp)
 	syscall
 	break	0				# just in case sigreturn fails
+XEND(freebsd64_sigcode)
 	.globl	_C_LABEL(freebsd64_esigcode)
 _C_LABEL(freebsd64_esigcode):
 
 	.data
 	.globl	freebsd64_szsigcode
+	.type	freebsd64_szsigcode, @object
 freebsd64_szsigcode:
 	.long	freebsd64_esigcode-freebsd64_sigcode
+	.size	freebsd64_szsigcode, . - freebsd64_szsigcode
 	.text
 #endif
 
 #if (defined(__mips_n32) || defined(__mips_n64)) && defined(COMPAT_FREEBSD32)
-	.globl	_C_LABEL(sigcode32)
-_C_LABEL(sigcode32):
+SIGCODE(sigcode32)
 	addu		a0, sp, SIGF32_UC	# address of ucontext
 	li		v0, SYS_sigreturn
 # sigreturn (ucp)
 	syscall
 	break	0				# just in case sigreturn fails
+XEND(sigcode32)
 	.globl	_C_LABEL(esigcode32)
 _C_LABEL(esigcode32):
 
 	.data
 	.globl	szsigcode32
+	.type	szsigcode32, @object
 szsigcode32:
 	.long	esigcode32-sigcode32
+	.size	szsigcode32, . - szsigcode32
 	.text
 #endif
 // CHERI CHANGES START
