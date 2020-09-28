@@ -92,7 +92,7 @@ void do_trap_supervisor(struct trapframe *);
 void do_trap_user(struct trapframe *);
 
 static __inline void
-call_trapsignal(struct thread *td, int sig, int code, void * __capability addr,
+call_trapsignal(struct thread *td, int sig, int code, uintcap_t addr,
     int trapno, int capreg)
 {
 	ksiginfo_t ksi;
@@ -100,7 +100,7 @@ call_trapsignal(struct thread *td, int sig, int code, void * __capability addr,
 	ksiginfo_init_trap(&ksi);
 	ksi.ksi_signo = sig;
 	ksi.ksi_code = code;
-	ksi.ksi_addr = addr;
+	ksi.ksi_addr = (void * __capability)addr;
 	ksi.ksi_capreg = capreg;
 	ksi.ksi_trapno = trapno;
 	trapsignal(td, &ksi);
@@ -350,8 +350,7 @@ data_abort(struct trapframe *frame, int usermode)
 	error = vm_fault_trap(map, va, ftype, VM_FAULT_NORMAL, &sig, &ucode);
 	if (error != KERN_SUCCESS) {
 		if (usermode) {
-			call_trapsignal(td, sig, ucode,
-			    (void * __capability)(uintcap_t)stval,
+			call_trapsignal(td, sig, ucode, (uintcap_t)stval,
 			    frame->tf_scause & EXCP_MASK, 0);
 		} else {
 			if (pcb->pcb_onfault != 0) {
@@ -512,13 +511,13 @@ do_trap_user(struct trapframe *frame)
 			break;
 		}
 #endif
-		call_trapsignal(td, SIGILL, ILL_ILLTRP,
-		    (void * __capability)frame->tf_sepc, exception, 0);
+		call_trapsignal(td, SIGILL, ILL_ILLTRP, frame->tf_sepc,
+		    exception, 0);
 		userret(td, frame);
 		break;
 	case EXCP_BREAKPOINT:
-		call_trapsignal(td, SIGTRAP, TRAP_BRKPT,
-		    (void * __capability)frame->tf_sepc, exception, 0);
+		call_trapsignal(td, SIGTRAP, TRAP_BRKPT, frame->tf_sepc,
+		    exception, 0);
 		userret(td, frame);
 		break;
 #if __has_feature(capabilities)
@@ -526,30 +525,26 @@ do_trap_user(struct trapframe *frame)
 	case EXCP_MISALIGNED_LOAD:
 	case EXCP_MISALIGNED_STORE:
 		call_trapsignal(td, SIGBUS, BUS_ADRALN,
-		    (void * __capability)(uintcap_t)frame->tf_stval, exception,
-		    0);
+		    (uintcap_t)frame->tf_stval, exception, 0);
 		break;
 	case EXCP_LOAD_CAP_PAGE_FAULT:
 		if (log_user_cheri_exceptions)
 			dump_cheri_exception(frame);
 		call_trapsignal(td, SIGSEGV, SEGV_LOADTAG,
-		    (void * __capability)(uintcap_t)frame->tf_stval, exception,
-		    0);
+		    (uintcap_t)frame->tf_stval, exception, 0);
 		break;
 	case EXCP_STORE_AMO_CAP_PAGE_FAULT:
 		if (log_user_cheri_exceptions)
 			dump_cheri_exception(frame);
 		call_trapsignal(td, SIGSEGV, SEGV_STORETAG,
-		    (void * __capability)(uintcap_t)frame->tf_stval, exception,
-		    0);
+		    (uintcap_t)frame->tf_stval, exception, 0);
 		break;
 	case EXCP_CHERI:
 		if (log_user_cheri_exceptions)
 			dump_cheri_exception(frame);
 		call_trapsignal(td, SIGPROT,
-		    cheri_stval_to_sicode(frame->tf_stval),
-		    (void * __capability)frame->tf_sepc, exception,
-		    TVAL_CAP_IDX(frame->tf_stval));
+		    cheri_stval_to_sicode(frame->tf_stval), frame->tf_sepc,
+		    exception, TVAL_CAP_IDX(frame->tf_stval));
 		userret(td, frame);
 		break;
 #endif

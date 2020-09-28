@@ -93,7 +93,7 @@ cheri_signal_sandboxed(struct thread *td)
 {
 	uintmax_t c_perms;
 
-	c_perms = cheri_getperm((void * __capability)td->td_frame->tf_sepc);
+	c_perms = cheri_getperm(td->td_frame->tf_sepc);
 	if ((c_perms & CHERI_PERM_SYSCALL) == 0) {
 		atomic_add_int(&security_cheri_sandboxed_signals, 1);
 		return (ECAPMODE);

@@ -256,8 +256,7 @@ set_regs(struct thread *td, struct reg *regs)
 
 	frame = td->td_frame;
 #if __has_feature(capabilities)
-	frame->tf_sepc = (uintcap_t)cheri_setaddress(
-	    (void * __capability)frame->tf_sepc, regs->sepc);
+	frame->tf_sepc = cheri_setaddress(frame->tf_sepc, regs->sepc);
 #else
 	frame->tf_sepc = regs->sepc;
 #endif
@@ -365,7 +364,7 @@ fill_capregs(struct thread *td, struct capreg *regs)
 	regs->ddc = frame->tf_ddc;
 	pcap = (uintcap_t *)regs;
 	for (i = 0; i < NCAPREGS; i++) {
-		if (cheri_gettag((void * __capability)pcap[i]))
+		if (cheri_gettag(pcap[i]))
 			regs->tagmask |= (uint64_t)1 << i;
 	}
 	return (0);
@@ -388,8 +387,7 @@ ptrace_set_pc(struct thread *td, u_long addr)
 	    !cheri_is_address_inbounds(
 	    (void * __capability)td->td_frame->tf_sepc, addr))
 		return (EINVAL);
-	td->td_frame->tf_sepc = (uintcap_t)cheri_setaddress(
-	    (void * __capability)td->td_frame->tf_sepc, addr);
+	td->td_frame->tf_sepc = cheri_setaddress(td->td_frame->tf_sepc, addr);
 #else
 	td->td_frame->tf_sepc = addr;
 #endif

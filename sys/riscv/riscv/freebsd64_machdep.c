@@ -197,18 +197,16 @@ freebsd64_set_mcontext(struct thread *td, mcontext64_t *mcp)
 		/* XXX: Permit userland to change GPRs for sigreturn? */
 
 		/* Honor 64-bit PC. */
-		mc.mc_capregs.cp_sepcc = (uintcap_t)cheri_setoffset(
-		    (void * __capability)mc.mc_capregs.cp_sepcc,
-		    mcp->mc_gpregs.gp_sepc);
+		mc.mc_capregs.cp_sepcc = cheri_setoffset(
+		    mc.mc_capregs.cp_sepcc, mcp->mc_gpregs.gp_sepc);
 	} else {
 		creg = (uintcap_t *)&mc.mc_capregs;
 		greg = (register_t *)&mcp->mc_gpregs;
 		for (i = 0; i < CONTEXT64_GPREGS; i++)
 			creg[i] = (uintcap_t)greg[i];
 
-		mc.mc_capregs.cp_sepcc = (uintcap_t)cheri_setoffset(
-		    (void * __capability)td->td_frame->tf_sepc,
-		    mcp->mc_gpregs.gp_sepc);
+		mc.mc_capregs.cp_sepcc = cheri_setoffset(
+		    td->td_frame->tf_sepc, mcp->mc_gpregs.gp_sepc);
 		mc.mc_capregs.cp_ddc = td->td_frame->tf_ddc;
 		mc.mc_capregs.cp_sstatus = mcp->mc_gpregs.gp_sstatus;
 	}
