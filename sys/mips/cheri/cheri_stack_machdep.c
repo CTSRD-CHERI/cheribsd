@@ -138,8 +138,7 @@ stack_capture(struct stack *st, struct thread *td, uintptr_t pc, uintptr_t sp)
 		if (pc <= (uintptr_t)btext)
 			break;
 		for (i = pc; i >= (uintptr_t)btext &&
-		    cheri_getoffset((void *)i) >= 0;
-		    i -= sizeof(insn)) {
+		     __CAP_CHECK(i, sizeof(insn)); i -= sizeof(insn)) {
 			bcopy((void *)i, &insn, sizeof(insn));
 			if (op_is_cheri_cincoffsetimm(insn) &&
 			    insn.CIType.r1 == insn.CIType.r2 &&

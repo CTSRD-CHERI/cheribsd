@@ -7,7 +7,7 @@ include		"CHERI128_PURECAP_BASE"
 ident		CHERI_PURECAP_MALTA64
 
 options		DIAGNOSTIC
-options		VERBOSE_SYSINIT
+# options	VERBOSE_SYSINIT
 # options	BUS_DEBUG
 # options	CAMDEBUG
 # options	CAM_DEBUG_FLAGS=3
