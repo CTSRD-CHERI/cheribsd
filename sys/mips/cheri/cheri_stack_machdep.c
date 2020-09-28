@@ -52,6 +52,15 @@ __FBSDID("$FreeBSD$");
 	((pc) >= (uintptr_t)cheri_getbase(fn) &&			\
 	 (pc) < (uintptr_t)cheri_gettop(fn))
 
+static bool
+stack_addr_ok(struct thread *td, uintptr_t sp, u_register_t stack_pos)
+{
+	vm_ptr_t va = sp + stack_pos;
+
+	return (va >= td->td_kstack && va + sizeof(uintptr_t) <=
+	    td->td_kstack + td->td_kstack_pages * PAGE_SIZE);
+}
+
 static uintptr_t
 stack_register_fetch(uintptr_t sp, u_register_t stack_pos)
 {
@@ -105,7 +114,7 @@ op_is_cheri_cjr(InstFmt insn)
 }
 
 static void
-stack_capture(struct stack *st, uintptr_t pc, uintptr_t sp)
+stack_capture(struct stack *st, struct thread *td, uintptr_t pc, uintptr_t sp)
 {
 	uintptr_t ra;
 	uintptr_t i;
@@ -148,6 +157,9 @@ stack_capture(struct stack *st, uintptr_t pc, uintptr_t sp)
 			else if (op_is_cheri_csc(insn) &&
 			    insn.CCMType.cs == OP_CHERI_FPC_REGNO &&
 			    insn.CCMType.cb == OP_CHERI_STC_REGNO) {
+				if (!stack_addr_ok(td, sp,
+				    (short)insn.CCMType.offset * 16))
+					return;
 				next_sp = stack_register_fetch(sp,
 				    (short)insn.CCMType.offset * 16);
 				break;
@@ -188,10 +200,14 @@ stack_capture(struct stack *st, uintptr_t pc, uintptr_t sp)
 		}
 
 		if (is_exc_handler) {
+			if (!stack_addr_ok(td, sp, CALLFRAME_SIZ + SZREG * C17))
+				return;
 			va = stack_register_fetch(sp,
 			    (CALLFRAME_SIZ + SZREG * C17));
 			exc_saved_ra = (va) ?
 			    (uintptr_t)cheri_setaddress(kcode, va) : 0;
+			if (!stack_addr_ok(td, sp, ra_stack_pos))
+				return;
 			va = stack_register_fetch(sp, ra_stack_pos);
 			pc = (va) ?
 			    (uintptr_t)cheri_setaddress(kcode, va) : 0;
@@ -205,6 +221,8 @@ stack_capture(struct stack *st, uintptr_t pc, uintptr_t sp)
 					break;
 			}
 			else {
+				if (!stack_addr_ok(td, sp, ra_stack_pos))
+					return;
 				va = stack_register_fetch(sp, ra_stack_pos);
 				if (!va)
 					break;
@@ -230,10 +248,9 @@ stack_save_td(struct stack *st, struct thread *td)
 	if (TD_IS_RUNNING(td))
                 return (EOPNOTSUPP);
 
-	/* XXX-AM: get thread pc and sp instead. */
-	pc = (uintptr_t)cheri_getpcc();
-	sp = (uintptr_t)cheri_getstack();
-	stack_capture(st, pc, sp);
+	pc = (uintptr_t)td->td_pcb->pcb_cherikframe.ckf_pcc;
+	sp = (uintptr_t)td->td_pcb->pcb_cherikframe.ckf_stc;
+	stack_capture(st, td, pc, sp);
         return (0);
 }
 
@@ -254,7 +271,7 @@ stack_save(struct stack *st)
 
 	pc = (uintptr_t)cheri_getpcc();
 	sp = (uintptr_t)cheri_getstack();
-	stack_capture(st, pc, sp);
+	stack_capture(st, curthread, pc, sp);
 }
 
 #endif /* CHERI_PURECAP_KERNEL */

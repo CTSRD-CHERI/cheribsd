@@ -43,6 +43,15 @@ __FBSDID("$FreeBSD$");
 
 #ifndef CHERI_PURECAP_KERNEL
 
+static bool
+stack_addr_ok(struct thread *td, u_register_t sp, u_register_t stack_pos)
+{
+	u_register_t va = sp + stack_pos;
+
+	return (va >= td->td_kstack && va + sizeof(u_register_t) <
+	    td->td_kstack + td->td_kstack_pages * PAGE_SIZE);
+}
+
 static u_register_t
 stack_register_fetch(u_register_t sp, u_register_t stack_pos)
 {
@@ -53,7 +62,7 @@ stack_register_fetch(u_register_t sp, u_register_t stack_pos)
 }
 
 static void
-stack_capture(struct stack *st, vaddr_t pc, vaddr_t sp)
+stack_capture(struct stack *st, struct thread *td, vaddr_t pc, vaddr_t sp)
 {
 	u_register_t  ra = 0, i, stacksize;
 	short ra_stack_pos = 0;
@@ -105,6 +114,8 @@ stack_capture(struct stack *st, vaddr_t pc, vaddr_t sp)
 						break;
 					if (insn.RType.rs != RA)
 						break;
+					if (!stack_addr_ok(td, sp, ra_stack_pos))
+						goto done;
 					ra = stack_register_fetch(sp, 
 					    ra_stack_pos);
 					if (!ra)
@@ -143,10 +154,9 @@ stack_save_td(struct stack *st, struct thread *td)
 	if (TD_IS_RUNNING(td))
 		return (EOPNOTSUPP);
 
-	/* XXXRW: Should be pcb_context? */
-	pc = TRAPF_PC(&td->td_pcb->pcb_regs);
-	sp = td->td_pcb->pcb_regs.sp; // FIXME: use $c11 for CHERI purecap
-	stack_capture(st, pc, sp);
+	pc = td->td_pcb->pcb_context[PCB_REG_RA];
+	sp = td->td_pcb->pcb_context[PCB_REG_SP];
+	stack_capture(st, td, pc, sp);
 	return (0);
 }
 
@@ -158,10 +168,10 @@ stack_save(struct stack *st)
 	if (curthread == NULL)
 		panic("stack_save: curthread == NULL");
 
-	/* XXXRW: Should be pcb_context? */
-	pc = TRAPF_PC(&curthread->td_pcb->pcb_regs);
-	sp = curthread->td_pcb->pcb_regs.sp; // FIXME: use $c11 for CHERI purecap
-	stack_capture(st, pc, sp);
+	pc = (uintptr_t)stack_save;
+	__asm __volatile("move %0, $sp" : "=&r" (sp));
+
+	stack_capture(st, curthread, pc, sp);
 }
 
 #endif /* !CHERI_PURECAP_KERNEL */
