@@ -1050,7 +1050,7 @@ exec_new_vmspace(struct image_params *imgp, struct sysentvec *sv)
 	vm_map_t map;
 	u_long ssiz;
 	vm_ptr_t shared_page_addr;
-        vm_prot_t stack_prot;
+	vm_prot_t stack_prot;
 
 	imgp->vmspace_destroyed = 1;
 	imgp->sysent = sv;
@@ -1157,7 +1157,7 @@ exec_new_vmspace(struct image_params *imgp, struct sysentvec *sv)
 		imgp->eff_stack_sz = ssiz;
 	/* We reserve the whole max stack size with restricted permission */
 	stack_addr = sv->sv_usrstack - ssiz;
-        stack_prot = (obj != NULL && imgp->stack_prot != 0) ? imgp->stack_prot :
+	stack_prot = (obj != NULL && imgp->stack_prot != 0) ? imgp->stack_prot :
 	    sv->sv_stackprot;
 	error = vm_map_reservation_create_fixed(map, &stack_addr, ssiz,
 	    PAGE_SIZE, stack_prot);

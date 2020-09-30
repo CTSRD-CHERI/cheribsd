@@ -1148,7 +1148,7 @@ kern_vfs_bio_buffer_alloc(caddr_t v, long physmem_est)
 	 * XXX-AM: this is hacky.
 	 */
 	if (!cheri_kern_gettag(v)) {
-	  return (v + nbuf * sizeof(*buf));
+		return (v + nbuf * sizeof(*buf));
 	}
 
 	buf = (void *)cheri_kern_setbounds(v, nbuf * sizeof(*buf));

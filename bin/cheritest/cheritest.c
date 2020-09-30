@@ -1062,7 +1062,6 @@ static const struct cheri_test cheri_tests[] = {
 	  .ct_check_xfail = xfail_swap_required},
 #endif
 
-
 #ifdef CHERI_LIBCHERI_TESTS
 #if 0
 	/*

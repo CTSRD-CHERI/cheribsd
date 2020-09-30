@@ -4764,7 +4764,7 @@ vm_map_stack_locked(vm_map_t map, vm_ptr_t addrbos, vm_size_t max_ssize,
 
 	if (map->flags & MAP_RESERVATIONS) {
 #ifdef CHERI_PURECAP_KERNEL
-		/* Check reservation capability is valid */
+		/* TODO: Check reservation capability is valid */
 #endif
 		/* Check reservation exists */
 		if (vm_map_lookup_entry(map, addrbos, &prev_entry) == 0 ||
@@ -5598,7 +5598,8 @@ vm_map_reservation_insert(vm_map_t map, vm_offset_t addr, vm_size_t length, vm_o
  * length must be representable.
  */
 int
-vm_map_reservation_create_locked(vm_map_t map, vm_ptr_t *addr, vm_size_t length, vm_prot_t max_prot)
+vm_map_reservation_create_locked(vm_map_t map, vm_ptr_t *addr,
+    vm_size_t length, vm_prot_t max_prot)
 {
 	vm_offset_t start = *addr;
 	vm_offset_t end = start + length;
@@ -5629,7 +5630,7 @@ vm_map_reservation_create_locked(vm_map_t map, vm_ptr_t *addr, vm_size_t length,
 	if (entry->start < end)
 		return (KERN_NO_SPACE);
 
-        vm_map_reservation_insert(map, start, length, start);
+	vm_map_reservation_insert(map, start, length, start);
 	CTR3(KTR_VM, "%s: reserve %lx-%lx", __func__, start, end);
 
 	*addr = vm_map_buildcap(map, start, length, max_prot);
