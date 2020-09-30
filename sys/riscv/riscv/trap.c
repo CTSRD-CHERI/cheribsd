@@ -245,7 +245,7 @@ dump_cheri_exception(struct trapframe *frame)
 
 	td = curthread;
 	p = td->td_proc;
-	printf("pid %d tid %ld (%s), uid %d: ", p->p_pid, td->td_tid,
+	printf("pid %d tid %d (%s), uid %d: ", p->p_pid, td->td_tid,
 	    p->p_comm, td->td_ucred->cr_uid);
 	switch (frame->tf_scause & EXCP_MASK) {
 	case EXCP_LOAD_CAP_PAGE_FAULT:
@@ -255,12 +255,12 @@ dump_cheri_exception(struct trapframe *frame)
 		printf("STORE/AMO CAP page fault");
 		break;
 	case EXCP_CHERI:
-		printf("CHERI fault (type %#x), capidx %d",
+		printf("CHERI fault (type %#lx), capidx %ld",
 		    TVAL_CAP_CAUSE(frame->tf_stval),
 		    TVAL_CAP_IDX(frame->tf_stval));
 		break;
 	default:
-		printf("fault %d", frame->tf_scause & EXCP_MASK);
+		printf("fault %ld", frame->tf_scause & EXCP_MASK);
 		break;
 	}
 	printf("\n");
@@ -446,7 +446,7 @@ do_trap_supervisor(struct trapframe *frame)
 			    frame->tf_stval);
 			break;
 		case EXCP_CHERI:
-			panic("CHERI exception %#x at 0x%016lx\n",
+			panic("CHERI exception %#lx at 0x%016lx\n",
 			    TVAL_CAP_CAUSE(frame->tf_stval),
 			    (__cheri_addr unsigned long)frame->tf_sepc);
 			break;
