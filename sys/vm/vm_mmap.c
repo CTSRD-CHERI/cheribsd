@@ -2113,7 +2113,6 @@ vm_mmap_object(vm_map_t map, vm_ptr_t *addr, vm_offset_t max_addr,
 			vm_map_unlock(map);
 		}
 	}
-//done:
 	return (vm_mmap_to_errno(rv));
 }
 

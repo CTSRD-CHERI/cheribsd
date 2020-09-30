@@ -201,9 +201,9 @@ _memstat_mt_reset_stats(struct memory_type *mtp, int maxcpus)
 	mtp->mt_kegfree = 0;
 
 #if __has_feature(capabilities)
-        mtp->mt_memreserved = 0;
-        mtp->mt_memunreserved = 0;
-        mtp->mt_reserved_bytes = 0;
+	mtp->mt_memreserved = 0;
+	mtp->mt_memunreserved = 0;
+	mtp->mt_reserved_bytes = 0;
 #endif
 
 	for (i = 0; i < maxcpus; i++) {
@@ -280,7 +280,7 @@ memstat_get_memalloced(const struct memory_type *mtp)
 	return (mtp->mt_memalloced);
 }
 
-uint64_t	 memstat_get_reserved_bytes(const struct memory_type *mtp);
+uint64_t memstat_get_reserved_bytes(const struct memory_type *mtp);
 
 uint64_t
 memstat_get_memfreed(const struct memory_type *mtp)

@@ -808,7 +808,7 @@ __elfN(load_sections)(struct image_params *imgp, const Elf_Ehdr *hdr,
 		section_addr = (uintcap_t)cheri_setaddress(
 		    imgp->imgact_capability, phdr[i].p_vaddr + rbase);
 #else
-                section_addr = phdr[i].p_vaddr + rbase;
+		section_addr = phdr[i].p_vaddr + rbase;
 #endif
 		prot = __elfN(trans_prot)(phdr[i].p_flags);
 		error = __elfN(load_section)(imgp, phdr[i].p_offset,
