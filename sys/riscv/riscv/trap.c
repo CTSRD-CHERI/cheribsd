@@ -137,8 +137,7 @@ cpu_fetch_syscall_args(struct thread *td)
 			stack_args = (char * __capability)td->td_frame->tf_sp;
 #endif
 	} else {
-		*dst_ap = *ap++;
-		dst_ap++;
+		*dst_ap++ = *ap++;
 	}
 
 	if (__predict_false(sa->code >= p->p_sysent->sv_size))
@@ -147,7 +146,8 @@ cpu_fetch_syscall_args(struct thread *td)
 		sa->callp = &p->p_sysent->sv_table[sa->code];
 
 	sa->narg = sa->callp->sy_narg;
-	KASSERT(sa->callp->sy_narg <= nitems(sa->args), ("Too many syscall arguments!"));
+	KASSERT(sa->callp->sy_narg <= nitems(sa->args),
+	    ("Syscall %d takes too many arguments", sa->code));
 #if __has_feature(capabilities)
 	if (stack_args != NULL) {
 		register_t intval;
