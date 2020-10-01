@@ -32,6 +32,7 @@
 #ifndef _CHERITEST_H_
 #define	_CHERITEST_H_
 
+#include <string.h>
 #include <cheri/cheric.h>
 
 #define	CHERI_CAP_PRINT(cap) do {					\
@@ -209,6 +210,33 @@ _cheritest_check_cap_eq(void *__capability a, void *__capability b,
  */
 #define CHERITEST_CHECK_SYSCALL(call) \
 	CHERITEST_CHECK_SYSCALL2(call, "Call \'" #call "\' failed")
+
+static inline void
+_cheritest_check_errno(const char *context, int actual, int expected)
+{
+	char actual_str[256];
+	char expected_str[256];
+
+	if (expected == actual)
+		return;
+	if (strerror_r(actual, actual_str, sizeof(actual_str)) != 0)
+		cheritest_failure_err("sterror_r(%d)", actual);
+	if (strerror_r(expected, expected_str, sizeof(expected_str)) != 0)
+		cheritest_failure_err("sterror_r(%d)", expected);
+	cheritest_failure_errx("%s errno %d (%s) != expected errno %d (%s)",
+	    context, actual, actual_str, expected, expected_str);
+}
+
+/** Check that @p call fails and errno is set to @p expected_errno */
+#define CHERITEST_CHECK_CALL_ERROR(call, expected_errno)			\
+	do {									\
+		errno = 0;							\
+		int __ret = call;						\
+		int call_errno = errno;						\
+		CHERITEST_VERIFY2(__ret == -1,					\
+		    #call " unexpectedly returned %d", __ret);			\
+		_cheritest_check_errno(#call, call_errno, expected_errno);	\
+	} while (0)
 
 #define DECLARE_CHERI_TEST_IMPL(name, args...) void name(args)
 #define DECLARE_CHERI_TEST_WITH_ARGS(name, args...) \
