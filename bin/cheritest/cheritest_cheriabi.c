@@ -251,3 +251,133 @@ test_cheriabi_malloc_zero_size(const struct cheri_test *ctp __unused)
 		    "non-zero length (%zu)", cheri_getlength(cap));
 	cheritest_success();
 }
+
+struct adjacent_mappings {
+	char *first;
+	char *middle;
+	char *last;
+	size_t maplen;
+};
+
+/*
+ * Create three adjacent memory mappings that be used to check that the memory
+ * mapping system calls reject out-of-bounds capabilities that have the address
+ * of a valid mapping.
+ */
+static void
+create_adjacent_mappings(struct adjacent_mappings *mappings)
+{
+	char *requested_addr;
+	size_t len;
+
+	len = getpagesize() * 2;
+	mappings->first = CHERITEST_CHECK_SYSCALL(
+	    mmap(0, len, PROT_READ | PROT_WRITE, MAP_ANON, -1, 0));
+	CHERITEST_VERIFY(cheri_gettag(mappings->first));
+	/* Try to create a mapping immediately following the latest one. */
+	requested_addr = cheri_cleartag(mappings->first) + len;
+	mappings->middle = CHERITEST_CHECK_SYSCALL2(mmap(requested_addr, len,
+	    PROT_READ | PROT_WRITE, MAP_ANON | MAP_FIXED, -1, 0),
+	    "Failed to create mapping at address %p", requested_addr);
+	CHERITEST_CHECK_EQ_LONG((vaddr_t)mappings->middle,
+	    (vaddr_t)mappings->first + len);
+	requested_addr = cheri_cleartag(mappings->middle) + len;
+	CHERITEST_VERIFY(cheri_gettag(mappings->middle));
+	mappings->last = CHERITEST_CHECK_SYSCALL2(mmap(requested_addr, len,
+	    PROT_READ | PROT_WRITE, MAP_ANON | MAP_FIXED, -1, 0),
+	    "Failed to create mapping at address %p", requested_addr);
+	CHERITEST_CHECK_EQ_LONG((vaddr_t)mappings->last,
+	    (vaddr_t)mappings->middle + len);
+	CHERITEST_VERIFY(cheri_gettag(mappings->last));
+	mappings->maplen = len;
+}
+
+static void
+free_adjacent_mappings(struct adjacent_mappings *mappings)
+{
+	CHERITEST_CHECK_SYSCALL(munmap(mappings->first, mappings->maplen));
+	CHERITEST_CHECK_SYSCALL(munmap(mappings->middle, mappings->maplen));
+	CHERITEST_CHECK_SYSCALL(munmap(mappings->last, mappings->maplen));
+}
+
+void
+test_cheriabi_munmap_invalid_ptr(const struct cheri_test *ctp __unused)
+{
+	struct adjacent_mappings mappings;
+
+	create_adjacent_mappings(&mappings);
+
+	/* munmap() with an in-bounds but untagged capability should fail. */
+	CHERITEST_CHECK_CALL_ERROR(
+	    munmap(cheri_cleartag(mappings.middle), mappings.maplen), EPROT);
+	mappings.middle[0] = 'a'; /* Check that the mapping is still valid */
+
+	/* munmap() with an out-of-bounds capability should fail. */
+	CHERITEST_CHECK_CALL_ERROR(
+	    munmap(mappings.middle - mappings.maplen, mappings.maplen), EPROT);
+	mappings.first[0] = 'a'; /* Check that the mapping is still valid */
+	CHERITEST_CHECK_CALL_ERROR(
+	    munmap(mappings.middle + mappings.maplen, mappings.maplen), EPROT);
+	mappings.last[0] = 'a'; /* Check that the mapping is still valid */
+
+	/* Unmapping the original capabilities should succeed. */
+	free_adjacent_mappings(&mappings);
+	cheritest_success();
+}
+
+void
+test_cheriabi_mprotect_invalid_ptr(const struct cheri_test *ctp __unused)
+{
+	struct adjacent_mappings mappings;
+
+	create_adjacent_mappings(&mappings);
+
+	/* mprotect() with an in-bounds but untagged capability should fail. */
+	CHERITEST_CHECK_CALL_ERROR(mprotect(cheri_cleartag(mappings.middle),
+	    mappings.maplen, PROT_NONE), EPROT);
+	mappings.middle[0] = 'a'; /* Check that it still has PROT_WRITE */
+
+	/* mprotect() with an out-of-bounds capability should fail. */
+	CHERITEST_CHECK_CALL_ERROR(mprotect(mappings.middle - mappings.maplen,
+	    mappings.maplen, PROT_NONE), EPROT);
+	mappings.first[0] = 'a'; /* Check that it still has PROT_WRITE */
+	CHERITEST_CHECK_CALL_ERROR(mprotect(mappings.middle + mappings.maplen,
+	    mappings.maplen, PROT_NONE), EPROT);
+	mappings.last[0] = 'a'; /* Check that it still has PROT_WRITE */
+
+	/* Sanity check: mprotect() on a valid capability should succeed. */
+	CHERITEST_CHECK_SYSCALL(mprotect(mappings.middle, mappings.maplen,
+	    PROT_NONE));
+	CHERITEST_CHECK_SYSCALL(mprotect(mappings.middle, mappings.maplen,
+	    PROT_READ));
+
+	free_adjacent_mappings(&mappings);
+	cheritest_success();
+}
+
+void
+test_cheriabi_minherit_invalid_ptr(const struct cheri_test *ctp __unused)
+{
+	struct adjacent_mappings mappings;
+
+	create_adjacent_mappings(&mappings);
+
+	/* minherit() with an in-bounds but untagged capability should fail. */
+	CHERITEST_CHECK_CALL_ERROR(minherit(cheri_cleartag(mappings.middle),
+	    mappings.maplen, INHERIT_NONE), EPROT);
+
+	/* minherit() with an out-of-bounds capability should fail. */
+	CHERITEST_CHECK_CALL_ERROR(minherit(mappings.middle - mappings.maplen,
+	    mappings.maplen, INHERIT_NONE), EPROT);
+	CHERITEST_CHECK_CALL_ERROR(minherit(mappings.middle + mappings.maplen,
+	    mappings.maplen, INHERIT_NONE), EPROT);
+
+	/* Sanity check: minherit() on a valid capability should succeed. */
+	CHERITEST_CHECK_SYSCALL(minherit(mappings.middle, mappings.maplen,
+	    INHERIT_NONE));
+	CHERITEST_CHECK_SYSCALL(minherit(mappings.middle, mappings.maplen,
+	    INHERIT_SHARE));
+
+	free_adjacent_mappings(&mappings);
+	cheritest_success();
+}

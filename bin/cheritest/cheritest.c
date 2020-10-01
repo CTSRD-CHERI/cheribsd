@@ -1719,6 +1719,18 @@ static const struct cheri_test cheri_tests[] = {
 	  .ct_desc = "Check that zero-sized mallocs are properly bounded",
 	  .ct_func = test_cheriabi_malloc_zero_size },
 
+	{ .ct_name = "test_cheriabi_munmap_invalid_ptr",
+	  .ct_desc = "Check that munmap() rejects invalid pointer arguments",
+	  .ct_func = test_cheriabi_munmap_invalid_ptr },
+
+	{ .ct_name = "test_cheriabi_mprotect_invalid_ptr",
+	  .ct_desc = "Check that mprotect() rejects invalid pointer arguments",
+	  .ct_func = test_cheriabi_mprotect_invalid_ptr },
+
+	{ .ct_name = "test_cheriabi_minherit_invalid_ptr",
+	  .ct_desc = "Check that minherit() rejects invalid pointer arguments",
+	  .ct_func = test_cheriabi_minherit_invalid_ptr },
+
 	/*
 	 * Tests for pathname handling in open(2).
 	 */
