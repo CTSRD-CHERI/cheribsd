@@ -165,7 +165,7 @@ void	signal_handler_clear(int sig);
 #define CHERITEST_CHECK_EQ_BOOL(a, b)	\
 	CHERITEST_CHECK_EQ(_Bool, "%d", a, b, __STRING(a), __STRING(b))
 #define CHERITEST_CHECK_EQ_INT(a, b)	\
-	CHERITEST_CHECK_EQ(int, "0x%lx", a, b, __STRING(a), __STRING(b))
+	CHERITEST_CHECK_EQ(int, "0x%x", a, b, __STRING(a), __STRING(b))
 #define CHERITEST_CHECK_EQ_LONG(a, b)	\
 	CHERITEST_CHECK_EQ(long, "0x%lx", a, b, __STRING(a), __STRING(b))
 #define CHERITEST_CHECK_EQ_SIZE(a, b)	\
