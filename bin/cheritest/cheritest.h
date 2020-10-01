@@ -367,6 +367,9 @@ DECLARE_CHERI_TEST(test_cheriabi_mmap_nospace);
 DECLARE_CHERI_TEST(test_cheriabi_mmap_perms);
 DECLARE_CHERI_TEST(test_cheriabi_mmap_unrepresentable);
 DECLARE_CHERI_TEST(test_cheriabi_malloc_zero_size);
+DECLARE_CHERI_TEST(test_cheriabi_munmap_invalid_ptr);
+DECLARE_CHERI_TEST(test_cheriabi_mprotect_invalid_ptr);
+DECLARE_CHERI_TEST(test_cheriabi_minherit_invalid_ptr);
 
 /* cheritest_cheriabi_open.c */
 DECLARE_CHERI_TEST(test_cheriabi_open_ordinary);
