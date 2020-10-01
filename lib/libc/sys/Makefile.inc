@@ -95,7 +95,6 @@ INTERPOSED:=	${INTERPOSED:N${_nu}}
 S_NU+=		${NO_UNDERSCORE:C/^.*$/_&.S/}
 SRCS+=		${NO_UNDERSCORE:S/$/.c/} ${S_NU}
 NOASM+=		${NO_UNDERSCORE:S/$/.o/}
-OBJS+=		${S_NU:S/.S$/.o/}
 .endif
 
 SRCS+=	${INTERPOSED:S/$/.c/}
