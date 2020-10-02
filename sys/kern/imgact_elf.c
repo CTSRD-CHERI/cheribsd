@@ -1824,8 +1824,7 @@ core_output(void * __capability base_cap, size_t len, off_t offset,
 	bool success;
 
 	KASSERT(is_aligned(base, PAGE_SIZE),
-	    ("%s: user address %#p is not page-aligned",
-	    __func__, base));
+	    ("%s: user address %#p is not page-aligned", __func__, base));
 
 	if (p->comp != NULL)
 		return (compress_chunk(p, base_cap, tmpbuf, len));
