@@ -499,6 +499,10 @@ do_trap_user(struct trapframe *frame)
 	case EXCP_FAULT_LOAD:
 	case EXCP_FAULT_STORE:
 	case EXCP_FAULT_FETCH:
+		call_trapsignal(td, SIGBUS, BUS_ADRERR, frame->tf_sepc,
+		    exception, 0);
+		userret(td, frame);
+		break;
 	case EXCP_STORE_PAGE_FAULT:
 	case EXCP_LOAD_PAGE_FAULT:
 	case EXCP_INST_PAGE_FAULT:
