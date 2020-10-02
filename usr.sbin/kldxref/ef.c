@@ -228,6 +228,19 @@ ef_lookup_set(elf_file_t ef, const char *name, long *startp, long *stopp,
 	Elf_Sym *sym;
 	char *setsym;
 	int error, len;
+	size_t ptrsz;
+
+#ifdef KLD_COMPAT_FREEBSD64
+	if (!(ef->ef_type & EFT_CHERI)) {
+		ptrsz = sizeof(uint64_t);
+	} else
+#endif
+#ifdef KLD_COMPAT_CHERIABI
+	if (ef->ef_type & EFT_CHERI) {
+		ptrsz = sizeof(uintcap_t);
+	} else
+#endif
+		ptrsz = sizeof(void *);
 
 	len = strlen(name) + sizeof("__start_set_"); /* sizeof includes \0 */
 	setsym = malloc(len);
@@ -249,7 +262,7 @@ ef_lookup_set(elf_file_t ef, const char *name, long *startp, long *stopp,
 	*stopp = sym->st_value;
 
 	/* and the number of entries */
-	*countp = (*stopp - *startp) / sizeof(void *);
+	*countp = (*stopp - *startp) / ptrsz;
 
 out:
 	free(setsym);
@@ -655,6 +668,10 @@ ef_open(const char *filename, struct elf_file *efile, int verbose)
 			error = 0;
 		} else
 			break;
+#if __has_feature(capabilities)
+		if (ELF_IS_CHERI(&ef->ef_hdr))
+			ef->ef_type |= EFT_CHERI;
+#endif
 	} while(0);
 	if (error != 0)
 		ef_close(ef);
