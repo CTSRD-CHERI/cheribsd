@@ -351,6 +351,7 @@ test_cheriabi_mprotect_invalid_ptr(const struct cheri_test *ctp __unused)
 	CHERITEST_CHECK_SYSCALL(mprotect(mappings.middle, mappings.maplen,
 	    PROT_READ));
 
+	/* Unmapping the original capabilities should succeed. */
 	free_adjacent_mappings(&mappings);
 	cheritest_success();
 }
@@ -378,6 +379,7 @@ test_cheriabi_minherit_invalid_ptr(const struct cheri_test *ctp __unused)
 	CHERITEST_CHECK_SYSCALL(minherit(mappings.middle, mappings.maplen,
 	    INHERIT_SHARE));
 
+	/* Unmapping the original capabilities should succeed. */
 	free_adjacent_mappings(&mappings);
 	cheritest_success();
 }
