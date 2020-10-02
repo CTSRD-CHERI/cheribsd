@@ -699,8 +699,13 @@ zone_fetch_bucket(uma_zone_t zone, uma_zone_domain_t zdom, bool reclaim)
 		if (STAILQ_NEXT(bucket, ub_link) != NULL)
 			zdom->uzd_seq = STAILQ_NEXT(bucket, ub_link)->ub_seq;
 	}
-	MPASS(zdom->uzd_nitems >= bucket->ub_cnt);
 	STAILQ_REMOVE_HEAD(&zdom->uzd_buckets, ub_link);
+
+	KASSERT(zdom->uzd_nitems >= bucket->ub_cnt,
+	    ("%s: item count underflow (%ld, %d)",
+	    __func__, zdom->uzd_nitems, bucket->ub_cnt));
+	KASSERT(bucket->ub_cnt > 0,
+	    ("%s: empty bucket in bucket cache", __func__));
 	zdom->uzd_nitems -= bucket->ub_cnt;
 
 	/*
@@ -747,7 +752,15 @@ zone_put_bucket(uma_zone_t zone, int domain, uma_bucket_t bucket, void *udata,
 			zone_domain_imax_set(zdom, zdom->uzd_nitems);
 		if (STAILQ_EMPTY(&zdom->uzd_buckets))
 			zdom->uzd_seq = bucket->ub_seq;
-		STAILQ_INSERT_TAIL(&zdom->uzd_buckets, bucket, ub_link);
+
+		/*
+		 * Try to promote reuse of recently used items.  For items
+		 * protected by SMR, try to defer reuse to minimize polling.
+		 */
+		if (bucket->ub_seq == SMR_SEQ_INVALID)
+			STAILQ_INSERT_HEAD(&zdom->uzd_buckets, bucket, ub_link);
+		else
+			STAILQ_INSERT_TAIL(&zdom->uzd_buckets, bucket, ub_link);
 		ZDOM_UNLOCK(zdom);
 		return;
 	}
@@ -920,11 +933,8 @@ cache_fetch_bucket(uma_zone_t zone, uma_cache_t cache, int domain)
 	 * Check the zone's cache of buckets.
 	 */
 	zdom = zone_domain_lock(zone, domain);
-	if ((bucket = zone_fetch_bucket(zone, zdom, false)) != NULL) {
-		KASSERT(bucket->ub_cnt != 0,
-		    ("cache_fetch_bucket: Returning an empty bucket."));
+	if ((bucket = zone_fetch_bucket(zone, zdom, false)) != NULL)
 		return (bucket);
-	}
 	ZDOM_UNLOCK(zdom);
 
 	return (NULL);
@@ -3393,7 +3403,7 @@ uma_zalloc_smr(uma_zone_t zone, int flags)
 	void *item;
 
 	KASSERT((zone->uz_flags & UMA_ZONE_SMR) != 0,
-	    ("uma_zalloc_arg: called with non-SMR zone.\n"));
+	    ("uma_zalloc_arg: called with non-SMR zone."));
 	if (uma_zalloc_debug(zone, &item, NULL, flags) == EJUSTRETURN)
 		return (item);
 #endif
@@ -3424,7 +3434,7 @@ uma_zalloc_arg(uma_zone_t zone, void *udata, int flags)
 	void *item;
 
 	KASSERT((zone->uz_flags & UMA_ZONE_SMR) == 0,
-	    ("uma_zalloc_arg: called with SMR zone.\n"));
+	    ("uma_zalloc_arg: called with SMR zone."));
 	if (uma_zalloc_debug(zone, &item, udata, flags) == EJUSTRETURN)
 		return (item);
 #endif
@@ -3549,6 +3559,11 @@ cache_alloc(uma_zone_t zone, uma_cache_t cache, void *udata, int flags)
 void *
 uma_zalloc_domain(uma_zone_t zone, void *udata, int domain, int flags)
 {
+#ifdef NUMA
+	uma_bucket_t bucket;
+	uma_zone_domain_t zdom;
+	void *item;
+#endif
 
 	/* Enable entropy collection for RANDOM_ENABLE_UMA kernel option */
 	random_harvest_fast_uma(&zone, sizeof(zone), RANDOM_UMA);
@@ -3563,8 +3578,45 @@ uma_zalloc_domain(uma_zone_t zone, void *udata, int domain, int flags)
 	}
 	KASSERT(curthread->td_critnest == 0 || SCHEDULER_STOPPED(),
 	    ("uma_zalloc_domain: called with spinlock or critical section held"));
+	KASSERT((zone->uz_flags & UMA_ZONE_SMR) == 0,
+	    ("uma_zalloc_domain: called with SMR zone."));
+#ifdef NUMA
+	KASSERT((zone->uz_flags & UMA_ZONE_FIRSTTOUCH) != 0,
+	    ("uma_zalloc_domain: called with non-FIRSTTOUCH zone."));
 
+	if (vm_ndomains == 1)
+		return (uma_zalloc_arg(zone, udata, flags));
+
+	/*
+	 * Try to allocate from the bucket cache before falling back to the keg.
+	 * We could try harder and attempt to allocate from per-CPU caches or
+	 * the per-domain cross-domain buckets, but the complexity is probably
+	 * not worth it.  It is more important that frees of previous
+	 * cross-domain allocations do not blow up the cache.
+	 */
+	zdom = zone_domain_lock(zone, domain);
+	if ((bucket = zone_fetch_bucket(zone, zdom, false)) != NULL) {
+		item = bucket->ub_bucket[bucket->ub_cnt - 1];
+#ifdef INVARIANTS
+		bucket->ub_bucket[bucket->ub_cnt - 1] = NULL;
+#endif
+		bucket->ub_cnt--;
+		zone_put_bucket(zone, domain, bucket, udata, true);
+		item = item_ctor(zone, zone->uz_flags, zone->uz_size, udata,
+		    flags, item);
+		if (item != NULL) {
+			KASSERT(item_domain(item) == domain,
+			    ("%s: bucket cache item %p from wrong domain",
+			    __func__, item));
+			counter_u64_add(zone->uz_allocs, 1);
+		}
+		return (item);
+	}
+	ZDOM_UNLOCK(zdom);
 	return (zone_alloc_item(zone, udata, domain, flags));
+#else
+	return (uma_zalloc_arg(zone, udata, flags));
+#endif
 }
 
 /*
@@ -4071,7 +4123,7 @@ uma_zfree_smr(uma_zone_t zone, void *item)
 
 #ifdef UMA_ZALLOC_DEBUG
 	KASSERT((zone->uz_flags & UMA_ZONE_SMR) != 0,
-	    ("uma_zfree_smr: called with non-SMR zone.\n"));
+	    ("uma_zfree_smr: called with non-SMR zone."));
 	KASSERT(item != NULL, ("uma_zfree_smr: Called with NULL pointer."));
 	SMR_ASSERT_NOT_ENTERED(zone->uz_smr);
 	if (uma_zfree_debug(zone, item, NULL) == EJUSTRETURN)
@@ -4124,7 +4176,7 @@ uma_zfree_arg(uma_zone_t zone, void *item, void *udata)
 
 #ifdef UMA_ZALLOC_DEBUG
 	KASSERT((zone->uz_flags & UMA_ZONE_SMR) == 0,
-	    ("uma_zfree_arg: called with SMR zone.\n"));
+	    ("uma_zfree_arg: called with SMR zone."));
 	if (uma_zfree_debug(zone, item, udata) == EJUSTRETURN)
 		return;
 #endif
@@ -5348,7 +5400,7 @@ uma_dbg_alloc(uma_zone_t zone, uma_slab_t slab, void *item)
 	if (slab == NULL) {
 		slab = uma_dbg_getslab(zone, item);
 		if (slab == NULL) 
-			panic("uma: item %p did not belong to zone %s\n",
+			panic("uma: item %p did not belong to zone %s",
 			    item, zone->uz_name);
 	}
 
@@ -5364,7 +5416,7 @@ uma_dbg_alloc(uma_zone_t zone, uma_slab_t slab, void *item)
 	freei = slab_item_index(slab, keg, item);
 
 	if (BIT_ISSET(keg->uk_ipers, freei, slab_dbg_bits(slab, keg)))
-		panic("Duplicate alloc of %p from zone %p(%s) slab %p(%d)\n",
+		panic("Duplicate alloc of %p from zone %p(%s) slab %p(%d)",
 		    item, zone, zone->uz_name, slab, freei);
 	BIT_SET_ATOMIC(keg->uk_ipers, freei, slab_dbg_bits(slab, keg));
 }
@@ -5382,8 +5434,8 @@ uma_dbg_free(uma_zone_t zone, uma_slab_t slab, void *item)
 
 	if (slab == NULL) {
 		slab = uma_dbg_getslab(zone, item);
-		if (slab == NULL)
-			panic("uma: Freed item %p did not belong to zone %s\n",
+		if (slab == NULL) 
+			panic("uma: Freed item %p did not belong to zone %s",
 			    item, zone->uz_name);
 	}
 	keg = zone->uz_keg;
@@ -5397,15 +5449,15 @@ uma_dbg_free(uma_zone_t zone, uma_slab_t slab, void *item)
 	freei = slab_item_index(slab, keg, item);
 
 	if (freei >= keg->uk_ipers)
-		panic("Invalid free of %p from zone %p(%s) slab %p(%d)\n",
+		panic("Invalid free of %p from zone %p(%s) slab %p(%d)",
 		    item, zone, zone->uz_name, slab, freei);
 
 	if (slab_item(slab, keg, freei) != item)
-		panic("Unaligned free of %p from zone %p(%s) slab %p(%d)\n",
+		panic("Unaligned free of %p from zone %p(%s) slab %p(%d)",
 		    item, zone, zone->uz_name, slab, freei);
 
 	if (!BIT_ISSET(keg->uk_ipers, freei, slab_dbg_bits(slab, keg)))
-		panic("Duplicate free of %p from zone %p(%s) slab %p(%d)\n",
+		panic("Duplicate free of %p from zone %p(%s) slab %p(%d)",
 		    item, zone, zone->uz_name, slab, freei);
 
 	BIT_CLR_ATOMIC(keg->uk_ipers, freei, slab_dbg_bits(slab, keg));
