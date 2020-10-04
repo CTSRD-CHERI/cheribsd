@@ -157,7 +157,7 @@ static void vm_map_wire_entry_failure(vm_map_t map, vm_map_entry_t entry,
     vm_offset_t failed_addr);
 static void vm_map_reservation_init_entry(vm_map_entry_t entry);
 static vm_map_entry_t vm_map_reservation_insert(vm_map_t map, vm_offset_t addr,
-    vm_size_t length, vm_offset_t reservation);
+    vm_size_t length, vm_prot_t max, vm_offset_t reservation);
 static inline void _vm_map_clip_end(vm_map_t map, vm_map_entry_t entry,
     vm_offset_t end);
 static inline void _vm_map_clip_start(vm_map_t map, vm_map_entry_t entry,
@@ -1722,6 +1722,7 @@ vm_map_insert(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 		if ((new_entry->eflags & MAP_ENTRY_UNMAPPED) == 0 ||
 		    new_entry->end < end)
 			return (KERN_NO_SPACE);
+		/* XXX-AM: TODO Check maxprot consistency with the reserved entry */
 	} else {
 		/*
 		 * Find the entry prior to the proposed starting address; if it's part
@@ -1884,7 +1885,6 @@ charged:
 
 	new_entry->inheritance = inheritance;
 	new_entry->protection = prot;
-	/* XXX-AM: should the reserved entry already have maxprot? */
 	new_entry->max_protection = max;
 	new_entry->wired_count = 0;
 	new_entry->wiring_thread = NULL;
@@ -5028,7 +5028,8 @@ retry:
 			if (map->flags & MAP_RESERVATIONS)
 				tmp_entry = vm_map_reservation_insert(map,
 				    stack_entry->start - grow_amount,
-				    grow_amount, stack_entry->reservation);
+				    grow_amount, stack_entry->max_protection,
+				    stack_entry->reservation);
 			gap_deleted = false;
 		}
 		/* XXX-AM: Would be nice to just grow the object as below */
@@ -5574,9 +5575,12 @@ _vm_map_buildcap(vm_map_t map, vm_offset_t addr, vm_size_t length,
  * and add it to the map
  */
 static vm_map_entry_t
-vm_map_reservation_insert(vm_map_t map, vm_offset_t addr, vm_size_t length, vm_offset_t reservation)
+vm_map_reservation_insert(vm_map_t map, vm_offset_t addr, vm_size_t length,
+    vm_prot_t max, vm_offset_t reservation)
 {
 	vm_map_entry_t new_entry;
+
+	VM_MAP_ASSERT_LOCKED(map);
 
 	new_entry = vm_map_entry_create(map);
 	vm_map_reservation_init_entry(new_entry);
@@ -5584,6 +5588,7 @@ vm_map_reservation_insert(vm_map_t map, vm_offset_t addr, vm_size_t length, vm_o
 	new_entry->end = addr + length;
 	new_entry->reservation = reservation;
 	new_entry->next_read = addr;
+	new_entry->max_protection = max;
 	vm_map_entry_link(map, new_entry);
 	vm_map_log("reserve", new_entry);
 
@@ -5630,7 +5635,7 @@ vm_map_reservation_create_locked(vm_map_t map, vm_ptr_t *addr,
 	if (entry->start < end)
 		return (KERN_NO_SPACE);
 
-	vm_map_reservation_insert(map, start, length, start);
+	vm_map_reservation_insert(map, start, length, max_prot, start);
 	CTR3(KTR_VM, "%s: reserve %lx-%lx", __func__, start, end);
 
 	*addr = vm_map_buildcap(map, start, length, max_prot);
