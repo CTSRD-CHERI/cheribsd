@@ -1167,8 +1167,7 @@ exec_new_vmspace(struct image_params *imgp, struct sysentvec *sv)
 	error = vm_map_stack(map, stack_addr, (vm_size_t)ssiz, stack_prot,
 	    stack_prot, MAP_STACK_GROWS_DOWN);
 	if (error != KERN_SUCCESS) {
-		vm_map_reservation_delete(map,
-		    cheri_kern_getbase((void *)stack_addr));
+		vm_map_reservation_delete(map, cheri_kern_getbase(stack_addr));
 		return (vm_mmap_to_errno(error));
 	}
 #if __has_feature(capabilities)
