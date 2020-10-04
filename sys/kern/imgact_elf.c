@@ -555,7 +555,7 @@ __elfN(build_imgact_capability)(struct image_params *imgp,
 	reservation_cap = cheri_setbounds(
 	    cheri_setaddress(userspace_cap, reservation), end - start);
 #endif
-	*imgact_cap = cheri_andperm((void * __capability)reservation, perm);
+	*imgact_cap = cheri_andperm(reservation_cap, perm);
 
 	return (KERN_SUCCESS);
 }
@@ -717,8 +717,7 @@ __elfN(load_section)(struct image_params *imgp, vm_ooffset_t offset,
 	else
 		map_len = round_page(offset + filsz) - file_addr;
 #if __has_feature(capabilities)
-	map_addr = (uintcap_t)cheri_setbounds(
-	    (void * __capability)map_addr, map_len);
+	map_addr = cheri_setbounds(map_addr, map_len);
 #endif
 
 	if (map_len != 0) {
@@ -747,8 +746,7 @@ __elfN(load_section)(struct image_params *imgp, vm_ooffset_t offset,
 	map_addr = trunc_page(vmaddr + filsz);
 	map_len = (vaddr_t)round_page(vmaddr + memsz) - (vaddr_t)map_addr;
 #if __has_feature(capabilities)
-	map_addr = (uintcap_t)cheri_setbounds(
-	    (void * __capability)map_addr, map_len);
+	map_addr = cheri_setbounds(map_addr, map_len);
 #endif
 
 	/* This had damn well better be true! */
