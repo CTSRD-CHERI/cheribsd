@@ -384,11 +384,11 @@ SES_ENABLE_PASSTHROUGH	opt_ses.h
 
 # Options used in dev/sym/ (Symbios SCSI driver).
 SYM_SETUP_SCSI_DIFF	opt_sym.h	#-HVD support for 825a, 875, 885
-					# disabled:0 (default), enabled:1
+				# disabled:0 (default), enabled:1
 SYM_SETUP_PCI_PARITY	opt_sym.h	#-PCI parity checking
-					# disabled:0, enabled:1 (default)
+				# disabled:0, enabled:1 (default)
 SYM_SETUP_MAX_LUN	opt_sym.h	#-Number of LUNs supported
-					# default:8, range:[1..64]
+				# default:8, range:[1..64]
 
 # Options used only in dev/isp/*
 ISP_TARGET_MODE		opt_isp.h
@@ -1016,6 +1016,9 @@ AMDSBWD_DEBUG	opt_amdsbwd.h
 # gcov support
 GCOV		opt_global.h
 LINDEBUGFS
+
+# options for HID support
+HID_DEBUG	opt_hid.h
 
 # CHERI
 CPU_CHERI	opt_global.h
