@@ -529,7 +529,8 @@ struct kinfo_vmentry {
 	uint64_t kve_vn_fsid;			/* dev_t of vnode location */
 	uint64_t kve_vn_rdev;			/* Device id if device. */
 	uint64_t kve_reservation;		/* Map reservation */
-	int	 _kve_ispare[6];		/* Space for more stuff. */
+	int      kve_max_protection;		/* Maximum protection bitmask */
+	int	 _kve_ispare[5];		/* Space for more stuff. */
 	/* Truncated before copyout in sysctl */
 	char	 kve_path[PATH_MAX];		/* Path to VM obj, if any. */
 };
@@ -611,7 +612,7 @@ int	kern_proc_filedesc_out(struct proc *p, struct sbuf *sb, ssize_t maxlen,
 int	kern_proc_cwd_out(struct proc *p, struct sbuf *sb, ssize_t maxlen);
 int	kern_proc_out(struct proc *p, struct sbuf *sb, int flags);
 int	kern_proc_vmmap_out(struct proc *p, struct sbuf *sb, ssize_t maxlen,
-	int flags);
+	vm_offset_t startaddr, size_t max, int flags);
 
 int	vntype_to_kinfo(int vtype);
 void	pack_kinfo(struct kinfo_file *kif);

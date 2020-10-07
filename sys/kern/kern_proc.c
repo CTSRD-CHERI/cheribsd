@@ -2666,7 +2666,8 @@ next:;
  * Must be called with the process locked and will return unlocked.
  */
 int
-kern_proc_vmmap_out(struct proc *p, struct sbuf *sb, ssize_t maxlen, int flags)
+kern_proc_vmmap_out(struct proc *p, struct sbuf *sb, ssize_t maxlen,
+	vm_offset_t startaddr, size_t n, int flags)
 {
 	vm_map_entry_t entry, tmp_entry;
 	struct vattr va;
@@ -2681,6 +2682,7 @@ kern_proc_vmmap_out(struct proc *p, struct sbuf *sb, ssize_t maxlen, int flags)
 	unsigned int last_timestamp;
 	int error;
 	bool super;
+	size_t pathlen, i;
 
 	PROC_LOCK_ASSERT(p, MA_OWNED);
 
@@ -2696,7 +2698,24 @@ kern_proc_vmmap_out(struct proc *p, struct sbuf *sb, ssize_t maxlen, int flags)
 	error = 0;
 	map = &vm->vm_map;
 	vm_map_lock_read(map);
-	VM_MAP_ENTRY_FOREACH(entry, map) {
+
+	/* XXX I really wish this could be 0, not 1. But...
+	 *
+	 * Someone is too damn smart and sees NULL for the new ptr and
+	 * zorches the new length, causing the kernel to do a full sweep
+	 * at first.  Pass 1 instead of 0 for the first query base.
+	 */
+	if (startaddr <= 1) {
+		entry = vm_map_entry_first(map);
+	} else {
+		boolean_t in = vm_map_lookup_entry(map, startaddr, &entry);
+		if (!in) {
+			entry = vm_map_entry_succ(entry);
+		}
+	}
+
+	for (i = 0; (entry != &map->header) && (n == 0 || i < n);
+	     entry = vm_map_entry_succ(entry), i++) {
 		if (entry->eflags & MAP_ENTRY_IS_SUB_MAP)
 			continue;
 
@@ -2738,13 +2757,24 @@ kern_proc_vmmap_out(struct proc *p, struct sbuf *sb, ssize_t maxlen, int flags)
 		if (entry->protection & VM_PROT_EXECUTE)
 			kve->kve_protection |= KVME_PROT_EXEC;
 #ifdef OBJ_NOLOADTAGS
-		if (obj != NULL && (obj->flags & OBJ_NOLOADTAGS) == 0)
+		if (obj != NULL && (obj->flags & OBJ_NOLOADTAGS) == 0) {
+			kve->kve_max_protection |= KVME_PROT_LOADTAGS;
 			kve->kve_protection |= KVME_PROT_LOADTAGS;
+		}
 #endif
 #ifdef OBJ_NOSTORETAGS
-		if (obj != NULL && (obj->flags & OBJ_NOSTORETAGS) == 0)
+		if (obj != NULL && (obj->flags & OBJ_NOSTORETAGS) == 0) {
+			kve->kve_max_protection |= KVME_PROT_STORETAGS;
 			kve->kve_protection |= KVME_PROT_STORETAGS;
+		}
 #endif
+
+		if (entry->max_protection & VM_PROT_READ)
+			kve->kve_max_protection |= KVME_PROT_READ;
+		if (entry->max_protection & VM_PROT_WRITE)
+			kve->kve_max_protection |= KVME_PROT_WRITE;
+		if (entry->max_protection & VM_PROT_EXECUTE)
+			kve->kve_max_protection |= KVME_PROT_EXEC;
 
 		if (entry->eflags & MAP_ENTRY_COW)
 			kve->kve_flags |= KVME_FLAG_COW;
@@ -2805,16 +2835,16 @@ kern_proc_vmmap_out(struct proc *p, struct sbuf *sb, ssize_t maxlen, int flags)
 			kve->kve_shadow_count = 0;
 		}
 
-		strlcpy(kve->kve_path, fullpath, sizeof(kve->kve_path));
+		pathlen = strlcpy(kve->kve_path, fullpath, sizeof(kve->kve_path));
 		if (freepath != NULL)
 			free(freepath, M_TEMP);
 
 		/* Pack record size down */
-		if ((flags & KERN_VMMAP_PACK_KINFO) != 0)
+		if ((flags & KERN_VMMAP_PACK_KINFO) != 0) {
 			kve->kve_structsize =
 			    offsetof(struct kinfo_vmentry, kve_path) +
-			    strlen(kve->kve_path) + 1;
-		else
+			    pathlen + 1;
+		} else
 			kve->kve_structsize = sizeof(*kve);
 		kve->kve_structsize = roundup(kve->kve_structsize,
 		    sizeof(uint64_t));
@@ -2822,25 +2852,26 @@ kern_proc_vmmap_out(struct proc *p, struct sbuf *sb, ssize_t maxlen, int flags)
 		/* Halt filling and truncate rather than exceeding maxlen */
 		if (maxlen != -1 && maxlen < kve->kve_structsize) {
 			error = 0;
-			vm_map_lock_read(map);
-			break;
+			goto out_nolock;
 		} else if (maxlen != -1)
 			maxlen -= kve->kve_structsize;
 
 		if (sbuf_bcat(sb, kve, kve->kve_structsize) != 0)
 			error = ENOMEM;
-		vm_map_lock_read(map);
 		if (error != 0)
-			break;
+			goto out_nolock;
+		vm_map_lock_read(map);
 		if (last_timestamp != map->timestamp) {
 			vm_map_lookup_entry(map, addr - 1, &tmp_entry);
 			entry = tmp_entry;
 		}
 	}
 	vm_map_unlock_read(map);
+out_nolock:
 	vmspace_free(vm);
 	PRELE(p);
 	free(kve, M_TEMP);
+
 	return (error);
 }
 
@@ -2850,8 +2881,17 @@ sysctl_kern_proc_vmmap(SYSCTL_HANDLER_ARGS)
 	struct proc *p;
 	struct sbuf sb;
 	int error, error2, *name;
+	vm_offset_t base;
+	size_t n;
 
 	name = (int *)arg1;
+
+	base = (__cheri_addr vm_offset_t)req->newptr;
+	req->newptr = NULL;
+
+	n = req->newlen;
+	req->newlen = 0;
+
 	sbuf_new_for_sysctl(&sb, NULL, sizeof(struct kinfo_vmentry), req);
 	sbuf_clear_flags(&sb, SBUF_INCLUDENUL);
 	error = pget((pid_t)name[0], PGET_CANDEBUG | PGET_NOTWEXIT, &p);
@@ -2859,7 +2899,8 @@ sysctl_kern_proc_vmmap(SYSCTL_HANDLER_ARGS)
 		sbuf_delete(&sb);
 		return (error);
 	}
-	error = kern_proc_vmmap_out(p, &sb, -1, KERN_VMMAP_PACK_KINFO);
+	error = kern_proc_vmmap_out(p, &sb, -1, base, n,
+		KERN_VMMAP_PACK_KINFO);
 	error2 = sbuf_finish(&sb);
 	sbuf_delete(&sb);
 	return (error != 0 ? error : error2);
@@ -3435,8 +3476,10 @@ static SYSCTL_NODE(_kern_proc, KERN_PROC_OVMMAP, ovmmap, CTLFLAG_RD |
 	CTLFLAG_MPSAFE, sysctl_kern_proc_ovmmap, "Old Process vm map entries");
 #endif
 
-static SYSCTL_NODE(_kern_proc, KERN_PROC_VMMAP, vmmap, CTLFLAG_RD |
-	CTLFLAG_MPSAFE, sysctl_kern_proc_vmmap, "Process vm map entries");
+/* XXXNWF CTLFLAG_RW is a hack to sneak a parameter in! */
+static SYSCTL_NODE(_kern_proc, KERN_PROC_VMMAP, vmmap, CTLFLAG_RW |
+	CTLFLAG_MPSAFE, sysctl_kern_proc_vmmap,
+	"Process vm map entries");
 
 #if defined(STACK) || defined(DDB)
 static SYSCTL_NODE(_kern_proc, KERN_PROC_KSTACK, kstack, CTLFLAG_RD |
