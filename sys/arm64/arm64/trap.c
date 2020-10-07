@@ -289,7 +289,12 @@ data_abort(struct thread *td, struct trapframe *frame, uint64_t esr,
 			if (td->td_intr_nesting_level == 0 &&
 			    pcb->pcb_onfault != 0) {
 				frame->tf_x[0] = error;
+#if __has_feature(capabilities)
+				frame->tf_elr = (uintcap_t)cheri_setaddress(
+				    cheri_getpcc(), pcb->pcb_onfault);
+#else
 				frame->tf_elr = pcb->pcb_onfault;
+#endif
 				return;
 			}
 
