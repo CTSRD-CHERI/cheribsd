@@ -491,7 +491,8 @@ elf_reloc_internal(linker_file_t lf, char *relocbase, const void *data,
 		break;
 
 	default:
-		printf("kldload: unexpected relocation type %ld\n", rtype);
+		printf("kldload: unexpected relocation type %ld, "
+		    "symbol index %ld\n", rtype, symidx);
 		return (-1);
 	}
 
