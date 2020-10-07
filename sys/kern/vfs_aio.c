@@ -1291,8 +1291,8 @@ aio_qbio(struct proc *p, struct kaiocb *job)
 	if (cb->aio_lio_opcode == LIO_READ)
 		prot |= VM_PROT_WRITE;	/* Less backwards than it looks */
 	job->npages = vm_fault_quick_hold_pages(&curproc->p_vmspace->vm_map,
-	    (__cheri_addr vm_offset_t)cb->aio_buf, bp->bio_length, prot, job->pages,
-	    nitems(job->pages));
+	    __DEVOLATILE_CAP(void * __capability, cb->aio_buf), bp->bio_length,
+	    prot, job->pages, nitems(job->pages));
 	if (job->npages < 0) {
 		error = EFAULT;
 		goto doerror;

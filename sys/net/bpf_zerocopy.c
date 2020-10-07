@@ -93,7 +93,7 @@ __FBSDID("$FreeBSD$");
  * knows that the space is not available.
  */
 struct zbuf {
-	vm_offset_t	 zb_uaddr;	/* User address at time of setup. */
+	void * __capability zb_uaddr;	/* User address at time of setup. */
 	size_t		 zb_size;	/* Size of buffer, incl. header. */
 	u_int		 zb_numpages;	/* Number of pages. */
 	int		 zb_flags;	/* Flags on zbuf. */
@@ -155,7 +155,7 @@ zbuf_free(struct zbuf *zb)
  * deadlock and use SFB_NOWAIT.
  */
 static struct sf_buf *
-zbuf_sfbuf_get(struct vm_map *map, vm_offset_t uaddr)
+zbuf_sfbuf_get(struct vm_map *map, void * __capability uaddr)
 {
 	struct sf_buf *sf;
 	vm_page_t pp;
@@ -176,7 +176,7 @@ zbuf_sfbuf_get(struct vm_map *map, vm_offset_t uaddr)
  * page alignment, size requirements, etc.
  */
 static int
-zbuf_setup(struct thread *td, vm_offset_t uaddr, size_t len,
+zbuf_setup(struct thread *td, void * __capability uaddr, size_t len,
     struct zbuf **zbp)
 {
 	struct zbuf *zb;
@@ -188,7 +188,7 @@ zbuf_setup(struct thread *td, vm_offset_t uaddr, size_t len,
 	/*
 	 * User address must be page-aligned.
 	 */
-	if (uaddr & PAGE_MASK)
+	if (!is_aligned(uaddr, PAGE_SIZE))
 		return (EINVAL);
 
 	/*
@@ -216,7 +216,7 @@ zbuf_setup(struct thread *td, vm_offset_t uaddr, size_t len,
 	map = &td->td_proc->p_vmspace->vm_map;
 	for (i = 0; i < zb->zb_numpages; i++) {
 		zb->zb_pages[i] = zbuf_sfbuf_get(map,
-		    uaddr + (i * PAGE_SIZE));
+		    (char * __capability)uaddr + (i * PAGE_SIZE));
 		if (zb->zb_pages[i] == NULL) {
 			error = EFAULT;
 			goto error;
@@ -514,7 +514,7 @@ bpf_zerocopy_ioctl_rotzbuf(struct thread *td, struct bpf_d *d,
 	if (d->bd_hbuf == NULL && d->bd_slen != 0) {
 		ROTATE_BUFFERS(d);
 		bzh = (struct zbuf *)d->bd_hbuf;
-		bz->bz_bufa = (void *)bzh->zb_uaddr;
+		bz->bz_bufa = bzh->zb_uaddr;
 		bz->bz_buflen = d->bd_hlen;
 	}
 	BPFD_UNLOCK(d);
@@ -550,12 +550,10 @@ bpf_zerocopy_ioctl_setzbuf(struct thread *td, struct bpf_d *d,
 	/*
 	 * Allocate new buffers.
 	 */
-	error = zbuf_setup(td, (vm_offset_t)bz->bz_bufa, bz->bz_buflen,
-	    &zba);
+	error = zbuf_setup(td, bz->bz_bufa, bz->bz_buflen, &zba);
 	if (error)
 		return (error);
-	error = zbuf_setup(td, (vm_offset_t)bz->bz_bufb, bz->bz_buflen,
-	    &zbb);
+	error = zbuf_setup(td, bz->bz_bufb, bz->bz_buflen, &zbb);
 	if (error) {
 		zbuf_free(zba);
 		return (error);
