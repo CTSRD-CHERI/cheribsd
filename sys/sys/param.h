@@ -190,6 +190,17 @@
 #define	MJUM16BYTES	(16 * 1024)	/* jumbo cluster 16k */
 
 /*
+ * Mach derived conversion macros
+ */
+#define	round_page(x)	(((x) + PAGE_MASK) & ~(PAGE_MASK))
+#define	trunc_page(x)	((x) & ~(PAGE_MASK))
+
+#define	atop(x)		((x) >> PAGE_SHIFT)
+#define	ptoa(x)		((x) << PAGE_SHIFT)
+
+#define	pgtok(x)	((x) * (PAGE_SIZE / 1024))
+
+/*
  * Some macros for units conversion
  */
 
