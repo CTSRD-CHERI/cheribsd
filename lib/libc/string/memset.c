@@ -89,6 +89,7 @@ __CAPSUFFIX(memset)(void * __CAP dst0, int c0, size_t length)
 	if (length < 3 * wsize) {
 		while (length != 0) {
 			*dst++ = VAL;
+			__asm__("");
 			--length;
 		}
 		RETURN;
@@ -111,6 +112,7 @@ __CAPSUFFIX(memset)(void * __CAP dst0, int c0, size_t length)
 		length -= t;
 		do {
 			*dst++ = VAL;
+			__asm__("");
 		} while (--t != 0);
 	}
 
@@ -126,6 +128,7 @@ __CAPSUFFIX(memset)(void * __CAP dst0, int c0, size_t length)
 	if (t != 0)
 		do {
 			*dst++ = VAL;
+			__asm__("");
 		} while (--t != 0);
 	RETURN;
 }
