@@ -200,7 +200,7 @@ linux_get_user_pages_internal(vm_map_t map, unsigned long start, int nr_pages,
 
 	prot = write ? (VM_PROT_READ | VM_PROT_WRITE) : VM_PROT_READ;
 	len = ((size_t)nr_pages) << PAGE_SHIFT;
-	count = vm_fault_quick_hold_pages(map, start, len, prot, pages, nr_pages);
+	count = vm_fault_quick_hold_pages(map, (void *)(uintptr_t)start, len, prot, pages, nr_pages);
 	return (count == -1 ? -EFAULT : nr_pages);
 }
 

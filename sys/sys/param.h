@@ -192,8 +192,8 @@
 /*
  * Mach derived conversion macros
  */
-#define	round_page(x)	(((x) + PAGE_MASK) & ~(PAGE_MASK))
-#define	trunc_page(x)	((x) & ~(PAGE_MASK))
+#define	round_page(x)	roundup2(x, PAGE_SIZE)
+#define	trunc_page(x)	rounddown2(x, PAGE_SIZE)
 
 #define	atop(x)		((x) >> PAGE_SHIFT)
 #define	ptoa(x)		((x) << PAGE_SHIFT)

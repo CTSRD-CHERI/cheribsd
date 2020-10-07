@@ -1751,37 +1751,44 @@ vm_fault_prefault(const struct faultstate *fs, vm_offset_t addra,
  * pages are successfully held, then the number of held pages is returned
  * together with pointers to those pages in the array "ma".  However, if any
  * of the pages cannot be held, -1 is returned.
+ *
+ * XXX-CHERI: In a pure-capability world with physical capabilities we'd
+ * likely want to bound the first and last pages when rounding is required.
  */
 int
-vm_fault_quick_hold_pages(vm_map_t map, vm_offset_t addr, vm_size_t len,
+vm_fault_quick_hold_pages(vm_map_t map, void * __capability addr, vm_size_t len,
     vm_prot_t prot, vm_page_t *ma, int max_count)
 {
-	vm_offset_t end, va;
+	vm_offset_t start, end, va;
 	vm_page_t *mp;
 	int count;
 	boolean_t pmap_failed;
 
 	if (len == 0)
 		return (0);
-	end = round_page(addr + len);
-	addr = trunc_page(addr);
+#if __has_feature(capabilities)
+	if (!__CAP_CHECK(addr, len))
+		return (-1);
+#endif
+	start = (__cheri_addr vm_offset_t)trunc_page(addr);
+	end = (__cheri_addr vm_offset_t)round_page((char * __capability)addr + len);
 
 	/*
 	 * Check for illegal addresses.
 	 */
-	if (addr < vm_map_min(map) || addr > end || end > vm_map_max(map))
+	if (start < vm_map_min(map) || start > end || end > vm_map_max(map))
 		return (-1);
 
-	if (atop(end - addr) > max_count)
+	if (atop(end - start) > max_count)
 		panic("vm_fault_quick_hold_pages: count > max_count");
-	count = atop(end - addr);
+	count = atop(end - start);
 
 	/*
 	 * Most likely, the physical pages are resident in the pmap, so it is
 	 * faster to try pmap_extract_and_hold() first.
 	 */
 	pmap_failed = FALSE;
-	for (mp = ma, va = addr; va < end; mp++, va += PAGE_SIZE) {
+	for (mp = ma, va = start; va < end; mp++, va += PAGE_SIZE) {
 		*mp = pmap_extract_and_hold(map->pmap, va, prot);
 		if (*mp == NULL)
 			pmap_failed = TRUE;
@@ -1817,7 +1824,7 @@ vm_fault_quick_hold_pages(vm_map_t map, vm_offset_t addr, vm_size_t len,
 		if ((prot & VM_PROT_QUICK_NOFAULT) != 0 &&
 		    (curthread->td_pflags & TDP_NOFAULTING) != 0)
 			goto error;
-		for (mp = ma, va = addr; va < end; mp++, va += PAGE_SIZE)
+		for (mp = ma, va = start; va < end; mp++, va += PAGE_SIZE)
 			if (*mp == NULL && vm_fault(map, va, prot,
 			    VM_FAULT_NORMAL, mp) != KERN_SUCCESS)
 				goto error;
