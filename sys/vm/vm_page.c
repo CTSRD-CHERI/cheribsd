@@ -5474,6 +5474,23 @@ vm_page_assert_pga_writeable(vm_page_t m, uint16_t bits)
 	if (!vm_page_xbusied(m))
 		VM_OBJECT_ASSERT_BUSY(m->object);
 }
+
+#if __has_feature(capabilities)
+void
+vm_page_assert_pga_capmeta_clear(vm_page_t m, uint16_t bits)
+{
+	if ((bits & (PGA_CAPDIRTY | PGA_CAPSTORE)) == 0)
+		return;
+
+	if (vm_page_xbusied(m)) {
+		/* If it's busy at all, it's busy by us */
+		vm_page_assert_xbusied(m);
+	} else {
+		/* If it's not busy, we hold its object's lock */
+		VM_OBJECT_ASSERT_LOCKED(m->object);
+	}
+}
+#endif
 #endif
 
 #include "opt_ddb.h"
