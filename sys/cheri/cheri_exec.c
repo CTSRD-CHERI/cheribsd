@@ -114,10 +114,19 @@ cheri_set_mmap_capability(struct thread *td, struct image_params *imgp,
 	KASSERT(text_end <= stack_base,
 	    ("text_end 0x%zx > stack_base 0x%lx", text_end, stack_base));
 
+	/*
+	 * XXXBFG on Morello stack_base - text_end is so large that map_base is
+	 * rounded up to be above where heap allocations are made. See
+	 * vm/vm_mmap.c:789. We probably want a better fix for this.
+	 */
+#ifdef __aarch64__
+	map_base = 0;
+#else
 	map_base = (text_end == stack_base) ?
 	    CHERI_CAP_USER_MMAP_BASE :
 	    roundup2(text_end,
 		CHERI_REPRESENTABLE_ALIGNMENT(stack_base - text_end));
+#endif
 	KASSERT(map_base < stack_base,
 	    ("map_base 0x%zx >= stack_base 0x%lx", map_base, stack_base));
 	map_length = stack_base - map_base;

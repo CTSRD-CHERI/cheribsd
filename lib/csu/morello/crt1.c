@@ -132,8 +132,9 @@ _start(void *auxv,
 
 	if (cleanup != NULL)
 		atexit(cleanup);
-	else
-		_init_tls();
+	/* Emulated TLS for now. */
+	/*else*/
+		/*_init_tls();*/
 
 	handle_static_init(argc, argv, env);
 
