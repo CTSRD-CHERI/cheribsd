@@ -95,8 +95,11 @@
  * XXX Will probaby want non-executive PCC when we add comparmentalization
  * support, but make all code caps executive for now.
  */
-#define	CHERI_PERMS_USERSPACE_CODE					\
-	(CHERI_PERMS_USERSPACE | CHERI_PERM_EXECUTE | CHERI_PERM_EXECUTIVE)
+#define	CHERI_PERMS_USERSPACE_CODE				\
+				(CHERI_PERMS_USERSPACE |		\
+				CHERI_PERM_EXECUTE |			\
+				CHERI_PERM_EXECUTIVE |			\
+				CHERI_PERM_MUTABLE_LOAD)
 
 #define	CHERI_PERMS_USERSPACE_SEALCAP					\
 	(CHERI_PERM_GLOBAL | CHERI_PERM_SEAL | CHERI_PERM_UNSEAL)
