@@ -119,7 +119,7 @@
 /* Reserved CHERI object types: */
 #ifdef __aarch64__
 #define	CHERI_OTYPE_UNSEALED	(0)
-#define	CHERI_OTYPE_SENTRY	(-1l)
+#define	CHERI_OTYPE_SENTRY	(1l)
 #else
 #define	CHERI_OTYPE_UNSEALED	(-1l)
 #define	CHERI_OTYPE_SENTRY	(-2l)
