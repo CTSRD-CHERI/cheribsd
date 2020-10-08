@@ -255,25 +255,30 @@ ENTRY(fork_trampoline)
 	/* Restore sp and lr */
 #if __has_feature(capabilities)
 	ldp	c0, c1, [sp, #TF_SP]
+	msr	csp_el0, c0
+	mov	clr, c1
 #else
 	ldp	x0, x1, [sp, #TF_SP]
-#endif
 	msr	sp_el0, x0
 	mov	lr, x1
+#endif
 
 	/* Restore elr and spsr */
 #if __has_feature(capabilities)
 	ldr	c0, [sp, #TF_ELR]
 	ldr	x1, [sp, #TF_SPSR]
 	msr	celr_el1, c0
-	/* Restore ddc */
-	ldr	c0, [sp, #TF_DDC]
-	msr	ddc_el0, c0
 #else
 	ldp	x0, x1, [sp, #TF_ELR]
 	msr	elr_el1, x0
 #endif
 	msr	spsr_el1, x1
+
+	/* Restore ddc */
+#if __has_feature(capabilities)
+	ldr	c0, [sp, #TF_DDC]
+	msr	ddc_el0, c0
+#endif
 
 	/* Finally x0 and x1 */
 #if __has_feature(capabilities)
