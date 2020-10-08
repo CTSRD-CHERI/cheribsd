@@ -99,6 +99,18 @@ _start:
 	bic	x2, x2, CPACR_CEN_MASK
 	orr	x2, x2, CPACR_CEN_TRAP_NONE
 	msr	cpacr_el1, x2
+
+	/*
+	 * Allow access to CNTVCT_EL0 without PCC System permission and enable
+	 * capability sealing for branch and link at EL0.
+	 *
+	 * XXXBFG should this be done somewhere else? Maybe eventually per-process or
+	 * compartment?
+	 */
+	mrs x2, cctlr_el0
+	orr x2, x2, CCTLR_PERMVCT_MASK
+	orr x2, x2, CCTLR_SBL_MASK
+	msr cctlr_el0, x2
 #endif
 
 	/*
