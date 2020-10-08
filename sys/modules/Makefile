@@ -208,7 +208,7 @@ SUBDIR=	\
 	libiconv \
 	libmchain \
 	lindebugfs \
-	linuxkpi \
+	${_linuxkpi} \
 	${_lio} \
 	lpt \
 	mac_biba \
@@ -800,6 +800,10 @@ _cloudabi64=	cloudabi64
 .if ${MACHINE_ARCH:Marmv[67]*} != "" || ${MACHINE_CPUARCH} == "aarch64"
 _bcm283x_clkman=  bcm283x_clkman
 _bcm283x_pwm=  bcm283x_pwm
+.endif
+
+.if ${CPUTYPE} != "cheri"
+_linuxkpi=	linuxkpi
 .endif
 
 SUBDIR+=${MODULES_EXTRA}
