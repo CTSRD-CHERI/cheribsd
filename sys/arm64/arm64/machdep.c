@@ -1462,6 +1462,9 @@ do {									\
 	PRINT_REG(aidr_el1);
 	PRINT_REG(amair_el1);
 	PRINT_REG(ccsidr_el1);
+#if __has_feature(capabilities)
+	PRINT_REG(cctlr_el0);
+#endif
 	PRINT_REG(clidr_el1);
 	PRINT_REG(contextidr_el1);
 	PRINT_REG(cpacr_el1);
