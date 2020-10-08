@@ -176,7 +176,8 @@ do_crt_init_globals(const Elf_Phdr * __capability phdr, long phnum)
 			__builtin_trap();
 		}
 		data_cap =
-		    cheri_setaddress(__DECONST(void *, phdr), writable_start);
+		    cheri_setaddress(__DECONST_CAP(void * __capability, phdr),
+		    writable_start);
 		/* Bound the result and clear execute permissions. */
 		data_cap = cheri_clearperm(data_cap, CHERI_PERM_EXECUTE);
 		/* TODO: should we use exact setbounds? */
