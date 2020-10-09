@@ -3025,7 +3025,7 @@ vn_generic_copy_file_range(struct vnode *invp, off_t *inoffp,
 	struct uio io;
 	off_t startoff, endoff, xfer, xfer2;
 	u_long blksize;
-	int error;
+	int error, interrupted;
 	bool cantseek, readzeros, eof, lastblock;
 	ssize_t aresid;
 	size_t copylen, len, rem, savlen;
@@ -3035,6 +3035,7 @@ vn_generic_copy_file_range(struct vnode *invp, off_t *inoffp,
 	holein = holeout = 0;
 	savlen = len = *lenp;
 	error = 0;
+	interrupted = 0;
 	dat = NULL;
 
 	error = vn_lock(invp, LK_SHARED);
@@ -3124,7 +3125,7 @@ vn_generic_copy_file_range(struct vnode *invp, off_t *inoffp,
 	 * support holes on the server, but do not support FIOSEEKHOLE.
 	 */
 	eof = false;
-	while (len > 0 && error == 0 && !eof) {
+	while (len > 0 && error == 0 && !eof && interrupted == 0) {
 		endoff = 0;			/* To shut up compilers. */
 		cantseek = true;
 		startoff = *inoffp;
@@ -3185,6 +3186,8 @@ vn_generic_copy_file_range(struct vnode *invp, off_t *inoffp,
 					*inoffp += xfer;
 					*outoffp += xfer;
 					len -= xfer;
+					if (len < savlen)
+						interrupted = sig_intr();
 				}
 			}
 			copylen = MIN(len, endoff - startoff);
@@ -3206,7 +3209,7 @@ vn_generic_copy_file_range(struct vnode *invp, off_t *inoffp,
 			xfer -= (*inoffp % blksize);
 		}
 		/* Loop copying the data block. */
-		while (copylen > 0 && error == 0 && !eof) {
+		while (copylen > 0 && error == 0 && !eof && interrupted == 0) {
 			if (copylen < xfer)
 				xfer = copylen;
 			error = vn_lock(invp, LK_SHARED);
@@ -3247,6 +3250,8 @@ vn_generic_copy_file_range(struct vnode *invp, off_t *inoffp,
 					*outoffp += xfer;
 					copylen -= xfer;
 					len -= xfer;
+					if (len < savlen)
+						interrupted = sig_intr();
 				}
 			}
 			xfer = blksize;
