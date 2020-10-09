@@ -1422,10 +1422,12 @@ DB_SHOW_COMMAND(specialregs, db_show_spregs)
     db_printf(__STRING(reg) " = %#016lx\n", READ_SPECIALREG(reg))
 
 #if __has_feature(capabilities)
-#include <cheri/cheric.h>
-#define	PRINT_REG_CAP(reg)	\
-    db_printf(__STRING(reg) " = " _CHERI_PRINTF_CAP_FMT "\n", \
-        _CHERI_PRINTF_CAP_ARG((void *__capability)READ_SPECIALREG_CAP(reg)))
+#define	PRINT_REG_CAP(reg)						\
+do {									\
+    void * __capability _tmp = (void * __capability)READ_SPECIALREG_CAP(reg); \
+    db_printf(__STRING(reg) " = " _CHERI_PRINTF_CAP_FMT "\n",		\
+        _CHERI_PRINTF_CAP_ARG(_tmp));					\
+} while (0)
 #endif
 
 	PRINT_REG(actlr_el1);
