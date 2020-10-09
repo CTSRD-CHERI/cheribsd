@@ -13789,7 +13789,7 @@ freebsd64_dof_actdesc(dof_actdesc64_t *actdesc64)
 	actdesc.dofa_kind = actdesc64->dofa_kind;
 	actdesc.dofa_ntuple = actdesc64->dofa_ntuple;
 	actdesc.dofa_arg = actdesc64->dofa_arg;
-	actdesc.dofa_uarg = (uintcap_t)cheri_fromint(actdesc64->dofa_uarg);
+	actdesc.dofa_uarg = actdesc64->dofa_uarg;
 	return actdesc;
 }
 #endif
