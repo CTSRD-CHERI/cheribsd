@@ -126,11 +126,15 @@ struct dirlist {
 
 /*
  * maproot/mapall credentials.
+ * cr_smallgrps can be used for a group list up to SMALLNGROUPS in size.
+ * Larger group lists are malloc'd/free'd.
  */
+#define	SMALLNGROUPS	32
 struct expcred {
 	uid_t		cr_uid;
 	int		cr_ngroups;
-	gid_t		cr_groups[NGROUPS_MAX + 1];
+	gid_t		cr_smallgrps[SMALLNGROUPS];
+	gid_t		*cr_groups;
 };
 
 struct exportlist {
@@ -1525,6 +1529,7 @@ get_exportlist_one(int passno)
 	uint64_t exflags;
 
 	v4root_phase = 0;
+	anon.cr_groups = NULL;
 	dirhead = (struct dirlist *)NULL;
 	while (get_line()) {
 		if (debug)
@@ -1538,6 +1543,7 @@ get_exportlist_one(int passno)
 		 * Set defaults.
 		 */
 		has_host = FALSE;
+		anon.cr_groups = anon.cr_smallgrps;
 		anon.cr_uid = UID_NOBODY;
 		anon.cr_ngroups = 1;
 		anon.cr_groups[0] = GID_NOGROUP;
@@ -1832,6 +1838,10 @@ nextline:
 		if (dirhead) {
 			free_dir(dirhead);
 			dirhead = (struct dirlist *)NULL;
+		}
+		if (anon.cr_groups != anon.cr_smallgrps) {
+			free(anon.cr_groups);
+			anon.cr_groups = NULL;
 		}
 	}
 }
@@ -2916,6 +2926,8 @@ free_exp(struct exportlist *ep)
 		grp = grp->gr_next;
 		free_grp(tgrp);
 	}
+	if (ep->ex_defanon.cr_groups != ep->ex_defanon.cr_smallgrps)
+		free(ep->ex_defanon.cr_groups);
 	free((caddr_t)ep);
 }
 
@@ -3468,14 +3480,17 @@ static void
 parsecred(char *namelist, struct expcred *cr)
 {
 	char *name;
-	int cnt;
+	int inpos;
 	char *names;
 	struct passwd *pw;
 	struct group *gr;
+	gid_t groups[NGROUPS_MAX + 1];
+	int ngroups;
 
 	/*
 	 * Set up the unprivileged user.
 	 */
+	cr->cr_groups = cr->cr_smallgrps;
 	cr->cr_uid = UID_NOBODY;
 	cr->cr_groups[0] = GID_NOGROUP;
 	cr->cr_ngroups = 1;
@@ -3498,24 +3513,28 @@ parsecred(char *namelist, struct expcred *cr)
 			return;
 		}
 		cr->cr_uid = pw->pw_uid;
-		cr->cr_ngroups = NGROUPS_MAX + 1;
-		if (getgrouplist(pw->pw_name, pw->pw_gid, cr->cr_groups,
-		    &cr->cr_ngroups)) {
+		ngroups = NGROUPS_MAX + 1;
+		if (getgrouplist(pw->pw_name, pw->pw_gid, groups, &ngroups)) {
 			syslog(LOG_ERR, "too many groups");
-			cr->cr_ngroups = NGROUPS_MAX + 1;
+			ngroups = NGROUPS_MAX + 1;
 		}
 
 		/*
 		 * Compress out duplicate.
 		 */
-		if (cr->cr_ngroups > 1 && cr->cr_groups[0] ==
-		    cr->cr_groups[1]) {
-			for (cnt = 2; cnt < cr->cr_ngroups; cnt++)
-				cr->cr_groups[cnt - 1] = cr->cr_groups[cnt];
-			cr->cr_ngroups--;
-		}
-		if (cr->cr_ngroups > NGROUPS_MAX)
-			cr->cr_ngroups = NGROUPS_MAX;
+		if (ngroups > 1 && groups[0] == groups[1]) {
+			ngroups--;
+			inpos = 2;
+		} else
+			inpos = 1;
+		if (ngroups > NGROUPS_MAX)
+			ngroups = NGROUPS_MAX;
+		if (ngroups > SMALLNGROUPS)
+			cr->cr_groups = malloc(ngroups * sizeof(gid_t));
+		cr->cr_ngroups = ngroups;
+		cr->cr_groups[0] = groups[0];
+		memcpy(&cr->cr_groups[1], &groups[inpos], (ngroups - 1) *
+		    sizeof(gid_t));
 		return;
 	}
 	/*
@@ -3534,17 +3553,20 @@ parsecred(char *namelist, struct expcred *cr)
 	while (names != NULL && *names != '\0' && cr->cr_ngroups < NGROUPS_MAX) {
 		name = strsep_quote(&names, ":");
 		if (isdigit(*name) || *name == '-') {
-			cr->cr_groups[cr->cr_ngroups++] = atoi(name);
+			groups[cr->cr_ngroups++] = atoi(name);
 		} else {
 			if ((gr = getgrnam(name)) == NULL) {
 				syslog(LOG_ERR, "unknown group: %s", name);
 				continue;
 			}
-			cr->cr_groups[cr->cr_ngroups++] = gr->gr_gid;
+			groups[cr->cr_ngroups++] = gr->gr_gid;
 		}
 	}
 	if (names != NULL && *names != '\0' && cr->cr_ngroups == NGROUPS_MAX)
 		syslog(LOG_ERR, "too many groups");
+	if (cr->cr_ngroups > SMALLNGROUPS)
+		cr->cr_groups = malloc(cr->cr_ngroups * sizeof(gid_t));
+	memcpy(cr->cr_groups, groups, cr->cr_ngroups * sizeof(gid_t));
 }
 
 #define	STRSIZ	(MNTNAMLEN+MNTPATHLEN+50)
@@ -3653,6 +3675,8 @@ free_grp(struct grouplist *grp)
 		if (grp->gr_ptr.gt_net.nt_name)
 			free(grp->gr_ptr.gt_net.nt_name);
 	}
+	if (grp->gr_anon.cr_groups != grp->gr_anon.cr_smallgrps)
+		free(grp->gr_anon.cr_groups);
 	free((caddr_t)grp);
 }
 
@@ -3871,6 +3895,10 @@ cp_cred(struct expcred *outcr, struct expcred *incr)
 
 	outcr->cr_uid = incr->cr_uid;
 	outcr->cr_ngroups = incr->cr_ngroups;
+	if (outcr->cr_ngroups > SMALLNGROUPS)
+		outcr->cr_groups = malloc(outcr->cr_ngroups * sizeof(gid_t));
+	else
+		outcr->cr_groups = outcr->cr_smallgrps;
 	memcpy(outcr->cr_groups, incr->cr_groups, incr->cr_ngroups *
 	    sizeof(gid_t));
 }
