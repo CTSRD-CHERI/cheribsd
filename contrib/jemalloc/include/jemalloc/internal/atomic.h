@@ -81,6 +81,8 @@ JEMALLOC_GENERATE_INT_ATOMICS(uint32_t, u32, 2)
 JEMALLOC_GENERATE_INT_ATOMICS(uint64_t, u64, 3)
 #endif
 
+JEMALLOC_GENERATE_ATOMICS(uintptr_t, uptr, this_should_not_be_used)
+
 #undef ATOMIC_INLINE
 
 #endif /* JEMALLOC_INTERNAL_ATOMIC_H */
