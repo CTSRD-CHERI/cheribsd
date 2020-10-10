@@ -49,7 +49,7 @@ extern ssize_t __sys_write(int, const void *, size_t);
 #define write_to_stderr(str) __sys_write(2, (str), __builtin_strlen(str))
 extern int __sysctlbyname(const char *name, size_t namelen, void *oldp,
     size_t *oldlenp, const void *newp, size_t newlen);
-#define ABORT_ON_TAG_LOSS_SYSCTL "security.cheri.abort_on_memcpy_tag_loss"
+#define ABORT_ON_TAG_LOSS_SYSCTL "debug.cheri.abort_on_memcpy_tag_loss"
 #define ABORT_ON_TAG_LOSS_ENVVAR "CHERI_ABORT_ON_TAG_STRIPPING_COPY"
 
 static void
