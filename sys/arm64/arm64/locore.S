@@ -108,8 +108,7 @@ _start:
 	 * compartment?
 	 */
 	mrs x2, cctlr_el0
-	orr x2, x2, CCTLR_PERMVCT_MASK
-	orr x2, x2, CCTLR_SBL_MASK
+	orr x2, x2, #(CCTLR_PERMVCT_MASK | CCTLR_SBL_MASK)
 	msr cctlr_el0, x2
 #endif
 
