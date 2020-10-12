@@ -650,7 +650,7 @@ freebsd64_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	 */
 	if (szsigcode != 0) {
 		destp -= szsigcode;
-		destp = __builtin_align_down(destp, sizeof(uint64_t));
+		destp = rounddown2(destp, sizeof(uint64_t));
 		error = copyout(p->p_sysent->sv_sigcode,
 		    (void * __capability)destp, szsigcode);
 		if (error != 0)
@@ -662,7 +662,7 @@ freebsd64_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	 */
 	if (execpath_len != 0) {
 		destp -= execpath_len;
-		destp = __builtin_align_down(destp, sizeof(uint64_t));
+		destp = rounddown2(destp, sizeof(uint64_t));
 		imgp->execpathp = (void * __capability)
 		    cheri_setbounds(destp, execpath_len);
 		error = copyout(imgp->execpath, imgp->execpathp, execpath_len);
@@ -686,7 +686,7 @@ freebsd64_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	 * Prepare the pagesizes array.
 	 */
 	destp -= szps;
-	destp = __builtin_align_down(destp, sizeof(uint64_t));
+	destp = rounddown2(destp, sizeof(uint64_t));
 	imgp->pagesizes = (void * __capability)cheri_setbounds(destp, szps);
 	error = copyout(pagesizes, imgp->pagesizes, szps);
 	if (error != 0)
@@ -697,7 +697,7 @@ freebsd64_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	 * Allocate room for the argument and environment strings.
 	 */
 	destp -= ARG_MAX - imgp->args->stringspace;
-	destp = __builtin_align_down(destp, sizeof(uint64_t));
+	destp = rounddown2(destp, sizeof(uint64_t));
 	ustringp = cheri_setbounds(destp, ARG_MAX - imgp->args->stringspace);
 
 	if (imgp->sysent->sv_stackgap != NULL)
@@ -709,7 +709,7 @@ freebsd64_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 		 * array.  It has up to AT_COUNT entries.
 		 */
 		destp -= AT_COUNT * sizeof(Elf64_Auxinfo);
-		destp = __builtin_align_down(destp, sizeof(uint64_t));
+		destp = rounddown2(destp, sizeof(uint64_t));
 	}
 
 	vectp = (uint64_t * __capability)destp;

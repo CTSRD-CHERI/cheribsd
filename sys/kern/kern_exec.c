@@ -1667,8 +1667,7 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	 */
 	if (szsigcode != 0) {
 		destp -= szsigcode;
-		destp = __builtin_align_down(destp,
-		    sizeof(void * __capability));
+		destp = rounddown2(destp, sizeof(void * __capability));
 		error = copyout(p->p_sysent->sv_sigcode,
 		    (void * __capability)destp, szsigcode);
 		if (error != 0)
@@ -1680,8 +1679,7 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	 */
 	if (execpath_len != 0) {
 		destp -= execpath_len;
-		destp = __builtin_align_down(destp,
-		    sizeof(void * __capability));
+		destp = rounddown2(destp, sizeof(void * __capability));
 #if __has_feature(capabilities)
 		imgp->execpathp = (void * __capability)
 		    cheri_setbounds(destp, execpath_len);
@@ -1713,7 +1711,7 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	 * Prepare the pagesizes array.
 	 */
 	destp -= szps;
-	destp = __builtin_align_down(destp, sizeof(void * __capability));
+	destp = rounddown2(destp, sizeof(void * __capability));
 #if __has_feature(capabilities)
 	imgp->pagesizes = (void * __capability)cheri_setbounds(destp, szps);
 #else
@@ -1728,7 +1726,7 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	 * Allocate room for the argument and environment strings.
 	 */
 	destp -= ARG_MAX - imgp->args->stringspace;
-	destp = __builtin_align_down(destp, sizeof(void * __capability));
+	destp = rounddown2(destp, sizeof(void * __capability));
 #if __has_feature(capabilities)
 	ustringp = cheri_setbounds(destp, ARG_MAX - imgp->args->stringspace);
 #else
@@ -1744,8 +1742,7 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 		 * array.  It has up to AT_COUNT entries.
 		 */
 		destp -= AT_COUNT * sizeof(Elf_Auxinfo);
-		destp = __builtin_align_down(destp,
-		    sizeof(void * __capability));
+		destp = rounddown2(destp, sizeof(void * __capability));
 	}
 
 	vectp = (char * __capability * __capability)destp;
