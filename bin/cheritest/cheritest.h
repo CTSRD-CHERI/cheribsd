@@ -518,7 +518,6 @@ DECLARE_CHERI_TEST(test_aio_sival);
 DECLARE_CHERI_TEST(test_initregs_default);
 #ifdef __CHERI_PURE_CAPABILITY__
 DECLARE_CHERI_TEST(test_initregs_stack);
-DECLARE_CHERI_TEST(test_initregs_stack_user_perms);
 DECLARE_CHERI_TEST(test_initregs_returncap);
 #endif
 DECLARE_CHERI_TEST(test_initregs_idc);

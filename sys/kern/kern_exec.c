@@ -1648,8 +1648,9 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	} while (rounded_stack_vaddr != CHERI_REPRESENTABLE_BASE(stack_vaddr,
 	    ssiz + stack_offset));
 	ustackp = cheri_capability_build_user_data(
-	    CHERI_CAP_USER_DATA_PERMS, rounded_stack_vaddr,
-	    CHERI_REPRESENTABLE_LENGTH(ssiz + stack_offset), stack_offset);
+	    CHERI_CAP_USER_DATA_PERMS & ~CHERI_PERM_CHERIABI_VMMAP,
+	    rounded_stack_vaddr, CHERI_REPRESENTABLE_LENGTH(ssiz + stack_offset),
+	    stack_offset);
 	destp = cheri_setaddress(ustackp, p->p_sysent->sv_psstrings);
 	arginfo = (struct ps_strings * __capability)cheri_setbounds(destp,
 	    sizeof(*arginfo));

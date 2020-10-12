@@ -363,22 +363,6 @@ test_initregs_default(const struct cheri_test *ctp __unused)
 #define	CHERI_STACK_USE_MAX	(256 * 1024)
 
 void
-test_initregs_stack_user_perms(const struct cheri_test *ctp __unused)
-{
-	register_t v;
-
-	/*
-	 * Note: this test is an expected failure since we set VMMAP
-	 * TODO: move this into test_initregs_stack once it passes
-	 */
-	v = cheri_getperm(cheri_getstack());
-	if ((v & CHERI_PERMS_SWALL) !=
-	    (CHERI_PERMS_SWALL & ~CHERI_PERM_CHERIABI_VMMAP))
-		cheritest_failure_errx("perms %jx (expected swperms %x)", v,
-		    (CHERI_PERMS_SWALL & ~CHERI_PERM_CHERIABI_VMMAP));
-}
-
-void
 test_initregs_stack(const struct cheri_test *ctp __unused)
 {
 	void * __capability c = cheri_getstack();
@@ -448,7 +432,12 @@ test_initregs_stack(const struct cheri_test *ctp __unused)
 	if ((v & CHERI_PERM_UNSEAL) != 0)
 		cheritest_failure_errx("perms %jx (unseal present)", v);
 
-	if (v != CHERI_CAP_USER_DATA_PERMS)
+	if ((v & CHERI_PERMS_SWALL) !=
+	    (CHERI_PERMS_SWALL & ~CHERI_PERM_CHERIABI_VMMAP))
+		cheritest_failure_errx("perms %jx (expected swperms %x)", v,
+		    (CHERI_PERMS_SWALL & ~CHERI_PERM_CHERIABI_VMMAP));
+
+	if (v != (CHERI_CAP_USER_DATA_PERMS & ~CHERI_PERM_CHERIABI_VMMAP))
 		cheritest_failure_errx("perms %jx (expected %jx)", v,
 		    (uintmax_t)CHERI_CAP_USER_DATA_PERMS);
 
