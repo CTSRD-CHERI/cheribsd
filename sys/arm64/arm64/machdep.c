@@ -101,6 +101,8 @@ __FBSDID("$FreeBSD$");
 #include <dev/ofw/openfirm.h>
 #endif
 
+extern void * __capability userspace_cap;
+
 static void get_fpcontext(struct thread *td, mcontext_t *mcp);
 static void set_fpcontext(struct thread *td, mcontext_t *mcp);
 
@@ -519,6 +521,7 @@ exec_setregs(struct thread *td, struct image_params *imgp, uintcap_t stack)
 		tf->tf_elr = entry;
 		cheri_set_mmap_capability(td, imgp,
 		    (void * __capability)tf->tf_sp);
+		td->td_proc->p_md.md_sigcode = cheri_sigcode_capability(td);
 		tf->tf_spsr |= PSR_C64;
 	} else
 #endif
@@ -826,7 +829,7 @@ sys_sigreturn(struct thread *td, struct sigreturn_args *uap)
 	ucontext_t uc;
 	int error;
 
-	if (copyin(uap->sigcntxp, &uc, sizeof(uc)))
+	if (copyincap(uap->sigcntxp, &uc, sizeof(uc)))
 		return (EFAULT);
 
 	error = set_mcontext(td, &uc.uc_mcontext);
@@ -962,7 +965,7 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	PROC_UNLOCK(td->td_proc);
 
 	/* Copy the sigframe out to the user's stack. */
-	if (copyout(&frame, fp, sizeof(*fp)) != 0) {
+	if (copyoutcap(&frame, fp, sizeof(*fp)) != 0) {
 		/* Process has trashed its stack. Kill it. */
 		CTR2(KTR_SIG, "sendsig: sigexit td=%p fp=%p", td, fp);
 		PROC_LOCK(p);
@@ -980,19 +983,44 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	tf->tf_x[2] = (register_t)&fp->sf_uc;
 #endif
 
-	/*
-	 * TODO in CheriABI catcher will be a sentry and
-	 * should be unsealed by some privileged kernel
-	 * capability before being put into ELR.
-	 */
-	tf->tf_elr = (uintcap_t)catcher;
+#if __has_feature(capabilities)
+	if (SV_PROC_FLAG(td->td_proc, SV_CHERI)) {
+		/*
+		 * catcher is a sentry in CheriABI and must be unsealed
+		 * before being put into ELR - Morello does not unseal
+		 * on ERET.
+		 */
+		void * __capability catcher_unsealed = cheri_unseal(catcher,
+		    cheri_setaddress(userspace_cap, CHERI_OTYPE_SENTRY));
+		/*
+		 * On ERET, Morello restores the PSTATE from SPSR. Unlike normal RET
+		 * instructions, ERET does not use the lowest bit of the ELR capability to
+		 * determine whether to execute in A64 or C64 after the return, and it does
+		 * not clear the bit.
+		 *
+		 * Because this is purecap, we assume C64 and just clear the bit.
+		 */
+		void * __capability catcher_adjusted =
+		    (void * __capability)((uintcap_t)catcher_unsealed & (~((vaddr_t)0x1)));
+		tf->tf_elr = (uintcap_t)catcher_adjusted;
+	} else
+#endif
+	{
+		tf->tf_elr = (uintcap_t)catcher;
+	}
+
 	tf->tf_sp = (uintcap_t)fp;
+
 	sysent = p->p_sysent;
+#if __has_feature(capabilities)
+	tf->tf_lr = (uintcap_t)p->p_md.md_sigcode;
+#else
 	if (sysent->sv_sigcode_base != 0)
 		tf->tf_lr = (register_t)sysent->sv_sigcode_base;
 	else
 		tf->tf_lr = (register_t)(sysent->sv_psstrings -
 		    *(sysent->sv_szsigcode));
+#endif
 
 	CTR3(KTR_SIG, "sendsig: return td=%p pc=%#x sp=%#x", td, tf->tf_elr,
 	    tf->tf_sp);
