@@ -495,10 +495,10 @@ int vm_map_prot2perms(vm_prot_t prot);
 #ifdef CHERI_PURECAP_KERNEL
 vm_ptr_t _vm_map_buildcap(vm_map_t map, vm_offset_t addr, vm_size_t length,
     vm_prot_t prot);
-#define vm_map_buildcap(map, addr, length, prot)        \
+#define	vm_map_buildcap(map, addr, length, prot)	\
     _vm_map_buildcap(map, addr, length, prot)
 #else
-#define vm_map_buildcap(map, addr, length, prot) (addr)
+#define	vm_map_buildcap(map, addr, length, prot) (addr)
 #endif
 
 static inline vm_map_entry_t

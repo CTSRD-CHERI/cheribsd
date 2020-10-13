@@ -113,6 +113,22 @@ cheri_is_address_inbounds(const void * __capability cap, vaddr_t addr)
 {
 	return (addr >= cheri_getbase(cap) && addr < cheri_gettop(cap));
 }
+
+/*
+ * Check whether a capability is NULL-derived
+ */
+#ifdef __cplusplus
+static __always_inline inline bool
+#else
+static __always_inline inline _Bool
+#endif
+cheri_is_null_derived(const void * __capability cap)
+{
+
+	return (__builtin_cheri_equal_exact((uintcap_t)cheri_getaddress(cap),
+	    cap));
+}
+
 #pragma clang diagnostic pop
 
 #ifdef _KERNEL

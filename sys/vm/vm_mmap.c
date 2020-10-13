@@ -327,6 +327,10 @@ sys_mmap(struct thread *td, struct mmap_args *uap)
 	 * requirements, then MAP_EXCL is implied to prevent changing
 	 * page contents without permission.
 	 *
+	 * If addr is not a valid capability, it must be NULL-derived,
+	 * otherwise the syscall fails.
+	 *
+	 * XXXAM: Update this comment
 	 * XXXBD: The fact that using valid a capability to a currently
 	 * unmapped region with and without the VMMAP permission will
 	 * yield different results (and even failure modes) is potentially
@@ -336,20 +340,31 @@ sys_mmap(struct thread *td, struct mmap_args *uap)
 	 * capability if this pattern proves common.
 	 */
 	hint = cheri_getaddress(uap->addr);
-	if (cheri_gettag(uap->addr) &&
-	    (cheri_getperm(uap->addr) & CHERI_PERM_CHERIABI_VMMAP) &&
-	    (flags & MAP_FIXED))
-		source_cap = uap->addr;
-	else {
+
+	if (cheri_gettag(uap->addr)) {
+		if ((flags & MAP_FIXED) == 0)
+			return (EPROT);
+		else if ((cheri_getperm(uap->addr) & CHERI_PERM_CHERIABI_VMMAP))
+			source_cap = uap->addr;
+		else
+			return (EACCES);
+	} else {
+		if (!cheri_is_null_derived(uap->addr))
+			return (EINVAL);
+
+		/*
+		 * When a capability is not provided, we implicitly
+		 * request the creation of a reservation.
+		 */
+		flags |= MAP_RESERVATION_CREATE;
+
 		if (flags & MAP_FIXED)
 			flags |= MAP_EXCL;
-
 		if (flags & MAP_CHERI_NOSETBOUNDS) {
 			SYSERRCAUSE("MAP_CHERI_NOSETBOUNDS without a valid "
 			    "addr capability");
 			return (EINVAL);
 		}
-
 		/* Allocate from the per-thread capability. */
 		source_cap = td->td_cheri_mmap_cap;
 	}
@@ -435,7 +450,11 @@ kern_mmap(struct thread *td, uintptr_t addr0, size_t len, int prot, int flags,
 		.mr_prot = prot,
 		.mr_flags = flags,
 		.mr_fd = fd,
-		.mr_pos = pos
+		.mr_pos = pos,
+#ifdef CHERI_PURECAP_KERNEL
+		/* Needed for fixed mappings */
+		.mr_source_cap = userspace_cap
+#endif
 	};
 
 	return (kern_mmap_req(td, &mr));
@@ -559,7 +578,7 @@ kern_mmap_req(struct thread *td, struct mmap_req *mrp)
 	    (flags & ~(MAP_SHARED | MAP_PRIVATE | MAP_FIXED | MAP_HASSEMAPHORE |
 	    MAP_STACK | MAP_NOSYNC | MAP_ANON | MAP_EXCL | MAP_NOCORE |
 	    MAP_PREFAULT_READ | MAP_GUARD |
-	    MAP_CHERI_NOSETBOUNDS |
+	    MAP_CHERI_NOSETBOUNDS | MAP_RESERVATION_CREATE |
 #ifdef MAP_32BIT
 	    MAP_32BIT |
 #endif
@@ -585,7 +604,7 @@ kern_mmap_req(struct thread *td, struct mmap_req *mrp)
 	}
 	if ((flags & MAP_GUARD) != 0 && (prot != PROT_NONE || fd != -1 ||
 	    pos != 0 || (flags & ~(MAP_FIXED | MAP_GUARD | MAP_EXCL |
-	    MAP_CHERI_NOSETBOUNDS |
+	    MAP_CHERI_NOSETBOUNDS | MAP_RESERVATION_CREATE |
 #ifdef MAP_32BIT
 	    MAP_32BIT |
 #endif
@@ -711,11 +730,13 @@ kern_mmap_req(struct thread *td, struct mmap_req *mrp)
 			}
 		}
 #ifdef CHERI_PURECAP_KERNEL
-                /*
-                 * If MAP_FIXED we use the source capability to authorize the
-                 * fixed mapping. What we do for hybrid userland is dubious.
-                 */
-		addr = (vm_ptr_t)cheri_setaddress(mrp->mr_source_cap, addr);
+		/*
+		 * Use the source capability for addr if a new reservation
+		 * is not requested.
+		 */
+		if ((flags & MAP_RESERVATION_CREATE) == 0)
+			addr = cheri_setaddress((uintcap_t)mrp->mr_source_cap,
+			    addr);
 #endif
 	} else if (flags & MAP_32BIT) {
 		KASSERT(!SV_CURPROC_FLAG(SV_CHERI),
@@ -1982,9 +2003,10 @@ vm_mmap_object(vm_map_t map, vm_ptr_t *addr, vm_offset_t max_addr,
     vm_prot_t maxprot, int flags, vm_object_t object, vm_ooffset_t foff,
     boolean_t writecounted, struct thread *td)
 {
-	boolean_t curmap, fitit;
+	boolean_t curmap, fitit, new_reservation;
 	int docow, error, findspace, rv;
 	vm_size_t padded_size;
+	vm_ptr_t reservation;
 
 	CHERI_ASSERT_PTRSIZE_BOUNDS(addr);
 
@@ -2040,6 +2062,11 @@ vm_mmap_object(vm_map_t map, vm_ptr_t *addr, vm_offset_t max_addr,
 		fitit = FALSE;
 	}
 
+	if (flags & MAP_RESERVATION_CREATE)
+		new_reservation = TRUE;
+	else
+		new_reservation = FALSE;
+
 	if (flags & MAP_ANON) {
 		if (object != NULL || foff != 0)
 			return (EINVAL);
@@ -2093,9 +2120,20 @@ vm_mmap_object(vm_map_t map, vm_ptr_t *addr, vm_offset_t max_addr,
 			return (ENOMEM);
 		if (docow & MAP_GUARD)
 			maxprot = PROT_NONE;
+		reservation = *addr;
+		if (new_reservation) {
+			rv = vm_map_reservation_create(map, &reservation,
+			    size, PAGE_SIZE, maxprot);
+			if (rv != KERN_SUCCESS)
+				return (vm_mmap_to_errno(rv));
+		}
 
-		rv = vm_map_fixed(map, object, foff, *addr, size,
+		rv = vm_map_fixed(map, object, foff, reservation, size,
 		    prot, maxprot, docow);
+		if (rv != KERN_SUCCESS && new_reservation)
+			vm_map_reservation_delete(map, reservation);
+		else
+			*addr = reservation;
 	}
 
 	if (rv == KERN_SUCCESS) {
@@ -2132,6 +2170,8 @@ vm_mmap_to_errno(int rv)
 		return (ENOMEM);
 	case KERN_PROTECTION_FAILURE:
 		return (EACCES);
+	case KERN_MEM_PROT_FAILURE:
+		return (EPROT);
 	default:
 		return (EINVAL);
 	}

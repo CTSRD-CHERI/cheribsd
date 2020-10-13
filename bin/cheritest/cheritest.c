@@ -989,30 +989,73 @@ static const struct cheri_test cheri_tests[] = {
 	  .ct_xfail_reason =
 	    "Tags currently survive cross-AS shared sigaction table", },
 
-        { .ct_name = "cheritest_vm_reservation_access_fault",
+	{ .ct_name = "cheritest_vm_reservation_access_fault",
 	  .ct_desc = "check that we fault when accessing padding of a reservation",
 	  .ct_func = cheritest_vm_reservation_access_fault,
-          .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE,
+	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE,
 	  .ct_signum = SIGSEGV,
 	  .ct_si_code = SEGV_ACCERR},
-        {
-         .ct_name = "cheritest_vm_reservation_reuse",
-         .ct_desc =
-             "check that we can not remap over a partially-unmapped reservation",
-         .ct_func = cheritest_vm_reservation_reuse, },
-        {
-         .ct_name = "cheritest_vm_reservation_align",
-         .ct_desc = "check that mmap correctly align mappings",
-         .ct_func = cheritest_vm_reservation_align, },
-        {
-         .ct_name = "cheritest_vm_reservation_mmap_after_free",
-         .ct_desc = "check that an old capability can not be used"
-         "to MAP_FIXED after the reservation has been deleted",
-         .ct_func = cheritest_vm_reservation_mmap_after_free, },
-        {
-         .ct_name = "cheritest_vm_reservation_mmap_shared",
-         .ct_desc = "check reservation alignment and bounds for shared mappings",
-         .ct_func = cheritest_vm_reservation_mmap_shared, },
+
+	{ .ct_name = "cheritest_vm_reservation_reuse",
+	  .ct_desc ="check that we can not remap over a "
+	    "partially-unmapped reservation",
+	  .ct_func = cheritest_vm_reservation_reuse, },
+
+	{ .ct_name = "cheritest_vm_reservation_align",
+	  .ct_desc = "check that mmap correctly align mappings",
+	  .ct_func = cheritest_vm_reservation_align, },
+
+	{ .ct_name = "cheritest_vm_reservation_mmap_after_free",
+	  .ct_desc = "check that an old capability can not be used"
+	    "to mmap after the reservation has been deleted",
+	  .ct_func = cheritest_vm_reservation_mmap_after_free, },
+
+	{
+	  .ct_name = "cheritest_vm_reservation_mmap_after_free_fixed",
+	  .ct_desc = "check that an old capability can not be used"
+	    "to mmap with MAP_FIXED after the reservation has been deleted",
+	  .ct_func = cheritest_vm_reservation_mmap_after_free_fixed, },
+
+	{ .ct_name = "cheritest_vm_reservation_mmap_shared",
+	  .ct_desc = "check reservation alignment and bounds for "
+	    "shared mappings",
+	  .ct_func = cheritest_vm_reservation_mmap_shared, },
+
+	{ .ct_name = "cheritest_vm_mmap_invalid_cap",
+	  .ct_desc = "check that mmap with invalid capability hint fails",
+	  .ct_func = cheritest_vm_mmap_invalid_cap, },
+
+	{ .ct_name = "cheritest_vm_mmap_invalid_cap_fixed",
+	  .ct_desc = "check that mmap MAP_FIXED with invalid "
+	    "capability hint fails",
+	  .ct_func = cheritest_vm_mmap_invalid_cap_fixed, },
+
+	{ .ct_name = "cheritest_vm_reservation_mmap_invalid_cap",
+	  .ct_desc = "check that mmap over existing reservation with "
+	    "invalid capability hint fails",
+	  .ct_func = cheritest_vm_reservation_mmap_invalid_cap, },
+
+	{ .ct_name = "cheritest_vm_reservation_mmap",
+	  .ct_desc = "check mmap with NULL-derived hint address",
+	  .ct_func = cheritest_vm_reservation_mmap, },
+
+	{ .ct_name = "cheritest_vm_reservation_mmap_fixed_unreserved",
+	  .ct_desc = "check mmap MAP_FIXED with NULL-derived hint address",
+	  .ct_func = cheritest_vm_reservation_mmap_fixed_unreserved, },
+
+	{ .ct_name = "cheritest_vm_reservation_mmap_insert_null_derived",
+	  .ct_desc = "check that mmap with NULL-derived hint address over "
+	    "existing reservation fails",
+	  .ct_func = cheritest_vm_reservation_mmap_insert_null_derived, },
+	{ .ct_name = "cheritest_vm_reservation_mmap_fixed_insert",
+	  .ct_desc = "check mmap MAP_FIXED into an existing reservation "
+	    "with a VM_MAP perm capability",
+	  .ct_func = cheritest_vm_reservation_mmap_fixed_insert, },
+
+	{ .ct_name = "cheritest_vm_reservation_mmap_fixed_insert_noperm",
+	  .ct_desc = "check that mmap MAP_FIXED into an existing reservation "
+	    " with a capability missing VM_MAP permission fails",
+	  .ct_func = cheritest_vm_reservation_mmap_fixed_insert_noperm, },
 #endif
 
 	{ .ct_name = "cheritest_vm_tag_dev_zero_shared",
