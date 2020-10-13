@@ -633,6 +633,7 @@ cheritest_vm_reservation_access_fault(const struct cheri_test *ctp __unused)
 
 	padding = (int *)((uintcap_t)map + expected_len - sizeof(int));
 	sink = *padding;
+
 	cheritest_failure_errx("reservation padding access allowed");
 }
 #endif
@@ -715,12 +716,42 @@ cheritest_vm_reservation_align(const struct cheri_test *ctp __unused)
 	CHERITEST_VERIFY2(((vaddr_t)(map) & align_mask) == 0,
 	    "mmap failed to align representable region with requested "
 	    "cheri seal alignment for %p", map);
+
 	cheritest_success();
 }
 
 /*
- * Check that it is not possible to explicitly mmap on an
- * unmapped reservation.
+ * Check that after a reservation is unmapped, it is not possible to
+ * reuse the old capability to create new fixed mappings.
+ * This is an attempt of reusing a capability before revocation, in
+ * a proper temporal-safety implementation will lead to failures so
+ * we catch these early.
+ */
+void
+cheritest_vm_reservation_mmap_after_free_fixed(
+    const struct cheri_test *ctp __unused)
+{
+	void *map;
+	map = CHERITEST_CHECK_SYSCALL(mmap(NULL, PAGE_SIZE,
+	    PROT_READ | PROT_WRITE, MAP_ANON, -1, 0));
+
+	CHERITEST_CHECK_SYSCALL(munmap((char *)map, PAGE_SIZE));
+
+	map = mmap(map, PAGE_SIZE, PROT_READ | PROT_WRITE,
+	    MAP_ANON | MAP_FIXED, -1, 0);
+	CHERITEST_VERIFY2(map == MAP_FAILED, "mmap after free succeeded");
+	CHERITEST_VERIFY2(errno == EPROT,
+	    "mmap after free failed with %d instead of EPROT", errno);
+
+	cheritest_success();
+}
+
+/*
+ * Check that after a reservation is unmapped, it is not possible to
+ * reuse the old capability to create new non-fixed mappings.
+ * This is an attempt of reusing a capability before revocation, in
+ * a proper temporal-safety implementation will lead to failures so
+ * we catch these early.
  */
 void
 cheritest_vm_reservation_mmap_after_free(const struct cheri_test *ctp __unused)
@@ -732,10 +763,10 @@ cheritest_vm_reservation_mmap_after_free(const struct cheri_test *ctp __unused)
 	CHERITEST_CHECK_SYSCALL(munmap((char *)map, PAGE_SIZE));
 
 	map = mmap(map, PAGE_SIZE, PROT_READ | PROT_WRITE,
-	    MAP_ANON | MAP_FIXED, -1, 0);
+	    MAP_ANON, -1, 0);
 	CHERITEST_VERIFY2(map == MAP_FAILED, "mmap after free succeeded");
-	CHERITEST_VERIFY2(errno == EACCES,
-	    "mmap after free failed with %d instead of EACCES", errno);
+	CHERITEST_VERIFY2(errno == EPROT,
+	    "mmap after free failed with %d instead of EPROT", errno);
 	cheritest_success();
 }
 
@@ -762,7 +793,207 @@ cheritest_vm_reservation_mmap_shared(const struct cheri_test *ctp __unused)
 	    "mmap failed to align shared regiont for representability");
 	CHERITEST_VERIFY2(cheri_getlen(map) == expected_len,
 	    "mmap returned pointer with unrepresentable length");
+
 	cheritest_success();
 }
 
+/*
+ * Check that we require NULL-derived capabilities when mmap().
+ * Test mmap() with an invalid capability and no backing reservation.
+ */
+void
+cheritest_vm_mmap_invalid_cap(const struct cheri_test *ctp __unused)
+{
+	void *invalid = cheri_cleartag(cheri_setaddress(
+	    cheri_getpcc(), 0x4300beef));
+	void *map;
+
+	map = mmap(invalid, PAGE_SIZE, PROT_READ | PROT_WRITE,
+	    MAP_ANON, -1, 0);
+	CHERITEST_VERIFY2(map == MAP_FAILED,
+	    "mmap with invalid capability succeeded");
+	CHERITEST_VERIFY2(errno == EINVAL,
+	    "mmap with invalid capability failed with %d instead "
+	    "of EINVAL", errno);
+
+	cheritest_success();
+}
+
+/*
+ * Check that we require NULL-derived capabilities when mmap().
+ * Test mmap() MAP_FIXED with an invalid capability and no backing reservation.
+ */
+void
+cheritest_vm_mmap_invalid_cap_fixed(const struct cheri_test *ctp __unused)
+{
+	void *invalid = cheri_cleartag(cheri_setaddress(
+	    cheri_getpcc(), 0x4300beef));
+	void *map;
+
+	map = mmap(invalid, PAGE_SIZE, PROT_READ | PROT_WRITE,
+	    MAP_ANON | MAP_FIXED, -1, 0);
+	CHERITEST_VERIFY2(map == MAP_FAILED,
+	    "mmap with invalid capability succeeded");
+	CHERITEST_VERIFY2(errno == EINVAL,
+	    "mmap with invalid capability failed with %d instead "
+	    "of EINVAL", errno);
+
+	cheritest_success();
+}
+
+/*
+ * Check that we require NULL-derived capabilities when mmap().
+ * Test mmap() MAP_FIXED with an invalid capability and existing
+ * backing reservation.
+ */
+void
+cheritest_vm_reservation_mmap_invalid_cap(const struct cheri_test *ctp __unused)
+{
+	void *invalid;
+	void *map;
+
+	map = CHERITEST_CHECK_SYSCALL(mmap(NULL, PAGE_SIZE,
+	    PROT_READ | PROT_WRITE, MAP_ANON, -1, 0));
+
+	invalid = cheri_cleartag(map);
+
+	map = mmap(invalid, PAGE_SIZE, PROT_READ | PROT_WRITE,
+	    MAP_ANON, -1, 0);
+	CHERITEST_VERIFY2(map == MAP_FAILED,
+	    "mmap with invalid capability succeeded");
+	CHERITEST_VERIFY2(errno == EINVAL,
+	    "mmap with invalid capability failed with %d instead "
+	    "of EINVAL", errno);
+
+	cheritest_success();
+}
+
+/*
+ * Check that mmap() with a null-derived hint address succeeds.
+ */
+void
+cheritest_vm_reservation_mmap(const struct cheri_test *ctp __unused)
+{
+	uintptr_t hint = 0x56000000;
+	void *map;
+
+	map = CHERITEST_CHECK_SYSCALL(mmap((void *)hint, PAGE_SIZE,
+	    PROT_READ | PROT_WRITE, MAP_ANON, -1, 0));
+	CHERITEST_VERIFY2(cheri_gettag(map) != 0,
+	    "mmap with null-derived hint failed to return valid capability");
+
+	cheritest_success();
+}
+
+/*
+ * Check that mapping with a NULL-derived capability hint at a fixed
+ * address, with no existing reservation at the target region, succeeds.
+ * Check that this fails if a mapping already exists at the target address
+ * as MAP_FIXED implies MAP_EXCL in this case.
+ */
+void
+cheritest_vm_reservation_mmap_fixed_unreserved(
+    const struct cheri_test *ctpb __unused)
+{
+	uintptr_t hint = 0x56000000;
+	void *map;
+
+	map = CHERITEST_CHECK_SYSCALL(mmap((void *)hint, PAGE_SIZE,
+	    PROT_MAX(PROT_READ | PROT_WRITE), MAP_ANON | MAP_FIXED, -1, 0));
+	CHERITEST_VERIFY2(cheri_gettag(map) != 0,
+	    "mmap fixed with NULL-derived hint failed to return "
+	    "valid capability");
+
+	map = mmap((void *)(hint - PAGE_SIZE), 2 * PAGE_SIZE,
+	    PROT_READ | PROT_WRITE, MAP_ANON | MAP_FIXED, -1, 0);
+	CHERITEST_VERIFY2(map == MAP_FAILED,
+	    "mmap fixed with NULL-derived hint does not imply MAP_EXCL");
+	CHERITEST_VERIFY2(errno == ENOMEM,
+	    "mmap fixed with NULL-derived hint failed with %d instead "
+	    "of ENOMEM", errno);
+
+	cheritest_success();
+}
+
+/*
+ * Check that mmap at fixed address with NULL-derived hint fails if
+ * a reservation already exists at the target address.
+ */
+void
+cheritest_vm_reservation_mmap_insert_null_derived(
+    const struct cheri_test *ctpb __unused)
+{
+	void *map;
+
+	map = CHERITEST_CHECK_SYSCALL(mmap(NULL, 3 * PAGE_SIZE,
+	    PROT_MAX(PROT_READ | PROT_WRITE), MAP_GUARD, -1, 0));
+	CHERITEST_VERIFY2(cheri_gettag(map) != 0,
+	    "mmap failed to return valid capability");
+
+	map = mmap((void *)(uintptr_t)(vaddr_t)map, PAGE_SIZE,
+	    PROT_READ | PROT_WRITE, MAP_ANON | MAP_FIXED, -1, 0);
+	CHERITEST_VERIFY2(map == MAP_FAILED,
+	    "mmap fixed with NULL-derived hint succeded");
+	CHERITEST_VERIFY2(errno == ENOMEM,
+	    "mmap fixed with NULL-derived hint failed with %d instead "
+	    "of ENOMEM", errno);
+
+	cheritest_success();
+}
+
+/*
+ * Check that we can add a fixed mapping into an existing
+ * reservation using a VM_MAP bearing capability.
+ */
+void
+cheritest_vm_reservation_mmap_fixed_insert(
+    const struct cheri_test *ctpb __unused)
+{
+	void *map;
+
+	map = CHERITEST_CHECK_SYSCALL(mmap(NULL, 3 * PAGE_SIZE,
+	    PROT_MAX(PROT_READ | PROT_WRITE), MAP_GUARD, -1, 0));
+	CHERITEST_VERIFY2(cheri_gettag(map) != 0,
+	    "mmap failed to return valid capability");
+	CHERITEST_VERIFY2(cheri_getperm(map) & CHERI_PERM_CHERIABI_VMMAP,
+	    "mmap failed to return capability with CHERIABI_VMMAP perm");
+
+	CHERITEST_CHECK_SYSCALL(mmap((char *)(map) + PAGE_SIZE, PAGE_SIZE,
+	    PROT_READ | PROT_WRITE, MAP_ANON | MAP_FIXED, -1, 0));
+	CHERITEST_VERIFY2(cheri_gettag(map) != 0,
+	    "mmap fixed failed to return valid capability");
+
+	cheritest_success();
+}
+
+/*
+ * Check that attempting to add a fixed mapping into an existing
+ * reservation using a capability without VM_MAP permission fails.
+ */
+void
+cheritest_vm_reservation_mmap_fixed_insert_noperm(
+    const struct cheri_test *ctpb __unused)
+{
+	void *map;
+	void *map2;
+	void *not_enough_perm;
+
+	map = CHERITEST_CHECK_SYSCALL(mmap(NULL, 3 * PAGE_SIZE,
+	    PROT_MAX(PROT_READ | PROT_WRITE), MAP_GUARD, -1, 0));
+	CHERITEST_VERIFY2(cheri_gettag(map) != 0,
+	    "mmap failed to return valid capability");
+	CHERITEST_VERIFY2(cheri_getperm(map) & CHERI_PERM_CHERIABI_VMMAP,
+	    "mmap failed to return capability with CHERIABI_VMMAP perm");
+
+	not_enough_perm = cheri_andperm(map, ~CHERI_PERM_CHERIABI_VMMAP);
+	map2 = mmap((char *)(not_enough_perm) + PAGE_SIZE, PAGE_SIZE,
+	    PROT_READ | PROT_WRITE, MAP_ANON | MAP_FIXED, -1, 0);
+	CHERITEST_VERIFY2(map2 == MAP_FAILED,
+	    "mmap fixed with capability missing VM_MAP perms succeeds");
+	CHERITEST_VERIFY2(errno == EACCES,
+	    "mmap fixed with capability missing VM_MAP perms failed "
+	    "with %d instead of EACCES", errno);
+
+	cheritest_success();
+}
 #endif

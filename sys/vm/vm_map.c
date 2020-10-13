@@ -2083,7 +2083,7 @@ vm_map_fixed(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 			}
 		}
 		else {
-			result = KERN_PROTECTION_FAILURE;
+			result = KERN_MEM_PROT_FAILURE;
 			goto done;
 		}
 	}
@@ -5745,10 +5745,7 @@ vm_map_reservation_delete_locked(vm_map_t map, vm_offset_t reservation)
 
 	if (!vm_map_lookup_entry(map, reservation, &entry))
 		return (KERN_FAILURE);
-	/*
-	 * XXX-AM: should round reservation to representable alignment
-	 * to match reservation_create?
-	 */
+
 	KASSERT(entry->reservation == reservation,
 	    ("Reservation mismatch requested %lx found %lx",
 		 reservation, entry->reservation));
