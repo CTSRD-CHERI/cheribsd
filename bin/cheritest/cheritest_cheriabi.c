@@ -267,7 +267,7 @@ struct adjacent_mappings {
 static void
 create_adjacent_mappings(struct adjacent_mappings *mappings)
 {
-	char *requested_addr;
+	void *requested_addr;
 	size_t len;
 
 	len = getpagesize() * 2;
@@ -275,13 +275,15 @@ create_adjacent_mappings(struct adjacent_mappings *mappings)
 	    mmap(0, len, PROT_READ | PROT_WRITE, MAP_ANON, -1, 0));
 	CHERITEST_VERIFY(cheri_gettag(mappings->first));
 	/* Try to create a mapping immediately following the latest one. */
-	requested_addr = cheri_cleartag(mappings->first) + len;
+	requested_addr =
+	    (void *)(uintcap_t)(cheri_getaddress(mappings->first) + len);
 	mappings->middle = CHERITEST_CHECK_SYSCALL2(mmap(requested_addr, len,
 	    PROT_READ | PROT_WRITE, MAP_ANON | MAP_FIXED, -1, 0),
 	    "Failed to create mapping at address %p", requested_addr);
 	CHERITEST_CHECK_EQ_LONG((vaddr_t)mappings->middle,
 	    (vaddr_t)mappings->first + len);
-	requested_addr = cheri_cleartag(mappings->middle) + len;
+	requested_addr =
+	    (void *)(uintcap_t)(cheri_getaddress(mappings->middle) + len);
 	CHERITEST_VERIFY(cheri_gettag(mappings->middle));
 	mappings->last = CHERITEST_CHECK_SYSCALL2(mmap(requested_addr, len,
 	    PROT_READ | PROT_WRITE, MAP_ANON | MAP_FIXED, -1, 0),
