@@ -309,6 +309,14 @@ test_cheriabi_munmap_invalid_ptr(const struct cheri_test *ctp __unused)
 
 	create_adjacent_mappings(&mappings);
 
+	/* munmap() with an out-of-bounds length should fail. */
+	CHERITEST_CHECK_CALL_ERROR(
+	    munmap(mappings.middle, mappings.maplen * 2), EPROT);
+	mappings.middle[0] = 'a'; /* Check that it still has PROT_WRITE */
+	CHERITEST_CHECK_CALL_ERROR(
+	    munmap(mappings.middle, mappings.maplen + 1), EPROT);
+	mappings.middle[0] = 'a'; /* Check that it still has PROT_WRITE */
+
 	/* munmap() with an in-bounds but untagged capability should fail. */
 	CHERITEST_CHECK_CALL_ERROR(
 	    munmap(cheri_cleartag(mappings.middle), mappings.maplen), EPROT);
@@ -333,6 +341,14 @@ test_cheriabi_mprotect_invalid_ptr(const struct cheri_test *ctp __unused)
 	struct adjacent_mappings mappings;
 
 	create_adjacent_mappings(&mappings);
+
+	/* mprotect() with an out-of-bounds length should fail. */
+	CHERITEST_CHECK_CALL_ERROR(
+	    mprotect(mappings.middle, mappings.maplen * 2, PROT_NONE), EPROT);
+	mappings.middle[0] = 'a'; /* Check that it still has PROT_WRITE */
+	CHERITEST_CHECK_CALL_ERROR(
+	    mprotect(mappings.middle, mappings.maplen + 1, PROT_NONE), EPROT);
+	mappings.middle[0] = 'a'; /* Check that it still has PROT_WRITE */
 
 	/* mprotect() with an in-bounds but untagged capability should fail. */
 	CHERITEST_CHECK_CALL_ERROR(mprotect(cheri_cleartag(mappings.middle),
@@ -364,6 +380,12 @@ test_cheriabi_minherit_invalid_ptr(const struct cheri_test *ctp __unused)
 	struct adjacent_mappings mappings;
 
 	create_adjacent_mappings(&mappings);
+
+	/* minherit() with an out-of-bounds length should fail. */
+	CHERITEST_CHECK_CALL_ERROR(minherit(mappings.middle,
+	    mappings.maplen * 2, INHERIT_NONE), EPROT);
+	CHERITEST_CHECK_CALL_ERROR(minherit(mappings.middle,
+	    mappings.maplen + 1, INHERIT_NONE), EPROT);
 
 	/* minherit() with an in-bounds but untagged capability should fail. */
 	CHERITEST_CHECK_CALL_ERROR(minherit(cheri_cleartag(mappings.middle),
