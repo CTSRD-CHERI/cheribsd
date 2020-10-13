@@ -183,6 +183,9 @@ colocation_get_peer(struct thread *td, struct thread **peertdp)
 void
 colocation_thread_exit(struct thread *td)
 {
+	struct vmspace *vmspace;
+	struct coname *con, *con_temp;
+
 	struct mdthread *md, *callermd;
 	struct switchercb scb, *peerscb;
 	vaddr_t addr;
@@ -192,6 +195,19 @@ colocation_thread_exit(struct thread *td)
 	have_scb = colocation_fetch_scb(td, &scb);
 	if (!have_scb)
 		return;
+
+	vmspace = td->td_proc->p_vmspace;
+
+	vm_map_lock(&vmspace->vm_map);
+
+	LIST_FOREACH_SAFE(con, &vmspace->vm_conames, c_next, con_temp) {
+		if (cheri_getaddress(con->c_value) == td->td_md.md_scb) {
+			LIST_REMOVE(con, c_next);
+			free(con, M_TEMP);
+		}
+	}
+
+	vm_map_unlock(&vmspace->vm_map);
 
 	md = &td->td_md;
 	sx_xlock(&md->md_slow_lock);
