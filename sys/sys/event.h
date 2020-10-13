@@ -91,18 +91,6 @@ struct kevent {
 };
 
 #ifdef _KERNEL
-#ifdef COMPAT_CHERIABI
-struct kevent_c {
-	__uintcap_t	ident;		/* identifier for this event */
-	short		filter;		/* filter for event */
-	unsigned short	flags;
-	unsigned int	fflags;
-	__int64_t	data;
-	void * __capability udata;	/* opaque user data identifier */
-	__uint64_t	ext[4];
-};
-#endif
-
 struct g_kevent_args {
 	int	fd;
 	const void * __capability changelist;

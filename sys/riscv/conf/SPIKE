@@ -2,7 +2,7 @@
 
 include "GENERIC"
 # Spike does not have a disk device so we need a MFS root
-include "std.MFS_ROOT"
+include "std.MFS-ROOT"
 
 ident SPIKE
 

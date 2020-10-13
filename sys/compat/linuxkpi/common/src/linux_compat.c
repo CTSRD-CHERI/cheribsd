@@ -821,9 +821,7 @@ linux_remap_address(void * __capability *uaddr, size_t len)
 		}
 
 		/* re-add kernel buffer address */
-		*uaddr =
-		    (__cheri_tocap char * __capability)pts->bsd_ioctl_data +
-		    uaddr_val;
+		*uaddr = PTR2CAP((char *)pts->bsd_ioctl_data) + uaddr_val;
 		return (1);
 	}
 	return (0);

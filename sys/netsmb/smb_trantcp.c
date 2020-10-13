@@ -133,9 +133,7 @@ nb_put_name(struct mbchain *mbp, struct sockaddr_nb *snb)
 	NBDEBUG("[%s]\n", cp);
 	for (;;) {
 		seglen = (*cp) + 1;
-		error = mb_put_mem(mbp,
-		    (__cheri_tocap unsigned char * __capability)cp, seglen,
-		    MB_MSYSTEM);
+		error = mb_put_mem(mbp, PTR2CAP(cp), seglen, MB_MSYSTEM);
 		if (error)
 			return error;
 		if (seglen == 1)
@@ -270,9 +268,7 @@ nbssn_rq_request(struct nbpcb *nbp, struct thread *td)
 			error = ECONNABORTED;
 			break;
 		}
-		md_get_mem(mdp,
-		    (__cheri_tocap char * __capability)(char *)&sin.sin_addr,
-		    4, MB_MSYSTEM);
+		md_get_mem(mdp, PTR2CAP((char *)&sin.sin_addr), 4, MB_MSYSTEM);
 		md_get_uint16(mdp, &port);
 		sin.sin_port = port;
 		nbp->nbp_state = NBST_RETARGET;

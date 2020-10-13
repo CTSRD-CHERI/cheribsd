@@ -372,19 +372,30 @@ SYSINIT(version, SI_SUB_COPYRIGHT, SI_ORDER_THIRD, print_version, NULL);
 #ifdef WITNESS
 static char wit_warn[] =
      "WARNING: WITNESS option enabled, expect reduced performance.\n";
-SYSINIT(witwarn, SI_SUB_COPYRIGHT, SI_ORDER_THIRD + 1,
+SYSINIT(witwarn, SI_SUB_COPYRIGHT, SI_ORDER_FOURTH,
    print_caddr_t, wit_warn);
-SYSINIT(witwarn2, SI_SUB_LAST, SI_ORDER_THIRD + 1,
+SYSINIT(witwarn2, SI_SUB_LAST, SI_ORDER_FOURTH,
    print_caddr_t, wit_warn);
 #endif
 
 #ifdef DIAGNOSTIC
 static char diag_warn[] =
      "WARNING: DIAGNOSTIC option enabled, expect reduced performance.\n";
-SYSINIT(diagwarn, SI_SUB_COPYRIGHT, SI_ORDER_THIRD + 2,
+SYSINIT(diagwarn, SI_SUB_COPYRIGHT, SI_ORDER_FIFTH,
     print_caddr_t, diag_warn);
-SYSINIT(diagwarn2, SI_SUB_LAST, SI_ORDER_THIRD + 2,
+SYSINIT(diagwarn2, SI_SUB_LAST, SI_ORDER_FIFTH,
     print_caddr_t, diag_warn);
+#endif
+
+#if __has_feature(capabilities)
+static char cheri_notice[] =
+#ifdef __CHERI_PURE_CAPABILITY__
+    "CHERI pure-capability kernel.\n";
+#else
+    "CHERI hybrid kernel.\n";
+#endif
+SYSINIT(cherinotice, SI_SUB_COPYRIGHT, SI_ORDER_ANY, print_caddr_t,
+    cheri_notice);
 #endif
 
 static int
@@ -734,12 +745,10 @@ start_init(void *dummy)
 			panic("%s: Can't allocate space for init arguments %d",
 			    __func__, error);
 
-		error = exec_args_add_fname(&args,
-		    (__cheri_tocap char * __capability)path, UIO_SYSSPACE);
+		error = exec_args_add_fname(&args, PTR2CAP(path), UIO_SYSSPACE);
 		if (error != 0)
 			panic("%s: Can't add fname %d", __func__, error);
-		error = exec_args_add_arg(&args,
-		    (__cheri_tocap char * __capability)path, UIO_SYSSPACE);
+		error = exec_args_add_arg(&args, PTR2CAP(path), UIO_SYSSPACE);
 		if (error != 0)
 			panic("%s: Can't add argv[0] %d", __func__, error);
 		if (boothowto & RB_SINGLE)

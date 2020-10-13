@@ -135,12 +135,11 @@ __FBSDID("$FreeBSD$");
 	cspecialw ddc, ct0
 
 	/* Switch to non-capmode PCC. */
-1:	auipcc	ct0, %pcrel_hi(2f)
-	cincoffset ct0, ct0, %pcrel_lo(1b)
-	csetflags ct0, ct0, x0
-	cjr	ct0
+	cllc	ct1, 1f
+	csetflags ct1, ct1, x0
+	cjr	ct1
 .option pop
-2:
+1:
 #else
 	sd	t0, (TF_T + 0 * 8)(sp)
 	sd	t1, (TF_T + 1 * 8)(sp)
@@ -222,12 +221,12 @@ __FBSDID("$FreeBSD$");
 
 #if __has_feature(capabilities)
 	/* Switch to capmode PCC. */
-	lla	t1, 1f
-	cspecialr ct0, pcc
-	csetaddr ct0, ct0, t1
-	li	t1, 1
-	csetflags ct0, ct0, t1
-	cjr	ct0
+	lla	t0, 1f
+	cspecialr ct1, pcc
+	csetaddr ct1, ct1, t0
+	li	t0, 1
+	csetflags ct1, ct1, t0
+	cjr	ct1
 .option push
 .option capmode
 1:

@@ -103,25 +103,6 @@ typedef struct aiocb {
 } aiocb_t;
 
 #ifdef _KERNEL
-#ifdef COMPAT_CHERIABI
-struct aiocb_c {
-	int	aio_fildes;		/* File descriptor */
-	off_t	aio_offset;		/* File offset for I/O */
-	volatile void * __capability aio_buf; /* I/O buffer in process space */
-	size_t	aio_nbytes;		/* Number of bytes for I/O */
-	int	__spare__[2];
-	void * __capability __spare2__;
-	int	aio_lio_opcode;		/* LIO opcode */
-	int	aio_reqprio;		/* Request priority -- ignored */
-	struct {
-		long	status;
-		long	error;
-		void * __capability kernelinfo;
-	} _aiocb_private;
-	struct sigevent aio_sigevent;	/* Signal to deliver */
-};
-#endif
-
 typedef void aio_cancel_fn_t(struct kaiocb *);
 typedef void aio_handle_fn_t(struct kaiocb *);
 

@@ -1,7 +1,7 @@
 #NO_UNIVERSE
 
 include "GENERIC"
-include "std.MFS_ROOT"
+include "std.MFS-ROOT"
 
 ident GFE
 

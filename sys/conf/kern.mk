@@ -135,11 +135,7 @@ INLINE_LIMIT?=	8000
 # code model as "medium" and "medany" respectively.
 #
 .if ${MACHINE_CPUARCH} == "riscv"
-.if ${MACHINE_ARCH:Mriscv*sf}
-RISCV_MARCH=	rv64imac
-.else
 RISCV_MARCH=	rv64imafdc
-.endif
 .if ${MACHINE_CPU:Mcheri}
 RISCV_MARCH:=	${RISCV_MARCH}xcheri
 .endif
@@ -208,9 +204,6 @@ CFLAGS+=	-mabi=elfv2
 .if ${MACHINE_CPUARCH} == "mips"
 CFLAGS+=	-msoft-float
 INLINE_LIMIT?=	8000
-# XXX: Workaround for:
-#      /usr/home/en322/cheri/cheribsd/sys/mips/cheri/cheri_debug.c:103:2: error: Direct access to KR1C is deprecated. Use C(Get/Set)KR1C instead. [-Werror,-Winline-asm]
-CWARNEXTRA+=	-Wno-error=inline-asm
 .endif
 
 #
@@ -244,6 +237,24 @@ CFLAGS+=	-mretpoline
 .endif
 
 #
+# Initialize stack variables on function entry
+#
+.if ${MK_INIT_ALL_ZERO} == "yes"
+.if ${COMPILER_FEATURES:Minit-all}
+CFLAGS+= -ftrivial-auto-var-init=zero \
+    -enable-trivial-auto-var-init-zero-knowing-it-will-be-removed-from-clang
+.else
+.warning InitAll (zeros) requested but not support by compiler
+.endif
+.elif ${MK_INIT_ALL_PATTERN} == "yes"
+.if ${COMPILER_FEATURES:Minit-all}
+CFLAGS+= -ftrivial-auto-var-init=pattern
+.else
+.warning InitAll (pattern) requested but not support by compiler
+.endif
+.endif
+
+#
 # Add -gdwarf-2 when compiling -g. The default starting in clang v3.4
 # and gcc 4.8 is to generate DWARF version 4. However, our tools don't
 # cope well with DWARF 4, so force it to genereate DWARF2, which they
@@ -252,6 +263,18 @@ CFLAGS+=	-mretpoline
 #
 .if ${CFLAGS:M-g} != "" && ${CFLAGS:M-gdwarf*} == ""
 CFLAGS+=	-gdwarf-2
+.endif
+
+#
+# CHERI purecap kernel flags
+#
+.if ${MACHINE_ABI:Mpurecap}
+
+.if defined(CHERI_SUBOBJECT_BOUNDS_STATS)
+CHERI_SUBOBJECT_BOUNDS_STATS_FILE?=kernel-subobject-bounds-stats.csv
+CFLAGS+=	-mllvm -collect-csetbounds-stats=csv \
+	-Xclang -cheri-stats-file="${CHERI_SUBOBJECT_BOUNDS_STATS_FILE}"
+.endif
 .endif
 
 CFLAGS+= ${CWARNFLAGS:M*} ${CWARNFLAGS.${.IMPSRC:T}}

@@ -175,7 +175,8 @@ do_crt_init_globals(const Elf_Phdr *phdr, long phnum)
 			/* TODO: should we allow a single RWX segment? */
 			__builtin_trap();
 		}
-		data_cap = cheri_setaddress(phdr, writable_start);
+		data_cap =
+		    cheri_setaddress(__DECONST(void *, phdr), writable_start);
 		/* Bound the result and clear execute permissions. */
 		data_cap = cheri_clearperm(data_cap, CHERI_PERM_EXECUTE);
 		/* TODO: should we use exact setbounds? */

@@ -397,15 +397,18 @@ void	hexdump(const void *ptr, int length, const char *hdr, int flags);
 
 #define ovbcopy(f, t, l) bcopy((f), (t), (l))
 void	bcopy(const void * _Nonnull from, void * _Nonnull to, size_t len);
-#if __has_feature(capabilities)
+#if __has_feature(capabilities) && !defined(__CHERI_PURE_CAPABILITY__)
 void	bcopy_c(const void * _Nonnull __capability from,
 	    void * _Nonnull __capability to, size_t len);
 void	bcopynocap_c(const void * _Nonnull __capability from,
 	    void * _Nonnull __capability to, size_t len);
-void	bcopynocap(const void *src0, void *dst0, size_t length);
 #else
 #define	bcopy_c		bcopy
-#define	bcopynocap_c	bcopy
+#define	bcopynocap_c	bcopynocap
+#endif
+#if __has_feature(capabilities)
+void	bcopynocap(const void *src0, void *dst0, size_t length);
+#else
 #define	bcopynocap	bcopy
 #endif
 void	bzero(void * _Nonnull buf, size_t len);
@@ -414,20 +417,36 @@ int	bcmp(const void *b1, const void *b2, size_t len);
 
 void	*memset(void * _Nonnull buf, int c, size_t len);
 void	*memcpy(void * _Nonnull to, const void * _Nonnull from, size_t len);
-#if __has_feature(capabilities)
+#if __has_feature(capabilities) && !defined(__CHERI_PURE_CAPABILITY__)
 void	* __capability memcpy_c(void * _Nonnull __capability to,
 	    const void * _Nonnull __capability from, size_t len);
 void	* __capability memcpynocap_c(void * _Nonnull __capability to,
 	    const void * _Nonnull __capability from, size_t len);
 #else
 #define	memcpy_c	memcpy
+#define	memcpynocap_c	memcpynocap
+#endif
+#if __has_feature(capabilities)
+void	*memcpynocap(void * _Nonnull to, const void * _Nonnull from,
+    size_t len);
+#else
+#define	memcpynocap	memcpy
 #endif
 void	*memmove(void * _Nonnull dest, const void * _Nonnull src, size_t n);
-#if __has_feature(capabilities)
+#if __has_feature(capabilities) && !defined(__CHERI_PURE_CAPABILITY__)
 void	* __capability memmove_c(void * _Nonnull __capability dest,
 	    const void * _Nonnull __capability src, size_t n);
 void	* __capability memmovenocap_c(void * _Nonnull __capability dest,
 	    const void * _Nonnull __capability src, size_t n);
+#else
+#define	memmove_c	memmove
+#define	memmovenocap_c	memmovenocap
+#endif
+#if __has_feature(capabilities)
+void	*memmovenocap(void * _Nonnull dest, const void * _Nonnull src,
+    size_t n);
+#else
+#define	memmovenocap	memmove
 #endif
 
 struct copy_map {

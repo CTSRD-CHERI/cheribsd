@@ -53,7 +53,12 @@ __FBSDID("$FreeBSD$");
 ENTRY(_ctx_start)
 #ifdef __CHERI_PURE_CAPABILITY__
 	PIC_PROLOGUE(_ctx_start)
-#endif
+	cjalr $c12, $c17
+
+	cmove	$c3, $c16
+	PIC_LOAD_CALL_PTR($c12, t9, _ctx_done)
+	cjalr $c12, $c17
+#else
 
 #ifdef __mips_o32
 	move	s1, gp
@@ -64,13 +69,8 @@ ENTRY(_ctx_start)
 	move	gp, s1
 #endif
 	move	a0, s0
-#ifndef __CHERI_PURE_CAPABILITY__
 	PTR_LA	t9, _ctx_done
 	jalr	t9
-#else
-	PIC_LOAD_CALL_PTR($c12, t9, _ctx_done)
-	cjalr $c12, $c17;
-	nop;
 #endif
 	break	0
 END(_ctx_start)

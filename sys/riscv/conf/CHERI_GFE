@@ -1,6 +1,3 @@
 #NO_UNIVERSE
 
-include "GFE"
-include "std.CHERI"
-
-ident CHERI_GFE
+include "CHERI-GFE"

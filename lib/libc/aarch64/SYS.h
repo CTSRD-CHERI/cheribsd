@@ -69,3 +69,12 @@ ENTRY(__sys_##name);						\
 	ret;							\
 1:	b	cerror;						\
 END(__sys_##name)
+
+/* Do a system call where the _x() is also custom (e.g. fcntl, ioctl) */
+#define	NO_UNDERSCORE(name)					\
+ENTRY(__sys_##name);						\
+	_SYSCALL(name);						\
+	b.cs	1f;						\
+	ret;							\
+1:	b	cerror;						\
+END(__sys_##name)

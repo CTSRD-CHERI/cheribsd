@@ -136,7 +136,7 @@ typedef	__ssize_t	ssize_t;
 void	 swab(const void * __restrict, void * __restrict, ssize_t);
 #endif /* _SWAB_DECLARED */
 
-#if __has_feature(capabilities)
+#if __has_feature(capabilities) && !defined(__CHERI_PURE_CAPABILITY__)
 void * __capability
 	 memcpy_c(void * __capability __restrict,
 	    const void * __capability __restrict, size_t);
@@ -145,6 +145,10 @@ void * __capability
 	    const void * __capability __restrict, size_t);
 void * __capability
 	memset_c(void * __capability, int, size_t);
+#else
+#define	memcpy_c	memcpy
+#define	memmove_c	memmove
+#define	memset_c	memset
 #endif
 
 int	 timingsafe_bcmp(const void *, const void *, size_t);

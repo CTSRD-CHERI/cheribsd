@@ -895,7 +895,7 @@ __elfN(load_file)(struct proc *p, const char *file, u_long *addr,
 	imgp->attr = attr;
 
 	NDINIT(nd, LOOKUP, ISOPEN | FOLLOW | LOCKSHARED | LOCKLEAF,
-	    UIO_SYSSPACE, file, curthread);
+	    UIO_SYSSPACE, PTR2CAP(file), curthread);
 	if ((error = namei(nd)) != 0) {
 		nd->ni_vp = NULL;
 		goto fail;
@@ -1510,6 +1510,7 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 	elf_auxargs->flags = 0;
 	elf_auxargs->entry = entry;
 	elf_auxargs->hdr_eflags = hdr->e_flags;
+	elf_auxargs->hdr_etype = hdr->e_type;
 
 	imgp->auxargs = elf_auxargs;
 	imgp->interpreted = 0;
@@ -1607,7 +1608,7 @@ __elfN(freebsd_copyout_auxargs)(struct image_params *imgp, uintcap_t base)
 #ifdef __ELF_CHERI
 	/*
 	 * AT_ENTRY gives an executable capability for the whole
-	 * program and AT_PHDR a writable one.  RTLD is reponsible for
+	 * program and AT_PHDR a writable one.  RTLD is responsible for
 	 * setting bounds.
 	 */
 	AUXARGS_ENTRY_PTR(pos, AT_PHDR, cheri_setaddress(prog_cap(imgp,
@@ -1631,16 +1632,34 @@ __elfN(freebsd_copyout_auxargs)(struct image_params *imgp, uintcap_t base)
 #endif
 	AUXARGS_ENTRY_PTR(pos, AT_ENTRY, entry);
 
-	/*
-	 * XXX: AT_BASE is both writable and executable to permit textrel
-	 * fixups.
-	 */
-	if (imgp->interp_end == 0)
-		exec_base = prog_cap(imgp, CHERI_CAP_USER_DATA_PERMS |
-		    CHERI_CAP_USER_CODE_PERMS);
-	else
-		exec_base = interp_cap(imgp, args, CHERI_CAP_USER_DATA_PERMS |
-		    CHERI_CAP_USER_CODE_PERMS);
+	if (imgp->interp_end == 0) {
+		if (args->hdr_etype != ET_DYN) {
+			/*
+			 * For statically linked (but not static-PIE, i.e.
+			 * currently only RTLD direct exec), AT_BASE should be
+			 * untagged args->base (zero) rather than a massively
+			 * out-of-bounds capability with address zero that may
+			 * or may not be tagged.
+			 */
+			exec_base = (void *__capability)(uintcap_t)args->base;
+		} else {
+			/*
+			 * For static-PIE we need AT_BASE for relocations and
+			 * therefore needs to be RWX.
+			 * TODO: should probably use AT_ENTRY/AT_PHDR instead.
+			 */
+			exec_base = prog_cap(imgp, CHERI_CAP_USER_DATA_PERMS |
+			    CHERI_CAP_USER_CODE_PERMS);
+		}
+	} else {
+		/*
+		 * XXX: AT_BASE is both writable and executable to permit
+		 * textrel fixups.
+		 * TODO: should probably use AT_ENTRY/AT_PHDR instead.
+		 */
+		exec_base = interp_cap(imgp, args,
+		    CHERI_CAP_USER_DATA_PERMS | CHERI_CAP_USER_CODE_PERMS);
+	}
 	AUXARGS_ENTRY_PTR(pos, AT_BASE, cheri_setaddress(exec_base,
 	    args->base));
 #else

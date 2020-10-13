@@ -1,6 +1,3 @@
 #NO_UNIVERSE
 
-include "CHERI_QEMU"
-include "std.MFS_ROOT"
-
-ident CHERI_QEMU_MFS_ROOT
+include "CHERI-QEMU-MFS-ROOT"

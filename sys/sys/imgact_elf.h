@@ -66,6 +66,7 @@ typedef struct {
 	Elf_Size	flags;
 	Elf_Size	entry;
 	Elf_Word	hdr_eflags;		/* e_flags field from ehdr */
+	Elf_Word	hdr_etype;		/* e_type field from ehdr */
 } __ElfN(Auxargs);
 
 typedef struct {

@@ -154,9 +154,9 @@ build-tools-${_tool}:
 build-tools: build-tools-${_tool}
 .endfor
 
-.for _lib in ${CRUNCH_CUSTOM_LIBS}
 custom_lib_installdirs:
 	mkdir -p ${CRUNCHOBJS}/tmp/usr/lib
+.for _lib in ${CRUNCH_CUSTOM_LIBS}
 custom-lib-${_lib}: custom_lib_installdirs
 	${_+_}cd ${.CURDIR}/../../${_lib}; \
 	    if [ "${MK_AUTO_OBJ}" = "no" ]; then \

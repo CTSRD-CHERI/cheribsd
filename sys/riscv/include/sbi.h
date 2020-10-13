@@ -110,12 +110,12 @@ sbi_call(uint64_t arg7, uint64_t arg6, uint64_t arg0, uint64_t arg1,
 {
 	struct sbi_ret ret;
 
-	register uintptr_t a0 __asm ("a0") = (uintptr_t)(arg0);
-	register uintptr_t a1 __asm ("a1") = (uintptr_t)(arg1);
-	register uintptr_t a2 __asm ("a2") = (uintptr_t)(arg2);
-	register uintptr_t a3 __asm ("a3") = (uintptr_t)(arg3);
-	register uintptr_t a6 __asm ("a6") = (uintptr_t)(arg6);
-	register uintptr_t a7 __asm ("a7") = (uintptr_t)(arg7);
+	register register_t a0 __asm ("a0") = (register_t)(arg0);
+	register register_t a1 __asm ("a1") = (register_t)(arg1);
+	register register_t a2 __asm ("a2") = (register_t)(arg2);
+	register register_t a3 __asm ("a3") = (register_t)(arg3);
+	register register_t a6 __asm ("a6") = (register_t)(arg6);
+	register register_t a7 __asm ("a7") = (register_t)(arg7);
 
 	__asm __volatile(			\
 		"ecall"				\

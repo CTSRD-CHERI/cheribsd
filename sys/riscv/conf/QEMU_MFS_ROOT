@@ -1,6 +1,3 @@
 #NO_UNIVERSE
 
-include "QEMU"
-include "std.MFS_ROOT"
-
-ident QEMU_MFS_ROOT
+include "QEMU-MFS-ROOT"

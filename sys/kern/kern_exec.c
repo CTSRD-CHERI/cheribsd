@@ -119,11 +119,6 @@ SYSCTL_INT(_kern, OID_AUTO, coredump_pack_vmmapinfo, CTLFLAG_RWTUN,
     &coredump_pack_vmmapinfo, 0,
     "Enable file path packing in 'procstat -v' coredump notes");
 
-int use_cheriabi = 0;
-SYSCTL_INT(_debug, OID_AUTO, use_cheriabi, CTLFLAG_RWTUN,
-    &use_cheriabi, 0,
-    "Use COMPAT_CHERIABI for purecap binaries");
-
 static int sysctl_kern_ps_strings(SYSCTL_HANDLER_ARGS);
 static int sysctl_kern_usrstack(SYSCTL_HANDLER_ARGS);
 static int sysctl_kern_stackprot(SYSCTL_HANDLER_ARGS);
@@ -554,7 +549,8 @@ do_execve(struct thread *td, struct image_args *args,
 	 */
 	if (args->fname != NULL) {
 		NDINIT(&nd, LOOKUP, ISOPEN | LOCKLEAF | LOCKSHARED | FOLLOW |
-		    SAVENAME | AUDITVNODE1, UIO_SYSSPACE, args->fname, td);
+		    SAVENAME | AUDITVNODE1, UIO_SYSSPACE, PTR2CAP(args->fname),
+		    td);
 	}
 
 	SDT_PROBE1(proc, , , exec, args->fname);
@@ -775,7 +771,8 @@ interpret:
 		imgp->freepath = NULL;
 		/* set new name to that of the interpreter */
 		NDINIT(&nd, LOOKUP, ISOPEN | LOCKLEAF | LOCKSHARED | FOLLOW |
-		    SAVENAME, UIO_SYSSPACE, imgp->interpreter_name, td);
+		    SAVENAME, UIO_SYSSPACE, PTR2CAP(imgp->interpreter_name),
+		    td);
 		args->fname = imgp->interpreter_name;
 		goto interpret;
 	}
@@ -1212,7 +1209,7 @@ exec_new_vmspace(struct image_params *imgp, struct sysentvec *sv)
 		map = &vmspace->vm_map;
 	}
 	map->flags |= imgp->map_flags;
-	if (SV_PROC_FLAG(p, SV_CHERI))
+	if (sv->sv_flags & SV_CHERI)
 		map->flags |= MAP_RESERVATIONS;
 	else
 		map->flags &= ~MAP_RESERVATIONS;
@@ -1274,8 +1271,8 @@ exec_new_vmspace(struct image_params *imgp, struct sysentvec *sv)
 		do {
 			p->p_usrstack -= MAXSSIZ;
 			stack_addr = p->p_usrstack - ssiz;
-			if (stack_addr < VM_MIN_USER_ADDRESS ||
-			    stack_addr > VM_MAX_USER_ADDRESS) {
+			if (stack_addr < VM_MINUSER_ADDRESS ||
+			    stack_addr > VM_MAXUSER_ADDRESS) {
 #if 0
 				printf("%s: cannot allocate stack, "
 				    "not enough free virtual address space\n",

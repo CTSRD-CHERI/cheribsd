@@ -66,7 +66,7 @@ cheri_syscall_authorize(struct thread *td, u_int code, int nargs,
 	if ((c_perms & CHERI_PERM_SYSCALL) == 0) {
 		atomic_add_int(&security_cheri_syscall_violations, 1);
 
-#if DDB
+#ifdef DDB
 		if (security_cheri_debugger_on_sandbox_syscall)
 			kdb_enter(KDB_WHY_CHERI,
 			    "Syscall rejected in CHERI sandbox");

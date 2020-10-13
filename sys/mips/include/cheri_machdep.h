@@ -51,8 +51,10 @@ _update_pcc_offset(trapf_pc_t pcc, register_t pc, const char *func)
 	 */
 	if (cheri_gettype(pcc) == CHERI_OTYPE_UNSEALED) {
 		void* __capability result = cheri_setoffset(pcc, pc);
-		KASSERT(cheri_gettag(result),
-		    ("created untagged pcc: " _CHERI_PRINT_PTR_FMT(result)));
+		if (!cheri_gettag(result))
+			printf("%s: created untagged $pcc: "
+			    _CHERI_PRINTF_CAP_FMT "\n", func,
+			    _CHERI_PRINTF_CAP_ARG(result));
 		return result;
 	} else if (cheri_getoffset(pcc) == pc) {
 		/* Don't warn if the values match (not modifying $pcc) */

@@ -225,7 +225,7 @@ kern_acct(struct thread *td, const char * __capability path)
 	 * appending and make sure it's a 'normal'.
 	 */
 	if (path != NULL) {
-		NDINIT_C(&nd, LOOKUP, NOFOLLOW | AUDITVNODE1,
+		NDINIT(&nd, LOOKUP, NOFOLLOW | AUDITVNODE1,
 		    UIO_USERSPACE, path, td);
 		flags = FWRITE | O_APPEND;
 		error = vn_open(&nd, &flags, 0, NULL);

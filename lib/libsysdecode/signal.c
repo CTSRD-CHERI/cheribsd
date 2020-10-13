@@ -66,6 +66,7 @@ static const char *signames[] = {
 	[SIGUSR2] = "SIGUSR2",
 	[SIGTHR] = "SIGTHR",
 	[SIGLIBRT] = "SIGLIBRT",
+	[SIGPROT] = "SIGPROT",
 
 	/* XXX: Solaris uses SIGRTMIN, SIGRTMIN+<x>...SIGRTMAX-<x>, SIGRTMAX */
 	[SIGRTMIN] = "SIGRT0",

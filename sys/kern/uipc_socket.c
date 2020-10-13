@@ -2954,7 +2954,7 @@ so_setsockopt(struct socket *so, int level, int optname, void *optval,
 	sopt.sopt_level = level;
 	sopt.sopt_name = optname;
 	sopt.sopt_dir = SOPT_SET;
-	sopt.sopt_val = (__cheri_tocap void * __capability)optval;
+	sopt.sopt_val = PTR2CAP(optval);
 	sopt.sopt_valsize = optlen;
 	sopt.sopt_td = NULL;
 	return (sosetopt(so, &sopt));

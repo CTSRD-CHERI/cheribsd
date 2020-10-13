@@ -1,6 +1,3 @@
 #NO_UNIVERSE
 
-include "FETT"
-include "std.CHERI"
-
-ident CHERI_FETT
+include "CHERI-FETT"
