@@ -43,6 +43,8 @@
 #include <cheri/cheri.h>
 #include <cheri/cheric.h>
 
+FEATURE(cheriabi, "CheriABI process support");
+
 /*
  * Helper routines to construct initial capabilities for CheriABI
  * programs.

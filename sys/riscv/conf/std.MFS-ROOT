@@ -1,4 +1,4 @@
-# MFS_ROOT -- Common kernel config options for kernels with MFS root
+# MFS-ROOT -- Common kernel config options for kernels with MFS root
 
 #NO_UNIVERSE
 

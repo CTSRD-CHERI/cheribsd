@@ -953,7 +953,7 @@ kern_jail_set(struct thread *td, struct uio *optuio, int flags)
 			goto done_free;
 		}
 		NDINIT(&nd, LOOKUP, FOLLOW | LOCKLEAF, UIO_SYSSPACE,
-		    path, td);
+		    PTR2CAP(path), td);
 		error = namei(&nd);
 		if (error)
 			goto done_free;

@@ -1,12 +1,10 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause
- *
- * Copyright (c) 2019 (holder)
+ * Copyright (c) 2014 SRI International
+ * All rights reserved.
  *
  * This software was developed by SRI International and the University of
- * Cambridge Computer Laboratory (Department of Computer Science and
- * Technology) under DARPA contract HR0011-18-C-0016 ("ECATS"), as part of the
- * DARPA SSITH research programme.
+ * Cambridge Computer Laboratory under DARPA/AFRL contract (FA8750-10-C-0237)
+ * ("CTSRD"), as part of the DARPA CRASH research programme.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -30,12 +28,5 @@
  * SUCH DAMAGE.
  */
 
-#ifndef _COMPAT_CHERIABI_CHERIABI_MISC_H_
-#define	_COMPAT_CHERIABI_CHERIABI_MISC_H_
-
-struct iovec_c {
-	void * __capability	iov_base;	/* Base address. */
-	size_t			iov_len;	/* Length. */
-};
-
-#endif /* _COMPAT_CHERIABI_CHERIABI_MISC_H_ */
+#define CAPABILITY_VERSION
+#include "memmove.c"

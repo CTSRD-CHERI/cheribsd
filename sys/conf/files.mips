@@ -11,7 +11,7 @@ mips/cheri/cheri_exception.c		optional cpu_cheri
 mips/cheri/cheri_memcpy_c.S		optional cpu_cheri
 mips/cheri/cheri_sealcap.c		optional cpu_cheri
 mips/cheri/cheri_signal.c		optional cpu_cheri
-mips/cheri/cheriabi_machdep.c		optional cpu_cheri compat_cheriabi
+mips/cheri/cheriabi_machdep.c		optional cpu_cheri
 mips/cheri/copystr_c.S			optional cpu_cheri
 mips/cheri/hybridabi_machdep.c		optional cpu_cheri
 mips/mips/autoconf.c			standard

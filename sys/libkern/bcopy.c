@@ -182,6 +182,14 @@ void
 }
 
 #if __has_feature(capabilities)
+void *
+memcpynocap(void *dst0, const void *src0, size_t length)
+{
+	return _memcpy(dst0, src0, length, false);
+}
+
+__strong_reference(memcpynocap, memmovenocap);
+
 void
 bcopynocap(const void *src0, void *dst0, size_t length)
 {

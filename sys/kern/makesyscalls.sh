@@ -76,7 +76,7 @@ if [ -n "$2" ]; then
 fi
 
 if [ -n "$capenabled" ]; then
-	# do nothing
+	: # do nothing
 elif [ -r $capabilities_conf ]; then
 	capenabled=`egrep -v '^#|^$' $capabilities_conf`
 	capenabled=`echo $capenabled | sed 's/ /,/g'`
@@ -367,9 +367,8 @@ sed -e '
 		return (n > 0 && flags[1] == name)
 	}
 	# Returns true if the given type is a pointer type
-	function isptrtype(type) {
-		return (type ~ /\*/ || type ~ /caddr_t/ || type ~ /intcap_t/ ||
-		    type ~ /intptr_t/)
+	function isptrtype(typ) {
+		return (typ ~ /\*/ || typ ~ /caddr_t/ || typ ~ /intcap_t/ || typ ~ /intptr_t/ )
 	}
 	# Returns true if the flag "name" is set in the type field
 	function flag(name, flags, i, n) {

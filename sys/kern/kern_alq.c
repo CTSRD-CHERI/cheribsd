@@ -445,7 +445,7 @@ alq_open_flags(struct alq **alqp, const char *file, struct ucred *cred, int cmod
 	*alqp = NULL;
 	td = curthread;
 
-	NDINIT(&nd, LOOKUP, NOFOLLOW, UIO_SYSSPACE, file, td);
+	NDINIT(&nd, LOOKUP, NOFOLLOW, UIO_SYSSPACE, PTR2CAP(file), td);
 	oflags = FWRITE | O_NOFOLLOW | O_CREAT;
 
 	error = vn_open_cred(&nd, &oflags, cmode, 0, cred, NULL);

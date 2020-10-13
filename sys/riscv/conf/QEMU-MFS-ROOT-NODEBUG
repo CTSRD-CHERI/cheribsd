@@ -1,0 +1,6 @@
+#NO_UNIVERSE
+
+include "QEMU-MFS-ROOT"
+include "std.NODEBUG"
+
+ident QEMU-MFS-ROOT-NODEBUG

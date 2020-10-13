@@ -413,18 +413,18 @@ ffs_sbget(void *devfd, struct fs **fsp, off_t altsblock,
 		size += fs->fs_ncg * sizeof(int32_t);
 	size += fs->fs_ncg * sizeof(u_int8_t);
 	/* When running in libufs or libsa, UFS_MALLOC may fail */
-	fs_si = UFS_MALLOC(sizeof(struct fs_summary_info), filltype, M_WAITOK);
-	if (fs_si == NULL) {
+	if ((fs_si = UFS_MALLOC(sizeof(*fs_si), filltype, M_WAITOK)) == NULL) {
 		UFS_FREE(fs, filltype);
 		return (ENOSPC);
 	}
+	bzero(fs_si, sizeof(*fs_si));
 	fs->fs_si = fs_si;
 	if ((space = UFS_MALLOC(size, filltype, M_WAITOK)) == NULL) {
 		UFS_FREE(fs->fs_si, filltype);
 		UFS_FREE(fs, filltype);
 		return (ENOSPC);
 	}
-	fs_si->fs_csp = (struct csum *)space;
+	fs_csp = (struct csum *)space;
 	for (i = 0; i < blks; i += fs->fs_frag) {
 		size = fs->fs_bsize;
 		if (i + fs->fs_frag > blks)
@@ -435,7 +435,7 @@ ffs_sbget(void *devfd, struct fs **fsp, off_t altsblock,
 		if (error) {
 			if (buf != NULL)
 				UFS_FREE(buf, filltype);
-			UFS_FREE(fs_si->fs_csp, filltype);
+			UFS_FREE(fs->fs_csp, filltype);
 			UFS_FREE(fs->fs_si, filltype);
 			UFS_FREE(fs, filltype);
 			return (error);
@@ -445,14 +445,14 @@ ffs_sbget(void *devfd, struct fs **fsp, off_t altsblock,
 		space += size;
 	}
 	if (fs->fs_contigsumsize > 0) {
-		fs_si->fs_maxcluster = lp = (int32_t *)space;
+		fs_maxcluster = lp = (int32_t *)space;
 		for (i = 0; i < fs->fs_ncg; i++)
 			*lp++ = fs->fs_contigsumsize;
 		space = (uint8_t *)lp;
 	}
 	size = fs->fs_ncg * sizeof(u_int8_t);
-	fs_si->fs_contigdirs = (u_int8_t *)space;
-	bzero(fs_si->fs_contigdirs, size);
+	fs_contigdirs = (u_int8_t *)space;
+	bzero(fs_contigdirs, size);
 	*fsp = fs;
 	return (0);
 }
@@ -545,9 +545,9 @@ ffs_sbput(void *devfd, struct fs *fs, off_t loc,
 	 * If there is summary information, write it first, so if there
 	 * is an error, the superblock will not be marked as clean.
 	 */
-	if (fs->fs_si->fs_csp != NULL) {
+	if (fs->fs_si != NULL && fs->fs_csp != NULL) {
 		blks = howmany(fs->fs_cssize, fs->fs_fsize);
-		space = (uint8_t *)fs->fs_si->fs_csp;
+		space = (uint8_t *)fs->fs_csp;
 		for (i = 0; i < blks; i += fs->fs_frag) {
 			size = fs->fs_bsize;
 			if (i + fs->fs_frag > blks)
@@ -833,7 +833,7 @@ ffs_clusteracct(struct fs *fs, struct cg *cgp, ufs1_daddr_t blkno, int cnt)
 	for (i = fs->fs_contigsumsize; i > 0; i--)
 		if (*lp-- > 0)
 			break;
-	fs->fs_si->fs_maxcluster[cgp->cg_cgx] = i;
+	fs->fs_maxcluster[cgp->cg_cgx] = i;
 }
 
 // CHERI CHANGES START

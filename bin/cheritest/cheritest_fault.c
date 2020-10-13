@@ -214,7 +214,14 @@ test_nofault_cfromptr(const struct cheri_test *ctp __unused)
 	char * __capability cd; /* stored into here */
 
 	cb = cheri_ptr(buf, 256);
-	cd = __builtin_cheri_cap_from_pointer(cb, (void *)(uintptr_t)10);
+	/*
+	 * This pragma is require to allow compiling this file both with and
+	 * without overloaded CHERI builtins.
+	 *
+	 * FIXME: remove once everyone has updated to overloaded builtins.
+	 */
+#pragma clang diagnostic ignored "-Wint-conversion"
+	cd = __builtin_cheri_cap_from_pointer(cb, 10);
 	*cd = '\0';
 	cheritest_success();
 }

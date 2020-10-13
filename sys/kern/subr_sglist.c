@@ -324,8 +324,7 @@ sglist_append(struct sglist *sg, void *buf, size_t len)
 	if (sg->sg_maxseg == 0)
 		return (EINVAL);
 	SGLIST_SAVE(sg, save);
-	error = _sglist_append_buf(sg, (__cheri_tocap void * __capability)buf,
-	    len, NULL, NULL);
+	error = _sglist_append_buf(sg, PTR2CAP(buf), len, NULL, NULL);
 	if (error)
 		SGLIST_RESTORE(sg, save);
 	return (error);

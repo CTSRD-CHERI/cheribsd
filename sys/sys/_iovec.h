@@ -49,7 +49,7 @@ struct iovec {
 
 #if defined(_KERNEL)
 #define	IOVEC_INIT(iovp, base, len)	do {				\
-	(iovp)->iov_base = (__cheri_tocap void * __capability)(base);	\
+	(iovp)->iov_base = PTR2CAP((base));				\
 	(iovp)->iov_len = (len);					\
 } while(0)
 #define IOVEC_INIT_C(iovp, base, len)	do {				\

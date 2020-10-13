@@ -135,7 +135,7 @@ freebsd64_copyinmsghdr(struct msghdr64 * __capability umsg, struct msghdr *msg,
 	    m64->msg_iovlen, &iov, EMSGSIZE);
 	if (error)
 		return (error);
-	msg->msg_iov = (__cheri_tocap struct iovec * __capability)iov;
+	msg->msg_iov = PTR2CAP(iov);
 	msg->msg_iovlen = m64->msg_iovlen;
 
 	msg->msg_control = __USER_CAP(m64->msg_control, m64->msg_controllen);
@@ -346,7 +346,7 @@ freebsd64_sendmsg(struct thread *td, struct freebsd64_sendmsg_args *uap)
 		error = getsockaddr(&to, msg.msg_name, msg.msg_namelen);
 		if (error)
 			goto out;
-		msg.msg_name = (__cheri_tocap struct sockaddr * __capability)to;
+		msg.msg_name = PTR2CAP(to);
 	}
 
 	/* No COMPAT_OLDSOCK support, no 64-bit 43BSD binaries should exist. */

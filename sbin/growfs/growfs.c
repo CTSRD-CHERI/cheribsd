@@ -155,10 +155,10 @@ growfs(int fsi, int fso, unsigned int Nflag)
 	fscs = (struct csum *)calloc((size_t)1, (size_t)sblock.fs_cssize);
 	if (fscs == NULL)
 		errx(1, "calloc failed");
-	memcpy(fscs, osblock.fs_si->fs_csp, osblock.fs_cssize);
-	free(osblock.fs_si->fs_csp);
-	osblock.fs_si->fs_csp = NULL;
-	sblock.fs_si->fs_csp = fscs;
+	memcpy(fscs, osblock.fs_csp, osblock.fs_cssize);
+	free(osblock.fs_csp);
+	osblock.fs_csp = NULL;
+	sblock.fs_csp = fscs;
 
 #ifdef FS_DEBUG
 	{

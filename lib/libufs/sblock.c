@@ -88,7 +88,7 @@ sbread(struct uufsd *disk)
 		disk->d_ufs = 2;
 	disk->d_bsize = fs->fs_fsize / fsbtodb(fs, 1);
 	disk->d_sblock = fs->fs_sblockloc / disk->d_bsize;
-	disk->d_sbcsum = fs->fs_si->fs_csp;
+	disk->d_sbcsum = fs->fs_csp;
 	return (0);
 }
 
@@ -178,19 +178,19 @@ sbput(int devfd, struct fs *fs, int numaltwrite)
 	if (numaltwrite == 0)
 		return (0);
 	savedactualloc = fs->fs_sblockactualloc;
-	savedcsp = fs->fs_si->fs_csp;
-	fs->fs_si->fs_csp = NULL;
+	savedcsp = fs->fs_csp;
+	fs->fs_csp = NULL;
 	for (i = 0; i < numaltwrite; i++) {
 		fs->fs_sblockactualloc = dbtob(fsbtodb(fs, cgsblock(fs, i)));
 		if ((error = ffs_sbput(&devfd, fs, fs->fs_sblockactualloc,
 		     use_pwrite)) != 0) {
 			fs->fs_sblockactualloc = savedactualloc;
-			fs->fs_si->fs_csp = savedcsp;
+			fs->fs_csp = savedcsp;
 			return (-1);
 		}
 	}
 	fs->fs_sblockactualloc = savedactualloc;
-	fs->fs_si->fs_csp = savedcsp;
+	fs->fs_csp = savedcsp;
 	return (0);
 }
 

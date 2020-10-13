@@ -10,6 +10,7 @@ options 	HZ=100
 options 	ROOTDEVNAME=\"ufs:/dev/ufs/root\nufs:/dev/vtbd0\"
 
 makeoptions 	KERNEL_LMA=0xc0200000
+makeoptions	NO_MODULES=yes
 
 options 	BREAK_TO_DEBUGGER
 options 	ALT_BREAK_TO_DEBUGGER

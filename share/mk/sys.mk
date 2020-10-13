@@ -16,21 +16,6 @@ unix		?=	We run FreeBSD, not UNIX.
 __TO_CPUARCH=C/mips(n32|64)?(el)?(hf)?(c(128|256))?/mips/:C/arm(v[67])?(eb)?/arm/:C/powerpc(64|spe)/powerpc/:C/riscv64(sf)?c?/riscv/
 MACHINE_CPUARCH=${MACHINE_ARCH:${__TO_CPUARCH}}
 .endif
-.if (${MACHINE_ARCH:Mmips*} && !${MACHINE_ARCH:Mmips*hf*}) || ${MACHINE_ARCH:Mriscv*sf*}
-MACHINE_ABI+=	soft-float
-.else
-MACHINE_ABI+=	hard-float
-.endif
-.if (${MACHINE_ARCH:Mmips*c*} || ${MACHINE_ARCH:Mriscv*c*})
-MACHINE_ABI+=	purecap
-.endif
-# Currently all 64-bit architectures include 64 in their name (see arch(7)).
-.if ${MACHINE_ARCH:M*64*}
-MACHINE_ABI+=	ptr64
-.else
-MACHINE_ABI+=	ptr32
-.endif
-
 
 __DEFAULT_YES_OPTIONS+= \
 	UNIFIED_OBJDIR

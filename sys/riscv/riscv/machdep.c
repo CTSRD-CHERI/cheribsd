@@ -41,6 +41,7 @@ __FBSDID("$FreeBSD$");
 
 #include <sys/param.h>
 #include <sys/systm.h>
+#include <sys/boot.h>
 #include <sys/buf.h>
 #include <sys/bus.h>
 #include <sys/cons.h>
@@ -96,6 +97,10 @@ __FBSDID("$FreeBSD$");
 #include <machine/fpe.h>
 #endif
 
+#ifdef DDB
+#include <ddb/ddb.h>
+#endif
+
 #if __has_feature(capabilities)
 #include <cheri/cheric.h>
 #endif
@@ -127,10 +132,16 @@ int64_t dcache_line_size;	/* The minimum D cache line size */
 int64_t icache_line_size;	/* The minimum I cache line size */
 int64_t idcache_line_size;	/* The minimum cache line size */
 
-uint32_t boot_hart;	/* The hart we booted on. */
+#define BOOT_HART_INVALID	0xffffffff
+uint32_t boot_hart = BOOT_HART_INVALID;	/* The hart we booted on. */
+
 cpuset_t all_harts;
 
 extern int *end;
+
+#ifdef FDT
+static char static_kenv[4096];
+#endif
 
 /*
  * When emulating RISC-V boards under QEMU, ISA-level tracing can be enabled and
@@ -424,8 +435,8 @@ exec_setregs(struct thread *td, struct image_params *imgp, uintcap_t stack)
 	} else
 #endif
 	{
-		tf->tf_a[0] = (__cheri_addr uintptr_t)stack;
-		tf->tf_sp = STACKALIGN((__cheri_addr uintptr_t)stack);
+		tf->tf_a[0] = (__cheri_addr vaddr_t)stack;
+		tf->tf_sp = STACKALIGN((__cheri_addr vaddr_t)stack);
 #if __has_feature(capabilities)
 		hybridabi_thread_setregs(td, imgp->entry_addr);
 #else
@@ -832,7 +843,7 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 #endif
 
 	CTR4(KTR_SIG, "sendsig: td=%p (%s) catcher=%p sig=%d", td, p->p_comm,
-	    catcher, sig);
+	    (__cheri_addr vaddr_t)catcher, sig);
 
 	/* Allocate and validate space for the signal handler context. */
 	if ((td->td_pflags & TDP_ALTSTACK) != 0 && !onstack &&
@@ -878,7 +889,8 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	/* Copy the sigframe out to the user's stack. */
 	if (copyoutcap(&frame, fp, sizeof(*fp)) != 0) {
 		/* Process has trashed its stack. Kill it. */
-		CTR2(KTR_SIG, "sendsig: sigexit td=%p fp=%p", td, fp);
+		CTR2(KTR_SIG, "sendsig: sigexit td=%p fp=%p", td,
+				(__cheri_addr vaddr_t)fp);
 		PROC_LOCK(p);
 		sigexit(td, SIGILL);
 	}
@@ -975,12 +987,11 @@ cache_setup(void)
 
 /*
  * Fake up a boot descriptor table.
- * RISCVTODO: This needs to be done via loader (when it's available).
  */
-vm_offset_t
+static void
 fake_preload_metadata(struct riscv_bootparams *rvbp)
 {
-	static uint32_t fake_preload[35];
+	static uint32_t fake_preload[48];
 	vm_offset_t lastaddr;
 	size_t fake_size, dtb_size;
 
@@ -1023,6 +1034,14 @@ fake_preload_metadata(struct riscv_bootparams *rvbp)
 	memmove((void *)lastaddr, (const void *)rvbp->dtbp_virt, dtb_size);
 	lastaddr = roundup(lastaddr + dtb_size, sizeof(int));
 
+	PRELOAD_PUSH_VALUE(uint32_t, MODINFO_METADATA | MODINFOMD_KERNEND);
+	PRELOAD_PUSH_VALUE(uint32_t, sizeof(vm_offset_t));
+	PRELOAD_PUSH_VALUE(vm_offset_t, lastaddr);
+
+	PRELOAD_PUSH_VALUE(uint32_t, MODINFO_METADATA | MODINFOMD_HOWTO);
+	PRELOAD_PUSH_VALUE(uint32_t, sizeof(int));
+	PRELOAD_PUSH_VALUE(int, RB_VERBOSE);
+
 	/* End marker */
 	PRELOAD_PUSH_VALUE(uint32_t, 0);
 	PRELOAD_PUSH_VALUE(uint32_t, 0);
@@ -1041,7 +1060,55 @@ fake_preload_metadata(struct riscv_bootparams *rvbp)
 		printf("FDT phys (%lx-%lx), kernel phys (%lx-%lx)\n",
 		    rvbp->dtbp_phys, rvbp->dtbp_phys + dtb_size,
 		    rvbp->kern_phys, rvbp->kern_phys + (lastaddr - KERNBASE));
+}
 
+#ifdef FDT
+static void
+parse_fdt_bootargs(void)
+{
+	char bootargs[512];
+
+	bootargs[sizeof(bootargs) - 1] = '\0';
+	if (fdt_get_chosen_bootargs(bootargs, sizeof(bootargs) - 1) == 0) {
+		boothowto |= boot_parse_cmdline(bootargs);
+	}
+}
+#endif
+
+static vm_offset_t
+parse_metadata(void)
+{
+	caddr_t kmdp;
+	vm_offset_t lastaddr;
+#ifdef DDB
+	vm_offset_t ksym_start, ksym_end;
+#endif
+	char *kern_envp;
+
+	/* Find the kernel address */
+	kmdp = preload_search_by_type("elf kernel");
+	if (kmdp == NULL)
+		kmdp = preload_search_by_type("elf64 kernel");
+	KASSERT(kmdp != NULL, ("No preload metadata found!"));
+
+	/* Read the boot metadata */
+	boothowto = MD_FETCH(kmdp, MODINFOMD_HOWTO, int);
+	lastaddr = MD_FETCH(kmdp, MODINFOMD_KERNEND, vm_offset_t);
+	kern_envp = MD_FETCH(kmdp, MODINFOMD_ENVP, char *);
+	if (kern_envp != NULL)
+		init_static_kenv(kern_envp, 0);
+#ifdef DDB
+	ksym_start = MD_FETCH(kmdp, MODINFOMD_SSYM, uintptr_t);
+	ksym_end = MD_FETCH(kmdp, MODINFOMD_ESYM, uintptr_t);
+	db_fetch_ksymtab(ksym_start, ksym_end);
+#endif
+#ifdef FDT
+	try_load_dtb(kmdp);
+	if (kern_envp == NULL) {
+		init_static_kenv(static_kenv, sizeof(static_kenv));
+		parse_fdt_bootargs();
+	}
+#endif
 	return (lastaddr);
 }
 
@@ -1053,14 +1120,16 @@ initriscv(struct riscv_bootparams *rvbp)
 	int mem_regions_sz;
 	vm_offset_t lastaddr;
 	vm_size_t kernlen;
-	caddr_t kmdp;
+#ifdef FDT
+	phandle_t chosen;
+	uint32_t hart;
+#endif
 
 	TSRAW(&thread0, TS_ENTER, __func__, NULL);
 
 	/* Set the pcpu data, this is needed by pmap_bootstrap */
 	pcpup = &__pcpu[0];
 	pcpu_init(pcpup, 0, sizeof(struct pcpu));
-	pcpup->pc_hart = boot_hart;
 
 	/* Set the pcpu pointer */
 	__asm __volatile("mv tp, %0" :: "r"(pcpup));
@@ -1070,22 +1139,31 @@ initriscv(struct riscv_bootparams *rvbp)
 	/* Initialize SBI interface. */
 	sbi_init();
 
-	/* Set the module data location */
-	lastaddr = fake_preload_metadata(rvbp);
-
-	/* Find the kernel address */
-	kmdp = preload_search_by_type("elf kernel");
-	if (kmdp == NULL)
-		kmdp = preload_search_by_type("elf64 kernel");
-
-	boothowto = RB_VERBOSE | RB_SINGLE;
-	boothowto = RB_VERBOSE;
-
-	kern_envp = NULL;
+	/* Parse the boot metadata. */
+	if (rvbp->modulep != 0) {
+		preload_metadata = (caddr_t)rvbp->modulep;
+	} else {
+		fake_preload_metadata(rvbp);
+	}
+	lastaddr = parse_metadata();
 
 #ifdef FDT
-	try_load_dtb(kmdp);
+	/*
+	 * Look for the boot hart ID. This was either passed in directly from
+	 * the SBI firmware and handled by locore, or was stored in the device
+	 * tree by an earlier boot stage.
+	 */
+	chosen = OF_finddevice("/chosen");
+	if (OF_getencprop(chosen, "boot-hartid", &hart, sizeof(hart)) != -1) {
+		boot_hart = hart;
+	}
+#endif
+	if (boot_hart == BOOT_HART_INVALID) {
+		panic("Boot hart ID was not properly set");
+	}
+	pcpup->pc_hart = boot_hart;
 
+#ifdef FDT
 	/*
 	 * Exclude reserved memory specified by the device tree. Typically,
 	 * this contains an entry for memory used by the runtime SBI firmware.
