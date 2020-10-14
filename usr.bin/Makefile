@@ -228,10 +228,7 @@ SUBDIR.${MK_CXX}+=	dtc
 .endif
 SUBDIR.${MK_HESIOD}+=	hesinfo
 SUBDIR.${MK_ICONV}+=	iconv
-.if !(${CPUTYPE} == "morello" && !${MACHINE_ABI:Mpurecap})
-# Compiler bug results in purecap relocations being generated.
 SUBDIR.${MK_ICONV}+=	mkcsmapper
-.endif
 SUBDIR.${MK_ICONV}+=	mkesdb
 SUBDIR.${MK_ISCSI}+=	iscsictl
 SUBDIR.${MK_KDUMP}+=	kdump
