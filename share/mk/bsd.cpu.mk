@@ -320,6 +320,8 @@ MACHINE_CPU += riscv
 # Morello purecap
 . if ${MACHINE_ARCH} == "morello"
 CFLAGS += -march=morello+c64 -mabi=purecap -femulated-tls
+# Workaround to avoid using memcpy_c, etc. until the compiler default has changed.
+CFLAGS += -mllvm -cheri-no-pure-cap-libfunc
 LDFLAGS += -march=morello+c64 -mabi=purecap -femulated-tls
 # Morello hybrid
 . elif defined(CPUTYPE) && ${CPUTYPE} == "morello"
