@@ -45,7 +45,7 @@ def buildImageAndRunTests(params, String suffix) {
         sh "./cheribuild/jenkins-cheri-build.py --build disk-image-${suffix} ${params.extraArgs}"
     }
     // No need for minimal images when running the testsuite
-    if (!GlobalVars.isTestSuiteJob && (suffix.startsWith('mips') || suffix.startsWith('riscv64'))) {
+    if (!GlobalVars.isTestSuiteJob && (suffix.startsWith('mips64') || suffix.startsWith('riscv64'))) {
         stage("Building minimal disk image") {
             sh "./cheribuild/jenkins-cheri-build.py --build disk-image-minimal-${suffix} ${params.extraArgs}"
         }
@@ -124,7 +124,7 @@ ls -la "artifacts-${suffix}/"
     }
 }
 
-["mips-nocheri", "mips-hybrid", "mips-purecap", "riscv64", "riscv64-hybrid", "riscv64-purecap", "amd64", "aarch64"].each { suffix ->
+["mips64", "mips64-hybrid", "mips64-purecap", "riscv64", "riscv64-hybrid", "riscv64-purecap", "amd64", "aarch64"].each { suffix ->
     String name = "cheribsd-${suffix}"
     jobs[suffix] = { ->
         def extraBuildOptions = '-s'
@@ -154,7 +154,7 @@ ls -la "artifacts-${suffix}/"
     }
 }
 
-["mips-hybrid", "mips-purecap", "riscv64-hybrid", "riscv64-purecap"].each { suffix ->
+["mips64-hybrid", "mips64-purecap", "riscv64-hybrid", "riscv64-purecap"].each { suffix ->
     String name = "cheribsd-purecap-kern-${suffix}"
     jobs[name] = { ->
         cheribuildProject(target: "cheribsd-${suffix}", architecture: suffix,
