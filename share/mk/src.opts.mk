@@ -374,6 +374,8 @@ BROKEN_OPTIONS+=NS_CACHING
 #   _Static_assert(PAGE_SIZE % sizeof(struct pcpu) == 0, "fix pcpu size");
 #
 BROKEN_OPTIONS+=CDDL
+# Broken; see the MIPS comment
+BROKEN_OPTIONS+=OFED
 .endif
 
 .if ${__T:Mriscv*c*}
