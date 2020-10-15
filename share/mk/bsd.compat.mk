@@ -104,7 +104,7 @@ LIB32_MACHINE_ABI=	${MACHINE_ABI}
 # -------------------------------------------------------------------
 # 64 bit world
 .if ${MK_LIB64} != "no"
-.if ${COMPAT_ARCH} == "morello"
+.if ${COMPAT_ARCH:Maarch64*c*}
 HAS_COMPAT=64
 LIB64_MACHINE=	arm64
 LIB64_MACHINE_ARCH=aarch64
@@ -174,7 +174,7 @@ LIBCHERICPUFLAGS=  -target aarch64-unknown-freebsd13.0 -march=morello+c64 -mabi=
 LIBCHERICPUFLAGS += -mllvm -cheri-no-pure-cap-libfunc
 .endif
 LIBCHERI_MACHINE=	arm64
-LIBCHERI_MACHINE_ARCH=	morello
+LIBCHERI_MACHINE_ARCH=	aarch64c
 .elif ${COMPAT_ARCH:Mmips64*} && !${COMPAT_ARCH:Mmips64*c*}
 .if ${COMPAT_ARCH:Mmips*el*}
 .error No little endian CHERI
