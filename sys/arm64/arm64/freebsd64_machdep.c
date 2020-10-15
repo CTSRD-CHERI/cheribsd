@@ -299,10 +299,10 @@ freebsd64_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	tf->tf_x[2] = (uintcap_t)&fp->sf_uc;
 
 	/*
-	* The LSB of catcher's address will be either set or unset depending on
-	* whether the code is C64 or A64. Morello does not (unlike how Thumb code is
-	* handled) clear the LSB on ERET, so do this manually.
-	*/
+	 * The LSB of catcher's address will be either set or unset depending on
+	 * whether the code is C64 or A64. Morello does not (unlike how Thumb code is
+	 * handled) clear the LSB on ERET, so do this manually.
+	 */
 	if (cheri_getaddress(catcher) & 0x1) {
 		tf->tf_spsr |= PSR_C64;
 	} else {
