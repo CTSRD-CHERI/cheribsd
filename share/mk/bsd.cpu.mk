@@ -156,11 +156,15 @@ _CPUCFLAGS = -cheri=128
 _CPUCFLAGS = -march=${CPUTYPE:S/^mips//}
 . endif
 . elif ${MACHINE_CPUARCH} == "aarch64"
-.  if ${CPUTYPE:Marmv*} != "" || ${CPUTYPE:Mmorello*} != ""
+.  if ${CPUTYPE:Marmv*} != ""
 .   if !defined(NO_CHERI)
 # Use -march when the CPU type is an architecture value, e.g. armv8.1-a
 _CPUCFLAGS = -march=${CPUTYPE}
 .   endif
+.  elif ${CPUTYPE:Mmorello*} != ""
+# Don't use -march; we will add -march=morello or -march=morello+c64 later but
+# adding -march=morello here would override that as _CPUCFLAGS is added late.
+# It is also not a valid value for -mcpu.
 .  else
 # Otherwise assume we have a CPU type
 _CPUCFLAGS = -mcpu=${CPUTYPE}
