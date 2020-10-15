@@ -2,10 +2,13 @@
 
 .include <src.opts.mk>
 
-PROG?=	cheri_minimal_dynamic_exe
-MAN=
+.if !${MACHINE_ABI:Mpurecap}
 NEED_COMPAT=	CHERI
 .include <bsd.compat.mk>
+.endif
+
+PROG?=	cheri_minimal_dynamic_exe
+MAN=
 
 CFLAGS+=	-I${SRCTOP}/lib/libsimple_printf -DSIMPLE_PRINTF_PREFIX=simple
 LDADD+=		-lsimple_printf -nodefaultlibs
