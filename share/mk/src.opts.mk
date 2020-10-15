@@ -368,6 +368,14 @@ BROKEN_OPTIONS+=GOOGLETEST SSP
 BROKEN_OPTIONS+=NS_CACHING
 .endif
 
+.if ${__T} == "morello"
+# Transitively includes pcpu.h pcpu_aux.h and fails on the:
+#
+#   _Static_assert(PAGE_SIZE % sizeof(struct pcpu) == 0, "fix pcpu size");
+#
+BROKEN_OPTIONS+=CDDL
+.endif
+
 .if ${__T:Mriscv*c*}
 # Crash in ZFS code. TODO: investigate
 BROKEN_OPTIONS+=CDDL
