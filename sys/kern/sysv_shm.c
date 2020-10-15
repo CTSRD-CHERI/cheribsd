@@ -352,6 +352,7 @@ kern_shmdt_locked(struct thread *td, const void * __capability shmaddr)
 {
 	struct proc *p = td->td_proc;
 	struct shmmap_state *shmmap_s;
+	static struct shmid_kernel *shmseg;
 #ifdef MAC
 	int error;
 #endif
@@ -365,6 +366,8 @@ kern_shmdt_locked(struct thread *td, const void * __capability shmaddr)
 		return (EINVAL);
 	AUDIT_ARG_SVIPC_ID(shmmap_s->shmid);
 	for (i = 0; i < shminfo.shmseg; i++, shmmap_s++) {
+		KASSERT(shmmap_s->shmid == -1 || shmmap_s->va != 0,
+		    ("SysV SHM segment %d mapped at NULL\n", shmmap_s->shmid));
 		if (shmmap_s->shmid != -1 &&
 		    shmmap_s->va == (__cheri_addr vm_offset_t)shmaddr) {
 			break;
@@ -372,9 +375,18 @@ kern_shmdt_locked(struct thread *td, const void * __capability shmaddr)
 	}
 	if (i == shminfo.shmseg)
 		return (EINVAL);
+	shmseg = &shmsegs[IPCID_TO_IX(shmmap_s->shmid)];
+#if __has_feature(capabilities)
+	if (!__CAP_CHECK(shmaddr, shmseg->u.shm_segsz)) {
+		KASSERT(SV_PROC_FLAG(td->td_proc, SV_CHERI),
+		    ("!__CAP_CHECK(" _CHERI_PRINTF_CAP_FMT
+		    ", %zx) for non-CheriABI program",
+		    _CHERI_PRINTF_CAP_ARG(shmaddr), shmseg->u.shm_segsz));
+		return (EPROT);
+	}
+#endif
 #ifdef MAC
-	error = mac_sysvshm_check_shmdt(td->td_ucred,
-	    &shmsegs[IPCID_TO_IX(shmmap_s->shmid)]);
+	error = mac_sysvshm_check_shmdt(td->td_ucred, shmseg);
 	if (error != 0)
 		return (error);
 #endif
@@ -389,24 +401,25 @@ struct shmdt_args {
 int
 sys_shmdt(struct thread *td, struct shmdt_args *uap)
 {
+	const void * __capability shmaddr = uap->shmaddr;
 
-	return (kern_shmdt(td, uap->shmaddr));
+#if __has_feature(capabilities)
+	/*
+	 * Require a valid, unsealed, VMMAP bearing capability or NULL.
+	 * length is checked after we find our mapping.
+	 */
+	if (shmaddr != NULL &&
+	    (!cheri_gettag(shmaddr) || cheri_getsealed(shmaddr) ||
+	    (cheri_getperm(shmaddr) & CHERI_PERM_CHERIABI_VMMAP) == 0))
+		return (EPROT);
+#endif
+	return (kern_shmdt(td, shmaddr));
 }
 
 static int
 kern_shmdt(struct thread *td, const void * __capability shmaddr)
 {
 	int error;
-
-#if __has_feature(capabilities)
-	/*
-	 * Check for VMMAP unconditionally as non-CheriABI processes
-	 * will have added it in __USER_CAP.
-	 */
-	if (shmaddr != NULL &&
-	    (cheri_getperm(shmaddr) & CHERI_PERM_CHERIABI_VMMAP) == 0)
-		return (EPROT);
-#endif
 
 	SYSVSHM_LOCK();
 	error = kern_shmdt_locked(td, shmaddr);
