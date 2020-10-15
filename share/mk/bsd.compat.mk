@@ -232,11 +232,6 @@ LIBSOFTWMAKEFLAGS=        -DCOMPAT_SOFTFP
 LIBSOFT_MACHINE_ABI=	${MACHINE_ABI:Nhard-float} soft-float
 .endif
 
-.if defined(NEED_COMPAT) && ${NEED_COMPAT:MCHERI} && ${MACHINE_ABI:Mpurecap}
-.info "NEED_COMPAT=CHERI with default ABI == purecap, ignoring for ${.CURDIR}"
-.undef NEED_COMPAT
-.endif
-
 # -------------------------------------------------------------------
 # In the program linking case, select LIBCOMPAT
 .if defined(NEED_COMPAT)
