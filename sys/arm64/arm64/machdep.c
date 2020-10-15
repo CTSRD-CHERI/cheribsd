@@ -984,30 +984,22 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 #endif
 
 #if __has_feature(capabilities)
-	if (SV_PROC_FLAG(td->td_proc, SV_CHERI)) {
-		/*
-		 * catcher is a sentry in CheriABI and must be unsealed
-		 * before being put into ELR - Morello does not unseal
-		 * on ERET.
-		 */
-		void * __capability catcher_unsealed = cheri_unseal(catcher,
-		    cheri_setaddress(userspace_cap, CHERI_OTYPE_SENTRY));
-		/*
-		 * On ERET, Morello restores the PSTATE from SPSR. Unlike normal RET
-		 * instructions, ERET does not use the lowest bit of the ELR capability to
-		 * determine whether to execute in A64 or C64 after the return, and it does
-		 * not clear the bit.
-		 *
-		 * Because this is purecap, we assume C64 and just clear the bit.
-		 */
-		void * __capability catcher_adjusted =
-		    (void * __capability)((uintcap_t)catcher_unsealed & (~((vaddr_t)0x1)));
-		tf->tf_elr = (uintcap_t)catcher_adjusted;
-	} else
-#endif
-	{
-		tf->tf_elr = (uintcap_t)catcher;
+	/*
+	 * In CheriABI, catcher is a sentry. The LSB of its address will be either
+	 * set or unset depending on whether the code is C64 or A64. Morello does not
+	 * unseal elr or (unlike how Thumb code is handled) clear the LSB on ERET, so
+	 * do this manually.
+	 */
+	if (cheri_getaddress(catcher) & 0x1) {
+	tf->tf_spsr |= PSR_C64;
+	} else {
+	tf->tf_spsr &= ~PSR_C64;
 	}
+	tf->tf_elr = rounddown2((uintcap_t)cheri_unseal(catcher,
+		    cheri_setaddress(userspace_cap, CHERI_OTYPE_SENTRY)), 2);
+#else
+	tf->tf_elr = (uintcap_t)catcher;
+#endif
 
 	tf->tf_sp = (uintcap_t)fp;
 
