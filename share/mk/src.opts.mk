@@ -374,8 +374,10 @@ BROKEN_OPTIONS+=CDDL
 
 # Some compilation failure: TODO: investigate
 BROKEN_OPTIONS+=SVN SVNLITE
+.endif
 
-# libcheri has not been ported to RISCV
+# libcheri is MIPS-specific and requires CHERI
+.if !${__T:Mmips64*} || (${__C} != "cheri" && !${__T:Mmips64*c*})
 BROKEN_OPTIONS+=LIBCHERI
 .endif
 
