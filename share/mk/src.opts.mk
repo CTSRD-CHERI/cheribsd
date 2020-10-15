@@ -341,7 +341,7 @@ __DEFAULT_YES_OPTIONS+=LIB32
 BROKEN_OPTIONS+=LIB32
 .endif
 # LIB64 on mips64*c* and riscv64*c*
-.if ${__T} == "morello" || ${__T:Mmips64*c*} || ${__T:Mriscv64*c*}
+.if ${__T:Maarch64*c*} || ${__T:Mmips64*c*} || ${__T:Mriscv64*c*}
 __DEFAULT_YES_OPTIONS+=LIB64
 # In principle, LIB32 could work on architectures where it's supported, but
 # Makefile.libcompat only supports one compat layer.
@@ -368,7 +368,7 @@ BROKEN_OPTIONS+=GOOGLETEST SSP
 BROKEN_OPTIONS+=NS_CACHING
 .endif
 
-.if ${__T} == "morello"
+.if ${__T:Maarch64*c*}
 # Transitively includes pcpu.h pcpu_aux.h and fails on the:
 #
 #   _Static_assert(PAGE_SIZE % sizeof(struct pcpu) == 0, "fix pcpu size");
@@ -428,7 +428,7 @@ __DEFAULT_NO_OPTIONS+=PIE
 #    !${MACHINE_CPU:Mcheri} || ${MACHINE_ABI:Mpurecap}
 # but that logic doesn't work in Makefile.inc1...
 .if (${__C} != "cheri" && ${__C} != "morello") || \
-    (${__T:Mmips64*c*} || ${__T:Mriscv64*c*} || ${__T:Mmorello})
+    (${__T:Mmips64*c*} || ${__T:Mriscv64*c*} || ${__T:Maarch64*c*})
 BROKEN_OPTIONS+=COMPAT_CHERIABI
 .endif
 

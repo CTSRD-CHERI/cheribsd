@@ -10,7 +10,7 @@ WARNS?=		2
 CFLAGS+=	${PICFLAG}
 CFLAGS+=	-fvisibility=hidden
 CFLAGS+=	-DVISIBILITY_HIDDEN
-.if (${MACHINE_ARCH} == "morello" || ${MACHINE_ARCH:Mmips*} || ${MACHINE_ARCH:Mriscv*c*})
+.if (${MACHINE_ARCH:Maarch64*c*} || ${MACHINE_ARCH:Mmips*} || ${MACHINE_ARCH:Mriscv*c*})
 CFLAGS+=	-I${SRCTOP}/contrib/subrepo-cheri-libcxxrt/src
 .else
 CFLAGS+=	-I${SRCTOP}/contrib/libcxxrt

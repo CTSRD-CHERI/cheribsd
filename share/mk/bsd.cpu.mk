@@ -7,7 +7,7 @@
 .if !defined(CPUTYPE) || empty(CPUTYPE)
 _CPUCFLAGS =
 . if ${MACHINE_CPUARCH} == "aarch64"
-.  if ${MACHINE_ARCH} == "morello"
+.  if ${MACHINE_ARCH:Maarch64*c*}
 MACHINE_CPU = cheri
 .endif
 MACHINE_CPU += arm64
@@ -322,7 +322,7 @@ MACHINE_CPU += riscv
 
 .if ${MACHINE_CPUARCH} == "aarch64"
 # Morello purecap
-. if ${MACHINE_ARCH} == "morello"
+. if ${MACHINE_ARCH:Maarch64*c*}
 CFLAGS += -march=morello+c64 -mabi=purecap -femulated-tls
 # Workaround to avoid using memcpy_c, etc. until the compiler default has changed.
 CFLAGS += -mllvm -cheri-no-pure-cap-libfunc
@@ -479,7 +479,7 @@ MACHINE_ABI+=	soft-float
 .else
 MACHINE_ABI+=	hard-float
 .endif
-.if (${MACHINE_ARCH:Mmips*c*} || ${MACHINE_ARCH:Mriscv*c*} || ${MACHINE_ARCH} == "morello")
+.if (${MACHINE_ARCH:Mmips*c*} || ${MACHINE_ARCH:Mriscv*c*} || ${MACHINE_ARCH:Maarch64*c*})
 MACHINE_ABI+=	purecap
 .endif
 # Currently all 64-bit architectures include 64 in their name (see arch(7)).
