@@ -116,9 +116,6 @@ cpu_fork(struct thread *td1, struct proc *p2, struct thread *td2, int flags)
 	 * longer (this copy does them both) 
 	 */
 	bcopy(td1->td_pcb, pcb2, sizeof(*pcb2));
-#ifdef CPU_CHERI
-	cheri_signal_copy(pcb2, td1->td_pcb);
-#endif
 
 	/* Point mdproc and then copy over td1's contents */
 	td2->td_md.md_flags = td1->td_md.md_flags & MDTD_FPUSED;
@@ -438,9 +435,6 @@ cpu_copy_thread(struct thread *td, struct thread *td0)
 	 * is needed.
 	 */
 	bcopy(td0->td_pcb, pcb2, sizeof(*pcb2));
-#ifdef CPU_CHERI
-	cheri_signal_copy(pcb2, td0->td_pcb);
-#endif
 
 	/*
 	 * Set registers for trampoline to user mode.

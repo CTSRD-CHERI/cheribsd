@@ -139,12 +139,6 @@ int	cheri_signal_sandboxed(struct thread *td);
 void	hybridabi_sendsig(struct thread *td);
 
 /*
- * Functions to set up and manipulate CHERI contexts and stacks.
- */
-struct pcb;
-void	cheri_signal_copy(struct pcb *dst, struct pcb *src);
-
-/*
  * Functions to manage object types.
  */
 otype_t	cheri_otype_alloc(void);

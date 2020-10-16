@@ -45,20 +45,6 @@
 #include <machine/sysarch.h>
 
 /*
- * When new threads are forked, by default simply replicate the parent
- * thread's CHERI-related signal-handling state.
- *
- * XXXRW: Is this, in fact, the right thing?
- */
-void
-cheri_signal_copy(struct pcb *dst, struct pcb *src)
-{
-
-	memcpy(&dst->pcb_cherisignal, &src->pcb_cherisignal,
-	    sizeof(dst->pcb_cherisignal));
-}
-
-/*
  * As with system calls, handling signal delivery connotes special authority
  * in the runtime environment.  In the signal delivery code, we need to
  * determine whether to trust the executing thread to have valid stack state,
