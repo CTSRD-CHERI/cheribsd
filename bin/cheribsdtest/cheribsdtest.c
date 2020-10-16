@@ -1725,6 +1725,10 @@ static const struct cheri_test cheri_tests[] = {
 	  .ct_desc = "Check that minherit() rejects invalid pointer arguments",
 	  .ct_func = test_cheriabi_minherit_invalid_ptr },
 
+	{ .ct_name = "test_cheriabi_shmdt_invalid_ptr",
+	  .ct_desc = "Check that shmdt() rejects invalid pointer arguments",
+	  .ct_func = test_cheriabi_shmdt_invalid_ptr },
+
 	/*
 	 * Tests for pathname handling in open(2).
 	 */

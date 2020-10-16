@@ -36,7 +36,9 @@
 
 #include <sys/param.h>
 #include <sys/types.h>
+#include <sys/ipc.h>
 #include <sys/mman.h>
+#include <sys/shm.h>
 #include <sys/signal.h>
 #include <sys/sysctl.h>
 #include <sys/time.h>
@@ -405,5 +407,74 @@ test_cheriabi_minherit_invalid_ptr(const struct cheri_test *ctp __unused)
 
 	/* Unmapping the original capabilities should succeed. */
 	free_adjacent_mappings(&mappings);
+	cheribsdtest_success();
+}
+
+/*
+ * Create three adjacent memory mappings that be used to check that the memory
+ * mapping system calls reject out-of-bounds capabilities that have the address
+ * of a valid mapping.
+ */
+static void
+create_adjacent_mappings_shm(struct adjacent_mappings *mappings)
+{
+	void *requested_addr;
+	size_t len;
+	int shmid;
+
+	len = getpagesize() * 2;
+	shmid = CHERIBSDTEST_CHECK_SYSCALL(shmget(IPC_PRIVATE, len, 0600));
+	mappings->first = CHERIBSDTEST_CHECK_SYSCALL(shmat(shmid, NULL, 0));
+	CHERIBSDTEST_VERIFY(cheri_gettag(mappings->first));
+	/* Try to create a mapping immediately following the latest one. */
+	requested_addr =
+	    (void *)(uintcap_t)(cheri_getaddress(mappings->first) + len);
+	mappings->middle = CHERIBSDTEST_CHECK_SYSCALL2(
+	    shmat(shmid, requested_addr, 0),
+	    "Failed to create mapping at address %p", requested_addr);
+	CHERIBSDTEST_CHECK_EQ_LONG((vaddr_t)mappings->middle,
+	    (vaddr_t)requested_addr);
+	CHERIBSDTEST_VERIFY(cheri_gettag(mappings->middle));
+	requested_addr =
+	    (void *)(uintcap_t)(cheri_getaddress(mappings->middle) + len);
+	mappings->last = CHERIBSDTEST_CHECK_SYSCALL2(
+	    shmat(shmid, requested_addr, 0),
+	    "Failed to create mapping at address %p", requested_addr);
+	CHERIBSDTEST_CHECK_EQ_LONG((vaddr_t)mappings->last,
+	    (vaddr_t)requested_addr);
+	CHERIBSDTEST_VERIFY(cheri_gettag(mappings->last));
+	mappings->maplen = len;
+}
+
+static void
+free_adjacent_mappings_shm(struct adjacent_mappings *mappings)
+{
+	CHERIBSDTEST_CHECK_SYSCALL(shmdt(mappings->first));
+	CHERIBSDTEST_CHECK_SYSCALL(shmdt(mappings->middle));
+	CHERIBSDTEST_CHECK_SYSCALL(shmdt(mappings->last));
+}
+
+void
+test_cheriabi_shmdt_invalid_ptr(const struct cheri_test *ctp __unused)
+{
+	struct adjacent_mappings mappings;
+
+	create_adjacent_mappings_shm(&mappings);
+
+	/* shmdt() with an in-bounds but untagged capability should fail. */
+	CHERIBSDTEST_CHECK_CALL_ERROR(
+	    shmdt(cheri_cleartag(mappings.middle)), EPROT);
+	mappings.middle[0] = 'a'; /* Check that the mapping is still valid */
+
+	/* shmdt() with an out-of-bounds capability should fail. */
+	CHERIBSDTEST_CHECK_CALL_ERROR(
+	    shmdt(mappings.middle - mappings.maplen), EPROT);
+	mappings.first[0] = 'a'; /* Check that the mapping is still valid */
+	CHERIBSDTEST_CHECK_CALL_ERROR(
+	    shmdt(mappings.middle + mappings.maplen), EPROT);
+	mappings.last[0] = 'a'; /* Check that the mapping is still valid */
+
+	/* Unmapping the original capabilities should succeed. */
+	free_adjacent_mappings_shm(&mappings);
 	cheribsdtest_success();
 }
