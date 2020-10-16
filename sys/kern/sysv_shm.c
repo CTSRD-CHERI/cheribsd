@@ -439,6 +439,9 @@ kern_shmat_locked(struct thread *td, int shmid,
 	vm_prot_t prot;
 	vm_size_t size;
 	int cow, error, find_space, i, rv;
+#if __has_feature(capabilities)
+	int reqperm;
+#endif
 
 	AUDIT_ARG_SVIPC_ID(shmid);
 	AUDIT_ARG_VALUE(shmflg);
@@ -554,6 +557,11 @@ kern_shmat_locked(struct thread *td, int shmid,
 		}
 	}
 #if __has_feature(capabilities)
+	reqperm = CHERI_PERM_LOAD;
+	reqperm |= (shmflg & SHM_RDONLY) != 0 ? 0 : CHERI_PERM_STORE;
+	if ((cheri_getperm(shmaddr) & reqperm) != reqperm)
+	    return (EPROT);
+
 	max_va = cheri_gettop(shmaddr);
 #else
 	max_va = 0;
@@ -575,7 +583,10 @@ kern_shmat_locked(struct thread *td, int shmid,
 	if (SV_CURPROC_FLAG(SV_CHERI)) {
 		shmaddr = cheri_setboundsexact(cheri_setaddress(shmaddr,
 		     attach_va), size);
-		/* XXX: set perms */
+		/* Remove inappropriate permissions. */
+		shmaddr = cheri_andperm(shmaddr, ~(CHERI_PERM_EXECUTE |
+		    CHERI_PERM_LOAD_CAP | CHERI_PERM_STORE_CAP |
+		    ((shmflg & SHM_RDONLY) != 0 ? CHERI_PERM_STORE : 0)));
 		td->td_retval[0] = (uintcap_t)__DECONST_CAP(void * __capability,
 		    shmaddr);
 	} else
