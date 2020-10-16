@@ -493,14 +493,33 @@ kern_shmat_locked(struct thread *td, int shmid,
 		else
 			return (EINVAL);
 #if __has_feature(capabilities)
+		/*
+		 * XXX: in principle we should be able to use a reservation
+		 * extending before and after the entry to allow arbitrary
+		 * addresses (subject to available space...).
+		 */
 		if (CHERI_REPRESENTABLE_BASE(attach_va, size) != attach_va)
 			return (EINVAL);
-		if (cheri_gettag(shmaddr))
+		if (cheri_gettag(shmaddr)) {
+			/*
+			 * Fixed mapping through a capability only makes
+			 * sense if we're knowingly remapping.
+			 */
+			if ((shmflg & SHM_REMAP) == 0)
+				return (EINVAL);
+			/* XXX: require that a reservation exists. */
+			/* Handle any rounding above */
 			shmaddr = cheri_setaddress(shmaddr, attach_va);
-		else
-			return (EINVAL);	/* XXX support this? */
-		if (!__CAP_CHECK(shmaddr, size))
-		    return (EINVAL);
+			if (!__CAP_CHECK(shmaddr, size))
+				return (EINVAL);
+		} else {
+			/* As with mmap, untagged implies exclusive. */
+			if ((shmflg & SHM_REMAP) != 0)
+				return (EINVAL);
+			shmaddr = cheri_setaddress(td->td_cheri_mmap_cap,
+			    attach_va);
+
+		}
 #endif
 		if ((shmflg & SHM_REMAP) != 0)
 			cow |= MAP_REMAP;
@@ -515,11 +534,12 @@ kern_shmat_locked(struct thread *td, int shmid,
 			 *
 			 * XXX: 12 should probably be the superpage shift.
 			 */
-			find_space = CHERI_REPRESENTABLE_ALIGNMENT(size) < (1UL << 12) ?
+			find_space =
+			    CHERI_REPRESENTABLE_ALIGNMENT(size) < (1UL << 12) ?
 			    VMFS_OPTIMAL_SPACE :
 			    VMFS_ALIGNED_SPACE(CHERI_ALIGN_SHIFT(size));
 			shmaddr = td->td_cheri_mmap_cap;
-			attach_va = cheri_getbase(shmaddr);
+			attach_va = cheri_getaddress(shmaddr);
 		} else
 #endif
 		{
@@ -534,7 +554,7 @@ kern_shmat_locked(struct thread *td, int shmid,
 		}
 	}
 #if __has_feature(capabilities)
-	max_va = cheri_getbase(shmaddr) + cheri_getlen(shmaddr);
+	max_va = cheri_gettop(shmaddr);
 #else
 	max_va = 0;
 #endif
@@ -570,16 +590,6 @@ kern_shmat(struct thread *td, int shmid, const void * __capability shmaddr,
 {
 	int error;
 
-#if __has_feature(capabilities)
-	/*
-	 * Check for VMMAP unconditionally as non-CheriABI processes
-	 * will have added it in __USER_CAP.
-	 */
-	if (shmaddr != NULL &&
-	    (cheri_getperm(shmaddr) & CHERI_PERM_CHERIABI_VMMAP) == 0)
-		return (EPROT);
-#endif
-
 	SYSVSHM_LOCK();
 	error = kern_shmat_locked(td, shmid, shmaddr, shmflg);
 	SYSVSHM_UNLOCK();
@@ -596,8 +606,19 @@ struct shmat_args {
 int
 sys_shmat(struct thread *td, struct shmat_args *uap)
 {
+	const char * __capability shmaddr = uap->shmaddr;
 
-	return (kern_shmat(td, uap->shmid, uap->shmaddr, uap->shmflg));
+#if __has_feature(capabilities)
+	/*
+	 * Require that shmaddr be NULL-derived or a valid, unsealed,
+	 * VMMAP bearing capability.
+	 */
+	if (!cheri_is_null_derived(shmaddr) &&
+	    (!cheri_gettag(shmaddr) || cheri_getsealed(shmaddr) ||
+	    (cheri_getperm(shmaddr) & CHERI_PERM_CHERIABI_VMMAP) == 0))
+		return (EPROT);
+#endif
+	return (kern_shmat(td, uap->shmid, shmaddr, uap->shmflg));
 }
 
 static int
