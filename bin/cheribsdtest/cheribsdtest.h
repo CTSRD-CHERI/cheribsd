@@ -370,6 +370,7 @@ DECLARE_CHERIBSD_TEST(test_cheriabi_malloc_zero_size);
 DECLARE_CHERIBSD_TEST(test_cheriabi_munmap_invalid_ptr);
 DECLARE_CHERIBSD_TEST(test_cheriabi_mprotect_invalid_ptr);
 DECLARE_CHERIBSD_TEST(test_cheriabi_minherit_invalid_ptr);
+DECLARE_CHERIBSD_TEST(test_cheriabi_shmdt_invalid_ptr);
 
 /* cheribsdtest_cheriabi_open.c */
 DECLARE_CHERIBSD_TEST(test_cheriabi_open_ordinary);
