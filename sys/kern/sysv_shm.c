@@ -480,10 +480,10 @@ kern_shmat_locked(struct thread *td, int shmid,
 	KASSERT(size == CHERI_REPRESENTABLE_LENGTH(size),
 	    ("shmget left unrepresentable size %zu", size));
 #endif
-	prot = VM_PROT_READ | VM_PROT_READ_CAP;
+	prot = VM_PROT_READ;
 	cow = MAP_INHERIT_SHARE | MAP_PREFAULT_PARTIAL;
 	if ((shmflg & SHM_RDONLY) == 0)
-		prot |= VM_PROT_WRITE | VM_PROT_WRITE_CAP;
+		prot |= VM_PROT_WRITE;
 	if (shmaddr != NULL) {
 		attach_va = (__cheri_addr vm_offset_t)shmaddr;
 		if ((shmflg & SHM_RND) != 0)
