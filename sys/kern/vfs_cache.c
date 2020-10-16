@@ -3405,9 +3405,6 @@ cache_fplookup_negative_promote(struct cache_fpl *fpl, struct namecache *oncp,
 	cnp = fpl->cnp;
 	dvp = fpl->dvp;
 
-	if (!vhold_smr(dvp))
-		return (cache_fpl_aborted(fpl));
-
 	nl = NCP2NEGLIST(oncp);
 	cache_fpl_smr_exit(fpl);
 
@@ -3420,6 +3417,10 @@ cache_fplookup_negative_promote(struct cache_fpl *fpl, struct namecache *oncp,
 	/*
 	 * Avoid all surprises by only succeeding if we got the same entry and
 	 * bailing completely otherwise.
+	 * XXX There are no provisions to keep the vnode around, meaning we may
+	 * end up promoting a negative entry for a *new* vnode and returning
+	 * ENOENT on its account. This is the error we want to return anyway
+	 * and promotion is harmless.
 	 *
 	 * In particular at this point there can be a new ncp which matches the
 	 * search but hashes to a different neglist.
@@ -3462,12 +3463,10 @@ cache_fplookup_negative_promote(struct cache_fpl *fpl, struct namecache *oncp,
 	counter_u64_add(numneghits, 1);
 	cache_fpl_smr_exit(fpl);
 	mtx_unlock(&nl->nl_lock);
-	vdrop(dvp);
 	return (cache_fpl_handled(fpl, ENOENT));
 out_abort:
 	cache_fpl_smr_exit(fpl);
 	mtx_unlock(&nl->nl_lock);
-	vdrop(dvp);
 	return (cache_fpl_aborted(fpl));
 }
 
