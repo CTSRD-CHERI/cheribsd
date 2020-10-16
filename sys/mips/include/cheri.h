@@ -120,7 +120,6 @@ struct cheri_kframe {
 struct cheri_frame;
 struct sysentvec;
 struct trapframe;
-void	cheri_capability_set_user_sealcap(void * __capability *);
 int	cheri_capcause_to_sicode(register_t capcause);
 void	cheri_log_cheri_frame(struct trapframe *frame);
 void	cheri_log_exception(struct trapframe *frame, int trap_type);

@@ -41,8 +41,6 @@
 #include <cheri/cheri.h>
 #include <cheri/cheric.h>
 
-#include <machine/sysarch.h>
-
 #include <err.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -225,16 +223,18 @@ test_cheriabi_open_bad_perm(const struct cheri_test *ctp __unused)
 	cheritest_success();
 }
 
-#ifdef CHERI_GET_SEALCAP
 void
 test_cheriabi_open_sealed(const struct cheri_test *ctp __unused)
 {
 	char *path;
-	void * sealer;
+	void *sealer;
+	size_t sealer_size;
 	int fd;
 
-	if (sysarch(CHERI_GET_SEALCAP, &sealer) < 0)
-		cheritest_failure_err("CHERI_GET_SEALCAP");
+	sealer_size = sizeof(sealer);
+	if (sysctlbyname("security.cheri.sealcap", &sealer, &sealer_size,
+	    NULL, 0) < 0)
+		cheritest_failure_err("sysctlbyname(security.cheri.sealcap)");
 
 	/* Allocate enough space that it's sealable for 128-bit */
 	path = calloc(1, 1<<12);
@@ -253,4 +253,3 @@ test_cheriabi_open_sealed(const struct cheri_test *ctp __unused)
 
 	cheritest_success();
 }
-#endif

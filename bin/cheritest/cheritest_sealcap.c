@@ -35,25 +35,27 @@
 #endif
 
 #include <sys/types.h>
-
-#include <machine/sysarch.h>
+#include <sys/sysctl.h>
 
 #include <cheri/cheri.h>
 #include <cheri/cheric.h>
 
 #include <err.h>
+#include <stddef.h>
 
 #include "cheritest.h"
 
-#ifdef CHERI_GET_SEALCAP
 void
-test_sealcap_sysarch(const struct cheri_test *ctp __unused)
+test_sealcap_sysctl(const struct cheri_test *ctp __unused)
 {
 	void * __capability sealcap;
+	size_t sealcap_size;
 	u_register_t v;
 
-	if (sysarch(CHERI_GET_SEALCAP, &sealcap) < 0)
-		cheritest_failure_err("sysarch(CHERI_GET_SEALCAP)");
+	sealcap_size = sizeof(sealcap);
+	if (sysctlbyname("security.cheri.sealcap", &sealcap, &sealcap_size,
+	    NULL, 0) < 0)
+		cheritest_failure_err("sysctlbyname(security.cheri.sealcap)");
 
 	/* Base. */
 	v = cheri_getbase(sealcap);
@@ -146,10 +148,13 @@ test_sealcap_seal(const struct cheri_test *ctp __unused)
 	void * __capability sealdatap;
 	void * __capability sealcap;
 	void * __capability sealed;
+	size_t sealcap_size;
 	u_register_t v;
 
-	if (sysarch(CHERI_GET_SEALCAP, &sealcap) < 0)
-		cheritest_failure_err("sysarch(CHERI_GET_SEALCAP)");
+	sealcap_size = sizeof(sealcap);
+	if (sysctlbyname("security.cheri.sealcap", &sealcap, &sealcap_size,
+	    NULL, 0) < 0)
+		cheritest_failure_err("sysctlbyname(security.cheri.sealcap)");
 
 	sealdatap = &sealdata;
 	sealed = cheri_seal(sealdatap, sealcap);
@@ -204,10 +209,13 @@ test_sealcap_seal_unseal(const struct cheri_test *ctp __unused)
 	void * __capability sealcap;
 	void * __capability sealed;
 	void * __capability unsealed;
+	size_t sealcap_size;
 	u_register_t v;
 
-	if (sysarch(CHERI_GET_SEALCAP, &sealcap) < 0)
-		cheritest_failure_err("sysarch(CHERI_GET_SEALCAP)");
+	sealcap_size = sizeof(sealcap);
+	if (sysctlbyname("security.cheri.sealcap", &sealcap, &sealcap_size,
+	    NULL, 0) < 0)
+		cheritest_failure_err("sysctlbyname(security.cheri.sealcap)");
 
 	sealdatap = &sealdata;
 	sealed = cheri_seal(sealdatap, sealcap);
@@ -255,4 +263,3 @@ test_sealcap_seal_unseal(const struct cheri_test *ctp __unused)
 
 	cheritest_success();
 }
-#endif	/* CHERI_GET_SEALCAP */

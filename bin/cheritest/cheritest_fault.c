@@ -39,8 +39,6 @@
 #include <sys/sysctl.h>
 #include <sys/time.h>
 
-#include <machine/sysarch.h>
-
 #include <cheri/cheri.h>
 #include <cheri/cheric.h>
 
@@ -96,7 +94,6 @@ test_nofault_perm_load(const struct cheri_test *ctp __unused)
 	cheritest_success();
 }
 
-#ifdef CHERI_GET_SEALCAP
 void
 test_fault_perm_seal(const struct cheri_test *ctp __unused)
 {
@@ -104,9 +101,12 @@ test_fault_perm_seal(const struct cheri_test *ctp __unused)
 	void * __capability ip = &i;
 	void * __capability sealcap;
 	void * __capability sealed;
+	size_t sealcap_size;
 
-	if (sysarch(CHERI_GET_SEALCAP, &sealcap) < 0)
-		cheritest_failure_err("sysarch(CHERI_GET_SEALCAP)");
+	sealcap_size = sizeof(sealcap);
+	if (sysctlbyname("security.cheri.sealcap", &sealcap, &sealcap_size,
+	    NULL, 0) < 0)
+		cheritest_failure_err("sysctlbyname(security.cheri.sealcap)");
 	sealcap = cheri_andperm(sealcap, ~CHERI_PERM_SEAL);
 	sealed = cheri_seal(ip, sealcap);
 	/*
@@ -117,7 +117,6 @@ test_fault_perm_seal(const struct cheri_test *ctp __unused)
 	    _CHERI_PRINTF_CAP_FMT " with bad sealcap" _CHERI_PRINTF_CAP_FMT,
 	    _CHERI_PRINTF_CAP_ARG(sealed), _CHERI_PRINTF_CAP_ARG(sealcap));
 }
-#endif
 
 void
 test_fault_perm_store(const struct cheri_test *ctp __unused)
@@ -137,7 +136,6 @@ test_nofault_perm_store(const struct cheri_test *ctp __unused)
 	cheritest_success();
 }
 
-#ifdef CHERI_GET_SEALCAP
 void
 test_fault_perm_unseal(const struct cheri_test *ctp __unused)
 {
@@ -146,9 +144,12 @@ test_fault_perm_unseal(const struct cheri_test *ctp __unused)
 	void * __capability sealcap;
 	void * __capability sealed;
 	void * __capability unsealed;
+	size_t sealcap_size;
 
-	if (sysarch(CHERI_GET_SEALCAP, &sealcap) < 0)
-		cheritest_failure_err("sysarch(CHERI_GET_SEALCAP)");
+	sealcap_size = sizeof(sealcap);
+	if (sysctlbyname("security.cheri.sealcap", &sealcap, &sealcap_size,
+	    NULL, 0) < 0)
+		cheritest_failure_err("sysctlbyname(security.cheri.sealcap)");
 	if ((cheri_getperm(sealcap) & CHERI_PERM_SEAL) == 0)
 		cheritest_failure_errx("unexpected !seal perm on sealcap");
 	sealed = cheri_seal(ip, sealcap);
@@ -162,7 +163,6 @@ test_fault_perm_unseal(const struct cheri_test *ctp __unused)
 	    _CHERI_PRINTF_CAP_FMT " with bad unsealcap" _CHERI_PRINTF_CAP_FMT,
 	    _CHERI_PRINTF_CAP_ARG(unsealed), _CHERI_PRINTF_CAP_ARG(sealcap));
 }
-#endif
 
 void
 test_fault_tag(const struct cheri_test *ctp __unused)

@@ -148,12 +148,6 @@ hybridabi_thread_init(struct thread *td, unsigned long entry_addr)
 	hybridabi_capability_set_user_idc(&csigp->csig_idc);
 	hybridabi_capability_set_user_pcc(td, &csigp->csig_pcc);
 	csigp->csig_sigcode = cheri_sigcode_capability(td);
-
-        /*
-         * Set up root for the userspace object-type sealing capability tree.
-         * This can be queried using sysarch(2).
-         */
-        cheri_capability_set_user_sealcap(&td->td_proc->p_md.md_cheri_sealcap);
 }
 
 /*

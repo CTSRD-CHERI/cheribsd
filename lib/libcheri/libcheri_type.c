@@ -34,11 +34,10 @@ __REQUIRE_CAPABILITIES
 
 #include <sys/types.h>
 #include <sys/param.h>
+#include <sys/sysctl.h>
 
 #include <cheri/cheri.h>
 #include <cheri/cheric.h>
-
-#include <machine/sysarch.h>
 
 #include <assert.h>
 #include <stdatomic.h>
@@ -67,6 +66,7 @@ static const int libcheri_system_type_max = 1<<(libcheri_cap_type_bits-1);
 static void
 libcheri_type_init(void)
 {
+	size_t sealcap_size;
 
 	/*
 	 * Request a root sealing capability from the kernel.  Ensure it is
@@ -75,7 +75,9 @@ libcheri_type_init(void)
 	 * properties of the capability later, should compartmentalisation
 	 * actually be used by the application.
 	 */
-	if (sysarch(CHERI_GET_SEALCAP, &libcheri_sealing_root) < 0)
+	sealer_size = sizeof(libcheri_sealing_root);
+	if (sysctlbyname("security.cheri.sealcap", &libcheri_sealing_root,
+	    &sealcap_size, NULL, 0) < 0)
 		libcheri_sealing_root = NULL;
 	assert((cheri_getperm(libcheri_sealing_root) & CHERI_PERM_SEAL) != 0);
 	assert(cheri_getlen(libcheri_sealing_root) != 0);

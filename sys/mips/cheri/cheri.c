@@ -84,9 +84,6 @@ CTASSERT(sizeof(void *) == 8);
 CTASSERT(sizeof(void * __capability) == 16);
 CTASSERT(sizeof(struct cheri_object) == 32);
 
-/* Set to -1 to prevent it from being zeroed with the rest of BSS */
-void * __capability user_sealcap = (void * __capability)(intcap_t)-1;
-
 /*
  * For now, all we do is declare what we support, as most initialisation took
  * place in the MIPS machine-dependent assembly.  CHERI doesn't need a lot of
@@ -115,10 +112,3 @@ cheri_cpu_startup(void)
 }
 SYSINIT(cheri_cpu_startup, SI_SUB_CPU, SI_ORDER_FIRST, cheri_cpu_startup,
     NULL);
-
-void
-cheri_capability_set_user_sealcap(void * __capability *cp)
-{
-
-	*cp = user_sealcap;
-}
