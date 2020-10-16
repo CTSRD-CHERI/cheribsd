@@ -55,13 +55,6 @@
 #define	CHERI_SET_STACK		5	/* Set trusted stack. */
 
 /*
- * Query the root of the object-type sealing capability provenance tree.  This
- * allows us to avoid setting CHERI_PERM_SEAL and CHERI_PERM_UNSEAL on data
- * and code capabilities.
- */
-#define	CHERI_GET_SEALCAP	6	/* Get root sealing capability. */
-
-/*
  * Manipulate the mmap capability.
  */
 #define	CHERI_MMAP_GETPERM	7	/* Get permissions */

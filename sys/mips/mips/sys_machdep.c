@@ -90,9 +90,6 @@ sysarch(struct thread *td, struct sysarch_args *uap)
 #endif
 
 #ifdef CPU_CHERI
-	case CHERI_GET_SEALCAP:
-		return (cheri_sysarch_getsealcap(td, uap->parms));
-
 	/*
 	 * CheriABI specific operations.
 	 */

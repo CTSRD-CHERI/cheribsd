@@ -483,7 +483,7 @@ DECLARE_CHERI_TEST(cheritest_setjmp_longjmp);
 DECLARE_CHERI_TEST(test_printf_cap);
 
 /* cheritest_sealcap.c */
-DECLARE_CHERI_TEST(test_sealcap_sysarch);
+DECLARE_CHERI_TEST(test_sealcap_sysctl);
 DECLARE_CHERI_TEST(test_sealcap_seal);
 DECLARE_CHERI_TEST(test_sealcap_seal_unseal);
 

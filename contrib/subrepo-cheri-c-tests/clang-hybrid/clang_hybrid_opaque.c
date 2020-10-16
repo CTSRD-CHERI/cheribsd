@@ -25,8 +25,10 @@
  * @BERI_LICENSE_HEADER_END@
  */
 
+#include <sys/types.h>
+#include <sys/sysctl.h>
+
 #include <assert.h>
-#include <machine/sysarch.h>
 
 #include "cheri_c_test.h"
 
@@ -66,7 +68,10 @@ void example_init(void)
  * be in the range 0 to 2^24-1.
  */
   void * __capability sealing_cap;
-  assert(sysarch(CHERI_GET_SEALCAP, &sealing_cap) == 0);
+  size_t sealing_cap_size;
+  sealing_cap_size = sizeof(sealing_cap);
+  assert(sysctlbyname("security.cheri.sealcap", &sealing_cap,
+    &sealing_cap_size, NULL, 0) == 0);
   example_key = __builtin_cheri_offset_set(sealing_cap, 4);
 }
 
