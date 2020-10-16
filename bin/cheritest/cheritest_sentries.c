@@ -77,9 +77,15 @@ test_sentry_dlsym(const struct cheri_test *ctp __unused)
 {
 	unsigned int (*fptr)(unsigned int seconds);
 	void *handle;
+	const char *libm_so;
 
-	if ((handle = dlopen(LIBM_SO, RTLD_LAZY)) == NULL)
-		cheritest_failure_errx("dlopen(%s) %s", LIBM_SO, dlerror());
+#if defined(COMPAT_CHERI)
+	libm_so = "/usr/libcheri/" LIBM_SONAME;
+#else
+	libm_so = "/lib/" LIBM_SONAME;
+#endif
+	if ((handle = dlopen(libm_so, RTLD_LAZY)) == NULL)
+		cheritest_failure_errx("dlopen(%s) %s", libm_so, dlerror());
 	if ((fptr = dlsym(handle, "acos")) == NULL)
 		cheritest_failure_err("dlsym(acos)");
 
