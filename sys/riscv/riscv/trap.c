@@ -188,12 +188,15 @@ cpu_fetch_syscall_args(struct thread *td)
 
 #include "../../kern/subr_syscall.c"
 
+/*
+ * This cannot use _CHERI_PRINTF_CAP_ARG due to the casts (the trapframe stores
+ * uintcap_t rather than void * __capability).
+ */
 #if __has_feature(capabilities)
-/* This cannot use _CHERI_PRINTF_CAP_ARG due to the cast for purecap. */
 #ifdef __CHERI_PURE_CAPABILITY__
 #define	PRINT_REG_ARG(value)	((void * __capability)(value))
 #else
-#define	PRINT_REG_ARG(value)	(&(value))
+#define	PRINT_REG_ARG(value)	((void * __capability *)&(value))
 #endif
 #define PRINT_REG(name, value)					\
 	printf(name " = " _CHERI_PRINTF_CAP_FMT "\n",		\
