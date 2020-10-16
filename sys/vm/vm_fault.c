@@ -1840,7 +1840,7 @@ vm_fault_quick_hold_pages(vm_map_t map, void * __capability addr, vm_size_t len,
 	if (len == 0)
 		return (0);
 #if __has_feature(capabilities)
-	if (!__CAP_CHECK(addr, len))
+	if (!__CAP_CHECK(addr, len) || !vm_cap_allows_prot(addr, prot))
 		return (-1);
 #endif
 	start = (__cheri_addr vm_offset_t)trunc_page(addr);
