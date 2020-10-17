@@ -71,6 +71,14 @@ typedef	uint64_t	pn_t;			/* page number */
 #define	PTE_CW		(1UL << 63) /* Capability Write */
 #define	PTE_CR		(1UL << 62) /* Capability Read */
 #define	PTE_CD		(1UL << 61) /* Capability Dirty */
+#define	PTE_CRM		(1UL << 60) /* Cap Read Modifier */
+#define	PTE_CRG		(1UL << 59) /* Cap Read Generation */
+
+#define	PTE_CR_CLEAR	0			/* clear tags on load */
+#define	PTE_CR_TRAP	PTE_CRM			/* trap on tag load */
+#define	PTE_CR_OK	PTE_CR			/* tags load OK */
+#define	PTE_CR_GEN	(PTE_CR | PTE_CRM)	/* tags gated by generation */
+
 #define	PTE_KERN_CHERI	(PTE_CR | PTE_CW | PTE_CD)
 #define	PTE_PROMOTE_CHERI (PTE_CR | PTE_CW | PTE_CD | PTE_CRM | PTE_CRG)
 #else
