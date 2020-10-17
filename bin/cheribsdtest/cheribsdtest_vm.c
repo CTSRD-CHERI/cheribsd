@@ -1411,6 +1411,140 @@ CHERIBSDTEST(cheri_revoke_lightly, "A gentle test of capability revocation")
 
 	cheribsdtest_success();
 }
+
+CHERIBSDTEST(cheri_revoke_loadside, "Test load-side revoker")
+{
+#define CHERIBSDTEST_VM_CHERI_REVOKE_LOADSIDE_NPG	3
+
+	void **mb;
+	void *sh;
+	const volatile struct cheri_revoke_info *cri;
+	void *revme;
+	struct cheri_revoke_syscall_info crsi;
+	unsigned char mcv[CHERIBSDTEST_VM_CHERI_REVOKE_LOADSIDE_NPG] = { 0 };
+	const size_t asz = CHERIBSDTEST_VM_CHERI_REVOKE_LOADSIDE_NPG *
+	    PAGE_SIZE;
+
+	mb = CHERIBSDTEST_CHECK_SYSCALL(
+	    mmap(0, asz, PROT_READ | PROT_WRITE, MAP_ANON, -1, 0));
+	CHERIBSDTEST_CHECK_SYSCALL(
+	    cheri_revoke_get_shadow(CHERI_REVOKE_SHADOW_NOVMMAP, mb, &sh));
+
+	CHERIBSDTEST_CHECK_SYSCALL(cheri_revoke_get_shadow(
+	    CHERI_REVOKE_SHADOW_INFO_STRUCT, NULL,
+	    __DEQUALIFY_CAP(void **, &cri)));
+
+	revme = cheri_andperm(mb, ~CHERI_PERM_SW_VMEM);
+	((void **)mb)[1] = revme;
+	((uint8_t *)sh)[0] = 1;
+
+	/* Write and clear a capability one page up */
+	size_t capsperpage = PAGE_SIZE/sizeof(void *);
+	((void * volatile *)mb)[capsperpage] = revme;
+	((volatile uintptr_t *)mb)[capsperpage] = 0;
+
+	CHERIBSDTEST_CHECK_SYSCALL(mincore(mb, asz, &mcv[0]));
+	CHERIBSDTEST_VERIFY2(
+	    (mcv[0] & MINCORE_CAPSTORE) != 0, "page 0 capstore 1");
+	CHERIBSDTEST_VERIFY2(
+	    (mcv[1] & MINCORE_CAPSTORE) != 0, "page 1 capstore 1");
+	CHERIBSDTEST_VERIFY2(
+	    (mcv[2] & MINCORE_CAPSTORE) == 0, "page 2 capstore 1");
+
+	/*
+	 * Begin load side.  This should be pretty speedy since we do no VM
+	 * walks.
+	 */
+	CHERIBSDTEST_CHECK_SYSCALL(cheri_revoke(CHERI_REVOKE_IGNORE_START |
+	    CHERI_REVOKE_TAKE_STATS, 0, &crsi));
+
+	/*
+	 * Try to induce a read fault and check that the read result is revoked.
+	 * Unfortunately, we can't check its capdirty status, but it should
+	 * still be CAPSTORED, since not enough time has elapsed for the state
+	 * machine to declare it clean.
+	 */
+	revme = ((void **)mb)[1];
+	CHERIBSDTEST_VERIFY2(check_revoked(revme), "Fault didn't stop me!");
+
+	CHERIBSDTEST_CHECK_SYSCALL(mincore(mb, asz, &mcv[0]));
+	CHERIBSDTEST_VERIFY2(
+	    (mcv[0] & MINCORE_CAPSTORE) != 0, "page 0 capstore 2.0");
+	CHERIBSDTEST_VERIFY2(
+	    (mcv[1] & MINCORE_CAPSTORE) != 0, "page 1 capstore 2.0");
+
+	/*
+	 * This might redirty the 0th page, if we're keeping tags around on
+	 * revoked caps.  If it does, we expect the dirty bit to stay set
+	 * through the revoker sweep (though that's not strictly essential)
+	 */
+	((void **)mb)[2] = revme;
+
+	/*
+	 * Now do the background sweep and wait for everything to finish
+	 */
+	CHERIBSDTEST_CHECK_SYSCALL(
+	    cheri_revoke(CHERI_REVOKE_LAST_PASS | CHERI_REVOKE_IGNORE_START |
+		CHERI_REVOKE_TAKE_STATS, 0, &crsi));
+
+	CHERIBSDTEST_CHECK_SYSCALL(mincore(mb, asz, &mcv[0]));
+	CHERIBSDTEST_VERIFY2(
+	    (mcv[0] & MINCORE_CAPSTORE) != 0, "page 0 capstore 2.1");
+	CHERIBSDTEST_VERIFY2(
+	    (mcv[1] & MINCORE_CAPSTORE) != 0, "page 1 capstore 2.1");
+
+	/* Re-dirty page 0 but not page 1 */
+	revme = cheri_andperm(mb + 1, ~CHERI_PERM_SW_VMEM);
+	CHERIBSDTEST_VERIFY2(!check_revoked(revme), "Tag clear on 2nd revme?");
+	((void **)mb)[1] = revme;
+
+	CHERIBSDTEST_CHECK_SYSCALL(mincore(mb, asz, &mcv[0]));
+	CHERIBSDTEST_VERIFY2(
+	    (mcv[0] & MINCORE_CAPSTORE) != 0, "page 0 capstore 2.2");
+	CHERIBSDTEST_VERIFY2(
+	    (mcv[1] & MINCORE_CAPSTORE) != 0, "page 1 capstore 2.2");
+
+	/*
+	 * Do another revocation, both parts at once this time.  This should
+	 * transition page 0 from capdirty to capstore, since all capabilities
+	 * on it are revoked.  Page 1, having previously been capstore, is now
+	 * capclean.
+	 */
+	CHERIBSDTEST_CHECK_SYSCALL(
+	    cheri_revoke(CHERI_REVOKE_LAST_PASS | CHERI_REVOKE_IGNORE_START |
+		CHERI_REVOKE_TAKE_STATS, 0, &crsi));
+
+	CHERIBSDTEST_VERIFY2(check_revoked(mb[1]),
+	    "Revoker failure in full pass");
+
+	CHERIBSDTEST_CHECK_SYSCALL(mincore(mb, asz, &mcv[0]));
+	CHERIBSDTEST_VERIFY2(
+	    (mcv[0] & MINCORE_CAPSTORE) != 0, "page 0 capstore 3");
+	CHERIBSDTEST_VERIFY2(
+	    (mcv[1] & MINCORE_CAPSTORE) == 0, "page 1 capstore 3");
+
+	/*
+	 * Do that again so that we end with an odd CLG.
+	 */
+	CHERIBSDTEST_CHECK_SYSCALL(
+	    cheri_revoke(CHERI_REVOKE_LAST_PASS | CHERI_REVOKE_IGNORE_START |
+	        CHERI_REVOKE_TAKE_STATS, 0, &crsi));
+
+	CHERIBSDTEST_CHECK_SYSCALL(mincore(mb, asz, &mcv[0]));
+	CHERIBSDTEST_VERIFY2(
+	    (mcv[0] & MINCORE_CAPSTORE) == 0, "page 0 capstore 4");
+	CHERIBSDTEST_VERIFY2(
+	    (mcv[1] & MINCORE_CAPSTORE) == 0, "page 1 capstore 4");
+	/*
+	 * TODO:
+	 *
+	 * - check that we can store to a page at any point in that transition.
+	 */
+
+	cheribsdtest_success();
+
+#undef CHERIBSDTEST_VM_CHERI_REVOKE_LOADSIDE_NPG
+}
 #endif /* CHERI_REVOKE */
 
 #endif /* __CHERI_PURE_CAPABILITY__ */
