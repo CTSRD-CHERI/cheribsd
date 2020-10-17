@@ -126,6 +126,7 @@ FBSD_1.6 {
 	qsort_s;
 	rand;
 	srand;
+	ptsname_r;
 };
 
 FBSDprivate_1.0 {
