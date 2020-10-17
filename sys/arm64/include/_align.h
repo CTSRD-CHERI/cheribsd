@@ -38,7 +38,11 @@
  * for all data types (int, long, ...).   The result is unsigned int
  * and must be cast to any desired pointer type.
  */
+#if __has_feature(capabilities)
+#define	_ALIGNBYTES	(sizeof(void * __capability) - 1)
+#else
 #define	_ALIGNBYTES	(sizeof(long long) - 1)
+#endif
 #define	_ALIGN(p)	__builtin_align_up((p), _ALIGNBYTES + 1)
 
 #endif /* !_MACHINE__ALIGN_H_ */

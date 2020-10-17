@@ -124,6 +124,8 @@ CFLAGS+=	-mgeneral-regs-only -ffixed-x18 -fPIC
 # capabilities before we can enable this as it may have interrupts enabled
 # so will need to save/restore the full capability registers
 CFLAGS:=	${CFLAGS:N-march=morello*:N-mabi=purecap}
+LDFLAGS:=	${CFLAGS:N-march=morello*:N-mabi=purecap}
+LDFLAGS+=	-nostdlib
 .elif ${MACHINE_CPUARCH} == "riscv"
 CFLAGS+=	-march=rv64imac -mabi=lp64
 .else

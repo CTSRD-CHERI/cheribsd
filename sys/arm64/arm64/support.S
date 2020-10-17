@@ -170,7 +170,7 @@ ENTRY(fuecap)
 	ldr	c0, [c0]		/* Try loading the data */
 	EXIT_USER_ACCESS(w6)
 	SET_FAULT_HANDLER(xzr, x2)	/* Reset the fault handler */
-	str	c0, [c1]		/* Save the data in kernel space */
+	str	c0, [x1]		/* Save the data in kernel space */
 	mov	x0, #0			/* Success */
 	ret				/* Return */
 END(fuecap)
