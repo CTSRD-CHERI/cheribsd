@@ -328,6 +328,7 @@ static int pmap_unuse_pt(pmap_t, vm_offset_t, pd_entry_t, struct spglist *);
 #define	pmap_load(pte)			atomic_load_64(pte)
 #define	pmap_store(pte, entry)		atomic_store_64(pte, entry)
 #define	pmap_store_bits(pte, bits)	atomic_set_64(pte, bits)
+#define	pmap_fcmpset(pte, exp, des)	atomic_fcmpset_64((pte), (exp), (des))
 
 /********************/
 /* Inline functions */
@@ -1282,6 +1283,10 @@ pmap_pinit(pmap_t pmap)
 	mtx_unlock(&allpmaps_lock);
 
 	vm_radix_init(&pmap->pm_root);
+
+#if __has_feature(capabilities)
+	pmap->flags.uclg = 0;
+#endif
 
 	return (1);
 }
@@ -2708,6 +2713,29 @@ pmap_promote_l2(pmap_t pmap, pd_entry_t *l2, vm_offset_t va,
 }
 #endif
 
+#if __has_feature(capabilities)
+static inline uint64_t
+cheri_pte_cr(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot)
+{
+	if (prot & VM_PROT_READ_CAP) {
+#ifdef CHERI_CAPREVOKE
+		if (va < VM_MAX_USER_ADDRESS) {
+			/* User pages' tags gated by CLG */
+			return PTE_CR_GEN | (pmap->flags.uclg ? PTE_CRG : 0);
+		} else {
+			/* Kernel mappings' tags always load OK */
+			return PTE_CR_OK;
+		}
+#else
+		return PTE_CR_OK;
+#endif
+	} else {
+		/* XXX Let's see what happens! */
+		return PTE_CR_TRAP;
+	}
+}
+#endif
+
 /*
  *	Insert the given physical page (p) at
  *	the specified virtual address (v) in the
@@ -2759,6 +2787,7 @@ pmap_enter(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot,
 		new_l3 |= PTE_CW;
 	if (flags & VM_PROT_WRITE_CAP)
 		new_l3 |= PTE_CD;
+	new_l3 |= cheri_pte_cr(pmap, va, m, prot);
 #endif
 
 	new_l3 |= (pn << PTE_PPN0_S);
@@ -3026,8 +3055,7 @@ pmap_enter_2mpage(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot,
 	if (va < VM_MAXUSER_ADDRESS)
 		new_l2 |= PTE_U;
 #if __has_feature(capabilities)
-	if ((prot & VM_PROT_READ_CAP) != 0)
-		new_l2 |= PTE_CR;
+	new_l2 |= cheri_pte_cr(pmap, va, m, prot);
 #endif
 	return (pmap_enter_l2(pmap, va, new_l2, PMAP_ENTER_NOSLEEP |
 	    PMAP_ENTER_NOREPLACE | PMAP_ENTER_NORECLAIM, NULL, lockp) ==
@@ -3399,6 +3427,337 @@ pmap_sync_capdirty(pmap_t pmap)
 
 	PMAP_UNLOCK(pmap);
 }
+
+#ifdef CHERI_CAPREVOKE
+void
+pmap_caploadgen_next(pmap_t pmap)
+{
+
+	/*
+	 * With a hardware PTW, this game is slightly more exciting than it was
+	 * on MIPS: even though we're invalidating here, there's nothing that
+	 * necessarily stops a TLB from loading the current (soon-to-be-prior)
+	 * LCLG or GCLG bit.  However, doing this global invalidate does mean
+	 * that no cached values from the prior epoch will persist into the
+	 * next one, which is great, because with one bit we can't distinguish
+	 * both past and future from present!
+	 */
+
+	PMAP_LOCK(pmap);
+	pmap_invalidate_all(pmap);
+	pmap->flags.uclg++;
+	PMAP_UNLOCK(pmap);
+}
+
+/* XREF pmap_page_test_mappings */
+static void
+pmap_caploadgen_test_all_clean(vm_page_t m)
+{
+	struct md_page *pvh;
+	struct rwlock *lock;
+	pd_entry_t l2e;
+	pt_entry_t l3e;
+	pv_entry_t pv;
+	pmap_t pmap;
+	int md_gen, pvh_gen;
+	bool rv;
+
+	KASSERT((m->flags & PG_FICTITIOUS) == 0,
+	    ("fictitious page in pmap_caploadgen_test_all_clean"));
+
+	rv = true;
+	rw_rlock(&pvh_global_lock);
+	lock = VM_PAGE_TO_PV_LIST_LOCK(m);
+	rw_rlock(lock);
+restart:
+	TAILQ_FOREACH(pv, &m->md.pv_list, pv_next) {
+		pmap = PV_PMAP(pv);
+		if (!PMAP_TRYLOCK(pmap)) {
+			md_gen = m->md.pv_gen;
+			rw_runlock(lock);
+			PMAP_LOCK(pmap);
+			rw_rlock(lock);
+			if (md_gen != m->md.pv_gen) {
+				PMAP_UNLOCK(pmap);
+				goto restart;
+			}
+		}
+
+		l3e = pmap_load(pmap_l3(pmap, pv->pv_va));
+		PMAP_UNLOCK(pmap);
+
+		KASSERT(l3e & PTE_V, ("!PTE_V on pv_list?"));
+		if (l3e & PTE_CW) {
+			rv = false;
+			goto out;
+		}
+	}
+
+	pvh = pa_to_pvh(VM_PAGE_TO_PHYS(m));
+	TAILQ_FOREACH(pv, &pvh->pv_list, pv_next) {
+		pmap = PV_PMAP(pv);
+		if (!PMAP_TRYLOCK(pmap)) {
+			md_gen = m->md.pv_gen;
+			pvh_gen = pvh->pv_gen;
+			rw_runlock(lock);
+			PMAP_LOCK(pmap);
+			rw_rlock(lock);
+			if (md_gen != m->md.pv_gen ||
+			    pvh_gen != pvh->pv_gen) {
+				PMAP_UNLOCK(pmap);
+				goto restart;
+			}
+		}
+		l2e = pmap_load(pmap_l2(pmap, pv->pv_va));
+		PMAP_UNLOCK(pmap);
+		if (l3e & PTE_CW) {
+			rv = false;
+			goto out;
+		}
+	}
+
+out:
+	rw_runlock(lock);
+	rw_runlock(&pvh_global_lock);
+
+	/*
+	 * It's important that we test the PGA_CAPDIRTY flag again *after*
+	 * we've looked at all the PTEs: we might have raced a removal of a PTE
+	 * that had PTE_SCI clear.
+	 *
+	 * Despite not holding a pmap LOCKed right now, something is preventing
+	 * new mappings (PMAP_CAPLOADGEN_EXCLUSIVE) and so we don't need to
+	 * worry that we're missing something here.
+	 */
+	if (rv && !(vm_page_astate_load(m).flags & PGA_CAPDIRTY)) {
+		vm_page_aflag_clear(m, PGA_CAPSTORE);
+	}
+}
+
+static inline void
+pmap_caploadgen_update_crg(pmap_t pmap, pt_entry_t *pte)
+{
+	if (pmap->flags.uclg) {
+		pmap_store_bits(pte, PTE_CRG);
+	} else {
+		pmap_clear_bits(pte, PTE_CRG);
+	}
+}
+
+static inline void
+pmap_caploadgen_update_clear_cw(pt_entry_t *pte, pt_entry_t oldpte)
+{
+	/*
+	 * We don't do a TLB shootdown here because we're guaranteed that any
+	 * TLB caching a PTE_CW-but-not-PTE_CD entry will attempt a CAS, and
+	 * not just a blind AMO OR, to set PTE_CD.  The barrier at the start of
+	 * a revocation epoch ensures that no TLB can have a PTE_CW-and-PTE_CD
+	 * entry for this mapping if we've gotten here.
+	 *
+	 * On the other hand, we do have to do this as a CAS, to ensure that we
+	 * don't end up with PTE_CD set (by a racing PTW) and no PTE_CW.
+	 * Spurious failures are fine, so we can use fcmpset here.
+	 *
+	 * TODO: Should we mark the page as cap-load-faulting as a debugging
+	 * aide once Toooba is tag-dependently faulting?  (We can't mark it as
+	 * cap-load-clearing because there might be aliases that update
+	 * asynchronously.)
+	 */
+	pt_entry_t exppte = oldpte;
+
+	if (!pmap_fcmpset(pte, &exppte, exppte & ~PTE_CW)) {
+		/*
+		 * Failure must have preserved all non-PTW-updatable bits;
+		 * notably, PTE_CW must remain set.
+		 */
+		KASSERT((exppte & ~(PTE_CD|PTE_D|PTE_A)) ==
+		    (oldpte & ~(PTE_CD|PTE_D|PTE_A)),
+		    ("pmap_caploadgen_update_clear_cw botch"));
+	}
+
+}
+
+int
+pmap_caploadgen_update(pmap_t pmap, vm_offset_t *pva, vm_page_t *mp, int flags)
+{
+	enum pmap_caploadgen_res res;
+	pd_entry_t *l2, l2e;
+	pt_entry_t *pte, oldpte = 0;
+	vm_page_t m;
+	vm_offset_t va = *pva;
+
+	PMAP_LOCK(pmap);
+
+	KASSERT(!(csr_read(sccsr) & SCCSR_UGCLG) == !(pmap->flags.uclg),
+	    ("pmap_caploadgen_update: pmap crg %d but CPU mismatch",
+	    (int)pmap->flags.uclg));
+
+	l2 = pmap_l2(pmap, va);
+	if (l2 == NULL || ((l2e = pmap_load(l2)) & PTE_V) == 0) {
+		m = NULL;
+		res = PMAP_CAPLOADGEN_UNABLE;
+		goto out;
+	}
+	if ((l2e & PTE_RWX) == 0) {
+		pte = pmap_l2_to_l3(l2, va);
+		if (pte == NULL || ((oldpte = pmap_load(pte)) & PTE_V) == 0) {
+			m = NULL;
+			res = PMAP_CAPLOADGEN_UNABLE;
+			goto out;
+		}
+	} else {
+		pte = l2;
+		oldpte = l2e;
+	}
+
+	switch (oldpte & (PTE_CR | PTE_CRM)) {
+	case 0:		// tag clearing
+	case PTE_CR:	// always allowed; not for us to worry about?
+	case PTE_CRM:	// always trapping; not something we can fix?
+		m = NULL;
+		res = PMAP_CAPLOADGEN_UNABLE;
+		goto out;
+	case PTE_CR | PTE_CRM: // ah, here we go
+		break;
+	}
+
+	if (!(oldpte & PTE_CRG) == !(pmap->flags.uclg)) {
+		/* Page already scanned, just fence (maybe redundantly) */
+		if (flags & PMAP_CAPLOADGEN_UPDATETLB)
+			sfence_vma_page(va);
+
+		*pva = va + ((pte == l2) ? L2_SIZE : PAGE_SIZE);
+		m = NULL;
+		res = PMAP_CAPLOADGEN_ALREADY;
+		goto out;
+	}
+
+	KASSERT(oldpte & PTE_U, ("!PTE_U w/ CLG mismatch va=%lx", va));
+
+	vm_offset_t oldphys = (pte == l2) ?
+		L2PTE_TO_PHYS(oldpte) : PTE_TO_PHYS(oldpte);
+	m = PHYS_TO_VM_PAGE(oldphys);
+	if (*mp == m) {
+		/*
+		 * We expected this page here (i.e., this is the page we just
+		 * scanned), so go ahead and update.  We know that the CLG bits
+		 * must still be wrong in light of the earlier test.
+		 */
+		*pva = va + ((pte == l2) ? L2_SIZE : PAGE_SIZE);
+		res = PMAP_CAPLOADGEN_OK;
+
+		if (!(flags & PMAP_CAPLOADGEN_HASCAPS)) {
+			/*
+			 * We didn't see a capability on this page; step this
+			 * PTE closer to being cap-clean.
+			 */
+			if (oldpte & PTE_CD) {
+				/*
+				 * CAP-DIRTY -> DIRTYABLE; we just do a store
+				 * here as there might be a capability store
+				 * between us having examined the page and the
+				 * store-release below, and so we're going to
+				 * scan the page again anyway.
+				 */
+				pmap_clear_bits(pte, PTE_CD);
+			} else if (oldpte & PTE_CW) {
+				/* PTE CAP-DIRTYABLE -> CAP-CLEAN */
+				pmap_caploadgen_update_clear_cw(pte, oldpte);
+			} else if (flags & PMAP_CAPLOADGEN_EXCLUSIVE) {
+				/* No new mappings possible */
+				vm_page_astate_t mas = vm_page_astate_load(m);
+
+				if (mas.flags & PGA_CAPDIRTY) {
+					/* Page-level cleaning: -?> VACANT */
+					vm_page_aflag_clear(m, PGA_CAPDIRTY);
+				} else {
+					KASSERT(mas.flags & PGA_CAPSTORE,
+					    ("Page already CAP-CLEAN?"));
+					/* PTE CAP-CLEAN; page -?> IDLE */
+					if (flags & PMAP_CAPLOADGEN_UPDATETLB) {
+						sfence_vma_page(va);
+					}
+					PMAP_UNLOCK(pmap);
+					pmap_caploadgen_test_all_clean(m);
+					m = NULL;
+					goto out_unlocked;
+				}
+			}
+		} else {
+			/*
+			 * Page has caps; may as well mark it dirty if we're
+			 * allowed to store here.
+			 *
+			 * We could clear PGA_CAPDIRTY here, too, but it
+			 * probably doesn't get set often ough to merit.
+			 */
+			if ((oldpte & PTE_CW) && !(oldpte & PTE_CD)) {
+				pmap_store_bits(pte, PTE_CD);
+			}
+		}
+
+		/*
+		 * On the fast path, where we're just updating the CRG bit, this
+		 * is the only store to the PTE we'll do.  This is probably a
+		 * better state of affairs (1 + epsilon AMOs, no retries) than
+		 * we could otherwise easily get (either 1 LL/SC CAS + epsilon
+		 * retries or 1 AMOSWAP to a zero PTE + 1 store).
+		 */
+		pmap_caploadgen_update_crg(pmap, pte);
+
+		if (flags & PMAP_CAPLOADGEN_UPDATETLB) {
+			sfence_vma_page(va);
+		}
+		m = NULL;
+	} else if (!(vm_page_astate_load(m).flags & PGA_CAPSTORE)) {
+		KASSERT(!(oldpte & PTE_CW), ("!PGA_CAPSTORE but CW?"));
+		KASSERT(!(oldpte & PTE_CD), ("!PGA_CAPSTORE but CD?"));
+
+		/*
+		 * For tag-independent faults, we might still raise a
+		 * fault for !PGA_CAPSTORE pages if the TLB is holding
+		 * a stale LCLG.  Since the page really ought to be
+		 * capability clean at this point, we should be OK to
+		 * arbitarily manipulate the LCLG, so appease the TLB.
+		 */
+		pmap_caploadgen_update_crg(pmap, pte);
+		if (flags & PMAP_CAPLOADGEN_UPDATETLB) {
+			sfence_vma_page(va);
+		}
+
+		*pva = va + ((pte == l2) ? L2_SIZE : PAGE_SIZE);
+		m = NULL;
+		res = PMAP_CAPLOADGEN_CLEAN;
+	} else if ((flags & PMAP_CAPLOADGEN_WIRE) && !vm_page_wire_mapped(m)) {
+		/* Can't wire this one; give up */
+		res = PMAP_CAPLOADGEN_TEARDOWN;
+	} else if ((oldpte & PTE_CW) == 0) {
+		KASSERT((oldpte & PTE_CD) == 0, ("!CW but CD?"));
+		res = (oldpte & PTE_D) ?
+			PMAP_CAPLOADGEN_SCAN_CLEAN_RW :
+			PMAP_CAPLOADGEN_SCAN_CLEAN_RO;
+	} else if (oldpte & PTE_W) {
+		res = PMAP_CAPLOADGEN_SCAN_RW;
+	} else {
+		res = PMAP_CAPLOADGEN_SCAN_RO;
+	}
+
+out:
+	PMAP_UNLOCK(pmap);
+out_unlocked:
+
+	if ((flags & PMAP_CAPLOADGEN_WIRE) && (*mp != NULL)) {
+		/*
+		 * Unwire any existing page we were given if we are asked to
+		 * wire the returned page.
+		 */
+		vm_page_unwire(*mp, PQ_INACTIVE);
+	}
+	*mp = m;
+
+	return res;
+}
+#endif
 #endif
 
 /*
@@ -4491,8 +4850,13 @@ pmap_activate_sw(struct thread *td)
 
 	oldpmap = PCPU_GET(curpmap);
 	pmap = vmspace_pmap(td->td_proc->p_vmspace);
-	if (pmap == oldpmap)
+	if (pmap == oldpmap) {
+#if __has_feature(capabilities)
+		goto update_crg;
+#else
 		return;
+#endif
+	}
 	load_satp(pmap->pm_satp);
 
 	hart = PCPU_GET(hart);
@@ -4504,6 +4868,14 @@ pmap_activate_sw(struct thread *td)
 	CPU_CLR(hart, &oldpmap->pm_active);
 #endif
 	PCPU_SET(curpmap, pmap);
+
+#if __has_feature(capabilities)
+update_crg:
+	if (pmap->flags.uclg)
+		csr_set(sccsr, SCCSR_UGCLG);
+	else
+		csr_clear(sccsr, SCCSR_UGCLG);
+#endif
 
 	sfence_vma();
 }
