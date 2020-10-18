@@ -541,7 +541,6 @@ OPENZFS_CFLAGS=     \
 	-nostdinc \
 	-DSMP \
 	-I${ZINCDIR}  \
-	-I${ZINCDIR}/spl \
 	-I${ZINCDIR}/os/freebsd \
 	-I${ZINCDIR}/os/freebsd/spl \
 	-I${ZINCDIR}/os/freebsd/zfs \
