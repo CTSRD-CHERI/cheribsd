@@ -399,6 +399,7 @@ MAN=	aac.4 \
 	ocs_fc.4\
 	ohci.4 \
 	orm.4 \
+	${_ossl.4} \
 	ow.4 \
 	ow_temp.4 \
 	owc.4 \
@@ -822,6 +823,7 @@ _ntb_transport.4=ntb_transport.4
 _nvd.4=		nvd.4
 _nvme.4=	nvme.4
 _nvram.4=	nvram.4
+_ossl.4=	ossl.4
 _padlock.4=	padlock.4
 _pchtherm.4=	pchtherm.4
 _rr232x.4=	rr232x.4
