@@ -324,6 +324,7 @@ vm_fault_soft_fast(struct faultstate *fs)
 	int psind;
 	vm_offset_t vaddr;
 	enum fault_status res;
+	vm_prot_t realprot;
 
 	MPASS(fs->vp == NULL);
 
@@ -370,8 +371,20 @@ vm_fault_soft_fast(struct faultstate *fs)
 	}
 #endif
 	VM_OBJECT_ASSERT_CAP(fs->first_object, fs->prot);
-	if (pmap_enter(fs->map->pmap, vaddr, m_map,
-	    VM_OBJECT_MASK_CAP_PROT(fs->first_object, fs->prot),
+
+	realprot = VM_OBJECT_MASK_CAP_PROT(fs->first_object, fs->prot);
+
+	/*
+	 * We might be upgrading a page previously mapped VM_PROT_WRITE to one
+	 * now mapped VM_PROT_WRITE | VM_PROT_WRITE_CAP.  Flag it as such.
+	 *
+	 * Importantly, realprot is exempt from vm_page_mask_cap_prot()!
+	 */
+	if ((realprot & (VM_PROT_WRITE | VM_PROT_WRITE_CAP)) ==
+	    (VM_PROT_WRITE | VM_PROT_WRITE_CAP))
+		vm_page_aflag_set(m_map, PGA_CAPSTORE);
+
+	if (pmap_enter(fs->map->pmap, vaddr, m_map, realprot,
 	    fs->fault_type |
 	    PMAP_ENTER_NOSLEEP | (fs->wired ? PMAP_ENTER_WIRED : 0), psind) !=
 	    KERN_SUCCESS) {
@@ -532,6 +545,8 @@ vm_fault_populate(struct faultstate *fs)
 		KASSERT((VM_PAGE_TO_PHYS(m) & (pagesizes[bdry_idx] - 1)) == 0,
 		    ("unaligned superpage m %p %#jx", m,
 		    (uintmax_t)VM_PAGE_TO_PHYS(m)));
+		if (fs->prot & VM_PROT_WRITE_CAP)
+			vm_page_aflag_set(m, PGA_CAPSTORE);
 		rv = pmap_enter(fs->map->pmap, vaddr, m, fs->prot,
 		    fs->fault_type | (fs->wired ? PMAP_ENTER_WIRED : 0) |
 		    PMAP_ENTER_LARGEPAGE, bdry_idx);
@@ -587,6 +602,8 @@ vm_fault_populate(struct faultstate *fs)
 		npages = atop(pagesizes[psind]);
 		for (i = 0; i < npages; i++) {
 			vm_fault_populate_check_page(&m[i]);
+			if (prot & VM_PROT_WRITE_CAP)
+				vm_page_aflag_set(&m[i], PGA_CAPSTORE);
 			vm_fault_dirty(fs, &m[i]);
 		}
 		VM_OBJECT_WUNLOCK(fs->first_object);
@@ -1254,6 +1271,9 @@ vm_fault_allocate(struct faultstate *fs)
 	}
 	fs->oom_started = false;
 
+	if (fs->prot & VM_PROT_WRITE_CAP)
+		vm_page_aflag_set(fs->m, PGA_CAPSTORE);
+
 	return (FAULT_CONTINUE);
 }
 
@@ -1712,8 +1732,15 @@ found:
 	 * won't find it (yet).
 	 */
 	VM_OBJECT_ASSERT_CAP(fs.object, fs.prot);
-	pmap_enter(fs.map->pmap, vaddr, fs.m,
-	    VM_OBJECT_MASK_CAP_PROT(fs.object, fs.prot),
+
+	/*
+	 * Modulate VM_PROT_WRITE_CAP by fs.object's OBJ_HASCAP and fs.m's
+	 * PGA_CAPSTORE.
+	 */
+	vm_prot_t realprot = VM_OBJECT_MASK_CAP_PROT(fs.object, fs.prot);
+	realprot = vm_page_mask_cap_prot(fs.m, realprot);
+
+	pmap_enter(fs.map->pmap, vaddr, fs.m, realprot,
 	    fs.fault_type | (fs.wired ? PMAP_ENTER_WIRED : 0), 0);
 	if (faultcount != 1 && (fs.fault_flags & VM_FAULT_WIRE) == 0 &&
 	    fs.wired == 0)
@@ -2212,10 +2239,14 @@ again:
 		 * backing pages.
 		 */
 		if (vm_page_all_valid(dst_m)) {
+			vm_prot_t realprot;
+
 			VM_OBJECT_WUNLOCK(dst_object);
 			VM_OBJECT_ASSERT_CAP(dst_object, prot);
-			pmap_enter(dst_map->pmap, vaddr, dst_m,
-			    VM_OBJECT_MASK_CAP_PROT(dst_object, prot),
+			realprot = VM_OBJECT_MASK_CAP_PROT(dst_object, prot);
+			realprot = vm_page_mask_cap_prot(dst_m, realprot);
+
+			pmap_enter(dst_map->pmap, vaddr, dst_m, realprot,
 			    access | (upgrade ? PMAP_ENTER_WIRED : 0), 0);
 			VM_OBJECT_WLOCK(dst_object);
 		}
