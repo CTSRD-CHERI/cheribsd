@@ -350,6 +350,15 @@ vm_fault_soft_fast(struct faultstate *fs)
 	}
 #endif
 	VM_OBJECT_ASSERT_CAP(fs->first_object, fs->prot);
+
+	/*
+	 * We might be upgrading a page previously mapped VM_PROT_WRITE to one
+	 * now mapped VM_PROT_WRITE|VM_PROT_WRITE_CAP.  Flag it as such.
+	 */
+	if ((fs->prot & (VM_PROT_WRITE | VM_PROT_WRITE_CAP)) ==
+	    (VM_PROT_WRITE | VM_PROT_WRITE_CAP))
+		vm_page_aflag_set(m_map, PGA_CAPSTORE);
+
 	rv = pmap_enter(fs->map->pmap, vaddr, m_map,
 	    VM_OBJECT_MASK_CAP_PROT(fs->first_object, fs->prot),
 	    fs->fault_type |
@@ -589,6 +598,8 @@ vm_fault_populate(struct faultstate *fs)
 				(*fs->m_hold) = &m[i];
 				vm_page_wire(&m[i]);
 			}
+			if (fs->prot & VM_PROT_WRITE_CAP)
+				vm_page_aflag_set(&m[i], PGA_CAPSTORE);
 			vm_page_xunbusy(&m[i]);
 		}
 	}
@@ -1175,6 +1186,9 @@ vm_fault_allocate(struct faultstate *fs)
 		return (KERN_RESOURCE_SHORTAGE);
 	}
 	fs->oom = 0;
+
+	if (fs->prot & VM_PROT_WRITE_CAP)
+		vm_page_aflag_set(fs->m, PGA_CAPSTORE);
 
 	return (KERN_NOT_RECEIVER);
 }
