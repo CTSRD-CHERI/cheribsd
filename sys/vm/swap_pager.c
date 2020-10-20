@@ -2251,6 +2251,7 @@ swp_pager_meta_cheri_get_tags(vm_page_t page)
 	void * __capability *p;
 	struct swblk *sb;
 	vm_pindex_t modpi;
+	bool mark_capdirty = false;
 
 	scan = (void *)PHYS_TO_DMAP(VM_PAGE_TO_PHYS(page));
 	sb = SWAP_PCTRIE_LOOKUP(&page->object->un_pager.swp.swp_blks,
@@ -2261,12 +2262,20 @@ swp_pager_meta_cheri_get_tags(vm_page_t page)
 	    i < (modpi + 1) * BITS_PER_TAGS_PER_PAGE; i++) {
 		p = scan;
 		for (t = sb->swb_tags[i]; t != 0; t >>= j) {
+			mark_capdirty = true;
 			j = ffsl((long)t);
 			cheri_restore_tag(p + j - 1);
 			p += j;
 		}
 		scan += 8 * sizeof(uint64_t);
 	}
+
+	/*
+	 * Because we stored through the direct region we may have bypassed
+	 * the MMU and all its implicit capdirty tracking.
+	 */
+	if (mark_capdirty)
+		vm_page_aflag_set(page, PGA_CAPSTORE | PGA_CAPDIRTY);
 }
 
 /*
