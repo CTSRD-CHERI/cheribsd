@@ -136,7 +136,7 @@
 	.globl sym; sym:
 
 #define	ENTRY(sym)						\
-	.text; .globl sym; .ent sym; sym:
+	.text; .globl sym; .ent sym; sym: .cfi_startproc;
 
 #define	ASM_ENTRY(sym)						\
 	.text; .globl sym; .type sym,@function; sym:
@@ -160,7 +160,8 @@
 	.ent	_C_LABEL(x);	\
 	.type	_C_LABEL(x),@function;	\
 _C_LABEL(x): ;			\
-	.frame _FRAME_STACK_REG, 0, _FRAME_RETURN_REG;	\
+	.frame _FRAME_STACK_REG, 0, _FRAME_RETURN_REG; \
+	.cfi_startproc; \
 	MCOUNT
 
 /*
@@ -172,7 +173,8 @@ _C_LABEL(x): ;			\
 	.ent	_C_LABEL(x);	\
 	.type	_C_LABEL(x),@function;	\
 _C_LABEL(x): ;			\
-	.frame	_FRAME_STACK_REG, 0, _FRAME_RETURN_REG
+	.frame	_FRAME_STACK_REG, 0, _FRAME_RETURN_REG; \
+	.cfi_startproc
 
 /*
  * XLEAF
@@ -195,6 +197,7 @@ _C_LABEL(x):
 	.type	_C_LABEL(x),@function;	\
 _C_LABEL(x): ;				\
 	.frame	_FRAME_STACK_REG, fsize, retpc;	\
+	.cfi_startproc;	\
 	MCOUNT
 
 /*
@@ -206,7 +209,8 @@ _C_LABEL(x): ;				\
 	.ent	_C_LABEL(x);			\
 	.type	_C_LABEL(x),@function;	\
 _C_LABEL(x): ;					\
-	.frame	_FRAME_STACK_REG, fsize, retpc
+	.frame	_FRAME_STACK_REG, fsize, retpc;	\
+	.cfi_startproc
 
 /*
  * XNESTED
@@ -223,11 +227,12 @@ _C_LABEL(x):
  * END
  *	Mark end of a procedure.
  */
-#define	END(x)			\
+#define	END(x) \
+	.cfi_endproc; \
 	.end _C_LABEL(x)
 
 /*
- * END
+ * XEND
  *	Mark end of an alternate entry point.
  */
 #define	XEND(x)				\
@@ -255,6 +260,7 @@ _C_LABEL(x):
 #define	VECTOR(x, regmask)	\
 	.ent	_C_LABEL(x);	\
 	EXPORT(x);		\
+	.cfi_startproc
 
 #define	VECTOR_END(x)		\
 	EXPORT(x ## End);	\
@@ -280,9 +286,9 @@ _C_LABEL(x):
 	MSG(msg)
 
 #define	MSG(msg)			\
-	.section rdata;	       		\
+	.pushsection .rodata;		\
 9:	.asciiz	msg;			\
-	.text
+	.popsection
 
 #define	ASMSTR(str)			\
 	.asciiz str;			\

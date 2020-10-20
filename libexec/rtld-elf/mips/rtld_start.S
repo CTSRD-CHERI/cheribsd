@@ -72,7 +72,6 @@
  *      c4      relocabase capability
  */
 LEAF(rtld_start)
-	// .cfi_startproc
 	dli		sp, -SFRAME_SIZE
 	cincoffset	$c11, $c11, sp
 	csc		$c3, zero, SFRAME_AUXARGS($c11)
@@ -131,7 +130,6 @@ LEAF(rtld_start)
 	cmove		$cra, $c12 /* return == PCC signals backtrace routine to stop */
 	cjr		$c12
 	nop
-	// .cfi_endproc
 END(rtld_start)
 
 #define	_XCALLFRAME_SIZ		(11*SZREG + XCALLFRAME_CAPSIZ)
@@ -299,7 +297,6 @@ LEAF(_rtld_bind_start)
 #endif
 	cjr	$c12	# call the resolved target
 	cincoffset $c11, $c11, XCALLFRAME_SIZ	# delay slot
-	// .cfi_endproc
 END(_rtld_bind_start)
 
 #else /* __CHERI_PURE_CAPABILITY__ */
@@ -459,7 +456,6 @@ _rtld_bind_start:
 	move	t9, v0
 	jr	t9
 	nop
-	.cfi_endproc
 END(_rtld_bind_start)
 
 
@@ -551,7 +547,6 @@ _rtld_pltbind_start:
 	move	t9, v0
 	jr	t9
 	nop
-	.cfi_endproc
 END(_rtld_pltbind_start)
 
 #endif /* __CHERI_PURE_CAPABILITY__ */
