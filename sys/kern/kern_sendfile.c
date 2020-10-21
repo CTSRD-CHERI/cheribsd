@@ -1325,7 +1325,7 @@ sys_sendfile(struct thread *td, struct sendfile_args *uap)
  
 	return (kern_sendfile(td, uap->fd, uap->s, uap->offset,
 	    uap->nbytes, uap->hdtr, uap->sbytes, uap->flags, 0,
-	    (copyin_hdtr_t *)copyin_hdtr, (copyinuio_t *)copyinuio));
+	    (copyin_hdtr_t *)copyin_hdtr, copyinuio));
 }
 
 #ifdef COMPAT_FREEBSD4
@@ -1335,7 +1335,7 @@ freebsd4_sendfile(struct thread *td, struct freebsd4_sendfile_args *uap)
 
 	return (kern_sendfile(td, uap->fd, uap->s, uap->offset,
 	    uap->nbytes, uap->hdtr, uap->sbytes, uap->flags, 1,
-	    (copyin_hdtr_t *)copyin_hdtr, (copyinuio_t *)copyinuio));
+	    (copyin_hdtr_t *)copyin_hdtr, copyinuio));
 }
 #endif /* COMPAT_FREEBSD4 */
 // CHERI CHANGES START

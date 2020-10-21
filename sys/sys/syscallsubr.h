@@ -358,8 +358,8 @@ int	kern_munlock(struct thread *td, uintptr_t addr, size_t size);
 int	kern_munmap(struct thread *td, uintptr_t addr, size_t size);
 int     kern_nanosleep(struct thread *td, struct timespec *rqt,
 	    struct timespec *rmt);
-int	kern_nmount(struct thread *td, void * __capability iovp, u_int iovcnt,
-	    int flags32, copyinuio_t * copyinuio_f);
+int	kern_nmount(struct thread *td, struct iovec * __capability iovp,
+	    u_int iovcnt, int flags32, copyinuio_t * copyinuio_f);
 int	kern_ntp_adjtime(struct thread *td, struct timex *tp, int *retval);
 int	kern_ntp_gettime(struct thread *td,
 	    struct ntptimeval * __capability ntvp);
@@ -610,10 +610,10 @@ int	user_getsockopt(struct thread *td, int s, int level, int name,
 	    void * __capability val, socklen_t * __capability avalsize);
 int	user_ioctl(struct thread *td, int fd, u_long com,
 	    void * __capability udata, void *datap, int copycaps);
-int	user_jail_get(struct thread *td, void * __capability iovp,
+int	user_jail_get(struct thread *td, struct iovec * __capability iovp,
 	    unsigned int iovcnt, int flags, copyinuio_t *copyinuio_f,
 	    updateiov_t *updateiov_f);
-int	user_jail_set(struct thread *td, void * __capability iovp,
+int	user_jail_set(struct thread *td, struct iovec * __capability iovp,
 	    unsigned int iovcnt, int flags, copyinuio_t *copyinuio_f);
 int	user_kldload(struct thread *td, const char * __capability file);
 int	user_pdgetpid(struct thread *td, int fd, pid_t * __capability pidp);
@@ -622,7 +622,7 @@ int	user_poll(struct thread *td, struct pollfd * __capability fds,
 int	user_ppoll(struct thread *td, struct pollfd *__capability fds,
 	    u_int nfds, const struct timespec * __capability uts,
 	    const sigset_t * __capability uset);
-int	user_preadv(struct thread *td, int fd, void * __capability iovp,
+int	user_preadv(struct thread *td, int fd, struct iovec * __capability iovp,
 	    u_int iovcnt, off_t offset, copyinuio_t *copyinuio_f);
 int	user_procctl(struct thread *td, enum idtype idtype, id_t id, int com,
 	    void * __capability data);
@@ -630,11 +630,11 @@ int	user_pselect(struct thread *td, int nd, fd_set * __capability in,
 	    fd_set * __capability ou, fd_set * __capability ex,
 	    const struct timespec * __capability uts,
 	    const sigset_t * __capability sm);
-int	user_pwritev(struct thread *td, int fd, void *__capability iovp,
+int	user_pwritev(struct thread *td, int fd, struct iovec * __capability iovp,
 	    u_int iovcnt, off_t offset, copyinuio_t *copyinuio_f);
 int	user_read(struct thread *td, int fd, void * __capability buf,
 	    size_t nbyte);
-int	user_readv(struct thread *td, int fd, void * __capability iovp,
+int	user_readv(struct thread *td, int fd, struct iovec * __capability iovp,
 	    u_int iovcnt, copyinuio_t *copyinuio_f);
 int	user_sched_getparam(struct thread *td, pid_t,
 	    struct sched_param * __capability param);
@@ -677,7 +677,7 @@ int	user_uuidgen(struct thread *td, struct uuid * __capability storep,
 int	user_wait6(struct thread *td, enum idtype idtype, id_t id,
 	    int * __capability statusp, int options,
 	    struct __wrusage * __capability wrusage, siginfo_t *sip);
-int	user_writev(struct thread *td, int fd, void * __capability iovp,
+int	user_writev(struct thread *td, int fd, struct iovec * __capability iovp,
 	    u_int iovcnt, copyinuio_t *copyinuio_f);
 
 /* flags for kern_sigaction */

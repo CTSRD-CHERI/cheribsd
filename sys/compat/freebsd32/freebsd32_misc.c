@@ -1002,7 +1002,7 @@ freebsd32_ptrace(struct thread *td, struct freebsd32_ptrace_args *uap)
 }
 
 static int
-freebsd32_copyinuio(struct iovec32 * __capability iovp, u_int iovcnt,
+freebsd32_copyinuio(const struct iovec * __capability cb_arg, u_int iovcnt,
     struct uio **uiop)
 {
 	struct iovec32 iov32;
@@ -1010,6 +1010,12 @@ freebsd32_copyinuio(struct iovec32 * __capability iovp, u_int iovcnt,
 	struct uio *uio;
 	u_int iovlen;
 	int error, i;
+	/*
+	 * The first argument is not actually a struct iovec *, but C's type
+	 * system does not allow for overloaded callbacks.
+	 */
+	const struct iovec32 * __capability iovp =
+	    (const struct iovec32 * __capability)cb_arg;
 
 	*uiop = NULL;
 	if (iovcnt > UIO_MAXIOV)
@@ -1047,7 +1053,7 @@ freebsd32_readv(struct thread *td, struct freebsd32_readv_args *uap)
 {
 
 	return (user_readv(td, uap->fd, __USER_CAP_ARRAY(uap->iovp,
-	    uap->iovcnt), uap->iovcnt, (copyinuio_t *)freebsd32_copyinuio));
+	    uap->iovcnt), uap->iovcnt, freebsd32_copyinuio));
 }
 
 int
@@ -1055,7 +1061,7 @@ freebsd32_writev(struct thread *td, struct freebsd32_writev_args *uap)
 {
 
 	return (user_writev(td, uap->fd, __USER_CAP_ARRAY(uap->iovp,
-	    uap->iovcnt), uap->iovcnt, (copyinuio_t *)freebsd32_copyinuio));
+	    uap->iovcnt), uap->iovcnt, freebsd32_copyinuio));
 }
 
 int
@@ -1064,26 +1070,33 @@ freebsd32_preadv(struct thread *td, struct freebsd32_preadv_args *uap)
 
 	return (user_preadv(td, uap->fd, __USER_CAP_ARRAY(uap->iovp,
 	    uap->iovcnt), uap->iovcnt, PAIR32TO64(off_t, uap->offset),
-	    (copyinuio_t *)freebsd32_copyinuio));
+	    freebsd32_copyinuio));
 }
 
 int
 freebsd32_pwritev(struct thread *td, struct freebsd32_pwritev_args *uap)
 {
 
-	return (user_pwritev(td, uap->fd, __USER_CAP_ARRAY(uap->iovp,
-	    uap->iovcnt), uap->iovcnt, PAIR32TO64(off_t, uap->offset),
-	    (copyinuio_t *)freebsd32_copyinuio));
+	return (user_pwritev(td, uap->fd,
+	    (struct iovec *__capability)__USER_CAP_ARRAY(uap->iovp,
+		uap->iovcnt), uap->iovcnt, PAIR32TO64(off_t, uap->offset),
+	    freebsd32_copyinuio));
 }
 
 int
-freebsd32_copyiniov(struct iovec32 * __capability iovp32, u_int iovcnt,
+freebsd32_copyiniov(const struct iovec * __capability cb_arg, u_int iovcnt,
     struct iovec **iovp, int error)
 {
 	struct iovec32 iov32;
 	struct iovec *iov;
 	u_int iovlen;
 	int i;
+	/*
+	 * The first argument is not actually a struct iovec *, but C's type
+	 * system does not allow for overloaded callbacks.
+	 */
+	const struct iovec32 * __capability iovp32 =
+	    (const struct iovec32 * __capability)cb_arg;
 
 	*iovp = NULL;
 	if (iovcnt > UIO_MAXIOV)
@@ -1317,9 +1330,9 @@ freebsd32_recvmsg(td, uap)
 	error = freebsd32_copyinmsghdr(uap->msg, &msg);
 	if (error)
 		return (error);
-	error = freebsd32_copyiniov(__USER_CAP(PTRIN(m32.msg_iov),
-	    m32.msg_iovlen * sizeof(struct iovec32)), m32.msg_iovlen, &iov,
-	    EMSGSIZE);
+	error = freebsd32_copyiniov((struct iovec * __capability)__USER_CAP(
+	    PTRIN(m32.msg_iov), m32.msg_iovlen * sizeof(struct iovec32)),
+	    m32.msg_iovlen, &iov, EMSGSIZE);
 	if (error)
 		return (error);
 	msg.msg_flags = uap->flags;
@@ -1452,9 +1465,9 @@ freebsd32_sendmsg(struct thread *td,
 	error = freebsd32_copyinmsghdr(uap->msg, &msg);
 	if (error)
 		return (error);
-	error = freebsd32_copyiniov(__USER_CAP(PTRIN(m32.msg_iov),
-	    m32.msg_iovlen * sizeof(struct iovec32)), m32.msg_iovlen, &iov,
-	    EMSGSIZE);
+	error = freebsd32_copyiniov((struct iovec * __capability)__USER_CAP(
+	    PTRIN(m32.msg_iov), m32.msg_iovlen * sizeof(struct iovec32)),
+	    m32.msg_iovlen, &iov, EMSGSIZE);
 	if (error)
 		return (error);
 	msg.msg_iov = iov;
@@ -1962,7 +1975,7 @@ freebsd4_freebsd32_sendfile(struct thread *td,
 	    PAIR32TO64(off_t, uap->offset), uap->nbytes,
 	    __USER_CAP_OBJ(uap->hdtr), __USER_CAP_OBJ(uap->sbytes),
 	    uap->flags, 1, (copyin_hdtr_t *)freebsd32_copyin_hdtr,
-	    (copyinuio_t *)freebsd32_copyinuio));
+	    freebsd32_copyinuio));
 }
 #endif
 
@@ -1974,7 +1987,7 @@ freebsd32_sendfile(struct thread *td, struct freebsd32_sendfile_args *uap)
 	    PAIR32TO64(off_t, uap->offset), uap->nbytes,
 	    __USER_CAP_OBJ(uap->hdtr), __USER_CAP_OBJ(uap->sbytes),
 	    uap->flags, 0, (copyin_hdtr_t *)freebsd32_copyin_hdtr,
-	    (copyinuio_t *)freebsd32_copyinuio));
+	    freebsd32_copyinuio));
 }
 
 static void
@@ -2414,14 +2427,19 @@ freebsd32_jail_set(struct thread *td, struct freebsd32_jail_set_args *uap)
 {
 
 	return (user_jail_set(td, __USER_CAP_ARRAY(uap->iovp, uap->iovcnt),
-	    uap->iovcnt, uap->flags, (copyinuio_t *)freebsd32_copyinuio));
+	    uap->iovcnt, uap->flags, freebsd32_copyinuio));
 }
 
 static int
-freebsd32_updateiov(const struct uio *uiop,
-    struct iovec32 * __capability iovp)
+freebsd32_updateiov(const struct uio *uiop, struct iovec * __capability cb_arg)
 {
 	int i, error;
+	/*
+	 * The second argument is not actually a struct iovec *, but C's type
+	 * system does not allow for overloaded callbacks.
+	 */
+	struct iovec32 * __capability iovp =
+	    (struct iovec32 * __capability)cb_arg;
 
 	for (i = 0; i < uiop->uio_iovcnt; i++) {
 		error = suword32(&iovp[i].iov_len, uiop->uio_iov[i].iov_len);
@@ -2436,8 +2454,7 @@ freebsd32_jail_get(struct thread *td, struct freebsd32_jail_get_args *uap)
 {
 
 	return (user_jail_get(td, __USER_CAP_ARRAY(uap->iovp, uap->iovcnt),
-	    uap->iovcnt, uap->flags, (copyinuio_t *)freebsd32_copyinuio,
-	    (updateiov_t *)freebsd32_updateiov));
+	    uap->iovcnt, uap->flags, freebsd32_copyinuio, freebsd32_updateiov));
 }
 
 int
@@ -3072,7 +3089,7 @@ freebsd32_nmount(struct thread *td, struct freebsd32_nmount_args *uap)
 {
 
 	return (kern_nmount(td, __USER_CAP_ARRAY(uap->iovp, uap->iovcnt),
-	    uap->iovcnt, uap->flags, (copyinuio_t *)freebsd32_copyinuio));
+	    uap->iovcnt, uap->flags, freebsd32_copyinuio));
 }
 
 #if 0
