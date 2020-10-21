@@ -440,11 +440,10 @@ int
 updateiov(const struct uio *uiop, struct iovec *iovp)
 {
 	int i, error;
-
 	for (i = 0; i < uiop->uio_iovcnt; i++) {
 		error = suword(&iovp[i].iov_len, uiop->uio_iov[i].iov_len);
 		if (error != 0)
-			return (error);
+			return (EFAULT);
 	}
 	return (0);
 }
