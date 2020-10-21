@@ -83,7 +83,7 @@ freebsd64_readv(struct thread *td, struct freebsd64_readv_args *uap)
 {
 
 	return (user_readv(td, uap->fd, __USER_CAP_ARRAY(uap->iovp,
-	    uap->iovcnt), uap->iovcnt, (copyinuio_t *)freebsd64_copyinuio));
+	    uap->iovcnt), uap->iovcnt, freebsd64_copyinuio));
 }
 
 int
@@ -91,8 +91,7 @@ freebsd64_preadv(struct thread *td, struct freebsd64_preadv_args *uap)
 {
 
 	return (user_preadv(td, uap->fd, __USER_CAP_ARRAY(uap->iovp,
-	    uap->iovcnt), uap->iovcnt, uap->offset,
-	    (copyinuio_t *)freebsd64_copyinuio));
+	    uap->iovcnt), uap->iovcnt, uap->offset, freebsd64_copyinuio));
 }
 
 int
@@ -127,7 +126,7 @@ freebsd64_writev(struct thread *td, struct freebsd64_writev_args *uap)
 {
 
 	return (user_writev(td, uap->fd, __USER_CAP_ARRAY(uap->iovp,
-	    uap->iovcnt), uap->iovcnt, (copyinuio_t *)freebsd64_copyinuio));
+	    uap->iovcnt), uap->iovcnt, freebsd64_copyinuio));
 }
 
 int
@@ -135,8 +134,7 @@ freebsd64_pwritev(struct thread *td, struct freebsd64_pwritev_args *uap)
 {
 
 	return (user_pwritev(td, uap->fd, __USER_CAP_ARRAY(uap->iovp,
-	    uap->iovcnt), uap->iovcnt, uap->offset,
-	    (copyinuio_t *)freebsd64_copyinuio));
+	    uap->iovcnt), uap->iovcnt, uap->offset, freebsd64_copyinuio));
 }
 
 int

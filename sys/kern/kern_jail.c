@@ -477,7 +477,7 @@ sys_jail_set(struct thread *td, struct jail_set_args *uap)
 {
 
 	return (user_jail_set(td, uap->iovp,
-	    uap->iovcnt, uap->flags, (copyinuio_t *)copyinuio));
+	    uap->iovcnt, uap->flags, copyinuio_cb));
 }
 
 int
@@ -1930,8 +1930,7 @@ sys_jail_get(struct thread *td, struct jail_get_args *uap)
 {
 
 	return (user_jail_get(td, uap->iovp,
-	    uap->iovcnt, uap->flags, (copyinuio_t *)copyinuio,
-	    (updateiov_t *)updateiov));
+	    uap->iovcnt, uap->flags, copyinuio_cb, updateiov_cb));
 }
 
 int

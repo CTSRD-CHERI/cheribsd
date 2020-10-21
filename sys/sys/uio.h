@@ -99,7 +99,35 @@ int	uiomove_fromphys(struct vm_page *ma[], vm_offset_t offset, int n,
 	    struct uio *uio);
 int	uiomove_nofault(void *cp, int n, struct uio *uio);
 int	uiomove_object(struct vm_object *obj, off_t obj_size, struct uio *uio);
-int	updateiov(const struct uio *uiop, struct iovec *iovp);
+int	updateiov(const struct uio *uiop, struct iovec * __capability iovp);
+
+/*
+ * These void* callbacks exist to avoid casting function pointers to updateiov_t
+ * and thereby avoiding the compiler function signature checks. Incorrect casts
+ * previously caused crashes in some jail system calls (due to conflicting
+ * __capability qualifiers).
+ */
+
+static inline int
+copyinuio_cb(const void * __capability iovp, u_int iovcnt, struct uio **uiop)
+{
+	return (copyinuio((const struct iovec * __capability)iovp, iovcnt,
+	    uiop));
+}
+
+static inline int
+copyiniov_cb(const void * __capability iovp, u_int iovcnt, struct iovec **iov,
+    int error)
+{
+	return (copyiniov((const struct iovec * __capability)iovp, iovcnt, iov,
+	    error));
+}
+
+static inline int
+updateiov_cb(const struct uio *uiop, void *__capability iovp)
+{
+	return (updateiov(uiop, (struct iovec * __capability)iovp));
+}
 
 #else /* !_KERNEL */
 

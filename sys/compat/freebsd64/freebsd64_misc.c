@@ -386,7 +386,7 @@ freebsd11_freebsd64_kevent(struct thread *td,
 #endif
 
 int
-freebsd64_copyinuio(struct iovec64 * __capability iovp, u_int iovcnt,
+freebsd64_copyinuio(const void * __capability _iovp, u_int iovcnt,
     struct uio **uiop)
 {
 	struct iovec64 iov64;
@@ -394,6 +394,7 @@ freebsd64_copyinuio(struct iovec64 * __capability iovp, u_int iovcnt,
 	struct uio *uio;
 	size_t iovlen;
 	int error, i;
+	const struct iovec64 * __capability iovp = _iovp;
 
 	*uiop = NULL;
 	if (iovcnt > UIO_MAXIOV)
@@ -427,13 +428,14 @@ freebsd64_copyinuio(struct iovec64 * __capability iovp, u_int iovcnt,
 }
 
 int
-freebsd64_copyiniov(struct iovec64 * __capability iov64, u_int iovcnt,
+freebsd64_copyiniov(const void * __capability _iov64, u_int iovcnt,
     struct iovec **iovp, int error)
 {
 	struct iovec64 useriov;
 	struct iovec *iovs;
 	size_t iovlen;
 	int i;
+	const struct iovec64 * __capability iov64 = _iov64;
 
 	*iovp = NULL;
 	if (iovcnt > UIO_MAXIOV)
@@ -481,7 +483,7 @@ freebsd64_sendfile(struct thread *td, struct freebsd64_sendfile_args *uap)
 	return (kern_sendfile(td, uap->fd, uap->s, uap->offset, uap->nbytes,
 	    __USER_CAP_OBJ(uap->hdtr), __USER_CAP_OBJ(uap->sbytes),
 	    uap->flags, 0, (copyin_hdtr_t *)freebsd64_copyin_hdtr,
-	    (copyinuio_t *)freebsd64_copyinuio));
+	    freebsd64_copyinuio));
 }
 
 int
@@ -489,13 +491,14 @@ freebsd64_jail_set(struct thread *td, struct freebsd64_jail_set_args *uap)
 {
 
 	return (user_jail_set(td, __USER_CAP_ARRAY(uap->iovp, uap->iovcnt),
-	    uap->iovcnt, uap->flags, (copyinuio_t *)freebsd64_copyinuio));
+	    uap->iovcnt, uap->flags, freebsd64_copyinuio));
 }
 
 static int
-freebsd64_updateiov(const struct uio *uiop, struct iovec64 * __capability iovp)
+freebsd64_updateiov(const struct uio *uiop, void * __capability _iovp)
 {
 	int i, error;
+	struct iovec64 * __capability iovp = _iovp;
 
 	for (i = 0; i < uiop->uio_iovcnt; i++) {
 		error = suword(&iovp[i].iov_len, uiop->uio_iov[i].iov_len);
@@ -510,8 +513,7 @@ freebsd64_jail_get(struct thread *td, struct freebsd64_jail_get_args *uap)
 {
 
 	return (user_jail_get(td, __USER_CAP_ARRAY(uap->iovp, uap->iovcnt),
-	    uap->iovcnt, uap->flags, (copyinuio_t *)freebsd64_copyinuio,
-	    (updateiov_t *)freebsd64_updateiov));
+	    uap->iovcnt, uap->flags, freebsd64_copyinuio, freebsd64_updateiov));
 }
 
 #define UC_COPY_SIZE	offsetof(ucontext64_t, uc_link)
@@ -589,7 +591,7 @@ freebsd64_nmount(struct thread *td, struct freebsd64_nmount_args *uap)
 {
 
 	return (kern_nmount(td, __USER_CAP_ARRAY(uap->iovp, uap->iovcnt),
-	    uap->iovcnt, uap->flags, (copyinuio_t *)freebsd64_copyinuio));
+	    uap->iovcnt, uap->flags, freebsd64_copyinuio));
 }
 
 int

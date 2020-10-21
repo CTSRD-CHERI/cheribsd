@@ -410,7 +410,7 @@ sys_nmount(struct thread *td, struct nmount_args *uap)
 {
 
 	return (kern_nmount(td, uap->iovp, uap->iovcnt, uap->flags,
-	    (copyinuio_t *)copyinuio));
+	    copyinuio_cb));
 }
 
 int

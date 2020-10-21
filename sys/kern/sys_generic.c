@@ -269,8 +269,7 @@ int
 sys_readv(struct thread *td, struct readv_args *uap)
 {
 
-	return (user_readv(td, uap->fd, uap->iovp, uap->iovcnt,
-	    (copyinuio_t *)copyinuio));
+	return (user_readv(td, uap->fd, uap->iovp, uap->iovcnt, copyinuio_cb));
 }
 
 int
@@ -318,7 +317,7 @@ sys_preadv(struct thread *td, struct preadv_args *uap)
 {
 
 	return (user_preadv(td, uap->fd, uap->iovp, uap->iovcnt, uap->offset,
-	    (copyinuio_t *)copyinuio));
+	    copyinuio_cb));
 }
 
 int
@@ -495,8 +494,7 @@ int
 sys_writev(struct thread *td, struct writev_args *uap)
 {
 
-	return (user_writev(td, uap->fd, uap->iovp, uap->iovcnt,
-	    (copyinuio_t *)copyinuio));
+	return (user_writev(td, uap->fd, uap->iovp, uap->iovcnt, copyinuio_cb));
 }
 
 int
@@ -544,7 +542,7 @@ sys_pwritev(struct thread *td, struct pwritev_args *uap)
 {
 
 	return (user_pwritev(td, uap->fd, uap->iovp, uap->iovcnt, uap->offset,
-	    (copyinuio_t *)copyinuio));
+	    copyinuio_cb));
 }
 
 int
