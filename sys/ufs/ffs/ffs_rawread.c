@@ -232,9 +232,8 @@ ffs_rawread_readahead(struct vnode *vp,
 		
 		if (bp->b_bcount + blockoff * DEV_BSIZE > bsize)
 			bp->b_bcount = bsize - blockoff * DEV_BSIZE;
-		bp->b_bufsize = bp->b_bcount;
 		
-		if (vmapbuf(bp, udata, 1) < 0)
+		if (vmapbuf(bp, udata, bp->b_bcount, 1) < 0)
 			return EFAULT;
 		
 		maybe_yield();
@@ -251,9 +250,8 @@ ffs_rawread_readahead(struct vnode *vp,
 
 	if (bp->b_bcount + blockoff * DEV_BSIZE > bsize * (1 + bforwards))
 		bp->b_bcount = bsize * (1 + bforwards) - blockoff * DEV_BSIZE;
-	bp->b_bufsize = bp->b_bcount;
-	
-	if (vmapbuf(bp, udata, 1) < 0)
+
+	if (vmapbuf(bp, udata, bp->b_bcount, 1) < 0)
 		return EFAULT;
 
 	BO_STRATEGY(&dp->v_bufobj, bp);
