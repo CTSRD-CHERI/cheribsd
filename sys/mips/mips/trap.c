@@ -432,6 +432,8 @@ trapf_pc_from_kernel_code_ptr(void *ptr)
  * Fetch an instruction from near frame->pc (or frame->pcc for CHERI).
  * Returns the virtual address (relative to $pcc) that was used to fetch the
  * instruction.
+ *
+ * Warning: this clobbers td->td_pcb->pcb_onfault.
  */
 static void * __capability
 fetch_instr_near_pc(struct trapframe *frame, register_t offset_from_pc, int32_t *instr)
@@ -440,6 +442,8 @@ fetch_instr_near_pc(struct trapframe *frame, register_t offset_from_pc, int32_t 
 
 	/* Should only be called from user mode */
 	/* TODO: if KERNLAND() */
+	KASSERT(curthread->td_pcb->pcb_onfault == NULL,
+	    ("This function clobbers td->td_pcb->pcb_onfault"));
 #ifdef CPU_CHERI
 	bad_inst_ptr = (char * __capability)frame->pcc + offset_from_pc;
 	if (!cheri_gettag(bad_inst_ptr)) {
@@ -1344,6 +1348,9 @@ dofault:
 		if (allow_unaligned_acc &&
 		    ((vm_offset_t)trapframe->badvaddr < VM_MAXUSER_ADDRESS)) {
 			int mode;
+			/* emulate_unaligned_access() clobbers pcb_onfault */
+			void *saved_onfault = td->td_pcb->pcb_onfault;
+			td->td_pcb->pcb_onfault = NULL;
 
 			if (type == T_ADDR_ERR_LD)
 				mode = VM_PROT_READ;
@@ -1351,6 +1358,7 @@ dofault:
 				mode = VM_PROT_WRITE;
 
 			access_type = emulate_unaligned_access(trapframe, mode);
+			td->td_pcb->pcb_onfault = saved_onfault;
 			if (access_type != 0)
 				return (trapframe->pc);
 		}
