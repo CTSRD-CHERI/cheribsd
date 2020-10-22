@@ -243,6 +243,16 @@ struct umutex64 {
 };
 #endif
 
+union umutex_all {
+	struct umutex m;
+#ifdef COMPAT_FREEBSD64
+	struct umutex64 m64;
+#endif
+#ifdef COMPAT_FREEBSD32
+	struct umutex32 m32;
+#endif
+};
+
 int umtx_shm_vnobj_persistent = 0;
 SYSCTL_INT(_kern_ipc, OID_AUTO, umtx_vnode_persistent, CTLFLAG_RWTUN,
     &umtx_shm_vnobj_persistent, 0,
@@ -4877,41 +4887,29 @@ umtx_read_uptr(struct thread *td, uintptr_t ptr, uintcap_t *res, bool compat32)
 }
 
 static void
-umtx_read_rb_list(struct thread *td, struct umutex *m, uintcap_t *rb_list,
+umtx_read_rb_list(struct thread *td, union umutex_all *mu, uintcap_t *rb_list,
     bool compat32)
 {
 #ifdef COMPAT_FREEBSD32
-	struct umutex32 m32;
-#endif
-#ifdef COMPAT_FREEBSD64
-	struct umutex64 m64;
-#endif
-
-#ifdef COMPAT_FREEBSD32
 	if (compat32) {
-		memcpy(&m32, m, sizeof(m32));
-		*rb_list = (uintcap_t)__USER_CAP_UNBOUND((void *)(uintptr_t)m32.m_rb_lnk);
+		*rb_list = (uintcap_t)__USER_CAP_UNBOUND(
+		    (void *)(uintptr_t)mu->m32.m_rb_lnk);
 	} else
 #endif
 #if __has_feature(capabilities)
 	if (!SV_PROC_FLAG(td->td_proc, SV_CHERI)) {
-		memcpy(&m64, m, sizeof(m64));
-		*rb_list = (uintcap_t)__USER_CAP_UNBOUND((void *)(uintptr_t)m64.m_rb_lnk);
+		*rb_list = (uintcap_t)__USER_CAP_UNBOUND(
+		    (void *)(uintptr_t)mu->m64.m_rb_lnk);
 	} else
 #endif
-		*rb_list = m->m_rb_lnk;
+		*rb_list = mu->m.m_rb_lnk;
 }
 
 static int
 umtx_handle_rb(struct thread *td, uintcap_t rbp, uintcap_t *rb_list, bool inact,
     bool compat32)
 {
-	union {
-		struct umutex m;
-#ifdef COMPAT_FREEBSD64
-		struct umutex64 m64;
-#endif
-	} mu;
+	union umutex_all mu;
 	int error;
 
 	KASSERT(td->td_proc == curproc, ("need current vmspace"));
@@ -4921,11 +4919,17 @@ umtx_handle_rb(struct thread *td, uintcap_t rbp, uintcap_t *rb_list, bool inact,
 		    sizeof(mu.m64));
 	} else
 #endif
+#ifdef COMPAT_FREEBSD32
+	if (compat32) {
+		error = copyin((void * __capability)rbp, &mu.m32,
+		    sizeof(mu.m32));
+	} else
+#endif
 		error = copyincap((void * __capability)rbp, &mu.m, sizeof(mu.m));
 	if (error != 0)
 		return (error);
 	if (rb_list != NULL)
-		umtx_read_rb_list(td, &mu.m, rb_list, compat32);
+		umtx_read_rb_list(td, &mu, rb_list, compat32);
 	if ((mu.m.m_flags & UMUTEX_ROBUST) == 0)
 		return (EINVAL);
 	if ((mu.m.m_owner & ~UMUTEX_CONTESTED) != td->td_tid)
