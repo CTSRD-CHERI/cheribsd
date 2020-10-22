@@ -1,5 +1,6 @@
 /*-
- * Copyright (c) 2012-2015 David Chisnall
+ * Copyright (c) 2012-2016 Robert N. M. Watson
+ * Copyright (c) 2014 SRI International
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -27,41 +28,67 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include <string.h>
-#include "cheri_c_test.h"
 
-static char pointees[] = "0123456789";
-static volatile char *buffer[] = {
-	&pointees[0],
-	&pointees[1],
-	&pointees[2],
-	&pointees[3],
-	&pointees[4],
-	&pointees[5],
-	&pointees[6],
-	&pointees[7],
-	&pointees[8],
-	&pointees[9],
-};
+#include <sys/cdefs.h>
 
-/*
- * memmove() needs to be a separate function so that the compiler cannot optimize
- * away memmove calls or use inlined loops (since we are then no longer testing
- * the memmove() implementation). We could also compile this file with
- * -fno-builtin but a linker error due to a missing function is easier to diagnose.
- */
-#ifdef TEST_COMPILER_MEMMOVE
-#define cheribsdtest_memmove __builtin_memmove
-#else
-extern void* cheribsdtest_memmove(void*, const void*, size_t);
+#if !__has_feature(capabilities)
+#error "This code requires a CHERI-aware compiler"
 #endif
 
+#include <sys/types.h>
 
-BEGIN_TEST(libc_memmove)
-	cheribsdtest_memmove(buffer, &buffer[2], sizeof(buffer) - 2*sizeof(char*));
-	for (int i=0 ; i<8 ; i++)
+#include <cheri/cheri.h>
+
+#include <cheribsdtest-helper.h>
+
+extern "C" {
+#include "cheribsdtest.h"
+}
+
+extern "C" void
+test_sandbox_cxx_exception(const struct cheri_test *ctp __unused)
+{
+#ifdef CHERIERRNO_LINKS
+	try
 	{
-		assert_eq(*buffer[i], '0' + i + 2);
+		invoke_clock_gettime();
 	}
-END_TEST
+	catch (cheri::sandbox_invoke_failure &e)
+	{
+		cheribsdtest_success();
+		return;
+	}
+	catch (...)
+	{
+		cheribsdtest_failure_errx("Sandbox failure threw the wrong kind of exception\n");
+		return;
+	}
+	cheribsdtest_failure_errx("Sandbox failure didn't throw an exception\n");
+#else
+	cheribsdtest_success();
+#endif
+}
 
+extern "C" void
+test_sandbox_cxx_no_exception(const struct cheri_test *ctp __unused)
+{
+#ifdef CHERIERRNO_LINKS
+	try
+	{
+		invoke_cheri_system_putchar();
+	}
+	catch (cheri::sandbox_invoke_failure &e)
+	{
+		cheribsdtest_failure_errx("Sandbox success threw a cheri exception\n");
+		return;
+	}
+	catch (...)
+	{
+		cheribsdtest_failure_errx("Sandbox success threw an exception\n");
+		return;
+	}
+	cheribsdtest_success();
+#else
+	cheribsdtest_success();
+#endif
+}

@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2012-2015 David Chisnall
+ * Copyright (c) 2017 Robert N. M. Watson
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -27,41 +27,48 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include <string.h>
-#include "cheri_c_test.h"
-
-static char pointees[] = "0123456789";
-static volatile char *buffer[] = {
-	&pointees[0],
-	&pointees[1],
-	&pointees[2],
-	&pointees[3],
-	&pointees[4],
-	&pointees[5],
-	&pointees[6],
-	&pointees[7],
-	&pointees[8],
-	&pointees[9],
-};
 
 /*
- * memmove() needs to be a separate function so that the compiler cannot optimize
- * away memmove calls or use inlined loops (since we are then no longer testing
- * the memmove() implementation). We could also compile this file with
- * -fno-builtin but a linker error due to a missing function is easier to diagnose.
+ * Exercise setjmp(3) and longjmp(3) -- for now, only outside of sandboxes.
  */
-#ifdef TEST_COMPILER_MEMMOVE
-#define cheribsdtest_memmove __builtin_memmove
-#else
-extern void* cheribsdtest_memmove(void*, const void*, size_t);
+
+#include <sys/cdefs.h>
+
+#if !__has_feature(capabilities)
+#error "This code requires a CHERI-aware compiler"
 #endif
 
+#include <sys/types.h>
 
-BEGIN_TEST(libc_memmove)
-	cheribsdtest_memmove(buffer, &buffer[2], sizeof(buffer) - 2*sizeof(char*));
-	for (int i=0 ; i<8 ; i++)
-	{
-		assert_eq(*buffer[i], '0' + i + 2);
+#include <setjmp.h>
+
+#include "cheribsdtest.h"
+
+void
+cheribsdtest_setjmp(const struct cheri_test *ctp __unused)
+{
+	jmp_buf jumpbuf;
+	int ret;
+
+	ret = setjmp(jumpbuf);
+	if (ret != 0)
+		cheribsdtest_failure_errx("setjmp returned non-zero value");
+	cheribsdtest_success();
+}
+
+void
+cheribsdtest_setjmp_longjmp(const struct cheri_test *ctp __unused)
+{
+	jmp_buf jumpbuf;
+	int ret;
+
+	ret = setjmp(jumpbuf);
+	if (ret == 0) {
+		longjmp(jumpbuf, 123);
+		cheribsdtest_failure_errx("longjmp returned");
 	}
-END_TEST
-
+	if (ret != 123)
+		cheribsdtest_failure_errx(
+		    "setjmp returned unexpected non-zero value");
+	cheribsdtest_success();
+}
