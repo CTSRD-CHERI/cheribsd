@@ -54,7 +54,6 @@ def buildImageAndRunTests(params, String suffix) {
         }
     }
     stage("Running tests") {
-        def haveCheritest = suffix.endsWith('-hybrid') || suffix.endsWith('-purecap')
         // copy qemu archive and run directly on the host
         dir("qemu-${params.buildOS}") { deleteDir() }
         copyArtifacts projectName: "qemu/qemu-cheri", filter: "qemu-${params.buildOS}/**", target: '.', fingerprintArtifacts: false
@@ -65,7 +64,7 @@ def buildImageAndRunTests(params, String suffix) {
         def testExtraArgs = ['--no-timestamped-test-subdir']
         if (GlobalVars.isTestSuiteJob) {
             testExtraArgs += ['--kyua-tests-files', '/usr/tests/Kyuafile',
-                              '--no-run-cheritest', // only run kyua tests
+                              '--no-run-cheribsdtest', // only run kyua tests
             ]
         } else {
             // Run a small subset of tests to check that we didn't break running tests (since the full testsuite takes too long)

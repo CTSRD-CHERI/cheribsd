@@ -45,7 +45,7 @@ SUBDIR+=	bootpd
 .endif
 
 SUBDIR.${MK_LIBCHERI}+=	cheri_bench-helper
-SUBDIR.${MK_LIBCHERI}+=	cheritest-helper
+SUBDIR.${MK_LIBCHERI}+=	cheribsdtest-helper
 SUBDIR.${MK_LIBCHERI}+=	tcpdump-helper
 
 .if ${MK_FINGER} != "no"

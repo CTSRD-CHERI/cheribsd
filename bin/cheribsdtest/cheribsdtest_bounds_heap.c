@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2012-2015 David Chisnall
+ * Copyright (c) 2016 Robert N. M. Watson
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -27,41 +27,50 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include <string.h>
-#include "cheri_c_test.h"
 
-static char pointees[] = "0123456789";
-static volatile char *buffer[] = {
-	&pointees[0],
-	&pointees[1],
-	&pointees[2],
-	&pointees[3],
-	&pointees[4],
-	&pointees[5],
-	&pointees[6],
-	&pointees[7],
-	&pointees[8],
-	&pointees[9],
-};
+#include <sys/cdefs.h>
 
-/*
- * memmove() needs to be a separate function so that the compiler cannot optimize
- * away memmove calls or use inlined loops (since we are then no longer testing
- * the memmove() implementation). We could also compile this file with
- * -fno-builtin but a linker error due to a missing function is easier to diagnose.
- */
-#ifdef TEST_COMPILER_MEMMOVE
-#define cheribsdtest_memmove __builtin_memmove
-#else
-extern void* cheribsdtest_memmove(void*, const void*, size_t);
+#if !__has_feature(capabilities)
+#error "This code requires a CHERI-aware compiler"
 #endif
 
+#include <sys/types.h>
+#include <sys/sysctl.h>
+#include <sys/time.h>
 
-BEGIN_TEST(libc_memmove)
-	cheribsdtest_memmove(buffer, &buffer[2], sizeof(buffer) - 2*sizeof(char*));
-	for (int i=0 ; i<8 ; i++)
-	{
-		assert_eq(*buffer[i], '0' + i + 2);
+#include <cheri/cheri.h>
+#include <cheri/cheric.h>
+
+#include <err.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <inttypes.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sysexits.h>
+#include <unistd.h>
+
+#include "cheribsdtest.h"
+
+#ifdef __CHERI_PURE_CAPABILITY__
+void
+test_bounds_calloc(const struct cheri_test *ctp __unused)
+{
+	size_t i;
+	const size_t sizes[] = {1, 2, 4, 8, 16, 32, 64, 128, 1024, 4096, 10000};
+	char * __capability calloc_allocation;
+
+	for (i = 0; i < sizeof(sizes) / sizeof(*sizes); i++) {
+		calloc_allocation = calloc(1, sizes[i]);
+		if (calloc_allocation == NULL)
+			cheribsdtest_failure_err("calloc failed");
+		if (cheri_getoffset(calloc_allocation) != 0)
+			cheribsdtest_failure_errx("non-zero offset returned");
+		if (cheri_getlen(calloc_allocation) < sizes[i])
+			cheribsdtest_failure_errx("returned length too small");
+		free((void *)calloc_allocation);
 	}
-END_TEST
-
+	cheribsdtest_success();
+}
+#endif
