@@ -38,7 +38,7 @@
  * for all data types (int, long, ...).   The result is unsigned int
  * and must be cast to any desired pointer type.
  */
-#if __has_feature(capabilities)
+#ifdef __CHERI_PURE_CAPABILITY__
 #define	_ALIGNBYTES	(sizeof(void * __capability) - 1)
 #else
 #define	_ALIGNBYTES	(sizeof(long long) - 1)
