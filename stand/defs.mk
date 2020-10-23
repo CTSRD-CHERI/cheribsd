@@ -123,9 +123,8 @@ CFLAGS+=	-mgeneral-regs-only -ffixed-x18 -fPIC
 # Disable Morello support in the bootloader. EFI needs to understand
 # capabilities before we can enable this as it may have interrupts enabled
 # so will need to save/restore the full capability registers
-CFLAGS:=	${CFLAGS:N-march=morello*:N-mabi=purecap}
-LDFLAGS:=	${CFLAGS:N-march=morello*:N-mabi=purecap}
-LDFLAGS+=	-nostdlib
+CFLAGS:=	${CFLAGS:N-march=morello*:N-mabi=purecap:N-femulated-tls}
+LDFLAGS:=	${LDFLAGS:N-march=morello*:N-mabi=purecap:N-femulated-tls}
 .elif ${MACHINE_CPUARCH} == "riscv"
 CFLAGS+=	-march=rv64imac -mabi=lp64
 .else
