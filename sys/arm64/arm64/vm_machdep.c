@@ -77,8 +77,13 @@ cpu_fork(struct thread *td1, struct proc *p2, struct thread *td2, int flags)
 		 * in cpu_switch, but if userland changes these then forks
 		 * this may not have happened.
 		 */
+#if __has_feature(capabilities)
+		td1->td_pcb->pcb_tpidr_el0 = READ_SPECIALREG_CAP(ctpidr_el0);
+		td1->td_pcb->pcb_tpidrro_el0 = READ_SPECIALREG_CAP(ctpidrro_el0);
+#else
 		td1->td_pcb->pcb_tpidr_el0 = READ_SPECIALREG(tpidr_el0);
 		td1->td_pcb->pcb_tpidrro_el0 = READ_SPECIALREG(tpidrro_el0);
+#endif
 #ifdef VFP
 		if ((td1->td_pcb->pcb_fpflags & PCB_FP_STARTED) != 0)
 			vfp_save_state(td1, td1->td_pcb);
@@ -213,16 +218,26 @@ cpu_set_user_tls(struct thread *td, void * __capability tls_base)
 	pcb = td->td_pcb;
 	if (td->td_frame->tf_spsr & PSR_M_32) {
 		/* 32bits arm stores the user TLS into tpidrro */
-		pcb->pcb_tpidrro_el0 = (__cheri_addr vaddr_t)tls_base;
-		pcb->pcb_tpidr_el0 = (__cheri_addr vaddr_t)tls_base;
+		pcb->pcb_tpidrro_el0 = (uintcap_t)tls_base;
+		pcb->pcb_tpidr_el0 = (uintcap_t)tls_base;
 		if (td == curthread) {
-			WRITE_SPECIALREG(tpidrro_el0, (__cheri_addr vaddr_t)tls_base);
-			WRITE_SPECIALREG(tpidr_el0, (__cheri_addr vaddr_t)tls_base);
+#if __has_feature(capabilities)
+			WRITE_SPECIALREG_CAP(ctpidrro_el0, tls_base);
+			WRITE_SPECIALREG_CAP(ctpidr_el0, tls_base);
+#else
+			WRITE_SPECIALREG(tpidrro_el0, tls_base);
+			WRITE_SPECIALREG(tpidr_el0, tls_base);
+#endif
 		}
 	} else {
-		pcb->pcb_tpidr_el0 = (__cheri_addr vaddr_t)tls_base;
-		if (td == curthread)
-			WRITE_SPECIALREG(tpidr_el0, (__cheri_addr vaddr_t)tls_base);
+		pcb->pcb_tpidr_el0 = (uintcap_t)tls_base;
+		if (td == curthread) {
+#if __has_feature(capabilities)
+			WRITE_SPECIALREG_CAP(ctpidr_el0, tls_base);
+#else
+			WRITE_SPECIALREG(tpidr_el0, tls_base);
+#endif
+		}
 	}
 
 	return (0);
