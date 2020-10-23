@@ -1455,6 +1455,19 @@ linprocfs_domsgmnb(PFS_FILL_ARGS)
 }
 
 /*
+ * Filler function for proc/sys/kernel/ngroups_max
+ *
+ * Note that in Linux it defaults to 65536, not 1023.
+ */
+static int
+linprocfs_dongroups_max(PFS_FILL_ARGS)
+{
+
+	sbuf_printf(sb, "%d\n", ngroups_max);
+	return (0);
+}
+
+/*
  * Filler function for proc/sys/kernel/pid_max
  */
 static int
@@ -1923,6 +1936,8 @@ linprocfs_init(PFS_INIT_ARGS)
 	pfs_create_file(dir, "msgmni", &linprocfs_domsgmni,
 	    NULL, NULL, NULL, PFS_RD);
 	pfs_create_file(dir, "msgmnb", &linprocfs_domsgmnb,
+	    NULL, NULL, NULL, PFS_RD);
+	pfs_create_file(dir, "ngroups_max", &linprocfs_dongroups_max,
 	    NULL, NULL, NULL, PFS_RD);
 	pfs_create_file(dir, "pid_max", &linprocfs_dopid_max,
 	    NULL, NULL, NULL, PFS_RD);
