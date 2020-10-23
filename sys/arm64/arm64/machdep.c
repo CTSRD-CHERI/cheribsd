@@ -990,16 +990,20 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	 * unseal elr or (unlike how Thumb code is handled) clear the LSB on ERET, so
 	 * do this manually.
 	 */
-	if (cheri_getaddress(catcher) & 0x1) {
-	tf->tf_spsr |= PSR_C64;
+	/*
+	 * TODO: add and initialize a distinct sealcap, remove sealing perms
+	 * from userspace_cap.
+	 */
+	catcher = cheri_unseal(catcher,
+	    cheri_setaddress(userspace_cap, CHERI_OTYPE_SENTRY));
+	if ((uintcap_t)catcher & 0x1) {
+		tf->tf_spsr |= PSR_C64;
+		catcher = cheri_incoffset(catcher, -1);
 	} else {
-	tf->tf_spsr &= ~PSR_C64;
+		tf->tf_spsr &= ~PSR_C64;
 	}
-	tf->tf_elr = rounddown2((uintcap_t)cheri_unseal(catcher,
-		    cheri_setaddress(userspace_cap, CHERI_OTYPE_SENTRY)), 2);
-#else
-	tf->tf_elr = (uintcap_t)catcher;
 #endif
+	tf->tf_elr = (uintcap_t)catcher;
 
 	tf->tf_sp = (uintcap_t)fp;
 
