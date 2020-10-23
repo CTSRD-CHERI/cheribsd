@@ -1650,7 +1650,7 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	    CHERI_CAP_USER_DATA_PERMS, rounded_stack_vaddr,
 	    CHERI_REPRESENTABLE_LENGTH(ssiz + stack_offset), stack_offset);
 	destp = cheri_setaddress(destp, p->p_sysent->sv_psstrings);
-	arginfo = (struct ps_strings * __capability)cheri_setbounds(destp,
+	arginfo = (struct ps_strings * __capability)cheri_setboundsexact(destp,
 	    sizeof(*arginfo));
 #else
 	arginfo = (struct ps_strings *)p->p_sysent->sv_psstrings;
@@ -1682,7 +1682,7 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 		destp = rounddown2(destp, sizeof(void * __capability));
 #if __has_feature(capabilities)
 		imgp->execpathp = (void * __capability)
-		    cheri_setbounds(destp, execpath_len);
+		    cheri_setboundsexact(destp, execpath_len);
 #else
 		imgp->execpathp = (void *)destp;
 #endif
@@ -1697,7 +1697,7 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	arc4rand(canary, sizeof(canary), 0);
 	destp -= sizeof(canary);
 #if __has_feature(capabilities)
-	imgp->canary = (void * __capability)cheri_setbounds(destp,
+	imgp->canary = (void * __capability)cheri_setboundsexact(destp,
 	    sizeof(canary));
 #else
 	imgp->canary = (void *)destp;
@@ -1713,7 +1713,8 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	destp -= szps;
 	destp = rounddown2(destp, sizeof(void * __capability));
 #if __has_feature(capabilities)
-	imgp->pagesizes = (void * __capability)cheri_setbounds(destp, szps);
+	imgp->pagesizes = (void * __capability)cheri_setboundsexact(destp,
+	    szps);
 #else
 	imgp->pagesizes = (void *)destp;
 #endif

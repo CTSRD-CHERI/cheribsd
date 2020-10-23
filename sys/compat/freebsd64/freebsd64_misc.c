@@ -637,8 +637,8 @@ freebsd64_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	    CHERI_CAP_USER_DATA_PERMS, rounded_stack_vaddr,
 	    CHERI_REPRESENTABLE_LENGTH(ssiz + stack_offset), stack_offset);
 	destp = cheri_setaddress(destp, p->p_sysent->sv_psstrings);
-	arginfo = (struct freebsd64_ps_strings * __capability)cheri_setbounds(
-	    destp, sizeof(*arginfo));
+	arginfo = (struct freebsd64_ps_strings * __capability)
+	    cheri_setboundsexact(destp, sizeof(*arginfo));
 	imgp->ps_strings = arginfo;
 	if (p->p_sysent->sv_sigcode_base == 0)
 		szsigcode = *(p->p_sysent->sv_szsigcode);
@@ -664,7 +664,7 @@ freebsd64_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 		destp -= execpath_len;
 		destp = rounddown2(destp, sizeof(uint64_t));
 		imgp->execpathp = (void * __capability)
-		    cheri_setbounds(destp, execpath_len);
+		    cheri_setboundsexact(destp, execpath_len);
 		error = copyout(imgp->execpath, imgp->execpathp, execpath_len);
 		if (error != 0)
 			return (error);
@@ -675,7 +675,7 @@ freebsd64_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	 */
 	arc4rand(canary, sizeof(canary), 0);
 	destp -= sizeof(canary);
-	imgp->canary = (void * __capability)cheri_setbounds(destp,
+	imgp->canary = (void * __capability)cheri_setboundsexact(destp,
 	    sizeof(canary));
 	error = copyout(canary, imgp->canary, sizeof(canary));
 	if (error != 0)
@@ -687,7 +687,8 @@ freebsd64_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	 */
 	destp -= szps;
 	destp = rounddown2(destp, sizeof(uint64_t));
-	imgp->pagesizes = (void * __capability)cheri_setbounds(destp, szps);
+	imgp->pagesizes = (void * __capability)cheri_setboundsexact(destp,
+	    szps);
 	error = copyout(pagesizes, imgp->pagesizes, szps);
 	if (error != 0)
 		return (error);
