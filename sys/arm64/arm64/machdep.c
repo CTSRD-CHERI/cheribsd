@@ -462,6 +462,12 @@ fill_capregs(struct thread *td, struct capreg *regs)
 	regs->clr = frame->tf_lr;
 	regs->celr = frame->tf_elr;
 	regs->ddc = frame->tf_ddc;
+	regs->ctpidr = td->td_pcb->pcb_tpidr_el0;
+	regs->ctpidrro = td->td_pcb->pcb_tpidrro_el0;
+	regs->cid = READ_SPECIALREG_CAP(cid_el0);
+	regs->rcsp = READ_SPECIALREG_CAP(rcsp_el0);
+	regs->rddc = READ_SPECIALREG_CAP(rddc_el0);
+	regs->rctpidr = READ_SPECIALREG_CAP(rctpidr_el0);
 
 	for (i = 0; i < nitems(frame->tf_x); i++) {
 		regs->c[i] = frame->tf_x[i];
@@ -478,6 +484,24 @@ fill_capregs(struct thread *td, struct capreg *regs)
 		regs->tagmask |= (uint64_t)1 << i;
 	i++;
 	if (cheri_gettag((void * __capability)frame->tf_ddc))
+		regs->tagmask |= (uint64_t)1 << i;
+	i++;
+	if (cheri_gettag((void * __capability)regs->ctpidr))
+		regs->tagmask |= (uint64_t)1 << i;
+	i++;
+	if (cheri_gettag((void * __capability)regs->ctpidrro))
+		regs->tagmask |= (uint64_t)1 << i;
+	i++;
+	if (cheri_gettag((void * __capability)regs->cid))
+		regs->tagmask |= (uint64_t)1 << i;
+	i++;
+	if (cheri_gettag((void * __capability)regs->rcsp))
+		regs->tagmask |= (uint64_t)1 << i;
+	i++;
+	if (cheri_gettag((void * __capability)regs->rddc))
+		regs->tagmask |= (uint64_t)1 << i;
+	i++;
+	if (cheri_gettag((void * __capability)regs->rctpidr))
 		regs->tagmask |= (uint64_t)1 << i;
 
 	return (0);
