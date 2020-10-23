@@ -81,6 +81,12 @@ struct capreg {
 	uintcap_t csp;
 	uintcap_t celr;
 	uintcap_t ddc;
+	uintcap_t ctpidr;
+	uintcap_t ctpidrro;
+	uintcap_t cid;
+	uintcap_t rcsp;
+	uintcap_t rddc;
+	uintcap_t rctpidr;
 	uint64_t tagmask;
 	uint64_t pad;
 };
