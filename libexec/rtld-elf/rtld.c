@@ -2585,7 +2585,8 @@ init_rtld(caddr_t mapbase, Elf_Auxinfo **aux_info)
     /* Initialize the object list. */
     TAILQ_INIT(&obj_list);
 
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(DEBUG_VERBOSE)
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(DEBUG_VERBOSE) && \
+    !defined(__aarch64__)
     if (objtmp.cap_relocs) {
 	extern char __start___cap_relocs, __stop___cap_relocs;
 	size_t cap_relocs_size =
@@ -3381,7 +3382,8 @@ relocate_object(Obj_Entry *obj, bool bind_now, Obj_Entry *rtldobj,
 	if (reloc_non_plt(obj, rtldobj, flags, lockstate))
 		return (-1);
 
-#ifdef __CHERI_PURE_CAPABILITY__
+/* Dynamically linked binaries for Morello don't have __caprelocs. */
+#if defined(__CHERI_PURE_CAPABILITY__) && !defined(__aarch64__)
 	/* Process the __cap_relocs section to initialize global capabilities */
 	if (obj->cap_relocs_size)
 		process___cap_relocs(obj);

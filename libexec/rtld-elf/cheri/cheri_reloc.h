@@ -46,6 +46,8 @@ __unused static void cheri_init_globals(void);
 extern bool add_cheri_plt_stub(const Obj_Entry *obj, const Obj_Entry *rtldobj,
     Elf_Word r_symndx, void **where);
 
+/* Dynamically linked binaries for Morello don't have __caprelocs. */
+#ifndef __aarch64__
 /* FIXME: replace this with cheri_init_globals_impl once everyone has updated clang */
 static __attribute__((always_inline))
 void _do___caprelocs(const struct capreloc *start_relocs,
@@ -56,6 +58,7 @@ void _do___caprelocs(const struct capreloc *start_relocs,
 	    /*code_cap=*/pcc, /*rodata_cap=*/pcc,
 	    /*tight_code_bounds=*/tight_pcc_bounds, base_addr);
 }
+#endif
 
 static inline int
 process_r_cheri_capability(Obj_Entry *obj, Elf_Word r_symndx,
@@ -76,7 +79,7 @@ process_r_cheri_capability(Obj_Entry *obj, Elf_Word r_symndx,
 	assert(ELF_ST_TYPE(def->st_info) != STT_GNU_IFUNC &&
 	    "IFUNC not implemented!");
 
-	const void *symval = NULL;
+	const void * __capability symval = NULL;
 	bool is_undef_weak = false;
 	if (def->st_shndx == SHN_UNDEF) {
 		/* Verify that we are resolving a weak symbol */
@@ -115,7 +118,11 @@ process_r_cheri_capability(Obj_Entry *obj, Elf_Word r_symndx,
 			}
 		}
 		/* Remove write permissions and set bounds */
+#ifdef __CHERI_PURE_CAPABILITY__
 		symval = make_function_pointer_with_addend(def, defobj, addend);
+#else
+		symval = make_function_cap_with_addend(def, defobj, addend);
+#endif
 		if (__predict_false(symval == NULL)) {
 			_rtld_error("Could not create function pointer for %s "
 				    "(in %s)\n",
@@ -124,7 +131,11 @@ process_r_cheri_capability(Obj_Entry *obj, Elf_Word r_symndx,
 		}
 	} else {
 		/* Remove execute permissions and set bounds */
+#ifdef __CHERI_PURE_CAPABILITY__
 		symval = cheri_incoffset(make_data_pointer(def, defobj), addend);
+#else
+		symval = cheri_incoffset(make_data_cap(def, defobj), addend);
+#endif
 	}
 #ifdef DEBUG
 	// FIXME: this warning breaks some tests that expect clean stdout/stderr
@@ -139,11 +150,12 @@ process_r_cheri_capability(Obj_Entry *obj, Elf_Word r_symndx,
 	}
 #endif
 	if (__predict_false(!cheri_gettag(symval) && !is_undef_weak)) {
-		_rtld_error("%s: constructed invalid capability for %s: %#p",
-		    obj->path, symname(obj, r_symndx), symval);
+		_rtld_error("%s: constructed invalid capability for %s: "
+		    _CHERI_PRINTF_CAP_FMT, obj->path, symname(obj, r_symndx),
+		    _CHERI_PRINTF_CAP_ARG(symval));
 		return -1;
 	}
-	*((const void **)where) = symval;
+	*((const void * __capability *)where) = symval;
 #if defined(DEBUG_VERBOSE) && DEBUG_VERBOSE >= 2
 	dbg("CAP(%p/0x%lx) %s in %s --> %-#p in %s", where,
 	    (const char *)where - (const char *)obj->relocbase,

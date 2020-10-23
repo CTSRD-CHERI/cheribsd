@@ -30,7 +30,52 @@
 #include <machine/asm.h>
 __FBSDID("$FreeBSD$");
 
+/*
+ * Pure-capability:
+ *
+ * void
+ * _rtld_relocate_nonplt_self(Elf_Dyn *dynp, Elf_Auxinfo *aux)
+ *
+ * func_ptr_type
+ * _rtld(Elf_Auxinfo *aux, func_ptr_type *exit_proc, Obj_Entry **objp)
+ */
+
+/*
+ * Plain:
+ *
+ * func_ptr_type
+ * _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
+ */
+
 ENTRY(.rtld_start)
+#ifdef __CHERI_PURE_CAPABILITY__
+	mov	c19, c0				/* Put aux in a callee-saved register */
+	mov	c20, csp			/* And the stack pointer */
+
+	sub	csp, csp, #32			/* Make room for obj_main & exit proc */
+
+	adrp	c0, _DYNAMIC
+	add	c0, c0, :lo12:_DYNAMIC		/* dynp */
+	mov	c1, c19				/* aux */
+	bl	_rtld_relocate_nonplt_self	/* Relocate ourselves early */
+
+#if __CHERI_CAPABILITY_TABLE__ != 3
+#error "Only the PC-relative ABI is currently supported"
+#endif
+
+	mov	c0, c19				/* Restore aux */
+	scbnds	c1, csp, #16			/* exit_proc */
+	add	c2, csp, #16
+	scbnds	c2, c2, #16			/* obj_main */
+	bl	_rtld				/* Call the loader */
+	mov	c8, c0				/* Backup the entry point*/
+
+	ldr	c1, [csp, #0]			/* Load cleanup */
+	ldr	c2, [csp, #16]			/* Load obj_main */
+	mov	c0, c19				/* Restore aux */
+	mov	csp, c20			/* Restore the stack pointer */
+	br	c8				/* Jump to the entry point */
+#else /* defined(__CHERI_PURE_CAPABILITY__) */
 	mov	x19, x0		/* Put ps_strings in a callee-saved register */
 	mov	x20, sp		/* And the stack pointer */
 
@@ -46,6 +91,7 @@ ENTRY(.rtld_start)
 	mov	x0, x19		/* Restore ps_strings */
 	mov	sp, x20		/* Restore the stack pointer */
 	br	x8		/* Jump to the entry point */
+#endif /* defined(__CHERI_PURE_CAPABILITY__) */
 END(.rtld_start)
 
 /*
@@ -55,6 +101,10 @@ END(.rtld_start)
  * x17 = &_rtld_bind_start
  */
 ENTRY(_rtld_bind_start)
+#ifdef __CHERI_PURE_CAPABILITY__
+	/* Currently unused and unimplemented for pure-capability code */
+	brk #0x1
+#else /* defined(__CHERI_PURE_CAPABILITY__) */
 	.cfi_startproc
 	mov	x17, sp
 
@@ -115,6 +165,7 @@ ENTRY(_rtld_bind_start)
 	/* Call into the correct function */
 	br	x16
 	.cfi_endproc
+#endif /* defined(__CHERI_PURE_CAPABILITY__) */
 END(_rtld_bind_start)
 
 /*
@@ -128,10 +179,15 @@ END(_rtld_bind_start)
  * Resolver function for TLS symbols resolved at load time
  */
 ENTRY(_rtld_tlsdesc_static)
+#ifdef __CHERI_PURE_CAPABILITY__
+	/* Currently unused and unimplemented for pure-capability code */
+	brk #0x1
+#else /* defined(__CHERI_PURE_CAPABILITY__) */
 	.cfi_startproc
 	ldr	x0, [x0, #8]
 	ret
 	.cfi_endproc
+#endif /* defined(__CHERI_PURE_CAPABILITY__) */
 END(_rtld_tlsdesc_static)
 
 /*
@@ -140,6 +196,10 @@ END(_rtld_tlsdesc_static)
  * Resolver function for weak and undefined TLS symbols
  */
 ENTRY(_rtld_tlsdesc_undef)
+#ifdef __CHERI_PURE_CAPABILITY__
+	/* Currently unused and unimplemented for pure-capability code */
+	brk #0x1
+#else /* defined(__CHERI_PURE_CAPABILITY__) */
 	.cfi_startproc
 	str	x1, [sp, #-16]!
 	.cfi_adjust_cfa_offset	16
@@ -152,6 +212,7 @@ ENTRY(_rtld_tlsdesc_undef)
 	.cfi_adjust_cfa_offset 	-16
 	.cfi_endproc
 	ret
+#endif /* defined(__CHERI_PURE_CAPABILITY__) */
 END(_rtld_tlsdesc_undef)
 
 /*
@@ -160,6 +221,10 @@ END(_rtld_tlsdesc_undef)
  * Resolver function for TLS symbols from dlopen()
  */
 ENTRY(_rtld_tlsdesc_dynamic)
+#ifdef __CHERI_PURE_CAPABILITY__
+	/* Currently unused and unimplemented for pure-capability code */
+	brk #0x1
+#else /* defined(__CHERI_PURE_CAPABILITY__) */
 	.cfi_startproc
 
 	/* Save registers used in fast path */
@@ -259,4 +324,5 @@ ENTRY(_rtld_tlsdesc_dynamic)
 	.cfi_adjust_cfa_offset	-2 * 16
 	.cfi_endproc
 	ret
+#endif /* defined(__CHERI_PURE_CAPABILITY__) */
 END(_rtld_tlsdesc_dynamic)
