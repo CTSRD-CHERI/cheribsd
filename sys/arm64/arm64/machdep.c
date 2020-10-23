@@ -1507,9 +1507,17 @@ do {									\
 	PRINT_REG(spsel);
 	PRINT_REG(spsr_el1);
 	PRINT_REG(tcr_el1);
+#if __has_feature(capabilities)
+	PRINT_REG_CAP(ctpidr_el0);
+#else
 	PRINT_REG(tpidr_el0);
+#endif
 	PRINT_REG(tpidr_el1);
+#if __has_feature(capabilities)
+	PRINT_REG_CAP(ctpidrro_el0);
+#else
 	PRINT_REG(tpidrro_el0);
+#endif
 	PRINT_REG(ttbr0_el1);
 	PRINT_REG(ttbr1_el1);
 	PRINT_REG(vbar_el1);
