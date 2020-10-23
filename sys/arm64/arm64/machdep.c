@@ -572,6 +572,16 @@ exec_setregs(struct thread *td, struct image_params *imgp, uintcap_t stack)
 #else
 	tf->tf_elr = imgp->entry_addr;
 #endif
+
+	td->td_pcb->pcb_tpidr_el0 = 0;
+	td->td_pcb->pcb_tpidrro_el0 = 0;
+#if __has_feature(capabilities)
+	WRITE_SPECIALREG_CAP(ctpidrro_el0, 0);
+	WRITE_SPECIALREG_CAP(ctpidr_el0, 0);
+#else
+	WRITE_SPECIALREG(tpidrro_el0, 0);
+	WRITE_SPECIALREG(tpidr_el0, 0);
+#endif
 #if __has_feature(capabilities)
 	td->td_pcb->pcb_cid_el0 = 0;
 	td->td_pcb->pcb_rcsp_el0 = 0;
