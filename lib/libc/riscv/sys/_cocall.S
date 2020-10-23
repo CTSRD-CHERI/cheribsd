@@ -1,6 +1,10 @@
 /*-
- * Copyright (c) 1995 Bruce D. Evans.
+ * Copyright (c) 2020 Edward Tomasz Napierala <trasz@FreeBSD.org>
  * All rights reserved.
+ *
+ * This software was developed by SRI International and the University of
+ * Cambridge Computer Laboratory under DARPA/AFRL contract (FA8750-10-C-0237)
+ * ("CTSRD"), as part of the DARPA CRASH research programme.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -10,9 +14,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. Neither the name of the author nor the names of contributors
- *    may be used to endorse or promote products derived from this software
- *    without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
@@ -25,37 +26,12 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *	from: FreeBSD: src/sys/i386/include/md_var.h,v 1.40 2001/07/12
- * $FreeBSD$
  */
 
-#ifndef	_MACHINE_MD_VAR_H_
-#define	_MACHINE_MD_VAR_H_
+#include <machine/asm.h>
+__FBSDID("$FreeBSD$");
+#include "SYS.h"
 
-extern long Maxmem;
-extern char sigcode[];
-extern int szsigcode;
-#ifdef COMPAT_FREEBSD64
-extern char freebsd64_sigcode[];
-extern int freebsd64_szsigcode;
-#endif
-extern	char	switcher_cocall[];
-extern	int	szswitcher_cocall;
-extern	char	switcher_coaccept[];
-extern	int	szswitcher_coaccept;
-extern uint64_t *vm_page_dump;
-extern int vm_page_dump_size;
-extern u_long elf_hwcap;
-extern register_t mvendorid;
-extern register_t marchid;
-extern register_t mimpid;
-
-struct dumperinfo;
-
-void busdma_swi(void);
-void dump_add_page(vm_paddr_t);
-void dump_drop_page(vm_paddr_t);
-int minidumpsys(struct dumperinfo *);
-
-#endif /* !_MACHINE_MD_VAR_H_ */
+ENTRY(_cocall)
+	unimp
+END(_cocall)

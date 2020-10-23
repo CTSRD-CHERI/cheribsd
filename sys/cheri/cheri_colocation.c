@@ -259,7 +259,9 @@ colocation_unborrow(struct thread *td, struct trapframe **trapframep)
 	struct thread *peertd;
 	struct trapframe peertrapframe;
 	struct syscall_args peersa;
+#ifdef __mips__
 	trapf_pc_t peertpc;
+#endif
 	bool have_scb;
 
 	have_scb = colocation_fetch_scb(td, &scb);
@@ -277,6 +279,7 @@ colocation_unborrow(struct thread *td, struct trapframe **trapframep)
 	KASSERT(peertd != td,
 	    ("%s: peertd %p == td %p\n", __func__, peertd, td));
 
+#ifdef __mips__
 	COLOCATION_DEBUG("replacing current td %p, pid %d (%s), switchercb %#lx, "
 	    "md_tls %p, md_tls_tcb_offset %zd, "
 	    "with td %p, pid %d (%s), switchercb %#lx, "
@@ -297,18 +300,26 @@ colocation_unborrow(struct thread *td, struct trapframe **trapframep)
 	KASSERT(peertd->td_frame == &peertd->td_pcb->pcb_regs,
 	    ("%s: peertd->td_frame %p != &peertd->td_pcb->pcb_regs %p, peertd %p",
 	    __func__, peertd->td_frame, &peertd->td_pcb->pcb_regs, peertd));
+#endif
 
 	peersa = peertd->td_sa;
+#ifdef __mips__
+	// XXX: Is td_sa.trapframe even the right trapframe, as opposed to peertd->td_frame?
 	memcpy(&peertrapframe, peertd->td_sa.trapframe, sizeof(struct trapframe));
 	peertpc = peertd->td_pcb->pcb_tpc;
+#endif
 
 	peertd->td_sa = td->td_sa;
 	memcpy(peertd->td_frame, *trapframep, sizeof(struct trapframe));
+#ifdef __mips__
 	peertd->td_pcb->pcb_tpc = td->td_pcb->pcb_tpc;
+#endif
 
 	td->td_sa = peersa;
 	memcpy(td->td_frame, &peertrapframe, sizeof(struct trapframe));
+#ifdef __mips__
 	td->td_pcb->pcb_tpc = peertpc;
+#endif
 
 	*trapframep = td->td_frame;
 
@@ -325,6 +336,7 @@ colocation_unborrow(struct thread *td, struct trapframe **trapframep)
 bool
 colocation_trap_in_switcher(struct thread *td, struct trapframe *trapframe)
 {
+#ifdef __mips__
 	const struct sysentvec *sv;
 	vm_offset_t addr;
 
@@ -335,6 +347,7 @@ colocation_trap_in_switcher(struct thread *td, struct trapframe *trapframe)
 		return (true);
 	if (addr >= sv->sv_coaccept_base && addr < sv->sv_coaccept_base + sv->sv_coaccept_len)
 		return (true);
+#endif
 	return (false);
 }
 
@@ -356,10 +369,12 @@ colocation_update_tls(struct thread *td)
 	error = copyincap(___USER_CFROMPTR((const void *)addr, userspace_cap), &scb, sizeof(scb));
 	KASSERT(error == 0, ("%s: copyincap from %p failed with error %d\n", __func__, (void *)addr, error));
 
+#ifdef __mips__
 	COLOCATION_DEBUG("changing TLS from %p to %p",
 	    (__cheri_fromcap void *)scb.scb_tls,
 	    (__cheri_fromcap void *)((char * __capability)td->td_md.md_tls + td->td_md.md_tls_tcb_offset));
 	scb.scb_tls = (char * __capability)td->td_md.md_tls + td->td_md.md_tls_tcb_offset;
+#endif
 
 	error = copyoutcap(&scb, ___USER_CFROMPTR((void *)addr, userspace_cap), sizeof(scb));
 	KASSERT(error == 0, ("%s: copyoutcap from %p failed with error %d\n", __func__, (void *)addr, error));
@@ -414,7 +429,9 @@ setup_scb(struct thread *td)
 	scb.scb_td = td;
 	scb.scb_borrower_td = NULL;
 	scb.scb_peer_scb = NULL;
+#ifdef __mips__
 	scb.scb_tls = (char * __capability)td->td_md.md_tls + td->td_md.md_tls_tcb_offset;
+#endif
 
 	error = copyoutcap(&scb,
 	    ___USER_CFROMPTR((void *)addr, userspace_cap), sizeof(scb));

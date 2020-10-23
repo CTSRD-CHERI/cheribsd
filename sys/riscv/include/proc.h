@@ -34,10 +34,60 @@
 #ifndef	_MACHINE_PROC_H_
 #define	_MACHINE_PROC_H_
 
+#ifdef CPU_CHERI
+struct switchercb {
+	/*
+	 * Peer context - callee in caller's context, caller in callee's.
+	 * This also serves as the callee's spinlock.  Must be first,
+	 * as the cllc instruction doesn't take an offset.
+	 */
+	struct switchercb * __capability	scb_peer_scb;
+
+	/*
+	 * Thread owning the context; the same thread that called cosetup(2).
+	 */
+	struct thread				*scb_td;
+
+	/*
+	 * Thread owning the context we're lending our thread to.  When
+	 * calling cocall(), this will be the callee thread.  NULL when
+	 * not lending.
+	 */
+	struct thread				*scb_borrower_td;
+
+	/*
+	 * Capability to unseal peer context.
+	 */
+	void * __capability			scb_unsealcap;
+
+	/*
+	 * TLS pointer, to be returned by CReadHwr.
+	 */
+	void * __capability			scb_tls;
+
+	/*
+	 * There's more stuff here; we allocate an entire page.
+	 */
+};
+#endif
+
 struct mdthread {
 	int	md_spinlock_count;	/* (k) */
 	register_t md_saved_sstatus_ie;	/* (k) */
 	int	md_flags;		/* (k) */
+#ifdef	CPU_CHERI
+	vaddr_t		md_scb;
+
+	/*
+	 * Stuff below is used for cocall_slow(2)/cocaccept_slow(2).
+	 */
+	struct cv	md_slow_cv;
+	struct sx	md_slow_lock;
+	struct thread	*md_slow_caller_td;
+	void		*md_slow_buf;
+	size_t		md_slow_len;
+	bool		md_slow_accepting;
+#endif
 };
 
 /* md_flags */
