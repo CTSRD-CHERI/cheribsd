@@ -837,10 +837,26 @@ initstack:
 	.space	(PAGE_SIZE * KSTACK_PAGES)
 initstack_end:
 
+/*
+ * sigcode has to be labeled as an #object type so that the symbols
+ * resolve to the correct address as a source for copies.  This also
+ * ensures that captable pointers to it will be able to read it.  This
+ * is fine as the code is never executed directly in the kernel, just
+ * copied to places for userland to execute.
+ */
+#define	SIGCODE(sym)						\
+	.text; .globl sym; .align 2; .type sym,#object; sym:
 
-ENTRY(sigcode)
+SIGCODE(sigcode)
+#if __has_feature(capabilities)
+#ifndef __CHERI_PURE_CAPABILITY__
+	.arch_extension c64
+#endif
+	add	c0, csp, #SF_UC
+#else
 	mov	x0, sp
 	add	x0, x0, #SF_UC
+#endif
 
 1:
 	mov	x8, #SYS_sigreturn
@@ -851,6 +867,12 @@ ENTRY(sigcode)
 	svc	0
 
 	b	1b
+#if __has_feature(capabilities)
+#ifndef __CHERI_PURE_CAPABILITY__
+	.arch_extension noc64
+	.arch_extension a64c
+#endif
+#endif
 END(sigcode)
 	/* This may be copied to the stack, keep it 16-byte aligned */
 	.align	3
@@ -863,7 +885,7 @@ szsigcode:
 	.quad	esigcode - sigcode
 
 #ifdef COMPAT_FREEBSD64
-ENTRY(freebsd64_sigcode)
+SIGCODE(freebsd64_sigcode)
 	mov	x0, sp
 	add	x0, x0, #SF_UC64
 
@@ -888,7 +910,7 @@ freebsd64_szsigcode:
 	.quad	freebsd64_esigcode - freebsd64_sigcode
 #endif
 
-ENTRY(aarch32_sigcode)
+SIGCODE(aarch32_sigcode)
 	.word 0xe1a0000d	// mov r0, sp
 	.word 0xe2800040	// add r0, r0, #SIGF_UC
 	.word 0xe59f700c	// ldr r7, [pc, #12]

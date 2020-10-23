@@ -521,7 +521,10 @@ exec_setregs(struct thread *td, struct image_params *imgp, uintcap_t stack)
 		tf->tf_elr = entry;
 		cheri_set_mmap_capability(td, imgp,
 		    (void * __capability)tf->tf_sp);
-		td->td_proc->p_md.md_sigcode = cheri_sigcode_capability(td);
+
+		/* Set LSB of the signal code address since it is C64. */
+		td->td_proc->p_md.md_sigcode = cheri_incoffset(
+		    cheri_sigcode_capability(td), 1);
 		tf->tf_spsr |= PSR_C64;
 	} else
 #endif
