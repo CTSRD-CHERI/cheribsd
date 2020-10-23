@@ -46,6 +46,8 @@ __FBSDID("$FreeBSD$");
 #include "debug.h"
 #include "rtld.h"
 
+/* Dynamically linked binaries for Morello don't have __caprelocs. */
+#ifndef __aarch64__
 void
 process___cap_relocs(Obj_Entry* obj)
 {
@@ -108,3 +110,4 @@ process___cap_relocs(Obj_Entry* obj)
 #endif
 	obj->cap_relocs_processed = true;
 }
+#endif

@@ -1,5 +1,6 @@
 /*-
  * Copyright (c) 2014-2015 The FreeBSD Foundation
+ * Copyright 2020 Brett F. Gutstein
  * All rights reserved.
  *
  * Portions of this software were developed by Andrew Turner
@@ -30,6 +31,7 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
+#include <sys/param.h>
 #include <sys/types.h>
 
 #include <stdlib.h>
@@ -37,6 +39,10 @@ __FBSDID("$FreeBSD$");
 #include "debug.h"
 #include "rtld.h"
 #include "rtld_printf.h"
+
+#if __has_feature(capabilities)
+#include "cheri_reloc.h"
+#endif
 
 /*
  * It is possible for the compiler to emit relocations for unaligned data.
@@ -64,6 +70,106 @@ init_pltgot(Obj_Entry *obj)
 		obj->pltgot[2] = (Elf_Addr) &_rtld_bind_start;
 	}
 }
+
+#if __has_feature(capabilities)
+/*
+ * Fragments consist of a 64-bit address followed by a 56-bit length and an
+ * 8-bit permission field.
+ */
+static void
+init_cap_from_fragment(caddr_t relocbase, const void *text_rodata_cap,
+    Elf_Addr fragment_offset, Elf_Size addend)
+{
+	void *fragment;
+	uintcap_t cap;
+	uint64_t address, len;
+	uint8_t perms;
+
+	fragment = (void *)(relocbase + fragment_offset);
+	address = *((uint64_t *)fragment);
+	len = *((uint64_t *)fragment + 1) & 0xffffffffffffffULL;
+	perms = *((uint64_t *)fragment + 1) >> 56;
+
+#ifdef __CHERI_PURE_CAPABILITY__
+	cap = perms == MORELLO_FRAG_EXECUTABLE ?
+	    (uintcap_t)text_rodata_cap : (uintcap_t)relocbase;
+#else
+	(void)text_rodata_cap;
+	cap = (uintcap_t)cheri_setoffset(cheri_getdefault(), (uintptr_t)relocbase);
+#endif
+
+	if (perms == MORELLO_FRAG_EXECUTABLE && addend != 0) {
+		rtld_fdprintf(STDERR_FILENO, "Warning: function relocation based on"
+		    "fragment at %p has non-zero addend, which is deprecated\n", fragment);
+	}
+	cap = cheri_incoffset(cap, address + addend);
+
+	if (perms == MORELLO_FRAG_EXECUTABLE || perms == MORELLO_FRAG_RODATA) {
+		cap = cheri_clearperm(cap, FUNC_PTR_REMOVE_PERMS);
+	}
+	if (perms == MORELLO_FRAG_RWDATA || perms == MORELLO_FRAG_RODATA) {
+		cap = cheri_clearperm(cap, DATA_PTR_REMOVE_PERMS);
+		cap = cheri_setbounds(cap, len);
+	}
+
+	if (perms == MORELLO_FRAG_EXECUTABLE) {
+		/*
+		 * TODO tight bounds: lower bound and len should be set
+		 * with LSB == 0 for C64 code.
+		 */
+		cap = cheri_sealentry(cap);
+	}
+
+	*((uintcap_t *)fragment) = cap;
+}
+#endif /* __has_feature(capabilities) */
+
+#ifdef __CHERI_PURE_CAPABILITY__
+/*
+ * Plain aarch64 can rely on PC-relative addressing early in rtld startup.
+ * However, pure capability code requires capabilities from the captable for
+ * function calls, and so we must perform early self-relocation before calling
+ * the general _rtld C entry point.
+ */
+void _rtld_relocate_nonplt_self(Elf_Dyn *dynp, Elf_Auxinfo *aux);
+
+void
+_rtld_relocate_nonplt_self(Elf_Dyn *dynp, Elf_Auxinfo *aux)
+{
+	caddr_t relocbase = NULL;
+	const Elf_Rela *rela = NULL, *relalim;
+	unsigned long relasz;
+
+	for (; aux->a_type != AT_NULL; aux++) {
+		if (aux->a_type == AT_BASE) {
+			relocbase = aux->a_un.a_ptr;
+			break;
+		}
+	}
+
+	for (; dynp->d_tag != DT_NULL; dynp++) {
+		switch (dynp->d_tag) {
+		case DT_RELA:
+			rela = (const Elf_Rela *)(relocbase + dynp->d_un.d_ptr);
+			break;
+		case DT_RELASZ:
+			relasz = dynp->d_un.d_val;
+			break;
+		}
+	}
+
+	rela = cheri_setbounds(rela, relasz);
+	relalim = (const Elf_Rela *)((const char *)rela + relasz);
+
+	/* Self-relocations should all be local, i.e. R_MORELLO_RELATIVE. */
+	for (; rela < relalim; rela++) {
+		if (ELF_R_TYPE(rela->r_info) != R_MORELLO_RELATIVE) {
+			continue;
+		}
+		init_cap_from_fragment(relocbase, relocbase, rela->r_offset, rela->r_addend);
+	}
+}
+#endif /* __CHERI_PURE_CAPABILITY__ */
 
 int
 do_copy_relocations(Obj_Entry *dstobj)
@@ -195,6 +301,15 @@ reloc_plt(Obj_Entry *obj, int flags, RtldLockState *lockstate)
 		where = (Elf_Addr *)(obj->relocbase + rela->r_offset);
 
 		switch(ELF_R_TYPE(rela->r_info)) {
+#if __has_feature(capabilities)
+		case R_MORELLO_JUMP_SLOT:
+			if (process_r_cheri_capability(obj, ELF_R_SYM(rela->r_info), lockstate,
+			    flags, where, rela->r_addend) != 0)
+				return (-1);
+			/* TODO: lazy binding */
+			/* *((uintcap_t *)where) = (uintcap_t)(obj->text_rodata_cap + *where); */
+			break;
+#endif /* __has_feature(capabilities) */
 		case R_AARCH64_JUMP_SLOT:
 			*where += (Elf_Addr)obj->relocbase;
 			break;
@@ -208,6 +323,7 @@ reloc_plt(Obj_Entry *obj, int flags, RtldLockState *lockstate)
 		case R_AARCH64_NONE:
 			break;
 		default:
+			/* XXXBFG R_MORELLO_IRELATIVE not handled. */
 			_rtld_error("Unknown relocation type %u in PLT",
 			    (unsigned int)ELF_R_TYPE(rela->r_info));
 			return (-1);
@@ -238,6 +354,13 @@ reloc_jmpslots(Obj_Entry *obj, int flags, RtldLockState *lockstate)
 
 		where = (Elf_Addr *)(obj->relocbase + rela->r_offset);
 		switch(ELF_R_TYPE(rela->r_info)) {
+#if __has_feature(capabilities)
+		case R_MORELLO_JUMP_SLOT:
+			if (process_r_cheri_capability(obj, ELF_R_SYM(rela->r_info), lockstate,
+			    flags, where, rela->r_addend) != 0)
+				return (-1);
+			break;
+#endif /* __has_feature(capabilities) */
 		case R_AARCH64_JUMP_SLOT:
 			def = find_symdef(ELF_R_SYM(rela->r_info), obj,
 			    &defobj, SYMLOOK_IN_PLT | flags, NULL, lockstate);
@@ -380,6 +503,15 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 	SymCache *cache;
 	Elf_Addr *where, symval;
 
+#ifdef __CHERI_PURE_CAPABILITY__
+	/*
+	 * The dynamic linker should only have R_MORELLO_RELATIVE (local)
+	 * relocations, which were processed in _rtld_relocate_nonplt_self.
+	 */
+	if (obj == obj_rtld)
+		return (0);
+#endif
+
 	/*
 	 * The dynamic loader may be called from a thread, we have
 	 * limited amounts of stack available so we cannot use alloca().
@@ -447,6 +579,29 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 		where = (Elf_Addr *)(obj->relocbase + rela->r_offset);
 
 		switch (ELF_R_TYPE(rela->r_info)) {
+#if __has_feature(capabilities)
+		/*
+		 * XXXBFG According to the spec, for R_MORELLO_CAPINIT there
+		 * *can* be a fragment containing extra information for the
+		 * symbol. How does this interact with symbol table
+		 * information?
+		 */
+		case R_MORELLO_CAPINIT:
+		case R_MORELLO_GLOB_DAT:
+			if (process_r_cheri_capability(obj, ELF_R_SYM(rela->r_info), lockstate,
+			    flags, where, rela->r_addend) != 0)
+				return (-1);
+			break;
+		case R_MORELLO_RELATIVE:
+#ifdef __CHERI_PURE_CAPABILITY__
+			init_cap_from_fragment(obj->relocbase, obj->text_rodata_cap,
+			    rela->r_offset, rela->r_addend);
+#else
+			init_cap_from_fragment(obj->relocbase, obj->relocbase,
+			    rela->r_offset, rela->r_addend);
+#endif
+			break;
+#endif /* __has_feature(capabilities) */
 		case R_AARCH64_ABS64:
 		case R_AARCH64_GLOB_DAT:
 			*where = symval + rela->r_addend;
@@ -551,7 +706,11 @@ allocate_initial_tls(Obj_Entry *objs)
 
 	tp = (Elf_Addr **) allocate_tls(objs, NULL, TLS_TCB_SIZE, 16);
 
+#ifdef __CHERI_PURE_CAPABILITY__
+	asm volatile("msr	ctpidr_el0, %0" : : "C"(tp));
+#else
 	asm volatile("msr	tpidr_el0, %0" : : "r"(tp));
+#endif
 }
 
 void *
@@ -560,8 +719,12 @@ __tls_get_addr(tls_index* ti)
       char *p;
       void *_tp;
 
+#ifdef __CHERI_PURE_CAPABILITY__
+      __asm __volatile("mrs	%0, ctpidr_el0"  : "=C" (_tp));
+#else
       __asm __volatile("mrs	%0, tpidr_el0"  : "=r" (_tp));
-      p = tls_get_addr_common((Elf_Addr **)(_tp), ti->ti_module, ti->ti_offset);
+#endif
+      p = tls_get_addr_common((uintptr_t **)(_tp), ti->ti_module, ti->ti_offset);
 
       return (p);
 }

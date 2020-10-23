@@ -139,3 +139,9 @@ ${PROG_FULL}:	${VERSION_MAP}
 # and are therefore not identical to the ones from the system headers.
 CFLAGS+=	-Wno-redundant-decls
 .endif
+
+# TODO better way to include this for hybrid Morello?
+.if ${MACHINE_ARCH} == "aarch64" && ${CPUTYPE} == "morello" && \
+    !${MACHINE_ABI:Mpurecap}
+CFLAGS+=	-I${RTLD_ELF_DIR}/cheri
+.endif
