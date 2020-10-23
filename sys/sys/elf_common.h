@@ -1064,6 +1064,12 @@ enum MipsCheriFlags {
 #define	R_AARCH64_TLSDESC 	1031	/* Identify the TLS descriptor */
 #define	R_AARCH64_IRELATIVE	1032
 
+#define	R_MORELLO_CAPINIT	59392
+#define	R_MORELLO_GLOB_DAT	59393
+#define	R_MORELLO_JUMP_SLOT	59394
+#define	R_MORELLO_RELATIVE	59395
+#define	R_MORELLO_IRELATIVE	59396
+
 #define	R_ARM_NONE		0	/* No relocation. */
 #define	R_ARM_PC24		1
 #define	R_ARM_ABS32		2
