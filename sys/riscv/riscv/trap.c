@@ -246,20 +246,20 @@ dump_cheri_exception(struct trapframe *frame)
 	p = td->td_proc;
 	printf("pid %d tid %d (%s), uid %d: ", p->p_pid, td->td_tid,
 	    p->p_comm, td->td_ucred->cr_uid);
-	switch (frame->tf_scause & EXCP_MASK) {
-	case EXCP_LOAD_CAP_PAGE_FAULT:
+	switch (frame->tf_scause & SCAUSE_CODE) {
+	case SCAUSE_LOAD_CAP_PAGE_FAULT:
 		printf("LOAD CAP page fault");
 		break;
-	case EXCP_STORE_AMO_CAP_PAGE_FAULT:
+	case SCAUSE_STORE_AMO_CAP_PAGE_FAULT:
 		printf("STORE/AMO CAP page fault");
 		break;
-	case EXCP_CHERI:
+	case SCAUSE_CHERI:
 		printf("CHERI fault (type %#lx), capidx %ld",
 		    TVAL_CAP_CAUSE(frame->tf_stval),
 		    TVAL_CAP_IDX(frame->tf_stval));
 		break;
 	default:
-		printf("fault %ld", frame->tf_scause & EXCP_MASK);
+		printf("fault %ld", frame->tf_scause & SCAUSE_CODE);
 		break;
 	}
 	printf("\n");
@@ -341,9 +341,9 @@ page_fault_handler(struct trapframe *frame, int usermode)
 
 	va = trunc_page(stval);
 
-	if (frame->tf_scause == EXCP_STORE_PAGE_FAULT) {
+	if (frame->tf_scause == SCAUSE_STORE_PAGE_FAULT) {
 		ftype = VM_PROT_WRITE;
-	} else if (frame->tf_scause == EXCP_INST_PAGE_FAULT) {
+	} else if (frame->tf_scause == SCAUSE_INST_PAGE_FAULT) {
 		ftype = VM_PROT_EXECUTE;
 	} else {
 		ftype = VM_PROT_READ;
@@ -356,7 +356,7 @@ page_fault_handler(struct trapframe *frame, int usermode)
 	if (error != KERN_SUCCESS) {
 		if (usermode) {
 			call_trapsignal(td, sig, ucode, stval,
-			    frame->tf_scause & EXCP_MASK, 0);
+			    frame->tf_scause & SCAUSE_CODE, 0);
 		} else {
 			if (pcb->pcb_onfault != 0) {
 				frame->tf_a[0] = error;
@@ -392,8 +392,8 @@ do_trap_supervisor(struct trapframe *frame)
 	KASSERT((csr_read(sstatus) & (SSTATUS_SPP | SSTATUS_SIE)) ==
 	    SSTATUS_SPP, ("Came from S mode with interrupts enabled"));
 
-	exception = frame->tf_scause & EXCP_MASK;
-	if (frame->tf_scause & EXCP_INTR) {
+	exception = frame->tf_scause & SCAUSE_CODE;
+	if ((frame->tf_scause & SCAUSE_INTR) != 0) {
 		/* Interrupt */
 		riscv_cpu_intr(frame);
 		return;
@@ -408,19 +408,19 @@ do_trap_supervisor(struct trapframe *frame)
 	    curthread, (__cheri_addr unsigned long)frame->tf_sepc, frame);
 
 	switch (exception) {
-	case EXCP_FAULT_LOAD:
-	case EXCP_FAULT_STORE:
-	case EXCP_FAULT_FETCH:
+	case SCAUSE_LOAD_ACCESS_FAULT:
+	case SCAUSE_STORE_ACCESS_FAULT:
+	case SCAUSE_INST_ACCESS_FAULT:
 		dump_regs(frame);
 		panic("Memory access exception at 0x%016lx\n",
 		    (__cheri_addr unsigned long)frame->tf_sepc);
 		break;
-	case EXCP_STORE_PAGE_FAULT:
-	case EXCP_LOAD_PAGE_FAULT:
-	case EXCP_INST_PAGE_FAULT:
+	case SCAUSE_STORE_PAGE_FAULT:
+	case SCAUSE_LOAD_PAGE_FAULT:
+	case SCAUSE_INST_PAGE_FAULT:
 		page_fault_handler(frame, 0);
 		break;
-	case EXCP_BREAKPOINT:
+	case SCAUSE_BREAKPOINT:
 #ifdef KDTRACE_HOOKS
 		if (dtrace_invop_jump_addr != NULL &&
 		    dtrace_invop_jump_addr(frame) == 0)
@@ -433,15 +433,15 @@ do_trap_supervisor(struct trapframe *frame)
 		panic("No debugger in kernel.\n");
 #endif
 		break;
-	case EXCP_ILLEGAL_INSTRUCTION:
+	case SCAUSE_ILLEGAL_INSTRUCTION:
 		dump_regs(frame);
 		panic("Illegal instruction at 0x%016lx\n",
 		    (__cheri_addr unsigned long)frame->tf_sepc);
 		break;
 #if __has_feature(capabilities)
-	case EXCP_LOAD_CAP_PAGE_FAULT:
-	case EXCP_STORE_AMO_CAP_PAGE_FAULT:
-	case EXCP_CHERI:
+	case SCAUSE_LOAD_CAP_PAGE_FAULT:
+	case SCAUSE_STORE_AMO_CAP_PAGE_FAULT:
+	case SCAUSE_CHERI:
 		if (curthread->td_pcb->pcb_onfault != 0) {
 			frame->tf_a[0] = EPROT;
 			frame->tf_sepc = (uintcap_t)cheri_setaddress(
@@ -455,7 +455,7 @@ do_trap_supervisor(struct trapframe *frame)
 			    (__cheri_addr unsigned long)frame->tf_sepc,
 			    frame->tf_stval);
 			break;
-		case EXCP_CHERI:
+		case SCAUSE_CHERI:
 			panic("CHERI exception %#lx at 0x%016lx\n",
 			    TVAL_CAP_CAUSE(frame->tf_stval),
 			    (__cheri_addr unsigned long)frame->tf_sepc);
@@ -486,8 +486,8 @@ do_trap_user(struct trapframe *frame)
 	KASSERT((csr_read(sstatus) & (SSTATUS_SPP | SSTATUS_SIE)) == 0,
 	    ("Came from U mode with interrupts enabled"));
 
-	exception = frame->tf_scause & EXCP_MASK;
-	if (frame->tf_scause & EXCP_INTR) {
+	exception = frame->tf_scause & SCAUSE_CODE;
+	if ((frame->tf_scause & SCAUSE_INTR) != 0) {
 		/* Interrupt */
 		riscv_cpu_intr(frame);
 		return;
@@ -498,23 +498,23 @@ do_trap_user(struct trapframe *frame)
 	    curthread, (__cheri_addr unsigned long)frame->tf_sepc, frame);
 
 	switch (exception) {
-	case EXCP_FAULT_LOAD:
-	case EXCP_FAULT_STORE:
-	case EXCP_FAULT_FETCH:
+	case SCAUSE_LOAD_ACCESS_FAULT:
+	case SCAUSE_STORE_ACCESS_FAULT:
+	case SCAUSE_INST_ACCESS_FAULT:
 		call_trapsignal(td, SIGBUS, BUS_ADRERR, frame->tf_sepc,
 		    exception, 0);
 		userret(td, frame);
 		break;
-	case EXCP_STORE_PAGE_FAULT:
-	case EXCP_LOAD_PAGE_FAULT:
-	case EXCP_INST_PAGE_FAULT:
+	case SCAUSE_STORE_PAGE_FAULT:
+	case SCAUSE_LOAD_PAGE_FAULT:
+	case SCAUSE_INST_PAGE_FAULT:
 		page_fault_handler(frame, 1);
 		break;
-	case EXCP_USER_ECALL:
+	case SCAUSE_ECALL_USER:
 		frame->tf_sepc += 4;	/* Next instruction */
 		ecall_handler();
 		break;
-	case EXCP_ILLEGAL_INSTRUCTION:
+	case SCAUSE_ILLEGAL_INSTRUCTION:
 #ifdef FPE
 		if ((pcb->pcb_fpflags & PCB_FP_STARTED) == 0) {
 			/*
@@ -532,31 +532,31 @@ do_trap_user(struct trapframe *frame)
 		    exception, 0);
 		userret(td, frame);
 		break;
-	case EXCP_BREAKPOINT:
+	case SCAUSE_BREAKPOINT:
 		call_trapsignal(td, SIGTRAP, TRAP_BRKPT, frame->tf_sepc,
 		    exception, 0);
 		userret(td, frame);
 		break;
 #if __has_feature(capabilities)
 	/* M-mode emulates alignment of non-CHERI instructions */
-	case EXCP_MISALIGNED_LOAD:
-	case EXCP_MISALIGNED_STORE:
+	case SCAUSE_LOAD_MISALIGNED:
+	case SCAUSE_STORE_MISALIGNED:
 		call_trapsignal(td, SIGBUS, BUS_ADRALN,
 		    (uintcap_t)frame->tf_stval, exception, 0);
 		break;
-	case EXCP_LOAD_CAP_PAGE_FAULT:
+	case SCAUSE_LOAD_CAP_PAGE_FAULT:
 		if (log_user_cheri_exceptions)
 			dump_cheri_exception(frame);
 		call_trapsignal(td, SIGSEGV, SEGV_LOADTAG,
 		    (uintcap_t)frame->tf_stval, exception, 0);
 		break;
-	case EXCP_STORE_AMO_CAP_PAGE_FAULT:
+	case SCAUSE_STORE_AMO_CAP_PAGE_FAULT:
 		if (log_user_cheri_exceptions)
 			dump_cheri_exception(frame);
 		call_trapsignal(td, SIGSEGV, SEGV_STORETAG,
 		    (uintcap_t)frame->tf_stval, exception, 0);
 		break;
-	case EXCP_CHERI:
+	case SCAUSE_CHERI:
 		if (log_user_cheri_exceptions)
 			dump_cheri_exception(frame);
 		call_trapsignal(td, SIGPROT,
