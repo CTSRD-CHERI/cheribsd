@@ -74,38 +74,52 @@ __asm("	.text			\n"
 #define DONT_EXPORT_CRT_INIT_GLOBALS
 #define CRT_INIT_GLOBALS_GDC_ONLY
 #include "crt_init_globals.c"
+#endif
 
-void __start(int, char **, char **, void (*)(void), const Elf_Auxinfo * __capability);
-
-/* The entry function. */
-void
-__start(int argc, char *argv[], char *env[], void (*cleanup)(void), const Elf_Auxinfo * __capability auxp)
-{
-	const Elf_Phdr * __capability phdr_cap = NULL;
-	void *phdr = NULL;
-	long phnum = 0;
-
-	/* Digest the auxiliary vector to get information needed to init globals. */
-	for (; auxp->a_type != AT_NULL; auxp++) {
-		if (auxp->a_type == AT_PHDR) {
-			phdr = auxp->a_un.a_ptr;
-		} else if (auxp->a_type == AT_PHNUM) {
-			phnum = auxp->a_un.a_val;
-		}
-	}
-
-	/* Generate capability to init globals from DDC. */
-	if (phdr != NULL && phnum != 0) {
-		phdr_cap = cheri_setaddress(cheri_getdefault(), (vaddr_t)phdr);
-		do_crt_init_globals(phdr_cap, phnum);
-	}
-#else
 void __start(int, char **, char **, void (*)(void));
 
 /* The entry function. */
 void
 __start(int argc, char *argv[], char *env[], void (*cleanup)(void))
 {
+
+#ifdef SHOULD_PROCESS_CAP_RELOCS
+	/*
+	 * Initialize __cap_relocs for static executables.  Dynamic
+	 * executables should not have any, and the runtime linker
+	 * would initialize them if they did.
+	 */
+	if (&_DYNAMIC == NULL) {
+		const Elf_Phdr * __capability phdr_cap = NULL;
+		const Elf_Auxinfo *auxp;
+		char **strp;
+		void *phdr = NULL;
+		long phnum = 0;
+
+		strp = env;
+		while (*strp == NULL)
+			strp++;
+		auxp = (Elf_Auxinfo *)(strp + 1);
+
+		/*
+		 * Digest the auxiliary vector to get information
+		 * needed to init globals.
+		 */
+		for (; auxp->a_type != AT_NULL; auxp++) {
+			if (auxp->a_type == AT_PHDR) {
+				phdr = auxp->a_un.a_ptr;
+			} else if (auxp->a_type == AT_PHNUM) {
+				phnum = auxp->a_un.a_val;
+			}
+		}
+
+		/* Generate capability to init globals from DDC. */
+		if (phdr != NULL && phnum != 0) {
+			phdr_cap = cheri_setaddress(cheri_getdefault(),
+			    (vaddr_t)phdr);
+			do_crt_init_globals(phdr_cap, phnum);
+		}
+	}
 #endif
 
 	handle_argv(argc, argv, env);
