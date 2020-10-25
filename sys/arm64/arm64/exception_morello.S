@@ -112,10 +112,7 @@ __FBSDID("$FreeBSD$");
 .endif
 	msr	spsr_el1, x11
 	msr	celr_el1, c10
-	/* TODO: Enable when we set a per-proces DDC */
-#ifdef NOTYET
 	msr	ddc_el0, c9
-#endif
 	ldp	c0,  c1,  [sp, #(TF_X + 0  * 16)]
 	ldp	c2,  c3,  [sp, #(TF_X + 2  * 16)]
 	ldp	c4,  c5,  [sp, #(TF_X + 4  * 16)]
