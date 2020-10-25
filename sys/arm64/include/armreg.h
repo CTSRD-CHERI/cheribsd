@@ -741,6 +741,11 @@
 #define	ID_AA64PFR1_RAS_frac_VAL(x)	((x) & ID_AA64PFR1_RAS_frac_MASK)
 #define	 ID_AA64PFR1_RAS_frac_V1	(UL(0x0) << ID_AA64PFR1_RAS_frac_SHIFT)
 #define	 ID_AA64PFR1_RAS_frac_V2	(UL(0x1) << ID_AA64PFR1_RAS_frac_SHIFT)
+#define	ID_AA64PFR1_CE_SHIFT		20
+#define	ID_AA64PFR1_CE_MASK		(UL(0xf) << ID_AA64PFR1_CE_SHIFT)
+#define	ID_AA64PFR1_CE_VAL(x)		((x) & ID_AA64PFR1_CE_MASK)
+#define	 ID_AA64PFR1_CE_NONE		(UL(0x0) << ID_AA64PFR1_CE_SHIFT)
+#define	 ID_AA64PFR1_CE_MORELLO		(UL(0x1) << ID_AA64PFR1_CE_SHIFT)
 
 /* MAIR_EL1 - Memory Attribute Indirection Register */
 #define	MAIR_ATTR_MASK(idx)	(0xff << ((n)* 8))
