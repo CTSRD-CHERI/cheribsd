@@ -523,6 +523,11 @@ DECLARE_CHERI_TEST(test_initregs_returncap);
 #endif
 DECLARE_CHERI_TEST(test_initregs_idc);
 DECLARE_CHERI_TEST(test_initregs_pcc);
+#ifdef __aarch64__
+DECLARE_CHERI_TEST(test_initregs_restricted_default);
+DECLARE_CHERI_TEST(test_initregs_restricted_stack);
+DECLARE_CHERI_TEST(test_initregs_restricted_thread);
+#endif
 DECLARE_CHERI_TEST(test_copyregs);
 DECLARE_CHERI_TEST(test_listregs);
 
