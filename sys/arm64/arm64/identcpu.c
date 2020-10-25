@@ -921,10 +921,17 @@ static struct mrs_field_value id_aa64pfr1_mte[] = {
 	MRS_FIELD_VALUE_END,
 };
 
+static struct mrs_field_value id_aa64pfr1_ce[] = {
+	MRS_FIELD_VALUE(ID_AA64PFR1_CE_NONE, ""),
+	MRS_FIELD_VALUE(ID_AA64PFR1_CE_MORELLO, "Morello"),
+	MRS_FIELD_VALUE_END,
+};
+
 static struct mrs_field id_aa64pfr1_fields[] = {
 	MRS_FIELD(ID_AA64PFR1, BT, false, MRS_EXACT, id_aa64pfr1_bt),
 	MRS_FIELD(ID_AA64PFR1, SSBS, false, MRS_LOWER, id_aa64pfr1_ssbs),
 	MRS_FIELD(ID_AA64PFR1, MTE, false, MRS_EXACT, id_aa64pfr1_mte),
+	MRS_FIELD(ID_AA64PFR1, CE, false, MRS_EXACT, id_aa64pfr1_ce),
 	MRS_FIELD_END,
 };
 
