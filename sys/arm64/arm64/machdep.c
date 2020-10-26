@@ -449,6 +449,12 @@ fill_capregs(struct thread *td, struct capreg *regs)
 	regs->clr = frame->tf_lr;
 	regs->celr = frame->tf_elr;
 	regs->ddc = frame->tf_ddc;
+	regs->ctpidr = td->td_pcb->pcb_tpidr_el0;
+	regs->ctpidrro = td->td_pcb->pcb_tpidrro_el0;
+	regs->cid = READ_SPECIALREG_CAP(cid_el0);
+	regs->rcsp = READ_SPECIALREG_CAP(rcsp_el0);
+	regs->rddc = READ_SPECIALREG_CAP(rddc_el0);
+	regs->rctpidr = READ_SPECIALREG_CAP(rctpidr_el0);
 
 	for (i = 0; i < nitems(frame->tf_x); i++) {
 		regs->c[i] = frame->tf_x[i];
@@ -465,6 +471,24 @@ fill_capregs(struct thread *td, struct capreg *regs)
 		regs->tagmask |= (uint64_t)1 << i;
 	i++;
 	if (cheri_gettag((void * __capability)frame->tf_ddc))
+		regs->tagmask |= (uint64_t)1 << i;
+	i++;
+	if (cheri_gettag((void * __capability)regs->ctpidr))
+		regs->tagmask |= (uint64_t)1 << i;
+	i++;
+	if (cheri_gettag((void * __capability)regs->ctpidrro))
+		regs->tagmask |= (uint64_t)1 << i;
+	i++;
+	if (cheri_gettag((void * __capability)regs->cid))
+		regs->tagmask |= (uint64_t)1 << i;
+	i++;
+	if (cheri_gettag((void * __capability)regs->rcsp))
+		regs->tagmask |= (uint64_t)1 << i;
+	i++;
+	if (cheri_gettag((void * __capability)regs->rddc))
+		regs->tagmask |= (uint64_t)1 << i;
+	i++;
+	if (cheri_gettag((void * __capability)regs->rctpidr))
 		regs->tagmask |= (uint64_t)1 << i;
 
 	return (0);
@@ -533,23 +557,22 @@ exec_setregs(struct thread *td, struct image_params *imgp, uintcap_t stack)
 		tf->tf_sp = STACKALIGN(stack);
 #if __has_feature(capabilities)
 		hybridabi_thread_setregs(td, imgp->entry_addr);
-		/*
-		 * For the hybrid ABI, give csu a capability to the auxiliary vector so it
-		 * can process capability relocations. The lower registers are used by the
-		 * existing non-purecap csu code. Use the address calculation corresponding
-		 * to the auxiliary vector from copyout_strings in freebsd64_misc.c because
-		 * this is hybrid.
-		 */
-		uint64_t * __capability auxv = (uint64_t * __capability)stack +
-		    imgp->args->argc + 1 + imgp->args->envc + 1 + 1;
-		auxv = cheri_setbounds(auxv, AT_COUNT * sizeof(Elf64_Auxinfo));
-		tf->tf_x[4] = (uintcap_t)(auxv);
 #else
 		tf->tf_elr = imgp->entry_addr;
 #endif
 		tf->tf_lr = tf->tf_lr;
 		tf->tf_spsr &= ~PSR_C64;
 	}
+
+	td->td_pcb->pcb_tpidr_el0 = 0;
+	td->td_pcb->pcb_tpidrro_el0 = 0;
+#if __has_feature(capabilities)
+	WRITE_SPECIALREG_CAP(ctpidrro_el0, 0);
+	WRITE_SPECIALREG_CAP(ctpidr_el0, 0);
+#else
+	WRITE_SPECIALREG(tpidrro_el0, 0);
+	WRITE_SPECIALREG(tpidr_el0, 0);
+#endif
 }
 
 /* Sanity check these are the same size, they will be memcpy'd to and fro */
@@ -1518,9 +1541,17 @@ do {									\
 	PRINT_REG(spsel);
 	PRINT_REG(spsr_el1);
 	PRINT_REG(tcr_el1);
+#if __has_feature(capabilities)
+	PRINT_REG_CAP(ctpidr_el0);
+#else
 	PRINT_REG(tpidr_el0);
+#endif
 	PRINT_REG(tpidr_el1);
+#if __has_feature(capabilities)
+	PRINT_REG_CAP(ctpidrro_el0);
+#else
 	PRINT_REG(tpidrro_el0);
+#endif
 	PRINT_REG(ttbr0_el1);
 	PRINT_REG(ttbr1_el1);
 	PRINT_REG(vbar_el1);

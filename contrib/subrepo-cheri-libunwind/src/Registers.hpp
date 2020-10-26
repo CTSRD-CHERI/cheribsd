@@ -1796,18 +1796,14 @@ inline const char *Registers_ppc64::getRegisterName(int regNum) {
 /// Registers_arm64  holds the register state of a thread in a 64-bit arm
 /// process.
 
-#if !__has_feature(capabilities)
-typedef uint64_t uintcap_t;
-#endif
-
 class _LIBUNWIND_HIDDEN Registers_arm64 {
 public:
   Registers_arm64();
   Registers_arm64(const void *registers);
 
   bool        validRegister(int num) const;
-  uintcap_t   getRegister(int num) const;
-  void        setRegister(int num, uintcap_t value);
+  uintptr_t   getRegister(int num) const;
+  void        setRegister(int num, uintptr_t value);
   bool        validFloatRegister(int num) const;
   double      getFloatRegister(int num) const;
   void        setFloatRegister(int num, double value);
@@ -1819,7 +1815,7 @@ public:
   static int  lastDwarfRegNum() { return _LIBUNWIND_HIGHEST_DWARF_REGISTER_ARM64; }
   static int  getArch() { return REGISTERS_ARM64; }
 
-#if __has_feature(capabilities)
+#ifdef __CHERI_PURE_CAPABILITY__
   bool        validCapabilityRegister(int num) const;
   uintcap_t   getCapabilityRegister(int num) const;
   void        setCapabilityRegister(int num, uintcap_t value);
@@ -1827,21 +1823,21 @@ public:
   CAPABILITIES_NOT_SUPPORTED
 #endif
 
-  uintcap_t getSP() const         { return _registers.__sp; }
-  void      setSP(uintcap_t value) { _registers.__sp = value; }
-  uintcap_t getIP() const         { return _registers.__pc; }
-  void      setIP(uintcap_t value) { _registers.__pc = value; }
-  uintcap_t getFP() const         { return _registers.__fp; }
-  void      setFP(uintcap_t value) { _registers.__fp = value; }
+  uintptr_t getSP() const         { return _registers.__sp; }
+  void      setSP(uintptr_t value) { _registers.__sp = value; }
+  uintptr_t getIP() const         { return _registers.__pc; }
+  void      setIP(uintptr_t value) { _registers.__pc = value; }
+  uintptr_t getFP() const         { return _registers.__fp; }
+  void      setFP(uintptr_t value) { _registers.__fp = value; }
 
 private:
   struct GPRs {
-    uintcap_t __x[29]; // x0-x28
-    uintcap_t __fp;    // Frame pointer x29
-    uintcap_t __lr;    // Link register x30
-    uintcap_t __sp;    // Stack pointer x31
-    uintcap_t __pc;    // Program counter
-#if __has_feature(capabilities)
+    uintptr_t __x[29]; // x0-x28
+    uintptr_t __fp;    // Frame pointer x29
+    uintptr_t __lr;    // Link register x30
+    uintptr_t __sp;    // Stack pointer x31
+    uintptr_t __pc;    // Program counter
+#ifdef __CHERI_PURE_CAPABILITY__
     uintcap_t __ddc;   // Default data capability
 #endif
     // XXXBFG I think this is SPSR but it's skipped anyway
@@ -1854,16 +1850,13 @@ private:
   // is perserved during unwinding.  We could define new register
   // numbers (> 96) which mean whole vector registers, then this
   // struct would need to change to contain whole vector registers.
-#if !__has_feature(capabilities)
-    uint64_t padding[34]; // To make size match hybrid and not change offset of floats
-#endif
 };
 
 inline Registers_arm64::Registers_arm64(const void *registers) {
   static_assert((check_fit<Registers_arm64, unw_context_t>::does_fit),
                 "arm64 registers do not fit into unw_context_t");
   memcpy(&_registers, registers, sizeof(_registers));
-#if !__has_feature(capabilities)
+#ifndef __CHERI_PURE_CAPABILITY__
   static_assert(sizeof(GPRs) == 0x110,
                 "expected VFP registers to be at offset 272");
 #endif
@@ -1882,7 +1875,7 @@ inline bool Registers_arm64::validRegister(int regNum) const {
     return true;
   if (regNum == UNW_REG_SP)
     return true;
-#if __has_feature(capabilities)
+#ifdef __CHERI_PURE_CAPABILITY__
   if (regNum == UNW_ARM64_DDC)
     return true;
 #endif
@@ -1897,12 +1890,12 @@ inline bool Registers_arm64::validRegister(int regNum) const {
   return true;
 }
 
-inline uintcap_t Registers_arm64::getRegister(int regNum) const {
+inline uintptr_t Registers_arm64::getRegister(int regNum) const {
   if (regNum == UNW_REG_IP)
     return _registers.__pc;
   if (regNum == UNW_REG_SP)
     return _registers.__sp;
-#if __has_feature(capabilities)
+#ifdef __CHERI_PURE_CAPABILITY__
   if (regNum == UNW_ARM64_DDC)
     return _registers.__ddc;
 #endif
@@ -1913,12 +1906,12 @@ inline uintcap_t Registers_arm64::getRegister(int regNum) const {
   _LIBUNWIND_ABORT("unsupported arm64 register");
 }
 
-inline void Registers_arm64::setRegister(int regNum, uintcap_t value) {
+inline void Registers_arm64::setRegister(int regNum, uintptr_t value) {
   if (regNum == UNW_REG_IP)
     _registers.__pc = value;
   else if (regNum == UNW_REG_SP)
     _registers.__sp = value;
-#if __has_feature(capabilities)
+#ifdef __CHERI_PURE_CAPABILITY__
   else if (regNum == UNW_ARM64_DDC)
     _registers.__ddc = value;
 #endif
@@ -1930,7 +1923,7 @@ inline void Registers_arm64::setRegister(int regNum, uintcap_t value) {
     _LIBUNWIND_ABORT("unsupported arm64 register");
 }
 
-#if __has_feature(capabilities)
+#ifdef __CHERI_PURE_CAPABILITY__
 inline bool Registers_arm64::validCapabilityRegister(int regNum) const {
   if (regNum == UNW_REG_IP)
     return true;
@@ -1940,9 +1933,9 @@ inline bool Registers_arm64::validCapabilityRegister(int regNum) const {
     return true;
   if (regNum < 0)
     return false;
-  if (regNum > UNW_ARM64_X31)
-    return false;
-  return true;
+  if (regNum >= UNW_ARM64_C0 && regNum <= UNW_ARM64_C31)
+    return true;
+  return false;
 }
 
 inline uintcap_t Registers_arm64::getCapabilityRegister(int regNum) const {
@@ -1962,7 +1955,7 @@ inline const char *Registers_arm64::getRegisterName(int regNum) {
     return "pc";
   case UNW_REG_SP:
     return "sp";
-#if __has_feature(capabilities)
+#ifdef __CHERI_PURE_CAPABILITY__
   case UNW_ARM64_DDC:
     return "ddc";
 #endif
