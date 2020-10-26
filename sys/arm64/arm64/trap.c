@@ -192,7 +192,33 @@ static void
 cap_abort(struct thread *td, struct trapframe *frame, uint64_t esr,
     uint64_t far, int lower)
 {
+	uintcap_t onfault;
+	struct pcb *pcb;
+
+	pcb = td->td_pcb;
 	if (!lower) {
+		if (td->td_intr_nesting_level == 0 &&
+		    pcb->pcb_onfault != 0) {
+			frame->tf_x[0] = EPROT;
+			onfault = pcb->pcb_onfault;
+#if __has_feature(capabilities)
+			/*
+			 * Morello does not clear the LSB on ERET nor does it
+			 * set PSTATE.C64 on ERET. We also need to derive a
+			 * capability.
+			 */
+			onfault = (uintcap_t)cheri_setaddress(cheri_getpcc(),
+			    onfault);
+			if (onfault & 0x1) {
+				frame->tf_spsr |= PSR_C64;
+				--onfault;
+			} else {
+				frame->tf_spsr &= ~PSR_C64;
+			}
+#endif
+			frame->tf_elr = onfault;
+			return;
+		}
 		print_registers(frame);
 		printf(" far: %16lx\n", far);
 		printf(" esr:         %.8lx\n", esr);
