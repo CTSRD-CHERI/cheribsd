@@ -313,7 +313,7 @@ freebsd64_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 		catcher = cheri_unseal(catcher,
 		    cheri_setaddress(userspace_cap, CHERI_OTYPE_SENTRY));
 	}
-	if (cheri_getaddress(catcher) & 0x1) {
+	if ((uintcap_t)catcher & 0x1) {
 		tf->tf_spsr |= PSR_C64;
 		catcher = cheri_incoffset(catcher, -1);
 	} else {
