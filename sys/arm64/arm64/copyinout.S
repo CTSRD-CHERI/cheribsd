@@ -339,7 +339,9 @@ END(copyoutcap)
  * lr - the return address, so jump here instead of calling
  *
  * In copycapcommon the bottom 4 bits of c0 and c1 must be identical so
- * they can both be aligned load & store capabilities.
+ * they can both be aligned load & store capabilities, and size must be at
+ * least one capability; if not, copycommon must be used instead, and will copy
+ * dwords at a time when posible.
  */
 	.text
 	.align	4
@@ -347,49 +349,57 @@ END(copyoutcap)
 	.type	copycapcommon,@function
 
 copycapcommon:
-	adr	x6, copyio_fault /* Get the handler address */
-	SET_FAULT_HANDLER(x6, x7) /* Set the handler */
+	adr	x6, copyio_fault	/* Get the handler address */
+	SET_FAULT_HANDLER(x6, x7)	/* Set the handler */
 	ENTER_USER_ACCESS(w6, x7)
 
 	mov	x5, #0			/* x5 is the offset to load/store */
 
-	/* Check alignment. The bottom 4 bits must be identical. */
-	gcvalue	x4, c0			/* Read the source capability value */
-	and	x3, x4, 0x0f
-	cbz	x3, copycap_main
+	/*
+	 * We require c0 and c1 to have the same lower bits so need only check
+	 * one of them.
+	 */
+	gcvalue	x3, c0
+	and	x3, x3, #0x0f
+	cbz	x3, copycap_main	/* Already capability-aligned, skip ahead */
 
+	/* Byte copy until the first capability-aligned address */
 copycap_byte_by_byte:
-	ldrb	w4, [c0, x5]
-	strb	w4, [c1, x5]
-	sub	x2, x2, #1
-	add	x3, x3, #1
-	add	x5, x5, #1
-	cmp	x3, #0x20
-	b.lo	copycap_byte_by_byte
+	ldrb	w4, [c0, x5]		/* Load byte from src */
+	strb	w4, [c1, x5]		/* Store byte in dest */
+	sub	x2, x2, #1		/* len-- */
+	add	x3, x3, #1		/* cap_off++ */
+	add	x5, x5, #1		/* off++ */
+	cmp	x3, #16
+	b.lt	copycap_byte_by_byte	/* Again if cap_off < 16 */
 
+	/* Copy capabilities */
 copycap_main:
 	cmp	x2, #16
 	b.lo	copycap_end_bytes
-1:	ldr	c4, [c0, x5]
-	str	c4, [c1, x5]
-	sub	x2, x2, #16
-	add	x5, x5, #16
+1:	ldr	c4, [c0, x5]		/* Load dword from src */
+	str	c4, [c1, x5]		/* Store dword in dest */
+	sub	x2, x2, #16		/* len -= 16 */
+	add	x5, x5, #16		/* off += 16 */
 	cmp	x2, #16
-	b.ge	1b
+	b.ge	1b			/* Again if len >= 16 */
+
+	/* Check if we're finished */
 	cbz	x2, copycap_done
 
+	/* Copy any remaining bytes */
 copycap_end_bytes:
-	ldrb	w3, [c0, x5]
-	strb	w3, [c1, x5]
-	sub	x2, x2, #1
-	add	x5, x5, #1
+	ldrb	w3, [c0, x5]		/* Load byte from src */
+	strb	w3, [c1, x5]		/* Store byte in dest */
+	sub	x2, x2, #1		/* len-- */
+	add	x5, x5, #1		/* off++ */
 	cbnz	x2, copycap_end_bytes
 
 copycap_done:
 	EXIT_USER_ACCESS(w6)
-	SET_FAULT_HANDLER(xzr, x7) /* Clear the handler */
+	SET_FAULT_HANDLER(xzr, x7)	/* Clear the handler */
 
-	mov	x0, xzr		/* return 0 */
+	mov	x0, xzr			/* Return 0 */
 	ret
 	.size	copycapcommon, . - copycapcommon
 
@@ -399,40 +409,64 @@ copycap_done:
 	.type	copycommon,@function
 
 copycommon:
-	adr	x6, copyio_fault /* Get the handler address */
-	SET_FAULT_HANDLER(x6, x7) /* Set the handler */
+	adr	x6, copyio_fault	/* Get the handler address */
+	SET_FAULT_HANDLER(x6, x7)	/* Set the handler */
 	ENTER_USER_ACCESS(w6, x7)
 
 	mov	x5, #0			/* x5 is the offset to load/store */
 
-	/* Check alignment. The bottom 4 bits must be identical. */
-	gcvalue	x4, c0			/* Read the source capability value */
-	and	x3, x4, 0x0f
-	cbz	x3, copy_main
+	cmp	x2, #8
+	b.lo	copy_end_bytes		/* Byte-copy if len < 8 */
 
+	/*
+	 * Compare lower bits of src and dest.
+	 * If they are aligned with each other, we can do a dword copy.
+	 */
+	gcvalue	x3, c0
+	gcvalue	x4, c1
+	and	x3, x3, #0x03
+	and	x4, x4, #0x03
+	cmp	x3, x4
+	b.ne	copy_end_bytes		/* Misaligned. Go to byte copy */
+	cbz	x3, copy_main		/* Already word-aligned, skip ahead */
+
+	/* Byte copy until the first word-aligned address */
+copy_byte_by_byte:
+	ldrb	w4, [c0, x5]		/* Load byte from src */
+	strb	w4, [c1, x5]		/* Store byte in dest */
+	sub	x2, x2, #1		/* len-- */
+	add	x3, x3, #1		/* dword_off++ */
+	add	x5, x5, #1		/* off++ */
+	cmp	x3, #8
+	b.lo	copy_byte_by_byte	/* Again if dword_off < 8 */
+
+	/* Copy words */
 copy_main:
 	cmp	x2, #8
 	b.lo	copy_end_bytes
-1:	ldr	x4, [c0, x5]
-	str	x4, [c1, x5]
-	sub	x2, x2, #8
-	add	x5, x5, #8
+1:	ldr	x4, [c0, x5]		/* Load dword from src */
+	str	x4, [c1, x5]		/* Store dword in dest */
+	sub	x2, x2, #8		/* len -= 8 */
+	add	x5, x5, #8		/* off += 8 */
 	cmp	x2, #8
-	b.ge	1b
+	b.ge	1b			/* Again if len >= 8 */
+
+	/* Check if we're finished */
 	cbz	x2, copy_done
 
+	/* Copy any remaining bytes */
 copy_end_bytes:
-	ldrb	w3, [c0, x5]
-	strb	w3, [c1, x5]
-	sub	x2, x2, #1
-	add	x5, x5, #1
+	ldrb	w3, [c0, x5]		/* Load byte from src */
+	strb	w3, [c1, x5]		/* Store byte in dest */
+	sub	x2, x2, #1		/* len-- */
+	add	x5, x5, #1		/* off++ */
 	cbnz	x2, copy_end_bytes
 
 copy_done:
 	EXIT_USER_ACCESS(w6)
-	SET_FAULT_HANDLER(xzr, x7) /* Clear the handler */
+	SET_FAULT_HANDLER(xzr, x7)	/* Clear the handler */
 
-	mov	x0, xzr		/* return 0 */
+	mov	x0, xzr			/* Return 0 */
 	ret
 	.size	copycommon, . - copycommon
 #endif
