@@ -57,6 +57,9 @@ __FBSDID("$FreeBSD$");
 /*
  * Fault handler for the copy{in,out} functions below.
  */
+#if __has_feature(capabilities)
+	.arch_extension	c64
+#endif
 ENTRY(copyio_c64_fault)
 	EXIT_C64
 EENTRY(copyio_fault)
@@ -125,7 +128,7 @@ ENTRY(copyinstr)
 	scbnds	c1, c1, x2		/* Set the bounds */
 #endif
 
-	adr	x6, copyio_c64_fault /* Get the handler address */
+	adr	x6, copyio_fault /* Get the handler address */
 	SET_FAULT_HANDLER(x6, x7) /* Set the handler */
 
 	ldr	x7, =VM_MAXUSER_ADDRESS

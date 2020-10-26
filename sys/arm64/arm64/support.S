@@ -57,7 +57,6 @@ __FBSDID("$FreeBSD$");
  * One of the fu* or su* functions failed, return -1.
  */
 ENTRY(fsu_fault)
-	EXIT_C64
 	SET_FAULT_HANDLER(xzr, x1)	/* Reset the handler function */
 	EXIT_USER_ACCESS_CHECK(w0, x1)
 fsu_fault_nopcb:
