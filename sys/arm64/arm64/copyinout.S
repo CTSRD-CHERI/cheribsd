@@ -294,7 +294,7 @@ ENTRY(copyincap)
 	and	x3, x3, #0xf		/* Check the lower bits */
 	cbnz	x3, copycommon		/* If different don't copy tags */
 
-	b	copytagcommon
+	b	copycapcommon
 
 1:	mov	x0, xzr		/* return 0 */
 	ret
@@ -324,7 +324,7 @@ ENTRY(copyoutcap)
 	and	x3, x3, #0xf		/* Check the lower bits */
 	cbnz	x3, copycommon		/* If different don't copy tags */
 
-	b	copytagcommon
+	b	copycapcommon
 
 1:	mov	x0, xzr		/* return 0 */
 	ret
@@ -338,15 +338,15 @@ END(copyoutcap)
  * x2 - size
  * lr - the return address, so jump here instead of calling
  *
- * In copytagcommon the bottom 4 bits of c0 and c1 must be identical so
+ * In copycapcommon the bottom 4 bits of c0 and c1 must be identical so
  * they can both be aligned load & store capabilities.
  */
 	.text
 	.align	4
-	.local	copytagcommon
-	.type	copytagcommon,@function
+	.local	copycapcommon
+	.type	copycapcommon,@function
 
-copytagcommon:
+copycapcommon:
 	adr	x6, copyio_fault /* Get the handler address */
 	SET_FAULT_HANDLER(x6, x7) /* Set the handler */
 	ENTER_USER_ACCESS(w6, x7)
@@ -356,42 +356,42 @@ copytagcommon:
 	/* Check alignment. The bottom 4 bits must be identical. */
 	gcvalue	x4, c0			/* Read the source capability value */
 	and	x3, x4, 0x0f
-	cbz	x3, captag_main
+	cbz	x3, copycap_main
 
-captag_byte_by_byte:
+copycap_byte_by_byte:
 	ldrb	w4, [c0, x5]
 	strb	w4, [c1, x5]
 	sub	x2, x2, #1
 	add	x3, x3, #1
 	add	x5, x5, #1
 	cmp	x3, #0x20
-	b.lo	captag_byte_by_byte
+	b.lo	copycap_byte_by_byte
 
-captag_main:
+copycap_main:
 	cmp	x2, #16
-	b.lo	captag_end_bytes
+	b.lo	copycap_end_bytes
 1:	ldr	c4, [c0, x5]
 	str	c4, [c1, x5]
 	sub	x2, x2, #16
 	add	x5, x5, #16
 	cmp	x2, #16
 	b.ge	1b
-	cbz	x2, captag_done
+	cbz	x2, copycap_done
 
-captag_end_bytes:
+copycap_end_bytes:
 	ldrb	w3, [c0, x5]
 	strb	w3, [c1, x5]
 	sub	x2, x2, #1
 	add	x5, x5, #1
-	cbnz	x2, captag_end_bytes
+	cbnz	x2, copycap_end_bytes
 
-captag_done:
+copycap_done:
 	EXIT_USER_ACCESS(w6)
 	SET_FAULT_HANDLER(xzr, x7) /* Clear the handler */
 
 	mov	x0, xzr		/* return 0 */
 	ret
-	.size	copytagcommon, . - copytagcommon
+	.size	copycapcommon, . - copycapcommon
 
 	.text
 	.align	4
@@ -408,27 +408,27 @@ copycommon:
 	/* Check alignment. The bottom 4 bits must be identical. */
 	gcvalue	x4, c0			/* Read the source capability value */
 	and	x3, x4, 0x0f
-	cbz	x3, cap_main
+	cbz	x3, copy_main
 
-cap_main:
+copy_main:
 	cmp	x2, #8
-	b.lo	cap_end_bytes
+	b.lo	copy_end_bytes
 1:	ldr	x4, [c0, x5]
 	str	x4, [c1, x5]
 	sub	x2, x2, #8
 	add	x5, x5, #8
 	cmp	x2, #8
 	b.ge	1b
-	cbz	x2, cap_done
+	cbz	x2, copy_done
 
-cap_end_bytes:
+copy_end_bytes:
 	ldrb	w3, [c0, x5]
 	strb	w3, [c1, x5]
 	sub	x2, x2, #1
 	add	x5, x5, #1
-	cbnz	x2, cap_end_bytes
+	cbnz	x2, copy_end_bytes
 
-cap_done:
+copy_done:
 	EXIT_USER_ACCESS(w6)
 	SET_FAULT_HANDLER(xzr, x7) /* Clear the handler */
 
