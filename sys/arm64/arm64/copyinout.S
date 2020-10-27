@@ -281,7 +281,7 @@ ENTRY(copyincap)
 	check_user_access 0, 2, copyio_fault_nopcb
 
 	/* Create a capability from kdaddr */
-	mov	x5, x1			/* Backup kdaddr */
+	mov	x5, x1			/* Backup kaddr */
 	cvtd	c1, x1			/* Store through a capability */
 	scbnds	c1, c1, x2		/* Set the bounds */
 
@@ -290,7 +290,8 @@ ENTRY(copyincap)
 	b.lo	copycommon
 
 	/* And the addresses will both align on a capability */
-	eor	x3, x6, x5		/* Compare the pointers */
+	gcvalue	x6, c0			/* Get uaddr's address */
+	eor	x3, x5, x6		/* Compare the addresses */
 	and	x3, x3, #0xf		/* Check the lower bits */
 	cbnz	x3, copycommon		/* If different don't copy tags */
 
@@ -320,7 +321,8 @@ ENTRY(copyoutcap)
 	b.lo	copycommon
 
 	/* And the addresses will both align on a capability */
-	eor	x3, x6, x5		/* Compare the pointers */
+	gcvalue	x6, c1			/* Get uaddr's address */
+	eor	x3, x5, x6		/* Compare the addresses */
 	and	x3, x3, #0xf		/* Check the lower bits */
 	cbnz	x3, copycommon		/* If different don't copy tags */
 
