@@ -90,7 +90,7 @@ ENTRY(longjmp)
 	add	sp, sp, #(REG_WIDTH * 4)
 
 	/* Check the magic value */
-	ldr	x8, [REG(0)], #8
+	ldr	REG(8), [REG(0)], #(REG_WIDTH)
 	ldr	x9, .Lmagic
 	cmp	x8, x9
 	b.ne	botch
