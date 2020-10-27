@@ -180,8 +180,12 @@ static void
 align_abort(struct thread *td, struct trapframe *frame, uint64_t esr,
     uint64_t far, int lower)
 {
-	if (!lower)
+	if (!lower) {
+		print_registers(frame);
+		printf(" far: %16lx\n", far);
+		printf(" esr:         %.8lx\n", esr);
 		panic("Misaligned access from kernel space!");
+	}
 
 	call_trapsignal(td, SIGBUS, BUS_ADRALN,
 	    (void * __capability)frame->tf_elr);
