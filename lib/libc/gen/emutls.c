@@ -78,13 +78,12 @@ struct emutls_array_list {
  */
 static _Atomic uintptr_t emutls_head;
 #else
+static pthread_once_t emutls_once = PTHREAD_ONCE_INIT;
 static pthread_key_t emutls_pthread_key;
 static void *emutls_specific = NULL; /* Used in the unthreaded case */
 #endif
 
-static pthread_once_t emutls_once = PTHREAD_ONCE_INIT;
-static _Atomic size_t emutls_next_index = 1;
-static pthread_mutex_t emutls_mutex;
+static _Atomic size_t emutls_next_index = 2;
 
 #ifdef EMUTLS_LIBC
 static void *
@@ -136,13 +135,11 @@ emutls_free(void *ptr)
 
 	free(ptr);
 }
-#endif
 
 static void
 emutls_init_once(void)
 {
 
-#ifndef EMUTLS_LIBC
 	/* TODO: Create a destructor to clean up */
 	pthread_key_create(&emutls_pthread_key, NULL);
 
@@ -153,24 +150,19 @@ emutls_init_once(void)
 	pthread_setspecific(emutls_pthread_key, (void*)42);
 	if (pthread_getspecific(emutls_pthread_key) != (void*)42) {
 		/*
-		 * Set no non-NULL to indicate
+		 * Set to non-NULL to indicate
 		 * pthread_setspecific/pthread_getspecific doesn't work.
 		 */
 		emutls_specific = (void *)42;
 	}
-#endif
-
-	if (pthread_mutex_init(&emutls_mutex, NULL) != 0)
-		abort();
 }
+#endif
 
 static void
 emutls_init(void)
 {
 
-#ifdef EMUTLS_LIBC
-	_once(&emutls_once, emutls_init_once);
-#else
+#ifndef EMUTLS_LIBC
 	pthread_once(&emutls_once, emutls_init_once);
 #endif
 }
