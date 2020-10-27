@@ -189,8 +189,10 @@ __rederive_pointer(void *ptr)
 	TLS_MALLOC_LOCK;
 	for (i = 0; i < n_pagepools; i++) {
 		char *pool = pagepool_list[i];
-		if (cheri_is_address_inbounds(pool, addr))
+		if (cheri_is_address_inbounds(pool, addr)) {
+			TLS_MALLOC_UNLOCK;
 			return (cheri_setaddress(pool, addr));
+		}
 	}
 	TLS_MALLOC_UNLOCK;
 
@@ -238,8 +240,10 @@ __tls_malloc(size_t nbytes)
 	TLS_MALLOC_LOCK;
 	if ((op = nextf[bucket]) == NULL) {
 		morecore(bucket);
-		if ((op = nextf[bucket]) == NULL)
+		if ((op = nextf[bucket]) == NULL) {
+			TLS_MALLOC_UNLOCK;
 			return (NULL);
+		}
 	}
 	/* remove from linked list */
 	nextf[bucket] = op->ov_next;
