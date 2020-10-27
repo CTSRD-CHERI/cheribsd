@@ -257,6 +257,10 @@ static int vtnet_mrg_rxbuf_disable = 0;
 TUNABLE_INT("hw.vtnet.mrg_rxbuf_disable", &vtnet_mrg_rxbuf_disable);
 SYSCTL_INT(_hw_vtnet, OID_AUTO, mrg_rxbuf_disable, CTLFLAG_RDTUN,
     &vtnet_mrg_rxbuf_disable, 0, "Disables Merge Receive Buffers support");
+static int vtnet_event_idx_disable = 0;
+TUNABLE_INT("hw.vtnet.event_idx_disable", &vtnet_event_idx_disable);
+SYSCTL_INT(_hw_vtnet, OID_AUTO, event_idx_disable, CTLFLAG_RDTUN,
+    &vtnet_event_idx_disable, 0, "Disables Event Index support");
 static int vtnet_mq_max_pairs = VTNET_MAX_QUEUE_PAIRS;
 TUNABLE_INT("hw.vtnet.mq_max_pairs", &vtnet_mq_max_pairs);
 SYSCTL_INT(_hw_vtnet, OID_AUTO, mq_max_pairs, CTLFLAG_RDTUN,
@@ -593,6 +597,8 @@ vtnet_negotiate_features(struct vtnet_softc *sc)
 		mask |= VTNET_LRO_FEATURES;
 	if (vtnet_tunable_int(sc, "mrg_rxbuf_disable", vtnet_mrg_rxbuf_disable))
 		mask |= VIRTIO_NET_F_MRG_RXBUF;
+	if (vtnet_tunable_int(sc, "event_idx_disable", vtnet_event_idx_disable))
+		mask |= VIRTIO_RING_F_EVENT_IDX;
 #ifndef VTNET_LEGACY_TX
 	if (vtnet_tunable_int(sc, "mq_disable", vtnet_mq_disable))
 		mask |= VIRTIO_NET_F_MQ;
