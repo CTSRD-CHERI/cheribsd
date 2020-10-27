@@ -80,8 +80,8 @@
 #endif
 
 static spinlock_t tls_malloc_lock = _SPINLOCK_INITIALIZER;
-#define	TLS_MALLOC_LOCK		_SPINLOCK(&tls_malloc_lock)
-#define	TLS_MALLOC_UNLOCK	_SPINUNLOCK(&tls_malloc_lock)
+#define	TLS_MALLOC_LOCK		if (__isthreaded) _SPINLOCK(&tls_malloc_lock)
+#define	TLS_MALLOC_UNLOCK	if (__isthreaded) _SPINUNLOCK(&tls_malloc_lock)
 union overhead;
 static void morecore(int);
 static void *__tls_malloc_aligned(size_t size, size_t align);
