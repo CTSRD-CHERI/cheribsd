@@ -464,10 +464,10 @@ fill_capregs(struct thread *td, struct capreg *regs)
 	regs->ddc = frame->tf_ddc;
 	regs->ctpidr = td->td_pcb->pcb_tpidr_el0;
 	regs->ctpidrro = td->td_pcb->pcb_tpidrro_el0;
-	regs->cid = READ_SPECIALREG_CAP(cid_el0);
-	regs->rcsp = READ_SPECIALREG_CAP(rcsp_el0);
-	regs->rddc = READ_SPECIALREG_CAP(rddc_el0);
-	regs->rctpidr = READ_SPECIALREG_CAP(rctpidr_el0);
+	regs->cid = td->td_pcb->pcb_cid_el0;
+	regs->rcsp = td->td_pcb->pcb_rcsp_el0;
+	regs->rddc = td->td_pcb->pcb_rddc_el0;
+	regs->rctpidr = td->td_pcb->pcb_rctpidr_el0;
 
 	for (i = 0; i < nitems(frame->tf_x); i++) {
 		regs->c[i] = frame->tf_x[i];
@@ -555,6 +555,16 @@ exec_setregs(struct thread *td, struct image_params *imgp, uintcap_t stack)
 	hybridabi_thread_setregs(td, imgp->entry_addr);
 #else
 	tf->tf_elr = imgp->entry_addr;
+#endif
+#if __has_feature(capabilities)
+	td->td_pcb->pcb_cid_el0 = 0;
+	td->td_pcb->pcb_rcsp_el0 = 0;
+	td->td_pcb->pcb_rddc_el0 = 0;
+	td->td_pcb->pcb_rctpidr_el0 = 0;
+	WRITE_SPECIALREG_CAP(cid_el0, 0);
+	WRITE_SPECIALREG_CAP(rcsp_el0, 0);
+	WRITE_SPECIALREG_CAP(rddc_el0, 0);
+	WRITE_SPECIALREG_CAP(rctpidr_el0, 0);
 #endif
 }
 
