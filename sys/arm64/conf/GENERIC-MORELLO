@@ -228,3 +228,8 @@ device		bpf		# Berkeley packet filter
 
 options 	FDT
 device		acpi
+
+# Arm Fast Models have a broken implementation for legacy transport and fail to
+# allow for the increased header size on the transmit path (which is just zero
+# padding there), only allowing for it on the receive path.
+envvar		hw.vtnet.mrg_rxbuf_disable="1"
