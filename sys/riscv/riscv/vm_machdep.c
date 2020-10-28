@@ -56,6 +56,10 @@ __FBSDID("$FreeBSD$");
 #include <machine/frame.h>
 #include <machine/sbi.h>
 
+#if __has_feature(capabilities)
+#include <cheri/cheri.h>
+#endif
+
 /* sizeof(struct tcb) */
 #define	TP_OFFSET	(2 * sizeof(void * __capability))
 #ifdef COMPAT_FREEBSD64
@@ -123,6 +127,10 @@ cpu_fork(struct thread *td1, struct proc *p2, struct thread *td2, int flags)
 	/* Setup to release spin count in fork_exit(). */
 	td2->td_md.md_spinlock_count = 1;
 	td2->td_md.md_saved_sstatus_ie = (SSTATUS_SIE);
+
+#ifdef CPU_CHERI
+        colocation_cleanup(td2);
+#endif
 }
 
 void
@@ -258,6 +266,10 @@ cpu_thread_alloc(struct thread *td)
 	p = (char *)td->td_pcb - sizeof(uintcap_t);
 #endif
 	td->td_frame = (struct trapframe *)STACKALIGN(p) - 1;
+
+#ifdef CPU_CHERI
+        colocation_cleanup(td);
+#endif
 }
 
 void
