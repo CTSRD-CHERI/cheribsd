@@ -91,6 +91,12 @@ ENTRY(cpu_throw)
 	ldp	c5, c6, [x4, #PCB_TPIDR]
 	msr	ctpidr_el0, c5
 	msr	ctpidrro_el0, c6
+	ldp	c5, c6, [x4, #PCB_CID]
+	msr	cid_el0, c5
+	msr	rcsp_el0, c6
+	ldp	c5, c6, [x4, #PCB_RDDC]
+	msr	rddc_el0, c5
+	msr	rctpidr_el0, c6
 #else
 	ldp	x5, x6, [x4, #PCB_SP]
 	mov	sp, x5
@@ -148,6 +154,12 @@ ENTRY(cpu_switch)
 	mrs	c5, ctpidr_el0
 	mrs	c6, ctpidrro_el0
 	stp	c5, c6, [x4, #PCB_TPIDR]
+	mrs	c5, cid_el0
+	mrs	c6, rcsp_el0
+	stp	c5, c6, [x4, #PCB_CID]
+	mrs	c5, rddc_el0
+	mrs	c6, rctpidr_el0
+	stp	c5, c6, [x4, #PCB_RDDC]
 #else
 	mrs	x6, tpidrro_el0
 	str	x6, [x4, #PCB_TPIDRRO]
@@ -203,6 +215,12 @@ ENTRY(cpu_switch)
 	ldp	c5, c6, [x4, #PCB_TPIDR]
 	msr	ctpidr_el0, c5
 	msr	ctpidrro_el0, c6
+	ldp	c5, c6, [x4, #PCB_CID]
+	msr	cid_el0, c5
+	msr	rcsp_el0, c6
+	ldp	c5, c6, [x4, #PCB_RDDC]
+	msr	rddc_el0, c5
+	msr	rctpidr_el0, c6
 #else
 	ldp	x5, x6, [x4, #PCB_SP]
 	mov	sp, x5
@@ -341,6 +359,12 @@ ENTRY(savectx)
 	mrs	c5, ctpidr_el0
 	mrs	c6, ctpidrro_el0
 	stp	c5, c6, [x0, #PCB_TPIDR]
+	mrs	c5, cid_el0
+	mrs	c6, rcsp_el0
+	stp	c5, c6, [x0, #PCB_CID]
+	mrs	c5, rddc_el0
+	mrs	c6, rctpidr_el0
+	stp	c5, c6, [x0, #PCB_RDDC]
 #else
 	mrs	x6, tpidrro_el0
 	str	x6, [x0, #PCB_TPIDRRO]
