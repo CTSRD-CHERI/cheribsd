@@ -40,6 +40,8 @@
 #include <machine/frame.h>
 #include <machine/vmparam.h>
 
+void * __capability sentry_unsealcap;
+
 void
 cheri_init_capabilities(void * __capability kroot)
 {
@@ -60,6 +62,11 @@ cheri_init_capabilities(void * __capability kroot)
 	ctemp = cheri_setbounds(ctemp, CHERI_SEALCAP_USERSPACE_LENGTH);
 	ctemp = cheri_andperm(ctemp, CHERI_SEALCAP_USERSPACE_PERMS);
 	userspace_root_sealcap = ctemp;
+
+	ctemp = cheri_setaddress(kroot, CHERI_OTYPE_SENTRY);
+	ctemp = cheri_setbounds(ctemp, 1);
+	ctemp = cheri_andperm(ctemp, CHERI_PERM_UNSEAL);
+	sentry_unsealcap = ctemp;
 
 	swap_restore_cap = kroot;
 }
