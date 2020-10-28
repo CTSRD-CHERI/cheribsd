@@ -91,7 +91,9 @@ typedef void (abort_handler)(struct thread *, struct trapframe *, uint64_t,
     uint64_t, int);
 
 static abort_handler align_abort;
+#if __has_feature(capabilities)
 static abort_handler cap_abort;
+#endif
 static abort_handler data_abort;
 
 static abort_handler *abort_handlers[] = {
@@ -106,10 +108,13 @@ static abort_handler *abort_handlers[] = {
 	[ISS_DATA_DFSC_PF_L2] = data_abort,
 	[ISS_DATA_DFSC_PF_L3] = data_abort,
 	[ISS_DATA_DFSC_ALIGN] = align_abort,
+#if __has_feature(capabilities)
 	[ISS_DATA_DFSC_CAP_TAG] = cap_abort,
 	[ISS_DATA_DFSC_CAP_SEALED] = cap_abort,
 	[ISS_DATA_DFSC_CAP_BOUND] = cap_abort,
 	[ISS_DATA_DFSC_CAP_PERM] = cap_abort,
+	[ISS_DATA_DFSC_LC_SC] = data_abort,
+#endif
 };
 
 static __inline void
@@ -192,6 +197,7 @@ align_abort(struct thread *td, struct trapframe *frame, uint64_t esr,
 	userret(td, frame);
 }
 
+#if __has_feature(capabilities)
 static void
 cap_abort(struct thread *td, struct trapframe *frame, uint64_t esr,
     uint64_t far, int lower)
@@ -205,13 +211,9 @@ cap_abort(struct thread *td, struct trapframe *frame, uint64_t esr,
 		    pcb->pcb_onfault != 0) {
 			frame->tf_x[0] = EPROT;
 			onfault = pcb->pcb_onfault;
-#if __has_feature(capabilities)
 			trapframe_set_elr(frame,
 			    (uintcap_t)cheri_setaddress(cheri_getpcc(),
 			    onfault));
-#else
-			frame->tf_elr = onfault;
-#endif
 			return;
 		}
 		print_registers(frame);
@@ -223,6 +225,7 @@ cap_abort(struct thread *td, struct trapframe *frame, uint64_t esr,
 	    (void * __capability)frame->tf_elr);
 	userret(td, frame);
 }
+#endif
 
 static void
 data_abort(struct thread *td, struct trapframe *frame, uint64_t esr,
@@ -290,19 +293,30 @@ data_abort(struct thread *td, struct trapframe *frame, uint64_t esr,
 		panic("data abort in critical section or under mutex");
 	}
 
-	switch (ESR_ELx_EXCEPTION(esr)) {
-	case EXCP_INSN_ABORT:
-	case EXCP_INSN_ABORT_L:
-		ftype = VM_PROT_EXECUTE;
-		break;
-	default:
-		ftype = (esr & ISS_DATA_WnR) == 0 ? VM_PROT_READ :
-		    VM_PROT_READ | VM_PROT_WRITE;
-		break;
-	}
+#if __has_feature(capabilities)
+	if ((esr & ISS_DATA_DFSC_MASK) == ISS_DATA_DFSC_LC_SC) {
+		sig = SIGSEGV;
+		ucode = (esr & ISS_DATA_WnR) == 0 ? SEGV_LOADTAG :
+		    SEGV_STORETAG;
+		error = KERN_FAILURE;
+	} else
+#endif
+	{
+		switch (ESR_ELx_EXCEPTION(esr)) {
+		case EXCP_INSN_ABORT:
+		case EXCP_INSN_ABORT_L:
+			ftype = VM_PROT_EXECUTE;
+			break;
+		default:
+			ftype = (esr & ISS_DATA_WnR) == 0 ? VM_PROT_READ :
+			    VM_PROT_READ | VM_PROT_WRITE;
+			break;
+		}
 
-	/* Fault in the page. */
-	error = vm_fault_trap(map, far, ftype, VM_FAULT_NORMAL, &sig, &ucode);
+		/* Fault in the page. */
+		error = vm_fault_trap(map, far, ftype, VM_FAULT_NORMAL, &sig,
+		    &ucode);
+	}
 	if (error != KERN_SUCCESS) {
 		if (lower) {
 			call_trapsignal(td, sig, ucode,
