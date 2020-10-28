@@ -27,7 +27,11 @@ SRCS+=  teken.c
 
 .if ${MACHINE_CPUARCH} == "amd64" || ${MACHINE_CPUARCH} == "i386"
 SRCS+=	time.c
+.elif ${MACHINE_CPUARCH} == "aarch64"
+# XXX: time_event.c does not work as expected on the FVP so use time.c instead.
+SRCS+=	time.c
 .elif ${MACHINE_CPUARCH} == "aarch64" || ${MACHINE_CPUARCH} == "arm"
+# Note: this appears to be broken on the FVP?
 SRCS+=	time_event.c
 .endif
 
