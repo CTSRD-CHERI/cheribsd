@@ -69,7 +69,6 @@ __FBSDID("$FreeBSD$");
 #include <compat/freebsd64/freebsd64_syscall.h>
 #include <compat/freebsd64/freebsd64_util.h>
 
-extern void * __capability userspace_cap;
 extern u_long elf_hwcap;
 
 static void	freebsd64_sendsig(sig_t, ksiginfo_t *, sigset_t *);

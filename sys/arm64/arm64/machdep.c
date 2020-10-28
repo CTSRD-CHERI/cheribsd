@@ -101,8 +101,6 @@ __FBSDID("$FreeBSD$");
 #include <dev/ofw/openfirm.h>
 #endif
 
-extern void * __capability userspace_cap;
-
 static void get_fpcontext(struct thread *td, mcontext_t *mcp);
 static void set_fpcontext(struct thread *td, mcontext_t *mcp);
 

@@ -41,17 +41,13 @@
 static __inline void
 trapframe_set_elr(struct trapframe *tf, uintcap_t elr)
 {
-	if (cheri_getsealed(elr)) {
-		/*
-		 * TODO: add and initialize a distinct sealcap, remove
-		 * sealing perms from userspace_cap.
-		 */
-		elr = cheri_unseal(elr, cheri_setaddress(userspace_cap,
-		    CHERI_OTYPE_SENTRY));
-	}
+	extern void * __capability sentry_unsealcap;
+
+	if (cheri_getsealed(elr))
+		elr = cheri_unseal(elr, sentry_unsealcap);
 	if (elr & 0x1) {
 		tf->tf_spsr |= PSR_C64;
-		elr = cheri_incoffset(elr, -1);
+		--elr;
 	} else {
 		tf->tf_spsr &= ~PSR_C64;
 	}
