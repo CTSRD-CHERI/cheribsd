@@ -101,15 +101,13 @@ typedef	uint64_t	pt_entry_t;		/* page table entry */
 
 #if __has_feature(capabilities)
 /*
- * The aarch64 orr instruction only works when we split this into two
- * values to be used in two orr instructions
+ * The aarch64 orr instruction cannot handle ATTR_DEFAULT |
+ * ATTR_CAP_RW as a single operand, so separate orr instructions are
+ * required for ATTR_CAP_RW.
  */
-#define	ATTR_DEFAULT_LOW	(ATTR_AF | ATTR_SH(ATTR_SH_IS))
-#define	ATTR_DEFAULT_HIGH	(ATTR_LC_ENABLED | ATTR_SC)
-#define	ATTR_DEFAULT		(ATTR_DEFAULT_LOW | ATTR_DEFAULT_HIGH)
-#else
-#define	ATTR_DEFAULT	(ATTR_AF | ATTR_SH(ATTR_SH_IS))
+#define	ATTR_CAP_RW	(ATTR_LC_ENABLED | ATTR_SC)
 #endif
+#define	ATTR_DEFAULT	(ATTR_AF | ATTR_SH(ATTR_SH_IS))
 
 #define	ATTR_DESCR_MASK		3
 #define	ATTR_DESCR_VALID	1
