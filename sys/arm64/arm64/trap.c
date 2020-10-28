@@ -206,21 +206,12 @@ cap_abort(struct thread *td, struct trapframe *frame, uint64_t esr,
 			frame->tf_x[0] = EPROT;
 			onfault = pcb->pcb_onfault;
 #if __has_feature(capabilities)
-			/*
-			 * Morello does not clear the LSB on ERET nor does it
-			 * set PSTATE.C64 on ERET. We also need to derive a
-			 * capability.
-			 */
-			onfault = (uintcap_t)cheri_setaddress(cheri_getpcc(),
-			    onfault);
-			if (onfault & 0x1) {
-				frame->tf_spsr |= PSR_C64;
-				--onfault;
-			} else {
-				frame->tf_spsr &= ~PSR_C64;
-			}
-#endif
+			trapframe_set_elr(frame,
+			    (uintcap_t)cheri_setaddress(cheri_getpcc(),
+			    onfault));
+#else
 			frame->tf_elr = onfault;
+#endif
 			return;
 		}
 		print_registers(frame);
@@ -322,21 +313,12 @@ data_abort(struct thread *td, struct trapframe *frame, uint64_t esr,
 				frame->tf_x[0] = error;
 				onfault = pcb->pcb_onfault;
 #if __has_feature(capabilities)
-				/*
-				 * Morello does not clear the LSB on ERET nor
-				 * does it set PSTATE.C64 on ERET. We also need
-				 * to derive a capability.
-				 */
-				onfault = (uintcap_t)cheri_setaddress(
-				    cheri_getpcc(), onfault);
-				if (onfault & 0x1) {
-					frame->tf_spsr |= PSR_C64;
-					--onfault;
-				} else {
-					frame->tf_spsr &= ~PSR_C64;
-				}
-#endif
+				trapframe_set_elr(frame,
+				    (uintcap_t)cheri_setaddress(cheri_getpcc(),
+				    onfault));
+#else
 				frame->tf_elr = onfault;
+#endif
 				return;
 			}
 

@@ -299,27 +299,7 @@ freebsd64_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	tf->tf_x[1] = (uintcap_t)&fp->sf_si;
 	tf->tf_x[2] = (uintcap_t)&fp->sf_uc;
 
-	/*
-	 * catcher may or may not be a sentry. The LSB of its address will be
-	 * either set or unset depending on whether the code is C64 or A64.
-	 * Morello does not (unlike how Thumb code is handled) clear the LSB on
-	 * ERET, so do this manually.
-	 */
-	if (cheri_getsealed(catcher)) {
-		/*
-		 * TODO: add and initialize a distinct sealcap, remove sealing perms
-		 * from userspace_cap.
-		 */
-		catcher = cheri_unseal(catcher,
-		    cheri_setaddress(userspace_cap, CHERI_OTYPE_SENTRY));
-	}
-	if ((uintcap_t)catcher & 0x1) {
-		tf->tf_spsr |= PSR_C64;
-		catcher = cheri_incoffset(catcher, -1);
-	} else {
-		tf->tf_spsr &= ~PSR_C64;
-	}
-	tf->tf_elr = (uintcap_t)catcher;
+	trapframe_set_elr(tf, (uintcap_t)catcher);
 	tf->tf_sp = (uintcap_t)fp;
 
 	sysent = p->p_sysent;
