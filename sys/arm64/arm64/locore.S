@@ -676,11 +676,9 @@ build_l1_block_pagetable:
 	/* Build the L1 block entry */
 	orr	x12, x7, #L1_BLOCK
 #if __has_feature(capabilities)
-	orr	x12, x12, #(ATTR_DEFAULT_LOW)
-	orr	x12, x12, #(ATTR_DEFAULT_HIGH)
-#else
-	orr	x12, x12, #(ATTR_DEFAULT)
+	orr	x12, x12, #(ATTR_CAP_RW)
 #endif
+	orr	x12, x12, #(ATTR_DEFAULT)
 
 	/* Only use the output address bits */
 	lsr	x9, x9, #L1_SHIFT
@@ -719,11 +717,9 @@ build_l2_block_pagetable:
 	lsl	x12, x7, #2
 	orr	x12, x12, #L2_BLOCK
 #if __has_feature(capabilities)
-	orr	x12, x12, #(ATTR_DEFAULT_LOW)
-	orr	x12, x12, #(ATTR_DEFAULT_HIGH)
-#else
-	orr	x12, x12, #(ATTR_DEFAULT)
+	orr	x12, x12, #(ATTR_CAP_RW)
 #endif
+	orr	x12, x12, #(ATTR_DEFAULT)
 	orr	x12, x12, #(ATTR_S1_UXN)
 
 	/* Only use the output address bits */
