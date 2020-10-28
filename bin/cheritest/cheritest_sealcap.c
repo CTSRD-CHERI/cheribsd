@@ -75,17 +75,11 @@ test_sealcap_sysctl(const struct cheri_test *ctp __unused)
 		cheritest_failure_errx("offset %jx (expected %jx)", v,
 		    (uintmax_t)CHERI_SEALCAP_USERSPACE_OFFSET);
 
-	/* Type -- should be (-1) for an unsealed capability (0 on Morello). */
+	/* Type -- should be CHERI_OTYPE_UNSEALED i.e. -1 (0 on Morello) */
 	v = cheri_gettype(sealcap);
-#ifdef __aarch64__
-	if (v != 0)
+	if (v != CHERI_OTYPE_UNSEALED)
 		cheritest_failure_errx("otype %jx (expected %jx)", v,
-		    (uintmax_t)0);
-#else
-	if (v != 0xffffffffffffffff)
-		cheritest_failure_errx("otype %jx (expected %jx)", v,
-		    (uintmax_t)0xffffffffffffffff);
-#endif
+		    (uintmax_t)CHERI_OTYPE_UNSEALED);
 
 	/* Permissions. */
 	v = cheri_getperm(sealcap);
