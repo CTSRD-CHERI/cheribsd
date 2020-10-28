@@ -188,10 +188,13 @@ static const struct cheri_test cheri_tests[] = {
 	{ .ct_name = "test_fault_perm_seal",
 	  .ct_desc = "Exercise capability seal permission failure",
 	  .ct_func = test_fault_perm_seal,
+#ifndef __aarch64__
 	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
 	  .ct_signum = SIGPROT,
 	  .ct_si_code = PROT_CHERI_PERM,
-	  .ct_si_trapno = TRAPNO_CHERI },
+	  .ct_si_trapno = TRAPNO_CHERI
+#endif
+  },
 
 	{ .ct_name = "test_fault_perm_store",
 	  .ct_desc = "Exercise capability store permission failure",
@@ -208,10 +211,13 @@ static const struct cheri_test cheri_tests[] = {
 	{ .ct_name = "test_fault_perm_unseal",
 	  .ct_desc = "Exercise capability unseal permission failure",
 	  .ct_func = test_fault_perm_unseal,
+#ifndef __aarch64__
 	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
 	  .ct_signum = SIGPROT,
 	  .ct_si_code = PROT_CHERI_PERM,
-	  .ct_si_trapno = TRAPNO_CHERI },
+	  .ct_si_trapno = TRAPNO_CHERI
+#endif
+  },
 
 	{ .ct_name = "test_fault_tag",
 	  .ct_desc = "Store via untagged capability",

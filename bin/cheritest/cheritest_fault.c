@@ -109,6 +109,11 @@ test_fault_perm_seal(const struct cheri_test *ctp __unused)
 		cheritest_failure_err("sysctlbyname(security.cheri.sealcap)");
 	sealcap = cheri_andperm(sealcap, ~CHERI_PERM_SEAL);
 	sealed = cheri_seal(ip, sealcap);
+  /* Morello clears tag rather than faulting. */
+#ifdef __aarch64__
+  if (!cheri_gettag(sealed))
+    cheritest_success();
+#endif
 	/*
 	 * Ensure that sealed is actually use, otherwise the faulting
 	 * instruction can be optimized away since it is dead.
@@ -155,6 +160,11 @@ test_fault_perm_unseal(const struct cheri_test *ctp __unused)
 	sealed = cheri_seal(ip, sealcap);
 	sealcap = cheri_andperm(sealcap, ~CHERI_PERM_UNSEAL);
 	unsealed = cheri_unseal(sealed, sealcap);
+  /* Morello clears tag rather than faulting. */
+#ifdef __aarch64__
+  if (!cheri_gettag(unsealed))
+    cheritest_success();
+#endif
 	/*
 	 * Ensure that unsealed is actually use, otherwise the faulting
 	 * instruction can be optimized away since it is dead.
