@@ -116,14 +116,27 @@ test_sealcap_sysctl(const struct cheri_test *ctp __unused)
 	if ((v & CHERI_PERM_SEAL) == 0)
 		cheritest_failure_errx("perms %jx (seal missing)", v);
 
+#ifdef __aarch64__
+	if ((v & CHERI_PERM_BRANCH_UNSEAL) != 0)
+		cheritest_failure_errx("perms %jx (branch_unseal present)", v);
+#else
 	if ((v & CHERI_PERM_CCALL) != 0)
 		cheritest_failure_errx("perms %jx (ccall present)", v);
+#endif
 
 	if ((v & CHERI_PERM_UNSEAL) == 0)
 		cheritest_failure_errx("perms %jx (unseal missing)", v);
 
 	if ((v & CHERI_PERM_SYSTEM_REGS) != 0)
 		cheritest_failure_errx("perms %jx (system_regs present)", v);
+
+#ifdef __aarch64__
+	if ((v & CHERI_PERM_EXECUTIVE) != 0)
+		cheritest_failure_errx("perms %jx (executive present)", v);
+
+	if ((v & CHERI_PERM_MUTABLE_LOAD) != 0)
+		cheritest_failure_errx("perms %jx (mutable_load present)", v);
+#endif
 
 	if ((v & CHERI_PERMS_SWALL) != 0)
 		cheritest_failure_errx("perms %jx (swperms present)", v);
