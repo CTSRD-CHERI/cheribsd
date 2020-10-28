@@ -98,8 +98,7 @@
 #define	CHERI_CAP_USER_MMAP_OFFSET	0x0
 
 /*
- * Root sealing capability for all userspace object capabilities.  This is
- * made available to userspace via a sysarch(2).
+ * Root sealing capability for all userspace object capabilities.
  */
 #define	CHERI_SEALCAP_USERSPACE_PERMS	CHERI_PERMS_USERSPACE_SEALCAP
 #define	CHERI_SEALCAP_USERSPACE_BASE	CHERI_OTYPE_USER_MIN

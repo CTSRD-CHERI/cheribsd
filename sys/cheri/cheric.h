@@ -137,8 +137,7 @@ cheri_is_address_inbounds(const void * __capability cap, vaddr_t addr)
 /*
  * Construct a capability suitable to describe a type identified by 'ptr';
  * set it to zero-length with the offset equal to the base.  The caller must
- * provide a root capability (in the old world order, derived from $ddc, but
- * in the new world order, likely extracted from the kernel using sysarch(2)).
+ * provide a root sealing capability.
  *
  * The caller may wish to assert various properties about the returned
  * capability, including that CHERI_PERM_SEAL is set.

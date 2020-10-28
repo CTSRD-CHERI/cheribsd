@@ -85,14 +85,7 @@ struct mdthread {
 #endif
 
 struct mdproc {
-	/*
-	 * Used only on CHERI kernels, but defined everywhere as we need
-	 * something in the struct as empty struct are undefined behavior.
-	 *
-	 * XXX-BD: In a coprocess world this might make more sense
-	 * attached to the vmspace (or at least near it).
-	 */
-	void * __kerncap md_cheri_sealcap;	/* Root of object-type tree. */
+	long md_dummy;
 };
 
 struct syscall_args {

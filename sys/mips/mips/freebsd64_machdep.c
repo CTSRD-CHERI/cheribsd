@@ -551,10 +551,6 @@ freebsd64_sysarch(struct thread *td, struct freebsd64_sysarch_args *uap)
 		return (0);
 #endif
 
-	case CHERI_GET_SEALCAP:
-		return (cheri_sysarch_getsealcap(td,
-		    __USER_CAP(uap->parms, sizeof(void * __capability))));
-
 	default:
 		return (EINVAL);
 	}

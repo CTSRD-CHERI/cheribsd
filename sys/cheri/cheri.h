@@ -97,8 +97,11 @@ void * __capability	_cheri_capability_build_user_rwx(uint32_t perms,
  * Global capabilities used to construct other capabilities.
  */
 
-/* Root of all userspace capabilities. */
+/* Root of all unsealed userspace capabilities. */
 extern void * __capability userspace_cap;
+
+/* Root of all sealed userspace capabilities. */
+extern void * __capability userspace_sealcap;
 
 /*
  * Omnipotent capability for restoring swapped capabilities.
@@ -134,15 +137,6 @@ int	cheri_syscall_authorize(struct thread *td, u_int code,
 	    int nargs, syscallarg_t *args);
 int	cheri_signal_sandboxed(struct thread *td);
 void	hybridabi_sendsig(struct thread *td);
-
-/*
- * Functions to set up and manipulate CHERI contexts and stacks.
- */
-struct pcb;
-struct proc;
-void	cheri_sealcap_copy(struct proc *dst, struct proc *src);
-void	cheri_signal_copy(struct pcb *dst, struct pcb *src);
-int	cheri_sysarch_getsealcap(struct thread *td, void * __capability ucap);
 
 /*
  * Functions to manage object types.
