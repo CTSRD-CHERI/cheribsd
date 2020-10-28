@@ -914,7 +914,11 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	tf->tf_x[2] = (register_t)&fp->sf_uc;
 #endif
 
+#if __has_feature(capabilities)
+	trapframe_set_elr(tf, (uintcap_t)catcher);
+#else
 	tf->tf_elr = (uintcap_t)catcher;
+#endif
 	tf->tf_sp = (uintcap_t)fp;
 	sysent = p->p_sysent;
 	if (sysent->sv_sigcode_base != 0)
