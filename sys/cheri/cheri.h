@@ -112,6 +112,12 @@ extern void * __capability swap_restore_cap;
 extern void * __capability kernel_sealcap;
 
 /*
+ * Capabilities used for colocation.
+ */
+extern void * __capability switcher_sealcap;
+extern void * __capability switcher_sealcap2;
+
+/*
  * Functions to create capabilities used in exec.
  */
 struct image_params;
