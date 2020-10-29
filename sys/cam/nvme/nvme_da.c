@@ -415,7 +415,7 @@ ndaioctl(struct disk *dp, u_long cmd, void *data, int fflag,
 		ccb = xpt_alloc_ccb();
 		xpt_setup_ccb(&ccb->ccb_h, periph->path, CAM_PRIORITY_NORMAL);
 		ccb->ccb_state = NDA_CCB_PASS;
-		cam_fill_nvmeio(&ccb->nvmeio,
+		cam_fill_nvmeio_user(&ccb->nvmeio,
 		    0,			/* Retries */
 		    ndadone,
 		    (pt->is_read ? CAM_DIR_IN : CAM_DIR_OUT) | CAM_DATA_VADDR,

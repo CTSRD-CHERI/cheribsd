@@ -1245,7 +1245,7 @@ nvme_ctrlr_passthrough_cmd(struct nvme_controller *ctrlr,
 		 * pages. Ensure this request has fewer than MAXPHYS bytes when
 		 * extended to full pages.
 		 */
-		addr = (vm_offset_t)pt->buf;
+		addr = (__cheri_addr vm_offset_t)pt->buf;
 		end = round_page(addr + pt->len);
 		addr = trunc_page(addr);
 		if (end - addr > MAXPHYS)
@@ -1273,7 +1273,8 @@ nvme_ctrlr_passthrough_cmd(struct nvme_controller *ctrlr,
 			req = nvme_allocate_request_vaddr(buf->b_data, pt->len, 
 			    nvme_pt_done, pt);
 		} else
-			req = nvme_allocate_request_vaddr(pt->buf, pt->len,
+			req = nvme_allocate_request_vaddr(
+			    (__cheri_fromcap void *)pt->buf, pt->len,
 			    nvme_pt_done, pt);
 	} else
 		req = nvme_allocate_request_null(nvme_pt_done, pt);

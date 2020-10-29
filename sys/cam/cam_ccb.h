@@ -1562,6 +1562,23 @@ cam_fill_nvmeio(struct ccb_nvmeio *nvmeio, u_int32_t retries,
 	nvmeio->dxfer_len = dxfer_len;
 }
 
+#ifdef _KERNEL
+static __inline void
+cam_fill_nvmeio_user(struct ccb_nvmeio *nvmeio, u_int32_t retries,
+	      void (*cbfcnp)(struct cam_periph *, union ccb *),
+	      u_int32_t flags, u_int8_t * __capability data_ptr,
+	      u_int32_t dxfer_len, u_int32_t timeout)
+{
+	nvmeio->ccb_h.func_code = XPT_NVME_IO;
+	nvmeio->ccb_h.flags = flags;
+	nvmeio->ccb_h.retry_count = retries;
+	nvmeio->ccb_h.cbfcnp = cbfcnp;
+	nvmeio->ccb_h.timeout = timeout;
+	nvmeio->user_data_ptr = data_ptr;
+	nvmeio->dxfer_len = dxfer_len;
+}
+#endif
+
 static __inline void
 cam_fill_nvmeadmin(struct ccb_nvmeio *nvmeio, u_int32_t retries,
 	      void (*cbfcnp)(struct cam_periph *, union ccb *),
