@@ -202,7 +202,6 @@ static void
 cap_abort(struct thread *td, struct trapframe *frame, uint64_t esr,
     uint64_t far, int lower)
 {
-	uintcap_t onfault;
 	struct pcb *pcb;
 
 	pcb = td->td_pcb;
@@ -210,10 +209,9 @@ cap_abort(struct thread *td, struct trapframe *frame, uint64_t esr,
 		if (td->td_intr_nesting_level == 0 &&
 		    pcb->pcb_onfault != 0) {
 			frame->tf_x[0] = EPROT;
-			onfault = pcb->pcb_onfault;
 			trapframe_set_elr(frame,
 			    (uintcap_t)cheri_setaddress(cheri_getpcc(),
-			    onfault));
+			    pcb->pcb_onfault));
 			return;
 		}
 		print_registers(frame);
@@ -236,7 +234,6 @@ data_abort(struct thread *td, struct trapframe *frame, uint64_t esr,
 	struct pcb *pcb;
 	vm_prot_t ftype;
 	int error, sig, ucode;
-	uintcap_t onfault;
 #ifdef KDB
 	bool handled;
 #endif
@@ -325,13 +322,12 @@ data_abort(struct thread *td, struct trapframe *frame, uint64_t esr,
 			if (td->td_intr_nesting_level == 0 &&
 			    pcb->pcb_onfault != 0) {
 				frame->tf_x[0] = error;
-				onfault = pcb->pcb_onfault;
 #if __has_feature(capabilities)
 				trapframe_set_elr(frame,
 				    (uintcap_t)cheri_setaddress(cheri_getpcc(),
-				    onfault));
+				    pcb->pcb_onfault));
 #else
-				frame->tf_elr = onfault;
+				frame->tf_elr = pcb->pcb_onfault;
 #endif
 				return;
 			}
