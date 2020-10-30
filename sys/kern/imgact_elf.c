@@ -82,7 +82,8 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_object.h>
 #include <vm/vm_extern.h>
 
-#ifdef __ELF_CHERI
+#if __has_feature(capabilities)
+#include <cheri/cheri.h>
 #include <cheri/cheric.h>
 #endif
 
@@ -1686,13 +1687,12 @@ static void note_procstat_vmmap(void *, struct sbuf *, size_t *);
  * Write out a core segment to the compression stream.
  */
 static int
-compress_chunk(struct coredump_params *p, char *base_vaddr, char *buf, u_int len)
+compress_chunk(struct coredump_params *p, char * __capability base, char *buf,
+    u_int len)
 {
-	char * __capability base;
 	u_int chunk_len;
 	int error;
 
-	base = __USER_CAP(base_vaddr, len);
 	while (len > 0) {
 		chunk_len = MIN(len, CORE_BUF_SIZE);
 
@@ -1731,20 +1731,21 @@ core_write(struct coredump_params *p, const void *base, size_t len,
 }
 
 static int
-core_output(char *base, size_t len, off_t offset, struct coredump_params *p,
-    void *tmpbuf)
+core_output(char * __capability base_cap, size_t len, off_t offset,
+    struct coredump_params *p, void *tmpbuf)
 {
 	vm_map_t map;
 	struct mount *mp;
 	size_t resid, runlen;
 	int error;
 	bool success;
+	char *base = (char *)(uintptr_t)(uintcap_t)base_cap;
 
 	KASSERT((uintptr_t)base % PAGE_SIZE == 0,
 	    ("%s: user address %p is not page-aligned", __func__, base));
 
 	if (p->comp != NULL)
-		return (compress_chunk(p, base, tmpbuf, len));
+		return (compress_chunk(p, base_cap, tmpbuf, len));
 
 	map = &p->td->td_proc->p_vmspace->vm_map;
 	for (; len > 0; base += runlen, offset += runlen, len -= runlen) {
@@ -1764,6 +1765,10 @@ core_output(char *base, size_t len, off_t offset, struct coredump_params *p,
 		}
 
 		if (success) {
+			/*
+			 * NB: The hybrid kernel drops the capability here, it
+			 * will be re-derived in vn_rdwr().
+			 */
 			error = core_write(p, base, runlen, offset,
 			    UIO_USERSPACE, &resid);
 			if (error != 0) {
@@ -1916,11 +1921,20 @@ __elfN(coredump)(struct thread *td, struct vnode *vp, off_t limit, int flags)
 		Elf_Phdr *php;
 		off_t offset;
 		int i;
+		char * __capability section_cap;
 
 		php = (Elf_Phdr *)((char *)hdr + sizeof(Elf_Ehdr)) + 1;
 		offset = round_page(hdrsize + notesz);
 		for (i = 0; i < seginfo.count; i++) {
-			error = core_output((char *)(uintptr_t)php->p_vaddr,
+#if __has_feature(capabilities)
+			section_cap = cheri_capability_build_user_data(
+			    CHERI_PERM_LOAD,
+			    CHERI_REPRESENTABLE_BASE(php->p_vaddr, php->p_filesz),
+			    CHERI_REPRESENTABLE_LENGTH(php->p_filesz), 0);
+#else
+			section_cap = (char *)(uintptr_t)php->p_vaddr;
+#endif
+			error = core_output(section_cap,
 			    php->p_filesz, offset, &params, tmpbuf);
 			if (error != 0)
 				break;
