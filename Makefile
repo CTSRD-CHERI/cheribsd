@@ -211,6 +211,7 @@ META_TGT_WHITELIST+= \
 .ORDER: buildkernel reinstallkernel.debug
 .ORDER: buildsysroot installsysroot
 
+_ORIGIAL_PATH:=${PATH}
 PATH=	/sbin:/bin:/usr/sbin:/usr/bin
 MAKEOBJDIRPREFIX?=	/usr/obj
 _MAKEOBJDIRPREFIX!= /usr/bin/env -i PATH=${PATH} `command -v ${MAKE}` -m ${.CURDIR}/share/mk \
@@ -273,7 +274,7 @@ CHERI_FLAGS+=	-DWITH_CHERI256
 .endif
 .endif
 
-_MAKE=	PATH=${PATH} MAKE_CMD="${MAKE}" ${SUB_MAKE} -f Makefile.inc1 \
+_MAKE=	PATH=${PATH} _ORIGIAL_PATH=${_ORIGIAL_PATH} MAKE_CMD="${MAKE}" ${SUB_MAKE} -f Makefile.inc1 \
 	${CHERI_FLAGS} \
 	TARGET=${_TARGET} TARGET_ARCH=${_TARGET_ARCH} ${_MAKEARGS}
 
