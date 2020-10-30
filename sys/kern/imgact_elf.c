@@ -1815,7 +1815,7 @@ core_write(struct coredump_params *p, const void *base, size_t len,
 }
 
 static int
-core_output(void * __capability base_cap, size_t len, off_t offset,
+core_output(char * __capability base_cap, size_t len, off_t offset,
     struct coredump_params *p, void *tmpbuf)
 {
 	vm_map_t map;
@@ -1824,6 +1824,7 @@ core_output(void * __capability base_cap, size_t len, off_t offset,
 	int error;
 	char *base = (char *)(uintptr_t)(uintcap_t)base_cap;
 	bool success;
+	char *base = (char *)(uintptr_t)(uintcap_t)base_cap;
 
 	KASSERT(is_aligned(base, PAGE_SIZE),
 	    ("%s: user address %p is not page-aligned", __func__, base));
@@ -1850,8 +1851,8 @@ core_output(void * __capability base_cap, size_t len, off_t offset,
 
 		if (success) {
 			/*
-			 * NB: The hybrid kernel drops the capability here,
-			 * it will be re-derived in vn_rdwr().
+			 * NB: The hybrid kernel drops the capability here, it
+			 * will be re-derived in vn_rdwr().
 			 */
 			error = core_write(p, base, runlen, offset,
 			    UIO_USERSPACE, &resid);
