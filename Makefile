@@ -214,7 +214,7 @@ META_TGT_WHITELIST+= \
 _ORIGIAL_PATH:=${PATH}
 PATH=	/sbin:/bin:/usr/sbin:/usr/bin
 MAKEOBJDIRPREFIX?=	/usr/obj
-_MAKEOBJDIRPREFIX!= /usr/bin/env -i PATH=${PATH} `command -v ${MAKE}` -m ${.CURDIR}/share/mk \
+_MAKEOBJDIRPREFIX!= /usr/bin/env -i PATH="${PATH}" `command -v ${MAKE}` -m ${.CURDIR}/share/mk \
     MK_AUTO_OBJ=no ${.MAKEFLAGS:MMAKEOBJDIRPREFIX=*} __MAKE_CONF=${__MAKE_CONF} \
     SRCCONF=${SRCCONF} SRC_ENV_CONF= \
     -f /dev/null -V MAKEOBJDIRPREFIX dummy
@@ -274,7 +274,7 @@ CHERI_FLAGS+=	-DWITH_CHERI256
 .endif
 .endif
 
-_MAKE=	PATH=${PATH} _ORIGIAL_PATH=${_ORIGIAL_PATH} MAKE_CMD="${MAKE}" ${SUB_MAKE} -f Makefile.inc1 \
+_MAKE=	PATH="${PATH}" _ORIGIAL_PATH="${_ORIGIAL_PATH}" MAKE_CMD="${MAKE}" ${SUB_MAKE} -f Makefile.inc1 \
 	${CHERI_FLAGS} \
 	TARGET=${_TARGET} TARGET_ARCH=${_TARGET_ARCH} ${_MAKEARGS}
 
