@@ -193,9 +193,8 @@ cheritest_vm_shm_open_anon_unix_surprise(const struct cheri_test *ctp __unused)
 						0));
 		c = *map;
 
-		fprintf(stderr, "rx cap: v:%lu b:%016jx l:%016zx o:%jx\n",
-			(unsigned long)cheri_gettag(c), cheri_getbase(c),
-			cheri_getlen(c), cheri_getoffset(c));
+		fprintf(stderr, "rx cap: ", _CHERI_PRINTF_CAP_FMT "\n",
+		    _CHERI_PRINTF_CAP_ARG(c));
 
 		tag = cheri_gettag(c);
 		CHERITEST_VERIFY2(tag == 0, "tag read");
@@ -229,9 +228,8 @@ cheritest_vm_shm_open_anon_unix_surprise(const struct cheri_test *ctp __unused)
 		c = *map;
 		CHERITEST_VERIFY2(cheri_gettag(c) != 0, "tag written");
 
-		fprintf(stderr, "tx cap: v:%lu b:%016jx l:%016zx o:%jx\n",
-			(unsigned long)cheri_gettag(c), cheri_getbase(c),
-			cheri_getlen(c), cheri_getoffset(c));
+		fprintf(stderr, "tx cap: ", _CHERI_PRINTF_CAP_FMT "\n",
+		    _CHERI_PRINTF_CAP_ARG(c));
 
 		CHERITEST_CHECK_SYSCALL(munmap(map, getpagesize()));
 
@@ -602,3 +600,53 @@ cheritest_vm_cow_write(const struct cheri_test *ctp __unused)
 	CHERITEST_CHECK_SYSCALL(close(fd));
 	cheritest_success();
 }
+
+#if __has_builtin(__builtin_cheri_cap_load_tags) && defined(__mips__)
+
+/*
+ * Test a mapped and unmapped invocation of cloadtags
+ */
+
+void
+test_cloadtags_mapped(const struct cheri_test *ctp __unused)
+{
+	uint64_t tags;
+	void * __capability * __capability c;
+	void * __capability * p;
+
+	p = CHERITEST_CHECK_SYSCALL(mmap(0, PAGE_SIZE, PROT_READ | PROT_WRITE,
+	    MAP_ANON, -1, 0));
+	c = (__cheri_tocap void * __capability * __capability)p;
+
+	p[1] = c;
+	p[2] = c;
+
+	tags = __builtin_cheri_cap_load_tags(c);
+
+	CHERITEST_VERIFY2(tags == 0x6,
+	    "incorrect result from cloadtags, 0x%" PRIx64 "\n", tags);
+
+	munmap(p, PAGE_SIZE);
+	cheritest_success();
+}
+
+void
+test_fault_cloadtags_unmapped(const struct cheri_test *ctp __unused)
+{
+	uint64_t tags;
+	void * __capability c;
+	void * p;
+
+	p = CHERITEST_CHECK_SYSCALL(mmap(0, PAGE_SIZE, PROT_READ | PROT_WRITE,
+	    MAP_ANON, -1, 0));
+	munmap(p, PAGE_SIZE);
+	c = (__cheri_tocap void * __capability)p;
+
+	tags = __builtin_cheri_cap_load_tags(c);
+
+	printf("cloadtags unmapped succeeded with tags=0x%" PRIx64 "\n", tags);
+
+	cheritest_success();
+}
+
+#endif /* __has_builtin(__builtin_cheri_cap_load_tags) */
