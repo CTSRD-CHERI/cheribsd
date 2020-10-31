@@ -80,12 +80,15 @@ SYSCTL_UINT(_security_cheri, OID_AUTO, debugger_on_sigprot, CTLFLAG_RW,
     &security_cheri_debugger_on_sigprot, 0,
     "Enter KDB when SIGPROT is delivered to an unsandboxed thread");
 
-u_int	security_cheri_abort_on_memcpy_tag_loss;
-SYSCTL_UINT(_security_cheri, OID_AUTO, abort_on_memcpy_tag_loss,
-    CTLFLAG_RW, &security_cheri_abort_on_memcpy_tag_loss, 0,
-    "abort() when memcpy() detects a tag loss due to misaligned copies.");
-
 u_int	security_cheri_bound_legacy_capabilities;
 SYSCTL_INT(_security_cheri, OID_AUTO, bound_legacy_capabilities,
     CTLFLAG_RWTUN, &security_cheri_bound_legacy_capabilities, 0,
     "Set bounds on userspace capabilities created by legacy ABIs.");
+
+SYSCTL_NODE(_debug, OID_AUTO, cheri, CTLFLAG_RD, 0,
+    "CHERI debug settings and statistics");
+
+u_int	security_cheri_abort_on_memcpy_tag_loss;
+SYSCTL_UINT(_debug_cheri, OID_AUTO, abort_on_memcpy_tag_loss,
+    CTLFLAG_RW, &security_cheri_abort_on_memcpy_tag_loss, 0,
+    "abort() when memcpy() detects a tag loss due to misaligned copies.");

@@ -40,6 +40,7 @@
 #include <cheri/cheri.h>
 #include <cheri/cheric.h>
 
+#include <stdlib.h>
 #include <string.h>
 
 #include "cheritest.h"
@@ -446,70 +447,106 @@ test_string_memmove(const struct cheri_test *ctp __unused)
  * can't replace it with an inline loop. We could also use -fno-builtin but that
  * could interfere with the other tests.
  */
-void
-test_unaligned_capability_copy_memcpy(const struct cheri_test *ctp __unused)
+static void
+do_tag_stripping_copy(void* (*copy_fn)(void*, const void*, size_t))
 {
-	/* Copying a tagged capability to an unaligned destination should trap. */
-	void * __capability src_buffer[2];
-	_Alignas(void * __capability) char dest_buffer[2 * sizeof(void* __capability) + 1];
+	void *__capability src_buffer[2];
+	_Alignas(void *__capability) char
+	    dest_buffer[2 * sizeof(void *__capability) + 1];
 
-	/* Check that dest buffer is capability aligned so that dest + 1 isn't */
+	/* Sanity-cCheck that dest buffer is capability aligned */
 	/* TODO: __builtin_is_aligned does not work on arrays (yet) */
-	CHERITEST_VERIFY(__builtin_is_aligned((void*)dest_buffer, sizeof(void* __capability)));
-	CHERITEST_VERIFY(__builtin_is_aligned((void*)src_buffer, sizeof(void * __capability)));
+	CHERITEST_VERIFY(__builtin_is_aligned(dest_buffer, sizeof(void *__capability)));
+	CHERITEST_VERIFY(__builtin_is_aligned(src_buffer, sizeof(void *__capability)));
 
 	src_buffer[0] = cheri_setoffset(NULL, 0x1234);
 	src_buffer[1] = cheri_setoffset(NULL, 0x4321);
 	CHERITEST_VERIFY(!cheri_gettag(src_buffer[0]));
 	CHERITEST_VERIFY(!cheri_gettag(src_buffer[1]));
 	/* This should succeed */
-	cheritest_memcpy(dest_buffer + 1 /* unaligned! */, src_buffer, sizeof(src_buffer));
-	/* TODO: verify the contents of the buffer? */
+	cheritest_memmove(
+	    dest_buffer + 1 /* unaligned! */, src_buffer, sizeof(src_buffer));
 
-	/* Even if we have a valid cap and operate misaligned, we should not fault. */
-	src_buffer[1] = (__cheri_tocap void* __capability)&strcpy;
+	/*
+	 * Now place a valid capability in buffer[1] and check that the
+	 * tag-stripping dection is triggered.
+	 */
+	src_buffer[1] = (__cheri_tocap void *__capability)&strcpy;
 	CHERITEST_VERIFY(!cheri_gettag(src_buffer[0]));
 	CHERITEST_VERIFY(cheri_gettag(src_buffer[1]));
 
-	cheritest_memcpy(dest_buffer + 1 /* unaligned! */, src_buffer, sizeof(src_buffer));
-	CHERITEST_VERIFY(!cheri_gettag(((void * __capability *)dest_buffer)[0]));
-	CHERITEST_VERIFY(!cheri_gettag(((void * __capability *)dest_buffer)[1]));
-	/* TODO: verify the contents of the buffer? */
+	/* Destination is unaligned and will therefore strip tags. */
+	copy_fn(dest_buffer + 1, src_buffer, sizeof(src_buffer));
+}
 
+void
+test_unaligned_capability_copy_memcpy(const struct cheri_test *ctp __unused)
+{
+	/*
+	 * Copying a tagged capability to an unaligned destination should not
+	 * trap if the tag stripping copy detection is enabled but
+	 * CHERI_ABORT_ON_TAG_STRIPPING_COPY is set to 0.
+	 *
+	 * Note: This test assumes that we haven't triggered a tag stripping
+	 * copy yet, since the env var is only read on the first violation.
+	 */
+	setenv("CHERI_ABORT_ON_TAG_STRIPPING_COPY", "0", 1);
+	/* Even if we have a valid cap and operate misaligned, we should not fault. */
+	do_tag_stripping_copy(cheritest_memmove);
+
+	/* Should not have abort()ed */
 	cheritest_success();
 }
 
 void
 test_unaligned_capability_copy_memmove(const struct cheri_test *ctp __unused)
 {
-	/* Copying a tagged capability to an unaligned destination should trap. */
-	void * __capability src_buffer[2];
-	_Alignas(void * __capability) char dest_buffer[2 * sizeof(void* __capability) + 1];
-
-	/* Check that dest buffer is capability aligned so that dest + 1 isn't */
-	/* TODO: __builtin_is_aligned does not work on arrays (yet) */
-	CHERITEST_VERIFY(__builtin_is_aligned((void*)dest_buffer, sizeof(void* __capability)));
-	CHERITEST_VERIFY(__builtin_is_aligned((void*)src_buffer, sizeof(void * __capability)));
-
-	src_buffer[0] = cheri_setoffset(NULL, 0x1234);
-	src_buffer[1] = cheri_setoffset(NULL, 0x4321);
-	CHERITEST_VERIFY(!cheri_gettag(src_buffer[0]));
-	CHERITEST_VERIFY(!cheri_gettag(src_buffer[1]));
-	/* This should succeed */
-	cheritest_memmove(dest_buffer + 1 /* unaligned! */, src_buffer, sizeof(src_buffer));
-	/* TODO: verify the contents of the buffer? */
-
+	/*
+	 * Copying a tagged capability to an unaligned destination should not
+	 * trap if the memcpy tag stripping detection is enabled but
+	 * CHERI_ABORT_ON_TAG_STRIPPING_COPY is set to 0.
+	 *
+	 * Note: This test assumes that we haven't triggered a tag stripping
+	 * copy yet, since the env var is only read on the first violation.
+	 */
+	setenv("CHERI_ABORT_ON_TAG_STRIPPING_COPY", "0", 1);
 	/* Even if we have a valid cap and operate misaligned, we should not fault. */
-	src_buffer[1] =  (__cheri_tocap void* __capability)&strcpy;
-	CHERITEST_VERIFY(!cheri_gettag(src_buffer[0]));
-	CHERITEST_VERIFY(cheri_gettag(src_buffer[1]));
+	do_tag_stripping_copy(cheritest_memmove);
 
-	cheritest_memmove(dest_buffer + 1 /* unaligned! */, src_buffer, sizeof(src_buffer));
-	CHERITEST_VERIFY(!cheri_gettag(((void * __capability *)dest_buffer)[0]));
-	CHERITEST_VERIFY(!cheri_gettag(((void * __capability *)dest_buffer)[1]));
-	/* TODO: verify the contents of the buffer? */
-
+	/* Should not have abort()ed */
 	cheritest_success();
+}
+
+void
+test_unaligned_capability_copy_memcpy_abort(const struct cheri_test *ctp __unused)
+{
+	/*
+	 * Copying a tagged capability to an unaligned destination should trap
+	 * if the tag stripping copy detection is enabled.
+	 *
+	 * Note: This test assumes that we haven't triggered a tag stripping
+	 * copy yet, since the env var is only read on the first violation.
+	 */
+	setenv("CHERI_ABORT_ON_TAG_STRIPPING_COPY", "1", 1);
+	do_tag_stripping_copy(cheritest_memcpy);
+	/* should have aborted: */
+	cheritest_failure_errx("memcpy() of an unaligned capability succeeded unexpectedly");
+}
+
+void
+test_unaligned_capability_copy_memmove_abort(const struct cheri_test *ctp __unused)
+{
+	/*
+	 * Copying a tagged capability to an unaligned destination should trap
+	 * if the tag stripping copy detection is enabled.
+	 *
+	 * Note: This test assumes that we haven't triggered a tag stripping
+	 * copy yet, since the env var is only read on the first violation.
+	 */
+	setenv("CHERI_ABORT_ON_TAG_STRIPPING_COPY", "1", 1);
+	do_tag_stripping_copy(cheritest_memmove);
+	/* should have aborted: */
+	cheritest_failure_errx("memmove() of an unaligned capability succeeded unexpectedly");
 }
 
 #ifdef KERNEL_MEMCPY_TESTS
