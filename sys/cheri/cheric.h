@@ -38,7 +38,7 @@
 
 #include <cheri/cherireg.h>	/* Permission definitions. */
 
-#if __has_feature(capabilities) || defined(__CHERI__)
+#if __has_feature(capabilities)
 
 /*
  * Programmer-friendly macros for CHERI-aware C code -- requires use of
@@ -466,7 +466,7 @@ __cheri_clear_low_ptr_bits(uintptr_t ptr, size_t bits_mask) {
 #define cheri_clear_low_ptr_bits(ptr, mask)                                    \
   __cheri_clear_low_ptr_bits((uintptr_t)(ptr), __runtime_assert_sensible_low_bits(mask))
 
-#if __has_feature(capabilities) || defined(__CHERI__)
+#if __has_feature(capabilities)
 #include <machine/cheric.h>
 #endif
 
