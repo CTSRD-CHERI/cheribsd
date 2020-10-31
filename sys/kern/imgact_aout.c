@@ -293,7 +293,7 @@ exec_aout_imgact(struct image_params *imgp)
 	vm_object_reference(object);
 
 	error = vm_map_reservation_create_locked(map, &reservation,
-	    reserv_size, VM_PROT_RW);
+	    reserv_size, VM_PROT_ALL);
 	if (error) {
 		vm_map_unlock(map);
 		vm_object_deallocate(object);
