@@ -1407,7 +1407,8 @@ domemstat_malloc(void)
 {
 	struct memory_type_list *mtlp;
 	struct memory_type *mtp;
-	int error, first, i;
+	size_t i, zones;
+	int error, first;
 
 	mtlp = memstat_mtl_alloc();
 	if (mtlp == NULL) {
@@ -1440,6 +1441,7 @@ domemstat_malloc(void)
 	    "Type", "InUse", "MemUse", "HighUse", "Requests");
 #endif
 	xo_open_list("memory");
+	zones = memstat_malloc_zone_get_count();
 	for (mtp = memstat_mtl_first(mtlp); mtp != NULL;
 	    mtp = memstat_mtl_next(mtp)) {
 		if (memstat_get_numallocs(mtp) == 0 &&
@@ -1464,11 +1466,11 @@ domemstat_malloc(void)
 #endif
 		first = 1;
 		xo_open_list("size");
-		for (i = 0; i < 32; i++) {
-			if (memstat_get_sizemask(mtp) & (1 << i)) {
+		for (i = 0; i < zones; i++) {
+			if (memstat_malloc_zone_used(mtp, i)) {
 				if (!first)
 					xo_emit(",");
-				xo_emit("{l:size/%d}", 1 << (i + 4));
+				xo_emit("{l:size/%d}", memstat_malloc_zone_get_size(i));
 				first = 0;
 			}
 		}
