@@ -83,8 +83,8 @@
 /*
  * Check that we are compiling with the expected flags
  */
-#if !defined(CHERI_PURECAP_KERNEL) || !defined(CPU_CHERI) || !defined(__CHERI_PURE_CAPABILITY__)
-#error CHERI kernel requires CPU_CHERI and CHERI_PURECAP_KERNEL
+#if !defined(__CHERI_PURE_CAPABILITY__) || !defined(CPU_CHERI) || !defined(__CHERI_PURE_CAPABILITY__)
+#error CHERI kernel requires CPU_CHERI and __CHERI_PURE_CAPABILITY__
 #endif
 
 	.data

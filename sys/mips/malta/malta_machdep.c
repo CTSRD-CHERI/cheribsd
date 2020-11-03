@@ -81,7 +81,7 @@ __FBSDID("$FreeBSD$");
 
 #include <mips/malta/maltareg.h>
 
-#ifdef CHERI_PURECAP_KERNEL
+#ifdef __CHERI_PURE_CAPABILITY__
 #include <cheri/cheric.h>
 #endif
 
@@ -320,7 +320,7 @@ malta_cpu_freq(void)
 	return (platform_counter_freq);
 }
 
-#ifdef CHERI_PURECAP_KERNEL
+#ifdef __CHERI_PURE_CAPABILITY__
 static void
 platform_clear_bss(void *kroot)
 {
@@ -384,7 +384,7 @@ platform_start(__register_t a0, __register_t a1,  __register_t a2,
 	int i;
 
 	/* Clear the BSS and SBSS segments */
-#ifdef CHERI_PURECAP_KERNEL
+#ifdef __CHERI_PURE_CAPABILITY__
 	argv = cheri_ptrperm(cheri_setaddress(cheri_kseg0_capability, a1),
 	    argc * sizeof(uint64_t), CHERI_PERM_LOAD);
 	envp = cheri_andperm(cheri_setaddress(cheri_kseg0_capability, a2),

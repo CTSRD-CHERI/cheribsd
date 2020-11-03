@@ -234,7 +234,7 @@ kmem_alloc_attr_domain(int domain, vm_size_t size, int flags, vm_paddr_t low,
 	int pflags;
 	vm_prot_t prot;
 
-#ifdef CHERI_PURECAP_KERNEL
+#ifdef __CHERI_PURE_CAPABILITY__
         size = CHERI_REPRESENTABLE_LENGTH(size);
 #endif
 	object = kernel_object;
@@ -319,7 +319,7 @@ kmem_alloc_contig_domain(int domain, vm_size_t size, int flags, vm_paddr_t low,
 	u_long npages;
 	int pflags;
 
-#ifdef CHERI_PURECAP_KERNEL
+#ifdef __CHERI_PURE_CAPABILITY__
         size = CHERI_REPRESENTABLE_LENGTH(size);
 #endif
 	object = kernel_object;

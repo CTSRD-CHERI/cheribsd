@@ -101,7 +101,7 @@ __FBSDID("$FreeBSD$");
 #include <machine/md_var.h>
 #include <machine/tlb.h>
 
-#ifdef CHERI_PURECAP_KERNEL
+#ifdef __CHERI_PURE_CAPABILITY__
 #include <machine/cherireg.h>
 #include <cheri/cheric.h>
 #endif
@@ -424,7 +424,7 @@ pmap_steal_memory(vm_size_t size)
 	if (MIPS_DIRECT_MAPPABLE(pa) == 0)
 		panic("Out of memory below 512Meg?");
 	va = (caddr_t)MIPS_PHYS_TO_DIRECT(pa);
-#ifdef CHERI_PURECAP_KERNEL
+#ifdef __CHERI_PURE_CAPABILITY__
 	va = cheri_setbounds(va, size);
 #endif
 	bzero(va, size);
@@ -955,9 +955,9 @@ pmap_map(vm_ptr_t *virt, vm_paddr_t start, vm_paddr_t end, int prot)
 	vm_ptr_t sva, va;
 
 	if (MIPS_DIRECT_MAPPABLE(end - 1)) {
-#ifndef CHERI_PURECAP_KERNEL
+#ifndef __CHERI_PURE_CAPABILITY__
 		return ((vm_ptr_t)MIPS_PHYS_TO_DIRECT(start));
-#else /* CHERI_PURECAP_KERNEL */
+#else /* __CHERI_PURE_CAPABILITY__ */
 		caddr_t map_addr;
 
 		map_addr = MIPS_PHYS_TO_DIRECT(start);
@@ -1442,7 +1442,7 @@ pv_to_chunk(pv_entry_t pv)
 
 #ifdef __mips_n64
 #define	PC_FREE0_1	0xfffffffffffffffful
-#ifdef CHERI_PURECAP_KERNEL
+#ifdef __CHERI_PURE_CAPABILITY__
 #define PC_FREE2	0x000000000007fffful
 #else
 #define PC_FREE2	0x000000fffffffffful
@@ -1454,11 +1454,11 @@ pv_to_chunk(pv_entry_t pv)
 
 static const u_long pc_freemask[_NPCM] = {
 #ifdef __mips_n64
-#ifdef CHERI_PURECAP_KERNEL
+#ifdef __CHERI_PURE_CAPABILITY__
 	PC_FREE0_1, PC_FREE2
-#else  /* ! CHERI_PURECAP_KERNEL */
+#else  /* ! __CHERI_PURE_CAPABILITY__ */
 	PC_FREE0_1, PC_FREE0_1, PC_FREE2
-#endif /* ! CHERI_PURECAP_KERNEL */
+#endif /* ! __CHERI_PURE_CAPABILITY__ */
 #else
 	PC_FREE0_9, PC_FREE0_9, PC_FREE0_9,
 	PC_FREE0_9, PC_FREE0_9, PC_FREE0_9,
@@ -3362,7 +3362,7 @@ pmap_mapdev_attr(vm_paddr_t pa, vm_size_t size, vm_memattr_t ma)
 	 */
 	if (MIPS_DIRECT_MAPPABLE(pa + size - 1) && ma == VM_MEMATTR_UNCACHEABLE) {
 		va = (caddr_t)MIPS_PHYS_TO_DIRECT_UNCACHED(pa);
-#ifdef CHERI_PURECAP_KERNEL
+#ifdef __CHERI_PURE_CAPABILITY__
 		/* Device memory should never contain capabilities (for now) */
 		va = cheri_setbounds(va, size);
 		va = cheri_andperm(va, ~(CHERI_PERM_LOAD_CAP |

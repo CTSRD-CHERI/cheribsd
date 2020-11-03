@@ -454,7 +454,7 @@ typedef struct if_rxsd {
 } *if_rxsd_t;
 
 /* multiple of word size */
-#ifdef CHERI_PURECAP_KERNEL
+#ifdef __CHERI_PURE_CAPABILITY__
 /* #ifdef CPU_CHERI128 */
 #define PKT_INFO_SIZE 8
 #define RXD_INFO_SIZE 8
@@ -490,7 +490,7 @@ pkt_info_zero(if_pkt_info_t pi)
 	pi_pad = (if_pkt_info_pad_t)pi;
 	pi_pad->pkt_val[0] = 0; pi_pad->pkt_val[1] = 0; pi_pad->pkt_val[2] = 0;
 	pi_pad->pkt_val[3] = 0; pi_pad->pkt_val[4] = 0; pi_pad->pkt_val[5] = 0;
-#ifdef CHERI_PURECAP_KERNEL
+#ifdef __CHERI_PURE_CAPABILITY__
 	pi_pad->pkt_val[6] = 0; pi_pad->pkt_val[7] = 0;
 #elif !defined(__LP64__)
 	pi_pad->pkt_val[6] = 0; pi_pad->pkt_val[7] = 0; pi_pad->pkt_val[8] = 0;

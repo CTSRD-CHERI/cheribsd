@@ -307,7 +307,7 @@ mips_proc0_init(void)
 	 * For cheri we use both pages, so do not bump the
 	 * address.
 	 */
-#ifndef CHERI_PURECAP_KERNEL
+#ifndef __CHERI_PURE_CAPABILITY__
 	thread0.td_kstack += KSTACK_PAGE_SIZE;
 #endif
 #endif /* KSTACK_LARGE_PAGE */
@@ -317,17 +317,17 @@ mips_proc0_init(void)
 	 * thread0 is the only thread that has kstack located in KSEG0 
 	 * while cpu_thread_alloc handles kstack allocated in KSEG2.
 	 */
-#ifndef CHERI_PURECAP_KERNEL
+#ifndef __CHERI_PURE_CAPABILITY__
 	thread0.td_pcb = (struct pcb *)(thread0.td_kstack +
 	    thread0.td_kstack_pages * PAGE_SIZE) - 1;
-#else /* CHERI_PURECAP_KERNEL */
+#else /* __CHERI_PURE_CAPABILITY__ */
 	/* Adjust the bounds of the thread0 kernel stack and pcb. */
 	thread0.td_pcb = cheri_setbounds((struct pcb *)(thread0.td_kstack +
 		thread0.td_kstack_pages * PAGE_SIZE) - 1,
 		sizeof(struct pcb));
 	thread0.td_kstack = (vm_ptr_t) cheri_setbounds((void *)thread0.td_kstack,
 		thread0.td_kstack_pages * PAGE_SIZE - sizeof(struct pcb));
-#endif /* CHERI_PURECAP_KERNEL */
+#endif /* __CHERI_PURE_CAPABILITY__ */
 	thread0.td_frame = &thread0.td_pcb->pcb_regs;
 
 	/* Steal memory for the dynamic per-cpu area. */

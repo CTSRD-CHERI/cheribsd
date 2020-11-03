@@ -41,7 +41,7 @@ __FBSDID("$FreeBSD$");
 #include <machine/pcb.h>
 #include <machine/regnum.h>
 
-#ifndef CHERI_PURECAP_KERNEL
+#ifndef __CHERI_PURE_CAPABILITY__
 
 static bool
 stack_addr_ok(struct thread *td, u_register_t sp, u_register_t stack_pos)
@@ -174,4 +174,4 @@ stack_save(struct stack *st)
 	stack_capture(st, curthread, pc, sp);
 }
 
-#endif /* !CHERI_PURECAP_KERNEL */
+#endif /* !__CHERI_PURE_CAPABILITY__ */

@@ -56,7 +56,7 @@ __FBSDID("$FreeBSD$");
  * Henry S. Warren, Jr.
  */
 
-#ifndef CHERI_PURECAP_KERNEL
+#ifndef __CHERI_PURE_CAPABILITY__
 /* Magic numbers for the algorithm */
 #if LONG_BIT == 32
 static const unsigned long mask01 = 0x01010101;
@@ -79,13 +79,13 @@ static const unsigned long mask80 = 0x8080808080808080;
 		if (p[x] == '\0')		\
 		    return (p - str + x);	\
 	} while (0)
-#endif /* !CHERI_PURECAP_KERNEL */
+#endif /* !__CHERI_PURE_CAPABILITY__ */
 
 size_t
 (strlen)(const char *str)
 {
 	const char *p;
-#ifndef CHERI_PURECAP_KERNEL
+#ifndef __CHERI_PURE_CAPABILITY__
 	const unsigned long *lp;
 	long va, vb;
 
@@ -127,7 +127,7 @@ size_t
 #endif
 		}
 	}
-#else /* CHERI_PURECAP_KERNEL */
+#else /* __CHERI_PURE_CAPABILITY__ */
 	/*
 	 * The purecap variant of strlen can not rely on access to
 	 * word-aligned memory since some bytes may be beyond the
@@ -139,7 +139,7 @@ size_t
 	while (*p != '\0')
 		p++;
 	return (p - str);
-#endif /* CHERI_PURECAP_KERNEL */
+#endif /* __CHERI_PURE_CAPABILITY__ */
 
 	/* NOTREACHED */
 	return (0);

@@ -46,7 +46,7 @@ __FBSDID("$FreeBSD$");
 
 #include <machine/abi.h>
 
-#ifdef CHERI_PURECAP_KERNEL
+#ifdef __CHERI_PURE_CAPABILITY__
 
 #define	pc_in(pc, fn)							\
 	((pc) >= (uintptr_t)cheri_getbase(fn) &&			\
@@ -273,7 +273,7 @@ stack_save(struct stack *st)
 	stack_capture(st, curthread, pc, sp);
 }
 
-#endif /* CHERI_PURECAP_KERNEL */
+#endif /* __CHERI_PURE_CAPABILITY__ */
 // CHERI CHANGES START
 // {
 //   "updated": 20200708,

@@ -1136,7 +1136,7 @@ bus_dmamap_sync_buf(vm_ptr_t buf, int len, bus_dmasync_op_t op, int aligned)
 	vm_ptr_t buf_cl = 0, buf_clend = 0;
 	vm_size_t size_cl, size_clend;
 	int cache_linesize_mask = mips_dcache_max_linesize - 1;
-#ifdef CHERI_PURECAP_KERNEL
+#ifdef __CHERI_PURE_CAPABILITY__
 	vm_offset_t tmp_va;
 	char _tmp_cl[mips_dcache_max_linesize] __aligned(CACHE_LINE_SIZE);
 	char _tmp_clend[mips_dcache_max_linesize] __aligned(CACHE_LINE_SIZE);
@@ -1176,7 +1176,7 @@ bus_dmamap_sync_buf(vm_ptr_t buf, int len, bus_dmasync_op_t op, int aligned)
 		size_cl = 0;
 		size_clend = 0;
 	} else {
-#ifdef CHERI_PURECAP_KERNEL
+#ifdef __CHERI_PURE_CAPABILITY__
 		/*
 		 * We cast first to make sure that the masking is done on
 		 * the full virtual address and not only on the offset.

@@ -83,7 +83,7 @@ __FBSDID("$FreeBSD$");
 #include <machine/pmap.h>
 #include <machine/trap.h>
 
-#ifdef CHERI_PURECAP_KERNEL
+#ifdef __CHERI_PURE_CAPABILITY__
 #include <cheri/cheric.h>
 #endif
 
@@ -99,7 +99,7 @@ __FBSDID("$FreeBSD$");
 extern int	*edata;
 extern int	*end;
 
-#ifdef CHERI_PURECAP_KERNEL
+#ifdef __CHERI_PURE_CAPABILITY__
 /*
  * XXX-AM: Create a pointer for the platform-specific data structures.
  * Currently we do not set bounds of these as it is hard to determine
@@ -141,7 +141,7 @@ platform_clear_bss(void *kroot)
 		edata_siz, CHERI_PERM_STORE);
 	memset(edata_start, 0, edata_siz);
 }
-#else /* CHERI_PURECAP_KERNEL */
+#else /* __CHERI_PURE_CAPABILITY__ */
 static void *
 beri_platform_ptr(vm_offset_t vaddr)
 {
@@ -161,7 +161,7 @@ platform_clear_bss()
 
 	memset(&edata, 0, kernend - (vm_offset_t)(&edata));
 }
-#endif /* CHERI_PURECAP_KERNEL */
+#endif /* __CHERI_PURE_CAPABILITY__ */
 
 void
 platform_cpu_init()
@@ -271,7 +271,7 @@ platform_start(__register_t a0, __register_t a1,  __register_t a2,
 	int i;
 
 	/* clear the BSS and SBSS segments */
-#ifdef CHERI_PURECAP_KERNEL
+#ifdef __CHERI_PURE_CAPABILITY__
 	argv = beri_platform_ptr(a1);
 	envp = beri_platform_ptr(a2);
 	platform_clear_bss(cheri_kdata_capability);

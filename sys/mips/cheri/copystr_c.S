@@ -73,7 +73,7 @@ cstr_return_toolong:
 	li		v0, ENAMETOOLONG
 	daddiu		t1, t1, -1	/* Count is 1 too high */
 cstr_return_nul:	/* Store length read if c5 is non-NULL */
-#ifdef CHERI_PURECAP_KERNEL
+#ifdef __CHERI_PURE_CAPABILITY__
         cbez            $c5, cstr_return
 #else
 	cgetdefault	$c3
@@ -83,7 +83,7 @@ cstr_return_nul:	/* Store length read if c5 is non-NULL */
 	nop
 	csd		t1, zero, 0($c5)	/* Store bytes copied */
 cstr_return:
-#ifdef CHERI_PURECAP_KERNEL
+#ifdef __CHERI_PURE_CAPABILITY__
 	cjr	$c17
 	nop
 #else

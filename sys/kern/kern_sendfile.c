@@ -65,7 +65,7 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_object.h>
 #include <vm/vm_pager.h>
 
-#ifdef CHERI_PURECAP_KERNEL
+#ifdef __CHERI_PURE_CAPABILITY__
 #include <cheri/cheric.h>
 #endif
 
@@ -1056,7 +1056,7 @@ retry_space:
 			}
 
 			m0 = m_get(M_WAITOK, MT_DATA);
-#ifdef CHERI_PURECAP_KERNEL
+#ifdef __CHERI_PURE_CAPABILITY__
 			m0->m_ext.ext_buf = cheri_setbounds(
 			    (char *)sf_buf_kva(sf), PAGE_SIZE);
 #else

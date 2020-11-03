@@ -2200,7 +2200,7 @@ vm_page_alloc_contig(vm_object_t object, vm_pindex_t pindex, int req,
 	return (m);
 }
 
-#ifdef CHERI_PURECAP_KERNEL
+#ifdef __CHERI_PURE_CAPABILITY__
 /*
  * XXX-AM: Horrible hack to work around a subobject bounds reordering bug
  * in the compiler.
@@ -2350,7 +2350,7 @@ found:
 		m->a.act_count = 0;
 		m->oflags = oflags;
 
-#ifdef CHERI_PURECAP_KERNEL
+#ifdef __CHERI_PURE_CAPABILITY__
 		if (_vm_page_hack(object, m, pindex, &mpred, npages, req, m_ret))
 			return (NULL);
 #else

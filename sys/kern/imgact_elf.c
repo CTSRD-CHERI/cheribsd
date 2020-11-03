@@ -549,7 +549,7 @@ __elfN(build_imgact_capability)(struct image_params *imgp,
 	if (result != KERN_SUCCESS)
 		return (result);
 
-#ifdef CHERI_PURECAP_KERNEL
+#ifdef __CHERI_PURE_CAPABILITY__
 	reservation_cap = (void *)reservation;
 #else
 	reservation_cap = cheri_setbounds(
