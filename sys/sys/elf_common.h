@@ -745,6 +745,7 @@ typedef struct {
 #define	DT_MIPS_CHERI_CAPTABLE_MAPPING	0x7000c005 /* start of .captable_mapping */
 #define	DT_MIPS_CHERI_CAPTABLE_MAPPINGSZ	0x7000c006 /* size of .captable_mapping */
 
+#ifndef LOCORE
 enum MipsCheriFlags {
 	DF_MIPS_CHERI_NONE		= 0x00000000,
 	DF_MIPS_CHERI_ABI_MASK		= 0x00000007,
@@ -756,6 +757,7 @@ enum MipsCheriFlags {
 	DF_MIPS_CHERI_CAPTABLE_PER_FUNC = 0x00000010,
 	DF_MIPS_CHERI_RELATIVE_CAPRELOCS = 0x00000020
 };
+#endif
 
 #define	DT_PPC_GOT			0x70000000
 #define	DT_PPC_TLSOPT			0x70000001
