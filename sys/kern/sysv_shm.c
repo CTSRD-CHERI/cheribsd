@@ -113,16 +113,6 @@ FEATURE(sysv_shm, "System V shared memory segments support");
 
 static MALLOC_DEFINE(M_SHM, "shm", "SVID compatible shared memory segments");
 
-static int shmget_allocate_segment(struct thread *td, key_t key, size_t size,
-    int mode);
-static int shmget_existing(struct thread *td, size_t size, int shmflg,
-    int mode, int segnum);
-static int kern_shmat(struct thread *td, int shmid,
-	const void * __capability shmaddr, int shmflg);
-static int kern_shmdt(struct thread *td, const void * __capability shmaddr);
-static int user_shmctl(struct thread *td, int shmid, int cmd,
-    struct shmid_ds * __capability ubuf);
-
 #define	SHMSEG_FREE     	0x0200
 #define	SHMSEG_REMOVED  	0x0400
 #define	SHMSEG_ALLOCATED	0x0800
@@ -141,6 +131,15 @@ static void shm_deallocate_segment(struct shmid_kernel *);
 static int shm_find_segment_by_key(struct prison *, key_t);
 static struct shmid_kernel *shm_find_segment(struct prison *, int, bool);
 static int shm_delete_mapping(struct vmspace *vm, struct shmmap_state *);
+static int shmget_allocate_segment(struct thread *td, key_t key, size_t size,
+    int mode);
+static int shmget_existing(struct thread *td, size_t size, int shmflg,
+    int mode, int segnum);
+static int kern_shmat(struct thread *td, int shmid,
+	const void * __capability shmaddr, int shmflg);
+static int kern_shmdt(struct thread *td, const void * __capability shmaddr);
+static int user_shmctl(struct thread *td, int shmid, int cmd,
+    struct shmid_ds * __capability ubuf);
 static void shmrealloc(void);
 static int shminit(void);
 static int sysvshm_modload(struct module *, int, void *);
