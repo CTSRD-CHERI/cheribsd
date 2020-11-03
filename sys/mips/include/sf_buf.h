@@ -33,7 +33,7 @@
 
 #ifdef __mips_n64	/* In 64 bit the whole memory is directly mapped */
 
-#ifdef CHERI_PURECAP_KERNEL
+#ifdef __CHERI_PURE_CAPABILITY__
 #include <machine/param.h>
 #include <cheri/cheric.h>
 #endif
@@ -44,7 +44,7 @@ sf_buf_kva(struct sf_buf *sf)
 	vm_page_t	m;
 
 	m = (vm_page_t)sf;
-#ifdef CHERI_PURECAP_KERNEL
+#ifdef __CHERI_PURE_CAPABILITY__
 	return ((vm_ptr_t)cheri_setboundsexact(
 	    MIPS_PHYS_TO_DIRECT(VM_PAGE_TO_PHYS(m)), PAGE_SIZE));
 #else

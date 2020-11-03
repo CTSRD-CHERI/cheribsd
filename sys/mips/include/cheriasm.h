@@ -110,7 +110,7 @@
 #define	CHERI_ASM_CMOVE(cd, cb)		cincoffset cd, cb, zero
 /* #endif */
 
-#ifdef CHERI_PURECAP_KERNEL
+#ifdef __CHERI_PURE_CAPABILITY__
 
 /*
  * KR2C is used to preserve a second scratch register KSCRATCH2 when
@@ -205,7 +205,7 @@
 	/* Restore $c27. */						\
 	cgetkr1c	CHERI_REG_KSCRATCH;
 
-#ifndef CHERI_PURECAP_KERNEL
+#ifndef __CHERI_PURE_CAPABILITY__
 
 /*
  * Capcause access to PCB
@@ -215,7 +215,7 @@
 #define	RESTORE_CAPCAUSE_FROM_PCB(treg, pcb)	\
 	RESTORE_U_PCB_REG(treg, CAPCAUSE, pcb)
 
-#else /* CHERI_PURECAP_KERNEL */
+#else /* __CHERI_PURE_CAPABILITY__ */
 
 /*
  * Capcause offset is too large for CHERI256 in this case and does not
@@ -226,9 +226,9 @@
 #define	RESTORE_CAPCAUSE_FROM_PCB(treg, pcb)		\
 	RESTORE_U_PCB_REG_FAR(treg, treg, CAPCAUSE, pcb)
 
-#endif /* CHERI_PURECAP_KERNEL */
+#endif /* __CHERI_PURE_CAPABILITY__ */
 
-#ifdef CHERI_PURECAP_KERNEL
+#ifdef __CHERI_PURE_CAPABILITY__
 
 /*
  * Save and restore user CHERI state on an exception.
@@ -337,7 +337,7 @@
 	csetcause	treg;						\
 	RESTORE_U_PCB_CREG(CHERI_REG_C1, C1, pcb)
 
-#else /* ! CHERI_PURECAP_KERNEL */
+#else /* ! __CHERI_PURE_CAPABILITY__ */
 
 /*
  * Save and restore user CHERI state on an exception.  Assumes that $ddc has
@@ -430,13 +430,13 @@
 	RESTORE_U_PCB_REG(treg, CAPCAUSE, pcb);				\
 	csetcause	treg
 
-#endif /* ! CHERI_PURECAP_KERNEL */
+#endif /* ! __CHERI_PURE_CAPABILITY__ */
 
 /*
  * Macros saving capability state to, and restoring it from, voluntary kernel
  * context-switch storage in pcb.pcb_cherikframe.
  */
-#ifndef CHERI_PURECAP_KERNEL
+#ifndef __CHERI_PURE_CAPABILITY__
 #define	SAVE_U_PCB_CHERIKFRAME_CREG(creg, offs, base)			\
 	csc		creg, base, (U_PCB_CHERIKFRAME +		\
 			    CHERICAP_SIZE * offs)($ddc)
@@ -447,7 +447,7 @@
 
 #define	SAVE_CHERIKFRAME_GPC(base)
 #define	RESTORE_CHERIKFRAME_GPC(base)
-#else /* CHERI_PURECAP_KERNEL */
+#else /* __CHERI_PURE_CAPABILITY__ */
 #define	SAVE_U_PCB_CHERIKFRAME_CREG(creg, offs, base)			\
 	cscbi		creg, (U_PCB_CHERIKFRAME +			\
 			    CHERICAP_SIZE * offs)(base)
@@ -463,7 +463,7 @@
 #define	RESTORE_CHERIKFRAME_GPC(base)				\
 	RESTORE_U_PCB_CHERIKFRAME_CREG(CHERI_REG_GPC,			\
 				       CHERIKFRAME_OFF_GPC, base)
-#endif /* CHERI_PURECAP_KERNEL */
+#endif /* __CHERI_PURE_CAPABILITY__ */
 
 /*
  * Macros to save (and restore) callee-save capability registers when

@@ -36,7 +36,7 @@
 #include <machine/cpufunc.h>
 #include <machine/pte.h>
 
-#ifdef CHERI_PURECAP_KERNEL
+#ifdef __CHERI_PURE_CAPABILITY__
 #include <cheri/cheric.h>
 #endif
 
@@ -51,7 +51,7 @@
 #define	PCPU_NUM_EXC_CNTRS	0
 #endif
 
-#if defined(CHERI_PURECAP_KERNEL)
+#if defined(__CHERI_PURE_CAPABILITY__)
 /*
  * Add an extra MD PCPU field for a cached copy of the current thread
  * kernel stack capability.
@@ -76,13 +76,13 @@
 
 #ifdef	__mips_n64
 
-#ifdef CHERI_PURECAP_KERNEL
+#ifdef __CHERI_PURE_CAPABILITY__
 // struct pcpu aligns to 512 bytes boundary
 #define PCPU_MD_MIPS64_PAD (112 - (PCPU_NUM_EXC_CNTRS * 8))
-#else /* ! defined(CHERI_PURECAP_KERNEL) */
+#else /* ! defined(__CHERI_PURE_CAPABILITY__) */
 // struct pcpu aligns to 512 bytes boundary
 #define PCPU_MD_MIPS64_PAD (245 - (PCPU_NUM_EXC_CNTRS * 8))
-#endif /* ! defined(CHERI_PURECAP_KERNEL) */
+#endif /* ! defined(__CHERI_PURE_CAPABILITY__) */
 #define	PCPU_MD_MIPS64_FIELDS						\
 	PCPU_MD_COMMON_FIELDS						\
 	char		__pad[PCPU_MD_MIPS64_PAD]
@@ -109,11 +109,11 @@
 #ifdef _KERNEL
 
 extern char pcpu_space[MAXCPU][PAGE_SIZE * 2];
-#ifndef CHERI_PURECAP_KERNEL
+#ifndef __CHERI_PURE_CAPABILITY__
 #define	PCPU_ADDR(cpu)		(struct pcpu *)(pcpu_space[(cpu)])
-#else /* CHERI_PURECAP_KERNEL */
+#else /* __CHERI_PURE_CAPABILITY__ */
 #define PCPU_ADDR(cpu)		cheri_setbounds((struct pcpu *)(pcpu_space[(cpu)]), sizeof(struct pcpu))
-#endif /* CHERI_PURECAP_KERNEL*/
+#endif /* __CHERI_PURE_CAPABILITY__*/
 
 extern struct pcpu *pcpup;
 #define	PCPUP	pcpup

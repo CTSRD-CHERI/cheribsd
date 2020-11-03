@@ -266,7 +266,7 @@ typedef struct {
 	Elf64_Xword	ch_addralign;
 } Elf64_Chdr;
 
-#ifdef CHERI_PURECAP_KERNEL
+#ifdef __CHERI_PURE_CAPABILITY__
 /* CHERI capability relocation format */
 typedef struct {
 	Elf64_Addr	location;

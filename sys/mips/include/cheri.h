@@ -32,7 +32,7 @@
 #ifndef _MIPS_INCLUDE_CHERI_H_
 #define	_MIPS_INCLUDE_CHERI_H_
 
-#if defined(_KERNEL) && defined(CHERI_PURECAP_KERNEL)
+#if defined(_KERNEL) && defined(__CHERI_PURE_CAPABILITY__)
 #include <sys/elf.h>
 #endif
 #include <sys/types.h>
@@ -114,7 +114,7 @@ struct cheri_kframe {
 	void * __capability	ckf_c22;
 	void * __capability	ckf_c23;
 	void * __capability	ckf_c24;
-#ifdef CHERI_PURECAP_KERNEL
+#ifdef __CHERI_PURE_CAPABILITY__
 	void *			ckf_pcc;
 	void *			ckf_stc;
 	void *			ckf_gpc;
@@ -128,7 +128,7 @@ struct cheri_kframe {
 /*
  * CHERI-MIPS-specific kernel utility functions.
  */
-#ifdef CHERI_PURECAP_KERNEL
+#ifdef __CHERI_PURE_CAPABILITY__
 /* purecap kernel specific startup */
 void process_kernel_cap_relocs(Elf64_Capreloc *start, Elf64_Capreloc *end,
     void *code_cap, void *data_cap);

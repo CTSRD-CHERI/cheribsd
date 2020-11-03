@@ -90,13 +90,13 @@
 /*
  * Note: The kernel stack is allocated below the pcb
  */
-#ifndef CHERI_PURECAP_KERNEL
+#ifndef __CHERI_PURE_CAPABILITY__
 #define SWITCH_TO_KERNEL_STACK(pcb)		\
 	PTR_SUBU	sp, pcb, CALLFRAME_SIZ
-#else /* CHERI_PURECAP_KERNEL */
+#else /* __CHERI_PURE_CAPABILITY__ */
 /* Skip this in purecap kernel, we will do it after saving REG_STC */
 #define SWITCH_TO_KERNEL_STACK(pcb)
-#endif /* CHERI_PURECAP_KERNEL */
+#endif /* __CHERI_PURE_CAPABILITY__ */
 
 /*
  * Save all of the registers except for the kernel temporaries in u.u_pcb.

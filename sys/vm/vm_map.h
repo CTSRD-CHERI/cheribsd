@@ -212,7 +212,7 @@ struct vm_map {
 	pmap_t pmap;			/* (c) Physical map */
 	vm_offset_t anon_loc;
 	int busy;
-#ifdef CHERI_PURECAP_KERNEL
+#ifdef __CHERI_PURE_CAPABILITY__
 	void *map_capability;		/* Capability spanning the whole map */
 #endif
 #ifdef DIAGNOSTIC
@@ -262,7 +262,7 @@ vm_map_modflags(vm_map_t map, vm_flags_t set, vm_flags_t clear)
 	map->flags = (map->flags | set) & ~clear;
 }
 #endif	/* KLD_MODULE */
-#ifdef CHERI_PURECAP_KERNEL
+#ifdef __CHERI_PURE_CAPABILITY__
 static __inline void *
 vm_map_rootcap(vm_map_t map)
 {
@@ -492,7 +492,7 @@ int vm_map_reservation_create_locked(vm_map_t, vm_ptr_t *, vm_size_t, vm_prot_t)
 #if __has_feature(capabilities)
 int vm_map_prot2perms(vm_prot_t prot);
 #endif
-#ifdef CHERI_PURECAP_KERNEL
+#ifdef __CHERI_PURE_CAPABILITY__
 vm_ptr_t _vm_map_buildcap(vm_map_t map, vm_offset_t addr, vm_size_t length,
     vm_prot_t prot);
 #define	vm_map_buildcap(map, addr, length, prot)	\

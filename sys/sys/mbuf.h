@@ -849,7 +849,7 @@ m_extaddref(struct mbuf *m, char *buf, u_int size, u_int *ref_cnt,
 
 	atomic_add_int(ref_cnt, 1);
 	m->m_flags |= M_EXT;
-#ifdef CHERI_PURECAP_KERNEL
+#ifdef __CHERI_PURE_CAPABILITY__
 	m->m_ext.ext_buf = cheri_setbounds(buf, size);
 #else
         m->m_ext.ext_buf = buf;
@@ -905,7 +905,7 @@ m_init(struct mbuf *m, int how, short type, int flags)
 
 	m->m_next = NULL;
 	m->m_nextpkt = NULL;
-#ifdef CHERI_PURECAP_KERNEL
+#ifdef __CHERI_PURE_CAPABILITY__
 	m->m_data = cheri_setbounds(m->m_dat, MLEN);
 #else
         m->m_data = m->m_dat;
@@ -991,7 +991,7 @@ m_cljset(struct mbuf *m, void *cl, int type)
 		break;
 	}
 
-#ifdef CHERI_PURECAP_KERNEL
+#ifdef __CHERI_PURE_CAPABILITY__
         m->m_data = m->m_ext.ext_buf = cheri_setbounds(cl, size);
 #else
 	m->m_data = m->m_ext.ext_buf = cl;
