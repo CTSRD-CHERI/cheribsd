@@ -158,11 +158,11 @@
 #endif
 
 #ifdef __mips_n64
-#ifndef CHERI_PURECAP_KERNEL
+#ifndef __CHERI_PURE_CAPABILITY__
 #define	NPDEPGSHIFT		9               /* LOG2(NPTEPG) */
-#else /* CHERI_PURECAP_KERNEL */
+#else /* __CHERI_PURE_CAPABILITY__ */
 #define NPDEPGSHIFT		8		/* LOG2(NPDEPG) */
-#endif /* CHERI_PURECAP_KERNEL */
+#endif /* __CHERI_PURE_CAPABILITY__ */
 #define	SEGSHIFT		(PAGE_SHIFT + NPTEPGSHIFT + NPDEPGSHIFT)
 #define	NBSEG			(1ul << SEGSHIFT)
 #define	PDRSHIFT		(PAGE_SHIFT + NPTEPGSHIFT)
@@ -188,7 +188,7 @@
  * For a large kernel stack page the KSTACK_SIZE needs to be a page size
  * supported by the hardware (e.g. 16K).
  */
-#ifdef CHERI_PURECAP_KERNEL
+#ifdef __CHERI_PURE_CAPABILITY__
 /*
  * Cheri-128 uses two 16K pages for the kernel stack, without any guard pages.
  * The stack capability is bounded propery so the stack should never overflow.
@@ -197,13 +197,13 @@
 #define	KSTACK_SIZE		(KSTACK_PAGE_SIZE * 2)
 #define KSTACK_GUARD_PAGES	0
 
-#else /* ! CHERI_PURECAP_KERNEL */
+#else /* ! __CHERI_PURE_CAPABILITY__ */
 
 #define	KSTACK_SIZE		(1 << 14)	/* Single 16K page */
 #define	KSTACK_PAGE_SIZE	KSTACK_SIZE
 #define	KSTACK_GUARD_PAGES	(KSTACK_PAGE_SIZE / PAGE_SIZE)
 
-#endif /* ! CHERI_PURECAP_KERNEL */
+#endif /* ! __CHERI_PURE_CAPABILITY__ */
 
 #define	KSTACK_PAGE_MASK	(KSTACK_PAGE_SIZE - 1)
 #define	KSTACK_PAGES		(KSTACK_SIZE / PAGE_SIZE)

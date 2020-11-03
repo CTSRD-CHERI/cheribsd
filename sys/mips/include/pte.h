@@ -43,7 +43,7 @@ typedef	uint32_t pt_entry_t;
 #endif
 
 #ifdef _KERNEL
-#ifdef CHERI_PURECAP_KERNEL
+#ifdef __CHERI_PURE_CAPABILITY__
 /*
  * The pointer to the second-level page table entry can is a capability
  * in the purecap kernel.
@@ -61,7 +61,7 @@ pde_page_bound(vm_ptr_t ptr)
 	    CHERI_PERM_LOAD_CAP | CHERI_PERM_STORE_CAP |
 	    CHERI_PERM_STORE_LOCAL_CAP));
 }
-#else /* ! CHERI_PURECAP_KERNEL */
+#else /* ! __CHERI_PURE_CAPABILITY__ */
 
 #define	pde_page_bound(ptr) (pd_entry_t)(ptr)
 #if !defined(__CHERI_PURE_CAPABILITY__)
@@ -74,7 +74,7 @@ typedef	pt_entry_t *pd_entry_t;
 typedef uint64_t pd_entry_t;
 #endif
 
-#endif /* ! CHERI_PURECAP_KERNEL */
+#endif /* ! __CHERI_PURE_CAPABILITY__ */
 #else /* ! _KERNEL */
 /*
  * XXX: used in the kernel to set VM system paramaters.  Only used for
@@ -504,10 +504,10 @@ TLBLO_PTE_TO_PA(pt_entry_t pte)
 #define	CLEAR_PTE_SWBITS(r)	LONG_SLL r, TLBLO_SWBITS_CLEAR_SHIFT; LONG_SRL r, TLBLO_SWBITS_CLEAR_SHIFT /* remove swbits */
 #endif /* ! defined(__mips_n64) || defined(__mips_n32) */
 
-#if defined(CPU_CHERI) && defined(CHERI_PURECAP_KERNEL)
+#if defined(CPU_CHERI) && defined(__CHERI_PURE_CAPABILITY__)
 #define PTRSHIFT		CHERICAP_SHIFT
 #define PDEPTRMASK		(0xfff & ~(CHERICAP_SIZE - 1))
-#else /* ! (CPU_HERI && CHERI_PURECAP_KERNEL) */
+#else /* ! (CPU_HERI && __CHERI_PURE_CAPABILITY__) */
 #if defined(__mips_n64)
 #define	PTRSHIFT		3
 #define	PDEPTRMASK		0xff8
@@ -515,7 +515,7 @@ TLBLO_PTE_TO_PA(pt_entry_t pte)
 #define	PTRSHIFT		2
 #define	PDEPTRMASK		0xffc
 #endif
-#endif /* ! (CPU_CHERI && CHERI_PURECAP_KERNEL) */
+#endif /* ! (CPU_CHERI && __CHERI_PURE_CAPABILITY__) */
 
 #endif /* LOCORE */
 

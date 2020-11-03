@@ -59,7 +59,7 @@ typedef int t_yamon_syscon_id;
 
 #define YAMON_FUNC(ofs)		((long)(*(int32_t *)(MIPS_PHYS_TO_KSEG0(ofs))))
 
-#ifndef CHERI_PURECAP_KERNEL
+#ifndef __CHERI_PURE_CAPABILITY__
 
 typedef void (*t_yamon_print_count)(uint32_t port, char *s, uint32_t count);
 #define YAMON_PRINT_COUNT(s, count) \
@@ -80,7 +80,7 @@ typedef int (*t_yamon_syscon_read)(t_yamon_syscon_id id, void *param,
 #define YAMON_SYSCON_READ(id, param, size)				\
 	((t_yamon_syscon_read)(YAMON_FUNC(YAMON_SYSCON_READ_OFS)))	\
 	(id, param, size)
-#else /* CHERI_PURECAP_KERNEL */
+#else /* __CHERI_PURE_CAPABILITY__ */
 /* Can not call YAMON functions with purecap ABI so wrap the calls */
 
 inline int _yamon_syscon_read(t_yamon_syscon_id id, void *param, uint32_t size);
@@ -89,7 +89,7 @@ int _yamon_cheri_syscon_read(vaddr_t fn_addr, t_yamon_syscon_id id, void *param,
 
 #define YAMON_SYSCON_READ(id, param, size) _yamon_syscon_read(id, param, size)
 
-#endif /* CHERI_PURECAP_KERNEL */
+#endif /* __CHERI_PURE_CAPABILITY__ */
 
 typedef struct {
 	char *name;

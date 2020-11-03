@@ -594,7 +594,7 @@ static __inline uma_slab_t hash_sfind(struct uma_hash *hash, uint8_t *data);
 #define	ZONE_CROSS_UNLOCK(z)	mtx_unlock(&(z)->uz_cross_lock)
 #define	ZONE_CROSS_LOCK_FINI(z)	mtx_destroy(&(z)->uz_cross_lock)
 
-#ifdef CHERI_PURECAP_KERNEL
+#ifdef __CHERI_PURE_CAPABILITY__
 extern vm_offset_t uma_bootmem_start;
 extern vm_offset_t uma_bootmem_end;
 extern uma_slab_t *uma_boot_vtoslab;
@@ -631,7 +631,7 @@ vtoslab(vm_offset_t va)
 {
 	vm_page_t p;
 
-#ifdef CHERI_PURECAP_KERNEL
+#ifdef __CHERI_PURE_CAPABILITY__
 	int page_index;
 
 	if (va >= uma_bootmem_start && va < uma_bootmem_end) {
@@ -652,7 +652,7 @@ vtozoneslab(vm_offset_t va, uma_zone_t *zone, uma_slab_t *slab)
 {
 	vm_page_t p;
 
-#ifdef CHERI_PURECAP_KERNEL
+#ifdef __CHERI_PURE_CAPABILITY__
 	int page_index;
 
 	if (va >= uma_bootmem_start && va < uma_bootmem_end) {
@@ -675,7 +675,7 @@ vsetzoneslab(vm_offset_t va, uma_zone_t zone, uma_slab_t slab)
 {
 	vm_page_t p;
 
-#ifdef CHERI_PURECAP_KERNEL
+#ifdef __CHERI_PURE_CAPABILITY__
 	int page_index;
 
 	if (va >= uma_bootmem_start && va < uma_bootmem_end) {

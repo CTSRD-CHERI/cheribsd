@@ -112,10 +112,10 @@ extern uintptr_t dpcpu_off[];
 /*
  * Accessors with a given base.
  */
-#ifndef CHERI_PURECAP_KERNEL
+#ifndef __CHERI_PURE_CAPABILITY__
 #define	_DPCPU_PTR(b, n)					\
     (__typeof(DPCPU_NAME(n))*)((b) + (vaddr_t)&DPCPU_NAME(n))
-#else /* CHERI_PURECAP_KERNEL */
+#else /* __CHERI_PURE_CAPABILITY__ */
 /*
  * The pcpu dynamic field in the CHERI kernel is not preliminarly
  * subtracted the DPCPU_START, so we do it now.
@@ -123,7 +123,7 @@ extern uintptr_t dpcpu_off[];
 #define	_DPCPU_PTR(b, n)					\
     (__typeof(DPCPU_NAME(n))*)((b) +                            \
         ((vaddr_t)&DPCPU_NAME(n) - (vaddr_t)DPCPU_START))
-#endif /* CHERI_PURECAP_KERNEL */
+#endif /* __CHERI_PURE_CAPABILITY__ */
 #define	_DPCPU_GET(b, n)	(*_DPCPU_PTR(b, n))
 #define	_DPCPU_SET(b, n, v)	(*_DPCPU_PTR(b, n) = v)
 

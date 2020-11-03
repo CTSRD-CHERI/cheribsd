@@ -96,7 +96,7 @@
  *
  * XXX Do we really need to disable interrupts?
  */
-#ifndef CHERI_PURECAP_KERNEL
+#ifndef __CHERI_PURE_CAPABILITY__
 #define DO_AST				             \
 44:				                     \
 	mfc0	t0, MIPS_COP_0_STATUS               ;\
@@ -122,7 +122,7 @@
 	j	44b                                 ;\
 	nop                                         ;\
 4:
-#else /* CHERI_PURECAP_KERNEL */
+#else /* __CHERI_PURE_CAPABILITY__ */
 /*
  * Note: we are forced to load some constants in
  * temporary registers because they do not fit in
@@ -156,9 +156,9 @@
 	j	44b                                 ;\
 	nop                                         ;\
 4:
-#endif /* CHERI_PURECAP_KERNEL */
+#endif /* __CHERI_PURE_CAPABILITY__ */
 
-#ifndef CHERI_PURECAP_KERNEL
+#ifndef __CHERI_PURE_CAPABILITY__
 #define	SAVE_U_PCB_REG(reg, offs, base) \
 	REG_S	reg, (U_PCB_REGS + (SZREG * offs)) (base)
 
@@ -191,7 +191,7 @@
 #define	RESTORE_U_PCB_CONTEXT(reg, offs, base)			\
 	REG_L	reg, (U_PCB_CONTEXT + (SZREG * offs)) (base)
 
-#else /* CHERI_PURECAP_KERNEL */
+#else /* __CHERI_PURE_CAPABILITY__ */
 
 /*
  * Save general purpose register to PCB.
@@ -257,7 +257,7 @@
  * #define	RESTORE_U_PCB_FPSR(reg, offs, base, treg)
  */
 
-#endif /* CHERI_PURECAP_KERNEL */
+#endif /* __CHERI_PURE_CAPABILITY__ */
 
 #ifdef CPU_CHERI
 /*
@@ -267,7 +267,7 @@
  * The kernel has been adjusted to use $pcc instead of $pc everywhere so we
  * can simply write that to $epcc.
  */
-#ifdef CHERI_PURECAP_KERNEL
+#ifdef __CHERI_PURE_CAPABILITY__
 #define RESTORE_U_PCB_PC(tmpcreg, pcb)					\
 	RESTORE_U_PCB_CREG(tmpcreg, PCC, pcb);				\
 	CSetEPCC tmpcreg
