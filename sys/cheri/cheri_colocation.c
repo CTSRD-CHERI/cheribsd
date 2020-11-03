@@ -273,7 +273,7 @@ colocation_thread_exit(struct thread *td)
  * Called from trap().
  */
 void
-colocation_unborrow(struct thread *td, struct trapframe **trapframep)
+colocation_unborrow(struct thread *td, struct trapframe *trapframe)
 {
 	struct switchercb scb;
 	struct thread *peertd;
@@ -299,8 +299,8 @@ colocation_unborrow(struct thread *td, struct trapframe **trapframep)
 
 	KASSERT(peertd != td,
 	    ("%s: peertd %p == td %p\n", __func__, peertd, td));
-	KASSERT(*trapframep == td->td_frame,
-	    ("%s: %p != %p", __func__, *trapframep, td->td_frame));
+	KASSERT(trapframe == td->td_frame,
+	    ("%s: %p != %p", __func__, trapframe, td->td_frame));
 
 #ifdef __mips__
 	COLOCATION_DEBUG("replacing current td %p, pid %d (%s), switchercb %#lx, "

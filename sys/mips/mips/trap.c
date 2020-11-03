@@ -1016,7 +1016,7 @@ dofault:
 
 	case T_SYSCALL + T_USER:
 		{
-			colocation_unborrow(td, &trapframe);
+			colocation_unborrow(td, trapframe);
 
 			td->td_sa.trapframe = trapframe;
 			syscallenter(td);
