@@ -38,8 +38,8 @@ __FBSDID("$FreeBSD$");
 #include <stdbool.h>
 #include <stdlib.h>
 #include "libc_private.h"
-#include "crtbrand.c"
 #include "ignore_init.c"
+
 /*
  * For -pie executables rtld will process the __cap_relocs, so we don't need
  * to include the code here.

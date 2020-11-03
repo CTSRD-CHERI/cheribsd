@@ -2,11 +2,11 @@
 
 SSP_CFLAGS=
 
-SED_FIX_NOTE = -i "" -e '/\.note\.tag/s/progbits/note/'
-
 NO_WMISSING_VARIABLE_DECLARATIONS=
 
 .include <src.opts.mk>
+
+ACFLAGS+=	-DLOCORE
 
 .if !defined(BUILDING_TESTS) && !defined(NO_BSD_CRTBEGIN)
 

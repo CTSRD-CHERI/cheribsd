@@ -14,7 +14,7 @@ CFLAGS+=	-DCRT_IRELOC_SUPPRESS
 CFLAGS+=	-fno-jump-tables
 
 NO_BSD_CRTBEGIN=	yes
-.PATH:	${.CURDIR}/../common-cheri
+.PATH:	${.CURDIR}/../common-cheri ${.CURDIR}/../common
 CFLAGS+=	-I${.CURDIR}/../common		\
 		-I${.CURDIR}/../common-cheri	\
 		-I${.CURDIR}/../../libc/include
@@ -25,6 +25,9 @@ FILES+=	crt1.o					\
 	crtbeginT.o				\
 	crtend.o				\
 	crtendS.o
+
+CLEANFILES+=	crt1_c.o Scrt1_c.o
+CLEANFILES+=	crtbrand.o ignore_init_note.o
 
 PICFLAG+=-DPOSITION_INDEPENDENT_STARTUP=1
 
@@ -48,8 +51,14 @@ crtendS.o:	crtendC.c
 crtend.o:	crtendC.c
 	${CC} ${CFLAGS} -c -o ${.TARGET} ${.ALLSRC}
 
+crt1.o:	crt1_c.o crtbrand.o ignore_init_note.o
+	${LD} ${_LDFLAGS} -o crt1.o -r crtbrand.o ignore_init_note.o crt1_c.o
+
+Scrt1_c.o: crt1_c.c
+	${CC} ${CFLAGS} ${PICFLAG} -c -o ${.TARGET} ${.CURDIR}/crt1_c.c
+
 # Used as the first object file for PIE (other executables use crt1.c)
-Scrt1.o:	crt1.c
-	${CC} ${CFLAGS} ${PICFLAG} -c -o ${.TARGET} ${.ALLSRC}
+Scrt1.o: Scrt1_c.o crtbrand.o ignore_init_note.o
+	${LD} ${_LDFLAGS} -o Scrt1.o -r crtbrand.o ignore_init_note.o Scrt1_c.o
 
 .include <bsd.lib.mk>
