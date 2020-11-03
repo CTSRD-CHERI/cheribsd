@@ -980,7 +980,7 @@ _vm_map_init(vm_map_t map, pmap_t pmap, vm_ptr_t min, vm_ptr_t max)
 	map->timestamp = 0;
 	map->busy = 0;
 	map->anon_loc = 0;
-#ifdef CHERI_PURECAP_KERNEL
+#ifdef __CHERI_PURE_CAPABILITY__
 	/*
 	 * Do not enforce exact bounds here. The kernel map
 	 * can not be made representable without dropping some
@@ -1711,7 +1711,7 @@ vm_map_insert(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 
 	if (map->flags & MAP_RESERVATIONS) {
 		/* Make sure we fit into a single reservation entry. */
-#ifdef CHERI_PURECAP_KERNEL
+#ifdef __CHERI_PURE_CAPABILITY__
 		if (cheri_gettag((void *)start) == 0 ||
 		    cheri_getlen((void *)start) < (vaddr_t)end - (vaddr_t)start)
 			return (KERN_INVALID_ARGUMENT);
@@ -2049,7 +2049,7 @@ vm_map_fixed(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 	vm_ptr_t end, reservation;
 	int result;
 
-#ifdef CHERI_PURECAP_KERNEL
+#ifdef __CHERI_PURE_CAPABILITY__
 	CHERI_ASSERT_VALID(start);
 	if (cheri_getlen((void *)start) < length)
 		return (KERN_INVALID_ARGUMENT);
@@ -4482,7 +4482,7 @@ vmspace_fork(struct vmspace *vm1, vm_ooffset_t *fork_charge)
 
 	old_map = &vm1->vm_map;
 	/* Copy immutable fields of vm1 to vm2. */
-#ifndef CHERI_PURECAP_KERNEL
+#ifndef __CHERI_PURE_CAPABILITY__
 	vm2 = vmspace_alloc(vm_map_min(old_map), vm_map_max(old_map),
 	    pmap_pinit);
 #else
@@ -4763,7 +4763,7 @@ vm_map_stack_locked(vm_map_t map, vm_ptr_t addrbos, vm_size_t max_ssize,
 		init_ssize = max_ssize - sgp;
 
 	if (map->flags & MAP_RESERVATIONS) {
-#ifdef CHERI_PURECAP_KERNEL
+#ifdef __CHERI_PURE_CAPABILITY__
 		/* TODO: Check reservation capability is valid */
 #endif
 		/* Check reservation exists */
@@ -5123,7 +5123,7 @@ vmspace_exec(struct proc *p, vm_offset_t minuser, vm_offset_t maxuser)
 {
 	struct vmspace *oldvmspace = p->p_vmspace;
 	struct vmspace *newvmspace;
-#ifdef CHERI_PURECAP_KERNEL
+#ifdef __CHERI_PURE_CAPABILITY__
 	vm_offset_t padded_minuser;
 	vm_ptr_t minuser_cap;
 	vm_ptr_t maxuser_cap;
@@ -5132,7 +5132,7 @@ vmspace_exec(struct proc *p, vm_offset_t minuser, vm_offset_t maxuser)
 
 	KASSERT((curthread->td_pflags & TDP_EXECVMSPC) == 0,
 	    ("vmspace_exec recursed"));
-#ifdef CHERI_PURECAP_KERNEL
+#ifdef __CHERI_PURE_CAPABILITY__
 	/*
 	 * We create a new userspace capability for this map
 	 * Only allow non-representable map capability if the minuser
@@ -5550,7 +5550,7 @@ vm_map_prot2perms(vm_prot_t prot)
 	return (perms);
 }
 
-#ifdef CHERI_PURECAP_KERNEL
+#ifdef __CHERI_PURE_CAPABILITY__
 /*
  * Create a capability for the given map, derived from the map root
  * capability.
@@ -5567,7 +5567,7 @@ _vm_map_buildcap(vm_map_t map, vm_offset_t addr, vm_size_t length,
 
 	return ((vm_ptr_t)cheri_andperm(retcap, perms));
 }
-#endif /* CHERI_PURECAP_KERNEL */
+#endif /* __CHERI_PURE_CAPABILITY__ */
 #endif /* has_feature(capabilities) */
 
 /*

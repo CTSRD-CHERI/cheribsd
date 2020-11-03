@@ -80,7 +80,7 @@ CTASSERT(offsetof(struct thread, td_cheri_mmap_cap) % CHERICAP_SIZE == 0);
  * kernel configuration on the size of a capability, and that we are compiling
  * for the hybrid or pure ABI.
  */
-#ifndef CHERI_PURECAP_KERNEL
+#ifndef __CHERI_PURE_CAPABILITY__
 CTASSERT(sizeof(void *) == 8);
 #else
 CTASSERT(sizeof(void *) == 16);
@@ -91,7 +91,7 @@ CTASSERT(sizeof(struct cheri_object) == 32);
 /* Set to -1 to prevent it from being zeroed with the rest of BSS */
 void * __capability user_sealcap = (void * __capability)(intcap_t)-1;
 
-#ifdef CHERI_PURECAP_KERNEL
+#ifdef __CHERI_PURE_CAPABILITY__
 __attribute__((weak))
 extern Elf64_Capreloc __start___cap_relocs;
 __attribute__((weak))
@@ -196,7 +196,7 @@ process_kernel_dyn_relocs(Elf64_Rel *start, Elf64_Rel *end,
 		}
 	}
 }
-#endif /* CHERI_PURECAP_KERNEL */
+#endif /* __CHERI_PURE_CAPABILITY__ */
 
 /*
  * Early capability initialization.
@@ -224,7 +224,7 @@ cheri_init_capabilities(void * __capability kroot)
 	    CHERI_CAP_USER_CODE_PERMS);
 	userspace_cap = ctemp;
 
-#ifdef CHERI_PURECAP_KERNEL
+#ifdef __CHERI_PURE_CAPABILITY__
 	/*
 	 * Split kroot and generate a capability for each memory segment.
 	 * XXX-AM: we should also have a separate capability for

@@ -95,7 +95,7 @@ static void print_nhop(const char *prefix, const struct nhop_object *nh);
 
 _Static_assert(__offsetof(struct nhop_object, nh_ifp) == 32,
     "nhop_object: wrong nh_ifp offset");
-#ifndef CHERI_PURECAP_KERNEL
+#ifndef __CHERI_PURE_CAPABILITY__
 _Static_assert(sizeof(struct nhop_object) <= 128,
     "nhop_object: size exceeds 128 bytes");
 #endif

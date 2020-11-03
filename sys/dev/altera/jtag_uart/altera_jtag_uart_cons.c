@@ -47,7 +47,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/tty.h>
 #include <sys/types.h>
 
-#ifdef CHERI_PURECAP_KERNEL
+#ifdef __CHERI_PURE_CAPABILITY__
 #include <cheri/cheric.h>
 #endif
 
@@ -74,7 +74,7 @@ int		aju_cons_jtag_present;
 u_int		aju_cons_jtag_missed;
 struct mtx	aju_cons_lock;
 
-#ifdef CHERI_PURECAP_KERNEL
+#ifdef __CHERI_PURE_CAPABILITY__
 /* UART memory mapping capability */
 char *aju_io_capability;
 #endif
@@ -127,7 +127,7 @@ static inline char *
 mips_aju_register_addr(vm_paddr_t regoff)
 {
 
-#ifdef CHERI_PURECAP_KERNEL
+#ifdef __CHERI_PURE_CAPABILITY__
 	return (cheri_setoffset(aju_io_capability, regoff));
 #else
 	return (MIPS_PHYS_TO_XKPHYS_UNCACHED(BERI_UART_BASE + regoff));
@@ -139,7 +139,7 @@ mips_ioread_uint32(char *raddr)
 {
 	uint32_t v;
 
-#ifdef CHERI_PURECAP_KERNEL
+#ifdef __CHERI_PURE_CAPABILITY__
 	__asm__ __volatile__ ("clw %0, $zero, 0(%1)" : "=r" (v) : "C" (raddr));
 #else
 	__asm__ __volatile__ ("lw %0, 0(%1)" : "=r" (v) : "r" (raddr));
@@ -151,7 +151,7 @@ static inline void
 mips_iowrite_uint32(char *raddr, uint32_t v)
 {
 
-#ifdef CHERI_PURECAP_KERNEL
+#ifdef __CHERI_PURE_CAPABILITY__
 	__asm__ __volatile__ ("csw %0, $zero, 0(%1)" : : "r" (v), "C" (raddr));
 #else
 	__asm__ __volatile__ ("sw %0, 0(%1)" : : "r" (v), "r" (raddr));
@@ -311,7 +311,7 @@ aju_cninit(struct consdev *cp)
 	AJU_CONSOLE_LOCK_INIT();
 
 	AJU_CONSOLE_LOCK();
-#ifdef CHERI_PURECAP_KERNEL
+#ifdef __CHERI_PURE_CAPABILITY__
 	aju_io_capability = cheri_ptrperm(
 		MIPS_PHYS_TO_XKPHYS_UNCACHED(BERI_UART_BASE),
 		8, CHERI_PERM_GLOBAL | CHERI_PERM_LOAD | CHERI_PERM_STORE);

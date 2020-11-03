@@ -1341,7 +1341,7 @@ vmem_xalloc(vmem_t *vm, const vmem_size_t size0, vmem_size_t align,
     const vmem_addr_t minaddr, const vmem_addr_t maxaddr, int flags,
     vmem_addr_t *addrp)
 {
-#ifdef CHERI_PURECAP_KERNEL
+#ifdef __CHERI_PURE_CAPABILITY__
 	const vmem_size_t size = vmem_roundup_size(vm,
 	    CHERI_REPRESENTABLE_LENGTH(size0));
 #else
@@ -1379,7 +1379,7 @@ vmem_xalloc(vmem_t *vm, const vmem_size_t size0, vmem_size_t align,
 
 	if (align == 0)
 		align = vm->vm_quantum_mask + 1;
-#ifdef CHERI_PURECAP_KERNEL
+#ifdef __CHERI_PURE_CAPABILITY__
 	if (CHERI_REPRESENTABLE_ALIGNMENT(size) > align)
 		align = vmem_roundup_size(vm,
 		    CHERI_REPRESENTABLE_ALIGNMENT(size));
@@ -1390,7 +1390,7 @@ vmem_xalloc(vmem_t *vm, const vmem_size_t size0, vmem_size_t align,
 	 * Next-fit allocations don't use the freelists.
 	 */
 	if (strat == M_NEXTFIT)
-#ifdef CHERI_PURECAP_KERNEL
+#ifdef __CHERI_PURE_CAPABILITY__
 		return (vmem_xalloc_nextfit(vm, size, align, phase, nocross,
 		    flags, addrp));
 #else

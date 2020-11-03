@@ -1171,7 +1171,7 @@ exec_new_vmspace(struct image_params *imgp, struct sysentvec *sv)
 		return (vm_mmap_to_errno(error));
 	}
 #if __has_feature(capabilities)
-#ifdef CHERI_PURECAP_KERNEL
+#ifdef __CHERI_PURE_CAPABILITY__
 	imgp->ustack_capability = (void *)stack_addr;
 #else
 	imgp->ustack_capability = cheri_capability_build_user_data(

@@ -35,7 +35,7 @@ __FBSDID("$FreeBSD$");
 
 #include <mips/malta/yamon.h>
 
-#ifdef CHERI_PURECAP_KERNEL
+#ifdef __CHERI_PURE_CAPABILITY__
 #include <cheri/cheric.h>
 
 /* Wrappers to call into non-purecap ABI YAMON routines */

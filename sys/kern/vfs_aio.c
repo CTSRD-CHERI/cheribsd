@@ -1285,7 +1285,7 @@ aio_qbio(struct proc *p, struct kaiocb *job)
 	bp->bio_length = cb->aio_nbytes;
 	bp->bio_bcount = cb->aio_nbytes;
 	bp->bio_done = aio_biowakeup;
-#ifdef CHERI_PURECAP_KERNEL
+#ifdef __CHERI_PURE_CAPABILITY__
 	bp->bio_data = (void *)(uintptr_t)cb->aio_buf;
 #else
 	bp->bio_data = (void *)(__cheri_addr vaddr_t)cb->aio_buf;

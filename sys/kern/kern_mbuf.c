@@ -65,7 +65,7 @@ __FBSDID("$FreeBSD$");
 #include <vm/uma.h>
 #include <vm/uma_dbg.h>
 
-#ifdef CHERI_PURECAP_KERNEL
+#ifdef __CHERI_PURE_CAPABILITY__
 #include <cheri/cheric.h>
 #endif
 
@@ -716,7 +716,7 @@ mb_ctor_clust(void *mem, int size, void *arg, int how)
 
 	m = (struct mbuf *)arg;
 	if (m != NULL) {
-#ifdef CHERI_PURECAP_KERNEL
+#ifdef __CHERI_PURE_CAPABILITY__
 		m->m_ext.ext_buf = cheri_setbounds((char *)mem, size);
 #else
 		m->m_ext.ext_buf = mem;
@@ -1498,7 +1498,7 @@ m_extadd(struct mbuf *mb, char *buf, u_int size, m_ext_free_t freef,
 	KASSERT(type != EXT_CLUSTER, ("%s: EXT_CLUSTER not allowed", __func__));
 
 	mb->m_flags |= (M_EXT | flags);
-#ifdef CHERI_PURECAP_KERNEL
+#ifdef __CHERI_PURE_CAPABILITY__
 	mb->m_ext.ext_buf = cheri_setbounds(buf, size);
 #else
 	mb->m_ext.ext_buf = buf;

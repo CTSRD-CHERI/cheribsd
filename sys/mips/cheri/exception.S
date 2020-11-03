@@ -87,7 +87,7 @@
 #ifndef CPU_CHERI
 #error "purecap kernel exception handlers compiled for non-CHERI target!"
 #endif
-#ifndef CHERI_PURECAP_KERNEL
+#ifndef __CHERI_PURE_CAPABILITY__
 #error "purecap kernel exception handlers compiled for non-purecap kernel!"
 #endif
 
@@ -211,7 +211,7 @@ LEAF(MipsDoTLBMiss)
 	csetkr1c	CHERI_REG_KSCRATCH
 	bltz		k0, 1f				#02: k0<0 -> 1f (kernel fault)
 	PTR_SRL		k0, k0, SEGSHIFT - PTRSHIFT	#03: k0=seg offset (almost)
-	/* CHERI_PURECAP_KERNEL - assumes __mips64 and ! MIPS64_NEW_PMAP */
+	/* __CHERI_PURE_CAPABILITY__ - assumes __mips64 and ! MIPS64_NEW_PMAP */
 	GET_CPU_PCPU(CHERI_REG_KSCRATCH)
 	clc		CHERI_REG_KSCRATCH, zero, PC_SEGBASE(CHERI_REG_KSCRATCH)
 	cbez		CHERI_REG_KSCRATCH, 2f			# == NULL no segbase
@@ -711,7 +711,7 @@ NESTED_NOPROFILE(MipsKernGenException, KERN_EXC_FRAME_SIZE, ra)
 	/* XXX-AM: Can we use .mask/.frame in cheriabi? */
 	.mask	0x80000000, (CALLFRAME_RA - KERN_EXC_FRAME_SIZE)
 	/*
-	 * For CHERI_PURECAP_KERNEL, CHERI_REG_STC holds the location of the
+	 * For __CHERI_PURE_CAPABILITY__, CHERI_REG_STC holds the location of the
 	 * trap frame, KSCRATCH holds the value of STC to save in the trap frame.
 	 * Will leave the trap frame address in c3.
 	 */

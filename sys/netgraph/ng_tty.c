@@ -441,7 +441,7 @@ ngt_rint_bypass(struct tty *tp, const void *buf, size_t len)
 		 * Odd, we have changed from non-bypass to bypass. It is
 		 * unlikely but not impossible, flush the data first.
 		 */
-#ifdef CHERI_PURECAP_KERNEL
+#ifdef __CHERI_PURE_CAPABILITY__
 		sc->m->m_data = cheri_setbounds(sc->m->m_pktdat, MHLEN);
 #else
 		sc->m->m_data = sc->m->m_pktdat;
@@ -501,7 +501,7 @@ ngt_rint(struct tty *tp, char c, int flags)
 
 	/* Ship off mbuf if it's time */
 	if (sc->hotchar == -1 || c == sc->hotchar || m->m_len >= MHLEN) {
-#ifdef CHERI_PURECAP_KERNEL
+#ifdef __CHERI_PURE_CAPABILITY__
 		m->m_data = cheri_setbounds(m->m_pktdat, MHLEN);
 #else
 		m->m_data = m->m_pktdat;

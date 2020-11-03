@@ -176,7 +176,7 @@ static struct rwlock_padalign __exclusive_cache_line uma_rwlock;
  */
 static vm_offset_t bootstart;
 static vm_ptr_t bootmem;
-#ifdef CHERI_PURECAP_KERNEL
+#ifdef __CHERI_PURE_CAPABILITY__
 /*
  * Boundaries of the UMA boot memory pool.
  */
@@ -2261,7 +2261,7 @@ keg_ctor(void *mem, int size, void *udata, int flags)
 
 	if (arg->flags & UMA_ZONE_MALLOC)
 		keg->uk_flags |= UMA_ZFLAG_VTOSLAB;
-#ifdef CHERI_PURECAP_KERNEL
+#ifdef __CHERI_PURE_CAPABILITY__
 	if ((keg->uk_flags & UMA_ZFLAG_HASH) == 0)
 		keg->uk_flags |= UMA_ZFLAG_VTOSLAB;
 #endif
@@ -5368,7 +5368,7 @@ uma_dbg_alloc(uma_zone_t zone, uma_slab_t slab, void *item)
 	}
 
 	keg = zone->uz_keg;
-#ifdef CHERI_PURECAP_KERNEL
+#ifdef __CHERI_PURE_CAPABILITY__
 	/* Check first that item is a subset of slab capability */
 	if ((keg->uk_flags & UMA_ZFLAG_OFFPAGE) == 0 &&
 	    !cheri_is_subset(slab, item)) {
@@ -5404,7 +5404,7 @@ uma_dbg_free(uma_zone_t zone, uma_slab_t slab, void *item)
 			    item, zone->uz_name);
 	}
 	keg = zone->uz_keg;
-#ifdef CHERI_PURECAP_KERNEL
+#ifdef __CHERI_PURE_CAPABILITY__
 	/* Check first that item is a subset of slab */
 	if ((keg->uk_flags & UMA_ZFLAG_OFFPAGE) == 0 &&
 	    !cheri_is_subset(slab, item))

@@ -429,9 +429,9 @@ link_elf_init(void* arg)
 #ifdef RELOCATABLE_KERNEL
 	ef->address = (caddr_t) (__startkernel - KERNBASE);
 #else
-#ifndef CHERI_PURECAP_KERNEL
+#ifndef __CHERI_PURE_CAPABILITY__
 	ef->address = 0;
-#else /* CHERI_PURECAP_KERNEL */
+#else /* __CHERI_PURE_CAPABILITY__ */
 	/*
 	 * This is the top-level capability used to generate all pointers
 	 * to ELF structures in the kernel image.
@@ -452,7 +452,7 @@ link_elf_init(void* arg)
 	ef->address = cheri_andperm(cheri_kall_capability,
 		(CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP));
 	linker_kernel_file->address = ef->address;
-#endif /* CHERI_PURECAP_KERNEL */
+#endif /* __CHERI_PURE_CAPABILITY__ */
 #endif
 #ifdef SPARSE_MAPPING
 	ef->object = NULL;
@@ -474,7 +474,7 @@ link_elf_init(void* arg)
 		ef->modptr = modptr;
 		baseptr = preload_search_info(modptr, MODINFO_ADDR);
 		if (baseptr != NULL)
-#ifndef CHERI_PURECAP_KERNEL
+#ifndef __CHERI_PURE_CAPABILITY__
 			linker_kernel_file->address = *(caddr_t *)baseptr;
 #else
 			/*

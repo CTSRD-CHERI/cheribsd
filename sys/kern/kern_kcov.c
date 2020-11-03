@@ -388,7 +388,7 @@ kcov_alloc(struct kcov_info *info, size_t entries)
 		vm_page_xunbusy(&m[n]);
 	}
 	VM_OBJECT_WUNLOCK(info->bufobj);
-#ifdef CHERI_PURECAP_KERNEL
+#ifdef __CHERI_PURE_CAPABILITY__
 	info->kvaddr = (vm_ptr_t)cheri_setbounds(
 	    MIPS_PHYS_TO_DIRECT(VM_PAGE_TO_PHYS(m)), info->bufsize);
 #else

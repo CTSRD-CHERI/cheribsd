@@ -387,7 +387,7 @@ malloc_type_zone_allocated(struct malloc_type *mtp, void *addr,
 	if (size > 0) {
 		mtsp->mts_memalloced += size;
 		mtsp->mts_numallocs++;
-#ifdef CHERI_PURECAP_KERNEL
+#ifdef __CHERI_PURE_CAPABILITY__
 		mtsp->mts_memreserved += cheri_getlen(addr);
 #elif __has_feature(capabilities)
 		mtsp->mts_memreserved += size;
@@ -434,7 +434,7 @@ malloc_type_freed(struct malloc_type *mtp, void *addr, unsigned long size)
 	mtsp = zpcpu_get(mtip->mti_stats);
 	mtsp->mts_memfreed += size;
 	mtsp->mts_numfrees++;
-#ifdef CHERI_PURECAP_KERNEL
+#ifdef __CHERI_PURE_CAPABILITY__
 	mtsp->mts_memunreserved += cheri_getlen(addr);
 #elif __has_feature(capabilities)
 	mtsp->mts_memunreserved += size;
@@ -754,7 +754,7 @@ mallocarray(size_t nmemb, size_t size, struct malloc_type *type, int flags)
 static void
 free_save_type(void *addr, struct malloc_type *mtp, u_long size)
 {
-#ifdef CHERI_PURECAP_KERNEL
+#ifdef __CHERI_PURE_CAPABILITY__
 	vaddr_t *mtpp = addr;
 #else
 	struct malloc_type **mtpp = addr;
@@ -768,7 +768,7 @@ free_save_type(void *addr, struct malloc_type *mtp, u_long size)
 	 * This code assumes that size is a multiple of 8 bytes for
 	 * 64 bit machines
 	 */
-#ifdef CHERI_PURECAP_KERNEL
+#ifdef __CHERI_PURE_CAPABILITY__
 	/*
 	 * This is for debugging only, so we just store the va of the
 	 * malloc_type, not a capability to it.

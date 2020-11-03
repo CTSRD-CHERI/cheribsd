@@ -152,7 +152,7 @@ mmap_retcap(struct thread *td, vm_ptr_t addr,
     const struct mmap_req *mrp)
 {
 	void * __capability newcap;
-#ifndef CHERI_PURECAP_KERNEL
+#ifndef __CHERI_PURE_CAPABILITY__
 	size_t cap_base, cap_len;
 #endif
 	register_t perms, cap_prot;
@@ -167,7 +167,7 @@ mmap_retcap(struct thread *td, vm_ptr_t addr,
 	if (mrp->mr_flags & MAP_CHERI_NOSETBOUNDS)
 		return (mrp->mr_source_cap);
 
-#ifdef CHERI_PURECAP_KERNEL
+#ifdef __CHERI_PURE_CAPABILITY__
 	CHERI_ASSERT_VALID(addr);
 	newcap = (void *)addr;
 	/* Enforce per-thread mmap capability permission */
@@ -191,7 +191,7 @@ mmap_retcap(struct thread *td, vm_ptr_t addr,
 	newcap = cheri_andperm(newcap,
 	    ~CHERI_CAP_PERM_RWX | vm_map_prot2perms(cap_prot));
 
-#ifndef CHERI_PURECAP_KERNEL
+#ifndef __CHERI_PURE_CAPABILITY__
 	/* Reservations in the kernel ensure this */
 	if (mrp->mr_flags & MAP_FIXED) {
 		/*
@@ -451,7 +451,7 @@ kern_mmap(struct thread *td, uintptr_t addr0, size_t len, int prot, int flags,
 		.mr_flags = flags,
 		.mr_fd = fd,
 		.mr_pos = pos,
-#ifdef CHERI_PURECAP_KERNEL
+#ifdef __CHERI_PURE_CAPABILITY__
 		/* Needed for fixed mappings */
 		.mr_source_cap = userspace_cap
 #endif
@@ -729,7 +729,7 @@ kern_mmap_req(struct thread *td, struct mmap_req *mrp)
 				return (EINVAL);
 			}
 		}
-#ifdef CHERI_PURECAP_KERNEL
+#ifdef __CHERI_PURE_CAPABILITY__
 		/*
 		 * Use the source capability for addr if a new reservation
 		 * is not requested.

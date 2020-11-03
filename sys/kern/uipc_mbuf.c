@@ -55,7 +55,7 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_pageout.h>
 #include <vm/vm_page.h>
 
-#ifdef CHERI_PURECAP_KERNEL
+#ifdef __CHERI_PURE_CAPABILITY__
 #include <cheri/cheric.h>
 #endif
 
@@ -368,7 +368,7 @@ m_pkthdr_init(struct mbuf *m, int how)
 #ifdef MAC
 	int error;
 #endif
-#ifdef CHERI_PURECAP_KERNEL
+#ifdef __CHERI_PURE_CAPABILITY__
 	m->m_data = cheri_setbounds(m->m_pktdat, MHLEN);
 #else
         m->m_data = m->m_pktdat;
@@ -412,7 +412,7 @@ m_move_pkthdr(struct mbuf *to, struct mbuf *from)
 	to->m_flags = (from->m_flags & M_COPYFLAGS) |
 	    (to->m_flags & (M_EXT | M_EXTPG));
 	if ((to->m_flags & M_EXT) == 0)
-#ifdef CHERI_PURECAP_KERNEL
+#ifdef __CHERI_PURE_CAPABILITY__
 		to->m_data = cheri_setbounds(to->m_pktdat, MHLEN);
 #else
 		to->m_data = to->m_pktdat;
@@ -455,7 +455,7 @@ m_dup_pkthdr(struct mbuf *to, const struct mbuf *from, int how)
 	to->m_flags = (from->m_flags & M_COPYFLAGS) |
 	    (to->m_flags & (M_EXT | M_EXTPG));
 	if ((to->m_flags & M_EXT) == 0)
-#ifdef CHERI_PURECAP_KERNEL
+#ifdef __CHERI_PURE_CAPABILITY__
 		to->m_data = cheri_setbounds(to->m_pktdat, MHLEN);
 #else
 		to->m_data = to->m_pktdat;
@@ -593,7 +593,7 @@ m_copypacket(struct mbuf *m, int how)
 		n->m_data = m->m_data;
 		mb_dupcl(n, m);
 	} else {
-#ifdef CHERI_PURECAP_KERNEL
+#ifdef __CHERI_PURE_CAPABILITY__
 		n->m_data = (char *)cheri_setbounds(n->m_pktdat, MHLEN) +
 		    (m->m_data - m->m_pktdat );
 #else
