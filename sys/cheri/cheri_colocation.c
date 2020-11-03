@@ -266,6 +266,10 @@ colocation_thread_exit(struct thread *td)
 }
 
 /*
+ * Assign our trapframe (userspace context) to the thread waiting
+ * in copark(2) and wake it up; it'll return to userspace with ERESTART
+ * and then bounce back.
+ *
  * Called from trap().
  */
 void
@@ -276,6 +280,7 @@ colocation_unborrow(struct thread *td, struct trapframe **trapframep)
 	struct trapframe peertrapframe;
 	struct syscall_args peersa;
 #ifdef __mips__
+	struct trapframe *satrapframe, *peersatrapframe;
 	trapf_pc_t peertpc;
 #endif
 	bool have_scb;
@@ -294,6 +299,8 @@ colocation_unborrow(struct thread *td, struct trapframe **trapframep)
 
 	KASSERT(peertd != td,
 	    ("%s: peertd %p == td %p\n", __func__, peertd, td));
+	KASSERT(*trapframep == td->td_frame,
+	    ("%s: %p != %p", __func__, *trapframep, td->td_frame));
 
 #ifdef __mips__
 	COLOCATION_DEBUG("replacing current td %p, pid %d (%s), switchercb %#lx, "
@@ -304,40 +311,61 @@ colocation_unborrow(struct thread *td, struct trapframe **trapframep)
 	    (__cheri_fromcap void *)td->td_md.md_tls, td->td_md.md_tls_tcb_offset,
 	    peertd, peertd->td_proc->p_pid, peertd->td_proc->p_comm, peertd->td_md.md_scb,
 	    (__cheri_fromcap void *)peertd->td_md.md_tls, peertd->td_md.md_tls_tcb_offset);
+#else
+	COLOCATION_DEBUG("replacing current td %p, pid %d (%s), switchercb %#lx, "
+	    "with td %p, pid %d (%s), switchercb %#lx",
+	    td, td->td_proc->p_pid, td->td_proc->p_comm, td->td_md.md_scb,
+	    peertd, peertd->td_proc->p_pid, peertd->td_proc->p_comm, peertd->td_md.md_scb);
+#endif
 
-	/*
-	 * Assign our trapframe (userspace context) to the thread waiting
-	 * in copark(2) and wake it up; it'll return to userspace with ERESTART
-	 * and then bounce back.
-	 */
+#ifdef __mips__
 	KASSERT(td->td_frame == &td->td_pcb->pcb_regs,
 	    ("%s: td->td_frame %p != &td->td_pcb->pcb_regs %p, td %p",
 	    __func__, td->td_frame, &td->td_pcb->pcb_regs, td));
+	KASSERT(td->td_frame == td->td_sa.trapframe,
+	    ("%s: td->td_frame %p != td->td_sa.trapframe %p, td %p",
+	    __func__, td->td_frame, td->td_sa.trapframe, td));
+
 	KASSERT(peertd->td_frame == &peertd->td_pcb->pcb_regs,
 	    ("%s: peertd->td_frame %p != &peertd->td_pcb->pcb_regs %p, peertd %p",
 	    __func__, peertd->td_frame, &peertd->td_pcb->pcb_regs, peertd));
+	KASSERT(peertd->td_frame == peertd->td_sa.trapframe,
+	    ("%s: peertd->td_frame %p != peertd->td_sa.trapframe %p, peertd %p",
+	    __func__, peertd->td_frame, peertd->td_sa.trapframe, peertd));
 #endif
 
-	peersa = peertd->td_sa;
 #ifdef __mips__
-	// XXX: Is td_sa.trapframe even the right trapframe, as opposed to peertd->td_frame?
-	memcpy(&peertrapframe, peertd->td_sa.trapframe, sizeof(struct trapframe));
+	/*
+	 * There's this... thing in MIPS' td_sa.  Its purpose is unknown,
+	 * but things break when you touch it.  Make sure to keep it as it is,
+	 * ie do not swap it.
+	 */
+	satrapframe = td->td_sa.trapframe;
+	peersatrapframe = peertd->td_sa.trapframe;
+#endif
+
+	/*
+	 * Swap the syscall information between td and peertd.
+	 */
+	memcpy(&peersa, &peertd->td_sa, sizeof(peersa));
+	memcpy(&peertd->td_sa, &td->td_sa, sizeof(peersa));
+	memcpy(&td->td_sa, &peersa, sizeof(peersa));
+
+#ifdef __mips__
+	td->td_sa.trapframe = satrapframe;
+	peertd->td_sa.trapframe = peersatrapframe;
+
+	/*
+	 * Another MIPS-specific field; this one needs to be swapped.
+	 */
 	peertpc = peertd->td_pcb->pcb_tpc;
-#endif
-
-	peertd->td_sa = td->td_sa;
-	memcpy(peertd->td_frame, *trapframep, sizeof(struct trapframe));
-#ifdef __mips__
 	peertd->td_pcb->pcb_tpc = td->td_pcb->pcb_tpc;
-#endif
-
-	td->td_sa = peersa;
-	memcpy(td->td_frame, &peertrapframe, sizeof(struct trapframe));
-#ifdef __mips__
 	td->td_pcb->pcb_tpc = peertpc;
 #endif
 
-	*trapframep = td->td_frame;
+	memcpy(&peertrapframe, peertd->td_frame, sizeof(struct trapframe));
+	memcpy(peertd->td_frame, td->td_frame, sizeof(struct trapframe));
+	memcpy(td->td_frame, &peertrapframe, sizeof(struct trapframe));
 
 	wakeup(&peertd->td_md.md_scb);
 
@@ -346,7 +374,8 @@ colocation_unborrow(struct thread *td, struct trapframe **trapframep)
 	 * syscall it was.
 	 */
 	KASSERT(td->td_sa.code == SYS_copark,
-	    ("%s: td_sa.code %d != %d\n", __func__, td->td_sa.code, SYS_copark));
+	    ("%s: td_sa.code %d != SYS_copark %d\n",
+	    __func__, td->td_sa.code, SYS_copark));
 }
 
 bool
