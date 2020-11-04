@@ -410,11 +410,6 @@ BROKEN_OPTIONS+=PROFILE
 BROKEN_OPTIONS+=CXGBETOOL
 BROKEN_OPTIONS+=MLX5TOOL
 .endif
-.if ${__T:Mmips*}
-__DEFAULT_YES_OPTIONS+=PIE
-.else
-__DEFAULT_NO_OPTIONS+=PIE
-.endif
 
 # We'd really like this to be:
 #    !${MACHINE_CPU:Mcheri} || ${MACHINE_ABI:Mpurecap}
