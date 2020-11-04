@@ -61,7 +61,6 @@ __FBSDID("$FreeBSD$");
 struct Struct_Obj_Entry;
 
 static void _start(void *, void (*)(void), struct Struct_Obj_Entry *) __used;
-extern void crt_call_constructors(void);
 
 #ifdef GCRT
 /* Profiling support. */
@@ -168,14 +167,6 @@ _start(void *auxv,
 		atexit(cleanup);
 	else
 		_init_tls();
-
-#ifndef POSITION_INDEPENDENT_STARTUP
-	/*
-	 * .ctors and .dtors are no longer supported for dynamically linked
-	 * binaries. TODO: remove for statically linked ones too
-	 */
-	crt_call_constructors();
-#endif
 
 	handle_static_init(argc, argv, env);
 
