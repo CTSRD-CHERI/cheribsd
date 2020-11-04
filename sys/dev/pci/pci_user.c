@@ -987,6 +987,24 @@ pci_bar_mmap(device_t pcidev, struct pci_bar_mmap *pbm)
 	prot = VM_PROT_READ | (((pbm->pbm_flags & PCIIO_BAR_MMAP_RW) != 0) ?
 	    VM_PROT_WRITE : 0);
 
+	flags = MAP_SHARED;
+#if __has_feature(capabilities)
+	/* Enforce the same policy as for sys_mmap() */
+	if (cheri_gettag(pbm->pbm_map_base)) {
+		if ((pbm->pbm_flags & PCIIO_BAR_MMAP_FIXED) == 0)
+			return (EPROT);
+		if ((cheri_getperm(pbm->pbm_map_base) &
+		    CHERI_PERM_CHERIABI_VMMAP) == 0)
+			return (EACCES);
+	} else {
+		if (!cheri_is_null_derived(pbm->pbm_map_base))
+			return (EINVAL);
+		flags |= MAP_RESERVATION_CREATE;
+		if (pbm->pbm_flags & PCIIO_BAR_MMAP_FIXED)
+			pbm->pbm_flags |= PCIIO_BAR_MMAP_EXCL;
+	}
+#endif
+
 	/* Create vm structures and mmap. */
 	sg = sglist_alloc(1, M_WAITOK);
 	error = sglist_append_phys(sg, pbase, plen);
@@ -998,10 +1016,9 @@ pci_bar_mmap(device_t pcidev, struct pci_bar_mmap *pbm)
 		goto out;
 	}
 	obj->memattr = pbm->pbm_memattr;
-	flags = MAP_SHARED;
 	addr = 0;
 	if ((pbm->pbm_flags & PCIIO_BAR_MMAP_FIXED) != 0) {
-		addr = (__cheri_addr vm_ptr_t)pbm->pbm_map_base;
+		addr = (uintcap_t)pbm->pbm_map_base;
 		flags |= MAP_FIXED;
 	}
 	if ((pbm->pbm_flags & PCIIO_BAR_MMAP_EXCL) != 0)
