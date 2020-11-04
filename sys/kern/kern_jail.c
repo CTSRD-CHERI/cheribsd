@@ -491,7 +491,7 @@ user_jail_set(struct thread *td, struct iovec * __capability iovp,
 	if (iovcnt & 1)
 		return (EINVAL);
 
-	error = copyinuio(iovp, iovcnt, &auio);
+	error = copyinuio_f(iovp, iovcnt, &auio);
 	if (error)
 		return (error);
 	error = kern_jail_set(td, auio, flags);
