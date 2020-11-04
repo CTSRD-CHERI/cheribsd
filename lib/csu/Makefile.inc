@@ -6,12 +6,12 @@ NO_WMISSING_VARIABLE_DECLARATIONS=
 
 .include <src.opts.mk>
 
-ACFLAGS+=	-DLOCORE
-
-.if !defined(BUILDING_TESTS) && !defined(NO_BSD_CRTBEGIN)
+.if !defined(BUILDING_TESTS)
 
 OBJS+=	crtbegin.o crtbeginS.o crtbeginT.o
 OBJS+=	crtend.o crtendS.o
+
+ACFLAGS+=	-DLOCORE
 
 CFLAGS+=	-fno-asynchronous-unwind-tables
 CFLAGS+=	-fno-omit-frame-pointer
