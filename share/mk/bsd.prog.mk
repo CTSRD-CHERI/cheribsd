@@ -48,9 +48,13 @@ LDFLAGS+= -Wl,-znow
 .if ${MK_PIE} != "no"
 # Static PIE is not yet supported/tested.
 .if !defined(NO_SHARED) || ${NO_SHARED:tl} == "no"
+# PIE does not work for libcheri
+.if !((defined(WANT_CHERI) && ${WANT_CHERI} == "sandbox") || \
+	(defined(LIBADD) && !empty(LIBADD:Mcheri)))
 CFLAGS+= -fPIE
 CXXFLAGS+= -fPIE
 LDFLAGS+= -pie
+.endif
 .endif
 .endif
 .if ${MK_RETPOLINE} != "no"
@@ -127,25 +131,6 @@ LDFLAGS+= -static
 .if ${MACHINE_ARCH:Mmips64*} && ${COMPILER_TYPE} == "clang"
 CFLAGS+= -ftls-model=initial-exec
 .endif
-
-.if defined(MK_PIE)
-# Ports will not have MK_PIE defined and the following logic requires
-# it be defined.
-
-.if ${LDFLAGS:M-static} || (defined(WANT_CHERI) && ${WANT_CHERI} == "sandbox") || (defined(LIBADD) && !empty(LIBADD:Mcheri))
-NOPIE=yes
-.endif
-
-.if !defined(NOPIE)
-.if ${MK_PIE} != "no"
-
-CFLAGS+= -fPIC -fPIE
-CXXFLAGS+= -fPIC -fPIE
-LDFLAGS+= -pie
-
-.endif # ${MK_PIE} != no
-.endif # !defined(NOPIE)
-.endif # defined(MK_PIE)
 
 .if ${MK_DEBUG_FILES} != "no"
 PROG_FULL=${PROG}.full
