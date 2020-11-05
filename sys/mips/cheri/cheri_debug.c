@@ -51,8 +51,7 @@
 static inline void
 db_print_cap(const char* msg, void * __capability cap)
 {
-	db_printf("%s" _CHERI_PRINTF_CAP_FMT "\n", msg,
-	    _CHERI_PRINTF_CAP_ARG(cap));
+	db_printf("%s%#.16lp\n", msg, cap);
 }
 
 static void * __capability
@@ -133,8 +132,7 @@ db_show_cheri_trapframe(struct trapframe *frame)
 	/* Laboriously load and print each trapframe capability. */
 	for (i = 1; i < 31; i++) {
 		void * __capability cap = *(&frame->ddc + i);
-		db_printf("$c%02d: " _CHERI_PRINTF_CAP_FMT "\n", i,
-		    _CHERI_PRINTF_CAP_ARG(cap));
+		db_printf("$c%02d: %#.16lp\n", i, cap);
 	}
 }
 

@@ -198,13 +198,10 @@ cpu_fetch_syscall_args(struct thread *td)
 #include "../../kern/subr_syscall.c"
 
 #if __has_feature(capabilities)
-#define	PRINT_REG_ARG(value)	((void * __capability)(value))
-#define PRINT_REG(name, value)					\
-	printf(name " = " _CHERI_PRINTF_CAP_FMT "\n",		\
-	    PRINT_REG_ARG(value));
-#define PRINT_REG_N(name, n, array)				\
-	printf(name "[%d] = " _CHERI_PRINTF_CAP_FMT "\n", n,	\
-	    PRINT_REG_ARG((array)[n]));
+#define PRINT_REG(name, value)	\
+	printf(name " = %#.16lp\n", (void * __capability)(value));
+#define PRINT_REG_N(name, n, array)	\
+	printf(name "[%d] = %#.16lp\n", n, (void * __capability)(array)[n]);
 #else
 #define PRINT_REG(name, value)	printf(name " = 0x%016lx\n", value)
 #define PRINT_REG_N(name, n, array)	\

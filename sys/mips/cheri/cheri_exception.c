@@ -237,7 +237,7 @@ static inline void
 cheri_cap_print(void* __capability cap)
 {
 
-	printf(_CHERI_PRINTF_CAP_FMT "\n", _CHERI_PRINTF_CAP_ARG(cap));
+	printf("%#.16lp\n", cap);
 }
 
 #define	CHERI_REG_PRINT(cap, num) do {					\

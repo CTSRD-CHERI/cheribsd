@@ -51,8 +51,7 @@
 static inline void
 db_print_cap(const char* msg, void * __capability cap)
 {
-	db_printf("%s" _CHERI_PRINTF_CAP_FMT "\n", msg,
-	    _CHERI_PRINTF_CAP_ARG(cap));
+	db_printf("%s%#.16lp\n", msg, cap);
 }
 
 /*
