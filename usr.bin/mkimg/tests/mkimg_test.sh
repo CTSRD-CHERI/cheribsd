@@ -142,14 +142,15 @@ atf_init_test_cases()
 {
     local B F G S nm
 
-    # Note: These tests take 2.5 minutes each on purecap CHERI-RISC-V, so if the
-    # unless the include_slow_tests option is set, we skip most of these tests
-    # to reduce test run time by almost 6 hours.
-    # FIXME: vhdx seems broken on RISC-V purecap so we run one of the failing
-    # tests (mbr_63x255_4096_vhdx) instead of the full matrix
+    # Note: These tests take 30 seconds each on purecap CHERI-RISC-V (i.e. 90
+    # minutes for all of them, or approximately 40% of the total test runtime),
+    # so unless the include_slow_tests option is set, we reduce the
+    # configuration matrix to run only one per file format.
+    # TODO: the majority of the time is spent in hexdump, so we could massively
+    # speed up the test if we used sparse files for the partition data and
+    # added SEEK_HOLE/SEEK_DATA support to hexdump.
     if [ "$(atf_config_get include_slow_tests false)" != "true" ]; then
 	mkimg_blksz_list="4096"
-	mkimg_format_list="vhdx"
 	mkimg_geom_list="63x255"
 	mkimg_scheme_list="mbr"
     fi
