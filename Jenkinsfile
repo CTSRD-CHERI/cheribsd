@@ -33,6 +33,8 @@ if (!env.CHANGE_ID && archiveBranches.contains(env.BRANCH_NAME)) {
 }
 // Add an architecture selector for manual builds
 def allArchitectures = ["aarch64", "amd64", "mips64", "mips64-hybrid", "mips64-purecap", "riscv64", "riscv64-hybrid", "riscv64-purecap"]
+// Build a subset of the architectures for morello-dev: Just check that we didn't break aarch64 (with CHERI LLVM) and *-purecap
+allArchitectures = ["morello-hybrid", "morello-purecap", "aarch64", "mips64-purecap", "riscv64-purecap"]
 jobProperties.add(parameters([text(defaultValue: allArchitectures.join('\n'),
         description: 'The architectures (cheribuild suffixes) to build for (one per line)',
         name: 'architectures')]))
