@@ -806,18 +806,16 @@ reswitch:	switch (ch = (u_char)*fmt++) {
 			goto handle_nosign;
 		case 'p':
 #if __has_feature(capabilities)
-#ifdef __CHERI_PURE_CAPABILITY__
-			cap = va_arg(ap, void *);
-			num = cheri_getaddress(cap);
-#else
-			if (lflag) {
-				cap = *va_arg(ap, void * __capability *);
-				num = cheri_getaddress(cap);
-			} else {
-				num = (uintptr_t)va_arg(ap, void *);
+#ifndef __CHERI_PURE_CAPABILITY__
+			if (!lflag) {
+				num = (uintmax_t)va_arg(ap, void *);
 				sharpflag = 0;
-			}
+			} else
 #endif
+			{
+				cap = va_arg(ap, void * __capability);
+				num = cheri_getaddress(cap);
+			}
 			if (sharpflag) {
 				int orig_dwidth;
 
