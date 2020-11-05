@@ -862,18 +862,16 @@ fp_common:
 			 *	-- ANSI X3J11
 			 */
 #if __has_feature(capabilities)
-#ifdef __CHERI_PURE_CAPABILITY__
-			cap = GETARG(void *);
-			ujval = cheri_getaddress(cap);
-#else
-			if (flags & LONGINT) {
-				cap = *GETARG(void * __capability *);
-				ujval = cheri_getaddress(cap);
-			} else {
+#ifndef __CHERI_PURE_CAPABILITY__
+			if (!(flags & LONGINT)) {
 				ujval = (uintmax_t)(uintptr_t)GETARG(void *);
 				flags &= ~ALT;
-			}
+			} else
 #endif
+			{
+				cap = GETARG(void * __capability);
+				ujval = cheri_getaddress(cap);
+			}
 			if (flags & ALT) {
 				cp = buf + BUF;
 				cp = __cheri_ptr_alt(cap, cp, xdigs_lower,

@@ -46,11 +46,7 @@
 
 #include "cheribsdtest.h"
 
-#ifdef __CHERI_PURE_CAPABILITY__
 #define	CAP_ARG(p)	(p)
-#else
-#define	CAP_ARG(p)	(&(p))
-#endif
 
 static void
 test_printf_cap_one(void * __capability p, int expected_tokens,

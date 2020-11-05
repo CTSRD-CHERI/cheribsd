@@ -211,11 +211,7 @@ cheri_bytes_remaining(const void * __capability cap)
 #define cheri_cap_to_typed_ptr(cap, type)				\
 	(type *)cheri_cap_to_ptr(cap, sizeof(type))
 
-#ifdef __CHERI_PURE_CAPABILITY__
 #define _CHERI_PRINTF_CAP_ARG(ptr)	(ptr)
-#else
-#define _CHERI_PRINTF_CAP_ARG(ptr)	(&(ptr))
-#endif
 #define _CHERI_PRINTF_CAP_FMT  "%#.16lp"
 
 #define _CHERI_PRINT_PTR_FMT(ptr)					\
