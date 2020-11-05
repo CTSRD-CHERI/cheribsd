@@ -1124,7 +1124,7 @@ parse_metadata(void)
 #ifdef DDB
 	ksym_start = MD_FETCH(kmdp, MODINFOMD_SSYM, uintptr_t);
 	ksym_end = MD_FETCH(kmdp, MODINFOMD_ESYM, uintptr_t);
-	db_fetch_ksymtab(ksym_start, ksym_end);
+	db_fetch_ksymtab(ksym_start, ksym_end, 0);
 #endif
 #ifdef FDT
 	try_load_dtb(kmdp);
