@@ -49,8 +49,7 @@ LDFLAGS+= -Wl,-znow
 # Static PIE is not yet supported/tested.
 .if !defined(NO_SHARED) || ${NO_SHARED:tl} == "no"
 # PIE does not work for libcheri
-.if !((defined(WANT_CHERI) && ${WANT_CHERI} == "sandbox") || \
-	(defined(LIBADD) && !empty(LIBADD:Mcheri)))
+.if !(defined(LIBADD) && !empty(LIBADD:Mcheri))
 CFLAGS+= -fPIE
 CXXFLAGS+= -fPIE
 LDFLAGS+= -pie
