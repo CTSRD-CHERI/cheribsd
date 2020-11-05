@@ -382,7 +382,7 @@ static struct csession *csecreate(struct fcrypt *, crypto_session_t,
     struct auth_hash *, void *);
 static void csefree(struct csession *);
 
-static	int cryptodev_op(struct csession *, struct crypt_op *,
+static	int cryptodev_op(struct csession *, const struct crypt_op *,
 			struct ucred *, struct thread *td);
 static	int cryptodev_aead(struct csession *, struct crypt_aead *,
 			struct ucred *, struct thread *);
@@ -943,12 +943,13 @@ cod_free(struct cryptop_data *cod)
 static int
 cryptodev_op(
 	struct csession *cse,
-	struct crypt_op *cop,
+	const struct crypt_op *cop,
 	struct ucred *active_cred,
 	struct thread *td)
 {
 	struct cryptop_data *cod = NULL;
 	struct cryptop *crp = NULL;
+	char * __capability dst;
 	int error;
 
 	if (cop->len > 256*1024-4) {
@@ -981,6 +982,7 @@ cryptodev_op(
 	}
 
 	cod = cod_alloc(cse, 0, cop->len + cse->hashsize, td);
+	dst = cop->dst;
 
 	crp = crypto_getreq(cse->cses, M_WAITOK);
 
@@ -1083,7 +1085,7 @@ cryptodev_op(
 		crp->crp_iv_start = 0;
 		crp->crp_payload_start += cse->ivsize;
 		crp->crp_payload_length -= cse->ivsize;
-		cop->dst += cse->ivsize;
+		dst += cse->ivsize;
 	}
 
 	if (cop->mac != NULL && crp->crp_op & CRYPTO_OP_VERIFY_DIGEST) {
@@ -1128,7 +1130,7 @@ again:
 
 	if (cop->dst != NULL) {
 		error = copyout(cod->obuf != NULL ? cod->obuf :
-		    cod->buf + crp->crp_payload_start, cop->dst,
+		    cod->buf + crp->crp_payload_start, dst,
 		    crp->crp_payload_length);
 		if (error) {
 			SDT_PROBE1(opencrypto, dev, ioctl, error, __LINE__);
@@ -1161,6 +1163,7 @@ cryptodev_aead(
 {
 	struct cryptop_data *cod = NULL;
 	struct cryptop *crp = NULL;
+	char * __capability dst;
 	int error;
 
 	if (caead->len > 256*1024-4 || caead->aadlen > 256*1024-4) {
@@ -1187,6 +1190,7 @@ cryptodev_aead(
 	}
 
 	cod = cod_alloc(cse, caead->aadlen, caead->len + cse->hashsize, td);
+	dst = caead->dst;
 
 	crp = crypto_getreq(cse->cses, M_WAITOK);
 
@@ -1278,7 +1282,7 @@ cryptodev_aead(
 		crp->crp_iv_start = crp->crp_payload_start;
 		crp->crp_payload_start += cse->ivsize;
 		crp->crp_payload_length -= cse->ivsize;
-		caead->dst += cse->ivsize;
+		dst += cse->ivsize;
 	}
 
 	if (crp->crp_op & CRYPTO_OP_VERIFY_DIGEST) {
@@ -1323,7 +1327,7 @@ again:
 
 	if (caead->dst != NULL) {
 		error = copyout(cod->obuf != NULL ? cod->obuf :
-		    cod->buf + crp->crp_payload_start, caead->dst,
+		    cod->buf + crp->crp_payload_start, dst,
 		    crp->crp_payload_length);
 		if (error) {
 			SDT_PROBE1(opencrypto, dev, ioctl, error, __LINE__);
