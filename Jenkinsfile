@@ -32,7 +32,12 @@ if (!env.CHANGE_ID && archiveBranches.contains(env.BRANCH_NAME)) {
     }
 }
 // Add an architecture selector for manual builds
-def allArchitectures = ["aarch64", "amd64", "mips64", "mips64-hybrid", "mips64-purecap", "riscv64", "riscv64-hybrid", "riscv64-purecap"]
+def allArchitectures = [
+    "aarch64", "amd64",
+    // TODO: enable once dependencies have been merged: "morello-hybrid", "morello-purecap",
+    "mips64", "mips64-hybrid", "mips64-purecap",
+    "riscv64", "riscv64-hybrid", "riscv64-purecap"
+]
 jobProperties.add(parameters([text(defaultValue: allArchitectures.join('\n'),
         description: 'The architectures (cheribuild suffixes) to build for (one per line)',
         name: 'architectures')]))
