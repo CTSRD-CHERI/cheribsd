@@ -2665,7 +2665,7 @@ pmap_enter(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot,
 	if (prot & VM_PROT_READ_CAP)
 		new_l3 |= PTE_CR;
 	if (prot & VM_PROT_WRITE_CAP)
-		new_l3 |= PTE_CW;
+		new_l3 |= PTE_CW | PTE_CD;
 #endif
 
 	new_l3 |= (pn << PTE_PPN0_S);
