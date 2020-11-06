@@ -7,7 +7,8 @@ class GlobalVars { // "Groovy"
 
 echo("JOB_NAME='${env.JOB_NAME}', JOB_BASE_NAME='${env.JOB_BASE_NAME}'")
 def rateLimit = rateLimitBuilds(throttle: [count: 1, durationName: 'hour', userBoost: true])
-if (env.JOB_NAME.contains("CheriBSD-testsuite")) {
+if (env.JOB_NAME.contains("CheriBSD-testsuite") ||
+    (env.CHANGE_ID && pullRequest.labels.contains('run-full-testsuite'))) {
     GlobalVars.isTestSuiteJob = true
     // This job takes a long time to run (approximately 20 hours) so limit it to twice a week
     rateLimit = rateLimitBuilds(throttle: [count: 2, durationName: 'week', userBoost: true])
