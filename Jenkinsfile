@@ -61,7 +61,7 @@ def buildImageAndRunTests(params, String suffix) {
 
         sh 'find qemu* && ls -lah'
         // TODO: run full testsuite (ideally in parallel)
-        def testExtraArgs = ['--no-timestamped-test-subdir']
+        def testExtraArgs = ['--no-timestamped-test-subdir', "--test-output-dir=\$WORKSPACE/test-results/${suffix}"]
         if (GlobalVars.isTestSuiteJob) {
             testExtraArgs += ['--kyua-tests-files', '/usr/tests/Kyuafile',
                               '--no-run-cheribsdtest', // only run kyua tests
@@ -92,6 +92,8 @@ find test-results
             // Note: Junit set should have set stage/build status to unstable already, but we still need to set
             // the per-configuration status, since Jenkins doesn't have a build result for each parallel branch.
             params.statusUnstable("Unstable test results: ${testResultMessage}")
+            // If there were test failures, we archive the JUnitXML file to simplify debugging
+            archiveArtifacts allowEmptyArchive: true, artifacts: "test-results/${suffix}/*.xml", onlyIfSuccessful: false
         }
     }
     if (GlobalVars.archiveArtifacts) {
