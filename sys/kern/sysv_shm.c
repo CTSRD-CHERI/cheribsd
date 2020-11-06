@@ -379,7 +379,7 @@ kern_shmdt_locked(struct thread *td, const void * __capability shmaddr)
 #if __has_feature(capabilities)
 	if (!__CAP_CHECK(shmaddr, shmseg->u.shm_segsz)) {
 		KASSERT(SV_PROC_FLAG(td->td_proc, SV_CHERI),
-		    ("!__CAP_CHECK(%#.16lp, %zx) for non-CheriABI program",
+		    ("!__CAP_CHECK(%#lp, %zx) for non-CheriABI program",
 		    shmaddr, shmseg->u.shm_segsz));
 		return (EPROT);
 	}

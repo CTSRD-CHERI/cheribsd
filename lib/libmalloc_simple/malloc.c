@@ -323,7 +323,7 @@ find_overhead(void * cp)
 	 */
 	error_printf("%s: Attempting to free or realloc unallocated memory\n",
 	    __func__);
-	error_printf("%s: cp %#.16lp\n", __func__, cp);
+	error_printf("%s: cp %#lp\n", __func__, cp);
 	return (NULL);
 }
 
