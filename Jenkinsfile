@@ -100,19 +100,18 @@ mv -v tarball/*.img tarball/rootfs/boot/kernel/kernel .
 xz -T0 *.img kernel*
 '''
             // Create sysroot archive (this is installed to cherisdk rather than the tarball)
+            // Seems like some Java versions require write permissions to the .xz files:
+            // java.nio.file.AccessDeniedException: /usr/local/jenkins/jobs/CheriBSD-pipeline/branches/PR-616/builds/14/archive/kernel.xz
+            //     at sun.nio.fs.UnixException.translateToIOException(UnixException.java:84)
+            //     at sun.nio.fs.UnixException.rethrowAsIOException(UnixException.java:102)
+            //     at sun.nio.fs.UnixException.rethrowAsIOException(UnixException.java:107)
+            //     at sun.nio.fs.UnixFileSystemProvider.newByteChannel(UnixFileSystemProvider.java:214)
+            //     at java.nio.file.spi.FileSystemProvider.newOutputStream(FileSystemProvider.java:434)
+            //     at java.nio.file.Files.newOutputStream(Files.java:216)
             sh label: 'Create sysroot archive', script: """
 rm -rf tarball artifacts-*
 mkdir tarball && mv -f cherisdk/sysroot tarball/sysroot
 ./cheribuild/jenkins-cheri-build.py --tarball cheribsd-sysroot-${suffix} --tarball-name cheribsd-sysroot.tar.xz
-ls -la
-# Seems like some Java versions require write permissions:
-# java.nio.file.AccessDeniedException: /usr/local/jenkins/jobs/CheriBSD-pipeline/branches/PR-616/builds/14/archive/kernel.xz
-#	at sun.nio.fs.UnixException.translateToIOException(UnixException.java:84)
-#	at sun.nio.fs.UnixException.rethrowAsIOException(UnixException.java:102)
-#	at sun.nio.fs.UnixException.rethrowAsIOException(UnixException.java:107)
-#	at sun.nio.fs.UnixFileSystemProvider.newByteChannel(UnixFileSystemProvider.java:214)
-#	at java.nio.file.spi.FileSystemProvider.newOutputStream(FileSystemProvider.java:434)
-#	at java.nio.file.Files.newOutputStream(Files.java:216)
 chmod +w *.xz
 mkdir -p "artifacts-${suffix}"
 mv -v *.xz "artifacts-${suffix}"
