@@ -121,7 +121,6 @@ struct cheri_frame;
 struct sysentvec;
 struct trapframe;
 int	cheri_capcause_to_sicode(register_t capcause);
-void	cheri_log_cheri_frame(struct trapframe *frame);
 void	cheri_log_exception(struct trapframe *frame, int trap_type);
 void	cheri_log_exception_registers(struct trapframe *frame);
 void	cheri_trapframe_from_cheriframe(struct trapframe *frame,
