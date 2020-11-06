@@ -70,21 +70,28 @@ def buildImageAndRunTests(params, String suffix) {
             // Run a small subset of tests to check that we didn't break running tests (since the full testsuite takes too long)
             testExtraArgs += ['--kyua-tests-files', '/usr/tests/bin/cat/Kyuafile']
         }
-        def exitCode = sh returnStatus: true, label: "Run tests in QEMU", script: """
-rm -rf cheribsd-test-results && mkdir cheribsd-test-results
-./cheribuild/jenkins-cheri-build.py --test run-${suffix} '--test-extra-args=${testExtraArgs.join(" ")}' ${params.extraArgs} --test-ssh-key \$WORKSPACE/id_ed25519.pub
-find cheribsd-test-results
+        sh label: "Run tests in QEMU", script: """
+rm -rf test-results && mkdir -p test-results/${suffix}
+# The test script returns 2 if the tests step is unstable, any other non-zero exit code is a fatal error
+exit_code=0
+./cheribuild/jenkins-cheri-build.py --test run-${suffix} '--test-extra-args=${testExtraArgs.join(" ")}' ${params.extraArgs} --test-ssh-key \$WORKSPACE/id_ed25519.pub || exit_code=\$?
+if [ \${exit_code} -eq 2 ]; then
+    echo "Test script encountered a non-fatal error - probably some of the tests failed."
+elif [ \${exit_code} -ne 0 ]; then
+    echo "Test script got fatal error: exit code \${exit_code}"
+    exit \${exit_code}
+fi
+find test-results
 """
-        def summary = junitReturnCurrentSummary allowEmptyResults: false, keepLongStdio: true, testResults: 'cheribsd-test-results/*.xml'
+        def summary = junitReturnCurrentSummary allowEmptyResults: false, keepLongStdio: true, testResults: "test-results/${suffix}/*.xml"
         def testResultMessage = "Test summary: ${summary.totalCount}, Failures: ${summary.failCount}, Skipped: ${summary.skipCount}, Passed: ${summary.passCount}"
         echo("${suffix}: ${testResultMessage}")
-        if (exitCode != 0 || summary.failCount != 0) {
-            // Note: Junit set should have set stage/build status to unstable already, but we still need to set
-            // the per-configuration status, since Jenkins doesn't have a build result for each parallel branch.
-            params.statusUnstable("Test script returned ${exitCode}! ${testResultMessage}")
-        }
         if (summary.passCount == 0 || summary.totalCount == 0) {
             params.statusFailure("No tests successful? ${testResultMessage}")
+        } else if (summary.failCount != 0) {
+            // Note: Junit set should have set stage/build status to unstable already, but we still need to set
+            // the per-configuration status, since Jenkins doesn't have a build result for each parallel branch.
+            params.statusUnstable("Unstable test results: ${testResultMessage}")
         }
     }
     if (GlobalVars.archiveArtifacts) {
