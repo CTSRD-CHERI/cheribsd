@@ -159,7 +159,7 @@ selectedArchitectures.each { suffix ->
                 extraArgs: cheribuildArgs.join(" "),
                 skipArchiving: true, skipTarball: true,
                 sdkCompilerOnly: true, // We only need clang not the CheriBSD sysroot since we are building that.
-                customGitCheckoutDir: 'cheribsd',
+                customGitCheckoutDir: suffix.startsWith('morello') ? 'morello-cheribsd' : 'cheribsd',
                 gitHubStatusContext: GlobalVars.isTestSuiteJob ? "testsuite/${suffix}" : "ci/${suffix}",
                 // Delete stale compiler/sysroot
                 beforeBuild: { params -> dir('cherisdk') { deleteDir() } },
