@@ -44,12 +44,3 @@ FBSD_1.6 {
 	procstat_get_pts_info;
 	procstat_get_vnode_info;
 };
-
-FBSDprivate_1.0 {
-	/*
-	 * XXX-JHB: Export .size.<var> symbols for <var>'s that are
-	 * undefined so rtld can update them.  This is a temporary
-	 * hack.
-	 */
-	.size.*;
-};
