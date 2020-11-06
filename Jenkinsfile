@@ -5,11 +5,6 @@ class GlobalVars { // "Groovy"
     public static boolean isTestSuiteJob = false;
 }
 
-if (env.CHANGE_ID && !shouldBuildPullRequest()) {
-    echo "Not building this pull request."
-    return
-}
-
 echo("JOB_NAME='${env.JOB_NAME}', JOB_BASE_NAME='${env.JOB_BASE_NAME}'")
 def rateLimit = rateLimitBuilds(throttle: [count: 1, durationName: 'hour', userBoost: true])
 if (env.JOB_NAME.contains("CheriBSD-testsuite")) {
