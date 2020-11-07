@@ -48,12 +48,9 @@ LDFLAGS+= -Wl,-znow
 .if ${MK_PIE} != "no"
 # Static PIE is not yet supported/tested.
 .if !defined(NO_SHARED) || ${NO_SHARED:tl} == "no"
-# PIE does not work for libcheri
-.if !(defined(LIBADD) && !empty(LIBADD:Mcheri))
 CFLAGS+= -fPIE
 CXXFLAGS+= -fPIE
 LDFLAGS+= -pie
-.endif
 .endif
 .endif
 .if ${MK_RETPOLINE} != "no"
