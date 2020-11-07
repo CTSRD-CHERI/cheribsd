@@ -1264,8 +1264,8 @@ malloc_init(void *data)
 
 	mtp = data;
 	if (mtp->ks_version != M_VERSION)
-		panic("malloc_init: unsupported malloc type version %lu",
-		    mtp->ks_version);
+		panic("malloc_init: type %s with unsupported version %lu",
+		    mtp->ks_shortdesc, mtp->ks_version);
 
 	mtip = &mtp->ks_mti;
 	mtip->mti_stats = uma_zalloc_pcpu(mt_stats_zone, M_WAITOK | M_ZERO);
