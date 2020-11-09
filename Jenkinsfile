@@ -1,8 +1,8 @@
 @Library('ctsrd-jenkins-scripts') _
 
 class GlobalVars { // "Groovy"
-    public static boolean archiveArtifacts = false;
-    public static boolean isTestSuiteJob = false;
+    public static boolean archiveArtifacts = false
+    public static boolean isTestSuiteJob = false
 }
 
 echo("JOB_NAME='${env.JOB_NAME}', JOB_BASE_NAME='${env.JOB_BASE_NAME}'")
@@ -163,7 +163,7 @@ selectedArchitectures.each { suffix ->
     }
 }
 
-boolean runParallel = true;
+boolean runParallel = true
 echo("Running jobs in parallel: ${runParallel}")
 if (runParallel) {
     jobs.failFast = false
@@ -171,6 +171,6 @@ if (runParallel) {
 } else {
     jobs.each { key, value ->
         echo("RUNNING ${key}")
-        value();
+        value()
     }
 }
