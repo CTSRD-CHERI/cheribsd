@@ -40,6 +40,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/lock.h>
 #include <sys/mutex.h>
 #include <sys/proc.h>
+#include <sys/bitstring.h>
 #include <sys/epoch.h>
 #include <sys/rangelock.h>
 #include <sys/resourcevar.h>
@@ -59,6 +60,7 @@ __FBSDID("$FreeBSD$");
 #ifdef	HWPMC_HOOKS
 #include <sys/pmckern.h>
 #endif
+#include <sys/priv.h>
 
 #include <security/audit/audit.h>
 
@@ -137,10 +139,15 @@ static int thread_unsuspend_one(struct thread *td, struct proc *p,
 #define TID_BUFFER_SIZE	1024
 
 struct mtx tid_lock;
-static struct unrhdr *tid_unrhdr;
-static lwpid_t tid_buffer[TID_BUFFER_SIZE];
-static int tid_head, tid_tail;
+bitstr_t *tid_bitmap;
+
 static MALLOC_DEFINE(M_TIDHASH, "tidhash", "thread hash");
+
+static int maxthread;
+SYSCTL_INT(_kern, OID_AUTO, maxthread, CTLFLAG_RDTUN,
+    &maxthread, 0, "Maximum number of threads");
+
+static int nthreads;
 
 struct	tidhashhead *tidhashtbl;
 u_long	tidhash;
@@ -154,37 +161,59 @@ EVENTHANDLER_LIST_DEFINE(thread_fini);
 static lwpid_t
 tid_alloc(void)
 {
-	lwpid_t	tid;
+	static struct timeval lastfail;
+	static int curfail;
+	static lwpid_t trytid;
+	lwpid_t tid;
 
-	tid = alloc_unr(tid_unrhdr);
-	if (tid != -1)
-		return (tid);
 	mtx_lock(&tid_lock);
-	if (tid_head == tid_tail) {
-		mtx_unlock(&tid_lock);
-		return (-1);
+	if (nthreads + 1 >= maxthread - 100) {
+		if (priv_check_cred(curthread->td_ucred, PRIV_MAXPROC) != 0 ||
+		    nthreads + 1 >= maxthread) {
+			mtx_unlock(&tid_lock);
+			if (ppsratecheck(&lastfail, &curfail, 1)) {
+				printf("maxthread limit exceeded by uid %u "
+				"(pid %d); consider increasing kern.maxthread\n",
+				curthread->td_ucred->cr_ruid, curproc->p_pid);
+			}
+			return (-1);
+		}
 	}
-	tid = tid_buffer[tid_head];
-	tid_head = (tid_head + 1) % TID_BUFFER_SIZE;
+
+	nthreads++;
+	/*
+	 * It is an invariant that the bitmap is big enough to hold maxthread
+	 * IDs. If we got to this point there has to be at least one free.
+	 */
+	if (trytid >= maxthread)
+		trytid = 0;
+	bit_ffc_at(tid_bitmap, trytid, maxthread, &tid);
+	if (tid == -1) {
+		KASSERT(trytid != 0, ("unexpectedly ran out of IDs"));
+		trytid = 0;
+		bit_ffc_at(tid_bitmap, trytid, maxthread, &tid);
+		KASSERT(tid != -1, ("unexpectedly ran out of IDs"));
+	}
+	bit_set(tid_bitmap, tid);
+	trytid++;
 	mtx_unlock(&tid_lock);
-	return (tid);
+	return (tid + NO_PID);
 }
 
 static void
-tid_free(lwpid_t tid)
+tid_free(lwpid_t rtid)
 {
-	lwpid_t tmp_tid = -1;
+	lwpid_t tid;
 
+	KASSERT(rtid >= NO_PID,
+	    ("%s: invalid tid %d\n", __func__, rtid));
+	tid = rtid - NO_PID;
 	mtx_lock(&tid_lock);
-	if ((tid_tail + 1) % TID_BUFFER_SIZE == tid_head) {
-		tmp_tid = tid_buffer[tid_head];
-		tid_head = (tid_head + 1) % TID_BUFFER_SIZE;
-	}
-	tid_buffer[tid_tail] = tid;
-	tid_tail = (tid_tail + 1) % TID_BUFFER_SIZE;
+	KASSERT(bit_test(tid_bitmap, tid) != 0,
+	    ("thread ID %d not allocated\n", rtid));
+	bit_clear(tid_bitmap, tid);
+	nthreads--;
 	mtx_unlock(&tid_lock);
-	if (tmp_tid != -1)
-		free_unr(tid_unrhdr, tmp_tid);
 }
 
 /*
@@ -199,8 +228,6 @@ thread_ctor(void *mem, int size, void *arg, int flags)
 	td->td_state = TDS_INACTIVE;
 	td->td_lastcpu = td->td_oncpu = NOCPU;
 
-	td->td_tid = tid_alloc();
-
 	/*
 	 * Note that td_critnest begins life as 1 because the thread is not
 	 * running and is thereby implicitly waiting to be on the receiving
@@ -208,7 +235,6 @@ thread_ctor(void *mem, int size, void *arg, int flags)
 	 */
 	td->td_critnest = 1;
 	td->td_lend_user_pri = PRI_MAX;
-	EVENTHANDLER_DIRECT_INVOKE(thread_ctor, td);
 #ifdef AUDIT
 	audit_thread_alloc(td);
 #endif
@@ -253,9 +279,6 @@ thread_dtor(void *mem, int size, void *arg)
 	osd_thread_exit(td);
 	td_softdep_cleanup(td);
 	MPASS(td->td_su == NULL);
-
-	EVENTHANDLER_DIRECT_INVOKE(thread_dtor, td);
-	tid_free(td->td_tid);
 }
 
 /*
@@ -325,6 +348,8 @@ proc_linkup(struct proc *p, struct thread *td)
 	thread_link(td, p);
 }
 
+extern int max_threads_per_proc;
+
 /*
  * Initialize global thread allocation resources.
  */
@@ -333,13 +358,24 @@ threadinit(void)
 {
 	uint32_t flags;
 
-	mtx_init(&tid_lock, "TID lock", NULL, MTX_DEF);
-
 	/*
-	 * pid_max cannot be greater than PID_MAX.
-	 * leave one number for thread0.
+	 * Place an upper limit on threads which can be allocated.
+	 *
+	 * Note that other factors may make the de facto limit much lower.
+	 *
+	 * Platform limits are somewhat arbitrary but deemed "more than good
+	 * enough" for the foreseable future.
 	 */
-	tid_unrhdr = new_unrhdr(PID_MAX + 2, INT_MAX, &tid_lock);
+	if (maxthread == 0) {
+#ifdef _LP64
+		maxthread = MIN(maxproc * max_threads_per_proc, 1000000);
+#else
+		maxthread = MIN(maxproc * max_threads_per_proc, 100000);
+#endif
+	}
+
+	mtx_init(&tid_lock, "TID lock", NULL, MTX_DEF);
+	tid_bitmap = bit_alloc(maxthread, M_TIDHASH, M_WAITOK);
 
 	flags = UMA_ZONE_NOFREE;
 #ifdef __aarch64__
@@ -415,16 +451,25 @@ struct thread *
 thread_alloc(int pages)
 {
 	struct thread *td;
+	lwpid_t tid;
 
 	thread_reap(); /* check if any zombies to get */
 
-	td = (struct thread *)uma_zalloc(thread_zone, M_WAITOK);
+	tid = tid_alloc();
+	if (tid == -1) {
+		return (NULL);
+	}
+
+	td = uma_zalloc(thread_zone, M_WAITOK);
 	KASSERT(td->td_kstack == 0, ("thread_alloc got thread with kstack"));
 	if (!vm_thread_new(td, pages)) {
 		uma_zfree(thread_zone, td);
+		tid_free(tid);
 		return (NULL);
 	}
+	td->td_tid = tid;
 	cpu_thread_alloc(td);
+	EVENTHANDLER_DIRECT_INVOKE(thread_ctor, td);
 	return (td);
 }
 
@@ -447,6 +492,7 @@ void
 thread_free(struct thread *td)
 {
 
+	EVENTHANDLER_DIRECT_INVOKE(thread_dtor, td);
 	lock_profile_thread_exit(td);
 	if (td->td_cpuset)
 		cpuset_rel(td->td_cpuset);
@@ -455,6 +501,8 @@ thread_free(struct thread *td)
 	if (td->td_kstack != 0)
 		vm_thread_dispose(td);
 	callout_drain(&td->td_slpcallout);
+	tid_free(td->td_tid);
+	td->td_tid = -1;
 	uma_zfree(thread_zone, td);
 }
 
