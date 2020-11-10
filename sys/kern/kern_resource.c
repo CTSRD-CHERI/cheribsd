@@ -323,8 +323,7 @@ kern_rtprio_thread(struct thread *td, int function, lwpid_t lwpid,
 		td1 = td;
 		PROC_LOCK(p);
 	} else {
-		/* Only look up thread in current process */
-		td1 = tdfind(lwpid, curproc->p_pid);
+		td1 = tdfind(lwpid, -1);
 		if (td1 == NULL)
 			return (ESRCH);
 		p = td1->td_proc;
