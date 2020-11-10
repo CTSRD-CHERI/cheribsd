@@ -87,6 +87,10 @@ int (*dtrace_invop_jump_addr)(struct trapframe *);
 
 extern register_t fsu_intr_fault;
 
+#ifdef CPU_QEMU_RISCV
+extern u_int qemu_trace_buffered;
+#endif
+
 /* Called from exception.S */
 void do_trap_supervisor(struct trapframe *);
 void do_trap_user(struct trapframe *);
@@ -96,6 +100,11 @@ call_trapsignal(struct thread *td, int sig, int code, uintcap_t addr,
     int trapno, int capreg)
 {
 	ksiginfo_t ksi;
+
+#ifdef CPU_QEMU_RISCV
+	if (qemu_trace_buffered)
+		QEMU_FLUSH_TRACE_BUFFER;
+#endif
 
 	ksiginfo_init_trap(&ksi);
 	ksi.ksi_signo = sig;
@@ -226,10 +235,8 @@ dump_regs(struct trapframe *frame)
 	for (i = 0; i < nitems(frame->tf_s); i++)
 		PRINT_REG_N("s", i, frame->tf_s);
 
-
 	for (i = 0; i < nitems(frame->tf_a); i++)
 		PRINT_REG_N("a", i, frame->tf_a);
-
 
 	PRINT_REG("sepc", frame->tf_sepc);
 #if __has_feature(capabilities)

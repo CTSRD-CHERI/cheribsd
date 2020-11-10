@@ -360,6 +360,8 @@ pagezero(void *p)
 
 #define	PTE_TO_PHYS(pte) \
     ((((pte) & ~PTE_HI_MASK) >> PTE_PPN0_S) * PAGE_SIZE)
+#define	L2PTE_TO_PHYS(l2) \
+    ((((l2) & ~PTE_HI_MASK) >> PTE_PPN1_S) << L2_SHIFT)
 
 static __inline pd_entry_t *
 pmap_l1(pmap_t pmap, vm_offset_t va)
@@ -495,7 +497,7 @@ pmap_early_vtophys(vm_offset_t l1pt, vm_offset_t va)
 		("Invalid bootstrap L2 table"));
 
 	/* L2 is superpages */
-	ret = (l2[l2_slot] >> PTE_PPN1_S) << L2_SHIFT;
+	ret = L2PTE_TO_PHYS(l2[l2_slot]);
 	ret += (va & L2_OFFSET);
 
 	return (ret);
@@ -844,7 +846,7 @@ pmap_extract(pmap_t pmap, vm_offset_t va)
 			}
 		} else {
 			/* L2 is superpages */
-			pa = (l2 >> PTE_PPN1_S) << L2_SHIFT;
+			pa = L2PTE_TO_PHYS(l2);
 			pa |= (va & L2_OFFSET);
 		}
 	}
@@ -896,7 +898,7 @@ pmap_kextract(vm_offset_t va)
 			panic("pmap_kextract: No l2");
 		if ((pmap_load(l2) & PTE_RX) != 0) {
 			/* superpages */
-			pa = (pmap_load(l2) >> PTE_PPN1_S) << L2_SHIFT;
+			pa = L2PTE_TO_PHYS(pmap_load(l2));
 			pa |= (va & L2_OFFSET);
 			return (pa);
 		}
@@ -2663,7 +2665,7 @@ pmap_enter(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot,
 	if (prot & VM_PROT_READ_CAP)
 		new_l3 |= PTE_CR;
 	if (prot & VM_PROT_WRITE_CAP)
-		new_l3 |= PTE_CW;
+		new_l3 |= PTE_CW | PTE_CD;
 #endif
 
 	new_l3 |= (pn << PTE_PPN0_S);

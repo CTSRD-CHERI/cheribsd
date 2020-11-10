@@ -46,11 +46,13 @@ SUBDIR.${MK_LIBCHERI}+=	cheri_bench
 .endif
 
 # Small cheri programs
-.if ${MACHINE_ABI:Mpurecap} || ${MK_COMPAT_CHERIABI} == "yes"
-.if ${MACHINE} == "mips"
-# link failure on riscv
+.if (${MACHINE_ABI:Mpurecap} || ${MK_COMPAT_CHERIABI} == "yes")
+.if !${MACHINE_ARCH:Maarch64*}
+# FIXME: linker assertion when building for Morello
 SUBDIR.${MK_CHERI}+=	cheri_minimal_dynamic_exe
 SUBDIR.${MK_CHERI}+=	cheri_minimal_pie_exe
+.endif
+.if ${MACHINE} == "mips"
 # mips assembly
 SUBDIR.${MK_CHERI}+=	cheri_pthreads
 .endif
@@ -64,15 +66,7 @@ SUBDIR.${MK_CHERI}+=	helloworld_static
 SUBDIR.${MK_LIBCHERI}+=	cheri_helloworld
 SUBDIR.${MK_LIBCHERI}+=	cheriabi_helloworld
 
-# cheritest
-SUBDIR.${MK_CHERI}+=	cheriabitest
-SUBDIR.${MK_CHERI}+=	cheriabitest-dynamic
-SUBDIR.${MK_CHERI}+=	cheriabitest-dynamic-mt
-SUBDIR.${MK_CHERI}+=	cheriabitest-mt
-SUBDIR.${MK_CHERI}+=	cheritest
-SUBDIR.${MK_CHERI}+=	cheritest-dynamic
-SUBDIR.${MK_CHERI}+=	cheritest-dynamic-mt
-SUBDIR.${MK_CHERI}+=	cheritest-mt
+SUBDIR.${MK_CHERI}+=	cheribsdtest
 .endif  # ${MACHINE_ABI:Mpurecap} || ${MK_COMPAT_CHERIABI} == "yes"
 
 

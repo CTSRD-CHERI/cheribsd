@@ -133,6 +133,10 @@ SYSCTL_INT(_machdep, OID_AUTO, log_cheri_registers, CTLFLAG_RW,
     &log_cheri_registers, 1, "Print CHERI registers for non-CHERI exceptions");
 #endif
 
+#ifdef CPU_QEMU_MALTA
+extern u_int qemu_trace_buffered;
+#endif
+
 #define	lbu_macro(data, addr)						\
 	__asm __volatile ("lbu %0, 0x0(%1)"				\
 			: "=r" (data)	/* outputs */			\
@@ -432,6 +436,8 @@ trapf_pc_from_kernel_code_ptr(void *ptr)
  * Fetch an instruction from near frame->pc (or frame->pcc for CHERI).
  * Returns the virtual address (relative to $pcc) that was used to fetch the
  * instruction.
+ *
+ * Warning: this clobbers td->td_pcb->pcb_onfault.
  */
 static void * __capability
 fetch_instr_near_pc(struct trapframe *frame, register_t offset_from_pc, int32_t *instr)
@@ -440,6 +446,8 @@ fetch_instr_near_pc(struct trapframe *frame, register_t offset_from_pc, int32_t 
 
 	/* Should only be called from user mode */
 	/* TODO: if KERNLAND() */
+	KASSERT(curthread->td_pcb->pcb_onfault == NULL,
+	    ("This function clobbers td->td_pcb->pcb_onfault"));
 #ifdef CPU_CHERI
 	bad_inst_ptr = (char * __capability)frame->pcc + offset_from_pc;
 	if (!cheri_gettag(bad_inst_ptr)) {
@@ -1141,7 +1149,7 @@ dofault:
 					if (inst.RType.rd == 29) {
 						frame_regs = &(trapframe->zero);
 						frame_regs[inst.RType.rt] = (register_t)(intptr_t)(__cheri_fromcap void *)td->td_md.md_tls;
-						frame_regs[inst.RType.rt] += td->td_md.md_tls_tcb_offset;
+						frame_regs[inst.RType.rt] += td->td_proc->p_md.md_tls_tcb_offset;
 						TRAPF_PC_INCREMENT(trapframe, sizeof(int));
 						goto out;
 					}
@@ -1343,7 +1351,12 @@ dofault:
 		/* Only allow emulation on a user address */
 		if (allow_unaligned_acc &&
 		    ((vm_offset_t)trapframe->badvaddr < VM_MAXUSER_ADDRESS)) {
+			void *saved_onfault;
 			int mode;
+
+			/* emulate_unaligned_access() clobbers pcb_onfault. */
+			saved_onfault = td->td_pcb->pcb_onfault;
+			td->td_pcb->pcb_onfault = NULL;
 
 			if (type == T_ADDR_ERR_LD)
 				mode = VM_PROT_READ;
@@ -1351,6 +1364,7 @@ dofault:
 				mode = VM_PROT_WRITE;
 
 			access_type = emulate_unaligned_access(trapframe, mode);
+			td->td_pcb->pcb_onfault = saved_onfault;
 			if (access_type != 0)
 				return (trapframe->pc);
 		}
@@ -1411,6 +1425,10 @@ err:
 	if (i == SIGPROT)
 		ksi.ksi_capreg = trapframe->capcause &
 		    CHERI_CAPCAUSE_REGNUM_MASK;
+#endif
+#ifdef CPU_QEMU_MALTA
+	if (qemu_trace_buffered)
+		QEMU_FLUSH_TRACE_BUFFER;
 #endif
 	trapsignal(td, &ksi);
 out:

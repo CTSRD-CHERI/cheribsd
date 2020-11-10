@@ -125,6 +125,8 @@
 #define	IEEE80211_NODE_AMSDU_RX	0x040000	/* AMSDU rx enabled */
 #define	IEEE80211_NODE_AMSDU_TX	0x080000	/* AMSDU tx enabled */
 #define	IEEE80211_NODE_VHT	0x100000	/* VHT enabled */
+#define	IEEE80211_NODE_LDPC	0x200000	/* LDPC enabled */
+#define	IEEE80211_NODE_UAPSD	0x400000	/* UAPSD enabled */
 #endif
 
 #define	MAXCHAN	1536		/* max 1.5K channels */
@@ -1804,6 +1806,12 @@ set80211ldpc(const char *val, int d, int s, const struct afswtch *rafp)
         set80211(s, IEEE80211_IOC_LDPC, ldpc, 0, NULL);
 }
 
+static void
+set80211uapsd(const char *val, int d, int s, const struct afswtch *rafp)
+{
+	set80211(s, IEEE80211_IOC_UAPSD, d, 0, NULL);
+}
+
 static
 DECL_CMD_FUNC(set80211ampdulimit, val, d)
 {
@@ -2631,6 +2639,10 @@ getflags(int flags)
 		*cp++ = 't';
 	if (flags & IEEE80211_NODE_AMSDU_RX)
 		*cp++ = 'r';
+	if (flags & IEEE80211_NODE_UAPSD)
+		*cp++ = 'U';
+	if (flags & IEEE80211_NODE_LDPC)
+		*cp++ = 'L';
 	*cp = '\0';
 	return flagstring;
 }
@@ -3840,8 +3852,8 @@ list_stations(int s)
 			, "TXSEQ"
 			, "RXSEQ"
 		);
-	else 
-		printf("%-17.17s %4s %4s %4s %4s %4s %6s %6s %4s %-7s\n"
+	else
+		printf("%-17.17s %4s %4s %4s %4s %4s %6s %6s %4s %-12s\n"
 			, "ADDR"
 			, "AID"
 			, "CHAN"
@@ -3875,8 +3887,8 @@ list_stations(int s)
 				, gettxseq(si)
 				, getrxseq(si)
 			);
-		else 
-			printf("%s %4u %4d %3dM %4.1f %4d %6d %6d %-4.4s %-7.7s"
+		else
+			printf("%s %4u %4d %3dM %4.1f %4d %6d %6d %-4.4s %-12.12s"
 				, ether_ntoa((const struct ether_addr*)
 				    si->isi_macaddr)
 				, IEEE80211_AID(si->isi_associd)
@@ -5288,6 +5300,16 @@ end:
 				break;
 			}
 		}
+		if (get80211val(s, IEEE80211_IOC_UAPSD, &val) != -1) {
+			switch (val) {
+			case 0:
+				LINE_CHECK("-uapsd");
+				break;
+			case 1:
+				LINE_CHECK("uapsd");
+				break;
+			}
+		}
 	}
 
 	if (IEEE80211_IS_CHAN_VHT(c) || verbose) {
@@ -5872,6 +5894,8 @@ static struct cmd ieee80211_cmds[] = {
 	DEF_CMD("-ldpctx",	-1,	set80211ldpc),
 	DEF_CMD("ldpc",		3,	set80211ldpc),		/* NB: tx+rx */
 	DEF_CMD("-ldpc",	-3,	set80211ldpc),
+	DEF_CMD("uapsd",	1,	set80211uapsd),
+	DEF_CMD("-uapsd",	0,	set80211uapsd),
 	DEF_CMD("puren",	1,	set80211puren),
 	DEF_CMD("-puren",	0,	set80211puren),
 	DEF_CMD("doth",		1,	set80211doth),

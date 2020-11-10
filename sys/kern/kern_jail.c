@@ -476,13 +476,13 @@ int
 sys_jail_set(struct thread *td, struct jail_set_args *uap)
 {
 
-	return (user_jail_set(td, uap->iovp,
-	    uap->iovcnt, uap->flags, (copyinuio_t *)copyinuio));
+	return (user_jail_set(td, uap->iovp, uap->iovcnt, uap->flags,
+	    copyinuio));
 }
 
 int
-user_jail_set(struct thread *td, void * __capability iovp, unsigned int iovcnt,
-    int flags, copyinuio_t *copyinuio_f)
+user_jail_set(struct thread *td, struct iovec * __capability iovp,
+    unsigned int iovcnt, int flags, copyinuio_t *copyinuio_f)
 {
 	struct uio *auio;
 	int error;
@@ -491,7 +491,7 @@ user_jail_set(struct thread *td, void * __capability iovp, unsigned int iovcnt,
 	if (iovcnt & 1)
 		return (EINVAL);
 
-	error = copyinuio(iovp, iovcnt, &auio);
+	error = copyinuio_f(iovp, iovcnt, &auio);
 	if (error)
 		return (error);
 	error = kern_jail_set(td, auio, flags);
@@ -1929,14 +1929,14 @@ int
 sys_jail_get(struct thread *td, struct jail_get_args *uap)
 {
 
-	return (user_jail_get(td, uap->iovp,
-	    uap->iovcnt, uap->flags, (copyinuio_t *)copyinuio,
-	    (updateiov_t *)updateiov));
+	return (user_jail_get(td, uap->iovp, uap->iovcnt, uap->flags,
+	    copyinuio, updateiov));
 }
 
 int
-user_jail_get(struct thread *td, void * __capability iovp, unsigned int iovcnt,
-    int flags, copyinuio_t *copyinuio_f, updateiov_t *updateiov_f)
+user_jail_get(struct thread *td, struct iovec * __capability iovp,
+    unsigned int iovcnt, int flags, copyinuio_t *copyinuio_f,
+    updateiov_t *updateiov_f)
 {
 	struct uio *auio;
 	int error;

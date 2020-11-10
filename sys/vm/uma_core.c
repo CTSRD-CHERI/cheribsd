@@ -2197,7 +2197,7 @@ keg_ctor(void *mem, int size, void *udata, int flags)
 	keg->uk_dr.dr_iter = 0;
 
 	/*
-	 * The master zone is passed to us at keg-creation time.
+	 * The primary zone is passed to us at keg-creation time.
 	 */
 	zone = arg->zone;
 	keg->uk_name = zone->uz_name;
@@ -2808,7 +2808,7 @@ uma_startup1(vm_offset_t virtual_avail)
 {
 	struct uma_zctor_args args;
 	size_t ksize, zsize, size;
-	uma_keg_t masterkeg;
+	uma_keg_t primarykeg;
 	uintptr_t m;
 	int domain;
 	uint8_t pflag;
@@ -2838,7 +2838,7 @@ uma_startup1(vm_offset_t virtual_avail)
 	m += zsize;
 	kegs = (uma_zone_t)m;
 	m += zsize;
-	masterkeg = (uma_keg_t)m;
+	primarykeg = (uma_keg_t)m;
 
 	/* "manually" create the initial zone */
 	memset(&args, 0, sizeof(args));
@@ -2848,7 +2848,7 @@ uma_startup1(vm_offset_t virtual_avail)
 	args.dtor = keg_dtor;
 	args.uminit = zero_init;
 	args.fini = NULL;
-	args.keg = masterkeg;
+	args.keg = primarykeg;
 	args.align = UMA_SUPER_ALIGN - 1;
 	args.flags = UMA_ZFLAG_INTERNAL;
 	zone_ctor(kegs, zsize, &args, M_WAITOK);
@@ -3024,13 +3024,13 @@ uma_zcreate(const char *name, size_t size, uma_ctor ctor, uma_dtor dtor,
 /* See uma.h */
 uma_zone_t
 uma_zsecond_create(const char *name, uma_ctor ctor, uma_dtor dtor,
-    uma_init zinit, uma_fini zfini, uma_zone_t master)
+    uma_init zinit, uma_fini zfini, uma_zone_t primary)
 {
 	struct uma_zctor_args args;
 	uma_keg_t keg;
 	uma_zone_t res;
 
-	keg = master->uz_keg;
+	keg = primary->uz_keg;
 	memset(&args, 0, sizeof(args));
 	args.name = name;
 	args.size = keg->uk_size;
@@ -3398,7 +3398,7 @@ static __noinline bool
 cache_alloc(uma_zone_t zone, uma_cache_t cache, void *udata, int flags)
 {
 	uma_bucket_t bucket;
-	int domain;
+	int curdomain, domain;
 	bool new;
 
 	CRITICAL_ASSERT(curthread);
@@ -3445,7 +3445,8 @@ cache_alloc(uma_zone_t zone, uma_cache_t cache, void *udata, int flags)
 	 * the critical section.
 	 */
 	domain = PCPU_GET(domain);
-	if ((cache_uz_flags(cache) & UMA_ZONE_ROUNDROBIN) != 0)
+	if ((cache_uz_flags(cache) & UMA_ZONE_ROUNDROBIN) != 0 ||
+	    VM_DOMAIN_EMPTY(domain))
 		domain = zone_domain_highest(zone, domain);
 	bucket = cache_fetch_bucket(zone, cache, domain);
 	if (bucket == NULL) {
@@ -3470,7 +3471,8 @@ cache_alloc(uma_zone_t zone, uma_cache_t cache, void *udata, int flags)
 	cache = &zone->uz_cpu[curcpu];
 	if (cache->uc_allocbucket.ucb_bucket == NULL &&
 	    ((cache_uz_flags(cache) & UMA_ZONE_FIRSTTOUCH) == 0 ||
-	    domain == PCPU_GET(domain))) {
+	    (curdomain = PCPU_GET(domain)) == domain ||
+	    VM_DOMAIN_EMPTY(curdomain))) {
 		if (new)
 			atomic_add_long(&ZDOM_GET(zone, domain)->uzd_imax,
 			    bucket->ub_cnt);
@@ -3877,7 +3879,7 @@ zone_alloc_bucket(uma_zone_t zone, void *udata, int domain, int flags)
 	/* Avoid allocs targeting empty domains. */
 	if (domain != UMA_ANYDOMAIN && VM_DOMAIN_EMPTY(domain))
 		domain = UMA_ANYDOMAIN;
-	if ((zone->uz_flags & UMA_ZONE_ROUNDROBIN) != 0)
+	else if ((zone->uz_flags & UMA_ZONE_ROUNDROBIN) != 0)
 		domain = UMA_ANYDOMAIN;
 
 	if (zone->uz_max_items > 0)

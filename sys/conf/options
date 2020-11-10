@@ -125,7 +125,6 @@ GEOM_PART_APM	opt_geom.h
 GEOM_PART_BSD	opt_geom.h
 GEOM_PART_BSD64	opt_geom.h
 GEOM_PART_EBR	opt_geom.h
-GEOM_PART_EBR_COMPAT	opt_geom.h
 GEOM_PART_GPT	opt_geom.h
 GEOM_PART_LDM	opt_geom.h
 GEOM_PART_MBR	opt_geom.h
@@ -479,6 +478,7 @@ XBONEHACK
 # SCTP
 #
 SCTP			opt_sctp.h
+SCTP_SUPPORT		opt_sctp.h
 SCTP_DEBUG		opt_sctp.h # Enable debug printfs
 SCTP_LOCK_LOGGING	opt_sctp.h # Log to KTR lock activity
 SCTP_MBUF_LOGGING	opt_sctp.h # Log to KTR general mbuf aloc/free

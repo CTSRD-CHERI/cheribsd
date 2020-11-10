@@ -3051,10 +3051,10 @@ int
 nfsvno_checkexp(struct mount *mp, struct sockaddr *nam, struct nfsexstuff *exp,
     struct ucred **credp)
 {
-	int i, error, *secflavors;
+	int error;
 
 	error = VFS_CHECKEXP(mp, nam, &exp->nes_exflag, credp,
-	    &exp->nes_numsecflavor, &secflavors);
+	    &exp->nes_numsecflavor, exp->nes_secflavors);
 	if (error) {
 		if (nfs_rootfhset) {
 			exp->nes_exflag = 0;
@@ -3066,10 +3066,6 @@ nfsvno_checkexp(struct mount *mp, struct sockaddr *nam, struct nfsexstuff *exp,
 		printf("nfsvno_checkexp: numsecflavors out of range\n");
 		exp->nes_numsecflavor = 0;
 		error = EACCES;
-	} else {
-		/* Copy the security flavors. */
-		for (i = 0; i < exp->nes_numsecflavor; i++)
-			exp->nes_secflavors[i] = secflavors[i];
 	}
 	NFSEXITCODE(error);
 	return (error);
@@ -3083,7 +3079,7 @@ nfsvno_fhtovp(struct mount *mp, fhandle_t *fhp, struct sockaddr *nam,
     int lktype, struct vnode **vpp, struct nfsexstuff *exp,
     struct ucred **credp)
 {
-	int i, error, *secflavors;
+	int error;
 
 	*credp = NULL;
 	exp->nes_numsecflavor = 0;
@@ -3093,7 +3089,7 @@ nfsvno_fhtovp(struct mount *mp, fhandle_t *fhp, struct sockaddr *nam,
 		error = ESTALE;
 	if (nam && !error) {
 		error = VFS_CHECKEXP(mp, nam, &exp->nes_exflag, credp,
-		    &exp->nes_numsecflavor, &secflavors);
+		    &exp->nes_numsecflavor, exp->nes_secflavors);
 		if (error) {
 			if (nfs_rootfhset) {
 				exp->nes_exflag = 0;
@@ -3108,10 +3104,6 @@ nfsvno_fhtovp(struct mount *mp, fhandle_t *fhp, struct sockaddr *nam,
 			exp->nes_numsecflavor = 0;
 			error = EACCES;
 			vput(*vpp);
-		} else {
-			/* Copy the security flavors. */
-			for (i = 0; i < exp->nes_numsecflavor; i++)
-				exp->nes_secflavors[i] = secflavors[i];
 		}
 	}
 	NFSEXITCODE(error);
@@ -3410,10 +3402,11 @@ int
 nfsvno_v4rootexport(struct nfsrv_descript *nd)
 {
 	struct ucred *credanon;
-	int exflags, error = 0, numsecflavor, *secflavors, i;
+	int error = 0, numsecflavor, secflavors[MAXSECFLAVORS], i;
+	uint64_t exflags;
 
 	error = vfs_stdcheckexp(&nfsv4root_mnt, nd->nd_nam, &exflags,
-	    &credanon, &numsecflavor, &secflavors);
+	    &credanon, &numsecflavor, secflavors);
 	if (error) {
 		error = NFSERR_PROGUNAVAIL;
 		goto out;
@@ -3658,8 +3651,9 @@ static int
 nfssvc_srvcall(struct thread *p, struct nfssvc_args *uap, struct ucred *cred)
 {
 	struct nfsex_args export;
+	struct nfsex_oldargs oexp;
 	struct file *fp = NULL;
-	int stablefd, len;
+	int stablefd, i, len;
 	struct nfsd_clid adminrevoke;
 	struct nfsd_dumplist dumplist;
 	struct nfsd_dumpclients *dumpclients;
@@ -3669,6 +3663,7 @@ nfssvc_srvcall(struct thread *p, struct nfssvc_args *uap, struct ucred *cred)
 	vnode_t vp;
 	int error = EINVAL, igotlock;
 	struct proc *procp;
+	gid_t *grps;
 	static int suspend_nfsd = 0;
 
 	if (uap->flag & NFSSVC_PUBLICFH) {
@@ -3678,11 +3673,72 @@ nfssvc_srvcall(struct thread *p, struct nfssvc_args *uap, struct ucred *cred)
 		    &nfs_pubfh.nfsrvfh_data, sizeof (fhandle_t));
 		if (!error)
 			nfs_pubfhset = 1;
-	} else if (uap->flag & NFSSVC_V4ROOTEXPORT) {
+	} else if ((uap->flag & (NFSSVC_V4ROOTEXPORT | NFSSVC_NEWSTRUCT)) ==
+	    (NFSSVC_V4ROOTEXPORT | NFSSVC_NEWSTRUCT)) {
 		error = copyincap(uap->argp,(caddr_t)&export,
 		    sizeof (struct nfsex_args));
-		if (!error)
-			error = nfsrv_v4rootexport(&export, cred, p);
+		if (!error) {
+			grps = NULL;
+			if (export.export.ex_ngroups > NGROUPS_MAX ||
+			    export.export.ex_ngroups < 0)
+				error = EINVAL;
+			else if (export.export.ex_ngroups > 0) {
+				grps = malloc(export.export.ex_ngroups *
+				    sizeof(gid_t), M_TEMP, M_WAITOK);
+				error = copyin(export.export.ex_groups_user,
+				    grps,
+				    export.export.ex_ngroups * sizeof(gid_t));
+				export.export.ex_groups = grps;
+			} else
+				export.export.ex_groups = NULL;
+			if (!error)
+				error = nfsrv_v4rootexport(&export, cred, p);
+			free(grps, M_TEMP);
+		}
+	} else if ((uap->flag & (NFSSVC_V4ROOTEXPORT | NFSSVC_NEWSTRUCT)) ==
+	    NFSSVC_V4ROOTEXPORT) {
+		error = copyin(uap->argp,(caddr_t)&oexp,
+		    sizeof (struct nfsex_oldargs));
+		if (!error) {
+			memset(&export.export, 0, sizeof(export.export));
+			export.export.ex_flags = (uint64_t)oexp.export.ex_flags;
+			export.export.ex_root = oexp.export.ex_root;
+			export.export.ex_uid = oexp.export.ex_anon.cr_uid;
+			export.export.ex_ngroups =
+			    oexp.export.ex_anon.cr_ngroups;
+			export.export.ex_groups = NULL;
+			if (export.export.ex_ngroups > XU_NGROUPS ||
+			    export.export.ex_ngroups < 0)
+				error = EINVAL;
+			else if (export.export.ex_ngroups > 0) {
+				export.export.ex_groups = malloc(
+				    export.export.ex_ngroups * sizeof(gid_t),
+				    M_TEMP, M_WAITOK);
+				for (i = 0; i < export.export.ex_ngroups; i++)
+					export.export.ex_groups[i] =
+					    oexp.export.ex_anon.cr_groups[i];
+			}
+			export.export.ex_addr = oexp.export.ex_addr;
+			export.export.ex_addrlen = oexp.export.ex_addrlen;
+			export.export.ex_mask = oexp.export.ex_mask;
+			export.export.ex_masklen = oexp.export.ex_masklen;
+			export.export.ex_indexfile = oexp.export.ex_indexfile;
+			export.export.ex_numsecflavors =
+			    oexp.export.ex_numsecflavors;
+			if (export.export.ex_numsecflavors >= MAXSECFLAVORS ||
+			    export.export.ex_numsecflavors < 0)
+				error = EINVAL;
+			else {
+				for (i = 0; i < export.export.ex_numsecflavors;
+				    i++)
+					export.export.ex_secflavors[i] =
+					    oexp.export.ex_secflavors[i];
+			}
+			export.fspec = oexp.fspec;
+			if (error == 0)
+				error = nfsrv_v4rootexport(&export, cred, p);
+			free(export.export.ex_groups, M_TEMP);
+		}
 	} else if (uap->flag & NFSSVC_NOPUBLICFH) {
 		nfs_pubfhset = 0;
 		error = 0;
@@ -4934,7 +4990,7 @@ nfsrv_readdsrpc(fhandle_t *fhp, off_t off, int len, struct ucred *cred,
 	st.other[2] = 0x55555555;
 	st.seqid = 0xffffffff;
 	nfscl_reqstart(nd, NFSPROC_READDS, nmp, (u_int8_t *)fhp, sizeof(*fhp),
-	    NULL, NULL, 0, 0);
+	    NULL, NULL, 0, 0, false);
 	nfsm_stateidtom(nd, &st, NFSSTATEID_PUTSTATEID);
 	NFSM_BUILD(tl, uint32_t *, NFSX_UNSIGNED * 3);
 	txdr_hyper(off, tl);
@@ -5042,7 +5098,7 @@ nfsrv_writedsdorpc(struct nfsmount *nmp, fhandle_t *fhp, off_t off, int len,
 
 	nd = malloc(sizeof(*nd), M_TEMP, M_WAITOK | M_ZERO);
 	nfscl_reqstart(nd, NFSPROC_WRITE, nmp, (u_int8_t *)fhp,
-	    sizeof(fhandle_t), NULL, NULL, 0, 0);
+	    sizeof(fhandle_t), NULL, NULL, 0, 0, false);
 
 	/*
 	 * Use a stateid where other is an alternating 01010 pattern and
@@ -5264,7 +5320,7 @@ nfsrv_allocatedsdorpc(struct nfsmount *nmp, fhandle_t *fhp, off_t off,
 
 	nd = malloc(sizeof(*nd), M_TEMP, M_WAITOK | M_ZERO);
 	nfscl_reqstart(nd, NFSPROC_ALLOCATE, nmp, (u_int8_t *)fhp,
-	    sizeof(fhandle_t), NULL, NULL, 0, 0);
+	    sizeof(fhandle_t), NULL, NULL, 0, 0, false);
 
 	/*
 	 * Use a stateid where other is an alternating 01010 pattern and
@@ -5418,7 +5474,7 @@ nfsrv_setattrdsdorpc(fhandle_t *fhp, struct ucred *cred, NFSPROC_T *p,
 	st.other[2] = 0x55555555;
 	st.seqid = 0xffffffff;
 	nfscl_reqstart(nd, NFSPROC_SETATTR, nmp, (u_int8_t *)fhp, sizeof(*fhp),
-	    NULL, NULL, 0, 0);
+	    NULL, NULL, 0, 0, false);
 	nfsm_stateidtom(nd, &st, NFSSTATEID_PUTSTATEID);
 	nfscl_fillsattr(nd, &nap->na_vattr, vp, NFSSATTR_FULL, 0);
 
@@ -5603,7 +5659,7 @@ nfsrv_setacldsdorpc(fhandle_t *fhp, struct ucred *cred, NFSPROC_T *p,
 	st.other[2] = 0x55555555;
 	st.seqid = 0xffffffff;
 	nfscl_reqstart(nd, NFSPROC_SETACL, nmp, (u_int8_t *)fhp, sizeof(*fhp),
-	    NULL, NULL, 0, 0);
+	    NULL, NULL, 0, 0, false);
 	nfsm_stateidtom(nd, &st, NFSSTATEID_PUTSTATEID);
 	NFSZERO_ATTRBIT(&attrbits);
 	NFSSETBIT_ATTRBIT(&attrbits, NFSATTRBIT_ACL);
@@ -5738,7 +5794,7 @@ nfsrv_getattrdsrpc(fhandle_t *fhp, struct ucred *cred, NFSPROC_T *p,
 	NFSD_DEBUG(4, "in nfsrv_getattrdsrpc\n");
 	nd = malloc(sizeof(*nd), M_TEMP, M_WAITOK | M_ZERO);
 	nfscl_reqstart(nd, NFSPROC_GETATTR, nmp, (u_int8_t *)fhp,
-	    sizeof(fhandle_t), NULL, NULL, 0, 0);
+	    sizeof(fhandle_t), NULL, NULL, 0, 0, false);
 	NFSZERO_ATTRBIT(&attrbits);
 	NFSSETBIT_ATTRBIT(&attrbits, NFSATTRBIT_SIZE);
 	NFSSETBIT_ATTRBIT(&attrbits, NFSATTRBIT_CHANGE);
@@ -5806,7 +5862,7 @@ nfsrv_seekdsrpc(fhandle_t *fhp, off_t *offp, int content, bool *eofp,
 	st.seqid = 0xffffffff;
 	nd = malloc(sizeof(*nd), M_TEMP, M_WAITOK | M_ZERO);
 	nfscl_reqstart(nd, NFSPROC_SEEKDS, nmp, (u_int8_t *)fhp,
-	    sizeof(fhandle_t), NULL, NULL, 0, 0);
+	    sizeof(fhandle_t), NULL, NULL, 0, 0, false);
 	nfsm_stateidtom(nd, &st, NFSSTATEID_PUTSTATEID);
 	NFSM_BUILD(tl, uint32_t *, NFSX_HYPER + NFSX_UNSIGNED);
 	txdr_hyper(*offp, tl); tl += 2;

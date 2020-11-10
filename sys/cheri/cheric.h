@@ -105,6 +105,17 @@ cheri_is_address_inbounds(const void * __capability cap, vaddr_t addr)
 	return (addr >= cheri_getbase(cap) && addr < cheri_gettop(cap));
 }
 
+#ifdef __cplusplus
+static __always_inline inline bool
+#else
+static __always_inline inline _Bool
+#endif
+cheri_is_null_derived(const void * __capability cap)
+{
+	return (__builtin_cheri_equal_exact((uintcap_t)cheri_getaddress(cap),
+	    cap));
+}
+
 /*
  * Two variations on cheri_ptr() based on whether we are looking for a code or
  * data capability.  The compiler's use of CFromPtr will be with respect to

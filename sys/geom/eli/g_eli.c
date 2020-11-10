@@ -388,10 +388,7 @@ g_eli_resize(struct g_consumer *cp)
 		}
 iofail:
 		explicit_bzero(&md, sizeof(md));
-		if (sector != NULL) {
-			explicit_bzero(sector, pp->sectorsize);
-			free(sector, M_ELI);
-		}
+		zfree(sector, M_ELI);
 	}
 
 	oldsize = sc->sc_mediasize;
@@ -1008,8 +1005,7 @@ failed:
 	g_destroy_consumer(cp);
 	g_destroy_geom(gp);
 	g_eli_key_destroy(sc);
-	bzero(sc, sizeof(*sc));
-	free(sc, M_ELI);
+	zfree(sc, M_ELI);
 	return (NULL);
 }
 
@@ -1052,8 +1048,7 @@ g_eli_destroy(struct g_eli_softc *sc, boolean_t force)
 	mtx_destroy(&sc->sc_queue_mtx);
 	gp->softc = NULL;
 	g_eli_key_destroy(sc);
-	bzero(sc, sizeof(*sc));
-	free(sc, M_ELI);
+	zfree(sc, M_ELI);
 
 	G_ELI_DEBUG(0, "Device %s destroyed.", gp->name);
 	g_wither_geom_close(gp, ENXIO);
@@ -1131,7 +1126,7 @@ g_eli_keyfiles_clear(const char *provider)
 		data = preload_fetch_addr(keyfile);
 		size = preload_fetch_size(keyfile);
 		if (data != NULL && size != 0)
-			bzero(data, size);
+			explicit_bzero(data, size);
 	}
 }
 
@@ -1266,7 +1261,7 @@ g_eli_taste(struct g_class *mp, struct g_provider *pp, int flags __unused)
 
                         pkcs5v2_genkey(dkey, sizeof(dkey), md.md_salt,
                             sizeof(md.md_salt), passphrase, md.md_iterations);
-                        bzero(passphrase, sizeof(passphrase));
+                        explicit_bzero(passphrase, sizeof(passphrase));
                         g_eli_crypto_hmac_update(&ctx, dkey, sizeof(dkey));
                         explicit_bzero(dkey, sizeof(dkey));
                 }
@@ -1277,7 +1272,7 @@ g_eli_taste(struct g_class *mp, struct g_provider *pp, int flags __unused)
                  * Decrypt Master-Key.
                  */
                 error = g_eli_mkey_decrypt_any(&md, key, mkey, &nkey);
-                bzero(key, sizeof(key));
+                explicit_bzero(key, sizeof(key));
                 if (error == -1) {
                         if (i == tries) {
                                 G_ELI_DEBUG(0,
@@ -1310,8 +1305,8 @@ have_key:
 	 * We have correct key, let's attach provider.
 	 */
 	gp = g_eli_create(NULL, mp, pp, &md, mkey, nkey);
-	bzero(mkey, sizeof(mkey));
-	bzero(&md, sizeof(md));
+	explicit_bzero(mkey, sizeof(mkey));
+	explicit_bzero(&md, sizeof(md));
 	if (gp == NULL) {
 		G_ELI_DEBUG(0, "Cannot create device %s%s.", pp->name,
 		    G_ELI_SUFFIX);

@@ -4588,7 +4588,7 @@ activate_rxt:
 		goto activate_rxt;
 	}
 	/* Convert from ms to usecs */
-	if (rsm->r_flags & RACK_SACK_PASSED) {
+	if ((rsm->r_flags & RACK_SACK_PASSED) || (rsm->r_dupack >= DUP_ACK_THRESHOLD)) {
 		if ((tp->t_flags & TF_SENTFIN) &&
 		    ((tp->snd_max - tp->snd_una) == 1) &&
 		    (rsm->r_flags & RACK_HAS_FIN)) {
@@ -6237,7 +6237,7 @@ rack_log_output(struct tcpcb *tp, struct tcpopt *to, int32_t len,
 		 * or FIN if seq_out is adding more on and a FIN is present
 		 * (and we are not resending).
 		 */
-		if ((th_flags & TH_SYN) && (seq_out == tp->iss)) 
+		if ((th_flags & TH_SYN) && (seq_out == tp->iss))
 			len++;
 		if (th_flags & TH_FIN)
 			len++;
@@ -8190,6 +8190,7 @@ rack_strike_dupack(struct tcp_rack *rack)
 		rsm->r_dupack++;
 		if (rsm->r_dupack >= DUP_ACK_THRESHOLD) {
 			rack->r_wanted_output = 1;
+			rack->r_timer_override = 1;
 			rack_log_retran_reason(rack, rsm, __LINE__, 1, 3);
 		} else {
 			rack_log_retran_reason(rack, rsm, __LINE__, 0, 3);
@@ -11359,7 +11360,8 @@ check_it:
 	if (rsm->r_flags & RACK_ACKED) {
 		return (NULL);
 	}
-	if ((rsm->r_flags & RACK_SACK_PASSED) == 0) {
+	if (((rsm->r_flags & RACK_SACK_PASSED) == 0) &&
+	    (rsm->r_dupack < DUP_ACK_THRESHOLD)) {
 		/* Its not yet ready */
 		return (NULL);
 	}
@@ -12748,7 +12750,8 @@ again:
 				flags &= ~TH_FIN;
 		}
 	}
-	recwin = sbspace(&so->so_rcv);
+	recwin = lmin(lmax(sbspace(&so->so_rcv), 0),
+	    (long)TCP_MAXWIN << tp->rcv_scale);
 
 	/*
 	 * Sender silly window avoidance.   We transmit under the following
@@ -13654,8 +13657,6 @@ send:
 		if (SEQ_GT(tp->rcv_adv, tp->rcv_nxt) &&
 		    recwin < (long)(tp->rcv_adv - tp->rcv_nxt))
 			recwin = (long)(tp->rcv_adv - tp->rcv_nxt);
-		if (recwin > (long)TCP_MAXWIN << tp->rcv_scale)
-			recwin = (long)TCP_MAXWIN << tp->rcv_scale;
 	}
 
 	/*

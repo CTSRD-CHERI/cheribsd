@@ -51,14 +51,14 @@ static volatile char *buffer[] = {
  * -fno-builtin but a linker error due to a missing function is easier to diagnose.
  */
 #ifdef TEST_COMPILER_MEMMOVE
-#define cheritest_memmove __builtin_memmove
+#define cheribsdtest_memmove __builtin_memmove
 #else
-extern void* cheritest_memmove(void*, const void*, size_t);
+extern void* cheribsdtest_memmove(void*, const void*, size_t);
 #endif
 
 
 BEGIN_TEST(libc_memmove)
-	cheritest_memmove(buffer, &buffer[2], sizeof(buffer) - 2*sizeof(char*));
+	cheribsdtest_memmove(buffer, &buffer[2], sizeof(buffer) - 2*sizeof(char*));
 	for (int i=0 ; i<8 ; i++)
 	{
 		assert_eq(*buffer[i], '0' + i + 2);

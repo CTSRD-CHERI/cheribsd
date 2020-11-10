@@ -67,7 +67,6 @@ struct mdthread {
 	int		md_pc_count;	/* performance counter */
 	int		md_pc_spill;	/* performance counter spill */
 	void * __capability md_tls;
-	size_t		md_tls_tcb_offset;	/* TCB offset */
 #ifdef	CPU_CNMIPS
 	struct octeon_cop2_state	*md_cop2; /* kernel context */
 	struct octeon_cop2_state	*md_ucop2; /* userland context */
@@ -82,10 +81,11 @@ struct mdthread {
 #define	MDTD_COP2USED	0x0002		/* Process used the COP2 */
 #ifdef CPU_QEMU_MALTA
 #define	MDTD_QTRACE	0x0004		/* QEMU-CHERI ISA-level tracing */
+#define	MDTD_QTRACE_USERMODE	0x0008	/* QEMU-CHERI user-only tracing */
 #endif
 
 struct mdproc {
-	long md_dummy;
+	size_t		md_tls_tcb_offset;	/* TCB offset */
 };
 
 struct syscall_args {

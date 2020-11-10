@@ -499,13 +499,36 @@ struct oexport_args {
 };
 
 /*
- * Export arguments for local filesystem mount calls.
+ * Not quite so old export arguments with 32bit ex_flags and xucred ex_anon.
  */
 #define	MAXSECFLAVORS	5
-struct export_args {
+struct o2export_args {
 	int	ex_flags;		/* export related flags */
 	uid_t	ex_root;		/* mapping for root uid */
 	struct	xucred ex_anon;		/* mapping for anonymous user */
+	struct	sockaddr * __kerncap ex_addr;	/* net address to which exported */
+	u_char	ex_addrlen;		/* and the net address length */
+	struct	sockaddr * __kerncap ex_mask;	/* mask of valid bits in saddr */
+	u_char	ex_masklen;		/* and the smask length */
+	char	* __kerncap ex_indexfile;	/* index file for WebNFS URLs */
+	int	ex_numsecflavors;	/* security flavor count */
+	int	ex_secflavors[MAXSECFLAVORS]; /* list of security flavors */
+};
+
+/*
+ * Export arguments for local filesystem mount calls.
+ */
+struct export_args {
+	uint64_t ex_flags;		/* export related flags */
+	uid_t	ex_root;		/* mapping for root uid */
+	uid_t	ex_uid;			/* mapping for anonymous user */
+	int	ex_ngroups;
+	union {
+#ifdef _KERNEL
+		gid_t * __capability ex_groups_user;
+#endif
+		gid_t	*ex_groups;
+	};
 	struct	sockaddr * __kerncap ex_addr;	/* net address to which exported */
 	u_char	ex_addrlen;		/* and the net address length */
 	struct	sockaddr * __kerncap ex_mask;	/* mask of valid bits in saddr */
@@ -695,8 +718,8 @@ typedef	int vfs_vget_t(struct mount *mp, ino_t ino, int flags,
 typedef	int vfs_fhtovp_t(struct mount *mp, struct fid *fhp,
 		    int flags, struct vnode **vpp);
 typedef	int vfs_checkexp_t(struct mount *mp, struct sockaddr *nam,
-		    int *extflagsp, struct ucred **credanonp,
-		    int *numsecflavors, int **secflavors);
+		    uint64_t *extflagsp, struct ucred **credanonp,
+		    int *numsecflavors, int *secflavors);
 typedef	int vfs_init_t(struct vfsconf *);
 typedef	int vfs_uninit_t(struct vfsconf *);
 typedef	int vfs_extattrctl_t(struct mount *mp, int cmd,
@@ -929,8 +952,6 @@ void	vfs_mount_error(struct mount *, const char *, ...);
 void	vfs_mountroot(void);			/* mount our root filesystem */
 void	vfs_mountedfrom(struct mount *, const char *from);
 void	vfs_notify_upper(struct vnode *, int);
-void	vfs_oexport_conv(const struct oexport_args *oexp,
-	    struct export_args *exp);
 void	vfs_ref(struct mount *);
 void	vfs_rel(struct mount *);
 struct mount *vfs_mount_alloc(struct vnode *, struct vfsconf *, const char *,

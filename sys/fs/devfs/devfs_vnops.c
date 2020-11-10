@@ -1318,7 +1318,7 @@ devfs_read_f(struct file *fp, struct uio *uio, struct ucred *cred,
 	td->td_fpop = fpop;
 	dev_relthread(dev, ref);
 
-	foffset_unlock_uio(fp, uio, flags | FOF_NOLOCK | FOF_NEXTOFF);
+	foffset_unlock_uio(fp, uio, flags | FOF_NOLOCK | FOF_NEXTOFF_R);
 	return (error);
 }
 
@@ -1815,7 +1815,7 @@ devfs_write_f(struct file *fp, struct uio *uio, struct ucred *cred,
 	td->td_fpop = fpop;
 	dev_relthread(dev, ref);
 
-	foffset_unlock_uio(fp, uio, flags | FOF_NOLOCK | FOF_NEXTOFF);
+	foffset_unlock_uio(fp, uio, flags | FOF_NOLOCK | FOF_NEXTOFF_W);
 	return (error);
 }
 

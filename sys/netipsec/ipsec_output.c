@@ -71,7 +71,7 @@
 #ifdef INET6
 #include <netinet/icmp6.h>
 #endif
-#ifdef SCTP
+#if defined(SCTP) || defined(SCTP_SUPPORT)
 #include <netinet/sctp_crc32.h>
 #endif
 
@@ -326,7 +326,7 @@ ipsec4_common_output(struct mbuf *m, struct inpcb *inp, int forwarding)
 			in_delayed_cksum(m);
 			m->m_pkthdr.csum_flags &= ~CSUM_DELAY_DATA;
 		}
-#ifdef SCTP
+#if defined(SCTP) || defined(SCTP_SUPPORT)
 		if (m->m_pkthdr.csum_flags & CSUM_SCTP) {
 			struct ip *ip = mtod(m, struct ip *);
 
@@ -621,7 +621,7 @@ ipsec6_common_output(struct mbuf *m, struct inpcb *inp, int forwarding)
 			    sizeof(struct ip6_hdr), sizeof(struct ip6_hdr));
 		m->m_pkthdr.csum_flags &= ~CSUM_DELAY_DATA_IPV6;
 		}
-#ifdef SCTP
+#if defined(SCTP) || defined(SCTP_SUPPORT)
 		if (m->m_pkthdr.csum_flags & CSUM_SCTP_IPV6) {
 			sctp_delayed_cksum(m, sizeof(struct ip6_hdr));
 			m->m_pkthdr.csum_flags &= ~CSUM_SCTP_IPV6;
@@ -688,6 +688,7 @@ int
 ipsec_process_done(struct mbuf *m, struct secpolicy *sp, struct secasvar *sav,
     u_int idx)
 {
+	struct epoch_tracker et;
 	struct xform_history *xh;
 	struct secasindex *saidx;
 	struct m_tag *mtag;
@@ -789,19 +790,25 @@ ipsec_process_done(struct mbuf *m, struct secpolicy *sp, struct secasvar *sav,
 	 * We're done with IPsec processing, transmit the packet using the
 	 * appropriate network protocol (IP or IPv6).
 	 */
+	NET_EPOCH_ENTER(et);
 	switch (saidx->dst.sa.sa_family) {
 #ifdef INET
 	case AF_INET:
 		key_freesav(&sav);
-		return ip_output(m, NULL, NULL, IP_RAWOUTPUT, NULL, NULL);
+		error = ip_output(m, NULL, NULL, IP_RAWOUTPUT, NULL, NULL);
+		break;
 #endif /* INET */
 #ifdef INET6
 	case AF_INET6:
 		key_freesav(&sav);
-		return ip6_output(m, NULL, NULL, 0, NULL, NULL, NULL);
+		error = ip6_output(m, NULL, NULL, 0, NULL, NULL, NULL);
+		break;
 #endif /* INET6 */
+	default:
+		panic("ipsec_process_done");
 	}
-	panic("ipsec_process_done");
+	NET_EPOCH_EXIT(et);
+	return (error);
 bad:
 	m_freem(m);
 	key_freesav(&sav);

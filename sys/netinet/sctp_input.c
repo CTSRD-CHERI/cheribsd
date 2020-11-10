@@ -5106,7 +5106,7 @@ process_control_chunks:
 			break;
 		case SCTP_STREAM_RESET:
 			SCTPDBG(SCTP_DEBUG_INPUT3, "SCTP_STREAM_RESET\n");
-			if (((stcb == NULL) || (ch == NULL) || (chk_length < sizeof(struct sctp_stream_reset_tsn_req)))) {
+			if ((stcb == NULL) || (chk_length < sizeof(struct sctp_stream_reset_tsn_req))) {
 				/* Its not ours */
 				*offset = length;
 				return (stcb);
@@ -5129,7 +5129,7 @@ process_control_chunks:
 				return (stcb);
 			}
 
-			if ((ch != NULL) && (stcb != NULL) && (netp != NULL) && (*netp != NULL)) {
+			if ((stcb != NULL) && (netp != NULL) && (*netp != NULL)) {
 				if (stcb->asoc.pktdrop_supported == 0) {
 					goto unknown_chunk;
 				}
@@ -5165,8 +5165,7 @@ process_control_chunks:
 				goto next_chunk;
 			}
 			got_auth = 1;
-			if ((ch == NULL) || sctp_handle_auth(stcb, (struct sctp_auth_chunk *)ch,
-			    m, *offset)) {
+			if (sctp_handle_auth(stcb, (struct sctp_auth_chunk *)ch, m, *offset)) {
 				/* auth HMAC failed so dump the packet */
 				*offset = length;
 				return (stcb);
@@ -5179,7 +5178,11 @@ process_control_chunks:
 		default:
 	unknown_chunk:
 			/* it's an unknown chunk! */
-			if ((ch->chunk_type & 0x40) && (stcb != NULL)) {
+			if ((ch->chunk_type & 0x40) &&
+			    (stcb != NULL) &&
+			    (SCTP_GET_STATE(stcb) != SCTP_STATE_EMPTY) &&
+			    (SCTP_GET_STATE(stcb) != SCTP_STATE_INUSE) &&
+			    (SCTP_GET_STATE(stcb) != SCTP_STATE_COOKIE_WAIT)) {
 				struct sctp_gen_error_cause *cause;
 				int len;
 
@@ -5594,9 +5597,8 @@ trigger_send:
 	if (!TAILQ_EMPTY(&stcb->asoc.asconf_send_queue) ||
 	    cnt_ctrl_ready ||
 	    stcb->asoc.trigger_reset ||
-	    ((un_sent) &&
-	    (stcb->asoc.peers_rwnd > 0 ||
-	    (stcb->asoc.peers_rwnd <= 0 && stcb->asoc.total_flight == 0)))) {
+	    ((un_sent > 0) &&
+	    (stcb->asoc.peers_rwnd > 0 || stcb->asoc.total_flight == 0))) {
 		SCTPDBG(SCTP_DEBUG_INPUT3, "Calling chunk OUTPUT\n");
 		sctp_chunk_output(inp, stcb, SCTP_OUTPUT_FROM_CONTROL_PROC, SCTP_SO_NOT_LOCKED);
 		SCTPDBG(SCTP_DEBUG_INPUT3, "chunk OUTPUT returns\n");

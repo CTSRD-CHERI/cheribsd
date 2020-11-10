@@ -2149,7 +2149,7 @@ void
 t4_update_fl_bufsize(struct ifnet *ifp)
 {
 	struct vi_info *vi = ifp->if_softc;
-	struct adapter *sc = vi->pi->adapter;
+	struct adapter *sc = vi->adapter;
 	struct sge_rxq *rxq;
 #ifdef TCP_OFFLOAD
 	struct sge_ofld_rxq *ofld_rxq;
@@ -2708,7 +2708,7 @@ start_wrq_wr(struct sge_wrq *wrq, int len16, struct wrq_cookie *cookie)
 	void *w;
 
 	MPASS(len16 > 0);
-	ndesc = howmany(len16, EQ_ESIZE / 16);
+	ndesc = tx_len16_to_desc(len16);
 	MPASS(ndesc > 0 && ndesc <= SGE_MAX_WR_NDESC);
 
 	EQ_LOCK(eq);
@@ -2881,8 +2881,7 @@ eth_tx(struct mp_ring *r, u_int cidx, u_int pidx)
 	struct sge_eq *eq = &txq->eq;
 	struct ifnet *ifp = txq->ifp;
 	struct vi_info *vi = ifp->if_softc;
-	struct port_info *pi = vi->pi;
-	struct adapter *sc = pi->adapter;
+	struct adapter *sc = vi->adapter;
 	u_int total, remaining;		/* # of packets */
 	u_int available, dbdiff;	/* # of hardware descriptors */
 	u_int n, next_cidx;
@@ -2920,10 +2919,9 @@ eth_tx(struct mp_ring *r, u_int cidx, u_int pidx)
 		M_ASSERTPKTHDR(m0);
 		MPASS(m0->m_nextpkt == NULL);
 
-		if (available < howmany(mbuf_len16(m0), EQ_ESIZE / 16)) {
-			MPASS(howmany(mbuf_len16(m0), EQ_ESIZE / 16) <= 64);
+		if (available < tx_len16_to_desc(mbuf_len16(m0))) {
 			available += reclaim_tx_descs(txq, 64);
-			if (available < howmany(mbuf_len16(m0), EQ_ESIZE / 16))
+			if (available < tx_len16_to_desc(mbuf_len16(m0)))
 				break;	/* out of descriptors */
 		}
 
@@ -3499,7 +3497,7 @@ alloc_rxq(struct vi_info *vi, struct sge_rxq *rxq, int intr_idx, int idx,
     struct sysctl_oid *oid)
 {
 	int rc;
-	struct adapter *sc = vi->pi->adapter;
+	struct adapter *sc = vi->adapter;
 	struct sysctl_oid_list *children;
 	char name[16];
 
@@ -3629,7 +3627,7 @@ alloc_nm_rxq(struct vi_info *vi, struct sge_nm_rxq *nm_rxq, int intr_idx,
 	struct sysctl_ctx_list *ctx;
 	char name[16];
 	size_t len;
-	struct adapter *sc = vi->pi->adapter;
+	struct adapter *sc = vi->adapter;
 	struct netmap_adapter *na = NA(vi->ifp);
 
 	MPASS(na != NULL);
@@ -3695,7 +3693,7 @@ alloc_nm_rxq(struct vi_info *vi, struct sge_nm_rxq *nm_rxq, int intr_idx,
 static int
 free_nm_rxq(struct vi_info *vi, struct sge_nm_rxq *nm_rxq)
 {
-	struct adapter *sc = vi->pi->adapter;
+	struct adapter *sc = vi->adapter;
 
 	if (vi->flags & VI_INIT_DONE)
 		MPASS(nm_rxq->iq_cntxt_id == INVALID_NM_RXQ_CNTXT_ID);
@@ -3761,7 +3759,7 @@ alloc_nm_txq(struct vi_info *vi, struct sge_nm_txq *nm_txq, int iqidx, int idx,
 static int
 free_nm_txq(struct vi_info *vi, struct sge_nm_txq *nm_txq)
 {
-	struct adapter *sc = vi->pi->adapter;
+	struct adapter *sc = vi->adapter;
 
 	if (vi->flags & VI_INIT_DONE)
 		MPASS(nm_txq->cntxt_id == INVALID_NM_TXQ_CNTXT_ID);
@@ -4271,7 +4269,7 @@ static int
 free_txq(struct vi_info *vi, struct sge_txq *txq)
 {
 	int rc;
-	struct adapter *sc = vi->pi->adapter;
+	struct adapter *sc = vi->adapter;
 	struct sge_eq *eq = &txq->eq;
 
 	rc = free_eq(sc, eq);
@@ -4678,7 +4676,7 @@ write_txpkt_vm_wr(struct adapter *sc, struct sge_txq *txq,
 	ctrl = sizeof(struct cpl_tx_pkt_core);
 	if (needs_tso(m0))
 		ctrl += sizeof(struct cpl_tx_pkt_lso_core);
-	ndesc = howmany(len16, EQ_ESIZE / 16);
+	ndesc = tx_len16_to_desc(len16);
 	MPASS(ndesc <= available);
 
 	/* Firmware work request header */
@@ -4789,7 +4787,7 @@ write_raw_wr(struct sge_txq *txq, void *wr, struct mbuf *m0, u_int available)
 	int len16, ndesc;
 
 	len16 = mbuf_len16(m0);
-	ndesc = howmany(len16, EQ_ESIZE / 16);
+	ndesc = tx_len16_to_desc(len16);
 	MPASS(ndesc <= available);
 
 	dst = wr;
@@ -4842,7 +4840,7 @@ write_txpkt_wr(struct adapter *sc, struct sge_txq *txq,
 		    sizeof(struct cpl_tx_pkt_core) + pktlen, 16);
 		nsegs = 0;
 	}
-	ndesc = howmany(len16, EQ_ESIZE / 16);
+	ndesc = tx_len16_to_desc(len16);
 	MPASS(ndesc <= available);
 
 	/* Firmware work request header */
@@ -4948,7 +4946,7 @@ try_txpkts(struct mbuf *m, struct mbuf *n, struct txpkts *txp, u_int available)
 		l2 = txpkts0_len16(nsegs2);
 	}
 	txp->len16 = howmany(sizeof(struct fw_eth_tx_pkts_wr), 16) + l1 + l2;
-	needed = howmany(txp->len16, EQ_ESIZE / 16);
+	needed = tx_len16_to_desc(txp->len16);
 	if (needed > SGE_MAX_WR_NDESC || needed > available)
 		return (1);
 
@@ -4985,7 +4983,7 @@ add_to_txpkts(struct mbuf *m, struct txpkts *txp, u_int available)
 		len16 = txpkts0_len16(nsegs);
 	else
 		len16 = txpkts1_len16();
-	needed = howmany(txp->len16 + len16, EQ_ESIZE / 16);
+	needed = tx_len16_to_desc(txp->len16 + len16);
 	if (needed > SGE_MAX_WR_NDESC || needed > available)
 		return (1);
 
@@ -5026,7 +5024,7 @@ write_txpkts_wr(struct adapter *sc, struct sge_txq *txq,
 	MPASS(txp->len16 <= howmany(SGE_MAX_WR_LEN, 16));
 	MPASS(available > 0 && available < eq->sidx);
 
-	ndesc = howmany(txp->len16, EQ_ESIZE / 16);
+	ndesc = tx_len16_to_desc(txp->len16);
 	MPASS(ndesc <= available);
 
 	MPASS(wr == (void *)&eq->desc[eq->pidx]);

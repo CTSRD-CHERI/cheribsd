@@ -111,6 +111,7 @@ arm/mv/a37x0_iic.c				optional a37x0_iic iicbus fdt
 arm/mv/a37x0_spi.c				optional a37x0_spi spibus fdt
 arm/mv/armada38x/armada38x_rtc.c		optional mv_rtc fdt
 arm/mv/gpio.c					optional mv_gpio fdt
+arm/mv/mvebu_gpio.c				optional mv_gpio fdt
 arm/mv/mvebu_pinctrl.c				optional mvebu_pinctrl fdt
 arm/mv/mv_ap806_clock.c				optional SOC_MARVELL_8K fdt
 arm/mv/mv_ap806_gicp.c				optional mv_ap806_gicp fdt
@@ -191,6 +192,8 @@ arm64/cheri/cheri_machdep.c		optional cpu_cheri
 arm64/cloudabi32/cloudabi32_sysvec.c	optional compat_cloudabi32
 arm64/cloudabi64/cloudabi64_sysvec.c	optional compat_cloudabi64
 arm64/coresight/coresight.c			standard
+arm64/coresight/coresight_acpi.c		optional acpi
+arm64/coresight/coresight_fdt.c			optional fdt
 arm64/coresight/coresight_if.m			standard
 arm64/coresight/coresight_cmd.c			standard
 arm64/coresight/coresight_cpu_debug.c		standard
@@ -400,3 +403,18 @@ arm64/rockchip/clk/rk_clk_pll.c		optional fdt soc_rockchip_rk3328 | fdt soc_rock
 arm64/rockchip/clk/rk3328_cru.c		optional fdt soc_rockchip_rk3328
 arm64/rockchip/clk/rk3399_cru.c		optional fdt soc_rockchip_rk3399
 arm64/rockchip/clk/rk3399_pmucru.c	optional fdt soc_rockchip_rk3399
+
+# i.MX8 Clock support
+arm64/freescale/imx/imx8mq_ccm.c	optional fdt soc_freescale_imx8
+arm64/freescale/imx/clk/imx_clk_gate.c	optional fdt soc_freescale_imx8
+arm64/freescale/imx/clk/imx_clk_mux.c	optional fdt soc_freescale_imx8
+arm64/freescale/imx/clk/imx_clk_composite.c	optional fdt soc_freescale_imx8
+arm64/freescale/imx/clk/imx_clk_sscg_pll.c	optional fdt soc_freescale_imx8
+arm64/freescale/imx/clk/imx_clk_frac_pll.c	optional fdt soc_freescale_imx8
+
+# iMX drivers
+arm/freescale/imx/imx_gpio.c		optional gpio
+arm/freescale/imx/imx_i2c.c		optional fsliic
+arm/freescale/imx/imx_machdep.c		standard
+arm64/freescale/imx/imx7gpc.c		optional fdt soc_freescale_imx8
+dev/ffec/if_ffec.c			optional ffec

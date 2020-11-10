@@ -70,8 +70,9 @@ typedef	uint64_t	pn_t;			/* page number */
 /* CHERI uses reserved bits in 55:63 */
 #define	PTE_CW		(1UL << 63) /* Capability Write */
 #define	PTE_CR		(1UL << 62) /* Capability Read */
-#define	PTE_KERN_CHERI	(PTE_CR | PTE_CW)
-#define	PTE_PROMOTE_CHERI (PTE_CR | PTE_CW)
+#define	PTE_CD		(1UL << 61) /* Capability Dirty */
+#define	PTE_KERN_CHERI	(PTE_CR | PTE_CW | PTE_CD)
+#define	PTE_PROMOTE_CHERI (PTE_CR | PTE_CW | PTE_CD)
 #else
 #define	PTE_KERN_CHERI	0
 #define	PTE_PROMOTE_CHERI 0
@@ -94,6 +95,9 @@ typedef	uint64_t	pn_t;			/* page number */
 #define	PTE_KERN_CAP	(PTE_KERN | PTE_KERN_CHERI)
 #define	PTE_PROMOTE	(PTE_V | PTE_RWX | PTE_D | PTE_A | PTE_G | PTE_U | \
 			 PTE_SW_MANAGED | PTE_SW_WIRED | PTE_PROMOTE_CHERI)
+
+/* Bits 63 - 54 are reserved for future use. */
+#define PTE_HI_MASK	0xFFC0000000000000ULL
 
 /* Bits 63 - 54 are reserved for future use. */
 #define PTE_HI_MASK	0xFFC0000000000000ULL

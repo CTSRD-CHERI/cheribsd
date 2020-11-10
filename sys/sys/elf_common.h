@@ -46,12 +46,14 @@
  * not include the padding.
  */
 
+#ifndef LOCORE
 typedef struct {
 	u_int32_t	n_namesz;	/* Length of name. */
 	u_int32_t	n_descsz;	/* Length of descriptor. */
 	u_int32_t	n_type;		/* Type of this note. */
 } Elf_Note;
 typedef Elf_Note Elf_Nhdr;
+#endif
 
 /*
  * Option kinds.
@@ -112,12 +114,14 @@ typedef Elf_Note Elf_Nhdr;
  * The header for GNU-style hash sections.
  */
 
+#ifndef LOCORE
 typedef struct {
 	u_int32_t	gh_nbuckets;	/* Number of hash buckets. */
 	u_int32_t	gh_symndx;	/* First visible symbol in .dynsym. */
 	u_int32_t	gh_maskwords;	/* #maskwords used in bloom filter. */
 	u_int32_t	gh_shift2;	/* Bloom filter shift count. */
 } Elf_GNU_Hash_Header;
+#endif
 
 /* Indexes into the e_ident array.  Keep synced with
    http://www.sco.com/developers/gabi/latest/ch4.eheader.html */
@@ -741,6 +745,7 @@ typedef struct {
 #define	DT_MIPS_CHERI_CAPTABLE_MAPPING	0x7000c005 /* start of .captable_mapping */
 #define	DT_MIPS_CHERI_CAPTABLE_MAPPINGSZ	0x7000c006 /* size of .captable_mapping */
 
+#ifndef LOCORE
 enum MipsCheriFlags {
 	DF_MIPS_CHERI_NONE		= 0x00000000,
 	DF_MIPS_CHERI_ABI_MASK		= 0x00000007,
@@ -752,6 +757,7 @@ enum MipsCheriFlags {
 	DF_MIPS_CHERI_CAPTABLE_PER_FUNC = 0x00000010,
 	DF_MIPS_CHERI_RELATIVE_CAPRELOCS = 0x00000020
 };
+#endif
 
 #define	DT_PPC_GOT			0x70000000
 #define	DT_PPC_TLSOPT			0x70000001

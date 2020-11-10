@@ -124,6 +124,7 @@ int has_pan;
  * passed into the kernel and used by the EFI code to call runtime services.
  */
 vm_paddr_t efi_systbl_phys;
+static struct efi_map_header *efihdr;
 
 /* pagezero_* implementations are provided in support.S */
 void pagezero_simple(void *);
@@ -175,7 +176,6 @@ cpu_startup(void *dummy)
 {
 
 	undef_init();
-	identify_cpu();
 	install_cpu_errata();
 
 	vm_ksubmap_init(&kmi);
@@ -1325,11 +1325,52 @@ cache_setup(void)
 	}
 }
 
+int
+memory_mapping_mode(vm_paddr_t pa)
+{
+	struct efi_md *map, *p;
+	size_t efisz;
+	int ndesc, i;
+
+	if (efihdr == NULL)
+		return (VM_MEMATTR_WRITE_BACK);
+
+	/*
+	 * Memory map data provided by UEFI via the GetMemoryMap
+	 * Boot Services API.
+	 */
+	efisz = (sizeof(struct efi_map_header) + 0xf) & ~0xf;
+	map = (struct efi_md *)((uint8_t *)efihdr + efisz);
+
+	if (efihdr->descriptor_size == 0)
+		return (VM_MEMATTR_WRITE_BACK);
+	ndesc = efihdr->memory_size / efihdr->descriptor_size;
+
+	for (i = 0, p = map; i < ndesc; i++,
+	    p = efi_next_descriptor(p, efihdr->descriptor_size)) {
+		if (pa < p->md_phys ||
+		    pa >= p->md_phys + p->md_pages * EFI_PAGE_SIZE)
+			continue;
+		if (p->md_type == EFI_MD_TYPE_IOMEM ||
+		    p->md_type == EFI_MD_TYPE_IOPORT)
+			return (VM_MEMATTR_DEVICE);
+		else if ((p->md_attr & EFI_MD_ATTR_WB) != 0 ||
+		    p->md_type == EFI_MD_TYPE_RECLAIM)
+			return (VM_MEMATTR_WRITE_BACK);
+		else if ((p->md_attr & EFI_MD_ATTR_WT) != 0)
+			return (VM_MEMATTR_WRITE_THROUGH);
+		else if ((p->md_attr & EFI_MD_ATTR_WC) != 0)
+			return (VM_MEMATTR_WRITE_COMBINING);
+		break;
+	}
+
+	return (VM_MEMATTR_DEVICE);
+}
+
 void
 initarm(struct arm64_bootparams *abp)
 {
 	struct efi_fb *efifb;
-	struct efi_map_header *efihdr;
 	struct pcpu *pcpup;
 	char *env;
 #ifdef FDT
@@ -1349,6 +1390,9 @@ initarm(struct arm64_bootparams *abp)
 	kmdp = preload_search_by_type("elf kernel");
 	if (kmdp == NULL)
 		kmdp = preload_search_by_type("elf64 kernel");
+
+	identify_cpu(0);
+	update_special_regs(0);
 
 	link_elf_ireloc(kmdp);
 	try_load_dtb(kmdp);
@@ -1393,6 +1437,7 @@ initarm(struct arm64_bootparams *abp)
 	    "msr tpidr_el1, %0" :: "r"(pcpup));
 
 	PCPU_SET(curthread, &thread0);
+	PCPU_SET(midr, get_midr());
 
 	/* Do basic tuning, hz etc */
 	init_param1();

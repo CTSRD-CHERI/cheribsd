@@ -36,4 +36,10 @@ LIBADD+=	edit
 LD_FATAL_WARNINGS=no
 .endif
 
+UCLSRC?=	${SRCTOP}/contrib/libucl
+.PATH: ${UCLSRC}/lua
+SRCS+=	lua_ucl.c
+CFLAGS+=	-I${UCLSRC}/include -I${UCLSRC}/src -I${UCLSRC}/uthash
+LIBADD+=	ucl
+
 .include <bsd.prog.mk>

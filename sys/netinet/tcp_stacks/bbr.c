@@ -12157,8 +12157,8 @@ bbr_output_wtime(struct tcpcb *tp, const struct timeval *tv)
 			 * have gotten more data into the socket buffer to
 			 * send.
 			 */
-			recwin = min(max(sbspace(&so->so_rcv), 0),
-			    TCP_MAXWIN << tp->rcv_scale);
+			recwin = lmin(lmax(sbspace(&so->so_rcv), 0),
+				      (long)TCP_MAXWIN << tp->rcv_scale);
 			if ((bbr_window_update_needed(tp, so, recwin, maxseg) == 0) &&
 			    ((tcp_outflags[tp->t_state] & TH_RST) == 0) &&
 			    ((sbavail(sb) + ((tcp_outflags[tp->t_state] & TH_FIN) ? 1 : 0)) <=
@@ -12839,8 +12839,8 @@ recheck_resend:
 	    ipoptlen == 0)
 		tso = 1;
 
-	recwin = min(max(sbspace(&so->so_rcv), 0),
-	    TCP_MAXWIN << tp->rcv_scale);
+	recwin = lmin(lmax(sbspace(&so->so_rcv), 0),
+	    (long)TCP_MAXWIN << tp->rcv_scale);
 	/*
 	 * Sender silly window avoidance.   We transmit under the following
 	 * conditions when len is non-zero:
@@ -13381,6 +13381,8 @@ send:
 					 */
 					BBR_STAT_INC(bbr_offset_drop);
 					tcp_set_inp_to_drop(inp, EFAULT);
+					SOCKBUF_UNLOCK(sb);
+					(void)m_free(m);
 					return (0);
 				}
 				len = rsm->r_end - rsm->r_start;

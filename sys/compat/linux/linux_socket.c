@@ -40,6 +40,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/capsicum.h>
 #include <sys/fcntl.h>
 #include <sys/file.h>
+#include <sys/filedesc.h>
 #include <sys/limits.h>
 #include <sys/lock.h>
 #include <sys/malloc.h>
@@ -236,6 +237,8 @@ linux_to_bsd_so_sockopt(int opt)
 		return (SO_TIMESTAMP);
 	case LINUX_SO_ACCEPTCONN:
 		return (SO_ACCEPTCONN);
+	case LINUX_SO_PROTOCOL:
+		return (SO_PROTOCOL);
 	}
 	return (-1);
 }
@@ -608,17 +611,19 @@ linux_accept_common(struct thread *td, int s, l_uintptr_t addr,
 {
 	struct l_sockaddr *lsa;
 	struct sockaddr *sa;
-	struct file *fp;
+	struct file *fp, *fp1;
 	int bflags, len;
 	struct socket *so;
 	int error, error1;
 
 	bflags = 0;
+	fp = NULL;
+	sa = NULL;
+
 	error = linux_set_socket_flags(flags, &bflags);
 	if (error != 0)
 		return (error);
 
-	sa = NULL;
 	if (PTRIN(addr) == NULL) {
 		len = 0;
 		error = kern_accept4(td, s, NULL, NULL, bflags, NULL);
@@ -629,48 +634,54 @@ linux_accept_common(struct thread *td, int s, l_uintptr_t addr,
 		if (len < 0)
 			return (EINVAL);
 		error = kern_accept4(td, s, &sa, &len, bflags, &fp);
-		if (error == 0)
-			fdrop(fp, td);
 	}
 
+	/*
+	 * Translate errno values into ones used by Linux.
+	 */
 	if (error != 0) {
 		/*
 		 * XXX. This is wrong, different sockaddr structures
 		 * have different sizes.
 		 */
-		if (error == EFAULT && namelen != sizeof(struct sockaddr_in))
-		{
-			error = EINVAL;
-			goto out;
-		}
-		if (error == EINVAL) {
-			error1 = getsock_cap(td, s, &cap_accept_rights, &fp, NULL, NULL);
+		switch (error) {
+		case EFAULT:
+			if (namelen != sizeof(struct sockaddr_in))
+				error = EINVAL;
+			break;
+		case EINVAL:
+			error1 = getsock_cap(td, s, &cap_accept_rights, &fp1, NULL, NULL);
 			if (error1 != 0) {
 				error = error1;
-				goto out;
+				break;
 			}
-			so = fp->f_data;
+			so = fp1->f_data;
 			if (so->so_type == SOCK_DGRAM)
 				error = EOPNOTSUPP;
-			fdrop(fp, td);
+			fdrop(fp1, td);
+			break;
 		}
-		goto out;
+		return (error);
 	}
 
-	if (len != 0 && error == 0) {
+	if (len != 0) {
 		error = bsd_to_linux_sockaddr(sa, &lsa, len);
 		if (error == 0)
 			error = copyout(lsa, PTRIN(addr), len);
 		free(lsa, M_SONAME);
-	}
 
+		/*
+		 * XXX: We should also copyout the len, shouldn't we?
+		 */
+
+		if (error != 0) {
+			fdclose(td, fp, td->td_retval[0]);
+			td->td_retval[0] = 0;
+		}
+	}
+	if (fp != NULL)
+		fdrop(fp, td);
 	free(sa, M_SONAME);
-
-out:
-	if (error != 0) {
-		(void)kern_close(td, td->td_retval[0]);
-		td->td_retval[0] = 0;
-	}
 	return (error);
 }
 
@@ -1039,8 +1050,12 @@ linux_sendmsg_common(struct thread *td, l_int s, struct l_msghdr *msghdr,
 			cmsg->cmsg_level =
 			    linux_to_bsd_sockopt_level(linux_cmsg.cmsg_level);
 			if (cmsg->cmsg_type == -1
-			    || cmsg->cmsg_level != SOL_SOCKET)
+			    || cmsg->cmsg_level != SOL_SOCKET) {
+				linux_msg(curthread,
+				    "unsupported sendmsg cmsg level %d type %d",
+				    linux_cmsg.cmsg_level, linux_cmsg.cmsg_type);
 				goto bad;
+			}
 
 			/*
 			 * Some applications (e.g. pulseaudio) attempt to
@@ -1225,6 +1240,9 @@ linux_recvmsg_common(struct thread *td, l_int s, struct l_msghdr *msghdr,
 			    bsd_to_linux_sockopt_level(cm->cmsg_level);
 			if (linux_cmsg->cmsg_type == -1 ||
 			    cm->cmsg_level != SOL_SOCKET) {
+				linux_msg(curthread,
+				    "unsupported recvmsg cmsg level %d type %d",
+				    cm->cmsg_level, cm->cmsg_type);
 				error = EINVAL;
 				goto bad;
 			}

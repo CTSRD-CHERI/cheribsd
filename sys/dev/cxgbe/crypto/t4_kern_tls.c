@@ -587,7 +587,7 @@ cxgbe_tls_tag_alloc(struct ifnet *ifp, union if_snd_tag_alloc_params *params,
 	}
 
 	vi = ifp->if_softc;
-	sc = vi->pi->adapter;
+	sc = vi->adapter;
 
 	tlsp = alloc_tlspcb(ifp, vi, M_WAITOK);
 
@@ -1375,7 +1375,7 @@ ktls_write_tcp_options(struct sge_txq *txq, void *dst, struct mbuf *m,
 	pktlen = m->m_len;
 	ctrl = sizeof(struct cpl_tx_pkt_core) + pktlen;
 	len16 = howmany(sizeof(struct fw_eth_tx_pkt_wr) + ctrl, 16);
-	ndesc = howmany(len16, EQ_ESIZE / 16);
+	ndesc = tx_len16_to_desc(len16);
 	MPASS(ndesc <= available);
 
 	/* Firmware work request header */
@@ -1475,7 +1475,7 @@ ktls_write_tunnel_packet(struct sge_txq *txq, void *dst, struct mbuf *m,
 	pktlen = m->m_len + m_tls->m_len;
 	ctrl = sizeof(struct cpl_tx_pkt_core) + pktlen;
 	len16 = howmany(sizeof(struct fw_eth_tx_pkt_wr) + ctrl, 16);
-	ndesc = howmany(len16, EQ_ESIZE / 16);
+	ndesc = tx_len16_to_desc(len16);
 	MPASS(ndesc <= available);
 
 	/* Firmware work request header */
@@ -2116,7 +2116,7 @@ ktls_write_tcp_fin(struct sge_txq *txq, void *dst, struct mbuf *m,
 	pktlen = m->m_len;
 	ctrl = sizeof(struct cpl_tx_pkt_core) + pktlen;
 	len16 = howmany(sizeof(struct fw_eth_tx_pkt_wr) + ctrl, 16);
-	ndesc = howmany(len16, EQ_ESIZE / 16);
+	ndesc = tx_len16_to_desc(len16);
 	MPASS(ndesc <= available);
 
 	/* Firmware work request header */
@@ -2337,8 +2337,7 @@ cxgbe_tls_tag_free(struct m_snd_tag *mst)
 	if (tlsp->tx_key_addr >= 0)
 		free_keyid(tlsp, tlsp->tx_key_addr);
 
-	explicit_bzero(&tlsp->keyctx, sizeof(&tlsp->keyctx));
-	free(tlsp, M_CXGBE);
+	zfree(tlsp, M_CXGBE);
 }
 
 void

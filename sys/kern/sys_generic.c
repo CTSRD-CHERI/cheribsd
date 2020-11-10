@@ -269,13 +269,12 @@ int
 sys_readv(struct thread *td, struct readv_args *uap)
 {
 
-	return (user_readv(td, uap->fd, uap->iovp, uap->iovcnt,
-	    (copyinuio_t *)copyinuio));
+	return (user_readv(td, uap->fd, uap->iovp, uap->iovcnt, copyinuio));
 }
 
 int
-user_readv(struct thread *td, int fd, void * __capability iovp, u_int iovcnt,
-    copyinuio_t *copyinuio_f)
+user_readv(struct thread *td, int fd, struct iovec * __capability iovp,
+    u_int iovcnt, copyinuio_t *copyinuio_f)
 {
 	struct uio *auio;
 	int error;
@@ -318,12 +317,12 @@ sys_preadv(struct thread *td, struct preadv_args *uap)
 {
 
 	return (user_preadv(td, uap->fd, uap->iovp, uap->iovcnt, uap->offset,
-	    (copyinuio_t *)copyinuio));
+	    copyinuio));
 }
 
 int
-user_preadv(struct thread *td, int fd, void * __capability iovp, u_int iovcnt,
-    off_t offset, copyinuio_t *copyinuio_f)
+user_preadv(struct thread *td, int fd, struct iovec * __capability iovp,
+    u_int iovcnt, off_t offset, copyinuio_t *copyinuio_f)
 {
 	struct uio *auio;
 	int error;
@@ -495,13 +494,12 @@ int
 sys_writev(struct thread *td, struct writev_args *uap)
 {
 
-	return (user_writev(td, uap->fd, uap->iovp, uap->iovcnt,
-	    (copyinuio_t *)copyinuio));
+	return (user_writev(td, uap->fd, uap->iovp, uap->iovcnt, copyinuio));
 }
 
 int
-user_writev(struct thread *td, int fd, void * __capability iovp, u_int iovcnt,
-    copyinuio_t *copyinuio_f)
+user_writev(struct thread *td, int fd, struct iovec * __capability iovp,
+    u_int iovcnt, copyinuio_t *copyinuio_f)
 {
 	struct uio *auio;
 	int error;
@@ -544,12 +542,12 @@ sys_pwritev(struct thread *td, struct pwritev_args *uap)
 {
 
 	return (user_pwritev(td, uap->fd, uap->iovp, uap->iovcnt, uap->offset,
-	    (copyinuio_t *)copyinuio));
+	    copyinuio));
 }
 
 int
-user_pwritev(struct thread *td, int fd, void *__capability iovp, u_int iovcnt,
-    off_t offset, copyinuio_t *copyinuio_f)
+user_pwritev(struct thread *td, int fd, struct iovec * __capability iovp,
+    u_int iovcnt, off_t offset, copyinuio_t *copyinuio_f)
 {
 	struct uio *auio;
 	int error;
@@ -1542,7 +1540,7 @@ sys_ppoll(struct thread *td, struct ppoll_args *uap)
 }
 
 int
-user_ppoll(struct thread *td, struct pollfd *__capability fds, u_int nfds,
+user_ppoll(struct thread *td, struct pollfd * __capability fds, u_int nfds,
     const struct timespec * __capability uts,
     const sigset_t * __capability uset)
 {
