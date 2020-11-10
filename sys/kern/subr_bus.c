@@ -33,6 +33,9 @@ __FBSDID("$FreeBSD$");
 #include "opt_ddb.h"
 
 #include <sys/param.h>
+#if defined(COMPAT_FREEBSD32) || defined(COMPAT_FREEBSD64)
+#include <sys/abi_compat.h>
+#endif
 #include <sys/conf.h>
 #include <sys/domainset.h>
 #include <sys/eventhandler.h>
@@ -155,6 +158,38 @@ static MALLOC_DEFINE(M_BUS_SC, "bus-sc", "Bus data structures, softc");
 EVENTHANDLER_LIST_DEFINE(device_attach);
 EVENTHANDLER_LIST_DEFINE(device_detach);
 EVENTHANDLER_LIST_DEFINE(dev_lookup);
+
+#ifdef COMPAT_FREEBSD32
+struct devreq_buffer32 {
+	uint32_t	buffer;	/* void * */
+	uint32_t	length;
+};
+
+struct devreq32 {
+	char		dr_name[128];
+	int		dr_flags;
+	union {
+		struct devreq_buffer32 dru_buffer;
+		uint32_t	dru_data;	/* void * */
+	} dr_dru;
+};
+#endif
+
+#ifdef COMPAT_FREEBSD64
+struct devreq_buffer64 {
+	uint64_t	buffer;	/* void * */
+	size_t	length;
+};
+
+struct devreq64 {
+	char		dr_name[128];
+	int		dr_flags;
+	union {
+		struct devreq_buffer64 dru_buffer;
+		uint64_t	dru_data;	/* void * */
+	} dr_dru;
+};
+#endif
 
 static void devctl2_init(void);
 static bool device_frozen;
@@ -5509,7 +5544,7 @@ sysctl_devices(SYSCTL_HANDLER_ARGS)
 	udev->dv_state = dev->state;
 	walker = udev->dv_fields;
 	ep = walker + sizeof(udev->dv_fields);
-#define CP(src)						\
+#define _CP(src)					\
 	if ((src) == NULL)				\
 		*walker++ = '\0';			\
 	else {						\
@@ -5520,9 +5555,9 @@ sysctl_devices(SYSCTL_HANDLER_ARGS)
 		break;
 
 	do {
-		CP(dev->nameunit);
-		CP(dev->desc);
-		CP(dev->driver != NULL ? dev->driver->name : NULL);
+		_CP(dev->nameunit);
+		_CP(dev->desc);
+		_CP(dev->driver != NULL ? dev->driver->name : NULL);
 		bus_child_pnpinfo_str(dev, walker, ep - walker);
 		walker += strlen(walker) + 1;
 		if (walker >= ep)
@@ -5533,7 +5568,7 @@ sysctl_devices(SYSCTL_HANDLER_ARGS)
 			break;
 		*walker++ = '\0';
 	} while (0);
-#undef CP
+#undef _CP
 	error = SYSCTL_OUT(req, udev, sizeof(*udev));
 	free(udev, M_BUS);
 	return (error);
@@ -5678,13 +5713,54 @@ static int
 devctl2_ioctl(struct cdev *cdev, u_long cmd, caddr_t data, int fflag,
     struct thread *td)
 {
+#if defined(COMPAT_FREEBSD32) || defined(COMPAT_FREEBSD64)
+	struct devreq dr;
+#endif
+#ifdef COMPAT_FREEBSD32
+	struct devreq32 *req32;
+#endif
+#ifdef COMPAT_FREEBSD64
+	struct devreq64 *req64;
+#endif
 	struct devreq *req;
 	device_t dev;
 	int error, old;
 
+#ifdef COMPAT_FREEBSD32
+	/*
+	 * NOTE: the compat code relies on all handled commands being
+	 * _IOW() defines with the size of struct devreq.  If other
+	 * structs are added or _IOR is used, this code needs to
+	 * be adjusted accordingly.
+	 *
+	 * No consumers of dr_buffer exist so we always copy dr_data
+	 * and leave dr_buffer.length zeroed.
+	 */
+	if (IOCPARM_LEN(cmd) == sizeof(struct devreq32)) {
+		req32 = (struct devreq32 *)data;
+		memset(&dr, 0, sizeof(dr));
+		memcpy(dr.dr_name, req32->dr_name, sizeof(dr.dr_name));
+		CP(*req32, dr, dr_flags);
+		PTRIN_CP(*req32, dr, dr_data);
+		req = &dr;
+		cmd = _IOC_NEWTYPE(cmd, struct devreq);
+	} else
+#endif
+#ifdef COMPAT_FREEBSD64
+	if (IOCPARM_LEN(cmd) == sizeof(struct devreq64)) {
+		req64 = (struct devreq64 *)data;
+		memset(&dr, 0, sizeof(dr));
+		memcpy(dr.dr_name, req64->dr_name, sizeof(dr.dr_name));
+		CP(*req64, dr, dr_flags);
+		dr.dr_data = __USER_CAP_STR(req64->dr_data);
+		req = &dr;
+		cmd = _IOC_NEWTYPE(cmd, struct devreq);
+	} else
+#endif
+		req = (struct devreq *)data;
+
 	/* Locate the device to control. */
 	mtx_lock(&Giant);
-	req = (struct devreq *)data;
 	switch (cmd) {
 	case DEV_ATTACH:
 	case DEV_DETACH:
