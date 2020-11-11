@@ -468,7 +468,7 @@ SHLINSTALLFLAGS+= -fschg
 # build system would be fixed to not build/install libc the second time round,
 # but for now using -S ensures the install is atomic and thus we never see a
 # broken intermediate state, so use it even for NO_ROOT builds.
-.if !defined(NO_SAFE_LIBINSTALL) # && !defined(NO_ROOT)
+.if !defined(NO_SAFE_LIBINSTALL) # && !defined(NO_ROOT)
 SHLINSTALLFLAGS+= -S
 .endif
 
