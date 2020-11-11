@@ -50,7 +50,7 @@ CFLAGS+=	-DBC_ENABLE_NLS=0
 CFLAGS+=	-DBC_ENABLE_NLS=1
 
 # prevent floating point incompatibilities caused by -flto on some architectures
-.if !${MACHINE_ARCH:Mmips*} && !${MACHINE_ARCH:Mriscv64*}
+.if !${MACHINE_ARCH:Mmips*} && !${MACHINE_ARCH:Mriscv64*} && !${MACHINE_ARCH:Maarch64c}
 CFLAGS+=	-flto
 .endif
 
