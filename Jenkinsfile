@@ -59,6 +59,11 @@ def buildImageAndRunTests(params, String suffix) {
             sh "./cheribuild/jenkins-cheri-build.py --build cheribsd-mfs-root-kernel-${suffix} --cheribsd-mfs-root-kernel-${suffix}/build-fpga-kernels ${params.extraArgs}"
         }
     }
+    if (suffix.startsWith("morello")) {
+        echo("Can't run tests on the FVP yet!")
+        maybeArchiveArtifacts(params, suffix)
+        return
+    }
     stage("Running tests") {
         // copy qemu archive and run directly on the host
         dir("qemu-${params.buildOS}") { deleteDir() }
@@ -102,6 +107,10 @@ find test-results
             archiveArtifacts allowEmptyArchive: true, artifacts: "test-results/${suffix}/*.xml", onlyIfSuccessful: false
         }
     }
+    maybeArchiveArtifacts(params, suffix)
+}
+
+def maybeArchiveArtifacts(params, String suffix) {
     if (GlobalVars.archiveArtifacts) {
         if (GlobalVars.isTestSuiteJob) {
             error("Should not happen!")
