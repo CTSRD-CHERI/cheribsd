@@ -86,8 +86,9 @@ freebsd64_jail(struct thread *td, struct freebsd64_jail_args *uap)
 		/* jail_v0 is host order */
 		ip4.s_addr = htonl(j0.ip_number);
 		return (kern_jail(td, __USER_CAP_STR(j0.path),
-		    __USER_CAP_STR(j0.hostname), NULL, &ip4, 1,
-		    NULL, 0, UIO_SYSSPACE)); }
+		    __USER_CAP_STR(j0.hostname), NULL, __CAP_ADDROF(ip4), 1,
+		    NULL, 0, UIO_SYSSPACE));
+	}
 
 	case 1:
 		/*

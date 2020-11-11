@@ -2530,8 +2530,8 @@ fdcheckstd(struct thread *td)
 		if (devnull != -1) {
 			error = kern_dup(td, FDDUP_FIXED, 0, devnull, i);
 		} else {
-			error = kern_openat(td, AT_FDCWD, "/dev/null",
-			    UIO_SYSSPACE, O_RDWR, 0);
+			error = kern_openat(td, AT_FDCWD,
+			    __CAP_DECAY("/dev/null"), UIO_SYSSPACE, O_RDWR, 0);
 			if (error == 0) {
 				devnull = td->td_retval[0];
 				KASSERT(devnull == i, ("we didn't get our fd"));

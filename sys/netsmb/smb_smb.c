@@ -180,7 +180,7 @@ smb_smb_negotiate(struct smb_vc *vcp, struct smb_cred *scred)
 			md_get_uint32le(mdp, &sp->sv_maxraw);
 			md_get_uint32le(mdp, &sp->sv_skey);
 			md_get_uint32le(mdp, &sp->sv_caps);
-			md_get_mem(mdp, stime, 8, MB_MSYSTEM);
+			md_get_mem(mdp, __CAP_DECAY(stime), 8, MB_MSYSTEM);
 			md_get_uint16le(mdp, (u_int16_t*)&sp->sv_tz);
 			md_get_uint8(mdp, &sblen);
 			if (sblen && (sp->sv_sm & SMB_SM_ENCRYPT)) {
@@ -193,7 +193,7 @@ smb_smb_negotiate(struct smb_vc *vcp, struct smb_cred *scred)
 					break;
 				if (sp->sv_caps & SMB_CAP_EXT_SECURITY)
 					md_get_mem(mdp, NULL, 16, MB_MSYSTEM);
-				error = md_get_mem(mdp, vcp->vc_ch, sblen, MB_MSYSTEM);
+				error = md_get_mem(mdp, (char * __capability)__CAP_ADDROF(vcp->vc_ch), sblen, MB_MSYSTEM);
 				if (error)
 					break;
 				vcp->vc_chlen = sblen;
@@ -243,7 +243,8 @@ smb_smb_negotiate(struct smb_vc *vcp, struct smb_cred *scred)
 				if (bc < swlen)
 					break;
 				if (swlen && (sp->sv_sm & SMB_SM_ENCRYPT)) {
-					error = md_get_mem(mdp, vcp->vc_ch, swlen, MB_MSYSTEM);
+					// FIXME: bounds?
+					error = md_get_mem(mdp, (char * __capability)__CAP_ADDROF(vcp->vc_ch), swlen, MB_MSYSTEM);
 					if (error)
 						break;
 					vcp->vc_chlen = swlen;

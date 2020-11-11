@@ -122,7 +122,7 @@ struct pci_vpd_element {
 	char		pve_keyword[2];
 	uint8_t		pve_flags;
 	uint8_t		pve_datalen;
-	uint8_t		pve_data[0];
+	uint8_t		pve_data[];
 };
 
 #define	PVE_FLAG_IDENT		0x01	/* Element is the string identifier */

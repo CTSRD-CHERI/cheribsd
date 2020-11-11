@@ -1315,7 +1315,7 @@ icl_conn_start(struct icl_conn *ic)
 	opt.sopt_dir = SOPT_SET;
 	opt.sopt_level = IPPROTO_TCP;
 	opt.sopt_name = TCP_NODELAY;
-	opt.sopt_val = &one;
+	opt.sopt_val = __CAP_ADDROF(one);
 	opt.sopt_valsize = sizeof(one);
 	error = sosetopt(ic->ic_socket, &opt);
 	if (error != 0) {

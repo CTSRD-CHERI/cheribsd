@@ -323,7 +323,7 @@ in_gre_setup_socket(struct gre_softc *sc)
 			sopt.sopt_dir = SOPT_SET;
 			sopt.sopt_level = IPPROTO_IP;
 			sopt.sopt_name = IP_BINDANY;
-			sopt.sopt_val = &value;
+			sopt.sopt_val = __CAP_ADDROF(value);
 			sopt.sopt_valsize = sizeof(value);
 			value = 1;
 			error = sosetopt(gs->so, &sopt);

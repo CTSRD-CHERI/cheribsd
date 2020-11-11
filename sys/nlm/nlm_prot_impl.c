@@ -1547,7 +1547,7 @@ nlm_server_main(int addr_count, char * __capability * __capability addrs)
 		opt.sopt_level = IPPROTO_IP;
 		opt.sopt_name = IP_PORTRANGE;
 		portlow = IP_PORTRANGE_LOW;
-		opt.sopt_val = &portlow;
+		opt.sopt_val = __CAP_ADDROF(portlow);
 		opt.sopt_valsize = sizeof(portlow);
 		sosetopt(nlm_socket, &opt);
 
@@ -1566,7 +1566,7 @@ nlm_server_main(int addr_count, char * __capability * __capability addrs)
 		opt.sopt_level = IPPROTO_IPV6;
 		opt.sopt_name = IPV6_PORTRANGE;
 		portlow = IPV6_PORTRANGE_LOW;
-		opt.sopt_val = &portlow;
+		opt.sopt_val = __CAP_ADDROF(portlow);
 		opt.sopt_valsize = sizeof(portlow);
 		sosetopt(nlm_socket6, &opt);
 #endif

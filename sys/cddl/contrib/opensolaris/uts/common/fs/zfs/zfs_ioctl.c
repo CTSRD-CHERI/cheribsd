@@ -820,7 +820,7 @@ zfs_secpolicy_deleg_share(zfs_cmd_t *zc, nvlist_t *innvl, cred_t *cr)
 	vnode_t *vp;
 	int error;
 
-	if ((error = lookupname(zc->zc_value, UIO_SYSSPACE,
+	if ((error = lookupname(__CAP_DECAY(zc->zc_value), UIO_SYSSPACE,
 	    NO_FOLLOW, NULL, &vp)) != 0)
 		return (error);
 

@@ -758,13 +758,13 @@ sys___semctl(struct thread *td, struct __semctl_args *uap)
 	switch (uap->cmd) {
 	case SEM_STAT:
 	case IPC_STAT:
-		semun.buf = &dsbuf;
+		semun.buf = __CAP_ADDROF(dsbuf);
 		break;
 	case IPC_SET:
 		error = copyin(arg.buf, &dsbuf, sizeof(dsbuf));
 		if (error)
 			return (error);
-		semun.buf = &dsbuf;
+		semun.buf = __CAP_ADDROF(dsbuf);
 		break;
 	case GETALL:
 	case SETALL:
@@ -842,7 +842,8 @@ kern_semctl(struct thread *td, int semid, int semnum, int cmd,
 		if (error != 0)
 			goto done2;
 #endif
-		bcopy_c(&semakptr->u, arg->buf, sizeof(struct semid_ds));
+		bcopy_c(__CAP_ADDROF(semakptr->u), arg->buf,
+		    sizeof(struct semid_ds));
 		if (cred->cr_prison != semakptr->cred->cr_prison)
 			arg->buf->sem_perm.key = IPC_PRIVATE;
 		*rval = IXSEQ_TO_IPCID(semid, semakptr->u.sem_perm);
@@ -898,7 +899,8 @@ kern_semctl(struct thread *td, int semid, int semnum, int cmd,
 			goto done2;
 		if ((error = ipcperm(td, &semakptr->u.sem_perm, IPC_R)))
 			goto done2;
-		bcopy_c(&semakptr->u, arg->buf, sizeof(struct semid_ds));
+		bcopy_c(__CAP_ADDROF(semakptr->u), arg->buf,
+		    sizeof(struct semid_ds));
 		if (cred->cr_prison != semakptr->cred->cr_prison)
 			arg->buf->sem_perm.key = IPC_PRIVATE;
 		break;
@@ -1161,7 +1163,7 @@ sys_semget(struct thread *td, struct semget_args *uap)
 		sema[semid].u.sem_nsems = nsems;
 		sema[semid].u.sem_otime = 0;
 		sema[semid].u.sem_ctime = time_second;
-		sema[semid].u.__sem_base = &sem[semtot];
+		sema[semid].u.__sem_base = __CAP_ADDROF(sem[semtot]);
 		semtot += nsems;
 		bzero(&sem[semtot],
 		    sizeof(sema[semid].u.__sem_base[0])*nsems);
@@ -1322,7 +1324,8 @@ kern_semop(struct thread *td, int usemid, struct sembuf * __capability usops,
 
 		for (i = 0; i < nsops; i++) {
 			sopptr = &sops[i];
-			semptr = &semakptr->u.__sem_base[sopptr->sem_num];
+			semptr = __CAP_ADDROF(
+			    semakptr->u.__sem_base[sopptr->sem_num]);
 
 			DPRINTF((
 			    "semop:  semakptr=%p, __sem_base=%p, "
@@ -1411,7 +1414,7 @@ kern_semop(struct thread *td, int usemid, struct sembuf * __capability usops,
 		 * during msleep __sem_base may have been modified and semptr
 		 * is not valid any more
 		 */
-		semptr = &semakptr->u.__sem_base[sopptr->sem_num];
+		semptr = __CAP_ADDROF(semakptr->u.__sem_base[sopptr->sem_num]);
 
 		/*
 		 * The semaphore is still alive.  Readjust the count of
@@ -1493,7 +1496,7 @@ done:
 	/* We're definitely done - set the sempid's and time */
 	for (i = 0; i < nsops; i++) {
 		sopptr = &sops[i];
-		semptr = &semakptr->u.__sem_base[sopptr->sem_num];
+		semptr = __CAP_ADDROF(semakptr->u.__sem_base[sopptr->sem_num]);
 		semptr->sempid = td->td_proc->p_pid;
 	}
 	semakptr->u.sem_otime = time_second;
@@ -2252,7 +2255,7 @@ freebsd64___semctl(struct thread *td, struct freebsd64___semctl_args *uap)
 	switch (uap->cmd) {
 	case SEM_STAT:
 	case IPC_STAT:
-		semun.buf = &dsbuf;
+		semun.buf = __CAP_ADDROF(dsbuf);
 		break;
 	case IPC_SET:
 		error = copyin(__USER_CAP_OBJ(arg.buf), &dsbuf64,
@@ -2264,7 +2267,7 @@ freebsd64___semctl(struct thread *td, struct freebsd64___semctl_args *uap)
 		CP(dsbuf64, dsbuf, sem_nsems);
 		CP(dsbuf64, dsbuf, sem_otime);
 		CP(dsbuf64, dsbuf, sem_ctime);
-		semun.buf = &dsbuf;
+		semun.buf = __CAP_ADDROF(dsbuf);
 		break;
 	case GETALL:
 	case SETALL:

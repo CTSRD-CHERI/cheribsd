@@ -307,7 +307,8 @@ vfs_mountroot_devfs(struct thread *td, struct mount **mpp)
 
 	set_rootvnode();
 
-	error = kern_symlinkat(td, "/", AT_FDCWD, "dev", UIO_SYSSPACE);
+	error = kern_symlinkat(td, __CAP_DECAY("/"), AT_FDCWD,
+	    __CAP_DECAY("dev"), UIO_SYSSPACE);
 	if (error)
 		printf("kern_symlink /dev -> / returns %d\n", error);
 
@@ -392,7 +393,8 @@ vfs_mountroot_shuffle(struct thread *td, struct mount *mpdevfs)
 	}
 
 	/* Remount devfs under /dev */
-	NDINIT(&nd, LOOKUP, FOLLOW | LOCKLEAF, UIO_SYSSPACE, "/dev", td);
+	NDINIT(&nd, LOOKUP, FOLLOW | LOCKLEAF, UIO_SYSSPACE,
+	    __CAP_DECAY("/dev"), td);
 	error = namei(&nd);
 	if (!error) {
 		vp = nd.ni_vp;
@@ -420,8 +422,8 @@ vfs_mountroot_shuffle(struct thread *td, struct mount *mpdevfs)
 	if (mporoot == mpdevfs) {
 		vfs_unbusy(mpdevfs);
 		/* Unlink the no longer needed /dev/dev -> / symlink */
-		error = kern_funlinkat(td, AT_FDCWD, "/dev/dev", FD_NONE,
-		    UIO_SYSSPACE, 0, 0);
+		error = kern_funlinkat(td, AT_FDCWD, __CAP_DECAY("/dev/dev"),
+		    FD_NONE, UIO_SYSSPACE, 0, 0);
 		if (error)
 			printf("mountroot: unable to unlink /dev/dev "
 			    "(error %d)\n", error);
@@ -938,7 +940,8 @@ vfs_mountroot_readconf(struct thread *td, struct sbuf *sb)
 	ssize_t resid;
 	int error, flags, len;
 
-	NDINIT(&nd, LOOKUP, FOLLOW, UIO_SYSSPACE, "/.mount.conf", td);
+	NDINIT(&nd, LOOKUP, FOLLOW, UIO_SYSSPACE, __CAP_DECAY("/.mount.conf"),
+	    td);
 	flags = FREAD;
 	error = vn_open(&nd, &flags, 0, NULL);
 	if (error)

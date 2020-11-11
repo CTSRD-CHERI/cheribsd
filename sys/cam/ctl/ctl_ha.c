@@ -325,7 +325,7 @@ ctl_ha_sock_setup(struct ha_softc *softc)
 	opt.sopt_dir = SOPT_SET;
 	opt.sopt_level = SOL_SOCKET;
 	opt.sopt_name = SO_KEEPALIVE;
-	opt.sopt_val = &val;
+	opt.sopt_val = __CAP_ADDROF(val);
 	opt.sopt_valsize = sizeof(val);
 	val = 1;
 	error = sosetopt(so, &opt);
@@ -452,7 +452,7 @@ ctl_ha_listen(struct ha_softc *softc)
 		opt.sopt_dir = SOPT_SET;
 		opt.sopt_level = SOL_SOCKET;
 		opt.sopt_name = SO_REUSEADDR;
-		opt.sopt_val = &val;
+		opt.sopt_val = __CAP_ADDROF(val);
 		opt.sopt_valsize = sizeof(val);
 		val = 1;
 		error = sosetopt(softc->ha_lso, &opt);
@@ -464,7 +464,7 @@ ctl_ha_listen(struct ha_softc *softc)
 		opt.sopt_dir = SOPT_SET;
 		opt.sopt_level = SOL_SOCKET;
 		opt.sopt_name = SO_REUSEPORT;
-		opt.sopt_val = &val;
+		opt.sopt_val = __CAP_ADDROF(val);
 		opt.sopt_valsize = sizeof(val);
 		val = 1;
 		error = sosetopt(softc->ha_lso, &opt);

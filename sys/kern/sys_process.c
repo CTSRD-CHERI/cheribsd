@@ -514,7 +514,7 @@ sys_ptrace(struct thread *td, struct ptrace_args *uap)
 	AUDIT_ARG_PID(uap->pid);
 	AUDIT_ARG_CMD(uap->req);
 	AUDIT_ARG_VALUE(uap->data);
-	addr = &r;
+	addr = __CAP_ADDROF(r);
 	switch (uap->req) {
 	case PT_GET_EVENT_MASK:
 	case PT_LWPINFO:
