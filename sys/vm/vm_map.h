@@ -234,7 +234,8 @@ struct vm_map {
 #define	MAP_IS_SUB_MAP		0x04	/* has parent */
 #define	MAP_ASLR		0x08	/* enabled ASLR */
 #define	MAP_ASLR_IGNSTART	0x10
-#define	MAP_RESERVATIONS	0x20	/* Don't merge reservations */
+#define	MAP_REPLENISH		0x20
+#define	MAP_RESERVATIONS	0x40	/* Don't merge reservations */
 
 #ifdef	_KERNEL
 #if defined(KLD_MODULE) && !defined(KLD_TIED)
