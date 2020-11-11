@@ -1516,7 +1516,7 @@ MipsEmulateBranch(struct trapframe *framePtr, trapf_pc_t _instPC, int fpcCSR,
 		if (!KERNLAND((__cheri_addr vaddr_t)instPC))
 			inst.word = fuword32(instPC);  /* XXXAR: error check? */
 		else
-			memcpy_c(&inst, instPC, sizeof(InstFmt));
+			memcpy_c(__CAP_ADDROF(inst), instPC, sizeof(InstFmt));
 	}
 	/* Save the bad branch instruction so we can log it */
 	framePtr->badinstr_p.inst = inst.word;
