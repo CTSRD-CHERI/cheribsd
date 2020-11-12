@@ -32,8 +32,6 @@
 __FBSDID("$FreeBSD$");
 
 #include "opt_capsicum.h"
-#include "opt_inet.h"
-#include "opt_inet6.h"
 #include "opt_sctp.h"
 #include "opt_ktrace.h"
 
@@ -185,8 +183,6 @@ sctp_syscalls_uninit(void)
 
 /*
  * SCTP syscalls.
- * Functionality only compiled in if SCTP is defined in the kernel Makefile,
- * otherwise all return EOPNOTSUPP.
  */
 #ifndef _SYS_SYSPROTO_H_
 struct sctp_peeloff_args {
@@ -197,7 +193,6 @@ int	sd;
 int
 sys_sctp_peeloff(struct thread *td, struct sctp_peeloff_args *uap)
 {
-#if defined(INET) || defined(INET6)
 	struct file *headfp, *nfp = NULL;
 	struct socket *head, *so;
 	cap_rights_t rights;
@@ -259,7 +254,6 @@ done:
 	fdrop(headfp, td);
 done2:
 	return (error);
-#endif
 }
 
 #ifndef _SYS_SYSPROTO_H_
@@ -300,7 +294,6 @@ kern_sys_sctp_generic_sendmsg(struct thread *td, int sd,
     void * __capability msg, int mlen, const struct sockaddr * __capability uto,
     socklen_t tolen, struct sctp_sndrcvinfo * __capability usinfo, int flags)
 {
-#if defined(INET) || defined(INET6)
 	struct sctp_sndrcvinfo sinfo, *u_sinfo = NULL;
 	struct socket *so;
 	struct file *fp = NULL;
@@ -394,7 +387,6 @@ sctp_bad:
 sctp_bad2:
 	free(to, M_SONAME);
 	return (error);
-#endif
 }
 
 #ifndef _SYS_SYSPROTO_H_
@@ -451,7 +443,6 @@ kern_sctp_generic_sendmsg_iov(struct thread *td, int sd,
     struct sctp_sndrcvinfo * __capability usinfo, int flags,
     copyiniov_t *copyiniov_f)
 {
-#if defined(INET) || defined(INET6)
 	struct sctp_sndrcvinfo sinfo, *u_sinfo = NULL;
 	struct socket *so;
 	struct file *fp = NULL;
@@ -557,7 +548,6 @@ sctp_bad1:
 sctp_bad2:
 	free(to, M_SONAME);
 	return (error);
-#endif
 }
 
 #ifndef _SYS_SYSPROTO_H_
@@ -616,7 +606,6 @@ kern_sctp_generic_recvmsg(struct thread *td, int sd,
     struct sctp_sndrcvinfo * __capability usinfo,
     int * __capability umsg_flags, copyiniov_t *copyiniov_f)
 {
-#if defined(INET) || defined(INET6)
 	uint8_t sockbufstore[256];
 	struct uio auio;
 	struct iovec *iov, *tiov;
@@ -740,7 +729,6 @@ out1:
 		fdrop(fp, td);
 
 	return (error);
-#endif
 }
 // CHERI CHANGES START
 // {
