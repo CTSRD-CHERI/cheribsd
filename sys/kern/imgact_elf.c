@@ -1803,14 +1803,14 @@ core_write(struct coredump_params *p, const void *base, size_t len,
 }
 
 static int
-core_output(void * __capability base, size_t len, off_t offset,
+core_output(void * __capability base_cap, size_t len, off_t offset,
     struct coredump_params *p, void *tmpbuf)
 {
 	int error;
-	void *base_vaddr = (void *)(uintptr_t)(uintcap_t)base;
+	void *base = (void *)(uintptr_t)(uintcap_t)base_cap;
 
 	if (p->comp != NULL)
-		return (compress_chunk(p, base, tmpbuf, len));
+		return (compress_chunk(p, base_cap, tmpbuf, len));
 
 	/*
 	 * EFAULT is a non-fatal error that we can get, for example,
@@ -1819,11 +1819,11 @@ core_output(void * __capability base, size_t len, off_t offset,
 	 * NB: The hybrid kernel drops the capability here, it will be
 	 * re-derived in vn_rdwr().
 	 */
-	error = core_write(p, base_vaddr, len, offset, UIO_USERSPACE);
+	error = core_write(p, base, len, offset, UIO_USERSPACE);
 	if (error == EFAULT) {
 		log(LOG_WARNING, "Failed to fully fault in a core file segment "
 		    "at VA %p with size 0x%zx to be written at offset 0x%jx "
-		    "for process %s\n", base_vaddr, len, offset, curproc->p_comm);
+		    "for process %s\n", base, len, offset, curproc->p_comm);
 
 		/*
 		 * Write a "real" zero byte at the end of the target region
@@ -1950,18 +1950,20 @@ __elfN(coredump)(struct thread *td, struct vnode *vp, off_t limit, int flags)
 		Elf_Phdr *php;
 		off_t offset;
 		int i;
-		char * __capability section_addr;
+		char * __capability section_cap;
 
 		php = (Elf_Phdr *)((char *)hdr + sizeof(Elf_Ehdr)) + 1;
 		offset = round_page(hdrsize + notesz);
 		for (i = 0; i < seginfo.count; i++) {
 #if __has_feature(capabilities)
-			section_addr = cheri_capability_build_user_data(
-			    CHERI_PERM_LOAD, php->p_vaddr, php->p_filesz, 0);
+			section_cap = cheri_capability_build_user_data(
+			    CHERI_PERM_LOAD,
+			    CHERI_REPRESENTABLE_BASE(php->p_vaddr, php->p_filesz),
+			    CHERI_REPRESENTABLE_LENGTH(php->p_filesz), 0);
 #else
-			section_addr = (caddr_t)(uintptr_t)php->p_vaddr;
+			section_cap = (caddr_t)(uintptr_t)php->p_vaddr;
 #endif
-			error = core_output(section_addr,
+			error = core_output(section_cap,
 			    php->p_filesz, offset, &params, tmpbuf);
 			if (error != 0)
 				break;
