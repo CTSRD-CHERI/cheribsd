@@ -301,7 +301,7 @@ kern_sys_sctp_generic_sendmsg(struct thread *td, int sd,
     socklen_t tolen, struct sctp_sndrcvinfo * __capability usinfo, int flags)
 {
 #if defined(INET) || defined(INET6)
-	struct sctp_sndrcvinfo sinfo, *sinfop = NULL;
+	struct sctp_sndrcvinfo sinfo, *u_sinfo = NULL;
 	struct socket *so;
 	struct file *fp = NULL;
 	struct sockaddr *to = NULL;
@@ -317,7 +317,7 @@ kern_sys_sctp_generic_sendmsg(struct thread *td, int sd,
 		error = copyin(usinfo, &sinfo, sizeof(sinfo));
 		if (error != 0)
 			return (error);
-		sinfop = &sinfo;
+		u_sinfo = &sinfo;
 	}
 
 	cap_rights_init_one(&rights, CAP_SEND);
@@ -366,7 +366,7 @@ kern_sys_sctp_generic_sendmsg(struct thread *td, int sd,
 	len = auio.uio_resid = mlen;
 	CURVNET_SET(so->so_vnet);
 	error = sctp_lower_sosend(so, to, &auio, (struct mbuf *)NULL,
-	    (struct mbuf *)NULL, flags, sinfop, td);
+	    (struct mbuf *)NULL, flags, u_sinfo, td);
 	CURVNET_RESTORE();
 	if (error != 0) {
 		if (auio.uio_resid != len && (error == ERESTART ||
@@ -452,7 +452,7 @@ kern_sctp_generic_sendmsg_iov(struct thread *td, int sd,
     copyiniov_t *copyiniov_f)
 {
 #if defined(INET) || defined(INET6)
-	struct sctp_sndrcvinfo sinfo, *sinfop = NULL;
+	struct sctp_sndrcvinfo sinfo, *u_sinfo = NULL;
 	struct socket *so;
 	struct file *fp = NULL;
 	struct sockaddr *to = NULL;
@@ -469,7 +469,7 @@ kern_sctp_generic_sendmsg_iov(struct thread *td, int sd,
 		error = copyin(usinfo, &sinfo, sizeof(sinfo));
 		if (error != 0)
 			return (error);
-		sinfop = &sinfo;
+		u_sinfo = &sinfo;
 	}
 	cap_rights_init_one(&rights, CAP_SEND);
 	if (tolen != 0) {
@@ -527,7 +527,7 @@ kern_sctp_generic_sendmsg_iov(struct thread *td, int sd,
 	CURVNET_SET(so->so_vnet);
 	error = sctp_lower_sosend(so, to, &auio,
 		    (struct mbuf *)NULL, (struct mbuf *)NULL,
-		    flags, sinfop, td);
+		    flags, u_sinfo, td);
 	CURVNET_RESTORE();
 	if (error != 0) {
 		if (auio.uio_resid != len && (error == ERESTART ||
