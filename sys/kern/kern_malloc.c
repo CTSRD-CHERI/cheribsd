@@ -237,11 +237,6 @@ static int sysctl_kern_mprof(SYSCTL_HANDLER_ARGS);
 
 static int sysctl_kern_malloc_stats(SYSCTL_HANDLER_ARGS);
 
-/*
- * time_uptime of the last malloc(9) failure (induced or real).
- */
-static time_t t_malloc_fail;
-
 #if defined(MALLOC_MAKE_FAILURES) || (MALLOC_DEBUG_MAXZONES > 1)
 static SYSCTL_NODE(_debug, OID_AUTO, malloc, CTLFLAG_RD | CTLFLAG_MPSAFE, 0,
     "Kernel malloc debugging options");
@@ -378,13 +373,6 @@ mtp_get_subzone(struct malloc_type *mtp)
 	return (0);
 }
 #endif /* MALLOC_DEBUG_MAXZONES > 1 */
-
-int
-malloc_last_fail(void)
-{
-
-	return (time_uptime - t_malloc_fail);
-}
 
 /*
  * An allocation has succeeded -- update malloc type statistics for the
@@ -552,7 +540,6 @@ malloc_dbg(caddr_t *vap, size_t *sizep, struct malloc_type *mtp,
 		atomic_add_int(&malloc_nowait_count, 1);
 		if ((malloc_nowait_count % malloc_failure_rate) == 0) {
 			atomic_add_int(&malloc_failure_count, 1);
-			t_malloc_fail = time_uptime;
 			*vap = NULL;
 			return (EJUSTRETURN);
 		}
@@ -680,7 +667,6 @@ void *
 	if (__predict_false(va == NULL)) {
 		KASSERT((flags & M_WAITOK) == 0,
 		    ("malloc(M_WAITOK) returned NULL"));
-		t_malloc_fail = time_uptime;
 	}
 #ifdef DEBUG_REDZONE
 	if (va != NULL)
@@ -752,7 +738,6 @@ malloc_domainset(size_t size, struct malloc_type *mtp, struct domainset *ds,
 	if (__predict_false(va == NULL)) {
 		KASSERT((flags & M_WAITOK) == 0,
 		    ("malloc(M_WAITOK) returned NULL"));
-		t_malloc_fail = time_uptime;
 	}
 #ifdef DEBUG_REDZONE
 	if (va != NULL)
@@ -783,7 +768,6 @@ malloc_exec(size_t size, struct malloc_type *mtp, int flags)
 	if (__predict_false(va == NULL)) {
 		KASSERT((flags & M_WAITOK) == 0,
 		    ("malloc(M_WAITOK) returned NULL"));
-		t_malloc_fail = time_uptime;
 	}
 #ifdef DEBUG_REDZONE
 	if (va != NULL)
@@ -813,7 +797,6 @@ malloc_domainset_exec(size_t size, struct malloc_type *mtp, struct domainset *ds
 	if (__predict_false(va == NULL)) {
 		KASSERT((flags & M_WAITOK) == 0,
 		    ("malloc(M_WAITOK) returned NULL"));
-		t_malloc_fail = time_uptime;
 	}
 #ifdef DEBUG_REDZONE
 	if (va != NULL)
