@@ -75,11 +75,6 @@
 
 #define	cheri_setbounds(x, y)	__builtin_cheri_bounds_set((x), (y))
 #define	cheri_setboundsexact(x, y)	__builtin_cheri_bounds_set_exact((x), (y))
-/* XXXAR: shouldn't this be the default and we add cheri_setbounds_untyped? */
-#define	cheri_setbounds_changetype(type, x, y)	\
-	(type)cheri_setbounds((x), (y)))
-#define	cheri_setbounds_sametype(x, y)	\
-	((__typeof__(x))cheri_setbounds((x), (y)))
 
 /* Create an untagged capability from an integer */
 #define cheri_fromint(x)	cheri_incoffset(NULL, x)
