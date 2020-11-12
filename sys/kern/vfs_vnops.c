@@ -549,18 +549,15 @@ vn_rdwr(enum uio_rw rw, struct vnode *vp, void *base, int len, off_t offset,
 		return (EINVAL);
 	auio.uio_iov = &aiov;
 	auio.uio_iovcnt = 1;
-#ifdef __CHERI_PURE_CAPABILITY__
-	IOVEC_INIT_C(&aiov, base, len);
-#elif __has_feature(capabilities)
+#if __has_feature(capabilities) && !defined(__CHERI_PURE_CAPABILITY__)
 	if (segflg == UIO_USERSPACE)
 		IOVEC_INIT_C(&aiov,
 		    cheri_capability_build_user_data(CHERI_CAP_USER_DATA_PERMS,
 			(vaddr_t)base, len, 0), len);
 	else
-		IOVEC_INIT(&aiov, base, len);
-#else
-	IOVEC_INIT(&aiov, base, len);
 #endif
+	IOVEC_INIT(&aiov, base, len);
+
 	auio.uio_resid = len;
 	auio.uio_offset = offset;
 	auio.uio_segflg = segflg;
