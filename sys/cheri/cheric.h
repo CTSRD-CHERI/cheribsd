@@ -125,7 +125,7 @@ cheri_is_null_derived(const void * __capability cap)
  * cheri_getpcc() for now.
  */
 #define cheri_codeptr(ptr, len)	\
-	cheri_setbounds(__builtin_cheri_cap_from_pointer(cheri_getpcc(), ptr), len));
+	cheri_setbounds(__builtin_cheri_cap_from_pointer(cheri_getpcc(), ptr), len)
 
 #define cheri_codeptrperm(ptr, len, perm)	\
 	cheri_andperm(cheri_codeptr(ptr, len), perm | CHERI_PERM_GLOBAL)
