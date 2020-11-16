@@ -4499,6 +4499,12 @@ static __noinline void
 zone_free_item(uma_zone_t zone, void *item, void *udata, enum zfreeskip skip)
 {
 
+#ifdef __CHERI_PURE_CAPABILITY__
+	CHERI_ASSERT_VALID(item);
+	CHERI_ASSERT_UNSEALED(item);
+	if (!cheri_gettag(item) || cheri_getsealed(item))
+		return;
+#endif
 	/*
 	 * If a free is sent directly to an SMR zone we have to
 	 * synchronize immediately because the item can instantly

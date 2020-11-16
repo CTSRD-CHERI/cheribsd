@@ -837,7 +837,12 @@ free(void *addr, struct malloc_type *mtp)
 	/* free(NULL, ...) does nothing */
 	if (addr == NULL)
 		return;
+#ifdef __CHERI_PURE_CAPABILITY__
 	CHERI_ASSERT_VALID(addr);
+	CHERI_ASSERT_UNSEALED(addr);
+	if (!cheri_gettag(addr) || cheri_getsealed(addr))
+		return;
+#endif
 
 	vtozoneslab((vm_offset_t)addr & (~UMA_SLAB_MASK), &zone, &slab);
 	if (slab == NULL)
