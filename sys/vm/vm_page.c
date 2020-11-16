@@ -2200,45 +2200,6 @@ vm_page_alloc_contig(vm_object_t object, vm_pindex_t pindex, int req,
 	return (m);
 }
 
-#ifdef __CHERI_PURE_CAPABILITY__
-/*
- * XXX-AM: Horrible hack to work around a subobject bounds reordering bug
- * in the compiler.
- */
-static bool __attribute__((noinline))
-_vm_page_hack(vm_object_t object, vm_page_t m, vm_pindex_t pindex,
-	      vm_page_t *mpred, u_long npages, int req, vm_page_t m_ret)
-{
-	if (object != NULL) {
-		if (vm_page_insert_after(m, object, pindex, *mpred)) {
-			if ((req & VM_ALLOC_WIRED) != 0)
-				vm_wire_sub(npages);
-			KASSERT(m->object == NULL,
-				("page %p has object", m));
-			*mpred = m;
-			for (m = m_ret; m < &m_ret[npages]; m++) {
-				if (m <= *mpred &&
-				    (req & VM_ALLOC_WIRED) != 0)
-					m->ref_count = 0;
-				m->oflags = VPO_UNMANAGED;
-				m->busy_lock = VPB_UNBUSIED;
-				/* Don't change PG_ZERO. */
-				vm_page_free_toq(m);
-			}
-			if (req & VM_ALLOC_WAITFAIL) {
-				VM_OBJECT_WUNLOCK(object);
-				vm_radix_wait();
-				VM_OBJECT_WLOCK(object);
-			}
-			return (true);
-		}
-		*mpred = m;
-	} else
-		m->pindex = pindex;
-	return (false);
-}
-#endif
-
 vm_page_t
 vm_page_alloc_contig_domain(vm_object_t object, vm_pindex_t pindex, int domain,
     int req, u_long npages, vm_paddr_t low, vm_paddr_t high, u_long alignment,
@@ -2349,11 +2310,6 @@ found:
 			m->ref_count = 1;
 		m->a.act_count = 0;
 		m->oflags = oflags;
-
-#ifdef __CHERI_PURE_CAPABILITY__
-		if (_vm_page_hack(object, m, pindex, &mpred, npages, req, m_ret))
-			return (NULL);
-#else
 		if (object != NULL) {
 			if (vm_page_insert_after(m, object, pindex, mpred)) {
 				if ((req & VM_ALLOC_WIRED) != 0)
@@ -2380,8 +2336,6 @@ found:
 			mpred = m;
 		} else
 			m->pindex = pindex;
-#endif
-
 		if (memattr != VM_MEMATTR_DEFAULT)
 			pmap_page_set_memattr(m, memattr);
 		pindex++;
