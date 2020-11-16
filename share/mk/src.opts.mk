@@ -370,6 +370,11 @@ BROKEN_OPTIONS+=GOOGLETEST SSP
 BROKEN_OPTIONS+=NS_CACHING
 .endif
 
+.if ${__C} == "cheri" || ${__T:Mmips64*c*} || ${__T:Mriscv*c*}
+# Broken post OpenZFS import
+BROKEN_OPTIONS+=CDDL ZFS
+.endif
+
 .if ${__T:Mriscv*c*}
 # Crash in ZFS code. TODO: investigate
 BROKEN_OPTIONS+=CDDL
