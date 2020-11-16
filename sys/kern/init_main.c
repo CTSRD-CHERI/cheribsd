@@ -752,7 +752,8 @@ start_init(void *dummy)
 		if (error != 0)
 			panic("%s: Can't add argv[0] %d", __func__, error);
 		if (boothowto & RB_SINGLE)
-			error = exec_args_add_arg(&args, "-s", UIO_SYSSPACE);
+			error = exec_args_add_arg(&args, __CAP_DECAY("-s"),
+			    UIO_SYSSPACE);
 		if (error != 0)
 			panic("%s: Can't add argv[0] %d", __func__, error);
 

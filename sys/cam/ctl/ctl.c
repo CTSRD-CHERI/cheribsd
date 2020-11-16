@@ -3459,8 +3459,9 @@ ctl_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flag,
 				stats->status = CTL_SS_NEED_MORE_SPACE;
 				break;
 			}
-			retval = copyout(&lun->stats, &stats->stats[i++],
-					 sizeof(lun->stats));
+			retval = copyout(&lun->stats,
+			    __CAP_ADDROF(stats->stats[i++]),
+			    sizeof(lun->stats));
 			if (retval != 0)
 				break;
 			stats->fill_len += sizeof(lun->stats);
@@ -3492,8 +3493,9 @@ ctl_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flag,
 				stats->status = CTL_SS_NEED_MORE_SPACE;
 				break;
 			}
-			retval = copyout(&port->stats, &stats->stats[i++],
-					 sizeof(port->stats));
+			retval = copyout(&port->stats,
+			    __CAP_ADDROF(stats->stats[i++]),
+			    sizeof(port->stats));
 			if (retval != 0)
 				break;
 			stats->fill_len += sizeof(port->stats);

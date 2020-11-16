@@ -1445,9 +1445,9 @@ freebsd64___sysctlbyname(struct thread *td, struct
 			return (EFAULT);
 
 	error = kern___sysctlbyname(td, __USER_CAP(uap->name, uap->namelen),
-	    uap->namelen, __USER_CAP(uap->old, oldlen),
-	    &oldlen, __USER_CAP(uap->new, uap->newlen),
-	    uap->newlen, &rv, SCTL_MASK64, 1);
+	    uap->namelen, __USER_CAP(uap->old, oldlen), __CAP_ADDROF(oldlen),
+	    __USER_CAP(uap->new, uap->newlen), uap->newlen, &rv, SCTL_MASK64,
+	    1);
 	if (error != 0)
 		return (error);
 	if (uap->oldlenp != NULL)

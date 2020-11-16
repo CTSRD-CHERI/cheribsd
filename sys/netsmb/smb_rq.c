@@ -119,7 +119,7 @@ smb_rq_new(struct smb_rq *rqp, u_char cmd)
 	error = mb_init(mbp);
 	if (error)
 		return error;
-	mb_put_mem(mbp, SMB_SIGNATURE, SMB_SIGLEN, MB_MSYSTEM);
+	mb_put_mem(mbp, __CAP_DECAY(SMB_SIGNATURE), SMB_SIGLEN, MB_MSYSTEM);
 	mb_put_uint8(mbp, cmd);
 	mb_put_uint32le(mbp, 0);		/* DosError */
 	mb_put_uint8(mbp, vcp->vc_hflags);
@@ -130,7 +130,7 @@ smb_rq_new(struct smb_rq *rqp, u_char cmd)
 		flags2 &= ~SMB_FLAGS2_SECURITY_SIGNATURE;
 	mb_put_uint16le(mbp, flags2);
 	if ((flags2 & SMB_FLAGS2_SECURITY_SIGNATURE) == 0) {
-		mb_put_mem(mbp, tzero, 12, MB_MSYSTEM);
+		mb_put_mem(mbp, __CAP_DECAY(tzero), 12, MB_MSYSTEM);
 		rqp->sr_rqsig = NULL;
 	} else {
 		mb_put_uint16le(mbp, 0 /*scred->sc_p->p_pid >> 16*/);

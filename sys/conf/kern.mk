@@ -275,6 +275,14 @@ CHERI_SUBOBJECT_BOUNDS_STATS_FILE?=kernel-subobject-bounds-stats.csv
 CFLAGS+=	-mllvm -collect-csetbounds-stats=csv \
 	-Xclang -cheri-stats-file="${CHERI_SUBOBJECT_BOUNDS_STATS_FILE}"
 .endif
+#
+# CHERI hybrid kernel flags
+#
+.elif ${MACHINE_CPU:Mcheri}
+# FIXME: despite being accepted by the frontend, these flags are not forwarded
+#        to -cc1, so we need to use -Xclang for now
+# Avoid implicit int -> ddc-relative cap conversions
+CFLAGS+=	-Xclang -cheri-int-to-cap=explicit
 .endif
 
 CFLAGS+= ${CWARNFLAGS:M*} ${CWARNFLAGS.${.IMPSRC:T}}

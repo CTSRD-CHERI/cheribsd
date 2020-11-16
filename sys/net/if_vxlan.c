@@ -970,7 +970,7 @@ vxlan_socket_init(struct vxlan_socket *vso, struct ifnet *ifp)
 		sopt.sopt_dir = SOPT_SET;
 		sopt.sopt_level = IPPROTO_IP;
 		sopt.sopt_name = SO_REUSEPORT;
-		sopt.sopt_val = &val;
+		sopt.sopt_val = __CAP_ADDROF(val);
 		sopt.sopt_valsize = sizeof(val);
 		error = sosetopt(vso->vxlso_sock, &sopt);
 		if (error) {
@@ -1127,7 +1127,7 @@ vxlan_socket_mc_join_group(struct vxlan_socket *vso,
 		sopt.sopt_dir = SOPT_SET;
 		sopt.sopt_level = IPPROTO_IP;
 		sopt.sopt_name = IP_ADD_MEMBERSHIP;
-		sopt.sopt_val = &mreq;
+		sopt.sopt_val = __CAP_ADDROF(mreq);
 		sopt.sopt_valsize = sizeof(mreq);
 		error = sosetopt(vso->vxlso_sock, &sopt);
 		if (error)
@@ -1158,7 +1158,7 @@ vxlan_socket_mc_join_group(struct vxlan_socket *vso,
 		sopt.sopt_dir = SOPT_SET;
 		sopt.sopt_level = IPPROTO_IPV6;
 		sopt.sopt_name = IPV6_JOIN_GROUP;
-		sopt.sopt_val = &mreq;
+		sopt.sopt_val = __CAP_ADDROF(mreq);
 		sopt.sopt_valsize = sizeof(mreq);
 		error = sosetopt(vso->vxlso_sock, &sopt);
 		if (error)
@@ -1193,7 +1193,7 @@ vxlan_socket_mc_leave_group(struct vxlan_socket *vso,
 
 		sopt.sopt_level = IPPROTO_IP;
 		sopt.sopt_name = IP_DROP_MEMBERSHIP;
-		sopt.sopt_val = &mreq;
+		sopt.sopt_val = __CAP_ADDROF(mreq);
 		sopt.sopt_valsize = sizeof(mreq);
 		error = sosetopt(vso->vxlso_sock, &sopt);
 
@@ -1205,7 +1205,7 @@ vxlan_socket_mc_leave_group(struct vxlan_socket *vso,
 
 		sopt.sopt_level = IPPROTO_IPV6;
 		sopt.sopt_name = IPV6_LEAVE_GROUP;
-		sopt.sopt_val = &mreq;
+		sopt.sopt_val = __CAP_ADDROF(mreq);
 		sopt.sopt_valsize = sizeof(mreq);
 		error = sosetopt(vso->vxlso_sock, &sopt);
 

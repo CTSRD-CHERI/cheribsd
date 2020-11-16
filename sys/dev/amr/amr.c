@@ -673,7 +673,9 @@ amr_linux_ioctl_int(struct cdev *dev, u_long cmd, caddr_t addr, int32_t flag,
 		    break;
 	    }
 	    error = copyout(ap->ap_request_sense_area,
-		uap->ap_request_sense_area, ap->ap_request_sense_length);
+		__CAP_DECAY_LEN(uap->ap_request_sense_area,
+		    ap->ap_request_sense_length),
+		ap->ap_request_sense_length);
 	    if (error)
 		break;
 

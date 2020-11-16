@@ -635,7 +635,8 @@ cloudabi_sys_file_stat_fput(struct thread *td,
 		    CLOUDABI_FILESTAT_MTIM_NOW)) != 0)
 			return (EINVAL);
 		convert_utimens_arguments(&fs, uap->flags, ts);
-		return (kern_futimens(td, uap->fd, &ts[0], UIO_SYSSPACE));
+		return (kern_futimens(td, uap->fd, __CAP_ADDROF(ts[0]),
+		    UIO_SYSSPACE));
 	}
 	return (EINVAL);
 }
@@ -710,9 +711,10 @@ cloudabi_sys_file_stat_put(struct thread *td,
 		return (error);
 
 	convert_utimens_arguments(&fs, uap->flags, ts);
-	error = kern_utimensat(td, uap->fd.fd, PTR2CAP(path), UIO_SYSSPACE, ts,
-	    UIO_SYSSPACE, (uap->fd.flags & CLOUDABI_LOOKUP_SYMLINK_FOLLOW) ?
-	    0 : AT_SYMLINK_NOFOLLOW);
+	error = kern_utimensat(td, uap->fd.fd, PTR2CAP(path), UIO_SYSSPACE,
+	    __CAP_DECAY(ts), UIO_SYSSPACE,
+	    (uap->fd.flags & CLOUDABI_LOOKUP_SYMLINK_FOLLOW) ? 0 :
+	    AT_SYMLINK_NOFOLLOW);
 	cloudabi_freestr(path);
 	return (error);
 }

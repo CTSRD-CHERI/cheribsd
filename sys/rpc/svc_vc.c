@@ -218,7 +218,7 @@ svc_vc_create_conn(SVCPOOL *pool, struct socket *so, struct sockaddr *raddr)
 	opt.sopt_dir = SOPT_SET;
 	opt.sopt_level = SOL_SOCKET;
 	opt.sopt_name = SO_KEEPALIVE;
-	opt.sopt_val = &one;
+	opt.sopt_val = __CAP_ADDROF(one);
 	opt.sopt_valsize = sizeof(one);
 	error = sosetopt(so, &opt);
 	if (error) {
@@ -230,7 +230,7 @@ svc_vc_create_conn(SVCPOOL *pool, struct socket *so, struct sockaddr *raddr)
 		opt.sopt_dir = SOPT_SET;
 		opt.sopt_level = IPPROTO_TCP;
 		opt.sopt_name = TCP_NODELAY;
-		opt.sopt_val = &one;
+		opt.sopt_val = __CAP_ADDROF(one);
 		opt.sopt_valsize = sizeof(one);
 		error = sosetopt(so, &opt);
 		if (error) {

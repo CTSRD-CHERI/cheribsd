@@ -847,7 +847,7 @@ user_sendto(struct thread *td, int s, const char * __capability buf,
 
 	msg.msg_name = __DECONST_CAP(void * __capability, to);
 	msg.msg_namelen = tolen;
-	msg.msg_iov = &aiov;
+	msg.msg_iov = __CAP_ADDROF(aiov);
 	msg.msg_iovlen = 1;
 	msg.msg_control = 0;
 #ifdef COMPAT_OLDSOCK
@@ -1129,7 +1129,7 @@ kern_recvfrom(struct thread *td, int s, void * __capability buf, size_t len,
 		msg.msg_namelen = 0;
 	}
 	msg.msg_name = from;
-	msg.msg_iov = &aiov;
+	msg.msg_iov = __CAP_ADDROF(aiov);
 	msg.msg_iovlen = 1;
 	IOVEC_INIT_C(&aiov, buf, len);
 	msg.msg_control = 0;

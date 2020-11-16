@@ -3097,7 +3097,7 @@ getutimes(const struct timeval * __capability usrtvp, enum uio_seg tvpseg,
 		} else {
 			if ((error = copyin(usrtvp, tv, sizeof(tv))) != 0)
 				return (error);
-			tvp = tv;
+			tvp = __CAP_DECAY(tv);
 		}
 
 		if (tvp[0].tv_usec < 0 || tvp[0].tv_usec >= 1000000 ||

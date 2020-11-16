@@ -195,7 +195,7 @@ clnt_vc_create(
 		sopt.sopt_dir = SOPT_SET;
 		sopt.sopt_level = SOL_SOCKET;
 		sopt.sopt_name = SO_KEEPALIVE;
-		sopt.sopt_val = &one;
+		sopt.sopt_val = __CAP_ADDROF(one);
 		sopt.sopt_valsize = sizeof(one);
 		sosetopt(so, &sopt);
 	}
@@ -205,7 +205,7 @@ clnt_vc_create(
 		sopt.sopt_dir = SOPT_SET;
 		sopt.sopt_level = IPPROTO_TCP;
 		sopt.sopt_name = TCP_NODELAY;
-		sopt.sopt_val = &one;
+		sopt.sopt_val = __CAP_ADDROF(one);
 		sopt.sopt_valsize = sizeof(one);
 		sosetopt(so, &sopt);
 	}

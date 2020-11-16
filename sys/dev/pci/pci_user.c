@@ -645,7 +645,8 @@ pci_list_vpd(device_t dev, struct pci_list_vpd_io *lvio)
 	error = copyout(&vpd_element, vpd_user, sizeof(vpd_element));
 	if (error)
 		return (error);
-	error = copyout(vpd->vpd_ident, vpd_user->pve_data,
+	error = copyout(vpd->vpd_ident,
+	    __CAP_DECAY_LEN(vpd_user->pve_data, strlen(vpd->vpd_ident)),
 	    strlen(vpd->vpd_ident));
 	if (error)
 		return (error);
@@ -658,7 +659,8 @@ pci_list_vpd(device_t dev, struct pci_list_vpd_io *lvio)
 		error = copyout(&vpd_element, vpd_user, sizeof(vpd_element));
 		if (error)
 			return (error);
-		error = copyout(vpd->vpd_ros[i].value, vpd_user->pve_data,
+		error = copyout(vpd->vpd_ros[i].value,
+		    __CAP_DECAY_LEN(vpd_user->pve_data, vpd->vpd_ros[i].len),
 		    vpd->vpd_ros[i].len);
 		if (error)
 			return (error);
@@ -672,7 +674,8 @@ pci_list_vpd(device_t dev, struct pci_list_vpd_io *lvio)
 		error = copyout(&vpd_element, vpd_user, sizeof(vpd_element));
 		if (error)
 			return (error);
-		error = copyout(vpd->vpd_w[i].value, vpd_user->pve_data,
+		error = copyout(vpd->vpd_w[i].value,
+		    __CAP_DECAY_LEN(vpd_user->pve_data, vpd->vpd_w[i].len),
 		    vpd->vpd_w[i].len);
 		if (error)
 			return (error);

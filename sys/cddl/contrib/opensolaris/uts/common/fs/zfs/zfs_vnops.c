@@ -5585,7 +5585,7 @@ vop_getextattr {
 	}
 
 	flags = FREAD;
-	NDINIT_ATVP(&nd, LOOKUP, NOFOLLOW, UIO_SYSSPACE, attrname,
+	NDINIT_ATVP(&nd, LOOKUP, NOFOLLOW, UIO_SYSSPACE, __CAP_DECAY(attrname),
 	    xvp, td);
 	error = vn_open_cred(&nd, &flags, VN_OPEN_INVFS, 0, ap->a_cred, NULL);
 	vp = nd.ni_vp;
@@ -5653,8 +5653,8 @@ vop_deleteextattr {
 		return (error);
 	}
 
-	NDINIT_ATVP(&nd, DELETE, NOFOLLOW | LOCKPARENT | LOCKLEAF,
-	    UIO_SYSSPACE, attrname, xvp, td);
+	NDINIT_ATVP(&nd, DELETE, NOFOLLOW | LOCKPARENT | LOCKLEAF, UIO_SYSSPACE,
+	    __CAP_DECAY(attrname), xvp, td);
 	error = namei(&nd);
 	vp = nd.ni_vp;
 	if (error != 0) {
@@ -5722,7 +5722,7 @@ vop_setextattr {
 	}
 
 	flags = FFLAGS(O_WRONLY | O_CREAT);
-	NDINIT_ATVP(&nd, LOOKUP, NOFOLLOW, UIO_SYSSPACE, attrname,
+	NDINIT_ATVP(&nd, LOOKUP, NOFOLLOW, UIO_SYSSPACE, __CAP_DECAY(attrname),
 	    xvp, td);
 	error = vn_open_cred(&nd, &flags, 0600, VN_OPEN_INVFS, ap->a_cred,
 	    NULL);
@@ -5804,8 +5804,8 @@ vop_listextattr {
 		return (error);
 	}
 
-	NDINIT_ATVP(&nd, LOOKUP, NOFOLLOW | LOCKLEAF | LOCKSHARED,
-	    UIO_SYSSPACE, ".", xvp, td);
+	NDINIT_ATVP(&nd, LOOKUP, NOFOLLOW | LOCKLEAF | LOCKSHARED, UIO_SYSSPACE,
+	    __CAP_DECAY("."), xvp, td);
 	error = namei(&nd);
 	vp = nd.ni_vp;
 	NDFREE(&nd, NDF_ONLY_PNBUF);

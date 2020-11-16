@@ -985,7 +985,8 @@ smbfs_smb_search(struct smbfs_fctx *ctx)
 		mb_put_uint8(mbp, 0);	/* file name length */
 		mb_put_uint8(mbp, SMB_DT_VARIABLE);
 		mb_put_uint16le(mbp, SMB_SKEYLEN);
-		mb_put_mem(mbp, ctx->f_skey, SMB_SKEYLEN, MB_MSYSTEM);
+		mb_put_mem(mbp, __CAP_DECAY(ctx->f_skey), SMB_SKEYLEN,
+		    MB_MSYSTEM);
 	}
 	smb_rq_bend(rqp);
 	error = smb_rq_simple(rqp);
@@ -1060,7 +1061,7 @@ smbfs_findnextLM1(struct smbfs_fctx *ctx, int limit)
 	}
 	rqp = ctx->f_rq;
 	smb_rq_getreply(rqp, &mbp);
-	md_get_mem(mbp, ctx->f_skey, SMB_SKEYLEN, MB_MSYSTEM);
+	md_get_mem(mbp, __CAP_DECAY(ctx->f_skey), SMB_SKEYLEN, MB_MSYSTEM);
 	md_get_uint8(mbp, &battr);
 	md_get_uint16le(mbp, &time);
 	md_get_uint16le(mbp, &date);

@@ -238,6 +238,23 @@ void	kassert_panic(const char *fmt, ...)  __printflike(1, 2);
 #define	__USER_CAP_STR(strp)	__USER_CAP_UNBOUND(strp)
 #define	__USER_CAP_PATH(path)	__USER_CAP((path), MAXPATHLEN)
 
+/* TODO: Could use C11 _Generic to avoid two different macros? */
+#if __has_feature(capabilities) && !defined(__CHERI_PURE_CAPABILITY__)
+
+#define	__CAP_DECAY_LEN(var, len)						\
+	__builtin_cheri_bounds_set(						\
+	    (__cheri_tocap __typeof__((var)[0]) * __capability)/*decay*/ (var),	\
+	    len)
+#define	__CAP_DECAY(var) __CAP_DECAY_LEN(var, sizeof(var))
+#define	__CAP_ADDROF(var)							\
+	__builtin_cheri_bounds_set(						\
+	    (__cheri_tocap __typeof__(var) * __capability)&(var), sizeof(var))
+#else
+#define	__CAP_ADDROF(var) (&(var))
+#define	__CAP_DECAY_LEN(var, len) /* decay */ (var)
+#define	__CAP_DECAY(var) /* decay */ (var)
+#endif
+
 /*
  * Align variables.
  */

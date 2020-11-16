@@ -87,7 +87,7 @@ nb_setsockopt_int(struct socket *so, int level, int name, int val)
 	bzero(&sopt, sizeof(sopt));
 	sopt.sopt_level = level;
 	sopt.sopt_name = name;
-	sopt.sopt_val = &val;
+	sopt.sopt_val = __CAP_ADDROF(val);
 	sopt.sopt_valsize = sizeof(val);
 	CURVNET_SET(so->so_vnet);
 	error = sosetopt(so, &sopt);

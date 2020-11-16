@@ -201,7 +201,7 @@ __rpc_socket2sockinfo(struct socket *so, struct __rpc_sockinfo *sip)
 	opt.sopt_dir = SOPT_GET;
 	opt.sopt_level = SOL_SOCKET;
 	opt.sopt_name = SO_TYPE;
-	opt.sopt_val = &type;
+	opt.sopt_val = __CAP_ADDROF(type);
 	opt.sopt_valsize = sizeof type;
 	opt.sopt_td = NULL;
 	error = sogetopt(so, &opt);
@@ -834,7 +834,7 @@ bindresvport(struct socket *so, struct sockaddr *sa)
 		opt.sopt_dir = SOPT_GET;
 		opt.sopt_level = proto;
 		opt.sopt_name = portrange;
-		opt.sopt_val = &old;
+		opt.sopt_val = __CAP_ADDROF(old);
 		opt.sopt_valsize = sizeof(old);
 		error = sogetopt(so, &opt);
 		if (error) {
@@ -842,7 +842,8 @@ bindresvport(struct socket *so, struct sockaddr *sa)
 		}
 
 		opt.sopt_dir = SOPT_SET;
-		opt.sopt_val = &portlow;
+		opt.sopt_val = __CAP_ADDROF(portlow);
+		opt.sopt_valsize = sizeof(portlow);
 		error = sosetopt(so, &opt);
 		if (error)
 			goto out;
@@ -853,7 +854,8 @@ bindresvport(struct socket *so, struct sockaddr *sa)
 	if (*portp == 0) {
 		if (error) {
 			opt.sopt_dir = SOPT_SET;
-			opt.sopt_val = &old;
+			opt.sopt_val = __CAP_ADDROF(old);
+			opt.sopt_valsize = sizeof(old);
 			sosetopt(so, &opt);
 		}
 	}
