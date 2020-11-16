@@ -4632,7 +4632,7 @@ retrylookup:
 			*mp = NULL;
 			return (VM_PAGER_FAIL);
 		}
-	} else if ((allocflags & VM_ALLOC_NOCREAT) != 0) {
+	} else if ((allocflags & (VM_ALLOC_NOZERO | VM_ALLOC_NOCREAT)) != 0) {
 		*mp = NULL;
 		return (VM_PAGER_FAIL);
 	} else if ((m = vm_page_alloc(object, pindex, pflags)) == NULL) {

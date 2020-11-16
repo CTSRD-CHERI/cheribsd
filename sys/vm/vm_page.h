@@ -554,6 +554,7 @@ vm_page_t PHYS_TO_VM_PAGE(vm_paddr_t pa);
 #define VM_ALLOC_INTERRUPT	1
 #define VM_ALLOC_SYSTEM		2
 #define	VM_ALLOC_CLASS_MASK	3
+#define	VM_ALLOC_NOZERO		0x0004	/* (g) Don't load a zero page */
 #define	VM_ALLOC_WAITOK		0x0008	/* (acf) Sleep and retry */
 #define	VM_ALLOC_WAITFAIL	0x0010	/* (acf) Sleep and return error */
 #define	VM_ALLOC_WIRED		0x0020	/* (acfgp) Allocate a wired page */
