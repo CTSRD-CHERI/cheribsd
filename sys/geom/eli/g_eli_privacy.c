@@ -73,8 +73,7 @@ g_eli_bio_copyin(struct bio *bp, void *kaddr)
 	struct uio uio;
 	struct iovec iov[1];
 
-	iov[0].iov_base = kaddr;
-	iov[0].iov_len = bp->bio_length;
+	IOVEC_INIT(&iov[0], kaddr, bp->bio_length);
 	uio.uio_iov = iov;
 	uio.uio_iovcnt = 1;
 	uio.uio_offset = 0;
