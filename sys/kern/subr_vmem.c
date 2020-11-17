@@ -171,6 +171,9 @@ struct vmem {
 
 	/* quantum cache */
 	qcache_t		vm_qcache[VMEM_QCACHE_IDX_MAX];
+
+	/* arena flags */
+	int			vm_flags;
 };
 
 #define	BT_TYPE_SPAN		1	/* Allocated from importfn */
@@ -250,6 +253,38 @@ vmem_t *transient_arena = &transient_arena_storage;
 static struct vmem memguard_arena_storage;
 vmem_t *memguard_arena = &memguard_arena_storage;
 #endif
+
+static vmem_addr_t vmem_buildcap(vmem_t *vm, vmem_addr_t addr, vmem_size_t size)
+{
+#ifdef __CHERI_PURE_CAPABILITY__
+	if (vm->vm_flags & VMEM_CAPABILITY_ARENA) {
+		CHERI_ASSERT_VALID(addr);
+		addr = cheri_setboundsexact(addr, size);
+	}
+#endif
+	return (addr);
+}
+
+/*
+ * Round up allocation alignment for the given requested size, if needed.
+ */
+static vmem_size_t
+vmem_roundup_align(vmem_t *vm, vmem_size_t align, vmem_size_t size)
+{
+
+	/* XXX-AM: Double check, may be redundant to verify these */
+	MPASS((align & vm->vm_quantum_mask) == 0);
+	MPASS((align & (align - 1)) == 0);
+#ifdef __CHERI_PURE_CAPABILITY__
+	if ((vm->vm_flags & VMEM_CAPABILITY_ARENA) != 0 &&
+	    CHERI_REPRESENTABLE_ALIGNMENT(size) > align) {
+		MPASS((CHERI_REPRESENTABLE_ALIGNMENT(size) &
+		    vm->vm_quantum_mask) == 0);
+		align = CHERI_REPRESENTABLE_ALIGNMENT(size);
+	}
+#endif
+	return align;
+}
 
 /*
  * Fill the vmem's boundary tag cache.  We guarantee that boundary tag
@@ -877,8 +912,12 @@ vmem_import(vmem_t *vm, vmem_size_t size, vmem_size_t align, int flags)
 	vm->vm_nfreetags += BT_MAXALLOC;
 	if (error)
 		return (ENOMEM);
-	CHERI_ASSERT_VALID(addr);
-	CHERI_ASSERT_EXBOUNDS(addr, size);
+#ifdef __CHERI_PURE_CAPABILITY__
+	if (vm->vm_flags & VMEM_CAPABILITY_ARENA) {
+		CHERI_ASSERT_VALID(addr);
+		CHERI_ASSERT_EXBOUNDS(addr, size);
+	}
+#endif
 
 	vmem_add1(vm, addr, size, BT_TYPE_SPAN);
 
@@ -905,9 +944,8 @@ vmem_fit(const bt_t *bt, vmem_size_t size, vmem_size_t align,
 	/*
 	 * XXX assumption: vmem_addr_t and vmem_size_t are
 	 * unsigned integer of the same size.
-	 * XXX-AM: CHERI breaks the assumption!
+	 * CHERI breaks this assumption.
 	 */
-	CHERI_ASSERT_VALID(bt->bt_start);
 
 	start = bt->bt_start;
 	if (start < minaddr) {
@@ -917,15 +955,6 @@ vmem_fit(const bt_t *bt, vmem_size_t size, vmem_size_t align,
 	if (end > maxaddr)
 		end = maxaddr;
 
-	/*
-	 * XXX-AM: Do not require that minaddr and maxaddr are valid
-	 * capabilities because in some cases we allow the fit
-	 * to be anywhere in the address space, so we do not
-	 * want to force the caller to hold a capability for
-	 * the whole address space.
-	 */
-	CHERI_ASSERT_VALID(start);
-	CHERI_ASSERT_VALID(end);
 	if (start > end) 
 		return (ENOMEM);
 
@@ -1067,13 +1096,24 @@ vmem_try_release(vmem_t *vm, struct vmem_btag *bt, const bool remfree)
 }
 
 static int
-vmem_xalloc_nextfit(vmem_t *vm, const vmem_size_t size, vmem_size_t align,
+vmem_xalloc_nextfit(vmem_t *vm, vmem_size_t size, vmem_size_t align,
     const vmem_size_t phase, const vmem_size_t nocross, int flags,
     vmem_addr_t *addrp)
 {
 	struct vmem_btag *bt, *cursor, *next, *prev;
 	int error;
+	vmem_addr_t addr;
 
+#ifdef __CHERI_PURE_CAPABILITY__
+	/*
+	 * Size and alignment have not been rounded up yet,
+	 * we do not round up the size to quantum size here.
+	 */
+	if (vm->vm_flags & VMEM_CAPABILITY_ARENA) {
+		size = CHERI_REPRESENTABLE_LENGTH(size);
+		align = vmem_roundup_align(vm, align, size);
+	}
+#endif
 	error = ENOMEM;
 	VMEM_LOCK(vm);
 retry:
@@ -1093,8 +1133,8 @@ retry:
 			bt = TAILQ_FIRST(&vm->vm_seglist);
 		if (bt->bt_type == BT_TYPE_FREE && bt->bt_size >= size &&
 		    (error = vmem_fit(bt, size, align, phase, nocross,
-		    VMEM_ADDR_MIN, VMEM_ADDR_MAX, addrp)) == 0) {
-			vmem_clip(vm, bt, *addrp, size);
+		    VMEM_ADDR_MIN, VMEM_ADDR_MAX, &addr)) == 0) {
+			vmem_clip(vm, bt, addr, size);
 			break;
 		}
 	}
@@ -1118,8 +1158,8 @@ retry:
 		 */
 		if (error == ENOMEM && prev->bt_size >= size &&
 		    (error = vmem_fit(prev, size, align, phase, nocross,
-		    VMEM_ADDR_MIN, VMEM_ADDR_MAX, addrp)) == 0) {
-			vmem_clip(vm, prev, *addrp, size);
+		    VMEM_ADDR_MIN, VMEM_ADDR_MAX, &addr)) == 0) {
+			vmem_clip(vm, prev, addr, size);
 			bt = prev;
 		} else
 			(void)vmem_try_release(vm, prev, true);
@@ -1130,7 +1170,7 @@ retry:
 	 */
 	if (error == 0) {
 		TAILQ_REMOVE(&vm->vm_seglist, cursor, bt_seglist);
-		for (; bt != NULL && bt->bt_start < *addrp + size;
+		for (; bt != NULL && bt->bt_start < addr + size;
 		    bt = TAILQ_NEXT(bt, bt_seglist))
 			;
 		if (bt != NULL)
@@ -1146,9 +1186,7 @@ retry:
 	if (error == ENOMEM && vmem_try_fetch(vm, size, align, flags))
 		goto retry;
 
-	CHERI_ASSERT_VALID(*addrp);
-	*addrp = cheri_kern_setboundsexact(*addrp, size);
-
+	*addrp = vmem_buildcap(vm, addr, size);
 out:
 	VMEM_UNLOCK(vm);
 
@@ -1189,11 +1227,12 @@ vmem_set_reclaim(vmem_t *vm, vmem_reclaim_t *reclaimfn)
 }
 
 /*
- * vmem_init: Initializes vmem arena.
+ * _vmem_init: Initializes vmem arena.
  */
 vmem_t *
-vmem_init(vmem_t *vm, const char *name, vmem_addr_t base, vmem_size_t size,
-    vmem_size_t quantum, vmem_size_t qcache_max, int flags)
+_vmem_init(vmem_t *vm, const char *name, vmem_addr_t base, vmem_size_t size,
+    vmem_size_t quantum, vmem_size_t qcache_max, int flags,
+    int arena_flags)
 {
 	int i;
 
@@ -1213,6 +1252,7 @@ vmem_init(vmem_t *vm, const char *name, vmem_addr_t base, vmem_size_t size,
 	vm->vm_size = 0;
 	vm->vm_limit = 0;
 	vm->vm_inuse = 0;
+	vm->vm_flags = arena_flags;
 	qc_init(vm, qcache_max);
 
 	TAILQ_INIT(&vm->vm_seglist);
@@ -1242,11 +1282,12 @@ vmem_init(vmem_t *vm, const char *name, vmem_addr_t base, vmem_size_t size,
 }
 
 /*
- * vmem_create: create an arena.
+ * _vmem_create: create an arena.
  */
 vmem_t *
-vmem_create(const char *name, vmem_addr_t base, vmem_size_t size,
-    vmem_size_t quantum, vmem_size_t qcache_max, int flags)
+_vmem_create(const char *name, vmem_addr_t base, vmem_size_t size,
+    vmem_size_t quantum, vmem_size_t qcache_max, int flags,
+    int arena_flags)
 {
 
 	vmem_t *vm;
@@ -1254,8 +1295,8 @@ vmem_create(const char *name, vmem_addr_t base, vmem_size_t size,
 	vm = uma_zalloc(vmem_zone, flags & (M_WAITOK|M_NOWAIT));
 	if (vm == NULL)
 		return (NULL);
-	if (vmem_init(vm, name, base, size, quantum, qcache_max,
-	    flags) == NULL)
+	if (_vmem_init(vm, name, base, size, quantum, qcache_max, flags,
+	    arena_flags) == NULL)
 		return (NULL);
 	return (vm);
 }
@@ -1275,6 +1316,20 @@ vmem_size_t
 vmem_roundup_size(vmem_t *vm, vmem_size_t size)
 {
 
+#ifdef __CHERI_PURE_CAPABILITY__
+	if (vm->vm_flags & VMEM_CAPABILITY_ARENA) {
+		size = CHERI_REPRESENTABLE_LENGTH(size);
+		/* if quantum <= representable size, we are done */
+		if ((size & vm->vm_quantum_mask) == 0)
+			return (size);
+		/*
+		 * If quantum > representable size, the size will be
+		 * rounded to quantum size, which will be representable
+		 * with some suitable alignment of the base,
+		 * because it must be a power of 2.
+		 */
+	}
+#endif
 	return (size + vm->vm_quantum_mask) & ~vm->vm_quantum_mask;
 }
 
@@ -1295,6 +1350,7 @@ vmem_alloc(vmem_t *vm, vmem_size_t size, int flags, vmem_addr_t *addrp)
 {
 	const int strat __unused = flags & VMEM_FITMASK;
 	qcache_t *qc;
+	vmem_addr_t addr;
 
 	flags &= VMEM_FLAGS;
 	MPASS(size > 0);
@@ -1309,12 +1365,10 @@ vmem_alloc(vmem_t *vm, vmem_size_t size, int flags, vmem_addr_t *addrp)
 		 * to return 0.
 		 */
 		qc = &vm->vm_qcache[(size - 1) >> vm->vm_quantum_shift];
-		*addrp = (vmem_addr_t)uma_zalloc(qc->qc_cache,
+		addr = (vmem_addr_t)uma_zalloc(qc->qc_cache,
 		    (flags & ~M_WAITOK) | M_NOWAIT);
-		if (__predict_true(*addrp != 0)) {
-			CHERI_ASSERT_VALID(*addrp);
-			*addrp = cheri_kern_setboundsexact(*addrp, size);
-			CHERI_ASSERT_BOUNDS(*addrp, size);
+		if (__predict_true(addr != 0)) {
+			*addrp = vmem_buildcap(vm, *addrp, size);
 			return (0);
 		}
 	}
@@ -1341,18 +1395,14 @@ vmem_xalloc(vmem_t *vm, const vmem_size_t size0, vmem_size_t align,
     const vmem_addr_t minaddr, const vmem_addr_t maxaddr, int flags,
     vmem_addr_t *addrp)
 {
-#ifdef __CHERI_PURE_CAPABILITY__
-	const vmem_size_t size = vmem_roundup_size(vm,
-	    CHERI_REPRESENTABLE_LENGTH(size0));
-#else
 	const vmem_size_t size = vmem_roundup_size(vm, size0);
-#endif
 	struct vmem_freelist *list;
 	struct vmem_freelist *first;
 	struct vmem_freelist *end;
 	bt_t *bt;
 	int error;
 	int strat;
+	vmem_addr_t addr = 0;
 
 	flags &= VMEM_FLAGS;
 	strat = flags & VMEM_FITMASK;
@@ -1372,32 +1422,26 @@ vmem_xalloc(vmem_t *vm, const vmem_size_t size0, vmem_size_t align,
 	MPASS(minaddr <= maxaddr);
 	MPASS(!VMEM_CROSS_P(phase, phase + size - 1, nocross));
 
-	CHERI_ASSERT_PTRSIZE_BOUNDS(addrp);
+#ifdef __CHERI_PURE_CAPABILITY__
+	if (vm->vm_flags & VMEM_CAPABILITY_ARENA)
+		CHERI_ASSERT_PTRSIZE_BOUNDS(addrp);
+#endif
 
 	if (strat == M_NEXTFIT)
 		MPASS(minaddr == VMEM_ADDR_MIN && maxaddr == VMEM_ADDR_MAX);
 
 	if (align == 0)
 		align = vm->vm_quantum_mask + 1;
-#ifdef __CHERI_PURE_CAPABILITY__
-	if (CHERI_REPRESENTABLE_ALIGNMENT(size) > align)
-		align = vmem_roundup_size(vm,
-		    CHERI_REPRESENTABLE_ALIGNMENT(size));
-#endif
 	*addrp = 0;
 
 	/*
 	 * Next-fit allocations don't use the freelists.
 	 */
 	if (strat == M_NEXTFIT)
-#ifdef __CHERI_PURE_CAPABILITY__
-		return (vmem_xalloc_nextfit(vm, size, align, phase, nocross,
-		    flags, addrp));
-#else
 		return (vmem_xalloc_nextfit(vm, size0, align, phase, nocross,
 		    flags, addrp));
-#endif
 
+	align = vmem_roundup_align(vm, align, size);
 	end = &vm->vm_freelist[VMEM_MAXORDER];
 	/*
 	 * choose a free block from which we allocate.
@@ -1425,9 +1469,9 @@ vmem_xalloc(vmem_t *vm, const vmem_size_t size0, vmem_size_t align,
 			LIST_FOREACH(bt, list, bt_freelist) {
 				if (bt->bt_size >= size) {
 					error = vmem_fit(bt, size, align, phase,
-					    nocross, minaddr, maxaddr, addrp);
+					    nocross, minaddr, maxaddr, &addr);
 					if (error == 0) {
-						vmem_clip(vm, bt, *addrp, size);
+						vmem_clip(vm, bt, addr, size);
 						goto out;
 					}
 				}
@@ -1460,8 +1504,8 @@ out:
 	VMEM_UNLOCK(vm);
 	if (error != 0 && (flags & M_NOWAIT) == 0)
 		panic("failed to allocate waiting allocation\n");
-	CHERI_ASSERT_VALID(*addrp);
-	*addrp = cheri_kern_setboundsexact(*addrp, size);
+	if (error == 0)
+		*addrp = vmem_buildcap(vm, addr, size);
 
 	return (error);
 }
@@ -1474,7 +1518,16 @@ vmem_free(vmem_t *vm, vmem_addr_t addr, vmem_size_t size)
 {
 	qcache_t *qc;
 	MPASS(size > 0);
-	CHERI_ASSERT_VALID(addr);
+#ifdef __CHERI_PURE_CAPABILITY__
+	if (vm->vm_flags & VMEM_CAPABILITY_ARENA) {
+		/*
+		 * XXX-AM: These should be checks, not just assertions.
+		 * What do we do on failure? panic?
+		 */
+		CHERI_ASSERT_VALID(addr);
+		CHERI_ASSERT_UNSEALED(addr);
+	}
+#endif
 
 	if (size <= vm->vm_qcache_max &&
 	    __predict_true(addr >= VMEM_ADDR_QCACHE_MIN)) {
@@ -1491,12 +1544,22 @@ vmem_xfree(vmem_t *vm, vmem_addr_t addr, vmem_size_t size)
 	bt_t *t;
 
 	MPASS(size > 0);
-	CHERI_ASSERT_VALID(addr);
+#ifdef __CHERI_PURE_CAPABILITY__
+	if (vm->vm_flags & VMEM_CAPABILITY_ARENA) {
+		/*
+		 * XXX-AM: These should be checks, not just assertions.
+		 * What do we do on failure? panic?
+		 */
+		CHERI_ASSERT_VALID(addr);
+		CHERI_ASSERT_UNSEALED(addr);
+	}
+#endif
 
 	VMEM_LOCK(vm);
 	bt = bt_lookupbusy(vm, addr);
 	MPASS(bt != NULL);
 	MPASS(bt->bt_start == addr);
+	/* XXX-AM: may be invalid when representablility is enforced */
 	MPASS(bt->bt_size == vmem_roundup_size(vm, size) ||
 	    bt->bt_size - vmem_roundup_size(vm, size) <= vm->vm_quantum_mask);
 	MPASS(bt->bt_type == BT_TYPE_BUSY);
@@ -1536,8 +1599,13 @@ vmem_add(vmem_t *vm, vmem_addr_t addr, vmem_size_t size, int flags)
 {
 	int error;
 
-	CHERI_ASSERT_VALID(addr);
-	CHERI_ASSERT_EXBOUNDS(addr, size);
+#ifdef __CHERI_PURE_CAPABILITY__
+	if (vm->vm_flags & VMEM_CAPABILITY_ARENA) {
+		CHERI_ASSERT_VALID(addr);
+		CHERI_ASSERT_UNSEALED(addr);
+		CHERI_ASSERT_EXBOUNDS(addr, size);
+	}
+#endif
 
 	error = 0;
 	flags &= VMEM_FLAGS;

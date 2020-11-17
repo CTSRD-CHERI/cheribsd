@@ -226,7 +226,7 @@ again:
 	CHERI_ASSERT_EXBOUNDS(firstaddr, size);
 	kmi->buffer_sva = (vm_offset_t)firstaddr;
 	kmi->buffer_eva = kmi->buffer_sva + size;
-	vmem_init(buffer_arena, "buffer arena", firstaddr, size,
+	vmem_init_cap(buffer_arena, "buffer arena", firstaddr, size,
 	    PAGE_SIZE, (mp_ncpus > 4) ? BKVASIZE * 8 : 0, 0);
 
 	/*
@@ -241,7 +241,7 @@ again:
 		CHERI_ASSERT_EXBOUNDS(firstaddr, size);
 		kmi->transient_sva = (vm_offset_t)firstaddr;
 		kmi->transient_eva = kmi->transient_sva + size;
-		vmem_init(transient_arena, "transient arena",
+		vmem_init_cap(transient_arena, "transient arena",
 		    firstaddr, size, PAGE_SIZE, 0, 0);
 	}
 

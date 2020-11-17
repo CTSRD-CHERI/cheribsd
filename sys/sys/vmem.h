@@ -49,6 +49,9 @@ typedef int (vmem_import_t)(void *, vmem_size_t, int, vmem_addr_t *);
 typedef void (vmem_release_t)(void *, vmem_addr_t, vmem_size_t);
 typedef void (vmem_reclaim_t)(vmem_t *, int);
 
+/* vmem arena flags for vmem_create() and vmem_init() */
+#define	VMEM_CAPABILITY_ARENA	0x1	/* The arena allocates virtual memory */
+
 /*
  * Create a vmem:
  *	name		- Name of the region
@@ -59,11 +62,29 @@ typedef void (vmem_reclaim_t)(vmem_t *, int);
  *			  cache for each multiple of quantum up to qcache_max.
  *	flags		- M_* flags
  */
-vmem_t *vmem_create(const char *name, vmem_addr_t base,
-    vmem_size_t size, vmem_size_t quantum, vmem_size_t qcache_max, int flags);
-vmem_t *vmem_init(vmem_t *vm, const char *name, vmem_addr_t base,
-    vmem_size_t size, vmem_size_t quantum, vmem_size_t qcache_max, int flags);
+vmem_t *_vmem_create(const char *name, vmem_addr_t base,
+    vmem_size_t size, vmem_size_t quantum, vmem_size_t qcache_max, int flags,
+    int arena_flags);
+vmem_t *_vmem_init(vmem_t *vm, const char *name, vmem_addr_t base,
+    vmem_size_t size, vmem_size_t quantum, vmem_size_t qcache_max, int flags,
+    int arena_flags);
 void vmem_destroy(vmem_t *);
+
+/* Create arena that does not allocate virtual memory */
+#define	vmem_create(name, base, size, quantum, qcache_max, flags)	\
+	_vmem_create(name, base, size, quantum, qcache_max, flags, 0)
+/* Init arena that does not allocate virtual memory */
+#define	vmem_init(vm, name, base, size, quantum, qcache_max, flags)	\
+	_vmem_init(vm, name, base, size, quantum, qcache_max, flags, 0)
+
+/* Create arena that allocates virtual memory */
+#define	vmem_create_cap(name, base, size, quantum, qcache_max, flags)	\
+	_vmem_create(name, base, size, quantum, qcache_max, flags,	\
+	    VMEM_CAPABILITY_ARENA)
+/* Init arena that allocates virtual memory */
+#define	vmem_init_cap(vm, name, base, size, quantum, qcache_max, flags)	\
+	_vmem_init(vm, name, base, size, quantum, qcache_max, flags,	\
+	    VMEM_CAPABILITY_ARENA)
 
 /*
  * Set callbacks for bringing in dynamic regions:

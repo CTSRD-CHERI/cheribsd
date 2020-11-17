@@ -212,7 +212,7 @@ memguard_init(vmem_t *parent)
 	vmem_addr_t base;
 
 	vmem_alloc(parent, memguard_mapsize, M_BESTFIT | M_WAITOK, &base);
-	vmem_init(memguard_arena, "memguard arena", base, memguard_mapsize,
+	vmem_init_cap(memguard_arena, "memguard arena", base, memguard_mapsize,
 	    PAGE_SIZE, 0, M_WAITOK);
 	memguard_base = base;
 
