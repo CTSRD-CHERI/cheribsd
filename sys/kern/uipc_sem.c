@@ -464,7 +464,7 @@ static int
 ksem_create(struct thread *td, const char * __capability name,
     semid_t * __capability semidp, mode_t mode, unsigned int value, int flags)
 {
-	struct filedesc *fdp;
+	struct pwddesc *pdp;
 	struct ksem *ks;
 	struct file *fp;
 	char *path;
@@ -480,8 +480,8 @@ ksem_create(struct thread *td, const char * __capability name,
 	if (value > SEM_VALUE_MAX)
 		return (EINVAL);
 
-	fdp = td->td_proc->p_fd;
-	mode = (mode & ~fdp->fd_cmask) & ACCESSPERMS;
+	pdp = td->td_proc->p_pd;
+	mode = (mode & ~pdp->pd_cmask) & ACCESSPERMS;
 	error = falloc(td, &fp, &fd, O_CLOEXEC);
 	if (error) {
 		if (name == NULL)
