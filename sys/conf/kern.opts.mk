@@ -97,7 +97,7 @@ BROKEN_OPTIONS+=EFI
 .endif
 
 # Broken post OpenZFS import
-.if ${MACHINE_CPU:Mcheri}
+.if ${MACHINE_CPU:Mcheri} || ${.MAKE.OS} == "Linux"
 BROKEN_OPTIONS=CDDL ZFS
 .endif
 
