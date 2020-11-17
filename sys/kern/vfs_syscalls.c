@@ -1138,7 +1138,8 @@ kern_openat(struct thread *td, int fd, char const * __capability path,
     enum uio_seg pathseg, int flags, int mode)
 {
 	struct proc *p = td->td_proc;
-	struct filedesc *fdp = p->p_fd;
+	struct filedesc *fdp;
+	struct pwddesc *pdp;
 	struct file *fp;
 	struct vnode *vp;
 	struct nameidata nd;
@@ -1146,6 +1147,8 @@ kern_openat(struct thread *td, int fd, char const * __capability path,
 	int cmode, error, indx;
 
 	indx = -1;
+	fdp = p->p_fd;
+	pdp = p->p_pd;
 
 	AUDIT_ARG_FFLAGS(flags);
 	AUDIT_ARG_MODE(mode);
@@ -1177,7 +1180,7 @@ kern_openat(struct thread *td, int fd, char const * __capability path,
 	 */
 	/* Set the flags early so the finit in devfs can pick them up. */
 	fp->f_flag = flags & FMASK;
-	cmode = ((mode & ~fdp->fd_cmask) & ALLPERMS) & ~S_ISTXT;
+	cmode = ((mode & ~pdp->pd_cmask) & ALLPERMS) & ~S_ISTXT;
 	NDINIT_ATRIGHTS(&nd, LOOKUP, FOLLOW | AUDITVNODE1, pathseg, path, fd,
 	    &rights, td);
 	td->td_dupfd = -1;		/* XXX check for fdopen */
@@ -1379,7 +1382,7 @@ restart:
 	} else {
 		VATTR_NULL(&vattr);
 		vattr.va_mode = (mode & ALLPERMS) &
-		    ~td->td_proc->p_fd->fd_cmask;
+		    ~td->td_proc->p_pd->pd_cmask;
 		vattr.va_rdev = dev;
 		whiteout = 0;
 
@@ -1494,7 +1497,7 @@ restart:
 	}
 	VATTR_NULL(&vattr);
 	vattr.va_type = VFIFO;
-	vattr.va_mode = (mode & ALLPERMS) & ~td->td_proc->p_fd->fd_cmask;
+	vattr.va_mode = (mode & ALLPERMS) & ~td->td_proc->p_pd->pd_cmask;
 #ifdef MAC
 	error = mac_vnode_check_create(td->td_ucred, nd.ni_dvp, &nd.ni_cnd,
 	    &vattr);
@@ -1767,7 +1770,7 @@ restart:
 		goto restart;
 	}
 	VATTR_NULL(&vattr);
-	vattr.va_mode = ACCESSPERMS &~ td->td_proc->p_fd->fd_cmask;
+	vattr.va_mode = ACCESSPERMS &~ td->td_proc->p_pd->pd_cmask;
 #ifdef MAC
 	vattr.va_type = VLNK;
 	error = mac_vnode_check_create(td->td_ucred, nd.ni_dvp, &nd.ni_cnd,
@@ -3862,7 +3865,7 @@ restart:
 	}
 	VATTR_NULL(&vattr);
 	vattr.va_type = VDIR;
-	vattr.va_mode = (mode & ACCESSPERMS) &~ td->td_proc->p_fd->fd_cmask;
+	vattr.va_mode = (mode & ACCESSPERMS) &~ td->td_proc->p_pd->pd_cmask;
 #ifdef MAC
 	error = mac_vnode_check_create(td->td_ucred, nd.ni_dvp, &nd.ni_cnd,
 	    &vattr);
@@ -4275,13 +4278,13 @@ struct umask_args {
 int
 sys_umask(struct thread *td, struct umask_args *uap)
 {
-	struct filedesc *fdp;
+	struct pwddesc *pdp;
 
-	fdp = td->td_proc->p_fd;
-	FILEDESC_XLOCK(fdp);
-	td->td_retval[0] = fdp->fd_cmask;
-	fdp->fd_cmask = uap->newmask & ALLPERMS;
-	FILEDESC_XUNLOCK(fdp);
+	pdp = td->td_proc->p_pd;
+	PWDDESC_XLOCK(pdp);
+	td->td_retval[0] = pdp->pd_cmask;
+	pdp->pd_cmask = uap->newmask & ALLPERMS;
+	PWDDESC_XUNLOCK(pdp);
 	return (0);
 }
 
