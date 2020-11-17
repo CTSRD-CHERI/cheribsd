@@ -4408,10 +4408,10 @@ __umtx_op_sem2_wait_compat32(struct thread *td, struct _umtx_op_args *uap)
 static int
 __umtx_op_nwake_private32(struct thread *td, struct _umtx_op_args *uap)
 {
-	uint32_t uaddrs[BATCH_SIZE], **upp;
+	uint32_t uaddrs[BATCH_SIZE], *upp;
 	int count, error, i, pos, tocopy;
 
-	upp = (uint32_t **)uap->obj;
+	upp = (uint32_t *)uap->obj;
 	error = 0;
 	for (count = uap->val, pos = 0; count > 0; count -= tocopy,
 	    pos += tocopy) {
@@ -4421,7 +4421,7 @@ __umtx_op_nwake_private32(struct thread *td, struct _umtx_op_args *uap)
 			break;
 		for (i = 0; i < tocopy; ++i)
 			kern_umtx_wake(td,
-			    __USER_CAP((void *)(intptr_t)uaddrs[i],
+			    __USER_CAP((void *)(uintptr_t)uaddrs[i],
 			    sizeof(struct umutex)), INT_MAX, 1);
 		maybe_yield();
 	}
