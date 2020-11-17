@@ -4389,7 +4389,7 @@ sys_lgetfh(struct thread *td, struct lgetfh_args *uap)
 {
 
 	return (kern_getfhat(td, AT_SYMLINK_NOFOLLOW, AT_FDCWD, uap->fname,
-	    UIO_USERSPACE, uap->fhp));
+	    UIO_USERSPACE, uap->fhp, UIO_USERSPACE));
 }
 
 #ifndef _SYS_SYSPROTO_H_
@@ -4403,7 +4403,7 @@ sys_getfh(struct thread *td, struct getfh_args *uap)
 {
 
 	return (kern_getfhat(td, 0, AT_FDCWD, uap->fname, UIO_USERSPACE,
-	    uap->fhp));
+	    uap->fhp, UIO_USERSPACE));
 }
 
 /*
@@ -4428,14 +4428,14 @@ sys_getfhat(struct thread *td, struct getfhat_args *uap)
 	if ((uap->flags & ~(AT_SYMLINK_NOFOLLOW | AT_BENEATH |
 	    AT_RESOLVE_BENEATH)) != 0)
 		return (EINVAL);
-	return (kern_getfhat(td, uap->flags, uap->fd, uap->path, UIO_SYSSPACE,
-	    uap->fhp));
+	return (kern_getfhat(td, uap->flags, uap->fd, uap->path, UIO_USERSPACE,
+	    uap->fhp, UIO_USERSPACE));
 }
 
 int
 kern_getfhat(struct thread *td, int flags, int fd,
     const char * __capability path, enum uio_seg pathseg,
-    fhandle_t * __capability fhp)
+    fhandle_t * __capability fhp, enum uio_seg fhseg)
 {
 	struct nameidata nd;
 	fhandle_t fh;
@@ -4457,8 +4457,13 @@ kern_getfhat(struct thread *td, int flags, int fd,
 	fh.fh_fsid = vp->v_mount->mnt_stat.f_fsid;
 	error = VOP_VPTOFH(vp, &fh.fh_fid);
 	vput(vp);
-	if (error == 0)
-		error = copyout(&fh, fhp, sizeof (fh));
+	if (error == 0) {
+		if (fhseg == UIO_USERSPACE)
+			error = copyout(&fh, fhp, sizeof (fh));
+		else
+			memcpy((__cheri_fromcap fhandle_t *)fhp, &fh,
+			    sizeof(fh));
+	}
 	return (error);
 }
 
@@ -4576,7 +4581,6 @@ struct fhopen_args {
 int
 sys_fhopen(struct thread *td, struct fhopen_args *uap)
 {
-
 	return (kern_fhopen(td, uap->u_fhp, uap->flags));
 }
 

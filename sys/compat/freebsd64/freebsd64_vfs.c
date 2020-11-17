@@ -1271,7 +1271,7 @@ freebsd64_lgetfh(struct thread *td, struct freebsd64_lgetfh_args *uap)
 
 	return (kern_getfhat(td, AT_SYMLINK_NOFOLLOW, AT_FDCWD,
 	    __USER_CAP_STR(uap->fname), UIO_USERSPACE,
-	    __USER_CAP_OBJ(uap->fhp)));
+	    __USER_CAP_OBJ(uap->fhp), UIO_USERSPACE));
 }
 
 int
@@ -1280,7 +1280,7 @@ freebsd64_getfh(struct thread *td, struct freebsd64_getfh_args *uap)
 
 	return (kern_getfhat(td, AT_SYMLINK_NOFOLLOW, AT_FDCWD,
 	    __USER_CAP_STR(uap->fname), UIO_USERSPACE,
-	    __USER_CAP_OBJ(uap->fhp)));
+	    __USER_CAP_OBJ(uap->fhp), UIO_USERSPACE));
 }
 
 int
@@ -1291,7 +1291,7 @@ freebsd64_getfhat(struct thread *td, struct freebsd64_getfhat_args *uap)
 		return (EINVAL);
 	return (kern_getfhat(td, uap->flags, uap->fd,
 	    __USER_CAP_STR(uap->path), UIO_SYSSPACE,
-	    __USER_CAP_OBJ(uap->fhp)));
+	    __USER_CAP_OBJ(uap->fhp), UIO_USERSPACE));
 }
 
 int
