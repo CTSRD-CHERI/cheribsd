@@ -370,7 +370,7 @@ BROKEN_OPTIONS+=GOOGLETEST SSP
 BROKEN_OPTIONS+=NS_CACHING
 .endif
 
-.if ${__C} == "cheri" || ${__T:Mmips64*c*} || ${__T:Mriscv*c*} || ${.MAKE.OS} != "Linux"
+.if ${__C} == "cheri" || ${__T:Mmips64*c*} || ${__T:Mriscv*c*} || ${.MAKE.OS} == "Linux"
 # Broken post OpenZFS import
 BROKEN_OPTIONS+=CDDL ZFS
 .endif
