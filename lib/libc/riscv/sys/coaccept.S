@@ -32,6 +32,9 @@
 __FBSDID("$FreeBSD$");
 #include "SYS.h"
 
-ENTRY(_coaccept)
-	unimp
-END(_coaccept)
+ENTRY(coaccept)
+	cspecialr ct0, pcc
+	cincoffsetimm ct0, ct0, 8
+	cinvoke ca0, ca1
+	cjr cra
+END(coaccept)

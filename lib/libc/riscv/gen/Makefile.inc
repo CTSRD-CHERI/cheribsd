@@ -11,9 +11,3 @@ SRCS+=	_ctx_start.S \
 	setjmp.S \
 	sigsetjmp.S \
 	trivial-getcontextx.c
-
-# XXX: The reason those two are here and not in lib/libc/sys/Makefile.inc
-#      is that it fails to link (missing _setjmp and _longjmp) otherwise.
-.if ${MK_CHERI} == "yes"
-SRCS+=	coaccept.c cocall.c
-.endif

@@ -3,9 +3,8 @@
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
- * Cambridge Computer Laboratory (Department of Computer Science and
- * Technology) under DARPA contract HR0011-18-C-0016 ("ECATS"), as part of the
- * DARPA SSITH research programme.
+ * Cambridge Computer Laboratory under DARPA/AFRL contract (FA8750-10-C-0237)
+ * ("CTSRD"), as part of the DARPA CRASH research programme.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -29,28 +28,13 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
+#include <machine/asm.h>
 __FBSDID("$FreeBSD$");
+#include "SYS.h"
 
-#include <setjmp.h>
-#include <unistd.h>
-
-int	_cocall(void * __capability, void * __capability, void * __capability,
-	    void * __capability, size_t);
-
-int
-cocall(void * __capability code, void * __capability data, void * __capability target,
-    void * __capability buf, size_t len)
-{
-	jmp_buf env;
-	int error, returning;
-
-	returning = _setjmp(env);
-	if (returning) {
-		return (error);
-	} else {
-		error = _cocall(code, data, target, buf, len);
-		_longjmp(env, 1);
-		/* NOTREACHED */
-	}
-}
+ENTRY(cocall)
+	cspecialr ct0, pcc
+	cincoffsetimm ct0, ct0, 8
+	cinvoke ca0, ca1
+	cjr cra
+END(cocall)
