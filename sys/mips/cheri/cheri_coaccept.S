@@ -90,7 +90,14 @@
 			 1 << 15 /* $c15 */)
 
 #define	CCLEARHI_BITS	(1 << 0  /* $c16 */ | \
-			 /* $c17-$c24 are loaded from the caller's context */ \
+			 /* $c17 is loaded from the caller's context */ \
+			 1 << 2  /* $c18 */ | \
+			 1 << 3  /* $c19 */ | \
+			 1 << 4  /* $c20 */ | \
+			 1 << 5  /* $c21 */ | \
+			 1 << 6  /* $c22 */ | \
+			 1 << 7  /* $c23 */ | \
+			 1 << 8  /* $c24 */ | \
 			 1 << 9  /* $c25 */ | \
 			 1 << 10 /* $c26 */)
 			 /* $c27-$c33 are reserved for the kernel */
@@ -101,13 +108,9 @@
  * on the cocall(2) side.  We - the thread calling into coaccept(2) - are
  * called the callee here.
  *
- * Register usage:
- *
- * Do not touch: a0-a7, c3-c10
- *
- * Save before calling the calee, and restore afterwards: s0-s7, gp, sp, s8
- *
- * Zero before calling the callee: at, v0, v1, t4-t7, s0-s7, t8, t9, gp, sp, s8, ra, hi, lo
+ * Register usage: we save and restore c11 (stack) and c17 (ra).
+ * The rest gets zeroed; the libc wrappers are responsible for saving
+ * and restoring the neccessary context.
  *
  * Note that this code executes while ignoring all the signals - a trapping
  * instruction will just get skipped over.
@@ -138,13 +141,6 @@ _C_LABEL(switcher_coaccept):
 	 */
 	csc	$c11, zero, 1*CHERICAP_SIZE+4*CHERICAP_SIZE+256($idc)
 	csc	$c17, zero, 2*CHERICAP_SIZE+4*CHERICAP_SIZE+256($idc)
-	csc	$c18, zero, 3*CHERICAP_SIZE+4*CHERICAP_SIZE+256($idc)
-	csc	$c19, zero, 4*CHERICAP_SIZE+4*CHERICAP_SIZE+256($idc)
-	csc	$c20, zero, 5*CHERICAP_SIZE+4*CHERICAP_SIZE+256($idc)
-	csc	$c21, zero, 6*CHERICAP_SIZE+4*CHERICAP_SIZE+256($idc)
-	csc	$c22, zero, 7*CHERICAP_SIZE+4*CHERICAP_SIZE+256($idc)
-	csc	$c23, zero, 8*CHERICAP_SIZE+4*CHERICAP_SIZE+256($idc)
-	csc	$c24, zero, 9*CHERICAP_SIZE+4*CHERICAP_SIZE+256($idc)
 
 	/*
 	 * Save the data transfer args.
@@ -198,13 +194,6 @@ _C_LABEL(switcher_coaccept):
 	 */
 	clc	$c11, zero, 1*CHERICAP_SIZE+4*CHERICAP_SIZE+256($c25)
 	clc	$c17, zero, 2*CHERICAP_SIZE+4*CHERICAP_SIZE+256($c25)
-	clc	$c18, zero, 3*CHERICAP_SIZE+4*CHERICAP_SIZE+256($c25)
-	clc	$c19, zero, 4*CHERICAP_SIZE+4*CHERICAP_SIZE+256($c25)
-	clc	$c20, zero, 5*CHERICAP_SIZE+4*CHERICAP_SIZE+256($c25)
-	clc	$c21, zero, 6*CHERICAP_SIZE+4*CHERICAP_SIZE+256($c25)
-	clc	$c22, zero, 7*CHERICAP_SIZE+4*CHERICAP_SIZE+256($c25)
-	clc	$c23, zero, 8*CHERICAP_SIZE+4*CHERICAP_SIZE+256($c25)
-	clc	$c24, zero, 9*CHERICAP_SIZE+4*CHERICAP_SIZE+256($c25)
 
 	clc	$c13, zero, 11*CHERICAP_SIZE+4*CHERICAP_SIZE+256($c25)
 
