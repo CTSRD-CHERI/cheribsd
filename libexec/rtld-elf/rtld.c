@@ -3245,11 +3245,7 @@ objlist_call_init(Objlist *list, RtldLockState *lockstate)
 	        (void *)(uintptr_t)elm->obj->init_ptr);
 	    LD_UTRACE(UTRACE_INIT_CALL, elm->obj, (void *)(intptr_t)elm->obj->init_ptr,
 	        0, 0, elm->obj->path);
-	    /*
-	     * Note: GLibc passes argc, argv and envv to _init. Should we also
-	     * do this here for compatibility?
-	     */
-	    call_initfini_pointer(elm->obj, elm->obj->init_ptr);
+	    call_init_pointer(elm->obj, elm->obj->init_ptr);
 	}
 	init_addr = elm->obj->init_array_ptr;
 	if (init_addr != NULL) {
