@@ -148,10 +148,16 @@ cheri_is_subset(const void * __capability parent, const void * __capability ptr)
 
 #ifdef __CHERI_PURE_CAPABILITY__
 
-/* Check that a capability is dereferenceable */
+/* Check that a capability is tagged */
 #define	CHERI_ASSERT_VALID(ptr)						\
-	KASSERT(cheri_gettag((void * __capability)(ptr)),		\
+	KASSERT(cheri_gettag(ptr),					\
 	    ("Expect valid capability %s %s:%d", __func__,		\
+	        __FILE__, __LINE__))
+
+/* Check that a capability is not sealed */
+#define	CHERI_ASSERT_UNSEALED(ptr)					\
+	KASSERT(!cheri_getsealed(ptr),					\
+	    ("Expect unsealed capability %s %s:%d", __func__,		\
 	        __FILE__, __LINE__))
 
 /*
@@ -159,27 +165,28 @@ cheri_is_subset(const void * __capability parent, const void * __capability ptr)
  * representable size
  */
 #define	CHERI_ASSERT_BOUNDS(ptr, expect) do {				\
-		KASSERT(cheri_getlen((void * __capability)ptr) <=	\
+		KASSERT(cheri_getlen(ptr) <=				\
 		    CHERI_REPRESENTABLE_LENGTH(expect),			\
 		    ("Invalid bounds on pointer in %s %s:%d "		\
-			 "expected %lx, found %lx",			\
+			 "expected %zx, found %zx",			\
 			__func__, __FILE__, __LINE__,			\
-			(u_long)expect,					\
-			(u_long)cheri_getlen((void * __capability)ptr))); \
+			(size_t)expect,					\
+			(size_t)cheri_getlen(ptr)));			\
 	} while (0)
 
 /* Check that bounds are exactly the given size */
 #define	CHERI_ASSERT_EXBOUNDS(ptr, len) do {				\
-		KASSERT(cheri_getlen((void * __capability)ptr) == len,	\
+		KASSERT(cheri_getlen(ptr) == len,			\
 		    ("Inexact bounds on pointer in %s %s:%d "		\
-			"expected %lx, found %lx",			\
+			"expected %zx, found %zx",			\
 			__func__, __FILE__, __LINE__,			\
-			(u_long)len,					\
-			cheri_getlen((void * __capability)ptr)));	\
+			(size_t)len,					\
+			(size_t)cheri_getlen(ptr)));			\
 	} while (0)
 
 #else /* !__CHERI_PURE_CAPABILITY__ */
 #define	CHERI_ASSERT_VALID(ptr)
+#define	CHERI_ASSERT_UNSEALED(ptr)
 #define	CHERI_ASSERT_BOUNDS(ptr, expect)
 #define	CHERI_ASSERT_EXBOUNDS(ptr, expect)
 #endif /* !__CHERI_PURE_CAPABILITY__ */
