@@ -55,6 +55,7 @@ __FBSDID("$FreeBSD$");
 
 #ifdef DDB
 #include <ddb/ddb.h>
+#include <sys/kdb.h>
 #endif
 
 extern void * __capability	userspace_cap;
@@ -74,6 +75,12 @@ struct mtx		switcher_lock;
 static int colocation_debug;
 SYSCTL_INT(_debug, OID_AUTO, colocation_debug, CTLFLAG_RWTUN,
     &colocation_debug, 0, "Enable process colocation debugging");
+
+#ifdef DDB
+static int kdb_on_switcher_trap;
+SYSCTL_INT(_debug, OID_AUTO, kdb_on_switcher_trap, CTLFLAG_RWTUN,
+    &kdb_on_switcher_trap, 0, "Enter ddb(4) on switcher traps");
+#endif
 
 #define	COLOCATION_DEBUG(X, ...)					\
 	do {								\
@@ -389,11 +396,17 @@ colocation_trap_in_switcher(struct thread *td, struct trapframe *trapframe)
 	addr = (__cheri_addr vaddr_t)trapframe->pc;
 
 	if (addr >= sv->sv_cocall_base && addr < sv->sv_cocall_base + sv->sv_cocall_len)
-		return (true);
+		goto trap;
 	if (addr >= sv->sv_coaccept_base && addr < sv->sv_coaccept_base + sv->sv_coaccept_len)
-		return (true);
+		goto trap;
 #endif
 	return (false);
+trap:
+#ifdef DDB
+	if (kdb_on_switcher_trap)
+		kdb_enter(KDB_WHY_CHERI, "switcher trap");
+#endif
+	return (true);
 }
 
 void
