@@ -176,8 +176,10 @@ _C_LABEL(switcher_cocall):
 	 * stripped off) where the callee wants it.
 	 */
 	clc	$c24, zero, SCB_COOKIEP($c25)
+	cbez	$c24, 2f
 	ccleartag	$c4, $c4
 	csc	$c4, zero, SCB_PEER_SCB($c24)
+2:
 
 	/*
 	 * Restore callee's TLS pointer.
@@ -201,15 +203,15 @@ _C_LABEL(switcher_cocall):
 	 * Compare buffer sizes, put the smaller one into t0.
 	 */
 	dsub	t8, a0, t0
-	bgez	t8, 2f
+	bgez	t8, 3f
 	nop
 	daddiu	t0, a0, 0
 
-2:
+3:
 	daddi	t0, -8
 	cld	t1, t0, 0($c6)
 	csd	t1, t0, 0($c7)
-	bgtz	t0, 2b
+	bgtz	t0, 3b
 	nop
 
 	clearlo		CLEARLO_BITS
