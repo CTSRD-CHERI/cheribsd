@@ -1015,9 +1015,10 @@ dofault:
 			 * XXXDTRACE: add dtrace_doubletrap_func here?
 			 */
 #ifdef VMFAULT_TRACE
-			printf("vm_fault(%p (pmap %p), %p (%p), %x, %d) -> %x at pc %p\n",
-			    map, &vm->vm_pmap, (void *)va, (void *)(intptr_t)trapframe->badvaddr,
-			    ftype, VM_FAULT_NORMAL, rv, (void *)(intptr_t)trapframe->pc);
+			printf("vm_fault(%p (pmap %p), %p (%lx), %x, %d) -> %x at pc %p\n",
+			    map, &vm->vm_pmap, (void *)va, trapframe->badvaddr,
+			    ftype, VM_FAULT_NORMAL, rv,
+			    (__cheri_fromcap void *)trapframe->pc);
 #endif
 
 			if (rv == KERN_SUCCESS) {
