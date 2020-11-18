@@ -952,8 +952,6 @@ db_print_scb_td(struct thread *td)
 	struct switchercb scb;
 	bool have_scb;
 
-	db_printf(" switcher control block: %p\n", (void *)td->td_md.md_scb);
-
 	have_scb = colocation_fetch_scb(td, &scb);
 	if (!have_scb)
 		return;
@@ -964,7 +962,10 @@ db_print_scb_td(struct thread *td)
 DB_SHOW_COMMAND(scb, db_show_scb)
 {
 	struct switchercb scb;
+	struct proc *p;
+	struct thread *td, *borrowertd;
 	int error;
+	bool have_scb;
 
 	if (have_addr) {
 		error = copyincap(___USER_CFROMPTR((const void *)addr, userspace_cap),
@@ -975,7 +976,45 @@ DB_SHOW_COMMAND(scb, db_show_scb)
 		}
 		db_print_scb(&scb);
 	} else {
+		td = curthread;
+		p = td->td_proc;
+		have_scb = colocation_fetch_scb(td, &scb);
+		if (!have_scb) {
+			db_printf("    no scb\n");
+			return;
+		}
+		db_printf(" switcher control block %p for thread %p, pid %d (%s):\n",
+		    (void *)td->td_md.md_scb, td, p->p_pid, p->p_comm);
 		db_print_scb_td(curthread);
+
+		borrowertd = scb.scb_borrower_td;
+
+		if ((__cheri_fromcap void *)scb.scb_peer_scb == NULL) {
+			if (borrowertd != NULL) {
+				td = borrowertd;
+				p = td->td_proc;
+				db_printf(" NULL scb_peer_scb; switcher control block %p for borrower thread %p, pid %d (%s):\n",
+				    (void *)td->td_md.md_scb, td, p->p_pid, p->p_comm);
+				db_print_scb_td(td);
+			} else {
+				db_printf(" NULL scb_peer_scb\n");
+			}
+		} else  {
+			have_scb = colocation_fetch_peer_scb(td, &scb);
+			if (!have_scb) {
+				db_printf("    no peer scb?!\n");
+			} else {
+				if (borrowertd == NULL) {
+					db_printf("    NULL td_borrow_td; peer switcher control block:\n");
+				} else {
+					td = borrowertd;
+					p = td->td_proc;
+					db_printf(" switcher control block %p for peer thread %p, pid %d (%s):\n",
+					    (void *)td->td_md.md_scb, td, p->p_pid, p->p_comm);
+				}
+				db_print_scb(&scb);
+			}
+		}
 	}
 }
 #endif /* DDB */
