@@ -230,93 +230,39 @@ void
 cheri_log_exception_registers(struct trapframe *frame)
 {
 
-	cheri_log_cheri_frame(frame);
-}
-
-static inline void
-cheri_cap_print(void* __capability cap)
-{
-
-	printf(_CHERI_PRINTF_CAP_FMT "\n", _CHERI_PRINTF_CAP_ARG(cap));
-}
-
-#define	CHERI_REG_PRINT(cap, num) do {					\
-	printf("$c%02u: ", num);					\
-	cheri_cap_print(cap);						\
-} while (0)
-
-void
-cheri_log_cheri_frame(struct trapframe *frame)
-{
-
-	/* C0 - $ddc */
-	printf("$ddc: ");
-	cheri_cap_print(frame->ddc);
-	/* C1 */
-	CHERI_REG_PRINT(frame->c1, 1);
-	/* C2 */
-	CHERI_REG_PRINT(frame->c2, 2);
-	/* C3 */
-	CHERI_REG_PRINT(frame->c3, 3);
-	/* C4 */
-	CHERI_REG_PRINT(frame->c4, 4);
-	/* C5 */
-	CHERI_REG_PRINT(frame->c5, 5);
-	/* C6 */
-	CHERI_REG_PRINT(frame->c6, 6);
-	/* C7 */
-	CHERI_REG_PRINT(frame->c7, 7);
-	/* C8 */
-	CHERI_REG_PRINT(frame->c8, 8);
-	/* C9 */
-	CHERI_REG_PRINT(frame->c9, 9);
-	/* C10 */
-	CHERI_REG_PRINT(frame->c10, 10);
-	/* C11 */
-	CHERI_REG_PRINT(frame->csp, 11);
-	/* C12 */
-	CHERI_REG_PRINT(frame->c12, 12);
-	/* C13 */
-	CHERI_REG_PRINT(frame->c13, 13);
-	/* C14 */
-	CHERI_REG_PRINT(frame->c14, 14);
-	/* C15 */
-	CHERI_REG_PRINT(frame->c15, 15);
-	/* C16 */
-	CHERI_REG_PRINT(frame->c16, 16);
-	/* C17 */
-	CHERI_REG_PRINT(frame->c17, 17);
-	/* C18 */
-	CHERI_REG_PRINT(frame->c18, 18);
-	/* C19 */
-	CHERI_REG_PRINT(frame->c19, 19);
-	/* C20 */
-	CHERI_REG_PRINT(frame->c20, 20);
-	/* C21 */
-	CHERI_REG_PRINT(frame->c21, 21);
-	/* C22 */
-	CHERI_REG_PRINT(frame->c22, 22);
-	/* C23 */
-	CHERI_REG_PRINT(frame->c23, 23);
-	/* C24 */
-	CHERI_REG_PRINT(frame->c24, 24);
-	/* C25 */
-	CHERI_REG_PRINT(frame->c25, 25);
-	/* C26 - $idc / $cgp */
-	CHERI_REG_PRINT(frame->idc, 26);
-	/* C27 */
-	CHERI_REG_PRINT(frame->c27, 27);
-	/* C28 */
-	CHERI_REG_PRINT(frame->c28, 28);
-	/* C29 */
-	CHERI_REG_PRINT(frame->c29, 29);
-	/* C30 */
-	CHERI_REG_PRINT(frame->c30, 30);
-	/* C31 */
-	CHERI_REG_PRINT(frame->c31, 31);
-	/* saved $pcc */
-	printf("$pcc: ");
-	cheri_cap_print(frame->pcc);
+	printf("$ddc: %#.16lp\n", frame->ddc);
+	printf("$c01: %#.16lp\n", frame->c1);
+	printf("$c02: %#.16lp\n", frame->c2);
+	printf("$c03: %#.16lp\n", frame->c3);
+	printf("$c04: %#.16lp\n", frame->c4);
+	printf("$c05: %#.16lp\n", frame->c5);
+	printf("$c06: %#.16lp\n", frame->c6);
+	printf("$c07: %#.16lp\n", frame->c7);
+	printf("$c08: %#.16lp\n", frame->c8);
+	printf("$c09: %#.16lp\n", frame->c9);
+	printf("$c10: %#.16lp\n", frame->c10);
+	printf("$c11: %#.16lp\n", frame->csp);
+	printf("$c12: %#.16lp\n", frame->c12);
+	printf("$c13: %#.16lp\n", frame->c13);
+	printf("$c14: %#.16lp\n", frame->c14);
+	printf("$c15: %#.16lp\n", frame->c15);
+	printf("$c16: %#.16lp\n", frame->c16);
+	printf("$c17: %#.16lp\n", frame->c17);
+	printf("$c18: %#.16lp\n", frame->c18);
+	printf("$c19: %#.16lp\n", frame->c19);
+	printf("$c20: %#.16lp\n", frame->c20);
+	printf("$c21: %#.16lp\n", frame->c21);
+	printf("$c22: %#.16lp\n", frame->c22);
+	printf("$c23: %#.16lp\n", frame->c23);
+	printf("$c24: %#.16lp\n", frame->c24);
+	printf("$c25: %#.16lp\n", frame->c25);
+	printf("$c26: %#.16lp\n", frame->idc);
+	printf("$c27: %#.16lp\n", frame->c27);
+	printf("$c28: %#.16lp\n", frame->c28);
+	printf("$c29: %#.16lp\n", frame->c29);
+	printf("$c30: %#.16lp\n", frame->c30);
+	printf("$c31: %#.16lp\n", frame->c31);
+	printf("$pcc: %#.16lp\n", frame->pcc);
 }
 
 void

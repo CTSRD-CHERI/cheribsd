@@ -30,10 +30,17 @@ CFLAGS+=	-DLUA_PROGNAME="\"${PROG}\""
 CFLAGS+=	-DLUA_USE_READLINE
 CFLAGS+=	-I${SRCTOP}/lib/libedit -I${SRCTOP}/contrib/libedit
 LIBADD+=	edit
+LDFLAGS+=	-Wl,-E
 .else
 # Work around Linux glibc+ld.bfd --fatal-warnings error:
 # the use of `tmpnam' is dangerous, better use `mkstemp'
 LD_FATAL_WARNINGS=no
 .endif
+
+UCLSRC?=	${SRCTOP}/contrib/libucl
+.PATH: ${UCLSRC}/lua
+SRCS+=	lua_ucl.c
+CFLAGS+=	-I${UCLSRC}/include -I${UCLSRC}/src -I${UCLSRC}/uthash
+LIBADD+=	ucl
 
 .include <bsd.prog.mk>

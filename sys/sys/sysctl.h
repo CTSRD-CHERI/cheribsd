@@ -1104,9 +1104,9 @@ TAILQ_HEAD(sysctl_ctx_list, sysctl_ctx_entry);
 #define	CTL_P1003_1B_SIGQUEUE_MAX		24	/* int */
 #define	CTL_P1003_1B_TIMER_MAX			25	/* int */
 
-#define	CTL_P1003_1B_MAXID		26
-
 #ifdef _KERNEL
+
+#define	CTL_P1003_1B_MAXID		26
 
 /*
  * Declare some common oids.
@@ -1130,7 +1130,6 @@ SYSCTL_DECL(_dev);
 SYSCTL_DECL(_hw);
 SYSCTL_DECL(_hw_bus);
 SYSCTL_DECL(_hw_bus_devices);
-SYSCTL_DECL(_hw_bus_info);
 SYSCTL_DECL(_machdep);
 SYSCTL_DECL(_machdep_mitigations);
 SYSCTL_DECL(_user);

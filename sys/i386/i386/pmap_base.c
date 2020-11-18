@@ -686,19 +686,17 @@ pmap_enter(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot,
 
 void
 pmap_enter_object(pmap_t pmap, vm_offset_t start, vm_offset_t end,
-    vm_page_t m_start, vm_prot_t prot, u_int flags)
+    vm_page_t m_start, vm_prot_t prot)
 {
 
-	pmap_methods_ptr->pm_enter_object(pmap, start, end, m_start, prot,
-	    flags);
+	pmap_methods_ptr->pm_enter_object(pmap, start, end, m_start, prot);
 }
 
 void
-pmap_enter_quick(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot,
-    u_int flags)
+pmap_enter_quick(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot)
 {
 
-	pmap_methods_ptr->pm_enter_quick(pmap, va, m, prot, flags);
+	pmap_methods_ptr->pm_enter_quick(pmap, va, m, prot);
 }
 
 void *

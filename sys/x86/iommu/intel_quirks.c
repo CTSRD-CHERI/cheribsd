@@ -46,10 +46,6 @@ __FBSDID("$FreeBSD$");
 #include <sys/taskqueue.h>
 #include <sys/tree.h>
 #include <sys/vmem.h>
-#include <machine/bus.h>
-#include <contrib/dev/acpica/include/acpi.h>
-#include <contrib/dev/acpica/include/accommon.h>
-#include <dev/acpica/acpivar.h>
 #include <vm/vm.h>
 #include <vm/vm_extern.h>
 #include <vm/vm_kern.h>
@@ -57,12 +53,16 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_page.h>
 #include <vm/vm_pager.h>
 #include <vm/vm_map.h>
-#include <x86/include/busdma_impl.h>
-#include <x86/iommu/intel_reg.h>
-#include <x86/iommu/busdma_dmar.h>
+#include <contrib/dev/acpica/include/acpi.h>
+#include <contrib/dev/acpica/include/accommon.h>
+#include <dev/acpica/acpivar.h>
 #include <dev/pci/pcireg.h>
-#include <x86/iommu/intel_dmar.h>
 #include <dev/pci/pcivar.h>
+#include <machine/bus.h>
+#include <x86/include/busdma_impl.h>
+#include <dev/iommu/busdma_iommu.h>
+#include <x86/iommu/intel_reg.h>
+#include <x86/iommu/intel_dmar.h>
 
 typedef void (*dmar_quirk_cpu_fun)(struct dmar_unit *);
 
@@ -222,8 +222,11 @@ static const struct intel_dmar_quirk_cpu post_ident_cpu[] = {
 };
 
 void
-dmar_quirks_pre_use(struct dmar_unit *dmar)
+dmar_quirks_pre_use(struct iommu_unit *unit)
 {
+	struct dmar_unit *dmar;
+
+	dmar = IOMMU2DMAR(unit);
 
 	if (!dmar_barrier_enter(dmar, DMAR_BARRIER_USEQ))
 		return;

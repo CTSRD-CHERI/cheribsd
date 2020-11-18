@@ -65,13 +65,18 @@ __FBSDID("$FreeBSD$");
 /*--------------------------- Forward Declarations ---------------------------*/
 #ifdef SMP
 static driver_filter_t xen_smp_rendezvous_action;
+#ifdef __amd64__
+static driver_filter_t xen_invlop;
+#else
 static driver_filter_t xen_invltlb;
 static driver_filter_t xen_invlpg;
 static driver_filter_t xen_invlrng;
 static driver_filter_t xen_invlcache;
+#endif
 static driver_filter_t xen_ipi_bitmap_handler;
 static driver_filter_t xen_cpustop_handler;
 static driver_filter_t xen_cpususpend_handler;
+static driver_filter_t xen_ipi_swi_handler;
 #endif
 
 /*---------------------------------- Macros ----------------------------------*/
@@ -88,13 +93,18 @@ struct xen_ipi_handler
 static struct xen_ipi_handler xen_ipis[] = 
 {
 	[IPI_TO_IDX(IPI_RENDEZVOUS)]	= { xen_smp_rendezvous_action,	"r"   },
+#ifdef __amd64__
+	[IPI_TO_IDX(IPI_INVLOP)]	= { xen_invlop,			"itlb"},
+#else
 	[IPI_TO_IDX(IPI_INVLTLB)]	= { xen_invltlb,		"itlb"},
 	[IPI_TO_IDX(IPI_INVLPG)]	= { xen_invlpg,			"ipg" },
 	[IPI_TO_IDX(IPI_INVLRNG)]	= { xen_invlrng,		"irg" },
 	[IPI_TO_IDX(IPI_INVLCACHE)]	= { xen_invlcache,		"ic"  },
+#endif
 	[IPI_TO_IDX(IPI_BITMAP_VECTOR)] = { xen_ipi_bitmap_handler,	"b"   },
 	[IPI_TO_IDX(IPI_STOP)]		= { xen_cpustop_handler,	"st"  },
 	[IPI_TO_IDX(IPI_SUSPEND)]	= { xen_cpususpend_handler,	"sp"  },
+	[IPI_TO_IDX(IPI_SWI)]		= { xen_ipi_swi_handler,	"sw"  },
 };
 #endif
 
@@ -454,6 +464,17 @@ xen_smp_rendezvous_action(void *arg)
 	return (FILTER_HANDLED);
 }
 
+#ifdef __amd64__
+static int
+xen_invlop(void *arg)
+{
+
+	invlop_handler();
+	return (FILTER_HANDLED);
+}
+
+#else /* __i386__ */
+
 static int
 xen_invltlb(void *arg)
 {
@@ -461,64 +482,6 @@ xen_invltlb(void *arg)
 	invltlb_handler();
 	return (FILTER_HANDLED);
 }
-
-#ifdef __amd64__
-static int
-xen_invltlb_invpcid(void *arg)
-{
-
-	invltlb_invpcid_handler();
-	return (FILTER_HANDLED);
-}
-
-static int
-xen_invltlb_pcid(void *arg)
-{
-
-	invltlb_pcid_handler();
-	return (FILTER_HANDLED);
-}
-
-static int
-xen_invltlb_invpcid_pti(void *arg)
-{
-
-	invltlb_invpcid_pti_handler();
-	return (FILTER_HANDLED);
-}
-
-static int
-xen_invlpg_invpcid_handler(void *arg)
-{
-
-	invlpg_invpcid_handler();
-	return (FILTER_HANDLED);
-}
-
-static int
-xen_invlpg_pcid_handler(void *arg)
-{
-
-	invlpg_pcid_handler();
-	return (FILTER_HANDLED);
-}
-
-static int
-xen_invlrng_invpcid_handler(void *arg)
-{
-
-	invlrng_invpcid_handler();
-	return (FILTER_HANDLED);
-}
-
-static int
-xen_invlrng_pcid_handler(void *arg)
-{
-
-	invlrng_pcid_handler();
-	return (FILTER_HANDLED);
-}
-#endif
 
 static int
 xen_invlpg(void *arg)
@@ -543,6 +506,7 @@ xen_invlcache(void *arg)
 	invlcache_handler();
 	return (FILTER_HANDLED);
 }
+#endif /* __amd64__ */
 
 static int
 xen_cpustop_handler(void *arg)
@@ -557,6 +521,15 @@ xen_cpususpend_handler(void *arg)
 {
 
 	cpususpend_handler();
+	return (FILTER_HANDLED);
+}
+
+static int
+xen_ipi_swi_handler(void *arg)
+{
+	struct trapframe *frame = arg;
+
+	ipi_swi_handler(*frame);
 	return (FILTER_HANDLED);
 }
 
@@ -598,22 +571,6 @@ xen_setup_cpus(void)
 	if (!xen_vector_callback_enabled)
 		return;
 
-#ifdef __amd64__
-	if (pmap_pcid_enabled) {
-		if (pti)
-			xen_ipis[IPI_TO_IDX(IPI_INVLTLB)].filter =
-			    invpcid_works ? xen_invltlb_invpcid_pti :
-			    xen_invltlb_pcid;
-		else
-			xen_ipis[IPI_TO_IDX(IPI_INVLTLB)].filter =
-			    invpcid_works ? xen_invltlb_invpcid :
-			    xen_invltlb_pcid;
-		xen_ipis[IPI_TO_IDX(IPI_INVLPG)].filter = invpcid_works ?
-		    xen_invlpg_invpcid_handler : xen_invlpg_pcid_handler;
-		xen_ipis[IPI_TO_IDX(IPI_INVLRNG)].filter = invpcid_works ?
-		    xen_invlrng_invpcid_handler : xen_invlrng_pcid_handler;
-	}
-#endif
 	CPU_FOREACH(i)
 		xen_cpu_ipi_init(i);
 

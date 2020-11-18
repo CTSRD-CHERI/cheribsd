@@ -113,9 +113,9 @@ FEATURE(sysv_shm, "System V shared memory segments support");
 
 static MALLOC_DEFINE(M_SHM, "shm", "SVID compatible shared memory segments");
 
-static int shmget_allocate_segment(struct thread *td,
-    struct shmget_args *uap, int mode);
-static int shmget_existing(struct thread *td, struct shmget_args *uap,
+static int shmget_allocate_segment(struct thread *td, key_t key, size_t size,
+    int mode);
+static int shmget_existing(struct thread *td, size_t size, int shmflg,
     int mode, int segnum);
 static int kern_shmat(struct thread *td, int shmid,
 	const void * __capability shmaddr, int shmflg);
@@ -350,6 +350,7 @@ kern_shmdt_locked(struct thread *td, const void * __capability shmaddr)
 {
 	struct proc *p = td->td_proc;
 	struct shmmap_state *shmmap_s;
+	static struct shmid_kernel *shmseg;
 #ifdef MAC
 	int error;
 #endif
@@ -363,6 +364,8 @@ kern_shmdt_locked(struct thread *td, const void * __capability shmaddr)
 		return (EINVAL);
 	AUDIT_ARG_SVIPC_ID(shmmap_s->shmid);
 	for (i = 0; i < shminfo.shmseg; i++, shmmap_s++) {
+		KASSERT(shmmap_s->shmid == -1 || shmmap_s->va != 0,
+		    ("SysV SHM segment %d mapped at NULL\n", shmmap_s->shmid));
 		if (shmmap_s->shmid != -1 &&
 		    shmmap_s->va == (__cheri_addr vm_offset_t)shmaddr) {
 			break;
@@ -370,9 +373,17 @@ kern_shmdt_locked(struct thread *td, const void * __capability shmaddr)
 	}
 	if (i == shminfo.shmseg)
 		return (EINVAL);
+	shmseg = &shmsegs[IPCID_TO_IX(shmmap_s->shmid)];
+#if __has_feature(capabilities)
+	if (!__CAP_CHECK(shmaddr, shmseg->u.shm_segsz)) {
+		KASSERT(SV_PROC_FLAG(td->td_proc, SV_CHERI),
+		    ("!__CAP_CHECK(%#lp, %zx) for non-CheriABI program",
+		    shmaddr, shmseg->u.shm_segsz));
+		return (EPROT);
+	}
+#endif
 #ifdef MAC
-	error = mac_sysvshm_check_shmdt(td->td_ucred,
-	    &shmsegs[IPCID_TO_IX(shmmap_s->shmid)]);
+	error = mac_sysvshm_check_shmdt(td->td_ucred, shmseg);
 	if (error != 0)
 		return (error);
 #endif
@@ -387,24 +398,25 @@ struct shmdt_args {
 int
 sys_shmdt(struct thread *td, struct shmdt_args *uap)
 {
+	const void * __capability shmaddr = uap->shmaddr;
 
-	return (kern_shmdt(td, uap->shmaddr));
+#if __has_feature(capabilities)
+	/*
+	 * Require a valid, unsealed, VMMAP bearing capability or NULL.
+	 * length is checked after we find our mapping.
+	 */
+	if (shmaddr != NULL &&
+	    (!cheri_gettag(shmaddr) || cheri_getsealed(shmaddr) ||
+	    (cheri_getperm(shmaddr) & CHERI_PERM_CHERIABI_VMMAP) == 0))
+		return (EPROT);
+#endif
+	return (kern_shmdt(td, shmaddr));
 }
 
 static int
 kern_shmdt(struct thread *td, const void * __capability shmaddr)
 {
 	int error;
-
-#if __has_feature(capabilities)
-	/*
-	 * Check for VMMAP unconditionally as non-CheriABI processes
-	 * will have added it in __USER_CAP.
-	 */
-	if (shmaddr != NULL &&
-	    (cheri_getperm(shmaddr) & CHERI_PERM_CHERIABI_VMMAP) == 0)
-		return (EPROT);
-#endif
 
 	SYSVSHM_LOCK();
 	error = kern_shmdt_locked(td, shmaddr);
@@ -425,6 +437,9 @@ kern_shmat_locked(struct thread *td, int shmid,
 	vm_prot_t prot;
 	vm_size_t size;
 	int cow, error, find_space, i, rv;
+#if __has_feature(capabilities)
+	int reqperm;
+#endif
 
 	AUDIT_ARG_SVIPC_ID(shmid);
 	AUDIT_ARG_VALUE(shmflg);
@@ -461,9 +476,7 @@ kern_shmat_locked(struct thread *td, int shmid,
 	}
 	if (i >= shminfo.shmseg)
 		return (EMFILE);
-	size = shmseg->u.shm_segsz;
-	KASSERT(is_aligned(size, PAGE_SIZE),
-	    ("shmget should have rounded size %zu", size));
+	size = round_page(shmseg->u.shm_segsz);
 #if __has_feature(capabilities)
 	KASSERT(size == CHERI_REPRESENTABLE_LENGTH(size),
 	    ("shmget left unrepresentable size %zu", size));
@@ -481,14 +494,33 @@ kern_shmat_locked(struct thread *td, int shmid,
 		else
 			return (EINVAL);
 #if __has_feature(capabilities)
+		/*
+		 * XXX: in principle we should be able to use a reservation
+		 * extending before and after the entry to allow arbitrary
+		 * addresses (subject to available space...).
+		 */
 		if (CHERI_REPRESENTABLE_BASE(attach_va, size) != attach_va)
 			return (EINVAL);
-		if (cheri_gettag(shmaddr))
+		if (cheri_gettag(shmaddr)) {
+			/*
+			 * Fixed mapping through a capability only makes
+			 * sense if we're knowingly remapping.
+			 */
+			if ((shmflg & SHM_REMAP) == 0)
+				return (EINVAL);
+			/* XXX: require that a reservation exists. */
+			/* Handle any rounding above */
 			shmaddr = cheri_setaddress(shmaddr, attach_va);
-		else
-			return (EINVAL);	/* XXX support this? */
-		if (!__CAP_CHECK(shmaddr, size))
-		    return (EINVAL);
+			if (!__CAP_CHECK(shmaddr, size))
+				return (EINVAL);
+		} else {
+			/* As with mmap, untagged implies exclusive. */
+			if ((shmflg & SHM_REMAP) != 0)
+				return (EINVAL);
+			shmaddr = cheri_setaddress(td->td_cheri_mmap_cap,
+			    attach_va);
+
+		}
 #endif
 		if ((shmflg & SHM_REMAP) != 0)
 			cow |= MAP_REMAP;
@@ -503,11 +535,12 @@ kern_shmat_locked(struct thread *td, int shmid,
 			 *
 			 * XXX: 12 should probably be the superpage shift.
 			 */
-			find_space = CHERI_REPRESENTABLE_ALIGNMENT(size) < (1UL << 12) ?
+			find_space =
+			    CHERI_REPRESENTABLE_ALIGNMENT(size) < (1UL << 12) ?
 			    VMFS_OPTIMAL_SPACE :
 			    VMFS_ALIGNED_SPACE(CHERI_ALIGN_SHIFT(size));
 			shmaddr = td->td_cheri_mmap_cap;
-			attach_va = cheri_getbase(shmaddr);
+			attach_va = cheri_getaddress(shmaddr);
 		} else
 #endif
 		{
@@ -522,7 +555,12 @@ kern_shmat_locked(struct thread *td, int shmid,
 		}
 	}
 #if __has_feature(capabilities)
-	max_va = cheri_getbase(shmaddr) + cheri_getlen(shmaddr);
+	reqperm = CHERI_PERM_LOAD;
+	reqperm |= (shmflg & SHM_RDONLY) != 0 ? 0 : CHERI_PERM_STORE;
+	if ((cheri_getperm(shmaddr) & reqperm) != reqperm)
+	    return (EPROT);
+
+	max_va = cheri_gettop(shmaddr);
 #else
 	max_va = 0;
 #endif
@@ -552,7 +590,10 @@ kern_shmat_locked(struct thread *td, int shmid,
 		 */
 		shmaddr = cheri_setboundsexact(cheri_setaddress(shmaddr,
 		     attach_addr), size);
-		/* XXX: set perms */
+		/* Remove inappropriate permissions. */
+		shmaddr = cheri_andperm(shmaddr, ~(CHERI_PERM_EXECUTE |
+		    CHERI_PERM_LOAD_CAP | CHERI_PERM_STORE_CAP |
+		    ((shmflg & SHM_RDONLY) != 0 ? CHERI_PERM_STORE : 0)));
 		td->td_retval[0] = (uintcap_t)__DECONST_CAP(void * __capability,
 		    shmaddr);
 	} else
@@ -566,16 +607,6 @@ kern_shmat(struct thread *td, int shmid, const void * __capability shmaddr,
     int shmflg)
 {
 	int error;
-
-#if __has_feature(capabilities)
-	/*
-	 * Check for VMMAP unconditionally as non-CheriABI processes
-	 * will have added it in __USER_CAP.
-	 */
-	if (shmaddr != NULL &&
-	    (cheri_getperm(shmaddr) & CHERI_PERM_CHERIABI_VMMAP) == 0)
-		return (EPROT);
-#endif
 
 	SYSVSHM_LOCK();
 	error = kern_shmat_locked(td, shmid, shmaddr, shmflg);
@@ -593,8 +624,19 @@ struct shmat_args {
 int
 sys_shmat(struct thread *td, struct shmat_args *uap)
 {
+	const char * __capability shmaddr = uap->shmaddr;
 
-	return (kern_shmat(td, uap->shmid, uap->shmaddr, uap->shmflg));
+#if __has_feature(capabilities)
+	/*
+	 * Require that shmaddr be NULL-derived or a valid, unsealed,
+	 * VMMAP bearing capability.
+	 */
+	if (!cheri_is_null_derived(shmaddr) &&
+	    (!cheri_gettag(shmaddr) || cheri_getsealed(shmaddr) ||
+	    (cheri_getperm(shmaddr) & CHERI_PERM_CHERIABI_VMMAP) == 0))
+		return (EPROT);
+#endif
+	return (kern_shmat(td, uap->shmid, shmaddr, uap->shmflg));
 }
 
 static int
@@ -768,7 +810,7 @@ done:
 }
 
 static int
-shmget_existing(struct thread *td, struct shmget_args *uap, int mode,
+shmget_existing(struct thread *td, size_t size, int shmflg, int mode,
     int segnum)
 {
 	struct shmid_kernel *shmseg;
@@ -780,35 +822,34 @@ shmget_existing(struct thread *td, struct shmget_args *uap, int mode,
 	KASSERT(segnum >= 0 && segnum < shmalloced,
 	    ("segnum %d shmalloced %d", segnum, shmalloced));
 	shmseg = &shmsegs[segnum];
-	if ((uap->shmflg & (IPC_CREAT | IPC_EXCL)) == (IPC_CREAT | IPC_EXCL))
+	if ((shmflg & (IPC_CREAT | IPC_EXCL)) == (IPC_CREAT | IPC_EXCL))
 		return (EEXIST);
 #ifdef MAC
-	error = mac_sysvshm_check_shmget(td->td_ucred, shmseg, uap->shmflg);
+	error = mac_sysvshm_check_shmget(td->td_ucred, shmseg, shmflg);
 	if (error != 0)
 		return (error);
 #endif
-	if (uap->size != 0 && uap->size > shmseg->u.shm_segsz)
+	if (size != 0 && size > shmseg->u.shm_segsz)
 		return (EINVAL);
 	td->td_retval[0] = IXSEQ_TO_IPCID(segnum, shmseg->u.shm_perm);
 	return (0);
 }
 
 static int
-shmget_allocate_segment(struct thread *td, struct shmget_args *uap, int mode)
+shmget_allocate_segment(struct thread *td, key_t key, size_t size, int mode)
 {
 	struct ucred *cred = td->td_ucred;
 	struct shmid_kernel *shmseg;
 	vm_object_t shm_object;
 	int i, segnum;
-	size_t size;
 
 	SYSVSHM_ASSERT_LOCKED();
 
-	if (uap->size < shminfo.shmmin || uap->size > shminfo.shmmax)
+	if (size < shminfo.shmmin || size > shminfo.shmmax)
 		return (EINVAL);
 	if (shm_nused >= shminfo.shmmni) /* Any shmids left? */
 		return (ENOSPC);
-	size = round_page(uap->size);
+	size = round_page(size);
 #if __has_feature(capabilities)
 	if (SV_CURPROC_FLAG(SV_CHERI))
 		size = CHERI_REPRESENTABLE_LENGTH(size);
@@ -851,7 +892,7 @@ shmget_allocate_segment(struct thread *td, struct shmget_args *uap, int mode)
 	 * to.
 	 */
 	shm_object = vm_pager_allocate(shm_use_phys ? OBJT_PHYS : OBJT_SWAP,
-	    0, size, VM_PROT_DEFAULT, 0, cred);
+	    0, size, VM_PROT_DEFAULT | VM_PROT_CAP, 0, cred);
 	if (shm_object == NULL) {
 #ifdef RACCT
 		if (racct_enable) {
@@ -864,14 +905,15 @@ shmget_allocate_segment(struct thread *td, struct shmget_args *uap, int mode)
 		return (ENOMEM);
 	}
 
+	vm_object_set_flag(shm_object, OBJ_HASCAP);
 	shmseg->object = shm_object;
 	shmseg->u.shm_perm.cuid = shmseg->u.shm_perm.uid = cred->cr_uid;
 	shmseg->u.shm_perm.cgid = shmseg->u.shm_perm.gid = cred->cr_gid;
 	shmseg->u.shm_perm.mode = (mode & ACCESSPERMS) | SHMSEG_ALLOCATED;
-	shmseg->u.shm_perm.key = uap->key;
+	shmseg->u.shm_perm.key = key;
 	shmseg->u.shm_perm.seq = (shmseg->u.shm_perm.seq + 1) & 0x7fff;
 	shmseg->cred = crhold(cred);
-	shmseg->u.shm_segsz = uap->size;
+	shmseg->u.shm_segsz = size;
 	shmseg->u.shm_cpid = td->td_proc->p_pid;
 	shmseg->u.shm_lpid = shmseg->u.shm_nattch = 0;
 	shmseg->u.shm_atime = shmseg->u.shm_dtime = 0;
@@ -904,16 +946,18 @@ sys_shmget(struct thread *td, struct shmget_args *uap)
 	mode = uap->shmflg & ACCESSPERMS;
 	SYSVSHM_LOCK();
 	if (uap->key == IPC_PRIVATE) {
-		error = shmget_allocate_segment(td, uap, mode);
+		error = shmget_allocate_segment(td, uap->key, uap->size, mode);
 	} else {
 		segnum = shm_find_segment_by_key(td->td_ucred->cr_prison,
 		    uap->key);
 		if (segnum >= 0)
-			error = shmget_existing(td, uap, mode, segnum);
+			error = shmget_existing(td, uap->size, uap->shmflg,
+			    mode, segnum);
 		else if ((uap->shmflg & IPC_CREAT) == 0)
 			error = ENOENT;
 		else
-			error = shmget_allocate_segment(td, uap, mode);
+			error = shmget_allocate_segment(td, uap->key,
+			    uap->size, mode);
 	}
 	SYSVSHM_UNLOCK();
 	return (error);

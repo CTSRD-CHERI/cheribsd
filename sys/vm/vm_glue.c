@@ -170,9 +170,13 @@ useracc(void * __capability cap, int len, int rw)
 		return (FALSE);
 	reqperm = CHERI_PERM_GLOBAL;
 	if (prot & VM_PROT_READ)
-		reqperm |= CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP;
+		reqperm |= CHERI_PERM_LOAD;
+	if (prot & VM_PROT_READ_CAP)
+		reqperm |= CHERI_PERM_LOAD_CAP;
 	if (prot & VM_PROT_WRITE)
-		reqperm |= CHERI_PERM_STORE | CHERI_PERM_STORE_CAP;
+		reqperm |= CHERI_PERM_STORE;
+	if (prot & VM_PROT_WRITE_CAP)
+		reqperm |= CHERI_PERM_STORE_CAP;
 	if (prot & VM_PROT_EXECUTE)
 		reqperm |= CHERI_PERM_EXECUTE;
 	if ((cheri_getperm(cap) & reqperm) != reqperm)
@@ -534,6 +538,7 @@ kstack_cache_init(void *null)
 {
 	kstack_object = vm_object_allocate(OBJT_SWAP,
 	    atop(VM_MAX_KERNEL_ADDRESS - VM_MIN_KERNEL_ADDRESS));
+	vm_object_set_flag(kstack_object, OBJ_HASCAP);
 	kstack_cache = uma_zcache_create("kstack_cache",
 	    kstack_pages * PAGE_SIZE, NULL, NULL, NULL, NULL,
 	    kstack_import, kstack_release, NULL,

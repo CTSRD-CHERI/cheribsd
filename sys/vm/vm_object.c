@@ -192,9 +192,6 @@ vm_object_zdtor(void *mem, int size, void *arg)
 	    ("object %p has reservations",
 	    object));
 #endif
-	KASSERT(blockcount_read(&object->paging_in_progress) == 0,
-	    ("object %p paging_in_progress = %d",
-	    object, blockcount_read(&object->paging_in_progress)));
 	KASSERT(!vm_object_busied(object),
 	    ("object %p busy = %d", object, blockcount_read(&object->busy)));
 	KASSERT(object->resident_page_count == 0,
@@ -254,25 +251,6 @@ _vm_object_allocate(objtype_t type, vm_pindex_t size, u_int flags,
 
 	object->pg_color = 0;
 	object->flags = flags;
-#if __has_feature(capabilities)
-	/*
-	 * XXXRW: For now, allow tags to be associated only with words stored
-	 * in anonymously backed pages.  There's also an argument that they
-	 * should be enabled for other types, such as device-backed pages,
-	 * and perhaps (eventually) filesystem-backed pages if any filesystems
-	 * grow tagging support.
-	 */
-	switch(type)
-	{
-	case OBJT_DEFAULT:
-	case OBJT_SWAP:
-	case OBJT_PHYS:
-		break;
-	default:
-		object->flags |= OBJ_NOLOADTAGS | OBJ_NOSTORETAGS;
-		break;
-	}
-#endif
 	object->size = size;
 	object->domain.dr_policy = NULL;
 	object->generation = 1;
@@ -308,11 +286,15 @@ vm_object_init(void)
 	kernel_object->flags |= OBJ_COLORED;
 	kernel_object->pg_color = (u_short)atop(VM_MIN_KERNEL_ADDRESS);
 #endif
+	vm_object_set_flag(kernel_object, OBJ_HASCAP);
 
 	/*
 	 * The lock portion of struct vm_object must be type stable due
 	 * to vm_pageout_fallback_object_lock locking a vm object
 	 * without holding any references to it.
+	 *
+	 * paging_in_progress is valid always.  Lockless references to
+	 * the objects may acquire pip and then check OBJ_DEAD.
 	 */
 	obj_zone = uma_zcreate("VM OBJECT", sizeof (struct vm_object), NULL,
 #ifdef INVARIANTS
@@ -483,7 +465,8 @@ vm_object_allocate_anon(vm_pindex_t size, vm_object_t backing_object,
 	else
 		handle = backing_object;
 	object = uma_zalloc(obj_zone, M_WAITOK);
-	_vm_object_allocate(OBJT_DEFAULT, size, OBJ_ANON | OBJ_ONEMAPPING,
+	_vm_object_allocate(OBJT_DEFAULT, size, OBJ_ANON | OBJ_ONEMAPPING |
+	    OBJ_HASCAP,
 	    object, handle);
 	object->cred = cred;
 	object->charge = cred != NULL ? charge : 0;
@@ -955,12 +938,13 @@ vm_object_terminate(vm_object_t object)
 	    ("terminating shadow obj %p", object));
 
 	/*
-	 * wait for the pageout daemon to be done with the object
+	 * Wait for the pageout daemon and other current users to be
+	 * done with the object.  Note that new paging_in_progress
+	 * users can come after this wait, but they must check
+	 * OBJ_DEAD flag set (without unlocking the object), and avoid
+	 * the object being terminated.
 	 */
 	vm_object_pip_wait(object, "objtrm");
-
-	KASSERT(!blockcount_read(&object->paging_in_progress),
-	    ("vm_object_terminate: pageout in progress"));
 
 	KASSERT(object->ref_count == 0,
 	    ("vm_object_terminate: object with references, ref_count=%d",
@@ -2140,6 +2124,12 @@ wired:
 		vm_page_free(p);
 	}
 	vm_object_pip_wakeup(object);
+
+	if (object->type == OBJT_SWAP) {
+		if (end == 0)
+			end = object->size;
+		swap_pager_freespace(object, start, end - start);
+	}
 }
 
 /*
@@ -2307,9 +2297,6 @@ vm_object_coalesce(vm_object_t prev_object, vm_ooffset_t prev_offset,
 	if (next_pindex < prev_object->size) {
 		vm_object_page_remove(prev_object, next_pindex, next_pindex +
 		    next_size, 0);
-		if (prev_object->type == OBJT_SWAP)
-			swap_pager_freespace(prev_object,
-					     next_pindex, next_size);
 #if 0
 		if (prev_object->cred != NULL) {
 			KASSERT(prev_object->charge >=
@@ -2713,6 +2700,8 @@ DB_SHOW_COMMAND(vmochk, vm_object_check)
 				    (void *)object->backing_object);
 			}
 		}
+		if (db_pager_quit)
+			return;
 	}
 }
 
@@ -2764,6 +2753,9 @@ DB_SHOW_COMMAND(object, vm_object_print_static)
 
 		db_printf("(off=0x%jx,page=0x%jx)",
 		    (uintmax_t)p->pindex, (uintmax_t)VM_PAGE_TO_PHYS(p));
+
+		if (db_pager_quit)
+			break;
 	}
 	if (count != 0)
 		db_printf("\n");

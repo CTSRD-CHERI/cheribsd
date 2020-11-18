@@ -777,7 +777,7 @@ __elfN(load_section)(struct image_params *imgp, vm_ooffset_t offset,
 	 */
 	if ((prot & VM_PROT_WRITE) == 0)
 		vm_map_protect(map, trunc_page(map_addr), round_page(map_addr +
-		    map_len), prot, FALSE);
+		    map_len), prot, FALSE, FALSE);
 
 	return (0);
 }
@@ -1638,9 +1638,9 @@ __elfN(freebsd_copyout_auxargs)(struct image_params *imgp, uintcap_t base)
 		AUXARGS_ENTRY(pos, AT_TIMEKEEP, imgp->sysent->sv_timekeep_base);
 #endif
 	}
-	AUXARGS_ENTRY(pos, AT_STACKPROT, imgp->sysent->sv_shared_page_obj
+	AUXARGS_ENTRY(pos, AT_STACKPROT, (imgp->sysent->sv_shared_page_obj
 	    != NULL && imgp->stack_prot != 0 ? imgp->stack_prot :
-	    imgp->sysent->sv_stackprot);
+	    imgp->sysent->sv_stackprot) & VM_PROT_RWX);
 	if (imgp->sysent->sv_hwcap != NULL)
 		AUXARGS_ENTRY(pos, AT_HWCAP, *imgp->sysent->sv_hwcap);
 	if (imgp->sysent->sv_hwcap2 != NULL)
@@ -3067,9 +3067,9 @@ __elfN(trans_prot)(Elf_Word flags)
 	if (flags & PF_X)
 		prot |= VM_PROT_EXECUTE;
 	if (flags & PF_W)
-		prot |= VM_PROT_WRITE;
+		prot |= VM_PROT_WRITE | VM_PROT_WRITE_CAP;
 	if (flags & PF_R)
-		prot |= VM_PROT_READ;
+		prot |= VM_PROT_READ | VM_PROT_READ_CAP;
 #if __ELF_WORD_SIZE == 32 && (defined(__amd64__) || defined(__i386__))
 	if (i386_read_exec && (flags & PF_R))
 		prot |= VM_PROT_EXECUTE;

@@ -98,7 +98,6 @@ typedef struct if_rxd_info {
 
 typedef struct if_rxd_update {
 	uint64_t	*iru_paddrs;
-	caddr_t		*iru_vaddrs;
 	qidx_t		*iru_idxs;
 	qidx_t		iru_pidx;
 	uint16_t	iru_qsidx;
@@ -304,7 +303,7 @@ typedef enum {
 } iflib_intr_type_t;
 
 /*
- * Interface has a separate command queue for RX
+ * Interface has a separate completion queue for RX
  */
 #define IFLIB_HAS_RXCQ		0x01
 /*
@@ -316,7 +315,7 @@ typedef enum {
  */
 #define IFLIB_IS_VF		0x04
 /*
- * Interface has a separate command queue for TX
+ * Interface has a separate completion queue for TX
  */
 #define IFLIB_HAS_TXCQ		0x08
 /*
@@ -381,6 +380,12 @@ typedef enum {
  * interrupts instead of doing combined RX/TX processing.
  */
 #define	IFLIB_SINGLE_IRQ_RX_ONLY	0x40000
+/*
+ * Don't need/want most of the niceties of
+ * emulating ethernet
+ */
+#define IFLIB_PSEUDO_ETHER	0x80000
+
 
 /*
  * These enum values are used in iflib_needs_restart to indicate to iflib

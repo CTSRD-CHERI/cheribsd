@@ -115,7 +115,10 @@ typedef volatile u_int rt_gen_t;	/* tree generation (for adds) */
 #define	RT_DEFAULT_FIB	0	/* Explicitly mark fib=0 restricted cases */
 #define	RT_ALL_FIBS	-1	/* Announce event for every fib */
 #ifdef _KERNEL
-extern u_int rt_numfibs;	/* number of usable routing tables */
+VNET_DECLARE(uint32_t, _rt_numfibs);	/* number of existing route tables */
+#define	V_rt_numfibs		VNET(_rt_numfibs)
+/* temporary compat arg */
+#define	rt_numfibs		V_rt_numfibs
 VNET_DECLARE(u_int, rt_add_addr_allfibs); /* Announce interfaces to all fibs */
 #define	V_rt_add_addr_allfibs	VNET(rt_add_addr_allfibs)
 #endif
@@ -379,7 +382,7 @@ void	 rt_newmaddrmsg(int, struct ifmultiaddr *);
 void 	 rt_maskedcopy(struct sockaddr *, struct sockaddr *, struct sockaddr *);
 struct rib_head *rt_table_init(int, int, u_int);
 void	rt_table_destroy(struct rib_head *);
-u_int	rt_tables_get_gen(int table, int fam);
+u_int	rt_tables_get_gen(uint32_t table, sa_family_t family);
 
 int	rtsock_addrmsg(int, struct ifaddr *, int);
 int	rtsock_routemsg(int, struct rtentry *, struct ifnet *ifp, int, int);
@@ -387,16 +390,7 @@ int	rtsock_routemsg_info(int, struct rt_addrinfo *, int);
 
 struct sockaddr *rtsock_fix_netmask(const struct sockaddr *dst,
 	    const struct sockaddr *smask, struct sockaddr_storage *dmask);
-/*
- * Note the following locking behavior:
- *
- *    rtfree() and RTFREE_LOCKED() require a locked rtentry
- *
- *    RTFREE() uses an unlocked entry.
- */
 
-void	 rtfree(struct rtentry *);
-void	 rtfree_func(struct rtentry *);
 void	rt_updatemtu(struct ifnet *);
 
 void	rt_flushifroutes_af(struct ifnet *, int);
@@ -411,9 +405,6 @@ int	 rtinit(struct ifaddr *, int, int);
  * but this will change.. 
  */
 int	 rtioctl_fib(u_long, caddr_t, u_int);
-int	 rtrequest_fib(int, struct sockaddr *,
-	    struct sockaddr *, struct sockaddr *, int, struct rtentry **, u_int);
-int	 rtrequest1_fib(int, struct rt_addrinfo *, struct rtentry **, u_int);
 int	rib_lookup_info(uint32_t, const struct sockaddr *, uint32_t, uint32_t,
 	    struct rt_addrinfo *);
 void	rib_free_info(struct rt_addrinfo *info);

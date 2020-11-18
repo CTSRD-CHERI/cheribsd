@@ -41,6 +41,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/filedesc.h>
 #include <sys/lock.h>
 #include <sys/malloc.h>
+#include <sys/mman.h>
 #include <sys/mount.h>
 #include <sys/mutex.h>
 #include <sys/namei.h>
@@ -65,8 +66,40 @@ __FBSDID("$FreeBSD$");
 #include <compat/linux/linux_util.h>
 #include <compat/linux/linux_file.h>
 
-static int	linux_common_open(struct thread *, int, char *, int, int);
+static int	linux_common_open(struct thread *, int, const char *, int, int,
+		    enum uio_seg);
 static int	linux_getdents_error(struct thread *, int, int);
+
+static struct bsd_to_linux_bitmap seal_bitmap[] = {
+	BITMAP_1t1_LINUX(F_SEAL_SEAL),
+	BITMAP_1t1_LINUX(F_SEAL_SHRINK),
+	BITMAP_1t1_LINUX(F_SEAL_GROW),
+	BITMAP_1t1_LINUX(F_SEAL_WRITE),
+};
+
+#define	MFD_HUGETLB_ENTRY(_size)					\
+	{								\
+		.bsd_value = MFD_HUGE_##_size,				\
+		.linux_value = LINUX_HUGETLB_FLAG_ENCODE_##_size	\
+	}
+static struct bsd_to_linux_bitmap mfd_bitmap[] = {
+	BITMAP_1t1_LINUX(MFD_CLOEXEC),
+	BITMAP_1t1_LINUX(MFD_ALLOW_SEALING),
+	BITMAP_1t1_LINUX(MFD_HUGETLB),
+	MFD_HUGETLB_ENTRY(64KB),
+	MFD_HUGETLB_ENTRY(512KB),
+	MFD_HUGETLB_ENTRY(1MB),
+	MFD_HUGETLB_ENTRY(2MB),
+	MFD_HUGETLB_ENTRY(8MB),
+	MFD_HUGETLB_ENTRY(16MB),
+	MFD_HUGETLB_ENTRY(32MB),
+	MFD_HUGETLB_ENTRY(256MB),
+	MFD_HUGETLB_ENTRY(512MB),
+	MFD_HUGETLB_ENTRY(1GB),
+	MFD_HUGETLB_ENTRY(2GB),
+	MFD_HUGETLB_ENTRY(16GB),
+};
+#undef MFD_HUGETLB_ENTRY
 
 #ifdef LINUX_LEGACY_SYSCALLS
 int
@@ -75,17 +108,22 @@ linux_creat(struct thread *td, struct linux_creat_args *args)
 	char *path;
 	int error;
 
-	LCONVPATHEXIST(td, args->path, &path);
-
-	error = kern_openat(td, AT_FDCWD, PTR2CAP(path), UIO_SYSSPACE,
-	    O_WRONLY | O_CREAT | O_TRUNC, args->mode);
-	LFREEPATH(path);
+	if (!LUSECONVPATH(td)) {
+		error = kern_openat(td, AT_FDCWD, __USER_CAP_PATH(args->path),
+		    UIO_USERSPACE, O_WRONLY | O_CREAT | O_TRUNC, args->mode);
+	} else {
+		LCONVPATHEXIST(td, args->path, &path);
+		error = kern_openat(td, AT_FDCWD, PTR2CAP(path), UIO_SYSSPACE,
+		    O_WRONLY | O_CREAT | O_TRUNC, args->mode);
+		LFREEPATH(path);
+	}
 	return (error);
 }
 #endif
 
 static int
-linux_common_open(struct thread *td, int dirfd, char *path, int l_flags, int mode)
+linux_common_open(struct thread *td, int dirfd, const char * __capability path,
+    int l_flags, int mode, enum uio_seg seg)
 {
 	struct proc *p = td->td_proc;
 	struct file *fp;
@@ -131,7 +169,7 @@ linux_common_open(struct thread *td, int dirfd, char *path, int l_flags, int mod
 		bsd_flags |= O_DIRECTORY;
 	/* XXX LINUX_O_NOATIME: unable to be easily implemented. */
 
-	error = kern_openat(td, dirfd, PTR2CAP(path), UIO_SYSSPACE, bsd_flags, mode);
+	error = kern_openat(td, dirfd, path, seg, bsd_flags, mode);
 	if (error != 0) {
 		if (error == EMLINK)
 			error = ELOOP;
@@ -169,7 +207,6 @@ linux_common_open(struct thread *td, int dirfd, char *path, int l_flags, int mod
 	}
 
 done:
-	LFREEPATH(path);
 	return (error);
 }
 
@@ -177,15 +214,22 @@ int
 linux_openat(struct thread *td, struct linux_openat_args *args)
 {
 	char *path;
-	int dfd;
+	int dfd, error;
 
 	dfd = (args->dfd == LINUX_AT_FDCWD) ? AT_FDCWD : args->dfd;
+	if (!LUSECONVPATH(td)) {
+		return (linux_common_open(td, dfd, args->filename, args->flags,
+		    args->mode, UIO_USERSPACE));
+	}
 	if (args->flags & LINUX_O_CREAT)
 		LCONVPATH_AT(td, args->filename, &path, 1, dfd);
 	else
 		LCONVPATH_AT(td, args->filename, &path, 0, dfd);
 
-	return (linux_common_open(td, dfd, path, args->flags, args->mode));
+	error = linux_common_open(td, dfd, path, args->flags, args->mode,
+	    UIO_SYSSPACE);
+	LFREEPATH(path);
+	return (error);
 }
 
 #ifdef LINUX_LEGACY_SYSCALLS
@@ -193,13 +237,21 @@ int
 linux_open(struct thread *td, struct linux_open_args *args)
 {
 	char *path;
+	int error;
 
+	if (!LUSECONVPATH(td)) {
+		return (linux_common_open(td, AT_FDCWD, args->path, args->flags,
+		    args->mode, UIO_USERSPACE));
+	}
 	if (args->flags & LINUX_O_CREAT)
 		LCONVPATHCREAT(td, args->path, &path);
 	else
 		LCONVPATHEXIST(td, args->path, &path);
 
-	return (linux_common_open(td, AT_FDCWD, path, args->flags, args->mode));
+	error = linux_common_open(td, AT_FDCWD, path, args->flags, args->mode,
+	    UIO_SYSSPACE);
+	LFREEPATH(path);
+	return (error);
 }
 #endif
 
@@ -503,11 +555,15 @@ linux_access(struct thread *td, struct linux_access_args *args)
 	if (args->amode & ~(F_OK | X_OK | W_OK | R_OK))
 		return (EINVAL);
 
-	LCONVPATHEXIST(td, args->path, &path);
-
-	error = kern_accessat(td, AT_FDCWD, PTR2CAP(path), UIO_SYSSPACE, 0,
-	    args->amode);
-	LFREEPATH(path);
+	if (!LUSECONVPATH(td)) {
+		error = kern_accessat(td, AT_FDCWD, __USER_CAP_PATH(args->path),
+		    UIO_USERSPACE, 0, args->amode);
+	} else {
+		LCONVPATHEXIST(td, args->path, &path);
+		error = kern_accessat(td, AT_FDCWD, PTR2CAP(path),
+		    UIO_SYSSPACE, 0, args->amode);
+		LFREEPATH(path);
+	}
 
 	return (error);
 }
@@ -524,10 +580,15 @@ linux_faccessat(struct thread *td, struct linux_faccessat_args *args)
 		return (EINVAL);
 
 	dfd = (args->dfd == LINUX_AT_FDCWD) ? AT_FDCWD : args->dfd;
-	LCONVPATHEXIST_AT(td, args->filename, &path, dfd);
-
-	error = kern_accessat(td, dfd, PTR2CAP(path), UIO_SYSSPACE, 0, args->amode);
-	LFREEPATH(path);
+	if (!LUSECONVPATH(td)) {
+		error = kern_accessat(td, dfd, __USER_CAP_PATH(args->filename),
+		    UIO_USERSPACE, 0, args->amode);
+	} else {
+		LCONVPATHEXIST_AT(td, args->filename, &path, dfd);
+		error = kern_accessat(td, dfd, PTR2CAP(path), UIO_SYSSPACE,
+		    0, args->amode);
+		LFREEPATH(path);
+	}
 
 	return (error);
 }
@@ -540,19 +601,32 @@ linux_unlink(struct thread *td, struct linux_unlink_args *args)
 	int error;
 	struct stat st;
 
-	LCONVPATHEXIST(td, args->path, &path);
-
-	error = kern_funlinkat(td, AT_FDCWD, PTR2CAP(path), FD_NONE,
-	    UIO_SYSSPACE, 0, 0);
-	if (error == EPERM) {
-		/* Introduce POSIX noncompliant behaviour of Linux */
-		if (kern_statat(td, 0, AT_FDCWD, PTR2CAP(path), UIO_SYSSPACE, &st,
-		    NULL) == 0) {
-			if (S_ISDIR(st.st_mode))
-				error = EISDIR;
+	if (!LUSECONVPATH(td)) {
+		error = kern_funlinkat(td, AT_FDCWD,
+		    __USER_CAP_PATH(args->path), FD_NONE, UIO_USERSPACE, 0, 0);
+		if (error == EPERM) {
+			/* Introduce POSIX noncompliant behaviour of Linux */
+			if (kern_statat(td, 0, AT_FDCWD,
+			    __USER_CAP_PATH(args->path), UIO_SYSSPACE, &st,
+			    NULL) == 0) {
+				if (S_ISDIR(st.st_mode))
+					error = EISDIR;
+			}
 		}
+	} else {
+		LCONVPATHEXIST(td, args->path, &path);
+		error = kern_funlinkat(td, AT_FDCWD, PTR2CAP(path), FD_NONE, UIO_SYSSPACE, 0, 0);
+		if (error == EPERM) {
+			/* Introduce POSIX noncompliant behaviour of Linux */
+			if (kern_statat(td, 0, AT_FDCWD, PTR2CAP(path), UIO_SYSSPACE, &st,
+			    NULL) == 0) {
+				if (S_ISDIR(st.st_mode))
+					error = EISDIR;
+			}
+		}
+		LFREEPATH(path);
 	}
-	LFREEPATH(path);
+
 	return (error);
 }
 #endif
@@ -1376,6 +1450,21 @@ fcntl_common(struct thread *td, struct linux_fcntl_args *args)
 
 	case LINUX_F_DUPFD_CLOEXEC:
 		return (kern_fcntl(td, args->fd, F_DUPFD_CLOEXEC, args->arg));
+	/*
+	 * Our F_SEAL_* values match Linux one for maximum compatibility.  So we
+	 * only needed to account for different values for fcntl(2) commands.
+	 */
+	case LINUX_F_GET_SEALS:
+		error = kern_fcntl(td, args->fd, F_GET_SEALS, 0);
+		if (error != 0)
+			return (error);
+		td->td_retval[0] = bsd_to_linux_bits(td->td_retval[0],
+		    seal_bitmap, 0);
+		return (0);
+
+	case LINUX_F_ADD_SEALS:
+		return (kern_fcntl(td, args->fd, F_ADD_SEALS,
+		    linux_to_bsd_bits(args->arg, seal_bitmap, 0)));
 	default:
 		linux_msg(td, "unsupported fcntl cmd %d\n", args->cmd);
 		return (EINVAL);
@@ -1628,7 +1717,7 @@ linux_fallocate(struct thread *td, struct linux_fallocate_args *args)
 	 * mode should be 0.
 	 */
 	if (args->mode != 0)
-		return (ENOSYS);
+		return (EOPNOTSUPP);
 
 #if defined(__amd64__) && defined(COMPAT_LINUX32)
 	len = PAIR32TO64(off_t, args->len);
@@ -1681,6 +1770,63 @@ linux_copy_file_range(struct thread *td, struct linux_copy_file_range_args
 	return (error);
 }
 
+#define	LINUX_MEMFD_PREFIX	"memfd:"
+
+int
+linux_memfd_create(struct thread *td, struct linux_memfd_create_args *args)
+{
+	char memfd_name[LINUX_NAME_MAX + 1];
+	int error, flags, shmflags, oflags;
+
+	/*
+	 * This is our clever trick to avoid the heap allocation to copy in the
+	 * uname.  We don't really need to go this far out of our way, but it
+	 * does keep the rest of this function fairly clean as they don't have
+	 * to worry about cleanup on the way out.
+	 */
+	error = copyinstr(args->uname_ptr,
+	    memfd_name + sizeof(LINUX_MEMFD_PREFIX) - 1,
+	    LINUX_NAME_MAX - sizeof(LINUX_MEMFD_PREFIX) - 1, NULL);
+	if (error != 0) {
+		if (error == ENAMETOOLONG)
+			error = EINVAL;
+		return (error);
+	}
+
+	memcpy(memfd_name, LINUX_MEMFD_PREFIX, sizeof(LINUX_MEMFD_PREFIX) - 1);
+	flags = linux_to_bsd_bits(args->flags, mfd_bitmap, 0);
+	if ((flags & ~(MFD_CLOEXEC | MFD_ALLOW_SEALING | MFD_HUGETLB |
+	    MFD_HUGE_MASK)) != 0)
+		return (EINVAL);
+	/* Size specified but no HUGETLB. */
+	if ((flags & MFD_HUGE_MASK) != 0 && (flags & MFD_HUGETLB) == 0)
+		return (EINVAL);
+	/* We don't actually support HUGETLB. */
+	if ((flags & MFD_HUGETLB) != 0)
+		return (ENOSYS);
+	oflags = O_RDWR;
+	shmflags = SHM_GROW_ON_WRITE;
+	if ((flags & MFD_CLOEXEC) != 0)
+		oflags |= O_CLOEXEC;
+	if ((flags & MFD_ALLOW_SEALING) != 0)
+		shmflags |= SHM_ALLOW_SEALING;
+	return (kern_shm_open2(td, SHM_ANON, oflags, 0, shmflags, NULL,
+	    memfd_name));
+}
+
+int
+linux_splice(struct thread *td, struct linux_splice_args *args)
+{
+
+	linux_msg(td, "syscall splice not really implemented");
+
+	/*
+	 * splice(2) is documented to return EINVAL in various circumstances;
+	 * returning it instead of ENOSYS should hint the caller to use fallback
+	 * instead.
+	 */
+	return (EINVAL);
+}
 // CHERI CHANGES START
 // {
 //   "updated": 20181114,

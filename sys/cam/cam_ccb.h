@@ -1109,14 +1109,41 @@ struct ccb_trans_settings_mmc {
 #define MMC_PM		(1 << 5)
 #define MMC_BT		(1 << 6)
 #define MMC_BM		(1 << 7)
+#define MMC_VCCQ        (1 << 8)
 	uint32_t ios_valid;
 /* The folowing is used only for GET_TRAN_SETTINGS */
 	uint32_t	host_ocr;
 	int host_f_min;
 	int host_f_max;
-#define MMC_CAP_4_BIT_DATA	(1 << 0) /* Can do 4-bit data transfers */
-#define MMC_CAP_8_BIT_DATA	(1 << 1) /* Can do 8-bit data transfers */
-#define MMC_CAP_HSPEED		(1 << 2) /* Can do High Speed transfers */
+/* Copied from sys/dev/mmc/bridge.h */
+#define	MMC_CAP_4_BIT_DATA	(1 <<  0) /* Can do 4-bit data transfers */
+#define	MMC_CAP_8_BIT_DATA	(1 <<  1) /* Can do 8-bit data transfers */
+#define	MMC_CAP_HSPEED		(1 <<  2) /* Can do High Speed transfers */
+#define	MMC_CAP_BOOT_NOACC	(1 <<  4) /* Cannot access boot partitions */
+#define	MMC_CAP_WAIT_WHILE_BUSY	(1 <<  5) /* Host waits for busy responses */
+#define	MMC_CAP_UHS_SDR12	(1 <<  6) /* Can do UHS SDR12 */
+#define	MMC_CAP_UHS_SDR25	(1 <<  7) /* Can do UHS SDR25 */
+#define	MMC_CAP_UHS_SDR50	(1 <<  8) /* Can do UHS SDR50 */
+#define	MMC_CAP_UHS_SDR104	(1 <<  9) /* Can do UHS SDR104 */
+#define	MMC_CAP_UHS_DDR50	(1 << 10) /* Can do UHS DDR50 */
+#define	MMC_CAP_MMC_DDR52_120	(1 << 11) /* Can do eMMC DDR52 at 1.2 V */
+#define	MMC_CAP_MMC_DDR52_180	(1 << 12) /* Can do eMMC DDR52 at 1.8 V */
+#define	MMC_CAP_MMC_DDR52	(MMC_CAP_MMC_DDR52_120 | MMC_CAP_MMC_DDR52_180)
+#define	MMC_CAP_MMC_HS200_120	(1 << 13) /* Can do eMMC HS200 at 1.2 V */
+#define	MMC_CAP_MMC_HS200_180	(1 << 14) /* Can do eMMC HS200 at 1.8 V */
+#define	MMC_CAP_MMC_HS200	(MMC_CAP_MMC_HS200_120| MMC_CAP_MMC_HS200_180)
+#define	MMC_CAP_MMC_HS400_120	(1 << 15) /* Can do eMMC HS400 at 1.2 V */
+#define	MMC_CAP_MMC_HS400_180	(1 << 16) /* Can do eMMC HS400 at 1.8 V */
+#define	MMC_CAP_MMC_HS400	(MMC_CAP_MMC_HS400_120 | MMC_CAP_MMC_HS400_180)
+#define	MMC_CAP_MMC_HSX00_120	(MMC_CAP_MMC_HS200_120 | MMC_CAP_MMC_HS400_120)
+#define	MMC_CAP_MMC_ENH_STROBE	(1 << 17) /* Can do eMMC Enhanced Strobe */
+#define	MMC_CAP_SIGNALING_120	(1 << 18) /* Can do signaling at 1.2 V */
+#define	MMC_CAP_SIGNALING_180	(1 << 19) /* Can do signaling at 1.8 V */
+#define	MMC_CAP_SIGNALING_330	(1 << 20) /* Can do signaling at 3.3 V */
+#define	MMC_CAP_DRIVER_TYPE_A	(1 << 21) /* Can do Driver Type A */
+#define	MMC_CAP_DRIVER_TYPE_C	(1 << 22) /* Can do Driver Type C */
+#define	MMC_CAP_DRIVER_TYPE_D	(1 << 23) /* Can do Driver Type D */
+
 	uint32_t host_caps;
 	uint32_t host_max_data;
 };
@@ -1562,6 +1589,23 @@ cam_fill_nvmeio(struct ccb_nvmeio *nvmeio, u_int32_t retries,
 	nvmeio->data_ptr = data_ptr;
 	nvmeio->dxfer_len = dxfer_len;
 }
+
+#ifdef _KERNEL
+static __inline void
+cam_fill_nvmeio_user(struct ccb_nvmeio *nvmeio, u_int32_t retries,
+	      void (*cbfcnp)(struct cam_periph *, union ccb *),
+	      u_int32_t flags, u_int8_t * __capability data_ptr,
+	      u_int32_t dxfer_len, u_int32_t timeout)
+{
+	nvmeio->ccb_h.func_code = XPT_NVME_IO;
+	nvmeio->ccb_h.flags = flags;
+	nvmeio->ccb_h.retry_count = retries;
+	nvmeio->ccb_h.cbfcnp = cbfcnp;
+	nvmeio->ccb_h.timeout = timeout;
+	nvmeio->user_data_ptr = data_ptr;
+	nvmeio->dxfer_len = dxfer_len;
+}
+#endif
 
 static __inline void
 cam_fill_nvmeadmin(struct ccb_nvmeio *nvmeio, u_int32_t retries,

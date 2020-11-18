@@ -88,6 +88,9 @@ union arg {
 	intptr_t intptrarg;
 	uintptr_t uintptrarg;
 	void	*pvoidarg;
+#if __has_feature(capabilities)
+	void	* __capability cvoidarg;
+#endif
 	char	*pchararg;
 	signed char *pschararg;
 	short	*pshortarg;

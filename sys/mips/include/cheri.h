@@ -140,9 +140,7 @@ void cheri_init_capabilities(void * __capability kroot);
 struct cheri_frame;
 struct sysentvec;
 struct trapframe;
-void	cheri_capability_set_user_sealcap(void * __capability *);
 int	cheri_capcause_to_sicode(register_t capcause);
-void	cheri_log_cheri_frame(struct trapframe *frame);
 void	cheri_log_exception(struct trapframe *frame, int trap_type);
 void	cheri_log_exception_registers(struct trapframe *frame);
 void	cheri_trapframe_from_cheriframe(struct trapframe *frame,

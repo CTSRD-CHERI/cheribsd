@@ -529,8 +529,7 @@ ieee80211_vap_setup(struct ieee80211com *ic, struct ieee80211vap *vap,
 
 	ifp = if_alloc(IFT_ETHER);
 	if (ifp == NULL) {
-		ic_printf(ic, "%s: unable to allocate ifnet\n",
-		    __func__);
+		ic_printf(ic, "%s: unable to allocate ifnet\n", __func__);
 		return ENOMEM;
 	}
 	if_initname(ifp, name, unit);
@@ -616,6 +615,12 @@ ieee80211_vap_setup(struct ieee80211com *ic, struct ieee80211vap *vap,
 	if (vap->iv_opmode == IEEE80211_M_HOSTAP &&
 	    (vap->iv_caps & IEEE80211_C_DFS))
 		vap->iv_flags_ext |= IEEE80211_FEXT_DFS;
+	/* NB: only flip on U-APSD for hostap/sta for now */
+	if ((vap->iv_opmode == IEEE80211_M_STA)
+	    || (vap->iv_opmode == IEEE80211_M_HOSTAP)) {
+		if (vap->iv_caps & IEEE80211_C_UAPSD)
+			vap->iv_flags_ext |= IEEE80211_FEXT_UAPSD;
+	}
 
 	vap->iv_des_chan = IEEE80211_CHAN_ANYC;		/* any channel is ok */
 	vap->iv_bmissthreshold = IEEE80211_HWBMISS_DEFAULT;
@@ -1204,9 +1209,7 @@ set_vht_extchan(struct ieee80211_channel *c)
 	}
 
 	printf("%s: unknown VHT channel type (ieee=%d, flags=0x%08x)\n",
-	    __func__,
-	    c->ic_ieee,
-	    c->ic_flags);
+	    __func__, c->ic_ieee, c->ic_flags);
 
 	return (0);
 }
@@ -1241,11 +1244,7 @@ addchan(struct ieee80211_channel chans[], int maxchans, int *nchans,
 
 #if 0
 	printf("%s: %d: ieee=%d, freq=%d, flags=0x%08x\n",
-	    __func__,
-	    *nchans,
-	    ieee,
-	    freq,
-	    flags);
+	    __func__, *nchans, ieee, freq, flags);
 #endif
 
 	c = &chans[(*nchans)++];
@@ -1275,9 +1274,7 @@ copychan_prev(struct ieee80211_channel chans[], int maxchans, int *nchans,
 
 #if 0
 	printf("%s: %d: flags=0x%08x\n",
-	    __func__,
-	    *nchans,
-	    flags);
+	    __func__, *nchans, flags);
 #endif
 
 	c = &chans[(*nchans)++];
@@ -1361,8 +1358,8 @@ getflags_5ghz(const uint8_t bands[], uint32_t flags[], int ht40, int vht80)
 		    IEEE80211_CHAN_HT40D | IEEE80211_CHAN_VHT80;
 	}
 
-	/* XXX VHT80+80 */
 	/* XXX VHT160 */
+	/* XXX VHT80+80 */
 	flags[nmodes] = 0;
 }
 
@@ -1549,6 +1546,9 @@ add_chanlist(struct ieee80211_channel chans[], int maxchans, int *nchans,
 			 *   check used for (V)HT40.
 			 */
 			is_vht = !! (flags[j] & IEEE80211_CHAN_VHT);
+
+			/* XXX TODO FIXME VHT80P80. */
+			/* XXX TODO FIXME VHT160. */
 
 			/*
 			 * Test for VHT80.
@@ -1770,11 +1770,7 @@ ieee80211_lookup_channel_rxstatus(struct ieee80211vap *vap,
 
 	IEEE80211_DPRINTF(vap, IEEE80211_MSG_INPUT,
 	    "%s: freq=%d, ieee=%d, flags=0x%08x; c=%p\n",
-	    __func__,
-	    (int) rxs->c_freq,
-	    (int) rxs->c_ieee,
-	    flags,
-	    c);
+	    __func__, (int) rxs->c_freq, (int) rxs->c_ieee, flags, c);
 
 	return (c);
 }

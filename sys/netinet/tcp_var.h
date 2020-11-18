@@ -105,12 +105,12 @@ struct sackhole {
 
 struct sackhint {
 	struct sackhole	*nexthole;
-	int		sack_bytes_rexmit;
+	int32_t		sack_bytes_rexmit;
 	tcp_seq		last_sack_ack;	/* Most recent/largest sacked ack */
 
-	int		ispare;		/* explicit pad for 64bit alignment */
-	int             sacked_bytes;	/*
-					 * Total sacked bytes reported by the
+	int32_t		delivered_data; /* Newly acked data from last SACK */
+
+	int32_t		sacked_bytes;	/* Total sacked bytes reported by the
 					 * receiver via sack option
 					 */
 	uint32_t	_pad1[1];	/* TBD */
@@ -188,8 +188,9 @@ struct tcpcb {
 	tcp_seq	snd_wl2;		/* window update seg ack number */
 
 	tcp_seq	irs;			/* initial receive sequence number */
-	tcp_seq	iss;		        /* initial send sequence number */
-	u_int   t_acktime;
+	tcp_seq	iss;			/* initial send sequence number */
+	u_int	t_acktime;		/* RACK and BBR incoming new data was acked */
+	u_int	t_sndtime;		/* time last data was sent */
 	u_int	ts_recent_age;		/* when last updated */
 	tcp_seq	snd_recover;		/* for use in NewReno Fast Recovery */
 	uint16_t cl4_spare;		/* Spare to adjust CL 4 */

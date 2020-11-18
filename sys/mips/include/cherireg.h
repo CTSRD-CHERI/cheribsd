@@ -282,7 +282,7 @@
 #define	CHERI_CCALL_EXC_VEC	MIPS_KSEG0((intptr_t)(int32_t)0x80000280)
 
 /*
- * CHERI_BASELEN_BITS is used in cheritest_cheriabi.c.  The others are
+ * CHERI_BASELEN_BITS is used in cheribsdtest_cheriabi.c.  The others are
  * unused.
  */
 #define	CHERI_BASELEN_BITS	10

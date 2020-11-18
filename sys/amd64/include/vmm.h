@@ -481,6 +481,8 @@ enum vm_cap_type {
 	VM_CAP_UNRESTRICTED_GUEST,
 	VM_CAP_ENABLE_INVPCID,
 	VM_CAP_BPT_EXIT,
+	VM_CAP_RDPID,
+	VM_CAP_RDTSCP,
 	VM_CAP_MAX
 };
 
@@ -546,6 +548,9 @@ _Static_assert(_Alignof(struct vie_op) == 2, "ABI");
 struct vie {
 	uint8_t		inst[VIE_INST_SIZE];	/* instruction bytes */
 	uint8_t		num_valid;		/* size of the instruction */
+
+/* The following fields are all zeroed upon restart. */
+#define	vie_startzero	num_processed
 	uint8_t		num_processed;
 
 	uint8_t		addrsize:4, opsize:4;	/* address and operand sizes */

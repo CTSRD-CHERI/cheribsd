@@ -87,20 +87,29 @@ int (*dtrace_invop_jump_addr)(struct trapframe *);
 
 extern register_t fsu_intr_fault;
 
+#ifdef CPU_QEMU_RISCV
+extern u_int qemu_trace_buffered;
+#endif
+
 /* Called from exception.S */
 void do_trap_supervisor(struct trapframe *);
 void do_trap_user(struct trapframe *);
 
 static __inline void
-call_trapsignal(struct thread *td, int sig, int code, void * __capability addr,
+call_trapsignal(struct thread *td, int sig, int code, uintcap_t addr,
     int trapno, int capreg)
 {
 	ksiginfo_t ksi;
 
+#ifdef CPU_QEMU_RISCV
+	if (qemu_trace_buffered)
+		QEMU_FLUSH_TRACE_BUFFER;
+#endif
+
 	ksiginfo_init_trap(&ksi);
 	ksi.ksi_signo = sig;
 	ksi.ksi_code = code;
-	ksi.ksi_addr = addr;
+	ksi.ksi_addr = (void * __capability)addr;
 	ksi.ksi_capreg = capreg;
 	ksi.ksi_trapno = trapno;
 	trapsignal(td, &ksi);
@@ -189,18 +198,10 @@ cpu_fetch_syscall_args(struct thread *td)
 #include "../../kern/subr_syscall.c"
 
 #if __has_feature(capabilities)
-/* This cannot use _CHERI_PRINTF_CAP_ARG due to the cast for purecap. */
-#ifdef __CHERI_PURE_CAPABILITY__
-#define	PRINT_REG_ARG(value)	((void * __capability)(value))
-#else
-#define	PRINT_REG_ARG(value)	(&(value))
-#endif
-#define PRINT_REG(name, value)					\
-	printf(name " = " _CHERI_PRINTF_CAP_FMT "\n",		\
-	    PRINT_REG_ARG(value));
-#define PRINT_REG_N(name, n, array)				\
-	printf(name "[%d] = " _CHERI_PRINTF_CAP_FMT "\n", n,	\
-	    PRINT_REG_ARG((array)[n]));
+#define PRINT_REG(name, value)	\
+	printf(name " = %#.16lp\n", (void * __capability)(value));
+#define PRINT_REG_N(name, n, array)	\
+	printf(name "[%d] = %#.16lp\n", n, (void * __capability)(array)[n]);
 #else
 #define PRINT_REG(name, value)	printf(name " = 0x%016lx\n", value)
 #define PRINT_REG_N(name, n, array)	\
@@ -223,10 +224,8 @@ dump_regs(struct trapframe *frame)
 	for (i = 0; i < nitems(frame->tf_s); i++)
 		PRINT_REG_N("s", i, frame->tf_s);
 
-
 	for (i = 0; i < nitems(frame->tf_a); i++)
 		PRINT_REG_N("a", i, frame->tf_a);
-
 
 	PRINT_REG("sepc", frame->tf_sepc);
 #if __has_feature(capabilities)
@@ -245,7 +244,7 @@ dump_cheri_exception(struct trapframe *frame)
 
 	td = curthread;
 	p = td->td_proc;
-	printf("pid %d tid %ld (%s), uid %d: ", p->p_pid, td->td_tid,
+	printf("pid %d tid %d (%s), uid %d: ", p->p_pid, td->td_tid,
 	    p->p_comm, td->td_ucred->cr_uid);
 	switch (frame->tf_scause & EXCP_MASK) {
 	case EXCP_LOAD_CAP_PAGE_FAULT:
@@ -255,12 +254,12 @@ dump_cheri_exception(struct trapframe *frame)
 		printf("STORE/AMO CAP page fault");
 		break;
 	case EXCP_CHERI:
-		printf("CHERI fault (type %#x), capidx %d",
+		printf("CHERI fault (type %#lx), capidx %ld",
 		    TVAL_CAP_CAUSE(frame->tf_stval),
 		    TVAL_CAP_IDX(frame->tf_stval));
 		break;
 	default:
-		printf("fault %d", frame->tf_scause & EXCP_MASK);
+		printf("fault %ld", frame->tf_scause & EXCP_MASK);
 		break;
 	}
 	printf("\n");
@@ -323,14 +322,22 @@ data_abort(struct trapframe *frame, int usermode)
 	    "Kernel page fault") != 0)
 		goto fatal;
 
-	if (usermode)
+	if (usermode) {
 		map = &td->td_proc->p_vmspace->vm_map;
-	else if (stval >= VM_MAX_USER_ADDRESS)
-		map = kernel_map;
-	else {
-		if (pcb->pcb_onfault == 0)
-			goto fatal;
-		map = &td->td_proc->p_vmspace->vm_map;
+	} else {
+		/*
+		 * Enable interrupts for the duration of the page fault. For
+		 * user faults this was done already in do_trap_user().
+		 */
+		intr_enable();
+
+		if (stval >= VM_MAX_USER_ADDRESS) {
+			map = kernel_map;
+		} else {
+			if (pcb->pcb_onfault == 0)
+				goto fatal;
+			map = &td->td_proc->p_vmspace->vm_map;
+		}
 	}
 
 	va = trunc_page(stval);
@@ -350,8 +357,7 @@ data_abort(struct trapframe *frame, int usermode)
 	error = vm_fault_trap(map, va, ftype, VM_FAULT_NORMAL, &sig, &ucode);
 	if (error != KERN_SUCCESS) {
 		if (usermode) {
-			call_trapsignal(td, sig, ucode,
-			    (void * __capability)(uintcap_t)stval,
+			call_trapsignal(td, sig, ucode, stval,
 			    frame->tf_scause & EXCP_MASK, 0);
 		} else {
 			if (pcb->pcb_onfault != 0) {
@@ -388,7 +394,7 @@ do_trap_supervisor(struct trapframe *frame)
 	KASSERT((csr_read(sstatus) & (SSTATUS_SPP | SSTATUS_SIE)) ==
 	    SSTATUS_SPP, ("Came from S mode with interrupts enabled"));
 
-	exception = (frame->tf_scause & EXCP_MASK);
+	exception = frame->tf_scause & EXCP_MASK;
 	if (frame->tf_scause & EXCP_INTR) {
 		/* Interrupt */
 		riscv_cpu_intr(frame);
@@ -403,10 +409,14 @@ do_trap_supervisor(struct trapframe *frame)
 	CTR3(KTR_TRAP, "do_trap_supervisor: curthread: %p, sepc: %lx, frame: %p",
 	    curthread, (__cheri_addr unsigned long)frame->tf_sepc, frame);
 
-	switch(exception) {
+	switch (exception) {
 	case EXCP_FAULT_LOAD:
 	case EXCP_FAULT_STORE:
 	case EXCP_FAULT_FETCH:
+		dump_regs(frame);
+		panic("Memory access exception at 0x%016lx\n",
+		    (__cheri_addr unsigned long)frame->tf_sepc);
+		break;
 	case EXCP_STORE_PAGE_FAULT:
 	case EXCP_LOAD_PAGE_FAULT:
 		data_abort(frame, 0);
@@ -447,7 +457,7 @@ do_trap_supervisor(struct trapframe *frame)
 			    frame->tf_stval);
 			break;
 		case EXCP_CHERI:
-			panic("CHERI exception %#x at 0x%016lx\n",
+			panic("CHERI exception %#lx at 0x%016lx\n",
 			    TVAL_CAP_CAUSE(frame->tf_stval),
 			    (__cheri_addr unsigned long)frame->tf_sepc);
 			break;
@@ -455,7 +465,7 @@ do_trap_supervisor(struct trapframe *frame)
 #endif
 	default:
 		dump_regs(frame);
-		panic("Unknown kernel exception %x trap value %lx\n",
+		panic("Unknown kernel exception %lx trap value %lx\n",
 		    exception, frame->tf_stval);
 	}
 }
@@ -475,17 +485,18 @@ do_trap_user(struct trapframe *frame)
 	KASSERT((csr_read(sstatus) & (SSTATUS_SPP | SSTATUS_SIE)) == 0,
 	    ("Came from U mode with interrupts enabled"));
 
-	exception = (frame->tf_scause & EXCP_MASK);
+	exception = frame->tf_scause & EXCP_MASK;
 	if (frame->tf_scause & EXCP_INTR) {
 		/* Interrupt */
 		riscv_cpu_intr(frame);
 		return;
 	}
+	intr_enable();
 
 	CTR3(KTR_TRAP, "do_trap_user: curthread: %p, sepc: %lx, frame: %p",
 	    curthread, (__cheri_addr unsigned long)frame->tf_sepc, frame);
 
-	switch(exception) {
+	switch (exception) {
 	case EXCP_FAULT_LOAD:
 	case EXCP_FAULT_STORE:
 	case EXCP_FAULT_FETCH:
@@ -512,13 +523,13 @@ do_trap_user(struct trapframe *frame)
 			break;
 		}
 #endif
-		call_trapsignal(td, SIGILL, ILL_ILLTRP,
-		    (void * __capability)frame->tf_sepc, exception, 0);
+		call_trapsignal(td, SIGILL, ILL_ILLTRP, frame->tf_sepc,
+		    exception, 0);
 		userret(td, frame);
 		break;
 	case EXCP_BREAKPOINT:
-		call_trapsignal(td, SIGTRAP, TRAP_BRKPT,
-		    (void * __capability)frame->tf_sepc, exception, 0);
+		call_trapsignal(td, SIGTRAP, TRAP_BRKPT, frame->tf_sepc,
+		    exception, 0);
 		userret(td, frame);
 		break;
 #if __has_feature(capabilities)
@@ -526,36 +537,32 @@ do_trap_user(struct trapframe *frame)
 	case EXCP_MISALIGNED_LOAD:
 	case EXCP_MISALIGNED_STORE:
 		call_trapsignal(td, SIGBUS, BUS_ADRALN,
-		    (void * __capability)(uintcap_t)frame->tf_stval, exception,
-		    0);
+		    (uintcap_t)frame->tf_stval, exception, 0);
 		break;
 	case EXCP_LOAD_CAP_PAGE_FAULT:
 		if (log_user_cheri_exceptions)
 			dump_cheri_exception(frame);
 		call_trapsignal(td, SIGSEGV, SEGV_LOADTAG,
-		    (void * __capability)(uintcap_t)frame->tf_stval, exception,
-		    0);
+		    (uintcap_t)frame->tf_stval, exception, 0);
 		break;
 	case EXCP_STORE_AMO_CAP_PAGE_FAULT:
 		if (log_user_cheri_exceptions)
 			dump_cheri_exception(frame);
 		call_trapsignal(td, SIGSEGV, SEGV_STORETAG,
-		    (void * __capability)(uintcap_t)frame->tf_stval, exception,
-		    0);
+		    (uintcap_t)frame->tf_stval, exception, 0);
 		break;
 	case EXCP_CHERI:
 		if (log_user_cheri_exceptions)
 			dump_cheri_exception(frame);
 		call_trapsignal(td, SIGPROT,
-		    cheri_stval_to_sicode(frame->tf_stval),
-		    (void * __capability)frame->tf_sepc, exception,
-		    TVAL_CAP_IDX(frame->tf_stval));
+		    cheri_stval_to_sicode(frame->tf_stval), frame->tf_sepc,
+		    exception, TVAL_CAP_IDX(frame->tf_stval));
 		userret(td, frame);
 		break;
 #endif
 	default:
 		dump_regs(frame);
-		panic("Unknown userland exception %x, trap value %lx\n",
+		panic("Unknown userland exception %lx, trap value %lx\n",
 		    exception, frame->tf_stval);
 	}
 }

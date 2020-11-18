@@ -99,9 +99,9 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_extern.h>
 #include <vm/uma.h>
 
-vm_map_t kernel_map;
-vm_map_t exec_map;
-vm_map_t pipe_map;
+struct vm_map kernel_map_store;
+struct vm_map exec_map_store;
+struct vm_map pipe_map_store;
 
 const void *zero_region;
 CTASSERT((ZERO_REGION_SIZE & PAGE_MASK) == 0);
@@ -244,7 +244,10 @@ kmem_alloc_attr_domain(int domain, vm_size_t size, int flags, vm_paddr_t low,
 		return (0);
 	offset = addr - VM_MIN_KERNEL_ADDRESS;
 	pflags = malloc2vm_flags(flags) | VM_ALLOC_WIRED;
-	prot = (flags & M_EXEC) != 0 ? VM_PROT_ALL : VM_PROT_RW;
+	prot = (flags & M_EXEC) != 0 ? VM_PROT_RWX : VM_PROT_RW;
+
+	/* XXX: Do we want a M_CAP? */
+	prot |= VM_PROT_CAP;
 	VM_OBJECT_WLOCK(object);
 	for (i = 0; i < size; i += PAGE_SIZE) {
 		m = kmem_alloc_contig_pages(object, atop(offset + i),
@@ -261,6 +264,7 @@ kmem_alloc_attr_domain(int domain, vm_size_t size, int flags, vm_paddr_t low,
 		if ((flags & M_ZERO) && (m->flags & PG_ZERO) == 0)
 			pmap_zero_page(m);
 		vm_page_valid(m);
+		VM_OBJECT_ASSERT_CAP(object, prot);
 		pmap_enter(kernel_pmap, addr + i, m, prot,
 		    prot | PMAP_ENTER_WIRED, 0);
 	}
@@ -347,8 +351,9 @@ kmem_alloc_contig_domain(int domain, vm_size_t size, int flags, vm_paddr_t low,
 		if ((flags & M_ZERO) && (m->flags & PG_ZERO) == 0)
 			pmap_zero_page(m);
 		vm_page_valid(m);
-		pmap_enter(kernel_pmap, tmp, m, VM_PROT_RW,
-		    VM_PROT_RW | PMAP_ENTER_WIRED, 0);
+		VM_OBJECT_ASSERT_CAP(object, VM_PROT_RW_CAP);
+		pmap_enter(kernel_pmap, tmp, m, VM_PROT_RW_CAP,
+		    VM_PROT_RW_CAP | PMAP_ENTER_WIRED, 0);
 		tmp += PAGE_SIZE;
 	}
 	VM_OBJECT_WUNLOCK(object);
@@ -387,9 +392,9 @@ kmem_alloc_contig_domainset(struct domainset *ds, vm_size_t size, int flags,
 }
 
 /*
- *	kmem_suballoc:
+ *	kmem_subinit:
  *
- *	Allocates a map to manage a subrange
+ *	Initializes a map to manage a subrange
  *	of the kernel virtual address space.
  *
  *	Arguments are as follows:
@@ -399,12 +404,11 @@ kmem_alloc_contig_domainset(struct domainset *ds, vm_size_t size, int flags,
  *	size		Size of range to find
  *	superpage_align	Request that min is superpage aligned
  */
-vm_map_t
-kmem_suballoc(vm_map_t parent, vm_ptr_t *min, vm_ptr_t *max,
-    vm_size_t size, boolean_t superpage_align)
+void
+kmem_subinit(vm_map_t map, vm_map_t parent, vm_ptr_t *min, vm_ptr_t *max,
+    vm_size_t size, bool superpage_align)
 {
 	int ret;
-	vm_map_t result;
 
 	CHERI_ASSERT_VALID(min);
 	CHERI_ASSERT_VALID(max);
@@ -415,14 +419,11 @@ kmem_suballoc(vm_map_t parent, vm_ptr_t *min, vm_ptr_t *max,
 	    VMFS_SUPER_SPACE : VMFS_ANY_SPACE, VM_PROT_ALL, VM_PROT_ALL,
 	    MAP_ACC_NO_CHARGE);
 	if (ret != KERN_SUCCESS)
-		panic("kmem_suballoc: bad status return of %d", ret);
+		panic("kmem_subinit: bad status return of %d", ret);
 	*max = *min + size;
-	result = vm_map_create(vm_map_pmap(parent), *min, *max);
-	if (result == NULL)
-		panic("kmem_suballoc: cannot create submap");
-	if (vm_map_submap(parent, *min, *max, result) != KERN_SUCCESS)
-		panic("kmem_suballoc: unable to change range to submap");
-	return (result);
+	vm_map_init(map, vm_map_pmap(parent), *min, *max);
+	if (vm_map_submap(parent, *min, *max, map) != KERN_SUCCESS)
+		panic("kmem_subinit: unable to change range to submap");
 }
 
 /*
@@ -511,7 +512,10 @@ kmem_back_domain(int domain, vm_object_t object, vm_ptr_t addr,
 	pflags &= ~(VM_ALLOC_NOWAIT | VM_ALLOC_WAITOK | VM_ALLOC_WAITFAIL);
 	if (flags & M_WAITOK)
 		pflags |= VM_ALLOC_WAITFAIL;
-	prot = (flags & M_EXEC) != 0 ? VM_PROT_ALL : VM_PROT_RW;
+	prot = (flags & M_EXEC) != 0 ? VM_PROT_RWX : VM_PROT_RW;
+
+	/* XXX: Do we want a M_CAP? */
+	prot |= VM_PROT_CAP;
 
 	i = 0;
 	VM_OBJECT_WLOCK(object);
@@ -541,6 +545,7 @@ retry:
 		KASSERT((m->oflags & VPO_UNMANAGED) != 0,
 		    ("kmem_malloc: page %p is managed", m));
 		vm_page_valid(m);
+		VM_OBJECT_ASSERT_CAP(object, prot);
 		pmap_enter(kernel_pmap, addr + i, m, prot,
 		    prot | PMAP_ENTER_WIRED, 0);
 		if (__predict_false((prot & VM_PROT_EXECUTE) != 0))
@@ -710,10 +715,10 @@ kmap_alloc_wait(vm_map_t map, vm_size_t size)
 
 	mapped = addr;
 	if (vm_map_reservation_create_locked(map, &mapped, padded_size,
-	    VM_PROT_RW))
+	    VM_PROT_RW_CAP))
 		return (0);
-	vm_map_insert(map, NULL, 0, mapped, mapped + size, VM_PROT_RW,
-	    VM_PROT_RW, MAP_ACC_CHARGED, mapped);
+	vm_map_insert(map, NULL, 0, mapped, mapped + size, VM_PROT_RW_CAP,
+	    VM_PROT_RW_CAP, MAP_ACC_CHARGED, mapped);
 	vm_map_unlock(map);
 
 	return (mapped);
@@ -814,20 +819,18 @@ kva_import_domain(void *arena, vmem_size_t size, int flags, vmem_addr_t *addrp)
 void
 kmem_init(vm_ptr_t start, vm_ptr_t end)
 {
-	vm_map_t m;
 	vm_ptr_t addr;
-	vm_size_t size;
 	int domain;
+	vm_size_t size;
 
 	CHERI_ASSERT_VALID(start);
 	CHERI_ASSERT_VALID(end);
 
-	m = vm_map_create(kernel_pmap,
+	vm_map_init(kernel_map, kernel_pmap,
 	    cheri_kern_setaddress(start, VM_MIN_KERNEL_ADDRESS), end);
-	m->system_map = 1;
-	vm_map_lock(m);
+	kernel_map->system_map = 1;
+	vm_map_lock(kernel_map);
 	/* N.B.: cannot use kgdb to debug, starting with this assignment ... */
-	kernel_map = m;
 #ifdef __amd64__
 	addr = KERNBASE;
 #else
@@ -835,8 +838,9 @@ kmem_init(vm_ptr_t start, vm_ptr_t end)
 #endif
 
 	size = (vaddr_t)start - (vaddr_t)addr;
-	(void)vm_map_reservation_create_locked(m, &addr, size, VM_PROT_ALL);
-	(void)vm_map_insert(m, NULL, 0, addr, start, VM_PROT_ALL,
+	(void)vm_map_reservation_create_locked(kernel_map, &addr, size,
+	    VM_PROT_ALL);
+	(void)vm_map_insert(kernel_map, NULL, 0, addr, start, VM_PROT_ALL,
 	    VM_PROT_ALL, MAP_NOFAULT, VM_MIN_KERNEL_ADDRESS);
 	/* ... and ending with the completion of the above `insert' */
 
@@ -848,11 +852,12 @@ kmem_init(vm_ptr_t start, vm_ptr_t end)
 	 */
 	addr = (vm_offset_t)vm_page_array;
 	size = round_2mpage(vm_page_array_size * sizeof(struct vm_page));
-	(void)vm_map_reservation_create_locked(m, &addr, size, VM_PROT_RW);
-	(void)vm_map_insert(m, NULL, 0, addr, addr + size, VM_PROT_RW,
+	(void)vm_map_reservation_create_locked(kernel_map, &addr, size,
+	    VM_PROT_RW);
+	(void)vm_map_insert(kernel_map, NULL, 0, addr, addr + size, VM_PROT_RW,
 	    VM_PROT_RW, MAP_NOFAULT, addr);
 #endif
-	vm_map_unlock(m);
+	vm_map_unlock(kernel_map);
 
 	/*
 	 * Initialize the kernel_arena.  This can grow on demand.

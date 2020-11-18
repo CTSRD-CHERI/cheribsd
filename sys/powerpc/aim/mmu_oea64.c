@@ -108,6 +108,9 @@ uintptr_t moea64_get_unique_vsid(void);
 #define	VSID_TO_HASH(vsid)	(((vsid) >> 4) & 0xfffff)
 #define	VSID_HASH_MASK		0x0000007fffffffffULL
 
+/* Get physical address from PVO. */
+#define	PVO_PADDR(pvo)		((pvo)->pvo_pte.pa & LPTE_RPGN)
+
 /*
  * Locking semantics:
  *
@@ -260,8 +263,8 @@ void moea64_copy_pages(vm_page_t *ma, vm_offset_t a_offset,
 int moea64_enter(pmap_t, vm_offset_t, vm_page_t, vm_prot_t,
     u_int flags, int8_t psind);
 void moea64_enter_object(pmap_t, vm_offset_t, vm_offset_t, vm_page_t,
-    vm_prot_t, u_int);
-void moea64_enter_quick(pmap_t, vm_offset_t, vm_page_t, vm_prot_t, u_int);
+    vm_prot_t);
+void moea64_enter_quick(pmap_t, vm_offset_t, vm_page_t, vm_prot_t);
 vm_paddr_t moea64_extract(pmap_t, vm_offset_t);
 vm_page_t moea64_extract_and_hold(pmap_t, vm_offset_t, vm_prot_t);
 void moea64_init(void);
@@ -1207,7 +1210,7 @@ moea64_unwire(pmap_t pm, vm_offset_t sva, vm_offset_t eva)
 		    (pvo->pvo_pte.prot & VM_PROT_WRITE)) {
 			if (refchg < 0)
 				refchg = LPTE_CHG;
-			m = PHYS_TO_VM_PAGE(pvo->pvo_pte.pa & LPTE_RPGN);
+			m = PHYS_TO_VM_PAGE(PVO_PADDR(pvo));
 
 			refchg |= atomic_readandclear_32(&m->md.mdpg_attrs);
 			if (refchg & LPTE_CHG)
@@ -1578,7 +1581,7 @@ moea64_syncicache(pmap_t pmap, vm_offset_t va, vm_paddr_t pa,
  */
 void
 moea64_enter_object(pmap_t pm, vm_offset_t start, vm_offset_t end,
-    vm_page_t m_start, vm_prot_t prot, u_int flags)
+    vm_page_t m_start, vm_prot_t prot)
 {
 	vm_page_t m;
 	vm_pindex_t diff, psize;
@@ -1597,7 +1600,7 @@ moea64_enter_object(pmap_t pm, vm_offset_t start, vm_offset_t end,
 
 void
 moea64_enter_quick(pmap_t pm, vm_offset_t va, vm_page_t m,
-    vm_prot_t prot, u_int flags)
+    vm_prot_t prot)
 {
 
 	moea64_enter(pm, va, m, prot & (VM_PROT_READ | VM_PROT_EXECUTE),
@@ -1615,7 +1618,7 @@ moea64_extract(pmap_t pm, vm_offset_t va)
 	if (pvo == NULL)
 		pa = 0;
 	else
-		pa = (pvo->pvo_pte.pa & LPTE_RPGN) | (va - PVO_VADDR(pvo));
+		pa = PVO_PADDR(pvo) | (va - PVO_VADDR(pvo));
 	PMAP_UNLOCK(pm);
 
 	return (pa);
@@ -1636,7 +1639,7 @@ moea64_extract_and_hold(pmap_t pmap, vm_offset_t va, vm_prot_t prot)
 	PMAP_LOCK(pmap);
 	pvo = moea64_pvo_find_va(pmap, va & ~ADDR_POFF);
 	if (pvo != NULL && (pvo->pvo_pte.prot & prot) == prot) {
-		m = PHYS_TO_VM_PAGE(pvo->pvo_pte.pa & LPTE_RPGN);
+		m = PHYS_TO_VM_PAGE(PVO_PADDR(pvo));
 		if (!vm_page_wire_mapped(m))
 			m = NULL;
 	}
@@ -1943,7 +1946,7 @@ moea64_kextract(vm_offset_t va)
 	pvo = moea64_pvo_find_va(kernel_pmap, va);
 	KASSERT(pvo != NULL, ("moea64_kextract: no addr found for %#" PRIxPTR,
 	    va));
-	pa = (pvo->pvo_pte.pa & LPTE_RPGN) | (va - PVO_VADDR(pvo));
+	pa = PVO_PADDR(pvo) | (va - PVO_VADDR(pvo));
 	PMAP_UNLOCK(kernel_pmap);
 	return (pa);
 }
@@ -2269,7 +2272,7 @@ moea64_pvo_protect( pmap_t pm, struct pvo_entry *pvo, vm_prot_t prot)
 	 */
 	oldprot = pvo->pvo_pte.prot;
 	pvo->pvo_pte.prot = prot;
-	pg = PHYS_TO_VM_PAGE(pvo->pvo_pte.pa & LPTE_RPGN);
+	pg = PHYS_TO_VM_PAGE(PVO_PADDR(pvo));
 
 	/*
 	 * If the PVO is in the page table, update mapping
@@ -2284,7 +2287,7 @@ moea64_pvo_protect( pmap_t pm, struct pvo_entry *pvo, vm_prot_t prot)
 		if ((pg->oflags & VPO_UNMANAGED) == 0)
 			vm_page_aflag_set(pg, PGA_EXECUTABLE);
 		moea64_syncicache(pm, PVO_VADDR(pvo),
-		    pvo->pvo_pte.pa & LPTE_RPGN, PAGE_SIZE);
+		    PVO_PADDR(pvo), PAGE_SIZE);
 	}
 
 	/*
@@ -2648,7 +2651,7 @@ moea64_pvo_remove_from_pmap(struct pvo_entry *pvo)
 	/* Send RC bits to VM */
 	if ((pvo->pvo_vaddr & PVO_MANAGED) &&
 	    (pvo->pvo_pte.prot & VM_PROT_WRITE)) {
-		pg = PHYS_TO_VM_PAGE(pvo->pvo_pte.pa & LPTE_RPGN);
+		pg = PHYS_TO_VM_PAGE(PVO_PADDR(pvo));
 		if (pg != NULL) {
 			refchg |= atomic_readandclear_32(&pg->md.mdpg_attrs);
 			if (refchg & LPTE_CHG)
@@ -2674,7 +2677,7 @@ moea64_pvo_remove_from_page_locked(struct pvo_entry *pvo,
 	/*
 	 * Update vm about page writeability/executability if managed
 	 */
-	PV_LOCKASSERT(pvo->pvo_pte.pa & LPTE_RPGN);
+	PV_LOCKASSERT(PVO_PADDR(pvo));
 	if (pvo->pvo_vaddr & PVO_MANAGED) {
 		if (m != NULL) {
 			LIST_REMOVE(pvo, pvo_vlink);
@@ -2694,11 +2697,11 @@ moea64_pvo_remove_from_page(struct pvo_entry *pvo)
 	vm_page_t pg = NULL;
 
 	if (pvo->pvo_vaddr & PVO_MANAGED)
-		pg = PHYS_TO_VM_PAGE(pvo->pvo_pte.pa & LPTE_RPGN);
+		pg = PHYS_TO_VM_PAGE(PVO_PADDR(pvo));
 
-	PV_LOCK(pvo->pvo_pte.pa & LPTE_RPGN);
+	PV_LOCK(PVO_PADDR(pvo));
 	moea64_pvo_remove_from_page_locked(pvo, pg);
-	PV_UNLOCK(pvo->pvo_pte.pa & LPTE_RPGN);
+	PV_UNLOCK(PVO_PADDR(pvo));
 }
 
 static struct pvo_entry *
@@ -2810,7 +2813,7 @@ moea64_dev_direct_mapped(vm_paddr_t pa, vm_size_t size)
 	for (pvo = RB_FIND(pvo_tree, &kernel_pmap->pmap_pvo, &key);
 	    ppa < pa + size; ppa += PAGE_SIZE,
 	    pvo = RB_NEXT(pvo_tree, &kernel_pmap->pmap_pvo, pvo)) {
-		if (pvo == NULL || (pvo->pvo_pte.pa & LPTE_RPGN) != ppa) {
+		if (pvo == NULL || PVO_PADDR(pvo) != ppa) {
 			error = EFAULT;
 			break;
 		}
@@ -2866,6 +2869,7 @@ moea64_unmapdev(vm_offset_t va, vm_size_t size)
 	offset = va & PAGE_MASK;
 	size = roundup2(offset + size, PAGE_SIZE);
 
+	moea64_qremove(base, atop(size));
 	kva_free(base, size);
 }
 
@@ -2886,7 +2890,7 @@ moea64_sync_icache(pmap_t pm, vm_offset_t va, vm_size_t sz)
 		len = MIN(lim - va, sz);
 		pvo = moea64_pvo_find_va(pm, va & ~ADDR_POFF);
 		if (pvo != NULL && !(pvo->pvo_pte.pa & LPTE_I)) {
-			pa = (pvo->pvo_pte.pa & LPTE_RPGN) | (va & ADDR_POFF);
+			pa = PVO_PADDR(pvo) | (va & ADDR_POFF);
 			moea64_syncicache(pm, va, pa, len);
 		}
 		va += len;
@@ -3005,7 +3009,7 @@ moea64_scan_pmap()
 			}
 		}
 
-		pa = pvo->pvo_pte.pa & LPTE_RPGN;
+		pa = PVO_PADDR(pvo);
 
 		if (va & PVO_LARGE) {
 			pa_end = pa + lpsize;

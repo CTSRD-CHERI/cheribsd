@@ -448,6 +448,8 @@
         ..
         ping6
         ..
+        route
+        ..
     ..
     secure
         lib
@@ -999,6 +1001,8 @@
         fold
         ..
         getconf
+        ..
+        gh-bc
         ..
         grep
         ..

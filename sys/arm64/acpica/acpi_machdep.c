@@ -63,7 +63,7 @@ acpi_machdep_quirks(int *quirks)
 }
 
 static void *
-map_table(vm_paddr_t pa, int offset, const char *sig)
+map_table(vm_paddr_t pa, const char *sig)
 {
 	ACPI_TABLE_HEADER *header;
 	vm_offset_t length;
@@ -105,9 +105,6 @@ probe_table(vm_paddr_t address, const char *sig)
 			    (uintmax_t)address);
 		return (0);
 	}
-	if (bootverbose)
-		printf("Table '%.4s' at 0x%jx\n", table->Signature,
-		    (uintmax_t)address);
 
 	if (strncmp(table->Signature, sig, ACPI_NAMESEG_SIZE) != 0) {
 		pmap_unmapbios((vm_offset_t)table, sizeof(ACPI_TABLE_HEADER));
@@ -135,7 +132,7 @@ void *
 acpi_map_table(vm_paddr_t pa, const char *sig)
 {
 
-	return (map_table(pa, 0, sig));
+	return (map_table(pa, sig));
 }
 
 /*
@@ -181,7 +178,7 @@ acpi_find_table(const char *sig)
 				printf("ACPI: RSDP failed extended checksum\n");
 			return (0);
 		}
-		xsdt = map_table(rsdp->XsdtPhysicalAddress, 2, ACPI_SIG_XSDT);
+		xsdt = map_table(rsdp->XsdtPhysicalAddress, ACPI_SIG_XSDT);
 		if (xsdt == NULL) {
 			if (bootverbose)
 				printf("ACPI: Failed to map XSDT\n");
@@ -200,19 +197,14 @@ acpi_find_table(const char *sig)
 	}
 	pmap_unmapbios((vm_offset_t)rsdp, sizeof(ACPI_TABLE_RSDP));
 
-	if (addr == 0) {
-		if (bootverbose)
-			printf("ACPI: No %s table found\n", sig);
+	if (addr == 0)
 		return (0);
-	}
-	if (bootverbose)
-		printf("%s: Found table at 0x%jx\n", sig, (uintmax_t)addr);
 
 	/*
 	 * Verify that we can map the full table and that its checksum is
 	 * correct, etc.
 	 */
-	table = map_table(addr, 0, sig);
+	table = map_table(addr, sig);
 	if (table == NULL)
 		return (0);
 	acpi_unmap_table(table);

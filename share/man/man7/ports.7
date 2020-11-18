@@ -25,7 +25,7 @@
 .\"
 .\" $FreeBSD$
 .\"
-.Dd February 4, 2020
+.Dd August 3, 2020
 .Dt PORTS 7
 .Os
 .Sh NAME
@@ -70,9 +70,7 @@ branch contains all the latest changes, while the
 branches only provide critical fixes.
 The
 .Em head
-branch can be installed or updated using either
-.Xr portsnap 8 ,
-or from Subversion repository at:
+branch can be installed or updated from the Subversion repository located at:
 .Pp
 .Lk https://svn.FreeBSD.org/ports/head
 .Pp
@@ -437,6 +435,14 @@ Where to find/put distfiles, normally
 .Pa distfiles/
 in
 .Va PORTSDIR .
+.It Va SU_CMD
+Command used to elevate privilege to configure and install a port.
+The unprivileged user must have write access to
+.Va WRKDIRPREFIX
+and
+.Va DISTDIR .
+The default is
+.Ql /usr/bin/su root -c
 .It Va PACKAGES
 Used only for the
 .Cm package
@@ -618,8 +624,7 @@ is going to be built with Python 3.7 support.)
 .Xr make 1 ,
 .Xr make.conf 5 ,
 .Xr development 7 ,
-.Xr pkg 7 ,
-.Xr portsnap 8
+.Xr pkg 7
 .Pp
 Additional developer documentation:
 .Bl -dash -width "" -offset indent

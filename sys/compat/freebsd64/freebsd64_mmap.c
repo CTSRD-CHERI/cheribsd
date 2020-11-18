@@ -133,7 +133,7 @@ int
 freebsd64_minherit(struct thread *td, struct freebsd64_minherit_args *uap)
 {
 
-	return (kern_minherit(td, (vm_offset_t)uap->addr, uap->len,
+	return (kern_minherit(td, (uintptr_t)uap->addr, uap->len,
 	    uap->inherit));
 }
 

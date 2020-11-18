@@ -88,6 +88,8 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_page.h>
 #include <vm/uma.h>
 
+#include <fs/devfs/devfs.h>
+
 #ifdef COMPAT_FREEBSD32
 #include <compat/freebsd32/freebsd32.h>
 #include <compat/freebsd32/freebsd32_util.h>
@@ -467,30 +469,6 @@ pfind_any(pid_t pid)
 	return (_pfind(pid, true));
 }
 
-static struct proc *
-pfind_tid(pid_t tid)
-{
-	struct proc *p;
-	struct thread *td;
-
-	sx_slock(&allproc_lock);
-	FOREACH_PROC_IN_SYSTEM(p) {
-		PROC_LOCK(p);
-		if (p->p_state == PRS_NEW) {
-			PROC_UNLOCK(p);
-			continue;
-		}
-		FOREACH_THREAD_IN_PROC(p, td) {
-			if (td->td_tid == tid)
-				goto found;
-		}
-		PROC_UNLOCK(p);
-	}
-found:
-	sx_sunlock(&allproc_lock);
-	return (p);
-}
-
 /*
  * Locate a process group by number.
  * The caller must hold proctree_lock.
@@ -518,6 +496,7 @@ int
 pget(pid_t pid, int flags, struct proc **pp)
 {
 	struct proc *p;
+	struct thread *td1;
 	int error;
 
 	p = curproc;
@@ -531,7 +510,9 @@ pget(pid_t pid, int flags, struct proc **pp)
 			else
 				p = pfind(pid);
 		} else if ((flags & PGET_NOTID) == 0) {
-			p = pfind_tid(pid);
+			td1 = tdfind(pid, -1);
+			if (td1 != NULL)
+				p = td1->td_proc;
 		}
 		if (p == NULL)
 			return (ESRCH);
@@ -763,9 +744,15 @@ pgadjustjobc(struct pgrp *pgrp, int entering)
 {
 
 	PGRP_LOCK(pgrp);
-	if (entering)
+	if (entering) {
+#ifdef notyet
+		MPASS(pgrp->pg_jobc >= 0);
+#endif
 		pgrp->pg_jobc++;
-	else {
+	} else {
+#ifdef notyet
+		MPASS(pgrp->pg_jobc > 0);
+#endif
 		--pgrp->pg_jobc;
 		if (pgrp->pg_jobc == 0)
 			orphanpg(pgrp);
@@ -885,7 +872,7 @@ killjobc(void)
 				VOP_REVOKE(ttyvp, REVOKEALL);
 				VOP_UNLOCK(ttyvp);
 			}
-			vrele(ttyvp);
+			devfs_ctty_unref(ttyvp);
 			sx_xlock(&proctree_lock);
 		}
 	}
@@ -2737,14 +2724,10 @@ kern_proc_vmmap_out(struct proc *p, struct sbuf *sb, ssize_t maxlen, int flags)
 			kve->kve_protection |= KVME_PROT_WRITE;
 		if (entry->protection & VM_PROT_EXECUTE)
 			kve->kve_protection |= KVME_PROT_EXEC;
-#ifdef OBJ_NOLOADTAGS
-		if (obj != NULL && (obj->flags & OBJ_NOLOADTAGS) == 0)
-			kve->kve_protection |= KVME_PROT_LOADTAGS;
-#endif
-#ifdef OBJ_NOSTORETAGS
-		if (obj != NULL && (obj->flags & OBJ_NOSTORETAGS) == 0)
-			kve->kve_protection |= KVME_PROT_STORETAGS;
-#endif
+		if (entry->protection & VM_PROT_READ_CAP)
+			kve->kve_protection |= KVME_PROT_READ_CAP;
+		if (entry->protection & VM_PROT_WRITE_CAP)
+			kve->kve_protection |= KVME_PROT_WRITE_CAP;
 
 		if (entry->eflags & MAP_ENTRY_COW)
 			kve->kve_flags |= KVME_FLAG_COW;

@@ -260,6 +260,8 @@ probe_zfs_currdev(uint64_t guid)
 {
 	char *devname;
 	struct zfs_devdesc currdev;
+	char *buf = NULL;
+	bool rv;
 
 	currdev.dd.d_dev = &zfs_dev;
 	currdev.dd.d_unit = 0;
@@ -267,9 +269,20 @@ probe_zfs_currdev(uint64_t guid)
 	currdev.root_guid = 0;
 	set_currdev_devdesc((struct devdesc *)&currdev);
 	devname = efi_fmtdev(&currdev);
-	init_zfs_bootenv(devname);
+	init_zfs_boot_options(devname);
 
-	return (sanity_check_currdev());
+	rv = sanity_check_currdev();
+	if (rv) {
+		buf = malloc(VDEV_PAD_SIZE);
+		if (buf != NULL) {
+			if (zfs_nextboot(&currdev, buf, VDEV_PAD_SIZE) == 0) {
+				printf("zfs nextboot: %s\n", buf);
+				set_currdev(buf);
+			}
+			free(buf);
+		}
+	}
+	return (rv);
 }
 #endif
 
@@ -899,7 +912,7 @@ main(int argc, CHAR16 *argv[])
 	 */
 	setenv("console", "efi", 1);
 	uhowto = parse_uefi_con_out();
-#if defined(__aarch64__) || defined(__arm__)
+#if defined(__aarch64__) || defined(__arm__) || defined(__riscv)
 	if ((uhowto & RB_SERIAL) != 0)
 		setenv("console", "comconsole", 1);
 #endif

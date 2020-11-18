@@ -543,6 +543,7 @@ thread_exit(void)
 	    (long)p->p_pid, td->td_name);
 	SDT_PROBE0(proc, , , lwp__exit);
 	KASSERT(TAILQ_EMPTY(&td->td_sigqueue.sq_list), ("signal pending"));
+	MPASS(td->td_realucred == td->td_ucred);
 
 	/*
 	 * drop FPU & debug register state storage, or any other
@@ -1298,6 +1299,14 @@ tdfind(lwpid_t tid, pid_t pid)
 #define RUN_THRESH	16
 	struct thread *td;
 	int run = 0;
+
+	td = curthread;
+	if (td->td_tid == tid) {
+		if (pid != -1 && td->td_proc->p_pid != pid)
+			return (NULL);
+		PROC_LOCK(td->td_proc);
+		return (td);
+	}
 
 	rw_rlock(&tidhash_lock);
 	LIST_FOREACH(td, TIDHASH(tid), td_hash) {

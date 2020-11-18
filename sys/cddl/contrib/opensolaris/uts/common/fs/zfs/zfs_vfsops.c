@@ -102,8 +102,8 @@ static int zfs_root(vfs_t *vfsp, int flags, vnode_t **vpp);
 static int zfs_statfs(vfs_t *vfsp, struct statfs *statp);
 static int zfs_vget(vfs_t *vfsp, ino_t ino, int flags, vnode_t **vpp);
 static int zfs_sync(vfs_t *vfsp, int waitfor);
-static int zfs_checkexp(vfs_t *vfsp, struct sockaddr *nam, int *extflagsp,
-    struct ucred **credanonp, int *numsecflavors, int **secflavors);
+static int zfs_checkexp(vfs_t *vfsp, struct sockaddr *nam, uint64_t *extflagsp,
+    struct ucred **credanonp, int *numsecflavors, int *secflavors);
 static int zfs_fhtovp(vfs_t *vfsp, fid_t *fidp, int flags, vnode_t **vpp);
 static void zfs_objset_close(zfsvfs_t *zfsvfs);
 static void zfs_freevfs(vfs_t *vfsp);
@@ -1392,6 +1392,9 @@ zfs_domount(vfs_t *vfsp, char *osname)
 
 	vfsp->vfs_data = zfsvfs;
 	vfsp->mnt_flag |= MNT_LOCAL;
+#if defined(_KERNEL) && !defined(KMEM_DEBUG)
+	vfsp->mnt_kern_flag |= MNTK_FPLOOKUP;
+#endif
 	vfsp->mnt_kern_flag |= MNTK_LOOKUP_SHARED;
 	vfsp->mnt_kern_flag |= MNTK_SHARED_WRITES;
 	vfsp->mnt_kern_flag |= MNTK_EXTENDED_SHARED;
@@ -1781,6 +1784,18 @@ getpoolname(const char *osname, char *poolname)
 	return (0);
 }
 
+static void
+fetch_osname_options(char *name, bool *checkpointrewind)
+{
+
+	if (name[0] == '!') {
+		*checkpointrewind = true;
+		memmove(name, name + 1, strlen(name));
+	} else {
+		*checkpointrewind = false;
+	}
+}
+
 /*ARGSUSED*/
 static int
 zfs_mount(vfs_t *vfsp)
@@ -1791,6 +1806,7 @@ zfs_mount(vfs_t *vfsp)
 	char		*osname;
 	int		error = 0;
 	int		canwrite;
+	bool		checkpointrewind;
 
 #ifdef illumos
 	if (mvp->v_type != VDIR)
@@ -1834,6 +1850,7 @@ zfs_mount(vfs_t *vfsp)
 		secpolicy_fs_mount_clearopts(cr, vfsp);
 	}
 #endif	/* illumos */
+	fetch_osname_options(osname, &checkpointrewind);
 
 	/*
 	 * Check for mount privilege?
@@ -1919,7 +1936,7 @@ zfs_mount(vfs_t *vfsp)
 
 		error = getpoolname(osname, pname);
 		if (error == 0)
-			error = spa_import_rootpool(pname);
+			error = spa_import_rootpool(pname, checkpointrewind);
 		if (error)
 			goto out;
 	}
@@ -2269,8 +2286,8 @@ zfs_vget(vfs_t *vfsp, ino_t ino, int flags, vnode_t **vpp)
 }
 
 static int
-zfs_checkexp(vfs_t *vfsp, struct sockaddr *nam, int *extflagsp,
-    struct ucred **credanonp, int *numsecflavors, int **secflavors)
+zfs_checkexp(vfs_t *vfsp, struct sockaddr *nam, uint64_t *extflagsp,
+    struct ucred **credanonp, int *numsecflavors, int *secflavors)
 {
 	zfsvfs_t *zfsvfs = vfsp->vfs_data;
 

@@ -130,8 +130,8 @@ freebsd64_copyinmsghdr(struct msghdr64 * __capability umsg, struct msghdr *msg,
 
 	msg->msg_iov = NULL;
 	error = freebsd64_copyiniov(
-            __USER_CAP_ARRAY((struct iovec64 *)(uintptr_t)m64->msg_iov,
-                m64->msg_iovlen),
+	    (struct iovec *__capability)__USER_CAP_ARRAY(
+		(struct iovec64 *)(uintptr_t)m64->msg_iov, m64->msg_iovlen),
 	    m64->msg_iovlen, &iov, EMSGSIZE);
 	if (error)
 		return (error);

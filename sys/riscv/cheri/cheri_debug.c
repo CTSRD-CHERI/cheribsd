@@ -48,13 +48,6 @@
 #include <cheri/cheri.h>
 #include <cheri/cheric.h>
 
-static inline void
-db_print_cap(const char* msg, void * __capability cap)
-{
-	db_printf("%s" _CHERI_PRINTF_CAP_FMT "\n", msg,
-	    _CHERI_PRINTF_CAP_ARG(cap));
-}
-
 /*
  * Show the special capability registers that aren't GPRs.
  */
@@ -66,12 +59,12 @@ DB_SHOW_COMMAND(scr, ddb_dump_scr)
 	db_printf("sccsr: %s, %s\n", sccsr & SCCSR_E ? "enabled" : "disabled",
 	    sccsr & SCCSR_D ? "dirty" : "clean");
 
-	db_print_cap("ddc: ",  scr_read(ddc));
-	db_print_cap("pcc: ",  scr_read(pcc));
-	db_print_cap("stcc: ",  scr_read(stcc));
-	db_print_cap("stdc: ",  scr_read(stdc));
-	db_print_cap("sscratchc: ",  scr_read(sscratchc));
-	db_print_cap("sepcc: ",  scr_read(sepcc));
+	db_printf("ddc: %#.16lp\n",  scr_read(ddc));
+	db_printf("pcc: %#.16lp\n",  scr_read(pcc));
+	db_printf("stcc: %#.16lp\n",  scr_read(stcc));
+	db_printf("stdc: %#.16lp\n",  scr_read(stdc));
+	db_printf("sscratchc: %#.16lp\n",  scr_read(sscratchc));
+	db_printf("sepcc: %#.16lp\n",  scr_read(sepcc));
 
 	/* XXX: Do user-mode registers if we support N? */
 }

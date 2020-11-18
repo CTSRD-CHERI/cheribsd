@@ -60,7 +60,7 @@
  *		in the range 5 to 9.
  */
 #undef __FreeBSD_version
-#define __FreeBSD_version 1300097	/* Master, propagated to newvers */
+#define __FreeBSD_version 1300110	/* Master, propagated to newvers */
 
 /*
  * __FreeBSD_kernel__ indicates that this system uses the kernel of FreeBSD,
@@ -136,8 +136,10 @@
 #endif
 
 #ifndef _KERNEL
+#ifndef LOCORE
 /* Signals. */
 #include <sys/signal.h>
+#endif
 #endif
 
 /* Machine type dependent parameters. */
@@ -192,6 +194,17 @@
 
 #define	MJUM9BYTES	(9 * 1024)	/* jumbo cluster 9k */
 #define	MJUM16BYTES	(16 * 1024)	/* jumbo cluster 16k */
+
+/*
+ * Mach derived conversion macros
+ */
+#define	round_page(x)	roundup2(x, PAGE_SIZE)
+#define	trunc_page(x)	rounddown2(x, PAGE_SIZE)
+
+#define	atop(x)		((x) >> PAGE_SHIFT)
+#define	ptoa(x)		((x) << PAGE_SHIFT)
+
+#define	pgtok(x)	((x) * (PAGE_SIZE / 1024))
 
 /*
  * Some macros for units conversion

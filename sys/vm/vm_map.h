@@ -235,6 +235,8 @@ struct vm_map {
 #define	vm_map_max(map)		vm_map_max_KBI((map))
 #define	vm_map_min(map)		vm_map_min_KBI((map))
 #define	vm_map_pmap(map)	vm_map_pmap_KBI((map))
+#define	vm_map_range_valid(map, start, end)	\
+	vm_map_range_valid_KBI((map), (start), (end))
 #else
 static __inline vm_offset_t
 vm_map_max(const struct vm_map *map)
@@ -261,6 +263,17 @@ vm_map_modflags(vm_map_t map, vm_flags_t set, vm_flags_t clear)
 {
 	map->flags = (map->flags | set) & ~clear;
 }
+
+static inline bool
+vm_map_range_valid(vm_map_t map, vm_offset_t start, vm_offset_t end)
+{
+	if (end < start)
+		return (false);
+	if (start < vm_map_min(map) || end > vm_map_max(map))
+		return (false);
+	return (true);
+}
+
 #endif	/* KLD_MODULE */
 #ifdef __CHERI_PURE_CAPABILITY__
 static __inline void *
@@ -332,6 +345,7 @@ void vm_map_wait_busy(vm_map_t map);
 vm_offset_t vm_map_max_KBI(const struct vm_map *map);
 vm_offset_t vm_map_min_KBI(const struct vm_map *map);
 pmap_t vm_map_pmap_KBI(vm_map_t map);
+bool vm_map_range_valid_KBI(vm_map_t map, vm_offset_t start, vm_offset_t end);
 
 #define	vm_map_lock(map)	_vm_map_lock(map, LOCK_FILE, LOCK_LINE)
 #define	vm_map_unlock(map)	_vm_map_unlock(map, LOCK_FILE, LOCK_LINE)
@@ -350,10 +364,6 @@ pmap_t vm_map_pmap_KBI(vm_map_t map);
 long vmspace_resident_count(struct vmspace *vmspace);
 
 #endif	/* _KERNEL */
-
-
-/* XXX: number of kernel maps to statically allocate */
-#define MAX_KMAP	10
 
 /*
  * Copy-on-write flags for vm_map operations
@@ -459,7 +469,6 @@ vm_map_entry_read_succ(void *token, struct vm_map_entry *const clone,
 
 #ifdef _KERNEL
 boolean_t vm_map_check_protection (vm_map_t, vm_offset_t, vm_offset_t, vm_prot_t);
-vm_map_t vm_map_create(pmap_t, vm_ptr_t, vm_ptr_t);
 int vm_map_delete(vm_map_t, vm_offset_t, vm_offset_t, bool);
 int vm_map_find(vm_map_t, vm_object_t, vm_ooffset_t, vm_ptr_t *, vm_size_t,
     vm_offset_t, int, vm_prot_t, vm_prot_t, int);
@@ -526,7 +535,8 @@ vm_map_entry_succ(vm_map_entry_t entry)
 	for ((it) = vm_map_entry_first(map);	\
 	    (it) != &(map)->header;		\
 	    (it) = vm_map_entry_succ(it))
-int vm_map_protect (vm_map_t, vm_offset_t, vm_offset_t, vm_prot_t, boolean_t);
+int vm_map_protect (vm_map_t, vm_offset_t, vm_offset_t, vm_prot_t, boolean_t,
+    boolean_t);
 int vm_map_remove_locked(vm_map_t, vm_offset_t, vm_offset_t);
 int vm_map_remove (vm_map_t, vm_offset_t, vm_offset_t);
 int vm_map_clear(vm_map_t);

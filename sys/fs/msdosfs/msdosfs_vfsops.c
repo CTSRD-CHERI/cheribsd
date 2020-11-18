@@ -190,7 +190,6 @@ static int
 msdosfs_cmount(struct mntarg *ma, void * __capability data, uint64_t flags)
 {
 	struct msdosfs_args args;
-	struct export_args exp;
 	int error;
 
 	if (data == NULL)
@@ -198,10 +197,9 @@ msdosfs_cmount(struct mntarg *ma, void * __capability data, uint64_t flags)
 	error = copyincap(data, &args, sizeof args);
 	if (error)
 		return (error);
-	vfs_oexport_conv(&args.export, &exp);
 
 	ma = mount_argsu(ma, "from", args.fspec, MAXPATHLEN);
-	ma = mount_arg(ma, "export", &exp, sizeof(exp));
+	ma = mount_arg(ma, "export", &args.export, sizeof(args.export));
 	ma = mount_argf(ma, "uid", "%d", args.uid);
 	ma = mount_argf(ma, "gid", "%d", args.gid);
 	ma = mount_argf(ma, "mask", "%d", args.mask);
@@ -346,7 +344,7 @@ msdosfs_mount(struct mount *mp)
 	devvp = ndp.ni_vp;
 	NDFREE(&ndp, NDF_ONLY_PNBUF);
 
-	if (!vn_isdisk(devvp, &error)) {
+	if (!vn_isdisk_error(devvp, &error)) {
 		vput(devvp);
 		return (error);
 	}
@@ -924,7 +922,7 @@ loop:
 			VI_UNLOCK(vp);
 			continue;
 		}
-		error = vget(vp, LK_EXCLUSIVE | LK_NOWAIT | LK_INTERLOCK, td);
+		error = vget(vp, LK_EXCLUSIVE | LK_NOWAIT | LK_INTERLOCK);
 		if (error) {
 			if (error == ENOENT) {
 				MNT_VNODE_FOREACH_ALL_ABORT(mp, nvp);

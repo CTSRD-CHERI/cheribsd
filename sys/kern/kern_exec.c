@@ -195,10 +195,11 @@ static int
 sysctl_kern_stackprot(SYSCTL_HANDLER_ARGS)
 {
 	struct proc *p;
+	int stackprot;
 
 	p = curproc;
-	return (SYSCTL_OUT(req, &p->p_sysent->sv_stackprot,
-	    sizeof(p->p_sysent->sv_stackprot)));
+	stackprot = p->p_sysent->sv_stackprot & VM_PROT_RWX;
+	return (SYSCTL_OUT(req, &stackprot, sizeof(stackprot)));
 }
 
 /*
@@ -1314,7 +1315,7 @@ exec_copyin_data_fds(struct thread *td, struct image_args *args,
 
 	memset(args, '\0', sizeof(*args));
 	ofdp = td->td_proc->p_fd;
-	if (datalen >= ARG_MAX || fdslen > ofdp->fd_lastfile + 1)
+	if (datalen >= ARG_MAX || fdslen >= ofdp->fd_nfiles)
 		return (E2BIG);
 	error = exec_alloc_args(args);
 	if (error != 0)
@@ -1667,8 +1668,8 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	arginfo = (struct ps_strings * __capability)cheri_setbounds(destp,
 	    sizeof(*arginfo));
 #else
-	destp = (void *)p->p_sysent->sv_psstrings;
-	arginfo = (struct ps_strings *)destp;
+	arginfo = (struct ps_strings *)p->p_sysent->sv_psstrings;
+	destp = (void *)arginfo;
 #endif
 	imgp->ps_strings = arginfo;
 	if (p->p_sysent->sv_sigcode_base == 0) {
@@ -1681,8 +1682,7 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	 */
 	if (szsigcode != 0) {
 		destp -= szsigcode;
-		destp = __builtin_align_down(destp,
-		    sizeof(void * __capability));
+		destp = rounddown2(destp, sizeof(void * __capability));
 		error = copyout(p->p_sysent->sv_sigcode, destp, szsigcode);
 		if (error != 0)
 			return (error);
@@ -1693,10 +1693,9 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	 */
 	if (execpath_len != 0) {
 		destp -= execpath_len;
-		destp = __builtin_align_down(destp,
-		    sizeof(void * __capability));
+		destp = rounddown2(destp, sizeof(void * __capability));
 #if __has_feature(capabilities)
-		imgp->execpathp = cheri_setbounds(destp, execpath_len);
+		imgp->execpathp = cheri_setboundsexact(destp, execpath_len);
 #else
 		imgp->execpathp = destp;
 #endif
@@ -1711,7 +1710,7 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	arc4rand(canary, sizeof(canary), 0);
 	destp -= sizeof(canary);
 #if __has_feature(capabilities)
-	imgp->canary = cheri_setbounds(destp, sizeof(canary));
+	imgp->canary = cheri_setboundsexact(destp, sizeof(canary));
 #else
 	imgp->canary = destp;
 #endif
@@ -1724,9 +1723,9 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	 * Prepare the pagesizes array.
 	 */
 	destp -= szps;
-	destp = __builtin_align_down(destp, sizeof(void * __capability));
+	destp = rounddown2(destp, sizeof(void * __capability));
 #if __has_feature(capabilities)
-	imgp->pagesizes = cheri_setbounds(destp, szps);
+	imgp->pagesizes = cheri_setboundsexact(destp, szps);
 #else
 	imgp->pagesizes = destp;
 #endif
@@ -1739,16 +1738,15 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	 * Allocate room for the argument and environment strings.
 	 */
 	destp -= ARG_MAX - imgp->args->stringspace;
-	destp = __builtin_align_down(destp, sizeof(void * __capability));
+	destp = rounddown2(destp, sizeof(void * __capability));
 #if __has_feature(capabilities)
 	ustringp = cheri_setbounds(destp, ARG_MAX - imgp->args->stringspace);
 #else
 	ustringp = destp;
 #endif
 
-	if (imgp->sysent->sv_stackgap != NULL) {
+	if (imgp->sysent->sv_stackgap != NULL)
 		imgp->sysent->sv_stackgap(imgp, (uintcap_t *)&destp);
-	}
 
 	if (imgp->auxargs) {
 		/*
@@ -1756,8 +1754,7 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 		 * array.  It has up to AT_COUNT entries.
 		 */
 		destp -= AT_COUNT * sizeof(Elf_Auxinfo);
-		destp = __builtin_align_down(destp,
-		    sizeof(void * __capability));
+		destp = rounddown2(destp, sizeof(void * __capability));
 	}
 
 	vectp = (char * __capability * __capability)destp;
@@ -1780,8 +1777,7 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	/*
 	 * Copy out strings - arguments and environment.
 	 */
-	error = copyout(stringp, (void * __capability)ustringp,
-	    ARG_MAX - imgp->args->stringspace);
+	error = copyout(stringp, ustringp, ARG_MAX - imgp->args->stringspace);
 	if (error != 0)
 		return (error);
 
@@ -1793,9 +1789,8 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 #else
 	imgp->argv = vectp;
 #endif
-	if (sucap(&arginfo->ps_argvstr, (intcap_t)imgp->argv) != 0)
-		return (EFAULT);
-	if (suword32(&arginfo->ps_nargvstr, argc) != 0)
+	if (sucap(&arginfo->ps_argvstr, (intcap_t)imgp->argv) != 0 ||
+	    suword32(&arginfo->ps_nargvstr, argc) != 0)
 		return (EFAULT);
 
 	/*
@@ -1804,8 +1799,8 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	for (; argc > 0; --argc) {
 		len = strlen(stringp) + 1;
 #if __has_feature(capabilities)
-		if (sucap(vectp++, (intcap_t)cheri_setbounds(ustringp,
-		    len)) != 0)
+		if (sucap(vectp++, (uintptr_t)cheri_setbounds(ustringp, len))
+		    != 0)
 			return (EFAULT);
 #else
 		if (suword(vectp++, (uintptr_t)ustringp) != 0)
@@ -1824,9 +1819,8 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 #else
 	imgp->envv = vectp;
 #endif
-	if (sucap(&arginfo->ps_envstr, (intcap_t)imgp->envv) != 0)
-		return (EFAULT);
-	if (suword32(&arginfo->ps_nenvstr, envc) != 0)
+	if (sucap(&arginfo->ps_envstr, (intcap_t)imgp->envv) != 0 ||
+	    suword32(&arginfo->ps_nenvstr, envc) != 0)
 		return (EFAULT);
 
 	/*
@@ -1835,8 +1829,8 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	for (; envc > 0; --envc) {
 		len = strlen(stringp) + 1;
 #if __has_feature(capabilities)
-		if (sucap(vectp++, (intcap_t)cheri_setbounds(ustringp,
-		    len)) != 0)
+		if (sucap(vectp++, (uintptr_t)cheri_setbounds(ustringp, len))
+		    != 0)
 			return (EFAULT);
 #else
 		if (suword(vectp++, (uintptr_t)ustringp) != 0)
@@ -1853,7 +1847,12 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	if (imgp->auxargs) {
 		vectp++;
 		error = imgp->sysent->sv_copyout_auxargs(imgp,
-		    (uintcap_t)vectp);
+#if __has_feature(capabilities)
+		    (uintcap_t)cheri_setbounds(vectp,
+		    AT_COUNT * sizeof(Elf_Auxinfo)));
+#else
+		    (uintptr_t)vectp);
+#endif
 		if (error != 0)
 			return (error);
 	}
