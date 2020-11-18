@@ -350,20 +350,47 @@ struct __no_subobject_bounds {						\
 	(cheri_get_low_ptr_bits(RB_BITS(elm, field), RB_RED_R) != 0)
 #define RB_PARENT(elm, field)		((__typeof(RB_UP(elm, field)))	\
 	 cheri_clear_low_ptr_bits(RB_BITS(elm, field), RB_RED_MASK))
+#define	RB_RED_BOTH(elm, field)						\
+	(~cheri_get_low_ptr_bits(RB_BITS(elm, field), RB_RED_MASK) == 0)
+
+#define RB_SET_PARENT(dst, src, field) do {				\
+	RB_BITS(dst, field) = cheri_set_low_ptr_bits((__uintptr_t)src,	\
+	    cheri_get_low_ptr_bits(RB_BITS(dst, field), RB_RED_MASK));	\
+} while (/*CONSTCOND*/ 0)
+#define	RB_CLEAR_PARENT_MASK(elm, field) do {			\
+	RB_BITS(elm, field) = cheri_clear_low_ptr_bits(		\
+	    RB_BITS(elm, field), RB_RED_MASK);			\
+} while (/*CONSTCOND*/ 0)
+
+#define	RB_SET_PARENT_MASK(elm, field) do {			\
+	RB_BITS(elm, field) = cheri_set_low_ptr_bits(		\
+	    RB_BITS(elm, field), RB_RED_MASK);			\
+} while (/*CONSTCOND*/ 0)
 #else /* ! __CHERI_PURE_CAPABILITY__ */
-#define RB_RED_LEFT(elm, field)		((RB_BITS(elm, field) & RB_RED_L) != 0)
-#define RB_RED_RIGHT(elm, field)	((RB_BITS(elm, field) & RB_RED_R) != 0)
+#define RB_RED_LEFT(elm, field)					\
+	((RB_BITS(elm, field) & RB_RED_L) != 0)
+#define RB_RED_RIGHT(elm, field)				\
+	((RB_BITS(elm, field) & RB_RED_R) != 0)
 #define RB_PARENT(elm, field)		((__typeof(RB_UP(elm, field)))	\
 					 (RB_BITS(elm, field) & ~RB_RED_MASK))
-#endif /* ! __CHERI_PURE_CAPABILITY__ */
-
-#define RB_ROOT(head)			(head)->rbh_root
-#define RB_EMPTY(head)			(RB_ROOT(head) == NULL)
+#define	RB_RED_BOTH(elm, field)						\
+	((~RB_BITS(elm, field) & RB_RED_MASK) == 0)
 
 #define RB_SET_PARENT(dst, src, field) do {				\
 	RB_BITS(dst, field) &= RB_RED_MASK;				\
 	RB_BITS(dst, field) |= (__uintptr_t)src;			\
 } while (/*CONSTCOND*/ 0)
+#define	RB_CLEAR_PARENT_MASK(elm, field) do {			\
+	RB_BITS(elm, field) &= ~RB_RED_MASK;			\
+} while (/*CONSTCOND*/ 0)
+
+#define	RB_SET_PARENT_MASK(elm, field) do {			\
+	RB_BITS(elm, field) |= RB_RED_MASK;			\
+} while (/*CONSTCOND*/ 0)
+#endif /* ! __CHERI_PURE_CAPABILITY__ */
+
+#define RB_ROOT(head)			(head)->rbh_root
+#define RB_EMPTY(head)			(RB_ROOT(head) == NULL)
 
 #define RB_SET(elm, parent, field) do {					\
 	RB_UP(elm, field) = parent;					\
@@ -521,7 +548,7 @@ name##_RB_INSERT_COLOR(struct name *head, struct type *elm)		\
 			}						\
 			RB_ROTATE_LEFT(head, parent, elm, field);	\
 		}							\
-		RB_BITS(elm, field) &= ~RB_RED_MASK;			\
+		RB_CLEAR_PARENT_MASK(elm, field);			\
 		break;							\
 	}								\
 }
@@ -534,7 +561,7 @@ name##_RB_REMOVE_COLOR(struct name *head,				\
 	struct type *sib;						\
 	if (RB_LEFT(parent, field) == elm &&				\
 	    RB_RIGHT(parent, field) == elm) {				\
-		RB_BITS(parent, field) &= ~RB_RED_MASK;			\
+		RB_CLEAR_PARENT_MASK(parent, field);			\
 		elm = parent;						\
 		parent = RB_PARENT(elm, field);				\
 		if (parent == NULL)					\
@@ -552,8 +579,8 @@ name##_RB_REMOVE_COLOR(struct name *head,				\
 				continue;				\
 			}						\
 			sib = RB_RIGHT(parent, field);			\
-			if ((~RB_BITS(sib, field) & RB_RED_MASK) == 0) {\
-				RB_BITS(sib, field) &= ~RB_RED_MASK;	\
+			if (RB_RED_BOTH(sib, field)) {			\
+				RB_CLEAR_PARENT_MASK(sib, field);	\
 				elm = parent;				\
 				continue;				\
 			}						\
@@ -567,7 +594,7 @@ name##_RB_REMOVE_COLOR(struct name *head,				\
 					RB_FLIP_LEFT(sib, field);	\
 				if (RB_RED_LEFT(elm, field))		\
 					RB_FLIP_RIGHT(parent, field);	\
-				RB_BITS(elm, field) |= RB_RED_MASK;	\
+				RB_SET_PARENT_MASK(elm, field);		\
 				sib = elm;				\
 			}						\
 			RB_ROTATE_LEFT(head, parent, sib, field);	\
@@ -582,8 +609,8 @@ name##_RB_REMOVE_COLOR(struct name *head,				\
 				continue;				\
 			}						\
 			sib = RB_LEFT(parent, field);			\
-			if ((~RB_BITS(sib, field) & RB_RED_MASK) == 0) {\
-				RB_BITS(sib, field) &= ~RB_RED_MASK;	\
+			if (RB_RED_BOTH(sib, field)) {			\
+				RB_CLEAR_PARENT_MASK(sib, field);	\
 				elm = parent;				\
 				continue;				\
 			}						\
@@ -597,7 +624,7 @@ name##_RB_REMOVE_COLOR(struct name *head,				\
 					RB_FLIP_RIGHT(sib, field);	\
 				if (RB_RED_RIGHT(elm, field))		\
 					RB_FLIP_LEFT(parent, field);	\
-				RB_BITS(elm, field) |= RB_RED_MASK;	\
+				RB_SET_PARENT_MASK(elm, field);		\
 				sib = elm;				\
 			}						\
 			RB_ROTATE_RIGHT(head, parent, sib, field);	\
