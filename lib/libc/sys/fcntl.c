@@ -71,6 +71,8 @@ fcntl(int fd, int cmd, ...)
 	case F_GETFD:
 	case F_GETFL:
 	case F_GETOWN:
+	case F_GET_SEALS:
+	case F_ISUNIONSTACK:
 		arg = 0;
 		break;
 
@@ -104,6 +106,8 @@ _fcntl(int fd, int cmd, ...)
 	case F_GETFD:
 	case F_GETFL:
 	case F_GETOWN:
+	case F_GET_SEALS:
+	case F_ISUNIONSTACK:
 		arg = 0;
 		break;
 

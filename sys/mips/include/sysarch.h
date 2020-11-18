@@ -55,13 +55,6 @@
 #define	CHERI_SET_STACK		5	/* Set trusted stack. */
 
 /*
- * Query the root of the object-type sealing capability provenance tree.  This
- * allows us to avoid setting CHERI_PERM_SEAL and CHERI_PERM_UNSEAL on data
- * and code capabilities.
- */
-#define	CHERI_GET_SEALCAP	6	/* Get root sealing capability. */
-
-/*
  * Manipulate the mmap capability.
  */
 #define	CHERI_MMAP_GETPERM	7	/* Get permissions */
@@ -82,6 +75,7 @@
  */
 #define	QEMU_GET_QTRACE		100	/* Get QEMU tracing. */
 #define	QEMU_SET_QTRACE		101	/* Set (or clear) QEMU tracing. */
+#define	QEMU_SET_QTRACE_USER	102	/* Set (or clear) QEMU per-thread user-only tracing mode */
 
 #ifndef _KERNEL
 #include <sys/cdefs.h>

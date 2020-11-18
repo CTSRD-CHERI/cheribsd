@@ -80,7 +80,7 @@ __END_DECLS
 #define _MYNAME	"ld-elf32.so.1"
 #elif defined(COMPAT_64BIT)
 #define _MYNAME	"ld-elf64.so.1"
-#elif defined(__CHERI_PURE_CAPABILITY__)
+#elif defined(COMPAT_CHERI)
 #define _MYNAME	"ld-cheri-elf.so.1"
 #else
 #define _MYNAME	"ld-elf.so.1"

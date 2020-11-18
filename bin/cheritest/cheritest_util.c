@@ -65,7 +65,7 @@ vcheritest_failure_errx(const char *msg, va_list ap)
 }
 
 static void
-vcheritest_failure_err(const char *msg, va_list ap)
+vcheritest_failure_errc(int code, const char *msg, va_list ap)
 {
 	size_t buflen;
 	int len;
@@ -78,7 +78,7 @@ vcheritest_failure_err(const char *msg, va_list ap)
 	if ((size_t)len >= buflen)	/* No room for further strings. */
 		return;
 	snprintf(ccsp->ccs_testresult_str + len, buflen - len, ": %s",
-	    strerror(errno));
+	    strerror(code));
 }
 
 void
@@ -93,11 +93,21 @@ cheritest_failure_errx(const char *msg, ...)
 }
 
 void
+cheritest_failure_errc(int code, const char *msg, ...)
+{
+	va_list ap;
+	va_start(ap, msg);
+	vcheritest_failure_errc(code, msg, ap);
+	va_end(ap);
+	exit(EX_SOFTWARE);
+}
+
+void
 cheritest_failure_err(const char *msg, ...)
 {
 	va_list ap;
 	va_start(ap, msg);
-	vcheritest_failure_err(msg, ap);
+	vcheritest_failure_errc(errno, msg, ap);
 	va_end(ap);
 	exit(EX_SOFTWARE);
 }

@@ -1,8 +1,11 @@
 # $FreeBSD$
 
+.include <src.opts.mk>
+
+.if !${MACHINE_ABI:Mpurecap}
 NEED_COMPAT=	CHERI
 .include <bsd.compat.mk>
-.include <src.opts.mk>
+.endif
 
 PROG_CXX=	helloworld_cxx
 

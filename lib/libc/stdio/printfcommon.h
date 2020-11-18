@@ -279,82 +279,131 @@ __ujtoa(uintmax_t val, CHAR *endp, int base, int octzero, const char *xdigs)
 	return (cp);
 }
 
-#ifdef __CHERI_PURE_CAPABILITY__
-/*
- * Print the pointer details.  Format matches the kernel register dump format:
- * v:0 s:0 p:00000000 b:0000000000000000 l:0000000000000000 o:0 t:0
- *  v	tag (valid)
- *  s	sealed
- *  p	permissions
- *  b	base
- *  l	length
- *  o	offset
- *  t	type
+#if __has_feature(capabilities)
+/**
+ * Print the pointer details.
+ * <address> [<permissions>,<base>-<top>] <attr>
+ *
+ * For null-derived capabilities, only the address is displayed.
+ *
+ * The address, base, and top are all printed in hex and honor
+ * requested precision by padding with leading zeroes.
+ *
+ * The permissions are zero or more of 'r' (LOAD), 'w' (STORE),
+ * 'x' (EXECUTE), 'R' (LOAD_CAP), and 'W' (STORE_CAP).
+ *
+ * The attributes are a comma-separated list of "invalid", "sentry",
+ * or "sealed" (sealed but not a sentry) enclosed in ()'s.  If no
+ * attributes are true, the ()'s are omitted.
  */
+
 static CHAR *
-__cheri_ptr_alt(void *pointer, CHAR *cp, const char *xdigs)
+__cheri_ptr_alt(void * __capability pointer, CHAR *cp, const char *xdigs,
+    int precision)
 {
 	uintmax_t ujval;
 	CHAR *scp;
+	char *p;
+	int padding, size;
 
-	ujval = cheri_gettype(pointer);
-	if (ujval == -1) {
-		*--cp = '1';
-		*--cp = '-';
-	} else {
-		cp = __ujtoa(ujval, cp, 16, 0, xdigs);
+	/* Skip attributes if NULL-derived. */
+	if (cheri_getperm(pointer) == 0 && cheri_getflags(pointer) == 0 &&
+	    cheri_getbase(pointer) == 0 && cheri_getlen(pointer) + 1 == 0 &&
+	    cheri_gettype(pointer) == CHERI_OTYPE_UNSEALED)
+		goto address;
+
+	/* tag and sealing */
+	switch (cheri_gettype(pointer)) {
+	case CHERI_OTYPE_UNSEALED:
+		if (cheri_gettag(pointer))
+			p = NULL;
+		else
+			p = "(invalid)";
+		break;
+	case CHERI_OTYPE_SENTRY:
+		if (cheri_gettag(pointer))
+			p = "(sentry)";
+		else
+			p = "(invalid,sentry)";
+		break;
+	default:
+		if (cheri_gettag(pointer))
+			p = "(sealed)";
+		else
+			p = "(invalid,sealed)";
+		break;
 	}
-	*--cp = ':';
-	*--cp = 't';
-	*--cp = ' ';
+	if (p != NULL) {
+		cp -= strlen(p);
+		memcpy(cp, p, strlen(p));
+		*--cp = ' ';
+	}
 
-	ujval = cheri_getoffset(pointer);
-	cp = __ujtoa(ujval, cp, 16, 0, xdigs);
-	*--cp = ':';
-	*--cp = 'o';
-	*--cp = ' ';
+	*--cp = ']';
 
+	/* top */
+	ujval = cheri_gettop(pointer);
 	scp = cp;
-	ujval = cheri_getlen(pointer);
 	cp = __ujtoa(ujval, cp, 16, 0, xdigs);
-	while (scp - cp < 16)
-		*--cp = '0';
-	*--cp = ':';
-	*--cp = 'l';
-	*--cp = ' ';
+	size = scp - cp;
+	if (precision > size) {
+		padding = precision - size;
+		while (padding-- > 0)
+			*--cp = '0';
+	}
+	*--cp = 'x';
+	*--cp = '0';
+	
+	*--cp = '-';
 
-	scp = cp;
+	/* base */
 	ujval = cheri_getbase(pointer);
-	cp = __ujtoa(ujval, cp, 16, 0, xdigs);
-	while (scp - cp < 16)
-		*--cp = '0';
-	*--cp = ':';
-	*--cp = 'b';
-	*--cp = ' ';
-
 	scp = cp;
-	ujval = cheri_getperm(pointer);
 	cp = __ujtoa(ujval, cp, 16, 0, xdigs);
-	while (scp - cp < 8)
-		*--cp = '0';
-	*--cp = ':';
-	*--cp = 'p';
+	size = scp - cp;
+	if (precision > size) {
+		padding = precision - size;
+		while (padding-- > 0)
+			*--cp = '0';
+	}
+	*--cp = 'x';
+	*--cp = '0';
+
+	*--cp = ',';
+
+	/* permissions */
+	ujval = cheri_getperm(pointer);
+	if (ujval & CHERI_PERM_STORE_CAP)
+		*--cp = 'W';
+	if (ujval & CHERI_PERM_LOAD_CAP)
+		*--cp = 'R';
+	if (ujval & CHERI_PERM_EXECUTE)
+		*--cp = 'x';
+	if (ujval & CHERI_PERM_STORE)
+		*--cp = 'w';
+	if (ujval & CHERI_PERM_LOAD)
+		*--cp = 'r';
+
+	*--cp = '[';
 	*--cp = ' ';
 
-	ujval = cheri_getsealed(pointer);
-	*--cp = ujval ? '1' : '0';
-	*--cp = ':';
-	*--cp = 's';
-	*--cp = ' ';
-
-	ujval = cheri_gettag(pointer);
-	*--cp = ujval ? '1' : '0';
-	*--cp = ':';
-	*--cp = 'v';
+address:
+	/* address */
+	ujval = cheri_getaddress(pointer);
+	scp = cp;
+	cp = __ujtoa(ujval, cp, 16, 0, xdigs);
+	size = scp - cp;
+	if (precision > size) {
+		padding = precision - size;
+		while (padding-- > 0)
+			*--cp = '0';
+	}
+	*--cp = 'x';
+	*--cp = '0';
 
 	return (cp);
 }
-#endif /* __CHERI_PURE_CAPABILITY__ */
+#endif /* __has_feature(capabilities) */
 
 #ifndef NO_FLOATING_POINT
 

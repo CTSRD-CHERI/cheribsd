@@ -294,25 +294,6 @@ vm_fault_dirty(struct faultstate *fs, vm_page_t m)
 }
 
 /*
- * Determine extra flags to pmap_enter to control pmap tag
- * permissions.
- */
-static u_int
-pmap_tag_flags(vm_object_t obj)
-{
-	u_int flags;
-
-	flags = 0;
-#if __has_feature(capabilities)
-	if (obj->flags & OBJ_NOLOADTAGS)
-		flags |= PMAP_ENTER_NOLOADTAGS;
-	if (obj->flags & OBJ_NOSTORETAGS)
-		flags |= PMAP_ENTER_NOSTORETAGS;
-#endif
-	return (flags);
-}
-
-/*
  * Unlocks fs.first_object and fs.map on success.
  */
 static int
@@ -368,9 +349,11 @@ vm_fault_soft_fast(struct faultstate *fs)
 		}
 	}
 #endif
-	rv = pmap_enter(fs->map->pmap, vaddr, m_map, fs->prot, fs->fault_type |
-	    PMAP_ENTER_NOSLEEP | (fs->wired ? PMAP_ENTER_WIRED : 0) |
-	    pmap_tag_flags(fs->first_object), psind);
+	VM_OBJECT_ASSERT_CAP(fs->first_object, fs->prot);
+	rv = pmap_enter(fs->map->pmap, vaddr, m_map,
+	    VM_OBJECT_MASK_CAP_PROT(fs->first_object, fs->prot),
+	    fs->fault_type |
+	    PMAP_ENTER_NOSLEEP | (fs->wired ? PMAP_ENTER_WIRED : 0), psind);
 	if (rv != KERN_SUCCESS)
 		goto out;
 	if (fs->m_hold != NULL) {
@@ -440,6 +423,7 @@ vm_fault_populate(struct faultstate *fs)
 {
 	vm_offset_t vaddr;
 	vm_page_t m;
+	vm_prot_t prot;
 	vm_pindex_t map_first, map_last, pager_first, pager_last, pidx;
 	int i, npages, psind, rv;
 
@@ -513,6 +497,7 @@ vm_fault_populate(struct faultstate *fs)
 		    pager_last);
 		pager_last = map_last;
 	}
+	VM_OBJECT_ASSERT_CAP(fs->first_object, fs->prot);
 	for (pidx = pager_first, m = vm_page_lookup(fs->first_object, pidx);
 	    pidx <= pager_last;
 	    pidx += npages, m = vm_page_next(&m[npages - 1])) {
@@ -532,17 +517,16 @@ vm_fault_populate(struct faultstate *fs)
 			vm_fault_populate_check_page(&m[i]);
 			vm_fault_dirty(fs, &m[i]);
 		}
+		prot = VM_OBJECT_MASK_CAP_PROT(fs->first_object, fs->prot);
 		VM_OBJECT_WUNLOCK(fs->first_object);
-		rv = pmap_enter(fs->map->pmap, vaddr, m, fs->prot, fs->fault_type |
-		    (fs->wired ? PMAP_ENTER_WIRED : 0) |
-		    pmap_tag_flags(fs->first_object), psind);
+		rv = pmap_enter(fs->map->pmap, vaddr, m, prot, fs->fault_type |
+		    (fs->wired ? PMAP_ENTER_WIRED : 0), psind);
 #if defined(__amd64__)
 		if (psind > 0 && rv == KERN_FAILURE) {
 			for (i = 0; i < npages; i++) {
 				rv = pmap_enter(fs->map->pmap, vaddr + ptoa(i),
-				    &m[i], fs->prot, fs->fault_type |
-				    (fs->wired ? PMAP_ENTER_WIRED : 0) |
-				    pmap_tag_flags(fs->first_object), 0);
+				    &m[i], prot, fs->fault_type |
+				    (fs->wired ? PMAP_ENTER_WIRED : 0), 0);
 				MPASS(rv == KERN_SUCCESS);
 			}
 		}
@@ -935,8 +919,24 @@ vm_fault_cow(struct faultstate *fs)
 		 * anonymously backed.  But is this always true?
 		 * XXX-AM: We must at least propagate tags for
 		 * anonymously backed objects.
+		 *
+		 * XXXJHB: To answer Robert's question, the top object
+		 * is always anonymously backed, and currently all
+		 * anonymous objects are OBJ_HASCAP.  In theory it
+		 * should be safe to always use pmap_copy_page_tags()
+		 * here, but checking OBJ_HASCAP on the source object
+		 * is just extra paranoia.  It should perhaps just be
+		 * an assertion that the source page has no tags
+		 * instead if OBJ_HASCAP is not set.
+		 *
+		 * Preserve tags if the source page contains tags.
+		 * The destination page will always belong to a
+		 * tag-bearing VM object.
 		 */
-		if (fs->first_object->flags & OBJ_ANON)
+		KASSERT(fs->first_object->flags & OBJ_HASCAP,
+		    ("%s: destination object %p doesn't have OBJ_HASCAP",
+		    __func__, fs->first_object));
+		if (fs->object->flags & OBJ_HASCAP)
 			pmap_copy_page_tags(fs->m, fs->first_m);
 		else
 #endif
@@ -1486,7 +1486,7 @@ RetryFault:
 				faultcount = 1;
 
 		} else {
-			fs.prot &= ~VM_PROT_WRITE;
+			fs.prot &= ~(VM_PROT_WRITE | VM_PROT_WRITE_CAP);
 		}
 	}
 
@@ -1530,9 +1530,10 @@ RetryFault:
 	 * back on the active queue until later so that the pageout daemon
 	 * won't find it (yet).
 	 */
-	pmap_enter(fs.map->pmap, vaddr, fs.m, fs.prot,
-	    fs.fault_type | (fs.wired ? PMAP_ENTER_WIRED : 0) |
-	    pmap_tag_flags(fs.object), 0);
+	VM_OBJECT_ASSERT_CAP(fs.object, fs.prot);
+	pmap_enter(fs.map->pmap, vaddr, fs.m,
+	    VM_OBJECT_MASK_CAP_PROT(fs.object, fs.prot),
+	    fs.fault_type | (fs.wired ? PMAP_ENTER_WIRED : 0), 0);
 	if (faultcount != 1 && (fs.fault_flags & VM_FAULT_WIRE) == 0 &&
 	    fs.wired == 0)
 		vm_fault_prefault(&fs, vaddr,
@@ -1727,9 +1728,17 @@ vm_fault_prefault(const struct faultstate *fs, vm_offset_t addra,
 		}
 
 		if (vm_page_all_valid(m) &&
-		    (m->flags & PG_FICTITIOUS) == 0)
-			pmap_enter_quick(pmap, addr, m, entry->protection,
-			    pmap_tag_flags(entry->object.vm_object));
+		    (m->flags & PG_FICTITIOUS) == 0) {
+			/*
+			 * NB: The lack of VM_OBJECT_ASSERT_CAP() is
+			 * intentional.  pmap_enter_quick() only
+			 * establishes read-only mappings, so
+			 * VM_PROT_WRITE_CAP is ignored.
+			 */
+			pmap_enter_quick(pmap, addr, m,
+			    VM_OBJECT_MASK_CAP_PROT(lobject,
+			    entry->protection));
+		}
 		if (!obj_locked || lobject != entry->object.vm_object)
 			VM_OBJECT_RUNLOCK(lobject);
 	}
@@ -1742,37 +1751,44 @@ vm_fault_prefault(const struct faultstate *fs, vm_offset_t addra,
  * pages are successfully held, then the number of held pages is returned
  * together with pointers to those pages in the array "ma".  However, if any
  * of the pages cannot be held, -1 is returned.
+ *
+ * XXX-CHERI: In a pure-capability world with physical capabilities we'd
+ * likely want to bound the first and last pages when rounding is required.
  */
 int
-vm_fault_quick_hold_pages(vm_map_t map, vm_offset_t addr, vm_size_t len,
+vm_fault_quick_hold_pages(vm_map_t map, void * __capability addr, vm_size_t len,
     vm_prot_t prot, vm_page_t *ma, int max_count)
 {
-	vm_offset_t end, va;
+	vm_offset_t start, end, va;
 	vm_page_t *mp;
 	int count;
 	boolean_t pmap_failed;
 
 	if (len == 0)
 		return (0);
-	end = round_page(addr + len);
-	addr = trunc_page(addr);
+#if __has_feature(capabilities)
+	if (!__CAP_CHECK(addr, len))
+		return (-1);
+#endif
+	start = (__cheri_addr vm_offset_t)trunc_page(addr);
+	end = (__cheri_addr vm_offset_t)round_page((char * __capability)addr + len);
 
 	/*
 	 * Check for illegal addresses.
 	 */
-	if (addr < vm_map_min(map) || addr > end || end > vm_map_max(map))
+	if (start < vm_map_min(map) || start > end || end > vm_map_max(map))
 		return (-1);
 
-	if (atop(end - addr) > max_count)
+	if (atop(end - start) > max_count)
 		panic("vm_fault_quick_hold_pages: count > max_count");
-	count = atop(end - addr);
+	count = atop(end - start);
 
 	/*
 	 * Most likely, the physical pages are resident in the pmap, so it is
 	 * faster to try pmap_extract_and_hold() first.
 	 */
 	pmap_failed = FALSE;
-	for (mp = ma, va = addr; va < end; mp++, va += PAGE_SIZE) {
+	for (mp = ma, va = start; va < end; mp++, va += PAGE_SIZE) {
 		*mp = pmap_extract_and_hold(map->pmap, va, prot);
 		if (*mp == NULL)
 			pmap_failed = TRUE;
@@ -1808,7 +1824,7 @@ vm_fault_quick_hold_pages(vm_map_t map, vm_offset_t addr, vm_size_t len,
 		if ((prot & VM_PROT_QUICK_NOFAULT) != 0 &&
 		    (curthread->td_pflags & TDP_NOFAULTING) != 0)
 			goto error;
-		for (mp = ma, va = addr; va < end; mp++, va += PAGE_SIZE)
+		for (mp = ma, va = start; va < end; mp++, va += PAGE_SIZE)
 			if (*mp == NULL && vm_fault(map, va, prot,
 			    VM_FAULT_NORMAL, mp) != KERN_SUCCESS)
 				goto error;
@@ -1973,10 +1989,16 @@ again:
 				goto again;
 			}
 
+#if __has_feature(capabilities)
 			/*
-			 * XXXRW: VM preserves tags across copy-on-write.
+			 * Preserve tags if the source page contains tags.
+			 * See longer discussion in vm_fault_cow.
 			 */
-			pmap_copy_page_tags(src_m, dst_m);
+			if (object->flags & OBJ_HASCAP)
+				pmap_copy_page_tags(src_m, dst_m);
+			else
+#endif
+				pmap_copy_page(src_m, dst_m);
 			VM_OBJECT_RUNLOCK(object);
 			dst_m->dirty = dst_m->valid = src_m->valid;
 		} else {
@@ -2008,9 +2030,10 @@ again:
 		 * backing pages.
 		 */
 		if (vm_page_all_valid(dst_m)) {
-			pmap_enter(dst_map->pmap, vaddr, dst_m, prot,
-			    access | (upgrade ? PMAP_ENTER_WIRED : 0) |
-			    pmap_tag_flags(dst_object), 0);
+			VM_OBJECT_ASSERT_CAP(dst_object, prot);
+			pmap_enter(dst_map->pmap, vaddr, dst_m,
+			    VM_OBJECT_MASK_CAP_PROT(dst_object, prot),
+			    access | (upgrade ? PMAP_ENTER_WIRED : 0), 0);
 		}
 
 		/*

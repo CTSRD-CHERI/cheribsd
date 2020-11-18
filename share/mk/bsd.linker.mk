@@ -59,7 +59,7 @@ _exported_vars=	${X_}LINKER_TYPE ${X_}LINKER_VERSION ${X_}LINKER_FEATURES \
 		${X_}LINKER_FREEBSD_VERSION
 ${X_}_ld_hash=	${${ld}}${MACHINE}${PATH}
 ${X_}_ld_hash:=	${${X_}_ld_hash:hash}
-# Only import if none of the vars are set differntly somehow else.
+# Only import if none of the vars are set differently somehow else.
 _can_export=	yes
 .for var in ${_exported_vars}
 .if defined(${var}) && (!defined(${var}__${${X_}_ld_hash}) || ${${var}__${${X_}_ld_hash}} != ${${var}})
@@ -101,8 +101,6 @@ ${X_}LINKER_FREEBSD_VERSION:=	${_ld_version:[4]:C/.*-([^-]*)\)/\1/}
 .else
 ${X_}LINKER_FREEBSD_VERSION=	0
 .endif
-.elif ${_ld_version:[1]} == "@(#)PROGRAM:ld"
-${X_}LINKER_TYPE=	mac
 .elif ${_ld_version:[1]} == "@(\#)PROGRAM:ld"
 # bootstrap linker on MacOS
 ${X_}LINKER_TYPE=        mac
@@ -119,7 +117,6 @@ _v:=${_v}.0.0
 ${X_}LINKER_TYPE=	bfd
 _v=	2.17.50
 .endif
-# See bsd.compiler.mk
 ${X_}LINKER_VERSION!=	echo "${_v:M[1-9]*.[0-9]*}" | \
 			  awk -F. '{print $$1 * 10000 + $$2 * 100 + $$3;}'
 .undef _ld_version
@@ -135,16 +132,12 @@ ${X_}LINKER_FEATURES+=	riscv-relaxations
 .if ${${X_}LINKER_TYPE} == "lld" && ${${X_}LINKER_VERSION} >= 60000
 ${X_}LINKER_FEATURES+=	retpoline
 .endif
-
+.if ${${X_}LINKER_TYPE} == "lld" && ${${X_}LINKER_VERSION} >= 90000
+${X_}LINKER_FEATURES+=	ifunc-noplt
+.endif
 .if ${${X_}LINKER_TYPE} == "lld" && ${${X_}LINKER_VERSION} >= 100000
 # If we are using lld 10.0 or newer we can use -Wl,--gdb-index without crashing
 ${X_}LINKER_FEATURES+=	gdb-index
-.endif
-# Upstream lld does not have support for ifunc-noplt so check the FreeBSD
-# version to check if the flag is supported.
-# TODO: what is the correct version number to check for?
-.if !empty(${X_}LINKER_FREEBSD_VERSION) && ${${X_}LINKER_FREEBSD_VERSION:S/-/ /:[2]} >= 1300000
-${X_}LINKER_FEATURES+=	ifunc-noplt
 .endif
 .endif
 .else

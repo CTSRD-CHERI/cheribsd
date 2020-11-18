@@ -497,7 +497,7 @@ __END_DECLS
 #endif
 
 #ifndef __CHERI_PURE_CAPABILITY__
-/* For CHERI we also set bounds (see rtld_machdep in rtld-cheri-elf) */
+/* For CHERI we also set bounds (see rtld_machdep.h) */
 #define make_data_pointer(def, defobj)	(defobj->relocbase + def->st_value)
 #endif
 

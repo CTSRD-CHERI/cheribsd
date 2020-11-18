@@ -76,18 +76,18 @@ _libc_other_objects+=umoddi3 udivdi3 qdivrem
 .endif
 # For CHERI we also use sysctlbyname
 _libc_other_objects+=sysctlbyname
-.ifdef BUILDING_RTLD_CHERI_ELF
+.if ${MACHINE_ABI:Mpurecap}
 # Instead of setjmp/_setjmp we use setjmp_c/_setjmp_c
 _libc_other_objects:=${_libc_other_objects:Nsetjmp:N_setjmp} setjmp_c _setjmp_c
 .endif
 .endif
 
-.ifdef BUILDING_RTLD_CHERI_ELF
+.if ${MACHINE_ABI:Mpurecap}
 # In purecap, mergesort uses timsort
 _libc_other_objects+=timsort
 .endif
 
-.ifdef BUILDING_RTLD_CHERI_ELF
+.if ${MACHINE_ABI:Mpurecap}
 _libc_obj_suffix=pico
 _libc_pic_path=${LIBC_PIC}
 .else

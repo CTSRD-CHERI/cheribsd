@@ -137,8 +137,7 @@ cheri_is_address_inbounds(const void * __capability cap, vaddr_t addr)
 /*
  * Construct a capability suitable to describe a type identified by 'ptr';
  * set it to zero-length with the offset equal to the base.  The caller must
- * provide a root capability (in the old world order, derived from $ddc, but
- * in the new world order, likely extracted from the kernel using sysarch(2)).
+ * provide a root sealing capability.
  *
  * The caller may wish to assert various properties about the returned
  * capability, including that CHERI_PERM_SEAL is set.
@@ -201,16 +200,12 @@ cheri_bytes_remaining(const void * __capability cap)
 #define cheri_cap_to_typed_ptr(cap, type)				\
 	(type *)cheri_cap_to_ptr(cap, sizeof(type))
 
-#define _CHERI_PRINTF_CAP_FMT  "v:%lu s:%lu p:%08lx f:%01lx b:%016jx l:%016zx o:%jx t:%ld"
-#define _CHERI_PRINTF_CAP_ARG(ptr)					\
-	    (unsigned long)cheri_gettag((const void * __capability)(ptr)),		\
-	    (unsigned long)cheri_getsealed((const void * __capability)(ptr)),		\
-	    cheri_getperm((const void * __capability)(ptr)),		\
-	    cheri_getflags((const void * __capability)(ptr)),		\
-	    cheri_getbase((const void * __capability)(ptr)),		\
-	    cheri_getlen((const void * __capability)(ptr)),		\
-	    cheri_getoffset((const void * __capability)(ptr)),		\
-	    (long)cheri_gettype((const void * __capability)(ptr))
+#ifdef __CHERI_PURE_CAPABILITY__
+#define _CHERI_PRINTF_CAP_ARG(ptr)	(ptr)
+#else
+#define _CHERI_PRINTF_CAP_ARG(ptr)	(&(ptr))
+#endif
+#define _CHERI_PRINTF_CAP_FMT  "%#.16lp"
 
 #define _CHERI_PRINT_PTR_FMT(ptr)					\
 	    "%s: " #ptr " " _CHERI_PRINTF_CAP_FMT "\n", __func__,	\
@@ -221,6 +216,7 @@ cheri_bytes_remaining(const void * __capability cap)
 
 #define CHERI_FPRINT_PTR(f, ptr)					\
 	fprintf(f, _CHERI_PRINT_PTR_FMT(ptr))
+
 #endif	/* __has_feature(capabilities) */
 
 /*

@@ -42,6 +42,14 @@ typedef	uint64_t	pt_entry_t;		/* page table entry */
 #define	ATTR_MASK_H		UINT64_C(0xfffc000000000000)
 #define	ATTR_MASK_L		UINT64_C(0x0000000000000fff)
 #define	ATTR_MASK		(ATTR_MASK_H | ATTR_MASK_L)
+#if __has_feature(capabilities)
+#define	ATTR_LC_MASK		(3UL << 61)
+#define	ATTR_LC_DISABLED	(0UL << 61)
+#define	ATTR_LC_ENABLED		(1UL << 61)
+#define	ATTR_LC_GEN0		(2UL << 61)
+#define	ATTR_LC_GEN1		(3UL << 61)
+#define	ATTR_SC			(1UL << 60)
+#endif
 /* Bits 58:55 are reserved for software */
 #define	ATTR_SW_UNUSED2		(1UL << 58)
 #define	ATTR_SW_UNUSED1		(1UL << 57)
@@ -91,7 +99,17 @@ typedef	uint64_t	pt_entry_t;		/* page table entry */
 #define	 ATTR_S2_MEMATTR_WT		0xa
 #define	 ATTR_S2_MEMATTR_WB		0xf
 
+#if __has_feature(capabilities)
+/*
+ * The aarch64 orr instruction only works when we split this into two
+ * values to be used in two orr instructions
+ */
+#define	ATTR_DEFAULT_LOW	(ATTR_AF | ATTR_SH(ATTR_SH_IS))
+#define	ATTR_DEFAULT_HIGH	(ATTR_LC_ENABLED | ATTR_SC)
+#define	ATTR_DEFAULT		(ATTR_DEFAULT_LOW | ATTR_DEFAULT_HIGH)
+#else
 #define	ATTR_DEFAULT	(ATTR_AF | ATTR_SH(ATTR_SH_IS))
+#endif
 
 #define	ATTR_DESCR_MASK		3
 #define	ATTR_DESCR_VALID	1

@@ -87,4 +87,4 @@ CFLAGS+=	${CFLAGS.${.IMPSRC:T}}
 
 .include <bsd.lib.mk>
 
-CFLAGS+=	-Wno-unused-parameter -Wno-cast-qual
+CFLAGS+=	-Wno-unused-parameter -Wno-cast-qual -Wno-cast-align

@@ -59,6 +59,11 @@ cheri_init_capabilities(void * __capability kroot)
 	    CHERI_CAP_USER_CODE_PERMS);
 	userspace_cap = ctemp;
 
+	ctemp = cheri_setaddress(kroot, CHERI_SEALCAP_USERSPACE_BASE);
+	ctemp = cheri_setbounds(ctemp, CHERI_SEALCAP_USERSPACE_LENGTH);
+	ctemp = cheri_andperm(ctemp, CHERI_SEALCAP_USERSPACE_PERMS);
+	userspace_sealcap = ctemp;
+
 	swap_restore_cap = kroot;
 }
 
@@ -93,7 +98,7 @@ cheri_signal_sandboxed(struct thread *td)
 {
 	uintmax_t c_perms;
 
-	c_perms = cheri_getperm((void * __capability)td->td_frame->tf_sepc);
+	c_perms = cheri_getperm(td->td_frame->tf_sepc);
 	if ((c_perms & CHERI_PERM_SYSCALL) == 0) {
 		atomic_add_int(&security_cheri_sandboxed_signals, 1);
 		return (ECAPMODE);

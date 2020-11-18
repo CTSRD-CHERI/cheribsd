@@ -32,29 +32,33 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
+ *
+ * $FreeBSD$
  */
 #pragma once
 
 #ifndef __USE_POSIX2
-// Ensure that unistd.h pulls in getopt
+/* Ensure that unistd.h pulls in getopt */
 #define __USE_POSIX2
 #endif
 #include_next <unistd.h>
 #include <fcntl.h>
+#include <getopt.h>
 #include <stdlib.h>
 #include <string.h>
-#include <getopt.h>
 #include <sys/syscall.h>
 
 #ifndef required_argument
-#error"something went wrong including getopt"
+#error "something went wrong including getopt"
 #endif
 
 __BEGIN_DECLS
 
 #ifdef __GLIBC__
-static inline int issetugid(void) {
-	return 0;
+static inline int
+issetugid(void)
+{
+	return (0);
 }
 #endif
 
@@ -65,7 +69,8 @@ fflagstostr(u_long flags)
 }
 
 static inline int
-strtofflags(char **stringp, u_long *setp, u_long *clrp) {
+strtofflags(char **stringp, u_long *setp, u_long *clrp)
+{
 	/* On linux just ignore the file flags for now */
 	/*
 	 * XXXAR: this will prevent makefs from setting noschg on libc, etc
@@ -75,14 +80,18 @@ strtofflags(char **stringp, u_long *setp, u_long *clrp) {
 		*setp = 0;
 	if (clrp)
 		*clrp = 0;
-	return 0; /* success */
+	return (0); /* success */
 }
 
-/* getentropy was added in glibc 2.25. Declare it for !glibc or older versions */
+/*
+ * getentropy() was added in glibc 2.25. Declare it for !glibc and older
+ * versions.
+ */
 #if defined(__GLIBC__) && !__GLIBC_PREREQ(2, 25)
 static inline int
-getentropy(void *buf, size_t buflen) {
-	return syscall(__NR_getrandom, buf, buflen, 0);
+getentropy(void *buf, size_t buflen)
+{
+	return (syscall(__NR_getrandom, buf, buflen, 0));
 }
 #endif
 
@@ -90,9 +99,7 @@ getentropy(void *buf, size_t buflen) {
 extern char *program_invocation_name;
 extern char *program_invocation_short_name;
 
-void	*setmode(const char *);
-mode_t	 getmode(const void *, mode_t);
-
-void	closefrom(int);
+void *setmode(const char *);
+mode_t getmode(const void *, mode_t);
 
 __END_DECLS

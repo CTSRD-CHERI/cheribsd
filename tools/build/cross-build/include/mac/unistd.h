@@ -32,20 +32,25 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
+ *
+ * $FreeBSD$
  */
 #pragma once
 
 #include_next <unistd.h>
-#include <fcntl.h>
+#include <sys/types.h>
 #include <sys/random.h> /* getentropy() */
 #include <sys/signal.h>
 #include <sys/time.h>
-#include <sys/types.h>
 
+#include <fcntl.h>
+
+__BEGIN_DECLS
 
 static inline int
-eaccess(const char *path, int mode) {
-	return faccessat(AT_FDCWD, path, mode, AT_EACCESS);
+eaccess(const char *path, int mode)
+{
+	return (faccessat(AT_FDCWD, path, mode, AT_EACCESS));
 }
-/* Just needs to be declared, doesn't actually have to be implemented */
-void closefrom(int lowfd);
+
+__END_DECLS

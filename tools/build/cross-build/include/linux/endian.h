@@ -32,11 +32,14 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
+ *
+ * $FreeBSD$
  */
 #pragma once
 #include_next <endian.h>
 #include <stdint.h>
-/* Work around error: initializer element is not a compile-time constant
+/*
+ * Work around error: initializer element is not a compile-time constant
  *
  * In some glibc versions (e.g. 2.28) htole16() expands to a call to an inline
  * function. Clang will complain that this is not a compile time constant if

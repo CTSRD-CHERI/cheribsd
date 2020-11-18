@@ -53,6 +53,10 @@ __RCSID("$NetBSD: makecontext.c,v 1.5 2009/12/14 01:07:42 matt Exp $");
 #define	_WANT_MIPS_REGNUM
 #include <machine/regnum.h>
 
+#ifdef __CHERI_PURE_CAPABILITY__
+#include <cheri/cheric.h>
+#endif
+
 #include <stdarg.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -97,6 +101,9 @@ __makecontext(ucontext_t *ucp, void (*func)(void), int argc, ...)
 	mc->mc_cheriframe.cf_csp = sp;
 	mc->mc_cheriframe.cf_c16 = ucp;
 	mc->mc_cheriframe.cf_c12 = func;
+	if (argc > 8)
+		mc->mc_cheriframe.cf_c13 = cheri_setbounds(sp, (argc - 8) *
+		    sizeof(register_t));
 	mc->mc_cheriframe.cf_pcc = _ctx_start;
 #else
 	mc->mc_regs[SP] = (intptr_t)sp;

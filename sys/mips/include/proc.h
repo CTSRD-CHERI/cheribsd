@@ -82,17 +82,11 @@ struct mdthread {
 #define	MDTD_COP2USED	0x0002		/* Process used the COP2 */
 #ifdef CPU_QEMU_MALTA
 #define	MDTD_QTRACE	0x0004		/* QEMU-CHERI ISA-level tracing */
+#define	MDTD_QTRACE_USERMODE	0x0008	/* QEMU-CHERI user-only tracing */
 #endif
 
 struct mdproc {
-	/*
-	 * Used only on CHERI kernels, but defined everywhere as we need
-	 * something in the struct as empty struct are undefined behavior.
-	 *
-	 * XXX-BD: In a coprocess world this might make more sense
-	 * attached to the vmspace (or at least near it).
-	 */
-	void * __kerncap md_cheri_sealcap;	/* Root of object-type tree. */
+	long md_dummy;
 };
 
 struct syscall_args {

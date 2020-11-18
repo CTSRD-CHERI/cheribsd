@@ -174,6 +174,14 @@ int suspend_blocked = 0;
 SYSCTL_INT(_kern, OID_AUTO, suspend_blocked, CTLFLAG_RW,
 	&suspend_blocked, 0, "Block suspend due to a pending shutdown");
 
+/*
+ * If CHERI-QEMU ISA-level tracing is enabled in buffered mode
+ * we emit the trace on panic.
+ */
+#if defined(CPU_QEMU_RISCV) || defined(CPU_QEMU_MALTA)
+extern u_int qemu_trace_buffered;
+#endif
+
 #ifdef EKCD
 FEATURE(ekcd, "Encrypted kernel crash dumps support");
 
@@ -852,6 +860,10 @@ panic(const char *fmt, ...)
 	if (nonexistent_function_so_that_panic_saves_retaddr)
 		nonexistent_function_so_that_panic_saves_retaddr();
 	va_list ap;
+#if defined(CPU_QEMU_RISCV) || defined(CPU_QEMU_MALTA)
+	if (qemu_trace_buffered)
+		QEMU_FLUSH_TRACE_BUFFER;
+#endif
 
 	va_start(ap, fmt);
 	vpanic(fmt, ap);

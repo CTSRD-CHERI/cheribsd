@@ -32,15 +32,18 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
+ *
+ * $FreeBSD$
  */
 
 /* No #pragam once since glibc can include this multiple times */
 #include <sys/cdefs.h>
+
 #include_next <stdio.h>
 
 __BEGIN_DECLS
-char	*fgetln(FILE *, __SIZE_TYPE__ *);
+char *fgetln(FILE *, __SIZE_TYPE__ *);
 #if defined(_WCHAR_H)
-__WCHAR_TYPE__	*fgetwln(FILE * __restrict, __SIZE_TYPE__ * __restrict);
+__WCHAR_TYPE__ *fgetwln(FILE *__restrict, __SIZE_TYPE__ *__restrict);
 #endif
 __END_DECLS

@@ -374,8 +374,10 @@ BROKEN_OPTIONS+=CDDL
 
 # Some compilation failure: TODO: investigate
 BROKEN_OPTIONS+=SVN SVNLITE
+.endif
 
-# libcheri has not been ported to RISCV
+# libcheri is MIPS-specific and requires CHERI
+.if !${__T:Mmips64*} || (${__C} != "cheri" && !${__T:Mmips64*c*})
 BROKEN_OPTIONS+=LIBCHERI
 .endif
 
@@ -446,6 +448,14 @@ BROKEN_OPTIONS+=GOOGLETEST
 __DEFAULT_YES_OPTIONS+=OPENMP
 .else
 __DEFAULT_NO_OPTIONS+=OPENMP
+.endif
+
+.if ${.MAKE.OS} != "FreeBSD"
+# Building the target compiler requires building tablegen on the host
+# which is (currently) not possible on non-FreeBSD.
+BROKEN_OPTIONS+=CLANG LLD LLDB
+# The same also applies to the bootstrap LLVM.
+BROKEN_OPTIONS+=CLANG_BOOTSTRAP LLD_BOOTSTRAP
 .endif
 
 .include <bsd.mkopt.mk>
