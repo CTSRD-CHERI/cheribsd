@@ -223,6 +223,10 @@ _C_LABEL(switcher_coaccept):
 	clearhi		CLEARHI_BITS
 	cclearlo	CCLEARLO_BITS
 	cclearhi	CCLEARHI_BITS
+#ifdef notyet
+	fpclearlo	0xff
+	fpclearhi	0xff
+#endif
 
 	/*
 	 * Clear lo and hi.
