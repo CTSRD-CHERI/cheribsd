@@ -1018,7 +1018,7 @@ DB_SHOW_COMMAND(scb, db_show_scb)
 				db_printf("    no peer scb?!\n");
 			} else {
 				if (borrowertd == NULL) {
-					db_printf("    NULL td_borrow_td; peer switcher control block:\n");
+					db_printf(" NULL td_borrow_td; peer switcher control block:\n");
 				} else {
 					td = borrowertd;
 					p = td->td_proc;
