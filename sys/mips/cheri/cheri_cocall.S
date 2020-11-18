@@ -74,12 +74,17 @@
 #define	CCLEARLO_BITS	(1 << 0  /* DDC */ | \
 			 1 << 1  /* PCC */ | \
 			 1 << 2  /* IDC */ | \
-			 1 << 3  /* $c3, containing the sealed code capability */ | \
-			 1 << 4  /* $c4, containing the sealed data capability */ | \
-			 /* $c5-$c10 are preserved and passed to the callee */ \
-			 /* $c11 is loaded from the callee context, despite being marked as caller-save */ \
+			 1 << 3  /* $c3 */ | \
+			 1 << 4  /* $c4 */ | \
+			 1 << 5  /* $c5 */ | \
+			 1 << 6  /* $c6 */ | \
+			 1 << 7  /* $c7 */ | \
+			 1 << 8  /* $c8 */ | \
+			 1 << 9  /* $c9 */ | \
+			 1 << 10 /* $c10 */ | \
+			 /* $c11 is loaded from the callee's context */ \
 			 1 << 12 /* $c12 */ | \
-			 /* $c13 is loaded from the callee context */ \
+			 /* $c13 is loaded from the callee's context */ \
 			 1 << 14 /* $c14 */ | \
 			 1 << 15 /* $c15 */)
 

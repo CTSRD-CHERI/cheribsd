@@ -82,7 +82,7 @@
 			 1 << 8  /* $c8 */ | \
 			 1 << 9  /* $c9 */ | \
 			 1 << 10 /* $c10 */ | \
-			 /* $c11 is loaded from the caller's context, despite being marked as caller-save */ \
+			 /* $c11 is loaded from the caller's context */ \
 			 1 << 12 /* $c12 */ | \
 			 /* $c13 is loaded from the caller's context */ \
 			 1 << 14 /* $c14 */ | \
