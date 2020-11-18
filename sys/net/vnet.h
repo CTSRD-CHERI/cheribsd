@@ -288,8 +288,16 @@ extern struct sx vnet_sxlock;
     static t VNET_NAME(n) __section(VNET_SETNAME) __used
 #endif
 #ifdef __CHERI_PURE_CAPABILITY__
-#define	_VNET_PTR(b, n)		(__typeof(VNET_NAME(n))*)		\
-	((b) + ((vaddr_t)&VNET_NAME(n) - (vaddr_t)VNET_START))
+/*
+ * XXX: This cannot use exact bounds currently as vnet variables are
+ * not suitably aligned.  In particular, V_ip6qb in
+ * sys/netinet6/frag6.c is a large variable requiring larger
+ * alignment.
+ */
+#define	_VNET_PTR(b, n)						\
+	cheri_setbounds((__typeof(VNET_NAME(n)) *)((b) +	\
+	    ((vaddr_t)&VNET_NAME(n) - (vaddr_t)VNET_START)),	\
+	    sizeof(VNET_NAME(n)))
 #else
 #define	_VNET_PTR(b, n)		(__typeof(VNET_NAME(n))*)		\
 				    ((b) + (uintptr_t)&VNET_NAME(n))
