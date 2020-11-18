@@ -367,7 +367,7 @@ grp_unmarshal_func(char *buffer, size_t buffer_size, void *retval, va_list ap,
 	memcpy(&p, buffer + sizeof(struct group), sizeof(char *));
 
 	if (orig_buf_size + sizeof(struct group) + sizeof(char *) +
-	    _ALIGN(p) - (size_t)p < buffer_size) {
+	    (_ALIGN(p) - p) < buffer_size) {
 		*ret_errno = ERANGE;
 		return (NS_RETURN);
 	}
