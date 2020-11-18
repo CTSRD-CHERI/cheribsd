@@ -32,10 +32,9 @@
 #include <sys/syscall.h>
 #include <machine/asm.h>
 
-#ifdef CPU_CHERI
 #include <machine/cheriasm.h>
 #include <machine/cherireg.h>
-#endif
+#include <machine/switcher.h>
 
 .set noreorder
 .set noat
@@ -141,29 +140,29 @@ _C_LABEL(switcher_coaccept):
 	 *
 	 * XXX: Make sure the IDC is cleared if we get a signal while here.
 	 */
-	csc	$c11, zero, 4*CHERICAP_SIZE($idc)
-	csc	$c17, zero, 5*CHERICAP_SIZE($idc)
+	csc	$c11, zero, SCB_CSP($idc)
+	csc	$c17, zero, SCB_CRA($idc)
 
 	/*
 	 * Save the data transfer args.
 	 */
-	csc	$c6, zero, 6*CHERICAP_SIZE($idc)
-	csd	a0, zero, 7*CHERICAP_SIZE($idc)
+	csc	$c6, zero, SCB_BUF($idc)
+	csd	a0, zero, SCB_BUFLEN($idc)
 
 	/*
 	 * Save the PCC, put there by coaccept().
 	 */
-	csc	$c13, zero, 8*CHERICAP_SIZE($idc)
+	csc	$c13, zero, SCB_C13($idc)
 
 	/*
 	 * Save the pointer to the cookie.
 	 */
-	csc	$c5, zero, 9*CHERICAP_SIZE($idc)
+	csc	$c5, zero, SCB_C5($idc)
 
 	/*
 	 * Load the capability to the caller's control block.
 	 */
-	clc	$c25, zero, 0($idc)
+	clc	$c25, zero, SCB_PEER_SCB($idc)
 
 	/*
 	 * Is this the first invocation of coaccept, or rather a response
@@ -181,23 +180,23 @@ _C_LABEL(switcher_coaccept):
 	 * This is used by kernel to look up the real thread.  Also clear
 	 * the same field on the caller side.
 	 */
-	cld	t8, zero, 1*CHERICAP_SIZE($c25);
-	csd	t8, zero, 1*CHERICAP_SIZE+8($idc)
-	csd	zero, zero, 1*CHERICAP_SIZE+8($c25)
+	cld	t8, zero, SCB_TD($c25)
+	csd	t8, zero, SCB_BORROWER_TD($idc)
+	csd	zero, zero, SCB_BORROWER_TD($c25)
 
 	/*
 	 * Restore caller's TLS pointer.
 	 */
-	clc	$c11, zero, 3*CHERICAP_SIZE($c25)
+	clc	$c11, zero, SCB_TLS($c25)
 	cwritehwr	$c11, $chwr_userlocal
 
 	/*
 	 * Restore the caller's context.
 	 */
-	clc	$c11, zero, 4*CHERICAP_SIZE($c25)
-	clc	$c17, zero, 5*CHERICAP_SIZE($c25)
+	clc	$c11, zero, SCB_CSP($c25)
+	clc	$c17, zero, SCB_CRA($c25)
 
-	clc	$c13, zero, 8*CHERICAP_SIZE($c25)
+	clc	$c13, zero, SCB_C13($c25)
 
 	/*
 	 * Do the data transfer back to the caller.  The reason
@@ -205,8 +204,8 @@ _C_LABEL(switcher_coaccept):
 	 * is doing - it transfers the data there and back, both
 	 * sides.
 	 */
-	clc	$c7, zero, 6*CHERICAP_SIZE($c25)
-	cld	t0, zero, 7*CHERICAP_SIZE($c25)
+	clc	$c7, zero, SCB_BUF($c25)
+	cld	t0, zero, SCB_BUFLEN($c25)
 
 	/*
 	 * Compare buffer sizes, put the smaller one into t0.
@@ -226,8 +225,8 @@ _C_LABEL(switcher_coaccept):
 	/*
 	 * Zero out the scb_peer_scb variables, releasing the spinlock.
 	 */
-	csd	zero, zero, 0($c25);
-	csd	zero, zero, 0($idc);
+	csd	zero, zero, SCB_PEER_SCB($c25)
+	csd	zero, zero, SCB_PEER_SCB($idc)
 
 	clearlo		CLEARLO_BITS
 	clearhi		CLEARHI_BITS

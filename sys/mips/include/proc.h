@@ -49,6 +49,9 @@
 #endif
 
 #ifdef CPU_CHERI
+/*
+ * When modifying this, make sure to update <machine/switcher.h>
+ */
 struct switchercb {
 	/*
 	 * Peer context - callee in caller's context, caller in callee's.
@@ -109,7 +112,7 @@ struct switchercb {
 	 */
 	void * __capability			scb_c5;
 };
-#endif
+#endif /* CPU_CHERI */
 
 /*
  * Machine-dependent part of the proc structure.
