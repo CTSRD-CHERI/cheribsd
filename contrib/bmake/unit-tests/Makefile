@@ -36,7 +36,8 @@
 # src/tests/usr.bin/make/t_make.sh as well.
 #TESTS+=		archive
 TESTS+=		archive-suffix
-TESTS+=		cmd-interrupt
+# Broken on linux
+#TESTS+=		cmd-interrupt
 TESTS+=		cmdline
 TESTS+=		comment
 TESTS+=		cond-cmp-numeric
