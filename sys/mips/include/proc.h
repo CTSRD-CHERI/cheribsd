@@ -105,7 +105,7 @@ struct switchercb {
 	/*
 	 * $c5.
 	 */
-	void * __capability			scb_c5;
+	void * __capability			scb_cookiep;
 };
 #endif /* CPU_CHERI */
 

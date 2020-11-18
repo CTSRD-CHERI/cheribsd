@@ -126,7 +126,7 @@
  * scb_cra (c13):	5*CHERICAP_SIZE($idc)
  * scb_buf (c6):	6*CHERICAP_SIZE($idc)
  * scb_len (a0):	7*CHERICAP_SIZE($idc)
- * scb_c5:		9*CHERICAP_SIZE($idc)
+ * scb_cookiep (c5):	8*CHERICAP_SIZE($idc)
  */
 .text
 .globl _C_LABEL(switcher_coaccept)
@@ -150,7 +150,7 @@ _C_LABEL(switcher_coaccept):
 	/*
 	 * Save the pointer to the cookie.
 	 */
-	csc	$c5, zero, SCB_C5($idc)
+	csc	$c5, zero, SCB_COOKIEP($idc)
 
 	/*
 	 * Load the capability to the caller's control block.

@@ -120,7 +120,7 @@
  * scb_cra (c13):	5*CHERICAP_SIZE($idc)
  * scb_buf (c6):	6*CHERICAP_SIZE($idc)
  * scb_buflen (a0):	7*CHERICAP_SIZE($idc)
- * scb_c5:		9*CHERICAP_SIZE($idc)
+ * scb_cookiep (c5):	8*CHERICAP_SIZE($idc)
  */
 
 .text
@@ -179,7 +179,7 @@ _C_LABEL(switcher_cocall):
 	 * Put the caller cookie (caller's data capability with the tag
 	 * stripped off) where the callee wants it.
 	 */
-	clc	$c24, zero, SCB_C5($c25)
+	clc	$c24, zero, SCB_COOKIEP($c25)
 	ccleartag	$c4, $c4
 	csc	$c4, zero, SCB_PEER_SCB($c24)
 

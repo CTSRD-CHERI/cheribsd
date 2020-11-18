@@ -943,9 +943,7 @@ db_print_scb(struct switchercb *scb)
 	db_printf("    scb_cra (c13):	%p\n", (__cheri_fromcap void *)scb->scb_cra);
 	db_printf("    scb_buf (c6):	%p\n", (__cheri_fromcap void *)scb->scb_buf);
 	db_printf("    scb_buflen (a0):	%zd\n", scb->scb_buflen);
-#ifdef __mips__
-	db_printf("    scb_c5:		%p\n", (__cheri_fromcap void *)scb->scb_c5);
-#endif
+	db_printf("    scb_cookiep:	%p\n", (__cheri_fromcap void *)scb->scb_cookiep);
 }
 
 void
