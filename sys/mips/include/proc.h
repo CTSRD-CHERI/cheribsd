@@ -103,11 +103,6 @@ struct switchercb {
 	size_t					scb_buflen;
 
 	/*
-	 * $c13.
-	 */
-	void * __capability			scb_c13;
-
-	/*
 	 * $c5.
 	 */
 	void * __capability			scb_c5;

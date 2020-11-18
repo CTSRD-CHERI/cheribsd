@@ -89,7 +89,7 @@
 			 1 << 15 /* $c15 */)
 
 #define	CCLEARHI_BITS	(1 << 0  /* $c16 */ | \
-			 /* $c17 is loaded from the caller's context */ \
+			 1 << 1  /* $c17 */ | \
 			 1 << 2  /* $c18 */ | \
 			 1 << 3  /* $c19 */ | \
 			 1 << 4  /* $c20 */ | \
@@ -123,10 +123,9 @@
  * scb_unsealcap:	2*CHERICAP_SIZE($idc)
  * scb_tls:		3*CHERICAP_SIZE($idc)
  * scb_csp (c11):	4*CHERICAP_SIZE($idc)
- * scb_cra (c17):	5*CHERICAP_SIZE($idc)
+ * scb_cra (c13):	5*CHERICAP_SIZE($idc)
  * scb_buf (c6):	6*CHERICAP_SIZE($idc)
  * scb_len (a0):	7*CHERICAP_SIZE($idc)
- * scb_c13:		8*CHERICAP_SIZE($idc)
  * scb_c5:		9*CHERICAP_SIZE($idc)
  */
 .text
@@ -134,25 +133,19 @@
 _C_LABEL(switcher_coaccept):
 
 	/*
-	 * Save the callee's context in the callee's control block.  We are
-	 * only saving the registeres which are defined as callee-saved;
-	 * the caller-saved ones will be zeroed on return.
+	 * Save the callee's stack pointer and return address (PCC)
+	 * in the callee's control block.
 	 *
 	 * XXX: Make sure the IDC is cleared if we get a signal while here.
 	 */
 	csc	$c11, zero, SCB_CSP($idc)
-	csc	$c17, zero, SCB_CRA($idc)
+	csc	$c13, zero, SCB_CRA($idc)
 
 	/*
 	 * Save the data transfer args.
 	 */
 	csc	$c6, zero, SCB_BUF($idc)
 	csd	a0, zero, SCB_BUFLEN($idc)
-
-	/*
-	 * Save the PCC, put there by coaccept().
-	 */
-	csc	$c13, zero, SCB_C13($idc)
 
 	/*
 	 * Save the pointer to the cookie.
@@ -194,9 +187,7 @@ _C_LABEL(switcher_coaccept):
 	 * Restore the caller's context.
 	 */
 	clc	$c11, zero, SCB_CSP($c25)
-	clc	$c17, zero, SCB_CRA($c25)
-
-	clc	$c13, zero, SCB_C13($c25)
+	clc	$c13, zero, SCB_CRA($c25)
 
 	/*
 	 * Do the data transfer back to the caller.  The reason
