@@ -2109,6 +2109,12 @@ each_dumpable_segment(struct thread *td, segment_callback func, void *closure)
 		if (entry->eflags & (MAP_ENTRY_NOCOREDUMP|MAP_ENTRY_IS_SUB_MAP))
 			continue;
 
+		/*
+		 * Don't dump map entries owned by another colocated process.
+		 */
+		if (entry->owner != p->p_pid)
+			continue;
+
 		if ((object = entry->object.vm_object) == NULL)
 			continue;
 
