@@ -939,6 +939,14 @@ db_print_scb(struct switchercb *scb)
 	db_printf("    scb_td:		%p\n", scb->scb_td);
 	db_printf("    scb_borrower_td:	%p\n", scb->scb_borrower_td);
 	db_printf("    scb_tls:		%p\n", (__cheri_fromcap void *)scb->scb_tls);
+	db_printf("    scb_csp (c11):	%p\n", (__cheri_fromcap void *)scb->scb_csp);
+	db_printf("    scb_cra (c17):	%p\n", (__cheri_fromcap void *)scb->scb_cra);
+	db_printf("    scb_buf (c6):	%p\n", (__cheri_fromcap void *)scb->scb_buf);
+	db_printf("    scb_buflen (a0):	%zd\n", scb->scb_buflen);
+#ifdef __mips__
+	db_printf("    scb_c13:		%p\n", (__cheri_fromcap void *)scb->scb_c13);
+	db_printf("    scb_c5:		%p\n", (__cheri_fromcap void *)scb->scb_c5);
+#endif
 }
 
 void

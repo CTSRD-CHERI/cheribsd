@@ -80,8 +80,34 @@ struct switchercb {
 	void * __capability			scb_tls;
 
 	/*
-	 * There's more stuff here; we allocate an entire page.
+	 * $c11.
 	 */
+	void * __capability			scb_csp;
+
+	/*
+	 * $c17.
+	 */
+	void * __capability			scb_cra;
+
+	/*
+	 * $c6.
+	 */
+	void * __capability			scb_buf;
+
+	/*
+	 * $a0.
+	 */
+	size_t					scb_buflen;
+
+	/*
+	 * $c13.
+	 */
+	void * __capability			scb_c13;
+
+	/*
+	 * $c5.
+	 */
+	void * __capability			scb_c5;
 };
 #endif
 
