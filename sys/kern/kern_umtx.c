@@ -3465,7 +3465,7 @@ umtx_copyin_robust_lists(const void * __capability uaddr, size_t size,
 
 	if (size > sizeof(*rb))
 		return (EINVAL);
-	return (copyin(uaddr, &rb, size));
+	return (copyin(uaddr, rb, size));
 }
 
 static int
