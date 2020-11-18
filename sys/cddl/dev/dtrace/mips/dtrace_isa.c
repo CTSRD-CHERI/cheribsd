@@ -82,24 +82,16 @@ dtrace_getpcstack(pc_t *pcstack, int pcstack_limit, int aframes,
 	int depth = 0;
 	vm_offset_t callpc;
 	pc_t caller = (pc_t) solaris_cpu[curcpu].cpu_dtrace_caller;
-	register_t sp, ra, pc;
+	register_t pc, sp;
 
 	if (intrpc != 0)
 		pcstack[depth++] = (pc_t) intrpc;
 
 	aframes++;
 
+	pc = (intptr_t)&&here;
 	sp = (register_t)(intptr_t)__builtin_frame_address(0);
-	ra = (register_t)(intptr_t)__builtin_return_address(0);
-
-       	__asm __volatile(
-		"jal 99f\n"
-		"nop\n"
-		"99:\n"
-		"move %0, $31\n" /* get ra */
-		"move $31, %1\n" /* restore ra */
-		: "=r" (pc)
-		: "r" (ra));
+here:
 
 	while (depth < pcstack_limit) {
 
@@ -219,22 +211,14 @@ uint64_t
 dtrace_getarg(int arg, int aframes)
 {
 	int i;
-	register_t sp, ra, pc;
+	register_t pc, sp;
 	/* XXX: Fix this ugly code */
 	register_t args[8];
 	int valid[8];
 
+	pc = (intptr_t)&&here;
 	sp = (register_t)(intptr_t)__builtin_frame_address(0);
-	ra = (register_t)(intptr_t)__builtin_return_address(0);
-
-       	__asm __volatile(
-		"jal 99f\n"
-		"nop\n"
-		"99:\n"
-		"move %0, $31\n" /* get ra */
-		"move $31, %1\n" /* restore ra */
-		: "=r" (pc)
-		: "r" (ra));
+here:
 
 	for (i = 0; i <= aframes + 1; i++) {
 		if (dtrace_next_frame(&pc, &sp, args, valid) < 0) {
@@ -256,20 +240,12 @@ dtrace_getarg(int arg, int aframes)
 int
 dtrace_getstackdepth(int aframes)
 {
-	register_t sp, ra, pc;
+	register_t pc, sp;
 	int depth = 0;
 
+	pc = (intptr_t)&&here;
 	sp = (register_t)(intptr_t)__builtin_frame_address(0);
-	ra = (register_t)(intptr_t)__builtin_return_address(0);
-
-       	__asm __volatile(
-		"jal 99f\n"
-		"nop\n"
-		"99:\n"
-		"move %0, $31\n" /* get ra */
-		"move $31, %1\n" /* restore ra */
-		: "=r" (pc)
-		: "r" (ra));
+here:
 
 	for (;;) {
 		if (dtrace_next_frame(&pc, &sp, NULL, NULL) < 0)

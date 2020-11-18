@@ -471,19 +471,11 @@ db_trace_self(void)
 {
 	register_t pc, ra, sp;
 
+	pc = (intptr_t)&&here;
 	sp = (register_t)(intptr_t)__builtin_frame_address(0);
 	ra = (register_t)(intptr_t)__builtin_return_address(0);
-
-	__asm __volatile(
-		"jal 99f\n"
-		"nop\n"
-		"99:\n"
-		 "move %0, $31\n" /* get ra */
-		 "move $31, %1\n" /* restore ra */
-		 : "=r" (pc)
-		 : "r" (ra));
+here:
 	stacktrace_subr(pc, sp, ra);
-	return;
 }
 
 int
