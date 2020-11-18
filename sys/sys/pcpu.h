@@ -53,6 +53,9 @@
 #define	DPCPU_SYMPREFIX		"pcpu_entry_"
 
 #ifdef _KERNEL
+#ifdef __CHERI_PURE_CAPABILITY__
+#include <cheri/cheric.h>
+#endif
 
 /*
  * Define a set for pcpu data.
@@ -121,8 +124,9 @@ extern uintptr_t dpcpu_off[];
  * subtracted the DPCPU_START, so we do it now.
  */
 #define	_DPCPU_PTR(b, n)					\
-    (__typeof(DPCPU_NAME(n))*)((b) +                            \
-        ((vaddr_t)&DPCPU_NAME(n) - (vaddr_t)DPCPU_START))
+	cheri_setboundsexact((__typeof(DPCPU_NAME(n)) *)((b) +	\
+	    ((vaddr_t)&DPCPU_NAME(n) - (vaddr_t)DPCPU_START)),	\
+	    CHERI_REPRESENTABLE_LENGTH(sizeof(DPCPU_NAME(n))))
 #endif /* __CHERI_PURE_CAPABILITY__ */
 #define	_DPCPU_GET(b, n)	(*_DPCPU_PTR(b, n))
 #define	_DPCPU_SET(b, n, v)	(*_DPCPU_PTR(b, n) = v)
