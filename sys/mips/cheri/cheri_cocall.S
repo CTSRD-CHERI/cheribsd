@@ -97,13 +97,9 @@
 			 /* $c27-$c33 are reserved for the kernel */
 
 /*
- * Register usage:
- *
- * Do not touch: a0-a7, c3-c10
- *
- * Save before calling the calee, and restore afterwards: s0-s7, gp, sp, s8
- *
- * Zero before calling the callee: at, v0, v1, t4-t6, s0-s7, t8, t9, gp, sp, s8, ra, hi, lo
+ * Register usage: we save and restore c11 (stack) and c13 (ra).
+ * The rest gets zeroed; the libc wrappers are responsible for saving
+ * and restoring the neccessary context.
  *
  * Note that this code executes while ignoring all the signals - a trapping
  * instruction will just get skipped over.

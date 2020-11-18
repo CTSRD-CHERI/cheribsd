@@ -107,7 +107,7 @@
  * on the cocall(2) side.  We - the thread calling into coaccept(2) - are
  * called the callee here.
  *
- * Register usage: we save and restore c11 (stack) and c17 (ra).
+ * Register usage: we save and restore c11 (stack) and c13 (ra).
  * The rest gets zeroed; the libc wrappers are responsible for saving
  * and restoring the neccessary context.
  *
