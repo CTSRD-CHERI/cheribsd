@@ -71,8 +71,8 @@
 			 1 << 14 /* $s8 */ | \
 			 1 << 15 /* $ra */)
 
-// XXX: $c0 (DDC)?
-#define	CCLEARLO_BITS	(1 << 1  /* PCC */ | \
+#define	CCLEARLO_BITS	(1 << 0  /* DDC */ | \
+			 1 << 1  /* PCC */ | \
 			 1 << 2  /* IDC */ | \
 			 1 << 3  /* $c3 */ | \
 			 1 << 4  /* $c4 */ | \
