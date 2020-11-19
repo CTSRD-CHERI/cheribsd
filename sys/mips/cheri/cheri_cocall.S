@@ -40,7 +40,7 @@
 .set noat
 
 #define	CLEARLO_BITS	(1 << 1  /* $at */ | \
-			 1 << 2  /* $v0 */ | \
+			 /* preserve $v0 */ \
 			 1 << 3  /* $v1 */ | \
 			 1 << 4  /* $a0 */ | \
 			 1 << 5  /* $a1 */ | \
@@ -219,6 +219,8 @@ _C_LABEL(switcher_cocall):
 	bgtz	t0, 3b
 	nop
 
+	li	v0, 0
+4:
 	clearlo		CLEARLO_BITS
 	clearhi		CLEARHI_BITS
 	cclearlo	CCLEARLO_BITS
@@ -234,7 +236,7 @@ _C_LABEL(switcher_cocall):
 	multu	zero, zero
 
 	/*
-	 * "Return" to the callee.
+	 * "Return" to the callee - or the caller, if returning error.
 	 */
 	cjr	$c13
 	nop
@@ -253,7 +255,8 @@ _C_LABEL(switcher_cocall):
 	/*
 	 * Nope - length zero means the callee is dead.
 	 */
-	cjr	$c13
+	clc	$c13, zero, SCB_CRA($idc)
+	b	4b
 	li	v0, EPIPE
 
 .globl _C_LABEL(eswitcher_cocall)
