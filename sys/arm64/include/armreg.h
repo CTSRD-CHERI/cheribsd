@@ -213,6 +213,11 @@
 #define	 ISS_DATA_DFSC_ECC_L2	(0x1e << 0)
 #define	 ISS_DATA_DFSC_ECC_L3	(0x1f << 0)
 #define	 ISS_DATA_DFSC_ALIGN	(0x21 << 0)
+#define	 ISS_DATA_DFSC_CAP_TAG	(0x28 << 0)
+#define	 ISS_DATA_DFSC_CAP_SEALED (0x29 << 0)
+#define	 ISS_DATA_DFSC_CAP_BOUND (0x2a << 0)
+#define	 ISS_DATA_DFSC_CAP_PERM	(0x2b << 0)
+#define	 ISS_DATA_DFSC_LC_SC	(0x2c << 0)
 #define	 ISS_DATA_DFSC_TLB_CONFLICT (0x30 << 0)
 #define	ESR_ELx_IL		(0x01 << 25)
 #define	ESR_ELx_EC_SHIFT	26
