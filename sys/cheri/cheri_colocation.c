@@ -953,7 +953,10 @@ static void
 db_print_scb(struct switchercb *scb)
 {
 
-	db_printf("    scb_peer_scb:	%p\n", (__cheri_fromcap void *)scb->scb_peer_scb);
+	if (cheri_getlen(scb->scb_peer_scb) != 0)
+		db_printf("    scb_peer_scb:	%p\n", (__cheri_fromcap void *)scb->scb_peer_scb);
+	else
+		db_printf("    scb_peer_scb:	<errno %lu>\n", cheri_getoffset(scb->scb_peer_scb));
 	db_printf("    scb_td:		%p\n", scb->scb_td);
 	db_printf("    scb_borrower_td:	%p\n", scb->scb_borrower_td);
 	db_printf("    scb_tls:		%p\n", (__cheri_fromcap void *)scb->scb_tls);
