@@ -35,9 +35,8 @@ if (!env.CHANGE_ID && archiveBranches.contains(env.BRANCH_NAME)) {
 def allArchitectures = ["aarch64", "amd64", "mips64", "mips64-hybrid", "mips64-purecap", "riscv64", "riscv64-hybrid", "riscv64-purecap"]
 jobProperties.add(parameters([text(defaultValue: allArchitectures.join('\n'),
         description: 'The architectures (cheribuild suffixes) to build for (one per line)',
-        name: 'architectures')]))
-
-jobProperties.add(parameters([text(defaultValue: ["mips64-hybrid", "mips64-purecap", "riscv64-hybrid", riscv64-purecap].join('\n'),
+        name: 'architectures'),
+	text(defaultValue: ["mips64-hybrid", "mips64-purecap", "riscv64-hybrid", "riscv64-purecap"].join('\n'),
         description: 'The architectures (cheribuild suffixes) to build with purecap kernel for (one per line)',
         name: 'purecap_kernel_architectures')]))
 // Set the default job properties (work around properties() not being additive but replacing)
