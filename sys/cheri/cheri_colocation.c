@@ -692,17 +692,23 @@ int
 kern_cogetpid(struct thread *td, pid_t * __capability pidp)
 {
 	struct switchercb scb;
+	struct thread *caller_td;
 	bool is_callee;
 	pid_t pid;
 	int error;
 
-	is_callee = colocation_fetch_peer_scb(td, &scb);
-	if (!is_callee)
+	if(td->td_md.md_slow_accepting) {
+		caller_td = td->td_md.md_slow_caller_td;
+		is_callee = (caller_td != NULL);	
+	}
+	else {
+		is_callee = colocation_fetch_peer_scb(td, &scb);
+		caller_td = scb.scb_td;
+	}
+	if(!is_callee)
 		return (ESRCH);
-
-	pid = scb.scb_td->td_proc->p_pid;
+	pid = caller_td->td_proc->p_pid;
 	error = copyoutcap(&pid, pidp, sizeof(pid));
-
 	return (error);
 }
 
@@ -774,7 +780,7 @@ kern_cocall_slow(void * __capability code, void * __capability data,
 		md->md_slow_len = len;
 		md->md_slow_buf = malloc(len, M_TEMP, M_WAITOK);
 
-		error = copyin(buf, md->md_slow_buf, len);
+		error = copyincap(buf, md->md_slow_buf, len);
 		if (error != 0) {
 			COLOCATION_DEBUG("copyin failed with error %d", error);
 			goto out;
@@ -829,7 +835,7 @@ kern_cocall_slow(void * __capability code, void * __capability data,
 		if (len > md->md_slow_len)
 			len = md->md_slow_len;
 		if (len > 0) {
-			error = copyout(md->md_slow_buf, buf, len);
+			error = copyoutcap(md->md_slow_buf, buf, len);
 			if (error != 0)
 				COLOCATION_DEBUG("copyout failed with error %d", error);
 		}
@@ -891,7 +897,7 @@ kern_coaccept_slow(void * __capability code, void * __capability data,
 		if (buf != NULL) {
 			minlen = MIN(len, callermd->md_slow_len);
 			if (minlen > 0) {
-				error = copyin(buf, callermd->md_slow_buf, minlen);
+				error = copyincap(buf, callermd->md_slow_buf, minlen);
 				if (error != 0) {
 					COLOCATION_DEBUG("copyin failed with error %d", error);
 					return (error);
@@ -926,7 +932,7 @@ kern_coaccept_slow(void * __capability code, void * __capability data,
 	if (buf != NULL) {
 		minlen = MIN(len, callermd->md_slow_len);
 		if (minlen > 0) {
-			error = copyout(callermd->md_slow_buf, buf, len);
+			error = copyoutcap(callermd->md_slow_buf, buf, len);
 			if (error != 0)
 				COLOCATION_DEBUG("copyout failed with error %d", error);
 		}
