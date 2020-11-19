@@ -49,6 +49,10 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_param.h>
 #include <vm/vm_extern.h>
 
+#if __has_feature(capabilities)
+#include <cheri/cheric.h>
+#endif
+
 #include <machine/frame.h>
 #include <machine/md_var.h>
 #include <machine/pcb.h>
@@ -88,6 +92,9 @@ typedef void (abort_handler)(struct thread *, struct trapframe *, uint64_t,
     uint64_t, int);
 
 static abort_handler align_abort;
+#if __has_feature(capabilities)
+static abort_handler cap_abort;
+#endif
 static abort_handler data_abort;
 static abort_handler external_abort;
 
@@ -104,6 +111,12 @@ static abort_handler *abort_handlers[] = {
 	[ISS_DATA_DFSC_PF_L3] = data_abort,
 	[ISS_DATA_DFSC_ALIGN] = align_abort,
 	[ISS_DATA_DFSC_EXT] =  external_abort,
+#if __has_feature(capabilities)
+	[ISS_DATA_DFSC_CAP_TAG] = cap_abort,
+	[ISS_DATA_DFSC_CAP_SEALED] = cap_abort,
+	[ISS_DATA_DFSC_CAP_BOUND] = cap_abort,
+	[ISS_DATA_DFSC_CAP_PERM] = cap_abort,
+#endif
 };
 
 static __inline void
@@ -238,6 +251,35 @@ external_abort(struct thread *td, struct trapframe *frame, uint64_t esr,
 	printf(" far: %16lx\n", far);
 	panic("Unhandled EL%d external data abort", lower ? 0: 1);
 }
+
+#if __has_feature(capabilities)
+static void
+cap_abort(struct thread *td, struct trapframe *frame, uint64_t esr,
+    uint64_t far, int lower)
+{
+	struct pcb *pcb;
+
+	pcb = td->td_pcb;
+	if (!lower) {
+		if (td->td_intr_nesting_level == 0 &&
+		    pcb->pcb_onfault != 0) {
+			frame->tf_x[0] = EPROT;
+			trapframe_set_elr(frame,
+			    (uintcap_t)cheri_setaddress(cheri_getpcc(),
+			    pcb->pcb_onfault));
+			return;
+		}
+		print_registers(frame);
+		printf(" far: %16lx\n", far);
+		printf(" esr:         %.8lx\n", esr);
+		panic("Capability abort from kernel space!");
+	}
+
+	call_trapsignal(td, SIGPROT, 0, (void * __capability)frame->tf_elr,
+	    ESR_ELx_EXCEPTION(esr));
+	userret(td, frame);
+}
+#endif
 
 static void
 data_abort(struct thread *td, struct trapframe *frame, uint64_t esr,
