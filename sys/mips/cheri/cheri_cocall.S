@@ -253,11 +253,11 @@ _C_LABEL(switcher_cocall):
 	nop
 
 	/*
-	 * Nope - length zero means the callee is dead.
+	 * Nope - length zero means we need to return error encoded as offset.
 	 */
 	clc	$c13, zero, SCB_CRA($idc)
 	b	4b
-	li	v0, EPIPE
+	cgetoffset	v0, $c12
 
 .globl _C_LABEL(eswitcher_cocall)
 _C_LABEL(eswitcher_cocall):

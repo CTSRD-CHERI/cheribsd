@@ -243,7 +243,7 @@ colocation_thread_exit(struct thread *td)
 	 * Set scb_peer_scb to a special "null" capability, so that cocall(2)
 	 * can see the callee thread is dead.
 	 */
-	scb.scb_peer_scb = cheri_capability_build_user_rwx(0, 0, 0, 0);
+	scb.scb_peer_scb = cheri_capability_build_user_rwx(0, 0, 0, EPIPE);
 	scb.scb_td = NULL;
 	scb.scb_borrower_td = NULL;
 
