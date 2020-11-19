@@ -93,7 +93,6 @@ struct syscall_args {
 	u_int argoff;
 	struct sysent *callp;
 	syscallarg_t args[8];
-	int narg;
 	struct trapframe *trapframe;
 };
 
