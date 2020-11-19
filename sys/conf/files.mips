@@ -64,7 +64,6 @@ mips/cheri/exception.S			optional	cheri_purecap_kernel
 mips/cheri/cheri_stack_machdep.c		optional	ddb | stack
 
 # misc opt-in bits
-kern/kern_clocksource.c			standard
 kern/link_elf_obj.c			standard
 kern/subr_atomic64.c			optional	mips | mipsel | mipshf | mipselhf
 kern/subr_busdma_bufalloc.c		standard
