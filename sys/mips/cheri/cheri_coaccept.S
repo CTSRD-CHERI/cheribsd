@@ -167,6 +167,7 @@ _C_LABEL(switcher_coaccept):
 	syscall
 	nop
 
+	// XXX: And then?  Fallthrough?
 1:
 	/*
 	 * Save the capability to the caller's thread in the callee control block.
