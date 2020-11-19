@@ -75,6 +75,9 @@ struct mtx		switcher_lock;
 static int colocation_debug;
 SYSCTL_INT(_debug, OID_AUTO, colocation_debug, CTLFLAG_RWTUN,
     &colocation_debug, 0, "Enable process colocation debugging");
+static int counregister_on_exit = 1;
+SYSCTL_INT(_debug, OID_AUTO, counregister_on_exit, CTLFLAG_RWTUN,
+    &counregister_on_exit, 0, "Remove dead conames on thread exit");
 
 #ifdef DDB
 static int kdb_on_switcher_trap;
@@ -203,18 +206,20 @@ colocation_thread_exit(struct thread *td)
 	if (!have_scb)
 		return;
 
-	vmspace = td->td_proc->p_vmspace;
+	if (counregister_on_exit) {
+		vmspace = td->td_proc->p_vmspace;
 
-	vm_map_lock(&vmspace->vm_map);
+		vm_map_lock(&vmspace->vm_map);
 
-	LIST_FOREACH_SAFE(con, &vmspace->vm_conames, c_next, con_temp) {
-		if (cheri_getaddress(con->c_value) == td->td_md.md_scb) {
-			LIST_REMOVE(con, c_next);
-			free(con, M_TEMP);
+		LIST_FOREACH_SAFE(con, &vmspace->vm_conames, c_next, con_temp) {
+			if (cheri_getaddress(con->c_value) == td->td_md.md_scb) {
+				LIST_REMOVE(con, c_next);
+				free(con, M_TEMP);
+			}
 		}
-	}
 
-	vm_map_unlock(&vmspace->vm_map);
+		vm_map_unlock(&vmspace->vm_map);
+	}
 
 	md = &td->td_md;
 	sx_xlock(&md->md_slow_lock);
