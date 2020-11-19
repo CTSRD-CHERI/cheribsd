@@ -580,7 +580,7 @@ ATF_TC_BODY(cocall_callee_dead_h, tc)
 	buf = 1;
 	error = cocall(switcher_code, switcher_data, lookedup, &buf, sizeof(buf));
 	ATF_REQUIRE_EQ(error, -1);
-	ATF_REQUIRE_ERRNO(EINVAL, error);
+	ATF_REQUIRE_ERRNO(EPIPE, error);
 	ATF_REQUIRE_EQ(buf, 1);
 }
 
