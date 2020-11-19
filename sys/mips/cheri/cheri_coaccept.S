@@ -216,9 +216,9 @@ _C_LABEL(switcher_coaccept):
 	daddiu	t0, a0, 0
 
 2:
-	daddi	t0, -8
-	cld	t1, t0, 0($c6)
-	csd	t1, t0, 0($c7)
+	daddi 	t0, -CHERICAP_SIZE
+	clc	$c16, t0, 0($c6)
+	csc	$c16, t0, 0($c7)
 	bgtz	t0, 2b
 	nop
 
