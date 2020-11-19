@@ -178,6 +178,75 @@ ATF_TC_BODY(cocall_h, tc)
 	ATF_REQUIRE_EQ(buf, 2);
 }
 
+ATF_TC_WITHOUT_HEAD(cocall_cookie);
+ATF_TC_BODY(cocall_cookie, tc)
+{
+	void * __capability switcher_code;
+	void * __capability switcher_data;
+	void * __capability cookie;
+	char *name;
+	uint64_t buf;
+	pid_t pid, pid2;
+	int error;
+
+	name = random_string();
+
+	pid = atf_utils_fork();
+	if (pid == 0) {
+		error = cosetup(COSETUP_COACCEPT, &switcher_code, &switcher_data);
+		ATF_REQUIRE_EQ(error, 0);
+
+		error = coregister(name, NULL);
+		ATF_REQUIRE_EQ(error, 0);
+
+		buf = 42;
+		cookie = NULL;
+		for (;;) {
+			error = coaccept(switcher_code, switcher_data, &cookie, &buf, sizeof(buf));
+			ATF_REQUIRE_EQ(error, 0);
+			ATF_REQUIRE_EQ(buf, 1);
+			ATF_REQUIRE((uintptr_t)cookie != 0);
+			buf++;
+		}
+		atf_tc_fail("You're not supposed to be here");
+	}
+
+	pid2 = atf_utils_fork();
+	if (pid2 == 0) {
+		coexec_helper(pid, "cocall_cookie_h", name, NULL);
+		atf_tc_fail("You're not supposed to be here");
+	}
+	atf_utils_wait(pid2, 0, "passed\n", "save:/dev/null");
+
+	error = kill(pid, SIGTERM);
+	ATF_REQUIRE_EQ(error, 0);
+}
+
+ATF_TC_WITHOUT_HEAD(cocall_cookie_h);
+ATF_TC_BODY(cocall_cookie_h, tc)
+{
+	void * __capability switcher_code;
+	void * __capability switcher_data;
+	void * __capability lookedup;
+	char *arg;
+	uint64_t buf;
+	int error;
+
+	arg = getenv("COCALL_TEST_HELPER_ARG");
+	if (arg == NULL)
+		atf_tc_skip("helper testcase, not supposed to be run directly");
+
+	error = cosetup(COSETUP_COCALL, &switcher_code, &switcher_data);
+	ATF_REQUIRE_EQ(error, 0);
+	wait_for_coregister();
+	error = colookup(arg, &lookedup);
+	ATF_REQUIRE_EQ(error, 0);
+	buf = 1;
+	error = cocall(switcher_code, switcher_data, lookedup, &buf, sizeof(buf));
+	ATF_REQUIRE_EQ(error, 0);
+	ATF_REQUIRE_EQ(buf, 2);
+}
+
 ATF_TC_WITHOUT_HEAD(cocall_bad_caller_buf);
 ATF_TC_BODY(cocall_bad_caller_buf, tc)
 {
@@ -724,6 +793,8 @@ ATF_TP_ADD_TCS(tp)
 {
 	ATF_TP_ADD_TC(tp, cocall);
 	ATF_TP_ADD_TC(tp, cocall_h);
+	ATF_TP_ADD_TC(tp, cocall_cookie);
+	ATF_TP_ADD_TC(tp, cocall_cookie_h);
 	ATF_TP_ADD_TC(tp, cocall_bad_caller_buf);
 	ATF_TP_ADD_TC(tp, cocall_bad_caller_buf_h);
 	ATF_TP_ADD_TC(tp, cocall_bad_callee_buf);
