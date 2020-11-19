@@ -142,7 +142,7 @@ xdma_iommu_init(struct xdma_iommu *xio)
 #endif
 
 	xio->vmem = vmem_create("xDMA vmem", 0, 0, PAGE_SIZE,
-	    PAGE_SIZE, M_FIRSTFIT | M_WAITOK);
+	    PAGE_SIZE, M_FIRSTFIT | M_WAITOK, 0);
 	if (xio->vmem == NULL)
 		return (ENXIO);
 

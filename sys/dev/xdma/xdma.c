@@ -422,7 +422,7 @@ xdma_get_memory(device_t dev)
 		return (NULL);
 
 	vmem = vmem_create("xDMA vmem", 0, 0, PAGE_SIZE,
-	    PAGE_SIZE, M_BESTFIT | M_WAITOK);
+	    PAGE_SIZE, M_BESTFIT | M_WAITOK, 0);
 	if (vmem == NULL)
 		return (NULL);
 
