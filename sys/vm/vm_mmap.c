@@ -993,8 +993,8 @@ kern_munmap(struct thread *td, uintptr_t addr0, size_t size)
 #ifdef HWPMC_HOOKS
 	struct pmckern_map_out pkm;
 	bool pmc_handled;
-#endif
 	vm_map_entry_t entry;
+#endif
 	vm_offset_t addr, end;
 	vm_size_t pageoff;
 	vm_map_t map;
