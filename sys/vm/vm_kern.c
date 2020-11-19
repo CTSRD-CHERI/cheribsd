@@ -91,8 +91,8 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_object.h>
 #include <vm/vm_page.h>
 #include <vm/vm_pageout.h>
-#include <vm/vm_phys.h>
 #include <vm/vm_pagequeue.h>
+#include <vm/vm_phys.h>
 #include <vm/vm_radix.h>
 #include <vm/vm_extern.h>
 #include <vm/uma.h>
@@ -239,9 +239,9 @@ kmem_alloc_attr_domain(int domain, vm_size_t size, int flags, vm_paddr_t low,
 			vmem_free(vmem, addr, size);
 			return (0);
 		}
-		KASSERT(vm_phys_domain(m) == domain,
+		KASSERT(vm_page_domain(m) == domain,
 		    ("kmem_alloc_attr_domain: Domain mismatch %d != %d",
-		    vm_phys_domain(m), domain));
+		    vm_page_domain(m), domain));
 		if ((flags & M_ZERO) && (m->flags & PG_ZERO) == 0)
 			pmap_zero_page(m);
 		vm_page_valid(m);
@@ -317,9 +317,9 @@ kmem_alloc_contig_domain(int domain, vm_size_t size, int flags, vm_paddr_t low,
 		vmem_free(vmem, addr, size);
 		return (0);
 	}
-	KASSERT(vm_phys_domain(m) == domain,
+	KASSERT(vm_page_domain(m) == domain,
 	    ("kmem_alloc_contig_domain: Domain mismatch %d != %d",
-	    vm_phys_domain(m), domain));
+	    vm_page_domain(m), domain));
 	end_m = m + npages;
 	tmp = addr;
 	for (; m < end_m; m++) {
@@ -497,9 +497,9 @@ retry:
 			kmem_unback(object, addr, i);
 			return (KERN_NO_SPACE);
 		}
-		KASSERT(vm_phys_domain(m) == domain,
+		KASSERT(vm_page_domain(m) == domain,
 		    ("kmem_back_domain: Domain mismatch %d != %d",
-		    vm_phys_domain(m), domain));
+		    vm_page_domain(m), domain));
 		if (flags & M_ZERO && (m->flags & PG_ZERO) == 0)
 			pmap_zero_page(m);
 		KASSERT((m->oflags & VPO_UNMANAGED) != 0,
@@ -582,7 +582,7 @@ _kmem_unback(vm_object_t object, vm_offset_t addr, vm_size_t size)
 	end = offset + size;
 	VM_OBJECT_WLOCK(object);
 	m = vm_page_lookup(object, atop(offset)); 
-	domain = vm_phys_domain(m);
+	domain = vm_page_domain(m);
 	if (__predict_true((m->oflags & VPO_KMEM_EXEC) == 0))
 		arena = vm_dom[domain].vmd_kernel_arena;
 	else
