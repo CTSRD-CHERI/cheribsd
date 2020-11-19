@@ -217,7 +217,7 @@ al_msix_attach(device_t dev)
 	mtx_init(&sc->msi_mtx, "msi_mtx", NULL, MTX_DEF);
 
 	sc->irq_alloc = vmem_create("Alpine MSI-X IRQs", 0, sc->irq_count,
-	    1, 0, M_FIRSTFIT | M_WAITOK);
+	    1, 0, M_FIRSTFIT | M_WAITOK, 0);
 
 	device_printf(dev, "MSI-X SPI IRQ %d-%d\n", sc->irq_min, sc->irq_max);
 

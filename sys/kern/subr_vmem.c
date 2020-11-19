@@ -1227,10 +1227,10 @@ vmem_set_reclaim(vmem_t *vm, vmem_reclaim_t *reclaimfn)
 }
 
 /*
- * _vmem_init: Initializes vmem arena.
+ * vmem_init: Initializes vmem arena.
  */
 vmem_t *
-_vmem_init(vmem_t *vm, const char *name, vmem_addr_t base, vmem_size_t size,
+vmem_init(vmem_t *vm, const char *name, vmem_addr_t base, vmem_size_t size,
     vmem_size_t quantum, vmem_size_t qcache_max, int flags,
     int arena_flags)
 {
@@ -1282,10 +1282,10 @@ _vmem_init(vmem_t *vm, const char *name, vmem_addr_t base, vmem_size_t size,
 }
 
 /*
- * _vmem_create: create an arena.
+ * vmem_create: create an arena.
  */
 vmem_t *
-_vmem_create(const char *name, vmem_addr_t base, vmem_size_t size,
+vmem_create(const char *name, vmem_addr_t base, vmem_size_t size,
     vmem_size_t quantum, vmem_size_t qcache_max, int flags,
     int arena_flags)
 {
@@ -1295,7 +1295,7 @@ _vmem_create(const char *name, vmem_addr_t base, vmem_size_t size,
 	vm = uma_zalloc(vmem_zone, flags & (M_WAITOK|M_NOWAIT));
 	if (vm == NULL)
 		return (NULL);
-	if (_vmem_init(vm, name, base, size, quantum, qcache_max, flags,
+	if (vmem_init(vm, name, base, size, quantum, qcache_max, flags,
 	    arena_flags) == NULL)
 		return (NULL);
 	return (vm);

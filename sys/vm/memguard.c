@@ -212,8 +212,8 @@ memguard_init(vmem_t *parent)
 	vmem_addr_t base;
 
 	vmem_alloc(parent, memguard_mapsize, M_BESTFIT | M_WAITOK, &base);
-	vmem_init_cap(memguard_arena, "memguard arena", base, memguard_mapsize,
-	    PAGE_SIZE, 0, M_WAITOK);
+	vmem_init(memguard_arena, "memguard arena", base, memguard_mapsize,
+	    PAGE_SIZE, 0, M_WAITOK, VMEM_CAPABILITY_ARENA);
 	memguard_base = base;
 
 	printf("MEMGUARD DEBUGGING ALLOCATOR INITIALIZED:\n");
