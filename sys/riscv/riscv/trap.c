@@ -154,7 +154,6 @@ cpu_fetch_syscall_args(struct thread *td)
 	else
 		sa->callp = &p->p_sysent->sv_table[sa->code];
 
-	sa->narg = sa->callp->sy_narg;
 #if __has_feature(capabilities)
 	if (stack_args != NULL) {
 		register_t intval;
@@ -166,7 +165,7 @@ cpu_fetch_syscall_args(struct thread *td)
 			ptrmask = sysargmask[sa->code];
 
 		offset = 0;
-		for (i = 0; i < sa->narg; i++) {
+		for (i = 0; i < sa->callp->sy_narg; i++) {
 			if (ptrmask & (1 << i)) {
 				offset = roundup2(offset, sizeof(uintcap_t));
 				error = fuecap(stack_args + offset,
@@ -184,7 +183,7 @@ cpu_fetch_syscall_args(struct thread *td)
 #endif
 	{
 		memcpy(sa->args, ap, nap * sizeof(syscallarg_t));
-		if (sa->narg > nap)
+		if (sa->callp->sy_narg > nap)
 			panic("TODO: Could we have more then %d args?",
 			    NARGREG);
 	}

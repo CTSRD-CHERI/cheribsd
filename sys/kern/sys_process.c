@@ -984,7 +984,7 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 		}
 		bzero((__cheri_fromcap void *)addr, sizeof(td2->td_sa.args));
 		bcopy(td2->td_sa.args, (__cheri_fromcap void *)addr,
-		    td2->td_sa.narg * sizeof(syscallarg_t));
+		    td2->td_sa.callp->sy_narg * sizeof(syscallarg_t));
 		break;
 
 	case PT_GET_SC_RET:
@@ -1325,7 +1325,7 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 		strcpy(pl->pl_tdname, td2->td_name);
 		if ((td2->td_dbgflags & (TDB_SCE | TDB_SCX)) != 0) {
 			pl->pl_syscall_code = td2->td_sa.code;
-			pl->pl_syscall_narg = td2->td_sa.narg;
+			pl->pl_syscall_narg = td2->td_sa.callp->sy_narg;
 		} else {
 			pl->pl_syscall_code = 0;
 			pl->pl_syscall_narg = 0;

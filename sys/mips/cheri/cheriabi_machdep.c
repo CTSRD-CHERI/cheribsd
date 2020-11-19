@@ -91,8 +91,6 @@ cheriabi_fetch_syscall_args(struct thread *td)
 	else
 		sa->callp = &se->sv_table[sa->code];
 
-	sa->narg = sa->callp->sy_narg;
-
 	if (sa->code >= nitems(sysargmask))
 		ptrmask = 0;
 	else
@@ -107,7 +105,7 @@ cheriabi_fetch_syscall_args(struct thread *td)
 		int offset;
 
 		offset = 0;
-		for (i = 0; i < sa->narg; i++) {
+		for (i = 0; i < sa->callp->sy_narg; i++) {
 			if (ptrmask & (1 << i)) {
 				offset = roundup2(offset, sizeof(uintcap_t));
 				error = copyincap(
@@ -129,7 +127,7 @@ cheriabi_fetch_syscall_args(struct thread *td)
 
 		intreg_offset = 0;
 		ptrreg_offset = 0;
-		for (i = 0; i < sa->narg; i++) {
+		for (i = 0; i < sa->callp->sy_narg; i++) {
 			if (ptrmask & (1 << i)) {
 				if (ptrreg_offset > 7)
 					panic(
