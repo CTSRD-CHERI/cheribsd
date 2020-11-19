@@ -173,6 +173,7 @@ make_data_cap(const Elf_Sym *def, const struct Struct_Obj_Entry *defobj)
 
 /* ignore _init/_fini */
 #define call_initfini_pointer(obj, target) rtld_fatal("%s: _init or _fini used!", obj->path)
+#define call_init_pointer(obj, target) rtld_fatal("%s: _init used!", obj->path)
 
 /* TODO: Per-function captable/PLT/FNDESC support */
 #define call_init_array_pointer(obj, target)				\
