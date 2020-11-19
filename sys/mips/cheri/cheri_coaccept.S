@@ -161,8 +161,11 @@ _C_LABEL(switcher_coaccept):
 	 * Is this the first invocation of coaccept, or rather a response
 	 * for a ccall()?  If the former - call copark(2).
 	 */
-	cbts	$c25, 1f
+	cgetlen	t0, $c25
+	bnez	t0, 1f
 	nop
+	ccleartag $c24, $cnull
+	csc	$c24, zero, SCB_PEER_SCB($idc)
 	li	v0, SYS_copark
 	syscall
 	nop

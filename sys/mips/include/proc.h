@@ -57,6 +57,9 @@ struct switchercb {
 	 * Peer context - callee in caller's context, caller in callee's.
 	 * This also serves as the callee's spinlock.  Must be first,
 	 * as the cllc instruction doesn't take an offset.
+	 *
+	 * This can also be set to a zero-length capability, with the offset
+	 * equal to errno to be returned by cocall(2).
 	 */
 	struct switchercb * __capability	scb_peer_scb;
 

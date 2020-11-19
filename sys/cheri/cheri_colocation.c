@@ -491,7 +491,7 @@ setup_scb(struct thread *td)
 	scb.scb_unsealcap = switcher_sealcap2;
 	scb.scb_td = td;
 	scb.scb_borrower_td = NULL;
-	scb.scb_peer_scb = NULL;
+	scb.scb_peer_scb = cheri_capability_build_user_rwx(0, 0, 0, EAGAIN);
 #ifdef __mips__
 	scb.scb_tls = (char * __capability)td->td_md.md_tls + td->td_md.md_tls_tcb_offset;
 #endif
