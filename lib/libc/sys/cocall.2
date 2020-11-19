@@ -29,7 +29,7 @@
 .\"
 .\" $FreeBSD$
 .\"
-.Dd April 30, 2018
+.Dd November 19, 2020
 .Dt COCALL 2
 .Os
 .Sh NAME
@@ -77,6 +77,12 @@ The
 system call
 will fail if:
 .Bl -tag -width Er
+.It Bq Er EAGAIN
+The callee has not called
+.Xr coaccept 2
+yet.
+.It Bq Er EPIPE
+The callee is no longer available, usually because it exited.
 .It Bq Er EINVAL
 The
 .Fa code ,
