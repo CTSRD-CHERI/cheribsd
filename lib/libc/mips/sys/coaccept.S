@@ -52,8 +52,6 @@ __FBSDID("$FreeBSD$");
 #define	JUMP_BUFFER_SIZE	(64 * _MIPS_SZCAP / 8)
 
 LEAF(coaccept)
-	PIC_PROLOGUE(coaccept)
-
 	/*
 	 * Save the CPU context before calling into switcher.
 	 * This mostly mimics setjmp(3).
@@ -198,10 +196,16 @@ LEAF(coaccept)
 	cincoffset	$csp, $csp, t0
 	bnez		v0, 1f
 	nop
-
-	PIC_RETURN()
+	cjr		$c17
 	nop
 1:
+	/*
+	 * XXX: I don't understand what it does, except that PIC_TAILCALL()
+	 *      depends on $c26 being loaded by PIC_PROLOGUE(). I don't really
+	 *      want to save $c26, so let's just call it here, all in one place.
+	 *      Without it, stuff will crash if v0 != 0.
+	 */
+	PIC_PROLOGUE(coaccept)
 	PIC_TAILCALL(__cerror)
 	nop
 END(coaccept)

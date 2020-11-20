@@ -133,6 +133,10 @@ SYSCTL_INT(_machdep, OID_AUTO, log_cheri_registers, CTLFLAG_RW,
     &log_cheri_registers, 1, "Print CHERI registers for non-CHERI exceptions");
 #endif
 
+#ifdef CPU_QEMU_MALTA
+extern u_int qemu_trace_buffered;
+#endif
+
 #define	lbu_macro(data, addr)						\
 	__asm __volatile ("lbu %0, 0x0(%1)"				\
 			: "=r" (data)	/* outputs */			\
@@ -870,6 +874,11 @@ trap(struct trapframe *trapframe)
 		}
 		break;
 	case T_TLB_MOD:
+		if (td->td_critnest != 0 || td->td_intr_nesting_level != 0 ||
+		    WITNESS_CHECK(WARN_SLEEPOK | WARN_GIANTOK, NULL,
+		    "Kernel page fault") != 0)
+			goto err;
+
 		/* check for kernel address */
 		if (KERNLAND(trapframe->badvaddr)) {
 			if (pmap_emulate_modified(kernel_pmap, 
@@ -893,6 +902,11 @@ trap(struct trapframe *trapframe)
 
 	case T_TLB_LD_MISS:
 	case T_TLB_ST_MISS:
+		if (td->td_critnest != 0 || td->td_intr_nesting_level != 0 ||
+		    WITNESS_CHECK(WARN_SLEEPOK | WARN_GIANTOK, NULL,
+		    "Kernel page fault") != 0)
+			goto err;
+
 		ftype = (type == T_TLB_ST_MISS) ? VM_PROT_WRITE : VM_PROT_READ;
 		/* check for kernel address */
 		if (KERNLAND(trapframe->badvaddr)) {
@@ -1409,6 +1423,10 @@ err:
 	if (i == SIGPROT)
 		ksi.ksi_capreg = trapframe->capcause &
 		    CHERI_CAPCAUSE_REGNUM_MASK;
+#endif
+#ifdef CPU_QEMU_MALTA
+	if (qemu_trace_buffered)
+		QEMU_FLUSH_TRACE_BUFFER;
 #endif
 	trapsignal(td, &ksi);
 out:

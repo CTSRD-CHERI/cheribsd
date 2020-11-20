@@ -383,10 +383,15 @@ ENTRY(cpu_switch)
 	beqz	t0, .Lout_qemu_tracing
 
 	lw	t0, TD_MDFLAGS(a1)
-	andi	t0, t0, MDTD_QTRACE
-	beqz	t0, .Ldisable_qemu_tracing
+	andi	t1, t0, MDTD_QTRACE
+	beqz	t1, .Ldisable_qemu_tracing
+	andi	t0, t0, MDTD_QTRACE_USERMODE
+	bnez	t0, .Lenable_qemu_user_tracing
 .Lenable_qemu_tracing:
 	slti	x0, x0, 0x1b
+	j	.Lout_qemu_tracing
+.Lenable_qemu_user_tracing:
+	slti	x0, x0, 0x2b
 	j	.Lout_qemu_tracing
 .Ldisable_qemu_tracing:
 	slti	x0, x0, 0x1e

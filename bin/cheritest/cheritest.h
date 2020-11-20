@@ -32,6 +32,7 @@
 #ifndef _CHERITEST_H_
 #define	_CHERITEST_H_
 
+#include <string.h>
 #include <cheri/cheric.h>
 
 #define	CHERI_CAP_PRINT(cap) do {					\
@@ -136,6 +137,8 @@ struct cheri_test {
  * the error.
  */
 void	cheritest_failure_err(const char *msg, ...) __dead2  __printflike(1, 2);
+void	cheritest_failure_errc(int code, const char *msg, ...) __dead2
+    __printflike(2, 3);
 void	cheritest_failure_errx(const char *msg, ...) __dead2  __printflike(1, 2);
 void	cheritest_success(void) __dead2;
 void	signal_handler_clear(int sig);
@@ -163,7 +166,7 @@ void	signal_handler_clear(int sig);
 #define CHERITEST_CHECK_EQ_BOOL(a, b)	\
 	CHERITEST_CHECK_EQ(_Bool, "%d", a, b, __STRING(a), __STRING(b))
 #define CHERITEST_CHECK_EQ_INT(a, b)	\
-	CHERITEST_CHECK_EQ(int, "0x%lx", a, b, __STRING(a), __STRING(b))
+	CHERITEST_CHECK_EQ(int, "0x%x", a, b, __STRING(a), __STRING(b))
 #define CHERITEST_CHECK_EQ_LONG(a, b)	\
 	CHERITEST_CHECK_EQ(long, "0x%lx", a, b, __STRING(a), __STRING(b))
 #define CHERITEST_CHECK_EQ_SIZE(a, b)	\
@@ -207,6 +210,33 @@ _cheritest_check_cap_eq(void *__capability a, void *__capability b,
  */
 #define CHERITEST_CHECK_SYSCALL(call) \
 	CHERITEST_CHECK_SYSCALL2(call, "Call \'" #call "\' failed")
+
+static inline void
+_cheritest_check_errno(const char *context, int actual, int expected)
+{
+	char actual_str[256];
+	char expected_str[256];
+
+	if (expected == actual)
+		return;
+	if (strerror_r(actual, actual_str, sizeof(actual_str)) != 0)
+		cheritest_failure_err("sterror_r(%d)", actual);
+	if (strerror_r(expected, expected_str, sizeof(expected_str)) != 0)
+		cheritest_failure_err("sterror_r(%d)", expected);
+	cheritest_failure_errx("%s errno %d (%s) != expected errno %d (%s)",
+	    context, actual, actual_str, expected, expected_str);
+}
+
+/** Check that @p call fails and errno is set to @p expected_errno */
+#define CHERITEST_CHECK_CALL_ERROR(call, expected_errno)			\
+	do {									\
+		errno = 0;							\
+		int __ret = call;						\
+		int call_errno = errno;						\
+		CHERITEST_VERIFY2(__ret == -1,					\
+		    #call " unexpectedly returned %d", __ret);			\
+		_cheritest_check_errno(#call, call_errno, expected_errno);	\
+	} while (0)
 
 #define DECLARE_CHERI_TEST_IMPL(name, args...) void name(args)
 #define DECLARE_CHERI_TEST_WITH_ARGS(name, args...) \
@@ -337,6 +367,9 @@ DECLARE_CHERI_TEST(test_cheriabi_mmap_nospace);
 DECLARE_CHERI_TEST(test_cheriabi_mmap_perms);
 DECLARE_CHERI_TEST(test_cheriabi_mmap_unrepresentable);
 DECLARE_CHERI_TEST(test_cheriabi_malloc_zero_size);
+DECLARE_CHERI_TEST(test_cheriabi_munmap_invalid_ptr);
+DECLARE_CHERI_TEST(test_cheriabi_mprotect_invalid_ptr);
+DECLARE_CHERI_TEST(test_cheriabi_minherit_invalid_ptr);
 
 /* cheritest_cheriabi_open.c */
 DECLARE_CHERI_TEST(test_cheriabi_open_ordinary);
@@ -477,8 +510,11 @@ DECLARE_CHERI_TEST(test_sandbox_var_constructor);
 DECLARE_CHERI_TEST(cheritest_setjmp);
 DECLARE_CHERI_TEST(cheritest_setjmp_longjmp);
 
+/* cheritest_printf.c */
+DECLARE_CHERI_TEST(test_printf_cap);
+
 /* cheritest_sealcap.c */
-DECLARE_CHERI_TEST(test_sealcap_sysarch);
+DECLARE_CHERI_TEST(test_sealcap_sysctl);
 DECLARE_CHERI_TEST(test_sealcap_seal);
 DECLARE_CHERI_TEST(test_sealcap_seal_unseal);
 

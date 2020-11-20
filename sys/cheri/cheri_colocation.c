@@ -75,6 +75,9 @@ struct mtx		switcher_lock;
 static int colocation_debug;
 SYSCTL_INT(_debug, OID_AUTO, colocation_debug, CTLFLAG_RWTUN,
     &colocation_debug, 0, "Enable process colocation debugging");
+static int counregister_on_exit = 1;
+SYSCTL_INT(_debug, OID_AUTO, counregister_on_exit, CTLFLAG_RWTUN,
+    &counregister_on_exit, 0, "Remove dead conames on thread exit");
 
 #ifdef DDB
 static int kdb_on_switcher_trap;
@@ -154,7 +157,8 @@ colocation_fetch_peer_scb(struct thread *td, struct switchercb *scbp)
 	KASSERT(error == 0, ("%s: copyincap from %p failed with error %d\n",
 	    __func__, (void *)addr, error));
 
-	if ((__cheri_fromcap void *)scbp->scb_peer_scb == NULL) {
+	if (cheri_gettag(scbp->scb_peer_scb) == 0 ||
+	    cheri_getlen(scbp->scb_peer_scb) == 0) {
 		/*
 		 * Not in cocall.
 		 */
@@ -181,7 +185,8 @@ colocation_get_peer(struct thread *td, struct thread **peertdp)
 		return;
 	}
 
-	if ((__cheri_fromcap void *)scb.scb_peer_scb != NULL)
+	if (cheri_gettag(scb.scb_peer_scb) != 0 &&
+	    cheri_getlen(scb.scb_peer_scb) > 0)
 		*peertdp = scb.scb_borrower_td;
 	else
 		*peertdp = NULL;
@@ -203,18 +208,20 @@ colocation_thread_exit(struct thread *td)
 	if (!have_scb)
 		return;
 
-	vmspace = td->td_proc->p_vmspace;
+	if (counregister_on_exit) {
+		vmspace = td->td_proc->p_vmspace;
 
-	vm_map_lock(&vmspace->vm_map);
+		vm_map_lock(&vmspace->vm_map);
 
-	LIST_FOREACH_SAFE(con, &vmspace->vm_conames, c_next, con_temp) {
-		if (cheri_getaddress(con->c_value) == td->td_md.md_scb) {
-			LIST_REMOVE(con, c_next);
-			free(con, M_TEMP);
+		LIST_FOREACH_SAFE(con, &vmspace->vm_conames, c_next, con_temp) {
+			if (cheri_getaddress(con->c_value) == td->td_md.md_scb) {
+				LIST_REMOVE(con, c_next);
+				free(con, M_TEMP);
+			}
 		}
-	}
 
-	vm_map_unlock(&vmspace->vm_map);
+		vm_map_unlock(&vmspace->vm_map);
+	}
 
 	md = &td->td_md;
 	sx_xlock(&md->md_slow_lock);
@@ -238,7 +245,7 @@ colocation_thread_exit(struct thread *td)
 	 * Set scb_peer_scb to a special "null" capability, so that cocall(2)
 	 * can see the callee thread is dead.
 	 */
-	scb.scb_peer_scb = cheri_capability_build_user_rwx(0, 0, 0, 0);
+	scb.scb_peer_scb = cheri_capability_build_user_data(0, 0, 0, EPIPE);
 	scb.scb_td = NULL;
 	scb.scb_borrower_td = NULL;
 
@@ -401,7 +408,9 @@ colocation_trap_in_switcher(struct thread *td, struct trapframe *trapframe)
 		goto trap;
 #endif
 	return (false);
+#ifdef __mips__
 trap:
+#endif
 #ifdef DDB
 	if (kdb_on_switcher_trap)
 		kdb_enter(KDB_WHY_CHERI, "switcher trap");
@@ -465,7 +474,8 @@ setup_scb(struct thread *td)
 	}
 
 	rv = vm_map_insert(map, NULL, 0, addr, addr + PAGE_SIZE,
-	    VM_PROT_READ | VM_PROT_WRITE, VM_PROT_READ | VM_PROT_WRITE,
+	    VM_PROT_READ | VM_PROT_WRITE | VM_PROT_READ_CAP | VM_PROT_WRITE_CAP,
+	    VM_PROT_READ | VM_PROT_WRITE | VM_PROT_READ_CAP | VM_PROT_WRITE_CAP,
 	    MAP_DISABLE_COREDUMP, addr);
 	if (rv != KERN_SUCCESS) {
 		COLOCATION_DEBUG("vm_map_insert() failed with rv %d", rv);
@@ -486,7 +496,7 @@ setup_scb(struct thread *td)
 	scb.scb_unsealcap = switcher_sealcap2;
 	scb.scb_td = td;
 	scb.scb_borrower_td = NULL;
-	scb.scb_peer_scb = NULL;
+	scb.scb_peer_scb = cheri_capability_build_user_data(0, 0, 0, EAGAIN);
 #ifdef __mips__
 	scb.scb_tls = (char * __capability)td->td_md.md_tls + td->td_md.md_tls_tcb_offset;
 #endif
@@ -549,7 +559,7 @@ kern_cosetup(struct thread *td, int what,
 		if (error != 0)
 			return (error);
 
-		datacap = cheri_capability_build_user_rwx(CHERI_CAP_USER_DATA_PERMS,
+		datacap = cheri_capability_build_user_data(CHERI_CAP_USER_DATA_PERMS,
 		    addr, PAGE_SIZE, 0);
 		datacap = cheri_seal(datacap, switcher_sealcap);
 		error = copyoutcap(&datacap, datap, sizeof(datacap));
@@ -564,7 +574,7 @@ kern_cosetup(struct thread *td, int what,
 		if (error != 0)
 			return (error);
 
-		datacap = cheri_capability_build_user_rwx(CHERI_CAP_USER_DATA_PERMS,
+		datacap = cheri_capability_build_user_data(CHERI_CAP_USER_DATA_PERMS,
 		    addr, PAGE_SIZE, 0);
 		datacap = cheri_seal(datacap, switcher_sealcap);
 		error = copyoutcap(&datacap, datap, sizeof(datacap));
@@ -621,7 +631,7 @@ kern_coregister(struct thread *td, const char * __capability namep,
 		}
 	}
 
-	cap = cheri_capability_build_user_rwx(CHERI_CAP_USER_DATA_PERMS,
+	cap = cheri_capability_build_user_data(CHERI_CAP_USER_DATA_PERMS,
 	    addr, PAGE_SIZE, 0);
 	cap = cheri_seal(cap, switcher_sealcap2);
 
@@ -954,15 +964,20 @@ static void
 db_print_scb(struct switchercb *scb)
 {
 
-	db_printf("    scb_peer_scb:	%p\n", (__cheri_fromcap void *)scb->scb_peer_scb);
+	if (cheri_getlen(scb->scb_peer_scb) == 0) {
+		db_printf("    scb_peer_scb:	<errno %lu>\n",
+		    cheri_getoffset(scb->scb_peer_scb));
+	} else {
+		db_printf("    scb_peer_scb:	%#lp\n", &scb->scb_peer_scb);
+	}
 	db_printf("    scb_td:		%p\n", scb->scb_td);
 	db_printf("    scb_borrower_td:	%p\n", scb->scb_borrower_td);
-	db_printf("    scb_tls:		%p\n", (__cheri_fromcap void *)scb->scb_tls);
-	db_printf("    scb_csp (c11):	%p\n", (__cheri_fromcap void *)scb->scb_csp);
-	db_printf("    scb_cra (c13):	%p\n", (__cheri_fromcap void *)scb->scb_cra);
-	db_printf("    scb_buf (c6):	%p\n", (__cheri_fromcap void *)scb->scb_buf);
+	db_printf("    scb_tls:		%#lp\n", &scb->scb_tls);
+	db_printf("    scb_csp (c11):	%#lp\n", &scb->scb_csp);
+	db_printf("    scb_cra (c13):	%#lp\n", &scb->scb_cra);
+	db_printf("    scb_buf (c6):	%#lp\n", &scb->scb_buf);
 	db_printf("    scb_buflen (a0):	%zd\n", scb->scb_buflen);
-	db_printf("    scb_cookiep:	%p\n", (__cheri_fromcap void *)scb->scb_cookiep);
+	db_printf("    scb_cookiep:	%#lp\n", &scb->scb_cookiep);
 }
 
 void

@@ -21,8 +21,9 @@ IGNORE_PRAGMA=	yes
 
 CFLAGS+=	-I. -I${.CURDIR}
 .if defined(BOOTSTRAPPING)
-CFLAGS+=	-D__BUILDING_LOCALEDEF_BOOTSTRAP=1
 CFLAGS+=	-I${.CURDIR}/bootstrap
 .endif
+CFLAGS+=	-I${SRCTOP}/lib/libc/locale
+CFLAGS+=	-I${SRCTOP}/lib/libc/stdtime
 
 .include <bsd.prog.mk>

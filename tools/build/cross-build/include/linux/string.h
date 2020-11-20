@@ -32,20 +32,20 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
+ *
+ * $FreeBSD$
  */
 #pragma once
 
 /*
- * On some version of glibc including string.h before stdlib.h won't work.
- * This happens when building anything that uses the libnetbsd stdlib.h override.
- * This is because string.h will include stdlib.h with a flag set to define
- * only a subset of the functions (which will then not set the _STDLIB_H
- * macro. libnetbsd stdlib.h can only be included once so this will not work.
+ * On some versions of glibc including string.h before stdlib.h won't work.
+ * This happens when building anything that uses the libnetbsd stdlib.h
+ * override. This is because string.h will include stdlib.h with a flag set to
+ * define only a subset of the functions (which will then not set the _STDLIB_H
+ * macro). libnetbsd stdlib.h can only be included once so this will not work.
  */
 #include <stdlib.h>
 
-/* Don't pull in the conflicting libbsd definition of strmode */
-#define LIBBSD_STRING_H
 #include <sys/cdefs.h>
 
 __BEGIN_DECLS

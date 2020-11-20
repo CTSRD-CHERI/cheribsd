@@ -51,24 +51,14 @@ OBJCOPY?=	objcopy
 SIZE?=		size
 
 .if defined(DEBUG)
-_MINUS_O=	-O
 CTFFLAGS+=	-g
-.else
-.if ${MACHINE_CPUARCH} == "powerpc"
-_MINUS_O=	-O	# gcc miscompiles some code at -O2
-.else
-_MINUS_O=	-O2
 .endif
-.endif
-.if ${MACHINE_CPUARCH} == "amd64"
-.if ${COMPILER_TYPE} == "clang"
-COPTFLAGS?=-O2 -pipe
+.if ${MACHINE_CPUARCH} == "amd64" && ${COMPILER_TYPE} != "clang"
+_COPTFLAGS_EXTRA=-frename-registers
 .else
-COPTFLAGS?=-O2 -frename-registers -pipe
+_COPTFLAGS_EXTRA=
 .endif
-.else
-COPTFLAGS?=${_MINUS_O} -pipe
-.endif
+COPTFLAGS?=-O2 -pipe ${_COPTFLAGS_EXTRA}
 .if !empty(COPTFLAGS:M-O[23s]) && empty(COPTFLAGS:M-fno-strict-aliasing)
 COPTFLAGS+= -fno-strict-aliasing
 .endif
@@ -161,14 +151,13 @@ LDFLAGS+=	--build-id=sha1
     defined(LINKER_FEATURES) && ${LINKER_FEATURES:Mifunc} == ""
 .error amd64/arm64/i386/ppc* kernel requires linker ifunc support
 .endif
-
 .if ${MACHINE_CPUARCH} == "amd64"
 LDFLAGS+=	-z max-page-size=2097152
 .if ${LINKER_TYPE} != "lld"
 LDFLAGS+=	-z common-page-size=4096
 .else
-.if defined(LINKER_FEATURES) && ${LINKER_FEATURES:Mifunc-noplt} == ""
-.warning "linker ${LD} does not support -z ifunc-noplt. Kernel will be slower!"
+.if defined(LINKER_FEATURES) && !${LINKER_FEATURES:Mifunc-noplt}
+.warning "Linker ${LD} does not support -z ifunc-noplt -> ifunc calls are unoptimized."
 .else
 LDFLAGS+=	-z notext -z ifunc-noplt
 .endif

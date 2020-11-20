@@ -32,6 +32,8 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
+ *
+ * $FreeBSD$
  */
 #pragma once
 
@@ -45,7 +47,7 @@
 #define optarg __freebsd_optarg
 
 /* Since we are building the FreeBSD getopt.c also use the matching header */
-#include "../../../../../include/getopt.h"
+#include_next <getopt.h>
 
 #undef getopt
 #define getopt(argc, argv, optstr) __freebsd_getopt(argc, argv, optstr)

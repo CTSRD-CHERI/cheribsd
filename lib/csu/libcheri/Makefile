@@ -1,6 +1,12 @@
-#
 # $FreeBSD$
-#
+
+.include <src.opts.mk>
+
+.if !${MACHINE_ABI:Mpurecap}
+NEED_COMPAT=	CHERI
+.include <bsd.compat.mk>
+.endif
+
 .PATH: ${.CURDIR}/../common-cheri
 CFLAGS+=	-I${.CURDIR}/../common		\
 		-I${.CURDIR}/../common-cheri
@@ -21,6 +27,4 @@ CLEANFILES=	${FILES}
 CFLAGS+=-mxgot -mllvm -mxmxgot
 CFLAGS+=	-DCRT_IRELOC_SUPPRESS -DCRT_ATEXIT_SUPPRESS
 
-NEED_COMPAT=	CHERI
-.include <bsd.compat.mk>
 .include <bsd.lib.mk>

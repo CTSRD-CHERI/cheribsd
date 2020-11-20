@@ -293,9 +293,7 @@ _LIBS=		lib${LIB_PRIVATE}${LIB}.a
 lib${LIB_PRIVATE}${LIB}.a: ${OBJS} ${STATICOBJS}
 	@${ECHO} building static ${LIB} library
 	@rm -f ${.TARGET}
-	${AR} ${ARFLAGS} ${.TARGET} `NM='${NM}' NMFLAGS='${NMFLAGS}' \
-	    ${LORDER} ${OBJS} ${STATICOBJS} | ${TSORT} ${TSORTFLAGS}` ${ARADD}
-	${RANLIB} ${RANLIBFLAGS} ${.TARGET}
+	${AR} ${ARFLAGS} ${.TARGET} ${OBJS} ${STATICOBJS} ${ARADD}
 .endif
 
 .if !defined(INTERNALLIB)
@@ -309,9 +307,7 @@ CLEANFILES+=	${POBJS}
 lib${LIB_PRIVATE}${LIB}_p.a: ${POBJS}
 	@${ECHO} building profiled ${LIB} library
 	@rm -f ${.TARGET}
-	${AR} ${ARFLAGS} ${.TARGET} `NM='${NM}' NMFLAGS='${NMFLAGS}' \
-	    ${LORDER} ${POBJS} | ${TSORT} ${TSORTFLAGS}` ${ARADD}
-	${RANLIB} ${RANLIBFLAGS} ${.TARGET}
+	${AR} ${ARFLAGS} ${.TARGET} ${POBJS} ${ARADD}
 .endif
 
 .if defined(LLVM_LINK)
@@ -371,9 +367,7 @@ ${SHLIB_NAME_FULL}: ${SOBJS}
 	@${INSTALL_LIBSYMLINK} ${TAG_ARGS:D${TAG_ARGS},dev} ${SHLIB_NAME} ${SHLIB_LINK}
 .endif
 	${_LD:N${CCACHE_BIN}} ${LDFLAGS} ${SSP_CFLAGS} ${SOLINKOPTS} \
-	    -o ${.TARGET} -Wl,-soname,${SONAME} \
-	    `NM='${NM}' NMFLAGS='${NMFLAGS}' ${LORDER} ${SOBJS} | \
-	    ${TSORT} ${TSORTFLAGS}` ${LDADD}
+	    -o ${.TARGET} -Wl,-soname,${SONAME} ${SOBJS} ${LDADD}
 .if ${MK_CTF} != "no"
 	${CTFMERGE} ${CTFFLAGS} -o ${.TARGET} ${SOBJS}
 .endif
@@ -404,7 +398,6 @@ lib${LIB_PRIVATE}${LIB}_pic.a: ${SOBJS}
 	@${ECHO} building special pic ${LIB} library
 	@rm -f ${.TARGET}
 	${AR} ${ARFLAGS} ${.TARGET} ${SOBJS} ${ARADD}
-	${RANLIB} ${RANLIBFLAGS} ${.TARGET}
 .endif
 
 .if defined(BUILD_NOSSP_PIC_ARCHIVE) && defined(LIB) && !empty(LIB)
@@ -417,7 +410,6 @@ lib${LIB_PRIVATE}${LIB}_nossp_pic.a: ${NOSSPSOBJS}
 	@${ECHO} building special nossp pic ${LIB} library
 	@rm -f ${.TARGET}
 	${AR} ${ARFLAGS} ${.TARGET} ${NOSSPSOBJS} ${ARADD}
-	${RANLIB} ${RANLIBFLAGS} ${.TARGET}
 .endif
 
 .endif # !defined(INTERNALLIB)
@@ -433,7 +425,6 @@ lib${LIB_PRIVATE}${LIB}_pie.a: ${PIEOBJS}
 	@${ECHO} building pie ${LIB} library
 	@rm -f ${.TARGET}
 	${AR} ${ARFLAGS} ${.TARGET} ${PIEOBJS} ${ARADD}
-	${RANLIB} ${RANLIBFLAGS} ${.TARGET}
 .endif
 
 .if defined(_SKIP_BUILD)
@@ -467,7 +458,17 @@ SHLINSTALLFLAGS+= -fschg
 # Install libraries with -S to avoid risk of modifying in-use libraries when
 # installing to a running system.  It is safe to avoid this for NO_ROOT builds
 # that are only creating an image.
-.if !defined(NO_SAFE_LIBINSTALL) && !defined(NO_ROOT)
+#
+# XXX: Since Makefile.inc1 ends up building lib/libc both as part of
+# _startup_libs and as part of _generic_libs it ends up getting installed a
+# second time during the parallel build, and although the .WAIT in lib/Makefile
+# stops that mattering for lib, other directories like secure/lib are built in
+# parallel at the top level and are unaffected by that, so can sometimes race
+# with the libc.so.7 reinstall and see a missing or corrupt file. Ideally the
+# build system would be fixed to not build/install libc the second time round,
+# but for now using -S ensures the install is atomic and thus we never see a
+# broken intermediate state, so use it even for NO_ROOT builds.
+.if !defined(NO_SAFE_LIBINSTALL) # && !defined(NO_ROOT)
 SHLINSTALLFLAGS+= -S
 .endif
 

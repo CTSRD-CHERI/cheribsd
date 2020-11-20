@@ -42,30 +42,49 @@ __RCSID("$NetBSD: t_getcontext.c,v 1.3 2011/07/14 04:59:14 jruoho Exp $");
 
 static int calls;
 
+#ifdef __FreeBSD__
+#if defined(__amd64__) || defined(__sparc64__)
 static void
-run(int n, ...)
+run(int n, int a0, int a1, int a2, int a3, int a4)
+#elif defined(__aarch64__) || defined(__riscv)
+static void
+run(int n, int a0, int a1, int a2, int a3, int a4, int a5, int a6)
+#else
+static void
+run(int n, int a0, int a1, int a2, int a3, int a4, int a5, int a6, int a7,
+    int a8)
+#endif
+#else
+static void
+run(int n, int a0, int a1, int a2, int a3, int a4, int a5, int a6, int a7,
+    int a8)
+#endif
 {
-	va_list va;
-	int i, ia;
 
 	ATF_REQUIRE_EQ(n, DEPTH - calls - 1);
 
-	va_start(va, n);
+	ATF_REQUIRE_EQ(a0, 0);
+	ATF_REQUIRE_EQ(a1, 1);
+	ATF_REQUIRE_EQ(a2, 2);
+	ATF_REQUIRE_EQ(a3, 3);
+	ATF_REQUIRE_EQ(a4, 4);
 #ifdef __FreeBSD__
 #if defined(__amd64__) || defined(__sparc64__)
-	for (i = 0; i < 5; i++) {
 #elif defined(__aarch64__) || defined(__riscv)
-	for (i = 0; i < 7; i++) {
+	ATF_REQUIRE_EQ(a5, 5);
+	ATF_REQUIRE_EQ(a6, 6);
 #else
-	for (i = 0; i < 9; i++) {
+	ATF_REQUIRE_EQ(a5, 5);
+	ATF_REQUIRE_EQ(a6, 6);
+	ATF_REQUIRE_EQ(a7, 7);
+	ATF_REQUIRE_EQ(a8, 8);
 #endif
 #else
-	for (i = 0; i < 9; i++) {
+	ATF_REQUIRE_EQ(a5, 5);
+	ATF_REQUIRE_EQ(a6, 6);
+	ATF_REQUIRE_EQ(a7, 7);
+	ATF_REQUIRE_EQ(a8, 8);
 #endif
-		ia = va_arg(va, int);
-		ATF_REQUIRE_EQ(i, ia);
-	}
-	va_end(va);
 
 	calls++;
 }

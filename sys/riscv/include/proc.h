@@ -35,11 +35,17 @@
 #define	_MACHINE_PROC_H_
 
 #ifdef CPU_CHERI
+/*
+ * When modifying this, make sure to update <machine/switcher.h>
+ */
 struct switchercb {
 	/*
 	 * Peer context - callee in caller's context, caller in callee's.
 	 * This also serves as the callee's spinlock.  Must be first,
 	 * as the cllc instruction doesn't take an offset.
+	 *
+	 * This can also be set to a zero-length capability, with the offset
+	 * equal to errno to be returned by cocall(2).
 	 */
 	struct switchercb * __capability	scb_peer_scb;
 
@@ -66,8 +72,29 @@ struct switchercb {
 	void * __capability			scb_tls;
 
 	/*
-	 * There's more stuff here; we allocate an entire page.
+	 * XXX
 	 */
+	void * __capability			scb_csp;
+
+	/*
+	 * XXX
+	 */
+	void * __capability			scb_cra;
+
+	/*
+	 * XXX
+	 */
+	void * __capability			scb_buf;
+
+	/*
+	 * XXX
+	 */
+	size_t					scb_buflen;
+
+	/*
+	 * XXX
+	 */
+	void * __capability			scb_cookiep;
 };
 #endif
 
@@ -92,7 +119,8 @@ struct mdthread {
 
 /* md_flags */
 #ifdef CPU_QEMU_RISCV
-#define	MDTD_QTRACE	0x0001		/* QEMU-CHERI ISA-level tracing */
+#define	MDTD_QTRACE		0x0001		/* QEMU-CHERI ISA-level tracing */
+#define	MDTD_QTRACE_USERMODE	0x0002		/* QEMU-CHERI user-only tracing */
 #endif
 
 struct mdproc {

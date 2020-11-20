@@ -40,7 +40,7 @@
 .set noat
 
 #define	CLEARLO_BITS	(1 << 1  /* $at */ | \
-			 1 << 2  /* $v0 */ | \
+			 /* preserve $v0 */ \
 			 1 << 3  /* $v1 */ | \
 			 1 << 4  /* $a0 */ | \
 			 1 << 5  /* $a1 */ | \
@@ -71,15 +71,20 @@
 			 1 << 14 /* $s8 */ | \
 			 1 << 15 /* $ra */)
 
-// XXX: $c0 (DDC)?
-#define	CCLEARLO_BITS	(1 << 1  /* PCC */ | \
+#define	CCLEARLO_BITS	(1 << 0  /* DDC */ | \
+			 1 << 1  /* PCC */ | \
 			 1 << 2  /* IDC */ | \
-			 1 << 3  /* $c3, containing the sealed code capability */ | \
-			 1 << 4  /* $c4, containing the sealed data capability */ | \
-			 /* $c5-$c10 are preserved and passed to the callee */ \
-			 /* $c11 is loaded from the callee context, despite being marked as caller-save */ \
+			 1 << 3  /* $c3 */ | \
+			 1 << 4  /* $c4 */ | \
+			 1 << 5  /* $c5 */ | \
+			 1 << 6  /* $c6 */ | \
+			 1 << 7  /* $c7 */ | \
+			 1 << 8  /* $c8 */ | \
+			 1 << 9  /* $c9 */ | \
+			 1 << 10 /* $c10 */ | \
+			 /* $c11 is loaded from the callee's context */ \
 			 1 << 12 /* $c12 */ | \
-			 /* $c13 is loaded from the callee context */ \
+			 /* $c13 is loaded from the callee's context */ \
 			 1 << 14 /* $c14 */ | \
 			 1 << 15 /* $c15 */)
 
@@ -176,8 +181,10 @@ _C_LABEL(switcher_cocall):
 	 * stripped off) where the callee wants it.
 	 */
 	clc	$c24, zero, SCB_COOKIEP($c25)
+	cbez	$c24, 2f
 	ccleartag	$c4, $c4
 	csc	$c4, zero, SCB_PEER_SCB($c24)
+2:
 
 	/*
 	 * Restore callee's TLS pointer.
@@ -201,21 +208,27 @@ _C_LABEL(switcher_cocall):
 	 * Compare buffer sizes, put the smaller one into t0.
 	 */
 	dsub	t8, a0, t0
-	bgez	t8, 2f
+	bgez	t8, 3f
 	nop
 	daddiu	t0, a0, 0
 
-2:
+3:
 	daddi 	t0, -CHERICAP_SIZE
 	clc	$c16, t0, 0($c6)
 	csc	$c16, t0, 0($c7)
-	bgtz	t0, 2b
+	bgtz	t0, 3b
 	nop
 
+	li	v0, 0
+4:
 	clearlo		CLEARLO_BITS
 	clearhi		CLEARHI_BITS
 	cclearlo	CCLEARLO_BITS
 	cclearhi	CCLEARHI_BITS
+#ifdef notyet
+	fpclearlo	0xff
+	fpclearhi	0xff
+#endif
 
 	/*
 	 * Clear lo and hi.
@@ -223,7 +236,7 @@ _C_LABEL(switcher_cocall):
 	multu	zero, zero
 
 	/*
-	 * "Return" to the callee.
+	 * "Return" to the callee - or the caller, if returning error.
 	 */
 	cjr	$c13
 	nop
@@ -240,10 +253,11 @@ _C_LABEL(switcher_cocall):
 	nop
 
 	/*
-	 * Nope - length zero means the callee is dead.
+	 * Nope - length zero means we need to return error encoded as offset.
 	 */
-	cjr	$c13
-	li	v0, EPIPE
+	clc	$c13, zero, SCB_CRA($idc)
+	b	4b
+	cgetoffset	v0, $c12
 
 .globl _C_LABEL(eswitcher_cocall)
 _C_LABEL(eswitcher_cocall):

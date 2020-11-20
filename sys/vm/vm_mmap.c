@@ -848,7 +848,8 @@ kern_mmap_req(struct thread *td, struct mmap_req *mrp)
 		 * This relies on VM_PROT_* matching PROT_*.
 		 */
 		error = vm_mmap_object(&vms->vm_map, &addr, max_addr, size,
-		    prot, max_prot, flags, NULL, pos, FALSE, td);
+		    VM_PROT_ADD_CAP(prot), VM_PROT_ADD_CAP(max_prot), flags,
+		    NULL, pos, FALSE, td);
 	} else {
 		/*
 		 * Mapping file, get fp for validation and don't let the
@@ -1054,7 +1055,7 @@ sys_munmap(struct thread *td, struct munmap_args *uap)
 
 #if __has_feature(capabilities)
 	if (cap_covers_pages(uap->addr, uap->len) == 0)
-		return (ENOMEM);
+		return (EPROT);
 	if ((cheri_getperm(uap->addr) & CHERI_PERM_CHERIABI_VMMAP) == 0)
 		return (EPROT);
 #endif
@@ -1184,7 +1185,7 @@ sys_mprotect(struct thread *td, struct mprotect_args *uap)
 
 #if __has_feature(capabilities)
 	if (cap_covers_pages(uap->addr, uap->len) == 0)
-		return (ENOMEM);
+		return (EPROT);
 	if ((cheri_getperm(uap->addr) & CHERI_PERM_CHERIABI_VMMAP) == 0)
 		return (EPROT);
 #endif
@@ -1227,11 +1228,11 @@ kern_mprotect(struct thread *td, uintptr_t addr0, size_t size, int prot)
 		if ((max_prot & prot) != prot)
 			return (ENOTSUP);
 		vm_error = vm_map_protect(&td->td_proc->p_vmspace->vm_map,
-		    addr, addr + size, max_prot, TRUE);
+		    addr, addr + size, max_prot, TRUE, TRUE);
 	}
 	if (vm_error == KERN_SUCCESS)
 		vm_error = vm_map_protect(&td->td_proc->p_vmspace->vm_map,
-		    addr, addr + size, prot, FALSE);
+		    addr, addr + size, prot, FALSE, TRUE);
 
 out:
 	switch (vm_error) {
@@ -1258,7 +1259,7 @@ sys_minherit(struct thread *td, struct minherit_args *uap)
 
 #if __has_feature(capabilities)
 	if (cap_covers_pages(uap->addr, uap->len) == 0)
-		return (ENOMEM);
+		return (EPROT);
 	if ((cheri_getperm(uap->addr) & CHERI_PERM_CHERIABI_VMMAP) == 0)
 		return (EPROT);
 #endif
@@ -1968,19 +1969,22 @@ done:
  * operations on cdevs.
  */
 int
-vm_mmap_cdev(struct thread *td, vm_size_t objsize, vm_prot_t prot,
+vm_mmap_cdev(struct thread *td, vm_size_t objsize, vm_prot_t *protp,
     vm_prot_t *maxprotp, int *flagsp, struct cdev *cdev, struct cdevsw *dsw,
     vm_ooffset_t *foff, vm_object_t *objp)
 {
 	vm_object_t obj;
+	vm_prot_t prot;
 	int error, flags;
 
 	flags = *flagsp;
+	prot = *protp;
 
 	if (dsw->d_flags & D_MMAP_ANON) {
 		*objp = NULL;
 		*foff = 0;
 		*maxprotp = VM_PROT_ALL;
+		*protp = VM_PROT_ADD_CAP(*protp);
 		*flagsp |= MAP_ANON;
 		return (0);
 	}
@@ -2047,6 +2051,9 @@ vm_mmap(vm_map_t map, vm_offset_t *addr, vm_size_t size, vm_prot_t prot,
 	object = NULL;
 	writecounted = FALSE;
 
+	KASSERT((prot & VM_PROT_CAP) == 0, ("VM_PROT_CAP set in prot"));
+	KASSERT((maxprot & VM_PROT_CAP) == 0, ("VM_PROT_CAP set in maxprot"));
+
 	/*
 	 * Lookup/allocate object.
 	 */
@@ -2060,7 +2067,7 @@ vm_mmap(vm_map_t map, vm_offset_t *addr, vm_size_t size, vm_prot_t prot,
 		dsw = dev_refthread(cdev, &ref);
 		if (dsw == NULL)
 			return (ENXIO);
-		error = vm_mmap_cdev(td, size, prot, &maxprot, &flags, cdev,
+		error = vm_mmap_cdev(td, size, &prot, &maxprot, &flags, cdev,
 		    dsw, &foff, &object);
 		dev_relthread(cdev, ref);
 		break;
@@ -2071,6 +2078,8 @@ vm_mmap(vm_map_t map, vm_offset_t *addr, vm_size_t size, vm_prot_t prot,
 		break;
 	case OBJT_DEFAULT:
 		if (handle == NULL) {
+			prot = VM_PROT_ADD_CAP(prot);
+			maxprot = VM_PROT_ADD_CAP(prot);
 			error = 0;
 			break;
 		}

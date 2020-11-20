@@ -71,8 +71,8 @@
 			 1 << 14 /* $s8 */ | \
 			 1 << 15 /* $ra */)
 
-// XXX: $c0 (DDC)?
-#define	CCLEARLO_BITS	(1 << 1  /* PCC */ | \
+#define	CCLEARLO_BITS	(1 << 0  /* DDC */ | \
+			 1 << 1  /* PCC */ | \
 			 1 << 2  /* IDC */ | \
 			 1 << 3  /* $c3 */ | \
 			 1 << 4  /* $c4 */ | \
@@ -82,7 +82,7 @@
 			 1 << 8  /* $c8 */ | \
 			 1 << 9  /* $c9 */ | \
 			 1 << 10 /* $c10 */ | \
-			 /* $c11 is loaded from the caller's context, despite being marked as caller-save */ \
+			 /* $c11 is loaded from the caller's context */ \
 			 1 << 12 /* $c12 */ | \
 			 /* $c13 is loaded from the caller's context */ \
 			 1 << 14 /* $c14 */ | \
@@ -161,12 +161,16 @@ _C_LABEL(switcher_coaccept):
 	 * Is this the first invocation of coaccept, or rather a response
 	 * for a ccall()?  If the former - call copark(2).
 	 */
-	cbts	$c25, 1f
+	cgetlen	t0, $c25
+	bnez	t0, 1f
 	nop
+	ccleartag $c24, $cnull
+	csc	$c24, zero, SCB_PEER_SCB($idc)
 	li	v0, SYS_copark
 	syscall
 	nop
 
+	// XXX: And then?  Fallthrough?
 1:
 	/*
 	 * Save the capability to the caller's thread in the callee control block.
@@ -223,6 +227,10 @@ _C_LABEL(switcher_coaccept):
 	clearhi		CLEARHI_BITS
 	cclearlo	CCLEARLO_BITS
 	cclearhi	CCLEARHI_BITS
+#ifdef notyet
+	fpclearlo	0xff
+	fpclearhi	0xff
+#endif
 
 	/*
 	 * Clear lo and hi.

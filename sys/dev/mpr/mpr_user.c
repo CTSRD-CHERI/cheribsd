@@ -661,7 +661,8 @@ mpr_user_command(struct mpr_softc *sc, struct mpr_usr_command *cmd)
 	hdr = (MPI2_REQUEST_HEADER *)cm->cm_req;
 
 	mpr_dprint(sc, MPR_USER, "%s: req %p %d  rpl %p %d\n", __func__,
-	    cmd->req, cmd->req_len, cmd->rpl, cmd->rpl_len);
+	    (__cheri_fromcap void *)cmd->req, cmd->req_len,
+	    (__cheri_fromcap void *)cmd->rpl, cmd->rpl_len);
 
 	if (cmd->req_len > (int)sc->reqframesz) {
 		err = EINVAL;
@@ -789,9 +790,11 @@ mpr_user_pass_thru(struct mpr_softc *sc, mpr_pass_thru_t *data)
 
 	mpr_dprint(sc, MPR_USER, "%s: req %p %d  rpl %p %d "
 	    "data in %p %d data out %p %d data dir %d\n", __func__,
-	    data->PtrRequest, data->RequestSize, data->PtrReply,
-	    data->ReplySize, data->PtrData, data->DataSize,
-	    data->PtrDataOut, data->DataOutSize, data->DataDirection);
+	    (__cheri_fromcap void *)data->PtrRequest, data->RequestSize,
+	    (__cheri_fromcap void *)data->PtrReply, data->ReplySize,
+	    (__cheri_fromcap void *)data->PtrData, data->DataSize,
+	    (__cheri_fromcap void *)data->PtrDataOut, data->DataOutSize,
+	    data->DataDirection);
 
 	/*
 	 * copy in the header so we know what we're dealing with before we

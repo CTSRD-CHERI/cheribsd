@@ -38,6 +38,10 @@
 
 #ifndef __ELF_WORD_SIZE
 #define	__ELF_WORD_SIZE	64	/* Used by <sys/elf_generic.h> */
+#if defined(__CHERI_PURE_CAPABILITY__) || \
+    (__has_feature(capabilities) && defined(_KERNEL))
+#define	__ELF_CHERI
+#endif
 #endif
 
 #include <sys/elf_generic.h>
@@ -57,12 +61,29 @@ typedef struct {	/* Auxiliary vector entry on initial stack */
 	long	a_type;			/* Entry type. */
 	union {
 		long	a_val;		/* Integer value. */
+#if __ELF_WORD_SIZE == 64 && !defined(__CHERI_PURE_CAPABILITY__)
 		void	*a_ptr;		/* Address. */
 		void	(*a_fcn)(void);	/* Function pointer (not used). */
+#endif
 	} a_un;
 } Elf64_Auxinfo;
 
+#if __has_feature(capabilities)
+typedef struct {	/* Auxiliary vector entry on initial stack */
+	int64_t	a_type;			/* Entry type. */
+	union {
+		int64_t	a_val;		/* Integer value. */
+		void * __capability a_ptr; /* Address. */
+		void	(* __capability a_fcn)(void); /* Function pointer (not used). */
+	} a_un;
+} Elf64C_Auxinfo;
+#endif
+
+#ifdef __ELF_CHERI
+typedef Elf64C_Auxinfo Elf_Auxinfo;
+#else
 __ElfType(Auxinfo);
+#endif
 
 #ifdef _MACHINE_ELF_WANT_32BIT
 #define	ELF_ARCH	EM_ARM

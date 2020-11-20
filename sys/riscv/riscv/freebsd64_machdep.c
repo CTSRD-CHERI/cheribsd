@@ -91,7 +91,7 @@ struct sysentvec elf_freebsd_freebsd64_sysvec = {
 	.sv_maxuser	= VM_MAXUSER_ADDRESS,
 	.sv_usrstack	= USRSTACK,
 	.sv_psstrings	= FREEBSD64_PS_STRINGS,
-	.sv_stackprot	= VM_PROT_READ | VM_PROT_WRITE,
+	.sv_stackprot	= VM_PROT_RW_CAP,
 	.sv_copyout_auxargs = __elfN(freebsd_copyout_auxargs),
 	.sv_copyout_strings = freebsd64_copyout_strings,
 	.sv_setregs	= exec_setregs,
@@ -197,18 +197,16 @@ freebsd64_set_mcontext(struct thread *td, mcontext64_t *mcp)
 		/* XXX: Permit userland to change GPRs for sigreturn? */
 
 		/* Honor 64-bit PC. */
-		mc.mc_capregs.cp_sepcc = (uintcap_t)cheri_setoffset(
-		    (void * __capability)mc.mc_capregs.cp_sepcc,
-		    mcp->mc_gpregs.gp_sepc);
+		mc.mc_capregs.cp_sepcc = cheri_setoffset(
+		    mc.mc_capregs.cp_sepcc, mcp->mc_gpregs.gp_sepc);
 	} else {
 		creg = (uintcap_t *)&mc.mc_capregs;
 		greg = (register_t *)&mcp->mc_gpregs;
 		for (i = 0; i < CONTEXT64_GPREGS; i++)
 			creg[i] = (uintcap_t)greg[i];
 
-		mc.mc_capregs.cp_sepcc = (uintcap_t)cheri_setoffset(
-		    (void * __capability)td->td_frame->tf_sepc,
-		    mcp->mc_gpregs.gp_sepc);
+		mc.mc_capregs.cp_sepcc = cheri_setoffset(
+		    td->td_frame->tf_sepc, mcp->mc_gpregs.gp_sepc);
 		mc.mc_capregs.cp_ddc = td->td_frame->tf_ddc;
 		mc.mc_capregs.cp_sstatus = mcp->mc_gpregs.gp_sstatus;
 	}
