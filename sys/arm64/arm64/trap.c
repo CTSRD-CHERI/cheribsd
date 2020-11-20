@@ -168,16 +168,17 @@ extern uint32_t generic_bs_poke_1f, generic_bs_poke_2f;
 extern uint32_t generic_bs_poke_4f, generic_bs_poke_8f;
 
 static bool
-test_bs_fault(void *addr)
+test_bs_fault(uintcap_t addr)
 {
-	return (addr == &generic_bs_peek_1f ||
-	    addr == &generic_bs_peek_2f ||
-	    addr == &generic_bs_peek_4f ||
-	    addr == &generic_bs_peek_8f ||
-	    addr == &generic_bs_poke_1f ||
-	    addr == &generic_bs_poke_2f ||
-	    addr == &generic_bs_poke_4f ||
-	    addr == &generic_bs_poke_8f);
+	/* TODO: Will need fixing for a purecap kernel */
+	return (addr == (uintcap_t)&generic_bs_peek_1f ||
+	    addr == (uintcap_t)&generic_bs_peek_2f ||
+	    addr == (uintcap_t)&generic_bs_peek_4f ||
+	    addr == (uintcap_t)&generic_bs_peek_8f ||
+	    addr == (uintcap_t)&generic_bs_poke_1f ||
+	    addr == (uintcap_t)&generic_bs_poke_2f ||
+	    addr == (uintcap_t)&generic_bs_poke_4f ||
+	    addr == (uintcap_t)&generic_bs_poke_8f);
 }
 
 static void
@@ -222,8 +223,14 @@ external_abort(struct thread *td, struct trapframe *frame, uint64_t esr,
 	 * Try to handle synchronous external aborts caused by
 	 * bus_space_peek() and/or bus_space_poke() functions.
 	 */
-	if (!lower && test_bs_fault((void *)frame->tf_elr)) {
+	if (!lower && test_bs_fault((uintcap_t)frame->tf_elr)) {
+#if __has_feature(capabilities)
+		trapframe_set_elr(frame,
+		    (uintcap_t)cheri_setaddress(cheri_getpcc(),
+		    (uint64_t)generic_bs_fault));
+#else
 		frame->tf_elr = (uint64_t)generic_bs_fault;
+#endif
 		return;
 	}
 
