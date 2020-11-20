@@ -958,18 +958,20 @@ static void
 db_print_scb(struct switchercb *scb)
 {
 
-	if (cheri_getlen(scb->scb_peer_scb) != 0)
-		db_printf("    scb_peer_scb:	%p\n", (__cheri_fromcap void *)scb->scb_peer_scb);
-	else
-		db_printf("    scb_peer_scb:	<errno %lu>\n", cheri_getoffset(scb->scb_peer_scb));
+	if (cheri_getlen(scb->scb_peer_scb) == 0) {
+		db_printf("    scb_peer_scb:	<errno %lu>\n",
+		    cheri_getoffset(scb->scb_peer_scb));
+	} else {
+		db_printf("    scb_peer_scb:	%#lp\n", &scb->scb_peer_scb);
+	}
 	db_printf("    scb_td:		%p\n", scb->scb_td);
 	db_printf("    scb_borrower_td:	%p\n", scb->scb_borrower_td);
-	db_printf("    scb_tls:		%p\n", (__cheri_fromcap void *)scb->scb_tls);
-	db_printf("    scb_csp (c11):	%p\n", (__cheri_fromcap void *)scb->scb_csp);
-	db_printf("    scb_cra (c13):	%p\n", (__cheri_fromcap void *)scb->scb_cra);
-	db_printf("    scb_buf (c6):	%p\n", (__cheri_fromcap void *)scb->scb_buf);
+	db_printf("    scb_tls:		%#lp\n", &scb->scb_tls);
+	db_printf("    scb_csp (c11):	%#lp\n", &scb->scb_csp);
+	db_printf("    scb_cra (c13):	%#lp\n", &scb->scb_cra);
+	db_printf("    scb_buf (c6):	%#lp\n", &scb->scb_buf);
 	db_printf("    scb_buflen (a0):	%zd\n", scb->scb_buflen);
-	db_printf("    scb_cookiep:	%p\n", (__cheri_fromcap void *)scb->scb_cookiep);
+	db_printf("    scb_cookiep:	%#lp\n", &scb->scb_cookiep);
 }
 
 void
