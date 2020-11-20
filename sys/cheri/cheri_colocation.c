@@ -245,7 +245,7 @@ colocation_thread_exit(struct thread *td)
 	 * Set scb_peer_scb to a special "null" capability, so that cocall(2)
 	 * can see the callee thread is dead.
 	 */
-	scb.scb_peer_scb = cheri_capability_build_user_rwx(0, 0, 0, EPIPE);
+	scb.scb_peer_scb = cheri_capability_build_user_data(0, 0, 0, EPIPE);
 	scb.scb_td = NULL;
 	scb.scb_borrower_td = NULL;
 
@@ -493,7 +493,7 @@ setup_scb(struct thread *td)
 	scb.scb_unsealcap = switcher_sealcap2;
 	scb.scb_td = td;
 	scb.scb_borrower_td = NULL;
-	scb.scb_peer_scb = cheri_capability_build_user_rwx(0, 0, 0, EAGAIN);
+	scb.scb_peer_scb = cheri_capability_build_user_data(0, 0, 0, EAGAIN);
 #ifdef __mips__
 	scb.scb_tls = (char * __capability)td->td_md.md_tls + td->td_md.md_tls_tcb_offset;
 #endif
@@ -556,7 +556,7 @@ kern_cosetup(struct thread *td, int what,
 		if (error != 0)
 			return (error);
 
-		datacap = cheri_capability_build_user_rwx(CHERI_CAP_USER_DATA_PERMS,
+		datacap = cheri_capability_build_user_data(CHERI_CAP_USER_DATA_PERMS,
 		    addr, PAGE_SIZE, 0);
 		datacap = cheri_seal(datacap, switcher_sealcap);
 		error = copyoutcap(&datacap, datap, sizeof(datacap));
@@ -571,7 +571,7 @@ kern_cosetup(struct thread *td, int what,
 		if (error != 0)
 			return (error);
 
-		datacap = cheri_capability_build_user_rwx(CHERI_CAP_USER_DATA_PERMS,
+		datacap = cheri_capability_build_user_data(CHERI_CAP_USER_DATA_PERMS,
 		    addr, PAGE_SIZE, 0);
 		datacap = cheri_seal(datacap, switcher_sealcap);
 		error = copyoutcap(&datacap, datap, sizeof(datacap));
@@ -628,7 +628,7 @@ kern_coregister(struct thread *td, const char * __capability namep,
 		}
 	}
 
-	cap = cheri_capability_build_user_rwx(CHERI_CAP_USER_DATA_PERMS,
+	cap = cheri_capability_build_user_data(CHERI_CAP_USER_DATA_PERMS,
 	    addr, PAGE_SIZE, 0);
 	cap = cheri_seal(cap, switcher_sealcap2);
 
