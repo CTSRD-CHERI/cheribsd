@@ -16,8 +16,6 @@ SRCS=	eval.c expr.c look.c main.c misc.c gnum4.c trace.c parser.y
 .if target(bootstrap_m4_tokenizer)
 # When crossbuilding on non-FreeBSD we need to first build m4 with pre-generated
 # tokenizer files and the build the real m4 once we have lex+yacc.
-# Avoid pulling in bsd.prog.mk early when this makefile is included from
-# tools/build/bootstrap-m4/Makefile
 SRCS+=	tokenizer.c
 .else
 SRCS+=	tokenizer.l

@@ -164,7 +164,7 @@ execute_process(COMMAND ${CMAKE_C_COMPILER} -print-resource-dir OUTPUT_VARIABLE 
 message(STATUS "BUILTIN_HEADERS_DIR=${BUILTIN_HEADERS_DIR}")
 add_compile_options(-idirafter ${BUILTIN_HEADERS_DIR}/include)
 
-add_subdirectory(libexec/rtld-cheri-elf)
+add_subdirectory(libexec/rtld-elf)
 set(AWK "awk" CACHE FILEPATH "Path to awk")
 function(generate_if_headers _if_files_dir)
     file(GLOB_RECURSE _if_files LIST_DIRECTORIES FALSE "${_if_files_dir}/*_if.m")

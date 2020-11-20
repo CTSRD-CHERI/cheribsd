@@ -252,6 +252,9 @@ va:
 	addi	s0, s0, 8
 	bltu	s0, s1, 1b
 
+	/* Save modulep in s2. */
+	mv	s2, a0
+
 	/* Save DTB physical pointer in s1. */
 	mv	s1, a1
 
@@ -277,7 +280,7 @@ va:
 	sd	t0, RISCV_BOOTPARAMS_DTBP_VIRT(sp)
 	sd	s1, RISCV_BOOTPARAMS_DTBP_PHYS(sp)
 
-	sd	a0, RISCV_BOOTPARAMS_MODULEP(sp)
+	sd	s2, RISCV_BOOTPARAMS_MODULEP(sp)
 
 	mv	a0, sp
 	call	_C_LABEL(initriscv)	/* Off we go */

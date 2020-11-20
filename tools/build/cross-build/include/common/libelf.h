@@ -32,10 +32,13 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
+ *
+ * $FreeBSD$
  */
 #pragma once
 /* Needed to get opensolaris stuff to compile */
 #ifdef _OPENSOLARIS_SYS_TYPES_H_
 #include <sys/endian.h>
+
 #include_next <libelf.h>
 #endif

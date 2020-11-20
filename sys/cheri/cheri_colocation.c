@@ -472,7 +472,8 @@ setup_scb(struct thread *td)
 	}
 
 	rv = vm_map_insert(map, NULL, 0, addr, addr + PAGE_SIZE,
-	    VM_PROT_READ | VM_PROT_WRITE, VM_PROT_READ | VM_PROT_WRITE,
+	    VM_PROT_READ | VM_PROT_WRITE | VM_PROT_READ_CAP | VM_PROT_WRITE_CAP,
+	    VM_PROT_READ | VM_PROT_WRITE | VM_PROT_READ_CAP | VM_PROT_WRITE_CAP,
 	    MAP_DISABLE_COREDUMP, addr);
 	if (rv != KERN_SUCCESS) {
 		COLOCATION_DEBUG("vm_map_insert() failed with rv %d", rv);

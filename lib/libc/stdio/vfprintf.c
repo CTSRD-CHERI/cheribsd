@@ -63,7 +63,7 @@ __FBSDID("$FreeBSD$");
 #include "namespace.h"
 #include <sys/types.h>
 
-#ifdef __CHERI_PURE_CAPABILITY__
+#if __has_feature(capabilities)
 #include <cheri/cheri.h>
 #include <cheri/cheric.h>
 #endif
@@ -314,13 +314,15 @@ vfprintf(FILE * __restrict fp, const char * __restrict fmt0, va_list ap)
  * write a uintmax_t in octal (plus one byte).
  */
 #if UINTMAX_MAX <= UINT64_MAX
-#ifndef __CHERI_PURE_CAPABILITY__
+#if !__has_feature(capabilities)
 #define	BUF	32
 #else
-/* For the CHERI sandbox ABI we need enough space to print a capability dump:
- * v:1 s:0 p:0007807d b:00000001200ff73c l:0000000000000004 o:0123456789abcdef t:-1
- * The current maximum length 80 chars but in case we decide to print more info
- * in the future we just use 128 since we have enough stack space here anyway.
+/* For CHERI we need enough space to print a capability dump:
+ * 0x0000007ffffecc10 [rwxRW,0x0000007ffffecc10-0x0000007ffffecc50] (invalid,sealed)
+ *
+ * The current maximum length is 81 chars but in case we decide to
+ * print more info in the future we just use 128 since we have enough
+ * stack space here anyway.
 */
 #define BUF	128
 #endif
@@ -393,8 +395,8 @@ __vfprintf(FILE *fp, locale_t locale, const char *fmt0, va_list ap)
 	va_list orgap;          /* original argument pointer */
 	char *convbuf;		/* wide to multibyte conversion result */
 	int savserr;
-#ifdef __CHERI_PURE_CAPABILITY__
-	void *pointer;
+#if __has_feature(capabilities)
+	void * __capability cap;
 #endif
 
 	static const char xdigs_lower[16] = "0123456789abcdef";
@@ -859,17 +861,29 @@ fp_common:
 			 * defined manner.''
 			 *	-- ANSI X3J11
 			 */
-#ifndef __CHERI_PURE_CAPABILITY__
-			ujval = (uintmax_t)(uintptr_t)GETARG(void *);
+#if __has_feature(capabilities)
+#ifdef __CHERI_PURE_CAPABILITY__
+			cap = GETARG(void *);
+			ujval = cheri_getaddress(cap);
 #else
-			pointer = GETARG(void *);
+			if (flags & LONGINT) {
+				cap = *GETARG(void * __capability *);
+				ujval = cheri_getaddress(cap);
+			} else {
+				ujval = (uintmax_t)(uintptr_t)GETARG(void *);
+				flags &= ~ALT;
+			}
+#endif
 			if (flags & ALT) {
 				cp = buf + BUF;
-				cp = __cheri_ptr_alt(pointer, cp, xdigs_lower);
+				cp = __cheri_ptr_alt(cap, cp, xdigs_lower,
+				    prec);
 				size = buf + BUF - cp;
+				flags &= ~ZEROPAD;
 				break;
 			}
-			ujval = cheri_getaddress(pointer);
+#else
+			ujval = (uintmax_t)(uintptr_t)GETARG(void *);
 #endif
 			base = 16;
 			xdigs = xdigs_lower;

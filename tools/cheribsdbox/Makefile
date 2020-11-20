@@ -488,11 +488,6 @@ check_crunchgen:
 	fi
 all: check_crunchgen
 
-.if ${MACHINE_ABI:Mpurecap} && ${MACHINE_ARCH:Mriscv*}
-# No RTLD yet!
-NO_SHARED=yes
-.endif
-
 .if defined(NO_RTLD) || defined(NO_SHARED)
 # Force empty shlibs if we are building without RTLD/NO_SHARED
 # See top_makefile_rules(FILE *outmk) in crunchgen.c

@@ -2809,7 +2809,10 @@ vm_page_reclaim_run(int req_class, int domain, u_long npages, vm_page_t m_run,
 					KASSERT(m_new->oflags == VPO_UNMANAGED,
 					    ("page %p is managed", m_new));
 					m_new->oflags = 0;
-					pmap_copy_page(m, m_new);
+					if (object->flags & OBJ_HASCAP)
+						pmap_copy_page_tags(m, m_new);
+					else
+						pmap_copy_page(m, m_new);
 					m_new->valid = m->valid;
 					m_new->dirty = m->dirty;
 					m->flags &= ~PG_ZERO;

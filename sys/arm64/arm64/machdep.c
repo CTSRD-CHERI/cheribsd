@@ -87,6 +87,10 @@ __FBSDID("$FreeBSD$");
 #include <machine/vfp.h>
 #endif
 
+#if __has_feature(capabilities)
+#include <cheri/cheric.h>
+#endif
+
 #ifdef DEV_ACPI
 #include <contrib/dev/acpica/include/acpi.h>
 #include <machine/acpica_machdep.h>
@@ -415,6 +419,47 @@ set_dbregs32(struct thread *td, struct dbreg32 *regs)
 }
 #endif
 
+#if __has_feature(capabilities)
+int
+fill_capregs(struct thread *td, struct capreg *regs)
+{
+	struct trapframe *frame;
+	int i;
+
+	frame = td->td_frame;
+	regs->csp = frame->tf_sp;
+	regs->clr = frame->tf_lr;
+	regs->celr = frame->tf_elr;
+	regs->ddc = frame->tf_ddc;
+
+	for (i = 0; i < nitems(frame->tf_x); i++) {
+		regs->c[i] = frame->tf_x[i];
+		if (cheri_gettag((void * __capability)frame->tf_x[i]))
+			regs->tagmask |= (uint64_t)1 << i;
+	}
+	if (cheri_gettag((void * __capability)frame->tf_lr))
+		regs->tagmask |= (uint64_t)1 << i;
+	i++;
+	if (cheri_gettag((void * __capability)frame->tf_sp))
+		regs->tagmask |= (uint64_t)1 << i;
+	i++;
+	if (cheri_gettag((void * __capability)frame->tf_elr))
+		regs->tagmask |= (uint64_t)1 << i;
+	i++;
+	if (cheri_gettag((void * __capability)frame->tf_ddc))
+		regs->tagmask |= (uint64_t)1 << i;
+
+	return (0);
+}
+
+int
+set_capregs(struct thread *td, struct capreg *regs)
+{
+
+	return (EOPNOTSUPP);
+}
+#endif
+
 int
 ptrace_set_pc(struct thread *td, u_long addr)
 {
@@ -714,7 +759,7 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	struct thread *td;
 	struct proc *p;
 	struct trapframe *tf;
-	struct sigframe *fp, frame;
+	struct sigframe * __capability fp, frame;
 	struct sigacts *psp;
 	struct sysentvec *sysent;
 	int onstack, sig;
@@ -736,18 +781,18 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	/* Allocate and validate space for the signal handler context. */
 	if ((td->td_pflags & TDP_ALTSTACK) != 0 && !onstack &&
 	    SIGISMEMBER(psp->ps_sigonstack, sig)) {
-		fp = (struct sigframe *)((uintptr_t)td->td_sigstk.ss_sp +
+		fp = (struct sigframe * __capability)((uintcap_t)td->td_sigstk.ss_sp +
 		    td->td_sigstk.ss_size);
 #if defined(COMPAT_43)
 		td->td_sigstk.ss_flags |= SS_ONSTACK;
 #endif
 	} else {
-		fp = (struct sigframe *)td->td_frame->tf_sp;
+		fp = (struct sigframe * __capability)td->td_frame->tf_sp;
 	}
 
 	/* Make room, keeping the stack aligned */
 	fp--;
-	fp = (struct sigframe *)STACKALIGN(fp);
+	fp = (struct sigframe * __capability)STACKALIGN(fp);
 
 	/* Fill in the frame to copy out */
 	bzero(&frame, sizeof(frame));
@@ -769,11 +814,18 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	}
 
 	tf->tf_x[0]= sig;
+#if __has_feature(capabilities)
+	tf->tf_x[1] = (uintcap_t)cheri_setbounds(&fp->sf_si,
+	    sizeof(fp->sf_si));
+	tf->tf_x[2] = (uintcap_t)cheri_setbounds(&fp->sf_uc,
+	    sizeof(fp->sf_uc));
+#else
 	tf->tf_x[1] = (register_t)&fp->sf_si;
 	tf->tf_x[2] = (register_t)&fp->sf_uc;
+#endif
 
-	tf->tf_elr = (register_t)catcher;
-	tf->tf_sp = (register_t)fp;
+	tf->tf_elr = (uintcap_t)catcher;
+	tf->tf_sp = (uintcap_t)fp;
 	sysent = p->p_sysent;
 	if (sysent->sv_sigcode_base != 0)
 		tf->tf_lr = (register_t)sysent->sv_sigcode_base;

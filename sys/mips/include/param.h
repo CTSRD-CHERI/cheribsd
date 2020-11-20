@@ -205,36 +205,19 @@
 #endif /* ! KSTACK_LARGE_PAGE */
 
 /*
- * CHERI specific define required by SysV shared memory.  Depends
- * on physically addressable memory.
- */
-#ifdef __mips_n64
-/* 1MB allows all sizes for 40-bit address spaces with ISA v5 128-bit caps. */
-/* XXX-BD: only increase for compressed capabilities? */
-#define	CHERI_SHMLBA	(1 << 20)
-#endif
-
-/*
  * Mach derived conversion macros
  */
-#define	round_page(x)		(((x) + PAGE_MASK) & ~PAGE_MASK)
-#define	trunc_page(x)		((x) & ~PAGE_MASK)
 #define	round_2mpage(x)		(((x) + PDRMASK) & ~PDRMASK)
 #define	trunc_2mpage(x)		((x) & ~PDRMASK)
-
-#define	atop(x)			((x) >> PAGE_SHIFT)
-#define	ptoa(x)			((x) << PAGE_SHIFT)
-
-#define	pgtok(x)		((x) * (PAGE_SIZE / 1024))
 
 #endif /* !_MIPS_INCLUDE_PARAM_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20200921,
 //   "target_type": "header",
 //   "changes": [
 //     "support"
 //   ],
-//   "change_comment": "sysv shm"
+//   "change_comment": "MACHINE_ARCH for CheriABI and freebsd64"
 // }
 // CHERI CHANGES END

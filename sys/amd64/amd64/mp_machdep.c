@@ -114,7 +114,7 @@ is_kernel_paddr(vm_paddr_t pa)
 {
 
 	return (pa >= trunc_2mpage(btext - KERNBASE) &&
-	   pa < round_page(_end - KERNBASE));
+	   pa < round_page((vm_paddr_t)_end - KERNBASE));
 }
 
 static bool

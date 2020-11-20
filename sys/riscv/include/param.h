@@ -42,6 +42,8 @@
 #define	STACKALIGNBYTES	(16 - 1)
 #define	STACKALIGN(p)	(__builtin_align_down((p), STACKALIGNBYTES + 1))
 
+#define __PCI_REROUTE_INTERRUPT
+
 #ifndef MACHINE
 #define	MACHINE		"riscv"
 #endif
@@ -123,27 +125,9 @@
 #define	PCPU_PAGES		1
 
 /*
- * CHERI specific define required by SysV shared memory.  Depends
- * on physically addressable memory.
- *
- * XXX-JHB: Just copied from MIPS
- */
-/* 1MB allows all sizes for 40-bit address spaces with ISA v5 128-bit caps. */
-/* XXX-BD: only increase for compressed capabilities? */
-#define	CHERI_SHMLBA	(1 << 20)
-
-/*
  * Mach derived conversion macros
  */
-#define	round_page(x)		(((unsigned long)(x) + PAGE_MASK) & ~PAGE_MASK)
-#define	trunc_page(x)		((unsigned long)(x) & ~PAGE_MASK)
-
-#define	atop(x)			((unsigned long)(x) >> PAGE_SHIFT)
-#define	ptoa(x)			((unsigned long)(x) << PAGE_SHIFT)
-
 #define	riscv_btop(x)		((unsigned long)(x) >> PAGE_SHIFT)
 #define	riscv_ptob(x)		((unsigned long)(x) << PAGE_SHIFT)
-
-#define	pgtok(x)		((unsigned long)(x) * (PAGE_SIZE / 1024))
 
 #endif /* !_MACHINE_PARAM_H_ */

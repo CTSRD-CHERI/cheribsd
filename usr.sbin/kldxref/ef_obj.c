@@ -153,6 +153,10 @@ static int
 ef_obj_get_type(elf_file_t __unused ef)
 {
 
+#if __has_feature(capabilities)
+	if (ELF_IS_CHERI(&ef->ef_hdr))
+		return (EFT_KLD | EFT_CHERI);
+#endif
 	return (EFT_KLD);
 }
 
@@ -178,6 +182,19 @@ ef_obj_lookup_set(elf_file_t ef, const char *name, long *startp, long *stopp,
     long *countp)
 {
 	int i;
+	size_t ptrsz;
+
+#ifdef KLD_COMPAT_FREEBSD64
+	if (!ELF_IS_CHERI(&ef->ef_hdr)) {
+		ptrsz = sizeof(uint64_t);
+	} else
+#endif
+#ifdef KLD_COMPAT_CHERIABI
+	if (ELF_IS_CHERI(&ef->ef_hdr)) {
+		ptrsz = sizeof(uintcap_t);
+	} else
+#endif
+		ptrsz = sizeof(void *);
 
 	for (i = 0; i < ef->nprogtab; i++) {
 		if ((strncmp(ef->progtab[i].name, "set_", 4) == 0) &&
@@ -185,7 +202,7 @@ ef_obj_lookup_set(elf_file_t ef, const char *name, long *startp, long *stopp,
 			*startp = (char *)ef->progtab[i].addr - ef->address;
 			*stopp = (char *)ef->progtab[i].addr +
 			    ef->progtab[i].size - ef->address;
-			*countp = (*stopp - *startp) / sizeof(void *);
+			*countp = (*stopp - *startp) / ptrsz;
 			return (0);
 		}
 	}

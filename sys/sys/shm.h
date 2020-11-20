@@ -53,11 +53,7 @@
 #define SHM_RDONLY  010000  /* Attach read-only (else read-write) */
 #define SHM_RND     020000  /* Round attach address to SHMLBA */
 #define	SHM_REMAP   030000  /* Unmap before mapping */
-#ifndef __CHERI_PURE_CAPABILITY__
 #define SHMLBA      PAGE_SIZE /* Segment low boundary address multiple */
-#else
-#define	SHMLBA      CHERI_SHMLBA
-#endif
 
 /* "official" access mode definitions; somewhat braindead since you have
    to specify (SHM_* >> 3) for group and (SHM_* >> 6) for world permissions */

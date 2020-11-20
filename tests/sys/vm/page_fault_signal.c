@@ -73,7 +73,8 @@ ATF_TC_BODY(page_fault_signal__segv_maperr_1, tc)
 	int sz;
 
 	sz = getpagesize();
-	p = mmap(NULL, sz, PROT_READ, MAP_ANON, -1, 0);
+	p = mmap(NULL, sz, PROT_READ | PROT_MAX(PROT_READ | PROT_WRITE),
+	    MAP_ANON, -1, 0);
 	ATF_REQUIRE(p != MAP_FAILED);
 	r = munmap(p, sz);
 	ATF_REQUIRE(r != -1);
@@ -92,7 +93,8 @@ ATF_TC_BODY(page_fault_signal__segv_accerr_1, tc)
 	int sz;
 
 	sz = getpagesize();
-	p = mmap(NULL, sz, PROT_READ, MAP_ANON, -1, 0);
+	p = mmap(NULL, sz, PROT_READ | PROT_MAX(PROT_READ | PROT_WRITE),
+	    MAP_ANON, -1, 0);
 	ATF_REQUIRE(p != MAP_FAILED);
 	if (sigsetjmp(sig_env, 1) == 0) {
 		setup_signals();
@@ -111,7 +113,7 @@ ATF_TC_BODY(page_fault_signal__segv_accerr_2, tc)
 	int sz;
 
 	sz = getpagesize();
-	p = mmap(NULL, sz, PROT_NONE, MAP_ANON, -1, 0);
+	p = mmap(NULL, sz, PROT_NONE | PROT_MAX(PROT_READ), MAP_ANON, -1, 0);
 	ATF_REQUIRE(p != MAP_FAILED);
 	if (sigsetjmp(sig_env, 1) == 0) {
 		setup_signals();

@@ -7,10 +7,10 @@ INCS=	pmc.h pmclog.h pmcformat.h
 
 CFLAGS+= -I${SRCTOP}/${RELDIR:H}/libpmcstat
 
-.if ${MACHINE_ARCH} == "aarch64" || ${MACHINE_ARCH} == "amd64" || \
+.if ${MACHINE_CPUARCH} == "aarch64" || ${MACHINE_ARCH} == "amd64" || \
     ${MACHINE_ARCH} == "i386"
 
-.if ${MACHINE_ARCH} == "aarch64"
+.if ${MACHINE_CPUARCH} == "aarch64"
 EVENT_ARCH="arm64"
 .elif ${MACHINE_ARCH} == "amd64" || ${MACHINE_ARCH} == "i386"
 EVENT_ARCH="x86"
@@ -32,14 +32,12 @@ SUBDIR+= pmu-events
 .endif
 .endif
 
-libpmc_events.c.tmp: ${JEVENTS} .META
-	${JEVENTS} ${EVENT_ARCH} ${.CURDIR}/pmu-events/arch ${.TARGET}
-
-libpmc_events.c: libpmc_events.c.tmp
+libpmc_events.c: ${JEVENTS} .META
+	${JEVENTS} ${EVENT_ARCH} ${.CURDIR}/pmu-events/arch ${.TARGET}.tmp
 	if [ ! -e ${.TARGET} ] || ! cmp -s ${.TARGET} ${.TARGET}.tmp; then \
 		mv -f ${.TARGET}.tmp ${.TARGET}; \
 	fi
-CLEANFILES+=	libpmc_events.c.tmp libpmc_events.c
+CLEANFILES+=	libpmc_events.c libpmc_events.c.tmp
 SRCS+=	libpmc_events.c
 .endif
 

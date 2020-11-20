@@ -781,7 +781,7 @@
 #ifndef __CAP_CHECK
 #if __has_feature(capabilities)
 #define __CAP_CHECK(cap, len) ({					\
-	int ret = 1;							\
+	int ret = __builtin_cheri_tag_get(cap);				\
 	size_t caplen = __builtin_cheri_length_get(cap);		\
 	size_t capoff = __builtin_cheri_offset_get(cap);		\
 	if (capoff < 0 || capoff > caplen || caplen - capoff < (len))	\

@@ -171,7 +171,6 @@ static const struct cheri_test cheri_tests[] = {
 	  .ct_desc = "Exercise capability load permission success",
 	  .ct_func = test_nofault_perm_load },
 
-#ifdef CHERI_GET_SEALCAP
 	{ .ct_name = "test_fault_perm_seal",
 	  .ct_desc = "Exercise capability seal permission failure",
 	  .ct_func = test_fault_perm_seal,
@@ -179,7 +178,6 @@ static const struct cheri_test cheri_tests[] = {
 	  .ct_signum = SIGPROT,
 	  .ct_si_code = PROT_CHERI_PERM,
 	  .ct_si_trapno = TRAPNO_CHERI },
-#endif
 
 	{ .ct_name = "test_fault_perm_store",
 	  .ct_desc = "Exercise capability store permission failure",
@@ -193,7 +191,6 @@ static const struct cheri_test cheri_tests[] = {
 	  .ct_desc = "Exercise capability store permission success",
 	  .ct_func = test_nofault_perm_store },
 
-#ifdef CHERI_GET_SEALCAP
 	{ .ct_name = "test_fault_perm_unseal",
 	  .ct_desc = "Exercise capability unseal permission failure",
 	  .ct_func = test_fault_perm_unseal,
@@ -201,7 +198,6 @@ static const struct cheri_test cheri_tests[] = {
 	  .ct_signum = SIGPROT,
 	  .ct_si_code = PROT_CHERI_PERM,
 	  .ct_si_trapno = TRAPNO_CHERI },
-#endif
 
 	{ .ct_name = "test_fault_tag",
 	  .ct_desc = "Store via untagged capability",
@@ -268,10 +264,9 @@ static const struct cheri_test cheri_tests[] = {
 	/*
 	 * Tests on the kernel-provided sealing capability (sealcap).
 	 */
-#ifdef CHERI_GET_SEALCAP
-	{ .ct_name = "test_sealcap_sysarch",
-	  .ct_desc = "Retrieve sealcap using sysarch(2)",
-	  .ct_func = test_sealcap_sysarch, },
+	{ .ct_name = "test_sealcap_sysctl",
+	  .ct_desc = "Retrieve sealcap using sysctl(3)",
+	  .ct_func = test_sealcap_sysctl, },
 
 	{ .ct_name = "test_sealcap_seal",
 	  .ct_desc = "Use sealcap to seal a capability",
@@ -280,7 +275,6 @@ static const struct cheri_test cheri_tests[] = {
 	{ .ct_name = "test_sealcap_seal_unseal",
 	  .ct_desc = "Use sealcap to seal and unseal a capability",
 	  .ct_func = test_sealcap_seal_unseal, },
-#endif
 
 	/*
 	 * Tests on function pointers as sentries.
@@ -1165,6 +1159,10 @@ static const struct cheri_test cheri_tests[] = {
 	  .ct_desc = "Test pointer passing through AIO signals",
 	  .ct_func = test_aio_sival, },
 
+	{ .ct_name = "test_printf_cap",
+	  .ct_desc = "Various checks of %#p",
+	  .ct_func = test_printf_cap },
+
 #ifdef CHERI_LIBCHERI_TESTS
 	/*
 	 * Test libcheri sandboxing -- and kernel sandbox unwind.
@@ -1715,6 +1713,18 @@ static const struct cheri_test cheri_tests[] = {
 	  .ct_desc = "Check that zero-sized mallocs are properly bounded",
 	  .ct_func = test_cheriabi_malloc_zero_size },
 
+	{ .ct_name = "test_cheriabi_munmap_invalid_ptr",
+	  .ct_desc = "Check that munmap() rejects invalid pointer arguments",
+	  .ct_func = test_cheriabi_munmap_invalid_ptr },
+
+	{ .ct_name = "test_cheriabi_mprotect_invalid_ptr",
+	  .ct_desc = "Check that mprotect() rejects invalid pointer arguments",
+	  .ct_func = test_cheriabi_mprotect_invalid_ptr },
+
+	{ .ct_name = "test_cheriabi_minherit_invalid_ptr",
+	  .ct_desc = "Check that minherit() rejects invalid pointer arguments",
+	  .ct_func = test_cheriabi_minherit_invalid_ptr },
+
 	/*
 	 * Tests for pathname handling in open(2).
 	 */
@@ -1754,11 +1764,9 @@ static const struct cheri_test cheri_tests[] = {
 	  .ct_desc = "Path with CHERI_PERM_LOAD permission missing",
 	  .ct_func = test_cheriabi_open_bad_perm, },
 
-#ifdef CHERI_GET_SEALCAP
 	{ .ct_name = "test_cheriabi_open_sealed",
 	  .ct_desc = "Sealed path",
 	  .ct_func = test_cheriabi_open_sealed, },
-#endif
 #endif
 #ifdef CHERI_C_TESTS
 #define	DECLARE_TEST(name, desc)			\
@@ -1798,10 +1806,10 @@ usage(void)
 
 	fprintf(stderr,
 "usage:\n"
-"    cheritest [options] -l               -- List tests\n"
-"    cheritest [options] -a               -- Run all tests\n"
-"    cheritest [options] <test> [...]     -- Run specified tests\n"
-"    cheritest [options] -g <glob> [...]  -- Run matching tests\n"
+"    " PROG " [options] -l               -- List tests\n"
+"    " PROG " [options] -a               -- Run all tests\n"
+"    " PROG " [options] <test> [...]     -- Run specified tests\n"
+"    " PROG " [options] -g <glob> [...]  -- Run matching tests\n"
 "\n"
 "options:\n"
 "    -f  -- Only include \"fast\" tests\n"
@@ -1823,6 +1831,7 @@ list_tests(void)
 	u_int i;
 	const char *xfail_reason;
 
+	xo_attr("name", "%s", PROG);
 	xo_open_container("testsuite");
 	xo_open_list("testcase");
 	for (i = 0; i < cheri_tests_len; i++) {
@@ -1991,7 +2000,7 @@ cheritest_run_test(const struct cheri_test *ctp)
 	const char *xfail_reason;
 	char* failure_message;
 	ssize_t len;
-	xo_attr("classname", "%s", ctp->ct_name);
+	xo_attr("classname", "%s.%s", PROG, ctp->ct_name);
 	xo_attr("name", "%s", ctp->ct_desc);
 	xo_open_instance("testcase");
 	bzero(ccsp, sizeof(*ccsp));
@@ -2495,7 +2504,7 @@ main(int argc, char *argv[])
 	}
 #endif
 	xo_open_container("testsuites");
-	xo_attr("name", "%s", "cheritest");
+	xo_attr("name", "%s", PROG);
 	xo_open_container("testsuite");
 	xo_open_list("test");
 	if (run_all) {

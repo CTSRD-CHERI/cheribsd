@@ -82,12 +82,15 @@ void
 test_sandbox_pthread_abort(const struct cheri_test *ctp __unused)
 {
 	pthread_t thread;
+	int error;
 
-	if (pthread_create(&thread, NULL, test_sandbox_pthread_abort_fn, NULL)
-	    < 0)
-		cheritest_failure_err("pthread_create");
-	if (pthread_join(thread, NULL) < 0)
-		cheritest_failure_err("pthread_join");
+	error = pthread_create(&thread, NULL, test_sandbox_pthread_abort_fn,
+	    NULL);
+	if (error != 0)
+		cheritest_failure_errc(error, "pthread_create");
+	error = pthread_join(thread, NULL);
+	if (error != 0)
+		cheritest_failure_errc(error, "pthread_join");
 	cheritest_success();
 }
 
@@ -107,11 +110,14 @@ void
 test_sandbox_pthread_cs_helloworld(const struct cheri_test *ctp __unused)
 {
 	pthread_t thread;
+	int error;
 
-	if (pthread_create(&thread, NULL,
-	    test_sandbox_pthread_cs_helloworld_fn, NULL) < 0)
-		cheritest_failure_err("pthread_create");
-	if (pthread_join(thread, NULL) < 0)
-		cheritest_failure_err("pthread_join");
+	error = pthread_create(&thread, NULL,
+	    test_sandbox_pthread_cs_helloworld_fn, NULL);
+	if (error != 0)
+		cheritest_failure_errc(error, "pthread_create");
+	error = pthread_join(thread, NULL);
+	if (error != 0)
+		cheritest_failure_errc(error, "pthread_join");
 	cheritest_success();
 }

@@ -37,6 +37,8 @@ $1 ~ "Machine:" {
             elfarch = "EM_MIPS";
         } else if (match($0, ".*[xX]86[-_]64")) {
             elfarch = "EM_X86_64";
+        } else if (match($0, "AArch64")) {
+            elfarch = "EM_AARCH64";
         } else if (match($0, "PowerPC64")) {
             elfarch = "EM_PPC64";
         } else {

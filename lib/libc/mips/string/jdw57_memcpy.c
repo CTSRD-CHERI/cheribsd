@@ -72,13 +72,20 @@ typedef	uintptr_t ptr;
 #define	pmask	(psize - 1)
 #define bigptr	(psize>wsize)
 
+#if _MIPS_SZLONG == 32
+#define ADDIU "addiu"
+#else
+#define ADDIU "daddiu"
+#endif
+
 #define MIPSLOOP(index, last, cStatements, increment)			\
 {									\
 	index -= increment;						\
 	do {								\
 		asm (							\
-			"daddiu %[indexIn], %[indexIn], " #increment "\n"	\
+			ADDIU " %[indexIn], %[indexIn], %[incrementIn]\n"	\
 			:[indexIn] "+r"(index)				\
+			:[incrementIn] "i"(increment)			\
 		);							\
 		cStatements						\
 	} while (index!=last);						\
@@ -258,10 +265,10 @@ bcopy(const void *src0, void *dst0, size_t length)
 					dst += t*wsize;
 					src += t*wsize;
 					t = -t*wsize;
-					MIPSLOOP(t, -8,
+					MIPSLOOP(t, -wsize,
 					    *((word * CAPABILITY)(dst+t)) =
 					    *((const word * CAPABILITY)(src+t));,
-					    8/*wsize*/);
+					    wsize);
 				}
 			}
 		}
@@ -273,16 +280,8 @@ bcopy(const void *src0, void *dst0, size_t length)
 			src += t*psize;
 			dst += t*psize;
 			t = -(t*psize);
-#if !defined(_MIPS_SZCAP)
 			MIPSLOOP(t, -psize, *((ptr * CAPABILITY)(dst+t)) =
-			    *((const ptr * CAPABILITY)(src+t));, 8/*sizeof(ptr)*/);
-#elif _MIPS_SZCAP==128
-			MIPSLOOP(t, -psize, *((ptr * CAPABILITY)(dst+t)) =
-			    *((const ptr * CAPABILITY)(src+t));, 16/*sizeof(ptr)*/);
-#elif _MIPS_SZCAP==256
-			MIPSLOOP(t, -psize, *((ptr * CAPABILITY)(dst+t)) =
-			    *((const ptr * CAPABILITY)(src+t));, 32/*sizeof(ptr)*/);
-#endif
+			    *((const ptr * CAPABILITY)(src+t));, sizeof(ptr));
 		}
 		t = length & pmask;
 		if (t) {
@@ -332,7 +331,7 @@ bcopy(const void *src0, void *dst0, size_t length)
 					MIPSLOOP(t, 0,
 					    *((word * CAPABILITY)(dst+t)) =
 					    *((const word * CAPABILITY)(src+t));,
-					    -8/*wsize*/);
+					    -wsize);
 				}
 			}
 		}
@@ -341,16 +340,8 @@ bcopy(const void *src0, void *dst0, size_t length)
 			src -= t*psize;
 			dst -= t*psize;
 			t = ((t-1)*psize);
-#if !defined(_MIPS_SZCAP)
 			MIPSLOOP(t, 0, *((ptr * CAPABILITY)(dst+t)) =
-			    *((const ptr * CAPABILITY)(src+t));, -8/*sizeof(ptr)*/);
-#elif _MIPS_SZCAP==128
-			MIPSLOOP(t, 0, *((ptr * CAPABILITY)(dst+t)) =
-			    *((const ptr * CAPABILITY)(src+t));, -16/*sizeof(ptr)*/);
-#elif _MIPS_SZCAP==256
-			MIPSLOOP(t, 0, *((ptr * CAPABILITY)(dst+t)) =
-			    *((const ptr * CAPABILITY)(src+t));, -32/*sizeof(ptr)*/);
-#endif
+			    *((const ptr * CAPABILITY)(src+t));, -sizeof(ptr));
 
 		}
 		t = length & pmask;
