@@ -463,6 +463,8 @@ fetch_instr_near_pc(struct trapframe *frame, register_t offset_from_pc, int32_t 
 		*instr = -1;
 		return (bad_inst_ptr);
 	}
+#else
+	bad_inst_ptr = (char *)frame->pc + offset_from_pc;
 #endif
 	if (USERLAND(frame->badvaddr)) {
 		KASSERT(curthread->td_pcb->pcb_onfault == NULL,
