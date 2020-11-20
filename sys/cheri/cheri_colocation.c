@@ -157,7 +157,8 @@ colocation_fetch_peer_scb(struct thread *td, struct switchercb *scbp)
 	KASSERT(error == 0, ("%s: copyincap from %p failed with error %d\n",
 	    __func__, (void *)addr, error));
 
-	if ((__cheri_fromcap void *)scbp->scb_peer_scb == NULL) {
+	if (cheri_gettag(scbp->scb_peer_scb) == 0 ||
+	    cheri_getlen(scbp->scb_peer_scb) == 0) {
 		/*
 		 * Not in cocall.
 		 */
@@ -184,7 +185,8 @@ colocation_get_peer(struct thread *td, struct thread **peertdp)
 		return;
 	}
 
-	if ((__cheri_fromcap void *)scb.scb_peer_scb != NULL)
+	if (cheri_gettag(scb.scb_peer_scb) != 0 &&
+	    cheri_getlen(scb.scb_peer_scb) > 0)
 		*peertdp = scb.scb_borrower_td;
 	else
 		*peertdp = NULL;
