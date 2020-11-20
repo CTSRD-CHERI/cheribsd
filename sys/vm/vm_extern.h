@@ -78,8 +78,8 @@ void kmem_unback(vm_object_t, vm_offset_t, vm_size_t);
 
 /* Bootstrapping. */
 void kmem_bootstrap_free(vm_offset_t, vm_size_t);
-vm_map_t kmem_suballoc(vm_map_t, vm_ptr_t *, vm_ptr_t *, vm_size_t,
-    boolean_t);
+void kmem_subinit(vm_map_t, vm_map_t, vm_ptr_t *, vm_ptr_t *, vm_size_t,
+    bool);
 void kmem_init(vm_ptr_t, vm_ptr_t);
 void kmem_init_zero_region(void);
 void kmeminit(void);
@@ -92,8 +92,8 @@ void vm_fault_copy_entry(vm_map_t, vm_map_t, vm_map_entry_t, vm_map_entry_t,
     vm_ooffset_t *);
 int vm_fault_disable_pagefaults(void);
 void vm_fault_enable_pagefaults(int save);
-int vm_fault_quick_hold_pages(vm_map_t map, vm_offset_t addr, vm_size_t len,
-    vm_prot_t prot, vm_page_t *ma, int max_count);
+int vm_fault_quick_hold_pages(vm_map_t map, void * __capability addr,
+    vm_size_t len, vm_prot_t prot, vm_page_t *ma, int max_count);
 int vm_fault_trap(vm_map_t map, vm_offset_t vaddr, vm_prot_t fault_type,
     int fault_flags, int *signo, int *ucode);
 int vm_forkproc(struct thread *, struct proc *, struct thread *,
@@ -105,7 +105,7 @@ int vm_mmap_object(vm_map_t, vm_ptr_t *, vm_offset_t, vm_size_t,
     vm_prot_t, vm_prot_t, int, vm_object_t, vm_ooffset_t, boolean_t,
     struct thread *);
 int vm_mmap_to_errno(int rv);
-int vm_mmap_cdev(struct thread *, vm_size_t, vm_prot_t, vm_prot_t *,
+int vm_mmap_cdev(struct thread *, vm_size_t, vm_prot_t *, vm_prot_t *,
     int *, struct cdev *, struct cdevsw *, vm_ooffset_t *, vm_object_t *);
 int vm_mmap_vnode(struct thread *, vm_size_t, vm_prot_t, vm_prot_t *, int *,
     struct vnode *, vm_ooffset_t *, vm_object_t *, boolean_t *);

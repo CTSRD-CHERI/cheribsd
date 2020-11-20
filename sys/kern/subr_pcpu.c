@@ -356,7 +356,7 @@ DB_SHOW_COMMAND(dpcpu_off, db_show_dpcpu_off)
 
 	CPU_FOREACH(id) {
 #ifdef __CHERI_PURE_CAPABILITY__
-		db_printf("dpcpu_off[%2d] = %p)\n", id, dpcpu_off[id]);
+		db_printf("dpcpu_off[%2d] = %p)\n", id, (void *)dpcpu_off[id]);
 #else
 		db_printf("dpcpu_off[%2d] = 0x%jx (+ DPCPU_START = %p)\n",
 		    id, (uintmax_t)dpcpu_off[id],

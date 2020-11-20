@@ -332,32 +332,15 @@ struct crypt_kop {
 #define	CIOCFINDDEV	_IOWR('c', 108, struct crypt_find_op)
 #define	CIOCCRYPTAEAD	_IOWR('c', 109, struct crypt_aead)
 
-struct cryptotstat {
-	struct timespec	acc;		/* total accumulated time */
-	struct timespec	min;		/* min time */
-	struct timespec	max;		/* max time */
-	u_int32_t	count;		/* number of observations */
-};
-
 struct cryptostats {
-	u_int32_t	cs_ops;		/* symmetric crypto ops submitted */
-	u_int32_t	cs_errs;	/* symmetric crypto ops that failed */
-	u_int32_t	cs_kops;	/* asymetric/key ops submitted */
-	u_int32_t	cs_kerrs;	/* asymetric/key ops that failed */
-	u_int32_t	cs_intrs;	/* crypto swi thread activations */
-	u_int32_t	cs_rets;	/* crypto return thread activations */
-	u_int32_t	cs_blocks;	/* symmetric op driver block */
-	u_int32_t	cs_kblocks;	/* symmetric op driver block */
-	/*
-	 * When CRYPTO_TIMING is defined at compile time and the
-	 * sysctl debug.crypto is set to 1, the crypto system will
-	 * accumulate statistics about how long it takes to process
-	 * crypto requests at various points during processing.
-	 */
-	struct cryptotstat cs_invoke;	/* crypto_dipsatch -> crypto_invoke */
-	struct cryptotstat cs_done;	/* crypto_invoke -> crypto_done */
-	struct cryptotstat cs_cb;	/* crypto_done -> callback */
-	struct cryptotstat cs_finis;	/* callback -> callback return */
+	uint64_t	cs_ops;		/* symmetric crypto ops submitted */
+	uint64_t	cs_errs;	/* symmetric crypto ops that failed */
+	uint64_t	cs_kops;	/* asymetric/key ops submitted */
+	uint64_t	cs_kerrs;	/* asymetric/key ops that failed */
+	uint64_t	cs_intrs;	/* crypto swi thread activations */
+	uint64_t	cs_rets;	/* crypto return thread activations */
+	uint64_t	cs_blocks;	/* symmetric op driver block */
+	uint64_t	cs_kblocks;	/* symmetric op driver block */
 };
 
 #ifdef _KERNEL
@@ -390,6 +373,7 @@ struct crypto_session_params {
 	int		csp_flags;
 
 #define	CSP_F_SEPARATE_OUTPUT	0x0001	/* Requests can use separate output */
+#define	CSP_F_SEPARATE_AAD	0x0002	/* Requests can use separate AAD */
 
 	int		csp_ivlen;	/* IV length in bytes. */
 
@@ -485,6 +469,7 @@ struct cryptop {
 	struct crypto_buffer crp_buf;
 	struct crypto_buffer crp_obuf;
 
+	void		*crp_aad;	/* AAD buffer. */
 	int		crp_aad_start;	/* Location of AAD. */
 	int		crp_aad_length;	/* 0 => no AAD. */
 	int		crp_iv_start;	/* Location of IV.  IV length is from
@@ -643,6 +628,8 @@ extern	void crypto_done(struct cryptop *crp);
 extern	void crypto_kdone(struct cryptkop *);
 extern	int crypto_getfeat(int *);
 
+extern	void crypto_destroyreq(struct cryptop *crp);
+extern	void crypto_initreq(struct cryptop *crp, crypto_session_t cses);
 extern	void crypto_freereq(struct cryptop *crp);
 extern	struct cryptop *crypto_getreq(crypto_session_t cses, int how);
 

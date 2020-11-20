@@ -303,8 +303,7 @@ static bool	pmap_demote_l2_locked(pmap_t pmap, pd_entry_t *l2,
 static int	pmap_enter_l2(pmap_t pmap, vm_offset_t va, pd_entry_t new_l2,
 		    u_int flags, vm_page_t m, struct rwlock **lockp);
 static vm_page_t pmap_enter_quick_locked(pmap_t pmap, vm_offset_t va,
-    vm_page_t m, vm_prot_t prot, u_int flags, vm_page_t mpte,
-    struct rwlock **lockp);
+    vm_page_t m, vm_prot_t prot, vm_page_t mpte, struct rwlock **lockp);
 static int pmap_remove_l3(pmap_t pmap, pt_entry_t *l3, vm_offset_t sva,
     pd_entry_t ptepde, struct spglist *free, struct rwlock **lockp);
 static boolean_t pmap_try_insert_pv_entry(pmap_t pmap, vm_offset_t va,
@@ -362,7 +361,10 @@ pagezero(void *p)
 #define	pmap_l2_index(va)	(((va) >> L2_SHIFT) & Ln_ADDR_MASK)
 #define	pmap_l3_index(va)	(((va) >> L3_SHIFT) & Ln_ADDR_MASK)
 
-#define	PTE_TO_PHYS(pte)	((pte >> PTE_PPN0_S) * PAGE_SIZE)
+#define	PTE_TO_PHYS(pte) \
+    ((((pte) & ~PTE_HI_MASK) >> PTE_PPN0_S) * PAGE_SIZE)
+#define	L2PTE_TO_PHYS(l2) \
+    ((((l2) & ~PTE_HI_MASK) >> PTE_PPN1_S) << L2_SHIFT)
 
 static __inline pd_entry_t *
 pmap_l1(pmap_t pmap, vm_offset_t va)
@@ -498,7 +500,7 @@ pmap_early_vtophys(vm_ptr_t l1pt, vm_offset_t va)
 		("Invalid bootstrap L2 table"));
 
 	/* L2 is superpages */
-	ret = (l2[l2_slot] >> PTE_PPN1_S) << L2_SHIFT;
+	ret = L2PTE_TO_PHYS(l2[l2_slot]);
 	ret += (va & L2_OFFSET);
 
 	return (ret);
@@ -626,7 +628,7 @@ pmap_bootstrap(vm_ptr_t l1pt, vm_paddr_t kernstart, vm_size_t kernlen)
 		if (physmap[i + 1] > max_pa)
 			max_pa = physmap[i + 1];
 	}
-	printf("physmap_idx %lx\n", physmap_idx);
+	printf("physmap_idx %u\n", physmap_idx);
 	printf("min_pa %lx\n", min_pa);
 	printf("max_pa %lx\n", max_pa);
 
@@ -878,7 +880,7 @@ pmap_extract(pmap_t pmap, vm_offset_t va)
 			}
 		} else {
 			/* L2 is superpages */
-			pa = (l2 >> PTE_PPN1_S) << L2_SHIFT;
+			pa = L2PTE_TO_PHYS(l2);
 			pa |= (va & L2_OFFSET);
 		}
 	}
@@ -930,7 +932,7 @@ pmap_kextract(vm_offset_t va)
 			panic("pmap_kextract: No l2");
 		if ((pmap_load(l2) & PTE_RX) != 0) {
 			/* superpages */
-			pa = (pmap_load(l2) >> PTE_PPN1_S) << L2_SHIFT;
+			pa = L2PTE_TO_PHYS(pmap_load(l2));
 			pa |= (va & L2_OFFSET);
 			return (pa);
 		}
@@ -2727,10 +2729,10 @@ pmap_enter(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot,
 	if (va < VM_MAX_USER_ADDRESS)
 		new_l3 |= PTE_U;
 #if __has_feature(capabilities)
-	if ((flags & PMAP_ENTER_NOLOADTAGS) == 0)
-		new_l3 |= PTE_LC;
-	if ((flags & PMAP_ENTER_NOSTORETAGS) == 0)
-		new_l3 |= PTE_SC;
+	if (prot & VM_PROT_READ_CAP)
+		new_l3 |= PTE_CR;
+	if (prot & VM_PROT_WRITE_CAP)
+		new_l3 |= PTE_CW | PTE_CD;
 #endif
 
 	new_l3 |= (pn << PTE_PPN0_S);
@@ -2980,7 +2982,7 @@ out:
  */
 static bool
 pmap_enter_2mpage(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot,
-    u_int flags, struct rwlock **lockp)
+    struct rwlock **lockp)
 {
 	pd_entry_t new_l2;
 	pn_t pn;
@@ -2996,10 +2998,8 @@ pmap_enter_2mpage(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot,
 	if (va < VM_MAXUSER_ADDRESS)
 		new_l2 |= PTE_U;
 #if __has_feature(capabilities)
-	if ((flags & PMAP_ENTER_NOLOADTAGS) == 0)
-		new_l2 |= PTE_LC;
-	if ((flags & PMAP_ENTER_NOSTORETAGS) == 0)
-		new_l2 |= PTE_SC;
+	if ((prot & VM_PROT_READ_CAP) != 0)
+		new_l2 |= PTE_CR;
 #endif
 	return (pmap_enter_l2(pmap, va, new_l2, PMAP_ENTER_NOSLEEP |
 	    PMAP_ENTER_NOREPLACE | PMAP_ENTER_NORECLAIM, NULL, lockp) ==
@@ -3132,7 +3132,7 @@ pmap_enter_l2(pmap_t pmap, vm_offset_t va, pd_entry_t new_l2, u_int flags,
  */
 void
 pmap_enter_object(pmap_t pmap, vm_offset_t start, vm_offset_t end,
-    vm_page_t m_start, vm_prot_t prot, u_int flags)
+    vm_page_t m_start, vm_prot_t prot)
 {
 	struct rwlock *lock;
 	vm_offset_t va;
@@ -3151,11 +3151,11 @@ pmap_enter_object(pmap_t pmap, vm_offset_t start, vm_offset_t end,
 		va = start + ptoa(diff);
 		if ((va & L2_OFFSET) == 0 && va + L2_SIZE <= end &&
 		    m->psind == 1 && pmap_ps_enabled(pmap) &&
-		    pmap_enter_2mpage(pmap, va, m, prot, flags, &lock))
+		    pmap_enter_2mpage(pmap, va, m, prot, &lock))
 			m = &m[L2_SIZE / PAGE_SIZE - 1];
 		else
-			mpte = pmap_enter_quick_locked(pmap, va, m, prot, flags,
-			    mpte, &lock);
+			mpte = pmap_enter_quick_locked(pmap, va, m, prot, mpte,
+			    &lock);
 		m = TAILQ_NEXT(m, listq);
 	}
 	if (lock != NULL)
@@ -3174,15 +3174,14 @@ pmap_enter_object(pmap_t pmap, vm_offset_t start, vm_offset_t end,
  */
 
 void
-pmap_enter_quick(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot,
-    u_int flags)
+pmap_enter_quick(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot)
 {
 	struct rwlock *lock;
 
 	lock = NULL;
 	rw_rlock(&pvh_global_lock);
 	PMAP_LOCK(pmap);
-	(void)pmap_enter_quick_locked(pmap, va, m, prot, flags, NULL, &lock);
+	(void)pmap_enter_quick_locked(pmap, va, m, prot, NULL, &lock);
 	if (lock != NULL)
 		rw_wunlock(lock);
 	rw_runlock(&pvh_global_lock);
@@ -3191,7 +3190,7 @@ pmap_enter_quick(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot,
 
 static vm_page_t
 pmap_enter_quick_locked(pmap_t pmap, vm_offset_t va, vm_page_t m,
-    vm_prot_t prot, u_int flags, vm_page_t mpte, struct rwlock **lockp)
+    vm_prot_t prot, vm_page_t mpte, struct rwlock **lockp)
 {
 	struct spglist free;
 	vm_paddr_t phys;
@@ -3290,10 +3289,8 @@ pmap_enter_quick_locked(pmap_t pmap, vm_offset_t va, vm_page_t m,
 	if (va < VM_MAX_USER_ADDRESS)
 		newl3 |= PTE_U;
 #if __has_feature(capabilities)
-	if ((flags & PMAP_ENTER_NOLOADTAGS) == 0)
-		newl3 |= PTE_LC;
-	if ((flags & PMAP_ENTER_NOSTORETAGS) == 0)
-		newl3 |= PTE_SC;
+	if ((prot & VM_PROT_READ_CAP) != 0)
+		newl3 |= PTE_CR;
 #endif
 
 	/*

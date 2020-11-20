@@ -2251,7 +2251,7 @@ keg_ctor(void *mem, int size, void *udata, int flags)
 	keg->uk_dr.dr_iter = 0;
 
 	/*
-	 * The master zone is passed to us at keg-creation time.
+	 * The primary zone is passed to us at keg-creation time.
 	 */
 	zone = arg->zone;
 	keg->uk_name = zone->uz_name;
@@ -2867,7 +2867,7 @@ uma_startup1(vm_ptr_t virtual_avail)
 {
 	struct uma_zctor_args args;
 	size_t ksize, zsize, size;
-	uma_keg_t masterkeg;
+	uma_keg_t primarykeg;
 	uintptr_t m;
 	int domain;
 	uint8_t pflag;
@@ -2897,7 +2897,7 @@ uma_startup1(vm_ptr_t virtual_avail)
 	m += zsize;
 	kegs = (uma_zone_t)m;
 	m += zsize;
-	masterkeg = (uma_keg_t)m;
+	primarykeg = (uma_keg_t)m;
 
 	/* "manually" create the initial zone */
 	memset(&args, 0, sizeof(args));
@@ -2907,7 +2907,7 @@ uma_startup1(vm_ptr_t virtual_avail)
 	args.dtor = keg_dtor;
 	args.uminit = zero_init;
 	args.fini = NULL;
-	args.keg = masterkeg;
+	args.keg = primarykeg;
 	args.align = UMA_SUPER_ALIGN - 1;
 	args.flags = UMA_ZFLAG_INTERNAL;
 	zone_ctor(kegs, zsize, &args, M_WAITOK);
@@ -2954,9 +2954,9 @@ uma_startup2(void)
 	if (bootstart != bootmem) {
 		vm_map_lock(kernel_map);
 		(void)vm_map_reservation_create_locked(kernel_map, &bootreserv,
-		    bootmem - bootstart, VM_PROT_RW);
+		    bootmem - bootstart, VM_PROT_RW_CAP);
 		(void)vm_map_insert(kernel_map, NULL, 0, bootreserv, bootmem,
-		    VM_PROT_RW, VM_PROT_RW, MAP_NOFAULT, bootstart);
+		    VM_PROT_RW_CAP, VM_PROT_RW_CAP, MAP_NOFAULT, bootstart);
 		vm_map_unlock(kernel_map);
 	}
 
@@ -3086,13 +3086,13 @@ uma_zcreate(const char *name, size_t size, uma_ctor ctor, uma_dtor dtor,
 /* See uma.h */
 uma_zone_t
 uma_zsecond_create(const char *name, uma_ctor ctor, uma_dtor dtor,
-    uma_init zinit, uma_fini zfini, uma_zone_t master)
+    uma_init zinit, uma_fini zfini, uma_zone_t primary)
 {
 	struct uma_zctor_args args;
 	uma_keg_t keg;
 	uma_zone_t res;
 
-	keg = master->uz_keg;
+	keg = primary->uz_keg;
 	memset(&args, 0, sizeof(args));
 	args.name = name;
 	args.size = keg->uk_size;
@@ -3460,7 +3460,7 @@ static __noinline bool
 cache_alloc(uma_zone_t zone, uma_cache_t cache, void *udata, int flags)
 {
 	uma_bucket_t bucket;
-	int domain;
+	int curdomain, domain;
 	bool new;
 
 	CRITICAL_ASSERT(curthread);
@@ -3491,12 +3491,6 @@ cache_alloc(uma_zone_t zone, uma_cache_t cache, void *udata, int flags)
 		bucket_free(zone, bucket, udata);
 	}
 
-	/* Short-circuit for zones without buckets and low memory. */
-	if (zone->uz_bucket_size == 0 || bucketdisable) {
-		critical_enter();
-		return (false);
-	}
-
 	/*
 	 * Attempt to retrieve the item from the per-CPU cache has failed, so
 	 * we must go back to the zone.  This requires the zdom lock, so we
@@ -3507,14 +3501,16 @@ cache_alloc(uma_zone_t zone, uma_cache_t cache, void *udata, int flags)
 	 * the critical section.
 	 */
 	domain = PCPU_GET(domain);
-	if ((cache_uz_flags(cache) & UMA_ZONE_ROUNDROBIN) != 0)
+	if ((cache_uz_flags(cache) & UMA_ZONE_ROUNDROBIN) != 0 ||
+	    VM_DOMAIN_EMPTY(domain))
 		domain = zone_domain_highest(zone, domain);
 	bucket = cache_fetch_bucket(zone, cache, domain);
-	if (bucket == NULL) {
+	if (bucket == NULL && zone->uz_bucket_size != 0 && !bucketdisable) {
 		bucket = zone_alloc_bucket(zone, udata, domain, flags);
 		new = true;
-	} else
+	} else {
 		new = false;
+	}
 
 	CTR3(KTR_UMA, "uma_zalloc: zone %s(%p) bucket zone returned %p",
 	    zone->uz_name, zone, bucket);
@@ -3532,7 +3528,8 @@ cache_alloc(uma_zone_t zone, uma_cache_t cache, void *udata, int flags)
 	cache = &zone->uz_cpu[curcpu];
 	if (cache->uc_allocbucket.ucb_bucket == NULL &&
 	    ((cache_uz_flags(cache) & UMA_ZONE_FIRSTTOUCH) == 0 ||
-	    domain == PCPU_GET(domain))) {
+	    (curdomain = PCPU_GET(domain)) == domain ||
+	    VM_DOMAIN_EMPTY(curdomain))) {
 		if (new)
 			atomic_add_long(&ZDOM_GET(zone, domain)->uzd_imax,
 			    bucket->ub_cnt);
@@ -3940,7 +3937,7 @@ zone_alloc_bucket(uma_zone_t zone, void *udata, int domain, int flags)
 	/* Avoid allocs targeting empty domains. */
 	if (domain != UMA_ANYDOMAIN && VM_DOMAIN_EMPTY(domain))
 		domain = UMA_ANYDOMAIN;
-	if ((zone->uz_flags & UMA_ZONE_ROUNDROBIN) != 0)
+	else if ((zone->uz_flags & UMA_ZONE_ROUNDROBIN) != 0)
 		domain = UMA_ANYDOMAIN;
 
 	if (zone->uz_max_items > 0)
@@ -4018,8 +4015,10 @@ zone_alloc_item(uma_zone_t zone, void *udata, int domain, int flags)
 {
 	void *item;
 
-	if (zone->uz_max_items > 0 && zone_alloc_limit(zone, 1, flags) == 0)
+	if (zone->uz_max_items > 0 && zone_alloc_limit(zone, 1, flags) == 0) {
+		counter_u64_add(zone->uz_fails, 1);
 		return (NULL);
+	}
 
 	/* Avoid allocs targeting empty domains. */
 	if (domain != UMA_ANYDOMAIN && VM_DOMAIN_EMPTY(domain))
@@ -4398,24 +4397,6 @@ cache_free(uma_zone_t zone, uma_cache_t cache, void *udata, void *item,
 		cache_bucket_load_free(cache, bucket);
 
 	return (true);
-}
-
-void
-uma_zfree_domain(uma_zone_t zone, void *item, void *udata)
-{
-
-	/* Enable entropy collection for RANDOM_ENABLE_UMA kernel option */
-	random_harvest_fast_uma(&zone, sizeof(zone), RANDOM_UMA);
-
-	CTR2(KTR_UMA, "uma_zfree_domain zone %s(%p)", zone->uz_name, zone);
-
-	KASSERT(curthread->td_critnest == 0 || SCHEDULER_STOPPED(),
-	    ("uma_zfree_domain: called with spinlock or critical section held"));
-
-	/* uma_zfree(..., NULL) does nothing, to match free(9). */
-	if (item == NULL)
-		return;
-	zone_free_item(zone, item, udata, SKIP_NONE);
 }
 
 static void
@@ -5378,10 +5359,8 @@ uma_dbg_alloc(uma_zone_t zone, uma_slab_t slab, void *item)
 	/* Check first that item is a subset of slab capability */
 	if ((keg->uk_flags & UMA_ZFLAG_OFFPAGE) == 0 &&
 	    !cheri_is_subset(slab, item)) {
-		CHERI_PRINT_PTR(slab);
-		CHERI_PRINT_PTR(item);
-		panic("Item capability %p is not a subset of the"
-		    " slab capability %p.", item, slab);
+		panic("Item capability %#p is not a subset of the"
+		    " slab capability %#p.", item, slab);
 	}
 #endif
 	freei = slab_item_index(slab, keg, item);

@@ -234,9 +234,9 @@ void	kassert_panic(const char *fmt, ...)  __printflike(1, 2);
 /*
  * NOTE: we can't place tigher bounds because we don't know what the
  * length is until after we use it.
- * XXX: We should probably have a __USER_CAP_PATH() with a MAXPATH limit.
  */
 #define	__USER_CAP_STR(strp)	__USER_CAP_UNBOUND(strp)
+#define	__USER_CAP_PATH(path)	__USER_CAP((path), MAXPATHLEN)
 
 /*
  * Align variables.

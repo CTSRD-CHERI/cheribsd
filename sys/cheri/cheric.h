@@ -78,11 +78,6 @@
 
 #define	cheri_setbounds(x, y)	__builtin_cheri_bounds_set((x), (y))
 #define	cheri_setboundsexact(x, y)	__builtin_cheri_bounds_set_exact((x), (y))
-/* XXXAR: shouldn't this be the default and we add cheri_setbounds_untyped? */
-#define	cheri_setbounds_changetype(type, x, y)	\
-	(type)cheri_setbounds((x), (y)))
-#define	cheri_setbounds_sametype(x, y)	\
-	((__typeof__(x))cheri_setbounds((x), (y)))
 
 /* Create an untagged capability from an integer */
 #define cheri_fromint(x)	cheri_incoffset(NULL, x)
@@ -211,7 +206,7 @@ cheri_is_subset(const void * __capability parent, const void * __capability ptr)
  * cheri_getpcc() for now.
  */
 #define cheri_codeptr(ptr, len)	\
-	cheri_setbounds(__builtin_cheri_cap_from_pointer(cheri_getpcc(), ptr), len));
+	cheri_setbounds(__builtin_cheri_cap_from_pointer(cheri_getpcc(), ptr), len)
 
 #define cheri_codeptrperm(ptr, len, perm)	\
 	cheri_andperm(cheri_codeptr(ptr, len), perm | CHERI_PERM_GLOBAL)
@@ -229,8 +224,7 @@ cheri_is_subset(const void * __capability parent, const void * __capability ptr)
 /*
  * Construct a capability suitable to describe a type identified by 'ptr';
  * set it to zero-length with the offset equal to the base.  The caller must
- * provide a root capability (in the old world order, derived from $ddc, but
- * in the new world order, likely extracted from the kernel using sysarch(2)).
+ * provide a root sealing capability.
  *
  * The caller may wish to assert various properties about the returned
  * capability, including that CHERI_PERM_SEAL is set.
@@ -292,23 +286,6 @@ cheri_bytes_remaining(const void * __capability cap)
  */
 #define cheri_cap_to_typed_ptr(cap, type)				\
 	(type *)cheri_cap_to_ptr(cap, sizeof(type))
-
-#ifdef __CHERI_PURE_CAPABILITY__
-#define _CHERI_PRINTF_CAP_ARG(ptr)	(ptr)
-#else
-#define _CHERI_PRINTF_CAP_ARG(ptr)	(&(ptr))
-#endif
-#define _CHERI_PRINTF_CAP_FMT  "%#.16lp"
-
-#define _CHERI_PRINT_PTR_FMT(ptr)					\
-	    "%s: " #ptr " " _CHERI_PRINTF_CAP_FMT "\n", __func__,	\
-	    _CHERI_PRINTF_CAP_ARG(ptr)
-
-#define CHERI_PRINT_PTR(ptr)						\
-	printf(_CHERI_PRINT_PTR_FMT(ptr))
-
-#define CHERI_FPRINT_PTR(f, ptr)					\
-	fprintf(f, _CHERI_PRINT_PTR_FMT(ptr))
 
 #else /* ! __has_feature(capabilities) */
 #ifdef _KERNEL

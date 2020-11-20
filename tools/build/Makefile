@@ -237,6 +237,7 @@ SYSINCS+=	${SRCTOP}/sys/sys/elf32.h
 SYSINCS+=	${SRCTOP}/sys/sys/elf64.h
 SYSINCS+=	${SRCTOP}/sys/sys/elf_common.h
 SYSINCS+=	${SRCTOP}/sys/sys/elf_generic.h
+
 SYSINCS+=	${SRCTOP}/sys/sys/queue.h
 SYSINCS+=	${SRCTOP}/sys/sys/md5.h
 SYSINCS+=	${SRCTOP}/sys/sys/sbuf.h
@@ -246,7 +247,9 @@ SYSINCS+=	${SRCTOP}/sys/sys/tree.h
 SYSINCS+=	${SRCTOP}/sys/sys/consio.h
 # for gencat:
 INCS+=	${SRCTOP}/include/nl_types.h
-# for vtfontcvt:
+
+# vtfontcvt is using sys/font.h
+SYSINCS+=	${SRCTOP}/sys/sys/font.h
 SYSINCS+=	${SRCTOP}/sys/sys/fnv_hash.h
 # opensolaris compatibility
 INCS+=	${SRCTOP}/include/elf.h
@@ -264,8 +267,8 @@ SYSINCS+=	${SRCTOP}/sys/sys/elf.h
 # Linux/MacOS since we only use flags that are supported by all of them.
 _host_tools_to_symlink=	basename bzip2 bunzip2 chmod chown cmp comm cp date dd \
 	dirname echo env false find fmt gzip gunzip head hostname id ln ls \
-	mkdir mv nice patch rm sh sleep stat tee touch tr true uname uniq unxz \
-	wc which xz
+	mkdir mv nice patch rm sh sleep stat tee touch tr true \
+	uname uniq unxz wc which xz
 
 # We also need a symlink to the absolute path to the make binary used for
 # the toplevel makefile. This is not necessarily the same as `which make`
@@ -286,10 +289,22 @@ _host_abs_tools_to_symlink+=	/bin/bash:sh
 _host_tools_to_symlink:=${_host_tools_to_symlink:Nsh}
 .endif
 
+
+# Tools such as xz are not included in /usr/bin on macOS, so also look inside
+# the homebrew install directory.
+.if !defined(HOST_TOOLS_PATH_EXTRA)
+.if ${.MAKE.OS} == "Darwin"
+HOST_TOOLS_PATH_EXTRA!=env PATH="${_ORIGIAL_PATH}:${PATH}" brew --prefix 2> /dev/null || echo /usr/local
+HOST_TOOLS_PATH_EXTRA:=${HOST_TOOLS_PATH_EXTRA}/bin
+.info HOST_TOOLS_PATH_EXTRA inferred as ${HOST_TOOLS_PATH_EXTRA}
+.endif
+.endif
+
 host-symlinks:
 	@echo "Linking host tools into ${DESTDIR}/bin"
 .for _tool in ${_host_tools_to_symlink}
-	@export PATH=$${PATH}:/usr/local/bin; source_path=`which ${_tool}`; \
+	# The toplevel makefile forces $PATH to only be /usr/local/bin
+	@export PATH="$${PATH}:${HOST_TOOLS_PATH_EXTRA}"; source_path=`which ${_tool} || true`; \
 	if [ ! -e "$${source_path}" ] ; then \
 		echo "Cannot find host tool '${_tool}' in PATH ($$PATH)." >&2; false; \
 	fi; \

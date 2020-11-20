@@ -42,6 +42,8 @@
 #define	STACKALIGNBYTES	(16 - 1)
 #define	STACKALIGN(p)	(__builtin_align_down((p), STACKALIGNBYTES + 1))
 
+#define __PCI_REROUTE_INTERRUPT
+
 #ifndef MACHINE
 #define	MACHINE		"riscv"
 #endif
@@ -125,16 +127,8 @@
 /*
  * Mach derived conversion macros
  */
-#define	round_page(x)		__builtin_align_up((x), PAGE_SIZE)
-#define	trunc_page(x)		__builtin_align_down((x), PAGE_SIZE)
-
-#define	atop(x)			((unsigned long)(x) >> PAGE_SHIFT)
-#define	ptoa(x)			((unsigned long)(x) << PAGE_SHIFT)
-
 #define	riscv_btop(x)		((unsigned long)(x) >> PAGE_SHIFT)
 #define	riscv_ptob(x)		((unsigned long)(x) << PAGE_SHIFT)
-
-#define	pgtok(x)		((unsigned long)(x) * (PAGE_SIZE / 1024))
 
 #endif /* !_MACHINE_PARAM_H_ */
 

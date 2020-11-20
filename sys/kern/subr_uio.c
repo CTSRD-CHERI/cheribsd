@@ -437,14 +437,14 @@ copyinuio(const struct iovec * __capability iovp, u_int iovcnt,
  * iovec.
  */
 int
-updateiov(const struct uio *uiop, struct iovec *iovp)
+updateiov(const struct uio *uiop, struct iovec * __capability iovp)
 {
 	int i, error;
 
 	for (i = 0; i < uiop->uio_iovcnt; i++) {
 		error = suword(&iovp[i].iov_len, uiop->uio_iov[i].iov_len);
 		if (error != 0)
-			return (error);
+			return (EFAULT);
 	}
 	return (0);
 }
@@ -486,8 +486,8 @@ copyout_map(struct thread *td, vm_ptr_t *addr, size_t sz)
 	size = (vm_size_t)round_page(sz);
 	if (size == 0)
 		return (EINVAL);
-	error = vm_mmap_object(&vms->vm_map, addr, 0, size, VM_PROT_READ |
-	    VM_PROT_WRITE, VM_PROT_ALL, MAP_PRIVATE | MAP_ANON, NULL, 0,
+	error = vm_mmap_object(&vms->vm_map, addr, 0, size, VM_PROT_RW_CAP,
+	    VM_PROT_ALL, MAP_PRIVATE | MAP_ANON, NULL, 0,
 	    FALSE, td);
 	return (error);
 }

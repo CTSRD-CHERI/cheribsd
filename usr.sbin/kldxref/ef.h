@@ -5,6 +5,9 @@
 
 #define	EFT_KLD		1
 #define	EFT_KERNEL	2
+#if __has_feature(capabilities)
+#define	EFT_CHERI	0x100
+#endif
 
 #define EF_RELOC_REL	1
 #define EF_RELOC_RELA	2

@@ -102,7 +102,6 @@ DUMMY(inotify_rm_watch);
 DUMMY(migrate_pages);
 DUMMY(unshare);
 /* Linux 2.6.17: */
-DUMMY(splice);
 DUMMY(tee);
 DUMMY(vmsplice);
 /* Linux 2.6.18: */
@@ -133,7 +132,6 @@ DUMMY(finit_module);
 DUMMY(sched_setattr);
 DUMMY(sched_getattr);
 /* Linux 3.17: */
-DUMMY(memfd_create);
 DUMMY(seccomp);
 /* Linux 3.18: */
 DUMMY(bpf);

@@ -51,7 +51,8 @@ struct rib_head;
 void nhops_init(void);
 int nhops_init_rib(struct rib_head *rh);
 void nhops_destroy_rib(struct rib_head *rh);
-int nhop_ref_object(struct nhop_object *nh);
+void nhop_ref_object(struct nhop_object *nh);
+int nhop_try_ref_object(struct nhop_object *nh);
 int nhop_ref_any(struct nhop_object *nh);
 void nhop_free_any(struct nhop_object *nh);
 
@@ -66,10 +67,11 @@ int nhop_create_from_nhop(struct rib_head *rnh, const struct nhop_object *nh_ori
 void nhops_update_ifmtu(struct rib_head *rh, struct ifnet *ifp, uint32_t mtu);
 int nhops_dump_sysctl(struct rib_head *rh, struct sysctl_req *w);
 
-/* route */
-VNET_DECLARE(uma_zone_t, rtzone);		/* Routing table UMA zone. */
-#define	V_rtzone	VNET(rtzone)
+/* subscriptions */
+void rib_init_subscriptions(struct rib_head *rnh);
+void rib_destroy_subscriptions(struct rib_head *rnh);
 
+/* route */
 struct rtentry *rt_unlinkrte(struct rib_head *rnh, struct rt_addrinfo *info,
     int *perror);
 

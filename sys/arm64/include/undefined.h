@@ -62,7 +62,6 @@ void undef_init(void);
 void *install_undef_handler(bool, undef_handler_t);
 void remove_undef_handler(void *);
 int undef_insn(u_int, struct trapframe *);
-bool extract_user_id_field(u_int, u_int, uint8_t *);
 
 #endif /* _KERNEL */
 

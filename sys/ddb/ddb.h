@@ -72,10 +72,6 @@ SYSCTL_DECL(_debug_ddb);
 #define	DB_MAXSCRIPTRECURSION	3
 #endif
 
-#ifndef DB_STOFFS
-#define DB_STOFFS(offs)		(offs)
-#endif
-
 #ifndef DB_CALL
 #define	DB_CALL	db_fncall_generic
 #else
@@ -89,6 +85,7 @@ int	DB_CALL(db_expr_t, db_expr_t *, int, db_expr_t[]);
  */
 extern vm_ptr_t ksymtab, kstrtab;
 extern vm_size_t ksymtab_size;
+extern vm_offset_t ksymtab_relbase;
 
 /*
  * There are three "command tables":
@@ -233,7 +230,8 @@ bool		db_value_of_name_vnet(const char *name, db_expr_t *valuep);
 int		db_write_bytes(vm_offset_t addr, size_t size, char *data);
 void		db_command_register(struct command_table *, struct command *);
 void		db_command_unregister(struct command_table *, struct command *);
-int		db_fetch_ksymtab(vm_ptr_t ksym_start, vm_ptr_t ksym_end);
+int		db_fetch_ksymtab(vm_ptr_t ksym_start, vm_ptr_t ksym_end,
+		    vm_offset_t relbase);
 #ifdef __CHERI_PURE_CAPABILITY__
 void		*db_code_ptr(db_addr_t addr);
 void		*db_data_ptr_unbound(db_addr_t addr);

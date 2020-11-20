@@ -197,10 +197,7 @@ struct vm_object {
 #define	OBJ_ONEMAPPING	0x2000		/* One USE (a single, non-forked) mapping flag */
 #define	OBJ_SHADOWLIST	0x4000		/* Object is on the shadow list. */
 #define	OBJ_TMPFS	0x8000		/* has tmpfs vnode allocated */
-#if __has_feature(capabilities)
-#define	OBJ_NOLOADTAGS	0x00010000	/* no tagged loads via pages */
-#define	OBJ_NOSTORETAGS	0x00020000	/* no tagged stores via pages */
-#endif
+#define	OBJ_HASCAP	0x10000		/* object can store capabilities */
 
 /*
  * Helpers to perform conversion between vm_object page indexes and offsets.
@@ -214,6 +211,25 @@ struct vm_object {
 #define	OBJ_MAX_SIZE	(OFF_TO_IDX(UINT64_MAX) + 1)
 
 #ifdef	_KERNEL
+
+/*
+ * This only asserts VM_PROT_WRITE_CAP to ensure that capabilities are
+ * never stored into objects that are not permitted to hold
+ * capabilities.
+ */
+#define	VM_OBJECT_ASSERT_CAP(object, prot)				\
+	KASSERT(((prot) & VM_PROT_WRITE_CAP) == 0 ||			\
+	    ((object)->flags & OBJ_HASCAP) != 0,			\
+	    ("%s: enabling WRITE_CAP on object %p without HASCAP",	\
+	    __func__, (object)))
+
+/*
+ * In reality this only strips VM_PROT_READ_CAP as pre-COW mappings of
+ * non-OBJ_HASCAP mappings should already be stripping
+ * VM_PROT_WRITE_CAP.
+ */
+#define	VM_OBJECT_MASK_CAP_PROT(object, prot)				\
+	((object)->flags & OBJ_HASCAP ? (prot) : (prot) & ~VM_PROT_CAP)
 
 #define OBJPC_SYNC	0x1			/* sync I/O */
 #define OBJPC_INVAL	0x2			/* invalidate */

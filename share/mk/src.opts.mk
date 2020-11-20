@@ -105,6 +105,7 @@ __DEFAULT_YES_OPTIONS = \
     FTP \
     GAMES \
     GDB \
+    GH_BC \
     GNU_DIFF \
     GNU_GREP \
     GOOGLETEST \
@@ -203,6 +204,7 @@ __DEFAULT_NO_OPTIONS = \
     BHYVE_SNAPSHOT \
     BSD_GREP \
     CLANG_EXTRAS \
+    CLANG_FORMAT \
     DTRACE_TESTS \
     EXPERIMENTAL \
     GNU_GREP_COMPAT \
@@ -374,13 +376,16 @@ BROKEN_OPTIONS+=CDDL
 
 # Some compilation failure: TODO: investigate
 BROKEN_OPTIONS+=SVN SVNLITE
+.endif
 
-# libcheri has not been ported to RISCV
+# libcheri is MIPS-specific and requires CHERI
+.if !${__T:Mmips64*} || (${__C} != "cheri" && !${__T:Mmips64*c*})
 BROKEN_OPTIONS+=LIBCHERI
 .endif
 
-# EFI doesn't exist on mips, powerpc or riscv.
-.if ${__T:Mmips*} || ${__T:Mpowerpc*} || ${__T:Mriscv*}
+# EFI doesn't exist on mips or powerpc.
+# It's also broken on purecap.
+.if ${__T:Mmips*} || ${__T:Mpowerpc*} || ${__T:Mriscv64*c*}
 BROKEN_OPTIONS+=EFI
 .endif
 # OFW is only for powerpc, exclude others
@@ -407,11 +412,6 @@ BROKEN_OPTIONS+=PROFILE
     ${__T} != "powerpc64"
 BROKEN_OPTIONS+=CXGBETOOL
 BROKEN_OPTIONS+=MLX5TOOL
-.endif
-.if ${__T:Mmips*}
-__DEFAULT_YES_OPTIONS+=PIE
-.else
-__DEFAULT_NO_OPTIONS+=PIE
 .endif
 
 # We'd really like this to be:
@@ -587,6 +587,7 @@ MK_LLDB:=	no
 
 .if ${MK_CLANG} == "no"
 MK_CLANG_EXTRAS:= no
+MK_CLANG_FORMAT:= no
 MK_CLANG_FULL:= no
 MK_LLVM_COV:= no
 .endif

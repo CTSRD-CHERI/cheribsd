@@ -77,7 +77,8 @@ ASSYM(TD_FLAGS, offsetof(struct thread, td_flags));
 ASSYM(TD_LOCK, offsetof(struct thread, td_lock));
 ASSYM(TD_MDFLAGS, offsetof(struct thread, td_md.md_flags));
 ASSYM(TD_MDTLS, offsetof(struct thread, td_md.md_tls));
-ASSYM(TD_MDTLS_TCB_OFFSET, offsetof(struct thread, td_md.md_tls_tcb_offset));
+
+ASSYM(P_MDTLS_TCB_OFFSET, offsetof(struct proc, p_md.md_tls_tcb_offset));
 
 ASSYM(PROC_TRACEFLAG, offsetof(struct proc, p_traceflag));
 
@@ -123,6 +124,7 @@ ASSYM(MAXCOMLEN, MAXCOMLEN);
 ASSYM(MDTD_COP2USED, MDTD_COP2USED);
 #ifdef CPU_QEMU_MALTA
 ASSYM(MDTD_QTRACE, MDTD_QTRACE);
+ASSYM(MDTD_QTRACE_USERMODE, MDTD_QTRACE_USERMODE);
 #endif
 #ifdef KSTACK_LARGE_PAGE
 ASSYM(KSTACK_TLBMASK_MASK, KSTACK_TLBMASK_MASK);

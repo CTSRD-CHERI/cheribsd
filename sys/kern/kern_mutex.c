@@ -540,7 +540,7 @@ __mtx_lock_sleep(volatile uintptr_t *c, uintptr_t v)
 #if defined(ADAPTIVE_MUTEXES)
 	lock_delay_arg_init(&lda, &mtx_delay);
 #elif defined(KDTRACE_HOOKS)
-	lock_delay_arg_init(&lda, NULL);
+	lock_delay_arg_init_noadapt(&lda);
 #endif
 
 	if (__predict_false(v == MTX_UNOWNED))
@@ -1276,6 +1276,35 @@ mtx_spin_wait_unlocked(struct mtx *m)
 		} else {
 			_mtx_lock_indefinite_check(m, &lda);
 		}
+	}
+}
+
+void
+mtx_wait_unlocked(struct mtx *m)
+{
+	struct thread *owner;
+	uintptr_t v;
+
+	KASSERT(m->mtx_lock != MTX_DESTROYED,
+	    ("%s() of destroyed mutex %p", __func__, m));
+	KASSERT(LOCK_CLASS(&m->lock_object) == &lock_class_mtx_sleep,
+	    ("%s() not a sleep mutex %p (%s)", __func__, m,
+	    m->lock_object.lo_name));
+	KASSERT(!mtx_owned(m), ("%s() waiting on myself on lock %p (%s)", __func__, m,
+	    m->lock_object.lo_name));
+
+	for (;;) {
+		v = atomic_load_acq_ptr(&m->mtx_lock);
+		if (v == MTX_UNOWNED) {
+			break;
+		}
+		owner = lv_mtx_owner(v);
+		if (!TD_IS_RUNNING(owner)) {
+			mtx_lock(m);
+			mtx_unlock(m);
+			break;
+		}
+		cpu_spinwait();
 	}
 }
 

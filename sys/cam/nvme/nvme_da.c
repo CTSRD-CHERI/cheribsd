@@ -415,7 +415,7 @@ ndaioctl(struct disk *dp, u_long cmd, void *data, int fflag,
 		ccb = xpt_alloc_ccb();
 		xpt_setup_ccb(&ccb->ccb_h, periph->path, CAM_PRIORITY_NORMAL);
 		ccb->ccb_state = NDA_CCB_PASS;
-		cam_fill_nvmeio(&ccb->nvmeio,
+		cam_fill_nvmeio_user(&ccb->nvmeio,
 		    0,			/* Retries */
 		    ndadone,
 		    (pt->is_read ? CAM_DIR_IN : CAM_DIR_OUT) | CAM_DATA_VADDR,
@@ -943,7 +943,11 @@ ndaregister(struct cam_periph *periph, void *arg)
 	disk->d_hba_subdevice = cpi.hba_subdevice;
 	snprintf(disk->d_attachment, sizeof(disk->d_attachment),
 	    "%s%d", cpi.dev_name, cpi.unit_number);
-	disk->d_stripesize = disk->d_sectorsize;
+	if (((nsd->nsfeat >> NVME_NS_DATA_NSFEAT_NPVALID_SHIFT) &
+	    NVME_NS_DATA_NSFEAT_NPVALID_MASK) != 0 && nsd->npwg != 0)
+		disk->d_stripesize = ((nsd->npwg + 1) * disk->d_sectorsize);
+	else
+		disk->d_stripesize = nsd->noiob * disk->d_sectorsize;
 	disk->d_stripeoffset = 0;
 	disk->d_devstat = devstat_new_entry(periph->periph_name,
 	    periph->unit_number, disk->d_sectorsize,

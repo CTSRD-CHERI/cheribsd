@@ -274,6 +274,7 @@ MAN=	accept_filter.9 \
 	printf.9 \
 	prison_check.9 \
 	priv.9 \
+	prng.9 \
 	proc_rwmem.9 \
 	pseudofs.9 \
 	psignal.9 \
@@ -609,13 +610,19 @@ MLINKS+=bitset.9 BITSET_DEFINE.9 \
 	bitset.9 BIT_EMPTY.9 \
 	bitset.9 BIT_ISFULLSET.9 \
 	bitset.9 BIT_FFS.9 \
+	bitset.9 BIT_FLS.9 \
 	bitset.9 BIT_COUNT.9 \
 	bitset.9 BIT_SUBSET.9 \
 	bitset.9 BIT_OVERLAP.9 \
 	bitset.9 BIT_CMP.9 \
 	bitset.9 BIT_OR.9 \
+	bitset.9 BIT_OR2.9 \
 	bitset.9 BIT_AND.9 \
+	bitset.9 BIT_AND2.9 \
 	bitset.9 BIT_ANDNOT.9 \
+	bitset.9 BIT_ANDNOT2.9 \
+	bitset.9 BIT_XOR.9 \
+	bitset.9 BIT_XOR2.9 \
 	bitset.9 BIT_CLR_ATOMIC.9 \
 	bitset.9 BIT_SET_ATOMIC.9 \
 	bitset.9 BIT_SET_ATOMIC_ACQ.9 \
@@ -929,9 +936,11 @@ MLINKS+=crypto_driver.9 crypto_copyback.9 \
 	crypto_driver.9 CRYPTODEV_PROCESS.9 \
 	crypto_driver.9 hmac_init_ipad.9 \
 	crypto_driver.9 hmac_init_opad.9
-MLINKS+=crypto_request.9 crypto_dispatch.9 \
+MLINKS+=crypto_request.9 crypto_destroyreq.9 \
+	crypto_request.9 crypto_dispatch.9 \
 	crypto_request.9 crypto_freereq.9 \
 	crypto_request.9 crypto_getreq.9 \
+	crypto_request.9 crypto_initreq.9 \
 	crypto_request.9 crypto_use_buf.9 \
 	crypto_request.9 crypto_use_mbuf.9 \
 	crypto_request.9 crypto_use_output_buf.9 \
@@ -968,10 +977,12 @@ MLINKS+=device_set_desc.9 device_get_desc.9 \
 	device_set_desc.9 device_set_desc_copy.9
 MLINKS+=device_set_flags.9 device_get_flags.9
 MLINKS+=devstat.9 devicestat.9 \
-	devstat.9 devstat_add_entry.9 \
+	devstat.9 devstat_new_entry.9 \
 	devstat.9 devstat_end_transaction.9 \
+	devstat.9 devstat_end_transaction_bio.9 \
 	devstat.9 devstat_remove_entry.9 \
-	devstat.9 devstat_start_transaction.9
+	devstat.9 devstat_start_transaction.9 \
+	devstat.9 devstat_start_transaction_bio.9
 MLINKS+=disk.9 disk_add_alias.9 \
 	disk.9 disk_alloc.9 \
 	disk.9 disk_create.9 \
@@ -1370,7 +1381,6 @@ MLINKS+=make_dev.9 destroy_dev.9 \
 	make_dev.9 make_dev_s.9
 MLINKS+=malloc.9 free.9 \
 	malloc.9 malloc_domainset.9 \
-	malloc.9 free_domain.9 \
 	malloc.9 mallocarray.9 \
 	malloc.9 MALLOC_DECLARE.9 \
 	malloc.9 MALLOC_DEFINE.9 \
@@ -1738,6 +1748,10 @@ MLINKS+=printf.9 log.9 \
 	printf.9 uprintf.9
 MLINKS+=priv.9 priv_check.9 \
 	priv.9 priv_check_cred.9
+MLINKS+=prng.9 prng32.9 \
+	prng.9 prng32_bounded.9 \
+	prng.9 prng64.9 \
+	prng.9 prng64_bounded.9
 MLINKS+=proc_rwmem.9 proc_readmem.9 \
 	proc_rwmem.9 proc_writemem.9
 MLINKS+=psignal.9 gsignal.9 \
@@ -1904,9 +1918,8 @@ MLINKS+=sf_buf.9 sf_buf_alloc.9 \
 MLINKS+=sglist.9 sglist_alloc.9 \
 	sglist.9 sglist_append.9 \
 	sglist.9 sglist_append_bio.9 \
-	sglist.9 sglist_append_ext_pgs.9 \
-	sglist.9 sglist_append_mb_ext_pgs.9 \
 	sglist.9 sglist_append_mbuf.9 \
+	sglist.9 sglist_append_mbuf_epg.9 \
 	sglist.9 sglist_append_phys.9 \
 	sglist.9 sglist_append_sglist.9 \
 	sglist.9 sglist_append_uio.9 \
@@ -1916,8 +1929,7 @@ MLINKS+=sglist.9 sglist_alloc.9 \
 	sglist.9 sglist_clone.9 \
 	sglist.9 sglist_consume_uio.9 \
 	sglist.9 sglist_count.9 \
-	sglist.9 sglist_count_ext_pgs.9 \
-	sglist.9 sglist_count_mb_ext_pgs.9 \
+	sglist.9 sglist_count_mbuf_epg.9 \
 	sglist.9 sglist_count_vmpages.9 \
 	sglist.9 sglist_free.9 \
 	sglist.9 sglist_hold.9 \
@@ -2303,7 +2315,8 @@ MLINKS+=vm_page_insert.9 vm_page_remove.9
 MLINKS+=vm_page_wire.9 vm_page_unwire.9
 MLINKS+=VOP_ACCESS.9 VOP_ACCESSX.9
 MLINKS+=VOP_ATTRIB.9 VOP_GETATTR.9 \
-	VOP_ATTRIB.9 VOP_SETATTR.9
+	VOP_ATTRIB.9 VOP_SETATTR.9 \
+	VOP_ATTRIB.9 VOP_STAT.9
 MLINKS+=VOP_CREATE.9 VOP_MKDIR.9 \
 	VOP_CREATE.9 VOP_MKNOD.9 \
 	VOP_CREATE.9 VOP_SYMLINK.9
@@ -2337,7 +2350,6 @@ MLINKS+=zone.9 uma.9 \
 	zone.9 uma_zdestroy.9 \
 	zone.9 uma_zfree.9 \
 	zone.9 uma_zfree_arg.9 \
-	zone.9 uma_zfree_domain.9 \
 	zone.9 uma_zfree_pcpu.9 \
 	zone.9 uma_zfree_pcpu_arg.9 \
 	zone.9 uma_zone_get_cur.9 \

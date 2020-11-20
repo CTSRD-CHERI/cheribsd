@@ -113,9 +113,9 @@ dump_vm(pid_t pid)
 		xo_emit_h(xop, "{en:exec/%s}",
 		    to_bool(curr->kve_protection & KVME_PROT_EXEC));
 		xo_emit_h(xop, "{en:load_tags/%s}",
-		    to_bool(curr->kve_protection & KVME_PROT_LOADTAGS));
+		    to_bool(curr->kve_protection & KVME_PROT_READ_CAP));
 		xo_emit_h(xop, "{en:store_tags/%s}",
-		    to_bool(curr->kve_protection & KVME_PROT_STORETAGS));
+		    to_bool(curr->kve_protection & KVME_PROT_WRITE_CAP));
 		xo_emit_h(xop, "{d:read/%s}", to_flag("r",
 		    curr->kve_protection & KVME_PROT_READ));
 		xo_emit_h(xop, "{d:write/%s}", to_flag("w",
@@ -123,9 +123,9 @@ dump_vm(pid_t pid)
 		xo_emit_h(xop, "{d:exec/%s}", to_flag("x",
 		    curr->kve_protection & KVME_PROT_EXEC));
 		xo_emit_h(xop, "{d:load_tags/%s}", to_flag("l",
-		    curr->kve_protection & KVME_PROT_LOADTAGS));
+		    curr->kve_protection & KVME_PROT_READ_CAP));
 		xo_emit_h(xop, "{dw:store_tags/%s}", to_flag("s",
-		    curr->kve_protection & KVME_PROT_STORETAGS));
+		    curr->kve_protection & KVME_PROT_WRITE_CAP));
 		xo_close_container_h(xop, "prot");
 
 		xo_open_container_h(xop, "flags");

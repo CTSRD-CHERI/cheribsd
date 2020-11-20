@@ -180,7 +180,12 @@ aesni_attach(device_t dev)
 	    M_WAITOK|M_ZERO);
 
 	CPU_FOREACH(i) {
-		ctx_fpu[i] = fpu_kern_alloc_ctx(0);
+#ifdef __amd64__
+		ctx_fpu[i] = fpu_kern_alloc_ctx_domain(
+		    pcpu_find(i)->pc_domain, FPU_KERN_NORMAL);
+#else
+		ctx_fpu[i] = fpu_kern_alloc_ctx(FPU_KERN_NORMAL);
+#endif
 		mtx_init(&ctx_mtx[i], "anifpumtx", NULL, MTX_DEF|MTX_NEW);
 	}
 
@@ -254,7 +259,8 @@ aesni_probesession(device_t dev, const struct crypto_session_params *csp)
 	struct aesni_softc *sc;
 
 	sc = device_get_softc(dev);
-	if ((csp->csp_flags & ~(CSP_F_SEPARATE_OUTPUT)) != 0)
+	if ((csp->csp_flags & ~(CSP_F_SEPARATE_OUTPUT | CSP_F_SEPARATE_AAD)) !=
+	    0)
 		return (EINVAL);
 	switch (csp->csp_mode) {
 	case CSP_MODE_DIGEST:
@@ -697,8 +703,11 @@ aesni_cipher_crypt(struct aesni_session *ses, struct cryptop *crp,
 	authbuf = NULL;
 	if (csp->csp_cipher_alg == CRYPTO_AES_NIST_GCM_16 ||
 	    csp->csp_cipher_alg == CRYPTO_AES_CCM_16) {
-		authbuf = aesni_cipher_alloc(crp, crp->crp_aad_start,
-		    crp->crp_aad_length, &authallocated);
+		if (crp->crp_aad != NULL)
+			authbuf = crp->crp_aad;
+		else
+			authbuf = aesni_cipher_alloc(crp, crp->crp_aad_start,
+			    crp->crp_aad_length, &authallocated);
 		if (authbuf == NULL) {
 			error = ENOMEM;
 			goto out;
@@ -804,18 +813,12 @@ aesni_cipher_crypt(struct aesni_session *ses, struct cryptop *crp,
 		    crp->crp_payload_length, outbuf);
 
 out:
-	if (allocated) {
-		explicit_bzero(buf, crp->crp_payload_length);
-		free(buf, M_AESNI);
-	}
-	if (authallocated) {
-		explicit_bzero(authbuf, crp->crp_aad_length);
-		free(authbuf, M_AESNI);
-	}
-	if (outallocated) {
-		explicit_bzero(outbuf, crp->crp_payload_length);
-		free(outbuf, M_AESNI);
-	}
+	if (allocated)
+		zfree(buf, M_AESNI);
+	if (authallocated)
+		zfree(authbuf, M_AESNI);
+	if (outallocated)
+		zfree(outbuf, M_AESNI);
 	explicit_bzero(iv, sizeof(iv));
 	explicit_bzero(tag, sizeof(tag));
 	return (error);
@@ -850,8 +853,12 @@ aesni_cipher_mac(struct aesni_session *ses, struct cryptop *crp,
 			hmac_key[i] = 0 ^ HMAC_IPAD_VAL;
 		ses->hash_update(&sctx, hmac_key, sizeof(hmac_key));
 
-		crypto_apply(crp, crp->crp_aad_start, crp->crp_aad_length,
-		    ses->hash_update, &sctx);
+		if (crp->crp_aad != NULL)
+			ses->hash_update(&sctx, crp->crp_aad,
+			    crp->crp_aad_length);
+		else
+			crypto_apply(crp, crp->crp_aad_start,
+			    crp->crp_aad_length, ses->hash_update, &sctx);
 		if (CRYPTO_HAS_OUTPUT_BUFFER(crp) &&
 		    CRYPTO_OP_IS_ENCRYPT(crp->crp_op))
 			crypto_apply_buf(&crp->crp_obuf,
@@ -876,8 +883,12 @@ aesni_cipher_mac(struct aesni_session *ses, struct cryptop *crp,
 	} else {
 		ses->hash_init(&sctx);
 
-		crypto_apply(crp, crp->crp_aad_start, crp->crp_aad_length,
-		    ses->hash_update, &sctx);
+		if (crp->crp_aad != NULL)
+			ses->hash_update(&sctx, crp->crp_aad,
+			    crp->crp_aad_length);
+		else
+			crypto_apply(crp, crp->crp_aad_start,
+			    crp->crp_aad_length, ses->hash_update, &sctx);
 		if (CRYPTO_HAS_OUTPUT_BUFFER(crp) &&
 		    CRYPTO_OP_IS_ENCRYPT(crp->crp_op))
 			crypto_apply_buf(&crp->crp_obuf,

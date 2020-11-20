@@ -520,7 +520,7 @@ nvme_ctrlr_create_qpairs(struct nvme_controller *ctrlr)
 		}
 
 		status.done = 0;
-		nvme_ctrlr_cmd_create_io_sq(qpair->ctrlr, qpair,
+		nvme_ctrlr_cmd_create_io_sq(ctrlr, qpair,
 		    nvme_completion_poll_cb, &status);
 		nvme_completion_poll(&status);
 		if (nvme_completion_is_error(&status.cpl)) {
@@ -1056,10 +1056,19 @@ nvme_ctrlr_start(void *ctrlr_arg, bool resetting)
 	if (resetting)
 		nvme_qpair_reset(&ctrlr->adminq);
 
-	for (i = 0; i < ctrlr->num_io_queues; i++)
-		nvme_qpair_reset(&ctrlr->ioq[i]);
+	if (ctrlr->ioq != NULL) {
+		for (i = 0; i < ctrlr->num_io_queues; i++)
+			nvme_qpair_reset(&ctrlr->ioq[i]);
+	}
 
 	nvme_admin_qpair_enable(&ctrlr->adminq);
+
+	/*
+	 * If it was a reset on initialization command timeout, just
+	 * return here, letting initialization code fail gracefully.
+	 */
+	if (resetting && !ctrlr->is_initialized)
+		return;
 
 	if (nvme_ctrlr_identify(ctrlr) != 0) {
 		nvme_ctrlr_fail(ctrlr);
@@ -1115,7 +1124,6 @@ void
 nvme_ctrlr_start_config_hook(void *arg)
 {
 	struct nvme_controller *ctrlr = arg;
-	int status;
 
 	/*
 	 * Reset controller twice to ensure we do a transition from cc.en==1 to
@@ -1123,19 +1131,15 @@ nvme_ctrlr_start_config_hook(void *arg)
 	 * controller was left in when boot handed off to OS.  Linux doesn't do
 	 * this, however. If we adopt that policy, see also nvme_ctrlr_resume().
 	 */
-	status = nvme_ctrlr_hw_reset(ctrlr);
-	if (status != 0) {
+	if (nvme_ctrlr_hw_reset(ctrlr) != 0) {
+fail:
 		nvme_ctrlr_fail(ctrlr);
 		config_intrhook_disestablish(&ctrlr->config_hook);
 		return;
 	}
 
-	status = nvme_ctrlr_hw_reset(ctrlr);
-	if (status != 0) {
-		nvme_ctrlr_fail(ctrlr);
-		config_intrhook_disestablish(&ctrlr->config_hook);
-		return;
-	}
+	if (nvme_ctrlr_hw_reset(ctrlr) != 0)
+		goto fail;
 
 	nvme_qpair_reset(&ctrlr->adminq);
 	nvme_admin_qpair_enable(&ctrlr->adminq);
@@ -1144,7 +1148,7 @@ nvme_ctrlr_start_config_hook(void *arg)
 	    nvme_ctrlr_construct_io_qpairs(ctrlr) == 0)
 		nvme_ctrlr_start(ctrlr, false);
 	else
-		nvme_ctrlr_fail(ctrlr);
+		goto fail;
 
 	nvme_sysctl_initialize_ctrlr(ctrlr);
 	config_intrhook_disestablish(&ctrlr->config_hook);
@@ -1245,7 +1249,7 @@ nvme_ctrlr_passthrough_cmd(struct nvme_controller *ctrlr,
 		 * pages. Ensure this request has fewer than MAXPHYS bytes when
 		 * extended to full pages.
 		 */
-		addr = (vm_offset_t)pt->buf;
+		addr = (__cheri_addr vm_offset_t)pt->buf;
 		end = round_page(addr + pt->len);
 		addr = trunc_page(addr);
 		if (end - addr > MAXPHYS)
@@ -1264,17 +1268,17 @@ nvme_ctrlr_passthrough_cmd(struct nvme_controller *ctrlr,
 			 */
 			PHOLD(curproc);
 			buf = uma_zalloc(pbuf_zone, M_WAITOK);
-			buf->b_data = pt->buf;
 			buf->b_bufsize = pt->len;
 			buf->b_iocmd = pt->is_read ? BIO_READ : BIO_WRITE;
-			if (vmapbuf(buf, 1) < 0) {
+			if (vmapbuf(buf, pt->buf, 1) < 0) {
 				ret = EFAULT;
 				goto err;
 			}
 			req = nvme_allocate_request_vaddr(buf->b_data, pt->len, 
 			    nvme_pt_done, pt);
 		} else
-			req = nvme_allocate_request_vaddr(pt->buf, pt->len,
+			req = nvme_allocate_request_vaddr(
+			    (__cheri_fromcap void *)pt->buf, pt->len,
 			    nvme_pt_done, pt);
 	} else
 		req = nvme_allocate_request_null(nvme_pt_done, pt);
@@ -1454,12 +1458,14 @@ nvme_ctrlr_destruct(struct nvme_controller *ctrlr, device_t dev)
 				nvme_ctrlr_hmb_enable(ctrlr, false, false);
 			nvme_ctrlr_delete_qpairs(ctrlr);
 		}
+		nvme_ctrlr_hmb_free(ctrlr);
+	}
+	if (ctrlr->ioq != NULL) {
 		for (i = 0; i < ctrlr->num_io_queues; i++)
 			nvme_io_qpair_destroy(&ctrlr->ioq[i]);
 		free(ctrlr->ioq, M_NVME);
-		nvme_ctrlr_hmb_free(ctrlr);
-		nvme_admin_qpair_destroy(&ctrlr->adminq);
 	}
+	nvme_admin_qpair_destroy(&ctrlr->adminq);
 
 	/*
 	 *  Notify the controller of a shutdown, even though this is due to

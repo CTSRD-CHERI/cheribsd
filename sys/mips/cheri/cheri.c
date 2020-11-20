@@ -88,14 +88,11 @@ CTASSERT(sizeof(void *) == 16);
 CTASSERT(sizeof(void * __capability) == 16);
 CTASSERT(sizeof(struct cheri_object) == 32);
 
-/* Set to -1 to prevent it from being zeroed with the rest of BSS */
-void * __capability user_sealcap = (void * __capability)(intcap_t)-1;
-
 #ifdef __CHERI_PURE_CAPABILITY__
 __attribute__((weak))
 extern Elf64_Capreloc __start___cap_relocs;
 __attribute__((weak))
-extern Elf64_Capreloc __stop___cap_relocs;
+
 
 /* Defined in linker script, mark the end of .text and kernel image */
 extern char etext[], end[];
@@ -216,7 +213,7 @@ cheri_init_capabilities(void * __capability kroot)
 	ctemp = cheri_setaddress(kroot, CHERI_SEALCAP_USERSPACE_BASE);
 	ctemp = cheri_setbounds(ctemp, CHERI_SEALCAP_USERSPACE_LENGTH);
 	ctemp = cheri_andperm(ctemp, CHERI_SEALCAP_USERSPACE_PERMS);
-	user_sealcap = ctemp;
+	userspace_sealcap = ctemp;
 
 	ctemp = cheri_setaddress(kroot, CHERI_CAP_USER_DATA_BASE);
 	ctemp = cheri_setbounds(ctemp, CHERI_CAP_USER_DATA_LENGTH);
@@ -300,13 +297,6 @@ cheri_cpu_startup(void)
 }
 SYSINIT(cheri_cpu_startup, SI_SUB_CPU, SI_ORDER_FIRST, cheri_cpu_startup,
     NULL);
-
-void
-cheri_capability_set_user_sealcap(void * __capability *cp)
-{
-
-	*cp = user_sealcap;
-}
 // CHERI CHANGES START
 // {
 //   "updated": 20200429,

@@ -719,7 +719,7 @@ db_vnet_print(struct vnet *vnet)
 	db_printf(" vnet_sockcnt   = %u\n", vnet->vnet_sockcnt);
 	db_printf(" vnet_data_mem  = %p\n", vnet->vnet_data_mem);
 #ifdef __CHERI_PURE_CAPABILITY__
-	db_printf(" vnet_data_base = %p\n", vnet->vnet_data_base);
+	db_printf(" vnet_data_base = %p\n", (void *)vnet->vnet_data_base);
 #else
 	db_printf(" vnet_data_base = %#jx\n",
 	    (uintmax_t)vnet->vnet_data_base);

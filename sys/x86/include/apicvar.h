@@ -112,7 +112,8 @@
 #define	APIC_IPI_INTS	(APIC_LOCAL_INTS + 3)
 
 #define	IPI_RENDEZVOUS	(APIC_IPI_INTS)		/* Inter-CPU rendezvous. */
-#define	IPI_INVLTLB	(APIC_IPI_INTS + 1)	/* TLB Shootdown IPIs */
+#define	IPI_INVLOP	(APIC_IPI_INTS + 1)	/* TLB Shootdown IPIs, amd64 */
+#define	IPI_INVLTLB	(APIC_IPI_INTS + 1)	/* TLB Shootdown IPIs, i386 */
 #define	IPI_INVLPG	(APIC_IPI_INTS + 2)
 #define	IPI_INVLRNG	(APIC_IPI_INTS + 3)
 #define	IPI_INVLCACHE	(APIC_IPI_INTS + 4)
@@ -129,7 +130,8 @@
 
 #define	IPI_STOP	(APIC_IPI_INTS + 6)	/* Stop CPU until restarted. */
 #define	IPI_SUSPEND	(APIC_IPI_INTS + 7)	/* Suspend CPU until restarted. */
-#define	IPI_DYN_FIRST	(APIC_IPI_INTS + 8)
+#define	IPI_SWI		(APIC_IPI_INTS + 8)	/* Run clk_intr_event. */
+#define	IPI_DYN_FIRST	(APIC_IPI_INTS + 9)
 #define	IPI_DYN_LAST	(254)			/* IPIs allocated at runtime */
 
 /*

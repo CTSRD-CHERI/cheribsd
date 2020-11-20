@@ -44,7 +44,6 @@
 /*
  * Driver data and defines.
  */
-#define	RX_MAX_PACKET	0x7ff
 #define	RX_DESC_COUNT	1024
 #define	RX_DESC_SIZE	(sizeof(struct dwc_hwdesc) * RX_DESC_COUNT)
 #define	TX_DESC_COUNT	1024
@@ -72,6 +71,7 @@ struct dwc_softc {
 	boolean_t		is_detaching;
 	int			tx_watchdog_count;
 	int			stats_harvest_count;
+	int			phy_mode;
 
 	/* RX */
 	bus_dma_tag_t		rxdesc_tag;

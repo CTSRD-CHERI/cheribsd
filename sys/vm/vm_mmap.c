@@ -702,21 +702,8 @@ kern_mmap_req(struct thread *td, struct mmap_req *mrp)
 		}
 
 		/* Address range must be all in user VM space. */
-		if (addr < vm_map_min(&vms->vm_map) ||
-		    addr + size > vm_map_max(&vms->vm_map)) {
-			SYSERRCAUSE("%s: range (%p-%p) is outside user "
-			    "address range (%p-%p)", __func__,
-			    (void *)addr,
-			    (void *)(addr + size),
-			    (void *)(uintptr_t)vm_map_min(&vms->vm_map),
-			    (void *)(uintptr_t)vm_map_max(&vms->vm_map));
+		if (!vm_map_range_valid(&vms->vm_map, addr, addr + size))
 			return (EINVAL);
-		}
-		if (addr + size < addr) {
-			SYSERRCAUSE("%s: addr (%p) + size (0x%zx) overflows",
-			    __func__, (void *)(uintptr_t)addr, size);
-			return (EINVAL);
-		}
 #ifdef MAP_32BIT
 		if (flags & MAP_32BIT) {
 			KASSERT(!SV_CURPROC_FLAG(SV_CHERI),
@@ -785,7 +772,8 @@ kern_mmap_req(struct thread *td, struct mmap_req *mrp)
 		 * This relies on VM_PROT_* matching PROT_*.
 		 */
 		error = vm_mmap_object(&vms->vm_map, &addr, max_addr, size,
-		    prot, max_prot, flags, NULL, pos, FALSE, td);
+		    VM_PROT_ADD_CAP(prot), VM_PROT_ADD_CAP(max_prot), flags,
+		    NULL, pos, FALSE, td);
 	} else {
 		/*
 		 * Mapping file, get fp for validation and don't let the
@@ -991,7 +979,7 @@ sys_munmap(struct thread *td, struct munmap_args *uap)
 
 #if __has_feature(capabilities)
 	if (cap_covers_pages(uap->addr, uap->len) == 0)
-		return (ENOMEM);
+		return (EPROT);
 	if ((cheri_getperm(uap->addr) & CHERI_PERM_CHERIABI_VMMAP) == 0)
 		return (EPROT);
 #endif
@@ -1007,7 +995,7 @@ kern_munmap(struct thread *td, uintptr_t addr0, size_t size)
 	bool pmc_handled;
 	vm_map_entry_t entry;
 #endif
-	vm_offset_t addr;
+	vm_offset_t addr, end;
 	vm_size_t pageoff;
 	vm_map_t map;
 
@@ -1019,15 +1007,11 @@ kern_munmap(struct thread *td, uintptr_t addr0, size_t size)
 	addr -= pageoff;
 	size += pageoff;
 	size = (vm_size_t) round_page(size);
-	if (addr + size < addr)
+	end = addr + size;
+	map = &td->td_proc->p_vmspace->vm_map;
+	if (!vm_map_range_valid(map, addr, end))
 		return (EINVAL);
 
-	/*
-	 * Check for illegal addresses.  Watch out for address wrap...
-	 */
-	map = &td->td_proc->p_vmspace->vm_map;
-	if (addr < vm_map_min(map) || addr + size > vm_map_max(map))
-		return (EINVAL);
 	vm_map_lock(map);
 #ifdef HWPMC_HOOKS
 	pmc_handled = false;
@@ -1039,7 +1023,7 @@ kern_munmap(struct thread *td, uintptr_t addr0, size_t size)
 		 */
 		pkm.pm_address = (uintptr_t) NULL;
 		if (vm_map_lookup_entry(map, addr, &entry)) {
-			for (; entry->start < addr + size;
+			for (; entry->start < end;
 			    entry = vm_map_entry_succ(entry)) {
 				if (vm_map_check_protection(map, entry->start,
 					entry->end, VM_PROT_EXECUTE) == TRUE) {
@@ -1081,7 +1065,7 @@ sys_mprotect(struct thread *td, struct mprotect_args *uap)
 
 #if __has_feature(capabilities)
 	if (cap_covers_pages(uap->addr, uap->len) == 0)
-		return (ENOMEM);
+		return (EPROT);
 	if ((cheri_getperm(uap->addr) & CHERI_PERM_CHERIABI_VMMAP) == 0)
 		return (EPROT);
 #endif
@@ -1124,11 +1108,11 @@ kern_mprotect(struct thread *td, uintptr_t addr0, size_t size, int prot)
 		if ((max_prot & prot) != prot)
 			return (ENOTSUP);
 		vm_error = vm_map_protect(&td->td_proc->p_vmspace->vm_map,
-		    addr, addr + size, max_prot, TRUE);
+		    addr, addr + size, max_prot, TRUE, TRUE);
 	}
 	if (vm_error == KERN_SUCCESS)
 		vm_error = vm_map_protect(&td->td_proc->p_vmspace->vm_map,
-		    addr, addr + size, prot, FALSE);
+		    addr, addr + size, prot, FALSE, TRUE);
 
 out:
 	switch (vm_error) {
@@ -1155,18 +1139,24 @@ sys_minherit(struct thread *td, struct minherit_args *uap)
 
 #if __has_feature(capabilities)
 	if (cap_covers_pages(uap->addr, uap->len) == 0)
-		return (ENOMEM);
+		return (EPROT);
 	if ((cheri_getperm(uap->addr) & CHERI_PERM_CHERIABI_VMMAP) == 0)
 		return (EPROT);
 #endif
-	return (kern_minherit(td, (__cheri_addr vm_offset_t)uap->addr, uap->len,
+	return (kern_minherit(td, (uintptr_t)(uintcap_t)uap->addr, uap->len,
 	    uap->inherit));
 }
 
 int
-kern_minherit(struct thread *td, vm_offset_t addr, vm_size_t size, int inherit)
+kern_minherit(struct thread *td, uintptr_t addr0, size_t len, int inherit0)
 {
-	vm_size_t pageoff;
+	vm_offset_t addr;
+	vm_size_t size, pageoff;
+	vm_inherit_t inherit;
+
+	addr = (vm_offset_t)addr0;
+	size = len;
+	inherit = inherit0;
 
 	pageoff = (addr & PAGE_MASK);
 	addr -= pageoff;
@@ -1237,9 +1227,7 @@ kern_madvise(struct thread *td, uintptr_t addr0, size_t len, int behav)
 	 */
 	map = &td->td_proc->p_vmspace->vm_map;
 	addr = addr0;
-	if (addr < vm_map_min(map) || addr + len > vm_map_max(map))
-		return (EINVAL);
-	if ((addr + len) < addr)
+	if (!vm_map_range_valid(map, addr, addr + len))
 		return (EINVAL);
 
 	/*
@@ -1767,7 +1755,7 @@ vm_mmap_vnode(struct thread *td, vm_size_t objsize,
 	cred = td->td_ucred;
 	writex = (*maxprotp & VM_PROT_WRITE) != 0 &&
 	    (*flagsp & MAP_SHARED) != 0;
-	if ((error = vget(vp, LK_SHARED, td)) != 0)
+	if ((error = vget(vp, LK_SHARED)) != 0)
 		return (error);
 	AUDIT_ARG_VNODE1(vp);
 	foff = *foffp;
@@ -1788,7 +1776,7 @@ vm_mmap_vnode(struct thread *td, vm_size_t objsize,
 			 * Bypass filesystems obey the mpsafety of the
 			 * underlying fs.  Tmpfs never bypasses.
 			 */
-			error = vget(vp, LK_SHARED, td);
+			error = vget(vp, LK_SHARED);
 			if (error != 0)
 				return (error);
 		}
@@ -1865,19 +1853,22 @@ done:
  * operations on cdevs.
  */
 int
-vm_mmap_cdev(struct thread *td, vm_size_t objsize, vm_prot_t prot,
+vm_mmap_cdev(struct thread *td, vm_size_t objsize, vm_prot_t *protp,
     vm_prot_t *maxprotp, int *flagsp, struct cdev *cdev, struct cdevsw *dsw,
     vm_ooffset_t *foff, vm_object_t *objp)
 {
 	vm_object_t obj;
+	vm_prot_t prot;
 	int error, flags;
 
 	flags = *flagsp;
+	prot = *protp;
 
 	if (dsw->d_flags & D_MMAP_ANON) {
 		*objp = NULL;
 		*foff = 0;
 		*maxprotp = VM_PROT_ALL;
+		*protp = VM_PROT_ADD_CAP(*protp);
 		*flagsp |= MAP_ANON;
 		return (0);
 	}
@@ -1944,6 +1935,9 @@ vm_mmap(vm_map_t map, vm_ptr_t *addr, vm_size_t size, vm_prot_t prot,
 	object = NULL;
 	writecounted = FALSE;
 
+	KASSERT((prot & VM_PROT_CAP) == 0, ("VM_PROT_CAP set in prot"));
+	KASSERT((maxprot & VM_PROT_CAP) == 0, ("VM_PROT_CAP set in maxprot"));
+
 	/*
 	 * Lookup/allocate object.
 	 */
@@ -1957,7 +1951,7 @@ vm_mmap(vm_map_t map, vm_ptr_t *addr, vm_size_t size, vm_prot_t prot,
 		dsw = dev_refthread(cdev, &ref);
 		if (dsw == NULL)
 			return (ENXIO);
-		error = vm_mmap_cdev(td, size, prot, &maxprot, &flags, cdev,
+		error = vm_mmap_cdev(td, size, &prot, &maxprot, &flags, cdev,
 		    dsw, &foff, &object);
 		dev_relthread(cdev, ref);
 		break;
@@ -1968,6 +1962,8 @@ vm_mmap(vm_map_t map, vm_ptr_t *addr, vm_size_t size, vm_prot_t prot,
 		break;
 	case OBJT_DEFAULT:
 		if (handle == NULL) {
+			prot = VM_PROT_ADD_CAP(prot);
+			maxprot = VM_PROT_ADD_CAP(prot);
 			error = 0;
 			break;
 		}

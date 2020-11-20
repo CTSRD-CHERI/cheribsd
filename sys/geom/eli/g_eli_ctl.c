@@ -58,7 +58,6 @@ g_eli_ctl_attach(struct gctl_req *req, struct g_class *mp)
 {
 	struct g_eli_metadata md;
 	struct g_provider *pp;
-	const char *name;
 	u_char *key, mkey[G_ELI_DATAIVKEYLEN];
 	int *nargs, *detach, *readonly, *dryrunp;
 	int keysize, error, nkey, dryrun, dummy;
@@ -115,22 +114,13 @@ g_eli_ctl_attach(struct gctl_req *req, struct g_class *mp)
 		return;
 	}
 
-	name = gctl_get_asciiparam(req, "arg0");
-	if (name == NULL) {
-		gctl_error(req, "No 'arg%u' argument.", 0);
+	pp = gctl_get_provider(req, "arg0");
+	if (pp == NULL)
 		return;
-	}
-	if (strncmp(name, "/dev/", strlen("/dev/")) == 0)
-		name += strlen("/dev/");
-	pp = g_provider_by_name(name);
-	if (pp == NULL) {
-		gctl_error(req, "Provider %s is invalid.", name);
-		return;
-	}
 	error = g_eli_read_metadata(mp, pp, &md);
 	if (error != 0) {
 		gctl_error(req, "Cannot read metadata from %s (error=%d).",
-		    name, error);
+		    pp->name, error);
 		return;
 	}
 	if (md.md_keys == 0x00) {
@@ -186,8 +176,8 @@ g_eli_find_device(struct g_class *mp, const char *prov)
 	struct g_provider *pp;
 	struct g_consumer *cp;
 
-	if (strncmp(prov, "/dev/", strlen("/dev/")) == 0)
-		prov += strlen("/dev/");
+	if (strncmp(prov, _PATH_DEV, strlen(_PATH_DEV)) == 0)
+		prov += strlen(_PATH_DEV);
 	LIST_FOREACH(gp, &mp->geom, geom) {
 		sc = gp->softc;
 		if (sc == NULL)
@@ -368,18 +358,9 @@ g_eli_ctl_onetime(struct gctl_req *req, struct g_class *mp)
 	/* Not important here. */
 	bzero(md.md_hash, sizeof(md.md_hash));
 
-	name = gctl_get_asciiparam(req, "arg0");
-	if (name == NULL) {
-		gctl_error(req, "No 'arg%u' argument.", 0);
+	pp = gctl_get_provider(req, "arg0");
+	if (pp == NULL)
 		return;
-	}
-	if (strncmp(name, "/dev/", strlen("/dev/")) == 0)
-		name += strlen("/dev/");
-	pp = g_provider_by_name(name);
-	if (pp == NULL) {
-		gctl_error(req, "Provider %s is invalid.", name);
-		return;
-	}
 
 	sectorsize = gctl_get_paraml(req, "sectorsize", sizeof(*sectorsize));
 	if (sectorsize == NULL) {
@@ -655,8 +636,7 @@ g_eli_ctl_configure(struct gctl_req *req, struct g_class *mp)
 			    prov, error);
 		}
 		explicit_bzero(&md, sizeof(md));
-		explicit_bzero(sector, pp->sectorsize);
-		free(sector, M_ELI);
+		zfree(sector, M_ELI);
 	}
 }
 
@@ -759,8 +739,7 @@ g_eli_ctl_setkey(struct gctl_req *req, struct g_class *mp)
 	explicit_bzero(&md, sizeof(md));
 	error = g_write_data(cp, pp->mediasize - pp->sectorsize, sector,
 	    pp->sectorsize);
-	explicit_bzero(sector, pp->sectorsize);
-	free(sector, M_ELI);
+	zfree(sector, M_ELI);
 	if (error != 0) {
 		gctl_error(req, "Cannot store metadata on %s (error=%d).",
 		    pp->name, error);
@@ -875,8 +854,7 @@ g_eli_ctl_delkey(struct gctl_req *req, struct g_class *mp)
 		(void)g_io_flush(cp);
 	}
 	explicit_bzero(&md, sizeof(md));
-	explicit_bzero(sector, pp->sectorsize);
-	free(sector, M_ELI);
+	zfree(sector, M_ELI);
 	if (*all)
 		G_ELI_DEBUG(1, "All keys removed from %s.", pp->name);
 	else

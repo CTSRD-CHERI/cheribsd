@@ -490,12 +490,13 @@ sw2:
 	.globl	cpu_switch_set_userlocal
 cpu_switch_set_userlocal:
 	clc	$c3, zero, TD_MDTLS($c4)	# Get TLS pointer
-	PTR_LI	t0, TD_MDTLS_TCB_OFFSET
-	cld	t0, t0, 0($c4)			# Get TLS/TCB offset
+	clc	$c5, zero, TD_PROC($c4)
+	PTR_LI	t0, P_MDTLS_TCB_OFFSET
+	cld	t0, t0, 0($c5)			# Get TLS/TCB offset
 	cincoffset $c3, $c3, t0
 	cwritehwr $c3, $chwr_userlocal
-	cgetaddr t0, $c3
-	MTC0	t0, MIPS_COP_0_USERLOCAL, 2	# write it to ULR for rdhwr
+	cgetaddr v0, $c3
+	MTC0	v0, MIPS_COP_0_USERLOCAL, 2	# write it to ULR for rdhwr
 	.size	cpu_switch_set_userlocal, . - cpu_switch_set_userlocal
 
 	cjr	$c17

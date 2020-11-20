@@ -91,6 +91,7 @@ __FBSDID("$FreeBSD$");
 #include <net/if_var.h>
 #include <net/if_types.h>
 #include <net/route.h>
+#include <net/route/nhop.h>
 #include <net/if_dl.h>
 #include <net/vnet.h>
 
@@ -2143,10 +2144,9 @@ in6_lltable_rtcheck(struct ifnet *ifp,
 		    const struct sockaddr *l3addr)
 {
 	const struct sockaddr_in6 *sin6;
-	struct nhop6_basic nh6;
+	struct nhop_object *nh;
 	struct in6_addr dst;
 	uint32_t scopeid;
-	int error;
 	char ip6buf[INET6_ADDRSTRLEN];
 	int fibnum;
 
@@ -2157,8 +2157,8 @@ in6_lltable_rtcheck(struct ifnet *ifp,
 	sin6 = (const struct sockaddr_in6 *)l3addr;
 	in6_splitscope(&sin6->sin6_addr, &dst, &scopeid);
 	fibnum = V_rt_add_addr_allfibs ? RT_DEFAULT_FIB : ifp->if_fib;
-	error = fib6_lookup_nh_basic(fibnum, &dst, scopeid, 0, 0, &nh6);
-	if (error != 0 || (nh6.nh_flags & NHF_GATEWAY) || nh6.nh_ifp != ifp) {
+	nh = fib6_lookup(fibnum, &dst, scopeid, NHR_NONE, 0);
+	if (nh && ((nh->nh_flags & NHF_GATEWAY) || nh->nh_ifp != ifp)) {
 		struct ifaddr *ifa;
 		/*
 		 * Create an ND6 cache for an IPv6 neighbor
@@ -2376,8 +2376,7 @@ in6_lltable_dump_entry(struct lltable *llt, struct llentry *lle,
 	ndpc.rtm.rtm_type = RTM_GET;
 	ndpc.rtm.rtm_flags = RTF_UP;
 	ndpc.rtm.rtm_addrs = RTA_DST | RTA_GATEWAY;
-	if (V_deembed_scopeid)
-		sa6_recoverscope(&ndpc.sin6);
+	sa6_recoverscope(&ndpc.sin6);
 
 	/* publish */
 	if (lle->la_flags & LLE_PUB)

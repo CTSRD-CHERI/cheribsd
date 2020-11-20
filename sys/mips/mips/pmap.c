@@ -172,7 +172,7 @@ static pv_entry_t pmap_pvh_remove(struct md_page *pvh, pmap_t pmap,
     vm_offset_t va);
 static vm_page_t pmap_alloc_direct_page(unsigned int index, int req);
 static vm_page_t pmap_enter_quick_locked(pmap_t pmap, vm_offset_t va,
-    vm_page_t m, vm_prot_t prot, u_int flags, vm_page_t mpte);
+    vm_page_t m, vm_prot_t prot, vm_page_t mpte);
 static void pmap_grow_direct_page(int req);
 static int pmap_remove_pte(struct pmap *pmap, pt_entry_t *ptq, vm_offset_t va,
     pd_entry_t pde);
@@ -2204,12 +2204,6 @@ pmap_enter(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot,
 	if (is_kernel_pmap(pmap))
 		newpte |= PTE_G;
 	PMAP_PTE_SET_CACHE_BITS(newpte, pa, m);
-#ifdef CPU_CHERI
-	if ((flags & PMAP_ENTER_NOLOADTAGS) != 0)
-		newpte |= PTE_LC;
-	if ((flags & PMAP_ENTER_NOSTORETAGS) != 0)
-		newpte |= PTE_SC;
-#endif
 	if ((m->oflags & VPO_UNMANAGED) == 0)
 		newpte |= PTE_MANAGED;
 
@@ -2389,20 +2383,19 @@ validate:
  */
 
 void
-pmap_enter_quick(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot,
-    u_int flags)
+pmap_enter_quick(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot)
 {
 
 	rw_wlock(&pvh_global_lock);
 	PMAP_LOCK(pmap);
-	(void)pmap_enter_quick_locked(pmap, va, m, prot, flags, NULL);
+	(void)pmap_enter_quick_locked(pmap, va, m, prot, NULL);
 	rw_wunlock(&pvh_global_lock);
 	PMAP_UNLOCK(pmap);
 }
 
 static vm_page_t
 pmap_enter_quick_locked(pmap_t pmap, vm_offset_t va, vm_page_t m,
-    vm_prot_t prot, u_int flags, vm_page_t mpte)
+    vm_prot_t prot, vm_page_t mpte)
 {
 	pt_entry_t *pte, npte;
 	vm_paddr_t pa;
@@ -2485,10 +2478,9 @@ pmap_enter_quick_locked(pmap_t pmap, vm_offset_t va, vm_page_t m,
 	 */
 	npte = PTE_RO | TLBLO_PA_TO_PFN(pa) | PTE_V;
 #ifdef CPU_CHERI
-	if ((flags & PMAP_ENTER_NOLOADTAGS) != 0)
-		npte |= PTE_LC;
-	if ((flags & PMAP_ENTER_NOSTORETAGS) != 0)
-		npte |= PTE_SC;
+	if ((prot & VM_PROT_READ_CAP) == 0)
+		npte |= PTE_LCI;
+	npte |= PTE_SCI;
 #endif
 	if ((m->oflags & VPO_UNMANAGED) == 0)
 		npte |= PTE_MANAGED;
@@ -2577,7 +2569,7 @@ pmap_kenter_temporary_free(vm_paddr_t pa)
  */
 void
 pmap_enter_object(pmap_t pmap, vm_offset_t start, vm_offset_t end,
-    vm_page_t m_start, vm_prot_t prot, u_int flags)
+    vm_page_t m_start, vm_prot_t prot)
 {
 	vm_page_t m, mpte;
 	vm_pindex_t diff, psize;
@@ -2591,7 +2583,7 @@ pmap_enter_object(pmap_t pmap, vm_offset_t start, vm_offset_t end,
 	PMAP_LOCK(pmap);
 	while (m != NULL && (diff = m->pindex - m_start->pindex) < psize) {
 		mpte = pmap_enter_quick_locked(pmap, start + ptoa(diff), m,
-		    prot, flags, mpte);
+		    prot, mpte);
 		m = TAILQ_NEXT(m, listq);
 	}
 	rw_wunlock(&pvh_global_lock);
@@ -3408,6 +3400,7 @@ pmap_unmapdev(vm_offset_t va, vm_size_t size)
 	base = trunc_page(va);
 	offset = va & PAGE_MASK;
 	size = roundup(size + offset, PAGE_SIZE);
+	pmap_qremove(base, atop(size));
 	kva_free(base, size);
 #endif
 }
@@ -3628,6 +3621,12 @@ init_pte_prot(vm_page_t m, vm_prot_t access, vm_prot_t prot)
 	} else
 		/* Needn't emulate a modified bit for unmanaged pages. */
 		rw = PTE_V | PTE_D;
+#ifdef CPU_CHERI
+	if ((prot & VM_PROT_READ_CAP) == 0)
+		rw |= PTE_LCI;
+	if ((prot & VM_PROT_WRITE_CAP) == 0)
+		rw |= PTE_SCI;
+#endif
 	return (rw);
 }
 

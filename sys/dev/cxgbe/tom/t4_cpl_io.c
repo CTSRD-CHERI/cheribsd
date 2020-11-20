@@ -1953,7 +1953,7 @@ alloc_aiotx_mbuf(struct kaiocb *job, int len)
 	vm_page_t pgs[MBUF_PEXT_MAX_PGS];
 	struct mbuf *m, *top, *last;
 	vm_map_t map;
-	vm_offset_t start;
+	char * __capability start;
 	int i, mlen, npages, pgoff;
 
 	KASSERT(job->aio_sent + len <= job->uaiocb.aio_nbytes,
@@ -1967,16 +1967,16 @@ alloc_aiotx_mbuf(struct kaiocb *job, int len)
 	 */
 	vm = job->userproc->p_vmspace;
 	map = &vm->vm_map;
-	start = (uintptr_t)job->uaiocb.aio_buf + job->aio_sent;
-	pgoff = start & PAGE_MASK;
+	start = __DEVOLATILE(char * __capability, job->uaiocb.aio_buf) + job->aio_sent;
+	pgoff = (__cheri_addr vm_offset_t)start & PAGE_MASK;
 
 	top = NULL;
 	last = NULL;
 	while (len > 0) {
 		mlen = imin(len, MBUF_PEXT_MAX_PGS * PAGE_SIZE - pgoff);
-		KASSERT(mlen == len || ((start + mlen) & PAGE_MASK) == 0,
-		    ("%s: next start (%#jx + %#x) is not page aligned",
-		    __func__, (uintmax_t)start, mlen));
+		KASSERT(mlen == len || is_aligned(start + mlen, PAGE_SIZE),
+		    ("%s: next start (%p + %#x) is not page aligned",
+		    __func__, start, mlen));
 
 		npages = vm_fault_quick_hold_pages(map, start, mlen,
 		    VM_PROT_WRITE, pgs, nitems(pgs));

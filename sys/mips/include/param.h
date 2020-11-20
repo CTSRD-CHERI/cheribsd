@@ -225,15 +225,8 @@
 /*
  * Mach derived conversion macros
  */
-#define	round_page(x)		__builtin_align_down(((x) + PAGE_MASK), PAGE_SIZE)
-#define	trunc_page(x)		__builtin_align_down((x), PAGE_SIZE)
 #define	round_2mpage(x)		__builtin_align_down(((x) + PDRMASK), PDRSIZE)
 #define	trunc_2mpage(x)		__builtin_align_down((x), PDRSIZE)
-
-#define	atop(x)			((x) >> PAGE_SHIFT)
-#define	ptoa(x)			((x) << PAGE_SHIFT)
-
-#define	pgtok(x)		((x) * (PAGE_SIZE / 1024))
 
 #endif /* !_MIPS_INCLUDE_PARAM_H_ */
 // CHERI CHANGES START

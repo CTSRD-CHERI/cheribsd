@@ -95,10 +95,10 @@ procstat_vm(struct procstat *procstat, struct kinfo_proc *kipp)
 		    "w" : "-");
 		xo_emit("{d:exec/%s}", kve->kve_protection & KVME_PROT_EXEC ?
 		    "x" : "-");
-		xo_emit("{d:load_tags/%s}", kve->kve_protection &
-		    KVME_PROT_LOADTAGS ? "l" : "-");
-		xo_emit("{d:store_tags/%s} ", kve->kve_protection &
-		    KVME_PROT_STORETAGS ? "s" : "-");
+		xo_emit("{d:read_cap/%s}", kve->kve_protection &
+		    KVME_PROT_READ_CAP ? "R" : "-");
+		xo_emit("{d:write_cap/%s} ", kve->kve_protection &
+		    KVME_PROT_WRITE_CAP ? "W" : "-");
 		xo_open_container("kve_protection");
 		xo_emit("{en:read/%s}", kve->kve_protection & KVME_PROT_READ ?
 		    "true" : "false");
@@ -106,10 +106,10 @@ procstat_vm(struct procstat *procstat, struct kinfo_proc *kipp)
 		    "true" : "false");
 		xo_emit("{en:exec/%s}", kve->kve_protection & KVME_PROT_EXEC ?
 		    "true" : "false");
-		xo_emit("{en:load_tags/%s}", kve->kve_protection &
-		    KVME_PROT_LOADTAGS ? "true" : "false");
-		xo_emit("{en:store_tags/%s}", kve->kve_protection &
-		    KVME_PROT_STORETAGS ? "true" : "false");
+		xo_emit("{en:read_cap/%s}", kve->kve_protection &
+		    KVME_PROT_READ_CAP ? "true" : "false");
+		xo_emit("{en:write_cap/%s}", kve->kve_protection &
+		    KVME_PROT_WRITE_CAP ? "true" : "false");
 		xo_close_container("kve_protection");
 		xo_emit("{:kve_resident/%4d/%d} ", kve->kve_resident);
 		xo_emit("{:kve_private_resident/%4d/%d} ",

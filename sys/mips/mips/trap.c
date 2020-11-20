@@ -138,6 +138,10 @@ SYSCTL_U64(_machdep, OID_AUTO, kern_unaligned_access, CTLFLAG_RD,
     &kern_unaligned_access_count, 0,
     "Cumulative count of kernel unaligned accesses");
 
+#ifdef CPU_QEMU_MALTA
+extern u_int qemu_trace_buffered;
+#endif
+
 #define	lbu_macro(data, addr)						\
 	__asm __volatile ("lbu %0, 0x0(%1)"				\
 			: "=r" (data)	/* outputs */			\
@@ -438,14 +442,16 @@ trapf_pc_from_kernel_code_ptr(void *ptr)
  * Fetch an instruction from near frame->pc (or frame->pcc for CHERI).
  * Returns the virtual address (relative to $pcc) that was used to fetch the
  * instruction.
+ *
+ * Warning: this clobbers td->td_pcb->pcb_onfault.
  */
 static void * __capability
 fetch_instr_near_pc(struct trapframe *frame, register_t offset_from_pc, int32_t *instr)
 {
 	void * __capability bad_inst_ptr;
 
-	bad_inst_ptr = (char * __capability)frame->pc + offset_from_pc;
 #if __has_feature(capabilities)
+	bad_inst_ptr = (char * __capability)frame->pcc + offset_from_pc;
 	if (!cheri_gettag(bad_inst_ptr)) {
 		struct thread *td = curthread;
 		struct proc *p = td->td_proc;
@@ -457,8 +463,12 @@ fetch_instr_near_pc(struct trapframe *frame, register_t offset_from_pc, int32_t 
 		*instr = -1;
 		return (bad_inst_ptr);
 	}
+#else
+	bad_inst_ptr = (char *)frame->pc + offset_from_pc;
 #endif
 	if (USERLAND(frame->badvaddr)) {
+		KASSERT(curthread->td_pcb->pcb_onfault == NULL,
+		    ("This function clobbers td->td_pcb->pcb_onfault"));
 		if (fueword32(bad_inst_ptr, instr) != 0) {
 			struct thread *td = curthread;
 			struct proc *p = td->td_proc;
@@ -886,6 +896,11 @@ trap(struct trapframe *trapframe)
 		}
 		break;
 	case T_TLB_MOD:
+		if (td->td_critnest != 0 || td->td_intr_nesting_level != 0 ||
+		    WITNESS_CHECK(WARN_SLEEPOK | WARN_GIANTOK, NULL,
+		    "Kernel page fault") != 0)
+			goto err;
+
 		/* check for kernel address */
 		if (KERNLAND(trapframe->badvaddr)) {
 			if (pmap_emulate_modified(kernel_pmap, 
@@ -909,6 +924,11 @@ trap(struct trapframe *trapframe)
 
 	case T_TLB_LD_MISS:
 	case T_TLB_ST_MISS:
+		if (td->td_critnest != 0 || td->td_intr_nesting_level != 0 ||
+		    WITNESS_CHECK(WARN_SLEEPOK | WARN_GIANTOK, NULL,
+		    "Kernel page fault") != 0)
+			goto err;
+
 		ftype = (type == T_TLB_ST_MISS) ? VM_PROT_WRITE : VM_PROT_READ;
 		/* check for kernel address */
 		if (KERNLAND(trapframe->badvaddr)) {
@@ -1078,6 +1098,7 @@ dofault:
 			va = addr;
 			if (DELAYBRANCH(trapframe->cause))
 				va += sizeof(int);
+			addr = va;
 
 			if (td->td_md.md_ss_addr != (__cheri_addr vaddr_t)va) {
 				addr = va;
@@ -1147,7 +1168,7 @@ dofault:
 					if (inst.RType.rd == 29) {
 						frame_regs = &(trapframe->zero);
 						frame_regs[inst.RType.rt] = (register_t)(intptr_t)(__cheri_fromcap void *)td->td_md.md_tls;
-						frame_regs[inst.RType.rt] += td->td_md.md_tls_tcb_offset;
+						frame_regs[inst.RType.rt] += td->td_proc->p_md.md_tls_tcb_offset;
 						TRAPF_PC_INCREMENT(trapframe, sizeof(int));
 						goto out;
 					}
@@ -1348,7 +1369,12 @@ dofault:
 #endif
 		/* Only allow emulation on a user address */
 		if (allow_unaligned_acc) {
+			void *saved_onfault;
 			int mode;
+
+			/* emulate_unaligned_access() clobbers pcb_onfault. */
+			saved_onfault = td->td_pcb->pcb_onfault;
+			td->td_pcb->pcb_onfault = NULL;
 
 			if (type == T_ADDR_ERR_LD)
 				mode = VM_PROT_READ;
@@ -1367,9 +1393,9 @@ dofault:
 				PCPU_SET(kern_unaligned_emul, 1);
 				atomic_add_long(&kern_unaligned_access_count, 1);
 			}
-			access_type = emulate_unaligned_access(
-			    trapframe, mode);
+			access_type = emulate_unaligned_access(trapframe, mode);
 			PCPU_SET(kern_unaligned_emul, 0);
+			td->td_pcb->pcb_onfault = saved_onfault;
 			if (access_type != 0)
 				return (trapframe->pc);
 		}
@@ -1438,6 +1464,10 @@ err:
 	if (i == SIGPROT)
 		ksi.ksi_capreg = trapframe->capcause &
 		    CHERI_CAPCAUSE_REGNUM_MASK;
+#endif
+#ifdef CPU_QEMU_MALTA
+	if (qemu_trace_buffered)
+		QEMU_FLUSH_TRACE_BUFFER;
 #endif
 	trapsignal(td, &ksi);
 out:

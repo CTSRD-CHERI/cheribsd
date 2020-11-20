@@ -241,23 +241,13 @@ ah_init(struct secasvar *sav, struct xformsw *xsp)
 		 crypto_newsession(&sav->tdb_cryptoid, &csp, V_crypto_support);
 }
 
-/*
- * Paranoia.
- *
- * NB: public for use by esp_zeroize (XXX).
- */
-int
-ah_zeroize(struct secasvar *sav)
+static void
+ah_cleanup(struct secasvar *sav)
 {
-
-	if (sav->key_auth)
-		bzero(sav->key_auth->key_data, _KEYLEN(sav->key_auth));
 
 	crypto_freesession(sav->tdb_cryptoid);
 	sav->tdb_cryptoid = NULL;
 	sav->tdb_authalgxform = NULL;
-	sav->tdb_xform = NULL;
-	return 0;
 }
 
 /*
@@ -1144,7 +1134,7 @@ static struct xformsw ah_xformsw = {
 	.xf_type =	XF_AH,
 	.xf_name =	"IPsec AH",
 	.xf_init =	ah_init,
-	.xf_zeroize =	ah_zeroize,
+	.xf_cleanup =	ah_cleanup,
 	.xf_input =	ah_input,
 	.xf_output =	ah_output,
 };

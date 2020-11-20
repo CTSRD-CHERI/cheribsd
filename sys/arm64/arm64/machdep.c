@@ -62,11 +62,14 @@ __FBSDID("$FreeBSD$");
 #include <sys/sysproto.h>
 #include <sys/ucontext.h>
 #include <sys/vdso.h>
+#include <sys/vmmeter.h>
 
 #include <vm/vm.h>
+#include <vm/vm_param.h>
 #include <vm/vm_kern.h>
 #include <vm/vm_object.h>
 #include <vm/vm_page.h>
+#include <vm/vm_phys.h>
 #include <vm/pmap.h>
 #include <vm/vm_map.h>
 #include <vm/vm_pager.h>
@@ -85,6 +88,10 @@ __FBSDID("$FreeBSD$");
 
 #ifdef VFP
 #include <machine/vfp.h>
+#endif
+
+#if __has_feature(capabilities)
+#include <cheri/cheric.h>
 #endif
 
 #ifdef DEV_ACPI
@@ -120,6 +127,7 @@ int has_pan;
  * passed into the kernel and used by the EFI code to call runtime services.
  */
 vm_paddr_t efi_systbl_phys;
+static struct efi_map_header *efihdr;
 
 /* pagezero_* implementations are provided in support.S */
 void pagezero_simple(void *);
@@ -127,6 +135,8 @@ void pagezero_cache(void *);
 
 /* pagezero_simple is default pagezero */
 void (*pagezero)(void *p) = pagezero_simple;
+
+int (*apei_nmi)(void);
 
 static void
 pan_setup(void)
@@ -169,9 +179,28 @@ has_hyp(void)
 static void
 cpu_startup(void *dummy)
 {
+	vm_paddr_t size;
+	int i;
+
+	printf("real memory  = %ju (%ju MB)\n", ptoa((uintmax_t)realmem),
+	    ptoa((uintmax_t)realmem) / 1024 / 1024);
+
+	if (bootverbose) {
+		printf("Physical memory chunk(s):\n");
+		for (i = 0; phys_avail[i + 1] != 0; i += 2) {
+			size = phys_avail[i + 1] - phys_avail[i];
+			printf("%#016jx - %#016jx, %ju bytes (%ju pages)\n",
+			    (uintmax_t)phys_avail[i],
+			    (uintmax_t)phys_avail[i + 1] - 1,
+			    (uintmax_t)size, (uintmax_t)size / PAGE_SIZE);
+		}
+	}
+
+	printf("avail memory = %ju (%ju MB)\n",
+	    ptoa((uintmax_t)vm_free_count()),
+	    ptoa((uintmax_t)vm_free_count()) / 1024 / 1024);
 
 	undef_init();
-	identify_cpu();
 	install_cpu_errata();
 
 	vm_ksubmap_init(&kmi);
@@ -180,6 +209,13 @@ cpu_startup(void *dummy)
 }
 
 SYSINIT(cpu, SI_SUB_CPU, SI_ORDER_FIRST, cpu_startup, NULL);
+
+static void
+late_ifunc_resolve(void *dummy __unused)
+{
+	link_elf_late_ireloc();
+}
+SYSINIT(late_ifunc_resolve, SI_SUB_CPU, SI_ORDER_ANY, late_ifunc_resolve, NULL);
 
 int
 cpu_idle_wakeup(int cpu)
@@ -412,6 +448,47 @@ set_dbregs32(struct thread *td, struct dbreg32 *regs)
 
 	printf("ARM64TODO: set_dbregs32");
 	return (EDOOFUS);
+}
+#endif
+
+#if __has_feature(capabilities)
+int
+fill_capregs(struct thread *td, struct capreg *regs)
+{
+	struct trapframe *frame;
+	int i;
+
+	frame = td->td_frame;
+	regs->csp = frame->tf_sp;
+	regs->clr = frame->tf_lr;
+	regs->celr = frame->tf_elr;
+	regs->ddc = frame->tf_ddc;
+
+	for (i = 0; i < nitems(frame->tf_x); i++) {
+		regs->c[i] = frame->tf_x[i];
+		if (cheri_gettag((void * __capability)frame->tf_x[i]))
+			regs->tagmask |= (uint64_t)1 << i;
+	}
+	if (cheri_gettag((void * __capability)frame->tf_lr))
+		regs->tagmask |= (uint64_t)1 << i;
+	i++;
+	if (cheri_gettag((void * __capability)frame->tf_sp))
+		regs->tagmask |= (uint64_t)1 << i;
+	i++;
+	if (cheri_gettag((void * __capability)frame->tf_elr))
+		regs->tagmask |= (uint64_t)1 << i;
+	i++;
+	if (cheri_gettag((void * __capability)frame->tf_ddc))
+		regs->tagmask |= (uint64_t)1 << i;
+
+	return (0);
+}
+
+int
+set_capregs(struct thread *td, struct capreg *regs)
+{
+
+	return (EOPNOTSUPP);
 }
 #endif
 
@@ -714,7 +791,7 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	struct thread *td;
 	struct proc *p;
 	struct trapframe *tf;
-	struct sigframe *fp, frame;
+	struct sigframe * __capability fp, frame;
 	struct sigacts *psp;
 	struct sysentvec *sysent;
 	int onstack, sig;
@@ -736,18 +813,18 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	/* Allocate and validate space for the signal handler context. */
 	if ((td->td_pflags & TDP_ALTSTACK) != 0 && !onstack &&
 	    SIGISMEMBER(psp->ps_sigonstack, sig)) {
-		fp = (struct sigframe *)((uintptr_t)td->td_sigstk.ss_sp +
+		fp = (struct sigframe * __capability)((uintcap_t)td->td_sigstk.ss_sp +
 		    td->td_sigstk.ss_size);
 #if defined(COMPAT_43)
 		td->td_sigstk.ss_flags |= SS_ONSTACK;
 #endif
 	} else {
-		fp = (struct sigframe *)td->td_frame->tf_sp;
+		fp = (struct sigframe * __capability)td->td_frame->tf_sp;
 	}
 
 	/* Make room, keeping the stack aligned */
 	fp--;
-	fp = (struct sigframe *)STACKALIGN(fp);
+	fp = (struct sigframe * __capability)STACKALIGN(fp);
 
 	/* Fill in the frame to copy out */
 	bzero(&frame, sizeof(frame));
@@ -769,11 +846,18 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	}
 
 	tf->tf_x[0]= sig;
+#if __has_feature(capabilities)
+	tf->tf_x[1] = (uintcap_t)cheri_setbounds(&fp->sf_si,
+	    sizeof(fp->sf_si));
+	tf->tf_x[2] = (uintcap_t)cheri_setbounds(&fp->sf_uc,
+	    sizeof(fp->sf_uc));
+#else
 	tf->tf_x[1] = (register_t)&fp->sf_si;
 	tf->tf_x[2] = (register_t)&fp->sf_uc;
+#endif
 
-	tf->tf_elr = (register_t)catcher;
-	tf->tf_sp = (register_t)fp;
+	tf->tf_elr = (uintcap_t)catcher;
+	tf->tf_sp = (uintcap_t)fp;
 	sysent = p->p_sysent;
 	if (sysent->sv_sigcode_base != 0)
 		tf->tf_lr = (register_t)sysent->sv_sigcode_base;
@@ -1071,11 +1155,52 @@ cache_setup(void)
 	}
 }
 
+int
+memory_mapping_mode(vm_paddr_t pa)
+{
+	struct efi_md *map, *p;
+	size_t efisz;
+	int ndesc, i;
+
+	if (efihdr == NULL)
+		return (VM_MEMATTR_WRITE_BACK);
+
+	/*
+	 * Memory map data provided by UEFI via the GetMemoryMap
+	 * Boot Services API.
+	 */
+	efisz = (sizeof(struct efi_map_header) + 0xf) & ~0xf;
+	map = (struct efi_md *)((uint8_t *)efihdr + efisz);
+
+	if (efihdr->descriptor_size == 0)
+		return (VM_MEMATTR_WRITE_BACK);
+	ndesc = efihdr->memory_size / efihdr->descriptor_size;
+
+	for (i = 0, p = map; i < ndesc; i++,
+	    p = efi_next_descriptor(p, efihdr->descriptor_size)) {
+		if (pa < p->md_phys ||
+		    pa >= p->md_phys + p->md_pages * EFI_PAGE_SIZE)
+			continue;
+		if (p->md_type == EFI_MD_TYPE_IOMEM ||
+		    p->md_type == EFI_MD_TYPE_IOPORT)
+			return (VM_MEMATTR_DEVICE);
+		else if ((p->md_attr & EFI_MD_ATTR_WB) != 0 ||
+		    p->md_type == EFI_MD_TYPE_RECLAIM)
+			return (VM_MEMATTR_WRITE_BACK);
+		else if ((p->md_attr & EFI_MD_ATTR_WT) != 0)
+			return (VM_MEMATTR_WRITE_THROUGH);
+		else if ((p->md_attr & EFI_MD_ATTR_WC) != 0)
+			return (VM_MEMATTR_WRITE_COMBINING);
+		break;
+	}
+
+	return (VM_MEMATTR_DEVICE);
+}
+
 void
 initarm(struct arm64_bootparams *abp)
 {
 	struct efi_fb *efifb;
-	struct efi_map_header *efihdr;
 	struct pcpu *pcpup;
 	char *env;
 #ifdef FDT
@@ -1095,6 +1220,9 @@ initarm(struct arm64_bootparams *abp)
 	kmdp = preload_search_by_type("elf kernel");
 	if (kmdp == NULL)
 		kmdp = preload_search_by_type("elf64 kernel");
+
+	identify_cpu(0);
+	update_special_regs(0);
 
 	link_elf_ireloc(kmdp);
 	try_load_dtb(kmdp);
@@ -1139,6 +1267,7 @@ initarm(struct arm64_bootparams *abp)
 	    "msr tpidr_el1, %0" :: "r"(pcpup));
 
 	PCPU_SET(curthread, &thread0);
+	PCPU_SET(midr, get_midr());
 
 	/* Do basic tuning, hz etc */
 	init_param1();

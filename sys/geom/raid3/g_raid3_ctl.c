@@ -78,7 +78,7 @@ g_raid3_find_disk(struct g_raid3_softc *sc, const char *name)
 	u_int n;
 
 	sx_assert(&sc->sc_lock, SX_XLOCKED);
-	if (strncmp(name, "/dev/", 5) == 0)
+	if (strncmp(name, _PATH_DEV, 5) == 0)
 		name += 5;
 	for (n = 0; n < sc->sc_ndisks; n++) {
 		disk = &sc->sc_disks[n];
@@ -422,24 +422,13 @@ g_raid3_ctl_insert(struct gctl_req *req, struct g_class *mp)
 		gctl_error(req, "No '%s' argument.", "hardcode");
 		return;
 	}
-	name = gctl_get_asciiparam(req, "arg1");
-	if (name == NULL) {
-		gctl_error(req, "No 'arg%u' argument.", 1);
+	pp = gctl_get_provider(req, "arg1");
+	if (pp == NULL)
 		return;
-	}
 	if (gctl_get_param(req, "number", NULL) != NULL)
 		no = gctl_get_paraml(req, "number", sizeof(*no));
 	else
 		no = NULL;
-	if (strncmp(name, "/dev/", 5) == 0)
-		name += 5;
-	g_topology_lock();
-	pp = g_provider_by_name(name);
-	if (pp == NULL) {
-		g_topology_unlock();
-		gctl_error(req, "Invalid provider.");
-		return;
-	}
 	gp = g_new_geomf(mp, "raid3:insert");
 	gp->orphan = g_raid3_ctl_insert_orphan;
 	cp = g_new_consumer(gp);

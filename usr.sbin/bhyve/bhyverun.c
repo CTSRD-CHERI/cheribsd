@@ -80,6 +80,7 @@ __FBSDID("$FreeBSD$");
 #ifndef WITHOUT_CAPSICUM
 #include <machine/vmm_dev.h>
 #endif
+#include <machine/vmm_instruction_emul.h>
 #include <vmmapi.h>
 
 #include "bhyverun.h"
@@ -196,6 +197,7 @@ static int gdb_port = 0;
 static int guest_vmexit_on_hlt, guest_vmexit_on_pause;
 static int virtio_msix = 1;
 static int x2apic_mode = 0;	/* default is xAPIC */
+static int destroy_on_poweroff = 0;
 
 static int strictio;
 static int strictmsr = 1;
@@ -235,7 +237,7 @@ usage(int code)
 {
 
         fprintf(stderr,
-		"Usage: %s [-abehuwxACHPSWY]\n"
+		"Usage: %s [-abehuwxACDHPSWY]\n"
 		"       %*s [-c [[cpus=]numcpus][,sockets=n][,cores=n][,threads=n]]\n"
 		"       %*s [-g <gdb port>] [-l <lpc>]\n"
 		"       %*s [-m mem] [-p vcpu:hostcpu] [-s <pci>] [-U uuid] <vm>\n"
@@ -243,6 +245,7 @@ usage(int code)
 		"       -A: create ACPI tables\n"
 		"       -c: number of cpus and/or topology specification\n"
 		"       -C: include guest memory in core file\n"
+		"       -D: destroy on power-off\n"
 		"       -e: exit on unhandled I/O access\n"
 		"       -g: gdb port\n"
 		"       -h: help\n"
@@ -746,12 +749,26 @@ vmexit_mtrap(struct vmctx *ctx, struct vm_exit *vmexit, int *pvcpu)
 static int
 vmexit_inst_emul(struct vmctx *ctx, struct vm_exit *vmexit, int *pvcpu)
 {
-	int err, i;
+	int err, i, cs_d;
 	struct vie *vie;
+	enum vm_cpu_mode mode;
 
 	stats.vmexit_inst_emul++;
 
 	vie = &vmexit->u.inst_emul.vie;
+	if (!vie->decoded) {
+		/*
+		 * Attempt to decode in userspace as a fallback.  This allows
+		 * updating instruction decode in bhyve without rebooting the
+		 * kernel (rapid prototyping), albeit with much slower
+		 * emulation.
+		 */
+		vie_restart(vie);
+		mode = vmexit->u.inst_emul.paging.cpu_mode;
+		cs_d = vmexit->u.inst_emul.cs_d;
+		(void)vmm_decode_instruction(mode, cs_d, vie);
+	}
+
 	err = emulate_mem(ctx, *pvcpu, vmexit->u.inst_emul.gpa,
 	    vie, &vmexit->u.inst_emul.paging);
 
@@ -800,6 +817,8 @@ vmexit_suspend(struct vmctx *ctx, struct vm_exit *vmexit, int *pvcpu)
 	case VM_SUSPEND_RESET:
 		exit(0);
 	case VM_SUSPEND_POWEROFF:
+		if (destroy_on_poweroff)
+			vm_destroy(ctx);
 		exit(1);
 	case VM_SUSPEND_HALT:
 		exit(2);
@@ -1086,9 +1105,9 @@ main(int argc, char *argv[])
 	memflags = 0;
 
 #ifdef BHYVE_SNAPSHOT
-	optstr = "abehuwxACHIPSWYp:g:G:c:s:m:l:U:r:";
+	optstr = "abehuwxACDHIPSWYp:g:G:c:s:m:l:U:r:";
 #else
-	optstr = "abehuwxACHIPSWYp:g:G:c:s:m:l:U:";
+	optstr = "abehuwxACDHIPSWYp:g:G:c:s:m:l:U:";
 #endif
 	while ((c = getopt(argc, argv, optstr)) != -1) {
 		switch (c) {
@@ -1100,6 +1119,9 @@ main(int argc, char *argv[])
 			break;
 		case 'b':
 			bvmcons = 1;
+			break;
+		case 'D':
+			destroy_on_poweroff = 1;
 			break;
 		case 'p':
                         if (pincpu_parse(optarg) != 0) {

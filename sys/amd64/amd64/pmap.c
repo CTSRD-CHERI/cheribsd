@@ -2084,7 +2084,7 @@ pmap_init(void)
 				ret = vm_page_blacklist_add(0x40000000 +
 				    ptoa(i), FALSE);
 				if (!ret && bootverbose)
-					printf("page at %#lx already used\n",
+					printf("page at %#x already used\n",
 					    0x40000000 + ptoa(i));
 			}
 		}
@@ -2111,7 +2111,7 @@ pmap_init(void)
 		 * Collect the page table pages that were replaced by a 2MB
 		 * page in create_pagetables().  They are zero filled.
 		 */
-		if (i << PDRSHIFT < KERNend &&
+		if ((vm_paddr_t)i << PDRSHIFT < KERNend &&
 		    pmap_insert_pt_page(kernel_pmap, mpte, false))
 			panic("pmap_init: pmap_insert_pt_page failed");
 	}
@@ -2520,7 +2520,16 @@ pmap_invalidate_page_pcid(pmap_t pmap, vm_offset_t va,
 
 	cpuid = PCPU_GET(cpuid);
 	if (pmap == PCPU_GET(curpmap)) {
-		if (pmap->pm_ucr3 != PMAP_NO_CR3) {
+		if (pmap->pm_ucr3 != PMAP_NO_CR3 &&
+		    /*
+		     * If we context-switched right after
+		     * PCPU_GET(ucr3_load_mask), we could read the
+		     * ~CR3_PCID_SAVE mask, which causes us to skip
+		     * the code below to invalidate user pages.  This
+		     * is handled in pmap_activate_sw_pcid_pti() by
+		     * clearing pm_gen if ucr3_load_mask is ~CR3_PCID_SAVE.
+		     */
+		    PCPU_GET(ucr3_load_mask) == PMAP_UCR3_NOMASK) {
 			/*
 			 * Because pm_pcid is recalculated on a
 			 * context switch, we must disable switching.
@@ -2635,7 +2644,8 @@ pmap_invalidate_range_pcid(pmap_t pmap, vm_offset_t sva, vm_offset_t eva,
 
 	cpuid = PCPU_GET(cpuid);
 	if (pmap == PCPU_GET(curpmap)) {
-		if (pmap->pm_ucr3 != PMAP_NO_CR3) {
+		if (pmap->pm_ucr3 != PMAP_NO_CR3 &&
+		    PCPU_GET(ucr3_load_mask) == PMAP_UCR3_NOMASK) {
 			critical_enter();
 			pcid = pmap->pm_pcids[cpuid].pm_pcid;
 			if (invpcid_works1) {
@@ -2736,7 +2746,7 @@ static inline void
 pmap_invalidate_all_pcid(pmap_t pmap, bool invpcid_works1)
 {
 	struct invpcid_descr d;
-	uint64_t kcr3, ucr3;
+	uint64_t kcr3;
 	uint32_t pcid;
 	u_int cpuid, i;
 
@@ -2757,20 +2767,12 @@ pmap_invalidate_all_pcid(pmap_t pmap, bool invpcid_works1)
 				d.pad = 0;
 				d.addr = 0;
 				invpcid(&d, INVPCID_CTX);
-				if (pmap->pm_ucr3 != PMAP_NO_CR3) {
-					d.pcid |= PMAP_PCID_USER_PT;
-					invpcid(&d, INVPCID_CTX);
-				}
 			} else {
 				kcr3 = pmap->pm_cr3 | pcid;
-				ucr3 = pmap->pm_ucr3;
-				if (ucr3 != PMAP_NO_CR3) {
-					ucr3 |= pcid | PMAP_PCID_USER_PT;
-					pmap_pti_pcid_invalidate(ucr3, kcr3);
-				} else {
-					load_cr3(kcr3);
-				}
+				load_cr3(kcr3);
 			}
+			if (pmap->pm_ucr3 != PMAP_NO_CR3)
+				PCPU_SET(ucr3_load_mask, ~CR3_PCID_SAVE);
 			critical_exit();
 		} else
 			pmap->pm_pcids[cpuid].pm_gen = 0;
@@ -3807,6 +3809,29 @@ pmap_pinit(pmap_t pmap)
  * one or two pages may be held during the wait, only to be released
  * afterwards.  This conservative approach is easily argued to avoid
  * race conditions.
+ *
+ * The ptepindexes, i.e. page indices, of the page table pages encountered
+ * while translating virtual address va are defined as follows:
+ * - for the page table page (last level),
+ *      ptepindex = pmap_pde_pindex(va) = va >> PDRSHIFT,
+ *   in other words, it is just the index of the PDE that maps the page
+ *   table page.
+ * - for the page directory page,
+ *      ptepindex = NUPDE (number of userland PD entries) +
+ *          (pmap_pde_index(va) >> NPDEPGSHIFT)
+ *   i.e. index of PDPE is put after the last index of PDE,
+ * - for the page directory pointer page,
+ *      ptepindex = NUPDE + NUPDPE + (pmap_pde_index(va) >> (NPDEPGSHIFT +
+ *          NPML4EPGSHIFT),
+ *   i.e. index of pml4e is put after the last index of PDPE.
+ *
+ * Define an order on the paging entries, where all entries of the
+ * same height are put together, then heights are put from deepest to
+ * root.  Then ptexpindex is the sequential number of the
+ * corresponding paging entry in this order.
+ *
+ * The root page at PML4 does not participate in this indexing scheme, since
+ * it is statically allocated by pmap_pinit() and not by _pmap_allocpte().
  */
 static vm_page_t
 _pmap_allocpte(pmap_t pmap, vm_pindex_t ptepindex, struct rwlock **lockp)
@@ -6466,7 +6491,7 @@ pmap_enter_pde(pmap_t pmap, vm_offset_t va, pd_entry_t newpde, u_int flags,
  */
 void
 pmap_enter_object(pmap_t pmap, vm_offset_t start, vm_offset_t end,
-    vm_page_t m_start, vm_prot_t prot, u_int flags)
+    vm_page_t m_start, vm_prot_t prot)
 {
 	struct rwlock *lock;
 	vm_offset_t va;
@@ -6507,8 +6532,7 @@ pmap_enter_object(pmap_t pmap, vm_offset_t start, vm_offset_t end,
  */
 
 void
-pmap_enter_quick(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot,
-    u_int flags)
+pmap_enter_quick(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot)
 {
 	struct rwlock *lock;
 
@@ -8256,8 +8280,10 @@ pmap_unmapdev(vm_offset_t va, vm_size_t size)
 			return;
 		}
 	}
-	if (pmap_initialized)
+	if (pmap_initialized) {
+		pmap_qremove(va, atop(size));
 		kva_free(va, size);
+	}
 }
 
 /*
@@ -8791,11 +8817,22 @@ pmap_activate_sw_pti_post(struct thread *td, pmap_t pmap)
 	    PCPU_GET(pti_rsp0) : (uintptr_t)td->td_md.md_stack_base;
 }
 
-static void inline
-pmap_activate_sw_pcid_pti(pmap_t pmap, u_int cpuid, const bool invpcid_works1)
+static void
+pmap_activate_sw_pcid_pti(struct thread *td, pmap_t pmap, u_int cpuid)
 {
-	struct invpcid_descr d;
+	pmap_t old_pmap;
 	uint64_t cached, cr3, kcr3, ucr3;
+
+	KASSERT((read_rflags() & PSL_I) == 0,
+	    ("PCID needs interrupts disabled in pmap_activate_sw()"));
+
+	/* See the comment in pmap_invalidate_page_pcid(). */
+	if (PCPU_GET(ucr3_load_mask) != PMAP_UCR3_NOMASK) {
+		PCPU_SET(ucr3_load_mask, PMAP_UCR3_NOMASK);
+		old_pmap = PCPU_GET(curpmap);
+		MPASS(old_pmap->pm_ucr3 != PMAP_NO_CR3);
+		old_pmap->pm_pcids[cpuid].pm_gen = 0;
+	}
 
 	cached = pmap_pcid_alloc_checked(pmap, cpuid);
 	cr3 = rcr3();
@@ -8806,68 +8843,14 @@ pmap_activate_sw_pcid_pti(pmap_t pmap, u_int cpuid, const bool invpcid_works1)
 	ucr3 = pmap->pm_ucr3 | pmap->pm_pcids[cpuid].pm_pcid |
 	    PMAP_PCID_USER_PT;
 
-	if (!cached && pmap->pm_ucr3 != PMAP_NO_CR3) {
-		/*
-		 * Explicitly invalidate translations cached from the
-		 * user page table.  They are not automatically
-		 * flushed by reload of cr3 with the kernel page table
-		 * pointer above.
-		 *
-		 * Note that the if() condition is resolved statically
-		 * by using the function argument instead of
-		 * runtime-evaluated invpcid_works value.
-		 */
-		if (invpcid_works1) {
-			d.pcid = PMAP_PCID_USER_PT |
-			    pmap->pm_pcids[cpuid].pm_pcid;
-			d.pad = 0;
-			d.addr = 0;
-			invpcid(&d, INVPCID_CTX);
-		} else {
-			pmap_pti_pcid_invalidate(ucr3, kcr3);
-		}
-	}
+	if (!cached && pmap->pm_ucr3 != PMAP_NO_CR3)
+		PCPU_SET(ucr3_load_mask, ~CR3_PCID_SAVE);
 
 	PCPU_SET(kcr3, kcr3 | CR3_PCID_SAVE);
 	PCPU_SET(ucr3, ucr3 | CR3_PCID_SAVE);
 	if (cached)
 		PCPU_INC(pm_save_cnt);
-}
 
-static void
-pmap_activate_sw_pcid_invpcid_pti(struct thread *td, pmap_t pmap, u_int cpuid)
-{
-
-	pmap_activate_sw_pcid_pti(pmap, cpuid, true);
-	pmap_activate_sw_pti_post(td, pmap);
-}
-
-static void
-pmap_activate_sw_pcid_noinvpcid_pti(struct thread *td, pmap_t pmap,
-    u_int cpuid)
-{
-	register_t rflags;
-
-	/*
-	 * If the INVPCID instruction is not available,
-	 * invltlb_pcid_handler() is used to handle an invalidate_all
-	 * IPI, which checks for curpmap == smp_tlb_pmap.  The below
-	 * sequence of operations has a window where %CR3 is loaded
-	 * with the new pmap's PML4 address, but the curpmap value has
-	 * not yet been updated.  This causes the invltlb IPI handler,
-	 * which is called between the updates, to execute as a NOP,
-	 * which leaves stale TLB entries.
-	 *
-	 * Note that the most typical use of pmap_activate_sw(), from
-	 * the context switch, is immune to this race, because
-	 * interrupts are disabled (while the thread lock is owned),
-	 * and the IPI happens after curpmap is updated.  Protect
-	 * other callers in a similar way, by disabling interrupts
-	 * around the %cr3 register reload and curpmap assignment.
-	 */
-	rflags = intr_disable();
-	pmap_activate_sw_pcid_pti(pmap, cpuid, false);
-	intr_restore(rflags);
 	pmap_activate_sw_pti_post(td, pmap);
 }
 
@@ -8877,6 +8860,9 @@ pmap_activate_sw_pcid_nopti(struct thread *td __unused, pmap_t pmap,
 {
 	uint64_t cached, cr3;
 
+	KASSERT((read_rflags() & PSL_I) == 0,
+	    ("PCID needs interrupts disabled in pmap_activate_sw()"));
+
 	cached = pmap_pcid_alloc_checked(pmap, cpuid);
 	cr3 = rcr3();
 	if (!cached || (cr3 & ~CR3_PCID_MASK) != pmap->pm_cr3)
@@ -8885,17 +8871,6 @@ pmap_activate_sw_pcid_nopti(struct thread *td __unused, pmap_t pmap,
 	PCPU_SET(curpmap, pmap);
 	if (cached)
 		PCPU_INC(pm_save_cnt);
-}
-
-static void
-pmap_activate_sw_pcid_noinvpcid_nopti(struct thread *td __unused, pmap_t pmap,
-    u_int cpuid)
-{
-	register_t rflags;
-
-	rflags = intr_disable();
-	pmap_activate_sw_pcid_nopti(td, pmap, cpuid);
-	intr_restore(rflags);
 }
 
 static void
@@ -8922,14 +8897,10 @@ DEFINE_IFUNC(static, void, pmap_activate_sw_mode, (struct thread *, pmap_t,
     u_int))
 {
 
-	if (pmap_pcid_enabled && pti && invpcid_works)
-		return (pmap_activate_sw_pcid_invpcid_pti);
-	else if (pmap_pcid_enabled && pti && !invpcid_works)
-		return (pmap_activate_sw_pcid_noinvpcid_pti);
-	else if (pmap_pcid_enabled && !pti && invpcid_works)
+	if (pmap_pcid_enabled && pti)
+		return (pmap_activate_sw_pcid_pti);
+	else if (pmap_pcid_enabled && !pti)
 		return (pmap_activate_sw_pcid_nopti);
-	else if (pmap_pcid_enabled && !pti && !invpcid_works)
-		return (pmap_activate_sw_pcid_noinvpcid_nopti);
 	else if (!pmap_pcid_enabled && pti)
 		return (pmap_activate_sw_nopcid_pti);
 	else /* if (!pmap_pcid_enabled && !pti) */
@@ -8966,10 +8937,26 @@ pmap_activate_sw(struct thread *td)
 void
 pmap_activate(struct thread *td)
 {
-
-	critical_enter();
+	/*
+	 * invltlb_{invpcid,}_pcid_handler() is used to handle an
+	 * invalidate_all IPI, which checks for curpmap ==
+	 * smp_tlb_pmap.  The below sequence of operations has a
+	 * window where %CR3 is loaded with the new pmap's PML4
+	 * address, but the curpmap value has not yet been updated.
+	 * This causes the invltlb IPI handler, which is called
+	 * between the updates, to execute as a NOP, which leaves
+	 * stale TLB entries.
+	 *
+	 * Note that the most common use of pmap_activate_sw(), from
+	 * a context switch, is immune to this race, because
+	 * interrupts are disabled (while the thread lock is owned),
+	 * so the IPI is delayed until after curpmap is updated.  Protect
+	 * other callers in a similar way, by disabling interrupts
+	 * around the %cr3 register reload and curpmap assignment.
+	 */
+	spinlock_enter();
 	pmap_activate_sw(td);
-	critical_exit();
+	spinlock_exit();
 }
 
 void

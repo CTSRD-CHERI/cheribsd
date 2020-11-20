@@ -207,15 +207,15 @@ install(char *pkgname)
 	if (*s == '\0')
 		goto invalid_url;
 
-	proto = NULL;
 	devname = NULL;
 	devnamelen = 0;
-	
+	proto = NULL;
+	local = 0;
+
 	if (i == 4 && !strncasecmp(pkgname, "tftp", i)) {
 		devname = "net0";
 		devnamelen = 4;
 		proto = &tftp_fsops;
-		local = 0;
 	} else if (i == 4 && !strncasecmp(pkgname, "file", i)) {
 		currdev = getenv("currdev");
 		local = 1;
@@ -286,10 +286,6 @@ install(char *pkgname)
 
 		setenv("serverip", inet_ntoa(servip), 1);
 
-		if (proto == &tftp_fsops) {
-			tftpip.s_addr = servip.s_addr;
-		}
-
 		*pkgname = '/';
 	} else
 		pkgname = s;
@@ -340,7 +336,7 @@ install(char *pkgname)
 	fd = open(s, O_RDONLY);
 	if (fd != -1) {
 		close(fd);
-		error = inter_include(s);
+		error = interp_include(s);
 		if (error == CMD_ERROR)
 			goto fail;
 	}
