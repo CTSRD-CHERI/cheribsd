@@ -106,6 +106,11 @@ main(int argc, char **argv)
 		err(1, "colookup");
 	}
 
+	if (!vflag) {
+		if (isatty(1))
+			setvbuf(stdout, NULL, _IONBF, 0);
+	}
+
 	if (vflag)
 		fprintf(stderr, "%s: cocalling...\n", getprogname());
 
@@ -131,6 +136,9 @@ main(int argc, char **argv)
 		if (!lflag)
 			sleep(1);
 	}
+
+	if (!vflag)
+		printf("\n");
 
 	return (0);
 }
