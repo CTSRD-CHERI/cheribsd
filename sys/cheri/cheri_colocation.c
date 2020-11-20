@@ -408,7 +408,9 @@ colocation_trap_in_switcher(struct thread *td, struct trapframe *trapframe)
 		goto trap;
 #endif
 	return (false);
+#ifdef __mips__
 trap:
+#endif
 #ifdef DDB
 	if (kdb_on_switcher_trap)
 		kdb_enter(KDB_WHY_CHERI, "switcher trap");
