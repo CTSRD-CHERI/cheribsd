@@ -1799,7 +1799,7 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	for (; argc > 0; --argc) {
 		len = strlen(stringp) + 1;
 #if __has_feature(capabilities)
-		if (sucap(vectp++, (uintptr_t)cheri_setbounds(ustringp, len))
+		if (sucap(vectp++, (uintcap_t)cheri_setbounds(ustringp, len))
 		    != 0)
 			return (EFAULT);
 #else
@@ -1829,7 +1829,7 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	for (; envc > 0; --envc) {
 		len = strlen(stringp) + 1;
 #if __has_feature(capabilities)
-		if (sucap(vectp++, (uintptr_t)cheri_setbounds(ustringp, len))
+		if (sucap(vectp++, (uintcap_t)cheri_setbounds(ustringp, len))
 		    != 0)
 			return (EFAULT);
 #else
