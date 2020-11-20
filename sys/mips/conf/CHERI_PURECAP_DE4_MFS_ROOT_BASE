@@ -22,7 +22,6 @@ options		VERBOSE_SYSINIT
 options		BOOTVERBOSE=1
 options		STACK
 options		WITNESS
-options		DEBUG_VFS_LOCKS
 
 # needed by dhclient
 device bpf
