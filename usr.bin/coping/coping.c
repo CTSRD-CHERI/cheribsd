@@ -49,7 +49,7 @@ static void
 usage(void)
 {
 
-	fprintf(stderr, "usage: coping [-kv] service-name\n");
+	fprintf(stderr, "usage: coping [-c count] [-kv] service-name\n");
 	exit(0);
 }
 
@@ -60,10 +60,15 @@ main(int argc, char **argv)
 	void * __capability switcher_data;
 	void * __capability lookedup;
 	bool kflag = false, vflag = false;
-	int ch, error;
+	int count = 0, ch, error, i = 0;
 
-	while ((ch = getopt(argc, argv, "kv")) != -1) {
+	while ((ch = getopt(argc, argv, "c:kv")) != -1) {
 		switch (ch) {
+		case 'c':
+			count = atoi(optarg);
+			if (count <= 0)
+				usage();
+			break;
 		case 'k':
 			kflag = true;
 			break;
@@ -115,6 +120,11 @@ main(int argc, char **argv)
 			printf("%s: returned, pid %d, buf[0] is %lld\n", getprogname(), getpid(), buf[0]);
 		else
 			printf(".");
+
+		i++;
+		if (count != 0 && i >= count)
+			break;
+
 		sleep(1);
 	}
 

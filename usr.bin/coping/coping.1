@@ -29,7 +29,7 @@
 .\"
 .\" $FreeBSD$
 .\"
-.Dd May 6, 2016
+.Dd November 20, 2020
 .Dt COPING 1
 .Os
 .Sh NAME
@@ -37,6 +37,7 @@
 .Nd colocated ping
 .Sh SYNOPSIS
 .Nm
+.Op Fl c Ar count
 .Op Fl k
 .Op Fl v
 .Ar target-name
@@ -47,7 +48,11 @@ utility is used to send colocated pings; usually used with
 .Xr copong 1 .
 .Pp
 The following options are available:
-.Bl -tag -width ".Fl v"
+.Bl -tag -width ".Fl c Ar count"
+.It Fl c Ar count
+Exit after
+.Ar count
+iterations.
 .It Fl k
 Use
 .Xr cocall_slow 2
