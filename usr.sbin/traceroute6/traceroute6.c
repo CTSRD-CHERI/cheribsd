@@ -338,9 +338,7 @@ static struct cmsghdr *cmsg;
 static char *source = NULL;
 static char *hostname;
 
-#ifdef WITH_CASPER
 static cap_channel_t *capdns;
-#endif
 
 static u_long nprobes = 3;
 static u_long first_hop = 1;
