@@ -141,7 +141,7 @@ cpuset_t all_harts;
 extern int *end;
 
 #ifdef FDT
-static char static_kenv[4096];
+static char static_kenv[PAGE_SIZE];
 #endif
 
 /*
@@ -1148,6 +1148,8 @@ parse_metadata(void)
 	kern_envp = MD_FETCH(kmdp, MODINFOMD_ENVP, char *);
 	if (kern_envp != NULL)
 		init_static_kenv(kern_envp, 0);
+	else
+		init_static_kenv(static_kenv, sizeof(static_kenv));
 #ifdef DDB
 	ksym_start = MD_FETCH(kmdp, MODINFOMD_SSYM, uintptr_t);
 	ksym_end = MD_FETCH(kmdp, MODINFOMD_ESYM, uintptr_t);
