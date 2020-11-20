@@ -49,7 +49,7 @@ static void
 usage(void)
 {
 
-	fprintf(stderr, "usage: coping [-c count] [-kv] service-name\n");
+	fprintf(stderr, "usage: coping [-c count] [-klv] service-name\n");
 	exit(0);
 }
 
@@ -59,10 +59,10 @@ main(int argc, char **argv)
 	void * __capability switcher_code;
 	void * __capability switcher_data;
 	void * __capability lookedup;
-	bool kflag = false, vflag = false;
+	bool lflag = false, kflag = false, vflag = false;
 	int count = 0, ch, error, i = 0;
 
-	while ((ch = getopt(argc, argv, "c:kv")) != -1) {
+	while ((ch = getopt(argc, argv, "c:lkv")) != -1) {
 		switch (ch) {
 		case 'c':
 			count = atoi(optarg);
@@ -71,6 +71,9 @@ main(int argc, char **argv)
 			break;
 		case 'k':
 			kflag = true;
+			break;
+		case 'l':
+			lflag = true;
 			break;
 		case 'v':
 			vflag = true;
@@ -125,7 +128,8 @@ main(int argc, char **argv)
 		if (count != 0 && i >= count)
 			break;
 
-		sleep(1);
+		if (!lflag)
+			sleep(1);
 	}
 
 	return (0);

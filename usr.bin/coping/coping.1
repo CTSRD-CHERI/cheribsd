@@ -39,6 +39,7 @@
 .Nm
 .Op Fl c Ar count
 .Op Fl k
+.Op Fl l
 .Op Fl v
 .Ar target-name
 .Sh DESCRIPTION
@@ -58,6 +59,8 @@ Use
 .Xr cocall_slow 2
 instead of
 .Xr cocall 2 .
+.It Fl l
+Do not pause between iterations.
 .It Fl v
 Be verbose.
 .El
