@@ -55,7 +55,6 @@ __FBSDID("$FreeBSD$");
 static void	dumpthread(volatile struct proc *p, volatile struct thread *td,
 		    int all);
 static void	db_ps_proc(struct proc *p);
-static void	db_vmspace_proc(struct proc *p);
 static int	ps_mode;
 
 /*
@@ -66,11 +65,6 @@ static int	ps_mode;
 DB_SHOW_ALL_COMMAND(procs, db_procs_cmd)
 {
 	db_ps(addr, have_addr, count, modif);
-}
-
-DB_SHOW_ALL_COMMAND(vmspaces, db_vmspaces_cmd)
-{
-	db_vmspace(addr, have_addr, count, modif);
 }
 
 static void
@@ -266,38 +260,8 @@ db_ps_proc(struct proc *p)
 	}
 }
 
-void
-db_vmspace(db_expr_t addr, bool hasaddr, db_expr_t count, char *modif)
-{
-	struct proc *p;
-	int i, j;
-
-	ps_mode = modif[0] == 'a' ? PRINT_ARGS : PRINT_NONE;
-
-	db_printf("  pid  ppid  pgrp   sid   uid vmaddr              cmd\n");
-
-	if (!LIST_EMPTY(&allproc))
-		p = LIST_FIRST(&allproc);
-	else
-		p = &proc0;
-	for (; p != NULL && !db_pager_quit; p = LIST_NEXT(p, p_list))
-		db_vmspace_proc(p);
-
-	/*
-	 * Do zombies.
-	 */
-	for (i = 0; i < pidhashlock + 1 && !db_pager_quit; i++) {
-		for (j = i; j <= pidhash && !db_pager_quit; j += pidhashlock + 1) {
-			LIST_FOREACH(p, &pidhashtbl[j], p_hash) {
-				if (p->p_state == PRS_ZOMBIE)
-					db_vmspace_proc(p);
-			}
-		}
-	}
-}
-
 static void
-db_vmspace_proc(struct proc *p)
+db_show_vmspaces_proc_single(struct proc *p, bool first)
 {
 	volatile struct proc *pp;
 	struct ucred *cred;
@@ -317,12 +281,64 @@ db_vmspace_proc(struct proc *p)
 	    session != NULL ? session->s_sid : 0,
 	    cred != NULL ? cred->cr_ruid : 0);
 
-	db_printf("%p  ", p->p_vmspace);
+	if (first)
+		db_printf("%p     ", p->p_vmspace);
+	else
+		db_printf("`-- %p ", p->p_vmspace);
 	db_printf("%s", p->p_comm);
 
 	db_printf(" ");
 	dump_args(p);
 	db_printf("\n");
+}
+
+static void
+db_show_vmspaces_proc(struct proc *p)
+{
+	struct proc *p2;
+
+	/*
+	 * Check whether "p" has the lowest PID of all processes with the same
+	 * vmspace.  Return if not; it will be handled later.
+	 */
+	FOREACH_PROC_IN_SYSTEM(p2) {
+		if (p2->p_vmspace != p->p_vmspace)
+			continue;
+		if (p2->p_pid < p->p_pid)
+			return;
+	}
+
+	db_show_vmspaces_proc_single(p, true);
+
+	/*
+	 * Iterate over the process list again, showing all the processes
+	 * with the same vmaddr.
+	 */
+	FOREACH_PROC_IN_SYSTEM(p2) {
+		if (p2 == p)
+			continue;
+		if (p2->p_vmspace != p->p_vmspace)
+			continue;
+		db_show_vmspaces_proc_single(p2, false);
+	}
+}
+
+/*
+ * Display all processes, grouped by address spaces.
+ */
+DB_SHOW_COMMAND(vmspaces, db_show_vmspaces)
+{
+	struct proc *p;
+
+	ps_mode = modif[0] == 'a' ? PRINT_ARGS : PRINT_NONE;
+
+	db_printf("  pid  ppid  pgrp   sid   uid vmaddr                 cmd\n");
+
+	FOREACH_PROC_IN_SYSTEM(p) {
+		if (db_pager_quit)
+			break;
+		db_show_vmspaces_proc(p);
+	}
 }
 
 static void
