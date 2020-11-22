@@ -71,7 +71,6 @@ struct thr_param;
 struct timex;
 struct uio;
 struct uuid;
-struct umtx_copyops;
 struct vm_map;
 struct vmspace;
 
@@ -112,9 +111,6 @@ int	kern___getcwd(struct thread *td, char * __capability buf,
 int	kern___realpathat(struct thread *td, int fd,
 	    const char * __capability path, char * __capability buf,
 	    size_t size, int flags, enum uio_seg pathseg);
-int	kern__umtx_op(struct thread *td, void * __capability obj, int op,
-	    unsigned long val, void * __capability uaddr1,
-	    void * __capability uaddr2, const struct umtx_copyops *ops);
 int	kern_abort2(struct thread *td, const char * __capability why,
             int nargs, void * __capability *uargs);
 int	kern_accept(struct thread *td, int s, struct sockaddr **name,
