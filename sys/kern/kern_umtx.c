@@ -75,8 +75,8 @@ __FBSDID("$FreeBSD$");
 #include <machine/atomic.h>
 #include <machine/cpu.h>
 
-#ifdef COMPAT_FREEBSD32
 #include <compat/freebsd32/freebsd32.h>
+#ifdef COMPAT_FREEBSD32
 #include <compat/freebsd32/freebsd32_proto.h>
 #endif
 
@@ -238,7 +238,6 @@ struct umtx_copyops {
 	const bool	compat32;
 };
 
-#ifdef COMPAT_FREEBSD32
 struct umtx_time32 {
 	struct	timespec32	_timeout;
 	uint32_t		_flags;
@@ -260,6 +259,7 @@ struct umutex32 {
 	__uint32_t		m_spare[2];
 };
 
+#ifdef COMPAT_FREEBSD32
 /*
  * XXX-CHERI: Not true, but leaving the assertion intact to catch future
  * issues
@@ -278,6 +278,14 @@ struct umutex64 {
 	__uint32_t		m_spare[2];
 };
 #endif
+
+union umutex_all {
+	struct umutex m;
+#ifdef COMPAT_FREEBSD64
+	struct umutex64 m64;
+#endif
+	struct umutex32 m32;
+};
 
 int umtx_shm_vnobj_persistent = 0;
 SYSCTL_INT(_kern_ipc, OID_AUTO, umtx_vnode_persistent, CTLFLAG_RWTUN,
@@ -4206,6 +4214,15 @@ __umtx_op_robust_lists(struct thread *td, struct _umtx_op_args *uap,
 	struct umtx_robust_lists_params rb;
 	int error;
 
+	if (ops->compat32) {
+		if ((td->td_pflags2 & TDP2_COMPAT32RB) == 0 &&
+		    (td->td_rb_list != 0 || td->td_rbp_list != 0 ||
+		    td->td_rb_inact != 0))
+			return (EBUSY);
+	} else if ((td->td_pflags2 & TDP2_COMPAT32RB) != 0) {
+		return (EBUSY);
+	}
+
 	bzero(&rb, sizeof(rb));
 	error = ops->copyin_robust_lists(uap->uaddr1, uap->val, &rb);
 	if (error != 0)
@@ -4213,8 +4230,6 @@ __umtx_op_robust_lists(struct thread *td, struct _umtx_op_args *uap,
 
 	if (ops->compat32)
 		td->td_pflags2 |= TDP2_COMPAT32RB;
-	else if ((td->td_pflags2 & TDP2_COMPAT32RB) != 0)
-		return (EINVAL);
 
 	td->td_rb_list = rb.robust_list_offset;
 	td->td_rbp_list = rb.robust_priv_list_offset;
@@ -4222,11 +4237,70 @@ __umtx_op_robust_lists(struct thread *td, struct _umtx_op_args *uap,
 	return (0);
 }
 
-#ifdef COMPAT_FREEBSD32
-static inline int
-umtx_copyin_timeout32(const void *uaddr, struct timespec *tsp)
+#if defined(__i386__) || defined(__amd64__)
+/*
+ * Provide the standard 32-bit definitions for x86, since native/compat32 use a
+ * 32-bit time_t there.  Other architectures just need the i386 definitions
+ * along with their standard compat32.
+ */
+struct timespecx32 {
+	int64_t			tv_sec;
+	int32_t			tv_nsec;
+};
+
+struct umtx_timex32 {
+	struct	timespecx32	_timeout;
+	uint32_t		_flags;
+	uint32_t		_clockid;
+};
+
+#ifndef __i386__
+#define	timespeci386	timespec32
+#define	umtx_timei386	umtx_time32
+#endif
+#else /* !__i386__ && !__amd64__ */
+/* 32-bit architectures can emulate i386, so define these almost everywhere. */
+struct timespeci386 {
+	int32_t			tv_sec;
+	int32_t			tv_nsec;
+};
+
+struct umtx_timei386 {
+	struct	timespeci386	_timeout;
+	uint32_t		_flags;
+	uint32_t		_clockid;
+};
+
+#if defined(__LP64__)
+#define	timespecx32	timespec32
+#define	umtx_timex32	umtx_time32
+#endif
+#endif
+
+static int
+umtx_copyin_robust_lists32(const void * __capability uaddr, size_t size,
+    struct umtx_robust_lists_params *rbp)
 {
-	struct timespec32 ts32;
+	struct umtx_robust_lists_params_compat32 rb32;
+	int error;
+
+	if (size > sizeof(rb32))
+		return (EINVAL);
+	bzero(&rb32, sizeof(rb32));
+	error = copyin(uaddr, &rb32, size);
+	if (error != 0)
+		return (error);
+	CP(rb32, *rbp, robust_list_offset);
+	CP(rb32, *rbp, robust_priv_list_offset);
+	CP(rb32, *rbp, robust_inact_offset);
+	return (0);
+}
+
+#ifndef __i386__
+static inline int
+umtx_copyin_timeouti386(const void * __capability uaddr, struct timespec *tsp)
+{
+	struct timespeci386 ts32;
 	int error;
 
 	error = copyin(uaddr, &ts32, sizeof(ts32));
@@ -4244,10 +4318,10 @@ umtx_copyin_timeout32(const void *uaddr, struct timespec *tsp)
 }
 
 static inline int
-umtx_copyin_umtx_time32(const void * __capability uaddr, size_t size,
+umtx_copyin_umtx_timei386(const void * __capability uaddr, size_t size,
     struct _umtx_time *tp)
 {
-	struct umtx_time32 t32;
+	struct umtx_timei386 t32;
 	int error;
 
 	t32._clockid = CLOCK_REALTIME;
@@ -4268,28 +4342,10 @@ umtx_copyin_umtx_time32(const void * __capability uaddr, size_t size,
 }
 
 static int
-umtx_copyin_robust_lists32(const void *uaddr, size_t size,
-    struct umtx_robust_lists_params *rbp)
+umtx_copyout_timeouti386(void * __capability uaddr, size_t sz,
+    struct timespec *tsp)
 {
-	struct umtx_robust_lists_params_compat32 rb32;
-	int error;
-
-	if (size > sizeof(rb32))
-		return (EINVAL);
-	bzero(&rb32, sizeof(rb32));
-	error = copyin(uaddr, &rb32, size);
-	if (error != 0)
-		return (error);
-	CP(rb32, *rbp, robust_list_offset);
-	CP(rb32, *rbp, robust_priv_list_offset);
-	CP(rb32, *rbp, robust_inact_offset);
-	return (0);
-}
-
-static int
-umtx_copyout_timeout32(void *uaddr, size_t sz, struct timespec *tsp)
-{
-	struct timespec32 remain32 = {
+	struct timespeci386 remain32 = {
 		.tv_sec = tsp->tv_sec,
 		.tv_nsec = tsp->tv_nsec,
 	};
@@ -4304,7 +4360,73 @@ umtx_copyout_timeout32(void *uaddr, size_t sz, struct timespec *tsp)
 
 	return (copyout(&remain32, uaddr, sizeof(remain32)));
 }
-#endif /* COMPAT_FREEBSD32 */
+#endif /* !__i386__ */
+
+#if defined(__i386__) || defined(__LP64__)
+static inline int
+umtx_copyin_timeoutx32(const void * __capability uaddr, struct timespec *tsp)
+{
+	struct timespecx32 ts32;
+	int error;
+
+	error = copyin(uaddr, &ts32, sizeof(ts32));
+	if (error == 0) {
+		if (ts32.tv_sec < 0 ||
+		    ts32.tv_nsec >= 1000000000 ||
+		    ts32.tv_nsec < 0)
+			error = EINVAL;
+		else {
+			CP(ts32, *tsp, tv_sec);
+			CP(ts32, *tsp, tv_nsec);
+		}
+	}
+	return (error);
+}
+
+static inline int
+umtx_copyin_umtx_timex32(const void * __capability uaddr, size_t size,
+    struct _umtx_time *tp)
+{
+	struct umtx_timex32 t32;
+	int error;
+
+	t32._clockid = CLOCK_REALTIME;
+	t32._flags   = 0;
+	if (size <= sizeof(t32._timeout))
+		error = copyin(uaddr, &t32._timeout, sizeof(t32._timeout));
+	else
+		error = copyin(uaddr, &t32, sizeof(t32));
+	if (error != 0)
+		return (error);
+	if (t32._timeout.tv_sec < 0 ||
+	    t32._timeout.tv_nsec >= 1000000000 || t32._timeout.tv_nsec < 0)
+		return (EINVAL);
+	TS_CP(t32, *tp, _timeout);
+	CP(t32, *tp, _flags);
+	CP(t32, *tp, _clockid);
+	return (0);
+}
+
+static int
+umtx_copyout_timeoutx32(void * __capability uaddr, size_t sz,
+    struct timespec *tsp)
+{
+	struct timespecx32 remain32 = {
+		.tv_sec = tsp->tv_sec,
+		.tv_nsec = tsp->tv_nsec,
+	};
+
+	/*
+	 * Should be guaranteed by the caller, sz == uaddr1 - sizeof(_umtx_time)
+	 * and we're only called if sz >= sizeof(timespec) as supplied in the
+	 * copyops.
+	 */
+	KASSERT(sz >= sizeof(remain32),
+	    ("umtx_copyops specifies incorrect sizes"));
+
+	return (copyout(&remain32, uaddr, sizeof(remain32)));
+}
+#endif /* __i386__ || __LP64__ */
 
 typedef int (*_umtx_op_func)(struct thread *td, struct _umtx_op_args *uap,
     const struct umtx_copyops *umtx_ops);
@@ -4353,17 +4475,40 @@ static const struct umtx_copyops umtx_native_ops = {
 	.umtx_time_sz = sizeof(struct _umtx_time),
 };
 
-#ifdef COMPAT_FREEBSD32
-const struct umtx_copyops umtx_native_ops32 = {
-	.copyin_timeout = umtx_copyin_timeout32,
-	.copyin_umtx_time = umtx_copyin_umtx_time32,
+#ifndef __i386__
+static const struct umtx_copyops umtx_native_opsi386 = {
+	.copyin_timeout = umtx_copyin_timeouti386,
+	.copyin_umtx_time = umtx_copyin_umtx_timei386,
 	.copyin_robust_lists = umtx_copyin_robust_lists32,
-	.copyout_timeout = umtx_copyout_timeout32,
-	.timespec_sz = sizeof(struct timespec32),
-	.umtx_time_sz = sizeof(struct umtx_time32),
+	.copyout_timeout = umtx_copyout_timeouti386,
+	.timespec_sz = sizeof(struct timespeci386),
+	.umtx_time_sz = sizeof(struct umtx_timei386),
 	.compat32 = true,
 };
 #endif
+
+#if defined(__i386__) || defined(__LP64__)
+/* i386 can emulate other 32-bit archs, too! */
+static const struct umtx_copyops umtx_native_opsx32 = {
+	.copyin_timeout = umtx_copyin_timeoutx32,
+	.copyin_umtx_time = umtx_copyin_umtx_timex32,
+	.copyin_robust_lists = umtx_copyin_robust_lists32,
+	.copyout_timeout = umtx_copyout_timeoutx32,
+	.timespec_sz = sizeof(struct timespecx32),
+	.umtx_time_sz = sizeof(struct umtx_timex32),
+	.compat32 = true,
+};
+
+#ifdef COMPAT_FREEBSD32
+#ifdef __amd64__
+#define	umtx_native_ops32	umtx_native_opsi386
+#else
+#define	umtx_native_ops32	umtx_native_opsx32
+#endif
+#endif /* COMPAT_FREEBSD32 */
+#endif /* __i386__ || __LP64__ */
+
+#define	UMTX_OP__FLAGS	(UMTX_OP__32BIT | UMTX_OP__I386)
 
 static int
 kern__umtx_op(struct thread *td, void * __capability obj, int op,
@@ -4372,7 +4517,7 @@ kern__umtx_op(struct thread *td, void * __capability obj, int op,
 {
 	struct _umtx_op_args uap = {
 		.obj = obj,
-		.op = op,
+		.op = op & ~UMTX_OP__FLAGS,
 		.val = val,
 		.uaddr1 = uaddr1,
 		.uaddr2 = uaddr2
@@ -4386,9 +4531,27 @@ kern__umtx_op(struct thread *td, void * __capability obj, int op,
 int
 sys__umtx_op(struct thread *td, struct _umtx_op_args *uap)
 {
+	static const struct umtx_copyops *umtx_ops;
 
+	umtx_ops = &umtx_native_ops;
+#ifdef __LP64__
+	if ((uap->op & (UMTX_OP__32BIT | UMTX_OP__I386)) != 0) {
+		if ((uap->op & UMTX_OP__I386) != 0)
+			umtx_ops = &umtx_native_opsi386;
+		else
+			umtx_ops = &umtx_native_opsx32;
+	}
+#elif !defined(__i386__)
+	/* We consider UMTX_OP__32BIT a nop on !i386 ILP32. */
+	if ((uap->op & UMTX_OP__I386) != 0)
+		umtx_ops = &umtx_native_opsi386;
+#else
+	/* Likewise, UMTX_OP__I386 is a nop on i386. */
+	if ((uap->op & UMTX_OP__32BIT) != 0)
+		umtx_ops = &umtx_native_opsx32;
+#endif
 	return (kern__umtx_op(td, uap->obj, uap->op, uap->val, uap->uaddr1,
-	    uap->uaddr2, &umtx_native_ops));
+	    uap->uaddr2, umtx_ops));
 }
 
 #ifdef COMPAT_FREEBSD32
@@ -4884,31 +5047,29 @@ umtx_thread_exit(struct thread *td)
 }
 
 static int
-umtx_read_uptr(struct thread *td, uintptr_t ptr, uintcap_t *res, bool compat32)
+umtx_read_uptr(struct thread *td, uintcap_t ptr, uintcap_t *res, bool compat32)
 {
 	intcap_t res1;
-	u_long res_native;
-#ifdef COMPAT_FREEBSD32
-	uint32_t res32;
+#ifdef COMPAT_FREEBSD64
+	uint64_t res64;
 #endif
+	uint32_t res32;
 	int error;
 
-#if __has_feature(capabilities)
-	if (SV_PROC_FLAG(td->td_proc, SV_CHERI)) {
-		error = fuecap((void * __capability)ptr, &res1);
-	} else
-#endif
-#ifdef COMPAT_FREEBSD32
 	if (compat32) {
 		error = fueword32((void * __capability)ptr, &res32);
 		if (error == 0)
 			res1 = res32;
 	} else
+#ifdef COMPAT_FREEBSD64
+	if (!SV_PROC_FLAG(td->td_proc, SV_CHERI)) {
+		error = fueword((void * __capability)ptr, &res64);
+		if (error == 0)
+			res1 = res64;
+	} else
 #endif
 	{
-		error = fueword((void * __capability)ptr, &res_native);
-		if (error == 0)
-			res1 = res_native;
+		error = fuecap((void * __capability)ptr, &res1);
 	}
 	if (error == 0)
 		*res = res1;
@@ -4918,55 +5079,46 @@ umtx_read_uptr(struct thread *td, uintptr_t ptr, uintcap_t *res, bool compat32)
 }
 
 static void
-umtx_read_rb_list(struct thread *td, struct umutex *m, uintcap_t *rb_list,
+umtx_read_rb_list(struct thread *td, union umutex_all *mu, uintcap_t *rb_list,
     bool compat32)
 {
-#ifdef COMPAT_FREEBSD32
-	struct umutex32 m32;
-#endif
-#ifdef COMPAT_FREEBSD64
-	struct umutex64 m64;
-#endif
-
-#ifdef COMPAT_FREEBSD32
 	if (compat32) {
-		memcpy(&m32, m, sizeof(m32));
-		*rb_list = (uintcap_t)__USER_CAP_UNBOUND((void *)(uintptr_t)m32.m_rb_lnk);
+		*rb_list = (uintcap_t)__USER_CAP_UNBOUND(
+		    (void *)(uintptr_t)mu->m32.m_rb_lnk);
 	} else
-#endif
-#if __has_feature(capabilities)
+#ifdef COMPAT_FREEBSD64
 	if (!SV_PROC_FLAG(td->td_proc, SV_CHERI)) {
-		memcpy(&m64, m, sizeof(m64));
-		*rb_list = (uintcap_t)__USER_CAP_UNBOUND((void *)(uintptr_t)m64.m_rb_lnk);
+		*rb_list = (uintcap_t)__USER_CAP_UNBOUND(
+		    (void *)(uintptr_t)mu->m64.m_rb_lnk);
 	} else
 #endif
-		*rb_list = m->m_rb_lnk;
+		*rb_list = mu->m.m_rb_lnk;
 }
 
 static int
 umtx_handle_rb(struct thread *td, uintcap_t rbp, uintcap_t *rb_list, bool inact,
     bool compat32)
 {
-	union {
-		struct umutex m;
-#ifdef COMPAT_FREEBSD64
-		struct umutex64 m64;
-#endif
-	} mu;
+	union umutex_all mu;
 	int error;
 
 	KASSERT(td->td_proc == curproc, ("need current vmspace"));
+	if (compat32) {
+		error = copyin((void * __capability)rbp, &mu.m32,
+		    sizeof(mu.m32));
+	} else
 #ifdef COMPAT_FREEBSD64
 	if (!SV_PROC_FLAG(td->td_proc, SV_CHERI)) {
 		error = copyin((void * __capability)rbp, &mu.m64,
 		    sizeof(mu.m64));
 	} else
 #endif
+	
 		error = copyincap((void * __capability)rbp, &mu.m, sizeof(mu.m));
 	if (error != 0)
 		return (error);
 	if (rb_list != NULL)
-		umtx_read_rb_list(td, &mu.m, rb_list, compat32);
+		umtx_read_rb_list(td, &mu, rb_list, compat32);
 	if ((mu.m.m_flags & UMUTEX_ROBUST) == 0)
 		return (EINVAL);
 	if ((mu.m.m_owner & ~UMUTEX_CONTESTED) != td->td_tid)
