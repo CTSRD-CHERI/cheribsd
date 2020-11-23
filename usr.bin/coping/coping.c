@@ -49,7 +49,7 @@ static void
 usage(void)
 {
 
-	fprintf(stderr, "usage: coping [-kv] service-name\n");
+	fprintf(stderr, "usage: coping [-c count] [-klv] service-name\n");
 	exit(0);
 }
 
@@ -59,13 +59,21 @@ main(int argc, char **argv)
 	void * __capability switcher_code;
 	void * __capability switcher_data;
 	void * __capability lookedup;
-	bool kflag = false, vflag = false;
-	int ch, error;
+	bool lflag = false, kflag = false, vflag = false;
+	int count = 0, ch, error, i = 0;
 
-	while ((ch = getopt(argc, argv, "kv")) != -1) {
+	while ((ch = getopt(argc, argv, "c:lkv")) != -1) {
 		switch (ch) {
+		case 'c':
+			count = atoi(optarg);
+			if (count <= 0)
+				usage();
+			break;
 		case 'k':
 			kflag = true;
+			break;
+		case 'l':
+			lflag = true;
 			break;
 		case 'v':
 			vflag = true;
@@ -98,6 +106,11 @@ main(int argc, char **argv)
 		err(1, "colookup");
 	}
 
+	if (!vflag) {
+		if (isatty(1))
+			setvbuf(stdout, NULL, _IONBF, 0);
+	}
+
 	if (vflag)
 		fprintf(stderr, "%s: cocalling...\n", getprogname());
 
@@ -115,8 +128,17 @@ main(int argc, char **argv)
 			printf("%s: returned, pid %d, buf[0] is %lld\n", getprogname(), getpid(), buf[0]);
 		else
 			printf(".");
-		sleep(1);
+
+		i++;
+		if (count != 0 && i >= count)
+			break;
+
+		if (!lflag)
+			sleep(1);
 	}
+
+	if (!vflag)
+		printf("\n");
 
 	return (0);
 }

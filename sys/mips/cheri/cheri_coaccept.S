@@ -40,7 +40,7 @@
 .set noat
 
 #define	CLEARLO_BITS	(1 << 1  /* $at */ | \
-			 1 << 2  /* $v0 */ | \
+			 /* preserve $v0 */ \
 			 1 << 3  /* $v1 */ | \
 			 1 << 4  /* $a0 */ | \
 			 1 << 5  /* $a1 */ | \
@@ -170,7 +170,14 @@ _C_LABEL(switcher_coaccept):
 	syscall
 	nop
 
-	// XXX: And then?  Fallthrough?
+	/*
+	 * Returned from copark(2).
+	 *
+	 * XXX: Wait for the spinlock to be released.
+	 */
+	b	3f
+	nop
+
 1:
 	/*
 	 * Save the capability to the caller's thread in the callee control block.
@@ -217,12 +224,15 @@ _C_LABEL(switcher_coaccept):
 	bgtz	t0, 2b
 	nop
 
+	li	v0, 0
+
 	/*
 	 * Zero out the scb_peer_scb variables, releasing the spinlock.
 	 */
 	csd	zero, zero, SCB_PEER_SCB($c25)
 	csd	zero, zero, SCB_PEER_SCB($idc)
 
+3:
 	clearlo		CLEARLO_BITS
 	clearhi		CLEARHI_BITS
 	cclearlo	CCLEARLO_BITS
