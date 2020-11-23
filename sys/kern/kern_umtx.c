@@ -238,27 +238,6 @@ struct umtx_copyops {
 	const bool	compat32;
 };
 
-struct umtx_time32 {
-	struct	timespec32	_timeout;
-	uint32_t		_flags;
-	uint32_t		_clockid;
-};
-
-struct umtx_robust_lists_params_compat32 {
-	uint32_t	robust_list_offset;
-	uint32_t	robust_priv_list_offset;
-	uint32_t	robust_inact_offset;
-};
-
-struct umutex32 {
-	volatile __lwpid_t	m_owner;	/* Owner of the mutex */
-	__uint32_t		m_flags;	/* Flags of the mutex */
-	__uint32_t		m_ceilings[2];	/* Priority protect ceiling */
-	__uint32_t		m_rb_lnk;	/* Robust linkage */
-	__uint32_t		m_pad;
-	__uint32_t		m_spare[2];
-};
-
 #ifdef COMPAT_FREEBSD32
 /*
  * XXX-CHERI: Not true, but leaving the assertion intact to catch future
