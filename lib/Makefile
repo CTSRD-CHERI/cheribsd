@@ -154,7 +154,7 @@ SUBDIR_DEPEND_liblzma= ${_libthr}
 SUBDIR_DEPEND_libpcap= ofed
 .endif
 
-.if !defined(COMPAT_32BIT)
+.if !defined(COMPAT_32BIT) && !defined(COMPAT_64BIT) && !defined(COMPAT_CHERI)
 SUBDIR+=	flua
 SUBDIR_DEPEND_flua=	libjail
 .endif
