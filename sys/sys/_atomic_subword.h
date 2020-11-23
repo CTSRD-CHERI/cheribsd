@@ -50,7 +50,7 @@
 #endif
 
 #define	_ATOMIC_WORD_ALIGNED(p)		\
-    (uint32_t *)(uintptr_t)(__builtin_align_down(p, 32))
+    (uint32_t *)(uintptr_t)(__builtin_align_down(p, 4))
 
 #if _BYTE_ORDER == _BIG_ENDIAN
 #define	_ATOMIC_BYTE_SHIFT(p)		\
