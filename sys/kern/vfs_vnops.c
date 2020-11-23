@@ -698,7 +698,7 @@ vn_rdwr_inchunks(enum uio_rw rw, struct vnode *vp, void *base, size_t len,
 	return (error);
 }
 
-#if OFF_MAX <= LONG_MAX && !defined(__mips__)
+#if OFF_MAX <= LONG_MAX
 off_t
 foffset_lock(struct file *fp, int flags)
 {
