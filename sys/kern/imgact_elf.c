@@ -1820,11 +1820,11 @@ core_output(void * __capability base_cap, size_t len, off_t offset,
 	struct mount *mp;
 	size_t resid, runlen;
 	int error;
-	void *base = (void *)(uintptr_t)(uintcap_t)base_cap;
+	char *base = (char *)(uintptr_t)(uintcap_t)base_cap;
 	bool success;
 
 	KASSERT(is_aligned(base, PAGE_SIZE),
-	    ("%s: user address %#p is not page-aligned", __func__, base));
+	    ("%s: user address %p is not page-aligned", __func__, base));
 
 	if (p->comp != NULL)
 		return (compress_chunk(p, base_cap, tmpbuf, len));
