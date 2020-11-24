@@ -371,8 +371,10 @@ colocation_unborrow(struct thread *td, struct trapframe *trapframe)
 	 */
 #ifdef __mips__
 	KASSERT(td->td_frame->v0 == SYS_copark,
-	    ("%s: td_sa.code %ld != SYS_copark %d\n",
-	    __func__, (long)td->td_frame->v0, SYS_copark));
+	    ("%s: td_sa.code %ld != SYS_copark %d; peer td_sa.code %ld; td %p, pid %d (%s); peer td %p, peer pid %d (%s)\n",
+	    __func__, (long)td->td_frame->v0, SYS_copark, (long)peertd->td_frame->v0,
+	    td, td->td_proc->p_pid, td->td_proc->p_comm,
+	    peertd, peertd->td_proc->p_pid, peertd->td_proc->p_comm));
 #endif
 }
 
