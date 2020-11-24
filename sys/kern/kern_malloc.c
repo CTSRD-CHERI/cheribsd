@@ -1010,7 +1010,7 @@ malloc_usable_size(const void *addr)
 	vtozoneslab((vm_offset_t)addr & (~UMA_SLAB_MASK), &zone, &slab);
 	if (slab == NULL)
 		panic("malloc_usable_size: address %p(%p) is not allocated.\n",
-		    addr, (void *)((u_long)addr & (~UMA_SLAB_MASK)));
+		    addr, rounddown2(addr, UMA_SLAB_SIZE));
 
 	if (!malloc_large_slab(slab))
 		size = zone->uz_size;
