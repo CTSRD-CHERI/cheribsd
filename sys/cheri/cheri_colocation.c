@@ -292,9 +292,7 @@ colocation_unborrow(struct thread *td, struct trapframe *trapframe)
 	struct switchercb scb;
 	struct thread *peertd;
 	struct trapframe peertrapframe;
-	struct syscall_args peersa;
 #ifdef __mips__
-	struct trapframe *satrapframe, *peersatrapframe;
 	trapf_pc_t peertpc;
 #endif
 	bool have_scb;
@@ -346,28 +344,6 @@ colocation_unborrow(struct thread *td, struct trapframe *trapframe)
 	KASSERT(peertd->td_frame == peertd->td_sa.trapframe,
 	    ("%s: peertd->td_frame %p != peertd->td_sa.trapframe %p, peertd %p",
 	    __func__, peertd->td_frame, peertd->td_sa.trapframe, peertd));
-#endif
-
-#ifdef __mips__
-	/*
-	 * There's this... thing in MIPS' td_sa.  Its purpose is unknown,
-	 * but things break when you touch it.  Make sure to keep it as it is,
-	 * ie do not swap it.
-	 */
-	satrapframe = td->td_sa.trapframe;
-	peersatrapframe = peertd->td_sa.trapframe;
-#endif
-
-	/*
-	 * Swap the syscall information between td and peertd.
-	 */
-	memcpy(&peersa, &peertd->td_sa, sizeof(peersa));
-	memcpy(&peertd->td_sa, &td->td_sa, sizeof(peersa));
-	memcpy(&td->td_sa, &peersa, sizeof(peersa));
-
-#ifdef __mips__
-	td->td_sa.trapframe = satrapframe;
-	peertd->td_sa.trapframe = peersatrapframe;
 
 	/*
 	 * Another MIPS-specific field; this one needs to be swapped.
@@ -381,15 +357,23 @@ colocation_unborrow(struct thread *td, struct trapframe *trapframe)
 	memcpy(peertd->td_frame, td->td_frame, sizeof(struct trapframe));
 	memcpy(td->td_frame, &peertrapframe, sizeof(struct trapframe));
 
+	/*
+	 * Wake up the other thread, which should return with ERESTART,
+	 * refetch its args from the updated trapframe, and then execute
+	 * whatever syscall we've just entered.
+	 */
 	wakeup(&peertd->td_md.md_scb);
 
 	/*
 	 * Continue as usual, but calling copark(2) instead of whatever
-	 * syscall it was.
+	 * syscall it was.  The cpu_fetch_syscall_args() will fetch updated
+	 * arguments from the stack frame.
 	 */
-	KASSERT(td->td_sa.code == SYS_copark,
-	    ("%s: td_sa.code %d != SYS_copark %d\n",
-	    __func__, td->td_sa.code, SYS_copark));
+#ifdef __mips__
+	KASSERT(td->td_frame->v0 == SYS_copark,
+	    ("%s: td_sa.code %ld != SYS_copark %d\n",
+	    __func__, (long)td->td_frame->v0, SYS_copark));
+#endif
 }
 
 bool
