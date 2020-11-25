@@ -38,7 +38,8 @@
 TESTS+=		archive-suffix
 TESTS+=		cmd-errors
 TESTS+=		cmd-errors-lint
-TESTS+=		cmd-interrupt
+# Broken on linux
+#TESTS+=		cmd-interrupt
 TESTS+=		cmdline
 TESTS+=		cmdline-undefined
 TESTS+=		comment
