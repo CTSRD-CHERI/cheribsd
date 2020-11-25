@@ -831,6 +831,7 @@
 #define	PSR_DAIF	(PSR_D | PSR_A | PSR_I | PSR_F)
 #define	PSR_IL		0x00100000
 #define	PSR_SS		0x00200000
+#define	PSR_C64		0x04000000
 #define	PSR_V		0x10000000
 #define	PSR_C		0x20000000
 #define	PSR_Z		0x40000000
