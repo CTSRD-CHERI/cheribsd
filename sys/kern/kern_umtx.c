@@ -4858,7 +4858,7 @@ umtx_read_uptr(struct thread *td, uintptr_t ptr, uintcap_t *res, bool compat32)
 	} else
 #endif
 #ifdef COMPAT_FREEBSD32
-	if (SV_PROC_FLAG(td->td_proc, SV_ILP32) {
+	if (compat32) {
 		error = fueword32((void * __capability)ptr, &res32);
 		if (error == 0)
 			res1 = res32;
@@ -4888,12 +4888,12 @@ umtx_read_rb_list(struct thread *td, struct umutex *m, uintcap_t *rb_list,
 #endif
 
 #ifdef COMPAT_FREEBSD32
-	if (compat32)
+	if (compat32) {
 		memcpy(&m32, m, sizeof(m32));
 		*rb_list = (uintcap_t)__USER_CAP_UNBOUND((void *)(uintptr_t)m32.m_rb_lnk);
 	} else
 #endif
-#ifdef COMPAT_FREEBSD64
+#if __has_feature(capabilities)
 	if (!SV_PROC_FLAG(td->td_proc, SV_CHERI)) {
 		memcpy(&m64, m, sizeof(m64));
 		*rb_list = (uintcap_t)__USER_CAP_UNBOUND((void *)(uintptr_t)m64.m_rb_lnk);
