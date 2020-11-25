@@ -3,22 +3,8 @@
 # $FreeBSD$
 
 include		"std.MALTA"
-include		"CHERI128_PURECAP_BASE"
+include		"std.CHERI_PURECAP"
 ident		CHERI_PURECAP_MALTA64
-
-options		DIAGNOSTIC
-# options	VERBOSE_SYSINIT
-# options	BUS_DEBUG
-# options	CAMDEBUG
-# options	CAM_DEBUG_FLAGS=3
-options		STACK
-options		WITNESS
-options		DEBUG_VFS_LOCKS
-# options	TRAP_DEBUG
-options		KTR
-# options	KTR_VERBOSE=2
-# nooptions	KTR_ALQ
-# options	LOCK_DEBUG
 
 #
 # Qemu-CHERI tracing is permitted per thread, not just globally.
@@ -28,7 +14,3 @@ options 	CPU_QEMU_MALTA
 # Qemu doesn't yet support these
 nooptions	CPU_CHERI_HW_CCALL_CHECKS
 nooptions	CPU_CHERI_HW_CCLEAR
-
-# support for virtio rng device
-device		virtio
-device		virtio_pci

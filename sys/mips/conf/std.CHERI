@@ -14,3 +14,11 @@ options 	BOOTVERBOSE=1
 options 	KSTACK_LARGE_PAGE	# Use a 16K page for kernel stack
 options 	NO_SWAPPING
 options 	TMPFS
+
+# networking
+options		INET6
+device		tuntap
+
+options		HWPMC_HOOKS
+device		hwpmc
+device		hwpmc_beri
