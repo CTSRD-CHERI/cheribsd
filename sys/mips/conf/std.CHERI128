@@ -1,7 +1,0 @@
-#
-# std.CHERI -- Convert a BERI kernel to a CHERI128 kernel by including
-# this file.
-#
-# $FreeBSD$
-#
-include		"std.CHERI"
