@@ -858,10 +858,21 @@ vmem_add1(vmem_t *vm, vmem_addr_t addr, vmem_size_t size, int type)
 		 * the future to coalesce the new segment with an existing free
 		 * segment.
 		 */
-		btprev = TAILQ_LAST(&vm->vm_seglist, vmem_seglist);
-		if ((!bt_isbusy(btprev) && !bt_isfree(btprev)) ||
-		    btprev->bt_start + btprev->bt_size != addr)
+#ifdef __CHERI_PURE_CAPABILITY__
+		if ((vm->vm_flags & VMEM_CAPABILITY_ARENA) != 0) {
+			/*
+			 * With CHERI, it is not possible to merge across
+			 * segments.
+			 */
 			btprev = NULL;
+		} else
+#endif
+		{
+			btprev = TAILQ_LAST(&vm->vm_seglist, vmem_seglist);
+			if ((!bt_isbusy(btprev) && !bt_isfree(btprev)) ||
+			    btprev->bt_start + btprev->bt_size != addr)
+				btprev = NULL;
+		}
 	} else {
 		btprev = NULL;
 	}
