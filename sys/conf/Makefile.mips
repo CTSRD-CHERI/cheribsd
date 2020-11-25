@@ -48,9 +48,12 @@ ARCH_FLAGS?=-march=mips32
 .endif
 
 ARCH_FLAGS+=-mabi=${MIPS_ABI}
-ARCH_PIC_FLAGS?=-fno-pic -mno-abicalls
-EXTRA_FLAGS=-G0 -DKERNLOADADDR=${KERNLOADADDR}
-EXTRA_FLAGS+=-${MIPS_ENDIAN}
+.if ${MACHINE_ABI:Mpurecap}
+EXTRA_FLAGS=-fpic
+.else
+EXTRA_FLAGS=-fno-pic -mno-abicalls
+.endif
+EXTRA_FLAGS+=-G0 -DKERNLOADADDR=${KERNLOADADDR} -${MIPS_ENDIAN}
 
 # We add the -fno-pic flag to kernels because otherwise performance
 # is extremely poor, as well as -mno-abicalls to force no ABI usage.
