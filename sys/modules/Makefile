@@ -472,8 +472,10 @@ _ipfw_nat64=	ipfw_nat64
 _ipfw_nptv6=	ipfw_nptv6
 .endif
 
+.if !${MACHINE_ABI:Mpurecap}
 .if ${MK_IPFILTER} != "no" || defined(ALL_MODULES)
 _ipfilter=	ipfilter
+.endif
 .endif
 
 .if ${MK_ISCSI} != "no" || defined(ALL_MODULES)
