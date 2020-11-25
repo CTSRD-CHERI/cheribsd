@@ -973,6 +973,45 @@ db_print_scb_td(struct thread *td)
 	db_print_scb(&scb);
 }
 
+/*
+ * Return PID owning the stack mapping the current userspace trapframe stack
+ * pointer points to.  Simply put: returns the PID which belongs to the
+ * userspace thread, which can - due to thread borrowing - be different from
+ * the PID for the kernel thread.
+ */
+static pid_t
+db_get_stack_pid(struct thread *td)
+{
+	vm_map_t map;
+	vm_map_entry_t entry;
+	vm_offset_t addr;
+	boolean_t found;
+	pid_t pid;
+
+#if defined(__mips__)
+	addr = __builtin_cheri_address_get(td->td_frame->csp);
+	db_printf("%s: td: %p; td_frame %p; csp: %#lp; csp addr: %lx\n",
+	    __func__, td, td->td_frame, &td->td_frame->csp, (long)addr);
+#elif defined(__riscv)
+	addr = __builtin_cheri_address_get(td->td_frame->tf_sp);
+	db_printf("%s: td: %p; td_frame %p; tf_sp: %#lp; csp addr: %lx\n",
+	    __func__, td, td->td_frame, (void * __capability)&td->td_frame->tf_sp, (long)addr);
+#else
+#error "what architecture is this?"
+#endif
+
+	map = &td->td_proc->p_vmspace->vm_map;
+	vm_map_lock(map);
+	found = vm_map_lookup_entry(map, addr, &entry);
+	if (found)
+		pid = entry->owner;
+	else
+		pid = -1;
+	vm_map_unlock(map);
+
+	return (pid);
+}
+
 DB_SHOW_COMMAND(scb, db_show_scb)
 {
 	struct switchercb scb;
@@ -997,8 +1036,8 @@ DB_SHOW_COMMAND(scb, db_show_scb)
 			db_printf("    no scb\n");
 			return;
 		}
-		db_printf(" switcher control block %p for thread %p, pid %d (%s):\n",
-		    (void *)td->td_md.md_scb, td, p->p_pid, p->p_comm);
+		db_printf(" switcher control block %p for thread %p, pid %d (%s), stack owned by %d:\n",
+		    (void *)td->td_md.md_scb, td, p->p_pid, p->p_comm, db_get_stack_pid(td));
 		db_print_scb_td(curthread);
 
 		borrowertd = scb.scb_borrower_td;
@@ -1007,8 +1046,8 @@ DB_SHOW_COMMAND(scb, db_show_scb)
 			if (borrowertd != NULL) {
 				td = borrowertd;
 				p = td->td_proc;
-				db_printf(" NULL scb_peer_scb; switcher control block %p for borrower thread %p, pid %d (%s):\n",
-				    (void *)td->td_md.md_scb, td, p->p_pid, p->p_comm);
+				db_printf(" NULL scb_peer_scb; switcher control block %p for borrower thread %p, pid %d (%s), stack owned by %d:\n",
+				    (void *)td->td_md.md_scb, td, p->p_pid, p->p_comm, db_get_stack_pid(td));
 				db_print_scb_td(td);
 			} else {
 				db_printf(" NULL scb_peer_scb\n");
@@ -1023,8 +1062,8 @@ DB_SHOW_COMMAND(scb, db_show_scb)
 				} else {
 					td = borrowertd;
 					p = td->td_proc;
-					db_printf(" switcher control block %p for peer thread %p, pid %d (%s):\n",
-					    (void *)td->td_md.md_scb, td, p->p_pid, p->p_comm);
+					db_printf(" switcher control block %p for peer thread %p, pid %d (%s), stack owned by %d:\n",
+					    (void *)td->td_md.md_scb, td, p->p_pid, p->p_comm, db_get_stack_pid(td));
 				}
 				db_print_scb(&scb);
 			}
