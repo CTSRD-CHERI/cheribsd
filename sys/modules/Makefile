@@ -829,7 +829,7 @@ _bcm283x_pwm=  bcm283x_pwm
 _malo=	malo
 .endif
 
-.if ${CPUTYPE} != "cheri"
+.if !${MACHINE_CPU:Mcheri}
 _linuxkpi=	linuxkpi
 .endif
 
