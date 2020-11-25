@@ -47,8 +47,12 @@ ARCH_FLAGS?=-march=mips64
 ARCH_FLAGS?=-march=mips32
 .endif
 ARCH_FLAGS+=-mabi=${MIPS_ABI}
-EXTRA_FLAGS=-fno-pic -mno-abicalls -G0 -DKERNLOADADDR=${KERNLOADADDR}
-EXTRA_FLAGS+=-${MIPS_ENDIAN}
+.if ${MACHINE_ABI:Mpurecap}
+EXTRA_FLAGS=-fpic
+.else
+EXTRA_FLAGS=-fno-pic -mno-abicalls
+.endif
+EXTRA_FLAGS+=-G0 -DKERNLOADADDR=${KERNLOADADDR} -${MIPS_ENDIAN}
 
 # We add the -fno-pic flag to kernels because otherwise performance
 # is extremely poor, as well as -mno-abicalls to force no ABI usage.
@@ -75,12 +79,11 @@ ${KERNEL_KO}.tramp.bin: ${KERNEL_KO} $S/$M/$M/elf_trampoline.c \
 		--strip-debug --strip-symbol '$$t' ${FULLKERNEL} ${KERNEL_KO}.tmp
 	sed -e s/${KERNLOADADDR}/${TRAMPLOADADDR}/ -e s/" + SIZEOF_HEADERS"// \
 		 ${LDSCRIPT_NAME} > ${LDSCRIPT_NAME}.tramp.noheader
-	${CC} -O -nostdlib -I. -I$S ${TRAMP_EXTRA_FLAGS} ${TRAMP_LDFLAGS} -Xlinker \
-		-T -Xlinker ${LDSCRIPT_NAME}.tramp.noheader \
+	${CC} -O -nostdlib -I. -I$S ${TRAMP_EXTRA_FLAGS} -fno-asynchronous-unwind-tables \
 		-DKERNNAME="\"${KERNEL_KO}.tmp\"" -DELFSIZE=${TRAMP_ELFSIZE} \
-		-fno-asynchronous-unwind-tables \
-		$S/$M/$M/inckern.S $S/$M/$M/elf_trampoline.c \
-		-o ${KERNEL_KO}.tramp.elf
+		-c $S/$M/$M/inckern.S $S/$M/$M/elf_trampoline.c
+	${LD} ${TRAMP_EXTRA_LDFLAGS} -T ${LDSCRIPT_NAME}.tramp.noheader \
+		-o ${KERNEL_KO}.tramp.elf inckern.o elf_trampoline.o
 	${OBJCOPY} -S -O binary ${KERNEL_KO}.tramp.elf \
 		${KERNEL_KO}.tramp.bin
 .endif
