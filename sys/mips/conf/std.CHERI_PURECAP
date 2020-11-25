@@ -9,11 +9,7 @@ include		"std.CHERI"
 machine		mips mips64c128
 
 nomakeoptions	ARCH_FLAGS
-makeoptions 	ARCH_PIC_FLAGS="-fpic"
-makeoptions 	ARCH_FLAGS="-mcpu=cheri128 -mxcaptable"
-makeoptions 	CFLAGS+="-gdwarf-5"
 makeoptions 	WERROR="-Wno-error"
-makeoptions 	KERNLOADADDR=0xffffffff80100000
 makeoptions 	CHERI_USE_CAP_TABLE=plt
 makeoptions	CHERI_SUBOBJECT_BOUNDS=subobject-safe
 makeoptions	LDSCRIPT_NAME=ldscript.mips.cheri

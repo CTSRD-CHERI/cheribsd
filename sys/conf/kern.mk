@@ -270,6 +270,10 @@ CFLAGS+=	-gdwarf-2
 #
 .if ${MACHINE_ABI:Mpurecap}
 
+.if defined(CHERI_SUBOBJECT_BOUNDS)
+CFLAGS+=	-Xclang -cheri-bounds=${CHERI_SUBOBJECT_BOUNDS}
+.endif
+
 .if defined(CHERI_SUBOBJECT_BOUNDS_STATS)
 CHERI_SUBOBJECT_BOUNDS_STATS_FILE?=kernel-subobject-bounds-stats.csv
 CFLAGS+=	-mllvm -collect-csetbounds-stats=csv \
@@ -336,6 +340,7 @@ LD_EMULATION_i386=elf_i386_fbsd
 LD_EMULATION_mips= elf32btsmip_fbsd
 LD_EMULATION_mipshf= elf32btsmip_fbsd
 LD_EMULATION_mips64= elf64btsmip_fbsd
+LD_EMULATION_mips64c128= elf64btsmip_fbsd
 LD_EMULATION_mips64hf= elf64btsmip_fbsd
 LD_EMULATION_mipsel= elf32ltsmip_fbsd
 LD_EMULATION_mipselhf= elf32ltsmip_fbsd
@@ -348,5 +353,6 @@ LD_EMULATION_powerpcspe= elf32ppc_fbsd
 LD_EMULATION_powerpc64= elf64ppc_fbsd
 LD_EMULATION_powerpc64le= elf64lppc_fbsd
 LD_EMULATION_riscv64= elf64lriscv
+LD_EMULATION_riscv64c= elf64lriscv
 LD_EMULATION_riscv64sf= elf64lriscv
 LD_EMULATION=${LD_EMULATION_${MACHINE_ARCH}}
