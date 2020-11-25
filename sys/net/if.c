@@ -523,6 +523,7 @@ vnet_if_uninit(const void *unused __unused)
 }
 VNET_SYSUNINIT(vnet_if_uninit, SI_SUB_INIT_IF, SI_ORDER_FIRST,
     vnet_if_uninit, NULL);
+#endif
 
 static void
 if_link_ifnet(struct ifnet *ifp)
@@ -559,6 +560,7 @@ if_unlink_ifnet(struct ifnet *ifp, bool vmove)
 	return (found);
 }
 
+#ifdef VIMAGE
 static void
 vnet_if_return(const void *unused __unused)
 {
