@@ -511,7 +511,7 @@ procstat_getfiles_kvm(struct procstat *procstat, struct kinfo_proc *kp, int mmap
 		return (NULL);
 	}
 	haspwd = false;
-	pwd_addr = (unitptr_t)(PWDDESC_KVM_LOAD_PWD(&pathsd));
+	pwd_addr = (uintptr_t)(PWDDESC_KVM_LOAD_PWD(&pathsd));
 	if (pwd_addr != 0) {
 		if (!kvm_read_all(kd, pwd_addr, &pwd, sizeof(pwd))) {
 			warnx("can't read fd_pwd at %p", (void *)pwd_addr);
