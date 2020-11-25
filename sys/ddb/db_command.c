@@ -404,7 +404,7 @@ db_command(struct command **last_cmdp, struct command_table *cmd_table,
 			        "see https://man.FreeBSD.org/ddb/4 for help.\n");
 			    db_printf("Use \"bt\" for backtrace, \"dump\" for "
 			        "kernel core dump, \"reset\" to reboot.\n");
-			    db_printf("PROTIP: \"show vmspaces\", \"show scb\"\n");
+			    db_printf("PROTIP: \"show vmspaces\", \"show cheripcb\", \"show scb\"\n");
 			    db_printf("Available commands:\n");
 			}
 			db_cmd_list(cmd_table);
