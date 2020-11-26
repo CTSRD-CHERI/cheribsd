@@ -47,48 +47,17 @@
 #include <machine/sysarch.h>
 
 #include <vm/vm.h>
-#include <vm/vm_param.h>
-#include <vm/vm_extern.h>
 #include <vm/vm_page.h>
-#include <vm/vm_pageout.h>
 #include <vm/vm_map.h>
 
 #ifdef DDB
-
-static pid_t
-db_get_cap_owner(struct thread *td, void * __capability c)
-{
-	vm_map_t map;
-	vm_map_entry_t entry;
-	vm_offset_t addr;
-	boolean_t found;
-	pid_t pid;
-
-	if (td == NULL)
-		return (-1);
-
-	addr = __builtin_cheri_address_get(c);
-	map = &td->td_proc->p_vmspace->vm_map;
-
-	/*
-	 * Note that we don't call vm_map_lock()/vm_map_unlock(); it would
-	 * panic due to mutex recursion.
-	 */
-	found = vm_map_lookup_entry(map, addr, &entry);
-	if (found)
-		pid = entry->owner;
-	else
-		pid = -1;
-
-	return (pid);
-}
 
 static inline void
 db_print_cap(struct thread *td, const char* msg, void * __capability cap)
 {
 	pid_t pid;
 
-	pid = db_get_cap_owner(td, cap);
+	pid = vm_get_cap_owner(td, (uintcap_t)cap);
 	if (pid >= 0) {
 		db_printf("%s" _CHERI_PRINTF_CAP_FMT " (pid %d)\n", msg,
 		    _CHERI_PRINTF_CAP_ARG(cap), pid);
@@ -177,7 +146,7 @@ db_show_cheri_trapframe(struct thread *td, struct trapframe *frame)
 	/* Laboriously load and print each trapframe capability. */
 	for (i = 1; i < 31; i++) {
 		void * __capability cap = *(&frame->ddc + i);
-		pid = db_get_cap_owner(td, cap);
+		pid = vm_get_cap_owner(td, (uintcap_t)cap);
 		if (pid >= 0) {
 			db_printf("$c%02d: " _CHERI_PRINTF_CAP_FMT " (pid %d)\n", i,
 			   _CHERI_PRINTF_CAP_ARG(cap), pid);

@@ -70,6 +70,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/elf.h>
+#include <sys/kdb.h>
 #include <sys/kernel.h>
 #include <sys/ktr.h>
 #include <sys/lock.h>
@@ -5588,6 +5589,42 @@ vm_map_reservation_is_unmapped(vm_map_t map, vm_offset_t reservation)
 		return (true);
 	return (false);
 }
+
+#if __has_feature(capabilities)
+pid_t
+vm_get_cap_owner(struct thread *td, uintcap_t c)
+{
+	vm_map_t map;
+	vm_map_entry_t entry;
+	vm_offset_t addr;
+	boolean_t found, need_lock;
+	pid_t pid;
+
+	if (td == NULL)
+		return (-1);
+
+	addr = __builtin_cheri_address_get(c);
+	map = &td->td_proc->p_vmspace->vm_map;
+
+	/*
+	 * Don't call vm_map_lock()/vm_map_unlock() if called from kdb;
+	 * it would panic due to mutex recursion.
+	 */
+	need_lock = !kdb_active;
+
+	if (need_lock)
+		vm_map_lock(map);
+	found = vm_map_lookup_entry(map, addr, &entry);
+	if (found)
+		pid = entry->owner;
+	else
+		pid = -1;
+	if (need_lock)
+		vm_map_unlock(map);
+
+	return (pid);
+}
+#endif /* __has_feature(capabilities) */
 
 #ifdef INVARIANTS
 static void
