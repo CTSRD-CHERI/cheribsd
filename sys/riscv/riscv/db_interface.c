@@ -179,7 +179,11 @@ DB_SHOW_COMMAND(frame, db_show_frame)
 	struct thread *td;
 	struct trapframe *frame;
 
-	td = curthread;
+	if (have_addr)
+		td = db_lookup_thread(addr, true);
+	else
+		td = curthread;
+
 	frame = td->td_frame;
 
 	db_show_reg(td, "ra", frame->tf_ra);
