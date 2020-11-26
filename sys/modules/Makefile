@@ -600,9 +600,11 @@ _syscons=	syscons
 .endif
 
 .if ${MACHINE_CPUARCH} != "mips"
+.if !${MACHINE_ABI:Mpurecap}
 # no BUS_SPACE_UNSPECIFIED
 # No barrier instruction support (specific to this driver)
 _sym=		sym
+.endif
 # intr_disable() is a macro, causes problems
 .if ${MK_SOURCELESS_UCODE} != "no"
 _cxgb=		cxgb
