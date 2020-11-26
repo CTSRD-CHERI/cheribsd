@@ -202,17 +202,18 @@ cpu_fetch_syscall_args(struct thread *td)
  * uintcap_t rather than void * __capability).
  */
 #if __has_feature(capabilities)
+
 #ifdef __CHERI_PURE_CAPABILITY__
 #define	PRINT_REG_ARG(value)	((void * __capability)(value))
 #else
 #define	PRINT_REG_ARG(value)	((void * __capability *)&(value))
 #endif
 #define PRINT_REG(name, value)					\
-	printf(name " = " _CHERI_PRINTF_CAP_FMT "\n",		\
-	    PRINT_REG_ARG(value));
+	printf(name " = " _CHERI_PRINTF_CAP_FMT " (pid %d)\n",	\
+	    PRINT_REG_ARG(value), vm_get_cap_owner(curthread, value));
 #define PRINT_REG_N(name, n, array)				\
-	printf(name "[%d] = " _CHERI_PRINTF_CAP_FMT "\n", n,	\
-	    PRINT_REG_ARG((array)[n]));
+	printf(name "[%d] = " _CHERI_PRINTF_CAP_FMT " (pid %d)\n", n,	\
+	    PRINT_REG_ARG((array)[n]), vm_get_cap_owner(curthread, (array)[n]));
 #else
 #define PRINT_REG(name, value)	printf(name " = 0x%016lx\n", value)
 #define PRINT_REG_N(name, n, array)	\
