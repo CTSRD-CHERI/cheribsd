@@ -8,6 +8,9 @@ INCS=		statcounters.h
 .if ${MACHINE_ARCH:Mmips*}
 INCS+=	statcounters_mips.h statcounters_mips.inc
 .endif
+.if ${MACHINE_ARCH:Mriscv*}
+INCS+=	statcounters_riscv.h statcounters_riscv.inc
+.endif
 
 MAN=		libstatcounters.3
 

@@ -300,6 +300,9 @@ CRUNCH_PROGS_usr.bin+=	qtrace
 .if ${MACHINE_ARCH:Mmips64*}
 CRUNCH_PROGS_usr.bin+=	beri_count_stats
 .endif
+.if ${MACHINE_ARCH:Mriscv64*}
+CRUNCH_PROGS_usr.bin+=	minimal_count_stats
+.endif
 
 
 # FIXME: wait -> usr.bin/alias (but that is just a script so how to add

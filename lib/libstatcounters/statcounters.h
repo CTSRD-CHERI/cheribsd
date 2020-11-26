@@ -43,26 +43,14 @@
 #include <stdio.h>
 #include <stdint.h>
 
-// counters bank
-#define STATCOUNTERS_MAX_MOD_CNT 12
-typedef struct statcounters_bank
-{
-    uint64_t itlb_miss;
-    uint64_t dtlb_miss;
-    uint64_t cycle;
-    uint64_t inst;
-    uint64_t inst_user;
-    uint64_t inst_kernel;
-    uint64_t imprecise_setbounds;
-    uint64_t unrepresentable_caps;
-    uint64_t icache[STATCOUNTERS_MAX_MOD_CNT];
-    uint64_t dcache[STATCOUNTERS_MAX_MOD_CNT];
-    uint64_t l2cache[STATCOUNTERS_MAX_MOD_CNT];
-    uint64_t mipsmem[STATCOUNTERS_MAX_MOD_CNT];
-    uint64_t tagcache[STATCOUNTERS_MAX_MOD_CNT];
-    uint64_t l2cachemaster[STATCOUNTERS_MAX_MOD_CNT];
-    uint64_t tagcachemaster[STATCOUNTERS_MAX_MOD_CNT];
-} statcounters_bank_t;
+#if defined(__mips__)
+#include "statcounters_mips.h"
+#elif defined(__riscv)
+#include "statcounters_riscv.h"
+#else
+#error "Architecture not supported"
+#endif
+
 
 // format flags
 typedef enum
