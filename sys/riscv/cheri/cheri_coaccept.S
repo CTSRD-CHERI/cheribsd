@@ -35,7 +35,9 @@
 .text
 .globl _C_LABEL(switcher_coaccept)
 _C_LABEL(switcher_coaccept):
-	unimp
+	li	t0, 0
+	li	a0, 0
+	cret
 .globl _C_LABEL(eswitcher_coaccept)
 _C_LABEL(eswitcher_coaccept):
 
