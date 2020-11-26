@@ -32,9 +32,89 @@
 __FBSDID("$FreeBSD$");
 #include "SYS.h"
 
+#define	CAP_LEN			16
+#define	JUMP_BUFFER_SIZE	(26 * CAP_LEN)
+
 ENTRY(coaccept)
-	cspecialr ct0, pcc
-	cincoffsetimm ct0, ct0, 8
+	cincoffsetimm	csp, csp, -JUMP_BUFFER_SIZE
+
+	/* Store the general purpose registers and ra */
+	csc	cs0, (0 * CAP_LEN)(csp)
+	csc	cs1, (1 * CAP_LEN)(csp)
+	csc	cs2, (2 * CAP_LEN)(csp)
+	csc	cs3, (3 * CAP_LEN)(csp)
+	csc	cs4, (4 * CAP_LEN)(csp)
+	csc	cs5, (5 * CAP_LEN)(csp)
+	csc	cs6, (6 * CAP_LEN)(csp)
+	csc	cs7, (7 * CAP_LEN)(csp)
+	csc	cs8, (8 * CAP_LEN)(csp)
+	csc	cs9, (9 * CAP_LEN)(csp)
+	csc	cs10, (10 * CAP_LEN)(csp)
+	csc	cs11, (11 * CAP_LEN)(csp)
+	csc	cra, (12 * CAP_LEN)(csp)
+	cspecialr ct1, ddc
+	csc	ct1, (13 * CAP_LEN)(csp)
+
+#if defined(__riscv_float_abi_double)
+	/* Store the fpe registers */
+	/*
+	 * XXX: We're wasting some space here, saving FP registers
+	 *      into capability-sized slots.
+	 */
+	cfsd	fs0, (14 * CAP_LEN)(csp)
+	cfsd	fs1, (15 * CAP_LEN)(csp)
+	cfsd	fs2, (16 * CAP_LEN)(csp)
+	cfsd	fs3, (17 * CAP_LEN)(csp)
+	cfsd	fs4, (18 * CAP_LEN)(csp)
+	cfsd	fs5, (19 * CAP_LEN)(csp)
+	cfsd	fs6, (20 * CAP_LEN)(csp)
+	cfsd	fs7, (21 * CAP_LEN)(csp)
+	cfsd	fs8, (22 * CAP_LEN)(csp)
+	cfsd	fs9, (23 * CAP_LEN)(csp)
+	cfsd	fs10, (24 * CAP_LEN)(csp)
+	cfsd	fs11, (25 * CAP_LEN)(csp)
+#endif
+	cllc cra, 1f
 	cinvoke ca0, ca1
-	cjr cra
+
+1:
+	/* Restore the general purpose registers and ra */
+	clc	cs0, (0 * CAP_LEN)(csp)
+	clc	cs1, (1 * CAP_LEN)(csp)
+	clc	cs2, (2 * CAP_LEN)(csp)
+	clc	cs3, (3 * CAP_LEN)(csp)
+	clc	cs4, (4 * CAP_LEN)(csp)
+	clc	cs5, (5 * CAP_LEN)(csp)
+	clc	cs6, (6 * CAP_LEN)(csp)
+	clc	cs7, (7 * CAP_LEN)(csp)
+	clc	cs8, (8 * CAP_LEN)(csp)
+	clc	cs9, (9 * CAP_LEN)(csp)
+	clc	cs10, (10 * CAP_LEN)(csp)
+	clc	cs11, (11 * CAP_LEN)(csp)
+	clc	cra, (12 * CAP_LEN)(csp)
+	clc	ct1, (13 * CAP_LEN)(csp)
+	cspecialw ddc, ct1
+
+#if defined(__riscv_float_abi_double)
+	/* Restore the fpe registers */
+	cfld	fs0, (14 * CAP_LEN)(csp)
+	cfld	fs1, (15 * CAP_LEN)(csp)
+	cfld	fs2, (16 * CAP_LEN)(csp)
+	cfld	fs3, (17 * CAP_LEN)(csp)
+	cfld	fs4, (18 * CAP_LEN)(csp)
+	cfld	fs5, (19 * CAP_LEN)(csp)
+	cfld	fs6, (20 * CAP_LEN)(csp)
+	cfld	fs7, (21 * CAP_LEN)(csp)
+	cfld	fs8, (22 * CAP_LEN)(csp)
+	cfld	fs9, (23 * CAP_LEN)(csp)
+	cfld	fs10, (24 * CAP_LEN)(csp)
+	cfld	fs11, (25 * CAP_LEN)(csp)
+#endif
+
+	cincoffsetimm	csp, csp, JUMP_BUFFER_SIZE
+
+	bnez	t0, 2f
+	cret
+2:
+	ASM_LOCAL_TAILCALL(t1, cerror)
 END(coaccept)
