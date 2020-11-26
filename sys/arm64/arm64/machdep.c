@@ -531,11 +531,69 @@ exec_setregs(struct thread *td, struct image_params *imgp, uintcap_t stack)
 }
 
 /* Sanity check these are the same size, they will be memcpy'd to and fro */
+#if __has_feature(capabilities)
+CTASSERT(sizeof(((struct trapframe *)0)->tf_x) ==
+    sizeof((struct capregs *)0)->cap_x);
+CTASSERT(sizeof(((struct trapframe *)0)->tf_x) ==
+    sizeof((struct capreg *)0)->c);
+#else
 CTASSERT(sizeof(((struct trapframe *)0)->tf_x) ==
     sizeof((struct gpregs *)0)->gp_x);
 CTASSERT(sizeof(((struct trapframe *)0)->tf_x) ==
     sizeof((struct reg *)0)->x);
+#endif
 
+#if __has_feature(capabilities)
+int
+get_mcontext(struct thread *td, mcontext_t *mcp, int clear_ret)
+{
+	struct trapframe *tf = td->td_frame;
+
+	if (clear_ret & GET_MC_CLEAR_RET) {
+		mcp->mc_capregs.cap_x[0] = 0;
+		mcp->mc_spsr = tf->tf_spsr & ~PSR_C;
+	} else {
+		mcp->mc_capregs.cap_x[0] = tf->tf_x[0];
+		mcp->mc_spsr = tf->tf_spsr;
+	}
+
+	memcpy(&mcp->mc_capregs.cap_x[1], &tf->tf_x[1],
+	    sizeof(mcp->mc_capregs.cap_x[1]) *
+	    (nitems(mcp->mc_capregs.cap_x) - 1));
+
+	mcp->mc_capregs.cap_sp = tf->tf_sp;
+	mcp->mc_capregs.cap_lr = tf->tf_lr;
+	mcp->mc_capregs.cap_elr = tf->tf_elr;
+	mcp->mc_capregs.cap_ddc = tf->tf_ddc;
+	get_fpcontext(td, mcp);
+
+	return (0);
+}
+
+int
+set_mcontext(struct thread *td, mcontext_t *mcp)
+{
+	struct trapframe *tf = td->td_frame;
+	uint32_t spsr;
+
+	spsr = mcp->mc_spsr;
+	if ((spsr & PSR_M_MASK) != PSR_M_EL0t ||
+	    (spsr & PSR_AARCH32) != 0 ||
+	    (spsr & PSR_DAIF) != (td->td_frame->tf_spsr & PSR_DAIF))
+		return (EINVAL);
+
+	memcpy(tf->tf_x, mcp->mc_capregs.cap_x, sizeof(tf->tf_x));
+
+	tf->tf_sp = mcp->mc_capregs.cap_sp;
+	tf->tf_lr = mcp->mc_capregs.cap_lr;
+	tf->tf_elr = mcp->mc_capregs.cap_elr;
+	tf->tf_ddc = mcp->mc_capregs.cap_ddc;
+	tf->tf_spsr = mcp->mc_spsr;
+	set_fpcontext(td, mcp);
+
+	return (0);
+}
+#else
 int
 get_mcontext(struct thread *td, mcontext_t *mcp, int clear_ret)
 {
@@ -582,6 +640,7 @@ set_mcontext(struct thread *td, mcontext_t *mcp)
 
 	return (0);
 }
+#endif
 
 static void
 get_fpcontext(struct thread *td, mcontext_t *mcp)
