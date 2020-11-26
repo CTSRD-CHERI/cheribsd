@@ -160,55 +160,62 @@ db_write_bytes(vm_offset_t addr, size_t size, char *data)
 }
 
 static void
-db_show_reg(const char *name, uintcap_t value)
+db_show_reg(struct thread *td, const char *name, uintcap_t value)
 {
+	pid_t pid;
 	void * __capability tmp;
 
 	tmp = (void * __capability)value;
+	pid = vm_get_cap_owner(td, value);
 
-	db_printf("%s:	%#lp\n", name, &tmp);
+	if (pid >= 0)
+		db_printf("%s:	%#lp (pid %d)\n", name, &tmp, pid);
+	else
+		db_printf("%s:	%#lp\n", name, &tmp);
 }
 
 DB_SHOW_COMMAND(frame, db_show_frame)
 {
+	struct thread *td;
 	struct trapframe *frame;
 
-	frame = curthread->td_frame;
+	td = curthread;
+	frame = td->td_frame;
 
-	db_show_reg("ra", frame->tf_ra);
-	db_show_reg("sp", frame->tf_sp);
-	db_show_reg("gp", frame->tf_gp);
-	db_show_reg("tp", frame->tf_tp);
-	db_show_reg("t0", frame->tf_t[0]);
-	db_show_reg("t1", frame->tf_t[1]);
-	db_show_reg("t2", frame->tf_t[2]);
-	db_show_reg("t3", frame->tf_t[3]);
-	db_show_reg("t4", frame->tf_t[4]);
-	db_show_reg("t5", frame->tf_t[5]);
-	db_show_reg("t6", frame->tf_t[6]);
-	db_show_reg("s0", frame->tf_s[0]);
-	db_show_reg("s1", frame->tf_s[1]);
-	db_show_reg("s2", frame->tf_s[2]);
-	db_show_reg("s3", frame->tf_s[3]);
-	db_show_reg("s4", frame->tf_s[4]);
-	db_show_reg("s5", frame->tf_s[5]);
-	db_show_reg("s6", frame->tf_s[6]);
-	db_show_reg("s7", frame->tf_s[7]);
-	db_show_reg("s8", frame->tf_s[8]);
-	db_show_reg("s9", frame->tf_s[9]);
-	db_show_reg("s10", frame->tf_s[10]);
-	db_show_reg("s11", frame->tf_s[11]);
-	db_show_reg("a0", frame->tf_a[0]);
-	db_show_reg("a1", frame->tf_a[1]);
-	db_show_reg("a2", frame->tf_a[2]);
-	db_show_reg("a3", frame->tf_a[3]);
-	db_show_reg("a4", frame->tf_a[4]);
-	db_show_reg("a5", frame->tf_a[5]);
-	db_show_reg("a6", frame->tf_a[6]);
-	db_show_reg("a7", frame->tf_a[7]);
-	db_show_reg("sepc", frame->tf_sepc);
-	db_show_reg("ddc", frame->tf_ddc);
-	db_show_reg("sstatus", frame->tf_sstatus);
-	db_show_reg("stval", frame->tf_stval);
-	db_show_reg("scause", frame->tf_scause);
+	db_show_reg(td, "ra", frame->tf_ra);
+	db_show_reg(td, "sp", frame->tf_sp);
+	db_show_reg(td, "gp", frame->tf_gp);
+	db_show_reg(td, "tp", frame->tf_tp);
+	db_show_reg(td, "t0", frame->tf_t[0]);
+	db_show_reg(td, "t1", frame->tf_t[1]);
+	db_show_reg(td, "t2", frame->tf_t[2]);
+	db_show_reg(td, "t3", frame->tf_t[3]);
+	db_show_reg(td, "t4", frame->tf_t[4]);
+	db_show_reg(td, "t5", frame->tf_t[5]);
+	db_show_reg(td, "t6", frame->tf_t[6]);
+	db_show_reg(td, "s0", frame->tf_s[0]);
+	db_show_reg(td, "s1", frame->tf_s[1]);
+	db_show_reg(td, "s2", frame->tf_s[2]);
+	db_show_reg(td, "s3", frame->tf_s[3]);
+	db_show_reg(td, "s4", frame->tf_s[4]);
+	db_show_reg(td, "s5", frame->tf_s[5]);
+	db_show_reg(td, "s6", frame->tf_s[6]);
+	db_show_reg(td, "s7", frame->tf_s[7]);
+	db_show_reg(td, "s8", frame->tf_s[8]);
+	db_show_reg(td, "s9", frame->tf_s[9]);
+	db_show_reg(td, "s10", frame->tf_s[10]);
+	db_show_reg(td, "s11", frame->tf_s[11]);
+	db_show_reg(td, "a0", frame->tf_a[0]);
+	db_show_reg(td, "a1", frame->tf_a[1]);
+	db_show_reg(td, "a2", frame->tf_a[2]);
+	db_show_reg(td, "a3", frame->tf_a[3]);
+	db_show_reg(td, "a4", frame->tf_a[4]);
+	db_show_reg(td, "a5", frame->tf_a[5]);
+	db_show_reg(td, "a6", frame->tf_a[6]);
+	db_show_reg(td, "a7", frame->tf_a[7]);
+	db_show_reg(td, "sepc", frame->tf_sepc);
+	db_show_reg(td, "ddc", frame->tf_ddc);
+	db_show_reg(td, "sstatus", frame->tf_sstatus);
+	db_show_reg(td, "stval", frame->tf_stval);
+	db_show_reg(td, "scause", frame->tf_scause);
 }
