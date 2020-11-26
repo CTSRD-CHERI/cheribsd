@@ -467,10 +467,10 @@ SHLINSTALLFLAGS+= -fschg
 # stops that mattering for lib, other directories like secure/lib are built in
 # parallel at the top level and are unaffected by that, so can sometimes race
 # with the libc.so.7 reinstall and see a missing or corrupt file. Ideally the
-# build system would be fixed to not build/install libc the second time round,
-# but for now using -S ensures the install is atomic and thus we never see a
-# broken intermediate state, so use it even for NO_ROOT builds.
-.if !defined(NO_SAFE_LIBINSTALL) # && !defined(NO_ROOT)
+# build system would be fixed to not build/install libc to WORLDTMP the second
+# time round, but for now using -S ensures the install is atomic and thus we
+# never see a broken intermediate state, so use it even for NO_ROOT builds.
+.if !defined(NO_SAFE_LIBINSTALL) #&& !defined(NO_ROOT)
 SHLINSTALLFLAGS+= -S
 SHLINSTALLSYMLINKFLAGS+= -S
 .endif
