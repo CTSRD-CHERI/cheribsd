@@ -529,12 +529,14 @@ _vmware=	vmware
 _netgraph=	netgraph
 .endif
 
+.if !${MACHINE_ABI:Mpurecap}
 .if (${MK_PF} != "no" && (${MK_INET_SUPPORT} != "no" || \
 	${MK_INET6_SUPPORT} != "no")) || defined(ALL_MODULES)
 _pf=		pf
 _pflog=		pflog
 .if ${MK_INET_SUPPORT} != "no"
 _pfsync=	pfsync
+.endif
 .endif
 .endif
 
