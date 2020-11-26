@@ -37,6 +37,7 @@
 #include <string.h>
 #include "statcounters.h"
 
+#if defined(__mips__)
 // low level rdhwr access to counters
 //////////////////////////////////////////////////////////////////////////////
 
@@ -47,32 +48,30 @@ static inline void resetStatCounters (void)
 }
 
 #define STATCOUNTER_NAMES_MAX	128
+#endif
 
 static int statcounter_names_len = 0;
-
-/* Declare all the statcounters accessor functions: */
-#ifdef __mips__
-#include "statcounters_mips.h"
-#else
-#error "Unsupported architecture!"
-#endif
 
 /* Build an array of statcounters without using __attribute__((constructor)): */
 static struct {
 	const char	*counter_name;
 	uint64_t	(*counter_get)(void);
-} statcounter_names[STATCOUNTER_NAMES_MAX] = {
+} statcounter_names[] = {
+#if defined(__mips__)
 #define STATCOUNTER_ITEM(name, X, Y)	\
     { __XSTRING(name), &statcounters_get_##name##_count },
-#ifdef __mips__
 #include "statcounters_mips.inc"
+#elif defined(__riscv)
+#define STATCOUNTER_ITEM(name, csr)	\
+    { __XSTRING(name), &statcounters_get_##csr##_count },
+#include "statcounters_riscv.inc"
 #else
 #error "Unsupported architecture!"
 #endif
 #undef STATCOUNTER_ITEM
 };
 
-
+#if defined(__mips__)
 // available modules, module type, associated rdhw primary selector
 //----------------------------------------------------------------------------
 // instruction cache, CacheCore, 8
@@ -157,6 +156,7 @@ enum
     STATCOUNTERS_READ_RSP_FLIT  = 4,
     STATCOUNTERS_WRITE_RSP      = 5
 };
+#endif
 
 // helper functions
 
@@ -165,14 +165,9 @@ enum
 static const char* getarchname(void)
 {
     const char* result = "unknown_arch";
-#ifdef __mips__
+#if defined(__mips__)
 #  if defined(__CHERI__)
 #    define STATCOUNTERS_ARCH "cheri" __XSTRING(_MIPS_SZCAP)
-#    if defined(__CHERI_PURE_CAPABILITY__)
-#      define STATCOUNTERS_ABI "-purecap"
-#    else
-#      define STATCOUNTERS_ABI "-hybrid"
-#    endif
 #  else
 #    define STATCOUNTERS_ARCH "mips"
 #    if defined(__mips_n64)
@@ -183,16 +178,28 @@ static const char* getarchname(void)
 #      error "Unkown MIPS ABI"
 #    endif
 #  endif
-    result = STATCOUNTERS_ARCH STATCOUNTERS_ABI;
+#elif defined(__riscv)
+#  define STATCOUNTERS_ARCH "riscv" __XSTRING(__riscv_xlen)
 #else /* !defined(__mips__) */
 #  error "Unknown target archicture for libstatcounters"
 #endif
-    return result;
+#if __has_feature(capabilities)
+#  if defined(__CHERI_PURE_CAPABILITY__)
+#    define STATCOUNTERS_ABI "-purecap"
+#  else
+#    define STATCOUNTERS_ABI "-hybrid"
+#  endif
+#else
+#  define STATCOUNTERS_ABI ""
+#endif
+	result = STATCOUNTERS_ARCH STATCOUNTERS_ABI;
+	return result;
 }
 
 // libstatcounters API
 //////////////////////////////////////////////////////////////////////////////
 
+#if defined(__mips__)
 // reset the hardware statcounters
 void reset_statcounters (void)
 {
@@ -202,6 +209,7 @@ void statcounters_reset (void)
 {
     resetStatCounters();
 }
+#endif
 
 // zero a statcounters_bank
 void zero_statcounters (statcounters_bank_t * const cnt_bank)
@@ -225,6 +233,7 @@ int statcounters_sample (statcounters_bank_t * const cnt_bank)
 {
     if (cnt_bank == NULL)
         return -1;
+#if defined(__mips__)
     cnt_bank->icache[STATCOUNTERS_WRITE_HIT]              = statcounters_get_icache_write_hit_count();
     cnt_bank->icache[STATCOUNTERS_WRITE_MISS]             = statcounters_get_icache_write_miss_count();
     cnt_bank->icache[STATCOUNTERS_READ_HIT]               = statcounters_get_icache_read_hit_count();
@@ -281,6 +290,11 @@ int statcounters_sample (statcounters_bank_t * const cnt_bank)
     cnt_bank->imprecise_setbounds                         = statcounters_get_imprecise_setbounds_count();
     cnt_bank->unrepresentable_caps                        = statcounters_get_unrepresentable_caps_count();
     cnt_bank->cycle                                       = statcounters_get_cycle_count();
+#elif defined(__riscv)
+#define STATCOUNTER_ITEM(name, csr) cnt_bank->name = statcounters_get_##csr##_count();
+#include "statcounters_riscv.inc"
+#undef STATCOUNTER_ITEM
+#endif
     return 0;
 }
 
@@ -299,6 +313,7 @@ int statcounters_diff (
 {
     if (bd == NULL || be == NULL || bs == NULL)
         return -1;
+#if defined(__mips__)
     bd->itlb_miss    = be->itlb_miss - bs->itlb_miss;
     bd->dtlb_miss    = be->dtlb_miss - bs->dtlb_miss;
     bd->cycle        = be->cycle - bs->cycle;
@@ -317,6 +332,11 @@ int statcounters_diff (
         bd->l2cachemaster[i]  = be->l2cachemaster[i] - bs->l2cachemaster[i];
         bd->tagcachemaster[i] = be->tagcachemaster[i] - bs->tagcachemaster[i];
     }
+#elif defined(__riscv)
+#define STATCOUNTER_ITEM(name, csr) bd->name = be->name - bs->name;
+#include "statcounters_riscv.inc"
+#undef STATCOUNTER_ITEM
+#endif
     return 0;
 }
 
@@ -436,6 +456,7 @@ int statcounters_dump_with_args (
     switch (fmt_flg)
     {
         case CSV_HEADER:
+#if defined(__mips__)
             fprintf(fp, "progname,");
             fprintf(fp, "archname,");
             fprintf(fp, "cycles,");
@@ -495,8 +516,16 @@ int statcounters_dump_with_args (
             fprintf(fp, "imprecise_setbounds,");
             fprintf(fp, "unrepresentable_caps");
             fprintf(fp, "\n");
+#elif defined(__riscv)
+            fputs("progname,archname"
+#define STATCOUNTER_ITEM(name, csr) "," #name
+#include "statcounters_riscv.inc"
+#undef STATCOUNTER_ITEM
+                  "\n", fp);
+#endif
             // fallthrough
         case CSV_NOHEADER:
+#if defined(__mips__)
             fprintf(fp, "%s,",pname);
             fprintf(fp, "%s,",aname);
             fprintf(fp, "%lu,",b->cycle);
@@ -556,10 +585,22 @@ int statcounters_dump_with_args (
             fprintf(fp, "%lu,",b->imprecise_setbounds);
             fprintf(fp, "%lu",b->unrepresentable_caps);
             fprintf(fp, "\n");
+#elif defined(__riscv)
+            fprintf(fp, "%s,%s"
+#define STATCOUNTER_ITEM(name, csr) ",%" PRId64
+#include "statcounters_riscv.inc"
+#undef STATCOUNTER_ITEM
+                    "\n", pname, aname
+#define STATCOUNTER_ITEM(name, csr) , b->name
+#include "statcounters_riscv.inc"
+#undef STATCOUNTER_ITEM
+                    );
+#endif
             break;
         case HUMAN_READABLE:
         default:
             fprintf(fp, "===== %s -- %s =====\n",pname, aname);
+#if defined(__mips__)
             fprintf(fp, "cycles:                       \t%lu\n",b->cycle);
             fprintf(fp, "instructions:                 \t%lu\n",b->inst);
             fprintf(fp, "instructions (user):          \t%lu\n",b->inst_user);
@@ -625,6 +666,11 @@ int statcounters_dump_with_args (
             fprintf(fp, "imprecise_setbounds:          \t%lu\n",b->imprecise_setbounds);
             fprintf(fp, "unrepresentable_caps:         \t%lu\n",b->unrepresentable_caps);
             fprintf(fp, "\n");
+#elif defined(__riscv)
+#define STATCOUNTER_ITEM(name, csr) fprintf(fp, "%-15s %" PRId64 "\n", #name ":", b->name);
+#include "statcounters_riscv.inc"
+#undef STATCOUNTER_ITEM
+#endif
             break;
     }
     free(pname);
