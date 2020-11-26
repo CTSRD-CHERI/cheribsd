@@ -70,6 +70,7 @@ __FBSDID("$FreeBSD$");
 
 static struct ofw_compat_data compat_data[] = {
 	{ "allwinner,sun5i-a13-pwm",		1 },
+	{ "allwinner,sun8i-h3-pwm",		1 },
 	{ NULL,					0 }
 };
 
@@ -258,6 +259,20 @@ aw_pwm_channel_config(device_t dev, u_int channel, u_int period, u_int duty)
 	period_freq = NS_PER_SEC / period;
 	if (period_freq > AW_PWM_MAX_FREQ)
 		return (EINVAL);
+
+	/*
+	 * FIXME.  The hardware is capable of sub-Hz frequencies, that is,
+	 * periods longer than a second.  But the current code cannot deal
+	 * with those properly.
+	 */
+	if (period_freq == 0)
+		return (EINVAL);
+
+	/*
+	 * FIXME.  There is a great loss of precision when the period and the
+	 * duty are near 1 second.  In some cases period_freq and duty_freq can
+	 * be equal even if the period and the duty are significantly different.
+	 */
 	duty_freq = NS_PER_SEC / duty;
 	if (duty_freq < period_freq) {
 		device_printf(sc->dev, "duty < period\n");
@@ -273,7 +288,7 @@ aw_pwm_channel_config(device_t dev, u_int channel, u_int period, u_int duty)
 		for (i = 0; i < nitems(aw_pwm_clk_prescaler); i++) {
 			if (aw_pwm_clk_prescaler[i] == 0)
 				continue;
-			div = (AW_PWM_MAX_FREQ * aw_pwm_clk_prescaler[i]) / period_freq;
+			div = AW_PWM_MAX_FREQ / aw_pwm_clk_prescaler[i] / period_freq;
 			if ((div - 1) < AW_PWM_PERIOD_TOTAL_MASK ) {
 				prescaler = i;
 				clk_rate = AW_PWM_MAX_FREQ / aw_pwm_clk_prescaler[i];
@@ -285,18 +300,21 @@ aw_pwm_channel_config(device_t dev, u_int channel, u_int period, u_int duty)
 	}
 
 	reg = AW_PWM_READ(sc, AW_PWM_CTRL);
-	if (reg & AW_PWM_CTRL_PERIOD_BUSY) {
-		device_printf(sc->dev, "pwm busy\n");
-		return (EBUSY);
-	}
 
 	/* Write the prescalar */
 	reg &= ~AW_PWM_CTRL_PRESCALE_MASK;
 	reg |= prescaler;
+
+	reg &= ~AW_PWM_CTRL_MODE_MASK;
+	reg |= AW_PWM_CTRL_CYCLE_MODE;
+
+	reg &= ~AW_PWM_CTRL_PULSE_START;
+	reg &= ~AW_PWM_CTRL_CLK_BYPASS;
+
 	AW_PWM_WRITE(sc, AW_PWM_CTRL, reg);
 
 	/* Write the total/active cycles */
-	reg = ((clk_rate / period_freq) << AW_PWM_PERIOD_TOTAL_SHIFT) |
+	reg = ((clk_rate / period_freq - 1) << AW_PWM_PERIOD_TOTAL_SHIFT) |
 	  ((clk_rate / duty_freq) << AW_PWM_PERIOD_ACTIVE_SHIFT);
 	AW_PWM_WRITE(sc, AW_PWM_PERIOD, reg);
 

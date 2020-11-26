@@ -488,7 +488,7 @@ _domainset_create(struct domainset *domain, struct domainlist *freelist)
 	else
 		uma_zfree(domainset_zone, domain);
 	return (ndomain);
-	
+
 }
 
 /*
@@ -1900,7 +1900,6 @@ kern_cpuset_setaffinity(struct thread *td, cpulevel_t level, cpuwhich_t which,
 				error = EINVAL;
 				goto out;
 			}
-
 	}
 	switch (level) {
 	case CPU_LEVEL_ROOT:
@@ -2157,7 +2156,6 @@ kern_cpuset_setdomain(struct thread *td, cpulevel_t level, cpuwhich_t which,
 				error = EINVAL;
 				goto out;
 			}
-
 	}
 	DOMAINSET_COPY(mask, &domain.ds_mask);
 	domain.ds_policy = policy;

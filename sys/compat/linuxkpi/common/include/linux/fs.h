@@ -63,7 +63,6 @@ struct linux_cdev;
 #define	S_IRUGO	(S_IRUSR | S_IRGRP | S_IROTH)
 #define	S_IWUGO	(S_IWUSR | S_IWGRP | S_IWOTH)
 
-
 typedef struct files_struct *fl_owner_t;
 
 struct file_operations;
@@ -180,7 +179,7 @@ struct file_operations {
 #define	FMODE_READ	FREAD
 #define	FMODE_WRITE	FWRITE
 #define	FMODE_EXEC	FEXEC
-
+#define	FMODE_UNSIGNED_OFFSET	0x2000
 int __register_chrdev(unsigned int major, unsigned int baseminor,
     unsigned int count, const char *name,
     const struct file_operations *fops);

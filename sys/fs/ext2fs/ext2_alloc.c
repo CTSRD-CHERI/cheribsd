@@ -193,7 +193,7 @@ static SYSCTL_NODE(_vfs, OID_AUTO, ext2fs, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
 static int doasyncfree = 1;
 
 SYSCTL_INT(_vfs_ext2fs, OID_AUTO, doasyncfree, CTLFLAG_RW, &doasyncfree, 0,
-    "Use asychronous writes to update block pointers when freeing blocks");
+    "Use asynchronous writes to update block pointers when freeing blocks");
 
 static int doreallocblks = 0;
 
@@ -467,7 +467,6 @@ ext2_valloc(struct vnode *pvp, int mode, struct ucred *cred, struct vnode **vpp)
 		ext4_ext_tree_init(ip);
 	else
 		memset(ip->i_data, 0, sizeof(ip->i_data));
-
 
 	/*
 	 * Set up a new generation number for this inode.
@@ -1300,7 +1299,6 @@ ext2_fix_bitmap_tail(unsigned char *bitmap, int first, int last)
 	for (i = first; i <= last; i++)
 		bitmap[i] = 0xff;
 }
-
 
 /*
  * Determine whether an inode can be allocated.

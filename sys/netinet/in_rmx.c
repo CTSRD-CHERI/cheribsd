@@ -30,8 +30,6 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
-#include "opt_mpath.h"
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -45,7 +43,6 @@ __FBSDID("$FreeBSD$");
 #include <net/route/route_ctl.h>
 #include <net/route/route_var.h>
 #include <net/route/nhop.h>
-#include <net/route/shared.h>
 #include <net/vnet.h>
 
 #include <netinet/in.h>
@@ -53,7 +50,6 @@ __FBSDID("$FreeBSD$");
 #include <netinet/ip.h>
 #include <netinet/ip_icmp.h>
 #include <netinet/ip_var.h>
-
 
 static int
 rib4_preadd(u_int fibnum, const struct sockaddr *addr, const struct sockaddr *mask,
@@ -68,7 +64,6 @@ rib4_preadd(u_int fibnum, const struct sockaddr *addr, const struct sockaddr *ma
 	rt_flags = nhop_get_rtflags(nh);
 
 	if (rt_flags & RTF_HOST) {
-
 		/*
 		 * Backward compatibility:
 		 * if the destination is broadcast,
@@ -130,9 +125,6 @@ in_inithead(uint32_t fibnum)
 		return (NULL);
 
 	rh->rnh_preadd = rib4_preadd;
-#ifdef	RADIX_MPATH
-	rt_mpath_init_rnh(rh);
-#endif
 
 	return (rh);
 }
@@ -189,4 +181,3 @@ in_ifadown(struct ifaddr *ifa, int delete)
 	rt_foreach_fib_walk_del(AF_INET, in_ifadownkill, &arg);
 	ifa->ifa_flags &= ~IFA_ROUTE;		/* XXXlocking? */
 }
-

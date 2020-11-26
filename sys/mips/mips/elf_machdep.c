@@ -58,8 +58,6 @@ __FBSDID("$FreeBSD$");
 static struct sysentvec elf_freebsd_sysvec = {
 	.sv_size	= SYS_MAXSYSCALL,
 	.sv_table	= sysent,
-	.sv_errsize	= 0,
-	.sv_errtbl	= NULL,
 	.sv_transtrap	= NULL,
 	.sv_fixup	= __elfN(freebsd_fixup),
 	.sv_sendsig	= sendsig,
@@ -124,7 +122,8 @@ INIT_SYSENTVEC(elf_sysvec, &elf_freebsd_sysvec);
 
 #if __has_feature(capabilities)
 static boolean_t
-mips_elf_header_supported(struct image_params * imgp)
+mips_elf_header_supported(struct image_params * imgp, int32_t *osrel __unused,
+    uint32_t *fctl0 __unused)
 {
 	const Elf_Ehdr *hdr = (const Elf_Ehdr *)imgp->image_header;
 	const uint32_t machine = hdr->e_flags & EF_MIPS_MACH;
@@ -514,12 +513,12 @@ elf_reloc_internal(linker_file_t lf, char *relocbase, const void *data,
 		break;
 
 	default:
-		printf("kldload: unexpected relocation type %d\n",
-			rtype);
+		printf("kldload: unexpected relocation type %d, "
+		    "symbol index %d\n", rtype, symidx);
 		return (-1);
 	}
 
-	return(0);
+	return (0);
 }
 
 int

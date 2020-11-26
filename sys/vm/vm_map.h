@@ -149,7 +149,13 @@ struct vm_map_entry {
 #define	MAP_ENTRY_STACK_GAP_DN		0x00020000
 #define	MAP_ENTRY_STACK_GAP_UP		0x00040000
 #define	MAP_ENTRY_HEADER		0x00080000
-#define	MAP_ENTRY_UNMAPPED		0x00100000
+/* Gap for MAP_ENTRY_SPLIT_BOUNDARY_MASK */
+#define	MAP_ENTRY_UNMAPPED		0x00400000
+
+#define	MAP_ENTRY_SPLIT_BOUNDARY_MASK	0x00300000
+
+#define	MAP_ENTRY_SPLIT_BOUNDARY_SHIFT	20
+
 
 #ifdef	_KERNEL
 static __inline u_char
@@ -388,12 +394,19 @@ long vmspace_resident_count(struct vmspace *vmspace);
 #define	MAP_CREATE_STACK_GAP_DN	0x00020000
 #define	MAP_VN_EXEC		0x00040000
 
+/* Gap for MAP_ENTRY_SPLIT_BOUNDARY_MASK */
+
+#define	MAP_SPLIT_BOUNDARY_MASK	0x00180000
+
+#define	MAP_SPLIT_BOUNDARY_SHIFT 19
+
 /*
  * vm_fault option flags
  */
-#define	VM_FAULT_NORMAL	0		/* Nothing special */
-#define	VM_FAULT_WIRE	1		/* Wire the mapped page */
-#define	VM_FAULT_DIRTY	2		/* Dirty the page; use w/VM_PROT_COPY */
+#define	VM_FAULT_NORMAL	0x00	/* Nothing special */
+#define	VM_FAULT_WIRE	0x01	/* Wire the mapped page */
+#define	VM_FAULT_DIRTY	0x02	/* Dirty the page; use w/VM_PROT_COPY */
+#define	VM_FAULT_NOFILL	0x04	/* Fail if the pager doesn't have a copy */
 
 /*
  * Initially, mappings are slightly sequential.  The maximum window size must
@@ -474,6 +487,8 @@ int vm_map_find(vm_map_t, vm_object_t, vm_ooffset_t, vm_ptr_t *, vm_size_t,
     vm_offset_t, int, vm_prot_t, vm_prot_t, int);
 int vm_map_find_min(vm_map_t, vm_object_t, vm_ooffset_t, vm_ptr_t *,
     vm_size_t, vm_offset_t, vm_offset_t, int, vm_prot_t, vm_prot_t, int);
+int vm_map_find_aligned(vm_map_t map, vm_offset_t *addr, vm_size_t length,
+    vm_offset_t max_addr, vm_offset_t alignment);
 int vm_map_fixed(vm_map_t, vm_object_t, vm_ooffset_t, vm_ptr_t, vm_size_t,
     vm_prot_t, vm_prot_t, int);
 vm_offset_t vm_map_findspace(vm_map_t, vm_offset_t, vm_size_t);

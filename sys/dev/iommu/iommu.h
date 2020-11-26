@@ -135,6 +135,7 @@ struct iommu_ctx {
 	u_long loads;			/* atomic updates, for stat only */
 	u_long unloads;			/* same */
 	u_int flags;			/* (u) */
+	uint16_t rid;			/* (c) pci RID */
 };
 
 /* struct iommu_ctx flags */
@@ -230,6 +231,9 @@ void iommu_domain_fini(struct iommu_domain *domain);
 bool bus_dma_iommu_set_buswide(device_t dev);
 int bus_dma_iommu_load_ident(bus_dma_tag_t dmat, bus_dmamap_t map,
     vm_paddr_t start, vm_size_t length, int flags);
+
+bus_dma_tag_t iommu_get_dma_tag(device_t dev, device_t child);
+struct iommu_ctx *iommu_get_dev_ctx(device_t dev);
 
 SYSCTL_DECL(_hw_iommu);
 

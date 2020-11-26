@@ -255,7 +255,7 @@ nfsrvd_getattr(struct nfsrv_descript *nd, int isdgram,
 		if (nd->nd_repstat == 0) {
 			accmode = 0;
 			NFSSET_ATTRBIT(&tmpbits, &attrbits);
-	
+
 			/*
 			 * GETATTR with write-only attr time_access_set and time_modify_set
 			 * should return NFS4ERR_INVAL.
@@ -2720,6 +2720,8 @@ nfsrvd_locku(struct nfsrv_descript *nd, __unused int isdgram,
 			stp->ls_stateid.seqid = 0;
 		} else {
 			nd->nd_repstat = NFSERR_BADSTATEID;
+			free(stp, M_NFSDSTATE);
+			free(lop, M_NFSDLOCK);
 			goto nfsmout;
 		}
 	}
@@ -3816,6 +3818,11 @@ nfsrvd_setclientid(struct nfsrv_descript *nd, __unused int isdgram,
 		clp->lc_uid = nd->nd_cred->cr_uid;
 		clp->lc_gid = nd->nd_cred->cr_gid;
 	}
+
+	/* If the client is using TLS, do so for the callback connection. */
+	if (nd->nd_flag & ND_TLS)
+		clp->lc_flags |= LCL_TLSCB;
+
 	NFSM_DISSECT(tl, u_int32_t *, NFSX_UNSIGNED);
 	clp->lc_program = fxdr_unsigned(u_int32_t, *tl);
 	error = nfsrv_getclientipaddr(nd, clp);
@@ -5921,4 +5928,3 @@ nfsrvd_notsupp(struct nfsrv_descript *nd, __unused int isdgram,
 	NFSEXITCODE2(0, nd);
 	return (0);
 }
-

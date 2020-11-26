@@ -124,6 +124,11 @@ __FBSDID("$FreeBSD$");
 
 #include <security/mac/mac_framework.h>
 
+VNET_DEFINE(int, zero_checksum_port) = 0;
+#define	V_zero_checksum_port	VNET(zero_checksum_port)
+SYSCTL_INT(_net_inet6_udp6, OID_AUTO, rfc6935_port, CTLFLAG_VNET | CTLFLAG_RW,
+    &VNET_NAME(zero_checksum_port), 0,
+    "Zero UDP checksum allowed for traffic to/from this port.");
 /*
  * UDP protocol implementation.
  * Per RFC 768, August, 1980.
@@ -183,7 +188,6 @@ udp6_append(struct inpcb *inp, struct mbuf *n, int off,
                         } else
                                 opts = tmp_opts;
                 }
-
 	}
 	m_adj(n, off + sizeof(struct udphdr));
 
@@ -268,7 +272,14 @@ udp6_input(struct mbuf **mp, int *offp, int proto)
 		}
 		if (uh->uh_sum == 0) {
 			UDPSTAT_INC(udps_nosum);
-			goto badunlocked;
+			/*
+			 * dport 0 was rejected earlier so this is OK even if
+			 * zero_checksum_port is 0 (which is its default value).
+			 */
+			if (ntohs(uh->uh_dport) == V_zero_checksum_port)
+				goto skip_checksum;
+			else
+				goto badunlocked;
 		}
 	}
 
@@ -288,6 +299,7 @@ udp6_input(struct mbuf **mp, int *offp, int proto)
 		goto badunlocked;
 	}
 
+skip_checksum:
 	/*
 	 * Construct sockaddr format source address.
 	 */
@@ -817,7 +829,6 @@ udp6_output(struct socket *so, int flags_arg, struct mbuf *m,
 
 	NET_EPOCH_ENTER(et);
 	if (sin6) {
-
 		/*
 		 * Since we saw no essential reason for calling in_pcbconnect,
 		 * we get rid of such kind of logic, and call in6_selectsrc

@@ -372,7 +372,6 @@ retry_sleepq:
 			}
 
 		} else {
-
 			/*
 			 * Exclusive waiters sleeping with LK_SLEEPFAIL on
 			 * and using interruptible sleeps/timeout may have
@@ -1198,7 +1197,6 @@ lockmgr_xunlock_hard(struct lock *lk, uintptr_t x, u_int flags, struct lock_obje
 			queue = SQ_SHARED_QUEUE;
 		}
 	} else {
-
 		/*
 		 * Exclusive waiters sleeping with LK_SLEEPFAIL
 		 * on and using interruptible sleeps/timeout
@@ -1502,7 +1500,6 @@ __lockmgr_args(struct lock *lk, u_int flags, struct lock_object *ilk,
 					v = cheri_clear_low_ptr_bits(v,
 					    LK_EXCLUSIVE_WAITERS);
 				} else {
-
 					/*
 					 * Exclusive waiters sleeping with
 					 * LK_SLEEPFAIL on and using

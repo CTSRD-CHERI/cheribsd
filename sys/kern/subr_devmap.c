@@ -386,7 +386,6 @@ DB_SHOW_COMMAND(devmap, db_show_devmap)
 }
 
 #endif /* DDB */
-
 // CHERI CHANGES START
 // {
 //   "updated": 20200804,

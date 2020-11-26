@@ -745,7 +745,6 @@ nvme_ctrlr_async_event_log_page_cb(void *arg, const struct nvme_completion *cpl)
 			}
 		}
 
-
 		/*
 		 * Pass the cpl data from the original async event completion,
 		 *  not the log page fetch.
@@ -835,7 +834,8 @@ nvme_ctrlr_configure_aer(struct nvme_controller *ctrlr)
 	    NVME_CRIT_WARN_ST_READ_ONLY |
 	    NVME_CRIT_WARN_ST_VOLATILE_MEMORY_BACKUP;
 	if (ctrlr->cdata.ver >= NVME_REV(1, 2))
-		ctrlr->async_event_config |= 0x300;
+		ctrlr->async_event_config |= NVME_ASYNC_EVENT_NS_ATTRIBUTE |
+		    NVME_ASYNC_EVENT_FW_ACTIVATE;
 
 	status.done = 0;
 	nvme_ctrlr_cmd_get_feature(ctrlr, NVME_FEAT_TEMPERATURE_THRESHOLD,
@@ -1345,6 +1345,9 @@ nvme_ctrlr_ioctl(struct cdev *cdev, u_long cmd, caddr_t arg, int flag,
 		gnsid->nsid = 0;
 		break;
 	}
+	case NVME_GET_MAX_XFER_SIZE:
+		*(uint64_t *)arg = ctrlr->max_xfer_size;
+		break;
 	default:
 		return (ENOTTY);
 	}

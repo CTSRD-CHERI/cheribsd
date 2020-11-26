@@ -36,6 +36,19 @@
 #   xargs -n1 | sort | uniq -d;
 # done
 
+# 20201004: logo files renamed to type-agnostic gfx-*.lua
+OLD_FILES+=boot/lua/logo-beastie.lua
+OLD_FILES+=boot/lua/logo-beastiebw.lua
+OLD_FILES+=boot/lua/logo-fbsdbw.lua
+OLD_FILES+=boot/lua/logo-orb.lua
+OLD_FILES+=boot/lua/logo-orbbw.lua
+
+# 20200923: memfd_test moved to /usr/tests/sys/posixshm
+OLD_FILES+=usr/tests/sys/kern/memfd_test
+
+# 20200910: remove vm_map_create(9) to sync with the code
+OLD_FILES+=usr/share/man/man9/vm_map_create.9.gz
+
 # 20200820: Removal of the ufm driver.
 OLD_FILES+=usr/share/man/man4/ufm.4.gz
 
@@ -7605,8 +7618,6 @@ OLD_FILES+=usr/lib/libdisk.a usr/lib32/libdisk.a
 # 20121230: remove wrongly created directories for auditdistd
 OLD_DIRS+=var/dist
 OLD_DIRS+=var/remote
-# 20121114: zpool-features manual page moved from section 5 to 7
-OLD_FILES+=usr/share/man/man5/zpool-features.5.gz
 # 20121022: remove harp, hfa and idt man page
 OLD_FILES+=usr/share/man/man4/harp.4.gz
 OLD_FILES+=usr/share/man/man4/hfa.4.gz

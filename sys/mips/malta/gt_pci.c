@@ -673,7 +673,7 @@ gt_pci_activate_resource(device_t bus, device_t child, int type, int rid,
 {
 	bus_space_handle_t p;
 	int error;
-	
+
 	if ((type == SYS_RES_MEMORY) || (type == SYS_RES_IOPORT)) {
 		error = bus_space_map(rman_get_bustag(r),
 		    rman_get_bushandle(r), rman_get_size(r), 0, &p);

@@ -214,7 +214,7 @@ pmap_init_reserved_pages(void)
 	struct pcpu *pc;
 	vm_offset_t pages;
  	int i;
- 
+
 	if (need_local_mappings == 0)
 		return;
 
@@ -1313,7 +1313,6 @@ retry:
 	return (m);
 }
 
-
 /***************************************************
  * Pmap allocation/deallocation routines.
  ***************************************************/
@@ -1965,7 +1964,6 @@ pmap_remove(pmap_t pmap, vm_offset_t sva, vm_offset_t eva)
 		va_fini = va_next;
 		for (pte = pmap_pde_to_pte(pde, sva); sva != va_next; pte++,
 		    sva += PAGE_SIZE) {
-
 			/* Skip over invalid entries; no need to shootdown */
 			if (!pte_test(pte, PTE_V)) {
 				/*
@@ -3781,7 +3779,6 @@ pmap_kextract(vm_offset_t va)
 
 	panic("%s for unknown address space %#jx.", __func__, va);
 }
-
 
 void
 pmap_flush_pvcache(vm_page_t m)

@@ -246,8 +246,10 @@ struct tp_params {
 
 	uint32_t vlan_pri_map;
 	uint32_t ingress_config;
+	uint32_t max_rx_pdu;
+	uint32_t max_tx_pdu;
 	uint64_t hash_filter_mask;
-	__be16 err_vec_mask;
+	bool rx_pkt_encap;
 
 	int8_t fcoe_shift;
 	int8_t port_shift;

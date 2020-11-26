@@ -81,6 +81,9 @@ struct nfsexstuff {
 #define	NFSVNO_EXPORTANON(e)		((e)->nes_exflag & MNT_EXPORTANON)
 #define	NFSVNO_EXSTRICTACCESS(e)	((e)->nes_exflag & MNT_EXSTRICTACCESS)
 #define	NFSVNO_EXV4ONLY(e)		((e)->nes_exflag & MNT_EXV4ONLY)
+#define	NFSVNO_EXTLS(e)			((e)->nes_exflag & MNT_EXTLS)
+#define	NFSVNO_EXTLSCERT(e)		((e)->nes_exflag & MNT_EXTLSCERT)
+#define	NFSVNO_EXTLSCERTUSER(e)		((e)->nes_exflag & MNT_EXTLSCERTUSER)
 
 #define	NFSVNO_SETEXRDONLY(e)	((e)->nes_exflag = (MNT_EXPORTED|MNT_EXRDONLY))
 
@@ -91,7 +94,7 @@ struct nfsexstuff {
 #define	NFSLOCKHASH(f) 							\
 	(&nfslockhash[nfsrv_hashfh(f) % nfsrv_lockhashsize])
 
-#define	NFSFPVNODE(f)	((struct vnode *)((f)->f_data))
+#define	NFSFPVNODE(f)	((f)->f_vnode)
 #define	NFSFPCRED(f)	((f)->f_cred)
 #define	NFSFPFLAG(f)	((f)->f_flag)
 
@@ -115,4 +118,3 @@ struct nfsexstuff {
 		if (nfsd_debuglevel >= (level))				\
 			printf(__VA_ARGS__);				\
 	} while (0)
-

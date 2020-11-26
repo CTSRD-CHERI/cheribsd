@@ -1,5 +1,7 @@
 # $FreeBSD$
 
+.include <bsd.own.mk>
+
 PACKAGE=	tests
 
 TESTSRC=	${SRCTOP}/contrib/netbsd-tests/kernel
@@ -8,10 +10,12 @@ TESTSRC=	${SRCTOP}/contrib/netbsd-tests/kernel
 TESTSDIR=	${TESTSBASE}/sys/kern
 
 #ATF_TESTS_C+=	kcov
+.if !${MACHINE_ABI:Mpurecap}
+# Makes pointers from raw VA
 ATF_TESTS_C+=	kern_copyin
+.endif
 ATF_TESTS_C+=	kern_descrip_test
 ATF_TESTS_C+=	kill_zombie
-ATF_TESTS_C+=	memfd_test
 ATF_TESTS_C+=	ptrace_test
 TEST_METADATA.ptrace_test+=		timeout="15"
 ATF_TESTS_C+=	reaper

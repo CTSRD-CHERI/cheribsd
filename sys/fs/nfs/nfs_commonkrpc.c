@@ -281,6 +281,8 @@ newnfs_connect(struct nfsmount *nmp, struct nfssockreq *nrp,
 			CLNT_CONTROL(client, CLSET_INTERRUPTIBLE, &one);
 		if ((nmp->nm_flag & NFSMNT_RESVPORT))
 			CLNT_CONTROL(client, CLSET_PRIVPORT, &one);
+		if (NFSHASTLS(nmp))
+			CLNT_CONTROL(client, CLSET_TLS, &one);
 		if (NFSHASSOFT(nmp)) {
 			if (nmp->nm_sotype == SOCK_DGRAM)
 				/*
@@ -487,7 +489,6 @@ nfs_getauth(struct nfssockreq *nrp, int secflavour, char *clnt_principal,
 	case AUTH_SYS:
 	default:
 		return (authunix_create(cred));
-
 	}
 }
 
@@ -732,7 +733,7 @@ newnfs_request(struct nfsrv_descript *nd, struct nfsmount *nmp,
 		if (dtrace_nfscl_nfs234_start_probe != NULL) {
 			uint32_t probe_id;
 			int probe_procnum;
-	
+
 			if (nd->nd_flag & ND_NFSV4) {
 				probe_id =
 				    nfscl_nfs4_start_probes[nd->nd_procnum];
@@ -1255,13 +1256,13 @@ static int
 nfs_sig_pending(sigset_t set)
 {
 	int i;
-	
+
 	for (i = 0 ; i < nitems(newnfs_sig_set); i++)
 		if (SIGISMEMBER(set, newnfs_sig_set[i]))
 			return (1);
 	return (0);
 }
- 
+
 /*
  * The set/restore sigmask functions are used to (temporarily) overwrite
  * the thread td_sigmask during an RPC call (for example). These are also
@@ -1273,7 +1274,7 @@ newnfs_set_sigmask(struct thread *td, sigset_t *oldset)
 	sigset_t newset;
 	int i;
 	struct proc *p;
-	
+
 	SIGFILLSET(newset);
 	if (td == NULL)
 		td = curthread; /* XXX */
@@ -1335,7 +1336,7 @@ newnfs_sigintr(struct nfsmount *nmp, struct thread *td)
 {
 	struct proc *p;
 	sigset_t tmpset;
-	
+
 	/* Terminate all requests while attempting a forced unmount. */
 	if (NFSCL_FORCEDISM(nmp->nm_mountp))
 		return (EIO);
@@ -1418,7 +1419,7 @@ nfs_up(struct nfsmount *nmp, struct thread *td, const char *msg,
 		    VQ_NOTRESP, 1);
 	} else
 		mtx_unlock(&nmp->nm_mtx);
-	
+
 	mtx_lock(&nmp->nm_mtx);
 	if ((flags & NFSSTA_LOCKTIMEO) && (nmp->nm_state & NFSSTA_LOCKTIMEO)) {
 		nmp->nm_state &= ~NFSSTA_LOCKTIMEO;
@@ -1428,4 +1429,3 @@ nfs_up(struct nfsmount *nmp, struct thread *td, const char *msg,
 	} else
 		mtx_unlock(&nmp->nm_mtx);
 }
-

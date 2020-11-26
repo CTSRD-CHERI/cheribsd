@@ -65,14 +65,14 @@ extern bool			systrace_enabled;
 #endif /* _KERNEL */
 
 struct sysent {			/* system call table */
-	int	sy_narg;	/* number of arguments */
 	sy_call_t *sy_call;	/* implementing function */
-	au_event_t sy_auevent;	/* audit event associated with syscall */
 	systrace_args_func_t sy_systrace_args_func;
 				/* optional argument conversion function. */
+	u_int8_t sy_narg;	/* number of arguments */
+	u_int8_t sy_flags;	/* General flags for system calls. */
+	au_event_t sy_auevent;	/* audit event associated with syscall */
 	u_int32_t sy_entry;	/* DTrace entry ID for systrace. */
 	u_int32_t sy_return;	/* DTrace return ID for systrace. */
-	u_int32_t sy_flags;	/* General flags for system calls. */
 	u_int32_t sy_thrcnt;
 };
 
@@ -102,8 +102,6 @@ struct vnode;
 struct sysentvec {
 	int		sv_size;	/* number of entries */
 	struct sysent	*sv_table;	/* pointer to sysent */
-	int		sv_errsize;	/* size of errno translation table */
-	const int 	*sv_errtbl;	/* errno translation table */
 	int		(*sv_transtrap)(int, int);
 					/* translate trap-to-signal mapping */
 	int		(*sv_fixup)(uintcap_t *, struct image_params *);
@@ -159,8 +157,6 @@ struct sysentvec {
 #define	SV_CHERI	0x08000000	/* CheriABI executable. */
 
 #define	SV_ABI_MASK	0xff
-#define	SV_ABI_ERRNO(p, e)	((p)->p_sysent->sv_errsize <= 0 ? e :	\
-	((e) >= (p)->p_sysent->sv_errsize ? -1 : (p)->p_sysent->sv_errtbl[e]))
 #define	SV_PROC_FLAG(p, x)	((p)->p_sysent->sv_flags & (x))
 #define	SV_PROC_ABI(p)		((p)->p_sysent->sv_flags & SV_ABI_MASK)
 #define	SV_CURPROC_FLAG(x)	SV_PROC_FLAG(curproc, x)
@@ -322,6 +318,7 @@ int shared_page_alloc(int size, int align);
 int shared_page_fill(int size, int align, const void *data);
 void shared_page_write(int base, int size, const void *data);
 void exec_sysvec_init(void *param);
+void exec_sysvec_init_secondary(struct sysentvec *sv, struct sysentvec *sv2);
 void exec_inittk(void);
 
 #define INIT_SYSENTVEC(name, sv)					\

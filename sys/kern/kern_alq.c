@@ -926,7 +926,7 @@ static int
 alq_load_handler(module_t mod, int what, void *arg)
 {
 	int ret;
-	
+
 	ret = 0;
 
 	switch (what) {

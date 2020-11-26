@@ -83,7 +83,7 @@ syscallenter(struct thread *td)
 	error = (p->p_sysent->sv_fetch_syscall_args)(td);
 #ifdef KTRACE
 	if (KTRPOINT(td, KTR_SYSCALL))
-		ktrsyscall(sa->code, sa->narg, sa->args);
+		ktrsyscall(sa->code, sa->callp->sy_narg, sa->args);
 #endif
 	KTR_START4(KTR_SYSC, "syscall", syscallname(p, sa->code),
 	    (uintptr_t)td, "pid:%d", td->td_proc->p_pid, "arg0:%p", sa->args[0],
@@ -99,12 +99,13 @@ syscallenter(struct thread *td)
 	 * Constrain code that can originate system calls if
 	 * userspace sandboxing is available.
 	 */
-	error = cheri_syscall_authorize(td, sa->code, sa->narg, sa->args);
+	error = cheri_syscall_authorize(td, sa->code, sa->callp->sy_narg,
+	    sa->args);
 	if (error != 0)
 		goto retval;
 #endif
 
-	if (__predict_false((p->p_flag & P_TRACED) != 0)) {
+	if (__predict_false(traced)) {
 		PROC_LOCK(p);
 		if (p->p_ptevents & PTRACE_SCE)
 			ptracestop((td), SIGTRAP, NULL);
@@ -118,7 +119,7 @@ syscallenter(struct thread *td)
 		error = (p->p_sysent->sv_fetch_syscall_args)(td);
 #ifdef KTRACE
 		if (KTRPOINT(td, KTR_SYSCALL))
-			ktrsyscall(sa->code, sa->narg, sa->args);
+			ktrsyscall(sa->code, sa->callp->sy_narg, sa->args);
 #endif
 		if (error != 0) {
 			td->td_errno = error;
@@ -152,7 +153,8 @@ syscallenter(struct thread *td)
 		(void)sigfastblock_fetch(td);
 
 	/* Let system calls set td_errno directly. */
-	td->td_pflags &= ~TDP_NERRNO;
+	KASSERT((td->td_pflags & TDP_NERRNO) == 0,
+	    ("%s: TDP_NERRNO set", __func__));
 
 	if (__predict_false(SYSTRACE_ENABLED() ||
 	    AUDIT_SYSCALL_ENTER(sa->code, td))) {
@@ -163,7 +165,9 @@ syscallenter(struct thread *td)
 #endif
 		error = (sa->callp->sy_call)(td, sa->args);
 		/* Save the latest error return value. */
-		if (__predict_false((td->td_pflags & TDP_NERRNO) == 0))
+		if (__predict_false((td->td_pflags & TDP_NERRNO) != 0))
+			td->td_pflags &= ~TDP_NERRNO;
+		else
 			td->td_errno = error;
 		AUDIT_SYSCALL_EXIT(error, td);
 #ifdef KDTRACE_HOOKS
@@ -175,7 +179,9 @@ syscallenter(struct thread *td)
 	} else {
 		error = (sa->callp->sy_call)(td, sa->args);
 		/* Save the latest error return value. */
-		if (__predict_false((td->td_pflags & TDP_NERRNO) == 0))
+		if (__predict_false((td->td_pflags & TDP_NERRNO) != 0))
+			td->td_pflags &= ~TDP_NERRNO;
+		else
 			td->td_errno = error;
 	}
 	syscall_thread_exit(td, sa->callp);

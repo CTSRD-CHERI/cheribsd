@@ -228,7 +228,6 @@ vnode_destroy_vobject(struct vnode *vp)
 	KASSERT(vp->v_object == NULL, ("vp %p obj %p", vp, vp->v_object));
 }
 
-
 /*
  * Allocate (or lookup) pager for a vnode.
  * Handle is a vnode pointer.
@@ -541,9 +540,6 @@ vnode_pager_addr(struct vnode *vp, vm_ooffset_t address, daddr_t *rtaddress,
 	int err;
 	daddr_t vblock;
 	daddr_t voffset;
-
-	if (address < 0)
-		return -1;
 
 	if (VN_IS_DOOMED(vp))
 		return -1;

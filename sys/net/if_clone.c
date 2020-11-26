@@ -241,7 +241,7 @@ if_clone_createif(struct if_clone *ifc, char *name, size_t len,
 		err = ifc_simple_create(ifc, name, len, params);
 	else
 		err = (*ifc->ifc_create)(ifc, name, len, params);
-	
+
 	if (!err) {
 		ifp = ifunit(name);
 		if (ifp == NULL)
@@ -671,7 +671,7 @@ ifc_simple_match(struct if_clone *ifc, const char *name)
 {
 	const char *cp;
 	int i;
-	
+
 	/* Match the name */
 	for (cp = name, i = 0; i < strlen(ifc->ifc_name); i++, cp++) {
 		if (ifc->ifc_name[i] != *cp)
@@ -724,7 +724,6 @@ ifc_simple_create(struct if_clone *ifc, char *name, size_t len,
 			 */
 			panic("if_clone_create(): interface name too long");
 		}
-
 	}
 
 	return (0);

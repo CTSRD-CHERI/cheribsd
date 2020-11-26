@@ -233,7 +233,6 @@ if __name__ == "__main__":
     debug("Adding -DWITH_AUTO_OBJ")
     bmake_args.append("-DWITH_AUTO_OBJ")
     if parsed_args.clean is False:
-        bmake_args.append("-DNO_CLEAN")
         bmake_args.append("-DWITHOUT_CLEAN")
     if (parsed_args.clean is None and not is_make_var_set("NO_CLEAN")
             and not is_make_var_set("WITHOUT_CLEAN")):

@@ -952,7 +952,8 @@ SYSINIT(sysctl, SI_SUB_KMEM, SI_ORDER_FIRST, sysctl_register_all, NULL);
  * {CTL_SYSCTL, CTL_SYSCTL_DEBUG}		printf the entire MIB-tree.
  * {CTL_SYSCTL, CTL_SYSCTL_NAME, ...}		return the name of the "..."
  *						OID.
- * {CTL_SYSCTL, CTL_SYSCTL_NEXT, ...}		return the next OID.
+ * {CTL_SYSCTL, CTL_SYSCTL_NEXT, ...}		return the next OID, honoring
+ *						CTLFLAG_SKIP.
  * {CTL_SYSCTL, CTL_SYSCTL_NAME2OID}		return the OID of the name in
  *						"new"
  * {CTL_SYSCTL, CTL_SYSCTL_OIDFMT, ...}		return the kind & format info
@@ -961,6 +962,8 @@ SYSINIT(sysctl, SI_SUB_KMEM, SI_ORDER_FIRST, sysctl_register_all, NULL);
  *						"..." OID.
  * {CTL_SYSCTL, CTL_SYSCTL_OIDLABEL, ...}	return the aggregation label of
  *						the "..." OID.
+ * {CTL_SYSCTL, CTL_SYSCTL_NEXTNOSKIP, ...}	return the next OID, ignoring
+ *						CTLFLAG_SKIP.
  */
 
 #ifdef SYSCTL_DEBUG
@@ -972,7 +975,6 @@ sysctl_sysctl_debug_dump_node(struct sysctl_oid_list *l, int i)
 
 	SYSCTL_ASSERT_LOCKED();
 	SLIST_FOREACH(oidp, l, oid_link) {
-
 		for (k=0; k<i; k++)
 			printf(" ");
 
@@ -1009,7 +1011,6 @@ sysctl_sysctl_debug_dump_node(struct sysctl_oid_list *l, int i)
 			case CTLTYPE_OPAQUE: printf(" Opaque/struct\n"); break;
 			default:	     printf("\n");
 		}
-
 	}
 }
 
@@ -1103,7 +1104,7 @@ static SYSCTL_NODE(_sysctl, CTL_SYSCTL_NAME, name, CTLFLAG_RD |
 
 static int
 sysctl_sysctl_next_ls(struct sysctl_oid_list *lsp, int *name, u_int namelen, 
-	int *next, int *len, int level, struct sysctl_oid **oidpp)
+    int *next, int *len, int level, struct sysctl_oid **oidpp, bool honor_skip)
 {
 	struct sysctl_oid *oidp;
 
@@ -1113,7 +1114,10 @@ sysctl_sysctl_next_ls(struct sysctl_oid_list *lsp, int *name, u_int namelen,
 		*next = oidp->oid_number;
 		*oidpp = oidp;
 
-		if ((oidp->oid_kind & (CTLFLAG_SKIP | CTLFLAG_DORMANT)) != 0)
+		if ((oidp->oid_kind & CTLFLAG_DORMANT) != 0)
+			continue;
+
+		if (honor_skip && (oidp->oid_kind & CTLFLAG_SKIP) != 0)
 			continue;
 
 		if (!namelen) {
@@ -1124,7 +1128,7 @@ sysctl_sysctl_next_ls(struct sysctl_oid_list *lsp, int *name, u_int namelen,
 				return (0);
 			lsp = SYSCTL_CHILDREN(oidp);
 			if (!sysctl_sysctl_next_ls(lsp, 0, 0, next+1, 
-				len, level+1, oidpp))
+				len, level+1, oidpp, honor_skip))
 				return (0);
 			goto emptynode;
 		}
@@ -1139,7 +1143,7 @@ sysctl_sysctl_next_ls(struct sysctl_oid_list *lsp, int *name, u_int namelen,
 				return (0);
 			lsp = SYSCTL_CHILDREN(oidp);
 			if (!sysctl_sysctl_next_ls(lsp, name+1, namelen-1, 
-				next+1, len, level+1, oidpp))
+				next+1, len, level+1, oidpp, honor_skip))
 				return (0);
 			goto next;
 		}
@@ -1151,14 +1155,14 @@ sysctl_sysctl_next_ls(struct sysctl_oid_list *lsp, int *name, u_int namelen,
 
 		lsp = SYSCTL_CHILDREN(oidp);
 		if (!sysctl_sysctl_next_ls(lsp, name+1, namelen-1, next+1, 
-			len, level+1, oidpp))
+			len, level+1, oidpp, honor_skip))
 			return (0);
 	next:
 		namelen = 1;
 	emptynode:
 		*len = level;
 	}
-	return (1);
+	return (ENOENT);
 }
 
 static int
@@ -1166,18 +1170,19 @@ sysctl_sysctl_next(SYSCTL_HANDLER_ARGS)
 {
 	int *name = (int *) arg1;
 	u_int namelen = arg2;
-	int i, j, error;
+	int len, error;
 	struct sysctl_oid *oid;
 	struct sysctl_oid_list *lsp = &sysctl__children;
 	struct rm_priotracker tracker;
-	int newoid[CTL_MAXNAME];
+	int next[CTL_MAXNAME];
 
 	SYSCTL_RLOCK(&tracker);
-	i = sysctl_sysctl_next_ls(lsp, name, namelen, newoid, &j, 1, &oid);
+	error = sysctl_sysctl_next_ls(lsp, name, namelen, next, &len, 1, &oid,
+	    oidp->oid_number == CTL_SYSCTL_NEXT);
 	SYSCTL_RUNLOCK(&tracker);
-	if (i)
-		return (ENOENT);
-	error = SYSCTL_OUT(req, newoid, j * sizeof (int));
+	if (error)
+		return (error);
+	error = SYSCTL_OUT(req, next, len * sizeof (int));
 	return (error);
 }
 
@@ -1186,6 +1191,9 @@ sysctl_sysctl_next(SYSCTL_HANDLER_ARGS)
  * capability mode.
  */
 static SYSCTL_NODE(_sysctl, CTL_SYSCTL_NEXT, next, CTLFLAG_RD |
+    CTLFLAG_MPSAFE | CTLFLAG_CAPRD, sysctl_sysctl_next, "");
+
+static SYSCTL_NODE(_sysctl, CTL_SYSCTL_NEXTNOSKIP, nextnoskip, CTLFLAG_RD |
     CTLFLAG_MPSAFE | CTLFLAG_CAPRD, sysctl_sysctl_next, "");
 
 static int
@@ -2783,10 +2791,10 @@ db_show_sysctl_all(int *oid, size_t len, int flags)
 	name1[1] = CTL_SYSCTL_NEXT;
 	l1 = 2;
 	if (len) {
-		memcpy(name1+2, oid, len * sizeof(int));
-		l1 +=len;
+		memcpy(name1 + 2, oid, len * sizeof(int));
+		l1 += len;
 	} else {
-		name1[2] = 1;
+		name1[2] = CTL_KERN;
 		l1++;
 	}
 	for (;;) {
@@ -2799,7 +2807,7 @@ db_show_sysctl_all(int *oid, size_t len, int flags)
 			if (error == ENOENT)
 				return (0);
 			else
-				db_error("sysctl(getnext)");
+				db_error("sysctl(next)");
 		}
 
 		l2 /= sizeof(int);

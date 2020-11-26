@@ -72,6 +72,7 @@
 #define	CR4_FXSR 0x00000200	/* Fast FPU save/restore used by OS */
 #define	CR4_XMM	0x00000400	/* enable SIMD/MMX2 to use except 16 */
 #define	CR4_UMIP 0x00000800	/* User Mode Instruction Prevention */
+#define	CR4_LA57 0x00001000	/* Enable 5-level paging */
 #define	CR4_VMXE 0x00002000	/* enable VMX operation (Intel-specific) */
 #define	CR4_FSGSBASE 0x00010000	/* Enable FS/GS BASE accessing instructions */
 #define	CR4_PCIDE 0x00020000	/* Enable Context ID */
@@ -1137,6 +1138,7 @@
 #define	MSR_EXTFEATURES	0xc0011005	/* Extended CPUID Features override */
 #define	MSR_LS_CFG	0xc0011020
 #define	MSR_IC_CFG	0xc0011021	/* Instruction Cache Configuration */
+#define	MSR_DE_CFG	0xc0011029	/* Decode Configuration */
 
 /* MSR_VM_CR related */
 #define	VM_CR_SVMDIS		0x10	/* SVM: disabled by BIOS */

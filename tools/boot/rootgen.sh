@@ -7,6 +7,7 @@ iterations=50000
 
 # The smallest FAT32 filesystem is 33292 KB
 espsize=33292
+dev=vtbd0
 
 #
 # Builds all the bat-shit crazy combinations we support booting from,
@@ -20,7 +21,7 @@ espsize=33292
 # This assumes an external program install-boot.sh which will install
 # the appropriate boot files in the appropriate locations.
 #
-# These images assume ada0 will be the root image. We should likely
+# These images assume ${dev} will be the root image. We should likely
 # use labels, but we don't.
 #
 # Assumes you've already rebuilt... maybe bad? Also maybe bad: the env
@@ -42,7 +43,7 @@ mk_nogeli_gpt_ufs_legacy() {
     img=$2
 
     cat > ${src}/etc/fstab <<EOF
-/dev/ada0p2	/		ufs	rw	1	1
+/dev/${dev}p2	/		ufs	rw	1	1
 EOF
     makefs -t ffs -B little -s 200m ${img}.p2 ${src}
     mkimg -s gpt -b ${src}/boot/pmbr \
@@ -56,7 +57,7 @@ mk_nogeli_gpt_ufs_uefi() {
     img=$2
 
     cat > ${src}/etc/fstab <<EOF
-/dev/ada0p2	/		ufs	rw	1	1
+/dev/${dev}p2	/		ufs	rw	1	1
 EOF
     make_esp_file ${img}.p1 ${espsize} ${src}/boot/loader.efi
     makefs -t ffs -B little -s 200m ${img}.p2 ${src}
@@ -71,7 +72,7 @@ mk_nogeli_gpt_ufs_both() {
     img=$2
 
     cat > ${src}/etc/fstab <<EOF
-/dev/ada0p3	/		ufs	rw	1	1
+/dev/${dev}p3	/		ufs	rw	1	1
 EOF
     make_esp_file ${img}.p1 ${espsize} ${src}/boot/loader.efi
     makefs -t ffs -B little -s 200m ${img}.p3 ${src}
@@ -107,12 +108,12 @@ mk_nogeli_gpt_zfs_legacy() {
     cpsys ${src} ${mntpt}
     # need to make a couple of tweaks
     cat >> ${mntpt}/boot/loader.conf <<EOF
+cryptodev_load=YES
 zfs_load=YES
-opensolaris_load=YES
 EOF
     cp /boot/kernel/acl_nfs4.ko ${mntpt}/boot/kernel/acl_nfs4.ko
+    cp /boot/kernel/cryptodev.ko ${mntpt}/boot/kernel/cryptodev.ko
     cp /boot/kernel/zfs.ko ${mntpt}/boot/kernel/zfs.ko
-    cp /boot/kernel/opensolaris.ko ${mntpt}/boot/kernel/opensolaris.ko
     # end tweaks
     zfs umount -f ${pool}/ROOT/default
     zfs set mountpoint=none ${pool}/ROOT/default
@@ -146,12 +147,12 @@ mk_nogeli_gpt_zfs_uefi() {
     cpsys ${src} ${mntpt}
     # need to make a couple of tweaks
     cat >> ${mntpt}/boot/loader.conf <<EOF
+cryptodev_load=YES
 zfs_load=YES
-opensolaris_load=YES
 EOF
     cp /boot/kernel/acl_nfs4.ko ${mntpt}/boot/kernel/acl_nfs4.ko
+    cp /boot/kernel/cryptodev.ko ${mntpt}/boot/kernel/cryptodev.ko
     cp /boot/kernel/zfs.ko ${mntpt}/boot/kernel/zfs.ko
-    cp /boot/kernel/opensolaris.ko ${mntpt}/boot/kernel/opensolaris.ko
     # end tweaks
     zfs umount -f ${pool}/ROOT/default
     zfs set mountpoint=none ${pool}/ROOT/default
@@ -186,12 +187,12 @@ mk_nogeli_gpt_zfs_both() {
     cpsys ${src} ${mntpt}
     # need to make a couple of tweaks
     cat >> ${mntpt}/boot/loader.conf <<EOF
+cryptodev_load=YES
 zfs_load=YES
-opensolaris_load=YES
 EOF
     cp /boot/kernel/acl_nfs4.ko ${mntpt}/boot/kernel/acl_nfs4.ko
+    cp /boot/kernel/cryptodev.ko ${mntpt}/boot/kernel/cryptodev.ko
     cp /boot/kernel/zfs.ko ${mntpt}/boot/kernel/zfs.ko
-    cp /boot/kernel/opensolaris.ko ${mntpt}/boot/kernel/opensolaris.ko
     # end tweaks
     zfs umount -f ${pool}/ROOT/default
     zfs set mountpoint=none ${pool}/ROOT/default
@@ -207,7 +208,7 @@ mk_nogeli_mbr_ufs_legacy() {
     img=$2
 
     cat > ${src}/etc/fstab <<EOF
-/dev/ada0s1a	/		ufs	rw	1	1
+/dev/${dev}s1a	/		ufs	rw	1	1
 EOF
     makefs -t ffs -B little -s 200m ${img}.s1a ${src}
     mkimg -s bsd -b ${src}/boot/boot -p freebsd-ufs:=${img}.s1a -o ${img}.s1
@@ -220,7 +221,7 @@ mk_nogeli_mbr_ufs_uefi() {
     img=$2
 
     cat > ${src}/etc/fstab <<EOF
-/dev/ada0s2a	/		ufs	rw	1	1
+/dev/${dev}s2a	/		ufs	rw	1	1
 EOF
     make_esp_file ${img}.s1 ${espsize} ${src}/boot/loader.efi
     makefs -t ffs -B little -s 200m ${img}.s2a ${src}
@@ -234,7 +235,7 @@ mk_nogeli_mbr_ufs_both() {
     img=$2
 
     cat > ${src}/etc/fstab <<EOF
-/dev/ada0s2a	/		ufs	rw	1	1
+/dev/${dev}s2a	/		ufs	rw	1	1
 EOF
     make_esp_file ${img}.s1 ${espsize} ${src}/boot/loader.efi
     makefs -t ffs -B little -s 200m ${img}.s2a ${src}
@@ -268,12 +269,12 @@ mk_nogeli_mbr_zfs_legacy() {
     cpsys ${src} ${mntpt}
     # need to make a couple of tweaks
     cat >> ${mntpt}/boot/loader.conf <<EOF
+cryptodev_load=YES
 zfs_load=YES
-opensolaris_load=YES
 EOF
     cp /boot/kernel/acl_nfs4.ko ${mntpt}/boot/kernel/acl_nfs4.ko
+    cp /boot/kernel/cryptodev.ko ${mntpt}/boot/kernel/cryptodev.ko
     cp /boot/kernel/zfs.ko ${mntpt}/boot/kernel/zfs.ko
-    cp /boot/kernel/opensolaris.ko ${mntpt}/boot/kernel/opensolaris.ko
     # end tweaks
     zfs umount -f ${pool}/ROOT/default
     zfs set mountpoint=none ${pool}/ROOT/default
@@ -310,12 +311,12 @@ mk_nogeli_mbr_zfs_uefi() {
     cpsys ${src} ${mntpt}
     # need to make a couple of tweaks
     cat >> ${mntpt}/boot/loader.conf <<EOF
+cryptodev_load=YES
 zfs_load=YES
-opensolaris_load=YES
 EOF
     cp /boot/kernel/acl_nfs4.ko ${mntpt}/boot/kernel/acl_nfs4.ko
+    cp /boot/kernel/cryptodev.ko ${mntpt}/boot/kernel/cryptodev.ko
     cp /boot/kernel/zfs.ko ${mntpt}/boot/kernel/zfs.ko
-    cp /boot/kernel/opensolaris.ko ${mntpt}/boot/kernel/opensolaris.ko
     # end tweaks
     zfs umount -f ${pool}/ROOT/default
     zfs set mountpoint=none ${pool}/ROOT/default
@@ -352,12 +353,12 @@ mk_nogeli_mbr_zfs_both() {
     cpsys ${src} ${mntpt}
     # need to make a couple of tweaks
     cat >> ${mntpt}/boot/loader.conf <<EOF
+cryptodev_load=YES
 zfs_load=YES
-opensolaris_load=YES
 EOF
     cp /boot/kernel/acl_nfs4.ko ${mntpt}/boot/kernel/acl_nfs4.ko
+    cp /boot/kernel/cryptodev.ko ${mntpt}/boot/kernel/cryptodev.ko
     cp /boot/kernel/zfs.ko ${mntpt}/boot/kernel/zfs.ko
-    cp /boot/kernel/opensolaris.ko ${mntpt}/boot/kernel/opensolaris.ko
     # end tweaks
     zfs umount -f ${pool}/ROOT/default
     zfs set mountpoint=none ${pool}/ROOT/default
@@ -393,7 +394,7 @@ mk_geli_gpt_ufs_legacy() {
 geom_eli_load=YES
 EOF
     cat > ${mntpt}/etc/fstab <<EOF
-/dev/ada0p2.eli	/		ufs	rw	1	1
+/dev/${dev}p2.eli	/		ufs	rw	1	1
 EOF
 
     cp /boot/kernel/geom_eli.ko ${mntpt}/boot/kernel/geom_eli.ko
@@ -429,7 +430,7 @@ mk_geli_gpt_ufs_uefi() {
 geom_eli_load=YES
 EOF
     cat > ${mntpt}/etc/fstab <<EOF
-/dev/ada0p2.eli	/		ufs	rw	1	1
+/dev/${dev}p2.eli	/		ufs	rw	1	1
 EOF
 
     cp /boot/kernel/geom_eli.ko ${mntpt}/boot/kernel/geom_eli.ko
@@ -466,7 +467,7 @@ mk_geli_gpt_ufs_both() {
 geom_eli_load=YES
 EOF
     cat > ${mntpt}/etc/fstab <<EOF
-/dev/ada0p3.eli	/		ufs	rw	1	1
+/dev/${dev}p3.eli	/		ufs	rw	1	1
 EOF
 
     cp /boot/kernel/geom_eli.ko ${mntpt}/boot/kernel/geom_eli.ko
@@ -507,13 +508,13 @@ mk_geli_gpt_zfs_legacy() {
     cpsys ${src} ${mntpt}
     # need to make a couple of tweaks
     cat >> ${mntpt}/boot/loader.conf <<EOF
+cryptodev_load=YES
 zfs_load=YES
-opensolaris_load=YES
 geom_eli_load=YES
 EOF
     cp /boot/kernel/acl_nfs4.ko ${mntpt}/boot/kernel/acl_nfs4.ko
+    cp /boot/kernel/cryptodev.ko ${mntpt}/boot/kernel/cryptodev.ko
     cp /boot/kernel/zfs.ko ${mntpt}/boot/kernel/zfs.ko
-    cp /boot/kernel/opensolaris.ko ${mntpt}/boot/kernel/opensolaris.ko
     cp /boot/kernel/geom_eli.ko ${mntpt}/boot/kernel/geom_eli.ko
     # end tweaks
     zfs umount -f ${pool}/ROOT/default
@@ -556,13 +557,13 @@ mk_geli_gpt_zfs_uefi() {
     cpsys ${src} ${mntpt}
     # need to make a couple of tweaks
     cat >> ${mntpt}/boot/loader.conf <<EOF
+cryptodev_load=YES
 zfs_load=YES
-opensolaris_load=YES
 geom_eli_load=YES
 EOF
     cp /boot/kernel/acl_nfs4.ko ${mntpt}/boot/kernel/acl_nfs4.ko
+    cp /boot/kernel/cryptodev.ko ${mntpt}/boot/kernel/cryptodev.ko
     cp /boot/kernel/zfs.ko ${mntpt}/boot/kernel/zfs.ko
-    cp /boot/kernel/opensolaris.ko ${mntpt}/boot/kernel/opensolaris.ko
     cp /boot/kernel/geom_eli.ko ${mntpt}/boot/kernel/geom_eli.ko
     # end tweaks
     zfs umount -f ${pool}/ROOT/default
@@ -601,13 +602,13 @@ mk_geli_gpt_zfs_both() {
     cpsys ${src} ${mntpt}
     # need to make a couple of tweaks
     cat > ${mntpt}/boot/loader.conf <<EOF
+cryptodev_load=YES
 zfs_load=YES
-opensolaris_load=YES
 geom_eli_load=YES
 EOF
     cp /boot/kernel/acl_nfs4.ko ${mntpt}/boot/kernel/acl_nfs4.ko
+    cp /boot/kernel/cryptodev.ko ${mntpt}/boot/kernel/cryptodev.ko
     cp /boot/kernel/zfs.ko ${mntpt}/boot/kernel/zfs.ko
-    cp /boot/kernel/opensolaris.ko ${mntpt}/boot/kernel/opensolaris.ko
     cp /boot/kernel/geom_eli.ko ${mntpt}/boot/kernel/geom_eli.ko
     # end tweaks
     zfs umount -f ${pool}/ROOT/default
@@ -654,7 +655,7 @@ mk_sparc64_nogeli_vtoc8_ufs_ofw() {
     bios=$7
 
     cat > ${src}/etc/fstab <<EOF
-/dev/ada0a	/		ufs	rw	1	1
+/dev/${dev}a	/		ufs	rw	1	1
 EOF
     makefs -t ffs -B big -s 200m ${img} ${src}
     md=$(mdconfig -f ${img})
@@ -794,10 +795,7 @@ mkdir -p ${DESTDIR}/boot/kernel
 cp /boot/kernel/kernel ${DESTDIR}/boot/kernel
 echo -h -D -S115200 > ${DESTDIR}/boot.config
 cat > ${DESTDIR}/boot/loader.conf <<EOF
-console=comconsole
 comconsole_speed=115200
-boot_serial=yes
-boot_multicons=yes
 EOF
 # XXX
 cp /boot/device.hints ${DESTDIR}/boot/device.hints

@@ -390,7 +390,6 @@ static device_method_t mips_pic_methods[] = {
 	DEVMETHOD(pic_pre_ithread,	mips_pic_pre_ithread),
 	DEVMETHOD(pic_post_ithread,	mips_pic_post_ithread),
 	DEVMETHOD(pic_post_filter,	mips_pic_post_filter),
-
 	{ 0, 0 }
 };
 

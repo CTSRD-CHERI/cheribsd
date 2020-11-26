@@ -194,7 +194,6 @@ bus_space_free(bus_space_tag_t t __unused, bus_space_handle_t bsh __unused,
 {
 }
 
-
 /*
  * Read a 1, 2, 4, or 8 byte quantity from bus space
  * described by tag/handle/offset.
@@ -361,7 +360,6 @@ static __inline void bus_space_read_region_4(bus_space_tag_t tag,
 					     bus_space_handle_t bsh,
 					     bus_size_t offset, u_int32_t *addr,
 					     size_t count);
-
 
 static __inline void
 bus_space_read_region_1(bus_space_tag_t tag, bus_space_handle_t bsh,
@@ -1090,6 +1088,38 @@ bus_space_barrier(bus_space_tag_t tag __unused, bus_space_handle_t bsh __unused,
 	bus_space_copy_region_2((t), (h1), (o1), (h2), (o2), (c))
 #define	bus_space_copy_region_stream_4(t, h1, o1, h2, o2, c) \
 	bus_space_copy_region_4((t), (h1), (o1), (h2), (o2), (c))
+
+#define BUS_PEEK_FUNC(width, type)					\
+	static inline int						\
+	bus_space_peek_##width(bus_space_tag_t tag,			\
+	    bus_space_handle_t hnd, bus_size_t offset, type *value)	\
+	{								\
+		type tmp;						\
+		tmp = bus_space_read_##width(tag, hnd, offset);		\
+		*value = (type)tmp;					\
+		return (0);						\
+	}
+BUS_PEEK_FUNC(1, uint8_t)
+BUS_PEEK_FUNC(2, uint16_t)
+BUS_PEEK_FUNC(4, uint32_t)
+#ifdef __amd64__
+BUS_PEEK_FUNC(8, uint64_t)
+#endif
+
+#define BUS_POKE_FUNC(width, type)					\
+	static inline int						\
+	bus_space_poke_##width(bus_space_tag_t tag,			\
+	    bus_space_handle_t hnd, bus_size_t offset, type value)	\
+	{								\
+		bus_space_write_##width(tag, hnd, offset, value);	\
+		return (0); 						\
+	}
+BUS_POKE_FUNC(1, uint8_t)
+BUS_POKE_FUNC(2, uint16_t)
+BUS_POKE_FUNC(4, uint32_t)
+#ifdef __amd64__
+BUS_POKE_FUNC(8, uint64_t)
+#endif
 
 #endif /* KCSAN && !KCSAN_RUNTIME */
 

@@ -88,7 +88,6 @@ static device_method_t an_pccard_methods[] = {
 	DEVMETHOD(device_attach,	an_pccard_attach),
 	DEVMETHOD(device_detach,	an_detach),
 	DEVMETHOD(device_shutdown,	an_shutdown),
-
 	{ 0, 0 }
 };
 
@@ -147,7 +146,7 @@ an_pccard_attach(device_t dev)
 	error = an_attach(sc, flags);
 	if (error)
 		goto fail;
-	
+
 	/*
 	 * Must setup the interrupt after the an_attach to prevent racing.
 	 */
@@ -157,6 +156,6 @@ fail:
 	if (error)
 		an_release_resources(dev);
 	else
-		gone_in_dev(dev, 13, "pccard removed");
+		gone_in_dev(dev, 13, "pccard removed, an doesn't support modern crypto");
 	return (error);
 }

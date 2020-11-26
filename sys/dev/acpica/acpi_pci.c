@@ -30,6 +30,7 @@
 __FBSDID("$FreeBSD$");
 
 #include "opt_acpi.h"
+#include "opt_iommu.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -37,6 +38,8 @@ __FBSDID("$FreeBSD$");
 #include <sys/kernel.h>
 #include <sys/malloc.h>
 #include <sys/module.h>
+#include <sys/taskqueue.h>
+#include <sys/tree.h>
 
 #include <contrib/dev/acpica/include/acpi.h>
 #include <contrib/dev/acpica/include/accommon.h>
@@ -48,6 +51,8 @@ __FBSDID("$FreeBSD$");
 #include <dev/pci/pcireg.h>
 #include <dev/pci/pcivar.h>
 #include <dev/pci/pci_private.h>
+
+#include <dev/iommu/iommu.h>
 
 #include "pcib_if.h"
 #include "pci_if.h"
@@ -424,7 +429,7 @@ acpi_pci_attach(device_t dev)
 	    acpi_pci_bus_notify_handler, dev);
 	AcpiWalkNamespace(ACPI_TYPE_DEVICE, acpi_get_handle(dev), 1,
 	    acpi_pci_install_device_notify_handler, NULL, dev, NULL);
-	
+
 	return (0);
 }
 
@@ -455,8 +460,7 @@ acpi_pci_detach(device_t dev)
 	return (pci_detach(dev));
 }
 
-#ifdef ACPI_DMAR
-bus_dma_tag_t acpi_iommu_get_dma_tag(device_t dev, device_t child);
+#ifdef IOMMU
 static bus_dma_tag_t
 acpi_pci_get_dma_tag(device_t bus, device_t child)
 {
@@ -464,7 +468,7 @@ acpi_pci_get_dma_tag(device_t bus, device_t child)
 
 	if (device_get_parent(child) == bus) {
 		/* try iommu and return if it works */
-		tag = acpi_iommu_get_dma_tag(bus, child);
+		tag = iommu_get_dma_tag(bus, child);
 	} else
 		tag = NULL;
 	if (tag == NULL)
@@ -479,4 +483,3 @@ acpi_pci_get_dma_tag(device_t bus, device_t child)
 	return (pci_get_dma_tag(bus, child));
 }
 #endif
-

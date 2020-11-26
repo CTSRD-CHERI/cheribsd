@@ -96,6 +96,11 @@ BROKEN_OPTIONS+= KERNEL_RETPOLINE
 BROKEN_OPTIONS+=EFI
 .endif
 
+# Broken post OpenZFS import
+.if ${MACHINE_CPU:Mcheri} || ${.MAKE.OS} == "Linux"
+BROKEN_OPTIONS=CDDL ZFS
+.endif
+
 # expanded inline from bsd.mkopt.mk to avoid share/mk dependency
 
 # Those that default to yes

@@ -129,7 +129,7 @@ CRUNCH_PROGS_usr.sbin+= zdb
 CRUNCH_LIBS+= -l80211 -lalias -lcam -lncursesw -ldevstat -lipsec -llzma
 .if ${MK_ZFS} != "no"
 CRUNCH_LIBS+= -lavl -lzpool -lzfs_core -lzfs -lnvpair -lpthread -luutil -lumem
-CRUNCH_LIBS+= -lbe
+CRUNCH_LIBS+= -lbe -lzfsbootenv -lzutil -ltpool -lspl -licp_rescue
 .else
 # liblzma needs pthread
 CRUNCH_LIBS+= -lpthread
@@ -222,10 +222,11 @@ CRUNCH_PROGS_usr.sbin+= chroot
 CRUNCH_PROGS_usr.sbin+= chown
 CRUNCH_ALIAS_chown= chgrp
 ##################################################################
-CRUNCH_LIBS+= -lm
 
 CRUNCH_LIBS+=		${OBJTOP}/lib/libifconfig/libifconfig.a
 CRUNCH_BUILDOPTS+=	CRUNCH_CFLAGS+=-I${OBJTOP}/lib/libifconfig
+
+CRUNCH_LIBS+= -lm
 
 .if ${MK_ISCSI} != "no"
 CRUNCH_PROGS_usr.bin+=	iscsictl

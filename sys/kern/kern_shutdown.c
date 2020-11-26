@@ -682,7 +682,6 @@ shutdown_reset(void *junk, int howto)
 	spinlock_enter();
 #endif
 
-	/* cpu_boot(howto); */ /* doesn't do anything at the moment */
 	cpu_reset();
 	/* NOTREACHED */ /* assuming reset worked */
 }
@@ -1494,6 +1493,7 @@ kerneldumpcomp_write_cb(void *base, size_t length, off_t offset, void *arg)
 		}
 		resid = length - rlength;
 		memmove(di->blockbuf, (uint8_t *)base + rlength, resid);
+		bzero((uint8_t *)di->blockbuf + resid, di->blocksize - resid);
 		di->kdcomp->kdc_resid = resid;
 		return (EAGAIN);
 	}
@@ -1710,9 +1710,10 @@ dump_finish(struct dumperinfo *di, struct kerneldumpheader *kdh)
 		error = compressor_flush(di->kdcomp->kdc_stream);
 		if (error == EAGAIN) {
 			/* We have residual data in di->blockbuf. */
-			error = dump_write(di, di->blockbuf, 0, di->dumpoff,
-			    di->blocksize);
-			di->dumpoff += di->kdcomp->kdc_resid;
+			error = _dump_append(di, di->blockbuf, 0, di->blocksize);
+			if (error == 0)
+				/* Compensate for _dump_append()'s adjustment. */
+				di->dumpoff -= di->blocksize - di->kdcomp->kdc_resid;
 			di->kdcomp->kdc_resid = 0;
 		}
 		if (error != 0)

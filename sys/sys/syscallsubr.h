@@ -71,6 +71,8 @@ struct thr_param;
 struct timex;
 struct uio;
 struct uuid;
+struct vm_map;
+struct vmspace;
 
 typedef int (*mmap_check_fp_fn)(struct file *, int, int, int);
 
@@ -182,7 +184,7 @@ int	kern_cpuset_setid(struct thread *td, cpuwhich_t which,
 	    id_t id, cpusetid_t setid);
 int	kern_dup(struct thread *td, u_int mode, int flags, int old, int new);
 int	kern_execve(struct thread *td, struct image_args *args,
-	    void * __capability mac_p);
+	    void * __capability mac_p, struct vmspace *oldvmspace);
 int	kern_extattrctl(struct thread *td, const char * __capability path,
 	    int cmd, const char * __capability filename, int attrnamespace,
 	    const char * __capability uattrname);
@@ -343,6 +345,8 @@ int	kern_mlock(struct proc *proc, struct ucred *cred, uintptr_t addr,
 int	kern_mmap(struct thread *td, uintptr_t addr, size_t len, int prot,
 	    int flags, int fd, off_t pos);
 int	kern_mmap_maxprot(struct proc *p, int prot);
+int	kern_mmap_racct_check(struct thread *td, struct vm_map *map,
+	    vm_size_t size);
 int	kern_mmap_req(struct thread *td, struct mmap_req *mrp);
 int	kern_modfind(struct thread *td, const char * __capability uname);
 int	kern_modstat(struct thread *td, int modid,

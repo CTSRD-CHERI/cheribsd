@@ -44,7 +44,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/socket.h>
 #include <sys/sockio.h>
 #include <sys/systm.h>
- 
+
 #include <net/if.h>
 #include <net/if_var.h>
 #include <net/if_dl.h>
@@ -778,7 +778,6 @@ static int
 ieee80211_ioctl_get80211(struct ieee80211vap *vap, u_long cmd,
     struct ieee80211req *ireq)
 {
-#define	MS(_v, _f)	(((_v) & _f) >> _f##_S)
 	struct ieee80211com *ic = vap->iv_ic;
 	u_int kid, len;
 	uint8_t tmpkey[IEEE80211_KEYBUF_SIZE];
@@ -1036,7 +1035,7 @@ ieee80211_ioctl_get80211(struct ieee80211vap *vap, u_long cmd,
 			 * XXX TODO: this isn't completely correct, as we've
 			 * negotiated the higher of the two.
 			 */
-			ireq->i_val = MS(vap->iv_bss->ni_htparam,
+			ireq->i_val = _IEEE80211_MASKSHIFT( vap->iv_bss->ni_htparam,
 			    IEEE80211_HTCAP_MAXRXAMPDU);
 		else
 			ireq->i_val = vap->iv_ampdu_limit;
@@ -1049,7 +1048,7 @@ ieee80211_ioctl_get80211(struct ieee80211vap *vap, u_long cmd,
 			 * XXX TODO: this isn't completely correct, as we've
 			 * negotiated the higher of the two.
 			 */
-			ireq->i_val = MS(vap->iv_bss->ni_htparam,
+			ireq->i_val = _IEEE80211_MASKSHIFT(vap->iv_bss->ni_htparam,
 			    IEEE80211_HTCAP_MPDUDENSITY);
 		else
 			ireq->i_val = vap->iv_ampdu_density;
@@ -1168,7 +1167,6 @@ ieee80211_ioctl_get80211(struct ieee80211vap *vap, u_long cmd,
 		break;
 	}
 	return error;
-#undef MS
 }
 
 static int

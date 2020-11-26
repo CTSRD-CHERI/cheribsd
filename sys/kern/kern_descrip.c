@@ -2220,7 +2220,7 @@ fdcopy_remapped(struct filedesc *fdp, const int *fds, size_t nfds,
 			error = EINVAL;
 			goto bad;
 		}
-		if (!fhold(nfde->fde_file)) {
+		if (!fhold(ofde->fde_file)) {
 			error = EBADF;
 			goto bad;
 		}
@@ -2627,6 +2627,15 @@ finit(struct file *fp, u_int flag, short type, void *data, struct fileops *ops)
 	fp->f_flag = flag;
 	fp->f_type = type;
 	atomic_store_rel_ptr((volatile uintptr_t *)&fp->f_ops, (uintptr_t)ops);
+}
+
+void
+finit_vnode(struct file *fp, u_int flag, void *data, struct fileops *ops)
+{
+	fp->f_seqcount[UIO_READ] = 1;
+	fp->f_seqcount[UIO_WRITE] = 1;
+	finit(fp, (flag & FMASK) | (fp->f_flag & FHASLOCK), DTYPE_VNODE,
+	    data, ops);
 }
 
 int
@@ -3342,6 +3351,17 @@ pwd_hold_filedesc(struct filedesc *fdp)
 	return (pwd);
 }
 
+bool
+pwd_hold_smr(struct pwd *pwd)
+{
+
+	MPASS(pwd != NULL);
+	if (__predict_true(refcount_acquire_if_not_zero(&pwd->pwd_refcount))) {
+		return (true);
+	}
+	return (false);
+}
+
 struct pwd *
 pwd_hold(struct thread *td)
 {
@@ -3352,8 +3372,7 @@ pwd_hold(struct thread *td)
 
 	vfs_smr_enter();
 	pwd = vfs_smr_entered_load(&fdp->fd_pwd);
-	MPASS(pwd != NULL);
-	if (__predict_true(refcount_acquire_if_not_zero(&pwd->pwd_refcount))) {
+	if (pwd_hold_smr(pwd)) {
 		vfs_smr_exit();
 		return (pwd);
 	}
@@ -3964,7 +3983,6 @@ kern_proc_filedesc_out(struct proc *p,  struct sbuf *sb, ssize_t maxlen,
 			vrefact(pwd->pwd_jdir);
 			export_vnode_to_sb(pwd->pwd_jdir, KF_FD_TYPE_JAIL, FREAD, efbuf);
 		}
-		pwd_drop(pwd);
 	}
 	lastfile = fdlastfile(fdp);
 	for (i = 0; fdp->fd_refcnt > 0 && i <= lastfile; i++) {
@@ -3986,6 +4004,8 @@ kern_proc_filedesc_out(struct proc *p,  struct sbuf *sb, ssize_t maxlen,
 			break;
 	}
 	FILEDESC_SUNLOCK(fdp);
+	if (pwd != NULL)
+		pwd_drop(pwd);
 	fddrop(fdp);
 fail:
 	free(efbuf, M_TEMP);
@@ -4107,7 +4127,6 @@ sysctl_kern_proc_ofiledesc(SYSCTL_HANDLER_ARGS)
 		if (pwd->pwd_jdir != NULL)
 			export_vnode_for_osysctl(pwd->pwd_jdir, KF_FD_TYPE_JAIL, kif,
 			    okif, fdp, req);
-		pwd_drop(pwd);
 	}
 	lastfile = fdlastfile(fdp);
 	for (i = 0; fdp->fd_refcnt > 0 && i <= lastfile; i++) {
@@ -4123,6 +4142,8 @@ sysctl_kern_proc_ofiledesc(SYSCTL_HANDLER_ARGS)
 			break;
 	}
 	FILEDESC_SUNLOCK(fdp);
+	if (pwd != NULL)
+		pwd_drop(pwd);
 	fddrop(fdp);
 	free(kif, M_TEMP);
 	free(okif, M_TEMP);

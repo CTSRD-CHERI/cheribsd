@@ -1870,14 +1870,20 @@ tryagain:
 			}
 			if (!error)
 			    nfsrv_getowner(&stp->ls_open, new_stp, &lckstp);
-			if (lckstp)
+			if (lckstp) {
 			    /*
-			     * I believe this should be an error, but it
-			     * isn't obvious what NFSERR_xxx would be
-			     * appropriate, so I'll use NFSERR_INVAL for now.
+			     * For NFSv4.1 and NFSv4.2 allow an
+			     * open_to_lock_owner when the lock_owner already
+			     * exists.  Just clear NFSLCK_OPENTOLOCK so that
+			     * a new lock_owner will not be created.
+			     * RFC7530 states that the error for NFSv4.0
+			     * is NFS4ERR_BAD_SEQID.
 			     */
-			    error = NFSERR_INVAL;
-			else
+			    if ((nd->nd_flag & ND_NFSV41) != 0)
+				new_stp->ls_flags &= ~NFSLCK_OPENTOLOCK;
+			    else
+				error = NFSERR_BADSEQID;
+			} else
 			    lckstp = new_stp;
 		    } else if (new_stp->ls_flags&(NFSLCK_LOCK|NFSLCK_UNLOCK)) {
 			/*
@@ -4470,7 +4476,7 @@ nfsrv_docallback(struct nfsclient *clp, int procnum, nfsv4stateid_t *stateidp,
 	m->m_len = 0;
 	nd->nd_mreq = nd->nd_mb = m;
 	nd->nd_bpos = mtod(m, caddr_t);
-	
+
 	/*
 	 * and build the callback request.
 	 */
@@ -5707,8 +5713,14 @@ nfsrv_checkgetattr(struct nfsrv_descript *nd, vnode_t vp,
 		goto out;
 	}
 	clp = stp->ls_clp;
-	delegfilerev = stp->ls_filerev;
 
+	/* If the clientid is not confirmed, ignore the delegation. */
+	if (clp->lc_flags & LCL_NEEDSCONFIRM) {
+		NFSUNLOCKSTATE();
+		goto out;
+	}
+
+	delegfilerev = stp->ls_filerev;
 	/*
 	 * If the Write delegation was issued as a part of this Compound RPC
 	 * or if we have an Implied Clientid (used in a previous Op in this
@@ -6227,6 +6239,7 @@ nfsrv_checksequence(struct nfsrv_descript *nd, uint32_t sequenceid,
 	 * bound as well, do the implicit binding unless a
 	 * BindConnectiontoSession has already been done on the session.
 	 */
+	savxprt = NULL;
 	if (sep->sess_clp->lc_req.nr_client != NULL &&
 	    sep->sess_cbsess.nfsess_xprt != nd->nd_xprt &&
 	    (sep->sess_crflags & NFSV4CRSESS_CONNBACKCHAN) != 0 &&
@@ -6239,14 +6252,14 @@ nfsrv_checksequence(struct nfsrv_descript *nd, uint32_t sequenceid,
 		    sep->sess_clp->lc_req.nr_client->cl_private;
 		nd->nd_xprt->xp_idletimeout = 0;	/* Disable timeout. */
 		sep->sess_cbsess.nfsess_xprt = nd->nd_xprt;
-		if (savxprt != NULL)
-			SVC_RELEASE(savxprt);
 	}
 
 	*sflagsp = 0;
 	if (sep->sess_clp->lc_req.nr_client == NULL)
 		*sflagsp |= NFSV4SEQ_CBPATHDOWN;
 	NFSUNLOCKSESSION(shp);
+	if (savxprt != NULL)
+		SVC_RELEASE(savxprt);
 	if (error == NFSERR_EXPIRED) {
 		*sflagsp |= NFSV4SEQ_EXPIREDALLSTATEREVOKED;
 		error = 0;
@@ -6417,6 +6430,7 @@ nfsrv_bindconnsess(struct nfsrv_descript *nd, uint8_t *sessionid, int *foreaftp)
 	int error;
 
 	error = 0;
+	savxprt = NULL;
 	shp = NFSSESSIONHASH(sessionid);
 	NFSLOCKSTATE();
 	NFSLOCKSESSION(shp);
@@ -6444,8 +6458,6 @@ nfsrv_bindconnsess(struct nfsrv_descript *nd, uint8_t *sessionid, int *foreaftp)
 				/* Disable idle timeout. */
 				nd->nd_xprt->xp_idletimeout = 0;
 				sep->sess_cbsess.nfsess_xprt = nd->nd_xprt;
-				if (savxprt != NULL)
-					SVC_RELEASE(savxprt);
 				sep->sess_crflags |= NFSV4CRSESS_CONNBACKCHAN;
 				clp->lc_flags |= LCL_DONEBINDCONN;
 				if (*foreaftp == NFSCDFS4_BACK)
@@ -6472,6 +6484,8 @@ nfsrv_bindconnsess(struct nfsrv_descript *nd, uint8_t *sessionid, int *foreaftp)
 		error = NFSERR_BADSESSION;
 	NFSUNLOCKSESSION(shp);
 	NFSUNLOCKSTATE();
+	if (savxprt != NULL)
+		SVC_RELEASE(savxprt);
 	return (error);
 }
 
@@ -7958,7 +7972,6 @@ nfsrv_allocdevid(struct nfsdevice *ds, char *addr, char *dnshost)
 	NFSBCOPY(dnshost, ds->nfsdev_host, ds->nfsdev_hostnamelen + 1);
 }
 
-
 /*
  * Create the device id list.
  * Return 0 if the nfsd threads are to run and ENXIO if the "-p" argument
@@ -8571,7 +8584,7 @@ nfsrv_mdscopymr(char *mdspathp, char *dspathp, char *curdspathp, char *buf,
 			return (ENXIO);
 		}
 		curnmp = VFSTONFS(nd.ni_vp->v_mount);
-	
+
 		/* Search the nfsdev list for a match. */
 		NFSDDSLOCK();
 		*fdsp = nfsv4_findmirror(curnmp);
@@ -8619,7 +8632,7 @@ nfsrv_mdscopymr(char *mdspathp, char *dspathp, char *curdspathp, char *buf,
 			return (ENXIO);
 		}
 		nmp = VFSTONFS(nd.ni_vp->v_mount);
-	
+
 		/*
 		 * Search the nfsdevice list for a match.  If curnmp == NULL,
 		 * this is a recovery and there must be a mirror.
@@ -8751,4 +8764,3 @@ nfsrv_findmirroredds(struct nfsmount *nmp)
 	}
 	return (fndds);
 }
-

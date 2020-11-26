@@ -32,7 +32,7 @@
  * $FreeBSD$
  */
 #include "opt_ddb.h"
-#include "opt_mpath.h"
+#include "opt_route.h"
 #include "opt_inet.h"
 #include "opt_inet6.h"
 
@@ -77,7 +77,6 @@
 #include <netinet6/scope6_var.h>
 #endif
 #include <net/route/nhop.h>
-#include <net/route/shared.h>
 
 #ifdef COMPAT_FREEBSD32
 #include <sys/mount.h>
@@ -159,8 +158,7 @@ MTX_SYSINIT(rtsock, &rtsock_mtx, "rtsock route_cb lock", MTX_DEF);
 #define	RTSOCK_UNLOCK()	mtx_unlock(&rtsock_mtx)
 #define	RTSOCK_LOCK_ASSERT()	mtx_assert(&rtsock_mtx, MA_OWNED)
 
-static SYSCTL_NODE(_net, OID_AUTO, route, CTLFLAG_RD | CTLFLAG_MPSAFE, 0,
-    "");
+SYSCTL_NODE(_net, OID_AUTO, route, CTLFLAG_RD | CTLFLAG_MPSAFE, 0, "");
 
 struct walkarg {
 	int	w_tmemsize;
@@ -176,16 +174,19 @@ static int	rtsock_msg_buffer(int type, struct rt_addrinfo *rtinfo,
 static int	rt_xaddrs(caddr_t cp, caddr_t cplim,
 			struct rt_addrinfo *rtinfo);
 static int	sysctl_dumpentry(struct radix_node *rn, void *vw);
+static int	sysctl_dumpnhop(struct rtentry *rt, struct nhop_object *nh,
+			uint32_t weight, struct walkarg *w);
 static int	sysctl_iflist(int af, struct walkarg *w);
 static int	sysctl_ifmalist(int af, struct walkarg *w);
 static int	route_output(struct mbuf *m, struct socket *so, ...);
-static void	rt_getmetrics(const struct rtentry *rt, struct rt_metrics *out);
+static void	rt_getmetrics(const struct rtentry *rt,
+			const struct nhop_object *nh, struct rt_metrics *out);
 static void	rt_dispatch(struct mbuf *, sa_family_t);
 static int	handle_rtm_get(struct rt_addrinfo *info, u_int fibnum,
 			struct rt_msghdr *rtm, struct rib_cmd_info *rc);
-static int	update_rtm_from_rte(struct rt_addrinfo *info,
+static int	update_rtm_from_rc(struct rt_addrinfo *info,
 			struct rt_msghdr **prtm, int alloc_len,
-			struct rtentry *rt, struct nhop_object *nh);
+			struct rib_cmd_info *rc, struct nhop_object *nh);
 static void	send_rtm_reply(struct socket *so, struct rt_msghdr *rtm,
 			struct mbuf *m, sa_family_t saf, u_int fibnum,
 			int rtm_errno);
@@ -648,6 +649,25 @@ fill_addrinfo(struct rt_msghdr *rtm, int len, u_int fibnum, struct rt_addrinfo *
 	return (0);
 }
 
+static struct nhop_object *
+select_nhop(struct nhop_object *nh, const struct sockaddr *gw)
+{
+	if (!NH_IS_NHGRP(nh))
+		return (nh);
+#ifdef ROUTE_MPATH
+	struct weightened_nhop *wn;
+	uint32_t num_nhops;
+	wn = nhgrp_get_nhops((struct nhgrp_object *)nh, &num_nhops);
+	if (gw == NULL)
+		return (wn[0].nh);
+	for (int i = 0; i < num_nhops; i++) {
+		if (match_nhop_gw(wn[i].nh, gw))
+			return (wn[i].nh);
+	}
+#endif
+	return (NULL);
+}
+
 /*
  * Handles RTM_GET message from routing socket, returning matching rt.
  *
@@ -661,6 +681,7 @@ handle_rtm_get(struct rt_addrinfo *info, u_int fibnum,
 {
 	RIB_RLOCK_TRACKER;
 	struct rib_head *rnh;
+	struct nhop_object *nh;
 	sa_family_t saf;
 
 	saf = info->rti_info[RTAX_DST]->sa_family;
@@ -688,21 +709,12 @@ handle_rtm_get(struct rt_addrinfo *info, u_int fibnum,
 		RIB_RUNLOCK(rnh);
 		return (ESRCH);
 	}
-#ifdef RADIX_MPATH
-	/*
-	 * for RTM_GET, gate is optional even with multipath.
-	 * if gate == NULL the first match is returned.
-	 * (no need to call rt_mpath_matchgate if gate == NULL)
-	 */
-	if (rt_mpath_capable(rnh) && info->rti_info[RTAX_GATEWAY]) {
-		rc->rc_rt = rt_mpath_matchgate(rc->rc_rt,
-		    info->rti_info[RTAX_GATEWAY]);
-		if (rc->rc_rt == NULL) {
-			RIB_RUNLOCK(rnh);
-			return (ESRCH);
-		}
+
+	nh = select_nhop(rc->rc_rt->rt_nhop, info->rti_info[RTAX_GATEWAY]);
+	if (nh == NULL) {
+		RIB_RUNLOCK(rnh);
+		return (ESRCH);
 	}
-#endif
 	/*
 	 * If performing proxied L2 entry insertion, and
 	 * the actual PPP host entry is found, perform
@@ -738,15 +750,21 @@ handle_rtm_get(struct rt_addrinfo *info, u_int fibnum,
 			RIB_RUNLOCK(rnh);
 			return (ESRCH);
 		}
+		nh = select_nhop(rc->rc_rt->rt_nhop, info->rti_info[RTAX_GATEWAY]);
+		if (nh == NULL) {
+			RIB_RUNLOCK(rnh);
+			return (ESRCH);
+		}
 	}
-	rc->rc_nh_new = rc->rc_rt->rt_nhop;
+	rc->rc_nh_new = nh;
+	rc->rc_nh_weight = rc->rc_rt->rt_weight;
 	RIB_RUNLOCK(rnh);
 
 	return (0);
 }
 
 /*
- * Update sockaddrs, flags, etc in @prtm based on @rt data.
+ * Update sockaddrs, flags, etc in @prtm based on @rc data.
  * rtm can be reallocated.
  *
  * Returns 0 on success, along with pointer to (potentially reallocated)
@@ -754,8 +772,8 @@ handle_rtm_get(struct rt_addrinfo *info, u_int fibnum,
  *
  */
 static int
-update_rtm_from_rte(struct rt_addrinfo *info, struct rt_msghdr **prtm,
-    int alloc_len, struct rtentry *rt, struct nhop_object *nh)
+update_rtm_from_rc(struct rt_addrinfo *info, struct rt_msghdr **prtm,
+    int alloc_len, struct rib_cmd_info *rc, struct nhop_object *nh)
 {
 	struct sockaddr_storage netmask_ss;
 	struct walkarg w;
@@ -766,10 +784,10 @@ update_rtm_from_rte(struct rt_addrinfo *info, struct rt_msghdr **prtm,
 
 	rtm = *prtm;
 
-	info->rti_info[RTAX_DST] = rt_key(rt);
+	info->rti_info[RTAX_DST] = rt_key(rc->rc_rt);
 	info->rti_info[RTAX_GATEWAY] = &nh->gw_sa;
-	info->rti_info[RTAX_NETMASK] = rtsock_fix_netmask(rt_key(rt),
-	    rt_mask(rt), &netmask_ss);
+	info->rti_info[RTAX_NETMASK] = rtsock_fix_netmask(rt_key(rc->rc_rt),
+	    rt_mask(rc->rc_rt), &netmask_ss);
 	info->rti_info[RTAX_GENMASK] = 0;
 	ifp = nh->nh_ifp;
 	if (rtm->rtm_addrs & (RTA_IFP | RTA_IFA)) {
@@ -814,12 +832,12 @@ update_rtm_from_rte(struct rt_addrinfo *info, struct rt_msghdr **prtm,
 	w.w_tmemsize = alloc_len;
 	rtsock_msg_buffer(rtm->rtm_type, info, &w, &len);
 
-	if (rt->rt_flags & RTF_GWFLAG_COMPAT)
+	rtm->rtm_flags = rc->rc_rt->rte_flags | nhop_get_rtflags(nh);
+	if (rtm->rtm_flags & RTF_GWFLAG_COMPAT)
 		rtm->rtm_flags = RTF_GATEWAY | 
-			(rt->rt_flags & ~RTF_GWFLAG_COMPAT);
-	else
-		rtm->rtm_flags = rt->rt_flags;
-	rt_getmetrics(rt, &rtm->rtm_rmx);
+			(rtm->rtm_flags & ~RTF_GWFLAG_COMPAT);
+	rt_getmetrics(rc->rc_rt, nh, &rtm->rtm_rmx);
+	rtm->rtm_rmx.rmx_weight = rc->rc_nh_weight;
 	rtm->rtm_addrs = info->rti_addrs;
 
 	if (orig_rtm != NULL)
@@ -828,6 +846,26 @@ update_rtm_from_rte(struct rt_addrinfo *info, struct rt_msghdr **prtm,
 
 	return (0);
 }
+
+#ifdef ROUTE_MPATH
+static void
+save_del_notification(struct rib_cmd_info *rc, void *_cbdata)
+{
+	struct rib_cmd_info *rc_new = (struct rib_cmd_info *)_cbdata;
+
+	if (rc->rc_cmd == RTM_DELETE)
+		*rc_new = *rc;
+}
+
+static void
+save_add_notification(struct rib_cmd_info *rc, void *_cbdata)
+{
+	struct rib_cmd_info *rc_new = (struct rib_cmd_info *)_cbdata;
+
+	if (rc->rc_cmd == RTM_ADD)
+		*rc_new = *rc;
+}
+#endif
 
 /*ARGSUSED*/
 static int
@@ -849,7 +887,6 @@ route_output(struct mbuf *m, struct socket *so, ...)
 	struct nhop_object *nh;
 
 	fibnum = so->so_fibnum;
-
 #define senderr(e) { error = e; goto flush;}
 	if (m == NULL || ((m->m_len < sizeof(long)) &&
 		       (m = m_pullup(m, sizeof(long))) == NULL))
@@ -917,14 +954,33 @@ route_output(struct mbuf *m, struct socket *so, ...)
 #ifdef INET6
 			rti_need_deembed = 1;
 #endif
-			rtm->rtm_index = rc.rc_nh_new->nh_ifp->if_index;
+#ifdef ROUTE_MPATH
+			if (NH_IS_NHGRP(rc.rc_nh_new) ||
+			    (rc.rc_nh_old && NH_IS_NHGRP(rc.rc_nh_old))) {
+				struct rib_cmd_info rc_simple = {};
+				rib_decompose_notification(&rc,
+				    save_add_notification, (void *)&rc_simple);
+				rc = rc_simple;
+			}
+#endif
 			nh = rc.rc_nh_new;
+			rtm->rtm_index = nh->nh_ifp->if_index;
+			rtm->rtm_flags = rc.rc_rt->rte_flags | nhop_get_rtflags(nh);
 		}
 		break;
 
 	case RTM_DELETE:
 		error = rib_action(fibnum, RTM_DELETE, &info, &rc);
 		if (error == 0) {
+#ifdef ROUTE_MPATH
+			if (NH_IS_NHGRP(rc.rc_nh_old) ||
+			    (rc.rc_nh_new && NH_IS_NHGRP(rc.rc_nh_new))) {
+				struct rib_cmd_info rc_simple = {};
+				rib_decompose_notification(&rc,
+				    save_del_notification, (void *)&rc_simple);
+				rc = rc_simple;
+			}
+#endif
 			nh = rc.rc_nh_old;
 			goto report;
 		}
@@ -945,7 +1001,7 @@ report:
 			senderr(ESRCH);
 		}
 
-		error = update_rtm_from_rte(&info, &rtm, alloc_len, rc.rc_rt, nh);
+		error = update_rtm_from_rc(&info, &rtm, alloc_len, &rc, nh);
 		/*
 		 * Note that some sockaddr pointers may have changed to
 		 * point to memory outsize @rtm. Some may be pointing
@@ -1053,15 +1109,15 @@ send_rtm_reply(struct socket *so, struct rt_msghdr *rtm, struct mbuf *m,
 	}
 }
 
-
 static void
-rt_getmetrics(const struct rtentry *rt, struct rt_metrics *out)
+rt_getmetrics(const struct rtentry *rt, const struct nhop_object *nh,
+    struct rt_metrics *out)
 {
 
 	bzero(out, sizeof(*out));
-	out->rmx_mtu = rt->rt_nhop->nh_mtu;
+	out->rmx_mtu = nh->nh_mtu;
 	out->rmx_weight = rt->rt_weight;
-	out->rmx_nhidx = nhop_get_idx(rt->rt_nhop);
+	out->rmx_nhidx = nhop_get_idx(nh);
 	/* Kernel -> userland timebase conversion. */
 	out->rmx_expire = rt->rt_expire ?
 	    rt->rt_expire - time_uptime + time_second : 0;
@@ -1150,7 +1206,6 @@ rtsock_msg_mbuf(int type, struct rt_addrinfo *rtinfo)
 	int len, dlen;
 
 	switch (type) {
-
 	case RTM_DELADDR:
 	case RTM_NEWADDR:
 		len = sizeof(struct ifa_msghdr);
@@ -1237,7 +1292,6 @@ rtsock_msg_buffer(int type, struct rt_addrinfo *rtinfo, struct walkarg *w, int *
 #endif
 
 	switch (type) {
-
 	case RTM_DELADDR:
 	case RTM_NEWADDR:
 		if (w != NULL && w->w_op == NET_RT_IFLISTL) {
@@ -1472,15 +1526,17 @@ rtsock_routemsg(int cmd, struct rtentry *rt, struct ifnet *ifp, int rti_addrs,
 {
 	struct sockaddr_storage ss;
 	struct rt_addrinfo info;
+	struct nhop_object *nh;
 
 	if (V_route_cb.any_count == 0)
 		return (0);
 
+	nh = rt->rt_nhop;
 	bzero((caddr_t)&info, sizeof(info));
 	info.rti_info[RTAX_DST] = rt_key(rt);
 	info.rti_info[RTAX_NETMASK] = rtsock_fix_netmask(rt_key(rt), rt_mask(rt), &ss);
-	info.rti_info[RTAX_GATEWAY] = &rt->rt_nhop->gw_sa;
-	info.rti_flags = rt->rt_flags;
+	info.rti_info[RTAX_GATEWAY] = &nh->gw_sa;
+	info.rti_flags = rt->rte_flags | nhop_get_rtflags(nh);
 	info.rti_ifp = ifp;
 
 	return (rtsock_routemsg_info(cmd, &info, fibnum));
@@ -1681,7 +1737,7 @@ static int
 can_export_rte(struct ucred *td_ucred, const struct rtentry *rt)
 {
 
-	if ((rt->rt_flags & RTF_HOST) == 0
+	if ((rt->rte_flags & RTF_HOST) == 0
 	    ? jailed_without_vnet(td_ucred)
 	    : prison_if(td_ucred, rt_key_const(rt)) != 0)
 		return (0);
@@ -1697,23 +1753,47 @@ sysctl_dumpentry(struct radix_node *rn, void *vw)
 	struct walkarg *w = vw;
 	struct rtentry *rt = (struct rtentry *)rn;
 	struct nhop_object *nh;
-	int error = 0, size;
-	struct rt_addrinfo info;
-	struct sockaddr_storage ss;
+	int error = 0;
 
 	NET_EPOCH_ASSERT();
 
-	if (w->w_op == NET_RT_FLAGS && !(rt->rt_flags & w->w_arg))
+	if (w->w_op == NET_RT_FLAGS && !(rt->rte_flags & w->w_arg))
 		return 0;
 	if (!can_export_rte(w->w_req->td->td_ucred, rt))
 		return (0);
+	nh = rt->rt_nhop;
+#ifdef ROUTE_MPATH
+	if (NH_IS_NHGRP(nh)) {
+		struct weightened_nhop *wn;
+		uint32_t num_nhops;
+		wn = nhgrp_get_nhops((struct nhgrp_object *)nh, &num_nhops);
+		for (int i = 0; i < num_nhops; i++) {
+			error = sysctl_dumpnhop(rt, wn[i].nh, wn[i].weight, w);
+			if (error != 0)
+				return (error);
+		}
+	} else
+#endif
+		error = sysctl_dumpnhop(rt, nh, rt->rt_weight, w);
+
+	return (0);
+}
+
+
+static int
+sysctl_dumpnhop(struct rtentry *rt, struct nhop_object *nh, uint32_t weight,
+    struct walkarg *w)
+{
+	struct rt_addrinfo info;
+	int error = 0, size;
+	struct sockaddr_storage ss;
+
 	bzero((caddr_t)&info, sizeof(info));
 	info.rti_info[RTAX_DST] = rt_key(rt);
-	info.rti_info[RTAX_GATEWAY] = &rt->rt_nhop->gw_sa;
+	info.rti_info[RTAX_GATEWAY] = &nh->gw_sa;
 	info.rti_info[RTAX_NETMASK] = rtsock_fix_netmask(rt_key(rt),
 	    rt_mask(rt), &ss);
 	info.rti_info[RTAX_GENMASK] = 0;
-	nh = rt->rt_nhop;
 	if (nh->nh_ifp && !(nh->nh_ifp->if_flags & IFF_DYING)) {
 		info.rti_info[RTAX_IFP] = nh->nh_ifp->if_addr->ifa_addr;
 		info.rti_info[RTAX_IFA] = nh->nh_ifa->ifa_addr;
@@ -1727,13 +1807,14 @@ sysctl_dumpentry(struct radix_node *rn, void *vw)
 
 		bzero(&rtm->rtm_index,
 		    sizeof(*rtm) - offsetof(struct rt_msghdr, rtm_index));
-		if (rt->rt_flags & RTF_GWFLAG_COMPAT)
+		if (rt->rte_flags & RTF_GWFLAG_COMPAT)
 			rtm->rtm_flags = RTF_GATEWAY | 
-				(rt->rt_flags & ~RTF_GWFLAG_COMPAT);
+				(rt->rte_flags & ~RTF_GWFLAG_COMPAT);
 		else
-			rtm->rtm_flags = rt->rt_flags;
+			rtm->rtm_flags = rt->rte_flags;
 		rtm->rtm_flags |= nhop_get_rtflags(nh);
-		rt_getmetrics(rt, &rtm->rtm_rmx);
+		rt_getmetrics(rt, nh, &rtm->rtm_rmx);
+		rtm->rtm_rmx.rmx_weight = weight;
 		rtm->rtm_index = nh->nh_ifp->if_index;
 		rtm->rtm_addrs = info.rti_addrs;
 		error = SYSCTL_OUT(w->w_req, (caddr_t)rtm, size);
@@ -2014,7 +2095,7 @@ sysctl_rtsock(SYSCTL_HANDLER_ARGS)
 	namelen--;
 	if (req->newptr)
 		return (EPERM);
-	if (name[1] == NET_RT_DUMP || name[1] == NET_RT_NHOP) {
+	if (name[1] == NET_RT_DUMP || name[1] == NET_RT_NHOP || name[1] == NET_RT_NHGRP) {
 		if (namelen == 3)
 			fib = req->td->td_proc->p_fibnum;
 		else if (namelen == 4)
@@ -2037,7 +2118,7 @@ sysctl_rtsock(SYSCTL_HANDLER_ARGS)
 	error = sysctl_wire_old_buffer(req, 0);
 	if (error)
 		return (error);
-	
+
 	/*
 	 * Allocate reply buffer in advance.
 	 * All rtsock messages has maximum length of u_short.
@@ -2082,6 +2163,7 @@ sysctl_rtsock(SYSCTL_HANDLER_ARGS)
 		}
 		break;
 	case NET_RT_NHOP:
+	case NET_RT_NHGRP:
 		/* Allow dumping one specific af/fib at a time */
 		if (namelen < 4) {
 			error = EINVAL;
@@ -2099,6 +2181,12 @@ sysctl_rtsock(SYSCTL_HANDLER_ARGS)
 		}
 		if (w.w_op == NET_RT_NHOP)
 			error = nhops_dump_sysctl(rnh, w.w_req);
+		else
+#ifdef ROUTE_MPATH
+			error = nhgrp_dump_sysctl(rnh, w.w_req);
+#else
+			error = ENOTSUP;
+#endif
 		break;
 	case NET_RT_IFLIST:
 	case NET_RT_IFLISTL:
@@ -2138,10 +2226,9 @@ static struct protosw routesw[] = {
 
 static struct domain routedomain = {
 	.dom_family =		PF_ROUTE,
-	.dom_name =		 "route",
+	.dom_name =		"route",
 	.dom_protosw =		routesw,
 	.dom_protoswNPROTOSW =	&routesw[nitems(routesw)]
 };
 
 VNET_DOMAIN_SET(route);
-

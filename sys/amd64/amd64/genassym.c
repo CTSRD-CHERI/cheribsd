@@ -99,11 +99,10 @@ ASSYM(TDP_KTHREAD, TDP_KTHREAD);
 ASSYM(PAGE_SIZE, PAGE_SIZE);
 ASSYM(NPTEPG, NPTEPG);
 ASSYM(NPDEPG, NPDEPG);
-ASSYM(addr_PTmap, addr_PTmap);
-ASSYM(addr_PDmap, addr_PDmap);
-ASSYM(addr_PDPmap, addr_PDPmap);
-ASSYM(addr_PML4map, addr_PML4map);
-ASSYM(addr_PML4pml4e, addr_PML4pml4e);
+ASSYM(addr_P4Tmap, addr_P4Tmap);
+ASSYM(addr_P4Dmap, addr_P4Dmap);
+ASSYM(addr_P5Tmap, addr_P5Tmap);
+ASSYM(addr_P5Dmap, addr_P5Dmap);
 ASSYM(PDESIZE, sizeof(pd_entry_t));
 ASSYM(PTESIZE, sizeof(pt_entry_t));
 ASSYM(PAGE_SHIFT, PAGE_SHIFT);
@@ -239,7 +238,7 @@ ASSYM(PC_IBPB_SET, offsetof(struct pcpu, pc_ibpb_set));
 ASSYM(PC_MDS_TMP, offsetof(struct pcpu, pc_mds_tmp));
 ASSYM(PC_MDS_BUF, offsetof(struct pcpu, pc_mds_buf));
 ASSYM(PC_MDS_BUF64, offsetof(struct pcpu, pc_mds_buf64));
- 
+
 ASSYM(LA_EOI, LAPIC_EOI * LAPIC_MEM_MUL);
 ASSYM(LA_ISR, LAPIC_ISR0 * LAPIC_MEM_MUL);
 

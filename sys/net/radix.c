@@ -44,10 +44,6 @@
 #include <sys/malloc.h>
 #include <sys/syslog.h>
 #include <net/radix.h>
-#include "opt_mpath.h"
-#ifdef RADIX_MPATH
-#include <net/radix_mpath.h>
-#endif
 #else /* !_KERNEL */
 #include <stdio.h>
 #include <strings.h>
@@ -77,7 +73,6 @@ static char rn_ones[RADIX_MAX_KEY_LEN] = {
 	-1, -1, -1, -1, -1, -1, -1, -1,
 	-1, -1, -1, -1, -1, -1, -1, -1,
 };
-
 
 static int	rn_lexobetter(void *m_arg, void *n_arg);
 static struct radix_mask *
@@ -1059,7 +1054,6 @@ rn_walktree_from(struct radix_head *h, void *a, void *m,
 			/* printf("root, stopping"); */
 			stopping = 1;
 		}
-
 	}
 	return (0);
 }
@@ -1134,7 +1128,7 @@ rn_detachhead_internal(struct radix_head *head)
 
 	KASSERT((head != NULL),
 	    ("%s: head already freed", __func__));
-	
+
 	/* Free <left,root,right> nodes. */
 	R_Free(head);
 }
@@ -1210,4 +1204,3 @@ rn_detachhead(void **head)
 
 	return (1);
 }
-

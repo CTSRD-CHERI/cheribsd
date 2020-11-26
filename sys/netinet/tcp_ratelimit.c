@@ -917,7 +917,6 @@ tcp_find_suitable_rate(const struct tcp_rate_set *rs, uint64_t bytes_per_sec, ui
 	int i, matched;
 	struct tcp_hwrate_limit_table *rte = NULL;
 
-
 	if ((rs->rs_flags & RS_INT_TBL) &&
 	    (rs->rs_rate_cnt >= ALL_HARDWARE_RATES)) {
 		/*
@@ -1138,7 +1137,7 @@ tcp_rl_ifnet_link(void *arg __unused, struct ifnet *ifp, int link_state)
 	int error;
 	struct tcp_rate_set *rs;
 
-	if (((ifp->if_capabilities & IFCAP_TXRTLMT) == 0) ||
+	if (((ifp->if_capenable & IFCAP_TXRTLMT) == 0) ||
 	    (link_state != LINK_STATE_UP)) {
 		/*
 		 * We only care on an interface going up that is rate-limit
@@ -1225,7 +1224,7 @@ tcp_set_pacing_rate(struct tcpcb *tp, struct ifnet *ifp,
 		/*
 		 * We are setting up a rate for the first time.
 		 */
-		if ((ifp->if_capabilities & IFCAP_TXRTLMT) == 0) {
+		if ((ifp->if_capenable & IFCAP_TXRTLMT) == 0) {
 			/* Not supported by the egress */
 			if (error)
 				*error = ENODEV;
@@ -1264,7 +1263,6 @@ tcp_chg_pacing_rate(const struct tcp_hwrate_limit_table *crte,
 	const struct tcp_rate_set *rs;
 	int is_indirect = 0;
 	int err;
-
 
 	if ((tp->t_inpcb->inp_snd_tag == NULL) ||
 	    (crte == NULL)) {
@@ -1365,7 +1363,6 @@ tcp_rel_pacing_rate(const struct tcp_hwrate_limit_table *crte, struct tcpcb *tp)
 #define ONE_HUNDRED_MBPS 12500000	/* 100Mbps in bytes per second */
 #define FIVE_HUNDRED_MBPS 62500000	/* 500Mbps in bytes per second */
 #define MAX_MSS_SENT 43	/* 43 mss = 43 x 1500 = 64,500 bytes */
-
 
 uint32_t
 tcp_get_pacing_burst_size (uint64_t bw, uint32_t segsiz, int can_use_1mss,

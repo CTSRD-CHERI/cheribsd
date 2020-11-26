@@ -55,13 +55,12 @@ __FBSDID("$FreeBSD$");
 
 #include "linker_if.h"
 
-u_long elf_hwcap;
+u_long __read_frequently elf_hwcap;
+u_long __read_frequently elf_hwcap2;
 
 static struct sysentvec elf64_freebsd_sysvec = {
 	.sv_size	= SYS_MAXSYSCALL,
 	.sv_table	= sysent,
-	.sv_errsize	= 0,
-	.sv_errtbl	= NULL,
 	.sv_transtrap	= NULL,
 	.sv_fixup	= __elfN(freebsd_fixup),
 	.sv_sendsig	= sendsig,
@@ -92,6 +91,7 @@ static struct sysentvec elf64_freebsd_sysvec = {
 	.sv_thread_detach = NULL,
 	.sv_trap	= NULL,
 	.sv_hwcap	= &elf_hwcap,
+	.sv_hwcap2	= &elf_hwcap2,
 };
 INIT_SYSENTVEC(elf64_sysvec, &elf64_freebsd_sysvec);
 
@@ -227,7 +227,8 @@ elf_reloc_internal(linker_file_t lf, char *relocbase, const void *data,
 			*where = val;
 		break;
 	default:
-		printf("kldload: unexpected relocation type %d\n", rtype);
+		printf("kldload: unexpected relocation type %d, "
+		    "symbol index %d\n", rtype, symidx);
 		return (-1);
 	}
 	return (error);

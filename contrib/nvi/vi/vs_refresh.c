@@ -9,16 +9,13 @@
 
 #include "config.h"
 
-#ifndef lint
-static const char sccsid[] = "$Id: vs_refresh.c,v 10.54 2015/04/08 16:32:49 zy Exp $";
-#endif /* not lint */
-
 #include <sys/types.h>
 #include <sys/queue.h>
 #include <sys/time.h>
 
 #include <bitstring.h>
 #include <ctype.h>
+#include <libgen.h>
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -244,7 +241,7 @@ vs_paint(
 	 * screen but the column offset is not, we'll end up in the adjust
 	 * code, when we should probably have compressed the screen.
 	 */
-	if (IS_SMALL(sp))
+	if (IS_SMALL(sp)) {
 		if (LNO < HMAP->lno) {
 			lcnt = vs_sm_nlines(sp, HMAP, LNO, sp->t_maxrows);
 			if (lcnt <= HALFSCREEN(sp))
@@ -281,6 +278,7 @@ small_fill:			(void)gp->scr_move(sp, LASTLINE(sp), 0);
 				goto adjust;
 			}
 		}
+	}
 
 	/*
 	 * 6b: Line down, or current screen.
@@ -393,7 +391,7 @@ top:		if (vs_sm_fill(sp, LNO, P_TOP))
 adjust:	if (!O_ISSET(sp, O_LEFTRIGHT) &&
 	    (LNO == HMAP->lno || LNO == TMAP->lno)) {
 		cnt = vs_screens(sp, LNO, &CNO);
-		if (LNO == HMAP->lno && cnt < HMAP->soff)
+		if (LNO == HMAP->lno && cnt < HMAP->soff) {
 			if ((HMAP->soff - cnt) > HALFTEXT(sp)) {
 				HMAP->soff = cnt;
 				vs_sm_fill(sp, OOBLNO, P_TOP);
@@ -402,7 +400,8 @@ adjust:	if (!O_ISSET(sp, O_LEFTRIGHT) &&
 				while (cnt < HMAP->soff)
 					if (vs_sm_1down(sp))
 						return (1);
-		if (LNO == TMAP->lno && cnt > TMAP->soff)
+		}
+		if (LNO == TMAP->lno && cnt > TMAP->soff) {
 			if ((cnt - TMAP->soff) > HALFTEXT(sp)) {
 				TMAP->soff = cnt;
 				vs_sm_fill(sp, OOBLNO, P_BOTTOM);
@@ -411,6 +410,7 @@ adjust:	if (!O_ISSET(sp, O_LEFTRIGHT) &&
 				while (cnt > TMAP->soff)
 					if (vs_sm_1up(sp))
 						return (1);
+		}
 	}
 
 	/*
@@ -469,7 +469,7 @@ adjust:	if (!O_ISSET(sp, O_LEFTRIGHT) &&
 	/* Sanity checking. */
 	if (CNO >= len && len != 0) {
 		msgq(sp, M_ERR, "Error: %s/%d: cno (%zu) >= len (%zu)",
-		     tail(__FILE__), __LINE__, CNO, len);
+		     basename(__FILE__), __LINE__, CNO, len);
 		return (1);
 	}
 #endif
@@ -503,7 +503,7 @@ adjust:	if (!O_ISSET(sp, O_LEFTRIGHT) &&
 
 		/*
 		 * Count up the widths of the characters.  If it's a tab
-		 * character, go do it the the slow way.
+		 * character, go do it the slow way.
 		 */
 		for (cwtotal = 0; cnt--; cwtotal += KEY_COL(sp, ch))
 			if ((ch = *(UCHAR_T *)p--) == '\t')
@@ -541,7 +541,7 @@ adjust:	if (!O_ISSET(sp, O_LEFTRIGHT) &&
 
 		/*
 		 * Count up the widths of the characters.  If it's a tab
-		 * character, go do it the the slow way.  If we cross a
+		 * character, go do it the slow way.  If we cross a
 		 * screen boundary, we can quit.
 		 */
 		for (cwtotal = SCNO; cnt--;) {

@@ -371,7 +371,6 @@ struct asmc_model asmc_models[] = {
 	  ASMC_LIGHT_FUNCS,
 	  ASMC_MBA7_TEMPS, ASMC_MBA7_TEMPNAMES, ASMC_MBA7_TEMPDESCS
 	},
-
 	{ NULL, NULL }
 };
 
@@ -389,7 +388,6 @@ static device_method_t	asmc_methods[] = {
 	DEVMETHOD(device_attach,	asmc_attach),
 	DEVMETHOD(device_detach,	asmc_detach),
 	DEVMETHOD(device_resume,	asmc_resume),
-
 	{ 0, 0 }
 };
 
@@ -712,7 +710,6 @@ asmc_resume(device_t dev)
     return (0);
 }
 
-
 #ifdef DEBUG
 void asmc_dumpall(device_t dev)
 {
@@ -871,7 +868,6 @@ asmc_wait(device_t dev, uint8_t val)
  */
 static int
 asmc_command(device_t dev, uint8_t command) {
-
 	int i;
 	struct asmc_softc *sc = device_get_softc(dev);
 
@@ -1073,7 +1069,7 @@ asmc_fan_count(device_t dev)
 {
 	uint8_t buf[1];
 
-	if (asmc_key_read(dev, ASMC_KEY_FANCOUNT, buf, sizeof buf) < 0)
+	if (asmc_key_read(dev, ASMC_KEY_FANCOUNT, buf, sizeof buf) != 0)
 		return (-1);
 
 	return (buf[0]);
@@ -1087,7 +1083,7 @@ asmc_fan_getvalue(device_t dev, const char *key, int fan)
 	char fankey[5];
 
 	snprintf(fankey, sizeof(fankey), key, fan);
-	if (asmc_key_read(dev, fankey, buf, sizeof buf) < 0)
+	if (asmc_key_read(dev, fankey, buf, sizeof buf) != 0)
 		return (-1);
 	speed = (buf[0] << 6) | (buf[1] >> 2);
 
@@ -1101,7 +1097,7 @@ asmc_fan_getstring(device_t dev, const char *key, int fan, uint8_t *buf, uint8_t
 	char* desc;
 
 	snprintf(fankey, sizeof(fankey), key, fan);
-	if (asmc_key_read(dev, fankey, buf, buflen) < 0)
+	if (asmc_key_read(dev, fankey, buf, buflen) != 0)
 		return (NULL);
 	desc = buf+4;
 
@@ -1171,7 +1167,6 @@ asmc_mb_sysctl_fansafespeed(SYSCTL_HANDLER_ARGS)
 	return (error);
 }
 
-
 static int
 asmc_mb_sysctl_fanminspeed(SYSCTL_HANDLER_ARGS)
 {
@@ -1240,7 +1235,7 @@ asmc_temp_getvalue(device_t dev, const char *key)
 	/*
 	 * Check for invalid temperatures.
 	 */
-	if (asmc_key_read(dev, key, buf, sizeof buf) < 0)
+	if (asmc_key_read(dev, key, buf, sizeof buf) != 0)
 		return (-1);
 
 	return (buf[0]);
@@ -1315,8 +1310,6 @@ asmc_sms_intrfast(void *arg)
 	taskqueue_enqueue(sc->sc_sms_tq, &sc->sc_sms_task);
 	return (FILTER_HANDLED);
 }
-
-
 
 static void
 asmc_sms_printintr(device_t dev, uint8_t type)

@@ -598,7 +598,6 @@ nfs_access(struct vop_access_args *ap)
 	}
 }
 
-
 /*
  * nfs open vnode op
  * Check to see if the type is ok
@@ -1176,7 +1175,7 @@ nfs_lookup(struct vop_lookup_args *ap)
 	struct nfsvattr dnfsva, nfsva;
 	struct vattr vattr;
 	struct timespec nctime;
-	
+
 	*vpp = NULLVP;
 	if ((flags & ISLASTCN) && (mp->mnt_flag & MNT_RDONLY) &&
 	    (cnp->cn_nameiop == DELETE || cnp->cn_nameiop == RENAME))
@@ -2340,7 +2339,7 @@ nfs_readdir(struct vop_readdir_args *ap)
 	ssize_t tresid, left;
 	int error = 0;
 	struct vattr vattr;
-	
+
 	if (ap->a_eofflag != NULL)
 		*ap->a_eofflag = 0;
 	if (vp->v_type != VDIR) 
@@ -2387,7 +2386,7 @@ nfs_readdir(struct vop_readdir_args *ap)
 		if (ap->a_eofflag != NULL)
 			*ap->a_eofflag = 1;
 	}
-	
+
 	/* Add the partial DIRBLKSIZ (left) back in. */
 	uio->uio_resid += left;
 	return (error);
@@ -3147,7 +3146,7 @@ nfs_advlock(struct vop_advlock_args *ap)
 	struct vattr va;
 	int ret, error;
 	u_quad_t size;
-	
+
 	error = NFSVOPLOCK(vp, LK_SHARED);
 	if (error != 0)
 		return (EBADF);
@@ -3276,7 +3275,7 @@ nfs_advlockasync(struct vop_advlockasync_args *ap)
 	struct vnode *vp = ap->a_vp;
 	u_quad_t size;
 	int error;
-	
+
 	if (NFS_ISV4(vp))
 		return (EOPNOTSUPP);
 	error = NFSVOPLOCK(vp, LK_SHARED);
@@ -3638,7 +3637,7 @@ nfs_copy_file_range(struct vop_copy_file_range_args *ap)
 	struct vattr *vap;
 	struct uio io;
 	struct nfsmount *nmp;
-	size_t len, len2, copiedlen;
+	size_t len, len2;
 	int error, inattrflag, outattrflag, ret, ret2;
 	off_t inoff, outoff;
 	bool consecutive, must_commit, tryoutcred;
@@ -3731,7 +3730,11 @@ nfs_copy_file_range(struct vop_copy_file_range_args *ap)
 		} else
 			error = 0;
 	}
-	copiedlen = 0;
+
+	/*
+	 * len will be set to 0 upon a successful Copy RPC.
+	 * As such, this only loops when the Copy RPC needs to be retried.
+	 */
 	while (len > 0 && error == 0) {
 		inattrflag = outattrflag = 0;
 		len2 = len;
@@ -3761,18 +3764,9 @@ nfs_copy_file_range(struct vop_copy_file_range_args *ap)
 				} else
 					error = NFSERR_OFFLOADNOREQS;
 			}
-			/*
-			 * If the Copy returns a length == 0, it hit the
-			 * EOF on the input file.
-			 */
-			if (len2 == 0) {
-				*ap->a_lenp = copiedlen;
-				len = 0;
-			} else {
-				len -= len2;
-				copiedlen += len2;
-			}
-			if (len == 0 && must_commit && error == 0)
+			*ap->a_lenp = len2;
+			len = 0;
+			if (len2 > 0 && must_commit && error == 0)
 				error = ncl_commit(outvp, outoff, *ap->a_lenp,
 				    ap->a_outcred, curthread);
 			if (error == 0 && ret != 0)
@@ -3783,6 +3777,9 @@ nfs_copy_file_range(struct vop_copy_file_range_args *ap)
 			/*
 			 * Try consecutive == false, which is ok only if all
 			 * bytes are copied.
+			 * If only some bytes were copied when consecutive
+			 * is false, there is no way to know which bytes
+			 * still need to be written.
 			 */
 			consecutive = false;
 			error = 0;
@@ -4291,7 +4288,6 @@ nfs_pathconf(struct vop_pathconf_args *ap)
 	}
 	return (error);
 }
-
 // CHERI CHANGES START
 // {
 //   "updated": 20181114,

@@ -272,7 +272,6 @@ fdesc_get_ino_alloc(struct mount *mp, void *arg, int lkflags,
 	return (error);
 }
 
-
 /*
  * vp is the current namei directory
  * ndp is the name to locate in that directory...
@@ -640,7 +639,7 @@ fdesc_readlink(struct vop_readlink_args *va)
 	switch (fp->f_type) {
 	case DTYPE_VNODE:
 		vp = fp->f_vnode;
-		error = vn_fullpath(td, vp, &fullpath, &freepath);
+		error = vn_fullpath(vp, &fullpath, &freepath);
 		break;
 	default:
 		fullpath = "anon_inode:[unknown]";

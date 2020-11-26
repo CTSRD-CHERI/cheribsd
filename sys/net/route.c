@@ -39,7 +39,6 @@
 #include "opt_inet.h"
 #include "opt_inet6.h"
 #include "opt_mrouting.h"
-#include "opt_mpath.h"
 #include "opt_route.h"
 
 #include <sys/param.h>
@@ -64,7 +63,6 @@
 #include <net/route/route_ctl.h>
 #include <net/route/route_var.h>
 #include <net/route/nhop.h>
-#include <net/route/shared.h>
 #include <net/vnet.h>
 
 #ifdef RADIX_MPATH
@@ -214,18 +212,19 @@ rib_add_redirect(u_int fibnum, struct sockaddr *dst, struct sockaddr *gateway,
 	/* Verify the allowed flag mask. */
 	KASSERT(((flags & ~(RTF_GATEWAY)) == 0),
 	    ("invalid redirect flags: %x", flags));
+	flags |= RTF_HOST | RTF_DYNAMIC;
 
 	/* Get the best ifa for the given interface and gateway. */
 	if ((ifa = ifaof_ifpforaddr(gateway, ifp)) == NULL)
 		return (ENETUNREACH);
 	ifa_ref(ifa);
-	
+
 	bzero(&info, sizeof(info));
 	info.rti_info[RTAX_DST] = dst;
 	info.rti_info[RTAX_GATEWAY] = gateway;
 	info.rti_ifa = ifa;
 	info.rti_ifp = ifp;
-	info.rti_flags = flags | RTF_HOST | RTF_DYNAMIC;
+	info.rti_flags = flags;
 
 	/* Setup route metrics to define expire time. */
 	bzero(&rti_rmx, sizeof(rti_rmx));
@@ -242,10 +241,6 @@ rib_add_redirect(u_int fibnum, struct sockaddr *dst, struct sockaddr *gateway,
 		return (error);
 	}
 
-	RT_LOCK(rc.rc_rt);
-	flags = rc.rc_rt->rt_flags;
-	RT_UNLOCK(rc.rc_rt);
-
 	RTSTAT_INC(rts_dynamic);
 
 	/* Send notification of a route addition to userland. */
@@ -253,7 +248,7 @@ rib_add_redirect(u_int fibnum, struct sockaddr *dst, struct sockaddr *gateway,
 	info.rti_info[RTAX_DST] = dst;
 	info.rti_info[RTAX_GATEWAY] = gateway;
 	info.rti_info[RTAX_AUTHOR] = author;
-	rt_missmsg_fib(RTM_REDIRECT, &info, flags, error, fibnum);
+	rt_missmsg_fib(RTM_REDIRECT, &info, flags | RTF_UP, error, fibnum);
 
 	return (0);
 }
@@ -332,7 +327,6 @@ ifa_ifwithroute(int flags, const struct sockaddr *dst,
 	return (ifa);
 }
 
-
 /*
  * Copy most of @rt data into @info.
  *
@@ -354,6 +348,7 @@ rt_exportinfo(struct rtentry *rt, struct rt_addrinfo *info, int flags)
 	struct nhop_object *nh;
 	int sa_len;
 
+	nh = rt->rt_nhop;
 	if (flags & NHR_COPY) {
 		/* Copy destination if dst is non-zero */
 		src = rt_key(rt);
@@ -370,7 +365,6 @@ rt_exportinfo(struct rtentry *rt, struct rt_addrinfo *info, int flags)
 		src = rt_mask(rt);
 		dst = info->rti_info[RTAX_NETMASK];
 		if (src != NULL && dst != NULL) {
-
 			/*
 			 * Radix stores different value in sa_len,
 			 * assume rt_mask() to have the same length
@@ -383,9 +377,10 @@ rt_exportinfo(struct rtentry *rt, struct rt_addrinfo *info, int flags)
 		}
 
 		/* Copy gateway is set && dst is non-zero */
-		src = &rt->rt_nhop->gw_sa;
+		src = &nh->gw_sa;
 		dst = info->rti_info[RTAX_GATEWAY];
-		if ((rt->rt_flags & RTF_GATEWAY) && src != NULL && dst != NULL){
+		if ((nhop_get_rtflags(nh) & RTF_GATEWAY) &&
+		    src != NULL && dst != NULL) {
 			if (src->sa_len > dst->sa_len)
 				return (ENOMEM);
 			memcpy(dst, src, src->sa_len);
@@ -398,20 +393,19 @@ rt_exportinfo(struct rtentry *rt, struct rt_addrinfo *info, int flags)
 			info->rti_info[RTAX_NETMASK] = rt_mask(rt);
 			info->rti_addrs |= RTA_NETMASK;
 		}
-		if (rt->rt_flags & RTF_GATEWAY) {
-			info->rti_info[RTAX_GATEWAY] = &rt->rt_nhop->gw_sa;
+		if (nhop_get_rtflags(nh) & RTF_GATEWAY) {
+			info->rti_info[RTAX_GATEWAY] = &nh->gw_sa;
 			info->rti_addrs |= RTA_GATEWAY;
 		}
 	}
 
-	nh = rt->rt_nhop;
 	rmx = info->rti_rmx;
 	if (rmx != NULL) {
 		info->rti_mflags |= RTV_MTU;
 		rmx->rmx_mtu = nh->nh_mtu;
 	}
 
-	info->rti_flags = rt->rt_flags | nhop_get_rtflags(nh);
+	info->rti_flags = rt->rte_flags | nhop_get_rtflags(nh);
 	info->rti_ifp = nh->nh_ifp;
 	info->rti_ifa = nh->nh_ifa;
 	if (flags & NHR_REF) {
@@ -579,7 +573,7 @@ rt_ifdelroute(const struct rtentry *rt, const struct nhop_object *nh, void *arg)
 	 * Protect (sorta) against walktree recursion problems
 	 * with cloned routes
 	 */
-	if ((rt->rt_flags & RTF_UP) == 0)
+	if ((rt->rte_flags & RTF_UP) == 0)
 		return (0);
 
 	return (1);
@@ -721,7 +715,6 @@ rt_updatemtu(struct ifnet *ifp)
 	}
 }
 
-
 #if 0
 int p_sockaddr(char *buf, int buflen, struct sockaddr *s);
 int rt_print(char *buf, int buflen, struct rtentry *rt);
@@ -745,7 +738,7 @@ p_sockaddr(char *buf, int buflen, struct sockaddr *s)
 
 	if (inet_ntop(s->sa_family, paddr, buf, buflen) == NULL)
 		return (0);
-	
+
 	return (strlen(buf));
 }
 
@@ -810,10 +803,8 @@ rt_mpath_unlink(struct rib_head *rnh, struct rt_addrinfo *info,
 		 */
 		if (rn) {
 			rto = RNTORT(rn);
-			RT_LOCK(rto);
-			rto->rt_flags |= RTF_UP;
-			RT_UNLOCK(rto);
-		} else if (rt->rt_flags & RTF_GATEWAY) {
+			rto->rte_flags |= RTF_UP;
+		} else if (rt->rte_flags & RTF_GATEWAY) {
 			/*
 			 * For gateway routes, we need to 
 			 * make sure that we we are deleting
@@ -857,18 +848,6 @@ rt_mpath_unlink(struct rib_head *rnh, struct rt_addrinfo *info,
 #endif
 
 void
-rt_setmetrics(const struct rt_addrinfo *info, struct rtentry *rt)
-{
-
-	if (info->rti_mflags & RTV_WEIGHT)
-		rt->rt_weight = info->rti_rmx->rmx_weight;
-	/* Kernel -> userland timebase conversion. */
-	if (info->rti_mflags & RTV_EXPIRE)
-		rt->rt_expire = info->rti_rmx->rmx_expire ?
-		    info->rti_rmx->rmx_expire - time_second + time_uptime : 0;
-}
-
-void
 rt_maskedcopy(struct sockaddr *src, struct sockaddr *dst, struct sockaddr *netmask)
 {
 	u_char *cp1 = (u_char *)src;
@@ -891,7 +870,6 @@ rt_maskedcopy(struct sockaddr *src, struct sockaddr *dst, struct sockaddr *netma
  * Set up a routing table entry, normally
  * for an interface.
  */
-#define _SOCKADDR_TMPSIZE 128 /* Not too big.. kernel stack size is limited */
 static inline  int
 rtinit1(struct ifaddr *ifa, int cmd, int flags, int fibnum)
 {
@@ -903,10 +881,10 @@ rtinit1(struct ifaddr *ifa, int cmd, int flags, int fibnum)
 	struct rt_addrinfo info;
 	int error = 0;
 	int startfib, endfib;
-	char tempbuf[_SOCKADDR_TMPSIZE];
+	struct sockaddr_storage ss;
 	int didwork = 0;
 	int a_failure = 0;
-	struct sockaddr_dl_short *sdl = NULL;
+	struct sockaddr_dl_short sdl;
 	struct rib_head *rnh;
 
 	if (flags & RTF_HOST) {
@@ -954,17 +932,15 @@ rtinit1(struct ifaddr *ifa, int cmd, int flags, int fibnum)
 		 * XXX this is kinda inet specific..
 		 */
 		if (netmask != NULL) {
-			rt_maskedcopy(dst, (struct sockaddr *)tempbuf, netmask);
-			dst = (struct sockaddr *)tempbuf;
+			rt_maskedcopy(dst, (struct sockaddr *)&ss, netmask);
+			dst = (struct sockaddr *)&ss;
 		}
-	} else if (cmd == RTM_ADD) {
-		sdl = (struct sockaddr_dl_short *)tempbuf;
-		bzero(sdl, sizeof(struct sockaddr_dl_short));
-		sdl->sdl_family = AF_LINK;
-		sdl->sdl_len = sizeof(struct sockaddr_dl_short);
-		sdl->sdl_type = ifa->ifa_ifp->if_type;
-		sdl->sdl_index = ifa->ifa_ifp->if_index;
-        }
+	}
+	bzero(&sdl, sizeof(struct sockaddr_dl_short));
+	sdl.sdl_family = AF_LINK;
+	sdl.sdl_len = sizeof(struct sockaddr_dl_short);
+	sdl.sdl_type = ifa->ifa_ifp->if_type;
+	sdl.sdl_index = ifa->ifa_ifp->if_index;
 	/*
 	 * Now go through all the requested tables (fibs) and do the
 	 * requested action. Realistically, this will either be fib 0
@@ -986,7 +962,6 @@ rtinit1(struct ifaddr *ifa, int cmd, int flags, int fibnum)
 			rn = rnh->rnh_lookup(dst, netmask, &rnh->head);
 #ifdef RADIX_MPATH
 			if (rt_mpath_capable(rnh)) {
-
 				if (rn == NULL) 
 					error = ESRCH;
 				else {
@@ -1021,13 +996,7 @@ rtinit1(struct ifaddr *ifa, int cmd, int flags, int fibnum)
 		info.rti_flags = flags |
 		    (ifa->ifa_flags & ~IFA_RTSELF) | RTF_PINNED;
 		info.rti_info[RTAX_DST] = dst;
-		/* 
-		 * doing this for compatibility reasons
-		 */
-		if (cmd == RTM_ADD)
-			info.rti_info[RTAX_GATEWAY] = (struct sockaddr *)sdl;
-		else
-			info.rti_info[RTAX_GATEWAY] = ifa->ifa_addr;
+		info.rti_info[RTAX_GATEWAY] = (struct sockaddr *)&sdl;
 		info.rti_info[RTAX_NETMASK] = netmask;
 		NET_EPOCH_ENTER(et);
 		error = rib_action(fibnum, cmd, &info, &rc);
@@ -1120,7 +1089,7 @@ rt_routemsg(int cmd, struct rtentry *rt, struct ifnet *ifp, int rti_addrs,
 
 	KASSERT(cmd == RTM_ADD || cmd == RTM_DELETE,
 	    ("unexpected cmd %d", cmd));
-	
+
 	KASSERT(fibnum == RT_ALL_FIBS || (fibnum >= 0 && fibnum < rt_numfibs),
 	    ("%s: fib out of range 0 <=%d<%d", __func__, fibnum, rt_numfibs));
 
@@ -1143,7 +1112,7 @@ rt_routemsg_info(int cmd, struct rt_addrinfo *info, int fibnum)
 
 	KASSERT(cmd == RTM_ADD || cmd == RTM_DELETE || cmd == RTM_CHANGE,
 	    ("unexpected cmd %d", cmd));
-	
+
 	KASSERT(fibnum == RT_ALL_FIBS || (fibnum >= 0 && fibnum < rt_numfibs),
 	    ("%s: fib out of range 0 <=%d<%d", __func__, fibnum, rt_numfibs));
 
@@ -1151,7 +1120,6 @@ rt_routemsg_info(int cmd, struct rt_addrinfo *info, int fibnum)
 
 	return (rtsock_routemsg_info(cmd, info, fibnum));
 }
-
 
 /*
  * This is called to generate messages from the routing socket
@@ -1176,4 +1144,3 @@ rt_newaddrmsg_fib(int cmd, struct ifaddr *ifa, struct rtentry *rt, int fibnum)
 		rt_addrmsg(cmd, ifa, fibnum);
 	}
 }
-

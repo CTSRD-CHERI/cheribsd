@@ -272,6 +272,16 @@ extern void *init_pt_va;
 
 #define	DEVMAP_MAX_VADDR	VM_MAX_KERNEL_ADDRESS
 
+/*
+ * No non-transparent large page support in the pmap.
+ */
+#define	PMAP_HAS_LARGEPAGES	0
+
+/*
+ * Need a page dump array for minidump.
+ */
+#define MINIDUMP_PAGE_TRACKING	1
+
 #endif /* !_MACHINE_VMPARAM_H_ */
 // CHERI CHANGES START
 // {

@@ -64,7 +64,6 @@ __FBSDID("$FreeBSD$");
 #include <machine/resource.h>
 #include <machine/intr.h>
 
-
 #include "opt_mmccam.h"
 
 struct ti_sdhci_softc {
@@ -93,6 +92,7 @@ struct ti_sdhci_softc {
  * Note that vendor Beaglebone dtsi files use "ti,omap3-hsmmc" for the am335x.
  */
 static struct ofw_compat_data compat_data[] = {
+	{"ti,am335-sdhci",	1},
 	{"ti,omap3-hsmmc",	1},
 	{"ti,omap4-hsmmc",	1},
 	{"ti,mmchs",		1},
@@ -640,7 +640,7 @@ ti_sdhci_attach(device_t dev)
 	 * before waiting to see them de-asserted.
 	 */
 	sc->slot.quirks |= SDHCI_QUIRK_WAITFOR_RESET_ASSERTED;
-	
+
 	/*
 	 * The controller waits for busy responses.
 	 */

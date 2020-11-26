@@ -1174,7 +1174,6 @@ struct ccb_trans_settings {
 	} xport_specific;
 };
 
-
 /*
  * Calculate the geometry parameters for a device
  * give the block size and volume size in blocks.
@@ -1194,7 +1193,6 @@ struct ccb_calc_geometry {
 
 #define	KNOB_VALID_ADDRESS	0x1
 #define	KNOB_VALID_ROLE		0x2
-
 
 #define	KNOB_ROLE_NONE		0x0
 #define	KNOB_ROLE_INITIATOR	0x1
@@ -1467,6 +1465,32 @@ cam_fill_csio(struct ccb_scsiio *csio, u_int32_t retries,
 	csio->bio = NULL;
 #endif
 }
+
+#ifdef _KERNEL
+static __inline void
+cam_fill_csio_user(struct ccb_scsiio *csio, u_int32_t retries,
+	      void (*cbfcnp)(struct cam_periph *, union ccb *),
+	      u_int32_t flags, u_int8_t tag_action,
+	      u_int8_t * __capability data_ptr, u_int32_t dxfer_len,
+	      u_int8_t sense_len, u_int8_t cdb_len,
+	      u_int32_t timeout)
+{
+	csio->ccb_h.func_code = XPT_SCSI_IO;
+	csio->ccb_h.flags = flags;
+	csio->ccb_h.xflags = 0;
+	csio->ccb_h.retry_count = retries;
+	csio->ccb_h.cbfcnp = cbfcnp;
+	csio->ccb_h.timeout = timeout;
+	csio->user_data_ptr = data_ptr;
+	csio->dxfer_len = dxfer_len;
+	csio->sense_len = sense_len;
+	csio->cdb_len = cdb_len;
+	csio->tag_action = tag_action;
+#if defined(BUF_TRACKING) || defined(FULL_BUF_TRACKING)
+	csio->bio = NULL;
+#endif
+}
+#endif
 
 static __inline void
 cam_fill_ctio(struct ccb_scsiio *csio, u_int32_t retries,

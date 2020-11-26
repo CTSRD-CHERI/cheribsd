@@ -149,7 +149,8 @@ freebsd64___mac_execve(struct thread *td,
 	error = exec_copyin_args(&eargs, NULL, UIO_SYSSPACE,
 	    __USER_CAP_UNBOUND(uap->argv), __USER_CAP_UNBOUND(uap->envv));
 	if (error == 0)
-		error = kern_execve(td, &eargs, __USER_CAP_OBJ(uap->mac_p));
+		error = kern_execve(td, &eargs, __USER_CAP_OBJ(uap->mac_p),
+		    oldvmspace);
 
 	post_execve(td, error, oldvmspace);
 	return (error);

@@ -9,10 +9,6 @@
 
 #include "config.h"
 
-#ifndef lint
-static const char sccsid[] = "$Id: put.c,v 10.19 04/07/11 17:00:24 zy Exp $";
-#endif /* not lint */
-
 #include <sys/types.h>
 #include <sys/queue.h>
 #include <sys/time.h>
@@ -33,13 +29,7 @@ static const char sccsid[] = "$Id: put.c,v 10.19 04/07/11 17:00:24 zy Exp $";
  * PUBLIC: int put(SCR *, CB *, CHAR_T *, MARK *, MARK *, int);
  */
 int
-put(
-	SCR *sp,
-	CB *cbp,
-	CHAR_T *namep,
-	MARK *cp,
-	MARK *rp,
-	int append)
+put(SCR *sp, CB *cbp, CHAR_T *namep, MARK *cp, MARK *rp, int append)
 {
 	CHAR_T name;
 	TEXT *ltp, *tp;
@@ -49,7 +39,7 @@ put(
 	CHAR_T *bp, *t;
 	CHAR_T *p;
 
-	if (cbp == NULL)
+	if (cbp == NULL) {
 		if (namep == NULL) {
 			cbp = sp->gp->dcbp;
 			if (cbp == NULL) {
@@ -66,6 +56,7 @@ put(
 				return (1);
 			}
 		}
+	}
 	tp = TAILQ_FIRST(cbp->textq);
 
 	/*

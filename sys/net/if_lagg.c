@@ -803,7 +803,6 @@ lagg_port_create(struct lagg_softc *sc, struct ifnet *ifp)
 
 	lagg_setmulti(lp);
 
-
 	if ((error = lagg_proto_addport(sc, lp)) != 0) {
 		/* Remove the port, without calling pr_delport. */
 		lagg_port_destroy(lp, 0);
@@ -1045,7 +1044,6 @@ lagg_get_counter(struct ifnet *ifp, ift_counter cnt)
 	 * Add counter data from detached ports counters
 	 */
 	vsum += sc->detached_counters.val[cnt];
-
 
 	return (vsum);
 }
@@ -1689,7 +1687,7 @@ lagg_snd_tag_alloc(struct ifnet *ifp,
 		return (error);
 	}
 
-	m_snd_tag_init(&lst->com, ifp);
+	m_snd_tag_init(&lst->com, ifp, lst->tag->type);
 
 	*ppmt = &lst->com;
 	return (0);
@@ -2426,7 +2424,6 @@ lagg_lacp_input(struct lagg_softc *sc, struct lagg_port *lp, struct mbuf *m)
 	m->m_pkthdr.rcvif = ifp;
 	return (m);
 }
-
 // CHERI CHANGES START
 // {
 //   "updated": 20181114,

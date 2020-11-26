@@ -458,6 +458,7 @@ NFSLOCKD
 PCBGROUP		opt_pcbgroup.h
 PF_DEFAULT_TO_DROP	opt_pf.h
 RADIX_MPATH		opt_mpath.h
+ROUTE_MPATH		opt_route.h
 ROUTETABLES		opt_route.h
 RSS			opt_rss.h
 SLIP_IFF_OPTS		opt_slip.h
@@ -708,8 +709,10 @@ EPOCH_TRACE		opt_global.h
 ACPI_DEBUG		opt_acpi.h
 ACPI_MAX_TASKS		opt_acpi.h
 ACPI_MAX_THREADS	opt_acpi.h
-ACPI_DMAR		opt_acpi.h
 DEV_ACPI		opt_acpi.h
+
+# options for IOMMU support
+IOMMU			opt_iommu.h
 
 # ISA support
 DEV_ISA			opt_isa.h

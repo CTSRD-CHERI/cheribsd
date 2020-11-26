@@ -38,6 +38,10 @@
 #ifndef	_SYS_CDEFS_H_
 #define	_SYS_CDEFS_H_
 
+#if defined(_KERNEL) && defined(_STANDALONE)
+#error "_KERNEL and _STANDALONE are mutually exclusive"
+#endif
+
 /*
  * Testing against Clang-specific extensions.
  */
@@ -1045,8 +1049,10 @@
  */
 #if __has_attribute(no_sanitize) && defined(__clang__)
 #define __nosanitizeaddress	__attribute__((no_sanitize("address")))
+#define __nosanitizethread	__attribute__((no_sanitize("thread")))
 #else
 #define __nosanitizeaddress
+#define __nosanitizethread
 #endif
 
 /* Guard variables and structure members by lock. */

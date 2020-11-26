@@ -121,7 +121,9 @@ typedef struct vm_object *vm_object_t;
  * Define it here for "applications" that include vm headers (e.g.,
  * genassym).
  */
+#ifndef HAVE_BOOLEAN
 typedef int boolean_t;
+#endif
 
 /*
  * The exact set of memory attributes is machine dependent.  However,
@@ -174,7 +176,6 @@ void swapper(void);
 #endif
 
 #endif				/* VM_H */
-
 // CHERI CHANGES START
 // {
 //   "updated": 20200804,

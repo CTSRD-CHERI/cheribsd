@@ -343,7 +343,7 @@ static void
 vlan_inithash(struct ifvlantrunk *trunk)
 {
 	int i, n;
-	
+
 	/*
 	 * The trunk must not be locked here since we call malloc(M_WAITOK).
 	 * It is OK in case this function is called before the trunk struct
@@ -415,7 +415,7 @@ vlan_remhash(struct ifvlantrunk *trunk, struct ifvlan *ifv)
 
 	VLAN_XLOCK_ASSERT();
 	KASSERT(trunk->hwidth > 0, ("%s: hwidth not positive", __func__));
-	
+
 	b = 1 << trunk->hwidth;
 	i = HASH(ifv->ifv_vid, trunk->hmask);
 	CK_SLIST_FOREACH(ifv2, &trunk->hash[i], ifv_list)
@@ -1234,7 +1234,6 @@ vlan_output(struct ifnet *ifp, struct mbuf *m, const struct sockaddr *dst,
 	return p->if_output(ifp, m, dst, ro);
 }
 
-
 /*
  * The ifp->if_qflush entry point for vlan(4) is a no-op.
  */
@@ -1635,7 +1634,7 @@ static int
 vlan_setflags(struct ifnet *ifp, int status)
 {
 	int error, i;
-	
+
 	for (i = 0; vlan_pflags[i].flag; i++) {
 		error = vlan_setflag(ifp, vlan_pflags[i].flag,
 				     status, vlan_pflags[i].func);
@@ -2070,7 +2069,7 @@ vlan_snd_tag_alloc(struct ifnet *ifp,
 		return (error);
 	}
 
-	m_snd_tag_init(&vst->com, ifp);
+	m_snd_tag_init(&vst->com, ifp, vst->tag->type);
 
 	*ppmt = &vst->com;
 	return (0);

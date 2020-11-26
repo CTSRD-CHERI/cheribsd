@@ -216,7 +216,7 @@ TEST_F(AioWrite, DISABLED_aio_write)
 	expect_write(ino, offset, bufsize, bufsize, CONTENTS);
 
 	fd = open(FULLPATH, O_WRONLY);
-	EXPECT_LE(0, fd) << strerror(errno);
+	ASSERT_LE(0, fd) << strerror(errno);
 
 	iocb.aio_nbytes = bufsize;
 	iocb.aio_fildes = fd;
@@ -258,7 +258,7 @@ TEST_F(Write, append)
 
 	/* Must open O_RDWR or fuse(4) implicitly sets direct_io */
 	fd = open(FULLPATH, O_RDWR | O_APPEND);
-	EXPECT_LE(0, fd) << strerror(errno);
+	ASSERT_LE(0, fd) << strerror(errno);
 
 	ASSERT_EQ(BUFSIZE, write(fd, CONTENTS, BUFSIZE)) << strerror(errno);
 	leak(fd);
@@ -291,7 +291,7 @@ TEST_F(Write, append_to_cached)
 
 	/* Must open O_RDWR or fuse(4) implicitly sets direct_io */
 	fd = open(FULLPATH, O_RDWR | O_APPEND);
-	EXPECT_LE(0, fd) << strerror(errno);
+	ASSERT_LE(0, fd) << strerror(errno);
 
 	/* Read the old data into the cache */
 	ASSERT_EQ((ssize_t)oldsize, read(fd, oldbuf, oldsize))
@@ -319,7 +319,7 @@ TEST_F(Write, append_direct_io)
 	expect_write(ino, initial_offset, BUFSIZE, BUFSIZE, CONTENTS);
 
 	fd = open(FULLPATH, O_WRONLY | O_APPEND);
-	EXPECT_LE(0, fd) << strerror(errno);
+	ASSERT_LE(0, fd) << strerror(errno);
 
 	ASSERT_EQ(BUFSIZE, write(fd, CONTENTS, BUFSIZE)) << strerror(errno);
 	leak(fd);
@@ -343,7 +343,7 @@ TEST_F(Write, direct_io_evicts_cache)
 	expect_write(ino, 0, bufsize, bufsize, CONTENTS1);
 
 	fd = open(FULLPATH, O_RDWR);
-	EXPECT_LE(0, fd) << strerror(errno);
+	ASSERT_LE(0, fd) << strerror(errno);
 
 	// Prime cache
 	ASSERT_EQ(bufsize, read(fd, readbuf, bufsize)) << strerror(errno);
@@ -387,7 +387,7 @@ TEST_F(Write, indirect_io_short_write)
 	expect_write(ino, bufsize0, bufsize1, bufsize1, contents1);
 
 	fd = open(FULLPATH, O_WRONLY);
-	EXPECT_LE(0, fd) << strerror(errno);
+	ASSERT_LE(0, fd) << strerror(errno);
 
 	ASSERT_EQ(bufsize, write(fd, CONTENTS, bufsize)) << strerror(errno);
 	leak(fd);
@@ -412,7 +412,7 @@ TEST_F(Write, direct_io_short_write)
 	expect_write(ino, 0, bufsize, halfbufsize, CONTENTS);
 
 	fd = open(FULLPATH, O_WRONLY);
-	EXPECT_LE(0, fd) << strerror(errno);
+	ASSERT_LE(0, fd) << strerror(errno);
 
 	ASSERT_EQ(halfbufsize, write(fd, CONTENTS, bufsize)) << strerror(errno);
 	leak(fd);
@@ -442,7 +442,7 @@ TEST_F(Write, direct_io_short_write_iov)
 	expect_write(ino, 0, totalsize, size0, EXPECTED0);
 
 	fd = open(FULLPATH, O_WRONLY);
-	EXPECT_LE(0, fd) << strerror(errno);
+	ASSERT_LE(0, fd) << strerror(errno);
 
 	iov[0].iov_base = __DECONST(void*, CONTENTS0);
 	iov[0].iov_len = strlen(CONTENTS0);
@@ -474,7 +474,7 @@ TEST_F(Write, rlimit_fsize)
 
 	fd = open(FULLPATH, O_WRONLY);
 
-	EXPECT_LE(0, fd) << strerror(errno);
+	ASSERT_LE(0, fd) << strerror(errno);
 
 	ASSERT_EQ(-1, pwrite(fd, CONTENTS, bufsize, offset));
 	EXPECT_EQ(EFBIG, errno);
@@ -508,7 +508,7 @@ TEST_F(Write, eof_during_rmw)
 	maybe_expect_write(ino, offset, bufsize, CONTENTS);
 
 	fd = open(FULLPATH, O_RDWR);
-	EXPECT_LE(0, fd) << strerror(errno);
+	ASSERT_LE(0, fd) << strerror(errno);
 
 	ASSERT_EQ(bufsize, pwrite(fd, CONTENTS, bufsize, offset))
 		<< strerror(errno);
@@ -553,7 +553,7 @@ TEST_F(Write, mmap)
 	expect_release(ino, ReturnErrno(0));
 
 	fd = open(FULLPATH, O_RDWR);
-	EXPECT_LE(0, fd) << strerror(errno);
+	ASSERT_LE(0, fd) << strerror(errno);
 
 	p = mmap(NULL, len, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
 	ASSERT_NE(MAP_FAILED, p) << strerror(errno);
@@ -584,7 +584,7 @@ TEST_F(Write, pwrite)
 	expect_write(ino, offset, bufsize, bufsize, CONTENTS);
 
 	fd = open(FULLPATH, O_WRONLY);
-	EXPECT_LE(0, fd) << strerror(errno);
+	ASSERT_LE(0, fd) << strerror(errno);
 
 	ASSERT_EQ(bufsize, pwrite(fd, CONTENTS, bufsize, offset))
 		<< strerror(errno);
@@ -607,7 +607,7 @@ TEST_F(Write, timestamps)
 	maybe_expect_write(ino, 0, bufsize, CONTENTS);
 
 	fd = open(FULLPATH, O_RDWR);
-	EXPECT_LE(0, fd) << strerror(errno);
+	ASSERT_LE(0, fd) << strerror(errno);
 	ASSERT_EQ(0, fstat(fd, &sb0)) << strerror(errno);
 	ASSERT_EQ(bufsize, write(fd, CONTENTS, bufsize)) << strerror(errno);
 
@@ -636,7 +636,7 @@ TEST_F(Write, write)
 	expect_write(ino, 0, bufsize, bufsize, CONTENTS);
 
 	fd = open(FULLPATH, O_WRONLY);
-	EXPECT_LE(0, fd) << strerror(errno);
+	ASSERT_LE(0, fd) << strerror(errno);
 
 	ASSERT_EQ(bufsize, write(fd, CONTENTS, bufsize)) << strerror(errno);
 	leak(fd);
@@ -667,7 +667,7 @@ TEST_F(Write, write_large)
 		&contents[halfbufsize / sizeof(int)]);
 
 	fd = open(FULLPATH, O_WRONLY);
-	EXPECT_LE(0, fd) << strerror(errno);
+	ASSERT_LE(0, fd) << strerror(errno);
 
 	ASSERT_EQ(bufsize, write(fd, contents, bufsize)) << strerror(errno);
 	leak(fd);
@@ -688,7 +688,7 @@ TEST_F(Write, write_nothing)
 	expect_open(ino, 0, 1);
 
 	fd = open(FULLPATH, O_WRONLY);
-	EXPECT_LE(0, fd) << strerror(errno);
+	ASSERT_LE(0, fd) << strerror(errno);
 
 	ASSERT_EQ(bufsize, write(fd, CONTENTS, bufsize)) << strerror(errno);
 	leak(fd);
@@ -708,7 +708,7 @@ TEST_F(Write_7_8, write)
 	expect_write_7_8(ino, 0, bufsize, bufsize, CONTENTS);
 
 	fd = open(FULLPATH, O_WRONLY);
-	EXPECT_LE(0, fd) << strerror(errno);
+	ASSERT_LE(0, fd) << strerror(errno);
 
 	ASSERT_EQ(bufsize, write(fd, CONTENTS, bufsize)) << strerror(errno);
 	leak(fd);
@@ -854,7 +854,7 @@ TEST_F(WriteBack, rmw)
 	maybe_expect_write(ino, offset, bufsize, CONTENTS);
 
 	fd = open(FULLPATH, O_WRONLY);
-	EXPECT_LE(0, fd) << strerror(errno);
+	ASSERT_LE(0, fd) << strerror(errno);
 
 	ASSERT_EQ(bufsize, pwrite(fd, CONTENTS, bufsize, offset))
 		<< strerror(errno);
@@ -879,7 +879,7 @@ TEST_F(WriteBack, cache)
 	expect_write(ino, 0, bufsize, bufsize, CONTENTS);
 
 	fd = open(FULLPATH, O_RDWR);
-	EXPECT_LE(0, fd) << strerror(errno);
+	ASSERT_LE(0, fd) << strerror(errno);
 
 	ASSERT_EQ(bufsize, write(fd, CONTENTS, bufsize)) << strerror(errno);
 	/* 
@@ -913,7 +913,7 @@ TEST_F(WriteBack, o_direct)
 	expect_read(ino, 0, bufsize, bufsize, CONTENTS);
 
 	fd = open(FULLPATH, O_RDWR | O_DIRECT);
-	EXPECT_LE(0, fd) << strerror(errno);
+	ASSERT_LE(0, fd) << strerror(errno);
 
 	ASSERT_EQ(bufsize, write(fd, CONTENTS, bufsize)) << strerror(errno);
 	/* A subsequent read must query the daemon because cache is empty */
@@ -921,6 +921,76 @@ TEST_F(WriteBack, o_direct)
 	ASSERT_EQ(0, fcntl(fd, F_SETFL, 0)) << strerror(errno);
 	ASSERT_EQ(bufsize, read(fd, readbuf, bufsize)) << strerror(errno);
 	leak(fd);
+}
+
+TEST_F(WriteBack, direct_io)
+{
+	const char FULLPATH[] = "mountpoint/some_file.txt";
+	const char RELPATH[] = "some_file.txt";
+	const char *CONTENTS = "abcdefgh";
+	uint64_t ino = 42;
+	int fd;
+	ssize_t bufsize = strlen(CONTENTS);
+	uint8_t readbuf[bufsize];
+
+	expect_lookup(RELPATH, ino, 0);
+	expect_open(ino, FOPEN_DIRECT_IO, 1);
+	FuseTest::expect_write(ino, 0, bufsize, bufsize, 0, FUSE_WRITE_CACHE,
+		CONTENTS);
+	expect_read(ino, 0, bufsize, bufsize, CONTENTS);
+
+	fd = open(FULLPATH, O_RDWR);
+	ASSERT_LE(0, fd) << strerror(errno);
+
+	ASSERT_EQ(bufsize, write(fd, CONTENTS, bufsize)) << strerror(errno);
+	/* A subsequent read must query the daemon because cache is empty */
+	ASSERT_EQ(0, lseek(fd, 0, SEEK_SET)) << strerror(errno);
+	ASSERT_EQ(0, fcntl(fd, F_SETFL, 0)) << strerror(errno);
+	ASSERT_EQ(bufsize, read(fd, readbuf, bufsize)) << strerror(errno);
+	leak(fd);
+}
+
+/*
+ * mmap should still be possible even if the server used direct_io.  Mmap will
+ * still use the cache, though.
+ *
+ * Regression test for bug 247276
+ * https://bugs.freebsd.org/bugzilla/show_bug.cgi?id=247276
+ */
+TEST_F(WriteBack, mmap_direct_io)
+{
+	const char FULLPATH[] = "mountpoint/some_file.txt";
+	const char RELPATH[] = "some_file.txt";
+	const char *CONTENTS = "abcdefgh";
+	uint64_t ino = 42;
+	int fd;
+	size_t len;
+	ssize_t bufsize = strlen(CONTENTS);
+	void *p, *zeros;
+
+	len = getpagesize();
+	zeros = calloc(1, len);
+	ASSERT_NE(nullptr, zeros);
+
+	expect_lookup(RELPATH, ino, len);
+	expect_open(ino, FOPEN_DIRECT_IO, 1);
+	expect_read(ino, 0, len, len, zeros);
+	expect_flush(ino, 1, ReturnErrno(0));
+	FuseTest::expect_write(ino, 0, len, len, FUSE_WRITE_CACHE, 0, zeros);
+	expect_release(ino, ReturnErrno(0));
+
+	fd = open(FULLPATH, O_RDWR);
+	ASSERT_LE(0, fd) << strerror(errno);
+
+	p = mmap(NULL, len, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+	ASSERT_NE(MAP_FAILED, p) << strerror(errno);
+
+	memmove((uint8_t*)p, CONTENTS, bufsize);
+
+	ASSERT_EQ(0, munmap(p, len)) << strerror(errno);
+	close(fd);	// Write mmap'd data on close
+
+	free(zeros);
 }
 
 /*
@@ -946,7 +1016,7 @@ TEST_F(WriteBackAsync, delay)
 	).Times(0);
 
 	fd = open(FULLPATH, O_RDWR);
-	EXPECT_LE(0, fd) << strerror(errno);
+	ASSERT_LE(0, fd) << strerror(errno);
 
 	ASSERT_EQ(bufsize, write(fd, CONTENTS, bufsize)) << strerror(errno);
 
@@ -981,7 +1051,7 @@ TEST_F(WriteBackAsync, direct_io_ignores_unrelated_cached)
 		CONTENTS1);
 
 	fd = open(FULLPATH, O_RDWR);
-	EXPECT_LE(0, fd) << strerror(errno);
+	ASSERT_LE(0, fd) << strerror(errno);
 
 	// Cache first block with dirty data.  This will entail first reading
 	// the existing data.
@@ -1035,7 +1105,7 @@ TEST_F(WriteBackAsync, direct_io_partially_overlaps_cached_block)
 	expect_open(ino, 0, 1);
 
 	fd = open(FULLPATH, O_RDWR);
-	EXPECT_LE(0, fd) << strerror(errno);
+	ASSERT_LE(0, fd) << strerror(errno);
 
 	/* Cache first and third blocks with dirty data.  */
 	ASSERT_EQ(3 * bs, pwrite(fd, zeros, 3 * bs, 0)) << strerror(errno);
@@ -1108,7 +1178,7 @@ TEST_F(WriteBackAsync, eof)
 	expect_read(ino, 0, m_maxbcachebuf, old_filesize, CONTENTS0);
 
 	fd = open(FULLPATH, O_RDWR);
-	EXPECT_LE(0, fd) << strerror(errno);
+	ASSERT_LE(0, fd) << strerror(errno);
 
 	/* Write and cache data beyond EOF */
 	ASSERT_EQ(wbufsize, pwrite(fd, CONTENTS1, wbufsize, offset))
@@ -1178,7 +1248,7 @@ TEST_F(WriteBackAsync, timestamps)
 	})));
 
 	fd = open(FULLPATH, O_RDWR);
-	EXPECT_LE(0, fd) << strerror(errno);
+	ASSERT_LE(0, fd) << strerror(errno);
 	ASSERT_EQ(bufsize, write(fd, CONTENTS, bufsize)) << strerror(errno);
 
 	ASSERT_EQ(0, fstat(fd, &sb)) << strerror(errno);
@@ -1217,7 +1287,7 @@ TEST_F(WriteBackAsync, timestamps_during_setattr)
 	})));
 
 	fd = open(FULLPATH, O_RDWR);
-	EXPECT_LE(0, fd) << strerror(errno);
+	ASSERT_LE(0, fd) << strerror(errno);
 	ASSERT_EQ(bufsize, write(fd, CONTENTS, bufsize)) << strerror(errno);
 	ASSERT_EQ(0, fchmod(fd, newmode)) << strerror(errno);
 
@@ -1254,7 +1324,7 @@ TEST_P(TimeGran, timestamps_during_setattr)
 	})));
 
 	fd = open(FULLPATH, O_RDWR);
-	EXPECT_LE(0, fd) << strerror(errno);
+	ASSERT_LE(0, fd) << strerror(errno);
 	ASSERT_EQ(bufsize, write(fd, CONTENTS, bufsize)) << strerror(errno);
 	ASSERT_EQ(0, fchmod(fd, newmode)) << strerror(errno);
 
@@ -1281,7 +1351,7 @@ TEST_F(Write, writethrough)
 	expect_write(ino, 0, bufsize, bufsize, CONTENTS);
 
 	fd = open(FULLPATH, O_RDWR);
-	EXPECT_LE(0, fd) << strerror(errno);
+	ASSERT_LE(0, fd) << strerror(errno);
 
 	ASSERT_EQ(bufsize, write(fd, CONTENTS, bufsize)) << strerror(errno);
 	/*
@@ -1309,7 +1379,7 @@ TEST_F(Write, update_file_size)
 	expect_write(ino, 0, bufsize, bufsize, CONTENTS);
 
 	fd = open(FULLPATH, O_RDWR);
-	EXPECT_LE(0, fd) << strerror(errno);
+	ASSERT_LE(0, fd) << strerror(errno);
 
 	ASSERT_EQ(bufsize, write(fd, CONTENTS, bufsize)) << strerror(errno);
 	/* Get cached attributes */

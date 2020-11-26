@@ -401,24 +401,6 @@ String containing the temperature of the core that has become too hot.
 .Pp
 .Bl -column "System" "Subsystem" "1234567" -compact
 .Sy "System" Ta Sy "Subsystem" Ta Sy "Type" Ta Sy "Description"
-.It Li IFNET
-.It Li IFNET Ta Ar inet Ta Ta
-The
-.Dq subsystem
-is the actual name of the network interface on which the event
-took place.
-.It Li IFNET Ta Ar inet Ta Li LINK_UP Ta
-Carrier status changed to UP.
-.It Li IFNET Ta Ar inet Ta Li LINK_DOWN Ta
-Carrier status changed to DOWN.
-.It Li IFNET Ta Ar inet Ta Li ATTACH Ta
-The network interface is attached to the system.
-.It Li IFNET Ta Ar inet Ta Li DETACH Ta
-The network interface is detached from the system.
-.El
-.Pp
-.Bl -column "System" "Subsystem" "1234567" -compact
-.Sy "System" Ta Sy "Subsystem" Ta Sy "Type" Ta Sy "Description"
 .It Li DEVFS
 .It Li DEVFS Ta Li CDEV Ta Li CREATE Ta
 The
@@ -428,6 +410,14 @@ node is created.
 The
 .Xr devfs 5
 node is destroyed.
+.El
+.Pp
+.Bl -column "System" "Subsystem" "1234567" -compact
+.Sy "System" Ta Sy "Subsystem" Ta Sy "Type" Ta Sy "Description"
+.It Li ETHERNET Ta Ar inet Ta IFATTACH Ta
+Notification when the default VNET instance of the
+.Ar inet
+interface is attached.
 .El
 .Pp
 .Bl -column "System" "Subsystem" "1234567" -compact
@@ -463,15 +453,36 @@ provider size has changed.
 .Pp
 .Bl -column "System" "Subsystem" "1234567" -compact
 .Sy "System" Ta Sy "Subsystem" Ta Sy "Type" Ta Sy "Description"
-.It Li kern Ta Li power Ta Li resume Ta
-Notification that the system has woken from the suspended state.
+.It Li IFNET
+.It Li IFNET Ta Ar inet Ta Ta
+The
+.Dq subsystem
+is the actual name of the network interface on which the event
+took place.
+.It Li IFNET Ta Ar inet Ta Li LINK_UP Ta
+Carrier status changed to UP.
+.It Li IFNET Ta Ar inet Ta Li LINK_DOWN Ta
+Carrier status changed to DOWN.
+.It Li IFNET Ta Ar inet Ta Li ATTACH Ta
+The network interface is attached to the system.
+.It Li IFNET Ta Ar inet Ta Li DETACH Ta
+The network interface is detached from the system.
 .El
 .Pp
+.Bl -column "System" "Subsystem" "1234567" -compact
+.Sy "System" Ta Sy "Subsystem" Ta Sy "Type" Ta Sy "Description"
+.It Li kern Ta Li power Ta Li resume Ta
+Notification that the system has woken from the suspended state.
+Note: this notification is deprecated and will be removed in
+.Fx 14.0 .
+.El
 .Pp
 .Bl -column "System" "Subsystem" "1234567" -compact
 .Sy "System" Ta Sy "Subsystem" Ta Sy "Type" Ta Sy "Description"
 .It Li kernel Ta Li signal Ta Li coredump Ta
 Notification that a process has crashed and dumped core.
+.It Li kernel Ta Li power Ta Li resume Ta
+Notification that the system has woken from the suspended state.
 .El
 .Pp
 .Bl -column "System" "Subsystem" "1234567" -compact
@@ -519,7 +530,7 @@ keyboard has been pressed.
 A brightness level change has been requested.
 Direction is in the $notify variable.
 .It Li PMU Ta Li keys Ta mute Ta
-The mute key 
+The mute key
 .It Li PMU Ta Li keys Ta volume Ta
 A volume level change has been requested.
 Direction is in the $notify variable.

@@ -319,7 +319,7 @@ function core.bootenvDefaultRewinded()
 	end
 
 	for curenv_idx = 0, bootenv_count - 1 do
-		curenv = loader.getenv("bootenvs_check[" .. curenv_idx .. "]")
+		local curenv = loader.getenv("bootenvs_check[" .. curenv_idx .. "]")
 		if curenv == defname then
 			return defname
 		end
@@ -449,6 +449,40 @@ function core.popFrontTable(tbl)
 	end
 
 	return first_value, new_tbl
+end
+
+function core.getConsoleName()
+	if loader.getenv("boot_multicons") ~= nil then
+		if loader.getenv("boot_serial") ~= nil then
+			return "Dual (Serial primary)"
+		else
+			return "Dual (Video primary)"
+		end
+	else
+		if loader.getenv("boot_serial") ~= nil then
+			return "Serial"
+		else
+			return "Video"
+		end
+	end
+end
+
+function core.nextConsoleChoice()
+	if loader.getenv("boot_multicons") ~= nil then
+		if loader.getenv("boot_serial") ~= nil then
+			loader.unsetenv("boot_serial")
+		else
+			loader.unsetenv("boot_multicons")
+			loader.setenv("boot_serial", "YES")
+		end
+	else
+		if loader.getenv("boot_serial") ~= nil then
+			loader.unsetenv("boot_serial")
+		else
+			loader.setenv("boot_multicons", "YES")
+			loader.setenv("boot_serial", "YES")
+		end
+	end
 end
 
 recordDefaults()

@@ -303,7 +303,6 @@ drop:
 		m_freem(m);
 	return (NULL);
 }
-
 // CHERI CHANGES START
 // {
 //   "updated": 20200804,

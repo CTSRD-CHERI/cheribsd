@@ -427,7 +427,7 @@ linprocfs_domtab(PFS_FILL_ARGS)
 	error = namei(&nd);
 	lep = linux_emul_path;
 	if (error == 0) {
-		if (vn_fullpath(td, nd.ni_vp, &dlep, &flep) == 0)
+		if (vn_fullpath(nd.ni_vp, &dlep, &flep) == 0)
 			lep = dlep;
 		vrele(nd.ni_vp);
 	}
@@ -1043,7 +1043,6 @@ linprocfs_doprocstatus(PFS_FILL_ARGS)
 	return (0);
 }
 
-
 /*
  * Filler function for proc/pid/cwd
  */
@@ -1055,7 +1054,7 @@ linprocfs_doproccwd(PFS_FILL_ARGS)
 	char *freepath = NULL;
 
 	pwd = pwd_hold(td);
-	vn_fullpath(td, pwd->pwd_cdir, &fullpath, &freepath);
+	vn_fullpath(pwd->pwd_cdir, &fullpath, &freepath);
 	sbuf_printf(sb, "%s", fullpath);
 	if (freepath)
 		free(freepath, M_TEMP);
@@ -1076,7 +1075,7 @@ linprocfs_doprocroot(PFS_FILL_ARGS)
 
 	pwd = pwd_hold(td);
 	vp = jailed(p->p_ucred) ? pwd->pwd_jdir : pwd->pwd_rdir;
-	vn_fullpath(td, vp, &fullpath, &freepath);
+	vn_fullpath(vp, &fullpath, &freepath);
 	sbuf_printf(sb, "%s", fullpath);
 	if (freepath)
 		free(freepath, M_TEMP);
@@ -1221,7 +1220,7 @@ linprocfs_doprocmaps(PFS_FILL_ARGS)
 			shadow_count = obj->shadow_count;
 			VM_OBJECT_RUNLOCK(obj);
 			if (vp != NULL) {
-				vn_fullpath(td, vp, &name, &freename);
+				vn_fullpath(vp, &name, &freename);
 				vn_lock(vp, LK_SHARED | LK_RETRY);
 				VOP_GETATTR(vp, &vat, td->td_ucred);
 				ino = vat.va_fileid;

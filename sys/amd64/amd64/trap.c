@@ -999,15 +999,15 @@ cpu_fetch_syscall_args_fallback(struct thread *td, struct syscall_args *sa)
   	else
  		sa->callp = &p->p_sysent->sv_table[sa->code];
 
-	sa->narg = sa->callp->sy_narg;
-	KASSERT(sa->narg <= nitems(sa->args), ("Too many syscall arguments!"));
+	KASSERT(sa->callp->sy_narg <= nitems(sa->args),
+	    ("Too many syscall arguments!"));
 	argp = &frame->tf_rdi;
 	argp += reg;
 	memcpy(sa->args, argp, sizeof(sa->args[0]) * NARGREGS);
-	if (sa->narg > regcnt) {
+	if (sa->callp->sy_narg > regcnt) {
 		params = (caddr_t)frame->tf_rsp + sizeof(register_t);
 		error = copyin(params, &sa->args[regcnt],
-	    	    (sa->narg - regcnt) * sizeof(sa->args[0]));
+	    	    (sa->callp->sy_narg - regcnt) * sizeof(sa->args[0]));
 		if (__predict_false(error != 0))
 			return (error);
 	}
@@ -1037,10 +1037,10 @@ cpu_fetch_syscall_args(struct thread *td)
 		return (cpu_fetch_syscall_args_fallback(td, sa));
 
 	sa->callp = &p->p_sysent->sv_table[sa->code];
-	sa->narg = sa->callp->sy_narg;
-	KASSERT(sa->narg <= nitems(sa->args), ("Too many syscall arguments!"));
+	KASSERT(sa->callp->sy_narg <= nitems(sa->args),
+	    ("Too many syscall arguments!"));
 
-	if (__predict_false(sa->narg > NARGREGS))
+	if (__predict_false(sa->callp->sy_narg > NARGREGS))
 		return (cpu_fetch_syscall_args_fallback(td, sa));
 
 	memcpy(sa->args, &frame->tf_rdi, sizeof(sa->args[0]) * NARGREGS);
@@ -1137,7 +1137,6 @@ SYSCTL_PROC(_machdep, OID_AUTO, syscall_ret_flush_l1d, CTLTYPE_INT |
     "Flush L1D on syscall return with error (0 - off, 1 - on, "
     "2 - use hw only, 3 - use sw only");
 
-
 /*
  * System call handler for native binaries.  The trap frame is already
  * set up by the assembler trampoline and a pointer to it is saved in
@@ -1189,7 +1188,8 @@ amd64_syscall(struct thread *td, int traced)
 	 * not be safe.  Instead, use the full return path which
 	 * catches the problem safely.
 	 */
-	if (__predict_false(td->td_frame->tf_rip >= VM_MAXUSER_ADDRESS))
+	if (__predict_false(td->td_frame->tf_rip >= (la57 ?
+	    VM_MAXUSER_ADDRESS_LA57 : VM_MAXUSER_ADDRESS_LA48)))
 		set_pcb_flags(td->td_pcb, PCB_FULL_IRET);
 
 	amd64_syscall_ret_flush_l1d_check_inline(td->td_errno);

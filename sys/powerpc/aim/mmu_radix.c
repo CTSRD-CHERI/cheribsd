@@ -25,10 +25,8 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
-
 
 #include <sys/param.h>
 #include <sys/kernel.h>
@@ -597,8 +595,6 @@ static int pmap_change_attr_locked(vm_offset_t va, vm_size_t size, int mode, boo
 #define UNIMPLEMENTED() panic("%s not implemented", __func__)
 #define UNTESTED() panic("%s not yet tested", __func__)
 
-
-
 /* Number of supported PID bits */
 static unsigned int isa3_pid_bits;
 
@@ -607,7 +603,6 @@ static unsigned int isa3_base_pid;
 
 #define PROCTAB_SIZE_SHIFT	(isa3_pid_bits + 4)
 #define PROCTAB_ENTRIES	(1ul << isa3_pid_bits)
-
 
 /*
  * Map of physical memory regions.
@@ -711,7 +706,6 @@ static struct md_page pv_dummy;
  * bits 4 - 5 of rts -> bits 62 - 63 of unsigned long
  */
 #define RTS_SIZE ((0x2UL << 61) | (0x5UL << 5))
-
 
 static int powernv_enabled = 1;
 
@@ -845,7 +839,6 @@ pa_cmp(const void *a, const void *b)
  */
 #define	PG_PTE_PROMOTE	(PG_X | PG_MANAGED | PG_W | PG_PTE_CACHE | \
 	    PG_M | PG_A | RPTE_EAA_MASK | PG_V)
-
 
 static __inline void
 pmap_resident_count_inc(pmap_t pmap, int count)
@@ -3068,7 +3061,6 @@ out:
 	return (rv);
 }
 
-
 /*
  * Tries to create a read- and/or execute-only 2MB page mapping.  Returns true
  * if successful.  Returns false if (1) a page table page cannot be allocated
@@ -4913,7 +4905,6 @@ pmap_demote_l3e_locked(pmap_t pmap, pml3_entry_t *l3e, vm_offset_t va,
 	if ((oldpde & PG_MANAGED) != 0)
 		pmap_pv_demote_l3e(pmap, va, oldpde & PG_PS_FRAME, lockp);
 
-
 	atomic_add_long(&pmap_l3e_demotions, 1);
 	CTR2(KTR_PMAP, "pmap_demote_l3e: success for va %#lx"
 	    " in pmap %p", va, pmap);
@@ -4998,7 +4989,6 @@ pmap_remove_l3e(pmap_t pmap, pml3_entry_t *pdq, vm_offset_t sva,
 	}
 	return (pmap_unuse_pt(pmap, sva, *pmap_pml2e(pmap, sva), free));
 }
-
 
 /*
  * pmap_remove_pte: do the things to unmap a page in a process
@@ -5102,7 +5092,6 @@ pmap_remove_ptes(pmap_t pmap, vm_offset_t sva, vm_offset_t eva,
 	return (anyvalid);
 }
 
-
 void
 mmu_radix_remove(pmap_t pmap, vm_offset_t sva, vm_offset_t eva)
 {
@@ -5146,7 +5135,6 @@ mmu_radix_remove(pmap_t pmap, vm_offset_t sva, vm_offset_t eva)
 
 	lock = NULL;
 	for (; sva < eva; sva = va_next) {
-
 		if (pmap->pm_stats.resident_count == 0)
 			break;
 		l1e = pmap_pml1e(pmap, sva);
@@ -5682,9 +5670,6 @@ mmu_radix_zero_page_area(vm_page_t m, int off, int size)
 	memset(addr + off, 0, size);
 }
 
-
-
-
 static int
 mmu_radix_mincore(pmap_t pmap, vm_offset_t addr, vm_paddr_t *locked_pa)
 {
@@ -5703,7 +5688,7 @@ mmu_radix_mincore(pmap_t pmap, vm_offset_t addr, vm_paddr_t *locked_pa)
 			/* Compute the physical address of the 4KB page. */
 			pa = ((*l3ep & PG_PS_FRAME) | (addr & L3_PAGE_MASK)) &
 			    PG_FRAME;
-			val = MINCORE_SUPER;
+			val = MINCORE_PSIND(1);
 		} else {
 			pte = *pmap_l3e_to_pte(l3ep, addr);
 			pa = pte & PG_FRAME;
@@ -6271,7 +6256,6 @@ pmap_change_attr_locked(vm_offset_t va, vm_size_t size, int mode, bool flush)
 
 		if (flush)
 			pmap_invalidate_cache_range(base, tmpva);
-
 	}
 	return (error);
 }
@@ -6403,7 +6387,6 @@ DB_SHOW_COMMAND(pte, pmap_print_pte)
 }
 
 #endif
-
 // CHERI CHANGES START
 // {
 //   "updated": 20200804,

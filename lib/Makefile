@@ -35,6 +35,7 @@ SUBDIR=	${SUBDIR_BOOTSTRAP} \
 	.WAIT \
 	libsqlite3 \
 	geom \
+	lib9p \
 	libalias \
 	libarchive \
 	libauditd \
@@ -76,6 +77,7 @@ SUBDIR=	${SUBDIR_BOOTSTRAP} \
 	libmd \
 	libmt \
 	lib80211 \
+	${_libnetmap} \
 	libnv \
 	libopenbsd \
 	libopie \
@@ -113,6 +115,8 @@ SUBDIR=	${SUBDIR_BOOTSTRAP} \
 .if !${MACHINE_ABI:Mpurecap}
 # Needs changes to be useful for purecap and not used by anything (yet)
 SUBDIR+=	libthread_db
+# lots of non-CHERI-friendly data structurs
+SUBDIR+=	libnetmap
 .endif
 
 # Inter-library dependencies.  When the makefile for a library contains LDADD

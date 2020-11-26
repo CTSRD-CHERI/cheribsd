@@ -101,7 +101,6 @@ ata_begin_transaction(struct ata_request *request)
 	request->flags &= ~ATA_R_DMA;
 
     switch (request->flags & (ATA_R_ATAPI | ATA_R_DMA)) {
-
     /* ATA PIO data transfer and control commands */
     default:
 	{
@@ -118,7 +117,6 @@ ata_begin_transaction(struct ata_request *request)
 
 	    /* device reset doesn't interrupt */
 	    if (request->u.ata.command == ATA_DEVICE_RESET) {
-
 		int timeout = 1000000;
 		do {
 		    DELAY(10);
@@ -256,7 +254,6 @@ ata_end_transaction(struct ata_request *request)
     request->status = ATA_IDX_INB(ch, ATA_STATUS);
 
     switch (request->flags & (ATA_R_ATAPI | ATA_R_DMA | ATA_R_CONTROL)) {
-
     /* ATA PIO data transfer and control commands */
     default:
 
@@ -275,10 +272,9 @@ ata_end_transaction(struct ata_request *request)
 	    request->error = ATA_IDX_INB(ch, ATA_ERROR);
 	    goto end_finished;
 	}
-	
+
 	/* are we moving data ? */
 	if (request->flags & (ATA_R_READ | ATA_R_WRITE)) {
-
 	    /* if read data get it */
 	    if (request->flags & ATA_R_READ) {
 		int flags = ATA_S_DRQ;
@@ -299,7 +295,6 @@ ata_end_transaction(struct ata_request *request)
 
 	    /* do we need a scoop more ? */
 	    if (request->bytecount > request->donecount) {
-
 		/* set this transfer size according to HW capabilities */
 		request->transfersize = 
 		    min((request->bytecount - request->donecount),
@@ -307,7 +302,6 @@ ata_end_transaction(struct ata_request *request)
 
 		/* if data write command, output the data */
 		if (request->flags & ATA_R_WRITE) {
-
 		    /* if we get an error here we are done with the HW */
 		    if (ata_wait(ch, request->unit, (ATA_S_READY | ATA_S_DRQ)) < 0) {
 			device_printf(request->parent,
@@ -366,7 +360,6 @@ ata_end_transaction(struct ata_request *request)
 
 	switch ((ATA_IDX_INB(ch, ATA_IREASON) & (ATA_I_CMD | ATA_I_IN)) |
 		(request->status & ATA_S_DRQ)) {
-
 	case ATAPI_P_CMDOUT:
 	    /* this seems to be needed for some (slow) devices */
 	    DELAY(10);
@@ -459,7 +452,7 @@ ata_end_transaction(struct ata_request *request)
 	    request->status |= ATA_S_ERROR;
 	else if (!(request->flags & ATA_R_TIMEOUT))
 	    request->donecount = request->bytecount;
- 
+
 	/* release SG list etc */
 	ch->dma.unload(request);
 

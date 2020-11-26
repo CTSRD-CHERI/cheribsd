@@ -3066,6 +3066,7 @@ prison_priv_check(struct ucred *cred, int priv)
 	 * called for them. See priv_check_cred().
 	 */
 	switch (priv) {
+	case PRIV_VFS_LOOKUP:
 	case PRIV_VFS_GENERATION:
 		KASSERT(0, ("prison_priv_check instead of a custom handler "
 		    "called for %d\n", priv));
@@ -3189,7 +3190,6 @@ prison_priv_check(struct ucred *cred, int priv)
 #endif /* VIMAGE */
 
 	switch (priv) {
-
 		/*
 		 * Allow ktrace privileges for root in jail.
 		 */
@@ -3294,7 +3294,6 @@ prison_priv_check(struct ucred *cred, int priv)
 	case PRIV_VFS_WRITE:
 	case PRIV_VFS_ADMIN:
 	case PRIV_VFS_EXEC:
-	case PRIV_VFS_LOOKUP:
 	case PRIV_VFS_BLOCKRESERVE:	/* XXXRW: Slightly surprising. */
 	case PRIV_VFS_CHFLAGS_DEV:
 	case PRIV_VFS_CHOWN:

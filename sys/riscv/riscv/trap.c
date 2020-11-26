@@ -119,25 +119,23 @@ int
 cpu_fetch_syscall_args(struct thread *td)
 {
 	struct proc *p;
-	syscallarg_t *ap;
+	syscallarg_t *ap, *dst_ap;
 	struct syscall_args *sa;
-	int nap;
 #if __has_feature(capabilities)
 	char * __capability stack_args = NULL;
 	u_int i;
 	int error;
 #endif
 
-	nap = NARGREG;
 	p = td->td_proc;
 	sa = &td->td_sa;
 	ap = &td->td_frame->tf_a[0];
+	dst_ap = &sa->args[0];
 
 	sa->code = td->td_frame->tf_t[0];
 
-	if (sa->code == SYS_syscall || sa->code == SYS___syscall) {
+	if (__predict_false(sa->code == SYS_syscall || sa->code == SYS___syscall)) {
 		sa->code = *ap++;
-		nap--;
 
 #if __has_feature(capabilities)
 		/*
@@ -147,16 +145,20 @@ cpu_fetch_syscall_args(struct thread *td)
 		if (SV_PROC_FLAG(td->td_proc, SV_CHERI))
 			stack_args = (char * __capability)td->td_frame->tf_sp;
 #endif
+	} else {
+		*dst_ap++ = *ap++;
 	}
 
-	if (sa->code >= p->p_sysent->sv_size)
+	if (__predict_false(sa->code >= p->p_sysent->sv_size))
 		sa->callp = &p->p_sysent->sv_table[0];
 	else
 		sa->callp = &p->p_sysent->sv_table[sa->code];
 
-	sa->narg = sa->callp->sy_narg;
+	KASSERT(sa->callp->sy_narg <= nitems(sa->args),
+	    ("Syscall %d takes too many arguments", sa->code));
+
 #if __has_feature(capabilities)
-	if (stack_args != NULL) {
+	if (__predict_false(stack_args != NULL)) {
 		register_t intval;
 		int offset, ptrmask;
 
@@ -166,27 +168,25 @@ cpu_fetch_syscall_args(struct thread *td)
 			ptrmask = sysargmask[sa->code];
 
 		offset = 0;
-		for (i = 0; i < sa->narg; i++) {
+		for (i = 0; i < sa->callp->sy_narg; i++) {
 			if (ptrmask & (1 << i)) {
 				offset = roundup2(offset, sizeof(uintcap_t));
 				error = fuecap(stack_args + offset,
-				    &sa->args[i]);
+				    dst_ap);
 				offset += sizeof(uintcap_t);
 			} else {
 				error = fueword(stack_args + offset, &intval);
-				sa->args[i] = intval;
+				*dst_ap = intval;
 				offset += sizeof(intval);
 			}
+			dst_ap++;
 			if (error)
 				return (error);
 		}
 	} else
 #endif
 	{
-		memcpy(sa->args, ap, nap * sizeof(syscallarg_t));
-		if (sa->narg > nap)
-			panic("TODO: Could we have more then %d args?",
-			    NARGREG);
+		memcpy(dst_ap, ap, (NARGREG - 1) * sizeof(syscallarg_t));
 	}
 
 	td->td_retval[0] = 0;
@@ -282,19 +282,18 @@ dump_cheri_exception(struct trapframe *frame)
 #endif
 
 static void
-svc_handler(struct trapframe *frame)
+ecall_handler(void)
 {
 	struct thread *td;
 
 	td = curthread;
-	td->td_frame = frame;
 
 	syscallenter(td);
 	syscallret(td);
 }
 
 static void
-data_abort(struct trapframe *frame, int usermode)
+page_fault_handler(struct trapframe *frame, int usermode)
 {
 	struct vm_map *map;
 	uint64_t stval;
@@ -342,8 +341,7 @@ data_abort(struct trapframe *frame, int usermode)
 
 	va = trunc_page(stval);
 
-	if ((frame->tf_scause == EXCP_FAULT_STORE) ||
-	    (frame->tf_scause == EXCP_STORE_PAGE_FAULT)) {
+	if (frame->tf_scause == EXCP_STORE_PAGE_FAULT) {
 		ftype = VM_PROT_WRITE;
 	} else if (frame->tf_scause == EXCP_INST_PAGE_FAULT) {
 		ftype = VM_PROT_EXECUTE;
@@ -419,7 +417,8 @@ do_trap_supervisor(struct trapframe *frame)
 		break;
 	case EXCP_STORE_PAGE_FAULT:
 	case EXCP_LOAD_PAGE_FAULT:
-		data_abort(frame, 0);
+	case EXCP_INST_PAGE_FAULT:
+		page_fault_handler(frame, 0);
 		break;
 	case EXCP_BREAKPOINT:
 #ifdef KDTRACE_HOOKS
@@ -478,8 +477,10 @@ do_trap_user(struct trapframe *frame)
 	struct pcb *pcb;
 
 	td = curthread;
-	td->td_frame = frame;
 	pcb = td->td_pcb;
+
+	KASSERT(td->td_frame == frame,
+	    ("%s: td_frame %p != frame %p", __func__, td->td_frame, frame));
 
 	/* Ensure we came from usermode, interrupts disabled */
 	KASSERT((csr_read(sstatus) & (SSTATUS_SPP | SSTATUS_SIE)) == 0,
@@ -500,14 +501,18 @@ do_trap_user(struct trapframe *frame)
 	case EXCP_FAULT_LOAD:
 	case EXCP_FAULT_STORE:
 	case EXCP_FAULT_FETCH:
+		call_trapsignal(td, SIGBUS, BUS_ADRERR, frame->tf_sepc,
+		    exception, 0);
+		userret(td, frame);
+		break;
 	case EXCP_STORE_PAGE_FAULT:
 	case EXCP_LOAD_PAGE_FAULT:
 	case EXCP_INST_PAGE_FAULT:
-		data_abort(frame, 1);
+		page_fault_handler(frame, 1);
 		break;
 	case EXCP_USER_ECALL:
 		frame->tf_sepc += 4;	/* Next instruction */
-		svc_handler(frame);
+		ecall_handler();
 		break;
 	case EXCP_ILLEGAL_INSTRUCTION:
 #ifdef FPE

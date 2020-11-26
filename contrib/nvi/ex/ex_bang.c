@@ -9,10 +9,6 @@
 
 #include "config.h"
 
-#ifndef lint
-static const char sccsid[] = "$Id: ex_bang.c,v 10.36 2001/06/25 15:19:14 skimo Exp $";
-#endif /* not lint */
-
 #include <sys/types.h>
 #include <sys/queue.h>
 #include <sys/time.h>
@@ -67,8 +63,7 @@ ex_bang(SCR *sp, EXCMD *cmdp)
 
 	/* Set the "last bang command" remembered value. */
 	exp = EXP(sp);
-	if (exp->lastbcomm != NULL)
-		free(exp->lastbcomm);
+	free(exp->lastbcomm);
 	if ((exp->lastbcomm = v_wstrdup(sp, ap->bp, ap->len)) == NULL) {
 		msgq(sp, M_SYSERR, NULL);
 		return (1);
@@ -101,7 +96,7 @@ ex_bang(SCR *sp, EXCMD *cmdp)
 	 */
 	if (cmdp->addrcnt == 0) {
 		msg = NULL;
-		if (sp->ep != NULL && F_ISSET(sp->ep, F_MODIFIED))
+		if (sp->ep != NULL && F_ISSET(sp->ep, F_MODIFIED)) {
 			if (O_ISSET(sp, O_AUTOWRITE)) {
 				if (file_aw(sp, FS_ALL))
 					return (0);
@@ -110,6 +105,7 @@ ex_bang(SCR *sp, EXCMD *cmdp)
 				msg = msg_cat(sp,
 				    "303|File modified since last write.",
 				    NULL);
+		}
 
 		/* If we're still in a vi screen, move out explicitly. */
 		INT2CHAR(sp, ap->bp, ap->len+1, np, nlen);
@@ -177,6 +173,10 @@ ex_bang(SCR *sp, EXCMD *cmdp)
 	/* Ex terminates with a bang, even if the command fails. */
 	if (!F_ISSET(sp, SC_VI) && !F_ISSET(sp, SC_EX_SILENT))
 		(void)ex_puts(sp, "!\n");
+
+	/* Apply expandtab to the new text */
+	if (O_ISSET(sp, O_EXPANDTAB))
+		ex_retab(sp, cmdp);
 
 	/*
 	 * XXX

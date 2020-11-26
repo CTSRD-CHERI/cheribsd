@@ -28,6 +28,14 @@ CFLAGS+=	-std=${CSTD}
 CXXFLAGS+=	-std=${CXXSTD}
 .endif
 
+# This gives the Makefile we're evaluating at the top-level a chance to set
+# WARNS.  If it doesn't do so, we may freely pull a DEFAULTWARNS if it's set
+# and use that.  This allows us to default WARNS to 6 for src builds without
+# needing to set the default in various Makefile.inc.
+.if !defined(WARNS) && defined(DEFAULTWARNS)
+WARNS=	${DEFAULTWARNS}
+.endif
+
 # -pedantic is problematic because it also imposes namespace restrictions
 #CFLAGS+=	-pedantic
 .if defined(WARNS)
@@ -150,7 +158,8 @@ CWARNFLAGS+=	-Wno-error=address			\
 
 # GCC 6.1.0
 .if ${COMPILER_VERSION} >= 60100
-CWARNFLAGS+=	-Wno-error=maybe-uninitialized		\
+CWARNFLAGS+=	-Wno-error=empty-body			\
+		-Wno-error=maybe-uninitialized		\
 		-Wno-error=nonnull-compare		\
 		-Wno-error=redundant-decls		\
 		-Wno-error=shift-negative-value		\
@@ -186,7 +195,7 @@ CWARNFLAGS+=	-Wno-error=aggressive-loop-optimizations	\
 .endif
 
 # GCC's own arm_neon.h triggers various warnings
-.if ${MACHINE_ARCH} == "aarch64"
+.if ${MACHINE_CPUARCH} == "aarch64"
 CWARNFLAGS+=	-Wno-system-headers
 .endif
 .endif	# gcc
@@ -311,10 +320,13 @@ CFLAGS+=	ERROR-tried-to-rebuild-during-make-install
 # Please keep this if in sync with kern.mk
 .if ${LD} != "ld" && (${CC:[1]:H} != ${LD:[1]:H} || ${LD:[1]:T} != "ld")
 # Add -fuse-ld=${LD} if $LD is in a different directory or not called "ld".
-# Note: Clang 12+ will prefer --ld-path= over -fuse-ld=.
 .if ${COMPILER_TYPE} == "clang"
-# Note: Clang does not like relative paths in -fuse-ld so we map ld.lld -> lld.
+# Note: Clang does not like relative paths for ld so we map ld.lld -> lld.
+.if ${COMPILER_VERSION} >= 120000
+LDFLAGS+=	--ld-path=${LD:[1]:S/^ld.//1W}
+.else
 LDFLAGS+=	-fuse-ld=${LD:[1]:S/^ld.//1W}
+.endif
 .else
 # GCC does not support an absolute path for -fuse-ld so we just print this
 # warning instead and let the user add the required symlinks.

@@ -13,6 +13,8 @@
 # A PARTICULAR PURPOSE.
 # $FreeBSD$
 
+.include <src.opts.mk>
+
 TRACEROUTE_DISTDIR?= ${SRCTOP}/contrib/traceroute
 .PATH: ${TRACEROUTE_DISTDIR}
 
@@ -26,7 +28,13 @@ BINMODE= 4555
 CFLAGS+= -DIPSEC -DHAVE_POLL
 CFLAGS+= -I${.CURDIR} -I${TRACEROUTE_DISTDIR} -I.
 
-LIBADD=	ipsec
+.if ${MK_CASPER} != "no"
+LIBADD+=	casper
+LIBADD+=	cap_dns
+CFLAGS+=	-DWITH_CASPER
+.endif
+
+LIBADD+=	ipsec
 
 .include <bsd.prog.mk>
 

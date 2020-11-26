@@ -4,6 +4,7 @@
 KMOD=	linuxkpi
 SRCS=	linux_compat.c \
 	linux_current.c \
+	linux_dmi.c \
 	linux_hrtimer.c \
 	linux_idr.c \
 	linux_kmod.c \
@@ -19,7 +20,8 @@ SRCS=	linux_compat.c \
 	linux_slab.c \
 	linux_tasklet.c \
 	linux_usb.c \
-	linux_work.c
+	linux_work.c \
+	linux_xarray.c
 
 SRCS+=	${LINUXKPI_GENSRCS}
 

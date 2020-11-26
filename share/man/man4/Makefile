@@ -515,6 +515,7 @@ MAN=	aac.4 \
 	ste.4 \
 	stf.4 \
 	stge.4 \
+	${_sume.4} \
 	${_superio.4} \
 	sym.4 \
 	syncache.4 \
@@ -524,6 +525,7 @@ MAN=	aac.4 \
 	tap.4 \
 	targ.4 \
 	tcp.4 \
+	tcp_bbr.4 \
 	tdfx.4 \
 	terasic_de4led.4 \
 	terasic_mtl.4 \
@@ -854,6 +856,7 @@ _qlxgbe.4=	qlxgbe.4
 _qlnxe.4=	qlnxe.4
 _sfxge.4=	sfxge.4
 _smartpqi.4=	smartpqi.4
+_sume.4=	sume.4
 _vmd.4=		vmd.4
 
 MLINKS+=qlxge.4 if_qlxge.4
@@ -861,6 +864,7 @@ MLINKS+=qlxgb.4 if_qlxgb.4
 MLINKS+=qlxgbe.4 if_qlxgbe.4
 MLINKS+=qlnxe.4 if_qlnxe.4
 MLINKS+=sfxge.4 if_sfxge.4
+MLINKS+=sume.4 if_sume.4
 
 .if ${MK_BHYVE} != "no"
 _bhyve.4=	bhyve.4

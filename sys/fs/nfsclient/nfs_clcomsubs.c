@@ -480,7 +480,6 @@ nfscl_lockderef(struct nfsv4lock *lckp)
 	}
 	NFSUNLOCKCLSTATE();
 }
-
 // CHERI CHANGES START
 // {
 //   "updated": 20191025,

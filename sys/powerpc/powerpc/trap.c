@@ -153,6 +153,11 @@ static struct powerpc_exception powerpc_exceptions[] = {
 	{ EXC_LAST,	NULL }
 };
 
+static int uprintf_signal;
+SYSCTL_INT(_machdep, OID_AUTO, uprintf_signal, CTLFLAG_RWTUN,
+    &uprintf_signal, 0,
+    "Print debugging information on trap signal to ctty");
+
 #define ESR_BITMASK							\
     "\20"								\
     "\040b0\037b1\036b2\035b3\034PIL\033PRR\032PTR\031FP"		\
@@ -171,7 +176,6 @@ static struct powerpc_exception powerpc_exceptions[] = {
     "\030b8\027b9\026b10\025b11\024b12\023L2TAG\022L2DAT\021L3TAG"	\
     "\020L3DAT\017APE\016DPE\015TEA\014b20\013b21\012b22\011b23"	\
     "\010b24\007b25\006b26\005b27\004b28\003b29\002b30\001b31"
-
 
 static const char *
 trapname(u_int vector)
@@ -490,6 +494,14 @@ trap(struct trapframe *frame)
 		ksi.ksi_code = (int) ucode; /* XXX, not POSIX */
 		ksi.ksi_addr = (void *)addr;
 		ksi.ksi_trapno = type;
+		if (uprintf_signal) {
+			uprintf("pid %d comm %s: signal %d code %d type %d "
+				"addr 0x%lx r1 0x%lx srr0 0x%lx srr1 0x%lx\n",
+			        p->p_pid, p->p_comm, sig, ucode, type,
+				(u_long)addr, (u_long)frame->fixreg[1],
+				(u_long)frame->srr0, (u_long)frame->srr1);
+		}
+
 		trapsignal(td, &ksi);
 	}
 
@@ -640,7 +652,7 @@ cpu_fetch_syscall_args(struct thread *td)
 	struct syscall_args *sa;
 	caddr_t	params;
 	size_t argsz;
-	int error, n, i;
+	int error, n, narg, i;
 
 	p = td->td_proc;
 	frame = td->td_frame;
@@ -681,7 +693,7 @@ cpu_fetch_syscall_args(struct thread *td)
 	else
 		sa->callp = &p->p_sysent->sv_table[sa->code];
 
-	sa->narg = sa->callp->sy_narg;
+	narg = sa->callp->sy_narg;
 
 	if (SV_PROC_FLAG(p, SV_ILP32)) {
 		argsz = sizeof(uint32_t);
@@ -696,17 +708,17 @@ cpu_fetch_syscall_args(struct thread *td)
 			sa->args[i] = ((u_register_t *)(params))[i];
 	}
 
-	if (sa->narg > n)
+	if (narg > n)
 		error = copyin(MOREARGS(frame->fixreg[1]), sa->args + n,
-			       (sa->narg - n) * argsz);
+			       (narg - n) * argsz);
 	else
 		error = 0;
 
 #ifdef __powerpc64__
-	if (SV_PROC_FLAG(p, SV_ILP32) && sa->narg > n) {
+	if (SV_PROC_FLAG(p, SV_ILP32) && narg > n) {
 		/* Expand the size of arguments copied from the stack */
 
-		for (i = sa->narg; i >= n; i--)
+		for (i = narg; i >= n; i--)
 			sa->args[i] = ((uint32_t *)(&sa->args[n]))[i-n];
 	}
 #endif

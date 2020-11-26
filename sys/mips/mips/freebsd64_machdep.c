@@ -94,8 +94,6 @@ extern const char *freebsd64_syscallnames[];
 struct sysentvec elf_freebsd_freebsd64_sysvec = {
 	.sv_size	= FREEBSD64_SYS_MAXSYSCALL,
 	.sv_table	= freebsd64_sysent,
-	.sv_errsize	= 0,
-	.sv_errtbl	= NULL,
 	.sv_fixup	= __elfN(freebsd_fixup),
 	.sv_sendsig	= freebsd64_sendsig,
 	.sv_sigcode	= freebsd64_sigcode,
@@ -150,7 +148,8 @@ mips_hybrid_check_cap_size(uint32_t bits, const char *execpath)
 }
 
 static boolean_t
-mips_elf_header_supported(struct image_params * imgp)
+mips_elf_header_supported(struct image_params * imgp, int32_t *osrel __unused,
+    uint32_t *fctl0 __unused)
 {
 	const Elf_Ehdr *hdr = (const Elf_Ehdr *)imgp->image_header;
 	if ((hdr->e_flags & EF_MIPS_MACH) == EF_MIPS_MACH_CHERI128)

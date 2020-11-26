@@ -1173,7 +1173,7 @@ OLD_FILES+=usr/sbin/zfsd
 OLD_FILES+=usr/sbin/zhack
 OLD_FILES+=usr/sbin/zdb
 OLD_FILES+=usr/share/man/man3/libbe.3.gz
-OLD_FILES+=usr/share/man/man7/zpool-features.7.gz
+OLD_FILES+=usr/share/man/man5/zpool-features.5.gz
 OLD_FILES+=usr/share/man/man8/bectl.8.gz
 OLD_FILES+=usr/share/man/man8/gptzfsboot.8.gz
 OLD_FILES+=usr/share/man/man8/zdb.8.gz
@@ -2041,6 +2041,11 @@ OLD_FILES+=usr/sbin/freebsd-update
 OLD_FILES+=usr/share/examples/etc/freebsd-update.conf
 OLD_FILES+=usr/share/man/man5/freebsd-update.conf.5.gz
 OLD_FILES+=usr/share/man/man8/freebsd-update.8.gz
+.endif
+
+.if ${MK_FREEBSD_UPDATE} == no && ${MK_PORTSNAP} == no
+OLD_FILES+=usr/libexec/phttpget
+OLD_FILES+=usr/share/man/man8/phttpget.8.gz
 .endif
 
 .if ${MK_GAMES} == no
@@ -7360,10 +7365,8 @@ OLD_FILES+=usr/share/man/man8/pmcstudy.8.gz
 .if ${MK_PORTSNAP} == no
 OLD_FILES+=etc/portsnap.conf
 OLD_FILES+=usr/libexec/make_index
-OLD_FILES+=usr/libexec/phttpget
 OLD_FILES+=usr/sbin/portsnap
 OLD_FILES+=usr/share/examples/etc/portsnap.conf
-OLD_FILES+=usr/share/man/man8/phttpget.8.gz
 OLD_FILES+=usr/share/man/man8/portsnap.8.gz
 .endif
 

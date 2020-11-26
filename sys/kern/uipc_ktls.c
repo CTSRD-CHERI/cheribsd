@@ -680,7 +680,8 @@ ktls_cleanup(struct ktls_session *tls)
 			counter_u64_add(ktls_ifnet_gcm, -1);
 			break;
 		}
-		m_snd_tag_rele(tls->snd_tag);
+		if (tls->snd_tag != NULL)
+			m_snd_tag_rele(tls->snd_tag);
 		break;
 #ifdef TCP_OFFLOAD
 	case TCP_TLS_MODE_TOE:
@@ -1640,21 +1641,6 @@ out:
 	sb->sb_ccc += len;
 	SBCHECK(sb);
 	return (top);
-}
-
-static int
-m_segments(struct mbuf *m, int skip)
-{
-	int count;
-
-	while (skip >= m->m_len) {
-		skip -= m->m_len;
-		m = m->m_next;
-	}
-
-	for (count = 0; m != NULL; count++)
-		m = m->m_next;
-	return (count);
 }
 
 static void

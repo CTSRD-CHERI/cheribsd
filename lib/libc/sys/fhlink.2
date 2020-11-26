@@ -25,7 +25,7 @@
 .\"
 .\" $FreeBSD$
 .\"
-.Dd March 30, 2020
+.Dd September 23, 2020
 .Dt FHLINK 2
 .Os
 .Sh NAME
@@ -113,6 +113,13 @@ See the description of the
 flag in the
 .Xr open 2
 manual page.
+.It Dv AT_RESOLVE_BENEATH
+Only walks paths below the topping directory.
+See the description of the
+.Dv O_RESOLVE_BENEATH
+flag in the
+.Xr open 2
+manual page.
 .El
 .Pp
 If
@@ -171,7 +178,7 @@ The link count of the file pointed at by
 .Fa fhp
 would exceed 32767.
 .It Bq Er EACCES
-A component of 
+A component of
 .Fa to
 prefix denies search permission.
 .It Bq Er EACCES

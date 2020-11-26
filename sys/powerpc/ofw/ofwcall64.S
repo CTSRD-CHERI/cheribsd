@@ -32,6 +32,8 @@
 #include <machine/spr.h>
 #include <machine/asm.h>
 
+#include "opt_platform.h"
+
 #define	OFWSTKSZ	4096		/* 4K Open Firmware stack */
 
 /*
@@ -113,11 +115,16 @@ ASENTRY_NOPROF(ofwcall)
 	/*
 	 * Set the MSR to the OF value. This has the side effect of disabling
 	 * exceptions, which is important for the next few steps.
+	 * This does NOT, however, cause us to switch endianness.
 	 */
 
 	addis	%r5,%r2,TOC_REF(ofmsr)@ha
 	ld	%r5,TOC_REF(ofmsr)@l(%r5)
 	ld	%r5,0(%r5)
+#if defined(__LITTLE_ENDIAN__) && defined(QEMU)
+	/* QEMU hack: qemu does not emulate mtmsrd correctly! */
+	ori	%r5,%r5,1	/* Leave PSR_LE set */
+#endif
 	mtmsrd	%r5
 	isync
 
@@ -138,9 +145,28 @@ ASENTRY_NOPROF(ofwcall)
 	stw	%r5,4(%r1)
 	stw	%r5,0(%r1)
 
+#ifdef __LITTLE_ENDIAN__
+	/* Atomic context switch w/ endian change */
+	mtmsrd	%r5, 1	/* Clear PSL_EE|PSL_RI */
+	addis	%r5,%r2,TOC_REF(ofmsr)@ha
+	ld	%r5,TOC_REF(ofmsr)@l(%r5)
+	ld	%r5,0(%r5)
+	mtsrr0	%r4
+	mtsrr1	%r5
+	LOAD_LR_NIA
+1:
+	mflr	%r5
+	addi	%r5, %r5, (2f-1b)
+	mtlr	%r5
+	li	%r5, 0
+	rfid
+2:
+	RETURN_TO_NATIVE_ENDIAN
+#else
 	/* Finally, branch to OF */
 	mtctr	%r4
 	bctrl
+#endif
 
 	/* Reload stack pointer, MSR, and reference PC from the OFW stack */
 	ld	%r7,32(%r1)
@@ -250,6 +276,10 @@ ASENTRY_NOPROF(rtascall)
 	addis	%r7,%r2,TOC_REF(rtasmsr)@ha
 	ld	%r7,TOC_REF(rtasmsr)@l(%r7)
 	ld	%r7,0(%r7)
+#ifdef	__LITTLE_ENDIAN__
+	/* QEMU hack: qemu does not emulate mtmsrd correctly! */
+	ori	%r7,%r7,1	/* Leave PSR_LE set */
+#endif
 	mtmsrd	%r7
 	isync
 
@@ -266,9 +296,29 @@ ASENTRY_NOPROF(rtascall)
 	std	%r6,16(%r1)	/* Save MSR */
 	std	%r9,24(%r1)	/* Save reference PC for high 32 bits */
 
+#ifdef __LITTLE_ENDIAN__
+	/* Atomic context switch w/ endian change */
+	li	%r7, 0
+	mtmsrd	%r7, 1	/* Clear PSL_EE|PSL_RI */
+	addis	%r7,%r2,TOC_REF(rtasmsr)@ha
+	ld	%r7,TOC_REF(rtasmsr)@l(%r7)
+	ld	%r7,0(%r7)
+	mtsrr0	%r5
+	mtsrr1	%r7
+	LOAD_LR_NIA
+1:
+	mflr	%r5
+	addi	%r5, %r5, (2f-1b)
+	mtlr	%r5
+	li	%r5, 0
+	rfid
+2:
+	RETURN_TO_NATIVE_ENDIAN
+#else
 	/* Finally, branch to RTAS */
 	mtctr	%r5
 	bctrl
+#endif
 
 	/* 
 	 * Reload stack pointer, MSR, reg PC from the reg save area in r1. We

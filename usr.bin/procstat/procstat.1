@@ -25,7 +25,7 @@
 .\"
 .\" $FreeBSD$
 .\"
-.Dd March 4, 2019
+.Dd October 5, 2020
 .Dt PROCSTAT 1
 .Os
 .Sh NAME
@@ -102,6 +102,15 @@
 .Op Fl N Ar system
 .Op Fl w Ar interval
 .Ar core ...
+.Nm pargs
+.Op Fl -libxo
+.Ar pid ...
+.Nm penv
+.Op Fl -libxo
+.Ar pid ...
+.Nm pwdx
+.Op Fl -libxo
+.Ar pid ...
 .Sh DESCRIPTION
 .Nm
 utility displays detailed information about the processes identified by the
@@ -112,6 +121,17 @@ flag is used, all processes.
 It can also display information extracted from a process core file, if
 the core file is specified as the argument.
 .Pp
+The
+.Nm pargs ,
+.Nm penv
+and
+.Nm pwdx
+utilities display the arguments, environment, and current working directory,
+respectively of the process specified by
+.Ar pid
+argument.
+They mimic the behavior of Solaris utilities of the same names.
+.Pp
 If the
 .Fl -libxo
 flag is specified the output is generated via
@@ -121,7 +141,8 @@ See
 .Xr xo_parse_args 3
 for details on command line arguments.
 .Pp
-The following commands are available:
+The following commands are available for
+.Nm :
 .Bl -tag -width indent
 .It Ar basic
 Print basic process statistics (this is the default).
@@ -200,6 +221,12 @@ If the
 flag is passed then extra information is shown.
 .It Ar auxv | Fl x
 Display ELF auxiliary vector for the process.
+.It Ar pargs
+Display arguments for the process.
+.It Ar penv
+Display environment variables for the process.
+.It Ar pwdx
+Display current working directory for the process.
 .El
 .Pp
 All options generate output in the format of a table, the first field of
@@ -434,7 +461,7 @@ process signal disposition details, three symbols
 if signal is pending in the global process queue; - otherwise.
 .It I
 if signal delivery disposition is
-.Dv SIG_IGN;
+.Dv SIG_IGN ;
 - otherwise.
 .It C
 if the signal will be caught; - otherwise.
@@ -697,6 +724,51 @@ auxiliary vector value
 .El
 .Sh EXIT STATUS
 .Ex -std
+.Sh EXAMPLES
+Show binary information about the current shell:
+.Bd -literal -offset indent
+$ procstat binary $$
+  PID COMM                OSREL PATH
+46620 bash              1201000 /usr/local/bin/bash
+.Ed
+.Pp
+Same as above but showing information about open file descriptors:
+.Bd -literal -offset indent
+$ procstat files $$
+  PID COMM                FD T V FLAGS    REF  OFFSET PRO NAME
+46620 bash              text v r r-------   -       - -   /usr/local/bin/bash
+46620 bash              ctty v c rw------   -       - -   /dev/pts/12
+46620 bash               cwd v d r-------   -       - -   /tmp
+46620 bash              root v d r-------   -       - -   /
+46620 bash                 0 v c rw------   7  372071 -   /dev/pts/12
+46620 bash                 1 v c rw------   7  372071 -   /dev/pts/12
+46620 bash                 2 v c rw------   7  372071 -   /dev/pts/12
+46620 bash               255 v c rw------   7  372071 -   /dev/pts/12
+.Ed
+.Pp
+Show the arguments used to launch
+.Xr init 8 :
+.Bd -literal -offset indent
+$ procstat arguments 1
+  PID COMM             ARGS
+    1 init             /sbin/init --
+.Ed
+.Pp
+Extract binary information from a core dump:
+.Bd -literal -offset indent
+$ procstat binary core.36642
+  PID COMM                OSREL PATH
+36642 top               1201000 /usr/bin/top
+.Ed
+.Pp
+Trying to extract information from a core file generated in a different major
+.Fx
+version might show an error like this:
+.Bd -literal -offset indent
+$ procstat mplayer.core
+procstat: kinfo_proc structure size mismatch
+procstat: procstat_getprocs()
+.Ed
 .Sh SEE ALSO
 .Xr fstat 1 ,
 .Xr ps 1 ,
@@ -725,6 +797,10 @@ support was added by
 .An -nosplit
 Allan Jude
 .Aq Mt allanjude@FreeBSD.org .
+.br
+.An Juraj Lutter
+.Aq Mt juraj@lutter.sk
+added the pargs, penv and pwdx functionality.
 .Sh BUGS
 The display of open file or memory mapping pathnames is implemented using the
 kernel's name cache.

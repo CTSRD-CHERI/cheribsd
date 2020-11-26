@@ -27,6 +27,8 @@
 
 #include <machine/asm.h>
 
+#include "opt_platform.h"
+
 GLOBAL(opal_entrypoint)
 	.llong	0
 GLOBAL(opal_data)
@@ -70,8 +72,21 @@ ASENTRY(opal_call)
 	ld	%r2,TOC_REF(opal_data)@l(%r2)
 	ld	%r2,0(%r2)
 
+
+#if defined(__LITTLE_ENDIAN__) && defined(QEMU)
+	/* QEMU hack: qemu does not emulate mtmsrd correctly! */
+	ori     %r3,%r3,1       /* Leave PSR_LE set */
+#endif
 	mtmsrd	%r3
 	isync
+#if defined(__LITTLE_ENDIAN__) && defined(QEMU)
+	/* Clean up from qemu hack */
+	xori	%r3,%r3,1
+#endif
+
+#ifdef __LITTLE_ENDIAN__
+	mtsrr1	%r3
+#endif
 
 	/* Shift registers over */
 	mr	%r3,%r4
@@ -82,8 +97,23 @@ ASENTRY(opal_call)
 	mr	%r8,%r9
 	mr	%r9,%r10
 
+#ifdef __LITTLE_ENDIAN__
+	/* We need to rfid to switch endian. */
+	mfctr	%r11
+	mtsrr0	%r11
+	LOAD_LR_NIA
+1:
+	mflr	%r11
+	addi	%r11, %r11, (2f-1b)
+	mtlr	%r11
+	/* Call OPAL */
+	rfid
+2:
+	RETURN_TO_NATIVE_ENDIAN
+#else
 	/* Call OPAL */
 	bctrl
+#endif
 
 	/* Restore MSR */
 	mtmsrd	%r31

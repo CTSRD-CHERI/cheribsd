@@ -534,7 +534,7 @@ cpu_fetch_syscall_args(struct thread *td)
 
 	locr0 = td->td_frame;
 	sa = &td->td_sa;
-	
+
 	bzero(sa->args, sizeof(sa->args));
 
 	/* compute next PC after syscall instruction */
@@ -640,9 +640,7 @@ cpu_fetch_syscall_args(struct thread *td)
 	else
 		sa->callp = &se->sv_table[sa->code];
 
-	sa->narg = sa->callp->sy_narg;
-
-	if (sa->narg > nsaved) {
+	if (sa->callp->sy_narg > nsaved) {
 		char * __capability stack_args;
 
 #if defined(__mips_n32) || defined(__mips_n64)
@@ -656,7 +654,7 @@ cpu_fetch_syscall_args(struct thread *td)
 		if (!SV_PROC_FLAG(td->td_proc, SV_ILP32))
 #endif
 			printf("SYSCALL #%u pid:%u, narg (%u) > nsaved (%u).\n",
-			    sa->code, td->td_proc->p_pid, sa->narg, nsaved);
+			    sa->code, td->td_proc->p_pid, sa->callp->sy_narg, nsaved);
 #endif
 #if (defined(__mips_n32) || defined(__mips_n64)) && defined(COMPAT_FREEBSD32)
 		if (SV_PROC_FLAG(td->td_proc, SV_ILP32)) {
@@ -664,9 +662,9 @@ cpu_fetch_syscall_args(struct thread *td)
 			int32_t arg;
 
 			stack_args = __USER_CAP(locr0->sp + 4 * sizeof(int32_t),
-			    (sa->narg - nsaved) * sizeof(int32_t));
+			    (sa->callp->sy_narg - nsaved) * sizeof(int32_t));
 			error = 0; /* XXX GCC is awful.  */
-			for (i = nsaved; i < sa->narg; i++) {
+			for (i = nsaved; i < sa->callp->sy_narg; i++) {
 				error = copyin(stack_args +
 				    (i - nsaved) * sizeof(int32_t),
 				    &arg, sizeof(arg));
@@ -678,10 +676,10 @@ cpu_fetch_syscall_args(struct thread *td)
 #endif
 		{
 			stack_args = __USER_CAP(locr0->sp +
-			    4 * sizeof(register_t), (sa->narg - nsaved) *
-			    sizeof(register_t));
+			    4 * sizeof(register_t),
+			    (sa->callp->sy_narg - nsaved) * sizeof(register_t));
 			error = copyin(stack_args, &sa->args[nsaved],
-			    (u_int)(sa->narg - nsaved) * sizeof(register_t));
+			    (u_int)(sa->callp->sy_narg - nsaved) * sizeof(register_t));
 		}
 		if (error != 0) {
 			locr0->v0 = error;
@@ -1526,7 +1524,6 @@ trapDump(char *msg)
 }
 #endif
 
-
 /*
  * Return the resulting PC as if the branch was executed.
  *
@@ -1885,7 +1882,6 @@ trap_frame_dump(struct trapframe *frame)
 }
 
 #endif
-
 
 static void
 get_mapping_info(vm_offset_t va, pd_entry_t **pdepp, pt_entry_t **ptepp)
@@ -2284,7 +2280,6 @@ mips_unaligned_load_store(struct trapframe *frame, int mode, register_t addr, ui
 	panic("%s: should not be reached.", __func__);
 }
 
-
 /*
  * XXX TODO: SMP?
  */
@@ -2311,7 +2306,6 @@ emulate_unaligned_access(struct trapframe *frame, int mode)
 	 * Fall through if it's instruction fetch exception
 	 */
 	if (!((pc & 3) || (pc == frame->badvaddr))) {
-
 		/*
 		 * Handle unaligned load and store
 		 */

@@ -31,6 +31,7 @@
 
 #include <assert.h>
 #include <elf.h>
+#include <sys/types.h>
 #include <fcntl.h>
 #include <gelf.h>
 #include <limits.h>
@@ -1583,14 +1584,14 @@ process_obj(dtrace_hdl_t *dtp, const char *obj, int *eprobesp)
 			 * preserved in order to support incremental rebuilds.
 			 */
 			if (shdr_rel.sh_type == SHT_RELA) {
-				rela.r_info =
-				    GELF_R_INFO(GELF_R_SYM(rela.r_info), 0);
+				rela.r_info = GELF_R_INFO(
+				    GELF_R_SYM(rela.r_info), DT_REL_NONE);
 				(void) gelf_update_rela(data_rel, i, &rela);
 			} else {
 				GElf_Rel rel;
 				rel.r_offset = rela.r_offset;
-				rela.r_info =
-				    GELF_R_INFO(GELF_R_SYM(rela.r_info), 0);
+				rel.r_info = GELF_R_INFO(
+				    GELF_R_SYM(rela.r_info), DT_REL_NONE);
 				(void) gelf_update_rel(data_rel, i, &rel);
 			}
 

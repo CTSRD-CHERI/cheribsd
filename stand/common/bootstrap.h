@@ -68,7 +68,6 @@ int	getrootmount(char *rootdev);
 
 /* misc.c */
 char	*unargv(int argc, char *argv[]);
-void	hexdump(caddr_t region, size_t len);
 size_t	strlenout(vm_offset_t str);
 char	*strdupout(vm_offset_t str);
 void	kern_bzero(vm_offset_t dest, size_t len);
@@ -344,6 +343,37 @@ extern struct arch_switch archsw;
 void	delay(int delay);
 
 void	dev_cleanup(void);
+
+/*
+ * nvstore API.
+ */
+typedef int (nvstore_getter_cb_t)(void *, const char *, void **);
+typedef int (nvstore_setter_cb_t)(void *, int, const char *,
+    const void *, size_t);
+typedef int (nvstore_setter_str_cb_t)(void *, const char *, const char *,
+    const char *);
+typedef int (nvstore_unset_cb_t)(void *, const char *);
+typedef int (nvstore_print_cb_t)(void *, void *);
+typedef int (nvstore_iterate_cb_t)(void *, int (*)(void *, void *));
+
+typedef struct nvs_callbacks {
+	nvstore_getter_cb_t	*nvs_getter;
+	nvstore_setter_cb_t	*nvs_setter;
+	nvstore_setter_str_cb_t *nvs_setter_str;
+	nvstore_unset_cb_t	*nvs_unset;
+	nvstore_print_cb_t	*nvs_print;
+	nvstore_iterate_cb_t	*nvs_iterate;
+} nvs_callbacks_t;
+
+int nvstore_init(const char *, nvs_callbacks_t *, void *);
+int nvstore_fini(const char *);
+void *nvstore_get_store(const char *);
+int nvstore_print(void *);
+int nvstore_get_var(void *, const char *, void **);
+int nvstore_set_var(void *, int, const char *, void *, size_t);
+int nvstore_set_var_from_string(void *, const char *, const char *,
+    const char *);
+int nvstore_unset_var(void *, const char *);
 
 #ifndef CTASSERT
 #define	CTASSERT(x)	_Static_assert(x, "compile-time assertion failed")

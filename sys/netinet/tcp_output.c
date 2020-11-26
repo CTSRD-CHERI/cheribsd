@@ -336,7 +336,7 @@ again:
 			sendalot = 1;
 			TCPSTAT_INC(tcps_sack_rexmits);
 			TCPSTAT_ADD(tcps_sack_rexmit_bytes,
-			    min(len, tp->t_maxseg));
+			    min(len, tcp_maxseg(tp)));
 		}
 	}
 after_sack_rexmit:
@@ -589,6 +589,20 @@ after_sack_rexmit:
 	 */
 	if (len) {
 		if (len >= tp->t_maxseg)
+			goto send;
+		/*
+		 * As the TCP header options are now
+		 * considered when setting up the initial
+		 * window, we would not send the last segment
+		 * if we skip considering the option length here.
+		 * Note: this may not work when tcp headers change
+		 * very dynamically in the future.
+		 */
+		if ((((tp->t_flags & TF_SIGNATURE) ?
+			PADTCPOLEN(TCPOLEN_SIGNATURE) : 0) +
+		    ((tp->t_flags & TF_RCVD_TSTMP) ?
+			PADTCPOLEN(TCPOLEN_TIMESTAMP) : 0) +
+		    len) >= tp->t_maxseg)
 			goto send;
 		/*
 		 * NOTE! on localhost connections an 'ack' from the remote
@@ -844,7 +858,6 @@ send:
 			if (flags & TH_SYN)
 				to.to_flags |= TOF_SACKPERM;
 			else if (TCPS_HAVEESTABLISHED(tp->t_state) &&
-			    (tp->t_flags & TF_SACK_PERMIT) &&
 			    tp->rcv_numsacks > 0) {
 				to.to_flags |= TOF_SACK;
 				to.to_nsacks = tp->rcv_numsacks;
@@ -1900,7 +1913,6 @@ tcp_m_copym(struct mbuf *m, int32_t off0, int32_t *plen,
 	int32_t *pkthdrlen;
 	uint32_t mlen, frags;
 	bool copyhdr;
-
 
 	KASSERT(off >= 0, ("tcp_m_copym, negative off %d", off));
 	KASSERT(len >= 0, ("tcp_m_copym, negative len %d", len));

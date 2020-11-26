@@ -31,7 +31,9 @@ CFLAGS+=-DBOOTPROG=\"zfsboot\" \
 	-I${ZFSSRC} \
 	-I${SYSDIR}/crypto/skein \
 	-I${SYSDIR}/cddl/boot/zfs \
-	-I${SYSDIR}/cddl/contrib/opensolaris/uts/common \
+	-I${SYSDIR}/contrib/openzfs/include \
+	-I${SYSDIR}/contrib/openzfs/include/os/freebsd/spl \
+	-I${SYSDIR}/contrib/openzfs/include/os/freebsd/zfs \
 	-I${SYSDIR}/cddl/contrib/opensolaris/common/lz4 \
 	-I${BOOTSRC}/i386/boot2 \
 	-Wall -Waggregate-return -Wbad-function-cast -Wno-cast-align \
@@ -79,7 +81,7 @@ zfsboot.ld: zfsboot.ldr zfsboot.bin ${BTXKERN}
 	    -o ${.TARGET} -P 1 zfsboot.bin
 
 zfsboot.ldr:
-	cp /dev/null ${.TARGET}
+	:> ${.TARGET}
 
 zfsboot.bin: zfsboot.out
 	${OBJCOPY} -S -O binary zfsboot.out ${.TARGET}

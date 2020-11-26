@@ -6852,7 +6852,8 @@ void t4_get_port_stats_offset(struct adapter *adap, int idx,
  */
 void t4_get_port_stats(struct adapter *adap, int idx, struct port_stats *p)
 {
-	u32 bgmap = adap2pinfo(adap, idx)->mps_bg_map;
+	struct port_info *pi = adap->port[idx];
+	u32 bgmap = pi->mps_bg_map;
 	u32 stat_ctl = t4_read_reg(adap, A_MPS_STAT_CTL);
 
 #define GET_STAT(name) \
@@ -6902,7 +6903,6 @@ void t4_get_port_stats(struct adapter *adap, int idx, struct port_stats *p)
 	p->rx_ucast_frames	= GET_STAT(RX_PORT_UCAST);
 	p->rx_too_long		= GET_STAT(RX_PORT_MTU_ERROR);
 	p->rx_jabber		= GET_STAT(RX_PORT_MTU_CRC_ERROR);
-	p->rx_fcs_err		= GET_STAT(RX_PORT_CRC_ERROR);
 	p->rx_len_err		= GET_STAT(RX_PORT_LEN_ERROR);
 	p->rx_symbol_err	= GET_STAT(RX_PORT_SYM_ERROR);
 	p->rx_runt		= GET_STAT(RX_PORT_LESS_64B);
@@ -6921,6 +6921,9 @@ void t4_get_port_stats(struct adapter *adap, int idx, struct port_stats *p)
 	p->rx_ppp5		= GET_STAT(RX_PORT_PPP5);
 	p->rx_ppp6		= GET_STAT(RX_PORT_PPP6);
 	p->rx_ppp7		= GET_STAT(RX_PORT_PPP7);
+
+	if (pi->fcs_reg != -1)
+		p->rx_fcs_err = t4_read_reg64(adap, pi->fcs_reg) - pi->fcs_base;
 
 	if (chip_id(adap) >= CHELSIO_T5) {
 		if (stat_ctl & F_COUNTPAUSESTATRX) {
@@ -9614,7 +9617,7 @@ static void read_filter_mode_and_ingress_config(struct adapter *adap,
 int t4_init_tp_params(struct adapter *adap, bool sleep_ok)
 {
 	int chan;
-	u32 v;
+	u32 tx_len, rx_len, r, v;
 	struct tp_params *tpp = &adap->params.tp;
 
 	v = t4_read_reg(adap, A_TP_TIMER_RESOLUTION);
@@ -9627,19 +9630,26 @@ int t4_init_tp_params(struct adapter *adap, bool sleep_ok)
 
 	read_filter_mode_and_ingress_config(adap, sleep_ok);
 
-	/*
-	 * Cache a mask of the bits that represent the error vector portion of
-	 * rx_pkt.err_vec.  T6+ can use a compressed error vector to make room
-	 * for information about outer encapsulation (GENEVE/VXLAN/NVGRE).
-	 */
-	tpp->err_vec_mask = htobe16(0xffff);
 	if (chip_id(adap) > CHELSIO_T5) {
 		v = t4_read_reg(adap, A_TP_OUT_CONFIG);
-		if (v & F_CRXPKTENC) {
-			tpp->err_vec_mask =
-			    htobe16(V_T6_COMPR_RXERR_VEC(M_T6_COMPR_RXERR_VEC));
-		}
-	}
+		tpp->rx_pkt_encap = v & F_CRXPKTENC;
+	} else
+		tpp->rx_pkt_encap = false;
+
+	rx_len = t4_read_reg(adap, A_TP_PMM_RX_PAGE_SIZE);
+	tx_len = t4_read_reg(adap, A_TP_PMM_TX_PAGE_SIZE);
+
+	r = t4_read_reg(adap, A_TP_PARA_REG2);
+	rx_len = min(rx_len, G_MAXRXDATA(r));
+	tx_len = min(tx_len, G_MAXRXDATA(r));
+
+	r = t4_read_reg(adap, A_TP_PARA_REG7);
+	v = min(G_PMMAXXFERLEN0(r), G_PMMAXXFERLEN1(r));
+	rx_len = min(rx_len, v);
+	tx_len = min(tx_len, v);
+
+	tpp->max_tx_pdu = tx_len;
+	tpp->max_rx_pdu = rx_len;
 
 	return 0;
 }

@@ -1030,7 +1030,7 @@ vmx_vminit(struct vm *vm, pmap_t pmap)
 	}
 	vmx->vm = vm;
 
-	vmx->eptp = eptp(vtophys((vm_offset_t)pmap->pm_pml4));
+	vmx->eptp = eptp(vtophys((vm_offset_t)pmap->pm_pmltop));
 
 	/*
 	 * Clean up EPTP-tagged guest physical and combined mappings
@@ -1193,15 +1193,11 @@ vmx_vminit(struct vm *vm, pmap_t pmap)
 static int
 vmx_handle_cpuid(struct vm *vm, int vcpu, struct vmxctx *vmxctx)
 {
-	int handled, func;
+	int handled;
 
-	func = vmxctx->guest_rax;
-
-	handled = x86_emulate_cpuid(vm, vcpu,
-				    (uint32_t*)(&vmxctx->guest_rax),
-				    (uint32_t*)(&vmxctx->guest_rbx),
-				    (uint32_t*)(&vmxctx->guest_rcx),
-				    (uint32_t*)(&vmxctx->guest_rdx));
+	handled = x86_emulate_cpuid(vm, vcpu, (uint64_t *)&vmxctx->guest_rax,
+	    (uint64_t *)&vmxctx->guest_rbx, (uint64_t *)&vmxctx->guest_rcx,
+	    (uint64_t *)&vmxctx->guest_rdx);
 	return (handled);
 }
 
@@ -1940,14 +1936,18 @@ vmx_cpu_mode(void)
 static enum vm_paging_mode
 vmx_paging_mode(void)
 {
+	uint64_t cr4;
 
 	if (!(vmcs_read(VMCS_GUEST_CR0) & CR0_PG))
 		return (PAGING_MODE_FLAT);
-	if (!(vmcs_read(VMCS_GUEST_CR4) & CR4_PAE))
+	cr4 = vmcs_read(VMCS_GUEST_CR4);
+	if (!(cr4 & CR4_PAE))
 		return (PAGING_MODE_32);
-	if (vmcs_read(VMCS_GUEST_IA32_EFER) & EFER_LME)
-		return (PAGING_MODE_64);
-	else
+	if (vmcs_read(VMCS_GUEST_IA32_EFER) & EFER_LME) {
+		if (!(cr4 & CR4_LA57))
+			return (PAGING_MODE_64);
+		return (PAGING_MODE_64_LA57);
+	} else
 		return (PAGING_MODE_PAE);
 }
 
@@ -3336,6 +3336,10 @@ vmx_setreg(void *arg, int vcpu, int reg, uint64_t val)
 
 	if (vmxctx_setreg(&vmx->ctx[vcpu], reg, val) == 0)
 		return (0);
+
+	/* Do not permit user write access to VMCS fields by offset. */
+	if (reg < 0)
+		return (EINVAL);
 
 	error = vmcs_setreg(&vmx->vmcs[vcpu], running, reg, val);
 

@@ -131,6 +131,8 @@ SYSCTL_INT(_vm, OID_AUTO, log_wxrequests, CTLFLAG_RWTUN, &log_wxrequests, 0,
 #define	MAP_32BIT_MAX_ADDR	((vm_offset_t)1 << 31)
 #endif
 
+_Static_assert(MAXPAGESIZES <= 4, "MINCORE_SUPER too narrow");
+
 #if __has_feature(capabilities)
 static int
 cap_covers_pages(const void * __capability cap, size_t size)
@@ -485,15 +487,15 @@ kern_mmap_req(struct thread *td, struct mmap_req *mrp)
 	struct proc *p;
 	off_t pos;
 	vm_offset_t addr_mask = PAGE_MASK;
-	vm_size_t len, pageoff, size;
-	vm_ptr_t addr;
+	vm_ptr_t addr, orig_addr;
 	vm_offset_t max_addr;
+	vm_size_t len, pageoff, size;
 	vm_prot_t cap_maxprot;
 	int align, error, fd, flags, max_prot, prot;
 	cap_rights_t rights;
 	mmap_check_fp_fn check_fp_fn;
 
-	addr = mrp->mr_hint;
+	orig_addr = addr = mrp->mr_hint;
 	max_addr = mrp->mr_max_addr;
 	len = mrp->mr_len;
 	prot = mrp->mr_prot;
@@ -810,6 +812,8 @@ kern_mmap_req(struct thread *td, struct mmap_req *mrp)
 			if (error != 0)
 				goto done;
 		}
+		if (fp->f_ops == &shm_ops && shm_largepage(fp->f_data))
+			addr = orig_addr;
 		/* This relies on VM_PROT_* matching PROT_*. */
 		error = fo_mmap(fp, &vms->vm_map, &addr, max_addr, size,
 		    prot, max_prot & cap_maxprot, flags, pos, td);
@@ -893,7 +897,6 @@ ommap(struct thread *td, struct ommap_args *uap)
 	    uap->fd, uap->pos));
 }
 #endif				/* COMPAT_43 */
-
 
 #ifndef _SYS_SYSPROTO_H_
 struct msync_args {
@@ -998,6 +1001,7 @@ kern_munmap(struct thread *td, uintptr_t addr0, size_t size)
 	vm_offset_t addr, end;
 	vm_size_t pageoff;
 	vm_map_t map;
+        int rv = KERN_SUCCESS;
 
 	if (size == 0)
 		return (EINVAL);
@@ -1038,7 +1042,7 @@ kern_munmap(struct thread *td, uintptr_t addr0, size_t size)
 	vm_map_remove_locked(map, addr, addr + size);
 
 #ifdef HWPMC_HOOKS
-	if (__predict_false(pmc_handled)) {
+	if (rv == KERN_SUCCESS && __predict_false(pmc_handled)) {
 		/* downgrade the lock to prevent a LOR with the pmc-sx lock */
 		vm_map_lock_downgrade(map);
 		if (pkm.pm_address != (uintptr_t) NULL)
@@ -1048,8 +1052,7 @@ kern_munmap(struct thread *td, uintptr_t addr0, size_t size)
 #endif
 		vm_map_unlock(map);
 
-	/* vm_map_delete returns nothing but KERN_SUCCESS anyway */
-	return (0);
+	return (vm_mmap_to_errno(rv));
 }
 
 #ifndef _SYS_SYSPROTO_H_
@@ -1307,7 +1310,6 @@ RestartScan:
 	 */
 	lastvecindex = -1;
 	while (entry->start < end) {
-
 		/*
 		 * check for contiguity
 		 */
@@ -1571,7 +1573,14 @@ kern_mlock(struct proc *proc, struct ucred *cred, uintptr_t addr0, size_t len)
 		PROC_UNLOCK(proc);
 	}
 #endif
-	return (error == KERN_SUCCESS ? 0 : ENOMEM);
+	switch (error) {
+	case KERN_SUCCESS:
+		return (0);
+	case KERN_INVALID_ARGUMENT:
+		return (EINVAL);
+	default:
+		return (ENOMEM);
+	}
 }
 
 #ifndef _SYS_SYSPROTO_H_
@@ -1989,6 +1998,39 @@ vm_mmap(vm_map_t map, vm_ptr_t *addr, vm_size_t size, vm_prot_t prot,
 	return (error);
 }
 
+int
+kern_mmap_racct_check(struct thread *td, vm_map_t map, vm_size_t size)
+{
+	int error;
+
+	RACCT_PROC_LOCK(td->td_proc);
+	if (map->size + size > lim_cur(td, RLIMIT_VMEM)) {
+		RACCT_PROC_UNLOCK(td->td_proc);
+		return (ENOMEM);
+	}
+	if (racct_set(td->td_proc, RACCT_VMEM, map->size + size)) {
+		RACCT_PROC_UNLOCK(td->td_proc);
+		return (ENOMEM);
+	}
+	if (!old_mlock && map->flags & MAP_WIREFUTURE) {
+		if (ptoa(pmap_wired_count(map->pmap)) + size >
+		    lim_cur(td, RLIMIT_MEMLOCK)) {
+			racct_set_force(td->td_proc, RACCT_VMEM, map->size);
+			RACCT_PROC_UNLOCK(td->td_proc);
+			return (ENOMEM);
+		}
+		error = racct_set(td->td_proc, RACCT_MEMLOCK,
+		    ptoa(pmap_wired_count(map->pmap)) + size);
+		if (error != 0) {
+			racct_set_force(td->td_proc, RACCT_VMEM, map->size);
+			RACCT_PROC_UNLOCK(td->td_proc);
+			return (error);
+		}
+	}
+	RACCT_PROC_UNLOCK(td->td_proc);
+	return (0);
+}
+
 /*
  * Internal version of mmap that maps a specific VM object into an
  * map.  Called by mmap for MAP_ANON, vm_mmap, shm_mmap, and vn_mmap.
@@ -1999,8 +2041,8 @@ vm_mmap_object(vm_map_t map, vm_ptr_t *addr, vm_offset_t max_addr,
     vm_prot_t maxprot, int flags, vm_object_t object, vm_ooffset_t foff,
     boolean_t writecounted, struct thread *td)
 {
-	boolean_t curmap, fitit, new_reservation;
 	int docow, error, findspace, rv;
+	bool curmap, fitit, new_reservation;
 	vm_size_t padded_size;
 	vm_ptr_t reservation;
 
@@ -2009,33 +2051,9 @@ vm_mmap_object(vm_map_t map, vm_ptr_t *addr, vm_offset_t max_addr,
 	curmap = map == &td->td_proc->p_vmspace->vm_map;
 	if (curmap) {
 		padded_size = CHERI_REPRESENTABLE_LENGTH(size);
-		RACCT_PROC_LOCK(td->td_proc);
-		if (map->size + padded_size > lim_cur(td, RLIMIT_VMEM)) {
-			RACCT_PROC_UNLOCK(td->td_proc);
-			return (ENOMEM);
-		}
-		if (racct_set(td->td_proc, RACCT_VMEM, map->size + padded_size)) {
-			RACCT_PROC_UNLOCK(td->td_proc);
-			return (ENOMEM);
-		}
-		if (!old_mlock && map->flags & MAP_WIREFUTURE) {
-			if (ptoa(pmap_wired_count(map->pmap)) + padded_size >
-			    lim_cur(td, RLIMIT_MEMLOCK)) {
-				racct_set_force(td->td_proc, RACCT_VMEM,
-				    map->size);
-				RACCT_PROC_UNLOCK(td->td_proc);
-				return (ENOMEM);
-			}
-			error = racct_set(td->td_proc, RACCT_MEMLOCK,
-			    ptoa(pmap_wired_count(map->pmap)) + padded_size);
-			if (error != 0) {
-				racct_set_force(td->td_proc, RACCT_VMEM,
-				    map->size);
-				RACCT_PROC_UNLOCK(td->td_proc);
-				return (error);
-			}
-		}
-		RACCT_PROC_UNLOCK(td->td_proc);
+		error = kern_mmap_racct_check(td, map, size);
+		if (error != 0)
+			return (error);
 	}
 
 	/*

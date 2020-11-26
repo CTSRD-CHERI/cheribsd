@@ -41,6 +41,8 @@
 extern int	Aflag;	/* show addresses of protocol control block */
 extern int	aflag;	/* show all sockets (including servers) */
 extern int	bflag;	/* show i/f total bytes in/out */
+extern int	cflag;	/* show congestion control stats */
+extern int	Cflag;	/* show congestion control algo and stack */
 extern int	dflag;	/* show i/f dropped packets */
 extern int	gflag;	/* show group (multicast) routing or stats */
 extern int	hflag;	/* show counters in human readable format */
@@ -162,3 +164,4 @@ void	mroutepr(void);
 void	mrt_stats(void);
 void	bpf_stats(char *);
 void	nhops_print(int fibnum, int af);
+void	nhgrp_print(int fibnum, int af);

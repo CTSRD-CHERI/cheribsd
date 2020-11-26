@@ -272,6 +272,10 @@ ccr_populate_sglist(struct sglist *sg, struct crypto_buffer *cb)
 	case CRYPTO_BUF_CONTIG:
 		error = sglist_append(sg, cb->cb_buf, cb->cb_buf_len);
 		break;
+	case CRYPTO_BUF_VMPAGE:
+		error = sglist_append_vmpages(sg, cb->cb_vm_page,
+		    cb->cb_vm_page_len, cb->cb_vm_page_offset);
+		break;
 	default:
 		error = EINVAL;
 	}
@@ -2773,7 +2777,7 @@ ccr_process(device_t dev, struct cryptop *crp, int hint)
 			return (0);
 		}
 		error = ccr_gcm(sc, s, crp);
-		if (error == EMSGSIZE) {
+		if (error == EMSGSIZE || error == EFBIG) {
 			counter_u64_add(sc->stats_sw_fallback, 1);
 			mtx_unlock(&s->lock);
 			ccr_gcm_soft(s, crp);
@@ -2792,7 +2796,7 @@ ccr_process(device_t dev, struct cryptop *crp, int hint)
 			    csp->csp_cipher_klen);
 		}
 		error = ccr_ccm(sc, s, crp);
-		if (error == EMSGSIZE) {
+		if (error == EMSGSIZE || error == EFBIG) {
 			counter_u64_add(sc->stats_sw_fallback, 1);
 			mtx_unlock(&s->lock);
 			ccr_ccm_soft(s, crp);

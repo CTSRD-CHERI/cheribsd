@@ -1431,21 +1431,27 @@ m_getm2(struct mbuf *m, int len, int how, short type, int flags)
 
 	/* Loop and append maximum sized mbufs to the chain tail. */
 	while (len > 0) {
-		if (len > MCLBYTES)
-			mb = m_getjcl(how, type, (flags & M_PKTHDR),
+		mb = NULL;
+		if (len > MCLBYTES) {
+			mb = m_getjcl(M_NOWAIT, type, (flags & M_PKTHDR),
 			    MJUMPAGESIZE);
-		else if (len >= MINCLSIZE)
-			mb = m_getcl(how, type, (flags & M_PKTHDR));
-		else if (flags & M_PKTHDR)
-			mb = m_gethdr(how, type);
-		else
-			mb = m_get(how, type);
-
-		/* Fail the whole operation if one mbuf can't be allocated. */
+		}
 		if (mb == NULL) {
-			if (nm != NULL)
+			if (len >= MINCLSIZE)
+				mb = m_getcl(how, type, (flags & M_PKTHDR));
+			else if (flags & M_PKTHDR)
+				mb = m_gethdr(how, type);
+			else
+				mb = m_get(how, type);
+
+			/*
+			 * Fail the whole operation if one mbuf can't be
+			 * allocated.
+			 */
+			if (mb == NULL) {
 				m_freem(nm);
-			return (NULL);
+				return (NULL);
+			}
 		}
 
 		/* Book keeping. */
@@ -1532,12 +1538,13 @@ m_freem(struct mbuf *mb)
 }
 
 void
-m_snd_tag_init(struct m_snd_tag *mst, struct ifnet *ifp)
+m_snd_tag_init(struct m_snd_tag *mst, struct ifnet *ifp, u_int type)
 {
 
 	if_ref(ifp);
 	mst->ifp = ifp;
 	refcount_init(&mst->refcount, 1);
+	mst->type = type;
 	counter_u64_add(snd_tag_count, 1);
 }
 

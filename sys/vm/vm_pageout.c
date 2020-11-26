@@ -165,11 +165,10 @@ SYSCTL_INT(_vm, OID_AUTO, pageout_update_period,
 	CTLFLAG_RWTUN, &vm_pageout_update_period, 0,
 	"Maximum active LRU update period");
 
-/* Access with get_pageout_threads_per_domain(). */
-static int pageout_threads_per_domain = 1;
-SYSCTL_INT(_vm, OID_AUTO, pageout_threads_per_domain, CTLFLAG_RDTUN,
-    &pageout_threads_per_domain, 0,
-    "Number of worker threads comprising each per-domain pagedaemon");
+static int pageout_cpus_per_thread = 16;
+SYSCTL_INT(_vm, OID_AUTO, pageout_cpus_per_thread, CTLFLAG_RDTUN,
+    &pageout_cpus_per_thread, 0,
+    "Number of CPUs per pagedaemon worker thread");
   
 SYSCTL_INT(_vm, OID_AUTO, lowmem_period, CTLFLAG_RWTUN, &lowmem_period, 0,
 	"Low memory callback period");
@@ -1288,8 +1287,10 @@ act_scan:
 			 * so, discarding any references collected by
 			 * pmap_ts_referenced().
 			 */
-			if (__predict_false(_vm_page_queue(old) == PQ_NONE))
+			if (__predict_false(_vm_page_queue(old) == PQ_NONE)) {
+				ps_delta = 0;
 				break;
+			}
 
 			/*
 			 * Advance or decay the act_count based on recent usage.
@@ -1648,25 +1649,26 @@ reinsert:
 
 /*
  * Dispatch a number of inactive threads according to load and collect the
- * results to prevent a coherent (CEM: incoherent?) view of paging activity on
- * this domain.
+ * results to present a coherent view of paging activity on this domain.
  */
 static int
 vm_pageout_inactive_dispatch(struct vm_domain *vmd, int shortage)
 {
-	u_int freed, pps, threads, us;
+	u_int freed, pps, slop, threads, us;
 
 	vmd->vmd_inactive_shortage = shortage;
+	slop = 0;
 
 	/*
 	 * If we have more work than we can do in a quarter of our interval, we
 	 * fire off multiple threads to process it.
 	 */
-	if (vmd->vmd_inactive_threads > 1 && vmd->vmd_inactive_pps != 0 &&
+	threads = vmd->vmd_inactive_threads;
+	if (threads > 1 && vmd->vmd_inactive_pps != 0 &&
 	    shortage > vmd->vmd_inactive_pps / VM_INACT_SCAN_RATE / 4) {
-		threads = vmd->vmd_inactive_threads;
-		vm_domain_pageout_lock(vmd);
 		vmd->vmd_inactive_shortage /= threads;
+		slop = shortage % threads;
+		vm_domain_pageout_lock(vmd);
 		blockcount_acquire(&vmd->vmd_inactive_starting, threads - 1);
 		blockcount_acquire(&vmd->vmd_inactive_running, threads - 1);
 		wakeup(&vmd->vmd_inactive_shortage);
@@ -1674,7 +1676,7 @@ vm_pageout_inactive_dispatch(struct vm_domain *vmd, int shortage)
 	}
 
 	/* Run the local thread scan. */
-	vm_pageout_scan_inactive(vmd, vmd->vmd_inactive_shortage);
+	vm_pageout_scan_inactive(vmd, vmd->vmd_inactive_shortage + slop);
 
 	/*
 	 * Block until helper threads report results and then accumulate
@@ -2200,38 +2202,38 @@ vm_pageout_helper(void *arg)
 }
 
 static int
-get_pageout_threads_per_domain(void)
+get_pageout_threads_per_domain(const struct vm_domain *vmd)
 {
-	static bool resolved = false;
-	int half_cpus_per_dom;
+	unsigned total_pageout_threads, eligible_cpus, domain_cpus;
 
-	/*
-	 * This is serialized externally by the sorted autoconfig portion of
-	 * boot.
-	 */
-	if (__predict_true(resolved))
-		return (pageout_threads_per_domain);
+	if (VM_DOMAIN_EMPTY(vmd->vmd_domain))
+		return (0);
 
 	/*
 	 * Semi-arbitrarily constrain pagedaemon threads to less than half the
-	 * total number of threads in the system as an insane upper limit.
+	 * total number of CPUs in the system as an upper limit.
 	 */
-	half_cpus_per_dom = howmany(mp_ncpus / vm_ndomains, 2);
+	if (pageout_cpus_per_thread < 2)
+		pageout_cpus_per_thread = 2;
+	else if (pageout_cpus_per_thread > mp_ncpus)
+		pageout_cpus_per_thread = mp_ncpus;
 
-	if (pageout_threads_per_domain < 1) {
-		printf("Invalid tuneable vm.pageout_threads_per_domain value: "
-		    "%d out of valid range: [1-%d]; clamping to 1\n",
-		    pageout_threads_per_domain, half_cpus_per_dom);
-		pageout_threads_per_domain = 1;
-	} else if (pageout_threads_per_domain > half_cpus_per_dom) {
-		printf("Invalid tuneable vm.pageout_threads_per_domain value: "
-		    "%d out of valid range: [1-%d]; clamping to %d\n",
-		    pageout_threads_per_domain, half_cpus_per_dom,
-		    half_cpus_per_dom);
-		pageout_threads_per_domain = half_cpus_per_dom;
-	}
-	resolved = true;
-	return (pageout_threads_per_domain);
+	total_pageout_threads = howmany(mp_ncpus, pageout_cpus_per_thread);
+	domain_cpus = CPU_COUNT(&cpuset_domain[vmd->vmd_domain]);
+
+	/* Pagedaemons are not run in empty domains. */
+	eligible_cpus = mp_ncpus;
+	for (unsigned i = 0; i < vm_ndomains; i++)
+		if (VM_DOMAIN_EMPTY(i))
+			eligible_cpus -= CPU_COUNT(&cpuset_domain[i]);
+
+	/*
+	 * Assign a portion of the total pageout threads to this domain
+	 * corresponding to the fraction of pagedaemon-eligible CPUs in the
+	 * domain.  In asymmetric NUMA systems, domains with more CPUs may be
+	 * allocated more threads than domains with fewer CPUs.
+	 */
+	return (howmany(total_pageout_threads * domain_cpus, eligible_cpus));
 }
 
 /*
@@ -2288,13 +2290,13 @@ vm_pageout_init_domain(int domain)
 	    "pidctrl", CTLFLAG_RD | CTLFLAG_MPSAFE, NULL, "");
 	pidctrl_init_sysctl(&vmd->vmd_pid, SYSCTL_CHILDREN(oid));
 
-	vmd->vmd_inactive_threads = get_pageout_threads_per_domain();
+	vmd->vmd_inactive_threads = get_pageout_threads_per_domain(vmd);
 }
 
 static void
 vm_pageout_init(void)
 {
-	u_int freecount;
+	u_long freecount;
 	int i;
 
 	/*
@@ -2327,8 +2329,13 @@ vm_pageout_init(void)
 	if (vm_pageout_update_period == 0)
 		vm_pageout_update_period = 600;
 
+	/*
+	 * Set the maximum number of user-wired virtual pages.  Historically the
+	 * main source of such pages was mlock(2) and mlockall(2).  Hypervisors
+	 * may also request user-wired memory.
+	 */
 	if (vm_page_max_user_wired == 0)
-		vm_page_max_user_wired = freecount / 3;
+		vm_page_max_user_wired = 4 * freecount / 5;
 }
 
 /*
@@ -2343,7 +2350,6 @@ vm_pageout(void)
 
 	p = curproc;
 	td = curthread;
-	pageout_threads = get_pageout_threads_per_domain();
 
 	mtx_init(&vm_oom_ratelim_mtx, "vmoomr", NULL, MTX_DEF);
 	swap_pager_swap_init();
@@ -2363,6 +2369,7 @@ vm_pageout(void)
 				panic("starting pageout for domain %d: %d\n",
 				    i, error);
 		}
+		pageout_threads = VM_DOMAIN(i)->vmd_inactive_threads;
 		for (j = 0; j < pageout_threads - 1; j++) {
 			error = kthread_add(vm_pageout_helper,
 			    (void *)(uintptr_t)i, p, NULL, 0, 0,

@@ -241,7 +241,7 @@ nfsrpc_null(vnode_t vp, struct ucred *cred, NFSPROC_T *p)
 {
 	int error;
 	struct nfsrv_descript nfsd, *nd = &nfsd;
-	
+
 	NFSCL_REQSTART(nd, NFSPROC_NULL, vp);
 	error = nfscl_request(nd, vp, p, cred, NULL);
 	if (nd->nd_repstat && !error)
@@ -1201,7 +1201,7 @@ nfsrpc_getattr(vnode_t vp, struct ucred *cred, NFSPROC_T *p,
 	struct nfsrv_descript nfsd, *nd = &nfsd;
 	int error;
 	nfsattrbit_t attrbits;
-	
+
 	NFSCL_REQSTART(nd, NFSPROC_GETATTR, vp);
 	if (nd->nd_flag & ND_NFSV4) {
 		NFSGETATTR_ATTRBIT(&attrbits);
@@ -1229,7 +1229,7 @@ nfsrpc_getattrnovp(struct nfsmount *nmp, u_int8_t *fhp, int fhlen, int syscred,
 	struct nfsrv_descript nfsd, *nd = &nfsd;
 	int error, vers = NFS_VER2;
 	nfsattrbit_t attrbits;
-	
+
 	nfscl_reqstart(nd, NFSPROC_GETATTR, nmp, fhp, fhlen, NULL, NULL, 0, 0);
 	if (nd->nd_flag & ND_NFSV4) {
 		vers = NFS_VER4;
@@ -1847,7 +1847,6 @@ nfsrpc_writerpc(vnode_t vp, struct uio *uiop, int *iomode,
 			x = txdr_unsigned(len);
 			*tl++ = x;      /* total to this offset */
 			*tl = x;        /* size of this write */
-
 		}
 		nfsm_uiombuf(nd, uiop, len);
 		/*
@@ -2502,7 +2501,7 @@ nfsrpc_rename(vnode_t fdvp, vnode_t fvp, char *fnameptr, int fnamelen,
 	nfsattrbit_t attrbits;
 	nfsv4stateid_t fdstateid, tdstateid;
 	int error = 0, ret = 0, gottd = 0, gotfd = 0, i;
-	
+
 	*fattrflagp = 0;
 	*tattrflagp = 0;
 	nmp = VFSTONFS(fdvp->v_mount);
@@ -3087,7 +3086,6 @@ nfsrpc_readdir(vnode_t vp, struct uio *uiop, nfsuint64 *cookiep,
 		reqsize = 5 * NFSX_UNSIGNED;
 	}
 
-
 	/*
 	 * Loop around doing readdir rpc's of size readsize.
 	 * The stopping criteria is EOF or buffer full.
@@ -3147,7 +3145,7 @@ nfsrpc_readdir(vnode_t vp, struct uio *uiop, nfsuint64 *cookiep,
 		more_dirs = fxdr_unsigned(int, *tl);
 		if (!more_dirs)
 			tryformoredirs = 0;
-	
+
 		/* loop through the dir entries, doctoring them to 4bsd form */
 		while (more_dirs && bigenough) {
 			if (nd->nd_flag & ND_NFSV4) {
@@ -3567,7 +3565,7 @@ nfsrpc_readdirplus(vnode_t vp, struct uio *uiop, nfsuint64 *cookiep,
 		more_dirs = fxdr_unsigned(int, *tl);
 		if (!more_dirs)
 			tryformoredirs = 0;
-	
+
 		/* loop through the dir entries, doctoring them to 4bsd form */
 		while (more_dirs && bigenough) {
 			NFSM_DISSECT(tl, u_int32_t *, 3 * NFSX_UNSIGNED);
@@ -3847,7 +3845,7 @@ nfsrpc_commit(vnode_t vp, u_quad_t offset, int cnt, struct ucred *cred,
 	nfsattrbit_t attrbits;
 	int error;
 	struct nfsmount *nmp = VFSTONFS(vp->v_mount);
-	
+
 	*attrflagp = 0;
 	NFSCL_REQSTART(nd, NFSPROC_COMMIT, vp);
 	NFSM_BUILD(tl, u_int32_t *, 3 * NFSX_UNSIGNED);
@@ -4652,7 +4650,7 @@ nfsrpc_getacl(vnode_t vp, struct ucred *cred, NFSPROC_T *p,
 	int error;
 	nfsattrbit_t attrbits;
 	struct nfsmount *nmp = VFSTONFS(vp->v_mount);
-	
+
 	if (nfsrv_useacl == 0 || !NFSHASNFSV4(nmp))
 		return (EOPNOTSUPP);
 	NFSCL_REQSTART(nd, NFSPROC_GETACL, vp);
@@ -4680,7 +4678,7 @@ nfsrpc_setacl(vnode_t vp, struct ucred *cred, NFSPROC_T *p,
 {
 	int error;
 	struct nfsmount *nmp = VFSTONFS(vp->v_mount);
-	
+
 	if (nfsrv_useacl == 0 || !NFSHASNFSV4(nmp))
 		return (EOPNOTSUPP);
 	error = nfsrpc_setattr(vp, NULL, aclp, cred, p, NULL, NULL, stuff);
@@ -4698,7 +4696,7 @@ nfsrpc_setaclrpc(vnode_t vp, struct ucred *cred, NFSPROC_T *p,
 	int error;
 	nfsattrbit_t attrbits;
 	struct nfsmount *nmp = VFSTONFS(vp->v_mount);
-	
+
 	if (!NFSHASNFSV4(nmp))
 		return (EOPNOTSUPP);
 	NFSCL_REQSTART(nd, NFSPROC_SETACL, vp);
@@ -5099,7 +5097,7 @@ nfsrpc_getdeviceinfo(struct nfsmount *nmp, uint8_t *deviceid, int layouttype,
 				error = NFSERR_BADXDR;
 				goto nfsmout;
 			}
-	
+
 			/*
 			 * Now we know how many stripe indices and addresses, so
 			 * we can allocate the structure the correct size.
@@ -6685,7 +6683,6 @@ nfscl_getsameserver(struct nfsmount *nmp, struct nfsclds *newdsp,
 				*retdspp = dsp;
 				return (NFSDSP_USETHISSESSION);
 			}
-
 		}
 	}
 	if (fndseq != 0)
@@ -6707,7 +6704,7 @@ nfsrpc_commitds(vnode_t vp, uint64_t offset, int cnt, struct nfsclds *dsp,
 	struct nfssockreq *nrp;
 	struct nfsvattr na;
 	int attrflag, error;
-	
+
 	nd->nd_mrep = NULL;
 	if (vers == 0 || vers == NFS_VER4) {
 		nfscl_reqstart(nd, NFSPROC_COMMITDS, nmp, fhp->nfh_fh,
@@ -6816,7 +6813,7 @@ nfsrpc_advise(vnode_t vp, off_t offset, uint64_t cnt, int advise,
 	struct nfsrv_descript nfsd, *nd = &nfsd;
 	nfsattrbit_t hints;
 	int error;
-	
+
 	NFSZERO_ATTRBIT(&hints);
 	if (advise == POSIX_FADV_WILLNEED)
 		NFSSETBIT_ATTRBIT(&hints, NFSV4IOHINT_WILLNEED);
@@ -6855,7 +6852,7 @@ nfsrpc_adviseds(vnode_t vp, uint64_t offset, int cnt, int advise,
 	struct nfssockreq *nrp;
 	nfsattrbit_t hints;
 	int error;
-	
+
 	/* For NFS DSs prior to NFSv4.2, just return OK. */
 	if (vers == NFS_VER3 || minorversion < NFSV42_MINORVERSION)
 		return (0);
@@ -7896,7 +7893,7 @@ nfsrpc_createlayout(vnode_t dvp, char *name, int namelen, struct vattr *vap,
 				goto nfsmout;
 			op->nfso_stateid = stateid;
 			newnfs_copyincred(cred, &op->nfso_cred);
-	
+
 			nfscl_openrelease(nmp, op, error, newone);
 			*unlockedp = 1;
 

@@ -172,6 +172,7 @@ KNOWN_ARCHES?=	aarch64/arm64 \
 		mips64hf/mips \
 		powerpc \
 		powerpc64/powerpc \
+		powerpc64le/powerpc \
 		powerpcspe/powerpc \
 		riscv64/riscv \
 		riscv64sf/riscv \
@@ -495,8 +496,12 @@ SUBDIR+=etc
 .endif	# !empty(SUBDIR_OVERRIDE)
 
 .if defined(NOCLEAN)
-.warning NOCLEAN option is deprecated. Use NO_CLEAN instead.
-NO_CLEAN=	${NOCLEAN}
+.warning The src.conf WITHOUT_CLEAN option can now be used instead of NOCLEAN.
+MK_CLEAN:=	no
+.endif
+.if defined(NO_CLEAN)
+.info The src.conf WITHOUT_CLEAN option can now be used instead of NO_CLEAN.
+MK_CLEAN:=	no
 .endif
 .if defined(NO_CLEANDIR)
 CLEANDIR=	clean cleandepend
@@ -505,7 +510,7 @@ CLEANDIR=	cleandir
 .endif
 
 .if defined(WORLDFAST)
-NO_CLEAN=	t
+MK_CLEAN:=	no
 NO_OBJWALK=	t
 .endif
 
@@ -514,7 +519,7 @@ NO_OBJWALK=	t
 # The .meta files will also track the build command and rebuild should
 # it change.
 .if empty(.MAKE.MODE:Mnofilemon)
-NO_CLEAN=	t
+MK_CLEAN:=	no
 .endif
 .endif
 .if defined(NO_OBJWALK) || ${MK_AUTO_OBJ} == "yes"
@@ -562,6 +567,15 @@ _VCS_REVISION?=	$$(eval ${SVNVERSION_CMD} ${SRCDIR})
 VCS_REVISION=	$$(echo r${_VCS_REVISION})
 . endif
 .export VCS_REVISION
+.endif
+
+.if !defined(GIT_CMD) || empty(GIT_CMD)
+. for _P in /usr/bin /usr/local/bin
+.  if exists(${_P}/git)
+GIT_CMD=   ${_P}/git
+.  endif
+. endfor
+.export GIT_CMD
 .endif
 
 .if !defined(OSRELDATE)
@@ -888,7 +902,7 @@ _LIBCOMPAT= SOFT
 # timestamps (see NO_META_IGNORE_HOST in sys.mk).  There are known times
 # when the ABI breaks though that we want to force rebuilding WORLDTMP
 # to get updated host tools.
-.if ${MK_META_MODE} == "yes" && defined(NO_CLEAN) && \
+.if ${MK_META_MODE} == "yes" && ${MK_CLEAN} == "no" && \
     !defined(NO_META_IGNORE_HOST) && !defined(NO_META_IGNORE_HOST_HEADERS) && \
     !defined(_MKSHOWCONFIG)
 # r318736 - ino64 major ABI breakage
@@ -920,7 +934,7 @@ NO_META_IGNORE_HOST_HEADERS=	1
 .export NO_META_IGNORE_HOST_HEADERS
 .endif	# defined(_meta_mode_need_rebuild)
 .endif	# defined(OBJDIR_HOST_OSRELDATE)
-.endif	# ${MK_META_MODE} == "yes" && defined(NO_CLEAN) ...
+.endif	# ${MK_META_MODE} == "yes" && ${MK_CLEAN} == "no" ...
 # This is only used for META_MODE+filemon to track what the oldest
 # __FreeBSD_version is in WORLDTMP.  This purposely does NOT have
 # a make dependency on /usr/include/osreldate.h as the file should
@@ -979,7 +993,9 @@ INSTALL_DDIR=	${_INSTALL_DDIR:S://:/:g:C:/$::}
 METALOG?=	${DESTDIR}/${DISTDIR}/METALOG
 METALOG:=	${METALOG:C,//+,/,g}
 IMAKE+=		-DNO_ROOT METALOG=${METALOG}
-INSTALLFLAGS+=	-U -M ${METALOG} -D ${INSTALL_DDIR}
+METALOG_INSTALLFLAGS=	-U -M ${METALOG} -D ${INSTALL_DDIR}
+INSTALLFLAGS+=	${METALOG_INSTALLFLAGS}
+CERTCTLFLAGS=	${METALOG_INSTALLFLAGS}
 MTREEFLAGS+=	-W
 .endif
 .if defined(BUILD_PKGS)
@@ -988,6 +1004,11 @@ INSTALLFLAGS+=	-h sha256
 .if defined(DB_FROM_SRC) || defined(NO_ROOT)
 IMAKE_INSTALL=	INSTALL="${INSTALL_CMD} ${INSTALLFLAGS}"
 IMAKE_MTREE=	MTREE_CMD="${MTREE_CMD} ${MTREEFLAGS}"
+.endif
+.if make(distributeworld)
+CERTCTLDESTDIR=	${DESTDIR}/${DISTDIR}/base
+.else
+CERTCTLDESTDIR=	${DESTDIR}
 .endif
 
 DESTDIR_MTREEFLAGS=	-deU
@@ -1038,34 +1059,6 @@ _sanity_check: .PHONY .MAKE
 _cleanobj_fast_depend_hack: .PHONY
 	@echo ">>> Deleting stale dependencies...";
 	sh ${.CURDIR}/tools/build/depend-cleanup.sh ${OBJTOP}
-# Date      SVN Rev  Syscalls/Changes
-# Syscall stubs rewritten in C and obsolete MD assembly implementations
-# 20191009  r353340  removal of opensolaris_atomic.S (also r353381)
-.if ${MACHINE} != i386
-.for f in opensolaris_atomic
-	@if [ -e "${OBJTOP}/cddl/lib/libzpool/.depend.${f}.o" ] && \
-	    egrep -qw 'opensolaris_atomic\.S' ${OBJTOP}/cddl/lib/libzpool/.depend.${f}.o; then \
-		echo "Removing stale dependencies for opensolaris_atomic"; \
-		rm -f ${OBJTOP}/cddl/lib/libzpool/.depend.${f}.* \
-		   ${LIBCOMPAT:D${LIBCOMPAT_OBJTOP}/cddl/lib/libzpool/.depend.${f}.*}; \
-	fi
-.endfor
-.endif
-# 20190925  r352689  removal of obsolete i386 memchr.S
-.for f in memchr
-	@if [ -e "${OBJTOP}/lib/libc/.depend.${f}.o" ] && \
-	    egrep -qw 'i386/string/memchr\.S' ${OBJTOP}/lib/libc/.depend.${f}.o; then \
-		echo "Removing stale dependencies for memchr"; \
-		rm -f ${OBJTOP}/lib/libc/.depend.${f}.*; \
-	fi
-.if defined(_LIBCOMPAT)
-	@if [ -e "${LIBCOMPAT_OBJTOP}/lib/libc/.depend.${f}.o" ] && \
-	    egrep -qw 'i386/string/memchr\.S' ${LIBCOMPAT_OBJTOP}/lib/libc/.depend.${f}.o; then \
-		echo "Removing stale dependencies for memchr"; \
-		rm -f ${LIBCOMPAT_OBJTOP}/lib/libc/.depend.${f}.*; \
-	fi
-.endif
-.endfor
 
 .if ${TARGET:Mmips*}
 .for f in memset
@@ -1083,7 +1076,7 @@ _worldtmp: .PHONY
 	@echo "--------------------------------------------------------------"
 	@echo ">>> Rebuilding the temporary build tree"
 	@echo "--------------------------------------------------------------"
-.if !defined(NO_CLEAN)
+.if ${MK_CLEAN} == "yes"
 	rm -rf ${WORLDTMP}
 .elif !defined(I_REALLY_MEAN_NO_CLEAN)
 # Note: for delete-old we need to set $PATH to also include the host $PATH
@@ -1108,7 +1101,7 @@ _worldtmp: .PHONY
 .if ${USING_SYSTEM_LINKER} == "yes"
 	@rm -f ${WORLDTMP}/usr/bin/ld ${WORLDTMP}/usr/bin/ld.lld
 .endif	# ${USING_SYSTEM_LINKER} == "yes"
-.endif	# !defined(NO_CLEAN)
+.endif	# ${MK_CLEAN} == "yes"
 	@mkdir -p ${WORLDTMP}
 	@touch ${WORLDTMP}/${.TARGET}
 # We can't use mtree to create the worldtmp directories since it may not be
@@ -1147,7 +1140,7 @@ _bootstrap-tools:
 	${WORLDTMP_MTREE} -f ${.CURDIR}/${_mtree} -p ${WORLDTMP} > /dev/null
 .endfor
 _cleanobj:
-.if !defined(NO_CLEAN)
+.if ${MK_CLEAN} == "yes"
 	@echo
 	@echo "--------------------------------------------------------------"
 	@echo ">>> stage 2.1: cleaning up the object tree"
@@ -1160,7 +1153,7 @@ _cleanobj:
 .endif
 .else
 	${_+_}cd ${.CURDIR}; ${WMAKE} _NO_INCLUDE_COMPILERMK=t _cleanobj_fast_depend_hack
-.endif	# !defined(NO_CLEAN)
+.endif	# ${MK_CLEAN} == "yes"
 _obj:
 	@echo
 	@echo "--------------------------------------------------------------"
@@ -1528,7 +1521,7 @@ distributeworld installworld stageworld installsysroot: _installcheck_world .PHO
 	    DISTBASE=/base DESTDIR=${DESTDIR}/${DISTDIR}/base \
 	    LOCAL_MTREE=${LOCAL_MTREE:Q} distrib-dirs
 	${INSTALL_SYMLINK} ${INSTALLFLAGS} usr/src/sys ${INSTALL_DDIR}/base/sys
-.endif
+.endif # make(distributeworld)
 	${_+_}cd ${.CURDIR}; ${IMAKE} re${.TARGET:S/world$//}; \
 	    ${IMAKEENV} rm -rf ${INSTALLTMP}
 .if make(distributeworld)
@@ -1557,6 +1550,14 @@ distributeworld installworld stageworld installsysroot: _installcheck_world .PHO
 	${DESTDIR}/${DISTDIR}/${dist}.debug.meta
 .endfor
 .endif
+.endif # make(distributeworld)
+.if !make(packageworld) && ${MK_CAROOT} != "no"
+	@if which openssl>/dev/null; then \
+		DESTDIR=${CERTCTLDESTDIR} PATH=${TMPPATH}:${PATH} \
+		    sh ${SRCTOP}/usr.sbin/certctl/certctl.sh ${CERTCTLFLAGS} rehash \
+	else \
+		echo "No openssl on the host, not rehashing certificates target -- /etc/ssl may not be populated."; \
+	fi
 .endif
 
 packageworld: .PHONY
@@ -1604,10 +1605,14 @@ _sysent_dirs+=	sys/amd64/linux		\
 		sys/arm/linux		\
 		sys/arm64/linux		\
 		sys/i386/linux
+
 sysent: .PHONY
 .for _dir in ${_sysent_dirs}
+sysent-${_dir}: .PHONY
 	@echo "${MAKE} -C ${.CURDIR}/${_dir} sysent"
 	${_+_}@env PATH=${_sysent_PATH} ${MAKE} -C ${.CURDIR}/${_dir} sysent
+
+sysent: sysent-${_dir}
 .endfor
 
 #
@@ -1792,7 +1797,7 @@ buildkernel: .MAKE .PHONY
 			-I '${KERNCONFDIR}' -I '${KRNLCONFDIR}' \
 			'${KERNCONFDIR}/${_kernel}'
 .endif
-.if !defined(NO_CLEAN) && !defined(NO_KERNELCLEAN)
+.if ${MK_CLEAN} == "yes" && !defined(NO_KERNELCLEAN)
 	@echo
 	@echo "--------------------------------------------------------------"
 	@echo ">>> stage 2.1: cleaning up the object tree"
@@ -2355,16 +2360,11 @@ _crunchide=	usr.sbin/crunch/crunchide
 _bootstrap_tools_links+=crunchide
 .endif
 
-# r285986 crunchen: use STRIPBIN rather than STRIP
-# 1100113: Support MK_AUTO_OBJ
-# 1200006: META_MODE fixes
-# 1400000: CheriBSD changes to use sysctl:
 .if 1
 # TODO: enable version check once patch has been upstreamed
-#.if ${BOOTSTRAPPING} < 1100078 || \
-#    (${MK_AUTO_OBJ} == "yes" && ${BOOTSTRAPPING} < 1100114) || \
-#    (${MK_META_MODE} == "yes" && ${BOOTSTRAPPING} < 1200006) || \
-#    ${BOOTSTRAPPING} < 1400000
+# 1300115: Higher WARNS fixes
+#.if ${BOOTSTRAPPING} < 1202502 || \
+#	(${BOOTSTRAPPING} > 1300000 && ${BOOTSTRAPPING} < 1300115)
 _crunchgen=	usr.sbin/crunch/crunchgen
 .else
 _bootstrap_tools_links+=crunchgen
@@ -2606,7 +2606,7 @@ _jevents=lib/libpmc/pmu-events
 
 # kernel-toolchain skips _cleanobj, so handle cleaning up previous
 # build-tools directories if needed.
-.if !defined(NO_CLEAN) && make(kernel-toolchain)
+.if ${MK_CLEAN} == "yes" && make(kernel-toolchain)
 _bt_clean=	${CLEANDIR}
 .endif
 
@@ -2655,7 +2655,7 @@ _btxld=		usr.sbin/btxld
 # Rebuild ctfconvert and ctfmerge to avoid difficult-to-diagnose failures
 # resulting from missing bug fixes or ELF Toolchain updates.
 .if ${MK_CDDL} != "no"
-_dtrace_tools= cddl/lib/libctf cddl/usr.bin/ctfconvert \
+_dtrace_tools= cddl/lib/libctf cddl/lib/libspl cddl/usr.bin/ctfconvert \
     cddl/usr.bin/ctfmerge
 .endif
 
@@ -2972,8 +2972,13 @@ _prebuild_libs=	${_kerberos5_lib_libasn1} \
 		${_cddl_lib_libumem} ${_cddl_lib_libnvpair} \
 		${_cddl_lib_libuutil} \
 		${_cddl_lib_libavl} \
+		${_cddl_lib_libicp} \
+		${_cddl_lib_libicp_rescue} \
+		${_cddl_lib_libspl} \
+		${_cddl_lib_libtpool} \
 		${_cddl_lib_libzfs_core} ${_cddl_lib_libzfs} \
-		${_cddl_lib_libctf} \
+		${_cddl_lib_libzutil} \
+		${_cddl_lib_libctf} ${_cddl_lib_libzfsbootenv} \
 		lib/libufs \
 		lib/libutil lib/libpjdlog ${_lib_libypclnt} lib/libz lib/msun \
 		${_secure_lib_libcrypto} ${_secure_lib_libssl} \
@@ -3050,22 +3055,38 @@ _cddl_lib_libumem= cddl/lib/libumem
 _cddl_lib_libnvpair= cddl/lib/libnvpair
 _cddl_lib_libavl= cddl/lib/libavl
 _cddl_lib_libuutil= cddl/lib/libuutil
+_cddl_lib_libspl= cddl/lib/libspl
+
+cddl/lib/libuutil__L: cddl/lib/libavl__L cddl/lib/libspl__L
+
 .if ${MK_ZFS} != "no"
+_cddl_lib_libicp= cddl/lib/libicp
+_cddl_lib_libicp_rescue= cddl/lib/libicp_rescue
+_cddl_lib_libtpool= cddl/lib/libtpool
+_cddl_lib_libzutil= cddl/lib/libzutil
 _cddl_lib_libzfs_core= cddl/lib/libzfs_core
 _cddl_lib_libzfs= cddl/lib/libzfs
+_cddl_lib_libzfsbootenv= cddl/lib/libzfsbootenv
+
+cddl/lib/libtpool__L: cddl/lib/libspl__L
+
+cddl/lib/libzutil__L: cddl/lib/libavl__L cddl/lib/libtpool__L
 
 cddl/lib/libzfs_core__L: cddl/lib/libnvpair__L
 
 cddl/lib/libzfs__L: cddl/lib/libzfs_core__L lib/msun__L lib/libutil__L
 cddl/lib/libzfs__L: lib/libthr__L lib/libmd__L lib/libz__L cddl/lib/libumem__L
 cddl/lib/libzfs__L: cddl/lib/libuutil__L cddl/lib/libavl__L lib/libgeom__L
+cddl/lib/libzfs__L: cddl/lib/libnvpair__L cddl/lib/libzutil__L
+cddl/lib/libzfs__L: secure/lib/libcrypto__L
 
-lib/libbe__L: cddl/lib/libzfs__L
+cddl/lib/libzfsbootenv__L: cddl/lib/libzfs__L
+lib/libbe__L: cddl/lib/libzfs__L cddl/lib/libzfsbootenv__L
 .endif
 _cddl_lib_libctf= cddl/lib/libctf
 _cddl_lib= cddl/lib
 cddl/lib/libavl__L: cddl/lib/libnvpair__L
-cddl/lib/libctf__L: lib/libz__L
+cddl/lib/libctf__L: lib/libz__L cddl/lib/libspl__L
 # Jenkins sometimes fails to find libgcc_s when building libctf
 cddl/lib/libctf__L: lib/libgcc_s__L
 cddl/lib/libuutil__L: cddl/lib/libnvpair__L

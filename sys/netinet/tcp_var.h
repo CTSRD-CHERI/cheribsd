@@ -754,7 +754,8 @@ struct xtcpcb {
 	struct xinpcb	xt_inp;
 	char		xt_stack[TCP_FUNCTION_NAME_LEN_MAX];	/* (s) */
 	char		xt_logid[TCP_LOG_ID_LEN];	/* (s) */
-	int64_t		spare64[8];
+	char		xt_cc[TCP_CA_NAME_MAX];	/* (s) */
+	int64_t		spare64[6];
 	int32_t		t_state;		/* (s,p) */
 	uint32_t	t_flags;		/* (s,p) */
 	int32_t		t_sndzerowin;		/* (s) */
@@ -767,7 +768,13 @@ struct xtcpcb {
 	int32_t		tt_2msl;		/* (s) */
 	int32_t		tt_delack;		/* (s) */
 	int32_t		t_logstate;		/* (3) */
-	int32_t		spare32[32];
+	uint32_t	t_snd_cwnd;		/* (s) */
+	uint32_t	t_snd_ssthresh;		/* (s) */
+	uint32_t	t_maxseg;		/* (s) */
+	uint32_t	t_rcv_wnd;		/* (s) */
+	uint32_t	t_snd_wnd;		/* (s) */
+	uint32_t	xt_ecn;			/* (s) */
+	int32_t		spare32[26];
 } __aligned(8);
 
 #ifdef _KERNEL

@@ -409,6 +409,11 @@ extern struct fs_ops	*exclusive_file_system;
 extern struct devsw	*devsw[];
 
 /*
+ * Time routines
+ */
+time_t time(time_t *);
+
+/*
  * Expose byteorder(3) functions.
  */
 #ifndef _BYTEORDER_PROTOTYPED
@@ -464,5 +469,8 @@ extern void *reallocf(void *, size_t);
  * va <-> pa routines. MD code must supply.
  */
 caddr_t ptov(uintptr_t);
+
+/* hexdump.c */
+void	hexdump(caddr_t region, size_t len);
 
 #endif	/* STAND_H */

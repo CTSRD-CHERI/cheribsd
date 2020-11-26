@@ -130,19 +130,6 @@ userret(struct thread *td, struct trapframe *frame)
 		PROC_UNLOCK(p);
 	}
 #endif
-#ifdef KTRACE
-	KTRUSERRET(td);
-#endif
-
-	td_softdep_cleanup(td);
-	MPASS(td->td_su == NULL);
-
-	/*
-	 * If this thread tickled GEOM, we need to wait for the giggling to
-	 * stop before we return to userland
-	 */
-	if (__predict_false(td->td_pflags & TDP_GEOM))
-		g_waitidle();
 
 	/*
 	 * Charge system time if profiling.
@@ -187,7 +174,7 @@ userret(struct thread *td, struct trapframe *frame)
 #ifdef EPOCH_TRACE
 		epoch_trace_list(curthread);
 #endif
-		KASSERT(1, ("userret: Returning with sleep disabled"));
+		KASSERT(0, ("userret: Returning with sleep disabled"));
 	}
 	KASSERT(td->td_pinned == 0 || (td->td_pflags & TDP_CALLCHAIN) != 0,
 	    ("userret: Returning with with pinned thread"));
@@ -195,8 +182,6 @@ userret(struct thread *td, struct trapframe *frame)
 	    ("userret: Returning with preallocated vnode"));
 	KASSERT((td->td_flags & (TDF_SBDRY | TDF_SEINTR | TDF_SERESTART)) == 0,
 	    ("userret: Returning with stop signals deferred"));
-	KASSERT(td->td_su == NULL,
-	    ("userret: Returning with SU cleanup request not handled"));
 	KASSERT(td->td_vslock_sz == 0,
 	    ("userret: Returning with vslock-wired space"));
 #ifdef VIMAGE
@@ -205,10 +190,6 @@ userret(struct thread *td, struct trapframe *frame)
 	    ("%s: Returning on td %p (pid %d, %s) with vnet %p set in %s",
 	    __func__, td, p->p_pid, td->td_name, curvnet,
 	    (td->td_vnet_lpush != NULL) ? td->td_vnet_lpush : "N/A"));
-#endif
-#ifdef RACCT
-	if (__predict_false(racct_enable && p->p_throttled != 0))
-		racct_proc_throttled(p);
 #endif
 }
 
@@ -290,6 +271,16 @@ ast(struct trapframe *framep)
 #endif
 	}
 
+	td_softdep_cleanup(td);
+	MPASS(td->td_su == NULL);
+
+	/*
+	 * If this thread tickled GEOM, we need to wait for the giggling to
+	 * stop before we return to userland
+	 */
+	if (__predict_false(td->td_pflags & TDP_GEOM))
+		g_waitidle();
+
 #ifdef DIAGNOSTIC
 	if (p->p_numthreads == 1 && (flags & TDF_NEEDSIGCHK) == 0) {
 		PROC_LOCK(p);
@@ -347,6 +338,10 @@ ast(struct trapframe *framep)
 	if (td->td_pflags & TDP_SIGFASTPENDING)
 		sigfastblock_setpend(td, false);
 
+#ifdef KTRACE
+	KTRUSERRET(td);
+#endif
+
 	/*
 	 * We need to check to see if we have to exit or wait due to a
 	 * single threading requirement or some other STOP condition.
@@ -361,6 +356,11 @@ ast(struct trapframe *framep)
 		td->td_pflags &= ~TDP_OLDMASK;
 		kern_sigprocmask(td, SIG_SETMASK, &td->td_oldsigmask, NULL, 0);
 	}
+
+#ifdef RACCT
+	if (__predict_false(racct_enable && p->p_throttled != 0))
+		racct_proc_throttled(p);
+#endif
 
 	userret(td, framep);
 }

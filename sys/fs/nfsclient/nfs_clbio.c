@@ -1887,7 +1887,6 @@ ncl_meta_setsize(struct vnode *vp, struct thread *td, u_quad_t nsize)
 	}
 	return(error);
 }
-
 // CHERI CHANGES START
 // {
 //   "updated": 20191025,
