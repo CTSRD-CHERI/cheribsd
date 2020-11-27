@@ -33,8 +33,8 @@
 #define RISCV_STATCOUNTER(csr) STATCOUNTER_ITEM(csr, csr, csr)
 #endif
 
-STATCOUNTER_ITEM(cycles,cycles,cycle)
-STATCOUNTER_ITEM(instructions,instructions,instret)
+STATCOUNTER_ITEM(cycles, cycles, cycle)
+STATCOUNTER_ITEM(instructions, instructions, instret)
 RISCV_STATCOUNTER(time)
 /* TODO: add the remaining counters once we have implementations that support them. */
 
