@@ -183,7 +183,7 @@ mipsNN_icache_sync_all_16(void)
 {
 	vm_offset_t va, eva;
 
-	va = MIPS_PHYS_TO_KSEG0(0);
+	va = (vm_offset_t)MIPS_PHYS_TO_KSEG0(0);
 	eva = va + picache_size;
 
 	/*
@@ -206,7 +206,7 @@ mipsNN_icache_sync_all_32(void)
 {
 	vm_offset_t va, eva;
 
-	va = MIPS_PHYS_TO_KSEG0(0);
+	va = (vm_offset_t)MIPS_PHYS_TO_KSEG0(0);
 	eva = va + picache_size;
 
 	/*
@@ -229,7 +229,7 @@ mipsNN_icache_sync_all_64(void)
 {
 	vm_offset_t va, eva;
 
-	va = MIPS_PHYS_TO_KSEG0(0);
+	va = (vm_offset_t)MIPS_PHYS_TO_KSEG0(0);
 	eva = va + picache_size;
 
 	/*
@@ -328,7 +328,7 @@ mipsNN_icache_sync_range_index_16(vm_offset_t va, vm_size_t size)
 	 * bits that determine the cache index, and make a KSEG0
 	 * address out of them.
 	 */
-	va = MIPS_PHYS_TO_KSEG0(va & picache_way_mask);
+	va = (vm_offset_t)MIPS_PHYS_TO_KSEG0(va & picache_way_mask);
 
 	eva = round_line16(va + size);
 	va = trunc_line16(va);
@@ -371,7 +371,7 @@ mipsNN_icache_sync_range_index_32(vm_offset_t va, vm_size_t size)
 	 * bits that determine the cache index, and make a KSEG0
 	 * address out of them.
 	 */
-	va = MIPS_PHYS_TO_KSEG0(va & picache_way_mask);
+	va = (vm_offset_t)MIPS_PHYS_TO_KSEG0(va & picache_way_mask);
 
 	eva = round_line32(va + size);
 	va = trunc_line32(va);
@@ -414,7 +414,7 @@ mipsNN_icache_sync_range_index_64(vm_offset_t va, vm_size_t size)
 	 * bits that determine the cache index, and make a KSEG0
 	 * address out of them.
 	 */
-	va = MIPS_PHYS_TO_KSEG0(va & picache_way_mask);
+	va = (vm_offset_t)MIPS_PHYS_TO_KSEG0(va & picache_way_mask);
 
 	eva = round_line64(va + size);
 	va = trunc_line64(va);
@@ -450,7 +450,7 @@ mipsNN_pdcache_wbinv_all_16(void)
 {
 	vm_offset_t va, eva;
 
-	va = MIPS_PHYS_TO_KSEG0(0);
+	va = (vm_offset_t)MIPS_PHYS_TO_KSEG0(0);
 	eva = va + pdcache_size;
 
 	/*
@@ -472,7 +472,7 @@ mipsNN_pdcache_wbinv_all_32(void)
 {
 	vm_offset_t va, eva;
 
-	va = MIPS_PHYS_TO_KSEG0(0);
+	va = (vm_offset_t)MIPS_PHYS_TO_KSEG0(0);
 	eva = va + pdcache_size;
 
 	/*
@@ -494,7 +494,7 @@ mipsNN_pdcache_wbinv_all_64(void)
 {
 	vm_offset_t va, eva;
 
-	va = MIPS_PHYS_TO_KSEG0(0);
+	va = (vm_offset_t)MIPS_PHYS_TO_KSEG0(0);
 	eva = va + pdcache_size;
 
 	/*
@@ -589,7 +589,7 @@ mipsNN_pdcache_wbinv_range_index_16(vm_offset_t va, vm_size_t size)
 	 * bits that determine the cache index, and make a KSEG0
 	 * address out of them.
 	 */
-	va = MIPS_PHYS_TO_KSEG0(va & pdcache_way_mask);
+	va = (vm_offset_t)MIPS_PHYS_TO_KSEG0(va & pdcache_way_mask);
 
 	eva = round_line16(va + size);
 	va = trunc_line16(va);
@@ -630,7 +630,7 @@ mipsNN_pdcache_wbinv_range_index_32(vm_offset_t va, vm_size_t size)
 	 * bits that determine the cache index, and make a KSEG0
 	 * address out of them.
 	 */
-	va = MIPS_PHYS_TO_KSEG0(va & pdcache_way_mask);
+	va = (vm_offset_t)MIPS_PHYS_TO_KSEG0(va & pdcache_way_mask);
 
 	eva = round_line32(va + size);
 	va = trunc_line32(va);
@@ -671,7 +671,7 @@ mipsNN_pdcache_wbinv_range_index_64(vm_offset_t va, vm_size_t size)
 	 * bits that determine the cache index, and make a KSEG0
 	 * address out of them.
 	 */
-	va = MIPS_PHYS_TO_KSEG0(va & pdcache_way_mask);
+	va = (vm_offset_t)MIPS_PHYS_TO_KSEG0(va & pdcache_way_mask);
 
 	eva = round_line64(va + size);
 	va = trunc_line64(va);
@@ -879,7 +879,7 @@ mipsNN_icache_sync_all_128(void)
 {
 	vm_offset_t va, eva;
 
-	va = MIPS_PHYS_TO_KSEG0(0);
+	va = (vm_offset_t)MIPS_PHYS_TO_KSEG0(0);
 	eva = va + picache_size;
 
 	/*
@@ -932,7 +932,7 @@ mipsNN_icache_sync_range_index_128(vm_offset_t va, vm_size_t size)
 	 * bits that determine the cache index, and make a KSEG0
 	 * address out of them.
 	 */
-	va = MIPS_PHYS_TO_KSEG0(va & picache_way_mask);
+	va = (vm_offset_t)MIPS_PHYS_TO_KSEG0(va & picache_way_mask);
 
 	eva = round_line128(va + size);
 	va = trunc_line128(va);
@@ -968,7 +968,7 @@ mipsNN_pdcache_wbinv_all_128(void)
 {
 	vm_offset_t va, eva;
 
-	va = MIPS_PHYS_TO_KSEG0(0);
+	va = (vm_offset_t)MIPS_PHYS_TO_KSEG0(0);
 	eva = va + pdcache_size;
 
 	/*
@@ -1019,7 +1019,7 @@ mipsNN_pdcache_wbinv_range_index_128(vm_offset_t va, vm_size_t size)
 	 * bits that determine the cache index, and make a KSEG0
 	 * address out of them.
 	 */
-	va = MIPS_PHYS_TO_KSEG0(va & pdcache_way_mask);
+	va = (vm_offset_t)MIPS_PHYS_TO_KSEG0(va & pdcache_way_mask);
 
 	eva = round_line128(va + size);
 	va = trunc_line128(va);
@@ -1095,7 +1095,7 @@ mipsNN_pdcache_wb_range_128(vm_offset_t va, vm_size_t size)
 void
 mipsNN_sdcache_wbinv_all_32(void)
 {
-	vm_offset_t va = MIPS_PHYS_TO_KSEG0(0);
+	vm_offset_t va = (vm_offset_t)MIPS_PHYS_TO_KSEG0(0);
 	vm_offset_t eva = va + sdcache_size;
 
 	while (va < eva) {
@@ -1108,7 +1108,7 @@ mipsNN_sdcache_wbinv_all_32(void)
 void
 mipsNN_sdcache_wbinv_all_64(void)
 {
-	vm_offset_t va = MIPS_PHYS_TO_KSEG0(0);
+	vm_offset_t va = (vm_offset_t)MIPS_PHYS_TO_KSEG0(0);
 	vm_offset_t eva = va + sdcache_size;
 
 	while (va < eva) {
@@ -1167,7 +1167,7 @@ mipsNN_sdcache_wbinv_range_index_32(vm_offset_t va, vm_size_t size)
 	 * bits that determine the cache index, and make a KSEG0
 	 * address out of them.
 	 */
-	va = MIPS_PHYS_TO_KSEG0(va & (sdcache_size - 1));
+	va = (vm_offset_t)MIPS_PHYS_TO_KSEG0(va & (sdcache_size - 1));
 
 	eva = round_line32(va + size);
 	va = trunc_line32(va);
@@ -1195,7 +1195,7 @@ mipsNN_sdcache_wbinv_range_index_64(vm_offset_t va, vm_size_t size)
 	 * bits that determine the cache index, and make a KSEG0
 	 * address out of them.
 	 */
-	va = MIPS_PHYS_TO_KSEG0(va & (sdcache_size - 1));
+	va = (vm_offset_t)MIPS_PHYS_TO_KSEG0(va & (sdcache_size - 1));
 
 	eva = round_line64(va + size);
 	va = trunc_line64(va);
@@ -1287,7 +1287,7 @@ mipsNN_sdcache_wb_range_64(vm_offset_t va, vm_size_t size)
 void
 mipsNN_sdcache_wbinv_all_128(void)
 {
-	vm_offset_t va = MIPS_PHYS_TO_KSEG0(0);
+	vm_offset_t va = (vm_offset_t)MIPS_PHYS_TO_KSEG0(0);
 	vm_offset_t eva = va + sdcache_size;
 
 	while (va < eva) {
@@ -1327,7 +1327,7 @@ mipsNN_sdcache_wbinv_range_index_128(vm_offset_t va, vm_size_t size)
 	 * bits that determine the cache index, and make a KSEG0
 	 * address out of them.
 	 */
-	va = MIPS_PHYS_TO_KSEG0(va & (sdcache_size - 1));
+	va = (vm_offset_t)MIPS_PHYS_TO_KSEG0(va & (sdcache_size - 1));
 
 	eva = round_line128(va + size);
 	va = trunc_line128(va);
@@ -1379,3 +1379,12 @@ mipsNN_sdcache_wb_range_128(vm_offset_t va, vm_size_t size)
 		va += 128;
 	}
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20171208,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_as_integer"
+//   ]
+// }
+// CHERI CHANGES END

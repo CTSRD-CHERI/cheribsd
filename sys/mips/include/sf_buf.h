@@ -39,7 +39,7 @@ sf_buf_kva(struct sf_buf *sf)
 	vm_page_t	m;
 
 	m = (vm_page_t)sf;
-	return (MIPS_PHYS_TO_DIRECT(VM_PAGE_TO_PHYS(m)));
+	return ((vm_ptr_t)MIPS_PHYS_TO_DIRECT(VM_PAGE_TO_PHYS(m)));
 }
 
 static inline struct vm_page *
@@ -69,3 +69,12 @@ sf_buf_unmap(struct sf_buf *sf)
 #endif	/* __mips_n64 */
 
 #endif /* !_MACHINE_SF_BUF_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20200706,
+//   "target_type": "header",
+//   "changes_purecap": [
+//     "pointer_as_integer"
+//   ]
+// }
+// CHERI CHANGES END

@@ -102,6 +102,11 @@ __FBSDID("$FreeBSD$");
 #include <machine/md_var.h>
 #include <machine/tlb.h>
 
+#ifdef __CHERI_PURE_CAPABILITY__
+#include <machine/cherireg.h>
+#include <cheri/cheric.h>
+#endif
+
 #undef PMAP_DEBUG
 
 #if !defined(DIAGNOSTIC)
@@ -419,7 +424,7 @@ pmap_steal_memory(vm_size_t size)
 	phys_avail[0] += size;
 	if (MIPS_DIRECT_MAPPABLE(pa) == 0)
 		panic("Out of memory below 512Meg?");
-	va = MIPS_PHYS_TO_DIRECT(pa);
+	va = (vm_offset_t)MIPS_PHYS_TO_DIRECT(pa);
 	bzero((caddr_t)va, size);
 	return (va);
 }
@@ -935,7 +940,7 @@ pmap_map(vm_offset_t *virt, vm_paddr_t start, vm_paddr_t end, int prot)
 	vm_offset_t va, sva;
 
 	if (MIPS_DIRECT_MAPPABLE(end - 1))
-		return (MIPS_PHYS_TO_DIRECT(start));
+		return ((vm_offset_t)MIPS_PHYS_TO_DIRECT(start));
 
 	va = sva = *virt;
 	while (start < end) {
@@ -1143,7 +1148,6 @@ pmap_alloc_direct_page(unsigned int index, int req)
 int
 pmap_pinit(pmap_t pmap)
 {
-	vm_offset_t ptdva;
 	vm_page_t ptdpg;
 	int i, req_class;
 
@@ -1155,8 +1159,8 @@ pmap_pinit(pmap_t pmap)
 	    NULL)
 		pmap_grow_direct_page(req_class);
 
-	ptdva = MIPS_PHYS_TO_DIRECT(VM_PAGE_TO_PHYS(ptdpg));
-	pmap->pm_segtab = (pd_entry_t *)ptdva;
+	pmap->pm_segtab = (pd_entry_t *)
+	    MIPS_PHYS_TO_DIRECT(VM_PAGE_TO_PHYS(ptdpg));
 	CPU_ZERO(&pmap->pm_active);
 	for (i = 0; i < MAXCPU; i++) {
 		pmap->pm_asid[i].asid = PMAP_ASID_RESERVED;
@@ -1203,7 +1207,7 @@ _pmap_allocpte(pmap_t pmap, unsigned ptepindex, u_int flags)
 	 * Map the pagetable page into the process address space, if it
 	 * isn't already there.
 	 */
-	pageva = MIPS_PHYS_TO_DIRECT(VM_PAGE_TO_PHYS(m));
+	pageva = (vm_offset_t)MIPS_PHYS_TO_DIRECT(VM_PAGE_TO_PHYS(m));
 
 #ifdef __mips_n64
 	if (ptepindex >= NUPDE) {
@@ -2466,7 +2470,7 @@ pmap_kenter_temporary(vm_paddr_t pa, int i)
 		    __func__);
 
 	if (MIPS_DIRECT_MAPPABLE(pa)) {
-		va = MIPS_PHYS_TO_DIRECT(pa);
+		va = (vm_offset_t)MIPS_PHYS_TO_DIRECT(pa);
 	} else {
 #ifndef __mips_n64    /* XXX : to be converted to new style */
 		pt_entry_t *pte, npte;
@@ -2626,7 +2630,7 @@ pmap_zero_page(vm_page_t m)
 	vm_paddr_t phys = VM_PAGE_TO_PHYS(m);
 
 	if (MIPS_DIRECT_MAPPABLE(phys)) {
-		va = MIPS_PHYS_TO_DIRECT(phys);
+		va = (vm_offset_t)MIPS_PHYS_TO_DIRECT(phys);
 		bzero((caddr_t)va, PAGE_SIZE);
 		mips_dcache_wbinv_range(va, PAGE_SIZE);
 	} else {
@@ -2650,7 +2654,7 @@ pmap_zero_page_area(vm_page_t m, int off, int size)
 	vm_paddr_t phys = VM_PAGE_TO_PHYS(m);
 
 	if (MIPS_DIRECT_MAPPABLE(phys)) {
-		va = MIPS_PHYS_TO_DIRECT(phys);
+		va = (vm_offset_t)MIPS_PHYS_TO_DIRECT(phys);
 		bzero((char *)(caddr_t)va + off, size);
 		mips_dcache_wbinv_range(va + off, size);
 	} else {
@@ -2685,9 +2689,9 @@ pmap_copy_page_internal(vm_page_t src, vm_page_t dst, int flags)
 		 */
 		pmap_flush_pvcache(src);
 		mips_dcache_wbinv_range_index(
-		    MIPS_PHYS_TO_DIRECT(phys_dst), PAGE_SIZE);
-		va_src = MIPS_PHYS_TO_DIRECT(phys_src);
-		va_dst = MIPS_PHYS_TO_DIRECT(phys_dst);
+		    (vm_offset_t)MIPS_PHYS_TO_DIRECT(phys_dst), PAGE_SIZE);
+		va_src = (vm_offset_t)MIPS_PHYS_TO_DIRECT(phys_src);
+		va_dst = (vm_offset_t)MIPS_PHYS_TO_DIRECT(phys_dst);
 #if __has_feature(capabilities)
 		if ((flags & PMAP_COPY_TAGS) == 0)
 			bcopynocap((caddr_t)va_src, (caddr_t)va_dst, PAGE_SIZE);
@@ -2760,7 +2764,8 @@ pmap_copy_pages(vm_page_t ma[], vm_offset_t a_offset, vm_page_t mb[],
 		    MIPS_DIRECT_MAPPABLE(b_phys)) {
 			pmap_flush_pvcache(a_m);
 			mips_dcache_wbinv_range_index(
-			    MIPS_PHYS_TO_DIRECT(b_phys), PAGE_SIZE);
+			    (vm_offset_t)MIPS_PHYS_TO_DIRECT(b_phys),
+			    PAGE_SIZE);
 			a_cp = (char *)MIPS_PHYS_TO_DIRECT(a_phys) +
 			    a_pg_offset;
 			b_cp = (char *)MIPS_PHYS_TO_DIRECT(b_phys) +
@@ -2786,7 +2791,7 @@ vm_offset_t
 pmap_quick_enter_page(vm_page_t m)
 {
 #if defined(__mips_n64)
-	return MIPS_PHYS_TO_DIRECT(VM_PAGE_TO_PHYS(m));
+	return (vm_offset_t)MIPS_PHYS_TO_DIRECT(VM_PAGE_TO_PHYS(m));
 #else
 	vm_offset_t qaddr;
 	vm_paddr_t pa;
