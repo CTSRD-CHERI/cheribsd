@@ -31,17 +31,8 @@
 #ifndef STATCOUNTERS_H
 #define STATCOUNTERS_H
 
-#ifndef __has_extension
-#define __has_extension(x) 0
-#endif
-#if __has_extension(attribute_deprecated_with_message)
-#define DEPRECATED(x) __attribute__((deprecated(x)))
-#else
-#define DEPRECATED(x) __attribute__((deprecated))
-#endif
-
-#include <stdio.h>
 #include <stdint.h>
+#include <stdio.h>
 
 #if defined(__mips__)
 #include "statcounters_mips.h"
@@ -51,44 +42,34 @@
 #error "Architecture not supported"
 #endif
 
-
 // format flags
-typedef enum
-{
-    HUMAN_READABLE,
-    CSV_HEADER,
-    CSV_NOHEADER
+typedef enum {
+	HUMAN_READABLE,
+	CSV_HEADER,
+	CSV_NOHEADER
 } statcounters_fmt_flag_t;
 
 __BEGIN_DECLS
 
 // zero a statcounters_bank
-int statcounters_zero (statcounters_bank_t * const cnt_bank);
+int statcounters_zero(statcounters_bank_t * const cnt_bank);
 // sample hardware counters in a statcounters_bank
-int statcounters_sample (statcounters_bank_t * const cnt_bank);
+int statcounters_sample(statcounters_bank_t * const cnt_bank);
 // diff two statcounters_banks into a third one
-int statcounters_diff (
-    statcounters_bank_t * const bd,
-    const statcounters_bank_t * const be,
-    const statcounters_bank_t * const bs);
+int statcounters_diff(statcounters_bank_t * const bd,
+    const statcounters_bank_t * const be, const statcounters_bank_t * const bs);
 // dump a statcounters_bank in a file (csv or human readable)
-int statcounters_dump (const statcounters_bank_t * const b);
-int statcounters_dump_with_phase (
-    const statcounters_bank_t * const b,
-    const char * phase);
-int statcounters_dump_with_args (
-    const statcounters_bank_t * const b,
-    const char * progname,
-    const char * phase,
-    const char * archname,
-    FILE * const fp,
-    const statcounters_fmt_flag_t fmt_flg);
+int statcounters_dump(const statcounters_bank_t * const b);
+int statcounters_dump_with_phase(const statcounters_bank_t * const b,
+    const char *phase);
+int statcounters_dump_with_args(const statcounters_bank_t * const b,
+    const char *progname, const char *phase, const char *archname,
+    FILE * const fp, const statcounters_fmt_flag_t fmt_flg);
 
-const char *statcounters_get_next_name (const char *name);
-int statcounters_id_from_name (const char *name);
-uint64_t statcounters_sample_by_id (int id);
+const char *statcounters_get_next_name(const char *name);
+int statcounters_id_from_name(const char *name);
+uint64_t statcounters_sample_by_id(int id);
 
 __END_DECLS
-
 
 #endif
