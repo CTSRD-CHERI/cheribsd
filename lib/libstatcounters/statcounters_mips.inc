@@ -59,8 +59,8 @@
  */
 STATCOUNTER_ITEM(cycles, cycles, (2, 0))
 STATCOUNTER_ITEM(instructions, instructions, (4, 0))
-STATCOUNTER_ITEM(instructions (user), inst_user, (4, 1))
-STATCOUNTER_ITEM(instructions (kernel), inst_kernel, (4, 2))
+STATCOUNTER_ITEM(instructions(user), inst_user, (4, 1))
+STATCOUNTER_ITEM(instructions(kernel), inst_kernel, (4, 2))
 MIPS_STATCOUNTER(itlb_miss, 5, 0)
 MIPS_STATCOUNTER(dtlb_miss, 6, 0)
 STATCOUNTERS_GROUP_END()

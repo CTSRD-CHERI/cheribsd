@@ -34,6 +34,7 @@
 #include <sys/mman.h>
 #include <sys/sysctl.h>
 #include <sys/param.h>
+
 #include <err.h>
 #include <stdio.h>
 #include <unistd.h>
@@ -41,7 +42,11 @@
 #include <stdlib.h>
 #include <inttypes.h>
 #include <stdbool.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
+
 #include "statcounters.h"
 
 #if defined(__mips__)
@@ -54,11 +59,11 @@
 
 /* Build an array of statcounters without using __attribute__((constructor)): */
 static struct {
-	const char	*counter_name;
-	uint64_t	(*counter_get)(void);
+	const char *counter_name;
+	uint64_t (*counter_get)(void);
 } statcounter_names[] = {
-#define STATCOUNTER_ITEM(name, field, args)	\
-    { __XSTRING(name), &statcounters_read_##field },
+#define STATCOUNTER_ITEM(name, field, args) \
+	{ __XSTRING(name), &statcounters_read_##field },
 #include STATCOUNTERS_ARCH_INC
 };
 
@@ -66,35 +71,36 @@ static struct {
 
 #define ARCHNAME_BUFF_SZ 32
 
-static const char* getarchname(void)
+static const char *
+getarchname(void)
 {
-    const char* result = "unknown_arch";
+	const char *result = "unknown_arch";
 #if defined(__mips__)
-#  if defined(__CHERI__)
-#    define STATCOUNTERS_ARCH "cheri" __XSTRING(_MIPS_SZCAP)
-#  else
-#    define STATCOUNTERS_ARCH "mips"
-#    if defined(__mips_n64)
-#      define STATCOUNTERS_ABI "" /* n64 is default case -> no suffix */
-#    elif defined(__mips_n32)
-#      define STATCOUNTERS_ABI "-n32"
-#    else
-#      error "Unkown MIPS ABI"
-#    endif
-#  endif
+#if defined(__CHERI__)
+#define STATCOUNTERS_ARCH "cheri" __XSTRING(_MIPS_SZCAP)
+#else
+#define STATCOUNTERS_ARCH "mips"
+#if defined(__mips_n64)
+#define STATCOUNTERS_ABI "" /* n64 is default case -> no suffix */
+#elif defined(__mips_n32)
+#define STATCOUNTERS_ABI "-n32"
+#else
+#error "Unknown MIPS ABI"
+#endif
+#endif
 #elif defined(__riscv)
-#  define STATCOUNTERS_ARCH "riscv" __XSTRING(__riscv_xlen)
+#define STATCOUNTERS_ARCH "riscv" __XSTRING(__riscv_xlen)
 #else /* !defined(__mips__) */
-#  error "Unknown target archicture for libstatcounters"
+#error "Unknown target archicture for libstatcounters"
 #endif
 #if __has_feature(capabilities)
-#  if defined(__CHERI_PURE_CAPABILITY__)
-#    define STATCOUNTERS_ABI "-purecap"
-#  else
-#    define STATCOUNTERS_ABI "-hybrid"
-#  endif
+#if defined(__CHERI_PURE_CAPABILITY__)
+#define STATCOUNTERS_ABI "-purecap"
 #else
-#  define STATCOUNTERS_ABI ""
+#define STATCOUNTERS_ABI "-hybrid"
+#endif
+#else
+#define STATCOUNTERS_ABI ""
 #endif
 	result = STATCOUNTERS_ARCH STATCOUNTERS_ABI;
 	return result;
@@ -104,24 +110,26 @@ static const char* getarchname(void)
 //////////////////////////////////////////////////////////////////////////////
 
 // zero a statcounters_bank
-int statcounters_zero (statcounters_bank_t * const cnt_bank)
+int
+statcounters_zero(statcounters_bank_t * const cnt_bank)
 {
-    if (cnt_bank == NULL)
-        return -1;
-    memset(cnt_bank, 0, sizeof(statcounters_bank_t));
-    return 0;
+	if (cnt_bank == NULL)
+		return -1;
+	memset(cnt_bank, 0, sizeof(statcounters_bank_t));
+	return 0;
 }
 
 // sample hardware counters in a statcounters_bank
-int statcounters_sample (statcounters_bank_t * const cnt_bank)
+int
+statcounters_sample(statcounters_bank_t * const cnt_bank)
 {
-    if (cnt_bank == NULL)
-        return -1;
+	if (cnt_bank == NULL)
+		return -1;
 
 #define STATCOUNTER_ITEM(name, field, args) \
 	cnt_bank->field = statcounters_read_##field();
 #include STATCOUNTERS_ARCH_INC
-    return 0;
+	return 0;
 }
 
 /*
@@ -144,133 +152,137 @@ int statcounters_sample_sysctl(statcounters_bank_t * const cnt_bank)
 }
 
 // diff two statcounters_banks into a third one
-int statcounters_diff (
-    statcounters_bank_t * const bd,
-    const statcounters_bank_t * const be,
-    const statcounters_bank_t * const bs)
+int
+statcounters_diff(statcounters_bank_t * const bd,
+    const statcounters_bank_t * const be, const statcounters_bank_t * const bs)
 {
-    if (bd == NULL || be == NULL || bs == NULL)
-        return -1;
+	if (bd == NULL || be == NULL || bs == NULL)
+		return -1;
 
 #define STATCOUNTER_ITEM(name, field, args) bd->field = be->field - bs->field;
 #include STATCOUNTERS_ARCH_INC
-    return 0;
+	return 0;
 }
 
 // dump a statcounters_bank in a file (csv or human readable)
-int statcounters_dump (const statcounters_bank_t * const b)
+int
+statcounters_dump(const statcounters_bank_t * const b)
 {
-    return statcounters_dump_with_args(b,NULL,NULL,NULL,NULL,HUMAN_READABLE);
+	return statcounters_dump_with_args(b, NULL, NULL, NULL, NULL,
+	    HUMAN_READABLE);
 }
-int statcounters_dump_with_phase (
-    const statcounters_bank_t * const b,
-    const char * phase)
-{
-    return statcounters_dump_with_args(b,NULL,phase,NULL,NULL,HUMAN_READABLE);
-}
-int statcounters_dump_with_args (
-    const statcounters_bank_t * const b,
-    const char * progname,
-    const char * phase,
-    const char * archname,
-    FILE * const fileptr,
-    const statcounters_fmt_flag_t format_flag)
-{
-    // preparing default values for NULL arguments
-    // displayed progname
-#define MAX_NAME_SIZE 512
-    if (!progname) {
-        progname = getenv("STATCOUNTERS_PROGNAME");
-        if (!progname || progname[0] == '\0')
-	    progname = getprogname();
-    }
-    size_t pname_s = strnlen(progname,MAX_NAME_SIZE);
-    size_t phase_s = 0;
-    if (phase) {
-        phase_s = strnlen(phase,MAX_NAME_SIZE);
-    }
-    char * pname = malloc((sizeof(char) * (pname_s + phase_s)) + 1);
-    strncpy(pname, progname, pname_s + 1);
-    if (phase) {
-        strncat(pname, phase, phase_s);
-    }
-    // displayed archname
-    const char * aname;
-    if (!archname) {
-        aname = getenv("STATCOUNTERS_ARCHNAME");
-        if (!aname || aname[0] == '\0')
-            aname = getarchname();
-    } else {
-        aname = archname;
-    }
-    // dump file pointer
-    bool display_header = true;
-    bool use_stdout = false;
-    FILE * fp = fileptr;
-    if (!fp) {
-        const char * const fname = getenv("STATCOUNTERS_OUTPUT");
-        if (!fname || fname[0] == '\0') {
-            use_stdout = true;
-        } else {
-            if (access(fname, F_OK) != -1) {
-                display_header = false;
-            }
-            fp = fopen(fname, "a");
-        }
-        if (!fp && !use_stdout) {
-            warn("Failed to open statcounters output %s", fname);
-            use_stdout = true;
-        }
-    } else {
-        use_stdout = false;
-    }
-    if (use_stdout)
-        fp = stdout;
-    // output format
-    const char * const fmt = getenv("STATCOUNTERS_FORMAT");
-    statcounters_fmt_flag_t fmt_flg = format_flag;
-    if (fmt && (strcmp(fmt,"csv") == 0)) {
-       if (display_header)
-           fmt_flg = CSV_HEADER;
-       else
-           fmt_flg = CSV_NOHEADER;
-    }
 
-    if (b == NULL || fp == NULL)
-        return -1;
-    switch (fmt_flg)
-    {
-        case CSV_HEADER:
-            fputs("progname,archname"
+int
+statcounters_dump_with_phase(const statcounters_bank_t * const b,
+    const char *phase)
+{
+	return statcounters_dump_with_args(b, NULL, phase, NULL, NULL,
+	    HUMAN_READABLE);
+}
+
+int
+statcounters_dump_with_args(const statcounters_bank_t * const b,
+    const char *progname, const char *phase, const char *archname,
+    FILE * const fileptr, const statcounters_fmt_flag_t format_flag)
+{
+	// preparing default values for NULL arguments
+	// displayed progname
+#define MAX_NAME_SIZE 512
+	if (!progname) {
+		progname = getenv("STATCOUNTERS_PROGNAME");
+		if (!progname || progname[0] == '\0')
+			progname = getprogname();
+	}
+	size_t pname_s = strnlen(progname, MAX_NAME_SIZE);
+	size_t phase_s = 0;
+	if (phase) {
+		phase_s = strnlen(phase, MAX_NAME_SIZE);
+	}
+	char *pname = malloc((sizeof(char) * (pname_s + phase_s)) + 1);
+	strncpy(pname, progname, pname_s + 1);
+	if (phase) {
+		strncat(pname, phase, phase_s);
+	}
+	// displayed archname
+	const char *aname;
+	if (!archname) {
+		aname = getenv("STATCOUNTERS_ARCHNAME");
+		if (!aname || aname[0] == '\0')
+			aname = getarchname();
+	} else {
+		aname = archname;
+	}
+	// dump file pointer
+	bool display_header = true;
+	bool use_stdout = false;
+	FILE *fp = fileptr;
+	if (!fp) {
+		const char * const fname = getenv("STATCOUNTERS_OUTPUT");
+		if (!fname || fname[0] == '\0') {
+			use_stdout = true;
+		} else {
+			if (access(fname, F_OK) != -1) {
+				display_header = false;
+			}
+			fp = fopen(fname, "a");
+		}
+		if (!fp && !use_stdout) {
+			warn("Failed to open statcounters output %s", fname);
+			use_stdout = true;
+		}
+	} else {
+		use_stdout = false;
+	}
+	if (use_stdout)
+		fp = stdout;
+	// output format
+	const char * const fmt = getenv("STATCOUNTERS_FORMAT");
+	statcounters_fmt_flag_t fmt_flg = format_flag;
+	if (fmt && (strcmp(fmt, "csv") == 0)) {
+		if (display_header)
+			fmt_flg = CSV_HEADER;
+		else
+			fmt_flg = CSV_NOHEADER;
+	}
+
+	if (b == NULL || fp == NULL)
+		return -1;
+	switch (fmt_flg) {
+	case CSV_HEADER:
+		fputs("progname,archname"
 #define STATCOUNTER_ITEM(name, field, args) "," #name
 #include STATCOUNTERS_ARCH_INC
-                  "\n", fp);
-            // fallthrough
-        case CSV_NOHEADER:
-            fprintf(fp, "%s,%s"
+		      "\n",
+		    fp);
+		// fallthrough
+	case CSV_NOHEADER:
+		fprintf(fp,
+		    "%s,%s"
 #define STATCOUNTER_ITEM(name, field, args) ",%" PRId64
 #include STATCOUNTERS_ARCH_INC
-                    "\n", pname, aname
+		    "\n",
+		    pname, aname
 #define STATCOUNTER_ITEM(name, field, args) , b->field
 #include STATCOUNTERS_ARCH_INC
-                    );
-            break;
-        case HUMAN_READABLE:
-        default:
-            fprintf(fp, "===== %s -- %s =====\n",pname, aname);
+		);
+		break;
+	case HUMAN_READABLE:
+	default:
+		fprintf(fp, "===== %s -- %s =====\n", pname, aname);
 #define STATCOUNTER_ITEM(name, field, args) \
-            fprintf(fp, "%-15s %" PRId64 "\n", #name ":", b->field);
+	fprintf(fp, "%-15s %" PRId64 "\n", #name ":", b->field);
 #define STATCOUNTERS_GROUP_END() fprintf(fp, "\n");
 #include STATCOUNTERS_ARCH_INC
-            break;
-    }
-    free(pname);
-    if (!use_stdout)
-        fclose(fp);
-    return 0;
+		break;
+	}
+	free(pname);
+	if (!use_stdout)
+		fclose(fp);
+	return 0;
 }
 
-const char *statcounters_get_next_name (const char *name)
+const char *
+statcounters_get_next_name(const char *name)
 {
 	size_t i;
 
@@ -288,7 +300,8 @@ const char *statcounters_get_next_name (const char *name)
 	return (statcounter_names[i + 1].counter_name);
 }
 
-int statcounters_id_from_name (const char *name)
+int
+statcounters_id_from_name(const char *name)
 {
 	size_t i;
 
@@ -300,7 +313,8 @@ int statcounters_id_from_name (const char *name)
 	return (-1);
 }
 
-uint64_t statcounters_sample_by_id (int id)
+uint64_t
+statcounters_sample_by_id(int id)
 {
 	if (id < 0 || (size_t)id > nitems(statcounter_names))
 		return (-1);
@@ -367,31 +381,37 @@ static statcounters_bank_t start_cnt;
 static statcounters_bank_t end_cnt;
 static statcounters_bank_t diff_cnt;
 
-static void end_sample (void);
+static void end_sample(void);
 
-__attribute__((constructor))
-static void start_sample (void)
+__attribute__((constructor)) static void
+start_sample(void)
 {
 	const char * const kcov_config = getenv("STATCOUNTERS_KCOV");
 
 	// registering exit function
 	atexit(end_sample);
-	if (kcov_config && (strcmp(kcov_config, "yes") == 0))
+	if (kcov_config && (strcmp(kcov_config, "yes") == 0)) {
 		statcounters_kcov_setup();
+                statcounters_sample_sysctl(&start_cnt);
+        }
+	// registering exit function
+	atexit(end_sample);
 	// initial sampling
-        statcounters_sample_sysctl(&start_cnt);
 	statcounters_sample(&start_cnt);
 }
 
 //__attribute__((destructor)) static void end_sample (void)
-static void end_sample (void)
+static void
+end_sample(void)
 {
 	// final sampling
-	statcounters_sample(&end_cnt); // TODO change the order of sampling to keep cycle sampled early
-        statcounters_sample_sysctl(&end_cnt);
+	statcounters_sample(&end_cnt); // TODO change the order of sampling to
+				       // keep cycle sampled early
 	// stop kernel coverage and dump results
-	if (kcov_enable)
+	if (kcov_enable) {
+                statcounters_sample_sysctl(&end_cnt);
 		statcounters_kcov_teardown();
+	}
 	// compute difference between samples
 	statcounters_diff(&diff_cnt, &end_cnt, &start_cnt);
 	// dump the counters
