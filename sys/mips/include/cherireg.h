@@ -276,7 +276,7 @@
 /*
  * Location of the CHERI CCall/CReturn software-path exception vector.
  */
-#define	CHERI_CCALL_EXC_VEC	((intptr_t)(int32_t)0x80000280)
+#define	CHERI_CCALL_EXC_VEC	MIPS_KSEG0((intptr_t)(int32_t)0x80000280)
 
 /*
  * CHERI_BASELEN_BITS is used in cheribsdtest_cheriabi.c.  The others are
@@ -288,3 +288,13 @@
 #define	CHERI_SEAL_MIN_ALIGN	12
 
 #endif /* _MIPS_INCLUDE_CHERIREG_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20200706,
+//   "target_type": "header",
+//   "changes_purecap": [
+//     "pointer_as_integer",
+//     "support"
+//   ]
+// }
+// CHERI CHANGES END

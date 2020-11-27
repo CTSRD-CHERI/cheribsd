@@ -158,7 +158,11 @@
 #endif
 
 #ifdef __mips_n64
+#ifndef __CHERI_PURE_CAPABILITY__
 #define	NPDEPGSHIFT		9               /* LOG2(NPTEPG) */
+#else /* __CHERI_PURE_CAPABILITY__ */
+#define NPDEPGSHIFT		8		/* LOG2(NPDEPG) */
+#endif /* __CHERI_PURE_CAPABILITY__ */
 #define	SEGSHIFT		(PAGE_SHIFT + NPTEPGSHIFT + NPDEPGSHIFT)
 #define	NBSEG			(1ul << SEGSHIFT)
 #define	PDRSHIFT		(PAGE_SHIFT + NPTEPGSHIFT)
@@ -184,13 +188,27 @@
  * For a large kernel stack page the KSTACK_SIZE needs to be a page size
  * supported by the hardware (e.g. 16K).
  */
+#ifdef __CHERI_PURE_CAPABILITY__
+/*
+ * Cheri-128 uses two 16K pages for the kernel stack, without any guard pages.
+ * The stack capability is bounded propery so the stack should never overflow.
+ */
+#define KSTACK_PAGE_SIZE	(1 << 14)	/* Single 16K page */
+#define	KSTACK_SIZE		(KSTACK_PAGE_SIZE * 2)
+#define KSTACK_GUARD_PAGES	0
+
+#else /* ! __CHERI_PURE_CAPABILITY__ */
+
 #define	KSTACK_SIZE		(1 << 14)	/* Single 16K page */
 #define	KSTACK_PAGE_SIZE	KSTACK_SIZE
+#define	KSTACK_GUARD_PAGES	(KSTACK_PAGE_SIZE / PAGE_SIZE)
+
+#endif /* ! __CHERI_PURE_CAPABILITY__ */
+
 #define	KSTACK_PAGE_MASK	(KSTACK_PAGE_SIZE - 1)
 #define	KSTACK_PAGES		(KSTACK_SIZE / PAGE_SIZE)
 #define	KSTACK_TLBMASK_MASK	((KSTACK_PAGE_MASK >> (TLBMASK_SHIFT - 1)) \
 					<< TLBMASK_SHIFT)
-#define	KSTACK_GUARD_PAGES	(KSTACK_PAGE_SIZE / PAGE_SIZE)
 
 #else /* ! KSTACK_LARGE_PAGE */
 
@@ -207,8 +225,8 @@
 /*
  * Mach derived conversion macros
  */
-#define	round_2mpage(x)		(((x) + PDRMASK) & ~PDRMASK)
-#define	trunc_2mpage(x)		((x) & ~PDRMASK)
+#define	round_2mpage(x)		__builtin_align_down(((x) + PDRMASK), PDRSIZE)
+#define	trunc_2mpage(x)		__builtin_align_down((x), PDRSIZE)
 
 #endif /* !_MIPS_INCLUDE_PARAM_H_ */
 // CHERI CHANGES START
@@ -218,6 +236,10 @@
 //   "changes": [
 //     "support"
 //   ],
-//   "change_comment": "MACHINE_ARCH for CheriABI and freebsd64"
+//   "changes_purecap": [
+//     "support",
+//     "pointer_alignment"
+//   ],
+//   "change_comment": "MACHINE_ARCH for CheriABI and freebsd64.  purecap: kstack"
 // }
 // CHERI CHANGES END
