@@ -113,10 +113,6 @@ static const char* getarchname(void)
 
 #if defined(__mips__)
 // reset the hardware statcounters
-void reset_statcounters (void)
-{
-    statcounters_reset();
-}
 void statcounters_reset (void)
 {
     resetStatCounters();
@@ -124,10 +120,6 @@ void statcounters_reset (void)
 #endif
 
 // zero a statcounters_bank
-void zero_statcounters (statcounters_bank_t * const cnt_bank)
-{
-    statcounters_zero(cnt_bank);
-}
 int statcounters_zero (statcounters_bank_t * const cnt_bank)
 {
     if (cnt_bank == NULL)
@@ -137,10 +129,6 @@ int statcounters_zero (statcounters_bank_t * const cnt_bank)
 }
 
 // sample hardware counters in a statcounters_bank
-void sample_statcounters (statcounters_bank_t * const cnt_bank)
-{
-    statcounters_sample(cnt_bank);
-}
 int statcounters_sample (statcounters_bank_t * const cnt_bank)
 {
     if (cnt_bank == NULL)
@@ -153,13 +141,6 @@ int statcounters_sample (statcounters_bank_t * const cnt_bank)
 }
 
 // diff two statcounters_banks into a third one
-void diff_statcounters (
-    const statcounters_bank_t * const be,
-    const statcounters_bank_t * const bs,
-    statcounters_bank_t * const bd)
-{
-    statcounters_diff(bd,be,bs);
-}
 int statcounters_diff (
     statcounters_bank_t * const bd,
     const statcounters_bank_t * const be,
@@ -174,38 +155,6 @@ int statcounters_diff (
 }
 
 // dump a statcounters_bank in a file (csv or human readable)
-void dump_statcounters (
-    const statcounters_bank_t * const b,
-    const char * const fname,
-    const char * const fmt)
-{
-    /* XXXAR: a lot of this is duplicated from end_sample */
-    FILE * fp = NULL;
-    bool display_header = true;
-    statcounters_fmt_flag_t flg = HUMAN_READABLE;
-    if (!fname)
-        return;
-    if (access(fname, F_OK) != -1)
-        display_header = false;
-    if ((fp = fopen(fname, "a")))
-    {
-        if (fmt && (strcmp(fmt,"csv") == 0))
-        {
-            if (display_header) flg = CSV_HEADER;
-            else flg = CSV_NOHEADER;
-        }
-        const char * pname = getenv("STATCOUNTERS_PROGNAME");
-        if (!pname || pname[0] == '\0')
-            pname = getprogname();
-        const char * aname = getenv("STATCOUNTERS_ARCHNAME");
-        if (!aname || aname[0] == '\0')
-            aname = getarchname();
-        statcounters_dump_with_args(b,pname,NULL,aname,fp,flg);
-        fclose(fp);
-    } else {
-        warn("Failed to open statcounters output %s", fname);
-    } 
-}
 int statcounters_dump (const statcounters_bank_t * const b)
 {
     return statcounters_dump_with_args(b,NULL,NULL,NULL,NULL,HUMAN_READABLE);
