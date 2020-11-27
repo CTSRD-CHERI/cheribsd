@@ -297,11 +297,12 @@ CRUNCH_PROGS_usr.bin+=su
 .if ${MACHINE} == "mips" || ${MACHINE} == "riscv"
 CRUNCH_PROGS_usr.bin+=	qtrace
 .endif
-.if ${MACHINE_ARCH:Mmips64*}
-CRUNCH_PROGS_usr.bin+=	beri_count_stats
-.endif
-.if ${MACHINE_ARCH:Mriscv64*}
+.if ${MACHINE_ARCH:Mmips64*} || ${MACHINE_ARCH:Mriscv64*}
 CRUNCH_PROGS_usr.bin+=	minimal_count_stats
+.if ${MACHINE_ARCH:Mmips64*}
+# backwards compat for old benchmark scripts
+CRUNCH_ALIAS_minimal_count_stats= beri_count_stats
+.endif
 .endif
 
 
