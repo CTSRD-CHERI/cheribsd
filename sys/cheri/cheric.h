@@ -34,8 +34,9 @@
 #include <sys/cdefs.h>
 #include <sys/types.h>
 
-#if __has_feature(capabilities)
 #include <cheri/cherireg.h>	/* Permission definitions. */
+
+#if __has_feature(capabilities)
 
 /*
  * Programmer-friendly macros for CHERI-aware C code -- requires use of
