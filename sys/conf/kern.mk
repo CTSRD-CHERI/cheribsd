@@ -120,6 +120,9 @@ CFLAGS += -mgeneral-regs-only
 # Reserve x18 for pcpu data
 CFLAGS += -ffixed-x18
 INLINE_LIMIT?=	8000
+.if ${MACHINE_CPU:Mcheri}
+CFLAGS+=	-march=morello
+.endif
 .endif
 
 #
