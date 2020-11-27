@@ -26,10 +26,17 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #ifndef STATCOUNTER_ITEM
-#error Must define STATCOUNTER_ITEM(name, csr)
+#error Must define STATCOUNTER_ITEM(name, field, args) when including this file.
 #endif
 
-STATCOUNTER_ITEM(cycles,cycle)
-STATCOUNTER_ITEM(instructions,instret)
-STATCOUNTER_ITEM(time,time)
+#ifndef RISCV_STATCOUNTER
+#define RISCV_STATCOUNTER(csr) STATCOUNTER_ITEM(csr, csr, csr)
+#endif
+
+STATCOUNTER_ITEM(cycles,cycles,cycle)
+STATCOUNTER_ITEM(instructions,instructions,instret)
+RISCV_STATCOUNTER(time)
 /* TODO: add the remaining counters once we have implementations that support them. */
+
+#undef RISCV_STATCOUNTER
+#undef STATCOUNTER_ITEM
