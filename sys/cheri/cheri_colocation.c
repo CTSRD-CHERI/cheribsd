@@ -381,22 +381,24 @@ colocation_unborrow(struct thread *td, struct trapframe *trapframe)
 bool
 colocation_trap_in_switcher(struct thread *td, struct trapframe *trapframe)
 {
-#ifdef __mips__
 	const struct sysentvec *sv;
 	vm_offset_t addr;
 
 	sv = td->td_proc->p_sysent;
+#if defined(__mips__)
 	addr = (__cheri_addr vaddr_t)trapframe->pc;
+#elif defined(__riscv)
+	addr = (__cheri_addr vaddr_t)trapframe->tf_sepc;
+#else
+#error "what architecture is this?"
+#endif
 
 	if (addr >= sv->sv_cocall_base && addr < sv->sv_cocall_base + sv->sv_cocall_len)
 		goto trap;
 	if (addr >= sv->sv_coaccept_base && addr < sv->sv_coaccept_base + sv->sv_coaccept_len)
 		goto trap;
-#endif
 	return (false);
-#ifdef __mips__
 trap:
-#endif
 #ifdef DDB
 	if (kdb_on_switcher_trap)
 		kdb_enter(KDB_WHY_CHERI, "switcher trap");

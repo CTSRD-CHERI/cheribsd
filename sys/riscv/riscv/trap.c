@@ -505,6 +505,11 @@ do_trap_user(struct trapframe *frame)
 	CTR3(KTR_TRAP, "do_trap_user: curthread: %p, sepc: %lx, frame: %p",
 	    curthread, (__cheri_addr unsigned long)frame->tf_sepc, frame);
 
+	if (colocation_trap_in_switcher(td, frame)) {
+		printf("%s: switcher trap at pc %#jx\n",
+		    __func__, (intmax_t)frame->tf_sepc);
+	}
+
 	switch(exception) {
 	case EXCP_FAULT_LOAD:
 	case EXCP_FAULT_STORE:
