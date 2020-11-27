@@ -4893,7 +4893,7 @@ umtx_read_rb_list(struct thread *td, struct umutex *m, uintcap_t *rb_list,
 		*rb_list = (uintcap_t)__USER_CAP_UNBOUND((void *)(uintptr_t)m32.m_rb_lnk);
 	} else
 #endif
-#if __has_feature(capabilities)
+#ifdef COMPAT_FREEBSD64
 	if (!SV_PROC_FLAG(td->td_proc, SV_CHERI)) {
 		memcpy(&m64, m, sizeof(m64));
 		*rb_list = (uintcap_t)__USER_CAP_UNBOUND((void *)(uintptr_t)m64.m_rb_lnk);
