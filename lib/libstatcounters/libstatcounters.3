@@ -24,12 +24,12 @@
 .\"
 .\" $FreeBSD$
 .\"
-.Dd July 14, 2016
+.Dd July 14, 2020
 .Dt LIBSTATCOUNTERS 3
 .Os
 .Sh NAME
 .Nm libstatcounters
-.Nd A library to gather BERI/CHERI's statcounters.
+.Nd A library to gather basic performance counter numbers. This currently supports BERI/CHERI's statcounters and the RISC-V HPM CSRs.
 .Sh DESCRIPTION
 .Nm
 provides an API to the BERI/CHERI statcounters. To link with
@@ -218,60 +218,10 @@ or
 .Fa fp
 are
 .Nm NULL .
-.Sh API - DEPRECATED
-.Pp
-.Ft void
-.Fn reset_statcounters
-.sp
-.Fn reset_statcounters
-resets the hardware statcounters. Avoid using this function and consider using
-.Fn sample_statcounters
-to populate two statcounters_bank_t and diff them using
-.Fn diff_statcounters
-instead.
-.Pp
-.Ft void
-.Fn zero_statcounters "statcounters_bank_t * const b"
-.sp
-.Fn zero_statcounters
-zeroes the statcounters_bank_t
-.Fa b .
-.Pp
-.Ft void
-.Fn sample_statcounters "statcounters_bank_t * const b"
-.sp
-.Fn sample_statcounters
-samples the hardware statcounters into statcounters_bank_t
-.Fa b .
-.Pp
-.Ft void
-.Fn diff_statcounters "const statcounters_bank_t * const be" "const statcounters_bank_t * const bs" "statcounters_bank_t * const bd"
-.sp
-.Fn diff_statcounters
-subtracts statcounters_bank_t
-.Fa bs
-from
-.Fa be
-and stores the result in statcounters_bank_t
-.Fa bd.
-.Pp
-.Ft void
-.Fn dump_statcounters "const statcounters_bank_t * const b" "const char * const fname" "const char * const fmt"
-.sp
-.Fn dump_statcounters
-dumps the statcounters_bank_t
-.Fa b
-content in file
-.Fa fname
-according to format
-.Fa fmt .
-The
-.Fa fname
-is a string  describing the path to the desired file. The supported value for the
-.Fa fmt
-string are "csv" for csv output, or anything else for human readable output.
 .Sh LIBRARY
 .Lb libstatcounters
 .Sh AUTHORS
 .An Alexandre Joannou
 .Aq aj443@cl.cam.ac.uk
+.An Alex Richardson
+.Aq arichardson@FreeBSD.org
