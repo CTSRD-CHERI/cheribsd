@@ -111,6 +111,59 @@ cheri_is_null_derived(const void * __capability cap)
 	    cap));
 }
 
+#ifdef _KERNEL
+
+#ifdef __CHERI_PURE_CAPABILITY__
+
+/* Check that a capability is tagged */
+#define	CHERI_ASSERT_VALID(ptr)						\
+	KASSERT(cheri_gettag(ptr),					\
+	    ("Expect valid capability %s %s:%d", __func__,		\
+	        __FILE__, __LINE__))
+
+/* Check that a capability is not sealed */
+#define	CHERI_ASSERT_UNSEALED(ptr)					\
+	KASSERT(!cheri_getsealed(ptr),					\
+	    ("Expect unsealed capability %s %s:%d", __func__,		\
+	        __FILE__, __LINE__))
+
+/*
+ * Check that bounds are within the given size, padded to
+ * representable size
+ */
+#define	CHERI_ASSERT_BOUNDS(ptr, expect) do {				\
+		KASSERT(cheri_getlen(ptr) <=				\
+		    CHERI_REPRESENTABLE_LENGTH(expect),			\
+		    ("Invalid bounds on pointer in %s %s:%d "		\
+			 "expected %zx, found %zx",			\
+			__func__, __FILE__, __LINE__,			\
+			(size_t)expect,					\
+			(size_t)cheri_getlen(ptr)));			\
+	} while (0)
+
+/* Check that bounds are exactly the given size */
+#define	CHERI_ASSERT_EXBOUNDS(ptr, len) do {				\
+		KASSERT(cheri_getlen(ptr) == len,			\
+		    ("Inexact bounds on pointer in %s %s:%d "		\
+			"expected %zx, found %zx",			\
+			__func__, __FILE__, __LINE__,			\
+			(size_t)len,					\
+			(size_t)cheri_getlen(ptr)));			\
+	} while (0)
+
+#else /* !__CHERI_PURE_CAPABILITY__ */
+#define	CHERI_ASSERT_VALID(ptr)
+#define	CHERI_ASSERT_UNSEALED(ptr)
+#define	CHERI_ASSERT_BOUNDS(ptr, expect)
+#define	CHERI_ASSERT_EXBOUNDS(ptr, expect)
+#endif /* !__CHERI_PURE_CAPABILITY__ */
+
+/* Check that bounds are exactly the size of a pointer */
+#define	CHERI_ASSERT_PTRSIZE_BOUNDS(ptr)		\
+	CHERI_ASSERT_EXBOUNDS(ptr, sizeof(void * __capability))
+
+#endif
+
 /*
  * Two variations on cheri_ptr() based on whether we are looking for a code or
  * data capability.  The compiler's use of CFromPtr will be with respect to
@@ -206,7 +259,14 @@ cheri_bytes_remaining(const void * __capability cap)
 #define cheri_cap_to_typed_ptr(cap, type)				\
 	(type *)cheri_cap_to_ptr(cap, sizeof(type))
 
-#endif	/* __has_feature(capabilities) */
+#else /* ! __has_feature(capabilities) */
+#ifdef _KERNEL
+#define	CHERI_ASSERT_VALID(ptr)
+#define	CHERI_ASSERT_BOUNDS(ptr, expect)
+#define	CHERI_ASSERT_EXBOUNDS(ptr, len)
+#define	CHERI_ASSERT_PTRSIZE_BOUNDS(ptr)
+#endif
+#endif /* ! __has_feature(capabilities) */
 
 /*
  * The cheri_{get,set,clear}_low_pointer_bits() functions work both with and
