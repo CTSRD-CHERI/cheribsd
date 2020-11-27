@@ -33,6 +33,7 @@
 #include <sys/kcov.h>
 #include <sys/mman.h>
 #include <sys/sysctl.h>
+#include <sys/param.h>
 #include <err.h>
 #include <stdio.h>
 #include <unistd.h>
@@ -60,11 +61,7 @@ static inline void resetStatCounters (void)
 {
     __asm __volatile(".word (0x1F << 26) | (0x0 << 21) | (0x0 << 16) | (0x7 << 11) | (0x0 << 6) | (0x3B)");
 }
-
-#define STATCOUNTER_NAMES_MAX	128
 #endif
-
-static int statcounter_names_len = 0;
 
 /* Build an array of statcounters without using __attribute__((constructor)): */
 static struct {
@@ -294,17 +291,17 @@ int statcounters_dump_with_args (
 
 const char *statcounters_get_next_name (const char *name)
 {
-	int i;
+	size_t i;
 
 	if (name == NULL)
 		return (statcounter_names[0].counter_name);
 
-	for (i = 0; i < statcounter_names_len; i++) {
+	for (i = 0; i < nitems(statcounter_names); i++) {
 		if (strcmp(statcounter_names[i].counter_name, name) == 0)
 			break;
 	}
 
-	if (i == statcounter_names_len)
+	if (i == nitems(statcounter_names))
 		return (NULL);
 
 	return (statcounter_names[i + 1].counter_name);
@@ -312,9 +309,9 @@ const char *statcounters_get_next_name (const char *name)
 
 int statcounters_id_from_name (const char *name)
 {
-	int i;
+	size_t i;
 
-	for (i = 0; i < statcounter_names_len; i++) {
+	for (i = 0; i < nitems(statcounter_names); i++) {
 		if (strcmp(statcounter_names[i].counter_name, name) == 0)
 			return (i);
 	}
@@ -324,6 +321,8 @@ int statcounters_id_from_name (const char *name)
 
 uint64_t statcounters_sample_by_id (int id)
 {
+	if (id < 0 || (size_t)id > nitems(statcounter_names))
+		return (-1);
 
 	return (statcounter_names[id].counter_get());
 }
