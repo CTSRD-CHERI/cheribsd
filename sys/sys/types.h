@@ -251,6 +251,12 @@ struct cap_rights;
 typedef	struct cap_rights	cap_rights_t;
 #endif
 
+#ifdef __CHERI_PURE_CAPABILITY__
+typedef __uintptr_t	vm_ptr_t;
+#else
+typedef __vm_offset_t	vm_ptr_t;
+#endif
+
 /*
  * Types suitable for exporting physical addresses, virtual addresses
  * (pointers), and memory object sizes from the kernel independent of native
@@ -445,11 +451,15 @@ typedef	void * __capability	otype_t;
 #endif /* !_SYS_TYPES_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20200706,
 //   "target_type": "header",
 //   "changes": [
 //     "support",
 //     "user_capabilities"
+//   ],
+//   "changes_purecap": [
+//     "support",
+//     "pointer_as_integer"
 //   ]
 // }
 // CHERI CHANGES END
