@@ -8,6 +8,9 @@
  * Technology) under DARPA contract HR0011-18-C-0016 ("ECATS"), as part of the
  * DARPA SSITH research programme.
  *
+ * This work was supported by Innovate UK project 105694, "Digital Security by
+ * Design (DSbD) Technology Platform Prototype".
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -31,37 +34,22 @@
  */
 #pragma once
 
-// counters bank
-#define STATCOUNTERS_MAX_MOD_CNT 12
-typedef struct statcounters_bank
-{
-	uint64_t itlb_miss;
-	uint64_t dtlb_miss;
-	uint64_t cycle;
-	uint64_t inst;
-	uint64_t inst_user;
-	uint64_t inst_kernel;
-	uint64_t imprecise_setbounds;
-	uint64_t unrepresentable_caps;
-	uint64_t icache[STATCOUNTERS_MAX_MOD_CNT];
-	uint64_t dcache[STATCOUNTERS_MAX_MOD_CNT];
-	uint64_t l2cache[STATCOUNTERS_MAX_MOD_CNT];
-	uint64_t mipsmem[STATCOUNTERS_MAX_MOD_CNT];
-	uint64_t tagcache[STATCOUNTERS_MAX_MOD_CNT];
-	uint64_t l2cachemaster[STATCOUNTERS_MAX_MOD_CNT];
-	uint64_t tagcachemaster[STATCOUNTERS_MAX_MOD_CNT];
-	/* Capture kernel unaligned access emulation statistics */
-	uint64_t kern_unaligned_access;
+typedef struct statcounters_bank {
+#define STATCOUNTER_ITEM(name, field, args) uint64_t field;
+#include "statcounters_mips.inc"
 } statcounters_bank_t;
 
-
-/* This header provides statcounters_get_foo_count() for all statcounters supported by BERI */
-#define STATCOUNTER_ITEM(name, X, Y)	\
-static inline uint64_t statcounters_get_##name##_count(void)   \
-{                                           \
-    uint64_t ret;                           \
-    __asm __volatile(".word (0x1f << 26) | (0x0 << 21) | (12 << 16) | ("#X" << 11) | ( "#Y"  << 6) | 0x3b\n\tmove %0,$12" : "=r" (ret) :: "$12"); \
-    return ret;                             \
-}
+/* Note: LLVM rejects certain selectors for RDHWR, so we have to use .word. */
+#define STATCOUNTER_RDHWR_TO_REG12(major, minor)		\
+	".word (0x1f << 26) | (0x0 << 21) | (12 << 16) | "	\
+	"(" #major " << 11) | ( " #minor "  << 6) | 0x3b"
+#define STATCOUNTER_ITEM(name, field, args)			\
+	static inline uint64_t					\
+	statcounters_read_##field(void)				\
+	{							\
+		uint64_t ret;					\
+		asm volatile(STATCOUNTER_RDHWR_TO_REG12 args	\
+			"\n\tmove %0, $12" :"=r"(ret)::"$12");	\
+		return ret;					\
+	}
 #include "statcounters_mips.inc"
-#undef STATCOUNTER_ITEM

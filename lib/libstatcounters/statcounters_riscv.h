@@ -27,20 +27,18 @@
  */
 #pragma once
 
-typedef union statcounters_bank {
-#define STATCOUNTER_ITEM(name, csr) uint64_t name;
+typedef struct statcounters_bank {
+#define STATCOUNTER_ITEM(name, field, args) uint64_t field;
 #include "statcounters_riscv.inc"
-#undef STATCOUNTER_ITEM
 } statcounters_bank_t;
 
 /* This header also exposes statcounters_get_cycle_count(), etc. functions */
-#define STATCOUNTER_ITEM(name, csr)			\
+#define STATCOUNTER_ITEM(name, field, args)			\
 	static inline uint64_t					\
-	statcounters_get_##csr##_count(void)			\
+	statcounters_read_##field(void)				\
 	{							\
 		uint64_t ret;					\
-		asm volatile("csrr %0, " #csr : "=r"(ret));	\
+		asm volatile("csrr %0, " #args : "=r"(ret));	\
 		return ret;					\
 	}
 #include "statcounters_riscv.inc"
-#undef STATCOUNTER_ITEM
