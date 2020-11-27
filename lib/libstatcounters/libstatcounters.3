@@ -63,16 +63,6 @@ environment variables.
 .Nd Environment variable specifying the desired output format. "csv" is supported, any other value will output in a human readable format
 .Sh API
 .Pp
-.Ft void
-.Fn statcounters_reset
-.sp
-.Fn statcounters_reset
-resets the hardware statcounters. Avoid using this function and consider using
-.Fn statcounters_sample
-to populate two statcounters_bank_t and diff them using
-.Fn statcounters_diff
-instead.
-.Pp
 .Ft int
 .Fn statcounters_zero "statcounters_bank_t * const b"
 .sp

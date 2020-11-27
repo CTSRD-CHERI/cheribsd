@@ -46,17 +46,6 @@
 #error "Unknown architecture"
 #endif
 
-#if defined(__mips__)
-// low level rdhwr access to counters
-//////////////////////////////////////////////////////////////////////////////
-
-// TODO the itlbmiss/dtlbmiss/cycle/inst counters are not reset with that
-static inline void resetStatCounters (void)
-{
-    __asm __volatile(".word (0x1F << 26) | (0x0 << 21) | (0x0 << 16) | (0x7 << 11) | (0x0 << 6) | (0x3B)");
-}
-#endif
-
 /* Build an array of statcounters without using __attribute__((constructor)): */
 static struct {
 	const char	*counter_name;
@@ -107,14 +96,6 @@ static const char* getarchname(void)
 
 // libstatcounters API
 //////////////////////////////////////////////////////////////////////////////
-
-#if defined(__mips__)
-// reset the hardware statcounters
-void statcounters_reset (void)
-{
-    resetStatCounters();
-}
-#endif
 
 // zero a statcounters_bank
 int statcounters_zero (statcounters_bank_t * const cnt_bank)
