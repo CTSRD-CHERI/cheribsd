@@ -63,30 +63,19 @@ __BEGIN_DECLS
 
 // reset statcounters XXX this literally resets the hardware counters (allowed
 // from user space for convenience but need not to be abused to be usefull)
-void reset_statcounters (void) DEPRECATED("use statcounters_reset instead");
 void statcounters_reset (void);
 // zero a statcounters_bank
-void zero_statcounters (statcounters_bank_t * const cnt_bank) DEPRECATED("use statcounters_zero instead");
 int statcounters_zero (statcounters_bank_t * const cnt_bank);
 // sample hardware counters in a statcounters_bank
-void sample_statcounters (statcounters_bank_t * const cnt_bank) DEPRECATED("use statcounters_sample instead");
 int statcounters_sample (statcounters_bank_t * const cnt_bank);
 // sample kernel statistics via sysctl
 int statcounters_sample_sysctl (statcounters_bank_t * const cnt_bank);
 // diff two statcounters_banks into a third one
-void diff_statcounters (
-    const statcounters_bank_t * const be,
-    const statcounters_bank_t * const bs,
-    statcounters_bank_t * const bd) DEPRECATED("use statcounters_diff instead -- arguments order changed");
 int statcounters_diff (
     statcounters_bank_t * const bd,
     const statcounters_bank_t * const be,
     const statcounters_bank_t * const bs);
 // dump a statcounters_bank in a file (csv or human readable)
-void dump_statcounters (
-    const statcounters_bank_t * const b,
-    const char * const fname,
-    const char * const fmt) DEPRECATED("use statcounters_dump instead -- arguments changed");
 int statcounters_dump (const statcounters_bank_t * const b);
 int statcounters_dump_with_phase (
     const statcounters_bank_t * const b,
