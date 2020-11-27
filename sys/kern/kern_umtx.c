@@ -4843,7 +4843,7 @@ umtx_thread_exit(struct thread *td)
 }
 
 static int
-umtx_read_uptr(struct thread *td, uintptr_t ptr, uintcap_t *res, bool compat32)
+umtx_read_uptr(struct thread *td, uintcap_t ptr, uintcap_t *res, bool compat32)
 {
 	intcap_t res1;
 	u_long res_native;
