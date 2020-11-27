@@ -540,9 +540,18 @@ kern_cosetup(struct thread *td, int what,
 
 	switch (what) {
 	case COSETUP_COCALL:
+		/*
+		 * XXX: This should should use cheri_capability_build_user_code()
+		 *      instead.  It fails to seal, though; I guess there's something
+		 *      wrong with perms.
+		 */
 		codecap = cheri_capability_build_user_rwx(CHERI_CAP_USER_CODE_PERMS,
 		    td->td_proc->p_sysent->sv_cocall_base,
 		    td->td_proc->p_sysent->sv_cocall_len, 0);
+#ifdef CHERI_FLAGS_CAP_MODE
+		if (SV_PROC_FLAG(td->td_proc, SV_CHERI))
+			codecap = cheri_setflags(codecap, CHERI_FLAGS_CAP_MODE);
+#endif
 		codecap = cheri_seal(codecap, switcher_sealcap);
 		error = copyoutcap(&codecap, codep, sizeof(codecap));
 		if (error != 0)
@@ -558,6 +567,10 @@ kern_cosetup(struct thread *td, int what,
 		codecap = cheri_capability_build_user_rwx(CHERI_CAP_USER_CODE_PERMS,
 		    td->td_proc->p_sysent->sv_coaccept_base,
 		    td->td_proc->p_sysent->sv_coaccept_len, 0);
+#ifdef CHERI_FLAGS_CAP_MODE
+		if (SV_PROC_FLAG(td->td_proc, SV_CHERI))
+			codecap = cheri_setflags(codecap, CHERI_FLAGS_CAP_MODE);
+#endif
 		codecap = cheri_seal(codecap, switcher_sealcap);
 		error = copyoutcap(&codecap, codep, sizeof(codecap));
 		if (error != 0)
