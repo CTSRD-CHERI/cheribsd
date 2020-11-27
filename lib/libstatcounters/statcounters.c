@@ -181,9 +181,6 @@ statcounters_dump_with_args(const statcounters_bank_t * const b,
 		if (!fname || fname[0] == '\0') {
 			use_stdout = true;
 		} else {
-			if (access(fname, F_OK) != -1) {
-				display_header = false;
-			}
 			fp = fopen(fname, "a");
 		}
 		if (!fp && !use_stdout) {
@@ -195,6 +192,11 @@ statcounters_dump_with_args(const statcounters_bank_t * const b,
 	}
 	if (use_stdout)
 		fp = stdout;
+	// If there is already data in the output file, don't print the CSV
+	// header again.
+	if (ftello(fp) > 0) {
+		display_header = false;
+	}
 	// output format
 	const char * const fmt = getenv("STATCOUNTERS_FORMAT");
 	statcounters_fmt_flag_t fmt_flg = format_flag;
