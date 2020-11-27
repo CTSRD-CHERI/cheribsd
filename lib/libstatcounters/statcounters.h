@@ -61,9 +61,6 @@ typedef enum
 
 __BEGIN_DECLS
 
-// reset statcounters XXX this literally resets the hardware counters (allowed
-// from user space for convenience but need not to be abused to be usefull)
-void statcounters_reset (void);
 // zero a statcounters_bank
 int statcounters_zero (statcounters_bank_t * const cnt_bank);
 // sample hardware counters in a statcounters_bank
