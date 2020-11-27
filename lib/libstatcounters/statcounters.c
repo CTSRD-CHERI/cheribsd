@@ -186,31 +186,19 @@ statcounters_dump_with_args(const statcounters_bank_t * const b,
     FILE * const fileptr, const statcounters_fmt_flag_t format_flag)
 {
 	// preparing default values for NULL arguments
-	// displayed progname
-#define MAX_NAME_SIZE 512
 	if (!progname) {
+		// displayed progname
 		progname = getenv("STATCOUNTERS_PROGNAME");
 		if (!progname || progname[0] == '\0')
 			progname = getprogname();
 	}
-	size_t pname_s = strnlen(progname, MAX_NAME_SIZE);
-	size_t phase_s = 0;
-	if (phase) {
-		phase_s = strnlen(phase, MAX_NAME_SIZE);
-	}
-	char *pname = malloc((sizeof(char) * (pname_s + phase_s)) + 1);
-	strncpy(pname, progname, pname_s + 1);
-	if (phase) {
-		strncat(pname, phase, phase_s);
-	}
+	if (!phase)
+	    phase = "";
 	// displayed archname
-	const char *aname;
 	if (!archname) {
-		aname = getenv("STATCOUNTERS_ARCHNAME");
-		if (!aname || aname[0] == '\0')
-			aname = getarchname();
-	} else {
-		aname = archname;
+		archname = getenv("STATCOUNTERS_ARCHNAME");
+		if (!archname || archname[0] == '\0')
+			archname = getarchname();
 	}
 	// dump file pointer
 	bool display_header = true;
@@ -257,25 +245,25 @@ statcounters_dump_with_args(const statcounters_bank_t * const b,
 		// fallthrough
 	case CSV_NOHEADER:
 		fprintf(fp,
-		    "%s,%s"
+		    "%s%s,%s"
 #define STATCOUNTER_ITEM(name, field, args) ",%" PRId64
 #include STATCOUNTERS_ARCH_INC
 		    "\n",
-		    pname, aname
+		    progname, phase, archname
 #define STATCOUNTER_ITEM(name, field, args) , b->field
 #include STATCOUNTERS_ARCH_INC
 		);
 		break;
 	case HUMAN_READABLE:
 	default:
-		fprintf(fp, "===== %s -- %s =====\n", pname, aname);
+		fprintf(fp, "===== %s%s -- %s =====\n", progname, phase,
+		    archname);
 #define STATCOUNTER_ITEM(name, field, args) \
 	fprintf(fp, "%-15s %" PRId64 "\n", #name ":", b->field);
 #define STATCOUNTERS_GROUP_END() fprintf(fp, "\n");
 #include STATCOUNTERS_ARCH_INC
 		break;
 	}
-	free(pname);
 	if (!use_stdout)
 		fclose(fp);
 	return 0;
