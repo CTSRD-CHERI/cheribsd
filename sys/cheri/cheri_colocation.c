@@ -481,6 +481,7 @@ setup_scb(struct thread *td)
 	td->td_md.md_scb = addr;
 
 	//printf("%s: scb at %p, td %p\n", __func__, (void *)addr, td);
+	memset(&scb, 0, sizeof(scb));
 	scb.scb_unsealcap = switcher_sealcap2;
 	scb.scb_td = td;
 	scb.scb_borrower_td = NULL;
