@@ -133,3 +133,13 @@
 #define	riscv_ptob(x)		((unsigned long)(x) << PAGE_SHIFT)
 
 #endif /* !_MACHINE_PARAM_H_ */
+
+// CHERI CHANGES START
+// {
+//   "updated": 20201007,
+//   "target_type": "header",
+//   "changes_purecap": [
+//     "support"
+//   ]
+// }
+// CHERI CHANGES END
