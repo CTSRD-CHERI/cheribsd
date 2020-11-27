@@ -112,6 +112,16 @@ cheri_is_null_derived(const void * __capability cap)
 }
 
 #ifdef _KERNEL
+/*
+ * Test whether a capability is a subset of another.
+ * This mimics the semantics of the experimental ctestsubset instruction.
+ */
+static __inline _Bool
+cheri_is_subset(const void * __capability parent, const void * __capability ptr)
+{
+
+	return (__builtin_cheri_subset_test(parent, ptr));
+}
 
 #ifdef __CHERI_PURE_CAPABILITY__
 
