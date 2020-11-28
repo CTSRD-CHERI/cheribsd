@@ -238,7 +238,7 @@ again:
 	 * And optionally transient bio space.
 	 */
 	if (bio_transient_maxcnt != 0) {
-		size = (long)bio_transient_maxcnt * MAXPHYS;
+		size = (long)bio_transient_maxcnt * maxphys;
 #ifdef __CHERI_PURE_CAPABILITY__
 		size = CHERI_REPRESENTABLE_LENGTH(size);
 #endif
