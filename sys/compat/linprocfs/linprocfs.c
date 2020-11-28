@@ -1930,8 +1930,8 @@ linprocfs_doauxv(PFS_FILL_ARGS)
 		buflen = resid;
 	if (buflen > IOSIZE_MAX)
 		return (EINVAL);
-	if (buflen > MAXPHYS)
-		buflen = MAXPHYS;
+	if (buflen > maxphys)
+		buflen = maxphys;
 	if (resid <= 0)
 		return (0);
 
