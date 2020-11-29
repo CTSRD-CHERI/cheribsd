@@ -93,6 +93,9 @@ void * __capability	_cheri_capability_build_user_rwx(uint32_t perms,
 	_cheri_capability_build_user_rwx(perms, basep, length, off,	\
 	    __func__, __LINE__)
 
+/* Root of all userspace capabilities. */
+extern void * __capability userspace_cap;
+
 /*
  * Global capabilities used to construct other capabilities.
  */
@@ -113,6 +116,15 @@ extern void * __capability swap_restore_cap;
 
 /* Root of all sealed kernel capabilities. */
 extern void * __capability kernel_sealcap;
+
+#ifdef __CHERI_PURE_CAPABILITY__
+/*
+ * Kernel root capability
+ * has all permissions
+ * This spans the whole address-space
+ */
+extern void * __capability cheri_kall_capability;
+#endif
 
 /*
  * Functions to create capabilities used in exec.
@@ -164,3 +176,12 @@ extern u_int	security_cheri_bound_legacy_capabilities;
 #include <machine/cheri.h>
 
 #endif /* _SYS_CHERI_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20200803,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "support"
+//   ]
+// }
+// CHERI CHANGES END

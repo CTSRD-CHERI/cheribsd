@@ -78,11 +78,29 @@ CTASSERT(offsetof(struct thread, td_cheri_mmap_cap) % CHERICAP_SIZE == 0);
 /*
  * Ensure that the compiler being used to build the kernel agrees with the
  * kernel configuration on the size of a capability, and that we are compiling
- * for the hybrid ABI.
+ * for the hybrid or pure ABI.
  */
+#ifndef __CHERI_PURE_CAPABILITY__
 CTASSERT(sizeof(void *) == 8);
+#else
+CTASSERT(sizeof(void *) == 16);
+#endif
 CTASSERT(sizeof(void * __capability) == 16);
 CTASSERT(sizeof(struct cheri_object) == 32);
+
+#ifdef __CHERI_PURE_CAPABILITY__
+/*
+ * Global capabilities for various address-space segments.
+ */
+caddr_t cheri_xkphys_capability = (void *)(intcap_t)-1;
+caddr_t cheri_xkseg_capability = (void *)(intcap_t)-1;
+caddr_t cheri_kseg0_capability = (void *)(intcap_t)-1;
+caddr_t cheri_kseg1_capability = (void *)(intcap_t)-1;
+caddr_t cheri_kseg2_capability = (void *)(intcap_t)-1;
+caddr_t cheri_kcode_capability = (void *)(intcap_t)-1;
+caddr_t cheri_kdata_capability = (void *)(intcap_t)-1;
+void *cheri_kall_capability = (void *)(intcap_t)-1;
+#endif /* __CHERI_PURE_CAPABILITY__ */
 
 /*
  * For now, all we do is declare what we support, as most initialisation took
@@ -112,3 +130,12 @@ cheri_cpu_startup(void)
 }
 SYSINIT(cheri_cpu_startup, SI_SUB_CPU, SI_ORDER_FIRST, cheri_cpu_startup,
     NULL);
+// CHERI CHANGES START
+// {
+//   "updated": 20200429,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "support"
+//   ]
+// }
+// CHERI CHANGES END
