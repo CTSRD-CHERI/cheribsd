@@ -104,4 +104,7 @@ STATCOUNTER_ITEM(tagcachemaster_read_rsp,14,3)
 STATCOUNTER_ITEM(tagcachemaster_read_rsp_flit,14,4)
 STATCOUNTER_ITEM(tagcachemaster_write_rsp,14,5)
 
+struct pmc_mdep *pmc_beri_initialize(void);
+void pmc_beri_finalize(struct pmc_mdep *md);
+
 #endif	/* !_DEV_HWPMC_HWPMC_BERI_H_ */

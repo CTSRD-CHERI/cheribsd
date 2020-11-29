@@ -221,7 +221,6 @@ beri_read_pmc(int cpu, int ri, pmc_value_t *v)
 {
 	uint32_t config;
 	struct pmc *pm;
-	pmc_value_t new;
 	pmc_value_t start_val;
 	pmc_value_t stop_val;
 	pmc_value_t saved_val;
