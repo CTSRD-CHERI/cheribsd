@@ -35,16 +35,16 @@
  * That pointer references the vm_page that is "mapped" by the sf_buf.  The
  * actual mapping is provided by the direct virtual-to-physical mapping.  
  */
-static inline vm_ptr_t
+static inline vm_pointer_t
 sf_buf_kva(struct sf_buf *sf)
 {
 	vm_page_t	m;
-	vm_ptr_t	va;
+	vm_pointer_t	va;
 
 	m = (vm_page_t)sf;
 	va = PHYS_TO_DMAP(VM_PAGE_TO_PHYS(m));
 #ifdef __CHERI_PURE_CAPABILITY__
-	va = (vm_ptr_t)cheri_setboundsexact((void *)va, PAGE_SIZE);
+	va = (vm_pointer_t)cheri_setboundsexact((void *)va, PAGE_SIZE);
 #endif
 	return (va);
 }

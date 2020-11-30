@@ -138,7 +138,7 @@ METHOD int iommu_release {
 METHOD int iommu_enter {
 	device_t dev;
 	struct xdma_iommu *xio;
-	vm_ptr_t va;
+	vm_pointer_t va;
 	vm_offset_t pa;
 };
 
@@ -148,7 +148,7 @@ METHOD int iommu_enter {
 METHOD int iommu_remove {
 	device_t dev;
 	struct xdma_iommu *xio;
-	vm_ptr_t va;
+	vm_pointer_t va;
 };
 # CHERI CHANGES START
 # {

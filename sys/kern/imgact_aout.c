@@ -159,12 +159,12 @@ exec_aout_imgact(struct image_params *imgp)
 	struct vmspace *vmspace;
 	vm_map_t map;
 	vm_object_t object;
-	vm_ptr_t text_end, data_end;
+	vm_pointer_t text_end, data_end;
 	unsigned long virtual_offset;
 	unsigned long file_offset;
 	unsigned long bss_size;
 	int error;
-	vm_ptr_t reservation;
+	vm_pointer_t reservation;
 	vm_size_t reserv_size;
 
 	/*

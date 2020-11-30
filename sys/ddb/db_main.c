@@ -76,7 +76,7 @@ KDB_BACKEND(ddb, db_init, db_trace_self_wrapper, db_trace_thread_wrapper,
  * the symtab and strtab in memory. This is used when loaded from
  * boot loaders different than the native one (like Xen).
  */
-vm_ptr_t ksymtab, kstrtab;
+vm_pointer_t ksymtab, kstrtab;
 vm_offset_t ksymtab_relbase;
 vm_size_t ksymtab_size;
 
@@ -203,7 +203,7 @@ X_db_symbol_values(db_symtab_t *symtab, c_db_sym_t sym, const char **namep,
 }
 
 int
-db_fetch_ksymtab(vm_ptr_t ksym_start, vm_ptr_t ksym_end, vm_offset_t relbase)
+db_fetch_ksymtab(vm_pointer_t ksym_start, vm_pointer_t ksym_end, vm_offset_t relbase)
 {
 	Elf_Size strsz;
 
@@ -221,9 +221,9 @@ db_fetch_ksymtab(vm_ptr_t ksym_start, vm_ptr_t ksym_end, vm_offset_t relbase)
 			    = 0;
 		} else {
 #ifdef __CHERI_PURE_CAPABILITY__
-			ksymtab = (vm_ptr_t)cheri_setbounds((char *)ksymtab,
+			ksymtab = (vm_pointer_t)cheri_setbounds((char *)ksymtab,
 			    ksymtab_size);
-			kstrtab = (vm_ptr_t)cheri_setbounds((char *)kstrtab,
+			kstrtab = (vm_pointer_t)cheri_setbounds((char *)kstrtab,
 			    strsz);
 #endif
 		}

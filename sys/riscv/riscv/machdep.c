@@ -952,7 +952,7 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 }
 
 static void
-init_proc0(vm_ptr_t kstack)
+init_proc0(vm_pointer_t kstack)
 {
 	struct pcpu *pcpup;
 
@@ -972,14 +972,14 @@ init_proc0(vm_ptr_t kstack)
 static void
 try_load_dtb(caddr_t kmdp)
 {
-	vm_ptr_t dtbp;
+	vm_pointer_t dtbp;
 
 	dtbp = MD_FETCH(kmdp, MODINFOMD_DTBP, vm_offset_t);
 #ifdef __CHERI_PURE_CAPABILITY__
-	if (dtbp != (vm_ptr_t)NULL) {
-		dtbp = (vm_ptr_t)cheri_andperm(cheri_setaddress(
+	if (dtbp != (vm_pointer_t)NULL) {
+		dtbp = (vm_pointer_t)cheri_andperm(cheri_setaddress(
 		    cheri_kall_capability, dtbp), CHERI_PERMS_KERNEL_DATA);
-		dtbp = (vm_ptr_t)cheri_setbounds((void *)dtbp,
+		dtbp = (vm_pointer_t)cheri_setbounds((void *)dtbp,
 		    fdt_totalsize((void *)dtbp));
 	}
 #endif
@@ -989,11 +989,11 @@ try_load_dtb(caddr_t kmdp)
 	 * In case the device tree blob was not retrieved (from metadata) try
 	 * to use the statically embedded one.
 	 */
-	if (dtbp == (vm_ptr_t)NULL)
-		dtbp = (vm_ptr_t)&fdt_static_dtb;
+	if (dtbp == (vm_pointer_t)NULL)
+		dtbp = (vm_pointer_t)&fdt_static_dtb;
 #endif
 
-	if (dtbp == (vm_ptr_t)NULL) {
+	if (dtbp == (vm_pointer_t)NULL) {
 		printf("ERROR loading DTB\n");
 		return;
 	}
@@ -1132,7 +1132,7 @@ parse_metadata(void)
 	caddr_t kmdp;
 	vm_offset_t lastaddr;
 #ifdef DDB
-	vm_ptr_t ksym_start, ksym_end;
+	vm_pointer_t ksym_start, ksym_end;
 #endif
 	char *kern_envp;
 

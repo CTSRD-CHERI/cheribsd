@@ -176,7 +176,7 @@ static struct rwlock_padalign __exclusive_cache_line uma_rwlock;
  * First available virual address for boot time allocations.
  */
 static vm_offset_t bootstart;
-static vm_ptr_t bootmem;
+static vm_pointer_t bootmem;
 #ifdef __CHERI_PURE_CAPABILITY__
 /*
  * Boundaries of the UMA boot memory pool.
@@ -290,7 +290,7 @@ enum zfreeskip {
 
 /* Prototypes.. */
 
-void	uma_startup1(vm_ptr_t);
+void	uma_startup1(vm_pointer_t);
 void	uma_startup2(void);
 
 static void *noobj_alloc(uma_zone_t, vm_size_t, int, uint8_t *, int);
@@ -1790,7 +1790,7 @@ pcpu_page_alloc(uma_zone_t zone, vm_size_t bytes, int domain, uint8_t *pflag,
     int wait)
 {
 	struct pglist alloctail;
-	vm_ptr_t addr, zkva;
+	vm_pointer_t addr, zkva;
 	int cpu, flags;
 	vm_page_t p, p_next;
 #ifdef NUMA
@@ -1862,7 +1862,7 @@ noobj_alloc(uma_zone_t zone, vm_size_t bytes, int domain, uint8_t *flags,
 {
 	TAILQ_HEAD(, vm_page) alloctail;
 	u_long npages;
-	vm_ptr_t retkva, zkva;
+	vm_pointer_t retkva, zkva;
 	vm_page_t p, p_next;
 	uma_keg_t keg;
 
@@ -1943,7 +1943,7 @@ page_free(void *mem, vm_size_t size, uint8_t flags)
 	KASSERT((flags & UMA_SLAB_KERNEL) != 0,
 	    ("UMA: page_free used with invalid flags %x", flags));
 
-	kmem_free((vm_ptr_t)mem, size);
+	kmem_free((vm_pointer_t)mem, size);
 }
 
 /*
@@ -2914,7 +2914,7 @@ zone_foreach(void (*zfunc)(uma_zone_t, void *arg), void *arg)
  * allocated but before general KVA is available.
  */
 void
-uma_startup1(vm_ptr_t virtual_avail)
+uma_startup1(vm_pointer_t virtual_avail)
 {
 	struct uma_zctor_args args;
 	size_t ksize, zsize, size;
@@ -3000,7 +3000,7 @@ extern void vm_radix_reserve_kva(void);
 void
 uma_startup2(void)
 {
-	vm_ptr_t bootreserv = bootstart;
+	vm_pointer_t bootreserv = bootstart;
 
 	if (bootstart != bootmem) {
 		vm_map_lock(kernel_map);
@@ -4858,7 +4858,7 @@ int
 uma_zone_reserve_kva(uma_zone_t zone, int count)
 {
 	uma_keg_t keg;
-	vm_ptr_t kva;
+	vm_pointer_t kva;
 	u_int pages;
 
 	KEG_GET(zone, keg);

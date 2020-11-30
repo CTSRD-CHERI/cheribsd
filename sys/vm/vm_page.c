@@ -517,7 +517,7 @@ vm_page_init_page(vm_page_t m, vm_paddr_t pa, int segind)
 
 #ifndef PMAP_HAS_PAGE_ARRAY
 static vm_paddr_t
-vm_page_array_alloc(vm_ptr_t *vaddr, vm_paddr_t end, vm_paddr_t page_range)
+vm_page_array_alloc(vm_pointer_t *vaddr, vm_paddr_t end, vm_paddr_t page_range)
 {
 	vm_paddr_t new_end;
 
@@ -548,8 +548,8 @@ vm_page_array_alloc(vm_ptr_t *vaddr, vm_paddr_t end, vm_paddr_t page_range)
  *	physical pages.  Initializes these structures, and populates the free
  *	page queues.
  */
-vm_ptr_t
-vm_page_startup(vm_ptr_t vaddr)
+vm_pointer_t
+vm_page_startup(vm_pointer_t vaddr)
 {
 	struct vm_phys_seg *seg;
 	vm_page_t m;
@@ -563,7 +563,7 @@ vm_page_startup(vm_ptr_t vaddr)
 #endif
 	int biggestone, i, segind;
 #ifdef WITNESS
-	vm_ptr_t mapped;
+	vm_pointer_t mapped;
 	int witness_size;
 #endif
 #if defined(__i386__) && defined(VM_PHYSSEG_DENSE)

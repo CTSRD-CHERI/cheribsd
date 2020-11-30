@@ -83,7 +83,7 @@ memrw(struct cdev *dev, struct uio *uio, int flags)
 	struct iovec *iov;
 	int error = 0;
 	vm_offset_t va, eva, off, v;
-	vm_ptr_t kva;
+	vm_pointer_t kva;
 	vm_prot_t prot;
 	struct vm_page m;
 	vm_page_t marr;

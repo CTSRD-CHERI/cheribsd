@@ -335,7 +335,7 @@ if_simloop(struct ifnet *ifp, struct mbuf *m, int af, int hlen)
 		if (mtod(m, vm_offset_t) & 3) {
 			KASSERT(hlen >= 3, ("if_simloop: hlen too small"));
 			bcopy(m->m_data,
-			    (char *)(mtod(m, vm_ptr_t)
+			    (char *)(mtod(m, vm_pointer_t)
 				- (mtod(m, vm_offset_t) & 3)),
 			    m->m_len);
 			m->m_data -= (mtod(m,vm_offset_t) & 3);

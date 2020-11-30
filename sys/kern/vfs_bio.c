@@ -1459,9 +1459,9 @@ bpmap_qenter(struct buf *bp)
 	 * bp->b_data is relative to bp->b_offset, but
 	 * bp->b_offset may be offset into the first page.
 	 */
-	bp->b_data = (caddr_t)trunc_page((vm_ptr_t)bp->b_data);
+	bp->b_data = (caddr_t)trunc_page((vm_pointer_t)bp->b_data);
 	pmap_qenter((vm_offset_t)bp->b_data, bp->b_pages, bp->b_npages);
-	bp->b_data = (caddr_t)((vm_ptr_t)bp->b_data |
+	bp->b_data = (caddr_t)((vm_pointer_t)bp->b_data |
 	    (vm_offset_t)(bp->b_offset & PAGE_MASK));
 }
 
@@ -2027,7 +2027,7 @@ bufkva_free(struct buf *bp)
 static int
 bufkva_alloc(struct buf *bp, int maxsize, int gbflags)
 {
-	vm_ptr_t addr;
+	vm_pointer_t addr;
 	int error;
 
 	KASSERT((gbflags & GB_UNMAPPED) == 0 || (gbflags & GB_KVAALLOC) != 0,

@@ -671,7 +671,7 @@ link_elf_load_file(linker_class_t cls, const char *filename,
 	Elf_Shdr *shdr;
 	Elf_Sym *es;
 	int nbytes, i, j;
-	vm_ptr_t mapbase;
+	vm_pointer_t mapbase;
 	size_t mapsize;
 	int error = 0;
 	ssize_t resid;

@@ -79,9 +79,9 @@ struct bus_dma_tag {
 };
 
 struct bounce_page {
-	vm_ptr_t	vaddr;		/* kva of bounce buffer */
+	vm_pointer_t	vaddr;		/* kva of bounce buffer */
 	bus_addr_t	busaddr;	/* Physical address */
-	vm_ptr_t	datavaddr;	/* kva of client data */
+	vm_pointer_t	datavaddr;	/* kva of client data */
 	vm_page_t	datapage;	/* physical page of client data */
 	vm_offset_t	dataoffs;	/* page offset of client data */
 	bus_size_t	datacount;	/* client data count */
@@ -119,7 +119,7 @@ SYSCTL_INT(_hw_busdma, OID_AUTO, total_bpages, CTLFLAG_RD, &total_bpages, 0,
 	   "Total bounce pages");
 
 struct sync_list {
-	vm_ptr_t	vaddr;		/* kva of client data */
+	vm_pointer_t	vaddr;		/* kva of client data */
 	bus_addr_t	paddr;		/* physical address */
 	vm_page_t	pages;		/* starting page of client data */
 	bus_size_t	datacount;	/* client data count */
@@ -150,7 +150,7 @@ static int alloc_bounce_pages(bus_dma_tag_t dmat, u_int numpages);
 static int reserve_bounce_pages(bus_dma_tag_t dmat, bus_dmamap_t map,
     int commit);
 static bus_addr_t add_bounce_page(bus_dma_tag_t dmat, bus_dmamap_t map,
-    vm_ptr_t vaddr, bus_addr_t addr, bus_size_t size);
+    vm_pointer_t vaddr, bus_addr_t addr, bus_size_t size);
 static void free_bounce_page(bus_dma_tag_t dmat, struct bounce_page *bpage);
 int run_filter(bus_dma_tag_t dmat, bus_addr_t paddr);
 static void _bus_dmamap_count_pages(bus_dma_tag_t dmat, bus_dmamap_t map,
@@ -532,7 +532,7 @@ bounce_bus_dmamem_free(bus_dma_tag_t dmat, void *vaddr, bus_dmamap_t map)
 	if ((dmat->bounce_flags & BF_KMEM_ALLOC) == 0)
 		free(vaddr, M_DEVBUF);
 	else
-		kmem_free((vm_ptr_t)vaddr, dmat->common.maxsize);
+		kmem_free((vm_pointer_t)vaddr, dmat->common.maxsize);
 	free(map, M_DEVBUF);
 	dmat->map_count--;
 	CTR3(KTR_BUSDMA, "%s: tag %p flags 0x%x", __func__, dmat,
@@ -570,8 +570,8 @@ static void
 _bus_dmamap_count_pages(bus_dma_tag_t dmat, bus_dmamap_t map, pmap_t pmap,
     void *buf, bus_size_t buflen, int flags)
 {
-	vm_ptr_t vaddr;
-	vm_ptr_t vendaddr;
+	vm_pointer_t vaddr;
+	vm_pointer_t vendaddr;
 	bus_addr_t paddr;
 	bus_size_t sg_len;
 
@@ -586,8 +586,8 @@ _bus_dmamap_count_pages(bus_dma_tag_t dmat, bus_dmamap_t map, pmap_t pmap,
 		 * Count the number of bounce pages
 		 * needed in order to complete this transfer
 		 */
-		vaddr = (vm_ptr_t)buf;
-		vendaddr = (vm_ptr_t)buf + buflen;
+		vaddr = (vm_pointer_t)buf;
+		vendaddr = (vm_pointer_t)buf + buflen;
 
 		while (vaddr < vendaddr) {
 			sg_len = PAGE_SIZE - ((vm_offset_t)vaddr & PAGE_MASK);
@@ -758,7 +758,7 @@ bounce_bus_dmamap_load_buffer(bus_dma_tag_t dmat, bus_dmamap_t map, void *buf,
 	struct sync_list *sl;
 	bus_size_t sgsize, max_sgsize;
 	bus_addr_t curaddr, sl_pend;
-	vm_ptr_t kvaddr, vaddr, sl_vend;
+	vm_pointer_t kvaddr, vaddr, sl_vend;
 	int error;
 
 	if (segs == NULL)
@@ -774,7 +774,7 @@ bounce_bus_dmamap_load_buffer(bus_dma_tag_t dmat, bus_dmamap_t map, void *buf,
 	}
 
 	sl = map->slist + map->sync_count - 1;
-	vaddr = (vm_ptr_t)buf;
+	vaddr = (vm_pointer_t)buf;
 	sl_pend = 0;
 	sl_vend = 0;
 
@@ -907,7 +907,7 @@ dma_dcache_sync(struct sync_list *sl, bus_dmasync_op_t op)
 	uint32_t len, offset;
 	vm_page_t m;
 	vm_paddr_t pa;
-	vm_ptr_t va, tempva;
+	vm_pointer_t va, tempva;
 	bus_size_t size;
 
 	offset = sl->paddr & PAGE_MASK;
@@ -967,7 +967,7 @@ bounce_bus_dmamap_sync(bus_dma_tag_t dmat, bus_dmamap_t map,
 {
 	struct bounce_page *bpage;
 	struct sync_list *sl, *end;
-	vm_ptr_t datavaddr, tempvaddr;
+	vm_pointer_t datavaddr, tempvaddr;
 
 	if (op == BUS_DMASYNC_POSTWRITE)
 		return;
@@ -1174,7 +1174,7 @@ alloc_bounce_pages(bus_dma_tag_t dmat, u_int numpages)
 
 		if (bpage == NULL)
 			break;
-		bpage->vaddr = (vm_ptr_t)contigmalloc(PAGE_SIZE, M_DEVBUF,
+		bpage->vaddr = (vm_pointer_t)contigmalloc(PAGE_SIZE, M_DEVBUF,
 		    M_NOWAIT, 0ul, bz->lowaddr, PAGE_SIZE, 0);
 		if (bpage->vaddr == 0) {
 			free(bpage, M_DEVBUF);
@@ -1213,7 +1213,7 @@ reserve_bounce_pages(bus_dma_tag_t dmat, bus_dmamap_t map, int commit)
 }
 
 static bus_addr_t
-add_bounce_page(bus_dma_tag_t dmat, bus_dmamap_t map, vm_ptr_t vaddr,
+add_bounce_page(bus_dma_tag_t dmat, bus_dmamap_t map, vm_pointer_t vaddr,
 		bus_addr_t addr, bus_size_t size)
 {
 	struct bounce_zone *bz;

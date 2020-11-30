@@ -93,7 +93,7 @@ struct sf_buf {
 	LIST_ENTRY(sf_buf)	list_entry;	/* list of buffers */
 	TAILQ_ENTRY(sf_buf)	free_entry;	/* list of buffers */
 	vm_page_t		m;		/* currently mapped page */
-	vm_ptr_t		kva;		/* va or capabiliy of mapping */
+	vm_pointer_t		kva;		/* va or capabiliy of mapping */
 	int			ref_count;	/* usage of this mapping */
 #if defined(SMP) && defined(SFBUF_CPUSET)
 	cpuset_t		cpumask;	/* where mapping is valid */
@@ -112,11 +112,11 @@ struct sf_buf *sf_buf_alloc(struct vm_page *, int);
 void sf_buf_free(struct sf_buf *);
 void sf_buf_ref(struct sf_buf *);
 
-static inline vm_ptr_t
+static inline vm_pointer_t
 sf_buf_kva(struct sf_buf *sf)
 {
 	if (PMAP_HAS_DMAP)
-		return ((vm_ptr_t)cheri_kern_setbounds(
+		return ((vm_pointer_t)cheri_kern_setbounds(
 		    PHYS_TO_DMAP(VM_PAGE_TO_PHYS((vm_page_t)sf)),
 		    PAGE_SIZE));
 

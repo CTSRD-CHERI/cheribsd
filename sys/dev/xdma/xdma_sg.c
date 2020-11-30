@@ -326,7 +326,7 @@ xchan_seg_done(xdma_channel_t *xchan,
 	struct xdma_request *xr;
 	xdma_controller_t *xdma;
 	struct xchan_buf *b;
-	vm_ptr_t addr;
+	vm_pointer_t addr;
 
 	xdma = xchan->xdma;
 
@@ -494,7 +494,7 @@ _xdma_load_data(xdma_channel_t *xchan, struct xdma_request *xr,
 	struct mbuf *m;
 	uint32_t nsegs;
 	vm_offset_t addr;
-	vm_ptr_t va;
+	vm_pointer_t va;
 	bus_addr_t pa;
 	vm_prot_t prot;
 	xdma_request_addr_t seg_addr;

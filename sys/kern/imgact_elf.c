@@ -540,7 +540,7 @@ __elfN(build_imgact_capability)(struct image_params *imgp,
 	vm_offset_t seg_addr;
 	vm_size_t seg_size;
 	int i, result;
-	vm_ptr_t reservation;
+	vm_pointer_t reservation;
         void * __capability reservation_cap;
 	vm_map_t map;
 

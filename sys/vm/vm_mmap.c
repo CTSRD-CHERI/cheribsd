@@ -150,7 +150,7 @@ cap_covers_pages(const void * __capability cap, size_t size)
 }
 
 static void * __capability
-mmap_retcap(struct thread *td, vm_ptr_t addr,
+mmap_retcap(struct thread *td, vm_pointer_t addr,
     const struct mmap_req *mrp)
 {
 	void * __capability newcap;
@@ -487,7 +487,7 @@ kern_mmap_req(struct thread *td, struct mmap_req *mrp)
 	struct proc *p;
 	off_t pos;
 	vm_offset_t addr_mask = PAGE_MASK;
-	vm_ptr_t addr, orig_addr;
+	vm_pointer_t addr, orig_addr;
 	vm_offset_t max_addr;
 	vm_size_t len, pageoff, size;
 	vm_prot_t cap_maxprot;
@@ -1927,7 +1927,7 @@ vm_mmap_cdev(struct thread *td, vm_size_t objsize, vm_prot_t *protp,
  * character device, or NULL for MAP_ANON.
  */
 int
-vm_mmap(vm_map_t map, vm_ptr_t *addr, vm_size_t size, vm_prot_t prot,
+vm_mmap(vm_map_t map, vm_pointer_t *addr, vm_size_t size, vm_prot_t prot,
 	vm_prot_t maxprot, int flags,
 	objtype_t handle_type, void *handle,
 	vm_ooffset_t foff)
@@ -2036,7 +2036,7 @@ kern_mmap_racct_check(struct thread *td, vm_map_t map, vm_size_t size)
  * map.  Called by mmap for MAP_ANON, vm_mmap, shm_mmap, and vn_mmap.
  */
 int
-vm_mmap_object(vm_map_t map, vm_ptr_t *addr, vm_offset_t max_addr,
+vm_mmap_object(vm_map_t map, vm_pointer_t *addr, vm_offset_t max_addr,
     vm_size_t size, vm_prot_t prot,
     vm_prot_t maxprot, int flags, vm_object_t object, vm_ooffset_t foff,
     boolean_t writecounted, struct thread *td)
@@ -2044,7 +2044,7 @@ vm_mmap_object(vm_map_t map, vm_ptr_t *addr, vm_offset_t max_addr,
 	int docow, error, findspace, rv;
 	bool curmap, fitit, new_reservation;
 	vm_size_t padded_size;
-	vm_ptr_t reservation;
+	vm_pointer_t reservation;
 
 	CHERI_ASSERT_PTRSIZE_BOUNDS(addr);
 

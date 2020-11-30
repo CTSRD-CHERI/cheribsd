@@ -114,7 +114,7 @@ beri_iommu_init(device_t dev, struct xdma_iommu *xio)
 }
 
 static int
-beri_iommu_remove(device_t dev, struct xdma_iommu *xio, vm_ptr_t va)
+beri_iommu_remove(device_t dev, struct xdma_iommu *xio, vm_pointer_t va)
 {
 	struct beri_iommu_softc *sc;
 
@@ -126,7 +126,7 @@ beri_iommu_remove(device_t dev, struct xdma_iommu *xio, vm_ptr_t va)
 }
 
 static int
-beri_iommu_enter(device_t dev, struct xdma_iommu *xio, vm_ptr_t va,
+beri_iommu_enter(device_t dev, struct xdma_iommu *xio, vm_pointer_t va,
     vm_paddr_t pa)
 {
 	struct beri_iommu_softc *sc;

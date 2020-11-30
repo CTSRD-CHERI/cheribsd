@@ -55,7 +55,7 @@ __FBSDID("$FreeBSD$");
 static bool
 stack_addr_ok(struct thread *td, uintptr_t sp, u_register_t stack_pos)
 {
-	vm_ptr_t va = sp + stack_pos;
+	vm_pointer_t va = sp + stack_pos;
 
 	return (va >= td->td_kstack && va + sizeof(uintptr_t) <=
 	    td->td_kstack + td->td_kstack_pages * PAGE_SIZE);

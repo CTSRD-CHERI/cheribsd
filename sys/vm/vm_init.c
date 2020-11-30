@@ -153,12 +153,12 @@ vm_mem_init(void *dummy)
 void
 vm_ksubmap_init(struct kva_md_info *kmi)
 {
-	vm_ptr_t firstaddr;
+	vm_pointer_t firstaddr;
 	caddr_t v;
 	vm_size_t size = 0;
 	long physmem_est;
-	vm_ptr_t minaddr;
-	vm_ptr_t maxaddr;
+	vm_pointer_t minaddr;
+	vm_pointer_t maxaddr;
 
 	/*
 	 * Allocate space for system data structures.

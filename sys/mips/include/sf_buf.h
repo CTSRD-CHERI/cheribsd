@@ -38,17 +38,17 @@
 #include <cheri/cheric.h>
 #endif
 
-static inline vm_ptr_t
+static inline vm_pointer_t
 sf_buf_kva(struct sf_buf *sf)
 {
 	vm_page_t	m;
 
 	m = (vm_page_t)sf;
 #ifdef __CHERI_PURE_CAPABILITY__
-	return ((vm_ptr_t)cheri_setboundsexact(
+	return ((vm_pointer_t)cheri_setboundsexact(
 	    MIPS_PHYS_TO_DIRECT(VM_PAGE_TO_PHYS(m)), PAGE_SIZE));
 #else
-	return ((vm_ptr_t)MIPS_PHYS_TO_DIRECT(VM_PAGE_TO_PHYS(m)));
+	return ((vm_pointer_t)MIPS_PHYS_TO_DIRECT(VM_PAGE_TO_PHYS(m)));
 #endif
 }
 

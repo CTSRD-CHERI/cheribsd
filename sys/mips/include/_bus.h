@@ -45,7 +45,7 @@
  * bus_size_t: size of objects in the bus space.
  *
  * bus_addr_t and bus_offset_t mirror the relationship between
- *  vm_ptr_t and vm_offset_t for host memory.
+ *  vm_pointer_t and vm_offset_t for host memory.
  * Ideally if CHERI will support physical capabilities, bus_addr_t
  * will become void* or uintptr_t.
  */
