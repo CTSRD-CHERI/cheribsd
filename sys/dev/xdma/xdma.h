@@ -95,7 +95,7 @@ struct xchan_buf {
 	bus_dmamap_t			map;
 	uint32_t			nsegs;
 	uint32_t			nsegs_left;
-	vm_ptr_t			vaddr;
+	vm_pointer_t			vaddr;
 	vm_offset_t			paddr;
 	vm_size_t			size;
 };
@@ -303,9 +303,9 @@ struct xdma_request * xchan_bank_get(xdma_channel_t *xchan);
 int xchan_bank_put(xdma_channel_t *xchan, struct xdma_request *xr);
 
 /* IOMMU */
-void xdma_iommu_add_entry(xdma_channel_t *xchan, vm_ptr_t *va,
+void xdma_iommu_add_entry(xdma_channel_t *xchan, vm_pointer_t *va,
     vm_paddr_t pa, vm_size_t size, vm_prot_t prot);
-void xdma_iommu_remove_entry(xdma_channel_t *xchan, vm_ptr_t va);
+void xdma_iommu_remove_entry(xdma_channel_t *xchan, vm_pointer_t va);
 int xdma_iommu_init(struct xdma_iommu *xio);
 int xdma_iommu_release(struct xdma_iommu *xio);
 

@@ -292,7 +292,7 @@ cpu_thread_free(struct thread *td)
 	 * XXX-AM: The ideal solution would be to avoid rederivation altogheter
 	 * and make sure that the kstack cache zone can rebuild the full capability.
 	 */
-	td->td_kstack = (vm_ptr_t)cheri_ptrperm(
+	td->td_kstack = (vm_pointer_t)cheri_ptrperm(
 	    cheri_setaddress(cheri_kall_capability,
 	        cheri_getbase((void *)td->td_kstack)),
 	    td->td_kstack_pages * PAGE_SIZE, CHERI_PERMS_KERNEL_DATA);
@@ -370,9 +370,9 @@ cpu_thread_alloc(struct thread *td)
 	    sizeof(struct pcb);
 
 	td->td_pcb = cheri_setbounds((void *)pcb_base, sizeof(struct pcb));
-	td->td_kstack = (vm_ptr_t)cheri_setbounds(
+	td->td_kstack = (vm_pointer_t)cheri_setbounds(
 	    (void *)td->td_kstack, kstack_size);
-	td->td_kstack = (vm_ptr_t)cheri_andperm((void *)td->td_kstack,
+	td->td_kstack = (vm_pointer_t)cheri_andperm((void *)td->td_kstack,
 	    CHERI_PERMS_KERNEL_DATA);
 #endif
 	td->td_frame = &td->td_pcb->pcb_regs;

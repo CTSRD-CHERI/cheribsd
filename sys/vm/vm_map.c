@@ -135,8 +135,8 @@ static uma_zone_t mapentzone;
 static uma_zone_t kmapentzone;
 static uma_zone_t vmspace_zone;
 static int vmspace_zinit(void *mem, int size, int flags);
-static void _vm_map_init(vm_map_t map, pmap_t pmap, vm_ptr_t min,
-    vm_ptr_t max);
+static void _vm_map_init(vm_map_t map, pmap_t pmap, vm_pointer_t min,
+    vm_pointer_t max);
 static void vm_map_entry_deallocate(vm_map_entry_t entry, boolean_t system_map);
 static void vm_map_entry_dispose(vm_map_t map, vm_map_entry_t entry);
 static void vm_map_entry_unwire(vm_map_t map, vm_map_entry_t entry);
@@ -147,7 +147,7 @@ static void vm_map_pmap_enter(vm_map_t map, vm_offset_t addr, vm_prot_t prot,
 #ifdef INVARIANTS
 static void vmspace_zdtor(void *mem, int size, void *arg);
 #endif
-static int vm_map_stack_locked(vm_map_t map, vm_ptr_t addrbos,
+static int vm_map_stack_locked(vm_map_t map, vm_pointer_t addrbos,
     vm_size_t max_ssize, vm_size_t growsize, vm_prot_t prot, vm_prot_t max,
     int cow);
 static void vm_map_wire_entry_failure(vm_map_t map, vm_map_entry_t entry,
@@ -375,7 +375,7 @@ vmspace_zdtor(void *mem, int size, void *arg)
  * and initialize those structures.  The refcnt is set to 1.
  */
 struct vmspace *
-vmspace_alloc(vm_ptr_t min, vm_ptr_t max, pmap_pinit_t pinit)
+vmspace_alloc(vm_pointer_t min, vm_pointer_t max, pmap_pinit_t pinit)
 {
 	struct vmspace *vm;
 
@@ -971,7 +971,7 @@ vmspace_resident_count(struct vmspace *vmspace)
  * such as that in the vmspace structure.
  */
 static void
-_vm_map_init(vm_map_t map, pmap_t pmap, vm_ptr_t min, vm_ptr_t max)
+_vm_map_init(vm_map_t map, pmap_t pmap, vm_pointer_t min, vm_pointer_t max)
 {
 	CHERI_ASSERT_VALID(min);
 	CHERI_ASSERT_VALID(max);
@@ -1005,7 +1005,7 @@ _vm_map_init(vm_map_t map, pmap_t pmap, vm_ptr_t min, vm_ptr_t max)
 }
 
 void
-vm_map_init(vm_map_t map, pmap_t pmap, vm_ptr_t min, vm_ptr_t max)
+vm_map_init(vm_map_t map, pmap_t pmap, vm_pointer_t min, vm_pointer_t max)
 {
 
 	_vm_map_init(map, pmap, min, max);
@@ -1726,7 +1726,7 @@ vm_map_lookup_entry(
  */
 int
 vm_map_insert(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
-    vm_ptr_t start, vm_ptr_t end, vm_prot_t prot, vm_prot_t max, int cow,
+    vm_pointer_t start, vm_pointer_t end, vm_prot_t prot, vm_prot_t max, int cow,
     vm_offset_t reservation)
 {
 	vm_map_entry_t new_entry, next_entry, prev_entry;
@@ -2101,11 +2101,11 @@ vm_map_findspace(vm_map_t map, vm_offset_t start, vm_size_t length)
  */
 int
 vm_map_fixed(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
-    vm_ptr_t start, vm_size_t length, vm_prot_t prot,
+    vm_pointer_t start, vm_size_t length, vm_prot_t prot,
     vm_prot_t max, int cow)
 {
 	vm_map_entry_t entry, next_entry;
-	vm_ptr_t end, reservation;
+	vm_pointer_t end, reservation;
 	int result;
 
 #ifdef __CHERI_PURE_CAPABILITY__
@@ -2184,7 +2184,7 @@ SYSCTL_INT(_vm, OID_AUTO, cluster_anon, CTLFLAG_RW,
     "Cluster anonymous mappings: 0 = no, 1 = yes if no hint, 2 = always");
 
 static bool
-clustering_anon_allowed(vm_ptr_t addr)
+clustering_anon_allowed(vm_pointer_t addr)
 {
 
 	switch (cluster_anon) {
@@ -2303,14 +2303,14 @@ vm_map_find_aligned(vm_map_t map, vm_offset_t *addr, vm_size_t length,
  */
 int
 vm_map_find(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
-	    vm_ptr_t *addr,	/* IN/OUT */
+	    vm_pointer_t *addr,	/* IN/OUT */
 	    vm_size_t length, vm_offset_t max_addr, int find_space,
 	    vm_prot_t prot, vm_prot_t max, int cow)
 {
 	vm_offset_t alignment, curr_min_addr, min_addr, vaddr;
 	int gap, pidx, rv, try;
 	bool cluster, en_aslr, update_anon;
-	vm_ptr_t reservation;
+	vm_pointer_t reservation;
 	const vm_size_t unpadded_length = length;
 
 	KASSERT((cow & (MAP_STACK_GROWS_DOWN | MAP_STACK_GROWS_UP)) == 0 ||
@@ -2500,11 +2500,11 @@ done:
  */
 int
 vm_map_find_min(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
-    vm_ptr_t *addr, vm_size_t length, vm_offset_t min_addr,
+    vm_pointer_t *addr, vm_size_t length, vm_offset_t min_addr,
     vm_offset_t max_addr, int find_space, vm_prot_t prot, vm_prot_t max,
     int cow)
 {
-	vm_ptr_t hint;
+	vm_pointer_t hint;
 	int rv;
 
 	hint = *addr;
@@ -2815,8 +2815,8 @@ vm_map_clip_end(vm_map_t map, vm_map_entry_t entry, vm_offset_t endaddr)
 int
 vm_map_submap(
 	vm_map_t map,
-	vm_ptr_t start,
-	vm_ptr_t end,
+	vm_pointer_t start,
+	vm_pointer_t end,
 	vm_map_t submap)
 {
 	vm_map_entry_t entry;
@@ -4708,8 +4708,8 @@ vmspace_fork(struct vmspace *vm1, vm_ooffset_t *fork_charge)
 	    pmap_pinit);
 #else
 	vm2 = vmspace_alloc(
-	    (vm_ptr_t)cheri_setaddress(old_map->map_capability, vm_map_min(old_map)),
-	    (vm_ptr_t)cheri_setaddress(old_map->map_capability, vm_map_max(old_map)),
+	    (vm_pointer_t)cheri_setaddress(old_map->map_capability, vm_map_min(old_map)),
+	    (vm_pointer_t)cheri_setaddress(old_map->map_capability, vm_map_max(old_map)),
 	    pmap_pinit);
 #endif
 
@@ -4916,7 +4916,7 @@ vmspace_fork(struct vmspace *vm1, vm_ooffset_t *fork_charge)
  * asked to wire the newly created stack.
  */
 int
-vm_map_stack(vm_map_t map, vm_ptr_t addrbos, vm_size_t max_ssize,
+vm_map_stack(vm_map_t map, vm_pointer_t addrbos, vm_size_t max_ssize,
     vm_prot_t prot, vm_prot_t max, int cow)
 {
 	vm_size_t growsize, init_ssize;
@@ -4952,11 +4952,11 @@ SYSCTL_INT(_security_bsd, OID_AUTO, stack_guard_page, CTLFLAG_RWTUN,
  * the stack address must also be a valid capability.
  */
 static int
-vm_map_stack_locked(vm_map_t map, vm_ptr_t addrbos, vm_size_t max_ssize,
+vm_map_stack_locked(vm_map_t map, vm_pointer_t addrbos, vm_size_t max_ssize,
     vm_size_t growsize, vm_prot_t prot, vm_prot_t max, int cow)
 {
 	vm_map_entry_t new_entry, prev_entry;
-	vm_ptr_t bot, gap_bot, gap_top, top;
+	vm_pointer_t bot, gap_bot, gap_top, top;
 	vm_size_t init_ssize, sgp;
 	int orient, rv;
 
@@ -5074,12 +5074,12 @@ vm_map_growstack(vm_map_t map, vm_offset_t addr, vm_map_entry_t gap_entry)
 	struct proc *p;
 	struct vmspace *vm;
 	struct ucred *cred;
-	vm_ptr_t gap_end, gap_start, grow_start;
+	vm_pointer_t gap_end, gap_start, grow_start;
 	vm_size_t grow_amount, guard, max_grow;
 	rlim_t lmemlim, stacklim, vmemlim;
 	int rv, rv1;
 	bool gap_deleted, grow_down, is_procstack;
-	vm_ptr_t stack_reservation;
+	vm_pointer_t stack_reservation;
 #ifdef notyet
 	uint64_t limit;
 #endif
@@ -5234,12 +5234,12 @@ retry:
 		    stack_entry->end - gap_entry->start,
 		    stack_entry->max_protection);
 
-		grow_start = (vm_ptr_t)cheri_kern_setaddress(
+		grow_start = (vm_pointer_t)cheri_kern_setaddress(
 		    stack_reservation, gap_entry->end - grow_amount);
 		if (gap_entry->start + grow_amount == gap_entry->end) {
-			gap_start = (vm_ptr_t)cheri_kern_setaddress(
+			gap_start = (vm_pointer_t)cheri_kern_setaddress(
 			    stack_reservation, gap_entry->start);
-			gap_end = (vm_ptr_t)cheri_kern_setaddress(
+			gap_end = (vm_pointer_t)cheri_kern_setaddress(
 			    stack_reservation, gap_entry->end);
 			vm_map_entry_delete(map, gap_entry);
 			gap_deleted = true;
@@ -5276,7 +5276,7 @@ retry:
 		stack_reservation = vm_map_buildcap(map, stack_entry->start,
 		    gap_entry->end - stack_entry->start,
 		    stack_entry->max_protection);
-		grow_start = (vm_ptr_t)cheri_kern_setaddress(
+		grow_start = (vm_pointer_t)cheri_kern_setaddress(
 		    stack_reservation, stack_entry->end);
 		cred = stack_entry->cred;
 		if (cred == NULL && stack_entry->object.vm_object != NULL)
@@ -5346,8 +5346,8 @@ vmspace_exec(struct proc *p, vm_offset_t minuser, vm_offset_t maxuser)
 	struct vmspace *newvmspace;
 #ifdef __CHERI_PURE_CAPABILITY__
 	vm_offset_t padded_minuser;
-	vm_ptr_t minuser_cap;
-	vm_ptr_t maxuser_cap;
+	vm_pointer_t minuser_cap;
+	vm_pointer_t maxuser_cap;
 	vm_offset_t user_length;
 #endif
 
@@ -5370,10 +5370,10 @@ vmspace_exec(struct proc *p, vm_offset_t minuser, vm_offset_t maxuser)
 	    ("Unrepresentable length for new vmspace"));
 
 	user_length = CHERI_REPRESENTABLE_LENGTH(user_length);
-	minuser_cap = (vm_ptr_t)cheri_capability_build_user_rwx(
+	minuser_cap = (vm_pointer_t)cheri_capability_build_user_rwx(
 	    CHERI_CAP_USER_CODE_PERMS | CHERI_CAP_USER_DATA_PERMS,
 	    padded_minuser, user_length, minuser);
-	maxuser_cap = (vm_ptr_t)cheri_setaddress((void *)minuser_cap, maxuser);
+	maxuser_cap = (vm_pointer_t)cheri_setaddress((void *)minuser_cap, maxuser);
 	newvmspace = vmspace_alloc(minuser_cap, maxuser_cap, pmap_pinit);
 #else
 	newvmspace = vmspace_alloc(minuser, maxuser, pmap_pinit);
@@ -5784,7 +5784,7 @@ vm_map_prot2perms(vm_prot_t prot)
  * Create a capability for the given map, derived from the map root
  * capability.
  */
-vm_ptr_t
+vm_pointer_t
 _vm_map_buildcap(vm_map_t map, vm_offset_t addr, vm_size_t length,
     vm_prot_t prot)
 {
@@ -5794,7 +5794,7 @@ _vm_map_buildcap(vm_map_t map, vm_offset_t addr, vm_size_t length,
 	retcap = cheri_setbounds(cheri_setaddress(vm_map_rootcap(map),
 	    addr), length);
 
-	return ((vm_ptr_t)cheri_andperm(retcap, perms));
+	return ((vm_pointer_t)cheri_andperm(retcap, perms));
 }
 #endif /* __CHERI_PURE_CAPABILITY__ */
 #endif /* has_feature(capabilities) */
@@ -5832,7 +5832,7 @@ vm_map_reservation_insert(vm_map_t map, vm_offset_t addr, vm_size_t length,
  * length must be representable.
  */
 int
-vm_map_reservation_create_locked(vm_map_t map, vm_ptr_t *addr,
+vm_map_reservation_create_locked(vm_map_t map, vm_pointer_t *addr,
     vm_size_t length, vm_prot_t max_prot)
 {
 	vm_offset_t start = *addr;
@@ -5882,12 +5882,12 @@ vm_map_reservation_create_locked(vm_map_t map, vm_ptr_t *addr,
  * ensure CHERI exact representability.
  */
 int
-vm_map_reservation_create(vm_map_t map, vm_ptr_t *addr, vm_size_t length,
+vm_map_reservation_create(vm_map_t map, vm_pointer_t *addr, vm_size_t length,
     vm_offset_t alignment, vm_prot_t max_prot)
 {
 	int result;
 	vm_size_t padded_length = CHERI_REPRESENTABLE_LENGTH(length);
-	vm_ptr_t start = *addr;
+	vm_pointer_t start = *addr;
 
 	if ((map->flags & MAP_RESERVATIONS) == 0) {
 		*addr = vm_map_buildcap(map, start, length, max_prot);
@@ -5922,14 +5922,14 @@ vm_map_reservation_create(vm_map_t map, vm_ptr_t *addr, vm_size_t length,
  * hint address.
  */
 int
-vm_map_reservation_create_fixed(vm_map_t map, vm_ptr_t *addr, vm_size_t length,
+vm_map_reservation_create_fixed(vm_map_t map, vm_pointer_t *addr, vm_size_t length,
     vm_offset_t alignment, vm_prot_t max_prot)
 {
 	int result;
 	vm_size_t padded_length;
 	vm_offset_t hint_addr = *addr;
 	vm_offset_t hint_offset = 0;
-	vm_ptr_t rounded_addr;
+	vm_pointer_t rounded_addr;
 	vm_offset_t hint_align;
 
 	if ((map->flags & MAP_RESERVATIONS) == 0) {

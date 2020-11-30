@@ -252,9 +252,9 @@ typedef	struct cap_rights	cap_rights_t;
 #endif
 
 #ifdef __CHERI_PURE_CAPABILITY__
-typedef __uintptr_t	vm_ptr_t;
+typedef __uintptr_t	vm_pointer_t;
 #else
-typedef __vm_offset_t	vm_ptr_t;
+typedef __vm_offset_t	vm_pointer_t;
 #endif
 
 /*

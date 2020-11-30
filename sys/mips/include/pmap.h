@@ -167,8 +167,8 @@ struct pv_chunk {
  */
 extern vm_paddr_t physmem_desc[PHYS_AVAIL_COUNT];
 
-extern vm_ptr_t virtual_avail;
-extern vm_ptr_t virtual_end;
+extern vm_pointer_t virtual_avail;
+extern vm_pointer_t virtual_end;
 
 #define	pmap_page_get_memattr(m) (((m)->md.pv_flags & PV_MEMATTR_MASK) >> PV_MEMATTR_SHIFT)
 #define	pmap_page_is_write_mapped(m)	(((m)->a.flags & PGA_WRITEABLE) != 0)
@@ -178,7 +178,7 @@ void *pmap_mapdev(vm_paddr_t, vm_size_t);
 boolean_t pmap_page_is_mapped(vm_page_t m);
 void *pmap_mapdev_attr(vm_paddr_t, vm_size_t, vm_memattr_t);
 void pmap_unmapdev(vm_offset_t, vm_size_t);
-vm_ptr_t pmap_steal_memory(vm_size_t size);
+vm_pointer_t pmap_steal_memory(vm_size_t size);
 void pmap_kenter(vm_offset_t va, vm_paddr_t pa);
 void pmap_kenter_attr(vm_offset_t va, vm_paddr_t pa, vm_memattr_t attr);
 void pmap_kenter_device(vm_offset_t, vm_size_t, vm_paddr_t);

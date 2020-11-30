@@ -62,7 +62,7 @@ uiomove_fromphys(vm_page_t ma[], vm_offset_t offset, int n, struct uio *uio)
 	struct iovec *iov;
 	void *cp;
 	vm_offset_t page_offset;
-	vm_ptr_t vaddr;
+	vm_pointer_t vaddr;
 	size_t cnt;
 	int error = 0;
 	int save = 0;

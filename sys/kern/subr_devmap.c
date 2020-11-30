@@ -242,7 +242,7 @@ devmap_ptov(vm_paddr_t pa, vm_size_t size)
  * corresponding physical address, or DEVMAP_PADDR_NOTFOUND if not found.
  */
 vm_paddr_t
-devmap_vtop(vm_ptr_t va, vm_size_t size)
+devmap_vtop(vm_pointer_t va, vm_size_t size)
 {
 	const struct devmap_entry *pd;
 
@@ -271,7 +271,7 @@ devmap_vtop(vm_ptr_t va, vm_size_t size)
 void *
 pmap_mapdev(vm_offset_t pa, vm_size_t size)
 {
-	vm_ptr_t va;
+	vm_pointer_t va;
 	vm_offset_t offset;
 	void * rva;
 
@@ -287,13 +287,13 @@ pmap_mapdev(vm_offset_t pa, vm_size_t size)
 	if (early_boot) {
 #ifdef __CHERI_PURE_CAPABILITY__
 #ifdef INVARIANTS
-		vm_ptr_t oldva = akva_devmap_vaddr;
+		vm_pointer_t oldva = akva_devmap_vaddr;
 #endif
 		akva_devmap_vaddr -= CHERI_REPRESENTABLE_LENGTH(size);
 		akva_devmap_vaddr = CHERI_REPRESENTABLE_BASE(akva_devmap_vaddr,
 		    size);
 		akva_devmap_vaddr = trunc_page(akva_devmap_vaddr);
-		va = (vm_ptr_t)cheri_setbounds(cheri_setaddress(
+		va = (vm_pointer_t)cheri_setbounds(cheri_setaddress(
 		    devmap_capability, akva_devmap_vaddr), size);
 		KASSERT(va + cheri_getlen((void *)va) <= oldva,
 		    ("%s: early devmap overlaps", __func__));
@@ -349,7 +349,7 @@ pmap_mapdev_attr(vm_offset_t pa, vm_size_t size, vm_memattr_t ma)
  * Unmap device memory and free the kva space.
  */
 void
-pmap_unmapdev(vm_ptr_t va, vm_size_t size)
+pmap_unmapdev(vm_pointer_t va, vm_size_t size)
 {
 	vm_offset_t offset;
 

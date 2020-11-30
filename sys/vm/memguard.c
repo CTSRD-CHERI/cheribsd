@@ -289,7 +289,7 @@ v2sizev(vm_offset_t va)
 void *
 memguard_alloc(unsigned long req_size, int flags)
 {
-	vm_ptr_t addr, origaddr;
+	vm_pointer_t addr, origaddr;
 	u_long size_p, size_v;
 	int do_guard, error, rv;
 
@@ -328,7 +328,7 @@ memguard_alloc(unsigned long req_size, int flags)
 	    &origaddr);
 	if (error != 0) {
 		memguard_fail_kva++;
-		addr = (vm_ptr_t)NULL;
+		addr = (vm_pointer_t)NULL;
 		goto out;
 	}
 	addr = origaddr;
@@ -338,7 +338,7 @@ memguard_alloc(unsigned long req_size, int flags)
 	if (rv != KERN_SUCCESS) {
 		vmem_xfree(memguard_arena, origaddr, size_v);
 		memguard_fail_pgs++;
-		addr = (vm_ptr_t)NULL;
+		addr = (vm_pointer_t)NULL;
 		goto out;
 	}
 	*v2sizep(trunc_page(addr)) = req_size;
@@ -374,7 +374,7 @@ is_memguard_addr(void *addr)
 void
 memguard_free(void *ptr)
 {
-	vm_ptr_t addr;
+	vm_pointer_t addr;
 	u_long req_size, size, sizev;
 	char *temp;
 	int i;

@@ -311,7 +311,7 @@ smp_after_idle_runnable(void *arg __unused)
 			pc = pcpu_find(cpu);
 			while (atomic_load_ptr(&pc->pc_curpcb) == NULL)
 				cpu_spinwait();
-			kmem_free((vm_ptr_t)bootstacks[cpu], PAGE_SIZE);
+			kmem_free((vm_pointer_t)bootstacks[cpu], PAGE_SIZE);
 		}
 	}
 }

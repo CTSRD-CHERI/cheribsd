@@ -1956,7 +1956,7 @@ devfs_write_f(struct file *fp, struct uio *uio, struct ucred *cred,
 }
 
 static int
-devfs_mmap_f(struct file *fp, vm_map_t map, vm_ptr_t *addr,
+devfs_mmap_f(struct file *fp, vm_map_t map, vm_pointer_t *addr,
     vm_offset_t max_addr, vm_size_t size, vm_prot_t prot,
     vm_prot_t cap_maxprot, int flags, vm_ooffset_t foff,
     struct thread *td)

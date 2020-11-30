@@ -147,7 +147,7 @@ boolean_t	 pmap_is_modified(vm_page_t m);
 boolean_t	 pmap_is_prefaultable(pmap_t pmap, vm_offset_t va);
 boolean_t	 pmap_is_referenced(vm_page_t m);
 boolean_t	 pmap_is_valid_memattr(pmap_t, vm_memattr_t);
-vm_ptr_t	 pmap_map(vm_ptr_t *, vm_paddr_t, vm_paddr_t, int);
+vm_pointer_t	 pmap_map(vm_pointer_t *, vm_paddr_t, vm_paddr_t, int);
 int		 pmap_mincore(pmap_t pmap, vm_offset_t addr,
 		    vm_paddr_t *pap);
 void		 pmap_object_init_pt(pmap_t pmap, vm_offset_t addr,
@@ -160,7 +160,7 @@ void		 pmap_pinit0(pmap_t);
 void		 pmap_protect(pmap_t, vm_offset_t, vm_offset_t, vm_prot_t);
 void		 pmap_qenter(vm_offset_t, vm_page_t *, int);
 void		 pmap_qremove(vm_offset_t, int);
-vm_ptr_t	 pmap_quick_enter_page(vm_page_t);
+vm_pointer_t	 pmap_quick_enter_page(vm_page_t);
 void		 pmap_quick_remove_page(vm_offset_t);
 void		 pmap_release(pmap_t);
 void		 pmap_remove(pmap_t, vm_offset_t, vm_offset_t);

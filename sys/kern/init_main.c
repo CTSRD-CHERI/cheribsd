@@ -646,8 +646,8 @@ proc0_init(void *dummy __unused)
 	minuser_cap = cheri_andperm(minuser_cap, 0);
 
 	vm_map_init(&vmspace0.vm_map, vmspace_pmap(&vmspace0),
-	    (vm_ptr_t)minuser_cap,
-	    (vm_ptr_t)minuser_cap + cheri_getlen(minuser_cap));
+	    (vm_pointer_t)minuser_cap,
+	    (vm_pointer_t)minuser_cap + cheri_getlen(minuser_cap));
 #endif
 
 	/*

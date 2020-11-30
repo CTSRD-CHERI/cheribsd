@@ -136,8 +136,8 @@ extern struct pmap	kernel_pmap_store;
 #define	PMAP_TRYLOCK(pmap)	mtx_trylock(&(pmap)->pm_mtx)
 #define	PMAP_UNLOCK(pmap)	mtx_unlock(&(pmap)->pm_mtx)
 
-extern vm_ptr_t virtual_avail;
-extern vm_ptr_t virtual_end;
+extern vm_pointer_t virtual_avail;
+extern vm_pointer_t virtual_end;
 
 /*
  * Macros to test if a mapping is mappable with an L1 Section mapping
@@ -150,7 +150,7 @@ struct thread;
 
 void	pmap_activate_boot(pmap_t);
 void	pmap_activate_sw(struct thread *);
-void	pmap_bootstrap(vm_ptr_t, vm_paddr_t, vm_size_t);
+void	pmap_bootstrap(vm_pointer_t, vm_paddr_t, vm_size_t);
 void	pmap_kenter_device(vm_offset_t, vm_size_t, vm_paddr_t);
 vm_paddr_t pmap_kextract(vm_offset_t va);
 void	pmap_kremove(vm_offset_t);
@@ -160,11 +160,11 @@ bool	pmap_ps_enabled(pmap_t);
 
 void	*pmap_mapdev(vm_offset_t, vm_size_t);
 void	*pmap_mapbios(vm_paddr_t, vm_size_t);
-void	pmap_unmapdev(vm_ptr_t, vm_size_t);
-void	pmap_unmapbios(vm_ptr_t, vm_size_t);
+void	pmap_unmapdev(vm_pointer_t, vm_size_t);
+void	pmap_unmapbios(vm_pointer_t, vm_size_t);
 
-boolean_t pmap_map_io_transient(vm_page_t *, vm_ptr_t *, int, boolean_t);
-void	pmap_unmap_io_transient(vm_page_t *, vm_ptr_t *, int, boolean_t);
+boolean_t pmap_map_io_transient(vm_page_t *, vm_pointer_t *, int, boolean_t);
+void	pmap_unmap_io_transient(vm_page_t *, vm_pointer_t *, int, boolean_t);
 
 bool	pmap_get_tables(pmap_t, vm_offset_t, pd_entry_t **, pd_entry_t **,
     pt_entry_t **);

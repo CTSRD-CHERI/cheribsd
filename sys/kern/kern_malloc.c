@@ -509,7 +509,7 @@ void
 contigfree(void *addr, unsigned long size, struct malloc_type *type)
 {
 	CHERI_ASSERT_VALID(addr);
-	kmem_free((vm_ptr_t)addr, size);
+	kmem_free((vm_pointer_t)addr, size);
 	malloc_type_freed(type, addr, round_page(size));
 }
 
@@ -603,7 +603,7 @@ static caddr_t __noinline
 malloc_large(size_t *size, struct malloc_type *mtp, struct domainset *policy,
     int flags DEBUG_REDZONE_ARG_DEF)
 {
-	vm_ptr_t kva;
+	vm_pointer_t kva;
 	caddr_t va;
 	size_t sz;
 
@@ -633,7 +633,7 @@ static void
 free_large(void *addr, size_t size)
 {
 
-	kmem_free((vm_ptr_t)addr, size);
+	kmem_free((vm_pointer_t)addr, size);
 	uma_total_dec(size);
 }
 

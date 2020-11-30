@@ -1427,7 +1427,7 @@ vm_reserv_size(int level)
  * management system's data structures, in particular, the reservation array.
  */
 vm_paddr_t
-vm_reserv_startup(vm_ptr_t *vaddr, vm_paddr_t end)
+vm_reserv_startup(vm_pointer_t *vaddr, vm_paddr_t end)
 {
 	vm_paddr_t new_end;
 	vm_pindex_t count;

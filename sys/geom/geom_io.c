@@ -745,7 +745,7 @@ SYSCTL_INT(_kern_geom, OID_AUTO, inflight_transient_maps, CTLFLAG_RD,
 static int
 g_io_transient_map_bio(struct bio *bp)
 {
-	vm_ptr_t addr;
+	vm_pointer_t addr;
 	long size;
 	u_int retried;
 

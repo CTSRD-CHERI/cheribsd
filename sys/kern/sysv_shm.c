@@ -432,7 +432,7 @@ kern_shmat_locked(struct thread *td, int shmid,
 	struct shmid_kernel *shmseg;
 	struct shmmap_state *shmmap_s;
 	vm_offset_t attach_va = 0, max_va;
-	vm_ptr_t attach_addr;
+	vm_pointer_t attach_addr;
 	vm_prot_t prot;
 	vm_size_t size;
 	int cow, error, find_space, i, rv;

@@ -125,7 +125,7 @@ typedef enum {
 struct kcov_info {
 	struct thread	*thread;	/* (l) */
 	vm_object_t	bufobj;		/* (o) */
-	vm_ptr_t	kvaddr;		/* (o) */
+	vm_pointer_t	kvaddr;		/* (o) */
 	size_t		entries;	/* (o) */
 	size_t		bufsize;	/* (o) */
 	kcov_state_t	state;		/* (s) */
@@ -391,7 +391,7 @@ kcov_alloc(struct kcov_info *info, size_t entries)
 	}
 	VM_OBJECT_WUNLOCK(info->bufobj);
 #ifdef __CHERI_PURE_CAPABILITY__
-	info->kvaddr = (vm_ptr_t)cheri_setbounds(
+	info->kvaddr = (vm_pointer_t)cheri_setbounds(
 	    MIPS_PHYS_TO_DIRECT(VM_PAGE_TO_PHYS(m)), info->bufsize);
 #else
 	info->kvaddr = MIPS_PHYS_TO_DIRECT(VM_PAGE_TO_PHYS(m));

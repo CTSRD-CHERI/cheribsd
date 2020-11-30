@@ -1430,7 +1430,7 @@ out:
 }
 
 static int
-shm_mmap_large(struct shmfd *shmfd, vm_map_t map, vm_ptr_t *addr,
+shm_mmap_large(struct shmfd *shmfd, vm_map_t map, vm_pointer_t *addr,
     vm_offset_t maxaddr,
     vm_size_t size, vm_prot_t prot, vm_prot_t max_prot, int flags,
     vm_ooffset_t foff, struct thread *td)
@@ -1439,7 +1439,7 @@ shm_mmap_large(struct shmfd *shmfd, vm_map_t map, vm_ptr_t *addr,
 	vm_offset_t align, mask, vaddr;
 	int docow, error, rv, try;
 	bool curmap;
-	vm_ptr_t reservation;
+	vm_pointer_t reservation;
 	bool new_reservation;
 
 	if (shmfd->shm_lp_psind == 0)
@@ -1563,7 +1563,7 @@ fail:
 }
 
 int
-shm_mmap(struct file *fp, vm_map_t map, vm_ptr_t *addr,
+shm_mmap(struct file *fp, vm_map_t map, vm_pointer_t *addr,
     vm_offset_t max_addr, vm_size_t objsize,
     vm_prot_t prot, vm_prot_t cap_maxprot, int flags,
     vm_ooffset_t foff, struct thread *td)
@@ -1726,7 +1726,7 @@ int
 shm_map(struct file *fp, size_t size, off_t offset, void **memp)
 {
 	struct shmfd *shmfd;
-	vm_ptr_t kva;
+	vm_pointer_t kva;
 	vm_offset_t ofs;
 	vm_object_t obj;
 	int rv;

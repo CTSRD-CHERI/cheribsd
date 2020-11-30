@@ -94,7 +94,7 @@ struct axidma_channel {
 
 	vm_size_t		mem_size;
 	vmem_addr_t		mem_paddr;
-	vm_ptr_t		mem_vaddr;
+	vm_pointer_t		mem_vaddr;
 
 	uint32_t		descs_used_count;
 };

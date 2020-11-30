@@ -124,7 +124,7 @@ SYSCTL_INT(_hw, OID_AUTO, clockrate, CTLFLAG_RD,
     &cpu_clock, 0, "CPU instruction clock rate");
 int clocks_running = 0;
 
-vm_ptr_t kstack0;
+vm_pointer_t kstack0;
 
 /*
  * Each entry in the pcpu_space[] array is laid out in the following manner:
@@ -325,7 +325,7 @@ mips_proc0_init(void)
 	thread0.td_pcb = cheri_setbounds((struct pcb *)(thread0.td_kstack +
 		thread0.td_kstack_pages * PAGE_SIZE) - 1,
 		sizeof(struct pcb));
-	thread0.td_kstack = (vm_ptr_t) cheri_setbounds((void *)thread0.td_kstack,
+	thread0.td_kstack = (vm_pointer_t) cheri_setbounds((void *)thread0.td_kstack,
 		thread0.td_kstack_pages * PAGE_SIZE - sizeof(struct pcb));
 #endif /* __CHERI_PURE_CAPABILITY__ */
 	thread0.td_frame = &thread0.td_pcb->pcb_regs;
@@ -476,8 +476,8 @@ mips_postboot_fixup(void)
 #ifdef DDB
 	Elf_Size *trampoline_data = (Elf_Size*)kernel_kseg0_end;
 	Elf_Size symtabsize = 0;
-	vm_ptr_t ksym_start;
-	vm_ptr_t ksym_end;
+	vm_pointer_t ksym_start;
+	vm_pointer_t ksym_end;
 
 	if (trampoline_data[0] == SYMTAB_MAGIC) {
 		symtabsize = trampoline_data[1];

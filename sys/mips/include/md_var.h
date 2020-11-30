@@ -55,7 +55,7 @@ extern	char	freebsd64_sigcode[];
 extern	int	freebsd64_szsigcode;
 #endif
 
-extern vm_ptr_t kstack0;
+extern vm_pointer_t kstack0;
 extern vm_offset_t kernel_kseg0_end;
 
 uint32_t MipsFPID(void);

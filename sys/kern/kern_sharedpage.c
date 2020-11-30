@@ -117,7 +117,7 @@ static void
 shared_page_init(void *dummy __unused)
 {
 	vm_page_t m;
-	vm_ptr_t addr;
+	vm_pointer_t addr;
 
 	sx_init(&shared_page_alloc_sx, "shpsx");
 	shared_page_obj = vm_pager_allocate(OBJT_PHYS, 0, PAGE_SIZE,

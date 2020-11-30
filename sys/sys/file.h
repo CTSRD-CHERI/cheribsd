@@ -121,7 +121,7 @@ typedef int fo_seek_t(struct file *fp, off_t offset, int whence,
 		    struct thread *td);
 typedef int fo_fill_kinfo_t(struct file *fp, struct kinfo_file *kif,
 		    struct filedesc *fdp);
-typedef int fo_mmap_t(struct file *fp, vm_map_t map, vm_ptr_t *addr,
+typedef int fo_mmap_t(struct file *fp, vm_map_t map, vm_pointer_t *addr,
 		    vm_offset_t max_addr, vm_size_t size, vm_prot_t prot,
 		    vm_prot_t cap_maxprot, int flags, vm_ooffset_t foff,
 		    struct thread *td);
@@ -415,7 +415,7 @@ fo_fill_kinfo(struct file *fp, struct kinfo_file *kif, struct filedesc *fdp)
 }
 
 static __inline int
-fo_mmap(struct file *fp, vm_map_t map, vm_ptr_t *addr, vm_offset_t max_addr,
+fo_mmap(struct file *fp, vm_map_t map, vm_pointer_t *addr, vm_offset_t max_addr,
     vm_size_t size, vm_prot_t prot, vm_prot_t cap_maxprot, int flags,
     vm_ooffset_t foff, struct thread *td)
 {

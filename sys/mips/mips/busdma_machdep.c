@@ -102,17 +102,17 @@ struct bus_dma_tag {
 };
 
 struct bounce_page {
-	vm_ptr_t	vaddr;		/* kva of bounce buffer */
-	vm_ptr_t	vaddr_nocache;	/* kva of bounce buffer uncached */
+	vm_pointer_t	vaddr;		/* kva of bounce buffer */
+	vm_pointer_t	vaddr_nocache;	/* kva of bounce buffer uncached */
 	bus_addr_t	busaddr;	/* Physical address */
-	vm_ptr_t	datavaddr;	/* kva of client data */
+	vm_pointer_t	datavaddr;	/* kva of client data */
 	bus_addr_t	dataaddr;	/* client physical address */
 	bus_size_t	datacount;	/* client data count */
 	STAILQ_ENTRY(bounce_page) links;
 };
 
 struct sync_list {
-	vm_ptr_t	vaddr;		/* kva of bounce buffer */
+	vm_pointer_t	vaddr;		/* kva of bounce buffer */
 	bus_addr_t	busaddr;	/* Physical address */
 	bus_size_t	datacount;	/* client data count */
 };
@@ -174,7 +174,7 @@ static int alloc_bounce_pages(bus_dma_tag_t dmat, u_int numpages);
 static int reserve_bounce_pages(bus_dma_tag_t dmat, bus_dmamap_t map,
 				int commit);
 static bus_addr_t add_bounce_page(bus_dma_tag_t dmat, bus_dmamap_t map,
-				  vm_ptr_t vaddr, bus_addr_t addr,
+				  vm_pointer_t vaddr, bus_addr_t addr,
 				  bus_size_t size);
 static void free_bounce_page(bus_dma_tag_t dmat, struct bounce_page *bpage);
 
@@ -774,7 +774,7 @@ bus_dmamem_free(bus_dma_tag_t dmat, void *vaddr, bus_dmamap_t map)
 	    !_bus_dma_can_bounce(dmat->lowaddr, dmat->highaddr))
 		uma_zfree(bufzone->umazone, vaddr);
 	else
-		kmem_free((vm_ptr_t)vaddr, dmat->maxsize);
+		kmem_free((vm_pointer_t)vaddr, dmat->maxsize);
 	CTR3(KTR_BUSDMA, "%s: tag %p flags 0x%x", __func__, dmat, dmat->flags);
 }
 
@@ -985,7 +985,7 @@ _bus_dmamap_load_buffer(bus_dma_tag_t dmat, bus_dmamap_t map, void *buf,
 	bus_size_t sgsize;
 	bus_addr_t curaddr;
 	struct sync_list *sl;
-	vm_ptr_t vaddr = (vm_ptr_t)buf;
+	vm_pointer_t vaddr = (vm_pointer_t)buf;
 	int error = 0;
 
 	if (segs == NULL)
@@ -1098,9 +1098,9 @@ bus_dmamap_unload(bus_dma_tag_t dmat, bus_dmamap_t map)
 }
 
 static void
-bus_dmamap_sync_buf(vm_ptr_t buf, int len, bus_dmasync_op_t op, int aligned)
+bus_dmamap_sync_buf(vm_pointer_t buf, int len, bus_dmasync_op_t op, int aligned)
 {
-	vm_ptr_t buf_cl = 0, buf_clend = 0;
+	vm_pointer_t buf_cl = 0, buf_clend = 0;
 	vm_size_t size_cl, size_clend;
 	int cache_linesize_mask = mips_dcache_max_linesize - 1;
 #ifdef __CHERI_PURE_CAPABILITY__
@@ -1155,7 +1155,7 @@ bus_dmamap_sync_buf(vm_ptr_t buf, int len, bus_dmasync_op_t op, int aligned)
 			 * Note that buf_cl and tmp_cl will have the same
 			 * misalignment since buf_cl is aligned to cache line.
 			 */
-			buf_cl = (vm_ptr_t)cheri_ptrperm(
+			buf_cl = (vm_pointer_t)cheri_ptrperm(
 			    cheri_setoffset(cheri_kall_capability, tmp_va),
 			    size_cl, CHERI_PERMS_KERNEL_DATA);
 			KASSERT(is_aligned(buf_cl, sizeof(void *)),
@@ -1170,7 +1170,7 @@ bus_dmamap_sync_buf(vm_ptr_t buf, int len, bus_dmasync_op_t op, int aligned)
 		size_clend = (mips_dcache_max_linesize -
 		    (tmp_va & cache_linesize_mask)) & cache_linesize_mask;
 		if (size_clend) {
-			buf_clend = (vm_ptr_t)cheri_ptrperm(
+			buf_clend = (vm_pointer_t)cheri_ptrperm(
 			    cheri_setoffset(cheri_kall_capability, tmp_va),
 			    size_clend, CHERI_PERMS_KERNEL_DATA);
 			/* Enforce the same misalignment as in buf_clend */
@@ -1458,7 +1458,7 @@ alloc_bounce_pages(bus_dma_tag_t dmat, u_int numpages)
 
 		if (bpage == NULL)
 			break;
-		bpage->vaddr = (vm_ptr_t)contigmalloc(PAGE_SIZE, M_BOUNCE,
+		bpage->vaddr = (vm_pointer_t)contigmalloc(PAGE_SIZE, M_BOUNCE,
 						      M_NOWAIT, 0ul,
 						      bz->lowaddr,
 						      PAGE_SIZE,
@@ -1469,7 +1469,7 @@ alloc_bounce_pages(bus_dma_tag_t dmat, u_int numpages)
 		}
 		bpage->busaddr = pmap_kextract(bpage->vaddr);
 		bpage->vaddr_nocache =
-		    (vm_ptr_t)pmap_mapdev(bpage->busaddr, PAGE_SIZE);
+		    (vm_pointer_t)pmap_mapdev(bpage->busaddr, PAGE_SIZE);
 		mtx_lock(&bounce_lock);
 		STAILQ_INSERT_TAIL(&bz->bounce_page_list, bpage, links);
 		total_bpages++;
@@ -1502,7 +1502,7 @@ reserve_bounce_pages(bus_dma_tag_t dmat, bus_dmamap_t map, int commit)
 }
 
 static bus_addr_t
-add_bounce_page(bus_dma_tag_t dmat, bus_dmamap_t map, vm_ptr_t vaddr,
+add_bounce_page(bus_dma_tag_t dmat, bus_dmamap_t map, vm_pointer_t vaddr,
 		bus_addr_t addr, bus_size_t size)
 {
 	struct bounce_zone *bz;

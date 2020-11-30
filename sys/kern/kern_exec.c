@@ -1059,10 +1059,10 @@ exec_new_vmspace(struct image_params *imgp, struct sysentvec *sv)
 	vm_object_t obj;
 	struct rlimit rlim_stack;
 	vm_offset_t sv_minuser;
-	vm_ptr_t stack_addr;
+	vm_pointer_t stack_addr;
 	vm_map_t map;
 	u_long ssiz;
-	vm_ptr_t shared_page_addr;
+	vm_pointer_t shared_page_addr;
 	vm_prot_t stack_prot;
 
 	imgp->vmspace_destroyed = 1;
@@ -1384,7 +1384,7 @@ err_exit:
 }
 
 struct exec_args_kva {
-	vm_ptr_t addr;
+	vm_pointer_t addr;
 	u_int gen;
 	SLIST_ENTRY(exec_args_kva) next;
 };
@@ -1412,7 +1412,7 @@ exec_prealloc_args_kva(void *arg __unused)
 }
 SYSINIT(exec_args_kva, SI_SUB_EXEC, SI_ORDER_ANY, exec_prealloc_args_kva, NULL);
 
-static vm_ptr_t
+static vm_pointer_t
 exec_alloc_args_kva(void **cookie)
 {
 	struct exec_args_kva *argkva;
