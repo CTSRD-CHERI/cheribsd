@@ -123,7 +123,7 @@ extern void * __capability kernel_sealcap;
  * has all permissions
  * This spans the whole address-space
  */
-extern void * __capability cheri_kall_capability;
+extern void * __capability kernel_root_cap;
 #endif
 
 /*

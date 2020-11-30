@@ -249,9 +249,9 @@ db_init(void)
 	}
 	db_add_symbol_table(NULL, NULL, "kld", NULL);
 #ifdef __CHERI_PURE_CAPABILITY__
-	db_code_cap = cheri_andperm(cheri_kall_capability,
+	db_code_cap = cheri_andperm(kernel_root_cap,
 	    CHERI_PERMS_KERNEL_CODE);
-	db_data_cap = cheri_andperm(cheri_kall_capability,
+	db_data_cap = cheri_andperm(kernel_root_cap,
 	    CHERI_PERMS_KERNEL_DATA);
 #endif
 	return (1);	/* We're the default debugger. */

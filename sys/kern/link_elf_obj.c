@@ -365,7 +365,7 @@ link_elf_link_preload(linker_class_t cls, const char *filename,
 	ef = (elf_file_t)lf;
 	ef->preloaded = 1;
 #ifdef __CHERI_PURE_CAPABILITY__
-	ef->address = cheri_setaddress(cheri_kall_capability,
+	ef->address = cheri_setaddress(kernel_root_cap,
 	    *(vaddr_t *)baseptr);
 	ef->address = cheri_setbounds(ef->address, *(size_t *)sizeptr);
 	ef->address = cheri_andperm(ef->address, CHERI_PERMS_KERNEL_CODE |

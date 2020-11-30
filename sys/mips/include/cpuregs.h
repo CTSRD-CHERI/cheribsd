@@ -148,7 +148,7 @@ extern caddr_t cheri_kdata_capability;
 #define MIPS_KDATA(x)							\
 	(cheri_kdata_capability +					\
 	((x) - __builtin_mips_cheri_get_cap_base(cheri_kdata_capability)))
-#define MIPS_KALL(x) ((char *)cheri_kall_capability + (x))
+#define MIPS_KALL(x) ((char *)kernel_root_cap + (x))
 #else /* ! __CHERI_PURE_CAPABILITY__ */
 #define MIPS_XKPHYS(x) ((char *)(x))
 #define MIPS_XKSEG(x) ((char *)(x))

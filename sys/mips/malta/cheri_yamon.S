@@ -50,7 +50,7 @@ NESTED(_yamon_cheri_syscon_read, 32, $c17)
 	cincoffset	$c24, $c11, 0
 
 	/* Switch to an unbounded kernel PCC */
-	CAPTABLE_LOAD($c12, _C_LABEL(cheri_kall_capability))
+	CAPTABLE_LOAD($c12, _C_LABEL(kernel_root_cap))
 	clc	$c12, zero, 0($c12)
 	REG_LI	t0, CHERI_PERMS_KERNEL_CODE
 	candperm	$c12, $c12, t0

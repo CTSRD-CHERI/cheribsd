@@ -1156,7 +1156,7 @@ bus_dmamap_sync_buf(vm_pointer_t buf, int len, bus_dmasync_op_t op, int aligned)
 			 * misalignment since buf_cl is aligned to cache line.
 			 */
 			buf_cl = (vm_pointer_t)cheri_ptrperm(
-			    cheri_setoffset(cheri_kall_capability, tmp_va),
+			    cheri_setoffset(kernel_root_cap, tmp_va),
 			    size_cl, CHERI_PERMS_KERNEL_DATA);
 			KASSERT(is_aligned(buf_cl, sizeof(void *)),
 			    ("dmamap cacheline head source buffer is not"
@@ -1171,7 +1171,7 @@ bus_dmamap_sync_buf(vm_pointer_t buf, int len, bus_dmasync_op_t op, int aligned)
 		    (tmp_va & cache_linesize_mask)) & cache_linesize_mask;
 		if (size_clend) {
 			buf_clend = (vm_pointer_t)cheri_ptrperm(
-			    cheri_setoffset(cheri_kall_capability, tmp_va),
+			    cheri_setoffset(kernel_root_cap, tmp_va),
 			    size_clend, CHERI_PERMS_KERNEL_DATA);
 			/* Enforce the same misalignment as in buf_clend */
 			tmp_clend += mips_dcache_max_linesize - size_clend;
