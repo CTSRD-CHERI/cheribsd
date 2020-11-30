@@ -193,7 +193,6 @@ CRUNCH_PROGS_sbin+= dhclient \
 		mount_nfs \
 		newfs \
 		ping \
-		ping6 \
 		rcorder \
 		reboot \
 		route \
