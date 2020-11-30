@@ -503,6 +503,7 @@ do_trap_user(struct trapframe *frame)
 		break;
 	case EXCP_USER_ECALL:
 		frame->tf_sepc += 4;	/* Next instruction */
+		colocation_unborrow(td, frame);
 		svc_handler(frame);
 		break;
 	case EXCP_ILLEGAL_INSTRUCTION:
