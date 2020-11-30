@@ -148,7 +148,7 @@ cheri_is_null_derived(const void * __capability cap)
  * The caller may wish to assert various properties about the returned
  * capability, including that CHERI_PERM_SEAL is set.
  */
-static __inline otype_t
+static inline otype_t
 cheri_maketype(void * __capability root_type, register_t type)
 {
 	void * __capability c;
@@ -160,13 +160,13 @@ cheri_maketype(void * __capability root_type, register_t type)
 	return (c);
 }
 
-static __inline void * __capability
+static inline void * __capability
 cheri_zerocap(void)
 {
 	return (void * __capability)0;
 }
 
-static __inline uint64_t
+static inline uint64_t
 cheri_bytes_remaining(const void * __capability cap)
 {
 	if (cheri_getoffset(cap) >= cheri_getlen(cap))
