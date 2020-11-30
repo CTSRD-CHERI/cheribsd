@@ -33,7 +33,7 @@ __FBSDID("$FreeBSD$");
 #include "SYS.h"
 
 #define	CAP_LEN			16
-#define	JUMP_BUFFER_SIZE	(26 * CAP_LEN)
+#define	JUMP_BUFFER_SIZE	(27 * CAP_LEN)
 
 ENTRY(coaccept)
 	cincoffsetimm	csp, csp, -JUMP_BUFFER_SIZE
@@ -52,8 +52,9 @@ ENTRY(coaccept)
 	csc	cs10, (10 * CAP_LEN)(csp)
 	csc	cs11, (11 * CAP_LEN)(csp)
 	csc	cra, (12 * CAP_LEN)(csp)
+	csc	ctp, (13 * CAP_LEN)(csp)
 	cspecialr ct1, ddc
-	csc	ct1, (13 * CAP_LEN)(csp)
+	csc	ct1, (14 * CAP_LEN)(csp)
 
 #if defined(__riscv_float_abi_double)
 	/* Store the fpe registers */
@@ -61,18 +62,18 @@ ENTRY(coaccept)
 	 * XXX: We're wasting some space here, saving FP registers
 	 *      into capability-sized slots.
 	 */
-	cfsd	fs0, (14 * CAP_LEN)(csp)
-	cfsd	fs1, (15 * CAP_LEN)(csp)
-	cfsd	fs2, (16 * CAP_LEN)(csp)
-	cfsd	fs3, (17 * CAP_LEN)(csp)
-	cfsd	fs4, (18 * CAP_LEN)(csp)
-	cfsd	fs5, (19 * CAP_LEN)(csp)
-	cfsd	fs6, (20 * CAP_LEN)(csp)
-	cfsd	fs7, (21 * CAP_LEN)(csp)
-	cfsd	fs8, (22 * CAP_LEN)(csp)
-	cfsd	fs9, (23 * CAP_LEN)(csp)
-	cfsd	fs10, (24 * CAP_LEN)(csp)
-	cfsd	fs11, (25 * CAP_LEN)(csp)
+	cfsd	fs0, (15 * CAP_LEN)(csp)
+	cfsd	fs1, (16 * CAP_LEN)(csp)
+	cfsd	fs2, (17 * CAP_LEN)(csp)
+	cfsd	fs3, (18 * CAP_LEN)(csp)
+	cfsd	fs4, (19 * CAP_LEN)(csp)
+	cfsd	fs5, (20 * CAP_LEN)(csp)
+	cfsd	fs6, (21 * CAP_LEN)(csp)
+	cfsd	fs7, (22 * CAP_LEN)(csp)
+	cfsd	fs8, (23 * CAP_LEN)(csp)
+	cfsd	fs9, (24 * CAP_LEN)(csp)
+	cfsd	fs10, (25 * CAP_LEN)(csp)
+	cfsd	fs11, (26 * CAP_LEN)(csp)
 #endif
 	cllc cra, 1f
 	cinvoke ca0, ca1
@@ -92,23 +93,24 @@ ENTRY(coaccept)
 	clc	cs10, (10 * CAP_LEN)(csp)
 	clc	cs11, (11 * CAP_LEN)(csp)
 	clc	cra, (12 * CAP_LEN)(csp)
-	clc	ct1, (13 * CAP_LEN)(csp)
+	clc	ctp, (13 * CAP_LEN)(csp)
+	clc	ct1, (14 * CAP_LEN)(csp)
 	cspecialw ddc, ct1
 
 #if defined(__riscv_float_abi_double)
 	/* Restore the fpe registers */
-	cfld	fs0, (14 * CAP_LEN)(csp)
-	cfld	fs1, (15 * CAP_LEN)(csp)
-	cfld	fs2, (16 * CAP_LEN)(csp)
-	cfld	fs3, (17 * CAP_LEN)(csp)
-	cfld	fs4, (18 * CAP_LEN)(csp)
-	cfld	fs5, (19 * CAP_LEN)(csp)
-	cfld	fs6, (20 * CAP_LEN)(csp)
-	cfld	fs7, (21 * CAP_LEN)(csp)
-	cfld	fs8, (22 * CAP_LEN)(csp)
-	cfld	fs9, (23 * CAP_LEN)(csp)
-	cfld	fs10, (24 * CAP_LEN)(csp)
-	cfld	fs11, (25 * CAP_LEN)(csp)
+	cfld	fs0, (15 * CAP_LEN)(csp)
+	cfld	fs1, (16 * CAP_LEN)(csp)
+	cfld	fs2, (17 * CAP_LEN)(csp)
+	cfld	fs3, (18 * CAP_LEN)(csp)
+	cfld	fs4, (19 * CAP_LEN)(csp)
+	cfld	fs5, (20 * CAP_LEN)(csp)
+	cfld	fs6, (21 * CAP_LEN)(csp)
+	cfld	fs7, (22 * CAP_LEN)(csp)
+	cfld	fs8, (23 * CAP_LEN)(csp)
+	cfld	fs9, (24 * CAP_LEN)(csp)
+	cfld	fs10, (25 * CAP_LEN)(csp)
+	cfld	fs11, (26 * CAP_LEN)(csp)
 #endif
 
 	cincoffsetimm	csp, csp, JUMP_BUFFER_SIZE

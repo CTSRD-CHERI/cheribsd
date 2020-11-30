@@ -406,6 +406,7 @@ trap:
 	return (true);
 }
 
+#ifdef __mips__
 void
 colocation_update_tls(struct thread *td)
 {
@@ -424,16 +425,15 @@ colocation_update_tls(struct thread *td)
 	error = copyincap(___USER_CFROMPTR((const void *)addr, userspace_cap), &scb, sizeof(scb));
 	KASSERT(error == 0, ("%s: copyincap from %p failed with error %d\n", __func__, (void *)addr, error));
 
-#ifdef __mips__
 	COLOCATION_DEBUG("changing TLS from %p to %p",
 	    (__cheri_fromcap void *)scb.scb_tls,
 	    (__cheri_fromcap void *)((char * __capability)td->td_md.md_tls + td->td_md.md_tls_tcb_offset));
 	scb.scb_tls = (char * __capability)td->td_md.md_tls + td->td_md.md_tls_tcb_offset;
-#endif
 
 	error = copyoutcap(&scb, ___USER_CFROMPTR((void *)addr, userspace_cap), sizeof(scb));
 	KASSERT(error == 0, ("%s: copyoutcap from %p failed with error %d\n", __func__, (void *)addr, error));
 }
+#endif
 
 /*
  * Setup the per-thread switcher control block.
@@ -968,8 +968,8 @@ db_print_scb(struct switchercb *scb)
 	}
 	db_printf("    scb_td:            %p\n", scb->scb_td);
 	db_printf("    scb_borrower_td:   %p\n", scb->scb_borrower_td);
-	db_printf("    scb_tls:           %#lp\n", &scb->scb_tls);
 #ifdef __mips__
+	db_printf("    scb_tls:           %#lp\n", &scb->scb_tls);
 	db_printf("    scb_csp (c11):     %#lp\n", &scb->scb_csp);
 	db_printf("    scb_cra (c13):     %#lp\n", &scb->scb_cra);
 	db_printf("    scb_buf (c6):      %#lp\n", &scb->scb_buf);

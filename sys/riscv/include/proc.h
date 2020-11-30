@@ -67,11 +67,6 @@ struct switchercb {
 	void * __capability			scb_unsealcap;
 
 	/*
-	 * TLS pointer, to be returned by CReadHwr.
-	 */
-	void * __capability			scb_tls;
-
-	/*
 	 * XXX
 	 */
 	void * __capability			scb_csp;
