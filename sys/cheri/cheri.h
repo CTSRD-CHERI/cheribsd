@@ -98,7 +98,7 @@ void * __capability	_cheri_capability_build_user_rwx(uint32_t perms,
  */
 
 /* Root of all unsealed userspace capabilities. */
-extern void * __capability userspace_cap;
+extern void * __capability userspace_root_cap;
 
 /* Root of all sealed userspace capabilities. */
 extern void * __capability userspace_sealcap;
