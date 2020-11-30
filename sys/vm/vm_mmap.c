@@ -455,7 +455,7 @@ kern_mmap(struct thread *td, uintptr_t addr0, size_t len, int prot, int flags,
 		.mr_pos = pos,
 #ifdef __CHERI_PURE_CAPABILITY__
 		/* Needed for fixed mappings */
-		.mr_source_cap = userspace_cap
+		.mr_source_cap = userspace_root_cap,
 #endif
 	};
 

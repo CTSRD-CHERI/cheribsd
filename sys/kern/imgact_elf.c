@@ -567,7 +567,7 @@ __elfN(build_imgact_capability)(struct image_params *imgp,
 	reservation_cap = (void *)reservation;
 #else
 	reservation_cap = cheri_setbounds(
-	    cheri_setaddress(userspace_cap, reservation), end - start);
+	    cheri_setaddress(userspace_root_cap, reservation), end - start);
 #endif
 	*imgact_cap = cheri_andperm(reservation_cap, perm);
 
