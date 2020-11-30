@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2018 Edward Tomasz Napierala <trasz@FreeBSD.org>
+ * Copyright (c) 2020 Edward Tomasz Napierala <trasz@FreeBSD.org>
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -28,15 +28,174 @@
  * SUCH DAMAGE.
  */
 
-#include "opt_compat.h"
 #include <sys/syscall.h>
 #include <machine/asm.h>
+#include <machine/cherireg.h>
+#include <machine/switcher.h>
+
+#define	idc ct6
+
+.option capmode
+
+/*
+ * Everywhere below the "caller" and "callee" terms are swapped.
+ * In other words, the "caller" here is the same thread as the "caller"
+ * on the cocall(2) side.  We - the thread calling into coaccept(2) - are
+ * called the callee here.
+ *
+ * Register usage: we save and restore csp and cra.  The rest gets zeroed;
+ * the libc wrappers are responsible for saving and restoring the context.
+ *
+ * Note that this code executes while ignoring all the signals - a trapping
+ * instruction will just get skipped over.
+ *
+ * Layout of struct switchercb, pointed to by idc (callee side)
+ * and, later on, ct0 (caller side):
+ *
+ * scb_peer_scb:	0(idc)
+ * scb_td:		1*CHERICAP_SIZE(idc)
+ * scb_borrower_td:	1*CHERICAP_SIZE+8(idc)
+ * scb_unsealcap:	2*CHERICAP_SIZE(idc)
+ * scb_csp:		4*CHERICAP_SIZE(idc)
+ * scb_cra:		5*CHERICAP_SIZE(idc)
+ * scb_buf (ca3):	6*CHERICAP_SIZE(idc)
+ * scb_len (a4):	7*CHERICAP_SIZE(idc)
+ * scb_cookiep (ca2):	8*CHERICAP_SIZE(idc)
+ */
 
 .text
 .globl _C_LABEL(switcher_coaccept)
 _C_LABEL(switcher_coaccept):
+	/*
+	 * Save the callee's stack pointer and return address (PCC)
+	 * in the callee's control block.
+	 *
+	 * XXX: Make sure the IDC is cleared if we get a signal while here.
+	 */
+	csc	csp, SCB_CSP(idc)
+	csc	cra, SCB_CRA(idc)
+
+	/*
+	 * Save the pointer to the cookie.
+	 */
+	csc	ca2, SCB_COOKIEP(idc)
+
+	/*
+	 * Save the data transfer args.
+	 */
+	csc	ca3, SCB_BUF(idc)
+	csd	a4, SCB_BUFLEN(idc)
+
+	/*
+	 * Load the capability to the caller's control block.
+	 */
+	clc	ct0, SCB_PEER_SCB(idc)
+
+	/*
+	 * Is this the first invocation of coaccept, or rather a response
+	 * for a ccall()?  If the former - call copark(2).
+	 */
+	cgetlen	t1, ct0
+	bnez	t1, 1f
+	ccleartag ct2, cnull
+	csc	ct2, SCB_PEER_SCB(idc)
+	li	t0, SYS_copark
+	ecall
+
+	/*
+	 * Returned from copark(2).
+	 *
+	 * XXX: Wait for the spinlock to be released.
+	 */
+	j	3f
+
+1:
+	/*
+	 * Save the capability to the caller's thread in the callee control block.
+	 * This is used by kernel to look up the real thread.  Also clear
+	 * the same field on the caller side.
+	 */
+	cld	t3, SCB_TD(ct0)
+	csd	t3, SCB_BORROWER_TD(idc)
+	csd	zero, SCB_BORROWER_TD(ct0)
+
+	/*
+	 * Restore the caller's context.
+	 */
+	clc	csp, SCB_CSP(ct0)
+	clc	cra, SCB_CRA(ct0)
+
+	/*
+	 * Do the data transfer back to the caller.  The reason
+	 * for this is to mimic what the "syscall_timing pipeping"
+	 * is doing - it transfers the data there and back, both
+	 * sides.
+	 */
+	clc	ct4, SCB_BUF(ct0)
+	cld	t5, SCB_BUFLEN(ct0)
+
+	/*
+	 * Compare buffer sizes, put the smaller one into t5.
+	 */
+	sub	t3, a4, t5
+	bgez	t3, 2f
+	addi	t5, a4, 0
+
+2:
+	cld	t3, 0(ca3)
+	csd	t3, 0(ct4)
+	cincoffset ca3, ca3, 8
+	cincoffset ct4, ct4, 8
+	addi	t5, t5, -8
+	bgtz	t5, 2b
+
+	/*
+	 * Zero out the scb_peer_scb variables, releasing the spinlock.
+	 */
+	csd	zero, SCB_PEER_SCB(ct0)
+	csd	zero, SCB_PEER_SCB(idc)
+
 	li	t0, 0
 	li	a0, 0
+
+3:
+	/*
+	 * XXX: We should use cclear here, but until it's supported in qemu, let's just...
+	 */
+	/* Preserve x1 (ra), and x2 (sp). */
+	li x3, 0
+	li x4, 0
+	/* Preserve x5 (t0), used for errno (XXX). */
+	li x6, 0
+	li x7, 0
+	li x8, 0
+	li x9, 0
+	/* Preserve x10 (a0), which is our return value. */
+	li x11, 0
+	li x12, 0
+	li x13, 0
+	li x14, 0
+	li x15, 0
+	li x16, 0
+	li x17, 0
+	li x18, 0
+	li x19, 0
+	li x20, 0
+	li x21, 0
+	li x22, 0
+	li x23, 0
+	li x24, 0
+	li x25, 0
+	li x26, 0
+	li x27, 0
+	li x28, 0
+	li x29, 0
+	li x30, 0
+	li x31, 0
+
+	/*
+	 * Bye!
+	 */
 	cret
 .globl _C_LABEL(eswitcher_coaccept)
 _C_LABEL(eswitcher_coaccept):
