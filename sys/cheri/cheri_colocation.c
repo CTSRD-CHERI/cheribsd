@@ -978,9 +978,9 @@ db_print_scb(struct switchercb *scb)
 #else
 	db_printf("    scb_csp:           %#lp\n", &scb->scb_csp);
 	db_printf("    scb_cra:           %#lp\n", &scb->scb_cra);
-	db_printf("    scb_cookiep (ca3): %#lp\n", &scb->scb_cookiep);
-	db_printf("    scb_buf (ca4):     %#lp\n", &scb->scb_buf);
-	db_printf("    scb_buflen (a5):   %zd\n", scb->scb_buflen);
+	db_printf("    scb_cookiep (ca2): %#lp\n", &scb->scb_cookiep);
+	db_printf("    scb_buf (ca3):     %#lp\n", &scb->scb_buf);
+	db_printf("    scb_buflen (a4):   %zd\n", scb->scb_buflen);
 #endif
 }
 
