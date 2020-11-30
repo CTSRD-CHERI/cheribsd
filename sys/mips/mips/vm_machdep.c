@@ -293,7 +293,7 @@ cpu_thread_free(struct thread *td)
 	 * and make sure that the kstack cache zone can rebuild the full capability.
 	 */
 	td->td_kstack = (vm_pointer_t)cheri_ptrperm(
-	    cheri_setaddress(cheri_kall_capability,
+	    cheri_setaddress(kernel_root_cap,
 	        cheri_getbase((void *)td->td_kstack)),
 	    td->td_kstack_pages * PAGE_SIZE, CHERI_PERMS_KERNEL_DATA);
 #endif

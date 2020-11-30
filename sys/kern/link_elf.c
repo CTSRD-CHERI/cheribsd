@@ -464,7 +464,7 @@ link_elf_init(void* arg)
 	 * so we are forced to use a 0-based capability and rely on bounds
 	 * enforcement later.
 	 */
-	ef->address = cheri_andperm(cheri_kall_capability,
+	ef->address = cheri_andperm(kernel_root_cap,
 		(CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP));
 	linker_kernel_file->address = ef->address;
 #endif /* __CHERI_PURE_CAPABILITY__ */

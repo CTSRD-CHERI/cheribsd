@@ -43,7 +43,7 @@
 #include <machine/riscvreg.h>
 #include <machine/vmparam.h>
 
-void *cheri_kall_capability = (void *)(intcap_t)-1;
+void *kernel_root_cap = (void *)(intcap_t)-1;
 
 void
 cheri_init_capabilities(void * __capability kroot)
@@ -74,7 +74,8 @@ cheri_init_capabilities(void * __capability kroot)
 	ctemp = cheri_andperm(ctemp, CHERI_PERMS_KERNEL_DATA);
 	devmap_init_capability(ctemp);
 
-	cheri_kall_capability = kroot;
+	kernel_root_cap = cheri_andperm(kroot,
+	    ~(CHERI_PERM_SEAL | CHERI_PERM_UNSEAL));
 #endif
 }
 

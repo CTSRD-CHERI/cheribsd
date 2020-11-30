@@ -112,7 +112,7 @@ beri_platform_ptr(vm_offset_t vaddr)
 	if (vaddr == 0)
 		return (NULL);
 
-	void *cap = cheri_setaddress(cheri_kall_capability, vaddr);
+	void *cap = cheri_setaddress(kernel_root_cap, vaddr);
 	cap = cheri_andperm(cap, CHERI_PERM_LOAD);
 
 	return (cap);

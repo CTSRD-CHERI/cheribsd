@@ -107,7 +107,7 @@ caddr_t cheri_kseg1_capability = (void *)(intcap_t)-1;
 caddr_t cheri_kseg2_capability = (void *)(intcap_t)-1;
 caddr_t cheri_kcode_capability = (void *)(intcap_t)-1;
 caddr_t cheri_kdata_capability = (void *)(intcap_t)-1;
-void *cheri_kall_capability = (void *)(intcap_t)-1;
+void *kernel_root_cap = (void *)(intcap_t)-1;
 
 /*
  * This is called from locore to initialise the cap table entries
@@ -265,7 +265,7 @@ cheri_init_capabilities(void * __capability kroot)
 	    ~(CHERI_PERM_EXECUTE | CHERI_PERM_CCALL | CHERI_PERM_SEAL |
 	      CHERI_PERM_SYSTEM_REGS));
 
-	cheri_kall_capability = kroot;
+	kernel_root_cap = kroot;
 #endif
 }
 

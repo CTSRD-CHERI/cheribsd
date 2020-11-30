@@ -537,7 +537,7 @@ pmap_bootstrap_dmap(vm_pointer_t kern_l1, vm_paddr_t min_pa, vm_paddr_t max_pa)
 	dmap_phys_max = pa;
 
 #ifdef __CHERI_PURE_CAPABILITY__
-	dmap_capability = cheri_setaddress(cheri_kall_capability,
+	dmap_capability = cheri_setaddress(kernel_root_cap,
 	    DMAP_MIN_ADDRESS);
 	dmap_capability = cheri_setbounds(dmap_capability,
 	    dmap_phys_max - dmap_phys_base);
@@ -652,7 +652,7 @@ pmap_bootstrap(vm_pointer_t l1pt, vm_paddr_t kernstart, vm_size_t kernlen)
 
 	freemempos = roundup2(KERNBASE + kernlen, PAGE_SIZE);
 #ifdef __CHERI_PURE_CAPABILITY__
-	freemempos = (vm_pointer_t)cheri_setaddress(cheri_kall_capability,
+	freemempos = (vm_pointer_t)cheri_setaddress(kernel_root_cap,
 	    freemempos);
 #endif
 
