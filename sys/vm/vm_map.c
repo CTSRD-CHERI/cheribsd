@@ -5613,7 +5613,7 @@ vm_get_cap_owner(struct thread *td, uintcap_t c)
 	need_lock = !kdb_active;
 
 	if (need_lock)
-		vm_map_lock(map);
+		need_lock = vm_map_trylock(map);
 	found = vm_map_lookup_entry(map, addr, &entry);
 	if (found)
 		pid = entry->owner;
