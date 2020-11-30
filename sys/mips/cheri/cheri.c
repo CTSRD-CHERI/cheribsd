@@ -94,7 +94,7 @@ cheri_cpu_startup(void)
 {
 
 	/*
-	 * Documentary assertions for userspace_cap.  Default data and
+	 * Documentary assertions for userspace_root_cap. Default data and
 	 * code need to be identically sized or we'll need seperate caps.
 	 */
 	_Static_assert(CHERI_CAP_USER_DATA_BASE == CHERI_CAP_USER_CODE_BASE,
