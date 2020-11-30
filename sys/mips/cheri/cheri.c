@@ -219,7 +219,7 @@ cheri_init_capabilities(void * __capability kroot)
 	ctemp = cheri_setbounds(ctemp, CHERI_CAP_USER_DATA_LENGTH);
 	ctemp = cheri_andperm(ctemp, CHERI_CAP_USER_DATA_PERMS |
 	    CHERI_CAP_USER_CODE_PERMS);
-	userspace_cap = ctemp;
+	userspace_root_cap = ctemp;
 
 #ifdef __CHERI_PURE_CAPABILITY__
 	/*
@@ -279,7 +279,7 @@ cheri_cpu_startup(void)
 {
 
 	/*
-	 * Documentary assertions for userspace_cap.  Default data and
+	 * Documentary assertions for userspace_root_cap. Default data and
 	 * code need to be identically sized or we'll need seperate caps.
 	 */
 	_Static_assert(CHERI_CAP_USER_DATA_BASE == CHERI_CAP_USER_CODE_BASE,

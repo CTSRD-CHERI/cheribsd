@@ -639,7 +639,7 @@ proc0_init(void *dummy __unused)
 	 * we strip all access permission because proc0 is not
 	 * expected to enter usermode.
 	 */
-	caddr_t minuser_cap = cheri_setaddress(userspace_cap,
+	caddr_t minuser_cap = cheri_setaddress(userspace_root_cap,
 	    p->p_sysent->sv_minuser);
 	minuser_cap = cheri_setbounds(minuser_cap,
 	    p->p_sysent->sv_maxuser - p->p_sysent->sv_minuser);
