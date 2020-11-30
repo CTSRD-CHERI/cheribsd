@@ -40,7 +40,7 @@ TESTS+=		cmd-errors
 TESTS+=		cmd-errors-lint
 # Broken on linux
 #TESTS+=		cmd-interrupt
-TESTS+=		cmdline
+#TESTS+=		cmdline
 TESTS+=		cmdline-undefined
 TESTS+=		comment
 TESTS+=		cond-cmp-numeric
