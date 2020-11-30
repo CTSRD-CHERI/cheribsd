@@ -93,18 +93,15 @@ void * __capability	_cheri_capability_build_user_rwx(uint32_t perms,
 	_cheri_capability_build_user_rwx(perms, basep, length, off,	\
 	    __func__, __LINE__)
 
-/* Root of all userspace capabilities. */
-extern void * __capability userspace_root_cap
-
 /*
  * Global capabilities used to construct other capabilities.
  */
 
 /* Root of all unsealed userspace capabilities. */
-extern void * __capability userspace_root_cap
+extern void * __capability userspace_root_cap;
 
 /* Root of all sealed userspace capabilities. */
-extern void * __capability userspace_sealcap;
+extern void * __capability userspace_root_sealcap;
 
 /*
  * Omnipotent capability for restoring swapped capabilities.
@@ -115,7 +112,7 @@ extern void * __capability userspace_sealcap;
 extern void * __capability swap_restore_cap;
 
 /* Root of all sealed kernel capabilities. */
-extern void * __capability kernel_sealcap;
+extern void * __capability kernel_root_sealcap;
 
 #ifdef __CHERI_PURE_CAPABILITY__
 /*

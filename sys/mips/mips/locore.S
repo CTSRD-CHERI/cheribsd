@@ -196,7 +196,7 @@ VECTOR(_locore, unknown)
 	csetbounds	CHERI_REG_C27, CHERI_REG_C27, t0
 	REG_LI	t0, CHERI_SEALCAP_USERSPACE_PERMS
 	candperm	CHERI_REG_C27, CHERI_REG_C27, t0
-	PTR_LA	t0, _C_LABEL(userspace_sealcap)
+	PTR_LA	t0, _C_LABEL(userspace_root_sealcap)
 	csc	CHERI_REG_C27, t0, 0($ddc)
 
 	/*

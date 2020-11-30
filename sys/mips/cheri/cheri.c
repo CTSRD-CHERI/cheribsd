@@ -213,7 +213,7 @@ cheri_init_capabilities(void * __capability kroot)
 	ctemp = cheri_setaddress(kroot, CHERI_SEALCAP_USERSPACE_BASE);
 	ctemp = cheri_setbounds(ctemp, CHERI_SEALCAP_USERSPACE_LENGTH);
 	ctemp = cheri_andperm(ctemp, CHERI_SEALCAP_USERSPACE_PERMS);
-	userspace_sealcap = ctemp;
+	userspace_root_sealcap = ctemp;
 
 	ctemp = cheri_setaddress(kroot, CHERI_CAP_USER_DATA_BASE);
 	ctemp = cheri_setbounds(ctemp, CHERI_CAP_USER_DATA_LENGTH);
