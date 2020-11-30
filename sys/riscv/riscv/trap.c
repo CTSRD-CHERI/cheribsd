@@ -96,6 +96,8 @@ extern u_int qemu_trace_buffered;
 void do_trap_supervisor(struct trapframe *);
 void do_trap_user(struct trapframe *);
 
+static void db_show_frame_td(struct thread *td);
+
 static __inline void
 call_trapsignal(struct thread *td, int sig, int code, uintcap_t addr,
     int trapno, int capreg)
@@ -224,30 +226,8 @@ cpu_fetch_syscall_args(struct thread *td)
 static void
 dump_regs(struct trapframe *frame)
 {
-	u_int i;
 
-	PRINT_REG("ra", frame->tf_ra);
-	PRINT_REG("sp", frame->tf_sp);
-	PRINT_REG("gp", frame->tf_gp);
-	PRINT_REG("tp", frame->tf_tp);
-
-	for (i = 0; i < nitems(frame->tf_t); i++)
-		PRINT_REG_N("t", i, frame->tf_t);
-
-	for (i = 0; i < nitems(frame->tf_s); i++)
-		PRINT_REG_N("s", i, frame->tf_s);
-
-
-	for (i = 0; i < nitems(frame->tf_a); i++)
-		PRINT_REG_N("a", i, frame->tf_a);
-
-
-	PRINT_REG("sepc", frame->tf_sepc);
-#if __has_feature(capabilities)
-	PRINT_REG("ddc", frame->tf_ddc);
-#endif
-	printf("sstatus == 0x%016lx\n", frame->tf_sstatus);
-	printf("stval == 0x%016lx\n", frame->tf_stval);
+	db_show_frame_td(curthread);
 }
 
 #if __has_feature(capabilities)
@@ -591,21 +571,18 @@ db_show_reg(struct thread *td, const char *name, uintcap_t value)
 	tmp = (void * __capability)value;
 	pid = vm_get_cap_owner(td, value);
 
-	if (pid >= 0)
-		db_printf("%s %#lp (pid %d)\n", name, &tmp, pid);
-	else
-		db_printf("%s %#lp\n", name, &tmp);
+	if (pid >= 0) {
+		(kdb_active ? db_printf : printf)("%s %#lp (pid %d)\n",
+		    name, &tmp, pid);
+	} else {
+		(kdb_active ? db_printf : printf)("%s %#lp\n", name, &tmp);
+	}
 }
 
-DB_SHOW_COMMAND(frame, db_show_frame)
+static void
+db_show_frame_td(struct thread *td)
 {
-	struct thread *td;
 	struct trapframe *frame;
-
-	if (have_addr)
-		td = db_lookup_thread(addr, true);
-	else
-		td = curthread;
 
 	frame = td->td_frame;
 
@@ -645,4 +622,16 @@ DB_SHOW_COMMAND(frame, db_show_frame)
 	db_show_reg(td, "sstatus:", frame->tf_sstatus);
 	db_show_reg(td, " stval: ", frame->tf_stval);
 	db_show_reg(td, "scause: ", frame->tf_scause);
+}
+
+DB_SHOW_COMMAND(frame, db_show_frame)
+{
+	struct thread *td;
+
+	if (have_addr)
+		td = db_lookup_thread(addr, true);
+	else
+		td = curthread;
+
+	db_show_frame_td(td);
 }
