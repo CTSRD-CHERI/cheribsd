@@ -92,7 +92,7 @@
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wduplicate-decl-specifier"
 /* Get the top of a capability (i.e. one byte past the last accessible one) */
-static __always_inline inline vaddr_t
+static inline vaddr_t
 cheri_gettop(const void * __capability cap)
 {
 	return (cheri_getbase(cap) + cheri_getlen(cap));
@@ -100,9 +100,9 @@ cheri_gettop(const void * __capability cap)
 
 /* Check if the address is between cap.base and cap.top, i.e. in bounds */
 #ifdef __cplusplus
-static __always_inline inline bool
+static inline bool
 #else
-static __always_inline inline _Bool
+static inline _Bool
 #endif
 cheri_is_address_inbounds(const void * __capability cap, vaddr_t addr)
 {
@@ -113,9 +113,9 @@ cheri_is_address_inbounds(const void * __capability cap, vaddr_t addr)
  * Check whether a capability is NULL-derived
  */
 #ifdef __cplusplus
-static __always_inline inline bool
+static inline inline bool
 #else
-static __always_inline inline _Bool
+static inline inline _Bool
 #endif
 cheri_is_null_derived(const void * __capability cap)
 {
@@ -321,14 +321,7 @@ cheri_bytes_remaining(const void * __capability cap)
  * XXXAR: Should kept in sync with the version from clang's cheri.h.
  */
 
-/*
- * XXX-AM: Ugly thing to make this importable from linux compat,
- * which redefines __always_inline
- */
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wduplicate-decl-specifier"
-
-static inline __always_inline __result_use_check size_t
+static inline __result_use_check size_t
 __cheri_get_low_ptr_bits(uintptr_t ptr, size_t mask) {
   /*
    * Note: we continue to use bitwise and on the uintcap value and silence the
@@ -346,7 +339,7 @@ __cheri_get_low_ptr_bits(uintptr_t ptr, size_t mask) {
 #pragma clang diagnostic pop
 }
 
-static inline __always_inline __result_use_check uintptr_t
+static inline __result_use_check uintptr_t
 __cheri_set_low_ptr_bits(uintptr_t ptr, size_t bits) {
   /*
    * We want to return a LHS-derived capability here so using the default
@@ -355,7 +348,7 @@ __cheri_set_low_ptr_bits(uintptr_t ptr, size_t bits) {
   return ptr | bits;
 }
 
-static inline __always_inline __result_use_check uintptr_t
+static inline __result_use_check uintptr_t
 __cheri_clear_low_ptr_bits(uintptr_t ptr, size_t bits_mask) {
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wcheri-bitwise-operations"
@@ -366,7 +359,6 @@ __cheri_clear_low_ptr_bits(uintptr_t ptr, size_t bits_mask) {
   return ptr & (~bits_mask);
 #pragma clang diagnostic pop
 }
-#pragma clang diagnostic pop
 
 /* Turn on the checking by default for now (until we have fixed everything)*/
 #define __check_low_ptr_bits_assignment
