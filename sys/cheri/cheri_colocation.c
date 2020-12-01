@@ -677,19 +677,19 @@ kern_colookup(struct thread *td, const char * __capability namep,
 	if (error != 0)
 		return (error);
 
-	vm_map_lock(&vmspace->vm_map);
+	vm_map_lock_read(&vmspace->vm_map);
 	LIST_FOREACH(con, &vmspace->vm_conames, c_next) {
 		if (strcmp(name, con->c_name) == 0)
 			break;
 	}
 
 	if (con == NULL) {
-		vm_map_unlock(&vmspace->vm_map);
+		vm_map_unlock_read(&vmspace->vm_map);
 		return (ESRCH);
 	}
 
 	error = copyoutcap(&con->c_value, capp, sizeof(con->c_value));
-	vm_map_unlock(&vmspace->vm_map);
+	vm_map_unlock_read(&vmspace->vm_map);
 	return (error);
 }
 
