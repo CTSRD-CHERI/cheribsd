@@ -2701,7 +2701,7 @@ ieee80211_send_mgmt(struct ieee80211_node *ni, int type, int arg)
 
 		if (vap->iv_opmode == IEEE80211_M_STA)
 			ieee80211_add_callback(m, ieee80211_tx_mgt_cb,
-				(void *) vap->iv_state);
+			    (void *)(uintptr_t)vap->iv_state);
 		break;
 
 	case IEEE80211_FC0_SUBTYPE_DEAUTH:
@@ -2855,7 +2855,7 @@ ieee80211_send_mgmt(struct ieee80211_node *ni, int type, int arg)
 		m->m_pkthdr.len = m->m_len = frm - mtod(m, uint8_t *);
 
 		ieee80211_add_callback(m, ieee80211_tx_mgt_cb,
-			(void *) vap->iv_state);
+		    (void *)(uintptr_t)vap->iv_state);
 		break;
 
 	case IEEE80211_FC0_SUBTYPE_ASSOC_RESP:
