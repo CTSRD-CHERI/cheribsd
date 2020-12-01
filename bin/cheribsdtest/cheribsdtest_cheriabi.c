@@ -282,16 +282,16 @@ create_adjacent_mappings(struct adjacent_mappings *mappings)
 	mappings->middle = CHERIBSDTEST_CHECK_SYSCALL2(mmap(requested_addr, len,
 	    PROT_READ | PROT_WRITE, MAP_ANON | MAP_FIXED, -1, 0),
 	    "Failed to create mapping at address %p", requested_addr);
-	CHERIBSDTEST_CHECK_EQ_LONG((vaddr_t)mappings->middle,
-	    (vaddr_t)mappings->first + len);
+	CHERIBSDTEST_CHECK_EQ_LONG((ptraddr_t)mappings->middle,
+	    (ptraddr_t)mappings->first + len);
 	requested_addr =
 	    (void *)(uintcap_t)(cheri_getaddress(mappings->middle) + len);
 	CHERIBSDTEST_VERIFY(cheri_gettag(mappings->middle));
 	mappings->last = CHERIBSDTEST_CHECK_SYSCALL2(mmap(requested_addr, len,
 	    PROT_READ | PROT_WRITE, MAP_ANON | MAP_FIXED, -1, 0),
 	    "Failed to create mapping at address %p", requested_addr);
-	CHERIBSDTEST_CHECK_EQ_LONG((vaddr_t)mappings->last,
-	    (vaddr_t)mappings->middle + len);
+	CHERIBSDTEST_CHECK_EQ_LONG((ptraddr_t)mappings->last,
+	    (ptraddr_t)mappings->middle + len);
 	CHERIBSDTEST_VERIFY(cheri_gettag(mappings->last));
 	mappings->maplen = len;
 }
@@ -432,16 +432,16 @@ create_adjacent_mappings_shm(struct adjacent_mappings *mappings)
 	mappings->middle = CHERIBSDTEST_CHECK_SYSCALL2(
 	    shmat(shmid, requested_addr, 0),
 	    "Failed to create mapping at address %p", requested_addr);
-	CHERIBSDTEST_CHECK_EQ_LONG((vaddr_t)mappings->middle,
-	    (vaddr_t)requested_addr);
+	CHERIBSDTEST_CHECK_EQ_LONG((ptraddr_t)mappings->middle,
+	    (ptraddr_t)requested_addr);
 	CHERIBSDTEST_VERIFY(cheri_gettag(mappings->middle));
 	requested_addr =
 	    (void *)(uintcap_t)(cheri_getaddress(mappings->middle) + len);
 	mappings->last = CHERIBSDTEST_CHECK_SYSCALL2(
 	    shmat(shmid, requested_addr, 0),
 	    "Failed to create mapping at address %p", requested_addr);
-	CHERIBSDTEST_CHECK_EQ_LONG((vaddr_t)mappings->last,
-	    (vaddr_t)requested_addr);
+	CHERIBSDTEST_CHECK_EQ_LONG((ptraddr_t)mappings->last,
+	    (ptraddr_t)requested_addr);
 	CHERIBSDTEST_VERIFY(cheri_gettag(mappings->last));
 	mappings->maplen = len;
 }
