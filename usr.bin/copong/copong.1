@@ -29,7 +29,7 @@
 .\"
 .\" $FreeBSD$
 .\"
-.Dd May 6, 2016
+.Dd December 1, 2020
 .Dt COPONG 1
 .Os
 .Sh NAME
@@ -40,7 +40,8 @@
 .Op Fl k
 .Op Fl v
 .Op Fl x
-.Ar target-name
+.Ar service-name
+.Op Ar target-name ...
 .Sh DESCRIPTION
 The
 .Nm
@@ -48,6 +49,10 @@ utility is used to answer to colocated pings from
 .Xr coping 1
 and
 .Xr syscall_timing 1 .
+If
+.Ar target-name
+is specified, upon receiving a ping it will cocall into each of the targets
+before returning.
 .Pp
 The following options are available:
 .Bl -tag -width ".Fl v"
