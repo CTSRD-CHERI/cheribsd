@@ -373,6 +373,13 @@ link_elf_link_preload(linker_class_t cls, const char *filename,
 	    hdr->e_ident[EI_VERSION] != EV_CURRENT ||
 	    hdr->e_version != EV_CURRENT ||
 	    hdr->e_type != ET_REL ||
+#if __has_feature(capabilities)
+#ifdef __CHERI_PURE_CAPABILITY__
+	    !ELF_IS_CHERI(hdr) ||
+#else
+	    ELF_IS_CHERI(hdr) ||
+#endif
+#endif
 	    hdr->e_machine != ELF_TARG_MACH) {
 		error = EFTYPE;
 		goto out;
@@ -732,6 +739,21 @@ link_elf_load_file(linker_class_t cls, const char *filename,
 		error = ENOEXEC;
 		goto out;
 	}
+#if __has_feature(capabilities)
+#ifdef __CHERI_PURE_CAPABILITY__
+	if (!ELF_IS_CHERI(hdr)) {
+		link_elf_error(filename, "Hybrid ABI");
+		error = ENOEXEC;
+		goto out;
+	}
+#else
+	if (ELF_IS_CHERI(hdr)) {
+		link_elf_error(filename, "Pure capability ABI");
+		error = ENOEXEC;
+		goto out;
+	}
+#endif
+#endif
 
 	lf = linker_make_file(filename, &link_elf_class);
 	if (!lf) {
