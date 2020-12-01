@@ -62,6 +62,7 @@ main(int argc, char **argv)
 	void * __capability cocall_data;
 	void * __capability cookie;
 	void * __capability *lookedup;
+	char *registered;
 	uint64_t *halfcookie;
 	bool kflag = false, vflag = false, xflag = false;
 	int c, ch, error;
@@ -88,8 +89,11 @@ main(int argc, char **argv)
 	if (argc < 1)
 		usage();
 
+	registered = argv[0];
+
 	if (vflag)
-		fprintf(stderr, "%s: setting up...\n", getprogname());
+		fprintf(stderr, "%s: %s: setting up...\n",
+		    getprogname(), registered);
 	error = cosetup(COSETUP_COACCEPT, &coaccept_code, &coaccept_data);
 	if (error != 0)
 		err(1, "cosetup");
@@ -99,7 +103,8 @@ main(int argc, char **argv)
 
 	if (argc > 0) {
 		if (vflag)
-			fprintf(stderr, "%s: setting up caller side...\n", getprogname());
+			fprintf(stderr, "%s: %s: setting up the caller side...\n",
+			    getprogname(), registered);
 		error = cosetup(COSETUP_COCALL, &cocall_code, &cocall_data);
 		if (error != 0)
 			err(1, "cosetup");
@@ -110,7 +115,8 @@ main(int argc, char **argv)
 
 		for (c = 0; c < argc; c++) {
 			if (vflag)
-				fprintf(stderr, "%s: colooking up \"%s\"...\n", getprogname(), argv[c]);
+				fprintf(stderr, "%s: %s: colooking up \"%s\"...\n",
+				    getprogname(), registered, argv[c]);
 			error = colookup(argv[c], &lookedup[c]);
 			if (error != 0) {
 				if (errno == ESRCH) {
@@ -123,13 +129,13 @@ main(int argc, char **argv)
 	}
 
 	if (vflag)
-		fprintf(stderr, "%s: coregistering as \"%s\"...\n", getprogname(), argv[-1]);
-	error = coregister(argv[-1], NULL);
+		fprintf(stderr, "%s: %s: coregistering...\n", getprogname(), registered);
+	error = coregister(registered, NULL);
 	if (error != 0)
 		err(1, "coregister");
 
 	if (vflag)
-		fprintf(stderr, "%s: coaccepting...\n", getprogname());
+		fprintf(stderr, "%s: %s: coaccepting...\n", getprogname(), registered);
 
 	for (;;) {
 		if (kflag)
@@ -140,14 +146,15 @@ main(int argc, char **argv)
 			warn("coaccept");
 		if (vflag) {
 			halfcookie = (uint64_t *)&cookie;
-			printf("%s: coaccepted, pid %d, cookie %#lx%lx, buf[0] is %lld\n",
-			    getprogname(), getpid(), halfcookie[0], halfcookie[1], buf[0]);
+			printf("%s: %s: coaccepted, pid %d, cookie %#lx%lx, buf[0] is %lld\n",
+			    getprogname(), registered, getpid(), halfcookie[0], halfcookie[1], buf[0]);
 		}
 		buf[0]++;
 
 		for (c = 0; c < argc; c++) {
 			if (vflag)
-				fprintf(stderr, "%s: cocalling \"%s\"...\n", getprogname(), argv[c]);
+				fprintf(stderr, "%s: %s: cocalling \"%s\"...\n",
+				    getprogname(), registered, argv[c]);
 			if (kflag)
 				error = cocall_slow(cocall_code, cocall_data, lookedup[c], buf, sizeof(buf));
 			else
@@ -155,7 +162,8 @@ main(int argc, char **argv)
 			if (error != 0)
 				warn("cocall");
 			if (vflag)
-				printf("%s: returned from \"%s\", pid %d, buf[0] is %lld\n", getprogname(), argv[c], getpid(), buf[0]);
+				printf("%s: %s: returned from \"%s\", pid %d, buf[0] is %lld\n",
+				    getprogname(), registered, argv[c], getpid(), buf[0]);
 		}
 
 		if (xflag)
