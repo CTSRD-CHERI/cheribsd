@@ -1822,7 +1822,6 @@ core_output(char * __capability base_cap, size_t len, off_t offset,
 	struct mount *mp;
 	size_t resid, runlen;
 	int error;
-	char *base = (char *)(uintptr_t)(uintcap_t)base_cap;
 	bool success;
 	char *base = (char *)(uintptr_t)(uintcap_t)base_cap;
 
