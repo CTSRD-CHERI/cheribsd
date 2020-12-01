@@ -668,14 +668,11 @@ parse_dynamic(elf_file_t ef)
 	if (ef->strtab)
 		ef->strtab = cheri_kern_setbounds(ef->strtab, ef->strsz);
 	if (ef->rel)
-		ef->rel = cheri_kern_setbounds(ef->rel,
-		    ef->relsize * sizeof(*ef->rel));
+		ef->rel = cheri_kern_setbounds(ef->rel, ef->relsize);
 	if (ef->pltrel)
-		ef->pltrel = cheri_kern_setbounds(ef->pltrel,
-		    ef->pltrelsize * sizeof(*ef->pltrel));
+		ef->pltrel = cheri_kern_setbounds(ef->pltrel, ef->pltrelsize);
 	if (ef->rela)
-		ef->rela = cheri_kern_setbounds(ef->rela,
-		    ef->relasize * sizeof(*ef->rela));
+		ef->rela = cheri_kern_setbounds(ef->rela, ef->relasize);
 	if (ef->symtab)
 		ef->symtab = cheri_kern_setbounds(ef->symtab,
 		    ef->nchains * sizeof(Elf_Sym));
