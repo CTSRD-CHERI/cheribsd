@@ -1048,6 +1048,21 @@ link_elf_load_file(linker_class_t cls, const char* filename,
 		error = ENOEXEC;
 		goto out;
 	}
+#if __has_feature(capabilities)
+#ifdef __CHERI_PURE_CAPABILITY__
+	if (!ELF_IS_CHERI(hdr)) {
+		link_elf_error(filename, "Hybrid ABI");
+		error = ENOEXEC;
+		goto out;
+	}
+#else
+	if (ELF_IS_CHERI(hdr)) {
+		link_elf_error(filename, "Pure capability ABI");
+		error = ENOEXEC;
+		goto out;
+	}
+#endif
+#endif
 
 	/*
 	 * We rely on the program header being in the first page.
