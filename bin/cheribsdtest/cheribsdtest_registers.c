@@ -147,7 +147,7 @@ check_initreg_code(void * __capability c)
 	 * large enough for this binary (rounded to the next representable
 	 * length).
 	 */
-	vaddr_t upper_bound =
+	ptraddr_t upper_bound =
 	    CHERI_REPRESENTABLE_LENGTH(cheri_getaddress(c) + 0x1000000);
 	CHERIBSDTEST_VERIFY2(cheri_getlength(c) < upper_bound,
 	    "code length 0x%jx should be < than 0x%jx)", cheri_getlength(c),
@@ -518,7 +518,7 @@ test_initregs_idc(const struct cheri_test *ctp __unused)
 	    "perms %jx (store_cap should not be set)", perms);
 	CHERIBSDTEST_VERIFY2((perms & CHERI_PERM_STORE_LOCAL_CAP) == 0,
 	    "perms %jx (store_local_cap should not be set)", perms);
-	CHERIBSDTEST_VERIFY2((vaddr_t)cap_table == (vaddr_t)cgp,
+	CHERIBSDTEST_VERIFY2((ptraddr_t)cap_table == (ptraddr_t)cgp,
 	    "$cgp (%#p) does not point to _CHERI_CAPABILITY_TABLE_ (%#p)", cgp,
 	    cap_table);
 
