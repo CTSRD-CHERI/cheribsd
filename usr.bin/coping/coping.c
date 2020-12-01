@@ -43,7 +43,7 @@ __FBSDID("$FreeBSD$");
 #include <stdlib.h>
 #include <unistd.h>
 
-static long long buf[MAXBSIZE / sizeof(long long)];
+static long long buf[1];
 
 static void
 usage(void)
@@ -120,7 +120,7 @@ main(int argc, char **argv)
 			setvbuf(stdout, NULL, _IONBF, 0);
 	}
 
-	buf[0] = 42;
+	buf[0] = 0;
 	c = 0;
 
 	for (;;) {
