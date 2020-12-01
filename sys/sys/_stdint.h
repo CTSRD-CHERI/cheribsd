@@ -113,6 +113,11 @@ typedef __uintptr_t	kuintcap_t;
 #define	_KUINTCAP_T_DECLARED
 #endif
 
+#ifndef _PTRADDR_T_DECLARED
+typedef	__ptraddr_t	ptraddr_t;
+#define	_PTRADDR_T_DECLARED
+#endif
+
 #ifndef _VADDR_T_DECLARED
 #ifndef __CHERI_PURE_CAPABILITY__
 typedef	__uintptr_t		vaddr_t;
