@@ -470,7 +470,7 @@ aio_init_aioinfo(struct proc *p)
 }
 
 static int
-aio_sendsig(struct proc *p, struct sigevent *sigev, ksiginfo_t *ksi)
+aio_sendsig(struct proc *p, struct sigevent *sigev, ksiginfo_t *ksi, bool ext)
 {
 	struct thread *td;
 	int error;
@@ -481,7 +481,7 @@ aio_sendsig(struct proc *p, struct sigevent *sigev, ksiginfo_t *ksi)
 	if (!KSI_ONQ(ksi)) {
 		ksiginfo_set_sigev(ksi, sigev);
 		ksi->ksi_code = SI_ASYNCIO;
-		ksi->ksi_flags |= KSI_EXT | KSI_INS;
+		ksi->ksi_flags |= ext ? (KSI_EXT | KSI_INS) : 0;
 		tdsendsignal(p, td, ksi->ksi_signo, ksi);
 	}
 	PROC_UNLOCK(p);
@@ -900,7 +900,7 @@ aio_bio_done_notify(struct proc *userp, struct kaiocb *job)
 
 	if (job->uaiocb.aio_sigevent.sigev_notify == SIGEV_SIGNAL ||
 	    job->uaiocb.aio_sigevent.sigev_notify == SIGEV_THREAD_ID)
-		aio_sendsig(userp, &job->uaiocb.aio_sigevent, &job->ksi);
+		aio_sendsig(userp, &job->uaiocb.aio_sigevent, &job->ksi, true);
 
 	KNOTE_LOCKED(&job->klist, 1);
 
@@ -913,7 +913,8 @@ aio_bio_done_notify(struct proc *userp, struct kaiocb *job)
 		    == LIOJ_SIGNAL &&
 		    (lj->lioj_signal.sigev_notify == SIGEV_SIGNAL ||
 		    lj->lioj_signal.sigev_notify == SIGEV_THREAD_ID)) {
-			aio_sendsig(userp, &lj->lioj_signal, &lj->lioj_ksi);
+			aio_sendsig(userp, &lj->lioj_signal, &lj->lioj_ksi,
+			    true);
 			lj->lioj_flags |= LIOJ_SIGNAL_POSTED;
 		}
 	}
@@ -2282,7 +2283,8 @@ kern_lio_listio(struct thread *td, int mode, intcap_t uacb_list,
 			    LIOJ_SIGNAL_POSTED)) == LIOJ_SIGNAL &&
 			    (lj->lioj_signal.sigev_notify == SIGEV_SIGNAL ||
 			    lj->lioj_signal.sigev_notify == SIGEV_THREAD_ID)) {
-				aio_sendsig(p, &lj->lioj_signal, &lj->lioj_ksi);
+				aio_sendsig(p, &lj->lioj_signal, &lj->lioj_ksi,
+				    lj->lioj_count != 1);
 				lj->lioj_flags |= LIOJ_SIGNAL_POSTED;
 			}
 		}
