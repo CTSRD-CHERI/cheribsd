@@ -41,7 +41,7 @@ __FBSDID("$FreeBSD$");
 #include <machine/pcb.h>
 #include <machine/regnum.h>
 
-#ifndef __CHERI_PURECAP_KERNEL__
+#ifndef __CHERI_PURE_CAPABILITY__
 #define	VALID_PC(addr)		((addr) >= (uintptr_t)btext && (addr) % 4 == 0)
 
 static void
