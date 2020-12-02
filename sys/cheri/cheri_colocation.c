@@ -157,18 +157,18 @@ colocation_fetch_peer_scb(struct thread *td, struct switchercb *scbp)
 	KASSERT(error == 0, ("%s: copyincap from %p failed with error %d\n",
 	    __func__, (void *)addr, error));
 
-	if (cheri_gettag(scbp->scb_peer_scb) == 0 ||
-	    cheri_getlen(scbp->scb_peer_scb) == 0) {
+	if (cheri_gettag(scbp->scb_caller_scb) == 0 ||
+	    cheri_getlen(scbp->scb_caller_scb) == 0) {
 		/*
 		 * Not in cocall.
 		 */
 		return (false);
 	}
 
-	error = copyincap(scbp->scb_peer_scb, &(*scbp), sizeof(*scbp));
+	error = copyincap(scbp->scb_caller_scb, &(*scbp), sizeof(*scbp));
 	KASSERT(error == 0,
 	    ("%s: copyincap from peer %p failed with error %d\n",
-	    __func__, (__cheri_fromcap void *)scbp->scb_peer_scb, error));
+	    __func__, (__cheri_fromcap void *)scbp->scb_caller_scb, error));
 
 	return (true);
 }
@@ -185,8 +185,8 @@ colocation_get_peer(struct thread *td, struct thread **peertdp)
 		return;
 	}
 
-	if (cheri_gettag(scb.scb_peer_scb) != 0 &&
-	    cheri_getlen(scb.scb_peer_scb) > 0)
+	if (cheri_gettag(scb.scb_caller_scb) != 0 &&
+	    cheri_getlen(scb.scb_caller_scb) > 0)
 		*peertdp = scb.scb_borrower_td;
 	else
 		*peertdp = NULL;
@@ -237,15 +237,15 @@ colocation_thread_exit(struct thread *td)
 		cv_signal(&callermd->md_slow_cv);
 	}
 
-	peerscb = (__cheri_fromcap struct switchercb *)scb.scb_peer_scb;
+	peerscb = (__cheri_fromcap struct switchercb *)scb.scb_caller_scb;
 	COLOCATION_DEBUG("terminating thread %p, scb %p, peer scb %p",
 	    td, (void *)td->td_md.md_scb, peerscb);
 
 	/*
-	 * Set scb_peer_scb to a special "null" capability, so that cocall(2)
+	 * Set scb_caller_scb to a special "null" capability, so that cocall(2)
 	 * can see the callee thread is dead.
 	 */
-	scb.scb_peer_scb = cheri_capability_build_user_data(0, 0, 0, EPIPE);
+	scb.scb_caller_scb = cheri_capability_build_user_data(0, 0, 0, EPIPE);
 	scb.scb_td = NULL;
 	scb.scb_borrower_td = NULL;
 
@@ -268,7 +268,7 @@ colocation_thread_exit(struct thread *td)
 		return;
 	}
 
-	scb.scb_peer_scb = NULL;
+	scb.scb_caller_scb = NULL;
 	scb.scb_borrower_td = NULL;
 
 	error = copyoutcap(&scb, ___USER_CFROMPTR((void *)peerscb, userspace_cap), sizeof(scb));
@@ -479,7 +479,7 @@ setup_scb(struct thread *td)
 	scb.scb_unsealcap = switcher_sealcap2;
 	scb.scb_td = td;
 	scb.scb_borrower_td = NULL;
-	scb.scb_peer_scb = cheri_capability_build_user_data(0, 0, 0, EAGAIN);
+	scb.scb_caller_scb = cheri_capability_build_user_data(0, 0, 0, EAGAIN);
 #ifdef __mips__
 	scb.scb_tls = (char * __capability)td->td_md.md_tls + td->td_proc->p_md.md_tls_tcb_offset;
 #endif
@@ -954,12 +954,13 @@ static void
 db_print_scb(struct switchercb *scb)
 {
 
-	if (cheri_getlen(scb->scb_peer_scb) == 0) {
-		db_printf("    scb_peer_scb:      <errno %lu>\n",
-		    cheri_getoffset(scb->scb_peer_scb));
+	if (cheri_getlen(scb->scb_caller_scb) == 0) {
+		db_printf("    scb_caller_scb:    <errno %lu>\n",
+		    cheri_getoffset(scb->scb_caller_scb));
 	} else {
-		db_printf("    scb_peer_scb:      %#lp\n", scb->scb_peer_scb);
+		db_printf("    scb_caller_scb:    %#lp\n", scb->scb_caller_scb);
 	}
+	db_printf("    scb_callee_scb:    %#lp\n", scb->scb_callee_scb);
 	db_printf("    scb_td:            %p\n", scb->scb_td);
 	db_printf("    scb_borrower_td:   %p\n", scb->scb_borrower_td);
 #ifdef __mips__
@@ -1061,15 +1062,15 @@ DB_SHOW_COMMAND(scb, db_show_scb)
 
 		borrowertd = scb.scb_borrower_td;
 
-		if ((__cheri_fromcap void *)scb.scb_peer_scb == NULL) {
+		if ((__cheri_fromcap void *)scb.scb_caller_scb == NULL) {
 			if (borrowertd != NULL) {
 				td = borrowertd;
 				p = td->td_proc;
-				db_printf(" NULL scb_peer_scb; switcher control block %p for borrower thread %p, pid %d (%s), stack owned by %d:\n",
+				db_printf(" NULL scb_caller_scb; switcher control block %p for borrower thread %p, pid %d (%s), stack owned by %d:\n",
 				    (void *)td->td_md.md_scb, td, p->p_pid, p->p_comm, db_get_stack_pid(td));
 				db_print_scb_td(td);
 			} else {
-				db_printf(" NULL scb_peer_scb\n");
+				db_printf(" NULL scb_caller_scb\n");
 			}
 		} else  {
 			have_scb = colocation_fetch_peer_scb(td, &scb);

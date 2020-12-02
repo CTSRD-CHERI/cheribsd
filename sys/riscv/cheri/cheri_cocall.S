@@ -47,10 +47,11 @@
  * Layout of struct switchercb, pointed to by idc (caller)
  * and, later on, ct0 (callee):
  *
- * scb_peer_scb:	0(idc)
- * scb_td:		1*CHERICAP_SIZE(idc)
- * scb_borrower_td:	1*CHERICAP_SIZE+8(idc)
- * scb_unsealcap:	2*CHERICAP_SIZE(idc)
+ * scb_caller_scb:	0(idc)
+ * scb_callee_scb:	1*CHERICAP_SIZE(idc)
+ * scb_td:		2*CHERICAP_SIZE(idc)
+ * scb_borrower_td:	2*CHERICAP_SIZE+8(idc)
+ * scb_unsealcap:	3*CHERICAP_SIZE(idc)
  * scb_csp:		4*CHERICAP_SIZE(idc)
  * scb_cra:		5*CHERICAP_SIZE(idc)
  * scb_buf (ca3):	6*CHERICAP_SIZE(idc)
@@ -86,7 +87,7 @@ _C_LABEL(switcher_cocall):
 	 * Save the capability to the callee's control block in the caller
 	 * context.
 	 */
-	csc	ct0, SCB_PEER_SCB(idc)
+	csc	ct0, SCB_CALLEE_SCB(idc)
 1:
 #ifdef notyet
 	/*
@@ -102,10 +103,10 @@ _C_LABEL(switcher_cocall):
 	/*
 	 * Implement a trivial almost-spinlock.
 	 */
-	clc	ct1, SCB_PEER_SCB(ct0)
+	clc	ct1, SCB_CALLER_SCB(ct0)
 	cgettag	t2, ct1
 	bne	t2, zero, 10f
-	csc	idc, SCB_PEER_SCB(ct0)
+	csc	idc, SCB_CALLER_SCB(ct0)
 #endif
 
 	/*

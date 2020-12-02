@@ -52,14 +52,15 @@
  * Layout of struct switchercb, pointed to by idc (callee side)
  * and, later on, ct0 (caller side):
  *
- * scb_peer_scb:	0(idc)
- * scb_td:		1*CHERICAP_SIZE(idc)
- * scb_borrower_td:	1*CHERICAP_SIZE+8(idc)
- * scb_unsealcap:	2*CHERICAP_SIZE(idc)
+ * scb_caller_scb:	0(idc)
+ * scb_callee_scb:	1*CHERICAP_SIZE(idc)
+ * scb_td:		2*CHERICAP_SIZE(idc)
+ * scb_borrower_td:	2*CHERICAP_SIZE+8(idc)
+ * scb_unsealcap:	3*CHERICAP_SIZE(idc)
  * scb_csp:		4*CHERICAP_SIZE(idc)
  * scb_cra:		5*CHERICAP_SIZE(idc)
  * scb_buf (ca3):	6*CHERICAP_SIZE(idc)
- * scb_len (a4):	7*CHERICAP_SIZE(idc)
+ * scb_buflen (a4):	7*CHERICAP_SIZE(idc)
  * scb_cookiep (ca2):	8*CHERICAP_SIZE(idc)
  */
 
@@ -89,7 +90,7 @@ _C_LABEL(switcher_coaccept):
 	/*
 	 * Load the capability to the caller's control block.
 	 */
-	clc	ct0, SCB_PEER_SCB(idc)
+	clc	ct0, SCB_CALLER_SCB(idc)
 
 	/*
 	 * Is this the first invocation of coaccept, or rather a response
@@ -98,7 +99,7 @@ _C_LABEL(switcher_coaccept):
 	cgetlen	t1, ct0
 	bnez	t1, 1f
 	ccleartag ct2, cnull
-	csc	ct2, SCB_PEER_SCB(idc)
+	csc	ct2, SCB_CALLER_SCB(idc)
 	li	t0, SYS_copark
 	ecall
 
@@ -152,8 +153,8 @@ _C_LABEL(switcher_coaccept):
 	/*
 	 * Zero out the scb_peer_scb variables, releasing the spinlock.
 	 */
-	csd	zero, SCB_PEER_SCB(ct0)
-	csd	zero, SCB_PEER_SCB(idc)
+	csd	zero, SCB_CALLEE_SCB(ct0)
+	csd	zero, SCB_CALLER_SCB(idc)
 
 	li	t0, 0
 	li	a0, 0
