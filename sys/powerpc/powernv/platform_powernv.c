@@ -89,7 +89,7 @@ static platform_method_t powernv_methods[] = {
 	PLATFORMMETHOD(platform_mem_regions,	powernv_mem_regions),
 	PLATFORMMETHOD(platform_numa_mem_regions,	powernv_numa_mem_regions),
 	PLATFORMMETHOD(platform_timebase_freq,	powernv_timebase_freq),
-	
+
 	PLATFORMMETHOD(platform_smp_ap_init,	powernv_smp_ap_init),
 	PLATFORMMETHOD(platform_smp_first_cpu,	powernv_smp_first_cpu),
 	PLATFORMMETHOD(platform_smp_next_cpu,	powernv_smp_next_cpu),
@@ -102,7 +102,6 @@ static platform_method_t powernv_methods[] = {
 	PLATFORMMETHOD(platform_node_numa_domain,	powernv_node_numa_domain),
 
 	PLATFORMMETHOD(platform_reset,		powernv_reset),
-
 	{ 0, 0 }
 };
 
@@ -142,6 +141,7 @@ powernv_attach(platform_t plat)
 	phandle_t opal;
 	int res, len, idx;
 	register_t msr;
+	bool has_lp;
 
 	/* Ping OPAL again just to make sure */
 	opal_check();
@@ -174,6 +174,10 @@ powernv_attach(platform_t plat)
 
 	if (cpu_features2 & PPC_FEATURE2_ARCH_3_00)
 		lpcr |= LPCR_HVICE;
+
+#if BYTE_ORDER == LITTLE_ENDIAN
+	lpcr |= LPCR_ILE;
+#endif
 
 	mtspr(SPR_LPCR, lpcr);
 	isync();
@@ -225,6 +229,7 @@ powernv_attach(platform_t plat)
 		    sizeof(arr));
 		len /= 4;
 		idx = 0;
+		has_lp = false;
 		while (len > 0) {
 			shift = arr[idx];
 			slb_encoding = arr[idx + 1];
@@ -235,17 +240,21 @@ powernv_attach(platform_t plat)
 				lp_size = arr[idx];
 				lp_encoding = arr[idx+1];
 				if (slb_encoding == SLBV_L && lp_encoding == 0)
-					break;
+					has_lp = true;
+
+				if (slb_encoding == SLB_PGSZ_4K_4K &&
+				    lp_encoding == LP_4K_16M)
+					moea64_has_lp_4k_16m = true;
 
 				idx += 2;
 				len -= 2;
 				nptlp--;
 			}
-			if (nptlp && slb_encoding == SLBV_L && lp_encoding == 0)
+			if (has_lp && moea64_has_lp_4k_16m)
 				break;
 		}
 
-		if (len == 0)
+		if (!has_lp)
 			panic("Standard large pages (SLB[L] = 1, PTE[LP] = 0) "
 			    "not supported by this system.");
 
@@ -256,7 +265,6 @@ powernv_attach(platform_t plat)
 out:
 	return (0);
 }
-
 
 void
 powernv_mem_regions(platform_t plat, struct mem_region *phys, int *physsz,

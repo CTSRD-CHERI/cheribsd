@@ -6,7 +6,7 @@ suite.  These tests are all expect to be run on a pure-capability target (i.e.
 where every pointer is represented by a memory capability).
 
 The current version of these tests runs on CHERIBSD using the CHERIABI mode.
-Bare metal support is available from the cheritest repository which includes
+Bare metal support is available from the cheribsdtest repository which includes
 this one as a subrepository.
 
 Building

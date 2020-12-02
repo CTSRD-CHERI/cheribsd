@@ -35,6 +35,7 @@ TAGS+=		lib64
 .endif
 .PATH: ${RTLD_ELF_DIR}
 SRCS= \
+	crtbrand.S \
 	rtld_start.S \
 	reloc.c \
 	rtld.c \
@@ -49,18 +50,17 @@ SRCS+= \
 	rtld_printf.c
 .endif
 MAN?=		rtld.1
-CSTD?=		gnu99
+ACFLAGS+=	-DLOCORE
 CFLAGS+=	-Wall -DFREEBSD_ELF -DIN_RTLD -ffreestanding
 CFLAGS+=	-I${SRCTOP}/lib/csu/common
-.if exists(${RTLD_ELF_DIR}/${MACHINE_ARCH})
-RTLD_ARCH=	${MACHINE_ARCH}
+.if exists(${RTLD_ELF_DIR}/${MACHINE_ARCH:S/powerpc64le/powerpc64/})
+RTLD_ARCH=	${MACHINE_ARCH:S/powerpc64le/powerpc64/}
 .else
 RTLD_ARCH=	${MACHINE_CPUARCH}
 .endif
 CFLAGS+=	-I${RTLD_ELF_DIR}/${RTLD_ARCH} -I${RTLD_ELF_DIR}
 
 NO_WCAST_ALIGN=	yes
-WARNS?=		6
 INSTALLFLAGS=	-C -b
 PRECIOUSPROG=
 BINDIR=		/libexec
@@ -98,7 +98,7 @@ beforeinstall:
 	-chflags -h noschg ${DESTDIR}/usr/libexec/${PROG}
 .endif
 
-.PATH: ${RTLD_ELF_DIR}/${RTLD_ARCH}
+.PATH: ${RTLD_ELF_DIR}/${RTLD_ARCH} ${SRCTOP}/lib/csu/common
 
 .if ${MACHINE_ABI:Mpurecap}
 .PATH: ${RTLD_ELF_DIR}/cheri

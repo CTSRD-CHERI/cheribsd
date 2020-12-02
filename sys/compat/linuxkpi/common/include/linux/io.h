@@ -31,9 +31,10 @@
 #ifndef	_LINUX_IO_H_
 #define	_LINUX_IO_H_
 
-#include <machine/vm.h>
 #include <sys/endian.h>
 #include <sys/types.h>
+
+#include <machine/vm.h>
 
 #include <linux/compiler.h>
 #include <linux/types.h>
@@ -41,7 +42,6 @@
 /*
  * XXX This is all x86 specific.  It should be bus space access.
  */
-
 
 /* rmb and wmb are declared in machine/atomic.h, so should be included first. */
 #ifndef __io_br

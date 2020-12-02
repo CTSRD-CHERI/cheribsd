@@ -364,7 +364,8 @@ ${SHLIB_NAME_FULL}: ${SOBJS}
 	@${ECHO} building shared library ${SHLIB_NAME}
 	@rm -f ${SHLIB_NAME} ${SHLIB_LINK}
 .if defined(SHLIB_LINK) && !commands(${SHLIB_LINK:R}.ld) && ${MK_DEBUG_FILES} == "no"
-	@${INSTALL_LIBSYMLINK} ${TAG_ARGS:D${TAG_ARGS},dev} ${SHLIB_NAME} ${SHLIB_LINK}
+	# Note: This uses ln instead of ${INSTALL_LIBSYMLINK} since we are in OBJDIR
+	@${LN:Uln} -fs ${SHLIB_NAME} ${SHLIB_LINK}
 .endif
 	${_LD:N${CCACHE_BIN}} ${LDFLAGS} ${SSP_CFLAGS} ${SOLINKOPTS} \
 	    -o ${.TARGET} -Wl,-soname,${SONAME} ${SOBJS} ${LDADD}
@@ -378,7 +379,8 @@ ${SHLIB_NAME}: ${SHLIB_NAME_FULL} ${SHLIB_NAME}.debug
 	${OBJCOPY} --strip-debug --add-gnu-debuglink=${SHLIB_NAME}.debug \
 	    ${SHLIB_NAME_FULL} ${.TARGET}
 .if defined(SHLIB_LINK) && !commands(${SHLIB_LINK:R}.ld)
-	@${INSTALL_LIBSYMLINK} ${TAG_ARGS:D${TAG_ARGS},dev} ${SHLIB_NAME} ${SHLIB_LINK}
+	# Note: This uses ln instead of ${INSTALL_LIBSYMLINK} since we are in OBJDIR
+	@${LN:Uln} -fs ${SHLIB_NAME} ${SHLIB_LINK}
 .endif
 
 ${SHLIB_NAME}.debug: ${SHLIB_NAME_FULL}
@@ -465,11 +467,12 @@ SHLINSTALLFLAGS+= -fschg
 # stops that mattering for lib, other directories like secure/lib are built in
 # parallel at the top level and are unaffected by that, so can sometimes race
 # with the libc.so.7 reinstall and see a missing or corrupt file. Ideally the
-# build system would be fixed to not build/install libc the second time round,
-# but for now using -S ensures the install is atomic and thus we never see a
-# broken intermediate state, so use it even for NO_ROOT builds.
-.if !defined(NO_SAFE_LIBINSTALL) # && !defined(NO_ROOT)
+# build system would be fixed to not build/install libc to WORLDTMP the second
+# time round, but for now using -S ensures the install is atomic and thus we
+# never see a broken intermediate state, so use it even for NO_ROOT builds.
+.if !defined(NO_SAFE_LIBINSTALL) #&& !defined(NO_ROOT)
 SHLINSTALLFLAGS+= -S
+SHLINSTALLSYMLINKFLAGS+= -S
 .endif
 
 _INSTALLFLAGS:=	${INSTALLFLAGS}
@@ -477,6 +480,7 @@ _INSTALLFLAGS:=	${INSTALLFLAGS}
 _INSTALLFLAGS:=	${_INSTALLFLAGS${ie}}
 .endfor
 _SHLINSTALLFLAGS:=	${SHLINSTALLFLAGS}
+_SHLINSTALLSYMLINKFLAGS:= ${SHLINSTALLSYMLINKFLAGS}
 .for ie in ${INSTALLFLAGS_EDIT}
 _SHLINSTALLFLAGS:=	${_SHLINSTALLFLAGS${ie}}
 .endfor
@@ -511,29 +515,31 @@ _libinstall:
 	    ${_INSTALLFLAGS} ${SHLIB_LINK:R}.ld \
 	    ${DESTDIR}${_LIBDIR}/${SHLIB_LINK}
 .for _SHLIB_LINK_LINK in ${SHLIB_LDSCRIPT_LINKS}
-	${INSTALL_LIBSYMLINK} ${TAG_ARGS} ${SHLIB_LINK} ${DESTDIR}${_LIBDIR}/${_SHLIB_LINK_LINK}
+	${INSTALL_LIBSYMLINK} ${_SHLINSTALLSYMLINKFLAGS} ${TAG_ARGS} ${SHLIB_LINK} \
+	    ${DESTDIR}${_LIBDIR}/${_SHLIB_LINK_LINK}
 .endfor
 .else
 .if ${_SHLIBDIR} == ${_LIBDIR}
 .if ${SHLIB_LINK:Mlib*}
-	${INSTALL_RSYMLINK} ${TAG_ARGS:D${TAG_ARGS},dev} ${SHLIB_NAME} ${DESTDIR}${_LIBDIR}/${SHLIB_LINK}
+	${INSTALL_RSYMLINK} ${_SHLINSTALLSYMLINKFLAGS} ${TAG_ARGS:D${TAG_ARGS},dev} \
+	    ${SHLIB_NAME} ${DESTDIR}${_LIBDIR}/${SHLIB_LINK}
 .else
-	${INSTALL_RSYMLINK} ${TAG_ARGS} ${DESTDIR}${_SHLIBDIR}/${SHLIB_NAME} \
+	${INSTALL_RSYMLINK} ${_SHLINSTALLSYMLINKFLAGS} ${TAG_ARGS} ${DESTDIR}${_SHLIBDIR}/${SHLIB_NAME} \
 	    ${DESTDIR}${_LIBDIR}/${SHLIB_LINK}
 .endif
 .else
 .if ${SHLIB_LINK:Mlib*}
-	${INSTALL_RSYMLINK} ${TAG_ARGS:D${TAG_ARGS},dev} ${DESTDIR}${_SHLIBDIR}/${SHLIB_NAME} \
-	    ${DESTDIR}${_LIBDIR}/${SHLIB_LINK}
+	${INSTALL_RSYMLINK} ${_SHLINSTALLSYMLINKFLAGS} ${TAG_ARGS:D${TAG_ARGS},dev} \
+	    ${DESTDIR}${_SHLIBDIR}/${SHLIB_NAME} ${DESTDIR}${_LIBDIR}/${SHLIB_LINK}
 .else
-	${INSTALL_RSYMLINK} ${TAG_ARGS} ${DESTDIR}${_SHLIBDIR}/${SHLIB_NAME} \
-	    ${DESTDIR}${_LIBDIR}/${SHLIB_LINK}
+	${INSTALL_RSYMLINK} ${_SHLINSTALLSYMLINKFLAGS} ${TAG_ARGS} \
+	    ${DESTDIR}${_SHLIBDIR}/${SHLIB_NAME} ${DESTDIR}${_LIBDIR}/${SHLIB_LINK}
 .endif
 .if exists(${DESTDIR}${_LIBDIR}/${SHLIB_NAME})
 	-chflags noschg ${DESTDIR}${_LIBDIR}/${SHLIB_NAME}
 	rm -f ${DESTDIR}${_LIBDIR}/${SHLIB_NAME}
 .endif
-.endif
+.endif # _SHLIBDIR == _LIBDIR
 .endif # SHLIB_LDSCRIPT
 .endif # SHLIB_LINK
 .endif # SHIB_NAME

@@ -337,7 +337,6 @@ syncache_destroy(void)
 
 	/* Cleanup hash buckets: stop timers, free entries, destroy locks. */
 	for (i = 0; i < V_tcp_syncache.hashsize; i++) {
-
 		sch = &V_tcp_syncache.hashbase[i];
 		callout_drain(&sch->sch_timer);
 
@@ -509,6 +508,9 @@ syncache_timer(void *xsch)
 			if (TSTMP_LT(sc->sc_rxttime, sch->sch_nextc))
 				sch->sch_nextc = sc->sc_rxttime;
 			continue;
+		}
+		if (sc->sc_rxmits > V_tcp_ecn_maxretries) {
+			sc->sc_flags &= ~SCF_ECN;
 		}
 		if (sc->sc_rxmits > V_tcp_syncache.rexmt_limit) {
 			if ((s = tcp_log_addrs(&sc->sc_inc, NULL, NULL, NULL))) {
@@ -828,6 +830,8 @@ syncache_socket(struct syncache *sc, struct socket *lso, struct mbuf *m)
 		inp->inp_vflag &= ~INP_IPV6;
 		inp->inp_vflag |= INP_IPV4;
 #endif
+		inp->inp_ip_ttl = sc->sc_ip_ttl;
+		inp->inp_ip_tos = sc->sc_ip_tos;
 		inp->inp_laddr = sc->sc_inc.inc_laddr;
 #ifdef INET6
 	}
@@ -863,6 +867,7 @@ syncache_socket(struct syncache *sc, struct socket *lso, struct mbuf *m)
 		if (oinp->in6p_outputopts)
 			inp->in6p_outputopts =
 			    ip6_copypktopts(oinp->in6p_outputopts, M_NOWAIT);
+		inp->in6p_hops = oinp->in6p_hops;
 	}
 
 	if (sc->sc_inc.inc_flags & INC_ISIPV6) {
@@ -1207,6 +1212,40 @@ syncache_expand(struct in_conninfo *inc, struct tcpopt *to, struct tcphdr *th,
 		}
 
 		/*
+		 * If timestamps were not negotiated during SYN/ACK and a
+		 * segment with a timestamp is received, ignore the
+		 * timestamp and process the packet normally.
+		 * See section 3.2 of RFC 7323.
+		 */
+		if (!(sc->sc_flags & SCF_TIMESTAMP) &&
+		    (to->to_flags & TOF_TS)) {
+			if ((s = tcp_log_addrs(inc, th, NULL, NULL))) {
+				log(LOG_DEBUG, "%s; %s: Timestamp not "
+				    "expected, segment processed normally\n",
+				    s, __func__);
+				free(s, M_TCPLOG);
+				s = NULL;
+			}
+		}
+
+		/*
+		 * If timestamps were negotiated during SYN/ACK and a
+		 * segment without a timestamp is received, silently drop
+		 * the segment.
+		 * See section 3.2 of RFC 7323.
+		 */
+		if ((sc->sc_flags & SCF_TIMESTAMP) &&
+		    !(to->to_flags & TOF_TS)) {
+			SCH_UNLOCK(sch);
+			if ((s = tcp_log_addrs(inc, th, NULL, NULL))) {
+				log(LOG_DEBUG, "%s; %s: Timestamp missing, "
+				    "segment silently dropped\n", s, __func__);
+				free(s, M_TCPLOG);
+			}
+			return (-1);  /* Do not send RST */
+		}
+
+		/*
 		 * Pull out the entry to unlock the bucket row.
 		 *
 		 * NOTE: We must decrease TCPS_SYN_RECEIVED count here, not
@@ -1249,32 +1288,6 @@ syncache_expand(struct in_conninfo *inc, struct tcpopt *to, struct tcphdr *th,
 			log(LOG_DEBUG, "%s; %s: SEQ %u != IRS+1 %u, segment "
 			    "rejected\n", s, __func__, th->th_seq, sc->sc_irs);
 		goto failed;
-	}
-
-	/*
-	 * If timestamps were not negotiated during SYN/ACK they
-	 * must not appear on any segment during this session.
-	 */
-	if (!(sc->sc_flags & SCF_TIMESTAMP) && (to->to_flags & TOF_TS)) {
-		if ((s = tcp_log_addrs(inc, th, NULL, NULL)))
-			log(LOG_DEBUG, "%s; %s: Timestamp not expected, "
-			    "segment rejected\n", s, __func__);
-		goto failed;
-	}
-
-	/*
-	 * If timestamps were negotiated during SYN/ACK they should
-	 * appear on every segment during this session.
-	 * XXXAO: This is only informal as there have been unverified
-	 * reports of non-compliants stacks.
-	 */
-	if ((sc->sc_flags & SCF_TIMESTAMP) && !(to->to_flags & TOF_TS)) {
-		if ((s = tcp_log_addrs(inc, th, NULL, NULL))) {
-			log(LOG_DEBUG, "%s; %s: Timestamp missing, "
-			    "no action\n", s, __func__);
-			free(s, M_TCPLOG);
-			s = NULL;
-		}
 	}
 
 	*lsop = syncache_socket(sc, *lsop, m);
@@ -1386,12 +1399,28 @@ syncache_add(struct in_conninfo *inc, struct tcpopt *to, struct tcphdr *th,
 	cred = crhold(so->so_cred);
 
 #ifdef INET6
-	if ((inc->inc_flags & INC_ISIPV6) &&
-	    (inp->inp_flags & IN6P_AUTOFLOWLABEL))
-		autoflowlabel = 1;
+	if (inc->inc_flags & INC_ISIPV6) {
+		if (inp->inp_flags & IN6P_AUTOFLOWLABEL) {
+			autoflowlabel = 1;
+		}
+		ip_ttl = in6_selecthlim(inp, NULL);
+		if ((inp->in6p_outputopts == NULL) ||
+		    (inp->in6p_outputopts->ip6po_tclass == -1)) {
+			ip_tos = 0;
+		} else {
+			ip_tos = inp->in6p_outputopts->ip6po_tclass;
+		}
+	}
 #endif
-	ip_ttl = inp->inp_ip_ttl;
-	ip_tos = inp->inp_ip_tos;
+#if defined(INET6) && defined(INET)
+	else
+#endif
+#ifdef INET
+	{
+		ip_ttl = inp->inp_ip_ttl;
+		ip_tos = inp->inp_ip_tos;
+	}
+#endif
 	win = so->sol_sbrcv_hiwat;
 	ltflags = (tp->t_flags & (TF_NOOPT | TF_SIGNATURE));
 
@@ -1505,6 +1534,13 @@ syncache_add(struct in_conninfo *inc, struct tcpopt *to, struct tcphdr *th,
 			sc->sc_tsreflect = to->to_tsval;
 		else
 			sc->sc_flags &= ~SCF_TIMESTAMP;
+		/*
+		 * Disable ECN if needed.
+		 */
+		if ((sc->sc_flags & SCF_ECN) &&
+		    ((th->th_flags & (TH_ECE|TH_CWR)) != (TH_ECE|TH_CWR))) {
+			sc->sc_flags &= ~SCF_ECN;
+		}
 #ifdef MAC
 		/*
 		 * Since we have already unconditionally allocated label
@@ -1589,13 +1625,8 @@ skip_alloc:
 	cred = NULL;
 	sc->sc_ipopts = ipopts;
 	bcopy(inc, &sc->sc_inc, sizeof(struct in_conninfo));
-#ifdef INET6
-	if (!(inc->inc_flags & INC_ISIPV6))
-#endif
-	{
-		sc->sc_ip_tos = ip_tos;
-		sc->sc_ip_ttl = ip_ttl;
-	}
+	sc->sc_ip_tos = ip_tos;
+	sc->sc_ip_ttl = ip_ttl;
 #ifdef TCP_OFFLOAD
 	sc->sc_tod = tod;
 	sc->sc_todctx = todctx;
@@ -1797,6 +1828,7 @@ syncache_respond(struct syncache *sc, const struct mbuf *m0, int flags)
 		/* Zero out traffic class and flow label. */
 		ip6->ip6_flow &= ~IPV6_FLOWINFO_MASK;
 		ip6->ip6_flow |= sc->sc_flowlabel;
+		ip6->ip6_flow |= htonl(sc->sc_ip_tos << 20);
 
 		th = (struct tcphdr *)(ip6 + 1);
 	}
@@ -1925,7 +1957,7 @@ syncache_respond(struct syncache *sc, const struct mbuf *m0, int flags)
 		m->m_pkthdr.csum_flags = CSUM_TCP_IPV6;
 		th->th_sum = in6_cksum_pseudo(ip6, tlen + optlen - hlen,
 		    IPPROTO_TCP, 0);
-		ip6->ip6_hlim = in6_selecthlim(NULL, NULL);
+		ip6->ip6_hlim = sc->sc_ip_ttl;
 #ifdef TCP_OFFLOAD
 		if (ADDED_BY_TOE(sc)) {
 			struct toedev *tod = sc->sc_tod;

@@ -29,6 +29,7 @@
 __FBSDID("$FreeBSD$");
 
 #include "opt_acpi.h"
+#include "opt_iommu.h"
 #include "opt_isa.h"
 
 #include <sys/param.h>
@@ -314,7 +315,7 @@ ioapic_program_intpin(struct ioapic_intsrc *intpin)
 {
 	struct ioapic *io = (struct ioapic *)intpin->io_intsrc.is_pic;
 	uint32_t low, high;
-#ifdef ACPI_DMAR
+#ifdef IOMMU
 	int error;
 #endif
 
@@ -331,7 +332,7 @@ ioapic_program_intpin(struct ioapic_intsrc *intpin)
 			ioapic_write(io->io_addr,
 			    IOAPIC_REDTBL_LO(intpin->io_intpin),
 			    low | IOART_INTMSET);
-#ifdef ACPI_DMAR
+#ifdef IOMMU
 		mtx_unlock_spin(&icu_lock);
 		iommu_unmap_ioapic_intr(io->io_apic_id,
 		    &intpin->io_remap_cookie);
@@ -340,7 +341,7 @@ ioapic_program_intpin(struct ioapic_intsrc *intpin)
 		return;
 	}
 
-#ifdef ACPI_DMAR
+#ifdef IOMMU
 	mtx_unlock_spin(&icu_lock);
 	error = iommu_map_ioapic_intr(io->io_apic_id,
 	    intpin->io_cpu, intpin->io_vector, intpin->io_edgetrigger,
@@ -509,7 +510,6 @@ ioapic_enable_intr(struct intsrc *isrc)
 			    intpin->io_irq);
 	apic_enable_vector(intpin->io_cpu, intpin->io_vector);
 }
-
 
 static void
 ioapic_disable_intr(struct intsrc *isrc)
@@ -713,7 +713,7 @@ ioapic_create(vm_paddr_t addr, int32_t apic_id, int intbase)
 		intpin->io_cpu = PCPU_GET(apic_id);
 		value = ioapic_read(apic, IOAPIC_REDTBL_LO(i));
 		ioapic_write(apic, IOAPIC_REDTBL_LO(i), value | IOART_INTMSET);
-#ifdef ACPI_DMAR
+#ifdef IOMMU
 		/* dummy, but sets cookie */
 		mtx_unlock_spin(&icu_lock);
 		iommu_map_ioapic_intr(io->io_apic_id,
@@ -1054,7 +1054,6 @@ static device_method_t ioapic_pci_methods[] = {
 	/* Device interface */
 	DEVMETHOD(device_probe,		ioapic_pci_probe),
 	DEVMETHOD(device_attach,	ioapic_pci_attach),
-
 	{ 0, 0 }
 };
 
@@ -1146,7 +1145,6 @@ static device_method_t apic_methods[] = {
 	DEVMETHOD(device_identify,	apic_identify),
 	DEVMETHOD(device_probe,		apic_probe),
 	DEVMETHOD(device_attach,	apic_attach),
-
 	{ 0, 0 }
 };
 

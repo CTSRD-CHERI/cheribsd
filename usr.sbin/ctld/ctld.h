@@ -2,7 +2,6 @@
  * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
  *
  * Copyright (c) 2012 The FreeBSD Foundation
- * All rights reserved.
  *
  * This software was developed by Edward Tomasz Napierala under sponsorship
  * from the FreeBSD Foundation.
@@ -127,6 +126,8 @@ struct portal_group {
 	TAILQ_HEAD(, port)		pg_ports;
 	char				*pg_offload;
 	char				*pg_redirection;
+	int				pg_dscp;
+	int				pg_pcp;
 
 	uint16_t			pg_tag;
 };

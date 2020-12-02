@@ -292,9 +292,7 @@ colocation_unborrow(struct thread *td, struct trapframe *trapframe)
 	struct switchercb scb;
 	struct thread *peertd;
 	struct trapframe peertrapframe;
-	struct syscall_args peersa;
 #ifdef __mips__
-	struct trapframe *satrapframe, *peersatrapframe;
 	trapf_pc_t peertpc;
 #endif
 	bool have_scb;
@@ -322,9 +320,9 @@ colocation_unborrow(struct thread *td, struct trapframe *trapframe)
 	    "with td %p, pid %d (%s), switchercb %#lx, "
 	    "md_tls %p, md_tls_tcb_offset %zd",
 	    td, td->td_proc->p_pid, td->td_proc->p_comm, td->td_md.md_scb,
-	    (__cheri_fromcap void *)td->td_md.md_tls, td->td_md.md_tls_tcb_offset,
+	    (__cheri_fromcap void *)td->td_md.md_tls, td->td_proc->p_md.md_tls_tcb_offset,
 	    peertd, peertd->td_proc->p_pid, peertd->td_proc->p_comm, peertd->td_md.md_scb,
-	    (__cheri_fromcap void *)peertd->td_md.md_tls, peertd->td_md.md_tls_tcb_offset);
+	    (__cheri_fromcap void *)peertd->td_md.md_tls, peertd->td_proc->p_md.md_tls_tcb_offset);
 #else
 	COLOCATION_DEBUG("replacing current td %p, pid %d (%s), switchercb %#lx, "
 	    "with td %p, pid %d (%s), switchercb %#lx",
@@ -336,38 +334,10 @@ colocation_unborrow(struct thread *td, struct trapframe *trapframe)
 	KASSERT(td->td_frame == &td->td_pcb->pcb_regs,
 	    ("%s: td->td_frame %p != &td->td_pcb->pcb_regs %p, td %p",
 	    __func__, td->td_frame, &td->td_pcb->pcb_regs, td));
-	KASSERT(td->td_frame == td->td_sa.trapframe,
-	    ("%s: td->td_frame %p != td->td_sa.trapframe %p, td %p",
-	    __func__, td->td_frame, td->td_sa.trapframe, td));
 
 	KASSERT(peertd->td_frame == &peertd->td_pcb->pcb_regs,
 	    ("%s: peertd->td_frame %p != &peertd->td_pcb->pcb_regs %p, peertd %p",
 	    __func__, peertd->td_frame, &peertd->td_pcb->pcb_regs, peertd));
-	KASSERT(peertd->td_frame == peertd->td_sa.trapframe,
-	    ("%s: peertd->td_frame %p != peertd->td_sa.trapframe %p, peertd %p",
-	    __func__, peertd->td_frame, peertd->td_sa.trapframe, peertd));
-#endif
-
-#ifdef __mips__
-	/*
-	 * There's this... thing in MIPS' td_sa.  Its purpose is unknown,
-	 * but things break when you touch it.  Make sure to keep it as it is,
-	 * ie do not swap it.
-	 */
-	satrapframe = td->td_sa.trapframe;
-	peersatrapframe = peertd->td_sa.trapframe;
-#endif
-
-	/*
-	 * Swap the syscall information between td and peertd.
-	 */
-	memcpy(&peersa, &peertd->td_sa, sizeof(peersa));
-	memcpy(&peertd->td_sa, &td->td_sa, sizeof(peersa));
-	memcpy(&td->td_sa, &peersa, sizeof(peersa));
-
-#ifdef __mips__
-	td->td_sa.trapframe = satrapframe;
-	peertd->td_sa.trapframe = peersatrapframe;
 
 	/*
 	 * Another MIPS-specific field; this one needs to be swapped.
@@ -381,36 +351,48 @@ colocation_unborrow(struct thread *td, struct trapframe *trapframe)
 	memcpy(peertd->td_frame, td->td_frame, sizeof(struct trapframe));
 	memcpy(td->td_frame, &peertrapframe, sizeof(struct trapframe));
 
+	/*
+	 * Wake up the other thread, which should return with ERESTART,
+	 * refetch its args from the updated trapframe, and then execute
+	 * whatever syscall we've just entered.
+	 */
 	wakeup(&peertd->td_md.md_scb);
 
 	/*
 	 * Continue as usual, but calling copark(2) instead of whatever
-	 * syscall it was.
+	 * syscall it was.  The cpu_fetch_syscall_args() will fetch updated
+	 * arguments from the stack frame.
 	 */
-	KASSERT(td->td_sa.code == SYS_copark,
-	    ("%s: td_sa.code %d != SYS_copark %d\n",
-	    __func__, td->td_sa.code, SYS_copark));
+#ifdef __mips__
+	KASSERT(td->td_frame->v0 == SYS_copark,
+	    ("%s: td_sa.code %ld != SYS_copark %d; peer td_sa.code %ld; td %p, pid %d (%s); peer td %p, peer pid %d (%s)\n",
+	    __func__, (long)td->td_frame->v0, SYS_copark, (long)peertd->td_frame->v0,
+	    td, td->td_proc->p_pid, td->td_proc->p_comm,
+	    peertd, peertd->td_proc->p_pid, peertd->td_proc->p_comm));
+#endif
 }
 
 bool
 colocation_trap_in_switcher(struct thread *td, struct trapframe *trapframe)
 {
-#ifdef __mips__
 	const struct sysentvec *sv;
 	vm_offset_t addr;
 
 	sv = td->td_proc->p_sysent;
+#if defined(__mips__)
 	addr = (__cheri_addr vaddr_t)trapframe->pc;
+#elif defined(__riscv)
+	addr = (__cheri_addr vaddr_t)trapframe->tf_sepc;
+#else
+#error "what architecture is this?"
+#endif
 
 	if (addr >= sv->sv_cocall_base && addr < sv->sv_cocall_base + sv->sv_cocall_len)
 		goto trap;
 	if (addr >= sv->sv_coaccept_base && addr < sv->sv_coaccept_base + sv->sv_coaccept_len)
 		goto trap;
-#endif
 	return (false);
-#ifdef __mips__
 trap:
-#endif
 #ifdef DDB
 	if (kdb_on_switcher_trap)
 		kdb_enter(KDB_WHY_CHERI, "switcher trap");
@@ -418,6 +400,7 @@ trap:
 	return (true);
 }
 
+#ifdef __mips__
 void
 colocation_update_tls(struct thread *td)
 {
@@ -436,16 +419,15 @@ colocation_update_tls(struct thread *td)
 	error = copyincap(___USER_CFROMPTR((const void *)addr, userspace_cap), &scb, sizeof(scb));
 	KASSERT(error == 0, ("%s: copyincap from %p failed with error %d\n", __func__, (void *)addr, error));
 
-#ifdef __mips__
 	COLOCATION_DEBUG("changing TLS from %p to %p",
 	    (__cheri_fromcap void *)scb.scb_tls,
-	    (__cheri_fromcap void *)((char * __capability)td->td_md.md_tls + td->td_md.md_tls_tcb_offset));
-	scb.scb_tls = (char * __capability)td->td_md.md_tls + td->td_md.md_tls_tcb_offset;
-#endif
+	    (__cheri_fromcap void *)((char * __capability)td->td_md.md_tls + td->td_proc->p_md.md_tls_tcb_offset));
+	scb.scb_tls = (char * __capability)td->td_md.md_tls + td->td_proc->p_md.md_tls_tcb_offset;
 
 	error = copyoutcap(&scb, ___USER_CFROMPTR((void *)addr, userspace_cap), sizeof(scb));
 	KASSERT(error == 0, ("%s: copyoutcap from %p failed with error %d\n", __func__, (void *)addr, error));
 }
+#endif
 
 /*
  * Setup the per-thread switcher control block.
@@ -493,12 +475,13 @@ setup_scb(struct thread *td)
 	td->td_md.md_scb = addr;
 
 	//printf("%s: scb at %p, td %p\n", __func__, (void *)addr, td);
+	memset(&scb, 0, sizeof(scb));
 	scb.scb_unsealcap = switcher_sealcap2;
 	scb.scb_td = td;
 	scb.scb_borrower_td = NULL;
 	scb.scb_peer_scb = cheri_capability_build_user_data(0, 0, 0, EAGAIN);
 #ifdef __mips__
-	scb.scb_tls = (char * __capability)td->td_md.md_tls + td->td_md.md_tls_tcb_offset;
+	scb.scb_tls = (char * __capability)td->td_md.md_tls + td->td_proc->p_md.md_tls_tcb_offset;
 #endif
 
 	error = copyoutcap(&scb,
@@ -551,9 +534,18 @@ kern_cosetup(struct thread *td, int what,
 
 	switch (what) {
 	case COSETUP_COCALL:
+		/*
+		 * XXX: This should should use cheri_capability_build_user_code()
+		 *      instead.  It fails to seal, though; I guess there's something
+		 *      wrong with perms.
+		 */
 		codecap = cheri_capability_build_user_rwx(CHERI_CAP_USER_CODE_PERMS,
 		    td->td_proc->p_sysent->sv_cocall_base,
 		    td->td_proc->p_sysent->sv_cocall_len, 0);
+#ifdef CHERI_FLAGS_CAP_MODE
+		if (SV_PROC_FLAG(td->td_proc, SV_CHERI))
+			codecap = cheri_setflags(codecap, CHERI_FLAGS_CAP_MODE);
+#endif
 		codecap = cheri_seal(codecap, switcher_sealcap);
 		error = copyoutcap(&codecap, codep, sizeof(codecap));
 		if (error != 0)
@@ -569,6 +561,10 @@ kern_cosetup(struct thread *td, int what,
 		codecap = cheri_capability_build_user_rwx(CHERI_CAP_USER_CODE_PERMS,
 		    td->td_proc->p_sysent->sv_coaccept_base,
 		    td->td_proc->p_sysent->sv_coaccept_len, 0);
+#ifdef CHERI_FLAGS_CAP_MODE
+		if (SV_PROC_FLAG(td->td_proc, SV_CHERI))
+			codecap = cheri_setflags(codecap, CHERI_FLAGS_CAP_MODE);
+#endif
 		codecap = cheri_seal(codecap, switcher_sealcap);
 		error = copyoutcap(&codecap, codep, sizeof(codecap));
 		if (error != 0)
@@ -675,19 +671,19 @@ kern_colookup(struct thread *td, const char * __capability namep,
 	if (error != 0)
 		return (error);
 
-	vm_map_lock(&vmspace->vm_map);
+	vm_map_lock_read(&vmspace->vm_map);
 	LIST_FOREACH(con, &vmspace->vm_conames, c_next) {
 		if (strcmp(name, con->c_name) == 0)
 			break;
 	}
 
 	if (con == NULL) {
-		vm_map_unlock(&vmspace->vm_map);
+		vm_map_unlock_read(&vmspace->vm_map);
 		return (ESRCH);
 	}
 
 	error = copyoutcap(&con->c_value, capp, sizeof(con->c_value));
-	vm_map_unlock(&vmspace->vm_map);
+	vm_map_unlock_read(&vmspace->vm_map);
 	return (error);
 }
 
@@ -965,19 +961,27 @@ db_print_scb(struct switchercb *scb)
 {
 
 	if (cheri_getlen(scb->scb_peer_scb) == 0) {
-		db_printf("    scb_peer_scb:	<errno %lu>\n",
+		db_printf("    scb_peer_scb:      <errno %lu>\n",
 		    cheri_getoffset(scb->scb_peer_scb));
 	} else {
-		db_printf("    scb_peer_scb:	%#lp\n", &scb->scb_peer_scb);
+		db_printf("    scb_peer_scb:      %#lp\n", scb->scb_peer_scb);
 	}
-	db_printf("    scb_td:		%p\n", scb->scb_td);
-	db_printf("    scb_borrower_td:	%p\n", scb->scb_borrower_td);
-	db_printf("    scb_tls:		%#lp\n", &scb->scb_tls);
-	db_printf("    scb_csp (c11):	%#lp\n", &scb->scb_csp);
-	db_printf("    scb_cra (c13):	%#lp\n", &scb->scb_cra);
-	db_printf("    scb_buf (c6):	%#lp\n", &scb->scb_buf);
-	db_printf("    scb_buflen (a0):	%zd\n", scb->scb_buflen);
-	db_printf("    scb_cookiep:	%#lp\n", &scb->scb_cookiep);
+	db_printf("    scb_td:            %p\n", scb->scb_td);
+	db_printf("    scb_borrower_td:   %p\n", scb->scb_borrower_td);
+#ifdef __mips__
+	db_printf("    scb_tls:           %#lp\n", scb->scb_tls);
+	db_printf("    scb_csp (c11):     %#lp\n", scb->scb_csp);
+	db_printf("    scb_cra (c13):     %#lp\n", scb->scb_cra);
+	db_printf("    scb_buf (c6):      %#lp\n", scb->scb_buf);
+	db_printf("    scb_buflen (a0):   %zd\n", scb->scb_buflen);
+	db_printf("    scb_cookiep:       %#lp\n", scb->scb_cookiep);
+#else
+	db_printf("    scb_csp:           %#lp\n", scb->scb_csp);
+	db_printf("    scb_cra:           %#lp\n", scb->scb_cra);
+	db_printf("    scb_cookiep (ca2): %#lp\n", scb->scb_cookiep);
+	db_printf("    scb_buf (ca3):     %#lp\n", scb->scb_buf);
+	db_printf("    scb_buflen (a4):   %zd\n", scb->scb_buflen);
+#endif
 }
 
 void
@@ -991,6 +995,46 @@ db_print_scb_td(struct thread *td)
 		return;
 
 	db_print_scb(&scb);
+}
+
+/*
+ * Return PID owning the stack mapping the current userspace trapframe stack
+ * pointer points to.  Simply put: returns the PID which belongs to the
+ * userspace thread, which can - due to thread borrowing - be different from
+ * the PID for the kernel thread.
+ */
+static pid_t
+db_get_stack_pid(struct thread *td)
+{
+	vm_map_t map;
+	vm_map_entry_t entry;
+	vm_offset_t addr;
+	boolean_t found;
+	pid_t pid;
+
+#if defined(__mips__)
+	addr = __builtin_cheri_address_get(td->td_frame->csp);
+	db_printf("%s: td: %p; td_frame %p; csp: %#lp; csp addr: %lx\n",
+	    __func__, td, td->td_frame, td->td_frame->csp, (long)addr);
+#elif defined(__riscv)
+	addr = __builtin_cheri_address_get(td->td_frame->tf_sp);
+	db_printf("%s: td: %p; td_frame %p; tf_sp: %#lp; csp addr: %lx\n",
+	    __func__, td, td->td_frame,
+	    (void * __capability)td->td_frame->tf_sp, (long)addr);
+#else
+#error "what architecture is this?"
+#endif
+
+	map = &td->td_proc->p_vmspace->vm_map;
+	vm_map_lock(map);
+	found = vm_map_lookup_entry(map, addr, &entry);
+	if (found)
+		pid = entry->owner;
+	else
+		pid = -1;
+	vm_map_unlock(map);
+
+	return (pid);
 }
 
 DB_SHOW_COMMAND(scb, db_show_scb)
@@ -1017,8 +1061,8 @@ DB_SHOW_COMMAND(scb, db_show_scb)
 			db_printf("    no scb\n");
 			return;
 		}
-		db_printf(" switcher control block %p for thread %p, pid %d (%s):\n",
-		    (void *)td->td_md.md_scb, td, p->p_pid, p->p_comm);
+		db_printf(" switcher control block %p for thread %p, pid %d (%s), stack owned by %d:\n",
+		    (void *)td->td_md.md_scb, td, p->p_pid, p->p_comm, db_get_stack_pid(td));
 		db_print_scb_td(curthread);
 
 		borrowertd = scb.scb_borrower_td;
@@ -1027,8 +1071,8 @@ DB_SHOW_COMMAND(scb, db_show_scb)
 			if (borrowertd != NULL) {
 				td = borrowertd;
 				p = td->td_proc;
-				db_printf(" NULL scb_peer_scb; switcher control block %p for borrower thread %p, pid %d (%s):\n",
-				    (void *)td->td_md.md_scb, td, p->p_pid, p->p_comm);
+				db_printf(" NULL scb_peer_scb; switcher control block %p for borrower thread %p, pid %d (%s), stack owned by %d:\n",
+				    (void *)td->td_md.md_scb, td, p->p_pid, p->p_comm, db_get_stack_pid(td));
 				db_print_scb_td(td);
 			} else {
 				db_printf(" NULL scb_peer_scb\n");
@@ -1043,8 +1087,8 @@ DB_SHOW_COMMAND(scb, db_show_scb)
 				} else {
 					td = borrowertd;
 					p = td->td_proc;
-					db_printf(" switcher control block %p for peer thread %p, pid %d (%s):\n",
-					    (void *)td->td_md.md_scb, td, p->p_pid, p->p_comm);
+					db_printf(" switcher control block %p for peer thread %p, pid %d (%s), stack owned by %d:\n",
+					    (void *)td->td_md.md_scb, td, p->p_pid, p->p_comm, db_get_stack_pid(td));
 				}
 				db_print_scb(&scb);
 			}

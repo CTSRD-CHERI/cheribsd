@@ -5,6 +5,4 @@ BINDIR?= /usr/bin
 
 CFLAGS+= -I. -I${.CURDIR}
 
-WARNS?=		6
-
 .include "../Makefile.inc"

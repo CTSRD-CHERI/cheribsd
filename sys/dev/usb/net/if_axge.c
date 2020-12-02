@@ -75,6 +75,7 @@ static const STRUCT_USB_HOST_ID axge_devs[] = {
 #define	AXGE_DEV(v,p) { USB_VP(USB_VENDOR_##v, USB_PRODUCT_##v##_##p) }
 	AXGE_DEV(ASIX, AX88178A),
 	AXGE_DEV(ASIX, AX88179),
+	AXGE_DEV(BELKIN, B2B128),
 	AXGE_DEV(DLINK, DUB1312),
 	AXGE_DEV(LENOVO, GIGALAN),
 	AXGE_DEV(SITECOMEU, LN032),
@@ -594,7 +595,6 @@ axge_detach(device_t dev)
 	sc = device_get_softc(dev);
 	ue = &sc->sc_ue;
 	if (device_is_attached(dev)) {
-
 		/* wait for any post attach or other command to complete */
 		usb_proc_drain(&ue->ue_tq);
 
@@ -740,7 +740,6 @@ tr_setup:
 			goto tr_setup;
 		}
 		return;
-
 	}
 }
 

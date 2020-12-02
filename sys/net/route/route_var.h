@@ -39,6 +39,13 @@
 #include <sys/epoch.h>
 #include <netinet/in.h>		/* struct sockaddr_in */
 #include <sys/counter.h>
+#include <net/route/nhop.h>
+
+#ifdef	RTDEBUG
+#define	DPRINTF(_fmt, ...)	printf("%s: " _fmt "\n", __func__ , ## __VA_ARGS__)
+#else
+#define	DPRINTF(_fmt, ...)
+#endif
 
 struct nh_control;
 typedef int rnh_preadd_entry_f_t(u_int fibnum, const struct sockaddr *addr,
@@ -79,6 +86,8 @@ struct rib_head {
 
 /* Constants */
 #define	RIB_MAX_RETRIES	3
+#define	RT_MAXFIBS	UINT16_MAX
+#define	RIB_MAX_MPATH_WIDTH	64
 
 /* Macro for verifying fields in af-specific 'struct route' structures */
 #define CHK_STRUCT_FIELD_GENERIC(_s1, _f1, _s2, _f2)			\
@@ -104,27 +113,14 @@ CHK_STRUCT_ROUTE_FIELDS(_ro_new);						\
 _Static_assert(__offsetof(struct route, ro_dst) == __offsetof(_ro_new, _dst_new),\
 		"ro_dst and " #_dst_new " are at different offset")
 
-struct rib_head *rt_tables_get_rnh(int fib, int family);
-void rt_mpath_init_rnh(struct rib_head *rnh);
+struct rib_head *rt_tables_get_rnh(uint32_t table, sa_family_t family);
 int rt_getifa_fib(struct rt_addrinfo *info, u_int fibnum);
-void rt_setmetrics(const struct rt_addrinfo *info, struct rtentry *rt);
-#ifdef RADIX_MPATH
-struct radix_node *rt_mpath_unlink(struct rib_head *rnh,
-    struct rt_addrinfo *info, struct rtentry *rto, int *perror);
-#endif
 struct rib_cmd_info;
-int add_route(struct rib_head *rnh, struct rt_addrinfo *info,
-    struct rib_cmd_info *rc);
-int del_route(struct rib_head *rnh, struct rt_addrinfo *info,
-    struct rib_cmd_info *rc);
-int change_route(struct rib_head *, struct rt_addrinfo *,
-    struct rib_cmd_info *rc);
 
 VNET_PCPUSTAT_DECLARE(struct rtstat, rtstat);
 #define	RTSTAT_ADD(name, val)	\
 	VNET_PCPUSTAT_ADD(struct rtstat, rtstat, name, (val))
 #define	RTSTAT_INC(name)	RTSTAT_ADD(name, 1)
-
 
 /*
  * Convert a 'struct radix_node *' to a 'struct rtentry *'.
@@ -170,25 +166,12 @@ struct rtentry {
 		char			rt_dstb[28];
 	};
 
-	int		rt_flags;	/* up/down?, host/net */
+	int		rte_flags;	/* up/down?, host/net */
 	u_long		rt_weight;	/* absolute weight */ 
 	u_long		rt_expire;	/* lifetime for route, e.g. redirect */
-#define	rt_endzero	rt_mtx
-	struct mtx	rt_mtx;		/* mutex for routing entry */
 	struct rtentry	*rt_chain;	/* pointer to next rtentry to delete */
 	struct epoch_context	rt_epoch_ctx;	/* net epoch tracker */
 };
-
-#define	RT_LOCK_INIT(_rt) \
-	mtx_init(&(_rt)->rt_mtx, "rtentry", NULL, MTX_DEF | MTX_DUPOK | MTX_NEW)
-#define	RT_LOCK(_rt)		mtx_lock(&(_rt)->rt_mtx)
-#define	RT_UNLOCK(_rt)		mtx_unlock(&(_rt)->rt_mtx)
-#define	RT_LOCK_DESTROY(_rt)	mtx_destroy(&(_rt)->rt_mtx)
-#define	RT_LOCK_ASSERT(_rt)	mtx_assert(&(_rt)->rt_mtx, MA_OWNED)
-#define	RT_UNLOCK_COND(_rt)	do {				\
-	if (mtx_owned(&(_rt)->rt_mtx))				\
-		mtx_unlock(&(_rt)->rt_mtx);			\
-} while (0)
 
 /*
  * With the split between the routing entry and the nexthop,
@@ -215,32 +198,117 @@ struct rtentry {
 /* rtentry rt flag mask */
 #define	RTE_RT_FLAG_MASK	(RTF_UP | RTF_HOST)
 
-/* Nexthop selection */
-#define	_NH2MP(_nh)	((struct nhgrp_object *)(_nh))
-#define	_SELECT_NHOP(_nh, _flowid)	\
-	(_NH2MP(_nh))->nhops[(_flowid) % (_NH2MP(_nh))->mp_size]
-#define	_RT_SELECT_NHOP(_nh, _flowid)	\
-	((!NH_IS_MULTIPATH(_nh)) ? (_nh) : _SELECT_NHOP(_nh, _flowid))
-#define	RT_SELECT_NHOP(_rt, _flowid)	_RT_SELECT_NHOP((_rt)->rt_nhop, _flowid)
- 
-/* rte<>nhop translation */
-static inline uint16_t
-fib_rte_to_nh_flags(int rt_flags)
-{
-	uint16_t res;
-
-	res = (rt_flags & RTF_REJECT) ? NHF_REJECT : 0;
-	res |= (rt_flags & RTF_HOST) ? NHF_HOST : 0;
-	res |= (rt_flags & RTF_BLACKHOLE) ? NHF_BLACKHOLE : 0;
-	res |= (rt_flags & (RTF_DYNAMIC|RTF_MODIFIED)) ? NHF_REDIRECT : 0;
-	res |= (rt_flags & RTF_BROADCAST) ? NHF_BROADCAST : 0;
-	res |= (rt_flags & RTF_GATEWAY) ? NHF_GATEWAY : 0;
-
-	return (res);
-}
-
+/* route_temporal.c */
 void tmproutes_update(struct rib_head *rnh, struct rtentry *rt);
 void tmproutes_init(struct rib_head *rh);
 void tmproutes_destroy(struct rib_head *rh);
+
+/* route_ctl.c */
+struct route_nhop_data {
+	union {
+		struct nhop_object *rnd_nhop;
+		struct nhgrp_object *rnd_nhgrp;
+	};
+	uint32_t rnd_weight;
+};
+
+int change_route_nhop(struct rib_head *rnh, struct rtentry *rt,
+    struct rt_addrinfo *info, struct route_nhop_data *rnd,
+    struct rib_cmd_info *rc);
+int change_route_conditional(struct rib_head *rnh, struct rtentry *rt,
+    struct rt_addrinfo *info, struct route_nhop_data *nhd_orig,
+    struct route_nhop_data *nhd_new, struct rib_cmd_info *rc);
+struct rtentry *lookup_prefix(struct rib_head *rnh,
+    const struct rt_addrinfo *info, struct route_nhop_data *rnd);
+
+bool nhop_can_multipath(const struct nhop_object *nh);
+bool match_nhop_gw(const struct nhop_object *nh, const struct sockaddr *gw);
+int check_info_match_nhop(const struct rt_addrinfo *info,
+    const struct rtentry *rt, const struct nhop_object *nh);
+int can_override_nhop(const struct rt_addrinfo *info,
+    const struct nhop_object *nh);
+
+void vnet_rtzone_init(void);
+void vnet_rtzone_destroy(void);
+
+/* subscriptions */
+void rib_init_subscriptions(struct rib_head *rnh);
+void rib_destroy_subscriptions(struct rib_head *rnh);
+
+/* Nexhops */
+void nhops_init(void);
+int nhops_init_rib(struct rib_head *rh);
+void nhops_destroy_rib(struct rib_head *rh);
+void nhop_ref_object(struct nhop_object *nh);
+int nhop_try_ref_object(struct nhop_object *nh);
+void nhop_free_any(struct nhop_object *nh);
+
+void nhop_set_type(struct nhop_object *nh, enum nhop_type nh_type);
+void nhop_set_rtflags(struct nhop_object *nh, int rt_flags);
+
+int nhop_create_from_info(struct rib_head *rnh, struct rt_addrinfo *info,
+    struct nhop_object **nh_ret);
+int nhop_create_from_nhop(struct rib_head *rnh, const struct nhop_object *nh_orig,
+    struct rt_addrinfo *info, struct nhop_object **pnh_priv);
+
+void nhops_update_ifmtu(struct rib_head *rh, struct ifnet *ifp, uint32_t mtu);
+int nhops_dump_sysctl(struct rib_head *rh, struct sysctl_req *w);
+
+/* MULTIPATH */
+#define	MPF_MULTIPATH	0x08	/* need to be consistent with NHF_MULTIPATH */
+
+struct nhgrp_object {
+	uint16_t		nhg_flags;	/* nexthop group flags */
+	uint8_t			nhg_size;	/* dataplain group size */
+	uint8_t			spare;
+	struct nhop_object	*nhops[0];	/* nhops */
+};
+
+static inline struct nhop_object *
+nhop_select(struct nhop_object *nh, uint32_t flowid)
+{
+
+#ifdef ROUTE_MPATH
+	if (NH_IS_NHGRP(nh)) {
+		struct nhgrp_object *nhg = (struct nhgrp_object *)nh;
+		nh = nhg->nhops[flowid % nhg->nhg_size];
+	}
+#endif
+	return (nh);
+}
+
+
+struct weightened_nhop;
+
+/* mpath_ctl.c */
+int add_route_mpath(struct rib_head *rnh, struct rt_addrinfo *info,
+    struct rtentry *rt, struct route_nhop_data *rnd_add,
+    struct route_nhop_data *rnd_orig, struct rib_cmd_info *rc);
+int del_route_mpath(struct rib_head *rh, struct rt_addrinfo *info,
+    struct rtentry *rt, struct nhgrp_object *nhg, struct rib_cmd_info *rc);
+
+/* nhgrp.c */
+int nhgrp_ctl_init(struct nh_control *ctl);
+void nhgrp_ctl_free(struct nh_control *ctl);
+void nhgrp_ctl_unlink_all(struct nh_control *ctl);
+
+
+/* nhgrp_ctl.c */
+int nhgrp_dump_sysctl(struct rib_head *rh, struct sysctl_req *w);
+
+int nhgrp_get_group(struct rib_head *rh, struct weightened_nhop *wn,
+    int num_nhops, struct route_nhop_data *rnd);
+typedef bool nhgrp_filter_cb_t(const struct nhop_object *nh, void *data);
+int nhgrp_get_filtered_group(struct rib_head *rh, const struct nhgrp_object *src,
+    nhgrp_filter_cb_t flt_func, void *flt_data, struct route_nhop_data *rnd);
+int nhgrp_get_addition_group(struct rib_head *rnh,
+    struct route_nhop_data *rnd_orig, struct route_nhop_data *rnd_add,
+    struct route_nhop_data *rnd_new);
+
+void nhgrp_free(struct nhgrp_object *nhg);
+
+/* Entropy data used for outbound hashing */
+#define MPATH_ENTROPY_KEY_LEN	40
+extern uint8_t mpath_entropy_key[MPATH_ENTROPY_KEY_LEN];
 
 #endif

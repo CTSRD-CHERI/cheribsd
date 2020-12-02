@@ -103,7 +103,7 @@ vendor CREATIVE		0x041e	Creative Labs
 vendor NOKIA		0x0421	Nokia
 vendor ADI		0x0422	ADI Systems
 vendor CATC		0x0423	Computer Access Technology
-vendor SMC2		0x0424	Microchip (Standard Microsystems)
+vendor SMC2		0x0424	Microchip Technology
 vendor MOTOROLA_HK	0x0425	Motorola HK
 vendor GRAVIS		0x0428	Advanced Gravis Computer
 vendor CIRRUSLOGIC	0x0429	Cirrus Logic
@@ -782,6 +782,7 @@ vendor NHJ		0x2770	NHJ
 vendor THINGM		0x27b8	ThingM
 vendor PERASO		0x2932	Peraso Technologies, Inc.
 vendor PLANEX		0x2c02	Planex Communications
+vendor MERCUSYS		0x2c4e	Mercusys, Inc.
 vendor QUECTEL		0x2c7c	Quectel Wireless Solutions
 vendor VIDZMEDIA	0x3275	VidzMedia Pte Ltd
 vendor LINKINSTRUMENTS	0x3195	Link Instruments Inc.
@@ -1274,6 +1275,7 @@ product ATEN UC1284		0x2001	Parallel printer
 product ATEN UC10T		0x2002	10Mbps Ethernet
 product ATEN UC110T		0x2007	UC-110T Ethernet
 product ATEN UC232A		0x2008	Serial
+product ATEN UC232B		0x2022  Serial
 product ATEN UC210T		0x2009	UC-210T Ethernet
 product ATEN DSB650C		0x4000	DSB-650C
 
@@ -1365,6 +1367,7 @@ product BELKIN F5U109		0x0109	F5U109 Serial
 product BELKIN USB2SCSI		0x0115	USB to SCSI
 product BELKIN F8T012		0x0121	F8T012xx1 Bluetooth USB Adapter
 product BELKIN USB2LAN		0x0121	USB to LAN
+product BELKIN B2B128		0x0128	USB3 to LAN
 product BELKIN F5U208		0x0208	F5U208 VideoBus II
 product BELKIN F5U237		0x0237	F5U237 USB 2.0 7-Port Hub
 product BELKIN F5U257		0x0257	F5U257 Serial
@@ -1377,6 +1380,7 @@ product BELKIN F6C900UNV	0x0900	F6C900-UNV
 product BELKIN F6C100UNV	0x0910	F6C100-UNV
 product BELKIN F6C120UNV	0x0912	F6C120-UNV UPS
 product BELKIN F6C800UNV	0x0980	F6C800-UNV
+product BELKIN F9L1004V1	0x1004	N300 Wireless Adapter
 product BELKIN F6C1100UNV	0x1100	F6C1100-UNV, F6C1200-UNV
 product BELKIN F5U120		0x1203	F5U120-PC Hub
 product BELKIN RTL8188CU	0x1102  RTL8188CU Wireless Adapter
@@ -1411,6 +1415,10 @@ product BILLIONTON USBLP100	0x0987	USB100LP
 product BILLIONTON USBEL100	0x0988	USB100EL
 product BILLIONTON USBE100	0x8511	USBE100
 product BILLIONTON USB2AR	0x90ff	USB2AR Ethernet
+
+/* Brainboxes Limited products */
+product BRAINBOXES US257	0x5001	US-257 USB2Serial 2xRS232
+product BRAINBOXES US25701	0x5002	US-25701 USB2Serial 2xRS232
 
 /* Broadcom products */
 product BROADCOM BCM2033	0x2033	BCM2033 Bluetooth USB dongle
@@ -1877,6 +1885,7 @@ product ELV USBI2C		0xe00f	USB-I2C interface
 product EMS DUAL_SHOOTER	0x0003	PSX gun controller converter
 
 /* Emtec products */
+product EMTEC DANEELEC4GB	0x1e20 USB DISK Pro PMAP
 product EMTEC RUF2PS 		0x2240 Flash Drive
 
 /* Encore products */
@@ -2245,7 +2254,9 @@ product FUJITSU AH_F401U	0x105b	AH-F401U Air H device
 product FUJITSUSIEMENS SCR	0x0009	Fujitsu-Siemens SCR USB Reader
 
 /* Garmin products */
+product GARMIN DAKOTA20		0x23c0	Dakota 20
 product GARMIN FORERUNNER230	0x086d	ForeRunner 230
+product GARMIN GPSMAP62S	0x2459	GPSMAP 62s
 product GARMIN IQUE_3600	0x0004	iQue 3600
 
 /* Gemalto products */
@@ -3190,6 +3201,10 @@ product MELCO WLIUCG300HPV1	0x01a8	WLI-UC-G300HP-V1
 product MELCO WLIUCGNM2		0x01ee	WLI-UC-GNM2
 product MELCO WIU2433DM		0x0242	WI-U2-433DM
 product MELCO WIU3866D		0x025d	WI-U3-866D
+product MELCO WIU2433DHP	0x029b	WI-U2-433DHP
+
+/* Mercusys, Inc. */
+product MERCUSYS MW150US	0x0102	Mercusys MW150US
 
 /* Merlin products */
 product MERLIN V620             0x1110  Merlin V620
@@ -4420,13 +4435,15 @@ product SMART2 G2MEMKEY		0x1700	G2 Memory Key
 product SMARTBRIDGES SMARTLINK	0x0001	SmartLink USB Ethernet
 product SMARTBRIDGES SMARTNIC	0x0003	smartNIC 2 PnP Ethernet
 
-/* SMC products */
+/* Microchip Technology (formerly SMC) products */
 product SMC 2102USB		0x0100	10Mbps Ethernet
 product SMC 2202USB		0x0200	10/100 Ethernet
 product SMC 2206USB		0x0201	EZ Connect USB Ethernet
 product SMC 2862WG		0xee13	EZ Connect Wireless Adapter
 product SMC2 2020HUB		0x2020	USB Hub
+product SMC2 2513HUB		0x2513	USB Hub
 product SMC2 2514HUB		0x2514	USB Hub
+product SMC2 2517HUB		0x2517	USB Hub
 product SMC3 2662WUSB		0xa002	2662W-AR Wireless
 product SMC2 LAN7800_ETH	0x7800	USB/Ethernet
 product SMC2 LAN7801_ETH	0x7801	USB/Ethernet
@@ -4842,6 +4859,7 @@ product WIENERPLEINBAUS MPOD	0x0012	MPOD PSU
 product WIENERPLEINBAUS CML	0x0015	CML Data Logger
 
 /* Windbond Electronics */
+product WINBOND CDC		0x5011	CDC serial device
 product WINBOND UH104		0x5518	4-port USB Hub
 
 /* WinMaxGroup products */

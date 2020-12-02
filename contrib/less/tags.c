@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 1984-2019  Mark Nudelman
+ * Copyright (C) 1984-2020  Mark Nudelman
  *
  * You may distribute under the terms of either the GNU General Public
  * License or the Less License, as specified in the README file.
@@ -57,10 +57,10 @@ enum {
 
 static enum tag_result findctag LESSPARAMS((char *tag));
 static enum tag_result findgtag LESSPARAMS((char *tag, int type));
-static char *nextgtag LESSPARAMS(());
-static char *prevgtag LESSPARAMS((void));
-static POSITION ctagsearch LESSPARAMS((void));
-static POSITION gtagsearch LESSPARAMS((void));
+static char *nextgtag(VOID_PARAM);
+static char *prevgtag(VOID_PARAM);
+static POSITION ctagsearch(VOID_PARAM);
+static POSITION gtagsearch(VOID_PARAM);
 static int getentry LESSPARAMS((char *buf, char **tag, char **file,
     char **line));
 

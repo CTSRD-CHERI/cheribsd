@@ -58,8 +58,6 @@ extern	char	switcher_cocall[];
 extern	int	szswitcher_cocall;
 extern	char	switcher_coaccept[];
 extern	int	szswitcher_coaccept;
-extern	uint32_t *vm_page_dump;
-extern	int vm_page_dump_size;
 
 extern vm_offset_t kstack0;
 extern vm_offset_t kernel_kseg0_end;
@@ -92,8 +90,6 @@ extern int busdma_swi_pending;
 void	busdma_swi(void);
 
 struct	dumperinfo;
-void	dump_add_page(vm_paddr_t);
-void	dump_drop_page(vm_paddr_t);
 int	minidumpsys(struct dumperinfo *);
 
 #endif /* !_MACHINE_MD_VAR_H_ */

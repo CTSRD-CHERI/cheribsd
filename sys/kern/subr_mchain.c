@@ -475,7 +475,7 @@ md_get_mem(struct mdchain *mdp, char * __capability target, int size, int type)
 	int error;
 	u_int count;
 	u_char *s;
-	
+
 	while (size > 0) {
 		if (m == NULL) {
 			MBERROR("incomplete copy\n");

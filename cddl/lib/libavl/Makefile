@@ -1,14 +1,21 @@
 # $FreeBSD$
 
-.PATH: ${SRCTOP}/sys/cddl/contrib/opensolaris/common/avl
+.PATH: ${SRCTOP}/sys/contrib/openzfs/module/avl
 
 PACKAGE=	runtime
 LIB=	avl
 SRCS=	avl.c
 WARNS?=	3
-CFLAGS+= -I${SRCTOP}/sys/cddl/compat/opensolaris
-CFLAGS+= -I${SRCTOP}/sys/cddl/contrib/opensolaris/uts/common
+CFLAGS+= -DIN_BASE
+CFLAGS+= -I${SRCTOP}/sys/contrib/openzfs/include
+CFLAGS+= -I${SRCTOP}/sys/contrib/openzfs/lib/libspl/include/
+CFLAGS+= -I${SRCTOP}/sys/contrib/openzfs/lib/libspl/include/os/freebsd
+CFLAGS+= -I${SRCTOP}/sys
+CFLAGS+= -include ${SRCTOP}/sys/contrib/openzfs/include/os/freebsd/spl/sys/ccompile.h
 # The assert macro needs `int aok` (which is in nvpair)
 LIBADD=	nvpair
+
+# missing decleration for assfail()
+NO_WERROR=
 
 .include <bsd.lib.mk>

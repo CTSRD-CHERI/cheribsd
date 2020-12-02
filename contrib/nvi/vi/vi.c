@@ -9,10 +9,6 @@
 
 #include "config.h"
 
-#ifndef lint
-static const char sccsid[] = "$Id: vi.c,v 10.61 2011/12/21 13:08:30 zy Exp $";
-#endif /* not lint */
-
 #include <sys/types.h>
 #include <sys/queue.h>
 #include <sys/time.h>
@@ -409,7 +405,7 @@ ret:		rval = 1;
 	return (rval);
 }
 
-#define	KEY(key, ec_flags) {						\
+#define	KEY(key, ec_flags) do {						\
 	if ((gcret = v_key(sp, 0, &ev, ec_flags)) != GC_OK)		\
 		return (gcret);						\
 	if (ev.e_value == K_ESCAPE)					\
@@ -417,7 +413,7 @@ ret:		rval = 1;
 	if (F_ISSET(&ev.e_ch, CH_MAPPED))				\
 		*mappedp = 1;						\
 	key = ev.e_c;							\
-}
+} while (0)
 
 /*
  * The O_TILDEOP option makes the ~ command take a motion instead
@@ -970,7 +966,7 @@ v_init(SCR *sp)
 	sp->roff = sp->coff = 0;
 
 	/* Create a screen map. */
-	CALLOC_RET(sp, HMAP, SMAP *, SIZE_HMAP(sp), sizeof(SMAP));
+	CALLOC_RET(sp, HMAP, SIZE_HMAP(sp), sizeof(SMAP));
 	TMAP = HMAP + (sp->t_rows - 1);
 	HMAP->lno = sp->lno;
 	HMAP->coff = 0;
@@ -1007,10 +1003,8 @@ v_dtoh(SCR *sp)
 	/* Move all screens to the hidden queue, tossing screen maps. */
 	for (hidden = 0, gp = sp->gp;
 	    (tsp = TAILQ_FIRST(gp->dq)) != NULL; ++hidden) {
-		if (_HMAP(tsp) != NULL) {
-			free(_HMAP(tsp));
-			_HMAP(tsp) = NULL;
-		}
+		free(_HMAP(tsp));
+		_HMAP(tsp) = NULL;
 		TAILQ_REMOVE(gp->dq, tsp, q);
 		TAILQ_INSERT_TAIL(gp->hq, tsp, q);
 		/* XXXX Change if hidden screens per window */

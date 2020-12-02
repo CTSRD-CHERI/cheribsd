@@ -8,7 +8,7 @@ V=	${.CURDIR}/../../../contrib/nvi
 
 FILESGROUPS+=VICAT
 CAT=	dutch english french german polish ru_RU.KOI8-R spanish swedish \
-	uk_UA.KOI8-U zh_CN.GB2312
+	uk_UA.KOI8-U zh_CN.GB2312 tr_TR.ISO8859-9 tr_TR.UTF-8
 VICAT=		${CAT}
 VICATDIR=	${FILESDIR}
 VICATPACKAGE=	${PACKAGE}
@@ -20,6 +20,7 @@ SCAN=	${V}/cl/*.c ${V}/common/*.c ${V}/ex/*.c ${V}/vi/*.c
 all:		dump
 
 build-tools:	dump
+WARNS=		3
 
 # Helper since iconv is non trivial to make a build tool
 utf8convert:
@@ -102,7 +103,7 @@ english.base: dump ${SCAN} #Makefile
 	sed -e '/|/!d' \
 	    -e 's/|/ "/' \
 	    -e 's/^"//' |\
-	sort -nu > $@
+	LC_ALL=C sort -nu > $@
 
 
 DEPENDOBJS+=	dump

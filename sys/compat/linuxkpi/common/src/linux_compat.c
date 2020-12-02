@@ -86,6 +86,7 @@ __FBSDID("$FreeBSD$");
 #include <linux/compat.h>
 #include <linux/poll.h>
 #include <linux/smp.h>
+#include <linux/wait_bit.h>
 
 #if defined(__i386__) || defined(__amd64__)
 #include <asm/smp.h>
@@ -118,6 +119,9 @@ struct list_head pci_devices;
 spinlock_t pci_lock;
 
 unsigned long linux_timer_hz_mask;
+
+wait_queue_head_t linux_bit_waitq;
+wait_queue_head_t linux_var_waitq;
 
 int
 panic_cmp(struct rb_node *one, struct rb_node *two)
@@ -202,7 +206,6 @@ kobject_add_complete(struct kobject *kobj, struct kobject *parent)
 		}
 		if (error)
 			sysfs_remove_dir(kobj);
-
 	}
 	return (error);
 }
@@ -419,22 +422,15 @@ linux_kq_unlock(void *arg)
 }
 
 static void
-linux_kq_lock_owned(void *arg)
+linux_kq_assert_lock(void *arg, int what)
 {
 #ifdef INVARIANTS
 	spinlock_t *s = arg;
 
-	mtx_assert(&s->m, MA_OWNED);
-#endif
-}
-
-static void
-linux_kq_lock_unowned(void *arg)
-{
-#ifdef INVARIANTS
-	spinlock_t *s = arg;
-
-	mtx_assert(&s->m, MA_NOTOWNED);
+	if (what == LA_LOCKED)
+		mtx_assert(&s->m, MA_OWNED);
+	else
+		mtx_assert(&s->m, MA_NOTOWNED);
 #endif
 }
 
@@ -454,8 +450,7 @@ linux_file_alloc(void)
 	/* setup fields needed by kqueue support */
 	spin_lock_init(&filp->f_kqlock);
 	knlist_init(&filp->f_selinfo.si_note, &filp->f_kqlock,
-	    linux_kq_lock, linux_kq_unlock,
-	    linux_kq_lock_owned, linux_kq_lock_unowned);
+	    linux_kq_lock, linux_kq_unlock, linux_kq_assert_lock);
 
 	return (filp);
 }
@@ -1005,7 +1000,6 @@ linux_poll_wakeup_state(atomic_t *v, const uint8_t *pstate)
 
 	return (c);
 }
-
 
 static int
 linux_poll_wakeup_callback(wait_queue_t *wq, unsigned int wq_state, int flags, void *key)
@@ -1687,7 +1681,7 @@ linux_file_stat(struct file *fp, struct stat *sb, struct ucred *active_cred,
 	vp = filp->f_vnode;
 
 	vn_lock(vp, LK_SHARED | LK_RETRY);
-	error = vn_stat(vp, sb, td->td_ucred, NOCRED, td);
+	error = VOP_STAT(vp, sb, td->td_ucred, NOCRED, td);
 	VOP_UNLOCK(vp);
 
 	return (error);
@@ -1826,7 +1820,6 @@ iounmap(void *addr)
 #endif
 	kfree(vmmap);
 }
-
 
 void *
 vmap(struct page **pages, unsigned int count, unsigned long flags, int prot)
@@ -1994,7 +1987,7 @@ linux_timer_init(void *arg)
 	linux_timer_hz_mask--;
 
 	/* compute some internal constants */
-	
+
 	lkpi_nsec2hz_rem = hz;
 	lkpi_usec2hz_rem = hz;
 	lkpi_msec2hz_rem = hz;
@@ -2519,6 +2512,8 @@ linux_compat_init(void *arg)
 	mtx_init(&vmmaplock, "IO Map lock", NULL, MTX_DEF);
 	for (i = 0; i < VMMAP_HASH_SIZE; i++)
 		LIST_INIT(&vmmaphead[i]);
+	init_waitqueue_head(&linux_bit_waitq);
+	init_waitqueue_head(&linux_var_waitq);
 }
 SYSINIT(linux_compat, SI_SUB_DRIVERS, SI_ORDER_SECOND, linux_compat_init, NULL);
 

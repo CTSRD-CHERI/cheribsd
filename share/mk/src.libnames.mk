@@ -75,6 +75,7 @@ _LIBRARIES=	\
 		${_INTERNALLIBS} \
 		${LOCAL_LIBRARIES} \
 		80211 \
+		9p \
 		alias \
 		archive \
 		asn1 \
@@ -99,6 +100,7 @@ _LIBRARIES=	\
 		cap_dns \
 		cap_fileargs \
 		cap_grp \
+		cap_net \
 		cap_pwd \
 		cap_sysctl \
 		cap_syslog \
@@ -136,6 +138,7 @@ _LIBRARIES=	\
 		heimntlm \
 		heimsqlite \
 		hx509 \
+		icp \
 		ipsec \
 		ipt \
 		jail \
@@ -159,6 +162,7 @@ _LIBRARIES=	\
 		ncurses \
 		ncursesw \
 		netgraph \
+		netmap \
 		ngatm \
 		nv \
 		nvpair \
@@ -185,6 +189,7 @@ _LIBRARIES=	\
 		sdp \
 		sm \
 		smb \
+		spl \
 		ssl \
 		ssp_nonshared \
 		stats \
@@ -196,6 +201,7 @@ _LIBRARIES=	\
 		tacplus \
 		termcap \
 		termcapw \
+		tpool \
 		ufs \
 		ugidfw \
 		ulog \
@@ -213,7 +219,9 @@ _LIBRARIES=	\
 		z \
 		zfs_core \
 		zfs \
+		zfsbootenv \
 		zpool \
+		zutil
 
 .if ${MK_BLACKLIST} != "no"
 _LIBRARIES+= \
@@ -255,6 +263,7 @@ LIBVERIEXEC?=	${LIBVERIEXECDIR}/libveriexec.a
 # Each library's LIBADD needs to be duplicated here for static linkage of
 # 2nd+ order consumers.  Auto-generating this would be better.
 _DP_80211=	sbuf bsdxml
+_DP_9p=		sbuf
 _DP_archive=	z bz2 lzma bsdxml zstd
 _DP_zstd=	pthread
 .if ${MK_BLACKLIST} != "no"
@@ -337,7 +346,7 @@ _DP_dpv=	dialog figpar util ncursesw
 _DP_dialog=	ncursesw m
 _DP_cuse=	pthread
 _DP_atf_cxx=	atf_c
-_DP_gtest=	pthread
+_DP_gtest=	pthread regex
 _DP_gmock=	gtest
 _DP_gmock_main=	gmock
 _DP_gtest_main=	gtest
@@ -367,13 +376,14 @@ _DP_heimipcs=	heimbase roken pthread
 _DP_kafs5=	asn1 krb5 roken
 _DP_krb5+=	asn1 com_err crypt crypto hx509 roken wind heimbase heimipcc
 _DP_gssapi_krb5+=	gssapi krb5 crypto roken asn1 com_err
-_DP_lzma=	pthread
+_DP_lzma=	md pthread
 _DP_ucl=	m
 _DP_vmmapi=	util
 _DP_opencsd=	cxxrt
-_DP_ctf=	z
+_DP_ctf=	spl z
 _DP_dtrace=	ctf elf proc pthread rtld_db
 _DP_xo=		util
+_DP_ztest=	geom m nvpair umem zpool pthread avl zfs_core spl zutil zfs uutil icp
 # The libc dependencies are not strictly needed but are defined to make the
 # assert happy.
 _DP_c=		compiler_rt
@@ -393,13 +403,18 @@ _DP_smb=	kiconv
 _DP_ulog=	md
 _DP_fifolog=	z
 _DP_ipf=	kvm
-_DP_zfs=	md pthread umem util uutil m nvpair avl bsdxml geom nvpair z \
-		zfs_core
+_DP_tpool=	spl
+_DP_uutil=	avl nvpair spl
+_DP_zfs=	md pthread umem util uutil m avl bsdxml crypto geom nvpair \
+	z zfs_core zutil
+_DP_zfsbootenv= zfs nvpair
 _DP_zfs_core=	nvpair
-_DP_uutil=	nvpair
 _DP_avl=	nvpair
-_DP_zpool=	md pthread z nvpair avl umem
-_DP_be=		zfs nvpair
+_DP_zpool=	md pthread z icp spl nvpair avl umem
+_DP_zutil=	avl tpool
+_DP_be=		zfs spl nvpair zfsbootenv
+_DP_netmap=
+_DP_ifconfig=	m
 
 # OFED support
 .if ${MK_OFED} != "no"
@@ -606,12 +621,16 @@ LIBC_NOSSP_PIC?=	${LIBC_NOSSP_PICDIR}/libc_nossp_pic${PIE_SUFFIX}.a
 LIBAVLDIR=	${_LIB_OBJTOP}/cddl/lib/libavl
 LIBCTFDIR=	${_LIB_OBJTOP}/cddl/lib/libctf
 LIBDTRACEDIR=	${_LIB_OBJTOP}/cddl/lib/libdtrace
+LIBICPDIR=	${_LIB_OBJTOP}/cddl/lib/libicp
 LIBNVPAIRDIR=	${_LIB_OBJTOP}/cddl/lib/libnvpair
 LIBUMEMDIR=	${_LIB_OBJTOP}/cddl/lib/libumem
 LIBUUTILDIR=	${_LIB_OBJTOP}/cddl/lib/libuutil
 LIBZFSDIR=	${_LIB_OBJTOP}/cddl/lib/libzfs
 LIBZFS_COREDIR=	${_LIB_OBJTOP}/cddl/lib/libzfs_core
+LIBZFSBOOTENVDIR=	${_LIB_OBJTOP}/cddl/lib/libzfsbootenv
 LIBZPOOLDIR=	${_LIB_OBJTOP}/cddl/lib/libzpool
+LIBZUTILDIR=	${_LIB_OBJTOP}/cddl/lib/libzutil
+LIBTPOOLDIR=	${_LIB_OBJTOP}/cddl/lib/libtpool
 
 # OFED support
 LIBCXGB4DIR=	${_LIB_OBJTOP}/lib/ofed/libcxgb4
@@ -677,6 +696,7 @@ LIBNCURSESWDIR=	${_LIB_OBJTOP}/lib/ncurses/ncursesw
 LIBPANELDIR=	${_LIB_OBJTOP}/lib/ncurses/panel
 LIBPANELWDIR=	${_LIB_OBJTOP}/lib/ncurses/panelw
 LIBCRYPTODIR=	${_LIB_OBJTOP}/secure/lib/libcrypto
+LIBSPLDIR=	${_LIB_OBJTOP}/cddl/lib/libspl
 LIBSSHDIR=	${_LIB_OBJTOP}/secure/lib/libssh
 LIBSSLDIR=	${_LIB_OBJTOP}/secure/lib/libssl
 LIBTEKENDIR=	${_LIB_OBJTOP}/sys/teken/libteken

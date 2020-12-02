@@ -2,26 +2,20 @@
 # $FreeBSD$
 
 PROG=	zfsbootcfg
-WARNS?=	1
 MAN=	zfsbootcfg.8
 
-LIBADD+=zfs
-LIBADD+=nvpair
-LIBADD+=umem
-LIBADD+=uutil
-LIBADD+=geom
+LIBADD+=zfsbootenv
 
+CFLAGS+= -DIN_BASE
+CFLAGS+= -I${SRCTOP}/sys/contrib/openzfs/include
+CFLAGS+= -I${SRCTOP}/sys/contrib/openzfs/include/os/freebsd
+CFLAGS+= -I${SRCTOP}/sys/contrib/openzfs/lib/libspl/include
+CFLAGS+= -I${SRCTOP}/sys/contrib/openzfs/lib/libspl/include/os/freebsd
+CFLAGS+= -I${SRCTOP}/sys
 CFLAGS+= -I${SRCTOP}/cddl/compat/opensolaris/include
-CFLAGS+= -I${SRCTOP}/cddl/compat/opensolaris/lib/libumem
-CFLAGS+= -I${SRCTOP}/cddl/contrib/opensolaris/lib/libzfs/common
-CFLAGS+= -I${SRCTOP}/cddl/contrib/opensolaris/lib/libzfs_core/common
-CFLAGS+= -I${SRCTOP}/cddl/contrib/opensolaris/lib/libzpool/common
-CFLAGS+= -I${SRCTOP}/cddl/contrib/opensolaris/lib/libnvpair
-CFLAGS+= -I${SRCTOP}/sys/cddl/compat/opensolaris
-CFLAGS+= -I${SRCTOP}/sys/cddl/contrib/opensolaris/uts/common/fs/zfs
-CFLAGS+= -I${SRCTOP}/sys/cddl/contrib/opensolaris/uts/common
-CFLAGS+= -I${SRCTOP}/cddl/contrib/opensolaris/head
-
-CFLAGS+= -DNEED_SOLARIS_BOOLEAN
+CFLAGS+= -I${SRCTOP}/sys/contrib/openzfs/module/icp/include
+CFLAGS+= -include ${SRCTOP}/sys/contrib/openzfs/include/os/freebsd/spl/sys/ccompile.h
+CFLAGS+= -DHAVE_ISSETUGID
+CFLAGS+= -include ${SRCTOP}/sys/modules/zfs/zfs_config.h
 
 .include <bsd.prog.mk>

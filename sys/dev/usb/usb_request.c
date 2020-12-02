@@ -274,7 +274,6 @@ tr_setup:
 			ep = ep_first;	/* endpoint wrapped around */
 		if (ep->edesc &&
 		    ep->is_stalled) {
-
 			/* setup a clear-stall packet */
 
 			req.bmRequestType = UT_WRITE_ENDPOINT;
@@ -721,7 +720,8 @@ done:
 	case USB_ERR_CANCELLED:
 		break;
 	default:
-		DPRINTF("I/O error - waiting a bit for TT cleanup\n");
+		DPRINTF("error=%s - waiting a bit for TT cleanup\n",
+		    usbd_errstr(err));
 		usb_pause_mtx(mtx, hz / 16);
 		break;
 	}
@@ -1002,7 +1002,6 @@ usbd_req_get_desc(struct usb_device *udev,
 	USETW(req.wIndex, id);
 
 	while (1) {
-
 		if ((min_len < 2) || (max_len < 2)) {
 			err = USB_ERR_INVAL;
 			goto done;
@@ -1010,7 +1009,7 @@ usbd_req_get_desc(struct usb_device *udev,
 		USETW(req.wLength, min_len);
 
 		err = usbd_do_request_flags(udev, mtx, &req,
-		    desc, 0, NULL, 500 /* ms */);
+		    desc, 0, NULL, 1000 /* ms */);
 
 		if (err != 0 && err != USB_ERR_TIMEOUT &&
 		    min_len != max_len) {
@@ -1021,7 +1020,7 @@ usbd_req_get_desc(struct usb_device *udev,
 			USETW(req.wLength, max_len);
 
 			err = usbd_do_request_flags(udev, mtx, &req,
-			    desc, USB_SHORT_XFER_OK, NULL, 500 /* ms */);
+			    desc, USB_SHORT_XFER_OK, NULL, 1000 /* ms */);
 
 			if (err == 0) {
 				/* verify length */
@@ -1050,7 +1049,6 @@ usbd_req_get_desc(struct usb_device *udev,
 		}
 
 		if (min_len == max_len) {
-
 			/* enforce correct length */
 			if ((buf[0] > min_len) && (actlen == NULL))
 				buf[0] = min_len;
@@ -1975,9 +1973,23 @@ usbd_setup_device_desc(struct usb_device *udev, struct mtx *mtx)
 		/* get partial device descriptor, some devices crash on this */
 		err = usbd_req_get_desc(udev, mtx, NULL, &udev->ddesc,
 		    USB_MAX_IPACKET, USB_MAX_IPACKET, 0, UDESC_DEVICE, 0, 0);
-		if (err != 0)
-			break;
-
+		if (err != 0) {
+			DPRINTF("Trying fallback for getting the USB device descriptor\n");
+			/* try 8 bytes bMaxPacketSize */
+			udev->ddesc.bMaxPacketSize = 8;
+			/* get full device descriptor */
+			err = usbd_req_get_device_desc(udev, mtx, &udev->ddesc);
+			if (err == 0)
+				break;
+			/* try 16 bytes bMaxPacketSize */
+			udev->ddesc.bMaxPacketSize = 16;
+			/* get full device descriptor */
+			err = usbd_req_get_device_desc(udev, mtx, &udev->ddesc);
+			if (err == 0)
+				break;
+			/* try 32/64 bytes bMaxPacketSize */
+			udev->ddesc.bMaxPacketSize = 32;
+		}
 		/* get the full device descriptor */
 		err = usbd_req_get_device_desc(udev, mtx, &udev->ddesc);
 		break;
@@ -2311,4 +2323,3 @@ usbd_req_set_lpm_info(struct usb_device *udev, struct mtx *mtx,
 	}
 	return (err);
 }
-

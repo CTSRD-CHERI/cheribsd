@@ -64,6 +64,24 @@
 #include <fs/cuse/cuse_defs.h>
 #include <fs/cuse/cuse_ioctl.h>
 
+static int
+cuse_modevent(module_t mod, int type, void *data)
+{
+	switch (type) {
+	case MOD_LOAD:
+	case MOD_UNLOAD:
+		return (0);
+	default:
+		return (EOPNOTSUPP);
+	}
+}
+
+static moduledata_t cuse_mod = {
+	.name = "cuse",
+	.evhand = &cuse_modevent,
+};
+
+DECLARE_MODULE(cuse, cuse_mod, SI_SUB_DEVFS, SI_ORDER_FIRST);
 MODULE_VERSION(cuse, 1);
 
 /*
@@ -274,7 +292,6 @@ cuse_kern_uninit(void *arg)
 	void *ptr;
 
 	while (1) {
-
 		printf("Cuse: Please exit all /dev/cuse instances "
 		    "and processes which have used this device.\n");
 
@@ -356,7 +373,6 @@ cuse_str_filter(char *ptr)
 	int c;
 
 	while (((c = *ptr) != 0)) {
-
 		if ((c >= 'a') && (c <= 'z')) {
 			ptr++;
 			continue;
@@ -425,8 +441,6 @@ cuse_server_alloc_memory(struct cuse_server *pcs, uint32_t alloc_nr,
 	int error;
 
 	mem = malloc(sizeof(*mem), M_CUSE, M_WAITOK | M_ZERO);
-	if (mem == NULL)
-		return (ENOMEM);
 
 	object = vm_pager_allocate(OBJT_SWAP, NULL, PAGE_SIZE * page_count,
 	    VM_PROT_DEFAULT, 0, curthread->td_ucred);
@@ -516,7 +530,6 @@ cuse_client_is_closing(struct cuse_client *pcc)
 	pcc->server_dev = NULL;
 
 	for (n = 0; n != CUSE_CMD_MAX; n++) {
-
 		pccmd = &pcc->cmds[n];
 
 		if (pccmd->entry.tqe_prev != NULL) {
@@ -748,8 +761,6 @@ cuse_server_open(struct cdev *dev, int fflags, int devtype, struct thread *td)
 	struct cuse_server *pcs;
 
 	pcs = malloc(sizeof(*pcs), M_CUSE, M_WAITOK | M_ZERO);
-	if (pcs == NULL)
-		return (ENOMEM);
 
 	if (devfs_set_cdevpriv(pcs, &cuse_server_free)) {
 		printf("Cuse: Cannot set cdevpriv.\n");
@@ -1068,7 +1079,6 @@ cuse_server_ioctl(struct cdev *dev, unsigned long cmd,
 
 		cuse_server_lock(pcs);
 		while ((pccmd = cuse_server_find_command(pcs, curthread)) != NULL) {
-
 			/* send sync command */
 			pccmd->entered = NULL;
 			pccmd->error = *(int *)data;
@@ -1213,10 +1223,6 @@ cuse_server_ioctl(struct cdev *dev, unsigned long cmd,
 
 		pcsd = malloc(sizeof(*pcsd), M_CUSE, M_WAITOK | M_ZERO);
 
-		if (pcsd == NULL) {
-			error = ENOMEM;
-			break;
-		}
 		pcsd->server = pcs;
 
 		pcsd->user_dev = pcd->dev;
@@ -1377,7 +1383,6 @@ cuse_client_free(void *arg)
 	cuse_server_unlock(pcs);
 
 	for (n = 0; n != CUSE_CMD_MAX; n++) {
-
 		pccmd = &pcc->cmds[n];
 
 		sx_destroy(&pccmd->sx);
@@ -1426,11 +1431,6 @@ cuse_client_open(struct cdev *dev, int fflags, int devtype, struct thread *td)
 	}
 
 	pcc = malloc(sizeof(*pcc), M_CUSE, M_WAITOK | M_ZERO);
-	if (pcc == NULL) {
-		/* drop reference on server */
-		cuse_server_unref(pcs);
-		return (ENOMEM);
-	}
 	if (devfs_set_cdevpriv(pcc, &cuse_client_free)) {
 		printf("Cuse: Cannot set cdevpriv.\n");
 		/* drop reference on server */
@@ -1443,7 +1443,6 @@ cuse_client_open(struct cdev *dev, int fflags, int devtype, struct thread *td)
 	pcc->server = pcs;
 
 	for (n = 0; n != CUSE_CMD_MAX; n++) {
-
 		pccmd = &pcc->cmds[n];
 
 		pccmd->sub.dev = pcd;
@@ -1581,7 +1580,6 @@ cuse_client_read(struct cdev *dev, struct uio *uio, int ioflag)
 	cuse_cmd_lock(pccmd);
 
 	while (uio->uio_resid != 0) {
-
 		if (uio->uio_iov->iov_len > CUSE_LENGTH_MAX) {
 			error = ENOMEM;
 			break;
@@ -1642,7 +1640,6 @@ cuse_client_write(struct cdev *dev, struct uio *uio, int ioflag)
 	cuse_cmd_lock(pccmd);
 
 	while (uio->uio_resid != 0) {
-
 		if (uio->uio_iov->iov_len > CUSE_LENGTH_MAX) {
 			error = ENOMEM;
 			break;

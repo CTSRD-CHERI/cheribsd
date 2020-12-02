@@ -76,6 +76,7 @@ struct iomux_softc {
 static struct iomux_softc *iomux_sc;
 
 static struct ofw_compat_data compat_data[] = {
+	{"fsl,imx8mq-iomuxc",	true},
 	{"fsl,imx6dl-iomuxc",	true},
 	{"fsl,imx6q-iomuxc",	true},
 	{"fsl,imx6sl-iomuxc",	true},
@@ -327,4 +328,3 @@ static devclass_t imx_iomux_devclass;
 
 EARLY_DRIVER_MODULE(imx_iomux, simplebus, imx_iomux_driver, 
     imx_iomux_devclass, 0, 0, BUS_PASS_CPU + BUS_PASS_ORDER_LATE);
-

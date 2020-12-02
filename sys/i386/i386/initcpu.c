@@ -41,6 +41,7 @@ __FBSDID("$FreeBSD$");
 
 #include <machine/cputypes.h>
 #include <machine/md_var.h>
+#include <machine/psl.h>
 #include <machine/specialreg.h>
 
 #include <vm/vm.h>
@@ -158,7 +159,6 @@ init_486dlc(void)
 	intr_restore(saveintr);
 }
 
-
 /*
  * Cyrix 486S/DX series
  */
@@ -179,7 +179,6 @@ init_cy486dx(void)
 	write_cyrix_reg(CCR2, ccr2);
 	intr_restore(saveintr);
 }
-
 
 /*
  * Cyrix 5x86
@@ -627,6 +626,18 @@ init_transmeta(void)
 }
 #endif
 
+/*
+ * The value for the TSC_AUX MSR and rdtscp/rdpid on the invoking CPU.
+ *
+ * Caller should prevent CPU migration.
+ */
+u_int
+cpu_auxmsr(void)
+{
+	KASSERT((read_eflags() & PSL_I) == 0, ("context switch possible"));
+	return (PCPU_GET(cpuid));
+}
+
 extern int elf32_nxstack;
 
 void
@@ -709,8 +720,8 @@ initializecpu(void)
 				break;
 			}
 			break;
-#ifdef CPU_ATHLON_SSE_HACK
 		case CPU_VENDOR_AMD:
+#ifdef CPU_ATHLON_SSE_HACK
 			/*
 			 * Sometimes the BIOS doesn't enable SSE instructions.
 			 * According to AMD document 20734, the mobile
@@ -727,8 +738,16 @@ initializecpu(void)
 				do_cpuid(1, regs);
 				cpu_feature = regs[3];
 			}
-			break;
 #endif
+			/*
+			 * Detect C1E that breaks APIC.  See comment in
+			 * amd64/initcpu.c.
+			 */
+			if ((CPUID_TO_FAMILY(cpu_id) == 0xf ||
+			    CPUID_TO_FAMILY(cpu_id) == 0x10) &&
+			    (cpu_feature2 & CPUID2_HV) == 0)
+				cpu_amdc1e_bug = 1;
+			break;
 		case CPU_VENDOR_CENTAUR:
 			init_via();
 			break;
@@ -751,7 +770,7 @@ initializecpu(void)
 	}
 	if ((amd_feature & AMDID_RDTSCP) != 0 ||
 	    (cpu_stdext_feature2 & CPUID_STDEXT2_RDPID) != 0)
-		wrmsr(MSR_TSC_AUX, PCPU_GET(cpuid));
+		wrmsr(MSR_TSC_AUX, cpu_auxmsr());
 }
 
 void
@@ -946,7 +965,6 @@ DB_SHOW_COMMAND(cyrixreg, cyrixreg)
 	cr0 = rcr0();
 	if (cpu_vendor_id == CPU_VENDOR_CYRIX) {
 		saveintr = intr_disable();
-
 
 		if ((cpu != CPU_M1SC) && (cpu != CPU_CY486DX)) {
 			ccr0 = read_cyrix_reg(CCR0);

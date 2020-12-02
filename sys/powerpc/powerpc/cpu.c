@@ -72,6 +72,7 @@
 #include <sys/sysctl.h>
 #include <sys/sched.h>
 #include <sys/smp.h>
+#include <sys/endian.h>
 
 #include <machine/bus.h>
 #include <machine/cpu.h>
@@ -284,7 +285,6 @@ cpu_feature_setup()
 	cpu_features2 |= cp->features2;
 }
 
-
 void
 cpu_setup(u_int cpuid)
 {
@@ -359,6 +359,7 @@ cpu_est_clockrate(int cpu_id, uint64_t *cps)
 	uint16_t	vers;
 	register_t	msr;
 	phandle_t	cpu, dev, root;
+	uint32_t	freq32;
 	int		res  = 0;
 	char		buf[8];
 
@@ -376,12 +377,13 @@ cpu_est_clockrate(int cpu_id, uint64_t *cps)
 		case MPC7410:
 		case MPC7447A:
 		case MPC7448:
-			mtspr(SPR_MMCR0, SPR_MMCR0_FC);
-			mtspr(SPR_PMC1, 0);
-			mtspr(SPR_MMCR0, SPR_MMCR0_PMC1SEL(PMCN_CYCLES));
+			mtspr(SPR_MMCR0_74XX, SPR_MMCR0_FC);
+			mtspr(SPR_PMC1_74XX, 0);
+			mtspr(SPR_MMCR0_74XX,
+			    SPR_MMCR0_74XX_PMC1SEL(PMCN_CYCLES));
 			DELAY(1000);
-			*cps = (mfspr(SPR_PMC1) * 1000) + 4999;
-			mtspr(SPR_MMCR0, SPR_MMCR0_FC);
+			*cps = (mfspr(SPR_PMC1_74XX) * 1000) + 4999;
+			mtspr(SPR_MMCR0_74XX, SPR_MMCR0_FC);
 
 			mtmsr(msr);
 			return (0);
@@ -389,18 +391,17 @@ cpu_est_clockrate(int cpu_id, uint64_t *cps)
 		case IBM970FX:
 		case IBM970MP:
 			isync();
-			mtspr(SPR_970MMCR0, SPR_MMCR0_FC);
+			mtspr(SPR_MMCR0, SPR_MMCR0_FC);
 			isync();
-			mtspr(SPR_970MMCR1, 0);
-			mtspr(SPR_970MMCRA, 0);
-			mtspr(SPR_970PMC1, 0);
-			mtspr(SPR_970MMCR0,
-			    SPR_970MMCR0_PMC1SEL(PMC970N_CYCLES));
+			mtspr(SPR_MMCR1, 0);
+			mtspr(SPR_MMCRA, 0);
+			mtspr(SPR_PMC1, 0);
+			mtspr(SPR_MMCR0, SPR_MMCR0_PMC1SEL(PMC970N_CYCLES));
 			isync();
 			DELAY(1000);
 			powerpc_sync();
-			mtspr(SPR_970MMCR0, SPR_MMCR0_FC);
-			*cps = (mfspr(SPR_970PMC1) * 1000) + 4999;
+			mtspr(SPR_MMCR0, SPR_MMCR0_FC);
+			*cps = (mfspr(SPR_PMC1) * 1000) + 4999;
 
 			mtmsr(msr);
 			return (0);
@@ -429,10 +430,11 @@ cpu_est_clockrate(int cpu_id, uint64_t *cps)
 				return (ENOENT);
 			if (OF_getprop(cpu, "ibm,extended-clock-frequency",
 			    cps, sizeof(*cps)) >= 0) {
+				*cps = be64toh(*cps);
 				return (0);
-			} else if (OF_getprop(cpu, "clock-frequency", cps, 
-			    sizeof(cell_t)) >= 0) {
-				*cps >>= 32;
+			} else if (OF_getencprop(cpu, "clock-frequency",
+			    &freq32, sizeof(freq32)) >= 0) {
+				*cps = freq32;
 				return (0);
 			} else {
 				return (ENOENT);
@@ -504,7 +506,6 @@ cpu_6xx_setup(int cpuid, uint16_t vers)
 			hid0 |= HID0_EMCP | HID0_BTIC | HID0_SGE | HID0_BHT;
 			hid0 |= HID0_EIEC;
 			break;
-
 	}
 
 	mtspr(SPR_HID0, hid0);
@@ -530,7 +531,6 @@ cpu_6xx_setup(int cpuid, uint16_t vers)
 	if (cpu_idle_hook == NULL)
 		cpu_idle_hook = cpu_idle_60x;
 }
-
 
 static void
 cpu_6xx_print_cacheinfo(u_int cpuid, uint16_t vers)
@@ -756,8 +756,9 @@ cpu_idle_60x(sbintime_t sbt)
 	case MPC7450:
 	case MPC7455:
 	case MPC7457:
+		/* 0x7e00066c: dssall */
 		__asm __volatile("\
-			    dssall; sync; mtmsr %0; isync"
+			    .long 0x7e00066c; sync; mtmsr %0; isync"
 			    :: "r"(msr | PSL_POW));
 		break;
 	default:
@@ -834,7 +835,7 @@ cpu_idle_power9(sbintime_t sbt)
 	 * the wake up.
 	 */
 	mtmsr(msr);
-	
+
 }
 #endif
 

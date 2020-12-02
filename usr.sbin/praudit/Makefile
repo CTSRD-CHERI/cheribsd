@@ -3,6 +3,8 @@
 #
 .include <src.opts.mk>
 
+.include <src.opts.mk>
+
 OPENBSMDIR=${SRCTOP}/contrib/openbsm
 .PATH: ${OPENBSMDIR}/bin/praudit
 

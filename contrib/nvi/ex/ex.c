@@ -9,10 +9,6 @@
 
 #include "config.h"
 
-#ifndef lint
-static const char sccsid[] = "$Id: ex.c,v 10.80 2012/10/03 16:24:40 zy Exp $";
-#endif /* not lint */
-
 #include <sys/types.h>
 #include <sys/queue.h>
 #include <sys/stat.h>
@@ -388,7 +384,7 @@ loop:	ecp = SLIST_FIRST(gp->ecq);
 		} else {
 			for (p = ecp->cp;
 			    ecp->clen > 0; --ecp->clen, ++ecp->cp)
-				if (!isascii(*ecp->cp) || !isalpha(*ecp->cp))
+				if (!isazAZ(*ecp->cp))
 					break;
 			if ((namelen = ecp->cp - p) == 0) {
 				msgq(sp, M_ERR, "080|Unknown command name");
@@ -732,8 +728,7 @@ skip_srch:	if (ecp->cmd == &cmds[C_VISUAL_EX] && F_ISSET(sp, SC_VI))
 			if (!cmdskip(ecp->cp[0]))
 				break;
 
-		if (!isascii(ecp->cp[0]) ||
-		    isalnum(ecp->cp[0]) || ecp->cp[0] == '|') {
+		if (is09azAZ(ecp->cp[0]) || ecp->cp[0] == '|') {
 			ecp->rcmd = cmds[C_SUBSTITUTE];
 			ecp->rcmd.fn = ex_subagain;
 			ecp->cmd = &ecp->rcmd;
@@ -816,13 +811,14 @@ skip_srch:	if (ecp->cmd == &cmds[C_VISUAL_EX] && F_ISSET(sp, SC_VI))
 	 * this isn't a particularly complex trap, and if backslashes were
 	 * legal in set commands, this would have to be much more complicated.
 	 */
-	if (ecp->cmd == &cmds[C_SET])
+	if (ecp->cmd == &cmds[C_SET]) {
 		for (p = ecp->cp, len = ecp->clen; len > 0; --len, ++p)
 			if (IS_ESCAPE(sp, ecp, *p) && len > 1) {
 				--len;
 				++p;
 			} else if (*p == '\\')
 				*p = CH_LITERAL;
+	}
 
 	/*
 	 * Set the default addresses.  It's an error to specify an address for
@@ -1259,7 +1255,7 @@ addr_verify:
 				ex_badaddr(sp, ecp->cmd, A_ZERO, NUM_OK);
 				goto err;
 			}
-		} else if (!db_exist(sp, ecp->addr2.lno))
+		} else if (!db_exist(sp, ecp->addr2.lno)) {
 			if (FL_ISSET(ecp->iflags, E_C_COUNT)) {
 				if (db_last(sp, &lno))
 					goto err;
@@ -1268,6 +1264,7 @@ addr_verify:
 				ex_badaddr(sp, NULL, A_EOF, NUM_OK);
 				goto err;
 			}
+		}
 		/* FALLTHROUGH */
 	case 1:
 		if (ecp->addr1.lno == 0) {
@@ -1504,7 +1501,7 @@ addr_verify:
 
 		ecp->save_cmd -= arg1_len;
 		ecp->save_cmdlen += arg1_len;
-		MEMCPY(ecp->save_cmd, arg1, arg1_len);
+		MEMMOVE(ecp->save_cmd, arg1, arg1_len);
 
 		/*
 		 * Any commands executed from a +cmd are executed starting at
@@ -2122,7 +2119,7 @@ ex_load(SCR *sp)
 
 			/* If it's a global/v command, fix up the last line. */
 			if (FL_ISSET(ecp->agv_flags,
-			    AGV_GLOBAL | AGV_V) && ecp->range_lno != OOBLNO)
+			    AGV_GLOBAL | AGV_V) && ecp->range_lno != OOBLNO) {
 				if (db_exist(sp, ecp->range_lno))
 					sp->lno = ecp->range_lno;
 				else {
@@ -2131,6 +2128,7 @@ ex_load(SCR *sp)
 					if (sp->lno == 0)
 						sp->lno = 1;
 				}
+			}
 			free(ecp->o_cp);
 		}
 

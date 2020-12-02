@@ -126,7 +126,7 @@ kmem_direct_mapped:	off = v & PAGE_MASK;
 				error = EFAULT;
 				break;
 			}
-	
+
 			if (hw_direct_map && !pmap_dev_direct_mapped(v, cnt)) {
 				error = uiomove((void *)PHYS_TO_DMAP(v), cnt,
 				    uio);
@@ -278,15 +278,14 @@ ppc_mrset(struct mem_range_softc *sc, struct mem_range_desc *desc, int *arg)
  * This is basically just an ioctl shim for mem_range_attr_get
  * and mem_range_attr_set.
  */
-/* ARGSUSED */
 int 
-memioctl(struct cdev *dev __unused, u_long cmd, caddr_t data, int flags,
+memioctl_md(struct cdev *dev __unused, u_long cmd, caddr_t data, int flags,
     struct thread *td)
 {
 	int nd, error = 0;
 	struct mem_range_op *mo = (struct mem_range_op *)data;
 	struct mem_range_desc *md;
-	
+
 	/* is this for us? */
 	if ((cmd != MEMRANGE_GET) &&
 	    (cmd != MEMRANGE_SET))

@@ -29,7 +29,6 @@
 __FBSDID("$FreeBSD$");
 #include "opt_inet.h"
 #include "opt_route.h"
-#include "opt_mpath.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -45,7 +44,6 @@ __FBSDID("$FreeBSD$");
 #define	_BLOCKS_TO_SZ(_blocks)		((size_t)(_blocks) * sizeof(u_long))
 #define	_BLOCKS_TO_ITEMS(_blocks)	((uint32_t)(_blocks) * BLOCK_ITEMS)
 #define	_ITEMS_TO_BLOCKS(_items)	((_items) / BLOCK_ITEMS)
-
 
 static void _bitmask_init_idx(void *index, uint32_t items);
 
@@ -110,7 +108,6 @@ _bitmask_init_idx(void *_idx, uint32_t items)
 	memset(idx, 0xFF, size);
 	*idx &= ~(u_long)1; /* Always skip index 0 */
 }
-
 
 /*
  * _try_merge api to allow shrinking?
@@ -216,4 +213,3 @@ bitmask_free_idx(struct bitmask_head *bi, uint16_t idx)
 
 	return (0);
 }
-

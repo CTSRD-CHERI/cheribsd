@@ -425,7 +425,7 @@ vm_fault_populate(struct faultstate *fs)
 	vm_page_t m;
 	vm_prot_t prot;
 	vm_pindex_t map_first, map_last, pager_first, pager_last, pidx;
-	int i, npages, psind, rv;
+	int bdry_idx, i, npages, psind, rv;
 
 	MPASS(fs->object == fs->first_object);
 	VM_OBJECT_ASSERT_WLOCKED(fs->first_object);
@@ -447,7 +447,8 @@ vm_fault_populate(struct faultstate *fs)
 	 * to the driver.
 	 */
 	rv = vm_pager_populate(fs->first_object, fs->first_pindex,
-	    fs->fault_type, fs->entry->max_protection, &pager_first, &pager_last);
+	    fs->fault_type, fs->entry->max_protection, &pager_first,
+	    &pager_last);
 
 	VM_OBJECT_ASSERT_WLOCKED(fs->first_object);
 	if (rv == VM_PAGER_BAD) {
@@ -470,15 +471,59 @@ vm_fault_populate(struct faultstate *fs)
 	MPASS(pager_last < fs->first_object->size);
 
 	vm_fault_restore_map_lock(fs);
+	bdry_idx = (fs->entry->eflags & MAP_ENTRY_SPLIT_BOUNDARY_MASK) >>
+	    MAP_ENTRY_SPLIT_BOUNDARY_SHIFT;
 	if (fs->map->timestamp != fs->map_generation) {
-		vm_fault_populate_cleanup(fs->first_object, pager_first,
-		    pager_last);
+		if (bdry_idx == 0) {
+			vm_fault_populate_cleanup(fs->first_object, pager_first,
+			    pager_last);
+		} else {
+			m = vm_page_lookup(fs->first_object, pager_first);
+			if (m != fs->m)
+				vm_page_xunbusy(m);
+		}
 		return (KERN_RESTART);
 	}
 
 	/*
 	 * The map is unchanged after our last unlock.  Process the fault.
 	 *
+	 * First, the special case of largepage mappings, where
+	 * populate only busies the first page in superpage run.
+	 */
+	if (bdry_idx != 0) {
+		KASSERT(PMAP_HAS_LARGEPAGES,
+		    ("missing pmap support for large pages"));
+		m = vm_page_lookup(fs->first_object, pager_first);
+		vm_fault_populate_check_page(m);
+		VM_OBJECT_WUNLOCK(fs->first_object);
+		vaddr = fs->entry->start + IDX_TO_OFF(pager_first) -
+		    fs->entry->offset;
+		/* assert alignment for entry */
+		KASSERT((vaddr & (pagesizes[bdry_idx] - 1)) == 0,
+    ("unaligned superpage start %#jx pager_first %#jx offset %#jx vaddr %#jx",
+		    (uintmax_t)fs->entry->start, (uintmax_t)pager_first,
+		    (uintmax_t)fs->entry->offset, (uintmax_t)vaddr));
+		KASSERT((VM_PAGE_TO_PHYS(m) & (pagesizes[bdry_idx] - 1)) == 0,
+		    ("unaligned superpage m %p %#jx", m,
+		    (uintmax_t)VM_PAGE_TO_PHYS(m)));
+		rv = pmap_enter(fs->map->pmap, vaddr, m, fs->prot,
+		    fs->fault_type | (fs->wired ? PMAP_ENTER_WIRED : 0) |
+		    PMAP_ENTER_LARGEPAGE, bdry_idx);
+		VM_OBJECT_WLOCK(fs->first_object);
+		vm_page_xunbusy(m);
+		if ((fs->fault_flags & VM_FAULT_WIRE) != 0) {
+			for (i = 0; i < atop(pagesizes[bdry_idx]); i++)
+				vm_page_wire(m + i);
+		}
+		if (fs->m_hold != NULL) {
+			*fs->m_hold = m + (fs->first_pindex - pager_first);
+			vm_page_wire(*fs->m_hold);
+		}
+		goto out;
+	}
+
+	/*
 	 * The range [pager_first, pager_last] that is given to the
 	 * pager is only a hint.  The pager may populate any range
 	 * within the object that includes the requested page index.
@@ -503,7 +548,8 @@ vm_fault_populate(struct faultstate *fs)
 	    pidx += npages, m = vm_page_next(&m[npages - 1])) {
 		vaddr = fs->entry->start + IDX_TO_OFF(pidx) - fs->entry->offset;
 #if defined(__aarch64__) || defined(__amd64__) || (defined(__arm__) && \
-    __ARM_ARCH >= 6) || defined(__i386__) || defined(__riscv)
+    __ARM_ARCH >= 6) || defined(__i386__) || defined(__riscv) || \
+    defined(__powerpc64__)
 		psind = m->psind;
 		if (psind > 0 && ((vaddr & (pagesizes[psind] - 1)) != 0 ||
 		    pidx + OFF_TO_IDX(pagesizes[psind]) - 1 > pager_last ||
@@ -546,6 +592,7 @@ vm_fault_populate(struct faultstate *fs)
 			vm_page_xunbusy(&m[i]);
 		}
 	}
+out:
 	curthread->td_ru.ru_majflt++;
 	return (KERN_SUCCESS);
 }
@@ -680,7 +727,7 @@ vm_fault_lock_vnode(struct faultstate *fs, bool objlocked)
 	 * paging-in-progress count incremented.  Otherwise, we could
 	 * deadlock.
 	 */
-	error = vget(vp, locked | LK_CANRECURSE | LK_NOWAIT, curthread);
+	error = vget(vp, locked | LK_CANRECURSE | LK_NOWAIT);
 	if (error == 0) {
 		fs->vp = vp;
 		return (KERN_SUCCESS);
@@ -691,7 +738,7 @@ vm_fault_lock_vnode(struct faultstate *fs, bool objlocked)
 		unlock_and_deallocate(fs);
 	else
 		fault_deallocate(fs);
-	error = vget(vp, locked | LK_RETRY | LK_CANRECURSE, curthread);
+	error = vget(vp, locked | LK_RETRY | LK_CANRECURSE);
 	vdrop(vp);
 	fs->vp = vp;
 	KASSERT(error == 0, ("vm_fault: vget failed %d", error));
@@ -883,7 +930,6 @@ vm_fault_cow(struct faultstate *fs)
 	    (is_first_object_locked = VM_OBJECT_TRYWLOCK(fs->first_object)) &&
 	    fs->object == fs->first_object->backing_object &&
 	    VM_OBJECT_TRYWLOCK(fs->object)) {
-
 		/*
 		 * Remove but keep xbusy for replace.  fs->m is moved into
 		 * fs->first_object and left busy while fs->first_m is
@@ -1051,7 +1097,6 @@ vm_fault_allocate(struct faultstate *fs)
 	struct domainset *dset;
 	int alloc_req;
 	int rv;
-
 
 	if ((fs->object->flags & OBJ_SIZEVNLOCK) != 0) {
 		rv = vm_fault_lock_vnode(fs, true);
@@ -1296,6 +1341,7 @@ RetryFault:
 	 * multiple page faults of a similar type to run in parallel.
 	 */
 	if (fs.vp == NULL /* avoid locked vnode leak */ &&
+	    (fs.entry->eflags & MAP_ENTRY_SPLIT_BOUNDARY_MASK) == 0 &&
 	    (fs.fault_flags & (VM_FAULT_WIRE | VM_FAULT_DIRTY)) == 0) {
 		VM_OBJECT_RLOCK(fs.first_object);
 		rv = vm_fault_soft_fast(&fs);
@@ -1328,6 +1374,27 @@ RetryFault:
 	 */
 	fs.object = fs.first_object;
 	fs.pindex = fs.first_pindex;
+
+	if ((fs.entry->eflags & MAP_ENTRY_SPLIT_BOUNDARY_MASK) != 0) {
+		rv = vm_fault_allocate(&fs);
+		switch (rv) {
+		case KERN_RESTART:
+			unlock_and_deallocate(&fs);
+			/* FALLTHROUGH */
+		case KERN_RESOURCE_SHORTAGE:
+			goto RetryFault;
+		case KERN_SUCCESS:
+		case KERN_FAILURE:
+		case KERN_OUT_OF_BOUNDS:
+			unlock_and_deallocate(&fs);
+			return (rv);
+		case KERN_NOT_RECEIVER:
+			break;
+		default:
+			panic("vm_fault: Unhandled rv %d", rv);
+		}
+	}
+
 	while (TRUE) {
 		KASSERT(fs.m == NULL,
 		    ("page still set %p at loop start", fs.m));
@@ -1451,6 +1518,12 @@ RetryFault:
 		 */
 		if (vm_fault_next(&fs))
 			continue;
+		if ((fs.fault_flags & VM_FAULT_NOFILL) != 0) {
+			if (fs.first_object == fs.object)
+				fault_page_free(&fs.first_m);
+			unlock_and_deallocate(&fs);
+			return (KERN_OUT_OF_BOUNDS);
+		}
 		VM_OBJECT_WUNLOCK(fs.object);
 		vm_fault_zerofill(&fs);
 		/* Don't try to prefault neighboring pages. */
@@ -1767,16 +1840,13 @@ vm_fault_quick_hold_pages(vm_map_t map, void * __capability addr, vm_size_t len,
 	if (len == 0)
 		return (0);
 #if __has_feature(capabilities)
-	if (!__CAP_CHECK(addr, len))
+	if (!__CAP_CHECK(addr, len) || !vm_cap_allows_prot(addr, prot))
 		return (-1);
 #endif
 	start = (__cheri_addr vm_offset_t)trunc_page(addr);
 	end = (__cheri_addr vm_offset_t)round_page((char * __capability)addr + len);
 
-	/*
-	 * Check for illegal addresses.
-	 */
-	if (start < vm_map_min(map) || start > end || end > vm_map_max(map))
+	if (!vm_map_range_valid(map, start, end))
 		return (-1);
 
 	if (atop(end - start) > max_count)

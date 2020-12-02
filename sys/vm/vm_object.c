@@ -192,9 +192,6 @@ vm_object_zdtor(void *mem, int size, void *arg)
 	    ("object %p has reservations",
 	    object));
 #endif
-	KASSERT(blockcount_read(&object->paging_in_progress) == 0,
-	    ("object %p paging_in_progress = %d",
-	    object, blockcount_read(&object->paging_in_progress)));
 	KASSERT(!vm_object_busied(object),
 	    ("object %p busy = %d", object, blockcount_read(&object->busy)));
 	KASSERT(object->resident_page_count == 0,
@@ -281,7 +278,7 @@ vm_object_init(void)
 {
 	TAILQ_INIT(&vm_object_list);
 	mtx_init(&vm_object_list_mtx, "vm object_list", NULL, MTX_DEF);
-	
+
 	rw_init(&kernel_object->lock, "kernel vm object");
 	_vm_object_allocate(OBJT_PHYS, atop(VM_MAX_KERNEL_ADDRESS -
 	    VM_MIN_KERNEL_ADDRESS), OBJ_UNMANAGED, kernel_object, NULL);
@@ -289,12 +286,16 @@ vm_object_init(void)
 	kernel_object->flags |= OBJ_COLORED;
 	kernel_object->pg_color = (u_short)atop(VM_MIN_KERNEL_ADDRESS);
 #endif
+	kernel_object->un_pager.phys.ops = &default_phys_pg_ops;
 	vm_object_set_flag(kernel_object, OBJ_HASCAP);
 
 	/*
 	 * The lock portion of struct vm_object must be type stable due
 	 * to vm_pageout_fallback_object_lock locking a vm object
 	 * without holding any references to it.
+	 *
+	 * paging_in_progress is valid always.  Lockless references to
+	 * the objects may acquire pip and then check OBJ_DEAD.
 	 */
 	obj_zone = uma_zcreate("VM OBJECT", sizeof (struct vm_object), NULL,
 #ifdef INVARIANTS
@@ -557,7 +558,6 @@ vm_object_deallocate_vnode(vm_object_t object)
 	/* vrele may need the vnode lock. */
 	vrele(vp);
 }
-
 
 /*
  * We dropped a reference on an object and discovered that it had a
@@ -938,12 +938,13 @@ vm_object_terminate(vm_object_t object)
 	    ("terminating shadow obj %p", object));
 
 	/*
-	 * wait for the pageout daemon to be done with the object
+	 * Wait for the pageout daemon and other current users to be
+	 * done with the object.  Note that new paging_in_progress
+	 * users can come after this wait, but they must check
+	 * OBJ_DEAD flag set (without unlocking the object), and avoid
+	 * the object being terminated.
 	 */
 	vm_object_pip_wait(object, "objtrm");
-
-	KASSERT(!blockcount_read(&object->paging_in_progress),
-	    ("vm_object_terminate: pageout in progress"));
 
 	KASSERT(object->ref_count == 0,
 	    ("vm_object_terminate: object with references, ref_count=%d",
@@ -1498,7 +1499,7 @@ vm_object_shadow(vm_object_t *object, vm_ooffset_t *offset, vm_size_t length,
 void
 vm_object_split(vm_map_entry_t entry)
 {
-	vm_page_t m, m_next;
+	vm_page_t m, m_busy, m_next;
 	vm_object_t orig_object, new_object, backing_object;
 	vm_pindex_t idx, offidxstart;
 	vm_size_t size;
@@ -1555,8 +1556,14 @@ vm_object_split(vm_map_entry_t entry)
 	 * that the object is in transition.
 	 */
 	vm_object_set_flag(orig_object, OBJ_SPLIT);
+	m_busy = NULL;
+#ifdef INVARIANTS
+	idx = 0;
+#endif
 retry:
 	m = vm_page_find_least(orig_object, offidxstart);
+	KASSERT(m == NULL || idx <= m->pindex - offidxstart,
+	    ("%s: object %p was repopulated", __func__, orig_object));
 	for (; m != NULL && (idx = m->pindex - offidxstart) < size;
 	    m = m_next) {
 		m_next = TAILQ_NEXT(m, listq);
@@ -1611,8 +1618,15 @@ retry:
 		 */
 		vm_reserv_rename(m, new_object, orig_object, offidxstart);
 #endif
+
+		/*
+		 * orig_object's type may change while sleeping, so keep track
+		 * of the beginning of the busied range.
+		 */
 		if (orig_object->type != OBJT_SWAP)
 			vm_page_xunbusy(m);
+		else if (m_busy == NULL)
+			m_busy = m;
 	}
 	if (orig_object->type == OBJT_SWAP) {
 		/*
@@ -1620,8 +1634,9 @@ retry:
 		 * and new_object's locks are released and reacquired. 
 		 */
 		swap_pager_copy(orig_object, new_object, offidxstart, 0);
-		TAILQ_FOREACH(m, &new_object->memq, listq)
-			vm_page_xunbusy(m);
+		if (m_busy != NULL)
+			TAILQ_FOREACH_FROM(m_busy, &new_object->memq, listq)
+				vm_page_xunbusy(m_busy);
 	}
 	vm_object_clear_flag(orig_object, OBJ_SPLIT);
 	VM_OBJECT_WUNLOCK(orig_object);
@@ -2123,6 +2138,12 @@ wired:
 		vm_page_free(p);
 	}
 	vm_object_pip_wakeup(object);
+
+	if (object->type == OBJT_SWAP) {
+		if (end == 0)
+			end = object->size;
+		swap_pager_freespace(object, start, end - start);
+	}
 }
 
 /*
@@ -2264,7 +2285,6 @@ vm_object_coalesce(vm_object_t prev_object, vm_ooffset_t prev_offset,
 	 * Account for the charge.
 	 */
 	if (prev_object->cred != NULL) {
-
 		/*
 		 * If prev_object was charged, then this mapping,
 		 * although not charged now, may become writable
@@ -2290,9 +2310,6 @@ vm_object_coalesce(vm_object_t prev_object, vm_ooffset_t prev_offset,
 	if (next_pindex < prev_object->size) {
 		vm_object_page_remove(prev_object, next_pindex, next_pindex +
 		    next_size, 0);
-		if (prev_object->type == OBJT_SWAP)
-			swap_pager_freespace(prev_object,
-					     next_pindex, next_size);
 #if 0
 		if (prev_object->cred != NULL) {
 			KASSERT(prev_object->charge >=
@@ -2432,7 +2449,6 @@ vm_object_vnode(vm_object_t object)
 	}
 	return (vp);
 }
-
 
 /*
  * Busy the vm object.  This prevents new pages belonging to the object from
@@ -2580,7 +2596,7 @@ sysctl_vm_object_list(SYSCTL_HANDLER_ARGS)
 			vref(vp);
 		VM_OBJECT_RUNLOCK(obj);
 		if (vp != NULL) {
-			vn_fullpath(curthread, vp, &fullpath, &freepath);
+			vn_fullpath(vp, &fullpath, &freepath);
 			vn_lock(vp, LK_SHARED | LK_RETRY);
 			if (VOP_GETATTR(vp, &va, curthread->td_ucred) == 0) {
 				kvo->kvo_vn_fileid = va.va_fileid;
@@ -2696,6 +2712,8 @@ DB_SHOW_COMMAND(vmochk, vm_object_check)
 				    (void *)object->backing_object);
 			}
 		}
+		if (db_pager_quit)
+			return;
 	}
 }
 
@@ -2753,6 +2771,9 @@ DB_SHOW_COMMAND(object, vm_object_print_static)
 
 		db_printf("(off=0x%jx,page=0x%jx)",
 		    (uintmax_t)p->pindex, (uintmax_t)VM_PAGE_TO_PHYS(p));
+
+		if (db_pager_quit)
+			break;
 	}
 	if (count != 0)
 		db_printf("\n");

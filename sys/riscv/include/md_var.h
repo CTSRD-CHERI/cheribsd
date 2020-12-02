@@ -44,8 +44,6 @@ extern	char	switcher_cocall[];
 extern	int	szswitcher_cocall;
 extern	char	switcher_coaccept[];
 extern	int	szswitcher_coaccept;
-extern uint64_t *vm_page_dump;
-extern int vm_page_dump_size;
 extern u_long elf_hwcap;
 extern register_t mvendorid;
 extern register_t marchid;
@@ -54,8 +52,6 @@ extern register_t mimpid;
 struct dumperinfo;
 
 void busdma_swi(void);
-void dump_add_page(vm_paddr_t);
-void dump_drop_page(vm_paddr_t);
 int minidumpsys(struct dumperinfo *);
 
 #endif /* !_MACHINE_MD_VAR_H_ */

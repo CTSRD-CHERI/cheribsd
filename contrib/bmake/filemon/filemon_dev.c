@@ -1,4 +1,4 @@
-/*	$NetBSD: filemon_dev.c,v 1.1 2020/01/19 19:49:37 riastradh Exp $	*/
+/*	$NetBSD: filemon_dev.c,v 1.4 2020/11/05 17:27:16 rillig Exp $	*/
 
 /*-
  * Copyright (c) 2020 The NetBSD Foundation, Inc.
@@ -65,12 +65,12 @@ filemon_open(void)
 	int error;
 
 	/* Allocate and zero a struct filemon object.  */
-	F = calloc(1, sizeof(*F));
+	F = calloc(1, sizeof *F);
 	if (F == NULL)
 		return NULL;
 
 	/* Try opening /dev/filemon, up to six times (cargo cult!).  */
-	for (i = 0; (F->fd = open(_PATH_FILEMON, O_RDWR)) == -1; i++) {
+	for (i = 0; (F->fd = open(_PATH_FILEMON, O_RDWR|O_CLOEXEC)) == -1; i++) {
 		if (i == 5) {
 			error = errno;
 			goto fail0;

@@ -1,4 +1,4 @@
-/*	$NetBSD: make.h,v 1.107 2020/04/03 03:35:16 sjg Exp $	*/
+/*	$NetBSD: make.h,v 1.210 2020/11/16 21:53:10 rillig Exp $	*/
 
 /*
  * Copyright (c) 1988, 1989, 1990, 1993
@@ -77,8 +77,8 @@
  *	The global definitions for pmake
  */
 
-#ifndef _MAKE_H_
-#define _MAKE_H_
+#ifndef MAKE_MAKE_H
+#define MAKE_MAKE_H
 
 #ifdef HAVE_CONFIG_H
 # include "config.h"
@@ -86,9 +86,12 @@
 
 #include <sys/types.h>
 #include <sys/param.h>
+#include <sys/stat.h>
 
+#include <assert.h>
 #include <ctype.h>
 #include <fcntl.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #ifdef HAVE_STRING_H
@@ -132,8 +135,44 @@
 #define MAKE_ATTR_PRINTFLIKE(fmtarg, firstvararg)	/* delete */
 #endif
 
-#include "sprite.h"
+#define MAKE_INLINE static inline MAKE_ATTR_UNUSED
+
+/*
+ * A boolean type is defined as an integer, not an enum, for historic reasons.
+ * The only allowed values are the constants TRUE and FALSE (1 and 0).
+ */
+
+#ifdef USE_DOUBLE_BOOLEAN
+/* During development, to find type mismatches in function declarations. */
+typedef double Boolean;
+#define TRUE 1.0
+#define FALSE 0.0
+#elif defined(USE_UCHAR_BOOLEAN)
+/* During development, to find code that depends on the exact value of TRUE or
+ * that stores other values in Boolean variables. */
+typedef unsigned char Boolean;
+#define TRUE ((unsigned char)0xFF)
+#define FALSE ((unsigned char)0x00)
+#elif defined(USE_CHAR_BOOLEAN)
+/* During development, to find code that uses a boolean as array index, via
+ * -Wchar-subscripts. */
+typedef char Boolean;
+#define TRUE ((char)-1)
+#define FALSE ((char)0x00)
+#elif defined(USE_ENUM_BOOLEAN)
+typedef enum Boolean { FALSE, TRUE } Boolean;
+#else
+typedef int Boolean;
+#ifndef TRUE
+#define TRUE	1
+#endif
+#ifndef FALSE
+#define FALSE	0
+#endif
+#endif
+
 #include "lst.h"
+#include "enum.h"
 #include "hash.h"
 #include "make-conf.h"
 #include "buf.h"
@@ -150,373 +189,524 @@
 #define POSIX_SIGNALS
 #endif
 
-/*-
- * The structure for an individual graph node. Each node has several
- * pieces of data associated with it.
- *	1) the name of the target it describes
- *	2) the location of the target file in the file system.
- *	3) the type of operator used to define its sources (qv. parse.c)
- *	4) whether it is involved in this invocation of make
- *	5) whether the target has been remade
- *	6) whether any of its children has been remade
- *	7) the number of its children that are, as yet, unmade
- *	8) its modification time
- *	9) the modification time of its youngest child (qv. make.c)
- *	10) a list of nodes for which this is a source (parents)
- *	11) a list of nodes on which this depends (children)
- *	12) a list of nodes that depend on this, as gleaned from the
- *	    transformation rules (iParents)
- *	13) a list of ancestor nodes, which includes parents, iParents,
- *	    and recursive parents of parents
- *	14) a list of nodes of the same name created by the :: operator
- *	15) a list of nodes that must be made (if they're made) before
- *	    this node can be, but that do not enter into the datedness of
- *	    this node.
- *	16) a list of nodes that must be made (if they're made) before
- *	    this node or any child of this node can be, but that do not
- *	    enter into the datedness of this node.
- *	17) a list of nodes that must be made (if they're made) after
- *	    this node is, but that do not depend on this node, in the
- *	    normal sense.
- *	18) a Lst of ``local'' variables that are specific to this target
- *	   and this target only (qv. var.c [$@ $< $?, etc.])
- *	19) a Lst of strings that are commands to be given to a shell
- *	   to create this target.
- */
+typedef enum GNodeMade {
+    UNMADE,			/* Not examined yet */
+    DEFERRED,			/* Examined once (building child) */
+    REQUESTED,			/* on toBeMade list */
+    BEINGMADE,			/* Target is already being made.
+				 * Indicates a cycle in the graph. */
+    MADE,			/* Was out-of-date and has been made */
+    UPTODATE,			/* Was already up-to-date */
+    ERROR,			/* An error occurred while it was being
+				 * made (used only in compat mode) */
+    ABORTED			/* The target was aborted due to an error
+				 * making an inferior (compat). */
+} GNodeMade;
+
+/* The OP_ constants are used when parsing a dependency line as a way of
+ * communicating to other parts of the program the way in which a target
+ * should be made.
+ *
+ * Some of the OP_ constants can be combined, others cannot. */
+typedef enum GNodeType {
+    OP_NONE		= 0,
+
+    /* The dependency operator ':' is the most common one.  The commands of
+     * this node are executed if any child is out-of-date. */
+    OP_DEPENDS		= 1 << 0,
+    /* The dependency operator '!' always executes its commands, even if
+     * its children are up-to-date. */
+    OP_FORCE		= 1 << 1,
+    /* The dependency operator '::' behaves like ':', except that it allows
+     * multiple dependency groups to be defined.  Each of these groups is
+     * executed on its own, independently from the others.  Each individual
+     * dependency group is called a cohort. */
+    OP_DOUBLEDEP	= 1 << 2,
+
+    /* Matches the dependency operators ':', '!' and '::'. */
+    OP_OPMASK		= OP_DEPENDS|OP_FORCE|OP_DOUBLEDEP,
+
+    /* Don't care if the target doesn't exist and can't be created */
+    OP_OPTIONAL		= 1 << 3,
+    /* Use associated commands for parents */
+    OP_USE		= 1 << 4,
+    /* Target is never out of date, but always execute commands anyway.
+     * Its time doesn't matter, so it has none...sort of */
+    OP_EXEC		= 1 << 5,
+    /* Ignore non-zero exit status from shell commands when creating the node */
+    OP_IGNORE		= 1 << 6,
+    /* Don't remove the target when interrupted */
+    OP_PRECIOUS		= 1 << 7,
+    /* Don't echo commands when executed */
+    OP_SILENT		= 1 << 8,
+    /* Target is a recursive make so its commands should always be executed
+     * when it is out of date, regardless of the state of the -n or -t flags */
+    OP_MAKE		= 1 << 9,
+    /* Target is out-of-date only if any of its children was out-of-date */
+    OP_JOIN		= 1 << 10,
+    /* Assume the children of the node have been already made */
+    OP_MADE		= 1 << 11,
+    /* Special .BEGIN, .END, .INTERRUPT */
+    OP_SPECIAL		= 1 << 12,
+    /* Like .USE, only prepend commands */
+    OP_USEBEFORE	= 1 << 13,
+    /* The node is invisible to its parents. I.e. it doesn't show up in the
+     * parents' local variables (.IMPSRC, .ALLSRC). */
+    OP_INVISIBLE	= 1 << 14,
+    /* The node is exempt from normal 'main target' processing in parse.c */
+    OP_NOTMAIN		= 1 << 15,
+    /* Not a file target; run always */
+    OP_PHONY		= 1 << 16,
+    /* Don't search for file in the path */
+    OP_NOPATH		= 1 << 17,
+    /* In a dependency line "target: source1 .WAIT source2", source1 is made
+     * first, including its children.  Once that is finished, source2 is made,
+     * including its children.  The .WAIT keyword may appear more than once in
+     * a single dependency declaration. */
+    OP_WAIT		= 1 << 18,
+    /* .NOMETA do not create a .meta file */
+    OP_NOMETA		= 1 << 19,
+    /* .META we _do_ want a .meta file */
+    OP_META		= 1 << 20,
+    /* Do not compare commands in .meta file */
+    OP_NOMETA_CMP	= 1 << 21,
+    /* Possibly a submake node */
+    OP_SUBMAKE		= 1 << 22,
+
+    /* Attributes applied by PMake */
+
+    /* The node is a transformation rule, such as ".c.o". */
+    OP_TRANSFORM	= 1 << 31,
+    /* Target is a member of an archive */
+    /* XXX: How does this differ from OP_ARCHV? */
+    OP_MEMBER		= 1 << 30,
+    /* The node is a library,
+     * its name has the form "-l<libname>" */
+    OP_LIB		= 1 << 29,
+    /* The node is an archive member,
+     * its name has the form "archive(member)" */
+    /* XXX: How does this differ from OP_MEMBER? */
+    OP_ARCHV		= 1 << 28,
+    /* Target has all the commands it should. Used when parsing to catch
+     * multiple command groups for a target.  Only applies to the dependency
+     * operators ':' and '!', but not to '::'. */
+    OP_HAS_COMMANDS	= 1 << 27,
+    /* The special command "..." has been seen. All further commands from
+     * this node will be saved on the .END node instead, to be executed at
+     * the very end. */
+    OP_SAVE_CMDS	= 1 << 26,
+    /* Already processed by Suff_FindDeps */
+    OP_DEPS_FOUND	= 1 << 25,
+    /* Node found while expanding .ALLSRC */
+    OP_MARK		= 1 << 24,
+
+    OP_NOTARGET		= OP_NOTMAIN | OP_USE | OP_EXEC | OP_TRANSFORM
+} GNodeType;
+
+typedef enum GNodeFlags {
+    REMAKE	= 0x0001,	/* this target needs to be (re)made */
+    CHILDMADE	= 0x0002,	/* children of this target were made */
+    FORCE	= 0x0004,	/* children don't exist, and we pretend made */
+    DONE_WAIT	= 0x0008,	/* Set by Make_ProcessWait() */
+    DONE_ORDER	= 0x0010,	/* Build requested by .ORDER processing */
+    FROM_DEPEND	= 0x0020,	/* Node created from .depend */
+    DONE_ALLSRC	= 0x0040,	/* We do it once only */
+    CYCLE	= 0x1000,	/* Used by MakePrintStatus */
+    DONECYCLE	= 0x2000,	/* Used by MakePrintStatus */
+    INTERNAL	= 0x4000	/* Internal use only */
+} GNodeFlags;
+
+typedef struct List StringList;
+typedef struct ListNode StringListNode;
+
+typedef struct List GNodeList;
+typedef struct ListNode GNodeListNode;
+
+typedef struct List /* of CachedDir */ SearchPath;
+
+/* A graph node represents a target that can possibly be made, including its
+ * relation to other targets and a lot of other details. */
 typedef struct GNode {
-    char            *name;     	/* The target's name */
-    char            *uname;    	/* The unexpanded name of a .USE node */
-    char    	    *path;     	/* The full pathname of the file */
-    int             type;      	/* Its type (see the OP flags, below) */
+    /* The target's name, such as "clean" or "make.c" */
+    char *name;
+    /* The unexpanded name of a .USE node */
+    char *uname;
+    /* The full pathname of the file belonging to the target.
+     * XXX: What about .PHONY targets? These don't have an associated path. */
+    char *path;
 
-    int             flags;
-#define REMAKE		0x1    	/* this target needs to be (re)made */
-#define	CHILDMADE	0x2	/* children of this target were made */
-#define FORCE		0x4	/* children don't exist, and we pretend made */
-#define DONE_WAIT	0x8	/* Set by Make_ProcessWait() */
-#define DONE_ORDER	0x10	/* Build requested by .ORDER processing */
-#define FROM_DEPEND	0x20	/* Node created from .depend */
-#define DONE_ALLSRC	0x40	/* We do it once only */
-#define CYCLE		0x1000  /* Used by MakePrintStatus */
-#define DONECYCLE	0x2000  /* Used by MakePrintStatus */
-#define INTERNAL	0x4000	/* Internal use only */
-    enum enum_made {
-	UNMADE, DEFERRED, REQUESTED, BEINGMADE,
-	MADE, UPTODATE, ERROR, ABORTED
-    }	    	    made;    	/* Set to reflect the state of processing
-				 * on this node:
-				 *  UNMADE - Not examined yet
-				 *  DEFERRED - Examined once (building child)
-				 *  REQUESTED - on toBeMade list
-				 *  BEINGMADE - Target is already being made.
-				 *  	Indicates a cycle in the graph.
-				 *  MADE - Was out-of-date and has been made
-				 *  UPTODATE - Was already up-to-date
-				 *  ERROR - An error occurred while it was being
-				 *  	made (used only in compat mode)
-				 *  ABORTED - The target was aborted due to
-				 *  	an error making an inferior (compat).
-				 */
-    int             unmade;    	/* The number of unmade children */
+    /* The type of operator used to define the sources (see the OP flags below).
+     * XXX: This looks like a wild mixture of type and flags. */
+    GNodeType type;
+    GNodeFlags flags;
 
-    time_t          mtime;     	/* Its modification time */
-    struct GNode    *cmgn;    	/* The youngest child */
+    /* The state of processing on this node */
+    GNodeMade made;
+    int unmade;			/* The number of unmade children */
 
-    Lst     	    iParents;  	/* Links to parents for which this is an
-				 * implied source, if any */
-    Lst	    	    cohorts;  	/* Other nodes for the :: operator */
-    Lst             parents;   	/* Nodes that depend on this one */
-    Lst             children;  	/* Nodes on which this one depends */
-    Lst             order_pred;	/* .ORDER nodes we need made */
-    Lst             order_succ;	/* .ORDER nodes who need us */
+    /* The modification time; 0 means the node does not have a corresponding
+     * file; see GNode_IsOODate. */
+    time_t mtime;
+    struct GNode *youngestChild;
 
-    char	    cohort_num[8]; /* #n for this cohort */
-    int		    unmade_cohorts;/* # of unmade instances on the
-				      cohorts list */
-    struct GNode    *centurion;	/* Pointer to the first instance of a ::
-				   node; only set when on a cohorts list */
-    unsigned int    checked;    /* Last time we tried to makle this node */
+    /* The GNodes for which this node is an implied source. May be empty.
+     * For example, when there is an inference rule for .c.o, the node for
+     * file.c has the node for file.o in this list. */
+    GNodeList *implicitParents;
 
-    Hash_Table      context;	/* The local variables */
-    Lst             commands;  	/* Creation commands */
+    /* The nodes that depend on this one, or in other words, the nodes for
+     * which this is a source. */
+    GNodeList *parents;
+    /* The nodes on which this one depends. */
+    GNodeList *children;
 
-    struct _Suff    *suffix;	/* Suffix for the node (determined by
-				 * Suff_FindDeps and opaque to everyone
-				 * but the Suff module) */
-    const char	    *fname;	/* filename where the GNode got defined */
-    int		     lineno;	/* line number where the GNode got defined */
+    /* .ORDER nodes we need made. The nodes that must be made (if they're
+     * made) before this node can be made, but that do not enter into the
+     * datedness of this node. */
+    GNodeList *order_pred;
+    /* .ORDER nodes who need us. The nodes that must be made (if they're made
+     * at all) after this node is made, but that do not depend on this node,
+     * in the normal sense. */
+    GNodeList *order_succ;
+
+    /* Other nodes of the same name, for the '::' dependency operator. */
+    GNodeList *cohorts;
+    /* The "#n" suffix for this cohort, or "" for other nodes */
+    char cohort_num[8];
+    /* The number of unmade instances on the cohorts list */
+    int unmade_cohorts;
+    /* Pointer to the first instance of a '::' node; only set when on a
+     * cohorts list */
+    struct GNode *centurion;
+
+    /* Last time (sequence number) we tried to make this node */
+    unsigned int checked_seqno;
+
+    /* The "local" variables that are specific to this target and this target
+     * only, such as $@, $<, $?.
+     *
+     * Also used for the global variable scopes VAR_GLOBAL, VAR_CMDLINE,
+     * VAR_INTERNAL, which contain variables with arbitrary names. */
+    HashTable /* of Var pointer */ context;
+
+    /* The commands to be given to a shell to create this target. */
+    StringList *commands;
+
+    /* Suffix for the node (determined by Suff_FindDeps and opaque to everyone
+     * but the Suff module) */
+    struct Suff *suffix;
+
+    /* Filename where the GNode got defined */
+    /* XXX: What is the lifetime of this string? */
+    const char *fname;
+    /* Line number where the GNode got defined */
+    int lineno;
 } GNode;
 
-/*
- * The OP_ constants are used when parsing a dependency line as a way of
- * communicating to other parts of the program the way in which a target
- * should be made. These constants are bitwise-OR'ed together and
- * placed in the 'type' field of each node. Any node that has
- * a 'type' field which satisfies the OP_NOP function was never never on
- * the lefthand side of an operator, though it may have been on the
- * righthand side...
- */
-#define OP_DEPENDS	0x00000001  /* Execution of commands depends on
-				     * kids (:) */
-#define OP_FORCE	0x00000002  /* Always execute commands (!) */
-#define OP_DOUBLEDEP	0x00000004  /* Execution of commands depends on kids
-				     * per line (::) */
-#define OP_OPMASK	(OP_DEPENDS|OP_FORCE|OP_DOUBLEDEP)
-
-#define OP_OPTIONAL	0x00000008  /* Don't care if the target doesn't
-				     * exist and can't be created */
-#define OP_USE		0x00000010  /* Use associated commands for parents */
-#define OP_EXEC	  	0x00000020  /* Target is never out of date, but always
-				     * execute commands anyway. Its time
-				     * doesn't matter, so it has none...sort
-				     * of */
-#define OP_IGNORE	0x00000040  /* Ignore errors when creating the node */
-#define OP_PRECIOUS	0x00000080  /* Don't remove the target when
-				     * interrupted */
-#define OP_SILENT	0x00000100  /* Don't echo commands when executed */
-#define OP_MAKE		0x00000200  /* Target is a recursive make so its
-				     * commands should always be executed when
-				     * it is out of date, regardless of the
-				     * state of the -n or -t flags */
-#define OP_JOIN 	0x00000400  /* Target is out-of-date only if any of its
-				     * children was out-of-date */
-#define	OP_MADE		0x00000800  /* Assume the children of the node have
-				     * been already made */
-#define OP_SPECIAL	0x00001000  /* Special .BEGIN, .END, .INTERRUPT */
-#define	OP_USEBEFORE	0x00002000  /* Like .USE, only prepend commands */
-#define OP_INVISIBLE	0x00004000  /* The node is invisible to its parents.
-				     * I.e. it doesn't show up in the parents's
-				     * local variables. */
-#define OP_NOTMAIN	0x00008000  /* The node is exempt from normal 'main
-				     * target' processing in parse.c */
-#define OP_PHONY	0x00010000  /* Not a file target; run always */
-#define OP_NOPATH	0x00020000  /* Don't search for file in the path */
-#define OP_WAIT 	0x00040000  /* .WAIT phony node */
-#define OP_NOMETA	0x00080000  /* .NOMETA do not create a .meta file */
-#define OP_META		0x00100000  /* .META we _do_ want a .meta file */
-#define OP_NOMETA_CMP	0x00200000  /* Do not compare commands in .meta file */
-#define OP_SUBMAKE	0x00400000  /* Possibly a submake node */
-/* Attributes applied by PMake */
-#define OP_TRANSFORM	0x80000000  /* The node is a transformation rule */
-#define OP_MEMBER 	0x40000000  /* Target is a member of an archive */
-#define OP_LIB	  	0x20000000  /* Target is a library */
-#define OP_ARCHV  	0x10000000  /* Target is an archive construct */
-#define OP_HAS_COMMANDS	0x08000000  /* Target has all the commands it should.
-				     * Used when parsing to catch multiple
-				     * commands for a target */
-#define OP_SAVE_CMDS	0x04000000  /* Saving commands on .END (Compat) */
-#define OP_DEPS_FOUND	0x02000000  /* Already processed by Suff_FindDeps */
-#define	OP_MARK		0x01000000  /* Node found while expanding .ALLSRC */
-
-#define NoExecute(gn) ((gn->type & OP_MAKE) ? noRecursiveExecute : noExecute)
-/*
- * OP_NOP will return TRUE if the node with the given type was not the
- * object of a dependency operator
- */
-#define OP_NOP(t)	(((t) & OP_OPMASK) == 0x00000000)
-
-#define OP_NOTARGET (OP_NOTMAIN|OP_USE|OP_EXEC|OP_TRANSFORM)
+/* Error levels for diagnostics during parsing. */
+typedef enum ParseErrorLevel {
+    /* Exit when the current top-level makefile has been parsed completely. */
+    PARSE_FATAL = 1,
+    /* Print "warning"; may be upgraded to fatal by the -w option. */
+    PARSE_WARNING,
+    /* Informational, mainly used during development of makefiles. */
+    PARSE_INFO
+} ParseErrorLevel;
 
 /*
- * The TARG_ constants are used when calling the Targ_FindNode and
- * Targ_FindList functions in targ.c. They simply tell the functions what to
- * do if the desired node(s) is (are) not found. If the TARG_CREATE constant
- * is given, a new, empty node will be created for the target, placed in the
- * table of all targets and its address returned. If TARG_NOCREATE is given,
- * a NULL pointer will be returned.
+ * Values returned by Cond_EvalLine and Cond_EvalCondition.
  */
-#define TARG_NOCREATE	0x00	  /* don't create it */
-#define TARG_CREATE	0x01	  /* create node if not found */
-#define TARG_NOHASH	0x02	  /* don't look in/add to hash table */
+typedef enum CondEvalResult {
+    COND_PARSE,			/* Parse the next lines */
+    COND_SKIP,			/* Skip the next lines */
+    COND_INVALID		/* Not a conditional statement */
+} CondEvalResult;
 
-/*
- * These constants are all used by the Str_Concat function to decide how the
- * final string should look. If STR_ADDSPACE is given, a space will be
- * placed between the two strings. If STR_ADDSLASH is given, a '/' will
- * be used instead of a space. If neither is given, no intervening characters
- * will be placed between the two strings in the final output. If the
- * STR_DOFREE bit is set, the two input strings will be freed before
- * Str_Concat returns.
- */
-#define STR_ADDSPACE	0x01	/* add a space when Str_Concat'ing */
-#define STR_ADDSLASH	0x02	/* add a slash when Str_Concat'ing */
-
-/*
- * Error levels for parsing. PARSE_FATAL means the process cannot continue
- * once the makefile has been parsed. PARSE_WARNING means it can. Passed
- * as the first argument to Parse_Error.
- */
-#define PARSE_INFO	3
-#define PARSE_WARNING	2
-#define PARSE_FATAL	1
-
-/*
- * Values returned by Cond_Eval.
- */
-#define COND_PARSE	0   	/* Parse the next lines */
-#define COND_SKIP 	1   	/* Skip the next lines */
-#define COND_INVALID	2   	/* Not a conditional statement */
-
-/*
- * Definitions for the "local" variables. Used only for clarity.
- */
-#define TARGET	  	  "@" 	/* Target of dependency */
-#define OODATE	  	  "?" 	/* All out-of-date sources */
-#define ALLSRC	  	  ">" 	/* All sources */
-#define IMPSRC	  	  "<" 	/* Source implied by transformation */
-#define PREFIX	  	  "*" 	/* Common prefix */
-#define ARCHIVE	  	  "!" 	/* Archive in "archive(member)" syntax */
-#define MEMBER	  	  "%" 	/* Member in "archive(member)" syntax */
-
-#define FTARGET           "@F"  /* file part of TARGET */
-#define DTARGET           "@D"  /* directory part of TARGET */
-#define FIMPSRC           "<F"  /* file part of IMPSRC */
-#define DIMPSRC           "<D"  /* directory part of IMPSRC */
-#define FPREFIX           "*F"  /* file part of PREFIX */
-#define DPREFIX           "*D"  /* directory part of PREFIX */
+/* Names of the variables that are "local" to a specific target. */
+#define TARGET		"@"	/* Target of dependency */
+#define OODATE		"?"	/* All out-of-date sources */
+#define ALLSRC		">"	/* All sources */
+#define IMPSRC		"<"	/* Source implied by transformation */
+#define PREFIX		"*"	/* Common prefix */
+#define ARCHIVE		"!"	/* Archive in "archive(member)" syntax */
+#define MEMBER		"%"	/* Member in "archive(member)" syntax */
 
 /*
  * Global Variables
  */
-extern Lst  	create;	    	/* The list of target names specified on the
-				 * command line. used to resolve #if
-				 * make(...) statements */
-extern Lst     	dirSearchPath; 	/* The list of directories to search when
-				 * looking for targets */
 
-extern Boolean	compatMake;	/* True if we are make compatible */
-extern Boolean	ignoreErrors;  	/* True if should ignore all errors */
-extern Boolean  beSilent;    	/* True if should print no commands */
-extern Boolean  noExecute;    	/* True if should execute nothing */
-extern Boolean  noRecursiveExecute;    	/* True if should execute nothing */
-extern Boolean  allPrecious;   	/* True if every target is precious */
-extern Boolean  deleteOnError;	/* True if failed targets should be deleted */
-extern Boolean  keepgoing;    	/* True if should continue on unaffected
-				 * portions of the graph when have an error
-				 * in one portion */
-extern Boolean 	touchFlag;    	/* TRUE if targets should just be 'touched'
-				 * if out of date. Set by the -t flag */
-extern Boolean 	queryFlag;    	/* TRUE if we aren't supposed to really make
-				 * anything, just see if the targets are out-
-				 * of-date */
-extern Boolean	doing_depend;	/* TRUE if processing .depend */
+/* True if every target is precious */
+extern Boolean allPrecious;
+/* True if failed targets should be deleted */
+extern Boolean deleteOnError;
+/* TRUE while processing .depend */
+extern Boolean doing_depend;
+/* .DEFAULT rule */
+extern GNode *defaultNode;
 
-extern Boolean	checkEnvFirst;	/* TRUE if environment should be searched for
-				 * variables before the global context */
-extern Boolean	jobServer;	/* a jobServer already exists */
+/* Variables defined internally by make which should not override those set
+ * by makefiles. */
+extern GNode *VAR_INTERNAL;
+/* Variables defined in a global context, e.g in the Makefile itself. */
+extern GNode *VAR_GLOBAL;
+/* Variables defined on the command line. */
+extern GNode *VAR_CMDLINE;
 
-extern Boolean	parseWarnFatal;	/* TRUE if makefile parsing warnings are
-				 * treated as errors */
+/* Value returned by Var_Parse when an error is encountered. It actually
+ * points to an empty string, so naive callers needn't worry about it. */
+extern char var_Error[];
 
-extern Boolean	varNoExportEnv;	/* TRUE if we should not export variables
-				 * set on the command line to the env. */
+/* The time at the start of this whole process */
+extern time_t now;
 
-extern GNode    *DEFAULT;    	/* .DEFAULT rule */
+/*
+ * If FALSE (the default behavior), undefined subexpressions in a variable
+ * expression are discarded.  If TRUE (only during variable assignments using
+ * the ':=' assignment operator, no matter how deeply nested), they are
+ * preserved and possibly expanded later when the variable from the
+ * subexpression has been defined.
+ *
+ * Example for a ':=' assignment:
+ *	CFLAGS = $(.INCLUDES)
+ *	CFLAGS := -I.. $(CFLAGS)
+ *	# If .INCLUDES (an undocumented special variable, by the way) is
+ *	# still undefined, the updated CFLAGS becomes "-I.. $(.INCLUDES)".
+ */
+extern Boolean preserveUndefined;
 
-extern GNode	*VAR_INTERNAL;	/* Variables defined internally by make
-				 * which should not override those set by
-				 * makefiles.
-				 */
-extern GNode    *VAR_GLOBAL;   	/* Variables defined in a global context, e.g
-				 * in the Makefile itself */
-extern GNode    *VAR_CMD;    	/* Variables defined on the command line */
-extern GNode	*VAR_FOR;	/* Iteration variables */
-extern char    	var_Error[];   	/* Value returned by Var_Parse when an error
-				 * is encountered. It actually points to
-				 * an empty string, so naive callers needn't
-				 * worry about it. */
+/* The list of directories to search when looking for targets (set by the
+ * special target .PATH). */
+extern SearchPath *dirSearchPath;
+/* Used for .include "...". */
+extern SearchPath *parseIncPath;
+/* Used for .include <...>, for the built-in sys.mk and makefiles from the
+ * command line arguments. */
+extern SearchPath *sysIncPath;
+/* The default for sysIncPath. */
+extern SearchPath *defSysIncPath;
 
-extern time_t 	now;	    	/* The time at the start of this whole
-				 * process */
+/* Startup directory */
+extern char curdir[];
+/* The basename of the program name, suffixed with [n] for sub-makes.  */
+extern char *progname;
+/* Name of the .depend makefile */
+extern char *makeDependfile;
+/* If we replaced environ, this will be non-NULL. */
+extern char **savedEnv;
 
-extern Boolean	oldVars;    	/* Do old-style variable substitution */
-
-extern Lst	sysIncPath;	/* The system include path. */
-extern Lst	defIncPath;	/* The default include path. */
-
-extern char	curdir[];	/* Startup directory */
-extern char	*progname;	/* The program name */
-extern char	*makeDependfile; /* .depend */
-extern char	**savedEnv;	 /* if we replaced environ this will be non-NULL */
+extern int makelevel;
 
 /*
  * We cannot vfork() in a child of vfork().
  * Most systems do not enforce this but some do.
  */
 #define vFork() ((getpid() == myPid) ? vfork() : fork())
-extern pid_t	myPid;
+extern pid_t myPid;
 
 #define	MAKEFLAGS	".MAKEFLAGS"
 #define	MAKEOVERRIDES	".MAKEOVERRIDES"
 #define	MAKE_JOB_PREFIX	".MAKE.JOB.PREFIX" /* prefix for job target output */
 #define	MAKE_EXPORTED	".MAKE.EXPORTED"   /* variables we export */
-#define	MAKE_MAKEFILES	".MAKE.MAKEFILES"  /* all the makefiles we read */
+#define	MAKE_MAKEFILES	".MAKE.MAKEFILES"  /* all makefiles already loaded */
 #define	MAKE_LEVEL	".MAKE.LEVEL"	   /* recursion level */
-#define MAKEFILE_PREFERENCE ".MAKE.MAKEFILE_PREFERENCE"
+#define MAKE_MAKEFILE_PREFERENCE ".MAKE.MAKEFILE_PREFERENCE"
 #define MAKE_DEPENDFILE	".MAKE.DEPENDFILE" /* .depend */
 #define MAKE_MODE	".MAKE.MODE"
 #ifndef MAKE_LEVEL_ENV
 # define MAKE_LEVEL_ENV	"MAKELEVEL"
 #endif
 
-/*
- * debug control:
- *	There is one bit per module.  It is up to the module what debug
- *	information to print.
- */
-extern FILE *debug_file;	/* Output written here - default stdout */
-extern int debug;
-#define	DEBUG_ARCH	0x00001
-#define	DEBUG_COND	0x00002
-#define	DEBUG_DIR	0x00004
-#define	DEBUG_GRAPH1	0x00008
-#define	DEBUG_GRAPH2	0x00010
-#define	DEBUG_JOB	0x00020
-#define	DEBUG_MAKE	0x00040
-#define	DEBUG_SUFF	0x00080
-#define	DEBUG_TARG	0x00100
-#define	DEBUG_VAR	0x00200
-#define DEBUG_FOR	0x00400
-#define DEBUG_SHELL	0x00800
-#define DEBUG_ERROR	0x01000
-#define DEBUG_LOUD	0x02000
-#define DEBUG_META	0x04000
-
-#define DEBUG_GRAPH3	0x10000
-#define DEBUG_SCRIPT	0x20000
-#define DEBUG_PARSE	0x40000
-#define DEBUG_CWD	0x80000
+typedef enum DebugFlags {
+    DEBUG_NONE		= 0,
+    DEBUG_ARCH		= 1 << 0,
+    DEBUG_COND		= 1 << 1,
+    DEBUG_CWD		= 1 << 2,
+    DEBUG_DIR		= 1 << 3,
+    DEBUG_ERROR		= 1 << 4,
+    DEBUG_FOR		= 1 << 5,
+    DEBUG_GRAPH1	= 1 << 6,
+    DEBUG_GRAPH2	= 1 << 7,
+    DEBUG_GRAPH3	= 1 << 8,
+    DEBUG_HASH		= 1 << 9,
+    DEBUG_JOB		= 1 << 10,
+    DEBUG_LOUD		= 1 << 11,
+    DEBUG_MAKE		= 1 << 12,
+    DEBUG_META		= 1 << 13,
+    DEBUG_PARSE		= 1 << 14,
+    DEBUG_SCRIPT	= 1 << 15,
+    DEBUG_SHELL		= 1 << 16,
+    DEBUG_SUFF		= 1 << 17,
+    DEBUG_TARG		= 1 << 18,
+    DEBUG_VAR		= 1 << 19,
+    DEBUG_ALL		= (1 << 20) - 1
+} DebugFlags;
 
 #define CONCAT(a,b)	a##b
 
-#define	DEBUG(module)	(debug & CONCAT(DEBUG_,module))
+#define	DEBUG(module)	(opts.debug & CONCAT(DEBUG_,module))
+
+void debug_printf(const char *, ...) MAKE_ATTR_PRINTFLIKE(1, 2);
+
+#define DEBUG0(module, text) \
+    if (!DEBUG(module)) (void)0; \
+    else debug_printf("%s", text)
+
+#define DEBUG1(module, fmt, arg1) \
+    if (!DEBUG(module)) (void)0; \
+    else debug_printf(fmt, arg1)
+
+#define DEBUG2(module, fmt, arg1, arg2) \
+    if (!DEBUG(module)) (void)0; \
+    else debug_printf(fmt, arg1, arg2)
+
+#define DEBUG3(module, fmt, arg1, arg2, arg3) \
+    if (!DEBUG(module)) (void)0; \
+    else debug_printf(fmt, arg1, arg2, arg3)
+
+#define DEBUG4(module, fmt, arg1, arg2, arg3, arg4) \
+    if (!DEBUG(module)) (void)0; \
+    else debug_printf(fmt, arg1, arg2, arg3, arg4)
+
+#define DEBUG5(module, fmt, arg1, arg2, arg3, arg4, arg5) \
+    if (!DEBUG(module)) (void)0; \
+    else debug_printf(fmt, arg1, arg2, arg3, arg4, arg5)
+
+typedef enum PrintVarsMode {
+    PVM_NONE,
+    PVM_UNEXPANDED,
+    PVM_EXPANDED
+} PrintVarsMode;
+
+/* Command line options */
+typedef struct CmdOpts {
+    /* -B: whether we are make compatible */
+    Boolean compatMake;
+
+    /* -d: debug control: There is one bit per module.  It is up to the
+     * module what debug information to print. */
+    DebugFlags debug;
+
+    /* -df: debug output is written here - default stderr */
+    FILE *debug_file;
+
+    /* -dL: lint mode
+     *
+     * Runs make in strict mode, with additional checks and better error
+     * handling. */
+    Boolean lint;
+
+    /* -dV: for the -V option, print unexpanded variable values */
+    Boolean debugVflag;
+
+    /* -e: check environment variables before global variables */
+    Boolean checkEnvFirst;
+
+    /* -f: the makefiles to read */
+    StringList *makefiles;
+
+    /* -i: if true, ignore all errors from shell commands */
+    Boolean ignoreErrors;
+
+    /* -j: the maximum number of jobs that can run in parallel;
+     * this is coordinated with the submakes */
+    int maxJobs;
+
+    /* -k: if true, continue on unaffected portions of the graph when an
+     * error occurs in one portion */
+    Boolean keepgoing;
+
+    /* -N: execute no commands from the targets */
+    Boolean noRecursiveExecute;
+
+    /* -n: execute almost no commands from the targets */
+    Boolean noExecute;
+
+    /* -q: if true, we aren't supposed to really make anything, just see if
+     * the targets are out-of-date */
+    Boolean queryFlag;
+
+    /* -r: raw mode, without loading the builtin rules. */
+    Boolean noBuiltins;
+
+    /* -s: don't echo the shell commands before executing them */
+    Boolean beSilent;
+
+    /* -t: touch the targets if they are out-of-date, but don't actually
+     * make them */
+    Boolean touchFlag;
+
+    /* -[Vv]: print expanded or unexpanded selected variables */
+    PrintVarsMode printVars;
+    /* -[Vv]: the variables to print */
+    StringList *variables;
+
+    /* -W: if true, makefile parsing warnings are treated as errors */
+    Boolean parseWarnFatal;
+
+    /* -w: print Entering and Leaving for submakes */
+    Boolean enterFlag;
+
+    /* -X: if true, do not export variables set on the command line to the
+     * environment. */
+    Boolean varNoExportEnv;
+
+    /* The target names specified on the command line.
+     * Used to resolve .if make(...) statements. */
+    StringList *create;
+
+} CmdOpts;
+
+extern CmdOpts opts;
 
 #include "nonints.h"
 
-int Make_TimeStamp(GNode *, GNode *);
-Boolean Make_OODate(GNode *);
-void Make_ExpandUse(Lst);
+void GNode_UpdateYoungestChild(GNode *, GNode *);
+Boolean GNode_IsOODate(GNode *);
+void Make_ExpandUse(GNodeList *);
 time_t Make_Recheck(GNode *);
 void Make_HandleUse(GNode *, GNode *);
 void Make_Update(GNode *);
 void Make_DoAllVar(GNode *);
-Boolean Make_Run(Lst);
-char * Check_Cwd_Cmd(const char *);
-void Check_Cwd(const char **);
+Boolean Make_Run(GNodeList *);
+Boolean shouldDieQuietly(GNode *, int);
 void PrintOnError(GNode *, const char *);
 void Main_ExportMAKEFLAGS(Boolean);
-Boolean Main_SetObjdir(const char *, ...) MAKE_ATTR_PRINTFLIKE(1, 2);
+Boolean Main_SetObjdir(Boolean, const char *, ...) MAKE_ATTR_PRINTFLIKE(2, 3);
 int mkTempFile(const char *, char **);
-int str2Lst_Append(Lst, char *, const char *);
-int cached_lstat(const char *, void *);
-int cached_stat(const char *, void *);
+int str2Lst_Append(StringList *, char *);
+void GNode_FprintDetails(FILE *, const char *, const GNode *, const char *);
+Boolean GNode_ShouldExecute(GNode *gn);
 
-#define	VARF_UNDEFERR	1
-#define	VARF_WANTRES	2
-#define	VARF_ASSIGN	4
+/* See if the node was seen on the left-hand side of a dependency operator. */
+MAKE_INLINE Boolean
+GNode_IsTarget(const GNode *gn)
+{
+    return (gn->type & OP_OPMASK) != 0;
+}
+
+MAKE_INLINE const char *
+GNode_Path(const GNode *gn)
+{
+    return gn->path != NULL ? gn->path : gn->name;
+}
+
+MAKE_INLINE const char *
+GNode_VarTarget(GNode *gn) { return Var_ValueDirect(TARGET, gn); }
+MAKE_INLINE const char *
+GNode_VarOodate(GNode *gn) { return Var_ValueDirect(OODATE, gn); }
+MAKE_INLINE const char *
+GNode_VarAllsrc(GNode *gn) { return Var_ValueDirect(ALLSRC, gn); }
+MAKE_INLINE const char *
+GNode_VarImpsrc(GNode *gn) { return Var_ValueDirect(IMPSRC, gn); }
+MAKE_INLINE const char *
+GNode_VarPrefix(GNode *gn) { return Var_ValueDirect(PREFIX, gn); }
+MAKE_INLINE const char *
+GNode_VarArchive(GNode *gn) { return Var_ValueDirect(ARCHIVE, gn); }
+MAKE_INLINE const char *
+GNode_VarMember(GNode *gn) { return Var_ValueDirect(MEMBER, gn); }
 
 #ifdef __GNUC__
-#define UNCONST(ptr)	({ 		\
+#define UNCONST(ptr)	({		\
     union __unconst {			\
 	const void *__cp;		\
 	void *__p;			\
@@ -524,13 +714,6 @@ int cached_stat(const char *, void *);
     __d.__cp = ptr, __d.__p; })
 #else
 #define UNCONST(ptr)	(void *)(ptr)
-#endif
-
-#ifndef MIN
-#define MIN(a, b) ((a < b) ? a : b)
-#endif
-#ifndef MAX
-#define MAX(a, b) ((a > b) ? a : b)
 #endif
 
 /* At least GNU/Hurd systems lack hardcoded MAXPATHLEN/PATH_MAX */
@@ -550,4 +733,56 @@ int cached_stat(const char *, void *);
 #define KILLPG(pid, sig)	killpg((pid), (sig))
 #endif
 
-#endif /* _MAKE_H_ */
+MAKE_INLINE Boolean
+ch_isalnum(char ch) { return isalnum((unsigned char)ch) != 0; }
+MAKE_INLINE Boolean
+ch_isalpha(char ch) { return isalpha((unsigned char)ch) != 0; }
+MAKE_INLINE Boolean
+ch_isdigit(char ch) { return isdigit((unsigned char)ch) != 0; }
+MAKE_INLINE Boolean
+ch_isspace(char ch) { return isspace((unsigned char)ch) != 0; }
+MAKE_INLINE Boolean
+ch_isupper(char ch) { return isupper((unsigned char)ch) != 0; }
+MAKE_INLINE char
+ch_tolower(char ch) { return (char)tolower((unsigned char)ch); }
+MAKE_INLINE char
+ch_toupper(char ch) { return (char)toupper((unsigned char)ch); }
+
+MAKE_INLINE void
+cpp_skip_whitespace(const char **pp)
+{
+    while (ch_isspace(**pp))
+	(*pp)++;
+}
+
+MAKE_INLINE void
+cpp_skip_hspace(const char **pp)
+{
+    while (**pp == ' ' || **pp == '\t')
+	(*pp)++;
+}
+
+MAKE_INLINE void
+pp_skip_whitespace(char **pp)
+{
+    while (ch_isspace(**pp))
+	(*pp)++;
+}
+
+MAKE_INLINE void
+pp_skip_hspace(char **pp)
+{
+    while (**pp == ' ' || **pp == '\t')
+	(*pp)++;
+}
+
+#ifdef MAKE_NATIVE
+#  include <sys/cdefs.h>
+#  ifndef lint
+#    define MAKE_RCSID(id) __RCSID(id)
+#  endif
+#else
+#  define MAKE_RCSID(id) static volatile char rcsid[] = id
+#endif
+
+#endif /* MAKE_MAKE_H */

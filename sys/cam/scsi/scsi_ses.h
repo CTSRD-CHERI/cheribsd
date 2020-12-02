@@ -155,7 +155,6 @@ ses_cfg_page_get_num_subenc(struct ses_cfg_page *page)
 	return (page->hdr.page_specific_flags + 1);
 }
 
-
 /*================ SCSI SES Control Diagnostic Page Structures ==============*/
 struct ses_ctrl_common {
 	uint8_t bytes[1];
@@ -2155,8 +2154,6 @@ struct ses_status_page_hdr {
 /* Element Descriptor Diagnostic Page: unused */
 /* Additional Element Status Diagnostic Page: unused */
 
-
-
 /* Summary SES Status Defines, Common Status Codes */
 #define	SES_OBJSTAT_UNSUPPORTED		0
 #define	SES_OBJSTAT_OK			1
@@ -2439,7 +2436,13 @@ int ses_elm_addlstatus_invalid(struct ses_elm_addlstatus_base_hdr *);
 struct ses_elm_addlstatus_eip_hdr {
 	struct ses_elm_addlstatus_base_hdr base;
 	uint8_t byte2;
-#define	SES_ADDL_EIP_EIIOE	1
+#define	SES_ADDL_EIP_EIIOE_MASK	3
+#define	SES_ADDL_EIP_EIIOE_SES2	0
+#define	SES_ADDL_EIP_EIIOE_GLOB	1
+#define	SES_ADDL_EIP_EIIOE_IND	2
+#define	SES_ADDL_EIP_EIIOE_MIX	3
+#define	SES_ADDL_EIP_EIIOE_EI_GLOB(x)				\
+    (((x) & SES_ADDL_EIP_EIIOE_MASK) == SES_ADDL_EIP_EIIOE_GLOB)
 	uint8_t element_index;
 	/* NB: This define (currently) applies to all eip=1 headers */
 #define	SES_EIP_HDR_EXTRA_LEN	2

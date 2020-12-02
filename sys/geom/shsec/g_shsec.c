@@ -269,7 +269,7 @@ g_shsec_done(struct bio *bp)
 			    (ssize_t)pbp->bio_length);
 		}
 	}
-	bzero(bp->bio_data, bp->bio_length);
+	explicit_bzero(bp->bio_data, bp->bio_length);
 	uma_zfree(g_shsec_zone, bp->bio_data);
 	g_destroy_bio(bp);
 	pbp->bio_inbed++;
@@ -384,7 +384,7 @@ failure:
 		TAILQ_REMOVE(&queue, cbp, bio_queue);
 		bp->bio_children--;
 		if (cbp->bio_data != NULL) {
-			bzero(cbp->bio_data, cbp->bio_length);
+			explicit_bzero(cbp->bio_data, cbp->bio_length);
 			uma_zfree(g_shsec_zone, cbp->bio_data);
 		}
 		g_destroy_bio(cbp);
@@ -646,9 +646,11 @@ g_shsec_taste(struct g_class *mp, struct g_provider *pp, int flags __unused)
 	gp->access = g_shsec_access;
 	gp->orphan = g_shsec_orphan;
 	cp = g_new_consumer(gp);
-	g_attach(cp, pp);
-	error = g_shsec_read_metadata(cp, &md);
-	g_detach(cp);
+	error = g_attach(cp, pp);
+	if (error == 0) {
+		error = g_shsec_read_metadata(cp, &md);
+		g_detach(cp);
+	}
 	g_destroy_consumer(cp);
 	g_destroy_geom(gp);
 	if (error != 0)

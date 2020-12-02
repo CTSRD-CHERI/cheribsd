@@ -36,7 +36,7 @@
 #include <sys/intr.h>
 
 #ifndef NIRQ
-#define	NIRQ		2048	/* XXX - It should be an option. */
+#define	NIRQ		16384	/* XXX - It should be an option. */
 #endif
 
 static inline void
@@ -51,6 +51,7 @@ void intr_ipi_dispatch(u_int, struct trapframe *);
 #ifdef DEV_ACPI
 #define	ACPI_INTR_XREF	1
 #define	ACPI_MSI_XREF	2
+#define	ACPI_GPIO_XREF	3
 #endif
 
 #endif	/* _MACHINE_INTR_H */

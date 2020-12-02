@@ -258,7 +258,6 @@ freemask_ffsll(uint32_t *freemask)
 	((uint64_t)ck_pr_load_32(FREEMASK_CHUNK((pg), (n)) + 1) << 32)
 #endif /* !__LP64__ */
 
-
 #define	NAT64LSN_TRY_PGCNT	32
 static struct nat64lsn_pg*
 nat64lsn_get_pg(uint32_t *chunkmask, uint32_t *pgmask,
@@ -548,6 +547,57 @@ nat64lsn_get_state4to6(struct nat64lsn_cfg *cfg, struct nat64lsn_alias *alias,
 	return (NULL);
 }
 
+/*
+ * Reassemble IPv4 fragments, make PULLUP if needed, get some ULP fields
+ * that might be unknown until reassembling is completed.
+ */
+static struct mbuf*
+nat64lsn_reassemble4(struct nat64lsn_cfg *cfg, struct mbuf *m,
+    uint16_t *port)
+{
+	struct ip *ip;
+	int len;
+
+	m = ip_reass(m);
+	if (m == NULL)
+		return (NULL);
+	/* IP header must be contigious after ip_reass() */
+	ip = mtod(m, struct ip *);
+	len = ip->ip_hl << 2;
+	switch (ip->ip_p) {
+	case IPPROTO_ICMP:
+		len += ICMP_MINLEN; /* Enough to get icmp_id */
+		break;
+	case IPPROTO_TCP:
+		len += sizeof(struct tcphdr);
+		break;
+	case IPPROTO_UDP:
+		len += sizeof(struct udphdr);
+		break;
+	default:
+		m_freem(m);
+		NAT64STAT_INC(&cfg->base.stats, noproto);
+		return (NULL);
+	}
+	if (m->m_len < len) {
+		m = m_pullup(m, len);
+		if (m == NULL) {
+			NAT64STAT_INC(&cfg->base.stats, nomem);
+			return (NULL);
+		}
+		ip = mtod(m, struct ip *);
+	}
+	switch (ip->ip_p) {
+	case IPPROTO_TCP:
+		*port = ntohs(L3HDR(ip, struct tcphdr *)->th_dport);
+		break;
+	case IPPROTO_UDP:
+		*port = ntohs(L3HDR(ip, struct udphdr *)->uh_dport);
+		break;
+	}
+	return (m);
+}
+
 static int
 nat64lsn_translate4(struct nat64lsn_cfg *cfg,
     const struct ipfw_flow_id *f_id, struct mbuf **mp)
@@ -567,6 +617,14 @@ nat64lsn_translate4(struct nat64lsn_cfg *cfg,
 	if (addr < cfg->prefix4 || addr > cfg->pmask4) {
 		NAT64STAT_INC(&cfg->base.stats, nomatch4);
 		return (cfg->nomatch_verdict);
+	}
+
+	/* Reassemble fragments if needed */
+	ret = ntohs(mtod(*mp, struct ip *)->ip_off);
+	if ((ret & (IP_MF | IP_OFFMASK)) != 0) {
+		*mp = nat64lsn_reassemble4(cfg, *mp, &port);
+		if (*mp == NULL)
+			return (IP_FW_DENY);
 	}
 
 	/* Check if protocol is supported */
@@ -1750,4 +1808,3 @@ nat64lsn_destroy_instance(struct nat64lsn_cfg *cfg)
 	free(cfg->aliases, M_NAT64LSN);
 	free(cfg, M_NAT64LSN);
 }
-

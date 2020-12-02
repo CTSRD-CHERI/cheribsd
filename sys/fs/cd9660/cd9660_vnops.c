@@ -158,7 +158,7 @@ cd9660_access(ap)
 	}
 
 	return (vaccess(vp->v_type, ip->inode.iso_mode, ip->inode.iso_uid,
-	    ip->inode.iso_gid, ap->a_accmode, ap->a_cred, NULL));
+	    ip->inode.iso_gid, ap->a_accmode, ap->a_cred));
 }
 
 static int
@@ -180,7 +180,6 @@ cd9660_open(ap)
 	vnode_create_vobject(vp, ip->i_size, ap->a_td);
 	return (0);
 }
-
 
 static int
 cd9660_getattr(ap)

@@ -36,6 +36,7 @@ __FBSDID("$FreeBSD$");
 
 #include "opt_inet.h"
 #include "opt_inet6.h"
+#include "opt_route.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -62,7 +63,7 @@ __FBSDID("$FreeBSD$");
 #include <net/if_dl.h>
 #include <net/if_types.h>
 #include <net/route.h>
-#include <net/route/route_var.h>
+#include <net/route/route_ctl.h>
 #include <net/route/nhop.h>
 #include <net/vnet.h>
 
@@ -138,12 +139,9 @@ static void nd6_free_redirect(const struct llentry *);
 static void nd6_llinfo_timer(void *);
 static void nd6_llinfo_settimer_locked(struct llentry *, long);
 static void clear_llinfo_pqueue(struct llentry *);
-static void nd6_rtrequest(int, struct rtentry *, struct nhop_object *,
-    struct rt_addrinfo *);
 static int nd6_resolve_slow(struct ifnet *, int, struct mbuf *,
     const struct sockaddr_in6 *, u_char *, uint32_t *, struct llentry **);
 static int nd6_need_cache(struct ifnet *);
- 
 
 VNET_DEFINE_STATIC(struct callout, nd6_slowtimo_ch);
 #define	V_nd6_slowtimo_ch		VNET(nd6_slowtimo_ch)
@@ -275,6 +273,10 @@ nd6_ifattach(struct ifnet *ifp)
 
 	nd->flags = ND6_IFF_PERFORMNUD;
 
+	/* Set IPv6 disabled on all interfaces but loopback by default. */
+	if ((ifp->if_flags & IFF_LOOPBACK) == 0)
+		nd->flags |= ND6_IFF_IFDISABLED;
+
 	/* A loopback interface always has ND6_IFF_AUTO_LINKLOCAL.
 	 * XXXHRS: Clear ND6_IFF_AUTO_LINKLOCAL on an IFT_BRIDGE interface by
 	 * default regardless of the V_ip6_auto_linklocal configuration to
@@ -292,8 +294,11 @@ nd6_ifattach(struct ifnet *ifp)
 	 */
 	if (V_ip6_accept_rtadv &&
 	    !(ifp->if_flags & IFF_LOOPBACK) &&
-	    (ifp->if_type != IFT_BRIDGE))
+	    (ifp->if_type != IFT_BRIDGE)) {
 			nd->flags |= ND6_IFF_ACCEPT_RTADV;
+			/* If we globally accept rtadv, assume IPv6 on. */
+			nd->flags &= ~ND6_IFF_IFDISABLED;
+	}
 	if (V_ip6_no_radr && !(ifp->if_flags & IFF_LOOPBACK))
 		nd->flags |= ND6_IFF_NO_RADR;
 
@@ -624,7 +629,6 @@ nd6_is_stale(struct llentry *lle, long *pdelay, int *do_switch)
 	LLE_REQ_UNLOCK(lle);
 
 	if (r_skip_req > 0) {
-
 		/*
 		 * Nonzero r_skip_req value was set upon entering
 		 * STALE state. Since value was not changed, no
@@ -641,7 +645,6 @@ nd6_is_stale(struct llentry *lle, long *pdelay, int *do_switch)
 		}
 
 		if (delay == 0) {
-
 			/*
 			 * The original ng6_gctime timeout ended,
 			 * no more rescheduling.
@@ -658,7 +661,6 @@ nd6_is_stale(struct llentry *lle, long *pdelay, int *do_switch)
 	 */
 	delay = (long)(time_uptime - lle_hittime);
 	if (delay < nd_delay) {
-
 		/*
 		 * V_nd6_delay still not passed since the first
 		 * hit in STALE state.
@@ -672,7 +674,6 @@ nd6_is_stale(struct llentry *lle, long *pdelay, int *do_switch)
 	*do_switch = 1;
 	return (0);
 }
-
 
 /*
  * Switch @lle state to new state optionally arming timers.
@@ -851,7 +852,6 @@ nd6_llinfo_timer(void *arg)
 
 	case ND6_LLINFO_STALE:
 		if (nd6_is_stale(ln, &delay, &do_switch) != 0) {
-
 			/*
 			 * No packet has used this entry and GC timeout
 			 * has not been passed. Reshedule timer and
@@ -862,7 +862,6 @@ nd6_llinfo_timer(void *arg)
 		}
 
 		if (do_switch == 0) {
-
 			/*
 			 * GC timer has ended and entry hasn't been used.
 			 * Run Garbage collector (RFC 4861, 5.3)
@@ -913,7 +912,6 @@ done:
 	NET_EPOCH_EXIT(et);
 	CURVNET_RESTORE();
 }
-
 
 /*
  * ND6 timer routine to expire default route list and prefix list
@@ -980,7 +978,6 @@ nd6_timer(void *arg)
 			if (V_ip6_use_tempaddr &&
 			    (ia6->ia6_flags & IN6_IFF_TEMPORARY) != 0 &&
 			    (oldflags & IN6_IFF_DEPRECATED) == 0) {
-
 				if (regen_tmpaddr(ia6) == 0) {
 					/*
 					 * A new temporary address is
@@ -1200,7 +1197,7 @@ nd6_lookup(const struct in6_addr *addr6, int flags, struct ifnet *ifp)
 {
 	struct sockaddr_in6 sin6;
 	struct llentry *ln;
-	
+
 	bzero(&sin6, sizeof(sin6));
 	sin6.sin6_len = sizeof(struct sockaddr_in6);
 	sin6.sin6_family = AF_INET6;
@@ -1371,7 +1368,6 @@ restart:
 	return (0);
 }
 
-
 /*
  * Detect if a given IPv6 address identifies a neighbor on a given link.
  * XXX: should take care of the destination of a p2p link?
@@ -1483,7 +1479,6 @@ nd6_free(struct llentry **lnp, int gc)
 		}
 
 		if (ln->ln_router || dr) {
-
 			/*
 			 * We need to unlock to avoid a LOR with rt6_flush() with the
 			 * rnh and for the calls to pfxlist_onlink_check() and
@@ -1566,6 +1561,7 @@ nd6_free_redirect(const struct llentry *ln)
 	int fibnum;
 	struct sockaddr_in6 sin6;
 	struct rt_addrinfo info;
+	struct rib_cmd_info rc;
 	struct epoch_tracker et;
 
 	lltable_fill_sa_entry(ln, (struct sockaddr *)&sin6);
@@ -1575,47 +1571,40 @@ nd6_free_redirect(const struct llentry *ln)
 
 	NET_EPOCH_ENTER(et);
 	for (fibnum = 0; fibnum < rt_numfibs; fibnum++)
-		rtrequest1_fib(RTM_DELETE, &info, NULL, fibnum);
+		rib_action(fibnum, RTM_DELETE, &info, &rc);
 	NET_EPOCH_EXIT(et);
 }
 
 /*
- * Rejuvenate this function for routing operations related
- * processing.
+ * Updates status of the default router route.
  */
-void
-nd6_rtrequest(int req, struct rtentry *rt, struct nhop_object *nh,
-    struct rt_addrinfo *info)
+static void
+check_release_defrouter(struct rib_cmd_info *rc, void *_cbdata)
 {
-	struct sockaddr_in6 *gateway;
 	struct nd_defrouter *dr;
+	struct nhop_object *nh;
 
-	gateway = &nh->gw6_sa;
+	nh = rc->rc_nh_old;
 
-	switch (req) {
-	case RTM_ADD:
-		break;
-
-	case RTM_DELETE:
-		/*
-		 * Only indirect routes are interesting.
-		 */
-		if ((nh->nh_flags & NHF_GATEWAY) == 0)
-			return;
-		/*
-		 * check for default route
-		 */
-		if (nh->nh_flags & NHF_DEFAULT) {
-			dr = defrouter_lookup(&gateway->sin6_addr, nh->nh_ifp);
-			if (dr != NULL) {
-				dr->installed = 0;
-				defrouter_rele(dr);
-			}
+	if ((nh != NULL) && (nh->nh_flags & NHF_DEFAULT)) {
+		dr = defrouter_lookup(&nh->gw6_sa.sin6_addr, nh->nh_ifp);
+		if (dr != NULL) {
+			dr->installed = 0;
+			defrouter_rele(dr);
 		}
-		break;
 	}
 }
 
+void
+nd6_subscription_cb(struct rib_head *rnh, struct rib_cmd_info *rc, void *arg)
+{
+
+#ifdef ROUTE_MPATH
+	rib_decompose_notification(rc, check_release_defrouter, NULL);
+#else
+	check_release_defrouter(rc, NULL);
+#endif
+}
 
 int
 nd6_ioctl(u_long cmd, caddr_t data, struct ifnet *ifp)
@@ -2086,7 +2075,7 @@ nd6_cache_lladdr(struct ifnet *ifp, struct in6_addr *from, char *lladdr,
 
 	if (chain != NULL)
 		nd6_flush_holdchain(ifp, chain, &sin6);
-	
+
 	/*
 	 * When the link-layer address of a router changes, select the
 	 * best router again.  In particular, when the neighbor entry is newly
@@ -2154,7 +2143,6 @@ nd6_grab_holdchain(struct llentry *ln, struct mbuf **chain,
 	lltable_fill_sa_entry(ln, (struct sockaddr *)sin6);
 
 	if (ln->ln_state == ND6_LLINFO_STALE) {
-
 		/*
 		 * The first time we send a packet to a
 		 * neighbor whose entry is STALE, we have
@@ -2286,7 +2274,6 @@ nd6_resolve(struct ifnet *ifp, int is_gw, struct mbuf *m,
 
 	return (nd6_resolve_slow(ifp, 0, m, dst6, desten, pflags, plle));
 }
-
 
 /*
  * Do L2 address resolution for @sa_dst address. Stores found
@@ -2532,7 +2519,6 @@ nd6_add_ifa_lle(struct in6_ifaddr *ia)
 	if (nd6_need_cache(ifp) == 0)
 		return (0);
 
-	ia->ia_ifa.ifa_rtrequest = nd6_rtrequest;
 	dst = (struct sockaddr *)&ia->ia_addr;
 	ln = lltable_alloc_entry(LLTABLE6(ifp), LLE_IFADDR, dst);
 	if (ln == NULL)

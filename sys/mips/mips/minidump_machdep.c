@@ -42,20 +42,18 @@ __FBSDID("$FreeBSD$");
 #include <sys/watchdog.h>
 #include <sys/vmmeter.h>
 #include <vm/vm.h>
+#include <vm/vm_param.h>
 #include <vm/pmap.h>
 #include <vm/vm_page.h>
 #include <vm/vm_phys.h>
+#include <vm/vm_dumpset.h>
 #include <machine/atomic.h>
 #include <machine/elf.h>
 #include <machine/md_var.h>
-#include <machine/vmparam.h>
 #include <machine/minidump.h>
 #include <machine/cache.h>
 
 CTASSERT(sizeof(struct kerneldumpheader) == 512);
-
-uint32_t *vm_page_dump;
-int vm_page_dump_size;
 
 static struct kerneldumpheader kdh;
 
@@ -65,8 +63,6 @@ static uint64_t counter, progress, dumpsize;
 static char tmpbuffer[PAGE_SIZE];
 
 extern pd_entry_t *kernel_segmap;
-
-CTASSERT(sizeof(*vm_page_dump) == 4);
 
 static int
 is_dumpable(vm_paddr_t pa)
@@ -81,28 +77,6 @@ is_dumpable(vm_paddr_t pa)
 			return (1);
 	}
 	return (0);
-}
-
-void
-dump_add_page(vm_paddr_t pa)
-{
-	int idx, bit;
-
-	pa >>= PAGE_SHIFT;
-	idx = pa >> 5;		/* 2^5 = 32 */
-	bit = pa & 31;
-	atomic_set_int(&vm_page_dump[idx], 1ul << bit);
-}
-
-void
-dump_drop_page(vm_paddr_t pa)
-{
-	int idx, bit;
-
-	pa >>= PAGE_SHIFT;
-	idx = pa >> 5;		/* 2^5 = 32 */
-	bit = pa & 31;
-	atomic_clear_int(&vm_page_dump[idx], 1ul << bit);
 }
 
 static struct {
@@ -192,13 +166,12 @@ minidumpsys(struct dumperinfo *di)
 {
 	struct minidumphdr mdhdr;
 	uint32_t ptesize;
-	uint32_t bits;
 	vm_paddr_t pa;
 	vm_offset_t prev_pte = 0;
 	uint32_t count = 0;
 	vm_offset_t va;
 	pt_entry_t *pte;
-	int i, bit, error;
+	int i, error;
 	void *dump_va;
 
 	/* Flush cache */
@@ -233,20 +206,14 @@ minidumpsys(struct dumperinfo *di)
 	/* Calculate dump size. */
 	dumpsize = ptesize;
 	dumpsize += round_page(msgbufp->msg_size);
-	dumpsize += round_page(vm_page_dump_size);
-	for (i = 0; i < vm_page_dump_size / sizeof(*vm_page_dump); i++) {
-		bits = vm_page_dump[i];
-		while (bits) {
-			bit = ffs(bits) - 1;
-			pa = (((uint64_t)i * sizeof(*vm_page_dump) * NBBY) +
-			    bit) * PAGE_SIZE;
-			/* Clear out undumpable pages now if needed */
-			if (is_dumpable(pa))
-				dumpsize += PAGE_SIZE;
-			else
-				dump_drop_page(pa);
-			bits &= ~(1ul << bit);
-		}
+	dumpsize += round_page(sizeof(dump_avail));
+	dumpsize += round_page(BITSET_SIZE(vm_page_dump_pages));
+	VM_PAGE_DUMP_FOREACH(pa) {
+		/* Clear out undumpable pages now if needed */
+		if (is_dumpable(pa))
+			dumpsize += PAGE_SIZE;
+		else
+			dump_drop_page(pa);
 	}
 	dumpsize += PAGE_SIZE;
 
@@ -257,9 +224,10 @@ minidumpsys(struct dumperinfo *di)
 	strcpy(mdhdr.magic, MINIDUMP_MAGIC);
 	mdhdr.version = MINIDUMP_VERSION;
 	mdhdr.msgbufsize = msgbufp->msg_size;
-	mdhdr.bitmapsize = vm_page_dump_size;
+	mdhdr.bitmapsize = round_page(BITSET_SIZE(vm_page_dump_pages));
 	mdhdr.ptesize = ptesize;
 	mdhdr.kernbase = VM_MIN_KERNEL_ADDRESS;
+	mdhdr.dumpavailsize = round_page(sizeof(dump_avail));
 
 	dump_init_header(di, &kdh, KERNELDUMPMAGIC, KERNELDUMP_MIPS_VERSION,
 	    dumpsize);
@@ -284,9 +252,18 @@ minidumpsys(struct dumperinfo *di)
 	if (error)
 		goto fail;
 
+	/* Dump dump_avail */
+	_Static_assert(sizeof(dump_avail) <= sizeof(tmpbuffer),
+	    "Large dump_avail not handled");
+	bzero(tmpbuffer, sizeof(tmpbuffer));
+	memcpy(tmpbuffer, dump_avail, sizeof(dump_avail));
+	error = write_buffer(di, tmpbuffer, PAGE_SIZE);
+	if (error)
+		goto fail;
+
 	/* Dump bitmap */
 	error = write_buffer(di, (char *)vm_page_dump,
-	    round_page(vm_page_dump_size));
+	    round_page(BITSET_SIZE(vm_page_dump_pages)));
 	if (error)
 		goto fail;
 
@@ -320,19 +297,12 @@ minidumpsys(struct dumperinfo *di)
 	}
 
 	/* Dump memory chunks  page by page*/
-	for (i = 0; i < vm_page_dump_size / sizeof(*vm_page_dump); i++) {
-		bits = vm_page_dump[i];
-		while (bits) {
-			bit = ffs(bits) - 1;
-			pa = (((uint64_t)i * sizeof(*vm_page_dump) * NBBY) +
-			    bit) * PAGE_SIZE;
-			dump_va = pmap_kenter_temporary(pa, 0);
-			error = write_buffer(di, dump_va, PAGE_SIZE);
-			if (error)
-				goto fail;
-			pmap_kenter_temporary_free(pa);
-			bits &= ~(1ul << bit);
-		}
+	VM_PAGE_DUMP_FOREACH(pa) {
+		dump_va = pmap_kenter_temporary(pa, 0);
+		error = write_buffer(di, dump_va, PAGE_SIZE);
+		if (error)
+			goto fail;
+		pmap_kenter_temporary_free(pa);
 	}
 
 	error = dump_finish(di, &kdh);

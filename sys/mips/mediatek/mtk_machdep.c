@@ -58,6 +58,7 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_object.h>
 #include <vm/vm_page.h>
 #include <vm/vm_phys.h>
+#include <vm/vm_dumpset.h>
 
 #include <machine/cache.h>
 #include <machine/clock.h>
@@ -296,7 +297,6 @@ platform_start(__register_t a0 __unused, __register_t a1 __unused,
 		else
 			kern_setenv(n, arg);
 	}
-
 
 	mips_init();
 	mips_timer_init_params(timer_clk, 0);

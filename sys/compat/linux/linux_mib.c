@@ -63,7 +63,7 @@ static unsigned linux_osd_jail_slot;
 SYSCTL_NODE(_compat, OID_AUTO, linux, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
     "Linux mode");
 
-int linux_debug = 1;
+int linux_debug = 3;
 SYSCTL_INT(_compat_linux, OID_AUTO, debug, CTLFLAG_RWTUN,
     &linux_debug, 0, "Log warnings from linux(4); or 0 to disable");
 
@@ -71,6 +71,16 @@ int linux_default_openfiles = 1024;
 SYSCTL_INT(_compat_linux, OID_AUTO, default_openfiles, CTLFLAG_RWTUN,
     &linux_default_openfiles, 0,
     "Default soft openfiles resource limit, or -1 for unlimited");
+
+int linux_default_stacksize = 8 * 1024 * 1024;
+SYSCTL_INT(_compat_linux, OID_AUTO, default_stacksize, CTLFLAG_RWTUN,
+    &linux_default_stacksize, 0,
+    "Default soft stack size resource limit, or -1 for unlimited");
+
+int linux_dummy_rlimits = 0;
+SYSCTL_INT(_compat_linux, OID_AUTO, dummy_rlimits, CTLFLAG_RWTUN,
+    &linux_dummy_rlimits, 0,
+    "Return dummy values for unsupported Linux-specific rlimits");
 
 int linux_ignore_ip_recverr = 1;
 SYSCTL_INT(_compat_linux, OID_AUTO, ignore_ip_recverr, CTLFLAG_RWTUN,
@@ -84,6 +94,10 @@ bool linux_map_sched_prio = true;
 SYSCTL_BOOL(_compat_linux, OID_AUTO, map_sched_prio, CTLFLAG_RDTUN,
     &linux_map_sched_prio, 0, "Map scheduler priorities to Linux priorities "
     "(not POSIX compliant)");
+
+int linux_use_emul_path = 1;
+SYSCTL_INT(_compat_linux, OID_AUTO, use_emul_path, CTLFLAG_RWTUN,
+    &linux_use_emul_path, 0, "Use linux.compat.emul_path");
 
 static int	linux_set_osname(struct thread *td, char *osname);
 static int	linux_set_osrelease(struct thread *td, char *osrelease);

@@ -37,6 +37,10 @@
 #ifndef __IF_DWC_H__
 #define __IF_DWC_H__
 
+#define	PHY_MODE_UNKNOWN	0x0
+#define	PHY_MODE_RMII		0x1
+#define	PHY_MODE_RGMII		0x2
+
 #define	MAC_CONFIGURATION	0x0
 #define	 CONF_JD		(1 << 22)	/* jabber timer disable */
 #define	 CONF_BE		(1 << 21)	/* Frame Burst Enable */
@@ -66,6 +70,10 @@
 #define	 GMII_ADDRESS_GB	(1 << 0)	/* Busy */
 #define	GMII_DATA		0x14
 #define	FLOW_CONTROL		0x18
+#define	 FLOW_CONTROL_PT_SHIFT	16
+#define	 FLOW_CONTROL_UP	(1 << 3)	/* Unicast pause enable */
+#define	 FLOW_CONTROL_RX	(1 << 2)	/* RX Flow control enable */
+#define	 FLOW_CONTROL_TX	(1 << 1)	/* TX Flow control enable */
 #define	GMAC_VLAN_TAG		0x1C
 #define	VERSION			0x20
 #define	DEBUG			0x24
@@ -212,6 +220,8 @@
 /* DMA */
 #define	BUS_MODE		0x1000
 #define	 BUS_MODE_EIGHTXPBL	(1 << 24) /* Multiplies PBL by 8 */
+#define	 BUS_MODE_USP		(1 << 23)
+#define	 BUS_MODE_RPBL_SHIFT	17 /* Single block transfer size */
 #define	 BUS_MODE_FIXEDBURST	(1 << 16)
 #define	 BUS_MODE_PRIORXTX_SHIFT	14
 #define	 BUS_MODE_PRIORXTX_41	3
@@ -272,8 +282,9 @@
 #define	CURRENT_HOST_RECEIVE_BUF_ADDR	0x1054
 #define	HW_FEATURE			0x1058
 
-#define	DWC_GMAC			0x1
-#define	DWC_GMAC_ALT_DESC		0x2
+#define	DWC_GMAC_NORMAL_DESC		0x1
+#define	DWC_GMAC_EXT_DESC		0x2
+
 #define	GMAC_MII_CLK_60_100M_DIV42	0x0
 #define	GMAC_MII_CLK_100_150M_DIV62	0x1
 #define	GMAC_MII_CLK_25_35M_DIV16	0x2

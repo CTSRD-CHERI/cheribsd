@@ -1,4 +1,4 @@
-#!/usr/local/bin/python2
+#!/usr/local/bin/python3
 #
 # Copyright (c) 2014 The FreeBSD Foundation
 # Copyright 2014 John-Mark Gurney
@@ -31,7 +31,7 @@
 # $FreeBSD$
 #
 
-from __future__ import print_function
+
 import array
 import binascii
 from fcntl import ioctl
@@ -115,7 +115,6 @@ class CryptAEAD(dpkt.Packet):
     )
 
 # h2py.py can't handle multiarg macros
-CRIOGET = 3221513060
 CIOCGSESSION = 3224396645
 CIOCFSESSION = 2147771238
 CIOCKEY = 3230688104
@@ -131,17 +130,7 @@ else:
     CIOCCRYPT = 3223085927
     CIOCCRYPTAEAD = 3223872365
 
-def _getdev():
-    buf = array.array('I', [0])
-    fd = os.open('/dev/crypto', os.O_RDWR)
-    try:
-        ioctl(fd, CRIOGET, buf, 1)
-    finally:
-        os.close(fd)
-
-    return buf[0]
-
-_cryptodev = _getdev()
+_cryptodev = os.open('/dev/crypto', os.O_RDWR)
 
 def str_to_ascii(val):
     if sys.version_info[0] >= 3:

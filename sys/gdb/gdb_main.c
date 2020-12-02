@@ -204,8 +204,14 @@ gdb_do_qsupported(uint32_t *feat)
 
 	/* Parse supported host features */
 	*feat = 0;
-	if (gdb_rx_char() != ':')
+	switch (gdb_rx_char()) {
+	case ':':
+		break;
+	case EOF:
+		goto nofeatures;
+	default:
 		goto error;
+	}
 
 	while (gdb_rxsz > 0) {
 		tok = gdb_rxp;
@@ -250,6 +256,7 @@ gdb_do_qsupported(uint32_t *feat)
 		*feat |= BIT(i);
 	}
 
+nofeatures:
 	/* Send a supported feature list back */
 	gdb_tx_begin(0);
 
@@ -354,9 +361,7 @@ init_qXfer_ctx(struct qXfer_context *qx, uintmax_t len)
 }
 
 /*
- * dst must be 2x strlen(max_src) + 1.
- *
- * Squashes invalid XML characters down to _.  Sorry.  Then escapes for GDB.
+ * Squashes special XML and GDB characters down to _.  Sorry.
  */
 static void
 qXfer_escape_xmlattr_str(char *dst, size_t dstlen, const char *src)
@@ -377,8 +382,18 @@ qXfer_escape_xmlattr_str(char *dst, size_t dstlen, const char *src)
 
 		/* GDB escape. */
 		if (strchr(forbidden, c) != NULL) {
+			/*
+			 * It would be nice to escape these properly, but to do
+			 * it correctly we need to escape them in the transmit
+			 * layer, potentially doubling our buffer requirements.
+			 * For now, avoid breaking the protocol by squashing
+			 * them to underscore.
+			 */
+#if 0
 			*dst++ = '}';
 			c ^= 0x20;
+#endif
+			c = '_';
 		}
 		*dst++ = c;
 	}

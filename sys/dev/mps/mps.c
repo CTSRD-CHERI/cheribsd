@@ -128,13 +128,13 @@ static char mpt2_reset_magic[] = { 0x00, 0x0f, 0x04, 0x0b, 0x02, 0x07, 0x0d };
  * "aggregate value used where an integer was expected"
  */
 
-typedef union _reply_descriptor {
+typedef union {
         u64 word;
         struct {
                 u32 low;
                 u32 high;
         } u;
-}reply_descriptor,address_descriptor;
+} request_descriptor_t;
 
 /* Rate limit chain-fail messages to 1 per minute */
 static struct timeval mps_chainfail_interval = { 60, 0 };
@@ -169,7 +169,7 @@ mps_diag_reset(struct mps_softc *sc,int sleep_flag)
 		sleep_flag = NO_SLEEP;
 
 	mps_dprint(sc, MPS_INIT, "sequence start, sleep_flag= %d\n", sleep_flag);
- 
+
 	/* Push the magic sequence */
 	error = ETIMEDOUT;
 	while (tries++ < 20) {
@@ -338,7 +338,7 @@ mps_transition_ready(struct mps_softc *sc)
 			error = EINVAL;
 			break;
 		}
-	
+
 		/* Wait 50ms for things to settle down. */
 		DELAY(50000);
 	}
@@ -1098,7 +1098,7 @@ mps_request_sync(struct mps_softc *sc, void *req, MPI2_DEFAULT_REPLY *reply,
 static void
 mps_enqueue_request(struct mps_softc *sc, struct mps_command *cm)
 {
-	reply_descriptor rd;
+	request_descriptor_t rd;
 	MPS_FUNCTRACE(sc);
 	mps_dprint(sc, MPS_TRACE, "SMID %u cm %p ccb %p\n",
 	    cm->cm_desc.Default.SMID, cm, cm->cm_ccb);
@@ -1278,6 +1278,7 @@ mps_alloc_queues(struct mps_softc *sc)
 static int
 mps_alloc_hw_queues(struct mps_softc *sc)
 {
+	bus_dma_template_t t;
 	bus_addr_t queues_busaddr;
 	uint8_t *queues;
 	int qsize, fqsize, pqsize;
@@ -1299,17 +1300,11 @@ mps_alloc_hw_queues(struct mps_softc *sc)
 	pqsize = sc->pqdepth * 8;
 	qsize = fqsize + pqsize;
 
-        if (bus_dma_tag_create( sc->mps_parent_dmat,    /* parent */
-				16, 0,			/* algnmnt, boundary */
-				BUS_SPACE_MAXADDR_32BIT,/* lowaddr */
-				BUS_SPACE_MAXADDR,	/* highaddr */
-				NULL, NULL,		/* filter, filterarg */
-                                qsize,			/* maxsize */
-                                1,			/* nsegments */
-                                qsize,			/* maxsegsize */
-                                0,			/* flags */
-                                NULL, NULL,		/* lockfunc, lockarg */
-                                &sc->queues_dmat)) {
+	bus_dma_template_init(&t, sc->mps_parent_dmat);
+	BUS_DMA_TEMPLATE_FILL(&t, BD_ALIGNMENT(16), BD_MAXSIZE(qsize),
+	    BD_MAXSEGSIZE(qsize), BD_NSEGMENTS(1),
+	    BD_LOWADDR(BUS_SPACE_MAXADDR_32BIT));
+	if (bus_dma_template_tag(&t, &sc->queues_dmat)) {
 		mps_dprint(sc, MPS_ERROR, "Cannot allocate queues DMA tag\n");
 		return (ENOMEM);
         }
@@ -1337,6 +1332,7 @@ mps_alloc_hw_queues(struct mps_softc *sc)
 static int
 mps_alloc_replies(struct mps_softc *sc)
 {
+	bus_dma_template_t t;
 	int rsize, num_replies;
 
 	/* Store the reply frame size in bytes rather than as 32bit words */
@@ -1350,17 +1346,11 @@ mps_alloc_replies(struct mps_softc *sc)
 	num_replies = max(sc->fqdepth, sc->num_replies);
 
 	rsize = sc->replyframesz * num_replies; 
-        if (bus_dma_tag_create( sc->mps_parent_dmat,    /* parent */
-				4, 0,			/* algnmnt, boundary */
-				BUS_SPACE_MAXADDR_32BIT,/* lowaddr */
-				BUS_SPACE_MAXADDR,	/* highaddr */
-				NULL, NULL,		/* filter, filterarg */
-                                rsize,			/* maxsize */
-                                1,			/* nsegments */
-                                rsize,			/* maxsegsize */
-                                0,			/* flags */
-                                NULL, NULL,		/* lockfunc, lockarg */
-                                &sc->reply_dmat)) {
+	bus_dma_template_init(&t, sc->mps_parent_dmat);
+	BUS_DMA_TEMPLATE_FILL(&t, BD_ALIGNMENT(4), BD_MAXSIZE(rsize),
+	    BD_MAXSEGSIZE(rsize), BD_NSEGMENTS(1),
+	    BD_LOWADDR(BUS_SPACE_MAXADDR_32BIT));
+	if (bus_dma_template_tag(&t, &sc->reply_dmat)) {
 		mps_dprint(sc, MPS_ERROR, "Cannot allocate replies DMA tag\n");
 		return (ENOMEM);
         }
@@ -1408,21 +1398,16 @@ mps_load_chains_cb(void *arg, bus_dma_segment_t *segs, int nsegs, int error)
 static int
 mps_alloc_requests(struct mps_softc *sc)
 {
+	bus_dma_template_t t;
 	struct mps_command *cm;
 	int i, rsize, nsegs;
 
 	rsize = sc->reqframesz * sc->num_reqs;
-        if (bus_dma_tag_create( sc->mps_parent_dmat,    /* parent */
-				16, 0,			/* algnmnt, boundary */
-				BUS_SPACE_MAXADDR_32BIT,/* lowaddr */
-				BUS_SPACE_MAXADDR,	/* highaddr */
-				NULL, NULL,		/* filter, filterarg */
-                                rsize,			/* maxsize */
-                                1,			/* nsegments */
-                                rsize,			/* maxsegsize */
-                                0,			/* flags */
-                                NULL, NULL,		/* lockfunc, lockarg */
-                                &sc->req_dmat)) {
+	bus_dma_template_init(&t, sc->mps_parent_dmat);
+	BUS_DMA_TEMPLATE_FILL(&t, BD_ALIGNMENT(16), BD_MAXSIZE(rsize),
+	    BD_MAXSEGSIZE(rsize), BD_NSEGMENTS(1),
+	    BD_LOWADDR(BUS_SPACE_MAXADDR_32BIT));
+        if (bus_dma_template_tag(&t, &sc->req_dmat)) {
 		mps_dprint(sc, MPS_ERROR, "Cannot allocate request DMA tag\n");
 		return (ENOMEM);
         }
@@ -1444,17 +1429,10 @@ mps_alloc_requests(struct mps_softc *sc)
 		return (ENOMEM);
 	}
 	rsize = sc->reqframesz * sc->num_chains;
-	if (bus_dma_tag_create( sc->mps_parent_dmat,	/* parent */
-				16, 0,			/* algnmnt, boundary */
-				BUS_SPACE_MAXADDR_32BIT,/* lowaddr */
-				BUS_SPACE_MAXADDR,	/* highaddr */
-				NULL, NULL,		/* filter, filterarg */
-				rsize,			/* maxsize */
-				howmany(rsize, PAGE_SIZE), /* nsegments */
-				rsize,			/* maxsegsize */
-				0,			/* flags */
-				NULL, NULL,		/* lockfunc, lockarg */
-				&sc->chain_dmat)) {
+	bus_dma_template_clone(&t, sc->req_dmat);
+	BUS_DMA_TEMPLATE_FILL(&t, BD_MAXSIZE(rsize), BD_MAXSEGSIZE(rsize),
+	    BD_NSEGMENTS(howmany(rsize, PAGE_SIZE)));
+	if (bus_dma_template_tag(&t, &sc->chain_dmat)) {
 		mps_dprint(sc, MPS_ERROR, "Cannot allocate chain DMA tag\n");
 		return (ENOMEM);
 	}
@@ -1472,17 +1450,10 @@ mps_alloc_requests(struct mps_softc *sc)
 	}
 
 	rsize = MPS_SENSE_LEN * sc->num_reqs;
-        if (bus_dma_tag_create( sc->mps_parent_dmat,    /* parent */
-				1, 0,			/* algnmnt, boundary */
-				BUS_SPACE_MAXADDR_32BIT,/* lowaddr */
-				BUS_SPACE_MAXADDR,	/* highaddr */
-				NULL, NULL,		/* filter, filterarg */
-                                rsize,			/* maxsize */
-                                1,			/* nsegments */
-                                rsize,			/* maxsegsize */
-                                0,			/* flags */
-                                NULL, NULL,		/* lockfunc, lockarg */
-                                &sc->sense_dmat)) {
+	bus_dma_template_clone(&t, sc->req_dmat);
+	BUS_DMA_TEMPLATE_FILL(&t, BD_ALIGNMENT(1), BD_MAXSIZE(rsize),
+	    BD_MAXSEGSIZE(rsize));
+        if (bus_dma_template_tag(&t, &sc->sense_dmat)) {
 		mps_dprint(sc, MPS_ERROR, "Cannot allocate sense DMA tag\n");
 		return (ENOMEM);
         }
@@ -1498,18 +1469,12 @@ mps_alloc_requests(struct mps_softc *sc)
 	    (uintmax_t)sc->sense_busaddr, rsize);
 
 	nsegs = (sc->maxio / PAGE_SIZE) + 1;
-        if (bus_dma_tag_create( sc->mps_parent_dmat,    /* parent */
-				1, 0,			/* algnmnt, boundary */
-				BUS_SPACE_MAXADDR,	/* lowaddr */
-				BUS_SPACE_MAXADDR,	/* highaddr */
-				NULL, NULL,		/* filter, filterarg */
-                                BUS_SPACE_MAXSIZE_32BIT,/* maxsize */
-                                nsegs,			/* nsegments */
-                                BUS_SPACE_MAXSIZE_24BIT,/* maxsegsize */
-                                BUS_DMA_ALLOCNOW,	/* flags */
-                                busdma_lock_mutex,	/* lockfunc */
-				&sc->mps_mtx,		/* lockarg */
-                                &sc->buffer_dmat)) {
+	bus_dma_template_init(&t, sc->mps_parent_dmat);
+	BUS_DMA_TEMPLATE_FILL(&t, BD_MAXSIZE(BUS_SPACE_MAXSIZE_32BIT),
+	    BD_NSEGMENTS(nsegs), BD_MAXSEGSIZE(BUS_SPACE_MAXSIZE_24BIT),
+	    BD_FLAGS(BUS_DMA_ALLOCNOW), BD_LOCKFUNC(busdma_lock_mutex),
+	    BD_LOCKFUNCARG(&sc->mps_mtx));
+        if (bus_dma_template_tag(&t, &sc->buffer_dmat)) {
 		mps_dprint(sc, MPS_ERROR, "Cannot allocate buffer DMA tag\n");
 		return (ENOMEM);
         }
@@ -1520,10 +1485,6 @@ mps_alloc_requests(struct mps_softc *sc)
 	 */
 	sc->commands = malloc(sizeof(struct mps_command) * sc->num_reqs,
 	    M_MPT2, M_WAITOK | M_ZERO);
-	if(!sc->commands) {
-		mps_dprint(sc, MPS_ERROR, "Cannot allocate command memory\n");
-		return (ENOMEM);
-	}
 	for (i = 1; i < sc->num_reqs; i++) {
 		cm = &sc->commands[i];
 		cm->cm_req = sc->req_frames + i * sc->reqframesz;
@@ -1914,7 +1875,6 @@ mps_parse_debug(struct mps_softc *sc, char *list)
 	flags = 0;
 	sz = sizeof(mps_debug_strings) / sizeof(mps_debug_strings[0]);
 	while ((token = strsep(&list, ":,")) != NULL) {
-
 		/* Handle integer flags */
 		flags |= strtol(token, &endtoken, 0);
 		if (token != endtoken)
@@ -2270,7 +2230,6 @@ mps_complete_command(struct mps_softc *sc, struct mps_command *cm)
 	}
 }
 
-
 static void
 mps_sas_log_info(struct mps_softc *sc , u32 log_info)
 {
@@ -2598,10 +2557,6 @@ mps_register_events(struct mps_softc *sc, u32 *mask,
 	int error = 0;
 
 	eh = malloc(sizeof(struct mps_event_handle), M_MPT2, M_WAITOK|M_ZERO);
-	if(!eh) {
-		mps_dprint(sc, MPS_ERROR, "Cannot allocate event memory\n");
-		return (ENOMEM);
-	}
 	eh->callback = cb;
 	eh->data = data;
 	TAILQ_INSERT_TAIL(&sc->event_list, eh, eh_list);
@@ -2632,7 +2587,6 @@ mps_update_events(struct mps_softc *sc, struct mps_event_handle *handle,
 
 	for (i = 0; i < MPI2_EVENT_NOTIFY_EVENTMASK_WORDS; i++)
 		sc->event_mask[i] &= ~handle->mask[i];
-
 
 	if ((cm = mps_alloc_command(sc)) == NULL)
 		return (EBUSY);

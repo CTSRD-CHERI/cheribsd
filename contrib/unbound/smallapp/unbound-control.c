@@ -74,6 +74,10 @@
 #include <sys/un.h>
 #endif
 
+#ifdef HAVE_TARGETCONDITIONALS_H
+#include <TargetConditionals.h>
+#endif
+
 static void usage(void) ATTR_NORETURN;
 static void ssl_err(const char* s) ATTR_NORETURN;
 static void ssl_path_err(const char* s, const char *path) ATTR_NORETURN;
@@ -264,6 +268,9 @@ static void print_mem(struct ub_shm_stat_info* shm_stat,
 #ifdef USE_IPSECMOD
 	PR_LL("mem.mod.ipsecmod", shm_stat->mem.ipsecmod);
 #endif
+#ifdef WITH_DYNLIBMODULE
+	PR_LL("mem.mod.dynlib", shm_stat->mem.dynlib);
+#endif
 #ifdef USE_DNSCRYPT
 	PR_LL("mem.cache.dnscrypt_shared_secret",
 		shm_stat->mem.dnscrypt_shared_secret);
@@ -271,6 +278,8 @@ static void print_mem(struct ub_shm_stat_info* shm_stat,
 		shm_stat->mem.dnscrypt_nonce);
 #endif
 	PR_LL("mem.streamwait", s->svr.mem_stream_wait);
+	PR_LL("mem.http.query_buffer", s->svr.mem_http2_query_buffer);
+	PR_LL("mem.http.response_buffer", s->svr.mem_http2_response_buffer);
 }
 
 /** print histogram */
@@ -335,6 +344,7 @@ static void print_extended(struct ub_stats_info* s)
 	PR_UL("num.query.tls", s->svr.qtls);
 	PR_UL("num.query.tls_resume", s->svr.qtls_resume);
 	PR_UL("num.query.ipv6", s->svr.qipv6);
+	PR_UL("num.query.https", s->svr.qhttps);
 
 	/* flags */
 	PR_UL("num.query.flags.QR", s->svr.qbit_QR);
@@ -586,11 +596,7 @@ contact_server(const char* svr, struct config_file* cfg, int statuscmd)
 		addrfamily = addr_is_ip6(&addr, addrlen)?PF_INET6:PF_INET;
 	fd = socket(addrfamily, SOCK_STREAM, proto);
 	if(fd == -1) {
-#ifndef USE_WINSOCK
-		fatal_exit("socket: %s", strerror(errno));
-#else
-		fatal_exit("socket: %s", wsa_strerror(WSAGetLastError()));
-#endif
+		fatal_exit("socket: %s", sock_strerror(errno));
 	}
 	if(connect(fd, (struct sockaddr*)&addr, addrlen) < 0) {
 #ifndef USE_WINSOCK
@@ -674,11 +680,7 @@ remote_read(SSL* ssl, int fd, char* buf, size_t len)
 				/* EOF */
 				return 0;
 			}
-#ifndef USE_WINSOCK
-			fatal_exit("could not recv: %s", strerror(errno));
-#else
-			fatal_exit("could not recv: %s", wsa_strerror(WSAGetLastError()));
-#endif
+			fatal_exit("could not recv: %s", sock_strerror(errno));
 		}
 		buf[rr] = 0;
 	}
@@ -694,11 +696,7 @@ remote_write(SSL* ssl, int fd, const char* buf, size_t len)
 			ssl_err("could not SSL_write");
 	} else {
 		if(send(fd, buf, len, 0) < (ssize_t)len) {
-#ifndef USE_WINSOCK
-			fatal_exit("could not send: %s", strerror(errno));
-#else
-			fatal_exit("could not send: %s", wsa_strerror(WSAGetLastError()));
-#endif
+			fatal_exit("could not send: %s", sock_strerror(errno));
 		}
 	}
 }
@@ -817,11 +815,7 @@ go(const char* cfgfile, char* svr, int quiet, int argc, char* argv[])
 	ret = go_cmd(ssl, fd, quiet, argc, argv);
 
 	if(ssl) SSL_free(ssl);
-#ifndef USE_WINSOCK
-	close(fd);
-#else
-	closesocket(fd);
-#endif
+	sock_close(fd);
 	if(ctx) SSL_CTX_free(ctx);
 	config_delete(cfg);
 	return ret;
@@ -879,11 +873,16 @@ int main(int argc, char* argv[])
 	if(argc == 0)
 		usage();
 	if(argc >= 1 && strcmp(argv[0], "start")==0) {
+#if (defined(TARGET_OS_TV) && TARGET_OS_TV) || (defined(TARGET_OS_WATCH) && TARGET_OS_WATCH)
+		fatal_exit("could not exec unbound: %s",
+			strerror(ENOSYS));
+#else
 		if(execlp("unbound", "unbound", "-c", cfgfile, 
 			(char*)NULL) < 0) {
 			fatal_exit("could not exec unbound: %s",
 				strerror(errno));
 		}
+#endif
 	}
 	if(argc >= 1 && strcmp(argv[0], "stats_shm")==0) {
 		print_stats_shm(cfgfile);

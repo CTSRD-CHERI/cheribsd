@@ -2,7 +2,6 @@
  * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
  *
  * Copyright (c) 2012 The FreeBSD Foundation
- * All rights reserved.
  *
  * This software was developed by Edward Tomasz Napierala under sponsorship
  * from the FreeBSD Foundation.
@@ -70,7 +69,9 @@ struct iscsi_session_conf {
 	int		isc_iser;
 	char		isc_offload[ISCSI_OFFLOAD_LEN];
 	int		isc_enable;
-	int		isc_spare[4];
+	int		isc_dscp;
+	int		isc_pcp;
+	int		isc_spare[2];
 };
 
 /*
@@ -123,7 +124,8 @@ struct iscsi_daemon_handoff {
 	unsigned int			idh_session_id;
 	int				idh_socket;
 	char				idh_target_alias[ISCSI_ALIAS_LEN];
-	uint8_t				idh_spare_isid[6];
+	int				idh_protocol_level;
+	uint16_t			idh_spare;
 	uint16_t			idh_tsih;
 	uint16_t			idh_spare_cid;
 	uint32_t			idh_statsn;

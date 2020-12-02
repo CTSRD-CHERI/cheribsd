@@ -39,12 +39,12 @@ __FBSDID("$FreeBSD$");
 #include <sys/kernel.h>
 #include <sys/bio.h>
 #include <sys/conf.h>
+#include <sys/devctl.h>
 #include <sys/lock.h>
 #include <sys/mutex.h>
 #include <sys/buf.h>
 #include <sys/proc.h>
 #include <sys/devicestat.h>
-#include <sys/bus.h>
 #include <sys/sbuf.h>
 #include <sys/sysctl.h>
 #include <vm/vm.h>
@@ -217,7 +217,6 @@ cam_periph_alloc(periph_ctor_t *periph_ctor,
 	 * handler.  If it looks like a mistaken re-allocation, complain.
 	 */
 	if ((periph = cam_periph_find(path, name)) != NULL) {
-
 		if ((periph->flags & CAM_PERIPH_INVALID) != 0
 		 && (periph->flags & CAM_PERIPH_NEW_DEV_FOUND) == 0) {
 			periph->flags |= CAM_PERIPH_NEW_DEV_FOUND;
@@ -233,15 +232,14 @@ cam_periph_alloc(periph_ctor_t *periph_ctor,
 		}
 		return (CAM_REQ_INVALID);
 	}
-	
+
 	periph = (struct cam_periph *)malloc(sizeof(*periph), M_CAMPERIPH,
 					     M_NOWAIT|M_ZERO);
 
 	if (periph == NULL)
 		return (CAM_RESRC_UNAVAIL);
-	
-	init_level++;
 
+	init_level++;
 
 	sim = xpt_path_sim(path);
 	path_id = xpt_path_path_id(path);
@@ -342,7 +340,6 @@ cam_periph_find(struct cam_path *path, char *name)
 
 	xpt_lock_buses();
 	for (p_drv = periph_drivers; *p_drv != NULL; p_drv++) {
-
 		if (name != NULL && (strcmp((*p_drv)->driver_name, name) != 0))
 			continue;
 
@@ -380,7 +377,6 @@ retry:
 	count = 0;
 	xpt_lock_buses();
 	for (p_drv = periph_drivers; *p_drv != NULL; p_drv++) {
-
 		TAILQ_FOREACH(periph, &(*p_drv)->units, unit_links) {
 			if (xpt_path_comp(periph->path, path) != 0)
 				continue;
@@ -468,7 +464,7 @@ cam_periph_release(struct cam_periph *periph)
 
 	if (periph == NULL)
 		return;
-	
+
 	cam_periph_assert(periph, MA_NOTOWNED);
 	mtx = cam_periph_mtx(periph);
 	mtx_lock(mtx);
@@ -549,7 +545,6 @@ camperiphnextunit(struct periph_driver *p_drv, u_int newunit, int wired,
 
 	periph_name = p_drv->driver_name;
 	for (;;newunit++) {
-
 		for (periph = TAILQ_FIRST(&p_drv->units);
 		     periph != NULL && periph->unit_number != newunit;
 		     periph = TAILQ_NEXT(periph, unit_links))
@@ -938,7 +933,6 @@ cam_periph_mapmem(union ccb *ccb, struct cam_periph_map_info *mapinfo,
 	PHOLD(curproc);
 
 	for (i = 0; i < numbufs; i++) {
-
 		/* Save the user's data address. */
 		mapinfo->orig[i] = *data_ptrs[i];
 
@@ -970,15 +964,12 @@ cam_periph_mapmem(union ccb *ccb, struct cam_periph_map_info *mapinfo,
 		 */
 		mapinfo->bp[i] = uma_zalloc(pbuf_zone, M_WAITOK);
 
-		/* set the transfer length, we know it's < MAXPHYS */
-		mapinfo->bp[i]->b_bufsize = lengths[i];
-
 		/* set the direction */
 		mapinfo->bp[i]->b_iocmd = (dirs[i] == CAM_DIR_OUT) ?
 		    BIO_WRITE : BIO_READ;
 
 		/* Map the buffer into kernel memory. */
-		if (vmapbuf(mapinfo->bp[i], *data_ptrs[i], 1) < 0) {
+		if (vmapbuf(mapinfo->bp[i], *data_ptrs[i], lengths[i], 1) < 0) {
 			uma_zfree(pbuf_zone, mapinfo->bp[i]);
 			goto fail;
 		}
@@ -1157,7 +1148,6 @@ cam_periph_ioctl(struct cam_periph *periph, u_long cmd, caddr_t addr,
 			ccb->cgdl.index = 0;
 			ccb->cgdl.status = CAM_GDEVLIST_MORE_DEVS;
 			while (ccb->cgdl.status == CAM_GDEVLIST_MORE_DEVS) {
-
 				/* we want the next device in the list */
 				xpt_action(ccb);
 				if (strncmp(ccb->cgdl.periph_name, 
@@ -2043,7 +2033,6 @@ cam_periph_error(union ccb *ccb, cam_flags camflags,
 				    xpt_path_path_id(ccb->ccb_h.path),
 				    xpt_path_target_id(ccb->ccb_h.path),
 				    lun_id) == CAM_REQ_CMP) {
-
 			/*
 			 * Let peripheral drivers know that this
 			 * device has gone away.
@@ -2063,7 +2052,6 @@ cam_periph_error(union ccb *ccb, cam_flags camflags,
 				    xpt_path_path_id(ccb->ccb_h.path),
 				    xpt_path_target_id(ccb->ccb_h.path),
 				    CAM_LUN_WILDCARD) == CAM_REQ_CMP) {
-
 			scan_ccb = xpt_alloc_ccb_nowait();
 			if (scan_ccb != NULL) {
 				scan_ccb->ccb_h.path = newpath;

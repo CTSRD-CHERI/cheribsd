@@ -8,9 +8,6 @@
  * stdlib/Symbol.map, string/Symbol.map, sys/Symbol.map, ...).
  */
 FBSD_1.0 {
-	/* PSEUDO syscalls */
-	_exit;
-
 	_mcount;
 	_setjmp;
 	_longjmp;
@@ -27,6 +24,9 @@ FBSD_1.0 {
 	htons;
 	ntohl;
 	ntohs;
+	vfork;
+	brk;
+	sbrk;
 };
 
 FBSD_1.3 {
@@ -34,6 +34,9 @@ FBSD_1.3 {
 };
 
 FBSDprivate_1.0 {
+	/* PSEUDO syscalls */
+	_getlogin;
+
 	_set_tp;
 	___longjmp;
 	__makecontext;
@@ -44,11 +47,4 @@ FBSDprivate_1.0 {
 	_vfork;
 	_brk;
 	_sbrk;
-
-	/*
-	 * XXX-BD: Export .size.<var> symbols for <var>'s that are undefined
-	 * so rtld can update them.  This is a hack and should be replaced
-	 * with linker support.
-	 */
-	.size.*;
 };

@@ -240,14 +240,13 @@ static int mlx5_eq_int(struct mlx5_core_dev *dev, struct mlx5_eq *eq)
 		 * Make sure we read EQ entry contents after we've
 		 * checked the ownership bit.
 		 */
-		rmb();
+		atomic_thread_fence_acq();
 
 		mlx5_core_dbg(eq->dev, "eqn %d, eqe type %s\n",
 			      eq->eqn, eqe_type_str(eqe->type));
 		switch (eqe->type) {
 		case MLX5_EVENT_TYPE_COMP:
-			cqn = be32_to_cpu(eqe->data.comp.cqn) & 0xffffff;
-			mlx5_cq_completion(dev, cqn);
+			mlx5_cq_completion(dev, eqe);
 			break;
 
 		case MLX5_EVENT_TYPE_PATH_MIG:

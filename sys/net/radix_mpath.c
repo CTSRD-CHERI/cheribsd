@@ -56,7 +56,6 @@ __FBSDID("$FreeBSD$");
 #include <sys/rmlock.h>
 #include <net/route.h>
 #include <net/route/nhop.h>
-#include <net/route/shared.h>
 #include <net/route/route_var.h>
 #include <net/route/nhop.h>
 #include <net/if.h>
@@ -100,7 +99,7 @@ rn_mpath_count(struct radix_node *rn)
 {
 	uint32_t i = 0;
 	struct rtentry *rt;
-	
+
 	while (rn != NULL) {
 		rt = (struct rtentry *)rn;
 		i += rt->rt_weight;
@@ -275,4 +274,3 @@ mpath_init(void)
 }
 SYSINIT(mpath_init, SI_SUB_LAST, SI_ORDER_ANY, mpath_init, NULL);
 #endif
-

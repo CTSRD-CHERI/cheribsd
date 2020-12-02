@@ -43,12 +43,12 @@ __FBSDID("$FreeBSD$");
 #include <errno.h>
 #include <fcntl.h>
 #include <fetch.h>
+#include <libutil.h>
 #include <paths.h>
 #include <stdbool.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#include <unistd.h>
 #include <ucl.h>
 
 #include <openssl/err.h>
@@ -915,10 +915,15 @@ bootstrap_pkg(bool force)
 
 fetchfail:
 	warnx("Error fetching %s: %s", url, fetchLastErrString);
-	fprintf(stderr, "A pre-built version of pkg could not be found for "
-	    "your system.\n");
-	fprintf(stderr, "Consider changing PACKAGESITE or installing it from "
-	    "ports: 'ports-mgmt/pkg'.\n");
+	if (fetchLastErrCode == FETCH_RESOLV) {
+		fprintf(stderr, "Address resolution failed for %s.\n", packagesite);
+		fprintf(stderr, "Consider changing PACKAGESITE.\n");
+	} else {
+		fprintf(stderr, "A pre-built version of pkg could not be found for "
+		    "your system.\n");
+		fprintf(stderr, "Consider changing PACKAGESITE or installing it from "
+		    "ports: 'ports-mgmt/pkg'.\n");
+	}
 
 cleanup:
 	if (fd_sig != -1) {
@@ -1040,13 +1045,20 @@ main(int argc, char *argv[])
 	pkgarg = NULL;
 	yes = false;
 
-	snprintf(pkgpath, MAXPATHLEN, "%s/sbin/pkg",
-	    getenv("LOCALBASE") ? getenv("LOCALBASE") : _LOCALBASE);
+	snprintf(pkgpath, MAXPATHLEN, "%s/sbin/pkg", getlocalbase());
 
 	if (argc > 1 && strcmp(argv[1], "bootstrap") == 0) {
 		bootstrap_only = true;
-		if (argc == 3 && strcmp(argv[2], "-f") == 0)
+		if (argc > 3) {
+			fprintf(stderr, "Too many arguments\nUsage: pkg bootstrap [-f]\n");
+			exit(EXIT_FAILURE);
+		}
+		if (argc == 3 && strcmp(argv[2], "-f") == 0) {
 			force = true;
+		} else if (argc == 3) {
+			fprintf(stderr, "Invalid argument specified\nUsage: pkg bootstrap [-f]\n");
+			exit(EXIT_FAILURE);
+		}
 	}
 
 	if ((bootstrap_only && force) || access(pkgpath, X_OK) == -1) {

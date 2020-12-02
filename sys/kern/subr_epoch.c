@@ -58,8 +58,6 @@ __FBSDID("$FreeBSD$");
 
 #include <ck_epoch.h>
 
-static MALLOC_DEFINE(M_EPOCH, "epoch", "epoch based reclamation");
-
 #ifdef __amd64__
 #define EPOCH_ALIGN CACHE_LINE_SIZE*2
 #else
@@ -74,12 +72,16 @@ typedef struct epoch_record {
 	volatile struct epoch_tdlist er_tdlist;
 	volatile uint32_t er_gen;
 	uint32_t er_cpuid;
+#ifdef INVARIANTS
+	/* Used to verify record ownership for non-preemptible epochs. */
+	struct thread *er_td;
+#endif
 } __aligned(EPOCH_ALIGN)     *epoch_record_t;
 
 struct epoch {
 	struct ck_epoch e_epoch __aligned(EPOCH_ALIGN);
 	epoch_record_t e_pcpu_record;
-	int	e_idx;
+	int	e_in_use;
 	int	e_flags;
 	struct sx e_drain_sx;
 	struct mtx e_drain_mtx;
@@ -128,18 +130,22 @@ TAILQ_HEAD (threadlist, thread);
 CK_STACK_CONTAINER(struct ck_epoch_entry, stack_entry,
     ck_epoch_entry_container)
 
-epoch_t	allepochs[MAX_EPOCHS];
+static struct epoch epoch_array[MAX_EPOCHS];
 
 DPCPU_DEFINE(struct grouptask, epoch_cb_task);
 DPCPU_DEFINE(int, epoch_cb_count);
 
 static __read_mostly int inited;
-static __read_mostly int epoch_count;
 __read_mostly epoch_t global_epoch;
 __read_mostly epoch_t global_epoch_preempt;
 
 static void epoch_call_task(void *context __unused);
 static 	uma_zone_t pcpu_zone_record;
+
+static struct sx epoch_sx;
+
+#define	EPOCH_LOCK() sx_xlock(&epoch_sx)
+#define	EPOCH_UNLOCK() sx_xunlock(&epoch_sx)
 
 #ifdef EPOCH_TRACE
 struct stackentry {
@@ -281,6 +287,7 @@ epoch_init(void *arg __unused)
 #ifdef EPOCH_TRACE
 	SLIST_INIT(&thread0.td_epochs);
 #endif
+	sx_init(&epoch_sx, "epoch-sx");
 	inited = 1;
 	global_epoch = epoch_alloc("Global", 0);
 	global_epoch_preempt = epoch_alloc("Global preemptible", EPOCH_PREEMPT);
@@ -326,33 +333,91 @@ epoch_t
 epoch_alloc(const char *name, int flags)
 {
 	epoch_t epoch;
+	int i;
+
+	MPASS(name != NULL);
 
 	if (__predict_false(!inited))
 		panic("%s called too early in boot", __func__);
-	epoch = malloc(sizeof(struct epoch), M_EPOCH, M_ZERO | M_WAITOK);
+
+	EPOCH_LOCK();
+
+	/*
+	 * Find a free index in the epoch array. If no free index is
+	 * found, try to use the index after the last one.
+	 */
+	for (i = 0;; i++) {
+		/*
+		 * If too many epochs are currently allocated,
+		 * return NULL.
+		 */
+		if (i == MAX_EPOCHS) {
+			epoch = NULL;
+			goto done;
+		}
+		if (epoch_array[i].e_in_use == 0)
+			break;
+	}
+
+	epoch = epoch_array + i;
 	ck_epoch_init(&epoch->e_epoch);
 	epoch_ctor(epoch);
-	MPASS(epoch_count < MAX_EPOCHS - 2);
 	epoch->e_flags = flags;
-	epoch->e_idx = epoch_count;
 	epoch->e_name = name;
 	sx_init(&epoch->e_drain_sx, "epoch-drain-sx");
 	mtx_init(&epoch->e_drain_mtx, "epoch-drain-mtx", NULL, MTX_DEF);
-	allepochs[epoch_count++] = epoch;
+
+	/*
+	 * Set e_in_use last, because when this field is set the
+	 * epoch_call_task() function will start scanning this epoch
+	 * structure.
+	 */
+	atomic_store_rel_int(&epoch->e_in_use, 1);
+done:
+	EPOCH_UNLOCK();
 	return (epoch);
 }
 
 void
 epoch_free(epoch_t epoch)
 {
+#ifdef INVARIANTS
+	int cpu;
+#endif
+
+	EPOCH_LOCK();
+
+	MPASS(epoch->e_in_use != 0);
 
 	epoch_drain_callbacks(epoch);
-	allepochs[epoch->e_idx] = NULL;
+
+	atomic_store_rel_int(&epoch->e_in_use, 0);
+	/*
+	 * Make sure the epoch_call_task() function see e_in_use equal
+	 * to zero, by calling epoch_wait() on the global_epoch:
+	 */
 	epoch_wait(global_epoch);
+#ifdef INVARIANTS
+	CPU_FOREACH(cpu) {
+		epoch_record_t er;
+
+		er = zpcpu_get_cpu(epoch->e_pcpu_record, cpu);
+
+		/*
+		 * Sanity check: none of the records should be in use anymore.
+		 * We drained callbacks above and freeing the pcpu records is
+		 * imminent.
+		 */
+		MPASS(er->er_td == NULL);
+		MPASS(TAILQ_EMPTY(&er->er_tdlist));
+	}
+#endif
 	uma_zfree_pcpu(pcpu_zone_record, epoch->e_pcpu_record);
 	mtx_destroy(&epoch->e_drain_mtx);
 	sx_destroy(&epoch->e_drain_sx);
-	free(epoch, M_EPOCH);
+	memset(epoch, 0, sizeof(*epoch));
+
+	EPOCH_UNLOCK();
 }
 
 static epoch_record_t
@@ -391,6 +456,8 @@ _epoch_enter_preempt(epoch_t epoch, epoch_tracker_t et EPOCH_FILE_LINE)
 	sched_pin();
 	td->td_pre_epoch_prio = td->td_priority;
 	er = epoch_currecord(epoch);
+	/* Record-level tracking is reserved for non-preemptible epochs. */
+	MPASS(er->er_td == NULL);
 	TAILQ_INSERT_TAIL(&er->er_tdlist, et, et_link);
 	ck_epoch_begin(&er->er_record, &et->et_section);
 	critical_exit();
@@ -405,6 +472,15 @@ epoch_enter(epoch_t epoch)
 	INIT_CHECK(epoch);
 	critical_enter();
 	er = epoch_currecord(epoch);
+#ifdef INVARIANTS
+	if (er->er_record.active == 0) {
+		MPASS(er->er_td == NULL);
+		er->er_td = curthread;
+	} else {
+		/* We've recursed, just make sure our accounting isn't wrong. */
+		MPASS(er->er_td == curthread);
+	}
+#endif
 	ck_epoch_begin(&er->er_record, NULL);
 }
 
@@ -425,6 +501,8 @@ _epoch_exit_preempt(epoch_t epoch, epoch_tracker_t et EPOCH_FILE_LINE)
 	MPASS(et->et_td == td);
 #ifdef INVARIANTS
 	et->et_td = (void*)0xDEADBEEF;
+	/* Record-level tracking is reserved for non-preemptible epochs. */
+	MPASS(er->er_td == NULL);
 #endif
 	ck_epoch_end(&er->er_record, &et->et_section);
 	TAILQ_REMOVE(&er->er_tdlist, et, et_link);
@@ -445,6 +523,11 @@ epoch_exit(epoch_t epoch)
 	INIT_CHECK(epoch);
 	er = epoch_currecord(epoch);
 	ck_epoch_end(&er->er_record, NULL);
+#ifdef INVARIANTS
+	MPASS(er->er_td == curthread);
+	if (er->er_record.active == 0)
+		er->er_td = NULL;
+#endif
 	critical_exit();
 }
 
@@ -705,8 +788,10 @@ epoch_call_task(void *arg __unused)
 	ck_stack_init(&cb_stack);
 	critical_enter();
 	epoch_enter(global_epoch);
-	for (total = i = 0; i < epoch_count; i++) {
-		if (__predict_false((epoch = allepochs[i]) == NULL))
+	for (total = i = 0; i != MAX_EPOCHS; i++) {
+		epoch = epoch_array + i;
+		if (__predict_false(
+		    atomic_load_acq_int(&epoch->e_in_use) == 0))
 			continue;
 		er = epoch_currecord(epoch);
 		record = &er->er_record;
@@ -732,17 +817,17 @@ epoch_call_task(void *arg __unused)
 	}
 }
 
-int
-in_epoch_verbose(epoch_t epoch, int dump_onfail)
+static int
+in_epoch_verbose_preempt(epoch_t epoch, int dump_onfail)
 {
+	epoch_record_t er;
 	struct epoch_tracker *tdwait;
 	struct thread *td;
-	epoch_record_t er;
 
+	MPASS(epoch != NULL);
+	MPASS((epoch->e_flags & EPOCH_PREEMPT) != 0);
 	td = curthread;
 	if (THREAD_CAN_SLEEP())
-		return (0);
-	if (__predict_false((epoch) == NULL))
 		return (0);
 	critical_enter();
 	er = epoch_currecord(epoch);
@@ -762,6 +847,66 @@ in_epoch_verbose(epoch_t epoch, int dump_onfail)
 #endif
 	critical_exit();
 	return (0);
+}
+
+#ifdef INVARIANTS
+static void
+epoch_assert_nocpu(epoch_t epoch, struct thread *td)
+{
+	epoch_record_t er;
+	int cpu;
+	bool crit;
+
+	crit = td->td_critnest > 0;
+
+	/* Check for a critical section mishap. */
+	CPU_FOREACH(cpu) {
+		er = zpcpu_get_cpu(epoch->e_pcpu_record, cpu);
+		KASSERT(er->er_td != td,
+		    ("%s critical section in epoch '%s', from cpu %d",
+		    (crit ? "exited" : "re-entered"), epoch->e_name, cpu));
+	}
+}
+#else
+#define	epoch_assert_nocpu(e, td)
+#endif
+
+int
+in_epoch_verbose(epoch_t epoch, int dump_onfail)
+{
+	epoch_record_t er;
+	struct thread *td;
+
+	if (__predict_false((epoch) == NULL))
+		return (0);
+	if ((epoch->e_flags & EPOCH_PREEMPT) != 0)
+		return (in_epoch_verbose_preempt(epoch, dump_onfail));
+
+	/*
+	 * The thread being in a critical section is a necessary
+	 * condition to be correctly inside a non-preemptible epoch,
+	 * so it's definitely not in this epoch.
+	 */
+	td = curthread;
+	if (td->td_critnest == 0) {
+		epoch_assert_nocpu(epoch, td);
+		return (0);
+	}
+
+	/*
+	 * The current cpu is in a critical section, so the epoch record will be
+	 * stable for the rest of this function.  Knowing that the record is not
+	 * active is sufficient for knowing whether we're in this epoch or not,
+	 * since it's a pcpu record.
+	 */
+	er = epoch_currecord(epoch);
+	if (er->er_record.active == 0) {
+		epoch_assert_nocpu(epoch, td);
+		return (0);
+	}
+
+	MPASS(er->er_td == td);
+	return (1);
 }
 
 int

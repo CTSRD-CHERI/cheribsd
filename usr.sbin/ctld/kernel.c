@@ -238,10 +238,16 @@ cctl_end_element(void *user_data, const char *name)
 		cur_lun->backend_type = str;
 		str = NULL;
 	} else if (strcmp(name, "lun_type") == 0) {
+		if (str == NULL)
+			log_errx(1, "%s: %s missing its argument", __func__, name);
 		cur_lun->device_type = strtoull(str, NULL, 0);
 	} else if (strcmp(name, "size") == 0) {
+		if (str == NULL)
+			log_errx(1, "%s: %s missing its argument", __func__, name);
 		cur_lun->size_blocks = strtoull(str, NULL, 0);
 	} else if (strcmp(name, "blocksize") == 0) {
+		if (str == NULL)
+			log_errx(1, "%s: %s missing its argument", __func__, name);
 		cur_lun->blocksize = strtoul(str, NULL, 0);
 	} else if (strcmp(name, "serial_number") == 0) {
 		cur_lun->serial_number = str;
@@ -357,15 +363,23 @@ cctl_end_pelement(void *user_data, const char *name)
 		cur_port->port_name = str;
 		str = NULL;
 	} else if (strcmp(name, "physical_port") == 0) {
+		if (str == NULL)
+			log_errx(1, "%s: %s missing its argument", __func__, name);
 		cur_port->pp = strtoul(str, NULL, 0);
 	} else if (strcmp(name, "virtual_port") == 0) {
+		if (str == NULL)
+			log_errx(1, "%s: %s missing its argument", __func__, name);
 		cur_port->vp = strtoul(str, NULL, 0);
 	} else if (strcmp(name, "cfiscsi_target") == 0) {
 		cur_port->cfiscsi_target = str;
 		str = NULL;
 	} else if (strcmp(name, "cfiscsi_state") == 0) {
+		if (str == NULL)
+			log_errx(1, "%s: %s missing its argument", __func__, name);
 		cur_port->cfiscsi_state = strtoul(str, NULL, 0);
 	} else if (strcmp(name, "cfiscsi_portal_group_tag") == 0) {
+		if (str == NULL)
+			log_errx(1, "%s: %s missing its argument", __func__, name);
 		cur_port->cfiscsi_portal_group_tag = strtoul(str, NULL, 0);
 	} else if (strcmp(name, "ctld_portal_group_name") == 0) {
 		cur_port->ctld_portal_group_name = str;
@@ -776,6 +790,30 @@ kernel_lun_modify(struct lun *lun)
 
 	req.reqdata.modify.lun_id = lun->l_ctl_lun;
 	req.reqdata.modify.lun_size_bytes = lun->l_size;
+
+	if (lun->l_path != NULL) {
+		o = option_find(&lun->l_options, "file");
+		if (o != NULL) {
+			option_set(o, lun->l_path);
+		} else {
+			o = option_new(&lun->l_options, "file", lun->l_path);
+			assert(o != NULL);
+		}
+	}
+
+	o = option_find(&lun->l_options, "ctld_name");
+	if (o != NULL) {
+		option_set(o, lun->l_name);
+	} else {
+		o = option_new(&lun->l_options, "ctld_name", lun->l_name);
+		assert(o != NULL);
+	}
+
+	o = option_find(&lun->l_options, "scsiname");
+	if (o == NULL && lun->l_scsiname != NULL) {
+		o = option_new(&lun->l_options, "scsiname", lun->l_scsiname);
+		assert(o != NULL);
+	}
 
 	if (!TAILQ_EMPTY(&lun->l_options)) {
 		req.args_nvl = nvlist_create(0);

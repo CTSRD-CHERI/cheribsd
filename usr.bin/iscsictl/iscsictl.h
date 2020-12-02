@@ -2,7 +2,6 @@
  * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
  *
  * Copyright (c) 2012 The FreeBSD Foundation
- * All rights reserved.
  *
  * This software was developed by Edward Tomasz Napierala under sponsorship
  * from the FreeBSD Foundation.
@@ -78,6 +77,8 @@ struct target {
 	int			t_session_type;
 	int			t_enable;
 	int			t_protocol;
+	int			t_dscp;
+	int			t_pcp;
 	char			*t_offload;
 	char			*t_user;
 	char			*t_secret;

@@ -46,13 +46,23 @@
 #include <machine/pcb.h>
 #include <machine/sysarch.h>
 
+#include <vm/vm.h>
+#include <vm/vm_page.h>
+#include <vm/vm_map.h>
+
 #ifdef DDB
 
 static inline void
-db_print_cap(const char* msg, void * __capability cap)
+db_print_cap(struct thread *td, const char* msg, void * __capability cap)
 {
-	db_printf("%s" _CHERI_PRINTF_CAP_FMT "\n", msg,
-	    _CHERI_PRINTF_CAP_ARG(cap));
+	pid_t pid;
+
+	pid = vm_get_cap_owner(td, (uintcap_t)cap);
+	if (pid >= 0) {
+		db_printf("%s %#.16lp (pid %d)\n", msg, cap, pid);
+	} else {
+		db_printf("%s %#.16lp\n", msg, cap);
+	}
 }
 
 static void * __capability
@@ -97,22 +107,23 @@ DB_SHOW_COMMAND(cp2, ddb_dump_cp2)
 		db_printf("RegNum: invalid (%d) ", regnum);
 	db_printf("(%s)\n", cheri_exccode_string(exccode));
 
-	db_print_cap("$ddc: ",  cheri_getdefault());
-	db_print_cap("$pcc: ",  cheri_getpcc());
-	db_print_cap("$culr: ", cheri_getculr());
-	db_print_cap("$cplr: ", cheri_getcplr());
-	db_print_cap("$kcc: ",  cheri_getkcc());
-	db_print_cap("$kdc: ",  cheri_getkdc());
-	db_print_cap("$epcc: ",  cheri_getepcc());
-	db_print_cap("$kr1c: ",  cheri_getkr1c());
-	db_print_cap("$kr2c: ",  cheri_getkr2c());
+	db_print_cap(NULL, "$ddc: ",  cheri_getdefault());
+	db_print_cap(NULL, "$pcc: ",  cheri_getpcc());
+	db_print_cap(NULL, "$culr: ", cheri_getculr());
+	db_print_cap(NULL, "$cplr: ", cheri_getcplr());
+	db_print_cap(NULL, "$kcc: ",  cheri_getkcc());
+	db_print_cap(NULL, "$kdc: ",  cheri_getkdc());
+	db_print_cap(NULL, "$epcc: ",  cheri_getepcc());
+	db_print_cap(NULL, "$kr1c: ",  cheri_getkr1c());
+	db_print_cap(NULL, "$kr2c: ",  cheri_getkr2c());
 }
 
 static void
-db_show_cheri_trapframe(struct trapframe *frame)
+db_show_cheri_trapframe(struct thread *td, struct trapframe *frame)
 {
 	register_t cause;
 	uint8_t exccode, regnum;
+	pid_t pid;
 	u_int i;
 
 	db_printf("Trapframe at %p\n", frame);
@@ -128,13 +139,17 @@ db_show_cheri_trapframe(struct trapframe *frame)
 		db_printf("RegNum: invalid (%d) ", regnum);
 	db_printf("(%s)\n", cheri_exccode_string(exccode));
 
-	db_print_cap("$ddc: ", frame->ddc);
-	db_print_cap("$pcc: ", frame->pcc);
+	db_print_cap(td, "$ddc: ", frame->ddc);
+	db_print_cap(td, "$pcc: ", frame->pcc);
 	/* Laboriously load and print each trapframe capability. */
 	for (i = 1; i < 31; i++) {
 		void * __capability cap = *(&frame->ddc + i);
-		db_printf("$c%02d: " _CHERI_PRINTF_CAP_FMT "\n", i,
-		    _CHERI_PRINTF_CAP_ARG(cap));
+		pid = vm_get_cap_owner(td, (uintcap_t)cap);
+		if (pid >= 0) {
+			db_printf("$c%02d: %#.16lp (pid %d)\n", i, cap, pid);
+		} else {
+			db_printf("$c%02d: %#.16lp\n", i, cap);
+		}
 	}
 }
 
@@ -149,7 +164,7 @@ DB_SHOW_COMMAND(cheri, ddb_dump_cheri)
 		frame = (struct trapframe *)addr;
 	else
 		frame = kdb_frame;
-	db_show_cheri_trapframe(frame);
+	db_show_cheri_trapframe(NULL, frame);
 }
 
 /*
@@ -168,6 +183,6 @@ DB_SHOW_COMMAND(cheripcb, ddb_dump_cheripcb)
 
 	frame = &td->td_pcb->pcb_regs;
 	db_printf("Thread %d at %p\n", td->td_tid, td);
-	db_show_cheri_trapframe(frame);
+	db_show_cheri_trapframe(td, frame);
 }
 #endif

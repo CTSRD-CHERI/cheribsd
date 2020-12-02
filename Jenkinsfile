@@ -1,18 +1,14 @@
 @Library('ctsrd-jenkins-scripts') _
 
 class GlobalVars { // "Groovy"
-    public static boolean archiveArtifacts = false;
-    public static boolean isTestSuiteJob = false;
-}
-
-if (env.CHANGE_ID && !shouldBuildPullRequest()) {
-    echo "Not building this pull request."
-    return
+    public static boolean archiveArtifacts = false
+    public static boolean isTestSuiteJob = false
 }
 
 echo("JOB_NAME='${env.JOB_NAME}', JOB_BASE_NAME='${env.JOB_BASE_NAME}'")
 def rateLimit = rateLimitBuilds(throttle: [count: 1, durationName: 'hour', userBoost: true])
-if (env.JOB_NAME.contains("CheriBSD-testsuite")) {
+if (env.JOB_NAME.contains("CheriBSD-testsuite") ||
+    (env.CHANGE_ID && pullRequest.labels.contains('run-full-testsuite'))) {
     GlobalVars.isTestSuiteJob = true
     // This job takes a long time to run (approximately 20 hours) so limit it to twice a week
     rateLimit = rateLimitBuilds(throttle: [count: 2, durationName: 'week', userBoost: true])
@@ -35,6 +31,11 @@ if (!env.CHANGE_ID && archiveBranches.contains(env.BRANCH_NAME)) {
         jobProperties.add(buildDiscarder(logRotator(artifactDaysToKeepStr: '', artifactNumToKeepStr: '2')))
     }
 }
+// Add an architecture selector for manual builds
+def allArchitectures = ["aarch64", "amd64", "mips64", "mips64-hybrid", "mips64-purecap", "riscv64", "riscv64-hybrid", "riscv64-purecap"]
+jobProperties.add(parameters([text(defaultValue: allArchitectures.join('\n'),
+        description: 'The architectures (cheribuild suffixes) to build for (one per line)',
+        name: 'architectures')]))
 // Set the default job properties (work around properties() not being additive but replacing)
 setDefaultJobProperties(jobProperties)
 
@@ -54,7 +55,6 @@ def buildImageAndRunTests(params, String suffix) {
         }
     }
     stage("Running tests") {
-        def haveCheritest = suffix.endsWith('-hybrid') || suffix.endsWith('-purecap')
         // copy qemu archive and run directly on the host
         dir("qemu-${params.buildOS}") { deleteDir() }
         copyArtifacts projectName: "qemu/qemu-cheri", filter: "qemu-${params.buildOS}/**", target: '.', fingerprintArtifacts: false
@@ -62,30 +62,39 @@ def buildImageAndRunTests(params, String suffix) {
 
         sh 'find qemu* && ls -lah'
         // TODO: run full testsuite (ideally in parallel)
-        def testExtraArgs = ['--no-timestamped-test-subdir']
+        def testExtraArgs = ['--no-timestamped-test-subdir', "--test-output-dir=\$WORKSPACE/test-results/${suffix}"]
         if (GlobalVars.isTestSuiteJob) {
             testExtraArgs += ['--kyua-tests-files', '/usr/tests/Kyuafile',
-                              '--no-run-cheritest', // only run kyua tests
+                              '--no-run-cheribsdtest', // only run kyua tests
             ]
         } else {
             // Run a small subset of tests to check that we didn't break running tests (since the full testsuite takes too long)
             testExtraArgs += ['--kyua-tests-files', '/usr/tests/bin/cat/Kyuafile']
         }
-        def exitCode = sh returnStatus: true, label: "Run tests in QEMU", script: """
-rm -rf cheribsd-test-results && mkdir cheribsd-test-results
-./cheribuild/jenkins-cheri-build.py --test run-${suffix} '--test-extra-args=${testExtraArgs.join(" ")}' ${params.extraArgs} --test-ssh-key \$WORKSPACE/id_ed25519.pub
-find cheribsd-test-results
+        sh label: "Run tests in QEMU", script: """
+rm -rf test-results && mkdir -p test-results/${suffix}
+# The test script returns 2 if the tests step is unstable, any other non-zero exit code is a fatal error
+exit_code=0
+./cheribuild/jenkins-cheri-build.py --test run-${suffix} '--test-extra-args=${testExtraArgs.join(" ")}' ${params.extraArgs} --test-ssh-key \$WORKSPACE/id_ed25519.pub || exit_code=\$?
+if [ \${exit_code} -eq 2 ]; then
+    echo "Test script encountered a non-fatal error - probably some of the tests failed."
+elif [ \${exit_code} -ne 0 ]; then
+    echo "Test script got fatal error: exit code \${exit_code}"
+    exit \${exit_code}
+fi
+find test-results
 """
-        def summary = junitReturnCurrentSummary allowEmptyResults: false, keepLongStdio: true, testResults: 'cheribsd-test-results/*.xml'
+        def summary = junitReturnCurrentSummary allowEmptyResults: false, keepLongStdio: true, testResults: "test-results/${suffix}/*.xml"
         def testResultMessage = "Test summary: ${summary.totalCount}, Failures: ${summary.failCount}, Skipped: ${summary.skipCount}, Passed: ${summary.passCount}"
         echo("${suffix}: ${testResultMessage}")
-        if (exitCode != 0 || summary.failCount != 0) {
-            // Note: Junit set should have set stage/build status to unstable already, but we still need to set
-            // the per-configuration status, since Jenkins doesn't have a build result for each parallel branch.
-            params.statusUnstable("Test script returned ${exitCode}! ${testResultMessage}")
-        }
         if (summary.passCount == 0 || summary.totalCount == 0) {
             params.statusFailure("No tests successful? ${testResultMessage}")
+        } else if (summary.failCount != 0) {
+            // Note: Junit set should have set stage/build status to unstable already, but we still need to set
+            // the per-configuration status, since Jenkins doesn't have a build result for each parallel branch.
+            params.statusUnstable("Unstable test results: ${testResultMessage}")
+            // If there were test failures, we archive the JUnitXML file to simplify debugging
+            archiveArtifacts allowEmptyArchive: true, artifacts: "test-results/${suffix}/*.xml", onlyIfSuccessful: false
         }
     }
     if (GlobalVars.archiveArtifacts) {
@@ -101,19 +110,18 @@ mv -v tarball/*.img tarball/rootfs/boot/kernel/kernel .
 xz -T0 *.img kernel*
 '''
             // Create sysroot archive (this is installed to cherisdk rather than the tarball)
+            // Seems like some Java versions require write permissions to the .xz files:
+            // java.nio.file.AccessDeniedException: /usr/local/jenkins/jobs/CheriBSD-pipeline/branches/PR-616/builds/14/archive/kernel.xz
+            //     at sun.nio.fs.UnixException.translateToIOException(UnixException.java:84)
+            //     at sun.nio.fs.UnixException.rethrowAsIOException(UnixException.java:102)
+            //     at sun.nio.fs.UnixException.rethrowAsIOException(UnixException.java:107)
+            //     at sun.nio.fs.UnixFileSystemProvider.newByteChannel(UnixFileSystemProvider.java:214)
+            //     at java.nio.file.spi.FileSystemProvider.newOutputStream(FileSystemProvider.java:434)
+            //     at java.nio.file.Files.newOutputStream(Files.java:216)
             sh label: 'Create sysroot archive', script: """
 rm -rf tarball artifacts-*
 mkdir tarball && mv -f cherisdk/sysroot tarball/sysroot
 ./cheribuild/jenkins-cheri-build.py --tarball cheribsd-sysroot-${suffix} --tarball-name cheribsd-sysroot.tar.xz
-ls -la
-# Seems like some Java versions require write permissions:
-# java.nio.file.AccessDeniedException: /usr/local/jenkins/jobs/CheriBSD-pipeline/branches/PR-616/builds/14/archive/kernel.xz
-#	at sun.nio.fs.UnixException.translateToIOException(UnixException.java:84)
-#	at sun.nio.fs.UnixException.rethrowAsIOException(UnixException.java:102)
-#	at sun.nio.fs.UnixException.rethrowAsIOException(UnixException.java:107)
-#	at sun.nio.fs.UnixFileSystemProvider.newByteChannel(UnixFileSystemProvider.java:214)
-#	at java.nio.file.spi.FileSystemProvider.newOutputStream(FileSystemProvider.java:434)
-#	at java.nio.file.Files.newOutputStream(Files.java:216)
 chmod +w *.xz
 mkdir -p "artifacts-${suffix}"
 mv -v *.xz "artifacts-${suffix}"
@@ -123,8 +131,9 @@ ls -la "artifacts-${suffix}/"
         }
     }
 }
-
-["aarch64", "amd64", "mips64", "mips64-hybrid", "mips64-purecap", "riscv64", "riscv64-hybrid", "riscv64-purecap"].each { suffix ->
+def selectedArchitectures = params.architectures.split('\n')
+echo("Selected architectures: ${selectedArchitectures}")
+selectedArchitectures.each { suffix ->
     String name = "cheribsd-${suffix}"
     jobs[suffix] = { ->
         def extraBuildOptions = '-s'
@@ -154,7 +163,7 @@ ls -la "artifacts-${suffix}/"
     }
 }
 
-boolean runParallel = true;
+boolean runParallel = true
 echo("Running jobs in parallel: ${runParallel}")
 if (runParallel) {
     jobs.failFast = false
@@ -162,6 +171,6 @@ if (runParallel) {
 } else {
     jobs.each { key, value ->
         echo("RUNNING ${key}")
-        value();
+        value()
     }
 }

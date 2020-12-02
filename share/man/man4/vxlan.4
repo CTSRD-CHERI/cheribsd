@@ -24,7 +24,7 @@
 .\"
 .\" $FreeBSD$
 .\"
-.Dd December 31, 2017
+.Dd September 17, 2020
 .Dt VXLAN 4
 .Os
 .Sh NAME
@@ -80,7 +80,7 @@ The
 driver creates a pseudo Ethernet network interface
 that supports the usual network
 .Xr ioctl 2 Ns s
-and is thus can be used with
+and thus can be used with
 .Xr ifconfig 8
 like any other Ethernet interface.
 The
@@ -89,7 +89,7 @@ interface encapsulates the Ethernet frame
 by prepending IP/UDP and
 .Nm
 headers.
-Thus, the encapsulated (inner) frame is able to transmitted
+Thus, the encapsulated (inner) frame is able to be transmitted
 over a routed, Layer 3 network to the remote host.
 .Pp
 The
@@ -102,7 +102,7 @@ When in multicast mode,
 the interface joins an IP multicast group,
 and receives packets sent to the group address,
 and transmits packets to either the multicast group address,
-or directly the remote host if there is an appropriate
+or directly to the remote host if there is an appropriate
 forwarding table entry.
 .Pp
 When the
@@ -155,7 +155,7 @@ The maximum number of entries in the table is configurable with the
 .Xr ifconfig 8
 .Cm vxlanmaxaddr
 command.
-Stale entries in the table periodically pruned.
+Stale entries in the table are periodically pruned.
 The timeout is configurable with the
 .Xr ifconfig 8
 .Cm vxlantimeout
@@ -182,6 +182,39 @@ command may be used to reduce the MTU size on the
 .Nm
 interface to allow the encapsulated frame to fit in the
 current MTU of the physical network.
+.Sh HARDWARE
+The
+.Nm
+driver supports hardware checksum offload (receive and transmit) and TSO on the
+encapsulated traffic over physical interfaces that support these features.
+The
+.Nm
+interface examines the
+.Cm vxlandev
+interface, if one is specified, or the interface hosting the
+.Cm vxlanlocal
+address, and configures its capabilities based on the hardware offload
+capabilities of that physical interface.
+If multiple physical interfaces will transmit or receive traffic for the
+.Nm
+then they all must have the same hardware capabilities.
+The transmit routine of a
+.Nm
+interface may fail with
+.Er ENXIO
+if an outbound physical interface does not support
+an offload that the
+.Nm
+interface is requesting.
+This can happen if there are multiple physical interfaces involved, with
+different hardware capabilities, or an interface capability was disabled after
+the
+.Nm
+interface had already started.
+.Pp
+At present, these devices are capable of generating checksums and performing TSO
+on the inner frames in hardware:
+.Xr cxgbe 4 .
 .Sh EXAMPLES
 Create a
 .Nm
@@ -244,3 +277,7 @@ The
 .Nm
 driver was written by
 .An Bryan Venteicher Aq bryanv@freebsd.org .
+Support for stateless hardware offloads was added by
+.An Navdeep Parhar Aq np@freebsd.org
+in
+.Fx 13.0 .

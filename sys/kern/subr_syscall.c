@@ -63,7 +63,9 @@ syscallenter(struct thread *td)
 {
 	struct proc *p;
 	struct syscall_args *sa;
+	struct sysent *se;
 	int error, traced;
+	bool sy_thr_static;
 
 	VM_CNT_INC(v_syscall);
 	p = td->td_proc;
@@ -81,9 +83,10 @@ syscallenter(struct thread *td)
 		PROC_UNLOCK(p);
 	}
 	error = (p->p_sysent->sv_fetch_syscall_args)(td);
+	se = sa->callp;
 #ifdef KTRACE
 	if (KTRPOINT(td, KTR_SYSCALL))
-		ktrsyscall(sa->code, sa->narg, sa->args);
+		ktrsyscall(sa->code, se->sy_narg, sa->args);
 #endif
 	KTR_START4(KTR_SYSC, "syscall", syscallname(p, sa->code),
 	    (uintptr_t)td, "pid:%d", td->td_proc->p_pid, "arg0:%p", sa->args[0],
@@ -99,30 +102,33 @@ syscallenter(struct thread *td)
 	 * Constrain code that can originate system calls if
 	 * userspace sandboxing is available.
 	 */
-	error = cheri_syscall_authorize(td, sa->code, sa->narg, sa->args);
+	error = cheri_syscall_authorize(td, sa->code, sa->callp->sy_narg,
+	    sa->args);
 	if (error != 0)
 		goto retval;
 #endif
 
-	if (__predict_false((p->p_flag & P_TRACED) != 0)) {
+	if (__predict_false(traced)) {
 		PROC_LOCK(p);
 		if (p->p_ptevents & PTRACE_SCE)
 			ptracestop((td), SIGTRAP, NULL);
 		PROC_UNLOCK(p);
-	}
-	if (__predict_false((td->td_dbgflags & TDB_USERWR) != 0)) {
-		/*
-		 * Reread syscall number and arguments if debugger
-		 * modified registers or memory.
-		 */
-		error = (p->p_sysent->sv_fetch_syscall_args)(td);
+
+		if ((td->td_dbgflags & TDB_USERWR) != 0) {
+			/*
+			 * Reread syscall number and arguments if debugger
+			 * modified registers or memory.
+			 */
+			error = (p->p_sysent->sv_fetch_syscall_args)(td);
+			se = sa->callp;
 #ifdef KTRACE
-		if (KTRPOINT(td, KTR_SYSCALL))
-			ktrsyscall(sa->code, sa->narg, sa->args);
+			if (KTRPOINT(td, KTR_SYSCALL))
+				ktrsyscall(sa->code, se->sy_narg, sa->args);
 #endif
-		if (error != 0) {
-			td->td_errno = error;
-			goto retval;
+			if (error != 0) {
+				td->td_errno = error;
+				goto retval;
+			}
 		}
 	}
 
@@ -132,17 +138,11 @@ syscallenter(struct thread *td)
 	 * flagged with SYF_CAPENABLED.
 	 */
 	if (__predict_false(IN_CAPABILITY_MODE(td) &&
-	    !(sa->callp->sy_flags & SYF_CAPENABLED))) {
+	    (se->sy_flags & SYF_CAPENABLED) == 0)) {
 		td->td_errno = error = ECAPMODE;
 		goto retval;
 	}
 #endif
-
-	error = syscall_thread_enter(td, sa->callp);
-	if (error != 0) {
-		td->td_errno = error;
-		goto retval;
-	}
 
 	/*
 	 * Fetch fast sigblock value at the time of syscall entry to
@@ -152,33 +152,62 @@ syscallenter(struct thread *td)
 		(void)sigfastblock_fetch(td);
 
 	/* Let system calls set td_errno directly. */
-	td->td_pflags &= ~TDP_NERRNO;
+	KASSERT((td->td_pflags & TDP_NERRNO) == 0,
+	    ("%s: TDP_NERRNO set", __func__));
+
+	sy_thr_static = (se->sy_thrcnt & SY_THR_STATIC) != 0;
 
 	if (__predict_false(SYSTRACE_ENABLED() ||
-	    AUDIT_SYSCALL_ENTER(sa->code, td))) {
+	    AUDIT_SYSCALL_ENTER(sa->code, td) ||
+	    !sy_thr_static)) {
+		if (!sy_thr_static) {
+			error = syscall_thread_enter(td, se);
+			if (error != 0) {
+				td->td_errno = error;
+				goto retval;
+			}
+		}
+
 #ifdef KDTRACE_HOOKS
 		/* Give the syscall:::entry DTrace probe a chance to fire. */
-		if (__predict_false(sa->callp->sy_entry != 0))
+		if (__predict_false(se->sy_entry != 0))
 			(*systrace_probe_func)(sa, SYSTRACE_ENTRY, 0);
 #endif
-		error = (sa->callp->sy_call)(td, sa->args);
+		error = (se->sy_call)(td, sa->args);
 		/* Save the latest error return value. */
-		if (__predict_false((td->td_pflags & TDP_NERRNO) == 0))
+		if (__predict_false((td->td_pflags & TDP_NERRNO) != 0))
+			td->td_pflags &= ~TDP_NERRNO;
+		else
 			td->td_errno = error;
+
+		/*
+		 * Note that some syscall implementations (e.g., sys_execve)
+		 * will commit the audit record just before their final return.
+		 * These were done under the assumption that nothing of interest
+		 * would happen between their return and here, where we would
+		 * normally commit the audit record.  These assumptions will
+		 * need to be revisited should any substantial logic be added
+		 * above.
+		 */
 		AUDIT_SYSCALL_EXIT(error, td);
+
 #ifdef KDTRACE_HOOKS
 		/* Give the syscall:::return DTrace probe a chance to fire. */
-		if (__predict_false(sa->callp->sy_return != 0))
+		if (__predict_false(se->sy_return != 0))
 			(*systrace_probe_func)(sa, SYSTRACE_RETURN,
 			    error ? -1 : td->td_retval[0]);
 #endif
+
+		if (!sy_thr_static)
+			syscall_thread_exit(td, se);
 	} else {
-		error = (sa->callp->sy_call)(td, sa->args);
+		error = (se->sy_call)(td, sa->args);
 		/* Save the latest error return value. */
-		if (__predict_false((td->td_pflags & TDP_NERRNO) == 0))
+		if (__predict_false((td->td_pflags & TDP_NERRNO) != 0))
+			td->td_pflags &= ~TDP_NERRNO;
+		else
 			td->td_errno = error;
 	}
-	syscall_thread_exit(td, sa->callp);
 
  retval:
 	KTR_STOP4(KTR_SYSC, "syscall", syscallname(p, sa->code),
@@ -203,6 +232,8 @@ syscallret(struct thread *td)
 
 	KASSERT((td->td_pflags & TDP_FORKING) == 0,
 	    ("fork() did not clear TDP_FORKING upon completion"));
+	KASSERT(td->td_errno != ERELOOKUP,
+	    ("ERELOOKUP not consumed syscall %d", td->td_sa.code));
 
 	p = td->td_proc;
 	sa = &td->td_sa;

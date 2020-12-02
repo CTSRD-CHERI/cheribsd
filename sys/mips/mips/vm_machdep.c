@@ -159,7 +159,7 @@ cpu_fork(struct thread *td1, struct proc *p2, struct thread *td2, int flags)
 	 */
 
 	td2->td_md.md_tls = td1->td_md.md_tls;
-	td2->td_md.md_tls_tcb_offset = td1->td_md.md_tls_tcb_offset;
+	p2->p_md.md_tls_tcb_offset = td1->td_proc->p_md.md_tls_tcb_offset;
 	td2->td_md.md_saved_intr = MIPS_SR_INT_IE;
 	td2->td_md.md_spinlock_count = 1;
 
@@ -487,6 +487,7 @@ cpu_copy_thread(struct thread *td, struct thread *td0)
 	                          (MIPS_SR_PX | MIPS_SR_UX | MIPS_SR_KX | MIPS_SR_SX) |
 	                          (MIPS_SR_INT_IE | MIPS_HARD_INT_MASK));
 #endif
+	td->td_md.md_tls = NULL;
 }
 
 /*
@@ -624,15 +625,15 @@ cpu_set_user_tls(struct thread *td, void * __capability tls_base)
 
 #ifdef COMPAT_FREEBSD32
 	if (SV_PROC_FLAG(td->td_proc, SV_ILP32))
-		td->td_md.md_tls_tcb_offset = TLS_TP_OFFSET32 + TLS_TCB_SIZE32;
+		td->td_proc->p_md.md_tls_tcb_offset = TLS_TP_OFFSET32 + TLS_TCB_SIZE32;
 	else
 #endif
 #ifdef COMPAT_FREEBSD64
 	if (!SV_PROC_FLAG(td->td_proc, SV_CHERI))
-		td->td_md.md_tls_tcb_offset = TLS_TP_OFFSET64 + TLS_TCB_SIZE64;
+		td->td_proc->p_md.md_tls_tcb_offset = TLS_TP_OFFSET64 + TLS_TCB_SIZE64;
 	else
 #endif
-		td->td_md.md_tls_tcb_offset = TLS_TP_OFFSET + TLS_TCB_SIZE;
+		td->td_proc->p_md.md_tls_tcb_offset = TLS_TP_OFFSET + TLS_TCB_SIZE;
 	td->td_md.md_tls = tls_base;
 	if (td == curthread) {
 		/*
@@ -651,14 +652,14 @@ cpu_set_user_tls(struct thread *td, void * __capability tls_base)
 			__asm __volatile ("cwritehwr %0, $chwr_userlocal"
 			    :
 			    : "C" ((char * __capability)td->td_md.md_tls +
-				td->td_md.md_tls_tcb_offset));
+				td->td_proc->p_md.md_tls_tcb_offset));
 			colocation_update_tls(td);
 		}
 		else
 #endif
 		if (cpuinfo.userlocal_reg == true) {
 			mips_wr_userlocal((__cheri_addr u_long)tls_base +
-			    td->td_md.md_tls_tcb_offset);
+			    td->td_proc->p_md.md_tls_tcb_offset);
 		}
 	}
 
@@ -744,7 +745,7 @@ DB_SHOW_COMMAND(pcb, ddb_dump_pcb)
 		td = db_lookup_thread(addr, true);
 	else
 		td = curthread;
-	
+
 	pcb = td->td_pcb;
 
 	db_printf("Thread %d at %p\n", td->td_tid, td);
@@ -785,7 +786,7 @@ DB_SHOW_COMMAND(pcb, ddb_dump_pcb)
  */
 DB_SHOW_COMMAND(trapframe, ddb_dump_trapframe)
 {
-	
+
 	if (!have_addr)
 		return;
 

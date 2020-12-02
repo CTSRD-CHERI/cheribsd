@@ -9,10 +9,6 @@
 
 #include "config.h"
 
-#ifndef lint
-static const char sccsid[] = "$Id: v_paragraph.c,v 10.10 2001/06/25 15:19:32 skimo Exp $";
-#endif /* not lint */
-
 #include <sys/types.h>
 #include <sys/queue.h>
 #include <sys/time.h>
@@ -27,7 +23,7 @@ static const char sccsid[] = "$Id: v_paragraph.c,v 10.10 2001/06/25 15:19:32 ski
 #include "../common/common.h"
 #include "vi.h"
 
-#define	INTEXT_CHECK {							\
+#define	INTEXT_CHECK do {						\
 	if (len == 0 || v_isempty(p, len)) {				\
 		if (!--cnt)						\
 			goto found;					\
@@ -52,7 +48,7 @@ static const char sccsid[] = "$Id: v_paragraph.c,v 10.10 2001/06/25 15:19:32 ski
 		    (lp[1] == ' ' && len == 2 || lp[1] == p[2]) &&	\
 		    !--cnt)						\
 			goto found;					\
-}
+} while (0)
 
 /*
  * v_paragraphf -- [count]}
@@ -87,7 +83,7 @@ v_paragraphf(SCR *sp, VICMD *vp)
 	 * line itself remained.  If somebody complains, don't pause, don't
 	 * hesitate, just hit them.
 	 */
-	if (ISMOTION(vp))
+	if (ISMOTION(vp)) {
 		if (vp->m_start.cno == 0)
 			F_SET(vp, VM_LMODE);
 		else {
@@ -98,6 +94,7 @@ v_paragraphf(SCR *sp, VICMD *vp)
 			if (vp->m_start.cno <= vp->m_stop.cno)
 				F_SET(vp, VM_LMODE);
 		}
+	}
 
 	/* Figure out what state we're currently in. */
 	lno = vp->m_start.lno;
@@ -230,7 +227,7 @@ v_paragraphb(SCR *sp, VICMD *vp)
 	 */
 	lno = vp->m_start.lno;
 
-	if (ISMOTION(vp))
+	if (ISMOTION(vp)) {
 		if (vp->m_start.cno == 0) {
 			if (vp->m_start.lno == 1) {
 				v_sof(sp, &vp->m_start);
@@ -240,6 +237,7 @@ v_paragraphb(SCR *sp, VICMD *vp)
 			F_SET(vp, VM_LMODE);
 		} else
 			--vp->m_start.cno;
+	}
 
 	if (vp->m_start.lno <= 1)
 		goto sof;
@@ -325,11 +323,10 @@ v_buildps(SCR *sp, char *p_p, char *s_p)
 	if (p_len == 0 && s_len == 0)
 		return (0);
 
-	MALLOC_RET(sp, p, char *, p_len + s_len + 1);
+	MALLOC_RET(sp, p, p_len + s_len + 1);
 
 	vip = VIP(sp);
-	if (vip->ps != NULL)
-		free(vip->ps);
+	free(vip->ps);
 
 	if (p_p != NULL)
 		memmove(p, p_p, p_len + 1);

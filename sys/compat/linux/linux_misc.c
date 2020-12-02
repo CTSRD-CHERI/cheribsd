@@ -99,19 +99,6 @@ __FBSDID("$FreeBSD$");
 #include <compat/linux/linux_emul.h>
 #include <compat/linux/linux_misc.h>
 
-/**
- * Special DTrace provider for the linuxulator.
- *
- * In this file we define the provider for the entire linuxulator. All
- * modules (= files of the linuxulator) use it.
- *
- * We define a different name depending on the emulated bitsize, see
- * ../../<ARCH>/linux{,32}/linux.h, e.g.:
- *      native bitsize          = linuxulator
- *      amd64, 32bit emulation  = linuxulator32
- */
-LIN_SDT_PROVIDER_DEFINE(LINUX_DTRACE);
-
 int stclohz;				/* Statistics clock frequency */
 
 static unsigned int linux_to_bsd_resource[LINUX_RLIM_NLIMITS] = {
@@ -144,7 +131,6 @@ struct l_pselect6arg {
 };
 
 static int	linux_utimensat_nsec_valid(l_long);
-
 
 int
 linux_sysinfo(struct thread *td, struct linux_sysinfo_args *args)
@@ -263,18 +249,23 @@ linux_uselib(struct thread *td, struct linux_uselib_args *args)
 	int error;
 	bool locked, opened, textset;
 
-	LCONVPATHEXIST(td, args->library, &library);
-
 	a_out = NULL;
 	vp = NULL;
 	locked = false;
 	textset = false;
 	opened = false;
 
-	NDINIT(&ni, LOOKUP, ISOPEN | FOLLOW | LOCKLEAF | AUDITVNODE1,
-	    UIO_SYSSPACE, library, td);
-	error = namei(&ni);
-	LFREEPATH(library);
+	if (!LUSECONVPATH(td)) {
+		NDINIT(&ni, LOOKUP, ISOPEN | FOLLOW | LOCKLEAF | AUDITVNODE1,
+		    UIO_USERSPACE, args->library, td);
+		error = namei(&ni);
+	} else {
+		LCONVPATHEXIST(td, args->library, &library);
+		NDINIT(&ni, LOOKUP, ISOPEN | FOLLOW | LOCKLEAF | AUDITVNODE1,
+		    UIO_SYSSPACE, library, td);
+		error = namei(&ni);
+		LFREEPATH(library);
+	}
 	if (error)
 		goto cleanup;
 
@@ -637,7 +628,6 @@ struct l_times_argv {
 	l_clock_t	tms_cstime;
 };
 
-
 /*
  * Glibc versions prior to 2.2.1 always use hard-coded CLK_TCK value.
  * Since 2.2.1 Glibc uses value exported from kernel via AT_CLKTCK
@@ -705,7 +695,17 @@ linux_newuname(struct thread *td, struct linux_newuname_args *args)
 			*p = '\0';
 			break;
 		}
+#if defined(__amd64__)
+	/*
+	 * On amd64, Linux uname(2) needs to return "x86_64"
+	 * for both 64-bit and 32-bit applications.  On 32-bit,
+	 * the string returned by getauxval(AT_PLATFORM) needs
+	 * to remain "i686", though.
+	 */
+	strlcpy(utsname.machine, "x86_64", LINUX_MAX_UTSNAME);
+#else
 	strlcpy(utsname.machine, linux_kplatform, LINUX_MAX_UTSNAME);
+#endif
 
 	return (copyout(&utsname, args->buf, sizeof(utsname)));
 }
@@ -723,12 +723,16 @@ linux_utime(struct thread *td, struct linux_utime_args *args)
 	struct l_utimbuf lut;
 	char *fname;
 	int error;
+	bool convpath;
 
-	LCONVPATHEXIST(td, args->fname, &fname);
+	convpath = LUSECONVPATH(td);
+	if (convpath)
+		LCONVPATHEXIST(td, args->fname, &fname);
 
 	if (args->times) {
 		if ((error = copyin(args->times, &lut, sizeof lut))) {
-			LFREEPATH(fname);
+			if (convpath)
+				LFREEPATH(fname);
 			return (error);
 		}
 		tv[0].tv_sec = lut.l_actime;
@@ -739,9 +743,14 @@ linux_utime(struct thread *td, struct linux_utime_args *args)
 	} else
 		tvp = NULL;
 
-	error = kern_utimesat(td, AT_FDCWD, fname, UIO_SYSSPACE, tvp,
-	    UIO_SYSSPACE);
-	LFREEPATH(fname);
+	if (!convpath) {
+		error = kern_utimesat(td, AT_FDCWD, args->fname, UIO_USERSPACE,
+		    tvp, UIO_SYSSPACE);
+	} else {
+		error = kern_utimesat(td, AT_FDCWD, fname, UIO_SYSSPACE, tvp,
+		    UIO_SYSSPACE);
+		LFREEPATH(fname);
+	}
 	return (error);
 }
 #endif
@@ -754,8 +763,11 @@ linux_utimes(struct thread *td, struct linux_utimes_args *args)
 	struct timeval tv[2], *tvp = NULL;
 	char *fname;
 	int error;
+	bool convpath;
 
-	LCONVPATHEXIST(td, args->fname, &fname);
+	convpath = LUSECONVPATH(td);
+	if (convpath)
+		LCONVPATHEXIST(td, args->fname, &fname);
 
 	if (args->tptr != NULL) {
 		if ((error = copyin(args->tptr, ltv, sizeof ltv))) {
@@ -769,9 +781,14 @@ linux_utimes(struct thread *td, struct linux_utimes_args *args)
 		tvp = tv;
 	}
 
-	error = kern_utimesat(td, AT_FDCWD, fname, UIO_SYSSPACE,
-	    tvp, UIO_SYSSPACE);
-	LFREEPATH(fname);
+	if (!convpath) {
+		error = kern_utimesat(td, AT_FDCWD, args->fname, UIO_USERSPACE,
+		    tvp, UIO_SYSSPACE);
+	} else {
+		error = kern_utimesat(td, AT_FDCWD, fname, UIO_SYSSPACE,
+		    tvp, UIO_SYSSPACE);
+		LFREEPATH(fname);
+	}
 	return (error);
 }
 #endif
@@ -845,6 +862,13 @@ linux_utimensat(struct thread *td, struct linux_utimensat_args *args)
 			return (0);
 	}
 
+	if (!LUSECONVPATH(td)) {
+		if (args->pathname != NULL) {
+			return (kern_utimensat(td, dfd, args->pathname,
+			    UIO_USERSPACE, timesp, UIO_SYSSPACE, flags));
+		}
+	}
+
 	if (args->pathname != NULL)
 		LCONVPATHEXIST_AT(td, args->pathname, &path, dfd);
 	else if (args->flags != 0)
@@ -872,13 +896,17 @@ linux_futimesat(struct thread *td, struct linux_futimesat_args *args)
 	struct timeval tv[2], *tvp = NULL;
 	char *fname;
 	int error, dfd;
+	bool convpath;
 
+	convpath = LUSECONVPATH(td);
 	dfd = (args->dfd == LINUX_AT_FDCWD) ? AT_FDCWD : args->dfd;
-	LCONVPATHEXIST_AT(td, args->filename, &fname, dfd);
+	if (convpath)
+		LCONVPATHEXIST_AT(td, args->filename, &fname, dfd);
 
 	if (args->utimes != NULL) {
 		if ((error = copyin(args->utimes, ltv, sizeof ltv))) {
-			LFREEPATH(fname);
+			if (convpath)
+				LFREEPATH(fname);
 			return (error);
 		}
 		tv[0].tv_sec = ltv[0].tv_sec;
@@ -888,8 +916,13 @@ linux_futimesat(struct thread *td, struct linux_futimesat_args *args)
 		tvp = tv;
 	}
 
-	error = kern_utimesat(td, dfd, fname, UIO_SYSSPACE, tvp, UIO_SYSSPACE);
-	LFREEPATH(fname);
+	if (!convpath) {
+		error = kern_utimesat(td, dfd, args->filename, UIO_USERSPACE,
+		    tvp, UIO_SYSSPACE);
+	} else {
+		error = kern_utimesat(td, dfd, fname, UIO_SYSSPACE, tvp, UIO_SYSSPACE);
+		LFREEPATH(fname);
+	}
 	return (error);
 }
 #endif
@@ -1053,19 +1086,28 @@ linux_mknod(struct thread *td, struct linux_mknod_args *args)
 {
 	char *path;
 	int error;
+	enum uio_seg seg;
+	bool convpath;
 
-	LCONVPATHCREAT(td, args->path, &path);
+	convpath = LUSECONVPATH(td);
+	if (!convpath) {
+		path = args->path;
+		seg = UIO_USERSPACE;
+	} else {
+		LCONVPATHCREAT(td, args->path, &path);
+		seg = UIO_SYSSPACE;
+	}
 
 	switch (args->mode & S_IFMT) {
 	case S_IFIFO:
 	case S_IFSOCK:
-		error = kern_mkfifoat(td, AT_FDCWD, path, UIO_SYSSPACE,
+		error = kern_mkfifoat(td, AT_FDCWD, path, seg,
 		    args->mode);
 		break;
 
 	case S_IFCHR:
 	case S_IFBLK:
-		error = kern_mknodat(td, AT_FDCWD, path, UIO_SYSSPACE,
+		error = kern_mknodat(td, AT_FDCWD, path, seg,
 		    args->mode, args->dev);
 		break;
 
@@ -1077,7 +1119,7 @@ linux_mknod(struct thread *td, struct linux_mknod_args *args)
 		args->mode |= S_IFREG;
 		/* FALLTHROUGH */
 	case S_IFREG:
-		error = kern_openat(td, AT_FDCWD, path, UIO_SYSSPACE,
+		error = kern_openat(td, AT_FDCWD, path, seg,
 		    O_WRONLY | O_CREAT | O_TRUNC, args->mode);
 		if (error == 0)
 			kern_close(td, td->td_retval[0]);
@@ -1087,7 +1129,8 @@ linux_mknod(struct thread *td, struct linux_mknod_args *args)
 		error = EINVAL;
 		break;
 	}
-	LFREEPATH(path);
+	if (convpath)
+		LFREEPATH(path);
 	return (error);
 }
 #endif
@@ -1097,19 +1140,29 @@ linux_mknodat(struct thread *td, struct linux_mknodat_args *args)
 {
 	char *path;
 	int error, dfd;
+	enum uio_seg seg;
+	bool convpath;
 
 	dfd = (args->dfd == LINUX_AT_FDCWD) ? AT_FDCWD : args->dfd;
-	LCONVPATHCREAT_AT(td, args->filename, &path, dfd);
+
+	convpath = LUSECONVPATH(td);
+	if (!convpath) {
+		path = __DECONST(char *, args->filename);
+		seg = UIO_USERSPACE;
+	} else {
+		LCONVPATHCREAT_AT(td, args->filename, &path, dfd);
+		seg = UIO_SYSSPACE;
+	}
 
 	switch (args->mode & S_IFMT) {
 	case S_IFIFO:
 	case S_IFSOCK:
-		error = kern_mkfifoat(td, dfd, path, UIO_SYSSPACE, args->mode);
+		error = kern_mkfifoat(td, dfd, path, seg, args->mode);
 		break;
 
 	case S_IFCHR:
 	case S_IFBLK:
-		error = kern_mknodat(td, dfd, path, UIO_SYSSPACE, args->mode,
+		error = kern_mknodat(td, dfd, path, seg, args->mode,
 		    args->dev);
 		break;
 
@@ -1121,7 +1174,7 @@ linux_mknodat(struct thread *td, struct linux_mknodat_args *args)
 		args->mode |= S_IFREG;
 		/* FALLTHROUGH */
 	case S_IFREG:
-		error = kern_openat(td, dfd, path, UIO_SYSSPACE,
+		error = kern_openat(td, dfd, path, seg,
 		    O_WRONLY | O_CREAT | O_TRUNC, args->mode);
 		if (error == 0)
 			kern_close(td, td->td_retval[0]);
@@ -1131,7 +1184,8 @@ linux_mknodat(struct thread *td, struct linux_mknodat_args *args)
 		error = EINVAL;
 		break;
 	}
-	LFREEPATH(path);
+	if (convpath)
+		LFREEPATH(path);
 	return (error);
 }
 
@@ -1314,6 +1368,31 @@ linux_getgroups(struct thread *td, struct linux_getgroups_args *args)
 	return (0);
 }
 
+static bool
+linux_get_dummy_limit(l_uint resource, struct rlimit *rlim)
+{
+
+	if (linux_dummy_rlimits == 0)
+		return (false);
+
+	switch (resource) {
+	case LINUX_RLIMIT_LOCKS:
+	case LINUX_RLIMIT_SIGPENDING:
+	case LINUX_RLIMIT_MSGQUEUE:
+	case LINUX_RLIMIT_RTTIME:
+		rlim->rlim_cur = LINUX_RLIM_INFINITY;
+		rlim->rlim_max = LINUX_RLIM_INFINITY;
+		return (true);
+	case LINUX_RLIMIT_NICE:
+	case LINUX_RLIMIT_RTPRIO:
+		rlim->rlim_cur = 0;
+		rlim->rlim_max = 0;
+		return (true);
+	default:
+		return (false);
+	}
+}
+
 int
 linux_setrlimit(struct thread *td, struct linux_setrlimit_args *args)
 {
@@ -1345,6 +1424,12 @@ linux_old_getrlimit(struct thread *td, struct linux_old_getrlimit_args *args)
 	struct l_rlimit rlim;
 	struct rlimit bsd_rlim;
 	u_int which;
+
+	if (linux_get_dummy_limit(args->resource, &bsd_rlim)) {
+		rlim.rlim_cur = bsd_rlim.rlim_cur;
+		rlim.rlim_max = bsd_rlim.rlim_max;
+		return (copyout(&rlim, args->rlim, sizeof(rlim)));
+	}
 
 	if (args->resource >= LINUX_RLIM_NLIMITS)
 		return (EINVAL);
@@ -1380,6 +1465,12 @@ linux_getrlimit(struct thread *td, struct linux_getrlimit_args *args)
 	struct l_rlimit rlim;
 	struct rlimit bsd_rlim;
 	u_int which;
+
+	if (linux_get_dummy_limit(args->resource, &bsd_rlim)) {
+		rlim.rlim_cur = bsd_rlim.rlim_cur;
+		rlim.rlim_max = bsd_rlim.rlim_max;
+		return (copyout(&rlim, args->rlim, sizeof(rlim)));
+	}
 
 	if (args->resource >= LINUX_RLIM_NLIMITS)
 		return (EINVAL);
@@ -1605,7 +1696,6 @@ linux_reboot(struct thread *td, struct linux_reboot_args *args)
 	return (sys_reboot(td, &bsd_args));
 }
 
-
 int
 linux_getpid(struct thread *td, struct linux_getpid_args *args)
 {
@@ -1627,7 +1717,6 @@ linux_gettid(struct thread *td, struct linux_gettid_args *args)
 
 	return (0);
 }
-
 
 int
 linux_getppid(struct thread *td, struct linux_getppid_args *args)
@@ -1836,7 +1925,7 @@ linux_prctl(struct thread *td, struct linux_prctl_args *args)
 	int error = 0, max_size;
 	struct proc *p = td->td_proc;
 	char comm[LINUX_MAX_COMM_LEN];
-	int pdeath_signal;
+	int pdeath_signal, trace_state;
 
 	switch (args->option) {
 	case LINUX_PR_SET_PDEATHSIG:
@@ -1854,7 +1943,46 @@ linux_prctl(struct thread *td, struct linux_prctl_args *args)
 		return (copyout(&pdeath_signal,
 		    (void *)(register_t)args->arg2,
 		    sizeof(pdeath_signal)));
-		break;
+	/*
+	 * In Linux, this flag controls if set[gu]id processes can coredump.
+	 * There are additional semantics imposed on processes that cannot
+	 * coredump:
+	 * - Such processes can not be ptraced.
+	 * - There are some semantics around ownership of process-related files
+	 *   in the /proc namespace.
+	 *
+	 * In FreeBSD, we can (and by default, do) disable setuid coredump
+	 * system-wide with 'sugid_coredump.'  We control tracability on a
+	 * per-process basis with the procctl PROC_TRACE (=> P2_NOTRACE flag).
+	 * By happy coincidence, P2_NOTRACE also prevents coredumping.  So the
+	 * procctl is roughly analogous to Linux's DUMPABLE.
+	 *
+	 * So, proxy these knobs to the corresponding PROC_TRACE setting.
+	 */
+	case LINUX_PR_GET_DUMPABLE:
+		error = kern_procctl(td, P_PID, p->p_pid, PROC_TRACE_STATUS,
+		    &trace_state);
+		if (error != 0)
+			return (error);
+		td->td_retval[0] = (trace_state != -1);
+		return (0);
+	case LINUX_PR_SET_DUMPABLE:
+		/*
+		 * It is only valid for userspace to set one of these two
+		 * flags, and only one at a time.
+		 */
+		switch (args->arg2) {
+		case LINUX_SUID_DUMP_DISABLE:
+			trace_state = PROC_TRACE_CTL_DISABLE_EXEC;
+			break;
+		case LINUX_SUID_DUMP_USER:
+			trace_state = PROC_TRACE_CTL_ENABLE;
+			break;
+		default:
+			return (EINVAL);
+		}
+		return (kern_procctl(td, P_PID, p->p_pid, PROC_TRACE_CTL,
+		    &trace_state));
 	case LINUX_PR_GET_KEEPCAPS:
 		/*
 		 * Indicate that we always clear the effective and
@@ -1907,7 +2035,23 @@ linux_prctl(struct thread *td, struct linux_prctl_args *args)
 		error = copyout(comm, (void *)(register_t)args->arg2,
 		    strlen(comm) + 1);
 		break;
+	case LINUX_PR_GET_SECCOMP:
+	case LINUX_PR_SET_SECCOMP:
+		/*
+		 * Same as returned by Linux without CONFIG_SECCOMP enabled.
+		 */
+		error = EINVAL;
+		break;
+	case LINUX_PR_SET_NO_NEW_PRIVS:
+		linux_msg(td, "unsupported prctl PR_SET_NO_NEW_PRIVS");
+		error = EINVAL;
+		break;
+	case LINUX_PR_SET_PTRACER:
+		linux_msg(td, "unsupported prctl PR_SET_PTRACER");
+		error = EINVAL;
+		break;
 	default:
+		linux_msg(td, "unsupported prctl option %d", args->option);
 		error = EINVAL;
 		break;
 	}
@@ -2080,6 +2224,14 @@ linux_prlimit64(struct thread *td, struct linux_prlimit64_args *args)
 	u_int which;
 	int flags;
 	int error;
+
+	if (args->new == NULL && args->old != NULL) {
+		if (linux_get_dummy_limit(args->resource, &rlim)) {
+			lrlim.rlim_cur = rlim.rlim_cur;
+			lrlim.rlim_max = rlim.rlim_max;
+			return (copyout(&lrlim, args->old, sizeof(lrlim)));
+		}
+	}
 
 	if (args->resource >= LINUX_RLIM_NLIMITS)
 		return (EINVAL);

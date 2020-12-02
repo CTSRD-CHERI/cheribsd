@@ -51,6 +51,7 @@ __FBSDID("$FreeBSD$");
 #include <net/if.h>	/* ip_fw.h requires IFNAMSIZ */
 #include <net/radix.h>
 #include <net/route.h>
+#include <net/route/nhop.h>
 #include <net/route/route_var.h>
 
 #include <netinet/in.h>
@@ -61,7 +62,6 @@ __FBSDID("$FreeBSD$");
 
 #include <netpfil/ipfw/ip_fw_private.h>
 #include <netpfil/ipfw/ip_fw_table.h>
-
 
 /*
  * IPFW table lookup algorithms.
@@ -298,7 +298,6 @@ static int badd(const void *key, void *item, void *base, size_t nmemb,
     size_t size, int (*compar) (const void *, const void *));
 static int bdel(const void *key, void *base, size_t nmemb, size_t size,
     int (*compar) (const void *, const void *));
-
 
 /*
  * ADDR implementation using radix
@@ -580,7 +579,6 @@ ta_foreach_radix(void *ta_state, struct table_info *ti, ta_foreach_f *f,
 	rnh->rnh_walktree(&rnh->rh, (walktree_f_t *)f, arg);
 }
 
-
 #ifdef INET6
 static inline void ipv6_writemask(struct in6_addr *addr6, uint8_t mask);
 
@@ -664,7 +662,7 @@ ta_prepare_add_radix(struct ip_fw_chain *ch, struct tentry_info *tei,
 
 	mlen = tei->masklen;
 	set_mask = 0;
-	
+
 	if (tei->subtype == AF_INET) {
 #ifdef INET
 		if (mlen > 32)
@@ -754,7 +752,7 @@ ta_add_radix(void *ta_state, struct table_info *ti, struct tentry_info *tei,
 		/* Unknown error */
 		return (EINVAL);
 	}
-	
+
 	if (tei->subtype == AF_INET)
 		cfg->count4++;
 	else
@@ -832,7 +830,7 @@ ta_del_radix(void *ta_state, struct table_info *ti, struct tentry_info *tei,
 		tei->value = ((struct radix_addr_xentry *)rn)->value;
 
 	tb->ent_ptr = rn;
-	
+
 	if (tei->subtype == AF_INET)
 		cfg->count4--;
 	else
@@ -886,7 +884,6 @@ struct table_algo addr_radix = {
 	.dump_tinfo	= ta_dump_radix_tinfo,
 	.need_modify	= ta_need_modify_radix,
 };
-
 
 /*
  * addr:hash cmds
@@ -993,7 +990,6 @@ static void ta_modify_chash(void *ta_state, struct table_info *ti, void *ta_buf,
     uint64_t pflags);
 static void ta_flush_mod_chash(void *ta_buf);
 
-
 #ifdef INET
 static __inline uint32_t
 hash_ip(uint32_t addr, int hsize)
@@ -1015,7 +1011,6 @@ hash_ip6(struct in6_addr *addr6, int hsize)
 	return (i % (hsize - 1));
 }
 
-
 static __inline uint16_t
 hash_ip64(struct in6_addr *addr6, int hsize)
 {
@@ -1025,7 +1020,6 @@ hash_ip64(struct in6_addr *addr6, int hsize)
 
 	return (i % (hsize - 1));
 }
-
 
 static __inline uint32_t
 hash_ip6_slow(struct in6_addr *addr6, void *key, int mask, int hsize)
@@ -1299,7 +1293,6 @@ ta_init_chash(struct ip_fw_chain *ch, void **ta_state, struct table_info *ti,
 	for (i = 0; i < cfg->size6; i++)
 		SLIST_INIT(&cfg->head6[i]);
 
-
 	*ta_state = cfg;
 	ti->state = cfg->head4;
 	ti->xstate = cfg->head6;
@@ -1423,9 +1416,8 @@ tei_to_chash_ent(struct tentry_info *tei, struct chashentry *ent)
 	struct in6_addr mask6;
 #endif
 
-
 	mlen = tei->masklen;
-	
+
 	if (tei->subtype == AF_INET) {
 #ifdef INET
 		if (mlen > 32)
@@ -1884,7 +1876,6 @@ struct table_algo addr_hash = {
 	.flush_mod	= ta_flush_mod_chash,
 };
 
-
 /*
  * Iface table cmds.
  *
@@ -2144,7 +2135,6 @@ destroy_ifidx_locked(struct namedobj_instance *ii, struct named_object *no,
 	return (0);
 }
 
-
 /*
  * Destroys table @ti
  */
@@ -2370,7 +2360,6 @@ ta_flush_ifidx_entry(struct ip_fw_chain *ch, struct tentry_info *tei,
 		free(tb->ife, M_IPFW_TBL);
 }
 
-
 /*
  * Handle interface announce/withdrawal for particular table.
  * Every real runtime array modification happens here.
@@ -2414,7 +2403,6 @@ if_notifier(struct ip_fw_chain *ch, void *cbdata, uint16_t ifindex)
 		ife->linked = 0;
 	}
 }
-
 
 /*
  * Table growing callbacks.
@@ -2803,7 +2791,7 @@ ta_add_numarray(void *ta_state, struct table_info *ti, struct tentry_info *tei,
 	tb->na.value = tei->value;
 
 	ri = numarray_find(ti, &tb->na.number);
-	
+
 	if (ri != NULL) {
 		if ((tei->flags & TEI_FLAGS_UPDATE) == 0)
 			return (EEXIST);
@@ -2853,7 +2841,7 @@ ta_del_numarray(void *ta_state, struct table_info *ti, struct tentry_info *tei,
 		return (ENOENT);
 
 	tei->value = ri->value;
-	
+
 	res = bdel(&tb->na.number, cfg->main_ptr, cfg->used,
 	    sizeof(struct numarray), compare_numarray);
 
@@ -2872,7 +2860,6 @@ ta_flush_numarray_entry(struct ip_fw_chain *ch, struct tentry_info *tei,
 
 	/* We don't have any state, do nothing */
 }
-
 
 /*
  * Table growing callbacks.
@@ -3430,7 +3417,6 @@ tei_to_fhash_ent(struct tentry_info *tei, struct fhashentry *ent)
 	return (0);
 }
 
-
 static int
 ta_find_fhash_tentry(void *ta_state, struct table_info *ti,
     ipfw_obj_tentry *tent)
@@ -3805,17 +3791,12 @@ static int ta_find_kfib_tentry(void *ta_state, struct table_info *ti,
 static void ta_foreach_kfib(void *ta_state, struct table_info *ti,
     ta_foreach_f *f, void *arg);
 
-
 static int
 ta_lookup_kfib(struct table_info *ti, void *key, uint32_t keylen,
     uint32_t *val)
 {
 #ifdef INET
-	struct nhop4_basic nh4;
 	struct in_addr in;
-#endif
-#ifdef INET6
-	struct nhop6_basic nh6;
 #endif
 	int error;
 
@@ -3823,14 +3804,14 @@ ta_lookup_kfib(struct table_info *ti, void *key, uint32_t keylen,
 #ifdef INET
 	if (keylen == 4) {
 		in.s_addr = *(in_addr_t *)key;
-		error = fib4_lookup_nh_basic(ti->data,
-		    in, 0, 0, &nh4);
+		NET_EPOCH_ASSERT();
+		error = fib4_lookup(ti->data, in, 0, NHR_NONE, 0) != NULL;
 	}
 #endif
 #ifdef INET6
 	if (keylen == 6)
-		error = fib6_lookup_nh_basic(ti->data,
-		    (struct in6_addr *)key, 0, 0, 0, &nh6);
+		error = fib6_lookup(ti->data, (struct in6_addr *)key,
+		    0, NHR_NONE, 0) != NULL;
 #endif
 
 	if (error != 0)
@@ -3938,7 +3919,6 @@ contigmask(uint8_t *p, int len)
 			return (-1); /* mask not contiguous */
 	return (i);
 }
-
 
 static int
 ta_dump_kfib_tentry(void *ta_state, struct table_info *ti, void *e,
@@ -4109,5 +4089,3 @@ ipfw_table_algo_destroy(struct ip_fw_chain *ch)
 	ipfw_del_table_algo(ch, flow_hash.idx);
 	ipfw_del_table_algo(ch, addr_kfib.idx);
 }
-
-

@@ -61,8 +61,6 @@
  */
 
 struct	rtentry;		/* ifa_rtrequest */
-struct	nhop_object;		/* ifa_rtrequest */
-struct	rt_addrinfo;		/* ifa_rtrequest */
 struct	socket;
 struct	carp_if;
 struct	carp_softc;
@@ -193,7 +191,8 @@ struct m_snd_tag;
 #define	IF_SND_TAG_TYPE_RATE_LIMIT 0
 #define	IF_SND_TAG_TYPE_UNLIMITED 1
 #define	IF_SND_TAG_TYPE_TLS 2
-#define	IF_SND_TAG_TYPE_MAX 3
+#define	IF_SND_TAG_TYPE_TLS_RATE_LIMIT 3
+#define	IF_SND_TAG_TYPE_MAX 4
 
 struct if_snd_tag_alloc_header {
 	uint32_t type;		/* send tag type, see IF_SND_TAG_XXX */
@@ -215,6 +214,13 @@ struct if_snd_tag_alloc_tls {
 	const struct ktls_session *tls;
 };
 
+struct if_snd_tag_alloc_tls_rate_limit {
+	struct if_snd_tag_alloc_header hdr;
+	struct inpcb *inp;
+	const struct ktls_session *tls;
+	uint64_t max_rate;	/* in bytes/s */
+};
+
 struct if_snd_tag_rate_limit_params {
 	uint64_t max_rate;	/* in bytes/s */
 	uint32_t queue_level;	/* 0 (empty) .. 65535 (full) */
@@ -228,16 +234,19 @@ union if_snd_tag_alloc_params {
 	struct if_snd_tag_alloc_rate_limit rate_limit;
 	struct if_snd_tag_alloc_rate_limit unlimited;
 	struct if_snd_tag_alloc_tls tls;
+	struct if_snd_tag_alloc_tls_rate_limit tls_rate_limit;
 };
 
 union if_snd_tag_modify_params {
 	struct if_snd_tag_rate_limit_params rate_limit;
 	struct if_snd_tag_rate_limit_params unlimited;
+	struct if_snd_tag_rate_limit_params tls_rate_limit;
 };
 
 union if_snd_tag_query_params {
 	struct if_snd_tag_rate_limit_params rate_limit;
 	struct if_snd_tag_rate_limit_params unlimited;
+	struct if_snd_tag_rate_limit_params tls_rate_limit;
 };
 
 /* Query return flags */
@@ -551,9 +560,6 @@ struct ifaddr {
 	struct	ifnet *ifa_ifp;		/* back-pointer to interface */
 	struct	carp_softc *ifa_carp;	/* pointer to CARP data */
 	CK_STAILQ_ENTRY(ifaddr) ifa_link;	/* queue macro glue */
-	void	(*ifa_rtrequest)	/* check or clean routes (+ or -)'d */
-		(int, struct rtentry *, struct nhop_object *,
-		 struct rt_addrinfo *);
 	u_short	ifa_flags;		/* mostly rt_flags for cloning */
 #define	IFA_ROUTE	RTF_UP		/* route installed */
 #define	IFA_RTSELF	RTF_HOST	/* loopback route to self installed */
@@ -587,29 +593,12 @@ struct ifmultiaddr {
 	struct	epoch_context	ifma_epoch_ctx;
 };
 
-extern	struct rwlock ifnet_rwlock;
 extern	struct sx ifnet_sxlock;
 
-#define	IFNET_WLOCK() do {						\
-	sx_xlock(&ifnet_sxlock);					\
-	rw_wlock(&ifnet_rwlock);					\
-} while (0)
-
-#define	IFNET_WUNLOCK() do {						\
-	rw_wunlock(&ifnet_rwlock);					\
-	sx_xunlock(&ifnet_sxlock);					\
-} while (0)
-
-/*
- * To assert the ifnet lock, you must know not only whether it's for read or
- * write, but also whether it was acquired with sleep support or not.
- */
-#define	IFNET_RLOCK_ASSERT()		sx_assert(&ifnet_sxlock, SA_SLOCKED)
-#define	IFNET_WLOCK_ASSERT() do {					\
-	sx_assert(&ifnet_sxlock, SA_XLOCKED);				\
-	rw_assert(&ifnet_rwlock, RA_WLOCKED);				\
-} while (0)
-
+#define	IFNET_WLOCK()		sx_xlock(&ifnet_sxlock)
+#define	IFNET_WUNLOCK()		sx_xunlock(&ifnet_sxlock)
+#define	IFNET_RLOCK_ASSERT()	sx_assert(&ifnet_sxlock, SA_SLOCKED)
+#define	IFNET_WLOCK_ASSERT()	sx_assert(&ifnet_sxlock, SA_XLOCKED)
 #define	IFNET_RLOCK()		sx_slock(&ifnet_sxlock)
 #define	IFNET_RUNLOCK()		sx_sunlock(&ifnet_sxlock)
 

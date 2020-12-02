@@ -128,7 +128,6 @@ memrw(struct cdev *dev, struct uio *uio, int flags)
 			pa = pmap_extract(kernel_pmap, addr);
 			if (pa == 0) 
 				return EFAULT;
-
 		}
 		
 		/* 
@@ -177,15 +176,14 @@ memmmap(struct cdev *dev, vm_ooffset_t offset, vm_paddr_t *paddr,
  * This is basically just an ioctl shim for mem_range_attr_get
  * and mem_range_attr_set.
  */
-/* ARGSUSED */
 int 
-memioctl(struct cdev *dev __unused, u_long cmd, caddr_t data, int flags,
+memioctl_md(struct cdev *dev __unused, u_long cmd, caddr_t data, int flags,
     struct thread *td)
 {
 	int nd, error = 0;
 	struct mem_range_op *mo = (struct mem_range_op *)data;
 	struct mem_range_desc *md;
-	
+
 	/* is this for us? */
 	if ((cmd != MEMRANGE_GET) &&
 	    (cmd != MEMRANGE_SET))

@@ -577,38 +577,7 @@ bus_dma_tag_create(bus_dma_tag_t parent, bus_size_t alignment,
 }
 
 void
-bus_dma_template_init(bus_dma_tag_template_t *t, bus_dma_tag_t parent)
-{
-
-	if (t == NULL)
-		return;
-
-	t->parent = parent;
-	t->alignment = 1;
-	t->boundary = 0;
-	t->lowaddr = t->highaddr = BUS_SPACE_MAXADDR;
-	t->maxsize = t->maxsegsize = BUS_SPACE_MAXSIZE;
-	t->nsegments = BUS_SPACE_UNRESTRICTED;
-	t->lockfunc = NULL;
-	t->lockfuncarg = NULL;
-	t->flags = 0;
-}
-
-int
-bus_dma_template_tag(bus_dma_tag_template_t *t, bus_dma_tag_t *dmat)
-{
-
-	if (t == NULL || dmat == NULL)
-		return (EINVAL);
-
-	return (bus_dma_tag_create(t->parent, t->alignment, t->boundary,
-	    t->lowaddr, t->highaddr, NULL, NULL, t->maxsize,
-	    t->nsegments, t->maxsegsize, t->flags, t->lockfunc, t->lockfuncarg,
-	    dmat));
-}
-
-void
-bus_dma_template_clone(bus_dma_tag_template_t *t, bus_dma_tag_t dmat)
+bus_dma_template_clone(bus_dma_template_t *t, bus_dma_tag_t dmat)
 {
 
 	if (t == NULL || dmat == NULL)
@@ -644,7 +613,6 @@ bus_dma_tag_destroy(bus_dma_tag_t dmat)
 	dmat_copy = dmat;
 
 	if (dmat != NULL) {
-
 		if (dmat->map_count != 0) {
 			error = EBUSY;
 			goto out;
@@ -997,7 +965,6 @@ _bus_dmamap_count_pages(bus_dma_tag_t dmat, pmap_t pmap, bus_dmamap_t map,
 				map->pagesneeded++;
 			}
 			vaddr += (PAGE_SIZE - ((vm_offset_t)vaddr & PAGE_MASK));
-
 		}
 		CTR1(KTR_BUSDMA, "pagesneeded= %d", map->pagesneeded);
 	}
@@ -1237,7 +1204,6 @@ _bus_dmamap_load_buffer(bus_dma_tag_t dmat, bus_dmamap_t map, void *buf,
 			if (map->sync_count == 0 ||
 			    (kvaddr != 0 && kvaddr != sl_vend) ||
 			    (curaddr != sl_pend)) {
-
 				if (++map->sync_count > dmat->nsegments)
 					goto cleanup;
 				sl++;
@@ -1416,7 +1382,6 @@ bus_dmamap_sync(bus_dma_tag_t dmat, bus_dmamap_t map, bus_dmasync_op_t op)
 	 * we're able to test direct userland dma, panic on a map mismatch.
 	 */
 	if ((bpage = STAILQ_FIRST(&map->bpages)) != NULL) {
-
 		CTR4(KTR_BUSDMA, "%s: tag %p tag flags 0x%x op 0x%x "
 		    "performing bounce", __func__, dmat, dmat->flags, op);
 

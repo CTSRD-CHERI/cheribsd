@@ -51,16 +51,15 @@ opal_check(void)
 	if (!OF_hasprop(opal, "opal-base-address") ||
 	    !OF_hasprop(opal, "opal-entry-address"))
 		return (ENOENT);
-	
+
 	OF_getencprop(opal, "opal-base-address", val, sizeof(val));
 	opal_data = ((uint64_t)val[0] << 32) | val[1];
 	OF_getencprop(opal, "opal-entry-address", val, sizeof(val));
 	opal_entrypoint = ((uint64_t)val[0] << 32) | val[1];
 
-	opal_msr = mfmsr() & ~(PSL_EE | PSL_IR | PSL_DR | PSL_SE);
+	opal_msr = mfmsr() & ~(PSL_EE | PSL_IR | PSL_DR | PSL_SE | PSL_LE);
 
 	opal_initialized = 1;
 
 	return (0);
 }
-

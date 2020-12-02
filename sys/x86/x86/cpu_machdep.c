@@ -194,17 +194,6 @@ SYSCTL_BOOL(_machdep, OID_AUTO, mwait_cpustop_broken, CTLFLAG_RDTUN,
     "Can not reliably wake MONITOR/MWAIT cpus without interrupts");
 
 /*
- * Machine dependent boot() routine
- *
- * I haven't seen anything to put here yet
- * Possibly some stuff might be grafted back here from boot()
- */
-void
-cpu_boot(int howto)
-{
-}
-
-/*
  * Flush the D-cache for non-DMA I/O so that the I-cache can
  * be made coherent later.
  */
@@ -497,7 +486,9 @@ cpu_mwait_usable(void)
 }
 
 void (*cpu_idle_hook)(sbintime_t) = NULL;	/* ACPI idle hook. */
-static int	cpu_ident_amdc1e = 0;	/* AMD C1E supported. */
+
+int cpu_amdc1e_bug = 0;			/* AMD C1E APIC workaround required. */
+
 static int	idle_mwait = 1;		/* Use MONITOR/MWAIT for short idle. */
 SYSCTL_INT(_machdep, OID_AUTO, idle_mwait, CTLFLAG_RWTUN, &idle_mwait,
     0, "Use MONITOR/MWAIT for short idle");
@@ -598,35 +589,6 @@ cpu_idle_spin(sbintime_t sbt)
 	}
 }
 
-/*
- * C1E renders the local APIC timer dead, so we disable it by
- * reading the Interrupt Pending Message register and clearing
- * both C1eOnCmpHalt (bit 28) and SmiOnCmpHalt (bit 27).
- * 
- * Reference:
- *   "BIOS and Kernel Developer's Guide for AMD NPT Family 0Fh Processors"
- *   #32559 revision 3.00+
- */
-#define	MSR_AMDK8_IPM		0xc0010055
-#define	AMDK8_SMIONCMPHALT	(1ULL << 27)
-#define	AMDK8_C1EONCMPHALT	(1ULL << 28)
-#define	AMDK8_CMPHALT		(AMDK8_SMIONCMPHALT | AMDK8_C1EONCMPHALT)
-
-void
-cpu_probe_amdc1e(void)
-{
-
-	/*
-	 * Detect the presence of C1E capability mostly on latest
-	 * dual-cores (or future) k8 family.
-	 */
-	if (cpu_vendor_id == CPU_VENDOR_AMD &&
-	    (cpu_id & 0x00000f00) == 0x00000f00 &&
-	    (cpu_id & 0x0fff0000) >=  0x00040000) {
-		cpu_ident_amdc1e = 1;
-	}
-}
-
 void (*cpu_idle_fn)(sbintime_t) = cpu_idle_acpi;
 
 void
@@ -656,10 +618,11 @@ cpu_idle(int busy)
 	}
 
 	/* Apply AMD APIC timer C1E workaround. */
-	if (cpu_ident_amdc1e && cpu_disable_c3_sleep) {
+	if (cpu_amdc1e_bug && cpu_disable_c3_sleep) {
 		msr = rdmsr(MSR_AMDK8_IPM);
-		if (msr & AMDK8_CMPHALT)
-			wrmsr(MSR_AMDK8_IPM, msr & ~AMDK8_CMPHALT);
+		if ((msr & (AMDK8_SMIONCMPHALT | AMDK8_C1EONCMPHALT)) != 0)
+			wrmsr(MSR_AMDK8_IPM, msr & ~(AMDK8_SMIONCMPHALT |
+			    AMDK8_C1EONCMPHALT));
 	}
 
 	/* Call main idle method. */
@@ -831,6 +794,7 @@ int nmi_is_broadcast = 1;
 SYSCTL_INT(_machdep, OID_AUTO, nmi_is_broadcast, CTLFLAG_RWTUN,
     &nmi_is_broadcast, 0,
     "Chipset NMI is broadcast");
+int (*apei_nmi)(void);
 
 void
 nmi_call_kdb(u_int cpu, u_int type, struct trapframe *frame)
@@ -845,6 +809,10 @@ nmi_call_kdb(u_int cpu, u_int type, struct trapframe *frame)
 			panic("NMI indicates hardware failure");
 	}
 #endif /* DEV_ISA */
+
+	/* ACPI Platform Error Interfaces callback. */
+	if (apei_nmi != NULL && (*apei_nmi)())
+		claimed = true;
 
 	/*
 	 * NMIs can be useful for debugging.  They can be hooked up to a
@@ -1401,6 +1369,60 @@ int __read_frequently cpu_flush_rsb_ctxsw;
 SYSCTL_INT(_machdep_mitigations, OID_AUTO, flush_rsb_ctxsw,
     CTLFLAG_RW | CTLFLAG_NOFETCH, &cpu_flush_rsb_ctxsw, 0,
     "Flush Return Stack Buffer on context switch");
+
+SYSCTL_NODE(_machdep_mitigations, OID_AUTO, rngds,
+    CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
+    "MCU Optimization, disable RDSEED mitigation");
+
+int x86_rngds_mitg_enable = 1;
+void
+x86_rngds_mitg_recalculate(bool all_cpus)
+{
+	if ((cpu_stdext_feature3 & CPUID_STDEXT3_MCUOPT) == 0)
+		return;
+	x86_msr_op(MSR_IA32_MCU_OPT_CTRL,
+	    (x86_rngds_mitg_enable ? MSR_OP_OR : MSR_OP_ANDNOT) |
+	    (all_cpus ? MSR_OP_RENDEZVOUS : MSR_OP_LOCAL),
+	    IA32_RNGDS_MITG_DIS);
+}
+
+static int
+sysctl_rngds_mitg_enable_handler(SYSCTL_HANDLER_ARGS)
+{
+	int error, val;
+
+	val = x86_rngds_mitg_enable;
+	error = sysctl_handle_int(oidp, &val, 0, req);
+	if (error != 0 || req->newptr == NULL)
+		return (error);
+	x86_rngds_mitg_enable = val;
+	x86_rngds_mitg_recalculate(true);
+	return (0);
+}
+SYSCTL_PROC(_machdep_mitigations_rngds, OID_AUTO, enable, CTLTYPE_INT |
+    CTLFLAG_RWTUN | CTLFLAG_NOFETCH | CTLFLAG_MPSAFE, NULL, 0,
+    sysctl_rngds_mitg_enable_handler, "I",
+    "MCU Optimization, disabling RDSEED mitigation control "
+    "(0 - mitigation disabled (RDSEED optimized), 1 - mitigation enabled");
+
+static int
+sysctl_rngds_state_handler(SYSCTL_HANDLER_ARGS)
+{
+	const char *state;
+
+	if ((cpu_stdext_feature3 & CPUID_STDEXT3_MCUOPT) == 0) {
+		state = "Not applicable";
+	} else if (x86_rngds_mitg_enable == 0) {
+		state = "RDSEED not serialized";
+	} else {
+		state = "Mitigated";
+	}
+	return (SYSCTL_OUT(req, state, strlen(state)));
+}
+SYSCTL_PROC(_machdep_mitigations_rngds, OID_AUTO, state,
+    CTLTYPE_STRING | CTLFLAG_RD | CTLFLAG_MPSAFE, NULL, 0,
+    sysctl_rngds_state_handler, "A",
+    "MCU Optimization state");
 
 /*
  * Enable and restore kernel text write permissions.

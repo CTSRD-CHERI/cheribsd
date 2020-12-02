@@ -198,7 +198,6 @@ linux_fetch_syscall_args(struct thread *td)
 		sa->callp = &p->p_sysent->sv_table[p->p_sysent->sv_size - 1];
 	else
 		sa->callp = &p->p_sysent->sv_table[sa->code];
-	sa->narg = sa->callp->sy_narg;
 
 	td->td_retval[0] = 0;
 	return (0);
@@ -207,19 +206,45 @@ linux_fetch_syscall_args(struct thread *td)
 static void
 linux_set_syscall_retval(struct thread *td, int error)
 {
-	struct trapframe *frame = td->td_frame;
+	struct trapframe *frame;
+
+	frame = td->td_frame;
+
+	switch (error) {
+	case 0:
+		frame->tf_rax = td->td_retval[0];
+ 		frame->tf_r10 = frame->tf_rcx;
+		break;
+
+	case ERESTART:
+		/*
+		 * Reconstruct pc, we know that 'syscall' is 2 bytes,
+		 * lcall $X,y is 7 bytes, int 0x80 is 2 bytes.
+		 * We saved this in tf_err.
+		 *
+		 */
+		frame->tf_rip -= frame->tf_err;
+		frame->tf_r10 = frame->tf_rcx;
+		break;
+ 
+	case EJUSTRETURN:
+		break;
+
+	default:
+		frame->tf_rax = bsd_to_linux_errno(error);
+		frame->tf_r10 = frame->tf_rcx;
+		break;
+	}
 
 	/*
-	 * On Linux only %rcx and %r11 values are not preserved across
-	 * the syscall.  So, do not clobber %rdx and %r10.
+	 * Differently from FreeBSD native ABI, on Linux only %rcx
+	 * and %r11 values are not preserved across the syscall.
+	 * Require full context restore to get all registers except
+	 * those two restored at return to usermode.
+	 *
+	 * XXX: Would be great to be able to avoid PCB_FULL_IRET
+	 *      for the error == 0 case.
 	 */
-	td->td_retval[1] = frame->tf_rdx;
-	if (error != EJUSTRETURN)
-		frame->tf_r10 = frame->tf_rcx;
-
-	cpu_set_syscall_retval(td, error);
-
-	 /* Restore all registers. */
 	set_pcb_flags(td->td_pcb, PCB_FULL_IRET);
 }
 
@@ -727,8 +752,6 @@ linux_vsyscall(struct thread *td)
 struct sysentvec elf_linux_sysvec = {
 	.sv_size	= LINUX_SYS_MAXSYSCALL,
 	.sv_table	= linux_sysent,
-	.sv_errsize	= ELAST + 1,
-	.sv_errtbl	= linux_errtbl,
 	.sv_transtrap	= linux_translate_traps,
 	.sv_fixup	= linux_fixup_elf,
 	.sv_sendsig	= linux_rt_sendsig,
@@ -739,9 +762,9 @@ struct sysentvec elf_linux_sysvec = {
 	.sv_imgact_try	= linux_exec_imgact_try,
 	.sv_minsigstksz	= LINUX_MINSIGSTKSZ,
 	.sv_minuser	= VM_MIN_ADDRESS,
-	.sv_maxuser	= VM_MAXUSER_ADDRESS,
-	.sv_usrstack	= USRSTACK,
-	.sv_psstrings	= PS_STRINGS,
+	.sv_maxuser	= VM_MAXUSER_ADDRESS_LA48,
+	.sv_usrstack	= USRSTACK_LA48,
+	.sv_psstrings	= PS_STRINGS_LA48,
 	.sv_stackprot	= VM_PROT_ALL,
 	.sv_copyout_auxargs = linux_copyout_auxargs,
 	.sv_copyout_strings = linux_copyout_strings,
@@ -752,11 +775,14 @@ struct sysentvec elf_linux_sysvec = {
 	.sv_set_syscall_retval = linux_set_syscall_retval,
 	.sv_fetch_syscall_args = linux_fetch_syscall_args,
 	.sv_syscallnames = NULL,
-	.sv_shared_page_base = SHAREDPAGE,
+	.sv_shared_page_base = SHAREDPAGE_LA48,
 	.sv_shared_page_len = PAGE_SIZE,
 	.sv_schedtail	= linux_schedtail,
 	.sv_thread_detach = linux_thread_detach,
 	.sv_trap	= linux_vsyscall,
+	.sv_onexec	= linux_on_exec,
+	.sv_onexit	= linux_on_exit,
+	.sv_ontdexit	= linux_thread_dtor,
 };
 
 static void

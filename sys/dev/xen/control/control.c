@@ -113,6 +113,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/filedesc.h>
 #include <sys/kdb.h>
 #include <sys/module.h>
+#include <sys/mount.h>
 #include <sys/namei.h>
 #include <sys/proc.h>
 #include <sys/reboot.h>
@@ -204,6 +205,7 @@ xctrl_suspend()
 	xs_lock();
 	stop_all_proc();
 	xs_unlock();
+	suspend_all_fs();
 	EVENTHANDLER_INVOKE(power_suspend);
 
 #ifdef EARLY_AP_STARTUP
@@ -317,6 +319,7 @@ xctrl_suspend()
 	}
 #endif
 
+	resume_all_fs();
 	resume_all_proc();
 
 	EVENTHANDLER_INVOKE(power_resume);
@@ -356,7 +359,7 @@ xctrl_on_watch_event(struct xs_watch *watch, const char **vec, unsigned int len)
 	char *result;
 	int   error;
 	int   result_len;
-	
+
 	error = xs_read(XST_NIL, "control", "shutdown",
 			&result_len, (void **)&result);
 	if (error != 0 || result_len == 0)
@@ -370,7 +373,6 @@ xctrl_on_watch_event(struct xs_watch *watch, const char **vec, unsigned int len)
 	reason = xctrl_shutdown_reasons;
 	last_reason = reason + nitems(xctrl_shutdown_reasons);
 	while (reason < last_reason) {
-
 		if (!strcmp(result, reason->name)) {
 			reason->handler();
 			break;
@@ -469,11 +471,11 @@ static device_method_t xctrl_methods[] = {
 	DEVMETHOD(device_probe,         xctrl_probe), 
 	DEVMETHOD(device_attach,        xctrl_attach), 
 	DEVMETHOD(device_detach,        xctrl_detach), 
- 
+
 	DEVMETHOD_END
 }; 
 
 DEFINE_CLASS_0(xctrl, xctrl_driver, xctrl_methods, sizeof(struct xctrl_softc));
 devclass_t xctrl_devclass; 
- 
+
 DRIVER_MODULE(xctrl, xenstore, xctrl_driver, xctrl_devclass, NULL, NULL);

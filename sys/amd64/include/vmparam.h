@@ -43,7 +43,6 @@
  * $FreeBSD$
  */
 
-
 #ifndef _MACHINE_VMPARAM_H_
 #define	_MACHINE_VMPARAM_H_ 1
 
@@ -150,6 +149,14 @@
 #endif
 
 /*
+ * Kernel physical load address. Needs to be aligned at 2MB superpage
+ * boundary.
+ */
+#ifndef KERNLOAD
+#define	KERNLOAD	0x200000
+#endif
+
+/*
  * Virtual addresses of things.  Derived from the page directory and
  * page table indexes from pmap.h for precision.
  *
@@ -169,25 +176,32 @@
  * 0xffffffff80000000                        KERNBASE
  */
 
-#define	VM_MIN_KERNEL_ADDRESS	KVADDR(KPML4BASE, 0, 0, 0)
-#define	VM_MAX_KERNEL_ADDRESS	KVADDR(KPML4BASE + NKPML4E - 1, \
+#define	VM_MIN_KERNEL_ADDRESS	KV4ADDR(KPML4BASE, 0, 0, 0)
+#define	VM_MAX_KERNEL_ADDRESS	KV4ADDR(KPML4BASE + NKPML4E - 1, \
 					NPDPEPG-1, NPDEPG-1, NPTEPG-1)
 
-#define	DMAP_MIN_ADDRESS	KVADDR(DMPML4I, 0, 0, 0)
-#define	DMAP_MAX_ADDRESS	KVADDR(DMPML4I + NDMPML4E, 0, 0, 0)
+#define	DMAP_MIN_ADDRESS	KV4ADDR(DMPML4I, 0, 0, 0)
+#define	DMAP_MAX_ADDRESS	KV4ADDR(DMPML4I + NDMPML4E, 0, 0, 0)
 
-#define	LARGEMAP_MIN_ADDRESS	KVADDR(LMSPML4I, 0, 0, 0)
-#define	LARGEMAP_MAX_ADDRESS	KVADDR(LMEPML4I + 1, 0, 0, 0)
+#define	LARGEMAP_MIN_ADDRESS	KV4ADDR(LMSPML4I, 0, 0, 0)
+#define	LARGEMAP_MAX_ADDRESS	KV4ADDR(LMEPML4I + 1, 0, 0, 0)
 
-#define	KERNBASE		KVADDR(KPML4I, KPDPI, 0, 0)
+#define	KERNBASE		KV4ADDR(KPML4I, KPDPI, 0, 0)
 
-#define	UPT_MAX_ADDRESS		KVADDR(PML4PML4I, PML4PML4I, PML4PML4I, PML4PML4I)
-#define	UPT_MIN_ADDRESS		KVADDR(PML4PML4I, 0, 0, 0)
+#define	UPT_MAX_ADDRESS		KV4ADDR(PML4PML4I, PML4PML4I, PML4PML4I, PML4PML4I)
+#define	UPT_MIN_ADDRESS		KV4ADDR(PML4PML4I, 0, 0, 0)
 
-#define	VM_MAXUSER_ADDRESS	UVADDR(NUPML4E, 0, 0, 0)
+#define	VM_MAXUSER_ADDRESS_LA57	UVADDR(NUPML5E, 0, 0, 0, 0)
+#define	VM_MAXUSER_ADDRESS_LA48	UVADDR(0, NUP4ML4E, 0, 0, 0)
+#define	VM_MAXUSER_ADDRESS	VM_MAXUSER_ADDRESS_LA57
 
-#define	SHAREDPAGE		(VM_MAXUSER_ADDRESS - PAGE_SIZE)
-#define	USRSTACK		SHAREDPAGE
+#define	SHAREDPAGE_LA57		(VM_MAXUSER_ADDRESS_LA57 - PAGE_SIZE)
+#define	SHAREDPAGE_LA48		(VM_MAXUSER_ADDRESS_LA48 - PAGE_SIZE)
+#define	USRSTACK_LA57		SHAREDPAGE_LA57
+#define	USRSTACK_LA48		SHAREDPAGE_LA48
+#define	USRSTACK		USRSTACK_LA48
+#define	PS_STRINGS_LA57		(USRSTACK_LA57 - sizeof(struct ps_strings))
+#define	PS_STRINGS_LA48		(USRSTACK_LA48 - sizeof(struct ps_strings))
 
 #define	VM_MAX_ADDRESS		UPT_MAX_ADDRESS
 #define	VM_MIN_ADDRESS		(0)
@@ -246,5 +260,15 @@
  * memory.
  */
 #define	VM_BATCHQUEUE_SIZE	31
+
+/*
+ * The pmap can create non-transparent large page mappings.
+ */
+#define	PMAP_HAS_LARGEPAGES	1
+
+/*
+ * Need a page dump array for minidump.
+ */
+#define MINIDUMP_PAGE_TRACKING	1
 
 #endif /* _MACHINE_VMPARAM_H_ */

@@ -53,7 +53,6 @@ static device_method_t uart_pccard_methods[] = {
 	DEVMETHOD(device_probe,		uart_pccard_probe),
 	DEVMETHOD(device_attach,	uart_pccard_attach),
 	DEVMETHOD(device_detach,	uart_bus_detach),
-
 	{ 0, 0 }
 };
 
@@ -98,6 +97,7 @@ uart_pccard_attach(device_t dev)
 	error = uart_bus_probe(dev, 0, 0, 0, 0, 0, 0);
 	if (error > 0)
 		return (error);
+	gone_in_dev(dev, 13, "pccard removed");
 	return (uart_bus_attach(dev));
 }
 

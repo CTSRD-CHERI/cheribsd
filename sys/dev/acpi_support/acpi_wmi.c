@@ -76,7 +76,7 @@ struct acpi_wmi_softc {
 	pid_t		wmistat_open_pid; /* pid operating on /dev/wmistat */
 	int		wmistat_bufptr;	/* /dev/wmistat ptr to buffer position */
 	char 	        *mofbuf;
-	
+
 	TAILQ_HEAD(wmi_info_list_head, wmi_info) wmi_info_list;
 };
 
@@ -97,7 +97,6 @@ enum event_generation_state {
 	EVENT_GENERATION_OFF = 0
 };
 
-
 /*
  * Information about one entry in _WDG.
  * List of those is used to lookup information by GUID.
@@ -108,7 +107,6 @@ struct wmi_info {
 	ACPI_NOTIFY_HANDLER	event_handler;/* client provided event handler */
 	void			*event_handler_user_data; /* ev handler cookie  */
 };
-
 
 ACPI_SERIAL_DECL(acpi_wmi, "ACPI-WMI Mapping");
 
@@ -168,7 +166,6 @@ static struct cdevsw wmistat_cdevsw = {
 	.d_name = "wmistat",
 };
 
-
 static device_method_t acpi_wmi_methods[] = {
 	/* Device interface */
 	DEVMETHOD(device_probe,	acpi_wmi_probe),
@@ -204,6 +201,7 @@ DRIVER_MODULE(acpi_wmi, acpi, acpi_wmi_driver, acpi_wmi_devclass, 0, 0);
 MODULE_VERSION(acpi_wmi, 1);
 MODULE_DEPEND(acpi_wmi, acpi, 1, 1, 1);
 static char *wmi_ids[] = {"PNP0C14", NULL};
+ACPI_PNP_INFO(wmi_ids);
 
 /*
  * Probe for the PNP0C14 ACPI node
@@ -353,7 +351,6 @@ acpi_wmi_detach(device_t dev)
 
 	return (ret);
 }
-
 
 /*
  * Check if the given GUID string (human readable format
@@ -801,7 +798,7 @@ acpi_wmi_toggle_we_event_generation(device_t dev, struct wmi_info *winfo,
 	params[0].Integer.Value = state==EVENT_GENERATION_ON?1:0;
 	input.Pointer = params;
 	input.Count = 1;
-	
+
 	UINT8 hi = ((UINT8) winfo->ginfo.oid[0]) >> 4;
 	UINT8 lo = ((UINT8) winfo->ginfo.oid[0]) & 0xf;
 	method[2] = (hi > 9 ? hi + 55: hi + 48);
@@ -978,7 +975,7 @@ acpi_wmi_wmistat_read(struct cdev *dev, struct uio *buf, int flag)
 	if (dev == NULL || dev->si_drv1 == NULL)
 		return (EBADF);
 	sc = dev->si_drv1;
-	
+
 	ACPI_SERIAL_BEGIN(acpi_wmi);
 	if (sc->wmistat_open_pid != buf->uio_td->td_proc->p_pid ||
 			sc->wmistat_bufptr == -1) {

@@ -53,6 +53,10 @@ intel_sha256.o			optional	aesni			\
 	compile-with	"${CC} -c ${CFLAGS:C/^-O2$/-O3/:N-nostdinc} ${WERROR} ${PROF} -mmmx -msse -msse4 -msha ${.IMPSRC}" \
 	no-implicit-rule						\
 	clean		"intel_sha256.o"
+crypto/openssl/ossl.c		optional ossl
+crypto/openssl/ossl_sha1.c	optional ossl
+crypto/openssl/ossl_sha256.c	optional ossl
+crypto/openssl/ossl_sha512.c	optional ossl
 crypto/via/padlock.c		optional padlock
 crypto/via/padlock_cipher.c	optional padlock
 crypto/via/padlock_hash.c	optional padlock
@@ -165,6 +169,8 @@ dev/imcsmb/imcsmb.c		optional	imcsmb
 dev/imcsmb/imcsmb_pci.c		optional	imcsmb pci
 dev/intel/spi.c			optional	intelspi
 dev/io/iodev.c			optional	io
+dev/iommu/busdma_iommu.c	optional	acpi iommu pci
+dev/iommu/iommu_gas.c		optional	acpi iommu pci
 dev/ipmi/ipmi.c			optional	ipmi
 dev/ipmi/ipmi_acpi.c		optional	ipmi acpi
 dev/ipmi/ipmi_isa.c		optional	ipmi isa
@@ -285,6 +291,15 @@ dev/isci/scil/scif_sas_task_request_state_handlers.c		optional isci
 dev/isci/scil/scif_sas_task_request_states.c			optional isci
 dev/isci/scil/scif_sas_timer.c					optional isci
 dev/itwd/itwd.c							optional itwd
+dev/qat/qat.c			optional qat
+dev/qat/qat_ae.c		optional qat
+dev/qat/qat_c2xxx.c		optional qat
+dev/qat/qat_c3xxx.c		optional qat
+dev/qat/qat_c62x.c		optional qat
+dev/qat/qat_d15xx.c		optional qat
+dev/qat/qat_dh895xcc.c		optional qat
+dev/qat/qat_hw15.c		optional qat
+dev/qat/qat_hw17.c		optional qat
 libkern/x86/crc32_sse42.c	standard
 #
 # x86 shared code between IA32 and AMD64 architectures
@@ -300,16 +315,14 @@ x86/cpufreq/hwpstate_amd.c	optional	cpufreq
 x86/cpufreq/hwpstate_intel.c	optional	cpufreq
 x86/cpufreq/p4tcc.c		optional	cpufreq
 x86/cpufreq/powernow.c		optional	cpufreq
-x86/iommu/busdma_dmar.c		optional	acpi acpi_dmar pci
-x86/iommu/intel_ctx.c		optional	acpi acpi_dmar pci
-x86/iommu/intel_drv.c		optional	acpi acpi_dmar pci
-x86/iommu/intel_fault.c		optional	acpi acpi_dmar pci
-x86/iommu/intel_gas.c		optional	acpi acpi_dmar pci
-x86/iommu/intel_idpgtbl.c	optional	acpi acpi_dmar pci
-x86/iommu/intel_intrmap.c	optional	acpi acpi_dmar pci
-x86/iommu/intel_qi.c		optional	acpi acpi_dmar pci
-x86/iommu/intel_quirks.c	optional	acpi acpi_dmar pci
-x86/iommu/intel_utils.c		optional	acpi acpi_dmar pci
+x86/iommu/intel_ctx.c		optional	acpi iommu pci
+x86/iommu/intel_drv.c		optional	acpi iommu pci
+x86/iommu/intel_fault.c		optional	acpi iommu pci
+x86/iommu/intel_idpgtbl.c	optional	acpi iommu pci
+x86/iommu/intel_intrmap.c	optional	acpi iommu pci
+x86/iommu/intel_qi.c		optional	acpi iommu pci
+x86/iommu/intel_quirks.c	optional	acpi iommu pci
+x86/iommu/intel_utils.c		optional	acpi iommu pci
 x86/isa/atrtc.c			standard
 x86/isa/clock.c			standard
 x86/isa/isa.c			optional	isa

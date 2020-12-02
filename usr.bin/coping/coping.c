@@ -43,13 +43,13 @@ __FBSDID("$FreeBSD$");
 #include <stdlib.h>
 #include <unistd.h>
 
-static long long buf[MAXBSIZE / sizeof(long long)];
+static long long buf[1];
 
 static void
 usage(void)
 {
 
-	fprintf(stderr, "usage: coping [-c count] [-klv] service-name\n");
+	fprintf(stderr, "usage: coping [-c count] [-s time] [-kv] service-name ...\n");
 	exit(0);
 }
 
@@ -58,11 +58,13 @@ main(int argc, char **argv)
 {
 	void * __capability switcher_code;
 	void * __capability switcher_data;
-	void * __capability lookedup;
-	bool lflag = false, kflag = false, vflag = false;
-	int count = 0, ch, error, i = 0;
+	void * __capability *lookedup;
+	char *tmp;
+	float dt = 1.0;
+	bool kflag = false, vflag = false;
+	int count = 0, ch, error, i = 0, c = 0;
 
-	while ((ch = getopt(argc, argv, "c:lkv")) != -1) {
+	while ((ch = getopt(argc, argv, "c:ks:v")) != -1) {
 		switch (ch) {
 		case 'c':
 			count = atoi(optarg);
@@ -72,8 +74,12 @@ main(int argc, char **argv)
 		case 'k':
 			kflag = true;
 			break;
-		case 'l':
-			lflag = true;
+		case 's':
+			dt = strtof(optarg, &tmp);
+			if (*tmp != '\0')
+				errx(1, "argument to -s must be a number");
+			if (dt < 0)
+				errx(1, "argument to -s must be >= 0.0");
 			break;
 		case 'v':
 			vflag = true;
@@ -86,7 +92,7 @@ main(int argc, char **argv)
 
 	argc -= optind;
 	argv += optind;
-	if (argc != 1)
+	if (argc < 1)
 		usage();
 
 	if (vflag)
@@ -95,15 +101,21 @@ main(int argc, char **argv)
 	if (error != 0)
 		err(1, "cosetup");
 
-	if (vflag)
-		fprintf(stderr, "%s: colooking up \"%s\"...\n", getprogname(), argv[0]);
-	error = colookup(argv[0], &lookedup);
-	if (error != 0) {
-		if (errno == ESRCH) {
-			warnx("received ESRCH; this usually means there's nothing coregistered for \"%s\"", argv[0]);
-			warnx("use coexec(1) to colocate; you might also find \"ps aux -o vmaddr\" useful");
+	lookedup = malloc(argc * sizeof(void * __capability));
+	if (lookedup == NULL)
+		err(1, "malloc");
+
+	for (c = 0; c < argc; c++) {
+		if (vflag)
+			fprintf(stderr, "%s: colooking up \"%s\"...\n", getprogname(), argv[c]);
+		error = colookup(argv[c], &lookedup[c]);
+		if (error != 0) {
+			if (errno == ESRCH) {
+				warnx("received ESRCH; this usually means there's nothing coregistered for \"%s\"", argv[c]);
+				warnx("use coexec(1) to colocate; you might also find \"ps aux -o vmaddr\" useful");
+			}
+			err(1, "colookup");
 		}
-		err(1, "colookup");
 	}
 
 	if (!vflag) {
@@ -111,30 +123,35 @@ main(int argc, char **argv)
 			setvbuf(stdout, NULL, _IONBF, 0);
 	}
 
-	if (vflag)
-		fprintf(stderr, "%s: cocalling...\n", getprogname());
-
-	buf[0] = 42;
+	buf[0] = 0;
+	c = 0;
 
 	for (;;) {
+		if (vflag)
+			fprintf(stderr, "%s: cocalling \"%s\"...\n", getprogname(), argv[c]);
+
 		if (kflag)
-			error = cocall_slow(switcher_code, switcher_data, lookedup, buf, sizeof(buf));
+			error = cocall_slow(switcher_code, switcher_data, lookedup[c], buf, sizeof(buf));
 		else
-			error = cocall(switcher_code, switcher_data, lookedup, buf, sizeof(buf));
+			error = cocall(switcher_code, switcher_data, lookedup[c], buf, sizeof(buf));
 		if (error != 0)
 			warn("cocall");
 
 		if (vflag)
-			printf("%s: returned, pid %d, buf[0] is %lld\n", getprogname(), getpid(), buf[0]);
+			printf("%s: returned from \"%s\", pid %d, buf[0] is %lld\n", getprogname(), argv[c], getpid(), buf[0]);
 		else
 			printf(".");
+
+		c++;
+		if (c == argc)
+			c = 0;
 
 		i++;
 		if (count != 0 && i >= count)
 			break;
 
-		if (!lflag)
-			sleep(1);
+		if (dt > 0)
+			usleep(dt * 1000000);
 	}
 
 	if (!vflag)

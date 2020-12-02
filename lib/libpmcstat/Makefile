@@ -1,4 +1,8 @@
 # $FreeBSD$
+
+# XXX: not at all purecap clean, but we need the headers...
+NO_WERROR=
+
 PACKAGE=lib${LIB}
 LIB=	pmcstat
 INTERNALLIB=

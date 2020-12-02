@@ -11,6 +11,11 @@
 # We handle those cases here in an ad-hoc fashion by looking for the known-
 # bad case in the main .depend file, and if found deleting all of the related
 # .depend files (including for example the lib32 version).
+#
+# These tests increase the build time (albeit by a small amount), so they
+# should be removed once enough time has passed and it is extremely unlikely
+# anyone would try a NO_CLEAN build against an object tree from before the
+# related change.  One year should be sufficient.
 
 OBJTOP=$1
 if [ ! -d "$OBJTOP" ]; then
@@ -32,9 +37,22 @@ clean_dep()
 }
 
 # Date      Rev      Description
-# 20190916  r352703  shm_open syscall reimplemented in C
-clean_dep lib/libc   shm_open S
 # 20200310  r358851  rename of openmp's ittnotify_static.c to .cpp
 clean_dep lib/libomp ittnotify_static c
 # 20200414  r359930  closefrom
 clean_dep lib/libc   closefrom S
+
+# 20200826  r364746  OpenZFS merge, apply a big hammer (remove whole tree)
+if [ -e "$OBJTOP"/cddl/lib/libzfs/.depend.libzfs_changelist.o ] && \
+    egrep -qw "cddl/contrib/opensolaris/lib/libzfs/common/libzfs_changelist.c" \
+    "$OBJTOP"/cddl/lib/libzfs/.depend.libzfs_changelist.o; then
+	echo "Removing old ZFS tree"
+	rm -rf "$OBJTOP"/cddl "$OBJTOP"/obj-lib32/cddl
+fi
+
+# 20200916  WARNS bumped, need bootstrapped crunchgen stubs
+if [ -e "$OBJTOP"/rescue/rescue/rescue.c ] && \
+    ! grep -q 'crunched_stub_t' "$OBJTOP"/rescue/rescue/rescue.c; then
+	echo "Removing old rescue(8) tree"
+	rm -rf "$OBJTOP"/rescue/rescue
+fi

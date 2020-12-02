@@ -133,184 +133,230 @@ cam/scsi/scsi_sg.c		optional sg
 cam/scsi/scsi_targ_bh.c		optional targbh
 cam/scsi/scsi_target.c		optional targ
 cam/scsi/smp_all.c		optional scbus
+
 # shared between zfs and dtrace
-cddl/compat/opensolaris/kern/opensolaris.c		optional zfs | dtrace compile-with "${CDDL_C}"
-cddl/compat/opensolaris/kern/opensolaris_cmn_err.c	optional zfs | dtrace compile-with "${CDDL_C}"
-cddl/compat/opensolaris/kern/opensolaris_kmem.c		optional zfs | dtrace compile-with "${CDDL_C}"
-cddl/compat/opensolaris/kern/opensolaris_misc.c		optional zfs | dtrace compile-with "${CDDL_C}"
+cddl/compat/opensolaris/kern/opensolaris.c		optional dtrace compile-with "${CDDL_C}"
 cddl/compat/opensolaris/kern/opensolaris_proc.c		optional zfs | dtrace compile-with "${CDDL_C}"
-cddl/compat/opensolaris/kern/opensolaris_sunddi.c	optional zfs | dtrace compile-with "${CDDL_C}"
-cddl/compat/opensolaris/kern/opensolaris_taskq.c	optional zfs | dtrace compile-with "${CDDL_C}"
+contrib/openzfs/module/os/freebsd/spl/spl_misc.c		optional zfs | dtrace compile-with "${ZFS_C}"
+contrib/openzfs/module/os/freebsd/spl/spl_cmn_err.c		optional zfs | dtrace compile-with "${ZFS_C}"
+contrib/openzfs/module/os/freebsd/spl/spl_taskq.c		optional zfs | dtrace compile-with "${ZFS_C}"
+contrib/openzfs/module/os/freebsd/spl/spl_kmem.c		optional zfs | dtrace compile-with "${ZFS_C}"
+
+#zfs solaris portability layer
+contrib/openzfs/module/os/freebsd/spl/acl_common.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/os/freebsd/spl/callb.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/os/freebsd/spl/list.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/os/freebsd/spl/spl_acl.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/os/freebsd/spl/spl_dtrace.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/os/freebsd/spl/spl_kstat.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/os/freebsd/spl/spl_policy.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/os/freebsd/spl/spl_string.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/os/freebsd/spl/spl_sunddi.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/os/freebsd/spl/spl_sysevent.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/os/freebsd/spl/spl_uio.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/os/freebsd/spl/spl_vfs.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/os/freebsd/spl/spl_vm.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/os/freebsd/spl/spl_zone.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/os/freebsd/spl/spl_procfs_list.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/os/freebsd/spl/spl_zlib.c		optional zfs compile-with "${ZFS_C}"
+
+
 # zfs specific
-cddl/compat/opensolaris/kern/opensolaris_acl.c				optional zfs compile-with "${ZFS_C}"
-cddl/compat/opensolaris/kern/opensolaris_dtrace.c			optional zfs compile-with "${ZFS_C}"
-cddl/compat/opensolaris/kern/opensolaris_kobj.c				optional zfs compile-with "${ZFS_C}"
-cddl/compat/opensolaris/kern/opensolaris_kstat.c			optional zfs compile-with "${ZFS_C}"
-cddl/compat/opensolaris/kern/opensolaris_lookup.c			optional zfs compile-with "${ZFS_C}"
-cddl/compat/opensolaris/kern/opensolaris_policy.c			optional zfs compile-with "${ZFS_C}"
-cddl/compat/opensolaris/kern/opensolaris_string.c			optional zfs compile-with "${ZFS_C}"
-cddl/compat/opensolaris/kern/opensolaris_sysevent.c			optional zfs compile-with "${ZFS_C}"
-cddl/compat/opensolaris/kern/opensolaris_uio.c				optional zfs compile-with "${ZFS_C}"
-cddl/compat/opensolaris/kern/opensolaris_vfs.c				optional zfs compile-with "${ZFS_C}"
-cddl/compat/opensolaris/kern/opensolaris_vm.c				optional zfs compile-with "${ZFS_C}"
-cddl/compat/opensolaris/kern/opensolaris_zone.c				optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/common/acl/acl_common.c			optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/common/avl/avl.c				optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/common/lz4/lz4.c				optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/common/nvpair/opensolaris_fnvpair.c		optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/common/nvpair/opensolaris_nvpair.c		optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/common/nvpair/opensolaris_nvpair_alloc_fixed.c	optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/common/unicode/u8_textprep.c			optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/common/zfs/zfeature_common.c			optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/common/zfs/zfs_comutil.c			optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/common/zfs/zfs_deleg.c				optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/common/zfs/zfs_fletcher.c			optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/common/zfs/zfs_ioctl_compat.c			optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/common/zfs/zfs_namecheck.c			optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/common/zfs/zfs_prop.c				optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/common/zfs/zpool_prop.c			optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/common/zfs/zprop_common.c			optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/vnode.c				optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/abd.c			optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/aggsum.c			optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/arc.c			optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/blkptr.c			optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/bplist.c			optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/bpobj.c			optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/bptree.c			optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/bqueue.c			optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/cityhash.c			optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/dbuf.c			optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/dbuf_stats.c		optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/ddt.c			optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/ddt_zap.c			optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/dmu.c			optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/dmu_diff.c			optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/dmu_object.c			optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/dmu_objset.c			optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/dmu_send.c			optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/dmu_traverse.c		optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/dmu_tx.c			optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/dmu_zfetch.c			optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/dnode.c			optional zfs compile-with "${ZFS_C}" \
-	warning "kernel contains CDDL licensed ZFS filesystem"
-cddl/contrib/opensolaris/uts/common/fs/zfs/dnode_sync.c			optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/dsl_bookmark.c		optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/dsl_dataset.c		optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/dsl_deadlist.c		optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/dsl_deleg.c			optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/dsl_destroy.c		optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/dsl_dir.c			optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/dsl_pool.c			optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/dsl_prop.c			optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/dsl_scan.c			optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/dsl_userhold.c		optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/dsl_synctask.c		optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/gzip.c			optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/lzjb.c			optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/metaslab.c			optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/mmp.c			optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/multilist.c			optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/range_tree.c			optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/refcount.c			optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/rrwlock.c			optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/sa.c				optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/sha256.c			optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/skein_zfs.c			optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/spa.c			optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/spa_checkpoint.c		optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/spa_config.c			optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/spa_errlog.c			optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/spa_history.c		optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/spa_misc.c			optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/space_map.c			optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/space_reftree.c		optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/trim_map.c			optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/txg.c			optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/uberblock.c			optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/unique.c			optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/vdev.c			optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/vdev_cache.c			optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/vdev_file.c			optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/vdev_indirect.c		optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/vdev_indirect_births.c	optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/vdev_indirect_mapping.c	optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/vdev_initialize.c		optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/vdev_geom.c			optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/vdev_label.c			optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/vdev_mirror.c		optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/vdev_missing.c		optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/vdev_queue.c			optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/vdev_raidz.c			optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/vdev_removal.c		optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/vdev_root.c			optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/zap.c			optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/zap_leaf.c			optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/zap_micro.c			optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/zcp.c			optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/zcp_get.c			optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/zcp_global.c			optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/zcp_iter.c			optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/zcp_synctask.c		optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/zfeature.c			optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/zfs_acl.c			optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/zfs_byteswap.c		optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/zfs_ctldir.c			optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/zfs_debug.c			optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/zfs_dir.c			optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/zfs_fm.c			optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/zfs_fuid.c			optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/zfs_ioctl.c			optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/zfs_log.c			optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/zfs_onexit.c			optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/zfs_replay.c			optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/zfs_rlock.c			optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/zfs_sa.c			optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/zfs_vfsops.c			optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/zfs_vnops.c			optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/zfs_znode.c			optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/zil.c			optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/zio.c			optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/zio_checksum.c		optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/zio_compress.c		optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/zio_inject.c			optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/zle.c			optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/zrlock.c			optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/zthr.c			optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/zvol.c			optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/os/callb.c				optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/os/fm.c				optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/os/list.c				optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/os/nvpair_alloc_system.c		optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/zmod/zmod.c				optional zfs compile-with "${ZFS_C}"
+
+#zfs avl
+contrib/openzfs/module/avl/avl.c				optional zfs compile-with "${ZFS_C}"
+
 # zfs lua support
-cddl/contrib/opensolaris/uts/common/fs/zfs/lua/lapi.c			optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/lua/lauxlib.c		optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/lua/lbaselib.c		optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/lua/lbitlib.c		optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/lua/lcode.c			optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/lua/lcompat.c		optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/lua/lcorolib.c		optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/lua/lctype.c			optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/lua/ldebug.c			optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/lua/ldo.c			optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/lua/ldump.c			optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/lua/lfunc.c			optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/lua/lgc.c			optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/lua/llex.c			optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/lua/lmem.c			optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/lua/lobject.c		optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/lua/lopcodes.c		optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/lua/lparser.c		optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/lua/lstate.c			optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/lua/lstring.c		optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/lua/lstrlib.c		optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/lua/ltable.c			optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/lua/ltablib.c		optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/lua/ltm.c			optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/lua/lundump.c		optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/lua/lvm.c			optional zfs compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/uts/common/fs/zfs/lua/lzio.c			optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/lua/lapi.c			optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/lua/lauxlib.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/lua/lbaselib.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/lua/lcode.c			optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/lua/lcompat.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/lua/lcorolib.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/lua/lctype.c			optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/lua/ldebug.c			optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/lua/ldo.c			optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/lua/lfunc.c			optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/lua/lgc.c			optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/lua/llex.c			optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/lua/lmem.c			optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/lua/lobject.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/lua/lopcodes.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/lua/lparser.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/lua/lstate.c			optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/lua/lstring.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/lua/lstrlib.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/lua/ltable.c			optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/lua/ltablib.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/lua/ltm.c			optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/lua/lvm.c			optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/lua/lzio.c			optional zfs compile-with "${ZFS_C}"
+
+# zfs nvpair support
+contrib/openzfs/module/nvpair/fnvpair.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/nvpair/nvpair.c		optional zfs compile-with "${ZFS_RPC_C}"
+contrib/openzfs/module/nvpair/nvpair_alloc_fixed.c	optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/nvpair/nvpair_alloc_spl.c	optional zfs compile-with "${ZFS_C}"
+
+#zfs platform compatibility code
+contrib/openzfs/module/os/freebsd/zfs/abd_os.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/os/freebsd/zfs/arc_os.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/os/freebsd/zfs/crypto_os.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/os/freebsd/zfs/dmu_os.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/os/freebsd/zfs/hkdf.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/os/freebsd/zfs/kmod_core.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/os/freebsd/zfs/spa_os.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/os/freebsd/zfs/sysctl_os.c		optional zfs compile-with "${ZFS_C}  -include $S/modules/zfs/zfs_config.h"
+contrib/openzfs/module/os/freebsd/zfs/vdev_file.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/os/freebsd/zfs/vdev_label_os.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/os/freebsd/zfs/vdev_geom.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/os/freebsd/zfs/zfs_acl.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/os/freebsd/zfs/zfs_ctldir.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/os/freebsd/zfs/zfs_debug.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/os/freebsd/zfs/zfs_dir.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/os/freebsd/zfs/zfs_file_os.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/os/freebsd/zfs/zfs_ioctl_compat.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/os/freebsd/zfs/zfs_ioctl_os.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/os/freebsd/zfs/zfs_vfsops.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/os/freebsd/zfs/zfs_vnops.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/os/freebsd/zfs/zfs_znode.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/os/freebsd/zfs/zio_crypt.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/os/freebsd/zfs/zvol_os.c		optional zfs compile-with "${ZFS_C}"
+
+#zfs unicode support
+contrib/openzfs/module/unicode/uconv.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/unicode/u8_textprep.c		optional zfs compile-with "${ZFS_C}"
+
+#zfs checksums / zcommon
+contrib/openzfs/module/zcommon/cityhash.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zcommon/zfeature_common.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zcommon/zfs_comutil.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zcommon/zfs_deleg.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zcommon/zfs_fletcher.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zcommon/zfs_fletcher_superscalar.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zcommon/zfs_fletcher_superscalar4.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zcommon/zfs_namecheck.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zcommon/zfs_prop.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zcommon/zpool_prop.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zcommon/zprop_common.c		optional zfs compile-with "${ZFS_C}"
+
+#zfs core common code
+contrib/openzfs/module/zfs/abd.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/aggsum.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/arc.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/blkptr.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/bplist.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/bpobj.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/bptree.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/btree.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/bqueue.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/dbuf.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/dbuf_stats.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/dataset_kstats.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/ddt.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/ddt_zap.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/dmu.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/dmu_diff.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/dmu_object.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/dmu_objset.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/dmu_recv.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/dmu_redact.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/dmu_send.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/dmu_traverse.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/dmu_tx.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/dmu_zfetch.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/dnode.c		optional zfs compile-with "${ZFS_C}" \
+	warning "kernel contains CDDL licensed ZFS filesystem"
+contrib/openzfs/module/zfs/dnode_sync.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/dsl_bookmark.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/dsl_crypt.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/dsl_dataset.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/dsl_deadlist.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/dsl_deleg.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/dsl_destroy.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/dsl_dir.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/dsl_pool.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/dsl_prop.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/dsl_scan.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/dsl_synctask.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/dsl_userhold.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/fm.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/gzip.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/lzjb.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/lz4.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/metaslab.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/mmp.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/multilist.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/objlist.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/pathname.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/range_tree.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/refcount.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/rrwlock.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/sa.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/sha256.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/skein_zfs.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/spa.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/spa_boot.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/spa_checkpoint.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/spa_config.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/spa_errlog.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/spa_history.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/spa_log_spacemap.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/spa_misc.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/spa_stats.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/space_map.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/space_reftree.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/txg.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/uberblock.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/unique.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/vdev.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/vdev_cache.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/vdev_indirect.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/vdev_indirect_births.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/vdev_indirect_mapping.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/vdev_initialize.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/vdev_label.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/vdev_mirror.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/vdev_missing.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/vdev_queue.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/vdev_raidz.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/vdev_raidz_math.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/vdev_raidz_math_scalar.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/vdev_rebuild.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/vdev_removal.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/vdev_root.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/vdev_trim.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/zap.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/zap_leaf.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/zap_micro.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/zcp.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/zcp_get.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/zcp_global.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/zcp_iter.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/zcp_set.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/zcp_synctask.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/zfeature.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/zfs_byteswap.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/zfs_fm.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/zfs_fuid.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/zfs_ioctl.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/zfs_log.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/zfs_onexit.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/zfs_quota.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/zfs_ratelimit.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/zfs_replay.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/zfs_rlock.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/zfs_sa.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zstd/zfs_zstd.c		optional zfs zstdio compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/zil.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/zio.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/zio_checksum.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/zio_compress.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/zio_inject.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/zle.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/zrlock.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/zthr.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/zvol.c		optional zfs compile-with "${ZFS_C}"
 
 # CHERI and CHERI-compat related files
 cheri/cheri_asserts.c			optional cpu_cheri
@@ -619,7 +665,7 @@ contrib/libfdt/fdt_wip.c	optional fdt
 contrib/libnv/cnvlist.c		standard
 contrib/libnv/dnvlist.c		standard
 contrib/libnv/nvlist.c		standard
-contrib/libnv/nvpair.c		standard
+contrib/libnv/bsd_nvpair.c		standard
 contrib/ngatm/netnatm/api/cc_conn.c optional ngatm_ccatm \
 	compile-with "${NORMAL_C_NOWERROR} -I$S/contrib/ngatm"
 contrib/ngatm/netnatm/api/cc_data.c optional ngatm_ccatm \
@@ -701,7 +747,7 @@ contrib/zstd/lib/decompress/zstd_decompress_block.c	optional zstdio \
 	compile-with "${ZSTD_C} ${ZSTD_DECOMPRESS_BLOCK_FLAGS}"
 contrib/zstd/lib/decompress/huf_decompress.c	optional zstdio compile-with ${ZSTD_C}
 # Blake 2
-contrib/libb2/blake2b-ref.c	optional crypto | ipsec | ipsec_support \
+contrib/libb2/blake2b-ref.c	optional crypto | ipsec | ipsec_support | !random_loadable random_fenestrasx \
 	compile-with "${NORMAL_C} -I$S/crypto/blake2 -Wno-cast-qual -DSUFFIX=_ref -Wno-unused-function"
 contrib/libb2/blake2s-ref.c	optional crypto | ipsec | ipsec_support \
 	compile-with "${NORMAL_C} -I$S/crypto/blake2 -Wno-cast-qual -DSUFFIX=_ref -Wno-unused-function"
@@ -780,6 +826,7 @@ dev/acpica/Osd/OsdSynch.c	optional acpi
 dev/acpica/Osd/OsdTable.c	optional acpi
 dev/acpica/acpi.c		optional acpi
 dev/acpica/acpi_acad.c		optional acpi
+dev/acpica/acpi_apei.c		optional acpi
 dev/acpica/acpi_battery.c	optional acpi
 dev/acpica/acpi_button.c	optional acpi
 dev/acpica/acpi_cmbat.c		optional acpi
@@ -1292,6 +1339,8 @@ dev/ath/ath_rate/sample/sample.c	optional ath_rate_sample \
 dev/ath/ath_dfs/null/dfs_null.c	optional ath \
 	compile-with "${NORMAL_C} -I$S/dev/ath"
 #
+dev/backlight/backlight_if.m		optional backlight | compat_linuxkpi
+dev/backlight/backlight.c		optional backlight | compat_linuxkpi
 dev/bce/if_bce.c			optional bce
 dev/bfe/if_bfe.c			optional bfe
 dev/bge/if_bge.c			optional bge
@@ -1494,7 +1543,7 @@ t4fw.fwo		optional cxgbe					\
 	no-implicit-rule						\
 	clean		"t4fw.fwo"
 t4fw.fw			optional cxgbe					\
-	dependency	"$S/dev/cxgbe/firmware/t4fw-1.24.12.0.bin"	\
+	dependency	"$S/dev/cxgbe/firmware/t4fw-1.25.0.40.bin"	\
 	compile-with	"${CP} ${.ALLSRC} ${.TARGET}"			\
 	no-obj no-implicit-rule						\
 	clean		"t4fw.fw"
@@ -1528,7 +1577,7 @@ t5fw.fwo		optional cxgbe					\
 	no-implicit-rule						\
 	clean		"t5fw.fwo"
 t5fw.fw			optional cxgbe					\
-	dependency	"$S/dev/cxgbe/firmware/t5fw-1.24.12.0.bin"	\
+	dependency	"$S/dev/cxgbe/firmware/t5fw-1.25.0.40.bin"	\
 	compile-with	"${CP} ${.ALLSRC} ${.TARGET}"			\
 	no-obj no-implicit-rule						\
 	clean		"t5fw.fw"
@@ -1562,15 +1611,12 @@ t6fw.fwo		optional cxgbe					\
 	no-implicit-rule						\
 	clean		"t6fw.fwo"
 t6fw.fw			optional cxgbe					\
-	dependency	"$S/dev/cxgbe/firmware/t6fw-1.24.12.0.bin"	\
+	dependency	"$S/dev/cxgbe/firmware/t6fw-1.25.0.40.bin"	\
 	compile-with	"${CP} ${.ALLSRC} ${.TARGET}"			\
 	no-obj no-implicit-rule						\
 	clean		"t6fw.fw"
 dev/cxgbe/crypto/t4_crypto.c	optional ccr \
 	compile-with "${NORMAL_C} -I$S/dev/cxgbe"
-dev/cy/cy.c			optional cy
-dev/cy/cy_isa.c			optional cy isa
-dev/cy/cy_pci.c			optional cy pci
 dev/cyapa/cyapa.c		optional cyapa iicbus
 dev/dc/if_dc.c			optional dc pci
 dev/dc/dcphy.c			optional dc pci
@@ -1667,6 +1713,10 @@ dev/e1000/e1000_osdep.c		optional em \
 	compile-with "${NORMAL_C} -I$S/dev/e1000"
 dev/et/if_et.c			optional et
 dev/ena/ena.c			optional ena \
+	compile-with "${NORMAL_C} -I$S/contrib"
+dev/ena/ena_datapath.c		optional ena \
+	compile-with "${NORMAL_C} -I$S/contrib"
+dev/ena/ena_netmap.c		optional ena \
 	compile-with "${NORMAL_C} -I$S/contrib"
 dev/ena/ena_sysctl.c 		optional ena \
 	compile-with "${NORMAL_C} -I$S/contrib"
@@ -2732,6 +2782,7 @@ dev/pwm/pwmbus.c		optional pwm | pwmbus
 dev/pwm/pwmbus_if.m		optional pwm | pwmbus
 dev/pwm/ofw_pwm.c		optional pwm fdt | pwmbus fdt
 dev/pwm/ofw_pwmbus.c		optional pwm fdt | pwmbus fdt
+dev/pwm/pwm_backlight.c		optional pwm pwm_backlight ext_resources fdt
 dev/quicc/quicc_core.c		optional quicc
 dev/ral/rt2560.c		optional ral
 dev/ral/rt2661.c		optional ral
@@ -2796,16 +2847,21 @@ rt2860.fw			optional rt2860fw | ralfw		\
 dev/random/random_infra.c	standard
 dev/random/random_harvestq.c	standard
 dev/random/randomdev.c		optional !random_loadable
-dev/random/fortuna.c		optional !random_loadable
+dev/random/fenestrasX/fx_brng.c	optional !random_loadable random_fenestrasx
+dev/random/fenestrasX/fx_main.c	optional !random_loadable random_fenestrasx \
+	compile-with "${NORMAL_C} -I$S/crypto/blake2"
+dev/random/fenestrasX/fx_pool.c	optional !random_loadable random_fenestrasx \
+	compile-with "${NORMAL_C} -I$S/crypto/blake2"
+dev/random/fenestrasX/fx_rng.c	optional !random_loadable random_fenestrasx \
+	compile-with "${NORMAL_C} -I$S/crypto/blake2"
+dev/random/fortuna.c		optional !random_loadable !random_fenestrasx
 dev/random/hash.c		optional !random_loadable
-dev/rc/rc.c			optional rc
 dev/rccgpio/rccgpio.c		optional rccgpio gpio
 dev/re/if_re.c			optional re
 dev/rl/if_rl.c			optional rl pci
 dev/rndtest/rndtest.c		optional rndtest
-dev/rp/rp.c			optional rp
-dev/rp/rp_isa.c			optional rp isa
-dev/rp/rp_pci.c			optional rp pci
+#
+dev/rtsx/rtsx.c			optional rtsx pci
 #
 dev/rtwn/if_rtwn.c		optional rtwn
 dev/rtwn/if_rtwn_beacon.c	optional rtwn
@@ -3041,6 +3097,7 @@ dev/scc/scc_dev_z8530.c		optional scc
 dev/sdhci/sdhci.c		optional sdhci
 dev/sdhci/sdhci_fdt.c		optional sdhci fdt
 dev/sdhci/sdhci_fdt_gpio.c	optional sdhci fdt gpio
+dev/sdhci/sdhci_fsl_fdt.c	optional sdhci ext_resources fdt gpio
 dev/sdhci/sdhci_if.m		optional sdhci
 dev/sdhci/sdhci_acpi.c		optional sdhci acpi
 dev/sdhci/sdhci_pci.c		optional sdhci pci
@@ -3056,6 +3113,7 @@ dev/smbus/smbconf.c		optional smbus
 dev/smbus/smbus.c		optional smbus
 dev/smbus/smbus_if.m		optional smbus
 dev/smc/if_smc.c		optional smc
+dev/smc/if_smc_acpi.c		optional smc acpi
 dev/smc/if_smc_fdt.c		optional smc fdt
 dev/snp/snp.c			optional snp
 dev/sound/clone.c		optional sound
@@ -3202,6 +3260,7 @@ dev/uart/uart_bus_scc.c		optional uart scc
 dev/uart/uart_core.c		optional uart
 dev/uart/uart_cpu_acpi.c	optional uart acpi
 dev/uart/uart_dbg.c		optional uart gdb
+dev/uart/uart_dev_imx.c		optional uart uart_imx fdt
 dev/uart/uart_dev_msm.c		optional uart uart_msm fdt
 dev/uart/uart_dev_mvebu.c	optional uart uart_mvebu
 dev/uart/uart_dev_ns8250.c	optional uart uart_ns8250 | uart uart_snps
@@ -3219,6 +3278,7 @@ dev/uart/uart_tty.c		optional uart
 dev/usb/controller/musb_otg.c		optional musb
 dev/usb/controller/dwc_otg.c		optional dwcotg
 dev/usb/controller/dwc_otg_fdt.c	optional dwcotg fdt
+dev/usb/controller/dwc_otg_acpi.c	optional dwcotg acpi
 dev/usb/controller/ehci.c		optional ehci
 dev/usb/controller/ehci_msm.c		optional ehci_msm fdt
 dev/usb/controller/ehci_pci.c		optional ehci pci
@@ -3358,7 +3418,7 @@ dev/usb/serial/usb_serial.c 	optional ucom | u3g | uark | ubsa | ubser | \
 #
 # USB misc drivers
 #
-dev/usb/misc/ufm.c		optional ufm
+dev/usb/misc/cp2112.c		optional cp2112
 dev/usb/misc/udbp.c		optional udbp
 dev/usb/misc/ugold.c		optional ugold
 dev/usb/misc/uled.c		optional uled
@@ -3424,6 +3484,18 @@ dev/virtio/random/virtio_random.c	optional	virtio_random
 dev/virtio/console/virtio_console.c	optional	virtio_console
 dev/vkbd/vkbd.c			optional vkbd
 dev/vmgenc/vmgenc_acpi.c	optional acpi
+dev/vmware/vmxnet3/if_vmx.c		optional vmx
+dev/vmware/vmci/vmci.c			optional vmci
+dev/vmware/vmci/vmci_datagram.c		optional vmci
+dev/vmware/vmci/vmci_doorbell.c		optional vmci
+dev/vmware/vmci/vmci_driver.c		optional vmci
+dev/vmware/vmci/vmci_event.c		optional vmci
+dev/vmware/vmci/vmci_hashtable.c	optional vmci
+dev/vmware/vmci/vmci_kernel_if.c	optional vmci
+dev/vmware/vmci/vmci_qpair.c		optional vmci
+dev/vmware/vmci/vmci_queue_pair.c	optional vmci
+dev/vmware/vmci/vmci_resource.c		optional vmci
+dev/vmware/pvscsi/pvscsi.c		optional pvscsi
 dev/vr/if_vr.c			optional vr pci
 dev/vt/colors/vt_termcolors.c	optional vt
 dev/vt/font/vt_font_default.c	optional vt
@@ -3735,6 +3807,7 @@ kern/ksched.c			optional _kposix_priority_scheduling
 kern/kern_acct.c		standard
 kern/kern_alq.c			optional alq
 kern/kern_clock.c		standard
+kern/kern_clocksource.c		standard
 kern/kern_condvar.c		standard
 kern/kern_conf.c		standard
 kern/kern_cons.c		standard
@@ -3862,6 +3935,7 @@ kern/subr_pctrie.c		standard
 kern/subr_pidctrl.c		standard
 kern/subr_power.c		standard
 kern/subr_prf.c			standard
+kern/subr_prng.c		standard
 kern/subr_prof.c		standard
 kern/subr_rangeset.c		standard
 kern/subr_rman.c		standard
@@ -4121,22 +4195,26 @@ net/debugnet.c			optional inet debugnet
 net/debugnet_inet.c		optional inet debugnet
 net/pfil.c			optional ether | inet
 net/radix.c			standard
-net/radix_mpath.c		standard
 net/raw_cb.c			standard
 net/raw_usrreq.c		standard
 net/route.c			standard
+net/route/mpath_ctl.c		optional route_mpath
+net/route/nhgrp.c		optional route_mpath
+net/route/nhgrp_ctl.c		optional route_mpath
 net/route/nhop.c		standard
 net/route/nhop_ctl.c		standard
 net/route/nhop_utils.c		standard
 net/route/route_ctl.c		standard
 net/route/route_ddb.c		optional ddb
 net/route/route_helpers.c	standard
+net/route/route_ifaddrs.c	standard
+net/route/route_tables.c	standard
 net/route/route_temporal.c	standard
 net/rss_config.c		optional inet rss | inet6 rss
 net/rtsock.c			standard
 net/slcompress.c		optional netgraph_vjc | sppp | \
 					 netgraph_sppp
-net/toeplitz.c			optional inet rss | inet6 rss
+net/toeplitz.c			optional inet rss | inet6 rss | route_mpath
 net/vnet.c			optional vimage
 net80211/ieee80211.c		optional wlan
 net80211/ieee80211_acl.c	optional wlan wlan_acl
@@ -4483,9 +4561,13 @@ nlm/sm_inter_xdr.c		optional nfslockd | nfsd
 # Linux Kernel Programming Interface
 compat/linuxkpi/common/src/linux_kmod.c		optional compat_linuxkpi \
 	compile-with "${LINUXKPI_C}"
+compat/linuxkpi/common/src/linux_acpi.c		optional compat_linuxkpi acpi \
+	compile-with "${LINUXKPI_C}"
 compat/linuxkpi/common/src/linux_compat.c	optional compat_linuxkpi \
 	compile-with "${LINUXKPI_C}"
 compat/linuxkpi/common/src/linux_current.c	optional compat_linuxkpi \
+	compile-with "${LINUXKPI_C}"
+compat/linuxkpi/common/src/linux_dmi.c		optional compat_linuxkpi \
 	compile-with "${LINUXKPI_C}"
 compat/linuxkpi/common/src/linux_hrtimer.c	optional compat_linuxkpi \
 	compile-with "${LINUXKPI_C}"
@@ -4515,6 +4597,8 @@ compat/linuxkpi/common/src/linux_usb.c		optional compat_linuxkpi usb \
 	compile-with "${LINUXKPI_C}"
 compat/linuxkpi/common/src/linux_work.c		optional compat_linuxkpi \
 	compile-with "${LINUXKPI_C}"
+compat/linuxkpi/common/src/linux_xarray.c	optional compat_linuxkpi \
+	compile-with "${LINUXKPI_C}"
 
 compat/linuxkpi/common/src/linux_seq_file.c		optional compat_linuxkpi | lindebugfs \
 	compile-with "${LINUXKPI_C}"
@@ -4523,6 +4607,7 @@ compat/lindebugfs/lindebugfs.c			optional lindebugfs \
 	compile-with "${LINUXKPI_C}"
 
 # OpenFabrics Enterprise Distribution (Infiniband)
+net/if_infiniband.c					optional ofed | lagg
 ofed/drivers/infiniband/core/ib_addr.c			optional ofed	\
 	compile-with "${OFED_C}"
 ofed/drivers/infiniband/core/ib_agent.c			optional ofed	\
@@ -4896,6 +4981,41 @@ rpc/svc_auth_unix.c		optional krpc | nfslockd | nfscl | nfsd
 rpc/svc_dg.c			optional krpc | nfslockd | nfscl | nfsd
 rpc/svc_generic.c		optional krpc | nfslockd | nfscl | nfsd
 rpc/svc_vc.c			optional krpc | nfslockd | nfscl | nfsd
+#
+# Kernel RPC-over-TLS
+#
+rpctlscd.h			optional krpc | nfslockd | nfscl | nfsd	\
+	dependency		"$S/rpc/rpcsec_tls/rpctlscd.x"			\
+	compile-with		"RPCGEN_CPP='${CPP}' rpcgen -hM $S/rpc/rpcsec_tls/rpctlscd.x | grep -v pthread.h > rpctlscd.h" \
+	no-obj no-implicit-rule before-depend local			\
+	clean			"rpctlscd.h"
+rpctlscd_xdr.c			optional krpc | nfslockd | nfscl | nfsd	\
+	dependency		"$S/rpc/rpcsec_tls/rpctlscd.x rpctlscd.h"		\
+	compile-with		"RPCGEN_CPP='${CPP}' rpcgen -c $S/rpc/rpcsec_tls/rpctlscd.x -o rpctlscd_xdr.c" no-ctfconvert \
+	no-implicit-rule before-depend local				\
+	clean			"rpctlscd_xdr.c"
+rpctlscd_clnt.c			optional krpc | nfslockd | nfscl | nfsd	\
+	dependency		"$S/rpc/rpcsec_tls/rpctlscd.x rpctlscd.h"		\
+	compile-with		"RPCGEN_CPP='${CPP}' rpcgen -lM $S/rpc/rpcsec_tls/rpctlscd.x | grep -v string.h > rpctlscd_clnt.c" no-ctfconvert \
+	no-implicit-rule before-depend local				\
+	clean			"rpctlscd_clnt.c"
+rpctlssd.h			optional krpc | nfslockd | nfscl | nfsd	\
+	dependency		"$S/rpc/rpcsec_tls/rpctlssd.x"			\
+	compile-with		"RPCGEN_CPP='${CPP}' rpcgen -hM $S/rpc/rpcsec_tls/rpctlssd.x | grep -v pthread.h > rpctlssd.h" \
+	no-obj no-implicit-rule before-depend local			\
+	clean			"rpctlssd.h"
+rpctlssd_xdr.c			optional krpc | nfslockd | nfscl | nfsd	\
+	dependency		"$S/rpc/rpcsec_tls/rpctlssd.x rpctlssd.h"		\
+	compile-with		"RPCGEN_CPP='${CPP}' rpcgen -c $S/rpc/rpcsec_tls/rpctlssd.x -o rpctlssd_xdr.c" no-ctfconvert \
+	no-implicit-rule before-depend local				\
+	clean			"rpctlssd_xdr.c"
+rpctlssd_clnt.c			optional krpc | nfslockd | nfscl | nfsd	\
+	dependency		"$S/rpc/rpcsec_tls/rpctlssd.x rpctlssd.h"		\
+	compile-with		"RPCGEN_CPP='${CPP}' rpcgen -lM $S/rpc/rpcsec_tls/rpctlssd.x | grep -v string.h > rpctlssd_clnt.c" no-ctfconvert \
+	no-implicit-rule before-depend local				\
+	clean			"rpctlssd_clnt.c"
+rpc/rpcsec_tls/rpctls_impl.c	optional krpc | nfslockd | nfscl | nfsd
+rpc/rpcsec_tls/auth_tls.c	optional krpc | nfslockd | nfscl | nfsd
 rpc/rpcsec_gss/rpcsec_gss.c	optional krpc kgssapi | nfslockd kgssapi | nfscl kgssapi | nfsd kgssapi
 rpc/rpcsec_gss/rpcsec_gss_conf.c optional krpc kgssapi | nfslockd kgssapi | nfscl kgssapi | nfsd kgssapi
 rpc/rpcsec_gss/rpcsec_gss_misc.c optional krpc kgssapi | nfslockd kgssapi | nfscl kgssapi | nfsd kgssapi

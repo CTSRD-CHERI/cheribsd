@@ -5,7 +5,8 @@
 
 # PROVIDE: ipfilter
 # REQUIRE: FILESYSTEMS
-# KEYWORD: nojail
+# BEFORE: ipmon ipnat netif netwait securelevel
+# KEYWORD: nojailvnet
 
 . /etc/rc.subr
 

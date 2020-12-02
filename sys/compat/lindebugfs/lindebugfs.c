@@ -294,12 +294,14 @@ debugfs_remove_recursive(struct dentry *dnode)
 	pfs_destroy(dnode->d_pfs_node);
 }
 
-
 static int
 debugfs_init(PFS_INIT_ARGS)
 {
 
 	debugfs_root = pi->pi_root;
+
+	(void)debugfs_create_symlink("kcov", NULL, "/dev/kcov");
+
 	return (0);
 }
 

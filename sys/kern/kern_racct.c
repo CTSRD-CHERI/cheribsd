@@ -2,7 +2,6 @@
  * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
  *
  * Copyright (c) 2010 The FreeBSD Foundation
- * All rights reserved.
  *
  * This software was developed by Edward Tomasz Napierala under sponsorship
  * from the FreeBSD Foundation.
@@ -528,7 +527,7 @@ racct_adjust_resource(struct racct *racct, int resource,
 		    ("%s: resource %d usage < 0", __func__, resource));
 		racct->r_resources[resource] = 0;
 	}
-	
+
 	/*
 	 * There are some cases where the racct %cpu resource would grow
 	 * beyond 100% per core.  For example in racct_proc_exit() we add
@@ -1146,6 +1145,8 @@ racct_proc_throttle(struct proc *p, int timeout)
 
 	FOREACH_THREAD_IN_PROC(p, td) {
 		thread_lock(td);
+		td->td_flags |= TDF_ASTPENDING;
+
 		switch (td->td_state) {
 		case TDS_RUNQ:
 			/*

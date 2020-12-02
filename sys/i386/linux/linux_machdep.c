@@ -61,6 +61,8 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm.h>
 #include <vm/vm_map.h>
 
+#include <security/audit/audit.h>
+
 #include <i386/linux/linux.h>
 #include <i386/linux/linux_proto.h>
 #include <compat/linux/linux_emul.h>
@@ -96,7 +98,6 @@ struct l_old_select_argv {
 	struct l_timeval	*timeout;
 };
 
-
 int
 linux_execve(struct thread *td, struct linux_execve_args *args)
 {
@@ -104,13 +105,20 @@ linux_execve(struct thread *td, struct linux_execve_args *args)
 	char *newpath;
 	int error;
 
-	LCONVPATHEXIST(td, args->path, &newpath);
-
-	error = exec_copyin_args(&eargs, PTR2CAP(newpath), UIO_SYSSPACE,
-	    __USER_CAP_UNBOUND(args->argp), __USER_CAP_UNBOUND(args->envp));
-	free(newpath, M_TEMP);
+	if (!LUSECONVPATH(td)) {
+		error = exec_copyin_args(&eargs, __USER_CAP_PATH(args->path),
+		    UIO_USERSPACE, __USER_CAP_UNBOUND(args->argp),
+		    __USER_CAP_UNBOUND(args->envp));
+	} else {
+		LCONVPATHEXIST(td, args->path, &newpath);
+		error = exec_copyin_args(&eargs, PTR2CAP(newpath), UIO_SYSSPACE,
+		    __USER_CAP_UNBOUND(args->argp),
+		    __USER_CAP_UNBOUND(args->envp));
+		LFREEPATH(newpath);
+	}
 	if (error == 0)
 		error = linux_common_execve(td, &eargs);
+	AUDIT_SYSCALL_EXIT(error == EJUSTRETURN ? 0 : error, td);
 	return (error);
 }
 
@@ -351,6 +359,13 @@ linux_mprotect(struct thread *td, struct linux_mprotect_args *uap)
 {
 
 	return (linux_mprotect_common(td, PTROUT(uap->addr), uap->len, uap->prot));
+}
+
+int
+linux_madvise(struct thread *td, struct linux_madvise_args *uap)
+{
+
+	return (linux_madvise_common(td, PTROUT(uap->addr), uap->len, uap->behav));
 }
 
 int

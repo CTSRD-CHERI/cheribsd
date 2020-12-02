@@ -152,6 +152,7 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_phys.h>
 #include <vm/vm_radix.h>
 #include <vm/vm_reserv.h>
+#include <vm/vm_dumpset.h>
 #include <vm/uma.h>
 
 #include <machine/machdep.h>
@@ -360,6 +361,8 @@ pagezero(void *p)
 
 #define	PTE_TO_PHYS(pte) \
     ((((pte) & ~PTE_HI_MASK) >> PTE_PPN0_S) * PAGE_SIZE)
+#define	L2PTE_TO_PHYS(l2) \
+    ((((l2) & ~PTE_HI_MASK) >> PTE_PPN1_S) << L2_SHIFT)
 
 static __inline pd_entry_t *
 pmap_l1(pmap_t pmap, vm_offset_t va)
@@ -495,7 +498,7 @@ pmap_early_vtophys(vm_offset_t l1pt, vm_offset_t va)
 		("Invalid bootstrap L2 table"));
 
 	/* L2 is superpages */
-	ret = (l2[l2_slot] >> PTE_PPN1_S) << L2_SHIFT;
+	ret = L2PTE_TO_PHYS(l2[l2_slot]);
 	ret += (va & L2_OFFSET);
 
 	return (ret);
@@ -562,7 +565,6 @@ pmap_bootstrap_l3(vm_offset_t l1pt, vm_offset_t va, vm_offset_t l3_start)
 		l3pt += PAGE_SIZE;
 	}
 
-
 	/* Clean the L2 page table */
 	memset((void *)l3_start, 0, l3pt - l3_start);
 
@@ -590,7 +592,12 @@ pmap_bootstrap(vm_offset_t l1pt, vm_paddr_t kernstart, vm_size_t kernlen)
 
 	rw_init(&pvh_global_lock, "pmap pv global");
 
-	CPU_FILL(&kernel_pmap->pm_active);
+	/*
+	 * Set the current CPU as active in the kernel pmap. Secondary cores
+	 * will add themselves later in init_secondary(). The SBI firmware
+	 * may rely on this mask being precise, so CPU_FILL() is not used.
+	 */
+	CPU_SET(PCPU_GET(hart), &kernel_pmap->pm_active);
 
 	/* Assume the address we were loaded to is a valid physical address. */
 	min_pa = max_pa = kernstart;
@@ -660,7 +667,7 @@ pmap_bootstrap(vm_offset_t l1pt, vm_paddr_t kernstart, vm_size_t kernlen)
 	virtual_avail = roundup2(freemempos, L2_SIZE);
 	virtual_end = VM_MAX_KERNEL_ADDRESS - L2_SIZE;
 	kernel_vm_end = virtual_avail;
-	
+
 	pa = pmap_early_vtophys(l1pt, freemempos);
 
 	physmem_exclude_region(kernstart, pa - kernstart, EXFLAG_NOALLOC);
@@ -844,7 +851,7 @@ pmap_extract(pmap_t pmap, vm_offset_t va)
 			}
 		} else {
 			/* L2 is superpages */
-			pa = (l2 >> PTE_PPN1_S) << L2_SHIFT;
+			pa = L2PTE_TO_PHYS(l2);
 			pa |= (va & L2_OFFSET);
 		}
 	}
@@ -896,7 +903,7 @@ pmap_kextract(vm_offset_t va)
 			panic("pmap_kextract: No l2");
 		if ((pmap_load(l2) & PTE_RX) != 0) {
 			/* superpages */
-			pa = (pmap_load(l2) >> PTE_PPN1_S) << L2_SHIFT;
+			pa = L2PTE_TO_PHYS(pmap_load(l2));
 			pa |= (va & L2_OFFSET);
 			return (pa);
 		}
@@ -1004,7 +1011,6 @@ pmap_map(vm_offset_t *virt, vm_paddr_t start, vm_paddr_t end, int prot)
 
 	return PHYS_TO_DMAP(start);
 }
-
 
 /*
  * Add a list of wired pages to the kva
@@ -1119,7 +1125,7 @@ pmap_remove_pt_page(pmap_t pmap, vm_offset_t va)
 	PMAP_LOCK_ASSERT(pmap, MA_OWNED);
 	return (vm_radix_remove(&pmap->pm_root, pmap_l2_pindex(va)));
 }
-	
+
 /*
  * Decrements a page table page's reference count, which is used to record the
  * number of valid page table entries within the page.  If the reference count
@@ -1400,7 +1406,6 @@ retry:
 	return (m);
 }
 
-
 /***************************************************
  * Pmap allocation/deallocation routines.
  ***************************************************/
@@ -1525,7 +1530,6 @@ pmap_growkernel(vm_offset_t addr)
 		}
 	}
 }
-
 
 /***************************************************
  * page management routines.
@@ -2663,7 +2667,7 @@ pmap_enter(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot,
 	if (prot & VM_PROT_READ_CAP)
 		new_l3 |= PTE_CR;
 	if (prot & VM_PROT_WRITE_CAP)
-		new_l3 |= PTE_CW;
+		new_l3 |= PTE_CW | PTE_CD;
 #endif
 
 	new_l3 |= (pn << PTE_PPN0_S);
@@ -4272,7 +4276,7 @@ pmap_mincore(pmap_t pmap, vm_offset_t addr, vm_paddr_t *pap)
 	if (l2 != NULL && ((tpte = pmap_load(l2)) & PTE_V) != 0) {
 		if ((tpte & PTE_RWX) != 0) {
 			pa = PTE_TO_PHYS(tpte) | (addr & L2_OFFSET);
-			val = MINCORE_INCORE | MINCORE_SUPER;
+			val = MINCORE_INCORE | MINCORE_PSIND(1);
 		} else {
 			l3 = pmap_l2_to_l3(l2, addr);
 			tpte = pmap_load(l3);

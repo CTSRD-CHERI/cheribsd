@@ -76,7 +76,6 @@ struct asmc_softc {
  */
 #define ASMC_INTPORT_READ(sc)	bus_read_1(sc->sc_ioport, 0x1f)
 
-
 /* Number of keys */
 #define ASMC_NKEYS		"#KEY"	/* RO; 4 bytes */
 
@@ -157,6 +156,21 @@ struct asmc_softc {
 				  "Northbridge Point 1", \
 				  "Heatsink 1","Heatsink 2" \
 				  "Memory Bank A", }
+
+#define ASMC_MB71_TEMPS		{ "TB0T", "TB1T", "TB2T", "TC0D", "TC0P", \
+				  "TH0P", "TN0D", "TN0P", "TN0S", "TN1D", \
+				  "TN1E", "TN1F", "TN1G", "TN1S", "Th1H", \
+				  "Ts0P", "Ts0S", NULL }
+
+#define ASMC_MB71_TEMPNAMES	{ "enclosure_bottom0", "battery_1", "battery_2", "cpu_package", "cpu_proximity", \
+				  "hdd_bay", "northbridge0_diode", "northbridge0_proximity", "TN0S", "mpc_die2", \
+				  "TN1E", "TN1F", "TN1G", "TN1S", "heatsink1", \
+				  "palm_rest", "memory_proximity", }
+
+#define ASMC_MB71_TEMPDESCS	{ "Enclosure Bottom 0", "Battery 1", "Battery 2", "CPU Package", "CPU Proximity", \
+				  "HDD Bay", "Northbridge Diode", "Northbridge Proximity", "TN0S", "MPC Die 2", \
+				  "TN1E", "TN1F", "TN1G", "TN1S", "Heatsink 1", \
+				  "Palm Rest", "Memory Proximity", }
 
 #define ASMC_MBP_TEMPS		{ "TB0T", "Th0H", "Th1H", "Tm0P",	\
 				  "TG0H", "TG0P", "TG0T", NULL }
@@ -277,7 +291,6 @@ struct asmc_softc {
 				  "GPU Die", "Memory Bank A1", "Memory Module A1", \
 				  "PCH Die" }
 
-
 #define ASMC_MBP112_TEMPS	{ "TB0T", "TB1T", "TB2T", "TBXT", "TC0E", \
 				  "TC0F", "TC0P", "TC1C", "TC2C", "TC3C", \
 				  "TC4C", "TCFC", "TCGC", "TCSA", "TCTD", \
@@ -334,8 +347,6 @@ struct asmc_softc {
 				  "TM0S", "TP0P", "TPCD", "TW0P", "Ta0P", \
 				  "TaSP", "Th1H", "Th2H", "Ts0P", "Ts0S", \
 				  "Ts1S" }
-
-
 #define ASMC_MM_TEMPS		{ "TN0P", "TN1P", NULL }
 #define ASMC_MM_TEMPNAMES	{ "northbridge1", "northbridge2" }
 #define ASMC_MM_TEMPDESCS	{ "Northbridge Point 1", \
@@ -418,7 +429,7 @@ struct asmc_softc {
 				  "memory_proximity", "pch_controller_proximity", \
 				  "pch_controller_die", "pwr_supply", \
 				  "wireless_proximity", }
- 
+
 #define ASMC_MM52_TEMPDESCS	{ "Ambient Air Proximity Temperature", \
 				  "Combo Ambient CPU PCH Wireless DIMM Temperature", \
 				  "CPU Die Temperature", "CPU Proximity Temperature", \
@@ -570,7 +581,6 @@ struct asmc_softc {
 				  "Te3F", "Te3S", "Te4F", "Te4S", "Te5F", \
 				  "Te5S", "TeGG", "TeGP", "TeRG", "TeRP", \
 				  "TeRV", "Tp0C", "Tp1C", "TpPS", "TpTG", }
-
 #define	ASMC_MBA_TEMPS		{ "TB0T", NULL }
 #define	ASMC_MBA_TEMPNAMES	{ "enclosure" }
 #define	ASMC_MBA_TEMPDESCS	{ "Enclosure Bottom" }

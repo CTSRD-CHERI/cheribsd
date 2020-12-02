@@ -35,7 +35,7 @@ options 	TCP_OFFLOAD		# TCP offload
 options 	TCP_BLACKBOX		# Enhanced TCP event logging
 options 	TCP_HHOOK		# hhook(9) framework for TCP
 options		TCP_RFC7413		# TCP Fast Open
-options 	SCTP			# Stream Control Transmission Protocol
+options 	SCTP_SUPPORT		# Allow kldload of SCTP
 options 	FFS			# Berkeley Fast Filesystem
 options 	SOFTUPDATES		# Enable FFS soft updates support
 options 	UFS_ACL			# Support for access control lists
@@ -127,7 +127,7 @@ device		cpufreq
 
 # Bus support.
 device		acpi
-options 	ACPI_DMAR
+options 	IOMMU
 device		pci
 options 	PCI_HP			# PCI-Express native HotPlug
 options		PCI_IOV			# PCI SR-IOV support
@@ -248,6 +248,7 @@ device		ixl			# Intel 700 Series Physical Function
 device		iavf			# Intel Adaptive Virtual Function
 device		ice			# Intel 800 Series Physical Function
 device		vmx			# VMware VMXNET3 Ethernet
+device		axp			# AMD EPYC integrated NIC
 
 # PCI Ethernet NICs.
 device		bxe			# Broadcom NetXtreme II BCM5771X/BCM578XX 10GbE
@@ -353,6 +354,7 @@ device		snd_via8233		# VIA VT8233x Audio
 device		mmc			# MMC/SD bus
 device		mmcsd			# MMC/SD memory card
 device		sdhci			# Generic PCI SD Host Controller
+device		rtsx			# Realtek SD card reader
 
 # VirtIO support
 device		virtio			# Generic VirtIO bus (required)

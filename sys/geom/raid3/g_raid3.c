@@ -117,7 +117,6 @@ struct g_class g_raid3_class = {
 	.fini = g_raid3_fini
 };
 
-
 static void g_raid3_destroy_provider(struct g_raid3_softc *sc);
 static int g_raid3_update_disk(struct g_raid3_disk *disk, u_int state);
 static void g_raid3_update_device(struct g_raid3_softc *sc, boolean_t force);
@@ -126,7 +125,6 @@ static void g_raid3_dumpconf(struct sbuf *sb, const char *indent,
 static void g_raid3_sync_stop(struct g_raid3_softc *sc, int type);
 static int g_raid3_register_request(struct bio *pbp);
 static void g_raid3_sync_release(struct g_raid3_softc *sc);
-
 
 static const char *
 g_raid3_disk_state2str(int state)
@@ -3317,9 +3315,11 @@ g_raid3_taste(struct g_class *mp, struct g_provider *pp, int flags __unused)
 	/* This orphan function should be never called. */
 	gp->orphan = g_raid3_taste_orphan;
 	cp = g_new_consumer(gp);
-	g_attach(cp, pp);
-	error = g_raid3_read_metadata(cp, &md);
-	g_detach(cp);
+	error = g_attach(cp, pp);
+	if (error == 0) {
+		error = g_raid3_read_metadata(cp, &md);
+		g_detach(cp);
+	}
 	g_destroy_consumer(cp);
 	g_destroy_geom(gp);
 	if (error != 0)

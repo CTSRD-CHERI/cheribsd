@@ -121,8 +121,8 @@ struct iovec32;
 struct rusage32;
 int	freebsd32_copyout_strings(struct image_params *imgp,
 	    uintptr_t *stack_base);
-int	freebsd32_copyiniov(struct iovec32 * __capability iovp, u_int iovcnt,
-	    struct iovec **iov, int error);
+int	freebsd32_copyiniov(const struct iovec * __capability cb_arg,
+	    u_int iovcnt, struct iovec **iov, int error);
 void	freebsd32_rusage_out(const struct rusage *s, struct rusage32 *s32);
 
 #endif /* !_COMPAT_FREEBSD32_FREEBSD32_UTIL_H_ */

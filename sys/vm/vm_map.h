@@ -150,7 +150,13 @@ struct vm_map_entry {
 #define	MAP_ENTRY_STACK_GAP_DN		0x00020000
 #define	MAP_ENTRY_STACK_GAP_UP		0x00040000
 #define	MAP_ENTRY_HEADER		0x00080000
-#define	MAP_ENTRY_UNMAPPED		0x00100000
+/* Gap for MAP_ENTRY_SPLIT_BOUNDARY_MASK */
+#define	MAP_ENTRY_UNMAPPED		0x00400000
+
+#define	MAP_ENTRY_SPLIT_BOUNDARY_MASK	0x00300000
+
+#define	MAP_ENTRY_SPLIT_BOUNDARY_SHIFT	20
+
 
 #ifdef	_KERNEL
 static __inline u_char
@@ -226,13 +232,16 @@ struct vm_map {
 #define	MAP_IS_SUB_MAP		0x04	/* has parent */
 #define	MAP_ASLR		0x08	/* enabled ASLR */
 #define	MAP_ASLR_IGNSTART	0x10
-#define	MAP_RESERVATIONS	0x20	/* Don't merge reservations */
+#define	MAP_REPLENISH		0x20
+#define	MAP_RESERVATIONS	0x40	/* Don't merge reservations */
 
 #ifdef	_KERNEL
 #if defined(KLD_MODULE) && !defined(KLD_TIED)
 #define	vm_map_max(map)		vm_map_max_KBI((map))
 #define	vm_map_min(map)		vm_map_min_KBI((map))
 #define	vm_map_pmap(map)	vm_map_pmap_KBI((map))
+#define	vm_map_range_valid(map, start, end)	\
+	vm_map_range_valid_KBI((map), (start), (end))
 #else
 static __inline vm_offset_t
 vm_map_max(const struct vm_map *map)
@@ -260,12 +269,23 @@ vm_map_modflags(vm_map_t map, vm_flags_t set, vm_flags_t clear)
 	map->flags = (map->flags | set) & ~clear;
 }
 
+static inline bool
+vm_map_range_valid(vm_map_t map, vm_offset_t start, vm_offset_t end)
+{
+	if (end < start)
+		return (false);
+	if (start < vm_map_min(map) || end > vm_map_max(map))
+		return (false);
+	return (true);
+}
+
 struct coname {
 	LIST_ENTRY(coname)	c_next;
 	struct thread		*c_td;
 	char			*c_name;
 	void * __capability	c_value;
 };
+
 #endif	/* KLD_MODULE */
 #endif	/* _KERNEL */
 
@@ -288,7 +308,7 @@ struct vmspace {
 	caddr_t vm_taddr;	/* (c) user virtual address of text */
 	caddr_t vm_daddr;	/* (c) user virtual address of data */
 	caddr_t vm_maxsaddr;	/* user VA at max stack growth */
-	volatile int vm_refcnt;	/* number of references */
+	u_int vm_refcnt;	/* number of references */
 	/*
 	 * Keep the PMAP last, so that CPU-specific variations of that
 	 * structure on a single architecture don't result in offset
@@ -333,6 +353,7 @@ void vm_map_wait_busy(vm_map_t map);
 vm_offset_t vm_map_max_KBI(const struct vm_map *map);
 vm_offset_t vm_map_min_KBI(const struct vm_map *map);
 pmap_t vm_map_pmap_KBI(vm_map_t map);
+bool vm_map_range_valid_KBI(vm_map_t map, vm_offset_t start, vm_offset_t end);
 
 #define	vm_map_lock(map)	_vm_map_lock(map, LOCK_FILE, LOCK_LINE)
 #define	vm_map_unlock(map)	_vm_map_unlock(map, LOCK_FILE, LOCK_LINE)
@@ -350,10 +371,6 @@ pmap_t vm_map_pmap_KBI(vm_map_t map);
 
 long vmspace_resident_count(struct vmspace *vmspace);
 #endif	/* _KERNEL */
-
-
-/* XXX: number of kernel maps to statically allocate */
-#define MAX_KMAP	10
 
 /*
  * Copy-on-write flags for vm_map operations
@@ -377,14 +394,20 @@ long vmspace_resident_count(struct vmspace *vmspace);
 #define	MAP_CREATE_STACK_GAP_UP	0x00010000
 #define	MAP_CREATE_STACK_GAP_DN	0x00020000
 #define	MAP_VN_EXEC		0x00040000
-#define MAP_CREATE_UNMAPPED	0x00080000
+/* Gap for MAP_ENTRY_SPLIT_BOUNDARY_MASK */
+#define MAP_CREATE_UNMAPPED	0x00200000
+
+#define	MAP_SPLIT_BOUNDARY_MASK	0x00180000
+
+#define	MAP_SPLIT_BOUNDARY_SHIFT 19
 
 /*
  * vm_fault option flags
  */
-#define	VM_FAULT_NORMAL	0		/* Nothing special */
-#define	VM_FAULT_WIRE	1		/* Wire the mapped page */
-#define	VM_FAULT_DIRTY	2		/* Dirty the page; use w/VM_PROT_COPY */
+#define	VM_FAULT_NORMAL	0x00	/* Nothing special */
+#define	VM_FAULT_WIRE	0x01	/* Wire the mapped page */
+#define	VM_FAULT_DIRTY	0x02	/* Dirty the page; use w/VM_PROT_COPY */
+#define	VM_FAULT_NOFILL	0x04	/* Fail if the pager doesn't have a copy */
 
 /*
  * Initially, mappings are slightly sequential.  The maximum window size must
@@ -462,13 +485,14 @@ vm_map_entry_read_succ(void *token, struct vm_map_entry *const clone,
 int vm_map_check_owner_proc(vm_map_t map, vm_offset_t start, vm_offset_t end, struct proc *p);
 int vm_map_check_owner(vm_map_t map, vm_offset_t start, vm_offset_t end);
 boolean_t vm_map_check_protection (vm_map_t, vm_offset_t, vm_offset_t, vm_prot_t);
-vm_map_t vm_map_create(pmap_t, vm_offset_t, vm_offset_t);
 int vm_map_abandon_and_delete(vm_map_t, vm_offset_t, vm_offset_t);
 int vm_map_delete(vm_map_t, vm_offset_t, vm_offset_t);
 int vm_map_find(vm_map_t, vm_object_t, vm_ooffset_t, vm_offset_t *, vm_size_t,
     vm_offset_t, int, vm_prot_t, vm_prot_t, int);
 int vm_map_find_min(vm_map_t, vm_object_t, vm_ooffset_t, vm_offset_t *,
     vm_size_t, vm_offset_t, vm_offset_t, int, vm_prot_t, vm_prot_t, int);
+int vm_map_find_aligned(vm_map_t map, vm_offset_t *addr, vm_size_t length,
+    vm_offset_t max_addr, vm_offset_t alignment);
 int vm_map_fixed(vm_map_t, vm_object_t, vm_ooffset_t, vm_offset_t, vm_size_t,
     vm_prot_t, vm_prot_t, int);
 vm_offset_t vm_map_findspace(vm_map_t, vm_offset_t, vm_size_t);
@@ -528,6 +552,7 @@ int vm_map_wire_locked(vm_map_t map, vm_offset_t start, vm_offset_t end,
     int flags);
 long vmspace_swap_count(struct vmspace *vmspace);
 void vm_map_entry_set_vnode_text(vm_map_entry_t entry, bool add);
+pid_t vm_get_cap_owner(struct thread *td, uintcap_t c);
 #endif				/* _KERNEL */
 #endif				/* _VM_MAP_ */
 // CHERI CHANGES START

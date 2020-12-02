@@ -41,6 +41,7 @@
 #define	NVME_PASSTHROUGH_CMD		_IOWR('n', 0, struct nvme_pt_command)
 #define	NVME_RESET_CONTROLLER		_IO('n', 1)
 #define	NVME_GET_NSID			_IOR('n', 2, struct nvme_get_nsid)
+#define	NVME_GET_MAX_XFER_SIZE		_IOR('n', 3, uint64_t)
 
 #define	NVME_IO_TEST			_IOWR('n', 100, struct nvme_io_test)
 #define	NVME_BIO_TEST			_IOWR('n', 101, struct nvme_io_test)
@@ -83,6 +84,8 @@
 #define NVME_CAP_HI_REG_DSTRD_MASK			(0xF)
 #define NVME_CAP_HI_REG_NSSRS_SHIFT			(4)
 #define NVME_CAP_HI_REG_NSSRS_MASK			(0x1)
+#define NVME_CAP_HI_REG_CSS_SHIFT			(5)
+#define NVME_CAP_HI_REG_CSS_MASK			(0xff)
 #define NVME_CAP_HI_REG_CSS_NVM_SHIFT			(5)
 #define NVME_CAP_HI_REG_CSS_NVM_MASK			(0x1)
 #define NVME_CAP_HI_REG_BPS_SHIFT			(13)
@@ -97,12 +100,22 @@
 #define NVME_CAP_HI_REG_CMBS_MASK			(0x1)
 #define NVME_CAP_HI_DSTRD(x) \
 	(((x) >> NVME_CAP_HI_REG_DSTRD_SHIFT) & NVME_CAP_HI_REG_DSTRD_MASK)
+#define NVME_CAP_HI_NSSRS(x) \
+	(((x) >> NVME_CAP_HI_REG_NSSRS_SHIFT) & NVME_CAP_HI_REG_NSSRS_MASK)
+#define NVME_CAP_HI_CSS(x) \
+	(((x) >> NVME_CAP_HI_REG_CSS_SHIFT) & NVME_CAP_HI_REG_CSS_MASK)
 #define NVME_CAP_HI_CSS_NVM(x) \
 	(((x) >> NVME_CAP_HI_REG_CSS_NVM_SHIFT) & NVME_CAP_HI_REG_CSS_NVM_MASK)
+#define NVME_CAP_HI_BPS(x) \
+	(((x) >> NVME_CAP_HI_REG_BPS_SHIFT) & NVME_CAP_HI_REG_BPS_MASK)
 #define NVME_CAP_HI_MPSMIN(x) \
 	(((x) >> NVME_CAP_HI_REG_MPSMIN_SHIFT) & NVME_CAP_HI_REG_MPSMIN_MASK)
 #define NVME_CAP_HI_MPSMAX(x) \
 	(((x) >> NVME_CAP_HI_REG_MPSMAX_SHIFT) & NVME_CAP_HI_REG_MPSMAX_MASK)
+#define NVME_CAP_HI_PMRS(x) \
+	(((x) >> NVME_CAP_HI_REG_PMRS_SHIFT) & NVME_CAP_HI_REG_PMRS_MASK)
+#define NVME_CAP_HI_CMBS(x) \
+	(((x) >> NVME_CAP_HI_REG_CMBS_SHIFT) & NVME_CAP_HI_REG_CMBS_MASK)
 
 #define NVME_CC_REG_EN_SHIFT				(0)
 #define NVME_CC_REG_EN_MASK				(0x1)
@@ -136,6 +149,36 @@
 #define NVME_AQA_REG_ASQS_MASK				(0xFFF)
 #define NVME_AQA_REG_ACQS_SHIFT				(16)
 #define NVME_AQA_REG_ACQS_MASK				(0xFFF)
+
+#define NVME_PMRCAP_REG_RDS_SHIFT			(3)
+#define NVME_PMRCAP_REG_RDS_MASK			(0x1)
+#define NVME_PMRCAP_REG_WDS_SHIFT			(4)
+#define NVME_PMRCAP_REG_WDS_MASK			(0x1)
+#define NVME_PMRCAP_REG_BIR_SHIFT			(5)
+#define NVME_PMRCAP_REG_BIR_MASK			(0x7)
+#define NVME_PMRCAP_REG_PMRTU_SHIFT			(8)
+#define NVME_PMRCAP_REG_PMRTU_MASK			(0x3)
+#define NVME_PMRCAP_REG_PMRWBM_SHIFT			(10)
+#define NVME_PMRCAP_REG_PMRWBM_MASK			(0xf)
+#define NVME_PMRCAP_REG_PMRTO_SHIFT			(16)
+#define NVME_PMRCAP_REG_PMRTO_MASK			(0xff)
+#define NVME_PMRCAP_REG_CMSS_SHIFT			(24)
+#define NVME_PMRCAP_REG_CMSS_MASK			(0x1)
+
+#define NVME_PMRCAP_RDS(x) \
+	(((x) >> NVME_PMRCAP_REG_RDS_SHIFT) & NVME_PMRCAP_REG_RDS_MASK)
+#define NVME_PMRCAP_WDS(x) \
+	(((x) >> NVME_PMRCAP_REG_WDS_SHIFT) & NVME_PMRCAP_REG_WDS_MASK)
+#define NVME_PMRCAP_BIR(x) \
+	(((x) >> NVME_PMRCAP_REG_BIR_SHIFT) & NVME_PMRCAP_REG_BIR_MASK)
+#define NVME_PMRCAP_PMRTU(x) \
+	(((x) >> NVME_PMRCAP_REG_PMRTU_SHIFT) & NVME_PMRCAP_REG_PMRTU_MASK)
+#define NVME_PMRCAP_PMRWBM(x) \
+	(((x) >> NVME_PMRCAP_REG_PMRWBM_SHIFT) & NVME_PMRCAP_REG_PMRWBM_MASK)
+#define NVME_PMRCAP_PMRTO(x) \
+	(((x) >> NVME_PMRCAP_REG_PMRTO_SHIFT) & NVME_PMRCAP_REG_PMRTO_MASK)
+#define NVME_PMRCAP_CMSS(x) \
+	(((x) >> NVME_PMRCAP_REG_CMSS_SHIFT) & NVME_PMRCAP_REG_CMSS_MASK)
 
 /* Command field definitions */
 
@@ -454,6 +497,8 @@ enum nvme_critical_warning_state {
 	NVME_CRIT_WARN_ST_VOLATILE_MEMORY_BACKUP	= 0x10,
 };
 #define NVME_CRIT_WARN_ST_RESERVED_MASK			(0xE0)
+#define	NVME_ASYNC_EVENT_NS_ATTRIBUTE			(0x100)
+#define	NVME_ASYNC_EVENT_FW_ACTIVATE			(0x200)
 
 /* slot for current FW */
 #define NVME_FIRMWARE_PAGE_AFI_SLOT_SHIFT		(0)
@@ -574,7 +619,6 @@ struct nvme_command
 _Static_assert(sizeof(struct nvme_command) == 16 * 4, "bad size for nvme_command");
 
 struct nvme_completion {
-
 	/* dword 0 */
 	uint32_t		cdw0;	/* command-specific */
 
@@ -869,7 +913,6 @@ _Static_assert(sizeof(struct nvme_power_state) == 32, "bad size for nvme_power_s
 #define NVME_FIRMWARE_REVISION_LENGTH	8
 
 struct nvme_controller_data {
-
 	/* bytes 0-255: controller capabilities and features */
 
 	/** pci vendor id */
@@ -1115,7 +1158,6 @@ struct nvme_controller_data {
 _Static_assert(sizeof(struct nvme_controller_data) == 4096, "bad size for nvme_controller_data");
 
 struct nvme_namespace_data {
-
 	/** namespace size */
 	uint64_t		nsze;
 
@@ -1229,7 +1271,6 @@ struct nvme_namespace_data {
 _Static_assert(sizeof(struct nvme_namespace_data) == 4096, "bad size for nvme_namepsace_data");
 
 enum nvme_log_page {
-
 	/* 0x00 - reserved */
 	NVME_LOG_ERROR			= 0x01,
 	NVME_LOG_HEALTH_INFORMATION	= 0x02,
@@ -1270,7 +1311,6 @@ enum nvme_log_page {
 };
 
 struct nvme_error_information_entry {
-
 	uint64_t		error_count;
 	uint16_t		sqid;
 	uint16_t		cid;
@@ -1289,7 +1329,6 @@ struct nvme_error_information_entry {
 _Static_assert(sizeof(struct nvme_error_information_entry) == 64, "bad size for nvme_error_information_entry");
 
 struct nvme_health_information_page {
-
 	uint8_t			critical_warning;
 	uint16_t		temperature;
 	uint8_t			available_spare;
@@ -1334,7 +1373,6 @@ struct nvme_health_information_page {
 _Static_assert(sizeof(struct nvme_health_information_page) == 512, "bad size for nvme_health_information_page");
 
 struct nvme_firmware_page {
-
 	uint8_t			afi;
 	uint8_t			reserved[7];
 	uint64_t		revision[7]; /* revisions for 7 slots */
@@ -1454,7 +1492,6 @@ _Static_assert(sizeof(struct nvme_resv_status_ext) == 64, "bad size for nvme_res
 #define NVME_TEST_MAX_THREADS	128
 
 struct nvme_io_test {
-
 	enum nvme_nvm_opcode	opc;
 	uint32_t		size;
 	uint32_t		time;	/* in seconds */
@@ -1464,7 +1501,6 @@ struct nvme_io_test {
 };
 
 enum nvme_io_test_flags {
-
 	/*
 	 * Specifies whether dev_refthread/dev_relthread should be
 	 *  called during NVME_BIO_TEST.  Ignored for other test
@@ -1474,7 +1510,6 @@ enum nvme_io_test_flags {
 };
 
 struct nvme_pt_command {
-
 	/*
 	 * cmd is used to specify a passthrough command to a controller or
 	 *  namespace.
@@ -1502,7 +1537,7 @@ struct nvme_pt_command {
 	struct nvme_completion	cpl;
 
 	/* buf is the data buffer associated with this passthrough command. */
-	void *			buf;
+	void * __kerncap	buf;
 
 	/*
 	 * len is the length of the data buffer associated with this
@@ -1852,7 +1887,6 @@ void	nvme_health_information_page_swapbytes(struct nvme_health_information_page 
 	s->ttftmt1 = le32toh(s->ttftmt1);
 	s->ttftmt2 = le32toh(s->ttftmt2);
 }
-
 
 static inline
 void	nvme_firmware_page_swapbytes(struct nvme_firmware_page *s)

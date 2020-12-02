@@ -63,7 +63,6 @@ __FBSDID("$FreeBSD$");
 #include "usb_if.h"
 
 static device_probe_t xhci_pci_probe;
-static device_attach_t xhci_pci_attach;
 static device_detach_t xhci_pci_detach;
 static usb_take_controller_t xhci_pci_take_controller;
 
@@ -80,15 +79,12 @@ static device_method_t xhci_device_methods[] = {
 	DEVMETHOD_END
 };
 
-static driver_t xhci_driver = {
-	.name = "xhci",
-	.methods = xhci_device_methods,
-	.size = sizeof(struct xhci_softc),
-};
+DEFINE_CLASS_0(xhci, xhci_pci_driver, xhci_device_methods,
+    sizeof(struct xhci_softc));
 
 static devclass_t xhci_devclass;
 
-DRIVER_MODULE(xhci, pci, xhci_driver, xhci_devclass, NULL, NULL);
+DRIVER_MODULE(xhci, pci, xhci_pci_driver, xhci_devclass, NULL, NULL);
 MODULE_DEPEND(xhci, usb, 1, 1, 1);
 
 static const char *
@@ -223,7 +219,7 @@ xhci_pci_port_route(device_t self, uint32_t set, uint32_t clear)
 	return (0);
 }
 
-static int
+int
 xhci_pci_attach(device_t self)
 {
 	struct xhci_softc *sc = device_get_softc(self);
@@ -281,21 +277,29 @@ xhci_pci_attach(device_t self)
 
 	rid = 0;
 	if (xhci_use_msix && (msix_table = pci_msix_table_bar(self)) >= 0) {
-		sc->sc_msix_res = bus_alloc_resource_any(self, SYS_RES_MEMORY,
-		    &msix_table, RF_ACTIVE);
-		if (sc->sc_msix_res == NULL) {
-			/* May not be enabled */
-			device_printf(self,
-			    "Unable to map MSI-X table \n");
+		if (msix_table == PCI_XHCI_CBMEM) {
+			sc->sc_msix_res = sc->sc_io_res;
 		} else {
+			sc->sc_msix_res = bus_alloc_resource_any(self,
+			    SYS_RES_MEMORY, &msix_table, RF_ACTIVE);
+			if (sc->sc_msix_res == NULL) {
+				/* May not be enabled */
+				device_printf(self,
+				    "Unable to map MSI-X table\n");
+			}
+		}
+		if (sc->sc_msix_res != NULL) {
 			count = 1;
 			if (pci_alloc_msix(self, &count) == 0) {
 				if (bootverbose)
 					device_printf(self, "MSI-X enabled\n");
 				rid = 1;
 			} else {
-				bus_release_resource(self, SYS_RES_MEMORY,
-				    msix_table, sc->sc_msix_res);
+				if (sc->sc_msix_res != sc->sc_io_res) {
+					bus_release_resource(self,
+					    SYS_RES_MEMORY,
+					    msix_table, sc->sc_msix_res);
+				}
 				sc->sc_msix_res = NULL;
 			}
 		}
@@ -391,15 +395,15 @@ xhci_pci_detach(device_t self)
 		sc->sc_irq_res = NULL;
 		pci_release_msi(self);
 	}
+	if (sc->sc_msix_res != NULL && sc->sc_msix_res != sc->sc_io_res) {
+		bus_release_resource(self, SYS_RES_MEMORY,
+		    rman_get_rid(sc->sc_msix_res), sc->sc_msix_res);
+		sc->sc_msix_res = NULL;
+	}
 	if (sc->sc_io_res) {
 		bus_release_resource(self, SYS_RES_MEMORY, PCI_XHCI_CBMEM,
 		    sc->sc_io_res);
 		sc->sc_io_res = NULL;
-	}
-	if (sc->sc_msix_res) {
-		bus_release_resource(self, SYS_RES_MEMORY,
-		    rman_get_rid(sc->sc_msix_res), sc->sc_msix_res);
-		sc->sc_msix_res = NULL;
 	}
 
 	xhci_uninit(sc);

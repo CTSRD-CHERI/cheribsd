@@ -80,6 +80,7 @@ __DEFAULT_YES_OPTIONS = \
     CLANG \
     CLANG_BOOTSTRAP \
     CLANG_IS_CC \
+    CLEAN \
     CPP \
     CROSS_COMPILER \
     CRYPT \
@@ -105,6 +106,7 @@ __DEFAULT_YES_OPTIONS = \
     FTP \
     GAMES \
     GDB \
+    GH_BC \
     GNU_DIFF \
     GNU_GREP \
     GOOGLETEST \
@@ -133,6 +135,7 @@ __DEFAULT_YES_OPTIONS = \
     LLD_IS_LD \
     LLVM_ASSERTIONS \
     LLVM_COV \
+    LLVM_CXXFILT \
     LLVM_TARGET_ALL \
     LOADER_GELI \
     LOADER_LUA \
@@ -203,15 +206,16 @@ __DEFAULT_NO_OPTIONS = \
     BHYVE_SNAPSHOT \
     BSD_GREP \
     CLANG_EXTRAS \
+    CLANG_FORMAT \
     DTRACE_TESTS \
     EXPERIMENTAL \
     GNU_GREP_COMPAT \
     HESIOD \
     LIBSOFT \
     LOADER_FIREWIRE \
-    LOADER_FORCE_LE \
     LOADER_VERBOSE \
     LOADER_VERIEXEC_PASS_MANIFEST \
+    MALLOC_PRODUCTION \
     OFED_EXTRA \
     OPENLDAP \
     REPRODUCIBLE_BUILD \
@@ -368,6 +372,11 @@ BROKEN_OPTIONS+=GOOGLETEST SSP
 BROKEN_OPTIONS+=NS_CACHING
 .endif
 
+.if ${__C} == "cheri" || ${__T:Mmips64*c*} || ${__T:Mriscv*c*} || ${.MAKE.OS} == "Linux"
+# Broken post OpenZFS import
+BROKEN_OPTIONS+=CDDL ZFS
+.endif
+
 .if ${__T:Mriscv*c*}
 # Crash in ZFS code. TODO: investigate
 BROKEN_OPTIONS+=CDDL
@@ -381,8 +390,9 @@ BROKEN_OPTIONS+=SVN SVNLITE
 BROKEN_OPTIONS+=LIBCHERI
 .endif
 
-# EFI doesn't exist on mips, powerpc or riscv.
-.if ${__T:Mmips*} || ${__T:Mpowerpc*} || ${__T:Mriscv*}
+# EFI doesn't exist on mips or powerpc.
+# It's also broken on purecap.
+.if ${__T:Mmips*} || ${__T:Mpowerpc*} || ${__T:Mriscv64*c*}
 BROKEN_OPTIONS+=EFI
 .endif
 # OFW is only for powerpc, exclude others
@@ -410,11 +420,6 @@ BROKEN_OPTIONS+=PROFILE
 BROKEN_OPTIONS+=CXGBETOOL
 BROKEN_OPTIONS+=MLX5TOOL
 .endif
-.if ${__T:Mmips*}
-__DEFAULT_YES_OPTIONS+=PIE
-.else
-__DEFAULT_NO_OPTIONS+=PIE
-.endif
 
 # We'd really like this to be:
 #    !${MACHINE_CPU:Mcheri} || ${MACHINE_ABI:Mpurecap}
@@ -433,9 +438,9 @@ BROKEN_OPTIONS+=CLANG LLD
 BROKEN_OPTIONS+=HYPERV
 .endif
 
-# NVME is only aarch64, x86 and powerpc64
+# NVME is only aarch64, x86 and powerpc64*
 .if ${__T} != "aarch64" && ${__T} != "amd64" && ${__T} != "i386" && \
-    ${__T} != "powerpc64"
+    ${__T:Mpowerpc64*} == ""
 BROKEN_OPTIONS+=NVME
 .endif
 
@@ -444,7 +449,8 @@ BROKEN_OPTIONS+=NVME
 BROKEN_OPTIONS+=GOOGLETEST
 .endif
 
-.if ${__T} == "amd64" || ${__T} == "i386" || ${__T} == "powerpc64"
+.if ${__T} == "aarch64" || ${__T} == "amd64" || ${__T} == "i386" || \
+    ${__T:Mpowerpc64*} != ""
 __DEFAULT_YES_OPTIONS+=OPENMP
 .else
 __DEFAULT_NO_OPTIONS+=OPENMP
@@ -556,11 +562,6 @@ MK_AUTHPF:=	no
 MK_OFED_EXTRA:=	no
 .endif
 
-.if ${MK_PORTSNAP} == "no"
-# freebsd-update depends on phttpget from portsnap
-MK_FREEBSD_UPDATE:=	no
-.endif
-
 .if ${MK_TESTS} == "no"
 MK_DTRACE_TESTS:= no
 .endif
@@ -589,6 +590,7 @@ MK_LLDB:=	no
 
 .if ${MK_CLANG} == "no"
 MK_CLANG_EXTRAS:= no
+MK_CLANG_FORMAT:= no
 MK_CLANG_FULL:= no
 MK_LLVM_COV:= no
 .endif

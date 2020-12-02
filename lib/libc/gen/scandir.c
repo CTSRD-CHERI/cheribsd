@@ -50,20 +50,24 @@ __FBSDID("$FreeBSD$");
 #include "block_abi.h"
 #define	SELECT(x)	CALL_BLOCK(select, x)
 #ifndef __BLOCKS__
-void
-qsort_b(void *, size_t, size_t, void*);
+void qsort_b(void *, size_t, size_t, void *);
 #endif
 #else
 #define	SELECT(x)	select(x)
 #endif
 
+#ifdef I_AM_SCANDIR_B
+typedef DECLARE_BLOCK(int, select_block, const struct dirent *);
+typedef DECLARE_BLOCK(int, dcomp_block, const struct dirent **,
+    const struct dirent **);
+#else
 static int alphasort_thunk(void *thunk, const void *p1, const void *p2);
+#endif
 
 int
 #ifdef I_AM_SCANDIR_B
-scandir_b(const char *dirname, struct dirent ***namelist,
-    DECLARE_BLOCK(int, select, const struct dirent *),
-    DECLARE_BLOCK(int, dcomp, const struct dirent **, const struct dirent **))
+scandir_b(const char *dirname, struct dirent ***namelist, select_block select,
+    dcomp_block dcomp)
 #else
 scandir(const char *dirname, struct dirent ***namelist,
     int (*select)(const struct dirent *), int (*dcomp)(const struct dirent **,
@@ -134,6 +138,7 @@ fail:
 	return (-1);
 }
 
+#ifndef I_AM_SCANDIR_B
 /*
  * Alphabetic order comparison routine for those who want it.
  * POSIX 2008 requires that alphasort() uses strcoll().
@@ -153,3 +158,4 @@ alphasort_thunk(void *thunk, const void *p1, const void *p2)
 	dc = *(int (**)(const struct dirent **, const struct dirent **))thunk;
 	return (dc((const struct dirent **)p1, (const struct dirent **)p2));
 }
+#endif

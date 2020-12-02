@@ -250,7 +250,7 @@ msdosfs_access(struct vop_access_args *ap)
 	}
 
 	return (vaccess(vp->v_type, file_mode, pmp->pm_uid, pmp->pm_gid,
-	    ap->a_accmode, ap->a_cred, NULL));
+	    ap->a_accmode, ap->a_cred));
 }
 
 static int
@@ -848,7 +848,7 @@ msdosfs_fsync(struct vop_fsync_args *ap)
 	* Non-critical metadata for associated directory entries only
 	* gets synced accidentally, as in most file systems.
 	*/
-	if (ap->a_waitfor == MNT_WAIT) {
+	if (ap->a_waitfor != MNT_NOWAIT) {
 		devvp = VTODE(ap->a_vp)->de_pmp->pm_devvp;
 		vn_lock(devvp, LK_EXCLUSIVE | LK_RETRY);
 		allerror = VOP_FSYNC(devvp, MNT_WAIT, ap->a_td);
@@ -856,7 +856,7 @@ msdosfs_fsync(struct vop_fsync_args *ap)
 	} else
 		allerror = 0;
 
-	error = deupdat(VTODE(ap->a_vp), ap->a_waitfor == MNT_WAIT);
+	error = deupdat(VTODE(ap->a_vp), ap->a_waitfor != MNT_NOWAIT);
 	if (allerror == 0)
 		allerror = error;
 	return (allerror);

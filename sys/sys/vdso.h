@@ -59,6 +59,18 @@ struct vdso_timekeep {
 #define	VDSO_TH_ALGO_3		0x3
 #define	VDSO_TH_ALGO_4		0x4
 
+struct vdso_fxrng_generation_1 {
+	uint32_t	fx_vdso_version;	/* 1 */
+	uint32_t	fx_generation32;
+	uint64_t	_fx_reserved;
+};
+_Static_assert(sizeof(struct vdso_fxrng_generation_1) == 16, "");
+#define	vdso_fxrng_generation	vdso_fxrng_generation_1
+
+/* fx_vdso_version values: */
+#define	VDSO_FXRNG_VER_1	0x1
+#define	VDSO_FXRNG_VER_CURR	VDSO_FXRNG_VER_1
+
 #ifndef _KERNEL
 
 struct timespec;
@@ -82,6 +94,9 @@ struct vdso_sv_tk {
 	uint32_t	sv_timekeep_gen;
 };
 
+#ifdef RANDOM_FENESTRASX
+void fxrng_push_seed_generation(uint64_t gen);
+#endif
 void timekeep_push_vdso(void);
 
 uint32_t tc_fill_vdso_timehands(struct vdso_timehands *vdso_th);
@@ -102,8 +117,16 @@ struct vdso_sv_tk *alloc_sv_tk(void);
 #define	VDSO_TH_NUM	4
 
 #ifdef COMPAT_FREEBSD32
+
+/*
+ * i386 is the only arch with a 32 bit time_t.
+ */
 struct bintime32 {
+#if defined(__amd64__)
 	uint32_t	sec;
+#else
+	uint64_t	sec;
+#endif
 	uint32_t	frac[2];
 };
 

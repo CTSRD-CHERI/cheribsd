@@ -106,11 +106,26 @@
 #define DDD(_fmt, ...)	ED("--DDD-- " _fmt, ##__VA_ARGS__)
 
 #define _GNU_SOURCE	// for CPU_SET() etc
+#include <errno.h>
+#include <fcntl.h>
+#include <libnetmap.h>
+#include <math.h> /* log, exp etc. */
+#include <pthread.h>
+#ifdef __FreeBSD__
+#include <pthread_np.h> /* pthread w/ affinity */
+#include <sys/cpuset.h> /* cpu_set */
+#endif /* __FreeBSD__ */
+#include <signal.h>
 #include <stdio.h>
-#define NETMAP_WITH_LIBS
-#include <net/netmap_user.h>
+#include <stdlib.h>
+#include <string.h> /* memcpy */
+#include <stdint.h>
+#include <sys/ioctl.h>
+#include <sys/mman.h>
 #include <sys/poll.h>
-
+#include <sys/resource.h> // setpriority
+#include <sys/time.h>
+#include <unistd.h>
 
 /*
  *
@@ -241,15 +256,6 @@ struct nm_pcap_file {
 static struct nm_pcap_file *readpcap(const char *fn);
 static void destroy_pcap(struct nm_pcap_file *file);
 
-
-#include <stdio.h>
-#include <stdlib.h>
-#include <stdint.h>
-#include <unistd.h>
-#include <fcntl.h>
-#include <string.h> /* memcpy */
-
-#include <sys/mman.h>
 
 #define NS_SCALE 1000000000UL	/* nanoseconds in 1s */
 
@@ -431,21 +437,9 @@ readpcap(const char *fn)
 
 enum my_pcap_mode { PM_NONE, PM_FAST, PM_FIXED, PM_REAL };
 
-int verbose = 0;
+static int verbose = 0;
 
 static int do_abort = 0;
-
-#include <stdlib.h>
-#include <stdio.h>
-#include <pthread.h>
-#include <sys/time.h>
-
-#include <sys/resource.h> // setpriority
-
-#ifdef __FreeBSD__
-#include <pthread_np.h> /* pthread w/ affinity */
-#include <sys/cpuset.h> /* cpu_set */
-#endif /* __FreeBSD__ */
 
 #ifdef linux
 #define cpuset_t        cpu_set_t
@@ -566,7 +560,7 @@ struct _qs { /* shared queue */
 	struct nm_pcap_file	*pcap;		/* the pcap struct */
 
 	/* parameters for reading from the netmap port */
-	struct nm_desc *src_port;		/* netmap descriptor */
+	struct nmport_d *src_port;		/* netmap descriptor */
 	const char *	prod_ifname;	/* interface name or pcap file */
 	struct netmap_ring *rxring;	/* current ring being handled */
 	uint32_t	si;		/* ring index */
@@ -640,8 +634,8 @@ struct pipe_args {
 	int		cons_core;	/* core for cons() */
 	int		prod_core;	/* core for prod() */
 
-	struct nm_desc *pa;		/* netmap descriptor */
-	struct nm_desc *pb;
+	struct nmport_d *pa;		/* netmap descriptor */
+	struct nmport_d *pb;
 
 	struct _qs	q;
 };
@@ -843,7 +837,7 @@ fail:
     if (q->buf != NULL) {
 	free(q->buf);
     }
-    nm_close(pa->pb);
+    nmport_close(pa->pb);
     return (NULL);
 }
 
@@ -893,7 +887,7 @@ cons(void *_pa)
 	    continue;
 	}
 	/* XXX copy is inefficient but simple */
-	if (nm_inject(pa->pb, (char *)(p + 1), p->pktlen) == 0) {
+	if (nmport_inject(pa->pb, (char *)(p + 1), p->pktlen) == 0) {
 	    RD(1, "inject failed len %d now %ld tx %ld h %ld t %ld next %ld",
 		(int)p->pktlen, (u_long)q->cons_now, (u_long)p->pt_tx,
 		(u_long)q->_head, (u_long)q->_tail, (u_long)p->next);
@@ -939,7 +933,7 @@ nmreplay_main(void *_a)
     pcap_prod((void*)a);
     destroy_pcap(q->pcap);
     q->pcap = NULL;
-    a->pb = nm_open(q->cons_ifname, NULL, 0, NULL);
+    a->pb = nmport_open(q->cons_ifname);
     if (a->pb == NULL) {
 	EEE("cannot open netmap on %s", q->cons_ifname);
 	do_abort = 1; // XXX any better way ?
@@ -988,7 +982,8 @@ usage(void)
 static char **
 split_arg(const char *src, int *_ac)
 {
-    char *my = NULL, **av = NULL, *seps = " \t\r\n,";
+    char *my = NULL, **av = NULL;
+    const char *seps = " \t\r\n,";
     int l, i, ac; /* number of entries */
 
     if (!src)
@@ -1127,15 +1122,15 @@ main(int argc, char **argv)
 
 	/* set default values */
 	for (i = 0; i < N_OPTS; i++) {
-	    struct _qs *q = &bp[i].q;
+	    struct _qs *qs = &bp[i].q;
 
-	    q->burst = 128;
-	    q->c_delay.optarg = "0";
-	    q->c_delay.run = null_run_fn;
-	    q->c_loss.optarg = "0";
-	    q->c_loss.run = null_run_fn;
-	    q->c_bw.optarg = "0";
-	    q->c_bw.run = null_run_fn;
+	    qs->burst = 128;
+	    qs->c_delay.optarg = "0";
+	    qs->c_delay.run = null_run_fn;
+	    qs->c_loss.optarg = "0";
+	    qs->c_loss.run = null_run_fn;
+	    qs->c_bw.optarg = "0";
+	    qs->c_bw.run = null_run_fn;
 	}
 
 	// Options:
@@ -1250,10 +1245,10 @@ main(int argc, char **argv)
 
 	/* apply commands */
 	for (i = 0; i < N_OPTS; i++) { /* once per queue */
-		struct _qs *q = &bp[i].q;
-		err += cmd_apply(delay_cfg, d[i], q, &q->c_delay);
-		err += cmd_apply(bw_cfg, b[i], q, &q->c_bw);
-		err += cmd_apply(loss_cfg, l[i], q, &q->c_loss);
+		struct _qs *qs = &bp[i].q;
+		err += cmd_apply(delay_cfg, d[i], qs, &qs->c_delay);
+		err += cmd_apply(bw_cfg, b[i], qs, &qs->c_bw);
+		err += cmd_apply(loss_cfg, l[i], qs, &qs->c_loss);
 	}
 
 	pthread_create(&bp[0].cons_tid, NULL, nmreplay_main, (void*)&bp[0]);
@@ -1287,7 +1282,7 @@ main(int argc, char **argv)
  * the final entry has s = NULL.
  */
 struct _sm {	/* string and multiplier */
-	char *s;
+	const char *s;
 	double m;
 };
 
@@ -1371,7 +1366,6 @@ parse_bw(const char *arg)
  * 24 useful random bits.
  */
 
-#include <math.h> /* log, exp etc. */
 static inline uint64_t
 my_random24(void)	/* 24 useful bits */
 {

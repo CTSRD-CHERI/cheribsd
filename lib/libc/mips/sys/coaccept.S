@@ -91,7 +91,6 @@ LEAF(coaccept)
 	/*
 	 * XXX: Not needed here, I suppose?
 	 */
-
 	cfc1	v0, $31
 	csw	v0, zero, (_JB_FPREG_FCSR * SZREG)($csp)
 #endif
@@ -161,6 +160,9 @@ LEAF(coaccept)
 	 * In O32, FP registers F20 .. F23 are callee-saved.
 	 */
 #if 0
+	/*
+	 * XXX: Not needed here, I suppose?
+	 */
         clw		v0, zero, (_JB_FPREG_FCSR * SZREG)($csp)
         ctc1		v0, $31
 #endif
@@ -188,9 +190,6 @@ LEAF(coaccept)
 	clc		$c23, zero, _JB_CHERI_OFFSET(C23)($csp)
 	clc		$c24, zero, _JB_CHERI_OFFSET(C24)($csp)
 	clc		$c25, zero, _JB_CHERI_OFFSET(C25)($csp)
-#if 0
-	clc		$c4, zero, _JB_CHERI_OFFSET(DDC)($csp)
-#endif
 
 	addi		t0, zero, JUMP_BUFFER_SIZE
 	cincoffset	$csp, $csp, t0

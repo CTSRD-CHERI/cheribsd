@@ -67,11 +67,6 @@ struct switchercb {
 	void * __capability			scb_unsealcap;
 
 	/*
-	 * TLS pointer, to be returned by CReadHwr.
-	 */
-	void * __capability			scb_tls;
-
-	/*
 	 * XXX
 	 */
 	void * __capability			scb_csp;
@@ -142,7 +137,6 @@ struct syscall_args {
 	u_int code;
 	struct sysent *callp;
 	syscallarg_t args[MAXARGS];
-	int narg;
 };
 
 #endif /* !_MACHINE_PROC_H_ */

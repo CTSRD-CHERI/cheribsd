@@ -88,7 +88,7 @@
  */
 #define	KI_NSPARE_INT	2
 #define	KI_NSPARE_LONG	12
-#define	KI_NSPARE_PTR	6
+#define	KI_NSPARE_PTR	5
 
 #ifndef _KERNEL
 #ifndef KINFO_PROC_SIZE
@@ -213,6 +213,7 @@ struct kinfo_proc {
 	 * front of ki_spareptrs, and longs from the end of ki_sparelongs.
 	 * That way the spare room from both arrays will remain contiguous.
 	 */
+	struct pwddesc * __kerncap ki_pd; /* pointer to process paths info */
 	void * __kerncap ki_spareptrs[KI_NSPARE_PTR];	/* spare room for growth */
 	long	ki_sparelongs[KI_NSPARE_LONG];	/* spare room for growth */
 	long	ki_sflag;		/* PS_* flags */
@@ -256,7 +257,7 @@ struct user {
 #define	KF_TYPE_PIPE	3
 #define	KF_TYPE_FIFO	4
 #define	KF_TYPE_KQUEUE	5
-#define	KF_TYPE_CRYPTO	6
+/* was	KF_TYPE_CRYPTO	6 */
 #define	KF_TYPE_MQUEUE	7
 #define	KF_TYPE_SHM	8
 #define	KF_TYPE_SEM	9

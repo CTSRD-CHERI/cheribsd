@@ -13,612 +13,612 @@
 #define AS(name) (sizeof(struct name) / sizeof(syscallarg_t))
 
 #ifdef COMPAT_FREEBSD6
-#define compat6(n, name) n, (sy_call_t *)__CONCAT(freebsd6_,name)
+#define compat6(n, name) .sy_narg = n, .sy_call = (sy_call_t *)__CONCAT(freebsd6_,name)
 #else
-#define compat6(n, name) 0, (sy_call_t *)nosys
+#define compat6(n, name) .sy_narg = 0, .sy_call = (sy_call_t *)nosys
 #endif
 
 #ifdef COMPAT_FREEBSD7
-#define compat7(n, name) n, (sy_call_t *)__CONCAT(freebsd7_,name)
+#define compat7(n, name) .sy_narg = n, .sy_call = (sy_call_t *)__CONCAT(freebsd7_,name)
 #else
-#define compat7(n, name) 0, (sy_call_t *)nosys
+#define compat7(n, name) .sy_narg = 0, .sy_call = (sy_call_t *)nosys
 #endif
 
 #ifdef COMPAT_FREEBSD10
-#define compat10(n, name) n, (sy_call_t *)__CONCAT(freebsd10_,name)
+#define compat10(n, name) .sy_narg = n, .sy_call = (sy_call_t *)__CONCAT(freebsd10_,name)
 #else
-#define compat10(n, name) 0, (sy_call_t *)nosys
+#define compat10(n, name) .sy_narg = 0, .sy_call = (sy_call_t *)nosys
 #endif
 
 #ifdef COMPAT_FREEBSD11
-#define compat11(n, name) n, (sy_call_t *)__CONCAT(freebsd11_,name)
+#define compat11(n, name) .sy_narg = n, .sy_call = (sy_call_t *)__CONCAT(freebsd11_,name)
 #else
-#define compat11(n, name) 0, (sy_call_t *)nosys
+#define compat11(n, name) .sy_narg = 0, .sy_call = (sy_call_t *)nosys
 #endif
 
 #ifdef COMPAT_FREEBSD12
-#define compat12(n, name) n, (sy_call_t *)__CONCAT(freebsd12_,name)
+#define compat12(n, name) .sy_narg = n, .sy_call = (sy_call_t *)__CONCAT(freebsd12_,name)
 #else
-#define compat12(n, name) 0, (sy_call_t *)nosys
+#define compat12(n, name) .sy_narg = 0, .sy_call = (sy_call_t *)nosys
 #endif
 
 /* The casts are bogus but will do for now. */
 struct sysent freebsd64_sysent[] = {
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },		/* 0 = syscall */
-	{ AS(sys_exit_args), (sy_call_t *)sys_sys_exit, AUE_EXIT, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 1 = exit */
-	{ 0, (sy_call_t *)sys_fork, AUE_FORK, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 2 = fork */
-	{ AS(freebsd64_read_args), (sy_call_t *)freebsd64_read, AUE_READ, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 3 = freebsd64_read */
-	{ AS(freebsd64_write_args), (sy_call_t *)freebsd64_write, AUE_WRITE, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 4 = freebsd64_write */
-	{ AS(freebsd64_open_args), (sy_call_t *)freebsd64_open, AUE_OPEN_RWTC, NULL, 0, 0, 0, SY_THR_STATIC },	/* 5 = freebsd64_open */
-	{ AS(close_args), (sy_call_t *)sys_close, AUE_CLOSE, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 6 = close */
-	{ AS(freebsd64_wait4_args), (sy_call_t *)freebsd64_wait4, AUE_WAIT4, NULL, 0, 0, 0, SY_THR_STATIC },	/* 7 = freebsd64_wait4 */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 8 = obsolete ocreat */
-	{ AS(freebsd64_link_args), (sy_call_t *)freebsd64_link, AUE_LINK, NULL, 0, 0, 0, SY_THR_STATIC },	/* 9 = freebsd64_link */
-	{ AS(freebsd64_unlink_args), (sy_call_t *)freebsd64_unlink, AUE_UNLINK, NULL, 0, 0, 0, SY_THR_STATIC },	/* 10 = freebsd64_unlink */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 11 = obsolete execv */
-	{ AS(freebsd64_chdir_args), (sy_call_t *)freebsd64_chdir, AUE_CHDIR, NULL, 0, 0, 0, SY_THR_STATIC },	/* 12 = freebsd64_chdir */
-	{ AS(fchdir_args), (sy_call_t *)sys_fchdir, AUE_FCHDIR, NULL, 0, 0, 0, SY_THR_STATIC },	/* 13 = fchdir */
-	{ compat11(AS(freebsd11_freebsd64_mknod_args),freebsd64_mknod), AUE_MKNOD, NULL, 0, 0, 0, SY_THR_STATIC },	/* 14 = freebsd11 freebsd64_mknod */
-	{ AS(freebsd64_chmod_args), (sy_call_t *)freebsd64_chmod, AUE_CHMOD, NULL, 0, 0, 0, SY_THR_STATIC },	/* 15 = freebsd64_chmod */
-	{ AS(freebsd64_chown_args), (sy_call_t *)freebsd64_chown, AUE_CHOWN, NULL, 0, 0, 0, SY_THR_STATIC },	/* 16 = freebsd64_chown */
-	{ AS(freebsd64_break_args), (sy_call_t *)freebsd64_break, AUE_NULL, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 17 = freebsd64_break */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 18 = obsolete freebsd4_getfsstat */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 19 = obsolete olseek */
-	{ 0, (sy_call_t *)sys_getpid, AUE_GETPID, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 20 = getpid */
-	{ AS(freebsd64_mount_args), (sy_call_t *)freebsd64_mount, AUE_MOUNT, NULL, 0, 0, 0, SY_THR_STATIC },	/* 21 = freebsd64_mount */
-	{ AS(freebsd64_unmount_args), (sy_call_t *)freebsd64_unmount, AUE_UMOUNT, NULL, 0, 0, 0, SY_THR_STATIC },	/* 22 = freebsd64_unmount */
-	{ AS(setuid_args), (sy_call_t *)sys_setuid, AUE_SETUID, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 23 = setuid */
-	{ 0, (sy_call_t *)sys_getuid, AUE_GETUID, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 24 = getuid */
-	{ 0, (sy_call_t *)sys_geteuid, AUE_GETEUID, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 25 = geteuid */
-	{ AS(freebsd64_ptrace_args), (sy_call_t *)freebsd64_ptrace, AUE_PTRACE, NULL, 0, 0, 0, SY_THR_STATIC },	/* 26 = freebsd64_ptrace */
-	{ AS(freebsd64_recvmsg_args), (sy_call_t *)freebsd64_recvmsg, AUE_RECVMSG, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 27 = freebsd64_recvmsg */
-	{ AS(freebsd64_sendmsg_args), (sy_call_t *)freebsd64_sendmsg, AUE_SENDMSG, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 28 = freebsd64_sendmsg */
-	{ AS(freebsd64_recvfrom_args), (sy_call_t *)freebsd64_recvfrom, AUE_RECVFROM, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 29 = freebsd64_recvfrom */
-	{ AS(freebsd64_accept_args), (sy_call_t *)freebsd64_accept, AUE_ACCEPT, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 30 = freebsd64_accept */
-	{ AS(freebsd64_getpeername_args), (sy_call_t *)freebsd64_getpeername, AUE_GETPEERNAME, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 31 = freebsd64_getpeername */
-	{ AS(freebsd64_getsockname_args), (sy_call_t *)freebsd64_getsockname, AUE_GETSOCKNAME, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 32 = freebsd64_getsockname */
-	{ AS(freebsd64_access_args), (sy_call_t *)freebsd64_access, AUE_ACCESS, NULL, 0, 0, 0, SY_THR_STATIC },	/* 33 = freebsd64_access */
-	{ AS(freebsd64_chflags_args), (sy_call_t *)freebsd64_chflags, AUE_CHFLAGS, NULL, 0, 0, 0, SY_THR_STATIC },	/* 34 = freebsd64_chflags */
-	{ AS(fchflags_args), (sy_call_t *)sys_fchflags, AUE_FCHFLAGS, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 35 = fchflags */
-	{ 0, (sy_call_t *)sys_sync, AUE_SYNC, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 36 = sync */
-	{ AS(kill_args), (sy_call_t *)sys_kill, AUE_KILL, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 37 = kill */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 38 = obsolete ostat */
-	{ 0, (sy_call_t *)sys_getppid, AUE_GETPPID, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 39 = getppid */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 40 = obsolete olstat */
-	{ AS(dup_args), (sy_call_t *)sys_dup, AUE_DUP, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 41 = dup */
-	{ compat10(0,pipe), AUE_PIPE, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 42 = freebsd10 pipe */
-	{ 0, (sy_call_t *)sys_getegid, AUE_GETEGID, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 43 = getegid */
-	{ AS(freebsd64_profil_args), (sy_call_t *)freebsd64_profil, AUE_PROFILE, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 44 = freebsd64_profil */
-	{ AS(freebsd64_ktrace_args), (sy_call_t *)freebsd64_ktrace, AUE_KTRACE, NULL, 0, 0, 0, SY_THR_STATIC },	/* 45 = freebsd64_ktrace */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 46 = obsolete osigaction */
-	{ 0, (sy_call_t *)sys_getgid, AUE_GETGID, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 47 = getgid */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 48 = obsolete osigprocmask */
-	{ AS(freebsd64_getlogin_args), (sy_call_t *)freebsd64_getlogin, AUE_GETLOGIN, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 49 = freebsd64_getlogin */
-	{ AS(freebsd64_setlogin_args), (sy_call_t *)freebsd64_setlogin, AUE_SETLOGIN, NULL, 0, 0, 0, SY_THR_STATIC },	/* 50 = freebsd64_setlogin */
-	{ AS(freebsd64_acct_args), (sy_call_t *)freebsd64_acct, AUE_ACCT, NULL, 0, 0, 0, SY_THR_STATIC },	/* 51 = freebsd64_acct */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 52 = obsolete osigpending */
-	{ AS(freebsd64_sigaltstack_args), (sy_call_t *)freebsd64_sigaltstack, AUE_SIGALTSTACK, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 53 = freebsd64_sigaltstack */
-	{ AS(freebsd64_ioctl_args), (sy_call_t *)freebsd64_ioctl, AUE_IOCTL, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 54 = freebsd64_ioctl */
-	{ AS(reboot_args), (sy_call_t *)sys_reboot, AUE_REBOOT, NULL, 0, 0, 0, SY_THR_STATIC },	/* 55 = reboot */
-	{ AS(freebsd64_revoke_args), (sy_call_t *)freebsd64_revoke, AUE_REVOKE, NULL, 0, 0, 0, SY_THR_STATIC },	/* 56 = freebsd64_revoke */
-	{ AS(freebsd64_symlink_args), (sy_call_t *)freebsd64_symlink, AUE_SYMLINK, NULL, 0, 0, 0, SY_THR_STATIC },	/* 57 = freebsd64_symlink */
-	{ AS(freebsd64_readlink_args), (sy_call_t *)freebsd64_readlink, AUE_READLINK, NULL, 0, 0, 0, SY_THR_STATIC },	/* 58 = freebsd64_readlink */
-	{ AS(freebsd64_execve_args), (sy_call_t *)freebsd64_execve, AUE_EXECVE, NULL, 0, 0, 0, SY_THR_STATIC },	/* 59 = freebsd64_execve */
-	{ AS(umask_args), (sy_call_t *)sys_umask, AUE_UMASK, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 60 = umask */
-	{ AS(freebsd64_chroot_args), (sy_call_t *)freebsd64_chroot, AUE_CHROOT, NULL, 0, 0, 0, SY_THR_STATIC },	/* 61 = freebsd64_chroot */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 62 = obsolete ofstat */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 63 = obsolete ogetkerninfo */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 64 = obsolete ogetpagesize */
-	{ AS(freebsd64_msync_args), (sy_call_t *)freebsd64_msync, AUE_MSYNC, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 65 = freebsd64_msync */
-	{ 0, (sy_call_t *)sys_vfork, AUE_VFORK, NULL, 0, 0, 0, SY_THR_STATIC },	/* 66 = vfork */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 67 = obsolete vread */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 68 = obsolete vwrite */
-	{ AS(sbrk_args), (sy_call_t *)sys_sbrk, AUE_SBRK, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 69 = sbrk */
-	{ AS(sstk_args), (sy_call_t *)sys_sstk, AUE_SSTK, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 70 = sstk */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 71 = obsolete ommap */
-	{ compat11(AS(freebsd11_vadvise_args),vadvise), AUE_O_VADVISE, NULL, 0, 0, 0, SY_THR_STATIC },	/* 72 = freebsd11 vadvise */
-	{ AS(freebsd64_munmap_args), (sy_call_t *)freebsd64_munmap, AUE_MUNMAP, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 73 = freebsd64_munmap */
-	{ AS(freebsd64_mprotect_args), (sy_call_t *)freebsd64_mprotect, AUE_MPROTECT, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 74 = freebsd64_mprotect */
-	{ AS(freebsd64_madvise_args), (sy_call_t *)freebsd64_madvise, AUE_MADVISE, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 75 = freebsd64_madvise */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 76 = obsolete vhangup */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 77 = obsolete vlimit */
-	{ AS(freebsd64_mincore_args), (sy_call_t *)freebsd64_mincore, AUE_MINCORE, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 78 = freebsd64_mincore */
-	{ AS(freebsd64_getgroups_args), (sy_call_t *)freebsd64_getgroups, AUE_GETGROUPS, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 79 = freebsd64_getgroups */
-	{ AS(freebsd64_setgroups_args), (sy_call_t *)freebsd64_setgroups, AUE_SETGROUPS, NULL, 0, 0, 0, SY_THR_STATIC },	/* 80 = freebsd64_setgroups */
-	{ 0, (sy_call_t *)sys_getpgrp, AUE_GETPGRP, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 81 = getpgrp */
-	{ AS(setpgid_args), (sy_call_t *)sys_setpgid, AUE_SETPGRP, NULL, 0, 0, 0, SY_THR_STATIC },	/* 82 = setpgid */
-	{ AS(freebsd64_setitimer_args), (sy_call_t *)freebsd64_setitimer, AUE_SETITIMER, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 83 = freebsd64_setitimer */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 84 = obsolete owait */
-	{ AS(freebsd64_swapon_args), (sy_call_t *)freebsd64_swapon, AUE_SWAPON, NULL, 0, 0, 0, SY_THR_STATIC },	/* 85 = freebsd64_swapon */
-	{ AS(freebsd64_getitimer_args), (sy_call_t *)freebsd64_getitimer, AUE_GETITIMER, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 86 = freebsd64_getitimer */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 87 = obsolete ogethostname */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 88 = obsolete osethostname */
-	{ 0, (sy_call_t *)sys_getdtablesize, AUE_GETDTABLESIZE, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 89 = getdtablesize */
-	{ AS(dup2_args), (sy_call_t *)sys_dup2, AUE_DUP2, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 90 = dup2 */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 91 = getdopt */
-	{ AS(freebsd64_fcntl_args), (sy_call_t *)freebsd64_fcntl, AUE_FCNTL, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 92 = freebsd64_fcntl */
-	{ AS(freebsd64_select_args), (sy_call_t *)freebsd64_select, AUE_SELECT, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 93 = freebsd64_select */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 94 = setdopt */
-	{ AS(fsync_args), (sy_call_t *)sys_fsync, AUE_FSYNC, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 95 = fsync */
-	{ AS(setpriority_args), (sy_call_t *)sys_setpriority, AUE_SETPRIORITY, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 96 = setpriority */
-	{ AS(socket_args), (sy_call_t *)sys_socket, AUE_SOCKET, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 97 = socket */
-	{ AS(freebsd64_connect_args), (sy_call_t *)freebsd64_connect, AUE_CONNECT, NULL, 0, 0, 0, SY_THR_STATIC },	/* 98 = freebsd64_connect */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 99 = obsolete oaccept */
-	{ AS(getpriority_args), (sy_call_t *)sys_getpriority, AUE_GETPRIORITY, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 100 = getpriority */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 101 = obsolete osend */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 102 = obsolete orecv */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 103 = obsolete osigreturn */
-	{ AS(freebsd64_bind_args), (sy_call_t *)freebsd64_bind, AUE_BIND, NULL, 0, 0, 0, SY_THR_STATIC },	/* 104 = freebsd64_bind */
-	{ AS(freebsd64_setsockopt_args), (sy_call_t *)freebsd64_setsockopt, AUE_SETSOCKOPT, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 105 = freebsd64_setsockopt */
-	{ AS(listen_args), (sy_call_t *)sys_listen, AUE_LISTEN, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 106 = listen */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 107 = obsolete vtimes */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 108 = obsolete osigvec */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 109 = obsolete osigblock */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 110 = obsolete osigsetmask */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 111 = obsolete osigsuspend */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 112 = obsolete osigstack */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 113 = obsolete orecvmsg */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 114 = obsolete osendmsg */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 115 = obsolete vtrace */
-	{ AS(freebsd64_gettimeofday_args), (sy_call_t *)freebsd64_gettimeofday, AUE_GETTIMEOFDAY, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 116 = freebsd64_gettimeofday */
-	{ AS(freebsd64_getrusage_args), (sy_call_t *)freebsd64_getrusage, AUE_GETRUSAGE, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 117 = freebsd64_getrusage */
-	{ AS(freebsd64_getsockopt_args), (sy_call_t *)freebsd64_getsockopt, AUE_GETSOCKOPT, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 118 = freebsd64_getsockopt */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 119 = resuba */
-	{ AS(freebsd64_readv_args), (sy_call_t *)freebsd64_readv, AUE_READV, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 120 = freebsd64_readv */
-	{ AS(freebsd64_writev_args), (sy_call_t *)freebsd64_writev, AUE_WRITEV, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 121 = freebsd64_writev */
-	{ AS(freebsd64_settimeofday_args), (sy_call_t *)freebsd64_settimeofday, AUE_SETTIMEOFDAY, NULL, 0, 0, 0, SY_THR_STATIC },	/* 122 = freebsd64_settimeofday */
-	{ AS(fchown_args), (sy_call_t *)sys_fchown, AUE_FCHOWN, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 123 = fchown */
-	{ AS(fchmod_args), (sy_call_t *)sys_fchmod, AUE_FCHMOD, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 124 = fchmod */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 125 = obsolete orecvfrom */
-	{ AS(setreuid_args), (sy_call_t *)sys_setreuid, AUE_SETREUID, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 126 = setreuid */
-	{ AS(setregid_args), (sy_call_t *)sys_setregid, AUE_SETREGID, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 127 = setregid */
-	{ AS(freebsd64_rename_args), (sy_call_t *)freebsd64_rename, AUE_RENAME, NULL, 0, 0, 0, SY_THR_STATIC },	/* 128 = freebsd64_rename */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 129 = obsolete otruncate */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 130 = obsolete oftruncate */
-	{ AS(flock_args), (sy_call_t *)sys_flock, AUE_FLOCK, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 131 = flock */
-	{ AS(freebsd64_mkfifo_args), (sy_call_t *)freebsd64_mkfifo, AUE_MKFIFO, NULL, 0, 0, 0, SY_THR_STATIC },	/* 132 = freebsd64_mkfifo */
-	{ AS(freebsd64_sendto_args), (sy_call_t *)freebsd64_sendto, AUE_SENDTO, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 133 = freebsd64_sendto */
-	{ AS(shutdown_args), (sy_call_t *)sys_shutdown, AUE_SHUTDOWN, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 134 = shutdown */
-	{ AS(freebsd64_socketpair_args), (sy_call_t *)freebsd64_socketpair, AUE_SOCKETPAIR, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 135 = freebsd64_socketpair */
-	{ AS(freebsd64_mkdir_args), (sy_call_t *)freebsd64_mkdir, AUE_MKDIR, NULL, 0, 0, 0, SY_THR_STATIC },	/* 136 = freebsd64_mkdir */
-	{ AS(freebsd64_rmdir_args), (sy_call_t *)freebsd64_rmdir, AUE_RMDIR, NULL, 0, 0, 0, SY_THR_STATIC },	/* 137 = freebsd64_rmdir */
-	{ AS(freebsd64_utimes_args), (sy_call_t *)freebsd64_utimes, AUE_UTIMES, NULL, 0, 0, 0, SY_THR_STATIC },	/* 138 = freebsd64_utimes */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 139 = obsolete 4.2 sigreturn */
-	{ AS(freebsd64_adjtime_args), (sy_call_t *)freebsd64_adjtime, AUE_ADJTIME, NULL, 0, 0, 0, SY_THR_STATIC },	/* 140 = freebsd64_adjtime */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 141 = obsolete ogetpeername */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 142 = obsolete ogethostid */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 143 = obsolete osethostid */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 144 = obsolete ogetrlimit */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 145 = obsolete osetrlimit */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 146 = obsolete okillpg */
-	{ 0, (sy_call_t *)sys_setsid, AUE_SETSID, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 147 = setsid */
-	{ AS(freebsd64_quotactl_args), (sy_call_t *)freebsd64_quotactl, AUE_QUOTACTL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 148 = freebsd64_quotactl */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 149 = obsolete oquota */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 150 = obsolete ogetsockname */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 151 = sem_lock */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 152 = sem_wakeup */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 153 = asyncdaemon */
-	{ AS(freebsd64_nlm_syscall_args), (sy_call_t *)lkmressys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },	/* 154 = freebsd64_nlm_syscall */
-	{ AS(freebsd64_nfssvc_args), (sy_call_t *)lkmressys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },	/* 155 = freebsd64_nfssvc */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 156 = obsolete ogetdirentries */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 157 = obsolete freebsd4_statfs */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 158 = obsolete freebsd4_fstatfs */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 159 = nosys */
-	{ AS(freebsd64_lgetfh_args), (sy_call_t *)freebsd64_lgetfh, AUE_LGETFH, NULL, 0, 0, 0, SY_THR_STATIC },	/* 160 = freebsd64_lgetfh */
-	{ AS(freebsd64_getfh_args), (sy_call_t *)freebsd64_getfh, AUE_NFS_GETFH, NULL, 0, 0, 0, SY_THR_STATIC },	/* 161 = freebsd64_getfh */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 162 = obsolete freebsd4_getdomainname */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 163 = obsolete freebsd4_setdomainname */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 164 = obsolete freebsd4_uname */
-	{ AS(freebsd64_sysarch_args), (sy_call_t *)freebsd64_sysarch, AUE_SYSARCH, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 165 = freebsd64_sysarch */
-	{ AS(freebsd64_rtprio_args), (sy_call_t *)freebsd64_rtprio, AUE_RTPRIO, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 166 = freebsd64_rtprio */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 167 = nosys */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 168 = nosys */
-	{ AS(freebsd64_semsys_args), (sy_call_t *)lkmressys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },	/* 169 = freebsd64_semsys */
-	{ AS(freebsd64_msgsys_args), (sy_call_t *)lkmressys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },	/* 170 = freebsd64_msgsys */
-	{ AS(freebsd64_shmsys_args), (sy_call_t *)lkmressys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },	/* 171 = freebsd64_shmsys */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 172 = nosys */
-	{ compat6(AS(freebsd6_freebsd64_pread_args),freebsd64_pread), AUE_PREAD, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 173 = freebsd6 freebsd64_pread */
-	{ compat6(AS(freebsd6_freebsd64_pwrite_args),freebsd64_pwrite), AUE_PWRITE, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 174 = freebsd6 freebsd64_pwrite */
-	{ AS(setfib_args), (sy_call_t *)sys_setfib, AUE_SETFIB, NULL, 0, 0, 0, SY_THR_STATIC },	/* 175 = setfib */
-	{ AS(freebsd64_ntp_adjtime_args), (sy_call_t *)freebsd64_ntp_adjtime, AUE_NTP_ADJTIME, NULL, 0, 0, 0, SY_THR_STATIC },	/* 176 = freebsd64_ntp_adjtime */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 177 = sfork */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 178 = getdescriptor */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 179 = setdescriptor */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 180 = nosys */
-	{ AS(setgid_args), (sy_call_t *)sys_setgid, AUE_SETGID, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 181 = setgid */
-	{ AS(setegid_args), (sy_call_t *)sys_setegid, AUE_SETEGID, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 182 = setegid */
-	{ AS(seteuid_args), (sy_call_t *)sys_seteuid, AUE_SETEUID, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 183 = seteuid */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 184 = obsolete lfs_bmapv */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 185 = obsolete lfs_markv */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 186 = obsolete lfs_segclean */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 187 = obsolete lfs_segwait */
-	{ compat11(AS(freebsd11_freebsd64_stat_args),freebsd64_stat), AUE_STAT, NULL, 0, 0, 0, SY_THR_STATIC },	/* 188 = freebsd11 freebsd64_stat */
-	{ compat11(AS(freebsd11_freebsd64_fstat_args),freebsd64_fstat), AUE_FSTAT, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 189 = freebsd11 freebsd64_fstat */
-	{ compat11(AS(freebsd11_freebsd64_lstat_args),freebsd64_lstat), AUE_LSTAT, NULL, 0, 0, 0, SY_THR_STATIC },	/* 190 = freebsd11 freebsd64_lstat */
-	{ AS(freebsd64_pathconf_args), (sy_call_t *)freebsd64_pathconf, AUE_PATHCONF, NULL, 0, 0, 0, SY_THR_STATIC },	/* 191 = freebsd64_pathconf */
-	{ AS(fpathconf_args), (sy_call_t *)sys_fpathconf, AUE_FPATHCONF, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 192 = fpathconf */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 193 = nosys */
-	{ AS(freebsd64___getrlimit_args), (sy_call_t *)freebsd64_getrlimit, AUE_GETRLIMIT, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 194 = freebsd64_getrlimit */
-	{ AS(freebsd64___setrlimit_args), (sy_call_t *)freebsd64_setrlimit, AUE_SETRLIMIT, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 195 = freebsd64_setrlimit */
-	{ compat11(AS(freebsd11_freebsd64_getdirentries_args),freebsd64_getdirentries), AUE_GETDIRENTRIES, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 196 = freebsd11 freebsd64_getdirentries */
-	{ compat6(AS(freebsd6_freebsd64_mmap_args),freebsd64_mmap), AUE_MMAP, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 197 = freebsd6 freebsd64_mmap */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },		/* 198 = __syscall */
-	{ compat6(AS(freebsd6_lseek_args),lseek), AUE_LSEEK, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 199 = freebsd6 lseek */
-	{ compat6(AS(freebsd6_freebsd64_truncate_args),freebsd64_truncate), AUE_TRUNCATE, NULL, 0, 0, 0, SY_THR_STATIC },	/* 200 = freebsd6 freebsd64_truncate */
-	{ compat6(AS(freebsd6_ftruncate_args),ftruncate), AUE_FTRUNCATE, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 201 = freebsd6 ftruncate */
-	{ AS(freebsd64___sysctl_args), (sy_call_t *)freebsd64___sysctl, AUE_SYSCTL, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 202 = freebsd64___sysctl */
-	{ AS(freebsd64_mlock_args), (sy_call_t *)freebsd64_mlock, AUE_MLOCK, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 203 = freebsd64_mlock */
-	{ AS(freebsd64_munlock_args), (sy_call_t *)freebsd64_munlock, AUE_MUNLOCK, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 204 = freebsd64_munlock */
-	{ AS(freebsd64_undelete_args), (sy_call_t *)freebsd64_undelete, AUE_UNDELETE, NULL, 0, 0, 0, SY_THR_STATIC },	/* 205 = freebsd64_undelete */
-	{ AS(freebsd64_futimes_args), (sy_call_t *)freebsd64_futimes, AUE_FUTIMES, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 206 = freebsd64_futimes */
-	{ AS(getpgid_args), (sy_call_t *)sys_getpgid, AUE_GETPGID, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 207 = getpgid */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 208 = nosys */
-	{ AS(freebsd64_poll_args), (sy_call_t *)freebsd64_poll, AUE_POLL, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 209 = freebsd64_poll */
-	{ AS(nosys_args), (sy_call_t *)lkmnosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },	/* 210 = lkmnosys */
-	{ AS(nosys_args), (sy_call_t *)lkmnosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },	/* 211 = lkmnosys */
-	{ AS(nosys_args), (sy_call_t *)lkmnosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },	/* 212 = lkmnosys */
-	{ AS(nosys_args), (sy_call_t *)lkmnosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },	/* 213 = lkmnosys */
-	{ AS(nosys_args), (sy_call_t *)lkmnosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },	/* 214 = lkmnosys */
-	{ AS(nosys_args), (sy_call_t *)lkmnosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },	/* 215 = lkmnosys */
-	{ AS(nosys_args), (sy_call_t *)lkmnosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },	/* 216 = lkmnosys */
-	{ AS(nosys_args), (sy_call_t *)lkmnosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },	/* 217 = lkmnosys */
-	{ AS(nosys_args), (sy_call_t *)lkmnosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },	/* 218 = lkmnosys */
-	{ AS(nosys_args), (sy_call_t *)lkmnosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },	/* 219 = lkmnosys */
-	{ 0, (sy_call_t *)lkmressys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },		/* 220 = freebsd7 freebsd64___semctl */
-	{ AS(semget_args), (sy_call_t *)lkmressys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },	/* 221 = semget */
-	{ AS(freebsd64_semop_args), (sy_call_t *)lkmressys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },	/* 222 = freebsd64_semop */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 223 = obsolete semconfig */
-	{ 0, (sy_call_t *)lkmressys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },		/* 224 = freebsd7 freebsd64_msgctl */
-	{ AS(msgget_args), (sy_call_t *)lkmressys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },	/* 225 = msgget */
-	{ AS(freebsd64_msgsnd_args), (sy_call_t *)lkmressys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },	/* 226 = freebsd64_msgsnd */
-	{ AS(freebsd64_msgrcv_args), (sy_call_t *)lkmressys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },	/* 227 = freebsd64_msgrcv */
-	{ AS(freebsd64_shmat_args), (sy_call_t *)lkmressys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },	/* 228 = freebsd64_shmat */
-	{ 0, (sy_call_t *)lkmressys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },		/* 229 = freebsd7 freebsd64_shmctl */
-	{ AS(freebsd64_shmdt_args), (sy_call_t *)lkmressys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },	/* 230 = freebsd64_shmdt */
-	{ AS(shmget_args), (sy_call_t *)lkmressys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },	/* 231 = shmget */
-	{ AS(freebsd64_clock_gettime_args), (sy_call_t *)freebsd64_clock_gettime, AUE_NULL, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 232 = freebsd64_clock_gettime */
-	{ AS(freebsd64_clock_settime_args), (sy_call_t *)freebsd64_clock_settime, AUE_CLOCK_SETTIME, NULL, 0, 0, 0, SY_THR_STATIC },	/* 233 = freebsd64_clock_settime */
-	{ AS(freebsd64_clock_getres_args), (sy_call_t *)freebsd64_clock_getres, AUE_NULL, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 234 = freebsd64_clock_getres */
-	{ AS(freebsd64_ktimer_create_args), (sy_call_t *)freebsd64_ktimer_create, AUE_NULL, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 235 = freebsd64_ktimer_create */
-	{ AS(ktimer_delete_args), (sy_call_t *)sys_ktimer_delete, AUE_NULL, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 236 = ktimer_delete */
-	{ AS(freebsd64_ktimer_settime_args), (sy_call_t *)freebsd64_ktimer_settime, AUE_NULL, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 237 = freebsd64_ktimer_settime */
-	{ AS(freebsd64_ktimer_gettime_args), (sy_call_t *)freebsd64_ktimer_gettime, AUE_NULL, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 238 = freebsd64_ktimer_gettime */
-	{ AS(ktimer_getoverrun_args), (sy_call_t *)sys_ktimer_getoverrun, AUE_NULL, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 239 = ktimer_getoverrun */
-	{ AS(freebsd64_nanosleep_args), (sy_call_t *)freebsd64_nanosleep, AUE_NULL, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 240 = freebsd64_nanosleep */
-	{ AS(freebsd64_ffclock_getcounter_args), (sy_call_t *)freebsd64_ffclock_getcounter, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 241 = freebsd64_ffclock_getcounter */
-	{ AS(freebsd64_ffclock_setestimate_args), (sy_call_t *)freebsd64_ffclock_setestimate, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 242 = freebsd64_ffclock_setestimate */
-	{ AS(freebsd64_ffclock_getestimate_args), (sy_call_t *)freebsd64_ffclock_getestimate, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 243 = freebsd64_ffclock_getestimate */
-	{ AS(freebsd64_clock_nanosleep_args), (sy_call_t *)freebsd64_clock_nanosleep, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 244 = freebsd64_clock_nanosleep */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 245 = nosys */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 246 = nosys */
-	{ AS(freebsd64_clock_getcpuclockid2_args), (sy_call_t *)freebsd64_clock_getcpuclockid2, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 247 = freebsd64_clock_getcpuclockid2 */
-	{ AS(freebsd64_ntp_gettime_args), (sy_call_t *)freebsd64_ntp_gettime, AUE_NULL, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 248 = freebsd64_ntp_gettime */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 249 = nosys */
-	{ AS(freebsd64_minherit_args), (sy_call_t *)freebsd64_minherit, AUE_MINHERIT, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 250 = freebsd64_minherit */
-	{ AS(rfork_args), (sy_call_t *)sys_rfork, AUE_RFORK, NULL, 0, 0, 0, SY_THR_STATIC },	/* 251 = rfork */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 252 = obsolete openbsd_poll */
-	{ 0, (sy_call_t *)sys_issetugid, AUE_ISSETUGID, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 253 = issetugid */
-	{ AS(freebsd64_lchown_args), (sy_call_t *)freebsd64_lchown, AUE_LCHOWN, NULL, 0, 0, 0, SY_THR_STATIC },	/* 254 = freebsd64_lchown */
-	{ AS(freebsd64_aio_read_args), (sy_call_t *)freebsd64_aio_read, AUE_AIO_READ, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 255 = freebsd64_aio_read */
-	{ AS(freebsd64_aio_write_args), (sy_call_t *)freebsd64_aio_write, AUE_AIO_WRITE, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 256 = freebsd64_aio_write */
-	{ AS(freebsd64_lio_listio_args), (sy_call_t *)freebsd64_lio_listio, AUE_LIO_LISTIO, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 257 = freebsd64_lio_listio */
-	{ AS(freebsd64_kbounce_args), (sy_call_t *)freebsd64_kbounce, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 258 = freebsd64_kbounce */
-	{ AS(freebsd64_flag_captured_args), (sy_call_t *)freebsd64_flag_captured, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 259 = freebsd64_flag_captured */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 260 = nosys */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 261 = nosys */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 262 = nosys */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 263 = nosys */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 264 = nosys */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 265 = nosys */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 266 = nosys */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 267 = nosys */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 268 = nosys */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 269 = nosys */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 270 = nosys */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 271 = nosys */
-	{ compat11(AS(freebsd11_freebsd64_getdents_args),freebsd64_getdents), AUE_O_GETDENTS, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 272 = freebsd11 freebsd64_getdents */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 273 = nosys */
-	{ AS(freebsd64_lchmod_args), (sy_call_t *)freebsd64_lchmod, AUE_LCHMOD, NULL, 0, 0, 0, SY_THR_STATIC },	/* 274 = freebsd64_lchmod */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 275 = obsolete netbsd_lchown */
-	{ AS(freebsd64_lutimes_args), (sy_call_t *)freebsd64_lutimes, AUE_LUTIMES, NULL, 0, 0, 0, SY_THR_STATIC },	/* 276 = freebsd64_lutimes */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 277 = obsolete netbsd_msync */
-	{ compat11(AS(freebsd11_freebsd64_nstat_args),freebsd64_nstat), AUE_STAT, NULL, 0, 0, 0, SY_THR_STATIC },	/* 278 = freebsd11 freebsd64_nstat */
-	{ compat11(AS(freebsd11_freebsd64_nfstat_args),freebsd64_nfstat), AUE_FSTAT, NULL, 0, 0, 0, SY_THR_STATIC },	/* 279 = freebsd11 freebsd64_nfstat */
-	{ compat11(AS(freebsd11_freebsd64_nlstat_args),freebsd64_nlstat), AUE_LSTAT, NULL, 0, 0, 0, SY_THR_STATIC },	/* 280 = freebsd11 freebsd64_nlstat */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 281 = nosys */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 282 = nosys */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 283 = nosys */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 284 = nosys */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 285 = nosys */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 286 = nosys */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 287 = nosys */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 288 = nosys */
-	{ AS(freebsd64_preadv_args), (sy_call_t *)freebsd64_preadv, AUE_PREADV, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 289 = freebsd64_preadv */
-	{ AS(freebsd64_pwritev_args), (sy_call_t *)freebsd64_pwritev, AUE_PWRITEV, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 290 = freebsd64_pwritev */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 291 = nosys */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 292 = nosys */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 293 = nosys */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 294 = nosys */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 295 = nosys */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 296 = nosys */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 297 = obsolete freebsd4_fhstatfs */
-	{ AS(freebsd64_fhopen_args), (sy_call_t *)freebsd64_fhopen, AUE_FHOPEN, NULL, 0, 0, 0, SY_THR_STATIC },	/* 298 = freebsd64_fhopen */
-	{ compat11(AS(freebsd11_freebsd64_fhstat_args),freebsd64_fhstat), AUE_FHSTAT, NULL, 0, 0, 0, SY_THR_STATIC },	/* 299 = freebsd11 freebsd64_fhstat */
-	{ AS(modnext_args), (sy_call_t *)sys_modnext, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 300 = modnext */
-	{ AS(freebsd64_modstat_args), (sy_call_t *)freebsd64_modstat, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 301 = freebsd64_modstat */
-	{ AS(modfnext_args), (sy_call_t *)sys_modfnext, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 302 = modfnext */
-	{ AS(freebsd64_modfind_args), (sy_call_t *)freebsd64_modfind, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 303 = freebsd64_modfind */
-	{ AS(freebsd64_kldload_args), (sy_call_t *)freebsd64_kldload, AUE_MODLOAD, NULL, 0, 0, 0, SY_THR_STATIC },	/* 304 = freebsd64_kldload */
-	{ AS(kldunload_args), (sy_call_t *)sys_kldunload, AUE_MODUNLOAD, NULL, 0, 0, 0, SY_THR_STATIC },	/* 305 = kldunload */
-	{ AS(freebsd64_kldfind_args), (sy_call_t *)freebsd64_kldfind, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 306 = freebsd64_kldfind */
-	{ AS(kldnext_args), (sy_call_t *)sys_kldnext, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 307 = kldnext */
-	{ AS(freebsd64_kldstat_args), (sy_call_t *)freebsd64_kldstat, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 308 = freebsd64_kldstat */
-	{ AS(kldfirstmod_args), (sy_call_t *)sys_kldfirstmod, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 309 = kldfirstmod */
-	{ AS(getsid_args), (sy_call_t *)sys_getsid, AUE_GETSID, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 310 = getsid */
-	{ AS(setresuid_args), (sy_call_t *)sys_setresuid, AUE_SETRESUID, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 311 = setresuid */
-	{ AS(setresgid_args), (sy_call_t *)sys_setresgid, AUE_SETRESGID, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 312 = setresgid */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 313 = obsolete signanosleep */
-	{ AS(freebsd64_aio_return_args), (sy_call_t *)freebsd64_aio_return, AUE_AIO_RETURN, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 314 = freebsd64_aio_return */
-	{ AS(freebsd64_aio_suspend_args), (sy_call_t *)freebsd64_aio_suspend, AUE_AIO_SUSPEND, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 315 = freebsd64_aio_suspend */
-	{ AS(freebsd64_aio_cancel_args), (sy_call_t *)freebsd64_aio_cancel, AUE_AIO_CANCEL, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 316 = freebsd64_aio_cancel */
-	{ AS(freebsd64_aio_error_args), (sy_call_t *)freebsd64_aio_error, AUE_AIO_ERROR, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 317 = freebsd64_aio_error */
-	{ compat6(AS(freebsd6_freebsd64_aio_read_args),freebsd64_aio_read), AUE_AIO_READ, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 318 = freebsd6 freebsd64_aio_read */
-	{ compat6(AS(freebsd6_freebsd64_aio_write_args),freebsd64_aio_write), AUE_AIO_WRITE, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 319 = freebsd6 freebsd64_aio_write */
-	{ compat6(AS(freebsd6_freebsd64_lio_listio_args),freebsd64_lio_listio), AUE_LIO_LISTIO, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 320 = freebsd6 freebsd64_lio_listio */
-	{ 0, (sy_call_t *)sys_yield, AUE_NULL, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 321 = yield */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 322 = obsolete thr_sleep */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 323 = obsolete thr_wakeup */
-	{ AS(mlockall_args), (sy_call_t *)sys_mlockall, AUE_MLOCKALL, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 324 = mlockall */
-	{ 0, (sy_call_t *)sys_munlockall, AUE_MUNLOCKALL, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 325 = munlockall */
-	{ AS(freebsd64___getcwd_args), (sy_call_t *)freebsd64___getcwd, AUE_GETCWD, NULL, 0, 0, 0, SY_THR_STATIC },	/* 326 = freebsd64___getcwd */
-	{ AS(freebsd64_sched_setparam_args), (sy_call_t *)freebsd64_sched_setparam, AUE_NULL, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 327 = freebsd64_sched_setparam */
-	{ AS(freebsd64_sched_getparam_args), (sy_call_t *)freebsd64_sched_getparam, AUE_NULL, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 328 = freebsd64_sched_getparam */
-	{ AS(freebsd64_sched_setscheduler_args), (sy_call_t *)freebsd64_sched_setscheduler, AUE_NULL, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 329 = freebsd64_sched_setscheduler */
-	{ AS(sched_getscheduler_args), (sy_call_t *)sys_sched_getscheduler, AUE_NULL, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 330 = sched_getscheduler */
-	{ 0, (sy_call_t *)sys_sched_yield, AUE_NULL, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 331 = sched_yield */
-	{ AS(sched_get_priority_max_args), (sy_call_t *)sys_sched_get_priority_max, AUE_NULL, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 332 = sched_get_priority_max */
-	{ AS(sched_get_priority_min_args), (sy_call_t *)sys_sched_get_priority_min, AUE_NULL, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 333 = sched_get_priority_min */
-	{ AS(freebsd64_sched_rr_get_interval_args), (sy_call_t *)freebsd64_sched_rr_get_interval, AUE_NULL, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 334 = freebsd64_sched_rr_get_interval */
-	{ AS(freebsd64_utrace_args), (sy_call_t *)freebsd64_utrace, AUE_NULL, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 335 = freebsd64_utrace */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 336 = obsolete freebsd4_sendfile */
-	{ AS(freebsd64_kldsym_args), (sy_call_t *)freebsd64_kldsym, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 337 = freebsd64_kldsym */
-	{ AS(freebsd64_jail_args), (sy_call_t *)freebsd64_jail, AUE_JAIL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 338 = freebsd64_jail */
-	{ AS(freebsd64_nnpfs_syscall_args), (sy_call_t *)lkmressys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },	/* 339 = freebsd64_nnpfs_syscall */
-	{ AS(freebsd64_sigprocmask_args), (sy_call_t *)freebsd64_sigprocmask, AUE_SIGPROCMASK, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 340 = freebsd64_sigprocmask */
-	{ AS(freebsd64_sigsuspend_args), (sy_call_t *)freebsd64_sigsuspend, AUE_SIGSUSPEND, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 341 = freebsd64_sigsuspend */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 342 = obsolete freebsd4_sigaction */
-	{ AS(freebsd64_sigpending_args), (sy_call_t *)freebsd64_sigpending, AUE_SIGPENDING, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 343 = freebsd64_sigpending */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 344 = obsolete freebsd4_sigreturn */
-	{ AS(freebsd64_sigtimedwait_args), (sy_call_t *)freebsd64_sigtimedwait, AUE_SIGWAIT, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 345 = freebsd64_sigtimedwait */
-	{ AS(freebsd64_sigwaitinfo_args), (sy_call_t *)freebsd64_sigwaitinfo, AUE_NULL, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 346 = freebsd64_sigwaitinfo */
-	{ AS(freebsd64___acl_get_file_args), (sy_call_t *)freebsd64___acl_get_file, AUE_ACL_GET_FILE, NULL, 0, 0, 0, SY_THR_STATIC },	/* 347 = freebsd64___acl_get_file */
-	{ AS(freebsd64___acl_set_file_args), (sy_call_t *)freebsd64___acl_set_file, AUE_ACL_SET_FILE, NULL, 0, 0, 0, SY_THR_STATIC },	/* 348 = freebsd64___acl_set_file */
-	{ AS(freebsd64___acl_get_fd_args), (sy_call_t *)freebsd64___acl_get_fd, AUE_ACL_GET_FD, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 349 = freebsd64___acl_get_fd */
-	{ AS(freebsd64___acl_set_fd_args), (sy_call_t *)freebsd64___acl_set_fd, AUE_ACL_SET_FD, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 350 = freebsd64___acl_set_fd */
-	{ AS(freebsd64___acl_delete_file_args), (sy_call_t *)freebsd64___acl_delete_file, AUE_ACL_DELETE_FILE, NULL, 0, 0, 0, SY_THR_STATIC },	/* 351 = freebsd64___acl_delete_file */
-	{ AS(__acl_delete_fd_args), (sy_call_t *)sys___acl_delete_fd, AUE_ACL_DELETE_FD, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 352 = __acl_delete_fd */
-	{ AS(freebsd64___acl_aclcheck_file_args), (sy_call_t *)freebsd64___acl_aclcheck_file, AUE_ACL_CHECK_FILE, NULL, 0, 0, 0, SY_THR_STATIC },	/* 353 = freebsd64___acl_aclcheck_file */
-	{ AS(freebsd64___acl_aclcheck_fd_args), (sy_call_t *)freebsd64___acl_aclcheck_fd, AUE_ACL_CHECK_FD, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 354 = freebsd64___acl_aclcheck_fd */
-	{ AS(freebsd64_extattrctl_args), (sy_call_t *)freebsd64_extattrctl, AUE_EXTATTRCTL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 355 = freebsd64_extattrctl */
-	{ AS(freebsd64_extattr_set_file_args), (sy_call_t *)freebsd64_extattr_set_file, AUE_EXTATTR_SET_FILE, NULL, 0, 0, 0, SY_THR_STATIC },	/* 356 = freebsd64_extattr_set_file */
-	{ AS(freebsd64_extattr_get_file_args), (sy_call_t *)freebsd64_extattr_get_file, AUE_EXTATTR_GET_FILE, NULL, 0, 0, 0, SY_THR_STATIC },	/* 357 = freebsd64_extattr_get_file */
-	{ AS(freebsd64_extattr_delete_file_args), (sy_call_t *)freebsd64_extattr_delete_file, AUE_EXTATTR_DELETE_FILE, NULL, 0, 0, 0, SY_THR_STATIC },	/* 358 = freebsd64_extattr_delete_file */
-	{ AS(freebsd64_aio_waitcomplete_args), (sy_call_t *)freebsd64_aio_waitcomplete, AUE_AIO_WAITCOMPLETE, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 359 = freebsd64_aio_waitcomplete */
-	{ AS(freebsd64_getresuid_args), (sy_call_t *)freebsd64_getresuid, AUE_GETRESUID, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 360 = freebsd64_getresuid */
-	{ AS(freebsd64_getresgid_args), (sy_call_t *)freebsd64_getresgid, AUE_GETRESGID, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 361 = freebsd64_getresgid */
-	{ 0, (sy_call_t *)sys_kqueue, AUE_KQUEUE, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 362 = kqueue */
-	{ compat11(AS(freebsd11_freebsd64_kevent_args),freebsd64_kevent), AUE_KEVENT, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 363 = freebsd11 freebsd64_kevent */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 364 = obsolete __cap_get_proc */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 365 = obsolete __cap_set_proc */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 366 = obsolete __cap_get_fd */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 367 = obsolete __cap_get_file */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 368 = obsolete __cap_set_fd */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 369 = obsolete __cap_set_file */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 370 = nosys */
-	{ AS(freebsd64_extattr_set_fd_args), (sy_call_t *)freebsd64_extattr_set_fd, AUE_EXTATTR_SET_FD, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 371 = freebsd64_extattr_set_fd */
-	{ AS(freebsd64_extattr_get_fd_args), (sy_call_t *)freebsd64_extattr_get_fd, AUE_EXTATTR_GET_FD, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 372 = freebsd64_extattr_get_fd */
-	{ AS(freebsd64_extattr_delete_fd_args), (sy_call_t *)freebsd64_extattr_delete_fd, AUE_EXTATTR_DELETE_FD, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 373 = freebsd64_extattr_delete_fd */
-	{ AS(__setugid_args), (sy_call_t *)sys___setugid, AUE_SETUGID, NULL, 0, 0, 0, SY_THR_STATIC },	/* 374 = __setugid */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 375 = obsolete nfsclnt */
-	{ AS(freebsd64_eaccess_args), (sy_call_t *)freebsd64_eaccess, AUE_EACCESS, NULL, 0, 0, 0, SY_THR_STATIC },	/* 376 = freebsd64_eaccess */
-	{ AS(afs3_syscall_args), (sy_call_t *)lkmressys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },	/* 377 = afs3_syscall */
-	{ AS(freebsd64_nmount_args), (sy_call_t *)freebsd64_nmount, AUE_NMOUNT, NULL, 0, 0, 0, SY_THR_STATIC },	/* 378 = freebsd64_nmount */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 379 = obsolete kse_exit */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 380 = obsolete kse_wakeup */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 381 = obsolete kse_create */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 382 = obsolete kse_thr_interrupt */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 383 = obsolete kse_release */
-	{ AS(freebsd64___mac_get_proc_args), (sy_call_t *)freebsd64___mac_get_proc, AUE_NULL, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 384 = freebsd64___mac_get_proc */
-	{ AS(freebsd64___mac_set_proc_args), (sy_call_t *)freebsd64___mac_set_proc, AUE_NULL, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 385 = freebsd64___mac_set_proc */
-	{ AS(freebsd64___mac_get_fd_args), (sy_call_t *)freebsd64___mac_get_fd, AUE_NULL, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 386 = freebsd64___mac_get_fd */
-	{ AS(freebsd64___mac_get_file_args), (sy_call_t *)freebsd64___mac_get_file, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 387 = freebsd64___mac_get_file */
-	{ AS(freebsd64___mac_set_fd_args), (sy_call_t *)freebsd64___mac_set_fd, AUE_NULL, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 388 = freebsd64___mac_set_fd */
-	{ AS(freebsd64___mac_set_file_args), (sy_call_t *)freebsd64___mac_set_file, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 389 = freebsd64___mac_set_file */
-	{ AS(freebsd64_kenv_args), (sy_call_t *)freebsd64_kenv, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 390 = freebsd64_kenv */
-	{ AS(freebsd64_lchflags_args), (sy_call_t *)freebsd64_lchflags, AUE_LCHFLAGS, NULL, 0, 0, 0, SY_THR_STATIC },	/* 391 = freebsd64_lchflags */
-	{ AS(freebsd64_uuidgen_args), (sy_call_t *)freebsd64_uuidgen, AUE_NULL, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 392 = freebsd64_uuidgen */
-	{ AS(freebsd64_sendfile_args), (sy_call_t *)freebsd64_sendfile, AUE_SENDFILE, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 393 = freebsd64_sendfile */
-	{ AS(freebsd64_mac_syscall_args), (sy_call_t *)freebsd64_mac_syscall, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 394 = freebsd64_mac_syscall */
-	{ compat11(AS(freebsd11_freebsd64_getfsstat_args),freebsd64_getfsstat), AUE_GETFSSTAT, NULL, 0, 0, 0, SY_THR_STATIC },	/* 395 = freebsd11 freebsd64_getfsstat */
-	{ compat11(AS(freebsd11_freebsd64_statfs_args),freebsd64_statfs), AUE_STATFS, NULL, 0, 0, 0, SY_THR_STATIC },	/* 396 = freebsd11 freebsd64_statfs */
-	{ compat11(AS(freebsd11_freebsd64_fstatfs_args),freebsd64_fstatfs), AUE_FSTATFS, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 397 = freebsd11 freebsd64_fstatfs */
-	{ compat11(AS(freebsd11_freebsd64_fhstatfs_args),freebsd64_fhstatfs), AUE_FHSTATFS, NULL, 0, 0, 0, SY_THR_STATIC },	/* 398 = freebsd11 freebsd64_fhstatfs */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 399 = nosys */
-	{ AS(ksem_close_args), (sy_call_t *)lkmressys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },	/* 400 = ksem_close */
-	{ AS(ksem_post_args), (sy_call_t *)lkmressys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },	/* 401 = ksem_post */
-	{ AS(ksem_wait_args), (sy_call_t *)lkmressys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },	/* 402 = ksem_wait */
-	{ AS(ksem_trywait_args), (sy_call_t *)lkmressys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },	/* 403 = ksem_trywait */
-	{ AS(freebsd64_ksem_init_args), (sy_call_t *)lkmressys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },	/* 404 = freebsd64_ksem_init */
-	{ AS(freebsd64_ksem_open_args), (sy_call_t *)lkmressys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },	/* 405 = freebsd64_ksem_open */
-	{ AS(freebsd64_ksem_unlink_args), (sy_call_t *)lkmressys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },	/* 406 = freebsd64_ksem_unlink */
-	{ AS(freebsd64_ksem_getvalue_args), (sy_call_t *)lkmressys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },	/* 407 = freebsd64_ksem_getvalue */
-	{ AS(ksem_destroy_args), (sy_call_t *)lkmressys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },	/* 408 = ksem_destroy */
-	{ AS(freebsd64___mac_get_pid_args), (sy_call_t *)freebsd64___mac_get_pid, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 409 = freebsd64___mac_get_pid */
-	{ AS(freebsd64___mac_get_link_args), (sy_call_t *)freebsd64___mac_get_link, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 410 = freebsd64___mac_get_link */
-	{ AS(freebsd64___mac_set_link_args), (sy_call_t *)freebsd64___mac_set_link, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 411 = freebsd64___mac_set_link */
-	{ AS(freebsd64_extattr_set_link_args), (sy_call_t *)freebsd64_extattr_set_link, AUE_EXTATTR_SET_LINK, NULL, 0, 0, 0, SY_THR_STATIC },	/* 412 = freebsd64_extattr_set_link */
-	{ AS(freebsd64_extattr_get_link_args), (sy_call_t *)freebsd64_extattr_get_link, AUE_EXTATTR_GET_LINK, NULL, 0, 0, 0, SY_THR_STATIC },	/* 413 = freebsd64_extattr_get_link */
-	{ AS(freebsd64_extattr_delete_link_args), (sy_call_t *)freebsd64_extattr_delete_link, AUE_EXTATTR_DELETE_LINK, NULL, 0, 0, 0, SY_THR_STATIC },	/* 414 = freebsd64_extattr_delete_link */
-	{ AS(freebsd64___mac_execve_args), (sy_call_t *)freebsd64___mac_execve, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 415 = freebsd64___mac_execve */
-	{ AS(freebsd64_sigaction_args), (sy_call_t *)freebsd64_sigaction, AUE_SIGACTION, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 416 = freebsd64_sigaction */
-	{ AS(freebsd64_sigreturn_args), (sy_call_t *)freebsd64_sigreturn, AUE_SIGRETURN, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 417 = freebsd64_sigreturn */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 418 = __xstat */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 419 = __xfstat */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 420 = __xlstat */
-	{ AS(freebsd64_getcontext_args), (sy_call_t *)freebsd64_getcontext, AUE_NULL, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 421 = freebsd64_getcontext */
-	{ AS(freebsd64_setcontext_args), (sy_call_t *)freebsd64_setcontext, AUE_NULL, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 422 = freebsd64_setcontext */
-	{ AS(freebsd64_swapcontext_args), (sy_call_t *)freebsd64_swapcontext, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 423 = freebsd64_swapcontext */
-	{ AS(freebsd64_swapoff_args), (sy_call_t *)freebsd64_swapoff, AUE_SWAPOFF, NULL, 0, 0, 0, SY_THR_STATIC },	/* 424 = freebsd64_swapoff */
-	{ AS(freebsd64___acl_get_link_args), (sy_call_t *)freebsd64___acl_get_link, AUE_ACL_GET_LINK, NULL, 0, 0, 0, SY_THR_STATIC },	/* 425 = freebsd64___acl_get_link */
-	{ AS(freebsd64___acl_set_link_args), (sy_call_t *)freebsd64___acl_set_link, AUE_ACL_SET_LINK, NULL, 0, 0, 0, SY_THR_STATIC },	/* 426 = freebsd64___acl_set_link */
-	{ AS(freebsd64___acl_delete_link_args), (sy_call_t *)freebsd64___acl_delete_link, AUE_ACL_DELETE_LINK, NULL, 0, 0, 0, SY_THR_STATIC },	/* 427 = freebsd64___acl_delete_link */
-	{ AS(freebsd64___acl_aclcheck_link_args), (sy_call_t *)freebsd64___acl_aclcheck_link, AUE_ACL_CHECK_LINK, NULL, 0, 0, 0, SY_THR_STATIC },	/* 428 = freebsd64___acl_aclcheck_link */
-	{ AS(freebsd64_sigwait_args), (sy_call_t *)freebsd64_sigwait, AUE_SIGWAIT, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 429 = freebsd64_sigwait */
-	{ AS(freebsd64_thr_create_args), (sy_call_t *)freebsd64_thr_create, AUE_THR_CREATE, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 430 = freebsd64_thr_create */
-	{ AS(freebsd64_thr_exit_args), (sy_call_t *)freebsd64_thr_exit, AUE_THR_EXIT, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 431 = freebsd64_thr_exit */
-	{ AS(freebsd64_thr_self_args), (sy_call_t *)freebsd64_thr_self, AUE_NULL, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 432 = freebsd64_thr_self */
-	{ AS(thr_kill_args), (sy_call_t *)sys_thr_kill, AUE_THR_KILL, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 433 = thr_kill */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 434 = nosys */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 435 = nosys */
-	{ AS(jail_attach_args), (sy_call_t *)sys_jail_attach, AUE_JAIL_ATTACH, NULL, 0, 0, 0, SY_THR_STATIC },	/* 436 = jail_attach */
-	{ AS(freebsd64_extattr_list_fd_args), (sy_call_t *)freebsd64_extattr_list_fd, AUE_EXTATTR_LIST_FD, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 437 = freebsd64_extattr_list_fd */
-	{ AS(freebsd64_extattr_list_file_args), (sy_call_t *)freebsd64_extattr_list_file, AUE_EXTATTR_LIST_FILE, NULL, 0, 0, 0, SY_THR_STATIC },	/* 438 = freebsd64_extattr_list_file */
-	{ AS(freebsd64_extattr_list_link_args), (sy_call_t *)freebsd64_extattr_list_link, AUE_EXTATTR_LIST_LINK, NULL, 0, 0, 0, SY_THR_STATIC },	/* 439 = freebsd64_extattr_list_link */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 440 = obsolete kse_switchin */
-	{ AS(freebsd64_ksem_timedwait_args), (sy_call_t *)lkmressys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },	/* 441 = freebsd64_ksem_timedwait */
-	{ AS(freebsd64_thr_suspend_args), (sy_call_t *)freebsd64_thr_suspend, AUE_NULL, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 442 = freebsd64_thr_suspend */
-	{ AS(thr_wake_args), (sy_call_t *)sys_thr_wake, AUE_NULL, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 443 = thr_wake */
-	{ AS(kldunloadf_args), (sy_call_t *)sys_kldunloadf, AUE_MODUNLOAD, NULL, 0, 0, 0, SY_THR_STATIC },	/* 444 = kldunloadf */
-	{ AS(freebsd64_audit_args), (sy_call_t *)freebsd64_audit, AUE_AUDIT, NULL, 0, 0, 0, SY_THR_STATIC },	/* 445 = freebsd64_audit */
-	{ AS(freebsd64_auditon_args), (sy_call_t *)freebsd64_auditon, AUE_AUDITON, NULL, 0, 0, 0, SY_THR_STATIC },	/* 446 = freebsd64_auditon */
-	{ AS(freebsd64_getauid_args), (sy_call_t *)freebsd64_getauid, AUE_GETAUID, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 447 = freebsd64_getauid */
-	{ AS(freebsd64_setauid_args), (sy_call_t *)freebsd64_setauid, AUE_SETAUID, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 448 = freebsd64_setauid */
-	{ AS(freebsd64_getaudit_args), (sy_call_t *)freebsd64_getaudit, AUE_GETAUDIT, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 449 = freebsd64_getaudit */
-	{ AS(freebsd64_setaudit_args), (sy_call_t *)freebsd64_setaudit, AUE_SETAUDIT, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 450 = freebsd64_setaudit */
-	{ AS(freebsd64_getaudit_addr_args), (sy_call_t *)freebsd64_getaudit_addr, AUE_GETAUDIT_ADDR, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 451 = freebsd64_getaudit_addr */
-	{ AS(freebsd64_setaudit_addr_args), (sy_call_t *)freebsd64_setaudit_addr, AUE_SETAUDIT_ADDR, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 452 = freebsd64_setaudit_addr */
-	{ AS(freebsd64_auditctl_args), (sy_call_t *)freebsd64_auditctl, AUE_AUDITCTL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 453 = freebsd64_auditctl */
-	{ AS(freebsd64__umtx_op_args), (sy_call_t *)freebsd64__umtx_op, AUE_NULL, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 454 = freebsd64__umtx_op */
-	{ AS(freebsd64_thr_new_args), (sy_call_t *)freebsd64_thr_new, AUE_THR_NEW, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 455 = freebsd64_thr_new */
-	{ AS(freebsd64_sigqueue_args), (sy_call_t *)freebsd64_sigqueue, AUE_NULL, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 456 = freebsd64_sigqueue */
-	{ AS(freebsd64_kmq_open_args), (sy_call_t *)lkmressys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },	/* 457 = freebsd64_kmq_open */
-	{ AS(freebsd64_kmq_setattr_args), (sy_call_t *)lkmressys, AUE_NULL, NULL, 0, 0, SYF_CAPENABLED, SY_THR_ABSENT },	/* 458 = freebsd64_kmq_setattr */
-	{ AS(freebsd64_kmq_timedreceive_args), (sy_call_t *)lkmressys, AUE_NULL, NULL, 0, 0, SYF_CAPENABLED, SY_THR_ABSENT },	/* 459 = freebsd64_kmq_timedreceive */
-	{ AS(freebsd64_kmq_timedsend_args), (sy_call_t *)lkmressys, AUE_NULL, NULL, 0, 0, SYF_CAPENABLED, SY_THR_ABSENT },	/* 460 = freebsd64_kmq_timedsend */
-	{ AS(freebsd64_kmq_notify_args), (sy_call_t *)lkmressys, AUE_NULL, NULL, 0, 0, SYF_CAPENABLED, SY_THR_ABSENT },	/* 461 = freebsd64_kmq_notify */
-	{ AS(freebsd64_kmq_unlink_args), (sy_call_t *)lkmressys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },	/* 462 = freebsd64_kmq_unlink */
-	{ AS(freebsd64_abort2_args), (sy_call_t *)freebsd64_abort2, AUE_NULL, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 463 = freebsd64_abort2 */
-	{ AS(freebsd64_thr_set_name_args), (sy_call_t *)freebsd64_thr_set_name, AUE_NULL, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 464 = freebsd64_thr_set_name */
-	{ AS(freebsd64_aio_fsync_args), (sy_call_t *)freebsd64_aio_fsync, AUE_AIO_FSYNC, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 465 = freebsd64_aio_fsync */
-	{ AS(freebsd64_rtprio_thread_args), (sy_call_t *)freebsd64_rtprio_thread, AUE_RTPRIO, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 466 = freebsd64_rtprio_thread */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 467 = nosys */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 468 = nosys */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 469 = __getpath_fromfd */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 470 = __getpath_fromaddr */
-	{ AS(sctp_peeloff_args), (sy_call_t *)lkmressys, AUE_NULL, NULL, 0, 0, SYF_CAPENABLED, SY_THR_ABSENT },	/* 471 = sctp_peeloff */
-	{ AS(freebsd64_sctp_generic_sendmsg_args), (sy_call_t *)lkmressys, AUE_NULL, NULL, 0, 0, SYF_CAPENABLED, SY_THR_ABSENT },	/* 472 = freebsd64_sctp_generic_sendmsg */
-	{ AS(freebsd64_sctp_generic_sendmsg_iov_args), (sy_call_t *)lkmressys, AUE_NULL, NULL, 0, 0, SYF_CAPENABLED, SY_THR_ABSENT },	/* 473 = freebsd64_sctp_generic_sendmsg_iov */
-	{ AS(freebsd64_sctp_generic_recvmsg_args), (sy_call_t *)lkmressys, AUE_NULL, NULL, 0, 0, SYF_CAPENABLED, SY_THR_ABSENT },	/* 474 = freebsd64_sctp_generic_recvmsg */
-	{ AS(freebsd64_pread_args), (sy_call_t *)freebsd64_pread, AUE_PREAD, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 475 = freebsd64_pread */
-	{ AS(freebsd64_pwrite_args), (sy_call_t *)freebsd64_pwrite, AUE_PWRITE, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 476 = freebsd64_pwrite */
-	{ AS(freebsd64_mmap_args), (sy_call_t *)freebsd64_mmap, AUE_MMAP, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 477 = freebsd64_mmap */
-	{ AS(lseek_args), (sy_call_t *)sys_lseek, AUE_LSEEK, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 478 = lseek */
-	{ AS(freebsd64_truncate_args), (sy_call_t *)freebsd64_truncate, AUE_TRUNCATE, NULL, 0, 0, 0, SY_THR_STATIC },	/* 479 = freebsd64_truncate */
-	{ AS(ftruncate_args), (sy_call_t *)sys_ftruncate, AUE_FTRUNCATE, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 480 = ftruncate */
-	{ AS(thr_kill2_args), (sy_call_t *)sys_thr_kill2, AUE_THR_KILL2, NULL, 0, 0, 0, SY_THR_STATIC },	/* 481 = thr_kill2 */
-	{ compat12(AS(freebsd12_freebsd64_shm_open_args),freebsd64_shm_open), AUE_SHMOPEN, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 482 = freebsd12 freebsd64_shm_open */
-	{ AS(freebsd64_shm_unlink_args), (sy_call_t *)freebsd64_shm_unlink, AUE_SHMUNLINK, NULL, 0, 0, 0, SY_THR_STATIC },	/* 483 = freebsd64_shm_unlink */
-	{ AS(freebsd64_cpuset_args), (sy_call_t *)freebsd64_cpuset, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 484 = freebsd64_cpuset */
-	{ AS(cpuset_setid_args), (sy_call_t *)sys_cpuset_setid, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 485 = cpuset_setid */
-	{ AS(freebsd64_cpuset_getid_args), (sy_call_t *)freebsd64_cpuset_getid, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 486 = freebsd64_cpuset_getid */
-	{ AS(freebsd64_cpuset_getaffinity_args), (sy_call_t *)freebsd64_cpuset_getaffinity, AUE_NULL, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 487 = freebsd64_cpuset_getaffinity */
-	{ AS(freebsd64_cpuset_setaffinity_args), (sy_call_t *)freebsd64_cpuset_setaffinity, AUE_NULL, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 488 = freebsd64_cpuset_setaffinity */
-	{ AS(freebsd64_faccessat_args), (sy_call_t *)freebsd64_faccessat, AUE_FACCESSAT, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 489 = freebsd64_faccessat */
-	{ AS(freebsd64_fchmodat_args), (sy_call_t *)freebsd64_fchmodat, AUE_FCHMODAT, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 490 = freebsd64_fchmodat */
-	{ AS(freebsd64_fchownat_args), (sy_call_t *)freebsd64_fchownat, AUE_FCHOWNAT, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 491 = freebsd64_fchownat */
-	{ AS(freebsd64_fexecve_args), (sy_call_t *)freebsd64_fexecve, AUE_FEXECVE, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 492 = freebsd64_fexecve */
-	{ compat11(AS(freebsd11_freebsd64_fstatat_args),freebsd64_fstatat), AUE_FSTATAT, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 493 = freebsd11 freebsd64_fstatat */
-	{ AS(freebsd64_futimesat_args), (sy_call_t *)freebsd64_futimesat, AUE_FUTIMESAT, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 494 = freebsd64_futimesat */
-	{ AS(freebsd64_linkat_args), (sy_call_t *)freebsd64_linkat, AUE_LINKAT, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 495 = freebsd64_linkat */
-	{ AS(freebsd64_mkdirat_args), (sy_call_t *)freebsd64_mkdirat, AUE_MKDIRAT, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 496 = freebsd64_mkdirat */
-	{ AS(freebsd64_mkfifoat_args), (sy_call_t *)freebsd64_mkfifoat, AUE_MKFIFOAT, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 497 = freebsd64_mkfifoat */
-	{ compat11(AS(freebsd11_freebsd64_mknodat_args),freebsd64_mknodat), AUE_MKNODAT, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 498 = freebsd11 freebsd64_mknodat */
-	{ AS(freebsd64_openat_args), (sy_call_t *)freebsd64_openat, AUE_OPENAT_RWTC, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 499 = freebsd64_openat */
-	{ AS(freebsd64_readlinkat_args), (sy_call_t *)freebsd64_readlinkat, AUE_READLINKAT, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 500 = freebsd64_readlinkat */
-	{ AS(freebsd64_renameat_args), (sy_call_t *)freebsd64_renameat, AUE_RENAMEAT, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 501 = freebsd64_renameat */
-	{ AS(freebsd64_symlinkat_args), (sy_call_t *)freebsd64_symlinkat, AUE_SYMLINKAT, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 502 = freebsd64_symlinkat */
-	{ AS(freebsd64_unlinkat_args), (sy_call_t *)freebsd64_unlinkat, AUE_UNLINKAT, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 503 = freebsd64_unlinkat */
-	{ AS(posix_openpt_args), (sy_call_t *)sys_posix_openpt, AUE_POSIX_OPENPT, NULL, 0, 0, 0, SY_THR_STATIC },	/* 504 = posix_openpt */
-	{ AS(freebsd64_gssd_syscall_args), (sy_call_t *)lkmressys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },	/* 505 = freebsd64_gssd_syscall */
-	{ AS(freebsd64_jail_get_args), (sy_call_t *)freebsd64_jail_get, AUE_JAIL_GET, NULL, 0, 0, 0, SY_THR_STATIC },	/* 506 = freebsd64_jail_get */
-	{ AS(freebsd64_jail_set_args), (sy_call_t *)freebsd64_jail_set, AUE_JAIL_SET, NULL, 0, 0, 0, SY_THR_STATIC },	/* 507 = freebsd64_jail_set */
-	{ AS(jail_remove_args), (sy_call_t *)sys_jail_remove, AUE_JAIL_REMOVE, NULL, 0, 0, 0, SY_THR_STATIC },	/* 508 = jail_remove */
-	{ compat12(AS(freebsd12_closefrom_args),closefrom), AUE_CLOSEFROM, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 509 = freebsd12 closefrom */
-	{ AS(freebsd64___semctl_args), (sy_call_t *)lkmressys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },	/* 510 = freebsd64___semctl */
-	{ AS(freebsd64_msgctl_args), (sy_call_t *)lkmressys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },	/* 511 = freebsd64_msgctl */
-	{ AS(freebsd64_shmctl_args), (sy_call_t *)lkmressys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },	/* 512 = freebsd64_shmctl */
-	{ AS(freebsd64_lpathconf_args), (sy_call_t *)freebsd64_lpathconf, AUE_LPATHCONF, NULL, 0, 0, 0, SY_THR_STATIC },	/* 513 = freebsd64_lpathconf */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 514 = obsolete cap_new */
-	{ AS(freebsd64___cap_rights_get_args), (sy_call_t *)freebsd64___cap_rights_get, AUE_CAP_RIGHTS_GET, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 515 = freebsd64___cap_rights_get */
-	{ 0, (sy_call_t *)sys_cap_enter, AUE_CAP_ENTER, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 516 = cap_enter */
-	{ AS(freebsd64_cap_getmode_args), (sy_call_t *)freebsd64_cap_getmode, AUE_CAP_GETMODE, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 517 = freebsd64_cap_getmode */
-	{ AS(freebsd64_pdfork_args), (sy_call_t *)freebsd64_pdfork, AUE_PDFORK, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 518 = freebsd64_pdfork */
-	{ AS(pdkill_args), (sy_call_t *)sys_pdkill, AUE_PDKILL, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 519 = pdkill */
-	{ AS(freebsd64_pdgetpid_args), (sy_call_t *)freebsd64_pdgetpid, AUE_PDGETPID, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 520 = freebsd64_pdgetpid */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 521 = pdwait4 */
-	{ AS(freebsd64_pselect_args), (sy_call_t *)freebsd64_pselect, AUE_SELECT, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 522 = freebsd64_pselect */
-	{ AS(freebsd64_getloginclass_args), (sy_call_t *)freebsd64_getloginclass, AUE_GETLOGINCLASS, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 523 = freebsd64_getloginclass */
-	{ AS(freebsd64_setloginclass_args), (sy_call_t *)freebsd64_setloginclass, AUE_SETLOGINCLASS, NULL, 0, 0, 0, SY_THR_STATIC },	/* 524 = freebsd64_setloginclass */
-	{ AS(freebsd64_rctl_get_racct_args), (sy_call_t *)freebsd64_rctl_get_racct, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 525 = freebsd64_rctl_get_racct */
-	{ AS(freebsd64_rctl_get_rules_args), (sy_call_t *)freebsd64_rctl_get_rules, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 526 = freebsd64_rctl_get_rules */
-	{ AS(freebsd64_rctl_get_limits_args), (sy_call_t *)freebsd64_rctl_get_limits, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 527 = freebsd64_rctl_get_limits */
-	{ AS(freebsd64_rctl_add_rule_args), (sy_call_t *)freebsd64_rctl_add_rule, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 528 = freebsd64_rctl_add_rule */
-	{ AS(freebsd64_rctl_remove_rule_args), (sy_call_t *)freebsd64_rctl_remove_rule, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 529 = freebsd64_rctl_remove_rule */
-	{ AS(posix_fallocate_args), (sy_call_t *)sys_posix_fallocate, AUE_POSIX_FALLOCATE, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 530 = posix_fallocate */
-	{ AS(posix_fadvise_args), (sy_call_t *)sys_posix_fadvise, AUE_POSIX_FADVISE, NULL, 0, 0, 0, SY_THR_STATIC },	/* 531 = posix_fadvise */
-	{ AS(freebsd64_wait6_args), (sy_call_t *)freebsd64_wait6, AUE_WAIT6, NULL, 0, 0, 0, SY_THR_STATIC },	/* 532 = freebsd64_wait6 */
-	{ AS(freebsd64_cap_rights_limit_args), (sy_call_t *)freebsd64_cap_rights_limit, AUE_CAP_RIGHTS_LIMIT, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 533 = freebsd64_cap_rights_limit */
-	{ AS(freebsd64_cap_ioctls_limit_args), (sy_call_t *)freebsd64_cap_ioctls_limit, AUE_CAP_IOCTLS_LIMIT, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 534 = freebsd64_cap_ioctls_limit */
-	{ AS(freebsd64_cap_ioctls_get_args), (sy_call_t *)freebsd64_cap_ioctls_get, AUE_CAP_IOCTLS_GET, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 535 = freebsd64_cap_ioctls_get */
-	{ AS(cap_fcntls_limit_args), (sy_call_t *)sys_cap_fcntls_limit, AUE_CAP_FCNTLS_LIMIT, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 536 = cap_fcntls_limit */
-	{ AS(freebsd64_cap_fcntls_get_args), (sy_call_t *)freebsd64_cap_fcntls_get, AUE_CAP_FCNTLS_GET, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 537 = freebsd64_cap_fcntls_get */
-	{ AS(freebsd64_bindat_args), (sy_call_t *)freebsd64_bindat, AUE_BINDAT, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 538 = freebsd64_bindat */
-	{ AS(freebsd64_connectat_args), (sy_call_t *)freebsd64_connectat, AUE_CONNECTAT, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 539 = freebsd64_connectat */
-	{ AS(freebsd64_chflagsat_args), (sy_call_t *)freebsd64_chflagsat, AUE_CHFLAGSAT, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 540 = freebsd64_chflagsat */
-	{ AS(freebsd64_accept4_args), (sy_call_t *)freebsd64_accept4, AUE_ACCEPT, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 541 = freebsd64_accept4 */
-	{ AS(freebsd64_pipe2_args), (sy_call_t *)freebsd64_pipe2, AUE_PIPE, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 542 = freebsd64_pipe2 */
-	{ AS(freebsd64_aio_mlock_args), (sy_call_t *)freebsd64_aio_mlock, AUE_AIO_MLOCK, NULL, 0, 0, 0, SY_THR_STATIC },	/* 543 = freebsd64_aio_mlock */
-	{ AS(freebsd64_procctl_args), (sy_call_t *)freebsd64_procctl, AUE_PROCCTL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 544 = freebsd64_procctl */
-	{ AS(freebsd64_ppoll_args), (sy_call_t *)freebsd64_ppoll, AUE_POLL, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 545 = freebsd64_ppoll */
-	{ AS(freebsd64_futimens_args), (sy_call_t *)freebsd64_futimens, AUE_FUTIMES, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 546 = freebsd64_futimens */
-	{ AS(freebsd64_utimensat_args), (sy_call_t *)freebsd64_utimensat, AUE_FUTIMESAT, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 547 = freebsd64_utimensat */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 548 = obsolete numa_getaffinity */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 549 = obsolete numa_setaffinity */
-	{ AS(fdatasync_args), (sy_call_t *)sys_fdatasync, AUE_FSYNC, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 550 = fdatasync */
-	{ AS(freebsd64_fstat_args), (sy_call_t *)freebsd64_fstat, AUE_FSTAT, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 551 = freebsd64_fstat */
-	{ AS(freebsd64_fstatat_args), (sy_call_t *)freebsd64_fstatat, AUE_FSTATAT, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 552 = freebsd64_fstatat */
-	{ AS(freebsd64_fhstat_args), (sy_call_t *)freebsd64_fhstat, AUE_FHSTAT, NULL, 0, 0, 0, SY_THR_STATIC },	/* 553 = freebsd64_fhstat */
-	{ AS(freebsd64_getdirentries_args), (sy_call_t *)freebsd64_getdirentries, AUE_GETDIRENTRIES, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 554 = freebsd64_getdirentries */
-	{ AS(freebsd64_statfs_args), (sy_call_t *)freebsd64_statfs, AUE_STATFS, NULL, 0, 0, 0, SY_THR_STATIC },	/* 555 = freebsd64_statfs */
-	{ AS(freebsd64_fstatfs_args), (sy_call_t *)freebsd64_fstatfs, AUE_FSTATFS, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 556 = freebsd64_fstatfs */
-	{ AS(freebsd64_getfsstat_args), (sy_call_t *)freebsd64_getfsstat, AUE_GETFSSTAT, NULL, 0, 0, 0, SY_THR_STATIC },	/* 557 = freebsd64_getfsstat */
-	{ AS(freebsd64_fhstatfs_args), (sy_call_t *)freebsd64_fhstatfs, AUE_FHSTATFS, NULL, 0, 0, 0, SY_THR_STATIC },	/* 558 = freebsd64_fhstatfs */
-	{ AS(freebsd64_mknodat_args), (sy_call_t *)freebsd64_mknodat, AUE_MKNODAT, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 559 = freebsd64_mknodat */
-	{ AS(freebsd64_kevent_args), (sy_call_t *)freebsd64_kevent, AUE_KEVENT, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 560 = freebsd64_kevent */
-	{ AS(freebsd64_cpuset_getdomain_args), (sy_call_t *)freebsd64_cpuset_getdomain, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 561 = freebsd64_cpuset_getdomain */
-	{ AS(freebsd64_cpuset_setdomain_args), (sy_call_t *)freebsd64_cpuset_setdomain, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 562 = freebsd64_cpuset_setdomain */
-	{ AS(freebsd64_getrandom_args), (sy_call_t *)freebsd64_getrandom, AUE_NULL, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 563 = freebsd64_getrandom */
-	{ AS(freebsd64_getfhat_args), (sy_call_t *)freebsd64_getfhat, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 564 = freebsd64_getfhat */
-	{ AS(freebsd64_fhlink_args), (sy_call_t *)freebsd64_fhlink, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 565 = freebsd64_fhlink */
-	{ AS(freebsd64_fhlinkat_args), (sy_call_t *)freebsd64_fhlinkat, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 566 = freebsd64_fhlinkat */
-	{ AS(freebsd64_fhreadlink_args), (sy_call_t *)freebsd64_fhreadlink, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 567 = freebsd64_fhreadlink */
-	{ AS(freebsd64_funlinkat_args), (sy_call_t *)freebsd64_funlinkat, AUE_UNLINKAT, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 568 = freebsd64_funlinkat */
-	{ AS(freebsd64_copy_file_range_args), (sy_call_t *)freebsd64_copy_file_range, AUE_NULL, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 569 = freebsd64_copy_file_range */
-	{ AS(freebsd64___sysctlbyname_args), (sy_call_t *)freebsd64___sysctlbyname, AUE_SYSCTL, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 570 = freebsd64___sysctlbyname */
-	{ AS(freebsd64_shm_open2_args), (sy_call_t *)freebsd64_shm_open2, AUE_SHMOPEN, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 571 = freebsd64_shm_open2 */
-	{ AS(freebsd64_shm_rename_args), (sy_call_t *)freebsd64_shm_rename, AUE_SHMRENAME, NULL, 0, 0, 0, SY_THR_STATIC },	/* 572 = freebsd64_shm_rename */
-	{ AS(freebsd64_sigfastblock_args), (sy_call_t *)freebsd64_sigfastblock, AUE_NULL, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 573 = freebsd64_sigfastblock */
-	{ AS(freebsd64___realpathat_args), (sy_call_t *)freebsd64___realpathat, AUE_REALPATHAT, NULL, 0, 0, 0, SY_THR_STATIC },	/* 574 = freebsd64___realpathat */
-	{ AS(close_range_args), (sy_call_t *)sys_close_range, AUE_CLOSERANGE, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 575 = close_range */
-	{ AS(freebsd64_rpctls_syscall_args), (sy_call_t *)lkmressys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },	/* 576 = freebsd64_rpctls_syscall */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },		/* 0 = syscall */
+	{ .sy_narg = AS(sys_exit_args), .sy_call = (sy_call_t *)sys_sys_exit, .sy_auevent = AUE_EXIT, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 1 = exit */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)sys_fork, .sy_auevent = AUE_FORK, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 2 = fork */
+	{ .sy_narg = AS(freebsd64_read_args), .sy_call = (sy_call_t *)freebsd64_read, .sy_auevent = AUE_READ, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 3 = freebsd64_read */
+	{ .sy_narg = AS(freebsd64_write_args), .sy_call = (sy_call_t *)freebsd64_write, .sy_auevent = AUE_WRITE, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 4 = freebsd64_write */
+	{ .sy_narg = AS(freebsd64_open_args), .sy_call = (sy_call_t *)freebsd64_open, .sy_auevent = AUE_OPEN_RWTC, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 5 = freebsd64_open */
+	{ .sy_narg = AS(close_args), .sy_call = (sy_call_t *)sys_close, .sy_auevent = AUE_CLOSE, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 6 = close */
+	{ .sy_narg = AS(freebsd64_wait4_args), .sy_call = (sy_call_t *)freebsd64_wait4, .sy_auevent = AUE_WAIT4, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 7 = freebsd64_wait4 */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 8 = obsolete ocreat */
+	{ .sy_narg = AS(freebsd64_link_args), .sy_call = (sy_call_t *)freebsd64_link, .sy_auevent = AUE_LINK, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 9 = freebsd64_link */
+	{ .sy_narg = AS(freebsd64_unlink_args), .sy_call = (sy_call_t *)freebsd64_unlink, .sy_auevent = AUE_UNLINK, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 10 = freebsd64_unlink */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 11 = obsolete execv */
+	{ .sy_narg = AS(freebsd64_chdir_args), .sy_call = (sy_call_t *)freebsd64_chdir, .sy_auevent = AUE_CHDIR, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 12 = freebsd64_chdir */
+	{ .sy_narg = AS(fchdir_args), .sy_call = (sy_call_t *)sys_fchdir, .sy_auevent = AUE_FCHDIR, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 13 = fchdir */
+	{ compat11(AS(freebsd11_freebsd64_mknod_args),freebsd64_mknod), .sy_auevent = AUE_MKNOD, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 14 = freebsd11 freebsd64_mknod */
+	{ .sy_narg = AS(freebsd64_chmod_args), .sy_call = (sy_call_t *)freebsd64_chmod, .sy_auevent = AUE_CHMOD, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 15 = freebsd64_chmod */
+	{ .sy_narg = AS(freebsd64_chown_args), .sy_call = (sy_call_t *)freebsd64_chown, .sy_auevent = AUE_CHOWN, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 16 = freebsd64_chown */
+	{ .sy_narg = AS(freebsd64_break_args), .sy_call = (sy_call_t *)freebsd64_break, .sy_auevent = AUE_NULL, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 17 = freebsd64_break */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 18 = obsolete freebsd4_getfsstat */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 19 = obsolete olseek */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)sys_getpid, .sy_auevent = AUE_GETPID, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 20 = getpid */
+	{ .sy_narg = AS(freebsd64_mount_args), .sy_call = (sy_call_t *)freebsd64_mount, .sy_auevent = AUE_MOUNT, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 21 = freebsd64_mount */
+	{ .sy_narg = AS(freebsd64_unmount_args), .sy_call = (sy_call_t *)freebsd64_unmount, .sy_auevent = AUE_UMOUNT, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 22 = freebsd64_unmount */
+	{ .sy_narg = AS(setuid_args), .sy_call = (sy_call_t *)sys_setuid, .sy_auevent = AUE_SETUID, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 23 = setuid */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)sys_getuid, .sy_auevent = AUE_GETUID, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 24 = getuid */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)sys_geteuid, .sy_auevent = AUE_GETEUID, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 25 = geteuid */
+	{ .sy_narg = AS(freebsd64_ptrace_args), .sy_call = (sy_call_t *)freebsd64_ptrace, .sy_auevent = AUE_PTRACE, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 26 = freebsd64_ptrace */
+	{ .sy_narg = AS(freebsd64_recvmsg_args), .sy_call = (sy_call_t *)freebsd64_recvmsg, .sy_auevent = AUE_RECVMSG, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 27 = freebsd64_recvmsg */
+	{ .sy_narg = AS(freebsd64_sendmsg_args), .sy_call = (sy_call_t *)freebsd64_sendmsg, .sy_auevent = AUE_SENDMSG, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 28 = freebsd64_sendmsg */
+	{ .sy_narg = AS(freebsd64_recvfrom_args), .sy_call = (sy_call_t *)freebsd64_recvfrom, .sy_auevent = AUE_RECVFROM, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 29 = freebsd64_recvfrom */
+	{ .sy_narg = AS(freebsd64_accept_args), .sy_call = (sy_call_t *)freebsd64_accept, .sy_auevent = AUE_ACCEPT, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 30 = freebsd64_accept */
+	{ .sy_narg = AS(freebsd64_getpeername_args), .sy_call = (sy_call_t *)freebsd64_getpeername, .sy_auevent = AUE_GETPEERNAME, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 31 = freebsd64_getpeername */
+	{ .sy_narg = AS(freebsd64_getsockname_args), .sy_call = (sy_call_t *)freebsd64_getsockname, .sy_auevent = AUE_GETSOCKNAME, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 32 = freebsd64_getsockname */
+	{ .sy_narg = AS(freebsd64_access_args), .sy_call = (sy_call_t *)freebsd64_access, .sy_auevent = AUE_ACCESS, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 33 = freebsd64_access */
+	{ .sy_narg = AS(freebsd64_chflags_args), .sy_call = (sy_call_t *)freebsd64_chflags, .sy_auevent = AUE_CHFLAGS, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 34 = freebsd64_chflags */
+	{ .sy_narg = AS(fchflags_args), .sy_call = (sy_call_t *)sys_fchflags, .sy_auevent = AUE_FCHFLAGS, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 35 = fchflags */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)sys_sync, .sy_auevent = AUE_SYNC, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 36 = sync */
+	{ .sy_narg = AS(kill_args), .sy_call = (sy_call_t *)sys_kill, .sy_auevent = AUE_KILL, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 37 = kill */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 38 = obsolete ostat */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)sys_getppid, .sy_auevent = AUE_GETPPID, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 39 = getppid */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 40 = obsolete olstat */
+	{ .sy_narg = AS(dup_args), .sy_call = (sy_call_t *)sys_dup, .sy_auevent = AUE_DUP, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 41 = dup */
+	{ compat10(0,pipe), .sy_auevent = AUE_PIPE, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 42 = freebsd10 pipe */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)sys_getegid, .sy_auevent = AUE_GETEGID, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 43 = getegid */
+	{ .sy_narg = AS(freebsd64_profil_args), .sy_call = (sy_call_t *)freebsd64_profil, .sy_auevent = AUE_PROFILE, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 44 = freebsd64_profil */
+	{ .sy_narg = AS(freebsd64_ktrace_args), .sy_call = (sy_call_t *)freebsd64_ktrace, .sy_auevent = AUE_KTRACE, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 45 = freebsd64_ktrace */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 46 = obsolete osigaction */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)sys_getgid, .sy_auevent = AUE_GETGID, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 47 = getgid */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 48 = obsolete osigprocmask */
+	{ .sy_narg = AS(freebsd64_getlogin_args), .sy_call = (sy_call_t *)freebsd64_getlogin, .sy_auevent = AUE_GETLOGIN, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 49 = freebsd64_getlogin */
+	{ .sy_narg = AS(freebsd64_setlogin_args), .sy_call = (sy_call_t *)freebsd64_setlogin, .sy_auevent = AUE_SETLOGIN, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 50 = freebsd64_setlogin */
+	{ .sy_narg = AS(freebsd64_acct_args), .sy_call = (sy_call_t *)freebsd64_acct, .sy_auevent = AUE_ACCT, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 51 = freebsd64_acct */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 52 = obsolete osigpending */
+	{ .sy_narg = AS(freebsd64_sigaltstack_args), .sy_call = (sy_call_t *)freebsd64_sigaltstack, .sy_auevent = AUE_SIGALTSTACK, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 53 = freebsd64_sigaltstack */
+	{ .sy_narg = AS(freebsd64_ioctl_args), .sy_call = (sy_call_t *)freebsd64_ioctl, .sy_auevent = AUE_IOCTL, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 54 = freebsd64_ioctl */
+	{ .sy_narg = AS(reboot_args), .sy_call = (sy_call_t *)sys_reboot, .sy_auevent = AUE_REBOOT, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 55 = reboot */
+	{ .sy_narg = AS(freebsd64_revoke_args), .sy_call = (sy_call_t *)freebsd64_revoke, .sy_auevent = AUE_REVOKE, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 56 = freebsd64_revoke */
+	{ .sy_narg = AS(freebsd64_symlink_args), .sy_call = (sy_call_t *)freebsd64_symlink, .sy_auevent = AUE_SYMLINK, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 57 = freebsd64_symlink */
+	{ .sy_narg = AS(freebsd64_readlink_args), .sy_call = (sy_call_t *)freebsd64_readlink, .sy_auevent = AUE_READLINK, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 58 = freebsd64_readlink */
+	{ .sy_narg = AS(freebsd64_execve_args), .sy_call = (sy_call_t *)freebsd64_execve, .sy_auevent = AUE_EXECVE, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 59 = freebsd64_execve */
+	{ .sy_narg = AS(umask_args), .sy_call = (sy_call_t *)sys_umask, .sy_auevent = AUE_UMASK, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 60 = umask */
+	{ .sy_narg = AS(freebsd64_chroot_args), .sy_call = (sy_call_t *)freebsd64_chroot, .sy_auevent = AUE_CHROOT, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 61 = freebsd64_chroot */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 62 = obsolete ofstat */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 63 = obsolete ogetkerninfo */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 64 = obsolete ogetpagesize */
+	{ .sy_narg = AS(freebsd64_msync_args), .sy_call = (sy_call_t *)freebsd64_msync, .sy_auevent = AUE_MSYNC, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 65 = freebsd64_msync */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)sys_vfork, .sy_auevent = AUE_VFORK, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 66 = vfork */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 67 = obsolete vread */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 68 = obsolete vwrite */
+	{ .sy_narg = AS(sbrk_args), .sy_call = (sy_call_t *)sys_sbrk, .sy_auevent = AUE_SBRK, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 69 = sbrk */
+	{ .sy_narg = AS(sstk_args), .sy_call = (sy_call_t *)sys_sstk, .sy_auevent = AUE_SSTK, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 70 = sstk */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 71 = obsolete ommap */
+	{ compat11(AS(freebsd11_vadvise_args),vadvise), .sy_auevent = AUE_O_VADVISE, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 72 = freebsd11 vadvise */
+	{ .sy_narg = AS(freebsd64_munmap_args), .sy_call = (sy_call_t *)freebsd64_munmap, .sy_auevent = AUE_MUNMAP, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 73 = freebsd64_munmap */
+	{ .sy_narg = AS(freebsd64_mprotect_args), .sy_call = (sy_call_t *)freebsd64_mprotect, .sy_auevent = AUE_MPROTECT, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 74 = freebsd64_mprotect */
+	{ .sy_narg = AS(freebsd64_madvise_args), .sy_call = (sy_call_t *)freebsd64_madvise, .sy_auevent = AUE_MADVISE, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 75 = freebsd64_madvise */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 76 = obsolete vhangup */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 77 = obsolete vlimit */
+	{ .sy_narg = AS(freebsd64_mincore_args), .sy_call = (sy_call_t *)freebsd64_mincore, .sy_auevent = AUE_MINCORE, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 78 = freebsd64_mincore */
+	{ .sy_narg = AS(freebsd64_getgroups_args), .sy_call = (sy_call_t *)freebsd64_getgroups, .sy_auevent = AUE_GETGROUPS, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 79 = freebsd64_getgroups */
+	{ .sy_narg = AS(freebsd64_setgroups_args), .sy_call = (sy_call_t *)freebsd64_setgroups, .sy_auevent = AUE_SETGROUPS, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 80 = freebsd64_setgroups */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)sys_getpgrp, .sy_auevent = AUE_GETPGRP, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 81 = getpgrp */
+	{ .sy_narg = AS(setpgid_args), .sy_call = (sy_call_t *)sys_setpgid, .sy_auevent = AUE_SETPGRP, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 82 = setpgid */
+	{ .sy_narg = AS(freebsd64_setitimer_args), .sy_call = (sy_call_t *)freebsd64_setitimer, .sy_auevent = AUE_SETITIMER, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 83 = freebsd64_setitimer */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 84 = obsolete owait */
+	{ .sy_narg = AS(freebsd64_swapon_args), .sy_call = (sy_call_t *)freebsd64_swapon, .sy_auevent = AUE_SWAPON, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 85 = freebsd64_swapon */
+	{ .sy_narg = AS(freebsd64_getitimer_args), .sy_call = (sy_call_t *)freebsd64_getitimer, .sy_auevent = AUE_GETITIMER, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 86 = freebsd64_getitimer */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 87 = obsolete ogethostname */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 88 = obsolete osethostname */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)sys_getdtablesize, .sy_auevent = AUE_GETDTABLESIZE, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 89 = getdtablesize */
+	{ .sy_narg = AS(dup2_args), .sy_call = (sy_call_t *)sys_dup2, .sy_auevent = AUE_DUP2, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 90 = dup2 */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 91 = getdopt */
+	{ .sy_narg = AS(freebsd64_fcntl_args), .sy_call = (sy_call_t *)freebsd64_fcntl, .sy_auevent = AUE_FCNTL, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 92 = freebsd64_fcntl */
+	{ .sy_narg = AS(freebsd64_select_args), .sy_call = (sy_call_t *)freebsd64_select, .sy_auevent = AUE_SELECT, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 93 = freebsd64_select */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 94 = setdopt */
+	{ .sy_narg = AS(fsync_args), .sy_call = (sy_call_t *)sys_fsync, .sy_auevent = AUE_FSYNC, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 95 = fsync */
+	{ .sy_narg = AS(setpriority_args), .sy_call = (sy_call_t *)sys_setpriority, .sy_auevent = AUE_SETPRIORITY, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 96 = setpriority */
+	{ .sy_narg = AS(socket_args), .sy_call = (sy_call_t *)sys_socket, .sy_auevent = AUE_SOCKET, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 97 = socket */
+	{ .sy_narg = AS(freebsd64_connect_args), .sy_call = (sy_call_t *)freebsd64_connect, .sy_auevent = AUE_CONNECT, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 98 = freebsd64_connect */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 99 = obsolete oaccept */
+	{ .sy_narg = AS(getpriority_args), .sy_call = (sy_call_t *)sys_getpriority, .sy_auevent = AUE_GETPRIORITY, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 100 = getpriority */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 101 = obsolete osend */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 102 = obsolete orecv */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 103 = obsolete osigreturn */
+	{ .sy_narg = AS(freebsd64_bind_args), .sy_call = (sy_call_t *)freebsd64_bind, .sy_auevent = AUE_BIND, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 104 = freebsd64_bind */
+	{ .sy_narg = AS(freebsd64_setsockopt_args), .sy_call = (sy_call_t *)freebsd64_setsockopt, .sy_auevent = AUE_SETSOCKOPT, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 105 = freebsd64_setsockopt */
+	{ .sy_narg = AS(listen_args), .sy_call = (sy_call_t *)sys_listen, .sy_auevent = AUE_LISTEN, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 106 = listen */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 107 = obsolete vtimes */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 108 = obsolete osigvec */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 109 = obsolete osigblock */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 110 = obsolete osigsetmask */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 111 = obsolete osigsuspend */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 112 = obsolete osigstack */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 113 = obsolete orecvmsg */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 114 = obsolete osendmsg */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 115 = obsolete vtrace */
+	{ .sy_narg = AS(freebsd64_gettimeofday_args), .sy_call = (sy_call_t *)freebsd64_gettimeofday, .sy_auevent = AUE_GETTIMEOFDAY, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 116 = freebsd64_gettimeofday */
+	{ .sy_narg = AS(freebsd64_getrusage_args), .sy_call = (sy_call_t *)freebsd64_getrusage, .sy_auevent = AUE_GETRUSAGE, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 117 = freebsd64_getrusage */
+	{ .sy_narg = AS(freebsd64_getsockopt_args), .sy_call = (sy_call_t *)freebsd64_getsockopt, .sy_auevent = AUE_GETSOCKOPT, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 118 = freebsd64_getsockopt */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 119 = resuba */
+	{ .sy_narg = AS(freebsd64_readv_args), .sy_call = (sy_call_t *)freebsd64_readv, .sy_auevent = AUE_READV, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 120 = freebsd64_readv */
+	{ .sy_narg = AS(freebsd64_writev_args), .sy_call = (sy_call_t *)freebsd64_writev, .sy_auevent = AUE_WRITEV, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 121 = freebsd64_writev */
+	{ .sy_narg = AS(freebsd64_settimeofday_args), .sy_call = (sy_call_t *)freebsd64_settimeofday, .sy_auevent = AUE_SETTIMEOFDAY, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 122 = freebsd64_settimeofday */
+	{ .sy_narg = AS(fchown_args), .sy_call = (sy_call_t *)sys_fchown, .sy_auevent = AUE_FCHOWN, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 123 = fchown */
+	{ .sy_narg = AS(fchmod_args), .sy_call = (sy_call_t *)sys_fchmod, .sy_auevent = AUE_FCHMOD, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 124 = fchmod */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 125 = obsolete orecvfrom */
+	{ .sy_narg = AS(setreuid_args), .sy_call = (sy_call_t *)sys_setreuid, .sy_auevent = AUE_SETREUID, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 126 = setreuid */
+	{ .sy_narg = AS(setregid_args), .sy_call = (sy_call_t *)sys_setregid, .sy_auevent = AUE_SETREGID, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 127 = setregid */
+	{ .sy_narg = AS(freebsd64_rename_args), .sy_call = (sy_call_t *)freebsd64_rename, .sy_auevent = AUE_RENAME, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 128 = freebsd64_rename */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 129 = obsolete otruncate */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 130 = obsolete oftruncate */
+	{ .sy_narg = AS(flock_args), .sy_call = (sy_call_t *)sys_flock, .sy_auevent = AUE_FLOCK, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 131 = flock */
+	{ .sy_narg = AS(freebsd64_mkfifo_args), .sy_call = (sy_call_t *)freebsd64_mkfifo, .sy_auevent = AUE_MKFIFO, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 132 = freebsd64_mkfifo */
+	{ .sy_narg = AS(freebsd64_sendto_args), .sy_call = (sy_call_t *)freebsd64_sendto, .sy_auevent = AUE_SENDTO, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 133 = freebsd64_sendto */
+	{ .sy_narg = AS(shutdown_args), .sy_call = (sy_call_t *)sys_shutdown, .sy_auevent = AUE_SHUTDOWN, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 134 = shutdown */
+	{ .sy_narg = AS(freebsd64_socketpair_args), .sy_call = (sy_call_t *)freebsd64_socketpair, .sy_auevent = AUE_SOCKETPAIR, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 135 = freebsd64_socketpair */
+	{ .sy_narg = AS(freebsd64_mkdir_args), .sy_call = (sy_call_t *)freebsd64_mkdir, .sy_auevent = AUE_MKDIR, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 136 = freebsd64_mkdir */
+	{ .sy_narg = AS(freebsd64_rmdir_args), .sy_call = (sy_call_t *)freebsd64_rmdir, .sy_auevent = AUE_RMDIR, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 137 = freebsd64_rmdir */
+	{ .sy_narg = AS(freebsd64_utimes_args), .sy_call = (sy_call_t *)freebsd64_utimes, .sy_auevent = AUE_UTIMES, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 138 = freebsd64_utimes */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 139 = obsolete 4.2 sigreturn */
+	{ .sy_narg = AS(freebsd64_adjtime_args), .sy_call = (sy_call_t *)freebsd64_adjtime, .sy_auevent = AUE_ADJTIME, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 140 = freebsd64_adjtime */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 141 = obsolete ogetpeername */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 142 = obsolete ogethostid */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 143 = obsolete osethostid */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 144 = obsolete ogetrlimit */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 145 = obsolete osetrlimit */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 146 = obsolete okillpg */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)sys_setsid, .sy_auevent = AUE_SETSID, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 147 = setsid */
+	{ .sy_narg = AS(freebsd64_quotactl_args), .sy_call = (sy_call_t *)freebsd64_quotactl, .sy_auevent = AUE_QUOTACTL, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 148 = freebsd64_quotactl */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 149 = obsolete oquota */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 150 = obsolete ogetsockname */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 151 = sem_lock */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 152 = sem_wakeup */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 153 = asyncdaemon */
+	{ .sy_narg = AS(freebsd64_nlm_syscall_args), .sy_call = (sy_call_t *)lkmressys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },	/* 154 = freebsd64_nlm_syscall */
+	{ .sy_narg = AS(freebsd64_nfssvc_args), .sy_call = (sy_call_t *)lkmressys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },	/* 155 = freebsd64_nfssvc */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 156 = obsolete ogetdirentries */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 157 = obsolete freebsd4_statfs */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 158 = obsolete freebsd4_fstatfs */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 159 = nosys */
+	{ .sy_narg = AS(freebsd64_lgetfh_args), .sy_call = (sy_call_t *)freebsd64_lgetfh, .sy_auevent = AUE_LGETFH, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 160 = freebsd64_lgetfh */
+	{ .sy_narg = AS(freebsd64_getfh_args), .sy_call = (sy_call_t *)freebsd64_getfh, .sy_auevent = AUE_NFS_GETFH, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 161 = freebsd64_getfh */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 162 = obsolete freebsd4_getdomainname */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 163 = obsolete freebsd4_setdomainname */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 164 = obsolete freebsd4_uname */
+	{ .sy_narg = AS(freebsd64_sysarch_args), .sy_call = (sy_call_t *)freebsd64_sysarch, .sy_auevent = AUE_SYSARCH, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 165 = freebsd64_sysarch */
+	{ .sy_narg = AS(freebsd64_rtprio_args), .sy_call = (sy_call_t *)freebsd64_rtprio, .sy_auevent = AUE_RTPRIO, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 166 = freebsd64_rtprio */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 167 = nosys */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 168 = nosys */
+	{ .sy_narg = AS(freebsd64_semsys_args), .sy_call = (sy_call_t *)lkmressys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },	/* 169 = freebsd64_semsys */
+	{ .sy_narg = AS(freebsd64_msgsys_args), .sy_call = (sy_call_t *)lkmressys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },	/* 170 = freebsd64_msgsys */
+	{ .sy_narg = AS(freebsd64_shmsys_args), .sy_call = (sy_call_t *)lkmressys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },	/* 171 = freebsd64_shmsys */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 172 = nosys */
+	{ compat6(AS(freebsd6_freebsd64_pread_args),freebsd64_pread), .sy_auevent = AUE_PREAD, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 173 = freebsd6 freebsd64_pread */
+	{ compat6(AS(freebsd6_freebsd64_pwrite_args),freebsd64_pwrite), .sy_auevent = AUE_PWRITE, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 174 = freebsd6 freebsd64_pwrite */
+	{ .sy_narg = AS(setfib_args), .sy_call = (sy_call_t *)sys_setfib, .sy_auevent = AUE_SETFIB, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 175 = setfib */
+	{ .sy_narg = AS(freebsd64_ntp_adjtime_args), .sy_call = (sy_call_t *)freebsd64_ntp_adjtime, .sy_auevent = AUE_NTP_ADJTIME, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 176 = freebsd64_ntp_adjtime */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 177 = sfork */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 178 = getdescriptor */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 179 = setdescriptor */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 180 = nosys */
+	{ .sy_narg = AS(setgid_args), .sy_call = (sy_call_t *)sys_setgid, .sy_auevent = AUE_SETGID, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 181 = setgid */
+	{ .sy_narg = AS(setegid_args), .sy_call = (sy_call_t *)sys_setegid, .sy_auevent = AUE_SETEGID, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 182 = setegid */
+	{ .sy_narg = AS(seteuid_args), .sy_call = (sy_call_t *)sys_seteuid, .sy_auevent = AUE_SETEUID, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 183 = seteuid */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 184 = obsolete lfs_bmapv */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 185 = obsolete lfs_markv */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 186 = obsolete lfs_segclean */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 187 = obsolete lfs_segwait */
+	{ compat11(AS(freebsd11_freebsd64_stat_args),freebsd64_stat), .sy_auevent = AUE_STAT, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 188 = freebsd11 freebsd64_stat */
+	{ compat11(AS(freebsd11_freebsd64_fstat_args),freebsd64_fstat), .sy_auevent = AUE_FSTAT, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 189 = freebsd11 freebsd64_fstat */
+	{ compat11(AS(freebsd11_freebsd64_lstat_args),freebsd64_lstat), .sy_auevent = AUE_LSTAT, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 190 = freebsd11 freebsd64_lstat */
+	{ .sy_narg = AS(freebsd64_pathconf_args), .sy_call = (sy_call_t *)freebsd64_pathconf, .sy_auevent = AUE_PATHCONF, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 191 = freebsd64_pathconf */
+	{ .sy_narg = AS(fpathconf_args), .sy_call = (sy_call_t *)sys_fpathconf, .sy_auevent = AUE_FPATHCONF, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 192 = fpathconf */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 193 = nosys */
+	{ .sy_narg = AS(freebsd64___getrlimit_args), .sy_call = (sy_call_t *)freebsd64_getrlimit, .sy_auevent = AUE_GETRLIMIT, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 194 = freebsd64_getrlimit */
+	{ .sy_narg = AS(freebsd64___setrlimit_args), .sy_call = (sy_call_t *)freebsd64_setrlimit, .sy_auevent = AUE_SETRLIMIT, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 195 = freebsd64_setrlimit */
+	{ compat11(AS(freebsd11_freebsd64_getdirentries_args),freebsd64_getdirentries), .sy_auevent = AUE_GETDIRENTRIES, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 196 = freebsd11 freebsd64_getdirentries */
+	{ compat6(AS(freebsd6_freebsd64_mmap_args),freebsd64_mmap), .sy_auevent = AUE_MMAP, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 197 = freebsd6 freebsd64_mmap */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },		/* 198 = __syscall */
+	{ compat6(AS(freebsd6_lseek_args),lseek), .sy_auevent = AUE_LSEEK, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 199 = freebsd6 lseek */
+	{ compat6(AS(freebsd6_freebsd64_truncate_args),freebsd64_truncate), .sy_auevent = AUE_TRUNCATE, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 200 = freebsd6 freebsd64_truncate */
+	{ compat6(AS(freebsd6_ftruncate_args),ftruncate), .sy_auevent = AUE_FTRUNCATE, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 201 = freebsd6 ftruncate */
+	{ .sy_narg = AS(freebsd64___sysctl_args), .sy_call = (sy_call_t *)freebsd64___sysctl, .sy_auevent = AUE_SYSCTL, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 202 = freebsd64___sysctl */
+	{ .sy_narg = AS(freebsd64_mlock_args), .sy_call = (sy_call_t *)freebsd64_mlock, .sy_auevent = AUE_MLOCK, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 203 = freebsd64_mlock */
+	{ .sy_narg = AS(freebsd64_munlock_args), .sy_call = (sy_call_t *)freebsd64_munlock, .sy_auevent = AUE_MUNLOCK, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 204 = freebsd64_munlock */
+	{ .sy_narg = AS(freebsd64_undelete_args), .sy_call = (sy_call_t *)freebsd64_undelete, .sy_auevent = AUE_UNDELETE, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 205 = freebsd64_undelete */
+	{ .sy_narg = AS(freebsd64_futimes_args), .sy_call = (sy_call_t *)freebsd64_futimes, .sy_auevent = AUE_FUTIMES, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 206 = freebsd64_futimes */
+	{ .sy_narg = AS(getpgid_args), .sy_call = (sy_call_t *)sys_getpgid, .sy_auevent = AUE_GETPGID, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 207 = getpgid */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 208 = nosys */
+	{ .sy_narg = AS(freebsd64_poll_args), .sy_call = (sy_call_t *)freebsd64_poll, .sy_auevent = AUE_POLL, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 209 = freebsd64_poll */
+	{ .sy_narg = AS(nosys_args), .sy_call = (sy_call_t *)lkmnosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },	/* 210 = lkmnosys */
+	{ .sy_narg = AS(nosys_args), .sy_call = (sy_call_t *)lkmnosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },	/* 211 = lkmnosys */
+	{ .sy_narg = AS(nosys_args), .sy_call = (sy_call_t *)lkmnosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },	/* 212 = lkmnosys */
+	{ .sy_narg = AS(nosys_args), .sy_call = (sy_call_t *)lkmnosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },	/* 213 = lkmnosys */
+	{ .sy_narg = AS(nosys_args), .sy_call = (sy_call_t *)lkmnosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },	/* 214 = lkmnosys */
+	{ .sy_narg = AS(nosys_args), .sy_call = (sy_call_t *)lkmnosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },	/* 215 = lkmnosys */
+	{ .sy_narg = AS(nosys_args), .sy_call = (sy_call_t *)lkmnosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },	/* 216 = lkmnosys */
+	{ .sy_narg = AS(nosys_args), .sy_call = (sy_call_t *)lkmnosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },	/* 217 = lkmnosys */
+	{ .sy_narg = AS(nosys_args), .sy_call = (sy_call_t *)lkmnosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },	/* 218 = lkmnosys */
+	{ .sy_narg = AS(nosys_args), .sy_call = (sy_call_t *)lkmnosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },	/* 219 = lkmnosys */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)lkmressys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },		/* 220 = freebsd7 freebsd64___semctl */
+	{ .sy_narg = AS(semget_args), .sy_call = (sy_call_t *)lkmressys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },	/* 221 = semget */
+	{ .sy_narg = AS(freebsd64_semop_args), .sy_call = (sy_call_t *)lkmressys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },	/* 222 = freebsd64_semop */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 223 = obsolete semconfig */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)lkmressys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },		/* 224 = freebsd7 freebsd64_msgctl */
+	{ .sy_narg = AS(msgget_args), .sy_call = (sy_call_t *)lkmressys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },	/* 225 = msgget */
+	{ .sy_narg = AS(freebsd64_msgsnd_args), .sy_call = (sy_call_t *)lkmressys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },	/* 226 = freebsd64_msgsnd */
+	{ .sy_narg = AS(freebsd64_msgrcv_args), .sy_call = (sy_call_t *)lkmressys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },	/* 227 = freebsd64_msgrcv */
+	{ .sy_narg = AS(freebsd64_shmat_args), .sy_call = (sy_call_t *)lkmressys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },	/* 228 = freebsd64_shmat */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)lkmressys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },		/* 229 = freebsd7 freebsd64_shmctl */
+	{ .sy_narg = AS(freebsd64_shmdt_args), .sy_call = (sy_call_t *)lkmressys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },	/* 230 = freebsd64_shmdt */
+	{ .sy_narg = AS(shmget_args), .sy_call = (sy_call_t *)lkmressys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },	/* 231 = shmget */
+	{ .sy_narg = AS(freebsd64_clock_gettime_args), .sy_call = (sy_call_t *)freebsd64_clock_gettime, .sy_auevent = AUE_NULL, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 232 = freebsd64_clock_gettime */
+	{ .sy_narg = AS(freebsd64_clock_settime_args), .sy_call = (sy_call_t *)freebsd64_clock_settime, .sy_auevent = AUE_CLOCK_SETTIME, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 233 = freebsd64_clock_settime */
+	{ .sy_narg = AS(freebsd64_clock_getres_args), .sy_call = (sy_call_t *)freebsd64_clock_getres, .sy_auevent = AUE_NULL, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 234 = freebsd64_clock_getres */
+	{ .sy_narg = AS(freebsd64_ktimer_create_args), .sy_call = (sy_call_t *)freebsd64_ktimer_create, .sy_auevent = AUE_NULL, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 235 = freebsd64_ktimer_create */
+	{ .sy_narg = AS(ktimer_delete_args), .sy_call = (sy_call_t *)sys_ktimer_delete, .sy_auevent = AUE_NULL, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 236 = ktimer_delete */
+	{ .sy_narg = AS(freebsd64_ktimer_settime_args), .sy_call = (sy_call_t *)freebsd64_ktimer_settime, .sy_auevent = AUE_NULL, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 237 = freebsd64_ktimer_settime */
+	{ .sy_narg = AS(freebsd64_ktimer_gettime_args), .sy_call = (sy_call_t *)freebsd64_ktimer_gettime, .sy_auevent = AUE_NULL, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 238 = freebsd64_ktimer_gettime */
+	{ .sy_narg = AS(ktimer_getoverrun_args), .sy_call = (sy_call_t *)sys_ktimer_getoverrun, .sy_auevent = AUE_NULL, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 239 = ktimer_getoverrun */
+	{ .sy_narg = AS(freebsd64_nanosleep_args), .sy_call = (sy_call_t *)freebsd64_nanosleep, .sy_auevent = AUE_NULL, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 240 = freebsd64_nanosleep */
+	{ .sy_narg = AS(freebsd64_ffclock_getcounter_args), .sy_call = (sy_call_t *)freebsd64_ffclock_getcounter, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 241 = freebsd64_ffclock_getcounter */
+	{ .sy_narg = AS(freebsd64_ffclock_setestimate_args), .sy_call = (sy_call_t *)freebsd64_ffclock_setestimate, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 242 = freebsd64_ffclock_setestimate */
+	{ .sy_narg = AS(freebsd64_ffclock_getestimate_args), .sy_call = (sy_call_t *)freebsd64_ffclock_getestimate, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 243 = freebsd64_ffclock_getestimate */
+	{ .sy_narg = AS(freebsd64_clock_nanosleep_args), .sy_call = (sy_call_t *)freebsd64_clock_nanosleep, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 244 = freebsd64_clock_nanosleep */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 245 = nosys */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 246 = nosys */
+	{ .sy_narg = AS(freebsd64_clock_getcpuclockid2_args), .sy_call = (sy_call_t *)freebsd64_clock_getcpuclockid2, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 247 = freebsd64_clock_getcpuclockid2 */
+	{ .sy_narg = AS(freebsd64_ntp_gettime_args), .sy_call = (sy_call_t *)freebsd64_ntp_gettime, .sy_auevent = AUE_NULL, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 248 = freebsd64_ntp_gettime */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 249 = nosys */
+	{ .sy_narg = AS(freebsd64_minherit_args), .sy_call = (sy_call_t *)freebsd64_minherit, .sy_auevent = AUE_MINHERIT, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 250 = freebsd64_minherit */
+	{ .sy_narg = AS(rfork_args), .sy_call = (sy_call_t *)sys_rfork, .sy_auevent = AUE_RFORK, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 251 = rfork */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 252 = obsolete openbsd_poll */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)sys_issetugid, .sy_auevent = AUE_ISSETUGID, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 253 = issetugid */
+	{ .sy_narg = AS(freebsd64_lchown_args), .sy_call = (sy_call_t *)freebsd64_lchown, .sy_auevent = AUE_LCHOWN, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 254 = freebsd64_lchown */
+	{ .sy_narg = AS(freebsd64_aio_read_args), .sy_call = (sy_call_t *)freebsd64_aio_read, .sy_auevent = AUE_AIO_READ, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 255 = freebsd64_aio_read */
+	{ .sy_narg = AS(freebsd64_aio_write_args), .sy_call = (sy_call_t *)freebsd64_aio_write, .sy_auevent = AUE_AIO_WRITE, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 256 = freebsd64_aio_write */
+	{ .sy_narg = AS(freebsd64_lio_listio_args), .sy_call = (sy_call_t *)freebsd64_lio_listio, .sy_auevent = AUE_LIO_LISTIO, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 257 = freebsd64_lio_listio */
+	{ .sy_narg = AS(freebsd64_kbounce_args), .sy_call = (sy_call_t *)freebsd64_kbounce, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 258 = freebsd64_kbounce */
+	{ .sy_narg = AS(freebsd64_flag_captured_args), .sy_call = (sy_call_t *)freebsd64_flag_captured, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 259 = freebsd64_flag_captured */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 260 = nosys */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 261 = nosys */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 262 = nosys */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 263 = nosys */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 264 = nosys */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 265 = nosys */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 266 = nosys */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 267 = nosys */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 268 = nosys */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 269 = nosys */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 270 = nosys */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 271 = nosys */
+	{ compat11(AS(freebsd11_freebsd64_getdents_args),freebsd64_getdents), .sy_auevent = AUE_O_GETDENTS, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 272 = freebsd11 freebsd64_getdents */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 273 = nosys */
+	{ .sy_narg = AS(freebsd64_lchmod_args), .sy_call = (sy_call_t *)freebsd64_lchmod, .sy_auevent = AUE_LCHMOD, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 274 = freebsd64_lchmod */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 275 = obsolete netbsd_lchown */
+	{ .sy_narg = AS(freebsd64_lutimes_args), .sy_call = (sy_call_t *)freebsd64_lutimes, .sy_auevent = AUE_LUTIMES, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 276 = freebsd64_lutimes */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 277 = obsolete netbsd_msync */
+	{ compat11(AS(freebsd11_freebsd64_nstat_args),freebsd64_nstat), .sy_auevent = AUE_STAT, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 278 = freebsd11 freebsd64_nstat */
+	{ compat11(AS(freebsd11_freebsd64_nfstat_args),freebsd64_nfstat), .sy_auevent = AUE_FSTAT, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 279 = freebsd11 freebsd64_nfstat */
+	{ compat11(AS(freebsd11_freebsd64_nlstat_args),freebsd64_nlstat), .sy_auevent = AUE_LSTAT, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 280 = freebsd11 freebsd64_nlstat */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 281 = nosys */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 282 = nosys */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 283 = nosys */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 284 = nosys */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 285 = nosys */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 286 = nosys */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 287 = nosys */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 288 = nosys */
+	{ .sy_narg = AS(freebsd64_preadv_args), .sy_call = (sy_call_t *)freebsd64_preadv, .sy_auevent = AUE_PREADV, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 289 = freebsd64_preadv */
+	{ .sy_narg = AS(freebsd64_pwritev_args), .sy_call = (sy_call_t *)freebsd64_pwritev, .sy_auevent = AUE_PWRITEV, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 290 = freebsd64_pwritev */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 291 = nosys */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 292 = nosys */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 293 = nosys */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 294 = nosys */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 295 = nosys */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 296 = nosys */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 297 = obsolete freebsd4_fhstatfs */
+	{ .sy_narg = AS(freebsd64_fhopen_args), .sy_call = (sy_call_t *)freebsd64_fhopen, .sy_auevent = AUE_FHOPEN, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 298 = freebsd64_fhopen */
+	{ compat11(AS(freebsd11_freebsd64_fhstat_args),freebsd64_fhstat), .sy_auevent = AUE_FHSTAT, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 299 = freebsd11 freebsd64_fhstat */
+	{ .sy_narg = AS(modnext_args), .sy_call = (sy_call_t *)sys_modnext, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 300 = modnext */
+	{ .sy_narg = AS(freebsd64_modstat_args), .sy_call = (sy_call_t *)freebsd64_modstat, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 301 = freebsd64_modstat */
+	{ .sy_narg = AS(modfnext_args), .sy_call = (sy_call_t *)sys_modfnext, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 302 = modfnext */
+	{ .sy_narg = AS(freebsd64_modfind_args), .sy_call = (sy_call_t *)freebsd64_modfind, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 303 = freebsd64_modfind */
+	{ .sy_narg = AS(freebsd64_kldload_args), .sy_call = (sy_call_t *)freebsd64_kldload, .sy_auevent = AUE_MODLOAD, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 304 = freebsd64_kldload */
+	{ .sy_narg = AS(kldunload_args), .sy_call = (sy_call_t *)sys_kldunload, .sy_auevent = AUE_MODUNLOAD, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 305 = kldunload */
+	{ .sy_narg = AS(freebsd64_kldfind_args), .sy_call = (sy_call_t *)freebsd64_kldfind, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 306 = freebsd64_kldfind */
+	{ .sy_narg = AS(kldnext_args), .sy_call = (sy_call_t *)sys_kldnext, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 307 = kldnext */
+	{ .sy_narg = AS(freebsd64_kldstat_args), .sy_call = (sy_call_t *)freebsd64_kldstat, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 308 = freebsd64_kldstat */
+	{ .sy_narg = AS(kldfirstmod_args), .sy_call = (sy_call_t *)sys_kldfirstmod, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 309 = kldfirstmod */
+	{ .sy_narg = AS(getsid_args), .sy_call = (sy_call_t *)sys_getsid, .sy_auevent = AUE_GETSID, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 310 = getsid */
+	{ .sy_narg = AS(setresuid_args), .sy_call = (sy_call_t *)sys_setresuid, .sy_auevent = AUE_SETRESUID, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 311 = setresuid */
+	{ .sy_narg = AS(setresgid_args), .sy_call = (sy_call_t *)sys_setresgid, .sy_auevent = AUE_SETRESGID, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 312 = setresgid */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 313 = obsolete signanosleep */
+	{ .sy_narg = AS(freebsd64_aio_return_args), .sy_call = (sy_call_t *)freebsd64_aio_return, .sy_auevent = AUE_AIO_RETURN, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 314 = freebsd64_aio_return */
+	{ .sy_narg = AS(freebsd64_aio_suspend_args), .sy_call = (sy_call_t *)freebsd64_aio_suspend, .sy_auevent = AUE_AIO_SUSPEND, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 315 = freebsd64_aio_suspend */
+	{ .sy_narg = AS(freebsd64_aio_cancel_args), .sy_call = (sy_call_t *)freebsd64_aio_cancel, .sy_auevent = AUE_AIO_CANCEL, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 316 = freebsd64_aio_cancel */
+	{ .sy_narg = AS(freebsd64_aio_error_args), .sy_call = (sy_call_t *)freebsd64_aio_error, .sy_auevent = AUE_AIO_ERROR, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 317 = freebsd64_aio_error */
+	{ compat6(AS(freebsd6_freebsd64_aio_read_args),freebsd64_aio_read), .sy_auevent = AUE_AIO_READ, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 318 = freebsd6 freebsd64_aio_read */
+	{ compat6(AS(freebsd6_freebsd64_aio_write_args),freebsd64_aio_write), .sy_auevent = AUE_AIO_WRITE, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 319 = freebsd6 freebsd64_aio_write */
+	{ compat6(AS(freebsd6_freebsd64_lio_listio_args),freebsd64_lio_listio), .sy_auevent = AUE_LIO_LISTIO, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 320 = freebsd6 freebsd64_lio_listio */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)sys_yield, .sy_auevent = AUE_NULL, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 321 = yield */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 322 = obsolete thr_sleep */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 323 = obsolete thr_wakeup */
+	{ .sy_narg = AS(mlockall_args), .sy_call = (sy_call_t *)sys_mlockall, .sy_auevent = AUE_MLOCKALL, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 324 = mlockall */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)sys_munlockall, .sy_auevent = AUE_MUNLOCKALL, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 325 = munlockall */
+	{ .sy_narg = AS(freebsd64___getcwd_args), .sy_call = (sy_call_t *)freebsd64___getcwd, .sy_auevent = AUE_GETCWD, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 326 = freebsd64___getcwd */
+	{ .sy_narg = AS(freebsd64_sched_setparam_args), .sy_call = (sy_call_t *)freebsd64_sched_setparam, .sy_auevent = AUE_NULL, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 327 = freebsd64_sched_setparam */
+	{ .sy_narg = AS(freebsd64_sched_getparam_args), .sy_call = (sy_call_t *)freebsd64_sched_getparam, .sy_auevent = AUE_NULL, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 328 = freebsd64_sched_getparam */
+	{ .sy_narg = AS(freebsd64_sched_setscheduler_args), .sy_call = (sy_call_t *)freebsd64_sched_setscheduler, .sy_auevent = AUE_NULL, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 329 = freebsd64_sched_setscheduler */
+	{ .sy_narg = AS(sched_getscheduler_args), .sy_call = (sy_call_t *)sys_sched_getscheduler, .sy_auevent = AUE_NULL, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 330 = sched_getscheduler */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)sys_sched_yield, .sy_auevent = AUE_NULL, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 331 = sched_yield */
+	{ .sy_narg = AS(sched_get_priority_max_args), .sy_call = (sy_call_t *)sys_sched_get_priority_max, .sy_auevent = AUE_NULL, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 332 = sched_get_priority_max */
+	{ .sy_narg = AS(sched_get_priority_min_args), .sy_call = (sy_call_t *)sys_sched_get_priority_min, .sy_auevent = AUE_NULL, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 333 = sched_get_priority_min */
+	{ .sy_narg = AS(freebsd64_sched_rr_get_interval_args), .sy_call = (sy_call_t *)freebsd64_sched_rr_get_interval, .sy_auevent = AUE_NULL, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 334 = freebsd64_sched_rr_get_interval */
+	{ .sy_narg = AS(freebsd64_utrace_args), .sy_call = (sy_call_t *)freebsd64_utrace, .sy_auevent = AUE_NULL, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 335 = freebsd64_utrace */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 336 = obsolete freebsd4_sendfile */
+	{ .sy_narg = AS(freebsd64_kldsym_args), .sy_call = (sy_call_t *)freebsd64_kldsym, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 337 = freebsd64_kldsym */
+	{ .sy_narg = AS(freebsd64_jail_args), .sy_call = (sy_call_t *)freebsd64_jail, .sy_auevent = AUE_JAIL, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 338 = freebsd64_jail */
+	{ .sy_narg = AS(freebsd64_nnpfs_syscall_args), .sy_call = (sy_call_t *)lkmressys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },	/* 339 = freebsd64_nnpfs_syscall */
+	{ .sy_narg = AS(freebsd64_sigprocmask_args), .sy_call = (sy_call_t *)freebsd64_sigprocmask, .sy_auevent = AUE_SIGPROCMASK, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 340 = freebsd64_sigprocmask */
+	{ .sy_narg = AS(freebsd64_sigsuspend_args), .sy_call = (sy_call_t *)freebsd64_sigsuspend, .sy_auevent = AUE_SIGSUSPEND, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 341 = freebsd64_sigsuspend */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 342 = obsolete freebsd4_sigaction */
+	{ .sy_narg = AS(freebsd64_sigpending_args), .sy_call = (sy_call_t *)freebsd64_sigpending, .sy_auevent = AUE_SIGPENDING, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 343 = freebsd64_sigpending */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 344 = obsolete freebsd4_sigreturn */
+	{ .sy_narg = AS(freebsd64_sigtimedwait_args), .sy_call = (sy_call_t *)freebsd64_sigtimedwait, .sy_auevent = AUE_SIGWAIT, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 345 = freebsd64_sigtimedwait */
+	{ .sy_narg = AS(freebsd64_sigwaitinfo_args), .sy_call = (sy_call_t *)freebsd64_sigwaitinfo, .sy_auevent = AUE_NULL, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 346 = freebsd64_sigwaitinfo */
+	{ .sy_narg = AS(freebsd64___acl_get_file_args), .sy_call = (sy_call_t *)freebsd64___acl_get_file, .sy_auevent = AUE_ACL_GET_FILE, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 347 = freebsd64___acl_get_file */
+	{ .sy_narg = AS(freebsd64___acl_set_file_args), .sy_call = (sy_call_t *)freebsd64___acl_set_file, .sy_auevent = AUE_ACL_SET_FILE, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 348 = freebsd64___acl_set_file */
+	{ .sy_narg = AS(freebsd64___acl_get_fd_args), .sy_call = (sy_call_t *)freebsd64___acl_get_fd, .sy_auevent = AUE_ACL_GET_FD, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 349 = freebsd64___acl_get_fd */
+	{ .sy_narg = AS(freebsd64___acl_set_fd_args), .sy_call = (sy_call_t *)freebsd64___acl_set_fd, .sy_auevent = AUE_ACL_SET_FD, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 350 = freebsd64___acl_set_fd */
+	{ .sy_narg = AS(freebsd64___acl_delete_file_args), .sy_call = (sy_call_t *)freebsd64___acl_delete_file, .sy_auevent = AUE_ACL_DELETE_FILE, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 351 = freebsd64___acl_delete_file */
+	{ .sy_narg = AS(__acl_delete_fd_args), .sy_call = (sy_call_t *)sys___acl_delete_fd, .sy_auevent = AUE_ACL_DELETE_FD, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 352 = __acl_delete_fd */
+	{ .sy_narg = AS(freebsd64___acl_aclcheck_file_args), .sy_call = (sy_call_t *)freebsd64___acl_aclcheck_file, .sy_auevent = AUE_ACL_CHECK_FILE, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 353 = freebsd64___acl_aclcheck_file */
+	{ .sy_narg = AS(freebsd64___acl_aclcheck_fd_args), .sy_call = (sy_call_t *)freebsd64___acl_aclcheck_fd, .sy_auevent = AUE_ACL_CHECK_FD, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 354 = freebsd64___acl_aclcheck_fd */
+	{ .sy_narg = AS(freebsd64_extattrctl_args), .sy_call = (sy_call_t *)freebsd64_extattrctl, .sy_auevent = AUE_EXTATTRCTL, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 355 = freebsd64_extattrctl */
+	{ .sy_narg = AS(freebsd64_extattr_set_file_args), .sy_call = (sy_call_t *)freebsd64_extattr_set_file, .sy_auevent = AUE_EXTATTR_SET_FILE, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 356 = freebsd64_extattr_set_file */
+	{ .sy_narg = AS(freebsd64_extattr_get_file_args), .sy_call = (sy_call_t *)freebsd64_extattr_get_file, .sy_auevent = AUE_EXTATTR_GET_FILE, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 357 = freebsd64_extattr_get_file */
+	{ .sy_narg = AS(freebsd64_extattr_delete_file_args), .sy_call = (sy_call_t *)freebsd64_extattr_delete_file, .sy_auevent = AUE_EXTATTR_DELETE_FILE, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 358 = freebsd64_extattr_delete_file */
+	{ .sy_narg = AS(freebsd64_aio_waitcomplete_args), .sy_call = (sy_call_t *)freebsd64_aio_waitcomplete, .sy_auevent = AUE_AIO_WAITCOMPLETE, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 359 = freebsd64_aio_waitcomplete */
+	{ .sy_narg = AS(freebsd64_getresuid_args), .sy_call = (sy_call_t *)freebsd64_getresuid, .sy_auevent = AUE_GETRESUID, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 360 = freebsd64_getresuid */
+	{ .sy_narg = AS(freebsd64_getresgid_args), .sy_call = (sy_call_t *)freebsd64_getresgid, .sy_auevent = AUE_GETRESGID, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 361 = freebsd64_getresgid */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)sys_kqueue, .sy_auevent = AUE_KQUEUE, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 362 = kqueue */
+	{ compat11(AS(freebsd11_freebsd64_kevent_args),freebsd64_kevent), .sy_auevent = AUE_KEVENT, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 363 = freebsd11 freebsd64_kevent */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 364 = obsolete __cap_get_proc */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 365 = obsolete __cap_set_proc */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 366 = obsolete __cap_get_fd */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 367 = obsolete __cap_get_file */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 368 = obsolete __cap_set_fd */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 369 = obsolete __cap_set_file */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 370 = nosys */
+	{ .sy_narg = AS(freebsd64_extattr_set_fd_args), .sy_call = (sy_call_t *)freebsd64_extattr_set_fd, .sy_auevent = AUE_EXTATTR_SET_FD, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 371 = freebsd64_extattr_set_fd */
+	{ .sy_narg = AS(freebsd64_extattr_get_fd_args), .sy_call = (sy_call_t *)freebsd64_extattr_get_fd, .sy_auevent = AUE_EXTATTR_GET_FD, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 372 = freebsd64_extattr_get_fd */
+	{ .sy_narg = AS(freebsd64_extattr_delete_fd_args), .sy_call = (sy_call_t *)freebsd64_extattr_delete_fd, .sy_auevent = AUE_EXTATTR_DELETE_FD, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 373 = freebsd64_extattr_delete_fd */
+	{ .sy_narg = AS(__setugid_args), .sy_call = (sy_call_t *)sys___setugid, .sy_auevent = AUE_SETUGID, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 374 = __setugid */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 375 = obsolete nfsclnt */
+	{ .sy_narg = AS(freebsd64_eaccess_args), .sy_call = (sy_call_t *)freebsd64_eaccess, .sy_auevent = AUE_EACCESS, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 376 = freebsd64_eaccess */
+	{ .sy_narg = AS(afs3_syscall_args), .sy_call = (sy_call_t *)lkmressys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },	/* 377 = afs3_syscall */
+	{ .sy_narg = AS(freebsd64_nmount_args), .sy_call = (sy_call_t *)freebsd64_nmount, .sy_auevent = AUE_NMOUNT, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 378 = freebsd64_nmount */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 379 = obsolete kse_exit */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 380 = obsolete kse_wakeup */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 381 = obsolete kse_create */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 382 = obsolete kse_thr_interrupt */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 383 = obsolete kse_release */
+	{ .sy_narg = AS(freebsd64___mac_get_proc_args), .sy_call = (sy_call_t *)freebsd64___mac_get_proc, .sy_auevent = AUE_NULL, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 384 = freebsd64___mac_get_proc */
+	{ .sy_narg = AS(freebsd64___mac_set_proc_args), .sy_call = (sy_call_t *)freebsd64___mac_set_proc, .sy_auevent = AUE_NULL, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 385 = freebsd64___mac_set_proc */
+	{ .sy_narg = AS(freebsd64___mac_get_fd_args), .sy_call = (sy_call_t *)freebsd64___mac_get_fd, .sy_auevent = AUE_NULL, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 386 = freebsd64___mac_get_fd */
+	{ .sy_narg = AS(freebsd64___mac_get_file_args), .sy_call = (sy_call_t *)freebsd64___mac_get_file, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 387 = freebsd64___mac_get_file */
+	{ .sy_narg = AS(freebsd64___mac_set_fd_args), .sy_call = (sy_call_t *)freebsd64___mac_set_fd, .sy_auevent = AUE_NULL, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 388 = freebsd64___mac_set_fd */
+	{ .sy_narg = AS(freebsd64___mac_set_file_args), .sy_call = (sy_call_t *)freebsd64___mac_set_file, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 389 = freebsd64___mac_set_file */
+	{ .sy_narg = AS(freebsd64_kenv_args), .sy_call = (sy_call_t *)freebsd64_kenv, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 390 = freebsd64_kenv */
+	{ .sy_narg = AS(freebsd64_lchflags_args), .sy_call = (sy_call_t *)freebsd64_lchflags, .sy_auevent = AUE_LCHFLAGS, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 391 = freebsd64_lchflags */
+	{ .sy_narg = AS(freebsd64_uuidgen_args), .sy_call = (sy_call_t *)freebsd64_uuidgen, .sy_auevent = AUE_NULL, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 392 = freebsd64_uuidgen */
+	{ .sy_narg = AS(freebsd64_sendfile_args), .sy_call = (sy_call_t *)freebsd64_sendfile, .sy_auevent = AUE_SENDFILE, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 393 = freebsd64_sendfile */
+	{ .sy_narg = AS(freebsd64_mac_syscall_args), .sy_call = (sy_call_t *)freebsd64_mac_syscall, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 394 = freebsd64_mac_syscall */
+	{ compat11(AS(freebsd11_freebsd64_getfsstat_args),freebsd64_getfsstat), .sy_auevent = AUE_GETFSSTAT, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 395 = freebsd11 freebsd64_getfsstat */
+	{ compat11(AS(freebsd11_freebsd64_statfs_args),freebsd64_statfs), .sy_auevent = AUE_STATFS, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 396 = freebsd11 freebsd64_statfs */
+	{ compat11(AS(freebsd11_freebsd64_fstatfs_args),freebsd64_fstatfs), .sy_auevent = AUE_FSTATFS, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 397 = freebsd11 freebsd64_fstatfs */
+	{ compat11(AS(freebsd11_freebsd64_fhstatfs_args),freebsd64_fhstatfs), .sy_auevent = AUE_FHSTATFS, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 398 = freebsd11 freebsd64_fhstatfs */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 399 = nosys */
+	{ .sy_narg = AS(ksem_close_args), .sy_call = (sy_call_t *)lkmressys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },	/* 400 = ksem_close */
+	{ .sy_narg = AS(ksem_post_args), .sy_call = (sy_call_t *)lkmressys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },	/* 401 = ksem_post */
+	{ .sy_narg = AS(ksem_wait_args), .sy_call = (sy_call_t *)lkmressys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },	/* 402 = ksem_wait */
+	{ .sy_narg = AS(ksem_trywait_args), .sy_call = (sy_call_t *)lkmressys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },	/* 403 = ksem_trywait */
+	{ .sy_narg = AS(freebsd64_ksem_init_args), .sy_call = (sy_call_t *)lkmressys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },	/* 404 = freebsd64_ksem_init */
+	{ .sy_narg = AS(freebsd64_ksem_open_args), .sy_call = (sy_call_t *)lkmressys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },	/* 405 = freebsd64_ksem_open */
+	{ .sy_narg = AS(freebsd64_ksem_unlink_args), .sy_call = (sy_call_t *)lkmressys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },	/* 406 = freebsd64_ksem_unlink */
+	{ .sy_narg = AS(freebsd64_ksem_getvalue_args), .sy_call = (sy_call_t *)lkmressys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },	/* 407 = freebsd64_ksem_getvalue */
+	{ .sy_narg = AS(ksem_destroy_args), .sy_call = (sy_call_t *)lkmressys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },	/* 408 = ksem_destroy */
+	{ .sy_narg = AS(freebsd64___mac_get_pid_args), .sy_call = (sy_call_t *)freebsd64___mac_get_pid, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 409 = freebsd64___mac_get_pid */
+	{ .sy_narg = AS(freebsd64___mac_get_link_args), .sy_call = (sy_call_t *)freebsd64___mac_get_link, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 410 = freebsd64___mac_get_link */
+	{ .sy_narg = AS(freebsd64___mac_set_link_args), .sy_call = (sy_call_t *)freebsd64___mac_set_link, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 411 = freebsd64___mac_set_link */
+	{ .sy_narg = AS(freebsd64_extattr_set_link_args), .sy_call = (sy_call_t *)freebsd64_extattr_set_link, .sy_auevent = AUE_EXTATTR_SET_LINK, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 412 = freebsd64_extattr_set_link */
+	{ .sy_narg = AS(freebsd64_extattr_get_link_args), .sy_call = (sy_call_t *)freebsd64_extattr_get_link, .sy_auevent = AUE_EXTATTR_GET_LINK, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 413 = freebsd64_extattr_get_link */
+	{ .sy_narg = AS(freebsd64_extattr_delete_link_args), .sy_call = (sy_call_t *)freebsd64_extattr_delete_link, .sy_auevent = AUE_EXTATTR_DELETE_LINK, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 414 = freebsd64_extattr_delete_link */
+	{ .sy_narg = AS(freebsd64___mac_execve_args), .sy_call = (sy_call_t *)freebsd64___mac_execve, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 415 = freebsd64___mac_execve */
+	{ .sy_narg = AS(freebsd64_sigaction_args), .sy_call = (sy_call_t *)freebsd64_sigaction, .sy_auevent = AUE_SIGACTION, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 416 = freebsd64_sigaction */
+	{ .sy_narg = AS(freebsd64_sigreturn_args), .sy_call = (sy_call_t *)freebsd64_sigreturn, .sy_auevent = AUE_SIGRETURN, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 417 = freebsd64_sigreturn */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 418 = __xstat */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 419 = __xfstat */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 420 = __xlstat */
+	{ .sy_narg = AS(freebsd64_getcontext_args), .sy_call = (sy_call_t *)freebsd64_getcontext, .sy_auevent = AUE_NULL, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 421 = freebsd64_getcontext */
+	{ .sy_narg = AS(freebsd64_setcontext_args), .sy_call = (sy_call_t *)freebsd64_setcontext, .sy_auevent = AUE_NULL, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 422 = freebsd64_setcontext */
+	{ .sy_narg = AS(freebsd64_swapcontext_args), .sy_call = (sy_call_t *)freebsd64_swapcontext, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 423 = freebsd64_swapcontext */
+	{ .sy_narg = AS(freebsd64_swapoff_args), .sy_call = (sy_call_t *)freebsd64_swapoff, .sy_auevent = AUE_SWAPOFF, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 424 = freebsd64_swapoff */
+	{ .sy_narg = AS(freebsd64___acl_get_link_args), .sy_call = (sy_call_t *)freebsd64___acl_get_link, .sy_auevent = AUE_ACL_GET_LINK, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 425 = freebsd64___acl_get_link */
+	{ .sy_narg = AS(freebsd64___acl_set_link_args), .sy_call = (sy_call_t *)freebsd64___acl_set_link, .sy_auevent = AUE_ACL_SET_LINK, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 426 = freebsd64___acl_set_link */
+	{ .sy_narg = AS(freebsd64___acl_delete_link_args), .sy_call = (sy_call_t *)freebsd64___acl_delete_link, .sy_auevent = AUE_ACL_DELETE_LINK, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 427 = freebsd64___acl_delete_link */
+	{ .sy_narg = AS(freebsd64___acl_aclcheck_link_args), .sy_call = (sy_call_t *)freebsd64___acl_aclcheck_link, .sy_auevent = AUE_ACL_CHECK_LINK, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 428 = freebsd64___acl_aclcheck_link */
+	{ .sy_narg = AS(freebsd64_sigwait_args), .sy_call = (sy_call_t *)freebsd64_sigwait, .sy_auevent = AUE_SIGWAIT, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 429 = freebsd64_sigwait */
+	{ .sy_narg = AS(freebsd64_thr_create_args), .sy_call = (sy_call_t *)freebsd64_thr_create, .sy_auevent = AUE_THR_CREATE, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 430 = freebsd64_thr_create */
+	{ .sy_narg = AS(freebsd64_thr_exit_args), .sy_call = (sy_call_t *)freebsd64_thr_exit, .sy_auevent = AUE_THR_EXIT, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 431 = freebsd64_thr_exit */
+	{ .sy_narg = AS(freebsd64_thr_self_args), .sy_call = (sy_call_t *)freebsd64_thr_self, .sy_auevent = AUE_NULL, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 432 = freebsd64_thr_self */
+	{ .sy_narg = AS(thr_kill_args), .sy_call = (sy_call_t *)sys_thr_kill, .sy_auevent = AUE_THR_KILL, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 433 = thr_kill */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 434 = nosys */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 435 = nosys */
+	{ .sy_narg = AS(jail_attach_args), .sy_call = (sy_call_t *)sys_jail_attach, .sy_auevent = AUE_JAIL_ATTACH, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 436 = jail_attach */
+	{ .sy_narg = AS(freebsd64_extattr_list_fd_args), .sy_call = (sy_call_t *)freebsd64_extattr_list_fd, .sy_auevent = AUE_EXTATTR_LIST_FD, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 437 = freebsd64_extattr_list_fd */
+	{ .sy_narg = AS(freebsd64_extattr_list_file_args), .sy_call = (sy_call_t *)freebsd64_extattr_list_file, .sy_auevent = AUE_EXTATTR_LIST_FILE, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 438 = freebsd64_extattr_list_file */
+	{ .sy_narg = AS(freebsd64_extattr_list_link_args), .sy_call = (sy_call_t *)freebsd64_extattr_list_link, .sy_auevent = AUE_EXTATTR_LIST_LINK, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 439 = freebsd64_extattr_list_link */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 440 = obsolete kse_switchin */
+	{ .sy_narg = AS(freebsd64_ksem_timedwait_args), .sy_call = (sy_call_t *)lkmressys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },	/* 441 = freebsd64_ksem_timedwait */
+	{ .sy_narg = AS(freebsd64_thr_suspend_args), .sy_call = (sy_call_t *)freebsd64_thr_suspend, .sy_auevent = AUE_NULL, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 442 = freebsd64_thr_suspend */
+	{ .sy_narg = AS(thr_wake_args), .sy_call = (sy_call_t *)sys_thr_wake, .sy_auevent = AUE_NULL, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 443 = thr_wake */
+	{ .sy_narg = AS(kldunloadf_args), .sy_call = (sy_call_t *)sys_kldunloadf, .sy_auevent = AUE_MODUNLOAD, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 444 = kldunloadf */
+	{ .sy_narg = AS(freebsd64_audit_args), .sy_call = (sy_call_t *)freebsd64_audit, .sy_auevent = AUE_AUDIT, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 445 = freebsd64_audit */
+	{ .sy_narg = AS(freebsd64_auditon_args), .sy_call = (sy_call_t *)freebsd64_auditon, .sy_auevent = AUE_AUDITON, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 446 = freebsd64_auditon */
+	{ .sy_narg = AS(freebsd64_getauid_args), .sy_call = (sy_call_t *)freebsd64_getauid, .sy_auevent = AUE_GETAUID, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 447 = freebsd64_getauid */
+	{ .sy_narg = AS(freebsd64_setauid_args), .sy_call = (sy_call_t *)freebsd64_setauid, .sy_auevent = AUE_SETAUID, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 448 = freebsd64_setauid */
+	{ .sy_narg = AS(freebsd64_getaudit_args), .sy_call = (sy_call_t *)freebsd64_getaudit, .sy_auevent = AUE_GETAUDIT, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 449 = freebsd64_getaudit */
+	{ .sy_narg = AS(freebsd64_setaudit_args), .sy_call = (sy_call_t *)freebsd64_setaudit, .sy_auevent = AUE_SETAUDIT, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 450 = freebsd64_setaudit */
+	{ .sy_narg = AS(freebsd64_getaudit_addr_args), .sy_call = (sy_call_t *)freebsd64_getaudit_addr, .sy_auevent = AUE_GETAUDIT_ADDR, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 451 = freebsd64_getaudit_addr */
+	{ .sy_narg = AS(freebsd64_setaudit_addr_args), .sy_call = (sy_call_t *)freebsd64_setaudit_addr, .sy_auevent = AUE_SETAUDIT_ADDR, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 452 = freebsd64_setaudit_addr */
+	{ .sy_narg = AS(freebsd64_auditctl_args), .sy_call = (sy_call_t *)freebsd64_auditctl, .sy_auevent = AUE_AUDITCTL, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 453 = freebsd64_auditctl */
+	{ .sy_narg = AS(freebsd64__umtx_op_args), .sy_call = (sy_call_t *)freebsd64__umtx_op, .sy_auevent = AUE_NULL, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 454 = freebsd64__umtx_op */
+	{ .sy_narg = AS(freebsd64_thr_new_args), .sy_call = (sy_call_t *)freebsd64_thr_new, .sy_auevent = AUE_THR_NEW, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 455 = freebsd64_thr_new */
+	{ .sy_narg = AS(freebsd64_sigqueue_args), .sy_call = (sy_call_t *)freebsd64_sigqueue, .sy_auevent = AUE_NULL, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 456 = freebsd64_sigqueue */
+	{ .sy_narg = AS(freebsd64_kmq_open_args), .sy_call = (sy_call_t *)lkmressys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },	/* 457 = freebsd64_kmq_open */
+	{ .sy_narg = AS(freebsd64_kmq_setattr_args), .sy_call = (sy_call_t *)lkmressys, .sy_auevent = AUE_NULL, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_ABSENT },	/* 458 = freebsd64_kmq_setattr */
+	{ .sy_narg = AS(freebsd64_kmq_timedreceive_args), .sy_call = (sy_call_t *)lkmressys, .sy_auevent = AUE_NULL, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_ABSENT },	/* 459 = freebsd64_kmq_timedreceive */
+	{ .sy_narg = AS(freebsd64_kmq_timedsend_args), .sy_call = (sy_call_t *)lkmressys, .sy_auevent = AUE_NULL, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_ABSENT },	/* 460 = freebsd64_kmq_timedsend */
+	{ .sy_narg = AS(freebsd64_kmq_notify_args), .sy_call = (sy_call_t *)lkmressys, .sy_auevent = AUE_NULL, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_ABSENT },	/* 461 = freebsd64_kmq_notify */
+	{ .sy_narg = AS(freebsd64_kmq_unlink_args), .sy_call = (sy_call_t *)lkmressys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },	/* 462 = freebsd64_kmq_unlink */
+	{ .sy_narg = AS(freebsd64_abort2_args), .sy_call = (sy_call_t *)freebsd64_abort2, .sy_auevent = AUE_NULL, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 463 = freebsd64_abort2 */
+	{ .sy_narg = AS(freebsd64_thr_set_name_args), .sy_call = (sy_call_t *)freebsd64_thr_set_name, .sy_auevent = AUE_NULL, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 464 = freebsd64_thr_set_name */
+	{ .sy_narg = AS(freebsd64_aio_fsync_args), .sy_call = (sy_call_t *)freebsd64_aio_fsync, .sy_auevent = AUE_AIO_FSYNC, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 465 = freebsd64_aio_fsync */
+	{ .sy_narg = AS(freebsd64_rtprio_thread_args), .sy_call = (sy_call_t *)freebsd64_rtprio_thread, .sy_auevent = AUE_RTPRIO, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 466 = freebsd64_rtprio_thread */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 467 = nosys */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 468 = nosys */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 469 = __getpath_fromfd */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 470 = __getpath_fromaddr */
+	{ .sy_narg = AS(sctp_peeloff_args), .sy_call = (sy_call_t *)lkmressys, .sy_auevent = AUE_NULL, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_ABSENT },	/* 471 = sctp_peeloff */
+	{ .sy_narg = AS(freebsd64_sctp_generic_sendmsg_args), .sy_call = (sy_call_t *)lkmressys, .sy_auevent = AUE_NULL, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_ABSENT },	/* 472 = freebsd64_sctp_generic_sendmsg */
+	{ .sy_narg = AS(freebsd64_sctp_generic_sendmsg_iov_args), .sy_call = (sy_call_t *)lkmressys, .sy_auevent = AUE_NULL, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_ABSENT },	/* 473 = freebsd64_sctp_generic_sendmsg_iov */
+	{ .sy_narg = AS(freebsd64_sctp_generic_recvmsg_args), .sy_call = (sy_call_t *)lkmressys, .sy_auevent = AUE_NULL, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_ABSENT },	/* 474 = freebsd64_sctp_generic_recvmsg */
+	{ .sy_narg = AS(freebsd64_pread_args), .sy_call = (sy_call_t *)freebsd64_pread, .sy_auevent = AUE_PREAD, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 475 = freebsd64_pread */
+	{ .sy_narg = AS(freebsd64_pwrite_args), .sy_call = (sy_call_t *)freebsd64_pwrite, .sy_auevent = AUE_PWRITE, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 476 = freebsd64_pwrite */
+	{ .sy_narg = AS(freebsd64_mmap_args), .sy_call = (sy_call_t *)freebsd64_mmap, .sy_auevent = AUE_MMAP, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 477 = freebsd64_mmap */
+	{ .sy_narg = AS(lseek_args), .sy_call = (sy_call_t *)sys_lseek, .sy_auevent = AUE_LSEEK, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 478 = lseek */
+	{ .sy_narg = AS(freebsd64_truncate_args), .sy_call = (sy_call_t *)freebsd64_truncate, .sy_auevent = AUE_TRUNCATE, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 479 = freebsd64_truncate */
+	{ .sy_narg = AS(ftruncate_args), .sy_call = (sy_call_t *)sys_ftruncate, .sy_auevent = AUE_FTRUNCATE, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 480 = ftruncate */
+	{ .sy_narg = AS(thr_kill2_args), .sy_call = (sy_call_t *)sys_thr_kill2, .sy_auevent = AUE_THR_KILL2, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 481 = thr_kill2 */
+	{ compat12(AS(freebsd12_freebsd64_shm_open_args),freebsd64_shm_open), .sy_auevent = AUE_SHMOPEN, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 482 = freebsd12 freebsd64_shm_open */
+	{ .sy_narg = AS(freebsd64_shm_unlink_args), .sy_call = (sy_call_t *)freebsd64_shm_unlink, .sy_auevent = AUE_SHMUNLINK, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 483 = freebsd64_shm_unlink */
+	{ .sy_narg = AS(freebsd64_cpuset_args), .sy_call = (sy_call_t *)freebsd64_cpuset, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 484 = freebsd64_cpuset */
+	{ .sy_narg = AS(cpuset_setid_args), .sy_call = (sy_call_t *)sys_cpuset_setid, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 485 = cpuset_setid */
+	{ .sy_narg = AS(freebsd64_cpuset_getid_args), .sy_call = (sy_call_t *)freebsd64_cpuset_getid, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 486 = freebsd64_cpuset_getid */
+	{ .sy_narg = AS(freebsd64_cpuset_getaffinity_args), .sy_call = (sy_call_t *)freebsd64_cpuset_getaffinity, .sy_auevent = AUE_NULL, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 487 = freebsd64_cpuset_getaffinity */
+	{ .sy_narg = AS(freebsd64_cpuset_setaffinity_args), .sy_call = (sy_call_t *)freebsd64_cpuset_setaffinity, .sy_auevent = AUE_NULL, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 488 = freebsd64_cpuset_setaffinity */
+	{ .sy_narg = AS(freebsd64_faccessat_args), .sy_call = (sy_call_t *)freebsd64_faccessat, .sy_auevent = AUE_FACCESSAT, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 489 = freebsd64_faccessat */
+	{ .sy_narg = AS(freebsd64_fchmodat_args), .sy_call = (sy_call_t *)freebsd64_fchmodat, .sy_auevent = AUE_FCHMODAT, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 490 = freebsd64_fchmodat */
+	{ .sy_narg = AS(freebsd64_fchownat_args), .sy_call = (sy_call_t *)freebsd64_fchownat, .sy_auevent = AUE_FCHOWNAT, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 491 = freebsd64_fchownat */
+	{ .sy_narg = AS(freebsd64_fexecve_args), .sy_call = (sy_call_t *)freebsd64_fexecve, .sy_auevent = AUE_FEXECVE, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 492 = freebsd64_fexecve */
+	{ compat11(AS(freebsd11_freebsd64_fstatat_args),freebsd64_fstatat), .sy_auevent = AUE_FSTATAT, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 493 = freebsd11 freebsd64_fstatat */
+	{ .sy_narg = AS(freebsd64_futimesat_args), .sy_call = (sy_call_t *)freebsd64_futimesat, .sy_auevent = AUE_FUTIMESAT, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 494 = freebsd64_futimesat */
+	{ .sy_narg = AS(freebsd64_linkat_args), .sy_call = (sy_call_t *)freebsd64_linkat, .sy_auevent = AUE_LINKAT, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 495 = freebsd64_linkat */
+	{ .sy_narg = AS(freebsd64_mkdirat_args), .sy_call = (sy_call_t *)freebsd64_mkdirat, .sy_auevent = AUE_MKDIRAT, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 496 = freebsd64_mkdirat */
+	{ .sy_narg = AS(freebsd64_mkfifoat_args), .sy_call = (sy_call_t *)freebsd64_mkfifoat, .sy_auevent = AUE_MKFIFOAT, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 497 = freebsd64_mkfifoat */
+	{ compat11(AS(freebsd11_freebsd64_mknodat_args),freebsd64_mknodat), .sy_auevent = AUE_MKNODAT, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 498 = freebsd11 freebsd64_mknodat */
+	{ .sy_narg = AS(freebsd64_openat_args), .sy_call = (sy_call_t *)freebsd64_openat, .sy_auevent = AUE_OPENAT_RWTC, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 499 = freebsd64_openat */
+	{ .sy_narg = AS(freebsd64_readlinkat_args), .sy_call = (sy_call_t *)freebsd64_readlinkat, .sy_auevent = AUE_READLINKAT, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 500 = freebsd64_readlinkat */
+	{ .sy_narg = AS(freebsd64_renameat_args), .sy_call = (sy_call_t *)freebsd64_renameat, .sy_auevent = AUE_RENAMEAT, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 501 = freebsd64_renameat */
+	{ .sy_narg = AS(freebsd64_symlinkat_args), .sy_call = (sy_call_t *)freebsd64_symlinkat, .sy_auevent = AUE_SYMLINKAT, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 502 = freebsd64_symlinkat */
+	{ .sy_narg = AS(freebsd64_unlinkat_args), .sy_call = (sy_call_t *)freebsd64_unlinkat, .sy_auevent = AUE_UNLINKAT, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 503 = freebsd64_unlinkat */
+	{ .sy_narg = AS(posix_openpt_args), .sy_call = (sy_call_t *)sys_posix_openpt, .sy_auevent = AUE_POSIX_OPENPT, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 504 = posix_openpt */
+	{ .sy_narg = AS(freebsd64_gssd_syscall_args), .sy_call = (sy_call_t *)lkmressys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },	/* 505 = freebsd64_gssd_syscall */
+	{ .sy_narg = AS(freebsd64_jail_get_args), .sy_call = (sy_call_t *)freebsd64_jail_get, .sy_auevent = AUE_JAIL_GET, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 506 = freebsd64_jail_get */
+	{ .sy_narg = AS(freebsd64_jail_set_args), .sy_call = (sy_call_t *)freebsd64_jail_set, .sy_auevent = AUE_JAIL_SET, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 507 = freebsd64_jail_set */
+	{ .sy_narg = AS(jail_remove_args), .sy_call = (sy_call_t *)sys_jail_remove, .sy_auevent = AUE_JAIL_REMOVE, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 508 = jail_remove */
+	{ compat12(AS(freebsd12_closefrom_args),closefrom), .sy_auevent = AUE_CLOSEFROM, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 509 = freebsd12 closefrom */
+	{ .sy_narg = AS(freebsd64___semctl_args), .sy_call = (sy_call_t *)lkmressys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },	/* 510 = freebsd64___semctl */
+	{ .sy_narg = AS(freebsd64_msgctl_args), .sy_call = (sy_call_t *)lkmressys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },	/* 511 = freebsd64_msgctl */
+	{ .sy_narg = AS(freebsd64_shmctl_args), .sy_call = (sy_call_t *)lkmressys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },	/* 512 = freebsd64_shmctl */
+	{ .sy_narg = AS(freebsd64_lpathconf_args), .sy_call = (sy_call_t *)freebsd64_lpathconf, .sy_auevent = AUE_LPATHCONF, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 513 = freebsd64_lpathconf */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 514 = obsolete cap_new */
+	{ .sy_narg = AS(freebsd64___cap_rights_get_args), .sy_call = (sy_call_t *)freebsd64___cap_rights_get, .sy_auevent = AUE_CAP_RIGHTS_GET, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 515 = freebsd64___cap_rights_get */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)sys_cap_enter, .sy_auevent = AUE_CAP_ENTER, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 516 = cap_enter */
+	{ .sy_narg = AS(freebsd64_cap_getmode_args), .sy_call = (sy_call_t *)freebsd64_cap_getmode, .sy_auevent = AUE_CAP_GETMODE, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 517 = freebsd64_cap_getmode */
+	{ .sy_narg = AS(freebsd64_pdfork_args), .sy_call = (sy_call_t *)freebsd64_pdfork, .sy_auevent = AUE_PDFORK, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 518 = freebsd64_pdfork */
+	{ .sy_narg = AS(pdkill_args), .sy_call = (sy_call_t *)sys_pdkill, .sy_auevent = AUE_PDKILL, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 519 = pdkill */
+	{ .sy_narg = AS(freebsd64_pdgetpid_args), .sy_call = (sy_call_t *)freebsd64_pdgetpid, .sy_auevent = AUE_PDGETPID, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 520 = freebsd64_pdgetpid */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 521 = pdwait4 */
+	{ .sy_narg = AS(freebsd64_pselect_args), .sy_call = (sy_call_t *)freebsd64_pselect, .sy_auevent = AUE_SELECT, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 522 = freebsd64_pselect */
+	{ .sy_narg = AS(freebsd64_getloginclass_args), .sy_call = (sy_call_t *)freebsd64_getloginclass, .sy_auevent = AUE_GETLOGINCLASS, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 523 = freebsd64_getloginclass */
+	{ .sy_narg = AS(freebsd64_setloginclass_args), .sy_call = (sy_call_t *)freebsd64_setloginclass, .sy_auevent = AUE_SETLOGINCLASS, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 524 = freebsd64_setloginclass */
+	{ .sy_narg = AS(freebsd64_rctl_get_racct_args), .sy_call = (sy_call_t *)freebsd64_rctl_get_racct, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 525 = freebsd64_rctl_get_racct */
+	{ .sy_narg = AS(freebsd64_rctl_get_rules_args), .sy_call = (sy_call_t *)freebsd64_rctl_get_rules, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 526 = freebsd64_rctl_get_rules */
+	{ .sy_narg = AS(freebsd64_rctl_get_limits_args), .sy_call = (sy_call_t *)freebsd64_rctl_get_limits, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 527 = freebsd64_rctl_get_limits */
+	{ .sy_narg = AS(freebsd64_rctl_add_rule_args), .sy_call = (sy_call_t *)freebsd64_rctl_add_rule, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 528 = freebsd64_rctl_add_rule */
+	{ .sy_narg = AS(freebsd64_rctl_remove_rule_args), .sy_call = (sy_call_t *)freebsd64_rctl_remove_rule, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 529 = freebsd64_rctl_remove_rule */
+	{ .sy_narg = AS(posix_fallocate_args), .sy_call = (sy_call_t *)sys_posix_fallocate, .sy_auevent = AUE_POSIX_FALLOCATE, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 530 = posix_fallocate */
+	{ .sy_narg = AS(posix_fadvise_args), .sy_call = (sy_call_t *)sys_posix_fadvise, .sy_auevent = AUE_POSIX_FADVISE, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 531 = posix_fadvise */
+	{ .sy_narg = AS(freebsd64_wait6_args), .sy_call = (sy_call_t *)freebsd64_wait6, .sy_auevent = AUE_WAIT6, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 532 = freebsd64_wait6 */
+	{ .sy_narg = AS(freebsd64_cap_rights_limit_args), .sy_call = (sy_call_t *)freebsd64_cap_rights_limit, .sy_auevent = AUE_CAP_RIGHTS_LIMIT, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 533 = freebsd64_cap_rights_limit */
+	{ .sy_narg = AS(freebsd64_cap_ioctls_limit_args), .sy_call = (sy_call_t *)freebsd64_cap_ioctls_limit, .sy_auevent = AUE_CAP_IOCTLS_LIMIT, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 534 = freebsd64_cap_ioctls_limit */
+	{ .sy_narg = AS(freebsd64_cap_ioctls_get_args), .sy_call = (sy_call_t *)freebsd64_cap_ioctls_get, .sy_auevent = AUE_CAP_IOCTLS_GET, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 535 = freebsd64_cap_ioctls_get */
+	{ .sy_narg = AS(cap_fcntls_limit_args), .sy_call = (sy_call_t *)sys_cap_fcntls_limit, .sy_auevent = AUE_CAP_FCNTLS_LIMIT, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 536 = cap_fcntls_limit */
+	{ .sy_narg = AS(freebsd64_cap_fcntls_get_args), .sy_call = (sy_call_t *)freebsd64_cap_fcntls_get, .sy_auevent = AUE_CAP_FCNTLS_GET, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 537 = freebsd64_cap_fcntls_get */
+	{ .sy_narg = AS(freebsd64_bindat_args), .sy_call = (sy_call_t *)freebsd64_bindat, .sy_auevent = AUE_BINDAT, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 538 = freebsd64_bindat */
+	{ .sy_narg = AS(freebsd64_connectat_args), .sy_call = (sy_call_t *)freebsd64_connectat, .sy_auevent = AUE_CONNECTAT, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 539 = freebsd64_connectat */
+	{ .sy_narg = AS(freebsd64_chflagsat_args), .sy_call = (sy_call_t *)freebsd64_chflagsat, .sy_auevent = AUE_CHFLAGSAT, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 540 = freebsd64_chflagsat */
+	{ .sy_narg = AS(freebsd64_accept4_args), .sy_call = (sy_call_t *)freebsd64_accept4, .sy_auevent = AUE_ACCEPT, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 541 = freebsd64_accept4 */
+	{ .sy_narg = AS(freebsd64_pipe2_args), .sy_call = (sy_call_t *)freebsd64_pipe2, .sy_auevent = AUE_PIPE, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 542 = freebsd64_pipe2 */
+	{ .sy_narg = AS(freebsd64_aio_mlock_args), .sy_call = (sy_call_t *)freebsd64_aio_mlock, .sy_auevent = AUE_AIO_MLOCK, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 543 = freebsd64_aio_mlock */
+	{ .sy_narg = AS(freebsd64_procctl_args), .sy_call = (sy_call_t *)freebsd64_procctl, .sy_auevent = AUE_PROCCTL, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 544 = freebsd64_procctl */
+	{ .sy_narg = AS(freebsd64_ppoll_args), .sy_call = (sy_call_t *)freebsd64_ppoll, .sy_auevent = AUE_POLL, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 545 = freebsd64_ppoll */
+	{ .sy_narg = AS(freebsd64_futimens_args), .sy_call = (sy_call_t *)freebsd64_futimens, .sy_auevent = AUE_FUTIMES, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 546 = freebsd64_futimens */
+	{ .sy_narg = AS(freebsd64_utimensat_args), .sy_call = (sy_call_t *)freebsd64_utimensat, .sy_auevent = AUE_FUTIMESAT, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 547 = freebsd64_utimensat */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 548 = obsolete numa_getaffinity */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 549 = obsolete numa_setaffinity */
+	{ .sy_narg = AS(fdatasync_args), .sy_call = (sy_call_t *)sys_fdatasync, .sy_auevent = AUE_FSYNC, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 550 = fdatasync */
+	{ .sy_narg = AS(freebsd64_fstat_args), .sy_call = (sy_call_t *)freebsd64_fstat, .sy_auevent = AUE_FSTAT, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 551 = freebsd64_fstat */
+	{ .sy_narg = AS(freebsd64_fstatat_args), .sy_call = (sy_call_t *)freebsd64_fstatat, .sy_auevent = AUE_FSTATAT, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 552 = freebsd64_fstatat */
+	{ .sy_narg = AS(freebsd64_fhstat_args), .sy_call = (sy_call_t *)freebsd64_fhstat, .sy_auevent = AUE_FHSTAT, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 553 = freebsd64_fhstat */
+	{ .sy_narg = AS(freebsd64_getdirentries_args), .sy_call = (sy_call_t *)freebsd64_getdirentries, .sy_auevent = AUE_GETDIRENTRIES, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 554 = freebsd64_getdirentries */
+	{ .sy_narg = AS(freebsd64_statfs_args), .sy_call = (sy_call_t *)freebsd64_statfs, .sy_auevent = AUE_STATFS, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 555 = freebsd64_statfs */
+	{ .sy_narg = AS(freebsd64_fstatfs_args), .sy_call = (sy_call_t *)freebsd64_fstatfs, .sy_auevent = AUE_FSTATFS, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 556 = freebsd64_fstatfs */
+	{ .sy_narg = AS(freebsd64_getfsstat_args), .sy_call = (sy_call_t *)freebsd64_getfsstat, .sy_auevent = AUE_GETFSSTAT, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 557 = freebsd64_getfsstat */
+	{ .sy_narg = AS(freebsd64_fhstatfs_args), .sy_call = (sy_call_t *)freebsd64_fhstatfs, .sy_auevent = AUE_FHSTATFS, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 558 = freebsd64_fhstatfs */
+	{ .sy_narg = AS(freebsd64_mknodat_args), .sy_call = (sy_call_t *)freebsd64_mknodat, .sy_auevent = AUE_MKNODAT, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 559 = freebsd64_mknodat */
+	{ .sy_narg = AS(freebsd64_kevent_args), .sy_call = (sy_call_t *)freebsd64_kevent, .sy_auevent = AUE_KEVENT, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 560 = freebsd64_kevent */
+	{ .sy_narg = AS(freebsd64_cpuset_getdomain_args), .sy_call = (sy_call_t *)freebsd64_cpuset_getdomain, .sy_auevent = AUE_NULL, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 561 = freebsd64_cpuset_getdomain */
+	{ .sy_narg = AS(freebsd64_cpuset_setdomain_args), .sy_call = (sy_call_t *)freebsd64_cpuset_setdomain, .sy_auevent = AUE_NULL, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 562 = freebsd64_cpuset_setdomain */
+	{ .sy_narg = AS(freebsd64_getrandom_args), .sy_call = (sy_call_t *)freebsd64_getrandom, .sy_auevent = AUE_NULL, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 563 = freebsd64_getrandom */
+	{ .sy_narg = AS(freebsd64_getfhat_args), .sy_call = (sy_call_t *)freebsd64_getfhat, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 564 = freebsd64_getfhat */
+	{ .sy_narg = AS(freebsd64_fhlink_args), .sy_call = (sy_call_t *)freebsd64_fhlink, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 565 = freebsd64_fhlink */
+	{ .sy_narg = AS(freebsd64_fhlinkat_args), .sy_call = (sy_call_t *)freebsd64_fhlinkat, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 566 = freebsd64_fhlinkat */
+	{ .sy_narg = AS(freebsd64_fhreadlink_args), .sy_call = (sy_call_t *)freebsd64_fhreadlink, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 567 = freebsd64_fhreadlink */
+	{ .sy_narg = AS(freebsd64_funlinkat_args), .sy_call = (sy_call_t *)freebsd64_funlinkat, .sy_auevent = AUE_UNLINKAT, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 568 = freebsd64_funlinkat */
+	{ .sy_narg = AS(freebsd64_copy_file_range_args), .sy_call = (sy_call_t *)freebsd64_copy_file_range, .sy_auevent = AUE_NULL, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 569 = freebsd64_copy_file_range */
+	{ .sy_narg = AS(freebsd64___sysctlbyname_args), .sy_call = (sy_call_t *)freebsd64___sysctlbyname, .sy_auevent = AUE_SYSCTL, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 570 = freebsd64___sysctlbyname */
+	{ .sy_narg = AS(freebsd64_shm_open2_args), .sy_call = (sy_call_t *)freebsd64_shm_open2, .sy_auevent = AUE_SHMOPEN, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 571 = freebsd64_shm_open2 */
+	{ .sy_narg = AS(freebsd64_shm_rename_args), .sy_call = (sy_call_t *)freebsd64_shm_rename, .sy_auevent = AUE_SHMRENAME, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 572 = freebsd64_shm_rename */
+	{ .sy_narg = AS(freebsd64_sigfastblock_args), .sy_call = (sy_call_t *)freebsd64_sigfastblock, .sy_auevent = AUE_NULL, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 573 = freebsd64_sigfastblock */
+	{ .sy_narg = AS(freebsd64___realpathat_args), .sy_call = (sy_call_t *)freebsd64___realpathat, .sy_auevent = AUE_REALPATHAT, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 574 = freebsd64___realpathat */
+	{ .sy_narg = AS(close_range_args), .sy_call = (sy_call_t *)sys_close_range, .sy_auevent = AUE_CLOSERANGE, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 575 = close_range */
+	{ .sy_narg = AS(freebsd64_rpctls_syscall_args), .sy_call = (sy_call_t *)lkmressys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },	/* 576 = freebsd64_rpctls_syscall */
 };

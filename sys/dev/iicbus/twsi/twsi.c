@@ -147,7 +147,11 @@ twsi_clear_iflg(struct twsi_softc *sc)
 {
 
 	DELAY(1000);
-	twsi_control_clear(sc, TWSI_CONTROL_IFLG);
+	/* There are two ways of clearing IFLAG. */
+	if (sc->iflag_w1c)
+		twsi_control_set(sc, TWSI_CONTROL_IFLG);
+	else
+		twsi_control_clear(sc, TWSI_CONTROL_IFLG);
 	DELAY(1000);
 }
 
@@ -484,7 +488,7 @@ twsi_transfer(device_t dev, struct iic_msg *msgs, uint32_t nmsgs)
 
 	sc = device_get_softc(dev);
 
-	if (sc->have_intr == false)
+	if (!sc->have_intr)
 		return (iicbus_transfer_gen(dev, msgs, nmsgs));
 
 	sc->error = 0;
@@ -499,6 +503,10 @@ twsi_transfer(device_t dev, struct iic_msg *msgs, uint32_t nmsgs)
 	sc->msg_idx = 0;
 	sc->transfer = 1;
 
+#ifdef TWSI_DEBUG
+	for (int i = 0; i < nmsgs; i++)
+		debugf(sc->dev, "msg %d is %d bytes long\n", i, msgs[i].len);
+#endif
 	/* Send start and re-enable interrupts */
 	sc->control_val = TWSI_CONTROL_TWSIEN |
 		TWSI_CONTROL_INTEN | TWSI_CONTROL_ACK;
@@ -506,7 +514,7 @@ twsi_transfer(device_t dev, struct iic_msg *msgs, uint32_t nmsgs)
 		sc->control_val &= ~TWSI_CONTROL_ACK;
 	TWSI_WRITE(sc, sc->reg_control, sc->control_val | TWSI_CONTROL_START);
 	while (sc->error == 0 && sc->transfer != 0) {
-		pause_sbt("twsi", SBT_1MS * 30, SBT_1MS, 0);
+		tsleep_sbt(sc, 0, "twsi", SBT_1MS * 30, SBT_1MS, 0);
 	}
 	debugf(sc->dev, "pause finish\n");
 
@@ -535,13 +543,13 @@ twsi_intr(void *arg)
 	debugf(sc->dev, "Got interrupt Current msg=%x\n", sc->msg_idx);
 
 	status = TWSI_READ(sc, sc->reg_status);
-	debugf(sc->dev, "initial status=%x\n", status);
+	debugf(sc->dev, "reg control=%x\n", TWSI_READ(sc, sc->reg_control));
 
 	switch (status) {
 	case TWSI_STATUS_START:
 	case TWSI_STATUS_RPTD_START:
 		/* Transmit the address */
-		debugf(sc->dev, "Send the address\n");
+		debugf(sc->dev, "Send the address (%x)", sc->msgs[sc->msg_idx].slave);
 
 		if (sc->msgs[sc->msg_idx].flags & IIC_M_RD)
 			TWSI_WRITE(sc, sc->reg_data,
@@ -555,8 +563,10 @@ twsi_intr(void *arg)
 	case TWSI_STATUS_ADDR_W_ACK:
 		debugf(sc->dev, "Ack received after transmitting the address (write)\n");
 		/* Directly send the first byte */
-		sc->sent_bytes = 0;
-		debugf(sc->dev, "Sending byte 0 = %x\n", sc->msgs[sc->msg_idx].buf[0]);
+		sc->sent_bytes = 1;
+		debugf(sc->dev, "Sending byte 0 (of %d) = %x\n",
+		    sc->msgs[sc->msg_idx].len,
+		    sc->msgs[sc->msg_idx].buf[0]);
 		TWSI_WRITE(sc, sc->reg_data, sc->msgs[sc->msg_idx].buf[0]);
 
 		TWSI_WRITE(sc, sc->reg_control, sc->control_val);
@@ -573,14 +583,14 @@ twsi_intr(void *arg)
 	case TWSI_STATUS_ADDR_R_NACK:
 		debugf(sc->dev, "No ack received after transmitting the address\n");
 		sc->transfer = 0;
-		sc->error = ETIMEDOUT;
+		sc->error = IIC_ENOACK;
 		sc->control_val = 0;
 		wakeup(sc);
 		break;
 
 	case TWSI_STATUS_DATA_WR_ACK:
 		debugf(sc->dev, "Ack received after transmitting data\n");
-		if (sc->sent_bytes++ == (sc->msgs[sc->msg_idx].len - 1)) {
+		if (sc->sent_bytes == sc->msgs[sc->msg_idx].len) {
 			debugf(sc->dev, "Done sending all the bytes for msg %d\n", sc->msg_idx);
 			/* Send stop, no interrupts on stop */
 			if (!(sc->msgs[sc->msg_idx].flags & IIC_M_NOSTOP)) {
@@ -595,30 +605,40 @@ twsi_intr(void *arg)
 			if (sc->msg_idx == sc->nmsgs) {
 				debugf(sc->dev, "transfer_done=1\n");
 				transfer_done = 1;
+				sc->error = 0;
+			} else {
+				debugf(sc->dev, "Send repeated start\n");
+				TWSI_WRITE(sc, sc->reg_control, sc->control_val | TWSI_CONTROL_START);
 			}
 		} else {
-			debugf(sc->dev, "Sending byte %d = %x\n",
+			debugf(sc->dev, "Sending byte %d (of %d) = %x\n",
 			    sc->sent_bytes,
+			    sc->msgs[sc->msg_idx].len,
 			    sc->msgs[sc->msg_idx].buf[sc->sent_bytes]);
 			TWSI_WRITE(sc, sc->reg_data,
 			    sc->msgs[sc->msg_idx].buf[sc->sent_bytes]);
 			TWSI_WRITE(sc, sc->reg_control,
 			    sc->control_val);
+			sc->sent_bytes++;
 		}
 		break;
 
 	case TWSI_STATUS_DATA_RD_ACK:
 		debugf(sc->dev, "Ack received after receiving data\n");
-		debugf(sc->dev, "msg_len=%d recv_bytes=%d\n", sc->msgs[sc->msg_idx].len, sc->recv_bytes);
 		sc->msgs[sc->msg_idx].buf[sc->recv_bytes++] = TWSI_READ(sc, sc->reg_data);
+		debugf(sc->dev, "msg_len=%d recv_bytes=%d\n", sc->msgs[sc->msg_idx].len, sc->recv_bytes);
 
 		/* If we only have one byte left, disable ACK */
 		if (sc->msgs[sc->msg_idx].len - sc->recv_bytes == 1)
 			sc->control_val &= ~TWSI_CONTROL_ACK;
-		if (sc->msgs[sc->msg_idx].len - sc->recv_bytes) {
+		if (sc->msgs[sc->msg_idx].len == sc->recv_bytes) {
+			debugf(sc->dev, "Done with msg %d\n", sc->msg_idx);
 			sc->msg_idx++;
-			if (sc->msg_idx == sc->nmsgs - 1)
+			if (sc->msg_idx == sc->nmsgs - 1) {
+				debugf(sc->dev, "No more msgs\n");
 				transfer_done = 1;
+				sc->error = 0;
+			}
 		}
 		TWSI_WRITE(sc, sc->reg_control, sc->control_val);
 		break;
@@ -631,22 +651,31 @@ twsi_intr(void *arg)
 				TWSI_WRITE(sc, sc->reg_control,
 				    sc->control_val | TWSI_CONTROL_STOP);
 		} else {
-			debugf(sc->dev, "No ack when receiving data\n");
-			sc->error = ENXIO;
-			sc->control_val = 0;
+			debugf(sc->dev, "No ack when receiving data, sending stop anyway\n");
+			if (!(sc->msgs[sc->msg_idx].flags & IIC_M_NOSTOP))
+				TWSI_WRITE(sc, sc->reg_control,
+				    sc->control_val | TWSI_CONTROL_STOP);
 		}
 		sc->transfer = 0;
 		transfer_done = 1;
+		sc->error = 0;
 		break;
 
 	default:
 		debugf(sc->dev, "status=%x hot handled\n", status);
 		sc->transfer = 0;
-		sc->error = ENXIO;
+		sc->error = IIC_EBUSERR;
 		sc->control_val = 0;
 		wakeup(sc);
 		break;
 	}
+	debugf(sc->dev, "Refresh reg_control\n");
+
+	/*
+	 * Newer Allwinner chips clear IFLG after writing 1 to it.
+	 */
+	TWSI_WRITE(sc, sc->reg_control, sc->control_val |
+	    (sc->iflag_w1c ? TWSI_CONTROL_IFLG : 0));
 
 	debugf(sc->dev, "Done with interrupts\n\n");
 	if (transfer_done == 1) {

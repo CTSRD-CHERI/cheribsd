@@ -255,7 +255,7 @@ nfsrvd_getattr(struct nfsrv_descript *nd, int isdgram,
 		if (nd->nd_repstat == 0) {
 			accmode = 0;
 			NFSSET_ATTRBIT(&tmpbits, &attrbits);
-	
+
 			/*
 			 * GETATTR with write-only attr time_access_set and time_modify_set
 			 * should return NFS4ERR_INVAL.
@@ -422,7 +422,7 @@ nfsrvd_setattr(struct nfsrv_descript *nd, __unused int isdgram,
 	if (!nd->nd_repstat) {
 		if (NFSVNO_NOTSETSIZE(&nva)) {
 			if (NFSVNO_EXRDONLY(exp) ||
-			    (vfs_flags(vnode_mount(vp)) & MNT_RDONLY))
+			    (vfs_flags(vp->v_mount) & MNT_RDONLY))
 				nd->nd_repstat = EROFS;
 		} else {
 			if (vnode_vtype(vp) != VREG)
@@ -667,6 +667,7 @@ nfsrvd_readlink(struct nfsrv_descript *nd, __unused int isdgram,
 	int getret = 1, len;
 	struct nfsvattr nva;
 	struct thread *p = curthread;
+	uint16_t off;
 
 	if (nd->nd_repstat) {
 		nfsrv_postopattr(nd, getret, &nva);
@@ -678,9 +679,14 @@ nfsrvd_readlink(struct nfsrv_descript *nd, __unused int isdgram,
 		else
 			nd->nd_repstat = EINVAL;
 	}
-	if (!nd->nd_repstat)
-		nd->nd_repstat = nfsvno_readlink(vp, nd->nd_cred, p,
-		    &mp, &mpend, &len);
+	if (nd->nd_repstat == 0) {
+		if ((nd->nd_flag & ND_EXTPG) != 0)
+			nd->nd_repstat = nfsvno_readlink(vp, nd->nd_cred,
+			    nd->nd_maxextsiz, p, &mp, &mpend, &len);
+		else
+			nd->nd_repstat = nfsvno_readlink(vp, nd->nd_cred,
+			    0, p, &mp, &mpend, &len);
+	}
 	if (nd->nd_flag & ND_NFSV3)
 		getret = nfsvno_getattr(vp, &nva, nd, p, 1, NULL);
 	vput(vp);
@@ -690,9 +696,20 @@ nfsrvd_readlink(struct nfsrv_descript *nd, __unused int isdgram,
 		goto out;
 	NFSM_BUILD(tl, u_int32_t *, NFSX_UNSIGNED);
 	*tl = txdr_unsigned(len);
-	nd->nd_mb->m_next = mp;
-	nd->nd_mb = mpend;
-	nd->nd_bpos = mtod(mpend, caddr_t) + mpend->m_len;
+	if (mp != NULL) {
+		nd->nd_mb->m_next = mp;
+		nd->nd_mb = mpend;
+		if ((mpend->m_flags & M_EXTPG) != 0) {
+			nd->nd_bextpg = mpend->m_epg_npgs - 1;
+			nd->nd_bpos = (char *)(void *)
+			    PHYS_TO_DMAP(mpend->m_epg_pa[nd->nd_bextpg]);
+			off = (nd->nd_bextpg == 0) ? mpend->m_epg_1st_off : 0;
+			nd->nd_bpos += off + mpend->m_epg_last_len;
+			nd->nd_bextpgsiz = PAGE_SIZE - mpend->m_epg_last_len -
+			    off;
+		} else
+			nd->nd_bpos = mtod(mpend, char *) + mpend->m_len;
+	}
 
 out:
 	NFSEXITCODE2(0, nd);
@@ -716,6 +733,7 @@ nfsrvd_read(struct nfsrv_descript *nd, __unused int isdgram,
 	nfsv4stateid_t stateid;
 	nfsquad_t clientid;
 	struct thread *p = curthread;
+	uint16_t poff;
 
 	if (nd->nd_repstat) {
 		nfsrv_postopattr(nd, getret, &nva);
@@ -837,8 +855,21 @@ nfsrvd_read(struct nfsrv_descript *nd, __unused int isdgram,
 		cnt = reqlen;
 	m3 = NULL;
 	if (cnt > 0) {
-		nd->nd_repstat = nfsvno_read(vp, off, cnt, nd->nd_cred, p,
-		    &m3, &m2);
+		/*
+		 * If cnt > MCLBYTES and the reply will not be saved, use
+		 * ext_pgs mbufs for TLS.
+		 * For NFSv4.0, we do not know for sure if the reply will
+		 * be saved, so do not use ext_pgs mbufs for NFSv4.0.
+		 * Always use ext_pgs mbufs if ND_EXTPG is set.
+		 */
+		if ((nd->nd_flag & ND_EXTPG) != 0 || (cnt > MCLBYTES &&
+		    (nd->nd_flag & (ND_TLS | ND_SAVEREPLY)) == ND_TLS &&
+		    (nd->nd_flag & (ND_NFSV4 | ND_NFSV41)) != ND_NFSV4))
+			nd->nd_repstat = nfsvno_read(vp, off, cnt, nd->nd_cred,
+			    nd->nd_maxextsiz, p, &m3, &m2);
+		else
+			nd->nd_repstat = nfsvno_read(vp, off, cnt, nd->nd_cred,
+			    0, p, &m3, &m2);
 		if (!(nd->nd_flag & ND_NFSV4)) {
 			getret = nfsvno_getattr(vp, &nva, nd, p, 1, NULL);
 			if (!nd->nd_repstat)
@@ -873,7 +904,17 @@ nfsrvd_read(struct nfsrv_descript *nd, __unused int isdgram,
 	if (m3) {
 		nd->nd_mb->m_next = m3;
 		nd->nd_mb = m2;
-		nd->nd_bpos = mtod(m2, caddr_t) + m2->m_len;
+		if ((m2->m_flags & M_EXTPG) != 0) {
+			nd->nd_flag |= ND_EXTPG;
+			nd->nd_bextpg = m2->m_epg_npgs - 1;
+			nd->nd_bpos = (char *)(void *)
+			    PHYS_TO_DMAP(m2->m_epg_pa[nd->nd_bextpg]);
+			poff = (nd->nd_bextpg == 0) ? m2->m_epg_1st_off : 0;
+			nd->nd_bpos += poff + m2->m_epg_last_len;
+			nd->nd_bextpgsiz = PAGE_SIZE - m2->m_epg_last_len -
+			    poff;
+		} else
+			nd->nd_bpos = mtod(m2, char *) + m2->m_len;
 	}
 
 out:
@@ -2679,6 +2720,8 @@ nfsrvd_locku(struct nfsrv_descript *nd, __unused int isdgram,
 			stp->ls_stateid.seqid = 0;
 		} else {
 			nd->nd_repstat = NFSERR_BADSTATEID;
+			free(stp, M_NFSDSTATE);
+			free(lop, M_NFSDLOCK);
 			goto nfsmout;
 		}
 	}
@@ -3775,6 +3818,11 @@ nfsrvd_setclientid(struct nfsrv_descript *nd, __unused int isdgram,
 		clp->lc_uid = nd->nd_cred->cr_uid;
 		clp->lc_gid = nd->nd_cred->cr_gid;
 	}
+
+	/* If the client is using TLS, do so for the callback connection. */
+	if (nd->nd_flag & ND_TLS)
+		clp->lc_flags |= LCL_TLSCB;
+
 	NFSM_DISSECT(tl, u_int32_t *, NFSX_UNSIGNED);
 	clp->lc_program = fxdr_unsigned(u_int32_t, *tl);
 	error = nfsrv_getclientipaddr(nd, clp);
@@ -5534,6 +5582,7 @@ nfsrvd_getxattr(struct nfsrv_descript *nd, __unused int isdgram,
 	int error, len;
 	char *name;
 	struct thread *p = curthread;
+	uint16_t off;
 
 	error = 0;
 	if (nfs_rootfhset == 0 || nfsd_checkrootexp(nd) != 0) {
@@ -5553,8 +5602,9 @@ nfsrvd_getxattr(struct nfsrv_descript *nd, __unused int isdgram,
 	name = malloc(len + 1, M_TEMP, M_WAITOK);
 	nd->nd_repstat = nfsrv_mtostr(nd, name, len);
 	if (nd->nd_repstat == 0)
-		nd->nd_repstat = nfsvno_getxattr(vp, name, nd->nd_maxresp,
-		    nd->nd_cred, p, &mp, &mpend, &len);
+		nd->nd_repstat = nfsvno_getxattr(vp, name,
+		    nd->nd_maxresp, nd->nd_cred, nd->nd_flag,
+		    nd->nd_maxextsiz, p, &mp, &mpend, &len);
 	if (nd->nd_repstat == ENOATTR)
 		nd->nd_repstat = NFSERR_NOXATTR;
 	else if (nd->nd_repstat == EOPNOTSUPP)
@@ -5565,7 +5615,19 @@ nfsrvd_getxattr(struct nfsrv_descript *nd, __unused int isdgram,
 		if (len > 0) {
 			nd->nd_mb->m_next = mp;
 			nd->nd_mb = mpend;
-			nd->nd_bpos = mtod(mpend, caddr_t) + mpend->m_len;
+			if ((mpend->m_flags & M_EXTPG) != 0) {
+				nd->nd_flag |= ND_EXTPG;
+				nd->nd_bextpg = mpend->m_epg_npgs - 1;
+				nd->nd_bpos = (char *)(void *)
+				   PHYS_TO_DMAP(mpend->m_epg_pa[nd->nd_bextpg]);
+				off = (nd->nd_bextpg == 0) ?
+				    mpend->m_epg_1st_off : 0;
+				nd->nd_bpos += off + mpend->m_epg_last_len;
+				nd->nd_bextpgsiz = PAGE_SIZE -
+				    mpend->m_epg_last_len - off;
+			} else
+				nd->nd_bpos = mtod(mpend, char *) +
+				    mpend->m_len;
 		}
 	}
 	free(name, M_TEMP);
@@ -5866,4 +5928,3 @@ nfsrvd_notsupp(struct nfsrv_descript *nd, __unused int isdgram,
 	NFSEXITCODE2(0, nd);
 	return (0);
 }
-

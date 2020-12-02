@@ -266,7 +266,6 @@ sec_attach(device_t dev)
 	if (error)
 		goto fail2;
 
-
 	if (sc->sc_version == 3) {
 		sc->sc_sec_irid = 1;
 		error = sec_setup_intr(sc, &sc->sc_sec_ires, &sc->sc_sec_ihand,
@@ -850,6 +849,9 @@ sec_desc_map_dma(struct sec_softc *sc, struct sec_dma_mem *dma_mem,
 		break;
 	case CRYPTO_BUF_MBUF:
 		size = m_length(crp->crp_buf.cb_mbuf, NULL);
+		break;
+	case CRYPTO_BUF_VMPAGE:
+		size = PAGE_SIZE - crp->crp_buf.cb_vm_page_offset;
 		break;
 	default:
 		return (EINVAL);

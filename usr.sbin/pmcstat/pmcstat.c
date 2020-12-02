@@ -374,7 +374,7 @@ pmcstat_show_usage(void)
 	    "\t -R file\t read events from \"file\"\n"
 	    "\t -S spec\t allocate a system-wide sampling PMC\n"
 	    "\t -T\t\t start in top mode\n"
-	    "\t -U \t\n merged user kernel stack capture\n"
+	    "\t -U \t\t merged user kernel stack capture\n"
 	    "\t -W\t\t (toggle) show counts per context switch\n"
 	    "\t -a file\t print sampled PCs and callgraph to \"file\"\n"
 	    "\t -c cpu-list\t set cpus for subsequent system-wide PMCs\n"
@@ -511,8 +511,12 @@ main(int argc, char **argv)
 	CPU_COPY(&rootmask, &cpumask);
 
 	while ((option = getopt(argc, argv,
-	    "CD:EF:G:ILM:NO:P:R:S:TUWZa:c:def:gi:k:l:m:n:o:p:qr:s:t:u:vw:z:")) != -1)
+	    "ACD:EF:G:ILM:NO:P:R:S:TUWZa:c:def:gi:k:l:m:n:o:p:qr:s:t:u:vw:z:")) != -1)
 		switch (option) {
+		case 'A':
+			args.pa_flags |= FLAG_SKIP_TOP_FN_RES;
+			break;
+
 		case 'a':	/* Annotate + callgraph */
 			args.pa_flags |= FLAG_DO_ANNOTATE;
 			args.pa_plugin = PMCSTAT_PL_ANNOTATE_CG;
@@ -586,12 +590,13 @@ main(int argc, char **argv)
 			args.pa_plugin	= PMCSTAT_PL_GPROF;
 			break;
 
-		case 'I':
-			args.pa_flags |= FLAG_SKIP_TOP_FN_RES;
-			break;
 		case 'i':
 			args.pa_flags |= FLAG_FILTER_THREAD_ID;
 			args.pa_tid = strtol(optarg, &end, 0);
+			break;
+
+		case 'I':
+			args.pa_flags |= FLAG_SHOW_OFFSET;
 			break;
 
 		case 'k':	/* pathname to the kernel */

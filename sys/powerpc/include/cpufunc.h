@@ -108,7 +108,6 @@ mfctrl(void)
 	return (value);
 }
 
-
 static __inline void
 mtdec(register_t value)
 {
@@ -162,6 +161,25 @@ mttb(u_quad_t time)
 	mtspr(TBR_TBWL, 0);
 	mtspr(TBR_TBWU, (uint32_t)(time >> 32));
 	mtspr(TBR_TBWL, (uint32_t)(time & 0xffffffff));
+}
+
+
+static __inline register_t
+mffs(void)
+{
+	register_t value;
+
+	__asm __volatile ("mffs 0; stfd 0,0(%0)"
+			:: "b"(&value));
+
+	return (value);
+}
+
+static __inline void
+mtfsf(register_t value)
+{
+	__asm __volatile ("lfd 0,0(%0); mtfsf 0xff,0"
+			:: "b"(&value));
 }
 
 static __inline void

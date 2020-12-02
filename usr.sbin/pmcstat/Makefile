@@ -2,6 +2,9 @@
 # $FreeBSD$
 #
 
+# XXX: not at all purecap clean
+NO_WERROR=
+
 PROG_CXX=	pmcstat
 MAN=	pmcstat.8
 

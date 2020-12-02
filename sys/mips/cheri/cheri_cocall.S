@@ -183,7 +183,7 @@ _C_LABEL(switcher_cocall):
 	clc	$c24, zero, SCB_COOKIEP($c25)
 	cbez	$c24, 2f
 	ccleartag	$c4, $c4
-	csc	$c4, zero, SCB_PEER_SCB($c24)
+	csc	$c4, zero, 0($c24)
 2:
 
 	/*

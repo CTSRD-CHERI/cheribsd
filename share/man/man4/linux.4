@@ -24,7 +24,7 @@
 .\"
 .\" $FreeBSD$
 .\"
-.Dd June 12, 2020
+.Dd July 5, 2020
 .Dt LINUX 4
 .Os
 .Sh NAME
@@ -98,7 +98,12 @@ tunables:
 .It Va compat.linux.debug
 Enable debugging messages.
 Set to 0 to silence them.
-Defaults to 1.
+Defaults to 3.
+A setting of 1 prints debug messages, tells about unimplemented stuff (only
+once).
+Set to 2 is like 1, but also prints messages about implemented but not tested
+stuff (only once).
+Setting it to 3 or higher is like 2, but no rate limiting of messages.
 .It Va compat.linux.default_openfiles
 Default soft openfiles resource limit for Linux applications.
 Set to -1 to disable the limit.
@@ -125,12 +130,18 @@ From a user perspective, this makes
 .Va SIGINFO
 work for Linux executables.
 Defaults to 0.
+.El
 .Sh FILES
 .Bl -tag -width /compat/linux/dev/shm -compact
 .It Pa /compat/linux
 minimal Linux run-time environment
+.It Pa /compat/linux/dev
+device file system, see
+.Xr devfs 5
 .It Pa /compat/linux/dev/fd
-file-descriptor file system, see
+file descriptor file system mounted with the
+.Cm linrdlnk
+option, see
 .Xr fdescfs 5
 .It Pa /compat/linux/dev/shm
 in-memory file system, see

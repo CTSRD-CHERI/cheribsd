@@ -2483,9 +2483,11 @@ g_journal_taste(struct g_class *mp, struct g_provider *pp, int flags __unused)
 	/* This orphan function should be never called. */
 	gp->orphan = g_journal_taste_orphan;
 	cp = g_new_consumer(gp);
-	g_attach(cp, pp);
-	error = g_journal_metadata_read(cp, &md);
-	g_detach(cp);
+	error = g_attach(cp, pp);
+	if (error == 0) {
+		error = g_journal_metadata_read(cp, &md);
+		g_detach(cp);
+	}
 	g_destroy_consumer(cp);
 	g_destroy_geom(gp);
 	if (error != 0)
@@ -2511,7 +2513,7 @@ g_journal_find_device(struct g_class *mp, const char *name)
 	struct g_geom *gp;
 	struct g_provider *pp;
 
-	if (strncmp(name, "/dev/", 5) == 0)
+	if (strncmp(name, _PATH_DEV, 5) == 0)
 		name += 5;
 	LIST_FOREACH(gp, &mp->geom, geom) {
 		sc = gp->softc;

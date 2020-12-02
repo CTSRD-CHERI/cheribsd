@@ -91,6 +91,7 @@ __FBSDID("$FreeBSD$");
 #include <net/if_var.h>
 #include <net/if_types.h>
 #include <net/route.h>
+#include <net/route/nhop.h>
 #include <net/if_dl.h>
 #include <net/vnet.h>
 
@@ -112,7 +113,6 @@ __FBSDID("$FreeBSD$");
 #include <netinet6/scope6_var.h>
 #include <netinet6/in6_fib.h>
 #include <netinet6/in6_pcb.h>
-
 
 /*
  * struct in6_ifreq and struct ifreq must be type punnable for common members
@@ -164,7 +164,6 @@ static int in6_broadcast_ifa(struct ifnet *, struct in6_aliasreq *,
 #define ifa2ia6(ifa)	((struct in6_ifaddr *)(ifa))
 #define ia62ifa(ia6)	(&((ia6)->ia_ifa))
 
-
 void
 in6_newaddrmsg(struct in6_ifaddr *ia, int cmd)
 {
@@ -186,7 +185,6 @@ in6_newaddrmsg(struct in6_ifaddr *ia, int cmd)
 	link_init_sdl(ifa->ifa_ifp, (struct sockaddr *)&gateway, ifa->ifa_ifp->if_type);
 	if (cmd != RTM_DELETE)
 		info.rti_ifp = V_loif;
-
 
 	fibnum = V_rt_add_addr_allfibs ? RT_ALL_FIBS : ia62ifa(ia)->ifa_ifp->if_fib;
 
@@ -742,7 +740,6 @@ out:
 	return (error);
 }
 
-
 static struct in6_multi_mship *
 in6_joingroup_legacy(struct ifnet *ifp, const struct in6_addr *mcaddr,
     int *errorp, int delay)
@@ -1081,7 +1078,6 @@ in6_validate_ifra(struct ifnet *ifp, struct in6_aliasreq *ifra,
 
 	return (0);
 }
-
 
 /*
  * Allocate a new ifaddr and link it into chains.
@@ -1502,7 +1498,6 @@ in6ifa_ifpforlinklocal(struct ifnet *ifp, int ignoreflags)
 	return ((struct in6_ifaddr *)ifa);
 }
 
-
 /*
  * find the interface address corresponding to a given IPv6 address.
  * ifaddr is returned referenced.
@@ -1560,7 +1555,6 @@ in6ifa_llaonifp(struct ifnet *ifp)
 	struct epoch_tracker et;
 	struct sockaddr_in6 *sin6;
 	struct ifaddr *ifa;
-
 
 	if (ND_IFINFO(ifp)->flags & ND6_IFF_IFDISABLED)
 		return (NULL);
@@ -1703,7 +1697,7 @@ in6_localip(struct in6_addr *in6)
 	IN6_IFADDR_RUNLOCK(&in6_ifa_tracker);
 	return (0);
 }
- 
+
 /*
  * Return 1 if an internet address is configured on an interface.
  */
@@ -2100,7 +2094,6 @@ in6_lltable_match_prefix(const struct sockaddr *saddr,
 		return (0);
 
 	if (lle->la_flags & LLE_IFADDR) {
-
 		/*
 		 * Delete LLE_IFADDR records IFF address & flag matches.
 		 * Note that addr is the interface address within prefix
@@ -2129,7 +2122,6 @@ in6_lltable_free_entry(struct lltable *llt, struct llentry *lle)
 
 	/* Unlink entry from table */
 	if ((lle->la_flags & LLE_LINKED) != 0) {
-
 		ifp = llt->llt_ifp;
 		IF_AFDATA_WLOCK_ASSERT(ifp);
 		lltable_unlink_entry(llt, lle);
@@ -2144,10 +2136,9 @@ in6_lltable_rtcheck(struct ifnet *ifp,
 		    const struct sockaddr *l3addr)
 {
 	const struct sockaddr_in6 *sin6;
-	struct nhop6_basic nh6;
+	struct nhop_object *nh;
 	struct in6_addr dst;
 	uint32_t scopeid;
-	int error;
 	char ip6buf[INET6_ADDRSTRLEN];
 	int fibnum;
 
@@ -2158,8 +2149,8 @@ in6_lltable_rtcheck(struct ifnet *ifp,
 	sin6 = (const struct sockaddr_in6 *)l3addr;
 	in6_splitscope(&sin6->sin6_addr, &dst, &scopeid);
 	fibnum = V_rt_add_addr_allfibs ? RT_DEFAULT_FIB : ifp->if_fib;
-	error = fib6_lookup_nh_basic(fibnum, &dst, scopeid, 0, 0, &nh6);
-	if (error != 0 || (nh6.nh_flags & NHF_GATEWAY) || nh6.nh_ifp != ifp) {
+	nh = fib6_lookup(fibnum, &dst, scopeid, NHR_NONE, 0);
+	if (nh && ((nh->nh_flags & NHF_GATEWAY) || nh->nh_ifp != ifp)) {
 		struct ifaddr *ifa;
 		/*
 		 * Create an ND6 cache for an IPv6 neighbor
@@ -2377,8 +2368,7 @@ in6_lltable_dump_entry(struct lltable *llt, struct llentry *lle,
 	ndpc.rtm.rtm_type = RTM_GET;
 	ndpc.rtm.rtm_flags = RTF_UP;
 	ndpc.rtm.rtm_addrs = RTA_DST | RTA_GATEWAY;
-	if (V_deembed_scopeid)
-		sa6_recoverscope(&ndpc.sin6);
+	sa6_recoverscope(&ndpc.sin6);
 
 	/* publish */
 	if (lle->la_flags & LLE_PUB)

@@ -1468,7 +1468,7 @@
 #define PACKAGE_NAME "ntp"
 
 /* Define to the full name and version of this package. */
-#define PACKAGE_STRING "ntp 4.2.8p14"
+#define PACKAGE_STRING "ntp 4.2.8p15"
 
 /* Define to the one symbol short name of this package. */
 #define PACKAGE_TARNAME "ntp"
@@ -1477,7 +1477,7 @@
 #define PACKAGE_URL "http://www.ntp.org./"
 
 /* Define to the version of this package. */
-#define PACKAGE_VERSION "4.2.8p14"
+#define PACKAGE_VERSION "4.2.8p15"
 
 /* data dir */
 #define PERLLIBDIR "/usr/share/ntp/lib"
@@ -1548,7 +1548,7 @@
 #define SIZEOF_SIGNED_CHAR 1
 
 /* The size of `time_t', as computed by sizeof. */
-#if defined(__i386__) || defined(__powerpc__)
+#if defined(__i386__)
 #define SIZEOF_TIME_T 4
 #else
 #define SIZEOF_TIME_T 8
@@ -1580,6 +1580,8 @@
 /* canonical system (cpu-vendor-os) of where we should run */
 #if defined(__amd64__)
 #define STR_SYSTEM "amd64-undermydesk-freebsd"
+#elif defined(__powerpc64__) && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+#define STR_SYSTEM "powerpc64le-undermydesk-freebsd"
 #elif defined(__powerpc64__)
 #define STR_SYSTEM "powerpc64-undermydesk-freebsd"
 #elif defined(__powerpc__)
@@ -1650,7 +1652,7 @@ typedef unsigned int	uintptr_t;
 /* #undef USE_UDP_SIGPOLL */
 
 /* Version number of package */
-#define VERSION "4.2.8p12"
+#define VERSION "4.2.8p15"
 
 /* vsnprintf expands "%m" to strerror(errno) */
 #define VSNPRINTF_PERCENT_M 1
@@ -1660,8 +1662,8 @@ typedef unsigned int	uintptr_t;
 
 /* Define WORDS_BIGENDIAN to 1 if your processor stores words with the most
    significant byte first (like Motorola and SPARC, unlike Intel). */
-#if defined(__ARMEB__) || defined(__MIPSEB__) || defined(__powerpc__) || \
-    defined(__powerpc64__)
+#if defined(__ARMEB__) || defined(__MIPSEB__) || \
+    (defined(__powerpc__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
 #define WORDS_BIGENDIAN 1
 #endif
 

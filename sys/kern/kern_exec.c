@@ -67,6 +67,8 @@ __FBSDID("$FreeBSD$");
 #include <sys/sysctl.h>
 #include <sys/sysent.h>
 #include <sys/sysproto.h>
+#include <sys/timers.h>
+#include <sys/umtx.h>
 #include <sys/vnode.h>
 #include <sys/wait.h>
 #ifdef KTRACE
@@ -123,7 +125,8 @@ static int sysctl_kern_ps_strings(SYSCTL_HANDLER_ARGS);
 static int sysctl_kern_usrstack(SYSCTL_HANDLER_ARGS);
 static int sysctl_kern_stackprot(SYSCTL_HANDLER_ARGS);
 static int do_execve(struct thread *td, struct image_args *args,
-    void * __capability mac_p, struct proc *cop, bool opportunistic);
+    void * __capability mac_p, struct vmspace *oldvmspace,
+    struct proc *cop, bool opportunistic);
 
 /* XXX This should be vm_size_t. */
 SYSCTL_PROC(_kern, KERN_PS_STRINGS, ps_strings, CTLTYPE_ULONG|CTLFLAG_RD|
@@ -232,7 +235,7 @@ sys_coexecve(struct thread *td, struct coexecve_args *uap)
 	error = exec_copyin_args(&args, uap->fname,
 	    UIO_USERSPACE, uap->argv, uap->envv);
 	if (error == 0)
-		error = kern_coexecve(td, &args, NULL, p, false);
+		error = kern_coexecve(td, &args, NULL, oldvmspace, p, false);
 	post_execve(td, error, oldvmspace);
 	PRELE(p);
 
@@ -260,8 +263,9 @@ sys_execve(struct thread *td, struct execve_args *uap)
 	error = exec_copyin_args(&args, uap->fname, UIO_USERSPACE,
 	    uap->argv, uap->envv);
 	if (error == 0)
-		error = kern_execve(td, &args, NULL);
+		error = kern_execve(td, &args, NULL, oldvmspace);
 	post_execve(td, error, oldvmspace);
+	AUDIT_SYSCALL_EXIT(error == EJUSTRETURN ? 0 : error, td);
 	return (error);
 }
 
@@ -286,9 +290,10 @@ sys_fexecve(struct thread *td, struct fexecve_args *uap)
 	    uap->argv, uap->envv);
 	if (error == 0) {
 		args.fd = uap->fd;
-		error = kern_execve(td, &args, NULL);
+		error = kern_execve(td, &args, NULL, oldvmspace);
 	}
 	post_execve(td, error, oldvmspace);
+	AUDIT_SYSCALL_EXIT(error == EJUSTRETURN ? 0 : error, td);
 	return (error);
 }
 
@@ -315,8 +320,9 @@ sys___mac_execve(struct thread *td, struct __mac_execve_args *uap)
 	error = exec_copyin_args(&args, uap->fname, UIO_USERSPACE,
 	    uap->argv, uap->envv);
 	if (error == 0)
-		error = kern_execve(td, &args, uap->mac_p);
+		error = kern_execve(td, &args, uap->mac_p, oldvmspace);
 	post_execve(td, error, oldvmspace);
+	AUDIT_SYSCALL_EXIT(error == EJUSTRETURN ? 0 : error, td);
 	return (error);
 #else
 	return (ENOSYS);
@@ -363,21 +369,11 @@ post_execve(struct thread *td, int error, struct vmspace *oldvmspace)
 			thread_single_end(p, SINGLE_BOUNDARY);
 		PROC_UNLOCK(p);
 	}
-	if ((td->td_pflags & TDP_EXECVMSPC) != 0) {
-#ifdef notanymore
-		/*
-		 * XXX: This assertion is not valid for coexecve(2).
-		 */
-		KASSERT(p->p_vmspace != oldvmspace,
-		    ("oldvmspace still used"));
-#endif
-		vmspace_free(oldvmspace);
-		td->td_pflags &= ~TDP_EXECVMSPC;
-	}
+	exec_cleanup(td, oldvmspace);
 }
 
 /*
- * XXX: kern_execve has the astonishing property of not always returning to
+ * kern_execve() has the astonishing property of not always returning to
  * the caller.  If sufficiently bad things happen during the call to
  * do_execve(), it can end up calling exit1(); as a result, callers must
  * avoid doing anything which they might need to undo (e.g., allocating
@@ -385,19 +381,21 @@ post_execve(struct thread *td, int error, struct vmspace *oldvmspace)
  */
 int
 kern_coexecve(struct thread *td, struct image_args *args,
-    void * __capability mac_p, struct proc *cop, bool opportunistic)
+    void * __capability mac_p, struct vmspace *oldvmspace,
+    struct proc *cop, bool opportunistic)
 {
 
 	AUDIT_ARG_ARGV(args->begin_argv, args->argc,
 	    exec_args_get_begin_envv(args) - args->begin_argv);
 	AUDIT_ARG_ENVV(exec_args_get_begin_envv(args), args->envc,
 	    args->endp - exec_args_get_begin_envv(args));
-	return (do_execve(td, args, mac_p, cop, opportunistic));
+	return (do_execve(td, args, mac_p, oldvmspace, cop,
+	    opportunistic));
 }
 
 int
 kern_execve(struct thread *td, struct image_args *args,
-    void * __capability mac_p)
+    void * __capability mac_p, struct vmspace *oldvmspace)
 {
 	struct proc *cop, *p;
 	int error;
@@ -434,7 +432,7 @@ kern_execve(struct thread *td, struct image_args *args,
 		PROC_UNLOCK(cop);
 		PHOLD(cop);
 		sx_sunlock(&proctree_lock);
-		error = kern_coexecve(td, args, mac_p, cop, true);
+		error = kern_coexecve(td, args, mac_p, oldvmspace, cop, true);
 		PRELE(cop);
 
 		KASSERT(error != 0, ("%s: kern_coexecve returned 0", __func__));
@@ -461,7 +459,7 @@ kern_execve(struct thread *td, struct image_args *args,
 	}
 
 fallback:
-	return (kern_coexecve(td, args, mac_p, NULL, false));
+	return (kern_coexecve(td, args, mac_p, oldvmspace, NULL, false));
 }
 
 /*
@@ -470,7 +468,8 @@ fallback:
  */
 static int
 do_execve(struct thread *td, struct image_args *args,
-    void * __capability umac, struct proc *cop, bool opportunistic)
+    void * __capability umac, struct vmspace *oldvmspace,
+    struct proc *cop, bool opportunistic)
 {
 	struct proc *p = td->td_proc;
 	struct nameidata nd;
@@ -699,8 +698,7 @@ interpret:
 		imgp->execpath = args->fname;
 	else {
 		VOP_UNLOCK(imgp->vp);
-		if (vn_fullpath(td, imgp->vp, &imgp->execpath,
-		    &imgp->freepath) != 0)
+		if (vn_fullpath(imgp->vp, &imgp->execpath, &imgp->freepath) != 0)
 			imgp->execpath = args->fname;
 		vn_lock(imgp->vp, LK_SHARED | LK_RETRY);
 	}
@@ -826,6 +824,7 @@ interpret:
 		 * cannot be shared after an exec.
 		 */
 		fdunshare(td);
+		pdunshare(td);
 		/* close files on exec */
 		fdcloseexec(td);
 	}
@@ -1075,13 +1074,15 @@ exec_fail:
 
 	if (error && imgp->vmspace_destroyed) {
 		if (opportunistic) {
-			error = do_execve(td, args, umac, NULL, false);
+			error = do_execve(td, args, umac, oldvmspace,
+			    NULL, false);
 			if (error == EJUSTRETURN)
 				return (error);
 		}
 		/* sorry, no more process anymore. exit gracefully */
 		if (cop != NULL)
 			PRELE(cop);
+		exec_cleanup(td, oldvmspace);
 		exit1(td, 0, SIGABRT);
 		/* NOT REACHED */
 	}
@@ -1098,6 +1099,19 @@ exec_fail:
 	 * registers unmodified when returning EJUSTRETURN.
 	 */
 	return (error == 0 ? EJUSTRETURN : error);
+}
+
+void
+exec_cleanup(struct thread *td, struct vmspace *oldvmspace)
+{
+	if ((td->td_pflags & TDP_EXECVMSPC) != 0) {
+#ifdef notanymore
+		KASSERT(td->td_proc->p_vmspace != oldvmspace,
+		    ("oldvmspace still used"));
+#endif
+		vmspace_free(oldvmspace);
+		td->td_pflags &= ~TDP_EXECVMSPC;
+	}
 }
 
 int
@@ -1167,8 +1181,11 @@ exec_new_vmspace(struct image_params *imgp, struct sysentvec *sv)
 	imgp->sysent = sv;
 
 	sigfastblock_clear(td);
+	umtx_exec(p);
+	itimers_exec(p);
+	if (sv->sv_onexec != NULL)
+		sv->sv_onexec(p, imgp);
 
-	/* May be called with Giant held */
 	EVENTHANDLER_DIRECT_INVOKE(process_exec, p, imgp);
 
 	/*
@@ -1181,7 +1198,8 @@ exec_new_vmspace(struct image_params *imgp, struct sysentvec *sv)
 		sv_minuser = sv->sv_minuser;
 	else
 		sv_minuser = MAX(sv->sv_minuser, PAGE_SIZE);
-	if (vmspace->vm_refcnt == 1 && vm_map_min(map) == sv_minuser &&
+	if (refcount_load(&vmspace->vm_refcnt) == 1 &&
+	    vm_map_min(map) == sv_minuser &&
 	    vm_map_max(map) == sv->sv_maxuser &&
 	    cpu_exec_vmspace_reuse(p, map) &&
 	    imgp->cop == NULL) {
@@ -1281,7 +1299,9 @@ exec_new_vmspace(struct image_params *imgp, struct sysentvec *sv)
 #endif
 				return (ENOMEM);
 			}
+			vm_map_lock(map);
 			dummy = vm_map_findspace(map, stack_addr, ssiz);
+			vm_map_unlock(map);
 		} while (dummy == vm_map_max(map) - ssiz + 1);
 	} else {
 		stack_addr = p->p_usrstack - ssiz;
@@ -1425,7 +1445,7 @@ exec_copyin_data_fds(struct thread *td, struct image_args *args,
 
 	memset(args, '\0', sizeof(*args));
 	ofdp = td->td_proc->p_fd;
-	if (datalen >= ARG_MAX || fdslen > ofdp->fd_lastfile + 1)
+	if (datalen >= ARG_MAX || fdslen >= ofdp->fd_nfiles)
 		return (E2BIG);
 	error = exec_alloc_args(args);
 	if (error != 0)
@@ -1754,11 +1774,10 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	char * __capability * __capability vectp;
 	char *stringp;
 #if __has_feature(capabilities)
-	char * __capability ustackp;
 	vaddr_t rounded_stack_vaddr, stack_vaddr, stack_offset;
 	size_t ssiz;
 #endif
-	char * __capability destp, * __capability ustringp;
+	uintcap_t destp, ustringp;
 	struct ps_strings * __capability arginfo;
 	struct proc *p;
 	size_t execpath_len, len;
@@ -1783,7 +1802,7 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 
 #if __has_feature(capabilities)
 	/*
-	 * ustackp must cover all of the smaller buffers copied out
+	 * destp must cover all of the smaller buffers copied out
 	 * onto the stack, so roundup the length to be representable
 	 * even if it means the capability extends beyond the stack
 	 * bounds.
@@ -1798,15 +1817,15 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 		stack_offset = stack_vaddr - rounded_stack_vaddr;
 	} while (rounded_stack_vaddr != CHERI_REPRESENTABLE_BASE(stack_vaddr,
 	    ssiz + stack_offset));
-	ustackp = cheri_capability_build_user_data(
+	destp = (uintcap_t)cheri_capability_build_user_data(
 	    CHERI_CAP_USER_DATA_PERMS, rounded_stack_vaddr,
 	    CHERI_REPRESENTABLE_LENGTH(ssiz + stack_offset), stack_offset);
-	destp = cheri_setaddress(ustackp, p->p_psstrings);
-	arginfo = (struct ps_strings * __capability)cheri_setbounds(destp,
+	destp = cheri_setaddress(destp, p->p_psstrings);
+	arginfo = (struct ps_strings * __capability)cheri_setboundsexact(destp,
 	    sizeof(*arginfo));
 #else
-	destp = (void *)p->p_psstrings;
-	arginfo = (struct ps_strings *)destp;
+	arginfo = (struct ps_strings *)p->p_psstrings;
+	destp = (uintptr_t)arginfo;
 #endif
 	imgp->ps_strings = arginfo;
 	if (p->p_sysent->sv_sigcode_base == 0) {
@@ -1819,9 +1838,9 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	 */
 	if (szsigcode != 0) {
 		destp -= szsigcode;
-		destp = __builtin_align_down(destp,
-		    sizeof(void * __capability));
-		error = copyout(p->p_sysent->sv_sigcode, destp, szsigcode);
+		destp = rounddown2(destp, sizeof(void * __capability));
+		error = copyout(p->p_sysent->sv_sigcode,
+		    (void * __capability)destp, szsigcode);
 		if (error != 0)
 			return (error);
 	}
@@ -1831,12 +1850,12 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	 */
 	if (execpath_len != 0) {
 		destp -= execpath_len;
-		destp = __builtin_align_down(destp,
-		    sizeof(void * __capability));
+		destp = rounddown2(destp, sizeof(void * __capability));
 #if __has_feature(capabilities)
-		imgp->execpathp = cheri_setbounds(destp, execpath_len);
+		imgp->execpathp = (void * __capability)
+		    cheri_setboundsexact(destp, execpath_len);
 #else
-		imgp->execpathp = destp;
+		imgp->execpathp = (void *)destp;
 #endif
 		error = copyout(imgp->execpath, imgp->execpathp, execpath_len);
 		if (error != 0)
@@ -1849,9 +1868,10 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	arc4rand(canary, sizeof(canary), 0);
 	destp -= sizeof(canary);
 #if __has_feature(capabilities)
-	imgp->canary = cheri_setbounds(destp, sizeof(canary));
+	imgp->canary = (void * __capability)cheri_setboundsexact(destp,
+	    sizeof(canary));
 #else
-	imgp->canary = destp;
+	imgp->canary = (void *)destp;
 #endif
 	error = copyout(canary, imgp->canary, sizeof(canary));
 	if (error != 0)
@@ -1862,11 +1882,12 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	 * Prepare the pagesizes array.
 	 */
 	destp -= szps;
-	destp = __builtin_align_down(destp, sizeof(void * __capability));
+	destp = rounddown2(destp, sizeof(void * __capability));
 #if __has_feature(capabilities)
-	imgp->pagesizes = cheri_setbounds(destp, szps);
+	imgp->pagesizes = (void * __capability)cheri_setboundsexact(destp,
+	    szps);
 #else
-	imgp->pagesizes = destp;
+	imgp->pagesizes = (void *)destp;
 #endif
 	error = copyout(pagesizes, imgp->pagesizes, szps);
 	if (error != 0)
@@ -1877,16 +1898,15 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	 * Allocate room for the argument and environment strings.
 	 */
 	destp -= ARG_MAX - imgp->args->stringspace;
-	destp = __builtin_align_down(destp, sizeof(void * __capability));
+	destp = rounddown2(destp, sizeof(void * __capability));
 #if __has_feature(capabilities)
 	ustringp = cheri_setbounds(destp, ARG_MAX - imgp->args->stringspace);
 #else
 	ustringp = destp;
 #endif
 
-	if (imgp->sysent->sv_stackgap != NULL) {
-		imgp->sysent->sv_stackgap(imgp, (uintcap_t *)&destp);
-	}
+	if (imgp->sysent->sv_stackgap != NULL)
+		imgp->sysent->sv_stackgap(imgp, &destp);
 
 	if (imgp->auxargs) {
 		/*
@@ -1894,8 +1914,7 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 		 * array.  It has up to AT_COUNT entries.
 		 */
 		destp -= AT_COUNT * sizeof(Elf_Auxinfo);
-		destp = __builtin_align_down(destp,
-		    sizeof(void * __capability));
+		destp = rounddown2(destp, sizeof(void * __capability));
 	}
 
 	vectp = (char * __capability * __capability)destp;
@@ -1931,9 +1950,8 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 #else
 	imgp->argv = vectp;
 #endif
-	if (sucap(&arginfo->ps_argvstr, (intcap_t)imgp->argv) != 0)
-		return (EFAULT);
-	if (suword32(&arginfo->ps_nargvstr, argc) != 0)
+	if (sucap(&arginfo->ps_argvstr, (intcap_t)imgp->argv) != 0 ||
+	    suword32(&arginfo->ps_nargvstr, argc) != 0)
 		return (EFAULT);
 
 	/*
@@ -1942,11 +1960,10 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	for (; argc > 0; --argc) {
 		len = strlen(stringp) + 1;
 #if __has_feature(capabilities)
-		if (sucap(vectp++, (intcap_t)cheri_setbounds(ustringp,
-		    len)) != 0)
+		if (sucap(vectp++, cheri_setbounds(ustringp, len)) != 0)
 			return (EFAULT);
 #else
-		if (suword(vectp++, (uintptr_t)ustringp) != 0)
+		if (suword(vectp++, ustringp) != 0)
 			return (EFAULT);
 #endif
 		stringp += len;
@@ -1962,9 +1979,8 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 #else
 	imgp->envv = vectp;
 #endif
-	if (sucap(&arginfo->ps_envstr, (intcap_t)imgp->envv) != 0)
-		return (EFAULT);
-	if (suword32(&arginfo->ps_nenvstr, envc) != 0)
+	if (sucap(&arginfo->ps_envstr, (intcap_t)imgp->envv) != 0 ||
+	    suword32(&arginfo->ps_nenvstr, envc) != 0)
 		return (EFAULT);
 
 	/*
@@ -1973,11 +1989,10 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	for (; envc > 0; --envc) {
 		len = strlen(stringp) + 1;
 #if __has_feature(capabilities)
-		if (sucap(vectp++, (intcap_t)cheri_setbounds(ustringp,
-		    len)) != 0)
+		if (sucap(vectp++, cheri_setbounds(ustringp, len)) != 0)
 			return (EFAULT);
 #else
-		if (suword(vectp++, (uintptr_t)ustringp) != 0)
+		if (suword(vectp++, ustringp) != 0)
 			return (EFAULT);
 #endif
 		stringp += len;
@@ -1991,7 +2006,12 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	if (imgp->auxargs) {
 		vectp++;
 		error = imgp->sysent->sv_copyout_auxargs(imgp,
-		    (uintcap_t)vectp);
+#if __has_feature(capabilities)
+		    (uintcap_t)cheri_setbounds(vectp,
+		    AT_COUNT * sizeof(Elf_Auxinfo)));
+#else
+		    (uintptr_t)vectp);
+#endif
 		if (error != 0)
 			return (error);
 	}
