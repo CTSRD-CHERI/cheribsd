@@ -149,8 +149,12 @@ twoway_strstr(const unsigned char *h, const unsigned char *n)
 	for (;;) {
 		/* Update incremental end-of-haystack pointer */
 		if (z - h < l) {
-			/* Fast estimate for MIN(l,63) */
+#ifdef __CHERI_PURE_CAPABILITY__
+			size_t grow = l;
+#else
+			/* Deliberate UB to avoid byte-wise path in memchr */
 			size_t grow = l | 63;
+#endif
 			const unsigned char *z2 = memchr(z, 0, grow);
 			if (z2) {
 				z = z2;
