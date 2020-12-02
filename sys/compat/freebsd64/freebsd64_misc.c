@@ -1120,11 +1120,11 @@ int
 freebsd64_kldstat(struct thread *td, struct freebsd64_kldstat_args *uap)
 {
         struct kld_file_stat stat;
-        struct kld_file_stat64 stat64;
+	struct kld_file_stat64 stat64, * __capability stat64p;
         int error, version;
 
-        error = copyin(__USER_CAP_OBJ(&uap->stat->version), &version,
-	    sizeof(version));
+	stat64p = __USER_CAP_OBJ(uap->stat);
+	error = copyin(&stat64p->version, &version, sizeof(version));
 	if (error != 0)
                 return (error);
         if (version != sizeof(struct kld_file_stat64))
@@ -1140,7 +1140,7 @@ freebsd64_kldstat(struct thread *td, struct freebsd64_kldstat_args *uap)
 	stat64.address = (__cheri_addr uint64_t)stat.address;
         CP(stat, stat64, size);
         bcopy(&stat.pathname[0], &stat64.pathname[0], sizeof(stat.pathname));
-        return (copyout(&stat64, __USER_CAP_OBJ(uap->stat), version));
+	return (copyout(&stat64, __USER_CAP(uap->stat, version), version));
 }
 
 int
