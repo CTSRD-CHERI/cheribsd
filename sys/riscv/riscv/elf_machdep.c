@@ -58,6 +58,8 @@ __FBSDID("$FreeBSD$");
 #include <machine/elf.h>
 #include <machine/md_var.h>
 
+#include "linker_if.h"
+
 static const char *riscv_machine_arch(struct proc *p);
 
 u_long elf_hwcap;
@@ -255,6 +257,9 @@ static const struct type2str_ent t2s[] = {
 	{ R_RISCV_HI20,		"R_RISCV_HI20"		},
 	{ R_RISCV_LO12_I,	"R_RISCV_LO12_I"	},
 	{ R_RISCV_LO12_S,	"R_RISCV_LO12_S"	},
+#ifdef __CHERI_PURE_CAPABILITY__
+	{ R_RISCV_CHERI_CAPABILITY, "R_RISCV_CHERI_CAPABILITY" },
+#endif
 };
 
 static const char *
@@ -293,6 +298,9 @@ elf_reloc_internal(linker_file_t lf, char *relocbase, const void *data,
 	Elf_Size rtype, symidx;
 	const Elf_Rela *rela;
 	Elf_Addr val, addr;
+#ifdef __CHERI_PURE_CAPABILITY__
+	uintcap_t beforecap, cap;
+#endif
 	Elf64_Addr *where;
 	Elf_Addr addend;
 	uint32_t before32_1;
@@ -492,6 +500,21 @@ elf_reloc_internal(linker_file_t lf, char *relocbase, const void *data,
 			    before32, *insn32p);
 		break;
 
+#ifdef __CHERI_PURE_CAPABILITY__
+	case R_RISCV_CHERI_CAPABILITY:
+		error = LINKER_SYMIDX_CAPABILITY(lf, symidx, 1, &cap);
+		if (error != 0)
+			return (-1);
+
+		cap += addend;
+		beforecap = *(uintcap_t *)where;
+		*(uintcap_t *)where = cap;
+		if (debug_kld)
+			printf("%p %c %-24s %#p -> %#p\n", where,
+			    (local ? 'l' : 'g'), reloctype_to_str(rtype),
+			    (void *)beforecap, (void *)cap);
+		break;
+#endif
 	default:
 		printf("kldload: unexpected relocation type %ld, "
 		    "symbol index %ld\n", rtype, symidx);
