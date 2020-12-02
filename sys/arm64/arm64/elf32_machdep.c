@@ -66,18 +66,17 @@ extern int sz_aarch32_sigcode;
 
 static int freebsd32_fetch_syscall_args(struct thread *td);
 static void freebsd32_setregs(struct thread *td, struct image_params *imgp,
-   u_long stack);
+    u_long stack);
 static void freebsd32_set_syscall_retval(struct thread *, int);
 
-static boolean_t elf32_arm_abi_supported(struct image_params *);
+static boolean_t elf32_arm_abi_supported(struct image_params *, int32_t *,
+    uint32_t *);
 
 extern void freebsd32_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask);
 
 static struct sysentvec elf32_freebsd_sysvec = {
 	.sv_size	= SYS_MAXSYSCALL,
 	.sv_table	= freebsd32_sysent,
-	.sv_errsize	= 0,
-	.sv_errtbl	= NULL,
 	.sv_transtrap	= NULL,
 	.sv_fixup	= elf32_freebsd_fixup,
 	.sv_sendsig	= freebsd32_sendsig,
@@ -97,7 +96,8 @@ static struct sysentvec elf32_freebsd_sysvec = {
 	.sv_setregs	= freebsd32_setregs,
 	.sv_fixlimit	= NULL, // XXX
 	.sv_maxssiz	= NULL,
-	.sv_flags	= SV_ABI_FREEBSD | SV_ILP32 | SV_SHP | SV_TIMEKEEP,
+	.sv_flags	= SV_ABI_FREEBSD | SV_ILP32 | SV_SHP | SV_TIMEKEEP |
+	    SV_RNG_SEED_VER,
 	.sv_set_syscall_retval = freebsd32_set_syscall_retval,
 	.sv_fetch_syscall_args = freebsd32_fetch_syscall_args,
 	.sv_syscallnames = freebsd32_syscallnames,
@@ -126,7 +126,8 @@ SYSINIT(elf32, SI_SUB_EXEC, SI_ORDER_FIRST,
     (sysinit_cfunc_t)elf32_insert_brand_entry, &freebsd32_brand_info);
 
 static boolean_t
-elf32_arm_abi_supported(struct image_params *imgp)
+elf32_arm_abi_supported(struct image_params *imgp, int32_t *osrel __unused,
+    uint32_t *fctl0 __unused)
 {
 	const Elf32_Ehdr *hdr;
 
@@ -156,7 +157,7 @@ freebsd32_fetch_syscall_args(struct thread *td)
 	struct proc *p;
 	register_t *ap;
 	struct syscall_args *sa;
-	int error, i, nap;
+	int error, i, nap, narg;
 	unsigned int args[4];
 
 	nap = 4;
@@ -181,15 +182,15 @@ freebsd32_fetch_syscall_args(struct thread *td)
 	else
 		sa->callp = &p->p_sysent->sv_table[sa->code];
 
-	sa->narg = sa->callp->sy_narg;
+	narg = sa->callp->sy_narg;
 	for (i = 0; i < nap; i++)
 		sa->args[i] = ap[i];
-	if (sa->narg > nap) {
-		if ((sa->narg - nap) > nitems(args))
+	if (narg > nap) {
+		if (narg - nap > nitems(args))
 			panic("Too many system call arguiments");
 		error = copyin((void *)td->td_frame->tf_x[13], args,
-		    (sa->narg - nap) * sizeof(int));
-		for (i = 0; i < (sa->narg - nap); i++)
+		    (narg - nap) * sizeof(int));
+		for (i = 0; i < (narg - nap); i++)
 			sa->args[i + nap] = args[i];
 	}
 

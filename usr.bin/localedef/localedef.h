@@ -47,11 +47,15 @@ extern int mb_cur_max;
 extern int mb_cur_min;
 extern int last_kw;
 extern int verbose;
+#if YYDEBUG
 extern int yydebug;
+#endif
 extern int lineno;
 extern int undefok;	/* mostly ignore undefined symbols */
 extern int warnok;
 extern int warnings;
+
+extern char *version;
 
 int yylex(void);
 void yyerror(const char *);

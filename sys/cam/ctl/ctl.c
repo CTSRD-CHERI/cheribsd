@@ -584,7 +584,6 @@ static struct cdevsw ctl_cdevsw = {
 	.d_name =	"ctl",
 };
 
-
 MALLOC_DEFINE(M_CTL, "ctlmem", "Memory used for CTL");
 
 static int ctl_module_event_handler(module_t, int /*modeventtype_t*/, void *);
@@ -1458,6 +1457,7 @@ ctl_isc_event_handler(ctl_ha_channel channel, ctl_ha_event event, int param)
 			if (softc->ha_mode != CTL_HA_MODE_XFER)
 				io->io_hdr.flags |= CTL_FLAG_INT_COPY;
 			io->io_hdr.nexus = msg->hdr.nexus;
+			io->scsiio.priority = msg->scsi.priority;
 			io->scsiio.tag_num = msg->scsi.tag_num;
 			io->scsiio.tag_type = msg->scsi.tag_type;
 #ifdef CTL_TIME_IO
@@ -1915,7 +1915,6 @@ ctl_init(void)
 	  ((ctl_max_ports + 31) / 32), M_DEVBUF, M_WAITOK | M_ZERO);
 	softc->ctl_ports = malloc(sizeof(struct ctl_port *) * ctl_max_ports,
 	     M_DEVBUF, M_WAITOK | M_ZERO);
-
 
 	/*
 	 * In Copan's HA scheme, the "master" and "slave" roles are
@@ -2472,7 +2471,6 @@ ctl_sbuf_printf_esc(struct sbuf *sb, char *str, int size)
 
 		if (retval != 0)
 			break;
-
 	}
 
 	return (retval);
@@ -3985,7 +3983,6 @@ ctl_expand_number(const char *buf, uint64_t *num)
 	return (0);
 }
 
-
 /*
  * This routine could be used in the future to load default and/or saved
  * mode page parameters for a particuar lun.
@@ -4002,7 +3999,6 @@ ctl_init_page_index(struct ctl_lun *lun)
 	       sizeof(page_index_template));
 
 	for (i = 0; i < CTL_NUM_MODE_PAGES; i++) {
-
 		page_index = &lun->mode_pages.index[i];
 		if (lun->be_lun->lun_type == T_DIRECT &&
 		    (page_index->page_flags & CTL_PAGE_FLAG_DIRECT) == 0)
@@ -4415,7 +4411,6 @@ ctl_init_log_page_index(struct ctl_lun *lun)
 
 	prev = -1;
 	for (i = 0, j = 0, k = 0; i < CTL_NUM_LOG_PAGES; i++) {
-
 		page_index = &lun->log_pages.index[i];
 		if (lun->be_lun->lun_type == T_DIRECT &&
 		    (page_index->page_flags & CTL_PAGE_FLAG_DIRECT) == 0)
@@ -5279,7 +5274,6 @@ ctl_start_stop(struct ctl_scsiio *ctsio)
 			residx = ctl_get_initindex(&ctsio->io_hdr.nexus);
 			if (ctl_get_prkey(lun, residx) == 0 ||
 			    (lun->pr_res_idx != residx && lun->pr_res_type < 4)) {
-
 				ctl_set_reservation_conflict(ctsio);
 				ctl_done((union ctl_io *)ctsio);
 				return (CTL_RETVAL_COMPLETE);
@@ -5996,7 +5990,6 @@ do_next_page:
 		ctl_done((union ctl_io *)ctsio);
 		return (CTL_RETVAL_COMPLETE);
 	} else if (*len_left < sizeof(struct scsi_mode_page_header)) {
-
 		free(ctsio->kern_data_ptr, M_CTL);
 		ctl_set_param_len_error(ctsio);
 		ctl_done((union ctl_io *)ctsio);
@@ -6004,13 +5997,11 @@ do_next_page:
 
 	} else if ((page_header->page_code & SMPH_SPF)
 		&& (*len_left < sizeof(struct scsi_mode_page_header_sp))) {
-
 		free(ctsio->kern_data_ptr, M_CTL);
 		ctl_set_param_len_error(ctsio);
 		ctl_done((union ctl_io *)ctsio);
 		return (CTL_RETVAL_COMPLETE);
 	}
-
 
 	/*
 	 * XXX KDM should we do something with the block descriptor?
@@ -7130,6 +7121,88 @@ ctl_read_defect(struct ctl_scsiio *ctsio)
 }
 
 int
+ctl_report_ident_info(struct ctl_scsiio *ctsio)
+{
+	struct ctl_lun *lun = CTL_LUN(ctsio);
+	struct scsi_report_ident_info *cdb;
+	struct scsi_report_ident_info_data *rii_ptr;
+	struct scsi_report_ident_info_descr *riid_ptr;
+	const char *oii, *otii;
+	int retval, alloc_len, total_len = 0, len = 0;
+
+	CTL_DEBUG_PRINT(("ctl_report_ident_info\n"));
+
+	cdb = (struct scsi_report_ident_info *)ctsio->cdb;
+	retval = CTL_RETVAL_COMPLETE;
+
+	total_len = sizeof(struct scsi_report_ident_info_data);
+	switch (cdb->type) {
+	case RII_LUII:
+		oii = dnvlist_get_string(lun->be_lun->options,
+		    "ident_info", NULL);
+		if (oii)
+			len = strlen(oii);	/* Approximately */
+		break;
+	case RII_LUTII:
+		otii = dnvlist_get_string(lun->be_lun->options,
+		    "text_ident_info", NULL);
+		if (otii)
+			len = strlen(otii) + 1;	/* NULL-terminated */
+		break;
+	case RII_IIS:
+		len = 2 * sizeof(struct scsi_report_ident_info_descr);
+		break;
+	default:
+		ctl_set_invalid_field(/*ctsio*/ ctsio,
+				      /*sks_valid*/ 1,
+				      /*command*/ 1,
+				      /*field*/ 11,
+				      /*bit_valid*/ 1,
+				      /*bit*/ 2);
+		ctl_done((union ctl_io *)ctsio);
+		return(retval);
+	}
+	total_len += len;
+	alloc_len = scsi_4btoul(cdb->length);
+
+	ctsio->kern_data_ptr = malloc(total_len, M_CTL, M_WAITOK | M_ZERO);
+	ctsio->kern_sg_entries = 0;
+	ctsio->kern_rel_offset = 0;
+	ctsio->kern_data_len = min(total_len, alloc_len);
+	ctsio->kern_total_len = ctsio->kern_data_len;
+
+	rii_ptr = (struct scsi_report_ident_info_data *)ctsio->kern_data_ptr;
+	switch (cdb->type) {
+	case RII_LUII:
+		if (oii) {
+			if (oii[0] == '0' && oii[1] == 'x')
+				len = hex2bin(oii, (uint8_t *)(rii_ptr + 1), len);
+			else
+				strncpy((uint8_t *)(rii_ptr + 1), oii, len);
+		}
+		break;
+	case RII_LUTII:
+		if (otii)
+			strlcpy((uint8_t *)(rii_ptr + 1), otii, len);
+		break;
+	case RII_IIS:
+		riid_ptr = (struct scsi_report_ident_info_descr *)(rii_ptr + 1);
+		riid_ptr->type = RII_LUII;
+		scsi_ulto2b(0xffff, riid_ptr->length);
+		riid_ptr++;
+		riid_ptr->type = RII_LUTII;
+		scsi_ulto2b(0xffff, riid_ptr->length);
+	}
+	scsi_ulto2b(len, rii_ptr->length);
+
+	ctl_set_success(ctsio);
+	ctsio->io_hdr.flags |= CTL_FLAG_ALLOCATED;
+	ctsio->be_move_done = ctl_config_move_done;
+	ctl_datamove((union ctl_io *)ctsio);
+	return(retval);
+}
+
+int
 ctl_report_tagret_port_groups(struct ctl_scsiio *ctsio)
 {
 	struct ctl_softc *softc = CTL_SOFTC(ctsio);
@@ -8109,7 +8182,6 @@ ctl_pro_preempt_other(struct ctl_lun *lun, union ctl_ha_msg *msg)
 
 }
 
-
 int
 ctl_persistent_reserve_out(struct ctl_scsiio *ctsio)
 {
@@ -8228,7 +8300,6 @@ ctl_persistent_reserve_out(struct ctl_scsiio *ctsio)
 	switch (cdb->action & SPRO_ACTION_MASK) {
 	case SPRO_REGISTER:
 	case SPRO_REG_IGNO: {
-
 		/*
 		 * We don't support any of these options, as we report in
 		 * the read capabilities request (see
@@ -8315,7 +8386,6 @@ ctl_persistent_reserve_out(struct ctl_scsiio *ctsio)
 			ctl_ha_msg_send(CTL_HA_CHAN_CTL, &persis_io,
 			    sizeof(persis_io.pr), M_WAITOK);
 		} else /* sa_res_key != 0 */ {
-
 			/*
 			 * If we aren't registered currently then increment
 			 * the key count and set the registered flag.
@@ -9414,7 +9484,6 @@ ctl_inquiry_evpd_serial(struct ctl_scsiio *ctsio, int alloc_len)
 	ctl_datamove((union ctl_io *)ctsio);
 	return (CTL_RETVAL_COMPLETE);
 }
-
 
 /*
  * SCSI VPD page 0x86, the Extended INQUIRY Data page.
@@ -11504,7 +11573,6 @@ ctl_scsiio_precheck(struct ctl_softc *softc, struct ctl_scsiio *ctsio)
 		}
 	}
 
-
 	if (ctl_scsiio_lun_check(lun, entry, ctsio) != 0) {
 		mtx_unlock(&lun->lun_lock);
 		ctl_done((union ctl_io *)ctsio);
@@ -11536,8 +11604,9 @@ ctl_scsiio_precheck(struct ctl_softc *softc, struct ctl_scsiio *ctsio)
 		msg_info.hdr.nexus = ctsio->io_hdr.nexus;
 		msg_info.scsi.tag_num = ctsio->tag_num;
 		msg_info.scsi.tag_type = ctsio->tag_type;
-		msg_info.scsi.cdb_len = ctsio->cdb_len;
 		memcpy(msg_info.scsi.cdb, ctsio->cdb, CTL_MAX_CDBLEN);
+		msg_info.scsi.cdb_len = ctsio->cdb_len;
+		msg_info.scsi.priority = ctsio->priority;
 
 		if ((isc_retval = ctl_ha_msg_send(CTL_HA_CHAN_CTL, &msg_info,
 		    sizeof(msg_info.scsi) - sizeof(msg_info.scsi.sense_data),
@@ -11843,7 +11912,6 @@ ctl_abort_tasks_lun(struct ctl_lun *lun, uint32_t targ_port, uint32_t init_id,
 	 */
 	for (xio = (union ctl_io *)TAILQ_FIRST(&lun->ooa_queue); xio != NULL;
 	     xio = (union ctl_io *)TAILQ_NEXT(&xio->io_hdr, ooa_links)) {
-
 		if ((targ_port == UINT32_MAX ||
 		     targ_port == xio->io_hdr.nexus.targ_port) &&
 		    (init_id == UINT32_MAX ||
@@ -11995,7 +12063,6 @@ ctl_abort_task(union ctl_io *io)
 	 */
 	for (xio = (union ctl_io *)TAILQ_FIRST(&lun->ooa_queue); xio != NULL;
 	     xio = (union ctl_io *)TAILQ_NEXT(&xio->io_hdr, ooa_links)) {
-
 		if ((xio->io_hdr.nexus.targ_port != io->io_hdr.nexus.targ_port)
 		 || (xio->io_hdr.nexus.initid != io->io_hdr.nexus.initid)
 		 || (xio->io_hdr.flags & CTL_FLAG_ABORT))
@@ -12067,7 +12134,6 @@ ctl_query_task(union ctl_io *io, int task_set)
 	mtx_unlock(&softc->ctl_lock);
 	for (xio = (union ctl_io *)TAILQ_FIRST(&lun->ooa_queue); xio != NULL;
 	     xio = (union ctl_io *)TAILQ_NEXT(&xio->io_hdr, ooa_links)) {
-
 		if ((xio->io_hdr.nexus.targ_port != io->io_hdr.nexus.targ_port)
 		 || (xio->io_hdr.nexus.initid != io->io_hdr.nexus.initid)
 		 || (xio->io_hdr.flags & CTL_FLAG_ABORT))
@@ -12245,7 +12311,6 @@ ctl_handle_isc(union ctl_io *io)
 
 }
 
-
 /*
  * Returns the match type in the case of a match, or CTL_LUN_PAT_NONE if
  * there is no match.
@@ -12417,12 +12482,13 @@ ctl_datamove(union ctl_io *io)
 			ctl_scsi_command_string(&io->scsiio, NULL, &sb);
 			sbuf_printf(&sb, "\n");
 			sbuf_cat(&sb, path_str);
-			sbuf_printf(&sb, "Tag: 0x%04x, type %d\n",
-				    io->scsiio.tag_num, io->scsiio.tag_type);
+			sbuf_printf(&sb, "Tag: 0x%04x/%d, Prio: %d\n",
+				    io->scsiio.tag_num, io->scsiio.tag_type,
+				    io->scsiio.priority);
 			break;
 		case CTL_IO_TASK:
-			sbuf_printf(&sb, "Task I/O type: %d, Tag: 0x%04x, "
-				    "Tag Type: %d\n", io->taskio.task_action,
+			sbuf_printf(&sb, "Task Action: %d Tag: 0x%04x/%d\n",
+				    io->taskio.task_action,
 				    io->taskio.tag_num, io->taskio.tag_type);
 			break;
 		default:
@@ -12446,7 +12512,6 @@ ctl_datamove(union ctl_io *io)
 		lun = CTL_LUN(io);
 		if ((lun != NULL)
 		 && (lun->delay_info.datamove_delay > 0)) {
-
 			callout_init(&io->io_hdr.delay_callout, /*mpsafe*/ 1);
 			io->io_hdr.flags |= CTL_FLAG_DELAY_DONE;
 			callout_reset(&io->io_hdr.delay_callout,
@@ -12716,7 +12781,6 @@ ctl_datamove_remote_xfer(union ctl_io *io, unsigned command,
 
 	if ((io->io_hdr.status & CTL_STATUS_MASK) != CTL_STATUS_NONE &&
 	    (io->io_hdr.status & CTL_STATUS_MASK) != CTL_SUCCESS) {
-
 		if (rq != NULL)
 			ctl_dt_req_free(rq);
 
@@ -12917,12 +12981,13 @@ ctl_process_done(union ctl_io *io)
 			ctl_scsi_command_string(&io->scsiio, NULL, &sb);
 			sbuf_printf(&sb, "\n");
 			sbuf_cat(&sb, path_str);
-			sbuf_printf(&sb, "Tag: 0x%04x, type %d\n",
-				    io->scsiio.tag_num, io->scsiio.tag_type);
+			sbuf_printf(&sb, "Tag: 0x%04x/%d, Prio: %d\n",
+				    io->scsiio.tag_num, io->scsiio.tag_type,
+				    io->scsiio.priority);
 			break;
 		case CTL_IO_TASK:
-			sbuf_printf(&sb, "Task I/O type: %d, Tag: 0x%04x, "
-				    "Tag Type: %d\n", io->taskio.task_action,
+			sbuf_printf(&sb, "Task Action: %d Tag: 0x%04x/%d\n",
+				    io->taskio.task_action,
 				    io->taskio.tag_num, io->taskio.tag_type);
 			break;
 		default:
@@ -13257,7 +13322,6 @@ ctl_done(union ctl_io *io)
 
 		if ((lun != NULL)
 		 && (lun->delay_info.done_delay > 0)) {
-
 			callout_init(&io->io_hdr.delay_callout, /*mpsafe*/ 1);
 			io->io_hdr.flags |= CTL_FLAG_DELAY_DONE;
 			callout_reset(&io->io_hdr.delay_callout,

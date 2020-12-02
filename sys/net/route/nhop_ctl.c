@@ -49,7 +49,6 @@ __FBSDID("$FreeBSD$");
 #include <net/route/nhop_utils.h>
 #include <net/route/nhop.h>
 #include <net/route/nhop_var.h>
-#include <net/route/shared.h>
 #include <net/vnet.h>
 
 /*
@@ -99,7 +98,6 @@ _Static_assert(sizeof(struct nhop_object) <= 128,
     "nhop_object: size exceeds 128 bytes");
 
 static uma_zone_t nhops_zone;	/* Global zone for each and every nexthop */
-
 
 #define	NHOP_OBJECT_ALIGNED_SIZE	roundup2(sizeof(struct nhop_object), \
 							2 * CACHE_LINE_SIZE)
@@ -166,8 +164,7 @@ cmp_priv(const struct nhop_priv *_one, const struct nhop_priv *_two)
 	if (memcmp(_one->nh, _two->nh, NHOP_END_CMP) != 0)
 		return (0);
 
-	if ((_one->nh_type != _two->nh_type) ||
-	    (_one->nh_family != _two->nh_family))
+	if (memcmp(_one, _two, NH_PRIV_END_CMP) != 0)
 		return (0);
 
 	return (1);
@@ -182,7 +179,6 @@ set_nhop_mtu_from_info(struct nhop_object *nh, const struct rt_addrinfo *info)
 
 	if (info->rti_mflags & RTV_MTU) {
 		if (info->rti_rmx->rmx_mtu != 0) {
-
 			/*
 			 * MTU was explicitly provided by user.
 			 * Keep it.
@@ -190,7 +186,6 @@ set_nhop_mtu_from_info(struct nhop_object *nh, const struct rt_addrinfo *info)
 
 			nh->nh_priv->rt_flags |= RTF_FIXEDMTU;
 		} else {
-
 			/*
 			 * User explicitly sets MTU to 0.
 			 * Assume rollback to default.
@@ -209,6 +204,7 @@ static void
 fill_sdl_from_ifp(struct sockaddr_dl_short *sdl, const struct ifnet *ifp)
 {
 
+	bzero(sdl, sizeof(struct sockaddr_dl_short));
 	sdl->sdl_family = AF_LINK;
 	sdl->sdl_len = sizeof(struct sockaddr_dl_short);
 	sdl->sdl_index = ifp->if_index;
@@ -221,6 +217,8 @@ set_nhop_gw_from_info(struct nhop_object *nh, struct rt_addrinfo *info)
 	struct sockaddr *gw;
 
 	gw = info->rti_info[RTAX_GATEWAY];
+	KASSERT(gw != NULL, ("gw is NULL"));
+
 	if (info->rti_flags & RTF_GATEWAY) {
 		if (gw->sa_len > sizeof(struct sockaddr_in6)) {
 			DPRINTF("nhop SA size too big: AF %d len %u",
@@ -229,6 +227,7 @@ set_nhop_gw_from_info(struct nhop_object *nh, struct rt_addrinfo *info)
 		}
 		memcpy(&nh->gw_sa, gw, gw->sa_len);
 	} else {
+
 		/*
 		 * Interface route. Currently the route.c code adds
 		 * sa of type AF_LINK, which is 56 bytes long. The only
@@ -239,10 +238,39 @@ set_nhop_gw_from_info(struct nhop_object *nh, struct rt_addrinfo *info)
 		 * in the separate field (nh_aifp, see below), write AF_LINK
 		 * compatible sa with shorter total length.
 		 */
-		fill_sdl_from_ifp(&nh->gwl_sa, nh->nh_ifp);
+		struct sockaddr_dl *sdl;
+		struct ifnet *ifp;
+
+		/* Fetch and validate interface index */
+		sdl = (struct sockaddr_dl *)gw;
+		if (sdl->sdl_family != AF_LINK) {
+			DPRINTF("unsupported AF: %d", sdl->sdl_family);
+			return (ENOTSUP);
+		}
+		ifp = ifnet_byindex(sdl->sdl_index);
+		if (ifp == NULL) {
+			DPRINTF("invalid ifindex %d", sdl->sdl_index);
+			return (EINVAL);
+		}
+		fill_sdl_from_ifp(&nh->gwl_sa, ifp);
 	}
 
 	return (0);
+}
+
+static uint16_t
+convert_rt_to_nh_flags(int rt_flags)
+{
+	uint16_t res;
+
+	res = (rt_flags & RTF_REJECT) ? NHF_REJECT : 0;
+	res |= (rt_flags & RTF_HOST) ? NHF_HOST : 0;
+	res |= (rt_flags & RTF_BLACKHOLE) ? NHF_BLACKHOLE : 0;
+	res |= (rt_flags & (RTF_DYNAMIC|RTF_MODIFIED)) ? NHF_REDIRECT : 0;
+	res |= (rt_flags & RTF_BROADCAST) ? NHF_BROADCAST : 0;
+	res |= (rt_flags & RTF_GATEWAY) ? NHF_GATEWAY : 0;
+
+	return (res);
 }
 
 static int
@@ -259,14 +287,15 @@ fill_nhop_from_info(struct nhop_priv *nh_priv, struct rt_addrinfo *info)
 	nh_priv->nh_family = info->rti_info[RTAX_DST]->sa_family;
 	nh_priv->nh_type = 0; // hook responsibility to set nhop type
 
-	nh->nh_flags = fib_rte_to_nh_flags(rt_flags);
+	nh->nh_flags = convert_rt_to_nh_flags(rt_flags);
 	set_nhop_mtu_from_info(nh, info);
-	nh->nh_ifp = info->rti_ifa->ifa_ifp;
-	nh->nh_ifa = info->rti_ifa;
-	nh->nh_aifp = get_aifp(nh, 0);
-
 	if ((error = set_nhop_gw_from_info(nh, info)) != 0)
 		return (error);
+
+	nh->nh_ifp = info->rti_ifa->ifa_ifp;
+	nh->nh_ifa = info->rti_ifa;
+	/* depends on the gateway */
+	nh->nh_aifp = get_aifp(nh, 0);
 
 	/*
 	 * Note some of the remaining data is set by the
@@ -291,6 +320,9 @@ nhop_create_from_info(struct rib_head *rnh, struct rt_addrinfo *info,
 	int error;
 
 	NET_EPOCH_ASSERT();
+
+	if (info->rti_info[RTAX_GATEWAY] == NULL)
+		return (EINVAL);
 
 	nh_priv = alloc_nhop_structure();
 
@@ -398,7 +430,7 @@ alter_nhop_from_info(struct nhop_object *nh, struct rt_addrinfo *info)
 		nh->nh_priv->rt_flags |= (RTF_GATEWAY & info->rti_flags);
 	}
 	/* Update datapath flags */
-	nh->nh_flags = fib_rte_to_nh_flags(nh->nh_priv->rt_flags);
+	nh->nh_flags = convert_rt_to_nh_flags(nh->nh_priv->rt_flags);
 
 	if (info->rti_ifa != NULL)
 		nh->nh_ifa = info->rti_ifa;
@@ -518,7 +550,6 @@ finalize_nhop(struct nh_control *ctl, struct rt_addrinfo *info,
 	print_nhop("FINALIZE", nh);
 
 	if (link_nhop(ctl, nh_priv) == 0) {
-
 		/*
 		 * Adding nexthop to the datastructures
 		 *  failed. Call destructor w/o waiting for
@@ -598,8 +629,17 @@ destroy_nhop_epoch(epoch_context_t ctx)
 	destroy_nhop(nh_priv);
 }
 
-int
+void
 nhop_ref_object(struct nhop_object *nh)
+{
+	u_int old;
+
+	old = refcount_acquire(&nh->nh_priv->nh_refcnt);
+	KASSERT(old > 0, ("%s: nhop object %p has 0 refs", __func__, nh));
+}
+
+int
+nhop_try_ref_object(struct nhop_object *nh)
 {
 
 	return (refcount_acquire_if_not_zero(&nh->nh_priv->nh_refcnt));
@@ -650,20 +690,19 @@ nhop_free(struct nhop_object *nh)
 	    &nh_priv->nh_epoch_ctx);
 }
 
-int
-nhop_ref_any(struct nhop_object *nh)
-{
-
-	return (nhop_ref_object(nh));
-}
-
 void
 nhop_free_any(struct nhop_object *nh)
 {
 
+#ifdef ROUTE_MPATH
+	if (!NH_IS_NHGRP(nh))
+		nhop_free(nh);
+	else
+		nhgrp_free((struct nhgrp_object *)nh);
+#else
 	nhop_free(nh);
+#endif
 }
-
 
 /* Helper functions */
 
@@ -835,4 +874,3 @@ nhops_dump_sysctl(struct rib_head *rh, struct sysctl_req *w)
 
 	return (0);
 }
-

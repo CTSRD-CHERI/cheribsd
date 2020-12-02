@@ -334,7 +334,8 @@ void g_io_deliver(struct bio *bp, int error);
 int g_io_getattr(const char *attr, struct g_consumer *cp, int *len, void *ptr);
 int g_io_zonecmd(struct disk_zone_args *zone_args, struct g_consumer *cp);
 int g_io_flush(struct g_consumer *cp);
-int g_io_speedup(size_t shortage, u_int flags, size_t *resid, struct g_consumer *cp);
+int g_io_speedup(off_t shortage, u_int flags, size_t *resid,
+    struct g_consumer *cp);
 void g_io_request(struct bio *bp, struct g_consumer *cp);
 struct bio *g_new_bio(void);
 struct bio *g_alloc_bio(void);
@@ -419,6 +420,10 @@ g_free(void *ptr)
 
 int g_is_geom_thread(struct thread *td);
 
+#ifndef	_PATH_DEV
+#define	_PATH_DEV	"/dev/"
+#endif
+
 #endif /* _KERNEL */
 
 /* geom_ctl.c */
@@ -430,7 +435,7 @@ void *gctl_get_paraml(struct gctl_req *req, const char *param, int len);
 void *gctl_get_paraml_opt(struct gctl_req *req, const char *param, int len);
 int gctl_error(struct gctl_req *req, const char *fmt, ...) __printflike(2, 3);
 struct g_class *gctl_get_class(struct gctl_req *req, char const *arg);
-struct g_geom *gctl_get_geom(struct gctl_req *req, struct g_class *mpr, char const *arg);
+struct g_geom *gctl_get_geom(struct gctl_req *req, struct g_class *mp, char const *arg);
 struct g_provider *gctl_get_provider(struct gctl_req *req, char const *arg);
 
 #endif /* _GEOM_GEOM_H_ */

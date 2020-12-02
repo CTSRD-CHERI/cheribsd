@@ -126,10 +126,9 @@ linux_fetch_syscall_args(struct thread *td)
 	else
 		sa->callp = &p->p_sysent->sv_table[sa->code];
 
-	sa->narg = sa->callp->sy_narg;
-	if (sa->narg > 8)
-		panic("ARM64TODO: Could we have more than 8 args?");
-	memcpy(sa->args, ap, 8 * sizeof(register_t));
+	if (sa->callp->sy_narg > MAXARGS)
+		panic("ARM64TODO: Could we have more than %d args?", MAXARGS);
+	memcpy(sa->args, ap, MAXARGS * sizeof(register_t));
 
 	td->td_retval[0] = 0;
 	return (0);
@@ -141,6 +140,11 @@ linux_set_syscall_retval(struct thread *td, int error)
 
 	td->td_retval[1] = td->td_frame->tf_x[1];
 	cpu_set_syscall_retval(td, error);
+
+	if (__predict_false(error != 0)) {
+		if (error != ERESTART && error != EJUSTRETURN)
+			td->td_frame->tf_x[0] = bsd_to_linux_errno(error);
+	}
 }
 
 static int
@@ -387,8 +391,6 @@ linux_vsyscall(struct thread *td)
 struct sysentvec elf_linux_sysvec = {
 	.sv_size	= LINUX_SYS_MAXSYSCALL,
 	.sv_table	= linux_sysent,
-	.sv_errsize	= ELAST + 1,
-	.sv_errtbl	= linux_errtbl,
 	.sv_transtrap	= linux_translate_traps,
 	.sv_fixup	= linux_elf_fixup,
 	.sv_sendsig	= linux_rt_sendsig,
@@ -417,6 +419,9 @@ struct sysentvec elf_linux_sysvec = {
 	.sv_schedtail	= linux_schedtail,
 	.sv_thread_detach = linux_thread_detach,
 	.sv_trap	= linux_vsyscall,
+	.sv_onexec	= linux_on_exec,
+	.sv_onexit	= linux_on_exit,
+	.sv_ontdexit	= linux_thread_dtor,
 };
 
 static void

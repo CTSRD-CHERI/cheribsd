@@ -2,7 +2,6 @@
  * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
  *
  * Copyright (c) 2008-2010 Edward Tomasz Napierała <trasz@FreeBSD.org>
- * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -172,7 +171,7 @@ _acl_denies(const struct acl *aclp, int access_mask, struct ucred *cred,
 
 int
 vaccess_acl_nfs4(enum vtype type, uid_t file_uid, gid_t file_gid,
-    struct acl *aclp, accmode_t accmode, struct ucred *cred, int *privused)
+    struct acl *aclp, accmode_t accmode, struct ucred *cred)
 {
 	accmode_t priv_granted = 0;
 	int denied, explicitly_denied, access_mask, is_directory,
@@ -186,9 +185,6 @@ vaccess_acl_nfs4(enum vtype type, uid_t file_uid, gid_t file_gid,
 	    ("invalid bit in accmode"));
 	KASSERT((accmode & VAPPEND) == 0 || (accmode & VWRITE),
 	    	("VAPPEND without VWRITE"));
-
-	if (privused != NULL)
-		*privused = 0;
 
 	if (accmode & VADMIN)
 		must_be_owner = 1;
@@ -289,9 +285,6 @@ vaccess_acl_nfs4(enum vtype type, uid_t file_uid, gid_t file_gid,
 		priv_granted |= VSTAT_PERMS;
 
 	if ((accmode & priv_granted) == accmode) {
-		if (privused != NULL)
-			*privused = 1;
-
 		return (0);
 	}
 
@@ -348,9 +341,9 @@ _acl_append(struct acl *aclp, acl_tag_t tag, acl_perm_t perm,
 }
 
 static struct acl_entry *
-_acl_duplicate_entry(struct acl *aclp, int entry_index)
+_acl_duplicate_entry(struct acl *aclp, unsigned entry_index)
 {
-	int i;
+	unsigned i;
 
 	KASSERT(aclp->acl_cnt + 1 <= ACL_MAX_ENTRIES,
 	    ("aclp->acl_cnt + 1 <= ACL_MAX_ENTRIES"));
@@ -367,7 +360,8 @@ static void
 acl_nfs4_sync_acl_from_mode_draft(struct acl *aclp, mode_t mode,
     int file_owner_id)
 {
-	int i, meets, must_append;
+	int meets, must_append;
+	unsigned i;
 	struct acl_entry *entry, *copy, *previous,
 	    *a1, *a2, *a3, *a4, *a5, *a6;
 	mode_t amode;

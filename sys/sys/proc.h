@@ -229,7 +229,10 @@ struct thread {
 	struct proc	*td_proc;	/* (*) Associated process. */
 	TAILQ_ENTRY(thread) td_plist;	/* (*) All threads in this proc. */
 	TAILQ_ENTRY(thread) td_runq;	/* (t) Run queue. */
-	TAILQ_ENTRY(thread) td_slpq;	/* (t) Sleep queue. */
+	union	{
+		TAILQ_ENTRY(thread) td_slpq;	/* (t) Sleep queue. */
+		struct thread *td_zombie; /* Zombie list linkage */
+	};
 	TAILQ_ENTRY(thread) td_lockq;	/* (t) Lock queue. */
 	LIST_ENTRY(thread) td_hash;	/* (d) Hash chain. */
 	struct cpuset	*td_cpuset;	/* (t) CPU affinity mask. */
@@ -243,6 +246,7 @@ struct thread {
 	sigqueue_t	td_sigqueue;	/* (c) Sigs arrived, not delivered. */
 #define	td_siglist	td_sigqueue.sq_signals
 	u_char		td_lend_user_pri; /* (t) Lend user pri. */
+	u_char		td_allocdomain;	/* (b) NUMA domain backing this struct thread. */
 
 /* Cleared during fork1() */
 #define	td_startzero td_flags
@@ -523,6 +527,7 @@ do {									\
 #define	TDP_SIGFASTPENDING 0x80000000 /* Pending signal due to sigfastblock */
 
 #define	TDP2_SBPAGES	0x00000001 /* Owns sbusy on some pages */
+#define	TDP2_COMPAT32RB	0x00000002 /* compat32 ABI for robust lists */
 
 /*
  * Reasons that the current thread can not be run yet.
@@ -600,6 +605,7 @@ struct proc {
 	struct ucred	*p_ucred;	/* (c) Process owner's identity. */
 	struct filedesc	*p_fd;		/* (b) Open files. */
 	struct filedesc_to_leader *p_fdtol; /* (b) Tracking node */
+	struct pwddesc	*p_pd;		/* (b) Cwd, chroot, jail, umask */
 	struct pstats	*p_stats;	/* (b) Accounting/statistics (CPU). */
 	struct plimit	*p_limit;	/* (c) Resource limits. */
 	struct callout	p_limco;	/* (c) Limit callout handle */
@@ -799,6 +805,7 @@ struct proc {
 #define	P_TREE_FIRST_ORPHAN	0x00000002	/* First element of orphan
 						   list */
 #define	P_TREE_REAPER		0x00000004	/* Reaper of subtree */
+#define	P_TREE_GRPEXITED	0x00000008	/* exit1() done with job ctl */
 
 /*
  * These were process status values (p_stat), now they are only used in
@@ -863,10 +870,10 @@ MALLOC_DECLARE(M_SUBPROC);
  */
 #define	PID_MAX		99999
 #define	NO_PID		100000
+#define	THREAD0_TID	NO_PID
 extern pid_t pid_max;
 
 #define	SESS_LEADER(p)	((p)->p_session->s_leader == (p))
-
 
 /* Lock and unlock a process. */
 #define	PROC_LOCK(p)	mtx_lock(&(p)->p_mtx)
@@ -976,10 +983,6 @@ extern LIST_HEAD(pidhashhead, proc) *pidhashtbl;
 extern struct sx *pidhashtbl_lock;
 extern u_long pidhash;
 extern u_long pidhashlock;
-#define	TIDHASH(tid)	(&tidhashtbl[(tid) & tidhash])
-extern LIST_HEAD(tidhashhead, thread) *tidhashtbl;
-extern u_long tidhash;
-extern struct rwlock tidhash_lock;
 
 #define	PGRPHASH(pgid)	(&pgrphashtbl[(pgid) & pgrphash])
 extern LIST_HEAD(pgrphashhead, pgrp) *pgrphashtbl;
@@ -1024,7 +1027,8 @@ struct	fork_req {
 	int 		fr_pd_flags;
 	struct filecaps	*fr_pd_fcaps;
 	int 		fr_flags2;
-#define	FR2_DROPSIG_CAUGHT	0x00001	/* Drop caught non-DFL signals */
+#define	FR2_DROPSIG_CAUGHT	0x00000001 /* Drop caught non-DFL signals */
+#define	FR2_SHARE_PATHS		0x00000002 /* Invert sense of RFFDG for paths */
 };
 
 /*
@@ -1055,7 +1059,6 @@ int	enterpgrp(struct proc *p, pid_t pgid, struct pgrp *pgrp,
 	    struct session *sess);
 int	enterthispgrp(struct proc *p, struct pgrp *pgrp);
 void	faultin(struct proc *p);
-void	fixjobc(struct proc *p, struct pgrp *pgrp, int entering);
 int	fork1(struct thread *, struct fork_req *);
 void	fork_rfppwait(struct thread *);
 void	fork_exit(void (*)(void *, struct trapframe *), void *,
@@ -1150,7 +1153,6 @@ int	thread_create(struct thread *td, struct rtprio *rtp,
 void	thread_exit(void) __dead2;
 void	thread_free(struct thread *td);
 void	thread_link(struct thread *td, struct proc *p);
-void	thread_reap(void);
 int	thread_single(struct proc *p, int how);
 void	thread_single_end(struct proc *p, int how);
 void	thread_stash(struct thread *td);
@@ -1165,7 +1167,6 @@ void	thread_suspend_one(struct thread *td);
 void	thread_unlink(struct thread *td);
 void	thread_unsuspend(struct proc *p);
 void	thread_wait(struct proc *p);
-struct thread	*thread_find(struct proc *p, lwpid_t tid);
 
 void	stop_all_proc(void);
 void	resume_all_proc(void);
@@ -1206,6 +1207,13 @@ curthread_pflags2_restore(int save)
 {
 
 	curthread->td_pflags2 &= save;
+}
+
+static __inline bool
+kstack_contains(struct thread *td, vm_offset_t va, size_t len)
+{
+	return (va >= td->td_kstack && va + len >= va &&
+	    va + len <= td->td_kstack + td->td_kstack_pages * PAGE_SIZE);
 }
 
 static __inline __pure2 struct td_sched *

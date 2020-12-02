@@ -56,8 +56,15 @@
  * Copyright 2013 by Saso Kiselkov. All rights reserved.
  */
 /*
- * Copyright (c) 2013 by Delphix. All rights reserved.
+ * Copyright (c) 2020 by Delphix. All rights reserved.
  */
+
+#include <sys/queue.h>
+#include <sys/list.h>
+#include <bootstrap.h>
+
+#ifndef _ZFSIMPL_H_
+#define	_ZFSIMPL_H_
 
 #define	MAXNAMELEN	256
 
@@ -493,7 +500,7 @@ typedef struct zio_gbh {
 #define	VDEV_RAIDZ_MAXPARITY	3
 
 #define	VDEV_PAD_SIZE		(8 << 10)
-/* 2 padding areas (vl_pad1 and vl_pad2) to skip */
+/* 2 padding areas (vl_pad1 and vl_be) to skip */
 #define	VDEV_SKIP_SIZE		VDEV_PAD_SIZE * 2
 #define	VDEV_PHYS_SIZE		(112 << 10)
 #define	VDEV_UBERBLOCK_RING	(128 << 10)
@@ -519,9 +526,29 @@ typedef struct vdev_phys {
 	zio_eck_t	vp_zbt;
 } vdev_phys_t;
 
+typedef enum vbe_vers {
+	/* The bootenv file is stored as ascii text in the envblock */
+	VB_RAW = 0,
+
+	/*
+	 * The bootenv file is converted to an nvlist and then packed into the
+	 * envblock.
+	 */
+	VB_NVLIST = 1
+} vbe_vers_t;
+
+typedef struct vdev_boot_envblock {
+	uint64_t	vbe_version;
+	char		vbe_bootenv[VDEV_PAD_SIZE - sizeof (uint64_t) -
+			sizeof (zio_eck_t)];
+ 	zio_eck_t	vbe_zbt;
+} vdev_boot_envblock_t;
+
+CTASSERT(sizeof (vdev_boot_envblock_t) == VDEV_PAD_SIZE);
+
 typedef struct vdev_label {
 	char		vl_pad1[VDEV_PAD_SIZE];			/*  8K  */
-	char		vl_pad2[VDEV_PAD_SIZE];			/*  8K  */
+	vdev_boot_envblock_t	vl_be;				/*  8K  */
 	vdev_phys_t	vl_vdev_phys;				/* 112K	*/
 	char		vl_uberblock[VDEV_UBERBLOCK_RING];	/* 128K	*/
 } vdev_label_t;							/* 256K total */
@@ -584,7 +611,61 @@ enum zio_compress {
 	ZIO_COMPRESS_GZIP_9,
 	ZIO_COMPRESS_ZLE,
 	ZIO_COMPRESS_LZ4,
+	ZIO_COMPRESS_ZSTD,
 	ZIO_COMPRESS_FUNCTIONS
+};
+
+enum zio_zstd_levels {
+	ZIO_ZSTD_LEVEL_INHERIT = 0,
+	ZIO_ZSTD_LEVEL_1,
+#define	ZIO_ZSTD_LEVEL_MIN	ZIO_ZSTD_LEVEL_1
+	ZIO_ZSTD_LEVEL_2,
+	ZIO_ZSTD_LEVEL_3,
+#define	ZIO_ZSTD_LEVEL_DEFAULT	ZIO_ZSTD_LEVEL_3
+	ZIO_ZSTD_LEVEL_4,
+	ZIO_ZSTD_LEVEL_5,
+	ZIO_ZSTD_LEVEL_6,
+	ZIO_ZSTD_LEVEL_7,
+	ZIO_ZSTD_LEVEL_8,
+	ZIO_ZSTD_LEVEL_9,
+	ZIO_ZSTD_LEVEL_10,
+	ZIO_ZSTD_LEVEL_11,
+	ZIO_ZSTD_LEVEL_12,
+	ZIO_ZSTD_LEVEL_13,
+	ZIO_ZSTD_LEVEL_14,
+	ZIO_ZSTD_LEVEL_15,
+	ZIO_ZSTD_LEVEL_16,
+	ZIO_ZSTD_LEVEL_17,
+	ZIO_ZSTD_LEVEL_18,
+	ZIO_ZSTD_LEVEL_19,
+#define	ZIO_ZSTD_LEVEL_MAX	ZIO_ZSTD_LEVEL_19
+	ZIO_ZSTD_LEVEL_RESERVE = 101, /* Leave room for new positive levels */
+	ZIO_ZSTD_LEVEL_FAST, /* Fast levels are negative */
+	ZIO_ZSTD_LEVEL_FAST_1,
+#define	ZIO_ZSTD_LEVEL_FAST_DEFAULT	ZIO_ZSTD_LEVEL_FAST_1
+	ZIO_ZSTD_LEVEL_FAST_2,
+	ZIO_ZSTD_LEVEL_FAST_3,
+	ZIO_ZSTD_LEVEL_FAST_4,
+	ZIO_ZSTD_LEVEL_FAST_5,
+	ZIO_ZSTD_LEVEL_FAST_6,
+	ZIO_ZSTD_LEVEL_FAST_7,
+	ZIO_ZSTD_LEVEL_FAST_8,
+	ZIO_ZSTD_LEVEL_FAST_9,
+	ZIO_ZSTD_LEVEL_FAST_10,
+	ZIO_ZSTD_LEVEL_FAST_20,
+	ZIO_ZSTD_LEVEL_FAST_30,
+	ZIO_ZSTD_LEVEL_FAST_40,
+	ZIO_ZSTD_LEVEL_FAST_50,
+	ZIO_ZSTD_LEVEL_FAST_60,
+	ZIO_ZSTD_LEVEL_FAST_70,
+	ZIO_ZSTD_LEVEL_FAST_80,
+	ZIO_ZSTD_LEVEL_FAST_90,
+	ZIO_ZSTD_LEVEL_FAST_100,
+	ZIO_ZSTD_LEVEL_FAST_500,
+	ZIO_ZSTD_LEVEL_FAST_1000,
+#define	ZIO_ZSTD_LEVEL_FAST_MAX	ZIO_ZSTD_LEVEL_FAST_1000
+	ZIO_ZSTD_LEVEL_AUTO = 251, /* Reserved for future use */
+	ZIO_ZSTD_LEVEL_LEVELS
 };
 
 #define	ZIO_COMPRESS_ON_VALUE	ZIO_COMPRESS_LZJB
@@ -1324,6 +1405,7 @@ typedef struct dsl_dataset_phys {
 #define	DMU_POOL_REMOVING		"com.delphix:removing"
 #define	DMU_POOL_OBSOLETE_BPOBJ		"com.delphix:obsolete_bpobj"
 #define	DMU_POOL_CONDENSING_INDIRECT	"com.delphix:condensing_indirect"
+#define	DMU_POOL_ZPOOL_CHECKPOINT       "com.delphix:zpool_checkpoint"
 
 #define	ZAP_MAGIC 0x2F52AB2ABULL
 
@@ -1635,10 +1717,9 @@ typedef struct znode_phys {
  */
 struct vdev;
 struct spa;
-typedef int vdev_phys_read_t(struct vdev *vdev, void *priv,
-    off_t offset, void *buf, size_t bytes);
-typedef int vdev_read_t(struct vdev *vdev, const blkptr_t *bp,
-    void *buf, off_t offset, size_t bytes);
+typedef int vdev_phys_read_t(struct vdev *, void *, off_t, void *, size_t);
+typedef int vdev_phys_write_t(struct vdev *, off_t, void *, size_t);
+typedef int vdev_read_t(struct vdev *, const blkptr_t *, void *, off_t, size_t);
 
 typedef STAILQ_HEAD(vdev_list, vdev) vdev_list_t;
 
@@ -1766,8 +1847,9 @@ typedef struct vdev {
 	size_t		v_nchildren;	/* # children */
 	vdev_state_t	v_state;	/* current state */
 	vdev_phys_read_t *v_phys_read;	/* read from raw leaf vdev */
+	vdev_phys_write_t *v_phys_write; /* write to raw leaf vdev */
 	vdev_read_t	*v_read;	/* read from vdev */
-	void		*v_read_priv;	/* private data for read function */
+	void		*v_priv;	/* data for read/write function */
 	boolean_t	v_islog;
 	struct spa	*v_spa;		/* link to spa */
 	/*
@@ -1787,12 +1869,18 @@ typedef struct spa {
 	char		*spa_name;	/* pool name */
 	uint64_t	spa_guid;	/* pool guid */
 	uint64_t	spa_txg;	/* most recent transaction */
-	struct uberblock spa_uberblock;	/* best uberblock so far */
+	struct uberblock *spa_uberblock;	/* best uberblock so far */
 	vdev_t		*spa_root_vdev;	/* toplevel vdev container */
-	objset_phys_t	spa_mos;	/* MOS for this pool */
+	objset_phys_t	*spa_mos;	/* MOS for this pool */
 	zio_cksum_salt_t spa_cksum_salt;	/* secret salt for cksum */
 	void		*spa_cksum_tmpls[ZIO_CHECKSUM_FUNCTIONS];
 	boolean_t	spa_with_log;	/* this pool has log */
+
+	struct uberblock spa_uberblock_master;	/* best uberblock so far */
+	objset_phys_t	spa_mos_master;		/* MOS for this pool */
+	struct uberblock spa_uberblock_checkpoint; /* checkpoint uberblock */
+	objset_phys_t	spa_mos_checkpoint;	/* Checkpoint MOS */
+	void		*spa_bootenv;		/* bootenv from pool label */
 } spa_t;
 
 /* IO related arguments. */
@@ -1811,3 +1899,5 @@ typedef struct zio {
 } zio_t;
 
 static void decode_embedded_bp_compressed(const blkptr_t *, void *);
+
+#endif /* _ZFSIMPL_H_ */

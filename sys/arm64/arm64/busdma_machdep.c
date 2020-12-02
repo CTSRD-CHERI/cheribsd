@@ -99,19 +99,17 @@ bus_dma_dflt_lock(void *arg, bus_dma_lock_op_t op)
 int
 bus_dma_run_filter(struct bus_dma_tag_common *tc, bus_addr_t paddr)
 {
-	int retval;
 
-	retval = 0;
-	do {
-		if (((paddr > tc->lowaddr && paddr <= tc->highaddr) ||
-		    ((paddr & (tc->alignment - 1)) != 0)) &&
+	while (tc != NULL) {
+		if ((paddr > tc->lowaddr && paddr <= tc->highaddr) &&
 		    (tc->filter == NULL ||
 		    (*tc->filter)(tc->filterarg, paddr) != 0))
-			retval = 1;
+			return (1);
 
 		tc = tc->parent;		
-	} while (retval == 0 && tc != NULL);
-	return (retval);
+	}
+
+	return (0);
 }
 
 int
@@ -167,6 +165,7 @@ common_bus_dma_tag_create(struct bus_dma_tag_common *parent,
 		common->impl = parent->impl;
 		common->lowaddr = MIN(parent->lowaddr, common->lowaddr);
 		common->highaddr = MAX(parent->highaddr, common->highaddr);
+		common->alignment = MAX(parent->alignment, common->alignment);
 		if (common->boundary == 0)
 			common->boundary = parent->boundary;
 		else if (parent->boundary != 0) {
@@ -215,38 +214,7 @@ bus_dma_tag_create(bus_dma_tag_t parent, bus_size_t alignment,
 }
 
 void
-bus_dma_template_init(bus_dma_tag_template_t *t, bus_dma_tag_t parent)
-{
-
-	if (t == NULL)
-		return;
-
-	t->parent = parent;
-	t->alignment = 1;
-	t->boundary = 0;
-	t->lowaddr = t->highaddr = BUS_SPACE_MAXADDR;
-	t->maxsize = t->maxsegsize = BUS_SPACE_MAXSIZE;
-	t->nsegments = BUS_SPACE_UNRESTRICTED;
-	t->lockfunc = NULL;
-	t->lockfuncarg = NULL;
-	t->flags = 0;
-}
-
-int
-bus_dma_template_tag(bus_dma_tag_template_t *t, bus_dma_tag_t *dmat)
-{
-
-	if (t == NULL || dmat == NULL)
-		return (EINVAL);
-
-	return (bus_dma_tag_create(t->parent, t->alignment, t->boundary,
-	    t->lowaddr, t->highaddr, NULL, NULL, t->maxsize,
-	    t->nsegments, t->maxsegsize, t->flags, t->lockfunc, t->lockfuncarg,
-	    dmat));
-}
-
-void
-bus_dma_template_clone(bus_dma_tag_template_t *t, bus_dma_tag_t dmat)
+bus_dma_template_clone(bus_dma_template_t *t, bus_dma_tag_t dmat)
 {
 	struct bus_dma_tag_common *common;
 

@@ -180,9 +180,6 @@ XZprivate_1.0 {
 	lzma_raw_coder_memusage;
 	lzma_raw_decoder_init;
 	lzma_raw_encoder_init;
-	lzma_sha256_finish;
-	lzma_sha256_init;
-	lzma_sha256_update;
 	lzma_simple_arm_decoder_init;
 	lzma_simple_arm_encoder_init;
 	lzma_simple_armthumb_decoder_init;
@@ -203,11 +200,4 @@ XZprivate_1.0 {
 	lzma_strm_init;
 	lzma_tuklib_cpucores;
 	lzma_tuklib_physmem;
-
-	/*
-	 * XXX-JHB: Export .size.<var> symbols for <var>'s that are
-	 * undefined so rtld can update them.  This is a temporary
-	 * hack.
-	 */
-	.size.*;
 };

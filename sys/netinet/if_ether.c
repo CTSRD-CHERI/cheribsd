@@ -63,6 +63,7 @@ __FBSDID("$FreeBSD$");
 #include <net/netisr.h>
 #include <net/ethernet.h>
 #include <net/route.h>
+#include <net/route/nhop.h>
 #include <net/vnet.h>
 
 #include <netinet/in.h>
@@ -177,7 +178,6 @@ SYSCTL_INT(_net_link_ether_arp, OID_AUTO, log_level, CTLFLAG_VNET | CTLFLAG_RW,
 	    ppsratecheck(&arp_lastlog, &arp_curpps, arp_maxpps))	\
 		log((pri), "arp: " __VA_ARGS__);			\
 } while (0)
-
 
 static void	arpintr(struct mbuf *);
 static void	arptimer(void *);
@@ -349,7 +349,6 @@ arp_fillheader(struct ifnet *ifp, struct arphdr *ah, int bcast, u_char *buf,
 
 	return (error);
 }
-
 
 /*
  * Broadcast an ARP request. Caller specifies:
@@ -804,7 +803,7 @@ in_arpinput(struct mbuf *m)
 	int carped;
 	struct sockaddr_in sin;
 	struct sockaddr *dst;
-	struct nhop4_basic nh4;
+	struct nhop_object *nh;
 	uint8_t linkhdr[LLE_MAX_LINKHDR];
 	struct route ro;
 	size_t linkhdrsize;
@@ -985,7 +984,6 @@ match:
 		/* Allocate new entry */
 		la = lltable_alloc_entry(LLTABLE(ifp), 0, dst);
 		if (la == NULL) {
-
 			/*
 			 * lle creation may fail if source address belongs
 			 * to non-directly connected subnet. However, we
@@ -1058,15 +1056,15 @@ reply:
 			(void)memcpy(ar_sha(ah), lle->ll_addr, ah->ar_hln);
 			LLE_RUNLOCK(lle);
 		} else {
-
 			if (lle != NULL)
 				LLE_RUNLOCK(lle);
 
 			if (!V_arp_proxyall)
 				goto drop;
 
-			if (fib4_lookup_nh_basic(ifp->if_fib, itaddr, 0, 0,
-			    &nh4) != 0)
+			NET_EPOCH_ASSERT();
+			nh = fib4_lookup(ifp->if_fib, itaddr, 0, 0, 0);
+			if (nh == NULL)
 				goto drop;
 
 			/*
@@ -1074,7 +1072,7 @@ reply:
 			 * as this one came out of, or we'll get into a fight
 			 * over who claims what Ether address.
 			 */
-			if (nh4.nh_ifp == ifp)
+			if (nh->nh_ifp == ifp)
 				goto drop;
 
 			(void)memcpy(ar_tha(ah), ar_sha(ah), ah->ar_hln);
@@ -1087,10 +1085,10 @@ reply:
 			 * wrong network.
 			 */
 
-			if (fib4_lookup_nh_basic(ifp->if_fib, isaddr, 0, 0,
-			    &nh4) != 0)
+			nh = fib4_lookup(ifp->if_fib, isaddr, 0, 0, 0);
+			if (nh == NULL)
 				goto drop;
-			if (nh4.nh_ifp != ifp) {
+			if (nh->nh_ifp != ifp) {
 				ARP_LOG(LOG_INFO, "proxy: ignoring request"
 				    " from %s via %s\n",
 				    inet_ntoa_r(isaddr, addrbuf),

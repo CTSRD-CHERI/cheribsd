@@ -97,8 +97,8 @@
  * safely only from their associated CPU, while the Zones backed by the same
  * Keg all share a common Keg lock (to coalesce contention on the backing
  * slabs).  The backing Keg typically only serves one Zone but in the case of
- * multiple Zones, one of the Zones is considered the Master Zone and all
- * Zone-related stats from the Keg are done in the Master Zone.  For an
+ * multiple Zones, one of the Zones is considered the Primary Zone and all
+ * Zone-related stats from the Keg are done in the Primary Zone.  For an
  * example of a Multi-Zone setup, refer to the Mbuf allocation code.
  */
 
@@ -307,14 +307,14 @@ cache_uz_flags(uma_cache_t cache)
 
 	return (cache->uc_freebucket.ucb_spare);
 }
- 
+
 static inline uint32_t
 cache_uz_size(uma_cache_t cache)
 {
 
 	return (cache->uc_allocbucket.ucb_spare);
 }
- 
+
 /*
  * Per-domain slab lists.  Embedded in the kegs.
  */
@@ -403,7 +403,7 @@ typedef struct uma_slab * uma_slab_t;
 struct uma_hash_slab {
 	LIST_ENTRY(uma_hash_slab) uhs_hlink;	/* Link for hash table */
 	uint8_t			*uhs_data;	/* First item */
-	struct uma_slab		uhs_slab;	/* Must be last. */
+	struct uma_slab		uhs_slab __subobject_use_container_bounds;	/* Must be last. */
 };
 
 typedef struct uma_hash_slab * uma_hash_slab_t;
@@ -529,6 +529,10 @@ struct uma_zone {
 	KASSERT(uma_zone_get_allocs((z)) == 0,				\
 	    ("zone %s initialization after use.", (z)->uz_name))
 
+/* Domains are contiguous after the last CPU */
+#define	ZDOM_GET(z, n)							\
+	(&((uma_zone_domain_t)&(z)->uz_cpu[mp_maxid + 1])[n])
+
 #undef	UMA_ALIGN
 
 #ifdef _KERNEL
@@ -563,10 +567,6 @@ static __inline uma_slab_t hash_sfind(struct uma_hash *hash, uint8_t *data);
 #define	KEG_ASSERT_COLD(k)						\
 	KASSERT(uma_keg_get_allocs((k)) == 0,				\
 	    ("keg %s initialization after use.", (k)->uk_name))
-
-/* Domains are contiguous after the last CPU */
-#define	ZDOM_GET(z, n)							\
-    (&((uma_zone_domain_t)&(z)->uz_cpu[mp_maxid + 1])[n])
 
 #define	ZDOM_LOCK_INIT(z, zdom, lc)					\
 	do {								\

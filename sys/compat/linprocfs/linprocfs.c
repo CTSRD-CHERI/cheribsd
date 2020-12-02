@@ -66,6 +66,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/resource.h>
 #include <sys/sbuf.h>
 #include <sys/sem.h>
+#include <sys/shm.h>
 #include <sys/smp.h>
 #include <sys/socket.h>
 #include <sys/syscallsubr.h>
@@ -144,41 +145,35 @@ static int
 linprocfs_domeminfo(PFS_FILL_ARGS)
 {
 	unsigned long memtotal;		/* total memory in bytes */
-	unsigned long memused;		/* used memory in bytes */
 	unsigned long memfree;		/* free memory in bytes */
-	unsigned long buffers, cached;	/* buffer / cache memory ??? */
+	unsigned long cached;		/* page cache */
+	unsigned long buffers;		/* buffer cache */
 	unsigned long long swaptotal;	/* total swap space in bytes */
 	unsigned long long swapused;	/* used swap space in bytes */
 	unsigned long long swapfree;	/* free swap space in bytes */
-	int i, j;
+	size_t sz;
+	int error, i, j;
 
 	memtotal = physmem * PAGE_SIZE;
-	/*
-	 * The correct thing here would be:
-	 *
-	memfree = vm_free_count() * PAGE_SIZE;
-	memused = memtotal - memfree;
-	 *
-	 * but it might mislead linux binaries into thinking there
-	 * is very little memory left, so we cheat and tell them that
-	 * all memory that isn't wired down is free.
-	 */
-	memused = vm_wire_count() * PAGE_SIZE;
-	memfree = memtotal - memused;
+	memfree = (unsigned long)vm_free_count() * PAGE_SIZE;
 	swap_pager_status(&i, &j);
 	swaptotal = (unsigned long long)i * PAGE_SIZE;
 	swapused = (unsigned long long)j * PAGE_SIZE;
 	swapfree = swaptotal - swapused;
+
 	/*
-	 * We'd love to be able to write:
-	 *
-	buffers = bufspace;
-	 *
-	 * but bufspace is internal to vfs_bio.c and we don't feel
-	 * like unstaticizing it just for linprocfs's sake.
+	 * This value may exclude wired pages, but we have no good way of
+	 * accounting for that.
 	 */
-	buffers = 0;
-	cached = vm_inactive_count() * PAGE_SIZE;
+	cached =
+	    (vm_active_count() + vm_inactive_count() + vm_laundry_count()) *
+	    PAGE_SIZE;
+
+	sz = sizeof(buffers);
+	error = kernel_sysctlbyname(curthread, "vfs.bufspace", &buffers, &sz,
+	    NULL, 0, 0, 0);
+	if (error != 0)
+		buffers = 0;
 
 	sbuf_printf(sb,
 	    "MemTotal: %9lu kB\n"
@@ -235,10 +230,10 @@ linprocfs_docpuinfo(PFS_FILL_ARGS)
 	};
 
 	static char *cpu_feature2_names[] = {
-		/*  0 */ "pni", "pclmulqdq", "dtes3", "monitor",
+		/*  0 */ "pni", "pclmulqdq", "dtes64", "monitor",
 		/*  4 */ "ds_cpl", "vmx", "smx", "est",
 		/*  8 */ "tm2", "ssse3", "cid", "sdbg",
-		/* 12 */ "fma", "cx16", "xptr", "pdcm",
+		/* 12 */ "fma", "cx16", "xtpr", "pdcm",
 		/* 16 */ "", "pcid", "dca", "sse4_1",
 		/* 20 */ "sse4_2", "x2apic", "movbe", "popcnt",
 		/* 24 */ "tsc_deadline_timer", "aes", "xsave", "",
@@ -364,7 +359,7 @@ linprocfs_docpuinfo(PFS_FILL_ARGS)
 #else
 		    "",
 #endif
-		    fqmhz, fqkhz,
+		    fqmhz * 2, fqkhz,
 		    cpu_clflush_line_size, cpu_clflush_line_size,
 		    cpu_maxphyaddr,
 		    (cpu_maxphyaddr > 32) ? 48 : 0);
@@ -408,18 +403,75 @@ linprocfs_docpuinfo(PFS_FILL_ARGS)
 }
 #endif /* __i386__ || __amd64__ */
 
+static const char *path_slash_sys = "/sys";
+static const char *fstype_sysfs = "sysfs";
+
+static int
+_mtab_helper(const struct pfs_node *pn, const struct statfs *sp,
+    const char **mntfrom, const char **mntto, const char **fstype)
+{
+	/* determine device name */
+	*mntfrom = sp->f_mntfromname;
+
+	/* determine mount point */
+	*mntto = sp->f_mntonname;
+
+	/* determine fs type */
+	*fstype = sp->f_fstypename;
+	if (strcmp(*fstype, pn->pn_info->pi_name) == 0)
+		*mntfrom = *fstype = "proc";
+	else if (strcmp(*fstype, "procfs") == 0)
+		return (ECANCELED);
+
+	if (strcmp(*fstype, "autofs") == 0) {
+		/*
+		 * FreeBSD uses eg "map -hosts", whereas Linux
+		 * expects just "-hosts".
+		 */
+		if (strncmp(*mntfrom, "map ", 4) == 0)
+			*mntfrom += 4;
+	}
+
+	if (strcmp(*fstype, "linsysfs") == 0) {
+		*mntfrom = path_slash_sys;
+		*fstype = fstype_sysfs;
+	} else {
+		/* For Linux msdosfs is called vfat */
+		if (strcmp(*fstype, "msdosfs") == 0)
+			*fstype = "vfat";
+	}
+	return (0);
+}
+
+static void
+_sbuf_mntoptions_helper(struct sbuf *sb, uint64_t f_flags)
+{
+	sbuf_cat(sb, (f_flags & MNT_RDONLY) ? "ro" : "rw");
+#define ADD_OPTION(opt, name) \
+	if (f_flags & (opt)) sbuf_cat(sb, "," name);
+	ADD_OPTION(MNT_SYNCHRONOUS,	"sync");
+	ADD_OPTION(MNT_NOEXEC,		"noexec");
+	ADD_OPTION(MNT_NOSUID,		"nosuid");
+	ADD_OPTION(MNT_UNION,		"union");
+	ADD_OPTION(MNT_ASYNC,		"async");
+	ADD_OPTION(MNT_SUIDDIR,		"suiddir");
+	ADD_OPTION(MNT_NOSYMFOLLOW,	"nosymfollow");
+	ADD_OPTION(MNT_NOATIME,		"noatime");
+#undef ADD_OPTION
+}
+
 /*
- * Filler function for proc/mtab
+ * Filler function for proc/mtab and proc/<pid>/mounts.
  *
- * This file doesn't exist in Linux' procfs, but is included here so
+ * /proc/mtab doesn't exist in Linux' procfs, but is included here so
  * users can symlink /compat/linux/etc/mtab to /proc/mtab
  */
 static int
 linprocfs_domtab(PFS_FILL_ARGS)
 {
 	struct nameidata nd;
-	const char *lep;
-	char *dlep, *flep, *mntto, *mntfrom, *fstype;
+	const char *lep, *mntto, *mntfrom, *fstype;
+	char *dlep, *flep;
 	size_t lep_len;
 	int error;
 	struct statfs * __capability buf;
@@ -427,12 +479,16 @@ linprocfs_domtab(PFS_FILL_ARGS)
 	size_t count;
 
 	/* resolve symlinks etc. in the emulation tree prefix */
+	/*
+	 * Ideally, this would use the current chroot rather than some
+	 * hardcoded path.
+	 */
 	NDINIT(&nd, LOOKUP, FOLLOW, UIO_SYSSPACE, linux_emul_path, td);
 	flep = NULL;
 	error = namei(&nd);
 	lep = linux_emul_path;
 	if (error == 0) {
-		if (vn_fullpath(td, nd.ni_vp, &dlep, &flep) == 0)
+		if (vn_fullpath(nd.ni_vp, &dlep, &flep) == 0)
 			lep = dlep;
 		vrele(nd.ni_vp);
 	}
@@ -449,56 +505,113 @@ linprocfs_domtab(PFS_FILL_ARGS)
 
 	for (sp = (__cheri_fromcap struct statfs *)buf; count > 0;
 	    sp++, count--) {
-		/* determine device name */
-		mntfrom = sp->f_mntfromname;
+		error = _mtab_helper(pn, sp, &mntfrom, &mntto, &fstype);
+		if (error != 0) {
+			MPASS(error == ECANCELED);
+			continue;
+		}
 
 		/* determine mount point */
-		mntto = sp->f_mntonname;
 		if (strncmp(mntto, lep, lep_len) == 0 && mntto[lep_len] == '/')
 			mntto += lep_len;
 
-		/* determine fs type */
-		fstype = sp->f_fstypename;
-		if (strcmp(fstype, pn->pn_info->pi_name) == 0)
-			mntfrom = fstype = "proc";
-		else if (strcmp(fstype, "procfs") == 0)
-			continue;
-
-		if (strcmp(fstype, "autofs") == 0) {
-			/*
-			 * FreeBSD uses eg "map -hosts", whereas Linux
-			 * expects just "-hosts".
-			 */
-			if (strncmp(mntfrom, "map ", 4) == 0)
-				mntfrom += 4;
-		}
-
-		if (strcmp(fstype, "linsysfs") == 0) {
-			sbuf_printf(sb, "/sys %s sysfs %s", mntto,
-			    sp->f_flags & MNT_RDONLY ? "ro" : "rw");
-		} else {
-			/* For Linux msdosfs is called vfat */
-			if (strcmp(fstype, "msdosfs") == 0)
-				fstype = "vfat";
-			sbuf_printf(sb, "%s %s %s %s", mntfrom, mntto, fstype,
-			    sp->f_flags & MNT_RDONLY ? "ro" : "rw");
-		}
-#define ADD_OPTION(opt, name) \
-	if (sp->f_flags & (opt)) sbuf_printf(sb, "," name);
-		ADD_OPTION(MNT_SYNCHRONOUS,	"sync");
-		ADD_OPTION(MNT_NOEXEC,		"noexec");
-		ADD_OPTION(MNT_NOSUID,		"nosuid");
-		ADD_OPTION(MNT_UNION,		"union");
-		ADD_OPTION(MNT_ASYNC,		"async");
-		ADD_OPTION(MNT_SUIDDIR,		"suiddir");
-		ADD_OPTION(MNT_NOSYMFOLLOW,	"nosymfollow");
-		ADD_OPTION(MNT_NOATIME,		"noatime");
-#undef ADD_OPTION
+		sbuf_printf(sb, "%s %s %s ", mntfrom, mntto, fstype);
+		_sbuf_mntoptions_helper(sb, sp->f_flags);
 		/* a real Linux mtab will also show NFS options */
 		sbuf_printf(sb, " 0 0\n");
 	}
 
 	free_c(buf, M_TEMP);
+	free(flep, M_TEMP);
+	return (error);
+}
+
+static int
+linprocfs_doprocmountinfo(PFS_FILL_ARGS)
+{
+	struct nameidata nd;
+	const char *mntfrom, *mntto, *fstype;
+	const char *lep;
+	char *dlep, *flep;
+	struct statfs *buf, *sp;
+	size_t count, lep_len;
+	int error;
+
+	/*
+	 * Ideally, this would use the current chroot rather than some
+	 * hardcoded path.
+	 */
+	NDINIT(&nd, LOOKUP, FOLLOW, UIO_SYSSPACE, linux_emul_path, td);
+	flep = NULL;
+	error = namei(&nd);
+	lep = linux_emul_path;
+	if (error == 0) {
+		if (vn_fullpath(nd.ni_vp, &dlep, &flep) == 0)
+			lep = dlep;
+		vrele(nd.ni_vp);
+	}
+	lep_len = strlen(lep);
+
+	buf = NULL;
+	error = kern_getfsstat(td, &buf, SIZE_T_MAX, &count,
+	    UIO_SYSSPACE, MNT_WAIT);
+	if (error != 0)
+		goto out;
+
+	for (sp = buf; count > 0; sp++, count--) {
+		error = _mtab_helper(pn, sp, &mntfrom, &mntto, &fstype);
+		if (error != 0) {
+			MPASS(error == ECANCELED);
+			continue;
+		}
+
+		if (strncmp(mntto, lep, lep_len) == 0 && mntto[lep_len] == '/')
+			mntto += lep_len;
+#if 0
+		/*
+		 * If the prefix is a chroot, and this mountpoint is not under
+		 * the prefix, we should skip it.  Leave it for now for
+		 * consistency with procmtab above.
+		 */
+		else
+			continue;
+#endif
+
+		/*
+		 * (1) mount id
+		 *
+		 * (2) parent mount id -- we don't have this cheaply, so
+		 * provide a dummy value
+		 *
+		 * (3) major:minor -- ditto
+		 *
+		 * (4) root filesystem mount -- probably a namespaces thing
+		 *
+		 * (5) mountto path
+		 */
+		sbuf_printf(sb, "%u 0 0:0 / %s ",
+		    sp->f_fsid.val[0] ^ sp->f_fsid.val[1], mntto);
+		/* (6) mount options */
+		_sbuf_mntoptions_helper(sb, sp->f_flags);
+		/*
+		 * (7) zero or more optional fields -- again, namespace related
+		 *
+		 * (8) End of variable length fields separator ("-")
+		 *
+		 * (9) fstype
+		 *
+		 * (10) mount from
+		 *
+		 * (11) "superblock" options -- like (6), but different
+		 * semantics in Linux
+		 */
+		sbuf_printf(sb, " - %s %s %s\n", fstype, mntfrom,
+		    (sp->f_flags & MNT_RDONLY) ? "ro" : "rw");
+	}
+
+	error = 0;
+out:
+	free(buf, M_TEMP);
 	free(flep, M_TEMP);
 	return (error);
 }
@@ -769,6 +882,32 @@ linprocfs_doloadavg(PFS_FILL_ARGS)
 	return (0);
 }
 
+static int
+linprocfs_get_tty_nr(struct proc *p)
+{
+	struct session *sp;
+	const char *ttyname;
+	int error, major, minor, nr;
+
+	PROC_LOCK_ASSERT(p, MA_OWNED);
+	sx_assert(&proctree_lock, SX_LOCKED);
+
+	if ((p->p_flag & P_CONTROLT) == 0)
+		return (-1);
+
+	sp = p->p_pgrp->pg_session;
+	if (sp == NULL)
+		return (-1);
+
+	ttyname = devtoname(sp->s_ttyp->t_dev);
+	error = linux_driver_get_major_minor(ttyname, &major, &minor);
+	if (error != 0)
+		return (-1);
+
+	nr = makedev(major, minor);
+	return (nr);
+}
+
 /*
  * Filler function for proc/pid/stat
  */
@@ -779,12 +918,14 @@ linprocfs_doprocstat(PFS_FILL_ARGS)
 	struct timeval boottime;
 	char state;
 	static int ratelimit = 0;
+	int tty_nr;
 	vm_offset_t startcode, startdata;
 
 	getboottime(&boottime);
 	sx_slock(&proctree_lock);
 	PROC_LOCK(p);
 	fill_kinfo_proc(p, &kp);
+	tty_nr = linprocfs_get_tty_nr(p);
 	sx_sunlock(&proctree_lock);
 	if (p->p_vmspace) {
 	   startcode = (vm_offset_t)p->p_vmspace->vm_taddr;
@@ -811,10 +952,7 @@ linprocfs_doprocstat(PFS_FILL_ARGS)
 	PS_ADD("pgrp",		"%d",	p->p_pgid);
 	PS_ADD("session",	"%d",	p->p_session->s_sid);
 	PROC_UNLOCK(p);
-	if (kp.ki_tdev == NODEV)
-		PS_ADD("tty",	"%s",	"-1");
-	else
-		PS_ADD("tty",		"%ju",	(uintmax_t)kp.ki_tdev);
+	PS_ADD("tty",		"%d",	tty_nr);
 	PS_ADD("tpgid",		"%d",	kp.ki_tpgid);
 	PS_ADD("flags",		"%u",	0); /* XXX */
 	PS_ADD("minflt",	"%lu",	kp.ki_rusage.ru_minflt);
@@ -1023,7 +1161,6 @@ linprocfs_doprocstatus(PFS_FILL_ARGS)
 	return (0);
 }
 
-
 /*
  * Filler function for proc/pid/cwd
  */
@@ -1035,7 +1172,7 @@ linprocfs_doproccwd(PFS_FILL_ARGS)
 	char *freepath = NULL;
 
 	pwd = pwd_hold(td);
-	vn_fullpath(td, pwd->pwd_cdir, &fullpath, &freepath);
+	vn_fullpath(pwd->pwd_cdir, &fullpath, &freepath);
 	sbuf_printf(sb, "%s", fullpath);
 	if (freepath)
 		free(freepath, M_TEMP);
@@ -1056,7 +1193,7 @@ linprocfs_doprocroot(PFS_FILL_ARGS)
 
 	pwd = pwd_hold(td);
 	vp = jailed(p->p_ucred) ? pwd->pwd_jdir : pwd->pwd_rdir;
-	vn_fullpath(td, vp, &fullpath, &freepath);
+	vn_fullpath(vp, &fullpath, &freepath);
 	sbuf_printf(sb, "%s", fullpath);
 	if (freepath)
 		free(freepath, M_TEMP);
@@ -1201,7 +1338,7 @@ linprocfs_doprocmaps(PFS_FILL_ARGS)
 			shadow_count = obj->shadow_count;
 			VM_OBJECT_RUNLOCK(obj);
 			if (vp != NULL) {
-				vn_fullpath(td, vp, &name, &freename);
+				vn_fullpath(vp, &name, &freename);
 				vn_lock(vp, LK_SHARED | LK_RETRY);
 				VOP_GETATTR(vp, &vat, td->td_ucred);
 				ino = vat.va_fileid;
@@ -1232,7 +1369,7 @@ linprocfs_doprocmaps(PFS_FILL_ARGS)
 		    0,
 		    0,
 		    (u_long)ino,
-		    *name ? "     " : "",
+		    *name ? "     " : " ",
 		    name
 		    );
 		if (freename)
@@ -1254,6 +1391,27 @@ linprocfs_doprocmaps(PFS_FILL_ARGS)
 	}
 	vm_map_unlock_read(map);
 	vmspace_free(vm);
+
+	return (error);
+}
+
+/*
+ * Filler function for proc/pid/mem
+ */
+static int
+linprocfs_doprocmem(PFS_FILL_ARGS)
+{
+	ssize_t resid;
+	int error;
+
+	resid = uio->uio_resid;
+	error = procfs_doprocmem(PFS_FILL_ARGNAMES);
+
+	if (uio->uio_rw == UIO_READ && resid != uio->uio_resid)
+		return (0);
+
+	if (error == EFAULT)
+		error = EIO;
 
 	return (error);
 }
@@ -1382,6 +1540,17 @@ linprocfs_doosbuild(PFS_FILL_ARGS)
 }
 
 /*
+ * Filler function for proc/sys/kernel/msgmax
+ */
+static int
+linprocfs_domsgmax(PFS_FILL_ARGS)
+{
+
+	sbuf_printf(sb, "%d\n", msginfo.msgmax);
+	return (0);
+}
+
+/*
  * Filler function for proc/sys/kernel/msgmni
  */
 static int
@@ -1389,6 +1558,30 @@ linprocfs_domsgmni(PFS_FILL_ARGS)
 {
 
 	sbuf_printf(sb, "%d\n", msginfo.msgmni);
+	return (0);
+}
+
+/*
+ * Filler function for proc/sys/kernel/msgmnb
+ */
+static int
+linprocfs_domsgmnb(PFS_FILL_ARGS)
+{
+
+	sbuf_printf(sb, "%d\n", msginfo.msgmnb);
+	return (0);
+}
+
+/*
+ * Filler function for proc/sys/kernel/ngroups_max
+ *
+ * Note that in Linux it defaults to 65536, not 1023.
+ */
+static int
+linprocfs_dongroups_max(PFS_FILL_ARGS)
+{
+
+	sbuf_printf(sb, "%d\n", ngroups_max);
 	return (0);
 }
 
@@ -1412,6 +1605,50 @@ linprocfs_dosem(PFS_FILL_ARGS)
 
 	sbuf_printf(sb, "%d %d %d %d\n", seminfo.semmsl, seminfo.semmns,
 	    seminfo.semopm, seminfo.semmni);
+	return (0);
+}
+
+/*
+ * Filler function for proc/sys/kernel/shmall
+ */
+static int
+linprocfs_doshmall(PFS_FILL_ARGS)
+{
+
+	sbuf_printf(sb, "%lu\n", shminfo.shmall);
+	return (0);
+}
+
+/*
+ * Filler function for proc/sys/kernel/shmmax
+ */
+static int
+linprocfs_doshmmax(PFS_FILL_ARGS)
+{
+
+	sbuf_printf(sb, "%lu\n", shminfo.shmmax);
+	return (0);
+}
+
+/*
+ * Filler function for proc/sys/kernel/shmmni
+ */
+static int
+linprocfs_doshmmni(PFS_FILL_ARGS)
+{
+
+	sbuf_printf(sb, "%lu\n", shminfo.shmmni);
+	return (0);
+}
+
+/*
+ * Filler function for proc/sys/kernel/tainted
+ */
+static int
+linprocfs_dotainted(PFS_FILL_ARGS)
+{
+
+	sbuf_printf(sb, "0\n");
 	return (0);
 }
 
@@ -1622,6 +1859,28 @@ out:
 }
 
 /*
+ * The point of the following two functions is to work around
+ * an assertion in Chromium; see kern/240991 for details.
+ */
+static int
+linprocfs_dotaskattr(PFS_ATTR_ARGS)
+{
+
+	vap->va_nlink = 3;
+	return (0);
+}
+
+/*
+ * Filler function for proc/<pid>/task/.dummy
+ */
+static int
+linprocfs_dotaskdummy(PFS_FILL_ARGS)
+{
+
+	return (0);
+}
+
+/*
  * Filler function for proc/sys/kernel/random/uuid
  */
 static int
@@ -1726,6 +1985,11 @@ linprocfs_init(PFS_INIT_ARGS)
 	pfs_create_file(root, "version", &linprocfs_doversion,
 	    NULL, NULL, NULL, PFS_RD);
 
+	/* /proc/bus/... */
+	dir = pfs_create_dir(root, "bus", NULL, NULL, NULL, 0);
+	dir = pfs_create_dir(dir, "pci", NULL, NULL, NULL, 0);
+	dir = pfs_create_dir(dir, "devices", NULL, NULL, NULL, 0);
+
 	/* /proc/net/... */
 	dir = pfs_create_dir(root, "net", NULL, NULL, NULL, 0);
 	pfs_create_file(dir, "dev", &linprocfs_donetdev,
@@ -1742,9 +2006,11 @@ linprocfs_init(PFS_INIT_ARGS)
 	pfs_create_link(dir, "exe", &procfs_doprocfile,
 	    NULL, &procfs_notsystem, NULL, 0);
 	pfs_create_file(dir, "maps", &linprocfs_doprocmaps,
-	    NULL, NULL, NULL, PFS_RD);
-	pfs_create_file(dir, "mem", &procfs_doprocmem,
+	    NULL, NULL, NULL, PFS_RD | PFS_AUTODRAIN);
+	pfs_create_file(dir, "mem", &linprocfs_doprocmem,
 	    procfs_attr_rw, &procfs_candebug, NULL, PFS_RDWR | PFS_RAW);
+	pfs_create_file(dir, "mountinfo", &linprocfs_doprocmountinfo,
+	    NULL, NULL, NULL, PFS_RD);
 	pfs_create_file(dir, "mounts", &linprocfs_domtab,
 	    NULL, NULL, NULL, PFS_RD);
 	pfs_create_link(dir, "root", &linprocfs_doprocroot,
@@ -1762,6 +2028,11 @@ linprocfs_init(PFS_INIT_ARGS)
 	pfs_create_file(dir, "limits", &linprocfs_doproclimits,
 	    NULL, NULL, NULL, PFS_RD);
 
+	/* /proc/<pid>/task/... */
+	dir = pfs_create_dir(dir, "task", linprocfs_dotaskattr, NULL, NULL, 0);
+	pfs_create_file(dir, ".dummy", &linprocfs_dotaskdummy,
+	    NULL, NULL, NULL, PFS_RD);
+
 	/* /proc/scsi/... */
 	dir = pfs_create_dir(root, "scsi", NULL, NULL, NULL, 0);
 	pfs_create_file(dir, "device_info", &linprocfs_doscsidevinfo,
@@ -1771,6 +2042,7 @@ linprocfs_init(PFS_INIT_ARGS)
 
 	/* /proc/sys/... */
 	sys = pfs_create_dir(root, "sys", NULL, NULL, NULL, 0);
+
 	/* /proc/sys/kernel/... */
 	dir = pfs_create_dir(sys, "kernel", NULL, NULL, NULL, 0);
 	pfs_create_file(dir, "osrelease", &linprocfs_doosrelease,
@@ -1779,11 +2051,25 @@ linprocfs_init(PFS_INIT_ARGS)
 	    NULL, NULL, NULL, PFS_RD);
 	pfs_create_file(dir, "version", &linprocfs_doosbuild,
 	    NULL, NULL, NULL, PFS_RD);
+	pfs_create_file(dir, "msgmax", &linprocfs_domsgmax,
+	    NULL, NULL, NULL, PFS_RD);
 	pfs_create_file(dir, "msgmni", &linprocfs_domsgmni,
+	    NULL, NULL, NULL, PFS_RD);
+	pfs_create_file(dir, "msgmnb", &linprocfs_domsgmnb,
+	    NULL, NULL, NULL, PFS_RD);
+	pfs_create_file(dir, "ngroups_max", &linprocfs_dongroups_max,
 	    NULL, NULL, NULL, PFS_RD);
 	pfs_create_file(dir, "pid_max", &linprocfs_dopid_max,
 	    NULL, NULL, NULL, PFS_RD);
 	pfs_create_file(dir, "sem", &linprocfs_dosem,
+	    NULL, NULL, NULL, PFS_RD);
+	pfs_create_file(dir, "shmall", &linprocfs_doshmall,
+	    NULL, NULL, NULL, PFS_RD);
+	pfs_create_file(dir, "shmmax", &linprocfs_doshmmax,
+	    NULL, NULL, NULL, PFS_RD);
+	pfs_create_file(dir, "shmmni", &linprocfs_doshmmni,
+	    NULL, NULL, NULL, PFS_RD);
+	pfs_create_file(dir, "tainted", &linprocfs_dotainted,
 	    NULL, NULL, NULL, PFS_RD);
 
 	/* /proc/sys/kernel/random/... */
@@ -1819,6 +2105,7 @@ MODULE_DEPEND(linprocfs, linux, 1, 1, 1);
 MODULE_DEPEND(linprocfs, procfs, 1, 1, 1);
 MODULE_DEPEND(linprocfs, sysvmsg, 1, 1, 1);
 MODULE_DEPEND(linprocfs, sysvsem, 1, 1, 1);
+MODULE_DEPEND(linprocfs, sysvshm, 1, 1, 1);
 // CHERI CHANGES START
 // {
 //   "updated": 20181114,

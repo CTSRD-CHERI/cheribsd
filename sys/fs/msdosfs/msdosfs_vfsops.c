@@ -190,7 +190,6 @@ static int
 msdosfs_cmount(struct mntarg *ma, void * __capability data, uint64_t flags)
 {
 	struct msdosfs_args args;
-	struct export_args exp;
 	int error;
 
 	if (data == NULL)
@@ -198,10 +197,9 @@ msdosfs_cmount(struct mntarg *ma, void * __capability data, uint64_t flags)
 	error = copyincap(data, &args, sizeof args);
 	if (error)
 		return (error);
-	vfs_oexport_conv(&args.export, &exp);
 
 	ma = mount_argsu(ma, "from", args.fspec, MAXPATHLEN);
-	ma = mount_arg(ma, "export", &exp, sizeof(exp));
+	ma = mount_arg(ma, "export", &args.export, sizeof(args.export));
 	ma = mount_argf(ma, "uid", "%d", args.uid);
 	ma = mount_argf(ma, "gid", "%d", args.gid);
 	ma = mount_argf(ma, "mask", "%d", args.mask);
@@ -250,22 +248,28 @@ msdosfs_mount(struct mount *mp)
 		pmp = VFSTOMSDOSFS(mp);
 		if (!(pmp->pm_flags & MSDOSFSMNT_RONLY) &&
 		    vfs_flagopt(mp->mnt_optnew, "ro", NULL, 0)) {
-			error = VFS_SYNC(mp, MNT_WAIT);
-			if (error)
+			if ((error = vn_start_write(NULL, &mp, V_WAIT)) != 0)
 				return (error);
+			error = vfs_write_suspend_umnt(mp);
+			if (error != 0)
+				return (error);
+
 			flags = WRITECLOSE;
 			if (mp->mnt_flag & MNT_FORCE)
 				flags |= FORCECLOSE;
 			error = vflush(mp, 0, flags, td);
-			if (error)
+			if (error != 0) {
+				vfs_write_resume(mp, 0);
 				return (error);
+			}
 
 			/*
 			 * Now the volume is clean.  Mark it so while the
 			 * device is still rw.
 			 */
 			error = markvoldirty(pmp, 0);
-			if (error) {
+			if (error != 0) {
+				vfs_write_resume(mp, 0);
 				(void)markvoldirty(pmp, 1);
 				return (error);
 			}
@@ -275,6 +279,7 @@ msdosfs_mount(struct mount *mp)
 			error = g_access(pmp->pm_cp, 0, -1, 0);
 			g_topology_unlock();
 			if (error) {
+				vfs_write_resume(mp, 0);
 				(void)markvoldirty(pmp, 1);
 				return (error);
 			}
@@ -288,6 +293,7 @@ msdosfs_mount(struct mount *mp)
 			MNT_ILOCK(mp);
 			mp->mnt_flag |= MNT_RDONLY;
 			MNT_IUNLOCK(mp);
+			vfs_write_resume(mp, 0);
 		} else if ((pmp->pm_flags & MSDOSFSMNT_RONLY) &&
 		    !vfs_flagopt(mp->mnt_optnew, "ro", NULL, 0)) {
 			/*
@@ -346,7 +352,7 @@ msdosfs_mount(struct mount *mp)
 	devvp = ndp.ni_vp;
 	NDFREE(&ndp, NDF_ONLY_PNBUF);
 
-	if (!vn_isdisk(devvp, &error)) {
+	if (!vn_isdisk_error(devvp, &error)) {
 		vput(devvp);
 		return (error);
 	}
@@ -752,21 +758,31 @@ msdosfs_unmount(struct mount *mp, int mntflags)
 {
 	struct msdosfsmount *pmp;
 	int error, flags;
+	bool susp;
 
 	error = flags = 0;
 	pmp = VFSTOMSDOSFS(mp);
-	if ((pmp->pm_flags & MSDOSFSMNT_RONLY) == 0)
-		error = msdosfs_sync(mp, MNT_WAIT);
+	susp = (pmp->pm_flags & MSDOSFSMNT_RONLY) == 0;
+
+	if (susp) {
+		error = vfs_write_suspend_umnt(mp);
+		if (error != 0)
+			return (error);
+	}
+
 	if ((mntflags & MNT_FORCE) != 0)
 		flags |= FORCECLOSE;
-	else if (error != 0)
-		return (error);
 	error = vflush(mp, 0, flags, curthread);
-	if (error != 0 && error != ENXIO)
+	if (error != 0 && error != ENXIO) {
+		if (susp)
+			vfs_write_resume(mp, VR_START_WRITE);
 		return (error);
-	if ((pmp->pm_flags & MSDOSFSMNT_RONLY) == 0) {
+	}
+	if (susp) {
 		error = markvoldirty(pmp, 0);
-		if (error && error != ENXIO) {
+		if (error != 0 && error != ENXIO) {
+			if (susp)
+				vfs_write_resume(mp, VR_START_WRITE);
 			(void)markvoldirty(pmp, 1);
 			return (error);
 		}
@@ -795,7 +811,7 @@ msdosfs_unmount(struct mount *mp, int mntflags)
 		printf("freef %p, freeb %p, mount %p\n",
 		    TAILQ_NEXT(vp, v_vnodelist), vp->v_vnodelist.tqe_prev,
 		    vp->v_mount);
-		printf("cleanblkhd %p, dirtyblkhd %p, numoutput %ld, type %d\n",
+		printf("cleanblkhd %p, dirtyblkhd %p, numoutput %d, type %d\n",
 		    TAILQ_FIRST(&vp->v_bufobj.bo_clean.bv_hd),
 		    TAILQ_FIRST(&vp->v_bufobj.bo_dirty.bv_hd),
 		    vp->v_bufobj.bo_numoutput, vp->v_type);
@@ -803,6 +819,9 @@ msdosfs_unmount(struct mount *mp, int mntflags)
 		BO_UNLOCK(bo);
 	}
 #endif
+	if (susp)
+		vfs_write_resume(mp, VR_START_WRITE);
+
 	g_topology_lock();
 	g_vfs_close(pmp->pm_cp);
 	g_topology_unlock();
@@ -924,7 +943,7 @@ loop:
 			VI_UNLOCK(vp);
 			continue;
 		}
-		error = vget(vp, LK_EXCLUSIVE | LK_NOWAIT | LK_INTERLOCK, td);
+		error = vget(vp, LK_EXCLUSIVE | LK_NOWAIT | LK_INTERLOCK);
 		if (error) {
 			if (error == ENOENT) {
 				MNT_VNODE_FOREACH_ALL_ABORT(mp, nvp);
@@ -953,6 +972,12 @@ loop:
 	error = msdosfs_fsiflush(pmp, waitfor);
 	if (error != 0)
 		allerror = error;
+
+	if (allerror == 0 && waitfor == MNT_SUSPEND) {
+		MNT_ILOCK(mp);
+		mp->mnt_kern_flag |= MNTK_SUSPEND2 | MNTK_SUSPENDED;
+		MNT_IUNLOCK(mp);
+	}
 	return (allerror);
 }
 

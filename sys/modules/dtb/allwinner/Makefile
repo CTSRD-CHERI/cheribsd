@@ -21,6 +21,7 @@ DTS=	\
 	sun8i-h3-nanopi-neo.dts \
 	sun8i-h3-orangepi-one.dts \
 	sun8i-h3-orangepi-pc.dts \
+	sun8i-h3-orangepi-pc-plus.dts \
 	sun8i-h3-orangepi-plus2e.dts
 
 DTSO=	sun8i-a83t-sid.dtso \
@@ -46,7 +47,9 @@ DTS=	\
 	allwinner/sun50i-a64-pinebook.dts \
 	allwinner/sun50i-a64-sopine-baseboard.dts \
 	allwinner/sun50i-h5-orangepi-pc2.dts \
-	allwinner/sun50i-h5-nanopi-neo2.dts
+	allwinner/sun50i-h5-nanopi-neo2.dts \
+	allwinner/sun50i-h6-pine-h64.dts \
+	allwinner/sun50i-h6-pine-h64-model-b.dts
 
 DTSO=	sun50i-a64-opp.dtso \
 	sun50i-a64-pwm.dtso \

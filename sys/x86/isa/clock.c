@@ -388,26 +388,6 @@ i8254_restore(void)
 		set_i8254_freq(MODE_STOP, 0);
 }
 
-#ifndef __amd64__
-/*
- * Restore all the timers non-atomically (XXX: should be atomically).
- *
- * This function is called from pmtimer_resume() to restore all the timers.
- * This should not be necessary, but there are broken laptops that do not
- * restore all the timers on resume. The APM spec was at best vague on the
- * subject.
- * pmtimer is used only with the old APM power management, and not with
- * acpi, which is required for amd64, so skip it in that case.
- */
-void
-timer_restore(void)
-{
-
-	i8254_restore();		/* restore i8254_freq and hz */
-	atrtc_restore();		/* reenable RTC interrupts */
-}
-#endif
-
 /* This is separate from startrtclock() so that it can be called early. */
 void
 i8254_init(void)
@@ -543,7 +523,7 @@ attimer_stop(struct eventtimer *et)
 {
 	device_t dev = (device_t)et->et_priv;
 	struct attimer_softc *sc = device_get_softc(dev);
-	
+
 	sc->mode = MODE_STOP;
 	sc->period = 0;
 	set_i8254_freq(sc->mode, sc->period);
@@ -563,7 +543,7 @@ static int
 attimer_probe(device_t dev)
 {
 	int result;
-	
+
 	result = ISA_PNP_PROBE(device_get_parent(dev), dev, attimer_ids);
 	/* ENOENT means no PnP-ID, device is hinted. */
 	if (result == ENOENT) {

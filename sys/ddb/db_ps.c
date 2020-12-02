@@ -347,7 +347,7 @@ dumpthread(volatile struct proc *p, volatile struct thread *td, int all)
 	char state[9], wprefix;
 	const char *wmesg;
 	const void *wchan;
-	
+
 	if (all) {
 		db_printf("%6d                  ", td->td_tid);
 		switch (td->td_state) {
@@ -611,8 +611,7 @@ db_findstack_cmd(db_expr_t addr, bool have_addr, db_expr_t dummy3 __unused,
 
 	FOREACH_PROC_IN_SYSTEM(p) {
 		FOREACH_THREAD_IN_PROC(p, td) {
-			if (td->td_kstack <= saddr && saddr < td->td_kstack +
-			    PAGE_SIZE * td->td_kstack_pages) {
+			if (kstack_contains(td, saddr, 1)) {
 				db_printf("Thread %p\n", td);
 				return;
 			}

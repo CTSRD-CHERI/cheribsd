@@ -38,6 +38,7 @@
 #include <linux/scatterlist.h>
 #include <linux/mm.h>
 #include <linux/page.h>
+#include <linux/sizes.h>
 
 #include <sys/systm.h>
 #include <sys/malloc.h>
@@ -274,7 +275,6 @@ static inline unsigned int dma_set_max_seg_size(struct device *dev,
 {
 	return (0);
 }
-
 
 #define dma_map_single(d, a, s, r) dma_map_single_attrs(d, a, s, r, NULL)
 #define dma_unmap_single(d, a, s, r) dma_unmap_single_attrs(d, a, s, r, NULL)

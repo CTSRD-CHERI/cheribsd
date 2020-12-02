@@ -65,6 +65,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/smp.h>
 #include <sys/stack.h>
 #include <sys/stat.h>
+#include <sys/dtrace_bsd.h>
 #include <sys/sysctl.h>
 #include <sys/filedesc.h>
 #include <sys/tty.h>
@@ -88,6 +89,8 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_page.h>
 #include <vm/uma.h>
 
+#include <fs/devfs/devfs.h>
+
 #ifdef COMPAT_FREEBSD32
 #include <compat/freebsd32/freebsd32.h>
 #include <compat/freebsd32/freebsd32_util.h>
@@ -109,13 +112,14 @@ MALLOC_DEFINE(M_SESSION, "session", "session header");
 static MALLOC_DEFINE(M_PROC, "proc", "Proc structures");
 MALLOC_DEFINE(M_SUBPROC, "subproc", "Proc sub-structures");
 
+static void fixjobc_enterpgrp(struct proc *p, struct pgrp *pgrp);
 static void doenterpgrp(struct proc *, struct pgrp *);
 static void orphanpg(struct pgrp *pg);
 static void fill_kinfo_aggregate(struct proc *p, struct kinfo_proc *kp);
 static void fill_kinfo_proc_only(struct proc *p, struct kinfo_proc *kp);
 static void fill_kinfo_thread(struct thread *td, struct kinfo_proc *kp,
     int preferthread);
-static void pgadjustjobc(struct pgrp *pgrp, int entering);
+static void pgadjustjobc(struct pgrp *pgrp, bool entering);
 static void pgdelete(struct pgrp *);
 static int proc_ctor(void *mem, int size, void *arg, int flags);
 static void proc_dtor(void *mem, int size, void *arg);
@@ -216,6 +220,9 @@ proc_ctor(void *mem, int size, void *arg, int flags)
 	struct thread *td;
 
 	p = (struct proc *)mem;
+#ifdef KDTRACE_HOOKS
+	kdtrace_proc_ctor(p);
+#endif
 	EVENTHANDLER_DIRECT_INVOKE(process_ctor, p);
 	td = FIRST_THREAD_IN_PROC(p);
 	if (td != NULL) {
@@ -252,6 +259,9 @@ proc_dtor(void *mem, int size, void *arg)
 		EVENTHANDLER_DIRECT_INVOKE(thread_dtor, td);
 	}
 	EVENTHANDLER_DIRECT_INVOKE(process_dtor, p);
+#ifdef KDTRACE_HOOKS
+	kdtrace_proc_dtor(p);
+#endif
 	if (p->p_ksi != NULL)
 		KASSERT(! KSI_ONQ(p->p_ksi), ("SIGCHLD queue"));
 }
@@ -467,30 +477,6 @@ pfind_any(pid_t pid)
 	return (_pfind(pid, true));
 }
 
-static struct proc *
-pfind_tid(pid_t tid)
-{
-	struct proc *p;
-	struct thread *td;
-
-	sx_slock(&allproc_lock);
-	FOREACH_PROC_IN_SYSTEM(p) {
-		PROC_LOCK(p);
-		if (p->p_state == PRS_NEW) {
-			PROC_UNLOCK(p);
-			continue;
-		}
-		FOREACH_THREAD_IN_PROC(p, td) {
-			if (td->td_tid == tid)
-				goto found;
-		}
-		PROC_UNLOCK(p);
-	}
-found:
-	sx_sunlock(&allproc_lock);
-	return (p);
-}
-
 /*
  * Locate a process group by number.
  * The caller must hold proctree_lock.
@@ -518,6 +504,7 @@ int
 pget(pid_t pid, int flags, struct proc **pp)
 {
 	struct proc *p;
+	struct thread *td1;
 	int error;
 
 	p = curproc;
@@ -531,7 +518,9 @@ pget(pid_t pid, int flags, struct proc **pp)
 			else
 				p = pfind(pid);
 		} else if ((flags & PGET_NOTID) == 0) {
-			p = pfind_tid(pid);
+			td1 = tdfind(pid, -1);
+			if (td1 != NULL)
+				p = td1->td_proc;
 		}
 		if (p == NULL)
 			return (ESRCH);
@@ -669,6 +658,72 @@ enterthispgrp(struct proc *p, struct pgrp *pgrp)
 }
 
 /*
+ * If true, any child of q which belongs to group pgrp, qualifies the
+ * process group pgrp as not orphaned.
+ */
+static bool
+isjobproc(struct proc *q, struct pgrp *pgrp)
+{
+	sx_assert(&proctree_lock, SX_LOCKED);
+	return (q->p_pgrp != pgrp &&
+	    q->p_pgrp->pg_session == pgrp->pg_session);
+}
+
+static struct proc *
+jobc_reaper(struct proc *p)
+{
+	struct proc *pp;
+
+	sx_assert(&proctree_lock, SX_LOCKED);
+
+	for (pp = p;;) {
+		pp = pp->p_reaper;
+		if (pp->p_reaper == pp ||
+		    (pp->p_treeflag & P_TREE_GRPEXITED) == 0)
+			return (pp);
+	}
+}
+
+static struct proc *
+jobc_parent(struct proc *p)
+{
+	struct proc *pp;
+
+	sx_assert(&proctree_lock, SX_LOCKED);
+
+	pp = proc_realparent(p);
+	if (pp->p_pptr == NULL ||
+	    (pp->p_treeflag & P_TREE_GRPEXITED) == 0)
+		return (pp);
+	return (jobc_reaper(pp));
+}
+
+#ifdef INVARIANTS
+static void
+check_pgrp_jobc(struct pgrp *pgrp)
+{
+	struct proc *q;
+	int cnt;
+
+	sx_assert(&proctree_lock, SX_LOCKED);
+	PGRP_LOCK_ASSERT(pgrp, MA_NOTOWNED);
+
+	cnt = 0;
+	PGRP_LOCK(pgrp);
+	LIST_FOREACH(q, &pgrp->pg_members, p_pglist) {
+		if ((q->p_treeflag & P_TREE_GRPEXITED) != 0 ||
+		    q->p_pptr == NULL)
+			continue;
+		if (isjobproc(jobc_parent(q), pgrp))
+			cnt++;
+	}
+	KASSERT(pgrp->pg_jobc == cnt, ("pgrp %d %p pg_jobc %d cnt %d",
+	    pgrp->pg_id, pgrp, pgrp->pg_jobc, cnt));
+	PGRP_UNLOCK(pgrp);
+}
+#endif
+
+/*
  * Move p to a process group
  */
 static void
@@ -684,13 +739,15 @@ doenterpgrp(struct proc *p, struct pgrp *pgrp)
 
 	savepgrp = p->p_pgrp;
 
+#ifdef INVARIANTS
+	check_pgrp_jobc(pgrp);
+	check_pgrp_jobc(savepgrp);
+#endif
+
 	/*
 	 * Adjust eligibility of affected pgrps to participate in job control.
-	 * Increment eligibility counts before decrementing, otherwise we
-	 * could reach 0 spuriously during the first call.
 	 */
-	fixjobc(p, pgrp, 1);
-	fixjobc(p, p->p_pgrp, 0);
+	fixjobc_enterpgrp(p, pgrp);
 
 	PGRP_LOCK(pgrp);
 	PGRP_LOCK(savepgrp);
@@ -741,7 +798,8 @@ pgdelete(struct pgrp *pgrp)
 
 	/*
 	 * Reset any sigio structures pointing to us as a result of
-	 * F_SETOWN with our pgid.
+	 * F_SETOWN with our pgid.  The proctree lock ensures that
+	 * new sigio structures will not be added after this point.
 	 */
 	funsetownlst(&pgrp->pg_sigiolst);
 
@@ -764,18 +822,39 @@ pgdelete(struct pgrp *pgrp)
 }
 
 static void
-pgadjustjobc(struct pgrp *pgrp, int entering)
+pgadjustjobc(struct pgrp *pgrp, bool entering)
 {
 
 	PGRP_LOCK(pgrp);
-	if (entering)
+	if (entering) {
+		MPASS(pgrp->pg_jobc >= 0);
 		pgrp->pg_jobc++;
-	else {
+	} else {
+		MPASS(pgrp->pg_jobc > 0);
 		--pgrp->pg_jobc;
 		if (pgrp->pg_jobc == 0)
 			orphanpg(pgrp);
 	}
 	PGRP_UNLOCK(pgrp);
+}
+
+static void
+fixjobc_enterpgrp_q(struct pgrp *pgrp, struct proc *p, struct proc *q, bool adj)
+{
+	struct pgrp *childpgrp;
+	bool future_jobc;
+
+	sx_assert(&proctree_lock, SX_LOCKED);
+
+	if ((q->p_treeflag & P_TREE_GRPEXITED) != 0)
+		return;
+	childpgrp = q->p_pgrp;
+	future_jobc = childpgrp != pgrp &&
+	    childpgrp->pg_session == pgrp->pg_session;
+
+	if ((adj && !isjobproc(p, childpgrp) && future_jobc) ||
+	    (!adj && isjobproc(p, childpgrp) && !future_jobc))
+		pgadjustjobc(childpgrp, adj);
 }
 
 /*
@@ -785,14 +864,12 @@ pgadjustjobc(struct pgrp *pgrp, int entering)
  * process group of the same session).  If that count reaches zero, the
  * process group becomes orphaned.  Check both the specified process'
  * process group and that of its children.
- * entering == 0 => p is leaving specified group.
- * entering == 1 => p is entering specified group.
+ * We increment eligibility counts before decrementing, otherwise we
+ * could reach 0 spuriously during the decrement.
  */
-void
-fixjobc(struct proc *p, struct pgrp *pgrp, int entering)
+static void
+fixjobc_enterpgrp(struct proc *p, struct pgrp *pgrp)
 {
-	struct pgrp *hispgrp;
-	struct session *mysession;
 	struct proc *q;
 
 	sx_assert(&proctree_lock, SX_LOCKED);
@@ -800,29 +877,100 @@ fixjobc(struct proc *p, struct pgrp *pgrp, int entering)
 	PGRP_LOCK_ASSERT(pgrp, MA_NOTOWNED);
 	SESS_LOCK_ASSERT(pgrp->pg_session, MA_NOTOWNED);
 
+	if (p->p_pgrp == pgrp)
+		return;
+
+	if (isjobproc(jobc_parent(p), pgrp))
+		pgadjustjobc(pgrp, true);
+	LIST_FOREACH(q, &p->p_children, p_sibling) {
+		if ((q->p_treeflag & P_TREE_ORPHANED) != 0)
+			continue;
+		fixjobc_enterpgrp_q(pgrp, p, q, true);
+	}
+	LIST_FOREACH(q, &p->p_orphans, p_orphan)
+		fixjobc_enterpgrp_q(pgrp, p, q, true);
+
+	if (isjobproc(jobc_parent(p), p->p_pgrp))
+		pgadjustjobc(p->p_pgrp, false);
+	LIST_FOREACH(q, &p->p_children, p_sibling) {
+		if ((q->p_treeflag & P_TREE_ORPHANED) != 0)
+			continue;
+		fixjobc_enterpgrp_q(pgrp, p, q, false);
+	}
+	LIST_FOREACH(q, &p->p_orphans, p_orphan)
+		fixjobc_enterpgrp_q(pgrp, p, q, false);
+}
+
+static void
+fixjobc_kill_q(struct proc *p, struct proc *q, bool adj)
+{
+	struct pgrp *childpgrp;
+
+	sx_assert(&proctree_lock, SX_LOCKED);
+
+	if ((q->p_treeflag & P_TREE_GRPEXITED) != 0)
+		return;
+	childpgrp = q->p_pgrp;
+
+	if ((adj && isjobproc(jobc_reaper(q), childpgrp) &&
+	    !isjobproc(p, childpgrp)) || (!adj && !isjobproc(jobc_reaper(q),
+	    childpgrp) && isjobproc(p, childpgrp)))
+		pgadjustjobc(childpgrp, adj);
+}
+
+static void
+fixjobc_kill(struct proc *p)
+{
+	struct proc *q;
+	struct pgrp *pgrp;
+
+	sx_assert(&proctree_lock, SX_LOCKED);
+	PROC_LOCK_ASSERT(p, MA_NOTOWNED);
+	pgrp = p->p_pgrp;
+	PGRP_LOCK_ASSERT(pgrp, MA_NOTOWNED);
+	SESS_LOCK_ASSERT(pgrp->pg_session, MA_NOTOWNED);
+#ifdef INVARIANTS
+	check_pgrp_jobc(pgrp);
+#endif
+
+	/*
+	 * p no longer affects process group orphanage for children.
+	 * It is marked by the flag because p is only physically
+	 * removed from its process group on wait(2).
+	 */
+	MPASS((p->p_treeflag & P_TREE_GRPEXITED) == 0);
+	p->p_treeflag |= P_TREE_GRPEXITED;
+
 	/*
 	 * Check p's parent to see whether p qualifies its own process
 	 * group; if so, adjust count for p's process group.
 	 */
-	mysession = pgrp->pg_session;
-	if ((hispgrp = p->p_pptr->p_pgrp) != pgrp &&
-	    hispgrp->pg_session == mysession)
-		pgadjustjobc(pgrp, entering);
+	if (isjobproc(jobc_parent(p), pgrp))
+		pgadjustjobc(pgrp, false);
 
 	/*
 	 * Check this process' children to see whether they qualify
-	 * their process groups; if so, adjust counts for children's
-	 * process groups.
+	 * their process groups after reparenting to reaper.  If so,
+	 * adjust counts for children's process groups.
 	 */
 	LIST_FOREACH(q, &p->p_children, p_sibling) {
-		hispgrp = q->p_pgrp;
-		if (hispgrp == pgrp ||
-		    hispgrp->pg_session != mysession)
+		if ((q->p_treeflag & P_TREE_ORPHANED) != 0)
 			continue;
-		if (q->p_state == PRS_ZOMBIE)
-			continue;
-		pgadjustjobc(hispgrp, entering);
+		fixjobc_kill_q(p, q, true);
 	}
+	LIST_FOREACH(q, &p->p_orphans, p_orphan)
+		fixjobc_kill_q(p, q, true);
+	LIST_FOREACH(q, &p->p_children, p_sibling) {
+		if ((q->p_treeflag & P_TREE_ORPHANED) != 0)
+			continue;
+		fixjobc_kill_q(p, q, false);
+	}
+	LIST_FOREACH(q, &p->p_orphans, p_orphan)
+		fixjobc_kill_q(p, q, false);
+
+#ifdef INVARIANTS
+	check_pgrp_jobc(pgrp);
+#endif
 }
 
 void
@@ -835,20 +983,8 @@ killjobc(void)
 
 	p = curproc;
 	MPASS(p->p_flag & P_WEXIT);
-	/*
-	 * Do a quick check to see if there is anything to do with the
-	 * proctree_lock held. pgrp and LIST_EMPTY checks are for fixjobc().
-	 */
-	PROC_LOCK(p);
-	if (!SESS_LEADER(p) &&
-	    (p->p_pgrp == p->p_pptr->p_pgrp) &&
-	    LIST_EMPTY(&p->p_children)) {
-		PROC_UNLOCK(p);
-		return;
-	}
-	PROC_UNLOCK(p);
+	sx_assert(&proctree_lock, SX_LOCKED);
 
-	sx_xlock(&proctree_lock);
 	if (SESS_LEADER(p)) {
 		sp = p->p_session;
 
@@ -890,12 +1026,11 @@ killjobc(void)
 				VOP_REVOKE(ttyvp, REVOKEALL);
 				VOP_UNLOCK(ttyvp);
 			}
-			vrele(ttyvp);
+			devfs_ctty_unref(ttyvp);
 			sx_xlock(&proctree_lock);
 		}
 	}
-	fixjobc(p, p->p_pgrp, 0);
-	sx_xunlock(&proctree_lock);
+	fixjobc_kill(p);
 }
 
 /*
@@ -950,6 +1085,16 @@ sess_release(struct session *s)
 
 #ifdef DDB
 
+static void
+db_print_pgrp_one(struct pgrp *pgrp, struct proc *p)
+{
+	db_printf(
+	    "    pid %d at %p pr %d pgrp %p e %d jc %d\n",
+	    p->p_pid, p, p->p_pptr == NULL ? -1 : p->p_pptr->p_pid,
+	    p->p_pgrp, (p->p_treeflag & P_TREE_GRPEXITED) != 0,
+	    p->p_pptr == NULL ? 0 : isjobproc(p->p_pptr, pgrp));
+}
+
 DB_SHOW_COMMAND(pgrpdump, pgrpdump)
 {
 	struct pgrp *pgrp;
@@ -958,19 +1103,15 @@ DB_SHOW_COMMAND(pgrpdump, pgrpdump)
 
 	for (i = 0; i <= pgrphash; i++) {
 		if (!LIST_EMPTY(&pgrphashtbl[i])) {
-			printf("\tindx %d\n", i);
+			db_printf("indx %d\n", i);
 			LIST_FOREACH(pgrp, &pgrphashtbl[i], pg_hash) {
-				printf(
-			"\tpgrp %p, pgid %ld, sess %p, sesscnt %d, mem %p\n",
-				    (void *)pgrp, (long)pgrp->pg_id,
-				    (void *)pgrp->pg_session,
+				db_printf(
+			"  pgrp %p, pgid %d, sess %p, sesscnt %d, mem %p\n",
+				    pgrp, (int)pgrp->pg_id, pgrp->pg_session,
 				    pgrp->pg_session->s_count,
-				    (void *)LIST_FIRST(&pgrp->pg_members));
-				LIST_FOREACH(p, &pgrp->pg_members, p_pglist) {
-					printf("\t\tpid %ld addr %p pgrp %p\n", 
-					    (long)p->p_pid, (void *)p,
-					    (void *)p->p_pgrp);
-				}
+				    LIST_FIRST(&pgrp->pg_members));
+				LIST_FOREACH(p, &pgrp->pg_members, p_pglist)
+					db_print_pgrp_one(pgrp, p);
 			}
 		}
 	}
@@ -1029,6 +1170,7 @@ fill_kinfo_proc_only(struct proc *p, struct kinfo_proc *kp)
 	kp->ki_traceflag = p->p_traceflag;
 #endif
 	kp->ki_fd = EXPORT_KPTR(p->p_fd);
+	kp->ki_pd = EXPORT_KPTR(p->p_pd);
 	kp->ki_vmspace = EXPORT_KPTR(p->p_vmspace);
 	kp->ki_flag = p->p_flag;
 	kp->ki_flag2 = p->p_flag2;
@@ -1528,6 +1670,7 @@ freebsd64_kinfo_proc_out(const struct kinfo_proc *ki, struct kinfo_proc64 *ki64)
 	PTRTRIM_CP(*ki, *ki64, ki_kstack);
 	PTRTRIM_CP(*ki, *ki64, ki_udata);
 	PTRTRIM_CP(*ki, *ki64, ki_tdaddr);
+	PTRTRIM_CP(*ki, *ki64, ki_pd);
 	CP(*ki, *ki64, ki_sflag);
 	CP(*ki, *ki64, ki_tdflags);
 }
@@ -1711,7 +1854,6 @@ sysctl_kern_proc_iterate(struct proc *p, void *origarg)
 	 * do by session.
 	 */
 	switch (oid_number) {
-
 	case KERN_PROC_GID:
 		if (p->p_ucred->cr_gid != (gid_t)name[0])
 			goto skip;
@@ -1765,7 +1907,6 @@ sysctl_kern_proc_iterate(struct proc *p, void *origarg)
 
 	default:
 		break;
-
 	}
 	error = sysctl_out_proc(p, req, flags);
 	PROC_LOCK_ASSERT(p, MA_NOTOWNED);
@@ -2424,7 +2565,7 @@ sysctl_kern_proc_pathname(SYSCTL_HANDLER_ARGS)
 	vref(vp);
 	if (*pidp != -1)
 		PROC_UNLOCK(p);
-	error = vn_fullpath(req->td, vp, &retbuf, &freebuf);
+	error = vn_fullpath(vp, &retbuf, &freebuf);
 	vrele(vp);
 	if (error)
 		return (error);
@@ -2562,8 +2703,7 @@ sysctl_kern_proc_ovmmap(SYSCTL_HANDLER_ARGS)
 			kve->kve_shadow_count = obj->shadow_count;
 			VM_OBJECT_RUNLOCK(obj);
 			if (vp != NULL) {
-				vn_fullpath(curthread, vp, &fullpath,
-				    &freepath);
+				vn_fullpath(vp, &fullpath, &freepath);
 				cred = curthread->td_ucred;
 				vn_lock(vp, LK_SHARED | LK_RETRY);
 				if (VOP_GETATTR(vp, &va, cred) == 0) {
@@ -2781,8 +2921,7 @@ kern_proc_vmmap_out(struct proc *p, struct sbuf *sb, ssize_t maxlen, int flags)
 			kve->kve_shadow_count = obj->shadow_count;
 			VM_OBJECT_RUNLOCK(obj);
 			if (vp != NULL) {
-				vn_fullpath(curthread, vp, &fullpath,
-				    &freepath);
+				vn_fullpath(vp, &fullpath, &freepath);
 				kve->kve_vn_type = vntype_to_kinfo(vp->v_type);
 				cred = curthread->td_ucred;
 				vn_lock(vp, LK_SHARED | LK_RETRY);
@@ -2917,9 +3056,10 @@ sysctl_kern_proc_kstack(SYSCTL_HANDLER_ARGS)
 		lwpidarray[i] = td->td_tid;
 		i++;
 	}
+	PROC_UNLOCK(p);
 	numthreads = i;
 	for (i = 0; i < numthreads; i++) {
-		td = thread_find(p, lwpidarray[i]);
+		td = tdfind(lwpidarray[i], p->p_pid);
 		if (td == NULL) {
 			continue;
 		}
@@ -2940,12 +3080,10 @@ sysctl_kern_proc_kstack(SYSCTL_HANDLER_ARGS)
 		sbuf_finish(&sb);
 		sbuf_delete(&sb);
 		error = SYSCTL_OUT(req, kkstp, sizeof(*kkstp));
-		PROC_LOCK(p);
 		if (error)
 			break;
 	}
-	_PRELE(p);
-	PROC_UNLOCK(p);
+	PRELE(p);
 	if (lwpidarray != NULL)
 		free(lwpidarray, M_TEMP);
 	stack_destroy(st);
@@ -3114,7 +3252,7 @@ sysctl_kern_proc_umask(SYSCTL_HANDLER_ARGS)
 	u_int namelen = arg2;
 	struct proc *p;
 	int error;
-	u_short fd_cmask;
+	u_short cmask;
 	pid_t pid;
 
 	if (namelen != 1)
@@ -3123,7 +3261,7 @@ sysctl_kern_proc_umask(SYSCTL_HANDLER_ARGS)
 	pid = (pid_t)name[0];
 	p = curproc;
 	if (pid == p->p_pid || pid == 0) {
-		fd_cmask = p->p_fd->fd_cmask;
+		cmask = p->p_pd->pd_cmask;
 		goto out;
 	}
 
@@ -3131,10 +3269,10 @@ sysctl_kern_proc_umask(SYSCTL_HANDLER_ARGS)
 	if (error != 0)
 		return (error);
 
-	fd_cmask = p->p_fd->fd_cmask;
+	cmask = p->p_pd->pd_cmask;
 	PRELE(p);
 out:
-	error = SYSCTL_OUT(req, &fd_cmask, sizeof(fd_cmask));
+	error = SYSCTL_OUT(req, &cmask, sizeof(cmask));
 	return (error);
 }
 

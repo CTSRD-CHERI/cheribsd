@@ -57,8 +57,8 @@ _WITH_STRSVIS!=	grep -c strsvis ${HOST_INCLUDE_ROOT}/vis.h 2>/dev/null || true
 .PATH: ${.CURDIR}/../../contrib/libc-vis
 INCS+=		vis.h
 SRCS+=		vis.c unvis.c
-CFLAGS.vis.c+=	-I${.CURDIR}/../../contrib/libc-vis
-CFLAGS.unvis.c+=	-I${.CURDIR}/../../contrib/libc-vis
+CFLAGS.vis.c+=	-I${.CURDIR}/../../contrib/libc-vis -DHAVE_VIS=0 -DHAVE_SVIS=0
+CFLAGS.unvis.c+=	-I${.CURDIR}/../../contrib/libc-vis -DHAVE_VIS=0 -DHAVE_SVIS=0
 .endif
 
 _WITH_REALLOCARRAY!= grep -c reallocarray ${HOST_INCLUDE_ROOT}/stdlib.h || true
@@ -237,6 +237,7 @@ SYSINCS+=	${SRCTOP}/sys/sys/elf32.h
 SYSINCS+=	${SRCTOP}/sys/sys/elf64.h
 SYSINCS+=	${SRCTOP}/sys/sys/elf_common.h
 SYSINCS+=	${SRCTOP}/sys/sys/elf_generic.h
+
 SYSINCS+=	${SRCTOP}/sys/sys/queue.h
 SYSINCS+=	${SRCTOP}/sys/sys/md5.h
 SYSINCS+=	${SRCTOP}/sys/sys/sbuf.h
@@ -246,7 +247,9 @@ SYSINCS+=	${SRCTOP}/sys/sys/tree.h
 SYSINCS+=	${SRCTOP}/sys/sys/consio.h
 # for gencat:
 INCS+=	${SRCTOP}/include/nl_types.h
-# for vtfontcvt:
+
+# vtfontcvt is using sys/font.h
+SYSINCS+=	${SRCTOP}/sys/sys/font.h
 SYSINCS+=	${SRCTOP}/sys/sys/fnv_hash.h
 # opensolaris compatibility
 INCS+=	${SRCTOP}/include/elf.h
@@ -264,8 +267,8 @@ SYSINCS+=	${SRCTOP}/sys/sys/elf.h
 # Linux/MacOS since we only use flags that are supported by all of them.
 _host_tools_to_symlink=	basename bzip2 bunzip2 chmod chown cmp comm cp date dd \
 	dirname echo env false find fmt gzip gunzip head hostname id ln ls \
-	mkdir mv nice patch rm sh sleep stat tee touch tr true uname uniq unxz \
-	wc which xz
+	mkdir mv nice patch rm sh sleep stat tee touch tr true \
+	uname uniq unxz wc which xz
 
 # We also need a symlink to the absolute path to the make binary used for
 # the toplevel makefile. This is not necessarily the same as `which make`

@@ -36,7 +36,6 @@
 #ifndef __ACPICA_MACHDEP_H__
 #define	__ACPICA_MACHDEP_H__
 
-
 #ifdef _KERNEL
 
 #include <machine/_bus.h>
@@ -56,6 +55,8 @@ struct acpi_generic_address;
 
 int	acpi_map_addr(struct acpi_generic_address  *, bus_space_tag_t *,
     bus_space_handle_t *, bus_size_t);
+
+extern int (*apei_nmi)(void);
 
 #endif /* _KERNEL */
 

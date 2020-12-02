@@ -2459,7 +2459,7 @@ static void mlx5_ib_handle_internal_error(struct mlx5_ib_dev *ibdev)
 	 * lock/unlock above locks Now need to arm all involved CQs.
 	 */
 	list_for_each_entry(mcq, &cq_armed_list, reset_notify) {
-		mcq->comp(mcq);
+		mcq->comp(mcq, NULL);
 	}
 	spin_unlock_irqrestore(&ibdev->reset_flow_resource_lock, flags);
 }
@@ -3399,5 +3399,5 @@ mlx5_ib_show_version(void __unused *arg)
 }
 SYSINIT(mlx5_ib_show_version, SI_SUB_DRIVERS, SI_ORDER_ANY, mlx5_ib_show_version, NULL);
 
-module_init_order(mlx5_ib_init, SI_ORDER_THIRD);
-module_exit_order(mlx5_ib_cleanup, SI_ORDER_THIRD);
+module_init_order(mlx5_ib_init, SI_ORDER_SEVENTH);
+module_exit_order(mlx5_ib_cleanup, SI_ORDER_SEVENTH);

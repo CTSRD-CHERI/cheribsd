@@ -363,7 +363,7 @@ vmm_init(void)
 	error = vmm_mem_init();
 	if (error)
 		return (error);
-	
+
 	if (vmm_is_intel())
 		ops = &vmm_ops_intel;
 	else if (vmm_is_svm())
@@ -999,8 +999,7 @@ vm_gpa_hold(struct vm *vm, int vcpuid, vm_paddr_t gpa, size_t len, int reqprot,
 	count = 0;
 	for (i = 0; i < VM_MAX_MEMMAPS; i++) {
 		mm = &vm->mem_maps[i];
-		if (sysmem_mapping(vm, mm) && gpa >= mm->gpa &&
-		    gpa < mm->gpa + mm->len) {
+		if (gpa >= mm->gpa && gpa < mm->gpa + mm->len) {
 			count = vm_fault_quick_hold_pages(&vm->vmspace->vm_map,
 			    (void *)(uintptr_t)trunc_page(gpa), PAGE_SIZE, reqprot, &m, 1);
 			break;
@@ -1076,7 +1075,7 @@ is_descriptor_table(int reg)
 static bool
 is_segment_register(int reg)
 {
-	
+
 	switch (reg) {
 	case VM_REG_GUEST_ES:
 	case VM_REG_GUEST_CS:
@@ -1503,7 +1502,7 @@ vm_handle_inst_emul(struct vm *vm, int vcpuid, bool *retu)
 	vcpu->nextrip += vie->num_processed;
 	VCPU_CTR1(vm, vcpuid, "nextrip updated to %#lx after instruction "
 	    "decoding", vcpu->nextrip);
- 
+
 	/* return to userland unless this is an in-kernel emulated device */
 	if (gpa >= DEFAULT_APIC_BASE && gpa < DEFAULT_APIC_BASE + PAGE_SIZE) {
 		mread = lapic_mmio_read;
@@ -2691,7 +2690,7 @@ vm_copyin(struct vm *vm, int vcpuid, struct vm_copyinfo *copyinfo, void *kaddr,
 {
 	char *dst;
 	int idx;
-	
+
 	dst = kaddr;
 	idx = 0;
 	while (len > 0) {

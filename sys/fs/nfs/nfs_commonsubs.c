@@ -50,6 +50,8 @@ __FBSDID("$FreeBSD$");
 
 #include <security/mac/mac_framework.h>
 
+#include <vm/vm_param.h>
+
 /*
  * Data items converted to xdr at startup, since they are constant
  * This is kinda hokey, but may save a little time doing byte swaps
@@ -350,6 +352,7 @@ nfscl_reqstart(struct nfsrv_descript *nd, int procnum, struct nfsmount *nmp,
 	}
 	nd->nd_procnum = procnum;
 	nd->nd_repstat = 0;
+	nd->nd_maxextsiz = 0;
 
 	/*
 	 * Get the first mbuf for the request.
@@ -360,8 +363,8 @@ nfscl_reqstart(struct nfsrv_descript *nd, int procnum, struct nfsmount *nmp,
 		NFSMGET(mb);
 	mb->m_len = 0;
 	nd->nd_mreq = nd->nd_mb = mb;
-	nd->nd_bpos = mtod(mb, caddr_t);
-	
+	nd->nd_bpos = mtod(mb, char *);
+
 	/*
 	 * And fill the first file handle into the request.
 	 */
@@ -493,6 +496,7 @@ nfscl_fillsattr(struct nfsrv_descript *nd, struct vattr *vap,
 	u_int32_t *tl;
 	struct nfsv2_sattr *sp;
 	nfsattrbit_t attrbits;
+	struct nfsnode *np;
 
 	switch (nd->nd_flag & (ND_NFSV2 | ND_NFSV3 | ND_NFSV4)) {
 	case ND_NFSV2:
@@ -594,6 +598,18 @@ nfscl_fillsattr(struct nfsrv_descript *nd, struct vattr *vap,
 			NFSSETBIT_ATTRBIT(&attrbits, NFSATTRBIT_TIMEACCESSSET);
 		if (vap->va_mtime.tv_sec != VNOVAL)
 			NFSSETBIT_ATTRBIT(&attrbits, NFSATTRBIT_TIMEMODIFYSET);
+		if (vap->va_birthtime.tv_sec != VNOVAL &&
+		    strcmp(vp->v_mount->mnt_vfc->vfc_name, "nfs") == 0) {
+			/*
+			 * We can only test for support of TimeCreate if
+			 * the "vp" argument is for an NFS vnode.
+			 */
+			np = VTONFS(vp);
+			if (NFSISSET_ATTRBIT(&np->n_vattr.na_suppattr,
+			    NFSATTRBIT_TIMECREATE))
+				NFSSETBIT_ATTRBIT(&attrbits,
+				    NFSATTRBIT_TIMECREATE);
+		}
 		(void) nfsv4_fillattr(nd, vp->v_mount, vp, NULL, vap, NULL, 0,
 		    &attrbits, NULL, NULL, 0, 0, 0, 0, (uint64_t)0, NULL);
 		break;
@@ -818,22 +834,38 @@ nfsm_strtom(struct nfsrv_descript *nd, const char *cp, int siz)
 	bytesize = NFSX_UNSIGNED + siz + rem;
 	m2 = nd->nd_mb;
 	cp2 = nd->nd_bpos;
-	left = M_TRAILINGSPACE(m2);
+	if ((nd->nd_flag & ND_EXTPG) != 0)
+		left = nd->nd_bextpgsiz;
+	else
+		left = M_TRAILINGSPACE(m2);
 
+	KASSERT(((m2->m_flags & (M_EXT | M_EXTPG)) ==
+	    (M_EXT | M_EXTPG) && (nd->nd_flag & ND_EXTPG) != 0) ||
+	    ((m2->m_flags & (M_EXT | M_EXTPG)) !=
+	    (M_EXT | M_EXTPG) && (nd->nd_flag & ND_EXTPG) == 0),
+	    ("nfsm_strtom: ext_pgs and non-ext_pgs mbufs mixed"));
 	/*
 	 * Loop around copying the string to mbuf(s).
 	 */
 	while (siz > 0) {
 		if (left == 0) {
-			if (siz > ncl_mbuf_mlen)
-				NFSMCLGET(m1, M_WAITOK);
-			else
-				NFSMGET(m1);
-			m1->m_len = 0;
-			m2->m_next = m1;
-			m2 = m1;
-			cp2 = mtod(m2, caddr_t);
-			left = M_TRAILINGSPACE(m2);
+			if ((nd->nd_flag & ND_EXTPG) != 0) {
+				m2 = nfsm_add_ext_pgs(m2,
+				    nd->nd_maxextsiz, &nd->nd_bextpg);
+				cp2 = (char *)(void *)PHYS_TO_DMAP(
+				    m2->m_epg_pa[nd->nd_bextpg]);
+				nd->nd_bextpgsiz = left = PAGE_SIZE;
+			} else {
+				if (siz > ncl_mbuf_mlen)
+					NFSMCLGET(m1, M_WAITOK);
+				else
+					NFSMGET(m1);
+				m1->m_len = 0;
+				cp2 = mtod(m1, char *);
+				left = M_TRAILINGSPACE(m1);
+				m2->m_next = m1;
+				m2 = m1;
+			}
 		}
 		if (left >= siz)
 			xfer = siz;
@@ -841,18 +873,31 @@ nfsm_strtom(struct nfsrv_descript *nd, const char *cp, int siz)
 			xfer = left;
 		NFSBCOPY(cp, cp2, xfer);
 		cp += xfer;
+		cp2 += xfer;
 		m2->m_len += xfer;
 		siz -= xfer;
 		left -= xfer;
+		if ((nd->nd_flag & ND_EXTPG) != 0) {
+			nd->nd_bextpgsiz -= xfer;
+			m2->m_epg_last_len += xfer;
+		}
 		if (siz == 0 && rem) {
 			if (left < rem)
 				panic("nfsm_strtom");
-			NFSBZERO(cp2 + xfer, rem);
+			NFSBZERO(cp2, rem);
 			m2->m_len += rem;
+			cp2 += rem;
+			if ((nd->nd_flag & ND_EXTPG) != 0) {
+				nd->nd_bextpgsiz -= rem;
+				m2->m_epg_last_len += rem;
+			}
 		}
 	}
 	nd->nd_mb = m2;
-	nd->nd_bpos = mtod(m2, caddr_t) + m2->m_len;
+	if ((nd->nd_flag & ND_EXTPG) != 0)
+		nd->nd_bpos = cp2;
+	else
+		nd->nd_bpos = mtod(m2, char *) + m2->m_len;
 	return (bytesize);
 }
 
@@ -1001,25 +1046,6 @@ nfsaddr2_match(NFSSOCKADDR_T nam1, NFSSOCKADDR_T nam2)
 #endif
 	}
 	return (0);
-}
-
-/*
- * Trim trailing data off the mbuf list being built.
- */
-void
-newnfs_trimtrailing(nd, mb, bpos)
-	struct nfsrv_descript *nd;
-	struct mbuf *mb;
-	caddr_t bpos;
-{
-
-	if (mb->m_next) {
-		m_freem(mb->m_next);
-		mb->m_next = NULL;
-	}
-	mb->m_len = bpos - mtod(mb, caddr_t);
-	nd->nd_mb = mb;
-	nd->nd_bpos = bpos;
 }
 
 /*
@@ -1401,9 +1427,9 @@ nfsv4_loadattr(struct nfsrv_descript *nd, vnode_t vp,
 			if (compare) {
 			    if (*retcmpp == 0) {
 				if (thyp != (u_int64_t)
-				    vfs_statfs(vnode_mount(vp))->f_fsid.val[0] ||
+				    vp->v_mount->mnt_stat.f_fsid.val[0] ||
 				    thyp2 != (u_int64_t)
-				    vfs_statfs(vnode_mount(vp))->f_fsid.val[1])
+				    vp->v_mount->mnt_stat.f_fsid.val[1])
 					*retcmpp = NFSERR_NOTSAME;
 			    }
 			} else if (nap != NULL) {
@@ -1875,9 +1901,8 @@ nfsv4_loadattr(struct nfsrv_descript *nd, vnode_t vp,
 			     */
 			    savuid = p->p_cred->p_ruid;
 			    p->p_cred->p_ruid = cred->cr_uid;
-			    if (!VFS_QUOTACTL(vnode_mount(vp),QCMD(Q_GETQUOTA,
-				USRQUOTA), cred->cr_uid,
-				(struct dqblk * __capability)&dqb))
+			    if (!VFS_QUOTACTL(vp->v_mount,QCMD(Q_GETQUOTA,
+				USRQUOTA), cred->cr_uid, &dqb))
 				freenum = min(dqb.dqb_bhardlimit, freenum);
 			    p->p_cred->p_ruid = savuid;
 #endif	/* QUOTA */
@@ -1905,9 +1930,8 @@ nfsv4_loadattr(struct nfsrv_descript *nd, vnode_t vp,
 			     */
 			    savuid = p->p_cred->p_ruid;
 			    p->p_cred->p_ruid = cred->cr_uid;
-			    if (!VFS_QUOTACTL(vnode_mount(vp),QCMD(Q_GETQUOTA,
-				USRQUOTA), cred->cr_uid,
-				(struct dqblk * __capability)&dqb))
+			    if (!VFS_QUOTACTL(vp->v_mount,QCMD(Q_GETQUOTA,
+				USRQUOTA), cred->cr_uid, &dqb))
 				freenum = min(dqb.dqb_bsoftlimit, freenum);
 			    p->p_cred->p_ruid = savuid;
 #endif	/* QUOTA */
@@ -1932,9 +1956,8 @@ nfsv4_loadattr(struct nfsrv_descript *nd, vnode_t vp,
 			     */
 			    savuid = p->p_cred->p_ruid;
 			    p->p_cred->p_ruid = cred->cr_uid;
-			    if (!VFS_QUOTACTL(vnode_mount(vp),QCMD(Q_GETQUOTA,
-				USRQUOTA), cred->cr_uid,
-				(struct dqblk * __capability)&dqb))
+			    if (!VFS_QUOTACTL(vp->v_mount,QCMD(Q_GETQUOTA,
+				USRQUOTA), cred->cr_uid, &dqb))
 				freenum = dqb.dqb_curblocks;
 			    p->p_cred->p_ruid = savuid;
 #endif	/* QUOTA */
@@ -2045,8 +2068,15 @@ nfsv4_loadattr(struct nfsrv_descript *nd, vnode_t vp,
 			break;
 		case NFSATTRBIT_TIMECREATE:
 			NFSM_DISSECT(tl, u_int32_t *, NFSX_V4TIME);
-			if (compare && !(*retcmpp))
-				*retcmpp = NFSERR_ATTRNOTSUPP;
+			fxdr_nfsv4time(tl, &temptime);
+			if (compare) {
+			    if (!(*retcmpp)) {
+				if (!NFS_CMPTIME(temptime, nap->na_btime))
+					*retcmpp = NFSERR_NOTSAME;
+			    }
+			} else if (nap != NULL) {
+				nap->na_btime = temptime;
+			}
 			attrsum += NFSX_V4TIME;
 			break;
 		case NFSATTRBIT_TIMEDELTA:
@@ -2528,7 +2558,7 @@ nfsv4_fillattr(struct nfsrv_descript *nd, struct mount *mp, vnode_t vp,
 				xattrsupp = true;
 		}
 	}
-	
+
 	/*
 	 * Put out the attribute bitmap for the ones being filled in
 	 * and get the field for the number of attributes returned.
@@ -2928,6 +2958,11 @@ nfsv4_fillattr(struct nfsrv_descript *nd, struct mount *mp, vnode_t vp,
 			txdr_nfsv4time(&vap->va_mtime, tl);
 			retnum += NFSX_V4TIME;
 			break;
+		case NFSATTRBIT_TIMECREATE:
+			NFSM_BUILD(tl, u_int32_t *, NFSX_V4TIME);
+			txdr_nfsv4time(&vap->va_birthtime, tl);
+			retnum += NFSX_V4TIME;
+			break;
 		case NFSATTRBIT_TIMEMODIFYSET:
 			if ((vap->va_vaflags & VA_UTIMES_NULL) == 0) {
 				NFSM_BUILD(tl, u_int32_t *, NFSX_V4SETTIME);
@@ -3240,7 +3275,7 @@ tryagain:
 			len -= (nfsrv_dnsnamelen + 1);
 			*(cp - 1) = '\0';
 		}
-	
+
 		/*
 		 * Check for the special case of "nobody".
 		 */
@@ -3249,7 +3284,7 @@ tryagain:
 			error = 0;
 			goto out;
 		}
-	
+
 		hp = NFSUSERNAMEHASH(str, len);
 		mtx_lock(&hp->mtx);
 		TAILQ_FOREACH(usrp, &hp->lughead, lug_namehash) {
@@ -3452,7 +3487,7 @@ tryagain:
 			len -= (nfsrv_dnsnamelen + 1);
 			*(cp - 1) = '\0';
 		}
-	
+
 		/*
 		 * Check for the special case of "nogroup".
 		 */
@@ -3461,7 +3496,7 @@ tryagain:
 			error = 0;
 			goto out;
 		}
-	
+
 		hp = NFSGROUPNAMEHASH(str, len);
 		mtx_lock(&hp->mtx);
 		TAILQ_FOREACH(usrp, &hp->lughead, lug_namehash) {
@@ -3591,7 +3626,7 @@ nfsrv_nfsuserdport(struct nfsuserd_args *nargs, NFSPROC_T *p)
  	}
 	rp->nr_vers = RPCNFSUSERD_VERS;
 	if (error == 0)
-		error = newnfs_connect(NULL, rp, NFSPROCCRED(p), p, 0);
+		error = newnfs_connect(NULL, rp, NFSPROCCRED(p), p, 0, false);
 	if (error == 0) {
 		NFSLOCKNAMEID();
 		nfsrv_nfsuserd = RUNNING;
@@ -4395,21 +4430,30 @@ nfsrvd_rephead(struct nfsrv_descript *nd)
 {
 	struct mbuf *mreq;
 
-	/*
-	 * If this is a big reply, use a cluster.
-	 */
-	if ((nd->nd_flag & ND_GSSINITREPLY) == 0 &&
-	    nfs_bigreply[nd->nd_procnum]) {
-		NFSMCLGET(mreq, M_WAITOK);
-		nd->nd_mreq = mreq;
-		nd->nd_mb = mreq;
+	if ((nd->nd_flag & ND_EXTPG) != 0) {
+		mreq = mb_alloc_ext_plus_pages(PAGE_SIZE, M_WAITOK);
+		nd->nd_mreq = nd->nd_mb = mreq;
+		nd->nd_bpos = (char *)(void *)
+		    PHYS_TO_DMAP(mreq->m_epg_pa[0]);
+		nd->nd_bextpg = 0;
+		nd->nd_bextpgsiz = PAGE_SIZE;
 	} else {
-		NFSMGET(mreq);
-		nd->nd_mreq = mreq;
-		nd->nd_mb = mreq;
+		/*
+		 * If this is a big reply, use a cluster.
+		 */
+		if ((nd->nd_flag & ND_GSSINITREPLY) == 0 &&
+		    nfs_bigreply[nd->nd_procnum]) {
+			NFSMCLGET(mreq, M_WAITOK);
+			nd->nd_mreq = mreq;
+			nd->nd_mb = mreq;
+		} else {
+			NFSMGET(mreq);
+			nd->nd_mreq = mreq;
+			nd->nd_mb = mreq;
+		}
+		nd->nd_bpos = mtod(mreq, char *);
+		mreq->m_len = 0;
 	}
-	nd->nd_bpos = mtod(mreq, caddr_t);
-	mreq->m_len = 0;
 
 	if ((nd->nd_flag & ND_GSSINITREPLY) == 0)
 		NFSM_BUILD(nd->nd_errp, int *, NFSX_UNSIGNED);
@@ -4791,9 +4835,71 @@ void
 nfsm_set(struct nfsrv_descript *nd, u_int offs)
 {
 	struct mbuf *m;
+	int rlen;
 
 	m = nd->nd_mb;
-	nd->nd_bpos = mtod(m, char *) + offs;
+	if ((m->m_flags & M_EXTPG) != 0) {
+		nd->nd_bextpg = 0;
+		while (offs > 0) {
+			if (nd->nd_bextpg == 0)
+				rlen = m_epg_pagelen(m, 0, m->m_epg_1st_off);
+			else
+				rlen = m_epg_pagelen(m, nd->nd_bextpg, 0);
+			if (offs <= rlen)
+				break;
+			offs -= rlen;
+			nd->nd_bextpg++;
+			if (nd->nd_bextpg == m->m_epg_npgs) {
+				printf("nfsm_set: build offs "
+				    "out of range\n");
+				nd->nd_bextpg--;
+				break;
+			}
+		}
+		nd->nd_bpos = (char *)(void *)
+		    PHYS_TO_DMAP(m->m_epg_pa[nd->nd_bextpg]);
+		if (nd->nd_bextpg == 0)
+			nd->nd_bpos += m->m_epg_1st_off;
+		if (offs > 0) {
+			nd->nd_bpos += offs;
+			nd->nd_bextpgsiz = rlen - offs;
+		} else if (nd->nd_bextpg == 0)
+			nd->nd_bextpgsiz = PAGE_SIZE - m->m_epg_1st_off;
+		else
+			nd->nd_bextpgsiz = PAGE_SIZE;
+	} else
+		nd->nd_bpos = mtod(m, char *) + offs;
+}
+
+/*
+ * Grow a ext_pgs mbuf list.  Either allocate another page or add
+ * an mbuf to the list.
+ */
+struct mbuf *
+nfsm_add_ext_pgs(struct mbuf *m, int maxextsiz, int *bextpg)
+{
+	struct mbuf *mp;
+	vm_page_t pg;
+
+	if ((m->m_epg_npgs + 1) * PAGE_SIZE > maxextsiz) {
+		mp = mb_alloc_ext_plus_pages(PAGE_SIZE, M_WAITOK);
+		*bextpg = 0;
+		m->m_next = mp;
+	} else {
+		do {
+			pg = vm_page_alloc(NULL, 0, VM_ALLOC_NORMAL |
+			    VM_ALLOC_NOOBJ | VM_ALLOC_NODUMP |
+			    VM_ALLOC_WIRED);
+			if (pg == NULL)
+				vm_wait(NULL);
+		} while (pg == NULL);
+		m->m_epg_pa[m->m_epg_npgs] = VM_PAGE_TO_PHYS(pg);
+		*bextpg = m->m_epg_npgs;
+		m->m_epg_npgs++;
+		m->m_epg_last_len = 0;
+		mp = m;
+	}
+	return (mp);
 }
 // CHERI CHANGES START
 // {

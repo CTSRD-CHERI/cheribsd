@@ -55,6 +55,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/proc.h>
 #include <sys/rwlock.h>
 #include <sys/rmlock.h>
+#include <sys/sdt.h>
 #include <sys/socket.h>
 #include <sys/socketvar.h>
 #include <sys/sysctl.h>
@@ -64,6 +65,7 @@ __FBSDID("$FreeBSD$");
 #include <net/if.h>
 #include <net/if_var.h>
 #include <net/route.h>
+#include <net/route/nhop.h>
 #include <net/pfil.h>
 #include <net/vnet.h>
 
@@ -104,6 +106,18 @@ __FBSDID("$FreeBSD$");
 #ifdef MAC
 #include <security/mac/mac_framework.h>
 #endif
+
+#define	IPFW_PROBE(probe, arg0, arg1, arg2, arg3, arg4, arg5)		\
+    SDT_PROBE6(ipfw, , , probe, arg0, arg1, arg2, arg3, arg4, arg5)
+
+SDT_PROVIDER_DEFINE(ipfw);
+SDT_PROBE_DEFINE6(ipfw, , , rule__matched,
+    "int",			/* retval */
+    "int",			/* af */
+    "void *",			/* src addr */
+    "void *",			/* dst addr */
+    "struct ip_fw_args *",	/* args */
+    "struct ip_fw *"		/* rule */);
 
 /*
  * static variables followed by global ones.
@@ -230,7 +244,6 @@ SYSEND
 
 #endif /* SYSCTL_NODE */
 
-
 /*
  * Some macros used in the various matching options.
  * L3HDR maps an ipv4 pointer into a layer3 header pointer of type T
@@ -309,7 +322,6 @@ ipopts_match(struct ip *ip, ipfw_insn *cmd)
 				return 0; /* invalid or truncated */
 		}
 		switch (opt) {
-
 		default:
 			break;
 
@@ -466,9 +478,10 @@ verify_path(struct in_addr src, struct ifnet *ifp, u_int fib)
 #if defined(USERSPACE) || !defined(__FreeBSD__)
 	return 0;
 #else
-	struct nhop4_basic nh4;
+	struct nhop_object *nh;
 
-	if (fib4_lookup_nh_basic(fib, src, NHR_IFAIF, 0, &nh4) != 0)
+	nh = fib4_lookup(fib, src, 0, NHR_NONE, 0);
+	if (nh == NULL)
 		return (0);
 
 	/*
@@ -478,15 +491,15 @@ verify_path(struct in_addr src, struct ifnet *ifp, u_int fib)
 	 * routing entry (via lo0) for our own address
 	 * may exist, so we need to handle routing assymetry.
 	 */
-	if (ifp != NULL && ifp != nh4.nh_ifp)
+	if (ifp != NULL && ifp != nh->nh_aifp)
 		return (0);
 
 	/* if no ifp provided, check if rtentry is not default route */
-	if (ifp == NULL && (nh4.nh_flags & NHF_DEFAULT) != 0)
+	if (ifp == NULL && (nh->nh_flags & NHF_DEFAULT) != 0)
 		return (0);
 
 	/* or if this is a blackhole/reject route */
-	if (ifp == NULL && (nh4.nh_flags & (NHF_REJECT|NHF_BLACKHOLE)) != 0)
+	if (ifp == NULL && (nh->nh_flags & (NHF_REJECT|NHF_BLACKHOLE)) != 0)
 		return (0);
 
 	/* found valid route */
@@ -755,17 +768,17 @@ ipfw_send_pkt(struct mbuf *replyto, struct ipfw_flow_id *id, u_int32_t seq,
  * ipv6 specific rules here...
  */
 static __inline int
-icmp6type_match (int type, ipfw_insn_u32 *cmd)
+icmp6type_match(int type, ipfw_insn_u32 *cmd)
 {
 	return (type <= ICMP6_MAXTYPE && (cmd->d[type/32] & (1<<(type%32)) ) );
 }
 
 static int
-flow6id_match( int curr_flow, ipfw_insn_u32 *cmd )
+flow6id_match(int curr_flow, ipfw_insn_u32 *cmd)
 {
 	int i;
-	for (i=0; i <= cmd->o.arg1; ++i )
-		if (curr_flow == cmd->d[i] )
+	for (i=0; i <= cmd->o.arg1; ++i)
+		if (curr_flow == cmd->d[i])
 			return 1;
 	return 0;
 }
@@ -805,24 +818,25 @@ ipfw_localip6(struct in6_addr *in6)
 static int
 verify_path6(struct in6_addr *src, struct ifnet *ifp, u_int fib)
 {
-	struct nhop6_basic nh6;
+	struct nhop_object *nh;
 
 	if (IN6_IS_SCOPE_LINKLOCAL(src))
 		return (1);
 
-	if (fib6_lookup_nh_basic(fib, src, 0, NHR_IFAIF, 0, &nh6) != 0)
+	nh = fib6_lookup(fib, src, 0, NHR_NONE, 0);
+	if (nh == NULL)
 		return (0);
 
 	/* If ifp is provided, check for equality with route table. */
-	if (ifp != NULL && ifp != nh6.nh_ifp)
+	if (ifp != NULL && ifp != nh->nh_aifp)
 		return (0);
 
 	/* if no ifp provided, check if rtentry is not default route */
-	if (ifp == NULL && (nh6.nh_flags & NHF_DEFAULT) != 0)
+	if (ifp == NULL && (nh->nh_flags & NHF_DEFAULT) != 0)
 		return (0);
 
 	/* or if this is a blackhole/reject route */
-	if (ifp == NULL && (nh6.nh_flags & (NHF_REJECT|NHF_BLACKHOLE)) != 0)
+	if (ifp == NULL && (nh->nh_flags & (NHF_REJECT|NHF_BLACKHOLE)) != 0)
 		return (0);
 
 	/* found valid route */
@@ -974,7 +988,6 @@ send_reject6(struct ip_fw_args *args, int code, u_int hlen, struct ip6_hdr *ip6)
 }
 
 #endif /* INET6 */
-
 
 /*
  * sends a reject message, consuming the mbuf passed as an argument.
@@ -1941,7 +1954,23 @@ do {								\
 				break;
 
 			case O_FRAG:
-				match = (offset != 0);
+				if (is_ipv4) {
+					/*
+					 * Since flags_match() works with
+					 * uint8_t we pack ip_off into 8 bits.
+					 * For this match offset is a boolean.
+					 */
+					match = flags_match(cmd,
+					    ((ntohs(ip->ip_off) & ~IP_OFFMASK)
+					    >> 8) | (offset != 0));
+				} else {
+					/*
+					 * Compatiblity: historically bare
+					 * "frag" would match IPv6 fragments.
+					 */
+					match = (cmd->arg1 == 0x1 &&
+					    (offset != 0));
+				}
 				break;
 
 			case O_IN:	/* "out" is "not in" */
@@ -2179,7 +2208,6 @@ do {								\
 #endif
 				break;
 
-
 			case O_IP_SRCPORT:
 			case O_IP_DSTPORT:
 				/*
@@ -2225,7 +2253,7 @@ do {								\
 				break;
 
 			case O_IPVER:
-				match = (is_ipv4 &&
+				match = ((is_ipv4 || is_ipv6) &&
 				    cmd->arg1 == ip->ip_v);
 				break;
 
@@ -3222,6 +3250,13 @@ do {								\
 		struct ip_fw *rule = chain->map[f_pos];
 		/* Update statistics */
 		IPFW_INC_RULE_COUNTER(rule, pktlen);
+		IPFW_PROBE(rule__matched, retval,
+		    is_ipv4 ? AF_INET : AF_INET6,
+		    is_ipv4 ? (uintptr_t)&src_ip :
+		        (uintptr_t)&args->f_id.src_ip6,
+		    is_ipv4 ? (uintptr_t)&dst_ip :
+		        (uintptr_t)&args->f_id.dst_ip6,
+		    args, rule);
 	} else {
 		retval = IP_FW_DENY;
 		printf("ipfw: ouch!, skip past end of rules, denying packet\n");
@@ -3543,7 +3578,7 @@ SYSINIT(ipfw_init, IPFW_SI_SUB_FIREWALL, IPFW_MODULE_ORDER,
 	    ipfw_init, NULL);
 VNET_SYSINIT(vnet_ipfw_init, IPFW_SI_SUB_FIREWALL, IPFW_VNET_ORDER,
 	    vnet_ipfw_init, NULL);
- 
+
 /*
  * Closing up shop. These are done in REVERSE ORDER, but still
  * after ipfwmod() has been called. Not called on reboot.

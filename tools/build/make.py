@@ -81,14 +81,6 @@ def bootstrap_bmake(source_root, objdir_prefix):
         "--with-default-sys-path=" + str(bmake_install_dir / "share/mk"),
         "--with-machine=amd64",  # TODO? "--with-machine-arch=amd64",
         "--without-filemon", "--prefix=" + str(bmake_install_dir)]
-
-    if Path("/bin/sh").resolve().name == "dash":
-        # Note: we have to avoid using dash as the default shell since it
-        # filters out variables containing characters such as '-' and that
-        # breaks the bmake bootstrap tests.
-        # TODO: remove this when the bootstrap tests have been fixed.
-        configure_args.append("--with-defshell=/bin/bash")
-
     try:
         run(["sh", bmake_source_dir / "boot-strap"] + configure_args,
             cwd=str(bmake_build_dir), env=env)
@@ -129,6 +121,9 @@ def check_required_make_env_var(varname, binary_name, bindir):
                  " does not exist")
     new_env_vars[varname] = guess
     debug("Inferred", varname, "as", guess)
+    global parsed_args
+    if parsed_args.debug:
+        run([guess, "--version"])
 
 
 def default_cross_toolchain():
@@ -202,6 +197,9 @@ if __name__ == "__main__":
 
         if parsed_args.host_compiler_type == "gcc":
             default_cc, default_cxx, default_cpp = ("gcc", "g++", "cpp")
+        # FIXME: this should take values like `clang-9` and then look for
+        # clang-cpp-9, etc. Would alleviate the need to set the bindir on
+        # ubuntu/debian at least.
         elif parsed_args.host_compiler_type == "clang":
             default_cc, default_cxx, default_cpp = (
                 "clang", "clang++", "clang-cpp")
@@ -233,7 +231,6 @@ if __name__ == "__main__":
     debug("Adding -DWITH_AUTO_OBJ")
     bmake_args.append("-DWITH_AUTO_OBJ")
     if parsed_args.clean is False:
-        bmake_args.append("-DNO_CLEAN")
         bmake_args.append("-DWITHOUT_CLEAN")
     if (parsed_args.clean is None and not is_make_var_set("NO_CLEAN")
             and not is_make_var_set("WITHOUT_CLEAN")):
@@ -250,7 +247,5 @@ if __name__ == "__main__":
         shlex.quote(s) for s in [str(bmake_binary)] + bmake_args)
     debug("Running `env ", env_cmd_str, " ", make_cmd_str, "`", sep="")
     os.environ.update(new_env_vars)
-    if parsed_args.debug:
-        input("Press enter to continue...")
     os.chdir(str(source_root))
     os.execv(str(bmake_binary), [str(bmake_binary)] + bmake_args)

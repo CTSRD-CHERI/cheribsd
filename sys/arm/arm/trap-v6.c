@@ -169,7 +169,8 @@ static const struct abort aborts[] = {
 };
 
 static __inline void
-call_trapsignal(struct thread *td, int sig, int code, vm_offset_t addr)
+call_trapsignal(struct thread *td, int sig, int code, vm_offset_t addr,
+    int trapno)
 {
 	ksiginfo_t ksi;
 
@@ -185,6 +186,7 @@ call_trapsignal(struct thread *td, int sig, int code, vm_offset_t addr)
 	ksi.ksi_signo = sig;
 	ksi.ksi_code = code;
 	ksi.ksi_addr = (void *)addr;
+	ksi.ksi_trapno = trapno;
 	trapsignal(td, &ksi);
 }
 
@@ -252,7 +254,7 @@ abort_debug(struct trapframe *tf, u_int fsr, u_int prefetch, bool usermode,
 		struct thread *td;
 
 		td = curthread;
-		call_trapsignal(td, SIGTRAP, TRAP_BRKPT, far);
+		call_trapsignal(td, SIGTRAP, TRAP_BRKPT, far, FAULT_DEBUG);
 		userret(td, tf);
 	} else {
 #ifdef KDB
@@ -462,8 +464,11 @@ abort_handler(struct trapframe *tf, int prefetch)
 		/*
 		 * Don't allow user-mode faults in kernel address space.
 		 */
-		if (usermode)
+		if (usermode) {
+			ksig.sig = SIGSEGV;
+			ksig.code = SEGV_ACCERR;
 			goto nogo;
+		}
 
 		map = kernel_map;
 	} else {
@@ -472,8 +477,11 @@ abort_handler(struct trapframe *tf, int prefetch)
 		 * is NULL or curproc->p_vmspace is NULL the fault is fatal.
 		 */
 		vm = (p != NULL) ? p->p_vmspace : NULL;
-		if (vm == NULL)
+		if (vm == NULL) {
+			ksig.sig = SIGSEGV;
+			ksig.code = 0;
 			goto nogo;
+		}
 
 		map = &vm->vm_map;
 		if (!usermode && (td->td_intr_nesting_level != 0 ||
@@ -523,7 +531,7 @@ nogo:
 	ksig.addr = far;
 
 do_trapsignal:
-	call_trapsignal(td, ksig.sig, ksig.code, ksig.addr);
+	call_trapsignal(td, ksig.sig, ksig.code, ksig.addr, idx);
 out:
 	if (usermode)
 		userret(td, tf);

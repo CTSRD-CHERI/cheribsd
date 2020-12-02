@@ -58,6 +58,7 @@ int main(int, char**)
                   "decltype(nullptr) == nullptr_t");
     static_assert(sizeof(nullptr_t) == sizeof(void*),
                   "sizeof(nullptr_t) == sizeof(void*)");
+#if TEST_STD_VER >= 11
 #if TEST_STD_VER > 17
 //   P0767
     static_assert(std::is_trivial<max_align_t>::value,
@@ -80,6 +81,7 @@ int main(int, char**)
                   std::alignment_of<void*>::value,
                   "std::alignment_of<max_align_t>::value >= "
                   "std::alignment_of<void*>::value");
+#endif
 
   return 0;
 }

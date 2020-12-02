@@ -287,7 +287,6 @@ void vm_exit_reqidle(struct vm *vm, int vcpuid, uint64_t rip);
 int vm_snapshot_req(struct vm *vm, struct vm_snapshot_meta *meta);
 int vm_restore_time(struct vm *vm);
 
-
 #ifdef _SYS__CPUSET_H_
 /*
  * Rendezvous all vcpus specified in 'dest' and execute 'func(arg)'.
@@ -481,6 +480,8 @@ enum vm_cap_type {
 	VM_CAP_UNRESTRICTED_GUEST,
 	VM_CAP_ENABLE_INVPCID,
 	VM_CAP_BPT_EXIT,
+	VM_CAP_RDPID,
+	VM_CAP_RDTSCP,
 	VM_CAP_MAX
 };
 
@@ -488,7 +489,7 @@ enum vm_intr_trigger {
 	EDGE_TRIGGER,
 	LEVEL_TRIGGER
 };
-	
+
 /*
  * The 'access' field has the format specified in Table 21-2 of the Intel
  * Architecture Manual vol 3b.
@@ -520,6 +521,7 @@ enum vm_paging_mode {
 	PAGING_MODE_32,
 	PAGING_MODE_PAE,
 	PAGING_MODE_64,
+	PAGING_MODE_64_LA57,
 };
 
 struct vm_guest_paging {
@@ -546,6 +548,9 @@ _Static_assert(_Alignof(struct vie_op) == 2, "ABI");
 struct vie {
 	uint8_t		inst[VIE_INST_SIZE];	/* instruction bytes */
 	uint8_t		num_valid;		/* size of the instruction */
+
+/* The following fields are all zeroed upon restart. */
+#define	vie_startzero	num_processed
 	uint8_t		num_processed;
 
 	uint8_t		addrsize:4, opsize:4;	/* address and operand sizes */

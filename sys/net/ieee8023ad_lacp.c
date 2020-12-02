@@ -54,6 +54,7 @@ __FBSDID("$FreeBSD$");
 #include <net/if_var.h>
 #include <net/if_dl.h>
 #include <net/ethernet.h>
+#include <net/infiniband.h>
 #include <net/if_media.h>
 #include <net/if_types.h>
 
@@ -206,7 +207,6 @@ VNET_DEFINE_STATIC(int, lacp_default_strict_mode) = 1;
 SYSCTL_INT(_net_link_lagg_lacp, OID_AUTO, default_strict_mode,
     CTLFLAG_RWTUN | CTLFLAG_VNET, &VNET_NAME(lacp_default_strict_mode), 0,
     "LACP strict protocol compliance default");
-
 #define LACP_DPRINTF(a) if (V_lacp_debug & 0x01) { lacp_dprintf a ; }
 #define LACP_TRACE(a) if (V_lacp_debug & 0x02) { lacp_dprintf(a,"%s\n",__func__); }
 #define LACP_TPRINTF(a) if (V_lacp_debug & 0x04) { lacp_dprintf a ; }
@@ -607,7 +607,7 @@ lacp_req(struct lagg_softc *sc, void *data)
 	struct lacp_aggregator *la;
 
 	bzero(req, sizeof(struct lacp_opreq));
-	
+
 	/*
 	 * If the LACP softc is NULL, return with the opreq structure full of
 	 * zeros.  It is normal for the softc to be NULL while the lagg is
@@ -832,7 +832,8 @@ lacp_stop(struct lagg_softc *sc)
 }
 
 struct lagg_port *
-lacp_select_tx_port_by_hash(struct lagg_softc *sc, uint32_t hash, uint8_t numa_domain)
+lacp_select_tx_port_by_hash(struct lagg_softc *sc, uint32_t hash,
+    uint8_t numa_domain, int *err)
 {
 	struct lacp_softc *lsc = LACP_SOFTC(sc);
 	struct lacp_portmap *pm;
@@ -842,12 +843,14 @@ lacp_select_tx_port_by_hash(struct lagg_softc *sc, uint32_t hash, uint8_t numa_d
 
 	if (__predict_false(lsc->lsc_suppress_distributing)) {
 		LACP_DPRINTF((NULL, "%s: waiting transit\n", __func__));
+		*err = ENOBUFS;
 		return (NULL);
 	}
 
 	pm = &lsc->lsc_pmap[lsc->lsc_activemap];
 	if (pm->pm_count == 0) {
 		LACP_DPRINTF((NULL, "%s: no active aggregator\n", __func__));
+		*err = ENETDOWN;
 		return (NULL);
 	}
 
@@ -879,7 +882,7 @@ lacp_select_tx_port_by_hash(struct lagg_softc *sc, uint32_t hash, uint8_t numa_d
 }
 
 struct lagg_port *
-lacp_select_tx_port(struct lagg_softc *sc, struct mbuf *m)
+lacp_select_tx_port(struct lagg_softc *sc, struct mbuf *m, int *err)
 {
 	struct lacp_softc *lsc = LACP_SOFTC(sc);
 	uint32_t hash;
@@ -892,7 +895,7 @@ lacp_select_tx_port(struct lagg_softc *sc, struct mbuf *m)
 		hash = m_ether_tcpip_hash(sc->sc_flags, m, lsc->lsc_hashkey);
 
 	numa_domain = m->m_pkthdr.numa_domain;
-	return (lacp_select_tx_port_by_hash(sc, hash, numa_domain));
+	return (lacp_select_tx_port_by_hash(sc, hash, numa_domain, err));
 }
 
 /*
@@ -1102,7 +1105,6 @@ lacp_compose_key(struct lacp_port *lp)
 	uint16_t key;
 
 	if ((lp->lp_state & LACP_STATE_AGGREGATION) == 0) {
-
 		/*
 		 * non-aggregatable links should have unique keys.
 		 *
@@ -1215,6 +1217,7 @@ lacp_compose_key(struct lacp_port *lp)
 		case IFM_40G_CR4:
 		case IFM_40G_SR4:
 		case IFM_40G_LR4:
+		case IFM_40G_LM4:
 		case IFM_40G_XLPPI:
 		case IFM_40G_KR4:
 		case IFM_40G_XLAUI:
@@ -1677,7 +1680,6 @@ lacp_sm_ptx_tx_schedule(struct lacp_port *lp)
 
 	if (!(lp->lp_state & LACP_STATE_ACTIVITY) &&
 	    !(lp->lp_partner.lip_state & LACP_STATE_ACTIVITY)) {
-
 		/*
 		 * NO_PERIODIC
 		 */

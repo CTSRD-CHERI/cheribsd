@@ -39,9 +39,6 @@ __FBSDID("$FreeBSD$");
 #include <geom/label/g_label.h>
 #include <geom/multipath/g_multipath.h>
 
-
-#define G_LABEL_DISK_IDENT_DIR	"diskid"
-
 static char* classes_pass[] = { G_DISK_CLASS_NAME, G_MULTIPATH_CLASS_NAME,
     NULL };
 
@@ -82,7 +79,7 @@ g_label_disk_ident_taste(struct g_consumer *cp, char *label, size_t size)
 
 struct g_label_desc g_label_disk_ident = {
 	.ld_taste = g_label_disk_ident_taste,
-	.ld_dir = G_LABEL_DISK_IDENT_DIR,
+	.ld_dirprefix = "diskid/",
 	.ld_enabled = 1
 };
 

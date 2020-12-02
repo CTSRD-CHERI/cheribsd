@@ -114,6 +114,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/kerneldump.h>
 #include <sys/ktr.h>
 #include <sys/lock.h>
+#include <sys/mman.h>
 #include <sys/msgbuf.h>
 #include <sys/mutex.h>
 #include <sys/proc.h>
@@ -126,6 +127,7 @@ __FBSDID("$FreeBSD$");
 #include <dev/ofw/openfirm.h>
 
 #include <vm/vm.h>
+#include <vm/pmap.h>
 #include <vm/vm_param.h>
 #include <vm/vm_kern.h>
 #include <vm/vm_page.h>
@@ -156,6 +158,9 @@ __FBSDID("$FreeBSD$");
 #define	VSID_MAKE(sr, hash)	((sr) | (((hash) & 0xfffff) << 4))
 #define	VSID_TO_SR(vsid)	((vsid) & 0xf)
 #define	VSID_TO_HASH(vsid)	(((vsid) >> 4) & 0xfffff)
+
+/* Get physical address from PVO. */
+#define PVO_PADDR(pvo)		((pvo)->pvo_pte.pte.pte_lo & PTE_RPGN)
 
 struct ofw_map {
 	vm_offset_t	om_va;
@@ -288,6 +293,7 @@ boolean_t moea_is_prefaultable(pmap_t, vm_offset_t);
 boolean_t moea_is_referenced(vm_page_t);
 int moea_ts_referenced(vm_page_t);
 vm_offset_t moea_map(vm_offset_t *, vm_paddr_t, vm_paddr_t, int);
+static int moea_mincore(pmap_t, vm_offset_t, vm_paddr_t *);
 boolean_t moea_page_exists_quick(pmap_t, vm_page_t);
 void moea_page_init(vm_page_t);
 int moea_page_wired_mappings(vm_page_t);
@@ -326,7 +332,6 @@ static int moea_map_user_ptr(pmap_t pm,
 static int moea_decode_kernel_ptr(vm_offset_t addr,
     int *is_user, vm_offset_t *decoded_addr);
 
-
 static struct pmap_funcs moea_methods = {
 	.clear_modify = moea_clear_modify,
 	.copy_page = moea_copy_page,
@@ -352,7 +357,8 @@ static struct pmap_funcs moea_methods = {
 	.qremove = moea_qremove,
 	.release = moea_release,
 	.remove = moea_remove,
-	.remove_all =       	moea_remove_all,
+	.remove_all = moea_remove_all,
+	.mincore = moea_mincore,
 	.remove_write = moea_remove_write,
 	.sync_icache = moea_sync_icache,
 	.unwire = moea_unwire,
@@ -418,6 +424,32 @@ moea_calc_wimg(vm_paddr_t pa, vm_memattr_t ma)
 	}
 
 	return pte_lo;
+}
+
+/*
+ * Translate OFW translations into VM attributes.
+ */
+static __inline vm_memattr_t
+moea_bootstrap_convert_wimg(uint32_t mode)
+{
+
+	switch (mode) {
+	case (PTE_I | PTE_G):
+		/* PCI device memory */
+		return VM_MEMATTR_UNCACHEABLE;
+	case (PTE_M):
+		/* Explicitly coherent */
+		return VM_MEMATTR_CACHEABLE;
+	case 0: /* Default claim */
+	case 2: /* Alternate PP bits set by OF for the original payload */
+		/* "Normal" memory. */
+		return VM_MEMATTR_DEFAULT;
+
+	default:
+		/* Err on the side of caution for unknowns */
+		/* XXX should we panic instead? */
+		return VM_MEMATTR_UNCACHEABLE;
+	}
 }
 
 static void
@@ -670,13 +702,6 @@ moea_bootstrap(vm_offset_t kernelstart, vm_offset_t kernelend)
 	vm_size_t	size, physsz, hwphyssz;
 	vm_offset_t	pa, va, off;
 	void		*dpcpu;
-	register_t	msr;
-
-        /*
-         * Set up BAT0 to map the lowest 256 MB area
-         */
-        battable[0x0].batl = BATL(0x00000000, BAT_M, BAT_PP_RW);
-        battable[0x0].batu = BATU(0x00000000, BAT_BL_256M, BAT_Vs);
 
 	/*
 	 * Map PCI memory space.
@@ -693,24 +718,7 @@ moea_bootstrap(vm_offset_t kernelstart, vm_offset_t kernelend)
 	battable[0xb].batl = BATL(0xb0000000, BAT_I|BAT_G, BAT_PP_RW);
 	battable[0xb].batu = BATU(0xb0000000, BAT_BL_256M, BAT_Vs);
 
-	/*
-	 * Map obio devices.
-	 */
-	battable[0xf].batl = BATL(0xf0000000, BAT_I|BAT_G, BAT_PP_RW);
-	battable[0xf].batu = BATU(0xf0000000, BAT_BL_256M, BAT_Vs);
-
-	/*
-	 * Use an IBAT and a DBAT to map the bottom segment of memory
-	 * where we are. Turn off instruction relocation temporarily
-	 * to prevent faults while reprogramming the IBAT.
-	 */
-	msr = mfmsr();
-	mtmsr(msr & ~PSL_IR);
-	__asm (".balign 32; \n"
-	       "mtibatu 0,%0; mtibatl 0,%1; isync; \n"
-	       "mtdbatu 0,%0; mtdbatl 0,%1; isync"
-	    :: "r"(battable[0].batu), "r"(battable[0].batl));
-	mtmsr(msr);
+	powerpc_sync();
 
 	/* map pci space */
 	__asm __volatile("mtdbatu 1,%0" :: "r"(battable[8].batu));
@@ -910,15 +918,21 @@ moea_bootstrap(vm_offset_t kernelstart, vm_offset_t kernelend)
 			/*
 			 * If the mapping is 1:1, let the RAM and device
 			 * on-demand BAT tables take care of the translation.
+			 *
+			 * However, always enter mappings for segment 16,
+			 * which is mixed-protection and therefore not
+			 * compatible with a BAT entry.
 			 */
-			if (translations[i].om_va == translations[i].om_pa)
-				continue;
+			if ((translations[i].om_va >> ADDR_SR_SHFT) != 0xf &&
+				translations[i].om_va == translations[i].om_pa)
+					continue;
 
 			/* Enter the pages */
 			for (off = 0; off < translations[i].om_len;
 			    off += PAGE_SIZE)
-				moea_kenter(translations[i].om_va + off,
-					    translations[i].om_pa + off);
+				moea_kenter_attr(translations[i].om_va + off,
+				    translations[i].om_pa + off,
+				    moea_bootstrap_convert_wimg(translations[i].om_mode));
 		}
 	}
 
@@ -1258,7 +1272,7 @@ moea_extract(pmap_t pm, vm_offset_t va)
 	if (pvo == NULL)
 		pa = 0;
 	else
-		pa = (pvo->pvo_pte.pte.pte_lo & PTE_RPGN) | (va & ADDR_POFF);
+		pa = PVO_PADDR(pvo) | (va & ADDR_POFF);
 	PMAP_UNLOCK(pm);
 	return (pa);
 }
@@ -1280,7 +1294,7 @@ moea_extract_and_hold(pmap_t pmap, vm_offset_t va, vm_prot_t prot)
 	if (pvo != NULL && (pvo->pvo_pte.pte.pte_hi & PTE_VALID) &&
 	    ((pvo->pvo_pte.pte.pte_lo & PTE_PP) == PTE_RW ||
 	     (prot & VM_PROT_WRITE) == 0)) {
-		m = PHYS_TO_VM_PAGE(pvo->pvo_pte.pte.pte_lo & PTE_RPGN);
+		m = PHYS_TO_VM_PAGE(PVO_PADDR(pvo));
 		if (!vm_page_wire_mapped(m))
 			m = NULL;
 	}
@@ -1528,7 +1542,7 @@ moea_kextract(vm_offset_t va)
 	PMAP_LOCK(kernel_pmap);
 	pvo = moea_pvo_find_va(kernel_pmap, va & ~ADDR_POFF, NULL);
 	KASSERT(pvo != NULL, ("moea_kextract: no addr found"));
-	pa = (pvo->pvo_pte.pte.pte_lo & PTE_RPGN) | (va & ADDR_POFF);
+	pa = PVO_PADDR(pvo) | (va & ADDR_POFF);
 	PMAP_UNLOCK(kernel_pmap);
 	return (pa);
 }
@@ -1565,14 +1579,14 @@ moea_map_user_ptr(pmap_t pm, volatile const void *uaddr,
 		return (EFAULT);
 
 	vsid = va_to_vsid(pm, (vm_offset_t)uaddr);
- 
+
 	/* Mark segment no-execute */
 	vsid |= SR_N;
- 
+
 	/* If we have already set this VSID, we can just return */
 	if (curthread->td_pcb->pcb_cpu.aim.usr_vsid == vsid)
 		return (0);
- 
+
 	__asm __volatile("isync");
 	curthread->td_pcb->pcb_cpu.aim.usr_segm =
 	    (uintptr_t)uaddr >> ADDR_SR_SHFT;
@@ -1708,7 +1722,6 @@ moea_pinit(pmap_t pmap)
 	    == NULL) {
 		pmap->pmap_phys = pmap;
 	}
-
 
 	mtx_lock(&moea_vsid_mutex);
 	/*
@@ -1917,6 +1930,50 @@ moea_remove_all(vm_page_t m)
 	rw_wunlock(&pvh_global_lock);
 }
 
+static int
+moea_mincore(pmap_t pm, vm_offset_t va, vm_paddr_t *pap)
+{
+	struct pvo_entry *pvo;
+	vm_paddr_t pa;
+	vm_page_t m;
+	int val;
+	bool managed;
+
+	PMAP_LOCK(pm);
+
+	pvo = moea_pvo_find_va(pm, va & ~ADDR_POFF, NULL);
+	if (pvo != NULL) {
+		pa = PVO_PADDR(pvo);
+		m = PHYS_TO_VM_PAGE(pa);
+		managed = (pvo->pvo_vaddr & PVO_MANAGED) == PVO_MANAGED;
+		val = MINCORE_INCORE;
+	} else {
+		PMAP_UNLOCK(pm);
+		return (0);
+	}
+
+	PMAP_UNLOCK(pm);
+
+	if (m == NULL)
+		return (0);
+
+	if (managed) {
+		if (moea_is_modified(m))
+			val |= MINCORE_MODIFIED | MINCORE_MODIFIED_OTHER;
+
+		if (moea_is_referenced(m))
+			val |= MINCORE_REFERENCED | MINCORE_REFERENCED_OTHER;
+	}
+
+	if ((val & (MINCORE_MODIFIED_OTHER | MINCORE_REFERENCED_OTHER)) !=
+	    (MINCORE_MODIFIED_OTHER | MINCORE_REFERENCED_OTHER) &&
+	    managed) {
+		*pap = pa;
+	}
+
+	return (val);
+}
+
 /*
  * Allocate a physical page of memory directly from the phys_avail map.
  * Can only be called from moea_bootstrap before avail start and end are
@@ -1995,7 +2052,7 @@ moea_pvo_enter(pmap_t pm, uma_zone_t zone, struct pvo_head *pvo_head,
 	mtx_lock(&moea_table_mutex);
 	LIST_FOREACH(pvo, &moea_pvo_table[ptegidx], pvo_olink) {
 		if (pvo->pvo_pmap == pm && PVO_VADDR(pvo) == va) {
-			if ((pvo->pvo_pte.pte.pte_lo & PTE_RPGN) == pa &&
+			if (PVO_PADDR(pvo) == pa &&
 			    (pvo->pvo_pte.pte.pte_lo & PTE_PP) ==
 			    (pte_lo & PTE_PP)) {
 				/*
@@ -2123,7 +2180,7 @@ moea_pvo_remove(struct pvo_entry *pvo, int pteidx)
 	if ((pvo->pvo_vaddr & PVO_MANAGED) == PVO_MANAGED) {
 		struct vm_page *pg;
 
-		pg = PHYS_TO_VM_PAGE(pvo->pvo_pte.pte.pte_lo & PTE_RPGN);
+		pg = PHYS_TO_VM_PAGE(PVO_PADDR(pvo));
 		if (pg != NULL) {
 			moea_attr_save(pg, pvo->pvo_pte.pte.pte_lo &
 			    (PTE_REF | PTE_CHG));
@@ -2473,7 +2530,6 @@ moea_query_bit(vm_page_t m, int ptebit)
 		return (TRUE);
 
 	LIST_FOREACH(pvo, vm_page_to_pvoh(m), pvo_vlink) {
-
 		/*
 		 * See if we saved the bit off.  If so, cache it and return
 		 * success.
@@ -2491,7 +2547,6 @@ moea_query_bit(vm_page_t m, int ptebit)
 	 */
 	powerpc_sync();
 	LIST_FOREACH(pvo, vm_page_to_pvoh(m), pvo_vlink) {
-
 		/*
 		 * See if this pvo has a valid PTE.  if so, fetch the
 		 * REF/CHG bits from the valid PTE.  If the appropriate
@@ -2673,6 +2728,7 @@ moea_unmapdev(vm_offset_t va, vm_size_t size)
 		base = trunc_page(va);
 		offset = va & PAGE_MASK;
 		size = roundup(offset + size, PAGE_SIZE);
+		moea_qremove(base, atop(size));
 		kva_free(base, size);
 	}
 }
@@ -2691,8 +2747,7 @@ moea_sync_icache(pmap_t pm, vm_offset_t va, vm_size_t sz)
 		len = MIN(lim - va, sz);
 		pvo = moea_pvo_find_va(pm, va & ~ADDR_POFF, NULL);
 		if (pvo != NULL) {
-			pa = (pvo->pvo_pte.pte.pte_lo & PTE_RPGN) |
-			    (va & ADDR_POFF);
+			pa = PVO_PADDR(pvo) | (va & ADDR_POFF);
 			moea_syncicache(pa, len);
 		}
 		va += len;

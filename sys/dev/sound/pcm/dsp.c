@@ -649,7 +649,6 @@ dsp_open(struct cdev *i_dev, int flags, int mode, struct thread *td)
 		}
 	}
 
-
 	PCM_LOCK(d);
 
 	/*
@@ -858,6 +857,8 @@ dsp_io_ops(struct cdev *i_dev, struct uio *buf)
 	getchns(i_dev, &rdch, &wrch, prio);
 
 	if (*ch == NULL || !((*ch)->flags & CHN_F_BUSY)) {
+		if (rdch != NULL || wrch != NULL)
+			relchns(i_dev, rdch, wrch, prio);
 		PCM_GIANT_EXIT(d);
 		return (EBADF);
 	}
@@ -2893,7 +2894,6 @@ dsp_oss_syncgroup(struct pcm_channel *wrch, struct pcm_channel *rdch, oss_syncgr
 		wrch->flags |= CHN_F_NOTRIGGER;
 		wrch->sm = smwr;
 	}
-
 
 out:
 	if (ret != 0) {

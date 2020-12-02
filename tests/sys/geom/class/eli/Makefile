@@ -4,6 +4,8 @@
 
 PACKAGE=	tests
 
+WARNS?=		3
+
 TESTSDIR=	${TESTSBASE}/sys/geom/class/${.CURDIR:T}
 
 ATF_TESTS_C=	pbkdf2_test
@@ -17,6 +19,7 @@ ATF_TESTS_SH+=	kill_test
 ATF_TESTS_SH+=	misc_test
 ATF_TESTS_SH+=	onetime_test
 ATF_TESTS_SH+=	online_resize_test
+ATF_TESTS_SH+=	reentrancy_test
 ATF_TESTS_SH+=	resize_test
 ATF_TESTS_SH+=	setkey_test
 

@@ -86,6 +86,7 @@ static MALLOC_DEFINE(M_CRED, "cred", "credentials");
 SYSCTL_NODE(_security, OID_AUTO, bsd, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
     "BSD security policy");
 
+static void crfree_final(struct ucred *cr);
 static void crsetgroups_locked(struct ucred *cr, int ngrp, gid_t *groups);
 
 #ifndef _SYS_SYSPROTO_H_
@@ -1406,7 +1407,7 @@ int
 cr_canseeothergids(struct ucred *u1, struct ucred *u2)
 {
 	int i, match;
-	
+
 	if (!see_other_gids) {
 		match = 0;
 		for (i = 0; i < u1->cr_ngroups; i++) {
@@ -1961,7 +1962,8 @@ crunuse(struct thread *td)
 {
 	struct ucred *cr, *crold;
 
-	cr = td->td_ucred;
+	MPASS(td->td_realucred == td->td_ucred);
+	cr = td->td_realucred;
 	mtx_lock(&cr->cr_mtx);
 	cr->cr_ref += td->td_ucredref;
 	td->td_ucredref = 0;
@@ -1977,7 +1979,33 @@ crunuse(struct thread *td)
 		crold = NULL;
 	}
 	mtx_unlock(&cr->cr_mtx);
+	td->td_realucred = NULL;
 	return (crold);
+}
+
+static void
+crunusebatch(struct ucred *cr, int users, int ref)
+{
+
+	KASSERT(users > 0, ("%s: passed users %d not > 0 ; cred %p",
+	    __func__, users, cr));
+	mtx_lock(&cr->cr_mtx);
+	KASSERT(cr->cr_users >= users, ("%s: users %d not > %d on cred %p",
+	    __func__, cr->cr_users, users, cr));
+	cr->cr_users -= users;
+	cr->cr_ref += ref;
+	cr->cr_ref -= users;
+	if (cr->cr_users > 0) {
+		mtx_unlock(&cr->cr_mtx);
+		return;
+	}
+	KASSERT(cr->cr_ref >= 0, ("%s: ref %d not >= 0 on cred %p",
+	    __func__, cr->cr_ref, cr));
+	if (cr->cr_ref > 0) {
+		mtx_unlock(&cr->cr_mtx);
+		return;
+	}
+	crfree_final(cr);
 }
 
 void
@@ -2010,6 +2038,44 @@ crcowsync(void)
 	td->td_realucred = crnew;
 	td->td_ucred = td->td_realucred;
 	return (crold);
+}
+
+/*
+ * Batching.
+ */
+void
+credbatch_add(struct credbatch *crb, struct thread *td)
+{
+	struct ucred *cr;
+
+	MPASS(td->td_realucred != NULL);
+	MPASS(td->td_realucred == td->td_ucred);
+	MPASS(td->td_state == TDS_INACTIVE);
+	cr = td->td_realucred;
+	KASSERT(cr->cr_users > 0, ("%s: users %d not > 0 on cred %p",
+	    __func__, cr->cr_users, cr));
+	if (crb->cred != cr) {
+		if (crb->users > 0) {
+			MPASS(crb->cred != NULL);
+			crunusebatch(crb->cred, crb->users, crb->ref);
+			crb->users = 0;
+			crb->ref = 0;
+		}
+	}
+	crb->cred = cr;
+	crb->users++;
+	crb->ref += td->td_ucredref;
+	td->td_ucredref = 0;
+	td->td_realucred = NULL;
+}
+
+void
+credbatch_final(struct credbatch *crb)
+{
+
+	MPASS(crb->cred != NULL);
+	MPASS(crb->users > 0);
+	crunusebatch(crb->cred, crb->users, crb->ref);
 }
 
 /*
@@ -2065,7 +2131,7 @@ crfree(struct ucred *cr)
 	struct thread *td;
 
 	td = curthread;
-	if (td->td_realucred == cr) {
+	if (__predict_true(td->td_realucred == cr)) {
 		KASSERT(cr->cr_users > 0, ("%s: users %d not > 0 on cred %p",
 		    __func__, cr->cr_users, cr));
 		td->td_ucredref--;
@@ -2085,6 +2151,18 @@ crfree(struct ucred *cr)
 		mtx_unlock(&cr->cr_mtx);
 		return;
 	}
+	crfree_final(cr);
+}
+
+static void
+crfree_final(struct ucred *cr)
+{
+
+	KASSERT(cr->cr_users == 0, ("%s: users %d not == 0 on cred %p",
+	    __func__, cr->cr_users, cr));
+	KASSERT(cr->cr_ref == 0, ("%s: ref %d not == 0 on cred %p",
+	    __func__, cr->cr_ref, cr));
+
 	/*
 	 * Some callers of crget(), such as nfs_statfs(), allocate a temporary
 	 * credential, but don't allocate a uidinfo structure.
@@ -2305,7 +2383,7 @@ crsetgroups_locked(struct ucred *cr, int ngrp, gid_t *groups)
 	int i;
 	int j;
 	gid_t g;
-	
+
 	KASSERT(cr->cr_agroups >= ngrp, ("cr_ngroups is too small"));
 
 	bcopy(groups, cr->cr_groups, ngrp * sizeof(gid_t));

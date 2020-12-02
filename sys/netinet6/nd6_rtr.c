@@ -177,7 +177,8 @@ nd6_rs_input(struct mbuf *m, int off, int icmp6len)
 
 	/* Sanity checks */
 	ip6 = mtod(m, struct ip6_hdr *);
-	if (ip6->ip6_hlim != 255) {
+	if (__predict_false(ip6->ip6_hlim != 255)) {
+		ICMP6STAT_INC(icp6s_invlhlim);
 		nd6log((LOG_ERR,
 		    "%s: invalid hlim (%d) from %s to %s on %s\n", __func__,
 		    ip6->ip6_hlim, ip6_sprintf(ip6bufs, &ip6->ip6_src),
@@ -376,7 +377,8 @@ nd6_ra_input(struct mbuf *m, int off, int icmp6len)
 		goto freeit;
 
 	ip6 = mtod(m, struct ip6_hdr *);
-	if (ip6->ip6_hlim != 255) {
+	if (__predict_false(ip6->ip6_hlim != 255)) {
+		ICMP6STAT_INC(icp6s_invlhlim);
 		nd6log((LOG_ERR,
 		    "%s: invalid hlim (%d) from %s to %s on %s\n", __func__,
 		    ip6->ip6_hlim, ip6_sprintf(ip6bufs, &ip6->ip6_src),
@@ -668,13 +670,13 @@ pfxrtr_del(struct nd_pfxrouter *pfr)
 	free(pfr, M_IP6NDP);
 }
 
-
 /* Default router list processing sub routines. */
 static void
 defrouter_addreq(struct nd_defrouter *new)
 {
 	struct sockaddr_in6 def, mask, gate;
-	struct rtentry *newrt = NULL;
+	struct rt_addrinfo info;
+	struct rib_cmd_info rc;
 	unsigned int fibnum;
 	int error;
 
@@ -688,11 +690,16 @@ defrouter_addreq(struct nd_defrouter *new)
 	gate.sin6_addr = new->rtaddr;
 	fibnum = new->ifp->if_fib;
 
-	error = in6_rtrequest(RTM_ADD, (struct sockaddr *)&def,
-	    (struct sockaddr *)&gate, (struct sockaddr *)&mask,
-	    RTF_GATEWAY, &newrt, fibnum);
-	if (newrt != NULL)
-		rt_routemsg(RTM_ADD, newrt, new->ifp, 0, fibnum);
+	bzero((caddr_t)&info, sizeof(info));
+	info.rti_flags = RTF_GATEWAY;
+	info.rti_info[RTAX_DST] = (struct sockaddr *)&def;
+	info.rti_info[RTAX_GATEWAY] = (struct sockaddr *)&gate;
+	info.rti_info[RTAX_NETMASK] = (struct sockaddr *)&mask;
+
+	NET_EPOCH_ASSERT();
+	error = rib_action(fibnum, RTM_ADD, &info, &rc);
+	if (rc.rc_rt != NULL)
+		rt_routemsg(RTM_ADD, rc.rc_rt, new->ifp, 0, fibnum);
 	if (error == 0)
 		new->installed = 1;
 }
@@ -706,7 +713,8 @@ static void
 defrouter_delreq(struct nd_defrouter *dr)
 {
 	struct sockaddr_in6 def, mask, gate;
-	struct rtentry *oldrt = NULL;
+	struct rt_addrinfo info;
+	struct rib_cmd_info rc;
 	struct epoch_tracker et;
 	unsigned int fibnum;
 
@@ -720,12 +728,16 @@ defrouter_delreq(struct nd_defrouter *dr)
 	gate.sin6_addr = dr->rtaddr;
 	fibnum = dr->ifp->if_fib;
 
+	bzero((caddr_t)&info, sizeof(info));
+	info.rti_flags = RTF_GATEWAY;
+	info.rti_info[RTAX_DST] = (struct sockaddr *)&def;
+	info.rti_info[RTAX_GATEWAY] = (struct sockaddr *)&gate;
+	info.rti_info[RTAX_NETMASK] = (struct sockaddr *)&mask;
+
 	NET_EPOCH_ENTER(et);
-	in6_rtrequest(RTM_DELETE, (struct sockaddr *)&def,
-	    (struct sockaddr *)&gate,
-	    (struct sockaddr *)&mask, RTF_GATEWAY, &oldrt, fibnum);
-	if (oldrt != NULL)
-		rt_routemsg(RTM_DELETE, oldrt, dr->ifp, 0, fibnum);
+	rib_action(fibnum, RTM_DELETE, &info, &rc);
+	if (rc.rc_rt != NULL)
+		rt_routemsg(RTM_DELETE, rc.rc_rt, dr->ifp, 0, fibnum);
 	NET_EPOCH_EXIT(et);
 
 	dr->installed = 0;
@@ -781,7 +793,6 @@ defrouter_del(struct nd_defrouter *dr)
 	 */
 	defrouter_rele(dr);
 }
-
 
 struct nd_defrouter *
 defrouter_lookup_locked(const struct in6_addr *addr, struct ifnet *ifp)
@@ -2009,15 +2020,10 @@ static int
 nd6_prefix_onlink_rtrequest(struct nd_prefix *pr, struct ifaddr *ifa)
 {
 	struct sockaddr_dl_short sdl;
-	struct rtentry *rt;
 	struct sockaddr_in6 mask6;
 	u_long rtflags;
 	int error, a_failure, fibnum, maxfib;
 
-	/*
-	 * in6_ifinit() sets nd6_rtrequest to ifa_rtrequest for all ifaddrs.
-	 * ifa->ifa_rtrequest = nd6_rtrequest;
-	 */
 	bzero(&mask6, sizeof(mask6));
 	mask6.sin6_len = sizeof(mask6);
 	mask6.sin6_addr = pr->ndpr_mask;
@@ -2038,11 +2044,17 @@ nd6_prefix_onlink_rtrequest(struct nd_prefix *pr, struct ifaddr *ifa)
 	}
 	a_failure = 0;
 	for (; fibnum < maxfib; fibnum++) {
+		struct rt_addrinfo info;
+		struct rib_cmd_info rc;
 
-		rt = NULL;
-		error = in6_rtrequest(RTM_ADD,
-		    (struct sockaddr *)&pr->ndpr_prefix, (struct sockaddr *)&sdl,
-		    (struct sockaddr *)&mask6, rtflags, &rt, fibnum);
+		bzero((caddr_t)&info, sizeof(info));
+		info.rti_flags = rtflags;
+		info.rti_info[RTAX_DST] = (struct sockaddr *)&pr->ndpr_prefix;
+		info.rti_info[RTAX_GATEWAY] = (struct sockaddr *)&sdl;
+		info.rti_info[RTAX_NETMASK] = (struct sockaddr *)&mask6;
+
+		NET_EPOCH_ASSERT();
+		error = rib_action(fibnum, RTM_ADD, &info, &rc);
 		if (error != 0) {
 			char ip6buf[INET6_ADDRSTRLEN];
 			char ip6bufg[INET6_ADDRSTRLEN];
@@ -2065,7 +2077,7 @@ nd6_prefix_onlink_rtrequest(struct nd_prefix *pr, struct ifaddr *ifa)
 		}
 
 		pr->ndpr_stateflags |= NDPRF_ONLINK;
-		rt_routemsg(RTM_ADD, rt, pr->ndpr_ifp, 0, fibnum);
+		rt_routemsg(RTM_ADD, rc.rc_rt, pr->ndpr_ifp, 0, fibnum);
 	}
 
 	/* Return the last error we got. */
@@ -2162,7 +2174,6 @@ nd6_prefix_offlink(struct nd_prefix *pr)
 	struct ifnet *ifp = pr->ndpr_ifp;
 	struct nd_prefix *opr;
 	struct sockaddr_in6 sa6, mask6;
-	struct rtentry *rt;
 	char ip6buf[INET6_ADDRSTRLEN];
 	uint64_t genid;
 	int fibnum, maxfib, a_failure;
@@ -2195,9 +2206,17 @@ nd6_prefix_offlink(struct nd_prefix *pr)
 	a_failure = 0;
 	NET_EPOCH_ENTER(et);
 	for (; fibnum < maxfib; fibnum++) {
-		rt = NULL;
-		error = in6_rtrequest(RTM_DELETE, (struct sockaddr *)&sa6, NULL,
-		    (struct sockaddr *)&mask6, 0, &rt, fibnum);
+		struct rt_addrinfo info;
+		struct rib_cmd_info rc;
+
+		bzero((caddr_t)&info, sizeof(info));
+		info.rti_flags = RTF_GATEWAY;
+		info.rti_info[RTAX_DST] = (struct sockaddr *)&sa6;
+		info.rti_info[RTAX_GATEWAY] = NULL;
+		info.rti_info[RTAX_NETMASK] = (struct sockaddr *)&mask6;
+
+		NET_EPOCH_ASSERT();
+		error = rib_action(fibnum, RTM_DELETE, &info, &rc);
 		if (error != 0) {
 			/* Save last error to return, see rtinit(). */
 			a_failure = error;
@@ -2205,7 +2224,7 @@ nd6_prefix_offlink(struct nd_prefix *pr)
 		}
 
 		/* report route deletion to the routing socket. */
-		rt_routemsg(RTM_DELETE, rt, ifp, 0, fibnum);
+		rt_routemsg(RTM_DELETE, rc.rc_rt, ifp, 0, fibnum);
 	}
 	NET_EPOCH_EXIT(et);
 	error = a_failure;
@@ -2441,7 +2460,7 @@ rt6_flush(struct in6_addr *gateway, struct ifnet *ifp)
 		return;
 
 	/* XXX Do we really need to walk any but the default FIB? */
-	rt_foreach_fib_walk_del(AF_INET6, rt6_deleteroute, (void *)gateway);
+	rib_foreach_table_walk_del(AF_INET6, rt6_deleteroute, (void *)gateway);
 }
 
 int

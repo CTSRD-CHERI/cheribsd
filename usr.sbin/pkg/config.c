@@ -32,14 +32,16 @@ __FBSDID("$FreeBSD$");
 
 #include <sys/param.h>
 #include <sys/queue.h>
-#include <sys/sbuf.h>
 #include <sys/utsname.h>
+#include <sys/sbuf.h>
 #include <sys/sysctl.h>
 
 #include <dirent.h>
 #include <ucl.h>
 #include <err.h>
 #include <errno.h>
+#include <libutil.h>
+#include <paths.h>
 #include <stdbool.h>
 #include <unistd.h>
 
@@ -166,7 +168,7 @@ pkg_get_myabi(char *dest, size_t sz)
 static void
 subst_packagesite(const char *abi)
 {
-	struct sbuf *newval;
+	char *newval;
 	const char *variable_string;
 	const char *oldval;
 
@@ -178,14 +180,14 @@ subst_packagesite(const char *abi)
 	if ((variable_string = strstr(oldval, "${ABI}")) == NULL)
 		return;
 
-	newval = sbuf_new_auto();
-	sbuf_bcat(newval, oldval, variable_string - oldval);
-	sbuf_cat(newval, abi);
-	sbuf_cat(newval, variable_string + strlen("${ABI}"));
-	sbuf_finish(newval);
+	asprintf(&newval, "%.*s%s%s",
+	    (int)(variable_string - oldval), oldval, abi,
+	    variable_string + strlen("${ABI}"));
+	if (newval == NULL)
+		errx(EXIT_FAILURE, "asprintf");
 
 	free(c[PACKAGESITE].value);
-	c[PACKAGESITE].value = strdup(sbuf_data(newval));
+	c[PACKAGESITE].value = newval;
 }
 
 static int
@@ -452,13 +454,11 @@ config_init(void)
 	}
 
 	/* Read LOCALBASE/etc/pkg.conf first. */
-
 	if (getenv("PKG_BOOTSTRAP_CONFIG_FILE")) {
 		strlcpy(confpath, getenv("PKG_BOOTSTRAP_CONFIG_FILE"),
 		    sizeof(confpath));
 	} else {
-		localbase = getenv("LOCALBASE") ? getenv("LOCALBASE") :
-		    _LOCALBASE;
+		localbase = getlocalbase();
 		snprintf(confpath, sizeof(confpath), "%s/etc/pkg.conf",
 		    localbase);
 	}

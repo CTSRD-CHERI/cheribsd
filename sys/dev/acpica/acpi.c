@@ -46,6 +46,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/sysctl.h>
 #include <sys/ctype.h>
 #include <sys/linker.h>
+#include <sys/mount.h>
 #include <sys/power.h>
 #include <sys/sbuf.h>
 #include <sys/sched.h>
@@ -152,6 +153,7 @@ static ACPI_STATUS acpi_device_scan_children(device_t bus, device_t dev,
 		    int max_depth, acpi_scan_cb_t user_fn, void *arg);
 static int	acpi_isa_pnp_probe(device_t bus, device_t child,
 		    struct isa_pnp_id *ids);
+static void	acpi_platform_osc(device_t dev);
 static void	acpi_probe_children(device_t bus);
 static void	acpi_probe_order(ACPI_HANDLE handle, int *order);
 static ACPI_STATUS acpi_probe_child(ACPI_HANDLE handle, UINT32 level,
@@ -682,6 +684,8 @@ acpi_attach(device_t dev)
 
     /* Register ACPI again to pass the correct argument of pm_func. */
     power_pm_register(POWER_PM_TYPE_ACPI, acpi_pm_func, sc);
+
+    acpi_platform_osc(dev);
 
     if (!acpi_disabled("bus")) {
 	EVENTHANDLER_REGISTER(dev_lookup, acpi_lookup, NULL, 1000);
@@ -1706,7 +1710,7 @@ acpi_device_id_probe(device_t bus, device_t dev, char **ids, char **match)
 	rv = acpi_MatchHid(h, ids[i]);
 	if (rv == ACPI_MATCHHID_NOMATCH)
 	    continue;
-	
+
 	if (match != NULL) {
 	    *match = ids[i];
 	}
@@ -1941,6 +1945,34 @@ acpi_enable_pcie(void)
 		alloc++;
 	}
 #endif
+}
+
+static void
+acpi_platform_osc(device_t dev)
+{
+	ACPI_HANDLE sb_handle;
+	ACPI_STATUS status;
+	uint32_t cap_set[2];
+
+	/* 0811B06E-4A27-44F9-8D60-3CBBC22E7B48 */
+	static uint8_t acpi_platform_uuid[ACPI_UUID_LENGTH] = {
+		0x6e, 0xb0, 0x11, 0x08, 0x27, 0x4a, 0xf9, 0x44,
+		0x8d, 0x60, 0x3c, 0xbb, 0xc2, 0x2e, 0x7b, 0x48
+	};
+
+	if (ACPI_FAILURE(AcpiGetHandle(ACPI_ROOT_OBJECT, "\\_SB_", &sb_handle)))
+		return;
+
+	cap_set[1] = 0x10;	/* APEI Support */
+	status = acpi_EvaluateOSC(sb_handle, acpi_platform_uuid, 1,
+	    nitems(cap_set), cap_set, cap_set, false);
+	if (ACPI_FAILURE(status)) {
+		if (status == AE_NOT_FOUND)
+			return;
+		device_printf(dev, "_OSC failed: %s\n",
+		    AcpiFormatException(status));
+		return;
+	}
 }
 
 /*
@@ -2601,8 +2633,8 @@ acpi_AppendBufferResource(ACPI_BUFFER *buf, ACPI_RESOURCE *res)
     return (AE_OK);
 }
 
-UINT8
-acpi_DSMQuery(ACPI_HANDLE h, uint8_t *uuid, int revision)
+UINT64
+acpi_DSMQuery(ACPI_HANDLE h, const uint8_t *uuid, int revision)
 {
     /*
      * ACPI spec 9.1.1 defines this.
@@ -2614,7 +2646,8 @@ acpi_DSMQuery(ACPI_HANDLE h, uint8_t *uuid, int revision)
      */
     ACPI_BUFFER buf;
     ACPI_OBJECT *obj;
-    UINT8 ret = 0;
+    UINT64 ret = 0;
+    int i;
 
     if (!ACPI_SUCCESS(acpi_EvaluateDSM(h, uuid, revision, 0, NULL, &buf))) {
 	ACPI_INFO(("Failed to enumerate DSM functions\n"));
@@ -2632,12 +2665,13 @@ acpi_DSMQuery(ACPI_HANDLE h, uint8_t *uuid, int revision)
      */
     switch (obj->Type) {
     case ACPI_TYPE_BUFFER:
-	ret = *(uint8_t *)obj->Buffer.Pointer;
+	for (i = 0; i < MIN(obj->Buffer.Length, sizeof(ret)); i++)
+	    ret |= (((uint64_t)obj->Buffer.Pointer[i]) << (i * 8));
 	break;
     case ACPI_TYPE_INTEGER:
 	ACPI_BIOS_WARNING((AE_INFO,
 	    "Possibly buggy BIOS with ACPI_TYPE_INTEGER for function enumeration\n"));
-	ret = obj->Integer.Value & 0xFF;
+	ret = obj->Integer.Value;
 	break;
     default:
 	ACPI_WARNING((AE_INFO, "Unexpected return type %u\n", obj->Type));
@@ -2653,8 +2687,17 @@ acpi_DSMQuery(ACPI_HANDLE h, uint8_t *uuid, int revision)
  * check the type of the returned object.
  */
 ACPI_STATUS
-acpi_EvaluateDSM(ACPI_HANDLE handle, uint8_t *uuid, int revision,
-    uint64_t function, union acpi_object *package, ACPI_BUFFER *out_buf)
+acpi_EvaluateDSM(ACPI_HANDLE handle, const uint8_t *uuid, int revision,
+    UINT64 function, ACPI_OBJECT *package, ACPI_BUFFER *out_buf)
+{
+	return (acpi_EvaluateDSMTyped(handle, uuid, revision, function,
+	    package, out_buf, ACPI_TYPE_ANY));
+}
+
+ACPI_STATUS
+acpi_EvaluateDSMTyped(ACPI_HANDLE handle, const uint8_t *uuid, int revision,
+    UINT64 function, ACPI_OBJECT *package, ACPI_BUFFER *out_buf,
+    ACPI_OBJECT_TYPE type)
 {
     ACPI_OBJECT arg[4];
     ACPI_OBJECT_LIST arglist;
@@ -2666,7 +2709,7 @@ acpi_EvaluateDSM(ACPI_HANDLE handle, uint8_t *uuid, int revision,
 
     arg[0].Type = ACPI_TYPE_BUFFER;
     arg[0].Buffer.Length = ACPI_UUID_LENGTH;
-    arg[0].Buffer.Pointer = uuid;
+    arg[0].Buffer.Pointer = __DECONST(uint8_t *, uuid);
     arg[1].Type = ACPI_TYPE_INTEGER;
     arg[1].Integer.Value = revision;
     arg[2].Type = ACPI_TYPE_INTEGER;
@@ -2683,7 +2726,7 @@ acpi_EvaluateDSM(ACPI_HANDLE handle, uint8_t *uuid, int revision,
     arglist.Count = 4;
     buf.Pointer = NULL;
     buf.Length = ACPI_ALLOCATE_BUFFER;
-    status = AcpiEvaluateObject(handle, "_DSM", &arglist, &buf);
+    status = AcpiEvaluateObjectTyped(handle, "_DSM", &arglist, &buf, type);
     if (ACPI_FAILURE(status))
 	return (status);
 
@@ -3039,6 +3082,7 @@ acpi_EnterSleepState(struct acpi_softc *sc, int state)
 
     EVENTHANDLER_INVOKE(power_suspend_early);
     stop_all_proc();
+    suspend_all_fs();
     EVENTHANDLER_INVOKE(power_suspend);
 
 #ifdef EARLY_AP_STARTUP
@@ -3198,6 +3242,7 @@ backout:
     }
 #endif
 
+    resume_all_fs();
     resume_all_proc();
 
     EVENTHANDLER_INVOKE(power_resume);

@@ -91,6 +91,7 @@ CFLAGS+=	-fno-strict-aliasing
 WERROR?=	-Werror
 
 LINUXKPI_GENSRCS+= \
+	backlight_if.h \
 	bus_if.h \
 	device_if.h \
 	pci_if.h \
@@ -216,7 +217,7 @@ OBJS+=	${SRCS:N*.h:R:S/$/.o/g}
 PROG=	${KMOD}.ko
 .endif
 
-.if !defined(DEBUG_FLAGS)
+.if !defined(DEBUG_FLAGS) || ${MK_KERNEL_SYMBOLS} == "no"
 FULLPROG=	${PROG}
 .else
 FULLPROG=	${PROG}.full
@@ -320,7 +321,7 @@ ${_ILINKS}:
 
 CLEANFILES+= ${PROG} ${KMOD}.kld ${OBJS}
 
-.if defined(DEBUG_FLAGS)
+.if defined(DEBUG_FLAGS) && ${MK_KERNEL_SYMBOLS} != "no"
 CLEANFILES+= ${FULLPROG} ${PROG}.debug
 .endif
 
@@ -532,6 +533,21 @@ OBJS_DEPEND_GUESS+= ${SRCS:M*.h}
 .if defined(KERNBUILDDIR)
 OBJS_DEPEND_GUESS+= opt_global.h
 .endif
+
+ZINCDIR=${SYSDIR}/contrib/openzfs/include
+OPENZFS_CFLAGS=     \
+	-D_SYS_VMEM_H_  \
+	-D__KERNEL__ \
+	-nostdinc \
+	-DSMP \
+	-I${ZINCDIR}  \
+	-I${ZINCDIR}/os/freebsd \
+	-I${ZINCDIR}/os/freebsd/spl \
+	-I${ZINCDIR}/os/freebsd/zfs \
+	-I${SYSDIR}/cddl/compat/opensolaris \
+	-I${SYSDIR}/cddl/contrib/opensolaris/uts/common \
+	-include ${ZINCDIR}/os/freebsd/spl/sys/ccompile.h
+
 
 .include <bsd.dep.mk>
 .include <bsd.clang-analyze.mk>

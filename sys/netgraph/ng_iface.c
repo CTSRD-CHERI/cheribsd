@@ -111,8 +111,6 @@ typedef const struct iffam *iffam_p;
 const static struct iffam gFamilies[] = {
 	{ AF_INET,	NG_IFACE_HOOK_INET	},
 	{ AF_INET6,	NG_IFACE_HOOK_INET6	},
-	{ AF_ATM,	NG_IFACE_HOOK_ATM	},
-	{ AF_NATM,	NG_IFACE_HOOK_NATM	},
 };
 #define	NUM_FAMILIES		nitems(gFamilies)
 
@@ -289,7 +287,6 @@ ng_iface_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	ng_iface_print_ioctl(ifp, command, data);
 #endif
 	switch (command) {
-
 	/* These two are mostly handled at a higher layer */
 	case CASE_IOC_IFREQ(SIOCSIFADDR):
 		ifp->if_flags |= IFF_UP;
@@ -627,7 +624,6 @@ ng_iface_rcvmsg(node_p node, item_p item, hook_p lasthook)
 		case NGM_IFACE_POINT2POINT:
 		case NGM_IFACE_BROADCAST:
 		    {
-
 			/* Deny request if interface is UP */
 			if ((ifp->if_flags & IFF_UP) != 0)
 				return (EBUSY);
@@ -732,9 +728,11 @@ ng_iface_rcvdata(hook_p hook, item_p item)
 	}
 	random_harvest_queue(m, sizeof(*m), RANDOM_NET_NG);
 	M_SETFIB(m, ifp->if_fib);
+	CURVNET_SET(ifp->if_vnet);
 	NET_EPOCH_ENTER(et);
 	netisr_dispatch(isr, m);
 	NET_EPOCH_EXIT(et);
+	CURVNET_RESTORE();
 	return (0);
 }
 

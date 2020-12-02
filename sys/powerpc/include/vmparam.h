@@ -185,31 +185,34 @@ struct pmap_physseg {
 #define	VM_NFREELIST		1
 #define	VM_FREELIST_DEFAULT	0
 
-/*
- * The largest allocation size is 4MB.
- */
 #ifdef __powerpc64__
+/* The largest allocation size is 16MB. */
 #define	VM_NFREEORDER		13
 #else
+/* The largest allocation size is 4MB. */
 #define	VM_NFREEORDER		11
 #endif
 
 #ifndef	VM_NRESERVLEVEL
 #ifdef __powerpc64__
+/* Enable superpage reservations: 1 level. */
 #define	VM_NRESERVLEVEL		1
 #else
-/*
- * Disable superpage reservations.
- */
+/* Disable superpage reservations. */
 #define	VM_NRESERVLEVEL		0
 #endif
 #endif
 
-/*
- * Level 0 reservations consist of 512 pages.
- */
 #ifndef	VM_LEVEL_0_ORDER
-#define	VM_LEVEL_0_ORDER	9
+/* Level 0 reservations consist of 512 (RPT) or 4096 (HPT) pages. */
+#define	VM_LEVEL_0_ORDER	vm_level_0_order
+#ifndef	__ASSEMBLER__
+extern	int vm_level_0_order;
+#endif
+#endif
+
+#ifndef	VM_LEVEL_0_ORDER_MAX
+#define	VM_LEVEL_0_ORDER_MAX	12
 #endif
 
 #ifdef __powerpc64__
@@ -307,6 +310,18 @@ struct pmap_physseg {
 #define	PMAP_HAS_PAGE_ARRAY	1
 #endif
 
+#if defined(__powerpc64__)
+/*
+ * Need a page dump array for minidump.
+ */
+#define MINIDUMP_PAGE_TRACKING	1
+#else
+/*
+ * No minidump with 32-bit powerpc.
+ */
+#define MINIDUMP_PAGE_TRACKING	0
+#endif
+
 #define	PMAP_HAS_DMAP	(hw_direct_map)
 #define PHYS_TO_DMAP(x) ({						\
 	KASSERT(hw_direct_map, ("Direct map not provided by PMAP"));	\
@@ -314,5 +329,10 @@ struct pmap_physseg {
 #define DMAP_TO_PHYS(x) ({						\
 	KASSERT(hw_direct_map, ("Direct map not provided by PMAP"));	\
 	(x) &~ DMAP_BASE_ADDRESS; })
+
+/*
+ * No non-transparent large page support in the pmap.
+ */
+#define	PMAP_HAS_LARGEPAGES	0
 
 #endif /* _MACHINE_VMPARAM_H_ */

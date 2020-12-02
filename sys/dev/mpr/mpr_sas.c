@@ -382,7 +382,7 @@ mprsas_remove_volume(struct mpr_softc *sc, struct mpr_command *tm)
 
 	mpr_dprint(sc, MPR_XINFO, "clearing target %u handle 0x%04x\n",
 	    targ->tid, handle);
-	
+
 	/*
 	 * Don't clear target if remove fails because things will get confusing.
 	 * Leave the devname and sasaddr intact so that we know to avoid reusing
@@ -411,7 +411,6 @@ mprsas_remove_volume(struct mpr_softc *sc, struct mpr_command *tm)
 
 	mprsas_free_tm(sc, tm);
 }
-
 
 /*
  * No Need to call "MPI2_SAS_OP_REMOVE_DEVICE" For Volume removal.
@@ -515,7 +514,6 @@ mprsas_prepare_remove(struct mprsas_softc *sassc, uint16_t handle)
 	mprsas_rescan_target(sc, targ);
 
 	req = (MPI2_SCSI_TASK_MANAGE_REQUEST *)tm->cm_req;
-	memset(req, 0, sizeof(*req));
 	req->DevHandle = htole16(targ->handle);
 	req->TaskType = MPI2_SCSITASKMGMT_TASKTYPE_TARGET_RESET;
 
@@ -736,11 +734,6 @@ mpr_attach_sas(struct mpr_softc *sc)
 	mpr_dprint(sc, MPR_INIT, "%s entered\n", __func__);
 
 	sassc = malloc(sizeof(struct mprsas_softc), M_MPR, M_WAITOK|M_ZERO);
-	if (!sassc) {
-		mpr_dprint(sc, MPR_INIT|MPR_ERROR,
-		    "Cannot allocate SAS subsystem memory\n");
-		return (ENOMEM);
-	}
 
 	/*
 	 * XXX MaxTargets could change during a reinit.  Since we don't
@@ -751,12 +744,6 @@ mpr_attach_sas(struct mpr_softc *sc)
 	sassc->maxtargets = sc->facts->MaxTargets + sc->facts->MaxVolumes;
 	sassc->targets = malloc(sizeof(struct mprsas_target) *
 	    sassc->maxtargets, M_MPR, M_WAITOK|M_ZERO);
-	if (!sassc->targets) {
-		mpr_dprint(sc, MPR_INIT|MPR_ERROR,
-		    "Cannot allocate SAS target memory\n");
-		free(sassc, M_MPR);
-		return (ENOMEM);
-	}
 	sc->sassc = sassc;
 	sassc->sc = sc;
 
@@ -1468,7 +1455,6 @@ mprsas_send_reset(struct mpr_softc *sc, struct mpr_command *tm, uint8_t type)
 	return err;
 }
 
-
 static void
 mprsas_abort_complete(struct mpr_softc *sc, struct mpr_command *tm)
 {
@@ -1671,7 +1657,6 @@ mprsas_scsiio_timeout(void *data)
 		    "processing by tm %p\n", cm, targ->tm);
 	}
 	else if ((targ->tm = mprsas_alloc_tm(sc)) != NULL) {
-
 		/* start recovery by aborting the first timedout command */
 		mpr_dprint(sc, MPR_RECOVERY|MPR_INFO,
 		    "Sending abort to target %u for SMID %d\n", targ->tid,
@@ -2012,6 +1997,8 @@ mprsas_action_scsiio(struct mprsas_softc *sassc, union ccb *ccb)
 		mpi_control |= MPI2_SCSIIO_CONTROL_SIMPLEQ;
 		break;
 	}
+	mpi_control |= (csio->priority << MPI2_SCSIIO_CONTROL_CMDPRI_SHIFT) &
+	    MPI2_SCSIIO_CONTROL_CMDPRI_MASK;
 	mpi_control |= sc->mapping_table[csio->ccb_h.target_id].TLR_bits;
 	req->Control = htole32(mpi_control);
 
@@ -2157,7 +2144,7 @@ mpr_sc_failed_io_info(struct mpr_softc *sc, struct ccb_scsiio *csio,
 	char *desc_ioc_state = NULL;
 	char *desc_scsi_status = NULL;
 	u32 log_info = le32toh(mpi_reply->IOCLogInfo);
-	
+
 	if (log_info == 0x31170000)
 		return;
 
@@ -2173,7 +2160,7 @@ mpr_sc_failed_io_info(struct mpr_softc *sc, struct ccb_scsiio *csio,
 		    "connector name (%4s)\n", targ->encl_level, targ->encl_slot,
 		    targ->connector_name);
 	}
-	
+
 	/*
 	 * We can add more detail about underflow data here
 	 * TO-DO
@@ -2362,7 +2349,7 @@ mprsas_nvme_trans_status_code(uint16_t nvme_status,
 		}
 		break;
 	}
-	
+
 	returned_sense_len = sizeof(struct scsi_sense_data);
 	if (returned_sense_len < ccb->csio.sense_len)
 		ccb->csio.sense_resid = ccb->csio.sense_len -
@@ -2800,7 +2787,7 @@ mprsas_scsiio_complete(struct mpr_softc *sc, struct mpr_command *cm)
 
 		break;
 	}
-	
+
 	mpr_sc_failed_io_info(sc, csio, rep, cm->cm_targ);
 
 	if (sassc->flags & MPRSAS_QUEUE_FROZEN) {
@@ -3163,7 +3150,6 @@ mprsas_action_smpio(struct mprsas_softc *sassc, union ccb *ccb)
 			    targ->handle, targ->parent_handle);
 			mprsas_set_ccbstatus(ccb, CAM_DEV_NOT_THERE);
 			goto bailout;
-
 		}
 		if (targ->parent_sasaddr == 0x0) {
 			mpr_dprint(sc, MPR_ERROR, "%s: handle %d parent handle "
@@ -3175,7 +3161,6 @@ mprsas_action_smpio(struct mprsas_softc *sassc, union ccb *ccb)
 
 		sasaddr = targ->parent_sasaddr;
 #endif /* OLD_MPR_PROBE */
-
 	}
 
 	if (sasaddr == 0) {
@@ -3554,8 +3539,4 @@ mprsas_realloc_targets(struct mpr_softc *sc, int maxtargets)
 
 	sassc->targets = malloc(sizeof(struct mprsas_target) * maxtargets,
 	    M_MPR, M_WAITOK|M_ZERO);
-	if (!sassc->targets) {
-		panic("%s failed to alloc targets with error %d\n",
-		    __func__, ENOMEM);
-	}
 }

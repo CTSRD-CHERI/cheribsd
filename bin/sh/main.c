@@ -134,6 +134,7 @@ main(int argc, char *argv[])
 	setstackmark(&smark);
 	setstackmark(&smark2);
 	procargs(argc, argv);
+	trap_init();
 	pwd_init(iflag);
 	INTON;
 	if (iflag)
@@ -228,6 +229,10 @@ cmdloop(int top)
 		}
 	}
 	popstackmark(&smark);
+	if (top && iflag) {
+		out2c('\n');
+		flushout(out2);
+	}
 }
 
 

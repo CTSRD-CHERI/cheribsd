@@ -340,7 +340,6 @@ static void tcp_mtudisc(struct inpcb *, int);
 static char *	tcp_log_addr(struct in_conninfo *inc, struct tcphdr *th,
 		    void *ip4hdr, const void *ip6hdr);
 
-
 static struct tcp_function_block tcp_def_funcblk = {
 	.tfb_tcp_block_name = "freebsd",
 	.tfb_tcp_output = tcp_output,
@@ -1702,11 +1701,18 @@ tcp_newtcpcb(struct inpcb *inp)
 	KASSERT(!STAILQ_EMPTY(&cc_list), ("cc_list is empty!"));
 	CC_ALGO(tp) = CC_DEFAULT();
 	CC_LIST_RUNLOCK();
+	/*
+	 * The tcpcb will hold a reference on its inpcb until tcp_discardcb()
+	 * is called.
+	 */
+	in_pcbref(inp);	/* Reference for tcpcb */
+	tp->t_inpcb = inp;
 
 	if (CC_ALGO(tp)->cb_init != NULL)
 		if (CC_ALGO(tp)->cb_init(tp->ccv) > 0) {
 			if (tp->t_fb->tfb_tcp_fb_fini)
 				(*tp->t_fb->tfb_tcp_fb_fini)(tp, 1);
+			in_pcbrele_wlocked(inp);
 			refcount_release(&tp->t_fb->tfb_refcnt);
 			uma_zfree(V_tcpcb_zone, tm);
 			return (NULL);
@@ -1717,6 +1723,7 @@ tcp_newtcpcb(struct inpcb *inp)
 	if (khelp_init_osd(HELPER_CLASS_TCP, tp->osd)) {
 		if (tp->t_fb->tfb_tcp_fb_fini)
 			(*tp->t_fb->tfb_tcp_fb_fini)(tp, 1);
+		in_pcbrele_wlocked(inp);
 		refcount_release(&tp->t_fb->tfb_refcnt);
 		uma_zfree(V_tcpcb_zone, tm);
 		return (NULL);
@@ -1746,12 +1753,6 @@ tcp_newtcpcb(struct inpcb *inp)
 	if (V_tcp_do_sack)
 		tp->t_flags |= TF_SACK_PERMIT;
 	TAILQ_INIT(&tp->snd_holes);
-	/*
-	 * The tcpcb will hold a reference on its inpcb until tcp_discardcb()
-	 * is called.
-	 */
-	in_pcbref(inp);	/* Reference for tcpcb */
-	tp->t_inpcb = inp;
 
 	/*
 	 * Init srtt to TCPTV_SRTTBASE (0), so we can tell that we have no
@@ -1782,8 +1783,14 @@ tcp_newtcpcb(struct inpcb *inp)
 	/* Initialize the per-TCPCB log data. */
 	tcp_log_tcpcbinit(tp);
 #endif
+	tp->t_pacing_rate = -1;
 	if (tp->t_fb->tfb_tcp_fb_init) {
-		(*tp->t_fb->tfb_tcp_fb_init)(tp);
+		if ((*tp->t_fb->tfb_tcp_fb_init)(tp)) {
+			refcount_release(&tp->t_fb->tfb_refcnt);
+			in_pcbrele_wlocked(inp);
+			uma_zfree(V_tcpcb_zone, tm);
+			return (NULL);
+		}
 	}
 #ifdef STATS
 	if (V_tcp_perconn_stats_enable == 1)
@@ -2430,7 +2437,6 @@ SYSCTL_PROC(_net_inet6_tcp6, OID_AUTO, getcred,
     "Get the xucred of a TCP6 connection");
 #endif /* INET6 */
 
-
 #ifdef INET
 void
 tcp_ctlinput(int cmd, struct sockaddr *sa, void *vip)
@@ -2927,7 +2933,6 @@ tcp_maxmtu(struct in_conninfo *inc, struct tcp_ifcap *cap)
 	KASSERT(inc != NULL, ("tcp_maxmtu with NULL in_conninfo pointer"));
 
 	if (inc->inc_faddr.s_addr != INADDR_ANY) {
-
 		nh = fib4_lookup(inc->inc_fibnum, inc->inc_faddr, 0, NHR_NONE, 0);
 		if (nh == NULL)
 			return (0);
@@ -3009,7 +3014,6 @@ tcp_maxseg(const struct tcpcb *tp)
 	 * but this is harmless, since result of tcp_maxseg() is used
 	 * only in cwnd and ssthresh estimations.
 	 */
-#define	PAD(len)	((((len) / 4) + !!((len) % 4)) * 4)
 	if (TCPS_HAVEESTABLISHED(tp->t_state)) {
 		if (tp->t_flags & TF_RCVD_TSTMP)
 			optlen = TCPOLEN_TSTAMP_APPA;
@@ -3017,26 +3021,26 @@ tcp_maxseg(const struct tcpcb *tp)
 			optlen = 0;
 #if defined(IPSEC_SUPPORT) || defined(TCP_SIGNATURE)
 		if (tp->t_flags & TF_SIGNATURE)
-			optlen += PAD(TCPOLEN_SIGNATURE);
+			optlen += PADTCPOLEN(TCPOLEN_SIGNATURE);
 #endif
 		if ((tp->t_flags & TF_SACK_PERMIT) && tp->rcv_numsacks > 0) {
 			optlen += TCPOLEN_SACKHDR;
 			optlen += tp->rcv_numsacks * TCPOLEN_SACK;
-			optlen = PAD(optlen);
+			optlen = PADTCPOLEN(optlen);
 		}
 	} else {
 		if (tp->t_flags & TF_REQ_TSTMP)
 			optlen = TCPOLEN_TSTAMP_APPA;
 		else
-			optlen = PAD(TCPOLEN_MAXSEG);
+			optlen = PADTCPOLEN(TCPOLEN_MAXSEG);
 		if (tp->t_flags & TF_REQ_SCALE)
-			optlen += PAD(TCPOLEN_WINDOW);
+			optlen += PADTCPOLEN(TCPOLEN_WINDOW);
 #if defined(IPSEC_SUPPORT) || defined(TCP_SIGNATURE)
 		if (tp->t_flags & TF_SIGNATURE)
-			optlen += PAD(TCPOLEN_SIGNATURE);
+			optlen += PADTCPOLEN(TCPOLEN_SIGNATURE);
 #endif
 		if (tp->t_flags & TF_SACK_PERMIT)
-			optlen += PAD(TCPOLEN_SACK_PERMITTED);
+			optlen += PADTCPOLEN(TCPOLEN_SACK_PERMITTED);
 	}
 #undef PAD
 	optlen = min(optlen, TCP_MAXOLEN);
@@ -3434,6 +3438,13 @@ tcp_inptoxtp(const struct inpcb *inp, struct xtcpcb *xt)
 		xt->t_sndzerowin = tp->t_sndzerowin;
 		xt->t_sndrexmitpack = tp->t_sndrexmitpack;
 		xt->t_rcvoopack = tp->t_rcvoopack;
+		xt->t_rcv_wnd = tp->rcv_wnd;
+		xt->t_snd_wnd = tp->snd_wnd;
+		xt->t_snd_cwnd = tp->snd_cwnd;
+		xt->t_snd_ssthresh = tp->snd_ssthresh;
+		xt->t_maxseg = tp->t_maxseg;
+		xt->xt_ecn = (tp->t_flags2 & TF2_ECN_PERMIT) ? 1 : 0 +
+			     (tp->t_flags2 & TF2_ACE_PERMIT) ? 2 : 0;
 
 		now = getsbinuptime();
 #define	COPYTIMER(ttt)	do {						\
@@ -3453,6 +3464,8 @@ tcp_inptoxtp(const struct inpcb *inp, struct xtcpcb *xt)
 
 		bcopy(tp->t_fb->tfb_tcp_block_name, xt->xt_stack,
 		    TCP_FUNCTION_NAME_LEN_MAX);
+		bcopy(CC_ALGO(tp)->name, xt->xt_cc,
+		    TCP_CA_NAME_MAX);
 #ifdef TCP_BLACKBOX
 		(void)tcp_log_get_id(tp, xt->xt_logid);
 #endif

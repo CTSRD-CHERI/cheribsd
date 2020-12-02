@@ -3,7 +3,6 @@
  * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
  *
  * Copyright (c) 2012 The FreeBSD Foundation
- * All rights reserved.
  *
  * This software was developed by Edward Tomasz Napierala under sponsorship
  * from the FreeBSD Foundation.
@@ -41,6 +40,8 @@
 #include <string.h>
 
 #include "ctld.h"
+#include <netinet/in.h>
+#include <netinet/ip.h>
 
 extern FILE *yyin;
 extern char *yytext;
@@ -53,18 +54,19 @@ static struct target *target = NULL;
 static struct lun *lun = NULL;
 
 extern void	yyerror(const char *);
-extern int	yylex(void);
 extern void	yyrestart(FILE *);
 
 %}
 
 %token ALIAS AUTH_GROUP AUTH_TYPE BACKEND BLOCKSIZE CHAP CHAP_MUTUAL
 %token CLOSING_BRACKET CTL_LUN DEBUG DEVICE_ID DEVICE_TYPE
-%token DISCOVERY_AUTH_GROUP DISCOVERY_FILTER FOREIGN
+%token DISCOVERY_AUTH_GROUP DISCOVERY_FILTER DSCP FOREIGN
 %token INITIATOR_NAME INITIATOR_PORTAL ISNS_SERVER ISNS_PERIOD ISNS_TIMEOUT
 %token LISTEN LISTEN_ISER LUN MAXPROC OFFLOAD OPENING_BRACKET OPTION
-%token PATH PIDFILE PORT PORTAL_GROUP REDIRECT SEMICOLON SERIAL SIZE STR
-%token TAG TARGET TIMEOUT
+%token PATH PCP PIDFILE PORT PORTAL_GROUP REDIRECT SEMICOLON SERIAL
+%token SIZE STR TAG TARGET TIMEOUT
+%token AF11 AF12 AF13 AF21 AF22 AF23 AF31 AF32 AF33 AF41 AF42 AF43
+%token BE EF CS0 CS1 CS2 CS3 CS4 CS5 CS6 CS7
 
 %union
 {
@@ -353,6 +355,10 @@ portal_group_entry:
 	portal_group_redirect
 	|
 	portal_group_tag
+	|
+	portal_group_dscp
+	|
+	portal_group_pcp
 	;
 
 portal_group_discovery_auth_group:	DISCOVERY_AUTH_GROUP STR
@@ -460,6 +466,68 @@ portal_group_tag:	TAG STR
 		}
 
 		portal_group->pg_tag = tmp;
+	}
+	;
+
+portal_group_dscp
+: DSCP STR
+	{
+		uint64_t tmp;
+
+		if (strcmp($2, "0x") == 0) {
+			tmp = strtol($2 + 2, NULL, 16);
+		} else if (expand_number($2, &tmp) != 0) {
+			yyerror("invalid numeric value");
+			free($2);
+			return(1);
+		}
+		if (tmp >= 0x40) {
+			yyerror("invalid dscp value");
+			return(1);
+		}
+
+		portal_group->pg_dscp = tmp;
+	}
+| DSCP BE	{ portal_group->pg_dscp = IPTOS_DSCP_CS0  >> 2 ; }
+| DSCP EF	{ portal_group->pg_dscp = IPTOS_DSCP_EF   >> 2 ; }
+| DSCP CS0	{ portal_group->pg_dscp = IPTOS_DSCP_CS0  >> 2 ; }
+| DSCP CS1	{ portal_group->pg_dscp = IPTOS_DSCP_CS1  >> 2 ; }
+| DSCP CS2	{ portal_group->pg_dscp = IPTOS_DSCP_CS2  >> 2 ; }
+| DSCP CS3	{ portal_group->pg_dscp = IPTOS_DSCP_CS3  >> 2 ; }
+| DSCP CS4	{ portal_group->pg_dscp = IPTOS_DSCP_CS4  >> 2 ; }
+| DSCP CS5	{ portal_group->pg_dscp = IPTOS_DSCP_CS5  >> 2 ; }
+| DSCP CS6	{ portal_group->pg_dscp = IPTOS_DSCP_CS6  >> 2 ; }
+| DSCP CS7	{ portal_group->pg_dscp = IPTOS_DSCP_CS7  >> 2 ; }
+| DSCP AF11	{ portal_group->pg_dscp = IPTOS_DSCP_AF11 >> 2 ; }
+| DSCP AF12	{ portal_group->pg_dscp = IPTOS_DSCP_AF12 >> 2 ; }
+| DSCP AF13	{ portal_group->pg_dscp = IPTOS_DSCP_AF13 >> 2 ; }
+| DSCP AF21	{ portal_group->pg_dscp = IPTOS_DSCP_AF21 >> 2 ; }
+| DSCP AF22	{ portal_group->pg_dscp = IPTOS_DSCP_AF22 >> 2 ; }
+| DSCP AF23	{ portal_group->pg_dscp = IPTOS_DSCP_AF23 >> 2 ; }
+| DSCP AF31	{ portal_group->pg_dscp = IPTOS_DSCP_AF31 >> 2 ; }
+| DSCP AF32	{ portal_group->pg_dscp = IPTOS_DSCP_AF32 >> 2 ; }
+| DSCP AF33	{ portal_group->pg_dscp = IPTOS_DSCP_AF33 >> 2 ; }
+| DSCP AF41	{ portal_group->pg_dscp = IPTOS_DSCP_AF41 >> 2 ; }
+| DSCP AF42	{ portal_group->pg_dscp = IPTOS_DSCP_AF42 >> 2 ; }
+| DSCP AF43	{ portal_group->pg_dscp = IPTOS_DSCP_AF43 >> 2 ; }
+	;
+
+portal_group_pcp:	PCP STR
+	{
+		uint64_t tmp;
+
+		if (expand_number($2, &tmp) != 0) {
+			yyerror("invalid numeric value");
+			free($2);
+			return (1);
+		}
+		if (tmp > 7) {
+			yyerror("invalid pcp value");
+			free($2);
+			return (1);
+		}
+
+		portal_group->pg_pcp = tmp;
 	}
 	;
 

@@ -1511,10 +1511,10 @@ user.
 This option can be combined with other options such as
 .Fl e Em pwd
 .Pp
-A master password may be set in a addition to the user password. The purpose of
-the master password is to allow an administrator to establish a password that
-is kept secret from the user, and which may be used to unlock the device if the
-user password is lost.
+A master password may be set in a addition to the user password.
+The purpose of the master password is to allow an administrator to establish
+a password that is kept secret from the user, and which may be used to unlock
+the device if the user password is lost.
 .Pp
 .Em Note:
 Setting the master password does not enable device security.
@@ -2276,7 +2276,6 @@ These zones must be written sequentially.
 If they are not written sequentially, starting at the write pointer, the
 command will fail.
 .El
-.Pp
 .Bl -tag -width 12n
 .It Fl c Ar cmd
 Specify the zone subcommand:
@@ -2528,7 +2527,8 @@ whether it is enabled and what the timer value is.
 .It Ic timestamp
 Issue REPORT TIMESTAMP or SET TIMESTAMP
 .Tn SCSI
-commands. Either the
+commands.
+Either the
 .Fl r
 option or the
 .Fl s
@@ -2552,7 +2552,8 @@ time, but override the system time zone and use UTC instead.
 .El
 .Bl -tag -width 6n
 .It Fl s
-Set the device's timestamp. Either the
+Set the device's timestamp.
+Either the
 .Fl f
 and
 .Fl T
@@ -2829,7 +2830,6 @@ This will read and decode the attribute values from partition 1 on the tape
 in tape drive sa0, and will display any
 .Tn SCSI
 errors that result.
-.Pp
 .Bd -literal -offset indent
 camcontrol zone da0 -v -c rz -P summary
 .Ed
@@ -2840,7 +2840,6 @@ summary of the zone parameters, and display any
 or
 .Tn ATA
 errors that result.
-.Pp
 .Bd -literal -offset indent
 camcontrol zone da0 -v -c rz -o reset
 .Ed
@@ -2851,7 +2850,6 @@ pointer reset from the disk da0, and display any
 or
 .Tn ATA
 errors that result.
-.Pp
 .Bd -literal -offset indent
 camcontrol zone da0 -v -c rwp -l 0x2c80000
 .Ed
@@ -2862,7 +2860,6 @@ that starts at LBA 0x2c80000 and display any
 or
 .Tn ATA
 errors that result.
-.Pp
 .Bd -literal -offset indent
 camcontrol epc ada0 -c timer -T 60.1 -p Idle_a -e -s
 .Ed
@@ -2871,7 +2868,6 @@ Set the timer for the Idle_a power condition on drive
 .Pa ada0
 to 60.1 seconds, enable that particular power condition, and save the timer
 value and the enabled state of the power condition.
-.Pp
 .Bd -literal -offset indent
 camcontrol epc da4 -c goto -p Standby_z -H
 .Ed
@@ -2883,7 +2879,6 @@ the drive's lowest power state) and hold in that state until it is
 explicitly released by another
 .Cm goto
 command.
-.Pp
 .Bd -literal -offset indent
 camcontrol epc da2 -c status -P
 .Ed
@@ -2901,7 +2896,6 @@ to only send the
 .Tn ATA
 CHECK POWER MODE command, which should not trigger a change in the drive's
 power state.
-.Pp
 .Bd -literal -offset indent
 camcontrol epc ada0 -c list
 .Ed
@@ -2909,7 +2903,6 @@ camcontrol epc ada0 -c list
 Display the ATA Power Conditions log (Log Address 0x08) for
 drive
 .Pa ada0 .
-.Pp
 .Bd -literal -offset indent
 camcontrol timestamp sa0 -s -f "%a, %d %b %Y %T %z" \e
 	-T "Wed, 26 Oct 2016 21:43:57 -0600"

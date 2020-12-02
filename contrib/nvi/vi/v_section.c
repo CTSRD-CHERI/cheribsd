@@ -9,10 +9,6 @@
 
 #include "config.h"
 
-#ifndef lint
-static const char sccsid[] = "$Id: v_section.c,v 10.10 2001/06/25 15:19:35 skimo Exp $";
-#endif /* not lint */
-
 #include <sys/types.h>
 #include <sys/queue.h>
 #include <sys/time.h>
@@ -81,7 +77,7 @@ v_sectionf(SCR *sp, VICMD *vp)
 	 * check here, because we know that the end is going to be the start
 	 * or end of a line.
 	 */
-	if (ISMOTION(vp))
+	if (ISMOTION(vp)) {
 		if (vp->m_start.cno == 0)
 			F_SET(vp, VM_LMODE);
 		else {
@@ -92,6 +88,7 @@ v_sectionf(SCR *sp, VICMD *vp)
 			if (vp->m_start.cno <= vp->m_stop.cno)
 				F_SET(vp, VM_LMODE);
 		}
+	}
 
 	cnt = F_ISSET(vp, VC_C1SET) ? vp->count : 1;
 	for (lno = vp->m_start.lno; !db_get(sp, ++lno, 0, &p, &len);) {

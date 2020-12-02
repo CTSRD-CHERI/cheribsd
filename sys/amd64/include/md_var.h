@@ -36,7 +36,8 @@
 
 #include <x86/x86_var.h>
 
-extern uint64_t	*vm_page_dump;
+extern char	ctx_switch_xsave[];
+extern char	ctx_switch_xsave32[];
 extern int	hw_lower_amd64_sharedpage;
 extern int	hw_ibrs_disable;
 extern int	hw_ssb_disable;
@@ -45,6 +46,8 @@ extern int	syscall_ret_l1d_flush_mode;
 
 extern vm_paddr_t intel_graphics_stolen_base;
 extern vm_paddr_t intel_graphics_stolen_size;
+
+extern int la57;
 
 /*
  * The file "conf/ldscript.amd64" defines the symbol "kernphys".  Its

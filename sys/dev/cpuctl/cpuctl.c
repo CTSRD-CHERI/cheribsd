@@ -547,10 +547,10 @@ cpuctl_do_eval_cpu_features(int cpu, struct thread *td)
 #endif
 	hw_mds_recalculate();
 	x86_taa_recalculate();
+	x86_rngds_mitg_recalculate(true);
 	printcpuinfo();
 	return (0);
 }
-
 
 int
 cpuctl_open(struct cdev *dev, int flags, int fmt __unused, struct thread *td)

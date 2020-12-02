@@ -38,35 +38,38 @@
  */
 
 #define _GNU_SOURCE	/* for CPU_SET() */
-#include <stdio.h>
-#define NETMAP_WITH_LIBS
-#include <net/netmap_user.h>
-
-
-#include <ctype.h>	// isprint()
-#include <unistd.h>	// sysconf()
-#include <sys/poll.h>
 #include <arpa/inet.h>	/* ntohs */
-#ifndef _WIN32
-#include <sys/sysctl.h>	/* sysctl */
-#endif
+#include <assert.h>
+#include <ctype.h>	// isprint()
+#include <errno.h>
+#include <fcntl.h>
 #include <ifaddrs.h>	/* getifaddrs */
+#include <libnetmap.h>
+#include <math.h>
 #include <net/ethernet.h>
 #include <netinet/in.h>
 #include <netinet/ip.h>
-#include <netinet/udp.h>
 #include <netinet/ip6.h>
+#include <netinet/udp.h>
+#ifndef NO_PCAP
+#include <pcap/pcap.h>
+#endif
+#include <pthread.h>
+#include <signal.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/ioctl.h>
+#include <sys/poll.h>
+#include <sys/stat.h>
+#if !defined(_WIN32) && !defined(linux)
+#include <sys/sysctl.h>	/* sysctl */
+#endif
+#include <sys/types.h>
+#include <unistd.h>	// sysconf()
 #ifdef linux
 #define IPV6_VERSION	0x60
 #define IPV6_DEFHLIM	64
-#endif
-#include <assert.h>
-#include <math.h>
-
-#include <pthread.h>
-
-#ifndef NO_PCAP
-#include <pcap/pcap.h>
 #endif
 
 #include "ctrs.h"
@@ -179,14 +182,14 @@ static inline void CPU_SET(uint32_t i, cpuset_t *p)
 	do {struct timespec t0 = {0,0}; *(b) = t0; } while (0)
 #endif  /* __APPLE__ */
 
-const char *default_payload="netmap pkt-gen DIRECT payload\n"
+static const char *default_payload = "netmap pkt-gen DIRECT payload\n"
 	"http://info.iet.unipi.it/~luigi/netmap/ ";
 
-const char *indirect_payload="netmap pkt-gen indirect payload\n"
+static const char *indirect_payload = "netmap pkt-gen indirect payload\n"
 	"http://info.iet.unipi.it/~luigi/netmap/ ";
 
-int verbose = 0;
-int normalize = 1;
+static int verbose = 0;
+static int normalize = 1;
 
 #define VIRT_HDR_1	10	/* length of a base vnet-hdr */
 #define VIRT_HDR_2	12	/* length of the extenede vnet-hdr */
@@ -218,7 +221,7 @@ struct pkt {
     ((af) == AF_INET ? (p)->ipv4.f: (p)->ipv6.f)
 
 struct ip_range {
-	char *name;
+	const char *name;
 	union {
 		struct {
 			uint32_t start, end; /* same as struct in_addr */
@@ -232,12 +235,13 @@ struct ip_range {
 };
 
 struct mac_range {
-	char *name;
+	const char *name;
 	struct ether_addr start, end;
 };
 
 /* ifname can be netmap:foo-xxxx */
-#define MAX_IFNAMELEN	64	/* our buffer for ifname */
+#define MAX_IFNAMELEN	512	/* our buffer for ifname */
+//#define MAX_PKTSIZE	1536
 #define MAX_PKTSIZE	MAX_BODYSIZE	/* XXX: + IP_HDR + ETH_HDR */
 
 /* compact timestamp to fit into 60 byte packet. (enough to obtain RTT) */
@@ -275,7 +279,7 @@ struct glob_arg {
 #define OPT_TS		16	/* add a timestamp */
 #define OPT_INDIRECT	32	/* use indirect buffers, tx only */
 #define OPT_DUMP	64	/* dump rx/tx traffic */
-#define OPT_RUBBISH	256	/* send wathever the buffers contain */
+#define OPT_RUBBISH	256	/* send whatever the buffers contain */
 #define OPT_RANDOM_SRC  512
 #define OPT_RANDOM_DST  1024
 #define OPT_PPS_STATS   2048
@@ -289,13 +293,14 @@ struct glob_arg {
 
 	int affinity;
 	int main_fd;
-	struct nm_desc *nmd;
+	struct nmport_d *nmd;
+	uint32_t orig_mode;
 	int report_interval;		/* milliseconds between prints */
 	void *(*td_body)(void *);
 	int td_type;
 	void *mmap_addr;
 	char ifname[MAX_IFNAMELEN];
-	char *nmr_config;
+	const char *nmr_config;
 	int dummy_send;
 	int virt_header;	/* send also the virt_header */
 	char *packet_file;	/* -P option */
@@ -323,7 +328,7 @@ struct targ {
 	int completed;
 	int cancel;
 	int fd;
-	struct nm_desc *nmd;
+	struct nmport_d *nmd;
 	/* these ought to be volatile, but they are
 	 * only sampled and errors should not accumulate
 	 */
@@ -516,16 +521,20 @@ extract_mac_range(struct mac_range *r)
 static int
 get_if_mtu(const struct glob_arg *g)
 {
-	char ifname[IFNAMSIZ];
 	struct ifreq ifreq;
 	int s, ret;
+	const char *ifname = g->nmd->hdr.nr_name;
+	size_t len;
 
-	if (!strncmp(g->ifname, "netmap:", 7) && !strchr(g->ifname, '{')
-			&& !strchr(g->ifname, '}')) {
-		/* Parse the interface name and ask the kernel for the
-		 * MTU value. */
-		strncpy(ifname, g->ifname+7, IFNAMSIZ-1);
-		ifname[strcspn(ifname, "-*^{}/@")] = '\0';
+	if (!strncmp(g->ifname, "netmap:", 7) && !strchr(ifname, '{')
+			&& !strchr(ifname, '}')) {
+
+		len = strlen(ifname);
+
+		if (len > IFNAMSIZ) {
+			D("'%s' too long, cannot ask for MTU", ifname);
+			return -1;
+		}
 
 		s = socket(AF_INET, SOCK_DGRAM, 0);
 		if (s < 0) {
@@ -534,12 +543,14 @@ get_if_mtu(const struct glob_arg *g)
 		}
 
 		memset(&ifreq, 0, sizeof(ifreq));
-		strncpy(ifreq.ifr_name, ifname, IFNAMSIZ);
+		memcpy(ifreq.ifr_name, ifname, len);
 
 		ret = ioctl(s, SIOCGIFMTU, &ifreq);
 		if (ret) {
 			D("ioctl(SIOCGIFMTU) failed: %s", strerror(errno));
 		}
+
+		close(s);
 
 		return ifreq.ifr_mtu;
 	}
@@ -620,8 +631,8 @@ system_ncpus(void)
  * If there is no 4th number, then the 3rd is assigned to both #tx-rings
  * and #rx-rings.
  */
-int
-parse_nmr_config(const char* conf, struct nmreq *nmr)
+static int
+parse_nmr_config(const char* conf, struct nmreq_register *nmr)
 {
 	char *w, *tok;
 	int i, v;
@@ -655,9 +666,7 @@ parse_nmr_config(const char* conf, struct nmreq *nmr)
 			nmr->nr_tx_rings, nmr->nr_tx_slots,
 			nmr->nr_rx_rings, nmr->nr_rx_slots);
 	free(w);
-	return (nmr->nr_tx_rings || nmr->nr_tx_slots ||
-		nmr->nr_rx_rings || nmr->nr_rx_slots) ?
-		NM_OPEN_RING_CFG : 0;
+	return 0;
 }
 
 
@@ -727,7 +736,7 @@ checksum(const void *data, uint16_t len, uint32_t sum)
 
 	/* Checksum all the pairs of bytes first... */
 	for (i = 0; i < (len & ~1U); i += 2) {
-		sum += (u_int16_t)ntohs(*((u_int16_t *)(addr + i)));
+		sum += (uint16_t)ntohs(*((const uint16_t *)(addr + i)));
 		if (sum > 0xFFFF)
 			sum -= 0xFFFF;
 	}
@@ -1109,20 +1118,22 @@ initialize_packet(struct targ *targ)
 static void
 get_vnet_hdr_len(struct glob_arg *g)
 {
-	struct nmreq req;
+	struct nmreq_header hdr;
+	struct nmreq_port_hdr ph;
 	int err;
 
-	memset(&req, 0, sizeof(req));
-	bcopy(g->nmd->req.nr_name, req.nr_name, sizeof(req.nr_name));
-	req.nr_version = NETMAP_API;
-	req.nr_cmd = NETMAP_VNET_HDR_GET;
-	err = ioctl(g->main_fd, NIOCREGIF, &req);
+	hdr = g->nmd->hdr; /* copy name and version */
+	hdr.nr_reqtype = NETMAP_REQ_PORT_HDR_GET;
+	hdr.nr_options = 0;
+	memset(&ph, 0, sizeof(ph));
+	hdr.nr_body = (uintptr_t)&ph;
+	err = ioctl(g->main_fd, NIOCCTRL, &hdr);
 	if (err) {
 		D("Unable to get virtio-net header length");
 		return;
 	}
 
-	g->virt_header = req.nr_arg1;
+	g->virt_header = ph.nr_hdr_len;
 	if (g->virt_header) {
 		D("Port requires virtio-net header, length = %d",
 		  g->virt_header);
@@ -1133,17 +1144,18 @@ static void
 set_vnet_hdr_len(struct glob_arg *g)
 {
 	int err, l = g->virt_header;
-	struct nmreq req;
+	struct nmreq_header hdr;
+	struct nmreq_port_hdr ph;
 
 	if (l == 0)
 		return;
 
-	memset(&req, 0, sizeof(req));
-	bcopy(g->nmd->req.nr_name, req.nr_name, sizeof(req.nr_name));
-	req.nr_version = NETMAP_API;
-	req.nr_cmd = NETMAP_BDG_VNET_HDR;
-	req.nr_arg1 = l;
-	err = ioctl(g->main_fd, NIOCREGIF, &req);
+	hdr = g->nmd->hdr; /* copy name and version */
+	hdr.nr_reqtype = NETMAP_REQ_PORT_HDR_SET;
+	hdr.nr_options = 0;
+	memset(&ph, 0, sizeof(ph));
+	hdr.nr_body = (uintptr_t)&ph;
+	err = ioctl(g->main_fd, NIOCCTRL, &hdr);
 	if (err) {
 		D("Unable to set virtio-net header length %d", l);
 	}
@@ -1241,7 +1253,7 @@ send_packets(struct netmap_ring *ring, struct pkt *pkt, void *frame,
 /*
  * Index of the highest bit set
  */
-uint32_t
+static uint32_t
 msb64(uint64_t x)
 {
 	uint64_t m = 1ULL << 63;
@@ -2360,7 +2372,7 @@ usage(int errcode)
 "             for client-side ping-pong operation, and pong for server-side ping-pong operation.\n"
 "\n"
 "     -n count\n"
-"             Number of iterations of the pkt-gen function, with 0 meaning infinite).  In case of tx or rx,\n"
+"             Number of iterations of the pkt-gen function (with 0 meaning infinite).  In case of tx or rx,\n"
 "             count is the number of packets to receive or transmit.  In case of ping or pong, count is the\n"
 "             number of ping-pong transactions.\n"
 "\n"
@@ -2397,20 +2409,20 @@ usage(int errcode)
 "     -p threads\n"
 "             Number of threads to use.  By default, only a single thread is used to handle all the netmap\n"
 "             rings.  If threads is larger than one, each thread handles a single TX ring (in tx mode), a\n"
-"             single RX ring (in rx mode), or a TX/RX ring couple.  The number of threads must be less or\n"
-"             equal than the number of TX (or RX) ring available in the device specified by interface.\n"
+"             single RX ring (in rx mode), or a TX/RX ring pair.  The number of threads must be less than or\n"
+"             equal to the number of TX (or RX) rings available in the device specified by interface.\n"
 "\n"
 "     -T report_ms\n"
 "             Number of milliseconds between reports.\n"
 "\n"
 "     -w wait_for_link_time\n"
-"             Number of seconds to wait before starting the pkt-gen function, useuful to make sure that the\n"
+"             Number of seconds to wait before starting the pkt-gen function, useful to make sure that the\n"
 "             network link is up.  A network device driver may take some time to enter netmap mode, or to\n"
 "             create a new transmit/receive ring pair when netmap(4) requests one.\n"
 "\n"
 "     -R rate\n"
 "             Packet transmission rate.  Not setting the packet transmission rate tells pkt-gen to transmit\n"
-"             packets as quickly as possible.  On servers from 2010 on-wards netmap(4) is able to com-\n"
+"             packets as quickly as possible.  On servers from 2010 onward netmap(4) is able to com-\n"
 "             pletely use all of the bandwidth of a 10 or 40Gbps link, so this option should be used unless\n"
 "             your intention is to saturate the link.\n"
 "\n"
@@ -2456,7 +2468,7 @@ usage(int errcode)
 "\n"
 "     -C tx_slots[,rx_slots[,tx_rings[,rx_rings]]]\n"
 "             Configuration in terms of number of rings and slots to be used when opening the netmap port.\n"
-"             Such configuration has effect on software ports created on the fly, such as VALE ports and\n"
+"             Such configuration has an effect on software ports created on the fly, such as VALE ports and\n"
 "             netmap pipes.  The configuration may consist of 1 to 4 numbers separated by commas: tx_slots,\n"
 "             rx_slots, tx_rings, rx_rings.  Missing numbers or zeroes stand for default values.  As an\n"
 "             additional convenience, if exactly one number is specified, then this is assigned to both\n"
@@ -2472,7 +2484,7 @@ usage(int errcode)
 "				OPT_INDIRECT	32 (use indirect buffers)\n"
 "				OPT_DUMP	64 (dump rx/tx traffic)\n"
 "				OPT_RUBBISH	256\n"
-"					(send wathever the buffers contain)\n"
+"					(send whatever the buffers contain)\n"
 "				OPT_RANDOM_SRC  512\n"
 "				OPT_RANDOM_DST  1024\n"
 "				OPT_PPS_STATS   2048\n"
@@ -2481,7 +2493,7 @@ usage(int errcode)
 	exit(errcode);
 }
 
-static void
+static int
 start_threads(struct glob_arg *g) {
 	int i;
 
@@ -2501,31 +2513,43 @@ start_threads(struct glob_arg *g) {
 		memcpy(t->seed, &seed, sizeof(t->seed));
 
 		if (g->dev_type == DEV_NETMAP) {
-			struct nm_desc nmd = *g->nmd; /* copy, we overwrite ringid */
-			uint64_t nmd_flags = 0;
-			nmd.self = &nmd;
+			int m = -1;
+
+			/*
+			 * if the user wants both HW and SW rings, we need to
+			 * know when to switch from NR_REG_ONE_NIC to NR_REG_ONE_SW
+			 */
+			if (g->orig_mode == NR_REG_NIC_SW) {
+				m = (g->td_type == TD_TYPE_RECEIVER ?
+						g->nmd->reg.nr_rx_rings :
+						g->nmd->reg.nr_tx_rings);
+			}
 
 			if (i > 0) {
+				int j;
 				/* the first thread uses the fd opened by the main
 				 * thread, the other threads re-open /dev/netmap
 				 */
-				if (g->nthreads > 1) {
-					nmd.req.nr_flags =
-						g->nmd->req.nr_flags & ~NR_REG_MASK;
-					nmd.req.nr_flags |= NR_REG_ONE_NIC;
-					nmd.req.nr_ringid = i;
+				t->nmd = nmport_clone(g->nmd);
+				if (t->nmd == NULL)
+					return -1;
+
+				j = i;
+				if (m > 0 && j >= m) {
+					/* switch to the software rings */
+					t->nmd->reg.nr_mode = NR_REG_ONE_SW;
+					j -= m;
 				}
+				t->nmd->reg.nr_ringid = j & NETMAP_RING_MASK;
 				/* Only touch one of the rings (rx is already ok) */
 				if (g->td_type == TD_TYPE_RECEIVER)
-					nmd_flags |= NETMAP_NO_TX_POLL;
+					t->nmd->reg.nr_flags |= NETMAP_NO_TX_POLL;
 
 				/* register interface. Override ifname and ringid etc. */
-				t->nmd = nm_open(t->g->ifname, NULL, nmd_flags |
-						NM_OPEN_IFNAME | NM_OPEN_NO_MMAP, &nmd);
-				if (t->nmd == NULL) {
-					D("Unable to open %s: %s",
-							t->g->ifname, strerror(errno));
-					continue;
+				if (nmport_open_desc(t->nmd) < 0) {
+					nmport_undo_prepare(t->nmd);
+					t->nmd = NULL;
+					return -1;
 				}
 			} else {
 				t->nmd = g->nmd;
@@ -2557,6 +2581,7 @@ start_threads(struct glob_arg *g) {
 			t->used = 0;
 		}
 	}
+	return 0;
 }
 
 static void
@@ -2656,7 +2681,7 @@ main_thread(struct glob_arg *g)
 		if (targs[i].used)
 			pthread_join(targs[i].thread, NULL); /* blocking */
 		if (g->dev_type == DEV_NETMAP) {
-			nm_close(targs[i].nmd);
+			nmport_close(targs[i].nmd);
 			targs[i].nmd = NULL;
 		} else {
 			close(targs[i].fd);
@@ -2695,7 +2720,7 @@ main_thread(struct glob_arg *g)
 
 struct td_desc {
 	int ty;
-	char *key;
+	const char *key;
 	void *f;
 	int default_burst;
 };
@@ -2715,7 +2740,7 @@ tap_alloc(char *dev)
 {
 	struct ifreq ifr;
 	int fd, err;
-	char *clonedev = TAP_CLONEDEV;
+	const char *clonedev = TAP_CLONEDEV;
 
 	(void)err;
 	(void)dev;
@@ -3079,20 +3104,13 @@ main(int arc, char **argv)
     } else if (g.dummy_send) { /* but DEV_NETMAP */
 	D("using a dummy send routine");
     } else {
-	struct nm_desc base_nmd;
-	char errmsg[MAXERRMSG];
-	u_int flags;
-
-	bzero(&base_nmd, sizeof(base_nmd));
-
-	parse_nmr_config(g.nmr_config, &base_nmd.req);
-
-	base_nmd.req.nr_flags |= NR_ACCEPT_VNET_HDR;
-
-	if (nm_parse(g.ifname, &base_nmd, errmsg) < 0) {
-		D("Invalid name '%s': %s", g.ifname, errmsg);
+	g.nmd = nmport_prepare(g.ifname);
+	if (g.nmd == NULL)
 		goto out;
-	}
+
+	parse_nmr_config(g.nmr_config, &g.nmd->reg);
+
+	g.nmd->reg.nr_flags |= NR_ACCEPT_VNET_HDR;
 
 	/*
 	 * Open the netmap device using nm_open().
@@ -3101,20 +3119,25 @@ main(int arc, char **argv)
 	 * which in turn may take some time for the PHY to
 	 * reconfigure. We do the open here to have time to reset.
 	 */
-	flags = NM_OPEN_IFNAME | NM_OPEN_ARG1 | NM_OPEN_ARG2 |
-		NM_OPEN_ARG3 | NM_OPEN_RING_CFG;
+	g.orig_mode = g.nmd->reg.nr_mode;
 	if (g.nthreads > 1) {
-		base_nmd.req.nr_flags &= ~NR_REG_MASK;
-		base_nmd.req.nr_flags |= NR_REG_ONE_NIC;
-		base_nmd.req.nr_ringid = 0;
+		switch (g.orig_mode) {
+		case NR_REG_ALL_NIC:
+		case NR_REG_NIC_SW:
+			g.nmd->reg.nr_mode = NR_REG_ONE_NIC;
+			break;
+		case NR_REG_SW:
+			g.nmd->reg.nr_mode = NR_REG_ONE_SW;
+			break;
+		default:
+			break;
+		}
+		g.nmd->reg.nr_ringid = 0;
 	}
-	g.nmd = nm_open(g.ifname, NULL, flags, &base_nmd);
-	if (g.nmd == NULL) {
-		D("Unable to open %s: %s", g.ifname, strerror(errno));
+	if (nmport_open_desc(g.nmd) < 0)
 		goto out;
-	}
 	g.main_fd = g.nmd->fd;
-	D("mapped %luKB at %p", (unsigned long)(g.nmd->req.nr_memsize>>10),
+	ND("mapped %luKB at %p", (unsigned long)(g.nmd->req.nr_memsize>>10),
 				g.nmd->mem);
 
 	if (g.virt_header) {
@@ -3129,9 +3152,9 @@ main(int arc, char **argv)
 
 	/* get num of queues in tx or rx */
 	if (g.td_type == TD_TYPE_SENDER)
-		devqueues = g.nmd->req.nr_tx_rings;
+		devqueues = g.nmd->reg.nr_tx_rings + g.nmd->reg.nr_host_tx_rings;
 	else
-		devqueues = g.nmd->req.nr_rx_rings;
+		devqueues = g.nmd->reg.nr_rx_rings + g.nmd->reg.nr_host_rx_rings;
 
 	/* validate provided nthreads. */
 	if (g.nthreads < 1 || g.nthreads > devqueues) {
@@ -3151,17 +3174,17 @@ main(int arc, char **argv)
 
 	if (verbose) {
 		struct netmap_if *nifp = g.nmd->nifp;
-		struct nmreq *req = &g.nmd->req;
+		struct nmreq_register *req = &g.nmd->reg;
 
-		D("nifp at offset %d, %d tx %d rx region %d",
+		D("nifp at offset %"PRIu64", %d tx %d rx region %d",
 		    req->nr_offset, req->nr_tx_rings, req->nr_rx_rings,
-		    req->nr_arg2);
-		for (i = 0; i <= req->nr_tx_rings; i++) {
+		    req->nr_mem_id);
+		for (i = 0; i < req->nr_tx_rings + req->nr_host_tx_rings; i++) {
 			struct netmap_ring *ring = NETMAP_TXRING(nifp, i);
 			D("   TX%d at 0x%p slots %d", i,
 			    (void *)((char *)ring - (char *)nifp), ring->num_slots);
 		}
-		for (i = 0; i <= req->nr_rx_rings; i++) {
+		for (i = 0; i < req->nr_rx_rings + req->nr_host_rx_rings; i++) {
 			struct netmap_ring *ring = NETMAP_RXRING(nifp, i);
 			D("   RX%d at 0x%p slots %d", i,
 			    (void *)((char *)ring - (char *)nifp), ring->num_slots);
@@ -3231,7 +3254,8 @@ out:
 	if (pthread_sigmask(SIG_BLOCK, &ss, NULL) < 0) {
 		D("failed to block SIGINT: %s", strerror(errno));
 	}
-	start_threads(&g);
+	if (start_threads(&g) < 0)
+		return 1;
 	/* Install the handler and re-enable SIGINT for the main thread */
 	memset(&sa, 0, sizeof(sa));
 	sa.sa_handler = sigint_h;

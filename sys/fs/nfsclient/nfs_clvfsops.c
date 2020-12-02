@@ -37,9 +37,9 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
-
 #include "opt_bootp.h"
 #include "opt_nfsroot.h"
+#include "opt_kern_tls.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -68,6 +68,7 @@ __FBSDID("$FreeBSD$");
 
 #include <net/if.h>
 #include <net/route.h>
+#include <net/route/route_ctl.h>
 #include <netinet/in.h>
 
 #include <fs/nfs/nfsport.h>
@@ -75,6 +76,8 @@ __FBSDID("$FreeBSD$");
 #include <fs/nfsclient/nfsmount.h>
 #include <fs/nfsclient/nfs.h>
 #include <nfs/nfsdiskless.h>
+
+#include <rpc/rpcsec_tls.h>
 
 FEATURE(nfscl, "NFSv4 client");
 
@@ -116,7 +119,7 @@ static void	nfs_decode_args(struct mount *mp, struct nfsmount *nmp,
 static int	mountnfs(struct nfs_args *, struct mount *,
 		    struct sockaddr *, char *, u_char *, int, u_char *, int,
 		    u_char *, int, struct vnode **, struct ucred *,
-		    struct thread *, int, int, int);
+		    struct thread *, int, int, int, uint32_t);
 static void	nfs_getnlminfo(struct vnode *, uint8_t *, size_t *,
 		    struct sockaddr_storage *, int *, off_t *,
 		    struct timeval *);
@@ -175,7 +178,6 @@ SYSCTL_STRING(_vfs_nfs, OID_AUTO, diskless_rootpath, CTLFLAG_RD,
 SYSCTL_OPAQUE(_vfs_nfs, OID_AUTO, diskless_rootaddr, CTLFLAG_RD,
     &nfsv3_diskless.root_saddr, sizeof(nfsv3_diskless.root_saddr),
     "%Ssockaddr_in", "Diskless root nfs address");
-
 
 void		newnfsargs_ntoh(struct nfs_args *);
 static int	nfs_mountdiskless(char *,
@@ -364,7 +366,7 @@ ncl_fsinfo(struct nfsmount *nmp, struct vnode *vp, struct ucred *cred,
 	struct nfsfsinfo fs;
 	struct nfsvattr nfsva;
 	int error, attrflag;
-	
+
 	error = nfsrpc_fsinfo(vp, &fs, cred, td, &nfsva, &attrflag, NULL);
 	if (!error) {
 		if (attrflag)
@@ -466,6 +468,8 @@ nfs_mountroot(struct mount *mp)
 	    nd->mygateway.sin_addr.s_addr != 0) {
 		struct sockaddr_in mask, sin;
 		struct epoch_tracker et;
+		struct rt_addrinfo info;
+		struct rib_cmd_info rc;
 
 		bzero((caddr_t)&mask, sizeof(mask));
 		sin = mask;
@@ -474,10 +478,14 @@ nfs_mountroot(struct mount *mp)
                 /* XXX MRT use table 0 for this sort of thing */
 		NET_EPOCH_ENTER(et);
 		CURVNET_SET(TD_TO_VNET(td));
-		error = rtrequest_fib(RTM_ADD, (struct sockaddr *)&sin,
-		    (struct sockaddr *)&nd->mygateway,
-		    (struct sockaddr *)&mask,
-		    RTF_UP | RTF_GATEWAY, NULL, RT_DEFAULT_FIB);
+
+		bzero((caddr_t)&info, sizeof(info));
+		info.rti_flags = RTF_UP | RTF_GATEWAY;
+		info.rti_info[RTAX_DST] = (struct sockaddr *)&sin;
+		info.rti_info[RTAX_GATEWAY] = (struct sockaddr *)&nd->mygateway;
+		info.rti_info[RTAX_NETMASK] = (struct sockaddr *)&mask;
+
+		error = rib_action(RT_DEFAULT_FIB, RTM_ADD, &info, &rc);
 		CURVNET_RESTORE();
 		NET_EPOCH_EXIT(et);
 		if (error)
@@ -537,7 +545,7 @@ nfs_mountdiskless(char *path,
 	nam = sodupsockaddr((struct sockaddr *)sin, M_WAITOK);
 	if ((error = mountnfs(args, mp, nam, path, NULL, 0, dirpath, dirlen,
 	    NULL, 0, vpp, td->td_ucred, td, NFS_DEFAULT_NAMETIMEO, 
-	    NFS_DEFAULT_NEGNAMETIMEO, 0)) != 0) {
+	    NFS_DEFAULT_NEGNAMETIMEO, 0, 0)) != 0) {
 		printf("nfs_mountroot: mount %s on /: %d\n", path, error);
 		return (error);
 	}
@@ -711,7 +719,7 @@ nfs_decode_args(struct mount *mp, struct nfsmount *nmp, struct nfs_args *argp,
 		    nmp->nm_soproto = argp->proto;
 		    if (nmp->nm_sotype == SOCK_DGRAM)
 			while (newnfs_connect(nmp, &nmp->nm_sockreq,
-			    cred, td, 0)) {
+			    cred, td, 0, false)) {
 				printf("newnfs_args: retrying connect\n");
 				(void) nfs_catnap(PSOCK, 0, "nfscon");
 			}
@@ -739,7 +747,7 @@ static const char *nfs_opts[] = { "from", "nfs_args",
     "resvport", "readahead", "hostname", "timeo", "timeout", "addr", "fh",
     "nfsv3", "sec", "principal", "nfsv4", "gssname", "allgssname", "dirpath",
     "minorversion", "nametimeo", "negnametimeo", "nocto", "noncontigwr",
-    "pnfs", "wcommitsize", "oneopenown",
+    "pnfs", "wcommitsize", "oneopenown", "tls",
     NULL };
 
 /*
@@ -890,9 +898,11 @@ nfs_mount(struct mount *mp)
 	int dirlen, has_nfs_args_opt, has_nfs_from_opt,
 	    krbnamelen, srvkrbnamelen;
 	size_t hstlen;
+	uint32_t newflag;
 
 	has_nfs_args_opt = 0;
 	has_nfs_from_opt = 0;
+	newflag = 0;
 	hst = malloc(MNAMELEN, M_TEMP, M_WAITOK);
 	if (vfs_filteropt(mp->mnt_optnew, nfs_opts)) {
 		error = EINVAL;
@@ -976,6 +986,8 @@ nfs_mount(struct mount *mp)
 		args.flags |= NFSMNT_PNFS;
 	if (vfs_getopt(mp->mnt_optnew, "oneopenown", NULL, NULL) == 0)
 		args.flags |= NFSMNT_ONEOPENOWN;
+	if (vfs_getopt(mp->mnt_optnew, "tls", NULL, NULL) == 0)
+		newflag |= NFSMNT_TLS;
 	if (vfs_getopt(mp->mnt_optnew, "readdirsize", (void **)&opt, NULL) == 0) {
 		if (opt == NULL) { 
 			vfs_mount_error(mp, "illegal readdirsize");
@@ -1332,7 +1344,7 @@ nfs_mount(struct mount *mp)
 	args.fh = nfh;
 	error = mountnfs(&args, mp, nam, hst, krbname, krbnamelen, dirpath,
 	    dirlen, srvkrbname, srvkrbnamelen, &vp, td->td_ucred, td,
-	    nametimeo, negnametimeo, minvers);
+	    nametimeo, negnametimeo, minvers, newflag);
 out:
 	if (!error) {
 		MNT_ILOCK(mp);
@@ -1345,7 +1357,6 @@ out:
 	free(hst, M_TEMP);
 	return (error);
 }
-
 
 /*
  * VFS Operations.
@@ -1381,7 +1392,7 @@ mountnfs(struct nfs_args *argp, struct mount *mp, struct sockaddr *nam,
     char *hst, u_char *krbname, int krbnamelen, u_char *dirpath, int dirlen,
     u_char *srvkrbname, int srvkrbnamelen, struct vnode **vpp,
     struct ucred *cred, struct thread *td, int nametimeo, int negnametimeo,
-    int minvers)
+    int minvers, uint32_t newflag)
 {
 	struct nfsmount *nmp;
 	struct nfsnode *np;
@@ -1391,6 +1402,9 @@ mountnfs(struct nfs_args *argp, struct mount *mp, struct sockaddr *nam,
 	struct nfsclds *dsp, *tdsp;
 	uint32_t lease;
 	static u_int64_t clval = 0;
+#ifdef KERN_TLS
+	u_int maxlen;
+#endif
 
 	NFSCL_DEBUG(3, "in mnt\n");
 	clp = NULL;
@@ -1400,9 +1414,24 @@ mountnfs(struct nfs_args *argp, struct mount *mp, struct sockaddr *nam,
 		free(nam, M_SONAME);
 		return (0);
 	} else {
+		/* NFS-over-TLS requires that rpctls be functioning. */
+		if ((newflag & NFSMNT_TLS) != 0) {
+			error = EINVAL;
+#ifdef KERN_TLS
+			/* KERN_TLS is only supported for TCP. */
+			if (argp->sotype == SOCK_STREAM &&
+			    rpctls_getinfo(&maxlen, true, false))
+				error = 0;
+#endif
+			if (error != 0) {
+				free(nam, M_SONAME);
+				return (error);
+			}
+		}
 		nmp = malloc(sizeof (struct nfsmount) +
 		    krbnamelen + dirlen + srvkrbnamelen + 2,
 		    M_NEWNFSMNT, M_WAITOK | M_ZERO);
+		nmp->nm_newflag = newflag;
 		TAILQ_INIT(&nmp->nm_bufq);
 		TAILQ_INIT(&nmp->nm_sess);
 		if (clval == 0)
@@ -1521,8 +1550,7 @@ mountnfs(struct nfs_args *argp, struct mount *mp, struct sockaddr *nam,
 	else
 		nmp->nm_sockreq.nr_vers = NFS_VER2;
 
-
-	if ((error = newnfs_connect(nmp, &nmp->nm_sockreq, cred, td, 0)))
+	if ((error = newnfs_connect(nmp, &nmp->nm_sockreq, cred, td, 0, false)))
 		goto bad;
 	/* For NFSv4.1, get the clientid now. */
 	if (nmp->nm_minorvers > 0) {
@@ -1572,7 +1600,7 @@ mountnfs(struct nfs_args *argp, struct mount *mp, struct sockaddr *nam,
 		if (error)
 			goto bad;
 		*vpp = NFSTOV(np);
-	
+
 		/*
 		 * Get file attributes and transfer parameters for the
 		 * mountpoint.  This has the side effect of filling in
@@ -1615,7 +1643,7 @@ mountnfs(struct nfs_args *argp, struct mount *mp, struct sockaddr *nam,
 		}
 		if (argp->flags & NFSMNT_NFSV3)
 			ncl_fsinfo(nmp, *vpp, cred, td);
-	
+
 		/* Mark if the mount point supports NFSv4 ACLs. */
 		if ((argp->flags & NFSMNT_NFSV4) != 0 && nfsrv_useacl != 0 &&
 		    ret == 0 &&
@@ -1624,7 +1652,7 @@ mountnfs(struct nfs_args *argp, struct mount *mp, struct sockaddr *nam,
 			mp->mnt_flag |= MNT_NFS4ACLS;
 			MNT_IUNLOCK(mp);
 		}
-	
+
 		/*
 		 * Lose the lock but keep the ref.
 		 */
@@ -1823,7 +1851,7 @@ loop:
 			VI_UNLOCK(vp);
 			continue;
 		}
-		if (vget(vp, LK_EXCLUSIVE | LK_INTERLOCK, td)) {
+		if (vget(vp, LK_EXCLUSIVE | LK_INTERLOCK)) {
 			MNT_VNODE_FOREACH_ALL_ABORT(mp, mvp);
 			goto loop;
 		}
@@ -2006,6 +2034,8 @@ void nfscl_retopts(struct nfsmount *nmp, char *buffer, size_t buflen)
 	nfscl_printopt(nmp, nmp->nm_sotype != SOCK_STREAM, ",udp", &buf, &blen);
 	nfscl_printopt(nmp, (nmp->nm_flag & NFSMNT_RESVPORT) != 0, ",resvport",
 	    &buf, &blen);
+	nfscl_printopt(nmp, (nmp->nm_newflag & NFSMNT_TLS) != 0, ",tls", &buf,
+	    &blen);
 	nfscl_printopt(nmp, (nmp->nm_flag & NFSMNT_NOCONN) != 0, ",noconn",
 	    &buf, &blen);
 	nfscl_printopt(nmp, (nmp->nm_flag & NFSMNT_SOFT) == 0, ",hard", &buf,
@@ -2053,7 +2083,6 @@ void nfscl_retopts(struct nfsmount *nmp, char *buffer, size_t buflen)
 	nfscl_printoptval(nmp, nmp->nm_timeo, ",timeout", &buf, &blen);
 	nfscl_printoptval(nmp, nmp->nm_retry, ",retrans", &buf, &blen);
 }
-
 // CHERI CHANGES START
 // {
 //   "updated": 20181114,

@@ -326,6 +326,9 @@ extern const char *buf_wmesg;		/* Default buffer lock message */
 	KASSERT(((bp)->b_flags & B_REMFREE) == 0,			\
 	    ("BUF_UNLOCK %p while B_REMFREE is still set.", (bp)));	\
 									\
+	BUF_UNLOCK_RAW((bp));						\
+} while (0)
+#define	BUF_UNLOCK_RAW(bp) do {						\
 	(void)_lockmgr_args(&(bp)->b_lock, LK_RELEASE, NULL,		\
 	    LK_WMESG_DEFAULT, LK_PRIO_DEFAULT, LK_TIMO_DEFAULT,		\
 	    LOCK_FILE, LOCK_LINE);					\
@@ -546,7 +549,9 @@ int	vfs_bio_awrite(struct buf *);
 void	vfs_busy_pages_acquire(struct buf *bp);
 void	vfs_busy_pages_release(struct buf *bp);
 struct buf *incore(struct bufobj *, daddr_t);
+bool	inmem(struct vnode *, daddr_t);
 struct buf *gbincore(struct bufobj *, daddr_t);
+struct buf *gbincore_unlocked(struct bufobj *, daddr_t);
 struct buf *getblk(struct vnode *, daddr_t, int, int, int, int);
 int	getblkx(struct vnode *vp, daddr_t blkno, daddr_t dblkno, int size,
 	    int slpflag, int slptimeo, int flags, struct buf **bpp);
@@ -570,7 +575,7 @@ void	vfs_bio_set_flags(struct buf *bp, int ioflags);
 void	vfs_bio_set_valid(struct buf *, int base, int size);
 void	vfs_busy_pages(struct buf *, int clear_modify);
 void	vfs_unbusy_pages(struct buf *);
-int	vmapbuf(struct buf *, void * __capability, int);
+int	vmapbuf(struct buf *, void * __capability, size_t, int);
 void	vunmapbuf(struct buf *);
 void	brelvp(struct buf *);
 void	bgetvp(struct vnode *, struct buf *);

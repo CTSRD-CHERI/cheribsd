@@ -81,6 +81,8 @@ __FBSDID("$FreeBSD$");
 #include <x86/ifunc.h>
 #include <x86/sysarch.h>
 
+#include <security/audit/audit.h>
+
 #include <amd64/linux/linux.h>
 #include <amd64/linux/linux_proto.h>
 #include <compat/linux/linux_emul.h>
@@ -98,15 +100,22 @@ linux_execve(struct thread *td, struct linux_execve_args *args)
 	char *path;
 	int error;
 
-	LCONVPATHEXIST(td, args->path, &path);
-
 	LINUX_CTR(execve);
 
-	error = exec_copyin_args(&eargs, PTR2CAP(path), UIO_SYSSPACE,
-	    __USER_CAP_UNBOUND(args->argp), __USER_CAP_UNBOUND(args->envp));
-	free(path, M_TEMP);
+	if (!LUSECONVPATH(td)) {
+		error = exec_copyin_args(&eargs, __USER_CAP_PATH(args->path),
+		    UIO_USERSPACE, __USER_CAP_UNBOUND(args->argp),
+		    __USER_CAP_UNBOUND(args->envp));
+	} else {
+		LCONVPATHEXIST(td, args->path, &path);
+		error = exec_copyin_args(&eargs, PTR2CAP(path), UIO_SYSSPACE,
+		    __USER_CAP_UNBOUND(args->argp),
+		    __USER_CAP_UNBOUND(args->envp));
+		LFREEPATH(path);
+	}
 	if (error == 0)
 		error = linux_common_execve(td, &eargs);
+	AUDIT_SYSCALL_EXIT(error == EJUSTRETURN ? 0 : error, td);
 	return (error);
 }
 
@@ -119,7 +128,7 @@ linux_set_upcall_kse(struct thread *td, register_t stack)
 
 	/*
 	 * The newly created Linux thread returns
-	 * to the user space by the same path that a parent do.
+	 * to the user space by the same path that a parent does.
 	 */
 	td->td_frame->tf_rax = 0;
 	return (0);
@@ -138,6 +147,13 @@ linux_mprotect(struct thread *td, struct linux_mprotect_args *uap)
 {
 
 	return (linux_mprotect_common(td, PTROUT(uap->addr), uap->len, uap->prot));
+}
+
+int
+linux_madvise(struct thread *td, struct linux_madvise_args *uap)
+{
+
+	return (linux_madvise_common(td, PTROUT(uap->addr), uap->len, uap->behav));
 }
 
 int

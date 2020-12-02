@@ -461,7 +461,6 @@ out:
 	return (error);
 }
 
-
 void
 makectx(struct trapframe *tf, struct pcb *pcb)
 {
@@ -766,15 +765,18 @@ exec_setregs(struct thread *td, struct image_params *imgp, uintcap_t stack)
 	td->td_md.md_tls = NULL;
 #ifdef COMPAT_FREEBSD32
 	if (SV_PROC_FLAG(td->td_proc, SV_ILP32))
-		td->td_md.md_tls_tcb_offset = TLS_TP_OFFSET32 + TLS_TCB_SIZE32;
+		td->td_proc->p_md.md_tls_tcb_offset = TLS_TP_OFFSET32 +
+		    TLS_TCB_SIZE32;
 	else
 #endif
 #ifdef COMPAT_FREEBSD64
 	if (SV_PROC_FLAG(td->td_proc, SV_CHERI | SV_LP64) == SV_LP64)
-		td->td_md.md_tls_tcb_offset = TLS_TP_OFFSET64 + TLS_TCB_SIZE64;
+		td->td_proc->p_md.md_tls_tcb_offset = TLS_TP_OFFSET64 +
+		     TLS_TCB_SIZE64;
 	else
 #endif
-		td->td_md.md_tls_tcb_offset = TLS_TP_OFFSET + TLS_TCB_SIZE;
+		td->td_proc->p_md.md_tls_tcb_offset = TLS_TP_OFFSET +
+		    TLS_TCB_SIZE;
 }
 
 int

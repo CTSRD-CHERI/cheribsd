@@ -137,7 +137,6 @@ struct syscall_args {
 	u_int code;
 	struct sysent *callp;
 	syscallarg_t args[MAXARGS];
-	int narg;
 };
 
 #endif /* !_MACHINE_PROC_H_ */

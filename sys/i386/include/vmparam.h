@@ -37,7 +37,6 @@
  * $FreeBSD$
  */
 
-
 #ifndef _MACHINE_VMPARAM_H_
 #define _MACHINE_VMPARAM_H_ 1
 
@@ -240,5 +239,15 @@
 #define	PMAP_HAS_DMAP	0
 #define	PHYS_TO_DMAP(x)	({ panic("No direct map exists"); 0; })
 #define	DMAP_TO_PHYS(x)	({ panic("No direct map exists"); 0; })
+
+/*
+ * No non-transparent large page support in the pmap.
+ */
+#define	PMAP_HAS_LARGEPAGES	0
+
+/*
+ * Need a page dump array for minidump.
+ */
+#define MINIDUMP_PAGE_TRACKING	1
 
 #endif /* _MACHINE_VMPARAM_H_ */

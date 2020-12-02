@@ -223,8 +223,16 @@ output_raw_success_cleanup()
 
 mpath_check()
 {
-	if [ "`sysctl -i -n net.route.multipath`" != 1 ]; then
+	if [ `sysctl -iW net.route.multipath | wc -l` != "1" ]; then
 		atf_skip "This test requires ROUTE_MPATH enabled"
+	fi
+}
+
+mpath_enable()
+{
+	jexec $1 sysctl net.route.multipath=1
+	if [ $? != 0 ]; then
+		atf_fail "Setting multipath in jail $1 failed".
 	fi
 }
 
@@ -258,6 +266,7 @@ output_tcp_flowid_mpath_success_body()
 	lo_dst=$(vnet_mkloopback)
 
 	vnet_mkjail ${jname}a ${epair0}a ${epair1}a ${lo_src}
+	mpath_enable ${jname}a
 	# Setup transit IPv4 networks
 	jexec ${jname}a ifconfig ${epair0}a up
 	jexec ${jname}a ifconfig ${epair0}a inet 203.0.113.1/30
@@ -339,11 +348,10 @@ output_tcp_flowid_mpath_success_body()
 	pkt_0=`jexec ${jname}a netstat -Wf link -I ${epair0}a | head | awk '$1!~/^Name/{print$8}'`
 	pkt_1=`jexec ${jname}a netstat -Wf link -I ${epair1}a | head | awk '$1!~/^Name/{print$8}'`
 	if [ ${pkt_0} -le 10 ]; then
-		echo "Balancing failure: 1: ${pkt_0} 2: ${pkt_1}"
-		exit 1
+		atf_fail "Balancing failure: 1: ${pkt_0} 2: ${pkt_1}"
 	fi
 	if [ ${pkt_1} -le 10 ]; then
-		echo "Balancing failure: 1: ${pkt_0} 2: ${pkt_1}"
+		atf_fail "Balancing failure: 1: ${pkt_0} 2: ${pkt_1}"
 		exit 1
 	fi
 	echo "TCP Balancing: 1: ${pkt_0} 2: ${pkt_1}"
@@ -387,6 +395,7 @@ output_udp_flowid_mpath_success_body()
 	lo_dst=$(vnet_mkloopback)
 
 	vnet_mkjail ${jname}a ${epair0}a ${epair1}a ${lo_src}
+	mpath_enable ${jname}a
 	# Setup transit IPv4 networks
 	jexec ${jname}a ifconfig ${epair0}a up
 	jexec ${jname}a ifconfig ${epair0}a inet 203.0.113.1/30
@@ -468,12 +477,10 @@ output_udp_flowid_mpath_success_body()
 	pkt_0=`jexec ${jname}a netstat -Wf link -I ${epair0}a | head | awk '$1!~/^Name/{print$8}'`
 	pkt_1=`jexec ${jname}a netstat -Wf link -I ${epair1}a | head | awk '$1!~/^Name/{print$8}'`
 	if [ ${pkt_0} -le 10 ]; then
-		echo "Balancing failure: 1: ${pkt_0} 2: ${pkt_1}"
-		exit 1
+		atf_fail "Balancing failure: 1: ${pkt_0} 2: ${pkt_1}"
 	fi
 	if [ ${pkt_1} -le 10 ]; then
-		echo "Balancing failure: 1: ${pkt_0} 2: ${pkt_1}"
-		exit 1
+		atf_fail "Balancing failure: 1: ${pkt_0} 2: ${pkt_1}"
 	fi
 	echo "UDP BALANCING: 1: ${pkt_0} 2: ${pkt_1}"
 }
@@ -512,6 +519,7 @@ output_raw_flowid_mpath_success_body()
 	lo_dst=$(vnet_mkloopback)
 
 	vnet_mkjail ${jname}a ${epair0}a ${epair1}a ${lo_src}
+	mpath_enable ${jname}a
 	# Setup transit IPv4 networks
 	jexec ${jname}a ifconfig ${epair0}a up
 	jexec ${jname}a ifconfig ${epair0}a inet 203.0.113.1/30
@@ -561,12 +569,10 @@ output_raw_flowid_mpath_success_body()
 	jexec ${jname}a netstat -bWf link -I ${epair0}a
 	jexec ${jname}a netstat -bWf link -I ${epair1}a
 	if [ ${pkt_0} -le 10 ]; then
-		echo "Balancing failure: 1: ${pkt_0} 2: ${pkt_1}"
-		exit 1
+		atf_fail "Balancing failure: 1: ${pkt_0} 2: ${pkt_1}"
 	fi
 	if [ ${pkt_1} -le 10 ]; then
-		echo "Balancing failure: 1: ${pkt_0} 2: ${pkt_1}"
-		exit 1
+		atf_fail "Balancing failure: 1: ${pkt_0} 2: ${pkt_1}"
 	fi
 	echo "RAW BALANCING: 1: ${pkt_0} 2: ${pkt_1}"
 }

@@ -44,7 +44,7 @@ options 	PREEMPTION		# Enable kernel thread preemption
 options 	INET			# InterNETworking
 options 	INET6			# IPv6 communications protocols
 options 	TCP_OFFLOAD		# TCP offload
-options 	SCTP			# Stream Control Transmission Protocol
+options 	SCTP_SUPPORT		# Allow kldload of SCTP
 options 	FFS			# Berkeley Fast Filesystem
 options 	SOFTUPDATES		# Enable FFS soft updates support
 options 	UFS_ACL			# Support for access control lists
@@ -103,7 +103,7 @@ device		cpufreq
 
 # Bus support.
 device		acpi
-options 	ACPI_DMAR
+options 	IOMMU
 device		pci
 
 # atkbdc0 controls both the keyboard and the PS/2 mouse

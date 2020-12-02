@@ -152,7 +152,7 @@ vnode_create_vobject(struct vnode *vp, off_t isize, struct thread *td)
 	struct vattr va;
 	bool last;
 
-	if (!vn_isdisk(vp, NULL) && vn_canvmio(vp) == FALSE)
+	if (!vn_isdisk(vp) && vn_canvmio(vp) == FALSE)
 		return (0);
 
 	object = vp->v_object;
@@ -160,7 +160,7 @@ vnode_create_vobject(struct vnode *vp, off_t isize, struct thread *td)
 		return (0);
 
 	if (size == 0) {
-		if (vn_isdisk(vp, NULL)) {
+		if (vn_isdisk(vp)) {
 			size = IDX_TO_OFF(INT_MAX);
 		} else {
 			if (VOP_GETATTR(vp, &va, td->td_ucred))
@@ -227,7 +227,6 @@ vnode_destroy_vobject(struct vnode *vp)
 	}
 	KASSERT(vp->v_object == NULL, ("vp %p obj %p", vp, vp->v_object));
 }
-
 
 /*
  * Allocate (or lookup) pager for a vnode.
@@ -520,7 +519,11 @@ vnode_pager_setsize(struct vnode *vp, vm_ooffset_t nsize)
 		vm_page_xunbusy(m);
 	}
 out:
+#if defined(__powerpc__) && !defined(__powerpc64__)
 	object->un_pager.vnp.vnp_size = nsize;
+#else
+	atomic_store_64(&object->un_pager.vnp.vnp_size, nsize);
+#endif
 	object->size = nobjsize;
 	VM_OBJECT_WUNLOCK(object);
 }
@@ -537,9 +540,6 @@ vnode_pager_addr(struct vnode *vp, vm_ooffset_t address, daddr_t *rtaddress,
 	int err;
 	daddr_t vblock;
 	daddr_t voffset;
-
-	if (address < 0)
-		return -1;
 
 	if (VN_IS_DOOMED(vp))
 		return -1;
@@ -1138,6 +1138,21 @@ vnode_pager_generic_getpages_done(struct buf *bp)
 		bp->b_data = unmapped_buf;
 	}
 
+	/*
+	 * If the read failed, we must free any read ahead/behind pages here.
+	 * The requested pages are freed by the caller (for sync requests)
+	 * or by the bp->b_pgiodone callback (for async requests).
+	 */
+	if (error != 0) {
+		VM_OBJECT_WLOCK(object);
+		for (i = 0; i < bp->b_pgbefore; i++)
+			vm_page_free_invalid(bp->b_pages[i]);
+		for (i = bp->b_npages - bp->b_pgafter; i < bp->b_npages; i++)
+			vm_page_free_invalid(bp->b_pages[i]);
+		VM_OBJECT_WUNLOCK(object);
+		return (error);
+	}
+
 	/* Read lock to protect size. */
 	VM_OBJECT_RLOCK(object);
 	for (i = 0, tfoff = IDX_TO_OFF(bp->b_pages[0]->pindex);
@@ -1149,30 +1164,28 @@ vnode_pager_generic_getpages_done(struct buf *bp)
 		if (mt == bogus_page)
 			continue;
 
-		if (error == 0) {
-			if (nextoff <= object->un_pager.vnp.vnp_size) {
-				/*
-				 * Read filled up entire page.
-				 */
-				vm_page_valid(mt);
-				KASSERT(mt->dirty == 0,
-				    ("%s: page %p is dirty", __func__, mt));
-				KASSERT(!pmap_page_is_mapped(mt),
-				    ("%s: page %p is mapped", __func__, mt));
-			} else {
-				/*
-				 * Read did not fill up entire page.
-				 *
-				 * Currently we do not set the entire page
-				 * valid, we just try to clear the piece that
-				 * we couldn't read.
-				 */
-				vm_page_set_valid_range(mt, 0,
-				    object->un_pager.vnp.vnp_size - tfoff);
-				KASSERT((mt->dirty & vm_page_bits(0,
-				    object->un_pager.vnp.vnp_size - tfoff)) ==
-				    0, ("%s: page %p is dirty", __func__, mt));
-			}
+		if (nextoff <= object->un_pager.vnp.vnp_size) {
+			/*
+			 * Read filled up entire page.
+			 */
+			vm_page_valid(mt);
+			KASSERT(mt->dirty == 0,
+			    ("%s: page %p is dirty", __func__, mt));
+			KASSERT(!pmap_page_is_mapped(mt),
+			    ("%s: page %p is mapped", __func__, mt));
+		} else {
+			/*
+			 * Read did not fill up entire page.
+			 *
+			 * Currently we do not set the entire page valid,
+			 * we just try to clear the piece that we couldn't
+			 * read.
+			 */
+			vm_page_set_valid_range(mt, 0,
+			    object->un_pager.vnp.vnp_size - tfoff);
+			KASSERT((mt->dirty & vm_page_bits(0,
+			    object->un_pager.vnp.vnp_size - tfoff)) == 0,
+			    ("%s: page %p is dirty", __func__, mt));
 		}
 
 		if (i < bp->b_pgbefore || i >= bp->b_npages - bp->b_pgafter)
@@ -1293,7 +1306,7 @@ vnode_pager_generic_putpages(struct vnode *vp, vm_page_t *ma, int bytecount,
 	 * the last page is partially invalid.  In this case the filesystem
 	 * may not properly clear the dirty bits for the entire page (which
 	 * could be VM_PAGE_BITS_ALL due to the page having been mmap()d).
-	 * With the page locked we are free to fix-up the dirty bits here.
+	 * With the page busied we are free to fix up the dirty bits here.
 	 *
 	 * We do not under any circumstances truncate the valid bits, as
 	 * this will screw up bogus page replacement.

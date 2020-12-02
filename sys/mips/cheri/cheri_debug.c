@@ -59,11 +59,9 @@ db_print_cap(struct thread *td, const char* msg, void * __capability cap)
 
 	pid = vm_get_cap_owner(td, (uintcap_t)cap);
 	if (pid >= 0) {
-		db_printf("%s" _CHERI_PRINTF_CAP_FMT " (pid %d)\n", msg,
-		    _CHERI_PRINTF_CAP_ARG(cap), pid);
+		db_printf("%s %#.16lp (pid %d)\n", msg, cap, pid);
 	} else {
-		db_printf("%s" _CHERI_PRINTF_CAP_FMT "\n", msg,
-		    _CHERI_PRINTF_CAP_ARG(cap));
+		db_printf("%s %#.16lp\n", msg, cap);
 	}
 }
 
@@ -148,11 +146,9 @@ db_show_cheri_trapframe(struct thread *td, struct trapframe *frame)
 		void * __capability cap = *(&frame->ddc + i);
 		pid = vm_get_cap_owner(td, (uintcap_t)cap);
 		if (pid >= 0) {
-			db_printf("$c%02d: " _CHERI_PRINTF_CAP_FMT " (pid %d)\n", i,
-			   _CHERI_PRINTF_CAP_ARG(cap), pid);
+			db_printf("$c%02d: %#.16lp (pid %d)\n", i, cap, pid);
 		} else {
-			db_printf("$c%02d: " _CHERI_PRINTF_CAP_FMT "\n", i,
-			   _CHERI_PRINTF_CAP_ARG(cap));
+			db_printf("$c%02d: %#.16lp\n", i, cap);
 		}
 	}
 }

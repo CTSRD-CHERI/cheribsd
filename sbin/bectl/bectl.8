@@ -17,7 +17,7 @@
 .\"
 .\" $FreeBSD$
 .\"
-.Dd April 18, 2020
+.Dd August 25, 2020
 .Dt BECTL 8
 .Os
 .Sh NAME
@@ -26,7 +26,7 @@
 .Sh SYNOPSIS
 .Nm
 .Cm activate
-.Op Fl t
+.Op Fl t | Fl T
 .Ar beName
 .Nm
 .Cm check
@@ -95,15 +95,22 @@ The following commands are supported by
 .Bl -tag -width activate
 .It Xo
 .Cm activate
-.Op Fl t
+.Op Fl t | Fl T
 .Ar beName
 .Xc
 Activate the given
 .Ar beName
 as the default boot filesystem.
 If the
-.Op Fl t
+.Fl t
 flag is given, this takes effect only for the next boot.
+Flag
+.Fl T
+removes temporary boot once configuration.
+Without temporary configuration, the next boot will use zfs dataset specified
+in boot pool
+.Ar bootfs
+property.
 .It Xo
 .Cm check
 .Xc
@@ -260,8 +267,10 @@ field indicates whether the boot environment is active now
 .Pq Em \&N ;
 active on reboot
 .Pq Em \&R ;
-or both
-.Pq Em \&NR .
+is used on next boot once
+.Pq Em \&T ;
+or combination of
+.Pq Em \&NRT .
 .Pp
 .Bl -tag -width indent
 .It Fl a
@@ -337,11 +346,11 @@ prints usage information if
 or
 .Fl \&?
 is specified.
-.Sh EXAMPLES
-.Bl -bullet
-.It
-To fill in with jail upgrade example when behavior is firm.
-.El
+\" .Sh EXAMPLES
+\" .Bl -bullet
+\" .It
+\" To fill in with jail upgrade example when behavior is firm.
+\" .El
 .Sh SEE ALSO
 .Xr libbe 3 ,
 .Xr beinstall.sh 8 ,

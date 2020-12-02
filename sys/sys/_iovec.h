@@ -48,10 +48,14 @@ struct iovec {
 };
 
 #if defined(_KERNEL)
+#ifdef __CHERI_PURE_CAPABILITY__
+#define	IOVEC_INIT IOVEC_INIT_C
+#else /* ! __CHERI_PURE_CAPABILITY__ */
 #define	IOVEC_INIT(iovp, base, len)	do {				\
 	(iovp)->iov_base = PTR2CAP((base));				\
 	(iovp)->iov_len = (len);					\
 } while(0)
+#endif /* ! __CHERI_PURE_CAPABILITY__ */
 #define IOVEC_INIT_C(iovp, base, len)	do {				\
 	(iovp)->iov_base = (base);					\
 	(iovp)->iov_len = (len);					\
@@ -80,11 +84,12 @@ struct iovec {
 #ifdef _KERNEL
 struct uio;
 
-typedef int (copyiniov_t)(const struct iovec * __capability iovp, u_int iovcnt,
-            struct iovec **iov, int error);
-typedef int (copyinuio_t)(void * __capability iovp, u_int iovcnt,
-	    struct uio **iov);
-typedef int (updateiov_t)(const struct uio *uiop, void * __capability iovp);
+typedef int(copyiniov_t)(const struct iovec * __capability iovp, u_int iovcnt,
+    struct iovec **iov, int error);
+typedef int(copyinuio_t)(const struct iovec * __capability iovp, u_int iovcnt,
+    struct uio **iov);
+typedef int(updateiov_t)(const struct uio *uiop,
+    struct iovec * __capability iovp);
 #endif
 
 #endif /* !_SYS__IOVEC_H_ */

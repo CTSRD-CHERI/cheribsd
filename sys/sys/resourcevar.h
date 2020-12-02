@@ -119,9 +119,6 @@ struct uidinfo {
 #endif
 };
 
-#define	UIDINFO_VMSIZE_LOCK(ui)		mtx_lock(&((ui)->ui_vmsize_mtx))
-#define	UIDINFO_VMSIZE_UNLOCK(ui)	mtx_unlock(&((ui)->ui_vmsize_mtx))
-
 struct proc;
 struct rusage_ext;
 struct thread;
@@ -158,6 +155,7 @@ rlim_t	 lim_cur(struct thread *td, int which);
 rlim_t	 lim_cur_proc(struct proc *p, int which);
 void	 lim_fork(struct proc *p1, struct proc *p2);
 void	 lim_free(struct plimit *limp);
+void	 lim_freen(struct plimit *limp, int n);
 struct plimit
 	*lim_hold(struct plimit *limp);
 rlim_t	 lim_max(struct thread *td, int which);

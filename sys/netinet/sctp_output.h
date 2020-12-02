@@ -42,7 +42,6 @@ __FBSDID("$FreeBSD$");
 
 #if defined(_KERNEL) || defined(__Userspace__)
 
-
 struct mbuf *
 sctp_add_addresses_to_i_ia(struct sctp_inpcb *inp,
     struct sctp_tcb *stcb,
@@ -51,9 +50,7 @@ sctp_add_addresses_to_i_ia(struct sctp_inpcb *inp,
     int cnt_inits_to,
     uint16_t *padding_len, uint16_t *chunk_len);
 
-
 int sctp_is_addr_restricted(struct sctp_tcb *, struct sctp_ifa *);
-
 
 int
 sctp_is_address_in_scope(struct sctp_ifa *ifa,
@@ -69,10 +66,9 @@ sctp_source_address_selection(struct sctp_inpcb *inp,
     sctp_route_t *ro, struct sctp_nets *net,
     int non_asoc_addr_ok, uint32_t vrf_id);
 
-int
-    sctp_v6src_match_nexthop(struct sockaddr_in6 *src6, sctp_route_t *ro);
-int
-    sctp_v4src_match_nexthop(struct sctp_ifa *sifa, sctp_route_t *ro);
+int sctp_v6src_match_nexthop(struct sockaddr_in6 *src6, sctp_route_t *ro);
+
+int sctp_v4src_match_nexthop(struct sctp_ifa *sifa, sctp_route_t *ro);
 
 void sctp_send_initiate(struct sctp_inpcb *, struct sctp_tcb *, int);
 
@@ -105,7 +101,6 @@ sctp_remove_from_wheel(struct sctp_tcb *stcb,
     struct sctp_association *asoc,
     struct sctp_stream_out *strq, int holds_lock);
 
-
 void sctp_send_shutdown(struct sctp_tcb *, struct sctp_nets *);
 
 void sctp_send_shutdown_ack(struct sctp_tcb *, struct sctp_nets *);
@@ -132,10 +127,9 @@ void sctp_fix_ecn_echo(struct sctp_association *);
 
 void sctp_move_chunks_from_net(struct sctp_tcb *stcb, struct sctp_nets *net);
 
-
 #define SCTP_DATA_CHUNK_OVERHEAD(stcb) ((stcb)->asoc.idata_supported ? \
-					sizeof(struct sctp_idata_chunk) : \
-					sizeof(struct sctp_data_chunk))
+                                        sizeof(struct sctp_idata_chunk) : \
+                                        sizeof(struct sctp_data_chunk))
 
 int
 sctp_output(struct sctp_inpcb *, struct mbuf *, struct sockaddr *,
@@ -157,10 +151,7 @@ void
 sctp_send_packet_dropped(struct sctp_tcb *, struct sctp_nets *, struct mbuf *,
     int, int, int);
 
-
-
 void sctp_send_cwr(struct sctp_tcb *, struct sctp_nets *, uint32_t, uint8_t);
-
 
 void
      sctp_add_stream_reset_result(struct sctp_tmit_chunk *, uint32_t, uint32_t);

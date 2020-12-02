@@ -44,6 +44,7 @@ __FBSDID("$FreeBSD$");
 #ifdef GPROF 
 #include <sys/gmon.h>
 #endif
+#include <sys/kdb.h>
 #include <sys/kernel.h>
 #include <sys/ktr.h>
 #include <sys/lock.h>
@@ -95,13 +96,15 @@ __FBSDID("$FreeBSD$");
 
 #define GiB(v)			(v ## ULL << 30)
 
-#define	AP_BOOTPT_SZ		(PAGE_SIZE * 3)
+#define	AP_BOOTPT_SZ		(PAGE_SIZE * 4)
 
 /* Temporary variables for init_secondary()  */
 char *doublefault_stack;
 char *mce_stack;
 char *nmi_stack;
 char *dbg_stack;
+
+extern u_int mptramp_la57;
 
 /*
  * Local data and functions.
@@ -202,36 +205,8 @@ cpu_mp_start(void)
 		cpu_apic_ids[i] = -1;
 	}
 
-	/* Install an inter-CPU IPI for TLB invalidation */
-	if (pmap_pcid_enabled) {
-		if (invpcid_works) {
-			setidt(IPI_INVLTLB, pti ?
-			    IDTVEC(invltlb_invpcid_pti_pti) :
-			    IDTVEC(invltlb_invpcid_nopti), SDT_SYSIGT,
-			    SEL_KPL, 0);
-			setidt(IPI_INVLPG, pti ? IDTVEC(invlpg_invpcid_pti) :
-			    IDTVEC(invlpg_invpcid), SDT_SYSIGT, SEL_KPL, 0);
-			setidt(IPI_INVLRNG, pti ? IDTVEC(invlrng_invpcid_pti) :
-			    IDTVEC(invlrng_invpcid), SDT_SYSIGT, SEL_KPL, 0);
-		} else {
-			setidt(IPI_INVLTLB, pti ? IDTVEC(invltlb_pcid_pti) :
-			    IDTVEC(invltlb_pcid), SDT_SYSIGT, SEL_KPL, 0);
-			setidt(IPI_INVLPG, pti ? IDTVEC(invlpg_pcid_pti) :
-			    IDTVEC(invlpg_pcid), SDT_SYSIGT, SEL_KPL, 0);
-			setidt(IPI_INVLRNG, pti ? IDTVEC(invlrng_pcid_pti) :
-			    IDTVEC(invlrng_pcid), SDT_SYSIGT, SEL_KPL, 0);
-		}
-	} else {
-		setidt(IPI_INVLTLB, pti ? IDTVEC(invltlb_pti) : IDTVEC(invltlb),
-		    SDT_SYSIGT, SEL_KPL, 0);
-		setidt(IPI_INVLPG, pti ? IDTVEC(invlpg_pti) : IDTVEC(invlpg),
-		    SDT_SYSIGT, SEL_KPL, 0);
-		setidt(IPI_INVLRNG, pti ? IDTVEC(invlrng_pti) : IDTVEC(invlrng),
-		    SDT_SYSIGT, SEL_KPL, 0);
-	}
-
-	/* Install an inter-CPU IPI for cache invalidation. */
-	setidt(IPI_INVLCACHE, pti ? IDTVEC(invlcache_pti) : IDTVEC(invlcache),
+	/* Install an inter-CPU IPI for cache and TLB invalidations. */
+	setidt(IPI_INVLOP, pti ? IDTVEC(invlop_pti) : IDTVEC(invlop),
 	    SDT_SYSIGT, SEL_KPL, 0);
 
 	/* Install an inter-CPU IPI for all-CPU rendezvous */
@@ -250,6 +225,10 @@ cpu_mp_start(void)
 	setidt(IPI_SUSPEND, pti ? IDTVEC(cpususpend_pti) : IDTVEC(cpususpend),
 	    SDT_SYSIGT, SEL_KPL, 0);
 
+	/* Install an IPI for calling delayed SWI */
+	setidt(IPI_SWI, pti ? IDTVEC(ipi_swi_pti) : IDTVEC(ipi_swi),
+	    SDT_SYSIGT, SEL_KPL, 0);
+
 	/* Set boot_cpu_id if needed. */
 	if (boot_cpu_id == -1) {
 		boot_cpu_id = PCPU_GET(apic_id);
@@ -262,6 +241,8 @@ cpu_mp_start(void)
 	topo_probe();
 
 	assign_cpu_ids();
+
+	mptramp_la57 = la57;
 
 	/* Start each Application Processor */
 	init_ops.start_all_aps();
@@ -310,9 +291,12 @@ init_secondary(void)
 	pc->pc_fs32p = &gdt[GUFS32_SEL];
 	pc->pc_gs32p = &gdt[GUGS32_SEL];
 	pc->pc_ldt = (struct system_segment_descriptor *)&gdt[GUSERLDT_SEL];
+	pc->pc_ucr3_load_mask = PMAP_UCR3_NOMASK;
 	/* See comment in pmap_bootstrap(). */
 	pc->pc_pcid_next = PMAP_PCID_KERN + 2;
 	pc->pc_pcid_gen = 1;
+
+	pc->pc_smp_tlb_gen = 1;
 
 	/* Init tss */
 	pc->pc_common_tss = __pcpu[0].pc_common_tss;
@@ -321,22 +305,22 @@ init_secondary(void)
 	pc->pc_common_tss.tss_rsp0 = 0;
 
 	/* The doublefault stack runs on IST1. */
-	np = ((struct nmi_pcpu *)&doublefault_stack[PAGE_SIZE]) - 1;
+	np = ((struct nmi_pcpu *)&doublefault_stack[DBLFAULT_STACK_SIZE]) - 1;
 	np->np_pcpu = (register_t)pc;
 	pc->pc_common_tss.tss_ist1 = (long)np;
 
 	/* The NMI stack runs on IST2. */
-	np = ((struct nmi_pcpu *) &nmi_stack[PAGE_SIZE]) - 1;
+	np = ((struct nmi_pcpu *)&nmi_stack[NMI_STACK_SIZE]) - 1;
 	np->np_pcpu = (register_t)pc;
 	pc->pc_common_tss.tss_ist2 = (long)np;
 
 	/* The MC# stack runs on IST3. */
-	np = ((struct nmi_pcpu *) &mce_stack[PAGE_SIZE]) - 1;
+	np = ((struct nmi_pcpu *)&mce_stack[MCE_STACK_SIZE]) - 1;
 	np->np_pcpu = (register_t)pc;
 	pc->pc_common_tss.tss_ist3 = (long)np;
 
 	/* The DB# stack runs on IST4. */
-	np = ((struct nmi_pcpu *) &dbg_stack[PAGE_SIZE]) - 1;
+	np = ((struct nmi_pcpu *)&dbg_stack[DBG_STACK_SIZE]) - 1;
 	np->np_pcpu = (register_t)pc;
 	pc->pc_common_tss.tss_ist4 = (long)np;
 
@@ -396,7 +380,7 @@ mp_realloc_pcpu(int cpuid, int domain)
 	vm_offset_t oa, na;
 
 	oa = (vm_offset_t)&__pcpu[cpuid];
-	if (_vm_phys_domain(pmap_kextract(oa)) == domain)
+	if (vm_phys_domain(pmap_kextract(oa)) == domain)
 		return;
 	m = vm_page_alloc_domain(NULL, 0, domain,
 	    VM_ALLOC_NORMAL | VM_ALLOC_NOOBJ);
@@ -415,9 +399,9 @@ mp_realloc_pcpu(int cpuid, int domain)
 int
 native_start_all_aps(void)
 {
-	u_int64_t *pt4, *pt3, *pt2;
+	u_int64_t *pt5, *pt4, *pt3, *pt2;
 	u_int32_t mpbioswarmvec;
-	int apic_id, cpu, domain, i;
+	int apic_id, cpu, domain, i, xo;
 	u_char mpbiosreason;
 
 	mtx_init(&ap_boot_mtx, "ap boot", NULL, MTX_SPIN);
@@ -426,18 +410,38 @@ native_start_all_aps(void)
 	bcopy(mptramp_start, (void *)PHYS_TO_DMAP(boot_address), bootMP_size);
 
 	/* Locate the page tables, they'll be below the trampoline */
-	pt4 = (uint64_t *)PHYS_TO_DMAP(mptramp_pagetables);
+	if (la57) {
+		pt5 = (uint64_t *)PHYS_TO_DMAP(mptramp_pagetables);
+		xo = 1;
+	} else {
+		xo = 0;
+	}
+	pt4 = (uint64_t *)PHYS_TO_DMAP(mptramp_pagetables + xo * PAGE_SIZE);
 	pt3 = pt4 + (PAGE_SIZE) / sizeof(u_int64_t);
 	pt2 = pt3 + (PAGE_SIZE) / sizeof(u_int64_t);
 
 	/* Create the initial 1GB replicated page tables */
 	for (i = 0; i < 512; i++) {
-		/* Each slot of the level 4 pages points to the same level 3 page */
-		pt4[i] = (u_int64_t)(uintptr_t)(mptramp_pagetables + PAGE_SIZE);
+		if (la57) {
+			pt5[i] = (u_int64_t)(uintptr_t)(mptramp_pagetables +
+			    PAGE_SIZE);
+			pt5[i] |= PG_V | PG_RW | PG_U;
+		}
+
+		/*
+		 * Each slot of the level 4 pages points to the same
+		 * level 3 page.
+		 */
+		pt4[i] = (u_int64_t)(uintptr_t)(mptramp_pagetables +
+		    (xo + 1) * PAGE_SIZE);
 		pt4[i] |= PG_V | PG_RW | PG_U;
 
-		/* Each slot of the level 3 pages points to the same level 2 page */
-		pt3[i] = (u_int64_t)(uintptr_t)(mptramp_pagetables + (2 * PAGE_SIZE));
+		/*
+		 * Each slot of the level 3 pages points to the same
+		 * level 2 page.
+		 */
+		pt3[i] = (u_int64_t)(uintptr_t)(mptramp_pagetables +
+		    ((xo + 2) * PAGE_SIZE));
 		pt3[i] |= PG_V | PG_RW | PG_U;
 
 		/* The level 2 page slots are mapped with 2MB pages for 1GB. */
@@ -477,13 +481,14 @@ native_start_all_aps(void)
 		/* allocate and set up an idle stack data page */
 		bootstacks[cpu] = (void *)kmem_malloc(kstack_pages * PAGE_SIZE,
 		    M_WAITOK | M_ZERO);
-		doublefault_stack = (char *)kmem_malloc(PAGE_SIZE, M_WAITOK |
-		    M_ZERO);
-		mce_stack = (char *)kmem_malloc(PAGE_SIZE, M_WAITOK | M_ZERO);
+		doublefault_stack = (char *)kmem_malloc(DBLFAULT_STACK_SIZE,
+		    M_WAITOK | M_ZERO);
+		mce_stack = (char *)kmem_malloc(MCE_STACK_SIZE,
+		    M_WAITOK | M_ZERO);
 		nmi_stack = (char *)kmem_malloc_domainset(
-		    DOMAINSET_PREF(domain), PAGE_SIZE, M_WAITOK | M_ZERO);
+		    DOMAINSET_PREF(domain), NMI_STACK_SIZE, M_WAITOK | M_ZERO);
 		dbg_stack = (char *)kmem_malloc_domainset(
-		    DOMAINSET_PREF(domain), PAGE_SIZE, M_WAITOK | M_ZERO);
+		    DOMAINSET_PREF(domain), DBG_STACK_SIZE, M_WAITOK | M_ZERO);
 		dpcpu = (void *)kmem_malloc_domainset(DOMAINSET_PREF(domain),
 		    DPCPU_SIZE, M_WAITOK | M_ZERO);
 
@@ -510,7 +515,6 @@ native_start_all_aps(void)
 	/* number of APs actually started */
 	return (mp_naps);
 }
-
 
 /*
  * This function starts the AP (application processor) identified
@@ -542,11 +546,264 @@ start_ap(int apic_id)
 	return 0;		/* return FAILURE */
 }
 
+/*
+ * Flush the TLB on other CPU's
+ */
+
+/*
+ * Invalidation request.  PCPU pc_smp_tlb_op uses u_int instead of the
+ * enum to avoid both namespace and ABI issues (with enums).
+ */
+enum invl_op_codes {
+      INVL_OP_TLB		= 1,
+      INVL_OP_TLB_INVPCID	= 2,
+      INVL_OP_TLB_INVPCID_PTI	= 3,
+      INVL_OP_TLB_PCID		= 4,
+      INVL_OP_PGRNG		= 5,
+      INVL_OP_PGRNG_INVPCID	= 6,
+      INVL_OP_PGRNG_PCID	= 7,
+      INVL_OP_PG		= 8,
+      INVL_OP_PG_INVPCID	= 9,
+      INVL_OP_PG_PCID		= 10,
+      INVL_OP_CACHE		= 11,
+};
+
+/*
+ * These variables are initialized at startup to reflect how each of
+ * the different kinds of invalidations should be performed on the
+ * current machine and environment.
+ */
+static enum invl_op_codes invl_op_tlb;
+static enum invl_op_codes invl_op_pgrng;
+static enum invl_op_codes invl_op_pg;
+
+/*
+ * Scoreboard of IPI completion notifications from target to IPI initiator.
+ *
+ * Each CPU can initiate shootdown IPI independently from other CPUs.
+ * Initiator enters critical section, then fills its local PCPU
+ * shootdown info (pc_smp_tlb_ vars), then clears scoreboard generation
+ * at location (cpu, my_cpuid) for each target cpu.  After that IPI is
+ * sent to all targets which scan for zeroed scoreboard generation
+ * words.  Upon finding such word the shootdown data is read from
+ * corresponding cpu's pcpu, and generation is set.  Meantime initiator
+ * loops waiting for all zeroed generations in scoreboard to update.
+ */
+static uint32_t *invl_scoreboard;
+
+static void
+invl_scoreboard_init(void *arg __unused)
+{
+	u_int i;
+
+	invl_scoreboard = malloc(sizeof(uint32_t) * (mp_maxid + 1) *
+	    (mp_maxid + 1), M_DEVBUF, M_WAITOK);
+	for (i = 0; i < (mp_maxid + 1) * (mp_maxid + 1); i++)
+		invl_scoreboard[i] = 1;
+
+	if (pmap_pcid_enabled) {
+		if (invpcid_works) {
+			if (pti)
+				invl_op_tlb = INVL_OP_TLB_INVPCID_PTI;
+			else
+				invl_op_tlb = INVL_OP_TLB_INVPCID;
+			invl_op_pgrng = INVL_OP_PGRNG_INVPCID;
+			invl_op_pg = INVL_OP_PG_INVPCID;
+		} else {
+			invl_op_tlb = INVL_OP_TLB_PCID;
+			invl_op_pgrng = INVL_OP_PGRNG_PCID;
+			invl_op_pg = INVL_OP_PG_PCID;
+		}
+	} else {
+		invl_op_tlb = INVL_OP_TLB;
+		invl_op_pgrng = INVL_OP_PGRNG;
+		invl_op_pg = INVL_OP_PG;
+	}
+}
+SYSINIT(invl_ops, SI_SUB_SMP, SI_ORDER_FIRST, invl_scoreboard_init, NULL);
+
+static uint32_t *
+invl_scoreboard_getcpu(u_int cpu)
+{
+	return (invl_scoreboard + cpu * (mp_maxid + 1));
+}
+
+static uint32_t *
+invl_scoreboard_slot(u_int cpu)
+{
+	return (invl_scoreboard_getcpu(cpu) + PCPU_GET(cpuid));
+}
+
+/*
+ * Used by pmap to request cache or TLB invalidation on local and
+ * remote processors.  Mask provides the set of remote CPUs which are
+ * to be signalled with the invalidation IPI.  As an optimization, the
+ * curcpu_cb callback is invoked on the calling CPU while waiting for
+ * remote CPUs to complete the operation.
+ *
+ * The callback function is called unconditionally on the caller's
+ * underlying processor, even when this processor is not set in the
+ * mask.  So, the callback function must be prepared to handle such
+ * spurious invocations.
+ *
+ * Interrupts must be enabled when calling the function with smp
+ * started, to avoid deadlock with other IPIs that are protected with
+ * smp_ipi_mtx spinlock at the initiator side.
+ */
+static void
+smp_targeted_tlb_shootdown(cpuset_t mask, pmap_t pmap, vm_offset_t addr1,
+    vm_offset_t addr2, smp_invl_cb_t curcpu_cb, enum invl_op_codes op)
+{
+	cpuset_t other_cpus, mask1;
+	uint32_t generation, *p_cpudone;
+	int cpu;
+
+	/*
+	 * It is not necessary to signal other CPUs while booting or
+	 * when in the debugger.
+	 */
+	if (kdb_active || KERNEL_PANICKED() || !smp_started) {
+		curcpu_cb(pmap, addr1, addr2);
+		return;
+	}
+
+	sched_pin();
+
+	/*
+	 * Check for other cpus.  Return if none.
+	 */
+	if (CPU_ISFULLSET(&mask)) {
+		if (mp_ncpus <= 1)
+			goto nospinexit;
+	} else {
+		CPU_CLR(PCPU_GET(cpuid), &mask);
+		if (CPU_EMPTY(&mask))
+			goto nospinexit;
+	}
+
+	/*
+	 * Initiator must have interrupts enabled, which prevents
+	 * non-invalidation IPIs that take smp_ipi_mtx spinlock,
+	 * from deadlocking with us.  On the other hand, preemption
+	 * must be disabled to pin initiator to the instance of the
+	 * pcpu pc_smp_tlb data and scoreboard line.
+	 */
+	KASSERT((read_rflags() & PSL_I) != 0,
+	    ("smp_targeted_tlb_shootdown: interrupts disabled"));
+	critical_enter();
+
+	PCPU_SET(smp_tlb_addr1, addr1);
+	PCPU_SET(smp_tlb_addr2, addr2);
+	PCPU_SET(smp_tlb_pmap, pmap);
+	generation = PCPU_GET(smp_tlb_gen);
+	if (++generation == 0)
+		generation = 1;
+	PCPU_SET(smp_tlb_gen, generation);
+	PCPU_SET(smp_tlb_op, op);
+	/* Fence between filling smp_tlb fields and clearing scoreboard. */
+	atomic_thread_fence_rel();
+
+	mask1 = mask;
+	while ((cpu = CPU_FFS(&mask1)) != 0) {
+		cpu--;
+		CPU_CLR(cpu, &mask1);
+		KASSERT(*invl_scoreboard_slot(cpu) != 0,
+		    ("IPI scoreboard is zero, initiator %d target %d",
+		    PCPU_GET(cpuid), cpu));
+		*invl_scoreboard_slot(cpu) = 0;
+	}
+
+	/*
+	 * IPI acts as a fence between writing to the scoreboard above
+	 * (zeroing slot) and reading from it below (wait for
+	 * acknowledgment).
+	 */
+	if (CPU_ISFULLSET(&mask)) {
+		ipi_all_but_self(IPI_INVLOP);
+		other_cpus = all_cpus;
+		CPU_CLR(PCPU_GET(cpuid), &other_cpus);
+	} else {
+		other_cpus = mask;
+		ipi_selected(mask, IPI_INVLOP);
+	}
+	curcpu_cb(pmap, addr1, addr2);
+	while ((cpu = CPU_FFS(&other_cpus)) != 0) {
+		cpu--;
+		CPU_CLR(cpu, &other_cpus);
+		p_cpudone = invl_scoreboard_slot(cpu);
+		while (atomic_load_int(p_cpudone) != generation)
+			ia32_pause();
+	}
+	critical_exit();
+	sched_unpin();
+	return;
+
+nospinexit:
+	curcpu_cb(pmap, addr1, addr2);
+	sched_unpin();
+}
+
 void
-invltlb_invpcid_handler(void)
+smp_masked_invltlb(cpuset_t mask, pmap_t pmap, smp_invl_cb_t curcpu_cb)
+{
+	smp_targeted_tlb_shootdown(mask, pmap, 0, 0, curcpu_cb, invl_op_tlb);
+#ifdef COUNT_XINVLTLB_HITS
+	ipi_global++;
+#endif
+}
+
+void
+smp_masked_invlpg(cpuset_t mask, vm_offset_t addr, pmap_t pmap,
+    smp_invl_cb_t curcpu_cb)
+{
+	smp_targeted_tlb_shootdown(mask, pmap, addr, 0, curcpu_cb, invl_op_pg);
+#ifdef COUNT_XINVLTLB_HITS
+	ipi_page++;
+#endif
+}
+
+void
+smp_masked_invlpg_range(cpuset_t mask, vm_offset_t addr1, vm_offset_t addr2,
+    pmap_t pmap, smp_invl_cb_t curcpu_cb)
+{
+	smp_targeted_tlb_shootdown(mask, pmap, addr1, addr2, curcpu_cb,
+	    invl_op_pgrng);
+#ifdef COUNT_XINVLTLB_HITS
+	ipi_range++;
+	ipi_range_size += (addr2 - addr1) / PAGE_SIZE;
+#endif
+}
+
+void
+smp_cache_flush(smp_invl_cb_t curcpu_cb)
+{
+	smp_targeted_tlb_shootdown(all_cpus, NULL, 0, 0, curcpu_cb,
+	    INVL_OP_CACHE);
+}
+
+/*
+ * Handlers for TLB related IPIs
+ */
+static void
+invltlb_handler(pmap_t smp_tlb_pmap)
+{
+#ifdef COUNT_XINVLTLB_HITS
+	xhits_gbl[PCPU_GET(cpuid)]++;
+#endif /* COUNT_XINVLTLB_HITS */
+#ifdef COUNT_IPIS
+	(*ipi_invltlb_counts[PCPU_GET(cpuid)])++;
+#endif /* COUNT_IPIS */
+
+	if (smp_tlb_pmap == kernel_pmap)
+		invltlb_glob();
+	else
+		invltlb();
+}
+
+static void
+invltlb_invpcid_handler(pmap_t smp_tlb_pmap)
 {
 	struct invpcid_descr d;
-	uint32_t generation;
 
 #ifdef COUNT_XINVLTLB_HITS
 	xhits_gbl[PCPU_GET(cpuid)]++;
@@ -555,20 +812,17 @@ invltlb_invpcid_handler(void)
 	(*ipi_invltlb_counts[PCPU_GET(cpuid)])++;
 #endif /* COUNT_IPIS */
 
-	generation = smp_tlb_generation;
 	d.pcid = smp_tlb_pmap->pm_pcids[PCPU_GET(cpuid)].pm_pcid;
 	d.pad = 0;
 	d.addr = 0;
 	invpcid(&d, smp_tlb_pmap == kernel_pmap ? INVPCID_CTXGLOB :
 	    INVPCID_CTX);
-	PCPU_SET(smp_tlb_done, generation);
 }
 
-void
-invltlb_invpcid_pti_handler(void)
+static void
+invltlb_invpcid_pti_handler(pmap_t smp_tlb_pmap)
 {
 	struct invpcid_descr d;
-	uint32_t generation;
 
 #ifdef COUNT_XINVLTLB_HITS
 	xhits_gbl[PCPU_GET(cpuid)]++;
@@ -577,7 +831,6 @@ invltlb_invpcid_pti_handler(void)
 	(*ipi_invltlb_counts[PCPU_GET(cpuid)])++;
 #endif /* COUNT_IPIS */
 
-	generation = smp_tlb_generation;
 	d.pcid = smp_tlb_pmap->pm_pcids[PCPU_GET(cpuid)].pm_pcid;
 	d.pad = 0;
 	d.addr = 0;
@@ -591,17 +844,15 @@ invltlb_invpcid_pti_handler(void)
 		invpcid(&d, INVPCID_CTXGLOB);
 	} else {
 		invpcid(&d, INVPCID_CTX);
-		d.pcid |= PMAP_PCID_USER_PT;
-		invpcid(&d, INVPCID_CTX);
+		if (smp_tlb_pmap == PCPU_GET(curpmap))
+			PCPU_SET(ucr3_load_mask, ~CR3_PCID_SAVE);
 	}
-	PCPU_SET(smp_tlb_done, generation);
 }
 
-void
-invltlb_pcid_handler(void)
+static void
+invltlb_pcid_handler(pmap_t smp_tlb_pmap)
 {
-	uint64_t kcr3, ucr3;
-	uint32_t generation, pcid;
+	uint32_t pcid;
   
 #ifdef COUNT_XINVLTLB_HITS
 	xhits_gbl[PCPU_GET(cpuid)]++;
@@ -610,7 +861,6 @@ invltlb_pcid_handler(void)
 	(*ipi_invltlb_counts[PCPU_GET(cpuid)])++;
 #endif /* COUNT_IPIS */
 
-	generation = smp_tlb_generation;	/* Overlap with serialization */
 	if (smp_tlb_pmap == kernel_pmap) {
 		invltlb_glob();
 	} else {
@@ -621,25 +871,32 @@ invltlb_pcid_handler(void)
 		 * invalidation when switching to the pmap on this
 		 * CPU.
 		 */
-		if (PCPU_GET(curpmap) == smp_tlb_pmap) {
+		if (smp_tlb_pmap == PCPU_GET(curpmap)) {
 			pcid = smp_tlb_pmap->pm_pcids[PCPU_GET(cpuid)].pm_pcid;
-			kcr3 = smp_tlb_pmap->pm_cr3 | pcid;
-			ucr3 = smp_tlb_pmap->pm_ucr3;
-			if (ucr3 != PMAP_NO_CR3) {
-				ucr3 |= PMAP_PCID_USER_PT | pcid;
-				pmap_pti_pcid_invalidate(ucr3, kcr3);
-			} else
-				load_cr3(kcr3);
+			load_cr3(smp_tlb_pmap->pm_cr3 | pcid);
+			if (smp_tlb_pmap->pm_ucr3 != PMAP_NO_CR3)
+				PCPU_SET(ucr3_load_mask, ~CR3_PCID_SAVE);
 		}
 	}
-	PCPU_SET(smp_tlb_done, generation);
 }
 
-void
-invlpg_invpcid_handler(void)
+static void
+invlpg_handler(vm_offset_t smp_tlb_addr1)
+{
+#ifdef COUNT_XINVLTLB_HITS
+	xhits_pg[PCPU_GET(cpuid)]++;
+#endif /* COUNT_XINVLTLB_HITS */
+#ifdef COUNT_IPIS
+	(*ipi_invlpg_counts[PCPU_GET(cpuid)])++;
+#endif /* COUNT_IPIS */
+
+	invlpg(smp_tlb_addr1);
+}
+
+static void
+invlpg_invpcid_handler(pmap_t smp_tlb_pmap, vm_offset_t smp_tlb_addr1)
 {
 	struct invpcid_descr d;
-	uint32_t generation;
 
 #ifdef COUNT_XINVLTLB_HITS
 	xhits_pg[PCPU_GET(cpuid)]++;
@@ -648,23 +905,22 @@ invlpg_invpcid_handler(void)
 	(*ipi_invlpg_counts[PCPU_GET(cpuid)])++;
 #endif /* COUNT_IPIS */
 
-	generation = smp_tlb_generation;	/* Overlap with serialization */
 	invlpg(smp_tlb_addr1);
-	if (smp_tlb_pmap->pm_ucr3 != PMAP_NO_CR3) {
+	if (smp_tlb_pmap == PCPU_GET(curpmap) &&
+	    smp_tlb_pmap->pm_ucr3 != PMAP_NO_CR3 &&
+	    PCPU_GET(ucr3_load_mask) == PMAP_UCR3_NOMASK) {
 		d.pcid = smp_tlb_pmap->pm_pcids[PCPU_GET(cpuid)].pm_pcid |
 		    PMAP_PCID_USER_PT;
 		d.pad = 0;
 		d.addr = smp_tlb_addr1;
 		invpcid(&d, INVPCID_ADDR);
 	}
-	PCPU_SET(smp_tlb_done, generation);
 }
 
-void
-invlpg_pcid_handler(void)
+static void
+invlpg_pcid_handler(pmap_t smp_tlb_pmap, vm_offset_t smp_tlb_addr1)
 {
 	uint64_t kcr3, ucr3;
-	uint32_t generation;
 	uint32_t pcid;
 
 #ifdef COUNT_XINVLTLB_HITS
@@ -674,24 +930,21 @@ invlpg_pcid_handler(void)
 	(*ipi_invlpg_counts[PCPU_GET(cpuid)])++;
 #endif /* COUNT_IPIS */
 
-	generation = smp_tlb_generation;	/* Overlap with serialization */
 	invlpg(smp_tlb_addr1);
 	if (smp_tlb_pmap == PCPU_GET(curpmap) &&
-	    (ucr3 = smp_tlb_pmap->pm_ucr3) != PMAP_NO_CR3) {
+	    (ucr3 = smp_tlb_pmap->pm_ucr3) != PMAP_NO_CR3 &&
+	    PCPU_GET(ucr3_load_mask) == PMAP_UCR3_NOMASK) {
 		pcid = smp_tlb_pmap->pm_pcids[PCPU_GET(cpuid)].pm_pcid;
 		kcr3 = smp_tlb_pmap->pm_cr3 | pcid | CR3_PCID_SAVE;
 		ucr3 |= pcid | PMAP_PCID_USER_PT | CR3_PCID_SAVE;
 		pmap_pti_pcid_invlpg(ucr3, kcr3, smp_tlb_addr1);
 	}
-	PCPU_SET(smp_tlb_done, generation);
 }
 
-void
-invlrng_invpcid_handler(void)
+static void
+invlrng_handler(vm_offset_t smp_tlb_addr1, vm_offset_t smp_tlb_addr2)
 {
-	struct invpcid_descr d;
 	vm_offset_t addr, addr2;
-	uint32_t generation;
 
 #ifdef COUNT_XINVLTLB_HITS
 	xhits_rng[PCPU_GET(cpuid)]++;
@@ -702,12 +955,35 @@ invlrng_invpcid_handler(void)
 
 	addr = smp_tlb_addr1;
 	addr2 = smp_tlb_addr2;
-	generation = smp_tlb_generation;	/* Overlap with serialization */
 	do {
 		invlpg(addr);
 		addr += PAGE_SIZE;
 	} while (addr < addr2);
-	if (smp_tlb_pmap->pm_ucr3 != PMAP_NO_CR3) {
+}
+
+static void
+invlrng_invpcid_handler(pmap_t smp_tlb_pmap, vm_offset_t smp_tlb_addr1,
+    vm_offset_t smp_tlb_addr2)
+{
+	struct invpcid_descr d;
+	vm_offset_t addr, addr2;
+
+#ifdef COUNT_XINVLTLB_HITS
+	xhits_rng[PCPU_GET(cpuid)]++;
+#endif /* COUNT_XINVLTLB_HITS */
+#ifdef COUNT_IPIS
+	(*ipi_invlrng_counts[PCPU_GET(cpuid)])++;
+#endif /* COUNT_IPIS */
+
+	addr = smp_tlb_addr1;
+	addr2 = smp_tlb_addr2;
+	do {
+		invlpg(addr);
+		addr += PAGE_SIZE;
+	} while (addr < addr2);
+	if (smp_tlb_pmap == PCPU_GET(curpmap) &&
+	    smp_tlb_pmap->pm_ucr3 != PMAP_NO_CR3 &&
+	    PCPU_GET(ucr3_load_mask) == PMAP_UCR3_NOMASK) {
 		d.pcid = smp_tlb_pmap->pm_pcids[PCPU_GET(cpuid)].pm_pcid |
 		    PMAP_PCID_USER_PT;
 		d.pad = 0;
@@ -717,15 +993,14 @@ invlrng_invpcid_handler(void)
 			d.addr += PAGE_SIZE;
 		} while (d.addr < addr2);
 	}
-	PCPU_SET(smp_tlb_done, generation);
 }
 
-void
-invlrng_pcid_handler(void)
+static void
+invlrng_pcid_handler(pmap_t smp_tlb_pmap, vm_offset_t smp_tlb_addr1,
+    vm_offset_t smp_tlb_addr2)
 {
 	vm_offset_t addr, addr2;
 	uint64_t kcr3, ucr3;
-	uint32_t generation;
 	uint32_t pcid;
 
 #ifdef COUNT_XINVLTLB_HITS
@@ -737,17 +1012,128 @@ invlrng_pcid_handler(void)
 
 	addr = smp_tlb_addr1;
 	addr2 = smp_tlb_addr2;
-	generation = smp_tlb_generation;	/* Overlap with serialization */
 	do {
 		invlpg(addr);
 		addr += PAGE_SIZE;
 	} while (addr < addr2);
 	if (smp_tlb_pmap == PCPU_GET(curpmap) &&
-	    (ucr3 = smp_tlb_pmap->pm_ucr3) != PMAP_NO_CR3) {
+	    (ucr3 = smp_tlb_pmap->pm_ucr3) != PMAP_NO_CR3 &&
+	    PCPU_GET(ucr3_load_mask) == PMAP_UCR3_NOMASK) {
 		pcid = smp_tlb_pmap->pm_pcids[PCPU_GET(cpuid)].pm_pcid;
 		kcr3 = smp_tlb_pmap->pm_cr3 | pcid | CR3_PCID_SAVE;
 		ucr3 |= pcid | PMAP_PCID_USER_PT | CR3_PCID_SAVE;
 		pmap_pti_pcid_invlrng(ucr3, kcr3, smp_tlb_addr1, addr2);
 	}
-	PCPU_SET(smp_tlb_done, generation);
+}
+
+static void
+invlcache_handler(void)
+{
+#ifdef COUNT_IPIS
+	(*ipi_invlcache_counts[PCPU_GET(cpuid)])++;
+#endif /* COUNT_IPIS */
+	wbinvd();
+}
+
+static void
+invlop_handler_one_req(enum invl_op_codes smp_tlb_op, pmap_t smp_tlb_pmap,
+    vm_offset_t smp_tlb_addr1, vm_offset_t smp_tlb_addr2)
+{
+	switch (smp_tlb_op) {
+	case INVL_OP_TLB:
+		invltlb_handler(smp_tlb_pmap);
+		break;
+	case INVL_OP_TLB_INVPCID:
+		invltlb_invpcid_handler(smp_tlb_pmap);
+		break;
+	case INVL_OP_TLB_INVPCID_PTI:
+		invltlb_invpcid_pti_handler(smp_tlb_pmap);
+		break;
+	case INVL_OP_TLB_PCID:
+		invltlb_pcid_handler(smp_tlb_pmap);
+		break;
+	case INVL_OP_PGRNG:
+		invlrng_handler(smp_tlb_addr1, smp_tlb_addr2);
+		break;
+	case INVL_OP_PGRNG_INVPCID:
+		invlrng_invpcid_handler(smp_tlb_pmap, smp_tlb_addr1,
+		    smp_tlb_addr2);
+		break;
+	case INVL_OP_PGRNG_PCID:
+		invlrng_pcid_handler(smp_tlb_pmap, smp_tlb_addr1,
+		    smp_tlb_addr2);
+		break;
+	case INVL_OP_PG:
+		invlpg_handler(smp_tlb_addr1);
+		break;
+	case INVL_OP_PG_INVPCID:
+		invlpg_invpcid_handler(smp_tlb_pmap, smp_tlb_addr1);
+		break;
+	case INVL_OP_PG_PCID:
+		invlpg_pcid_handler(smp_tlb_pmap, smp_tlb_addr1);
+		break;
+	case INVL_OP_CACHE:
+		invlcache_handler();
+		break;
+	default:
+		__assert_unreachable();
+		break;
+	}
+}
+
+void
+invlop_handler(void)
+{
+	struct pcpu *initiator_pc;
+	pmap_t smp_tlb_pmap;
+	vm_offset_t smp_tlb_addr1, smp_tlb_addr2;
+	u_int initiator_cpu_id;
+	enum invl_op_codes smp_tlb_op;
+	uint32_t *scoreboard, smp_tlb_gen;
+
+	scoreboard = invl_scoreboard_getcpu(PCPU_GET(cpuid));
+	for (;;) {
+		for (initiator_cpu_id = 0; initiator_cpu_id <= mp_maxid;
+		    initiator_cpu_id++) {
+			if (atomic_load_int(&scoreboard[initiator_cpu_id]) == 0)
+				break;
+		}
+		if (initiator_cpu_id > mp_maxid)
+			break;
+		initiator_pc = cpuid_to_pcpu[initiator_cpu_id];
+
+		/*
+		 * This acquire fence and its corresponding release
+		 * fence in smp_targeted_tlb_shootdown() is between
+		 * reading zero scoreboard slot and accessing PCPU of
+		 * initiator for pc_smp_tlb values.
+		 */
+		atomic_thread_fence_acq();
+		smp_tlb_pmap = initiator_pc->pc_smp_tlb_pmap;
+		smp_tlb_addr1 = initiator_pc->pc_smp_tlb_addr1;
+		smp_tlb_addr2 = initiator_pc->pc_smp_tlb_addr2;
+		smp_tlb_op = initiator_pc->pc_smp_tlb_op;
+		smp_tlb_gen = initiator_pc->pc_smp_tlb_gen;
+
+		/*
+		 * Ensure that we do not make our scoreboard
+		 * notification visible to the initiator until the
+		 * pc_smp_tlb values are read.  The corresponding
+		 * fence is implicitly provided by the barrier in the
+		 * IPI send operation before the APIC ICR register
+		 * write.
+		 *
+		 * As an optimization, the request is acknowledged
+		 * before the actual invalidation is performed.  It is
+		 * safe because target CPU cannot return to userspace
+		 * before handler finishes. Only NMI can preempt the
+		 * handler, but NMI would see the kernel handler frame
+		 * and not touch not-invalidated user page table.
+		 */
+		atomic_thread_fence_acq();
+		atomic_store_int(&scoreboard[initiator_cpu_id], smp_tlb_gen);
+
+		invlop_handler_one_req(smp_tlb_op, smp_tlb_pmap, smp_tlb_addr1,
+		    smp_tlb_addr2);
+	}
 }

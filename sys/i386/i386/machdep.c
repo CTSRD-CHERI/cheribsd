@@ -94,14 +94,15 @@ __FBSDID("$FreeBSD$");
 #include <sys/vmmeter.h>
 
 #include <vm/vm.h>
+#include <vm/vm_param.h>
 #include <vm/vm_extern.h>
 #include <vm/vm_kern.h>
 #include <vm/vm_page.h>
 #include <vm/vm_map.h>
 #include <vm/vm_object.h>
 #include <vm/vm_pager.h>
-#include <vm/vm_param.h>
 #include <vm/vm_phys.h>
+#include <vm/vm_dumpset.h>
 
 #ifdef DDB
 #ifndef KDB
@@ -1667,7 +1668,7 @@ add_physmap_entry(uint64_t base, uint64_t length, vm_paddr_t *physmap,
 	int i, insert_idx, physmap_idx;
 
 	physmap_idx = *physmap_idxp;
-	
+
 	if (length == 0)
 		return (1);
 
@@ -2151,7 +2152,7 @@ do_next:
 		}
 	}
 	pmap_cmap3(0, 0);
-	
+
 	/*
 	 * XXX
 	 * The last chunk must contain at least one page plus the message
@@ -2180,7 +2181,7 @@ static void
 i386_kdb_init(void)
 {
 #ifdef DDB
-	db_fetch_ksymtab(bootinfo.bi_symtab, bootinfo.bi_esymtab);
+	db_fetch_ksymtab(bootinfo.bi_symtab, bootinfo.bi_esymtab, 0);
 #endif
 	kdb_init();
 #ifdef KDB
@@ -2503,8 +2504,6 @@ init386(int first)
 	thread0.td_pcb->pcb_cr3 = pmap_get_kcr3();
 	thread0.td_pcb->pcb_ext = 0;
 	thread0.td_frame = &proc0_tf;
-
-	cpu_probe_amdc1e();
 
 #ifdef FDT
 	x86_init_fdt();

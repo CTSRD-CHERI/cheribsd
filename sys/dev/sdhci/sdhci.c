@@ -626,29 +626,8 @@ sdhci_card_task(void *arg, int pending __unused)
 				slot_printf(slot, "Card inserted\n");
 #ifdef MMCCAM
 			slot->card_present = 1;
-			union ccb *ccb;
-			uint32_t pathid;
-			pathid = cam_sim_path(slot->sim);
-			ccb = xpt_alloc_ccb_nowait();
-			if (ccb == NULL) {
-				slot_printf(slot, "Unable to alloc CCB for rescan\n");
-				SDHCI_UNLOCK(slot);
-				return;
-			}
-
-			/*
-			 * We create a rescan request for BUS:0:0, since the card
-			 * will be at lun 0.
-			 */
-			if (xpt_create_path(&ccb->ccb_h.path, NULL, pathid,
-					    /* target */ 0, /* lun */ 0) != CAM_REQ_CMP) {
-				slot_printf(slot, "Unable to create path for rescan\n");
-				SDHCI_UNLOCK(slot);
-				xpt_free_ccb(ccb);
-				return;
-			}
+			mmccam_start_discovery(slot->sim);
 			SDHCI_UNLOCK(slot);
-			xpt_rescan(ccb);
 #else
 			d = slot->dev = device_add_child(slot->bus, "mmc", -1);
 			SDHCI_UNLOCK(slot);
@@ -672,29 +651,8 @@ sdhci_card_task(void *arg, int pending __unused)
 			slot->dev = NULL;
 #ifdef MMCCAM
 			slot->card_present = 0;
-			union ccb *ccb;
-			uint32_t pathid;
-			pathid = cam_sim_path(slot->sim);
-			ccb = xpt_alloc_ccb_nowait();
-			if (ccb == NULL) {
-				slot_printf(slot, "Unable to alloc CCB for rescan\n");
-				SDHCI_UNLOCK(slot);
-				return;
-			}
-
-			/*
-			 * We create a rescan request for BUS:0:0, since the card
-			 * will be at lun 0.
-			 */
-			if (xpt_create_path(&ccb->ccb_h.path, NULL, pathid,
-					    /* target */ 0, /* lun */ 0) != CAM_REQ_CMP) {
-				slot_printf(slot, "Unable to create path for rescan\n");
-				SDHCI_UNLOCK(slot);
-				xpt_free_ccb(ccb);
-				return;
-			}
+			mmccam_start_discovery(slot->sim);
 			SDHCI_UNLOCK(slot);
-			xpt_rescan(ccb);
 #else
 			slot->intmask &= ~sdhci_tuning_intmask(slot);
 			WR4(slot, SDHCI_INT_ENABLE, slot->intmask);
@@ -2692,31 +2650,43 @@ sdhci_cam_settran_settings(struct sdhci_slot *slot, union ccb *ccb)
 	/* Update only requested fields */
 	if (cts->ios_valid & MMC_CLK) {
 		ios->clock = sdhci_cam_get_possible_host_clock(slot, new_ios->clock);
-		slot_printf(slot, "Clock => %d\n", ios->clock);
+		if (sdhci_debug > 1)
+			slot_printf(slot, "Clock => %d\n", ios->clock);
 	}
 	if (cts->ios_valid & MMC_VDD) {
 		ios->vdd = new_ios->vdd;
-		slot_printf(slot, "VDD => %d\n", ios->vdd);
+		if (sdhci_debug > 1)
+			slot_printf(slot, "VDD => %d\n", ios->vdd);
 	}
 	if (cts->ios_valid & MMC_CS) {
 		ios->chip_select = new_ios->chip_select;
-		slot_printf(slot, "CS => %d\n", ios->chip_select);
+		if (sdhci_debug > 1)
+			slot_printf(slot, "CS => %d\n", ios->chip_select);
 	}
 	if (cts->ios_valid & MMC_BW) {
 		ios->bus_width = new_ios->bus_width;
-		slot_printf(slot, "Bus width => %d\n", ios->bus_width);
+		if (sdhci_debug > 1)
+			slot_printf(slot, "Bus width => %d\n", ios->bus_width);
 	}
 	if (cts->ios_valid & MMC_PM) {
 		ios->power_mode = new_ios->power_mode;
-		slot_printf(slot, "Power mode => %d\n", ios->power_mode);
+		if (sdhci_debug > 1)
+			slot_printf(slot, "Power mode => %d\n", ios->power_mode);
 	}
 	if (cts->ios_valid & MMC_BT) {
 		ios->timing = new_ios->timing;
-		slot_printf(slot, "Timing => %d\n", ios->timing);
+		if (sdhci_debug > 1)
+			slot_printf(slot, "Timing => %d\n", ios->timing);
 	}
 	if (cts->ios_valid & MMC_BM) {
 		ios->bus_mode = new_ios->bus_mode;
-		slot_printf(slot, "Bus mode => %d\n", ios->bus_mode);
+		if (sdhci_debug > 1)
+			slot_printf(slot, "Bus mode => %d\n", ios->bus_mode);
+	}
+	if (cts->ios_valid & MMC_VCCQ) {
+		ios->vccq = new_ios->vccq;
+		if (sdhci_debug > 1)
+			slot_printf(slot, "VCCQ => %d\n", ios->vccq);
 	}
 
 	/* XXX Provide a way to call a chip-specific IOS update, required for TI */
@@ -2728,7 +2698,8 @@ sdhci_cam_update_ios(struct sdhci_slot *slot)
 {
 	struct mmc_ios *ios = &slot->host.ios;
 
-	slot_printf(slot, "%s: power_mode=%d, clk=%d, bus_width=%d, timing=%d\n",
+	if (sdhci_debug > 1)
+		slot_printf(slot, "%s: power_mode=%d, clk=%d, bus_width=%d, timing=%d\n",
 		    __func__, ios->power_mode, ios->clock, ios->bus_width, ios->timing);
 	SDHCI_LOCK(slot);
 	/* Do full reset on bus power down to clear from any state. */

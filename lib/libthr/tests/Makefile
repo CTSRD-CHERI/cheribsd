@@ -2,6 +2,8 @@
 
 PACKAGE=	tests
 
+WARNS?=		3
+
 TESTSRC=	${SRCTOP}/contrib/netbsd-tests/lib/libpthread
 
 # TODO: t_name (missing pthread_getname_np support in FreeBSD)
@@ -32,6 +34,8 @@ NETBSD_ATF_TESTS_SH=	atexit_test
 NETBSD_ATF_TESTS_SH+=	cancel_test
 NETBSD_ATF_TESTS_SH+=	exit_test
 NETBSD_ATF_TESTS_SH+=	resolv_test
+
+ATF_TESTS_C+=		umtx_op_test
 
 LIBADD+=		pthread
 LIBADD.fpu_test+=	m

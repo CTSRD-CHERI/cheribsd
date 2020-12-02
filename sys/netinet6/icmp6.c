@@ -917,6 +917,7 @@ icmp6_notify_error(struct mbuf **mp, int off, int icmp6len, int code)
 	}
 	icmp6 = (struct icmp6_hdr *)(mtod(m, caddr_t) + off);
 	eip6 = (struct ip6_hdr *)(icmp6 + 1);
+	bzero(&icmp6dst, sizeof(icmp6dst));
 
 	/* Detect the upper level protocol */
 	{
@@ -925,7 +926,6 @@ icmp6_notify_error(struct mbuf **mp, int off, int icmp6len, int code)
 		int eoff = off + sizeof(struct icmp6_hdr) +
 		    sizeof(struct ip6_hdr);
 		struct ip6ctlparam ip6cp;
-		struct in6_addr *finaldst = NULL;
 		int icmp6type = icmp6->icmp6_type;
 		struct ip6_frag *fh;
 		struct ip6_rthdr *rth;
@@ -999,10 +999,11 @@ icmp6_notify_error(struct mbuf **mp, int off, int icmp6len, int code)
 					}
 					rth0 = (struct ip6_rthdr0 *)
 					    (mtod(m, caddr_t) + eoff);
+
 					/* just ignore a bogus header */
 					if ((rth0->ip6r0_len % 2) == 0 &&
 					    (hops = rth0->ip6r0_len/2))
-						finaldst = (struct in6_addr *)(rth0 + 1) + (hops - 1);
+						icmp6dst.sin6_addr = *((struct in6_addr *)(rth0 + 1) + (hops - 1));
 				}
 				eoff += rthlen;
 				nxt = rth->ip6r_nxt;
@@ -1056,13 +1057,10 @@ icmp6_notify_error(struct mbuf **mp, int off, int icmp6len, int code)
 		 */
 		eip6 = (struct ip6_hdr *)(icmp6 + 1);
 
-		bzero(&icmp6dst, sizeof(icmp6dst));
 		icmp6dst.sin6_len = sizeof(struct sockaddr_in6);
 		icmp6dst.sin6_family = AF_INET6;
-		if (finaldst == NULL)
+		if (IN6_IS_ADDR_UNSPECIFIED(&icmp6dst.sin6_addr))
 			icmp6dst.sin6_addr = eip6->ip6_dst;
-		else
-			icmp6dst.sin6_addr = *finaldst;
 		if (in6_setscope(&icmp6dst.sin6_addr, m->m_pkthdr.rcvif, NULL))
 			goto freeit;
 		bzero(&icmp6src, sizeof(icmp6src));
@@ -1074,13 +1072,11 @@ icmp6_notify_error(struct mbuf **mp, int off, int icmp6len, int code)
 		icmp6src.sin6_flowinfo =
 		    (eip6->ip6_flow & IPV6_FLOWLABEL_MASK);
 
-		if (finaldst == NULL)
-			finaldst = &eip6->ip6_dst;
 		ip6cp.ip6c_m = m;
 		ip6cp.ip6c_icmp6 = icmp6;
 		ip6cp.ip6c_ip6 = (struct ip6_hdr *)(icmp6 + 1);
 		ip6cp.ip6c_off = eoff;
-		ip6cp.ip6c_finaldst = finaldst;
+		ip6cp.ip6c_finaldst = &icmp6dst.sin6_addr;
 		ip6cp.ip6c_src = &icmp6src;
 		ip6cp.ip6c_nxt = nxt;
 
@@ -2261,7 +2257,8 @@ icmp6_redirect_input(struct mbuf *m, int off)
 		    ip6_sprintf(ip6buf, &src6)));
 		goto bad;
 	}
-	if (ip6->ip6_hlim != 255) {
+	if (__predict_false(ip6->ip6_hlim != 255)) {
+		ICMP6STAT_INC(icp6s_invlhlim);
 		nd6log((LOG_ERR,
 		    "ICMP6 redirect sent from %s rejected; "
 		    "hlim=%d (must be 255)\n",
@@ -2270,13 +2267,17 @@ icmp6_redirect_input(struct mbuf *m, int off)
 	}
     {
 	/* ip6->ip6_src must be equal to gw for icmp6->icmp6_reddst */
-	struct nhop6_basic nh6;
+	struct nhop_object *nh;
 	struct in6_addr kdst;
 	uint32_t scopeid;
 
 	in6_splitscope(&reddst6, &kdst, &scopeid);
-	if (fib6_lookup_nh_basic(ifp->if_fib, &kdst, scopeid, 0, 0,&nh6)==0){
-		if ((nh6.nh_flags & NHF_GATEWAY) == 0) {
+	NET_EPOCH_ASSERT();
+	nh = fib6_lookup(ifp->if_fib, &kdst, scopeid, 0, 0);
+	if (nh != NULL) {
+		struct in6_addr nh_addr;
+		nh_addr = ifatoia6(nh->nh_ifa)->ia_addr.sin6_addr;
+		if ((nh->nh_flags & NHF_GATEWAY) == 0) {
 			nd6log((LOG_ERR,
 			    "ICMP6 redirect rejected; no route "
 			    "with inet6 gateway found for redirect dst: %s\n",
@@ -2285,19 +2286,16 @@ icmp6_redirect_input(struct mbuf *m, int off)
 		}
 
 		/*
-		 * Embed scope zone id into next hop address, since
-		 * fib6_lookup_nh_basic() returns address without embedded
-		 * scope zone id.
+		 * Embed scope zone id into next hop address.
 		 */
-		if (in6_setscope(&nh6.nh_addr, m->m_pkthdr.rcvif, NULL))
-			goto freeit;
+		nh_addr = nh->gw6_sa.sin6_addr;
 
-		if (IN6_ARE_ADDR_EQUAL(&src6, &nh6.nh_addr) == 0) {
+		if (IN6_ARE_ADDR_EQUAL(&src6, &nh_addr) == 0) {
 			nd6log((LOG_ERR,
 			    "ICMP6 redirect rejected; "
 			    "not equal to gw-for-src=%s (must be same): "
 			    "%s\n",
-			    ip6_sprintf(ip6buf, &nh6.nh_addr),
+			    ip6_sprintf(ip6buf, &nh_addr),
 			    icmp6_redirect_diag(&src6, &reddst6, &redtgt6)));
 			goto bad;
 		}

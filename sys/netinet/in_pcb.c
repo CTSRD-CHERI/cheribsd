@@ -46,6 +46,7 @@ __FBSDID("$FreeBSD$");
 #include "opt_inet6.h"
 #include "opt_ratelimit.h"
 #include "opt_pcbgroup.h"
+#include "opt_route.h"
 #include "opt_rss.h"
 
 #include <sys/param.h>
@@ -726,7 +727,6 @@ in_pcb_lport_dest(struct inpcb *inp, struct sockaddr *lsa, u_short *lportp,
 		lport = htons(*lastport);
 
 		if (fsa != NULL) {
-
 #ifdef INET
 			if (lsa->sa_family == AF_INET) {
 				tmpinp = in_pcblookup_hash_locked(pcbinfo,
@@ -1005,7 +1005,6 @@ in_pcbbind_setup(struct inpcb *inp, struct sockaddr *nam, in_addr_t *laddrp,
 		error = in_pcb_lport(inp, &laddr, &lport, cred, lookupflags);
 		if (error != 0)
 			return (error);
-
 	}
 	*laddrp = laddr.s_addr;
 	*lportp = lport;
@@ -1132,7 +1131,6 @@ in_pcbladdr(struct inpcb *inp, struct in_addr *faddr, struct in_addr *laddr,
 		if (ia == NULL) {
 			ia = ifatoia(ifa_ifwithnet((struct sockaddr *)sin, 0,
 						inp->inp_socket->so_fibnum));
-
 		}
 		if (ia == NULL) {
 			error = ENETUNREACH;
@@ -1147,7 +1145,6 @@ in_pcbladdr(struct inpcb *inp, struct in_addr *faddr, struct in_addr *laddr,
 		ifp = ia->ia_ifp;
 		ia = NULL;
 		CK_STAILQ_FOREACH(ifa, &ifp->if_addrhead, ifa_link) {
-
 			sa = ifa->ifa_addr;
 			if (sa->sa_family != AF_INET)
 				continue;
@@ -1331,7 +1328,17 @@ in_pcbconnect_setup(struct inpcb *inp, struct sockaddr *nam,
 	lport = *lportp;
 	faddr = sin->sin_addr;
 	fport = sin->sin_port;
+#ifdef ROUTE_MPATH
+	if (CALC_FLOWID_OUTBOUND) {
+		uint32_t hash_val, hash_type;
 
+		hash_val = fib4_calc_software_hash(laddr, faddr, 0, fport,
+		    inp->inp_socket->so_proto->pr_protocol, &hash_type);
+
+		inp->inp_flowid = hash_val;
+		inp->inp_flowtype = hash_type;
+	}
+#endif
 	if (!CK_STAILQ_EMPTY(&V_in_ifaddrhead)) {
 		/*
 		 * If the destination address is INADDR_ANY,
@@ -3323,37 +3330,22 @@ in_pcbattach_txrtlmt(struct inpcb *inp, struct ifnet *ifp,
 	if (*st != NULL)
 		return (EINVAL);
 
-	if (ifp->if_snd_tag_alloc == NULL) {
-		error = EOPNOTSUPP;
-	} else {
-		error = ifp->if_snd_tag_alloc(ifp, &params, &inp->inp_snd_tag);
-
+	error = m_snd_tag_alloc(ifp, &params, st);
 #ifdef INET
-		if (error == 0) {
-			counter_u64_add(rate_limit_set_ok, 1);
-			counter_u64_add(rate_limit_active, 1);
-		} else
-			counter_u64_add(rate_limit_alloc_fail, 1);
+	if (error == 0) {
+		counter_u64_add(rate_limit_set_ok, 1);
+		counter_u64_add(rate_limit_active, 1);
+	} else if (error != EOPNOTSUPP)
+		  counter_u64_add(rate_limit_alloc_fail, 1);
 #endif
-	}
 	return (error);
 }
 
 void
-in_pcbdetach_tag(struct ifnet *ifp, struct m_snd_tag *mst)
+in_pcbdetach_tag(struct m_snd_tag *mst)
 {
-	if (ifp == NULL)
-		return;
 
-	/*
-	 * If the device was detached while we still had reference(s)
-	 * on the ifp, we assume if_snd_tag_free() was replaced with
-	 * stubs.
-	 */
-	ifp->if_snd_tag_free(mst);
-
-	/* release reference count on network interface */
-	if_rele(ifp);
+	m_snd_tag_rele(mst);
 #ifdef INET
 	counter_u64_add(rate_limit_active, -1);
 #endif

@@ -14,8 +14,13 @@ union pmc_md_op_pmcallocate {
 };
 
 /* Logging */
+#ifdef __powerpc64__
+#define	PMCLOG_READADDR		PMCLOG_READ64
+#define	PMCLOG_EMITADDR		PMCLOG_EMIT64
+#else
 #define	PMCLOG_READADDR		PMCLOG_READ32
 #define	PMCLOG_EMITADDR		PMCLOG_EMIT32
+#endif
 
 #define	mtpmr(reg, val)							\
 	__asm __volatile("mtpmr %0,%1" : : "K"(reg), "r"(val))
@@ -74,6 +79,7 @@ union pmc_md_op_pmcallocate {
 #if	_KERNEL
 
 struct pmc_md_powerpc_pmc {
+	uint64_t	pm_powerpc_overflowcnt;
 	uint32_t	pm_powerpc_evsel;
 };
 

@@ -44,6 +44,7 @@ __FBSDID("$FreeBSD$");
 #include "opt_inet.h"
 #include "opt_inet6.h"
 #include "opt_ipsec.h"
+#include "opt_route.h"
 #include "opt_rss.h"
 
 #include <sys/param.h>
@@ -76,6 +77,7 @@ __FBSDID("$FreeBSD$");
 
 #include <netinet/in.h>
 #include <netinet/in_kdtrace.h>
+#include <netinet/in_fib.h>
 #include <netinet/in_pcb.h>
 #include <netinet/in_systm.h>
 #include <netinet/in_var.h>
@@ -163,7 +165,7 @@ VNET_PCPUSTAT_SYSUNINIT(udpstat);
 #ifdef INET
 static void	udp_detach(struct socket *so);
 static int	udp_output(struct inpcb *, struct mbuf *, struct sockaddr *,
-		    struct mbuf *, struct thread *);
+		    struct mbuf *, struct thread *, int);
 #endif
 
 static void
@@ -1086,9 +1088,64 @@ udp_ctloutput(struct socket *so, struct sockopt *sopt)
 }
 
 #ifdef INET
+#ifdef INET6
+/* The logic here is derived from ip6_setpktopt(). See comments there. */
+static int
+udp_v4mapped_pktinfo(struct cmsghdr *cm, struct sockaddr_in * src,
+    struct inpcb *inp, int flags)
+{
+	struct ifnet *ifp;
+	struct in6_pktinfo *pktinfo;
+	struct in_addr ia;
+
+	if ((flags & PRUS_IPV6) == 0)
+		return (0);
+
+	if (cm->cmsg_level != IPPROTO_IPV6)
+		return (0);
+
+	if  (cm->cmsg_type != IPV6_2292PKTINFO &&
+	    cm->cmsg_type != IPV6_PKTINFO)
+		return (0);
+
+	if (cm->cmsg_len !=
+	    CMSG_LEN(sizeof(struct in6_pktinfo)))
+		return (EINVAL);
+
+	pktinfo = (struct in6_pktinfo *)CMSG_DATA(cm);
+	if (!IN6_IS_ADDR_V4MAPPED(&pktinfo->ipi6_addr) &&
+	    !IN6_IS_ADDR_UNSPECIFIED(&pktinfo->ipi6_addr))
+		return (EINVAL);
+
+	/* Validate the interface index if specified. */
+	if (pktinfo->ipi6_ifindex > V_if_index)
+		return (ENXIO);
+
+	ifp = NULL;
+	if (pktinfo->ipi6_ifindex) {
+		ifp = ifnet_byindex(pktinfo->ipi6_ifindex);
+		if (ifp == NULL)
+			return (ENXIO);
+	}
+	if (ifp != NULL && !IN6_IS_ADDR_UNSPECIFIED(&pktinfo->ipi6_addr)) {
+		ia.s_addr = pktinfo->ipi6_addr.s6_addr32[3];
+		if (in_ifhasaddr(ifp, ia) == 0)
+			return (EADDRNOTAVAIL);
+	}
+
+	bzero(src, sizeof(*src));
+	src->sin_family = AF_INET;
+	src->sin_len = sizeof(*src);
+	src->sin_port = inp->inp_lport;
+	src->sin_addr.s_addr = pktinfo->ipi6_addr.s6_addr32[3];
+
+	return (0);
+}
+#endif
+
 static int
 udp_output(struct inpcb *inp, struct mbuf *m, struct sockaddr *addr,
-    struct mbuf *control, struct thread *td)
+    struct mbuf *control, struct thread *td, int flags)
 {
 	struct udpiphdr *ui;
 	int len = m->m_pkthdr.len;
@@ -1099,7 +1156,7 @@ udp_output(struct inpcb *inp, struct mbuf *m, struct sockaddr *addr,
 	struct epoch_tracker et;
 	int cscov_partial = 0;
 	int error = 0;
-	int ipflags;
+	int ipflags = 0;
 	u_short fport, lport;
 	u_char tos;
 	uint8_t pr;
@@ -1152,6 +1209,11 @@ udp_output(struct inpcb *inp, struct mbuf *m, struct sockaddr *addr,
 				error = EINVAL;
 				break;
 			}
+#ifdef INET6
+			error = udp_v4mapped_pktinfo(cm, &src, inp, flags);
+			if (error != 0)
+				break;
+#endif
 			if (cm->cmsg_level != IPPROTO_IP)
 				continue;
 
@@ -1378,7 +1440,6 @@ udp_output(struct inpcb *inp, struct mbuf *m, struct sockaddr *addr,
 		ip->ip_off |= htons(IP_DF);
 	}
 
-	ipflags = 0;
 	if (inp->inp_socket->so_options & SO_DONTROUTE)
 		ipflags |= IP_ROUTETOIF;
 	if (inp->inp_socket->so_options & SO_BROADCAST)
@@ -1427,30 +1488,14 @@ udp_output(struct inpcb *inp, struct mbuf *m, struct sockaddr *addr,
 		m->m_pkthdr.flowid = flowid;
 		M_HASHTYPE_SET(m, flowtype);
 	}
-#ifdef	RSS
-	else {
+#if defined(ROUTE_MPATH) || defined(RSS)
+	else if (CALC_FLOWID_OUTBOUND_SENDTO) {
 		uint32_t hash_val, hash_type;
-		/*
-		 * Calculate an appropriate RSS hash for UDP and
-		 * UDP Lite.
-		 *
-		 * The called function will take care of figuring out
-		 * whether a 2-tuple or 4-tuple hash is required based
-		 * on the currently configured scheme.
-		 *
-		 * Later later on connected socket values should be
-		 * cached in the inpcb and reused, rather than constantly
-		 * re-calculating it.
-		 *
-		 * UDP Lite is a different protocol number and will
-		 * likely end up being hashed as a 2-tuple until
-		 * RSS / NICs grow UDP Lite protocol awareness.
-		 */
-		if (rss_proto_software_hash_v4(faddr, laddr, fport, lport,
-		    pr, &hash_val, &hash_type) == 0) {
-			m->m_pkthdr.flowid = hash_val;
-			M_HASHTYPE_SET(m, hash_type);
-		}
+
+		hash_val = fib4_calc_packet_hash(laddr, faddr,
+		    lport, fport, pr, &hash_type);
+		m->m_pkthdr.flowid = hash_val;
+		M_HASHTYPE_SET(m, hash_type);
 	}
 
 	/*
@@ -1699,7 +1744,7 @@ udp_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *addr,
 
 	inp = sotoinpcb(so);
 	KASSERT(inp != NULL, ("udp_send: inp == NULL"));
-	return (udp_output(inp, m, addr, control, td));
+	return (udp_output(inp, m, addr, control, td, flags));
 }
 #endif /* INET */
 

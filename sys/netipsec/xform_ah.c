@@ -236,28 +236,22 @@ ah_init(struct secasvar *sav, struct xformsw *xsp)
 
 	memset(&csp, 0, sizeof(csp));
 	csp.csp_mode = CSP_MODE_DIGEST;
+
+	if (sav->flags & SADB_X_SAFLAGS_ESN)
+		csp.csp_flags |= CSP_F_ESN;
+
 	error = ah_init0(sav, xsp, &csp);
 	return error ? error :
 		 crypto_newsession(&sav->tdb_cryptoid, &csp, V_crypto_support);
 }
 
-/*
- * Paranoia.
- *
- * NB: public for use by esp_zeroize (XXX).
- */
-int
-ah_zeroize(struct secasvar *sav)
+static void
+ah_cleanup(struct secasvar *sav)
 {
-
-	if (sav->key_auth)
-		bzero(sav->key_auth->key_data, _KEYLEN(sav->key_auth));
 
 	crypto_freesession(sav->tdb_cryptoid);
 	sav->tdb_cryptoid = NULL;
 	sav->tdb_authalgxform = NULL;
-	sav->tdb_xform = NULL;
-	return 0;
 }
 
 /*
@@ -544,6 +538,7 @@ ah_input(struct mbuf *m, struct secasvar *sav, int skip, int protoff)
 	struct newah *ah;
 	crypto_session_t cryptoid;
 	int hl, rplen, authsize, ahsize, error;
+	uint32_t seqh;
 
 	IPSEC_ASSERT(sav != NULL, ("null SA"));
 	IPSEC_ASSERT(sav->key_auth != NULL, ("null authentication key"));
@@ -567,7 +562,7 @@ ah_input(struct mbuf *m, struct secasvar *sav, int skip, int protoff)
 	/* Check replay window, if applicable. */
 	SECASVAR_LOCK(sav);
 	if (sav->replay != NULL && sav->replay->wsize != 0 &&
-	    ipsec_chkreplay(ntohl(ah->ah_seq), sav) == 0) {
+	    ipsec_chkreplay(ntohl(ah->ah_seq), &seqh, sav) == 0) {
 		SECASVAR_UNLOCK(sav);
 		AHSTAT_INC(ahs_replay);
 		DPRINTF(("%s: packet replay failure: %s\n", __func__,
@@ -662,6 +657,12 @@ ah_input(struct mbuf *m, struct secasvar *sav, int skip, int protoff)
 	crypto_use_mbuf(crp, m);
 	crp->crp_callback = ah_input_cb;
 	crp->crp_opaque = xd;
+
+	if (sav->flags & SADB_X_SAFLAGS_ESN &&
+	    sav->replay != NULL && sav->replay->wsize != 0) {
+		seqh = htonl(seqh);
+		memcpy(crp->crp_esn, &seqh, sizeof(seqh));
+	}
 
 	/* These are passed as-is to the callback. */
 	xd->sav = sav;
@@ -843,6 +844,7 @@ ah_output(struct mbuf *m, struct secpolicy *sp, struct secasvar *sav,
 	uint16_t iplen;
 	int error, rplen, authsize, ahsize, maxpacketsize, roff;
 	uint8_t prot;
+	uint32_t seqh;
 
 	IPSEC_ASSERT(sav != NULL, ("null SA"));
 	ahx = sav->tdb_authalgxform;
@@ -935,7 +937,9 @@ ah_output(struct mbuf *m, struct secpolicy *sp, struct secasvar *sav,
 	/* Insert packet replay counter, as requested.  */
 	SECASVAR_LOCK(sav);
 	if (sav->replay) {
-		if (sav->replay->count == ~0 &&
+		if ((sav->replay->count == ~0 ||
+		    (!(sav->flags & SADB_X_SAFLAGS_ESN) &&
+		    ((uint32_t)sav->replay->count) == ~0)) &&
 		    (sav->flags & SADB_X_EXT_CYCSEQ) == 0) {
 			SECASVAR_UNLOCK(sav);
 			DPRINTF(("%s: replay counter wrapped for SA %s/%08lx\n",
@@ -950,7 +954,7 @@ ah_output(struct mbuf *m, struct secpolicy *sp, struct secasvar *sav,
 		if (!V_ipsec_replay)
 #endif
 			sav->replay->count++;
-		ah->ah_seq = htonl(sav->replay->count);
+		ah->ah_seq = htonl((uint32_t)sav->replay->count);
 	}
 	cryptoid = sav->tdb_cryptoid;
 	SECASVAR_UNLOCK(sav);
@@ -1037,6 +1041,11 @@ ah_output(struct mbuf *m, struct secpolicy *sp, struct secasvar *sav,
 	crypto_use_mbuf(crp, m);
 	crp->crp_callback = ah_output_cb;
 	crp->crp_opaque = xd;
+
+	if (sav->flags & SADB_X_SAFLAGS_ESN && sav->replay != NULL) {
+		seqh = htonl((uint32_t)(sav->replay->count >> IPSEC_SEQH_SHIFT));
+		memcpy(crp->crp_esn, &seqh, sizeof(seqh));
+	}
 
 	/* These are passed as-is to the callback. */
 	xd->sp = sp;
@@ -1144,7 +1153,7 @@ static struct xformsw ah_xformsw = {
 	.xf_type =	XF_AH,
 	.xf_name =	"IPsec AH",
 	.xf_init =	ah_init,
-	.xf_zeroize =	ah_zeroize,
+	.xf_cleanup =	ah_cleanup,
 	.xf_input =	ah_input,
 	.xf_output =	ah_output,
 };

@@ -320,9 +320,9 @@ colocation_unborrow(struct thread *td, struct trapframe *trapframe)
 	    "with td %p, pid %d (%s), switchercb %#lx, "
 	    "md_tls %p, md_tls_tcb_offset %zd",
 	    td, td->td_proc->p_pid, td->td_proc->p_comm, td->td_md.md_scb,
-	    (__cheri_fromcap void *)td->td_md.md_tls, td->td_md.md_tls_tcb_offset,
+	    (__cheri_fromcap void *)td->td_md.md_tls, td->td_proc->p_md.md_tls_tcb_offset,
 	    peertd, peertd->td_proc->p_pid, peertd->td_proc->p_comm, peertd->td_md.md_scb,
-	    (__cheri_fromcap void *)peertd->td_md.md_tls, peertd->td_md.md_tls_tcb_offset);
+	    (__cheri_fromcap void *)peertd->td_md.md_tls, peertd->td_proc->p_md.md_tls_tcb_offset);
 #else
 	COLOCATION_DEBUG("replacing current td %p, pid %d (%s), switchercb %#lx, "
 	    "with td %p, pid %d (%s), switchercb %#lx",
@@ -334,16 +334,10 @@ colocation_unborrow(struct thread *td, struct trapframe *trapframe)
 	KASSERT(td->td_frame == &td->td_pcb->pcb_regs,
 	    ("%s: td->td_frame %p != &td->td_pcb->pcb_regs %p, td %p",
 	    __func__, td->td_frame, &td->td_pcb->pcb_regs, td));
-	KASSERT(td->td_frame == td->td_sa.trapframe,
-	    ("%s: td->td_frame %p != td->td_sa.trapframe %p, td %p",
-	    __func__, td->td_frame, td->td_sa.trapframe, td));
 
 	KASSERT(peertd->td_frame == &peertd->td_pcb->pcb_regs,
 	    ("%s: peertd->td_frame %p != &peertd->td_pcb->pcb_regs %p, peertd %p",
 	    __func__, peertd->td_frame, &peertd->td_pcb->pcb_regs, peertd));
-	KASSERT(peertd->td_frame == peertd->td_sa.trapframe,
-	    ("%s: peertd->td_frame %p != peertd->td_sa.trapframe %p, peertd %p",
-	    __func__, peertd->td_frame, peertd->td_sa.trapframe, peertd));
 
 	/*
 	 * Another MIPS-specific field; this one needs to be swapped.
@@ -427,8 +421,8 @@ colocation_update_tls(struct thread *td)
 
 	COLOCATION_DEBUG("changing TLS from %p to %p",
 	    (__cheri_fromcap void *)scb.scb_tls,
-	    (__cheri_fromcap void *)((char * __capability)td->td_md.md_tls + td->td_md.md_tls_tcb_offset));
-	scb.scb_tls = (char * __capability)td->td_md.md_tls + td->td_md.md_tls_tcb_offset;
+	    (__cheri_fromcap void *)((char * __capability)td->td_md.md_tls + td->td_proc->p_md.md_tls_tcb_offset));
+	scb.scb_tls = (char * __capability)td->td_md.md_tls + td->td_proc->p_md.md_tls_tcb_offset;
 
 	error = copyoutcap(&scb, ___USER_CFROMPTR((void *)addr, userspace_cap), sizeof(scb));
 	KASSERT(error == 0, ("%s: copyoutcap from %p failed with error %d\n", __func__, (void *)addr, error));
@@ -487,7 +481,7 @@ setup_scb(struct thread *td)
 	scb.scb_borrower_td = NULL;
 	scb.scb_peer_scb = cheri_capability_build_user_data(0, 0, 0, EAGAIN);
 #ifdef __mips__
-	scb.scb_tls = (char * __capability)td->td_md.md_tls + td->td_md.md_tls_tcb_offset;
+	scb.scb_tls = (char * __capability)td->td_md.md_tls + td->td_proc->p_md.md_tls_tcb_offset;
 #endif
 
 	error = copyoutcap(&scb,
@@ -964,22 +958,22 @@ db_print_scb(struct switchercb *scb)
 		db_printf("    scb_peer_scb:      <errno %lu>\n",
 		    cheri_getoffset(scb->scb_peer_scb));
 	} else {
-		db_printf("    scb_peer_scb:      %#lp\n", &scb->scb_peer_scb);
+		db_printf("    scb_peer_scb:      %#lp\n", scb->scb_peer_scb);
 	}
 	db_printf("    scb_td:            %p\n", scb->scb_td);
 	db_printf("    scb_borrower_td:   %p\n", scb->scb_borrower_td);
 #ifdef __mips__
-	db_printf("    scb_tls:           %#lp\n", &scb->scb_tls);
-	db_printf("    scb_csp (c11):     %#lp\n", &scb->scb_csp);
-	db_printf("    scb_cra (c13):     %#lp\n", &scb->scb_cra);
-	db_printf("    scb_buf (c6):      %#lp\n", &scb->scb_buf);
+	db_printf("    scb_tls:           %#lp\n", scb->scb_tls);
+	db_printf("    scb_csp (c11):     %#lp\n", scb->scb_csp);
+	db_printf("    scb_cra (c13):     %#lp\n", scb->scb_cra);
+	db_printf("    scb_buf (c6):      %#lp\n", scb->scb_buf);
 	db_printf("    scb_buflen (a0):   %zd\n", scb->scb_buflen);
-	db_printf("    scb_cookiep:       %#lp\n", &scb->scb_cookiep);
+	db_printf("    scb_cookiep:       %#lp\n", scb->scb_cookiep);
 #else
-	db_printf("    scb_csp:           %#lp\n", &scb->scb_csp);
-	db_printf("    scb_cra:           %#lp\n", &scb->scb_cra);
-	db_printf("    scb_cookiep (ca2): %#lp\n", &scb->scb_cookiep);
-	db_printf("    scb_buf (ca3):     %#lp\n", &scb->scb_buf);
+	db_printf("    scb_csp:           %#lp\n", scb->scb_csp);
+	db_printf("    scb_cra:           %#lp\n", scb->scb_cra);
+	db_printf("    scb_cookiep (ca2): %#lp\n", scb->scb_cookiep);
+	db_printf("    scb_buf (ca3):     %#lp\n", scb->scb_buf);
 	db_printf("    scb_buflen (a4):   %zd\n", scb->scb_buflen);
 #endif
 }
@@ -1015,11 +1009,12 @@ db_get_stack_pid(struct thread *td)
 #if defined(__mips__)
 	addr = __builtin_cheri_address_get(td->td_frame->csp);
 	db_printf("%s: td: %p; td_frame %p; csp: %#lp; csp addr: %lx\n",
-	    __func__, td, td->td_frame, &td->td_frame->csp, (long)addr);
+	    __func__, td, td->td_frame, td->td_frame->csp, (long)addr);
 #elif defined(__riscv)
 	addr = __builtin_cheri_address_get(td->td_frame->tf_sp);
 	db_printf("%s: td: %p; td_frame %p; tf_sp: %#lp; csp addr: %lx\n",
-	    __func__, td, td->td_frame, (void * __capability)&td->td_frame->tf_sp, (long)addr);
+	    __func__, td, td->td_frame,
+	    (void * __capability)td->td_frame->tf_sp, (long)addr);
 #else
 #error "what architecture is this?"
 #endif

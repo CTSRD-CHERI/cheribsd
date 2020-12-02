@@ -34,16 +34,17 @@ __FBSDID("$FreeBSD$");
 
 #include <sys/param.h>
 #include <sys/systm.h>
+#include <sys/fcntl.h>
 #include <sys/kernel.h>
 #include <sys/lock.h>
 #include <sys/malloc.h>
+#include <sys/linker.h>
 #include <sys/mutex.h>
 #include <sys/mount.h>
-#include <sys/proc.h>
 #include <sys/namei.h>
-#include <sys/fcntl.h>
+#include <sys/proc.h>
+#include <sys/rwlock.h>
 #include <sys/vnode.h>
-#include <sys/linker.h>
 
 #include <machine/elf.h>
 
@@ -53,11 +54,13 @@ __FBSDID("$FreeBSD$");
 
 #include <vm/vm.h>
 #include <vm/vm_param.h>
-#include <vm/vm_object.h>
-#include <vm/vm_kern.h>
-#include <vm/vm_extern.h>
 #include <vm/pmap.h>
+#include <vm/vm_extern.h>
+#include <vm/vm_kern.h>
 #include <vm/vm_map.h>
+#include <vm/vm_object.h>
+#include <vm/vm_page.h>
+#include <vm/vm_pager.h>
 
 #include <sys/link_elf.h>
 
@@ -909,11 +912,15 @@ link_elf_load_file(linker_class_t cls, const char *filename,
 	 * This stuff needs to be in a single chunk so that profiling etc
 	 * can get the bounds and gdb can associate offsets with modules
 	 */
-	ef->object = vm_object_allocate(OBJT_PHYS, atop(round_page(mapsize)));
+	ef->object = vm_pager_allocate(OBJT_PHYS, NULL, round_page(mapsize),
+	    VM_PROT_ALL, 0, thread0.td_ucred);
 	if (ef->object == NULL) {
 		error = ENOMEM;
 		goto out;
 	}
+#if VM_NRESERVLEVEL > 0
+	vm_object_color(ef->object, 0);
+#endif
 	vm_object_set_flag(ef->object, OBJ_HASCAP);
 
 	/*
@@ -1462,7 +1469,7 @@ link_elf_each_function_name(linker_file_t file,
 	elf_file_t ef = (elf_file_t)file;
 	const Elf_Sym *symp;
 	int i, error;
-	
+
 	/* Exhaustive search */
 	for (i = 0, symp = ef->ddbsymtab; i < ef->ddbsymcnt; i++, symp++) {
 		if (symp->st_value != 0 &&
@@ -1677,9 +1684,11 @@ link_elf_reloc_local(linker_file_t lf, bool ifuncs)
 			if (ELF_ST_BIND(sym->st_info) != STB_LOCAL)
 				continue;
 			if ((ELF_ST_TYPE(sym->st_info) == STT_GNU_IFUNC ||
-			    elf_is_ifunc_reloc(rel->r_info)) == ifuncs)
-				elf_reloc_local(lf, base, rel, ELF_RELOC_REL,
-				    elf_obj_lookup);
+			    elf_is_ifunc_reloc(rel->r_info)) != ifuncs)
+				continue;
+			if (elf_reloc_local(lf, base, rel, ELF_RELOC_REL,
+			    elf_obj_lookup) != 0)
+				return (ENOEXEC);
 		}
 	}
 
@@ -1705,9 +1714,11 @@ link_elf_reloc_local(linker_file_t lf, bool ifuncs)
 			if (ELF_ST_BIND(sym->st_info) != STB_LOCAL)
 				continue;
 			if ((ELF_ST_TYPE(sym->st_info) == STT_GNU_IFUNC ||
-			    elf_is_ifunc_reloc(rela->r_info)) == ifuncs)
-				elf_reloc_local(lf, base, rela, ELF_RELOC_RELA,
-				    elf_obj_lookup);
+			    elf_is_ifunc_reloc(rela->r_info)) != ifuncs)
+				continue;
+			if (elf_reloc_local(lf, base, rela, ELF_RELOC_RELA,
+			    elf_obj_lookup) != 0)
+				return (ENOEXEC);
 		}
 	}
 	return (0);

@@ -270,7 +270,6 @@ uiomove_flags(void *cp, int n, struct uio *uio, bool nofault,
 			cnt = n;
 
 		switch (uio->uio_segflg) {
-
 		case UIO_USERSPACE:
 			maybe_yield();
 			if (preserve_tags) {
@@ -356,7 +355,6 @@ again:
 		goto again;
 	}
 	switch (uio->uio_segflg) {
-
 	case UIO_USERSPACE:
 		if (subyte(iov->iov_base, c) < 0)
 			return (EFAULT);
@@ -437,14 +435,14 @@ copyinuio(const struct iovec * __capability iovp, u_int iovcnt,
  * iovec.
  */
 int
-updateiov(const struct uio *uiop, struct iovec *iovp)
+updateiov(const struct uio *uiop, struct iovec * __capability iovp)
 {
 	int i, error;
 
 	for (i = 0; i < uiop->uio_iovcnt; i++) {
 		error = suword(&iovp[i].iov_len, uiop->uio_iov[i].iov_len);
 		if (error != 0)
-			return (error);
+			return (EFAULT);
 	}
 	return (0);
 }

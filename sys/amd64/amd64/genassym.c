@@ -99,11 +99,10 @@ ASSYM(TDP_KTHREAD, TDP_KTHREAD);
 ASSYM(PAGE_SIZE, PAGE_SIZE);
 ASSYM(NPTEPG, NPTEPG);
 ASSYM(NPDEPG, NPDEPG);
-ASSYM(addr_PTmap, addr_PTmap);
-ASSYM(addr_PDmap, addr_PDmap);
-ASSYM(addr_PDPmap, addr_PDPmap);
-ASSYM(addr_PML4map, addr_PML4map);
-ASSYM(addr_PML4pml4e, addr_PML4pml4e);
+ASSYM(addr_P4Tmap, addr_P4Tmap);
+ASSYM(addr_P4Dmap, addr_P4Dmap);
+ASSYM(addr_P5Tmap, addr_P5Tmap);
+ASSYM(addr_P5Dmap, addr_P5Dmap);
 ASSYM(PDESIZE, sizeof(pd_entry_t));
 ASSYM(PTESIZE, sizeof(pt_entry_t));
 ASSYM(PAGE_SHIFT, PAGE_SHIFT);
@@ -116,6 +115,7 @@ ASSYM(val_KPML4I, KPML4I);
 ASSYM(val_PML4PML4I, PML4PML4I);
 ASSYM(VM_MAXUSER_ADDRESS, VM_MAXUSER_ADDRESS);
 ASSYM(KERNBASE, KERNBASE);
+ASSYM(KERNLOAD, KERNLOAD);
 ASSYM(DMAP_MIN_ADDRESS, DMAP_MIN_ADDRESS);
 ASSYM(DMAP_MAX_ADDRESS, DMAP_MAX_ADDRESS);
 
@@ -230,6 +230,7 @@ ASSYM(PC_TSS, offsetof(struct pcpu, pc_tss));
 ASSYM(PC_PM_SAVE_CNT, offsetof(struct pcpu, pc_pm_save_cnt));
 ASSYM(PC_KCR3, offsetof(struct pcpu, pc_kcr3));
 ASSYM(PC_UCR3, offsetof(struct pcpu, pc_ucr3));
+ASSYM(PC_UCR3_LOAD_MASK, offsetof(struct pcpu, pc_ucr3_load_mask));
 ASSYM(PC_SAVED_UCR3, offsetof(struct pcpu, pc_saved_ucr3));
 ASSYM(PC_PTI_STACK, offsetof(struct pcpu, pc_pti_stack));
 ASSYM(PC_PTI_STACK_SZ, PC_PTI_STACK_SZ);
@@ -238,7 +239,7 @@ ASSYM(PC_IBPB_SET, offsetof(struct pcpu, pc_ibpb_set));
 ASSYM(PC_MDS_TMP, offsetof(struct pcpu, pc_mds_tmp));
 ASSYM(PC_MDS_BUF, offsetof(struct pcpu, pc_mds_buf));
 ASSYM(PC_MDS_BUF64, offsetof(struct pcpu, pc_mds_buf64));
- 
+
 ASSYM(LA_EOI, LAPIC_EOI * LAPIC_MEM_MUL);
 ASSYM(LA_ISR, LAPIC_ISR0 * LAPIC_MEM_MUL);
 

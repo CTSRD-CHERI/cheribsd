@@ -22,9 +22,125 @@ NOTE TO PEOPLE WHO THINK THAT FreeBSD 13.x IS SLOW:
 	debugging flags in userland, and various verbose features in the
 	kernel.  Many developers choose to disable these features on build
 	machines to maximize performance.  (To completely disable malloc
-	debugging, define MALLOC_PRODUCTION in /etc/make.conf, or to merely
-	disable the most expensive debugging functionality run
-	"ln -s 'abort:false,junk:false' /etc/malloc.conf".)
+	debugging, define WITH_MALLOC_PRODUCTION in /etc/src.conf and rebuild
+	world, or to merely disable the most expensive debugging functionality
+	at runtime, run "ln -s 'abort:false,junk:false' /etc/malloc.conf".)
+
+20201124:
+	ping6 has been merged into ping.  It can now be called as "ping -6".
+	See ping(8) for details.
+
+20201108:
+	Default value of net.add_addr_allfibs has been changed to 0.
+	If you have multi-fib configuration and rely on existence of all
+	interface routes in every fib, you need to set the above sysctl to 1.
+20201030:
+	The internal pre-processor in the calendar(1) program has been
+	extended to support more C pre-processor commands (e.g. #ifdef, #else,
+	and #undef) and to detect unbalanced conditional statements.
+	Error messages have been extended to include the filename and line
+	number if processing stops to help fixing malformed data files.
+
+20201026:
+	All the data files for the calendar(1) program, except calendar.freebsd,
+	have been moved to the deskutils/calendar-data port, much like the
+	jewish calendar entries were moved to deskutils/hebcal years ago. After
+	make delete-old-files, you need to install it to retain full
+	functionality. calendar(1) will issue a reminder for files it can't
+	find.
+
+20200923:
+	LINT files are no longer generated. We now include the relevant NOTES
+	files. Note: This may cause conflicts with updating in some cases.
+	        find sys -name LINT\* -delete
+	is suggested across this commit	to remove the generated	LINT files.
+
+	If you have tried to update with generated files there, the svn
+	command you want to un-auger the tree is
+		cd sys/amd64/conf
+		svn revert -R .
+	and then do the above find from the top level. Substitute 'amd64'
+	above with where the error message indicates a conflict.
+
+20200824:
+	OpenZFS support has been integrated. Do not upgrade root pools until
+	the loader is updated to support zstd. Furthermore, we caution against
+	'zpool upgrade' for the next few weeks. The change should be transparent
+	unless you  want to use new features.
+
+	Not all "NO_CLEAN" build scenarios work across these changes. Many
+	scenarios have been tested and fixed, but rebuilding kernels without
+	rebuilding world may fail.
+
+	The ZFS cache file has moved from /boot to /etc to match the OpenZFS
+	upstream default. A fallback to /boot has been added for mountroot.
+
+	Pool auto import behavior at boot has been moved from the kernel module
+	to an explicit "zpool import -a" in one of the rc scripts enabled by
+	zfs_enable=YES. This means your non-root zpools won't auto import until
+	you upgrade your /etc/rc.d files.
+
+20200824:
+	The resume code now notifies devd with the 'kernel' system
+	rather than the old 'kern' subsystem to be consistent with
+	other use. The old notification will be created as well, but
+	will be removed prior to FreeBSD 14.0.
+
+20200821:
+	r362275 changed the internal API between the kernel RPC and the
+	NFS modules. As such, all the modules must be recompiled from
+	sources.
+
+20200817:
+	r364330 modified the internal API used between the NFS modules.
+	As such, all the NFS modules must be re-compiled from sources.
+
+20200816:
+	Clang, llvm, lld, lldb, compiler-rt, libc++, libunwind and openmp have
+	been upgraded to 11.0.0.  Please see the 20141231 entry below for
+	information about prerequisites and upgrading, if you are not already
+	using clang 3.5.0 or higher.
+
+20200810:
+	r364092 modified the internal ABI used between the kernel NFS
+	modules.  As such, all of these modules need to be rebuilt
+	from sources, so a version bump was done.
+
+20200807:
+	Makefile.inc has been updated to work around the issue documented in
+	20200729. It was a case where the optimization of using symbolic links
+	to point to binaries created a situation where we'd run new binaries
+	with old libraries starting midway through the installworld process.
+
+20200729:
+	r363679 has redefined some undefined behavior in regcomp(3); notably,
+	extraneous escapes of most ordinary characters will no longer be
+	accepted.  An exp-run has identified all of the problems with this in
+	ports, but other non-ports software may need extra escapes removed to
+	continue to function.
+
+	Because of this change, installworld may encounter the following error
+	from rtld: Undefined symbol "regcomp@FBSD_1.6" -- It is imperative that
+	you do not halt installworld. Instead, let it run to completion (whether
+	successful or not) and run installworld once more.
+
+20200627:
+	A new implementation of bc and dc has been imported in r362681. This
+	implementation corrects non-conformant behavior of the previous bc
+	and adds GNU bc compatible options. It offers a number of extensions,
+	is much faster on large values, and has support for message catalogs
+	(a number of languages are already supported, contributions of further
+	languages welcome). The option WITHOUT_GH_BC can be used to build the
+	world with the previous versions of bc and dc.
+
+20200625:
+	r362639 changed the internal API used between the NFS kernel modules.
+	As such, they all need to be rebuilt from sources.
+
+20200613:
+	r362158 changed the arguments for VFS_CHECKEXP().  As such, any
+	out of tree file systems need to be modified and rebuilt.
+	Also, any file systems that are modules must be rebuilt.
 
 20200604:
 	read(2) of a directory fd is now rejected by default.  root may
@@ -2102,9 +2218,11 @@ COMMON ITEMS:
 
 	2.) update the ZFS boot block on your boot drive
 
-	The following example updates the ZFS boot block on the first
-	partition (freebsd-boot) of a GPT partitioned drive ada0:
-	"gpart bootcode -p /boot/gptzfsboot -i 1 ada0"
+	The following example updates the ZFS boot block on the
+	freebsd-boot partition of a GPT partitioned drive ada0:
+	"gpart bootcode -p /boot/gptzfsboot -i $N ada0"
+	The value $N will typically be 1 (if booting from BIOS) or 2 (if
+	booting from EFI).
 
 	Non-boot pools do not need these updates.
 
@@ -2193,9 +2311,16 @@ COMMON ITEMS:
 	messages there.  If in doubt, please track -stable which has
 	much fewer pitfalls.
 
-	[1] If you have third party modules, such as vmware, you
-	should disable them at this point so they don't crash your
-	system on reboot.
+	[1] If you have third party modules, such as vmware, you should disable
+	them at this point so they don't crash your system on
+	reboot. Alternatively, you should rebuild all the modules you have in
+	your system and install them as well.  If you are running -current, you
+	should seriously consider placing all sources to all the modules for
+	your system (or symlinks to them) in /usr/local/sys/modules so this
+	happens automatically. If all your modules come from ports, then adding
+	the port origin directories to PORTS_MODULES instead is also automatic
+	and effective, eg:
+	     PORTS_MODULES+=x11/nvidia-driver
 
 	[3] From the bootblocks, boot -s, and then do
 		fsck -p
@@ -2204,8 +2329,8 @@ COMMON ITEMS:
 		sh /etc/rc.d/zfs start	# mount zfs filesystem, if needed
 		cd src			# full path to source
 		adjkerntz -i		# if CMOS is wall time
-	Also, when doing a major release upgrade, it is required that
-	you boot into single user mode to do the installworld.
+	Also, when doing a major release upgrade, it is required that you boot
+	into single user mode to do the installworld.
 
 	[4] Note: This step is non-optional.  Failure to do this step
 	can result in a significant reduction in the functionality of the

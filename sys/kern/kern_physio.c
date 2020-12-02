@@ -45,8 +45,7 @@ physio(struct cdev *dev, struct uio *uio, int ioflag)
 	struct buf *pbuf;
 	struct bio *bp;
 	struct vm_page **pages;
-	caddr_t sa;
-	char * __capability base;
+	char * __capability base, *sa;
 	u_int iolen, poff;
 	int error, i, npages, maxpages;
 	vm_prot_t prot;

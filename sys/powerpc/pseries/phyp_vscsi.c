@@ -87,7 +87,7 @@ struct vscsi_xfer {
         union ccb *ccb;
         bus_dmamap_t dmamap;
         uint64_t tag;
-	
+
 	vmem_addr_t srp_iu_offset;
 	vmem_size_t srp_iu_size;
 };
@@ -368,7 +368,6 @@ vscsi_attach(device_t dev)
 		return (EINVAL);
 	}
 
-
 	mtx_lock(&sc->io_lock);
 	if (xpt_bus_register(sc->sim, dev, 0) != 0) {
 		device_printf(dev, "XPT bus registration failed\n");
@@ -405,7 +404,7 @@ vscsi_detach(device_t dev)
 		cam_simq_free(sc->devq);
 		sc->devq = NULL;
 	}
-	
+
 	mtx_destroy(&sc->io_lock);
 
 	return (0);
@@ -505,9 +504,10 @@ vscsi_srp_login(struct vscsi_softc *sc)
 	xp->ccb = NULL;
 	TAILQ_REMOVE(&sc->free_xferq, xp, queue);
 	TAILQ_INSERT_TAIL(&sc->active_xferq, xp, queue);
-	
+
 	/* Set up command */
-	xp->srp_iu_size = crq.iu_length = 64;
+	xp->srp_iu_size = 64;
+	crq.iu_length = htobe16(xp->srp_iu_size);
 	err = vmem_alloc(xp->sc->srp_iu_arena, xp->srp_iu_size,
 	    M_BESTFIT | M_NOWAIT, &xp->srp_iu_offset);
 	if (err)
@@ -525,11 +525,12 @@ vscsi_srp_login(struct vscsi_softc *sc)
 	/* Create CRQ entry */
 	crq.valid = 0x80;
 	crq.format = 0x01;
-	crq.iu_data = xp->sc->srp_iu_phys + xp->srp_iu_offset;
+	crq.iu_data = htobe64(xp->sc->srp_iu_phys + xp->srp_iu_offset);
 	bus_dmamap_sync(sc->crq_tag, sc->crq_map, BUS_DMASYNC_PREWRITE);
 
-	err = phyp_hcall(H_SEND_CRQ, xp->sc->unit, ((uint64_t *)(&crq))[0],
-	    ((uint64_t *)(&crq))[1]);
+	err = phyp_hcall(H_SEND_CRQ, xp->sc->unit,
+	    be64toh(((uint64_t *)(&crq))[0]),
+	    be64toh(((uint64_t *)(&crq))[1]));
 	if (err != 0)
 		panic("CRQ send failure (%d)", err);
 }
@@ -551,7 +552,8 @@ vscsi_task_management(struct vscsi_softc *sc, union ccb *ccb)
 	TAILQ_REMOVE(&sc->free_xferq, xp, queue);
 	TAILQ_INSERT_TAIL(&sc->active_xferq, xp, queue);
 
-	xp->srp_iu_size = crq.iu_length = sizeof(*cmd);
+	xp->srp_iu_size = sizeof(*cmd);
+	crq.iu_length = htobe16(xp->srp_iu_size);
 	err = vmem_alloc(xp->sc->srp_iu_arena, xp->srp_iu_size,
 	    M_BESTFIT | M_NOWAIT, &xp->srp_iu_offset);
 	if (err)
@@ -578,10 +580,11 @@ vscsi_task_management(struct vscsi_softc *sc, union ccb *ccb)
 	/* Create CRQ entry */
 	crq.valid = 0x80;
 	crq.format = 0x01;
-	crq.iu_data = xp->sc->srp_iu_phys + xp->srp_iu_offset;
+	crq.iu_data = htobe64(xp->sc->srp_iu_phys + xp->srp_iu_offset);
 
-	err = phyp_hcall(H_SEND_CRQ, xp->sc->unit, ((uint64_t *)(&crq))[0],
-	    ((uint64_t *)(&crq))[1]);
+	err = phyp_hcall(H_SEND_CRQ, xp->sc->unit,
+	    be64toh(((uint64_t *)(&crq))[0]),
+	    be64toh(((uint64_t *)(&crq))[1]));
 	if (err != 0)
 		panic("CRQ send failure (%d)", err);
 }
@@ -606,9 +609,9 @@ vscsi_scsi_command(void *xxp, bus_dma_segment_t *segs, int nsegs, int err)
 	    ccb->csio.cdb_io.cdb_ptr : ccb->csio.cdb_io.cdb_bytes;
 
 	/* Command format from Table 20, page 37 of SRP spec */
-	crq.iu_length = 48 + ((nsegs > 1) ? 20 : 16) + 
+	xp->srp_iu_size = 48 + ((nsegs > 1) ? 20 : 16) +
 	    ((ccb->csio.cdb_len > 16) ? (ccb->csio.cdb_len - 16) : 0);
-	xp->srp_iu_size = crq.iu_length;
+	crq.iu_length = htobe16(xp->srp_iu_size);
 	if (nsegs > 1)
 		xp->srp_iu_size += nsegs*16;
 	xp->srp_iu_size = roundup(xp->srp_iu_size, 16);
@@ -645,19 +648,20 @@ vscsi_scsi_command(void *xxp, bus_dma_segment_t *segs, int nsegs, int err)
 
 		desc_start = ((ccb->csio.cdb_len > 16) ?
 		    ccb->csio.cdb_len - 16 : 0);
-		chunk_addr = xp->sc->srp_iu_phys + xp->srp_iu_offset + 20 +
-		    desc_start + sizeof(*cmd);
-		chunk_size = 16*nsegs;
+		chunk_addr = htobe64(xp->sc->srp_iu_phys + xp->srp_iu_offset + 20 +
+		    desc_start + sizeof(*cmd));
+		chunk_size = htobe32(16*nsegs);
 		memcpy(&cmd->data_payload[desc_start], &chunk_addr, 8);
 		memcpy(&cmd->data_payload[desc_start+12], &chunk_size, 4);
 		chunk_size = 0;
 		for (i = 0; i < nsegs; i++)
 			chunk_size += segs[i].ds_len;
+		chunk_size = htobe32(chunk_size);
 		memcpy(&cmd->data_payload[desc_start+16], &chunk_size, 4);
 		desc_start += 20;
 		for (i = 0; i < nsegs; i++) {
-			chunk_addr = segs[i].ds_addr;
-			chunk_size = segs[i].ds_len;
+			chunk_addr = htobe64(segs[i].ds_addr);
+			chunk_size = htobe32(segs[i].ds_len);
 
 			memcpy(&cmd->data_payload[desc_start + 16*i],
 			    &chunk_addr, 8);
@@ -686,8 +690,8 @@ vscsi_scsi_command(void *xxp, bus_dma_segment_t *segs, int nsegs, int err)
 		 * 4 byte length
 		 */
 
-		chunk_addr = segs[0].ds_addr;
-		chunk_size = segs[0].ds_len;
+		chunk_addr = htobe64(segs[0].ds_addr);
+		chunk_size = htobe32(segs[0].ds_len);
 		desc_start = ((ccb->csio.cdb_len > 16) ?
 		    ccb->csio.cdb_len - 16 : 0);
 
@@ -704,10 +708,11 @@ vscsi_scsi_command(void *xxp, bus_dma_segment_t *segs, int nsegs, int err)
 	/* Create CRQ entry */
 	crq.valid = 0x80;
 	crq.format = 0x01;
-	crq.iu_data = xp->sc->srp_iu_phys + xp->srp_iu_offset;
+	crq.iu_data = htobe64(xp->sc->srp_iu_phys + xp->srp_iu_offset);
 
-	err = phyp_hcall(H_SEND_CRQ, xp->sc->unit, ((uint64_t *)(&crq))[0],
-	    ((uint64_t *)(&crq))[1]);
+	err = phyp_hcall(H_SEND_CRQ, xp->sc->unit,
+	    be64toh(((uint64_t *)(&crq))[0]),
+	    be64toh(((uint64_t *)(&crq))[1]));
 	if (err != 0)
 		panic("CRQ send failure (%d)", err);
 }
@@ -716,7 +721,7 @@ static void
 vscsi_crq_load_cb(void *xsc, bus_dma_segment_t *segs, int nsegs, int err)
 {
 	struct vscsi_softc *sc = xsc;
-	
+
 	sc->crq_phys = segs[0].ds_addr;
 	sc->n_crqs = PAGE_SIZE/sizeof(struct vscsi_crq);
 
@@ -769,8 +774,9 @@ vscsi_setup_bus(struct vscsi_softc *sc)
 	    sc->n_crqs*sizeof(sc->crq_queue[0]));
 	KASSERT(error == 0, ("CRQ registration success"));
 
-	error = phyp_hcall(H_SEND_CRQ, sc->unit, ((uint64_t *)(&crq))[0],
-	    ((uint64_t *)(&crq))[1]);
+	error = phyp_hcall(H_SEND_CRQ, sc->unit,
+	    be64toh(((uint64_t *)(&crq))[0]),
+	    be64toh(((uint64_t *)(&crq))[1]));
 	if (error != 0)
 		panic("CRQ setup failure (%d)", error);
 
@@ -778,15 +784,15 @@ vscsi_setup_bus(struct vscsi_softc *sc)
 		vscsi_check_response_queue(sc);
 
 	/* Send MAD adapter info */
-	mad_adapter_info.type = MAD_ADAPTER_INFO_REQUEST;
+	mad_adapter_info.type = htobe32(MAD_ADAPTER_INFO_REQUEST);
 	mad_adapter_info.status = 0;
-	mad_adapter_info.length = sizeof(mad_adapter_info.payload);
+	mad_adapter_info.length = htobe16(sizeof(mad_adapter_info.payload));
 
 	strcpy(mad_adapter_info.payload.srp_version, "16.a");
 	strcpy(mad_adapter_info.payload.partition_name, "UNKNOWN");
 	mad_adapter_info.payload.partition_number = -1;
-	mad_adapter_info.payload.mad_version = 1;
-	mad_adapter_info.payload.os_type = 2; /* Claim we are Linux */
+	mad_adapter_info.payload.mad_version = htobe32(1);
+	mad_adapter_info.payload.os_type = htobe32(2); /* Claim we are Linux */
 	mad_adapter_info.payload.port_max_txu[0] = 0;
 	/* If this fails, we get the defaults above */
 	OF_getprop(OF_finddevice("/"), "ibm,partition-name",
@@ -800,19 +806,21 @@ vscsi_setup_bus(struct vscsi_softc *sc)
 	xp->ccb = NULL;
 	TAILQ_REMOVE(&sc->free_xferq, xp, queue);
 	TAILQ_INSERT_TAIL(&sc->active_xferq, xp, queue);
-	xp->srp_iu_size = crq.iu_length = sizeof(mad_adapter_info);
+	xp->srp_iu_size = sizeof(mad_adapter_info);
+	crq.iu_length = htobe16(xp->srp_iu_size);
 	vmem_alloc(xp->sc->srp_iu_arena, xp->srp_iu_size,
 	    M_BESTFIT | M_NOWAIT, &xp->srp_iu_offset);
-	mad_adapter_info.buffer = xp->sc->srp_iu_phys + xp->srp_iu_offset + 24;
+	mad_adapter_info.buffer = htobe64(xp->sc->srp_iu_phys + xp->srp_iu_offset + 24);
 	mad_adapter_info.tag = (uint64_t)xp;
 	memcpy((uint8_t *)xp->sc->srp_iu_queue + (uintptr_t)xp->srp_iu_offset,
 		&mad_adapter_info, sizeof(mad_adapter_info));
 	crq.valid = 0x80;
 	crq.format = 0x02;
-	crq.iu_data = xp->sc->srp_iu_phys + xp->srp_iu_offset;
+	crq.iu_data = htobe64(xp->sc->srp_iu_phys + xp->srp_iu_offset);
 	bus_dmamap_sync(sc->crq_tag, sc->crq_map, BUS_DMASYNC_PREWRITE);
-	phyp_hcall(H_SEND_CRQ, xp->sc->unit, ((uint64_t *)(&crq))[0],
-	    ((uint64_t *)(&crq))[1]);
+	phyp_hcall(H_SEND_CRQ, xp->sc->unit,
+	    be64toh(((uint64_t *)(&crq))[0]),
+	    be64toh(((uint64_t *)(&crq))[1]));
 
 	while (TAILQ_EMPTY(&sc->free_xferq))
 		vscsi_check_response_queue(sc);
@@ -824,7 +832,6 @@ vscsi_setup_bus(struct vscsi_softc *sc)
 
 	error = phyp_hcall(H_VIO_SIGNAL, sc->unit, 1); /* Enable interrupts */
 }
-	
 
 static void
 vscsi_intr(void *xsc)
@@ -992,4 +999,3 @@ vscsi_check_response_queue(struct vscsi_softc *sc)
 		phyp_hcall(H_VIO_SIGNAL, sc->unit, 1);
 	}
 }
-

@@ -36,7 +36,9 @@ __FBSDID("$FreeBSD$");
 
 #include <sys/param.h>
 #include <sys/bus.h>
+#include <sys/conf.h>
 #include <sys/fcntl.h>
+#include <sys/jail.h>
 #include <sys/lock.h>
 #include <sys/malloc.h>
 #include <sys/kernel.h>
@@ -95,7 +97,8 @@ linux_msg(const struct thread *td, const char *fmt, ...)
 		return;
 
 	p = td->td_proc;
-	printf("linux: pid %d (%s): ", (int)p->p_pid, p->p_comm);
+	printf("linux: jid %d pid %d (%s): ", p->p_ucred->cr_prison->pr_id,
+	    (int)p->p_pid, p->p_comm);
 	va_start(ap, fmt);
 	vprintf(fmt, ap);
 	va_end(ap);
@@ -193,6 +196,24 @@ linux_driver_get_major_minor(const char *node, int *major, int *minor)
 	}
 
 	return (1);
+}
+
+int
+linux_vn_get_major_minor(const struct vnode *vp, int *major, int *minor)
+{
+	int error;
+
+	if (vp->v_type != VCHR)
+		return (ENOTBLK);
+	dev_lock();
+	if (vp->v_rdev == NULL) {
+		dev_unlock();
+		return (ENXIO);
+	}
+	error = linux_driver_get_major_minor(devtoname(vp->v_rdev),
+	    major, minor);
+	dev_unlock();
+	return (error);
 }
 
 char *

@@ -24,12 +24,12 @@
 .\"
 .\" $FreeBSD$
 .\"
-.Dd May 3, 2020
+.Dd November 12, 2020
 .Dt BUILD 7
 .Os
 .Sh NAME
 .Nm build
-.Nd information on how to build the system
+.Nd General instructions on how to build the system
 .Sh DESCRIPTION
 The sources for the
 .Fx
@@ -41,10 +41,8 @@ and
 .Pa /usr/ports .
 These directories may be initially empty or non-existent until updated with
 .Xr svn 1
-or
-.Xr svnlite 1
-or
-.Xr portsnap 8 .
+(or
+.Xr svnlite 1 ) .
 Directory
 .Pa /usr/src
 contains the
@@ -68,10 +66,11 @@ command is used in each of these directories to build and install the
 things in that directory.
 Issuing the
 .Xr make 1
-command in any directory or
-subdirectory of those directories has the same effect as issuing the
-same command in all subdirectories of that directory.
-With no target specified, the things in that directory are just built.
+command in any directory issues the
+.Xr make 1
+command recursively in all subdirectories.
+With no target specified, the items in the directories are built
+and no further action is taken.
 .Pp
 A source tree is allowed to be read-only.
 As described in
@@ -94,6 +93,14 @@ variables described in the
 .Sx ENVIRONMENT
 section below, and by the variables documented in
 .Xr make.conf 5 .
+.Pp
+The default components included in the build are specified in the file
+.Pa /etc/src.conf
+in the source tree.
+To override the default file, include the SRCCONF option in the make steps,
+pointing to a custom src.conf file.
+For more information see
+.Xr src.conf 5 .
 .Pp
 The following list provides the names and actions for the targets
 supported by the build system:
@@ -565,6 +572,16 @@ If set, this variable supplies a list of additional mtrees relative to the
 root of the source tree to use as part of the
 .Cm hierarchy
 target.
+.It Va LOCAL_LEGACY_DIRS
+If set, this variable supplies a list of additional directories relative to
+the root of the source tree to build as part of the
+.Cm legacy
+target.
+.It Va LOCAL_BSTOOL_DIRS
+If set, this variable supplies a list of additional directories relative to
+the root of the source tree to build as part of the
+.Cm bootstrap-tools
+target.
 .It Va LOCAL_TOOL_DIRS
 If set, this variable supplies a list of additional directories relative to
 the root of the source tree to build as part of the
@@ -585,6 +602,12 @@ process.
 .Bd -literal -offset indent
 make PORTS_MODULES=emulators/kqemu-kmod kernel
 .Ed
+.It Va SRCCONF
+Specify a file to override the default
+.Pa /etc/src.conf .
+The src.conf file controls the components to build.
+See
+.Xr src.conf 5
 .It Va STRIPBIN
 Command to use at install time when stripping binaries.
 Be sure to add any additional tools required to run
@@ -851,8 +874,8 @@ manpage first appeared in
 .Xr release 7 ,
 .Xr tests 7 ,
 .Xr config 8 ,
+.Xr etcupdate 8 ,
 .Xr mergemaster 8 ,
-.Xr portsnap 8 ,
 .Xr reboot 8 ,
 .Xr shutdown 8
 .Sh AUTHORS

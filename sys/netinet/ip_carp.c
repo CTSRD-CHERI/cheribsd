@@ -37,7 +37,7 @@ __FBSDID("$FreeBSD$");
 
 #include <sys/param.h>
 #include <sys/systm.h>
-#include <sys/bus.h>
+#include <sys/devctl.h>
 #include <sys/jail.h>
 #include <sys/kernel.h>
 #include <sys/limits.h>
@@ -579,7 +579,6 @@ carp6_input(struct mbuf **mp, int *offp, int proto)
 		}
 	}
 	ch = (struct carp_header *)(mtod(m, char *) + *offp);
-
 
 	/* verify the CARP checksum */
 	m->m_data += *offp;

@@ -38,7 +38,6 @@ __FBSDID("$FreeBSD$");
 #include "opt_ipsec.h"
 #include "opt_kern_tls.h"
 #include "opt_mbuf_stress_test.h"
-#include "opt_mpath.h"
 #include "opt_ratelimit.h"
 #include "opt_route.h"
 #include "opt_rss.h"
@@ -63,7 +62,9 @@ __FBSDID("$FreeBSD$");
 
 #include <net/if.h>
 #include <net/if_var.h>
+#include <net/if_vlan_var.h>
 #include <net/if_llatbl.h>
+#include <net/ethernet.h>
 #include <net/netisr.h>
 #include <net/pfil.h>
 #include <net/route.h>
@@ -86,7 +87,7 @@ __FBSDID("$FreeBSD$");
 #include <netinet/udp.h>
 #include <netinet/udp_var.h>
 
-#ifdef SCTP
+#if defined(SCTP) || defined(SCTP_SUPPORT)
 #include <netinet/sctp.h>
 #include <netinet/sctp_crc32.h>
 #endif
@@ -104,7 +105,6 @@ SYSCTL_INT(_net_inet_ip, OID_AUTO, mbuf_frag_size, CTLFLAG_RW,
 #endif
 
 static void	ip_mloopback(struct ifnet *, const struct mbuf *, int);
-
 
 extern int in_mcast_loop;
 extern	struct protosw inetsw[];
@@ -154,7 +154,7 @@ ip_output_pfil(struct mbuf **mp, struct ifnet *ifp, int flags,
 			}
 			m->m_pkthdr.csum_flags |=
 				CSUM_IP_CHECKED | CSUM_IP_VALID;
-#ifdef SCTP
+#if defined(SCTP) || defined(SCTP_SUPPORT)
 			if (m->m_pkthdr.csum_flags & CSUM_SCTP)
 				m->m_pkthdr.csum_flags |= CSUM_SCTP_VALID;
 #endif
@@ -185,7 +185,7 @@ ip_output_pfil(struct mbuf **mp, struct ifnet *ifp, int flags,
 				CSUM_DATA_VALID | CSUM_PSEUDO_HDR;
 			m->m_pkthdr.csum_data = 0xffff;
 		}
-#ifdef SCTP
+#if defined(SCTP) || defined(SCTP_SUPPORT)
 		if (m->m_pkthdr.csum_flags & CSUM_SCTP)
 			m->m_pkthdr.csum_flags |= CSUM_SCTP_VALID;
 #endif
@@ -324,11 +324,12 @@ ip_output(struct mbuf *m, struct mbuf *opt, struct route *ro, int flags,
 	struct ifnet *ifp = NULL;	/* keep compiler happy */
 	struct mbuf *m0;
 	int hlen = sizeof (struct ip);
-	int mtu;
+	int mtu = 0;
 	int error = 0;
+	int vlan_pcp = -1;
 	struct sockaddr_in *dst, sin;
 	const struct sockaddr_in *gw;
-	struct in_ifaddr *ia;
+	struct in_ifaddr *ia = NULL;
 	struct in_addr src;
 	int isbroadcast;
 	uint16_t ip_len, ip_off;
@@ -347,6 +348,9 @@ ip_output(struct mbuf *m, struct mbuf *opt, struct route *ro, int flags,
 			m->m_pkthdr.flowid = inp->inp_flowid;
 			M_HASHTYPE_SET(m, inp->inp_flowtype);
 		}
+		if ((inp->inp_flags2 & INP_2PCP_SET) != 0)
+			vlan_pcp = (inp->inp_flags2 & INP_2PCP_MASK) >>
+			    INP_2PCP_SHIFT;
 #ifdef NUMA
 		m->m_pkthdr.numa_domain = inp->inp_numa_domain;
 #endif
@@ -471,11 +475,7 @@ again:
 			 * for correct operation (as it is for ARP).
 			 */
 			uint32_t flowid;
-#ifdef RADIX_MPATH
-			flowid = ntohl(ip->ip_src.s_addr ^ ip->ip_dst.s_addr);
-#else
 			flowid = m->m_pkthdr.flowid;
-#endif
 			ro->ro_nh = fib4_lookup(fibnum, dst->sin_addr, 0,
 			    NHR_REF, flowid);
 
@@ -486,7 +486,6 @@ again:
 				 * possible that a matching SPD entry exists.
 				 */
 				no_route_but_check_spd = 1;
-				mtu = 0; /* Silence GCC warning. */
 				goto sendit;
 #endif
 				IPSTAT_INC(ips_noroute);
@@ -514,7 +513,8 @@ again:
 	} else {
 		struct nhop_object *nh;
 
-		nh = fib4_lookup(M_GETFIB(m), ip->ip_dst, 0, NHR_NONE, 0);
+		nh = fib4_lookup(M_GETFIB(m), ip->ip_dst, 0, NHR_NONE,
+		    m->m_pkthdr.flowid);
 		if (nh == NULL) {
 #if defined(IPSEC) || defined(IPSEC_SUPPORT)
 			/*
@@ -522,7 +522,6 @@ again:
 			 * possible that a matching SPD entry exists.
 			 */
 			no_route_but_check_spd = 1;
-			mtu = 0; /* Silence GCC warning. */
 			goto sendit;
 #endif
 			IPSTAT_INC(ips_noroute);
@@ -721,9 +720,11 @@ sendit:
 			gw = dst;
 			ip = mtod(m, struct ip *);
 			goto again;
-
 		}
 	}
+
+	if (vlan_pcp > -1)
+		EVL_APPLY_PRI(m, vlan_pcp);
 
 	/* IN_LOOPBACK must not appear on the wire - RFC1122. */
 	if (IN_LOOPBACK(ntohl(ip->ip_dst.s_addr)) ||
@@ -753,7 +754,7 @@ sendit:
 			goto bad;
 		}
 	}
-#ifdef SCTP
+#if defined(SCTP) || defined(SCTP_SUPPORT)
 	if (m->m_pkthdr.csum_flags & CSUM_SCTP & ~ifp->if_hwassist) {
 		m = mb_unmapped_to_ext(m);
 		if (m == NULL) {
@@ -769,9 +770,13 @@ sendit:
 	/*
 	 * If small enough for interface, or the interface will take
 	 * care of the fragmentation for us, we can just send directly.
+	 * Note that if_vxlan could have requested TSO even though the outer
+	 * frame is UDP.  It is correct to not fragment such datagrams and
+	 * instead just pass them on to the driver.
 	 */
 	if (ip_len <= mtu ||
-	    (m->m_pkthdr.csum_flags & ifp->if_hwassist & CSUM_TSO) != 0) {
+	    (m->m_pkthdr.csum_flags & ifp->if_hwassist &
+	    (CSUM_TSO | CSUM_INNER_TSO)) != 0) {
 		ip->ip_sum = 0;
 		if (m->m_pkthdr.csum_flags & CSUM_IP & ~ifp->if_hwassist) {
 			ip->ip_sum = in_cksum(m, hlen);
@@ -785,7 +790,8 @@ sendit:
 		 * once instead of for every generated packet.
 		 */
 		if (!(flags & IP_FORWARDING) && ia) {
-			if (m->m_pkthdr.csum_flags & CSUM_TSO)
+			if (m->m_pkthdr.csum_flags &
+			    (CSUM_TSO | CSUM_INNER_TSO))
 				counter_u64_add(ia->ia_ifa.ifa_opackets,
 				    m->m_pkthdr.len / m->m_pkthdr.tso_segsz);
 			else
@@ -809,7 +815,8 @@ sendit:
 	}
 
 	/* Balk when DF bit is set or the interface didn't support TSO. */
-	if ((ip_off & IP_DF) || (m->m_pkthdr.csum_flags & CSUM_TSO)) {
+	if ((ip_off & IP_DF) ||
+	    (m->m_pkthdr.csum_flags & (CSUM_TSO | CSUM_INNER_TSO))) {
 		error = EMSGSIZE;
 		IPSTAT_INC(ips_cantfrag);
 		goto bad;
@@ -905,7 +912,7 @@ ip_fragment(struct ip *ip, struct mbuf **m_frag, int mtu,
 		in_delayed_cksum(m0);
 		m0->m_pkthdr.csum_flags &= ~CSUM_DELAY_DATA;
 	}
-#ifdef SCTP
+#if defined(SCTP) || defined(SCTP_SUPPORT)
 	if (m0->m_pkthdr.csum_flags & CSUM_SCTP) {
 		m0 = mb_unmapped_to_ext(m0);
 		if (m0 == NULL) {
@@ -1212,6 +1219,7 @@ ip_ctloutput(struct socket *so, struct sockopt *sopt)
 #ifdef	RSS
 		case IP_RECVRSSBUCKETID:
 #endif
+		case IP_VLAN_PCP:
 			error = sooptcopyin(sopt, &optval, sizeof optval,
 					    sizeof optval);
 			if (error)
@@ -1307,6 +1315,28 @@ ip_ctloutput(struct socket *so, struct sockopt *sopt)
 				OPTSET2(INP_RECVRSSBUCKETID, optval);
 				break;
 #endif
+			case IP_VLAN_PCP:
+				if ((optval >= -1) && (optval <=
+				    (INP_2PCP_MASK >> INP_2PCP_SHIFT))) {
+					if (optval == -1) {
+						INP_WLOCK(inp);
+						inp->inp_flags2 &=
+						    ~(INP_2PCP_SET |
+						      INP_2PCP_MASK);
+						INP_WUNLOCK(inp);
+					} else {
+						INP_WLOCK(inp);
+						inp->inp_flags2 |=
+						    INP_2PCP_SET;
+						inp->inp_flags2 &=
+						    ~INP_2PCP_MASK;
+						inp->inp_flags2 |=
+						    optval << INP_2PCP_SHIFT;
+						INP_WUNLOCK(inp);
+					}
+				} else
+					error = EINVAL;
+				break;
 			}
 			break;
 #undef OPTSET
@@ -1427,8 +1457,8 @@ ip_ctloutput(struct socket *so, struct sockopt *sopt)
 		case IP_RSSBUCKETID:
 		case IP_RECVRSSBUCKETID:
 #endif
+		case IP_VLAN_PCP:
 			switch (sopt->sopt_name) {
-
 			case IP_TOS:
 				optval = inp->inp_ip_tos;
 				break;
@@ -1514,6 +1544,14 @@ ip_ctloutput(struct socket *so, struct sockopt *sopt)
 #endif
 			case IP_BINDMULTI:
 				optval = OPTBIT2(INP_BINDMULTI);
+				break;
+			case IP_VLAN_PCP:
+				if (OPTBIT2(INP_2PCP_SET)) {
+					optval = (inp->inp_flags2 &
+					    INP_2PCP_MASK) >> INP_2PCP_SHIFT;
+				} else {
+					optval = -1;
+				}
 				break;
 			}
 			error = sooptcopyout(sopt, &optval, sizeof optval);

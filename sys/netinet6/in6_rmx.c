@@ -64,8 +64,6 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
-#include "opt_mpath.h"
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -84,7 +82,6 @@ __FBSDID("$FreeBSD$");
 #include <net/route/route_ctl.h>
 #include <net/route/route_var.h>
 #include <net/route/nhop.h>
-#include <net/route/shared.h>
 
 #include <netinet/in.h>
 #include <netinet/ip_var.h>
@@ -100,11 +97,6 @@ __FBSDID("$FreeBSD$");
 #include <netinet/tcp_seq.h>
 #include <netinet/tcp_timer.h>
 #include <netinet/tcp_var.h>
-
-extern int	in6_inithead(void **head, int off, u_int fibnum);
-#ifdef VIMAGE
-extern int	in6_detachhead(void **head, int off);
-#endif
 
 static int
 rib6_preadd(u_int fibnum, const struct sockaddr *addr, const struct sockaddr *mask,
@@ -147,44 +139,31 @@ rib6_preadd(u_int fibnum, const struct sockaddr *addr, const struct sockaddr *ma
  * Initialize our routing tree.
  */
 
-int
-in6_inithead(void **head, int off, u_int fibnum)
+struct rib_head *
+in6_inithead(uint32_t fibnum)
 {
 	struct rib_head *rh;
+	struct rib_subscription *rs;
 
 	rh = rt_table_init(offsetof(struct sockaddr_in6, sin6_addr) << 3,
 	    AF_INET6, fibnum);
 	if (rh == NULL)
-		return (0);
+		return (NULL);
 
 	rh->rnh_preadd = rib6_preadd;
-#ifdef	RADIX_MPATH
-	rt_mpath_init_rnh(rh);
-#endif
-	*head = (void *)rh;
 
-	return (1);
+	rs = rib_subscribe_internal(rh, nd6_subscription_cb, NULL,
+	    RIB_NOTIFY_IMMEDIATE, true);
+	KASSERT(rs != NULL, ("Unable to subscribe to fib %u\n", fibnum));
+
+	return (rh);
 }
 
 #ifdef VIMAGE
-int
-in6_detachhead(void **head, int off)
+void
+in6_detachhead(struct rib_head *rh)
 {
 
-	rt_table_destroy((struct rib_head *)(*head));
-
-	return (1);
+	rt_table_destroy(rh);
 }
 #endif
-
-/*
- * Extended API for IPv6 FIB support.
- */
-int
-in6_rtrequest(int req, struct sockaddr *dst, struct sockaddr *gw,
-    struct sockaddr *mask, int flags, struct rtentry **ret_nrt, u_int fibnum)
-{
-
-	return (rtrequest_fib(req, dst, gw, mask, flags, ret_nrt, fibnum));
-}
-

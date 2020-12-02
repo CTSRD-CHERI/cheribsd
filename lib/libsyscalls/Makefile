@@ -43,13 +43,6 @@ CFLAGS.interposing_table.c+=	-DINTERPOS_SYSCALLS_ONLY=1
 SRCS+=	memcpy.c
 CFLAGS.memcpy.c+=	-DIN_LIBSYSCALLS -Wno-cast-align
 
-# Note: Some architectures define the symbol versions for syscalls in
-# ${LIBC_SRCTOP}/${LIBC_ARCH}/Symbol.map add add it to SYM_MAPS in
-# ${LIBC_SRCTOP}/${LIBC_ARCH}/Makefile.inc. However, this is not added
-# by including "${LIBC_SRCTOP}/sys/Makefile.inc", so we have to do it manually
-.if exists(${LIBC_SRCTOP}/${LIBC_ARCH}/Symbol.map)
-SYM_MAPS+=	${LIBC_SRCTOP}/${LIBC_ARCH}/Symbol.map
-.endif
 SYMBOL_MAPS=	${SYM_MAPS}
 VERSION_DEF=	${LIBC_SRCTOP}/Versions.def
 CFLAGS+= -DSYMBOL_VERSIONING

@@ -52,6 +52,7 @@ struct thread;
 struct uio;
 struct knote;
 struct vnode;
+struct nameidata;
 
 #endif /* _KERNEL */
 
@@ -81,7 +82,8 @@ struct ucred;
 
 #define	FOF_OFFSET	0x01	/* Use the offset in uio argument */
 #define	FOF_NOLOCK	0x02	/* Do not take FOFFSET_LOCK */
-#define	FOF_NEXTOFF	0x04	/* Also update f_nextoff */
+#define	FOF_NEXTOFF_R	0x04	/* Also update f_nextoff[UIO_READ] */
+#define	FOF_NEXTOFF_W	0x08	/* Also update f_nextoff[UIO_WRITE] */
 #define	FOF_NOUPDATE	0x10	/* Do not update f_offset */
 off_t foffset_lock(struct file *fp, int flags);
 void foffset_lock_uio(struct file *fp, struct uio *uio, int flags);
@@ -176,22 +178,22 @@ struct fadvise_info {
 };
 
 struct file {
-	void		*f_data;	/* file descriptor specific data */
-	struct fileops	*f_ops;		/* File operations */
-	struct ucred	*f_cred;	/* associated credentials. */
-	struct vnode 	*f_vnode;	/* NULL or applicable vnode */
-	short		f_type;		/* descriptor type */
-	short		f_vnread_flags; /* (f) Sleep lock for f_offset */
 	volatile u_int	f_flag;		/* see fcntl.h */
 	volatile u_int 	f_count;	/* reference count */
+	void		*f_data;	/* file descriptor specific data */
+	struct fileops	*f_ops;		/* File operations */
+	struct vnode 	*f_vnode;	/* NULL or applicable vnode */
+	struct ucred	*f_cred;	/* associated credentials. */
+	short		f_type;		/* descriptor type */
+	short		f_vnread_flags; /* (f) Sleep lock for f_offset */
 	/*
 	 *  DTYPE_VNODE specific fields.
 	 */
 	union {
-		int16_t	f_seqcount;	/* (a) Count of sequential accesses. */
+		int16_t	f_seqcount[2];	/* (a) Count of seq. reads and writes. */
 		int	f_pipegen;
 	};
-	off_t		f_nextoff;	/* next expected read/write offset. */
+	off_t		f_nextoff[2];	/* next expected read/write offset. */
 	union {
 		struct cdev_privdata *fvn_cdevpriv;
 					/* (d) Private data for the cdev. */
@@ -268,6 +270,7 @@ fo_fill_kinfo_t	vn_fill_kinfo;
 int vn_fill_kinfo_vnode(struct vnode *vp, struct kinfo_file *kif);
 
 void finit(struct file *, u_int, short, void *, struct fileops *);
+void finit_vnode(struct file *, u_int, void *, struct fileops *);
 int fgetvp(struct thread *td, int fd, cap_rights_t *rightsp,
     struct vnode **vpp);
 int fgetvp_exec(struct thread *td, int fd, cap_rights_t *rightsp,
@@ -278,13 +281,7 @@ int fgetvp_read(struct thread *td, int fd, cap_rights_t *rightsp,
     struct vnode **vpp);
 int fgetvp_write(struct thread *td, int fd, cap_rights_t *rightsp,
     struct vnode **vpp);
-
-static __inline int
-_fnoop(void)
-{
-
-	return (0);
-}
+int fgetvp_lookup_smr(int fd, struct nameidata *ndp, struct vnode **vpp, bool *fsearch);
 
 static __inline __result_use_check bool
 fhold(struct file *fp)
@@ -292,8 +289,16 @@ fhold(struct file *fp)
 	return (refcount_acquire_checked(&fp->f_count));
 }
 
-#define	fdrop(fp, td)							\
-	(refcount_release(&(fp)->f_count) ? _fdrop((fp), (td)) : _fnoop())
+#define	fdrop(fp, td)		({				\
+	struct file *_fp;					\
+	int _error;						\
+								\
+	_error = 0;						\
+	_fp = (fp);						\
+	if (__predict_false(refcount_release(&_fp->f_count)))	\
+		_error = _fdrop(_fp, td);			\
+	_error;							\
+})
 
 static __inline fo_rdwr_t	fo_read;
 static __inline fo_rdwr_t	fo_write;

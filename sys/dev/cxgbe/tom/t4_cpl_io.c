@@ -446,16 +446,6 @@ t4_rcvd_locked(struct toedev *tod, struct tcpcb *tp)
 	SOCKBUF_LOCK_ASSERT(sb);
 
 	rx_credits = sbspace(sb) > tp->rcv_wnd ? sbspace(sb) - tp->rcv_wnd : 0;
-	if (ulp_mode(toep) == ULP_MODE_TLS) {
-		if (toep->tls.rcv_over >= rx_credits) {
-			toep->tls.rcv_over -= rx_credits;
-			rx_credits = 0;
-		} else {
-			rx_credits -= toep->tls.rcv_over;
-			toep->tls.rcv_over = 0;
-		}
-	}
-
 	if (rx_credits > 0 &&
 	    (tp->rcv_wnd <= 32 * 1024 || rx_credits >= 64 * 1024 ||
 	    (rx_credits >= 16 * 1024 && tp->rcv_wnd <= 128 * 1024) ||
@@ -1546,6 +1536,15 @@ do_rx_data(struct sge_iq *iq, const struct rss_header *rss, struct mbuf *m)
 	}
 
 	tp = intotcpcb(inp);
+
+	if (__predict_false(ulp_mode(toep) == ULP_MODE_TLS &&
+	   toep->flags & TPF_TLS_RECEIVE)) {
+		/* Received "raw" data on a TLS socket. */
+		CTR3(KTR_CXGBE, "%s: tid %u, raw TLS data (%d bytes)",
+		    __func__, tid, len);
+		do_rx_data_tls(cpl, toep, m);
+		return (0);
+	}
 
 	if (__predict_false(tp->rcv_nxt != be32toh(cpl->seq)))
 		ddp_placed = be32toh(cpl->seq) - tp->rcv_nxt;

@@ -6,7 +6,7 @@ CFLAGS+=-I${LDRSRC}
 
 SRCS+=	boot.c commands.c console.c devopen.c interp.c 
 SRCS+=	interp_backslash.c interp_parse.c ls.c misc.c 
-SRCS+=	module.c
+SRCS+=	module.c nvstore.c
 
 .if ${MACHINE} == "i386" || ${MACHINE_CPUARCH} == "amd64"
 SRCS+=	load_elf32.c load_elf32_obj.c reloc_elf32.c
@@ -24,6 +24,9 @@ SRCS+= load_elf64.c reloc_elf64.c
 SRCS+=	metadata.c
 .elif ${MACHINE} == "mips"
 SRCS+=	load_elf32.c reloc_elf32.c
+SRCS+=	metadata.c
+.elif ${MACHINE_CPUARCH} == "riscv"
+SRCS+=	load_elf64.c reloc_elf64.c
 SRCS+=	metadata.c
 .endif
 
@@ -136,6 +139,7 @@ CFLAGS+= -DLOADER_MBR_SUPPORT
 CFLAGS+=	-DLOADER_ZFS_SUPPORT
 CFLAGS+=	-I${ZFSSRC}
 CFLAGS+=	-I${SYSDIR}/cddl/boot/zfs
+CFLAGS+=	-I${SYSDIR}/cddl/contrib/opensolaris/uts/common
 SRCS+=		zfs_cmd.c
 .endif
 

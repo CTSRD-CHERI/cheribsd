@@ -95,7 +95,7 @@ static deactivate_func dns_deactivate;
 
 struct port_sock {
 	/* common input stuff; must be first */
-	struct port_input input;
+	struct port_input input __subobject_use_container_bounds;
 
 	/** link field */
 	TAILQ_ENTRY(port_sock) link;
@@ -139,7 +139,7 @@ static_assert(offsetof(struct port_sock, input) == 0,
  */
 struct inet_port {
 	/** common i/o port stuff (must be first) */
-	struct tport tport;
+	struct tport tport __subobject_use_container_bounds;
 
 	/** transport protocol */
 	enum BegemotSnmpdTransportProto proto;

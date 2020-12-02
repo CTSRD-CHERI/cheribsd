@@ -160,6 +160,7 @@ struct kinfo_proc64 {
 	uint64_t ki_kstack;		/* void* */
 	uint64_t ki_udata;		/* void* */
 	uint64_t ki_tdaddr;		/* struct thread*  */
+	uint64_t ki_pd;			/* struct pwddesc* */
 	uint64_t ki_spareptrs[KI_NSPARE_PTR];	/* void* */
 	long	ki_sparelongs[KI_NSPARE_LONG];
 	long	ki_sflag;

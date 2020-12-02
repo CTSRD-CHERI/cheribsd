@@ -78,7 +78,6 @@ SDT_PROBE_DEFINE2(ext2fs, , vfsops, trace, "int", "char*");
 SDT_PROBE_DEFINE2(ext2fs, , vfsops, ext2_cg_validate_error, "char*", "int");
 SDT_PROBE_DEFINE1(ext2fs, , vfsops, ext2_compute_sb_data_error, "char*");
 
-
 static int	ext2_flushfiles(struct mount *mp, int flags, struct thread *td);
 static int	ext2_mountfs(struct vnode *, struct mount *);
 static int	ext2_reload(struct mount *mp, struct thread *td);
@@ -248,7 +247,7 @@ ext2_mount(struct mount *mp)
 	NDFREE(ndp, NDF_ONLY_PNBUF);
 	devvp = ndp->ni_vp;
 
-	if (!vn_isdisk(devvp, &error)) {
+	if (!vn_isdisk_error(devvp, &error)) {
 		vput(devvp);
 		return (error);
 	}
@@ -399,7 +398,6 @@ ext2_cg_validate(struct m_ext2fs *fs)
 			SDT_PROBE2(ext2fs, , vfsops, ext2_cg_validate_error,
 			    "block bitmap is zero", i);
 			return (EINVAL);
-
 		}
 		if (b_bitmap <= last_cg_block) {
 			SDT_PROBE2(ext2fs, , vfsops, ext2_cg_validate_error,
@@ -800,7 +798,7 @@ loop:
 		/*
 		 * Step 4: invalidate all cached file data.
 		 */
-		if (vget(vp, LK_EXCLUSIVE | LK_INTERLOCK, td)) {
+		if (vget(vp, LK_EXCLUSIVE | LK_INTERLOCK)) {
 			MNT_VNODE_FOREACH_ALL_ABORT(mp, mvp);
 			goto loop;
 		}
@@ -1159,7 +1157,7 @@ loop:
 			VI_UNLOCK(vp);
 			continue;
 		}
-		error = vget(vp, LK_EXCLUSIVE | LK_NOWAIT | LK_INTERLOCK, td);
+		error = vget(vp, LK_EXCLUSIVE | LK_NOWAIT | LK_INTERLOCK);
 		if (error) {
 			if (error == ENOENT) {
 				MNT_VNODE_FOREACH_ALL_ABORT(mp, mvp);

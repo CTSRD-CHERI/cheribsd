@@ -5,7 +5,7 @@
 BOOT1?=		boot1
 PROG=		${BOOT1}.sym
 INTERNALPROG=
-WARNS=		6
+WARNS?=		6
 
 CFLAGS+=	-DEFI_BOOT1
 # We implement a slightly non-standard %S in that it always takes a
@@ -36,8 +36,11 @@ SRCS+=		zfs_module.c
 CFLAGS.zfs_module.c+=	-I${ZFSSRC}
 CFLAGS.zfs_module.c+=	-I${SYSDIR}/cddl/boot/zfs
 CFLAGS.zfs_module.c+=	-I${SYSDIR}/crypto/skein
-CFLAGS.zfs_module.c+=	-I${SYSDIR}/cddl/contrib/opensolaris/uts/common
+CFLAGS.zfs_module.c+=	-I${SYSDIR}/contrib/openzfs/include
+CFLAGS.zfs_module.c+=	-I${SYSDIR}/contrib/openzfs/include/os/freebsd/spl
+CFLAGS.zfs_module.c+=	-I${SYSDIR}/contrib/openzfs/include/os/freebsd/zfs
 CFLAGS.zfs_module.c+=	-I${SYSDIR}/cddl/contrib/opensolaris/common/lz4
+CFLAGS.zfs_module.c+=	-include ${ZFSOSINC}/spl/sys/ccompile.h
 
 CFLAGS+=	-DEFI_ZFS_BOOT
 .endif

@@ -80,6 +80,8 @@
 #include <opencrypto/cryptodev.h>
 #include <opencrypto/xform.h>
 
+#define SPI_SIZE	4
+
 VNET_DEFINE(int, esp_enable) = 1;
 VNET_DEFINE_STATIC(int, esp_ctr_compatibility) = 1;
 #define V_esp_ctr_compatibility VNET(esp_ctr_compatibility)
@@ -219,9 +221,13 @@ esp_init(struct secasvar *sav, struct xformsw *xsp)
 			return EINVAL;
 		}
 		csp.csp_mode = CSP_MODE_AEAD;
-	} else if (sav->alg_auth != 0)
+		if (sav->flags & SADB_X_SAFLAGS_ESN)
+			csp.csp_flags |= CSP_F_SEPARATE_AAD;
+	} else if (sav->alg_auth != 0) {
 		csp.csp_mode = CSP_MODE_ETA;
-	else
+		if (sav->flags & SADB_X_SAFLAGS_ESN)
+			csp.csp_flags |= CSP_F_ESN;
+	} else
 		csp.csp_mode = CSP_MODE_CIPHER;
 
 	/* Initialize crypto session. */
@@ -237,20 +243,14 @@ esp_init(struct secasvar *sav, struct xformsw *xsp)
 	return error;
 }
 
-/*
- * Paranoia.
- */
-static int
-esp_zeroize(struct secasvar *sav)
+static void
+esp_cleanup(struct secasvar *sav)
 {
-	/* NB: ah_zerorize free's the crypto session state */
-	int error = ah_zeroize(sav);
 
-	if (sav->key_enc)
-		bzero(sav->key_enc->key_data, _KEYLEN(sav->key_enc));
+	crypto_freesession(sav->tdb_cryptoid);
+	sav->tdb_cryptoid = NULL;
+	sav->tdb_authalgxform = NULL;
 	sav->tdb_encalgxform = NULL;
-	sav->tdb_xform = NULL;
-	return error;
 }
 
 /*
@@ -268,6 +268,8 @@ esp_input(struct mbuf *m, struct secasvar *sav, int skip, int protoff)
 	uint8_t *ivp;
 	crypto_session_t cryptoid;
 	int alen, error, hlen, plen;
+	uint32_t seqh;
+	const struct crypto_session_params *csp;
 
 	IPSEC_ASSERT(sav != NULL, ("null SA"));
 	IPSEC_ASSERT(sav->tdb_encalgxform != NULL, ("null encoding xform"));
@@ -326,7 +328,7 @@ esp_input(struct mbuf *m, struct secasvar *sav, int skip, int protoff)
 	 */
 	SECASVAR_LOCK(sav);
 	if (esph != NULL && sav->replay != NULL && sav->replay->wsize != 0) {
-		if (ipsec_chkreplay(ntohl(esp->esp_seq), sav) == 0) {
+		if (ipsec_chkreplay(ntohl(esp->esp_seq), &seqh, sav) == 0) {
 			SECASVAR_UNLOCK(sav);
 			DPRINTF(("%s: packet replay check for %s\n", __func__,
 			    ipsec_sa2str(sav, buf, sizeof(buf))));
@@ -334,6 +336,7 @@ esp_input(struct mbuf *m, struct secasvar *sav, int skip, int protoff)
 			error = EACCES;
 			goto bad;
 		}
+		seqh = htonl(seqh);
 	}
 	cryptoid = sav->tdb_cryptoid;
 	SECASVAR_UNLOCK(sav);
@@ -355,19 +358,49 @@ esp_input(struct mbuf *m, struct secasvar *sav, int skip, int protoff)
 	xd = malloc(sizeof(*xd), M_XDATA, M_NOWAIT | M_ZERO);
 	if (xd == NULL) {
 		DPRINTF(("%s: failed to allocate xform_data\n", __func__));
-		ESPSTAT_INC(esps_crypto);
-		crypto_freereq(crp);
-		error = ENOBUFS;
-		goto bad;
+		goto xd_fail;
 	}
 
 	if (esph != NULL) {
 		crp->crp_op = CRYPTO_OP_VERIFY_DIGEST;
-		crp->crp_aad_start = skip;
 		if (SAV_ISGCM(sav))
 			crp->crp_aad_length = 8; /* RFC4106 5, SPI + SN */
 		else
 			crp->crp_aad_length = hlen;
+
+		csp = crypto_get_params(crp->crp_session);
+		if ((csp->csp_flags & CSP_F_SEPARATE_AAD) &&
+		    (sav->replay != NULL) && (sav->replay->wsize != 0)) {
+			int aad_skip;
+
+			crp->crp_aad_length += sizeof(seqh);
+			crp->crp_aad = malloc(crp->crp_aad_length, M_XDATA, M_NOWAIT);
+			if (crp->crp_aad == NULL) {
+				DPRINTF(("%s: failed to allocate xform_data\n",
+					 __func__));
+				goto crp_aad_fail;
+			}
+
+			/* SPI */
+			m_copydata(m, skip, SPI_SIZE, crp->crp_aad);
+			aad_skip = SPI_SIZE;
+
+			/* ESN */
+			bcopy(&seqh, (char *)crp->crp_aad + aad_skip, sizeof(seqh));
+			aad_skip += sizeof(seqh);
+
+			/* Rest of aad */
+			if (crp->crp_aad_length - aad_skip > 0)
+				m_copydata(m, skip + SPI_SIZE,
+					   crp->crp_aad_length - aad_skip,
+					   (char *)crp->crp_aad + aad_skip);
+		} else
+			crp->crp_aad_start = skip;
+
+		if (csp->csp_flags & CSP_F_ESN &&
+			   sav->replay != NULL && sav->replay->wsize != 0)
+			memcpy(crp->crp_esn, &seqh, sizeof(seqh));
+
 		crp->crp_digest_start = m->m_pkthdr.len - alen;
 	}
 
@@ -428,6 +461,13 @@ esp_input(struct mbuf *m, struct secasvar *sav, int skip, int protoff)
 		crp->crp_iv_start = skip + hlen - sav->ivlen;
 
 	return (crypto_dispatch(crp));
+
+crp_aad_fail:
+	free(xd, M_XDATA);
+xd_fail:
+	crypto_freereq(crp);
+	ESPSTAT_INC(esps_crypto);
+	error = ENOBUFS;
 bad:
 	m_freem(m);
 	key_freesav(&sav);
@@ -510,6 +550,7 @@ esp_input_cb(struct cryptop *crp)
 
 	/* Release the crypto descriptors */
 	free(xd, M_XDATA), xd = NULL;
+	free(crp->crp_aad, M_XDATA), crp->crp_aad = NULL;
 	crypto_freereq(crp), crp = NULL;
 
 	/*
@@ -619,8 +660,10 @@ bad:
 		m_freem(m);
 	if (xd != NULL)
 		free(xd, M_XDATA);
-	if (crp != NULL)
+	if (crp != NULL) {
+		free(crp->crp_aad, M_XDATA);
 		crypto_freereq(crp);
+	}
 	return error;
 }
 /*
@@ -644,6 +687,8 @@ esp_output(struct mbuf *m, struct secpolicy *sp, struct secasvar *sav,
 	int hlen, rlen, padding, blks, alen, i, roff;
 	int error, maxpacketsize;
 	uint8_t prot;
+	uint32_t seqh;
+	const struct crypto_session_params *csp;
 
 	IPSEC_ASSERT(sav != NULL, ("null SA"));
 	esph = sav->tdb_authalgxform;
@@ -746,10 +791,12 @@ esp_output(struct mbuf *m, struct secpolicy *sp, struct secasvar *sav,
 		if (!V_ipsec_replay)
 #endif
 			sav->replay->count++;
-		replay = htonl(sav->replay->count);
+		replay = htonl((uint32_t)sav->replay->count);
 
 		bcopy((caddr_t) &replay, mtod(mo, caddr_t) + roff +
 		    sizeof(uint32_t), sizeof(uint32_t));
+
+		seqh = htonl((uint32_t)(sav->replay->count >> IPSEC_SEQH_SHIFT));
 	}
 	cryptoid = sav->tdb_cryptoid;
 	if (SAV_ISCTRORGCM(sav))
@@ -806,13 +853,10 @@ esp_output(struct mbuf *m, struct secpolicy *sp, struct secasvar *sav,
 	}
 
 	/* IPsec-specific opaque crypto info. */
-	xd =  malloc(sizeof(struct xform_data), M_XDATA, M_NOWAIT | M_ZERO);
+	xd = malloc(sizeof(struct xform_data), M_XDATA, M_NOWAIT | M_ZERO);
 	if (xd == NULL) {
-		crypto_freereq(crp);
 		DPRINTF(("%s: failed to allocate xform_data\n", __func__));
-		ESPSTAT_INC(esps_crypto);
-		error = ENOBUFS;
-		goto bad;
+		goto xd_fail;
 	}
 
 	/* Encryption descriptor. */
@@ -860,15 +904,54 @@ esp_output(struct mbuf *m, struct secpolicy *sp, struct secasvar *sav,
 	if (esph) {
 		/* Authentication descriptor. */
 		crp->crp_op |= CRYPTO_OP_COMPUTE_DIGEST;
-		crp->crp_aad_start = skip;
 		if (SAV_ISGCM(sav))
 			crp->crp_aad_length = 8; /* RFC4106 5, SPI + SN */
 		else
 			crp->crp_aad_length = hlen;
+
+		csp = crypto_get_params(crp->crp_session);
+		if (csp->csp_flags & CSP_F_SEPARATE_AAD &&
+		    sav->replay != NULL) {
+			int aad_skip;
+
+			crp->crp_aad_length += sizeof(seqh);
+			crp->crp_aad = malloc(crp->crp_aad_length, M_XDATA, M_NOWAIT);
+			if (crp->crp_aad == NULL) {
+				DPRINTF(("%s: failed to allocate xform_data\n",
+					 __func__));
+				goto crp_aad_fail;
+			}
+
+			/* SPI */
+			m_copydata(m, skip, SPI_SIZE, crp->crp_aad);
+			aad_skip = SPI_SIZE;
+
+			/* ESN */
+			bcopy(&seqh, (char *)crp->crp_aad + aad_skip, sizeof(seqh));
+			aad_skip += sizeof(seqh);
+
+			/* Rest of aad */
+			if (crp->crp_aad_length - aad_skip > 0)
+				m_copydata(m, skip + SPI_SIZE,
+					   crp->crp_aad_length - aad_skip,
+					   (char *)crp->crp_aad + aad_skip);
+		} else
+			crp->crp_aad_start = skip;
+
+		if (csp->csp_flags & CSP_F_ESN && sav->replay != NULL)
+			memcpy(crp->crp_esn, &seqh, sizeof(seqh));
+
 		crp->crp_digest_start = m->m_pkthdr.len - alen;
 	}
 
 	return crypto_dispatch(crp);
+
+crp_aad_fail:
+	free(xd, M_XDATA);
+xd_fail:
+	crypto_freereq(crp);
+	ESPSTAT_INC(esps_crypto);
+	error = ENOBUFS;
 bad:
 	if (m)
 		m_freem(m);
@@ -923,6 +1006,7 @@ esp_output_cb(struct cryptop *crp)
 		goto bad;
 	}
 	free(xd, M_XDATA);
+	free(crp->crp_aad, M_XDATA);
 	crypto_freereq(crp);
 	ESPSTAT_INC(esps_hist[sav->alg_enc]);
 	if (sav->tdb_authalgxform != NULL)
@@ -956,6 +1040,7 @@ esp_output_cb(struct cryptop *crp)
 bad:
 	CURVNET_RESTORE();
 	free(xd, M_XDATA);
+	free(crp->crp_aad, M_XDATA);
 	crypto_freereq(crp);
 	key_freesav(&sav);
 	key_freesp(&sp);
@@ -966,7 +1051,7 @@ static struct xformsw esp_xformsw = {
 	.xf_type =	XF_ESP,
 	.xf_name =	"IPsec ESP",
 	.xf_init =	esp_init,
-	.xf_zeroize =	esp_zeroize,
+	.xf_cleanup =	esp_cleanup,
 	.xf_input =	esp_input,
 	.xf_output =	esp_output,
 };

@@ -1,6 +1,5 @@
 /*-
  * Copyright (c) 2014 The FreeBSD Foundation
- * All rights reserved.
  *
  * This software was developed by Edward Tomasz Napierala under sponsorship
  * from the FreeBSD Foundation.
@@ -535,7 +534,6 @@ autofs_trigger(struct autofs_node *anp,
 			    "error %d", anp->an_retries, error);
 			anp->an_retries = 0;
 			return (error);
-
 		}
 		AUTOFS_DEBUG("trigger failed with error %d; will retry in "
 		    "%d seconds, %d attempts left", error, autofs_retry_delay,

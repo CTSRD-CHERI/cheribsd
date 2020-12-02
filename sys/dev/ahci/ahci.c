@@ -148,7 +148,6 @@ ahci_ctlr_reset(device_t dev)
 	if ((ATA_INL(ctlr->r_mem, AHCI_VS) >= 0x00010200) &&
 	    (ATA_INL(ctlr->r_mem, AHCI_CAP2) & AHCI_CAP2_BOH) &&
 	    ((v = ATA_INL(ctlr->r_mem, AHCI_BOHC)) & AHCI_BOHC_OOS) == 0) {
-
 		/* Request OS ownership. */
 		ATA_OUTL(ctlr->r_mem, AHCI_BOHC, v | AHCI_BOHC_OOS);
 
@@ -192,7 +191,6 @@ ahci_ctlr_reset(device_t dev)
 
 	return (0);
 }
-
 
 int
 ahci_attach(device_t dev)
@@ -2580,21 +2578,23 @@ ahci_setup_fis(struct ahci_channel *ch, struct ahci_cmd_tab *ctp, union ccb *ccb
 		fis[9] = ccb->ataio.cmd.lba_mid_exp;
 		fis[10] = ccb->ataio.cmd.lba_high_exp;
 		fis[11] = ccb->ataio.cmd.features_exp;
+		fis[12] = ccb->ataio.cmd.sector_count;
 		if (ccb->ataio.cmd.flags & CAM_ATAIO_FPDMA) {
-			fis[12] = tag << 3;
-		} else {
-			fis[12] = ccb->ataio.cmd.sector_count;
+			fis[12] &= 0x07;
+			fis[12] |= tag << 3;
 		}
 		fis[13] = ccb->ataio.cmd.sector_count_exp;
+		if (ccb->ataio.ata_flags & ATA_FLAG_ICC)
+			fis[14] = ccb->ataio.icc;
 		fis[15] = ATA_A_4BIT;
+		if (ccb->ataio.ata_flags & ATA_FLAG_AUX) {
+			fis[16] =  ccb->ataio.aux        & 0xff;
+			fis[17] = (ccb->ataio.aux >>  8) & 0xff;
+			fis[18] = (ccb->ataio.aux >> 16) & 0xff;
+			fis[19] = (ccb->ataio.aux >> 24) & 0xff;
+		}
 	} else {
 		fis[15] = ccb->ataio.cmd.control;
-	}
-	if (ccb->ataio.ata_flags & ATA_FLAG_AUX) {
-		fis[16] =  ccb->ataio.aux        & 0xff;
-		fis[17] = (ccb->ataio.aux >>  8) & 0xff;
-		fis[18] = (ccb->ataio.aux >> 16) & 0xff;
-		fis[19] = (ccb->ataio.aux >> 24) & 0xff;
 	}
 	return (20);
 }

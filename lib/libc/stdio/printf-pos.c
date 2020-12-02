@@ -85,7 +85,11 @@ enum typeid {
 	T_LONG, T_U_LONG, TP_LONG, T_LLONG, T_U_LLONG, TP_LLONG,
 	T_PTRDIFFT, TP_PTRDIFFT, T_SSIZET, T_SIZET, TP_SSIZET,
 	T_INTMAXT, T_UINTMAXT, TP_INTMAXT, T_INTPTRT, T_UINTPTRT, TP_INTPTRT,
-	TP_VOID, TP_CHAR, TP_SCHAR,
+	TP_VOID,
+#if __has_feature(capabilities)
+	TC_VOID,
+#endif
+	TP_CHAR, TP_SCHAR,
 	T_DOUBLE, T_LONG_DOUBLE, T_WINT, TP_WCHAR
 };
 
@@ -430,7 +434,11 @@ reswitch:	switch (ch) {
 				goto error;
 			break;
 		case 'p':
-			if ((error = addtype(&types, TP_VOID)))
+			if ((error = addtype(&types,
+#if __has_feature(capabilities)
+			    (flags & LONGINT) ? TC_VOID :
+#endif
+			    TP_VOID)));
 				goto error;
 			break;
 		case 'S':
@@ -626,7 +634,11 @@ reswitch:	switch (ch) {
 				goto error;
 			break;
 		case 'p':
-			if ((error = addtype(&types, TP_VOID)))
+			if ((error = addtype(&types,
+#if __has_feature(capabilities)
+			    (flags & LONGINT) ? TC_VOID :
+#endif
+			    TP_VOID)));
 				goto error;
 			break;
 		case 'S':
@@ -800,6 +812,11 @@ build_arg_table(struct typetable *types, va_list ap, union arg **argtable)
 		    case TP_VOID:
 			(*argtable) [n].pvoidarg = va_arg (ap, void *);
 			break;
+#if __has_feature(capabilities)
+		    case TC_VOID:
+			(*argtable) [n].cvoidarg = va_arg (ap, void * __capability);
+			break;
+#endif
 		    case T_WINT:
 			(*argtable) [n].wintarg = va_arg (ap, wint_t);
 			break;

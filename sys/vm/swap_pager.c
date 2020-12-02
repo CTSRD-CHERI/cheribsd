@@ -180,7 +180,7 @@ static struct sx swdev_syscall_lock;	/* serialize swap(on|off) */
 void * __capability swap_restore_cap;
 #endif
 
-static u_long swap_reserved;
+static __exclusive_cache_line u_long swap_reserved;
 static u_long swap_total;
 static int sysctl_page_shift(SYSCTL_HANDLER_ARGS);
 
@@ -230,101 +230,141 @@ sysctl_page_shift(SYSCTL_HANDLER_ARGS)
 	return (sysctl_handle_64(oidp, &newval, 0, req));
 }
 
-int
+static bool
+swap_reserve_by_cred_rlimit(u_long pincr, struct ucred *cred, int oc)
+{
+	struct uidinfo *uip;
+	u_long prev;
+
+	uip = cred->cr_ruidinfo;
+
+	prev = atomic_fetchadd_long(&uip->ui_vmsize, pincr);
+	if ((oc & SWAP_RESERVE_RLIMIT_ON) != 0 &&
+	    prev + pincr > lim_cur(curthread, RLIMIT_SWAP) &&
+	    priv_check(curthread, PRIV_VM_SWAP_NORLIMIT) != 0) {
+		prev = atomic_fetchadd_long(&uip->ui_vmsize, -pincr);
+		KASSERT(prev >= pincr, ("negative vmsize for uid = %d\n", uip->ui_uid));
+		return (false);
+	}
+	return (true);
+}
+
+static void
+swap_release_by_cred_rlimit(u_long pdecr, struct ucred *cred)
+{
+	struct uidinfo *uip;
+#ifdef notyet
+	u_long prev;
+#endif
+
+	uip = cred->cr_ruidinfo;
+
+#ifdef notyet
+	prev = atomic_fetchadd_long(&uip->ui_vmsize, -pdecr);
+	KASSERT(prev >= pdecr, ("negative vmsize for uid = %d\n", uip->ui_uid));
+#else
+	atomic_subtract_long(&uip->ui_vmsize, pdecr);
+#endif
+}
+
+static void
+swap_reserve_force_rlimit(u_long pincr, struct ucred *cred)
+{
+	struct uidinfo *uip;
+
+	uip = cred->cr_ruidinfo;
+	atomic_add_long(&uip->ui_vmsize, pincr);
+}
+
+bool
 swap_reserve(vm_ooffset_t incr)
 {
 
 	return (swap_reserve_by_cred(incr, curthread->td_ucred));
 }
 
-int
+bool
 swap_reserve_by_cred(vm_ooffset_t incr, struct ucred *cred)
 {
 	u_long r, s, prev, pincr;
-	int res, error;
+#ifdef RACCT
+	int error;
+#endif
+	int oc;
 	static int curfail;
 	static struct timeval lastfail;
-	struct uidinfo *uip;
-
-	uip = cred->cr_ruidinfo;
 
 	KASSERT((incr & PAGE_MASK) == 0, ("%s: incr: %ju & PAGE_MASK", __func__,
 	    (uintmax_t)incr));
 
 #ifdef RACCT
-	if (racct_enable) {
+	if (RACCT_ENABLED()) {
 		PROC_LOCK(curproc);
 		error = racct_add(curproc, RACCT_SWAP, incr);
 		PROC_UNLOCK(curproc);
 		if (error != 0)
-			return (0);
+			return (false);
 	}
 #endif
 
 	pincr = atop(incr);
-	res = 0;
 	prev = atomic_fetchadd_long(&swap_reserved, pincr);
 	r = prev + pincr;
-	if (overcommit & SWAP_RESERVE_ALLOW_NONWIRED) {
-		s = vm_cnt.v_page_count - vm_cnt.v_free_reserved -
+	s = swap_total;
+	oc = atomic_load_int(&overcommit);
+	if (r > s && (oc & SWAP_RESERVE_ALLOW_NONWIRED) != 0) {
+		s += vm_cnt.v_page_count - vm_cnt.v_free_reserved -
 		    vm_wire_count();
-	} else
-		s = 0;
-	s += swap_total;
-	if ((overcommit & SWAP_RESERVE_FORCE_ON) == 0 || r <= s ||
-	    (error = priv_check(curthread, PRIV_VM_SWAP_NOQUOTA)) == 0) {
-		res = 1;
-	} else {
+	}
+	if ((oc & SWAP_RESERVE_FORCE_ON) != 0 && r > s &&
+	    priv_check(curthread, PRIV_VM_SWAP_NOQUOTA) != 0) {
 		prev = atomic_fetchadd_long(&swap_reserved, -pincr);
-		if (prev < pincr)
-			panic("swap_reserved < incr on overcommit fail");
-	}
-	if (res) {
-		prev = atomic_fetchadd_long(&uip->ui_vmsize, pincr);
-		if ((overcommit & SWAP_RESERVE_RLIMIT_ON) != 0 &&
-		    prev + pincr > lim_cur(curthread, RLIMIT_SWAP) &&
-		    priv_check(curthread, PRIV_VM_SWAP_NORLIMIT)) {
-			res = 0;
-			prev = atomic_fetchadd_long(&uip->ui_vmsize, -pincr);
-			if (prev < pincr)
-				panic("uip->ui_vmsize < incr on overcommit fail");
-		}
-	}
-	if (!res && ppsratecheck(&lastfail, &curfail, 1)) {
-		printf("uid %d, pid %d: swap reservation for %jd bytes failed\n",
-		    uip->ui_uid, curproc->p_pid, incr);
+		KASSERT(prev >= pincr, ("swap_reserved < incr on overcommit fail"));
+		goto out_error;
 	}
 
+	if (!swap_reserve_by_cred_rlimit(pincr, cred, oc)) {
+		prev = atomic_fetchadd_long(&swap_reserved, -pincr);
+		KASSERT(prev >= pincr, ("swap_reserved < incr on overcommit fail"));
+		goto out_error;
+	}
+
+	return (true);
+
+out_error:
+	if (ppsratecheck(&lastfail, &curfail, 1)) {
+		printf("uid %d, pid %d: swap reservation for %jd bytes failed\n",
+		    cred->cr_ruidinfo->ui_uid, curproc->p_pid, incr);
+	}
 #ifdef RACCT
-	if (racct_enable && !res) {
+	if (RACCT_ENABLED()) {
 		PROC_LOCK(curproc);
 		racct_sub(curproc, RACCT_SWAP, incr);
 		PROC_UNLOCK(curproc);
 	}
 #endif
 
-	return (res);
+	return (false);
 }
 
 void
 swap_reserve_force(vm_ooffset_t incr)
 {
-	struct uidinfo *uip;
 	u_long pincr;
 
 	KASSERT((incr & PAGE_MASK) == 0, ("%s: incr: %ju & PAGE_MASK", __func__,
 	    (uintmax_t)incr));
 
-	PROC_LOCK(curproc);
 #ifdef RACCT
-	if (racct_enable)
+	if (RACCT_ENABLED()) {
+		PROC_LOCK(curproc);
 		racct_add_force(curproc, RACCT_SWAP, incr);
+		PROC_UNLOCK(curproc);
+	}
 #endif
 	pincr = atop(incr);
 	atomic_add_long(&swap_reserved, pincr);
-	uip = curproc->p_ucred->cr_ruidinfo;
-	atomic_add_long(&uip->ui_vmsize, pincr);
-	PROC_UNLOCK(curproc);
+	swap_reserve_force_rlimit(pincr, curthread->td_ucred);
 }
 
 void
@@ -341,22 +381,23 @@ swap_release(vm_ooffset_t decr)
 void
 swap_release_by_cred(vm_ooffset_t decr, struct ucred *cred)
 {
-	u_long prev, pdecr;
- 	struct uidinfo *uip;
-
-	uip = cred->cr_ruidinfo;
+	u_long pdecr;
+#ifdef INVARIANTS
+	u_long prev;
+#endif
 
 	KASSERT((decr & PAGE_MASK) == 0, ("%s: decr: %ju & PAGE_MASK", __func__,
 	    (uintmax_t)decr));
 
 	pdecr = atop(decr);
+#ifdef INVARIANTS
 	prev = atomic_fetchadd_long(&swap_reserved, -pdecr);
-	if (prev < pdecr)
-		panic("swap_reserved < decr");
+	KASSERT(prev >= pdecr, ("swap_reserved < decr"));
+#else
+	atomic_subtract_long(&swap_reserved, pdecr);
+#endif
 
-	prev = atomic_fetchadd_long(&uip->ui_vmsize, -pdecr);
-	if (prev < pdecr)
-		printf("negative vmsize for uid = %d\n", uip->ui_uid);
+	swap_release_by_cred_rlimit(pdecr, cred);
 #ifdef RACCT
 	if (racct_enable)
 		racct_sub_cred(cred, RACCT_SWAP, decr);
@@ -857,7 +898,6 @@ swp_pager_strategy(struct buf *bp)
 	panic("Swapdev not found");
 }
 
-
 /*
  * SWP_PAGER_FREESWAPSPACE() -	free raw swap space
  *
@@ -911,7 +951,7 @@ sysctl_swap_fragmentation(SYSCTL_HANDLER_ARGS)
 	sbuf_new_for_sysctl(&sbuf, NULL, 128, req);
 	mtx_lock(&sw_dev_mtx);
 	TAILQ_FOREACH(sp, &swtailq, sw_list) {
-		if (vn_isdisk(sp->sw_vp, NULL))
+		if (vn_isdisk(sp->sw_vp))
 			devname = devtoname(sp->sw_vp->v_rdev);
 		else
 			devname = "[file]";
@@ -2442,7 +2482,7 @@ kern_swapon(struct thread *td, const char * __capability name)
 	NDFREE(&nd, NDF_ONLY_PNBUF);
 	vp = nd.ni_vp;
 
-	if (vn_isdisk(vp, &error)) {
+	if (vn_isdisk_error(vp, &error)) {
 		error = swapongeom(vp);
 	} else if (vp->v_type == VREG &&
 	    (vp->v_mount->mnt_vfc->vfc_flags & VFCF_NETWORK) != 0 &&
@@ -2486,7 +2526,6 @@ swaponsomething(struct vnode *vp, void *id, u_long nblks,
 {
 	struct swdevt *sp, *tsp;
 	daddr_t dvbase;
-	u_long mblocks;
 
 	/*
 	 * nblks is in DEV_BSIZE'd chunks, convert to PAGE_SIZE'd chunks.
@@ -2497,19 +2536,8 @@ swaponsomething(struct vnode *vp, void *id, u_long nblks,
 	nblks &= ~(ctodb(1) - 1);
 	nblks = dbtoc(nblks);
 
-	/*
-	 * If we go beyond this, we get overflows in the radix
-	 * tree bitmap code.
-	 */
-	mblocks = 0x40000000 / BLIST_META_RADIX;
-	if (nblks > mblocks) {
-		printf(
-    "WARNING: reducing swap size to maximum of %luMB per unit\n",
-		    mblocks / 1024 / 1024 * PAGE_SIZE);
-		nblks = mblocks;
-	}
-
 	sp = malloc(sizeof *sp, M_VMPGDATA, M_WAITOK | M_ZERO);
+	sp->sw_blist = blist_create(nblks, M_WAITOK);
 	sp->sw_vp = vp;
 	sp->sw_id = id;
 	sp->sw_dev = dev;
@@ -2519,7 +2547,6 @@ swaponsomething(struct vnode *vp, void *id, u_long nblks,
 	sp->sw_close = close;
 	sp->sw_flags = flags;
 
-	sp->sw_blist = blist_create(nblks, M_WAITOK);
 	/*
 	 * Do not free the first blocks in order to avoid overwriting
 	 * any bsd label at the front of the partition
@@ -2684,7 +2711,7 @@ swapoff_all(void)
 	mtx_lock(&sw_dev_mtx);
 	TAILQ_FOREACH_SAFE(sp, &swtailq, sw_list, spt) {
 		mtx_unlock(&sw_dev_mtx);
-		if (vn_isdisk(sp->sw_vp, NULL))
+		if (vn_isdisk(sp->sw_vp))
 			devname = devtoname(sp->sw_vp->v_rdev);
 		else
 			devname = "[file]";
@@ -2732,7 +2759,7 @@ swap_dev_info(int name, struct xswdev *xs, char *devname, size_t len)
 		xs->xsw_nblks = sp->sw_nblks;
 		xs->xsw_used = sp->sw_used;
 		if (devname != NULL) {
-			if (vn_isdisk(sp->sw_vp, NULL))
+			if (vn_isdisk(sp->sw_vp))
 				tmp_devname = devtoname(sp->sw_vp->v_rdev);
 			else
 				tmp_devname = "[file]";
@@ -2879,7 +2906,6 @@ static struct g_class g_swap_class = {
 };
 
 DECLARE_GEOM_CLASS(g_swap_class, g_class);
-
 
 static void
 swapgeom_close_ev(void *arg, int flags)
@@ -3143,7 +3169,6 @@ swapdev_close(struct thread *td, struct swdevt *sp)
 	VOP_CLOSE(sp->sw_vp, FREAD | FWRITE, td->td_ucred, td);
 	vrele(sp->sw_vp);
 }
-
 
 static int
 swaponvp(struct thread *td, struct vnode *vp, u_long nblks)

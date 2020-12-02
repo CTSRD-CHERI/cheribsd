@@ -127,6 +127,11 @@ SYSCTL_INT(_debug, OID_AUTO, debugger_on_panic,
     CTLFLAG_RWTUN | CTLFLAG_SECURE,
     &debugger_on_panic, 0, "Run debugger on kernel panic");
 
+static bool debugger_on_recursive_panic = false;
+SYSCTL_BOOL(_debug, OID_AUTO, debugger_on_recursive_panic,
+    CTLFLAG_RWTUN | CTLFLAG_SECURE,
+    &debugger_on_recursive_panic, 0, "Run debugger on recursive kernel panic");
+
 int debugger_on_trap = 0;
 SYSCTL_INT(_debug, OID_AUTO, debugger_on_trap,
     CTLFLAG_RWTUN | CTLFLAG_SECURE,
@@ -682,7 +687,6 @@ shutdown_reset(void *junk, int howto)
 	spinlock_enter();
 #endif
 
-	/* cpu_boot(howto); */ /* doesn't do anything at the moment */
 	cpu_reset();
 	/* NOTREACHED */ /* assuming reset worked */
 }
@@ -930,6 +934,8 @@ vpanic(const char *fmt, va_list ap)
 		kdb_backtrace();
 	if (debugger_on_panic)
 		kdb_enter(KDB_WHY_PANIC, "panic");
+	else if (!newpanic && debugger_on_recursive_panic)
+		kdb_enter(KDB_WHY_PANIC, "re-panic");
 #endif
 	/*thread_lock(td); */
 	td->td_flags |= TDF_INPANIC;
@@ -1088,8 +1094,7 @@ kerneldumpcrypto_create(size_t blocksize, uint8_t encryption,
 
 	return (kdc);
 failed:
-	explicit_bzero(kdc, sizeof(*kdc) + dumpkeysize);
-	free(kdc, M_EKCD);
+	zfree(kdc, M_EKCD);
 	return (NULL);
 }
 
@@ -1186,8 +1191,7 @@ kerneldumpcomp_destroy(struct dumperinfo *di)
 	if (kdcomp == NULL)
 		return;
 	compressor_fini(kdcomp->kdc_stream);
-	explicit_bzero(kdcomp->kdc_buf, di->maxiosize);
-	free(kdcomp->kdc_buf, M_DUMPER);
+	zfree(kdcomp->kdc_buf, M_DUMPER);
 	free(kdcomp, M_DUMPER);
 }
 
@@ -1201,23 +1205,14 @@ free_single_dumper(struct dumperinfo *di)
 	if (di == NULL)
 		return;
 
-	if (di->blockbuf != NULL) {
-		explicit_bzero(di->blockbuf, di->blocksize);
-		free(di->blockbuf, M_DUMPER);
-	}
+	zfree(di->blockbuf, M_DUMPER);
 
 	kerneldumpcomp_destroy(di);
 
 #ifdef EKCD
-	if (di->kdcrypto != NULL) {
-		explicit_bzero(di->kdcrypto, sizeof(*di->kdcrypto) +
-		    di->kdcrypto->kdc_dumpkeysize);
-		free(di->kdcrypto, M_EKCD);
-	}
+	zfree(di->kdcrypto, M_EKCD);
 #endif
-
-	explicit_bzero(di, sizeof(*di));
-	free(di, M_DUMPER);
+	zfree(di, M_DUMPER);
 }
 
 /* Registration of dumpers */
@@ -1505,6 +1500,7 @@ kerneldumpcomp_write_cb(void *base, size_t length, off_t offset, void *arg)
 		}
 		resid = length - rlength;
 		memmove(di->blockbuf, (uint8_t *)base + rlength, resid);
+		bzero((uint8_t *)di->blockbuf + resid, di->blocksize - resid);
 		di->kdcomp->kdc_resid = resid;
 		return (EAGAIN);
 	}
@@ -1721,9 +1717,10 @@ dump_finish(struct dumperinfo *di, struct kerneldumpheader *kdh)
 		error = compressor_flush(di->kdcomp->kdc_stream);
 		if (error == EAGAIN) {
 			/* We have residual data in di->blockbuf. */
-			error = dump_write(di, di->blockbuf, 0, di->dumpoff,
-			    di->blocksize);
-			di->dumpoff += di->kdcomp->kdc_resid;
+			error = _dump_append(di, di->blockbuf, 0, di->blocksize);
+			if (error == 0)
+				/* Compensate for _dump_append()'s adjustment. */
+				di->dumpoff -= di->blocksize - di->kdcomp->kdc_resid;
 			di->kdcomp->kdc_resid = 0;
 		}
 		if (error != 0)

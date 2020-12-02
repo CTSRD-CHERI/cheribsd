@@ -12,6 +12,8 @@
         ..
         chmod
         ..
+        cp
+        ..
         date
         ..
         dd
@@ -446,7 +448,7 @@
         ..
         ping
         ..
-        ping6
+        route
         ..
     ..
     secure
@@ -999,6 +1001,8 @@
         fold
         ..
         getconf
+        ..
+        gh-bc
         ..
         grep
         ..

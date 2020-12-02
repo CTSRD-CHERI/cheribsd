@@ -214,7 +214,6 @@ static void	uftdi_stop_write(struct ucom_softc *);
 static void	uftdi_poll(struct ucom_softc *ucom);
 
 static const struct usb_config uftdi_config[UFTDI_N_TRANSFER] = {
-
 	[UFTDI_BULK_DT_WR] = {
 		.type = UE_BULK,
 		.endpoint = UE_ADDR_ANY,
@@ -294,6 +293,8 @@ static const STRUCT_USB_HOST_ID uftdi_devs[] = {
 	UFTDI_DEV(BBELECTRONICS, USPTL4, 0),
 	UFTDI_DEV(BBELECTRONICS, USTL4, 0),
 	UFTDI_DEV(BBELECTRONICS, ZZ_PROG1_USB, 0),
+	UFTDI_DEV(BRAINBOXES, US257, 0),
+	UFTDI_DEV(BRAINBOXES, US25701, 0),
 	UFTDI_DEV(CONTEC, COM1USBH, 0),
 	UFTDI_DEV(DRESDENELEKTRONIK, SENSORTERMINALBOARD, 0),
 	UFTDI_DEV(DRESDENELEKTRONIK, WIRELESSHANDHELDTERMINAL, 0),
@@ -1101,7 +1102,6 @@ uftdi_attach(device_t dev)
 	device_set_usb_desc(dev);
 	mtx_init(&sc->sc_mtx, "uftdi", NULL, MTX_DEF);
 	ucom_ref(&sc->sc_super_ucom);
-
 
 	uftdi_devtype_setup(sc, uaa);
 

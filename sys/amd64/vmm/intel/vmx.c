@@ -41,6 +41,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/malloc.h>
 #include <sys/pcpu.h>
 #include <sys/proc.h>
+#include <sys/smr.h>
 #include <sys/sysctl.h>
 
 #include <vm/vm.h>
@@ -166,6 +167,14 @@ SYSCTL_INT(_hw_vmm_vmx_cap, OID_AUTO, halt_exit, CTLFLAG_RD, &cap_halt_exit, 0,
 static int cap_pause_exit;
 SYSCTL_INT(_hw_vmm_vmx_cap, OID_AUTO, pause_exit, CTLFLAG_RD, &cap_pause_exit,
     0, "PAUSE triggers a VM-exit");
+
+static int cap_rdpid;
+SYSCTL_INT(_hw_vmm_vmx_cap, OID_AUTO, rdpid, CTLFLAG_RD, &cap_rdpid, 0,
+    "Guests are allowed to use RDPID");
+
+static int cap_rdtscp;
+SYSCTL_INT(_hw_vmm_vmx_cap, OID_AUTO, rdtscp, CTLFLAG_RD, &cap_rdtscp, 0,
+    "Guests are allowed to use RDTSCP");
 
 static int cap_unrestricted_guest;
 SYSCTL_INT(_hw_vmm_vmx_cap, OID_AUTO, unrestricted_guest, CTLFLAG_RD,
@@ -302,6 +311,18 @@ static void vmx_inject_pir(struct vlapic *vlapic);
 #ifdef BHYVE_SNAPSHOT
 static int vmx_restore_tsc(void *arg, int vcpu, uint64_t now);
 #endif
+
+static inline bool
+host_has_rdpid(void)
+{
+	return ((cpu_stdext_feature2 & CPUID_STDEXT2_RDPID) != 0);
+}
+
+static inline bool
+host_has_rdtscp(void)
+{
+	return ((amd_feature & AMDID_RDTSCP) != 0);
+}
 
 #ifdef KTR
 static const char *
@@ -755,6 +776,43 @@ vmx_init(int ipinum)
 					 PROCBASED_PAUSE_EXITING, 0,
 					 &tmp) == 0);
 
+	/*
+	 * Check support for RDPID and/or RDTSCP.
+	 *
+	 * Support a pass-through-based implementation of these via the
+	 * "enable RDTSCP" VM-execution control and the "RDTSC exiting"
+	 * VM-execution control.
+	 *
+	 * The "enable RDTSCP" VM-execution control applies to both RDPID
+	 * and RDTSCP (see SDM volume 3, section 25.3, "Changes to
+	 * Instruction Behavior in VMX Non-root operation"); this is why
+	 * only this VM-execution control needs to be enabled in order to
+	 * enable passing through whichever of RDPID and/or RDTSCP are
+	 * supported by the host.
+	 *
+	 * The "RDTSC exiting" VM-execution control applies to both RDTSC
+	 * and RDTSCP (again, per SDM volume 3, section 25.3), and is
+	 * already set up for RDTSC and RDTSCP pass-through by the current
+	 * implementation of RDTSC.
+	 *
+	 * Although RDPID and RDTSCP are optional capabilities, since there
+	 * does not currently seem to be a use case for enabling/disabling
+	 * these via libvmmapi, choose not to support this and, instead,
+	 * just statically always enable or always disable this support
+	 * across all vCPUs on all VMs. (Note that there may be some
+	 * complications to providing this functionality, e.g., the MSR
+	 * bitmap is currently per-VM rather than per-vCPU while the
+	 * capability API wants to be able to control capabilities on a
+	 * per-vCPU basis).
+	 */
+	error = vmx_set_ctlreg(MSR_VMX_PROCBASED_CTLS2,
+			       MSR_VMX_PROCBASED_CTLS2,
+			       PROCBASED2_ENABLE_RDTSCP, 0, &tmp);
+	cap_rdpid = error == 0 && host_has_rdpid();
+	cap_rdtscp = error == 0 && host_has_rdtscp();
+	if (cap_rdpid || cap_rdtscp)
+		procbased_ctls2 |= PROCBASED2_ENABLE_RDTSCP;
+
 	cap_unrestricted_guest = (vmx_set_ctlreg(MSR_VMX_PROCBASED_CTLS2,
 					MSR_VMX_PROCBASED_CTLS2,
 					PROCBASED2_UNRESTRICTED_GUEST, 0,
@@ -973,7 +1031,7 @@ vmx_vminit(struct vm *vm, pmap_t pmap)
 	}
 	vmx->vm = vm;
 
-	vmx->eptp = eptp(vtophys((vm_offset_t)pmap->pm_pml4));
+	vmx->eptp = eptp(vtophys((vm_offset_t)pmap->pm_pmltop));
 
 	/*
 	 * Clean up EPTP-tagged guest physical and combined mappings
@@ -1007,6 +1065,15 @@ vmx_vminit(struct vm *vm, pmap_t pmap)
 	 * the "use TSC offsetting" execution control is enabled and the
 	 * difference between the host TSC and the guest TSC is written
 	 * into the TSC offset in the VMCS.
+	 *
+	 * Guest TSC_AUX support is enabled if any of guest RDPID and/or
+	 * guest RDTSCP support are enabled (since, as per Table 2-2 in SDM
+	 * volume 4, TSC_AUX is supported if any of RDPID and/or RDTSCP are
+	 * supported). If guest TSC_AUX support is enabled, TSC_AUX is
+	 * exposed read-only so that the VMM can do one fewer MSR read per
+	 * exit than if this register were exposed read-write; the guest
+	 * restore value can be updated during guest writes (expected to be
+	 * rare) instead of during all exits (common).
 	 */
 	if (guest_msr_rw(vmx, MSR_GSBASE) ||
 	    guest_msr_rw(vmx, MSR_FSBASE) ||
@@ -1014,7 +1081,8 @@ vmx_vminit(struct vm *vm, pmap_t pmap)
 	    guest_msr_rw(vmx, MSR_SYSENTER_ESP_MSR) ||
 	    guest_msr_rw(vmx, MSR_SYSENTER_EIP_MSR) ||
 	    guest_msr_rw(vmx, MSR_EFER) ||
-	    guest_msr_ro(vmx, MSR_TSC))
+	    guest_msr_ro(vmx, MSR_TSC) ||
+	    ((cap_rdpid || cap_rdtscp) && guest_msr_ro(vmx, MSR_TSC_AUX)))
 		panic("vmx_vminit: error setting guest msr access");
 
 	vpid_alloc(vpid, VM_MAXCPU);
@@ -1093,6 +1161,8 @@ vmx_vminit(struct vm *vm, pmap_t pmap)
 		KASSERT(error == 0, ("vmx_vminit: error customizing the vmcs"));
 
 		vmx->cap[i].set = 0;
+		vmx->cap[i].set |= cap_rdpid != 0 ? 1 << VM_CAP_RDPID : 0;
+		vmx->cap[i].set |= cap_rdtscp != 0 ? 1 << VM_CAP_RDTSCP : 0;
 		vmx->cap[i].proc_ctls = procbased_ctls;
 		vmx->cap[i].proc_ctls2 = procbased_ctls2;
 		vmx->cap[i].exc_bitmap = exc_bitmap;
@@ -1124,15 +1194,11 @@ vmx_vminit(struct vm *vm, pmap_t pmap)
 static int
 vmx_handle_cpuid(struct vm *vm, int vcpu, struct vmxctx *vmxctx)
 {
-	int handled, func;
+	int handled;
 
-	func = vmxctx->guest_rax;
-
-	handled = x86_emulate_cpuid(vm, vcpu,
-				    (uint32_t*)(&vmxctx->guest_rax),
-				    (uint32_t*)(&vmxctx->guest_rbx),
-				    (uint32_t*)(&vmxctx->guest_rcx),
-				    (uint32_t*)(&vmxctx->guest_rdx));
+	handled = x86_emulate_cpuid(vm, vcpu, (uint64_t *)&vmxctx->guest_rax,
+	    (uint64_t *)&vmxctx->guest_rbx, (uint64_t *)&vmxctx->guest_rcx,
+	    (uint64_t *)&vmxctx->guest_rdx);
 	return (handled);
 }
 
@@ -1208,7 +1274,7 @@ vmx_invvpid(struct vmx *vmx, int vcpu, pmap_t pmap, int running)
 	 * Note also that this will invalidate mappings tagged with 'vpid'
 	 * for "all" EP4TAs.
 	 */
-	if (pmap->pm_eptgen == vmx->eptgen[curcpu]) {
+	if (atomic_load_long(&pmap->pm_eptgen) == vmx->eptgen[curcpu]) {
 		invvpid_desc._res1 = 0;
 		invvpid_desc._res2 = 0;
 		invvpid_desc.vpid = vmxstate->vpid;
@@ -1871,14 +1937,18 @@ vmx_cpu_mode(void)
 static enum vm_paging_mode
 vmx_paging_mode(void)
 {
+	uint64_t cr4;
 
 	if (!(vmcs_read(VMCS_GUEST_CR0) & CR0_PG))
 		return (PAGING_MODE_FLAT);
-	if (!(vmcs_read(VMCS_GUEST_CR4) & CR4_PAE))
+	cr4 = vmcs_read(VMCS_GUEST_CR4);
+	if (!(cr4 & CR4_PAE))
 		return (PAGING_MODE_32);
-	if (vmcs_read(VMCS_GUEST_IA32_EFER) & EFER_LME)
-		return (PAGING_MODE_64);
-	else
+	if (vmcs_read(VMCS_GUEST_IA32_EFER) & EFER_LME) {
+		if (!(cr4 & CR4_LA57))
+			return (PAGING_MODE_64);
+		return (PAGING_MODE_64_LA57);
+	} else
 		return (PAGING_MODE_PAE);
 }
 
@@ -2766,7 +2836,6 @@ vmx_exit_inst_error(struct vmxctx *vmxctx, int rc, struct vm_exit *vmexit)
 	switch (rc) {
 	case VMX_VMRESUME_ERROR:
 	case VMX_VMLAUNCH_ERROR:
-	case VMX_INVEPT_ERROR:
 		vmexit->u.vmx.inst_type = rc;
 		break;
 	default:
@@ -2869,6 +2938,31 @@ vmx_dr_leave_guest(struct vmxctx *vmxctx)
 	wrmsr(MSR_DEBUGCTLMSR, vmxctx->host_debugctl);
 	load_dr7(vmxctx->host_dr7);
 	write_rflags(read_rflags() | vmxctx->host_tf);
+}
+
+static __inline void
+vmx_pmap_activate(struct vmx *vmx, pmap_t pmap)
+{
+	long eptgen;
+	int cpu;
+
+	cpu = curcpu;
+
+	CPU_SET_ATOMIC(cpu, &pmap->pm_active);
+	smr_enter(pmap->pm_eptsmr);
+	eptgen = atomic_load_long(&pmap->pm_eptgen);
+	if (eptgen != vmx->eptgen[cpu]) {
+		vmx->eptgen[cpu] = eptgen;
+		invept(INVEPT_TYPE_SINGLE_CONTEXT,
+		    (struct invept_desc){ .eptp = vmx->eptp, ._res = 0 });
+	}
+}
+
+static __inline void
+vmx_pmap_deactivate(struct vmx *vmx, pmap_t pmap)
+{
+	smr_exit(pmap->pm_eptsmr);
+	CPU_CLR_ATOMIC(curcpu, &pmap->pm_active);
 }
 
 static int
@@ -3002,10 +3096,37 @@ vmx_run(void *arg, int vcpu, register_t rip, pmap_t pmap,
 		sidt(&idtr);
 		ldt_sel = sldt();
 
-		vmx_run_trace(vmx, vcpu);
+		/*
+		 * The TSC_AUX MSR must be saved/restored while interrupts
+		 * are disabled so that it is not possible for the guest
+		 * TSC_AUX MSR value to be overwritten by the resume
+		 * portion of the IPI_SUSPEND codepath. This is why the
+		 * transition of this MSR is handled separately from those
+		 * handled by vmx_msr_guest_{enter,exit}(), which are ok to
+		 * be transitioned with preemption disabled but interrupts
+		 * enabled.
+		 *
+		 * These vmx_msr_guest_{enter,exit}_tsc_aux() calls can be
+		 * anywhere in this loop so long as they happen with
+		 * interrupts disabled. This location is chosen for
+		 * simplicity.
+		 */
+		vmx_msr_guest_enter_tsc_aux(vmx, vcpu);
+
 		vmx_dr_enter_guest(vmxctx);
+
+		/*
+		 * Mark the EPT as active on this host CPU and invalidate
+		 * EPTP-tagged TLB entries if required.
+		 */
+		vmx_pmap_activate(vmx, pmap);
+
+		vmx_run_trace(vmx, vcpu);
 		rc = vmx_enter_guest(vmxctx, vmx, launched);
+
+		vmx_pmap_deactivate(vmx, pmap);
 		vmx_dr_leave_guest(vmxctx);
+		vmx_msr_guest_exit_tsc_aux(vmx, vcpu);
 
 		bare_lgdt(&gdtr);
 		lidt(&idtr);
@@ -3249,6 +3370,10 @@ vmx_setreg(void *arg, int vcpu, int reg, uint64_t val)
 	if (vmxctx_setreg(&vmx->ctx[vcpu], reg, val) == 0)
 		return (0);
 
+	/* Do not permit user write access to VMCS fields by offset. */
+	if (reg < 0)
+		return (EINVAL);
+
 	error = vmcs_setreg(&vmx->vmcs[vcpu], running, reg, val);
 
 	if (error == 0) {
@@ -3344,6 +3469,14 @@ vmx_getcap(void *arg, int vcpu, int type, int *retval)
 		if (cap_monitor_trap)
 			ret = 0;
 		break;
+	case VM_CAP_RDPID:
+		if (cap_rdpid)
+			ret = 0;
+		break;
+	case VM_CAP_RDTSCP:
+		if (cap_rdtscp)
+			ret = 0;
+		break;
 	case VM_CAP_UNRESTRICTED_GUEST:
 		if (cap_unrestricted_guest)
 			ret = 0;
@@ -3407,6 +3540,17 @@ vmx_setcap(void *arg, int vcpu, int type, int val)
 			flag = PROCBASED_PAUSE_EXITING;
 			reg = VMCS_PRI_PROC_BASED_CTLS;
 		}
+		break;
+	case VM_CAP_RDPID:
+	case VM_CAP_RDTSCP:
+		if (cap_rdpid || cap_rdtscp)
+			/*
+			 * Choose not to support enabling/disabling
+			 * RDPID/RDTSCP via libvmmapi since, as per the
+			 * discussion in vmx_init(), RDPID/RDTSCP are
+			 * either always enabled or always disabled.
+			 */
+			error = EOPNOTSUPP;
 		break;
 	case VM_CAP_UNRESTRICTED_GUEST:
 		if (cap_unrestricted_guest) {

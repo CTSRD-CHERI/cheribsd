@@ -9,10 +9,6 @@
 
 #include "config.h"
 
-#ifndef lint
-static const char sccsid[] = "$Id: v_itxt.c,v 10.21 2001/06/25 15:19:32 skimo Exp $";
-#endif /* not lint */
-
 #include <sys/types.h>
 #include <sys/queue.h>
 #include <sys/time.h>
@@ -52,10 +48,10 @@ static const char sccsid[] = "$Id: v_itxt.c,v 10.21 2001/06/25 15:19:32 skimo Ex
  * position.)  We also check for mapped keys waiting, i.e. if we're in the
  * middle of a map, don't bother logging the cursor.
  */
-#define	LOG_CORRECT {							\
+#define	LOG_CORRECT do {						\
 	if (!MAPPED_KEYS_WAITING(sp))					\
 		(void)log_cursor(sp);					\
-}
+} while (0)
 
 static u_int32_t set_txt_std(SCR *, VICMD *, u_int32_t);
 

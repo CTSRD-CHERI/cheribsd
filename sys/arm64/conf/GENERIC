@@ -34,7 +34,7 @@ options 	IPSEC_SUPPORT		# Allow kldload of ipsec and tcpmd5
 options 	TCP_HHOOK		# hhook(9) framework for TCP
 options 	TCP_OFFLOAD		# TCP offload
 options		TCP_RFC7413		# TCP Fast Open
-options 	SCTP			# Stream Control Transmission Protocol
+options 	SCTP_SUPPORT		# Allow kldload of SCTP
 options 	FFS			# Berkeley Fast Filesystem
 options 	SOFTUPDATES		# Enable FFS soft updates support
 options 	UFS_ACL			# Support for access control lists
@@ -72,12 +72,14 @@ options 	CAPABILITIES		# Capsicum capabilities
 options 	MAC			# TrustedBSD MAC Framework
 options 	KDTRACE_FRAME		# Ensure frames are compiled in
 options 	KDTRACE_HOOKS		# Kernel DTrace hooks
+options 	DDB_CTF			# Kernel ELF linker loads CTF data
 options 	VFP			# Floating-point support
 options 	RACCT			# Resource accounting framework
 options 	RACCT_DEFAULT_TO_DISABLED # Set kern.racct.enable=0 by default
 options 	RCTL			# Resource limits
 options 	SMP
 options 	INTRNG
+options 	LINUX_BOOT_ABI		# Boot using booti command from U-Boot
 
 # Debugging support.  Always need this:
 options 	KDB			# Enable kernel debugger support.
@@ -114,6 +116,7 @@ options 	SOC_ALLWINNER_A64
 options 	SOC_ALLWINNER_H5
 options 	SOC_ALLWINNER_H6
 options 	SOC_CAVM_THUNDERX
+options 	SOC_FREESCALE_IMX8
 options 	SOC_HISI_HI6220
 options 	SOC_INTEL_STRATIX10
 options 	SOC_BRCM_BCM2837
@@ -164,7 +167,7 @@ device		mdio
 device		mii
 device		miibus		# MII bus support
 device		awg		# Allwinner EMAC Gigabit Ethernet
-device		axgbe		# AMD Opteron A1100 integrated NIC
+device		axa		# AMD Opteron A1100 integrated NIC
 device		msk		# Marvell/SysKonnect Yukon II Gigabit Ethernet
 device		neta		# Marvell Armada 370/38x/XP/3700 NIC
 device  	smc		# SMSC LAN91C111
@@ -173,6 +176,7 @@ device		al_eth		# Annapurna Alpine Ethernet NIC
 device		dwc_rk		# Rockchip Designware
 device		dwc_socfpga	# Altera SOCFPGA Ethernet MAC
 device		genet		# Broadcom on RPi4
+device		ffec		# iMX FFEC
 
 # Etherswitch devices
 device		etherswitch	# Enable etherswitch support
@@ -185,6 +189,7 @@ device		scbus
 device		da
 
 # ATA/SCSI peripherals
+device		cd		# CD
 device		pass		# Passthrough device (direct ATA/SCSI access)
 
 # NVM Express (NVMe) support
@@ -206,6 +211,7 @@ device		rk_emmcphy
 
 # Serial (COM) ports
 device		uart		# Generic UART driver
+device		uart_imx	# iMX8 UART
 device		uart_msm	# Qualcomm MSM UART driver
 device		uart_mu		# RPI3 aux port
 device		uart_mvebu	# Armada 3700 UART driver
@@ -214,11 +220,14 @@ device		uart_snps
 device		pl011
 
 # USB support
+options 	USB_HOST_ALIGN=64	# Align usb buffers to cache line size.
 device		aw_usbphy		# Allwinner USB PHY
 device		rk_usb2phy		# Rockchip USB2PHY
 device		rk_typec_phy		# Rockchip TypeC PHY
 device		dwcotg			# DWC OTG controller
+device		musb			# Mentor Graphics USB OTG controller
 device		ohci			# OHCI USB interface
+device		uhci			# UHCI USB interface
 device		ehci			# EHCI USB interface (USB 2.0)
 device		ehci_mv			# Marvell EHCI USB interface
 device		xhci			# XHCI USB interface (USB 3.0)
@@ -252,6 +261,7 @@ device		gpioregulator
 device		ls1046_gpio	# LS1046A GPIO controller
 device		mv_gpio		# Marvell GPIO controller
 device		mvebu_pinctrl	# Marvell Pinmux Controller
+device		pl061		# Arm PL061 GPIO controller
 device		rk_gpio		# RockChip GPIO Controller
 device		rk_pinctrl	# RockChip Pinmux Controller
 
@@ -266,6 +276,7 @@ device		rk_i2c		# RockChip I2C controller
 device		syr827		# Silergy SYR827 PMIC
 device		sy8106a		# SY8106A Buck Regulator
 device		vf_i2c		# Freescale Vybrid I2C controller
+device		fsliic		# Freescale iMX I2C controller
 
 # Clock and reset controllers
 device		aw_ccu		# Allwinner clock controller
@@ -279,6 +290,9 @@ device		mv_ap806_sei	# Marvell AP806 SEI
 # Real-time clock support
 device		aw_rtc		# Allwinner Real-time Clock
 device		mv_rtc		# Marvell Real-time Clock
+
+# Crypto accelerators
+device		safexcel	# Inside Secure EIP-97
 
 # Watchdog controllers
 device		aw_wdog		# Allwinner Watchdog
@@ -353,4 +367,4 @@ options 	FDT
 device		acpi
 
 # DTBs
-makeoptions	MODULES_EXTRA="dtb/allwinner dtb/mv dtb/rockchip dtb/rpi"
+makeoptions	MODULES_EXTRA="dtb/allwinner dtb/imx8 dtb/mv dtb/rockchip dtb/rpi"

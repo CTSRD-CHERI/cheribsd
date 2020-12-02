@@ -51,6 +51,7 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_param.h>
 #include <vm/vm_page.h>
 #include <vm/vm_phys.h>
+#include <vm/vm_dumpset.h>
 
 #include <net/ethernet.h>
 
@@ -141,7 +142,6 @@ mips_init(void)
 
 #ifdef FDT
 	if (fdt_get_mem_regions(mr, &mr_cnt, &val) == 0) {
-
 		physmem = realmem = btoc(val);
 
 		KASSERT((phys_avail[0] >= mr[0].mr_start) && \

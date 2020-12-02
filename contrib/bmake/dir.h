@@ -1,4 +1,4 @@
-/*	$NetBSD: dir.h,v 1.18 2017/05/31 22:02:06 maya Exp $	*/
+/*	$NetBSD: dir.h,v 1.34 2020/11/14 19:24:24 rillig Exp $	*/
 
 /*
  * Copyright (c) 1988, 1989, 1990 The Regents of the University of California.
@@ -72,37 +72,52 @@
  *	from: @(#)dir.h	8.1 (Berkeley) 6/6/93
  */
 
-/* dir.h --
- */
-
 #ifndef	MAKE_DIR_H
 #define	MAKE_DIR_H
 
-typedef struct Path {
-    char         *name;	    	/* Name of directory */
-    int	    	  refCount; 	/* Number of paths with this directory */
-    int		  hits;	    	/* the number of times a file in this
+/* A cache for the filenames in a directory. */
+typedef struct CachedDir {
+    char *name;			/* Name of directory, either absolute or
+				 * relative to the current directory.
+				 * The name is not normalized in any way,
+				 * that is, "." and "./." are different.
+				 *
+				 * Not sure what happens when .CURDIR is
+				 * assigned a new value; see Parse_DoVar. */
+    int refCount;		/* Number of SearchPaths with this directory */
+    int hits;			/* The number of times a file in this
 				 * directory has been found */
-    Hash_Table    files;    	/* Hash table of files in directory */
-} Path;
+    HashTable files;		/* Hash set of files in directory;
+				 * all values are NULL. */
+} CachedDir;
 
-void Dir_Init(const char *);
+void Dir_Init(void);
+void Dir_InitDir(const char *);
 void Dir_InitCur(const char *);
 void Dir_InitDot(void);
 void Dir_End(void);
 void Dir_SetPATH(void);
-Boolean Dir_HasWildcards(char *);
-void Dir_Expand(const char *, Lst, Lst);
-char *Dir_FindFile(const char *, Lst);
-int Dir_FindHereOrAbove(char *, char *, char *, int);
-int Dir_MTime(GNode *, Boolean);
-Path *Dir_AddDir(Lst, const char *);
-char *Dir_MakeFlags(const char *, Lst);
-void Dir_ClearPath(Lst);
-void Dir_Concat(Lst, Lst);
+Boolean Dir_HasWildcards(const char *);
+void Dir_Expand(const char *, SearchPath *, StringList *);
+char *Dir_FindFile(const char *, SearchPath *);
+char *Dir_FindHereOrAbove(const char *, const char *);
+void Dir_UpdateMTime(GNode *, Boolean);
+CachedDir *Dir_AddDir(SearchPath *, const char *);
+char *Dir_MakeFlags(const char *, SearchPath *);
+void Dir_ClearPath(SearchPath *);
+void Dir_Concat(SearchPath *, SearchPath *);
 void Dir_PrintDirectories(void);
-void Dir_PrintPath(Lst);
+void Dir_PrintPath(SearchPath *);
 void Dir_Destroy(void *);
-void * Dir_CopyDir(void *);
+SearchPath *Dir_CopyDirSearchPath(void);
+
+/* Stripped-down variant of struct stat. */
+struct cached_stat {
+    time_t cst_mtime;
+    mode_t cst_mode;
+};
+
+int cached_lstat(const char *, struct cached_stat *);
+int cached_stat(const char *, struct cached_stat *);
 
 #endif /* MAKE_DIR_H */

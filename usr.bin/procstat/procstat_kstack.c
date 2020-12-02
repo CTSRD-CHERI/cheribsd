@@ -25,9 +25,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD$");
 
 #include <sys/param.h>
 #include <sys/sysctl.h>
@@ -68,7 +69,7 @@ kstack_nextstate(enum trace_state ts)
 		return (TS_OFF);
 
 	case TS_OFF:
-		return TS_FRAMENUM;
+		return (TS_FRAMENUM);
 
 	default:
 		errx(-1, "kstack_nextstate");

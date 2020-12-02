@@ -436,6 +436,8 @@ trapf_pc_from_kernel_code_ptr(void *ptr)
  * Fetch an instruction from near frame->pc (or frame->pcc for CHERI).
  * Returns the virtual address (relative to $pcc) that was used to fetch the
  * instruction.
+ *
+ * Warning: this clobbers td->td_pcb->pcb_onfault.
  */
 static void * __capability
 fetch_instr_near_pc(struct trapframe *frame, register_t offset_from_pc, int32_t *instr)
@@ -444,6 +446,8 @@ fetch_instr_near_pc(struct trapframe *frame, register_t offset_from_pc, int32_t 
 
 	/* Should only be called from user mode */
 	/* TODO: if KERNLAND() */
+	KASSERT(curthread->td_pcb->pcb_onfault == NULL,
+	    ("This function clobbers td->td_pcb->pcb_onfault"));
 #ifdef CPU_CHERI
 	bad_inst_ptr = (char * __capability)frame->pcc + offset_from_pc;
 	if (!cheri_gettag(bad_inst_ptr)) {
@@ -521,15 +525,15 @@ cpu_fetch_syscall_args(struct thread *td)
 
 	locr0 = td->td_frame;
 	sa = &td->td_sa;
-	
+
 	bzero(sa->args, sizeof(sa->args));
 
 	/* compute next PC after syscall instruction */
-	td->td_pcb->pcb_tpc = sa->trapframe->pc; /* Remember if restart */
-	if (DELAYBRANCH(sa->trapframe->cause)) { /* Check BD bit */
-		fetch_bad_branch_instr(sa->trapframe);
-		locr0->pc = MipsEmulateBranch(locr0, sa->trapframe->pc, 0,
-		    &sa->trapframe->badinstr_p.inst);
+	td->td_pcb->pcb_tpc = locr0->pc; /* Remember if restart */
+	if (DELAYBRANCH(locr0->cause)) { /* Check BD bit */
+		fetch_bad_branch_instr(locr0);
+		locr0->pc = MipsEmulateBranch(locr0, locr0->pc, 0,
+		    &locr0->badinstr_p.inst);
 	} else {
 		TRAPF_PC_INCREMENT(locr0, sizeof(int));
 	}
@@ -627,9 +631,7 @@ cpu_fetch_syscall_args(struct thread *td)
 	else
 		sa->callp = &se->sv_table[sa->code];
 
-	sa->narg = sa->callp->sy_narg;
-
-	if (sa->narg > nsaved) {
+	if (sa->callp->sy_narg > nsaved) {
 		char * __capability stack_args;
 
 #if defined(__mips_n32) || defined(__mips_n64)
@@ -643,7 +645,7 @@ cpu_fetch_syscall_args(struct thread *td)
 		if (!SV_PROC_FLAG(td->td_proc, SV_ILP32))
 #endif
 			printf("SYSCALL #%u pid:%u, narg (%u) > nsaved (%u).\n",
-			    sa->code, td->td_proc->p_pid, sa->narg, nsaved);
+			    sa->code, td->td_proc->p_pid, sa->callp->sy_narg, nsaved);
 #endif
 #if (defined(__mips_n32) || defined(__mips_n64)) && defined(COMPAT_FREEBSD32)
 		if (SV_PROC_FLAG(td->td_proc, SV_ILP32)) {
@@ -651,9 +653,9 @@ cpu_fetch_syscall_args(struct thread *td)
 			int32_t arg;
 
 			stack_args = __USER_CAP(locr0->sp + 4 * sizeof(int32_t),
-			    (sa->narg - nsaved) * sizeof(int32_t));
+			    (sa->callp->sy_narg - nsaved) * sizeof(int32_t));
 			error = 0; /* XXX GCC is awful.  */
-			for (i = nsaved; i < sa->narg; i++) {
+			for (i = nsaved; i < sa->callp->sy_narg; i++) {
 				error = copyin(stack_args +
 				    (i - nsaved) * sizeof(int32_t),
 				    &arg, sizeof(arg));
@@ -665,10 +667,10 @@ cpu_fetch_syscall_args(struct thread *td)
 #endif
 		{
 			stack_args = __USER_CAP(locr0->sp +
-			    4 * sizeof(register_t), (sa->narg - nsaved) *
-			    sizeof(register_t));
+			    4 * sizeof(register_t),
+			    (sa->callp->sy_narg - nsaved) * sizeof(register_t));
 			error = copyin(stack_args, &sa->args[nsaved],
-			    (u_int)(sa->narg - nsaved) * sizeof(register_t));
+			    (u_int)(sa->callp->sy_narg - nsaved) * sizeof(register_t));
 		}
 		if (error != 0) {
 			locr0->v0 = error;
@@ -1031,8 +1033,6 @@ dofault:
 	case T_SYSCALL + T_USER:
 		{
 			colocation_unborrow(td, trapframe);
-
-			td->td_sa.trapframe = trapframe;
 			syscallenter(td);
 
 #if !defined(SMP) && (defined(DDB) || defined(DEBUG))
@@ -1078,6 +1078,7 @@ dofault:
 			va = addr;
 			if (DELAYBRANCH(trapframe->cause))
 				va += sizeof(int);
+			addr = va;
 
 			if (td->td_md.md_ss_addr != (__cheri_addr uintptr_t)va) {
 				addr = va;
@@ -1147,7 +1148,7 @@ dofault:
 					if (inst.RType.rd == 29) {
 						frame_regs = &(trapframe->zero);
 						frame_regs[inst.RType.rt] = (register_t)(intptr_t)(__cheri_fromcap void *)td->td_md.md_tls;
-						frame_regs[inst.RType.rt] += td->td_md.md_tls_tcb_offset;
+						frame_regs[inst.RType.rt] += td->td_proc->p_md.md_tls_tcb_offset;
 						TRAPF_PC_INCREMENT(trapframe, sizeof(int));
 						goto out;
 					}
@@ -1355,7 +1356,12 @@ dofault:
 		/* Only allow emulation on a user address */
 		if (allow_unaligned_acc &&
 		    ((vm_offset_t)trapframe->badvaddr < VM_MAXUSER_ADDRESS)) {
+			void *saved_onfault;
 			int mode;
+
+			/* emulate_unaligned_access() clobbers pcb_onfault. */
+			saved_onfault = td->td_pcb->pcb_onfault;
+			td->td_pcb->pcb_onfault = NULL;
 
 			if (type == T_ADDR_ERR_LD)
 				mode = VM_PROT_READ;
@@ -1363,6 +1369,7 @@ dofault:
 				mode = VM_PROT_WRITE;
 
 			access_type = emulate_unaligned_access(trapframe, mode);
+			td->td_pcb->pcb_onfault = saved_onfault;
 			if (access_type != 0)
 				return (trapframe->pc);
 		}
@@ -1484,7 +1491,6 @@ trapDump(char *msg)
 	intr_restore(s);
 }
 #endif
-
 
 /*
  * Return the resulting PC as if the branch was executed.
@@ -1843,7 +1849,6 @@ trap_frame_dump(struct trapframe *frame)
 }
 
 #endif
-
 
 static void
 get_mapping_info(vm_offset_t va, pd_entry_t **pdepp, pt_entry_t **ptepp)
@@ -2207,7 +2212,6 @@ mips_unaligned_load_store(struct trapframe *frame, int mode, register_t addr, ui
 	panic("%s: should not be reached.", __func__);
 }
 
-
 /*
  * XXX TODO: SMP?
  */
@@ -2234,7 +2238,6 @@ emulate_unaligned_access(struct trapframe *frame, int mode)
 	 * Fall through if it's instruction fetch exception
 	 */
 	if (!((pc & 3) || (pc == frame->badvaddr))) {
-
 		/*
 		 * Handle unaligned load and store
 		 */

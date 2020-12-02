@@ -7,10 +7,11 @@ PROGS	=	pkt-gen nmreplay bridge lb
 
 CLEANFILES = $(PROGS) *.o
 MAN=
-CFLAGS += -Werror -Wall
-CFLAGS += -Wextra
 
-LDFLAGS += -lpthread
+.include <bsd.prog.mk>
+.include <bsd.lib.mk>
+
+LDFLAGS += -lpthread -lnetmap
 .ifdef WITHOUT_PCAP
 CFLAGS += -DNO_PCAP
 .else
@@ -18,8 +19,7 @@ LDFLAGS += -lpcap
 .endif
 LDFLAGS += -lm # used by nmreplay
 
-.include <bsd.prog.mk>
-.include <bsd.lib.mk>
+CFLAGS += -Wno-cast-align
 
 all: $(PROGS)
 
@@ -27,7 +27,7 @@ pkt-gen: pkt-gen.o
 	$(CC) $(CFLAGS) -o pkt-gen pkt-gen.o $(LDFLAGS)
 
 bridge: bridge.o
-	$(CC) $(CFLAGS) -o bridge bridge.o
+	$(CC) $(CFLAGS) -o bridge bridge.o $(LDFLAGS)
 
 nmreplay: nmreplay.o
 	$(CC) $(CFLAGS) -o nmreplay nmreplay.o $(LDFLAGS)
