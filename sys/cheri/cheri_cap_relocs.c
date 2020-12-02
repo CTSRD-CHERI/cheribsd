@@ -40,3 +40,25 @@ init_cap_relocs(void *data_cap, void *code_cap)
 {
 	cheri_init_globals_3(data_cap, code_cap, data_cap);
 }
+
+/* Can't include <sys/cheri.h>. */
+void	init_linker_file_cap_relocs(const void *start_relocs, const void *stop_relocs,
+	    void *data_cap, void *code_cap, ptraddr_t base_addr);
+
+void
+init_linker_file_cap_relocs(const void *start_relocs, const void *stop_relocs,
+    void *data_cap, void *code_cap, ptraddr_t base_addr)
+{
+	/*
+	 * Set code bounds if the ABI allows it.
+	 * When building for hybrid or with the pc-relative captable ABI we do
+	 * not further constrain the given code_cap.
+	 */
+#if !defined(__CHERI_PURE_CAPABILITY__) || __CHERI_CAPABILITY_TABLE__ == 3
+	bool can_set_code_bounds = false;
+#else
+	bool can_set_code_bounds = true;
+#endif
+	cheri_init_globals_impl(start_relocs, stop_relocs, data_cap, code_cap,
+	    data_cap, can_set_code_bounds, base_addr);
+}

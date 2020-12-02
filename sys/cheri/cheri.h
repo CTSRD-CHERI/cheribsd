@@ -136,6 +136,14 @@ extern u_int	security_cheri_debugger_on_sandbox_unwind;
 extern u_int	security_cheri_sandboxed_signals;
 extern u_int	security_cheri_syscall_violations;
 extern u_int	security_cheri_bound_legacy_capabilities;
+
+#ifdef __CHERI_PURE_CAPABILITY__
+/*
+ * Used by the kernel linker to handle caprelocs in modules.
+ */
+void	init_linker_file_cap_relocs(const void *start_relocs, const void *stop_relocs,
+	    void *data_cap, void *code_cap, ptraddr_t base_addr);
+#endif
 #endif /* !_KERNEL */
 
 /*
