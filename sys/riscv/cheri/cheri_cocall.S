@@ -163,11 +163,11 @@ SIGCODE(switcher_cocall)
 
 CSYM(switcher_cocall_copy_start)
 3:
-	cld	t3, 0(ca3)
-	csd	t3, 0(ct4)
-	cincoffset ca3, ca3, 8
-	cincoffset ct4, ct4, 8
-	addi	t5, t5, -8
+	clc	ct2, 0(ca3)
+	csc	ct2, 0(ct4)
+	cincoffset ca3, ca3, CHERICAP_SIZE
+	cincoffset ct4, ct4, CHERICAP_SIZE
+	addi	t5, t5, -CHERICAP_SIZE
 	bgtz	t5, 3b
 CSYM(switcher_cocall_copy_end)
 
