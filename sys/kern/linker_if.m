@@ -54,6 +54,40 @@ METHOD int search_symbol {
 };
 
 #
+# Lookup a symbol by index rather than name.  If the symbol is not
+# found then return ENOENT, otherwise zero.
+#
+# Useful for processing relocations.
+#
+METHOD int symidx_address {
+	linker_file_t	file;
+	unsigned long	index;
+	int		deps;
+	ptraddr_t	*address;
+};
+
+CODE {
+	#ifdef __CHERI_PURE_CAPABILITY__
+};
+HEADER {
+	#ifdef __CHERI_PURE_CAPABILITY__
+};
+
+METHOD int symidx_capability {
+	linker_file_t	file;
+	unsigned long	index;
+	int		deps;
+	uintcap_t	*cap;
+};
+
+CODE {
+	#endif
+};
+HEADER {
+	#endif
+};
+
+#
 # Call the callback with each specified function defined in the file.
 # Stop and return the error if the callback returns an error.
 #
