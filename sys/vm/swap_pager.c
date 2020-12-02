@@ -253,13 +253,13 @@ static void
 swap_release_by_cred_rlimit(u_long pdecr, struct ucred *cred)
 {
 	struct uidinfo *uip;
-#ifdef INVARIANTS
+#ifdef notyet
 	u_long prev;
 #endif
 
 	uip = cred->cr_ruidinfo;
 
-#ifdef INVARIANTS
+#ifdef notyet
 	prev = atomic_fetchadd_long(&uip->ui_vmsize, -pdecr);
 	KASSERT(prev >= pdecr, ("negative vmsize for uid = %d\n", uip->ui_uid));
 #else
