@@ -460,7 +460,17 @@ link_elf_init(void* arg)
 	/* Compute relative displacement */
 	ef->address = (caddr_t) (__startkernel - KERNBASE);
 #else
+#ifndef __CHERI_PURE_CAPABILITY__
 	ef->address = 0;
+#else /* __CHERI_PURE_CAPABILITY__ */
+	/*
+	 * It is particularly sad that we are not able to put bounds on
+	 * this capability.  At some point ef->address should become a
+	 * plain address and ef should grow capabilities for different
+	 * loadable segments instead.
+	 */
+	ef->address = cheri_setaddress(kernel_root_cap, 0);
+#endif /* __CHERI_PURE_CAPABILITY__ */
 #endif
 #ifdef SPARSE_MAPPING
 	ef->object = NULL;
@@ -474,7 +484,7 @@ link_elf_init(void* arg)
 	linker_kernel_file->size = (intptr_t)(__endkernel - __startkernel);
 	kern_relbase = (unsigned long)__startkernel;
 #else
-	linker_kernel_file->address += KERNBASE;
+	linker_kernel_file->address = ef->address + KERNBASE;
 	linker_kernel_file->size = -(intptr_t)linker_kernel_file->address;
 #endif
 
