@@ -40,3 +40,21 @@ init_cap_relocs(void *data_cap, void *code_cap)
 {
 	cheri_init_globals_3(data_cap, code_cap, data_cap);
 }
+
+/* Can't include <sys/cheri.h>. */
+void	init_linker_file_cap_relocs(void *start_relocs, void *stop_relocs,
+	    void *data_cap, void *pc_cap, unsigned long base_addr);
+
+void
+init_linker_file_cap_relocs(void *start_relocs, void *stop_relocs,
+    void *data_cap, void *pc_cap, unsigned long base_addr)
+{
+#if !defined(__CHERI_PURE_CAPABILITY__) || __CHERI_CAPABILITY_TABLE__ == 3
+	/* pc-relative or hybrid ABI -> need large bounds on $pcc */
+	bool can_set_code_bounds = false;
+#else
+	bool can_set_code_bounds = true; /* fn-desc/plt ABI -> tight bounds okay */
+#endif
+	cheri_init_globals_impl(start_relocs, stop_relocs, data_cap, pc_cap,
+	    data_cap, can_set_code_bounds, base_addr);
+}

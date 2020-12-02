@@ -101,6 +101,10 @@ typedef struct elf_file {
 	int		relsize;	/* DT_RELSZ */
 	const Elf_Rela	*rela;		/* DT_RELA */
 	int		relasize;	/* DT_RELASZ */
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(DT_CHERI___CAPRELOCS)
+	void		*caprelocs;	/* DT_CHERI___CAPRELOCS */
+	int		caprelocssize;	/* DT_CHERI___CAPRELOCSSZ */
+#endif
 	caddr_t		modptr;
 	const Elf_Sym	*ddbsymtab;	/* The symbol table we are using */
 	long		ddbsymcnt;	/* Number of symbols */
@@ -665,6 +669,14 @@ parse_dynamic(elf_file_t ef)
 			if (plttype != DT_REL && plttype != DT_RELA)
 				return (ENOEXEC);
 			break;
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(DT_CHERI___CAPRELOCS)
+		case DT_CHERI___CAPRELOCS:
+			ef->caprelocs = ef->address + dp->d_un.d_ptr;
+			break;
+		case DT_CHERI___CAPRELOCSSZ:
+			ef->caprelocssize = dp->d_un.d_val;
+			break;
+#endif
 #ifdef GDB
 		case DT_DEBUG:
 			dp->d_un.d_ptr = (Elf_Addr)&r_debug;
@@ -686,6 +698,11 @@ parse_dynamic(elf_file_t ef)
 	if (ef->symtab)
 		ef->symtab = cheri_kern_setbounds(ef->symtab,
 		    ef->nchains * sizeof(Elf_Sym));
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(DT_CHERI___CAPRELOCS)
+	if (ef->caprelocs != NULL)
+		ef->caprelocs = cheri_kern_setbounds(ef->caprelocs,
+		    ef->caprelocssize);
+#endif
 	/*
 	 * XXX-AM: How do we get .got size?
 	 * We probably have to leave it like this or define
@@ -2022,6 +2039,21 @@ link_elf_reloc_local(linker_file_t lf)
 			rela++;
 		}
 	}
+
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(DT_CHERI___CAPRELOCS)
+	if (ef->caprelocs != NULL) {
+		void *data_cap, *pc_cap;
+
+		data_cap = cheri_andperm(ef->address, CHERI_PERMS_KERNEL_DATA);
+		pc_cap = cheri_andperm(ef->address, CHERI_PERMS_KERNEL_CODE);
+#ifdef CHERI_FLAGS_CAP_MODE
+		pc_cap = cheri_setflags(pc_cap, CHERI_FLAGS_CAP_MODE);
+#endif
+		init_linker_file_cap_relocs(ef->caprelocs,
+		    (char *)ef->caprelocs + ef->caprelocssize, data_cap, pc_cap,
+		    (ptraddr_t)ef->address);
+	}
+#endif
 }
 
 static long
