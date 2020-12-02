@@ -99,7 +99,6 @@ SYSCTL_INT(_hw_usb_otus, OID_AUTO, debug, CTLFLAG_RWTUN, &otus_debug, 0,
 		if ((dm == OTUS_DEBUG_ANY) || (dm & otus_debug)) \
 			device_printf(sc->sc_dev, __VA_ARGS__); \
 	} while (0)
-
 #define	OTUS_DEV(v, p) { USB_VPI(v, p, 0) }
 static const STRUCT_USB_HOST_ID otus_devs[] = {
 	OTUS_DEV(USB_VENDOR_ACCTON,		USB_PRODUCT_ACCTON_WN7512),
@@ -167,7 +166,6 @@ void		otus_write(struct otus_softc *, uint32_t, uint32_t);
 int		otus_write_barrier(struct otus_softc *);
 static struct	ieee80211_node *otus_node_alloc(struct ieee80211vap *vap,
 		    const uint8_t mac[IEEE80211_ADDR_LEN]);
-int		otus_media_change(struct ifnet *);
 int		otus_read_eeprom(struct otus_softc *);
 void		otus_newassoc(struct ieee80211_node *, int);
 void		otus_cmd_rxeof(struct otus_softc *, uint8_t *, int);
@@ -1339,35 +1337,6 @@ otus_node_alloc(struct ieee80211vap *vap, const uint8_t mac[IEEE80211_ADDR_LEN])
 	    M_NOWAIT | M_ZERO);
 }
 
-#if 0
-int
-otus_media_change(struct ifnet *ifp)
-{
-	struct otus_softc *sc = ifp->if_softc;
-	struct ieee80211com *ic = &sc->sc_ic;
-	uint8_t rate, ridx;
-	int error;
-
-	error = ieee80211_media_change(ifp);
-	if (error != ENETRESET)
-		return error;
-
-	if (ic->ic_fixed_rate != -1) {
-		rate = ic->ic_sup_rates[ic->ic_curmode].
-		    rs_rates[ic->ic_fixed_rate] & IEEE80211_RATE_VAL;
-		for (ridx = 0; ridx <= OTUS_RIDX_MAX; ridx++)
-			if (otus_rates[ridx].rate == rate)
-				break;
-		sc->fixed_ridx = ridx;
-	}
-
-	if ((ifp->if_flags & (IFF_UP | IFF_RUNNING)) == (IFF_UP | IFF_RUNNING))
-		error = otus_init(sc);
-
-	return error;
-}
-#endif
-
 int
 otus_read_eeprom(struct otus_softc *sc)
 {
@@ -1570,7 +1539,6 @@ otus_sub_rxeof(struct otus_softc *sc, uint8_t *buf, int len, struct mbufq *rxq)
 	struct ieee80211_frame *wh;
 	struct mbuf *m;
 //	int s;
-
 
 	if (otus_debug & OTUS_DEBUG_RX_BUFFER) {
 		device_printf(sc->sc_dev, "%s: %*D\n",
@@ -2226,7 +2194,6 @@ otus_hw_rate_is_ofdm(struct otus_softc *sc, uint8_t hw_rate)
 	}
 }
 
-
 static void
 otus_tx_update_ratectl(struct otus_softc *sc, struct ieee80211_node *ni)
 {
@@ -2417,7 +2384,6 @@ otus_hash_maddr(void *arg, struct sockaddr_dl *sdl, u_int cnt)
 
 	return (1);
 }
-
 
 int
 otus_set_multi(struct otus_softc *sc)

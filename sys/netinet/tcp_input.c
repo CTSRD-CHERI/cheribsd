@@ -349,8 +349,7 @@ cc_ack_received(struct tcpcb *tp, struct tcphdr *th, uint16_t nsegs,
 		}
 #endif /* STATS */
 		if (tp->snd_cwnd > tp->snd_ssthresh) {
-			tp->t_bytes_acked += min(tp->ccv->bytes_this_ack,
-			     nsegs * V_tcp_abc_l_var * tcp_maxseg(tp));
+			tp->t_bytes_acked += tp->ccv->bytes_this_ack;
 			if (tp->t_bytes_acked >= tp->snd_cwnd) {
 				tp->t_bytes_acked -= tp->snd_cwnd;
 				tp->ccv->flags |= CCF_ABC_SENTAWND;
@@ -430,8 +429,6 @@ cc_conn_init(struct tcpcb *tp)
 void inline
 cc_cong_signal(struct tcpcb *tp, struct tcphdr *th, uint32_t type)
 {
-	u_int maxseg;
-
 	INP_WLOCK_ASSERT(tp->t_inpcb);
 
 #ifdef STATS
@@ -461,13 +458,9 @@ cc_cong_signal(struct tcpcb *tp, struct tcphdr *th, uint32_t type)
 		}
 		break;
 	case CC_RTO:
-		maxseg = tcp_maxseg(tp);
 		tp->t_dupacks = 0;
 		tp->t_bytes_acked = 0;
 		EXIT_RECOVERY(tp->t_flags);
-		tp->snd_ssthresh = max(2, min(tp->snd_wnd, tp->snd_cwnd) / 2 /
-		    maxseg) * maxseg;
-		tp->snd_cwnd = maxseg;
 		if (tp->t_flags2 & TF2_ECN_PERMIT)
 			tp->t_flags2 |= TF2_ECN_SND_CWR;
 		break;
@@ -591,7 +584,6 @@ tcp6_input(struct mbuf **mp, int *offp, int proto)
 	ip6 = mtod(m, struct ip6_hdr *);
 	ia6 = in6ifa_ifwithaddr(&ip6->ip6_dst, 0 /* XXX */);
 	if (ia6 && (ia6->ia6_flags & IN6_IFF_ANYCAST)) {
-
 		ifa_free(&ia6->ia_ifa);
 		icmp6_error(m, ICMP6_DST_UNREACH, ICMP6_DST_UNREACH_ADDR,
 			    (caddr_t)&ip6->ip6_dst - (caddr_t)ip6);
@@ -660,7 +652,6 @@ tcp_input(struct mbuf **mp, int *offp, int proto)
 
 #ifdef INET6
 	if (isipv6) {
-
 		ip6 = mtod(m, struct ip6_hdr *);
 		th = (struct tcphdr *)((caddr_t)ip6 + off0);
 		tlen = sizeof(*ip6) + ntohs(ip6->ip6_plen) - off0;
@@ -986,8 +977,8 @@ findpcb:
 	 * XXXRW: It may be time to rethink timewait locking.
 	 */
 	if (inp->inp_flags & INP_TIMEWAIT) {
-		if (thflags & TH_SYN)
-			tcp_dooptions(&to, optp, optlen, TO_SYN);
+		tcp_dooptions(&to, optp, optlen,
+		    (thflags & TH_SYN) ? TO_SYN : 0);
 		/*
 		 * NB: tcp_twcheck unlocks the INP and frees the mbuf.
 		 */
@@ -1067,7 +1058,6 @@ findpcb:
 		 * socket appended to the listen queue in SYN_RECEIVED state.
 		 */
 		if ((thflags & (TH_RST|TH_ACK|TH_SYN)) == TH_ACK) {
-
 			/*
 			 * Parse the TCP options here because
 			 * syncookies need access to the reflected
@@ -1472,6 +1462,29 @@ tcp_autorcvbuf(struct mbuf *m, struct tcphdr *th, struct socket *so,
 }
 
 void
+tcp_handle_wakeup(struct tcpcb *tp, struct socket *so)
+{
+	/*
+	 * Since tp might be gone if the session entered
+	 * the TIME_WAIT state before coming here, we need
+	 * to check if the socket is still connected.
+	 */
+	if ((so->so_state & SS_ISCONNECTED) == 0)
+		return;
+	INP_LOCK_ASSERT(tp->t_inpcb);
+	if (tp->t_flags & TF_WAKESOR) {
+		tp->t_flags &= ~TF_WAKESOR;
+		SOCKBUF_UNLOCK_ASSERT(&so->so_rcv);
+		sorwakeup(so);
+	}
+	if (tp->t_flags & TF_WAKESOW) {
+		tp->t_flags &= ~TF_WAKESOW;
+		SOCKBUF_UNLOCK_ASSERT(&so->so_snd);
+		sowwakeup(so);
+	}
+}
+
+void
 tcp_do_segment(struct mbuf *m, struct tcphdr *th, struct socket *so,
     struct tcpcb *tp, int drop_hdrlen, int tlen, uint8_t iptos)
 {
@@ -1667,20 +1680,29 @@ tcp_do_segment(struct mbuf *m, struct tcphdr *th, struct socket *so,
 	}
 
 	/*
-	 * If timestamps were negotiated during SYN/ACK they should
-	 * appear on every segment during this session and vice versa.
+	 * If timestamps were negotiated during SYN/ACK and a
+	 * segment without a timestamp is received, silently drop
+	 * the segment.
+	 * See section 3.2 of RFC 7323.
 	 */
 	if ((tp->t_flags & TF_RCVD_TSTMP) && !(to.to_flags & TOF_TS)) {
 		if ((s = tcp_log_addrs(inc, th, NULL, NULL))) {
 			log(LOG_DEBUG, "%s; %s: Timestamp missing, "
-			    "no action\n", s, __func__);
+			    "segment silently dropped\n", s, __func__);
 			free(s, M_TCPLOG);
 		}
+		goto drop;
 	}
+	/*
+	 * If timestamps were not negotiated during SYN/ACK and a
+	 * segment with a timestamp is received, ignore the
+	 * timestamp and process the packet normally.
+	 * See section 3.2 of RFC 7323.
+	 */
 	if (!(tp->t_flags & TF_RCVD_TSTMP) && (to.to_flags & TOF_TS)) {
 		if ((s = tcp_log_addrs(inc, th, NULL, NULL))) {
 			log(LOG_DEBUG, "%s; %s: Timestamp not expected, "
-			    "no action\n", s, __func__);
+			    "segment processed normally\n", s, __func__);
 			free(s, M_TCPLOG);
 		}
 	}
@@ -1711,7 +1733,6 @@ tcp_do_segment(struct mbuf *m, struct tcphdr *th, struct socket *so,
 	    SEGQ_EMPTY(tp) &&
 	    ((to.to_flags & TOF_TS) == 0 ||
 	     TSTMP_GEQ(to.to_tsval, tp->ts_recent)) ) {
-
 		/*
 		 * If last ACK falls within this segment's sequence numbers,
 		 * record the timestamp.
@@ -1822,7 +1843,7 @@ tcp_do_segment(struct mbuf *m, struct tcphdr *th, struct socket *so,
 				else if (!tcp_timer_active(tp, TT_PERSIST))
 					tcp_timer_activate(tp, TT_REXMT,
 						      tp->t_rxtcur);
-				sowwakeup(so);
+				tp->t_flags |= TF_WAKESOW;
 				if (sbavail(&so->so_snd))
 					(void) tp->t_fb->tfb_tcp_output(tp);
 				goto check_delack;
@@ -1887,8 +1908,8 @@ tcp_do_segment(struct mbuf *m, struct tcphdr *th, struct socket *so,
 				m_adj(m, drop_hdrlen);	/* delayed header drop */
 				sbappendstream_locked(&so->so_rcv, m, 0);
 			}
-			/* NB: sorwakeup_locked() does an implicit unlock. */
-			sorwakeup_locked(so);
+			SOCKBUF_UNLOCK(&so->so_rcv);
+			tp->t_flags |= TF_WAKESOR;
 			if (DELAY_ACK(tp, tlen)) {
 				tp->t_flags |= TF_DELACK;
 			} else {
@@ -1911,7 +1932,6 @@ tcp_do_segment(struct mbuf *m, struct tcphdr *th, struct socket *so,
 	tp->rcv_wnd = imax(win, (int)(tp->rcv_adv - tp->rcv_nxt));
 
 	switch (tp->t_state) {
-
 	/*
 	 * If the state is SYN_RECEIVED:
 	 *	if seg contains an ACK, but not for our SYN/ACK, send a RST.
@@ -2118,7 +2138,6 @@ tcp_do_segment(struct mbuf *m, struct tcphdr *th, struct socket *so,
 		if ((SEQ_GEQ(th->th_seq, tp->last_ack_sent) &&
 		    SEQ_LT(th->th_seq, tp->last_ack_sent + tp->rcv_wnd)) ||
 		    (tp->rcv_wnd == 0 && tp->last_ack_sent == th->th_seq)) {
-
 			KASSERT(tp->t_state != TCPS_SYN_SENT,
 			    ("%s: TH_RST for TCPS_SYN_SENT th %p tp %p",
 			    __func__, th, tp));
@@ -2183,7 +2202,6 @@ tcp_do_segment(struct mbuf *m, struct tcphdr *th, struct socket *so,
 	 */
 	if ((to.to_flags & TOF_TS) != 0 && tp->ts_recent &&
 	    TSTMP_LT(to.to_tsval, tp->ts_recent)) {
-
 		/* Check to see if ts_recent is over 24 days old.  */
 		if (tcp_ts_getticks() - tp->ts_recent_age > TCP_PAWS_IDLE) {
 			/*
@@ -2375,7 +2393,6 @@ tcp_do_segment(struct mbuf *m, struct tcphdr *th, struct socket *so,
 	 * Ack processing.
 	 */
 	switch (tp->t_state) {
-
 	/*
 	 * In SYN_RECEIVED state, the ack ACKs our SYN, so enter
 	 * ESTABLISHED state and continue processing.
@@ -2673,9 +2690,16 @@ tcp_do_segment(struct mbuf *m, struct tcphdr *th, struct socket *so,
 			tp->t_dupacks = 0;
 			/*
 			 * If this ack also has new SACK info, increment the
-			 * counter as per rfc6675.
+			 * counter as per rfc6675. The variable
+			 * sack_changed tracks all changes to the SACK
+			 * scoreboard, including when partial ACKs without
+			 * SACK options are received, and clear the scoreboard
+			 * from the left side. Such partial ACKs should not be
+			 * counted as dupacks here.
 			 */
-			if ((tp->t_flags & TF_SACK_PERMIT) && sack_changed)
+			if ((tp->t_flags & TF_SACK_PERMIT) &&
+			    (to.to_flags & TOF_SACK) &&
+			    sack_changed)
 				tp->t_dupacks++;
 		}
 
@@ -2819,8 +2843,8 @@ process_ACK:
 				tp->snd_wnd = 0;
 			ourfinisacked = 0;
 		}
-		/* NB: sowwakeup_locked() does an implicit unlock. */
-		sowwakeup_locked(so);
+		SOCKBUF_UNLOCK(&so->so_snd);
+		tp->t_flags |= TF_WAKESOW;
 		m_freem(mfree);
 		/* Detect una wraparound. */
 		if (!IN_RECOVERY(tp->t_flags) &&
@@ -2841,7 +2865,6 @@ process_ACK:
 			tp->snd_nxt = tp->snd_una;
 
 		switch (tp->t_state) {
-
 		/*
 		 * In FIN_WAIT_1 STATE in addition to the processing
 		 * for the ESTABLISHED state if our FIN is now acknowledged
@@ -3042,8 +3065,8 @@ dodata:							/* XXX */
 				m_freem(m);
 			else
 				sbappendstream_locked(&so->so_rcv, m, 0);
-			/* NB: sorwakeup_locked() does an implicit unlock. */
-			sorwakeup_locked(so);
+			SOCKBUF_UNLOCK(&so->so_rcv);
+			tp->t_flags |= TF_WAKESOR;
 		} else {
 			/*
 			 * XXX: Due to the header drop above "th" is
@@ -3110,6 +3133,8 @@ dodata:							/* XXX */
 	if (thflags & TH_FIN) {
 		if (TCPS_HAVERCVDFIN(tp->t_state) == 0) {
 			socantrcvmore(so);
+			/* The socket upcall is handled by socantrcvmore. */
+			tp->t_flags &= ~TF_WAKESOR;
 			/*
 			 * If connection is half-synchronized
 			 * (ie NEEDSYN flag on) then delay ACK,
@@ -3124,7 +3149,6 @@ dodata:							/* XXX */
 			tp->rcv_nxt++;
 		}
 		switch (tp->t_state) {
-
 		/*
 		 * In SYN_RECEIVED and ESTABLISHED STATES
 		 * enter the CLOSE_WAIT state.
@@ -3174,6 +3198,7 @@ check_delack:
 		tp->t_flags &= ~TF_DELACK;
 		tcp_timer_activate(tp, TT_DELACK, tcp_delacktime);
 	}
+	tcp_handle_wakeup(tp, so);
 	INP_WUNLOCK(tp->t_inpcb);
 	return;
 
@@ -3207,6 +3232,7 @@ dropafterack:
 	TCP_PROBE3(debug__input, tp, th, m);
 	tp->t_flags |= TF_ACKNOW;
 	(void) tp->t_fb->tfb_tcp_output(tp);
+	tcp_handle_wakeup(tp, so);
 	INP_WUNLOCK(tp->t_inpcb);
 	m_freem(m);
 	return;
@@ -3214,6 +3240,7 @@ dropafterack:
 dropwithreset:
 	if (tp != NULL) {
 		tcp_dropwithreset(m, th, tp, tlen, rstreason);
+		tcp_handle_wakeup(tp, so);
 		INP_WUNLOCK(tp->t_inpcb);
 	} else
 		tcp_dropwithreset(m, th, NULL, tlen, rstreason);
@@ -3229,8 +3256,10 @@ drop:
 			  &tcp_savetcp, 0);
 #endif
 	TCP_PROBE3(debug__input, tp, th, m);
-	if (tp != NULL)
+	if (tp != NULL) {
+		tcp_handle_wakeup(tp, so);
 		INP_WUNLOCK(tp->t_inpcb);
+	}
 	m_freem(m);
 }
 
@@ -3809,7 +3838,6 @@ tcp_mssopt(struct in_conninfo *inc)
 
 	return (mss);
 }
-
 
 /*
  * On a partial ack arrives, force the retransmission of the

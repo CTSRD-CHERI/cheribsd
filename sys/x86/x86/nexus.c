@@ -66,6 +66,7 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_param.h>
 #include <vm/vm_page.h>
 #include <vm/vm_phys.h>
+#include <vm/vm_dumpset.h>
 #include <vm/pmap.h>
 
 #include <machine/metadata.h>
@@ -187,7 +188,6 @@ static device_method_t nexus_methods[] = {
 	DEVMETHOD(pcib_release_msix,	nexus_release_msix),
 	DEVMETHOD(pcib_map_msi,		nexus_map_msi),
 #endif
-
 	{ 0, 0 }
 };
 
@@ -537,7 +537,7 @@ static int
 nexus_unmap_resource(device_t bus, device_t child, int type, struct resource *r,
     struct resource_map *map)
 {
-	
+
 	/*
 	 * If this is a memory resource, unmap it.
 	 */

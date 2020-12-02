@@ -46,7 +46,6 @@ __FBSDID("$FreeBSD$");
 #include <net/route/nhop_utils.h>
 #include <net/route/nhop.h>
 #include <net/route/nhop_var.h>
-#include <net/route/shared.h>
 #include <net/vnet.h>
 
 /*
@@ -65,8 +64,7 @@ __FBSDID("$FreeBSD$");
  * is backed by the bitmask array.
  */
 
-static MALLOC_DEFINE(M_NHOP, "nhops", "nexthops data");
-
+MALLOC_DEFINE(M_NHOP, "nhops", "nexthops data");
 
 /* Hash management functions */
 
@@ -114,6 +112,9 @@ destroy_ctl(struct nh_control *ctl)
 	NHOPS_LOCK_DESTROY(ctl);
 	free(ctl->nh_head.ptr, M_NHOP);
 	free(ctl->nh_idx_head.idx, M_NHOP);
+#ifdef ROUTE_MPATH
+	nhgrp_ctl_free(ctl);
+#endif
 	free(ctl, M_NHOP);
 }
 
@@ -156,6 +157,9 @@ nhops_destroy_rib(struct rib_head *rh)
 		DPRINTF("Marking nhop %u unlinked", nh_priv->nh_idx);
 		refcount_release(&nh_priv->nh_linked);
 	} CHT_SLIST_FOREACH_END;
+#ifdef ROUTE_MPATH
+	nhgrp_ctl_unlink_all(ctl);
+#endif
 	NHOPS_WUNLOCK(ctl);
 
 	/*
@@ -385,4 +389,3 @@ find_nhop(struct nh_control *ctl, const struct nhop_priv *nh_priv)
 
 	return (nh_priv_ret);
 }
-

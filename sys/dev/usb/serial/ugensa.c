@@ -110,7 +110,6 @@ static void	ugensa_stop_write(struct ucom_softc *);
 static void	ugensa_poll(struct ucom_softc *ucom);
 
 static const struct usb_config ugensa_xfer_config[UGENSA_N_TRANSFER] = {
-
 	[UGENSA_BULK_DT_WR] = {
 		.type = UE_BULK,
 		.endpoint = UE_ADDR_ANY,
@@ -162,6 +161,8 @@ static const STRUCT_USB_HOST_ID ugensa_devs[] = {
 	{USB_VPI(USB_VENDOR_KYOCERA2, USB_PRODUCT_KYOCERA2_CDMA_MSM_K, 1)},
 	{USB_VPI(USB_VENDOR_HP, USB_PRODUCT_HP_49GPLUS, 1)},
 	{USB_VPI(USB_VENDOR_NOVATEL2, USB_PRODUCT_NOVATEL2_FLEXPACKGPS, 3)},
+	{USB_VENDOR(USB_VENDOR_GOOGLE), USB_IFACE_CLASS(UICLASS_VENDOR),
+		USB_IFACE_SUBCLASS(0x50), USB_IFACE_PROTOCOL(0x01), USB_DRIVER_INFO(10)},
 };
 
 DRIVER_MODULE(ugensa, uhub, ugensa_driver, ugensa_devclass, NULL, 0);
@@ -205,7 +206,6 @@ ugensa_attach(device_t dev)
 	ucom_ref(&sc->sc_super_ucom);
 
 	for (iface_index = UGENSA_IFACE_INDEX; iface_index < UGENSA_IFACE_MAX; iface_index++) {
-
 		iface = usbd_get_iface(uaa->device, iface_index);
 		if (iface == NULL || iface->idesc->bInterfaceClass != UICLASS_VENDOR)
 			/* Not a serial port, most likely a SD reader */
@@ -213,7 +213,6 @@ ugensa_attach(device_t dev)
 
 		/* Loop over all endpoints pairwise */
 		for (x = 0; x < maxports && sc->sc_nports < UGENSA_PORT_MAX; x++) {
-
 			ssc = sc->sc_sub + sc->sc_nports;
 			ssc->sc_ucom_ptr = sc->sc_ucom + sc->sc_nports;
 

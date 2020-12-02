@@ -1163,8 +1163,9 @@ aio_daemon(void *_id)
 
 	KASSERT(p->p_vmspace == myvm,
 	    ("AIOD: bad vmspace for exiting daemon"));
-	KASSERT(myvm->vm_refcnt > 1,
-	    ("AIOD: bad vm refcnt for exiting daemon: %d", myvm->vm_refcnt));
+	KASSERT(refcount_load(&myvm->vm_refcnt) > 1,
+	    ("AIOD: bad vm refcnt for exiting daemon: %d",
+	    refcount_load(&myvm->vm_refcnt)));
 	kproc_exit(0);
 }
 
@@ -2000,7 +2001,7 @@ kern_aio_cancel(struct thread *td, int fd, void * __capability ujob,
 
 	if (fp->f_type == DTYPE_VNODE) {
 		vp = fp->f_vnode;
-		if (vn_isdisk(vp, &error)) {
+		if (vn_isdisk(vp)) {
 			fdrop(fp, td);
 			td->td_retval[0] = AIO_NOTCANCELED;
 			return (0);

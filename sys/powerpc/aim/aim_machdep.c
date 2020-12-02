@@ -61,6 +61,7 @@ __FBSDID("$FreeBSD$");
 #include "opt_kstack_pages.h"
 #include "opt_platform.h"
 
+#include <sys/endian.h>
 #include <sys/param.h>
 #include <sys/proc.h>
 #include <sys/systm.h>
@@ -257,6 +258,11 @@ aim_cpu_init(vm_offset_t toc)
 	psl_kernset |= PSL_SF;
 	if (mfmsr() & PSL_HV)
 		psl_kernset |= PSL_HV;
+
+#if BYTE_ORDER == LITTLE_ENDIAN
+	psl_kernset |= PSL_LE;
+#endif
+
 #endif
 	psl_userset = psl_kernset | PSL_PR;
 #ifdef __powerpc64__
@@ -390,6 +396,24 @@ aim_cpu_init(vm_offset_t toc)
 		bcopy(&restorebridge, (void *)EXC_MCHK, trap_offset);
 		bcopy(&restorebridge, (void *)EXC_TRC, trap_offset);
 		bcopy(&restorebridge, (void *)EXC_BPT, trap_offset);
+	} else {
+		/*
+		 * Use an IBAT and a DBAT to map the bottom 256M segment.
+		 *
+		 * It is very important to do it *now* to avoid taking a
+		 * fault in .text / .data before the MMU is bootstrapped,
+		 * because until then, the translation data has not been
+		 * copied over from OpenFirmware, so our DSI/ISI will fail
+		 * to find a match.
+		 */
+
+		battable[0x0].batl = BATL(0x00000000, BAT_M, BAT_PP_RW);
+		battable[0x0].batu = BATU(0x00000000, BAT_BL_256M, BAT_Vs);
+
+		__asm (".balign 32; \n"
+		    "mtibatu 0,%0; mtibatl 0,%1; isync; \n"
+		    "mtdbatu 0,%0; mtdbatl 0,%1; isync"
+		    :: "r"(battable[0].batu), "r"(battable[0].batl));
 	}
 	#else
 	trapsize = (size_t)&hypertrapcodeend - (size_t)&hypertrapcode;
@@ -553,7 +577,6 @@ cpu_machine_check(struct thread *td, struct trapframe *frame, int *ucode)
 	return (SIGBUS);
 }
 
-
 #ifndef __powerpc64__
 uint64_t
 va_to_vsid(pmap_t pm, vm_offset_t va)
@@ -612,7 +635,8 @@ flush_disable_caches(void)
 	mtspr(SPR_MSSCR0, msscr0);
 	powerpc_sync();
 	isync();
-	__asm__ __volatile__("dssall; sync");
+	/* 7e00066c: dssall */
+	__asm__ __volatile__(".long 0x7e00066c; sync");
 	powerpc_sync();
 	isync();
 	__asm__ __volatile__("dcbf 0,%0" :: "r"(0));
@@ -760,4 +784,3 @@ cpu_sleep()
 		enable_vec(curthread);
 	powerpc_sync();
 }
-

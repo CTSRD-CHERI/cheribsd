@@ -570,7 +570,6 @@ sctp_process_asconf_set_primary(struct sockaddr *src,
 		    SCTP_MOBILITY_PRIM_DELETED) &&
 		    (stcb->asoc.primary_destination->dest_state &
 		    SCTP_ADDR_UNCONFIRMED) == 0) {
-
 			sctp_timer_stop(SCTP_TIMER_TYPE_PRIM_DELETED,
 			    stcb->sctp_ep, stcb, NULL,
 			    SCTP_FROM_SCTP_ASCONF + SCTP_LOC_1);
@@ -990,7 +989,6 @@ sctp_asconf_nets_cleanup(struct sctp_tcb *stcb, struct sctp_ifn *ifn)
 	}
 }
 
-
 void
 sctp_assoc_immediate_retrans(struct sctp_tcb *stcb, struct sctp_nets *dstnet)
 {
@@ -1332,7 +1330,6 @@ sctp_asconf_queue_mgmt(struct sctp_tcb *stcb, struct sctp_ifa *ifa,
 
 	return (0);
 }
-
 
 /*
  * add an asconf operation for the given ifa and type.
@@ -2023,7 +2020,6 @@ sctp_addr_mgmt_assoc(struct sctp_inpcb *inp, struct sctp_tcb *stcb,
 	}
 }
 
-
 int
 sctp_asconf_iterator_ep(struct sctp_inpcb *inp, void *ptr, uint32_t val SCTP_UNUSED)
 {
@@ -2087,7 +2083,6 @@ sctp_asconf_iterator_ep_end(struct sctp_inpcb *inp, void *ptr, uint32_t val SCTP
 					laddr->action = 0;
 					break;
 				}
-
 			}
 		} else if (l->action == SCTP_DEL_IP_ADDRESS) {
 			LIST_FOREACH_SAFE(laddr, &inp->sctp_addr_list, sctp_nxt_addr, nladdr) {
@@ -2224,7 +2219,6 @@ sctp_asconf_iterator_stcb(struct sctp_inpcb *inp, struct sctp_tcb *stcb,
 					 */
 					stcb->asoc.cc_functions.sctp_set_initial_cc_param(stcb, net);
 					net->RTO = 0;
-
 				}
 			}
 		} else if (type == SCTP_SET_PRIM_ADDR) {
@@ -2587,14 +2581,14 @@ sctp_compose_asconf(struct sctp_tcb *stcb, int *retlen, int addr_locked)
 	if (m_asconf_chk == NULL) {
 		/* no mbuf's */
 		SCTPDBG(SCTP_DEBUG_ASCONF1,
-		    "compose_asconf: couldn't get chunk mbuf!\n");
+		    "sctp_compose_asconf: couldn't get chunk mbuf!\n");
 		return (NULL);
 	}
 	m_asconf = sctp_get_mbuf_for_msg(MCLBYTES, 0, M_NOWAIT, 1, MT_DATA);
 	if (m_asconf == NULL) {
 		/* no mbuf's */
 		SCTPDBG(SCTP_DEBUG_ASCONF1,
-		    "compose_asconf: couldn't get mbuf!\n");
+		    "sctp_compose_asconf: couldn't get mbuf!\n");
 		sctp_m_freem(m_asconf_chk);
 		return (NULL);
 	}
@@ -2719,10 +2713,12 @@ sctp_compose_asconf(struct sctp_tcb *stcb, int *retlen, int addr_locked)
 				break;
 #endif
 			default:
-				p_size = 0;
-				addr_size = 0;
-				addr_ptr = NULL;
-				break;
+				SCTPDBG(SCTP_DEBUG_ASCONF1,
+				    "sctp_compose_asconf: no usable lookup addr (family = %d)!\n",
+				    found_addr->sa_family);
+				sctp_m_freem(m_asconf_chk);
+				sctp_m_freem(m_asconf);
+				return (NULL);
 			}
 			lookup->ph.param_length = htons(SCTP_SIZE32(p_size));
 			memcpy(lookup->addr, addr_ptr, addr_size);
@@ -2730,12 +2726,10 @@ sctp_compose_asconf(struct sctp_tcb *stcb, int *retlen, int addr_locked)
 		} else {
 			/* uh oh... don't have any address?? */
 			SCTPDBG(SCTP_DEBUG_ASCONF1,
-			    "compose_asconf: no lookup addr!\n");
-			/* XXX for now, we send a IPv4 address of 0.0.0.0 */
-			lookup->ph.param_type = htons(SCTP_IPV4_ADDRESS);
-			lookup->ph.param_length = htons(SCTP_SIZE32(sizeof(struct sctp_ipv4addr_param)));
-			memset(lookup->addr, 0, sizeof(struct in_addr));
-			SCTP_BUF_LEN(m_asconf_chk) += SCTP_SIZE32(sizeof(struct sctp_ipv4addr_param));
+			    "sctp_compose_asconf: no lookup addr!\n");
+			sctp_m_freem(m_asconf_chk);
+			sctp_m_freem(m_asconf);
+			return (NULL);
 		}
 	}
 	/* chain it all together */
@@ -3165,7 +3159,7 @@ sctp_check_address_list(struct sctp_tcb *stcb, struct mbuf *m, int offset,
  */
 uint32_t
 sctp_addr_mgmt_ep_sa(struct sctp_inpcb *inp, struct sockaddr *sa,
-    uint32_t type, uint32_t vrf_id, struct sctp_ifa *sctp_ifap)
+    uint32_t type, uint32_t vrf_id)
 {
 	struct sctp_ifa *ifa;
 	struct sctp_laddr *laddr, *nladdr;
@@ -3174,9 +3168,7 @@ sctp_addr_mgmt_ep_sa(struct sctp_inpcb *inp, struct sockaddr *sa,
 		SCTP_LTRACE_ERR_RET(inp, NULL, NULL, SCTP_FROM_SCTP_ASCONF, EINVAL);
 		return (EINVAL);
 	}
-	if (sctp_ifap) {
-		ifa = sctp_ifap;
-	} else if (type == SCTP_ADD_IP_ADDRESS) {
+	if (type == SCTP_ADD_IP_ADDRESS) {
 		/* For an add the address MUST be on the system */
 		ifa = sctp_find_ifa_by_addr(sa, vrf_id, SCTP_ADDR_NOT_LOCKED);
 	} else if (type == SCTP_DEL_IP_ADDRESS) {
@@ -3263,10 +3255,9 @@ sctp_addr_mgmt_ep_sa(struct sctp_inpcb *inp, struct sockaddr *sa,
 }
 
 void
-sctp_asconf_send_nat_state_update(struct sctp_tcb *stcb,
-    struct sctp_nets *net)
+sctp_asconf_send_nat_state_update(struct sctp_tcb *stcb, struct sctp_nets *net)
 {
-	struct sctp_asconf_addr *aa;
+	struct sctp_asconf_addr *aa_vtag, *aa_add, *aa_del;
 	struct sctp_ifa *sctp_ifap;
 	struct sctp_asconf_tag_param *vtag;
 #ifdef INET
@@ -3275,6 +3266,7 @@ sctp_asconf_send_nat_state_update(struct sctp_tcb *stcb,
 #ifdef INET6
 	struct sockaddr_in6 *to6;
 #endif
+
 	if (net == NULL) {
 		SCTPDBG(SCTP_DEBUG_ASCONF1, "sctp_asconf_send_nat_state_update: Missing net\n");
 		return;
@@ -3284,105 +3276,81 @@ sctp_asconf_send_nat_state_update(struct sctp_tcb *stcb,
 		return;
 	}
 	/*
-	 * Need to have in the asconf: - vtagparam(my_vtag/peer_vtag) -
-	 * add(0.0.0.0) - del(0.0.0.0) - Any global addresses add(addr)
+	 * Need to have in the ASCONF: - VTAG(my_vtag/peer_vtag) -
+	 * ADD(wildcard) - DEL(wildcard) - ADD(Any global addresses)
 	 */
-	SCTP_MALLOC(aa, struct sctp_asconf_addr *, sizeof(*aa),
-	    SCTP_M_ASC_ADDR);
-	if (aa == NULL) {
-		/* didn't get memory */
-		SCTPDBG(SCTP_DEBUG_ASCONF1,
-		    "sctp_asconf_send_nat_state_update: failed to get memory!\n");
+	SCTP_MALLOC(aa_vtag, struct sctp_asconf_addr *, sizeof(struct sctp_asconf_addr), SCTP_M_ASC_ADDR);
+	SCTP_MALLOC(aa_add, struct sctp_asconf_addr *, sizeof(struct sctp_asconf_addr), SCTP_M_ASC_ADDR);
+	SCTP_MALLOC(aa_del, struct sctp_asconf_addr *, sizeof(struct sctp_asconf_addr), SCTP_M_ASC_ADDR);
+
+	if ((aa_vtag == NULL) || (aa_add == NULL) || (aa_del == NULL)) {
+		/* Didn't get memory */
+		SCTPDBG(SCTP_DEBUG_ASCONF1, "sctp_asconf_send_nat_state_update: failed to get memory!\n");
+out:
+		if (aa_vtag != NULL) {
+			SCTP_FREE(aa_vtag, SCTP_M_ASC_ADDR);
+		}
+		if (aa_add != NULL) {
+			SCTP_FREE(aa_add, SCTP_M_ASC_ADDR);
+		}
+		if (aa_del != NULL) {
+			SCTP_FREE(aa_del, SCTP_M_ASC_ADDR);
+		}
 		return;
 	}
-	aa->special_del = 0;
-	/* fill in asconf address parameter fields */
-	/* top level elements are "networked" during send */
-	aa->ifa = NULL;
-	aa->sent = 0;		/* clear sent flag */
-	vtag = (struct sctp_asconf_tag_param *)&aa->ap.aph;
+	memset(aa_vtag, 0, sizeof(struct sctp_asconf_addr));
+	aa_vtag->special_del = 0;
+	/* Fill in ASCONF address parameter fields. */
+	/* Top level elements are "networked" during send. */
+	aa_vtag->ifa = NULL;
+	aa_vtag->sent = 0;	/* clear sent flag */
+	vtag = (struct sctp_asconf_tag_param *)&aa_vtag->ap.aph;
 	vtag->aph.ph.param_type = SCTP_NAT_VTAGS;
 	vtag->aph.ph.param_length = sizeof(struct sctp_asconf_tag_param);
 	vtag->local_vtag = htonl(stcb->asoc.my_vtag);
 	vtag->remote_vtag = htonl(stcb->asoc.peer_vtag);
-	TAILQ_INSERT_TAIL(&stcb->asoc.asconf_queue, aa, next);
 
-	SCTP_MALLOC(aa, struct sctp_asconf_addr *, sizeof(*aa),
-	    SCTP_M_ASC_ADDR);
-	if (aa == NULL) {
-		/* didn't get memory */
-		SCTPDBG(SCTP_DEBUG_ASCONF1,
-		    "sctp_asconf_send_nat_state_update: failed to get memory!\n");
-		return;
-	}
-	memset(aa, 0, sizeof(struct sctp_asconf_addr));
-	/* fill in asconf address parameter fields */
-	/* ADD(0.0.0.0) */
+	memset(aa_add, 0, sizeof(struct sctp_asconf_addr));
+	memset(aa_del, 0, sizeof(struct sctp_asconf_addr));
 	switch (net->ro._l_addr.sa.sa_family) {
 #ifdef INET
 	case AF_INET:
-		aa->ap.aph.ph.param_type = SCTP_ADD_IP_ADDRESS;
-		aa->ap.aph.ph.param_length = sizeof(struct sctp_asconf_addrv4_param);
-		aa->ap.addrp.ph.param_type = SCTP_IPV4_ADDRESS;
-		aa->ap.addrp.ph.param_length = sizeof(struct sctp_ipv4addr_param);
-		/* No need to add an address, we are using 0.0.0.0 */
-		TAILQ_INSERT_TAIL(&stcb->asoc.asconf_queue, aa, next);
+		aa_add->ap.aph.ph.param_type = SCTP_ADD_IP_ADDRESS;
+		aa_add->ap.aph.ph.param_length = sizeof(struct sctp_asconf_addrv4_param);
+		aa_add->ap.addrp.ph.param_type = SCTP_IPV4_ADDRESS;
+		aa_add->ap.addrp.ph.param_length = sizeof(struct sctp_ipv4addr_param);
+		/* No need to fill the address, we are using 0.0.0.0 */
+		aa_del->ap.aph.ph.param_type = SCTP_ADD_IP_ADDRESS;
+		aa_del->ap.aph.ph.param_length = sizeof(struct sctp_asconf_addrv4_param);
+		aa_del->ap.addrp.ph.param_type = SCTP_IPV4_ADDRESS;
+		aa_del->ap.addrp.ph.param_length = sizeof(struct sctp_ipv4addr_param);
+		/* No need to fill the address, we are using 0.0.0.0 */
 		break;
 #endif
 #ifdef INET6
 	case AF_INET6:
-		aa->ap.aph.ph.param_type = SCTP_ADD_IP_ADDRESS;
-		aa->ap.aph.ph.param_length = sizeof(struct sctp_asconf_addr_param);
-		aa->ap.addrp.ph.param_type = SCTP_IPV6_ADDRESS;
-		aa->ap.addrp.ph.param_length = sizeof(struct sctp_ipv6addr_param);
-		/* No need to add an address, we are using 0.0.0.0 */
-		TAILQ_INSERT_TAIL(&stcb->asoc.asconf_queue, aa, next);
+		aa_add->ap.aph.ph.param_type = SCTP_ADD_IP_ADDRESS;
+		aa_add->ap.aph.ph.param_length = sizeof(struct sctp_asconf_addr_param);
+		aa_add->ap.addrp.ph.param_type = SCTP_IPV6_ADDRESS;
+		aa_add->ap.addrp.ph.param_length = sizeof(struct sctp_ipv6addr_param);
+		/* No need to fill the address, we are using ::0 */
+		aa_del->ap.aph.ph.param_type = SCTP_DEL_IP_ADDRESS;
+		aa_del->ap.aph.ph.param_length = sizeof(struct sctp_asconf_addr_param);
+		aa_del->ap.addrp.ph.param_type = SCTP_IPV6_ADDRESS;
+		aa_del->ap.addrp.ph.param_length = sizeof(struct sctp_ipv6addr_param);
+		/* No need to fill the address, we are using ::0 */
 		break;
 #endif
 	default:
 		SCTPDBG(SCTP_DEBUG_ASCONF1,
-		    "sctp_asconf_send_nat_state_update: unknown address family\n");
-		SCTP_FREE(aa, SCTP_M_ASC_ADDR);
-		return;
+		    "sctp_asconf_send_nat_state_update: unknown address family %d\n",
+		    net->ro._l_addr.sa.sa_family);
+		goto out;
 	}
-	SCTP_MALLOC(aa, struct sctp_asconf_addr *, sizeof(*aa),
-	    SCTP_M_ASC_ADDR);
-	if (aa == NULL) {
-		/* didn't get memory */
-		SCTPDBG(SCTP_DEBUG_ASCONF1,
-		    "sctp_asconf_send_nat_state_update: failed to get memory!\n");
-		return;
-	}
-	memset(aa, 0, sizeof(struct sctp_asconf_addr));
-	/* fill in asconf address parameter fields */
-	/* ADD(0.0.0.0) */
-	switch (net->ro._l_addr.sa.sa_family) {
-#ifdef INET
-	case AF_INET:
-		aa->ap.aph.ph.param_type = SCTP_ADD_IP_ADDRESS;
-		aa->ap.aph.ph.param_length = sizeof(struct sctp_asconf_addrv4_param);
-		aa->ap.addrp.ph.param_type = SCTP_IPV4_ADDRESS;
-		aa->ap.addrp.ph.param_length = sizeof(struct sctp_ipv4addr_param);
-		/* No need to add an address, we are using 0.0.0.0 */
-		TAILQ_INSERT_TAIL(&stcb->asoc.asconf_queue, aa, next);
-		break;
-#endif
-#ifdef INET6
-	case AF_INET6:
-		aa->ap.aph.ph.param_type = SCTP_DEL_IP_ADDRESS;
-		aa->ap.aph.ph.param_length = sizeof(struct sctp_asconf_addr_param);
-		aa->ap.addrp.ph.param_type = SCTP_IPV6_ADDRESS;
-		aa->ap.addrp.ph.param_length = sizeof(struct sctp_ipv6addr_param);
-		/* No need to add an address, we are using 0.0.0.0 */
-		TAILQ_INSERT_TAIL(&stcb->asoc.asconf_queue, aa, next);
-		break;
-#endif
-	default:
-		SCTPDBG(SCTP_DEBUG_ASCONF1,
-		    "sctp_asconf_send_nat_state_update: unknown address family\n");
-		SCTP_FREE(aa, SCTP_M_ASC_ADDR);
-		return;
-	}
+	TAILQ_INSERT_TAIL(&stcb->asoc.asconf_queue, aa_vtag, next);
+	TAILQ_INSERT_TAIL(&stcb->asoc.asconf_queue, aa_add, next);
+	TAILQ_INSERT_TAIL(&stcb->asoc.asconf_queue, aa_del, next);
+
 	/* Now we must hunt the addresses and add all global addresses */
 	if (stcb->sctp_ep->sctp_flags & SCTP_PCB_FLAGS_BOUNDALL) {
 		struct sctp_vrf *vrf = NULL;

@@ -153,6 +153,11 @@ static struct powerpc_exception powerpc_exceptions[] = {
 	{ EXC_LAST,	NULL }
 };
 
+static int uprintf_signal;
+SYSCTL_INT(_machdep, OID_AUTO, uprintf_signal, CTLFLAG_RWTUN,
+    &uprintf_signal, 0,
+    "Print debugging information on trap signal to ctty");
+
 #define ESR_BITMASK							\
     "\20"								\
     "\040b0\037b1\036b2\035b3\034PIL\033PRR\032PTR\031FP"		\
@@ -171,7 +176,6 @@ static struct powerpc_exception powerpc_exceptions[] = {
     "\030b8\027b9\026b10\025b11\024b12\023L2TAG\022L2DAT\021L3TAG"	\
     "\020L3DAT\017APE\016DPE\015TEA\014b20\013b21\012b22\011b23"	\
     "\010b24\007b25\006b26\005b27\004b28\003b29\002b30\001b31"
-
 
 static const char *
 trapname(u_int vector)
@@ -207,7 +211,7 @@ trap(struct trapframe *frame)
 	int		sig, type, user;
 	u_int		ucode;
 	ksiginfo_t	ksi;
-	register_t 	fscr;
+	register_t 	addr, fscr;
 
 	VM_CNT_INC(v_trap);
 
@@ -224,6 +228,7 @@ trap(struct trapframe *frame)
 	type = ucode = frame->exc;
 	sig = 0;
 	user = frame->srr1 & PSL_PR;
+	addr = 0;
 
 	CTR3(KTR_TRAP, "trap: %s type=%s (%s)", td->td_name,
 	    trapname(type), user ? "user" : "kernel");
@@ -248,6 +253,7 @@ trap(struct trapframe *frame)
 	if (user) {
 		td->td_pticks = 0;
 		td->td_frame = frame;
+		addr = frame->srr0;
 		if (td->td_cowgen != p->p_cowgen)
 			thread_cow_update(td);
 
@@ -261,18 +267,22 @@ trap(struct trapframe *frame)
 			break;
 
 #if defined(__powerpc64__) && defined(AIM)
-		case EXC_ISE:
 		case EXC_DSE:
+			addr = frame->dar;
+			/* FALLTHROUGH */
+		case EXC_ISE:
 			/* DSE/ISE are automatically fatal with radix pmap. */
 			if (radix_mmu ||
 			    handle_user_slb_spill(&p->p_vmspace->vm_pmap,
-			    (type == EXC_ISE) ? frame->srr0 : frame->dar) != 0){
+			    addr) != 0){
 				sig = SIGSEGV;
 				ucode = SEGV_MAPERR;
 			}
 			break;
 #endif
 		case EXC_DSI:
+			addr = frame->dar;
+			/* FALLTHROUGH */
 		case EXC_ISI:
 			if (trap_pfault(frame, true, &sig, &ucode))
 				sig = 0;
@@ -368,6 +378,7 @@ trap(struct trapframe *frame)
 			if (fix_unaligned(td, frame) != 0) {
 				sig = SIGBUS;
 				ucode = BUS_ADRALN;
+				addr = frame->dar;
 			}
 			else
 				frame->srr0 += 4;
@@ -394,16 +405,24 @@ trap(struct trapframe *frame)
 #endif
  				sig = SIGTRAP;
 				ucode = TRAP_BRKPT;
-			} else {
-				sig = ppc_instr_emulate(frame, td);
-				if (sig == SIGILL) {
-					if (frame->srr1 & EXC_PGM_PRIV)
-						ucode = ILL_PRVOPC;
-					else if (frame->srr1 & EXC_PGM_ILLEGAL)
-						ucode = ILL_ILLOPC;
-				} else if (sig == SIGFPE)
-					ucode = FPE_FLTINV;	/* Punt for now, invalid operation. */
+				break;
 			}
+
+			if ((frame->srr1 & EXC_PGM_FPENABLED) &&
+			     (td->td_pcb->pcb_flags & PCB_FPU))
+				sig = SIGFPE;
+			else
+				sig = ppc_instr_emulate(frame, td);
+
+			if (sig == SIGILL) {
+				if (frame->srr1 & EXC_PGM_PRIV)
+					ucode = ILL_PRVOPC;
+				else if (frame->srr1 & EXC_PGM_ILLEGAL)
+					ucode = ILL_ILLOPC;
+			} else if (sig == SIGFPE) {
+				ucode = get_fpu_exception(td);
+			}
+
 			break;
 
 		case EXC_MCHK:
@@ -481,8 +500,16 @@ trap(struct trapframe *frame)
 		ksiginfo_init_trap(&ksi);
 		ksi.ksi_signo = sig;
 		ksi.ksi_code = (int) ucode; /* XXX, not POSIX */
-		ksi.ksi_addr = (void *)frame->srr0;
+		ksi.ksi_addr = (void *)addr;
 		ksi.ksi_trapno = type;
+		if (uprintf_signal) {
+			uprintf("pid %d comm %s: signal %d code %d type 0x%x "
+				"addr 0x%lx r1 0x%lx srr0 0x%lx srr1 0x%lx\n",
+			        p->p_pid, p->p_comm, sig, ucode, type,
+				(u_long)addr, (u_long)frame->fixreg[1],
+				(u_long)frame->srr0, (u_long)frame->srr1);
+		}
+
 		trapsignal(td, &ksi);
 	}
 
@@ -633,7 +660,7 @@ cpu_fetch_syscall_args(struct thread *td)
 	struct syscall_args *sa;
 	caddr_t	params;
 	size_t argsz;
-	int error, n, i;
+	int error, n, narg, i;
 
 	p = td->td_proc;
 	frame = td->td_frame;
@@ -674,7 +701,7 @@ cpu_fetch_syscall_args(struct thread *td)
 	else
 		sa->callp = &p->p_sysent->sv_table[sa->code];
 
-	sa->narg = sa->callp->sy_narg;
+	narg = sa->callp->sy_narg;
 
 	if (SV_PROC_FLAG(p, SV_ILP32)) {
 		argsz = sizeof(uint32_t);
@@ -689,17 +716,17 @@ cpu_fetch_syscall_args(struct thread *td)
 			sa->args[i] = ((u_register_t *)(params))[i];
 	}
 
-	if (sa->narg > n)
+	if (narg > n)
 		error = copyin(MOREARGS(frame->fixreg[1]), sa->args + n,
-			       (sa->narg - n) * argsz);
+			       (narg - n) * argsz);
 	else
 		error = 0;
 
 #ifdef __powerpc64__
-	if (SV_PROC_FLAG(p, SV_ILP32) && sa->narg > n) {
+	if (SV_PROC_FLAG(p, SV_ILP32) && narg > n) {
 		/* Expand the size of arguments copied from the stack */
 
-		for (i = sa->narg; i >= n; i--)
+		for (i = narg; i >= n; i--)
 			sa->args[i] = ((uint32_t *)(&sa->args[n]))[i-n];
 	}
 #endif
@@ -945,7 +972,7 @@ fix_unaligned(struct thread *td, struct trapframe *frame)
 static void
 normalize_inputs(void)
 {
-	unsigned long msr;
+	register_t msr;
 
 	/* enable VSX */
 	msr = mfmsr();

@@ -84,6 +84,8 @@ struct mdproc {
 };
 
 #define	P_MD_KPTI		0x00000001	/* Enable KPTI on exec */
+#define	P_MD_LA48		0x00000002	/* Request LA48 after exec */
+#define	P_MD_LA57		0x00000004	/* Request LA57 after exec */
 
 #define	KINFO_PROC_SIZE 1088
 #define	KINFO_PROC32_SIZE 768
@@ -92,7 +94,6 @@ struct syscall_args {
 	u_int code;
 	struct sysent *callp;
 	register_t args[8];
-	int narg;
 };
 
 #ifdef	_KERNEL

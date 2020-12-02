@@ -1127,6 +1127,7 @@ struct nfsv3_sattr {
  	NFSATTRBM_SPACETOTAL |						\
  	NFSATTRBM_SPACEUSED |						\
  	NFSATTRBM_TIMEACCESS |						\
+ 	NFSATTRBM_TIMECREATE |						\
  	NFSATTRBM_TIMEDELTA |						\
  	NFSATTRBM_TIMEMETADATA |					\
  	NFSATTRBM_TIMEMODIFY |						\
@@ -1135,7 +1136,6 @@ struct nfsv3_sattr {
     	NFSATTRBM_QUOTASOFT |                        			\
     	NFSATTRBM_QUOTAUSED |						\
 	NFSATTRBM_FSLAYOUTTYPE)
-
 
 #ifdef QUOTA
 /*
@@ -1176,6 +1176,7 @@ struct nfsv3_sattr {
  	(NFSATTRBM_MODE |						\
  	NFSATTRBM_OWNER |						\
  	NFSATTRBM_OWNERGROUP |						\
+ 	NFSATTRBM_TIMECREATE |					\
  	NFSATTRBM_TIMEACCESSSET |					\
  	NFSATTRBM_TIMEMODIFYSET)
 #define	NFSATTRBIT_SETABLE2						\

@@ -71,9 +71,9 @@ cheriabi_fetch_syscall_args(struct thread *td)
 	bzero(sa->args, sizeof(sa->args));
 
 	/* compute next PC after syscall instruction */
-	td->td_pcb->pcb_tpc = sa->trapframe->pc; /* Remember if restart */
-	if (DELAYBRANCH(sa->trapframe->cause))	 /* Check BD bit */
-		locr0->pc = MipsEmulateBranch(locr0, sa->trapframe->pc, 0, 0);
+	td->td_pcb->pcb_tpc = locr0->pc; /* Remember if restart */
+	if (DELAYBRANCH(locr0->cause))	 /* Check BD bit */
+		locr0->pc = MipsEmulateBranch(locr0, locr0->pc, 0, 0);
 	else
 		TRAPF_PC_INCREMENT(locr0, sizeof(int));
 
@@ -91,8 +91,6 @@ cheriabi_fetch_syscall_args(struct thread *td)
 	else
 		sa->callp = &se->sv_table[sa->code];
 
-	sa->narg = sa->callp->sy_narg;
-
 	if (sa->code >= nitems(sysargmask))
 		ptrmask = 0;
 	else
@@ -107,7 +105,7 @@ cheriabi_fetch_syscall_args(struct thread *td)
 		int offset;
 
 		offset = 0;
-		for (i = 0; i < sa->narg; i++) {
+		for (i = 0; i < sa->callp->sy_narg; i++) {
 			if (ptrmask & (1 << i)) {
 				offset = roundup2(offset, sizeof(uintcap_t));
 				error = copyincap(
@@ -129,7 +127,7 @@ cheriabi_fetch_syscall_args(struct thread *td)
 
 		intreg_offset = 0;
 		ptrreg_offset = 0;
-		for (i = 0; i < sa->narg; i++) {
+		for (i = 0; i < sa->callp->sy_narg; i++) {
 			if (ptrmask & (1 << i)) {
 				if (ptrreg_offset > 7)
 					panic(

@@ -33,13 +33,14 @@ SRCS=	entropy_common.c \
 	debug.c \
 	hist.c \
 	fastcover.c
-WARNS=	2
+WARNS?=	2
 INCS=	zstd.h
 CFLAGS+=	-I${ZSTDDIR}/lib -I${ZSTDDIR}/lib/common -DXXH_NAMESPACE=ZSTD_ \
 		-DZSTD_MULTITHREAD=1
 LIBADD=	pthread
 
 PRIVATELIB=	yes
+PACKAGE=	runtime
 
 ZSTDDIR=	${SRCTOP}/sys/contrib/zstd
 .PATH:	${ZSTDDIR}/lib/common ${ZSTDDIR}/lib/compress \

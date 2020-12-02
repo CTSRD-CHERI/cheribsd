@@ -32,7 +32,6 @@ __FBSDID("$FreeBSD$");
 #include <stdlib.h>
 
 #include "libc_private.h"
-#include "crtbrand.c"
 #include "ignore_init.c"
 
 typedef void (*fptr)(void);

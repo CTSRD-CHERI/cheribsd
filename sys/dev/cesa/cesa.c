@@ -459,6 +459,7 @@ cesa_set_mkey(struct cesa_session *cs, int alg, const uint8_t *mkey, int mklen)
 		hin[i] = htobe32(hin[i]);
 		hout[i] = htobe32(hout[i]);
 	}
+	explicit_bzero(&auth_ctx, sizeof(auth_ctx));
 }
 
 static int
@@ -1412,7 +1413,7 @@ cesa_detach(device_t dev)
 {
 	struct cesa_softc *sc;
 	int i;
- 
+
 	sc = device_get_softc(dev);
 
 	/* TODO: Wait for queued requests completion before shutdown. */
@@ -1638,7 +1639,7 @@ cesa_newsession(device_t dev, crypto_session_t cses,
 	struct cesa_session *cs;
 	struct cesa_softc *sc;
 	int error;
- 
+
 	sc = device_get_softc(dev);
 	error = 0;
 

@@ -88,7 +88,6 @@ static driver_t mpr_pci_driver = {
 	sizeof(struct mpr_softc)
 };
 
-
 struct mpr_ident {
 	uint16_t	vendor;
 	uint16_t	device;
@@ -175,7 +174,6 @@ struct mpr_ident {
 	{ 0, 0, 0, 0, 0, NULL }
 };
 
-
 static devclass_t	mpr_devclass;
 DRIVER_MODULE(mpr, pci, mpr_pci_driver, mpr_devclass, 0, 0);
 MODULE_PNP_INFO("U16:vendor;U16:device;U16:subvendor;U16:subdevice;D:#", pci,
@@ -220,7 +218,7 @@ mpr_pci_probe(device_t dev)
 static int
 mpr_pci_attach(device_t dev)
 {
-	bus_dma_tag_template_t t;
+	bus_dma_template_t t;
 	struct mpr_softc *sc;
 	struct mpr_ident *m;
 	int error, i;
@@ -489,4 +487,3 @@ mpr_pci_restore(struct mpr_softc *sc)
 	pci_cfg_restore(sc->mpr_dev, dinfo);
 	return (0);
 }
-

@@ -45,8 +45,8 @@ __FBSDID("$FreeBSD$");
 #include <sys/kernel.h>
 #include <sys/sysctl.h>
 #include <sys/bio.h>
-#include <sys/bus.h>
 #include <sys/ctype.h>
+#include <sys/devctl.h>
 #include <sys/fcntl.h>
 #include <sys/malloc.h>
 #include <sys/sbuf.h>
@@ -497,8 +497,6 @@ g_disk_start(struct bio *bp)
 		    dp->d_fwsectors))
 			break;
 		else if (g_handleattr_int(bp, "GEOM::fwheads", dp->d_fwheads))
-			break;
-		else if (g_handleattr_off_t(bp, "GEOM::frontstuff", 0))
 			break;
 		else if (g_handleattr_str(bp, "GEOM::ident", dp->d_ident))
 			break;
@@ -1081,7 +1079,7 @@ sysctl_disks(SYSCTL_HANDLER_ARGS)
 	sbuf_delete(sb);
 	return error;
 }
- 
+
 SYSCTL_PROC(_kern, OID_AUTO, disks,
     CTLTYPE_STRING | CTLFLAG_RD | CTLFLAG_MPSAFE, NULL, 0,
     sysctl_disks, "A", "names of available disks");

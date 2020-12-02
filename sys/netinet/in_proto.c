@@ -39,7 +39,6 @@ __FBSDID("$FreeBSD$");
 #include "opt_inet.h"
 #include "opt_inet6.h"
 #include "opt_sctp.h"
-#include "opt_mpath.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -94,7 +93,7 @@ static struct pr_usrreqs nousrreqs;
 #include <netinet/sctp_pcb.h>
 #include <netinet/sctp.h>
 #include <netinet/sctp_var.h>
-#endif /* SCTP */
+#endif
 
 FEATURE(inet, "Internet Protocol version 4");
 
@@ -294,9 +293,6 @@ IPPROTOSPACER,
 },
 };
 
-extern int in_inithead(void **, int, u_int);
-extern int in_detachhead(void **, int);
-
 struct domain inetdomain = {
 	.dom_family =		AF_INET,
 	.dom_name =		"internet",
@@ -324,7 +320,7 @@ SYSCTL_NODE(_net_inet, IPPROTO_UDP, udp, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
     "UDP");
 SYSCTL_NODE(_net_inet, IPPROTO_TCP, tcp, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
     "TCP");
-#ifdef SCTP
+#if defined(SCTP) || defined(SCTP_SUPPORT)
 SYSCTL_NODE(_net_inet, IPPROTO_SCTP, sctp, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
     "SCTP");
 #endif

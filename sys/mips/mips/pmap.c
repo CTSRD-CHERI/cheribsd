@@ -95,6 +95,7 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_extern.h>
 #include <vm/vm_pageout.h>
 #include <vm/vm_pager.h>
+#include <vm/vm_dumpset.h>
 #include <vm/uma.h>
 
 #include <machine/cache.h>
@@ -209,7 +210,7 @@ pmap_init_reserved_pages(void)
 	struct pcpu *pc;
 	vm_offset_t pages;
  	int i;
- 
+
 	if (need_local_mappings == 0)
 		return;
 
@@ -1274,7 +1275,6 @@ retry:
 	return (m);
 }
 
-
 /***************************************************
  * Pmap allocation/deallocation routines.
  ***************************************************/
@@ -1911,7 +1911,6 @@ pmap_remove(pmap_t pmap, vm_offset_t sva, vm_offset_t eva)
 		va_fini = va_next;
 		for (pte = pmap_pde_to_pte(pde, sva); sva != va_next; pte++,
 		    sva += PAGE_SIZE) {
-
 			/* Skip over invalid entries; no need to shootdown */
 			if (!pte_test(pte, PTE_V)) {
 				/*
@@ -3334,6 +3333,7 @@ pmap_unmapdev(vm_offset_t va, vm_size_t size)
 	base = trunc_page(va);
 	offset = va & PAGE_MASK;
 	size = roundup(size + offset, PAGE_SIZE);
+	pmap_qremove(base, atop(size));
 	kva_free(base, size);
 #endif
 }
@@ -3714,7 +3714,6 @@ pmap_kextract(vm_offset_t va)
 
 	panic("%s for unknown address space %p.", __func__, (void *)va);
 }
-
 
 void
 pmap_flush_pvcache(vm_page_t m)

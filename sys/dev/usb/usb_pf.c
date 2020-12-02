@@ -102,7 +102,7 @@ usbpf_uninit(void *arg)
 	struct usb_bus *ubus;
 	int error;
 	int i;
-	
+
 	if_clone_detach(usbpf_cloner);
 
 	dc = devclass_find(usbusname);
@@ -122,7 +122,7 @@ usbpf_uninit(void *arg)
 static int
 usbpf_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 {
-	
+
 	/* No configuration allowed. */
 	return (EINVAL);
 }
@@ -236,7 +236,7 @@ usbpf_clone_destroy(struct if_clone *ifc, struct ifnet *ifp)
 	if_detach(ifp);
 	if_free(ifp);
 	ifc_free_unit(ifc, unit);
-	
+
 	return (0);
 }
 

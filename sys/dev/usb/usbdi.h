@@ -88,7 +88,7 @@ typedef enum {	/* keep in sync with usb_errstr_table */
 #define	USB_NO_TIMEOUT 0
 #define	USB_DEFAULT_TIMEOUT 5000	/* 5000 ms = 5 seconds */
 
-#if defined(_KERNEL)
+#if defined(_KERNEL) || defined(_STANDALONE)
 /* typedefs */
 
 typedef void (usb_callback_t)(struct usb_xfer *, usb_error_t);
@@ -101,7 +101,6 @@ typedef void (usb_fifo_close_t)(struct usb_fifo *fifo, int fflags);
 typedef int (usb_fifo_ioctl_t)(struct usb_fifo *fifo, u_long cmd, void *addr, int fflags);
 typedef void (usb_fifo_cmd_t)(struct usb_fifo *fifo);
 typedef void (usb_fifo_filter_t)(struct usb_fifo *fifo, struct usb_mbuf *m);
-
 
 /* USB events */
 #ifndef USB_GLOBAL_INCLUDE_FILE
@@ -267,7 +266,6 @@ struct usb_config {
  * "usb_device_id".
  */
 struct usb_device_id {
-
 	/* Select which fields to match against */
 #if BYTE_ORDER == LITTLE_ENDIAN
 	uint16_t
@@ -711,5 +709,5 @@ void	*usb_fifo_softc(struct usb_fifo *fifo);
 void	usb_fifo_set_close_zlp(struct usb_fifo *, uint8_t);
 void	usb_fifo_set_write_defrag(struct usb_fifo *, uint8_t);
 void	usb_fifo_free(struct usb_fifo *f);
-#endif /* _KERNEL */
-#endif /* _USB_USBDI_H_ */
+#endif	/* _KERNEL || _STANDALONE */
+#endif	/* _USB_USBDI_H_ */

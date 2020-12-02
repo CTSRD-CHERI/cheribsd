@@ -77,14 +77,17 @@ void kmem_unback(vm_object_t, vm_offset_t, vm_size_t);
 
 /* Bootstrapping. */
 void kmem_bootstrap_free(vm_offset_t, vm_size_t);
-vm_map_t kmem_suballoc(vm_map_t, vm_offset_t *, vm_offset_t *, vm_size_t,
-    boolean_t);
+void kmem_subinit(vm_map_t, vm_map_t, vm_offset_t *, vm_offset_t *, vm_size_t,
+    bool);
 void kmem_init(vm_offset_t, vm_offset_t);
 void kmem_init_zero_region(void);
 void kmeminit(void);
 
 int kernacc(void *, int, int);
 int useracc(void * __capability, int, int);
+#if __has_feature(capabilities)
+bool vm_cap_allows_prot(const void * __capability, vm_prot_t);
+#endif
 int vm_fault(vm_map_t map, vm_offset_t vaddr, vm_prot_t fault_type,
     int fault_flags, vm_page_t *m_hold);
 void vm_fault_copy_entry(vm_map_t, vm_map_t, vm_map_entry_t, vm_map_entry_t,

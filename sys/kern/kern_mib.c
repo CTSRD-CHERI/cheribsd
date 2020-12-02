@@ -246,22 +246,22 @@ sysctl_hw_pagesizes(SYSCTL_HANDLER_ARGS)
 			pagesizes32[i] = (uint32_t)pagesizes[i];
 
 		len = sizeof(pagesizes32);
-		if (len > req->oldlen)
+		if (len > req->oldlen && req->oldptr != NULL)
 			len = req->oldlen;
 		error = SYSCTL_OUT(req, pagesizes32, len);
 	} else
 #endif
 	{
 		len = sizeof(pagesizes);
-		if (len > req->oldlen)
+		if (len > req->oldlen && req->oldptr != NULL)
 			len = req->oldlen;
 		error = SYSCTL_OUT(req, pagesizes, len);
 	}
 	return (error);
 }
 SYSCTL_PROC(_hw, OID_AUTO, pagesizes,
-    CTLTYPE_ULONG | CTLFLAG_RD | CTLFLAG_MPSAFE, NULL, 0, 
-    sysctl_hw_pagesizes, "LU",
+    CTLTYPE_OPAQUE | CTLFLAG_RD | CTLFLAG_MPSAFE, NULL, 0,
+    sysctl_hw_pagesizes, "S,pagesizes",
     "Supported page sizes");
 
 int adaptive_machine_arch = 1;
@@ -658,6 +658,11 @@ SYSCTL_INT(_user, USER_STREAM_MAX, stream_max, CTLFLAG_RD,
     SYSCTL_NULL_INT_PTR, 0, "Min Maximum number of streams a process may have open at one time");
 SYSCTL_INT(_user, USER_TZNAME_MAX, tzname_max, CTLFLAG_RD,
     SYSCTL_NULL_INT_PTR, 0, "Min Maximum number of types supported for timezone names");
+
+static char localbase[MAXPATHLEN] = "";
+
+SYSCTL_STRING(_user, USER_LOCALBASE, localbase, CTLFLAG_RWTUN,
+    localbase, sizeof(localbase), "Prefix used to install and locate add-on packages");
 
 #include <sys/vnode.h>
 SYSCTL_INT(_debug_sizeof, OID_AUTO, vnode, CTLFLAG_RD,

@@ -1311,6 +1311,14 @@ static void perfmgr_check_overflow(osm_perfmgr_t * pm,
 		cl_plock_acquire(&pm->osm->lock);
 		p_node =
 		    osm_get_node_by_guid(pm->subn, cl_hton64(mon_node->guid));
+		if (!p_node) {
+			OSM_LOG(pm->log, OSM_LOG_ERROR,
+				"ERR 5407: Node \"%s\" (guid 0x%" PRIx64
+				") no longer exists so removing from PerfMgr"
+                                " monitoring\n",
+				mon_node->name, mon_node->guid);
+			goto Exit;
+		}
 		lid = get_lid(p_node, port, mon_node);
 		cl_plock_release(&pm->osm->lock);
 		if (lid == 0) {
@@ -1402,6 +1410,14 @@ static void perfmgr_check_pce_overflow(osm_perfmgr_t * pm,
 		cl_plock_acquire(&pm->osm->lock);
 		p_node =
 		    osm_get_node_by_guid(pm->subn, cl_hton64(mon_node->guid));
+		if (!p_node) {
+			OSM_LOG(pm->log, OSM_LOG_ERROR,
+				"ERR 5407: Node \"%s\" (guid 0x%" PRIx64
+				") no longer exists so removing from PerfMgr"
+                                " monitoring\n",
+				mon_node->name, mon_node->guid);
+			goto Exit;
+		}
 		lid = get_lid(p_node, port, mon_node);
 		cl_plock_release(&pm->osm->lock);
 		if (lid == 0) {
@@ -1935,7 +1951,9 @@ ib_api_status_t osm_perfmgr_init(osm_perfmgr_t * pm, osm_opensm_t * osm,
 	pm->state =
 	    p_opt->perfmgr ? PERFMGR_STATE_ENABLED : PERFMGR_STATE_DISABLE;
 	pm->sweep_state = PERFMGR_SWEEP_SLEEP;
-	cl_spinlock_init(&pm->lock);
+	status = cl_spinlock_init(&pm->lock);
+	if (status != IB_SUCCESS)
+		goto Exit;
 	pm->sweep_time_s = p_opt->perfmgr_sweep_time_s;
 	pm->max_outstanding_queries = p_opt->perfmgr_max_outstanding_queries;
 	pm->ignore_cas = p_opt->perfmgr_ignore_cas;

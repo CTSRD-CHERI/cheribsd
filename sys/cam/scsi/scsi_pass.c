@@ -445,7 +445,6 @@ pass_add_physpath(void *context, int pending)
 	if (xpt_getattr(physpath, MAXPATHLEN,
 			"GEOM::physpath", periph->path) == 0
 	 && strlen(physpath) != 0) {
-
 		mtx_unlock(mtx);
 		make_dev_physpath_alias(MAKEDEV_WAITOK, &softc->alias_dev,
 					softc->dev, softc->alias_dev, physpath);
@@ -484,7 +483,7 @@ passasync(void *callback_arg, u_int32_t code,
 	{
 		struct ccb_getdev *cgd;
 		cam_status status;
- 
+
 		cgd = (struct ccb_getdev *)arg;
 		if (cgd == NULL)
 			break;
@@ -652,6 +651,7 @@ passregister(struct cam_periph *periph, void *arg)
 	args.mda_gid = GID_OPERATOR;
 	args.mda_mode = 0600;
 	args.mda_si_drv1 = periph;
+	args.mda_flags = MAKEDEV_NOWAIT;
 	error = make_dev_s(&args, &softc->dev, "%s%d", periph->periph_name,
 	    periph->unit_number);
 	if (error != 0) {
@@ -831,7 +831,6 @@ passclose(struct cdev *dev, int flag, int fmt, struct thread *td)
 
 	return (0);
 }
-
 
 static void
 passstart(struct cam_periph *periph, union ccb *start_ccb)
@@ -1038,7 +1037,6 @@ passcreatezone(struct cam_periph *periph)
 		("%s called when the pass(4) zone is allocated!\n", __func__));
 
 	if ((softc->flags & PASS_FLAG_ZONE_INPROG) == 0) {
-
 		/*
 		 * We're the first context through, so we need to create
 		 * the pass(4) UMA zone for I/O requests.
@@ -1696,7 +1694,6 @@ passmemdone(struct cam_periph *periph, struct pass_io_req *io_req)
 					  (__cheri_fromcap void *)io_req->user_bufs[i]);
 				goto bailout;
 			}
-
 		}
 		break;
 	case CAM_DATA_PADDR:
@@ -1758,7 +1755,6 @@ passdoioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flag, struct thread 
 	error = 0;
 
 	switch (cmd) {
-
 	case CAMIOCOMMAND:
 	{
 		union ccb *inccb;
@@ -2215,7 +2211,6 @@ passsendccb(struct cam_periph *periph, union ccb *ccb, union ccb *inccb)
 	if ((fc == XPT_SCSI_IO) || (fc == XPT_ATA_IO) || (fc == XPT_SMP_IO)
             || (fc == XPT_DEV_MATCH) || (fc == XPT_DEV_ADVINFO) || (fc == XPT_MMC_IO)
             || (fc == XPT_NVME_ADMIN) || (fc == XPT_NVME_IO)) {
-
 		bzero(&mapinfo, sizeof(mapinfo));
 
 		/*
@@ -2266,7 +2261,7 @@ passerror(union ccb *ccb, u_int32_t cam_flags, u_int32_t sense_flags)
 
 	periph = xpt_path_periph(ccb->ccb_h.path);
 	softc = (struct pass_softc *)periph->softc;
-	
+
 	return(cam_periph_error(ccb, cam_flags, sense_flags));
 }
 // CHERI CHANGES START

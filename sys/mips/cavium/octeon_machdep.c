@@ -60,6 +60,7 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_object.h>
 #include <vm/vm_page.h>
 #include <vm/vm_phys.h>
+#include <vm/vm_dumpset.h>
 
 #include <machine/atomic.h>
 #include <machine/cache.h>
@@ -341,7 +342,6 @@ platform_start(__register_t a0, __register_t a1, __register_t a2 __unused,
 	printf("MAC address base: %6D (%u configured)\n",
 	       cvmx_sysinfo_get()->mac_addr_base, ":",
 	       cvmx_sysinfo_get()->mac_addr_count);
-
 
 	octeon_ciu_reset();
 	/*

@@ -85,7 +85,6 @@ nvme_identify_match(caddr_t identbuffer, caddr_t table_entry)
 	return 0;
 }
 
-
 void
 nvme_print_ident(const struct nvme_controller_data *cdata,
     const struct nvme_namespace_data *data, struct sbuf *sb)
@@ -153,7 +152,12 @@ nvme_cmd_string(const struct nvme_command *cmd, char *cmd_string, size_t len)
 	nvme_cmd_sbuf(cmd, &sb);
 
 	error = sbuf_finish(&sb);
-	if (error != 0 && error != ENOMEM)
+	if (error != 0 &&
+#ifdef _KERNEL
+	    error != ENOMEM)
+#else
+	    errno != ENOMEM)
+#endif
 		return ("");
 
 	return(sbuf_data(&sb));

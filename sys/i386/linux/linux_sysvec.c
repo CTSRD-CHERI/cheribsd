@@ -48,7 +48,6 @@ __FBSDID("$FreeBSD$");
 #include <sys/sysent.h>
 #include <sys/sysproto.h>
 #include <sys/vnode.h>
-#include <sys/eventhandler.h>
 
 #include <vm/vm.h>
 #include <vm/pmap.h>
@@ -103,10 +102,6 @@ static void	linux_vdso_deinstall(void *param);
 
 static int linux_szplatform;
 const char *linux_kplatform;
-
-static eventhandler_tag linux_exit_tag;
-static eventhandler_tag linux_exec_tag;
-static eventhandler_tag linux_thread_dtor_tag;
 
 #define LINUX_T_UNKNOWN  255
 static int _bsd_to_linux_trapcode[] = {
@@ -493,7 +488,6 @@ linux_rt_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	mtx_lock(&psp->ps_mtx);
 }
 
-
 /*
  * Send an interrupt to process.
  *
@@ -785,12 +779,24 @@ linux_fetch_syscall_args(struct thread *td)
 		sa->callp = &p->p_sysent->sv_table[p->p_sysent->sv_size - 1];
 	else
 		sa->callp = &p->p_sysent->sv_table[sa->code];
-	sa->narg = sa->callp->sy_narg;
 
 	td->td_retval[0] = 0;
 	td->td_retval[1] = frame->tf_edx;
 
 	return (0);
+}
+
+static void
+linux_set_syscall_retval(struct thread *td, int error)
+{
+	struct trapframe *frame = td->td_frame;
+
+	cpu_set_syscall_retval(td, error);
+
+	if (__predict_false(error != 0)) {
+		if (error != ERESTART && error != EJUSTRETURN)
+			frame->tf_eax = bsd_to_linux_errno(error);
+	}
 }
 
 /*
@@ -835,8 +841,6 @@ linux_get_machine(const char **dst)
 struct sysentvec linux_sysvec = {
 	.sv_size	= LINUX_SYS_MAXSYSCALL,
 	.sv_table	= linux_sysent,
-	.sv_errsize	= ELAST + 1,
-	.sv_errtbl	= linux_errtbl,
 	.sv_transtrap	= linux_translate_traps,
 	.sv_fixup	= linux_fixup,
 	.sv_sendsig	= linux_sendsig,
@@ -856,7 +860,7 @@ struct sysentvec linux_sysvec = {
 	.sv_fixlimit	= NULL,
 	.sv_maxssiz	= NULL,
 	.sv_flags	= SV_ABI_LINUX | SV_AOUT | SV_IA32 | SV_ILP32,
-	.sv_set_syscall_retval = cpu_set_syscall_retval,
+	.sv_set_syscall_retval = linux_set_syscall_retval,
 	.sv_fetch_syscall_args = linux_fetch_syscall_args,
 	.sv_syscallnames = NULL,
 	.sv_shared_page_base = LINUX_SHAREDPAGE,
@@ -864,14 +868,15 @@ struct sysentvec linux_sysvec = {
 	.sv_schedtail	= linux_schedtail,
 	.sv_thread_detach = linux_thread_detach,
 	.sv_trap	= NULL,
+	.sv_onexec	= linux_on_exec,
+	.sv_onexit	= linux_on_exit,
+	.sv_ontdexit	= linux_thread_dtor,
 };
 INIT_SYSENTVEC(aout_sysvec, &linux_sysvec);
 
 struct sysentvec elf_linux_sysvec = {
 	.sv_size	= LINUX_SYS_MAXSYSCALL,
 	.sv_table	= linux_sysent,
-	.sv_errsize	= ELAST + 1,
-	.sv_errtbl	= linux_errtbl,
 	.sv_transtrap	= linux_translate_traps,
 	.sv_fixup	= linux_fixup_elf,
 	.sv_sendsig	= linux_sendsig,
@@ -892,7 +897,7 @@ struct sysentvec elf_linux_sysvec = {
 	.sv_fixlimit	= NULL,
 	.sv_maxssiz	= NULL,
 	.sv_flags	= SV_ABI_LINUX | SV_IA32 | SV_ILP32 | SV_SHP,
-	.sv_set_syscall_retval = cpu_set_syscall_retval,
+	.sv_set_syscall_retval = linux_set_syscall_retval,
 	.sv_fetch_syscall_args = linux_fetch_syscall_args,
 	.sv_syscallnames = NULL,
 	.sv_shared_page_base = LINUX_SHAREDPAGE,
@@ -900,6 +905,9 @@ struct sysentvec elf_linux_sysvec = {
 	.sv_schedtail	= linux_schedtail,
 	.sv_thread_detach = linux_thread_detach,
 	.sv_trap	= NULL,
+	.sv_onexec	= linux_on_exec,
+	.sv_onexit	= linux_on_exit,
+	.sv_ontdexit	= linux_thread_dtor,
 };
 
 static void
@@ -1033,12 +1041,6 @@ linux_elf_modevent(module_t mod, int type, void *data)
 				linux_ioctl_register_handler(*lihp);
 			LIST_INIT(&futex_list);
 			mtx_init(&futex_mtx, "ftllk", NULL, MTX_DEF);
-			linux_exit_tag = EVENTHANDLER_REGISTER(process_exit, linux_proc_exit,
-			      NULL, 1000);
-			linux_exec_tag = EVENTHANDLER_REGISTER(process_exec, linux_proc_exec,
-			      NULL, 1000);
-			linux_thread_dtor_tag = EVENTHANDLER_REGISTER(thread_dtor,
-			    linux_thread_dtor, NULL, EVENTHANDLER_PRI_ANY);
 			linux_get_machine(&linux_kplatform);
 			linux_szplatform = roundup(strlen(linux_kplatform) + 1,
 			    sizeof(char *));
@@ -1065,9 +1067,6 @@ linux_elf_modevent(module_t mod, int type, void *data)
 			SET_FOREACH(lihp, linux_ioctl_handler_set)
 				linux_ioctl_unregister_handler(*lihp);
 			mtx_destroy(&futex_mtx);
-			EVENTHANDLER_DEREGISTER(process_exit, linux_exit_tag);
-			EVENTHANDLER_DEREGISTER(process_exec, linux_exec_tag);
-			EVENTHANDLER_DEREGISTER(thread_dtor, linux_thread_dtor_tag);
 			linux_dev_shm_destroy();
 			linux_osd_jail_deregister();
 			if (bootverbose)

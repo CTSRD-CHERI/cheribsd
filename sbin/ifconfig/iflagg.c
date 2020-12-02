@@ -30,7 +30,11 @@ static const char rcsid[] =
 
 #include "ifconfig.h"
 
-char lacpbuf[120];	/* LACP peer '[(a,a,a),(p,p,p)]' */
+static struct iflaggparam params = {
+	.lagg_type = LAGG_TYPE_DEFAULT,
+};
+
+static char lacpbuf[120];	/* LACP peer '[(a,a,a),(p,p,p)]' */
 
 static void
 setlaggport(const char *val, int d, int s, const struct afswtch *afp)
@@ -301,7 +305,30 @@ lagg_status(int s)
 	}
 }
 
+static
+DECL_CMD_FUNC(setlaggtype, arg, d)
+{
+	static const struct lagg_types lt[] = LAGG_TYPES;
+	int i;
+
+	for (i = 0; i < nitems(lt); i++) {
+		if (strcmp(arg, lt[i].lt_name) == 0) {
+			params.lagg_type = lt[i].lt_value;
+			return;
+		}
+	}
+	errx(1, "invalid lagg type: %s", arg);
+}
+
+static void
+lagg_create(int s, struct ifreq *ifr)
+{
+	ifr->ifr_data = (caddr_t) &params;
+	ioctl_ifcreate(s, ifr);
+}
+
 static struct cmd lagg_cmds[] = {
+	DEF_CLONE_CMD_ARG("laggtype",   setlaggtype),
 	DEF_CMD_ARG("laggport",		setlaggport),
 	DEF_CMD_ARG("-laggport",	unsetlaggport),
 	DEF_CMD_ARG("laggproto",	setlaggproto),
@@ -335,4 +362,5 @@ lagg_ctor(void)
 	for (i = 0; i < nitems(lagg_cmds);  i++)
 		cmd_register(&lagg_cmds[i]);
 	af_register(&af_lagg);
+	clone_setdefcallback_prefix("lagg", lagg_create);
 }

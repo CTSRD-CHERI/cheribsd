@@ -50,10 +50,6 @@ __FBSDID("$FreeBSD$");
 
 #include "g_part_if.h"
 
-#ifndef _PATH_DEV
-#define _PATH_DEV "/dev/"
-#endif
-
 static kobj_method_t g_part_null_methods[] = {
 	{ 0, 0 }
 };
@@ -80,6 +76,7 @@ struct g_part_alias_list {
 	{ "apple-raid-offline", G_PART_ALIAS_APPLE_RAID_OFFLINE },
 	{ "apple-tv-recovery", G_PART_ALIAS_APPLE_TV_RECOVERY },
 	{ "apple-ufs", G_PART_ALIAS_APPLE_UFS },
+	{ "apple-zfs", G_PART_ALIAS_APPLE_ZFS },
 	{ "bios-boot", G_PART_ALIAS_BIOS_BOOT },
 	{ "chromeos-firmware", G_PART_ALIAS_CHROMEOS_FIRMWARE },
 	{ "chromeos-kernel", G_PART_ALIAS_CHROMEOS_KERNEL },
@@ -126,6 +123,14 @@ struct g_part_alias_list {
 	{ "ntfs", G_PART_ALIAS_MS_NTFS },
 	{ "openbsd-data", G_PART_ALIAS_OPENBSD_DATA },
 	{ "prep-boot", G_PART_ALIAS_PREP_BOOT },
+        { "solaris-boot", G_PART_ALIAS_SOLARIS_BOOT },
+        { "solaris-root", G_PART_ALIAS_SOLARIS_ROOT },
+        { "solaris-swap", G_PART_ALIAS_SOLARIS_SWAP },
+        { "solaris-backup", G_PART_ALIAS_SOLARIS_BACKUP },
+        { "solaris-var", G_PART_ALIAS_SOLARIS_VAR },
+        { "solaris-home", G_PART_ALIAS_SOLARIS_HOME },
+        { "solaris-altsec", G_PART_ALIAS_SOLARIS_ALTSEC },
+	{ "solaris-reserved", G_PART_ALIAS_SOLARIS_RESERVED },
 	{ "vmware-reserved", G_PART_ALIAS_VMRESERVED },
 	{ "vmware-vmfs", G_PART_ALIAS_VMFS },
 	{ "vmware-vmkdiag", G_PART_ALIAS_VMKDIAG },
@@ -135,9 +140,9 @@ struct g_part_alias_list {
 SYSCTL_DECL(_kern_geom);
 SYSCTL_NODE(_kern_geom, OID_AUTO, part, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
     "GEOM_PART stuff");
-static u_int check_integrity = 1;
+u_int geom_part_check_integrity = 1;
 SYSCTL_UINT(_kern_geom_part, OID_AUTO, check_integrity,
-    CTLFLAG_RWTUN, &check_integrity, 1,
+    CTLFLAG_RWTUN, &geom_part_check_integrity, 1,
     "Enable integrity checking");
 static u_int auto_resize = 1;
 SYSCTL_UINT(_kern_geom_part, OID_AUTO, auto_resize,
@@ -312,7 +317,6 @@ g_part_get_physpath_done(struct bio *bp)
 	g_std_done(bp);
 }
 
-
 #define	DPRINTF(...)	if (bootverbose) {	\
 	printf("GEOM_PART: " __VA_ARGS__);	\
 }
@@ -424,7 +428,7 @@ g_part_check_integrity(struct g_part_table *table, struct g_consumer *cp)
 	if (failed != 0) {
 		printf("GEOM_PART: integrity check failed (%s, %s)\n",
 		    pp->name, table->gpt_scheme->name);
-		if (check_integrity != 0)
+		if (geom_part_check_integrity != 0)
 			return (EINVAL);
 		table->gpt_corrupt = 1;
 	}
@@ -1848,7 +1852,8 @@ g_part_ctlreq(struct gctl_req *req, struct g_class *mp, const char *verb)
 		table = gpp.gpp_geom->softc;
 		if (table != NULL && table->gpt_corrupt &&
 		    ctlreq != G_PART_CTL_DESTROY &&
-		    ctlreq != G_PART_CTL_RECOVER) {
+		    ctlreq != G_PART_CTL_RECOVER &&
+		    geom_part_check_integrity) {
 			gctl_error(req, "%d table '%s' is corrupt",
 			    EPERM, gpp.gpp_geom->name);
 			return;

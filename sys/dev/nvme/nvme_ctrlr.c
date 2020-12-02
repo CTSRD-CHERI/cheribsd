@@ -520,7 +520,7 @@ nvme_ctrlr_create_qpairs(struct nvme_controller *ctrlr)
 		}
 
 		status.done = 0;
-		nvme_ctrlr_cmd_create_io_sq(qpair->ctrlr, qpair,
+		nvme_ctrlr_cmd_create_io_sq(ctrlr, qpair,
 		    nvme_completion_poll_cb, &status);
 		nvme_completion_poll(&status);
 		if (nvme_completion_is_error(&status.cpl)) {
@@ -745,7 +745,6 @@ nvme_ctrlr_async_event_log_page_cb(void *arg, const struct nvme_completion *cpl)
 			}
 		}
 
-
 		/*
 		 * Pass the cpl data from the original async event completion,
 		 *  not the log page fetch.
@@ -835,7 +834,8 @@ nvme_ctrlr_configure_aer(struct nvme_controller *ctrlr)
 	    NVME_CRIT_WARN_ST_READ_ONLY |
 	    NVME_CRIT_WARN_ST_VOLATILE_MEMORY_BACKUP;
 	if (ctrlr->cdata.ver >= NVME_REV(1, 2))
-		ctrlr->async_event_config |= 0x300;
+		ctrlr->async_event_config |= NVME_ASYNC_EVENT_NS_ATTRIBUTE |
+		    NVME_ASYNC_EVENT_FW_ACTIVATE;
 
 	status.done = 0;
 	nvme_ctrlr_cmd_get_feature(ctrlr, NVME_FEAT_TEMPERATURE_THRESHOLD,
@@ -1056,10 +1056,19 @@ nvme_ctrlr_start(void *ctrlr_arg, bool resetting)
 	if (resetting)
 		nvme_qpair_reset(&ctrlr->adminq);
 
-	for (i = 0; i < ctrlr->num_io_queues; i++)
-		nvme_qpair_reset(&ctrlr->ioq[i]);
+	if (ctrlr->ioq != NULL) {
+		for (i = 0; i < ctrlr->num_io_queues; i++)
+			nvme_qpair_reset(&ctrlr->ioq[i]);
+	}
 
 	nvme_admin_qpair_enable(&ctrlr->adminq);
+
+	/*
+	 * If it was a reset on initialization command timeout, just
+	 * return here, letting initialization code fail gracefully.
+	 */
+	if (resetting && !ctrlr->is_initialized)
+		return;
 
 	if (nvme_ctrlr_identify(ctrlr) != 0) {
 		nvme_ctrlr_fail(ctrlr);
@@ -1115,7 +1124,6 @@ void
 nvme_ctrlr_start_config_hook(void *arg)
 {
 	struct nvme_controller *ctrlr = arg;
-	int status;
 
 	/*
 	 * Reset controller twice to ensure we do a transition from cc.en==1 to
@@ -1123,19 +1131,16 @@ nvme_ctrlr_start_config_hook(void *arg)
 	 * controller was left in when boot handed off to OS.  Linux doesn't do
 	 * this, however. If we adopt that policy, see also nvme_ctrlr_resume().
 	 */
-	status = nvme_ctrlr_hw_reset(ctrlr);
-	if (status != 0) {
+	if (nvme_ctrlr_hw_reset(ctrlr) != 0) {
+fail:
 		nvme_ctrlr_fail(ctrlr);
 		config_intrhook_disestablish(&ctrlr->config_hook);
+		ctrlr->config_hook.ich_arg = NULL;
 		return;
 	}
 
-	status = nvme_ctrlr_hw_reset(ctrlr);
-	if (status != 0) {
-		nvme_ctrlr_fail(ctrlr);
-		config_intrhook_disestablish(&ctrlr->config_hook);
-		return;
-	}
+	if (nvme_ctrlr_hw_reset(ctrlr) != 0)
+		goto fail;
 
 	nvme_qpair_reset(&ctrlr->adminq);
 	nvme_admin_qpair_enable(&ctrlr->adminq);
@@ -1144,10 +1149,11 @@ nvme_ctrlr_start_config_hook(void *arg)
 	    nvme_ctrlr_construct_io_qpairs(ctrlr) == 0)
 		nvme_ctrlr_start(ctrlr, false);
 	else
-		nvme_ctrlr_fail(ctrlr);
+		goto fail;
 
 	nvme_sysctl_initialize_ctrlr(ctrlr);
 	config_intrhook_disestablish(&ctrlr->config_hook);
+	ctrlr->config_hook.ich_arg = NULL;
 
 	ctrlr->is_initialized = 1;
 	nvme_notify_new_controller(ctrlr);
@@ -1245,7 +1251,7 @@ nvme_ctrlr_passthrough_cmd(struct nvme_controller *ctrlr,
 		 * pages. Ensure this request has fewer than MAXPHYS bytes when
 		 * extended to full pages.
 		 */
-		addr = (vm_offset_t)pt->buf;
+		addr = (__cheri_addr vm_offset_t)pt->buf;
 		end = round_page(addr + pt->len);
 		addr = trunc_page(addr);
 		if (end - addr > MAXPHYS)
@@ -1264,16 +1270,16 @@ nvme_ctrlr_passthrough_cmd(struct nvme_controller *ctrlr,
 			 */
 			PHOLD(curproc);
 			buf = uma_zalloc(pbuf_zone, M_WAITOK);
-			buf->b_bufsize = pt->len;
 			buf->b_iocmd = pt->is_read ? BIO_READ : BIO_WRITE;
-			if (vmapbuf(buf, pt->buf, 1) < 0) {
+			if (vmapbuf(buf, pt->buf, pt->len, 1) < 0) {
 				ret = EFAULT;
 				goto err;
 			}
 			req = nvme_allocate_request_vaddr(buf->b_data, pt->len, 
 			    nvme_pt_done, pt);
 		} else
-			req = nvme_allocate_request_vaddr(pt->buf, pt->len,
+			req = nvme_allocate_request_vaddr(
+			    (__cheri_fromcap void *)pt->buf, pt->len,
 			    nvme_pt_done, pt);
 	} else
 		req = nvme_allocate_request_null(nvme_pt_done, pt);
@@ -1340,6 +1346,9 @@ nvme_ctrlr_ioctl(struct cdev *cdev, u_long cmd, caddr_t arg, int flag,
 		gnsid->nsid = 0;
 		break;
 	}
+	case NVME_GET_MAX_XFER_SIZE:
+		*(uint64_t *)arg = ctrlr->max_xfer_size;
+		break;
 	default:
 		return (ENOTTY);
 	}
@@ -1359,7 +1368,7 @@ nvme_ctrlr_construct(struct nvme_controller *ctrlr, device_t dev)
 	struct make_dev_args	md_args;
 	uint32_t	cap_lo;
 	uint32_t	cap_hi;
-	uint32_t	to;
+	uint32_t	to, vs, pmrcap;
 	uint8_t		mpsmin;
 	int		status, timeout_period;
 
@@ -1369,14 +1378,53 @@ nvme_ctrlr_construct(struct nvme_controller *ctrlr, device_t dev)
 	if (bus_get_domain(dev, &ctrlr->domain) != 0)
 		ctrlr->domain = 0;
 
+	cap_lo = nvme_mmio_read_4(ctrlr, cap_lo);
+	if (bootverbose) {
+		device_printf(dev, "CapLo: 0x%08x: MQES %u%s%s%s%s, TO %u\n",
+		    cap_lo, NVME_CAP_LO_MQES(cap_lo),
+		    NVME_CAP_LO_CQR(cap_lo) ? ", CQR" : "",
+		    NVME_CAP_LO_AMS(cap_lo) ? ", AMS" : "",
+		    (NVME_CAP_LO_AMS(cap_lo) & 0x1) ? " WRRwUPC" : "",
+		    (NVME_CAP_LO_AMS(cap_lo) & 0x2) ? " VS" : "",
+		    NVME_CAP_LO_TO(cap_lo));
+	}
 	cap_hi = nvme_mmio_read_4(ctrlr, cap_hi);
+	if (bootverbose) {
+		device_printf(dev, "CapHi: 0x%08x: DSTRD %u%s, CSS %x%s, "
+		    "MPSMIN %u, MPSMAX %u%s%s\n", cap_hi,
+		    NVME_CAP_HI_DSTRD(cap_hi),
+		    NVME_CAP_HI_NSSRS(cap_hi) ? ", NSSRS" : "",
+		    NVME_CAP_HI_CSS(cap_hi),
+		    NVME_CAP_HI_BPS(cap_hi) ? ", BPS" : "",
+		    NVME_CAP_HI_MPSMIN(cap_hi),
+		    NVME_CAP_HI_MPSMAX(cap_hi),
+		    NVME_CAP_HI_PMRS(cap_hi) ? ", PMRS" : "",
+		    NVME_CAP_HI_CMBS(cap_hi) ? ", CMBS" : "");
+	}
+	if (bootverbose) {
+		vs = nvme_mmio_read_4(ctrlr, vs);
+		device_printf(dev, "Version: 0x%08x: %d.%d\n", vs,
+		    NVME_MAJOR(vs), NVME_MINOR(vs));
+	}
+	if (bootverbose && NVME_CAP_HI_PMRS(cap_hi)) {
+		pmrcap = nvme_mmio_read_4(ctrlr, pmrcap);
+		device_printf(dev, "PMRCap: 0x%08x: BIR %u%s%s, PMRTU %u, "
+		    "PMRWBM %x, PMRTO %u%s\n", pmrcap,
+		    NVME_PMRCAP_BIR(pmrcap),
+		    NVME_PMRCAP_RDS(pmrcap) ? ", RDS" : "",
+		    NVME_PMRCAP_WDS(pmrcap) ? ", WDS" : "",
+		    NVME_PMRCAP_PMRTU(pmrcap),
+		    NVME_PMRCAP_PMRWBM(pmrcap),
+		    NVME_PMRCAP_PMRTO(pmrcap),
+		    NVME_PMRCAP_CMSS(pmrcap) ? ", CMSS" : "");
+	}
+
 	ctrlr->dstrd = NVME_CAP_HI_DSTRD(cap_hi) + 2;
 
 	mpsmin = NVME_CAP_HI_MPSMIN(cap_hi);
 	ctrlr->min_page_size = 1 << (12 + mpsmin);
 
 	/* Get ready timeout value from controller, in units of 500ms. */
-	cap_lo = nvme_mmio_read_4(ctrlr, cap_lo);
 	to = NVME_CAP_LO_TO(cap_lo) + 1;
 	ctrlr->ready_timeout_in_ms = to * 500;
 
@@ -1453,12 +1501,14 @@ nvme_ctrlr_destruct(struct nvme_controller *ctrlr, device_t dev)
 				nvme_ctrlr_hmb_enable(ctrlr, false, false);
 			nvme_ctrlr_delete_qpairs(ctrlr);
 		}
+		nvme_ctrlr_hmb_free(ctrlr);
+	}
+	if (ctrlr->ioq != NULL) {
 		for (i = 0; i < ctrlr->num_io_queues; i++)
 			nvme_io_qpair_destroy(&ctrlr->ioq[i]);
 		free(ctrlr->ioq, M_NVME);
-		nvme_ctrlr_hmb_free(ctrlr);
-		nvme_admin_qpair_destroy(&ctrlr->adminq);
 	}
+	nvme_admin_qpair_destroy(&ctrlr->adminq);
 
 	/*
 	 *  Notify the controller of a shutdown, even though this is due to
@@ -1500,22 +1550,24 @@ nvme_ctrlr_shutdown(struct nvme_controller *ctrlr)
 {
 	uint32_t	cc;
 	uint32_t	csts;
-	int		ticks = 0;
+	int		ticks = 0, timeout;
 
 	cc = nvme_mmio_read_4(ctrlr, cc);
 	cc &= ~(NVME_CC_REG_SHN_MASK << NVME_CC_REG_SHN_SHIFT);
 	cc |= NVME_SHN_NORMAL << NVME_CC_REG_SHN_SHIFT;
 	nvme_mmio_write_4(ctrlr, cc, cc);
 
+	timeout = ctrlr->cdata.rtd3e == 0 ? 5 * hz :
+	    ((uint64_t)ctrlr->cdata.rtd3e * hz + 999999) / 1000000;
 	while (1) {
 		csts = nvme_mmio_read_4(ctrlr, csts);
 		if (csts == 0xffffffff)		/* Hot unplug. */
 			break;
 		if (NVME_CSTS_GET_SHST(csts) == NVME_SHST_COMPLETE)
 			break;
-		if (ticks++ > 5*hz) {
+		if (ticks++ > timeout) {
 			nvme_printf(ctrlr, "did not complete shutdown within"
-			    " 5 seconds of notification\n");
+			    " %d ticks of notification\n", timeout);
 			break;
 		}
 		pause("nvme shn", 1);

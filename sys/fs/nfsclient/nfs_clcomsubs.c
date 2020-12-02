@@ -62,7 +62,7 @@ nfsm_uiombuf(struct nfsrv_descript *nd, struct uio *uiop, int siz)
 	struct mbuf *mp, *mp2;
 	int xfer, left, mlen;
 	int uiosiz, clflg, rem;
-	char *cp;
+	char *mcp;
 
 	KASSERT(uiop->uio_iovcnt == 1, ("nfsm_uiotombuf: iovcnt != 1"));
 
@@ -72,41 +72,52 @@ nfsm_uiombuf(struct nfsrv_descript *nd, struct uio *uiop, int siz)
 		clflg = 0;
 	rem = NFSM_RNDUP(siz) - siz;
 	mp = mp2 = nd->nd_mb;
+	mcp = nd->nd_bpos;
 	while (siz > 0) {
+		KASSERT((nd->nd_flag & ND_EXTPG) != 0 || mcp ==
+		    mtod(mp, char *) + mp->m_len, ("nfsm_uiombuf: mcp wrong"));
 		left = uiop->uio_iov->iov_len;
 		uiocp = uiop->uio_iov->iov_base;
 		if (left > siz)
 			left = siz;
 		uiosiz = left;
 		while (left > 0) {
-			mlen = M_TRAILINGSPACE(mp);
-			if (mlen == 0) {
-				if (clflg)
-					NFSMCLGET(mp, M_WAITOK);
-				else
-					NFSMGET(mp);
-				mp->m_len = 0;
-				mp2->m_next = mp;
-				mp2 = mp;
+			if ((nd->nd_flag & ND_EXTPG) != 0)
+				mlen = nd->nd_bextpgsiz;
+			else
 				mlen = M_TRAILINGSPACE(mp);
+			if (mlen == 0) {
+				if ((nd->nd_flag & ND_EXTPG) != 0) {
+					mp = nfsm_add_ext_pgs(mp,
+					    nd->nd_maxextsiz, &nd->nd_bextpg);
+					mcp = (char *)(void *)PHYS_TO_DMAP(
+					  mp->m_epg_pa[nd->nd_bextpg]);
+					nd->nd_bextpgsiz = mlen = PAGE_SIZE;
+				} else {
+					if (clflg)
+						NFSMCLGET(mp, M_WAITOK);
+					else
+						NFSMGET(mp);
+					mp->m_len = 0;
+					mlen = M_TRAILINGSPACE(mp);
+					mcp = mtod(mp, char *);
+					mp2->m_next = mp;
+					mp2 = mp;
+				}
 			}
 			xfer = (left > mlen) ? mlen : left;
-#ifdef notdef
-			/* Not Yet.. */
-			if (uiop->uio_iov->iov_op != NULL)
-				(*(uiop->uio_iov->iov_op))
-				(uiocp, mtod(mp, caddr_t) + mp->m_len,
-				    xfer);
-			else
-#endif
 			if (uiop->uio_segflg == UIO_SYSSPACE)
-			    NFSBCOPY((__cheri_fromcap char *)uiocp,
-				mtod(mp, caddr_t) + mp->m_len, xfer);
+				NFSBCOPY((__cheri_fromcap char *)uiocp, mcp, xfer);
 			else
-			    copyin(uiocp, mtod(mp, caddr_t) + mp->m_len, xfer);
+				copyin(uiocp, mcp, xfer);
 			mp->m_len += xfer;
 			left -= xfer;
 			uiocp += xfer;
+			mcp += xfer;
+			if ((nd->nd_flag & ND_EXTPG) != 0) {
+				nd->nd_bextpgsiz -= xfer;
+				mp->m_epg_last_len += xfer;
+			}
 			uiop->uio_offset += xfer;
 			uiop->uio_resid -= xfer;
 		}
@@ -114,18 +125,29 @@ nfsm_uiombuf(struct nfsrv_descript *nd, struct uio *uiop, int siz)
 		siz -= uiosiz;
 	}
 	if (rem > 0) {
-		if (rem > M_TRAILINGSPACE(mp)) {
+		if ((nd->nd_flag & ND_EXTPG) == 0 && rem >
+		    M_TRAILINGSPACE(mp)) {
 			NFSMGET(mp);
 			mp->m_len = 0;
 			mp2->m_next = mp;
+			mcp = mtod(mp, char *);
+		} else if ((nd->nd_flag & ND_EXTPG) != 0 && rem >
+		    nd->nd_bextpgsiz) {
+			mp = nfsm_add_ext_pgs(mp, nd->nd_maxextsiz,
+			    &nd->nd_bextpg);
+			mcp = (char *)(void *)
+			    PHYS_TO_DMAP(mp->m_epg_pa[nd->nd_bextpg]);
+			nd->nd_bextpgsiz = PAGE_SIZE;
 		}
-		cp = mtod(mp, caddr_t) + mp->m_len;
 		for (left = 0; left < rem; left++)
-			*cp++ = '\0';
+			*mcp++ = '\0';
 		mp->m_len += rem;
-		nd->nd_bpos = cp;
-	} else
-		nd->nd_bpos = mtod(mp, caddr_t) + mp->m_len;
+		if ((nd->nd_flag & ND_EXTPG) != 0) {
+			nd->nd_bextpgsiz -= rem;
+			mp->m_epg_last_len += rem;
+		}
+	}
+	nd->nd_bpos = mcp;
 	nd->nd_mb = mp;
 }
 
@@ -135,25 +157,35 @@ nfsm_uiombuf(struct nfsrv_descript *nd, struct uio *uiop, int siz)
  * NOTE: can ony handle iovcnt == 1
  */
 struct mbuf *
-nfsm_uiombuflist(struct uio *uiop, int siz, struct mbuf **mbp, char **cpp)
+nfsm_uiombuflist(struct uio *uiop, int siz, u_int maxext)
 {
 	char * __capability uiocp;
 	struct mbuf *mp, *mp2, *firstmp;
-	int xfer, left, mlen;
+	int extpg, extpgsiz = 0, i, left, mlen, rem, xfer;
 	int uiosiz, clflg;
+	char *mcp;
 
 	KASSERT(uiop->uio_iovcnt == 1, ("nfsm_uiotombuf: iovcnt != 1"));
 
-	if (siz > ncl_mbuf_mlen)	/* or should it >= MCLBYTES ?? */
-		clflg = 1;
-	else
-		clflg = 0;
-	if (clflg != 0)
-		NFSMCLGET(mp, M_WAITOK);
-	else
-		NFSMGET(mp);
+	if (maxext > 0) {
+		mp = mb_alloc_ext_plus_pages(PAGE_SIZE, M_WAITOK);
+		mcp = (char *)(void *)PHYS_TO_DMAP(mp->m_epg_pa[0]);
+		extpg = 0;
+		extpgsiz = PAGE_SIZE;
+	} else {
+		if (siz > ncl_mbuf_mlen) /* or should it >= MCLBYTES ?? */
+			clflg = 1;
+		else
+			clflg = 0;
+		if (clflg != 0)
+			NFSMCLGET(mp, M_WAITOK);
+		else
+			NFSMGET(mp);
+		mcp = mtod(mp, char *);
+	}
 	mp->m_len = 0;
 	firstmp = mp2 = mp;
+	rem = NFSM_RNDUP(siz) - siz;
 	while (siz > 0) {
 		left = uiop->uio_iov->iov_len;
 		uiocp = uiop->uio_iov->iov_base;
@@ -161,25 +193,41 @@ nfsm_uiombuflist(struct uio *uiop, int siz, struct mbuf **mbp, char **cpp)
 			left = siz;
 		uiosiz = left;
 		while (left > 0) {
-			mlen = M_TRAILINGSPACE(mp);
-			if (mlen == 0) {
-				if (clflg)
-					NFSMCLGET(mp, M_WAITOK);
-				else
-					NFSMGET(mp);
-				mp->m_len = 0;
-				mp2->m_next = mp;
-				mp2 = mp;
+			if (maxext > 0)
+				mlen = extpgsiz;
+			else
 				mlen = M_TRAILINGSPACE(mp);
+			if (mlen == 0) {
+				if (maxext > 0) {
+					mp = nfsm_add_ext_pgs(mp, maxext,
+					    &extpg);
+					mlen = extpgsiz = PAGE_SIZE;
+					mcp = (char *)(void *)PHYS_TO_DMAP(
+					    mp->m_epg_pa[extpg]);
+				} else {
+					if (clflg)
+						NFSMCLGET(mp, M_WAITOK);
+					else
+						NFSMGET(mp);
+					mcp = mtod(mp, char *);
+					mlen = M_TRAILINGSPACE(mp);
+					mp->m_len = 0;
+					mp2->m_next = mp;
+					mp2 = mp;
+				}
 			}
 			xfer = (left > mlen) ? mlen : left;
 			if (uiop->uio_segflg == UIO_SYSSPACE)
 				NFSBCOPY((__cheri_fromcap char *)uiocp,
-				    mtod(mp, caddr_t) + mp->m_len, xfer);
+				    mcp, xfer);
 			else
-				copyin(uiocp,
-				    mtod(mp, caddr_t) + mp->m_len, xfer);
+				copyin(uiocp, mcp, xfer);
 			mp->m_len += xfer;
+			mcp += xfer;
+			if (maxext > 0) {
+				extpgsiz -= xfer;
+				mp->m_epg_last_len += xfer;
+			}
 			left -= xfer;
 			uiocp += xfer;
 			uiop->uio_offset += xfer;
@@ -188,10 +236,16 @@ nfsm_uiombuflist(struct uio *uiop, int siz, struct mbuf **mbp, char **cpp)
 		IOVEC_ADVANCE(uiop->uio_iov, uiosiz);
 		siz -= uiosiz;
 	}
-	if (cpp != NULL)
-		*cpp = mtod(mp, caddr_t) + mp->m_len;
-	if (mbp != NULL)
-		*mbp = mp;
+	if (rem > 0) {
+		KASSERT((mp->m_flags & M_EXTPG) != 0 ||
+		    rem <= M_TRAILINGSPACE(mp),
+		    ("nfsm_uiombuflist: no space for padding"));
+		for (i = 0; i < rem; i++)
+			*mcp++ = '\0';
+		mp->m_len += rem;
+		if (maxext > 0)
+			mp->m_epg_last_len += rem;
+	}
 	return (firstmp);
 }
 
@@ -426,7 +480,6 @@ nfscl_lockderef(struct nfsv4lock *lckp)
 	}
 	NFSUNLOCKCLSTATE();
 }
-
 // CHERI CHANGES START
 // {
 //   "updated": 20191025,

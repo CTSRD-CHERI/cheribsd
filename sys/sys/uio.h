@@ -99,7 +99,7 @@ int	uiomove_fromphys(struct vm_page *ma[], vm_offset_t offset, int n,
 	    struct uio *uio);
 int	uiomove_nofault(void *cp, int n, struct uio *uio);
 int	uiomove_object(struct vm_object *obj, off_t obj_size, struct uio *uio);
-int	updateiov(const struct uio *uiop, struct iovec *iovp);
+int	updateiov(const struct uio *uiop, struct iovec * __capability iovp);
 
 #else /* !_KERNEL */
 

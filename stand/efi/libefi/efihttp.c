@@ -36,6 +36,7 @@ __FBSDID("$FreeBSD$");
 #include <netinet/in_systm.h>
 
 #include <stand.h>
+#include <bootstrap.h>
 #include <net.h>
 
 #include <efi.h>
@@ -575,6 +576,14 @@ efihttp_fs_open(const char *path, struct open_file *f)
 	 */
 	err = _efihttp_fs_open(path, f);
 	if (err != 0) {
+		/*
+		 * Work around a bug in the EFI HTTP implementation which
+		 * causes a crash if the http instance isn't torn down
+		 * between requests.
+		 * See https://bugzilla.tianocore.org/show_bug.cgi?id=1917
+		 */
+		efihttp_dev_close(f);
+		efihttp_dev_open(f);
 		path_slash = malloc(strlen(path) + 2);
 		if (path_slash == NULL)
 			return (ENOMEM);
@@ -718,6 +727,14 @@ efihttp_fs_seek(struct open_file *f, off_t offset, int where)
 		path = fh->path;
 		fh->path = NULL;
 		efihttp_fs_close(f);
+		/*
+		 * Work around a bug in the EFI HTTP implementation which
+		 * causes a crash if the http instance isn't torn down
+		 * between requests.
+		 * See https://bugzilla.tianocore.org/show_bug.cgi?id=1917
+		 */
+		efihttp_dev_close(f);
+		efihttp_dev_open(f);
 		err = efihttp_fs_open(path, f);
 		free(path);
 		if (err != 0)

@@ -2,7 +2,6 @@
  * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
  *
  * Copyright (c) 2012 The FreeBSD Foundation
- * All rights reserved.
  *
  * This software was developed by Edward Tomasz Napierala under sponsorship
  * from the FreeBSD Foundation.
@@ -367,8 +366,8 @@ iscsi_session_cleanup(struct iscsi_session *is, bool destroy_sim)
 	xpt_async(AC_LOST_DEVICE, is->is_path, NULL);
 
 	if (is->is_simq_frozen) {
-		xpt_release_simq(is->is_sim, 1);
 		is->is_simq_frozen = false;
+		xpt_release_simq(is->is_sim, 1);
 	}
 
 	xpt_free_path(is->is_path);
@@ -398,14 +397,14 @@ iscsi_maintenance_thread_reconnect(struct iscsi_session *is)
 	}
 	cv_signal(&is->is_login_cv);
 #endif
- 
+
 	if (fail_on_disconnection) {
 		ISCSI_SESSION_DEBUG(is, "connection failed, destroying devices");
 		iscsi_session_cleanup(is, true);
 	} else {
 		iscsi_session_cleanup(is, false);
 	}
- 
+
 	KASSERT(TAILQ_EMPTY(&is->is_outstanding),
 	    ("destroying session with active tasks"));
 	KASSERT(STAILQ_EMPTY(&is->is_postponed),
@@ -1037,7 +1036,7 @@ iscsi_pdu_handle_data_in(struct icl_pdu *response)
 	union ccb *ccb;
 	struct ccb_scsiio *csio;
 	size_t data_segment_len, received, oreceived;
-	
+
 	is = PDU_SESSION(response);
 	bhsdi = (struct iscsi_bhs_data_in *)response->ip_bhs;
 	io = iscsi_outstanding_find(is, bhsdi->bhsdi_initiator_task_tag);
@@ -1427,6 +1426,7 @@ iscsi_ioctl_daemon_handoff(struct iscsi_softc *sc,
 	    sizeof(is->is_target_alias));
 	is->is_tsih = handoff->idh_tsih;
 	is->is_statsn = handoff->idh_statsn;
+	is->is_protocol_level = handoff->idh_protocol_level;
 	is->is_initial_r2t = handoff->idh_initial_r2t;
 	is->is_immediate_data = handoff->idh_immediate_data;
 
@@ -1479,8 +1479,8 @@ iscsi_ioctl_daemon_handoff(struct iscsi_softc *sc,
 		KASSERT(is->is_simq_frozen, ("reconnect without frozen simq"));
 		ISCSI_SESSION_LOCK(is);
 		ISCSI_SESSION_DEBUG(is, "releasing");
-		xpt_release_simq(is->is_sim, 1);
 		is->is_simq_frozen = false;
+		xpt_release_simq(is->is_sim, 1);
 		ISCSI_SESSION_UNLOCK(is);
 
 	} else {
@@ -2300,6 +2300,11 @@ iscsi_action_scsiio(struct iscsi_session *is, union ccb *ccb)
 	} else
 		bhssc->bhssc_flags |= BHSSC_FLAGS_ATTR_UNTAGGED;
 
+	if (is->is_protocol_level >= 2) {
+		bhssc->bhssc_pri = (csio->priority << BHSSC_PRI_SHIFT) &
+		    BHSSC_PRI_MASK;
+	}
+
 	bhssc->bhssc_lun = htobe64(CAM_EXTLUN_BYTE_SWIZZLE(ccb->ccb_h.target_lun));
 	bhssc->bhssc_initiator_task_tag = initiator_task_tag;
 	bhssc->bhssc_expected_data_transfer_length = htonl(csio->dxfer_len);
@@ -2353,6 +2358,17 @@ iscsi_action(struct cam_sim *sim, union ccb *ccb)
 	if (is->is_terminating ||
 	    (is->is_connected == false && fail_on_disconnection)) {
 		ccb->ccb_h.status = CAM_DEV_NOT_THERE;
+		xpt_done(ccb);
+		return;
+	}
+
+	/*
+	 * Make sure CAM doesn't sneak in a CCB just after freezing the queue.
+	 */
+	if (is->is_simq_frozen == true) {
+		ccb->ccb_h.status &= ~(CAM_SIM_QUEUED | CAM_STATUS_MASK);
+		ccb->ccb_h.status |= CAM_REQUEUE_REQ;
+		/* Don't freeze the devq - the SIM queue is already frozen. */
 		xpt_done(ccb);
 		return;
 	}

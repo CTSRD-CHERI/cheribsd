@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 1984-2019  Mark Nudelman
+ * Copyright (C) 1984-2020  Mark Nudelman
  *
  * You may distribute under the terms of either the GNU General Public
  * License or the Less License, as specified in the README file.
@@ -265,6 +265,11 @@ extern int hilite_search;
 #endif
 #if MSDOS_COMPILER==WIN32C
 extern HANDLE tty;
+extern DWORD console_mode;
+#ifndef ENABLE_EXTENDED_FLAGS
+#define ENABLE_EXTENDED_FLAGS 0x80
+#define ENABLE_QUICK_EDIT_MODE 0x40
+#endif
 #else
 extern int tty;
 #endif
@@ -654,7 +659,6 @@ ltget_env(capname)
 	char *capname;
 {
 	char name[64];
-	char *s;
 
 	if (termcap_debug)
 	{
@@ -1092,7 +1096,6 @@ get_term(VOID_PARAM)
 #else
 #if MSDOS_COMPILER==WIN32C
     {
-	DWORD nread;
 	CONSOLE_SCREEN_BUFFER_INFO scr;
 
 	con_out_save = con_out = GetStdHandle(STD_OUTPUT_HANDLE);
@@ -1102,8 +1105,7 @@ get_term(VOID_PARAM)
 	 */
 	SET_BINARY(0);
 	GetConsoleScreenBufferInfo(con_out, &scr);
-	ReadConsoleOutputAttribute(con_out, &curr_attr, 
-					1, scr.dwCursorPosition, &nread);
+	curr_attr = scr.wAttributes;
 	sy_bg_color = (curr_attr & BG_COLORS) >> 4; /* normalize */
 	sy_fg_color = curr_attr & FG_COLORS;
     }
@@ -1134,8 +1136,11 @@ get_term(VOID_PARAM)
 	char *sp;
 	char *t1, *t2;
 	char *term;
-	char termbuf[TERMBUF_SIZE];
-
+	/*
+	 * Some termcap libraries assume termbuf is static
+	 * (accessible after tgetent returns).
+	 */
+	static char termbuf[TERMBUF_SIZE];
 	static char sbuf[TERMSBUF_SIZE];
 
 #if OS2
@@ -1158,12 +1163,13 @@ get_term(VOID_PARAM)
 	/*
 	 * Find out what kind of terminal this is.
 	 */
- 	if ((term = lgetenv("TERM")) == NULL)
- 		term = DEFAULT_TERM;
+	if ((term = lgetenv("TERM")) == NULL)
+		term = DEFAULT_TERM;
 	hardcopy = 0;
- 	if (tgetent(termbuf, term) != TGETENT_OK)
- 		hardcopy = 1;
- 	if (ltgetflag("hc"))
+	/* {{ Should probably just pass NULL instead of termbuf. }} */
+	if (tgetent(termbuf, term) != TGETENT_OK)
+		hardcopy = 1;
+	if (ltgetflag("hc"))
 		hardcopy = 1;
 
 	/*
@@ -1574,7 +1580,9 @@ init_mouse(VOID_PARAM)
 	tputs(sc_s_mousecap, sc_height, putchr);
 #else
 #if MSDOS_COMPILER==WIN32C
-	SetConsoleMode(tty, ENABLE_PROCESSED_INPUT | ENABLE_MOUSE_INPUT);
+	SetConsoleMode(tty, ENABLE_PROCESSED_INPUT | ENABLE_MOUSE_INPUT
+			    | ENABLE_EXTENDED_FLAGS /* disable quick edit */);
+
 #endif
 #endif
 }
@@ -1592,7 +1600,8 @@ deinit_mouse(VOID_PARAM)
 	tputs(sc_e_mousecap, sc_height, putchr);
 #else
 #if MSDOS_COMPILER==WIN32C
-	SetConsoleMode(tty, ENABLE_PROCESSED_INPUT);
+	SetConsoleMode(tty, ENABLE_PROCESSED_INPUT | ENABLE_EXTENDED_FLAGS
+			    | (console_mode & ENABLE_QUICK_EDIT_MODE));
 #endif
 #endif
 }
@@ -1628,8 +1637,13 @@ init(VOID_PARAM)
 		line_left();
 #else
 #if MSDOS_COMPILER==WIN32C
-	if (!no_init)
-		win32_init_term();
+	if (!(quit_if_one_screen && one_screen))
+	{
+		if (!no_init)
+			win32_init_term();
+		init_mouse();
+
+	}
 #endif
 	initcolor();
 	flush();
@@ -1658,8 +1672,12 @@ deinit(VOID_PARAM)
 	/* Restore system colors. */
 	SETCOLORS(sy_fg_color, sy_bg_color);
 #if MSDOS_COMPILER==WIN32C
-	if (!no_init)
-		win32_deinit_term();
+	if (!(quit_if_one_screen && one_screen))
+	{
+		deinit_mouse();
+		if (!no_init)
+			win32_deinit_term();
+	}
 #else
 	/* Need clreol to make SETCOLORS take effect. */
 	clreol();

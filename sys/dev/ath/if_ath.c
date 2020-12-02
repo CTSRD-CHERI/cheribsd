@@ -160,7 +160,6 @@ static int	ath_init(struct ath_softc *);
 static void	ath_stop(struct ath_softc *);
 static int	ath_reset_vap(struct ieee80211vap *, u_long);
 static int	ath_transmit(struct ieee80211com *, struct mbuf *);
-static int	ath_media_change(struct ifnet *);
 static void	ath_watchdog(void *);
 static void	ath_parent(struct ieee80211com *);
 static void	ath_fatal_proc(void *, int);
@@ -1221,7 +1220,6 @@ ath_attach(u_int16_t devid, struct ath_softc *sc)
 					 IEEE80211_HTC_TXLDPC;
 		}
 
-
 		device_printf(sc->sc_dev,
 		    "[HT] %d RX streams; %d TX streams\n", rxs, txs);
 	}
@@ -1767,8 +1765,8 @@ ath_vap_create(struct ieee80211com *ic, const char name[IFNAMSIZ], int unit,
 	ATH_UNLOCK(sc);
 
 	/* complete setup */
-	ieee80211_vap_attach(vap, ath_media_change, ieee80211_media_status,
-	    mac);
+	ieee80211_vap_attach(vap, ieee80211_media_change,
+	    ieee80211_media_status, mac);
 	return vap;
 bad2:
 	reclaim_address(sc, mac);
@@ -3540,16 +3538,8 @@ finish:
 	ATH_UNLOCK(sc);
 
 	ATH_KTR(sc, ATH_KTR_TX, 0, "ath_transmit: finished");
-	
-	return (retval);
-}
 
-static int
-ath_media_change(struct ifnet *ifp)
-{
-	int error = ieee80211_media_change(ifp);
-	/* NB: only the fixed rate can change and that doesn't need a reset */
-	return (error == ENETRESET ? 0 : error);
+	return (retval);
 }
 
 /*
@@ -4379,8 +4369,6 @@ ath_tx_process_buf_completion(struct ath_softc *sc, struct ath_txq *txq,
 	} else
 		bf->bf_comp(sc, bf, 0);
 }
-
-
 
 /*
  * Process completed xmit descriptors from the specified queue.
@@ -6103,7 +6091,6 @@ ath_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg)
 
 		taskqueue_unblock(sc->sc_tq);
 	} else if (nstate == IEEE80211_S_INIT) {
-
 		/* Quiet time handling - ensure we resync */
 		memset(&avp->quiet_ie, 0, sizeof(avp->quiet_ie));
 

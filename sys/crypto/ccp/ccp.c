@@ -78,6 +78,7 @@ static struct pciid {
 } ccp_ids[] = {
 	{ 0x14561022, "AMD CCP-5a" },
 	{ 0x14681022, "AMD CCP-5b" },
+	{ 0x14861022, "AMD CCP-5a" },
 	{ 0x15df1022, "AMD CCP-5a" },
 };
 
@@ -106,6 +107,10 @@ ccp_populate_sglist(struct sglist *sg, struct crypto_buffer *cb)
 		break;
 	case CRYPTO_BUF_CONTIG:
 		error = sglist_append(sg, cb->cb_buf, cb->cb_buf_len);
+		break;
+	case CRYPTO_BUF_VMPAGE:
+		error = sglist_append_vmpages(sg, cb->cb_vm_page,
+		    cb->cb_vm_page_len, cb->cb_vm_page_offset);
 		break;
 	default:
 		error = EINVAL;

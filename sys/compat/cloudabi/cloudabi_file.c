@@ -267,7 +267,7 @@ cloudabi_sys_file_open(struct thread *td,
 	}
 	NDINIT_ATRIGHTS(&nd, LOOKUP, FOLLOW, UIO_SYSSPACE, PTR2CAP(path),
 	    uap->dirfd.fd, &rights, td);
-	error = vn_open(&nd, &fflags, 0777 & ~td->td_proc->p_fd->fd_cmask, fp);
+	error = vn_open(&nd, &fflags, 0777 & ~td->td_proc->p_pd->pd_cmask, fp);
 	cloudabi_freestr(path);
 	if (error != 0) {
 		/* Custom operations provided. */
@@ -289,7 +289,8 @@ cloudabi_sys_file_open(struct thread *td,
 
 	/* Install vnode operations if no custom operations are provided. */
 	if (fp->f_ops == &badfileops) {
-		fp->f_seqcount = 1;
+		fp->f_seqcount[UIO_READ] = 1;
+		fp->f_seqcount[UIO_WRITE] = 1;
 		finit(fp, (fflags & FMASK) | (fp->f_flag & FHASLOCK),
 		    DTYPE_VNODE, vp, &vnops);
 	}

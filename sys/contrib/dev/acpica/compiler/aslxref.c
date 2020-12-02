@@ -433,6 +433,7 @@ XfNamespaceLocateBegin (
     UINT32                  i;
     ACPI_NAMESPACE_NODE     *DeclarationParentMethod;
     ACPI_PARSE_OBJECT       *ReferenceParentMethod;
+    char                    *ExternalPath;
 
 
     ACPI_FUNCTION_TRACE_PTR (XfNamespaceLocateBegin, Op);
@@ -994,12 +995,14 @@ XfNamespaceLocateBegin (
          * invocation of the method, it is simply a reference to the method.
          *
          * September 2016: Removed DeRefOf from this list
+         * July 2020: Added Alias to this list
          */
         if ((Op->Asl.Parent) &&
             ((Op->Asl.Parent->Asl.ParseOpcode == PARSEOP_REFOF)     ||
             (Op->Asl.Parent->Asl.ParseOpcode == PARSEOP_PACKAGE)    ||
             (Op->Asl.Parent->Asl.ParseOpcode == PARSEOP_VAR_PACKAGE)||
-            (Op->Asl.Parent->Asl.ParseOpcode == PARSEOP_OBJECTTYPE)))
+            (Op->Asl.Parent->Asl.ParseOpcode == PARSEOP_OBJECTTYPE) ||
+            (Op->Asl.Parent->Asl.ParseOpcode == PARSEOP_ALIAS)))
         {
             return_ACPI_STATUS (AE_OK);
         }
@@ -1261,7 +1264,15 @@ XfNamespaceLocateBegin (
         Op->Asl.Parent->Asl.ParseOpcode != PARSEOP_CONDREFOF &&
         !XfRefIsGuardedByIfCondRefOf (Node, Op))
     {
-        AslError (ASL_ERROR, ASL_MSG_UNDEFINED_EXTERNAL, Op, NULL);
+        ExternalPath = AcpiNsGetNormalizedPathname (Node, TRUE);
+        sprintf (AslGbl_MsgBuffer, "full path of external object: %s",
+            ExternalPath);
+        AslDualParseOpError (ASL_ERROR, ASL_MSG_UNDEFINED_EXTERNAL, Op, NULL,
+            ASL_MSG_EXTERNAL_FOUND_HERE, Node->Op, AslGbl_MsgBuffer);
+        if (ExternalPath)
+        {
+            ACPI_FREE (ExternalPath);
+        }
     }
 
     /* 5) Check for a connection object */

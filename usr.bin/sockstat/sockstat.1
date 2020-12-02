@@ -27,7 +27,7 @@
 .\"
 .\" $FreeBSD$
 .\"
-.Dd July 3, 2018
+.Dd September 13, 2020
 .Dt SOCKSTAT 1
 .Os
 .Sh NAME
@@ -35,7 +35,7 @@
 .Nd list open sockets
 .Sh SYNOPSIS
 .Nm
-.Op Fl 46cLlSsUuvw
+.Op Fl 46CcLlSsUuvw
 .Op Fl j Ar jid
 .Op Fl p Ar ports
 .Op Fl P Ar protocols
@@ -56,6 +56,9 @@ Show
 Show
 .Dv AF_INET6
 (IPv6) sockets.
+.It Fl C
+Display the congestion control module, if applicable.
+This is currently only implemented for TCP.
 .It Fl c
 Show connected sockets.
 .It Fl j Ar jail
@@ -171,12 +174,33 @@ is specified (only for SCTP or TCP).
 The protocol stack if
 .Fl S
 is specified (only for TCP).
+.It Li CC
+The congestion control if
+.Fl C
+is specified (only for TCP).
 .El
 .Pp
 If a socket is associated with more than one file descriptor,
 it is shown multiple times.
 If a socket is not associated with any file descriptor,
 the first four columns have no meaning.
+.Sh EXAMPLES
+Show information for IPv4 sockets listening on port 22 using protocol
+TCP:
+.Bd -literal -offset indent
+$ sockstat -4 -l -P tcp -p 22
+.Ed
+.Pp
+Show information for sockets using either TCP or UDP, if neither, the local nor
+the foreign addresses are in the loopback network:
+.Bd -literal -offset indent
+$ sockstat -L -P tcp,udp
+.Ed
+.Pp
+Show TCP IPv6 sockets which are listening and connected (default):
+.Bd -literal -offset indent
+$ sockstat -6 -P tcp
+.Ed
 .Sh SEE ALSO
 .Xr fstat 1 ,
 .Xr netstat 1 ,

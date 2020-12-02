@@ -220,7 +220,7 @@ _pam_exec(pam_handle_t *pamh,
 		if (pam_err != PAM_SUCCESS || item == NULL)
 			continue;
 		if (asprintf(&envstr, "%s=%s", pam_item_env[i].name,
-		     (const char *)item) < 0)
+		    (const char *)item) < 0)
 			OUT(PAM_BUF_ERR);
 		envlist[envlen++] = envstr;
 		envlist[envlen] = NULL;

@@ -70,7 +70,6 @@ __FBSDID("$FreeBSD$");
 #include "opt_ipsec.h"
 #include "opt_ipstealth.h"
 #include "opt_sctp.h"
-#include "opt_mpath.h"
 #include "opt_route.h"
 
 #include <sys/param.h>
@@ -333,11 +332,6 @@ IP6PROTOSPACER,
 },
 };
 
-extern int in6_inithead(void **, int, u_int);
-#ifdef VIMAGE
-extern int in6_detachhead(void **, int);
-#endif
-
 struct domain inet6domain = {
 	.dom_family =		AF_INET6,
 	.dom_name =		"internet6",
@@ -429,7 +423,7 @@ SYSCTL_NODE(_net_inet6,	IPPROTO_UDP, udp6, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
     "UDP6");
 SYSCTL_NODE(_net_inet6,	IPPROTO_TCP, tcp6, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
     "TCP6");
-#ifdef SCTP
+#if defined(SCTP) || defined(SCTP_SUPPORT)
 SYSCTL_NODE(_net_inet6,	IPPROTO_SCTP, sctp6, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
     "SCTP6");
 #endif
@@ -586,7 +580,7 @@ SYSCTL_INT(_net_inet6_icmp6, ICMPV6CTL_ND6_USELOOPBACK, nd6_useloopback,
 	"Create a loopback route when configuring an IPv6 address");
 SYSCTL_INT(_net_inet6_icmp6, ICMPV6CTL_NODEINFO, nodeinfo,
 	CTLFLAG_VNET | CTLFLAG_RW, &VNET_NAME(icmp6_nodeinfo), 0,
-	"Mask of enabled RF4620 node information query types");
+	"Mask of enabled RFC4620 node information query types");
 SYSCTL_INT(_net_inet6_icmp6, ICMPV6CTL_NODEINFO_OLDMCPREFIX,
 	nodeinfo_oldmcprefix, CTLFLAG_VNET | CTLFLAG_RW,
 	&VNET_NAME(icmp6_nodeinfo_oldmcprefix), 0,

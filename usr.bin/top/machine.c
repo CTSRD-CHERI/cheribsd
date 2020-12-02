@@ -282,10 +282,7 @@ machine_init(struct statics *statics)
 	size_t size;
 
 	size = sizeof(smpmode);
-	if ((sysctlbyname("machdep.smp_active", &smpmode, &size,
-	    NULL, 0) != 0 &&
-	    sysctlbyname("kern.smp.active", &smpmode, &size,
-	    NULL, 0) != 0) ||
+	if (sysctlbyname("kern.smp.active", &smpmode, &size, NULL, 0) != 0 ||
 	    size != sizeof(smpmode))
 		smpmode = 0;
 
@@ -1019,7 +1016,7 @@ format_next_process(struct handle * xhandle, char *(*get_userid)(int), int flags
 				len = (argbuflen - (dst - argbuf) - 1) / 4;
 				strvisx(dst, src,
 				    MIN(strlen(src), len),
-				    VIS_NL | VIS_CSTYLE | VIS_OCTAL | VIS_SAFE);
+				    VIS_NL | VIS_TAB | VIS_CSTYLE | VIS_OCTAL);
 				while (*dst != '\0')
 					dst++;
 				if ((argbuflen - (dst - argbuf) - 1) / 4 > 0)

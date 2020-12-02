@@ -2270,7 +2270,6 @@ g_raid_md_ctl_ddf(struct g_raid_md_object *md,
 	error = 0;
 
 	if (strcmp(verb, "label") == 0) {
-
 		if (*nargs < 4) {
 			gctl_error(req, "Invalid number of arguments.");
 			return (-1);
@@ -2511,13 +2510,11 @@ g_raid_md_ctl_ddf(struct g_raid_md_object *md,
 		return (0);
 	}
 	if (strcmp(verb, "add") == 0) {
-
 		gctl_error(req, "`add` command is not applicable, "
 		    "use `label` instead.");
 		return (-99);
 	}
 	if (strcmp(verb, "delete") == 0) {
-
 		nodename = gctl_get_asciiparam(req, "arg0");
 		if (nodename != NULL && strcasecmp(sc->sc_name, nodename) != 0)
 			nodename = NULL;
@@ -2618,7 +2615,7 @@ g_raid_md_ctl_ddf(struct g_raid_md_object *md,
 				error = -2;
 				break;
 			}
-			if (strncmp(diskname, "/dev/", 5) == 0)
+			if (strncmp(diskname, _PATH_DEV, 5) == 0)
 				diskname += 5;
 
 			TAILQ_FOREACH(disk, &sc->sc_disks, d_next) {

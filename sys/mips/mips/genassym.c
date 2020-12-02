@@ -77,7 +77,8 @@ ASSYM(TD_FLAGS, offsetof(struct thread, td_flags));
 ASSYM(TD_LOCK, offsetof(struct thread, td_lock));
 ASSYM(TD_MDFLAGS, offsetof(struct thread, td_md.md_flags));
 ASSYM(TD_MDTLS, offsetof(struct thread, td_md.md_tls));
-ASSYM(TD_MDTLS_TCB_OFFSET, offsetof(struct thread, td_md.md_tls_tcb_offset));
+
+ASSYM(P_MDTLS_TCB_OFFSET, offsetof(struct proc, p_md.md_tls_tcb_offset));
 
 ASSYM(PROC_TRACEFLAG, offsetof(struct proc, p_traceflag));
 

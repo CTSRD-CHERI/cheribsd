@@ -454,7 +454,7 @@ vt_window_postswitch(struct vt_window *vw)
 	return (0);
 }
 
-/* vt_late_window_switch will done VT switching for regular case. */
+/* vt_late_window_switch will do VT switching for regular case. */
 static int
 vt_late_window_switch(struct vt_window *vw)
 {
@@ -725,13 +725,22 @@ vt_scroll(struct vt_window *vw, int offset, int whence)
 }
 
 static int
-vt_machine_kbdevent(int c)
+vt_machine_kbdevent(struct vt_device *vd, int c)
 {
 
 	switch (c) {
 	case SPCLKEY | DBG: /* kbdmap(5) keyword `debug`. */
-		if (vt_kbd_debug)
+		if (vt_kbd_debug) {
 			kdb_enter(KDB_WHY_BREAK, "manual escape to debugger");
+#if VT_ALT_TO_ESC_HACK
+			/*
+			 * There's an unfortunate conflict between SPCLKEY|DBG
+			 * and VT_ALT_TO_ESC_HACK.  Just assume they didn't mean
+			 * it if we got to here.
+			 */
+			vd->vd_kbstate &= ~ALKED;
+#endif
+		}
 		return (1);
 	case SPCLKEY | HALT: /* kbdmap(5) keyword `halt`. */
 		if (vt_kbd_halt)
@@ -864,7 +873,7 @@ vt_processkey(keyboard_t *kbd, struct vt_device *vd, int c)
 		return (0);
 #endif
 
-	if (vt_machine_kbdevent(c))
+	if (vt_machine_kbdevent(vd, c))
 		return (0);
 
 	if (vw->vw_flags & VWF_SCROLL) {
@@ -1422,7 +1431,6 @@ vtterm_splash(struct vt_device *vd)
 
 	/* Display a nice boot splash. */
 	if (!(vd->vd_flags & VDF_TEXTMODE) && (boothowto & RB_MUTE)) {
-
 		top = (vd->vd_height - vt_logo_height) / 2;
 		left = (vd->vd_width - vt_logo_width) / 2;
 		switch (vt_logo_depth) {
@@ -1436,7 +1444,6 @@ vtterm_splash(struct vt_device *vd)
 	}
 }
 #endif
-
 
 static void
 vtterm_cnprobe(struct terminal *tm, struct consdev *cp)
@@ -2326,12 +2333,11 @@ skip_thunk:
 	case CONS_HISTORY:
 		if (*(int *)data < 0)
 			return EINVAL;
-		if (*(int *)data != vd->vd_curwindow->vw_buf.vb_history_size)
-			vtbuf_sethistory_size(&vd->vd_curwindow->vw_buf,
-			    *(int *)data);
+		if (*(int *)data != vw->vw_buf.vb_history_size)
+			vtbuf_sethistory_size(&vw->vw_buf, *(int *)data);
 		return (0);
 	case CONS_CLRHIST:
-		vtbuf_clearhistory(&vd->vd_curwindow->vw_buf);
+		vtbuf_clearhistory(&vw->vw_buf);
 		/*
 		 * Invalidate the entire visible window; it is not guaranteed
 		 * that this operation will be immediately followed by a scroll
@@ -2339,9 +2345,11 @@ skip_thunk:
 		 * to remain visible.
 		 */
 		VT_LOCK(vd);
-		vd->vd_flags |= VDF_INVALID;
+		if (vw == vd->vd_curwindow) {
+			vd->vd_flags |= VDF_INVALID;
+			vt_resume_flush_timer(vw, 0);
+		}
 		VT_UNLOCK(vd);
-		vt_resume_flush_timer(vd->vd_curwindow, 0);
 		return (0);
 	case CONS_GET:
 		/* XXX */
@@ -2728,7 +2736,6 @@ vt_upgrade(struct vt_device *vd)
 				    vt_window_switch, vw, SHUTDOWN_PRI_DEFAULT);
 			}
 		}
-
 	}
 	VT_LOCK(vd);
 	if (vd->vd_curwindow == NULL)

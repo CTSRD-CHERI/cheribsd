@@ -151,20 +151,20 @@ CTASSERT(VM_LOWMEM_BOUNDARY < VM_DMA32_BOUNDARY);
 
 static int sysctl_vm_phys_free(SYSCTL_HANDLER_ARGS);
 SYSCTL_OID(_vm, OID_AUTO, phys_free,
-    CTLTYPE_STRING | CTLFLAG_RD | CTLFLAG_NEEDGIANT, NULL, 0,
+    CTLTYPE_STRING | CTLFLAG_RD | CTLFLAG_MPSAFE, NULL, 0,
     sysctl_vm_phys_free, "A",
     "Phys Free Info");
 
 static int sysctl_vm_phys_segs(SYSCTL_HANDLER_ARGS);
 SYSCTL_OID(_vm, OID_AUTO, phys_segs,
-    CTLTYPE_STRING | CTLFLAG_RD | CTLFLAG_NEEDGIANT, NULL, 0,
+    CTLTYPE_STRING | CTLFLAG_RD | CTLFLAG_MPSAFE, NULL, 0,
     sysctl_vm_phys_segs, "A",
     "Phys Seg Info");
 
 #ifdef NUMA
 static int sysctl_vm_phys_locality(SYSCTL_HANDLER_ARGS);
 SYSCTL_OID(_vm, OID_AUTO, phys_locality,
-    CTLTYPE_STRING | CTLFLAG_RD | CTLFLAG_NEEDGIANT, NULL, 0,
+    CTLTYPE_STRING | CTLFLAG_RD | CTLFLAG_MPSAFE, NULL, 0,
     sysctl_vm_phys_locality, "A",
     "Phys Locality Info");
 #endif
@@ -646,24 +646,6 @@ vm_phys_register_domains(int ndomains, struct mem_affinity *affinity,
 	(void)ndomains;
 	(void)affinity;
 	(void)locality;
-#endif
-}
-
-int
-_vm_phys_domain(vm_paddr_t pa)
-{
-#ifdef NUMA
-	int i;
-
-	if (vm_ndomains == 1)
-		return (0);
-	for (i = 0; mem_affinity[i].end != 0; i++)
-		if (mem_affinity[i].start <= pa &&
-		    mem_affinity[i].end >= pa)
-			return (mem_affinity[i].domain);
-	return (-1);
-#else
-	return (0);
 #endif
 }
 

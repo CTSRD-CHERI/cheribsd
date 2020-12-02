@@ -55,13 +55,12 @@ __FBSDID("$FreeBSD$");
 
 #include "linker_if.h"
 
-u_long elf_hwcap;
+u_long __read_frequently elf_hwcap;
+u_long __read_frequently elf_hwcap2;
 
 static struct sysentvec elf64_freebsd_sysvec = {
 	.sv_size	= SYS_MAXSYSCALL,
 	.sv_table	= sysent,
-	.sv_errsize	= 0,
-	.sv_errtbl	= NULL,
 	.sv_transtrap	= NULL,
 	.sv_fixup	= __elfN(freebsd_fixup),
 	.sv_sendsig	= sendsig,
@@ -82,7 +81,7 @@ static struct sysentvec elf64_freebsd_sysvec = {
 	.sv_fixlimit	= NULL,
 	.sv_maxssiz	= NULL,
 	.sv_flags	= SV_SHP | SV_TIMEKEEP | SV_ABI_FREEBSD | SV_LP64 |
-	    SV_ASLR,
+	    SV_ASLR | SV_RNG_SEED_VER,
 	.sv_set_syscall_retval = cpu_set_syscall_retval,
 	.sv_fetch_syscall_args = cpu_fetch_syscall_args,
 	.sv_syscallnames = syscallnames,
@@ -92,6 +91,7 @@ static struct sysentvec elf64_freebsd_sysvec = {
 	.sv_thread_detach = NULL,
 	.sv_trap	= NULL,
 	.sv_hwcap	= &elf_hwcap,
+	.sv_hwcap2	= &elf_hwcap2,
 };
 INIT_SYSENTVEC(elf64_sysvec, &elf64_freebsd_sysvec);
 
@@ -143,8 +143,10 @@ reloc_instr_imm(Elf32_Addr *where, Elf_Addr val, u_int msb, u_int lsb)
  */
 static int
 elf_reloc_internal(linker_file_t lf, Elf_Addr relocbase, const void *data,
-    int type, int local, elf_lookup_fn lookup)
+    int type, int flags, elf_lookup_fn lookup)
 {
+#define	ARM64_ELF_RELOC_LOCAL		(1 << 0)
+#define	ARM64_ELF_RELOC_LATE_IFUNC	(1 << 1)
 	Elf_Addr *where, addr, addend, val;
 	Elf_Word rtype, symidx;
 	const Elf_Rel *rel;
@@ -170,7 +172,14 @@ elf_reloc_internal(linker_file_t lf, Elf_Addr relocbase, const void *data,
 		panic("unknown reloc type %d\n", type);
 	}
 
-	if (local) {
+	if ((flags & ARM64_ELF_RELOC_LATE_IFUNC) != 0) {
+		KASSERT(type == ELF_RELOC_RELA,
+		    ("Only RELA ifunc relocations are supported"));
+		if (rtype != R_AARCH64_IRELATIVE)
+			return (0);
+	}
+
+	if ((flags & ARM64_ELF_RELOC_LOCAL) != 0) {
 		if (rtype == R_AARCH64_RELATIVE)
 			*where = elf_relocaddr(lf, relocbase + addend);
 		return (0);
@@ -218,7 +227,8 @@ elf_reloc_internal(linker_file_t lf, Elf_Addr relocbase, const void *data,
 			*where = val;
 		break;
 	default:
-		printf("kldload: unexpected relocation type %d\n", rtype);
+		printf("kldload: unexpected relocation type %d, "
+		    "symbol index %d\n", rtype, symidx);
 		return (-1);
 	}
 	return (error);
@@ -229,7 +239,8 @@ elf_reloc_local(linker_file_t lf, Elf_Addr relocbase, const void *data,
     int type, elf_lookup_fn lookup)
 {
 
-	return (elf_reloc_internal(lf, relocbase, data, type, 1, lookup));
+	return (elf_reloc_internal(lf, relocbase, data, type,
+	    ARM64_ELF_RELOC_LOCAL, lookup));
 }
 
 /* Process one elf relocation with addend. */
@@ -239,6 +250,15 @@ elf_reloc(linker_file_t lf, Elf_Addr relocbase, const void *data, int type,
 {
 
 	return (elf_reloc_internal(lf, relocbase, data, type, 0, lookup));
+}
+
+int
+elf_reloc_late(linker_file_t lf, Elf_Addr relocbase, const void *data,
+    int type, elf_lookup_fn lookup)
+{
+
+	return (elf_reloc_internal(lf, relocbase, data, type,
+	    ARM64_ELF_RELOC_LATE_IFUNC, lookup));
 }
 
 int

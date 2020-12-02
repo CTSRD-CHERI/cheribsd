@@ -93,7 +93,6 @@ SYSCTL_PROC(_kern_geom_cache, OID_AUTO, used_hi,
     sysctl_handle_pct, "IU",
     "");
 
-
 static int g_cache_destroy(struct g_cache_softc *sc, boolean_t force);
 static g_ctl_destroy_geom_t g_cache_destroy_geom;
 
@@ -111,7 +110,6 @@ struct g_class g_cache_class = {
 
 #define	OFF2BNO(off, sc)	((off) >> (sc)->sc_bshift)
 #define	BNO2OFF(bno, sc)	((bno) << (sc)->sc_bshift)
-
 
 static struct g_cache_desc *
 g_cache_alloc(struct g_cache_softc *sc)
@@ -675,9 +673,11 @@ g_cache_taste(struct g_class *mp, struct g_provider *pp, int flags __unused)
 	gp->orphan = g_cache_orphan;
 	gp->access = g_cache_access;
 	cp = g_new_consumer(gp);
-	g_attach(cp, pp);
-	error = g_cache_read_metadata(cp, &md);
-	g_detach(cp);
+	error = g_attach(cp, pp);
+	if (error == 0) {
+		error = g_cache_read_metadata(cp, &md);
+		g_detach(cp);
+	}
 	g_destroy_consumer(cp);
 	g_destroy_geom(gp);
 	if (error != 0)
@@ -757,19 +757,9 @@ g_cache_ctl_create(struct gctl_req *req, struct g_class *mp)
 	/* This field is not important here. */
 	md.md_provsize = 0;
 
-	name = gctl_get_asciiparam(req, "arg1");
-	if (name == NULL) {
-		gctl_error(req, "No 'arg1' argument");
+	pp = gctl_get_provider(req, "arg1");
+	if (pp == NULL)
 		return;
-	}
-	if (strncmp(name, "/dev/", strlen("/dev/")) == 0)
-		name += strlen("/dev/");
-	pp = g_provider_by_name(name);
-	if (pp == NULL) {
-		G_CACHE_DEBUG(1, "Provider %s is invalid.", name);
-		gctl_error(req, "Provider %s is invalid.", name);
-		return;
-	}
 	gp = g_cache_create(mp, pp, &md, G_CACHE_TYPE_MANUAL);
 	if (gp == NULL) {
 		gctl_error(req, "Can't create %s.", md.md_name);

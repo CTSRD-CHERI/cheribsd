@@ -13,7 +13,7 @@
  */
 
 /*-
- * The following functions are based in the vn(4) driver: mdstart_swap(),
+ * The following functions are based on the vn(4) driver: mdstart_swap(),
  * mdstart_vnode(), mdcreate_swap(), mdcreate_vnode() and mddestroy(),
  * and as such under the following copyright:
  *
@@ -234,7 +234,6 @@ struct g_class g_md_class = {
 
 DECLARE_GEOM_CLASS(g_md_class, g_md);
 
-
 static LIST_HEAD(, md_s) md_softc_list = LIST_HEAD_INITIALIZER(md_softc_list);
 
 #define NINDIR	(PAGE_SIZE / sizeof(uintptr_t))
@@ -451,7 +450,6 @@ s_write(struct indir *ip, off_t offset, uintptr_t ptr)
 	}
 	return (0);
 }
-
 
 static int
 g_md_access(struct g_provider *pp, int r, int w, int e)
@@ -1378,7 +1376,6 @@ mdcreate_malloc(struct md_s *sc, struct md_req *mdr)
 	return (error);
 }
 
-
 static int
 mdsetcred(struct md_s *sc, struct ucred *cred)
 {
@@ -1565,13 +1562,11 @@ mdresize(struct md_s *sc, struct md_req *mdr)
 		if (mdr->md_mediasize <= 0 ||
 		    (mdr->md_mediasize % PAGE_SIZE) != 0)
 			return (EDOM);
-		oldpages = OFF_TO_IDX(round_page(sc->mediasize));
-		newpages = OFF_TO_IDX(round_page(mdr->md_mediasize));
+		oldpages = OFF_TO_IDX(sc->mediasize);
+		newpages = OFF_TO_IDX(mdr->md_mediasize);
 		if (newpages < oldpages) {
 			VM_OBJECT_WLOCK(sc->object);
 			vm_object_page_remove(sc->object, newpages, 0, 0);
-			swap_pager_freespace(sc->object, newpages,
-			    oldpages - newpages);
 			swap_release_by_cred(IDX_TO_OFF(oldpages -
 			    newpages), sc->cred);
 			sc->object->charge = IDX_TO_OFF(newpages);

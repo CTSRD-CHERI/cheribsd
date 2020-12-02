@@ -9,10 +9,6 @@
 
 #include "config.h"
 
-#ifndef lint
-static const char sccsid[] = "$Id: vs_relative.c,v 10.19 2011/12/01 15:22:59 zy Exp $";
-#endif /* not lint */
-
 #include <sys/types.h>
 #include <sys/queue.h>
 #include <sys/time.h>
@@ -146,15 +142,16 @@ done:		if (diffp != NULL)		/* XXX */
 	 * last column of the screen.  Otherwise, display the rest of the
 	 * character in the next screen.
 	 */
-#define	TAB_RESET {							\
+#define	TAB_RESET do {							\
 	curoff += chlen;						\
-	if (!leftright && curoff >= sp->cols)				\
+	if (!leftright && curoff >= sp->cols) {				\
 		if (ch == '\t') {					\
 			curoff = 0;					\
 			scno -= scno % sp->cols;			\
 		} else							\
 			curoff -= sp->cols;				\
-}
+	}								\
+} while (0)
 	if (cnop == NULL)
 		while (len--) {
 			chlen = CHLEN(curoff);

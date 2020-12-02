@@ -101,16 +101,14 @@ static int
 cd9660_cmount(struct mntarg *ma, void * __capability data, uint64_t flags)
 {
 	struct iso_args args;
-	struct export_args exp;
 	int error;
 
 	error = copyincap(data, &args, sizeof args);
 	if (error)
 		return (error);
-	vfs_oexport_conv(&args.export, &exp);
 
 	ma = mount_argsu(ma, "from", args.fspec, MAXPATHLEN);
-	ma = mount_arg(ma, "export", &exp, sizeof(exp));
+	ma = mount_arg(ma, "export", &args.export, sizeof(args.export));
 	ma = mount_argsu(ma, "cs_disk", args.cs_disk, 64);
 	ma = mount_argsu(ma, "cs_local", args.cs_local, 64);
 	ma = mount_argf(ma, "ssector", "%u", args.ssector);
@@ -168,7 +166,7 @@ cd9660_mount(struct mount *mp)
 	NDFREE(&ndp, NDF_ONLY_PNBUF);
 	devvp = ndp.ni_vp;
 
-	if (!vn_isdisk(devvp, &error)) {
+	if (!vn_isdisk_error(devvp, &error)) {
 		vput(devvp);
 		return (error);
 	}

@@ -35,6 +35,7 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
+#include <sys/endian.h>
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -173,7 +174,11 @@ static bus_space_tag_t
 nexus_get_bus_tag(device_t bus __unused, device_t child __unused)
 {
 
+#if BYTE_ORDER == LITTLE_ENDIAN
+	return(&bs_le_tag);
+#else
 	return(&bs_be_tag);
+#endif
 }
 
 static int
@@ -208,7 +213,7 @@ static int
 nexus_config_intr(device_t dev, int irq, enum intr_trigger trig,
     enum intr_polarity pol)
 {
- 
+
 	return (powerpc_config_intr(irq, trig, pol));
 } 
 
@@ -263,4 +268,3 @@ nexus_deactivate_resource(device_t bus __unused, device_t child __unused,
 
 	return (rman_deactivate_resource(r));
 }
-

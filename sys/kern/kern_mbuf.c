@@ -73,12 +73,12 @@ __FBSDID("$FreeBSD$");
  * Zone.  The Zone can be capped at kern.ipc.nmbclusters, if the
  * administrator so desires.
  *
- * Mbufs are allocated from a UMA Master Zone called the Mbuf
+ * Mbufs are allocated from a UMA Primary Zone called the Mbuf
  * Zone.
  *
  * Additionally, FreeBSD provides a Packet Zone, which it
- * configures as a Secondary Zone to the Mbuf Master Zone,
- * thus sharing backend Slab kegs with the Mbuf Master Zone.
+ * configures as a Secondary Zone to the Mbuf Primary Zone,
+ * thus sharing backend Slab kegs with the Mbuf Primary Zone.
  *
  * Thus common-case allocations and locking are simplified:
  *
@@ -87,7 +87,7 @@ __FBSDID("$FreeBSD$");
  *    |   .------------>[(Packet Cache)]    m_get(), m_gethdr()
  *    |   |             [     Packet   ]            |
  *  [(Cluster Cache)]   [    Secondary ]   [ (Mbuf Cache)     ]
- *  [ Cluster Zone  ]   [     Zone     ]   [ Mbuf Master Zone ]
+ *  [ Cluster Zone  ]   [     Zone     ]   [ Mbuf Primary Zone ]
  *        |                       \________         |
  *  [ Cluster Keg   ]                      \       /
  *        |	                         [ Mbuf Keg   ]
@@ -101,7 +101,7 @@ __FBSDID("$FreeBSD$");
  * for any deallocation through uma_zfree() the _dtor_ function
  * is executed.
  *
- * Caches are per-CPU and are filled from the Master Zone.
+ * Caches are per-CPU and are filled from the Primary Zone.
  *
  * Whenever an object is allocated from the underlying global
  * memory pool it gets pre-initialized with the _zinit_ functions.
@@ -611,7 +611,7 @@ debugnet_mbuf_reinit(int nmbuf, int nclust, int clsize)
 #endif /* DEBUGNET */
 
 /*
- * Constructor for Mbuf master zone.
+ * Constructor for Mbuf primary zone.
  *
  * The 'arg' pointer points to a mb_args structure which
  * contains call-specific information required to support the
@@ -646,7 +646,7 @@ mb_ctor_mbuf(void *mem, int size, void *arg, int how)
 }
 
 /*
- * The Mbuf master zone destructor.
+ * The Mbuf primary zone destructor.
  */
 static void
 mb_dtor_mbuf(void *mem, int size, void *arg)
@@ -1397,6 +1397,7 @@ m_getjcl(int how, short type, int flags, int size)
 		uma_zfree(zone_mbuf, m);
 		return (NULL);
 	}
+	MBUF_PROBE5(m__getjcl, how, type, flags, size, m);
 	return (m);
 }
 
@@ -1422,21 +1423,27 @@ m_getm2(struct mbuf *m, int len, int how, short type, int flags)
 
 	/* Loop and append maximum sized mbufs to the chain tail. */
 	while (len > 0) {
-		if (len > MCLBYTES)
-			mb = m_getjcl(how, type, (flags & M_PKTHDR),
+		mb = NULL;
+		if (len > MCLBYTES) {
+			mb = m_getjcl(M_NOWAIT, type, (flags & M_PKTHDR),
 			    MJUMPAGESIZE);
-		else if (len >= MINCLSIZE)
-			mb = m_getcl(how, type, (flags & M_PKTHDR));
-		else if (flags & M_PKTHDR)
-			mb = m_gethdr(how, type);
-		else
-			mb = m_get(how, type);
-
-		/* Fail the whole operation if one mbuf can't be allocated. */
+		}
 		if (mb == NULL) {
-			if (nm != NULL)
+			if (len >= MINCLSIZE)
+				mb = m_getcl(how, type, (flags & M_PKTHDR));
+			else if (flags & M_PKTHDR)
+				mb = m_gethdr(how, type);
+			else
+				mb = m_get(how, type);
+
+			/*
+			 * Fail the whole operation if one mbuf can't be
+			 * allocated.
+			 */
+			if (mb == NULL) {
 				m_freem(nm);
-			return (NULL);
+				return (NULL);
+			}
 		}
 
 		/* Book keeping. */
@@ -1518,13 +1525,24 @@ m_freem(struct mbuf *mb)
 		mb = m_free(mb);
 }
 
+int
+m_snd_tag_alloc(struct ifnet *ifp, union if_snd_tag_alloc_params *params,
+    struct m_snd_tag **mstp)
+{
+
+	if (ifp->if_snd_tag_alloc == NULL)
+		return (EOPNOTSUPP);
+	return (ifp->if_snd_tag_alloc(ifp, params, mstp));
+}
+
 void
-m_snd_tag_init(struct m_snd_tag *mst, struct ifnet *ifp)
+m_snd_tag_init(struct m_snd_tag *mst, struct ifnet *ifp, u_int type)
 {
 
 	if_ref(ifp);
 	mst->ifp = ifp;
 	refcount_init(&mst->refcount, 1);
+	mst->type = type;
 	counter_u64_add(snd_tag_count, 1);
 }
 

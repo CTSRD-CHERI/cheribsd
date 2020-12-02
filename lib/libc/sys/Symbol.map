@@ -8,6 +8,9 @@
  * it has to be manual.
  */
 FBSD_1.0 {
+	/* PSEUDO syscalls */
+	_exit;
+
 	__acl_aclcheck_fd;
 	__acl_aclcheck_file;
 	__acl_aclcheck_link;
@@ -413,6 +416,7 @@ FBSD_1.6 {
 	getfhat;
 	funlinkat;
 	memfd_create;
+	shm_create_largepage;
 	shm_rename;
 };
 
@@ -921,6 +925,7 @@ FBSDprivate_1.0 {
 	__sys_setuid;
 	_shm_open;
 	__sys_shm_open;
+	__sys_shm_open2;
 	_shm_unlink;
 	__sys_shm_unlink;
 	_shmat;

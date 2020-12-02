@@ -193,7 +193,6 @@ int linker_search_symbol_name_flags(caddr_t value, char *buf, u_int buflen,
 int linker_search_symbol_name(caddr_t value, char *buf, u_int buflen,
     long *offset);
 
-
 /* HWPMC helper */
 void *linker_hwpmc_list_objects(void);
 
@@ -258,6 +257,7 @@ extern caddr_t		preload_search_next_name(caddr_t _base);
 extern caddr_t		preload_search_info(caddr_t _mod, int _inf);
 extern void		preload_delete_name(const char *_name);
 extern void		preload_bootstrap_relocate(vm_offset_t _offset);
+extern void		preload_dump(void);
 
 #ifdef KLD_DEBUG
 
@@ -288,6 +288,12 @@ Elf_Addr elf_relocaddr(linker_file_t _lf, Elf_Addr addr);
 const Elf_Sym *elf_get_sym(linker_file_t _lf, Elf_Size _symidx);
 const char *elf_get_symname(linker_file_t _lf, Elf_Size _symidx);
 void	link_elf_ireloc(caddr_t kmdp);
+
+#if defined(__aarch64__) || defined(__amd64__)
+int	elf_reloc_late(linker_file_t _lf, Elf_Addr base, const void *_rel,
+	    int _type, elf_lookup_fn _lu);
+void	link_elf_late_ireloc(void);
+#endif
 
 typedef struct linker_ctf {
 	const uint8_t 	*ctftab;	/* Decompressed CTF data. */

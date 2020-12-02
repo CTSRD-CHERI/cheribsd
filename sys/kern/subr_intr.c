@@ -38,6 +38,7 @@ __FBSDID("$FreeBSD$");
 
 #include "opt_ddb.h"
 #include "opt_hwpmc_hooks.h"
+#include "opt_iommu.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -50,6 +51,8 @@ __FBSDID("$FreeBSD$");
 #include <sys/queue.h>
 #include <sys/bus.h>
 #include <sys/interrupt.h>
+#include <sys/taskqueue.h>
+#include <sys/tree.h>
 #include <sys/conf.h>
 #include <sys/cpuset.h>
 #include <sys/rman.h>
@@ -68,6 +71,10 @@ __FBSDID("$FreeBSD$");
 
 #ifdef DDB
 #include <ddb/ddb.h>
+#endif
+
+#ifdef IOMMU
+#include <dev/iommu/iommu_msi.h>
 #endif
 
 #include "pic_if.h"
@@ -128,7 +135,11 @@ static struct intr_irqsrc *irq_sources[NIRQ];
 u_int irq_next_free;
 
 #ifdef SMP
-static boolean_t irq_assign_cpu = FALSE;
+#ifdef EARLY_AP_STARTUP
+static bool irq_assign_cpu = true;
+#else
+static bool irq_assign_cpu = false;
+#endif
 #endif
 
 /*
@@ -577,9 +588,6 @@ intr_isrc_assign_cpu(void *arg, int cpu)
 	struct intr_irqsrc *isrc = arg;
 	int error;
 
-	if (isrc->isrc_dev != intr_irq_root_dev)
-		return (EINVAL);
-
 	mtx_lock(&isrc_table_lock);
 	if (cpu == NOCPU) {
 		CPU_ZERO(&isrc->isrc_cpu);
@@ -932,8 +940,22 @@ intr_resolve_irq(device_t dev, intptr_t xref, struct intr_map_data *data,
 		    ("%s: Found a non-PIC controller: %s", __func__,
 		     device_get_name(pic->pic_dev)));
 		return (PIC_MAP_INTR(pic->pic_dev, data, isrc));
-
 	}
+}
+
+bool
+intr_is_per_cpu(struct resource *res)
+{
+	u_int res_id;
+	struct intr_irqsrc *isrc;
+
+	res_id = (u_int)rman_get_start(res);
+	isrc = intr_map_get_isrc(res_id);
+
+	if (isrc == NULL)
+		panic("Attempt to get isrc for non-active resource id: %u\n",
+		    res_id);
+	return ((isrc->isrc_flags & INTR_ISRCF_PPI) != 0);
 }
 
 int
@@ -1191,6 +1213,7 @@ intr_irq_next_cpu(u_int last_cpu, cpuset_t *cpumask)
 	return (last_cpu);
 }
 
+#ifndef EARLY_AP_STARTUP
 /*
  *  Distribute all the interrupt sources among the available
  *  CPUs once the AP's have been launched.
@@ -1205,7 +1228,7 @@ intr_irq_shuffle(void *arg __unused)
 		return;
 
 	mtx_lock(&isrc_table_lock);
-	irq_assign_cpu = TRUE;
+	irq_assign_cpu = true;
 	for (i = 0; i < NIRQ; i++) {
 		isrc = irq_sources[i];
 		if (isrc == NULL || isrc->isrc_handlers == 0 ||
@@ -1231,6 +1254,7 @@ intr_irq_shuffle(void *arg __unused)
 	mtx_unlock(&isrc_table_lock);
 }
 SYSINIT(intr_irq_shuffle, SI_SUB_SMP, SI_ORDER_SECOND, intr_irq_shuffle, NULL);
+#endif /* !EARLY_AP_STARTUP */
 
 #else
 u_int
@@ -1239,7 +1263,7 @@ intr_irq_next_cpu(u_int current_cpu, cpuset_t *cpumask)
 
 	return (PCPU_GET(cpuid));
 }
-#endif
+#endif /* SMP */
 
 /*
  * Allocate memory for new intr_map_data structure.
@@ -1285,6 +1309,7 @@ int
 intr_alloc_msi(device_t pci, device_t child, intptr_t xref, int count,
     int maxcount, int *irqs)
 {
+	struct iommu_domain *domain;
 	struct intr_irqsrc **isrc;
 	struct intr_pic *pic;
 	device_t pdev;
@@ -1299,6 +1324,14 @@ intr_alloc_msi(device_t pci, device_t child, intptr_t xref, int count,
 	    ("%s: Found a non-MSI controller: %s", __func__,
 	     device_get_name(pic->pic_dev)));
 
+	/*
+	 * If this is the first time we have used this context ask the
+	 * interrupt controller to map memory the msi source will need.
+	 */
+	err = MSI_IOMMU_INIT(pic->pic_dev, child, &domain);
+	if (err != 0)
+		return (err);
+
 	isrc = malloc(sizeof(*isrc) * count, M_INTRNG, M_WAITOK);
 	err = MSI_ALLOC_MSI(pic->pic_dev, child, count, maxcount, &pdev, isrc);
 	if (err != 0) {
@@ -1307,12 +1340,13 @@ intr_alloc_msi(device_t pci, device_t child, intptr_t xref, int count,
 	}
 
 	for (i = 0; i < count; i++) {
+		isrc[i]->isrc_iommu = domain;
 		msi = (struct intr_map_data_msi *)intr_alloc_map_data(
 		    INTR_MAP_DATA_MSI, sizeof(*msi), M_WAITOK | M_ZERO);
 		msi-> isrc = isrc[i];
+
 		irqs[i] = intr_map_irq(pic->pic_dev, xref,
 		    (struct intr_map_data *)msi);
-
 	}
 	free(isrc, M_INTRNG);
 
@@ -1347,6 +1381,8 @@ intr_release_msi(device_t pci, device_t child, intptr_t xref, int count,
 		isrc[i] = msi->isrc;
 	}
 
+	MSI_IOMMU_DEINIT(pic->pic_dev, child);
+
 	err = MSI_RELEASE_MSI(pic->pic_dev, child, count, isrc);
 
 	for (i = 0; i < count; i++) {
@@ -1361,6 +1397,7 @@ intr_release_msi(device_t pci, device_t child, intptr_t xref, int count,
 int
 intr_alloc_msix(device_t pci, device_t child, intptr_t xref, int *irq)
 {
+	struct iommu_domain *domain;
 	struct intr_irqsrc *isrc;
 	struct intr_pic *pic;
 	device_t pdev;
@@ -1375,10 +1412,19 @@ intr_alloc_msix(device_t pci, device_t child, intptr_t xref, int *irq)
 	    ("%s: Found a non-MSI controller: %s", __func__,
 	     device_get_name(pic->pic_dev)));
 
+	/*
+	 * If this is the first time we have used this context ask the
+	 * interrupt controller to map memory the msi source will need.
+	 */
+	err = MSI_IOMMU_INIT(pic->pic_dev, child, &domain);
+	if (err != 0)
+		return (err);
+
 	err = MSI_ALLOC_MSIX(pic->pic_dev, child, &pdev, &isrc);
 	if (err != 0)
 		return (err);
 
+	isrc->isrc_iommu = domain;
 	msi = (struct intr_map_data_msi *)intr_alloc_map_data(
 		    INTR_MAP_DATA_MSI, sizeof(*msi), M_WAITOK | M_ZERO);
 	msi->isrc = isrc;
@@ -1413,6 +1459,8 @@ intr_release_msix(device_t pci, device_t child, intptr_t xref, int irq)
 		return (EINVAL);
 	}
 
+	MSI_IOMMU_DEINIT(pic->pic_dev, child);
+
 	err = MSI_RELEASE_MSIX(pic->pic_dev, child, isrc);
 	intr_unmap_irq(irq);
 
@@ -1440,6 +1488,12 @@ intr_map_msi(device_t pci, device_t child, intptr_t xref, int irq,
 		return (EINVAL);
 
 	err = MSI_MAP_MSI(pic->pic_dev, child, isrc, addr, data);
+
+#ifdef IOMMU
+	if (isrc->isrc_iommu != NULL)
+		iommu_translate_msi(isrc->isrc_iommu, addr);
+#endif
+
 	return (err);
 }
 
@@ -1517,13 +1571,12 @@ intr_map_get_isrc(u_int res_id)
 {
 	struct intr_irqsrc *isrc;
 
+	isrc = NULL;
 	mtx_lock(&irq_map_lock);
-	if ((res_id >= irq_map_count) || (irq_map[res_id] == NULL)) {
-		mtx_unlock(&irq_map_lock);
-		return (NULL);
-	}
-	isrc = irq_map[res_id]->isrc;
+	if (res_id < irq_map_count && irq_map[res_id] != NULL)
+		isrc = irq_map[res_id]->isrc;
 	mtx_unlock(&irq_map_lock);
+
 	return (isrc);
 }
 
@@ -1532,11 +1585,8 @@ intr_map_set_isrc(u_int res_id, struct intr_irqsrc *isrc)
 {
 
 	mtx_lock(&irq_map_lock);
-	if ((res_id >= irq_map_count) || (irq_map[res_id] == NULL)) {
-		mtx_unlock(&irq_map_lock);
-		return;
-	}
-	irq_map[res_id]->isrc = isrc;
+	if (res_id < irq_map_count && irq_map[res_id] != NULL)
+		irq_map[res_id]->isrc = isrc;
 	mtx_unlock(&irq_map_lock);
 }
 

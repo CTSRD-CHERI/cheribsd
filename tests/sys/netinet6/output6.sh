@@ -227,7 +227,7 @@ output6_raw_success_body()
 		sleep 0.1
 	done
 
-	atf_check -o match:'1 packets transmitted, 1 packets received' jexec ${jname}a ping6 -nc1 ${ip_dst}
+	atf_check -o match:'1 packets transmitted, 1 packets received' jexec ${jname}a ping -6 -nc1 ${ip_dst}
 }
 
 output6_raw_success_cleanup()
@@ -247,10 +247,19 @@ output6_raw_success_cleanup()
 
 mpath_check()
 {
-	if [ "`sysctl -i -n net.route.multipath`" != 1 ]; then
+	if [ `sysctl -iW net.route.multipath | wc -l` != "1" ]; then
 		atf_skip "This test requires ROUTE_MPATH enabled"
 	fi
 }
+
+mpath_enable()
+{
+	jexec $1 sysctl net.route.multipath=1
+	if [ $? != 0 ]; then
+		atf_fail "Setting multipath in jail $1 failed".
+	fi
+}
+
 
 atf_test_case "output6_tcp_flowid_mpath_success" "cleanup"
 output6_tcp_flowid_mpath_success_head()
@@ -282,6 +291,7 @@ output6_tcp_flowid_mpath_success_body()
 	lo_dst=$(vnet_mkloopback)
 
 	vnet_mkjail ${jname}a ${epair0}a ${epair1}a ${lo_src}
+	mpath_enable ${jname}a
 	jls -N
 	# enable link-local IPv6
 	jexec ${jname}a ndp -i ${epair0}a -- -disabled
@@ -330,7 +340,7 @@ output6_tcp_flowid_mpath_success_body()
 	jexec ${jname}b route add -6 -net ${net_src}::/${plen} ${ll}%${epair1}b
 	
 	# Base setup verification
-	atf_check -o match:'1 packets transmitted, 1 packets received' jexec ${jname}a ping6 -c1 ${ip_dst}
+	atf_check -o match:'1 packets transmitted, 1 packets received' jexec ${jname}a ping -6 -c1 ${ip_dst}
 
 	# run listener
 	num_ports=`echo ${ports} | wc -w`
@@ -376,12 +386,10 @@ output6_tcp_flowid_mpath_success_body()
 	pkt_0=`jexec ${jname}a netstat -Wf link -I ${epair0}a | head | awk '$1!~/^Name/{print$8}'`
 	pkt_1=`jexec ${jname}a netstat -Wf link -I ${epair1}a | head | awk '$1!~/^Name/{print$8}'`
 	if [ ${pkt_0} -le 10 ]; then
-		echo "Balancing failure: 1: ${pkt_0} 2: ${pkt_1}"
-		exit 1
+		atf_fail "Balancing failure: 1: ${pkt_0} 2: ${pkt_1}"
 	fi
 	if [ ${pkt_1} -le 10 ]; then
-		echo "Balancing failure: 1: ${pkt_0} 2: ${pkt_1}"
-		exit 1
+		atf_fail "Balancing failure: 1: ${pkt_0} 2: ${pkt_1}"
 	fi
 	echo "TCP Balancing: 1: ${pkt_0} 2: ${pkt_1}"
 }
@@ -424,6 +432,7 @@ output6_udp_flowid_mpath_success_body()
 	lo_dst=$(vnet_mkloopback)
 
 	vnet_mkjail ${jname}a ${epair0}a ${epair1}a ${lo_src}
+	mpath_enable ${jname}a
 	jls -N
 	# enable link-local IPv6
 	jexec ${jname}a ndp -i ${epair0}a -- -disabled
@@ -473,7 +482,7 @@ output6_udp_flowid_mpath_success_body()
 	jexec ${jname}b route add -6 -net ${net_src}::/${plen} ${ll}%${epair1}b
 	
 	# Base setup verification
-	atf_check -o match:'1 packets transmitted, 1 packets received' jexec ${jname}a ping6 -c1 ${ip_dst}
+	atf_check -o match:'1 packets transmitted, 1 packets received' jexec ${jname}a ping -6 -c1 ${ip_dst}
 
 	# run listener
 	num_ports=`echo ${ports} | wc -w`
@@ -519,12 +528,10 @@ output6_udp_flowid_mpath_success_body()
 	pkt_0=`jexec ${jname}a netstat -Wf link -I ${epair0}a | head | awk '$1!~/^Name/{print$8}'`
 	pkt_1=`jexec ${jname}a netstat -Wf link -I ${epair1}a | head | awk '$1!~/^Name/{print$8}'`
 	if [ ${pkt_0} -le 10 ]; then
-		echo "Balancing failure: 1: ${pkt_0} 2: ${pkt_1}"
-		exit 1
+		atf_fail "Balancing failure: 1: ${pkt_0} 2: ${pkt_1}"
 	fi
 	if [ ${pkt_1} -le 10 ]; then
-		echo "Balancing failure: 1: ${pkt_0} 2: ${pkt_1}"
-		exit 1
+		atf_fail "Balancing failure: 1: ${pkt_0} 2: ${pkt_1}"
 	fi
 	echo "UDP BALANCING: 1: ${pkt_0} 2: ${pkt_1}"
 }
@@ -563,6 +570,7 @@ output6_raw_flowid_mpath_success_body()
 	lo_dst=$(vnet_mkloopback)
 
 	vnet_mkjail ${jname}a ${epair0}a ${epair1}a ${lo_src}
+	mpath_enable ${jname}a
 	jls -N
 	# enable link-local IPv6
 	jexec ${jname}a ndp -i ${epair0}a -- -disabled
@@ -613,13 +621,13 @@ output6_raw_flowid_mpath_success_body()
 	jexec ${jname}b route add -6 -net ${net_src}::/${plen} ${ll}%${epair1}b
 	
 	# Base setup verification
-	atf_check -o match:'1 packets transmitted, 1 packets received' jexec ${jname}a ping6 -nc1 ${ip_dst}
+	atf_check -o match:'1 packets transmitted, 1 packets received' jexec ${jname}a ping -6 -nc1 ${ip_dst}
 
 	# run sender
 	valid_message='1 packets transmitted, 1 packets received'
 	for _ip in ${ips}; do
 		ip="${net_dst}:${_ip}"
-		atf_check -o match:"${valid_message}" jexec ${jname}a ping6 -nc1 ${ip}
+		atf_check -o match:"${valid_message}" jexec ${jname}a ping -6 -nc1 ${ip}
 	done
 
 	pkt_0=`jexec ${jname}a netstat -Wf link -I ${epair0}a | head | awk '$1!~/^Name/{print$8}'`
@@ -628,12 +636,10 @@ output6_raw_flowid_mpath_success_body()
 	jexec ${jname}a netstat -bWf link -I ${epair0}a
 	jexec ${jname}a netstat -bWf link -I ${epair1}a
 	if [ ${pkt_0} -le 10 ]; then
-		echo "Balancing failure: 1: ${pkt_0} 2: ${pkt_1}"
-		exit 1
+		atf_fail "Balancing failure: 1: ${pkt_0} 2: ${pkt_1}"
 	fi
 	if [ ${pkt_1} -le 10 ]; then
-		echo "Balancing failure: 1: ${pkt_0} 2: ${pkt_1}"
-		exit 1
+		atf_fail "Balancing failure: 1: ${pkt_0} 2: ${pkt_1}"
 	fi
 	echo "RAW BALANCING: 1: ${pkt_0} 2: ${pkt_1}"
 }

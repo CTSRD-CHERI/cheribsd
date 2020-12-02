@@ -1,7 +1,7 @@
 #
-# BSD LICENSE
+# SPDX-License-Identifier: BSD-2-Clause
 #
-# Copyright (c) 2015-2019 Amazon.com, Inc. or its affiliates.
+# Copyright (c) 2015-2020 Amazon.com, Inc. or its affiliates.
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -37,6 +37,7 @@ KMOD	= if_ena
 SRCS	= ena_com.c ena_eth_com.c
 SRCS	+= ena.c ena_sysctl.c ena_datapath.c ena_netmap.c
 SRCS	+= device_if.h bus_if.h pci_if.h
+SRCS	+= opt_rss.h
 CFLAGS  += -I${SRCTOP}/sys/contrib
 
 .include <bsd.kmod.mk>

@@ -30,7 +30,7 @@
 # $FreeBSD$
 #
 
-: ${PYTHON=python2}
+: ${PYTHON=python3}
 
 if [ ! -d /usr/local/share/nist-kat ]; then
 	echo "1..0 # SKIP: nist-kat package not installed for test vectors"
@@ -68,7 +68,7 @@ aarch64)
 	cpu_module=nexus/armv8crypto
 	;;
 amd64|i386)
-	cpu_module=nexus/aesni
+	cpu_module="nexus/aesni nexus/ossl"
 	;;
 esac
 
@@ -83,7 +83,7 @@ for required_module in $cpu_module cryptodev; do
 	fi
 done
 
-cdas_sysctl=kern.cryptodevallowsoft
+cdas_sysctl=kern.crypto.allow_soft
 if ! oldcdas=$(sysctl -e $cdas_sysctl); then
 	echo "1..0 # SKIP: could not resolve sysctl: $cdas_sysctl"
 	exit 0

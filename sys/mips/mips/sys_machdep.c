@@ -67,7 +67,7 @@ sysarch(struct thread *td, struct sysarch_args *uap)
 	case MIPS_SET_TLS:
 		return (cpu_set_user_tls(td, uap->parms));
 
-	case MIPS_GET_TLS:
+	case MIPS_GET_TLS: 
 		tlsbase = td->td_md.md_tls;
 		error = copyoutcap(&tlsbase, uap->parms, sizeof(tlsbase));
 		return (error);

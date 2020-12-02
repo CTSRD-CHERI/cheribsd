@@ -260,7 +260,8 @@ tcp_output(struct tcpcb *tp)
 	 * to send, then transmit; otherwise, investigate further.
 	 */
 	idle = (tp->t_flags & TF_LASTIDLE) || (tp->snd_max == tp->snd_una);
-	if (idle && ticks - tp->t_rcvtime >= tp->t_rxtcur)
+	if (idle && (((ticks - tp->t_rcvtime) >= tp->t_rxtcur) ||
+	    (tp->t_sndtime && ((ticks - tp->t_sndtime) >= tp->t_rxtcur))))
 		cc_after_idle(tp);
 	tp->t_flags &= ~TF_LASTIDLE;
 	if (idle) {
@@ -335,7 +336,7 @@ again:
 			sendalot = 1;
 			TCPSTAT_INC(tcps_sack_rexmits);
 			TCPSTAT_ADD(tcps_sack_rexmit_bytes,
-			    min(len, tp->t_maxseg));
+			    min(len, tcp_maxseg(tp)));
 		}
 	}
 after_sack_rexmit:
@@ -588,6 +589,20 @@ after_sack_rexmit:
 	 */
 	if (len) {
 		if (len >= tp->t_maxseg)
+			goto send;
+		/*
+		 * As the TCP header options are now
+		 * considered when setting up the initial
+		 * window, we would not send the last segment
+		 * if we skip considering the option length here.
+		 * Note: this may not work when tcp headers change
+		 * very dynamically in the future.
+		 */
+		if ((((tp->t_flags & TF_SIGNATURE) ?
+			PADTCPOLEN(TCPOLEN_SIGNATURE) : 0) +
+		    ((tp->t_flags & TF_RCVD_TSTMP) ?
+			PADTCPOLEN(TCPOLEN_TIMESTAMP) : 0) +
+		    len) >= tp->t_maxseg)
 			goto send;
 		/*
 		 * NOTE! on localhost connections an 'ack' from the remote
@@ -843,7 +858,6 @@ send:
 			if (flags & TH_SYN)
 				to.to_flags |= TOF_SACKPERM;
 			else if (TCPS_HAVEESTABLISHED(tp->t_state) &&
-			    (tp->t_flags & TF_SACK_PERMIT) &&
 			    tp->rcv_numsacks > 0) {
 				to.to_flags |= TOF_SACK;
 				to.to_nsacks = tp->rcv_numsacks;
@@ -1502,6 +1516,7 @@ out:
 			 * Time this transmission if not a retransmission and
 			 * not currently timing anything.
 			 */
+			tp->t_sndtime = ticks;
 			if (tp->t_rtttime == 0) {
 				tp->t_rtttime = ticks;
 				tp->t_rtseq = startseq;
@@ -1899,7 +1914,6 @@ tcp_m_copym(struct mbuf *m, int32_t off0, int32_t *plen,
 	uint32_t mlen, frags;
 	bool copyhdr;
 
-
 	KASSERT(off >= 0, ("tcp_m_copym, negative off %d", off));
 	KASSERT(len >= 0, ("tcp_m_copym, negative len %d", len));
 	if (off == 0 && m->m_flags & M_PKTHDR)
@@ -1950,17 +1964,6 @@ tcp_m_copym(struct mbuf *m, int32_t off0, int32_t *plen,
 			 */
 			if (tls != ntls) {
 				MPASS(m != start);
-				*plen = len_cp;
-				if (pkthdrlen != NULL)
-					*pkthdrlen = len_cp;
-				break;
-			}
-
-			/*
-			 * Don't end a send in the middle of a TLS
-			 * record if it spans multiple TLS records.
-			 */
-			if (tls != NULL && (m != start) && len < m->m_len) {
 				*plen = len_cp;
 				if (pkthdrlen != NULL)
 					*pkthdrlen = len_cp;

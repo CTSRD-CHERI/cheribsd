@@ -124,7 +124,7 @@ smbfs_node_alloc(struct mount *mp, struct vnode *dvp, const char *dirnm,
 		if (dvp == NULL)
 			return EINVAL;
 		vp = VTOSMB(VTOSMB(dvp)->n_parent)->n_vnode;
-		error = vget(vp, LK_EXCLUSIVE, td);
+		error = vget(vp, LK_EXCLUSIVE);
 		if (error == 0)
 			*vpp = vp;
 		return error;
@@ -260,21 +260,20 @@ int
 smbfs_reclaim(ap)                     
         struct vop_reclaim_args /* {
 		struct vnode *a_vp;
-		struct thread *a_p;
         } */ *ap;
 {
 	struct vnode *vp = ap->a_vp;
 	struct vnode *dvp;
 	struct smbnode *np = VTOSMB(vp);
 	struct smbmount *smp = VTOSMBFS(vp);
-	
+
 	SMBVDEBUG("%s,%d\n", np->n_name, vrefcnt(vp));
 
 	KASSERT((np->n_flag & NOPEN) == 0, ("file not closed before reclaim"));
 
 	dvp = (np->n_parent && (np->n_flag & NREFPARENT)) ?
 	    np->n_parent : NULL;
-	
+
 	/*
 	 * Remove the vnode from its hash chain.
 	 */
@@ -300,10 +299,9 @@ int
 smbfs_inactive(ap)
 	struct vop_inactive_args /* {
 		struct vnode *a_vp;
-		struct thread *a_td;
 	} */ *ap;
 {
-	struct thread *td = ap->a_td;
+	struct thread *td = curthread;
 	struct ucred *cred = td->td_ucred;
 	struct vnode *vp = ap->a_vp;
 	struct smbnode *np = VTOSMB(vp);

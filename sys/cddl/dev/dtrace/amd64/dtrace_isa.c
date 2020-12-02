@@ -56,6 +56,7 @@ void
 dtrace_getpcstack(pc_t *pcstack, int pcstack_limit, int aframes,
     uint32_t *intrpc)
 {
+	struct thread *td;
 	int depth = 0;
 	register_t rbp;
 	struct amd64_frame *frame;
@@ -70,8 +71,10 @@ dtrace_getpcstack(pc_t *pcstack, int pcstack_limit, int aframes,
 	__asm __volatile("movq %%rbp,%0" : "=r" (rbp));
 
 	frame = (struct amd64_frame *)rbp;
+	td = curthread;
 	while (depth < pcstack_limit) {
-		if (!INKERNEL((long) frame))
+		if (!kstack_contains(curthread, (vm_offset_t)frame,
+		    sizeof(*frame))
 			break;
 
 		callpc = frame->f_retaddr;
@@ -84,14 +87,11 @@ dtrace_getpcstack(pc_t *pcstack, int pcstack_limit, int aframes,
 			if ((aframes == 0) && (caller != 0)) {
 				pcstack[depth++] = caller;
 			}
-		}
-		else {
+		} else {
 			pcstack[depth++] = callpc;
 		}
 
-		if (frame->f_frame <= frame ||
-		    (vm_offset_t)frame->f_frame >= curthread->td_kstack +
-		    curthread->td_kstack_pages * PAGE_SIZE)
+		if ((vm_offset_t)frame->f_frame <= (vm_offset_t)frame)
 			break;
 		frame = frame->f_frame;
 	}
@@ -462,14 +462,11 @@ dtrace_getstackdepth(int aframes)
 	frame = (struct amd64_frame *)rbp;
 	depth++;
 	for(;;) {
-		if (!INKERNEL((long) frame))
-			break;
-		if (!INKERNEL((long) frame->f_frame))
+		if (!kstack_contains(curthread, (vm_offset_t)frame,
+		    sizeof(*frame))
 			break;
 		depth++;
-		if (frame->f_frame <= frame ||
-		    (vm_offset_t)frame->f_frame >= curthread->td_kstack +
-		    curthread->td_kstack_pages * PAGE_SIZE)
+		if (frame->f_frame <= frame)
 			break;
 		frame = frame->f_frame;
 	}

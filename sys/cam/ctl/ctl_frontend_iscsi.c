@@ -2,7 +2,6 @@
  * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
  *
  * Copyright (c) 2012 The FreeBSD Foundation
- * All rights reserved.
  *
  * This software was developed by Edward Tomasz Napierala under sponsorship
  * from the FreeBSD Foundation.
@@ -530,6 +529,8 @@ cfiscsi_pdu_handle_scsi_command(struct icl_pdu *request)
 	io->io_hdr.nexus.initid = cs->cs_ctl_initid;
 	io->io_hdr.nexus.targ_port = cs->cs_target->ct_port.targ_port;
 	io->io_hdr.nexus.targ_lun = ctl_decode_lun(be64toh(bhssc->bhssc_lun));
+	io->scsiio.priority = (bhssc->bhssc_pri & BHSSC_PRI_MASK) >>
+	    BHSSC_PRI_SHIFT;
 	io->scsiio.tag_num = bhssc->bhssc_initiator_task_tag;
 	switch ((bhssc->bhssc_flags & BHSSC_FLAGS_ATTR)) {
 	case BHSSC_FLAGS_ATTR_UNTAGGED:
@@ -1183,7 +1184,6 @@ cfiscsi_maintenance_thread(void *arg)
 		CFISCSI_SESSION_UNLOCK(cs);
 
 		if (cs->cs_terminating && cs->cs_handoff_in_progress == false) {
-
 			/*
 			 * We used to wait up to 30 seconds to deliver queued
 			 * PDUs to the initiator.  We also tried hard to deliver
@@ -2137,7 +2137,6 @@ cfiscsi_ioctl_port_create(struct ctl_req *req)
 	alias = dnvlist_get_string(req->args_nvl, "cfiscsi_target_alias", NULL);
 	val = dnvlist_get_string(req->args_nvl, "cfiscsi_portal_group_tag",
 	    NULL);
-
 
 	if (target == NULL || val == NULL) {
 		req->status = CTL_LUN_ERROR;

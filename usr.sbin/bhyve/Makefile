@@ -3,6 +3,7 @@
 #
 
 .include <src.opts.mk>
+CFLAGS+=-I${.CURDIR}/../../contrib/lib9p
 CFLAGS+=-I${SRCTOP}/sys
 .PATH:  ${SRCTOP}/sys/cam/ctl
 
@@ -47,6 +48,7 @@ SRCS=	\
 	pci_lpc.c		\
 	pci_nvme.c		\
 	pci_passthru.c		\
+	pci_virtio_9p.c		\
 	pci_virtio_block.c	\
 	pci_virtio_console.c	\
 	pci_virtio_net.c	\
@@ -54,6 +56,7 @@ SRCS=	\
 	pci_virtio_scsi.c	\
 	pci_uart.c		\
 	pci_xhci.c		\
+	pctestdev.c		\
 	pm.c			\
 	post.c			\
 	ps2kbd.c		\
@@ -82,7 +85,7 @@ CFLAGS.kernemu_dev.c+=	-I${SRCTOP}/sys/amd64
 .PATH:  ${BHYVE_SYSDIR}/sys/amd64/vmm
 SRCS+=	vmm_instruction_emul.c
 
-LIBADD=	vmmapi md pthread z util sbuf cam
+LIBADD=	vmmapi md pthread z util sbuf cam 9p casper cap_pwd cap_grp
 .if ${MK_BHYVE_SNAPSHOT} != "no"
 LIBADD+= ucl xo
 .endif

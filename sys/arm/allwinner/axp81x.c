@@ -1118,9 +1118,9 @@ axp8xx_intr(void *arg)
 		if (bootverbose)
 			device_printf(dev, "AXP_IRQSTAT4 val: %x\n", val);
 		if (val & AXP_IRQSTAT4_BATLVL_LO0)
-			devctl_notify("PMU", "Battery", "shutdown threshold", NULL);
+			devctl_notify("PMU", "Battery", "shutdown-threshold", NULL);
 		if (val & AXP_IRQSTAT4_BATLVL_LO1)
-			devctl_notify("PMU", "Battery", "warning threshold", NULL);
+			devctl_notify("PMU", "Battery", "warning-threshold", NULL);
 		/* Acknowledge */
 		axp8xx_write(dev, AXP_IRQSTAT4, val);
 	}
@@ -1316,7 +1316,6 @@ axp8xx_gpio_pin_set(device_t dev, uint32_t pin, unsigned int val)
 
 	return (error);
 }
-
 
 static int
 axp8xx_gpio_pin_toggle(device_t dev, uint32_t pin)

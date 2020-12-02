@@ -47,7 +47,6 @@ static void	_nvme_qpair_submit_request(struct nvme_qpair *qpair,
 static void	nvme_qpair_destroy(struct nvme_qpair *qpair);
 
 struct nvme_opcode_string {
-
 	uint16_t	opc;
 	const char *	str;
 };
@@ -128,7 +127,6 @@ get_io_opcode_string(uint16_t opc)
 	return (entry->str);
 }
 
-
 static void
 nvme_admin_qpair_print_command(struct nvme_qpair *qpair,
     struct nvme_command *cmd)
@@ -195,7 +193,6 @@ nvme_qpair_print_command(struct nvme_qpair *qpair, struct nvme_command *cmd)
 }
 
 struct nvme_status_string {
-
 	uint16_t	sc;
 	const char *	str;
 };
@@ -662,7 +659,6 @@ nvme_qpair_construct(struct nvme_qpair *qpair,
 	qpair->ctrlr = ctrlr;
 
 	if (ctrlr->msix_enabled) {
-
 		/*
 		 * MSI-X vector resource IDs start at 1, so we add one to
 		 *  the queue's vector to get the corresponding rid to use.
@@ -729,6 +725,8 @@ nvme_qpair_construct(struct nvme_qpair *qpair,
 	if (bus_dmamap_load(qpair->dma_tag, qpair->queuemem_map,
 	    queuemem, allocsz, nvme_single_map, &queuemem_phys, 0) != 0) {
 		nvme_printf(ctrlr, "failed to load qpair memory\n");
+		bus_dmamem_free(qpair->dma_tag, qpair->cmd,
+		    qpair->queuemem_map);
 		goto out;
 	}
 
@@ -760,7 +758,6 @@ nvme_qpair_construct(struct nvme_qpair *qpair,
 	list_phys = prpmem_phys;
 	prp_list = prpmem;
 	for (i = 0; i < qpair->num_trackers; i++) {
-
 		if (list_phys + prpsz > prpmem_phys + prpmemsz) {
 			qpair->num_trackers = i;
 			break;
@@ -811,38 +808,49 @@ nvme_qpair_destroy(struct nvme_qpair *qpair)
 {
 	struct nvme_tracker	*tr;
 
-	if (qpair->tag)
+	if (qpair->tag) {
 		bus_teardown_intr(qpair->ctrlr->dev, qpair->res, qpair->tag);
-
-	if (mtx_initialized(&qpair->lock))
-		mtx_destroy(&qpair->lock);
-
-	if (qpair->res)
-		bus_release_resource(qpair->ctrlr->dev, SYS_RES_IRQ,
-		    rman_get_rid(qpair->res), qpair->res);
-
-	if (qpair->cmd != NULL) {
-		bus_dmamap_unload(qpair->dma_tag, qpair->queuemem_map);
-		bus_dmamem_free(qpair->dma_tag, qpair->cmd,
-		    qpair->queuemem_map);
+		qpair->tag = NULL;
 	}
 
-	if (qpair->act_tr)
-		free_domain(qpair->act_tr, M_NVME);
+	if (qpair->act_tr) {
+		free(qpair->act_tr, M_NVME);
+		qpair->act_tr = NULL;
+	}
 
 	while (!TAILQ_EMPTY(&qpair->free_tr)) {
 		tr = TAILQ_FIRST(&qpair->free_tr);
 		TAILQ_REMOVE(&qpair->free_tr, tr, tailq);
 		bus_dmamap_destroy(qpair->dma_tag_payload,
 		    tr->payload_dma_map);
-		free_domain(tr, M_NVME);
+		free(tr, M_NVME);
 	}
 
-	if (qpair->dma_tag)
-		bus_dma_tag_destroy(qpair->dma_tag);
+	if (qpair->cmd != NULL) {
+		bus_dmamap_unload(qpair->dma_tag, qpair->queuemem_map);
+		bus_dmamem_free(qpair->dma_tag, qpair->cmd,
+		    qpair->queuemem_map);
+		qpair->cmd = NULL;
+	}
 
-	if (qpair->dma_tag_payload)
+	if (qpair->dma_tag) {
+		bus_dma_tag_destroy(qpair->dma_tag);
+		qpair->dma_tag = NULL;
+	}
+
+	if (qpair->dma_tag_payload) {
 		bus_dma_tag_destroy(qpair->dma_tag_payload);
+		qpair->dma_tag_payload = NULL;
+	}
+
+	if (mtx_initialized(&qpair->lock))
+		mtx_destroy(&qpair->lock);
+
+	if (qpair->res) {
+		bus_release_resource(qpair->ctrlr->dev, SYS_RES_IRQ,
+		    rman_get_rid(qpair->res), qpair->res);
+		qpair->res = NULL;
+	}
 }
 
 static void
@@ -943,6 +951,7 @@ nvme_qpair_submit_tracker(struct nvme_qpair *qpair, struct nvme_tracker *tr)
 {
 	struct nvme_request	*req;
 	struct nvme_controller	*ctrlr;
+	int timeout;
 
 	mtx_assert(&qpair->lock, MA_OWNED);
 
@@ -951,9 +960,14 @@ nvme_qpair_submit_tracker(struct nvme_qpair *qpair, struct nvme_tracker *tr)
 	qpair->act_tr[tr->cid] = tr;
 	ctrlr = qpair->ctrlr;
 
-	if (req->timeout)
-		callout_reset_on(&tr->timer, ctrlr->timeout_period * hz,
-		    nvme_timeout, tr, qpair->cpu);
+	if (req->timeout) {
+		if (req->cb_fn == nvme_completion_poll_cb)
+			timeout = hz;
+		else
+			timeout = ctrlr->timeout_period * hz;
+		callout_reset_on(&tr->timer, timeout, nvme_timeout, tr,
+		    qpair->cpu);
+	}
 
 	/* Copy the command from the tracker to the submission queue. */
 	memcpy(&qpair->cmd[qpair->sq_tail], &req->cmd, sizeof(req->cmd));

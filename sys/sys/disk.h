@@ -63,14 +63,6 @@ void disk_err(struct bio *bp, const char *what, int blkdone, int nl);
 	 * Enable/Disable (the argument is boolean) the device for kernel
 	 * core dumps.
 	 */
-	
-#define	DIOCGFRONTSTUFF _IOR('d', 134, off_t)
-	/*
-	 * Many disk formats have some amount of space reserved at the
-	 * start of the disk to hold bootblocks, various disklabels and
-	 * similar stuff.  This ioctl returns the number of such bytes
-	 * which may apply to the device.
-	 */
 
 #define	DIOCGFLUSH _IO('d', 135)		/* Flush write cache */
 	/*

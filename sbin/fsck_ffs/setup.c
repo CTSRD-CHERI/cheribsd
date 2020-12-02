@@ -217,7 +217,7 @@ setup(char *dev)
 	disk.d_ufs = (sblock.fs_magic == FS_UFS1_MAGIC) ? 1 : 2;
 	disk.d_bsize = sblock.fs_fsize / fsbtodb(&sblock, 1);
 	disk.d_sblock = sblock.fs_sblockloc / disk.d_bsize;
-	disk.d_sbcsum = sblock.fs_csp;
+	disk.d_si = sblock.fs_si;
 
 	if (skipclean && ckclean && sblock.fs_clean) {
 		pwarn("FILE SYSTEM CLEAN; SKIPPING CHECKS\n");
@@ -331,7 +331,7 @@ readsb(int listerr)
 	int bad, ret;
 	struct fs *fs;
 
-	super = bflag ? bflag * dev_bsize : STDSB;
+	super = bflag ? bflag * dev_bsize : STDSB_NOHASHFAIL;
 	readcnt[sblk.b_type]++;
 	if ((ret = sbget(fsreadfd, &fs, super)) != 0) {
 		switch (ret) {
@@ -340,15 +340,15 @@ readsb(int listerr)
 			return (0);
 		case ENOENT:
 			if (bflag)
-				fprintf(stderr, "%jd is not a file system "
+				printf("%jd is not a file system "
 				    "superblock\n", super / dev_bsize);
 			else
-				fprintf(stderr, "Cannot find file system "
+				printf("Cannot find file system "
 				    "superblock\n");
 			return (0);
 		case EIO:
 		default:
-			fprintf(stderr, "I/O error reading %jd\n",
+			printf("I/O error reading %jd\n",
 			    super / dev_bsize);
 			return (0);
 		}

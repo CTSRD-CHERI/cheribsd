@@ -96,7 +96,7 @@ SUBDIR=	adduser \
 	trpt \
 	tzsetup \
 	ugidfw \
-	valectl \
+	${_valectl} \
 	vigr \
 	vipw \
 	wake \
@@ -216,6 +216,11 @@ SUBDIR.${MK_UTMPX}+=	utx
 SUBDIR.${MK_WIRELESS}+=	ancontrol
 SUBDIR.${MK_WIRELESS}+=	wlandebug
 SUBDIR.${MK_WIRELESS}+=	wpa
+
+.if !${MACHINE_ABI:Mpurecap}
+# ioctls hardcode pointers as uint64_t
+_valectl=	valectl
+.endif
 
 SUBDIR.${MK_TESTS}+=	tests
 

@@ -23,7 +23,7 @@
 .\" SUCH DAMAGE.
 .\" $FreeBSD$
 .\"
-.Dd October 21, 2018
+.Dd September 17, 2020
 .Dt EVENTHANDLER 9
 .Os
 .Sh NAME
@@ -299,7 +299,7 @@ Callback invoked when an interfance has been removed from an interface group.
 .It Vt ifaddr_event
 Callbacks invoked when an address is set up on a network interface.
 .It Vt ifaddr_event_ext
-Callback invoked when an address has been added or removed from an interface. 
+Callback invoked when an address has been added or removed from an interface.
 .It Vt if_clone_event
 Callbacks invoked when an interface is cloned.
 .It Vt iflladdr_event
@@ -389,6 +389,10 @@ Callback invoked when the vlan configuration has changed.
 Callback invoked when a vlan is destroyed.
 .It Vt vm_lowmem
 Callbacks invoked when virtual memory is low.
+.It Vt vxlan_start
+Callback invoked when a vxlan interface starts.
+.It Vt vxlan_stop
+Callback invoked when a vxlan interface stops.
 .It Vt watchdog_list
 Callbacks invoked when the system watchdog timer is reinitialized.
 .El

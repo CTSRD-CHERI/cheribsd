@@ -9,10 +9,6 @@
 
 #include "config.h"
 
-#ifndef lint
-static const char sccsid[] = "$Id: v_sentence.c,v 10.9 2001/06/25 15:19:35 skimo Exp $";
-#endif /* not lint */
-
 #include <sys/types.h>
 #include <sys/queue.h>
 #include <sys/time.h>
@@ -291,7 +287,7 @@ ret:			slno = cs.cs_lno;
 			 * we can end up where we started.  Fix it.
 			 */
 			if (vp->m_start.lno != cs.cs_lno ||
-			    vp->m_start.cno != cs.cs_cno)
+			    vp->m_start.cno > cs.cs_cno)
 				goto okret;
 
 			/*
@@ -340,7 +336,7 @@ okret:	vp->m_stop.lno = cs.cs_lno;
 	 * All commands move to the end of the range.  Adjust the start of
 	 * the range for motion commands.
 	 */
-	if (ISMOTION(vp))
+	if (ISMOTION(vp)) {
 		if (vp->m_start.cno == 0 &&
 		    (cs.cs_flags != 0 || vp->m_stop.cno == 0)) {
 			if (db_get(sp,
@@ -350,6 +346,7 @@ okret:	vp->m_stop.lno = cs.cs_lno;
 			F_SET(vp, VM_LMODE);
 		} else
 			--vp->m_start.cno;
+	}
 	vp->m_final = vp->m_stop;
 	return (0);
 }

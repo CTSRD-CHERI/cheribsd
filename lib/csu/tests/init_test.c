@@ -40,9 +40,11 @@ __FBSDID("$FreeBSD$");
 
 typedef void (*func_ptr)(void);
 
+#ifndef __CHERI_PURE_CAPABILITY__
 extern volatile int jcr_run;
 extern const func_ptr *jcr_ptr;
 extern const void *jcr_func_ptr;
+#endif
 extern volatile int ctors_run;
 extern volatile int preinit_array_run;
 extern volatile int preinit_array_state;
@@ -50,14 +52,17 @@ extern volatile int init_array_run;
 extern volatile int init_array_state;
 
 #ifndef DSO_BASE
+#ifndef __CHERI_PURE_CAPABILITY__
 volatile int jcr_run;
 const func_ptr *jcr_ptr;
+#endif
 volatile int ctors_run;
 volatile int preinit_array_run;
 volatile int preinit_array_state = -1;
 volatile int init_array_run;
 volatile int init_array_state = -1;
 
+#ifndef __CHERI_PURE_CAPABILITY__
 void _Jv_RegisterClasses(const func_ptr *);
 
 __section(".jcr") __used static func_ptr jcr_func = (func_ptr)1;
@@ -71,7 +76,9 @@ _Jv_RegisterClasses(const func_ptr *jcr)
 	jcr_ptr = jcr;
 }
 #endif
+#endif
 
+#ifndef __CHERI_PURE_CAPABILITY__
 #ifndef DSO_LIB
 ATF_TC_WITHOUT_HEAD(jcr_test);
 ATF_TC_BODY(jcr_test, tc)
@@ -81,6 +88,7 @@ ATF_TC_BODY(jcr_test, tc)
 	ATF_REQUIRE_MSG(jcr_ptr == jcr_func_ptr,
 	    "Incorrect pointer passed to _Jv_RegisterClasses");
 }
+#endif
 #endif
 
 #ifndef DSO_BASE
@@ -162,7 +170,9 @@ ATF_TC_BODY(init_array_test, tc)
 ATF_TP_ADD_TCS(tp)
 {
 
+#ifndef __CHERI_PURE_CAPABILITY__
 	ATF_TP_ADD_TC(tp, jcr_test);
+#endif
 	ATF_TP_ADD_TC(tp, ctors_test);
 	ATF_TP_ADD_TC(tp, preinit_array_test);
 	ATF_TP_ADD_TC(tp, init_array_test);

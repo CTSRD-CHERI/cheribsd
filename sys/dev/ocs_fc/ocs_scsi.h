@@ -44,7 +44,6 @@
 #include "ocs_mgmt.h"
 #include "ocs_utils.h"
 
-
 /* ocs_scsi_rcv_cmd() ocs_scsi_rcv_tmf() flags */
 #define OCS_SCSI_CMD_DIR_IN		(1U << 0)
 #define OCS_SCSI_CMD_DIR_OUT		(1U << 1)
@@ -55,6 +54,8 @@
 #define OCS_SCSI_CMD_ACA		(1U << 6)
 #define OCS_SCSI_FIRST_BURST_ERR	(1U << 7)
 #define OCS_SCSI_FIRST_BURST_ABORTED	(1U << 8)
+#define OCS_SCSI_PRIORITY_MASK		0xf0000
+#define OCS_SCSI_PRIORITY_SHIFT		16
 
 /* ocs_scsi_send_rd_data/recv_wr_data/send_resp flags */
 #define OCS_SCSI_LAST_DATAPHASE		(1U << 0)
@@ -129,8 +130,6 @@ typedef enum {
 #define SCSI_STATUS_TASK_SET_FULL			0x28
 #define SCSI_STATUS_ACA_ACTIVE				0x30
 #define SCSI_STATUS_TASK_ABORTED			0x40
-
-
 
 /* Callback used by send_rd_data(), recv_wr_data(), send_resp() */
 typedef int32_t (*ocs_scsi_io_cb_t)(ocs_io_t *io, ocs_scsi_io_status_e status, uint32_t flags,
@@ -232,7 +231,6 @@ typedef struct ocs_scsi_sgl_s {
 	size_t		len;			/**< length */
 } ocs_scsi_sgl_t;
 
-
 /**
  * @brief T10 DIF information passed to the transport
  */
@@ -304,7 +302,6 @@ extern int32_t ocs_scsi_recv_tmf(ocs_io_t *tmfio, uint64_t lun, ocs_scsi_tmf_cmd
 extern ocs_sport_t *ocs_sport_get_instance(ocs_domain_t *domain, uint32_t index);
 extern ocs_domain_t *ocs_domain_get_instance(ocs_t *ocs, uint32_t index);
 
-
 /* Calls from target-server to base driver */
 
 extern int32_t ocs_scsi_send_rd_data(ocs_io_t *io, uint32_t flags,
@@ -352,17 +349,18 @@ extern int32_t ocs_scsi_del_target(ocs_node_t *node, ocs_scsi_del_target_reason_
 
 extern int32_t ocs_scsi_send_rd_io(ocs_node_t *node, ocs_io_t *io, uint64_t lun, void *cdb, uint32_t cdb_len,
 	ocs_scsi_dif_info_t *dif_info,
-	ocs_scsi_sgl_t *sgl, uint32_t sgl_count, uint32_t wire_len, ocs_scsi_rsp_io_cb_t cb, void *arg);
+	ocs_scsi_sgl_t *sgl, uint32_t sgl_count, uint32_t wire_len, ocs_scsi_rsp_io_cb_t cb, void *arg, uint32_t flags);
 extern int32_t ocs_scsi_send_wr_io(ocs_node_t *node, ocs_io_t *io, uint64_t lun, void *cdb, uint32_t cdb_len,
 	ocs_scsi_dif_info_t *dif_info,
-	ocs_scsi_sgl_t *sgl, uint32_t sgl_count, uint32_t wire_len, ocs_scsi_rsp_io_cb_t cb, void *arg);
+	ocs_scsi_sgl_t *sgl, uint32_t sgl_count, uint32_t wire_len, ocs_scsi_rsp_io_cb_t cb, void *arg, uint32_t flags);
 extern int32_t ocs_scsi_send_wr_io_first_burst(ocs_node_t *node, ocs_io_t *io, uint64_t lun, void *cdb, uint32_t cdb_len,
 	ocs_scsi_dif_info_t *dif_info,
 	ocs_scsi_sgl_t *sgl, uint32_t sgl_count, uint32_t wire_len, uint32_t first_burst,
-	ocs_scsi_rsp_io_cb_t cb, void *arg);
+	ocs_scsi_rsp_io_cb_t cb, void *arg, uint32_t flags);
 extern int32_t ocs_scsi_send_tmf(ocs_node_t *node, ocs_io_t *io, ocs_io_t *io_to_abort, uint64_t lun,
 	ocs_scsi_tmf_cmd_e tmf, ocs_scsi_sgl_t *sgl, uint32_t sgl_count, uint32_t len, ocs_scsi_rsp_io_cb_t cb, void *arg);
-extern int32_t ocs_scsi_send_nodata_io(ocs_node_t *node, ocs_io_t *io, uint64_t lun, void *cdb, uint32_t cdb_len, ocs_scsi_rsp_io_cb_t cb, void *arg);
+extern int32_t ocs_scsi_send_nodata_io(ocs_node_t *node, ocs_io_t *io, uint64_t lun, void *cdb, uint32_t cdb_len,
+	ocs_scsi_rsp_io_cb_t cb, void *arg, uint32_t flags);
 extern void ocs_scsi_del_target_complete(ocs_node_t *node);
 
 typedef enum {
@@ -394,7 +392,6 @@ extern uint32_t ocs_scsi_dif_blocksize(ocs_scsi_dif_info_t *dif_info);
 extern int32_t ocs_scsi_dif_set_blocksize(ocs_scsi_dif_info_t *dif_info, uint32_t blocksize);
 extern int32_t ocs_scsi_dif_mem_blocksize(ocs_scsi_dif_info_t *dif_info, int wiretomem);
 extern int32_t ocs_scsi_dif_wire_blocksize(ocs_scsi_dif_info_t *dif_info, int wiretomem);
-
 
 uint32_t ocs_get_crn(ocs_node_t *node, uint8_t *crn, uint64_t lun);
 void ocs_del_crn(ocs_node_t *node);
@@ -433,7 +430,6 @@ ocs_scsi_notify_sport_force_free(ocs_sport_t *sport)
 	/* Nothing to do */
 	return;
 }
-
 
 /**
  * @brief Notification from base driver that node is in force-free path.

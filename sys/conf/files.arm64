@@ -92,6 +92,7 @@ arm/broadcom/bcm2835/bcm2835_clkman.c		optional soc_brcm_bcm2837 fdt | soc_brcm_
 arm/broadcom/bcm2835/bcm2835_cpufreq.c		optional soc_brcm_bcm2837 fdt | soc_brcm_bcm2838 fdt
 arm/broadcom/bcm2835/bcm2835_dma.c		optional soc_brcm_bcm2837 fdt | soc_brcm_bcm2838 fdt
 arm/broadcom/bcm2835/bcm2835_fbd.c		optional vt soc_brcm_bcm2837 fdt | vt soc_brcm_bcm2838 fdt
+arm/broadcom/bcm2835/bcm2835_firmware.c		optional soc_brcm_bcm2837 fdt | soc_brcm_bcm2838 fdt
 arm/broadcom/bcm2835/bcm2835_ft5406.c		optional evdev bcm2835_ft5406 fdt
 arm/broadcom/bcm2835/bcm2835_gpio.c		optional gpio soc_brcm_bcm2837 fdt | gpio soc_brcm_bcm2838 fdt
 arm/broadcom/bcm2835/bcm2835_intr.c		optional soc_brcm_bcm2837 fdt | soc_brcm_bcm2838 fdt
@@ -105,12 +106,16 @@ arm/broadcom/bcm2835/bcm2835_vcio.c		optional soc_brcm_bcm2837 fdt | soc_brcm_bc
 arm/broadcom/bcm2835/bcm2835_wdog.c		optional soc_brcm_bcm2837 fdt | soc_brcm_bcm2838 fdt
 arm/broadcom/bcm2835/bcm2836.c			optional soc_brcm_bcm2837 fdt | soc_brcm_bcm2838 fdt
 arm/broadcom/bcm2835/bcm283x_dwc_fdt.c		optional dwcotg fdt soc_brcm_bcm2837 | dwcotg fdt soc_brcm_bcm2838
+arm/broadcom/bcm2835/bcm2838_pci.c		optional soc_brcm_bcm2838 fdt pci
+arm/broadcom/bcm2835/bcm2838_xhci.c		optional soc_brcm_bcm2838 fdt pci xhci
+arm/broadcom/bcm2835/raspberrypi_gpio.c		optional soc_brcm_bcm2837 gpio | soc_brcm_bcm2838 gpio
 arm/freescale/vybrid/vf_i2c.c			optional vf_i2c iicbus SOC_NXP_LS
 arm/mv/a37x0_gpio.c				optional a37x0_gpio gpio fdt
 arm/mv/a37x0_iic.c				optional a37x0_iic iicbus fdt
 arm/mv/a37x0_spi.c				optional a37x0_spi spibus fdt
 arm/mv/armada38x/armada38x_rtc.c		optional mv_rtc fdt
 arm/mv/gpio.c					optional mv_gpio fdt
+arm/mv/mvebu_gpio.c				optional mv_gpio fdt
 arm/mv/mvebu_pinctrl.c				optional mvebu_pinctrl fdt
 arm/mv/mv_ap806_clock.c				optional SOC_MARVELL_8K fdt
 arm/mv/mv_ap806_gicp.c				optional mv_ap806_gicp fdt
@@ -187,6 +192,8 @@ arm64/cavium/thunder_pcie_common.c	optional	soc_cavm_thunderx pci
 arm64/cloudabi32/cloudabi32_sysvec.c	optional compat_cloudabi32
 arm64/cloudabi64/cloudabi64_sysvec.c	optional compat_cloudabi64
 arm64/coresight/coresight.c			standard
+arm64/coresight/coresight_acpi.c		optional acpi
+arm64/coresight/coresight_fdt.c			optional fdt
 arm64/coresight/coresight_if.m			standard
 arm64/coresight/coresight_cmd.c			standard
 arm64/coresight/coresight_cpu_debug.c		standard
@@ -205,6 +212,11 @@ arm64/coresight/coresight_tmc_fdt.c		optional fdt
 arm64/intel/firmware.c				optional soc_intel_stratix10
 arm64/intel/stratix10-soc-fpga-mgr.c		optional soc_intel_stratix10
 arm64/intel/stratix10-svc.c			optional soc_intel_stratix10
+arm64/iommu/iommu.c				optional iommu
+arm64/iommu/iommu_if.m				optional iommu
+arm64/iommu/smmu.c				optional iommu
+arm64/iommu/smmu_acpi.c				optional acpi iommu
+arm64/iommu/smmu_quirks.c			optional iommu
 arm64/qoriq/ls1046_gpio.c			optional ls1046_gpio gpio fdt SOC_NXP_LS
 arm64/qoriq/clk/ls1046a_clkgen.c		optional clk SOC_NXP_LS
 arm64/qoriq/clk/qoriq_clk_pll.c			optional clk SOC_NXP_LS
@@ -243,12 +255,21 @@ dev/acpica/acpi_pxm.c		optional	acpi
 dev/ahci/ahci_fsl_fdt.c		optional	SOC_NXP_LS ahci fdt
 dev/ahci/ahci_generic.c		optional	ahci
 dev/altera/dwc/if_dwc_socfpga.c	optional	fdt dwc_socfpga
-dev/axgbe/if_axgbe.c		optional	axgbe
-dev/axgbe/xgbe-desc.c		optional	axgbe
-dev/axgbe/xgbe-dev.c		optional	axgbe
-dev/axgbe/xgbe-drv.c		optional	axgbe
-dev/axgbe/xgbe-mdio.c		optional	axgbe
+dev/axgbe/if_axgbe.c		optional	axa
+dev/axgbe/xgbe-desc.c		optional	axa
+dev/axgbe/xgbe-dev.c		optional	axa
+dev/axgbe/xgbe-drv.c		optional	axa
+dev/axgbe/xgbe-mdio.c		optional	axa
+dev/axgbe/xgbe-sysctl.c		optional	axa
+dev/axgbe/xgbe-txrx.c		optional	axa
+dev/axgbe/xgbe_osdep.c		optional	axa
+dev/axgbe/xgbe-phy-v1.c		optional	axa
 dev/cpufreq/cpufreq_dt.c	optional	cpufreq fdt
+dev/gpio/pl061.c		optional	pl061 gpio
+dev/gpio/pl061_acpi.c		optional	pl061 gpio acpi
+dev/gpio/pl061_fdt.c		optional	pl061 gpio fdt
+dev/hwpmc/hwpmc_arm64.c		optional	hwpmc
+dev/hwpmc/hwpmc_arm64_md.c	optional	hwpmc
 dev/ice/if_ice_iflib.c		optional	ice pci \
 	compile-with "${NORMAL_C} -I$S/dev/ice"
 dev/ice/ice_lib.c		optional	ice pci \
@@ -282,7 +303,7 @@ dev/ice/ice_sriov.c		optional	ice pci \
 dev/ice/ice_switch.c		optional	ice pci \
 	compile-with "${NORMAL_C} -I$S/dev/ice"
 ice_ddp.c			optional ice_ddp	\
-	compile-with	"${AWK} -f $S/tools/fw_stub.awk ice_ddp.fw:ice_ddp:0x01030900 -mice_ddp -c${.TARGET}"	\
+	compile-with	"${AWK} -f $S/tools/fw_stub.awk ice_ddp.fw:ice_ddp:0x01031000 -mice_ddp -c${.TARGET}"	\
 	no-implicit-rule before-depend local		\
 	clean		"ice_ddp.c"
 ice_ddp.fwo			optional ice_ddp	\
@@ -291,16 +312,16 @@ ice_ddp.fwo			optional ice_ddp	\
 	no-implicit-rule				\
 	clean		"ice_ddp.fwo"
 ice_ddp.fw			optional ice_ddp	\
-	dependency	"$S/contrib/dev/ice/ice-1.3.9.0.pkg" \
-	compile-with	"${CP} $S/contrib/dev/ice/ice-1.3.9.0.pkg ice_ddp.fw" \
+	dependency	"$S/contrib/dev/ice/ice-1.3.16.0.pkg" \
+	compile-with	"${CP} $S/contrib/dev/ice/ice-1.3.16.0.pkg ice_ddp.fw" \
 	no-obj no-implicit-rule				\
 	clean		"ice_ddp.fw"
 dev/iicbus/sy8106a.c		optional	sy8106a fdt
 dev/iicbus/twsi/mv_twsi.c	optional	twsi fdt
 dev/iicbus/twsi/a10_twsi.c	optional	twsi fdt
 dev/iicbus/twsi/twsi.c		optional	twsi fdt
-dev/hwpmc/hwpmc_arm64.c		optional	hwpmc
-dev/hwpmc/hwpmc_arm64_md.c	optional	hwpmc
+dev/iommu/busdma_iommu.c	optional	iommu
+dev/iommu/iommu_gas.c		optional	iommu
 dev/mbox/mbox_if.m		optional	soc_brcm_bcm2837
 dev/mmc/host/dwmmc.c		optional	dwmmc fdt
 dev/mmc/host/dwmmc_altera.c	optional	dwmmc dwmmc_altera fdt
@@ -320,6 +341,7 @@ dev/pci/pci_dw_if.m		optional	pci fdt
 dev/psci/psci.c			standard
 dev/psci/smccc_arm64.S		standard
 dev/psci/smccc.c		standard
+dev/safexcel/safexcel.c		optional	safexcel fdt
 dev/sdhci/sdhci_xenon.c		optional	sdhci_xenon sdhci fdt
 dev/uart/uart_cpu_arm64.c	optional	uart
 dev/uart/uart_dev_mu.c		optional	uart uart_mu
@@ -332,6 +354,7 @@ dev/usb/controller/generic_ehci_acpi.c optional	ehci acpi
 dev/usb/controller/generic_ehci_fdt.c optional	ehci fdt
 dev/usb/controller/generic_ohci.c optional	ohci fdt
 dev/usb/controller/generic_usb_if.m optional	ohci fdt
+dev/usb/controller/musb_otg_allwinner.c	optional musb fdt soc_allwinner_a64
 dev/usb/controller/usb_nop_xceiv.c	optional fdt ext_resources
 dev/usb/controller/generic_xhci.c	optional	xhci
 dev/usb/controller/generic_xhci_acpi.c	optional	xhci acpi
@@ -345,7 +368,6 @@ dev/vnic/thunder_bgx.c		optional	vnic pci
 dev/vnic/thunder_mdio_fdt.c	optional	vnic fdt
 dev/vnic/thunder_mdio.c		optional	vnic
 dev/vnic/lmac_if.m		optional	inet | inet6 | vnic
-kern/kern_clocksource.c		standard
 kern/msi_if.m			optional	intrng
 kern/pic_if.m			optional	intrng
 kern/subr_devmap.c		standard
@@ -394,3 +416,18 @@ arm64/rockchip/clk/rk_clk_pll.c		optional fdt soc_rockchip_rk3328 | fdt soc_rock
 arm64/rockchip/clk/rk3328_cru.c		optional fdt soc_rockchip_rk3328
 arm64/rockchip/clk/rk3399_cru.c		optional fdt soc_rockchip_rk3399
 arm64/rockchip/clk/rk3399_pmucru.c	optional fdt soc_rockchip_rk3399
+
+# i.MX8 Clock support
+arm64/freescale/imx/imx8mq_ccm.c	optional fdt soc_freescale_imx8
+arm64/freescale/imx/clk/imx_clk_gate.c	optional fdt soc_freescale_imx8
+arm64/freescale/imx/clk/imx_clk_mux.c	optional fdt soc_freescale_imx8
+arm64/freescale/imx/clk/imx_clk_composite.c	optional fdt soc_freescale_imx8
+arm64/freescale/imx/clk/imx_clk_sscg_pll.c	optional fdt soc_freescale_imx8
+arm64/freescale/imx/clk/imx_clk_frac_pll.c	optional fdt soc_freescale_imx8
+
+# iMX drivers
+arm/freescale/imx/imx_gpio.c		optional gpio soc_freescale_imx8
+arm/freescale/imx/imx_i2c.c		optional fsliic
+arm/freescale/imx/imx_machdep.c		optional fdt soc_freescale_imx8
+arm64/freescale/imx/imx7gpc.c		optional fdt soc_freescale_imx8
+dev/ffec/if_ffec.c			optional ffec

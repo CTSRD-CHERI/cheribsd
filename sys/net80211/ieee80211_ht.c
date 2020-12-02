@@ -42,7 +42,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/malloc.h>
 #include <sys/systm.h> 
 #include <sys/endian.h>
- 
+
 #include <sys/socket.h>
 
 #include <net/if.h>
@@ -53,10 +53,6 @@ __FBSDID("$FreeBSD$");
 #include <net80211/ieee80211_var.h>
 #include <net80211/ieee80211_action.h>
 #include <net80211/ieee80211_input.h>
-
-/* define here, used throughout file */
-#define	MS(_v, _f)	(((_v) & _f) >> _f##_S)
-#define	SM(_v, _f)	(((_v) << _f##_S) & _f)
 
 const struct ieee80211_mcs_rates ieee80211_htrates[IEEE80211_HTRATE_MAXSIZE] = {
 	{  13,  14,   27,   30 },	/* MCS 0 */
@@ -269,6 +265,9 @@ ieee80211_ht_vattach(struct ieee80211vap *vap)
 	vap->iv_ampdu_mintraffic[WME_AC_BE] = 64;
 	vap->iv_ampdu_mintraffic[WME_AC_VO] = 32;
 	vap->iv_ampdu_mintraffic[WME_AC_VI] = 32;
+
+	vap->iv_htprotmode = IEEE80211_PROT_RTSCTS;
+	vap->iv_curhtprotmode = IEEE80211_HTINFO_OPMODE_PURE;
 
 	if (vap->iv_htcaps & IEEE80211_HTC_HT) {
 		/*
@@ -517,6 +516,22 @@ ieee80211_decap_amsdu(struct ieee80211_node *ni, struct mbuf *m)
 	return m;				/* last delivered by caller */
 }
 
+static void
+ampdu_rx_purge_slot(struct ieee80211_rx_ampdu *rap, int i)
+{
+	struct mbuf *m;
+
+	/* Walk the queue, removing frames as appropriate */
+	while (mbufq_len(&rap->rxa_mq[i]) != 0) {
+		m = mbufq_dequeue(&rap->rxa_mq[i]);
+		if (m == NULL)
+			break;
+		rap->rxa_qbytes -= m->m_pkthdr.len;
+		rap->rxa_qframes--;
+		m_freem(m);
+	}
+}
+
 /*
  * Add the given frame to the current RX reorder slot.
  *
@@ -528,16 +543,94 @@ static int
 ampdu_rx_add_slot(struct ieee80211_rx_ampdu *rap, int off, int tid,
     ieee80211_seq rxseq,
     struct ieee80211_node *ni,
-    struct mbuf *m)
+    struct mbuf *m,
+    const struct ieee80211_rx_stats *rxs)
 {
+	const struct ieee80211_rx_stats *rxs_final = NULL;
 	struct ieee80211vap *vap = ni->ni_vap;
+	int toss_dup;
+#define	PROCESS		0	/* caller should process frame */
+#define	CONSUMED	1	/* frame consumed, caller does nothing */
 
-	if (rap->rxa_m[off] == NULL) {
-		rap->rxa_m[off] = m;
+	/*
+	 * Figure out if this is a duplicate frame for the given slot.
+	 *
+	 * We're assuming that the driver will hand us all the frames
+	 * for a given AMSDU decap pass and if we get /a/ frame
+	 * for an AMSDU decap then we'll get all of them.
+	 *
+	 * The tricksy bit is that we don't know when the /end/ of
+	 * the decap pass is, because we aren't tracking state here
+	 * per-slot to know that we've finished receiving the frame list.
+	 *
+	 * The driver sets RX_F_AMSDU and RX_F_AMSDU_MORE to tell us
+	 * what's going on; so ideally we'd just check the frame at the
+	 * end of the reassembly slot to see if its F_AMSDU w/ no F_AMSDU_MORE -
+	 * that means we've received the whole AMSDU decap pass.
+	 */
+
+	/*
+	 * Get the rxs of the final mbuf in the slot, if one exists.
+	 */
+	if (mbufq_len(&rap->rxa_mq[off]) != 0) {
+		rxs_final = ieee80211_get_rx_params_ptr(mbufq_last(&rap->rxa_mq[off]));
+	}
+
+	/* Default to tossing the duplicate frame */
+	toss_dup = 1;
+
+	/*
+	 * Check to see if the final frame has F_AMSDU and F_AMSDU set, AND
+	 * this frame has F_AMSDU set (MORE or otherwise.)  That's a sign
+	 * that more can come.
+	 */
+
+	if ((rxs != NULL) && (rxs_final != NULL) &&
+	    ieee80211_check_rxseq_amsdu(rxs) &&
+	    ieee80211_check_rxseq_amsdu(rxs_final)) {
+		if (! ieee80211_check_rxseq_amsdu_more(rxs_final)) {
+			/*
+			 * amsdu_more() returning 0 means "it's not the
+			 * final frame" so we can append more
+			 * frames here.
+			 */
+			toss_dup = 0;
+		}
+	}
+
+	/*
+	 * If the list is empty OR we have determined we can put more
+	 * driver decap'ed AMSDU frames in here, then insert.
+	 */
+	if ((mbufq_len(&rap->rxa_mq[off]) == 0) || (toss_dup == 0)) {
+		if (mbufq_enqueue(&rap->rxa_mq[off], m) != 0) {
+			IEEE80211_DISCARD_MAC(vap, IEEE80211_MSG_INPUT | IEEE80211_MSG_11N,
+			    ni->ni_macaddr,
+			    "a-mpdu queue fail",
+			    "seqno %u tid %u BA win <%u:%u> off=%d, qlen=%d, maxqlen=%d",
+			    rxseq, tid, rap->rxa_start,
+			    IEEE80211_SEQ_ADD(rap->rxa_start, rap->rxa_wnd-1),
+			    off,
+			    mbufq_len(&rap->rxa_mq[off]),
+			    rap->rxa_mq[off].mq_maxlen);
+			/* XXX error count */
+			m_freem(m);
+			return CONSUMED;
+		}
 		rap->rxa_qframes++;
 		rap->rxa_qbytes += m->m_pkthdr.len;
 		vap->iv_stats.is_ampdu_rx_reorder++;
-		return (0);
+		/*
+		 * Statistics for AMSDU decap.
+		 */
+		if (rxs != NULL && ieee80211_check_rxseq_amsdu(rxs)) {
+			if (ieee80211_check_rxseq_amsdu_more(rxs)) {
+				/* more=1, AMSDU, end of batch */
+				IEEE80211_NODE_STAT(ni, rx_amsdu_more_end);
+			} else {
+				IEEE80211_NODE_STAT(ni, rx_amsdu_more);
+			}
+		}
 	} else {
 		IEEE80211_DISCARD_MAC(vap,
 		    IEEE80211_MSG_INPUT | IEEE80211_MSG_11N,
@@ -545,26 +638,27 @@ ampdu_rx_add_slot(struct ieee80211_rx_ampdu *rap, int off, int tid,
 		    "seqno %u tid %u BA win <%u:%u>",
 		    rxseq, tid, rap->rxa_start,
 		    IEEE80211_SEQ_ADD(rap->rxa_start, rap->rxa_wnd-1));
+		if (rxs != NULL) {
+			IEEE80211_DISCARD_MAC(vap,
+			    IEEE80211_MSG_INPUT | IEEE80211_MSG_11N,
+			    ni->ni_macaddr, "a-mpdu duplicate",
+			    "seqno %d tid %u pktflags 0x%08x\n",
+			    rxseq, tid, rxs->c_pktflags);
+		}
+		if (rxs_final != NULL) {
+			IEEE80211_DISCARD_MAC(vap,
+			    IEEE80211_MSG_INPUT | IEEE80211_MSG_11N,
+			    ni->ni_macaddr, "a-mpdu duplicate",
+			    "final: pktflags 0x%08x\n",
+			    rxs_final->c_pktflags);
+		}
 		vap->iv_stats.is_rx_dup++;
 		IEEE80211_NODE_STAT(ni, rx_dup);
 		m_freem(m);
-		return (-1);
 	}
-}
-
-static void
-ampdu_rx_purge_slot(struct ieee80211_rx_ampdu *rap, int i)
-{
-	struct mbuf *m;
-
-	m = rap->rxa_m[i];
-	if (m == NULL)
-		return;
-
-	rap->rxa_m[i] = NULL;
-	rap->rxa_qbytes -= m->m_pkthdr.len;
-	rap->rxa_qframes--;
-	m_freem(m);
+	return CONSUMED;
+#undef	CONSUMED
+#undef	PROCESS
 }
 
 /*
@@ -585,6 +679,18 @@ ampdu_rx_purge(struct ieee80211_rx_ampdu *rap)
 	    rap->rxa_qbytes, rap->rxa_qframes));
 }
 
+static void
+ieee80211_ampdu_rx_init_rap(struct ieee80211_node *ni,
+    struct ieee80211_rx_ampdu *rap)
+{
+	int i;
+
+	/* XXX TODO: ensure the queues are empty */
+	memset(rap, 0, sizeof(*rap));
+	for (i = 0; i < IEEE80211_AGGR_BAWMAX; i++)
+		mbufq_init(&rap->rxa_mq[i], 256);
+}
+
 /*
  * Start A-MPDU rx/re-order processing for the specified TID.
  */
@@ -593,7 +699,7 @@ ampdu_rx_start(struct ieee80211_node *ni, struct ieee80211_rx_ampdu *rap,
 	int baparamset, int batimeout, int baseqctl)
 {
 	struct ieee80211vap *vap = ni->ni_vap;
-	int bufsiz = MS(baparamset, IEEE80211_BAPS_BUFSIZ);
+	int bufsiz = _IEEE80211_MASKSHIFT(baparamset, IEEE80211_BAPS_BUFSIZ);
 
 	if (rap->rxa_flags & IEEE80211_AGGR_RUNNING) {
 		/*
@@ -602,15 +708,15 @@ ampdu_rx_start(struct ieee80211_node *ni, struct ieee80211_rx_ampdu *rap,
 		 */
 		ampdu_rx_purge(rap);
 	}
-	memset(rap, 0, sizeof(*rap));
+	ieee80211_ampdu_rx_init_rap(ni, rap);
 	rap->rxa_wnd = (bufsiz == 0) ?
 	    IEEE80211_AGGR_BAWMAX : min(bufsiz, IEEE80211_AGGR_BAWMAX);
-	rap->rxa_start = MS(baseqctl, IEEE80211_BASEQ_START);
+	rap->rxa_start = _IEEE80211_MASKSHIFT(baseqctl, IEEE80211_BASEQ_START);
 	rap->rxa_flags |=  IEEE80211_AGGR_RUNNING | IEEE80211_AGGR_XCHGPEND;
 
 	/* XXX this should be a configuration flag */
 	if ((vap->iv_htcaps & IEEE80211_HTC_RX_AMSDU_AMPDU) &&
-	    (MS(baparamset, IEEE80211_BAPS_AMSDU)))
+	    (_IEEE80211_MASKSHIFT(baparamset, IEEE80211_BAPS_AMSDU)))
 		rap->rxa_flags |= IEEE80211_AGGR_AMSDU;
 	else
 		rap->rxa_flags &= ~IEEE80211_AGGR_AMSDU;
@@ -638,7 +744,8 @@ ieee80211_ampdu_rx_start_ext(struct ieee80211_node *ni, int tid, int seq, int ba
 		ampdu_rx_purge(rap);
 	}
 
-	memset(rap, 0, sizeof(*rap));
+	ieee80211_ampdu_rx_init_rap(ni, rap);
+
 	rap->rxa_wnd = (baw== 0) ?
 	    IEEE80211_AGGR_BAWMAX : min(baw, IEEE80211_AGGR_BAWMAX);
 	if (seq == -1) {
@@ -708,18 +815,20 @@ ampdu_dispatch_slot(struct ieee80211_rx_ampdu *rap, struct ieee80211_node *ni,
     int i)
 {
 	struct mbuf *m;
+	int n = 0;
 
-	if (rap->rxa_m[i] == NULL)
-		return (0);
+	while (mbufq_len(&rap->rxa_mq[i]) != 0) {
+		m = mbufq_dequeue(&rap->rxa_mq[i]);
+		if (m == NULL)
+			break;
+		n++;
 
-	m = rap->rxa_m[i];
-	rap->rxa_m[i] = NULL;
-	rap->rxa_qbytes -= m->m_pkthdr.len;
-	rap->rxa_qframes--;
+		rap->rxa_qbytes -= m->m_pkthdr.len;
+		rap->rxa_qframes--;
 
-	ampdu_dispatch(ni, m);
-
-	return (1);
+		ampdu_dispatch(ni, m);
+	}
+	return (n);
 }
 
 static void
@@ -728,22 +837,22 @@ ampdu_rx_moveup(struct ieee80211_rx_ampdu *rap, struct ieee80211_node *ni,
 {
 	struct ieee80211vap *vap = ni->ni_vap;
 
+	/*
+	 * If frames remain, copy the mbuf pointers down so
+	 * they correspond to the offsets in the new window.
+	 */
 	if (rap->rxa_qframes != 0) {
 		int n = rap->rxa_qframes, j;
-
-		if (winstart != -1) {
-			/*
-			 * NB: in window-sliding mode, loop assumes i > 0
-			 * and/or rxa_m[0] is NULL
-			 */
-			KASSERT(rap->rxa_m[0] == NULL,
-			    ("%s: BA window slot 0 occupied", __func__));
-		}
 		for (j = i+1; j < rap->rxa_wnd; j++) {
-			if (rap->rxa_m[j] != NULL) {
-				rap->rxa_m[j-i] = rap->rxa_m[j];
-				rap->rxa_m[j] = NULL;
-				if (--n == 0)
+			/*
+			 * Concat the list contents over, which will
+			 * blank the source list for us.
+			 */
+			if (mbufq_len(&rap->rxa_mq[j]) != 0) {
+				n = n - mbufq_len(&rap->rxa_mq[j]);
+				mbufq_concat(&rap->rxa_mq[j-i], &rap->rxa_mq[j]);
+				KASSERT(n >= 0, ("%s: n < 0 (%d)", __func__, n));
+				if (n == 0)
 					break;
 			}
 		}
@@ -768,18 +877,18 @@ static void
 ampdu_rx_dispatch(struct ieee80211_rx_ampdu *rap, struct ieee80211_node *ni)
 {
 	struct ieee80211vap *vap = ni->ni_vap;
-	int i;
+	int i, r, r2;
 
 	/* flush run of frames */
+	r2 = 0;
 	for (i = 1; i < rap->rxa_wnd; i++) {
-		if (ampdu_dispatch_slot(rap, ni, i) == 0)
+		r = ampdu_dispatch_slot(rap, ni, i);
+		if (r == 0)
 			break;
+		r2 += r;
 	}
 
-	/*
-	 * If frames remain, copy the mbuf pointers down so
-	 * they correspond to the offsets in the new window.
-	 */
+	/* move up frames */
 	ampdu_rx_moveup(rap, ni, i, -1);
 
 	/*
@@ -787,7 +896,14 @@ ampdu_rx_dispatch(struct ieee80211_rx_ampdu *rap, struct ieee80211_node *ni)
 	 * reflect the frames just dispatched.
 	 */
 	rap->rxa_start = IEEE80211_SEQ_ADD(rap->rxa_start, i);
-	vap->iv_stats.is_ampdu_rx_oor += i;
+	vap->iv_stats.is_ampdu_rx_oor += r2;
+
+	IEEE80211_NOTE(ni->ni_vap, IEEE80211_MSG_11N, ni,
+	    "%s: moved slot up %d slots to start at %d (%d frames)",
+	    __func__,
+	    i,
+	    rap->rxa_start,
+	    r2);
 }
 
 /*
@@ -796,14 +912,20 @@ ampdu_rx_dispatch(struct ieee80211_rx_ampdu *rap, struct ieee80211_node *ni)
 static void
 ampdu_rx_flush(struct ieee80211_node *ni, struct ieee80211_rx_ampdu *rap)
 {
-	struct ieee80211vap *vap = ni->ni_vap;
 	int i, r;
 
 	for (i = 0; i < rap->rxa_wnd; i++) {
 		r = ampdu_dispatch_slot(rap, ni, i);
 		if (r == 0)
 			continue;
-		vap->iv_stats.is_ampdu_rx_oor += r;
+		ni->ni_vap->iv_stats.is_ampdu_rx_oor += r;
+
+		IEEE80211_NOTE(ni->ni_vap, IEEE80211_MSG_11N, ni,
+		    "%s: moved slot up %d slots to start at %d (%d frames)",
+		    __func__,
+		    1,
+		    rap->rxa_start,
+		    r);
 
 		if (rap->rxa_qframes == 0)
 			break;
@@ -832,14 +954,23 @@ ampdu_rx_flush_upto(struct ieee80211_node *ni,
 	 */
 	seqno = rap->rxa_start;
 	for (i = 0; i < rap->rxa_wnd; i++) {
-		r = ampdu_dispatch_slot(rap, ni, i);
-		if (r == 0) {
+		if ((r = mbufq_len(&rap->rxa_mq[i])) != 0) {
+			(void) ampdu_dispatch_slot(rap, ni, i);
+		} else {
 			if (!IEEE80211_SEQ_BA_BEFORE(seqno, winstart))
 				break;
 		}
 		vap->iv_stats.is_ampdu_rx_oor += r;
 		seqno = IEEE80211_SEQ_INC(seqno);
+
+		IEEE80211_NOTE(ni->ni_vap, IEEE80211_MSG_11N, ni,
+		    "%s: moved slot up %d slots to start at %d (%d frames)",
+		    __func__,
+		    1,
+		    seqno,
+		    r);
 	}
+
 	/*
 	 * If frames remain, copy the mbuf pointers down so
 	 * they correspond to the offsets in the new window.
@@ -862,6 +993,10 @@ ampdu_rx_flush_upto(struct ieee80211_node *ni,
  * this frame completes a run, flush any pending frames.  We
  * return 1 if the frame is consumed.  A 0 is returned if
  * the frame should be processed normally by the caller.
+ *
+ * A-MSDU: handle hardware decap'ed A-MSDU frames that are
+ * pretending to be MPDU's.  They're dispatched directly if
+ * able; or attempted to put into the receive reordering slot.
  */
 int
 ieee80211_ampdu_reorder(struct ieee80211_node *ni, struct mbuf *m,
@@ -875,7 +1010,8 @@ ieee80211_ampdu_reorder(struct ieee80211_node *ni, struct mbuf *m,
 	ieee80211_seq rxseq;
 	uint8_t tid;
 	int off;
-	int amsdu_more = ieee80211_check_rxseq_amsdu_more(rxs);
+	int amsdu = ieee80211_check_rxseq_amsdu(rxs);
+	int amsdu_end = ieee80211_check_rxseq_amsdu_more(rxs);
 
 	KASSERT((m->m_flags & (M_AMPDU | M_AMPDU_MPDU)) == M_AMPDU,
 	    ("!a-mpdu or already re-ordered, flags 0x%x", m->m_flags));
@@ -944,7 +1080,7 @@ again:
 			/*
 			 * Dispatch as many packets as we can.
 			 */
-			KASSERT(rap->rxa_m[0] == NULL, ("unexpected dup"));
+			KASSERT((mbufq_len(&rap->rxa_mq[0]) == 0), ("unexpected dup"));
 			ampdu_dispatch(ni, m);
 			ampdu_rx_dispatch(rap, ni);
 			return CONSUMED;
@@ -953,8 +1089,16 @@ again:
 			 * In order; advance window if needed and notify
 			 * caller to dispatch directly.
 			 */
-			if (amsdu_more)
+			if (amsdu) {
+				if (amsdu_end) {
+					rap->rxa_start = IEEE80211_SEQ_INC(rxseq);
+					IEEE80211_NODE_STAT(ni, rx_amsdu_more_end);
+				} else {
+					IEEE80211_NODE_STAT(ni, rx_amsdu_more);
+				}
+			} else {
 				rap->rxa_start = IEEE80211_SEQ_INC(rxseq);
+			}
 			return PROCESS;
 		}
 	}
@@ -998,8 +1142,24 @@ again:
 					    rap->rxa_qframes;
 					ampdu_rx_flush(ni, rap);
 				}
-				if (amsdu_more)
-					rap->rxa_start = IEEE80211_SEQ_INC(rxseq);
+				/*
+				 * Advance the window if needed and notify
+				 * the caller to dispatch directly.
+				 */
+				if (amsdu) {
+					if (amsdu_end) {
+						rap->rxa_start =
+						    IEEE80211_SEQ_INC(rxseq);
+						IEEE80211_NODE_STAT(ni,
+						    rx_amsdu_more_end);
+					} else {
+						IEEE80211_NODE_STAT(ni,
+						    rx_amsdu_more);
+					}
+				} else {
+					rap->rxa_start =
+					    IEEE80211_SEQ_INC(rxseq);
+				}
 				return PROCESS;
 			}
 		} else {
@@ -1010,8 +1170,7 @@ again:
 		}
 
 		/* save packet - this consumes, no matter what */
-		ampdu_rx_add_slot(rap, off, tid, rxseq, ni, m);
-
+		ampdu_rx_add_slot(rap, off, tid, rxseq, ni, m, rxs);
 		return CONSUMED;
 	}
 	if (off < IEEE80211_SEQ_BA_RANGE) {
@@ -1084,7 +1243,7 @@ ieee80211_recv_bar(struct ieee80211_node *ni, struct mbuf *m0)
 	}
 	wh = mtod(m0, struct ieee80211_frame_bar *);
 	/* XXX check basic BAR */
-	tid = MS(le16toh(wh->i_ctl), IEEE80211_BAR_TID);
+	tid = _IEEE80211_MASKSHIFT(le16toh(wh->i_ctl), IEEE80211_BAR_TID);
 	rap = &ni->ni_rx_ampdu[tid];
 	if ((rap->rxa_flags & IEEE80211_AGGR_XCHGPEND) == 0) {
 		/*
@@ -1175,6 +1334,7 @@ ieee80211_ht_node_init(struct ieee80211_node *ni)
 		tap->txa_ni = ni;
 		ieee80211_txampdu_init_pps(tap);
 		/* NB: further initialization deferred */
+		ieee80211_ampdu_rx_init_rap(ni, &ni->ni_rx_ampdu[tid]);
 	}
 	ni->ni_flags |= IEEE80211_NODE_HT | IEEE80211_NODE_AMPDU |
 	    IEEE80211_NODE_AMSDU;
@@ -1348,38 +1508,36 @@ ieee80211_ht_wds_init(struct ieee80211_node *ni)
 }
 
 /*
- * Notify hostap vaps of a change in the HTINFO ie.
+ * Notify a VAP of a change in the HTINFO ie if it's a hostap VAP.
+ *
+ * This is to be called from the deferred HT protection update
+ * task once the flags are updated.
  */
-static void
-htinfo_notify(struct ieee80211com *ic)
+void
+ieee80211_htinfo_notify(struct ieee80211vap *vap)
 {
-	struct ieee80211vap *vap;
-	int first = 1;
 
-	IEEE80211_LOCK_ASSERT(ic);
+	IEEE80211_LOCK_ASSERT(vap->iv_ic);
 
-	TAILQ_FOREACH(vap, &ic->ic_vaps, iv_next) {
-		if (vap->iv_opmode != IEEE80211_M_HOSTAP)
-			continue;
-		if (vap->iv_state != IEEE80211_S_RUN ||
-		    !IEEE80211_IS_CHAN_HT(vap->iv_bss->ni_chan))
-			continue;
-		if (first) {
-			IEEE80211_NOTE(vap,
-			    IEEE80211_MSG_ASSOC | IEEE80211_MSG_11N,
-			    vap->iv_bss,
-			    "HT bss occupancy change: %d sta, %d ht, "
-			    "%d ht40%s, HT protmode now 0x%x"
-			    , ic->ic_sta_assoc
-			    , ic->ic_ht_sta_assoc
-			    , ic->ic_ht40_sta_assoc
-			    , (ic->ic_flags_ht & IEEE80211_FHT_NONHT_PR) ?
-				 ", non-HT sta present" : ""
-			    , ic->ic_curhtprotmode);
-			first = 0;
-		}
-		ieee80211_beacon_notify(vap, IEEE80211_BEACON_HTINFO);
-	}
+	if (vap->iv_opmode != IEEE80211_M_HOSTAP)
+		return;
+	if (vap->iv_state != IEEE80211_S_RUN ||
+	    !IEEE80211_IS_CHAN_HT(vap->iv_bss->ni_chan))
+		return;
+
+	IEEE80211_NOTE(vap,
+	    IEEE80211_MSG_ASSOC | IEEE80211_MSG_11N,
+	    vap->iv_bss,
+	    "HT bss occupancy change: %d sta, %d ht, "
+	    "%d ht40%s, HT protmode now 0x%x"
+	    , vap->iv_sta_assoc
+	    , vap->iv_ht_sta_assoc
+	    , vap->iv_ht40_sta_assoc
+	    , (vap->iv_flags_ht & IEEE80211_FHT_NONHT_PR) ?
+		 ", non-HT sta present" : ""
+	    , vap->iv_curhtprotmode);
+
+	ieee80211_beacon_notify(vap, IEEE80211_BEACON_HTINFO);
 }
 
 /*
@@ -1387,26 +1545,28 @@ htinfo_notify(struct ieee80211com *ic)
  * state and handle updates.
  */
 static void
-htinfo_update(struct ieee80211com *ic)
+htinfo_update(struct ieee80211vap *vap)
 {
+	struct ieee80211com *ic = vap->iv_ic;
 	uint8_t protmode;
 
-	if (ic->ic_sta_assoc != ic->ic_ht_sta_assoc) {
+	if (vap->iv_sta_assoc != vap->iv_ht_sta_assoc) {
 		protmode = IEEE80211_HTINFO_OPMODE_MIXED
 			 | IEEE80211_HTINFO_NONHT_PRESENT;
-	} else if (ic->ic_flags_ht & IEEE80211_FHT_NONHT_PR) {
+	} else if (vap->iv_flags_ht & IEEE80211_FHT_NONHT_PR) {
 		protmode = IEEE80211_HTINFO_OPMODE_PROTOPT
 			 | IEEE80211_HTINFO_NONHT_PRESENT;
 	} else if (ic->ic_bsschan != IEEE80211_CHAN_ANYC &&
 	    IEEE80211_IS_CHAN_HT40(ic->ic_bsschan) && 
-	    ic->ic_sta_assoc != ic->ic_ht40_sta_assoc) {
+	    vap->iv_sta_assoc != vap->iv_ht40_sta_assoc) {
 		protmode = IEEE80211_HTINFO_OPMODE_HT20PR;
 	} else {
 		protmode = IEEE80211_HTINFO_OPMODE_PURE;
 	}
-	if (protmode != ic->ic_curhtprotmode) {
-		ic->ic_curhtprotmode = protmode;
-		htinfo_notify(ic);
+	if (protmode != vap->iv_curhtprotmode) {
+		vap->iv_curhtprotmode = protmode;
+		/* Update VAP with new protection mode */
+		ieee80211_vap_update_ht_protmode(vap);
 	}
 }
 
@@ -1416,16 +1576,16 @@ htinfo_update(struct ieee80211com *ic)
 void
 ieee80211_ht_node_join(struct ieee80211_node *ni)
 {
-	struct ieee80211com *ic = ni->ni_ic;
+	struct ieee80211vap *vap = ni->ni_vap;
 
-	IEEE80211_LOCK_ASSERT(ic);
+	IEEE80211_LOCK_ASSERT(vap->iv_ic);
 
 	if (ni->ni_flags & IEEE80211_NODE_HT) {
-		ic->ic_ht_sta_assoc++;
+		vap->iv_ht_sta_assoc++;
 		if (ni->ni_chw == 40)
-			ic->ic_ht40_sta_assoc++;
+			vap->iv_ht40_sta_assoc++;
 	}
-	htinfo_update(ic);
+	htinfo_update(vap);
 }
 
 /*
@@ -1434,16 +1594,16 @@ ieee80211_ht_node_join(struct ieee80211_node *ni)
 void
 ieee80211_ht_node_leave(struct ieee80211_node *ni)
 {
-	struct ieee80211com *ic = ni->ni_ic;
+	struct ieee80211vap *vap = ni->ni_vap;
 
-	IEEE80211_LOCK_ASSERT(ic);
+	IEEE80211_LOCK_ASSERT(vap->iv_ic);
 
 	if (ni->ni_flags & IEEE80211_NODE_HT) {
-		ic->ic_ht_sta_assoc--;
+		vap->iv_ht_sta_assoc--;
 		if (ni->ni_chw == 40)
-			ic->ic_ht40_sta_assoc--;
+			vap->iv_ht40_sta_assoc--;
 	}
-	htinfo_update(ic);
+	htinfo_update(vap);
 }
 
 /*
@@ -1457,25 +1617,27 @@ ieee80211_ht_node_leave(struct ieee80211_node *ni)
  * a higher precedence than PROTOPT (i.e. we will not change
  * change PROTOPT -> MIXED; only MIXED -> PROTOPT).  This
  * corresponds to how we handle things in htinfo_update.
+ *
  */
 void
-ieee80211_htprot_update(struct ieee80211com *ic, int protmode)
+ieee80211_htprot_update(struct ieee80211vap *vap, int protmode)
 {
-#define	OPMODE(x)	SM(x, IEEE80211_HTINFO_OPMODE)
+	struct ieee80211com *ic = vap->iv_ic;
+#define	OPMODE(x)	_IEEE80211_SHIFTMASK(x, IEEE80211_HTINFO_OPMODE)
 	IEEE80211_LOCK(ic);
 
 	/* track non-HT station presence */
 	KASSERT(protmode & IEEE80211_HTINFO_NONHT_PRESENT,
 	    ("protmode 0x%x", protmode));
-	ic->ic_flags_ht |= IEEE80211_FHT_NONHT_PR;
-	ic->ic_lastnonht = ticks;
+	vap->iv_flags_ht |= IEEE80211_FHT_NONHT_PR;
+	vap->iv_lastnonht = ticks;
 
-	if (protmode != ic->ic_curhtprotmode &&
-	    (OPMODE(ic->ic_curhtprotmode) != IEEE80211_HTINFO_OPMODE_MIXED ||
+	if (protmode != vap->iv_curhtprotmode &&
+	    (OPMODE(vap->iv_curhtprotmode) != IEEE80211_HTINFO_OPMODE_MIXED ||
 	     OPMODE(protmode) == IEEE80211_HTINFO_OPMODE_PROTOPT)) {
-		/* push beacon update */
-		ic->ic_curhtprotmode = protmode;
-		htinfo_notify(ic);
+		vap->iv_curhtprotmode = protmode;
+		/* Update VAP with new protection mode */
+		ieee80211_vap_update_ht_protmode(vap);
 	}
 	IEEE80211_UNLOCK(ic);
 #undef OPMODE
@@ -1490,18 +1652,17 @@ ieee80211_htprot_update(struct ieee80211com *ic, int protmode)
  * gone we time out this condition.
  */
 void
-ieee80211_ht_timeout(struct ieee80211com *ic)
+ieee80211_ht_timeout(struct ieee80211vap *vap)
 {
-	IEEE80211_LOCK_ASSERT(ic);
 
-	if ((ic->ic_flags_ht & IEEE80211_FHT_NONHT_PR) &&
-	    ieee80211_time_after(ticks, ic->ic_lastnonht + IEEE80211_NONHT_PRESENT_AGE)) {
-#if 0
-		IEEE80211_NOTE(vap, IEEE80211_MSG_11N, ni,
+	IEEE80211_LOCK_ASSERT(vap->iv_ic);
+
+	if ((vap->iv_flags_ht & IEEE80211_FHT_NONHT_PR) &&
+	    ieee80211_time_after(ticks, vap->iv_lastnonht + IEEE80211_NONHT_PRESENT_AGE)) {
+		IEEE80211_DPRINTF(vap, IEEE80211_MSG_11N,
 		    "%s", "time out non-HT STA present on channel");
-#endif
-		ic->ic_flags_ht &= ~IEEE80211_FHT_NONHT_PR;
-		htinfo_update(ic);
+		vap->iv_flags_ht &= ~IEEE80211_FHT_NONHT_PR;
+		htinfo_update(vap);
 	}
 }
 
@@ -1534,11 +1695,12 @@ htinfo_parse(struct ieee80211_node *ni,
 	uint16_t w;
 
 	ni->ni_htctlchan = htinfo->hi_ctrlchannel;
-	ni->ni_ht2ndchan = SM(htinfo->hi_byte1, IEEE80211_HTINFO_2NDCHAN);
+	ni->ni_ht2ndchan = _IEEE80211_SHIFTMASK(htinfo->hi_byte1,
+	    IEEE80211_HTINFO_2NDCHAN);
 	w = le16dec(&htinfo->hi_byte2);
-	ni->ni_htopmode = SM(w, IEEE80211_HTINFO_OPMODE);
+	ni->ni_htopmode = _IEEE80211_SHIFTMASK(w, IEEE80211_HTINFO_OPMODE);
 	w = le16dec(&htinfo->hi_byte45);
-	ni->ni_htstbc = SM(w, IEEE80211_HTINFO_BASIC_STBCMCS);
+	ni->ni_htstbc = _IEEE80211_SHIFTMASK(w, IEEE80211_HTINFO_BASIC_STBCMCS);
 }
 
 /*
@@ -1777,7 +1939,7 @@ ieee80211_vht_get_vhtflags(struct ieee80211_node *ni, uint32_t htflags)
 	if (ni->ni_flags & IEEE80211_NODE_VHT && vap->iv_flags_vht & IEEE80211_FVHT_VHT) {
 		if ((ni->ni_vht_chanwidth == IEEE80211_VHT_CHANWIDTH_160MHZ) &&
 		    /* XXX 2 means "160MHz and 80+80MHz", 1 means "160MHz" */
-		    (MS(vap->iv_vhtcaps,
+		    (_IEEE80211_MASKSHIFT(vap->iv_vhtcaps,
 		     IEEE80211_VHTCAP_SUPP_CHAN_WIDTH_MASK) >= 1) &&
 		    (vap->iv_flags_vht & IEEE80211_FVHT_USEVHT160)) {
 			vhtflags = IEEE80211_CHAN_VHT160;
@@ -1789,10 +1951,10 @@ ieee80211_vht_get_vhtflags(struct ieee80211_node *ni, uint32_t htflags)
 			}
 		} else if ((ni->ni_vht_chanwidth == IEEE80211_VHT_CHANWIDTH_80P80MHZ) &&
 		    /* XXX 2 means "160MHz and 80+80MHz" */
-		    (MS(vap->iv_vhtcaps,
+		    (_IEEE80211_MASKSHIFT(vap->iv_vhtcaps,
 		     IEEE80211_VHTCAP_SUPP_CHAN_WIDTH_MASK) == 2) &&
 		    (vap->iv_flags_vht & IEEE80211_FVHT_USEVHT80P80)) {
-			vhtflags = IEEE80211_CHAN_VHT80_80;
+			vhtflags = IEEE80211_CHAN_VHT80P80;
 			/* Mirror the HT40 flags */
 			if (htflags == IEEE80211_CHAN_HT40U) {
 				vhtflags |= IEEE80211_CHAN_HT40U;
@@ -2122,7 +2284,7 @@ ieee80211_addba_request(struct ieee80211_node *ni,
 	/* XXX locking */
 	tap->txa_token = dialogtoken;
 	tap->txa_flags |= IEEE80211_AGGR_IMMEDIATE;
-	bufsiz = MS(baparamset, IEEE80211_BAPS_BUFSIZ);
+	bufsiz = _IEEE80211_MASKSHIFT(baparamset, IEEE80211_BAPS_BUFSIZ);
 	tap->txa_wnd = (bufsiz == 0) ?
 	    IEEE80211_AGGR_BAWMAX : min(bufsiz, IEEE80211_AGGR_BAWMAX);
 	addba_start_timeout(tap);
@@ -2194,17 +2356,17 @@ ieee80211_addba_response(struct ieee80211_node *ni,
 	/* XXX locking */
 	addba_stop_timeout(tap);
 	if (status == IEEE80211_STATUS_SUCCESS) {
-		bufsiz = MS(baparamset, IEEE80211_BAPS_BUFSIZ);
+		bufsiz = _IEEE80211_MASKSHIFT(baparamset, IEEE80211_BAPS_BUFSIZ);
 		/* XXX override our request? */
 		tap->txa_wnd = (bufsiz == 0) ?
 		    IEEE80211_AGGR_BAWMAX : min(bufsiz, IEEE80211_AGGR_BAWMAX);
-		tid = MS(baparamset, IEEE80211_BAPS_TID);
+		tid = _IEEE80211_MASKSHIFT(baparamset, IEEE80211_BAPS_TID);
 		tap->txa_flags |= IEEE80211_AGGR_RUNNING;
 		tap->txa_attempts = 0;
 		/* TODO: this should be a vap flag */
 		if ((vap->iv_htcaps & IEEE80211_HTC_TX_AMSDU_AMPDU) &&
 		    (ni->ni_flags & IEEE80211_NODE_AMSDU_TX) &&
-		    (MS(baparamset, IEEE80211_BAPS_AMSDU)))
+		    (_IEEE80211_MASKSHIFT(baparamset, IEEE80211_BAPS_AMSDU)))
 			tap->txa_flags |= IEEE80211_AGGR_AMSDU;
 		else
 			tap->txa_flags &= ~IEEE80211_AGGR_AMSDU;
@@ -2255,17 +2417,17 @@ ht_recv_action_ba_addba_request(struct ieee80211_node *ni,
 	batimeout = le16dec(frm+5);
 	baseqctl = le16dec(frm+7);
 
-	tid = MS(baparamset, IEEE80211_BAPS_TID);
+	tid = _IEEE80211_MASKSHIFT(baparamset, IEEE80211_BAPS_TID);
 
 	IEEE80211_NOTE(vap, IEEE80211_MSG_ACTION | IEEE80211_MSG_11N, ni,
 	    "recv ADDBA request: dialogtoken %u baparamset 0x%x "
 	    "(tid %d bufsiz %d) batimeout %d baseqctl %d:%d amsdu %d",
 	    dialogtoken, baparamset,
-	    tid, MS(baparamset, IEEE80211_BAPS_BUFSIZ),
+	    tid, _IEEE80211_MASKSHIFT(baparamset, IEEE80211_BAPS_BUFSIZ),
 	    batimeout,
-	    MS(baseqctl, IEEE80211_BASEQ_START),
-	    MS(baseqctl, IEEE80211_BASEQ_FRAG),
-	    MS(baparamset, IEEE80211_BAPS_AMSDU));
+	    _IEEE80211_MASKSHIFT(baseqctl, IEEE80211_BASEQ_START),
+	    _IEEE80211_MASKSHIFT(baseqctl, IEEE80211_BASEQ_FRAG),
+	    _IEEE80211_MASKSHIFT(baparamset, IEEE80211_BAPS_AMSDU));
 
 	rap = &ni->ni_rx_ampdu[tid];
 
@@ -2294,8 +2456,8 @@ ht_recv_action_ba_addba_request(struct ieee80211_node *ni,
 	}
 	/* XXX honor rap flags? */
 	args[2] = IEEE80211_BAPS_POLICY_IMMEDIATE
-		| SM(tid, IEEE80211_BAPS_TID)
-		| SM(rap->rxa_wnd, IEEE80211_BAPS_BUFSIZ)
+		| _IEEE80211_SHIFTMASK(tid, IEEE80211_BAPS_TID)
+		| _IEEE80211_SHIFTMASK(rap->rxa_wnd, IEEE80211_BAPS_BUFSIZ)
 		;
 
 	/*
@@ -2330,10 +2492,10 @@ ht_recv_action_ba_addba_response(struct ieee80211_node *ni,
 	dialogtoken = frm[2];
 	code = le16dec(frm+3);
 	baparamset = le16dec(frm+5);
-	tid = MS(baparamset, IEEE80211_BAPS_TID);
-	bufsiz = MS(baparamset, IEEE80211_BAPS_BUFSIZ);
-	policy = MS(baparamset, IEEE80211_BAPS_POLICY);
-	amsdu = !! MS(baparamset, IEEE80211_BAPS_AMSDU);
+	tid = _IEEE80211_MASKSHIFT(baparamset, IEEE80211_BAPS_TID);
+	bufsiz = _IEEE80211_MASKSHIFT(baparamset, IEEE80211_BAPS_BUFSIZ);
+	policy = _IEEE80211_MASKSHIFT(baparamset, IEEE80211_BAPS_POLICY);
+	amsdu = !! _IEEE80211_MASKSHIFT(baparamset, IEEE80211_BAPS_AMSDU);
 	batimeout = le16dec(frm+7);
 
 	tap = &ni->ni_tx_ampdu[tid];
@@ -2407,12 +2569,12 @@ ht_recv_action_ba_delba(struct ieee80211_node *ni,
 	baparamset = le16dec(frm+2);
 	code = le16dec(frm+4);
 
-	tid = MS(baparamset, IEEE80211_DELBAPS_TID);
+	tid = _IEEE80211_MASKSHIFT(baparamset, IEEE80211_DELBAPS_TID);
 
 	IEEE80211_NOTE(ni->ni_vap, IEEE80211_MSG_ACTION | IEEE80211_MSG_11N, ni,
 	    "recv DELBA: baparamset 0x%x (tid %d initiator %d) "
 	    "code %d", baparamset, tid,
-	    MS(baparamset, IEEE80211_DELBAPS_INIT), code);
+	    _IEEE80211_MASKSHIFT(baparamset, IEEE80211_DELBAPS_INIT), code);
 
 	if ((baparamset & IEEE80211_DELBAPS_INIT) == 0) {
 		tap = &ni->ni_tx_ampdu[tid];
@@ -2541,8 +2703,9 @@ ieee80211_ampdu_request(struct ieee80211_node *ni,
 	args[0] = dialogtoken;
 	args[1] = 0;	/* NB: status code not used */
 	args[2]	= IEEE80211_BAPS_POLICY_IMMEDIATE
-		| SM(tid, IEEE80211_BAPS_TID)
-		| SM(IEEE80211_AGGR_BAWMAX, IEEE80211_BAPS_BUFSIZ)
+		| _IEEE80211_SHIFTMASK(tid, IEEE80211_BAPS_TID)
+		| _IEEE80211_SHIFTMASK(IEEE80211_AGGR_BAWMAX,
+		    IEEE80211_BAPS_BUFSIZ)
 		;
 
 	/* XXX TODO: this should be a flag, not iv_htcaps */
@@ -2566,8 +2729,8 @@ ieee80211_ampdu_request(struct ieee80211_node *ni,
 	}
 	tokens = dialogtoken;			/* allocate token */
 	/* NB: after calling ic_addba_request so driver can set txa_start */
-	args[4] = SM(tap->txa_start, IEEE80211_BASEQ_START)
-		| SM(0, IEEE80211_BASEQ_FRAG)
+	args[4] = _IEEE80211_SHIFTMASK(tap->txa_start, IEEE80211_BASEQ_START)
+		| _IEEE80211_SHIFTMASK(0, IEEE80211_BASEQ_FRAG)
 		;
 	return ic->ic_send_action(ni, IEEE80211_ACTION_CAT_BA,
 		IEEE80211_ACTION_BA_ADDBA_REQUEST, args);
@@ -2750,7 +2913,6 @@ ieee80211_send_bar(struct ieee80211_node *ni,
 	uint8_t *frm;
 	int tid, ret;
 
-
 	IEEE80211_NOTE(tap->txa_ni->ni_vap, IEEE80211_MSG_11N,
 	    tap->txa_ni,
 	    "%s: called",
@@ -2787,9 +2949,9 @@ ieee80211_send_bar(struct ieee80211_node *ni,
 	barctl 	= (tap->txa_flags & IEEE80211_AGGR_IMMEDIATE ?
 			0 : IEEE80211_BAR_NOACK)
 		| IEEE80211_BAR_COMP
-		| SM(tid, IEEE80211_BAR_TID)
+		| _IEEE80211_SHIFTMASK(tid, IEEE80211_BAR_TID)
 		;
-	barseqctl = SM(seq, IEEE80211_BAR_SEQ_START);
+	barseqctl = _IEEE80211_SHIFTMASK(seq, IEEE80211_BAR_SEQ_START);
 	/* NB: known to have proper alignment */
 	bar->i_ctl = htole16(barctl);
 	bar->i_seq = htole16(barseqctl);
@@ -2883,9 +3045,10 @@ ht_send_action_ba_addba(struct ieee80211_node *ni,
 	    "send ADDBA %s: dialogtoken %d status %d "
 	    "baparamset 0x%x (tid %d amsdu %d) batimeout 0x%x baseqctl 0x%x",
 	    (action == IEEE80211_ACTION_BA_ADDBA_REQUEST) ?
-		"request" : "response",
-	    args[0], args[1], args[2], MS(args[2], IEEE80211_BAPS_TID),
-	    MS(args[2], IEEE80211_BAPS_AMSDU), args[3], args[4]);
+		"request" : "response", args[0], args[1], args[2],
+	    _IEEE80211_MASKSHIFT(args[2], IEEE80211_BAPS_TID),
+	    _IEEE80211_MASKSHIFT(args[2], IEEE80211_BAPS_AMSDU),
+	    args[3], args[4]);
 
 	IEEE80211_DPRINTF(vap, IEEE80211_MSG_NODE,
 	    "ieee80211_ref_node (%s:%u) %p<%s> refcnt %d\n", __func__, __LINE__,
@@ -2928,7 +3091,7 @@ ht_send_action_ba_delba(struct ieee80211_node *ni,
 	uint16_t baparamset;
 	uint8_t *frm;
 
-	baparamset = SM(args[0], IEEE80211_DELBAPS_TID)
+	baparamset = _IEEE80211_SHIFTMASK(args[0], IEEE80211_DELBAPS_TID)
 		   | args[1]
 		   ;
 	IEEE80211_NOTE(vap, IEEE80211_MSG_ACTION | IEEE80211_MSG_11N, ni,
@@ -3080,8 +3243,10 @@ ieee80211_add_htcap_body(uint8_t *frm, struct ieee80211_node *ni)
 			caps &= ~IEEE80211_HTCAP_CHWIDTH40;
 
 		/* Start by using the advertised settings */
-		rxmax = MS(ni->ni_htparam, IEEE80211_HTCAP_MAXRXAMPDU);
-		density = MS(ni->ni_htparam, IEEE80211_HTCAP_MPDUDENSITY);
+		rxmax = _IEEE80211_MASKSHIFT(ni->ni_htparam,
+		    IEEE80211_HTCAP_MAXRXAMPDU);
+		density = _IEEE80211_MASKSHIFT(ni->ni_htparam,
+		    IEEE80211_HTCAP_MPDUDENSITY);
 
 		IEEE80211_DPRINTF(vap, IEEE80211_MSG_11N,
 		    "%s: advertised rxmax=%d, density=%d, vap rxmax=%d, density=%d\n",
@@ -3144,8 +3309,8 @@ ieee80211_add_htcap_body(uint8_t *frm, struct ieee80211_node *ni)
 	ADDSHORT(frm, caps);
 
 	/* HT parameters */
-	*frm = SM(rxmax, IEEE80211_HTCAP_MAXRXAMPDU)
-	     | SM(density, IEEE80211_HTCAP_MPDUDENSITY)
+	*frm = _IEEE80211_SHIFTMASK(rxmax, IEEE80211_HTCAP_MAXRXAMPDU)
+	     | _IEEE80211_SHIFTMASK(density, IEEE80211_HTCAP_MPDUDENSITY)
 	     ;
 	frm++;
 
@@ -3233,8 +3398,8 @@ ieee80211_add_htcap_body_ch(uint8_t *frm, struct ieee80211vap *vap,
 	ADDSHORT(frm, caps);
 
 	/* HT parameters */
-	*frm = SM(rxmax, IEEE80211_HTCAP_MAXRXAMPDU)
-	     | SM(density, IEEE80211_HTCAP_MPDUDENSITY)
+	*frm = _IEEE80211_SHIFTMASK(rxmax, IEEE80211_HTCAP_MAXRXAMPDU)
+	     | _IEEE80211_SHIFTMASK(density, IEEE80211_HTCAP_MPDUDENSITY)
 	     ;
 	frm++;
 
@@ -3346,6 +3511,12 @@ ieee80211_ht_update_beacon(struct ieee80211vap *vap,
 		ht->hi_byte1 |= IEEE80211_HTINFO_TXWIDTH_2040;
 
 	/* protection mode */
+	/*
+	 * XXX TODO: this uses the global flag, not the per-VAP flag.
+	 * Eventually (once the protection modes are done per-channel
+	 * rather than per-VAP) we can flip this over to be per-VAP but
+	 * using the channel protection mode.
+	 */
 	ht->hi_byte2 = (ht->hi_byte2 &~ PROTMODE) | ic->ic_curhtprotmode;
 
 	ieee80211_free_node(ni);
@@ -3386,7 +3557,11 @@ ieee80211_add_htinfo_body(uint8_t *frm, struct ieee80211_node *ni)
 	if (IEEE80211_IS_CHAN_HT40(ni->ni_chan))
 		frm[0] |= IEEE80211_HTINFO_TXWIDTH_2040;
 
-	frm[1] = ic->ic_curhtprotmode;
+	/*
+	 * Add current protection mode.  Unlike for beacons,
+	 * this will respect the per-VAP flags.
+	 */
+	frm[1] = vap->iv_curhtprotmode;
 
 	frm += 5;
 

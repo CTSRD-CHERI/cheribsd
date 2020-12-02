@@ -101,7 +101,7 @@ g_dbg_printf(const char *classname, int lvl, struct bio *bp,
 	sbuf_cat(&sb, classname);
 	if (lvl >= 0)
 		sbuf_printf(&sb, "[%d]", lvl);
-	
+
 	va_start(ap, format);
 	sbuf_vprintf(&sb, format, ap);
 	va_end(ap);
@@ -598,7 +598,6 @@ g_new_provider_event(void *arg, int flag)
 	}
 }
 
-
 struct g_provider *
 g_new_providerf(struct g_geom *gp, const char *fmt, ...)
 {
@@ -717,7 +716,7 @@ g_resize_provider_event(void *arg, int flag)
 	}
 
 	pp->mediasize = size;
-	
+
 	LIST_FOREACH_SAFE(cp, &pp->consumers, consumers, cp2) {
 		gp = cp->geom;
 		if ((gp->flags & G_GEOM_WITHER) == 0 && gp->resize != NULL)
@@ -759,10 +758,6 @@ g_resize_provider(struct g_provider *pp, off_t size)
 	hh->size = size;
 	g_post_event(g_resize_provider_event, hh, M_WAITOK, NULL);
 }
-
-#ifndef	_PATH_DEV
-#define	_PATH_DEV	"/dev/"
-#endif
 
 struct g_provider *
 g_provider_by_name(char const *arg)
@@ -901,6 +896,8 @@ g_attach(struct g_consumer *cp, struct g_provider *pp)
 	G_VALID_PROVIDER(pp);
 	g_trace(G_T_TOPOLOGY, "g_attach(%p, %p)", cp, pp);
 	KASSERT(cp->provider == NULL, ("attach but attached"));
+	if ((pp->flags & (G_PF_ORPHAN | G_PF_WITHER)) != 0)
+		return (ENXIO);
 	cp->provider = pp;
 	cp->flags &= ~G_CF_ORPHAN;
 	LIST_INSERT_HEAD(&pp->consumers, cp, consumers);

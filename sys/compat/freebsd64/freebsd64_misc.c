@@ -187,7 +187,7 @@ freebsd64_execve(struct thread *td, struct freebsd64_execve_args *uap)
 	    UIO_USERSPACE, __USER_CAP_UNBOUND(uap->argv),
 	    __USER_CAP_UNBOUND(uap->envv));
 	if (error == 0)
-		error = kern_execve(td, &eargs, NULL);
+		error = kern_execve(td, &eargs, NULL, oldvmspace);
 	post_execve(td, error, oldvmspace);
 	return (error);
 }
@@ -206,7 +206,7 @@ freebsd64_fexecve(struct thread *td, struct freebsd64_fexecve_args *uap)
 	    __USER_CAP_UNBOUND(uap->argv), __USER_CAP_UNBOUND(uap->envv));
 	if (error == 0) {
 		eargs.fd = uap->fd;
-		error = kern_execve(td, &eargs, NULL);
+		error = kern_execve(td, &eargs, NULL, oldvmspace);
 	}
 	post_execve(td, error, oldvmspace);
 	return (error);
@@ -386,7 +386,7 @@ freebsd11_freebsd64_kevent(struct thread *td,
 #endif
 
 int
-freebsd64_copyinuio(struct iovec64 * __capability iovp, u_int iovcnt,
+freebsd64_copyinuio(const struct iovec * __capability cb_arg, u_int iovcnt,
     struct uio **uiop)
 {
 	struct iovec64 iov64;
@@ -394,6 +394,12 @@ freebsd64_copyinuio(struct iovec64 * __capability iovp, u_int iovcnt,
 	struct uio *uio;
 	size_t iovlen;
 	int error, i;
+	/*
+	 * The first argument is not actually a struct iovec *, but C's type
+	 * system does not allow for overloaded callbacks.
+	 */
+	const struct iovec64 * __capability iovp =
+	    (const struct iovec64 * __capability)cb_arg;
 
 	*uiop = NULL;
 	if (iovcnt > UIO_MAXIOV)
@@ -427,13 +433,19 @@ freebsd64_copyinuio(struct iovec64 * __capability iovp, u_int iovcnt,
 }
 
 int
-freebsd64_copyiniov(struct iovec64 * __capability iov64, u_int iovcnt,
+freebsd64_copyiniov(const struct iovec * __capability cb_arg, u_int iovcnt,
     struct iovec **iovp, int error)
 {
 	struct iovec64 useriov;
 	struct iovec *iovs;
 	size_t iovlen;
 	int i;
+	/*
+	 * The first argument is not actually a struct iovec *, but C's type
+	 * system does not allow for overloaded callbacks.
+	 */
+	const struct iovec64 * __capability iov64 =
+	    (const struct iovec64 * __capability)cb_arg;
 
 	*iovp = NULL;
 	if (iovcnt > UIO_MAXIOV)
@@ -481,7 +493,7 @@ freebsd64_sendfile(struct thread *td, struct freebsd64_sendfile_args *uap)
 	return (kern_sendfile(td, uap->fd, uap->s, uap->offset, uap->nbytes,
 	    __USER_CAP_OBJ(uap->hdtr), __USER_CAP_OBJ(uap->sbytes),
 	    uap->flags, 0, (copyin_hdtr_t *)freebsd64_copyin_hdtr,
-	    (copyinuio_t *)freebsd64_copyinuio));
+	    freebsd64_copyinuio));
 }
 
 int
@@ -489,13 +501,20 @@ freebsd64_jail_set(struct thread *td, struct freebsd64_jail_set_args *uap)
 {
 
 	return (user_jail_set(td, __USER_CAP_ARRAY(uap->iovp, uap->iovcnt),
-	    uap->iovcnt, uap->flags, (copyinuio_t *)freebsd64_copyinuio));
+	    uap->iovcnt, uap->flags, freebsd64_copyinuio));
 }
 
 static int
-freebsd64_updateiov(const struct uio *uiop, struct iovec64 * __capability iovp)
+freebsd64_updateiov(const struct uio *uiop, struct iovec * __capability cb_arg)
 {
 	int i, error;
+	/*
+	 * The second argument is not actually a struct iovec *, but C's type
+	 * system does not allow for overloaded callbacks.
+	 */
+	struct iovec64 * __capability iovp =
+	    (struct iovec64 * __capability)cb_arg;
+
 
 	for (i = 0; i < uiop->uio_iovcnt; i++) {
 		error = suword(&iovp[i].iov_len, uiop->uio_iov[i].iov_len);
@@ -510,8 +529,7 @@ freebsd64_jail_get(struct thread *td, struct freebsd64_jail_get_args *uap)
 {
 
 	return (user_jail_get(td, __USER_CAP_ARRAY(uap->iovp, uap->iovcnt),
-	    uap->iovcnt, uap->flags, (copyinuio_t *)freebsd64_copyinuio,
-	    (updateiov_t *)freebsd64_updateiov));
+	    uap->iovcnt, uap->flags, freebsd64_copyinuio, freebsd64_updateiov));
 }
 
 #define UC_COPY_SIZE	offsetof(ucontext64_t, uc_link)
@@ -589,7 +607,7 @@ freebsd64_nmount(struct thread *td, struct freebsd64_nmount_args *uap)
 {
 
 	return (kern_nmount(td, __USER_CAP_ARRAY(uap->iovp, uap->iovcnt),
-	    uap->iovcnt, uap->flags, (copyinuio_t *)freebsd64_copyinuio));
+	    uap->iovcnt, uap->flags, freebsd64_copyinuio));
 }
 
 int
@@ -598,7 +616,7 @@ freebsd64_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	int argc, envc;
 	uint64_t * __capability vectp;
 	char *stringp;
-	char * __capability destp, * __capability ustringp;
+	uintcap_t destp, ustringp;
 	struct freebsd64_ps_strings * __capability arginfo;
 	struct proc *p;
 	size_t execpath_len;
@@ -618,6 +636,7 @@ freebsd64_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 		execpath_len = 0;
 	p = imgp->proc;
 	szsigcode = 0;
+
 	/*
 	 * Here we do not care about the representability of the
 	 * resulting stack as the capability will not be handed out
@@ -632,11 +651,12 @@ freebsd64_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 		stack_offset = stack_vaddr - rounded_stack_vaddr;
 	} while (rounded_stack_vaddr != CHERI_REPRESENTABLE_BASE(stack_vaddr,
 	    ssiz + stack_offset));
-	destp = cheri_capability_build_user_data(CHERI_CAP_USER_DATA_PERMS,
-	    rounded_stack_vaddr,
+	destp = (uintcap_t)cheri_capability_build_user_data(
+	    CHERI_CAP_USER_DATA_PERMS, rounded_stack_vaddr,
 	    CHERI_REPRESENTABLE_LENGTH(ssiz + stack_offset), stack_offset);
 	destp = cheri_setaddress(destp, p->p_sysent->sv_psstrings);
-	arginfo = (void * __capability)cheri_setbounds(destp, sizeof(*arginfo));
+	arginfo = (struct freebsd64_ps_strings * __capability)
+	    cheri_setboundsexact(destp, sizeof(*arginfo));
 	imgp->ps_strings = arginfo;
 	if (p->p_sysent->sv_sigcode_base == 0)
 		szsigcode = *(p->p_sysent->sv_szsigcode);
@@ -648,8 +668,9 @@ freebsd64_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	 */
 	if (szsigcode != 0) {
 		destp -= szsigcode;
-		destp = __builtin_align_down(destp, sizeof(uint64_t));
-		error = copyout(p->p_sysent->sv_sigcode, destp, szsigcode);
+		destp = rounddown2(destp, sizeof(uint64_t));
+		error = copyout(p->p_sysent->sv_sigcode,
+		    (void * __capability)destp, szsigcode);
 		if (error != 0)
 			return (error);
 	}
@@ -659,10 +680,12 @@ freebsd64_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	 */
 	if (execpath_len != 0) {
 		destp -= execpath_len;
-		imgp->execpathp = cheri_setbounds(destp, execpath_len);
-		error = copyout(imgp->execpath, destp, execpath_len);
+		destp = rounddown2(destp, sizeof(uint64_t));
+		imgp->execpathp = (void * __capability)
+		    cheri_setboundsexact(destp, execpath_len);
+		error = copyout(imgp->execpath, imgp->execpathp, execpath_len);
 		if (error != 0)
-			return(error);
+			return (error);
 	}
 
 	/*
@@ -670,8 +693,9 @@ freebsd64_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	 */
 	arc4rand(canary, sizeof(canary), 0);
 	destp -= sizeof(canary);
-	imgp->canary = cheri_setbounds(destp, sizeof(canary));
-	error = copyout(canary, destp, sizeof(canary));
+	imgp->canary = (void * __capability)cheri_setboundsexact(destp,
+	    sizeof(canary));
+	error = copyout(canary, imgp->canary, sizeof(canary));
 	if (error != 0)
 		return (error);
 	imgp->canarylen = sizeof(canary);
@@ -680,9 +704,10 @@ freebsd64_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	 * Prepare the pagesizes array.
 	 */
 	destp -= szps;
-	destp = __builtin_align_down(destp, sizeof(uint64_t));
-	imgp->pagesizes = cheri_setbounds(destp, szps);
-	error = copyout(pagesizes, destp, szps);
+	destp = rounddown2(destp, sizeof(uint64_t));
+	imgp->pagesizes = (void * __capability)cheri_setboundsexact(destp,
+	    szps);
+	error = copyout(pagesizes, imgp->pagesizes, szps);
 	if (error != 0)
 		return (error);
 	imgp->pagesizeslen = szps;
@@ -691,11 +716,11 @@ freebsd64_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	 * Allocate room for the argument and environment strings.
 	 */
 	destp -= ARG_MAX - imgp->args->stringspace;
-	destp = __builtin_align_down(destp, sizeof(uint64_t));
-	ustringp = destp;
+	destp = rounddown2(destp, sizeof(uint64_t));
+	ustringp = cheri_setbounds(destp, ARG_MAX - imgp->args->stringspace);
 
 	if (imgp->sysent->sv_stackgap != NULL)
-		imgp->sysent->sv_stackgap(imgp, (uintcap_t *)&destp);
+		imgp->sysent->sv_stackgap(imgp, &destp);
 
 	if (imgp->auxargs) {
 		/*
@@ -703,7 +728,7 @@ freebsd64_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 		 * array.  It has up to AT_COUNT entries.
 		 */
 		destp -= AT_COUNT * sizeof(Elf64_Auxinfo);
-		destp = __builtin_align_down(destp, sizeof(uint64_t));
+		destp = rounddown2(destp, sizeof(uint64_t));
 	}
 
 	vectp = (uint64_t * __capability)destp;
@@ -726,7 +751,7 @@ freebsd64_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	/*
 	 * Copy out strings - arguments and environment.
 	 */
-	error = copyout(stringp, ustringp,
+	error = copyout(stringp, (void * __capability)ustringp,
 	    ARG_MAX - imgp->args->stringspace);
 	if (error != 0)
 		return (error);
@@ -743,7 +768,7 @@ freebsd64_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	 * Fill in argument portion of vector table.
 	 */
 	for (; argc > 0; --argc) {
-		if (suword(vectp++, (__cheri_addr uint64_t)ustringp) != 0)
+		if (suword(vectp++, ustringp) != 0)
 			return (EFAULT);
 		while (*stringp++ != 0)
 			ustringp++;
@@ -763,7 +788,7 @@ freebsd64_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	 * Fill in environment portion of vector table.
 	 */
 	for (; envc > 0; --envc) {
-		if (suword(vectp++, (__cheri_addr uint64_t)ustringp) != 0)
+		if (suword(vectp++, ustringp) != 0)
 			return (EFAULT);
 		while (*stringp++ != 0)
 			ustringp++;
@@ -778,7 +803,7 @@ freebsd64_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 		vectp++;
 		error = imgp->sysent->sv_copyout_auxargs(imgp,
 		    (uintcap_t)cheri_setbounds(vectp,
-		        AT_COUNT * sizeof(Elf64_Auxinfo)));
+		    AT_COUNT * sizeof(Elf64_Auxinfo)));
 		if (error != 0)
 			return (error);
 	}

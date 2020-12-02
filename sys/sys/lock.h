@@ -137,7 +137,6 @@ struct lock_class {
 #define	LOCK_LOG_TEST(lo, flags)	0
 #endif
 
-
 #define	LOCK_LOG_LOCK(opname, lo, flags, recurse, file, line) do {	\
 	if (LOCK_LOG_TEST((lo), (flags)))				\
 		CTR6(KTR_LOCK, opname " (%s) %s %p r = %d at %s:%d",	\
@@ -192,6 +191,13 @@ lock_delay_arg_init(struct lock_delay_arg *la, struct lock_delay_config *lc)
 {
 	la->config = lc;
 	la->delay = lc->base;
+	la->spin_cnt = 0;
+}
+
+static inline void
+lock_delay_arg_init_noadapt(struct lock_delay_arg *la)
+{
+	la->delay = 0;
 	la->spin_cnt = 0;
 }
 

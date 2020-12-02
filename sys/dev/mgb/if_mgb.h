@@ -178,7 +178,8 @@
 #define MGB_DESC_GET_FRAME_LEN(_desc)	\
 	(((_desc)->ctl & MGB_DESC_FRAME_LEN_MASK) >> 16)
 
-#define MGB_NEXT_RING_IDX(_idx)		(((_idx) + 1) % MGB_DMA_RING_SIZE)
+#define MGB_NEXT_RING_IDX(_idx)		(((_idx) == MGB_DMA_RING_SIZE - 1) ? 0 : ((_idx) + 1))
+#define MGB_PREV_RING_IDX(_idx)		(((_idx) == 0) ? (MGB_DMA_RING_SIZE - 1) : ((_idx) - 1))
 #define MGB_RING_SPACE(_sc)		\
 	((((_sc)->tx_ring_data.last_head - (_sc)->tx_ring_data.last_tail - 1) \
 	 + MGB_DMA_RING_SIZE ) % MGB_DMA_RING_SIZE )
@@ -215,7 +216,6 @@
 #define MGB_INTR_VEC_MAP(_vsts, _ch)	((_vsts) << ((_ch) << 2))
 #define MGB_INTR_VEC_STS(_v)		(1 << (_v))
 #define MGB_INTR_RX_VEC_STS(_qid)	MGB_INTR_VEC_STS((_qid) + 1)
-
 
 #define MGB_STS_OK			( 0 )
 #define MGB_STS_TIMEOUT 		(-1 )
@@ -321,7 +321,6 @@ struct mgb_softc {
 	struct mtx			 mtx;
 	struct callout			 watchdog;
 	int				 timer;
-
 
 	bus_dma_tag_t			 dma_parent_tag;
 	struct mgb_ring_data		 rx_ring_data;

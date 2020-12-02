@@ -88,7 +88,6 @@ validbcd(int bcd)
 
 	return (bcd == 0 || (bcd > 0 && bcd <= 0x99 && bcd2bin_data[bcd] != 0));
 }
-
 static __inline int imax(int a, int b) { return (a > b ? a : b); }
 static __inline int imin(int a, int b) { return (a < b ? a : b); }
 static __inline long lmax(long a, long b) { return (a > b ? a : b); }
@@ -113,15 +112,16 @@ static __inline __uintmax_t ummin(__uintmax_t a, __uintmax_t b)
 }
 static __inline off_t omax(off_t a, off_t b) { return (a > b ? a : b); }
 static __inline off_t omin(off_t a, off_t b) { return (a < b ? a : b); }
-
 static __inline int abs(int a) { return (a < 0 ? -a : a); }
 static __inline long labs(long a) { return (a < 0 ? -a : a); }
 static __inline quad_t qabs(quad_t a) { return (a < 0 ? -a : a); }
 
+#ifndef RANDOM_FENESTRASX
 #define	ARC4_ENTR_NONE	0	/* Don't have entropy yet. */
 #define	ARC4_ENTR_HAVE	1	/* Have entropy. */
 #define	ARC4_ENTR_SEED	2	/* Reseeding. */
 extern int arc4rand_iniseed_state;
+#endif
 
 /* Prototypes for non-quad routines. */
 struct malloc_type;

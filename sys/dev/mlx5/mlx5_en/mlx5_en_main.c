@@ -499,7 +499,7 @@ mlx5e_media_status(struct ifnet *dev, struct ifmediareq *ifmr)
 	struct mlx5e_priv *priv = dev->if_softc;
 
 	ifmr->ifm_status = priv->media_status_last;
-	ifmr->ifm_active = priv->media_active_last |
+	ifmr->ifm_current = ifmr->ifm_active = priv->media_active_last |
 	    (priv->params.rx_pauseframe_control ? IFM_ETH_RXPAUSE : 0) |
 	    (priv->params.tx_pauseframe_control ? IFM_ETH_TXPAUSE : 0);
 
@@ -1073,7 +1073,7 @@ mlx5e_update_stats(void *arg)
 
 	queue_work(priv->wq, &priv->update_stats_work);
 
-	callout_reset(&priv->watchdog, hz, &mlx5e_update_stats, priv);
+	callout_reset(&priv->watchdog, hz / 4, &mlx5e_update_stats, priv);
 }
 
 static void
@@ -1898,7 +1898,7 @@ mlx5e_drain_sq(struct mlx5e_sq *sq)
 	    mdev->state != MLX5_DEVICE_STATE_INTERNAL_ERROR) {
 		mtx_unlock(&sq->lock);
 		msleep(1);
-		sq->cq.mcq.comp(&sq->cq.mcq);
+		sq->cq.mcq.comp(&sq->cq.mcq, NULL);
 		mtx_lock(&sq->lock);
 	}
 	mtx_unlock(&sq->lock);
@@ -1916,7 +1916,7 @@ mlx5e_drain_sq(struct mlx5e_sq *sq)
 	       mdev->state != MLX5_DEVICE_STATE_INTERNAL_ERROR) {
 		mtx_unlock(&sq->lock);
 		msleep(1);
-		sq->cq.mcq.comp(&sq->cq.mcq);
+		sq->cq.mcq.comp(&sq->cq.mcq, NULL);
 		mtx_lock(&sq->lock);
 	}
 	mtx_unlock(&sq->lock);
@@ -1989,6 +1989,7 @@ static int
 mlx5e_enable_cq(struct mlx5e_cq *cq, struct mlx5e_cq_param *param, int eq_ix)
 {
 	struct mlx5_core_cq *mcq = &cq->mcq;
+	u32 out[MLX5_ST_SZ_DW(create_cq_out)];
 	void *in;
 	void *cqc;
 	int inlen;
@@ -2017,7 +2018,7 @@ mlx5e_enable_cq(struct mlx5e_cq *cq, struct mlx5e_cq_param *param, int eq_ix)
 	    PAGE_SHIFT);
 	MLX5_SET64(cqc, cqc, dbr_addr, cq->wq_ctrl.db.dma);
 
-	err = mlx5_core_create_cq(cq->priv->mdev, mcq, in, inlen);
+	err = mlx5_core_create_cq(cq->priv->mdev, mcq, in, inlen, out, sizeof(out));
 
 	kvfree(in);
 
@@ -2141,8 +2142,7 @@ mlx5e_chan_static_init(struct mlx5e_priv *priv, struct mlx5e_channel *c, int ix)
 	c->ix = ix;
 
 	/* setup send tag */
-	c->tag.type = IF_SND_TAG_TYPE_UNLIMITED;
-	m_snd_tag_init(&c->tag.m_snd_tag, c->priv->ifp);
+	m_snd_tag_init(&c->tag, c->priv->ifp, IF_SND_TAG_TYPE_UNLIMITED);
 
 	init_completion(&c->completion);
 
@@ -2166,7 +2166,7 @@ static void
 mlx5e_chan_wait_for_completion(struct mlx5e_channel *c)
 {
 
-	m_snd_tag_rele(&c->tag.m_snd_tag);
+	m_snd_tag_rele(&c->tag);
 	wait_for_completion(&c->completion);
 }
 
@@ -2229,7 +2229,7 @@ mlx5e_open_channel(struct mlx5e_priv *priv,
 
 	/* poll receive queue initially */
 	NET_EPOCH_ENTER(et);
-	c->rq.cq.mcq.comp(&c->rq.cq.mcq);
+	c->rq.cq.mcq.comp(&c->rq.cq.mcq, NULL);
 	NET_EPOCH_EXIT(et);
 
 	return (0);
@@ -3233,6 +3233,7 @@ mlx5e_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 {
 	struct mlx5e_priv *priv;
 	struct ifreq *ifr;
+	struct ifdownreason *ifdr;
 	struct ifi2creq i2c;
 	int error = 0;
 	int mask = 0;
@@ -3323,6 +3324,7 @@ mlx5e_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 
 			if (IFCAP_TSO4 & ifp->if_capenable &&
 			    !(IFCAP_TXCSUM & ifp->if_capenable)) {
+				mask &= ~IFCAP_TSO4;
 				ifp->if_capenable &= ~IFCAP_TSO4;
 				ifp->if_hwassist &= ~CSUM_IP_TSO;
 				mlx5_en_err(ifp,
@@ -3335,6 +3337,7 @@ mlx5e_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 
 			if (IFCAP_TSO6 & ifp->if_capenable &&
 			    !(IFCAP_TXCSUM_IPV6 & ifp->if_capenable)) {
+				mask &= ~IFCAP_TSO6;
 				ifp->if_capenable &= ~IFCAP_TSO6;
 				ifp->if_hwassist &= ~CSUM_IP6_TSO;
 				mlx5_en_err(ifp,
@@ -3347,6 +3350,10 @@ mlx5e_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 			ifp->if_capenable ^= IFCAP_TXTLS4;
 		if (mask & IFCAP_TXTLS6)
 			ifp->if_capenable ^= IFCAP_TXTLS6;
+#ifdef RATELIMIT
+		if (mask & IFCAP_TXTLS_RTLMT)
+			ifp->if_capenable ^= IFCAP_TXTLS_RTLMT;
+#endif
 		if (mask & IFCAP_RXCSUM)
 			ifp->if_capenable ^= IFCAP_RXCSUM;
 		if (mask & IFCAP_RXCSUM_IPV6)
@@ -3498,6 +3505,16 @@ out:
 		error = copyout(&i2c, ifr_data_get_ptr(ifr), sizeof(i2c));
 err_i2c:
 		PRIV_UNLOCK(priv);
+		break;
+	case SIOCGIFDOWNREASON:
+		ifdr = (struct ifdownreason *)data;
+		bzero(ifdr->ifdr_msg, sizeof(ifdr->ifdr_msg));
+		PRIV_LOCK(priv);
+		error = -mlx5_query_pddr_troubleshooting_info(priv->mdev, NULL,
+		    ifdr->ifdr_msg, sizeof(ifdr->ifdr_msg));
+		PRIV_UNLOCK(priv);
+		if (error == 0)
+			ifdr->ifdr_reason = IFDR_REASON_MSG;
 		break;
 
 	default:
@@ -3788,7 +3805,7 @@ mlx5e_disable_rx_dma(struct mlx5e_channel *ch)
 	while (!mlx5_wq_ll_is_empty(&rq->wq)) {
 		msleep(1);
 		NET_EPOCH_ENTER(et);
-		rq->cq.mcq.comp(&rq->cq.mcq);
+		rq->cq.mcq.comp(&rq->cq.mcq, NULL);
 		NET_EPOCH_EXIT(et);
 	}
 
@@ -3821,7 +3838,7 @@ mlx5e_enable_rx_dma(struct mlx5e_channel *ch)
 	rq->enabled = 1;
 
 	NET_EPOCH_ENTER(et);
-	rq->cq.mcq.comp(&rq->cq.mcq);
+	rq->cq.mcq.comp(&rq->cq.mcq, NULL);
 	NET_EPOCH_EXIT(et);
 }
 
@@ -4074,8 +4091,8 @@ mlx5e_ul_snd_tag_alloc(struct ifnet *ifp,
 		/* check if send queue is not running */
 		if (unlikely(pch->sq[0].running == 0))
 			return (ENXIO);
-		m_snd_tag_ref(&pch->tag.m_snd_tag);
-		*ppmt = &pch->tag.m_snd_tag;
+		m_snd_tag_ref(&pch->tag);
+		*ppmt = &pch->tag;
 		return (0);
 	}
 }
@@ -4084,7 +4101,7 @@ int
 mlx5e_ul_snd_tag_query(struct m_snd_tag *pmt, union if_snd_tag_query_params *params)
 {
 	struct mlx5e_channel *pch =
-	    container_of(pmt, struct mlx5e_channel, tag.m_snd_tag);
+	    container_of(pmt, struct mlx5e_channel, tag);
 
 	params->unlimited.max_rate = -1ULL;
 	params->unlimited.queue_level = mlx5e_sq_queue_level(&pch->sq[0]);
@@ -4095,7 +4112,7 @@ void
 mlx5e_ul_snd_tag_free(struct m_snd_tag *pmt)
 {
 	struct mlx5e_channel *pch =
-	    container_of(pmt, struct mlx5e_channel, tag.m_snd_tag);
+	    container_of(pmt, struct mlx5e_channel, tag);
 
 	complete(&pch->completion);
 }
@@ -4110,7 +4127,7 @@ mlx5e_snd_tag_alloc(struct ifnet *ifp,
 #ifdef RATELIMIT
 	case IF_SND_TAG_TYPE_RATE_LIMIT:
 		return (mlx5e_rl_snd_tag_alloc(ifp, params, ppmt));
-#if defined(KERN_TLS) && defined(IF_SND_TAG_TYPE_TLS_RATE_LIMIT)
+#ifdef KERN_TLS
 	case IF_SND_TAG_TYPE_TLS_RATE_LIMIT:
 		return (mlx5e_tls_snd_tag_alloc(ifp, params, ppmt));
 #endif
@@ -4129,14 +4146,12 @@ mlx5e_snd_tag_alloc(struct ifnet *ifp,
 static int
 mlx5e_snd_tag_modify(struct m_snd_tag *pmt, union if_snd_tag_modify_params *params)
 {
-	struct mlx5e_snd_tag *tag =
-	    container_of(pmt, struct mlx5e_snd_tag, m_snd_tag);
 
-	switch (tag->type) {
+	switch (pmt->type) {
 #ifdef RATELIMIT
 	case IF_SND_TAG_TYPE_RATE_LIMIT:
 		return (mlx5e_rl_snd_tag_modify(pmt, params));
-#if defined(KERN_TLS) && defined(IF_SND_TAG_TYPE_TLS_RATE_LIMIT)
+#ifdef KERN_TLS
 	case IF_SND_TAG_TYPE_TLS_RATE_LIMIT:
 		return (mlx5e_tls_snd_tag_modify(pmt, params));
 #endif
@@ -4153,14 +4168,12 @@ mlx5e_snd_tag_modify(struct m_snd_tag *pmt, union if_snd_tag_modify_params *para
 static int
 mlx5e_snd_tag_query(struct m_snd_tag *pmt, union if_snd_tag_query_params *params)
 {
-	struct mlx5e_snd_tag *tag =
-	    container_of(pmt, struct mlx5e_snd_tag, m_snd_tag);
 
-	switch (tag->type) {
+	switch (pmt->type) {
 #ifdef RATELIMIT
 	case IF_SND_TAG_TYPE_RATE_LIMIT:
 		return (mlx5e_rl_snd_tag_query(pmt, params));
-#if defined(KERN_TLS) && defined(IF_SND_TAG_TYPE_TLS_RATE_LIMIT)
+#ifdef KERN_TLS
 	case IF_SND_TAG_TYPE_TLS_RATE_LIMIT:
 		return (mlx5e_tls_snd_tag_query(pmt, params));
 #endif
@@ -4223,15 +4236,13 @@ mlx5e_ratelimit_query(struct ifnet *ifp __unused, struct if_ratelimit_query_resu
 static void
 mlx5e_snd_tag_free(struct m_snd_tag *pmt)
 {
-	struct mlx5e_snd_tag *tag =
-	    container_of(pmt, struct mlx5e_snd_tag, m_snd_tag);
 
-	switch (tag->type) {
+	switch (pmt->type) {
 #ifdef RATELIMIT
 	case IF_SND_TAG_TYPE_RATE_LIMIT:
 		mlx5e_rl_snd_tag_free(pmt);
 		break;
-#if defined(KERN_TLS) && defined(IF_SND_TAG_TYPE_TLS_RATE_LIMIT)
+#ifdef KERN_TLS
 	case IF_SND_TAG_TYPE_TLS_RATE_LIMIT:
 		mlx5e_tls_snd_tag_free(pmt);
 		break;
@@ -4248,6 +4259,23 @@ mlx5e_snd_tag_free(struct m_snd_tag *pmt)
 	default:
 		break;
 	}
+}
+
+static void
+mlx5e_ifm_add(struct mlx5e_priv *priv, int type)
+{
+	ifmedia_add(&priv->media, type | IFM_ETHER, 0, NULL);
+	ifmedia_add(&priv->media, type | IFM_ETHER |
+	    IFM_ETH_RXPAUSE | IFM_ETH_TXPAUSE, 0, NULL);
+	ifmedia_add(&priv->media, type | IFM_ETHER | IFM_ETH_RXPAUSE, 0, NULL);
+	ifmedia_add(&priv->media, type | IFM_ETHER | IFM_ETH_TXPAUSE, 0, NULL);
+	ifmedia_add(&priv->media, type | IFM_ETHER | IFM_FDX, 0, NULL);
+	ifmedia_add(&priv->media, type | IFM_ETHER | IFM_FDX |
+	    IFM_ETH_RXPAUSE, 0, NULL);
+	ifmedia_add(&priv->media, type | IFM_ETHER | IFM_FDX |
+	    IFM_ETH_TXPAUSE, 0, NULL);
+	ifmedia_add(&priv->media, type | IFM_ETHER | IFM_FDX |
+	    IFM_ETH_RXPAUSE | IFM_ETH_TXPAUSE, 0, NULL);
 }
 
 static void *
@@ -4314,7 +4342,9 @@ mlx5e_create_ifp(struct mlx5_core_dev *mdev)
 	ifp->if_capabilities |= IFCAP_HWSTATS | IFCAP_HWRXTSTMP;
 	ifp->if_capabilities |= IFCAP_NOMAP;
 	ifp->if_capabilities |= IFCAP_TXTLS4 | IFCAP_TXTLS6;
-	ifp->if_capabilities |= IFCAP_TXRTLMT;
+#ifdef RATELIMIT
+	ifp->if_capabilities |= IFCAP_TXRTLMT | IFCAP_TXTLS_RTLMT;
+#endif
 	ifp->if_snd_tag_alloc = mlx5e_snd_tag_alloc;
 	ifp->if_snd_tag_free = mlx5e_snd_tag_free;
 	ifp->if_snd_tag_modify = mlx5e_snd_tag_modify;
@@ -4420,8 +4450,7 @@ mlx5e_create_ifp(struct mlx5_core_dev *mdev)
 
 	/* Set default media status */
 	priv->media_status_last = IFM_AVALID;
-	priv->media_active_last = IFM_ETHER | IFM_AUTO |
-	    IFM_ETH_RXPAUSE | IFM_FDX;
+	priv->media_active_last = IFM_ETHER | IFM_AUTO | IFM_FDX;
 
 	/* setup default pauseframes configuration */
 	mlx5e_setup_pauseframes(priv);
@@ -4441,7 +4470,7 @@ mlx5e_create_ifp(struct mlx5_core_dev *mdev)
 		mlx5_en_err(ifp, "Query port media capability failed, %d\n", err);
 	}
 
-	ifmedia_init(&priv->media, IFM_IMASK | IFM_ETH_FMASK,
+	ifmedia_init(&priv->media, IFM_IMASK,
 	    mlx5e_media_change, mlx5e_media_status);
 
 	speeds_num = ext ? MLX5E_EXT_LINK_SPEEDS_NUMBER : MLX5E_LINK_SPEEDS_NUMBER;
@@ -4451,21 +4480,12 @@ mlx5e_create_ifp(struct mlx5_core_dev *mdev)
 			    mlx5e_mode_table[i][j];
 			if (media_entry.baudrate == 0)
 				continue;
-			if (MLX5E_PROT_MASK(i) & eth_proto_cap) {
-				ifmedia_add(&priv->media,
-				    media_entry.subtype |
-				    IFM_ETHER, 0, NULL);
-				ifmedia_add(&priv->media,
-				    media_entry.subtype |
-				    IFM_ETHER | IFM_FDX |
-				    IFM_ETH_RXPAUSE | IFM_ETH_TXPAUSE, 0, NULL);
-			}
+			if (MLX5E_PROT_MASK(i) & eth_proto_cap)
+				mlx5e_ifm_add(priv, media_entry.subtype);
 		}
 	}
 
-	ifmedia_add(&priv->media, IFM_ETHER | IFM_AUTO, 0, NULL);
-	ifmedia_add(&priv->media, IFM_ETHER | IFM_AUTO | IFM_FDX |
-	    IFM_ETH_RXPAUSE | IFM_ETH_TXPAUSE, 0, NULL);
+	mlx5e_ifm_add(priv, IFM_AUTO);
 
 	/* Set autoselect by default */
 	ifmedia_set(&priv->media, IFM_ETHER | IFM_AUTO | IFM_FDX |
@@ -4721,8 +4741,8 @@ mlx5e_show_version(void __unused *arg)
 }
 SYSINIT(mlx5e_show_version, SI_SUB_DRIVERS, SI_ORDER_ANY, mlx5e_show_version, NULL);
 
-module_init_order(mlx5e_init, SI_ORDER_THIRD);
-module_exit_order(mlx5e_cleanup, SI_ORDER_THIRD);
+module_init_order(mlx5e_init, SI_ORDER_SIXTH);
+module_exit_order(mlx5e_cleanup, SI_ORDER_SIXTH);
 
 #if (__FreeBSD_version >= 1100000)
 MODULE_DEPEND(mlx5en, linuxkpi, 1, 1, 1);

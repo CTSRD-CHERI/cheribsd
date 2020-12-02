@@ -32,8 +32,6 @@
 __FBSDID("$FreeBSD$");
 
 #include "opt_capsicum.h"
-#include "opt_inet.h"
-#include "opt_inet6.h"
 #include "opt_sctp.h"
 #include "opt_ktrace.h"
 
@@ -69,6 +67,8 @@ __FBSDID("$FreeBSD$");
 #include <sys/ktrace.h>
 #endif
 #ifdef COMPAT_FREEBSD32
+#include <compat/freebsd32/freebsd32.h>
+#include <compat/freebsd32/freebsd32_syscall.h>
 #include <compat/freebsd32/freebsd32_util.h>
 #include <compat/freebsd32/freebsd32_syscall.h>
 #include <compat/freebsd32/freebsd32_proto.h>
@@ -86,6 +86,7 @@ __FBSDID("$FreeBSD$");
 #include <security/mac/mac_framework.h>
 
 #include <netinet/sctp.h>
+#include <netinet/sctp_os_bsd.h>
 #include <netinet/sctp_peeloff.h>
 
 static struct syscall_helper_data sctp_syscalls[] = {
@@ -97,7 +98,7 @@ static struct syscall_helper_data sctp_syscalls[] = {
 };
 
 #ifdef COMPAT_FREEBSD32
-static struct syscall_helper_data sctp_syscalls32[] = {
+static struct syscall_helper_data sctp32_syscalls[] = {
 	SYSCALL32_INIT_HELPER_COMPAT(sctp_peeloff),
 	SYSCALL32_INIT_HELPER_COMPAT(sctp_generic_sendmsg),
 	SYSCALL32_INIT_HELPER(freebsd32_sctp_generic_sendmsg_iov),
@@ -107,7 +108,7 @@ static struct syscall_helper_data sctp_syscalls32[] = {
 #endif
 
 #ifdef COMPAT_FREEBSD64
-static struct syscall_helper_data sctp_syscalls64[] = {
+static struct syscall_helper_data sctp64_syscalls[] = {
 	FREEBSD64_SYSCALL_INIT_HELPER_COMPAT(sctp_peeloff),
 	FREEBSD64_SYSCALL_INIT_HELPER(freebsd64_sctp_generic_sendmsg),
 	FREEBSD64_SYSCALL_INIT_HELPER(freebsd64_sctp_generic_sendmsg_iov),
@@ -121,47 +122,67 @@ static int	kern_sys_sctp_generic_sendmsg(struct thread *td, int sd,
 		    const struct sockaddr * __capability uto, socklen_t tolen,
 		    struct sctp_sndrcvinfo * __capability usinfo, int flags);
 static int	kern_sctp_generic_sendmsg_iov(struct thread *td, int sd,
-		    void * __capability uiov, int iovlen,
+		    struct iovec * __capability uiov, int iovlen,
 		    const struct sockaddr * __capability uto, socklen_t tolen,
 		    struct sctp_sndrcvinfo * __capability usinfo, int flags,
 		    copyiniov_t *copyiniov_f);
 static int	kern_sctp_generic_recvmsg(struct thread *td, int sd,
-		    void * __capability uiov, int iovlen,
+		    struct iovec * __capability uiov, int iovlen,
 		    struct sockaddr * __capability from,
 		    socklen_t * __capability fromlenaddr,
 		    struct sctp_sndrcvinfo * __capability usinfo,
 		    int * __capability umsg_flags,
 		    copyiniov_t *copyiniov_f);
 
-static void
-sctp_syscalls_init(void *unused __unused)
+int
+sctp_syscalls_init(void)
 {
-	int error __unused;
+	int error;
 
-	error = syscall_helper_register(sctp_syscalls, SY_THR_STATIC);
-	KASSERT((error == 0),
-	    ("%s: syscall_helper_register failed for sctp syscalls", __func__));
+	error = syscall_helper_register(sctp_syscalls, SY_THR_STATIC_KLD);
+	if (error != 0)
+		return (error);
 #ifdef COMPAT_FREEBSD32
-	error = syscall32_helper_register(sctp_syscalls32, SY_THR_STATIC);
-	KASSERT((error == 0),
-	    ("%s: syscall32_helper_register failed for sctp syscalls",
-	    __func__));
+	error = syscall32_helper_register(sctp32_syscalls, SY_THR_STATIC_KLD);
+	if (error != 0)
+		return (error);
 #endif
 #ifdef COMPAT_FREEBSD64
-	error = freebsd64_syscall_helper_register(sctp_syscalls64,
-	    SY_THR_STATIC);
-	KASSERT((error == 0),
-	    ("%s: freebsd64_syscall_helper_register failed for sctp syscalls",
-	    __func__));
+	error = freebsd64_syscall_helper_register(sctp64_syscalls,
+	    SY_THR_STATIC_KLD);
+	if (error != 0)
+		return (error);
 #endif
+	return (0);
 }
+
+#ifdef SCTP
 SYSINIT(sctp_syscalls, SI_SUB_SYSCALLS, SI_ORDER_ANY, sctp_syscalls_init, NULL);
+#endif
+
+int
+sctp_syscalls_uninit(void)
+{
+	int error;
+
+#ifdef COMPAT_FREEBSD64
+	error = freebsd64_syscall_helper_unregister(sctp64_syscalls);
+	if (error != 0)
+		return (error);
+#endif
+#ifdef COMPAT_FREEBSD32
+	error = syscall32_helper_unregister(sctp32_syscalls);
+	if (error != 0)
+		return (error);
+#endif
+	error = syscall_helper_unregister(sctp_syscalls);
+	if (error != 0)
+		return (error);
+	return (0);
+}
 
 /*
  * SCTP syscalls.
- * Functionality only compiled in if SCTP is defined in the kernel Makefile,
- * otherwise all return EOPNOTSUPP.
- * XXX: We should make this loadable one day.
  */
 #ifndef _SYS_SYSPROTO_H_
 struct sctp_peeloff_args {
@@ -172,7 +193,6 @@ int	sd;
 int
 sys_sctp_peeloff(struct thread *td, struct sctp_peeloff_args *uap)
 {
-#if (defined(INET) || defined(INET6)) && defined(SCTP)
 	struct file *headfp, *nfp = NULL;
 	struct socket *head, *so;
 	cap_rights_t rights;
@@ -234,9 +254,6 @@ done:
 	fdrop(headfp, td);
 done2:
 	return (error);
-#else  /* SCTP */
-	return (EOPNOTSUPP);
-#endif /* SCTP */
 }
 
 #ifndef _SYS_SYSPROTO_H_
@@ -277,8 +294,7 @@ kern_sys_sctp_generic_sendmsg(struct thread *td, int sd,
     void * __capability msg, int mlen, const struct sockaddr * __capability uto,
     socklen_t tolen, struct sctp_sndrcvinfo * __capability usinfo, int flags)
 {
-#if (defined(INET) || defined(INET6)) && defined(SCTP)
-	struct sctp_sndrcvinfo sinfo, *sinfop = NULL;
+	struct sctp_sndrcvinfo sinfo, *u_sinfo = NULL;
 	struct socket *so;
 	struct file *fp = NULL;
 	struct sockaddr *to = NULL;
@@ -294,7 +310,7 @@ kern_sys_sctp_generic_sendmsg(struct thread *td, int sd,
 		error = copyin(usinfo, &sinfo, sizeof(sinfo));
 		if (error != 0)
 			return (error);
-		sinfop = &sinfo;
+		u_sinfo = &sinfo;
 	}
 
 	cap_rights_init_one(&rights, CAP_SEND);
@@ -343,7 +359,7 @@ kern_sys_sctp_generic_sendmsg(struct thread *td, int sd,
 	len = auio.uio_resid = mlen;
 	CURVNET_SET(so->so_vnet);
 	error = sctp_lower_sosend(so, to, &auio, (struct mbuf *)NULL,
-	    (struct mbuf *)NULL, flags, sinfop, td);
+	    (struct mbuf *)NULL, flags, u_sinfo, td);
 	CURVNET_RESTORE();
 	if (error != 0) {
 		if (auio.uio_resid != len && (error == ERESTART ||
@@ -371,9 +387,6 @@ sctp_bad:
 sctp_bad2:
 	free(to, M_SONAME);
 	return (error);
-#else  /* SCTP */
-	return (EOPNOTSUPP);
-#endif /* SCTP */
 }
 
 #ifndef _SYS_SYSPROTO_H_
@@ -404,10 +417,9 @@ freebsd32_sctp_generic_sendmsg_iov(struct thread *td,
 {
 
 	return (kern_sctp_generic_sendmsg_iov(td, uap->sd,
-	    __USER_CAP_ARRAY(uap->iov, uap->iovlen), uap->iovlen,
-	    __USER_CAP(uap->to, uap->tolen), uap->tolen,
-	    __USER_CAP_OBJ(uap->sinfo), uap->flags,
-	    (copyiniov_t *)freebsd32_copyiniov));
+	    (struct iovec * __capability)__USER_CAP_ARRAY(uap->iov, uap->iovlen),
+	    uap->iovlen, __USER_CAP(uap->to, uap->tolen), uap->tolen,
+	    __USER_CAP_OBJ(uap->sinfo), uap->flags, freebsd32_copyiniov));
 }
 #endif
 
@@ -418,21 +430,20 @@ freebsd64_sctp_generic_sendmsg_iov(struct thread *td,
 {
 
 	return (kern_sctp_generic_sendmsg_iov(td, uap->sd,
-	    __USER_CAP_ARRAY(uap->iov, uap->iovlen), uap->iovlen,
-	    __USER_CAP(uap->to, uap->tolen), uap->tolen,
-	    __USER_CAP_OBJ(uap->sinfo), uap->flags,
-	    (copyiniov_t *)freebsd64_copyiniov));
+	    (struct iovec * __capability)__USER_CAP_ARRAY(uap->iov, uap->iovlen),
+	    uap->iovlen, __USER_CAP(uap->to, uap->tolen), uap->tolen,
+	    __USER_CAP_OBJ(uap->sinfo), uap->flags, freebsd64_copyiniov));
 }
 #endif
 
 static int
 kern_sctp_generic_sendmsg_iov(struct thread *td, int sd,
-    void * __capability uiov, int iovlen, const struct sockaddr * __capability uto,
-    socklen_t tolen, struct sctp_sndrcvinfo * __capability usinfo, int flags,
+    struct iovec * __capability uiov, int iovlen,
+    const struct sockaddr * __capability uto, socklen_t tolen,
+    struct sctp_sndrcvinfo * __capability usinfo, int flags,
     copyiniov_t *copyiniov_f)
 {
-#if (defined(INET) || defined(INET6)) && defined(SCTP)
-	struct sctp_sndrcvinfo sinfo, *sinfop = NULL;
+	struct sctp_sndrcvinfo sinfo, *u_sinfo = NULL;
 	struct socket *so;
 	struct file *fp = NULL;
 	struct sockaddr *to = NULL;
@@ -449,7 +460,7 @@ kern_sctp_generic_sendmsg_iov(struct thread *td, int sd,
 		error = copyin(usinfo, &sinfo, sizeof(sinfo));
 		if (error != 0)
 			return (error);
-		sinfop = &sinfo;
+		u_sinfo = &sinfo;
 	}
 	cap_rights_init_one(&rights, CAP_SEND);
 	if (tolen != 0) {
@@ -507,7 +518,7 @@ kern_sctp_generic_sendmsg_iov(struct thread *td, int sd,
 	CURVNET_SET(so->so_vnet);
 	error = sctp_lower_sosend(so, to, &auio,
 		    (struct mbuf *)NULL, (struct mbuf *)NULL,
-		    flags, sinfop, td);
+		    flags, u_sinfo, td);
 	CURVNET_RESTORE();
 	if (error != 0) {
 		if (auio.uio_resid != len && (error == ERESTART ||
@@ -537,9 +548,6 @@ sctp_bad1:
 sctp_bad2:
 	free(to, M_SONAME);
 	return (error);
-#else  /* SCTP */
-	return (EOPNOTSUPP);
-#endif /* SCTP */
 }
 
 #ifndef _SYS_SYSPROTO_H_
@@ -570,10 +578,10 @@ freebsd32_sctp_generic_recvmsg(struct thread *td,
 {
 
 	return (kern_sctp_generic_recvmsg(td, uap->sd,
-	   __USER_CAP_ARRAY(uap->iov, uap->iovlen), uap->iovlen,
-	   __USER_CAP_UNBOUND(uap->from),
-	   __USER_CAP_OBJ(uap->fromlenaddr), __USER_CAP_OBJ(uap->sinfo),
-	   __USER_CAP_OBJ(uap->msg_flags), (copyiniov_t *)freebsd32_copyiniov));
+	    (struct iovec * __capability)__USER_CAP_ARRAY(uap->iov, uap->iovlen),
+	    uap->iovlen, __USER_CAP_UNBOUND(uap->from),
+	    __USER_CAP_OBJ(uap->fromlenaddr), __USER_CAP_OBJ(uap->sinfo),
+	    __USER_CAP_OBJ(uap->msg_flags), freebsd32_copyiniov));
 }
 #endif
 
@@ -584,21 +592,20 @@ freebsd64_sctp_generic_recvmsg(struct thread *td,
 {
 
 	return (kern_sctp_generic_recvmsg(td, uap->sd,
-	   __USER_CAP_ARRAY(uap->iov, uap->iovlen), uap->iovlen,
-	   __USER_CAP_UNBOUND(uap->from),
-	   __USER_CAP_OBJ(uap->fromlenaddr), __USER_CAP_OBJ(uap->sinfo),
-	   __USER_CAP_OBJ(uap->msg_flags), (copyiniov_t *)freebsd64_copyiniov));
+	    (struct iovec * __capability)__USER_CAP_ARRAY(uap->iov, uap->iovlen),
+	    uap->iovlen, __USER_CAP_UNBOUND(uap->from),
+	    __USER_CAP_OBJ(uap->fromlenaddr), __USER_CAP_OBJ(uap->sinfo),
+	    __USER_CAP_OBJ(uap->msg_flags), freebsd64_copyiniov));
 }
 #endif
 
 static int
-kern_sctp_generic_recvmsg(struct thread *td, int sd, void * __capability uiov, 
-    int iovlen, struct sockaddr * __capability from,
-    socklen_t * __capability fromlenaddr,
+kern_sctp_generic_recvmsg(struct thread *td, int sd,
+    struct iovec * __capability uiov, int iovlen,
+    struct sockaddr * __capability from, socklen_t * __capability fromlenaddr,
     struct sctp_sndrcvinfo * __capability usinfo,
     int * __capability umsg_flags, copyiniov_t *copyiniov_f)
 {
-#if (defined(INET) || defined(INET6)) && defined(SCTP)
 	uint8_t sockbufstore[256];
 	struct uio auio;
 	struct iovec *iov, *tiov;
@@ -722,9 +729,6 @@ out1:
 		fdrop(fp, td);
 
 	return (error);
-#else  /* SCTP */
-	return (EOPNOTSUPP);
-#endif /* SCTP */
 }
 // CHERI CHANGES START
 // {

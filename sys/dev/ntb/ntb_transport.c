@@ -357,7 +357,7 @@ ntb_transport_attach(device_t dev)
 	spad_count = ntb_spad_count(dev);
 	db_bitmap = ntb_db_valid_mask(dev);
 	db_count = flsll(db_bitmap);
-	KASSERT(db_bitmap == (1 << db_count) - 1,
+	KASSERT(db_bitmap == ((uint64_t)1 << db_count) - 1,
 	    ("Doorbells are not sequential (%jx).\n", db_bitmap));
 
 	if (nt->mw_count == 0) {
@@ -756,8 +756,6 @@ ntb_transport_link_up(struct ntb_transport_qp *qp)
 	if (nt->link_is_up)
 		callout_reset(&qp->link_work, 0, ntb_qp_link_work, qp);
 }
-
-
 
 /* Transport Tx */
 
@@ -1204,7 +1202,6 @@ ntb_transport_link_work(void *arg)
 		mw->rx_size = val64;
 		val64 = roundup(val64, mw->xlat_align_size);
 		if (mw->buff_size != val64) {
-
 			rc = ntb_set_mw(nt, i, val64);
 			if (rc != 0) {
 				ntb_printf(0, "link up set mw%d fails, rc %d\n",
@@ -1592,7 +1589,6 @@ ntb_send_link_down(struct ntb_transport_qp *qp)
 
 	ntb_qp_link_down_reset(qp);
 }
-
 
 /* List Management */
 

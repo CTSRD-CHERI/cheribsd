@@ -239,10 +239,13 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 		usfp = (void *)((sp - rndfsize) & ~0xFul);
 	}
 
-	/*
-	 * Save the floating-point state, if necessary, then copy it.
+	/* 
+	 * Set Floating Point facility to "Ignore Exceptions Mode" so signal
+	 * handler can run. 
 	 */
-	/* XXX */
+	if (td->td_pcb->pcb_flags & PCB_FPU)
+		tf->srr1 = tf->srr1 & ~(PSL_FE0 | PSL_FE1);
+
 
 	/*
 	 * Set up the registers to return to sigcode.
@@ -330,6 +333,13 @@ sys_sigreturn(struct thread *td, struct sigreturn_args *uap)
 	error = set_mcontext(td, &uc.uc_mcontext);
 	if (error != 0)
 		return (error);
+
+	/* 
+	 * Save FPU state if needed. User may have changed it on
+	 * signal handler 
+	 */ 
+	if (uc.uc_mcontext.mc_srr1 & PSL_FP)
+		save_fpu(td);
 
 	kern_sigprocmask(td, SIG_SETMASK, &uc.uc_sigmask, NULL, 0);
 
@@ -556,6 +566,8 @@ cleanup_power_extras(struct thread *td)
 		mtspr(SPR_FSCR, 0);
 	if (pcb_flags & PCB_CDSCR) 
 		mtspr(SPR_DSCRP, 0);
+
+	cleanup_fpscr();
 }
 
 /*
@@ -678,7 +690,7 @@ set_regs(struct thread *td, struct reg *regs)
 
 	tf = td->td_frame;
 	memcpy(tf, regs, sizeof(struct reg));
-	
+
 	return (0);
 }
 
@@ -752,7 +764,7 @@ grab_mcontext32(struct thread *td, mcontext32_t *mcp, int flags)
 	error = grab_mcontext(td, &mcp64, flags);
 	if (error != 0)
 		return (error);
-	
+
 	mcp->mc_vers = mcp64.mc_vers;
 	mcp->mc_flags = mcp64.mc_flags;
 	mcp->mc_onstack = mcp64.mc_onstack;
@@ -823,6 +835,13 @@ freebsd32_sigreturn(struct thread *td, struct freebsd32_sigreturn_args *uap)
 	error = set_mcontext32(td, &uc.uc_mcontext);
 	if (error != 0)
 		return (error);
+
+	/*
+	 * Save FPU state if needed. User may have changed it on
+	 * signal handler
+	 */
+	if (uc.uc_mcontext.mc_srr1 & PSL_FP)
+		save_fpu(td);
 
 	kern_sigprocmask(td, SIG_SETMASK, &uc.uc_sigmask, NULL, 0);
 
@@ -955,7 +974,7 @@ cpu_set_syscall_retval(struct thread *td, int error)
 		tf->srr0 -= 4;
 		break;
 	default:
-		tf->fixreg[FIRSTARG] = SV_ABI_ERRNO(p, error);
+		tf->fixreg[FIRSTARG] = error;
 		tf->cr |= 0x10000000;		/* Set summary overflow */
 		break;
 	}
@@ -1193,4 +1212,3 @@ ppc_instr_emulate(struct trapframe *frame, struct thread *td)
 
 	return (sig);
 }
-

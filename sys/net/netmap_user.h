@@ -123,13 +123,11 @@
 	( ((char *)(buf) - ((char *)(ring) + (ring)->buf_ofs) ) / \
 		(ring)->nr_buf_size )
 
-
 static inline uint32_t
 nm_ring_next(struct netmap_ring *r, uint32_t i)
 {
 	return ( unlikely(i + 1 == r->num_slots) ? 0 : i + 1);
 }
-
 
 /*
  * Return 1 if we have pending transmissions in the tx ring.
@@ -292,12 +290,9 @@ struct nm_desc {
  * when the descriptor is open correctly, d->self == d
  * Eventually we should also use some magic number.
  */
-#define P2NMD(p)		((struct nm_desc *)(p))
+#define P2NMD(p)		((const struct nm_desc *)(p))
 #define IS_NETMAP_DESC(d)	((d) && P2NMD(d)->self == P2NMD(d))
 #define NETMAP_FD(d)		(P2NMD(d)->fd)
-
-
-
 
 /*
  * The callback, invoked on each received packet. Same as libpcap
@@ -354,7 +349,6 @@ enum {
 	NM_OPEN_ARG3 =		0x400000,
 	NM_OPEN_RING_CFG =	0x800000, /* tx|rx rings|slots */
 };
-
 
 /*
  * nm_close()	closes and restores the port to its previous state
@@ -435,7 +429,6 @@ win_remove_fd_record(int fd)
 		break;
 	}
 }
-
 
 HANDLE
 win_get_netmap_handle(int fd)
@@ -623,7 +616,7 @@ nm_parse(const char *ifname, struct nm_desc *d, char *err)
 	const char *vpname = NULL;
 	u_int namelen;
 	uint32_t nr_ringid = 0, nr_flags;
-	char errmsg[MAXERRMSG] = "";
+	char errmsg[MAXERRMSG] = "", *tmp;
 	long num;
 	uint16_t nr_arg2 = 0;
 	enum { P_START, P_RNGSFXOK, P_GETNUM, P_FLAGS, P_FLAGSOK, P_MEMID } p_state;
@@ -720,12 +713,13 @@ nm_parse(const char *ifname, struct nm_desc *d, char *err)
 			port++;
 			break;
 		case P_GETNUM:
-			num = strtol(port, (char **)&port, 10);
+			num = strtol(port, &tmp, 10);
 			if (num < 0 || num >= NETMAP_RING_MASK) {
 				snprintf(errmsg, MAXERRMSG, "'%ld' out of range [0, %d)",
 						num, NETMAP_RING_MASK);
 				goto fail;
 			}
+			port = tmp;
 			nr_ringid = num & NETMAP_RING_MASK;
 			p_state = P_RNGSFXOK;
 			break;
@@ -767,11 +761,12 @@ nm_parse(const char *ifname, struct nm_desc *d, char *err)
 				snprintf(errmsg, MAXERRMSG, "double setting of memid");
 				goto fail;
 			}
-			num = strtol(port, (char **)&port, 10);
+			num = strtol(port, &tmp, 10);
 			if (num <= 0) {
 				snprintf(errmsg, MAXERRMSG, "invalid memid %ld, must be >0", num);
 				goto fail;
 			}
+			port = tmp;
 			nr_arg2 = num;
 			p_state = P_RNGSFXOK;
 			break;
@@ -921,7 +916,6 @@ nm_open(const char *ifname, const struct nmreq *req,
 		goto fail;
 	}
 
-
 #ifdef DEBUG_NETMAP_USER
     { /* debugging code */
 	int i;
@@ -953,7 +947,6 @@ fail:
 	return NULL;
 }
 
-
 static int
 nm_close(struct nm_desc *d)
 {
@@ -976,7 +969,6 @@ nm_close(struct nm_desc *d)
 	free(d);
 	return 0;
 }
-
 
 static int
 nm_mmap(struct nm_desc *d, const struct nm_desc *parent)
@@ -1054,7 +1046,7 @@ nm_inject(struct nm_desc *d, const void *buf, size_t size)
 			ring->slot[i].flags = NS_MOREFRAG;
 			nm_pkt_copy(buf, NETMAP_BUF(ring, idx), ring->nr_buf_size);
 			i = nm_ring_next(ring, i);
-			buf = (char *)buf + ring->nr_buf_size;
+			buf = (const char *)buf + ring->nr_buf_size;
 		}
 		idx = ring->slot[i].buf_idx;
 		ring->slot[i].len = rem;
@@ -1066,7 +1058,6 @@ nm_inject(struct nm_desc *d, const void *buf, size_t size)
 	}
 	return 0; /* fail */
 }
-
 
 /*
  * Same prototype as pcap_dispatch(), only need to cast.

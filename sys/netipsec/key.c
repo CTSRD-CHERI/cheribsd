@@ -101,6 +101,7 @@
 #define FULLMASK	0xff
 #define	_BITS(bytes)	((bytes) << 3)
 
+#define	UINT32_80PCT	0xcccccccc
 /*
  * Note on SA reference counting:
  * - SAs that are not in DEAD state will have (total external reference + 1)
@@ -871,7 +872,6 @@ key_do_allocsp(struct secpolicyindex *spidx, u_int dir)
 	return (sp);
 }
 
-
 /*
  * allocating a SP for OUTBOUND or INBOUND packet.
  * Must call key_freesp() later.
@@ -1036,7 +1036,6 @@ key_allocsa_policy(struct secpolicy *sp, const struct secasindex *saidx,
 		    kdebug_secash(sah, "  "));
 		if (key_cmpsaidx(&sah->saidx, saidx, CMP_MODE_REQID))
 			break;
-
 	}
 	if (sah != NULL) {
 		/*
@@ -3059,28 +3058,17 @@ key_cleansav(struct secasvar *sav)
 	}
 	if (sav->flags & SADB_X_EXT_F_CLONED)
 		return;
-	/*
-	 * Cleanup xform state.  Note that zeroize'ing causes the
-	 * keys to be cleared; otherwise we must do it ourself.
-	 */
 	if (sav->tdb_xform != NULL) {
-		sav->tdb_xform->xf_zeroize(sav);
+		sav->tdb_xform->xf_cleanup(sav);
 		sav->tdb_xform = NULL;
-	} else {
-		if (sav->key_auth != NULL)
-			bzero(sav->key_auth->key_data, _KEYLEN(sav->key_auth));
-		if (sav->key_enc != NULL)
-			bzero(sav->key_enc->key_data, _KEYLEN(sav->key_enc));
 	}
 	if (sav->key_auth != NULL) {
-		if (sav->key_auth->key_data != NULL)
-			free(sav->key_auth->key_data, M_IPSEC_MISC);
+		zfree(sav->key_auth->key_data, M_IPSEC_MISC);
 		free(sav->key_auth, M_IPSEC_MISC);
 		sav->key_auth = NULL;
 	}
 	if (sav->key_enc != NULL) {
-		if (sav->key_enc->key_data != NULL)
-			free(sav->key_enc->key_data, M_IPSEC_MISC);
+		zfree(sav->key_enc->key_data, M_IPSEC_MISC);
 		free(sav->key_enc, M_IPSEC_MISC);
 		sav->key_enc = NULL;
 	}
@@ -4077,7 +4065,6 @@ key_dup_keymsg(const struct sadb_key *src, size_t len,
 	} else {
 		ipseclog((LOG_DEBUG, "%s: No more memory.\n",
 		    __func__));
-
 	}
 	return (dst);
 }
@@ -4144,7 +4131,6 @@ key_cmpsaidx(const struct secasindex *saidx0, const struct secasindex *saidx1,
 		    saidx0->dst.sa.sa_len) != 0)
 			return 0;
 	} else {
-
 		/* CMP_MODE_REQID, CMP_REQID, CMP_HEAD */
 		if (flag == CMP_MODE_REQID || flag == CMP_REQID) {
 			/*
@@ -4551,7 +4537,11 @@ key_flush_sad(time_t now)
 			    (sav->lft_s->usetime != 0 && sav->firstused &&
 			    now - sav->firstused > sav->lft_s->usetime) ||
 			    (sav->lft_s->bytes != 0 && counter_u64_fetch(
-				sav->lft_c_bytes) > sav->lft_s->bytes))) {
+				sav->lft_c_bytes) > sav->lft_s->bytes) ||
+			    (!(sav->flags & SADB_X_SAFLAGS_ESN) &&
+			    (sav->replay != NULL) && (
+			    (sav->replay->count > UINT32_80PCT) ||
+			    (sav->replay->last > UINT32_80PCT))))) {
 				SECASVAR_UNLOCK(sav);
 				SAV_ADDREF(sav);
 				LIST_INSERT_HEAD(&sexpireq, sav, drainq);
@@ -5042,7 +5032,6 @@ key_do_getnewspi(struct sadb_spirange *spirange, struct secasindex *saidx)
 		count--; /* taking one cost. */
 		newspi = min;
 	} else {
-
 		/* init SPI */
 		newspi = 0;
 
@@ -8547,7 +8536,7 @@ key_setlifetime(struct seclifetime *src, uint16_t exttype)
 	p->sadb_lifetime_bytes = src->bytes;
 	p->sadb_lifetime_addtime = src->addtime;
 	p->sadb_lifetime_usetime = src->usetime;
-	
+
 	return m;
 
 }
@@ -8584,4 +8573,3 @@ comp_algorithm_lookup(int alg)
 			return (supported_calgs[i].xform);
 	return (NULL);
 }
-

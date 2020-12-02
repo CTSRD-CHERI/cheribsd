@@ -479,7 +479,6 @@ g_multipath_kt(void *arg)
 	kproc_exit(0);
 }
 
-
 static int
 g_multipath_access(struct g_provider *pp, int dr, int dw, int de)
 {
@@ -824,9 +823,11 @@ g_multipath_taste(struct g_class *mp, struct g_provider *pp, int flags __unused)
 	gp->access = g_multipath_access;
 	gp->orphan = g_multipath_orphan;
 	cp = g_new_consumer(gp);
-	g_attach(cp, pp);
-	error = g_multipath_read_metadata(cp, &md);
-	g_detach(cp);
+	error = g_attach(cp, pp);
+	if (error == 0) {
+		error = g_multipath_read_metadata(cp, &md);
+		g_detach(cp);
+	}
 	g_destroy_consumer(cp);
 	g_destroy_geom(gp);
 	if (error != 0)
@@ -944,7 +945,7 @@ g_multipath_ctl_add_name(struct gctl_req *req, struct g_class *mp,
 	struct g_consumer *cp;
 	struct g_provider *pp;
 	const char *mpname;
-	static const char devpf[6] = "/dev/";
+	static const char devpf[6] = _PATH_DEV;
 	int error;
 
 	g_topology_assert();
@@ -1007,7 +1008,7 @@ g_multipath_ctl_prefer(struct gctl_req *req, struct g_class *mp)
 	struct g_multipath_softc *sc;
 	struct g_consumer *cp;
 	const char *name, *mpname;
-	static const char devpf[6] = "/dev/";
+	static const char devpf[6] = _PATH_DEV;
 	int *nargs;
 
 	g_topology_assert();

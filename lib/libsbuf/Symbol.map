@@ -43,12 +43,3 @@ FBSD_1.5 {
 FBSD_1.6 {
 	sbuf_printf_drain;
 };
-
-FBSDprivate_1.0 {
-	/*
-	 * XXX-JHB: Export .size.<var> symbols for <var>'s that are
-	 * undefined so rtld can update them.  This is a temporary
-	 * hack.
-	 */
-	.size.*;
-};

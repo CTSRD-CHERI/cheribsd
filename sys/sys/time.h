@@ -463,8 +463,12 @@ struct clockinfo {
 /* These macros are also in time.h. */
 #ifndef CLOCK_REALTIME
 #define	CLOCK_REALTIME	0
+#endif
+#ifndef CLOCK_VIRTUAL
 #define	CLOCK_VIRTUAL	1
 #define	CLOCK_PROF	2
+#endif
+#ifndef CLOCK_MONOTONIC
 #define	CLOCK_MONOTONIC	4
 #define	CLOCK_UPTIME	5		/* FreeBSD-specific. */
 #define	CLOCK_UPTIME_PRECISE	7	/* FreeBSD-specific. */
@@ -488,7 +492,7 @@ struct clockinfo {
 #define	CPUCLOCK_WHICH_TID	1
 #endif
 
-#ifdef _KERNEL
+#if defined(_KERNEL) || defined(_STANDALONE)
 
 /*
  * Kernel to clock driver interface.
@@ -596,7 +600,7 @@ int	tvtohz(struct timeval *tv);
 	(((sbt2) >= sbt_timethreshold) ?				\
 	    ((*(sbt) = getsbinuptime()), 1) : ((*(sbt) = sbinuptime()), 0))
 
-#else /* !_KERNEL */
+#else /* !_KERNEL && !_STANDALONE */
 #include <time.h>
 
 #include <sys/cdefs.h>

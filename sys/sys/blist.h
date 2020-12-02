@@ -85,10 +85,9 @@ typedef struct blist {
 	blmeta_t	bl_root[1];	/* root of radix tree		*/
 } *blist_t;
 
-#define BLIST_BMAP_RADIX	(sizeof(u_daddr_t)*8)
-#define BLIST_META_RADIX	BLIST_BMAP_RADIX
+#define BLIST_RADIX		(sizeof(u_daddr_t) * 8)
 
-#define BLIST_MAX_ALLOC		BLIST_BMAP_RADIX
+#define BLIST_MAX_ALLOC		BLIST_RADIX
 
 struct sbuf;
 
@@ -103,4 +102,3 @@ void	blist_resize(blist_t *pblist, daddr_t count, int freenew, int flags);
 void	blist_stats(blist_t blist, struct sbuf *s);
 
 #endif	/* _SYS_BLIST_H_ */
-

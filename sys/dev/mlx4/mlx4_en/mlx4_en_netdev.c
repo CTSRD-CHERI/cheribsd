@@ -850,9 +850,11 @@ static void mlx4_en_do_multicast(struct mlx4_en_priv *priv,
 	int err = 0;
 	u64 mcast_addr = 0;
 
-
-	/* Enable/disable the multicast filter according to IFF_ALLMULTI */
-	if (dev->if_flags & IFF_ALLMULTI) {
+	/*
+	 * Enable/disable the multicast filter according to
+	 * IFF_ALLMULTI and IFF_PROMISC:
+	 */
+	if (dev->if_flags & (IFF_ALLMULTI | IFF_PROMISC)) {
 		err = mlx4_SET_MCAST_FLTR(mdev->dev, priv->port, 0,
 					  0, MLX4_MCAST_DISABLE);
 		if (err)
@@ -2006,6 +2008,7 @@ static int mlx4_en_ioctl(struct ifnet *dev, u_long command, caddr_t data)
 
 			if (IFCAP_TSO4 & dev->if_capenable &&
 			    !(IFCAP_TXCSUM & dev->if_capenable)) {
+				mask &= ~IFCAP_TSO4;
 				dev->if_capenable &= ~IFCAP_TSO4;
 				dev->if_hwassist &= ~CSUM_IP_TSO;
 				if_printf(dev,
@@ -2018,6 +2021,7 @@ static int mlx4_en_ioctl(struct ifnet *dev, u_long command, caddr_t data)
 
 			if (IFCAP_TSO6 & dev->if_capenable &&
 			    !(IFCAP_TXCSUM_IPV6 & dev->if_capenable)) {
+				mask &= ~IFCAP_TSO6;
 				dev->if_capenable &= ~IFCAP_TSO6;
 				dev->if_hwassist &= ~CSUM_IP6_TSO;
 				if_printf(dev,

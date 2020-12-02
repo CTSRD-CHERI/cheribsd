@@ -54,8 +54,6 @@ __FBSDID("$FreeBSD$");
 struct sysentvec elf32_freebsd_sysvec = {
 	.sv_size	= SYS_MAXSYSCALL,
 	.sv_table	= sysent,
-	.sv_errsize	= 0,
-	.sv_errtbl	= NULL,
 	.sv_transtrap	= NULL,
 	.sv_fixup	= __elfN(freebsd_fixup),
 	.sv_sendsig	= sendsig,
@@ -76,7 +74,7 @@ struct sysentvec elf32_freebsd_sysvec = {
 	.sv_fixlimit	= NULL,
 	.sv_maxssiz	= NULL,
 	.sv_flags	= SV_ABI_FREEBSD | SV_ASLR | SV_IA32 | SV_ILP32 |
-			    SV_SHP | SV_TIMEKEEP,
+			    SV_SHP | SV_TIMEKEEP | SV_RNG_SEED_VER,
 	.sv_set_syscall_retval = cpu_set_syscall_retval,
 	.sv_fetch_syscall_args = cpu_fetch_syscall_args,
 	.sv_syscallnames = syscallnames,
@@ -209,14 +207,13 @@ elf_reloc_internal(linker_file_t lf, Elf_Addr relocbase, const void *data,
 	}
 
 	switch (rtype) {
-
 		case R_386_NONE:	/* none */
 			break;
 
 		case R_386_32:		/* S + A */
 			error = lookup(lf, symidx, 1, &addr);
 			if (error != 0)
-				return -1;
+				return (-1);
 			addr += addend;
 			if (*where != addr)
 				*where = addr;
@@ -225,7 +222,7 @@ elf_reloc_internal(linker_file_t lf, Elf_Addr relocbase, const void *data,
 		case R_386_PC32:	/* S + A - P */
 			error = lookup(lf, symidx, 1, &addr);
 			if (error != 0)
-				return -1;
+				return (-1);
 			addr += addend - (Elf_Addr)where;
 			if (*where != addr)
 				*where = addr;
@@ -236,14 +233,15 @@ elf_reloc_internal(linker_file_t lf, Elf_Addr relocbase, const void *data,
 			 * There shouldn't be copy relocations in kernel
 			 * objects.
 			 */
-			printf("kldload: unexpected R_COPY relocation\n");
-			return -1;
+			printf("kldload: unexpected R_COPY relocation, "
+			    "symbol index %d\n", symidx);
+			return (-1);
 			break;
 
 		case R_386_GLOB_DAT:	/* S */
 			error = lookup(lf, symidx, 1, &addr);
 			if (error != 0)
-				return -1;
+				return (-1);
 			if (*where != addr)
 				*where = addr;
 			break;
@@ -258,9 +256,9 @@ elf_reloc_internal(linker_file_t lf, Elf_Addr relocbase, const void *data,
 				*where = addr;
 			break;
 		default:
-			printf("kldload: unexpected relocation type %d\n",
-			       rtype);
-			return -1;
+			printf("kldload: unexpected relocation type %d, "
+			    "symbol index %d\n", rtype, symidx);
+			return (-1);
 	}
 	return(0);
 }

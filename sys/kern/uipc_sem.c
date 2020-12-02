@@ -177,7 +177,7 @@ ksem_stat(struct file *fp, struct stat *sb, struct ucred *active_cred,
 	if (error)
 		return (error);
 #endif
-	
+
 	/*
 	 * Attempt to return sanish values for fstat() on a semaphore
 	 * file descriptor.
@@ -213,7 +213,7 @@ ksem_chmod(struct file *fp, mode_t mode, struct ucred *active_cred,
 		goto out;
 #endif
 	error = vaccess(VREG, ks->ks_mode, ks->ks_uid, ks->ks_gid, VADMIN,
-	    active_cred, NULL);
+	    active_cred);
 	if (error != 0)
 		goto out;
 	ks->ks_mode = mode & ACCESSPERMS;
@@ -363,7 +363,7 @@ ksem_access(struct ksem *ks, struct ucred *ucred)
 	int error;
 
 	error = vaccess(VREG, ks->ks_mode, ks->ks_uid, ks->ks_gid,
-	    VREAD | VWRITE, ucred, NULL);
+	    VREAD | VWRITE, ucred);
 	if (error)
 		error = priv_check_cred(ucred, PRIV_SEM_WRITE);
 	return (error);
@@ -464,7 +464,7 @@ static int
 ksem_create(struct thread *td, const char * __capability name,
     semid_t * __capability semidp, mode_t mode, unsigned int value, int flags)
 {
-	struct filedesc *fdp;
+	struct pwddesc *pdp;
 	struct ksem *ks;
 	struct file *fp;
 	char *path;
@@ -480,8 +480,8 @@ ksem_create(struct thread *td, const char * __capability name,
 	if (value > SEM_VALUE_MAX)
 		return (EINVAL);
 
-	fdp = td->td_proc->p_fd;
-	mode = (mode & ~fdp->fd_cmask) & ACCESSPERMS;
+	pdp = td->td_proc->p_pd;
+	mode = (mode & ~pdp->pd_cmask) & ACCESSPERMS;
 	error = falloc(td, &fp, &fd, O_CLOEXEC);
 	if (error) {
 		if (name == NULL)

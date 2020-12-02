@@ -107,7 +107,6 @@ static void	xive_init_irq(struct xive_irq *irqd, u_int irq);
 static struct xive_irq	*xive_configure_irq(u_int irq);
 static int	xive_provision_page(struct xive_softc *sc);
 
-
 /* Interfaces */
 static int	xive_probe(device_t);
 static int	xive_attach(device_t);
@@ -292,7 +291,6 @@ xive_write_mmap8(vm_offset_t addr, uint64_t val)
 	*(uint64_t *)(addr) = val;
 }
 
-
 /* Device interfaces. */
 static int
 xive_probe(device_t dev)
@@ -343,7 +341,11 @@ xive_attach(device_t dev)
 
 	mtx_init(&sc->sc_mtx, "XIVE", NULL, MTX_DEF);
 
-	order = fls(mp_maxid + (mp_maxid - 1)) - 1;
+	/* Workaround for qemu single-thread powernv */
+	if (mp_maxid == 0)
+		order = 1;
+	else
+		order = fls(mp_maxid + (mp_maxid - 1)) - 1;
 
 	do {
 		vp_block = opal_call(OPAL_XIVE_ALLOCATE_VP_BLOCK, order);
@@ -374,6 +376,9 @@ xive_attach(device_t dev)
 		xive_cpud->vp = vp_id + vp_block;
 		opal_call(OPAL_XIVE_GET_VP_INFO, xive_cpud->vp, NULL,
 		    vtophys(&xive_cpud->cam), NULL, vtophys(&xive_cpud->chip));
+
+		xive_cpud->cam = be64toh(xive_cpud->cam);
+		xive_cpud->chip = be64toh(xive_cpud->chip);
 
 		/* Allocate the queue page and populate the queue state data. */
 		xive_cpud->queue.q_page = contigmalloc(PAGE_SIZE, M_XIVE,
@@ -466,8 +471,8 @@ xive_bind(device_t dev, u_int irq, cpuset_t cpumask, void **priv)
 		ncpus++;
 	}
 
-	opal_call(OPAL_XIVE_SYNC);
-	
+	opal_call(OPAL_XIVE_SYNC, OPAL_XIVE_SYNC_QUEUE, irq);
+
 	irqd->vp = pcpu_find(cpu)->pc_hwref;
 	error = opal_call(OPAL_XIVE_SET_IRQ_CONFIG, irq, irqd->vp,
 	    XIVE_PRIORITY, irqd->lirq);
@@ -507,6 +512,7 @@ xive_dispatch(device_t dev, struct trapframe *tf)
 
 	sc = device_get_softc(dev);
 
+	xive_cpud = DPCPU_PTR(xive_cpu_data);
 	for (;;) {
 		ack = xive_read_2(sc, XIVE_TM_SPC_ACK);
 		cppr = (ack & 0xff);
@@ -515,19 +521,17 @@ xive_dispatch(device_t dev, struct trapframe *tf)
 
 		if (he == TM_QW3_NSR_HE_NONE)
 			break;
-		switch (he) {
-		case TM_QW3_NSR_HE_NONE:
-			goto end;
-		case TM_QW3_NSR_HE_POOL:
-		case TM_QW3_NSR_HE_LSI:
+
+		else if (__predict_false(he != TM_QW3_NSR_HE_PHYS)) {
+			/*
+			 * We don't support TM_QW3_NSR_HE_POOL or
+			 * TM_QW3_NSR_HE_LSI interrupts.
+			 */
 			device_printf(dev,
 			    "Unexpected interrupt he type: %d\n", he);
 			goto end;
-		case TM_QW3_NSR_HE_PHYS:
-			break;
 		}
 
-		xive_cpud = DPCPU_PTR(xive_cpu_data);
 		xive_write_1(sc, XIVE_TM_CPPR, cppr);
 
 		for (;;) {
@@ -706,10 +710,16 @@ xive_init_irq(struct xive_irq *irqd, u_int irq)
 	    vtophys(&trig_phys), vtophys(&esb_shift),
 	    vtophys(&irqd->chip));
 
+	irqd->flags = be64toh(irqd->flags);
+	eoi_phys = be64toh(eoi_phys);
+	trig_phys = be64toh(trig_phys);
+	esb_shift = be32toh(esb_shift);
+	irqd->chip = be32toh(irqd->chip);
+
 	irqd->girq = irq;
 	irqd->esb_size = 1 << esb_shift;
 	irqd->eoi_page = (vm_offset_t)pmap_mapdev(eoi_phys, irqd->esb_size);
-	
+
 	if (eoi_phys == trig_phys)
 		irqd->trig_page = irqd->eoi_page;
 	else if (trig_phys != 0)
@@ -720,6 +730,10 @@ xive_init_irq(struct xive_irq *irqd, u_int irq)
 
 	opal_call(OPAL_XIVE_GET_IRQ_CONFIG, irq, vtophys(&irqd->vp),
 	    vtophys(&irqd->prio), vtophys(&irqd->lirq));
+
+	irqd->vp = be64toh(irqd->vp);
+	irqd->prio = be64toh(irqd->prio);
+	irqd->lirq = be32toh(irqd->lirq);
 }
 
 /* Allocate an IRQ struct before populating it. */

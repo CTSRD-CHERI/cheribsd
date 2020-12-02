@@ -440,7 +440,7 @@ ufs_extattr_iterate_directory(struct ufsmount *ump, struct vnode *dvp,
 		}
 	}
 	free(dirbuf, M_TEMP);
-	
+
 	return (0);
 }
 
@@ -622,7 +622,7 @@ ufs_extattr_enable(struct ufsmount *ump, int attrnamespace,
 	attribute->uele_attrnamespace = attrnamespace;
 	bzero(&attribute->uele_fileheader,
 	    sizeof(struct ufs_extattr_fileheader));
-	
+
 	attribute->uele_backing_vnode = backing_vnode;
 
 	auio.uio_iov = &aiov;
@@ -898,7 +898,7 @@ ufs_extattr_get(struct vnode *vp, int attrnamespace, const char *name,
 	local_aio.uio_td = td;
 	local_aio.uio_offset = base_offset;
 	local_aio.uio_resid = sizeof(struct ufs_extattr_header);
-	
+
 	/*
 	 * Acquire locks.
 	 *
@@ -999,7 +999,6 @@ vop_deleteextattr {
 
 	error = ufs_extattr_rm(ap->a_vp, ap->a_attrnamespace, ap->a_name,
 	    ap->a_cred, ap->a_td);
-
 
 	ufs_extattr_uepm_unlock(ump);
 
@@ -1271,7 +1270,7 @@ vopunlock_exit:
  * attributes stripped.
  */
 void
-ufs_extattr_vnode_inactive(struct vnode *vp, struct thread *td)
+ufs_extattr_vnode_inactive(struct vnode *vp)
 {
 	struct ufs_extattr_list_entry *uele;
 	struct mount *mp = vp->v_mount;
@@ -1294,7 +1293,7 @@ ufs_extattr_vnode_inactive(struct vnode *vp, struct thread *td)
 
 	LIST_FOREACH(uele, &ump->um_extattr.uepm_list, uele_entries)
 		ufs_extattr_rm(vp, uele->uele_attrnamespace,
-		    uele->uele_attrname, NULL, td);
+		    uele->uele_attrname, NULL, curthread);
 
 	ufs_extattr_uepm_unlock(ump);
 }

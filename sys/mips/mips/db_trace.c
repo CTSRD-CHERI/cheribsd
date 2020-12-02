@@ -178,10 +178,8 @@ loop:
 		subr = (uintptr_t)savectx;
 	else if (pcBetween(cpu_throw, cpu_switch))
 		subr = (uintptr_t)cpu_throw;
-#if defined(CPU_HAVEFPU)
 	else if (pcBetween(cpu_switch, MipsSwitchFPState))
 		subr = (uintptr_t)cpu_switch;
-#endif
 	else if (pcBetween(_locore, _locoreEnd)) {
 		subr = (uintptr_t)_locore;
 		ra = 0;
@@ -447,7 +445,6 @@ done:
 	}
 }
 
-
 int
 db_md_set_watchpoint(db_expr_t addr, db_expr_t size)
 {
@@ -455,14 +452,12 @@ db_md_set_watchpoint(db_expr_t addr, db_expr_t size)
 	return(0);
 }
 
-
 int
 db_md_clr_watchpoint(db_expr_t addr, db_expr_t size)
 {
 
 	return(0);
 }
-
 
 void
 db_md_list_watchpoints()
@@ -474,19 +469,11 @@ db_trace_self(void)
 {
 	register_t pc, ra, sp;
 
+	pc = (intptr_t)&&here;
 	sp = (register_t)(intptr_t)__builtin_frame_address(0);
 	ra = (register_t)(intptr_t)__builtin_return_address(0);
-
-	__asm __volatile(
-		"jal 99f\n"
-		"nop\n"
-		"99:\n"
-		 "move %0, $31\n" /* get ra */
-		 "move $31, %1\n" /* restore ra */
-		 : "=r" (pc)
-		 : "r" (ra));
+here:
 	stacktrace_subr(pc, sp, ra);
-	return;
 }
 
 int

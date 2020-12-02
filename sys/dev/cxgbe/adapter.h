@@ -118,7 +118,10 @@ enum {
 	SGE_MAX_WR_NDESC = SGE_MAX_WR_LEN / EQ_ESIZE, /* max WR size in desc */
 	TX_SGL_SEGS = 39,
 	TX_SGL_SEGS_TSO = 38,
+	TX_SGL_SEGS_VM = 38,
+	TX_SGL_SEGS_VM_TSO = 37,
 	TX_SGL_SEGS_EO_TSO = 30,	/* XXX: lower for IPv6. */
+	TX_SGL_SEGS_VXLAN_TSO = 37,
 	TX_WR_FLITS = SGE_MAX_WR_LEN / 8
 };
 
@@ -172,6 +175,7 @@ enum {
 	DOOMED		= (1 << 0),
 	VI_INIT_DONE	= (1 << 1),
 	VI_SYSCTL_CTX	= (1 << 2),
+	TX_USES_VM_WR 	= (1 << 3),
 
 	/* adapter debug_flags */
 	DF_DUMP_MBOX		= (1 << 0),	/* Log all mbox cmd/rpl. */
@@ -190,6 +194,7 @@ enum {
 struct vi_info {
 	device_t dev;
 	struct port_info *pi;
+	struct adapter *adapter;
 
 	struct ifnet *ifp;
 	struct pfil_head *pfil;
@@ -285,6 +290,7 @@ struct port_info {
 	int nvi;
 	int up_vis;
 	int uld_vis;
+	bool vxlan_tcam_entry;
 
 	struct tx_sched_params *sched_params;
 
@@ -308,6 +314,8 @@ struct port_info {
  	struct port_stats stats;
 	u_int tnl_cong_drops;
 	u_int tx_parse_error;
+	int fcs_reg;
+	uint64_t fcs_base;
 	u_long	tx_toe_tls_records;
 	u_long	tx_toe_tls_octets;
 	u_long	rx_toe_tls_records;
@@ -549,6 +557,23 @@ struct sge_fl {
 
 struct mp_ring;
 
+struct txpkts {
+	uint8_t wr_type;	/* type 0 or type 1 */
+	uint8_t npkt;		/* # of packets in this work request */
+	uint8_t len16;		/* # of 16B pieces used by this work request */
+	uint8_t score;		/* 1-10. coalescing attempted if score > 3 */
+	uint8_t max_npkt;	/* maximum number of packets allowed */
+	uint16_t plen;		/* total payload (sum of all packets) */
+
+	/* straight from fw_eth_tx_pkts_vm_wr. */
+	__u8   ethmacdst[6];
+	__u8   ethmacsrc[6];
+	__be16 ethtype;
+	__be16 vlantci;
+
+	struct mbuf *mb[15];
+};
+
 /* txq: SGE egress queue + what's needed for Ethernet NIC */
 struct sge_txq {
 	struct sge_eq eq;	/* MUST be first */
@@ -559,6 +584,7 @@ struct sge_txq {
 	struct sglist *gl;
 	__be32 cpl_ctrl0;	/* for convenience */
 	int tc_idx;		/* traffic class */
+	struct txpkts txp;
 
 	struct task tx_reclaim_task;
 	/* stats for common events first */
@@ -574,6 +600,8 @@ struct sge_txq {
 	uint64_t txpkts0_pkts;	/* # of frames in type0 coalesced tx WRs */
 	uint64_t txpkts1_pkts;	/* # of frames in type1 coalesced tx WRs */
 	uint64_t raw_wrs;	/* # of raw work requests (alloc_wr_mbuf) */
+	uint64_t vxlan_tso_wrs;	/* # of VXLAN TSO work requests */
+	uint64_t vxlan_txcsum;
 
 	uint64_t kern_tls_records;
 	uint64_t kern_tls_short;
@@ -606,6 +634,7 @@ struct sge_rxq {
 
 	uint64_t rxcsum;	/* # of times hardware assisted with checksum */
 	uint64_t vlan_extraction;/* # of times VLAN tag was extracted */
+	uint64_t vxlan_rxcsum;
 
 	/* stats for not-that-common events */
 
@@ -703,6 +732,7 @@ struct sge_nm_rxq {
 	uint32_t fl_sidx2;	/* copy of fl_sidx */
 	uint32_t fl_db_val;
 	u_int fl_db_saved;
+	u_int fl_db_threshold;	/* in descriptors */
 	u_int fl_hwidx:4;
 
 	/*
@@ -719,6 +749,9 @@ struct sge_nm_rxq {
 	bus_dma_tag_t fl_desc_tag;
 	bus_dmamap_t fl_desc_map;
 	bus_addr_t fl_ba;
+
+	void *bb;		/* bit bucket for packets with nowhere to go. */
+	uma_zone_t bb_zone;
 };
 
 #define INVALID_NM_TXQ_CNTXT_ID ((u_int)(-1))
@@ -769,6 +802,8 @@ struct sge {
 	uint16_t iq_base;	/* first abs_id */
 	int eq_start;		/* first cntxt_id */
 	int eq_base;		/* first abs_id */
+	int iqmap_sz;
+	int eqmap_sz;
 	struct sge_iq **iqmap;	/* iq->cntxt_id to iq mapping */
 	struct sge_eq **eqmap;	/* eq->cntxt_id to eq mapping */
 
@@ -828,6 +863,11 @@ struct adapter {
 	struct sge sge;
 	int lro_timeout;
 	int sc_do_rxcopy;
+
+	int vxlan_port;
+	u_int vxlan_refcount;
+	int rawf_base;
+	int nrawf;
 
 	struct taskqueue *tq[MAX_NCHAN];	/* General purpose taskqueues */
 	struct task async_event_task;
@@ -953,22 +993,22 @@ struct adapter {
 #define TXQ_LOCK_ASSERT_NOTOWNED(txq)	EQ_LOCK_ASSERT_NOTOWNED(&(txq)->eq)
 
 #define for_each_txq(vi, iter, q) \
-	for (q = &vi->pi->adapter->sge.txq[vi->first_txq], iter = 0; \
+	for (q = &vi->adapter->sge.txq[vi->first_txq], iter = 0; \
 	    iter < vi->ntxq; ++iter, ++q)
 #define for_each_rxq(vi, iter, q) \
-	for (q = &vi->pi->adapter->sge.rxq[vi->first_rxq], iter = 0; \
+	for (q = &vi->adapter->sge.rxq[vi->first_rxq], iter = 0; \
 	    iter < vi->nrxq; ++iter, ++q)
 #define for_each_ofld_txq(vi, iter, q) \
-	for (q = &vi->pi->adapter->sge.ofld_txq[vi->first_ofld_txq], iter = 0; \
+	for (q = &vi->adapter->sge.ofld_txq[vi->first_ofld_txq], iter = 0; \
 	    iter < vi->nofldtxq; ++iter, ++q)
 #define for_each_ofld_rxq(vi, iter, q) \
-	for (q = &vi->pi->adapter->sge.ofld_rxq[vi->first_ofld_rxq], iter = 0; \
+	for (q = &vi->adapter->sge.ofld_rxq[vi->first_ofld_rxq], iter = 0; \
 	    iter < vi->nofldrxq; ++iter, ++q)
 #define for_each_nm_txq(vi, iter, q) \
-	for (q = &vi->pi->adapter->sge.nm_txq[vi->first_nm_txq], iter = 0; \
+	for (q = &vi->adapter->sge.nm_txq[vi->first_nm_txq], iter = 0; \
 	    iter < vi->nnmtxq; ++iter, ++q)
 #define for_each_nm_rxq(vi, iter, q) \
-	for (q = &vi->pi->adapter->sge.nm_rxq[vi->first_nm_rxq], iter = 0; \
+	for (q = &vi->adapter->sge.nm_rxq[vi->first_nm_rxq], iter = 0; \
 	    iter < vi->nnmrxq; ++iter, ++q)
 #define for_each_vi(_pi, _iter, _vi) \
 	for ((_vi) = (_pi)->vi, (_iter) = 0; (_iter) < (_pi)->nvi; \
@@ -1169,7 +1209,6 @@ int update_mac_settings(struct ifnet *, int);
 int adapter_full_init(struct adapter *);
 int adapter_full_uninit(struct adapter *);
 uint64_t cxgbe_get_counter(struct ifnet *, ift_counter);
-void cxgbe_snd_tag_init(struct cxgbe_snd_tag *, struct ifnet *, int);
 int vi_full_init(struct vi_info *);
 int vi_full_uninit(struct vi_info *);
 void vi_sysctls(struct vi_info *);
@@ -1238,7 +1277,7 @@ void t4_intr_evt(void *);
 void t4_wrq_tx_locked(struct adapter *, struct sge_wrq *, struct wrqe *);
 void t4_update_fl_bufsize(struct ifnet *);
 struct mbuf *alloc_wr_mbuf(int, int);
-int parse_pkt(struct adapter *, struct mbuf **);
+int parse_pkt(struct mbuf **, bool);
 void *start_wrq_wr(struct sge_wrq *, int, struct wrq_cookie *);
 void commit_wrq_wr(struct sge_wrq *, void *, struct wrq_cookie *);
 int tnl_cong(struct port_info *, int);
@@ -1346,5 +1385,13 @@ write_via_memwin(struct adapter *sc, int idx, uint32_t addr,
 {
 
 	return (rw_via_memwin(sc, idx, addr, (void *)(uintptr_t)val, len, 1));
+}
+
+/* Number of len16 -> number of descriptors */
+static inline int
+tx_len16_to_desc(int len16)
+{
+
+	return (howmany(len16, EQ_ESIZE / 16));
 }
 #endif

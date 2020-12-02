@@ -88,7 +88,7 @@ g_bde_orphan(struct g_consumer *cp)
 	gp->flags |= G_GEOM_WITHER;
 	LIST_FOREACH(pp, &gp->provider, provider)
 		g_wither_provider(pp, ENXIO);
-	bzero(sc, sizeof(struct g_bde_softc));	/* destroy evidence */
+	explicit_bzero(sc, sizeof(struct g_bde_softc));	/* destroy evidence */
 	return;
 }
 
@@ -129,10 +129,15 @@ g_bde_create_geom(struct gctl_req *req, struct g_class *mp, struct g_provider *p
 	g_topology_assert();
 	gp = NULL;
 
-
 	gp = g_new_geomf(mp, "%s.bde", pp->name);
 	cp = g_new_consumer(gp);
-	g_attach(cp, pp);
+	error = g_attach(cp, pp);
+	if (error != 0) {
+		g_destroy_consumer(cp);
+		g_destroy_geom(gp);
+		gctl_error(req, "could not attach consumer");
+		return;
+	}
 	error = g_access(cp, 1, 1, 1);
 	if (error) {
 		g_detach(cp);
@@ -163,7 +168,7 @@ g_bde_create_geom(struct gctl_req *req, struct g_class *mp, struct g_provider *p
 
 		error = g_bde_decrypt_lock(sc, pass, key,
 		    mediasize, sectorsize, NULL);
-		bzero(sc->sha2, sizeof sc->sha2);
+		explicit_bzero(sc->sha2, sizeof sc->sha2);
 		if (error)
 			break;
 		kp = &sc->key;
@@ -195,9 +200,9 @@ g_bde_create_geom(struct gctl_req *req, struct g_class *mp, struct g_provider *p
 		break;
 	} while (0);
 	if (pass != NULL)
-		bzero(pass, SHA512_DIGEST_LENGTH);
+		explicit_bzero(pass, SHA512_DIGEST_LENGTH);
 	if (key != NULL)
-		bzero(key, 16);
+		explicit_bzero(key, 16);
 	if (error == 0)
 		return;
 	g_access(cp, -1, -1, -1);
@@ -225,7 +230,6 @@ g_bde_create_geom(struct gctl_req *req, struct g_class *mp, struct g_provider *p
 	}
 	return;
 }
-
 
 static int
 g_bde_destroy_geom(struct gctl_req *req, struct g_class *mp, struct g_geom *gp)
@@ -255,7 +259,7 @@ g_bde_destroy_geom(struct gctl_req *req, struct g_class *mp, struct g_geom *gp)
 	while (sc->dead != 2 && !LIST_EMPTY(&pp->consumers))
 		tsleep(sc, PRIBIO, "g_bdedie", hz);
 	mtx_destroy(&sc->worklist_mutex);
-	bzero(&sc->key, sizeof sc->key);
+	explicit_bzero(&sc->key, sizeof sc->key);
 	g_free(sc);
 	g_wither_geom(gp, ENXIO);
 	return (0);

@@ -234,6 +234,8 @@ static int dupcomponent(int type, locale_t base, locale_t new)
 		if (new->components[type]) {
 			strncpy(new->components[type]->locale, src->locale,
 			    ENCODING_LEN);
+			strncpy(new->components[type]->version, src->version,
+			    XLOCALE_DEF_VERSION_LEN);
 		}
 	} else if (base->components[type]) {
 		new->components[type] = xlocale_retain(base->components[type]);
@@ -255,6 +257,7 @@ static int dupcomponent(int type, locale_t base, locale_t new)
 locale_t newlocale(int mask, const char *locale, locale_t base)
 {
 #ifndef FORCE_C_LOCALE
+	locale_t orig_base;
 	int type;
 	const char *realLocale = locale;
 	int useenv = 0;
@@ -267,6 +270,7 @@ locale_t newlocale(int mask, const char *locale, locale_t base)
 		return (NULL);
 	}
 
+	orig_base = base;
 	FIX_LOCALE(base);
 	copyflags(new, base);
 
@@ -301,6 +305,8 @@ locale_t newlocale(int mask, const char *locale, locale_t base)
 	if (0 == success) {
 		xlocale_release(new);
 		new = NULL;
+	} else if (base == orig_base) {
+		xlocale_release(base);
 	}
 
 	return (new);
@@ -353,17 +359,24 @@ freelocale(locale_t loc)
 }
 
 /*
- * Returns the name of the locale for a particular component of a locale_t.
+ * Returns the name or version of the locale for a particular component of a
+ * locale_t.
  */
 const char *querylocale(int mask, locale_t loc)
 {
-	int type = ffs(mask) - 1;
+	int type = ffs(mask & ~LC_VERSION_MASK) - 1;
 	FIX_LOCALE(loc);
 	if (type >= XLC_LAST)
 		return (NULL);
-	if (loc->components[type])
-		return (loc->components[type]->locale);
-	return ("C");
+	if (mask & LC_VERSION_MASK) {
+		if (loc->components[type])
+			return (loc->components[type]->version);
+		return ("");
+	} else {
+		if (loc->components[type])
+			return (loc->components[type]->locale);
+		return ("C");
+	}
 }
 
 /*

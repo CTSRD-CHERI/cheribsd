@@ -336,6 +336,7 @@ struct nfsreferral {
 #define	LCL_DONEBINDCONN	0x00040000
 #define	LCL_RECLAIMONEFS	0x00080000
 #define	LCL_NFSV42		0x00100000
+#define	LCL_TLSCB		0x00200000
 
 #define	LCL_GSS		LCL_KERBV	/* Or of all mechs */
 
@@ -578,7 +579,6 @@ struct uio; struct buf; struct vattr; struct nameidata;	/* XXX */
 		((e) != EINTR && (e) != ERESTART && (e) != EWOULDBLOCK && \
 		((s) & PR_CONNREQUIRED) == 0)
 
-
 /*
  * This structure holds socket information for a connection. Used by the
  * client and the server for callbacks.
@@ -670,6 +670,9 @@ struct nfsrv_descript {
 	nfsv4stateid_t		nd_savedcurstateid; /* Saved Current StateID */
 	uint32_t		nd_maxreq;	/* Max. request (session). */
 	uint32_t		nd_maxresp;	/* Max. reply (session). */
+	int			nd_bextpg;	/* Current ext_pgs page */
+	int			nd_bextpgsiz;	/* Bytes left in page */
+	int			nd_maxextsiz;	/* Max ext_pgs mbuf size */
 };
 
 #define	nd_princlen	nd_gssnamelen
@@ -711,6 +714,13 @@ struct nfsrv_descript {
 #define	ND_SAVEDCURSTATEID	0x100000000
 #define	ND_HASSLOTID		0x200000000
 #define	ND_NFSV42		0x400000000
+#define	ND_EXTPG		0x800000000
+#define	ND_TLS			0x1000000000
+#define	ND_TLSCERT		0x2000000000
+#define	ND_TLSCERTUSER		0x4000000000
+#define	ND_EXTLS		0x8000000000
+#define	ND_EXTLSCERT		0x10000000000
+#define	ND_EXTLSCERTUSER	0x20000000000
 
 /*
  * ND_GSS should be the "or" of all GSS type authentications.

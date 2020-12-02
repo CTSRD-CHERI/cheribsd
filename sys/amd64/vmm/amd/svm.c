@@ -38,6 +38,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/malloc.h>
 #include <sys/pcpu.h>
 #include <sys/proc.h>
+#include <sys/smr.h>
 #include <sys/sysctl.h>
 
 #include <vm/vm.h>
@@ -459,7 +460,6 @@ vmcb_init(struct svm_softc *sc, int vcpu, uint64_t iopm_base_pa,
 			svm_enable_intercept(sc, vcpu, VMCB_CR_INTCPT, mask);
 	}
 
-
 	/*
 	 * Intercept everything when tracing guest exceptions otherwise
 	 * just intercept machine check exception.
@@ -489,9 +489,22 @@ vmcb_init(struct svm_softc *sc, int vcpu, uint64_t iopm_base_pa,
 	svm_enable_intercept(sc, vcpu, VMCB_CTRL1_INTCPT, VMCB_INTCPT_SHUTDOWN);
 	svm_enable_intercept(sc, vcpu, VMCB_CTRL1_INTCPT,
 	    VMCB_INTCPT_FERR_FREEZE);
+	svm_enable_intercept(sc, vcpu, VMCB_CTRL1_INTCPT, VMCB_INTCPT_INVD);
+	svm_enable_intercept(sc, vcpu, VMCB_CTRL1_INTCPT, VMCB_INTCPT_INVLPGA);
 
 	svm_enable_intercept(sc, vcpu, VMCB_CTRL2_INTCPT, VMCB_INTCPT_MONITOR);
 	svm_enable_intercept(sc, vcpu, VMCB_CTRL2_INTCPT, VMCB_INTCPT_MWAIT);
+
+	/*
+	 * Intercept SVM instructions since AMD enables them in guests otherwise.
+	 * Non-intercepted VMMCALL causes #UD, skip it.
+	 */
+	svm_enable_intercept(sc, vcpu, VMCB_CTRL2_INTCPT, VMCB_INTCPT_VMLOAD);
+	svm_enable_intercept(sc, vcpu, VMCB_CTRL2_INTCPT, VMCB_INTCPT_VMSAVE);
+	svm_enable_intercept(sc, vcpu, VMCB_CTRL2_INTCPT, VMCB_INTCPT_STGI);
+	svm_enable_intercept(sc, vcpu, VMCB_CTRL2_INTCPT, VMCB_INTCPT_CLGI);
+	svm_enable_intercept(sc, vcpu, VMCB_CTRL2_INTCPT, VMCB_INTCPT_SKINIT);
+	svm_enable_intercept(sc, vcpu, VMCB_CTRL2_INTCPT, VMCB_INTCPT_ICEBP);
 
 	/*
 	 * From section "Canonicalization and Consistency Checks" in APMv2
@@ -560,7 +573,7 @@ svm_vminit(struct vm *vm, pmap_t pmap)
 		panic("contigmalloc of SVM IO bitmap failed");
 
 	svm_sc->vm = vm;
-	svm_sc->nptp = (vm_offset_t)vtophys(pmap->pm_pml4);
+	svm_sc->nptp = (vm_offset_t)vtophys(pmap->pm_pmltop);
 
 	/*
 	 * Intercept read and write accesses to all MSRs.
@@ -821,7 +834,7 @@ npf_fault_type(uint64_t exitinfo1)
 static bool
 svm_npf_emul_fault(uint64_t exitinfo1)
 {
-	
+
 	if (exitinfo1 & VMCB_NPF_INFO1_ID) {
 		return (false);
 	}
@@ -1237,43 +1250,45 @@ emulate_rdmsr(struct svm_softc *sc, int vcpu, u_int num, bool *retu)
 static const char *
 exit_reason_to_str(uint64_t reason)
 {
+	int i;
 	static char reasonbuf[32];
+	static const struct {
+		int reason;
+		const char *str;
+	} reasons[] = {
+		{ .reason = VMCB_EXIT_INVALID,	.str = "invalvmcb" },
+		{ .reason = VMCB_EXIT_SHUTDOWN,	.str = "shutdown" },
+		{ .reason = VMCB_EXIT_NPF, 	.str = "nptfault" },
+		{ .reason = VMCB_EXIT_PAUSE,	.str = "pause" },
+		{ .reason = VMCB_EXIT_HLT,	.str = "hlt" },
+		{ .reason = VMCB_EXIT_CPUID,	.str = "cpuid" },
+		{ .reason = VMCB_EXIT_IO,	.str = "inout" },
+		{ .reason = VMCB_EXIT_MC,	.str = "mchk" },
+		{ .reason = VMCB_EXIT_INTR,	.str = "extintr" },
+		{ .reason = VMCB_EXIT_NMI,	.str = "nmi" },
+		{ .reason = VMCB_EXIT_VINTR,	.str = "vintr" },
+		{ .reason = VMCB_EXIT_MSR,	.str = "msr" },
+		{ .reason = VMCB_EXIT_IRET,	.str = "iret" },
+		{ .reason = VMCB_EXIT_MONITOR,	.str = "monitor" },
+		{ .reason = VMCB_EXIT_MWAIT,	.str = "mwait" },
+		{ .reason = VMCB_EXIT_VMRUN,	.str = "vmrun" },
+		{ .reason = VMCB_EXIT_VMMCALL,	.str = "vmmcall" },
+		{ .reason = VMCB_EXIT_VMLOAD,	.str = "vmload" },
+		{ .reason = VMCB_EXIT_VMSAVE,	.str = "vmsave" },
+		{ .reason = VMCB_EXIT_STGI,	.str = "stgi" },
+		{ .reason = VMCB_EXIT_CLGI,	.str = "clgi" },
+		{ .reason = VMCB_EXIT_SKINIT,	.str = "skinit" },
+		{ .reason = VMCB_EXIT_ICEBP,	.str = "icebp" },
+		{ .reason = VMCB_EXIT_INVD,	.str = "invd" },
+		{ .reason = VMCB_EXIT_INVLPGA,	.str = "invlpga" },
+	};
 
-	switch (reason) {
-	case VMCB_EXIT_INVALID:
-		return ("invalvmcb");
-	case VMCB_EXIT_SHUTDOWN:
-		return ("shutdown");
-	case VMCB_EXIT_NPF:
-		return ("nptfault");
-	case VMCB_EXIT_PAUSE:
-		return ("pause");
-	case VMCB_EXIT_HLT:
-		return ("hlt");
-	case VMCB_EXIT_CPUID:
-		return ("cpuid");
-	case VMCB_EXIT_IO:
-		return ("inout");
-	case VMCB_EXIT_MC:
-		return ("mchk");
-	case VMCB_EXIT_INTR:
-		return ("extintr");
-	case VMCB_EXIT_NMI:
-		return ("nmi");
-	case VMCB_EXIT_VINTR:
-		return ("vintr");
-	case VMCB_EXIT_MSR:
-		return ("msr");
-	case VMCB_EXIT_IRET:
-		return ("iret");
-	case VMCB_EXIT_MONITOR:
-		return ("monitor");
-	case VMCB_EXIT_MWAIT:
-		return ("mwait");
-	default:
-		snprintf(reasonbuf, sizeof(reasonbuf), "%#lx", reason);
-		return (reasonbuf);
+	for (i = 0; i < nitems(reasons); i++) {
+		if (reasons[i].reason == reason)
+			return (reasons[i].str);
 	}
+	snprintf(reasonbuf, sizeof(reasonbuf), "%#lx", reason);
+	return (reasonbuf);
 }
 #endif	/* KTR */
 
@@ -1482,11 +1497,8 @@ svm_vmexit(struct svm_softc *svm_sc, int vcpu, struct vm_exit *vmexit)
 		break;
 	case VMCB_EXIT_CPUID:
 		vmm_stat_incr(svm_sc->vm, vcpu, VMEXIT_CPUID, 1);
-		handled = x86_emulate_cpuid(svm_sc->vm, vcpu,
-		    (uint32_t *)&state->rax,
-		    (uint32_t *)&ctx->sctx_rbx,
-		    (uint32_t *)&ctx->sctx_rcx,
-		    (uint32_t *)&ctx->sctx_rdx);
+		handled = x86_emulate_cpuid(svm_sc->vm, vcpu, &state->rax,
+		    &ctx->sctx_rbx, &ctx->sctx_rcx, &ctx->sctx_rdx);
 		break;
 	case VMCB_EXIT_HLT:
 		vmm_stat_incr(svm_sc->vm, vcpu, VMEXIT_HLT, 1);
@@ -1524,6 +1536,20 @@ svm_vmexit(struct svm_softc *svm_sc, int vcpu, struct vm_exit *vmexit)
 		break;
 	case VMCB_EXIT_MWAIT:
 		vmexit->exitcode = VM_EXITCODE_MWAIT;
+		break;
+	case VMCB_EXIT_SHUTDOWN:
+	case VMCB_EXIT_VMRUN:
+	case VMCB_EXIT_VMMCALL:
+	case VMCB_EXIT_VMLOAD:
+	case VMCB_EXIT_VMSAVE:
+	case VMCB_EXIT_STGI:
+	case VMCB_EXIT_CLGI:
+	case VMCB_EXIT_SKINIT:
+	case VMCB_EXIT_ICEBP:
+	case VMCB_EXIT_INVD:
+	case VMCB_EXIT_INVLPGA:
+		vm_inject_ud(svm_sc->vm, vcpu);
+		handled = 1;
 		break;
 	default:
 		vmm_stat_incr(svm_sc->vm, vcpu, VMEXIT_UNKNOWN, 1);
@@ -1775,15 +1801,17 @@ restore_host_tss(void)
 }
 
 static void
-check_asid(struct svm_softc *sc, int vcpuid, pmap_t pmap, u_int thiscpu)
+svm_pmap_activate(struct svm_softc *sc, int vcpuid, pmap_t pmap)
 {
 	struct svm_vcpu *vcpustate;
 	struct vmcb_ctrl *ctrl;
 	long eptgen;
+	int cpu;
 	bool alloc_asid;
 
-	KASSERT(CPU_ISSET(thiscpu, &pmap->pm_active), ("%s: nested pmap not "
-	    "active on cpu %u", __func__, thiscpu));
+	cpu = curcpu;
+	CPU_SET_ATOMIC(cpu, &pmap->pm_active);
+	smr_enter(pmap->pm_eptsmr);
 
 	vcpustate = svm_get_vcpu(sc, vcpuid);
 	ctrl = svm_get_vmcb_ctrl(sc, vcpuid);
@@ -1824,10 +1852,10 @@ check_asid(struct svm_softc *sc, int vcpuid, pmap_t pmap, u_int thiscpu)
 	 */
 
 	alloc_asid = false;
-	eptgen = pmap->pm_eptgen;
+	eptgen = atomic_load_long(&pmap->pm_eptgen);
 	ctrl->tlb_ctrl = VMCB_TLB_FLUSH_NOTHING;
 
-	if (vcpustate->asid.gen != asid[thiscpu].gen) {
+	if (vcpustate->asid.gen != asid[cpu].gen) {
 		alloc_asid = true;	/* (c) and (d) */
 	} else if (vcpustate->eptgen != eptgen) {
 		if (flush_by_asid())
@@ -1844,10 +1872,10 @@ check_asid(struct svm_softc *sc, int vcpuid, pmap_t pmap, u_int thiscpu)
 	}
 
 	if (alloc_asid) {
-		if (++asid[thiscpu].num >= nasid) {
-			asid[thiscpu].num = 1;
-			if (++asid[thiscpu].gen == 0)
-				asid[thiscpu].gen = 1;
+		if (++asid[cpu].num >= nasid) {
+			asid[cpu].num = 1;
+			if (++asid[cpu].gen == 0)
+				asid[cpu].gen = 1;
 			/*
 			 * If this cpu does not support "flush-by-asid"
 			 * then flush the entire TLB on a generation
@@ -1857,8 +1885,8 @@ check_asid(struct svm_softc *sc, int vcpuid, pmap_t pmap, u_int thiscpu)
 			if (!flush_by_asid())
 				ctrl->tlb_ctrl = VMCB_TLB_FLUSH_ALL;
 		}
-		vcpustate->asid.gen = asid[thiscpu].gen;
-		vcpustate->asid.num = asid[thiscpu].num;
+		vcpustate->asid.gen = asid[cpu].gen;
+		vcpustate->asid.num = asid[cpu].num;
 
 		ctrl->asid = vcpustate->asid.num;
 		svm_set_dirty(sc, vcpuid, VMCB_CACHE_ASID);
@@ -1875,6 +1903,13 @@ check_asid(struct svm_softc *sc, int vcpuid, pmap_t pmap, u_int thiscpu)
 	KASSERT(ctrl->asid != 0, ("Guest ASID must be non-zero"));
 	KASSERT(ctrl->asid == vcpustate->asid.num,
 	    ("ASID mismatch: %u/%u", ctrl->asid, vcpustate->asid.num));
+}
+
+static void
+svm_pmap_deactivate(pmap_t pmap)
+{
+	smr_exit(pmap->pm_eptsmr);
+	CPU_CLR_ATOMIC(curcpu, &pmap->pm_active);
 }
 
 static __inline void
@@ -2058,14 +2093,11 @@ svm_vmrun(void *arg, int vcpu, register_t rip, pmap_t pmap,
 
 		svm_inj_interrupts(svm_sc, vcpu, vlapic);
 
-		/* Activate the nested pmap on 'curcpu' */
-		CPU_SET_ATOMIC_ACQ(curcpu, &pmap->pm_active);
-
 		/*
 		 * Check the pmap generation and the ASID generation to
 		 * ensure that the vcpu does not use stale TLB mappings.
 		 */
-		check_asid(svm_sc, vcpu, pmap, curcpu);
+		svm_pmap_activate(svm_sc, vcpu, pmap);
 
 		ctrl->vmcb_clean = vmcb_clean & ~vcpustate->dirty;
 		vcpustate->dirty = 0;
@@ -2077,7 +2109,7 @@ svm_vmrun(void *arg, int vcpu, register_t rip, pmap_t pmap,
 		svm_launch(vmcb_pa, gctx, get_pcpu());
 		svm_dr_leave_guest(gctx);
 
-		CPU_CLR_ATOMIC(curcpu, &pmap->pm_active);
+		svm_pmap_deactivate(pmap);
 
 		/*
 		 * The host GDTR and IDTR is saved by VMRUN and restored
@@ -2199,8 +2231,11 @@ svm_setreg(void *arg, int vcpu, int ident, uint64_t val)
 		return (svm_modify_intr_shadow(svm_sc, vcpu, val));
 	}
 
-	if (vmcb_write(svm_sc, vcpu, ident, val) == 0) {
-		return (0);
+	/* Do not permit user write access to VMCB fields by offset. */
+	if (!VMCB_ACCESS_OK(ident)) {
+		if (vmcb_write(svm_sc, vcpu, ident, val) == 0) {
+			return (0);
+		}
 	}
 
 	reg = swctx_regptr(svm_get_guest_regctx(svm_sc, vcpu), ident);

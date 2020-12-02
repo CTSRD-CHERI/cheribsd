@@ -1,4 +1,4 @@
-#!/usr/local/bin/python2
+#!/usr/local/bin/python3
 #
 # Copyright (c) 2014 The FreeBSD Foundation
 # All rights reserved.
@@ -30,7 +30,7 @@
 # $FreeBSD$
 #
 
-from __future__ import print_function
+
 
 import binascii
 import errno
@@ -50,8 +50,8 @@ def katg(base, glob):
         raise unittest.SkipTest("Missing %s test vectors" % (base))
     return iglob(os.path.join(katdir, base, glob))
 
-aesmodules = [ 'cryptosoft0', 'aesni0', 'armv8crypto0', 'ccr0', 'ccp0' ]
-shamodules = [ 'cryptosoft0', 'aesni0', 'armv8crypto0', 'ccr0', 'ccp0' ]
+aesmodules = [ 'cryptosoft0', 'aesni0', 'armv8crypto0', 'ccr0', 'ccp0', 'safexcel0', 'qat0' ]
+shamodules = [ 'cryptosoft0', 'aesni0', 'armv8crypto0', 'ccr0', 'ccp0', 'ossl0', 'safexcel0', 'qat0' ]
 
 def GenTestCase(cname):
     try:
@@ -456,6 +456,9 @@ aesni = GenTestCase('aesni0')
 armv8crypto = GenTestCase('armv8crypto0')
 ccr = GenTestCase('ccr0')
 ccp = GenTestCase('ccp0')
+ossl = GenTestCase('ossl0')
+safexcel = GenTestCase('safexcel0')
+qat = GenTestCase('qat0')
 
 if __name__ == '__main__':
     unittest.main()

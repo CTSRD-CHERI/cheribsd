@@ -241,8 +241,7 @@ int
 	if (error == ERESTART || error == EINTR)
 		error = 0;
 
-	explicit_bzero(random_buf, bufsize);
-	free(random_buf, M_ENTROPY);
+	zfree(random_buf, M_ENTROPY);
 	return (error);
 }
 
@@ -374,8 +373,10 @@ randomdev_unblock(void)
 	selwakeuppri(&rsel, PUSER);
 	wakeup(p_random_alg_context);
 	printf("random: unblocking device.\n");
+#ifndef RANDOM_FENESTRASX
 	/* Do random(9) a favour while we are about it. */
 	(void)atomic_cmpset_int(&arc4rand_iniseed_state, ARC4_ENTR_NONE, ARC4_ENTR_HAVE);
+#endif
 }
 
 /* ARGSUSED */

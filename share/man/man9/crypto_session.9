@@ -30,7 +30,7 @@
 .\"
 .\" $FreeBSD$
 .\"
-.Dd May 25, 2020
+.Dd June 22, 2020
 .Dt CRYPTO_SESSION 9
 .Os
 .Sh NAME
@@ -194,6 +194,22 @@ that is modified in-place, or requests with separate input and output
 buffers.
 Sessions without this flag only permit requests with a single buffer that
 is modified in-place.
+.It Dv CSP_F_SEPARATE_AAD
+Support requests that use a separate buffer for AAD rather than providing
+AAD as a region in the input buffer.
+Sessions with this flag set permit requests with AAD passed in either in
+a region of the input buffer or in a single, virtually-contiguous buffer.
+Sessions without this flag only permit requests with AAD passed in as
+a region in the input buffer.
+.It Dv CSP_F_ESN
+Support requests that use a separate buffer for IPsec ESN (Extended Sequence
+Numbers).
+.Pp
+Sessions with this flag set permit requests with IPsec ESN passed in special
+buffer.
+It is required for IPsec ESN support of encrypt and authenticate mode where
+the high-order 32 bits of the sequence number are appended after the Next
+Header (RFC 4303).
 .El
 .It Fa csp_ivlen
 If either the cipher or authentication algorithms require an explicit

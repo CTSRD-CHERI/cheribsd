@@ -67,8 +67,6 @@ __FBSDID("$FreeBSD$");
 
 #include "opt_inet.h"
 #include "opt_inet6.h"
-#include "opt_mpath.h"
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/lock.h>
@@ -767,7 +765,6 @@ selectroute(struct sockaddr_in6 *dstsock, struct ip6_pktopts *opts,
 				/* Unwrap in6_getscope() and in6_clearscope() */
 				scopeid = ntohs(sa6->sin6_addr.s6_addr16[1]);
 				sa6->sin6_addr.s6_addr16[1] = 0;
-
 			}
 
 			ro->ro_nh = fib6_lookup(fibnum,
@@ -916,15 +913,16 @@ in6_selecthlim(struct inpcb *inp, struct ifnet *ifp)
 	else if (ifp)
 		return (ND_IFINFO(ifp)->chlim);
 	else if (inp && !IN6_IS_ADDR_UNSPECIFIED(&inp->in6p_faddr)) {
-		struct nhop6_basic nh6;
+		struct nhop_object *nh;
 		struct in6_addr dst;
 		uint32_t fibnum, scopeid;
 		int hlim;
 
 		fibnum = inp->inp_inc.inc_fibnum;
 		in6_splitscope(&inp->in6p_faddr, &dst, &scopeid);
-		if (fib6_lookup_nh_basic(fibnum, &dst, scopeid, 0, 0, &nh6)==0){
-			hlim = ND_IFINFO(nh6.nh_ifp)->chlim;
+		nh = fib6_lookup(fibnum, &dst, scopeid, 0, 0);
+		if (nh != NULL) {
+			hlim = ND_IFINFO(nh->nh_ifp)->chlim;
 			return (hlim);
 		}
 	}

@@ -371,8 +371,13 @@ static int mlx4_ib_del_gid(struct ib_device *device,
 		if (!gids) {
 			ret = -ENOMEM;
 		} else {
-			for (i = 0; i < MLX4_MAX_PORT_GIDS; i++)
-				memcpy(&gids[i].gid, &port_gid_table->gids[i].gid, sizeof(union ib_gid));
+			for (i = 0; i < MLX4_MAX_PORT_GIDS; i++) {
+				memcpy(&gids[i].gid,
+				       &port_gid_table->gids[i].gid,
+				       sizeof(union ib_gid));
+				gids[i].gid_type =
+				    port_gid_table->gids[i].gid_type;
+			}
 		}
 	}
 	spin_unlock_bh(&iboe->lock);
@@ -3319,8 +3324,8 @@ static void __exit mlx4_ib_cleanup(void)
 	destroy_workqueue(wq);
 }
 
-module_init_order(mlx4_ib_init, SI_ORDER_THIRD);
-module_exit(mlx4_ib_cleanup);
+module_init_order(mlx4_ib_init, SI_ORDER_SEVENTH);
+module_exit_order(mlx4_ib_cleanup, SI_ORDER_SEVENTH);
 
 static int
 mlx4ib_evhand(module_t mod, int event, void *arg)
