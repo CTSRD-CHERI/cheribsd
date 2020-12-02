@@ -93,6 +93,7 @@ db_print_cap(struct thread *td, const char* msg, void * __capability cap)
 		db_printf("%s %#.16lp (pid %d)\n", msg, cap, pid);
 	} else {
 		db_printf("%s %#.16lp\n", msg, cap);
+	}
 }
 
 static void * __capability
