@@ -161,12 +161,22 @@ static int	link_elf_each_function_nameval(linker_file_t,
 static void	link_elf_reloc_local(linker_file_t);
 static long	link_elf_symtab_get(linker_file_t, const Elf_Sym **);
 static long	link_elf_strtab_get(linker_file_t, caddr_t *);
+static int	link_elf_symidx_address(linker_file_t, unsigned long, int,
+		    ptraddr_t *);
+#ifdef __CHERI_PURE_CAPABILITY__
+static int	link_elf_symidx_capability(linker_file_t, unsigned long, int,
+		    uintcap_t *);
+#endif
 static int	elf_lookup(linker_file_t, Elf_Size, int, Elf_Addr *);
 
 static kobj_method_t link_elf_methods[] = {
 	KOBJMETHOD(linker_lookup_symbol,	link_elf_lookup_symbol),
 	KOBJMETHOD(linker_symbol_values,	link_elf_symbol_values),
 	KOBJMETHOD(linker_search_symbol,	link_elf_search_symbol),
+	KOBJMETHOD(linker_symidx_address,	link_elf_symidx_address),
+#ifdef __CHERI_PURE_CAPABILITY__
+	KOBJMETHOD(linker_symidx_capability,	link_elf_symidx_capability),
+#endif
 	KOBJMETHOD(linker_unload,		link_elf_unload_file),
 	KOBJMETHOD(linker_load_file,		link_elf_load_file),
 	KOBJMETHOD(linker_link_preload,		link_elf_link_preload),
@@ -1638,6 +1648,32 @@ link_elf_lookup_symbol(linker_file_t lf, const char *name, c_linker_sym_t *sym)
 	return (ENOENT);
 }
 
+#ifdef __CHERI_PURE_CAPABILITY__
+/*
+ * Given a pointer into a linker file derived from ef->address, narrow
+ * its permissions and bounds.
+ */
+static caddr_t
+make_capability(const Elf_Sym *sym, caddr_t val)
+{
+
+	switch (ELF_ST_TYPE(sym->st_info)) {
+	case STT_FUNC:
+	case STT_GNU_IFUNC:
+		val = cheri_andperm(val, CHERI_PERMS_KERNEL_CODE);
+#ifdef CHERI_FLAGS_CAP_MODE
+		val = cheri_setflags(val, CHERI_FLAGS_CAP_MODE);
+#endif
+		break;
+	default:
+		val = cheri_setbounds(val, sym->st_size);
+		val = cheri_andperm(val, CHERI_PERMS_KERNEL_DATA);
+		break;
+	}
+	return (val);
+}
+#endif
+
 static int
 link_elf_symbol_values(linker_file_t lf, c_linker_sym_t sym,
     linker_symval_t *symval)
@@ -1654,16 +1690,7 @@ link_elf_symbol_values(linker_file_t lf, c_linker_sym_t sym,
 		if (ELF_ST_TYPE(es->st_info) == STT_GNU_IFUNC)
 			val = ((caddr_t (*)(void))val)();
 #ifdef __CHERI_PURE_CAPABILITY__
-		val = cheri_setbounds(val, es->st_size);
-		switch (ELF_ST_TYPE(es->st_info)) {
-		case STT_FUNC:
-		case STT_GNU_IFUNC:
-			val = cheri_andperm(val, CHERI_PERMS_KERNEL_CODE);
-			break;
-		default:
-			val = cheri_andperm(val, CHERI_PERMS_KERNEL_DATA);
-			break;
-		}
+		val = make_capability(es, val);
 #endif
 		symval->value = val;
 		symval->size = es->st_size;
@@ -1677,16 +1704,7 @@ link_elf_symbol_values(linker_file_t lf, c_linker_sym_t sym,
 		if (ELF_ST_TYPE(es->st_info) == STT_GNU_IFUNC)
 			val = ((caddr_t (*)(void))val)();
 #ifdef __CHERI_PURE_CAPABILITY__
-		val = cheri_setbounds(val, es->st_size);
-		switch (ELF_ST_TYPE(es->st_info)) {
-		case STT_FUNC:
-		case STT_GNU_IFUNC:
-			val = cheri_andperm(val, CHERI_PERMS_KERNEL_CODE);
-			break;
-		default:
-			val = cheri_andperm(val, CHERI_PERMS_KERNEL_DATA);
-			break;
-		}
+		val = make_capability(es, val);
 #endif
 		symval->value = val;
 		symval->size = es->st_size;
@@ -1857,14 +1875,21 @@ elf_get_symname(linker_file_t lf, Elf_Size symidx)
 }
 
 /*
- * Symbol lookup function that can be used when the symbol index is known (ie
+ * Symbol lookup functions that can be used when the symbol index is known (ie
  * in relocations). It uses the symbol index instead of doing a fully fledged
  * hash table based lookup when such is valid. For example for local symbols.
  * This is not only more efficient, it's also more correct. It's not always
  * the case that the symbol can be found through the hash table.
  */
+#ifdef __CHERI_PURE_CAPABILITY__
 static int
-elf_lookup(linker_file_t lf, Elf_Size symidx, int deps, Elf_Addr *res)
+link_elf_symidx_capability(linker_file_t lf, unsigned long symidx, int deps,
+    uintcap_t *res)
+#else
+static int
+link_elf_symidx_address(linker_file_t lf, unsigned long symidx, int deps,
+    ptraddr_t *res)
+#endif
 {
 	elf_file_t ef = (elf_file_t)lf;
 	const Elf_Sym *sym;
@@ -1889,7 +1914,12 @@ elf_lookup(linker_file_t lf, Elf_Size symidx, int deps, Elf_Addr *res)
 			*res = 0;
 			return (EINVAL);
 		}
-		*res = ((Elf_Addr)ef->address + sym->st_value);
+#ifdef __CHERI_PURE_CAPABILITY__
+		*res = (uintcap_t)make_capability(sym, ef->address +
+		    sym->st_value);
+#else
+		*res = ((ptraddr_t)ef->address + sym->st_value);
+#endif
 		return (0);
 	}
 
@@ -1914,14 +1944,53 @@ elf_lookup(linker_file_t lf, Elf_Size symidx, int deps, Elf_Addr *res)
 		return (EINVAL);
 	}
 
-	if (elf_set_find(&set_pcpu_list, addr, &start, &base))
-		addr = (vaddr_t)addr - (vaddr_t)start + base;
-#ifdef VIMAGE
-	else if (elf_set_find(&set_vnet_list, addr, &start, &base))
-		addr = (vaddr_t)addr - (vaddr_t)start + base;
+	if (elf_set_find(&set_pcpu_list, addr, &start, &base)) {
+		addr = (ptraddr_t)addr - (ptraddr_t)start + base;
+#ifdef __CHERI_PURE_CAPABILITY__
+		addr = make_capability(sym, addr);
 #endif
-	*res = (Elf_Addr)addr;
+	}
+#ifdef VIMAGE
+	else if (elf_set_find(&set_vnet_list, addr, &start, &base)) {
+		addr = (ptraddr_t)addr - (ptraddr_t)start + base;
+#ifdef __CHERI_PURE_CAPABILITY__
+		addr = make_capability(sym, addr);
+#endif
+	}
+#endif
+#ifdef __CHERI_PURE_CAPABILITY__
+	*res = (uintcap_t)addr;
+#else
+	*res = (ptraddr_t)addr;
+#endif
 	return (0);
+}
+
+#ifdef __CHERI_PURE_CAPABILITY__
+static int
+link_elf_symidx_address(linker_file_t lf, unsigned long symidx, int deps,
+    ptraddr_t *res)
+{
+	uintcap_t cap;
+	int error;
+
+	error = link_elf_symidx_capability(lf, symidx, deps, &cap);
+	if (error == 0)
+		*res = (ptraddr_t)cap;
+	return (error);
+}
+#endif
+
+static int
+elf_lookup(linker_file_t lf, Elf_Size symidx, int deps, Elf_Addr *res)
+{
+	ptraddr_t addr;
+	int error;
+
+	error = link_elf_symidx_address(lf, symidx, deps, &addr);
+	if (error == 0)
+		*res = addr;
+	return (error);
 }
 
 static void
