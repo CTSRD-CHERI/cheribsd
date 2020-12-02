@@ -125,7 +125,8 @@ static int sysctl_kern_ps_strings(SYSCTL_HANDLER_ARGS);
 static int sysctl_kern_usrstack(SYSCTL_HANDLER_ARGS);
 static int sysctl_kern_stackprot(SYSCTL_HANDLER_ARGS);
 static int do_execve(struct thread *td, struct image_args *args,
-    void * __capability mac_p, struct vmspace *oldvmspace, struct proc *cop, bool opportunistic);
+    void * __capability mac_p, struct vmspace *oldvmspace,
+    struct proc *cop, bool opportunistic);
 
 /* XXX This should be vm_size_t. */
 SYSCTL_PROC(_kern, KERN_PS_STRINGS, ps_strings, CTLTYPE_ULONG|CTLFLAG_RD|
@@ -1073,7 +1074,8 @@ exec_fail:
 
 	if (error && imgp->vmspace_destroyed) {
 		if (opportunistic) {
-			error = do_execve(td, args, umac, oldvmspace, NULL, false);
+			error = do_execve(td, args, umac, oldvmspace,
+			    NULL, false);
 			if (error == EJUSTRETURN)
 				return (error);
 		}
