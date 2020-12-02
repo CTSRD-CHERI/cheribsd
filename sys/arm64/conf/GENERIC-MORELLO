@@ -24,8 +24,7 @@ ident		GENERIC-MORELLO
 
 makeoptions	CPUTYPE=morello
 options 	CPU_CHERI
-# TODO: Support freebsd64
-#options 	COMPAT_FREEBSD64
+options 	COMPAT_FREEBSD64
 
 # Needs porting to use __USER_CAP
 nooptions 	COMPAT_FREEBSD32
