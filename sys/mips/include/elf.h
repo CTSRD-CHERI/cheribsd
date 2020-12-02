@@ -160,6 +160,9 @@ __ElfType(Auxinfo);
  */
 #define	SYMTAB_MAGIC	0x64656267
 
+#define	DT_CHERI___CAPRELOCS	DT_MIPS_CHERI___CAPRELOCS
+#define	DT_CHERI___CAPRELOCSSZ	DT_MIPS_CHERI___CAPRELOCSSZ
+
 /* from NetBSD's sys/mips/include/elf_machdep.h $NetBSD: elf_machdep.h,v 1.18 2013/05/23 21:39:49 christos Exp $ */
 
 /* mips relocs. */
