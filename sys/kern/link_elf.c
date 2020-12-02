@@ -462,24 +462,12 @@ link_elf_init(void* arg)
 	ef->address = 0;
 #else /* __CHERI_PURE_CAPABILITY__ */
 	/*
-	 * This is the top-level capability used to generate all pointers
-	 * to ELF structures in the kernel image.
-	 *
-	 * XXX-AM: Ideally this is derived from the kernel data capability
-	 * since it does not need access to anything else, the capability is
-	 * read-only on the assumption that we shouldn't ELF files do not
-	 * write to kernel ELF sections.
-	 * It is particularly sad that we have to use this capability to
-	 * load other things later, we may have some more luck if we link
-	 * the kernel at 0x00 and relocate it at boot using pcc/ddc...
-	 * This is incompatible with the way other kld are linked, they are
-	 * 0-based so the addresses in the ELF file can be used as offsets
-	 * relative to ef->address. This is not true for the kernel,
-	 * so we are forced to use a 0-based capability and rely on bounds
-	 * enforcement later.
+	 * It is particularly sad that we are not able to put bounds on
+	 * this capability.  At some point ef->address should become a
+	 * plain address and ef should grow capabilities for different
+	 * loadable segments instead.
 	 */
-	ef->address = cheri_andperm(kernel_root_cap,
-		(CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP));
+	ef->address = cheri_setaddress(kernel_root_cap, 0);
 	linker_kernel_file->address = ef->address;
 #endif /* __CHERI_PURE_CAPABILITY__ */
 #endif
