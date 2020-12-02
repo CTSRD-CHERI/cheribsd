@@ -39,8 +39,7 @@ memchr(const void *src, int c, size_t n)
 {
 	const unsigned char *s = src;
 	c = (unsigned char)c;
-// XXX-BD: this path produces out of bounds cld's on CHERI-mips.
-#if defined(__GNUC__) && !defined(__CHERI_PURE_CAPABILITY__) && !defined(CAPABILITY_VERSION)
+#if defined(__GNUC__)
 	for (; !__builtin_is_aligned(s, SS) && n && *s != c; s++, n--)
 		;
 	if (n && *s != c) {
