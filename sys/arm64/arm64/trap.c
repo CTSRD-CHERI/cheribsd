@@ -377,6 +377,8 @@ data_abort(struct thread *td, struct trapframe *frame, uint64_t esr,
 static void
 print_registers(struct trapframe *frame)
 {
+#if 0
+	/* Disable for now */
 	u_int reg;
 
 	/*
@@ -393,6 +395,7 @@ print_registers(struct trapframe *frame)
 	PRINT_REG("  lr", frame->tf_lr);
 	PRINT_REG(" elr", frame->tf_elr);
 	printf("spsr:         %8x\n", frame->tf_spsr);
+#endif
 }
 
 void
