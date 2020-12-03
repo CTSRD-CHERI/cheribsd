@@ -2,6 +2,9 @@
 # $FreeBSD$
 #
 
+# XXX: not at all purecap clean
+NO_WERROR=
+
 .include <src.opts.mk>
 PROG_CXX=	pmc
 MAN=	

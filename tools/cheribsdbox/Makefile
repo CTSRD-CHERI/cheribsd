@@ -18,7 +18,9 @@ BINDIR?=${CHERIBSDBOX_DIR}
 NEED_COMPAT=	64
 WANT_CHERI=		none
 CRUNCH_BUILDOPTS+=	WANT_CHERI=none NEED_COMPAT=64
+CRUNCH_OBJTOP=		${OBJTOP}/obj-lib64
 .endif
+CRUNCH_OBJTOP?=		${OBJTOP}
 CRUNCH_BUILDOPTS+=	-DWITHOUT_TESTS MK_TESTS=no -D_CRUNCHGEN
 # Avoid linking against libcasper for tcpdump/traceroute/kdump:
 CRUNCH_BUILDOPTS+=	-DWITHOUT_CASPER MK_CASPER=no
@@ -96,6 +98,8 @@ CRUNCH_LIBS+= -lprocstat -lelf
 
 # needed by ifconfig
 CRUNCH_LIBS+=	-l80211
+CRUNCH_LIBS+=		${CRUNCH_OBJTOP}/lib/libifconfig/libifconfig.a
+CRUNCH_BUILDOPTS+=	CRUNCH_CFLAGS+=-I${CRUNCH_OBJTOP}/lib/libifconfig
 # needed by fetch:
 CRUNCH_LIBS+= -lfetch
 # devinfo

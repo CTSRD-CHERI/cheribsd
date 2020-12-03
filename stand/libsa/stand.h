@@ -337,6 +337,7 @@ extern struct env_var	*env_getenv(const char *name);
 extern int		env_setenv(const char *name, int flags,
 				   const void *value, ev_sethook_t sethook,
 				   ev_unsethook_t unsethook);
+extern void		env_discard(struct env_var *);
 extern char		*getenv(const char *name);
 extern int		setenv(const char *name, const char *value,
 			       int overwrite);
@@ -406,6 +407,11 @@ extern time_t		getsecs(void);
 extern struct fs_ops	*file_system[];
 extern struct fs_ops	*exclusive_file_system;
 extern struct devsw	*devsw[];
+
+/*
+ * Time routines
+ */
+time_t time(time_t *);
 
 /*
  * Expose byteorder(3) functions.

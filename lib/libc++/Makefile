@@ -20,6 +20,10 @@ SHLIB_LDSCRIPT=	libc++.ldscript
 
 SRCS+=		algorithm.cpp
 SRCS+=		any.cpp
+.if ${LIBCXX_VERSION} > 10
+SRCS+=		atomic.cpp
+SRCS+=		barrier.cpp
+.endif
 SRCS+=		bind.cpp
 SRCS+=		charconv.cpp
 SRCS+=		chrono.cpp
@@ -46,6 +50,9 @@ SRCS+=		mutex_destructor.cpp
 SRCS+=		new.cpp
 SRCS+=		optional.cpp
 SRCS+=		random.cpp
+.if ${LIBCXX_VERSION} > 10
+SRCS+=		random_shuffle.cpp
+.endif
 SRCS+=		regex.cpp
 SRCS+=		shared_mutex.cpp
 SRCS+=		stdexcept.cpp

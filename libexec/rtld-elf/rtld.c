@@ -1726,7 +1726,7 @@ digest_dynamic2(Obj_Entry *obj, const Elf_Dyn *dyn_rpath,
 			// Note: not setting precise bounds here since the end
 			// of the captable is probably not strongly aligned.
 			obj->text_rodata_cap += start_offset;
-			obj->text_rodata_cap = cheri_setbounds_sametype(
+			obj->text_rodata_cap = cheri_setbounds(
 			    obj->text_rodata_cap, precise_size);
 			if (cheri_getlength(obj->text_rodata_cap) !=
 			    precise_size) {
@@ -1748,8 +1748,8 @@ digest_dynamic2(Obj_Entry *obj, const Elf_Dyn *dyn_rpath,
 		// TODO: data-only .so files? Possibly used by icu4c? For now
 		// I'll keep this assertion until we hit an error
 		rtld_require(obj->text_rodata_end_offset != 0, "No text segment in %s?", obj->path);
-		obj->text_rodata_cap = cheri_setbounds_sametype(
-		   obj->text_rodata_cap, obj->text_rodata_end_offset - obj->text_rodata_start_offset);
+		obj->text_rodata_cap = cheri_setbounds(obj->text_rodata_cap,
+		    obj->text_rodata_end_offset - obj->text_rodata_start_offset);
 	}
 	dbg("%s: tightened bounds of text/rodata cap: " PTR_FMT, obj->path,
 	    obj->text_rodata_cap);

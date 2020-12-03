@@ -127,11 +127,15 @@ struct 	fileops vnops = {
 
 static const int io_hold_cnt = 16;
 static int vn_io_fault_enable = 1;
-SYSCTL_INT(_debug, OID_AUTO, vn_io_fault_enable, CTLFLAG_RW,
+SYSCTL_INT(_debug, OID_AUTO, vn_io_fault_enable, CTLFLAG_RWTUN,
     &vn_io_fault_enable, 0, "Enable vn_io_fault lock avoidance");
 static int vn_io_fault_prefault = 0;
-SYSCTL_INT(_debug, OID_AUTO, vn_io_fault_prefault, CTLFLAG_RW,
+SYSCTL_INT(_debug, OID_AUTO, vn_io_fault_prefault, CTLFLAG_RWTUN,
     &vn_io_fault_prefault, 0, "Enable vn_io_fault prefaulting");
+static int vn_io_pgcache_read_enable = 1;
+SYSCTL_INT(_debug, OID_AUTO, vn_io_pgcache_read_enable, CTLFLAG_RWTUN,
+    &vn_io_pgcache_read_enable, 0,
+    "Enable copying from page cache for reads, avoiding fs");
 static u_long vn_io_faults_cnt;
 SYSCTL_ULONG(_debug, OID_AUTO, vn_io_faults, CTLFLAG_RD,
     &vn_io_faults_cnt, 0, "Count of vn_io_fault lock avoidance triggers");
@@ -848,6 +852,118 @@ get_advice(struct file *fp, struct uio *uio)
 	return (ret);
 }
 
+static int
+vn_read_from_obj(struct vnode *vp, struct uio *uio)
+{
+	vm_object_t obj;
+	vm_page_t ma[io_hold_cnt + 2];
+	off_t off, vsz;
+	ssize_t resid;
+	int error, i, j;
+
+	obj = vp->v_object;
+	MPASS(uio->uio_resid <= ptoa(io_hold_cnt + 2));
+	MPASS(obj != NULL);
+	MPASS(obj->type == OBJT_VNODE);
+
+	/*
+	 * Depends on type stability of vm_objects.
+	 */
+	vm_object_pip_add(obj, 1);
+	if ((obj->flags & OBJ_DEAD) != 0) {
+		/*
+		 * Note that object might be already reused from the
+		 * vnode, and the OBJ_DEAD flag cleared.  This is fine,
+		 * we recheck for DOOMED vnode state after all pages
+		 * are busied, and retract then.
+		 *
+		 * But we check for OBJ_DEAD to ensure that we do not
+		 * busy pages while vm_object_terminate_pages()
+		 * processes the queue.
+		 */
+		error = EJUSTRETURN;
+		goto out_pip;
+	}
+
+	resid = uio->uio_resid;
+	off = uio->uio_offset;
+	for (i = 0; resid > 0; i++) {
+		MPASS(i < io_hold_cnt + 2);
+		ma[i] = vm_page_grab_unlocked(obj, atop(off),
+		    VM_ALLOC_NOCREAT | VM_ALLOC_SBUSY | VM_ALLOC_IGN_SBUSY |
+		    VM_ALLOC_NOWAIT);
+		if (ma[i] == NULL)
+			break;
+
+		/*
+		 * Skip invalid pages.  Valid mask can be partial only
+		 * at EOF, and we clip later.
+		 */
+		if (vm_page_none_valid(ma[i])) {
+			vm_page_sunbusy(ma[i]);
+			break;
+		}
+
+		resid -= PAGE_SIZE;
+		off += PAGE_SIZE;
+	}
+	if (i == 0) {
+		error = EJUSTRETURN;
+		goto out_pip;
+	}
+
+	/*
+	 * Check VIRF_DOOMED after we busied our pages.  Since
+	 * vgonel() terminates the vnode' vm_object, it cannot
+	 * process past pages busied by us.
+	 */
+	if (VN_IS_DOOMED(vp)) {
+		error = EJUSTRETURN;
+		goto out;
+	}
+
+	resid = PAGE_SIZE - (uio->uio_offset & PAGE_MASK) + ptoa(i - 1);
+	if (resid > uio->uio_resid)
+		resid = uio->uio_resid;
+
+	/*
+	 * Unlocked read of vnp_size is safe because truncation cannot
+	 * pass busied page.  But we load vnp_size into a local
+	 * variable so that possible concurrent extension does not
+	 * break calculation.
+	 */
+#if defined(__powerpc__) && !defined(__powerpc64__)
+	vsz = obj->un_pager.vnp.vnp_size;
+#else
+	vsz = atomic_load_64(&obj->un_pager.vnp.vnp_size);
+#endif
+	if (uio->uio_offset + resid > vsz)
+		resid = vsz - uio->uio_offset;
+
+	error = vn_io_fault_pgmove(ma, uio->uio_offset & PAGE_MASK, resid, uio);
+
+out:
+	for (j = 0; j < i; j++) {
+		if (error == 0)
+			vm_page_reference(ma[j]);
+		vm_page_sunbusy(ma[j]);
+	}
+out_pip:
+	vm_object_pip_wakeup(obj);
+	if (error != 0)
+		return (error);
+	return (uio->uio_resid == 0 ? 0 : EJUSTRETURN);
+}
+
+static bool
+do_vn_read_from_pgcache(struct vnode *vp, struct uio *uio, struct file *fp)
+{
+	return ((vp->v_irflag & (VIRF_DOOMED | VIRF_PGREAD)) == VIRF_PGREAD &&
+	    !mac_vnode_check_read_enabled() &&
+	    uio->uio_resid <= ptoa(io_hold_cnt) && uio->uio_offset >= 0 &&
+	    (fp->f_flag & O_DIRECT) == 0 && vn_io_pgcache_read_enable);
+}
+
 /*
  * File table vnode read routine.
  */
@@ -864,6 +980,15 @@ vn_read(struct file *fp, struct uio *uio, struct ucred *active_cred, int flags,
 	    uio->uio_td, td));
 	KASSERT(flags & FOF_OFFSET, ("No FOF_OFFSET"));
 	vp = fp->f_vnode;
+	if (do_vn_read_from_pgcache(vp, uio, fp)) {
+		error = vn_read_from_obj(vp, uio);
+		if (error == 0) {
+			fp->f_nextoff[UIO_READ] = uio->uio_offset;
+			return (0);
+		}
+		if (error != EJUSTRETURN)
+			return (error);
+	}
 	ioflag = 0;
 	if (fp->f_flag & FNONBLOCK)
 		ioflag |= IO_NDELAY;
@@ -1168,8 +1293,8 @@ vn_io_fault1(struct vnode *vp, struct uio *uio, struct vn_io_fault_args *args,
 			uio_clone->uio_iovcnt--;
 			continue;
 		}
-		if (len > io_hold_cnt * PAGE_SIZE)
-			len = io_hold_cnt * PAGE_SIZE;
+		if (len > ptoa(io_hold_cnt))
+			len = ptoa(io_hold_cnt);
 		addr = uio_clone->uio_iov->iov_base;
 		end = round_page(addr + len);
 		if (end < addr) {
@@ -1456,121 +1581,10 @@ vn_statfile(struct file *fp, struct stat *sb, struct ucred *active_cred,
 	int error;
 
 	vn_lock(vp, LK_SHARED | LK_RETRY);
-	error = vn_stat(vp, sb, active_cred, fp->f_cred, td);
+	error = VOP_STAT(vp, sb, active_cred, fp->f_cred, td);
 	VOP_UNLOCK(vp);
 
 	return (error);
-}
-
-/*
- * Stat a vnode; implementation for the stat syscall
- */
-int
-vn_stat(struct vnode *vp, struct stat *sb, struct ucred *active_cred,
-    struct ucred *file_cred, struct thread *td)
-{
-	struct vattr vattr;
-	struct vattr *vap;
-	int error;
-	u_short mode;
-
-	AUDIT_ARG_VNODE1(vp);
-#ifdef MAC
-	error = mac_vnode_check_stat(active_cred, file_cred, vp);
-	if (error)
-		return (error);
-#endif
-
-	vap = &vattr;
-
-	/*
-	 * Initialize defaults for new and unusual fields, so that file
-	 * systems which don't support these fields don't need to know
-	 * about them.
-	 */
-	vap->va_birthtime.tv_sec = -1;
-	vap->va_birthtime.tv_nsec = 0;
-	vap->va_fsid = VNOVAL;
-	vap->va_rdev = NODEV;
-
-	error = VOP_GETATTR(vp, vap, active_cred);
-	if (error)
-		return (error);
-
-	/*
-	 * Zero the spare stat fields
-	 */
-	bzero(sb, sizeof *sb);
-
-	/*
-	 * Copy from vattr table
-	 */
-	if (vap->va_fsid != VNOVAL)
-		sb->st_dev = vap->va_fsid;
-	else
-		sb->st_dev = vp->v_mount->mnt_stat.f_fsid.val[0];
-	sb->st_ino = vap->va_fileid;
-	mode = vap->va_mode;
-	switch (vap->va_type) {
-	case VREG:
-		mode |= S_IFREG;
-		break;
-	case VDIR:
-		mode |= S_IFDIR;
-		break;
-	case VBLK:
-		mode |= S_IFBLK;
-		break;
-	case VCHR:
-		mode |= S_IFCHR;
-		break;
-	case VLNK:
-		mode |= S_IFLNK;
-		break;
-	case VSOCK:
-		mode |= S_IFSOCK;
-		break;
-	case VFIFO:
-		mode |= S_IFIFO;
-		break;
-	default:
-		return (EBADF);
-	}
-	sb->st_mode = mode;
-	sb->st_nlink = vap->va_nlink;
-	sb->st_uid = vap->va_uid;
-	sb->st_gid = vap->va_gid;
-	sb->st_rdev = vap->va_rdev;
-	if (vap->va_size > OFF_MAX)
-		return (EOVERFLOW);
-	sb->st_size = vap->va_size;
-	sb->st_atim.tv_sec = vap->va_atime.tv_sec;
-	sb->st_atim.tv_nsec = vap->va_atime.tv_nsec;
-	sb->st_mtim.tv_sec = vap->va_mtime.tv_sec;
-	sb->st_mtim.tv_nsec = vap->va_mtime.tv_nsec;
-	sb->st_ctim.tv_sec = vap->va_ctime.tv_sec;
-	sb->st_ctim.tv_nsec = vap->va_ctime.tv_nsec;
-	sb->st_birthtim.tv_sec = vap->va_birthtime.tv_sec;
-	sb->st_birthtim.tv_nsec = vap->va_birthtime.tv_nsec;
-
-	/*
-	 * According to www.opengroup.org, the meaning of st_blksize is 
-	 *   "a filesystem-specific preferred I/O block size for this 
-	 *    object.  In some filesystem types, this may vary from file
-	 *    to file"
-	 * Use minimum/default of PAGE_SIZE (e.g. for VCHR).
-	 */
-
-	sb->st_blksize = max(PAGE_SIZE, vap->va_blocksize);
-
-	sb->st_flags = vap->va_flags;
-	if (priv_check_cred_vfs_generation(td->td_ucred))
-		sb->st_gen = 0;
-	else
-		sb->st_gen = vap->va_gen;
-
-	sb->st_blocks = vap->va_bytes / S_BLKSIZE;
-	return (0);
 }
 
 /*
@@ -2498,7 +2512,7 @@ vn_fill_kinfo_vnode(struct vnode *vp, struct kinfo_file *kif)
 	kif->kf_un.kf_file.kf_file_type = vntype_to_kinfo(vp->v_type);
 	freepath = NULL;
 	fullpath = "-";
-	error = vn_fullpath(curthread, vp, &fullpath, &freepath);
+	error = vn_fullpath(vp, &fullpath, &freepath);
 	if (error == 0) {
 		strlcpy(kif->kf_path, fullpath, sizeof(kif->kf_path));
 	}

@@ -2000,7 +2000,7 @@ kern_aio_cancel(struct thread *td, int fd, void * __capability ujob,
 
 	if (fp->f_type == DTYPE_VNODE) {
 		vp = fp->f_vnode;
-		if (vn_isdisk(vp, &error)) {
+		if (vn_isdisk(vp)) {
 			fdrop(fp, td);
 			td->td_retval[0] = AIO_NOTCANCELED;
 			return (0);

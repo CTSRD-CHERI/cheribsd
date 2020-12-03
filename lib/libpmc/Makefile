@@ -1,5 +1,8 @@
 # $FreeBSD$
 
+# XXX: not at all purecap clean, but we need the headers...
+NO_WERROR=
+
 LIB=	pmc
 
 SRCS=	libpmc.c pmclog.c libpmc_pmu_util.c libpmc_json.cc

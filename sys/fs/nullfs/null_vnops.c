@@ -182,6 +182,7 @@
 #include <sys/namei.h>
 #include <sys/sysctl.h>
 #include <sys/vnode.h>
+#include <sys/stat.h>
 
 #include <fs/nullfs/null.h>
 
@@ -438,8 +439,17 @@ null_open(struct vop_open_args *ap)
 	vp = ap->a_vp;
 	ldvp = NULLVPTOLOWERVP(vp);
 	retval = null_bypass(&ap->a_gen);
-	if (retval == 0)
+	if (retval == 0) {
 		vp->v_object = ldvp->v_object;
+		if ((ldvp->v_irflag & VIRF_PGREAD) != 0) {
+			MPASS(vp->v_object != NULL);
+			if ((vp->v_irflag & VIRF_PGREAD) == 0) {
+				VI_LOCK(vp);
+				vp->v_irflag |= VIRF_PGREAD;
+				VI_UNLOCK(vp);
+			}
+		}
+	}
 	return (retval);
 }
 
@@ -484,8 +494,20 @@ null_setattr(struct vop_setattr_args *ap)
 }
 
 /*
- *  We handle getattr only to change the fsid.
+ *  We handle stat and getattr only to change the fsid.
  */
+static int
+null_stat(struct vop_stat_args *ap)
+{
+	int error;
+
+	if ((error = null_bypass((struct vop_generic_args *)ap)) != 0)
+		return (error);
+
+	ap->a_sb->st_dev = ap->a_vp->v_mount->mnt_stat.f_fsid.val[0];
+	return (0);
+}
+
 static int
 null_getattr(struct vop_getattr_args *ap)
 {
@@ -918,6 +940,7 @@ struct vop_vector null_vnodeops = {
 	.vop_accessx =		null_accessx,
 	.vop_advlockpurge =	vop_stdadvlockpurge,
 	.vop_bmap =		VOP_EOPNOTSUPP,
+	.vop_stat =		null_stat,
 	.vop_getattr =		null_getattr,
 	.vop_getwritemount =	null_getwritemount,
 	.vop_inactive =		null_inactive,

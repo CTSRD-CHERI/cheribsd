@@ -197,22 +197,11 @@ cpu_fetch_syscall_args(struct thread *td)
 
 #include "../../kern/subr_syscall.c"
 
-/*
- * This cannot use _CHERI_PRINTF_CAP_ARG due to the casts (the trapframe stores
- * uintcap_t rather than void * __capability).
- */
 #if __has_feature(capabilities)
-#ifdef __CHERI_PURE_CAPABILITY__
-#define	PRINT_REG_ARG(value)	((void * __capability)(value))
-#else
-#define	PRINT_REG_ARG(value)	((void * __capability *)&(value))
-#endif
-#define PRINT_REG(name, value)					\
-	printf(name " = " _CHERI_PRINTF_CAP_FMT "\n",		\
-	    PRINT_REG_ARG(value));
-#define PRINT_REG_N(name, n, array)				\
-	printf(name "[%d] = " _CHERI_PRINTF_CAP_FMT "\n", n,	\
-	    PRINT_REG_ARG((array)[n]));
+#define PRINT_REG(name, value)	\
+	printf(name " = %#.16lp\n", (void * __capability)(value));
+#define PRINT_REG_N(name, n, array)	\
+	printf(name "[%d] = %#.16lp\n", n, (void * __capability)(array)[n]);
 #else
 #define PRINT_REG(name, value)	printf(name " = 0x%016lx\n", value)
 #define PRINT_REG_N(name, n, array)	\
@@ -333,14 +322,22 @@ data_abort(struct trapframe *frame, int usermode)
 	    "Kernel page fault") != 0)
 		goto fatal;
 
-	if (usermode)
+	if (usermode) {
 		map = &td->td_proc->p_vmspace->vm_map;
-	else if (stval >= VM_MAX_USER_ADDRESS)
-		map = kernel_map;
-	else {
-		if (pcb->pcb_onfault == 0)
-			goto fatal;
-		map = &td->td_proc->p_vmspace->vm_map;
+	} else {
+		/*
+		 * Enable interrupts for the duration of the page fault. For
+		 * user faults this was done already in do_trap_user().
+		 */
+		intr_enable();
+
+		if (stval >= VM_MAX_USER_ADDRESS) {
+			map = kernel_map;
+		} else {
+			if (pcb->pcb_onfault == 0)
+				goto fatal;
+			map = &td->td_proc->p_vmspace->vm_map;
+		}
 	}
 
 	va = trunc_page(stval);
@@ -494,6 +491,7 @@ do_trap_user(struct trapframe *frame)
 		riscv_cpu_intr(frame);
 		return;
 	}
+	intr_enable();
 
 	CTR3(KTR_TRAP, "do_trap_user: curthread: %p, sepc: %lx, frame: %p",
 	    curthread, (__cheri_addr unsigned long)frame->tf_sepc, frame);

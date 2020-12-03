@@ -370,14 +370,9 @@ BROKEN_OPTIONS+=GOOGLETEST SSP
 BROKEN_OPTIONS+=NS_CACHING
 .endif
 
-.if ${__T:Maarch64*c*}
-# Transitively includes pcpu.h pcpu_aux.h and fails on the:
-#
-#   _Static_assert(PAGE_SIZE % sizeof(struct pcpu) == 0, "fix pcpu size");
-#
-BROKEN_OPTIONS+=CDDL
-# Broken; see the MIPS comment
-BROKEN_OPTIONS+=OFED
+.if ${__C} == "cheri" || ${__T:Mmips64*c*} || ${__T:Mriscv*c*} || ${.MAKE.OS} == "Linux"
+# Broken post OpenZFS import
+BROKEN_OPTIONS+=CDDL ZFS
 .endif
 
 .if ${__T:Mriscv*c*}
@@ -453,7 +448,8 @@ BROKEN_OPTIONS+=NVME
 BROKEN_OPTIONS+=GOOGLETEST
 .endif
 
-.if ${__T} == "amd64" || ${__T} == "i386" || ${__T} == "powerpc64"
+.if ${__T} == "aarch64" || ${__T} == "amd64" || ${__T} == "i386" || \
+    ${__T} == "powerpc64"
 __DEFAULT_YES_OPTIONS+=OPENMP
 .else
 __DEFAULT_NO_OPTIONS+=OPENMP

@@ -319,6 +319,7 @@ CONFGROUPS+=	ZFS
 ZFS+=		zfs
 ZFS+=		zfsbe
 ZFS+=		zfsd
+ZFS+=		zpool
 ZFS+=		zvol
 .endif
 

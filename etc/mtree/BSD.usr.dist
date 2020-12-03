@@ -39,7 +39,7 @@
         aout
         ..
         clang
-            10.0.1
+            11.0.0
                 include
                     cuda_wrappers
                     ..
@@ -69,6 +69,8 @@
         dtrace
         ..
         engines
+        ..
+        flua
         ..
         i18n
         ..
@@ -371,6 +373,8 @@
             ..
         ..
         firmware
+        ..
+        flua
         ..
         games
             fortune

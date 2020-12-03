@@ -757,17 +757,17 @@ ipfw_send_pkt(struct mbuf *replyto, struct ipfw_flow_id *id, u_int32_t seq,
  * ipv6 specific rules here...
  */
 static __inline int
-icmp6type_match (int type, ipfw_insn_u32 *cmd)
+icmp6type_match(int type, ipfw_insn_u32 *cmd)
 {
 	return (type <= ICMP6_MAXTYPE && (cmd->d[type/32] & (1<<(type%32)) ) );
 }
 
 static int
-flow6id_match( int curr_flow, ipfw_insn_u32 *cmd )
+flow6id_match(int curr_flow, ipfw_insn_u32 *cmd)
 {
 	int i;
-	for (i=0; i <= cmd->o.arg1; ++i )
-		if (curr_flow == cmd->d[i] )
+	for (i=0; i <= cmd->o.arg1; ++i)
+		if (curr_flow == cmd->d[i])
 			return 1;
 	return 0;
 }
@@ -1944,7 +1944,23 @@ do {								\
 				break;
 
 			case O_FRAG:
-				match = (offset != 0);
+				if (is_ipv4) {
+					/*
+					 * Since flags_match() works with
+					 * uint8_t we pack ip_off into 8 bits.
+					 * For this match offset is a boolean.
+					 */
+					match = flags_match(cmd,
+					    ((ntohs(ip->ip_off) & ~IP_OFFMASK)
+					    >> 8) | (offset != 0));
+				} else {
+					/*
+					 * Compatiblity: historically bare
+					 * "frag" would match IPv6 fragments.
+					 */
+					match = (cmd->arg1 == 0x1 &&
+					    (offset != 0));
+				}
 				break;
 
 			case O_IN:	/* "out" is "not in" */

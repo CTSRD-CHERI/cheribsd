@@ -116,7 +116,7 @@ test_sig_dfl_neq_ign(const struct cheri_test *ctp __unused)
 	 */
 	int eq = (SIG_IGN == SIG_DFL);
 
-	CHERI_FPRINT_PTR(stderr, sic);
+	fprintf(stderr, "sic %#lp\n", sic);
 	fprintf(stderr, "IGN=%ld(%p) DFL=%ld(%p) EQ=%d(%d)\n",
 		(long)SIG_IGN, SIG_IGN,
 		(long)SIG_DFL, SIG_DFL, SIG_IGN == SIG_DFL, eq);

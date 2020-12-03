@@ -168,6 +168,14 @@ static struct _s_x f_iptos[] = {
 	{ NULL,	0 }
 };
 
+static struct _s_x f_ipoff[] = {
+	{ "rf", IP_RF >> 8 },
+	{ "df", IP_DF >> 8 },
+	{ "mf", IP_MF >> 8 },
+	{ "offset", 0x1 },
+	{ NULL, 0}
+};
+
 struct _s_x f_ipdscp[] = {
 	{ "af11", IPTOS_DSCP_AF11 >> 2 },	/* 001010 */
 	{ "af12", IPTOS_DSCP_AF12 >> 2 },	/* 001100 */
@@ -1531,7 +1539,7 @@ print_instruction(struct buf_pr *bp, const struct format_opts *fo,
 		    IPPROTO_ETHERTYPE, cmd->opcode);
 		break;
 	case O_FRAG:
-		bprintf(bp, " frag");
+		print_flags(bp, "frag", cmd, f_ipoff);
 		break;
 	case O_FIB:
 		bprintf(bp, " fib %u", cmd->arg1);
@@ -2191,7 +2199,7 @@ show_static_rule(struct cmdline_opts *co, struct format_opts *fo,
 			*strchr(timestr, '\n') = '\0';
 			bprintf(bp, "%s ", timestr);
 		} else {
-			bprintf(bp, "%*s", twidth, " ");
+			bprintf(bp, "%*s", twidth + 1, " ");
 		}
 	}
 
@@ -4553,7 +4561,15 @@ read_options:
 			break;
 
 		case TOK_FRAG:
-			fill_cmd(cmd, O_FRAG, 0, 0);
+			fill_flags_cmd(cmd, O_FRAG, f_ipoff, *av);
+			/*
+			 * Compatibility: no argument after "frag"
+			 * keyword equals to "frag offset".
+			 */
+			if (cmd->arg1 == 0)
+				cmd->arg1 = 0x1;
+			else
+				av++;
 			break;
 
 		case TOK_LAYER2:

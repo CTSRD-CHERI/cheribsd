@@ -82,8 +82,6 @@ ATF_TESTS_C+=	trig_test
 CFLAGS+=	-O0
 .endif
 
-CSTD=		c99
-
 #COPTS+=	-Wfloat-equal
 
 IGNORE_PRAGMA=

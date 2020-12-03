@@ -119,8 +119,7 @@ test_fault_perm_seal(const struct cheri_test *ctp __unused)
 	 * instruction can be optimized away since it is dead.
 	 */
 	cheribsdtest_failure_errx("cheri_seal() performed successfully "
-	    _CHERI_PRINTF_CAP_FMT " with bad sealcap" _CHERI_PRINTF_CAP_FMT,
-	    _CHERI_PRINTF_CAP_ARG(sealed), _CHERI_PRINTF_CAP_ARG(sealcap));
+	    "%#lp with bad sealcap %#lp", sealed, sealcap);
 }
 
 void
@@ -170,8 +169,7 @@ test_fault_perm_unseal(const struct cheri_test *ctp __unused)
 	 * instruction can be optimized away since it is dead.
 	 */
 	cheribsdtest_failure_errx("cheri_unseal() performed successfully "
-	    _CHERI_PRINTF_CAP_FMT " with bad unsealcap" _CHERI_PRINTF_CAP_FMT,
-	    _CHERI_PRINTF_CAP_ARG(unsealed), _CHERI_PRINTF_CAP_ARG(sealcap));
+	    "%#lp with bad unsealcap %#lp", unsealed, sealcap);
 }
 
 void

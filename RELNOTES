@@ -10,6 +10,11 @@ newline.  Entries should be separated by a newline.
 
 Changes to this file should not be MFCed.
 
+r364725:
+	Changes to one obscure devd event generated on resume need to
+	be documented. The old form will still be generated in 13, but not
+	in 14.
+
 r363679:
 	Applications using regex(3), e.g. sed/grep, will no longer accept
 	redundant escapes for most ordinary characters.
@@ -26,6 +31,13 @@ r363180:
 
 r363084:
 	nc(1) now implements SCTP mode, enabled by specifying the --sctp option.
+
+r362681:
+	A new implementation of bc and dc has been imported. It offers
+	better standards compliance, performance, localization and comes
+	with extensive test cases that are optionally installed.
+	Use WITHOUT_GH_BC=yes to build and install the world with the
+	previous version instead of the new one, if required.
 
 r362158, r362163:
 	struct export_args has changed so that the "user" specified for

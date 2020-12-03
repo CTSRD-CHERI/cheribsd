@@ -65,9 +65,7 @@ __FBSDID("$FreeBSD$");
 #include <machine/atomic.h>
 #include <machine/bus.h>
 #include <machine/md_var.h>
-#if defined(__amd64__) || defined(__i386__)
-#include <x86/iommu/intel_reg.h>
-#endif
+#include <machine/iommu.h>
 #include <dev/iommu/busdma_iommu.h>
 
 /*
@@ -111,7 +109,7 @@ void
 iommu_gas_free_entry(struct iommu_domain *domain, struct iommu_map_entry *entry)
 {
 
-	KASSERT(domain == (struct iommu_domain *)entry->domain,
+	KASSERT(domain == entry->domain,
 	    ("mismatched free domain %p entry %p entry->domain %p", domain,
 	    entry, entry->domain));
 	atomic_subtract_int(&domain->entries_cnt, 1);
@@ -174,7 +172,7 @@ iommu_gas_check_free(struct iommu_domain *domain)
 	iommu_gaddr_t v;
 
 	RB_FOREACH(entry, iommu_gas_entries_tree, &domain->rb_root) {
-		KASSERT(domain == (struct iommu_domain *)entry->domain,
+		KASSERT(domain == entry->domain,
 		    ("mismatched free domain %p entry %p entry->domain %p",
 		    domain, entry, entry->domain));
 		l = RB_LEFT(entry, rb_entry);

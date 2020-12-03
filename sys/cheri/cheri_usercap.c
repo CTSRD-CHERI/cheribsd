@@ -112,8 +112,7 @@ _cheri_capability_build_user_rwx(uint32_t perms, vaddr_t basep, size_t length,
 
 	KASSERT(cheri_getlen(tmpcap) == length,
 	    ("%s:%d: Constructed capability has wrong length 0x%zx != 0x%zx: "
-	    _CHERI_PRINTF_CAP_FMT, func, line, cheri_getlen(tmpcap), length,
-	    _CHERI_PRINTF_CAP_ARG(tmpcap)));
+	     "%#lp", func, line, cheri_getlen(tmpcap), length, tmpcap));
 
 	return (tmpcap);
 }

@@ -239,7 +239,7 @@ static inline const void* target_cgp_for_func(const struct Struct_Obj_Entry *obj
 }
 
 #define set_bounds_if_nonnull(ptr, size)	\
-	do { if (ptr) { ptr = cheri_setbounds_sametype(ptr, size); } } while(0)
+	do { if (ptr) { ptr = cheri_setbounds(ptr, size); } } while(0)
 
 // ignore _init/_fini
 #define call_initfini_pointer(obj, target) rtld_fatal("%s: _init or _fini used!", obj->path)

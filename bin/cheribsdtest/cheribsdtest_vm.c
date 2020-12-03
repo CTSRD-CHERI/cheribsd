@@ -292,7 +292,7 @@ cheribsdtest_vm_cap_share_fd_kqueue(const struct cheri_test *ctp __unused)
 		CHERIBSDTEST_VERIFY2(oke.ident == 0x2BAD, "Bad identifier from kqueue");
 		CHERIBSDTEST_VERIFY2(oke.filter == EVFILT_USER, "Bad filter from kqueue");
 
-		CHERI_FPRINT_PTR(stderr, oke.udata);
+		fprintf(stderr, "oke.udata %#lp\n", oke.udata);
 
 		exit(cheri_gettag(oke.udata));
 	} else {
@@ -362,7 +362,7 @@ cheribsdtest_vm_cap_share_sigaction(const struct cheri_test *ctp __unused)
 		/* Read it again and check that we get the same value back. */
 		CHERIBSDTEST_CHECK_SYSCALL(__sys_sigaction(SIGUSR1, NULL, &sa));
 		fprintf(stderr, "child value read from sigaction(): ");
-		CHERI_FPRINT_PTR(stderr, sa.sa_handler);
+		fprintf(stderr, "sa.sa_handler %#lp\n", sa.sa_handler);
 		CHERIBSDTEST_CHECK_EQ_CAP(sa.sa_handler, passme);
 
 		exit(0);
@@ -376,7 +376,7 @@ cheribsdtest_vm_cap_share_sigaction(const struct cheri_test *ctp __unused)
 
 		CHERIBSDTEST_CHECK_SYSCALL(__sys_sigaction(SIGUSR1, NULL, &sa));
 		fprintf(stderr, "parent sa read from sigaction(): ");
-		CHERI_FPRINT_PTR(stderr, sa.sa_handler);
+		fprintf(stderr, "sa.sa_handler %#lp\n", sa.sa_handler);
 
 		/* Flags should be zero on read */
 		CHERIBSDTEST_CHECK_EQ_LONG(sa.sa_flags, 0);

@@ -132,7 +132,7 @@ check_initreg_code(void * __capability c)
 {
 	uintmax_t v;
 
-	CHERI_FPRINT_PTR(stderr, c);
+	fprintf(stderr, "c %#lp\n", c);
 
 #if defined(__CHERI_PURE_CAPABILITY__)
 	/*

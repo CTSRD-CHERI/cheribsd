@@ -234,9 +234,9 @@ void	kassert_panic(const char *fmt, ...)  __printflike(1, 2);
 /*
  * NOTE: we can't place tigher bounds because we don't know what the
  * length is until after we use it.
- * XXX: We should probably have a __USER_CAP_PATH() with a MAXPATH limit.
  */
 #define	__USER_CAP_STR(strp)	__USER_CAP_UNBOUND(strp)
+#define	__USER_CAP_PATH(path)	__USER_CAP((path), MAXPATHLEN)
 
 /*
  * Align variables.
@@ -641,9 +641,6 @@ void	kern_reboot(int) __dead2;
 void	shutdown_nice(int);
 
 /* Stubs for obsolete functions that used to be for interrupt management */
-static __inline intrmask_t	splbio(void)		{ return 0; }
-static __inline intrmask_t	splcam(void)		{ return 0; }
-static __inline intrmask_t	splclock(void)		{ return 0; }
 static __inline intrmask_t	splhigh(void)		{ return 0; }
 static __inline intrmask_t	splimp(void)		{ return 0; }
 static __inline intrmask_t	splnet(void)		{ return 0; }

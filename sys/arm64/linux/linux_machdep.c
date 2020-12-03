@@ -66,11 +66,17 @@ linux_execve(struct thread *td, struct linux_execve_args *uap)
 	char *path;
 	int error;
 
-	LCONVPATHEXIST(td, uap->path, &path);
-
-	error = exec_copyin_args(&eargs, PTR2CAP(path), UIO_SYSSPACE,
-	    __USER_CAP_UNBOUND(uap->argp), __USER_CAP_UNBOUND(uap->envp));
-	free(path, M_TEMP);
+	if (!LUSECONVPATH(td)) {
+		error = exec_copyin_args(&eargs, __USER_CAP_PATH(uap->path),
+		    UIO_USERSPACE, __USER_CAP_UNBOUND(uap->argp),
+		    __USER_CAP_UNBOUND(uap->envp));
+	} else {
+		LCONVPATHEXIST(td, uap->path, &path);
+		error = exec_copyin_args(&eargs, PTR2CAP(path), UIO_SYSSPACE,
+		    __USER_CAP_UNBOUND(uap->argp),
+		    __USER_CAP_UNBOUND(uap->envp));
+		LFREEPATH(path);
+	}
 	if (error == 0)
 		error = linux_common_execve(td, &eargs);
 	return (error);

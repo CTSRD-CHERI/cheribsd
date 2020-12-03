@@ -49,7 +49,6 @@ __FBSDID("$FreeBSD$");
 #include <net/route/nhop_utils.h>
 #include <net/route/nhop.h>
 #include <net/route/nhop_var.h>
-#include <net/route/shared.h>
 #include <net/vnet.h>
 
 /*
@@ -245,6 +244,21 @@ set_nhop_gw_from_info(struct nhop_object *nh, struct rt_addrinfo *info)
 	return (0);
 }
 
+static uint16_t
+convert_rt_to_nh_flags(int rt_flags)
+{
+	uint16_t res;
+
+	res = (rt_flags & RTF_REJECT) ? NHF_REJECT : 0;
+	res |= (rt_flags & RTF_HOST) ? NHF_HOST : 0;
+	res |= (rt_flags & RTF_BLACKHOLE) ? NHF_BLACKHOLE : 0;
+	res |= (rt_flags & (RTF_DYNAMIC|RTF_MODIFIED)) ? NHF_REDIRECT : 0;
+	res |= (rt_flags & RTF_BROADCAST) ? NHF_BROADCAST : 0;
+	res |= (rt_flags & RTF_GATEWAY) ? NHF_GATEWAY : 0;
+
+	return (res);
+}
+
 static int
 fill_nhop_from_info(struct nhop_priv *nh_priv, struct rt_addrinfo *info)
 {
@@ -259,7 +273,7 @@ fill_nhop_from_info(struct nhop_priv *nh_priv, struct rt_addrinfo *info)
 	nh_priv->nh_family = info->rti_info[RTAX_DST]->sa_family;
 	nh_priv->nh_type = 0; // hook responsibility to set nhop type
 
-	nh->nh_flags = fib_rte_to_nh_flags(rt_flags);
+	nh->nh_flags = convert_rt_to_nh_flags(rt_flags);
 	set_nhop_mtu_from_info(nh, info);
 	nh->nh_ifp = info->rti_ifa->ifa_ifp;
 	nh->nh_ifa = info->rti_ifa;
@@ -398,7 +412,7 @@ alter_nhop_from_info(struct nhop_object *nh, struct rt_addrinfo *info)
 		nh->nh_priv->rt_flags |= (RTF_GATEWAY & info->rti_flags);
 	}
 	/* Update datapath flags */
-	nh->nh_flags = fib_rte_to_nh_flags(nh->nh_priv->rt_flags);
+	nh->nh_flags = convert_rt_to_nh_flags(nh->nh_priv->rt_flags);
 
 	if (info->rti_ifa != NULL)
 		nh->nh_ifa = info->rti_ifa;

@@ -300,7 +300,7 @@ _WANT_LINKER_FREEBSD_VERSION!= \
 WANT_LINKER_FREEBSD_VERSION=${_WANT_LINKER_FREEBSD_VERSION:C/.*-(.*)/\1/}
 WANT_LINKER_VERSION_FILE= lib/clang/include/lld/Common/Version.inc
 WANT_LINKER_VERSION!= \
-	awk '$$2 == "LLD_VERSION" {split($$3, a, "."); print a[1] * 10000 + a[2] * 100 + a[3]}' \
+	awk '$$2 == "LLD_VERSION_STRING" { gsub("\"", "", $$3); split($$3, a, "."); print a[1] * 10000 + a[2] * 100 + a[3]}' \
 	${SRCDIR}/${WANT_LINKER_VERSION_FILE} || echo unknown
 .else
 WANT_LINKER_FREEBSD_VERSION_FILE=
@@ -565,6 +565,15 @@ VCS_REVISION=	$$(echo r${_VCS_REVISION})
 .export VCS_REVISION
 .endif
 
+.if !defined(GIT_CMD) || empty(GIT_CMD)
+. for _P in /usr/bin /usr/local/bin
+.  if exists(${_P}/git)
+GIT_CMD=   ${_P}/git
+.  endif
+. endfor
+.export GIT_CMD
+.endif
+
 .if !defined(OSRELDATE)
 .if exists(/usr/include/osreldate.h)
 OSRELDATE!=	awk '/^\#define[[:space:]]*__FreeBSD_version/ { print $$3 }' \
@@ -612,6 +621,20 @@ EXTRA_REVISION=	_${_BRANCH:C/.*-p([0-9]+$)/\1/}
 PKG_VERSION=	${_REVISION}${EXTRA_REVISION}
 .endif
 .endif	# !defined(PKG_VERSION)
+
+.if !defined(PKG_TIMESTAMP)
+TIMEEPOCHNOW=	%s
+SOURCE_DATE_EPOCH=	${TIMEEPOCHNOW:gmtime}
+.else
+SOURCE_DATE_EPOCH=	${PKG_TIMESTAMP}
+.endif
+
+PKG_NAME_PREFIX?=	FreeBSD
+PKG_MAINTAINER?=	re@FreeBSD.org
+PKG_WWW?=		https://www.FreeBSD.org
+.export PKG_NAME_PREFIX
+.export PKG_MAINTAINER
+.export PKG_WWW
 
 .if !defined(_MKSHOWCONFIG)
 _CPUTYPE!=	MAKEFLAGS= CPUTYPE=${_TARGET_CPUTYPE} ${MAKE} -f /dev/null \
@@ -1969,6 +1992,7 @@ KSTAGEDIR?=	${OBJTOP}/kernelstage
 REPODIR?=	${OBJROOT}repo
 PKG_FORMAT?=	txz
 PKGSIGNKEY?=	# empty
+PKG_OUTPUT_DIR?=	${PKG_VERSION}
 
 .ORDER:		stage-packages create-packages
 .ORDER:		create-packages create-world-packages
@@ -2018,6 +2042,7 @@ create-packages-kernel:	_pkgbootstrap _repodir .PHONY
 		${MAKE} -f Makefile.inc1 \
 			DESTDIR=${KSTAGEDIR} \
 			PKG_VERSION=${PKG_VERSION} DISTDIR=kernel \
+			SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH} \
 			create-kernel-packages
 
 create-packages: .PHONY create-packages-world create-packages-kernel
@@ -2034,6 +2059,7 @@ create-world-packages:	_pkgbootstrap .PHONY
 	done > ${WSTAGEDIR}/packages.mk
 	${_+_}@cd ${.CURDIR}; \
 		${MAKE} -f Makefile.inc1 create-world-packages-jobs \
+		SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH} \
 		.MAKE.JOB.PREFIX=
 
 .if make(create-world-packages-jobs)
@@ -2061,7 +2087,7 @@ create-world-package-${pkgname}: .PHONY
 		create -f ${PKG_FORMAT} -M ${WSTAGEDIR}/${pkgname}.ucl \
 		-p ${WSTAGEDIR}/${pkgname}.plist \
 		-r ${WSTAGEDIR} \
-		-o ${REPODIR}/${PKG_ABI}/${PKG_VERSION}
+		-o ${REPODIR}/${PKG_ABI}/${PKG_OUTPUT_DIR}
 .endfor
 
 _default_flavor=	-default
@@ -2083,6 +2109,9 @@ create-kernel-packages-flavor${flavor:C,^""$,${_default_flavor},}: _pkgbootstrap
 		-e "s/%COMMENT%/FreeBSD ${INSTALLKERNEL} kernel ${flavor}/" \
 		-e "s/%DESC%/FreeBSD ${INSTALLKERNEL} kernel ${flavor}/" \
 		-e "s/ %VCS_REVISION%/${VCS_REVISION}/" \
+		-e "s/%PKG_NAME_PREFIX%/${PKG_NAME_PREFIX}/" \
+		-e "s/%PKG_MAINTAINER%/${PKG_MAINTAINER}/" \
+		-e "s|%PKG_WWW%|${PKG_WWW}|" \
 		${SRCDIR}/release/packages/kernel.ucl \
 		> ${KSTAGEDIR}/${DISTDIR}/kernel.${INSTALLKERNEL}${flavor}.ucl ; \
 	awk -F\" ' \
@@ -2094,7 +2123,7 @@ create-kernel-packages-flavor${flavor:C,^""$,${_default_flavor},}: _pkgbootstrap
 		-M ${KSTAGEDIR}/${DISTDIR}/kernel.${INSTALLKERNEL}${flavor}.ucl \
 		-p ${KSTAGEDIR}/${DISTDIR}/kernel.${INSTALLKERNEL}${flavor}.plist \
 		-r ${KSTAGEDIR}/${DISTDIR} \
-		-o ${REPODIR}/${PKG_ABI}/${PKG_VERSION}
+		-o ${REPODIR}/${PKG_ABI}/${PKG_OUTPUT_DIR}
 . endfor
 .endif
 .if ${BUILDKERNELS:[#]} > 1 && ${NO_INSTALLEXTRAKERNELS} != "yes"
@@ -2116,6 +2145,9 @@ create-kernel-packages-extra-flavor${flavor:C,^""$,${_default_flavor},}-${_kerne
 		-e "s/%COMMENT%/FreeBSD ${_kernel} kernel ${flavor}/" \
 		-e "s/%DESC%/FreeBSD ${_kernel} kernel ${flavor}/" \
 		-e "s/ %VCS_REVISION%/${VCS_REVISION}/" \
+		-e "s/%PKG_NAME_PREFIX%/${PKG_NAME_PREFIX}/" \
+		-e "s/%PKG_MAINTAINER%/${PKG_MAINTAINER}/" \
+		-e "s|%PKG_WWW%|${PKG_WWW}|" \
 		${SRCDIR}/release/packages/kernel.ucl \
 		> ${KSTAGEDIR}/kernel.${_kernel}/kernel.${_kernel}${flavor}.ucl ; \
 	awk -F\" ' \
@@ -2127,7 +2159,7 @@ create-kernel-packages-extra-flavor${flavor:C,^""$,${_default_flavor},}-${_kerne
 		-M ${KSTAGEDIR}/kernel.${_kernel}/kernel.${_kernel}${flavor}.ucl \
 		-p ${KSTAGEDIR}/kernel.${_kernel}/kernel.${_kernel}${flavor}.plist \
 		-r ${KSTAGEDIR}/kernel.${_kernel} \
-		-o ${REPODIR}/${PKG_ABI}/${PKG_VERSION}
+		-o ${REPODIR}/${PKG_ABI}/${PKG_OUTPUT_DIR}
 .   endfor
 .  endif
 . endfor
@@ -2143,7 +2175,7 @@ sign-packages:	_pkgbootstrap .PHONY
 		${REPODIR}/$$(${PKG_CMD} -o ABI_FILE=${WSTAGEDIR}/usr/bin/uname config ABI)/${PKG_VERSION} \
 		${PKGSIGNKEY} ; \
 	cd ${REPODIR}/$$(${PKG_CMD} -o ABI_FILE=${WSTAGEDIR}/usr/bin/uname config ABI); \
-	ln -s ${PKG_VERSION} latest
+	ln -s ${PKG_OUTPUT_DIR} latest
 
 #
 #
@@ -2429,7 +2461,7 @@ ${_bt}-usr.bin/mandoc: ${_bt}-lib/libopenbsd
 _basic_bootstrap_tools_multilink=usr.bin/grep grep,egrep,fgrep
 _basic_bootstrap_tools_multilink+=bin/test test,[
 # bootstrap tools needed by buildworld:
-_basic_bootstrap_tools+=usr.bin/cut bin/expr usr.bin/gencat usr.bin/join \
+_basic_bootstrap_tools=usr.bin/cut bin/expr usr.bin/gencat usr.bin/join \
     usr.bin/mktemp bin/realpath bin/rmdir usr.bin/sed usr.bin/sort \
     usr.bin/truncate usr.bin/tsort
 # Some build scripts use nawk instead of awk (this happens at least in
@@ -2648,7 +2680,7 @@ _btxld=		usr.sbin/btxld
 # Rebuild ctfconvert and ctfmerge to avoid difficult-to-diagnose failures
 # resulting from missing bug fixes or ELF Toolchain updates.
 .if ${MK_CDDL} != "no"
-_dtrace_tools= cddl/lib/libctf cddl/usr.bin/ctfconvert \
+_dtrace_tools= cddl/lib/libctf cddl/lib/libspl cddl/usr.bin/ctfconvert \
     cddl/usr.bin/ctfmerge
 .endif
 
@@ -2965,7 +2997,12 @@ _prebuild_libs=	${_kerberos5_lib_libasn1} \
 		${_cddl_lib_libumem} ${_cddl_lib_libnvpair} \
 		${_cddl_lib_libuutil} \
 		${_cddl_lib_libavl} \
+		${_cddl_lib_libicp} \
+		${_cddl_lib_libicp_rescue} \
+		${_cddl_lib_libspl} \
+		${_cddl_lib_libtpool} \
 		${_cddl_lib_libzfs_core} ${_cddl_lib_libzfs} \
+		${_cddl_lib_libzutil} \
 		${_cddl_lib_libctf} \
 		lib/libufs \
 		lib/libutil lib/libpjdlog ${_lib_libypclnt} lib/libz lib/msun \
@@ -2983,6 +3020,10 @@ lib/libpng__L: lib/libz__L
 .if ${MK_DIALOG} != "no"
 _prebuild_libs+= gnu/lib/libdialog
 gnu/lib/libdialog__L: lib/msun__L lib/ncurses/ncursesw__L
+.endif
+
+.if ${MK_GOOGLETEST} != "no"
+_prebuild_libs+= lib/libregex
 .endif
 
 .if ${MK_LIBCPLUSPLUS} != "no"
@@ -3039,22 +3080,36 @@ _cddl_lib_libumem= cddl/lib/libumem
 _cddl_lib_libnvpair= cddl/lib/libnvpair
 _cddl_lib_libavl= cddl/lib/libavl
 _cddl_lib_libuutil= cddl/lib/libuutil
+_cddl_lib_libspl= cddl/lib/libspl
+
+cddl/lib/libuutil__L: cddl/lib/libavl__L cddl/lib/libspl__L
+
 .if ${MK_ZFS} != "no"
+_cddl_lib_libicp= cddl/lib/libicp
+_cddl_lib_libicp_rescue= cddl/lib/libicp_rescue
+_cddl_lib_libtpool= cddl/lib/libtpool
+_cddl_lib_libzutil= cddl/lib/libzutil
 _cddl_lib_libzfs_core= cddl/lib/libzfs_core
 _cddl_lib_libzfs= cddl/lib/libzfs
+
+cddl/lib/libtpool__L: cddl/lib/libspl__L
+
+cddl/lib/libzutil__L: cddl/lib/libavl__L cddl/lib/libtpool__L
 
 cddl/lib/libzfs_core__L: cddl/lib/libnvpair__L
 
 cddl/lib/libzfs__L: cddl/lib/libzfs_core__L lib/msun__L lib/libutil__L
 cddl/lib/libzfs__L: lib/libthr__L lib/libmd__L lib/libz__L cddl/lib/libumem__L
 cddl/lib/libzfs__L: cddl/lib/libuutil__L cddl/lib/libavl__L lib/libgeom__L
+cddl/lib/libzfs__L: cddl/lib/libnvpair__L cddl/lib/libzutil__L
+cddl/lib/libzfs__L: secure/lib/libcrypto__L
 
 lib/libbe__L: cddl/lib/libzfs__L
 .endif
 _cddl_lib_libctf= cddl/lib/libctf
 _cddl_lib= cddl/lib
 cddl/lib/libavl__L: cddl/lib/libnvpair__L
-cddl/lib/libctf__L: lib/libz__L
+cddl/lib/libctf__L: lib/libz__L cddl/lib/libspl__L
 # Jenkins sometimes fails to find libgcc_s when building libctf
 cddl/lib/libctf__L: lib/libgcc_s__L
 cddl/lib/libuutil__L: cddl/lib/libnvpair__L

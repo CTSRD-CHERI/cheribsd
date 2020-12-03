@@ -729,7 +729,7 @@ ffs_mount(struct mount *mp)
 		return (error);
 	NDFREE(&ndp, NDF_ONLY_PNBUF);
 	devvp = ndp.ni_vp;
-	if (!vn_isdisk(devvp, &error)) {
+	if (!vn_isdisk_error(devvp, &error)) {
 		vput(devvp);
 		return (error);
 	}
@@ -806,7 +806,7 @@ ffs_mount(struct mount *mp)
 	 */
 	if ((mp->mnt_kern_flag & MNTK_FPLOOKUP) != 0)
 		panic("MNTK_FPLOOKUP set on mount %p when it should not be", mp);
-	if ((mp->mnt_flag & (MNT_ACLS | MNT_NFS4ACLS)) == 0)
+	if ((mp->mnt_flag & (MNT_ACLS | MNT_NFS4ACLS | MNT_UNION)) == 0)
 		mp->mnt_kern_flag |= MNTK_FPLOOKUP;
 	MNT_IUNLOCK(mp);
 
@@ -975,7 +975,7 @@ loop:
 		/*
 		 * Step 4: invalidate all cached file data.
 		 */
-		if (vget(vp, LK_EXCLUSIVE | LK_INTERLOCK, td)) {
+		if (vget(vp, LK_EXCLUSIVE | LK_INTERLOCK)) {
 			MNT_VNODE_FOREACH_ALL_ABORT(mp, mvp);
 			goto loop;
 		}
@@ -1759,8 +1759,7 @@ ffs_sync_lazy(mp)
 			VI_UNLOCK(vp);
 			continue;
 		}
-		if ((error = vget(vp, LK_EXCLUSIVE | LK_NOWAIT | LK_INTERLOCK,
-		    td)) != 0)
+		if ((error = vget(vp, LK_EXCLUSIVE | LK_NOWAIT | LK_INTERLOCK)) != 0)
 			continue;
 #ifdef QUOTA
 		qsyncvp(vp);
@@ -1857,7 +1856,7 @@ loop:
 			VI_UNLOCK(vp);
 			continue;
 		}
-		if ((error = vget(vp, lockreq, td)) != 0) {
+		if ((error = vget(vp, lockreq)) != 0) {
 			if (error == ENOENT || error == ENOLCK) {
 				MNT_VNODE_FOREACH_ALL_ABORT(mp, mvp);
 				goto loop;

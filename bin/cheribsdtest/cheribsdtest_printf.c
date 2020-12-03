@@ -46,12 +46,6 @@
 
 #include "cheribsdtest.h"
 
-#ifdef __CHERI_PURE_CAPABILITY__
-#define	CAP_ARG(p)	(p)
-#else
-#define	CAP_ARG(p)	(&(p))
-#endif
-
 static void
 test_printf_cap_one(void * __capability p, int expected_tokens,
     const char *descr)
@@ -65,7 +59,7 @@ test_printf_cap_one(void * __capability p, int expected_tokens,
 	assert(expected_tokens == 1 || expected_tokens == 4 ||
 	    expected_tokens == 5);
 
-	asprintf(&str, "%#lp", CAP_ARG(p));
+	asprintf(&str, "%#lp", p);
 	tokens = sscanf(str, "%lx [%15[^,],%lx-%lx] %31s", &addr, perms, &base,
 	    &top, attr);
 	free(str);
@@ -167,26 +161,26 @@ test_printf_cap(const struct cheri_test *ctp __unused)
 	void * __capability scalar = (void * __capability)(uintcap_t)4;
 	char * __capability datap = data;
 
-	snprintf(data, sizeof(data), "%#lp", CAP_ARG(scalar));
+	snprintf(data, sizeof(data), "%#lp", scalar);
 	if (strcmp(data, "0x4") != 0)
 		cheribsdtest_failure_errx("Wrong output for simple scalar");
 
-	snprintf(data, sizeof(data), "%#.4lp", CAP_ARG(scalar));
+	snprintf(data, sizeof(data), "%#.4lp", scalar);
 	if (strcmp(data, "0x0004") != 0)
 		cheribsdtest_failure_errx("Wrong output for simple scalar "
 		    "with precision");
 
-	snprintf(data, sizeof(data), "%#8lp", CAP_ARG(scalar));
+	snprintf(data, sizeof(data), "%#8lp", scalar);
 	if (strcmp(data, "     0x4") != 0)
 		cheribsdtest_failure_errx("Wrong output for simple scalar "
 		    "with padding");
 
-	snprintf(data, sizeof(data), "%#-8lp", CAP_ARG(scalar));
+	snprintf(data, sizeof(data), "%#-8lp", scalar);
 	if (strcmp(data, "0x4     ") != 0)
 		cheribsdtest_failure_errx("Wrong output for simple scalar "
 		    "with left adjust padding");
 
-	snprintf(data, sizeof(data), "%#8.4lp", CAP_ARG(scalar));
+	snprintf(data, sizeof(data), "%#8.4lp", scalar);
 	if (strcmp(data, "  0x0004") != 0)
 		cheribsdtest_failure_errx("Wrong output for simple scalar "
 		    "with precision and padding");

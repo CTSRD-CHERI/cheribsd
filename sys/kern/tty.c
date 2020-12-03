@@ -67,6 +67,8 @@ __FBSDID("$FreeBSD$");
 #include <sys/ucred.h>
 #include <sys/vnode.h>
 
+#include <fs/devfs/devfs.h>
+
 #include <machine/stdarg.h>
 
 static MALLOC_DEFINE(M_TTY, "tty", "tty device");
@@ -1256,7 +1258,7 @@ tty_drop_ctty(struct tty *tp, struct proc *p)
 	 * is either changed or released.
 	 */
 	if (vp != NULL)
-		vrele(vp);
+		devfs_ctty_unref(vp);
 	return (0);
 }
 
@@ -1465,6 +1467,7 @@ tty_signal_sessleader(struct tty *tp, int sig)
 
 	/* Make signals start output again. */
 	tp->t_flags &= ~TF_STOPPED;
+	tp->t_termios.c_lflag &= ~FLUSHO;
 
 	if (tp->t_session != NULL && tp->t_session->s_leader != NULL) {
 		p = tp->t_session->s_leader;
@@ -1484,6 +1487,7 @@ tty_signal_pgrp(struct tty *tp, int sig)
 
 	/* Make signals start output again. */
 	tp->t_flags &= ~TF_STOPPED;
+	tp->t_termios.c_lflag &= ~FLUSHO;
 
 	if (sig == SIGINFO && !(tp->t_termios.c_lflag & NOKERNINFO))
 		tty_info(tp);
@@ -1928,6 +1932,7 @@ tty_generic_ioctl(struct tty *tp, u_long cmd, void *data, int fflag,
 		return (0);
 	case TIOCSTART:
 		tp->t_flags &= ~TF_STOPPED;
+		tp->t_termios.c_lflag &= ~FLUSHO;
 		ttydevsw_outwakeup(tp);
 		ttydevsw_pktnotify(tp, TIOCPKT_START);
 		return (0);
