@@ -52,7 +52,7 @@ __FBSDID("$FreeBSD$");
  * For -pie executables rtld will process the __cap_relocs, so we don't need
  * to include the code here.
  */
-#ifndef POSITION_INDEPENDENT_STARTUP
+#ifndef PIC
 #define DONT_EXPORT_CRT_INIT_GLOBALS
 #define CRT_INIT_GLOBALS_GDC_ONLY
 #include "crt_init_globals.c"
@@ -70,7 +70,7 @@ static void _start(void *, void (*)(void), struct Struct_Obj_Entry *) __used;
 Elf_Auxinfo *__auxargs;
 
 /* Define an assembly stub that sets up $cgp and jumps to _start */
-#ifndef POSITION_INDEPENDENT_STARTUP
+#ifndef PIC
 DEFINE_CHERI_START_FUNCTION(_start)
 #else
 /* RTLD takes care of initializing $cgp, and all the globals */
@@ -112,7 +112,7 @@ _start(void *auxv,
 	char **argv = NULL;
 	char **env = NULL;
 	const bool has_dynamic_linker = obj != NULL && cleanup != NULL;
-#ifndef POSITION_INDEPENDENT_STARTUP
+#ifndef PIC
 	const Elf_Phdr *at_phdr = NULL;
 	long at_phnum = 0;
 #else
@@ -137,7 +137,7 @@ _start(void *auxv,
 			env = (char **)auxp->a_un.a_ptr;
 		} else if (auxp->a_type == AT_ARGC) {
 			argc = auxp->a_un.a_val;
-#ifndef POSITION_INDEPENDENT_STARTUP
+#ifndef PIC
 		} else if (auxp->a_type == AT_PHDR) {
 			at_phdr = auxp->a_un.a_ptr;
 		} else if (auxp->a_type == AT_PHNUM) {
@@ -147,7 +147,7 @@ _start(void *auxv,
 	}
 
 	/* For -pie executables rtld will initialize the __cap_relocs */
-#ifndef POSITION_INDEPENDENT_STARTUP
+#ifndef PIC
 	/*
 	 * crt_init_globals_3 must be called before accessing any globals.
 	 *
