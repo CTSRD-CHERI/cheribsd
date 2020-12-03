@@ -32,8 +32,6 @@
 __FBSDID("$FreeBSD$");
 
 #include "opt_capsicum.h"
-#include "opt_inet.h"
-#include "opt_inet6.h"
 #include "opt_sctp.h"
 #include "opt_ktrace.h"
 
@@ -158,6 +156,10 @@ sctp_syscalls_init(void)
 	return (0);
 }
 
+#ifdef SCTP
+SYSINIT(sctp_syscalls, SI_SUB_SYSCALLS, SI_ORDER_ANY, sctp_syscalls_init, NULL);
+#endif
+
 int
 sctp_syscalls_uninit(void)
 {
@@ -181,8 +183,6 @@ sctp_syscalls_uninit(void)
 
 /*
  * SCTP syscalls.
- * Functionality only compiled in if SCTP is defined in the kernel Makefile,
- * otherwise all return EOPNOTSUPP.
  */
 #ifndef _SYS_SYSPROTO_H_
 struct sctp_peeloff_args {
@@ -193,7 +193,6 @@ int	sd;
 int
 sys_sctp_peeloff(struct thread *td, struct sctp_peeloff_args *uap)
 {
-#if defined(INET) || defined(INET6)
 	struct file *headfp, *nfp = NULL;
 	struct socket *head, *so;
 	cap_rights_t rights;
@@ -255,7 +254,6 @@ done:
 	fdrop(headfp, td);
 done2:
 	return (error);
-#endif
 }
 
 #ifndef _SYS_SYSPROTO_H_
@@ -296,8 +294,7 @@ kern_sys_sctp_generic_sendmsg(struct thread *td, int sd,
     void * __capability msg, int mlen, const struct sockaddr * __capability uto,
     socklen_t tolen, struct sctp_sndrcvinfo * __capability usinfo, int flags)
 {
-#if defined(INET) || defined(INET6)
-	struct sctp_sndrcvinfo sinfo, *sinfop = NULL;
+	struct sctp_sndrcvinfo sinfo, *u_sinfo = NULL;
 	struct socket *so;
 	struct file *fp = NULL;
 	struct sockaddr *to = NULL;
@@ -313,7 +310,7 @@ kern_sys_sctp_generic_sendmsg(struct thread *td, int sd,
 		error = copyin(usinfo, &sinfo, sizeof(sinfo));
 		if (error != 0)
 			return (error);
-		sinfop = &sinfo;
+		u_sinfo = &sinfo;
 	}
 
 	cap_rights_init_one(&rights, CAP_SEND);
@@ -362,7 +359,7 @@ kern_sys_sctp_generic_sendmsg(struct thread *td, int sd,
 	len = auio.uio_resid = mlen;
 	CURVNET_SET(so->so_vnet);
 	error = sctp_lower_sosend(so, to, &auio, (struct mbuf *)NULL,
-	    (struct mbuf *)NULL, flags, sinfop, td);
+	    (struct mbuf *)NULL, flags, u_sinfo, td);
 	CURVNET_RESTORE();
 	if (error != 0) {
 		if (auio.uio_resid != len && (error == ERESTART ||
@@ -390,7 +387,6 @@ sctp_bad:
 sctp_bad2:
 	free(to, M_SONAME);
 	return (error);
-#endif
 }
 
 #ifndef _SYS_SYSPROTO_H_
@@ -447,8 +443,7 @@ kern_sctp_generic_sendmsg_iov(struct thread *td, int sd,
     struct sctp_sndrcvinfo * __capability usinfo, int flags,
     copyiniov_t *copyiniov_f)
 {
-#if defined(INET) || defined(INET6)
-	struct sctp_sndrcvinfo sinfo, *sinfop = NULL;
+	struct sctp_sndrcvinfo sinfo, *u_sinfo = NULL;
 	struct socket *so;
 	struct file *fp = NULL;
 	struct sockaddr *to = NULL;
@@ -465,7 +460,7 @@ kern_sctp_generic_sendmsg_iov(struct thread *td, int sd,
 		error = copyin(usinfo, &sinfo, sizeof(sinfo));
 		if (error != 0)
 			return (error);
-		sinfop = &sinfo;
+		u_sinfo = &sinfo;
 	}
 	cap_rights_init_one(&rights, CAP_SEND);
 	if (tolen != 0) {
@@ -523,7 +518,7 @@ kern_sctp_generic_sendmsg_iov(struct thread *td, int sd,
 	CURVNET_SET(so->so_vnet);
 	error = sctp_lower_sosend(so, to, &auio,
 		    (struct mbuf *)NULL, (struct mbuf *)NULL,
-		    flags, sinfop, td);
+		    flags, u_sinfo, td);
 	CURVNET_RESTORE();
 	if (error != 0) {
 		if (auio.uio_resid != len && (error == ERESTART ||
@@ -553,7 +548,6 @@ sctp_bad1:
 sctp_bad2:
 	free(to, M_SONAME);
 	return (error);
-#endif
 }
 
 #ifndef _SYS_SYSPROTO_H_
@@ -612,7 +606,6 @@ kern_sctp_generic_recvmsg(struct thread *td, int sd,
     struct sctp_sndrcvinfo * __capability usinfo,
     int * __capability umsg_flags, copyiniov_t *copyiniov_f)
 {
-#if defined(INET) || defined(INET6)
 	uint8_t sockbufstore[256];
 	struct uio auio;
 	struct iovec *iov, *tiov;
@@ -736,7 +729,6 @@ out1:
 		fdrop(fp, td);
 
 	return (error);
-#endif
 }
 // CHERI CHANGES START
 // {

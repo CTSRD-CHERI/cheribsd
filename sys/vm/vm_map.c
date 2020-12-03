@@ -5258,6 +5258,13 @@ vm_map_pmap_KBI(vm_map_t map)
 	return (map->pmap);
 }
 
+bool
+vm_map_range_valid_KBI(vm_map_t map, vm_offset_t start, vm_offset_t end)
+{
+
+	return (vm_map_range_valid(map, start, end));
+}
+
 int
 vm_map_reservation_delete(vm_map_t map, vm_offset_t reservation)
 {

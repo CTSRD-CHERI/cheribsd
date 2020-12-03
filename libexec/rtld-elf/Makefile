@@ -35,6 +35,7 @@ TAGS+=		lib64
 .endif
 .PATH: ${RTLD_ELF_DIR}
 SRCS= \
+	crtbrand.S \
 	rtld_start.S \
 	reloc.c \
 	rtld.c \
@@ -50,6 +51,7 @@ SRCS+= \
 .endif
 MAN?=		rtld.1
 CSTD?=		gnu99
+ACFLAGS+=	-DLOCORE
 CFLAGS+=	-Wall -DFREEBSD_ELF -DIN_RTLD -ffreestanding
 CFLAGS+=	-I${SRCTOP}/lib/csu/common
 .if exists(${RTLD_ELF_DIR}/${MACHINE_ARCH})
@@ -98,7 +100,7 @@ beforeinstall:
 	-chflags -h noschg ${DESTDIR}/usr/libexec/${PROG}
 .endif
 
-.PATH: ${RTLD_ELF_DIR}/${RTLD_ARCH}
+.PATH: ${RTLD_ELF_DIR}/${RTLD_ARCH} ${SRCTOP}/lib/csu/common
 
 .if ${MACHINE_ABI:Mpurecap}
 .PATH: ${RTLD_ELF_DIR}/cheri

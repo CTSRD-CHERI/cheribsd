@@ -1407,7 +1407,7 @@ clk_set_assigned(device_t dev, phandle_t node)
 	if (ofw_bus_parse_xref_list_get_length(node,
 	    "assigned-clock-parents", "#clock-cells", &nparents) != 0)
 		nparents = -1;
-	for (i = 0; i < nclocks; i++) {
+	for (i = nclocks - 1; i >= 0; i--) {
 		/* First get the clock we are supposed to modify */
 		rv = clk_get_by_ofw_index_prop(dev, 0, "assigned-clocks",
 		    i, &clk);
@@ -1420,15 +1420,17 @@ clk_set_assigned(device_t dev, phandle_t node)
 		}
 
 		/* First set it's parent if needed */
-		if (i <= nparents)
+		if (i < nparents)
 			clk_set_assigned_parent(dev, clk, i);
 
 		/* Then set a new frequency */
-		if (i <= nrates && rates[i] != 0)
+		if (i < nrates && rates[i] != 0)
 			clk_set_assigned_rates(dev, clk, rates[i]);
 
 		clk_release(clk);
 	}
+	if (rates != NULL)
+		OF_prop_free(rates);
 
 	return (0);
 }
