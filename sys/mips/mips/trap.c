@@ -1177,13 +1177,13 @@ dofault:
 		break;
 
 	case T_C2E + T_USER:
-		if (colocation_trap_in_switcher(td, trapframe)) {
+		msg = "USER_CHERI_EXCEPTION";
+		if (colocation_trap_in_switcher(td, trapframe, msg)) {
 			printf("%s: switcher trap at pc %#jx\n",
 			    __func__, (intmax_t)TRAPF_PC(trapframe));
 			TRAPF_PC_INCREMENT(trapframe, sizeof(int));
 			goto out;
 		}
-		msg = "USER_CHERI_EXCEPTION";
 		fetch_bad_instr(trapframe);
 		if (log_user_cheri_exceptions)
 			log_c2e_exception(msg, trapframe, type);

@@ -332,6 +332,10 @@ kern_thr_exit(struct thread *td)
 
 	p = td->td_proc;
 
+#ifdef CPU_CHERI
+	colocation_thread_exit(td);
+#endif
+
 	/*
 	 * If all of the threads in a process call this routine to
 	 * exit (e.g. all threads call pthread_exit()), exactly one
@@ -367,10 +371,6 @@ kern_thr_exit(struct thread *td)
 		p->p_pendingexits--;
 	}
 	tidhash_remove(td);
-
-#ifdef CPU_CHERI
-	colocation_thread_exit(td);
-#endif
 
 	/*
 	 * The check above should prevent all other threads from this

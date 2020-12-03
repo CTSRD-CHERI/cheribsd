@@ -155,7 +155,7 @@ _C_LABEL(switcher_coaccept):
 	/*
 	 * Load the capability to the caller's control block.
 	 */
-	clc	$c25, zero, SCB_PEER_SCB($idc)
+	clc	$c25, zero, SCB_CALLER_SCB($idc)
 
 	/*
 	 * Is this the first invocation of coaccept, or rather a response
@@ -165,7 +165,7 @@ _C_LABEL(switcher_coaccept):
 	bnez	t0, 1f
 	nop
 	ccleartag $c24, $cnull
-	csc	$c24, zero, SCB_PEER_SCB($idc)
+	csc	$c24, zero, SCB_CALLER_SCB($idc)
 	li	v0, SYS_copark
 	syscall
 	nop
@@ -229,8 +229,8 @@ _C_LABEL(switcher_coaccept):
 	/*
 	 * Zero out the scb_peer_scb variables, releasing the spinlock.
 	 */
-	csd	zero, zero, SCB_PEER_SCB($c25)
-	csd	zero, zero, SCB_PEER_SCB($idc)
+	csd	zero, zero, SCB_CALLER_SCB($c25)
+	csd	zero, zero, SCB_CALLER_SCB($idc)
 
 3:
 	clearlo		CLEARLO_BITS

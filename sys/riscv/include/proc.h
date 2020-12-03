@@ -40,14 +40,19 @@
  */
 struct switchercb {
 	/*
-	 * Peer context - callee in caller's context, caller in callee's.
+	 * Caller context: context of the thread that cocalled us.
 	 * This also serves as the callee's spinlock.  Must be first,
 	 * as the cllc instruction doesn't take an offset.
 	 *
 	 * This can also be set to a zero-length capability, with the offset
 	 * equal to errno to be returned by cocall(2).
 	 */
-	struct switchercb * __capability	scb_peer_scb;
+	struct switchercb * __capability	scb_caller_scb;
+
+	/*
+	 * Callee context, context of the thread we're cocalling into.
+	 */
+	struct switchercb * __capability	scb_callee_scb;
 
 	/*
 	 * Thread owning the context; the same thread that called cosetup(2).

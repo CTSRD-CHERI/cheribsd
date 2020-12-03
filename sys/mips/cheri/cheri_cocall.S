@@ -174,7 +174,7 @@ _C_LABEL(switcher_cocall):
 	 * Save the capability to the callee's control block in the caller
 	 * context.
 	 */
-	csc	$c25, zero, SCB_PEER_SCB($idc)
+	csc	$c25, zero, SCB_CALLER_SCB($idc)
 
 	/*
 	 * Put the caller cookie (caller's data capability with the tag

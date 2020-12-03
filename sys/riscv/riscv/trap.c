@@ -329,6 +329,7 @@ page_fault_handler(struct trapframe *frame, int usermode)
 	error = vm_fault_trap(map, va, ftype, VM_FAULT_NORMAL, &sig, &ucode);
 	if (error != KERN_SUCCESS) {
 		if (usermode) {
+			colocation_trap_in_switcher(td, frame, "bad page fault");
 			call_trapsignal(td, sig, ucode, stval,
 			    frame->tf_scause & SCAUSE_CODE, 0);
 		} else {
@@ -473,16 +474,11 @@ do_trap_user(struct trapframe *frame)
 	CTR3(KTR_TRAP, "do_trap_user: curthread: %p, sepc: %lx, frame: %p",
 	    curthread, (__cheri_addr unsigned long)frame->tf_sepc, frame);
 
-	if (exception != SCAUSE_ECALL_USER &&
-	    colocation_trap_in_switcher(td, frame)) {
-		printf("%s: switcher trap at pc %#jx\n",
-		    __func__, (intmax_t)frame->tf_sepc);
-	}
-
 	switch (exception) {
 	case SCAUSE_LOAD_ACCESS_FAULT:
 	case SCAUSE_STORE_ACCESS_FAULT:
 	case SCAUSE_INST_ACCESS_FAULT:
+		colocation_trap_in_switcher(td, frame, "load/store fault");
 		call_trapsignal(td, SIGBUS, BUS_ADRERR, frame->tf_sepc,
 		    exception, 0);
 		userret(td, frame);
@@ -511,11 +507,13 @@ do_trap_user(struct trapframe *frame)
 			break;
 		}
 #endif
+		colocation_trap_in_switcher(td, frame, "illegal instruction");
 		call_trapsignal(td, SIGILL, ILL_ILLTRP, frame->tf_sepc,
 		    exception, 0);
 		userret(td, frame);
 		break;
 	case SCAUSE_BREAKPOINT:
+		colocation_trap_in_switcher(td, frame, "breakpoint");
 		call_trapsignal(td, SIGTRAP, TRAP_BRKPT, frame->tf_sepc,
 		    exception, 0);
 		userret(td, frame);
@@ -524,22 +522,26 @@ do_trap_user(struct trapframe *frame)
 	/* M-mode emulates alignment of non-CHERI instructions */
 	case SCAUSE_LOAD_MISALIGNED:
 	case SCAUSE_STORE_MISALIGNED:
+		colocation_trap_in_switcher(td, frame, "misaligned load/store");
 		call_trapsignal(td, SIGBUS, BUS_ADRALN,
 		    (uintcap_t)frame->tf_stval, exception, 0);
 		break;
 	case SCAUSE_LOAD_CAP_PAGE_FAULT:
+		colocation_trap_in_switcher(td, frame, "load cap page fault");
 		if (log_user_cheri_exceptions)
 			dump_cheri_exception(frame);
 		call_trapsignal(td, SIGSEGV, SEGV_LOADTAG,
 		    (uintcap_t)frame->tf_stval, exception, 0);
 		break;
 	case SCAUSE_STORE_AMO_CAP_PAGE_FAULT:
+		colocation_trap_in_switcher(td, frame, "store amo cap page fault");
 		if (log_user_cheri_exceptions)
 			dump_cheri_exception(frame);
 		call_trapsignal(td, SIGSEGV, SEGV_STORETAG,
 		    (uintcap_t)frame->tf_stval, exception, 0);
 		break;
 	case SCAUSE_CHERI:
+		colocation_trap_in_switcher(td, frame, "cheri fault");
 		if (log_user_cheri_exceptions)
 			dump_cheri_exception(frame);
 		call_trapsignal(td, SIGPROT,
