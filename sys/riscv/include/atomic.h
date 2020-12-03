@@ -104,10 +104,25 @@ atomic_fcmpset##SUFFIX##WIDTH(__volatile uint##WIDTH##_t *p,		\
 	ATOMIC_FCMPSET_ORDER(WIDTH, _, __ATOMIC_RELAXED)		\
 	ATOMIC_FCMPSET_ACQ_REL(WIDTH)					\
 
+#ifdef __CHERI_PURE_CAPABILITY__
+/*
+ * The purecap kernel can not use the generic sub-word atomics
+ * as they break in the presence of subobject bounds.
+ */
+ATOMIC_CMPSET(8);
+ATOMIC_FCMPSET(8);
+ATOMIC_CMPSET(16);
+ATOMIC_FCMPSET(16);
+#define	atomic_cmpset_8 atomic_cmpset_8
+#define	atomic_fcmpset_8 atomic_fcmpset_8
+#define	atomic_cmpset_16 atomic_cmpset_16
+#define	atomic_fcmpset_16 atomic_fcmpset_16
+#else
 ATOMIC_CMPSET_ACQ_REL(8);
 ATOMIC_FCMPSET_ACQ_REL(8);
 ATOMIC_CMPSET_ACQ_REL(16);
 ATOMIC_FCMPSET_ACQ_REL(16);
+#endif
 
 #define	atomic_cmpset_char		atomic_cmpset_8
 #define	atomic_cmpset_acq_char		atomic_cmpset_acq_8
@@ -269,6 +284,15 @@ atomic_swap_64(volatile uint64_t *p, uint64_t val)
 
 	return (__atomic_exchange_n(p, val, __ATOMIC_RELAXED));
 }
+
+#ifdef __CHERI_PURE_CAPABILITY__
+static __inline uintptr_t
+atomic_swap_ptr(volatile uintptr_t *p, uintptr_t val)
+{
+
+	return (__atomic_exchange_n(p, val, __ATOMIC_RELAXED));
+}
+#endif
 
 #define	atomic_swap_int			atomic_swap_32
 
