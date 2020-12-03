@@ -1046,13 +1046,13 @@ db_get_stack_pid(struct thread *td)
 
 #if defined(__mips__)
 	addr = __builtin_cheri_address_get(td->td_frame->csp);
-	db_printf("%s: td: %p; td_frame %p; csp: %#lp; csp addr: %lx\n",
-	    __func__, td, td->td_frame, td->td_frame->csp, (long)addr);
+//	db_printf("%s: td: %p; td_frame %p; csp: %#lp; csp addr: %lx\n",
+//	    __func__, td, td->td_frame, td->td_frame->csp, (long)addr);
 #elif defined(__riscv)
 	addr = __builtin_cheri_address_get(td->td_frame->tf_sp);
-	db_printf("%s: td: %p; td_frame %p; tf_sp: %#lp; csp addr: %lx\n",
-	    __func__, td, td->td_frame,
-	    (void * __capability)td->td_frame->tf_sp, (long)addr);
+//	db_printf("%s: td: %p; td_frame %p; tf_sp: %#lp; csp addr: %lx\n",
+//	    __func__, td, td->td_frame,
+//	    (void * __capability)td->td_frame->tf_sp, (long)addr);
 #else
 #error "what architecture is this?"
 #endif
