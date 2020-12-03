@@ -138,6 +138,21 @@ colocation_fetch_scb(struct thread *td, struct switchercb *scbp)
 	return (true);
 }
 
+static void
+colocation_copyout_scb(struct thread *td, struct switchercb *scbp)
+{
+	vaddr_t addr;
+	int error;
+
+	addr = td->td_md.md_scb;
+	KASSERT(addr != 0, ("%s: md_scb %#lx", __func__, td->td_md.md_scb));
+
+	error = copyoutcap(scbp, ___USER_CFROMPTR((void *)addr, userspace_cap),
+	    sizeof(*scbp));
+	KASSERT(error == 0, ("%s: copyoutcap to %p failed with error %d",
+	    __func__, (void *)addr, error));
+}
+
 static bool
 colocation_fetch_caller_scb(struct thread *td, struct switchercb *scbp)
 {
@@ -405,6 +420,9 @@ colocation_unborrow(struct thread *td, struct trapframe *trapframe)
 	    td, td->td_proc->p_pid, td->td_proc->p_comm,
 	    peertd, peertd->td_proc->p_pid, peertd->td_proc->p_comm));
 #endif
+
+	scb.scb_borrower_td = NULL;
+	colocation_copyout_scb(td, &scb);
 }
 
 bool
