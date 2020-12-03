@@ -36,6 +36,8 @@ __FBSDID("$FreeBSD$");
 #include <vm/uma.h>
 #include <vm/uma_int.h>
 
+#include <cheri/cheric.h>
+
 void *
 uma_small_alloc(uma_zone_t zone, vm_size_t bytes, int domain, u_int8_t *flags,
     int wait)
