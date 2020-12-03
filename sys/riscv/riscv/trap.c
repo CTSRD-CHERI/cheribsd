@@ -329,6 +329,7 @@ page_fault_handler(struct trapframe *frame, int usermode)
 	error = vm_fault_trap(map, va, ftype, VM_FAULT_NORMAL, &sig, &ucode);
 	if (error != KERN_SUCCESS) {
 		if (usermode) {
+			colocation_trap_in_switcher(td, frame, "bad page fault");
 			call_trapsignal(td, sig, ucode, stval,
 			    frame->tf_scause & SCAUSE_CODE, 0);
 		} else {
@@ -485,7 +486,6 @@ do_trap_user(struct trapframe *frame)
 	case SCAUSE_STORE_PAGE_FAULT:
 	case SCAUSE_LOAD_PAGE_FAULT:
 	case SCAUSE_INST_PAGE_FAULT:
-		colocation_trap_in_switcher(td, frame, "page fault");
 		page_fault_handler(frame, 1);
 		break;
 	case SCAUSE_ECALL_USER:
