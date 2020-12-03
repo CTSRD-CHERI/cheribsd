@@ -118,7 +118,8 @@ static abort_handler *abort_handlers[] = {
 };
 
 static __inline void
-call_trapsignal(struct thread *td, int sig, int code, void * __capability addr)
+call_trapsignal(struct thread *td, int sig, int code, void * __capability addr,
+    int trapno)
 {
 	ksiginfo_t ksi;
 
@@ -126,6 +127,7 @@ call_trapsignal(struct thread *td, int sig, int code, void * __capability addr)
 	ksi.ksi_signo = sig;
 	ksi.ksi_code = code;
 	ksi.ksi_addr = addr;
+	ksi.ksi_trapno = trapno;
 	trapsignal(td, &ksi);
 }
 
@@ -176,7 +178,8 @@ svc_handler(struct thread *td, struct trapframe *frame)
 		syscallret(td);
 	} else {
 		call_trapsignal(td, SIGILL, ILL_ILLOPN,
-		    (void * __capability)frame->tf_elr);
+		    (void * __capability)frame->tf_elr,
+		    ESR_ELx_EXCEPTION(frame->tf_esr));
 		userret(td, frame);
 	}
 }
@@ -193,7 +196,8 @@ align_abort(struct thread *td, struct trapframe *frame, uint64_t esr,
 	}
 
 	call_trapsignal(td, SIGBUS, BUS_ADRALN,
-	    (void * __capability)frame->tf_elr);
+	    (void * __capability)frame->tf_elr,
+	    ESR_ELx_EXCEPTION(frame->tf_esr));
 	userret(td, frame);
 }
 
@@ -320,7 +324,8 @@ data_abort(struct thread *td, struct trapframe *frame, uint64_t esr,
 	if (error != KERN_SUCCESS) {
 		if (lower) {
 			call_trapsignal(td, sig, ucode,
-			    (void * __capability)(uintcap_t)far);
+			    (void * __capability)(uintcap_t)far,
+			    ESR_ELx_EXCEPTION(esr));
 		} else {
 			if (td->td_intr_nesting_level == 0 &&
 			    pcb->pcb_onfault != 0) {
@@ -431,7 +436,7 @@ do_el1h_sync(struct thread *td, struct trapframe *frame)
 		break;
 	}
 
-	switch(exception) {
+	switch (exception) {
 	case EXCP_FP_SIMD:
 	case EXCP_TRAP_FP:
 #ifdef VFP
@@ -542,7 +547,7 @@ do_el0_sync(struct thread *td, struct trapframe *frame)
 	    "do_el0_sync: curthread: %p, esr %lx, elr: %lx, frame: %p", td, esr,
 	    frame->tf_elr, frame);
 
-	switch(exception) {
+	switch (exception) {
 	case EXCP_FP_SIMD:
 	case EXCP_TRAP_FP:
 #ifdef VFP
@@ -573,24 +578,29 @@ do_el0_sync(struct thread *td, struct trapframe *frame)
 		break;
 	case EXCP_UNKNOWN:
 		if (!undef_insn(0, frame))
-			call_trapsignal(td, SIGILL, ILL_ILLTRP, (void * __capability)(uintcap_t)far);
+			call_trapsignal(td, SIGILL, ILL_ILLTRP,
+			    (void * __capability)(uintcap_t)far, exception);
 		userret(td, frame);
 		break;
 	case EXCP_SP_ALIGN:
-		call_trapsignal(td, SIGBUS, BUS_ADRALN, (void * __capability)frame->tf_sp);
+		call_trapsignal(td, SIGBUS, BUS_ADRALN,
+		    (void * __capability)frame->tf_sp, exception);
 		userret(td, frame);
 		break;
 	case EXCP_PC_ALIGN:
-		call_trapsignal(td, SIGBUS, BUS_ADRALN, (void * __capability)frame->tf_elr);
+		call_trapsignal(td, SIGBUS, BUS_ADRALN,
+		    (void * __capability)frame->tf_elr, exception);
 		userret(td, frame);
 		break;
 	case EXCP_BRKPT_EL0:
 	case EXCP_BRK:
-		call_trapsignal(td, SIGTRAP, TRAP_BRKPT, (void * __capability)frame->tf_elr);
+		call_trapsignal(td, SIGTRAP, TRAP_BRKPT,
+		    (void * __capability)frame->tf_elr, exception);
 		userret(td, frame);
 		break;
 	case EXCP_MSR:
-		call_trapsignal(td, SIGILL, ILL_PRVOPC, (void * __capability)frame->tf_elr); 
+		call_trapsignal(td, SIGILL, ILL_PRVOPC,
+		    (void * __capability)frame->tf_elr, exception); 
 		userret(td, frame);
 		break;
 	case EXCP_SOFTSTP_EL0:
@@ -599,11 +609,12 @@ do_el0_sync(struct thread *td, struct trapframe *frame)
 		WRITE_SPECIALREG(mdscr_el1,
 		    READ_SPECIALREG(mdscr_el1) & ~DBG_MDSCR_SS);
 		call_trapsignal(td, SIGTRAP, TRAP_TRACE,
-		    (void * __capability)frame->tf_elr);
+		    (void * __capability)frame->tf_elr, exception);
 		userret(td, frame);
 		break;
 	default:
-		call_trapsignal(td, SIGBUS, BUS_OBJERR, (void * __capability)frame->tf_elr);
+		call_trapsignal(td, SIGBUS, BUS_OBJERR,
+		    (void * __capability)frame->tf_elr, exception);
 		userret(td, frame);
 		break;
 	}

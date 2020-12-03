@@ -68,7 +68,7 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_map.h>
 #include <x86/include/busdma_impl.h>
 #include <x86/iommu/intel_reg.h>
-#include <x86/iommu/busdma_dmar.h>
+#include <dev/iommu/busdma_iommu.h>
 #include <dev/pci/pcireg.h>
 #include <dev/pci/pcivar.h>
 #include <x86/iommu/intel_dmar.h>
@@ -1160,7 +1160,7 @@ dmar_print_domain(struct dmar_domain *domain, bool show_mappings)
 	    "   ctx_cnt %d flags %x pgobj %p map_ents %u\n",
 	    domain, domain->domain, domain->mgaw, domain->agaw, domain->pglvl,
 	    (uintmax_t)domain->end, domain->refs, domain->ctx_cnt,
-	    domain->flags, domain->pgtbl_obj, domain->entries_cnt);
+	    domain->flags, domain->pgtbl_obj, domain->iodom.entries_cnt);
 	if (!LIST_EMPTY(&domain->contexts)) {
 		db_printf("  Contexts:\n");
 		LIST_FOREACH(ctx, &domain->contexts, link)
