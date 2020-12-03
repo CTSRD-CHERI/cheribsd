@@ -221,6 +221,11 @@ cheri_init_capabilities(void * __capability kroot)
 	    CHERI_CAP_USER_CODE_PERMS);
 	userspace_root_cap = ctemp;
 
+	ctemp = cheri_setaddress(kroot, CHERI_SEALCAP_KERNEL_BASE);
+	ctemp = cheri_setbounds(kroot, CHERI_SEALCAP_KERNEL_LENGTH);
+	ctemp = cheri_andperm(kroot, CHERI_SEALCAP_KERNEL_PERMS);
+	kernel_root_sealcap = ctemp;
+
 #ifdef __CHERI_PURE_CAPABILITY__
 	/*
 	 * Split kroot and generate a capability for each memory segment.
@@ -265,7 +270,8 @@ cheri_init_capabilities(void * __capability kroot)
 	    ~(CHERI_PERM_EXECUTE | CHERI_PERM_CCALL | CHERI_PERM_SEAL |
 	      CHERI_PERM_SYSTEM_REGS));
 
-	kernel_root_cap = kroot;
+	kernel_root_cap = cheri_andperm(kroot,
+	    ~(CHERI_PERM_SEAL | CHERI_PERM_UNSEAL));
 #endif
 }
 

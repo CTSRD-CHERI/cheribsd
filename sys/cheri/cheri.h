@@ -115,11 +115,7 @@ extern void * __capability swap_restore_cap;
 extern void * __capability kernel_root_sealcap;
 
 #ifdef __CHERI_PURE_CAPABILITY__
-/*
- * Kernel root capability
- * has all permissions
- * This spans the whole address-space
- */
+/* Root kernel capability */
 extern void * __capability kernel_root_cap;
 #endif
 
