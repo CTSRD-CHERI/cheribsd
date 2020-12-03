@@ -56,6 +56,7 @@ mips/mips/trap.c			standard
 mips/mips/uio_machdep.c			standard
 mips/mips/uma_machdep.c			standard
 mips/mips/vm_machdep.c			standard
+mips/mips/vm_machdep_caprevoke.c	optional	cpu_cheri cheri_caprevoke
 
 # cheri arch files
 mips/cheri/locore.S			optional	no-obj cheri_purecap_kernel
