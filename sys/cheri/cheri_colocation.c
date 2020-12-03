@@ -1000,6 +1000,7 @@ db_print_scb(struct switchercb *scb)
 	db_printf("    scb_callee_scb:    %#lp\n", scb->scb_callee_scb);
 	db_printf("    scb_td:            %p\n", scb->scb_td);
 	db_printf("    scb_borrower_td:   %p\n", scb->scb_borrower_td);
+	db_printf("    scb_unsealcap:     %#lp\n", scb->scb_unsealcap);
 #ifdef __mips__
 	db_printf("    scb_tls:           %#lp\n", scb->scb_tls);
 	db_printf("    scb_csp (c11):     %#lp\n", scb->scb_csp);
