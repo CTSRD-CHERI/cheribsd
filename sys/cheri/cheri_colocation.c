@@ -139,7 +139,7 @@ colocation_fetch_scb(struct thread *td, struct switchercb *scbp)
 }
 
 static bool
-colocation_fetch_peer_scb(struct thread *td, struct switchercb *scbp)
+colocation_fetch_caller_scb(struct thread *td, struct switchercb *scbp)
 {
 	vaddr_t addr;
 	int error;
@@ -169,6 +169,41 @@ colocation_fetch_peer_scb(struct thread *td, struct switchercb *scbp)
 	KASSERT(error == 0,
 	    ("%s: copyincap from peer %p failed with error %d\n",
 	    __func__, (__cheri_fromcap void *)scbp->scb_caller_scb, error));
+
+	return (true);
+}
+
+static bool
+colocation_fetch_callee_scb(struct thread *td, struct switchercb *scbp)
+{
+	vaddr_t addr;
+	int error;
+
+	addr = td->td_md.md_scb;
+	if (addr == 0) {
+		/*
+		 * We've never called cosetup(2).
+		 */
+		return (false);
+	}
+
+	error = copyincap(___USER_CFROMPTR((const void *)addr, userspace_cap),
+	    &(*scbp), sizeof(*scbp));
+	KASSERT(error == 0, ("%s: copyincap from %p failed with error %d\n",
+	    __func__, (void *)addr, error));
+
+	if (cheri_gettag(scbp->scb_callee_scb) == 0 ||
+	    cheri_getlen(scbp->scb_callee_scb) == 0) {
+		/*
+		 * Not in cocall.
+		 */
+		return (false);
+	}
+
+	error = copyincap(scbp->scb_callee_scb, &(*scbp), sizeof(*scbp));
+	KASSERT(error == 0,
+	    ("%s: copyincap from peer %p failed with error %d\n",
+	    __func__, (__cheri_fromcap void *)scbp->scb_callee_scb, error));
 
 	return (true);
 }
@@ -704,7 +739,7 @@ kern_cogetpid(struct thread *td, pid_t * __capability pidp)
 	pid_t pid;
 	int error;
 
-	is_callee = colocation_fetch_peer_scb(td, &scb);
+	is_callee = colocation_fetch_caller_scb(td, &scb);
 	if (!is_callee)
 		return (ESRCH);
 
@@ -1040,7 +1075,7 @@ DB_SHOW_COMMAND(scb, db_show_scb)
 	struct proc *p;
 	struct thread *td, *borrowertd;
 	int error;
-	bool have_scb;
+	bool have_scb, shown_borrowertd;
 
 	if (have_addr) {
 		error = copyincap(___USER_CFROMPTR((const void *)addr, userspace_cap),
@@ -1058,37 +1093,53 @@ DB_SHOW_COMMAND(scb, db_show_scb)
 			db_printf("    no scb\n");
 			return;
 		}
-		db_printf(" switcher control block %p for thread %p, pid %d (%s), stack owned by %d:\n",
+		db_printf(" switcher control block %p for curthread %p, pid %d (%s), stack owned by %d:\n",
 		    (void *)td->td_md.md_scb, td, p->p_pid, p->p_comm, db_get_stack_pid(td));
-		db_print_scb_td(curthread);
+		db_print_scb_td(td);
 
 		borrowertd = scb.scb_borrower_td;
+		shown_borrowertd = false;
 
-		if ((__cheri_fromcap void *)scb.scb_caller_scb == NULL) {
-			if (borrowertd != NULL) {
+		have_scb = colocation_fetch_caller_scb(td, &scb);
+		if (have_scb) {
+			if (borrowertd != scb.scb_td) {
+				td = scb.scb_td;
+				p = td->td_proc;
+				db_printf(" caller's SCB %p owned by thread %p, pid %d (%s), stack owned by %d:\n",
+				    (void *)td->td_md.md_scb, td, p->p_pid, p->p_comm, db_get_stack_pid(td));
+			} else {
 				td = borrowertd;
 				p = td->td_proc;
-				db_printf(" NULL scb_caller_scb; switcher control block %p for borrower thread %p, pid %d (%s), stack owned by %d:\n",
+				db_printf(" caller's SCB %p for borrowing thread %p, pid %d (%s), stack owned by %d:\n",
 				    (void *)td->td_md.md_scb, td, p->p_pid, p->p_comm, db_get_stack_pid(td));
-				db_print_scb_td(td);
-			} else {
-				db_printf(" NULL scb_caller_scb\n");
+				shown_borrowertd = true;
 			}
-		} else  {
-			have_scb = colocation_fetch_peer_scb(td, &scb);
-			if (!have_scb) {
-				db_printf("    no peer scb?!\n");
+			db_print_scb(&scb);
+		}
+
+		td = curthread;
+		have_scb = colocation_fetch_callee_scb(td, &scb);
+		if (have_scb) {
+			if (borrowertd != scb.scb_td) {
+				td = scb.scb_td;
+				p = td->td_proc;
+				db_printf(" callee's SCB %p owned by thread %p, pid %d (%s), stack owned by %d:\n",
+				    (void *)td->td_md.md_scb, td, p->p_pid, p->p_comm, db_get_stack_pid(td));
 			} else {
-				if (borrowertd == NULL) {
-					db_printf(" NULL td_borrow_td; peer switcher control block:\n");
-				} else {
-					td = borrowertd;
-					p = td->td_proc;
-					db_printf(" switcher control block %p for peer thread %p, pid %d (%s), stack owned by %d:\n",
-					    (void *)td->td_md.md_scb, td, p->p_pid, p->p_comm, db_get_stack_pid(td));
-				}
-				db_print_scb(&scb);
+				td = borrowertd;
+				p = td->td_proc;
+				db_printf(" callee's SCB %p for borrowing thread %p, pid %d (%s), stack owned by %d:\n",
+				    (void *)td->td_md.md_scb, td, p->p_pid, p->p_comm, db_get_stack_pid(td));
+				shown_borrowertd = true;
 			}
+			db_print_scb(&scb);
+		}
+
+		if (!shown_borrowertd && borrowertd != NULL) {
+			td = borrowertd;
+			p = td->td_proc;
+			db_printf(" borrowing thread %p, pid %d (%s), stack owned by %d\n",
+			    td, p->p_pid, p->p_comm, db_get_stack_pid(td));
 		}
 	}
 }
