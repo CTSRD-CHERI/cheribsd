@@ -249,7 +249,6 @@ colocation_thread_exit(struct thread *td)
 
 	struct mdthread *md, *callermd;
 	struct switchercb scb, *peerscb;
-	vaddr_t addr;
 	bool have_scb;
 	int error;
 
@@ -298,14 +297,8 @@ colocation_thread_exit(struct thread *td)
 	scb.scb_td = NULL;
 	scb.scb_borrower_td = NULL;
 
-	addr = td->td_md.md_scb;
+	colocation_copyout_scb(td, &scb);
 	td->td_md.md_scb = 0;
-	error = copyoutcap(&scb, ___USER_CFROMPTR((void *)addr, userspace_cap), sizeof(scb));
-	if (error != 0) {
-		COLOCATION_DEBUG("copyoutcap to %p failed with error %d",
-		    (void *)addr, error);
-		return;
-	}
 
 	if (peerscb == NULL)
 		return;
@@ -499,7 +492,7 @@ setup_scb(struct thread *td)
 	vm_map_entry_t entry;
 	vm_offset_t addr;
 	boolean_t found;
-	int error, rv;
+	int rv;
 
 	KASSERT(td->td_md.md_scb == 0, ("%s: already initialized\n", __func__));
 
@@ -542,11 +535,7 @@ setup_scb(struct thread *td)
 #ifdef __mips__
 	scb.scb_tls = (char * __capability)td->td_md.md_tls + td->td_proc->p_md.md_tls_tcb_offset;
 #endif
-
-	error = copyoutcap(&scb,
-	    ___USER_CFROMPTR((void *)addr, userspace_cap), sizeof(scb));
-	KASSERT(error == 0,
-	    ("%s: copyoutcap() failed with error %d\n", __func__, error));
+	colocation_copyout_scb(td, &scb);
 
 	/*
 	 * Stuff neccessary for cocall_slow(2)/coaccept_slow(2).
