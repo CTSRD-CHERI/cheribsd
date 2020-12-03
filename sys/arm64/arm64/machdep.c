@@ -1543,8 +1543,7 @@ DB_SHOW_COMMAND(specialregs, db_show_spregs)
 #define	PRINT_REG_CAP(reg)						\
 do {									\
     void * __capability _tmp = (void * __capability)READ_SPECIALREG_CAP(reg); \
-    db_printf(__STRING(reg) " = " _CHERI_PRINTF_CAP_FMT "\n",		\
-        _CHERI_PRINTF_CAP_ARG(_tmp));					\
+    db_printf(__STRING(reg) " = %#lp\n", _tmp);				\
 } while (0)
 #endif
 
