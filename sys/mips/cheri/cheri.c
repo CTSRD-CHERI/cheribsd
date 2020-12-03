@@ -100,13 +100,13 @@ extern char etext[], end[];
 /*
  * Global capabilities for various address-space segments.
  */
-caddr_t cheri_xkphys_capability = (void *)(intcap_t)-1;
-caddr_t cheri_xkseg_capability = (void *)(intcap_t)-1;
-caddr_t cheri_kseg0_capability = (void *)(intcap_t)-1;
-caddr_t cheri_kseg1_capability = (void *)(intcap_t)-1;
-caddr_t cheri_kseg2_capability = (void *)(intcap_t)-1;
-caddr_t cheri_kcode_capability = (void *)(intcap_t)-1;
-caddr_t cheri_kdata_capability = (void *)(intcap_t)-1;
+caddr_t mips_xkphys_cap = (void *)(intcap_t)-1;
+caddr_t mips_xkseg_cap = (void *)(intcap_t)-1;
+caddr_t mips_kseg0_cap = (void *)(intcap_t)-1;
+caddr_t mips_kseg1_cap = (void *)(intcap_t)-1;
+caddr_t mips_kseg2_cap = (void *)(intcap_t)-1;
+caddr_t kernel_code_cap = (void *)(intcap_t)-1;
+caddr_t kernel_data_cap = (void *)(intcap_t)-1;
 void *kernel_root_cap = (void *)(intcap_t)-1;
 
 /*
@@ -234,24 +234,24 @@ cheri_init_capabilities(void * __capability kroot)
 	 * KROOT that covers only kernel .data/.rodata/.bss etc.
 	 * Those should fall both into kseg0.
 	 */
-	cheri_xkphys_capability = cheri_ptrperm(
+	mips_xkphys_cap = cheri_ptrperm(
 	    cheri_setoffset(kroot, MIPS_XKPHYS_START),
 	    MIPS_XKPHYS_END - MIPS_XKPHYS_START,
 	    (CHERI_PERM_LOAD | CHERI_PERM_STORE | CHERI_PERM_LOAD_CAP |
 	     CHERI_PERM_STORE_CAP | CHERI_PERM_STORE_LOCAL_CAP));
-	cheri_xkseg_capability = cheri_ptrperm(
+	mips_xkseg_cap = cheri_ptrperm(
 	    cheri_setoffset(kroot, MIPS_XKSEG_START),
 	    MIPS_XKSEG_END - MIPS_XKSEG_START,
 	    CHERI_CAP_KERN_PERMS);
-	cheri_kseg0_capability = cheri_ptrperm(
+	mips_kseg0_cap = cheri_ptrperm(
 	    cheri_setoffset(kroot, MIPS_KSEG0_START),
 	    (vaddr_t)MIPS_KSEG0_END - (vaddr_t)MIPS_KSEG0_START,
 	    CHERI_CAP_KERN_PERMS);
-	cheri_kseg1_capability = cheri_ptrperm(
+	mips_kseg1_cap = cheri_ptrperm(
 	    cheri_setoffset(kroot, MIPS_KSEG1_START),
 	    (vaddr_t)MIPS_KSEG1_END - (vaddr_t)MIPS_KSEG1_START,
 	    CHERI_CAP_KERN_PERMS);
-	cheri_kseg2_capability = cheri_ptrperm(
+	mips_kseg2_cap = cheri_ptrperm(
 	    cheri_setoffset(kroot, MIPS_KSEG2_START),
 	    (vaddr_t)MIPS_KSEG2_END - (vaddr_t)MIPS_KSEG2_START,
 	    CHERI_CAP_KERN_PERMS);
@@ -259,14 +259,14 @@ cheri_init_capabilities(void * __capability kroot)
 	ctemp = cheri_setoffset(kroot, MIPS_KSEG0_START);
 	ctemp = cheri_setboundsexact(ctemp,
 	    (vaddr_t)&etext - (vaddr_t)MIPS_KSEG0_START);
-	cheri_kcode_capability = cheri_andperm(ctemp,
+	kernel_code_cap = cheri_andperm(ctemp,
 	    (CHERI_PERM_EXECUTE | CHERI_PERM_LOAD | CHERI_PERM_CCALL |
 	     CHERI_PERM_SYSTEM_REGS | CHERI_PERM_GLOBAL));
 
 	ctemp = cheri_setoffset(kroot, (vaddr_t)&etext);
 	ctemp = cheri_setboundsexact(ctemp,
 	    (vaddr_t)&end - (vaddr_t)&etext);
-	cheri_kdata_capability = cheri_andperm(ctemp,
+	kernel_data_cap = cheri_andperm(ctemp,
 	    ~(CHERI_PERM_EXECUTE | CHERI_PERM_CCALL | CHERI_PERM_SEAL |
 	      CHERI_PERM_SYSTEM_REGS));
 
