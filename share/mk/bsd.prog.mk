@@ -27,6 +27,9 @@ NO_WERROR=
 .if defined(DEBUG_FLAGS)
 CFLAGS+=${DEBUG_FLAGS}
 CXXFLAGS+=${DEBUG_FLAGS}
+.if ${LINKER_FEATURES:Mgdb-index}
+LDFLAGS+=	-Wl,--gdb-index
+.endif
 
 .if ${MK_CTF} != "no" && ${DEBUG_FLAGS:M-g} != ""
 CTFFLAGS+= -g
