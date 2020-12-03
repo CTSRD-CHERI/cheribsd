@@ -1447,7 +1447,7 @@ LEAF_NOPROFILE(MipsTLBMissException)
 	 * the KERNEL_ADDRESS with MIPS_XKSEG() to automatically have it
 	 * derived as a capability everywhere. The implications are not obvious
 	 * to me so I'll leave it for now.
-	 * PTR_LA		k1, _C_LABEL(cheri_xkseg_capability)
+	 * PTR_LA		k1, _C_LABEL(mips_xkseg_cap)
 	*/
 	PTR_LI		k1, VM_MAX_KERNEL_ADDRESS	# check fault address against
 	sltu		k1, k1, k0			# upper bound of kernel_segmap
@@ -1528,7 +1528,7 @@ VECTOR(MipsCache, unknown)
 	CAPCALL_LOAD(CHERI_REG_KSCRATCH, _C_LABEL(MipsCacheException))
 	clc	CHERI_REG_KSCRATCH, zero, 0(CHERI_REG_KSCRATCH)
 	cgetaddr k0, CHERI_REG_KSCRATCH
-	CAPCALL_LOAD(CHERI_REG_KSCRATCH, _C_LABEL(cheri_kseg1_capability))
+	CAPCALL_LOAD(CHERI_REG_KSCRATCH, _C_LABEL(mips_kseg1_cap))
 	clc	CHERI_REG_KSCRATCH, zero, 0(CHERI_REG_KSCRATCH)
 	csetaddr CHERI_REG_KSCRATCH, CHERI_REG_KSCRATCH, k0
 	cjr	CHERI_REG_KSCRATCH

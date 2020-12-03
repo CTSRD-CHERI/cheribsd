@@ -86,12 +86,11 @@ stack_fetch_ra(uintptr_t sp, u_register_t stack_pos)
 		 * XXX-AM: The exception handlers have base=0, this should
 		 * probably change.
 		 */
-		if (cheri_getbase(ra) < cheri_getbase(cheri_kcode_capability))
-			ra = cheri_setaddress(
-			    (uintptr_t)cheri_kcode_capability, ra);
+		if (cheri_getbase(ra) < cheri_getbase(kernel_code_cap))
+			ra = cheri_setaddress((uintptr_t)kernel_code_cap, ra);
 		else
 			ra = cheri_setaddress(cheri_setbounds(
-			    cheri_setaddress((uintptr_t)cheri_kcode_capability,
+			    cheri_setaddress((uintptr_t)kernel_code_cap,
 			    cheri_getbase(ra)), cheri_getlen(ra)), ra);
 	}
 

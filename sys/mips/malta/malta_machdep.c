@@ -374,7 +374,7 @@ platform_argv_ptr(int32_t argv)
 	 * do not try to get the precise string length.
 	 */
 	arg = cheri_ptrperm(
-	    cheri_setaddress(cheri_kseg0_capability, (vm_offset_t)(argv)),
+	    cheri_setaddress(mips_kseg0_cap, (vm_offset_t)(argv)),
 	    4096, CHERI_PERM_LOAD | CHERI_PERM_STORE);
 
 	return (arg);
@@ -411,11 +411,11 @@ platform_start(__register_t a0, __register_t a1,  __register_t a2,
 
 	/* Clear the BSS and SBSS segments */
 #ifdef __CHERI_PURE_CAPABILITY__
-	argv = cheri_ptrperm(cheri_setaddress(cheri_kseg0_capability, a1),
+	argv = cheri_ptrperm(cheri_setaddress(mips_kseg0_cap, a1),
 	    argc * sizeof(uint64_t), CHERI_PERM_LOAD);
-	envp = cheri_andperm(cheri_setaddress(cheri_kseg0_capability, a2),
+	envp = cheri_andperm(cheri_setaddress(mips_kseg0_cap, a2),
 	    CHERI_PERM_LOAD);
-	platform_clear_bss(cheri_kdata_capability);
+	platform_clear_bss(kernel_data_cap);
 #else
 	argv = (int32_t *)a1;
 	envp = (int32_t *)a2;

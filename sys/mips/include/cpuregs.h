@@ -108,11 +108,11 @@
 /*
  * Global capabilities for various address-space segments.
  */
-extern caddr_t cheri_xkphys_capability;
-extern caddr_t cheri_xkseg_capability;
-extern caddr_t cheri_kseg0_capability;
-extern caddr_t cheri_kseg1_capability;
-extern caddr_t cheri_kseg2_capability;
+extern caddr_t mips_xkphys_cap;
+extern caddr_t mips_xkseg_cap;
+extern caddr_t mips_kseg0_cap;
+extern caddr_t mips_kseg1_cap;
+extern caddr_t mips_kseg2_cap;
 /*
  * Global capabilities for specific kernel address space regions
  */
@@ -121,33 +121,33 @@ extern caddr_t cheri_kseg2_capability;
  * has PERM_LOAD PERM_EXECUTE PERM_CCALL PERM_SYSTEM_REGS
  * This spans the kernel .text section and exception vectors.
  */
-extern caddr_t cheri_kcode_capability;
+extern caddr_t kernel_code_cap;
 /*
  * Kernel global data capability
  * has PERM_LOAD PERM_STORE PERM_LOAD_CAP PERM_STORE_CAP PERM_STORE_LOCAL_CAP
  * This spans the kernel data sections, excluding debug sections
  */
-extern caddr_t cheri_kdata_capability;
+extern caddr_t kernel_data_cap;
 
 /*
  * Macros used to create a pointer for each address space segment
  */
 #define MIPS_XKPHYS(x)						\
-	(cheri_xkphys_capability + ((x) - MIPS_XKPHYS_START))
+	(mips_xkphys_cap + ((x) - MIPS_XKPHYS_START))
 #define MIPS_XKSEG(x)						\
-	(cheri_xkseg_capability + ((x) - MIPS_XKSEG_START))
+	(mips_xkseg_cap + ((x) - MIPS_XKSEG_START))
 #define MIPS_KSEG0(x)							\
-	(cheri_kseg0_capability + ((x) - (vm_offset_t)MIPS_KSEG0_START))
+	(mips_kseg0_cap + ((x) - (vm_offset_t)MIPS_KSEG0_START))
 #define MIPS_KSEG1(x)							\
-	(cheri_kseg1_capability + ((x) - (vm_offset_t)MIPS_KSEG1_START))
+	(mips_kseg1_cap + ((x) - (vm_offset_t)MIPS_KSEG1_START))
 #define MIPS_KSEG2(x)							\
-	(cheri_kseg2_capability + ((x) - (vm_offset_t)MIPS_KSEG2_START))
+	(mips_kseg2_cap + ((x) - (vm_offset_t)MIPS_KSEG2_START))
 /* Macros used to create pointers in specific kernel address space regions */
 #define MIPS_KCODE(x)							\
-	(cheri_kcode_capability + ((x) - (vm_offset_t)MIPS_KSEG0_START))
+	(kernel_code_cap + ((x) - (vm_offset_t)MIPS_KSEG0_START))
 #define MIPS_KDATA(x)							\
-	(cheri_kdata_capability +					\
-	((x) - __builtin_mips_cheri_get_cap_base(cheri_kdata_capability)))
+	(kernel_data_cap +					\
+	((x) - __builtin_mips_cheri_get_cap_base(kernel_data_cap)))
 #define MIPS_KALL(x) ((char *)kernel_root_cap + (x))
 #else /* ! __CHERI_PURE_CAPABILITY__ */
 #define MIPS_XKPHYS(x) ((char *)(x))
