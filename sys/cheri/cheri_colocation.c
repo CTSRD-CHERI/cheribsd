@@ -238,11 +238,7 @@ colocation_get_peer(struct thread *td, struct thread **peertdp)
 		return;
 	}
 
-	if (cheri_gettag(scb.scb_caller_scb) != 0 &&
-	    cheri_getlen(scb.scb_caller_scb) > 0)
-		*peertdp = scb.scb_borrower_td;
-	else
-		*peertdp = NULL;
+	*peertdp = scb.scb_borrower_td;
 }
 
 void
