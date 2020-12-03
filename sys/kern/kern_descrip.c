@@ -2220,7 +2220,7 @@ fdcopy_remapped(struct filedesc *fdp, const int *fds, size_t nfds,
 			error = EINVAL;
 			goto bad;
 		}
-		if (!fhold(nfde->fde_file)) {
+		if (!fhold(ofde->fde_file)) {
 			error = EBADF;
 			goto bad;
 		}
@@ -2627,6 +2627,15 @@ finit(struct file *fp, u_int flag, short type, void *data, struct fileops *ops)
 	fp->f_flag = flag;
 	fp->f_type = type;
 	atomic_store_rel_ptr((volatile uintptr_t *)&fp->f_ops, (uintptr_t)ops);
+}
+
+void
+finit_vnode(struct file *fp, u_int flag, void *data, struct fileops *ops)
+{
+	fp->f_seqcount[UIO_READ] = 1;
+	fp->f_seqcount[UIO_WRITE] = 1;
+	finit(fp, (flag & FMASK) | (fp->f_flag & FHASLOCK), DTYPE_VNODE,
+	    data, ops);
 }
 
 int

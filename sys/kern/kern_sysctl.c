@@ -972,7 +972,6 @@ sysctl_sysctl_debug_dump_node(struct sysctl_oid_list *l, int i)
 
 	SYSCTL_ASSERT_LOCKED();
 	SLIST_FOREACH(oidp, l, oid_link) {
-
 		for (k=0; k<i; k++)
 			printf(" ");
 
@@ -1009,7 +1008,6 @@ sysctl_sysctl_debug_dump_node(struct sysctl_oid_list *l, int i)
 			case CTLTYPE_OPAQUE: printf(" Opaque/struct\n"); break;
 			default:	     printf("\n");
 		}
-
 	}
 }
 

@@ -471,6 +471,13 @@ __elfN(get_brandinfo)(struct image_params *imgp, const char *interp,
 	return (NULL);
 }
 
+static bool
+__elfN(phdr_in_zero_page)(const Elf_Ehdr *hdr)
+{
+	return (hdr->e_phoff <= PAGE_SIZE &&
+	    (u_int)hdr->e_phentsize * hdr->e_phnum <= PAGE_SIZE - hdr->e_phoff);
+}
+
 static int
 __elfN(check_header)(const Elf_Ehdr *hdr)
 {
@@ -860,8 +867,7 @@ __elfN(load_file)(struct proc *p, const char *file, u_long *addr,
 	}
 
 	/* Only support headers that fit within first page for now      */
-	if ((hdr->e_phoff > PAGE_SIZE) ||
-	    (u_int)hdr->e_phentsize * hdr->e_phnum > PAGE_SIZE - hdr->e_phoff) {
+	if (!__elfN(phdr_in_zero_page)(hdr)) {
 		error = ENOEXEC;
 		goto fail;
 	}
@@ -967,7 +973,7 @@ __elfN(enforce_limits)(struct image_params *imgp, const Elf_Ehdr *hdr,
 		}
 		total_size += seg_size;
 	}
-	
+
 	if (data_addr == 0 && data_size == 0) {
 		data_addr = text_addr;
 		data_size = text_size;
@@ -1148,9 +1154,7 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 	 * detected an ELF file.
 	 */
 
-	if ((hdr->e_phoff > PAGE_SIZE) ||
-	    (u_int)hdr->e_phentsize * hdr->e_phnum > PAGE_SIZE - hdr->e_phoff) {
-		/* Only support headers in first page for now */
+	if (!__elfN(phdr_in_zero_page)(hdr)) {
 		uprintf("Program headers not in the first page\n");
 		return (ENOEXEC);
 	}

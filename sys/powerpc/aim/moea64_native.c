@@ -282,7 +282,7 @@ moea64_pte_synch_native(struct pvo_entry *pvo)
 	ptelo = be64toh(pt->pte_lo);
 
 	rw_runlock(&moea64_eviction_lock);
-	
+
 	return (ptelo & (LPTE_REF | LPTE_CHG));
 }
 
@@ -556,9 +556,9 @@ moea64_bootstrap_native(vm_offset_t kernelstart, vm_offset_t kernelend)
 	    sizeof(struct lpteg));
 	if (cpu_features2 & PPC_FEATURE2_ARCH_3_00) {
 		bzero(__DEVOLATILE(void *, moea64_part_table), PART_SIZE);
-		moea64_part_table[0].pagetab =
+		moea64_part_table[0].pagetab = htobe64(
 			(DMAP_TO_PHYS((vm_offset_t)moea64_pteg_table)) |
-			(uintptr_t)(flsl((moea64_pteg_count - 1) >> 11));
+			(uintptr_t)(flsl((moea64_pteg_count - 1) >> 11)));
 	}
 	ENABLE_TRANS(msr);
 

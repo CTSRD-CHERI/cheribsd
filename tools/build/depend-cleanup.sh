@@ -37,8 +37,6 @@ clean_dep()
 }
 
 # Date      Rev      Description
-# 20190916  r352703  shm_open syscall reimplemented in C
-clean_dep lib/libc   shm_open S
 # 20200310  r358851  rename of openmp's ittnotify_static.c to .cpp
 clean_dep lib/libomp ittnotify_static c
 # 20200414  r359930  closefrom
@@ -50,4 +48,11 @@ if [ -e "$OBJTOP"/cddl/lib/libzfs/.depend.libzfs_changelist.o ] && \
     "$OBJTOP"/cddl/lib/libzfs/.depend.libzfs_changelist.o; then
 	echo "Removing old ZFS tree"
 	rm -rf "$OBJTOP"/cddl "$OBJTOP"/obj-lib32/cddl
+fi
+
+# 20200916  WARNS bumped, need bootstrapped crunchgen stubs
+if [ -e "$OBJTOP"/rescue/rescue/rescue.c ] && \
+    ! grep -q 'crunched_stub_t' "$OBJTOP"/rescue/rescue/rescue.c; then
+	echo "Removing old rescue(8) tree"
+	rm -rf "$OBJTOP"/rescue/rescue
 fi

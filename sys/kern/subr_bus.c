@@ -191,6 +191,8 @@ struct devreq64 {
 };
 #endif
 
+static int bus_child_location_sb(device_t child, struct sbuf *sb);
+static int bus_child_pnpinfo_sb(device_t child, struct sbuf *sb);
 static void devctl2_init(void);
 static bool device_frozen;
 
@@ -202,7 +204,6 @@ static bool device_frozen;
 static int bus_debug = 1;
 SYSCTL_INT(_debug, OID_AUTO, bus_debug, CTLFLAG_RWTUN, &bus_debug, 0,
     "Bus debug level");
-
 #define PDEBUG(a)	if (bus_debug) {printf("%s:%d: ", __func__, __LINE__), printf a; printf("\n");}
 #define DEVICENAME(d)	((d)? device_get_name(d): "no device")
 
@@ -293,36 +294,34 @@ enum {
 static int
 device_sysctl_handler(SYSCTL_HANDLER_ARGS)
 {
+	struct sbuf sb;
 	device_t dev = (device_t)arg1;
-	const char *value;
-	char *buf;
 	int error;
 
-	buf = NULL;
+	sbuf_new_for_sysctl(&sb, NULL, 1024, req);
+	sbuf_clear_flags(&sb, SBUF_INCLUDENUL);
 	switch (arg2) {
 	case DEVICE_SYSCTL_DESC:
-		value = dev->desc ? dev->desc : "";
+		sbuf_cat(&sb, dev->desc ? dev->desc : "");
 		break;
 	case DEVICE_SYSCTL_DRIVER:
-		value = dev->driver ? dev->driver->name : "";
+		sbuf_cat(&sb, dev->driver ? dev->driver->name : "");
 		break;
 	case DEVICE_SYSCTL_LOCATION:
-		value = buf = malloc(1024, M_BUS, M_WAITOK | M_ZERO);
-		bus_child_location_str(dev, buf, 1024);
+		bus_child_location_sb(dev, &sb);
 		break;
 	case DEVICE_SYSCTL_PNPINFO:
-		value = buf = malloc(1024, M_BUS, M_WAITOK | M_ZERO);
-		bus_child_pnpinfo_str(dev, buf, 1024);
+		bus_child_pnpinfo_sb(dev, &sb);
 		break;
 	case DEVICE_SYSCTL_PARENT:
-		value = dev->parent ? dev->parent->nameunit : "";
+		sbuf_cat(&sb, dev->parent ? dev->parent->nameunit : "");
 		break;
 	default:
+		sbuf_delete(&sb);
 		return (EINVAL);
 	}
-	error = SYSCTL_OUT_STR(req, value);
-	if (buf != NULL)
-		free(buf, M_BUS);
+	error = sbuf_finish(&sb);
+	sbuf_delete(&sb);
 	return (error);
 }
 
@@ -427,9 +426,10 @@ static struct cdevsw dev_cdevsw = {
 	.d_name =	"devctl",
 };
 
+#define DEVCTL_BUFFER (1024 - sizeof(void *))
 struct dev_event_info {
-	char *dei_data;
 	STAILQ_ENTRY(dev_event_info) dei_link;
+	char dei_data[DEVCTL_BUFFER];
 };
 
 STAILQ_HEAD(devq, dev_event_info);
@@ -444,6 +444,7 @@ static struct dev_softc {
 	struct selinfo	sel;
 	struct devq	devq;
 	struct sigio	*sigio;
+	uma_zone_t	zone;
 } devsoftc;
 
 static void	filt_devctl_detach(struct knote *kn);
@@ -460,12 +461,32 @@ static struct cdev *devctl_dev;
 static void
 devinit(void)
 {
+	int reserve;
+	uma_zone_t z;
+
 	devctl_dev = make_dev_credf(MAKEDEV_ETERNAL, &dev_cdevsw, 0, NULL,
 	    UID_ROOT, GID_WHEEL, 0600, "devctl");
 	mtx_init(&devsoftc.mtx, "dev mtx", "devd", MTX_DEF);
 	cv_init(&devsoftc.cv, "dev cv");
 	STAILQ_INIT(&devsoftc.devq);
 	knlist_init_mtx(&devsoftc.sel.si_note, &devsoftc.mtx);
+	if (devctl_queue_length > 0) {
+		/*
+		 * Allocate a zone for the messages. Preallocate 2% of these for
+		 * a reserve. Allow only devctl_queue_length slabs to cap memory
+		 * usage.  The reserve usually allows coverage of surges of
+		 * events during memory shortages. Normally we won't have to
+		 * re-use events from the queue, but will in extreme shortages.
+		 */
+		z = devsoftc.zone = uma_zcreate("DEVCTL",
+		    sizeof(struct dev_event_info), NULL, NULL, NULL, NULL,
+		    UMA_ALIGN_PTR, 0);
+		reserve = max(devctl_queue_length / 50, 100);	/* 2% reserve */
+		uma_zone_set_max(z, devctl_queue_length);
+		uma_zone_set_maxcache(z, 0);
+		uma_zone_reserve(z, reserve);
+		uma_prealloc(z, reserve);
+	}
 	devctl2_init();
 }
 
@@ -530,8 +551,7 @@ devread(struct cdev *dev, struct uio *uio, int ioflag)
 	devsoftc.queued--;
 	mtx_unlock(&devsoftc.mtx);
 	rv = uiomove(n1->dei_data, strlen(n1->dei_data), uio);
-	free(n1->dei_data, M_BUS);
-	free(n1, M_BUS);
+	uma_zfree(devsoftc.zone, n1);
 	return (rv);
 }
 
@@ -614,48 +634,67 @@ filt_devctl_read(struct knote *kn, long hint)
 /**
  * @brief Return whether the userland process is running
  */
-boolean_t
+bool
 devctl_process_running(void)
 {
 	return (devsoftc.inuse == 1);
 }
 
-/**
- * @brief Queue data to be read from the devctl device
- *
- * Generic interface to queue data to the devctl device.  It is
- * assumed that @p data is properly formatted.  It is further assumed
- * that @p data is allocated using the M_BUS malloc type.
- */
-static void
-devctl_queue_data_f(char *data, int flags)
+static struct dev_event_info *
+devctl_alloc_dei(void)
 {
-	struct dev_event_info *n1 = NULL, *n2 = NULL;
+	struct dev_event_info *dei = NULL;
 
-	if (strlen(data) == 0)
-		goto out;
+	mtx_lock(&devsoftc.mtx);
 	if (devctl_queue_length == 0)
 		goto out;
-	n1 = malloc(sizeof(*n1), M_BUS, flags);
-	if (n1 == NULL)
-		goto out;
-	n1->dei_data = data;
-	mtx_lock(&devsoftc.mtx);
-	if (devctl_queue_length == 0) {
-		mtx_unlock(&devsoftc.mtx);
-		free(n1->dei_data, M_BUS);
-		free(n1, M_BUS);
-		return;
-	}
-	/* Leave at least one spot in the queue... */
-	while (devsoftc.queued > devctl_queue_length - 1) {
-		n2 = STAILQ_FIRST(&devsoftc.devq);
+	dei = uma_zalloc(devsoftc.zone, M_NOWAIT);
+	if (dei == NULL)
+		dei = uma_zalloc(devsoftc.zone, M_NOWAIT | M_USE_RESERVE);
+	if (dei == NULL) {
+		/*
+		 * Guard against no items in the queue. Normally, this won't
+		 * happen, but if lots of events happen all at once and there's
+		 * a chance we're out of allocated space but none have yet been
+		 * queued when we get here, leaving nothing to steal. This can
+		 * also happen with error injection. Fail safe by returning
+		 * NULL in that case..
+		 */
+		if (devsoftc.queued == 0)
+			goto out;
+		dei = STAILQ_FIRST(&devsoftc.devq);
 		STAILQ_REMOVE_HEAD(&devsoftc.devq, dei_link);
-		free(n2->dei_data, M_BUS);
-		free(n2, M_BUS);
 		devsoftc.queued--;
 	}
-	STAILQ_INSERT_TAIL(&devsoftc.devq, n1, dei_link);
+	MPASS(dei != NULL);
+	*dei->dei_data = '\0';
+out:
+	mtx_unlock(&devsoftc.mtx);
+	return (dei);
+}
+
+static struct dev_event_info *
+devctl_alloc_dei_sb(struct sbuf *sb)
+{
+	struct dev_event_info *dei;
+
+	dei = devctl_alloc_dei();
+	if (dei != NULL)
+		sbuf_new(sb, dei->dei_data, sizeof(dei->dei_data), SBUF_FIXEDLEN);
+	return (dei);
+}
+
+static void
+devctl_free_dei(struct dev_event_info *dei)
+{
+	uma_zfree(devsoftc.zone, dei);
+}
+
+static void
+devctl_queue(struct dev_event_info *dei)
+{
+	mtx_lock(&devsoftc.mtx);
+	STAILQ_INSERT_TAIL(&devsoftc.devq, dei, dei_link);
 	devsoftc.queued++;
 	cv_broadcast(&devsoftc.cv);
 	KNOTE_LOCKED(&devsoftc.sel.si_note, 0);
@@ -663,62 +702,38 @@ devctl_queue_data_f(char *data, int flags)
 	selwakeup(&devsoftc.sel);
 	if (devsoftc.async && devsoftc.sigio != NULL)
 		pgsigio(&devsoftc.sigio, SIGIO, 0);
-	return;
-out:
-	/*
-	 * We have to free data on all error paths since the caller
-	 * assumes it will be free'd when this item is dequeued.
-	 */
-	free(data, M_BUS);
-	return;
-}
-
-static void
-devctl_queue_data(char *data)
-{
-	devctl_queue_data_f(data, M_NOWAIT);
 }
 
 /**
  * @brief Send a 'notification' to userland, using standard ways
  */
 void
-devctl_notify_f(const char *system, const char *subsystem, const char *type,
-    const char *data, int flags)
-{
-	int len = 0;
-	char *msg;
-
-	if (system == NULL)
-		return;		/* BOGUS!  Must specify system. */
-	if (subsystem == NULL)
-		return;		/* BOGUS!  Must specify subsystem. */
-	if (type == NULL)
-		return;		/* BOGUS!  Must specify type. */
-	len += strlen(" system=") + strlen(system);
-	len += strlen(" subsystem=") + strlen(subsystem);
-	len += strlen(" type=") + strlen(type);
-	/* add in the data message plus newline. */
-	if (data != NULL)
-		len += strlen(data);
-	len += 3;	/* '!', '\n', and NUL */
-	msg = malloc(len, M_BUS, flags);
-	if (msg == NULL)
-		return;		/* Drop it on the floor */
-	if (data != NULL)
-		snprintf(msg, len, "!system=%s subsystem=%s type=%s %s\n",
-		    system, subsystem, type, data);
-	else
-		snprintf(msg, len, "!system=%s subsystem=%s type=%s\n",
-		    system, subsystem, type);
-	devctl_queue_data_f(msg, flags);
-}
-
-void
 devctl_notify(const char *system, const char *subsystem, const char *type,
     const char *data)
 {
-	devctl_notify_f(system, subsystem, type, data, M_NOWAIT);
+	struct dev_event_info *dei;
+	struct sbuf sb;
+
+	if (system == NULL || subsystem == NULL || type == NULL)
+		return;
+	dei = devctl_alloc_dei_sb(&sb);
+	if (dei == NULL)
+		return;
+	sbuf_cpy(&sb, "!system=");
+	sbuf_cat(&sb, system);
+	sbuf_cat(&sb, " subsystem=");
+	sbuf_cat(&sb, subsystem);
+	sbuf_cat(&sb, " type=");
+	sbuf_cat(&sb, type);
+	if (data != NULL) {
+		sbuf_putc(&sb, ' ');
+		sbuf_cat(&sb, data);
+	}
+	sbuf_putc(&sb, '\n');
+	if (sbuf_finish(&sb) != 0)
+		devctl_free_dei(dei);	/* overflow -> drop it */
+	else
+		devctl_queue(dei);
 }
 
 /*
@@ -733,53 +748,46 @@ devctl_notify(const char *system, const char *subsystem, const char *type,
  * object of that event, plus the plug and play info and location info
  * for that event.  This is likely most useful for devices, but less
  * useful for other consumers of this interface.  Those should use
- * the devctl_queue_data() interface instead.
+ * the devctl_notify() interface instead.
+ *
+ * Output: 
+ *	${type}${what} at $(location dev) $(pnp-info dev) on $(parent dev)
  */
 static void
 devaddq(const char *type, const char *what, device_t dev)
 {
-	char *data = NULL;
-	char *loc = NULL;
-	char *pnp = NULL;
+	struct dev_event_info *dei;
 	const char *parstr;
+	struct sbuf sb;
 
-	if (!devctl_queue_length)/* Rare race, but lost races safely discard */
+	dei = devctl_alloc_dei_sb(&sb);
+	if (dei == NULL)
 		return;
-	data = malloc(1024, M_BUS, M_NOWAIT);
-	if (data == NULL)
-		goto bad;
+	sbuf_cpy(&sb, type);
+	sbuf_cat(&sb, what);
+	sbuf_cat(&sb, " at ");
 
-	/* get the bus specific location of this device */
-	loc = malloc(1024, M_BUS, M_NOWAIT);
-	if (loc == NULL)
-		goto bad;
-	*loc = '\0';
-	bus_child_location_str(dev, loc, 1024);
+	/* Add in the location */
+	bus_child_location_sb(dev, &sb);
+	sbuf_putc(&sb, ' ');
 
-	/* Get the bus specific pnp info of this device */
-	pnp = malloc(1024, M_BUS, M_NOWAIT);
-	if (pnp == NULL)
-		goto bad;
-	*pnp = '\0';
-	bus_child_pnpinfo_str(dev, pnp, 1024);
+	/* Add in pnpinfo */
+	bus_child_pnpinfo_sb(dev, &sb);
 
 	/* Get the parent of this device, or / if high enough in the tree. */
 	if (device_get_parent(dev) == NULL)
 		parstr = ".";	/* Or '/' ? */
 	else
 		parstr = device_get_nameunit(device_get_parent(dev));
-	/* String it all together. */
-	snprintf(data, 1024, "%s%s at %s %s on %s\n", type, what, loc, pnp,
-	  parstr);
-	free(loc, M_BUS);
-	free(pnp, M_BUS);
-	devctl_queue_data(data);
+	sbuf_cat(&sb, " on ");
+	sbuf_cat(&sb, parstr);
+	sbuf_putc(&sb, '\n');
+	if (sbuf_finish(&sb) != 0)
+		goto bad;
+	devctl_queue(dei);
 	return;
 bad:
-	free(pnp, M_BUS);
-	free(loc, M_BUS);
-	free(data, M_BUS);
-	return;
+	devctl_free_dei(dei);
 }
 
 /*
@@ -821,7 +829,6 @@ devnomatch(device_t dev)
 static int
 sysctl_devctl_queue(SYSCTL_HANDLER_ARGS)
 {
-	struct dev_event_info *n1;
 	int q, error;
 
 	q = devctl_queue_length;
@@ -830,18 +837,32 @@ sysctl_devctl_queue(SYSCTL_HANDLER_ARGS)
 		return (error);
 	if (q < 0)
 		return (EINVAL);
-	if (mtx_initialized(&devsoftc.mtx))
-		mtx_lock(&devsoftc.mtx);
-	devctl_queue_length = q;
-	while (devsoftc.queued > devctl_queue_length) {
-		n1 = STAILQ_FIRST(&devsoftc.devq);
-		STAILQ_REMOVE_HEAD(&devsoftc.devq, dei_link);
-		free(n1->dei_data, M_BUS);
-		free(n1, M_BUS);
-		devsoftc.queued--;
+
+	/*
+	 * When set as a tunable, we've not yet initialized the mutex.
+	 * It is safe to just assign to devctl_queue_length and return
+	 * as we're racing no one. We'll use whatever value set in
+	 * devinit.
+	 */
+	if (!mtx_initialized(&devsoftc.mtx)) {
+		devctl_queue_length = q;
+		return (0);
 	}
-	if (mtx_initialized(&devsoftc.mtx))
-		mtx_unlock(&devsoftc.mtx);
+
+	/*
+	 * XXX It's hard to grow or shrink the UMA zone. Only allow
+	 * disabling the queue size for the moment until underlying
+	 * UMA issues can be sorted out.
+	 */
+	if (q != 0)
+		return (EINVAL);
+	if (q == devctl_queue_length)
+		return (0);
+	mtx_lock(&devsoftc.mtx);
+	devctl_queue_length = 0;
+	uma_zdestroy(devsoftc.zone);
+	devsoftc.zone = 0;
+	mtx_unlock(&devsoftc.mtx);
 	return (0);
 }
 
@@ -1959,7 +1980,7 @@ device_delete_child(device_t dev, device_t child)
 	/* detach parent before deleting children, if any */
 	if ((error = device_detach(child)) != 0)
 		return (error);
-	
+
 	/* remove children second */
 	while ((grandchild = TAILQ_FIRST(&child->children)) != NULL) {
 		error = device_delete_child(child, grandchild);
@@ -4955,6 +4976,70 @@ bus_child_location_str(device_t child, char *buf, size_t buflen)
 }
 
 /**
+ * @brief Wrapper function for bus_child_pnpinfo_str using sbuf
+ *
+ * A convenient wrapper frunction for bus_child_pnpinfo_str that allows
+ * us to splat that into an sbuf. It uses unholy knowledge of sbuf to
+ * accomplish this, however. It is an interim function until we can convert
+ * this interface more fully.
+ */
+/* Note: we reach inside of sbuf because it's API isn't rich enough to do this */
+#define	SPACE(s)	((s)->s_size - (s)->s_len)
+#define EOB(s)		((s)->s_buf + (s)->s_len)
+
+static int
+bus_child_pnpinfo_sb(device_t dev, struct sbuf *sb)
+{
+	char *p;
+	size_t space;
+
+	MPASS((sb->s_flags & SBUF_INCLUDENUL) == 0);
+	if (sb->s_error != 0)
+		return (-1);
+	p = EOB(sb);
+	*p = '\0';	/* sbuf buffer isn't NUL terminated until sbuf_finish() */
+	space = SPACE(sb);
+	if (space <= 1) {
+		sb->s_error = ENOMEM;
+		return (-1);
+	}
+	bus_child_pnpinfo_str(dev, p, space);
+	sb->s_len += strlen(p);
+	return (0);
+}
+
+/**
+ * @brief Wrapper function for bus_child_pnpinfo_str using sbuf
+ *
+ * A convenient wrapper frunction for bus_child_pnpinfo_str that allows
+ * us to splat that into an sbuf. It uses unholy knowledge of sbuf to
+ * accomplish this, however. It is an interim function until we can convert
+ * this interface more fully.
+ */
+static int
+bus_child_location_sb(device_t dev, struct sbuf *sb)
+{
+	char *p;
+	size_t space;
+
+	MPASS((sb->s_flags & SBUF_INCLUDENUL) == 0);
+	if (sb->s_error != 0)
+		return (-1);
+	p = EOB(sb);
+	*p = '\0';	/* sbuf buffer isn't NUL terminated until sbuf_finish() */
+	space = SPACE(sb);
+	if (space <= 1) {
+		sb->s_error = ENOMEM;
+		return (-1);
+	}
+	bus_child_location_str(dev, p, space);
+	sb->s_len += strlen(p);
+	return (0);
+}
+#undef SPACE
+#undef EOB
+
+/**
  * @brief Wrapper function for BUS_GET_CPUS().
  *
  * This function simply calls the BUS_GET_CPUS() method of the
@@ -5436,13 +5521,13 @@ SYSCTL_PROC(_hw_bus, OID_AUTO, info, CTLTYPE_STRUCT | CTLFLAG_RD |
 static int
 sysctl_devices(SYSCTL_HANDLER_ARGS)
 {
+	struct sbuf		sb;
 	int			*name = (int *)arg1;
 	u_int			namelen = arg2;
 	int			index;
 	device_t		dev;
 	struct u_device		*udev;
 	int			error;
-	char			*walker, *ep;
 
 	if (namelen != 2)
 		return (EINVAL);
@@ -5473,34 +5558,30 @@ sysctl_devices(SYSCTL_HANDLER_ARGS)
 	udev->dv_devflags = dev->devflags;
 	udev->dv_flags = dev->flags;
 	udev->dv_state = dev->state;
-	walker = udev->dv_fields;
-	ep = walker + sizeof(udev->dv_fields);
-#define _CP(src)					\
-	if ((src) == NULL)				\
-		*walker++ = '\0';			\
-	else {						\
-		strlcpy(walker, (src), ep - walker);	\
-		walker += strlen(walker) + 1;		\
-	}						\
-	if (walker >= ep)				\
-		break;
-
-	do {
-		_CP(dev->nameunit);
-		_CP(dev->desc);
-		_CP(dev->driver != NULL ? dev->driver->name : NULL);
-		bus_child_pnpinfo_str(dev, walker, ep - walker);
-		walker += strlen(walker) + 1;
-		if (walker >= ep)
-			break;
-		bus_child_location_str(dev, walker, ep - walker);
-		walker += strlen(walker) + 1;
-		if (walker >= ep)
-			break;
-		*walker++ = '\0';
-	} while (0);
-#undef _CP
-	error = SYSCTL_OUT(req, udev, sizeof(*udev));
+	sbuf_new(&sb, udev->dv_fields, sizeof(udev->dv_fields), SBUF_FIXEDLEN);
+	if (dev->nameunit != NULL)
+		sbuf_cat(&sb, dev->nameunit);
+	else
+		sbuf_putc(&sb, '\0');
+	sbuf_putc(&sb, '\0');
+	if (dev->desc != NULL)
+		sbuf_cat(&sb, dev->desc);
+	else
+		sbuf_putc(&sb, '\0');
+	sbuf_putc(&sb, '\0');
+	if (dev->driver != NULL)
+		sbuf_cat(&sb, dev->driver->name);
+	else
+		sbuf_putc(&sb, '\0');
+	sbuf_putc(&sb, '\0');
+	bus_child_pnpinfo_sb(dev, &sb);
+	sbuf_putc(&sb, '\0');
+	bus_child_location_sb(dev, &sb);
+	sbuf_putc(&sb, '\0');
+	error = sbuf_finish(&sb);
+	if (error == 0)
+		error = SYSCTL_OUT(req, udev, sizeof(*udev));
+	sbuf_delete(&sb);
 	free(udev, M_BUS);
 	return (error);
 }

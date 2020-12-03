@@ -2625,7 +2625,6 @@ sched_sync(void)
 				wdog_kern_pat(WD_LASTVAL);
 				mtx_lock(&sync_mtx);
 			}
-
 		}
 		if (syncer_state == SYNCER_FINAL_DELAY && syncer_final_iter > 0)
 			syncer_final_iter--;
@@ -3225,15 +3224,6 @@ vhold(struct vnode *vp)
 	    ("%s: wrong hold count %d", __func__, old));
 	if (old == 0)
 		vn_freevnodes_dec();
-}
-
-void
-vholdl(struct vnode *vp)
-{
-
-	ASSERT_VI_LOCKED(vp, __func__);
-	CTR2(KTR_VFS, "%s: vp %p", __func__, vp);
-	vhold(vp);
 }
 
 void
@@ -3851,6 +3841,7 @@ vgonel(struct vnode *vp)
 		VNASSERT(vp->v_holdcnt > 0, vp, ("vnode without hold count"));
 		VI_UNLOCK(vp);
 	}
+	cache_purge_vgone(vp);
 	vfs_notify_upper(vp, VFS_NOTIFY_UPPER_RECLAIM);
 
 	/*
@@ -3924,7 +3915,6 @@ vgonel(struct vnode *vp)
 	 * Delete from old mount point vnode list.
 	 */
 	delmntque(vp);
-	cache_purge_vgone(vp);
 	/*
 	 * Done with purge, reset to the standard lock and invalidate
 	 * the vnode.
@@ -4712,11 +4702,8 @@ vfs_periodic_msync_inactive(struct mount *mp, int flags)
 {
 	struct vnode *vp, *mvp;
 	struct vm_object *obj;
-	struct thread *td;
 	int lkflags, objflags;
 	bool seen_defer;
-
-	td = curthread;
 
 	lkflags = LK_EXCLUSIVE | LK_INTERLOCK;
 	if (flags != MNT_WAIT) {
@@ -5883,6 +5870,15 @@ vop_read_post(void *ap, int rc)
 
 	if (!rc)
 		VFS_KNOTE_LOCKED(a->a_vp, NOTE_READ);
+}
+
+void
+vop_read_pgcache_post(void *ap, int rc)
+{
+	struct vop_read_pgcache_args *a = ap;
+
+	if (!rc)
+		VFS_KNOTE_UNLOCKED(a->a_vp, NOTE_READ);
 }
 
 void

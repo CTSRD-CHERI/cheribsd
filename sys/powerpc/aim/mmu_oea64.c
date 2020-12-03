@@ -57,6 +57,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/lock.h>
 #include <sys/msgbuf.h>
 #include <sys/malloc.h>
+#include <sys/mman.h>
 #include <sys/mutex.h>
 #include <sys/proc.h>
 #include <sys/rwlock.h>
@@ -72,6 +73,7 @@ __FBSDID("$FreeBSD$");
 #include <dev/ofw/openfirm.h>
 
 #include <vm/vm.h>
+#include <vm/pmap.h>
 #include <vm/vm_param.h>
 #include <vm/vm_kern.h>
 #include <vm/vm_page.h>
@@ -315,7 +317,7 @@ static void *moea64_dump_pmap_init(unsigned blkpgs);
 #ifdef __powerpc64__
 static void moea64_page_array_startup(long);
 #endif
-
+static int moea64_mincore(pmap_t, vm_offset_t, vm_paddr_t *);
 
 static struct pmap_funcs moea64_methods = {
 	.clear_modify = moea64_clear_modify,
@@ -332,6 +334,7 @@ static struct pmap_funcs moea64_methods = {
 	.is_referenced = moea64_is_referenced,
 	.ts_referenced = moea64_ts_referenced,
 	.map =      		moea64_map,
+	.mincore = moea64_mincore,
 	.page_exists_quick = moea64_page_exists_quick,
 	.page_init = moea64_page_init,
 	.page_wired_mappings = moea64_page_wired_mappings,
@@ -408,7 +411,6 @@ alloc_pvo_entry(int bootstrap)
 	return (pvo);
 }
 
-
 static void
 init_pvo_entry(struct pvo_entry *pvo, pmap_t pmap, vm_offset_t va)
 {
@@ -445,7 +447,7 @@ moea64_pte_from_pvo(const struct pvo_entry *pvo, struct lpte *lpte)
 
 	lpte->pte_hi = moea64_pte_vpn_from_pvo_vpn(pvo);
 	lpte->pte_hi |= LPTE_VALID;
-	
+
 	if (pvo->pvo_vaddr & PVO_LARGE)
 		lpte->pte_hi |= LPTE_BIG;
 	if (pvo->pvo_vaddr & PVO_WIRED)
@@ -1223,6 +1225,51 @@ moea64_unwire(pmap_t pm, vm_offset_t sva, vm_offset_t eva)
 	PMAP_UNLOCK(pm);
 }
 
+static int
+moea64_mincore(pmap_t pmap, vm_offset_t addr, vm_paddr_t *pap)
+{
+	struct pvo_entry *pvo;
+	vm_paddr_t pa;
+	vm_page_t m;
+	int val;
+	bool managed;
+
+	PMAP_LOCK(pmap);
+
+	/* XXX Add support for superpages */
+	pvo = moea64_pvo_find_va(pmap, addr);
+	if (pvo != NULL) {
+		pa = PVO_PADDR(pvo);
+		m = PHYS_TO_VM_PAGE(pa);
+		managed = (pvo->pvo_vaddr & PVO_MANAGED) == PVO_MANAGED;
+		val = MINCORE_INCORE;
+	} else {
+		PMAP_UNLOCK(pmap);
+		return (0);
+	}
+
+	PMAP_UNLOCK(pmap);
+
+	if (m == NULL)
+		return (0);
+
+	if (managed) {
+		if (moea64_is_modified(m))
+			val |= MINCORE_MODIFIED | MINCORE_MODIFIED_OTHER;
+
+		if (moea64_is_referenced(m))
+			val |= MINCORE_REFERENCED | MINCORE_REFERENCED_OTHER;
+	}
+
+	if ((val & (MINCORE_MODIFIED_OTHER | MINCORE_REFERENCED_OTHER)) !=
+	    (MINCORE_MODIFIED_OTHER | MINCORE_REFERENCED_OTHER) &&
+	    managed) {
+		*pap = pa;
+	}
+
+	return (val);
+}
+
 /*
  * This goes through and sets the physical address of our
  * special scratch PTE to the PA we want to zero or copy. Because
@@ -1688,7 +1735,7 @@ moea64_uma_page_alloc(uma_zone_t zone, vm_size_t bytes, int domain,
 
 	if (needed_lock)
 		PMAP_UNLOCK(kernel_pmap);
-	
+
 	if ((wait & M_ZERO) && (m->flags & PG_ZERO) == 0)
                 bzero((void *)va, PAGE_SIZE);
 
@@ -2373,7 +2420,6 @@ moea64_release_vsid(uint64_t vsid)
 	moea64_vsid_bitmap[idx] &= ~mask;
 	mtx_unlock(&moea64_slb_mutex);
 }
-	
 
 void
 moea64_release(pmap_t pmap)

@@ -564,7 +564,6 @@ pmap_bootstrap_l3(vm_offset_t l1pt, vm_offset_t va, vm_offset_t l3_start)
 		l3pt += PAGE_SIZE;
 	}
 
-
 	/* Clean the L2 page table */
 	memset((void *)l3_start, 0, l3pt - l3_start);
 
@@ -662,7 +661,7 @@ pmap_bootstrap(vm_offset_t l1pt, vm_paddr_t kernstart, vm_size_t kernlen)
 	virtual_avail = roundup2(freemempos, L2_SIZE);
 	virtual_end = VM_MAX_KERNEL_ADDRESS - L2_SIZE;
 	kernel_vm_end = virtual_avail;
-	
+
 	pa = pmap_early_vtophys(l1pt, freemempos);
 
 	physmem_exclude_region(kernstart, pa - kernstart, EXFLAG_NOALLOC);
@@ -1007,7 +1006,6 @@ pmap_map(vm_offset_t *virt, vm_paddr_t start, vm_paddr_t end, int prot)
 	return PHYS_TO_DMAP(start);
 }
 
-
 /*
  * Add a list of wired pages to the kva
  * this routine is only used for temporary
@@ -1121,7 +1119,7 @@ pmap_remove_pt_page(pmap_t pmap, vm_offset_t va)
 	PMAP_LOCK_ASSERT(pmap, MA_OWNED);
 	return (vm_radix_remove(&pmap->pm_root, pmap_l2_pindex(va)));
 }
-	
+
 /*
  * Decrements a page table page's reference count, which is used to record the
  * number of valid page table entries within the page.  If the reference count
@@ -1402,7 +1400,6 @@ retry:
 	return (m);
 }
 
-
 /***************************************************
  * Pmap allocation/deallocation routines.
  ***************************************************/
@@ -1527,7 +1524,6 @@ pmap_growkernel(vm_offset_t addr)
 		}
 	}
 }
-
 
 /***************************************************
  * page management routines.
@@ -4274,7 +4270,7 @@ pmap_mincore(pmap_t pmap, vm_offset_t addr, vm_paddr_t *pap)
 	if (l2 != NULL && ((tpte = pmap_load(l2)) & PTE_V) != 0) {
 		if ((tpte & PTE_RWX) != 0) {
 			pa = PTE_TO_PHYS(tpte) | (addr & L2_OFFSET);
-			val = MINCORE_INCORE | MINCORE_SUPER;
+			val = MINCORE_INCORE | MINCORE_PSIND(1);
 		} else {
 			l3 = pmap_l2_to_l3(l2, addr);
 			tpte = pmap_load(l3);

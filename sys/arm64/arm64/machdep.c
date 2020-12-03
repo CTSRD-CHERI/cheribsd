@@ -430,7 +430,6 @@ set_regs32(struct thread *td, struct reg32 *regs)
 	tf->tf_elr = regs->r_pc;
 	tf->tf_spsr = regs->r_cpsr;
 
-
 	return (0);
 }
 
@@ -1490,6 +1489,8 @@ initarm(struct arm64_bootparams *abp)
 	valid = bus_probe();
 
 	cninit();
+	set_ttbr0(abp->kern_ttbr0);
+	cpu_tlb_flushID();
 
 	if (!valid)
 		panic("Invalid bus configuration: %s",

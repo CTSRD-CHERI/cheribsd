@@ -35,6 +35,9 @@ SASRC=		${BOOTSRC}/libsa
 SYSDIR=		${SRCTOP}/sys
 UBOOTSRC=	${BOOTSRC}/uboot
 ZFSSRC=		${SASRC}/zfs
+OZFS=		${SRCTOP}/sys/contrib/openzfs
+ZFSOSSRC=	${OZFS}/module/os/freebsd/
+ZFSOSINC=	${OZFS}/include/os/freebsd
 LIBCSRC=	${SRCTOP}/lib/libc
 
 BOOTOBJ=	${OBJTOP}/stand
@@ -175,12 +178,6 @@ DD=dd ${DD_NOSTATUS}
 
 .if ${MACHINE_CPUARCH} == "mips"
 CFLAGS+=	-G0 -fno-pic -mno-abicalls
-.endif
-
-.if ${MK_LOADER_FORCE_LE} != "no"
-.if ${MACHINE_ARCH} == "powerpc64"
-CFLAGS+=	-mlittle-endian
-.endif
 .endif
 
 #

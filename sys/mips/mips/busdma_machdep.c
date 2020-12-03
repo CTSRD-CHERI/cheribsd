@@ -478,38 +478,7 @@ bus_dma_tag_create(bus_dma_tag_t parent, bus_size_t alignment,
 }
 
 void
-bus_dma_template_init(bus_dma_tag_template_t *t, bus_dma_tag_t parent)
-{
-
-	if (t == NULL)
-		return;
-
-	t->parent = parent;
-	t->alignment = 1;
-	t->boundary = 0;
-	t->lowaddr = t->highaddr = BUS_SPACE_MAXADDR;
-	t->maxsize = t->maxsegsize = BUS_SPACE_MAXSIZE;
-	t->nsegments = BUS_SPACE_UNRESTRICTED;
-	t->lockfunc = NULL;
-	t->lockfuncarg = NULL;
-	t->flags = 0;
-}
-
-int
-bus_dma_template_tag(bus_dma_tag_template_t *t, bus_dma_tag_t *dmat)
-{
-
-	if (t == NULL || dmat == NULL)
-		return (EINVAL);
-
-	return (bus_dma_tag_create(t->parent, t->alignment, t->boundary,
-	    t->lowaddr, t->highaddr, NULL, NULL, t->maxsize,
-	    t->nsegments, t->maxsegsize, t->flags, t->lockfunc, t->lockfuncarg,
-	    dmat));
-}
-
-void
-bus_dma_template_clone(bus_dma_tag_template_t *t, bus_dma_tag_t dmat)
+bus_dma_template_clone(bus_dma_template_t *t, bus_dma_tag_t dmat)
 {
 
 	if (t == NULL || dmat == NULL)
@@ -605,7 +574,6 @@ bus_dmamap_create(bus_dma_tag_t dmat, int flags, bus_dmamap_t *mapp)
 	 * an active address boundary.
 	 */
 	if (dmat->flags & BUS_DMA_COULD_BOUNCE) {
-
 		/* Must bounce */
 		struct bounce_zone *bz;
 		int maxpages;
@@ -1017,7 +985,6 @@ _bus_dmamap_load_buffer(bus_dma_tag_t dmat, bus_dmamap_t map, void *buf,
 	struct sync_list *sl;
 	vm_offset_t vaddr = (vm_offset_t)buf;
 	int error = 0;
-
 
 	if (segs == NULL)
 		segs = dmat->segments;

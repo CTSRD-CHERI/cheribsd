@@ -172,4 +172,3 @@ void swapper(void);
 #endif
 
 #endif				/* VM_H */
-

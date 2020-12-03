@@ -105,7 +105,6 @@ SYSCTL_INT(_net_inet_ip, OID_AUTO, mbuf_frag_size, CTLFLAG_RW,
 
 static void	ip_mloopback(struct ifnet *, const struct mbuf *, int);
 
-
 extern int in_mcast_loop;
 extern	struct protosw inetsw[];
 
@@ -324,11 +323,11 @@ ip_output(struct mbuf *m, struct mbuf *opt, struct route *ro, int flags,
 	struct ifnet *ifp = NULL;	/* keep compiler happy */
 	struct mbuf *m0;
 	int hlen = sizeof (struct ip);
-	int mtu;
+	int mtu = 0;
 	int error = 0;
 	struct sockaddr_in *dst, sin;
 	const struct sockaddr_in *gw;
-	struct in_ifaddr *ia;
+	struct in_ifaddr *ia = NULL;
 	struct in_addr src;
 	int isbroadcast;
 	uint16_t ip_len, ip_off;
@@ -486,7 +485,6 @@ again:
 				 * possible that a matching SPD entry exists.
 				 */
 				no_route_but_check_spd = 1;
-				mtu = 0; /* Silence GCC warning. */
 				goto sendit;
 #endif
 				IPSTAT_INC(ips_noroute);
@@ -522,7 +520,6 @@ again:
 			 * possible that a matching SPD entry exists.
 			 */
 			no_route_but_check_spd = 1;
-			mtu = 0; /* Silence GCC warning. */
 			goto sendit;
 #endif
 			IPSTAT_INC(ips_noroute);
@@ -721,7 +718,6 @@ sendit:
 			gw = dst;
 			ip = mtod(m, struct ip *);
 			goto again;
-
 		}
 	}
 
@@ -769,9 +765,13 @@ sendit:
 	/*
 	 * If small enough for interface, or the interface will take
 	 * care of the fragmentation for us, we can just send directly.
+	 * Note that if_vxlan could have requested TSO even though the outer
+	 * frame is UDP.  It is correct to not fragment such datagrams and
+	 * instead just pass them on to the driver.
 	 */
 	if (ip_len <= mtu ||
-	    (m->m_pkthdr.csum_flags & ifp->if_hwassist & CSUM_TSO) != 0) {
+	    (m->m_pkthdr.csum_flags & ifp->if_hwassist &
+	    (CSUM_TSO | CSUM_INNER_TSO)) != 0) {
 		ip->ip_sum = 0;
 		if (m->m_pkthdr.csum_flags & CSUM_IP & ~ifp->if_hwassist) {
 			ip->ip_sum = in_cksum(m, hlen);
@@ -785,7 +785,8 @@ sendit:
 		 * once instead of for every generated packet.
 		 */
 		if (!(flags & IP_FORWARDING) && ia) {
-			if (m->m_pkthdr.csum_flags & CSUM_TSO)
+			if (m->m_pkthdr.csum_flags &
+			    (CSUM_TSO | CSUM_INNER_TSO))
 				counter_u64_add(ia->ia_ifa.ifa_opackets,
 				    m->m_pkthdr.len / m->m_pkthdr.tso_segsz);
 			else
@@ -809,7 +810,8 @@ sendit:
 	}
 
 	/* Balk when DF bit is set or the interface didn't support TSO. */
-	if ((ip_off & IP_DF) || (m->m_pkthdr.csum_flags & CSUM_TSO)) {
+	if ((ip_off & IP_DF) ||
+	    (m->m_pkthdr.csum_flags & (CSUM_TSO | CSUM_INNER_TSO))) {
 		error = EMSGSIZE;
 		IPSTAT_INC(ips_cantfrag);
 		goto bad;
@@ -1428,7 +1430,6 @@ ip_ctloutput(struct socket *so, struct sockopt *sopt)
 		case IP_RECVRSSBUCKETID:
 #endif
 			switch (sopt->sopt_name) {
-
 			case IP_TOS:
 				optval = inp->inp_ip_tos;
 				break;

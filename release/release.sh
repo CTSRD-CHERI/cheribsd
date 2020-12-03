@@ -57,7 +57,9 @@ usage() {
 env_setup() {
 	# The directory within which the release will be built.
 	CHROOTDIR="/scratch"
-	RELENGDIR="$(dirname $(realpath ${0}))"
+	if [ -z "${RELENGDIR}" ]; then
+		export RELENGDIR="$(dirname $(realpath ${0}))"
+	fi
 
 	# The default version control system command to obtain the sources.
 	for _dir in /usr/bin /usr/local/bin; do
@@ -65,7 +67,7 @@ env_setup() {
 		[ ! -z "${VCSCMD}" ] && break 2
 	done
 
-	if [ -z "${VCSCMD}" ]; then
+	if [ -z "${VCSCMD}" -a -z "${NOGIT}" ]; then
 		echo "*** The devel/git port/package is required."
 		exit 1
 	fi
@@ -220,13 +222,25 @@ chroot_setup() {
 	mkdir -p ${CHROOTDIR}/usr
 
 	if [ -z "${SRC_UPDATE_SKIP}" ]; then
-		${VCSCMD} ${SRC} -b ${SRCBRANCH} ${CHROOTDIR}/usr/src
+		if [ -d "${CHROOTDIR}/usr/src/.git" ]; then
+			git -C ${CHROOTDIR}/usr/src pull -q
+		else
+			${VCSCMD} ${SRC} -b ${SRCBRANCH} ${CHROOTDIR}/usr/src
+		fi
 	fi
 	if [ -z "${NODOC}" ] && [ -z "${DOC_UPDATE_SKIP}" ]; then
-		${VCSCMD} ${DOC} -b ${DOCBRANCH} ${CHROOTDIR}/usr/doc
+		if [ -d "${CHROOTDIR}/usr/doc/.git" ]; then
+			git -C ${CHROOTDIR}/usr/doc pull -q
+		else
+			${VCSCMD} ${DOC} -b ${DOCBRANCH} ${CHROOTDIR}/usr/doc
+		fi
 	fi
 	if [ -z "${NOPORTS}" ] && [ -z "${PORTS_UPDATE_SKIP}" ]; then
-		${VCSCMD} ${PORT} -b ${PORTBRANCH} ${CHROOTDIR}/usr/ports
+		if [ -d "${CHROOTDIR}/usr/ports/.git" ]; then
+			git -C ${CHROOTDIR}/usr/ports pull -q
+		else
+			${VCSCMD} ${PORT} -b ${PORTBRANCH} ${CHROOTDIR}/usr/ports
+		fi
 	fi
 
 	if [ -z "${CHROOTBUILD_SKIP}" ]; then
@@ -263,25 +277,32 @@ extra_chroot_setup() {
 		cp ${SRC_CONF} ${CHROOTDIR}/${SRC_CONF}
 	fi
 
-	# Install git from ports or packages if the ports tree is
-	# available and VCSCMD is unset.
-	_gitcmd="$(which git)"
-	if [ -d ${CHROOTDIR}/usr/ports -a -z "${_gitcmd}" ]; then
-		# Trick the ports 'run-autotools-fixup' target to do the right
-		# thing.
-		_OSVERSION=$(chroot ${CHROOTDIR} /usr/bin/uname -U)
-		REVISION=$(chroot ${CHROOTDIR} make -C /usr/src/release -V REVISION)
-		BRANCH=$(chroot ${CHROOTDIR} make -C /usr/src/release -V BRANCH)
-		UNAME_r=${REVISION}-${BRANCH}
-		GITUNSETOPTS="CONTRIB CURL CVS GITWEB GUI HTMLDOCS"
-		GITUNSETOPTS="${GITUNSETOPTS} ICONV NLS P4 PERL"
-		GITUNSETOPTS="${GITUNSETOPTS} SEND_EMAIL SUBTREE SVN"
-		GITUNSETOPTS="${GITUNSETOPTS} PCRE PCRE2"
-		eval chroot ${CHROOTDIR} env OPTIONS_UNSET=\"${GITUNSETOPTS}\" \
-			make -C /usr/ports/devel/git FORCE_PKG_REGISTER=1 \
-			WRKDIRPREFIX=/tmp/ports \
-			DISTDIR=/tmp/distfiles \
-			install clean distclean
+	if [ -z "${NOGIT}" ]; then
+		# Install git from ports or packages if the ports tree is
+		# available and VCSCMD is unset.
+		_gitcmd="$(which git)"
+		if [ -d ${CHROOTDIR}/usr/ports -a -z "${_gitcmd}" ]; then
+			# Trick the ports 'run-autotools-fixup' target to do the right
+			# thing.
+			_OSVERSION=$(chroot ${CHROOTDIR} /usr/bin/uname -U)
+			REVISION=$(chroot ${CHROOTDIR} make -C /usr/src/release -V REVISION)
+			BRANCH=$(chroot ${CHROOTDIR} make -C /usr/src/release -V BRANCH)
+			UNAME_r=${REVISION}-${BRANCH}
+			GITUNSETOPTS="CONTRIB CURL CVS GITWEB GUI HTMLDOCS"
+			GITUNSETOPTS="${GITUNSETOPTS} ICONV NLS P4 PERL"
+			GITUNSETOPTS="${GITUNSETOPTS} SEND_EMAIL SUBTREE SVN"
+			GITUNSETOPTS="${GITUNSETOPTS} PCRE PCRE2"
+			eval chroot ${CHROOTDIR} env OPTIONS_UNSET=\"${GITUNSETOPTS}\" \
+				make -C /usr/ports/devel/git FORCE_PKG_REGISTER=1 \
+				WRKDIRPREFIX=/tmp/ports \
+				DISTDIR=/tmp/distfiles \
+				install clean distclean
+		else
+			eval chroot ${CHROOTDIR} env ASSUME_ALWAYS_YES=yes \
+				pkg install -y devel/git
+			eval chroot ${CHROOTDIR} env ASSUME_ALWAYS_YES=yes \
+				pkg clean -y
+		fi
 	fi
 	if [ -d ${CHROOTDIR}/usr/ports ]; then
 		# Trick the ports 'run-autotools-fixup' target to do the right

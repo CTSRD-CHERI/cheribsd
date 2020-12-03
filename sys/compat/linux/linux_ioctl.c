@@ -50,6 +50,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/filio.h>
 #include <sys/jail.h>
 #include <sys/kbio.h>
+#include <sys/kcov.h>
 #include <sys/kernel.h>
 #include <sys/linker_set.h>
 #include <sys/lock.h>
@@ -117,6 +118,7 @@ static linux_ioctl_function_t linux_ioctl_v4l2;
 static linux_ioctl_function_t linux_ioctl_special;
 static linux_ioctl_function_t linux_ioctl_fbsd_usb;
 static linux_ioctl_function_t linux_ioctl_evdev;
+static linux_ioctl_function_t linux_ioctl_kcov;
 
 static struct linux_ioctl_handler cdrom_handler =
 { linux_ioctl_cdrom, LINUX_IOCTL_CDROM_MIN, LINUX_IOCTL_CDROM_MAX };
@@ -146,6 +148,8 @@ static struct linux_ioctl_handler fbsd_usb =
 { linux_ioctl_fbsd_usb, FBSD_LUSB_MIN, FBSD_LUSB_MAX };
 static struct linux_ioctl_handler evdev_handler =
 { linux_ioctl_evdev, LINUX_IOCTL_EVDEV_MIN, LINUX_IOCTL_EVDEV_MAX };
+static struct linux_ioctl_handler kcov_handler =
+{ linux_ioctl_kcov, LINUX_KCOV_MIN, LINUX_KCOV_MAX };
 
 DATA_SET(linux_ioctl_handler_set, cdrom_handler);
 DATA_SET(linux_ioctl_handler_set, vfat_handler);
@@ -161,6 +165,7 @@ DATA_SET(linux_ioctl_handler_set, video_handler);
 DATA_SET(linux_ioctl_handler_set, video2_handler);
 DATA_SET(linux_ioctl_handler_set, fbsd_usb);
 DATA_SET(linux_ioctl_handler_set, evdev_handler);
+DATA_SET(linux_ioctl_handler_set, kcov_handler);
 
 /*
  * Keep sorted by low.
@@ -713,7 +718,6 @@ linux_ioctl_termio(struct thread *td, struct linux_ioctl_args *args)
 		return (error);
 
 	switch (args->cmd & 0xffff) {
-
 	case LINUX_TCGETS:
 		error = fo_ioctl(fp, TIOCGETA, (caddr_t)&bios, td->td_ucred,
 		    td);
@@ -1455,7 +1459,6 @@ linux_ioctl_cdrom(struct thread *td, struct linux_ioctl_args *args)
 	if (error != 0)
 		return (error);
 	switch (args->cmd & 0xffff) {
-
 	case LINUX_CDROMPAUSE:
 		args->cmd = CDIOCPAUSE;
 		error = (sys_ioctl(td, (struct ioctl_args *)args));
@@ -1723,7 +1726,6 @@ linux_ioctl_sound(struct thread *td, struct linux_ioctl_args *args)
 {
 
 	switch (args->cmd & 0xffff) {
-
 	case LINUX_SOUND_MIXER_WRITE_VOLUME:
 		args->cmd = SETDIR(SOUND_MIXER_WRITE_VOLUME);
 		return (sys_ioctl(td, (struct ioctl_args *)args));
@@ -1790,6 +1792,10 @@ linux_ioctl_sound(struct thread *td, struct linux_ioctl_args *args)
 
 	case LINUX_SOUND_MIXER_WRITE_LINE3:
 		args->cmd = SETDIR(SOUND_MIXER_WRITE_LINE3);
+		return (sys_ioctl(td, (struct ioctl_args *)args));
+
+	case LINUX_SOUND_MIXER_WRITE_MONITOR:
+		args->cmd = SETDIR(SOUND_MIXER_WRITE_MONITOR);
 		return (sys_ioctl(td, (struct ioctl_args *)args));
 
 	case LINUX_SOUND_MIXER_INFO: {
@@ -1981,7 +1987,6 @@ linux_ioctl_sound(struct thread *td, struct linux_ioctl_args *args)
 	case LINUX_SNDCTL_SYNTH_MEMAVL:
 		args->cmd = SNDCTL_SYNTH_MEMAVL;
 		return (sys_ioctl(td, (struct ioctl_args *)args));
-
 	}
 
 	return (ENOIOCTL);
@@ -2001,7 +2006,6 @@ linux_ioctl_console(struct thread *td, struct linux_ioctl_args *args)
 	if (error != 0)
 		return (error);
 	switch (args->cmd & 0xffff) {
-
 	case LINUX_KIOCSOUND:
 		args->cmd = KIOCSOUND;
 		error = (sys_ioctl(td, (struct ioctl_args *)args));
@@ -2296,7 +2300,6 @@ linux_gifhwaddr(struct ifnet *ifp, struct l_ifreq *ifr)
 	return (copyout(&lsa, &ifr->ifr_hwaddr, sizeof(lsa)));
 }
 
-
  /*
 * If we fault in bsd_to_linux_ifreq() then we will fault when we call
 * the native ioctl().  Thus, we don't really need to check the return
@@ -2352,7 +2355,6 @@ linux_ioctl_socket(struct thread *td, struct linux_ioctl_args *args)
 	}
 
 	switch (args->cmd & 0xffff) {
-
 	case LINUX_FIOGETOWN:
 	case LINUX_FIOSETOWN:
 	case LINUX_SIOCADDMULTI:
@@ -2405,7 +2407,6 @@ linux_ioctl_socket(struct thread *td, struct linux_ioctl_args *args)
 	}
 
 	switch (args->cmd & 0xffff) {
-
 	case LINUX_FIOSETOWN:
 		args->cmd = FIOSETOWN;
 		error = sys_ioctl(td, (struct ioctl_args *)args);
@@ -3579,6 +3580,38 @@ linux_ioctl_evdev(struct thread *td, struct linux_ioctl_args *args)
 		args->cmd = (args->cmd & ~IOC_DIRMASK) | IOC_INOUT;
 
 	return (sys_ioctl(td, (struct ioctl_args *)args));
+}
+
+static int
+linux_ioctl_kcov(struct thread *td, struct linux_ioctl_args *args)
+{
+	int error;
+
+	error = 0;
+	switch (args->cmd & 0xffff) {
+	case LINUX_KCOV_INIT_TRACE:
+		args->cmd = KIOSETBUFSIZE;
+		break;
+	case LINUX_KCOV_ENABLE:
+		args->cmd = KIOENABLE;
+		if (args->arg == 0)
+			args->arg = KCOV_MODE_TRACE_PC;
+		else if (args->arg == 1)
+			args->arg = KCOV_MODE_TRACE_CMP;
+		else
+			error = EINVAL;
+		break;
+	case LINUX_KCOV_DISABLE:
+		args->cmd = KIODISABLE;
+		break;
+	default:
+		error = ENOTTY;
+		break;
+	}
+
+	if (error == 0)
+		error = sys_ioctl(td, (struct ioctl_args *)args);
+	return (error);
 }
 
 /*

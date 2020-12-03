@@ -452,12 +452,15 @@ pmap_l1(pmap_t pmap, vm_offset_t va)
 }
 
 static __inline pd_entry_t *
-pmap_l1_to_l2(pd_entry_t *l1, vm_offset_t va)
+pmap_l1_to_l2(pd_entry_t *l1p, vm_offset_t va)
 {
-	pd_entry_t *l2;
+	pd_entry_t l1, *l2p;
 
-	l2 = (pd_entry_t *)PHYS_TO_DMAP(pmap_load(l1) & ~ATTR_MASK);
-	return (&l2[pmap_l2_index(va)]);
+	l1 = pmap_load(l1p);
+	KASSERT((l1 & ATTR_DESCR_MASK) == L1_TABLE,
+	    ("%s: L1 entry %#lx is a leaf", __func__, l1));
+	l2p = (pd_entry_t *)PHYS_TO_DMAP(l1 & ~ATTR_MASK);
+	return (&l2p[pmap_l2_index(va)]);
 }
 
 static __inline pd_entry_t *
@@ -473,12 +476,16 @@ pmap_l2(pmap_t pmap, vm_offset_t va)
 }
 
 static __inline pt_entry_t *
-pmap_l2_to_l3(pd_entry_t *l2, vm_offset_t va)
+pmap_l2_to_l3(pd_entry_t *l2p, vm_offset_t va)
 {
-	pt_entry_t *l3;
+	pd_entry_t l2;
+	pt_entry_t *l3p;
 
-	l3 = (pd_entry_t *)PHYS_TO_DMAP(pmap_load(l2) & ~ATTR_MASK);
-	return (&l3[pmap_l3_index(va)]);
+	l2 = pmap_load(l2p);
+	KASSERT((l2 & ATTR_DESCR_MASK) == L2_TABLE,
+	    ("%s: L2 entry %#lx is a leaf", __func__, l2));
+	l3p = (pt_entry_t *)PHYS_TO_DMAP(l2 & ~ATTR_MASK);
+	return (&l3p[pmap_l3_index(va)]);
 }
 
 /*
@@ -619,7 +626,6 @@ pmap_l3_valid(pt_entry_t l3)
 	return ((l3 & ATTR_DESCR_MASK) == L3_PAGE);
 }
 
-
 CTASSERT(L1_BLOCK == L2_BLOCK);
 
 static pt_entry_t
@@ -693,13 +699,18 @@ static inline int
 pmap_pte_dirty(pmap_t pmap, pt_entry_t pte)
 {
 
-	PMAP_ASSERT_STAGE1(pmap);
 	KASSERT((pte & ATTR_SW_MANAGED) != 0, ("pte %#lx is unmanaged", pte));
-	KASSERT((pte & (ATTR_S1_AP_RW_BIT | ATTR_SW_DBM)) != 0,
-	    ("pte %#lx is writeable and missing ATTR_SW_DBM", pte));
 
-	return ((pte & (ATTR_S1_AP_RW_BIT | ATTR_SW_DBM)) ==
-	    (ATTR_S1_AP(ATTR_S1_AP_RW) | ATTR_SW_DBM));
+	if (pmap->pm_stage == PM_STAGE1) {
+		KASSERT((pte & (ATTR_S1_AP_RW_BIT | ATTR_SW_DBM)) != 0,
+		    ("pte %#lx is writeable and missing ATTR_SW_DBM", pte));
+
+		return ((pte & (ATTR_S1_AP_RW_BIT | ATTR_SW_DBM)) ==
+		    (ATTR_S1_AP(ATTR_S1_AP_RW) | ATTR_SW_DBM));
+	}
+
+	return ((pte & ATTR_S2_S2AP(ATTR_S2_S2AP_WRITE)) ==
+	    ATTR_S2_S2AP(ATTR_S2_S2AP_WRITE));
 }
 
 static __inline void
@@ -1457,7 +1468,6 @@ pmap_map(vm_offset_t *virt, vm_paddr_t start, vm_paddr_t end, int prot)
 	return PHYS_TO_DMAP(start);
 }
 
-
 /*
  * Add a list of wired pages to the kva
  * this routine is only used for temporary
@@ -1983,20 +1993,27 @@ pmap_release(pmap_t pmap)
 	    pmap->pm_stats.resident_count));
 	KASSERT(vm_radix_is_empty(&pmap->pm_root),
 	    ("pmap_release: pmap has reserved page table page(s)"));
-	PMAP_ASSERT_STAGE1(pmap);
 
 	set = pmap->pm_asid_set;
 	KASSERT(set != NULL, ("%s: NULL asid set", __func__));
 
-	mtx_lock_spin(&set->asid_set_mutex);
-	if (COOKIE_TO_EPOCH(pmap->pm_cookie) == set->asid_epoch) {
-		asid = COOKIE_TO_ASID(pmap->pm_cookie);
-		KASSERT(asid >= ASID_FIRST_AVAILABLE &&
-		    asid < set->asid_set_size,
-		    ("pmap_release: pmap cookie has out-of-range asid"));
-		bit_clear(set->asid_set, asid);
+	/*
+	 * Allow the ASID to be reused. In stage 2 VMIDs we don't invalidate
+	 * the entries when removing them so rely on a later tlb invalidation.
+	 * this will happen when updating the VMID generation. Because of this
+	 * we don't reuse VMIDs within a generation.
+	 */
+	if (pmap->pm_stage == PM_STAGE1) {
+		mtx_lock_spin(&set->asid_set_mutex);
+		if (COOKIE_TO_EPOCH(pmap->pm_cookie) == set->asid_epoch) {
+			asid = COOKIE_TO_ASID(pmap->pm_cookie);
+			KASSERT(asid >= ASID_FIRST_AVAILABLE &&
+			    asid < set->asid_set_size,
+			    ("pmap_release: pmap cookie has out-of-range asid"));
+			bit_clear(set->asid_set, asid);
+		}
+		mtx_unlock_spin(&set->asid_set_mutex);
 	}
-	mtx_unlock_spin(&set->asid_set_mutex);
 
 	m = PHYS_TO_VM_PAGE(pmap->pm_l0_paddr);
 	vm_page_unwire_noq(m);
@@ -2090,7 +2107,6 @@ pmap_growkernel(vm_offset_t addr)
 		}
 	}
 }
-
 
 /***************************************************
  * page management routines.
@@ -2914,7 +2930,6 @@ pmap_remove(pmap_t pmap, vm_offset_t sva, vm_offset_t eva)
 
 	lock = NULL;
 	for (; sva < eva; sva = va_next) {
-
 		if (pmap->pm_stats.resident_count == 0)
 			break;
 
@@ -3168,7 +3183,6 @@ pmap_protect(pmap_t pmap, vm_offset_t sva, vm_offset_t eva, vm_prot_t prot)
 
 	PMAP_LOCK(pmap);
 	for (; sva < eva; sva = va_next) {
-
 		l0 = pmap_l0(pmap, sva);
 		if (pmap_load(l0) == 0) {
 			va_next = (sva + L0_SIZE) & ~L0_OFFSET;
@@ -3507,8 +3521,11 @@ pmap_enter(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot,
 		if ((prot & VM_PROT_WRITE) != 0) {
 			new_l3 |= ATTR_SW_DBM;
 			if ((flags & VM_PROT_WRITE) == 0) {
-				PMAP_ASSERT_STAGE1(pmap);
-				new_l3 |= ATTR_S1_AP(ATTR_S1_AP_RO);
+				if (pmap->pm_stage == PM_STAGE1)
+					new_l3 |= ATTR_S1_AP(ATTR_S1_AP_RO);
+				else
+					new_l3 &=
+					    ~ATTR_S2_S2AP(ATTR_S2_S2AP_WRITE);
 			}
 		}
 	}
@@ -6008,7 +6025,7 @@ pmap_mincore(pmap_t pmap, vm_offset_t addr, vm_paddr_t *pap)
 		managed = (tpte & ATTR_SW_MANAGED) != 0;
 		val = MINCORE_INCORE;
 		if (lvl != 3)
-			val |= MINCORE_SUPER;
+			val |= MINCORE_PSIND(3 - lvl);
 		if ((managed && pmap_pte_dirty(pmap, tpte)) || (!managed &&
 		    (tpte & ATTR_S1_AP_RW_BIT) == ATTR_S1_AP(ATTR_S1_AP_RW)))
 			val |= MINCORE_MODIFIED | MINCORE_MODIFIED_OTHER;

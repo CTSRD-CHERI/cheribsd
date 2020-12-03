@@ -711,7 +711,7 @@ mpr_user_command(struct mpr_softc *sc, struct mpr_usr_command *cmd)
 		sz = rpl->MsgLength * 4;
 	else
 		sz = 0;
-	
+
 	if (sz > cmd->rpl_len) {
 		mpr_printf(sc, "%s: user reply buffer (%d) smaller than "
 		    "returned buffer (%d)\n", __func__, cmd->rpl_len, sz);
@@ -858,7 +858,7 @@ mpr_user_pass_thru(struct mpr_softc *sc, mpr_pass_thru_t *data)
 		if ((cm != NULL) && (cm->cm_reply != NULL)) {
 			rpl = (MPI2_DEFAULT_REPLY *)cm->cm_reply;
 			sz = rpl->MsgLength * 4;
-	
+
 			if (sz > data->ReplySize) {
 				mpr_printf(sc, "%s: user reply buffer (%d) "
 				    "smaller than returned buffer (%d)\n",
@@ -1446,7 +1446,7 @@ static int
 mpr_diag_register(struct mpr_softc *sc, mpr_fw_diag_register_t *diag_register,
     uint32_t *return_code)
 {
-	bus_dma_tag_template_t		t;
+	bus_dma_template_t		t;
 	mpr_fw_diagnostic_buffer_t	*pBuffer;
 	struct mpr_busdma_context	*ctx;
 	uint8_t				extended_type, buffer_type, i;
@@ -1510,9 +1510,9 @@ mpr_diag_register(struct mpr_softc *sc, mpr_fw_diag_register_t *diag_register,
 		return (MPR_DIAG_FAILURE);
 	}
 	bus_dma_template_init(&t, sc->mpr_parent_dmat);
-	t.lowaddr = BUS_SPACE_MAXADDR_32BIT;
-	t.maxsize = t.maxsegsize = buffer_size;
-	t.nsegments = 1;
+	BUS_DMA_TEMPLATE_FILL(&t, BD_LOWADDR(BUS_SPACE_MAXADDR_32BIT),
+	    BD_MAXSIZE(buffer_size), BD_MAXSEGSIZE(buffer_size),
+	    BD_NSEGMENTS(1));
 	if (bus_dma_template_tag(&t, &sc->fw_diag_dmat)) {
 		mpr_dprint(sc, MPR_ERROR,
 		    "Cannot allocate FW diag buffer DMA tag\n");
@@ -1539,7 +1539,6 @@ mpr_diag_register(struct mpr_softc *sc, mpr_fw_diag_register_t *diag_register,
 	    sc->fw_diag_buffer, buffer_size, mpr_memaddr_wait_cb,
 	    ctx, 0);
 	if (error == EINPROGRESS) {
-
 		/* XXX KDM */
 		device_printf(sc->mpr_dev, "%s: Deferred bus_dmamap_load\n",
 		    __func__);

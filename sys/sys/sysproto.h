@@ -2416,7 +2416,6 @@ int	ogetdirentries(struct thread *, struct ogetdirentries_args *);
 
 #endif /* COMPAT_43 */
 
-
 #ifdef COMPAT_FREEBSD4
 
 struct freebsd4_getfsstat_args {
@@ -2476,7 +2475,6 @@ int	freebsd4_sigaction(struct thread *, struct freebsd4_sigaction_args *);
 int	freebsd4_sigreturn(struct thread *, struct freebsd4_sigreturn_args *);
 
 #endif /* COMPAT_FREEBSD4 */
-
 
 #ifdef COMPAT_FREEBSD6
 
@@ -2543,7 +2541,6 @@ int	freebsd6_lio_listio(struct thread *, struct freebsd6_lio_listio_args *);
 
 #endif /* COMPAT_FREEBSD6 */
 
-
 #ifdef COMPAT_FREEBSD7
 
 struct freebsd7___semctl_args {
@@ -2568,13 +2565,11 @@ int	freebsd7_shmctl(struct thread *, struct freebsd7_shmctl_args *);
 
 #endif /* COMPAT_FREEBSD7 */
 
-
 #ifdef COMPAT_FREEBSD10
 
 int	freebsd10_pipe(struct thread *, struct freebsd10_pipe_args *);
 
 #endif /* COMPAT_FREEBSD10 */
-
 
 #ifdef COMPAT_FREEBSD11
 
@@ -2682,7 +2677,6 @@ int	freebsd11_fstatat(struct thread *, struct freebsd11_fstatat_args *);
 int	freebsd11_mknodat(struct thread *, struct freebsd11_mknodat_args *);
 
 #endif /* COMPAT_FREEBSD11 */
-
 
 #ifdef COMPAT_FREEBSD12
 

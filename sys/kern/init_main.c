@@ -277,7 +277,6 @@ restart:
 	 * Perform each task, and continue on to the next task.
 	 */
 	for (sipp = sysinit; sipp < sysinit_end; sipp++) {
-
 		if ((*sipp)->subsystem == SI_SUB_DUMMY)
 			continue;	/* skip dummy task(s)*/
 
@@ -415,8 +414,6 @@ null_set_syscall_retval(struct thread *td __unused, int error __unused)
 struct sysentvec null_sysvec = {
 	.sv_size	= 0,
 	.sv_table	= NULL,
-	.sv_errsize	= 0,
-	.sv_errtbl	= NULL,
 	.sv_transtrap	= NULL,
 	.sv_fixup	= NULL,
 	.sv_sendsig	= NULL,
@@ -734,7 +731,7 @@ start_init(void *dummy)
 		freeenv(var);
 	}
 	free_init_path = tmp_init_path = strdup(init_path, M_TEMP);
-	
+
 	while ((path = strsep(&tmp_init_path, ":")) != NULL) {
 		if (bootverbose)
 			printf("start_init: trying %s\n", path);

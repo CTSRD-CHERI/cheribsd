@@ -525,7 +525,7 @@ cpu_fetch_syscall_args(struct thread *td)
 
 	locr0 = td->td_frame;
 	sa = &td->td_sa;
-	
+
 	bzero(sa->args, sizeof(sa->args));
 
 	/* compute next PC after syscall instruction */
@@ -1488,7 +1488,6 @@ trapDump(char *msg)
 }
 #endif
 
-
 /*
  * Return the resulting PC as if the branch was executed.
  *
@@ -1846,7 +1845,6 @@ trap_frame_dump(struct trapframe *frame)
 }
 
 #endif
-
 
 static void
 get_mapping_info(vm_offset_t va, pd_entry_t **pdepp, pt_entry_t **ptepp)
@@ -2210,7 +2208,6 @@ mips_unaligned_load_store(struct trapframe *frame, int mode, register_t addr, ui
 	panic("%s: should not be reached.", __func__);
 }
 
-
 /*
  * XXX TODO: SMP?
  */
@@ -2237,7 +2234,6 @@ emulate_unaligned_access(struct trapframe *frame, int mode)
 	 * Fall through if it's instruction fetch exception
 	 */
 	if (!((pc & 3) || (pc == frame->badvaddr))) {
-
 		/*
 		 * Handle unaligned load and store
 		 */

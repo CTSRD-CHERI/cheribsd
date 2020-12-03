@@ -22,9 +22,9 @@ NOTE TO PEOPLE WHO THINK THAT FreeBSD 13.x IS SLOW:
 	debugging flags in userland, and various verbose features in the
 	kernel.  Many developers choose to disable these features on build
 	machines to maximize performance.  (To completely disable malloc
-	debugging, define MALLOC_PRODUCTION in /etc/make.conf, or to merely
-	disable the most expensive debugging functionality run
-	"ln -s 'abort:false,junk:false' /etc/malloc.conf".)
+	debugging, define WITH_MALLOC_PRODUCTION in /etc/src.conf and rebuild
+	world, or to merely disable the most expensive debugging functionality
+	at runtime, run "ln -s 'abort:false,junk:false' /etc/malloc.conf".)
 
 20200824:
 	OpenZFS support has been integrated. Do not upgrade root pools until
@@ -35,6 +35,14 @@ NOTE TO PEOPLE WHO THINK THAT FreeBSD 13.x IS SLOW:
 	Not all "NO_CLEAN" build scenarios work across these changes. Many
 	scenarios have been tested and fixed, but rebuilding kernels without
 	rebuilding world may fail.
+
+	The ZFS cache file has moved from /boot to /etc to match the OpenZFS
+	upstream default. A fallback to /boot has been added for mountroot.
+
+	Pool auto import behavior at boot has been moved from the kernel module
+	to an explicit "zpool import -a" in one of the rc scripts enabled by
+	zfs_enable=YES. This means your non-root zpools won't auto import until
+	you upgrade your /etc/rc.d files.
 
 20200824:
 	The resume code now notifies devd with the 'kernel' system

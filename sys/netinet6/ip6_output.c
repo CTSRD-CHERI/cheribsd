@@ -155,7 +155,6 @@ static int ip6_calcmtu(struct ifnet *, const struct in6_addr *, u_long,
 static int ip6_getpmtu_ctl(u_int, const struct in6_addr *, u_long *);
 static int copypktopts(struct ip6_pktopts *, struct ip6_pktopts *, int);
 
-
 /*
  * Make an extension header from option data.  hp is the source,
  * mp is the destination, and _ol is the optlen.
@@ -826,7 +825,7 @@ nonh6lookup:
 		 * more details.
 		 */
 		origifp = ifp;
-	
+
 		/*
 		 * We should use ia_ifp to support the case of sending
 		 * packets to an address of our own.
@@ -1120,7 +1119,8 @@ passout:
 	 */
 	sw_csum = m->m_pkthdr.csum_flags;
 	if (!hdrsplit) {
-		tso = ((sw_csum & ifp->if_hwassist & CSUM_TSO) != 0) ? 1 : 0;
+		tso = ((sw_csum & ifp->if_hwassist &
+		    (CSUM_TSO | CSUM_INNER_TSO)) != 0) ? 1 : 0;
 		sw_csum &= ~ifp->if_hwassist;
 	} else
 		tso = 0;
@@ -1496,7 +1496,6 @@ ip6_getpmtu(struct route_in6 *ro_pmtu, int do_lookup,
 
 	mtu = 0;
 	if (ro_pmtu == NULL || do_lookup) {
-
 		/*
 		 * Here ro_pmtu has final destination address, while
 		 * ro might represent immediate destination.
@@ -1681,7 +1680,6 @@ ip6_ctloutput(struct socket *so, struct sockopt *sopt)
 		}
 	} else {		/* level == IPPROTO_IPV6 */
 		switch (op) {
-
 		case SOPT_SET:
 			switch (optname) {
 			case IPV6_2292PKTOPTIONS:
@@ -1770,7 +1768,6 @@ ip6_ctloutput(struct socket *so, struct sockopt *sopt)
 				if (error)
 					break;
 				switch (optname) {
-
 				case IPV6_UNICAST_HOPS:
 					if (optval < -1 || optval >= 256)
 						error = EINVAL;
@@ -2133,7 +2130,6 @@ do {									\
 
 		case SOPT_GET:
 			switch (optname) {
-
 			case IPV6_2292PKTOPTIONS:
 #ifdef IPV6_PKTOPTIONS
 			case IPV6_PKTOPTIONS:
@@ -2173,7 +2169,6 @@ do {									\
 #endif
 			case IPV6_BINDMULTI:
 				switch (optname) {
-
 				case IPV6_RECVHOPOPTS:
 					optval = OPTBIT(IN6P_HOPOPTS);
 					break;
@@ -2269,7 +2264,6 @@ do {									\
 				case IPV6_BINDMULTI:
 					optval = OPTBIT2(INP_BINDMULTI);
 					break;
-
 				}
 				if (error)
 					break;

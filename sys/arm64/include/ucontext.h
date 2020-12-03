@@ -133,5 +133,4 @@ typedef struct __mcontext32_vfp {
 
 #endif /* COMPAT_FREEBSD32 */
 
-
 #endif	/* !_MACHINE_UCONTEXT_H_ */

@@ -75,7 +75,6 @@ __FBSDID("$FreeBSD$");
 #include <cam/cam_xpt_internal.h>
 #include <cam/cam_debug.h>
 
-
 #include <cam/mmc/mmc_all.h>
 
 #ifdef _KERNEL
@@ -183,7 +182,6 @@ static void sdda_start_init(void *context, union ccb *start_ccb);
 static void sdda_start_init_task(void *context, int pending);
 static void sdda_process_mmc_partitions(struct cam_periph *periph, union ccb *start_ccb);
 static uint32_t sdda_get_host_caps(struct cam_periph *periph, union ccb *ccb);
-static void sdda_init_switch_part(struct cam_periph *periph, union ccb *start_ccb, u_int part);
 static int mmc_select_card(struct cam_periph *periph, union ccb *ccb, uint32_t rca);
 static inline uint32_t mmc_get_sector_size(struct cam_periph *periph) {return MMC_SECTOR_SIZE;}
 
@@ -268,7 +266,6 @@ mmc_handle_reply(union ccb *ccb)
 	return (0); /* Normal return */
 }
 
-
 static uint32_t
 mmc_get_bits(uint32_t *bits, int bit_len, int start, int size)
 {
@@ -279,7 +276,6 @@ mmc_get_bits(uint32_t *bits, int bit_len, int start, int size)
 		retval |= bits[i - 1] << (32 - shift);
 	return (retval & ((1llu << size) - 1));
 }
-
 
 static void
 mmc_decode_csd_sd(uint32_t *raw_csd, struct mmc_csd *csd)
@@ -752,7 +748,6 @@ sddaasync(void *callback_arg, u_int32_t code,
 	}
 }
 
-
 static int
 sddagetattr(struct bio *bp)
 {
@@ -1021,7 +1016,6 @@ static int
 mmc_sd_switch(struct cam_periph *periph, union ccb *ccb,
 	      uint8_t mode, uint8_t grp, uint8_t value,
 	      uint8_t *res) {
-
 	struct mmc_data mmc_d;
 	uint32_t arg;
 	int err;
@@ -1303,7 +1297,6 @@ sdda_start_init(void *context, union ccb *start_ccb)
 			/* FIXME: there should be a better name for this option...*/
 			mmcp->card_features |= CARD_FEATURE_SDHC;
 		}
-
 	}
 	CAM_DEBUG(periph->path, CAM_DEBUG_PERIPH,
 	    ("Capacity: %"PRIu64", sectors: %"PRIu64"\n",
@@ -1776,10 +1769,13 @@ sdda_process_mmc_partitions(struct cam_periph *periph, union ccb *ccb)
  * This function cannot fail, instead check switch errors in sddadone().
  */
 static void
-sdda_init_switch_part(struct cam_periph *periph, union ccb *start_ccb, u_int part) {
+sdda_init_switch_part(struct cam_periph *periph, union ccb *start_ccb,
+    uint8_t part)
+{
 	struct sdda_softc *sc = (struct sdda_softc *)periph->softc;
 	uint8_t value;
 
+	KASSERT(part < MMC_PART_MAX, ("%s: invalid partition index", __func__));
 	sc->part_requested = part;
 
 	value = (sc->raw_ext_csd[EXT_CSD_PART_CONFIG] &
@@ -1803,7 +1799,7 @@ sddastart(struct cam_periph *periph, union ccb *start_ccb)
 	struct sdda_softc *softc = (struct sdda_softc *)periph->softc;
 	struct sdda_part *part;
 	struct mmc_params *mmcp = &periph->path->device->mmc_ident_data;
-	int part_index;
+	uint8_t part_index;
 
 	CAM_DEBUG(periph->path, CAM_DEBUG_TRACE, ("sddastart\n"));
 
@@ -1814,6 +1810,7 @@ sddastart(struct cam_periph *periph, union ccb *start_ccb)
 	}
 
 	/* Find partition that has outstanding commands.  Prefer current partition. */
+	part_index = softc->part_curr;
 	part = softc->part[softc->part_curr];
 	bp = bioq_first(&part->bio_queue);
 	if (bp == NULL) {
@@ -1970,7 +1967,8 @@ sddadone(struct cam_periph *periph, union ccb *done_ccb)
 	/* Process result of switching MMC partitions */
 	if (softc->state == SDDA_STATE_PART_SWITCH) {
 		CAM_DEBUG(path, CAM_DEBUG_TRACE,
-		    ("Compteting partition switch to %d\n", softc->part_requested));
+		    ("Completing partition switch to %d\n",
+		    softc->part_requested));
 		softc->outstanding_cmds--;
 		/* Complete partition switch */
 		softc->state = SDDA_STATE_NORMAL;

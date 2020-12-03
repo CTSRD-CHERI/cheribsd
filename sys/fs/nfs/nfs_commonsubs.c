@@ -364,7 +364,7 @@ nfscl_reqstart(struct nfsrv_descript *nd, int procnum, struct nfsmount *nmp,
 	mb->m_len = 0;
 	nd->nd_mreq = nd->nd_mb = mb;
 	nd->nd_bpos = mtod(mb, char *);
-	
+
 	/*
 	 * And fill the first file handle into the request.
 	 */
@@ -2558,7 +2558,7 @@ nfsv4_fillattr(struct nfsrv_descript *nd, struct mount *mp, vnode_t vp,
 				xattrsupp = true;
 		}
 	}
-	
+
 	/*
 	 * Put out the attribute bitmap for the ones being filled in
 	 * and get the field for the number of attributes returned.
@@ -3275,7 +3275,7 @@ tryagain:
 			len -= (nfsrv_dnsnamelen + 1);
 			*(cp - 1) = '\0';
 		}
-	
+
 		/*
 		 * Check for the special case of "nobody".
 		 */
@@ -3284,7 +3284,7 @@ tryagain:
 			error = 0;
 			goto out;
 		}
-	
+
 		hp = NFSUSERNAMEHASH(str, len);
 		mtx_lock(&hp->mtx);
 		TAILQ_FOREACH(usrp, &hp->lughead, lug_namehash) {
@@ -3487,7 +3487,7 @@ tryagain:
 			len -= (nfsrv_dnsnamelen + 1);
 			*(cp - 1) = '\0';
 		}
-	
+
 		/*
 		 * Check for the special case of "nogroup".
 		 */
@@ -3496,7 +3496,7 @@ tryagain:
 			error = 0;
 			goto out;
 		}
-	
+
 		hp = NFSGROUPNAMEHASH(str, len);
 		mtx_lock(&hp->mtx);
 		TAILQ_FOREACH(usrp, &hp->lughead, lug_namehash) {

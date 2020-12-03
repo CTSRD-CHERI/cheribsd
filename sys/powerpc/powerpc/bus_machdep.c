@@ -178,10 +178,10 @@ bs_gen_barrier(bus_space_handle_t bsh __unused, bus_size_t ofs __unused,
 }
 
 /*
- * Big-endian access functions
+ * Native-endian access functions
  */
 static uint8_t
-bs_be_rs_1(bus_space_handle_t bsh, bus_size_t ofs)
+native_bs_rs_1(bus_space_handle_t bsh, bus_size_t ofs)
 {
 	volatile uint8_t *addr;
 	uint8_t res;
@@ -194,7 +194,7 @@ bs_be_rs_1(bus_space_handle_t bsh, bus_size_t ofs)
 }
 
 static uint16_t
-bs_be_rs_2(bus_space_handle_t bsh, bus_size_t ofs)
+native_bs_rs_2(bus_space_handle_t bsh, bus_size_t ofs)
 {
 	volatile uint16_t *addr;
 	uint16_t res;
@@ -207,7 +207,7 @@ bs_be_rs_2(bus_space_handle_t bsh, bus_size_t ofs)
 }
 
 static uint32_t
-bs_be_rs_4(bus_space_handle_t bsh, bus_size_t ofs)
+native_bs_rs_4(bus_space_handle_t bsh, bus_size_t ofs)
 {
 	volatile uint32_t *addr;
 	uint32_t res;
@@ -220,7 +220,7 @@ bs_be_rs_4(bus_space_handle_t bsh, bus_size_t ofs)
 }
 
 static uint64_t
-bs_be_rs_8(bus_space_handle_t bsh, bus_size_t ofs)
+native_bs_rs_8(bus_space_handle_t bsh, bus_size_t ofs)
 {
 	volatile uint64_t *addr;
 	uint64_t res;
@@ -232,31 +232,31 @@ bs_be_rs_8(bus_space_handle_t bsh, bus_size_t ofs)
 }
 
 static void
-bs_be_rm_1(bus_space_handle_t bsh, bus_size_t ofs, uint8_t *addr, size_t cnt)
+native_bs_rm_1(bus_space_handle_t bsh, bus_size_t ofs, uint8_t *addr, size_t cnt)
 {
 	ins8(__ppc_ba(bsh, ofs), addr, cnt);
 }
 
 static void
-bs_be_rm_2(bus_space_handle_t bsh, bus_size_t ofs, uint16_t *addr, size_t cnt)
+native_bs_rm_2(bus_space_handle_t bsh, bus_size_t ofs, uint16_t *addr, size_t cnt)
 {
 	ins16(__ppc_ba(bsh, ofs), addr, cnt);
 }
 
 static void
-bs_be_rm_4(bus_space_handle_t bsh, bus_size_t ofs, uint32_t *addr, size_t cnt)
+native_bs_rm_4(bus_space_handle_t bsh, bus_size_t ofs, uint32_t *addr, size_t cnt)
 {
 	ins32(__ppc_ba(bsh, ofs), addr, cnt);
 }
 
 static void
-bs_be_rm_8(bus_space_handle_t bsh, bus_size_t ofs, uint64_t *addr, size_t cnt)
+native_bs_rm_8(bus_space_handle_t bsh, bus_size_t ofs, uint64_t *addr, size_t cnt)
 {
 	ins64(__ppc_ba(bsh, ofs), addr, cnt);
 }
 
 static void
-bs_be_rr_1(bus_space_handle_t bsh, bus_size_t ofs, uint8_t *addr, size_t cnt)
+native_bs_rr_1(bus_space_handle_t bsh, bus_size_t ofs, uint8_t *addr, size_t cnt)
 {
 	volatile uint8_t *s = __ppc_ba(bsh, ofs);
 
@@ -266,7 +266,7 @@ bs_be_rr_1(bus_space_handle_t bsh, bus_size_t ofs, uint8_t *addr, size_t cnt)
 }
 
 static void
-bs_be_rr_2(bus_space_handle_t bsh, bus_size_t ofs, uint16_t *addr, size_t cnt)
+native_bs_rr_2(bus_space_handle_t bsh, bus_size_t ofs, uint16_t *addr, size_t cnt)
 {
 	volatile uint16_t *s = __ppc_ba(bsh, ofs);
 
@@ -276,7 +276,7 @@ bs_be_rr_2(bus_space_handle_t bsh, bus_size_t ofs, uint16_t *addr, size_t cnt)
 }
 
 static void
-bs_be_rr_4(bus_space_handle_t bsh, bus_size_t ofs, uint32_t *addr, size_t cnt)
+native_bs_rr_4(bus_space_handle_t bsh, bus_size_t ofs, uint32_t *addr, size_t cnt)
 {
 	volatile uint32_t *s = __ppc_ba(bsh, ofs);
 
@@ -286,7 +286,7 @@ bs_be_rr_4(bus_space_handle_t bsh, bus_size_t ofs, uint32_t *addr, size_t cnt)
 }
 
 static void
-bs_be_rr_8(bus_space_handle_t bsh, bus_size_t ofs, uint64_t *addr, size_t cnt)
+native_bs_rr_8(bus_space_handle_t bsh, bus_size_t ofs, uint64_t *addr, size_t cnt)
 {
 	volatile uint64_t *s = __ppc_ba(bsh, ofs);
 
@@ -296,7 +296,7 @@ bs_be_rr_8(bus_space_handle_t bsh, bus_size_t ofs, uint64_t *addr, size_t cnt)
 }
 
 static void
-bs_be_ws_1(bus_space_handle_t bsh, bus_size_t ofs, uint8_t val)
+native_bs_ws_1(bus_space_handle_t bsh, bus_size_t ofs, uint8_t val)
 {
 	volatile uint8_t *addr;
 
@@ -307,7 +307,7 @@ bs_be_ws_1(bus_space_handle_t bsh, bus_size_t ofs, uint8_t val)
 }
 
 static void
-bs_be_ws_2(bus_space_handle_t bsh, bus_size_t ofs, uint16_t val)
+native_bs_ws_2(bus_space_handle_t bsh, bus_size_t ofs, uint16_t val)
 {
 	volatile uint16_t *addr;
 
@@ -318,7 +318,7 @@ bs_be_ws_2(bus_space_handle_t bsh, bus_size_t ofs, uint16_t val)
 }
 
 static void
-bs_be_ws_4(bus_space_handle_t bsh, bus_size_t ofs, uint32_t val)
+native_bs_ws_4(bus_space_handle_t bsh, bus_size_t ofs, uint32_t val)
 {
 	volatile uint32_t *addr;
 
@@ -329,7 +329,7 @@ bs_be_ws_4(bus_space_handle_t bsh, bus_size_t ofs, uint32_t val)
 }
 
 static void
-bs_be_ws_8(bus_space_handle_t bsh, bus_size_t ofs, uint64_t val)
+native_bs_ws_8(bus_space_handle_t bsh, bus_size_t ofs, uint64_t val)
 {
 	volatile uint64_t *addr;
 
@@ -340,35 +340,35 @@ bs_be_ws_8(bus_space_handle_t bsh, bus_size_t ofs, uint64_t val)
 }
 
 static void
-bs_be_wm_1(bus_space_handle_t bsh, bus_size_t ofs, const uint8_t *addr,
+native_bs_wm_1(bus_space_handle_t bsh, bus_size_t ofs, const uint8_t *addr,
     bus_size_t cnt)
 {
 	outsb(__ppc_ba(bsh, ofs), addr, cnt);
 }
 
 static void
-bs_be_wm_2(bus_space_handle_t bsh, bus_size_t ofs, const uint16_t *addr,
+native_bs_wm_2(bus_space_handle_t bsh, bus_size_t ofs, const uint16_t *addr,
     bus_size_t cnt)
 {
 	outsw(__ppc_ba(bsh, ofs), addr, cnt);
 }
 
 static void
-bs_be_wm_4(bus_space_handle_t bsh, bus_size_t ofs, const uint32_t *addr,
+native_bs_wm_4(bus_space_handle_t bsh, bus_size_t ofs, const uint32_t *addr,
     bus_size_t cnt)
 {
 	outsl(__ppc_ba(bsh, ofs), addr, cnt);
 }
 
 static void
-bs_be_wm_8(bus_space_handle_t bsh, bus_size_t ofs, const uint64_t *addr,
+native_bs_wm_8(bus_space_handle_t bsh, bus_size_t ofs, const uint64_t *addr,
     bus_size_t cnt)
 {
 	outsll(__ppc_ba(bsh, ofs), addr, cnt);
 }
 
 static void
-bs_be_wr_1(bus_space_handle_t bsh, bus_size_t ofs, const uint8_t *addr,
+native_bs_wr_1(bus_space_handle_t bsh, bus_size_t ofs, const uint8_t *addr,
     size_t cnt)
 {
 	volatile uint8_t *d = __ppc_ba(bsh, ofs);
@@ -379,7 +379,7 @@ bs_be_wr_1(bus_space_handle_t bsh, bus_size_t ofs, const uint8_t *addr,
 }
 
 static void
-bs_be_wr_2(bus_space_handle_t bsh, bus_size_t ofs, const uint16_t *addr,
+native_bs_wr_2(bus_space_handle_t bsh, bus_size_t ofs, const uint16_t *addr,
     size_t cnt)
 {
 	volatile uint16_t *d = __ppc_ba(bsh, ofs);
@@ -390,7 +390,7 @@ bs_be_wr_2(bus_space_handle_t bsh, bus_size_t ofs, const uint16_t *addr,
 }
 
 static void
-bs_be_wr_4(bus_space_handle_t bsh, bus_size_t ofs, const uint32_t *addr,
+native_bs_wr_4(bus_space_handle_t bsh, bus_size_t ofs, const uint32_t *addr,
     size_t cnt)
 {
 	volatile uint32_t *d = __ppc_ba(bsh, ofs);
@@ -401,7 +401,7 @@ bs_be_wr_4(bus_space_handle_t bsh, bus_size_t ofs, const uint32_t *addr,
 }
 
 static void
-bs_be_wr_8(bus_space_handle_t bsh, bus_size_t ofs, const uint64_t *addr,
+native_bs_wr_8(bus_space_handle_t bsh, bus_size_t ofs, const uint64_t *addr,
     size_t cnt)
 {
 	volatile uint64_t *d = __ppc_ba(bsh, ofs);
@@ -412,7 +412,7 @@ bs_be_wr_8(bus_space_handle_t bsh, bus_size_t ofs, const uint64_t *addr,
 }
 
 static void
-bs_be_sm_1(bus_space_handle_t bsh, bus_size_t ofs, uint8_t val, size_t cnt)
+native_bs_sm_1(bus_space_handle_t bsh, bus_size_t ofs, uint8_t val, size_t cnt)
 {
 	volatile uint8_t *d = __ppc_ba(bsh, ofs);
 
@@ -422,7 +422,7 @@ bs_be_sm_1(bus_space_handle_t bsh, bus_size_t ofs, uint8_t val, size_t cnt)
 }
 
 static void
-bs_be_sm_2(bus_space_handle_t bsh, bus_size_t ofs, uint16_t val, size_t cnt)
+native_bs_sm_2(bus_space_handle_t bsh, bus_size_t ofs, uint16_t val, size_t cnt)
 {
 	volatile uint16_t *d = __ppc_ba(bsh, ofs);
 
@@ -432,7 +432,7 @@ bs_be_sm_2(bus_space_handle_t bsh, bus_size_t ofs, uint16_t val, size_t cnt)
 }
 
 static void
-bs_be_sm_4(bus_space_handle_t bsh, bus_size_t ofs, uint32_t val, size_t cnt)
+native_bs_sm_4(bus_space_handle_t bsh, bus_size_t ofs, uint32_t val, size_t cnt)
 {
 	volatile uint32_t *d = __ppc_ba(bsh, ofs);
 
@@ -442,7 +442,7 @@ bs_be_sm_4(bus_space_handle_t bsh, bus_size_t ofs, uint32_t val, size_t cnt)
 }
 
 static void
-bs_be_sm_8(bus_space_handle_t bsh, bus_size_t ofs, uint64_t val, size_t cnt)
+native_bs_sm_8(bus_space_handle_t bsh, bus_size_t ofs, uint64_t val, size_t cnt)
 {
 	volatile uint64_t *d = __ppc_ba(bsh, ofs);
 
@@ -452,7 +452,7 @@ bs_be_sm_8(bus_space_handle_t bsh, bus_size_t ofs, uint64_t val, size_t cnt)
 }
 
 static void
-bs_be_sr_1(bus_space_handle_t bsh, bus_size_t ofs, uint8_t val, size_t cnt)
+native_bs_sr_1(bus_space_handle_t bsh, bus_size_t ofs, uint8_t val, size_t cnt)
 {
 	volatile uint8_t *d = __ppc_ba(bsh, ofs);
 
@@ -462,7 +462,7 @@ bs_be_sr_1(bus_space_handle_t bsh, bus_size_t ofs, uint8_t val, size_t cnt)
 }
 
 static void
-bs_be_sr_2(bus_space_handle_t bsh, bus_size_t ofs, uint16_t val, size_t cnt)
+native_bs_sr_2(bus_space_handle_t bsh, bus_size_t ofs, uint16_t val, size_t cnt)
 {
 	volatile uint16_t *d = __ppc_ba(bsh, ofs);
 
@@ -472,7 +472,7 @@ bs_be_sr_2(bus_space_handle_t bsh, bus_size_t ofs, uint16_t val, size_t cnt)
 }
 
 static void
-bs_be_sr_4(bus_space_handle_t bsh, bus_size_t ofs, uint32_t val, size_t cnt)
+native_bs_sr_4(bus_space_handle_t bsh, bus_size_t ofs, uint32_t val, size_t cnt)
 {
 	volatile uint32_t *d = __ppc_ba(bsh, ofs);
 
@@ -482,7 +482,7 @@ bs_be_sr_4(bus_space_handle_t bsh, bus_size_t ofs, uint32_t val, size_t cnt)
 }
 
 static void
-bs_be_sr_8(bus_space_handle_t bsh, bus_size_t ofs, uint64_t val, size_t cnt)
+native_bs_sr_8(bus_space_handle_t bsh, bus_size_t ofs, uint64_t val, size_t cnt)
 {
 	volatile uint64_t *d = __ppc_ba(bsh, ofs);
 
@@ -492,10 +492,10 @@ bs_be_sr_8(bus_space_handle_t bsh, bus_size_t ofs, uint64_t val, size_t cnt)
 }
 
 /*
- * Little-endian access functions
+ * Byteswapped access functions
  */
 static uint8_t
-bs_le_rs_1(bus_space_handle_t bsh, bus_size_t ofs)
+swapped_bs_rs_1(bus_space_handle_t bsh, bus_size_t ofs)
 {
 	volatile uint8_t *addr;
 	uint8_t res;
@@ -508,7 +508,7 @@ bs_le_rs_1(bus_space_handle_t bsh, bus_size_t ofs)
 }
 
 static uint16_t
-bs_le_rs_2(bus_space_handle_t bsh, bus_size_t ofs)
+swapped_bs_rs_2(bus_space_handle_t bsh, bus_size_t ofs)
 {
 	volatile uint16_t *addr;
 	uint16_t res;
@@ -521,7 +521,7 @@ bs_le_rs_2(bus_space_handle_t bsh, bus_size_t ofs)
 }
 
 static uint32_t
-bs_le_rs_4(bus_space_handle_t bsh, bus_size_t ofs)
+swapped_bs_rs_4(bus_space_handle_t bsh, bus_size_t ofs)
 {
 	volatile uint32_t *addr;
 	uint32_t res;
@@ -534,7 +534,7 @@ bs_le_rs_4(bus_space_handle_t bsh, bus_size_t ofs)
 }
 
 static uint64_t
-bs_le_rs_8(bus_space_handle_t bsh, bus_size_t ofs)
+swapped_bs_rs_8(bus_space_handle_t bsh, bus_size_t ofs)
 {
 	volatile uint64_t *addr;
 	uint64_t res;
@@ -547,31 +547,31 @@ bs_le_rs_8(bus_space_handle_t bsh, bus_size_t ofs)
 }
 
 static void
-bs_le_rm_1(bus_space_handle_t bsh, bus_size_t ofs, uint8_t *addr, size_t cnt)
+swapped_bs_rm_1(bus_space_handle_t bsh, bus_size_t ofs, uint8_t *addr, size_t cnt)
 {
 	ins8(__ppc_ba(bsh, ofs), addr, cnt);
 }
 
 static void
-bs_le_rm_2(bus_space_handle_t bsh, bus_size_t ofs, uint16_t *addr, size_t cnt)
+swapped_bs_rm_2(bus_space_handle_t bsh, bus_size_t ofs, uint16_t *addr, size_t cnt)
 {
 	ins16rb(__ppc_ba(bsh, ofs), addr, cnt);
 }
 
 static void
-bs_le_rm_4(bus_space_handle_t bsh, bus_size_t ofs, uint32_t *addr, size_t cnt)
+swapped_bs_rm_4(bus_space_handle_t bsh, bus_size_t ofs, uint32_t *addr, size_t cnt)
 {
 	ins32rb(__ppc_ba(bsh, ofs), addr, cnt);
 }
 
 static void
-bs_le_rm_8(bus_space_handle_t bshh, bus_size_t ofs, uint64_t *addr, size_t cnt)
+swapped_bs_rm_8(bus_space_handle_t bshh, bus_size_t ofs, uint64_t *addr, size_t cnt)
 {
 	TODO;
 }
 
 static void
-bs_le_rr_1(bus_space_handle_t bsh, bus_size_t ofs, uint8_t *addr, size_t cnt)
+swapped_bs_rr_1(bus_space_handle_t bsh, bus_size_t ofs, uint8_t *addr, size_t cnt)
 {
 	volatile uint8_t *s = __ppc_ba(bsh, ofs);
 
@@ -581,7 +581,7 @@ bs_le_rr_1(bus_space_handle_t bsh, bus_size_t ofs, uint8_t *addr, size_t cnt)
 }
 
 static void
-bs_le_rr_2(bus_space_handle_t bsh, bus_size_t ofs, uint16_t *addr, size_t cnt)
+swapped_bs_rr_2(bus_space_handle_t bsh, bus_size_t ofs, uint16_t *addr, size_t cnt)
 {
 	volatile uint16_t *s = __ppc_ba(bsh, ofs);
 
@@ -591,7 +591,7 @@ bs_le_rr_2(bus_space_handle_t bsh, bus_size_t ofs, uint16_t *addr, size_t cnt)
 }
 
 static void
-bs_le_rr_4(bus_space_handle_t bsh, bus_size_t ofs, uint32_t *addr, size_t cnt)
+swapped_bs_rr_4(bus_space_handle_t bsh, bus_size_t ofs, uint32_t *addr, size_t cnt)
 {
 	volatile uint32_t *s = __ppc_ba(bsh, ofs);
 
@@ -601,13 +601,13 @@ bs_le_rr_4(bus_space_handle_t bsh, bus_size_t ofs, uint32_t *addr, size_t cnt)
 }
 
 static void
-bs_le_rr_8(bus_space_handle_t bsh, bus_size_t ofs, uint64_t *addr, size_t cnt)
+swapped_bs_rr_8(bus_space_handle_t bsh, bus_size_t ofs, uint64_t *addr, size_t cnt)
 {
 	TODO;
 }
 
 static void
-bs_le_ws_1(bus_space_handle_t bsh, bus_size_t ofs, uint8_t val)
+swapped_bs_ws_1(bus_space_handle_t bsh, bus_size_t ofs, uint8_t val)
 {
 	volatile uint8_t *addr;
 
@@ -618,10 +618,10 @@ bs_le_ws_1(bus_space_handle_t bsh, bus_size_t ofs, uint8_t val)
 }
 
 static void
-bs_le_ws_2(bus_space_handle_t bsh, bus_size_t ofs, uint16_t val)
+swapped_bs_ws_2(bus_space_handle_t bsh, bus_size_t ofs, uint16_t val)
 {
 	volatile uint16_t *addr;
- 
+
 	addr = __ppc_ba(bsh, ofs);
 	__asm __volatile("sthbrx %0, 0, %1" :: "r"(val), "r"(addr));
 	powerpc_iomb();
@@ -629,7 +629,7 @@ bs_le_ws_2(bus_space_handle_t bsh, bus_size_t ofs, uint16_t val)
 }
 
 static void
-bs_le_ws_4(bus_space_handle_t bsh, bus_size_t ofs, uint32_t val)
+swapped_bs_ws_4(bus_space_handle_t bsh, bus_size_t ofs, uint32_t val)
 {
 	volatile uint32_t *addr;
 
@@ -640,7 +640,7 @@ bs_le_ws_4(bus_space_handle_t bsh, bus_size_t ofs, uint32_t val)
 }
 
 static void
-bs_le_ws_8(bus_space_handle_t bsh, bus_size_t ofs, uint64_t val)
+swapped_bs_ws_8(bus_space_handle_t bsh, bus_size_t ofs, uint64_t val)
 {
 	volatile uint64_t *addr;
 
@@ -651,35 +651,35 @@ bs_le_ws_8(bus_space_handle_t bsh, bus_size_t ofs, uint64_t val)
 }
 
 static void
-bs_le_wm_1(bus_space_handle_t bsh, bus_size_t ofs, const uint8_t *addr,
+swapped_bs_wm_1(bus_space_handle_t bsh, bus_size_t ofs, const uint8_t *addr,
     bus_size_t cnt)
 {
 	outs8(__ppc_ba(bsh, ofs), addr, cnt);
 }
 
 static void
-bs_le_wm_2(bus_space_handle_t bsh, bus_size_t ofs, const uint16_t *addr,
+swapped_bs_wm_2(bus_space_handle_t bsh, bus_size_t ofs, const uint16_t *addr,
     bus_size_t cnt)
 {
 	outs16rb(__ppc_ba(bsh, ofs), addr, cnt);
 }
 
 static void
-bs_le_wm_4(bus_space_handle_t bsh, bus_size_t ofs, const uint32_t *addr,
+swapped_bs_wm_4(bus_space_handle_t bsh, bus_size_t ofs, const uint32_t *addr,
     bus_size_t cnt)
 {
 	outs32rb(__ppc_ba(bsh, ofs), addr, cnt);
 }
 
 static void
-bs_le_wm_8(bus_space_handle_t bsh, bus_size_t ofs, const uint64_t *addr,
+swapped_bs_wm_8(bus_space_handle_t bsh, bus_size_t ofs, const uint64_t *addr,
     bus_size_t cnt)
 {
 	TODO;
 }
 
 static void
-bs_le_wr_1(bus_space_handle_t bsh, bus_size_t ofs, const uint8_t *addr,
+swapped_bs_wr_1(bus_space_handle_t bsh, bus_size_t ofs, const uint8_t *addr,
     size_t cnt)
 {
 	volatile uint8_t *d = __ppc_ba(bsh, ofs);
@@ -690,7 +690,7 @@ bs_le_wr_1(bus_space_handle_t bsh, bus_size_t ofs, const uint8_t *addr,
 }
 
 static void
-bs_le_wr_2(bus_space_handle_t bsh, bus_size_t ofs, const uint16_t *addr,
+swapped_bs_wr_2(bus_space_handle_t bsh, bus_size_t ofs, const uint16_t *addr,
     size_t cnt)
 {
 	volatile uint16_t *d = __ppc_ba(bsh, ofs);
@@ -701,7 +701,7 @@ bs_le_wr_2(bus_space_handle_t bsh, bus_size_t ofs, const uint16_t *addr,
 }
 
 static void
-bs_le_wr_4(bus_space_handle_t bsh, bus_size_t ofs, const uint32_t *addr,
+swapped_bs_wr_4(bus_space_handle_t bsh, bus_size_t ofs, const uint32_t *addr,
     size_t cnt)
 {
 	volatile uint32_t *d = __ppc_ba(bsh, ofs);
@@ -712,14 +712,14 @@ bs_le_wr_4(bus_space_handle_t bsh, bus_size_t ofs, const uint32_t *addr,
 }
 
 static void
-bs_le_wr_8(bus_space_handle_t bsh, bus_size_t ofs, const uint64_t *addr,
+swapped_bs_wr_8(bus_space_handle_t bsh, bus_size_t ofs, const uint64_t *addr,
     size_t cnt)
 {
 	TODO;
 }
 
 static void
-bs_le_sm_1(bus_space_handle_t bsh, bus_size_t ofs, uint8_t val, size_t cnt)
+swapped_bs_sm_1(bus_space_handle_t bsh, bus_size_t ofs, uint8_t val, size_t cnt)
 {
 	volatile uint8_t *d = __ppc_ba(bsh, ofs);
 
@@ -729,7 +729,7 @@ bs_le_sm_1(bus_space_handle_t bsh, bus_size_t ofs, uint8_t val, size_t cnt)
 }
 
 static void
-bs_le_sm_2(bus_space_handle_t bsh, bus_size_t ofs, uint16_t val, size_t cnt)
+swapped_bs_sm_2(bus_space_handle_t bsh, bus_size_t ofs, uint16_t val, size_t cnt)
 {
 	volatile uint16_t *d = __ppc_ba(bsh, ofs);
 
@@ -739,7 +739,7 @@ bs_le_sm_2(bus_space_handle_t bsh, bus_size_t ofs, uint16_t val, size_t cnt)
 }
 
 static void
-bs_le_sm_4(bus_space_handle_t bsh, bus_size_t ofs, uint32_t val, size_t cnt)
+swapped_bs_sm_4(bus_space_handle_t bsh, bus_size_t ofs, uint32_t val, size_t cnt)
 {
 	volatile uint32_t *d = __ppc_ba(bsh, ofs);
 
@@ -749,13 +749,13 @@ bs_le_sm_4(bus_space_handle_t bsh, bus_size_t ofs, uint32_t val, size_t cnt)
 }
 
 static void
-bs_le_sm_8(bus_space_handle_t bsh, bus_size_t ofs, uint64_t val, size_t cnt)
+swapped_bs_sm_8(bus_space_handle_t bsh, bus_size_t ofs, uint64_t val, size_t cnt)
 {
 	TODO;
 }
 
 static void
-bs_le_sr_1(bus_space_handle_t bsh, bus_size_t ofs, uint8_t val, size_t cnt)
+swapped_bs_sr_1(bus_space_handle_t bsh, bus_size_t ofs, uint8_t val, size_t cnt)
 {
 	volatile uint8_t *d = __ppc_ba(bsh, ofs);
 
@@ -765,7 +765,7 @@ bs_le_sr_1(bus_space_handle_t bsh, bus_size_t ofs, uint8_t val, size_t cnt)
 }
 
 static void
-bs_le_sr_2(bus_space_handle_t bsh, bus_size_t ofs, uint16_t val, size_t cnt)
+swapped_bs_sr_2(bus_space_handle_t bsh, bus_size_t ofs, uint16_t val, size_t cnt)
 {
 	volatile uint16_t *d = __ppc_ba(bsh, ofs);
 
@@ -775,7 +775,7 @@ bs_le_sr_2(bus_space_handle_t bsh, bus_size_t ofs, uint16_t val, size_t cnt)
 }
 
 static void
-bs_le_sr_4(bus_space_handle_t bsh, bus_size_t ofs, uint32_t val, size_t cnt)
+swapped_bs_sr_4(bus_space_handle_t bsh, bus_size_t ofs, uint32_t val, size_t cnt)
 {
 	volatile uint32_t *d = __ppc_ba(bsh, ofs);
 
@@ -785,195 +785,241 @@ bs_le_sr_4(bus_space_handle_t bsh, bus_size_t ofs, uint32_t val, size_t cnt)
 }
 
 static void
-bs_le_sr_8(bus_space_handle_t bsh, bus_size_t ofs, uint64_t val, size_t cnt)
+swapped_bs_sr_8(bus_space_handle_t bsh, bus_size_t ofs, uint64_t val, size_t cnt)
 {
 	TODO;
 }
 
+#if BYTE_ORDER == LITTLE_ENDIAN
+struct bus_space bs_le_tag = {
+#else
 struct bus_space bs_be_tag = {
+#endif
 	/* mapping/unmapping */
-	bs_gen_map,
-	bs_gen_unmap,
-	bs_gen_subregion,
+	.bs_map =	bs_gen_map,
+	.bs_unmap =	bs_gen_unmap,
+	.bs_subregion =	bs_gen_subregion,
 
 	/* allocation/deallocation */
-	bs_gen_alloc,
-	bs_gen_free,
+	.bs_alloc =	bs_gen_alloc,
+	.bs_free =	bs_gen_free,
 
 	/* barrier */
-	bs_gen_barrier,
+	.bs_barrier =	bs_gen_barrier,
 
 	/* read (single) */
-	bs_be_rs_1,
-	bs_be_rs_2,
-	bs_be_rs_4,
-	bs_be_rs_8,
+	.bs_r_1 =	native_bs_rs_1,
+	.bs_r_2 =	native_bs_rs_2,
+	.bs_r_4 =	native_bs_rs_4,
+	.bs_r_8 =	native_bs_rs_8,
 
-	bs_be_rs_2,
-	bs_be_rs_4,
-	bs_be_rs_8,
+	/* read (single) stream */
+	.bs_r_s_2 =	native_bs_rs_2,
+	.bs_r_s_4 =	native_bs_rs_4,
+	.bs_r_s_8 =	native_bs_rs_8,
 
 	/* read multiple */
-	bs_be_rm_1,
-	bs_be_rm_2,
-	bs_be_rm_4,
-	bs_be_rm_8,
+	.bs_rm_1 =	native_bs_rm_1,
+	.bs_rm_2 =	native_bs_rm_2,
+	.bs_rm_4 =	native_bs_rm_4,
+	.bs_rm_8 =	native_bs_rm_8,
 
-	bs_be_rm_2,
-	bs_be_rm_4,
-	bs_be_rm_8,
+	/* read multiple stream */
+	.bs_rm_s_2 =	native_bs_rm_2,
+	.bs_rm_s_4 =	native_bs_rm_4,
+	.bs_rm_s_8 =	native_bs_rm_8,
 
 	/* read region */
-	bs_be_rr_1,
-	bs_be_rr_2,
-	bs_be_rr_4,
-	bs_be_rr_8,
+	.bs_rr_1 =	native_bs_rr_1,
+	.bs_rr_2 =	native_bs_rr_2,
+	.bs_rr_4 =	native_bs_rr_4,
+	.bs_rr_8 =	native_bs_rr_8,
 
-	bs_be_rr_2,
-	bs_be_rr_4,
-	bs_be_rr_8,
+	/* read region stream */
+	.bs_rr_s_2 =	native_bs_rr_2,
+	.bs_rr_s_4 =	native_bs_rr_4,
+	.bs_rr_s_8 =	native_bs_rr_8,
 
 	/* write (single) */
-	bs_be_ws_1,
-	bs_be_ws_2,
-	bs_be_ws_4,
-	bs_be_ws_8,
+	.bs_w_1 =	native_bs_ws_1,
+	.bs_w_2 =	native_bs_ws_2,
+	.bs_w_4 =	native_bs_ws_4,
+	.bs_w_8 =	native_bs_ws_8,
 
-	bs_be_ws_2,
-	bs_be_ws_4,
-	bs_be_ws_8,
+	/* write (single) stream */
+	.bs_w_s_2 =	native_bs_ws_2,
+	.bs_w_s_4 =	native_bs_ws_4,
+	.bs_w_s_8 =	native_bs_ws_8,
 
 	/* write multiple */
-	bs_be_wm_1,
-	bs_be_wm_2,
-	bs_be_wm_4,
-	bs_be_wm_8,
+	.bs_wm_1 =	native_bs_wm_1,
+	.bs_wm_2 =	native_bs_wm_2,
+	.bs_wm_4 =	native_bs_wm_4,
+	.bs_wm_8 =	native_bs_wm_8,
 
-	bs_be_wm_2,
-	bs_be_wm_4,
-	bs_be_wm_8,
+	/* write multiple stream */
+	.bs_wm_s_2 =	native_bs_wm_2,
+	.bs_wm_s_4 =	native_bs_wm_4,
+	.bs_wm_s_8 =	native_bs_wm_8,
 
 	/* write region */
-	bs_be_wr_1,
-	bs_be_wr_2,
-	bs_be_wr_4,
-	bs_be_wr_8,
+	.bs_wr_1 =	native_bs_wr_1,
+	.bs_wr_2 =	native_bs_wr_2,
+	.bs_wr_4 =	native_bs_wr_4,
+	.bs_wr_8 =	native_bs_wr_8,
 
-	bs_be_wr_2,
-	bs_be_wr_4,
-	bs_be_wr_8,
+	/* write region stream */
+	.bs_wr_s_2 =	native_bs_wr_2,
+	.bs_wr_s_4 =	native_bs_wr_4,
+	.bs_wr_s_8 =	native_bs_wr_8,
 
 	/* set multiple */
-	bs_be_sm_1,
-	bs_be_sm_2,
-	bs_be_sm_4,
-	bs_be_sm_8,
+	.bs_sm_1 =	native_bs_sm_1,
+	.bs_sm_2 =	native_bs_sm_2,
+	.bs_sm_4 =	native_bs_sm_4,
+	.bs_sm_8 =	native_bs_sm_8,
 
-	bs_be_sm_2,
-	bs_be_sm_4,
-	bs_be_sm_8,
+	/* set multiple stream */
+	.bs_sm_s_2 =	native_bs_sm_2,
+	.bs_sm_s_4 =	native_bs_sm_4,
+	.bs_sm_s_8 =	native_bs_sm_8,
 
 	/* set region */
-	bs_be_sr_1,
-	bs_be_sr_2,
-	bs_be_sr_4,
-	bs_be_sr_8,
+	.bs_sr_1 =	native_bs_sr_1,
+	.bs_sr_2 =	native_bs_sr_2,
+	.bs_sr_4 =	native_bs_sr_4,
+	.bs_sr_8 =	native_bs_sr_8,
 
-	bs_be_sr_2,
-	bs_be_sr_4,
-	bs_be_sr_8,
+	/* set region stream */
+	.bs_sr_s_2 =	native_bs_sr_2,
+	.bs_sr_s_4 =	native_bs_sr_4,
+	.bs_sr_s_8 =	native_bs_sr_8,
+
+	/* copy region */
+	.bs_cr_1 =	NULL, /* UNIMPLEMENTED */
+	.bs_cr_2 =	NULL, /* UNIMPLEMENTED */
+	.bs_cr_4 =	NULL, /* UNIMPLEMENTED */
+	.bs_cr_8 =	NULL, /* UNIMPLEMENTED */
+
+	/* copy region stream */
+	.bs_cr_s_2 =	NULL, /* UNIMPLEMENTED */
+	.bs_cr_s_4 =	NULL, /* UNIMPLEMENTED */
+	.bs_cr_s_8 =	NULL, /* UNIMPLEMENTED */
 };
 
+#if BYTE_ORDER == LITTLE_ENDIAN
+struct bus_space bs_be_tag = {
+#else
 struct bus_space bs_le_tag = {
+#endif
 	/* mapping/unmapping */
-	bs_gen_map,
-	bs_gen_unmap,
-	bs_gen_subregion,
+	.bs_map =	bs_gen_map,
+	.bs_unmap =	bs_gen_unmap,
+	.bs_subregion =	bs_gen_subregion,
 
 	/* allocation/deallocation */
-	bs_gen_alloc,
-	bs_gen_free,
+	.bs_alloc =	bs_gen_alloc,
+	.bs_free =	bs_gen_free,
 
 	/* barrier */
-	bs_gen_barrier,
+	.bs_barrier =	bs_gen_barrier,
 
 	/* read (single) */
-	bs_le_rs_1,
-	bs_le_rs_2,
-	bs_le_rs_4,
-	bs_le_rs_8,
+	.bs_r_1 =	swapped_bs_rs_1,
+	.bs_r_2 =	swapped_bs_rs_2,
+	.bs_r_4 =	swapped_bs_rs_4,
+	.bs_r_8 =	swapped_bs_rs_8,
 
-	bs_be_rs_2,
-	bs_be_rs_4,
-	bs_be_rs_8,
+	/* read (single) stream */
+	.bs_r_s_2 =	native_bs_rs_2,
+	.bs_r_s_4 =	native_bs_rs_4,
+	.bs_r_s_8 =	native_bs_rs_8,
 
 	/* read multiple */
-	bs_le_rm_1,
-	bs_le_rm_2,
-	bs_le_rm_4,
-	bs_le_rm_8,
+	.bs_rm_1 =	swapped_bs_rm_1,
+	.bs_rm_2 =	swapped_bs_rm_2,
+	.bs_rm_4 =	swapped_bs_rm_4,
+	.bs_rm_8 =	swapped_bs_rm_8,
 
-	bs_be_rm_2,
-	bs_be_rm_4,
-	bs_be_rm_8,
+	/* read multiple stream */
+	.bs_rm_s_2 =	native_bs_rm_2,
+	.bs_rm_s_4 =	native_bs_rm_4,
+	.bs_rm_s_8 =	native_bs_rm_8,
 
 	/* read region */
-	bs_le_rr_1,
-	bs_le_rr_2,
-	bs_le_rr_4,
-	bs_le_rr_8,
+	.bs_rr_1 =	swapped_bs_rr_1,
+	.bs_rr_2 =	swapped_bs_rr_2,
+	.bs_rr_4 =	swapped_bs_rr_4,
+	.bs_rr_8 =	swapped_bs_rr_8,
 
-	bs_be_rr_2,
-	bs_be_rr_4,
-	bs_be_rr_8,
+	/* read region stream */
+	.bs_rr_s_2 =	native_bs_rr_2,
+	.bs_rr_s_4 =	native_bs_rr_4,
+	.bs_rr_s_8 =	native_bs_rr_8,
 
 	/* write (single) */
-	bs_le_ws_1,
-	bs_le_ws_2,
-	bs_le_ws_4,
-	bs_le_ws_8,
+	.bs_w_1 =	swapped_bs_ws_1,
+	.bs_w_2 =	swapped_bs_ws_2,
+	.bs_w_4 =	swapped_bs_ws_4,
+	.bs_w_8 =	swapped_bs_ws_8,
 
-	bs_be_ws_2,
-	bs_be_ws_4,
-	bs_be_ws_8,
+	/* write (single) stream */
+	.bs_w_s_2 =	native_bs_ws_2,
+	.bs_w_s_4 =	native_bs_ws_4,
+	.bs_w_s_8 =	native_bs_ws_8,
 
 	/* write multiple */
-	bs_le_wm_1,
-	bs_le_wm_2,
-	bs_le_wm_4,
-	bs_le_wm_8,
+	.bs_wm_1 =	swapped_bs_wm_1,
+	.bs_wm_2 =	swapped_bs_wm_2,
+	.bs_wm_4 =	swapped_bs_wm_4,
+	.bs_wm_8 =	swapped_bs_wm_8,
 
-	bs_be_wm_2,
-	bs_be_wm_4,
-	bs_be_wm_8,
+	/* write multiple stream */
+	.bs_wm_s_2 =	native_bs_wm_2,
+	.bs_wm_s_4 =	native_bs_wm_4,
+	.bs_wm_s_8 =	native_bs_wm_8,
 
 	/* write region */
-	bs_le_wr_1,
-	bs_le_wr_2,
-	bs_le_wr_4,
-	bs_le_wr_8,
+	.bs_wr_1 =	swapped_bs_wr_1,
+	.bs_wr_2 =	swapped_bs_wr_2,
+	.bs_wr_4 =	swapped_bs_wr_4,
+	.bs_wr_8 =	swapped_bs_wr_8,
 
-	bs_be_wr_2,
-	bs_be_wr_4,
-	bs_be_wr_8,
+	/* write region stream */
+	.bs_wr_s_2 =	native_bs_wr_2,
+	.bs_wr_s_4 =	native_bs_wr_4,
+	.bs_wr_s_8 =	native_bs_wr_8,
 
 	/* set multiple */
-	bs_le_sm_1,
-	bs_le_sm_2,
-	bs_le_sm_4,
-	bs_le_sm_8,
+	.bs_sm_1 =	swapped_bs_sm_1,
+	.bs_sm_2 =	swapped_bs_sm_2,
+	.bs_sm_4 =	swapped_bs_sm_4,
+	.bs_sm_8 =	swapped_bs_sm_8,
 
-	bs_be_sm_2,
-	bs_be_sm_4,
-	bs_be_sm_8,
+	/* set multiple stream */
+	.bs_sm_s_2 =	native_bs_sm_2,
+	.bs_sm_s_4 =	native_bs_sm_4,
+	.bs_sm_s_8 =	native_bs_sm_8,
 
 	/* set region */
-	bs_le_sr_1,
-	bs_le_sr_2,
-	bs_le_sr_4,
-	bs_le_sr_8,
+	.bs_sr_1 =	swapped_bs_sr_1,
+	.bs_sr_2 =	swapped_bs_sr_2,
+	.bs_sr_4 =	swapped_bs_sr_4,
+	.bs_sr_8 =	swapped_bs_sr_8,
 
-	bs_be_sr_2,
-	bs_be_sr_4,
-	bs_be_sr_8,
+	/* set region stream */
+	.bs_sr_s_2 =	native_bs_sr_2,
+	.bs_sr_s_4 =	native_bs_sr_4,
+	.bs_sr_s_8 =	native_bs_sr_8,
+
+	/* copy region */
+	.bs_cr_1 =	NULL, /* UNIMPLEMENTED */
+	.bs_cr_2 =	NULL, /* UNIMPLEMENTED */
+	.bs_cr_4 =	NULL, /* UNIMPLEMENTED */
+	.bs_cr_8 =	NULL, /* UNIMPLEMENTED */
+
+	/* copy region stream */
+	.bs_cr_s_2 =	NULL, /* UNIMPLEMENTED */
+	.bs_cr_s_4 =	NULL, /* UNIMPLEMENTED */
+	.bs_cr_s_8 =	NULL, /* UNIMPLEMENTED */
 };

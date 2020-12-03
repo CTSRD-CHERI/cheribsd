@@ -141,6 +141,13 @@ linux_set_syscall_retval(struct thread *td, int error)
 
 	td->td_retval[1] = td->td_frame->tf_x[1];
 	cpu_set_syscall_retval(td, error);
+
+	if (__predict_false(error != 0)) {
+		if (error != ERESTART && error != EJUSTRETURN) {
+			td->td_frame->tf_x[0] =
+				linux_to_bsd_errno(error);
+		}
+	}
 }
 
 static int
@@ -387,8 +394,6 @@ linux_vsyscall(struct thread *td)
 struct sysentvec elf_linux_sysvec = {
 	.sv_size	= LINUX_SYS_MAXSYSCALL,
 	.sv_table	= linux_sysent,
-	.sv_errsize	= ELAST + 1,
-	.sv_errtbl	= linux_errtbl,
 	.sv_transtrap	= linux_translate_traps,
 	.sv_fixup	= linux_elf_fixup,
 	.sv_sendsig	= linux_rt_sendsig,

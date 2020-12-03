@@ -234,7 +234,6 @@ struct g_class g_md_class = {
 
 DECLARE_GEOM_CLASS(g_md_class, g_md);
 
-
 static LIST_HEAD(, md_s) md_softc_list = LIST_HEAD_INITIALIZER(md_softc_list);
 
 #define NINDIR	(PAGE_SIZE / sizeof(uintptr_t))
@@ -451,7 +450,6 @@ s_write(struct indir *ip, off_t offset, uintptr_t ptr)
 	}
 	return (0);
 }
-
 
 static int
 g_md_access(struct g_provider *pp, int r, int w, int e)
@@ -1377,7 +1375,6 @@ mdcreate_malloc(struct md_s *sc, struct md_req *mdr)
 	}
 	return (error);
 }
-
 
 static int
 mdsetcred(struct md_s *sc, struct ucred *cred)

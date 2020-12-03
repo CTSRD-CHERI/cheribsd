@@ -447,7 +447,6 @@ struct __no_subobject_bounds {				\
 		(head2)->stqh_last = &STAILQ_FIRST(head2);		\
 } while (0)
 
-
 /*
  * List declarations.
  */

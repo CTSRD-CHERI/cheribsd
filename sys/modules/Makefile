@@ -345,6 +345,7 @@ SUBDIR=	\
 	${_sppp} \
 	ste \
 	stge \
+	${_sume} \
 	${_superio} \
 	${_sym} \
 	${_syscons} \
@@ -728,6 +729,7 @@ _nvdimm=	nvdimm
 _pms=		pms
 _qlxge=		qlxge
 _qlxgb=		qlxgb
+_sume=		sume
 _vmd=		vmd
 .if ${MK_SOURCELESS_UCODE} != "no"
 _qlxgbe=	qlxgbe
@@ -791,7 +793,7 @@ _ipmi=		ipmi
 _ixl=		ixl
 _nvram=		opal_nvram
 .endif
-.if ${MACHINE_ARCH} == "powerpc64" || ${MACHINE_ARCH} == "powerpc"
+.if ${MACHINE_CPUARCH} == "powerpc" && ${MACHINE_ARCH} != "powerpcspe"
 # Don't build powermac_nvram for powerpcspe, it's never supported.
 _nvram+=	powermac_nvram
 .endif

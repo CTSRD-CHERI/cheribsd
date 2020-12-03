@@ -255,7 +255,7 @@ nfsrvd_getattr(struct nfsrv_descript *nd, int isdgram,
 		if (nd->nd_repstat == 0) {
 			accmode = 0;
 			NFSSET_ATTRBIT(&tmpbits, &attrbits);
-	
+
 			/*
 			 * GETATTR with write-only attr time_access_set and time_modify_set
 			 * should return NFS4ERR_INVAL.
@@ -2720,6 +2720,8 @@ nfsrvd_locku(struct nfsrv_descript *nd, __unused int isdgram,
 			stp->ls_stateid.seqid = 0;
 		} else {
 			nd->nd_repstat = NFSERR_BADSTATEID;
+			free(stp, M_NFSDSTATE);
+			free(lop, M_NFSDLOCK);
 			goto nfsmout;
 		}
 	}
@@ -5926,4 +5928,3 @@ nfsrvd_notsupp(struct nfsrv_descript *nd, __unused int isdgram,
 	NFSEXITCODE2(0, nd);
 	return (0);
 }
-

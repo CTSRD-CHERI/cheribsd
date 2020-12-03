@@ -149,7 +149,13 @@ struct vm_map_entry {
 #define	MAP_ENTRY_STACK_GAP_DN		0x00020000
 #define	MAP_ENTRY_STACK_GAP_UP		0x00040000
 #define	MAP_ENTRY_HEADER		0x00080000
-#define	MAP_ENTRY_UNMAPPED		0x00100000
+/* Gap for MAP_ENTRY_SPLIT_BOUNDARY_MASK */
+#define	MAP_ENTRY_UNMAPPED		0x00400000
+
+#define	MAP_ENTRY_SPLIT_BOUNDARY_MASK	0x00300000
+
+#define	MAP_ENTRY_SPLIT_BOUNDARY_SHIFT	20
+
 
 #ifdef	_KERNEL
 static __inline u_char
@@ -376,7 +382,12 @@ long vmspace_resident_count(struct vmspace *vmspace);
 #define	MAP_CREATE_STACK_GAP_UP	0x00010000
 #define	MAP_CREATE_STACK_GAP_DN	0x00020000
 #define	MAP_VN_EXEC		0x00040000
-#define MAP_CREATE_UNMAPPED	0x00080000
+/* Gap for MAP_ENTRY_SPLIT_BOUNDARY_MASK */
+#define MAP_CREATE_UNMAPPED	0x00200000
+
+#define	MAP_SPLIT_BOUNDARY_MASK	0x00180000
+
+#define	MAP_SPLIT_BOUNDARY_SHIFT 19
 
 /*
  * vm_fault option flags
@@ -464,6 +475,8 @@ int vm_map_find(vm_map_t, vm_object_t, vm_ooffset_t, vm_offset_t *, vm_size_t,
     vm_offset_t, int, vm_prot_t, vm_prot_t, int);
 int vm_map_find_min(vm_map_t, vm_object_t, vm_ooffset_t, vm_offset_t *,
     vm_size_t, vm_offset_t, vm_offset_t, int, vm_prot_t, vm_prot_t, int);
+int vm_map_find_aligned(vm_map_t map, vm_offset_t *addr, vm_size_t length,
+    vm_offset_t max_addr, vm_offset_t alignment);
 int vm_map_fixed(vm_map_t, vm_object_t, vm_ooffset_t, vm_offset_t, vm_size_t,
     vm_prot_t, vm_prot_t, int);
 vm_offset_t vm_map_findspace(vm_map_t, vm_offset_t, vm_size_t);

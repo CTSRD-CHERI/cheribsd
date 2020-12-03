@@ -1,4 +1,4 @@
-/*	$NetBSD: str.c,v 1.51 2020/07/03 07:40:13 rillig Exp $	*/
+/*	$NetBSD: str.c,v 1.70 2020/10/24 20:51:49 rillig Exp $	*/
 
 /*-
  * Copyright (c) 1988, 1989, 1990, 1993
@@ -68,86 +68,76 @@
  * SUCH DAMAGE.
  */
 
-#ifndef MAKE_NATIVE
-static char rcsid[] = "$NetBSD: str.c,v 1.51 2020/07/03 07:40:13 rillig Exp $";
-#else
-#include <sys/cdefs.h>
-#ifndef lint
-#if 0
-static char     sccsid[] = "@(#)str.c	5.8 (Berkeley) 6/1/90";
-#else
-__RCSID("$NetBSD: str.c,v 1.51 2020/07/03 07:40:13 rillig Exp $");
-#endif
-#endif				/* not lint */
-#endif
-
 #include "make.h"
 
-/*-
- * str_concat --
- *	concatenate the two strings, inserting a space or slash between them,
- *	freeing them if requested.
- *
- * returns --
- *	the resulting string in allocated space.
- */
+/*	"@(#)str.c	5.8 (Berkeley) 6/1/90"	*/
+MAKE_RCSID("$NetBSD: str.c,v 1.70 2020/10/24 20:51:49 rillig Exp $");
+
+/* Return the concatenation of s1 and s2, freshly allocated. */
 char *
-str_concat(const char *s1, const char *s2, int flags)
+str_concat2(const char *s1, const char *s2)
 {
-	int len1, len2;
-	char *result;
-
-	/* get the length of both strings */
-	len1 = strlen(s1);
-	len2 = strlen(s2);
-
-	/* allocate length plus separator plus EOS */
-	result = bmake_malloc((unsigned int)(len1 + len2 + 2));
-
-	/* copy first string into place */
+	size_t len1 = strlen(s1);
+	size_t len2 = strlen(s2);
+	char *result = bmake_malloc(len1 + len2 + 1);
 	memcpy(result, s1, len1);
-
-	/* add separator character */
-	if (flags & STR_ADDSPACE) {
-		result[len1] = ' ';
-		++len1;
-	} else if (flags & STR_ADDSLASH) {
-		result[len1] = '/';
-		++len1;
-	}
-
-	/* copy second string plus EOS into place */
 	memcpy(result + len1, s2, len2 + 1);
-
 	return result;
 }
 
-/*-
- * brk_string --
- *	Fracture a string into an array of words (as delineated by tabs or
- *	spaces) taking quotation marks into account.  Leading tabs/spaces
- *	are ignored.
- *
- * If expand is TRUE, quotes are removed and escape sequences
- *  such as \r, \t, etc... are expanded.
- *
- * returns --
- *	Pointer to the array of pointers to the words.
- *      Memory containing the actual words in *store_words_buf.
- *		Both of these must be free'd by the caller.
- *      Number of words in *store_words_len.
- */
-char **
-brk_string(const char *str, int *store_words_len, Boolean expand,
-	char **store_words_buf)
+/* Return the concatenation of s1, s2 and s3, freshly allocated. */
+char *
+str_concat3(const char *s1, const char *s2, const char *s3)
 {
-	char inquote;
-	const char *str_p;
+	size_t len1 = strlen(s1);
+	size_t len2 = strlen(s2);
+	size_t len3 = strlen(s3);
+	char *result = bmake_malloc(len1 + len2 + len3 + 1);
+	memcpy(result, s1, len1);
+	memcpy(result + len1, s2, len2);
+	memcpy(result + len1 + len2, s3, len3 + 1);
+	return result;
+}
+
+/* Return the concatenation of s1, s2, s3 and s4, freshly allocated. */
+char *
+str_concat4(const char *s1, const char *s2, const char *s3, const char *s4)
+{
+	size_t len1 = strlen(s1);
+	size_t len2 = strlen(s2);
+	size_t len3 = strlen(s3);
+	size_t len4 = strlen(s4);
+	char *result = bmake_malloc(len1 + len2 + len3 + len4 + 1);
+	memcpy(result, s1, len1);
+	memcpy(result + len1, s2, len2);
+	memcpy(result + len1 + len2, s3, len3);
+	memcpy(result + len1 + len2 + len3, s4, len4 + 1);
+	return result;
+}
+
+/* Fracture a string into an array of words (as delineated by tabs or spaces)
+ * taking quotation marks into account.  Leading tabs/spaces are ignored.
+ *
+ * If expand is TRUE, quotes are removed and escape sequences such as \r, \t,
+ * etc... are expanded. In this case, the return value is NULL on parse
+ * errors.
+ *
+ * Returns the fractured words, which must be freed later using Words_Free.
+ * If expand was TRUE and there was a parse error, words is NULL, and in that
+ * case, nothing needs to be freed.
+ */
+Words
+Str_Words(const char *str, Boolean expand)
+{
 	size_t str_len;
-    	char **words;
-	int words_len;
-	int words_cap = 50;
-	char *words_buf, *word_start, *word_end;
+	char *words_buf;
+	size_t words_cap;
+	char **words;
+	size_t words_len;
+	char inquote;
+	char *word_start;
+	char *word_end;
+	const char *str_p;
 
 	/* skip leading space chars. */
 	for (; *str == ' ' || *str == '\t'; ++str)
@@ -157,7 +147,7 @@ brk_string(const char *str, int *store_words_len, Boolean expand,
 	str_len = strlen(str);
 	words_buf = bmake_malloc(strlen(str) + 1);
 
-	words_cap = MAX((str_len / 5), 50);
+	words_cap = str_len / 5 > 50 ? str_len / 5 : 50;
 	words = bmake_malloc((words_cap + 1) * sizeof(char *));
 
 	/*
@@ -166,10 +156,11 @@ brk_string(const char *str, int *store_words_len, Boolean expand,
 	 */
 	words_len = 0;
 	inquote = '\0';
-	word_start = word_end = words_buf;
+	word_start = words_buf;
+	word_end = words_buf;
 	for (str_p = str;; ++str_p) {
 		char ch = *str_p;
-		switch(ch) {
+		switch (ch) {
 		case '"':
 		case '\'':
 			if (inquote) {
@@ -177,9 +168,8 @@ brk_string(const char *str, int *store_words_len, Boolean expand,
 					inquote = '\0';
 				else
 					break;
-			}
-			else {
-				inquote = (char) ch;
+			} else {
+				inquote = ch;
 				/* Don't miss "" or '' */
 				if (word_start == NULL && str_p[1] == inquote) {
 					if (!expand) {
@@ -212,13 +202,14 @@ brk_string(const char *str, int *store_words_len, Boolean expand,
 			 * space and save off a pointer.
 			 */
 			if (word_start == NULL)
-			    goto done;
+				goto done;
 
 			*word_end++ = '\0';
 			if (words_len == words_cap) {
+				size_t new_size;
 				words_cap *= 2;		/* ramp up fast */
-				words = (char **)bmake_realloc(words,
-				    (words_cap + 1) * sizeof(char *));
+				new_size = (words_cap + 1) * sizeof(char *);
+				words = bmake_realloc(words, new_size);
 			}
 			words[words_len++] = word_start;
 			word_start = NULL;
@@ -226,8 +217,7 @@ brk_string(const char *str, int *store_words_len, Boolean expand,
 				if (expand && inquote) {
 					free(words);
 					free(words_buf);
-					*store_words_buf = NULL;
-					return NULL;
+					return (Words){ NULL, 0, NULL };
 				}
 				goto done;
 			}
@@ -273,50 +263,9 @@ brk_string(const char *str, int *store_words_len, Boolean expand,
 			word_start = word_end;
 		*word_end++ = ch;
 	}
-done:	words[words_len] = NULL;
-	*store_words_len = words_len;
-	*store_words_buf = words_buf;
-	return words;
-}
-
-/*
- * Str_FindSubstring -- See if a string contains a particular substring.
- *
- * Input:
- *	string		String to search.
- *	substring	Substring to find in string.
- *
- * Results: If string contains substring, the return value is the location of
- * the first matching instance of substring in string.  If string doesn't
- * contain substring, the return value is NULL.  Matching is done on an exact
- * character-for-character basis with no wildcards or special characters.
- *
- * Side effects: None.
- */
-char *
-Str_FindSubstring(const char *string, const char *substring)
-{
-	const char *a, *b;
-
-	/*
-	 * First scan quickly through the two strings looking for a single-
-	 * character match.  When it's found, then compare the rest of the
-	 * substring.
-	 */
-
-	for (b = substring; *string != 0; string++) {
-		if (*string != *b)
-			continue;
-		a = string;
-		for (;;) {
-			if (*b == 0)
-				return UNCONST(string);
-			if (*a++ != *b++)
-				break;
-		}
-		b = substring;
-	}
-	return NULL;
+done:
+	words[words_len] = NULL;
+	return (Words){ words, words_len, words_buf };
 }
 
 /*
@@ -375,7 +324,7 @@ Str_Match(const char *str, const char *pat)
 		 */
 		if (*pat == '[') {
 			Boolean neg = pat[1] == '^';
-			pat += 1 + neg;
+			pat += neg ? 2 : 1;
 
 			for (;;) {
 				if (*pat == ']' || *pat == 0) {
@@ -422,108 +371,4 @@ Str_Match(const char *str, const char *pat)
 		pat++;
 		str++;
 	}
-}
-
-/*-
- *-----------------------------------------------------------------------
- * Str_SYSVMatch --
- *	Check word against pattern for a match (% is wild),
- *
- * Input:
- *	word		Word to examine
- *	pattern		Pattern to examine against
- *	len		Number of characters to substitute
- *
- * Results:
- *	Returns the beginning position of a match or null. The number
- *	of characters matched is returned in len.
- *
- * Side Effects:
- *	None
- *
- *-----------------------------------------------------------------------
- */
-char *
-Str_SYSVMatch(const char *word, const char *pattern, size_t *len,
-    Boolean *hasPercent)
-{
-    const char *p = pattern;
-    const char *w = word;
-    const char *m;
-
-    *hasPercent = FALSE;
-    if (*p == '\0') {
-	/* Null pattern is the whole string */
-	*len = strlen(w);
-	return UNCONST(w);
-    }
-
-    if ((m = strchr(p, '%')) != NULL) {
-	*hasPercent = TRUE;
-	if (*w == '\0') {
-		/* empty word does not match pattern */
-		return NULL;
-	}
-	/* check that the prefix matches */
-	for (; p != m && *w && *w == *p; w++, p++)
-	     continue;
-
-	if (p != m)
-	    return NULL;	/* No match */
-
-	if (*++p == '\0') {
-	    /* No more pattern, return the rest of the string */
-	    *len = strlen(w);
-	    return UNCONST(w);
-	}
-    }
-
-    m = w;
-
-    /* Find a matching tail */
-    do
-	if (strcmp(p, w) == 0) {
-	    *len = w - m;
-	    return UNCONST(m);
-	}
-    while (*w++ != '\0');
-
-    return NULL;
-}
-
-
-/*-
- *-----------------------------------------------------------------------
- * Str_SYSVSubst --
- *	Substitute '%' on the pattern with len characters from src.
- *	If the pattern does not contain a '%' prepend len characters
- *	from src.
- *
- * Results:
- *	None
- *
- * Side Effects:
- *	Places result on buf
- *
- *-----------------------------------------------------------------------
- */
-void
-Str_SYSVSubst(Buffer *buf, char *pat, char *src, size_t len,
-    Boolean lhsHasPercent)
-{
-    char *m;
-
-    if ((m = strchr(pat, '%')) != NULL && lhsHasPercent) {
-	/* Copy the prefix */
-	Buf_AddBytes(buf, m - pat, pat);
-	/* skip the % */
-	pat = m + 1;
-    }
-    if (m != NULL || !lhsHasPercent) {
-	/* Copy the pattern */
-	Buf_AddBytes(buf, len, src);
-    }
-
-    /* append the rest */
-    Buf_AddBytes(buf, strlen(pat), pat);
 }

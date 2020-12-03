@@ -43,6 +43,7 @@
 #include <assert.h>
 #include <err.h>
 #include <errno.h>
+#include <inttypes.h>
 #include <fcntl.h>
 #include <libgen.h>
 #include <libutil.h>
@@ -349,6 +350,16 @@ exports_check(struct ggd_export *ex, struct g_gate_cinit *cinit,
 		flags = O_WRONLY;
 	else
 		flags = O_RDWR;
+	if (conn->c_diskfd != -1) {
+		if (strcmp(conn->c_path, ex->e_path) != 0) {
+			g_gate_log(LOG_ERR, "old %s and new %s: "
+			    "Path mismatch during handshakes.",
+			    conn->c_path, ex->e_path);
+			return (EPERM);
+		}
+		return (0);
+	}
+
 	conn->c_diskfd = open(ex->e_path, flags);
 	if (conn->c_diskfd == -1) {
 		error = errno;
@@ -455,7 +466,7 @@ connection_new(struct g_gate_cinit *cinit, struct sockaddr *s, int sfd)
 	conn->c_token = cinit->gc_token;
 	ip = htonl(((struct sockaddr_in *)(void *)s)->sin_addr.s_addr);
 	conn->c_srcip = ip;
-	conn->c_sendfd = conn->c_recvfd = -1;
+	conn->c_diskfd = conn->c_sendfd = conn->c_recvfd = -1;
 	if ((cinit->gc_flags & GGATE_FLAG_SEND) != 0)
 		conn->c_sendfd = sfd;
 	else
@@ -510,6 +521,8 @@ connection_remove(struct ggd_connection *conn)
 	LIST_REMOVE(conn, c_next);
 	g_gate_log(LOG_DEBUG, "Connection removed [%s %s].",
 	    ip2str(conn->c_srcip), conn->c_path);
+	if (conn->c_diskfd != -1)
+		close(conn->c_diskfd);
 	if (conn->c_sendfd != -1)
 		close(conn->c_sendfd);
 	if (conn->c_recvfd != -1)
@@ -650,8 +663,8 @@ recv_thread(void *arg)
 		g_gate_log(LOG_DEBUG, "Received hdr packet.");
 		g_gate_swap2h_hdr(&req->r_hdr);
 
-		g_gate_log(LOG_DEBUG, "%s: offset=%jd length=%u", __func__,
-		    (intmax_t)req->r_offset, (unsigned)req->r_length);
+		g_gate_log(LOG_DEBUG, "%s: offset=%" PRIu64 " length=%" PRIu32,
+		    __func__, req->r_offset, req->r_length);
 
 		/*
 		 * Allocate memory for data.
@@ -718,8 +731,8 @@ disk_thread(void *arg)
 		assert((req->r_offset % conn->c_sectorsize) == 0);
 		assert((req->r_length % conn->c_sectorsize) == 0);
 
-		g_gate_log(LOG_DEBUG, "%s: offset=%jd length=%u", __func__,
-		    (intmax_t)req->r_offset, (unsigned)req->r_length);
+		g_gate_log(LOG_DEBUG, "%s: offset=%" PRIu64 " length=%" PRIu32,
+		     __func__, req->r_offset, req->r_length);
 
 		/*
 		 * Do the request.
@@ -792,8 +805,8 @@ send_thread(void *arg)
 		error = pthread_mutex_unlock(&outqueue_mtx);
 		assert(error == 0);
 
-		g_gate_log(LOG_DEBUG, "%s: offset=%jd length=%u", __func__,
-		    (intmax_t)req->r_offset, (unsigned)req->r_length);
+		g_gate_log(LOG_DEBUG, "%s: offset=%" PRIu64 " length=%" PRIu32,
+		    __func__, req->r_offset, req->r_length);
 
 		/*
 		 * Send the request.
@@ -812,8 +825,8 @@ send_thread(void *arg)
 				    strerror(errno));
 			}
 			g_gate_log(LOG_DEBUG,
-			    "Sent %zd bytes (offset=%ju, size=%zu).", data,
-			    (uintmax_t)req->r_offset, (size_t)req->r_length);
+			    "Sent %zd bytes (offset=%" PRIu64 ", size=%" PRIu32
+			    ").", data, req->r_offset, req->r_length);
 			free(req->r_data);
 		}
 		free(req);

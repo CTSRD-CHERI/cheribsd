@@ -125,7 +125,7 @@ struct 	fileops vnops = {
 	.fo_flags = DFLAG_PASSABLE | DFLAG_SEEKABLE
 };
 
-static const int io_hold_cnt = 16;
+const u_int io_hold_cnt = 16;
 static int vn_io_fault_enable = 1;
 SYSCTL_INT(_debug, OID_AUTO, vn_io_fault_enable, CTLFLAG_RWTUN,
     &vn_io_fault_enable, 0, "Enable vn_io_fault lock avoidance");
@@ -852,7 +852,7 @@ get_advice(struct file *fp, struct uio *uio)
 	return (ret);
 }
 
-static int
+int
 vn_read_from_obj(struct vnode *vp, struct uio *uio)
 {
 	vm_object_t obj;
@@ -955,15 +955,6 @@ out_pip:
 	return (uio->uio_resid == 0 ? 0 : EJUSTRETURN);
 }
 
-static bool
-do_vn_read_from_pgcache(struct vnode *vp, struct uio *uio, struct file *fp)
-{
-	return ((vp->v_irflag & (VIRF_DOOMED | VIRF_PGREAD)) == VIRF_PGREAD &&
-	    !mac_vnode_check_read_enabled() &&
-	    uio->uio_resid <= ptoa(io_hold_cnt) && uio->uio_offset >= 0 &&
-	    (fp->f_flag & O_DIRECT) == 0 && vn_io_pgcache_read_enable);
-}
-
 /*
  * File table vnode read routine.
  */
@@ -980,8 +971,19 @@ vn_read(struct file *fp, struct uio *uio, struct ucred *active_cred, int flags,
 	    uio->uio_td, td));
 	KASSERT(flags & FOF_OFFSET, ("No FOF_OFFSET"));
 	vp = fp->f_vnode;
-	if (do_vn_read_from_pgcache(vp, uio, fp)) {
-		error = vn_read_from_obj(vp, uio);
+	ioflag = 0;
+	if (fp->f_flag & FNONBLOCK)
+		ioflag |= IO_NDELAY;
+	if (fp->f_flag & O_DIRECT)
+		ioflag |= IO_DIRECT;
+
+	/*
+	 * Try to read from page cache.  VIRF_DOOMED check is racy but
+	 * allows us to avoid unneeded work outright.
+	 */
+	if (vn_io_pgcache_read_enable && !mac_vnode_check_read_enabled() &&
+	    (vp->v_irflag & (VIRF_DOOMED | VIRF_PGREAD)) == VIRF_PGREAD) {
+		error = VOP_READ_PGCACHE(vp, uio, ioflag, fp->f_cred);
 		if (error == 0) {
 			fp->f_nextoff[UIO_READ] = uio->uio_offset;
 			return (0);
@@ -989,11 +991,7 @@ vn_read(struct file *fp, struct uio *uio, struct ucred *active_cred, int flags,
 		if (error != EJUSTRETURN)
 			return (error);
 	}
-	ioflag = 0;
-	if (fp->f_flag & FNONBLOCK)
-		ioflag |= IO_NDELAY;
-	if (fp->f_flag & O_DIRECT)
-		ioflag |= IO_DIRECT;
+
 	advice = get_advice(fp, uio);
 	vn_lock(vp, LK_SHARED | LK_RETRY);
 
@@ -2637,7 +2635,7 @@ vn_mmap(struct file *fp, vm_map_t map, vm_offset_t *addr,
 #ifdef _LP64
 	    size > OFF_MAX ||
 #endif
-	    foff < 0 || foff > OFF_MAX - size)
+	    foff > OFF_MAX - size)
 		return (EINVAL);
 
 	writecounted = FALSE;

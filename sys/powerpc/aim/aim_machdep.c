@@ -391,7 +391,6 @@ aim_cpu_init(vm_offset_t toc)
 		bcopy(&restorebridge, (void *)EXC_TRC, trap_offset);
 		bcopy(&restorebridge, (void *)EXC_BPT, trap_offset);
 	} else {
-
 		/*
 		 * Use an IBAT and a DBAT to map the bottom 256M segment.
 		 *
@@ -572,7 +571,6 @@ cpu_machine_check(struct thread *td, struct trapframe *frame, int *ucode)
 	return (SIGBUS);
 }
 
-
 #ifndef __powerpc64__
 uint64_t
 va_to_vsid(pmap_t pm, vm_offset_t va)
@@ -631,7 +629,8 @@ flush_disable_caches(void)
 	mtspr(SPR_MSSCR0, msscr0);
 	powerpc_sync();
 	isync();
-	__asm__ __volatile__("dssall; sync");
+	/* 7e00066c: dssall */
+	__asm__ __volatile__(".long 0x7e00066c; sync");
 	powerpc_sync();
 	isync();
 	__asm__ __volatile__("dcbf 0,%0" :: "r"(0));
@@ -779,4 +778,3 @@ cpu_sleep()
 		enable_vec(curthread);
 	powerpc_sync();
 }
-

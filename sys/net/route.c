@@ -328,7 +328,6 @@ ifa_ifwithroute(int flags, const struct sockaddr *dst,
 	return (ifa);
 }
 
-
 /*
  * Copy most of @rt data into @info.
  *
@@ -367,7 +366,6 @@ rt_exportinfo(struct rtentry *rt, struct rt_addrinfo *info, int flags)
 		src = rt_mask(rt);
 		dst = info->rti_info[RTAX_NETMASK];
 		if (src != NULL && dst != NULL) {
-
 			/*
 			 * Radix stores different value in sa_len,
 			 * assume rt_mask() to have the same length
@@ -718,7 +716,6 @@ rt_updatemtu(struct ifnet *ifp)
 	}
 }
 
-
 #if 0
 int p_sockaddr(char *buf, int buflen, struct sockaddr *s);
 int rt_print(char *buf, int buflen, struct rtentry *rt);
@@ -742,7 +739,7 @@ p_sockaddr(char *buf, int buflen, struct sockaddr *s)
 
 	if (inet_ntop(s->sa_family, paddr, buf, buflen) == NULL)
 		return (0);
-	
+
 	return (strlen(buf));
 }
 
@@ -886,7 +883,6 @@ rt_maskedcopy(struct sockaddr *src, struct sockaddr *dst, struct sockaddr *netma
  * Set up a routing table entry, normally
  * for an interface.
  */
-#define _SOCKADDR_TMPSIZE 128 /* Not too big.. kernel stack size is limited */
 static inline  int
 rtinit1(struct ifaddr *ifa, int cmd, int flags, int fibnum)
 {
@@ -898,10 +894,10 @@ rtinit1(struct ifaddr *ifa, int cmd, int flags, int fibnum)
 	struct rt_addrinfo info;
 	int error = 0;
 	int startfib, endfib;
-	char tempbuf[_SOCKADDR_TMPSIZE];
+	struct sockaddr_storage ss;
 	int didwork = 0;
 	int a_failure = 0;
-	struct sockaddr_dl_short *sdl = NULL;
+	struct sockaddr_dl_short sdl;
 	struct rib_head *rnh;
 
 	if (flags & RTF_HOST) {
@@ -949,17 +945,15 @@ rtinit1(struct ifaddr *ifa, int cmd, int flags, int fibnum)
 		 * XXX this is kinda inet specific..
 		 */
 		if (netmask != NULL) {
-			rt_maskedcopy(dst, (struct sockaddr *)tempbuf, netmask);
-			dst = (struct sockaddr *)tempbuf;
+			rt_maskedcopy(dst, (struct sockaddr *)&ss, netmask);
+			dst = (struct sockaddr *)&ss;
 		}
-	} else if (cmd == RTM_ADD) {
-		sdl = (struct sockaddr_dl_short *)tempbuf;
-		bzero(sdl, sizeof(struct sockaddr_dl_short));
-		sdl->sdl_family = AF_LINK;
-		sdl->sdl_len = sizeof(struct sockaddr_dl_short);
-		sdl->sdl_type = ifa->ifa_ifp->if_type;
-		sdl->sdl_index = ifa->ifa_ifp->if_index;
-        }
+	}
+	bzero(&sdl, sizeof(struct sockaddr_dl_short));
+	sdl.sdl_family = AF_LINK;
+	sdl.sdl_len = sizeof(struct sockaddr_dl_short);
+	sdl.sdl_type = ifa->ifa_ifp->if_type;
+	sdl.sdl_index = ifa->ifa_ifp->if_index;
 	/*
 	 * Now go through all the requested tables (fibs) and do the
 	 * requested action. Realistically, this will either be fib 0
@@ -981,7 +975,6 @@ rtinit1(struct ifaddr *ifa, int cmd, int flags, int fibnum)
 			rn = rnh->rnh_lookup(dst, netmask, &rnh->head);
 #ifdef RADIX_MPATH
 			if (rt_mpath_capable(rnh)) {
-
 				if (rn == NULL) 
 					error = ESRCH;
 				else {
@@ -1016,13 +1009,7 @@ rtinit1(struct ifaddr *ifa, int cmd, int flags, int fibnum)
 		info.rti_flags = flags |
 		    (ifa->ifa_flags & ~IFA_RTSELF) | RTF_PINNED;
 		info.rti_info[RTAX_DST] = dst;
-		/* 
-		 * doing this for compatibility reasons
-		 */
-		if (cmd == RTM_ADD)
-			info.rti_info[RTAX_GATEWAY] = (struct sockaddr *)sdl;
-		else
-			info.rti_info[RTAX_GATEWAY] = ifa->ifa_addr;
+		info.rti_info[RTAX_GATEWAY] = (struct sockaddr *)&sdl;
 		info.rti_info[RTAX_NETMASK] = netmask;
 		NET_EPOCH_ENTER(et);
 		error = rib_action(fibnum, cmd, &info, &rc);
@@ -1115,7 +1102,7 @@ rt_routemsg(int cmd, struct rtentry *rt, struct ifnet *ifp, int rti_addrs,
 
 	KASSERT(cmd == RTM_ADD || cmd == RTM_DELETE,
 	    ("unexpected cmd %d", cmd));
-	
+
 	KASSERT(fibnum == RT_ALL_FIBS || (fibnum >= 0 && fibnum < rt_numfibs),
 	    ("%s: fib out of range 0 <=%d<%d", __func__, fibnum, rt_numfibs));
 
@@ -1138,7 +1125,7 @@ rt_routemsg_info(int cmd, struct rt_addrinfo *info, int fibnum)
 
 	KASSERT(cmd == RTM_ADD || cmd == RTM_DELETE || cmd == RTM_CHANGE,
 	    ("unexpected cmd %d", cmd));
-	
+
 	KASSERT(fibnum == RT_ALL_FIBS || (fibnum >= 0 && fibnum < rt_numfibs),
 	    ("%s: fib out of range 0 <=%d<%d", __func__, fibnum, rt_numfibs));
 
@@ -1146,7 +1133,6 @@ rt_routemsg_info(int cmd, struct rt_addrinfo *info, int fibnum)
 
 	return (rtsock_routemsg_info(cmd, info, fibnum));
 }
-
 
 /*
  * This is called to generate messages from the routing socket
@@ -1171,4 +1157,3 @@ rt_newaddrmsg_fib(int cmd, struct ifaddr *ifa, struct rtentry *rt, int fibnum)
 		rt_addrmsg(cmd, ifa, fibnum);
 	}
 }
-

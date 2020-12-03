@@ -20,10 +20,6 @@
 
 #include "config.h"
 
-#ifndef lint
-static const char sccsid[] = "$Id: log.c,v 10.27 2011/07/13 06:25:50 zy Exp $";
-#endif /* not lint */
-
 #include <sys/types.h>
 #include <sys/queue.h>
 #include <sys/stat.h>
@@ -31,6 +27,7 @@ static const char sccsid[] = "$Id: log.c,v 10.27 2011/07/13 06:25:50 zy Exp $";
 #include <bitstring.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <libgen.h>
 #include <limits.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -104,9 +101,7 @@ typedef struct {
  * PUBLIC: int log_init(SCR *, EXF *);
  */
 int
-log_init(
-	SCR *sp,
-	EXF *ep)
+log_init(SCR *sp, EXF *ep)
 {
 	/*
 	 * !!!
@@ -140,9 +135,7 @@ log_init(
  * PUBLIC: int log_end(SCR *, EXF *);
  */
 int
-log_end(
-	SCR *sp,
-	EXF *ep)
+log_end(SCR *sp, EXF *ep)
 {
 	/*
 	 * !!!
@@ -152,10 +145,8 @@ log_end(
 		(void)(ep->log->close)(ep->log);
 		ep->log = NULL;
 	}
-	if (ep->l_lp != NULL) {
-		free(ep->l_lp);
-		ep->l_lp = NULL;
-	}
+	free(ep->l_lp);
+	ep->l_lp = NULL;
 	ep->l_len = 0;
 	ep->l_cursor.lno = 1;		/* XXX Any valid recno. */
 	ep->l_cursor.cno = 0;
@@ -197,9 +188,7 @@ log_cursor(SCR *sp)
  *	Actually push a cursor record out.
  */
 static int
-log_cursor1(
-	SCR *sp,
-	int type)
+log_cursor1(SCR *sp, int type)
 {
 	DBT data, key;
 	EXF *ep;
@@ -235,10 +224,7 @@ log_cursor1(
  * PUBLIC: int log_line(SCR *, recno_t, u_int);
  */
 int
-log_line(
-	SCR *sp,
-	recno_t lno,
-	u_int action)
+log_line(SCR *sp, recno_t lno, u_int action)
 {
 	DBT data, key;
 	EXF *ep;
@@ -338,9 +324,7 @@ log_line(
  * PUBLIC: int log_mark(SCR *, LMARK *);
  */
 int
-log_mark(
-	SCR *sp,
-	LMARK *lmp)
+log_mark(SCR *sp, LMARK *lmp)
 {
 	DBT data, key;
 	EXF *ep;
@@ -384,9 +368,7 @@ log_mark(
  * PUBLIC: int log_backward(SCR *, MARK *);
  */
 int
-log_backward(
-	SCR *sp,
-	MARK *rp)
+log_backward(SCR *sp, MARK *rp)
 {
 	DBT key, data;
 	EXF *ep;
@@ -572,9 +554,7 @@ err:	F_CLR(ep, F_NOLOG);
  * PUBLIC: int log_forward(SCR *, MARK *);
  */
 int
-log_forward(
-	SCR *sp,
-	MARK *rp)
+log_forward(SCR *sp, MARK *rp)
 {
 	DBT key, data;
 	EXF *ep;
@@ -669,14 +649,11 @@ err:	F_CLR(ep, F_NOLOG);
  *	Try and restart the log on failure, i.e. if we run out of memory.
  */
 static void
-log_err(
-	SCR *sp,
-	char *file,
-	int line)
+log_err(SCR *sp, char *file, int line)
 {
 	EXF *ep;
 
-	msgq(sp, M_SYSERR, "015|%s/%d: log put error", tail(file), line);
+	msgq(sp, M_SYSERR, "015|%s/%d: log put error", basename(file), line);
 	ep = sp->ep;
 	(void)ep->log->close(ep->log);
 	if (!log_init(sp, ep))
@@ -685,11 +662,7 @@ log_err(
 
 #if defined(DEBUG) && 0
 static void
-log_trace(
-	SCR *sp,
-	char *msg,
-	recno_t rno,
-	u_char *p)
+log_trace(SCR *sp, char *msg, recno_t rno, u_char *p)
 {
 	LMARK lm;
 	MARK m;
@@ -740,12 +713,8 @@ log_trace(
  *	Apply a realigned line from the log db to the file db.
  */
 static int
-apply_with(
-	int (*db_func)(SCR *, recno_t, CHAR_T *, size_t),
-	SCR *sp,
-	recno_t lno,
-	u_char *p,
-	size_t len)
+apply_with(int (*db_func)(SCR *, recno_t, CHAR_T *, size_t), SCR *sp,
+    recno_t lno, u_char *p, size_t len)
 {
 #ifdef USE_WIDECHAR
 	typedef unsigned long nword;

@@ -164,7 +164,6 @@ struct if_data {
 #define	IFF_RENAMING	0x400000	/* (n) interface is being renamed */
 #define	IFF_NOGROUP	0x800000	/* (n) interface is not part of any groups */
 
-
 /*
  * Old names for driver flags so that user space tools can continue to use
  * the old (portable) names.
@@ -249,6 +248,8 @@ struct if_data {
 #define	IFCAP_NOMAP		0x4000000 /* can TX unmapped mbufs */
 #define	IFCAP_TXTLS4		0x8000000 /* can do TLS encryption and segmentation for TCP */
 #define	IFCAP_TXTLS6		0x10000000 /* can do TLS encryption and segmentation for TCP6 */
+#define	IFCAP_VXLAN_HWCSUM	0x20000000 /* can do IFCAN_HWCSUM on VXLANs */
+#define	IFCAP_VXLAN_HWTSO	0x40000000 /* can do IFCAP_TSO on VXLANs */
 
 #define IFCAP_HWCSUM_IPV6	(IFCAP_RXCSUM_IPV6 | IFCAP_TXCSUM_IPV6)
 

@@ -1126,7 +1126,6 @@ udp_v4mapped_pktinfo(struct cmsghdr *cm, struct sockaddr_in * src,
 			return (ENXIO);
 	}
 	if (ifp != NULL && !IN6_IS_ADDR_UNSPECIFIED(&pktinfo->ipi6_addr)) {
-
 		ia.s_addr = pktinfo->ipi6_addr.s6_addr32[3];
 		if (in_ifhasaddr(ifp, ia) == 0)
 			return (EADDRNOTAVAIL);
@@ -1155,7 +1154,7 @@ udp_output(struct inpcb *inp, struct mbuf *m, struct sockaddr *addr,
 	struct epoch_tracker et;
 	int cscov_partial = 0;
 	int error = 0;
-	int ipflags;
+	int ipflags = 0;
 	u_short fport, lport;
 	u_char tos;
 	uint8_t pr;
@@ -1439,7 +1438,6 @@ udp_output(struct inpcb *inp, struct mbuf *m, struct sockaddr *addr,
 		ip->ip_off |= htons(IP_DF);
 	}
 
-	ipflags = 0;
 	if (inp->inp_socket->so_options & SO_DONTROUTE)
 		ipflags |= IP_ROUTETOIF;
 	if (inp->inp_socket->so_options & SO_BROADCAST)

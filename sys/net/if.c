@@ -539,7 +539,6 @@ VNET_SYSUNINIT(vnet_if_return, SI_SUB_VNET_DONE, SI_ORDER_ANY,
     vnet_if_return, NULL);
 #endif
 
-
 static void *
 if_grow(void)
 {
@@ -739,7 +738,7 @@ if_rele(struct ifnet *ifp)
 void
 ifq_init(struct ifaltq *ifq, struct ifnet *ifp)
 {
-	
+
 	mtx_init(&ifq->ifq_mtx, ifp->if_xname, "if send queue", MTX_DEF);
 
 	if (ifq->ifq_maxlen == 0) 
@@ -1350,6 +1349,11 @@ if_vmove(struct ifnet *ifp, struct vnet *new_vnet)
 	ifindex_free_locked(ifp->if_index);
 	IFNET_WUNLOCK();
 
+
+	/* Don't re-attach DYING interfaces. */
+	if (ifp->if_flags & IFF_DYING)
+		return (0);
+
 	/*
 	 * Perform interface-specific reassignment tasks, if provided by
 	 * the driver.
@@ -1900,7 +1904,6 @@ ifa_free(struct ifaddr *ifa)
 		NET_EPOCH_CALL(ifa_destroy, &ifa->ifa_epoch_ctx);
 }
 
-
 static int
 ifa_maintain_loopback_route(int cmd, const char *otype, struct ifaddr *ifa,
     struct sockaddr *ia)
@@ -2420,7 +2423,7 @@ if_qflush(struct ifnet *ifp)
 {
 	struct mbuf *m, *n;
 	struct ifaltq *ifq;
-	
+
 	ifq = &ifp->if_snd;
 	IFQ_LOCK(ifq);
 #ifdef ALTQ
@@ -3697,7 +3700,7 @@ if_setflag(struct ifnet *ifp, int flag, int pflag, int *refcount, int onswitch)
 	/* Save ifnet parameters for if_ioctl() may fail */
 	oldcount = *refcount;
 	oldflags = ifp->if_flags;
-	
+
 	/*
 	 * See if we aren't the only and touching refcount is enough.
 	 * Actually toggle interface flag if we are the first or last.
@@ -3983,7 +3986,6 @@ if_freemulti(struct ifmultiaddr *ifma)
 
 	NET_EPOCH_CALL(if_destroymulti, &ifma->ifma_epoch_ctx);
 }
-
 
 /*
  * Register an additional multicast address with a network interface.
@@ -4583,7 +4585,7 @@ void
 if_register_com_alloc(u_char type,
     if_com_alloc_t *a, if_com_free_t *f)
 {
-	
+
 	KASSERT(if_com_alloc[type] == NULL,
 	    ("if_register_com_alloc: %d already registered", type));
 	KASSERT(if_com_free[type] == NULL,
@@ -4596,7 +4598,7 @@ if_register_com_alloc(u_char type,
 void
 if_deregister_com_alloc(u_char type)
 {
-	
+
 	KASSERT(if_com_alloc[type] != NULL,
 	    ("if_deregister_com_alloc: %d not registered", type));
 	KASSERT(if_com_free[type] != NULL,
@@ -4708,14 +4710,13 @@ if_getdrvflags(if_t ifp)
 {
 	return ((struct ifnet *)ifp)->if_drv_flags;
 }
- 
+
 int
 if_setdrvflags(if_t ifp, int flags)
 {
 	((struct ifnet *)ifp)->if_drv_flags = flags;
 	return (0);
 }
-
 
 int
 if_setflags(if_t ifp, int flags)
@@ -4930,7 +4931,6 @@ if_getamcount(if_t ifp)
 	return ((struct ifnet *)ifp)->if_amcount;
 }
 
-
 int
 if_setsendqready(if_t ifp)
 {
@@ -5091,7 +5091,7 @@ if_settransmitfn(if_t ifp, if_transmit_fn_t start_fn)
 void if_setqflushfn(if_t ifp, if_qflush_fn_t flush_fn)
 {
 	((struct ifnet *)ifp)->if_qflush = flush_fn;
-	
+
 }
 
 void

@@ -243,6 +243,7 @@ static inline const void* target_cgp_for_func(const struct Struct_Obj_Entry *obj
 
 // ignore _init/_fini
 #define call_initfini_pointer(obj, target) rtld_fatal("%s: _init or _fini used!", obj->path)
+#define call_init_pointer(obj, target) rtld_fatal("%s: _init or _fini used!", obj->path)
 
 static inline void
 _call_init_fini_array_pointer(const struct Struct_Obj_Entry *obj, InitArrayEntry entry, int argc, char** argv, char** env) {

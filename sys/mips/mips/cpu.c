@@ -518,7 +518,6 @@ static device_method_t cpu_methods[] = {
 	DEVMETHOD(bus_alloc_resource,	cpu_alloc_resource),
 	DEVMETHOD(bus_setup_intr,	cpu_setup_intr),
 	DEVMETHOD(bus_teardown_intr,	bus_generic_teardown_intr),
-
 	{ 0, 0 }
 };
 

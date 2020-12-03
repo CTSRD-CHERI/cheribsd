@@ -3150,9 +3150,12 @@ vm_wait_count(void)
 	return (vm_severe_waiters + vm_min_waiters + vm_pageproc_waiters);
 }
 
-void
-vm_wait_doms(const domainset_t *wdoms)
+int
+vm_wait_doms(const domainset_t *wdoms, int mflags)
 {
+	int error;
+
+	error = 0;
 
 	/*
 	 * We use racey wakeup synchronization to avoid expensive global
@@ -3165,8 +3168,8 @@ vm_wait_doms(const domainset_t *wdoms)
 	if (curproc == pageproc) {
 		mtx_lock(&vm_domainset_lock);
 		vm_pageproc_waiters++;
-		msleep(&vm_pageproc_waiters, &vm_domainset_lock, PVM | PDROP,
-		    "pageprocwait", 1);
+		error = msleep(&vm_pageproc_waiters, &vm_domainset_lock,
+		    PVM | PDROP | mflags, "pageprocwait", 1);
 	} else {
 		/*
 		 * XXX Ideally we would wait only until the allocation could
@@ -3176,11 +3179,12 @@ vm_wait_doms(const domainset_t *wdoms)
 		mtx_lock(&vm_domainset_lock);
 		if (vm_page_count_min_set(wdoms)) {
 			vm_min_waiters++;
-			msleep(&vm_min_domains, &vm_domainset_lock,
-			    PVM | PDROP, "vmwait", 0);
+			error = msleep(&vm_min_domains, &vm_domainset_lock,
+			    PVM | PDROP | mflags, "vmwait", 0);
 		} else
 			mtx_unlock(&vm_domainset_lock);
 	}
+	return (error);
 }
 
 /*
@@ -3211,20 +3215,12 @@ vm_wait_domain(int domain)
 			panic("vm_wait in early boot");
 		DOMAINSET_ZERO(&wdom);
 		DOMAINSET_SET(vmd->vmd_domain, &wdom);
-		vm_wait_doms(&wdom);
+		vm_wait_doms(&wdom, 0);
 	}
 }
 
-/*
- *	vm_wait:
- *
- *	Sleep until free pages are available for allocation in the
- *	affinity domains of the obj.  If obj is NULL, the domain set
- *	for the calling thread is used.
- *	Called in various places after failed memory allocations.
- */
-void
-vm_wait(vm_object_t obj)
+static int
+vm_wait_flags(vm_object_t obj, int mflags)
 {
 	struct domainset *d;
 
@@ -3239,7 +3235,27 @@ vm_wait(vm_object_t obj)
 	if (d == NULL)
 		d = curthread->td_domain.dr_policy;
 
-	vm_wait_doms(&d->ds_mask);
+	return (vm_wait_doms(&d->ds_mask, mflags));
+}
+
+/*
+ *	vm_wait:
+ *
+ *	Sleep until free pages are available for allocation in the
+ *	affinity domains of the obj.  If obj is NULL, the domain set
+ *	for the calling thread is used.
+ *	Called in various places after failed memory allocations.
+ */
+void
+vm_wait(vm_object_t obj)
+{
+	(void)vm_wait_flags(obj, 0);
+}
+
+int
+vm_wait_intr(vm_object_t obj)
+{
+	return (vm_wait_flags(obj, PCATCH));
 }
 
 /*
@@ -4727,12 +4743,11 @@ vm_page_grab_pages(vm_object_t object, vm_pindex_t pindex, int allocflags,
 	VM_OBJECT_ASSERT_WLOCKED(object);
 	KASSERT(((u_int)allocflags >> VM_ALLOC_COUNT_SHIFT) == 0,
 	    ("vm_page_grap_pages: VM_ALLOC_COUNT() is not allowed"));
+	KASSERT(count > 0,
+	    ("vm_page_grab_pages: invalid page count %d", count));
 	vm_page_grab_check(allocflags);
 
 	pflags = vm_page_grab_pflags(allocflags);
-	if (count == 0)
-		return (0);
-
 	i = 0;
 retrylookup:
 	m = vm_radix_lookup_le(&object->rtree, pindex + i);
@@ -4786,6 +4801,8 @@ vm_page_grab_pages_unlocked(vm_object_t object, vm_pindex_t pindex,
 	int flags;
 	int i;
 
+	KASSERT(count > 0,
+	    ("vm_page_grab_pages_unlocked: invalid page count %d", count));
 	vm_page_grab_check(allocflags);
 
 	/*
@@ -4808,7 +4825,7 @@ vm_page_grab_pages_unlocked(vm_object_t object, vm_pindex_t pindex,
 		vm_page_grab_release(m, allocflags);
 		pred = ma[i] = m;
 	}
-	if ((allocflags & VM_ALLOC_NOCREAT) != 0)
+	if (i == count || (allocflags & VM_ALLOC_NOCREAT) != 0)
 		return (i);
 	count -= i;
 	VM_OBJECT_WLOCK(object);
