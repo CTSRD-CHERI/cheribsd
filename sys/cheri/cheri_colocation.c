@@ -373,7 +373,8 @@ colocation_unborrow(struct thread *td, struct trapframe *trapframe)
 }
 
 bool
-colocation_trap_in_switcher(struct thread *td, struct trapframe *trapframe)
+colocation_trap_in_switcher(struct thread *td, struct trapframe *trapframe,
+    const char *msg)
 {
 	const struct sysentvec *sv;
 	vm_offset_t addr;
@@ -393,9 +394,10 @@ colocation_trap_in_switcher(struct thread *td, struct trapframe *trapframe)
 		goto trap;
 	return (false);
 trap:
+	COLOCATION_DEBUG("%s in switcher", msg);
 #ifdef DDB
 	if (kdb_on_switcher_trap)
-		kdb_enter(KDB_WHY_CHERI, "switcher trap");
+		kdb_enter(KDB_WHY_CHERI, msg);
 #endif
 	return (true);
 }
