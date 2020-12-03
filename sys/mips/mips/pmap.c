@@ -3758,6 +3758,90 @@ pmap_emulate_modified(pmap_t pmap, vm_offset_t va)
 }
 
 #ifdef CPU_CHERI
+/*
+ * Atomically push all the in-PTE, MD capdirty bits up to the MI layer.
+ *
+ * While this is a fairly long-running operation under the current pmap
+ * lock, it's going to be called only from single-threaded context, so there
+ * should be minimal contention (perhaps from the page daemon or updates to
+ * shared mappings) as no other cores are going to have this pmap active.
+ *
+ * XREF pmap_remove_pages
+ */
+
+void
+pmap_sync_capdirty(pmap_t pmap)
+{
+	struct pv_chunk *pc, *npc;
+
+	PMAP_LOCK(pmap);
+
+	/*
+	 * While we expect that no other cores have us active right now,
+	 * because we're thread_single'd, other TLBs may still have cached
+	 * entries with PTE_SCI clear!  We'd best get those out of the way.
+	 *
+	 * Doing this before clearing the bits means that even if we're
+	 * wrong about being single-threaded, those other cores will park
+	 * behind us when they go to update their TLBs.
+	 *
+	 * XXX Is it worth only invalidating the capdirty ones?
+	 */
+	pmap_invalidate_all(pmap);
+
+	TAILQ_FOREACH_SAFE (pc, &pmap->pm_pvchunk, pc_list, npc) {
+		int field;
+
+		for (field = 0; field < _NPCM; field++) {
+			u_long inuse;
+
+			inuse = ~pc->pc_map[field] & pc_freemask[field];
+			while (inuse != 0) {
+				pd_entry_t *pde;
+				pt_entry_t *pte, tpte;
+				pv_entry_t pv;
+				u_long bitmask;
+				int bit, idx;
+
+				bit = ffsl(inuse) - 1;
+				bitmask = 1UL << bit;
+				idx = field * sizeof(inuse) * NBBY + bit;
+				pv = &pc->pc_pventry[idx];
+				inuse &= ~bitmask;
+
+				pde = pmap_pde(pmap, pv->pv_va);
+				KASSERT(pde != NULL && *pde != 0,
+				    ("pmap_sync_capdirty: pde"));
+				pte = pmap_pde_to_pte(pde, pv->pv_va);
+				if (!pte_test(pte, PTE_V))
+					panic("pmap_sync_capdirty: bad pte");
+				tpte = *pte;
+
+				if (pte_test(&tpte, PTE_MANAGED) == 0)
+					continue;
+
+				if (pte_test(&tpte, PTE_SCI) == 0) {
+					vm_page_t m;
+
+					m = PHYS_TO_VM_PAGE(
+					    TLBLO_PTE_TO_PA(tpte));
+					KASSERT(m != NULL,
+					    ("pmap_sync_capdirty: bad tpte %#jx",
+						(uintmax_t)(tpte)));
+
+					KASSERT(pte_test(&tpte, PTE_CRO) == 0,
+					    ("cap-read-only without inhibit?"));
+
+					vm_page_capdirty(m);
+					pte_set(pte, PTE_SCI);
+				}
+			}
+		}
+	}
+
+	PMAP_UNLOCK(pmap);
+}
+
 /* XREF pmap_emulate_modified */
 int
 pmap_emulate_capdirty(pmap_t pmap, vm_offset_t va)
