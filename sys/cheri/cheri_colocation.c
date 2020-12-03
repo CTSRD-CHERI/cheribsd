@@ -83,6 +83,9 @@ SYSCTL_INT(_debug, OID_AUTO, counregister_on_exit, CTLFLAG_RWTUN,
 static int kdb_on_switcher_trap;
 SYSCTL_INT(_debug, OID_AUTO, kdb_on_switcher_trap, CTLFLAG_RWTUN,
     &kdb_on_switcher_trap, 0, "Enter ddb(4) on switcher traps");
+static int kdb_on_unborrow;
+SYSCTL_INT(_debug, OID_AUTO, kdb_on_unborrow, CTLFLAG_RWTUN,
+    &kdb_on_unborrow, 0, "Enter ddb(4) on thread unborrow");
 #endif
 
 #define	COLOCATION_DEBUG(X, ...)					\
@@ -378,6 +381,11 @@ colocation_unborrow(struct thread *td, struct trapframe *trapframe)
 	    "with td %p, pid %d (%s), switchercb %#lx",
 	    td, td->td_proc->p_pid, td->td_proc->p_comm, td->td_md.md_scb,
 	    peertd, peertd->td_proc->p_pid, peertd->td_proc->p_comm, peertd->td_md.md_scb);
+#endif
+
+#ifdef DDB
+	if (kdb_on_unborrow)
+		kdb_enter(KDB_WHY_CHERI, "unborrow");
 #endif
 
 #ifdef __mips__
