@@ -49,7 +49,7 @@ static void
 usage(void)
 {
 
-	fprintf(stderr, "usage: copong [-kxv] service-name [target-name ...]\n");
+	fprintf(stderr, "usage: copong [-s time] [-kxv] service-name [target-name ...]\n");
 	exit(0);
 }
 
@@ -62,15 +62,23 @@ main(int argc, char **argv)
 	void * __capability cocall_data;
 	void * __capability cookie;
 	void * __capability *lookedup;
-	char *registered;
+	char *registered, *tmp;
 	uint64_t *halfcookie;
+	float dt = 0.0;
 	bool kflag = false, vflag = false, xflag = false;
 	int c, ch, error;
 
-	while ((ch = getopt(argc, argv, "kxv")) != -1) {
+	while ((ch = getopt(argc, argv, "ks:xv")) != -1) {
 		switch (ch) {
 		case 'k':
 			kflag = true;
+			break;
+		case 's':
+			dt = strtof(optarg, &tmp);
+			if (*tmp != '\0')
+				errx(1, "argument to -s must be a number");
+			if (dt < 0)
+				errx(1, "argument to -s must be >= 0.0");
 			break;
 		case 'x':
 			xflag = true;
@@ -165,6 +173,9 @@ main(int argc, char **argv)
 				printf("%s: %s: returned from \"%s\", pid %d, buf[0] is %lld\n",
 				    getprogname(), registered, argv[c], getpid(), buf[0]);
 		}
+
+		if (dt > 0)
+			usleep(dt * 1000000);
 
 		if (xflag)
 			abort();
