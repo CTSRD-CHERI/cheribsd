@@ -124,6 +124,26 @@ void		 pmap_advise(pmap_t pmap, vm_offset_t sva, vm_offset_t eva,
 		    int advice);
 void		 pmap_align_superpage(vm_object_t, vm_ooffset_t, vm_offset_t *,
 		    vm_size_t);
+#ifdef CHERI_CAPREVOKE
+static const int PMAP_CAPLOADGEN_HASCAPS   = 0x1;
+static const int PMAP_CAPLOADGEN_EXCLUSIVE = 0x2;
+static const int PMAP_CAPLOADGEN_UPDATETLB = 0x4;
+static const int PMAP_CAPLOADGEN_WIRE      = 0x8;
+enum pmap_caploadgen_res {
+	PMAP_CAPLOADGEN_OK            = 0, /* Update done */
+	PMAP_CAPLOADGEN_ALREADY       = 1, /* Update already applied */
+	PMAP_CAPLOADGEN_CLEAN         = 2, /* Like _ALREADY, and !CAPSTORE */
+	PMAP_CAPLOADGEN_UNABLE        = 4, /* No valid PTE at this address */
+	PMAP_CAPLOADGEN_TEARDOWN      = 5, /* Mapping being torn down */
+	PMAP_CAPLOADGEN_SCAN_RO       = 6, /* scan this page, mapped RO */
+	PMAP_CAPLOADGEN_SCAN_RW       = 7, /* scan this page, mapped RW */
+	PMAP_CAPLOADGEN_SCAN_CLEAN_RO = 8, /* scan, thinks itself clean & RO */
+	PMAP_CAPLOADGEN_SCAN_CLEAN_RW = 9, /* scan, thinks itself clean & RW */
+};
+int		 pmap_caploadgen_update(pmap_t, vm_offset_t, vm_page_t *,
+		    int flags);
+void		 pmap_caploadgen_next(pmap_t pmap);
+#endif
 void		 pmap_clear_modify(vm_page_t m);
 void		 pmap_copy(pmap_t, pmap_t, vm_offset_t, vm_size_t, vm_offset_t);
 void		 pmap_copy_page(vm_page_t, vm_page_t);
@@ -132,6 +152,15 @@ void		 pmap_copy_page_tags(vm_page_t, vm_page_t);
 #endif
 void		 pmap_copy_pages(vm_page_t ma[], vm_offset_t a_offset,
 		    vm_page_t mb[], vm_offset_t b_offset, int xfersize);
+
+/*
+ * CHERI capability revocation imposes the following novel demand on pmap_enter
+ * and its friends: the page must be suitable for insertion at the current
+ * revocation epoch.  In particular, if a load-side sweep is in progres, either
+ * the page must not be carrying capabilities, the new mapping must lack read
+ * permission, or all capabilities within the page must be checked for
+ * revocation.  This responsibility falls to **the caller of pmap_enter**!
+ */
 int		 pmap_enter(pmap_t pmap, vm_offset_t va, vm_page_t m,
 		    vm_prot_t prot, u_int flags, int8_t psind);
 void		 pmap_enter_object(pmap_t pmap, vm_offset_t start,
@@ -169,6 +198,9 @@ void		 pmap_remove_pages(pmap_t);
 void		 pmap_remove_write(vm_page_t m);
 void		 pmap_sync_icache(pmap_t, vm_offset_t, vm_size_t);
 int		 pmap_ts_referenced(vm_page_t m);
+#ifdef CPU_CHERI
+void		 pmap_sync_capdirty(pmap_t);
+#endif
 void		 pmap_unwire(pmap_t pmap, vm_offset_t start, vm_offset_t end);
 void		 pmap_zero_page(vm_page_t);
 void		 pmap_zero_page_area(vm_page_t, int off, int size);
