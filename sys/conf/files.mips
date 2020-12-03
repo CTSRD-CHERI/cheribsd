@@ -55,6 +55,7 @@ mips/mips/trap.c			standard
 mips/mips/uio_machdep.c			standard
 mips/mips/uma_machdep.c			standard
 mips/mips/vm_machdep.c			standard
+mips/mips/vm_machdep_caprevoke.c	optional	cpu_cheri cheri_caprevoke
 
 # misc opt-in bits
 kern/link_elf_obj.c			standard
