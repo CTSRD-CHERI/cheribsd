@@ -546,7 +546,7 @@ initstack_end:
  * to execute.
  */
 #define	SIGCODE(sym)						\
-	.text; .globl sym; .type sym,@object; .align 4; sym:
+	.text; .globl sym; .type sym,@object; .align 4; sym: .cfi_startproc
 
 .option push
 #if __has_feature(capabilities)
