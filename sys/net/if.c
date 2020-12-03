@@ -155,6 +155,15 @@ CTASSERT(sizeof(struct ifreq64) == sizeof(struct ifreq32));
 CTASSERT(__offsetof(struct ifreq, ifr_ifru) ==
     __offsetof(struct ifreq32, ifr_ifru));
 
+struct ifdrv32 {
+	char		ifd_name[IFNAMSIZ];
+	uint32_t	ifd_cmd;
+	uint32_t	ifd_len;
+	uint32_t	ifd_data;
+};
+#define SIOCSDRVSPEC32	_IOC_NEWTYPE(SIOCSDRVSPEC, struct ifdrv32)
+#define SIOCGDRVSPEC32	_IOC_NEWTYPE(SIOCGDRVSPEC, struct ifdrv32)
+
 struct ifgroupreq32 {
 	char	ifgr_name[IFNAMSIZ];
 	u_int	ifgr_len;
@@ -183,6 +192,15 @@ struct ifmediareq32 {
 #endif /* !COMPAT_FREEBSD32 */
 
 #ifdef COMPAT_FREEBSD64
+struct ifdrv64 {
+	char		ifd_name[IFNAMSIZ];
+	uint64_t	ifd_cmd;
+	uint64_t	ifd_len;
+	uint64_t	ifd_data;
+};
+#define SIOCSDRVSPEC64	_IOC_NEWTYPE(SIOCSDRVSPEC, struct ifdrv64)
+#define SIOCGDRVSPEC64	_IOC_NEWTYPE(SIOCGDRVSPEC, struct ifdrv64)
+
 struct ifgroupreq64 {
 	char	ifgr_name[IFNAMSIZ];
 	u_int	ifgr_len;
@@ -3355,6 +3373,69 @@ struct ifconf64 {
 #define	SIOCGIFCONF64	_IOC_NEWTYPE(SIOCGIFCONF, struct ifconf64)
 #endif
 
+static void
+ifd_init(struct ifdrv *ifd, caddr_t data)
+{
+#ifdef COMPAT_FREEBSD32
+	struct ifdrv32 *ifd32;
+#endif
+#ifdef COMPAT_FREEBSD64
+	struct ifdrv64 *ifd64;
+#endif
+
+#ifdef COMPAT_FREEBSD32
+	if (SV_CURPROC_FLAG(SV_ILP32)) {
+		ifd32 = (struct ifdrv32 *)data;
+		memcpy(ifd->ifd_name, ifd32->ifd_name, sizeof(ifd->ifd_name));
+		ifd->ifd_cmd = ifd32->ifd_cmd;
+		ifd->ifd_len = ifd32->ifd_len;
+		ifd->ifd_data = __USER_CAP((void *)(uintptr_t)ifd32->ifd_data,
+		    ifd32->ifd_len);
+	}
+#endif
+#ifdef COMPAT_FREEBSD64
+	if (SV_CURPROC_FLAG(SV_CHERI | SV_LP64) == SV_LP64) {
+		ifd64 = (struct ifdrv64 *)data;
+		memcpy(ifd->ifd_name, ifd64->ifd_name, sizeof(ifd->ifd_name));
+		ifd->ifd_cmd = ifd64->ifd_cmd;
+		ifd->ifd_len = ifd64->ifd_len;
+		ifd->ifd_data = __USER_CAP((void *)(uintptr_t)ifd64->ifd_data,
+		    ifd64->ifd_len);
+	}
+#endif
+}
+
+static void
+ifd_update(struct ifdrv *ifd, caddr_t data)
+{
+#ifdef COMPAT_FREEBSD32
+	struct ifdrv32 *ifd32;
+#endif
+#ifdef COMPAT_FREEBSD64
+	struct ifdrv64 *ifd64;
+#endif
+
+	/*
+	 * SIOCGDRVSPEC is IOWR, but nothing actually touches the struct
+	 * so just assert that ifd_len (the only field it might make sense
+	 * to update) hasn't changed.
+	 */
+#ifdef COMPAT_FREEBSD32
+	if (SV_CURPROC_FLAG(SV_ILP32)) {
+		ifd32 = (struct ifdrv32 *)data;
+		KASSERT(ifd->ifd_len == ifd32->ifd_len, ("ifd_len was updated "
+		    "%u -> %lu", ifd32->ifd_len, ifd->ifd_len));
+	}
+#endif
+#ifdef COMPAT_FREEBSD64
+	if (SV_CURPROC_FLAG(SV_CHERI | SV_LP64) == SV_LP64) {
+		ifd64 = (struct ifdrv64 *)data;
+		KASSERT(ifd->ifd_len == ifd64->ifd_len, ("ifd_len was updated "
+		    "%lu -> %lu", ifd64->ifd_len, ifd->ifd_len));
+	}
+#endif
+}
+
 #if defined(COMPAT_FREEBSD32) || defined(COMPAT_FREEBSD64)
 static void
 ifmr_init(struct ifmediareq *ifmr, caddr_t data)
@@ -3439,6 +3520,7 @@ ifioctl(struct socket *so, u_long cmd, caddr_t data, struct thread *td)
 {
 #if defined(COMPAT_FREEBSD32) || defined(COMPAT_FREEBSD64)
 	caddr_t saved_data = NULL;
+	struct ifdrv ifd, *ifdp = NULL;
 	struct ifmediareq ifmr;
 	struct ifmediareq *ifmrp = NULL;
 #ifdef COMPAT_FREEBSD32
@@ -3501,6 +3583,21 @@ ifioctl(struct socket *so, u_long cmd, caddr_t data, struct thread *td)
 #if defined(COMPAT_FREEBSD32) || defined(COMPAT_FREEBSD64)
 	switch (cmd) {
 #ifdef COMPAT_FREEBSD32
+	case SIOCGDRVSPEC32:
+	case SIOCSDRVSPEC32:
+#endif
+#ifdef COMPAT_FREEBSD64
+	case SIOCGDRVSPEC64:
+	case SIOCSDRVSPEC64:
+#endif
+		ifdp = &ifd;
+		ifd_init(ifdp, data);
+		cmd = _IOC_NEWTYPE(cmd, struct ifdrv);
+		saved_data = data;
+		data = (caddr_t)ifdp;
+		break;
+
+#ifdef COMPAT_FREEBSD32
 	case SIOCGIFMEDIA32:
 	case SIOCGIFXMEDIA32:
 #endif
@@ -3513,6 +3610,7 @@ ifioctl(struct socket *so, u_long cmd, caddr_t data, struct thread *td)
 		cmd = _IOC_NEWTYPE(cmd, struct ifmediareq);
 		saved_data = data;
 		data = (caddr_t)ifmrp;
+		break;
 	}
 #endif	/* defined(COMPAT_FREEBSD32) || defined(COMPAT_FREEBSD64) */
 
@@ -3637,6 +3735,15 @@ out_noref:
 		     cmd));
 		data = saved_data;
 		ifmr_update(ifmrp, data);
+	}
+	if (ifdp != NULL) {
+		if (cmd == SIOCGDRVSPEC) {
+			data = saved_data;
+			ifd_update(ifdp, data);
+		} else {
+			KASSERT(cmd == SIOCSDRVSPEC, ("ifdp non-NULL, "
+			    "but cmd is not a known ifdrv req 0x%lx", cmd));
+		}
 	}
 #endif
 	CURVNET_RESTORE();
