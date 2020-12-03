@@ -1482,7 +1482,7 @@ static struct kproc_desc vnlru_kp = {
 };
 SYSINIT(vnlru, SI_SUB_KTHREAD_UPDATE, SI_ORDER_FIRST, kproc_start,
     &vnlru_kp);
- 
+
 /*
  * Routines having to do with the management of the vnode table.
  */
@@ -3441,10 +3441,23 @@ vholdnz(struct vnode *vp)
 }
 
 /*
- * Grab a hold count as long as the vnode is not getting freed.
+ * Grab a hold count unless the vnode is freed.
  *
  * Only use this routine if vfs smr is the only protection you have against
  * freeing the vnode.
+ *
+ * The code loops trying to add a hold count as long as the VHOLD_NO_SMR flag
+ * is not set.  After the flag is set the vnode becomes immutable to anyone but
+ * the thread which managed to set the flag.
+ *
+ * It may be tempting to replace the loop with:
+ * count = atomic_fetchadd_int(&vp->v_holdcnt, 1);
+ * if (count & VHOLD_NO_SMR) {
+ *     backpedal and error out;
+ * }
+ *
+ * However, while this is more performant, it hinders debugging by eliminating
+ * the previously mentioned invariant.
  */
 bool
 vhold_smr(struct vnode *vp)

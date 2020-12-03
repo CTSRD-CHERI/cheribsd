@@ -359,13 +359,19 @@ nfscl_reqstart(struct nfsrv_descript *nd, int procnum, struct nfsmount *nmp,
 	/*
 	 * Get the first mbuf for the request.
 	 */
-	if (nfs_bigrequest[procnum])
-		NFSMCLGET(mb, M_WAITOK);
-	else
-		NFSMGET(mb);
-	mb->m_len = 0;
-	nd->nd_mreq = nd->nd_mb = mb;
-	nd->nd_bpos = mtod(mb, char *);
+	if ((nd->nd_flag & ND_EXTPG) != 0) {
+		mb = mb_alloc_ext_plus_pages(PAGE_SIZE, M_WAITOK);
+		nd->nd_mreq = nd->nd_mb = mb;
+		nfsm_set(nd, 0);
+	} else {
+		if (nfs_bigrequest[procnum])
+			NFSMCLGET(mb, M_WAITOK);
+		else
+			NFSMGET(mb);
+		mb->m_len = 0;
+		nd->nd_mreq = nd->nd_mb = mb;
+		nd->nd_bpos = mtod(mb, char *);
+	}
 	
 	/*
 	 * And fill the first file handle into the request.
@@ -825,22 +831,38 @@ nfsm_strtom(struct nfsrv_descript *nd, const char *cp, int siz)
 	bytesize = NFSX_UNSIGNED + siz + rem;
 	m2 = nd->nd_mb;
 	cp2 = nd->nd_bpos;
-	left = M_TRAILINGSPACE(m2);
+	if ((nd->nd_flag & ND_EXTPG) != 0)
+		left = nd->nd_bextpgsiz;
+	else
+		left = M_TRAILINGSPACE(m2);
 
+	KASSERT(((m2->m_flags & (M_EXT | M_EXTPG)) ==
+	    (M_EXT | M_EXTPG) && (nd->nd_flag & ND_EXTPG) != 0) ||
+	    ((m2->m_flags & (M_EXT | M_EXTPG)) !=
+	    (M_EXT | M_EXTPG) && (nd->nd_flag & ND_EXTPG) == 0),
+	    ("nfsm_strtom: ext_pgs and non-ext_pgs mbufs mixed"));
 	/*
 	 * Loop around copying the string to mbuf(s).
 	 */
 	while (siz > 0) {
 		if (left == 0) {
-			if (siz > ncl_mbuf_mlen)
-				NFSMCLGET(m1, M_WAITOK);
-			else
-				NFSMGET(m1);
-			m1->m_len = 0;
-			m2->m_next = m1;
-			m2 = m1;
-			cp2 = mtod(m2, caddr_t);
-			left = M_TRAILINGSPACE(m2);
+			if ((nd->nd_flag & ND_EXTPG) != 0) {
+				m2 = nfsm_add_ext_pgs(m2,
+				    nd->nd_maxextsiz, &nd->nd_bextpg);
+				cp2 = (char *)(void *)PHYS_TO_DMAP(
+				    m2->m_epg_pa[nd->nd_bextpg]);
+				nd->nd_bextpgsiz = left = PAGE_SIZE;
+			} else {
+				if (siz > ncl_mbuf_mlen)
+					NFSMCLGET(m1, M_WAITOK);
+				else
+					NFSMGET(m1);
+				m1->m_len = 0;
+				cp2 = mtod(m1, char *);
+				left = M_TRAILINGSPACE(m1);
+				m2->m_next = m1;
+				m2 = m1;
+			}
 		}
 		if (left >= siz)
 			xfer = siz;
@@ -848,18 +870,31 @@ nfsm_strtom(struct nfsrv_descript *nd, const char *cp, int siz)
 			xfer = left;
 		NFSBCOPY(cp, cp2, xfer);
 		cp += xfer;
+		cp2 += xfer;
 		m2->m_len += xfer;
 		siz -= xfer;
 		left -= xfer;
+		if ((nd->nd_flag & ND_EXTPG) != 0) {
+			nd->nd_bextpgsiz -= xfer;
+			m2->m_epg_last_len += xfer;
+		}
 		if (siz == 0 && rem) {
 			if (left < rem)
 				panic("nfsm_strtom");
-			NFSBZERO(cp2 + xfer, rem);
+			NFSBZERO(cp2, rem);
 			m2->m_len += rem;
+			cp2 += rem;
+			if ((nd->nd_flag & ND_EXTPG) != 0) {
+				nd->nd_bextpgsiz -= rem;
+				m2->m_epg_last_len += rem;
+			}
 		}
 	}
 	nd->nd_mb = m2;
-	nd->nd_bpos = mtod(m2, caddr_t) + m2->m_len;
+	if ((nd->nd_flag & ND_EXTPG) != 0)
+		nd->nd_bpos = cp2;
+	else
+		nd->nd_bpos = mtod(m2, char *) + m2->m_len;
 	return (bytesize);
 }
 
@@ -4411,21 +4446,30 @@ nfsrvd_rephead(struct nfsrv_descript *nd)
 {
 	struct mbuf *mreq;
 
-	/*
-	 * If this is a big reply, use a cluster.
-	 */
-	if ((nd->nd_flag & ND_GSSINITREPLY) == 0 &&
-	    nfs_bigreply[nd->nd_procnum]) {
-		NFSMCLGET(mreq, M_WAITOK);
-		nd->nd_mreq = mreq;
-		nd->nd_mb = mreq;
+	if ((nd->nd_flag & ND_EXTPG) != 0) {
+		mreq = mb_alloc_ext_plus_pages(PAGE_SIZE, M_WAITOK);
+		nd->nd_mreq = nd->nd_mb = mreq;
+		nd->nd_bpos = (char *)(void *)
+		    PHYS_TO_DMAP(mreq->m_epg_pa[0]);
+		nd->nd_bextpg = 0;
+		nd->nd_bextpgsiz = PAGE_SIZE;
 	} else {
-		NFSMGET(mreq);
-		nd->nd_mreq = mreq;
-		nd->nd_mb = mreq;
+		/*
+		 * If this is a big reply, use a cluster.
+		 */
+		if ((nd->nd_flag & ND_GSSINITREPLY) == 0 &&
+		    nfs_bigreply[nd->nd_procnum]) {
+			NFSMCLGET(mreq, M_WAITOK);
+			nd->nd_mreq = mreq;
+			nd->nd_mb = mreq;
+		} else {
+			NFSMGET(mreq);
+			nd->nd_mreq = mreq;
+			nd->nd_mb = mreq;
+		}
+		nd->nd_bpos = mtod(mreq, char *);
+		mreq->m_len = 0;
 	}
-	nd->nd_bpos = mtod(mreq, caddr_t);
-	mreq->m_len = 0;
 
 	if ((nd->nd_flag & ND_GSSINITREPLY) == 0)
 		NFSM_BUILD(nd->nd_errp, int *, NFSX_UNSIGNED);
@@ -4807,9 +4851,71 @@ void
 nfsm_set(struct nfsrv_descript *nd, u_int offs)
 {
 	struct mbuf *m;
+	int rlen;
 
 	m = nd->nd_mb;
-	nd->nd_bpos = mtod(m, char *) + offs;
+	if ((m->m_flags & M_EXTPG) != 0) {
+		nd->nd_bextpg = 0;
+		while (offs > 0) {
+			if (nd->nd_bextpg == 0)
+				rlen = m_epg_pagelen(m, 0, m->m_epg_1st_off);
+			else
+				rlen = m_epg_pagelen(m, nd->nd_bextpg, 0);
+			if (offs <= rlen)
+				break;
+			offs -= rlen;
+			nd->nd_bextpg++;
+			if (nd->nd_bextpg == m->m_epg_npgs) {
+				printf("nfsm_set: build offs "
+				    "out of range\n");
+				nd->nd_bextpg--;
+				break;
+			}
+		}
+		nd->nd_bpos = (char *)(void *)
+		    PHYS_TO_DMAP(m->m_epg_pa[nd->nd_bextpg]);
+		if (nd->nd_bextpg == 0)
+			nd->nd_bpos += m->m_epg_1st_off;
+		if (offs > 0) {
+			nd->nd_bpos += offs;
+			nd->nd_bextpgsiz = rlen - offs;
+		} else if (nd->nd_bextpg == 0)
+			nd->nd_bextpgsiz = PAGE_SIZE - m->m_epg_1st_off;
+		else
+			nd->nd_bextpgsiz = PAGE_SIZE;
+	} else
+		nd->nd_bpos = mtod(m, char *) + offs;
+}
+
+/*
+ * Grow a ext_pgs mbuf list.  Either allocate another page or add
+ * an mbuf to the list.
+ */
+struct mbuf *
+nfsm_add_ext_pgs(struct mbuf *m, int maxextsiz, int *bextpg)
+{
+	struct mbuf *mp;
+	vm_page_t pg;
+
+	if ((m->m_epg_npgs + 1) * PAGE_SIZE > maxextsiz) {
+		mp = mb_alloc_ext_plus_pages(PAGE_SIZE, M_WAITOK);
+		*bextpg = 0;
+		m->m_next = mp;
+	} else {
+		do {
+			pg = vm_page_alloc(NULL, 0, VM_ALLOC_NORMAL |
+			    VM_ALLOC_NOOBJ | VM_ALLOC_NODUMP |
+			    VM_ALLOC_WIRED);
+			if (pg == NULL)
+				vm_wait(NULL);
+		} while (pg == NULL);
+		m->m_epg_pa[m->m_epg_npgs] = VM_PAGE_TO_PHYS(pg);
+		*bextpg = m->m_epg_npgs;
+		m->m_epg_npgs++;
+		m->m_epg_last_len = 0;
+		mp = m;
+	}
+	return (mp);
 }
 // CHERI CHANGES START
 // {

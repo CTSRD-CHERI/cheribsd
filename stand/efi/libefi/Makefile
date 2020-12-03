@@ -30,7 +30,8 @@ SRCS+=	time.c
 .elif ${MACHINE_CPUARCH} == "aarch64"
 # XXX: time_event.c does not work as expected on the FVP so use time.c instead.
 SRCS+=	time.c
-.elif ${MACHINE_CPUARCH} == "aarch64" || ${MACHINE_CPUARCH} == "arm"
+.elif ${MACHINE_CPUARCH} == "aarch64" || ${MACHINE_CPUARCH} == "arm" || \
+    ${MACHINE_CPUARCH} == "riscv"
 # Note: this appears to be broken on the FVP?
 SRCS+=	time_event.c
 .endif

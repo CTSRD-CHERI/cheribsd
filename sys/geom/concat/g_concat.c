@@ -845,8 +845,8 @@ g_concat_ctl_create(struct gctl_req *req, struct g_class *mp)
 			gctl_error(req, "No 'arg%u' argument.", no);
 			return;
 		}
-		if (strncmp(name, "/dev/", strlen("/dev/")) == 0)
-			name += strlen("/dev/");
+		if (strncmp(name, _PATH_DEV, strlen(_PATH_DEV)) == 0)
+			name += strlen(_PATH_DEV);
 		pp = g_provider_by_name(name);
 		if (pp == NULL) {
 			G_CONCAT_DEBUG(1, "Disk %s is invalid.", name);
@@ -871,8 +871,8 @@ g_concat_ctl_create(struct gctl_req *req, struct g_class *mp)
 			gctl_error(req, "No 'arg%d' argument.", no);
 			return;
 		}
-		if (strncmp(name, "/dev/", strlen("/dev/")) == 0)
-			name += strlen("/dev/");
+		if (strncmp(name, _PATH_DEV, strlen(_PATH_DEV)) == 0)
+			name += strlen(_PATH_DEV);
 		pp = g_provider_by_name(name);
 		KASSERT(pp != NULL, ("Provider %s disappear?!", name));
 		if (g_concat_add_disk(sc, pp, no - 1) != 0) {
@@ -896,6 +896,9 @@ g_concat_find_device(struct g_class *mp, const char *name)
 {
 	struct g_concat_softc *sc;
 	struct g_geom *gp;
+
+	if (strncmp(name, _PATH_DEV, strlen(_PATH_DEV)) == 0)
+		name += strlen(_PATH_DEV);
 
 	LIST_FOREACH(gp, &mp->geom, geom) {
 		sc = gp->softc;
