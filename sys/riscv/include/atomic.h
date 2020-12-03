@@ -106,17 +106,16 @@ atomic_fcmpset##SUFFIX##WIDTH(__volatile uint##WIDTH##_t *p,		\
 
 #ifdef __CHERI_PURE_CAPABILITY__
 /*
- * The purecap kernel can not use the generic sub-word atomics
- * as they break in the presence of subobject bounds.
+ * In a purecap kernel we cannot use the generic sub-word implementation.
  */
 ATOMIC_CMPSET(8);
 ATOMIC_FCMPSET(8);
 ATOMIC_CMPSET(16);
 ATOMIC_FCMPSET(16);
-#define	atomic_cmpset_8 atomic_cmpset_8
-#define	atomic_fcmpset_8 atomic_fcmpset_8
-#define	atomic_cmpset_16 atomic_cmpset_16
-#define	atomic_fcmpset_16 atomic_fcmpset_16
+#define	atomic_cmpset_8		atomic_cmpset_8
+#define	atomic_fcmpset_8		atomic_fcmpset_8
+#define	atomic_cmpset_16		atomic_cmpset_16
+#define	atomic_fcmpset_16		atomic_fcmpset_16
 #else
 ATOMIC_CMPSET_ACQ_REL(8);
 ATOMIC_FCMPSET_ACQ_REL(8);
