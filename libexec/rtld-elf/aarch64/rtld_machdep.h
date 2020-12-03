@@ -88,7 +88,7 @@ Elf_Addr reloc_jmpslot(Elf_Addr *where, Elf_Addr target,
 #define can_use_tight_pcc_bounds(obj) ((void)(obj), false)
 
 #define set_bounds_if_nonnull(ptr, size)	\
-	do { if (ptr) { ptr = cheri_setbounds_sametype(ptr, size); } } while(0)
+	do { if (ptr) { ptr = cheri_setbounds(ptr, size); } } while(0)
 
 #ifdef __CHERI_PURE_CAPABILITY__
 /* TODO: we should have a separate member for .text/rodata */

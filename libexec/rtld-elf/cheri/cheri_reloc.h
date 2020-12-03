@@ -144,16 +144,14 @@ process_r_cheri_capability(Obj_Entry *obj, Elf_Word r_symndx,
 	// https://github.com/CTSRD-CHERI/cheribsd/commit/c1920496c0086d9c5214fb0f491e4d6cdff3828e?
 	if (__predict_false(symval != NULL && cheri_getlen(symval) <= 0)) {
 		rtld_fdprintf(STDERR_FILENO,
-		    "Warning: created zero length capability for %s (in %s): "
-		    _CHERI_PRINTF_CAP_FMT "\n",
-		    symname(obj, r_symndx), obj->path,
-		    _CHERI_PRINTF_CAP_ARG(symval));
+		    "Warning: created zero length "
+		    "capability for %s (in %s): %-#lp\n",
+		    symname(obj, r_symndx), obj->path, symval);
 	}
 #endif
 	if (__predict_false(!cheri_gettag(symval) && !is_undef_weak)) {
-		_rtld_error("%s: constructed invalid capability for %s: "
-		    _CHERI_PRINTF_CAP_FMT, obj->path, symname(obj, r_symndx),
-		    _CHERI_PRINTF_CAP_ARG(symval));
+		_rtld_error("%s: constructed invalid capability for %s: %#lp",
+		    obj->path, symname(obj, r_symndx), symval);
 		return -1;
 	}
 	*((const void * __capability *)where) = symval;
