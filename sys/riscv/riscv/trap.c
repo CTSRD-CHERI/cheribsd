@@ -360,7 +360,7 @@ data_abort(struct trapframe *frame, int usermode)
 	error = vm_fault_trap(map, va, ftype, VM_FAULT_NORMAL, &sig, &ucode);
 	if (error != KERN_SUCCESS) {
 		if (usermode) {
-			call_trapsignal(td, sig, ucode, (uintcap_t)stval,
+			call_trapsignal(td, sig, ucode, stval,
 			    frame->tf_scause & EXCP_MASK, 0);
 		} else {
 			if (pcb->pcb_onfault != 0) {
@@ -397,7 +397,7 @@ do_trap_supervisor(struct trapframe *frame)
 	KASSERT((csr_read(sstatus) & (SSTATUS_SPP | SSTATUS_SIE)) ==
 	    SSTATUS_SPP, ("Came from S mode with interrupts enabled"));
 
-	exception = (frame->tf_scause & EXCP_MASK);
+	exception = frame->tf_scause & EXCP_MASK;
 	if (frame->tf_scause & EXCP_INTR) {
 		/* Interrupt */
 		riscv_cpu_intr(frame);
@@ -488,7 +488,7 @@ do_trap_user(struct trapframe *frame)
 	KASSERT((csr_read(sstatus) & (SSTATUS_SPP | SSTATUS_SIE)) == 0,
 	    ("Came from U mode with interrupts enabled"));
 
-	exception = (frame->tf_scause & EXCP_MASK);
+	exception = frame->tf_scause & EXCP_MASK;
 	if (frame->tf_scause & EXCP_INTR) {
 		/* Interrupt */
 		riscv_cpu_intr(frame);

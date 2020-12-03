@@ -141,6 +141,7 @@ FPFLAG(vnode_check_read);
 FPFLAG(vnode_check_write);
 FPFLAG(vnode_check_mmap);
 FPFLAG_RARE(vnode_check_poll);
+FPFLAG_RARE(vnode_check_rename_from);
 
 #undef FPFLAG
 #undef FPFLAG_RARE
@@ -429,6 +430,8 @@ struct mac_policy_fastpath_elem mac_policy_fastpath_array[] = {
 		.flag = &mac_vnode_check_mmap_fp_flag },
 	{ .offset = FPO(vnode_check_poll),
 		.flag = &mac_vnode_check_poll_fp_flag },
+	{ .offset = FPO(vnode_check_rename_from),
+		.flag = &mac_vnode_check_rename_from_fp_flag },
 };
 
 static void

@@ -34,11 +34,6 @@
 #ifndef _SYS_IOMMU_H_
 #define _SYS_IOMMU_H_
 
-#include <sys/queue.h>
-#include <sys/taskqueue.h>
-#include <sys/tree.h>
-#include <sys/types.h>
-
 /* Host or physical memory address, after translation. */
 typedef uint64_t iommu_haddr_t;
 /* Guest or bus address, before translation. */
@@ -47,6 +42,10 @@ typedef uint64_t iommu_gaddr_t;
 struct bus_dma_tag_common;
 struct iommu_map_entry;
 TAILQ_HEAD(iommu_map_entries_tailq, iommu_map_entry);
+
+RB_HEAD(iommu_gas_entries_tree, iommu_map_entry);
+RB_PROTOTYPE(iommu_gas_entries_tree, iommu_map_entry, rb_entry,
+    iommu_gas_cmp_entries);
 
 struct iommu_qi_genseq {
 	u_int gen;
@@ -91,6 +90,21 @@ struct iommu_unit {
 	struct task dmamap_load_task;
 	TAILQ_HEAD(, bus_dmamap_iommu) delayed_maps;
 	struct taskqueue *delayed_taskqueue;
+
+	/*
+	 * Bitmap of buses for which context must ignore slot:func,
+	 * duplicating the page table pointer into all context table
+	 * entries.  This is a client-controlled quirk to support some
+	 * NTBs.
+	 */
+	uint32_t buswide_ctxs[(PCI_BUSMAX + 1) / NBBY / sizeof(uint32_t)];
+};
+
+struct iommu_domain_map_ops {
+	int (*map)(struct iommu_domain *domain, iommu_gaddr_t base,
+	    iommu_gaddr_t size, vm_page_t *ma, uint64_t pflags, int flags);
+	int (*unmap)(struct iommu_domain *domain, iommu_gaddr_t base,
+	    iommu_gaddr_t size, int flags);
 };
 
 /*
@@ -102,11 +116,17 @@ struct iommu_unit {
 
 struct iommu_domain {
 	struct iommu_unit *iommu;	/* (c) */
+	const struct iommu_domain_map_ops *ops;
 	struct mtx lock;		/* (c) */
 	struct task unload_task;	/* (c) */
 	u_int entries_cnt;		/* (d) */
 	struct iommu_map_entries_tailq unload_entries; /* (d) Entries to
 							 unload */
+	struct iommu_gas_entries_tree rb_root; /* (d) */
+	iommu_gaddr_t end;		/* (c) Highest address + 1 in
+					   the guest AS */
+	struct iommu_map_entry *first_place, *last_place; /* (d) */
+	u_int flags;			/* (u) */
 };
 
 struct iommu_ctx {
@@ -123,6 +143,24 @@ struct iommu_ctx {
 #define	IOMMU_CTX_DISABLED	0x0002	/* Device is disabled, the
 					   ephemeral reference is kept
 					   to prevent context destruction */
+
+#define	IOMMU_DOMAIN_GAS_INITED		0x0001
+#define	IOMMU_DOMAIN_PGTBL_INITED	0x0002
+#define	IOMMU_DOMAIN_IDMAP		0x0010	/* Domain uses identity
+						   page table */
+#define	IOMMU_DOMAIN_RMRR		0x0020	/* Domain contains RMRR entry,
+						   cannot be turned off */
+
+/* Map flags */
+#define	IOMMU_MF_CANWAIT	0x0001
+#define	IOMMU_MF_CANSPLIT	0x0002
+#define	IOMMU_MF_RMRR		0x0004
+
+#define	IOMMU_PGF_WAITOK	0x0001
+#define	IOMMU_PGF_ZERO		0x0002
+#define	IOMMU_PGF_ALLOC		0x0004
+#define	IOMMU_PGF_NOALLOC	0x0008
+#define	IOMMU_PGF_OBJL		0x0010
 
 #define	IOMMU_LOCK(unit)		mtx_lock(&(unit)->lock)
 #define	IOMMU_UNLOCK(unit)		mtx_unlock(&(unit)->lock)
@@ -164,5 +202,32 @@ int iommu_map(struct iommu_domain *iodom,
     u_int eflags, u_int flags, vm_page_t *ma, struct iommu_map_entry **res);
 int iommu_map_region(struct iommu_domain *domain,
     struct iommu_map_entry *entry, u_int eflags, u_int flags, vm_page_t *ma);
+
+void iommu_gas_init_domain(struct iommu_domain *domain);
+void iommu_gas_fini_domain(struct iommu_domain *domain);
+struct iommu_map_entry *iommu_gas_alloc_entry(struct iommu_domain *domain,
+    u_int flags);
+void iommu_gas_free_entry(struct iommu_domain *domain,
+    struct iommu_map_entry *entry);
+void iommu_gas_free_space(struct iommu_domain *domain,
+    struct iommu_map_entry *entry);
+int iommu_gas_map(struct iommu_domain *domain,
+    const struct bus_dma_tag_common *common, iommu_gaddr_t size, int offset,
+    u_int eflags, u_int flags, vm_page_t *ma, struct iommu_map_entry **res);
+void iommu_gas_free_region(struct iommu_domain *domain,
+    struct iommu_map_entry *entry);
+int iommu_gas_map_region(struct iommu_domain *domain,
+    struct iommu_map_entry *entry, u_int eflags, u_int flags, vm_page_t *ma);
+int iommu_gas_reserve_region(struct iommu_domain *domain, iommu_gaddr_t start,
+    iommu_gaddr_t end);
+
+void iommu_set_buswide_ctx(struct iommu_unit *unit, u_int busno);
+bool iommu_is_buswide_ctx(struct iommu_unit *unit, u_int busno);
+
+bool bus_dma_iommu_set_buswide(device_t dev);
+int bus_dma_iommu_load_ident(bus_dma_tag_t dmat, bus_dmamap_t map,
+    vm_paddr_t start, vm_size_t length, int flags);
+
+SYSCTL_DECL(_hw_iommu);
 
 #endif /* !_SYS_IOMMU_H_ */
