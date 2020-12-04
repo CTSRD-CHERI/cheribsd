@@ -81,6 +81,11 @@ __FBSDID("$FreeBSD$");
 #include <machine/cheri_machdep.h>
 #endif
 
+#ifdef CHERI_CAPREVOKE
+#include <cheri/revoke.h>
+#include <vm/vm_cheri_revoke.h>
+#endif
+
 #include <ddb/ddb.h>
 #include <sys/kdb.h>
 
@@ -758,6 +763,59 @@ ptrace_clear_single_step(struct thread *td)
 	td->td_md.md_ss_addr = 0;
 	return 0;
 }
+
+#ifdef CHERI_CAPREVOKE
+static inline void
+cheri_revoke_reg(const struct vm_cheri_revoke_cookie *crc,
+    void * __capability *rp)
+{
+	CHERI_REVOKE_STATS_FOR(crst, crc);
+
+	uintcap_t r = (uintcap_t)*rp;
+	if (cheri_gettag(r)) {
+		CHERI_REVOKE_STATS_BUMP(crst, caps_found);
+		if (vm_cheri_revoke_test(crc, r)) {
+			*rp = (void * __capability)cheri_revoke_cap(r);
+			CHERI_REVOKE_STATS_BUMP(crst, caps_cleared);
+		}
+	}
+}
+
+void
+cheri_revoke_td_frame(struct thread *td,
+    const struct vm_cheri_revoke_cookie *crc)
+{
+	cheri_revoke_reg(crc, &td->td_frame->ddc);
+	cheri_revoke_reg(crc, &td->td_frame->c1);
+	cheri_revoke_reg(crc, &td->td_frame->c2);
+	cheri_revoke_reg(crc, &td->td_frame->c3);
+	cheri_revoke_reg(crc, &td->td_frame->c4);
+	cheri_revoke_reg(crc, &td->td_frame->c5);
+	cheri_revoke_reg(crc, &td->td_frame->c6);
+	cheri_revoke_reg(crc, &td->td_frame->c7);
+	cheri_revoke_reg(crc, &td->td_frame->c8);
+	cheri_revoke_reg(crc, &td->td_frame->c9);
+	cheri_revoke_reg(crc, &td->td_frame->c10);
+	cheri_revoke_reg(crc, &td->td_frame->csp);
+	cheri_revoke_reg(crc, &td->td_frame->c12);
+	cheri_revoke_reg(crc, &td->td_frame->c13);
+	cheri_revoke_reg(crc, &td->td_frame->c14);
+	cheri_revoke_reg(crc, &td->td_frame->c15);
+	cheri_revoke_reg(crc, &td->td_frame->c16);
+	cheri_revoke_reg(crc, &td->td_frame->c17);
+	cheri_revoke_reg(crc, &td->td_frame->c18);
+	cheri_revoke_reg(crc, &td->td_frame->c19);
+	cheri_revoke_reg(crc, &td->td_frame->c20);
+	cheri_revoke_reg(crc, &td->td_frame->c21);
+	cheri_revoke_reg(crc, &td->td_frame->c22);
+	cheri_revoke_reg(crc, &td->td_frame->c23);
+	cheri_revoke_reg(crc, &td->td_frame->c24);
+	cheri_revoke_reg(crc, &td->td_frame->c25);
+	cheri_revoke_reg(crc, &td->td_frame->idc);
+	cheri_revoke_reg(crc, (void * __capability *)&td->td_frame->pcc);
+}
+#endif
+
 // CHERI CHANGES START
 // {
 //   "updated": 20200706,
