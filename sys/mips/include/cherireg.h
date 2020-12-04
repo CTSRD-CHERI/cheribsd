@@ -98,6 +98,22 @@
 	(CHERI_PERM_EXECUTE | CHERI_PERMS_PROT2PERM_READ)
 
 /*
+ * Hardware defines a kind of tripartite taxonomy: memory, type, and CID.
+ * They're all squished together in the permission bits, so define masks
+ * that give us a kind of "kind" for capabilities.  A capability may belong
+ * to zero, one, or more than one of these.
+ */
+
+#define CHERI_PERMS_HWALL_MEMORY                                      \
+	(CHERI_PERM_EXECUTE | CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP | \
+	    CHERI_PERM_STORE | CHERI_PERM_STORE_CAP |                 \
+	    CHERI_PERM_STORE_LOCAL_CAP | CHERI_PERM_CCALL)
+
+#define CHERI_PERMS_HWALL_OTYPE	(CHERI_PERM_SEAL | CHERI_PERM_UNSEAL)
+
+// TODO #define CHERI_PERMS_HWALL_CID	(CHERI_PERM_SETCID)
+
+/*
  * Basic userspace permission mask; CHERI_PERM_EXECUTE will be added for
  * executable capabilities ($pcc); CHERI_PERM_STORE, CHERI_PERM_STORE_CAP,
  * and CHERI_PERM_STORE_LOCAL_CAP will be added for data permissions ($ddc).

@@ -19,6 +19,8 @@ mips/mips/busdma_machdep.c		standard
 mips/mips/cache.c			standard
 mips/mips/cache_mipsNN.c		standard
 mips/mips/cheri_revoke_machdep.c	optional	cpu_cheri cheri_caprevoke
+mips/mips/cheri_revoke_machdep_tests.c	optional	cpu_cheri cheri_caprevoke \
+	compile-with "${NORMAL_C} -fomit-frame-pointer"
 mips/mips/cpu.c				standard
 mips/mips/db_disasm.c			optional	ddb
 mips/mips/db_interface.c		optional	ddb
