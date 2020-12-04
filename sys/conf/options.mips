@@ -117,6 +117,14 @@ FDT_DTB_STATIC_ONLY		opt_platform.h
 #
 
 #
+# Capability revocation
+#
+CHERI_CAPREVOKE			opt_global.h
+CHERI_CAPREVOKE_CLOADTAGS	opt_global.h
+CHERI_CAPREVOKE_STATS		opt_global.h
+CHERI_CAPREVOKE_CLEARTAGS	opt_global.h
+
+#
 # Options that control the NetFPGA-10G Embedded CPU Ethernet Core.
 #
 NF10BMAC_64BIT			opt_netfpga.h
