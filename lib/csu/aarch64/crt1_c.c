@@ -87,10 +87,6 @@ __start(int argc, char *argv[], char *env[], void (*cleanup)(void))
 			strp++;
 		auxp = (Elf_Auxinfo *)(strp + 1);
 
-		/*
-		 * Digest the auxiliary vector to get information
-		 * needed to init globals.
-		 */
 		for (; auxp->a_type != AT_NULL; auxp++) {
 			if (auxp->a_type == AT_PHDR) {
 				phdr = auxp->a_un.a_ptr;
