@@ -84,9 +84,12 @@
 #include <sys/sysent.h>
 #include <sys/shm.h>
 
-#include <cheri/cheric.h>
 #if __has_feature(capabilities)
 #include <cheri/cheri.h>
+#endif
+#include <cheri/cheric.h>
+#ifdef CHERI_CAPREVOKE
+#include <cheri/revoke.h>
 #endif
 
 #include <vm/vm.h>
@@ -102,9 +105,8 @@
 #include <vm/vnode_pager.h>
 #include <vm/swap_pager.h>
 #include <vm/uma.h>
-
 #ifdef CHERI_CAPREVOKE
-#include <cheri/revoke.h>
+#include <vm/vm_cheri_revoke.h>
 #endif
 
 /*
@@ -3102,6 +3104,27 @@ again:
 	 */
 	vm_map_wait_busy(map);
 
+#ifdef CHERI_CAPREVOKE
+	if (cheri_revoke_st_get_state(map->vm_cheri_revoke_st) !=
+	    CHERI_REVOKE_ST_NONE) {
+		if (map == &curthread->td_proc->p_vmspace->vm_map) {
+			/* Push our revocation along */
+			vm_map_unlock(map);
+
+			// XXX!
+
+			goto again;
+		} else {
+			/* It's hard to push on another thread; wait */
+			rv = cv_wait_sig(&map->vm_cheri_revoke_cv, &map->lock);
+			if (rv != 0) {
+				return rv;
+			}
+			goto again;
+		}
+	}
+#endif
+
 	VM_MAP_RANGE_CHECK(map, start, end);
 
 	if (!vm_map_lookup_entry(map, start, &first_entry))
@@ -4614,6 +4637,17 @@ vm_map_clear(vm_map_t map)
 	int result;
 
 	vm_map_lock(map);
+#ifdef CHERI_CAPREVOKE
+	/*
+	 * vm_map_clear() is the ultimate revocation (no mappings means
+	 * no capabilities).  Clear revocation state.
+	 */
+	map->vm_cheri_revoke_st = CHERI_REVOKE_ST_NONE;
+#ifdef CHERI_CAPREVOKE_STATS
+	memset(&map->vm_cheri_revoke_stats, 0,
+	    sizeof(map->vm_cheri_revoke_stats));
+#endif
+#endif
 	result = vm_map_delete(map, vm_map_min(map), vm_map_max(map), false);
 	vm_map_unlock(map);
 
