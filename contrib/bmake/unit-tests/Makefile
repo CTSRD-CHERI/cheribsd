@@ -259,7 +259,8 @@ TESTS+=		sh-single-line
 TESTS+=		shell-csh
 TESTS+=		shell-custom
 .if exists(/bin/ksh)
-TESTS+=		shell-ksh
+# Seems broken on macOS
+#TESTS+=		shell-ksh
 .endif
 TESTS+=		shell-sh
 TESTS+=		suff-add-later

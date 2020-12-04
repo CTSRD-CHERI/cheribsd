@@ -301,14 +301,14 @@ TESTS_SRCS= \
 
 # Deterministic failures:
 # Fails with `test_read_disk_directory_traversals.c:1094: File at has atime 886622, 1443306049 seconds ago`
-BROKEN_TESTS+=			test_read_disk_directory_traversals
+#BROKEN_TESTS+=			test_read_disk_directory_traversals
 
 # Non-deterministic failures:
 # (Times out?) [and] crashes
-BROKEN_TESTS+=			test_fuzz_rar
+#BROKEN_TESTS+=			test_fuzz_rar
 
 # https://bugs.freebsd.org/240683
-BROKEN_TESTS+=			test_write_filter_zstd
+#BROKEN_TESTS+=			test_write_filter_zstd
 
 # Build the test program.
 SRCS.libarchive_test=		\
@@ -324,10 +324,13 @@ SRCS.libarchive_test+=	test_main.c	\
 
 # list.h is just a list of all tests, as indicated by DEFINE_TEST macro lines
 list.h: ${TESTS_SRCS} Makefile
-	@(cd ${_LIBARCHIVEDIR}/libarchive/test && \
-	grep -E -h ^DEFINE_TEST ${.ALLSRC:N*Makefile} | \
-	    egrep -v '${BROKEN_TESTS:tW:C/ /|/g}') > ${.TARGET}.tmp
+	(cd ${_LIBARCHIVEDIR}/libarchive/test && \
+	grep -E -h ^DEFINE_TEST ${.ALLSRC:N*Makefile}) > ${.TARGET}.tmp
+.if !empty(BROKEN_TESTS)
+	egrep -v '${BROKEN_TESTS:tW:C/ /|/g}' ${.TARGET}.tmp > ${.TARGET}
+.else
 	@mv ${.TARGET}.tmp ${.TARGET}
+.endif
 
 CLEANTESTS+=	list.h list.h.tmp
 ${PACKAGE}FILES+=	README
