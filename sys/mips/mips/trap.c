@@ -91,6 +91,10 @@ __FBSDID("$FreeBSD$");
 #include <cheri/cheri.h>
 #include <cheri/cheric.h>
 #include <machine/cheri_machdep.h>
+#include <machine/cherireg.h>
+#ifdef CHERI_CAPREVOKE
+#include <vm/vm_cheri_revoke.h>
+#endif
 #endif
 
 #ifdef DDB
@@ -699,15 +703,13 @@ cpu_fetch_syscall_args(struct thread *td)
  * have set *ftype to the appropriate fault code to pass to the VM subsystem for
  * it to try hiding the fault.
  *
- * At the moment, there's just the one, CHERI_EXCCODE_TLBSTORE, which we hook
- * to emulate capdirty tracking.  If the PTE for badvaddr permits transparent
- * upgrade to capdirty, then we do so and squash the rest of the fault handling;
- * otherwise, we indicate that this is a write fault that also needs to set a
- * capability tag.  This logic is identical to the TLB_MOD paths through trap(),
- * which call pmap_emulate_modified().
+ * CHERI_EXCCODE_TLBSTORE is hooked to emulate capdirty tracking.  If the PTE
+ * for badvaddr permits transparent upgrade to capdirty, then we do so and
+ * squash the rest of the fault handling; otherwise, we indicate that this is a
+ * write fault that also needs to set a capability tag.  This logic is identical
+ * to the TLB_MOD paths through trap(), which call pmap_emulate_modified().
  *
- * In the future, this function will also hook capability load generation faults
- * and call into the revoker to check all the capabilities on the target page.
+ * CHERI_EXCCODE_CAPLOADGEN is hooked for load-side revocation.
  */
 static inline bool
 c2e_fixup_fault(struct trapframe *trapframe, bool is_kernel,
@@ -718,6 +720,28 @@ c2e_fixup_fault(struct trapframe *trapframe, bool is_kernel,
 
 	cause &= CHERI_CAPCAUSE_EXCCODE_MASK;
 	cause >>= CHERI_CAPCAUSE_EXCCODE_SHIFT;
+
+	if (cause == CHERI_EXCCODE_CAPLOADGEN) {
+		/* This page is from the wrong revocation epoch; clean it up. */
+
+		if (KERNLAND(va)) {
+			panic("kernel VA caploadgen fault %lx", va);
+		}
+
+#ifdef CHERI_CAPREVOKE
+		switch(vm_cheri_revoke_fault_visit(uvms, va)) {
+		case VM_CHERI_REVOKE_FAULT_RESOLVED:
+			return (true);
+		case VM_CHERI_REVOKE_FAULT_UNRESOLVED:
+			return (false);
+		case VM_CHERI_REVOKE_FAULT_CAPSTORE:
+			*ftype = VM_PROT_WRITE | VM_PROT_WRITE_CAP;
+			return (false);
+		}
+#else
+		panic("user VA caploadgen fault on non-revoke kernel %lx", va);
+#endif
+	}
 
 	if (cause == CHERI_EXCCODE_TLBSTORE) {
 		*ftype = VM_PROT_WRITE | VM_PROT_WRITE_CAP;
