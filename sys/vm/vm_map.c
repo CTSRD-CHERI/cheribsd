@@ -2909,8 +2909,28 @@ vm_map_pmap_enter(vm_map_t map, vm_offset_t addr, vm_prot_t prot,
 	vm_page_t p, p_start;
 	vm_pindex_t mask, psize, threshold, tmpidx;
 
+#ifdef CHERI_CAPREVOKE
+	/*
+	 * If we're trying to insert pages during a load-side revocation scan,
+	 * we should be having the revoker visit each before exposing them to
+	 * userland.  However, this raises a number of challenges, and this
+	 * method is just an optimization, so we nop it out right now.
+	 *
+	 * XXX CAPREVOKE This could be much better in just about every way
+	 */
+	if (cheri_revoke_st_is_loadside(map->vm_cheri_revoke_st)) {
+		return;
+	}
+#endif
+
 	if ((prot & (VM_PROT_READ | VM_PROT_EXECUTE)) == 0 || object == NULL)
 		return;
+#ifdef CHERI_CAPREVOKE
+	/* This is pretty heavy-handed, but it's good enough for now */
+	if (cheri_revoke_st_state(map->vm_cheri_revoke_st) !=
+	    CHERI_REVOKE_ST_NONE)
+		return;
+#endif
 	if (object->type == OBJT_DEVICE || object->type == OBJT_SG) {
 		VM_OBJECT_WLOCK(object);
 		if (object->type == OBJT_DEVICE || object->type == OBJT_SG) {
@@ -3035,6 +3055,27 @@ again:
 	 * update the protection on the map entry in between faults.
 	 */
 	vm_map_wait_busy(map);
+
+#ifdef CHERI_CAPREVOKE
+	if (cheri_revoke_st_state(map->vm_cheri_revoke_st) !=
+	    CHERI_REVOKE_ST_NONE) {
+		if (map == &curthread->td_proc->p_vmspace->vm_map) {
+			/* Push our revocation along */
+			vm_map_unlock(map);
+
+			// XXX!
+
+			goto again;
+		} else {
+			/* It's hard to push on another thread; wait */
+			rv = cv_wait_sig(&map->vm_cheri_revoke_cv, &map->lock);
+			if (rv != 0) {
+				return rv;
+			}
+			goto again;
+		}
+	}
+#endif
 
 	VM_MAP_RANGE_CHECK(map, start, end);
 
@@ -4775,12 +4816,15 @@ vmspace_fork(struct vmspace *vm1, vm_ooffset_t *fork_charge)
 	/*
 	 * Revocation holds the map busy, so if we're here, there isn't a state
 	 * transition in progress (but an epoch might be open).
+	 *
+	 * XXX NWF We should probably go around again to force the epoch closed.
 	 */
 	vm2->vm_map.vm_cheri_revoke_st = vm1->vm_map.vm_cheri_revoke_st;
 	vm2->vm_map.vm_cheri_revoke_sh = vm1->vm_map.vm_cheri_revoke_sh;
 	vm2->vm_map.vm_cheri_revoke_shva = vm1->vm_map.vm_cheri_revoke_shva;
 #endif
 
+	/* XXX NWF This should copy across the CLG? */
 	error = pmap_vmspace_copy(new_map->pmap, old_map->pmap);
 	if (error != 0) {
 		sx_xunlock(&old_map->lock);
