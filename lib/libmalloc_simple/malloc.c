@@ -46,7 +46,7 @@ static char *rcsid = "$FreeBSD$";
 
 #include <sys/param.h>
 #ifdef CAPREVOKE
-#include <sys/caprevoke.h>
+#include <cheri/revoke.h>
 #include <sys/stdatomic.h>
 #endif
 #include <sys/types.h>
@@ -123,8 +123,8 @@ _Static_assert(NBUCKETS < FIRST_BUCKET_SIZE,
 static	union overhead *quarantine_bufs[NBUCKETS];
 static	union overhead *painted_bufs[NBUCKETS];
 static	size_t quarantine_size, painted_size;
-static	volatile const struct caprevoke_info *cri;
-static	caprevoke_epoch painted_epoch;
+static	volatile const struct cheri_revoke_info *cri;
+static	cheri_revoke_epoch painted_epoch;
 #endif
 
 static	size_t pagesz;			/* page size */
@@ -195,15 +195,15 @@ try_revoke(int target_bucket)
 	 * avoid the extra syscall in the common case.
 	 */
 	if (painted_size > 0 &&
-	    caprevoke_epoch_clears(cri->epoch_dequeue, painted_epoch))
+	    cheri_revoke_epoch_clears(cri->epochs.dequeue, painted_epoch))
 		free_painted();
 
 	if (quarantine_size < MAX_QUARANTINE && painted_size < MAX_PAINTED)
 		return;
 
 	if (cri == NULL) {
-		error = caprevoke_shadow(CAPREVOKE_SHADOW_INFO_STRUCT, NULL,
-		    __DECONST(void **, &cri));
+		error = cheri_revoke_shadow(CHERI_REVOKE_SHADOW_INFO_STRUCT,
+		    NULL, __DECONST(void **, &cri));
 		assert(error == 0);
 	}
 
@@ -221,7 +221,7 @@ try_revoke(int target_bucket)
 	painted_size += quarantine_size;
 	quarantine_size = 0;
 	atomic_thread_fence(memory_order_acq_rel);
-	painted_epoch = cri->epoch_enqueue;
+	painted_epoch = cri->epochs.enqueue;
 
 	/*
 	 * Don't force revocation unless we've exceeded MAX_PAINTED and
@@ -231,9 +231,9 @@ try_revoke(int target_bucket)
 	if (painted_size < MAX_PAINTED || painted_bufs[target_bucket] == NULL)
 		return;
 
-	while (!caprevoke_epoch_clears(cri->epoch_dequeue, painted_epoch)) {
-		struct caprevoke_stats crst;
-		error = caprevoke(CAPREVOKE_LAST_PASS, painted_epoch, &crst);
+	while (!cheri_revoke_epoch_clears(cri->epochs.dequeue, painted_epoch)) {
+		error = cheri_revoke(CHERI_REVOKE_LAST_PASS, painted_epoch,
+		    NULL);
 		assert(error == 0);
 	}
 
