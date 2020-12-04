@@ -104,6 +104,10 @@ __FBSDID("$FreeBSD$");
 #if __has_feature(capabilities)
 #include <machine/cheri.h>
 #include <cheri/cheric.h>
+#ifdef CHERI_CAPREVOKE
+#include <cheri/revoke.h>
+#include <vm/vm_cheri_revoke.h>
+#endif
 #endif
 
 #ifdef FDT
@@ -1236,6 +1240,63 @@ bzero(void *buf, size_t len)
 	while(len-- > 0)
 		*p++ = 0;
 }
+
+#ifdef CHERI_CAPREVOKE
+void
+cheri_revoke_td_frame(struct thread *td,
+    const struct vm_cheri_revoke_cookie *crc)
+{
+	CHERI_REVOKE_STATS_FOR(crst, crc);
+
+#define CHERI_REVOKE_REG(r) \
+	do { if (cheri_gettag(r)) { \
+		CHERI_REVOKE_STATS_BUMP(crst, caps_found); \
+		if (vm_cheri_revoke_test(crc, r)) { \
+			r = cheri_revoke_cap(r); \
+			CHERI_REVOKE_STATS_BUMP(crst, caps_cleared); \
+		} \
+	    }} while(0)
+
+	CHERI_REVOKE_REG(td->td_frame->tf_ra);
+	CHERI_REVOKE_REG(td->td_frame->tf_sp);
+	CHERI_REVOKE_REG(td->td_frame->tf_gp);
+	CHERI_REVOKE_REG(td->td_frame->tf_tp);
+	CHERI_REVOKE_REG(td->td_frame->tf_t[0]);
+	CHERI_REVOKE_REG(td->td_frame->tf_t[1]);
+	CHERI_REVOKE_REG(td->td_frame->tf_t[2]);
+	CHERI_REVOKE_REG(td->td_frame->tf_t[3]);
+	CHERI_REVOKE_REG(td->td_frame->tf_t[4]);
+	CHERI_REVOKE_REG(td->td_frame->tf_t[5]);
+	CHERI_REVOKE_REG(td->td_frame->tf_t[6]);
+	CHERI_REVOKE_REG(td->td_frame->tf_s[0]);
+	CHERI_REVOKE_REG(td->td_frame->tf_s[1]);
+	CHERI_REVOKE_REG(td->td_frame->tf_s[2]);
+	CHERI_REVOKE_REG(td->td_frame->tf_s[3]);
+	CHERI_REVOKE_REG(td->td_frame->tf_s[4]);
+	CHERI_REVOKE_REG(td->td_frame->tf_s[5]);
+	CHERI_REVOKE_REG(td->td_frame->tf_s[6]);
+	CHERI_REVOKE_REG(td->td_frame->tf_s[7]);
+	CHERI_REVOKE_REG(td->td_frame->tf_s[8]);
+	CHERI_REVOKE_REG(td->td_frame->tf_s[9]);
+	CHERI_REVOKE_REG(td->td_frame->tf_s[10]);
+	CHERI_REVOKE_REG(td->td_frame->tf_s[11]);
+	CHERI_REVOKE_REG(td->td_frame->tf_a[0]);
+	CHERI_REVOKE_REG(td->td_frame->tf_a[1]);
+	CHERI_REVOKE_REG(td->td_frame->tf_a[2]);
+	CHERI_REVOKE_REG(td->td_frame->tf_a[3]);
+	CHERI_REVOKE_REG(td->td_frame->tf_a[4]);
+	CHERI_REVOKE_REG(td->td_frame->tf_a[5]);
+	CHERI_REVOKE_REG(td->td_frame->tf_a[6]);
+	CHERI_REVOKE_REG(td->td_frame->tf_a[7]);
+	CHERI_REVOKE_REG(td->td_frame->tf_sepc); /* This could be real exciting! */
+	CHERI_REVOKE_REG(td->td_frame->tf_ddc);
+
+#undef CHERI_REVOKE_REG
+
+	return;
+}
+#endif
+
 // CHERI CHANGES START
 // {
 //   "updated": 20200803,
