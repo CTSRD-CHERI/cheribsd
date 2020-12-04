@@ -2398,11 +2398,9 @@ _crunchide=	usr.sbin/crunch/crunchide
 _bootstrap_tools_links+=crunchide
 .endif
 
-.if 1
-# TODO: enable version check once patch has been upstreamed
 # 1300115: Higher WARNS fixes
-#.if ${BOOTSTRAPPING} < 1202502 || \
-#	(${BOOTSTRAPPING} > 1300000 && ${BOOTSTRAPPING} < 1300115)
+.if ${BOOTSTRAPPING} < 1202502 || \
+	(${BOOTSTRAPPING} > 1300000 && ${BOOTSTRAPPING} < 1300131)
 _crunchgen=	usr.sbin/crunch/crunchgen
 .else
 _bootstrap_tools_links+=crunchgen
