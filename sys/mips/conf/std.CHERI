@@ -21,3 +21,8 @@ device		tuntap
 options		HWPMC_HOOKS
 device		hwpmc
 device		hwpmc_beri
+
+# revocation
+options		CHERI_CAPREVOKE
+options		CHERI_CAPREVOKE_CLOADTAGS
+options		CHERI_CAPREVOKE_STATS
