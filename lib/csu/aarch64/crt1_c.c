@@ -83,9 +83,9 @@ __start(int argc, char *argv[], char *env[], void (*cleanup)(void))
 		long phnum = 0;
 
 		strp = env;
-		while (*strp == NULL)
-			strp++;
-		auxp = (Elf_Auxinfo *)(strp + 1);
+		while (*strp++ != NULL)
+			;
+		auxp = (Elf_Auxinfo *)strp;
 
 		for (; auxp->a_type != AT_NULL; auxp++) {
 			if (auxp->a_type == AT_PHDR) {
