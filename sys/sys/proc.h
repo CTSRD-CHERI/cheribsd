@@ -1163,6 +1163,11 @@ void	thread_unlink(struct thread *td);
 void	thread_unsuspend(struct proc *p);
 void	thread_wait(struct proc *p);
 
+#ifdef CHERI_CAPREVOKE
+struct vm_caprevoke_cookie;
+void caprevoke_td_frame(struct thread *td, const struct vm_caprevoke_cookie *);
+#endif
+
 void	stop_all_proc(void);
 void	resume_all_proc(void);
 
