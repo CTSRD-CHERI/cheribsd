@@ -1,0 +1,4 @@
+include "std.CHERI-CAPREVOKE"
+include "std.NODEBUG"
+
+nooptions CHERI_CAPREVOKE_STATS

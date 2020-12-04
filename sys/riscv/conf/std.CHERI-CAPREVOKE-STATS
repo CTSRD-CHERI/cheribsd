@@ -1,0 +1,2 @@
+include "std.CHERI-CAPREVOKE"
+include "std.NODEBUG"
