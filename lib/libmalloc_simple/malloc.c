@@ -232,8 +232,8 @@ try_revoke(int target_bucket)
 		return;
 
 	while (!caprevoke_epoch_clears(cri->epoch_dequeue, painted_epoch)) {
-		struct caprevoke_stats crst;
-		error = caprevoke(CAPREVOKE_LAST_PASS, painted_epoch, &crst);
+		error = caprevoke(CAPREVOKE_LAST_PASS|CAPREVOKE_LOAD_SIDE,
+		    painted_epoch, NULL);
 		assert(error == 0);
 	}
 
