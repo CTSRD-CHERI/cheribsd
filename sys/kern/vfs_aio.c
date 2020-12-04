@@ -74,6 +74,12 @@ __FBSDID("$FreeBSD$");
 #include <vm/uma.h>
 #include <sys/aio.h>
 
+#ifdef CHERI_CAPREVOKE
+#include <cheri/cheric.h>
+#include <cheri/revoke.h>
+#include <vm/vm_cheri_revoke.h>
+#endif
+
 /*
  * Counter for allocating reference ids to new jobs.  Wrapped to 1 on
  * overflow. (XXX will be removed soon.)
@@ -231,6 +237,7 @@ typedef struct oaiocb {
 #define	KAIOCB_CHECKSYNC	0x08
 #define	KAIOCB_CLEARED		0x10
 #define	KAIOCB_FINISHED		0x20
+#define	KAIOCB_CAPREV_EPOCH	0x40
 
 /*
  * AIO process info
@@ -284,8 +291,9 @@ struct kaioinfo {
 #define AIO_LOCK_ASSERT(ki, f)	mtx_assert(&(ki)->kaio_mtx, (f))
 #define AIO_MTX(ki)		(&(ki)->kaio_mtx)
 
-#define KAIO_RUNDOWN	0x1	/* process is being run down */
-#define KAIO_WAKEUP	0x2	/* wakeup process when AIO completes */
+#define KAIO_RUNDOWN		0x1	/* process is being run down */
+#define KAIO_WAKEUP		0x2	/* wakeup process when AIO completes */
+#define KAIO_CAPREV_EPOCH	0x4
 
 /*
  * Operations used to interact with userland aio control blocks.
@@ -1749,6 +1757,12 @@ no_kqueue:
 
 	AIO_LOCK(ki);
 	job->jobflags &= ~KAIOCB_QUEUEING;
+	/* Mark as needing revocation in the next pass */
+	if ((ki->kaio_flags & KAIO_CAPREV_EPOCH) == 0) {
+		job->jobflags |= KAIOCB_CAPREV_EPOCH;
+	} else {
+		job->jobflags &= ~KAIOCB_CAPREV_EPOCH;
+	}
 	TAILQ_INSERT_TAIL(&ki->kaio_all, job, allist);
 	ki->kaio_count++;
 	if (lj)
@@ -2780,6 +2794,115 @@ filt_lio(struct knote *kn, long hint)
 
 	return (lj->lioj_flags & LIOJ_KEVENT_POSTED);
 }
+
+#ifdef CHERI_CAPREVOKE
+
+/*
+ * XXX Does not yet count caps into stats
+ */
+static void
+aio_cheri_revoke_one(struct proc *p,
+    const struct vm_cheri_revoke_cookie *crc, struct kaiocb *job)
+{
+	uintcap_t sival, ujob, aiobuf, kerninfo, spare2;
+	bool revsival, revujob, revaiobuf, revkerninfo, revspare2;
+	struct kaioinfo *ki = p->p_aioinfo;
+
+	/* Under the lock, read all the caps we might want to revoke */
+	sival = (uintcap_t)job->uaiocb.aio_sigevent.sigev_value.sival_ptr;
+	ujob = (uintcap_t)job->ujob;
+	aiobuf = (uintcap_t)job->uaiocb.aio_buf;
+	kerninfo = (uintcap_t)job->uaiocb._aiocb_private.kernelinfo;
+	spare2 = (uintcap_t)job->uaiocb.__spare2__;
+
+	refcount_acquire(&job->refcount);
+
+	AIO_UNLOCK(ki);
+
+	revsival    = vm_cheri_revoke_test(crc, sival);
+	revujob     = vm_cheri_revoke_test(crc, ujob);
+	revaiobuf   = vm_cheri_revoke_test(crc, aiobuf);
+	revkerninfo = vm_cheri_revoke_test(crc, kerninfo);
+	revspare2   = vm_cheri_revoke_test(crc, spare2);
+
+	AIO_LOCK(ki);
+
+	/* Look to see if anything changed while we didn't hold the lock */
+	if ((sival !=
+		(uintcap_t)job->uaiocb.aio_sigevent.sigev_value.sival_ptr) ||
+	    (ujob != (uintcap_t)job->ujob) ||
+	    (aiobuf != (uintcap_t)job->uaiocb.aio_buf) ||
+	    (kerninfo != (uintcap_t)job->uaiocb._aiocb_private.kernelinfo) ||
+	    (spare2 != (uintcap_t)job->uaiocb.__spare2__))
+		return;
+
+	if (revsival)
+		job->uaiocb.aio_sigevent.sigev_value.sival_ptr =
+		    (void * __capability)cheri_revoke_cap(sival);
+
+	if (revujob || revaiobuf || revkerninfo || revspare2) {
+		aio_cancel_job(p, ki, job);
+		ki->kaio_flags |= KAIO_WAKEUP;
+		msleep(&p->p_aioinfo, AIO_MTX(ki), PRIBIO, "aiocherirevoke",
+		    hz);
+	}
+
+	if (revujob)
+		job->ujob = (void * __capability)cheri_revoke_cap(ujob);
+
+	if (revaiobuf)
+		job->uaiocb.aio_buf =
+		    (void * __capability)cheri_revoke_cap(aiobuf);
+
+	if (revkerninfo)
+		job->uaiocb._aiocb_private.kernelinfo =
+		    (void * __capability)cheri_revoke_cap(kerninfo);
+
+	if (revspare2)
+		job->uaiocb.__spare2__ =
+		    (void * __capability)cheri_revoke_cap(spare2);
+
+	job->jobflags ^= KAIOCB_CAPREV_EPOCH;
+
+	/* Drop ref or free */
+	aiocb_free_kaiocb(job);
+}
+
+void
+aio_cheri_revoke(struct proc *p, const struct vm_cheri_revoke_cookie *crc)
+{
+	struct kaioinfo *ki;
+	struct kaiocb *job, *jobn;
+
+	ki = p->p_aioinfo;
+	if (ki == NULL)
+		return;
+
+	AIO_LOCK(ki);
+
+	/* We should not get here if this process is exiting or execing */
+	KASSERT((ki->kaio_flags & KAIO_RUNDOWN) == 0,
+	    ("aio_cheri_revoke while RUNDOWN"));
+
+restart:
+	/* Visit all pending jobs. */
+	TAILQ_FOREACH_SAFE (job, &ki->kaio_all, allist, jobn) {
+
+		if (!(job->jobflags & KAIOCB_CAPREV_EPOCH) ==
+		    !(ki->kaio_flags & KAIO_CAPREV_EPOCH)) {
+			continue;
+		}
+
+		aio_cheri_revoke_one(p, crc, job);
+		goto restart;
+	}
+
+	ki->kaio_flags ^= KAIO_CAPREV_EPOCH;
+
+	AIO_UNLOCK(ki);
+}
+
+#endif
 
 #ifdef COMPAT_FREEBSD32
 #include <sys/mount.h>

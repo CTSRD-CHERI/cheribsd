@@ -210,6 +210,11 @@ void	aio_schedule(struct kaiocb *job, aio_handle_fn_t *func);
 bool	aio_set_cancel_function(struct kaiocb *job, aio_cancel_fn_t *func);
 void	aio_switch_vmspace(struct kaiocb *job);
 
+#ifdef CHERI_CAPREVOKE
+struct vm_cheri_revoke_cookie;
+void aio_cheri_revoke(struct proc *, const struct vm_cheri_revoke_cookie *);
+#endif
+
 #else /* !_KERNEL */
 
 struct timespec;
