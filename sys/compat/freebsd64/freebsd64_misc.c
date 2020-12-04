@@ -637,8 +637,6 @@ freebsd64_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	p = imgp->proc;
 	szsigcode = 0;
 
-	p->p_psstrings = p->p_usrstack - p->p_sysent->sv_szpsstrings;
-
 	/*
 	 * Here we do not care about the representability of the
 	 * resulting stack as the capability will not be handed out

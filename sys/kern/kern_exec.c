@@ -97,6 +97,7 @@ __FBSDID("$FreeBSD$");
 #if __has_feature(capabilities)
 #include <cheri/cheri.h>
 #include <cheri/cheric.h>
+#include <cheri/cherireg.h>
 #endif
 
 #ifdef KDTRACE_HOOKS
@@ -1153,10 +1154,25 @@ exec_new_vmspace(struct image_params *imgp, struct sysentvec *sv)
 	} else {
 		ssiz = maxssiz;
 	}
+#if __has_feature(capabilities)
+	if (sv->sv_flags & SV_CHERI) {
+		/*
+		 * NB: This may cause the stack to exceed the administrator-
+		 * configured stack size limit.
+		 */
+		ssiz = CHERI_REPRESENTABLE_LENGTH(ssiz);
+	}
+#endif
 	imgp->eff_stack_sz = lim_cur(curthread, RLIMIT_STACK);
 	if (ssiz < imgp->eff_stack_sz)
 		imgp->eff_stack_sz = ssiz;
 	p->p_usrstack = sv->sv_usrstack;
+#if __has_feature(capabilities)
+	if (sv->sv_flags & SV_CHERI)
+		p->p_usrstack = CHERI_REPRESENTABLE_BASE(p->p_usrstack, ssiz);
+#endif
+	p->p_psstrings = p->p_usrstack - sv->sv_szpsstrings;
+
 	stack_addr =  p->p_usrstack - ssiz;
 	error = vm_map_stack(map, stack_addr, (vm_size_t)ssiz,
 	    obj != NULL && imgp->stack_prot != 0 ? imgp->stack_prot :
@@ -1646,8 +1662,6 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 		execpath_len = 0;
 	p = imgp->proc;
 	szsigcode = 0;
-
-	p->p_psstrings = p->p_usrstack - p->p_sysent->sv_szpsstrings;
 
 #if __has_feature(capabilities)
 	/*
