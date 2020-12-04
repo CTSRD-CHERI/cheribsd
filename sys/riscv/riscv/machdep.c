@@ -104,6 +104,10 @@ __FBSDID("$FreeBSD$");
 #if __has_feature(capabilities)
 #include <machine/cheri.h>
 #include <cheri/cheric.h>
+#ifdef CHERI_CAPREVOKE
+#include <sys/caprevoke.h>
+#include <vm/vm_caprevoke.h>
+#endif
 #endif
 
 #ifdef FDT
@@ -1236,6 +1240,62 @@ bzero(void *buf, size_t len)
 	while(len-- > 0)
 		*p++ = 0;
 }
+
+#ifdef CHERI_CAPREVOKE
+void
+caprevoke_td_frame(struct thread *td, const struct vm_caprevoke_cookie *crc)
+{
+	CAPREVOKE_STATS_FOR(crst, crc);
+
+#define CAPREV_REG(r) \
+	do { if (cheri_gettag(r)) { \
+		CAPREVOKE_STATS_BUMP(crst, caps_found); \
+		if (vm_caprevoke_test(crc, r)) { \
+			r = cheri_revoke(r); \
+			CAPREVOKE_STATS_BUMP(crst, caps_cleared); \
+		} \
+	    }} while(0)
+
+	CAPREV_REG(td->td_frame->tf_ra);
+	CAPREV_REG(td->td_frame->tf_sp);
+	CAPREV_REG(td->td_frame->tf_gp);
+	CAPREV_REG(td->td_frame->tf_tp);
+	CAPREV_REG(td->td_frame->tf_t[0]);
+	CAPREV_REG(td->td_frame->tf_t[1]);
+	CAPREV_REG(td->td_frame->tf_t[2]);
+	CAPREV_REG(td->td_frame->tf_t[3]);
+	CAPREV_REG(td->td_frame->tf_t[4]);
+	CAPREV_REG(td->td_frame->tf_t[5]);
+	CAPREV_REG(td->td_frame->tf_t[6]);
+	CAPREV_REG(td->td_frame->tf_s[0]);
+	CAPREV_REG(td->td_frame->tf_s[1]);
+	CAPREV_REG(td->td_frame->tf_s[2]);
+	CAPREV_REG(td->td_frame->tf_s[3]);
+	CAPREV_REG(td->td_frame->tf_s[4]);
+	CAPREV_REG(td->td_frame->tf_s[5]);
+	CAPREV_REG(td->td_frame->tf_s[6]);
+	CAPREV_REG(td->td_frame->tf_s[7]);
+	CAPREV_REG(td->td_frame->tf_s[8]);
+	CAPREV_REG(td->td_frame->tf_s[9]);
+	CAPREV_REG(td->td_frame->tf_s[10]);
+	CAPREV_REG(td->td_frame->tf_s[11]);
+	CAPREV_REG(td->td_frame->tf_a[0]);
+	CAPREV_REG(td->td_frame->tf_a[1]);
+	CAPREV_REG(td->td_frame->tf_a[2]);
+	CAPREV_REG(td->td_frame->tf_a[3]);
+	CAPREV_REG(td->td_frame->tf_a[4]);
+	CAPREV_REG(td->td_frame->tf_a[5]);
+	CAPREV_REG(td->td_frame->tf_a[6]);
+	CAPREV_REG(td->td_frame->tf_a[7]);
+	CAPREV_REG(td->td_frame->tf_sepc); /* This could be real exciting! */
+	CAPREV_REG(td->td_frame->tf_ddc);
+
+#undef CAPREV_REG
+
+	return;
+}
+#endif
+
 // CHERI CHANGES START
 // {
 //   "updated": 20200803,
