@@ -1,0 +1,7 @@
+# Inherit base config
+include "CHERI_DE4_MFS_ROOT_CAPREVOKE"
+
+ident CHERI_DE4_MFS_ROOT_BENCHMARK_CAPREVOKE
+
+# Disable slow things
+include "std.BENCHMARK"
