@@ -81,6 +81,11 @@ __FBSDID("$FreeBSD$");
 #include <machine/cheri_machdep.h>
 #endif
 
+#ifdef CHERI_CAPREVOKE
+#include <sys/caprevoke.h>
+#include <vm/vm_caprevoke.h>
+#endif
+
 #include <ddb/ddb.h>
 #include <sys/kdb.h>
 
@@ -758,6 +763,57 @@ ptrace_clear_single_step(struct thread *td)
 	td->td_md.md_ss_addr = 0;
 	return 0;
 }
+
+#ifdef CHERI_CAPREVOKE
+static inline void
+caprev_reg(const struct vm_caprevoke_cookie *crc, void * __capability *rp)
+{
+	CAPREVOKE_STATS_FOR(crst, crc);
+
+	uintcap_t r = (uintcap_t)*rp;
+	if (cheri_gettag(r)) {
+		CAPREVOKE_STATS_BUMP(crst, caps_found);
+		if (vm_caprevoke_test(crc, r)) {
+			*rp = (void * __capability)cheri_revoke(r);
+			CAPREVOKE_STATS_BUMP(crst, caps_cleared);
+		}
+	}
+}
+
+void
+caprevoke_td_frame(struct thread *td, const struct vm_caprevoke_cookie *crc)
+{
+	caprev_reg(crc, &td->td_frame->ddc);
+	caprev_reg(crc, &td->td_frame->c1);
+	caprev_reg(crc, &td->td_frame->c2);
+	caprev_reg(crc, &td->td_frame->c3);
+	caprev_reg(crc, &td->td_frame->c4);
+	caprev_reg(crc, &td->td_frame->c5);
+	caprev_reg(crc, &td->td_frame->c6);
+	caprev_reg(crc, &td->td_frame->c7);
+	caprev_reg(crc, &td->td_frame->c8);
+	caprev_reg(crc, &td->td_frame->c9);
+	caprev_reg(crc, &td->td_frame->c10);
+	caprev_reg(crc, &td->td_frame->csp);
+	caprev_reg(crc, &td->td_frame->c12);
+	caprev_reg(crc, &td->td_frame->c13);
+	caprev_reg(crc, &td->td_frame->c14);
+	caprev_reg(crc, &td->td_frame->c15);
+	caprev_reg(crc, &td->td_frame->c16);
+	caprev_reg(crc, &td->td_frame->c17);
+	caprev_reg(crc, &td->td_frame->c18);
+	caprev_reg(crc, &td->td_frame->c19);
+	caprev_reg(crc, &td->td_frame->c20);
+	caprev_reg(crc, &td->td_frame->c21);
+	caprev_reg(crc, &td->td_frame->c22);
+	caprev_reg(crc, &td->td_frame->c23);
+	caprev_reg(crc, &td->td_frame->c24);
+	caprev_reg(crc, &td->td_frame->c25);
+	caprev_reg(crc, &td->td_frame->idc);
+	caprev_reg(crc, (void * __capability *)&td->td_frame->pcc);
+}
+#endif
+
 // CHERI CHANGES START
 // {
 //   "updated": 20200706,
