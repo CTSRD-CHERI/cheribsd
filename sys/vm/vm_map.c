@@ -997,7 +997,7 @@ _vm_map_init(vm_map_t map, pmap_t pmap, vm_pointer_t min, vm_pointer_t max)
 #endif
 
 #ifdef CHERI_CAPREVOKE
-	map->vm_cheri_revoke_st = CHERI_REVOKE_ST_NONE;	/* and epoch 0 */
+	map->vm_cheri_revoke_st = CHERI_REVOKE_ST_NONE; /* and epoch 0 */
 #endif
 }
 
@@ -2952,6 +2952,20 @@ vm_map_pmap_enter(vm_map_t map, vm_offset_t addr, vm_prot_t prot,
 	vm_offset_t start;
 	vm_page_t p, p_start;
 	vm_pindex_t mask, psize, threshold, tmpidx;
+
+#ifdef CHERI_CAPREVOKE
+	/*
+	 * If we're trying to insert pages during a load-side revocation scan,
+	 * we should be having the revoker visit each before exposing them to
+	 * userland.  However, this raises a number of challenges, and this
+	 * method is just an optimization, so we nop it out right now.
+	 *
+	 * XXX CAPREVOKE This could be much better in just about every way
+	 */
+	if (cheri_revoke_st_is_revoking(map->vm_cheri_revoke_st)) {
+		return;
+	}
+#endif
 
 	if ((prot & (VM_PROT_READ | VM_PROT_EXECUTE)) == 0 || object == NULL)
 		return;
