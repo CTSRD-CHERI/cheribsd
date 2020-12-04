@@ -80,3 +80,6 @@ riscv/riscv/vm_machdep.c	standard
 
 # Zstd
 contrib/zstd/lib/freebsd/zstd_kfreebsd.c		optional zstdio compile-with ${ZSTD_C}
+
+# Caprevoke
+riscv/riscv/cheri_revoke_machdep.c		optional	cpu_cheri cheri_caprevoke

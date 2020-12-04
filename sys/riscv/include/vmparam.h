@@ -210,8 +210,80 @@
 #define	VM_MAXUSER_ADDRESS	(VM_MAX_USER_ADDRESS)
 
 #define	KERNBASE		(VM_MIN_KERNEL_ADDRESS)
+
+#if __has_feature(capabilities)
+
+/*
+ * Lay out some bitmaps for us, ranging from VM_CHERI_REVOKE_BM_BASE
+ * to VM_CHERI_REVOKE_BM_TOP:
+ *
+ * TOP:
+ * 	- shared page for per-process information (_INFO_PAGE)
+ * 	- one bit per otype (BM_OTYPE)
+ * 	- one bit per page, checked for VMMAP-bearing caps (BM_MEM_MAP)
+ * 	- one bit per cap, checked for non-VMMAP-bearing caps (BM_MEM_NOMAP)
+ * BASE:
+ *
+ * The granularities of these bitmaps are specified in the _GSZ_ constants.
+ * For the present settings, a *byte* of these bitmaps spans....
+ * 	- 8 otypes
+ * 	- 8 pages (32KiB of memory)
+ * 	- 128 bytes of memory (on CC and CHERI-128; 256 bytes on CHERI-256)
+ * Requests to access the shadow space must, therefore, be at least that
+ * aligned!
+ *
+ */
+
+#define VM_CHERI_REVOKE_GSZ_OTYPE		((vm_offset_t)1)
+#define VM_CHERI_REVOKE_GSZ_MEM_MAP	((vm_offset_t)PAGE_SIZE)
+#define VM_CHERI_REVOKE_GSZ_MEM_NOMAP	\
+    ((vm_offset_t)sizeof (void * __capability))
+
+#define VM_CHERI_REVOKE_BSZ_MEM_NOMAP	(VM_MAX_USER_ADDRESS \
+					 / VM_CHERI_REVOKE_GSZ_MEM_NOMAP / 8)
+#define VM_CHERI_REVOKE_BSZ_MEM_MAP	(VM_MAX_USER_ADDRESS \
+					 / VM_CHERI_REVOKE_GSZ_MEM_MAP   / 8)
+#define VM_CHERI_REVOKE_BSZ_OTYPE	((1 << CHERI_OTYPE_BITS) \
+					 / VM_CHERI_REVOKE_GSZ_OTYPE / 8)
+/* XXX TODO SetCID revocation? */
+
+#define VM_CHERI_REVOKE_BM_TOP	VM_MAX_USER_ADDRESS
+
+/*
+ * Pad all the capability revocation material out to CHERI capability
+ * representability so that we can construct a single capability at the start
+ * of each revocation pass.
+ */
+#define VM_CHERI_REVOKE_PAD_SIZE	((VM_CHERI_REVOKE_BSZ_MEM_NOMAP \
+					  + VM_CHERI_REVOKE_BSZ_MEM_MAP \
+					  + VM_CHERI_REVOKE_BSZ_OTYPE \
+					  + PAGE_SIZE + 0x7FFFFF) & ~0x7FFFFF)
+#define VM_CHERI_REVOKE_BM_BASE	\
+    (VM_CHERI_REVOKE_BM_TOP - VM_CHERI_REVOKE_PAD_SIZE)
+
+#define VM_CHERI_REVOKE_BM_MEM_NOMAP	VM_CHERI_REVOKE_BM_BASE
+#define VM_CHERI_REVOKE_BM_MEM_MAP	( VM_CHERI_REVOKE_BM_MEM_NOMAP  \
+					+ VM_CHERI_REVOKE_BSZ_MEM_NOMAP )
+#define VM_CHERI_REVOKE_BM_OTYPE	( VM_CHERI_REVOKE_BM_MEM_MAP  \
+					+ VM_CHERI_REVOKE_BSZ_MEM_MAP )
+#define VM_CHERI_REVOKE_INFO_PAGE	( VM_CHERI_REVOKE_BM_OTYPE  \
+					+ VM_CHERI_REVOKE_BSZ_OTYPE )
+
+#define	SHAREDPAGE		(VM_CHERI_REVOKE_BM_BASE - PAGE_SIZE)
+
+/*
+ * To ensure that the stack base address that is sufficiently aligned to create
+ * a precisely bounded capability we must round down significantly.
+ */
+#define	USRSTACK		(SHAREDPAGE & ~0xFFFFF)
+
+#else /* !__has_features(capabilities) */
+
 #define	SHAREDPAGE		(VM_MAXUSER_ADDRESS - PAGE_SIZE)
+
 #define	USRSTACK		SHAREDPAGE
+
+#endif /* !__has_features(capabilities) */
 
 #define	VM_EARLY_DTB_ADDRESS	(VM_MAX_KERNEL_ADDRESS - (2 * L2_SIZE))
 
