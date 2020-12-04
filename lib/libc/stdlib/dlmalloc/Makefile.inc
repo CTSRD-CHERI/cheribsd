@@ -15,8 +15,9 @@ DLMALLOC_CFLAGS+=	-DDCONSOLIDATE_ON_FREE=1
 DLMALLOC_CFLAGS+=	-DZERO_MEMORY=0
 DLMALLOC_CFLAGS+=	-DSUPPORT_UNMAP=1
 .if ${MK_CHERI_CAPREVOKE} == "yes"
-.PATH: ${SRCTOP}/lib/libcheri_caprevoke
-DLMALLOCSRCS+=		libcheri_caprevoke.c
+# We used to need to add libcheri_caprevoke.c as a source file, too,
+# but that gets included now as part of the tls_malloc goo and doing
+# so again here results in duplicate symbol definitions.
 DLMALLOC_CFLAGS+=	-DCAPREVOKE -DDEFAULT_MAX_FREEBUFBYTES=8388608
 .endif
 CFLAGS.dlmalloc_nonreuse.c+=	${DLMALLOC_CFLAGS}
