@@ -91,6 +91,10 @@ __FBSDID("$FreeBSD$");
 #include <cheri/cheri.h>
 #include <cheri/cheric.h>
 #include <machine/cheri_machdep.h>
+#include <machine/cherireg.h>
+#ifdef CHERI_CAPREVOKE
+#include <vm/vm_caprevoke.h>
+#endif
 #endif
 
 #ifdef DDB
@@ -718,6 +722,28 @@ c2e_fixup_fault(struct trapframe *trapframe, bool is_kernel,
 
 	cause &= CHERI_CAPCAUSE_EXCCODE_MASK;
 	cause >>= CHERI_CAPCAUSE_EXCCODE_SHIFT;
+
+	if (cause == CHERI_EXCCODE_CAPLOADGEN) {
+		/* This page is from the wrong revocation epoch; clean it up. */
+
+		if (KERNLAND(va)) {
+			panic("kernel VA caploadgen fault %lx", va);
+		}
+
+#ifdef CHERI_CAPREVOKE
+		switch(vm_caprevoke_fault_visit(uvms, va)) {
+		case VM_CAPREVOKE_FAULT_RESOLVED:
+			return (0);
+		case VM_CAPREVOKE_FAULT_UNRESOLVED:
+			return (1);
+		case VM_CAPREVOKE_FAULT_CAPSTORE:
+			*ftype = VM_PROT_WRITE | VM_PROT_WRITE_CAP;
+			return (1);
+		}
+#else
+		panic("user VA caploadgen fault on non-revoke kernel %lx", va);
+#endif
+	}
 
 	if (cause == CHERI_EXCCODE_TLBSTORE) {
 		*ftype = VM_PROT_WRITE | VM_PROT_WRITE_CAP;
