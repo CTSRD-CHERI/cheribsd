@@ -81,6 +81,9 @@
 #include <vm/pmap.h>
 #include <vm/vm_page.h>
 #include <vm/vm_map.h>
+#ifdef CHERI_CAPREVOKE
+#include <vm/vm_cheri_revoke.h>
+#endif
 #include <vm/vm_kern.h>
 #include <vm/vm_extern.h>
 #include <vm/vm_object.h>
@@ -1340,6 +1343,22 @@ exec_map_stack(struct image_params *imgp)
 	else
 #endif
 		p->p_psstrings = stack_top - sv->sv_psstringssz;
+
+#ifdef CHERI_CAPREVOKE
+	/*
+	 * For CheriABI, create an anonymous, CoW mapping for the revocation
+	 * bitmaps.
+	 *
+	 * XXX This almost surely belongs elsewhere, but I don't immediately
+	 * see a per-sv hook here.
+	 */
+	if (sv->sv_flags & SV_CHERI) {
+		error = vm_map_install_cheri_revoke_shadow(map, sv);
+
+		if (error != KERN_SUCCESS)
+			return (vm_mmap_to_errno(error));
+	}
+#endif
 
 	/* Map a shared page */
 	obj = sv->sv_shared_page_obj;
