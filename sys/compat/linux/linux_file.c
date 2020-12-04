@@ -121,13 +121,9 @@ linux_creat(struct thread *td, struct linux_creat_args *args)
 #endif
 
 static int
-linux_common_open(struct thread *td, int dirfd, const char * __capability path,
-    int l_flags, int mode, enum uio_seg seg)
+linux_common_openflags(int l_flags)
 {
-	struct proc *p = td->td_proc;
-	struct file *fp;
-	int fd;
-	int bsd_flags, error;
+	int bsd_flags;
 
 	bsd_flags = 0;
 	switch (l_flags & LINUX_O_ACCMODE) {
@@ -167,7 +163,19 @@ linux_common_open(struct thread *td, int dirfd, const char * __capability path,
 	if (l_flags & LINUX_O_DIRECTORY)
 		bsd_flags |= O_DIRECTORY;
 	/* XXX LINUX_O_NOATIME: unable to be easily implemented. */
+	return (bsd_flags);
+}
 
+static int
+linux_common_open(struct thread *td, int dirfd, const char * __capability path,
+    int l_flags, int mode, enum uio_seg seg)
+{
+	struct proc *p = td->td_proc;
+	struct file *fp;
+	int fd;
+	int bsd_flags, error;
+
+	bsd_flags = linux_common_openflags(l_flags);
 	error = kern_openat(td, dirfd, path, seg, bsd_flags, mode);
 	if (error != 0) {
 		if (error == EMLINK)
@@ -253,6 +261,102 @@ linux_open(struct thread *td, struct linux_open_args *args)
 	return (error);
 }
 #endif
+
+int
+linux_name_to_handle_at(struct thread *td,
+    struct linux_name_to_handle_at_args *args)
+{
+	static const l_int valid_flags = (LINUX_AT_SYMLINK_FOLLOW |
+	    LINUX_AT_EMPTY_PATH);
+	static const l_uint fh_size = sizeof(fhandle_t);
+
+	fhandle_t fh;
+	l_uint fh_bytes;
+	l_int mount_id;
+	int error, fd, bsd_flags;
+
+	if (args->flags & ~valid_flags)
+		return (EINVAL);
+	if (args->flags & LINUX_AT_EMPTY_PATH)
+		/* XXX: not supported yet */
+		return (EOPNOTSUPP);
+
+	fd = args->dirfd;
+	if (fd == LINUX_AT_FDCWD)
+		fd = AT_FDCWD;
+
+	bsd_flags = 0;
+	if (!(args->flags & LINUX_AT_SYMLINK_FOLLOW))
+		bsd_flags |= AT_SYMLINK_NOFOLLOW;
+
+	if (!LUSECONVPATH(td)) {
+		error = kern_getfhat(td, bsd_flags, fd, args->name,
+		    UIO_USERSPACE, &fh, UIO_SYSSPACE);
+	} else {
+		char *path;
+
+		LCONVPATH_AT(td, args->name, &path, 0, fd);
+		error = kern_getfhat(td, bsd_flags, fd, path, UIO_SYSSPACE,
+		    &fh, UIO_SYSSPACE);
+		LFREEPATH(path);
+	}
+	if (error != 0)
+		return (error);
+
+	/* Emit mount_id -- required before EOVERFLOW case. */
+	mount_id = (fh.fh_fsid.val[0] ^ fh.fh_fsid.val[1]);
+	error = copyout(&mount_id, args->mnt_id, sizeof(mount_id));
+	if (error != 0)
+		return (error);
+
+	/* Check if there is room for handle. */
+	error = copyin(&args->handle->handle_bytes, &fh_bytes,
+	    sizeof(fh_bytes));
+	if (error != 0)
+		return (error);
+
+	if (fh_bytes < fh_size) {
+		error = copyout(&fh_size, &args->handle->handle_bytes,
+		    sizeof(fh_size));
+		if (error == 0)
+			error = EOVERFLOW;
+		return (error);
+	}
+
+	/* Emit handle. */
+	mount_id = 0;
+	/*
+	 * We don't use handle_type for anything yet, but initialize a known
+	 * value.
+	 */
+	error = copyout(&mount_id, &args->handle->handle_type,
+	    sizeof(mount_id));
+	if (error != 0)
+		return (error);
+
+	error = copyout(&fh, &args->handle->f_handle,
+	    sizeof(fh));
+	return (error);
+}
+
+int
+linux_open_by_handle_at(struct thread *td,
+    struct linux_open_by_handle_at_args *args)
+{
+	l_uint fh_bytes;
+	int bsd_flags, error;
+
+	error = copyin(&args->handle->handle_bytes, &fh_bytes,
+	    sizeof(fh_bytes));
+	if (error != 0)
+		return (error);
+
+	if (fh_bytes < sizeof(fhandle_t))
+		return (EINVAL);
+
+	bsd_flags = linux_common_openflags(args->flags);
+	return (kern_fhopen(td, (void *)&args->handle->f_handle, bsd_flags));
+}
 
 int
 linux_lseek(struct thread *td, struct linux_lseek_args *args)
@@ -1192,13 +1296,15 @@ linux_pwritev(struct thread *td, struct linux_pwritev_args *uap)
 int
 linux_mount(struct thread *td, struct linux_mount_args *args)
 {
-	char fstypename[MFSNAMELEN];
-	char *mntonname, *mntfromname;
+	struct mntarg *ma = NULL;
+	char *fstypename, *mntonname, *mntfromname, *data;
 	int error, fsflags;
 
+	fstypename = malloc(MNAMELEN, M_TEMP, M_WAITOK);
 	mntonname = malloc(MNAMELEN, M_TEMP, M_WAITOK);
 	mntfromname = malloc(MNAMELEN, M_TEMP, M_WAITOK);
-	error = copyinstr(args->filesystemtype, fstypename, MFSNAMELEN - 1,
+	data = NULL;
+	error = copyinstr(args->filesystemtype, fstypename, MNAMELEN - 1,
 	    NULL);
 	if (error != 0)
 		goto out;
@@ -1219,6 +1325,31 @@ linux_mount(struct thread *td, struct linux_mount_args *args)
 		strcpy(fstypename, "linprocfs");
 	} else if (strcmp(fstypename, "vfat") == 0) {
 		strcpy(fstypename, "msdosfs");
+	} else if (strcmp(fstypename, "fuse") == 0) {
+		char *fuse_options, *fuse_option, *fuse_name;
+
+		if (strcmp(mntfromname, "fuse") == 0)
+			strcpy(mntfromname, "/dev/fuse");
+
+		strcpy(fstypename, "fusefs");
+		data = malloc(MNAMELEN, M_TEMP, M_WAITOK);
+		error = copyinstr(args->data, data, MNAMELEN - 1, NULL);
+		if (error != 0)
+			goto out;
+
+		fuse_options = data;
+		while ((fuse_option = strsep(&fuse_options, ",")) != NULL) {
+			fuse_name = strsep(&fuse_option, "=");
+			if (fuse_name == NULL || fuse_option == NULL)
+				goto out;
+			ma = mount_arg(ma, fuse_name, fuse_option, -1);
+		}
+
+		/*
+		 * The FUSE server uses Linux errno values instead of FreeBSD
+		 * ones; add a flag to tell fuse(4) to do errno translation.
+		 */
+		ma = mount_arg(ma, "linux_errnos", "1", -1);
 	}
 
 	fsflags = 0;
@@ -1236,14 +1367,15 @@ linux_mount(struct thread *td, struct linux_mount_args *args)
 	if (args->rwflag & LINUX_MS_REMOUNT)
 		fsflags |= MNT_UPDATE;
 
-	error = kernel_vmount(fsflags,
-	    "fstype", fstypename,
-	    "fspath", mntonname,
-	    "from", mntfromname,
-	    NULL);
+	ma = mount_arg(ma, "fstype", fstypename, -1);
+	ma = mount_arg(ma, "fspath", mntonname, -1);
+	ma = mount_arg(ma, "from", mntfromname, -1);
+	error = kernel_mount(ma, fsflags);
 out:
+	free(fstypename, M_TEMP);
 	free(mntonname, M_TEMP);
 	free(mntfromname, M_TEMP);
+	free(data, M_TEMP);
 	return (error);
 }
 

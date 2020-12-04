@@ -112,8 +112,7 @@ static void	vgonel(struct vnode *);
 static bool	vhold_recycle_free(struct vnode *);
 static void	vfs_knllock(void *arg);
 static void	vfs_knlunlock(void *arg);
-static void	vfs_knl_assert_locked(void *arg);
-static void	vfs_knl_assert_unlocked(void *arg);
+static void	vfs_knl_assert_lock(void *arg, int what);
 static void	destroy_vpollinfo(struct vpollinfo *vi);
 static int	v_inval_buf_range_locked(struct vnode *vp, struct bufobj *bo,
 		    daddr_t startlbn, daddr_t endlbn);
@@ -735,17 +734,18 @@ SYSINIT(vfs, SI_SUB_VFS, SI_ORDER_FIRST, vntblinit, NULL);
 int
 vfs_busy(struct mount *mp, int flags)
 {
+	struct mount_pcpu *mpcpu;
 
 	MPASS((flags & ~MBF_MASK) == 0);
 	CTR3(KTR_VFS, "%s: mp %p with flags %d", __func__, mp, flags);
 
-	if (vfs_op_thread_enter(mp)) {
+	if (vfs_op_thread_enter(mp, mpcpu)) {
 		MPASS((mp->mnt_kern_flag & MNTK_DRAINING) == 0);
 		MPASS((mp->mnt_kern_flag & MNTK_UNMOUNT) == 0);
 		MPASS((mp->mnt_kern_flag & MNTK_REFEXPIRE) == 0);
-		vfs_mp_count_add_pcpu(mp, ref, 1);
-		vfs_mp_count_add_pcpu(mp, lockref, 1);
-		vfs_op_thread_exit(mp);
+		vfs_mp_count_add_pcpu(mpcpu, ref, 1);
+		vfs_mp_count_add_pcpu(mpcpu, lockref, 1);
+		vfs_op_thread_exit(mp, mpcpu);
 		if (flags & MBF_MNTLSTLOCK)
 			mtx_unlock(&mountlist_mtx);
 		return (0);
@@ -795,15 +795,16 @@ vfs_busy(struct mount *mp, int flags)
 void
 vfs_unbusy(struct mount *mp)
 {
+	struct mount_pcpu *mpcpu;
 	int c;
 
 	CTR2(KTR_VFS, "%s: mp %p", __func__, mp);
 
-	if (vfs_op_thread_enter(mp)) {
+	if (vfs_op_thread_enter(mp, mpcpu)) {
 		MPASS((mp->mnt_kern_flag & MNTK_DRAINING) == 0);
-		vfs_mp_count_sub_pcpu(mp, lockref, 1);
-		vfs_mp_count_sub_pcpu(mp, ref, 1);
-		vfs_op_thread_exit(mp);
+		vfs_mp_count_sub_pcpu(mpcpu, lockref, 1);
+		vfs_mp_count_sub_pcpu(mpcpu, ref, 1);
+		vfs_op_thread_exit(mp, mpcpu);
 		return;
 	}
 
@@ -1936,7 +1937,10 @@ bufobj_invalbuf(struct bufobj *bo, int flags, int slpflag, int slptimeo)
 		}
 		if (bo->bo_dirty.bv_cnt > 0) {
 			BO_UNLOCK(bo);
-			if ((error = BO_SYNC(bo, MNT_WAIT)) != 0)
+			do {
+				error = BO_SYNC(bo, MNT_WAIT);
+			} while (error == ERELOOKUP);
+			if (error != 0)
 				return (error);
 			/*
 			 * XXX We could save a lock/unlock if this was only
@@ -3677,7 +3681,9 @@ loop:
 				vm_object_page_clean(vp->v_object, 0, 0, 0);
 				VM_OBJECT_WUNLOCK(vp->v_object);
 			}
-			error = VOP_FSYNC(vp, MNT_WAIT, td);
+			do {
+				error = VOP_FSYNC(vp, MNT_WAIT, td);
+			} while (error == ERELOOKUP);
 			if (error != 0) {
 				VOP_UNLOCK(vp);
 				vdrop(vp);
@@ -4074,8 +4080,9 @@ vn_printf(struct vnode *vp, const char *fmt, ...)
 	if (vp->v_vflag & VV_READLINK)
 		strlcat(buf, "|VV_READLINK", sizeof(buf));
 	flags = vp->v_vflag & ~(VV_ROOT | VV_ISTTY | VV_NOSYNC | VV_ETERNALDEV |
-	    VV_CACHEDLABEL | VV_COPYONWRITE | VV_SYSTEM | VV_PROCDEP |
-	    VV_NOKNOTE | VV_DELETED | VV_MD | VV_FORCEINSMQ);
+	    VV_CACHEDLABEL | VV_VMSIZEVNLOCK | VV_COPYONWRITE | VV_SYSTEM |
+	    VV_PROCDEP | VV_NOKNOTE | VV_DELETED | VV_MD | VV_FORCEINSMQ |
+	    VV_READLINK);
 	if (flags != 0) {
 		snprintf(buf2, sizeof(buf2), "|VV(0x%lx)", flags);
 		strlcat(buf, buf2, sizeof(buf));
@@ -4103,9 +4110,10 @@ vn_printf(struct vnode *vp, const char *fmt, ...)
 		snprintf(buf2, sizeof(buf2), "|VMP(0x%lx)", flags);
 		strlcat(buf, buf2, sizeof(buf));
 	}
-	printf("    flags (%s)\n", buf + 1);
+	printf("    flags (%s)", buf + 1);
 	if (mtx_owned(VI_MTX(vp)))
 		printf(" VI_LOCKed");
+	printf("\n");
 	if (vp->v_object != NULL)
 		printf("    v_object %p ref %d pages %d "
 		    "cleanbuf %d dirtybuf %d\n",
@@ -4845,7 +4853,7 @@ v_addpollinfo(struct vnode *vp)
 	vi = malloc(sizeof(*vi), M_VNODEPOLL, M_WAITOK | M_ZERO);
 	mtx_init(&vi->vpi_lock, "vnode pollinfo", NULL, MTX_DEF);
 	knlist_init(&vi->vpi_selinfo.si_note, vp, vfs_knllock,
-	    vfs_knlunlock, vfs_knl_assert_locked, vfs_knl_assert_unlocked);
+	    vfs_knlunlock, vfs_knl_assert_lock);
 	VI_LOCK(vp);
 	if (vp->v_pollinfo != NULL) {
 		VI_UNLOCK(vp);
@@ -6094,22 +6102,15 @@ vfs_knlunlock(void *arg)
 }
 
 static void
-vfs_knl_assert_locked(void *arg)
+vfs_knl_assert_lock(void *arg, int what)
 {
 #ifdef DEBUG_VFS_LOCKS
 	struct vnode *vp = arg;
 
-	ASSERT_VOP_LOCKED(vp, "vfs_knl_assert_locked");
-#endif
-}
-
-static void
-vfs_knl_assert_unlocked(void *arg)
-{
-#ifdef DEBUG_VFS_LOCKS
-	struct vnode *vp = arg;
-
-	ASSERT_VOP_UNLOCKED(vp, "vfs_knl_assert_unlocked");
+	if (what == LA_LOCKED)
+		ASSERT_VOP_LOCKED(vp, "vfs_knl_assert_locked");
+	else
+		ASSERT_VOP_UNLOCKED(vp, "vfs_knl_assert_unlocked");
 #endif
 }
 
@@ -6440,18 +6441,19 @@ restart:
 int
 vfs_cache_root(struct mount *mp, int flags, struct vnode **vpp)
 {
+	struct mount_pcpu *mpcpu;
 	struct vnode *vp;
 	int error;
 
-	if (!vfs_op_thread_enter(mp))
+	if (!vfs_op_thread_enter(mp, mpcpu))
 		return (vfs_cache_root_fallback(mp, flags, vpp));
 	vp = atomic_load_ptr(&mp->mnt_rootvnode);
 	if (vp == NULL || VN_IS_DOOMED(vp)) {
-		vfs_op_thread_exit(mp);
+		vfs_op_thread_exit(mp, mpcpu);
 		return (vfs_cache_root_fallback(mp, flags, vpp));
 	}
 	vrefact(vp);
-	vfs_op_thread_exit(mp);
+	vfs_op_thread_exit(mp, mpcpu);
 	error = vn_lock(vp, flags);
 	if (error != 0) {
 		vrele(vp);

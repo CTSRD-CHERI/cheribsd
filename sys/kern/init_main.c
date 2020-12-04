@@ -65,6 +65,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/loginclass.h>
 #include <sys/mount.h>
 #include <sys/mutex.h>
+#include <sys/dtrace_bsd.h>
 #include <sys/syscallsubr.h>
 #include <sys/sysctl.h>
 #include <sys/proc.h>
@@ -507,9 +508,8 @@ proc0_init(void *dummy __unused)
 	p->p_klist = knlist_alloc(&p->p_mtx);
 	STAILQ_INIT(&p->p_ktr);
 	p->p_nice = NZERO;
-	/* pid_max cannot be greater than PID_MAX */
-	td->td_tid = PID_MAX + 1;
-	LIST_INSERT_HEAD(TIDHASH(td->td_tid), td, td_hash);
+	td->td_tid = THREAD0_TID;
+	tidhash_add(td);
 	td->td_state = TDS_RUNNING;
 	td->td_pri_class = PRI_TIMESHARE;
 	td->td_user_pri = PUSER;
@@ -567,6 +567,7 @@ proc0_init(void *dummy __unused)
 	siginit(&proc0);
 
 	/* Create the file descriptor table. */
+	p->p_pd = pdinit(NULL, false);
 	p->p_fd = fdinit(NULL, false, NULL);
 	p->p_fdtol = NULL;
 
@@ -602,7 +603,7 @@ proc0_init(void *dummy __unused)
 
 	/* Allocate a prototype map so we have something to fork. */
 	p->p_vmspace = &vmspace0;
-	vmspace0.vm_refcnt = 1;
+	refcount_init(&vmspace0.vm_refcnt, 1);
 	pmap_pinit0(vmspace_pmap(&vmspace0));
 
 	/*
@@ -618,6 +619,10 @@ proc0_init(void *dummy __unused)
 	 */
 	EVENTHANDLER_DIRECT_INVOKE(process_init, p);
 	EVENTHANDLER_DIRECT_INVOKE(thread_init, td);
+#ifdef KDTRACE_HOOKS
+	kdtrace_proc_ctor(p);
+	kdtrace_thread_ctor(td);
+#endif
 	EVENTHANDLER_DIRECT_INVOKE(process_ctor, p);
 	EVENTHANDLER_DIRECT_INVOKE(thread_ctor, td);
 

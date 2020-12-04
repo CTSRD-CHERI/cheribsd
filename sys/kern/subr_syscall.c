@@ -65,6 +65,7 @@ syscallenter(struct thread *td)
 	struct syscall_args *sa;
 	struct sysent *se;
 	int error, traced;
+	bool sy_thr_static;
 
 	VM_CNT_INC(v_syscall);
 	p = td->td_proc;
@@ -112,21 +113,22 @@ syscallenter(struct thread *td)
 		if (p->p_ptevents & PTRACE_SCE)
 			ptracestop((td), SIGTRAP, NULL);
 		PROC_UNLOCK(p);
-	}
-	if (__predict_false((td->td_dbgflags & TDB_USERWR) != 0)) {
-		/*
-		 * Reread syscall number and arguments if debugger
-		 * modified registers or memory.
-		 */
-		error = (p->p_sysent->sv_fetch_syscall_args)(td);
-		se = sa->callp;
+
+		if ((td->td_dbgflags & TDB_USERWR) != 0) {
+			/*
+			 * Reread syscall number and arguments if debugger
+			 * modified registers or memory.
+			 */
+			error = (p->p_sysent->sv_fetch_syscall_args)(td);
+			se = sa->callp;
 #ifdef KTRACE
-		if (KTRPOINT(td, KTR_SYSCALL))
-			ktrsyscall(sa->code, se->sy_narg, sa->args);
+			if (KTRPOINT(td, KTR_SYSCALL))
+				ktrsyscall(sa->code, se->sy_narg, sa->args);
 #endif
-		if (error != 0) {
-			td->td_errno = error;
-			goto retval;
+			if (error != 0) {
+				td->td_errno = error;
+				goto retval;
+			}
 		}
 	}
 
@@ -142,12 +144,6 @@ syscallenter(struct thread *td)
 	}
 #endif
 
-	error = syscall_thread_enter(td, se);
-	if (error != 0) {
-		td->td_errno = error;
-		goto retval;
-	}
-
 	/*
 	 * Fetch fast sigblock value at the time of syscall entry to
 	 * handle sleepqueue primitives which might call cursig().
@@ -159,8 +155,19 @@ syscallenter(struct thread *td)
 	KASSERT((td->td_pflags & TDP_NERRNO) == 0,
 	    ("%s: TDP_NERRNO set", __func__));
 
+	sy_thr_static = (se->sy_thrcnt & SY_THR_STATIC) != 0;
+
 	if (__predict_false(SYSTRACE_ENABLED() ||
-	    AUDIT_SYSCALL_ENTER(sa->code, td))) {
+	    AUDIT_SYSCALL_ENTER(sa->code, td) ||
+	    !sy_thr_static)) {
+		if (!sy_thr_static) {
+			error = syscall_thread_enter(td, se);
+			if (error != 0) {
+				td->td_errno = error;
+				goto retval;
+			}
+		}
+
 #ifdef KDTRACE_HOOKS
 		/* Give the syscall:::entry DTrace probe a chance to fire. */
 		if (__predict_false(se->sy_entry != 0))
@@ -190,6 +197,9 @@ syscallenter(struct thread *td)
 			(*systrace_probe_func)(sa, SYSTRACE_RETURN,
 			    error ? -1 : td->td_retval[0]);
 #endif
+
+		if (!sy_thr_static)
+			syscall_thread_exit(td, se);
 	} else {
 		error = (se->sy_call)(td, sa->args);
 		/* Save the latest error return value. */
@@ -198,7 +208,6 @@ syscallenter(struct thread *td)
 		else
 			td->td_errno = error;
 	}
-	syscall_thread_exit(td, se);
 
  retval:
 	KTR_STOP4(KTR_SYSC, "syscall", syscallname(p, sa->code),
@@ -223,6 +232,8 @@ syscallret(struct thread *td)
 
 	KASSERT((td->td_pflags & TDP_FORKING) == 0,
 	    ("fork() did not clear TDP_FORKING upon completion"));
+	KASSERT(td->td_errno != ERELOOKUP,
+	    ("ERELOOKUP not consumed syscall %d", td->td_sa.code));
 
 	p = td->td_proc;
 	sa = &td->td_sa;

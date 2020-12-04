@@ -253,7 +253,7 @@ ffs_syncvnode(struct vnode *vp, int waitfor, int flags)
 	struct buf *bp, *nbp;
 	ufs_lbn_t lbn;
 	int error, passes;
-	bool still_dirty, wait;
+	bool still_dirty, unlocked, wait;
 
 	ip = VTOI(vp);
 	ip->i_flag &= ~IN_NEEDSYNC;
@@ -277,6 +277,7 @@ ffs_syncvnode(struct vnode *vp, int waitfor, int flags)
 	error = 0;
 	passes = 0;
 	wait = false;	/* Always do an async pass first. */
+	unlocked = false;
 	lbn = lblkno(ITOFS(ip), (ip->i_size + ITOFS(ip)->fs_bsize - 1));
 	BO_LOCK(bo);
 loop:
@@ -325,6 +326,26 @@ loop:
 		if (!LIST_EMPTY(&bp->b_dep) &&
 		    (error = softdep_sync_buf(vp, bp,
 		    wait ? MNT_WAIT : MNT_NOWAIT)) != 0) {
+			/*
+			 * Lock order conflict, buffer was already unlocked,
+			 * and vnode possibly unlocked.
+			 */
+			if (error == ERELOOKUP) {
+				if (vp->v_data == NULL)
+					return (EBADF);
+				unlocked = true;
+				if (DOINGSOFTDEP(vp) && waitfor == MNT_WAIT &&
+				    (error = softdep_sync_metadata(vp)) != 0) {
+					if (ffs_fsfail_cleanup(ump, error))
+						error = 0;
+					return (unlocked && error == 0 ?
+					    ERELOOKUP : error);
+				}
+				/* Re-evaluate inode size */
+				lbn = lblkno(ITOFS(ip), (ip->i_size +
+				    ITOFS(ip)->fs_bsize - 1));
+				goto next;
+			}
 			/* I/O error. */
 			if (error != EBUSY) {
 				BUF_UNLOCK(bp);
@@ -361,9 +382,11 @@ next:
 	if (waitfor != MNT_WAIT) {
 		BO_UNLOCK(bo);
 		if ((flags & NO_INO_UPDT) != 0)
-			return (0);
-		else
-			return (ffs_update(vp, 0));
+			return (unlocked ? ERELOOKUP : 0);
+		error = ffs_update(vp, 0);
+		if (error == 0 && unlocked)
+			error = ERELOOKUP;
+		return (error);
 	}
 	/* Drain IO to see if we're done. */
 	bufobj_wwait(bo, 0, 0);
@@ -419,6 +442,8 @@ next:
 	} else if ((ip->i_flags & (IN_SIZEMOD | IN_IBLKDATA)) != 0) {
 		error = ffs_update(vp, 1);
 	}
+	if (error == 0 && unlocked)
+		error = ERELOOKUP;
 	return (error);
 }
 
@@ -434,16 +459,20 @@ ffs_lock(ap)
 	struct vop_lock1_args /* {
 		struct vnode *a_vp;
 		int a_flags;
-		struct thread *a_td;
 		char *file;
 		int line;
 	} */ *ap;
 {
+#if !defined(NO_FFS_SNAPSHOT) || defined(DIAGNOSTIC)
+	struct vnode *vp = ap->a_vp;
+#endif	/* !NO_FFS_SNAPSHOT || DIAGNOSTIC */
+#ifdef DIAGNOSTIC
+	struct inode *ip;
+#endif	/* DIAGNOSTIC */
+	int result;
 #ifndef NO_FFS_SNAPSHOT
-	struct vnode *vp;
 	int flags;
 	struct lock *lkp;
-	int result;
 
 	/*
 	 * Adaptive spinning mixed with SU leads to trouble. use a giant hammer
@@ -456,12 +485,11 @@ ffs_lock(ap)
 	case LK_SHARED:
 	case LK_UPGRADE:
 	case LK_EXCLUSIVE:
-		vp = ap->a_vp;
 		flags = ap->a_flags;
 		for (;;) {
 #ifdef DEBUG_VFS_LOCKS
 			VNPASS(vp->v_holdcnt != 0, vp);
-#endif
+#endif	/* DEBUG_VFS_LOCKS */
 			lkp = vp->v_vnlock;
 			result = lockmgr_lock_flags(lkp, flags,
 			    &VI_MTX(vp)->lock_object, ap->a_file, ap->a_line);
@@ -483,28 +511,67 @@ ffs_lock(ap)
 				flags = (flags & ~LK_TYPE_MASK) | LK_EXCLUSIVE;
 			flags &= ~LK_INTERLOCK;
 		}
+#ifdef DIAGNOSTIC
+		switch (ap->a_flags & LK_TYPE_MASK) {
+		case LK_UPGRADE:
+		case LK_EXCLUSIVE:
+			if (result == 0 && vp->v_vnlock->lk_recurse == 0) {
+				ip = VTOI(vp);
+				if (ip != NULL)
+					ip->i_lock_gen++;
+			}
+		}
+#endif	/* DIAGNOSTIC */
 		break;
 	default:
+#ifdef DIAGNOSTIC
+		if ((ap->a_flags & LK_TYPE_MASK) == LK_DOWNGRADE) {
+			ip = VTOI(vp);
+			if (ip != NULL)
+				ufs_unlock_tracker(ip);
+		}
+#endif	/* DIAGNOSTIC */
 		result = VOP_LOCK1_APV(&ufs_vnodeops, ap);
+		break;
 	}
-	return (result);
-#else
+#else	/* NO_FFS_SNAPSHOT */
 	/*
 	 * See above for an explanation.
 	 */
 	if ((ap->a_flags & LK_NODDLKTREAT) != 0)
 		ap->a_flags |= LK_ADAPTIVE;
-	return (VOP_LOCK1_APV(&ufs_vnodeops, ap));
-#endif
+#ifdef DIAGNOSTIC
+	if ((ap->a_flags & LK_TYPE_MASK) == LK_DOWNGRADE) {
+		ip = VTOI(vp);
+		if (ip != NULL)
+			ufs_unlock_tracker(ip);
+	}
+#endif	/* DIAGNOSTIC */
+	result =  VOP_LOCK1_APV(&ufs_vnodeops, ap);
+#endif	/* NO_FFS_SNAPSHOT */
+#ifdef DIAGNOSTIC
+	switch (ap->a_flags & LK_TYPE_MASK) {
+	case LK_UPGRADE:
+	case LK_EXCLUSIVE:
+		if (result == 0 && vp->v_vnlock->lk_recurse == 0) {
+			ip = VTOI(vp);
+			if (ip != NULL)
+				ip->i_lock_gen++;
+		}
+	}
+#endif	/* DIAGNOSTIC */
+	return (result);
 }
 
 #ifdef INVARIANTS
 static int
 ffs_unlock_debug(struct vop_unlock_args *ap)
 {
-	struct vnode *vp = ap->a_vp;
-	struct inode *ip = VTOI(vp);
+	struct vnode *vp;
+	struct inode *ip;
 
+	vp = ap->a_vp;
+	ip = VTOI(vp);
 	if (ip->i_flag & UFS_INODE_FLAG_LAZY_MASK_ASSERTABLE) {
 		if ((vp->v_mflag & VMP_LAZYLIST) == 0) {
 			VI_LOCK(vp);
@@ -514,6 +581,11 @@ ffs_unlock_debug(struct vop_unlock_args *ap)
 			VI_UNLOCK(vp);
 		}
 	}
+#ifdef DIAGNOSTIC
+	if (VOP_ISLOCKED(vp) == LK_EXCLUSIVE && ip != NULL &&
+	    vp->v_vnlock->lk_recurse == 0)
+		ufs_unlock_tracker(ip);
+#endif
 	return (VOP_UNLOCK_APV(&ufs_vnodeops, ap));
 }
 #endif

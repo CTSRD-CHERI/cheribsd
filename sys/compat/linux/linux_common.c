@@ -34,11 +34,12 @@ __FBSDID("$FreeBSD$");
 #include <sys/imgact_elf.h>
 #include <sys/kernel.h>
 #include <sys/malloc.h>
-#include <sys/eventhandler.h>
+#include <sys/mutex.h>
 #include <sys/sx.h>
 #include <sys/sysctl.h>
 
 #include <compat/linux/linux.h>
+#include <compat/linux/linux_dtrace.h>
 #include <compat/linux/linux_emul.h>
 #include <compat/linux/linux_ioctl.h>
 #include <compat/linux/linux_mib.h>
@@ -49,16 +50,26 @@ FEATURE(linuxulator_v4l2, "V4L2 ioctl wrapper support in the linuxulator");
 
 MODULE_VERSION(linux_common, 1);
 
+/**
+ * Special DTrace provider for the linuxulator.
+ *
+ * In this file we define the provider for the entire linuxulator. All
+ * modules (= files of the linuxulator) use it.
+ *
+ * We define a different name depending on the emulated bitsize, see
+ * ../../<ARCH>/linux{,32}/linux.h, e.g.:
+ *      native bitsize          = linuxulator
+ *      amd64, 32bit emulation  = linuxulator32
+ */
+LIN_SDT_PROVIDER_DEFINE(linuxulator);
+LIN_SDT_PROVIDER_DEFINE(linuxulator32);
+
 SET_DECLARE(linux_device_handler_set, struct linux_device_handler);
 
 TAILQ_HEAD(, linux_ioctl_handler_element) linux_ioctl_handlers =
     TAILQ_HEAD_INITIALIZER(linux_ioctl_handlers);
 struct sx linux_ioctl_sx;
 SX_SYSINIT(linux_ioctl, &linux_ioctl_sx, "Linux ioctl handlers");
-
-static eventhandler_tag linux_exec_tag;
-static eventhandler_tag linux_thread_dtor_tag;
-static eventhandler_tag	linux_exit_tag;
 
 static int
 linux_common_modevent(module_t mod, int type, void *data)
@@ -72,12 +83,6 @@ linux_common_modevent(module_t mod, int type, void *data)
 #endif
 		linux_dev_shm_create();
 		linux_osd_jail_register();
-		linux_exit_tag = EVENTHANDLER_REGISTER(process_exit,
-		    linux_proc_exit, NULL, 1000);
-		linux_exec_tag = EVENTHANDLER_REGISTER(process_exec,
-		    linux_proc_exec, NULL, 1000);
-		linux_thread_dtor_tag = EVENTHANDLER_REGISTER(thread_dtor,
-		    linux_thread_dtor, NULL, EVENTHANDLER_PRI_ANY);
 		SET_FOREACH(ldhp, linux_device_handler_set)
 			linux_device_register_handler(*ldhp);
 		LIST_INIT(&futex_list);
@@ -89,9 +94,6 @@ linux_common_modevent(module_t mod, int type, void *data)
 		SET_FOREACH(ldhp, linux_device_handler_set)
 			linux_device_unregister_handler(*ldhp);
 		mtx_destroy(&futex_mtx);
-		EVENTHANDLER_DEREGISTER(process_exit, linux_exit_tag);
-		EVENTHANDLER_DEREGISTER(process_exec, linux_exec_tag);
-		EVENTHANDLER_DEREGISTER(thread_dtor, linux_thread_dtor_tag);
 		break;
 	default:
 		return (EOPNOTSUPP);

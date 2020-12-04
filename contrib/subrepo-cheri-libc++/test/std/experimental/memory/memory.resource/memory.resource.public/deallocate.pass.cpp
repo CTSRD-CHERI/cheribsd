@@ -8,8 +8,7 @@
 
 // <experimental/memory_resource>
 
-// UNSUPPORTED: c++98, c++03
-// UNSUPPORTED: libcpp-no-rtti
+// UNSUPPORTED: c++03, libcpp-no-rtti
 
 //------------------------------------------------------------------------------
 // TESTING void * memory_resource::deallocate(void *, size_t, size_t = max_align)

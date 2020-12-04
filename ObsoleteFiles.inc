@@ -36,6 +36,14 @@
 #   xargs -n1 | sort | uniq -d;
 # done
 
+# 20201124: ping6(8) was merged into ping(8)
+OLD_FILES+=usr/lib/debug/sbin/ping6.debug
+OLD_FILES+=usr/share/man/man8/ping6.8.gz
+OLD_FILES+=usr/tests/sbin/ping6/Kyuafile
+OLD_FILES+=usr/tests/sbin/ping6/ping6_c1_s8_t1.out
+OLD_FILES+=usr/tests/sbin/ping6/ping6_test
+OLD_DIRS+=usr/tests/sbin/ping6
+
 # 20201025: Remove cal data files
 OLD_FILES+=usr/share/calendar/calendar.all
 OLD_FILES+=usr/share/calendar/calendar.australia
@@ -914,9 +922,9 @@ OLD_FILES+=usr/share/man/man1/gdbserver.1.gz
 OLD_FILES+=usr/share/man/man1/kgdb.1.gz
 
 # 20200327: OCF refactoring
-OLD_FILES+=usr/share/man/man9/crypto_find_driver.9
-OLD_FILES+=usr/share/man/man9/crypto_register.9
-OLD_FILES+=usr/share/man/man9/crypto_unregister.9
+OLD_FILES+=usr/share/man/man9/crypto_find_driver.9.gz
+OLD_FILES+=usr/share/man/man9/crypto_register.9.gz
+OLD_FILES+=usr/share/man/man9/crypto_unregister.9.gz
 
 # 20200323: INTERNALLIB don't install headers anymore
 OLD_FILES+=usr/include/libelftc.h

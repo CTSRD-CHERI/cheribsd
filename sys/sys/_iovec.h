@@ -48,10 +48,14 @@ struct iovec {
 };
 
 #if defined(_KERNEL)
+#ifdef __CHERI_PURE_CAPABILITY__
+#define	IOVEC_INIT IOVEC_INIT_C
+#else /* ! __CHERI_PURE_CAPABILITY__ */
 #define	IOVEC_INIT(iovp, base, len)	do {				\
 	(iovp)->iov_base = PTR2CAP((base));				\
 	(iovp)->iov_len = (len);					\
 } while(0)
+#endif /* ! __CHERI_PURE_CAPABILITY__ */
 #define IOVEC_INIT_C(iovp, base, len)	do {				\
 	(iovp)->iov_base = (base);					\
 	(iovp)->iov_len = (len);					\

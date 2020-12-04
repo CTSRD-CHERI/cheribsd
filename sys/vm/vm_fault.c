@@ -548,7 +548,8 @@ vm_fault_populate(struct faultstate *fs)
 	    pidx += npages, m = vm_page_next(&m[npages - 1])) {
 		vaddr = fs->entry->start + IDX_TO_OFF(pidx) - fs->entry->offset;
 #if defined(__aarch64__) || defined(__amd64__) || (defined(__arm__) && \
-    __ARM_ARCH >= 6) || defined(__i386__) || defined(__riscv)
+    __ARM_ARCH >= 6) || defined(__i386__) || defined(__riscv) || \
+    defined(__powerpc64__)
 		psind = m->psind;
 		if (psind > 0 && ((vaddr & (pagesizes[psind] - 1)) != 0 ||
 		    pidx + OFF_TO_IDX(pagesizes[psind]) - 1 > pager_last ||
@@ -1839,7 +1840,7 @@ vm_fault_quick_hold_pages(vm_map_t map, void * __capability addr, vm_size_t len,
 	if (len == 0)
 		return (0);
 #if __has_feature(capabilities)
-	if (!__CAP_CHECK(addr, len))
+	if (!__CAP_CHECK(addr, len) || !vm_cap_allows_prot(addr, prot))
 		return (-1);
 #endif
 	start = (__cheri_addr vm_offset_t)trunc_page(addr);

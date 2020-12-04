@@ -92,14 +92,16 @@
 # 10.  `reboot'
 # 11.  `make delete-old-libs' (in case no 3rd party program uses them anymore)
 #
-# For individuals wanting to build from source with GCC from ports, first build
-# or install an appropriate flavor of devel/freebsd-gcc9.  The packages produced
-# by this port are named "${TARGET_ARCH}-gcc9" -- note that not all
-# architectures supported by FreeBSD have an external gcc toolchain available.
+# For individuals wanting to build from source with GCC from ports, first
+# install the appropriate GCC cross toolchain package:
+#   `pkg install ${TARGET_ARCH}-gccN`
 #
-# Once the appropriate freebsd-gcc package is installed, simply pass
-# CROSS_TOOLCHAIN=${TARGET_ARCH}-gcc9 while building with the above steps,
-# e.g., `make buildworld CROSS_TOOLCHAIN=amd64-gcc9`.
+# Once you have installed the necessary cross toolchain, simply pass
+# CROSS_TOOLCHAIN=${TARGET_ARCH}-gccN while building with the above steps,
+# e.g., `make buildworld CROSS_TOOLCHAIN=amd64-gcc6`.
+#
+# The ${TARGET_ARCH}-gccN packages are provided as flavors of the
+# devel/freebsd-gccN ports.
 #
 # See src/UPDATING `COMMON ITEMS' for more complete information.
 #
@@ -170,8 +172,8 @@ TGTS=	all all-man buildenv buildenvvars buildkernel buildsysroot buildworld \
 	xdev-links native-xtools native-xtools-install stageworld stagekernel \
 	stage-packages stage-packages-kernel stage-packages-world \
 	create-packages-world create-packages-kernel create-packages \
-	packages installconfig real-packages sign-packages package-pkg \
-	print-dir test-system-compiler test-system-linker
+	update-packages packages installconfig real-packages real-update-packages \
+	sign-packages package-pkg print-dir test-system-compiler test-system-linker
 
 # These targets require a TARGET and TARGET_ARCH be defined.
 XTGTS=	native-xtools native-xtools-install xdev xdev-build xdev-install \

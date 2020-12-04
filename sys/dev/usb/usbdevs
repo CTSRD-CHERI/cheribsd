@@ -1275,6 +1275,7 @@ product ATEN UC1284		0x2001	Parallel printer
 product ATEN UC10T		0x2002	10Mbps Ethernet
 product ATEN UC110T		0x2007	UC-110T Ethernet
 product ATEN UC232A		0x2008	Serial
+product ATEN UC232B		0x2022  Serial
 product ATEN UC210T		0x2009	UC-210T Ethernet
 product ATEN DSB650C		0x4000	DSB-650C
 
@@ -2253,7 +2254,9 @@ product FUJITSU AH_F401U	0x105b	AH-F401U Air H device
 product FUJITSUSIEMENS SCR	0x0009	Fujitsu-Siemens SCR USB Reader
 
 /* Garmin products */
+product GARMIN DAKOTA20		0x23c0	Dakota 20
 product GARMIN FORERUNNER230	0x086d	ForeRunner 230
+product GARMIN GPSMAP62S	0x2459	GPSMAP 62s
 product GARMIN IQUE_3600	0x0004	iQue 3600
 
 /* Gemalto products */

@@ -249,7 +249,7 @@ int	kern_getdirentries(struct thread *td, int fd, char * __capability buf,
 	    size_t count, off_t *basep, ssize_t *residp, enum uio_seg bufseg);
 int	kern_getfhat(struct thread *td, int flags, int fd,
 	    const char * __capability path, enum uio_seg pathseg,
-	    fhandle_t * __capability fhp);
+	    fhandle_t * __capability fhp, enum uio_seg fhseg);
 int	kern_getfsstat(struct thread *td, struct statfs * __capability *buf,
 	    size_t bufsize, size_t *countp, enum uio_seg bufseg, int mode);
 int	kern_getgroups(struct thread *td, u_int gidsetsize,

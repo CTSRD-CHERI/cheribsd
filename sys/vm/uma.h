@@ -666,7 +666,10 @@ size_t uma_zone_memory(uma_zone_t zone);
 /*
  * Common UMA_ZONE_PCPU zones.
  */
-extern uma_zone_t pcpu_zone_int;
+extern uma_zone_t pcpu_zone_4;
+extern uma_zone_t pcpu_zone_8;
+extern uma_zone_t pcpu_zone_16;
+extern uma_zone_t pcpu_zone_32;
 extern uma_zone_t pcpu_zone_64;
 
 /*

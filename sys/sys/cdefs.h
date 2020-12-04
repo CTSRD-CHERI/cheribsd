@@ -596,7 +596,7 @@
     _Static_assert(__builtin_marked_no_subobject_bounds(type) ||		\
 	__builtin_marked_no_subobject_bounds(__typeof(((type *)0)->member)),	\
 	"this type is unsafe for use in containerof() with sub-object"		\
-	"bounds. Please mark the member/type with __no_subobject_bounds")
+	"bounds. Please mark the member/type with __subobject_use_container_bounds")
 #else
 /* No checks without sub-object bounds */
 #define __check_safe_type_for_containerof(type, member) ((void)0)

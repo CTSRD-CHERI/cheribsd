@@ -20,12 +20,17 @@
 #	LOCAL_LIB_DIRS="list of dirs" to add additional dirs to libraries target
 #	LOCAL_MTREE="list of mtree files" to process to allow local directories
 #	    to be created before files are installed
+#	LOCAL_LEGACY_DIRS="list of dirs" to add additional dirs to the legacy
+#	    target
+#	LOCAL_BSTOOL_DIRS="list of dirs" to add additional dirs to the
+#	    bootstrap-tools target
 #	LOCAL_TOOL_DIRS="list of dirs" to add additional dirs to the build-tools
-#	    list
+#	    target
 #	LOCAL_XTOOL_DIRS="list of dirs" to add additional dirs to the
 #	    cross-tools target
 #	METALOG="path to metadata log" to write permission and ownership
-#	    when NO_ROOT is set.  (default: ${DESTDIR}/METALOG)
+#	    when NO_ROOT is set.  (default: ${DESTDIR}/${DISTDIR}/METALOG,
+#           check /etc/make.conf for DISTDIR)
 #	TARGET="machine" to crossbuild world for a different machine type
 #	TARGET_ARCH= may be required when a TARGET supports multiple endians
 #	BUILDENV_SHELL= shell to launch for the buildenv target (def:${SHELL})
@@ -623,12 +628,12 @@ EXTRA_REVISION= _${_BRANCH:C/-PRERELEASE/.p/}
 .elif ${_BRANCH:M*-p*}
 EXTRA_REVISION=	_${_BRANCH:C/.*-p([0-9]+$)/\1/}
 .endif
-PKG_VERSION=	${_REVISION}${EXTRA_REVISION}
+PKG_VERSION:=	${_REVISION}${EXTRA_REVISION}
 .endif
 .endif	# !defined(PKG_VERSION)
 
 .if !defined(PKG_TIMESTAMP)
-TIMEEPOCHNOW=	%s
+TIMEEPOCHNOW=		%s
 SOURCE_DATE_EPOCH=	${TIMEEPOCHNOW:gmtime}
 .else
 SOURCE_DATE_EPOCH=	${PKG_TIMESTAMP}
@@ -1720,6 +1725,10 @@ KERNCONF=${KERNFAST}
 .endif
 .if ${TARGET_ARCH} == "powerpc64"
 KERNCONF?=	GENERIC64
+.elif ${TARGET_ARCH} == "powerpc64le"
+KERNCONF?=	GENERIC64LE
+.elif ${TARGET_ARCH} == "powerpcspe"
+KERNCONF?=	MPC85XXSPE
 .else
 KERNCONF?=	GENERIC
 .endif
@@ -1985,8 +1994,21 @@ _pkgbootstrap: .PHONY
 	@env ASSUME_ALWAYS_YES=YES pkg bootstrap
 .endif
 
+.if make(create-world-packages-jobs) || make(create-kernel-packages*) || make(real-update-packages)
+PKG_ABI!=${PKG_CMD} -o ABI_FILE=${WSTAGEDIR}/usr/bin/uname config ABI
+.endif
+
+.if !defined(PKG_VERSION_FROM)
+.if defined(PKG_ABI)
+PKG_VERSION_FROM!=/usr/bin/readlink ${REPODIR}/${PKG_ABI}/latest
+.endif
+.endif
+
 packages: .PHONY
 	${_+_}${MAKE} -C ${.CURDIR} PKG_VERSION=${PKG_VERSION} real-packages
+
+update-packages: .PHONY
+	${_+_}${MAKE} -C ${.CURDIR} PKG_VERSION=${PKG_VERSION} real-update-packages
 
 package-pkg: .PHONY
 	rm -rf /tmp/ports.${TARGET} || :
@@ -1996,6 +2018,28 @@ package-pkg: .PHONY
 		sh ${.CURDIR}/release/scripts/make-pkg-package.sh
 
 real-packages:	stage-packages create-packages sign-packages .PHONY
+
+real-update-packages: stage-packages .PHONY
+	${_+_}${MAKE} -C ${.CURDIR} PKG_VERSION=${PKG_VERSION} create-packages
+	@echo "==> Checking for new packages (comparing ${PKG_VERSION} to ${PKG_VERSION_FROM})"
+	@for pkg in ${REPODIR}/${PKG_ABI}/${PKG_VERSION_FROM}/${PKG_NAME_PREFIX}-*; do \
+	  pkgname=$$(pkg query -F $${pkg} '%n' | sed 's/${PKG_NAME_PREFIX}-\(.*\)/\1/') ; \
+	  newpkgname=${PKG_NAME_PREFIX}-$${pkgname}-${PKG_VERSION}.${PKG_FORMAT} ; \
+	  oldsum=$$(pkg query -F $${pkg} '%X') ; \
+	  if [ ! -f ${REPODIR}/${PKG_ABI}/${PKG_VERSION}/$${newpkgname} ]; then \
+	    continue; \
+	  fi ; \
+	  newsum=$$(pkg query -F ${REPODIR}/${PKG_ABI}/${PKG_VERSION}/$${newpkgname} '%X') ; \
+	  if [ "$${oldsum}" == "$${newsum}" ]; then \
+	   echo "==> Keeping old ${PKG_NAME_PREFIX}-$${pkgname}-${PKG_VERSION_FROM}.${PKG_FORMAT}" ; \
+	   rm ${REPODIR}/${PKG_ABI}/${PKG_VERSION}/$${newpkgname} ; \
+	   cp $${pkg} ${REPODIR}/${PKG_ABI}/${PKG_VERSION} ; \
+	  else \
+	    echo "==> New package $${newpkgname}" ; \
+	  fi ; \
+	done
+	${_+_}@cd ${.CURDIR}; \
+		${MAKE} -f Makefile.inc1 PKG_VERSION=${PKG_VERSION} sign-packages
 
 stage-packages-world: .PHONY
 	@mkdir -p ${WSTAGEDIR}
@@ -2045,10 +2089,6 @@ create-world-packages:	_pkgbootstrap .PHONY
 
 .if make(create-world-packages-jobs)
 .include "${WSTAGEDIR}/packages.mk"
-.endif
-
-.if make(create-world-packages-jobs) || make(create-kernel-packages*)
-PKG_ABI!=${PKG_CMD} -o ABI_FILE=${WSTAGEDIR}/usr/bin/uname config ABI
 .endif
 
 create-world-packages-jobs: .PHONY
@@ -2215,18 +2255,15 @@ update: .PHONY
 # which don't have the APIs required by the targets built in bootstrap-tools,
 # build-tools or cross-tools.
 #
-
-# libnv and libsbuf are requirements for config(8), which is an unconditional
-# bootstrap-tool.
-_config_deps= lib/libnv lib/libsbuf
-
 legacy: .PHONY
 .if ${BOOTSTRAPPING} < ${MINIMUM_SUPPORTED_OSREL} && ${BOOTSTRAPPING} != 0
 	@echo "ERROR: Source upgrades from versions prior to ${MINIMUM_SUPPORTED_REL} are not supported."; \
 	false
 .endif
 
-.for _tool in tools/build
+.for _tool in \
+  tools/build \
+  ${LOCAL_LEGACY_DIRS}
 	${_+_}@${ECHODIR} "===> ${_tool} (obj,includes,all,install)"; \
 	    cd ${.CURDIR}/${_tool}; \
 	    if [ -z "${NO_OBJWALK}" ]; then ${MAKE} DIRPRFX=${_tool}/ obj; fi; \
@@ -2559,7 +2596,8 @@ bootstrap-tools: ${_bt}-links .PHONY
     ${_crunchgen} \
     ${_nmtree} \
     ${_vtfontcvt} \
-    ${_localedef}
+    ${_localedef} \
+    ${LOCAL_BSTOOL_DIRS}
 ${_bt}-${_tool}: ${_bt}-links .PHONY .MAKE
 	${_+_}@${ECHODIR} "===> ${_tool} (obj,all,install)"; \
 		cd ${.CURDIR}/${_tool}; \
