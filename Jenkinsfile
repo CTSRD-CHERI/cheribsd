@@ -145,7 +145,11 @@ ls -la "artifacts-${suffix}/"
         }
     }
 }
-def selectedArchitectures = params.architectures.split('\n')
+
+// Work around for https://issues.jenkins.io/browse/JENKINS-46941
+// Jenkins appears to use the last selected manual override for automatically triggered builds.
+// Therefore, only read the parameter value for manually-triggered builds.
+def selectedArchitectures = isManualBuild() ? params.architectures.split('\n') : allArchitectures
 echo("Selected architectures: ${selectedArchitectures}")
 selectedArchitectures.each { suffix ->
     String name = "cheribsd-${suffix}"
