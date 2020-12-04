@@ -8,3 +8,11 @@ INTRNG				opt_global.h
 CPU_QEMU_RISCV			opt_global.h
 
 COMPAT_FREEBSD64	opt_global.h
+
+#
+# Capability revocation
+#
+CHERI_CAPREVOKE			opt_global.h
+CHERI_CAPREVOKE_STATS		opt_global.h
+CHERI_CAPREVOKE_CLEARTAGS	opt_global.h
+CHERI_CAPREVOKE_FAST_COPYIN	opt_global.h
