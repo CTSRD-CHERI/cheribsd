@@ -3174,7 +3174,6 @@ freebsd32_copyout_strings(struct image_params *imgp, uintptr_t *stack_base)
 		execpath_len = strlen(imgp->execpath) + 1;
 	else
 		execpath_len = 0;
-	p->p_psstrings = p->p_usrstack - p->p_sysent->sv_szpsstrings
 	arginfo = (struct freebsd32_ps_strings *)curproc->p_psstrings;
 	imgp->ps_strings = arginfo;
 	if (imgp->proc->p_sysent->sv_sigcode_base == 0)

@@ -196,7 +196,6 @@ linux_copyout_auxargs(struct image_params *imgp, uintptr_t base)
 
 	p = imgp->proc;
 	issetugid = imgp->proc->p_flag & P_SUGID ? 1 : 0;
-	p->p_psstrings = p->p_psstrings;
 	arginfo = (struct ps_strings *)p->p_psstrings;
 	uplatform = (Elf32_Addr *)((caddr_t)arginfo - linux_szplatform);
 	args = (Elf32_Auxargs *)imgp->auxargs;
@@ -282,7 +281,6 @@ linux_copyout_strings(struct image_params *imgp, uintptr_t *stack_base)
 		execpath_len = strlen(imgp->execpath) + 1;
 	else
 		execpath_len = 0;
-	p->p_psstrings = p->p_sysent->sv_psstrings
 	arginfo = (struct ps_strings *)p->p_psstrings;
 	destp = (uintptr_t)arginfo;
 
