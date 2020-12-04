@@ -220,8 +220,8 @@ __do_revoke(void)
 
 	caprevoke_epoch start_epoch = cri->epoch_enqueue;
 	while (!caprevoke_epoch_clears(cri->epoch_dequeue, start_epoch)) {
-		struct caprevoke_stats crst;
-		error = caprevoke(CAPREVOKE_LAST_PASS, start_epoch, &crst);
+		error = caprevoke(CAPREVOKE_LAST_PASS|CAPREVOKE_LOAD_SIDE,
+		    start_epoch, NULL);
 		assert(error == 0);
 	}
 }
