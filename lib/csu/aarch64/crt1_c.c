@@ -77,7 +77,6 @@ __start(int argc, char *argv[], char *env[], void (*cleanup)(void))
 	 * would initialize them if they did.
 	 */
 	if (&_DYNAMIC == NULL) {
-		const Elf_Phdr * __capability phdr_cap = NULL;
 		const Elf_Auxinfo *auxp;
 		char **strp;
 		void *phdr = NULL;
@@ -100,11 +99,8 @@ __start(int argc, char *argv[], char *env[], void (*cleanup)(void))
 			}
 		}
 
-		/* Generate capability to init globals from DDC. */
 		if (phdr != NULL && phnum != 0) {
-			phdr_cap = cheri_setaddress(cheri_getdefault(),
-			    (vaddr_t)phdr);
-			do_crt_init_globals(phdr_cap, phnum);
+			do_crt_init_globals(phdr, phnum);
 		}
 	}
 #endif
