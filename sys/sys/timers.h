@@ -113,6 +113,12 @@ struct	kclock {
 void	itimers_exec(struct proc *p);
 void	itimers_exit(struct proc *p);
 int	itimer_accept(struct proc *p, int tid, ksiginfo_t *ksi);
+
+#ifdef CHERI_CAPREVOKE
+struct vm_cheri_revoke_cookie;
+void ktimer_cheri_revoke(struct proc *, const struct vm_cheri_revoke_cookie *);
+#endif
+
 #endif
 #endif /* !_SYS_TIMERS_H_ */
 // CHERI CHANGES START
