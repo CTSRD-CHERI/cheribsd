@@ -57,6 +57,8 @@ mips/mips/uio_machdep.c			standard
 mips/mips/uma_machdep.c			standard
 mips/mips/vm_machdep.c			standard
 mips/mips/vm_machdep_caprevoke.c	optional	cpu_cheri cheri_caprevoke
+mips/mips/vm_machdep_caprevoke_tests.c	optional	cpu_cheri cheri_caprevoke \
+	compile-with "${NORMAL_C} -fomit-frame-pointer"
 
 # cheri arch files
 mips/cheri/locore.S			optional	no-obj cheri_purecap_kernel
