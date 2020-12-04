@@ -316,6 +316,7 @@ struct knote {
 #define KN_DETACHED	0x08			/* knote is detached */
 #define KN_MARKER	0x20			/* ignore this knote */
 #define KN_KQUEUE	0x40			/* this knote belongs to a kq */
+#define KN_CAPREV_EPOCH	0x80			/* revocation epoch */
 #define	KN_SCAN		0x100			/* flux set in kqueue_scan() */
 	int			kn_influx;
 	int			kn_sfflags;	/* saved filter flags */
@@ -373,6 +374,12 @@ int 	kqfd_register(int fd, struct kevent *kev, struct thread *p,
 	    int mflag);
 int	kqueue_add_filteropts(int filt, struct filterops *filtops);
 int	kqueue_del_filteropts(int filt);
+
+#ifdef CHERI_CAPREVOKE
+struct filedesc;
+struct vm_caprevoke_cookie;
+void kqueue_caprevoke(struct filedesc *, const struct vm_caprevoke_cookie *);
+#endif
 
 #else 	/* !_KERNEL */
 
