@@ -101,6 +101,10 @@ __FBSDID("$FreeBSD$");
 #include <cheri/cherireg.h>
 #endif
 
+#ifdef CHERI_CAPREVOKE
+#include <vm/vm_cheri_revoke.h>
+#endif
+
 #ifdef KDTRACE_HOOKS
 #include <sys/dtrace_bsd.h>
 dtrace_execexit_func_t	dtrace_fasttrap_exec;
@@ -1252,6 +1256,22 @@ exec_new_vmspace(struct image_params *imgp, struct sysentvec *sv)
 	else
 #endif
 		p->p_psstrings = p->p_usrstack - sv->sv_szpsstrings;
+
+#ifdef CHERI_CAPREVOKE
+	/*
+	 * For CheriABI, create an anonymous, CoW mapping for the revocation
+	 * bitmaps.
+	 *
+	 * XXX This almost surely belongs elsewhere, but I don't immediately
+	 * see a per-sv hook here.
+	 */
+	if (sv->sv_flags & SV_CHERI) {
+		error = vm_map_install_cheri_revoke_shadow(map);
+
+		if (error != KERN_SUCCESS)
+			return (vm_mmap_to_errno(error));
+	}
+#endif
 
 	/*
 	 * vm_ssize and vm_maxsaddr are somewhat antiquated concepts, but they
