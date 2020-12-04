@@ -30,6 +30,7 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
+#include <sys/endian.h>
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -135,6 +136,9 @@ chrp_attach(platform_t plat)
 	int quiesce;
 #ifdef __powerpc64__
 	int i;
+#if BYTE_ORDER == LITTLE_ENDIAN
+	int result;
+#endif
 
 	/* XXX: check for /rtas/ibm,hypertas-functions? */
 	if (!(mfmsr() & PSL_HV)) {
@@ -170,6 +174,24 @@ chrp_attach(platform_t plat)
 
 		/* Set up hypervisor CPU stuff */
 		chrp_smp_ap_init(plat);
+
+#if BYTE_ORDER == LITTLE_ENDIAN
+		/*
+		 * Ask the hypervisor to update the LPAR ILE bit.
+		 *
+		 * This involves all processors reentering the hypervisor
+		 * so the change appears simultaneously in all processors.
+		 * This can take a long time.
+		 */
+		for(;;) {
+			result = phyp_hcall(H_SET_MODE, 1UL,
+			    H_SET_MODE_RSRC_ILE, 0, 0);
+			if (result == H_SUCCESS)
+				break;
+			DELAY(1000);
+		}
+#endif
+
 	}
 #endif
 	chrp_cpuref_init();
@@ -414,7 +436,7 @@ chrp_cpuref_init(void)
 	/* /chosen/cpu */
 	if (OF_getproplen(chosen, "cpu") == sizeof(ihandle_t)) {
 		OF_getprop(chosen, "cpu", &ibsp, sizeof(ibsp));
-		pbsp = OF_instance_to_package(ibsp);
+		pbsp = OF_instance_to_package(be32toh(ibsp));
 		if (pbsp != -1)
 			get_cpu_reg(pbsp, &bsp_reg);
 	}

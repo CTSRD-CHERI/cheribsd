@@ -46,8 +46,7 @@
 #define	VM_NFREEORDER_MAX	VM_NFREEORDER
 #endif
 
-extern vm_paddr_t phys_avail[];
-extern vm_paddr_t dump_avail[];
+extern vm_paddr_t phys_avail[PHYS_AVAIL_COUNT];
 
 /* Domains must be dense (non-sparse) and zero-based. */
 struct mem_affinity {
@@ -69,6 +68,12 @@ struct vm_phys_seg {
 	vm_paddr_t	start;
 	vm_paddr_t	end;
 	vm_page_t	first_page;
+#if VM_NRESERVLEVEL > 0
+	vm_reserv_t	first_reserv;
+#endif
+#ifdef __aarch64__
+	void		*md_first;
+#endif
 	int		domain;
 	struct vm_freelist (*free_queues)[VM_NFREEPOOL][VM_NFREEORDER_MAX];
 };

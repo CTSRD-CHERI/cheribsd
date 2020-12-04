@@ -178,11 +178,13 @@ static void
 nameicap_tracker_add(struct nameidata *ndp, struct vnode *dp)
 {
 	struct nameicap_tracker *nt;
+	struct componentname *cnp;
 
 	if ((ndp->ni_lcf & NI_LCF_CAP_DOTDOT) == 0 || dp->v_type != VDIR)
 		return;
-	if ((ndp->ni_lcf & (NI_LCF_BENEATH_ABS | NI_LCF_BENEATH_LATCHED)) ==
-	    NI_LCF_BENEATH_ABS) {
+	cnp = &ndp->ni_cnd;
+	if ((cnp->cn_flags & BENEATH) != 0 &&
+	    (ndp->ni_lcf & NI_LCF_BENEATH_LATCHED) == 0) {
 		MPASS((ndp->ni_lcf & NI_LCF_LATCH) != 0);
 		if (dp != ndp->ni_beneath_latch)
 			return;
@@ -215,7 +217,11 @@ nameicap_cleanup(struct nameidata *ndp, bool clean_latch)
 /*
  * For dotdot lookups in capability mode, only allow the component
  * lookup to succeed if the resulting directory was already traversed
- * during the operation.  Also fail dotdot lookups for non-local
+ * during the operation.  This catches situations where already
+ * traversed directory is moved to different parent, and then we walk
+ * over it with dotdots.
+ *
+ * Also allow to force failure of dotdot lookups for non-local
  * filesystems, where external agents might assist local lookups to
  * escape the compartment.
  */
@@ -234,13 +240,14 @@ nameicap_check_dotdot(struct nameidata *ndp, struct vnode *dp)
 		return (ENOTCAPABLE);
 	TAILQ_FOREACH_REVERSE(nt, &ndp->ni_cap_tracker, nameicap_tracker_head,
 	    nm_link) {
+		if ((ndp->ni_lcf & NI_LCF_LATCH) != 0 &&
+		    ndp->ni_beneath_latch == nt->dp) {
+			ndp->ni_lcf &= ~NI_LCF_BENEATH_LATCHED;
+			nameicap_cleanup(ndp, false);
+			return (0);
+		}
 		if (dp == nt->dp)
 			return (0);
-	}
-	if ((ndp->ni_lcf & NI_LCF_BENEATH_ABS) != 0) {
-		ndp->ni_lcf &= ~NI_LCF_BENEATH_LATCHED;
-		nameicap_cleanup(ndp, false);
-		return (0);
 	}
 	return (ENOTCAPABLE);
 }
@@ -318,6 +325,7 @@ namei_setup(struct nameidata *ndp, struct vnode **dpp, struct pwd **pwdp)
 	 */
 	if (IN_CAPABILITY_MODE(td) && (cnp->cn_flags & NOCAPCHECK) == 0) {
 		ndp->ni_lcf |= NI_LCF_STRICTRELATIVE;
+		ndp->ni_resflags |= NIRES_STRICTREL;
 		if (ndp->ni_dirfd == AT_FDCWD) {
 #ifdef KTRACE
 			if (KTRPOINT(td, KTR_CAPFAIL))
@@ -396,6 +404,7 @@ namei_setup(struct nameidata *ndp, struct vnode **dpp, struct pwd **pwdp)
 			    ndp->ni_filecaps.fc_fcntls != CAP_FCNTL_ALL ||
 			    ndp->ni_filecaps.fc_nioctls != -1) {
 				ndp->ni_lcf |= NI_LCF_STRICTRELATIVE;
+				ndp->ni_resflags |= NIRES_STRICTREL;
 			}
 #endif
 		}
@@ -419,6 +428,16 @@ namei_setup(struct nameidata *ndp, struct vnode **dpp, struct pwd **pwdp)
 		if (error == 0)
 			ndp->ni_lcf |= NI_LCF_LATCH;
 	}
+	if (error == 0 && (cnp->cn_flags & RBENEATH) != 0) {
+		if (cnp->cn_pnbuf[0] == '/' ||
+		    (ndp->ni_lcf & NI_LCF_BENEATH_ABS) != 0) {
+			error = EINVAL;
+		} else if ((ndp->ni_lcf & NI_LCF_STRICTRELATIVE) == 0) {
+			ndp->ni_lcf |= NI_LCF_STRICTRELATIVE |
+			    NI_LCF_CAP_DOTDOT;
+		}
+	}
+
 	/*
 	 * If we are auditing the kernel pathname, save the user pathname.
 	 */
@@ -483,6 +502,13 @@ namei(struct nameidata *ndp)
 	cnp = &ndp->ni_cnd;
 	td = cnp->cn_thread;
 #ifdef INVARIANTS
+	KASSERT((ndp->ni_debugflags & NAMEI_DBG_CALLED) == 0,
+	    ("%s: repeated call to namei without NDREINIT", __func__));
+	KASSERT(ndp->ni_debugflags == NAMEI_DBG_INITED,
+	    ("%s: bad debugflags %d", __func__, ndp->ni_debugflags));
+	ndp->ni_debugflags |= NAMEI_DBG_CALLED;
+	if (ndp->ni_startdir != NULL)
+		ndp->ni_debugflags |= NAMEI_DBG_HADSTARTDIR;
 	/*
 	 * For NDVALIDATE.
 	 *
@@ -492,6 +518,8 @@ namei(struct nameidata *ndp)
 	cnp->cn_origflags = cnp->cn_flags;
 #endif
 	ndp->ni_cnd.cn_cred = ndp->ni_cnd.cn_thread->td_ucred;
+	KASSERT(ndp->ni_resflags == 0, ("%s: garbage in ni_resflags: %x\n",
+	    __func__, ndp->ni_resflags));
 	KASSERT(cnp->cn_cred && td->td_proc, ("namei: bad cred/proc"));
 	KASSERT((cnp->cn_flags & NAMEI_INTERNAL_FLAGS) == 0,
 	    ("namei: unexpected flags: %" PRIx64 "\n",
@@ -576,8 +604,17 @@ namei(struct nameidata *ndp)
 	for (;;) {
 		ndp->ni_startdir = dp;
 		error = lookup(ndp);
-		if (error != 0)
+		if (error != 0) {
+			/*
+			 * Override an error to not allow user to use
+			 * BENEATH as an oracle.
+			 */
+			if ((ndp->ni_lcf & (NI_LCF_LATCH |
+			    NI_LCF_BENEATH_LATCHED)) == NI_LCF_LATCH)
+				error = ENOTCAPABLE;
 			goto out;
+		}
+
 		/*
 		 * If not a symbolic link, we're done.
 		 */
@@ -586,8 +623,8 @@ namei(struct nameidata *ndp)
 				namei_cleanup_cnp(cnp);
 			} else
 				cnp->cn_flags |= HASBUF;
-			if ((ndp->ni_lcf & (NI_LCF_BENEATH_ABS |
-			    NI_LCF_BENEATH_LATCHED)) == NI_LCF_BENEATH_ABS) {
+			if ((ndp->ni_lcf & (NI_LCF_LATCH |
+			    NI_LCF_BENEATH_LATCHED)) == NI_LCF_LATCH) {
 				NDFREE(ndp, 0);
 				error = ENOTCAPABLE;
 			}
@@ -1243,6 +1280,8 @@ success:
 			goto bad2;
 		}
 	}
+	if (ndp->ni_vp != NULL && ndp->ni_vp->v_type == VDIR)
+		nameicap_tracker_add(ndp, ndp->ni_vp);
 	return (0);
 
 bad2:

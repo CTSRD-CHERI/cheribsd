@@ -39,7 +39,6 @@
 #include "opt_inet.h"
 #include "opt_inet6.h"
 #include "opt_mrouting.h"
-#include "opt_mpath.h"
 #include "opt_route.h"
 
 #include <sys/param.h>
@@ -847,18 +846,6 @@ rt_mpath_unlink(struct rib_head *rnh, struct rt_addrinfo *info,
 	return (rn);
 }
 #endif
-
-void
-rt_setmetrics(const struct rt_addrinfo *info, struct rtentry *rt)
-{
-
-	if (info->rti_mflags & RTV_WEIGHT)
-		rt->rt_weight = info->rti_rmx->rmx_weight;
-	/* Kernel -> userland timebase conversion. */
-	if (info->rti_mflags & RTV_EXPIRE)
-		rt->rt_expire = info->rti_rmx->rmx_expire ?
-		    info->rti_rmx->rmx_expire - time_second + time_uptime : 0;
-}
 
 void
 rt_maskedcopy(struct sockaddr *src, struct sockaddr *dst, struct sockaddr *netmask)

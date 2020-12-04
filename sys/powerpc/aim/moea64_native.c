@@ -341,7 +341,7 @@ moea64_pte_unset_native(struct pvo_entry *pvo)
 	pvo_ptevpn = moea64_pte_vpn_from_pvo_vpn(pvo);
 
 	rw_rlock(&moea64_eviction_lock);
-	if ((be64toh(pt->pte_hi & LPTE_AVPN_MASK)) != pvo_ptevpn) {
+	if ((be64toh(pt->pte_hi) & LPTE_AVPN_MASK) != pvo_ptevpn) {
 		/* Evicted */
 		STAT_MOEA64(moea64_pte_overflow--);
 		rw_runlock(&moea64_eviction_lock);
@@ -354,7 +354,7 @@ moea64_pte_unset_native(struct pvo_entry *pvo)
 	 */
 	isync();
 	critical_enter();
-	pt->pte_hi = be64toh((pt->pte_hi & ~LPTE_VALID) | LPTE_LOCKED);
+	pt->pte_hi = htobe64((be64toh(pt->pte_hi) & ~LPTE_VALID) | LPTE_LOCKED);
 	PTESYNC();
 	TLBIE(pvo->pvo_vpn);
 	ptelo = be64toh(pt->pte_lo);
@@ -378,7 +378,7 @@ moea64_pte_replace_inval_native(struct pvo_entry *pvo,
 	moea64_pte_from_pvo(pvo, &properpt);
 
 	rw_rlock(&moea64_eviction_lock);
-	if ((be64toh(pt->pte_hi & LPTE_AVPN_MASK)) !=
+	if ((be64toh(pt->pte_hi) & LPTE_AVPN_MASK) !=
 	    (properpt.pte_hi & LPTE_AVPN_MASK)) {
 		/* Evicted */
 		STAT_MOEA64(moea64_pte_overflow--);
@@ -392,7 +392,7 @@ moea64_pte_replace_inval_native(struct pvo_entry *pvo,
 	 */
 	isync();
 	critical_enter();
-	pt->pte_hi = be64toh((pt->pte_hi & ~LPTE_VALID) | LPTE_LOCKED);
+	pt->pte_hi = htobe64((be64toh(pt->pte_hi) & ~LPTE_VALID) | LPTE_LOCKED);
 	PTESYNC();
 	TLBIE(pvo->pvo_vpn);
 	ptelo = be64toh(pt->pte_lo);
@@ -633,14 +633,45 @@ static int
 atomic_pte_lock(volatile struct lpte *pte, uint64_t bitmask, uint64_t *oldhi)
 {
 	int	ret;
+#ifdef __powerpc64__
+	uint64_t temp;
+#else
 	uint32_t oldhihalf;
+#endif
 
 	/*
 	 * Note: in principle, if just the locked bit were set here, we
 	 * could avoid needing the eviction lock. However, eviction occurs
 	 * so rarely that it isn't worth bothering about in practice.
 	 */
-
+#ifdef __powerpc64__
+	/*
+	 * Note: Success of this sequence has the side effect of invalidating
+	 * the PTE, as we are setting it to LPTE_LOCKED and discarding the
+	 * other bits, including LPTE_V.
+	 */
+	__asm __volatile (
+		"1:\tldarx %1, 0, %3\n\t"	/* load old value */
+		"and. %0,%1,%4\n\t"		/* check if any bits set */
+		"bne 2f\n\t"			/* exit if any set */
+		"stdcx. %5, 0, %3\n\t"		/* attempt to store */
+		"bne- 1b\n\t"			/* spin if failed */
+		"li %0, 1\n\t"			/* success - retval = 1 */
+		"b 3f\n\t"			/* we've succeeded */
+		"2:\n\t"
+		"stdcx. %1, 0, %3\n\t"       	/* clear reservation (74xx) */
+		"li %0, 0\n\t"			/* failure - retval = 0 */
+		"3:\n\t"
+		: "=&r" (ret), "=&r"(temp), "=m" (pte->pte_hi)
+		: "r" ((volatile char *)&pte->pte_hi),
+		  "r" (htobe64(bitmask)), "r" (htobe64(LPTE_LOCKED)),
+		  "m" (pte->pte_hi)
+		: "cr0", "cr1", "cr2", "memory");
+	*oldhi = be64toh(temp);
+#else
+	/*
+	 * This code is used on bridge mode only.
+	 */
 	__asm __volatile (
 		"1:\tlwarx %1, 0, %3\n\t"	/* load old value */
 		"and. %0,%1,%4\n\t"		/* check if any bits set */
@@ -660,6 +691,7 @@ atomic_pte_lock(volatile struct lpte *pte, uint64_t bitmask, uint64_t *oldhi)
 		: "cr0", "cr1", "cr2", "memory");
 
 	*oldhi = (pte->pte_hi & 0xffffffff00000000ULL) | oldhihalf;
+#endif
 
 	return (ret);
 }

@@ -338,9 +338,7 @@ static struct cmsghdr *cmsg;
 static char *source = NULL;
 static char *hostname;
 
-#ifdef WITH_CASPER
 static cap_channel_t *capdns;
-#endif
 
 static u_long nprobes = 3;
 static u_long first_hop = 1;
@@ -1532,7 +1530,7 @@ get_uphdr(struct ip6_hdr *ip6, u_char *lim)
 void
 capdns_open(void)
 {
-#ifdef WITH_CASPER
+#ifdef	WITH_CASPER
 	const char *types[] = { "NAME", "ADDR" };
 	int families[1];
 	cap_channel_t *casper;
@@ -1549,7 +1547,7 @@ capdns_open(void)
 	if (cap_dns_family_limit(capdns, families, nitems(families)) < 0)
 		errx(1, "unable to limit access to system.dns service");
 	cap_close(casper);
-#endif /* WITH_CASPER */
+#endif	/* WITH_CASPER */
 }
 
 void

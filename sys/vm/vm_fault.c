@@ -492,6 +492,8 @@ vm_fault_populate(struct faultstate *fs)
 	 * populate only busies the first page in superpage run.
 	 */
 	if (bdry_idx != 0) {
+		KASSERT(PMAP_HAS_LARGEPAGES,
+		    ("missing pmap support for large pages"));
 		m = vm_page_lookup(fs->first_object, pager_first);
 		vm_fault_populate_check_page(m);
 		VM_OBJECT_WUNLOCK(fs->first_object);
@@ -1515,6 +1517,12 @@ RetryFault:
 		 */
 		if (vm_fault_next(&fs))
 			continue;
+		if ((fs.fault_flags & VM_FAULT_NOFILL) != 0) {
+			if (fs.first_object == fs.object)
+				fault_page_free(&fs.first_m);
+			unlock_and_deallocate(&fs);
+			return (KERN_OUT_OF_BOUNDS);
+		}
 		VM_OBJECT_WUNLOCK(fs.object);
 		vm_fault_zerofill(&fs);
 		/* Don't try to prefault neighboring pages. */

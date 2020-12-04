@@ -91,6 +91,7 @@ CFLAGS+=	-fno-strict-aliasing
 WERROR?=	-Werror
 
 LINUXKPI_GENSRCS+= \
+	backlight_if.h \
 	bus_if.h \
 	device_if.h \
 	pci_if.h \
@@ -540,7 +541,6 @@ OPENZFS_CFLAGS=     \
 	-nostdinc \
 	-DSMP \
 	-I${ZINCDIR}  \
-	-I${ZINCDIR}/spl \
 	-I${ZINCDIR}/os/freebsd \
 	-I${ZINCDIR}/os/freebsd/spl \
 	-I${ZINCDIR}/os/freebsd/zfs \

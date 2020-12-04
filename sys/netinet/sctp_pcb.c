@@ -3588,7 +3588,6 @@ sctp_inpcb_free(struct sctp_inpcb *inp, int immediate, int from)
 #ifdef SCTP_LOG_CLOSING
 	sctp_log_closing(inp, NULL, 5);
 #endif
-
 	if ((inp->sctp_asocidhash) != NULL) {
 		SCTP_HASH_FREE(inp->sctp_asocidhash, inp->hashasocidmark);
 		inp->sctp_asocidhash = NULL;
@@ -3623,7 +3622,6 @@ sctp_inpcb_free(struct sctp_inpcb *inp, int immediate, int from)
 		(void)sctp_m_free(ip_pcb->inp_options);
 		ip_pcb->inp_options = 0;
 	}
-
 #ifdef INET6
 	if (ip_pcb->inp_vflag & INP_IPV6) {
 		ip6_freepcbopts(ip_pcb->in6p_outputopts);
@@ -4244,7 +4242,9 @@ sctp_aloc_assoc(struct sctp_inpcb *inp, struct sockaddr *firstaddr,
 			if ((ntohs(sin->sin_port) == 0) ||
 			    (sin->sin_addr.s_addr == INADDR_ANY) ||
 			    (sin->sin_addr.s_addr == INADDR_BROADCAST) ||
-			    IN_MULTICAST(ntohl(sin->sin_addr.s_addr))) {
+			    IN_MULTICAST(ntohl(sin->sin_addr.s_addr)) ||
+			    (((inp->sctp_flags & SCTP_PCB_FLAGS_BOUND_V6) != 0) &&
+			    (SCTP_IPV6_V6ONLY(inp) != 0))) {
 				/* Invalid address */
 				SCTP_INP_RUNLOCK(inp);
 				SCTP_LTRACE_ERR_RET(inp, NULL, NULL, SCTP_FROM_SCTP_PCB, EINVAL);
@@ -4263,7 +4263,8 @@ sctp_aloc_assoc(struct sctp_inpcb *inp, struct sockaddr *firstaddr,
 			sin6 = (struct sockaddr_in6 *)firstaddr;
 			if ((ntohs(sin6->sin6_port) == 0) ||
 			    IN6_IS_ADDR_UNSPECIFIED(&sin6->sin6_addr) ||
-			    IN6_IS_ADDR_MULTICAST(&sin6->sin6_addr)) {
+			    IN6_IS_ADDR_MULTICAST(&sin6->sin6_addr) ||
+			    ((inp->sctp_flags & SCTP_PCB_FLAGS_BOUND_V6) == 0)) {
 				/* Invalid address */
 				SCTP_INP_RUNLOCK(inp);
 				SCTP_LTRACE_ERR_RET(inp, NULL, NULL, SCTP_FROM_SCTP_PCB, EINVAL);
@@ -4344,7 +4345,7 @@ sctp_aloc_assoc(struct sctp_inpcb *inp, struct sockaddr *firstaddr,
 	LIST_INSERT_HEAD(head, stcb, sctp_asocs);
 	SCTP_INP_INFO_WUNLOCK();
 
-	if ((err = sctp_add_remote_addr(stcb, firstaddr, NULL, port, SCTP_DO_SETSCOPE, SCTP_ALLOC_ASOC))) {
+	if (sctp_add_remote_addr(stcb, firstaddr, NULL, port, SCTP_DO_SETSCOPE, SCTP_ALLOC_ASOC)) {
 		/* failure.. memory error? */
 		if (asoc->strmout) {
 			SCTP_FREE(asoc->strmout, SCTP_M_STRMO);
@@ -5728,7 +5729,6 @@ sctp_pcb_init(void)
 	SCTP_BASE_INFO(sctp_tcpephash) = SCTP_HASH_INIT(SCTP_BASE_SYSCTL(sctp_hashtblsize),
 	    &SCTP_BASE_INFO(hashtcpmark));
 	SCTP_BASE_INFO(hashtblsize) = SCTP_BASE_SYSCTL(sctp_hashtblsize);
-
 	SCTP_BASE_INFO(sctp_vrfhash) = SCTP_HASH_INIT(SCTP_SIZE_OF_VRF_HASH,
 	    &SCTP_BASE_INFO(hashvrfmark));
 
@@ -6047,6 +6047,7 @@ sctp_load_addresses_from_init(struct sctp_tcb *stcb, struct mbuf *m,
 	peer_supports_prsctp = 0;
 	peer_supports_auth = 0;
 	peer_supports_asconf = 0;
+	peer_supports_asconf_ack = 0;
 	peer_supports_reconfig = 0;
 	peer_supports_nrsack = 0;
 	peer_supports_pktdrop = 0;
@@ -6527,7 +6528,7 @@ sctp_load_addresses_from_init(struct sctp_tcb *stcb, struct mbuf *m,
 			    (ptype == SCTP_DEL_IP_ADDRESS) ||
 			    (ptype == SCTP_ERROR_CAUSE_IND) ||
 		    (ptype == SCTP_SUCCESS_REPORT)) {
-			 /* don't care */ ;
+			/* don't care */
 		} else {
 			if ((ptype & 0x8000) == 0x0000) {
 				/*

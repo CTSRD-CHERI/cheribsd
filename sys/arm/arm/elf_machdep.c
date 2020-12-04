@@ -86,7 +86,7 @@ struct sysentvec elf32_freebsd_sysvec = {
 	.sv_maxssiz	= NULL,
 	.sv_flags	=
 #if __ARM_ARCH >= 6
-			  SV_ASLR | SV_SHP | SV_TIMEKEEP |
+			  SV_ASLR | SV_SHP | SV_TIMEKEEP | SV_RNG_SEED_VER |
 #endif
 			  SV_ABI_FREEBSD | SV_ILP32 | SV_ASLR,
 	.sv_set_syscall_retval = cpu_set_syscall_retval,
@@ -236,7 +236,7 @@ elf_reloc_internal(linker_file_t lf, Elf_Addr relocbase, const void *data,
 		case R_ARM_ABS32:
 			error = lookup(lf, symidx, 1, &addr);
 			if (error != 0)
-				return -1;
+				return (-1);
 			store_ptr(where, addr + load_ptr(where));
 			break;
 
@@ -245,8 +245,9 @@ elf_reloc_internal(linker_file_t lf, Elf_Addr relocbase, const void *data,
 			 * There shouldn't be copy relocations in kernel
 			 * objects.
 			 */
-			printf("kldload: unexpected R_COPY relocation\n");
-			return -1;
+			printf("kldload: unexpected R_COPY relocation, "
+			    "symbol index %d\n", symidx);
+			return (-1);
 			break;
 
 		case R_ARM_JUMP_SLOT:
@@ -260,9 +261,9 @@ elf_reloc_internal(linker_file_t lf, Elf_Addr relocbase, const void *data,
 			break;
 
 		default:
-			printf("kldload: unexpected relocation type %d\n",
-			       rtype);
-			return -1;
+			printf("kldload: unexpected relocation type %d, "
+			    "symbol index %d\n", rtype, symidx);
+			return (-1);
 	}
 	return(0);
 }

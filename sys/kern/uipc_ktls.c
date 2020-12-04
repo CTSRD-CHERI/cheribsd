@@ -734,7 +734,7 @@ ktls_try_toe(struct socket *so, struct ktls_session *tls, int direction)
 		return (ECONNRESET);
 	}
 	tp = intotcpcb(inp);
-	if (tp->tod == NULL) {
+	if (!(tp->t_flags & TF_TOE)) {
 		INP_WUNLOCK(inp);
 		return (EOPNOTSUPP);
 	}
@@ -814,18 +814,26 @@ ktls_alloc_snd_tag(struct inpcb *inp, struct ktls_session *tls, bool force,
 	ifp = nh->nh_ifp;
 	if_ref(ifp);
 
-	params.hdr.type = IF_SND_TAG_TYPE_TLS;
+	/*
+	 * Allocate a TLS + ratelimit tag if the connection has an
+	 * existing pacing rate.
+	 */
+	if (tp->t_pacing_rate != -1 &&
+	    (ifp->if_capenable & IFCAP_TXTLS_RTLMT) != 0) {
+		params.hdr.type = IF_SND_TAG_TYPE_TLS_RATE_LIMIT;
+		params.tls_rate_limit.inp = inp;
+		params.tls_rate_limit.tls = tls;
+		params.tls_rate_limit.max_rate = tp->t_pacing_rate;
+	} else {
+		params.hdr.type = IF_SND_TAG_TYPE_TLS;
+		params.tls.inp = inp;
+		params.tls.tls = tls;
+	}
 	params.hdr.flowid = inp->inp_flowid;
 	params.hdr.flowtype = inp->inp_flowtype;
 	params.hdr.numa_domain = inp->inp_numa_domain;
-	params.tls.inp = inp;
-	params.tls.tls = tls;
 	INP_RUNLOCK(inp);
 
-	if (ifp->if_snd_tag_alloc == NULL) {
-		error = EOPNOTSUPP;
-		goto out;
-	}
 	if ((ifp->if_capenable & IFCAP_NOMAP) == 0) {	
 		error = EOPNOTSUPP;
 		goto out;
@@ -841,7 +849,7 @@ ktls_alloc_snd_tag(struct inpcb *inp, struct ktls_session *tls, bool force,
 			goto out;
 		}
 	}
-	error = ifp->if_snd_tag_alloc(ifp, &params, mstp);
+	error = m_snd_tag_alloc(ifp, &params, mstp);
 out:
 	if_rele(ifp);
 	return (error);
@@ -1034,6 +1042,7 @@ int
 ktls_enable_tx(struct socket *so, struct tls_enable *en)
 {
 	struct ktls_session *tls;
+	struct inpcb *inp;
 	int error;
 
 	if (!ktls_offload_enable)
@@ -1086,12 +1095,20 @@ ktls_enable_tx(struct socket *so, struct tls_enable *en)
 		return (error);
 	}
 
+	/*
+	 * Write lock the INP when setting sb_tls_info so that
+	 * routines in tcp_ratelimit.c can read sb_tls_info while
+	 * holding the INP lock.
+	 */
+	inp = so->so_pcb;
+	INP_WLOCK(inp);
 	SOCKBUF_LOCK(&so->so_snd);
 	so->so_snd.sb_tls_seqno = be64dec(en->rec_seq);
 	so->so_snd.sb_tls_info = tls;
 	if (tls->mode != TCP_TLS_MODE_SW)
 		so->so_snd.sb_flags |= SB_TLS_IFNET;
 	SOCKBUF_UNLOCK(&so->so_snd);
+	INP_WUNLOCK(inp);
 	sbunlock(&so->so_snd);
 
 	counter_u64_add(ktls_offload_total, 1);
@@ -1344,6 +1361,42 @@ ktls_output_eagain(struct inpcb *inp, struct ktls_session *tls)
 	mtx_pool_unlock(mtxpool_sleep, tls);
 	return (ENOBUFS);
 }
+
+#ifdef RATELIMIT
+int
+ktls_modify_txrtlmt(struct ktls_session *tls, uint64_t max_pacing_rate)
+{
+	union if_snd_tag_modify_params params = {
+		.rate_limit.max_rate = max_pacing_rate,
+		.rate_limit.flags = M_NOWAIT,
+	};
+	struct m_snd_tag *mst;
+	struct ifnet *ifp;
+	int error;
+
+	/* Can't get to the inp, but it should be locked. */
+	/* INP_LOCK_ASSERT(inp); */
+
+	MPASS(tls->mode == TCP_TLS_MODE_IFNET);
+
+	if (tls->snd_tag == NULL) {
+		/*
+		 * Resetting send tag, ignore this change.  The
+		 * pending reset may or may not see this updated rate
+		 * in the tcpcb.  If it doesn't, we will just lose
+		 * this rate change.
+		 */
+		return (0);
+	}
+
+	MPASS(tls->snd_tag != NULL);
+	MPASS(tls->snd_tag->type == IF_SND_TAG_TYPE_TLS_RATE_LIMIT);
+
+	mst = tls->snd_tag;
+	ifp = mst->ifp;
+	return (ifp->if_snd_tag_modify(mst, &params));
+}
+#endif
 #endif
 
 void
@@ -1384,7 +1437,9 @@ ktls_seq(struct sockbuf *sb, struct mbuf *m)
  * The enq_count argument on return is set to the number of pages of
  * payload data for this entire chain that need to be encrypted via SW
  * encryption.  The returned value should be passed to ktls_enqueue
- * when scheduling encryption of this chain of mbufs.
+ * when scheduling encryption of this chain of mbufs.  To handle the
+ * special case of empty fragments for TLS 1.0 sessions, an empty
+ * fragment counts as one page.
  */
 void
 ktls_frame(struct mbuf *top, struct ktls_session *tls, int *enq_cnt,
@@ -1400,12 +1455,16 @@ ktls_frame(struct mbuf *top, struct ktls_session *tls, int *enq_cnt,
 	*enq_cnt = 0;
 	for (m = top; m != NULL; m = m->m_next) {
 		/*
-		 * All mbufs in the chain should be non-empty TLS
-		 * records whose payload does not exceed the maximum
-		 * frame length.
+		 * All mbufs in the chain should be TLS records whose
+		 * payload does not exceed the maximum frame length.
+		 *
+		 * Empty TLS records are permitted when using CBC.
 		 */
-		KASSERT(m->m_len <= maxlen && m->m_len > 0,
+		KASSERT(m->m_len <= maxlen &&
+		    (tls->params.cipher_algorithm == CRYPTO_AES_CBC ?
+		    m->m_len >= 0 : m->m_len > 0),
 		    ("ktls_frame: m %p len %d\n", m, m->m_len));
+
 		/*
 		 * TLS frames require unmapped mbufs to store session
 		 * info.
@@ -1496,7 +1555,11 @@ ktls_frame(struct mbuf *top, struct ktls_session *tls, int *enq_cnt,
 		if (tls->mode == TCP_TLS_MODE_SW) {
 			m->m_flags |= M_NOTREADY;
 			m->m_epg_nrdy = m->m_epg_npgs;
-			*enq_cnt += m->m_epg_npgs;
+			if (__predict_false(tls_len == 0)) {
+				/* TLS 1.0 empty fragment. */
+				*enq_cnt += 1;
+			} else
+				*enq_cnt += m->m_epg_npgs;
 		}
 	}
 }
@@ -1961,7 +2024,11 @@ retry_page:
 			dst_iov[i].iov_len = len;
 		}
 
-		npages += i;
+		if (__predict_false(m->m_epg_npgs == 0)) {
+			/* TLS 1.0 empty fragment. */
+			npages++;
+		} else
+			npages += i;
 
 		error = (*tls->sw_encrypt)(tls,
 		    (const struct tls_record_layer *)m->m_epg_hdr,

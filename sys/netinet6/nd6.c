@@ -36,6 +36,7 @@ __FBSDID("$FreeBSD$");
 
 #include "opt_inet.h"
 #include "opt_inet6.h"
+#include "opt_route.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -1570,23 +1571,32 @@ nd6_free_redirect(const struct llentry *ln)
 /*
  * Updates status of the default router route.
  */
-void
-nd6_subscription_cb(struct rib_head *rnh, struct rib_cmd_info *rc, void *arg)
+static void
+check_release_defrouter(struct rib_cmd_info *rc, void *_cbdata)
 {
 	struct nd_defrouter *dr;
 	struct nhop_object *nh;
 
-	if (rc->rc_cmd == RTM_DELETE) {
-		nh = rc->rc_nh_old;
+	nh = rc->rc_nh_old;
 
-		if (nh->nh_flags & NHF_DEFAULT) {
-			dr = defrouter_lookup(&nh->gw6_sa.sin6_addr, nh->nh_ifp);
-			if (dr != NULL) {
-				dr->installed = 0;
-				defrouter_rele(dr);
-			}
+	if ((nh != NULL) && (nh->nh_flags & NHF_DEFAULT)) {
+		dr = defrouter_lookup(&nh->gw6_sa.sin6_addr, nh->nh_ifp);
+		if (dr != NULL) {
+			dr->installed = 0;
+			defrouter_rele(dr);
 		}
 	}
+}
+
+void
+nd6_subscription_cb(struct rib_head *rnh, struct rib_cmd_info *rc, void *arg)
+{
+
+#ifdef ROUTE_MPATH
+	rib_decompose_notification(rc, check_release_defrouter, NULL);
+#else
+	check_release_defrouter(rc, NULL);
+#endif
 }
 
 int

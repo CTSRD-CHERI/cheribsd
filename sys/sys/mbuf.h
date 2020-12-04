@@ -141,6 +141,7 @@ struct m_tag {
 struct m_snd_tag {
 	struct ifnet *ifp;		/* network interface tag belongs to */
 	volatile u_int refcount;
+	u_int	type;			/* One of IF_SND_TAG_TYPE_*. */
 };
 
 /*
@@ -753,6 +754,7 @@ m_epg_pagelen(const struct mbuf *m, int pidx, int pgoff)
 #define	MBUF_EXTPGS_MEM_NAME	"mbuf_extpgs"
 
 #ifdef _KERNEL
+union if_snd_tag_alloc_params;
 
 #ifdef WITNESS
 #define	MBUF_CHECKSLEEP(how) do {					\
@@ -833,7 +835,9 @@ int		 m_sanity(struct mbuf *, int);
 struct mbuf	*m_split(struct mbuf *, int, int);
 struct mbuf	*m_uiotombuf(struct uio *, int, int, int, int);
 struct mbuf	*m_unshare(struct mbuf *, int);
-void		 m_snd_tag_init(struct m_snd_tag *, struct ifnet *);
+int		 m_snd_tag_alloc(struct ifnet *,
+		    union if_snd_tag_alloc_params *, struct m_snd_tag **);
+void		 m_snd_tag_init(struct m_snd_tag *, struct ifnet *, u_int);
 void		 m_snd_tag_destroy(struct m_snd_tag *);
 
 static __inline int
@@ -1454,14 +1458,16 @@ rt_m_getfib(struct mbuf *m)
 	((_m)->m_pkthdr.fibnum) = (_fib);				\
 } while (0)
 
-/* flags passed as first argument for "m_ether_tcpip_hash()" */
+/* flags passed as first argument for "m_xxx_tcpip_hash()" */
 #define	MBUF_HASHFLAG_L2	(1 << 2)
 #define	MBUF_HASHFLAG_L3	(1 << 3)
 #define	MBUF_HASHFLAG_L4	(1 << 4)
 
 /* mbuf hashing helper routines */
 uint32_t	m_ether_tcpip_hash_init(void);
-uint32_t	m_ether_tcpip_hash(const uint32_t, const struct mbuf *, const uint32_t);
+uint32_t	m_ether_tcpip_hash(const uint32_t, const struct mbuf *, uint32_t);
+uint32_t	m_infiniband_tcpip_hash_init(void);
+uint32_t	m_infiniband_tcpip_hash(const uint32_t, const struct mbuf *, uint32_t);
 
 #ifdef MBUF_PROFILING
  void m_profile(struct mbuf *m);

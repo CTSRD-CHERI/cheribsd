@@ -512,8 +512,25 @@ linux_socket(struct thread *td, struct linux_socket_args *args)
 	if (retval_socket != 0)
 		return (retval_socket);
 	domain = linux_to_bsd_domain(args->domain);
-	if (domain == -1)
+	if (domain == -1) {
+		if (args->domain == LINUX_AF_NETLINK &&
+		    args->protocol == LINUX_NETLINK_ROUTE) {
+			linux_msg(curthread,
+			    "unsupported socket(AF_NETLINK, %d, NETLINK_ROUTE)", type);
+			return (EAFNOSUPPORT);
+		}
+		    
+		if (args->domain == LINUX_AF_NETLINK &&
+		    args->protocol == LINUX_NETLINK_UEVENT) {
+			linux_msg(curthread,
+			    "unsupported socket(AF_NETLINK, %d, NETLINK_UEVENT)", type);
+			return (EAFNOSUPPORT);
+		}
+	
+		linux_msg(curthread, "unsupported socket domain %d, type %d, protocol %d",
+		    args->domain, args->type & LINUX_SOCK_TYPE_MASK, args->protocol);
 		return (EAFNOSUPPORT);
+	}
 
 	retval_socket = kern_socket(td, domain, type, args->protocol);
 	if (retval_socket)
@@ -1539,7 +1556,7 @@ linux_getsockopt(struct thread *td, struct linux_getsockopt_args *args)
 			    name, &newval, UIO_SYSSPACE, &len);
 			if (error != 0)
 				return (error);
-			newval = -linux_to_bsd_errno(newval);
+			newval = -bsd_to_linux_errno(newval);
 			return (copyout(&newval, PTRIN(args->optval), len));
 			/* NOTREACHED */
 		default:

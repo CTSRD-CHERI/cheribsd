@@ -269,14 +269,12 @@ iommu_instantiate_ctx(struct iommu_unit *unit, device_t dev, bool rmrr)
 	return (ctx);
 }
 
-bus_dma_tag_t
-acpi_iommu_get_dma_tag(device_t dev, device_t child)
+struct iommu_ctx *
+iommu_get_dev_ctx(device_t dev)
 {
 	struct iommu_unit *unit;
-	struct iommu_ctx *ctx;
-	bus_dma_tag_t res;
 
-	unit = iommu_find(child, bootverbose);
+	unit = iommu_find(dev, bootverbose);
 	/* Not in scope of any IOMMU ? */
 	if (unit == NULL)
 		return (NULL);
@@ -288,8 +286,20 @@ acpi_iommu_get_dma_tag(device_t dev, device_t child)
 	dmar_instantiate_rmrr_ctxs(unit);
 #endif
 
-	ctx = iommu_instantiate_ctx(unit, child, false);
-	res = ctx == NULL ? NULL : (bus_dma_tag_t)ctx->tag;
+	return (iommu_instantiate_ctx(unit, dev, false));
+}
+
+bus_dma_tag_t
+iommu_get_dma_tag(device_t dev, device_t child)
+{
+	struct iommu_ctx *ctx;
+	bus_dma_tag_t res;
+
+	ctx = iommu_get_dev_ctx(child);
+	if (ctx == NULL)
+		return (NULL);
+
+	res = (bus_dma_tag_t)ctx->tag;
 	return (res);
 }
 
@@ -878,7 +888,7 @@ iommu_bus_dmamap_unload(bus_dma_tag_t dmat, bus_dmamap_t map1)
 	struct bus_dmamap_iommu *map;
 	struct iommu_ctx *ctx;
 	struct iommu_domain *domain;
-#if defined(__amd64__)
+#ifndef IOMMU_DOMAIN_UNLOAD_SLEEP
 	struct iommu_map_entries_tailq entries;
 #endif
 
@@ -888,13 +898,13 @@ iommu_bus_dmamap_unload(bus_dma_tag_t dmat, bus_dmamap_t map1)
 	domain = ctx->domain;
 	atomic_add_long(&ctx->unloads, 1);
 
-#if defined(__i386__)
+#if defined(IOMMU_DOMAIN_UNLOAD_SLEEP)
 	IOMMU_DOMAIN_LOCK(domain);
 	TAILQ_CONCAT(&domain->unload_entries, &map->map_entries, dmamap_link);
 	IOMMU_DOMAIN_UNLOCK(domain);
 	taskqueue_enqueue(domain->iommu->delayed_taskqueue,
 	    &domain->unload_task);
-#else /* defined(__amd64__) */
+#else
 	TAILQ_INIT(&entries);
 	IOMMU_DOMAIN_LOCK(domain);
 	TAILQ_CONCAT(&entries, &map->map_entries, dmamap_link);

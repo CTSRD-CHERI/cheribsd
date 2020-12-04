@@ -746,7 +746,7 @@ contrib/zstd/lib/decompress/zstd_decompress_block.c	optional zstdio \
 	compile-with "${ZSTD_C} ${ZSTD_DECOMPRESS_BLOCK_FLAGS}"
 contrib/zstd/lib/decompress/huf_decompress.c	optional zstdio compile-with ${ZSTD_C}
 # Blake 2
-contrib/libb2/blake2b-ref.c	optional crypto | ipsec | ipsec_support \
+contrib/libb2/blake2b-ref.c	optional crypto | ipsec | ipsec_support | !random_loadable random_fenestrasx \
 	compile-with "${NORMAL_C} -I$S/crypto/blake2 -Wno-cast-qual -DSUFFIX=_ref -Wno-unused-function"
 contrib/libb2/blake2s-ref.c	optional crypto | ipsec | ipsec_support \
 	compile-with "${NORMAL_C} -I$S/crypto/blake2 -Wno-cast-qual -DSUFFIX=_ref -Wno-unused-function"
@@ -1338,6 +1338,8 @@ dev/ath/ath_rate/sample/sample.c	optional ath_rate_sample \
 dev/ath/ath_dfs/null/dfs_null.c	optional ath \
 	compile-with "${NORMAL_C} -I$S/dev/ath"
 #
+dev/backlight/backlight_if.m		optional backlight | compat_linuxkpi
+dev/backlight/backlight.c		optional backlight | compat_linuxkpi
 dev/bce/if_bce.c			optional bce
 dev/bfe/if_bfe.c			optional bfe
 dev/bge/if_bge.c			optional bge
@@ -2779,6 +2781,7 @@ dev/pwm/pwmbus.c		optional pwm | pwmbus
 dev/pwm/pwmbus_if.m		optional pwm | pwmbus
 dev/pwm/ofw_pwm.c		optional pwm fdt | pwmbus fdt
 dev/pwm/ofw_pwmbus.c		optional pwm fdt | pwmbus fdt
+dev/pwm/pwm_backlight.c		optional pwm pwm_backlight ext_resources fdt
 dev/quicc/quicc_core.c		optional quicc
 dev/ral/rt2560.c		optional ral
 dev/ral/rt2661.c		optional ral
@@ -2843,7 +2846,14 @@ rt2860.fw			optional rt2860fw | ralfw		\
 dev/random/random_infra.c	standard
 dev/random/random_harvestq.c	standard
 dev/random/randomdev.c		optional !random_loadable
-dev/random/fortuna.c		optional !random_loadable
+dev/random/fenestrasX/fx_brng.c	optional !random_loadable random_fenestrasx
+dev/random/fenestrasX/fx_main.c	optional !random_loadable random_fenestrasx \
+	compile-with "${NORMAL_C} -I$S/crypto/blake2"
+dev/random/fenestrasX/fx_pool.c	optional !random_loadable random_fenestrasx \
+	compile-with "${NORMAL_C} -I$S/crypto/blake2"
+dev/random/fenestrasX/fx_rng.c	optional !random_loadable random_fenestrasx \
+	compile-with "${NORMAL_C} -I$S/crypto/blake2"
+dev/random/fortuna.c		optional !random_loadable !random_fenestrasx
 dev/random/hash.c		optional !random_loadable
 dev/rccgpio/rccgpio.c		optional rccgpio gpio
 dev/re/if_re.c			optional re
@@ -3471,6 +3481,18 @@ dev/virtio/random/virtio_random.c	optional	virtio_random
 dev/virtio/console/virtio_console.c	optional	virtio_console
 dev/vkbd/vkbd.c			optional vkbd
 dev/vmgenc/vmgenc_acpi.c	optional acpi
+dev/vmware/vmxnet3/if_vmx.c		optional vmx
+dev/vmware/vmci/vmci.c			optional vmci
+dev/vmware/vmci/vmci_datagram.c		optional vmci
+dev/vmware/vmci/vmci_doorbell.c		optional vmci
+dev/vmware/vmci/vmci_driver.c		optional vmci
+dev/vmware/vmci/vmci_event.c		optional vmci
+dev/vmware/vmci/vmci_hashtable.c	optional vmci
+dev/vmware/vmci/vmci_kernel_if.c	optional vmci
+dev/vmware/vmci/vmci_qpair.c		optional vmci
+dev/vmware/vmci/vmci_queue_pair.c	optional vmci
+dev/vmware/vmci/vmci_resource.c		optional vmci
+dev/vmware/pvscsi/pvscsi.c		optional pvscsi
 dev/vr/if_vr.c			optional vr pci
 dev/vt/colors/vt_termcolors.c	optional vt
 dev/vt/font/vt_font_default.c	optional vt
@@ -4169,10 +4191,12 @@ net/debugnet.c			optional inet debugnet
 net/debugnet_inet.c		optional inet debugnet
 net/pfil.c			optional ether | inet
 net/radix.c			standard
-net/radix_mpath.c		standard
 net/raw_cb.c			standard
 net/raw_usrreq.c		standard
 net/route.c			standard
+net/route/mpath_ctl.c		optional route_mpath
+net/route/nhgrp.c		optional route_mpath
+net/route/nhgrp_ctl.c		optional route_mpath
 net/route/nhop.c		standard
 net/route/nhop_ctl.c		standard
 net/route/nhop_utils.c		standard
@@ -4185,7 +4209,7 @@ net/rss_config.c		optional inet rss | inet6 rss
 net/rtsock.c			standard
 net/slcompress.c		optional netgraph_vjc | sppp | \
 					 netgraph_sppp
-net/toeplitz.c			optional inet rss | inet6 rss
+net/toeplitz.c			optional inet rss | inet6 rss | route_mpath
 net/vnet.c			optional vimage
 net80211/ieee80211.c		optional wlan
 net80211/ieee80211_acl.c	optional wlan wlan_acl
@@ -4536,6 +4560,8 @@ compat/linuxkpi/common/src/linux_compat.c	optional compat_linuxkpi \
 	compile-with "${LINUXKPI_C}"
 compat/linuxkpi/common/src/linux_current.c	optional compat_linuxkpi \
 	compile-with "${LINUXKPI_C}"
+compat/linuxkpi/common/src/linux_dmi.c		optional compat_linuxkpi \
+	compile-with "${LINUXKPI_C}"
 compat/linuxkpi/common/src/linux_hrtimer.c	optional compat_linuxkpi \
 	compile-with "${LINUXKPI_C}"
 compat/linuxkpi/common/src/linux_kthread.c	optional compat_linuxkpi \
@@ -4574,6 +4600,7 @@ compat/lindebugfs/lindebugfs.c			optional lindebugfs \
 	compile-with "${LINUXKPI_C}"
 
 # OpenFabrics Enterprise Distribution (Infiniband)
+net/if_infiniband.c					optional ofed | lagg
 ofed/drivers/infiniband/core/ib_addr.c			optional ofed	\
 	compile-with "${OFED_C}"
 ofed/drivers/infiniband/core/ib_agent.c			optional ofed	\

@@ -62,6 +62,8 @@ typedef struct zstd_stats {
 	kstat_named_t	zstd_stat_dec_header_inval;
 	kstat_named_t	zstd_stat_com_fail;
 	kstat_named_t	zstd_stat_dec_fail;
+	kstat_named_t	zstd_stat_buffers;
+	kstat_named_t	zstd_stat_size;
 } zstd_stats_t;
 
 static zstd_stats_t zstd_stats = {
@@ -74,6 +76,8 @@ static zstd_stats_t zstd_stats = {
 	{ "decompress_header_invalid",	KSTAT_DATA_UINT64 },
 	{ "compress_failed",		KSTAT_DATA_UINT64 },
 	{ "decompress_failed",		KSTAT_DATA_UINT64 },
+	{ "buffers",			KSTAT_DATA_UINT64 },
+	{ "size",			KSTAT_DATA_UINT64 },
 };
 
 /* Enums describing the allocator type specified by kmem_type in zstd_kmem */
@@ -238,7 +242,7 @@ zstd_mempool_alloc(struct zstd_pool *zstd_mempool, size_t size)
 			 * Check if objects fits the size, if so we take it and
 			 * update the timestamp.
 			 */
-			if (!mem && pool->mem && size <= pool->size) {
+			if (size && !mem && pool->mem && size <= pool->size) {
 				pool->timeout = gethrestime_sec() +
 				    ZSTD_POOL_TIMEOUT;
 				mem = pool->mem;
@@ -248,6 +252,8 @@ zstd_mempool_alloc(struct zstd_pool *zstd_mempool, size_t size)
 			/* Free memory if unused object older than 2 minutes */
 			if (pool->mem && gethrestime_sec() > pool->timeout) {
 				vmem_free(pool->mem, pool->size);
+				ZSTDSTAT_SUB(zstd_stat_buffers, 1);
+				ZSTDSTAT_SUB(zstd_stat_size, pool->size);
 				pool->mem = NULL;
 				pool->size = 0;
 				pool->timeout = 0;
@@ -257,7 +263,7 @@ zstd_mempool_alloc(struct zstd_pool *zstd_mempool, size_t size)
 		}
 	}
 
-	if (mem) {
+	if (!size || mem) {
 		return (mem);
 	}
 
@@ -275,12 +281,13 @@ zstd_mempool_alloc(struct zstd_pool *zstd_mempool, size_t size)
 			/* Object is free, try to allocate new one */
 			if (!pool->mem) {
 				mem = vmem_alloc(size, KM_SLEEP);
-				pool->mem = mem;
-
-				if (pool->mem) {
+				if (mem) {
+					ZSTDSTAT_ADD(zstd_stat_buffers, 1);
+					ZSTDSTAT_ADD(zstd_stat_size, size);
+					pool->mem = mem;
+					pool->size = size;
 					/* Keep track for later release */
 					mem->pool = pool;
-					pool->size = size;
 					mem->kmem_type = ZSTD_KMEM_POOL;
 					mem->kmem_size = size;
 				}
@@ -688,6 +695,19 @@ zstd_mempool_deinit(void)
 	zstd_mempool_cctx = NULL;
 }
 
+/* release unused memory from pool */
+
+void
+zfs_zstd_cache_reap_now(void)
+{
+	/*
+	 * calling alloc with zero size seeks
+	 * and releases old unused objects
+	 */
+	zstd_mempool_alloc(zstd_mempool_cctx, 0);
+	zstd_mempool_alloc(zstd_mempool_dctx, 0);
+}
+
 extern int __init
 zstd_init(void)
 {
@@ -729,10 +749,11 @@ module_init(zstd_init);
 module_exit(zstd_fini);
 
 ZFS_MODULE_DESCRIPTION("ZSTD Compression for ZFS");
-ZFS_MODULE_LICENSE("BSD");
+ZFS_MODULE_LICENSE("Dual BSD/GPL");
 ZFS_MODULE_VERSION(ZSTD_VERSION_STRING);
 
 EXPORT_SYMBOL(zfs_zstd_compress);
 EXPORT_SYMBOL(zfs_zstd_decompress_level);
 EXPORT_SYMBOL(zfs_zstd_decompress);
+EXPORT_SYMBOL(zfs_zstd_cache_reap_now);
 #endif

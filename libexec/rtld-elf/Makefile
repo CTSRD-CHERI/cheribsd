@@ -53,15 +53,14 @@ MAN?=		rtld.1
 ACFLAGS+=	-DLOCORE
 CFLAGS+=	-Wall -DFREEBSD_ELF -DIN_RTLD -ffreestanding
 CFLAGS+=	-I${SRCTOP}/lib/csu/common
-.if exists(${RTLD_ELF_DIR}/${MACHINE_ARCH})
-RTLD_ARCH=	${MACHINE_ARCH}
+.if exists(${RTLD_ELF_DIR}/${MACHINE_ARCH:S/powerpc64le/powerpc64/})
+RTLD_ARCH=	${MACHINE_ARCH:S/powerpc64le/powerpc64/}
 .else
 RTLD_ARCH=	${MACHINE_CPUARCH}
 .endif
 CFLAGS+=	-I${RTLD_ELF_DIR}/${RTLD_ARCH} -I${RTLD_ELF_DIR}
 
 NO_WCAST_ALIGN=	yes
-WARNS?=		6
 INSTALLFLAGS=	-C -b
 PRECIOUSPROG=
 BINDIR=		/libexec

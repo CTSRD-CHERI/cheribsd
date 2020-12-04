@@ -253,4 +253,14 @@
  */
 #define	VM_BATCHQUEUE_SIZE	31
 
+/*
+ * The pmap can create non-transparent large page mappings.
+ */
+#define	PMAP_HAS_LARGEPAGES	1
+
+/*
+ * Need a page dump array for minidump.
+ */
+#define MINIDUMP_PAGE_TRACKING	1
+
 #endif /* _MACHINE_VMPARAM_H_ */

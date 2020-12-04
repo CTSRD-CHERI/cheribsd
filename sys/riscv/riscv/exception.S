@@ -40,11 +40,11 @@ __FBSDID("$FreeBSD$");
 #include <machine/trap.h>
 #include <machine/riscvreg.h>
 
-.macro save_registers el
+.macro save_registers mode
 #if __has_feature(capabilities)
 .option push
 .option capmode
-.if \el == 1
+.if \mode == 1
 	/*
 	 * Build a capability for 'csp' using 'sp' as an address
 	 * in the kernel DDC.  We haven't saved any registers yet,
@@ -68,7 +68,7 @@ __FBSDID("$FreeBSD$");
 	sd	ra, (TF_RA)(sp)
 #endif
 
-.if \el == 0	/* We came from userspace. */
+.if \mode == 0	/* We came from userspace. */
 #if __has_feature(capabilities)
 	csc	cgp, (TF_GP)(csp)
 
@@ -115,7 +115,7 @@ __FBSDID("$FreeBSD$");
 	csc	ca6, (TF_A + 6 * 16)(csp)
 	csc	ca7, (TF_A + 7 * 16)(csp)
 
-.if \el == 1
+.if \mode == 1
 	/* Store kernel sp */
 	li	t1, TF_SIZE
 	cincoffset ct0, csp, t1
@@ -171,7 +171,7 @@ __FBSDID("$FreeBSD$");
 	sd	a6, (TF_A + 6 * 8)(sp)
 	sd	a7, (TF_A + 7 * 8)(sp)
 
-.if \el == 1
+.if \mode == 1
 	/* Store kernel sp */
 	li	t1, TF_SIZE
 	add	t0, sp, t1
@@ -193,7 +193,7 @@ __FBSDID("$FreeBSD$");
 	csrr	t0, scause
 	sd	t0, (TF_SCAUSE)(sp)
 
-.if \el == 0
+.if \mode == 0
 .option push
 .option norelax
 	/* Load the kernel's global pointer */
@@ -202,9 +202,9 @@ __FBSDID("$FreeBSD$");
 .endif
 .endm
 
-.macro load_registers el
+.macro load_registers mode
 	ld	t0, (TF_SSTATUS)(sp)
-.if \el == 0
+.if \mode == 0
 	/* Ensure user interrupts will be enabled on eret */
 	li	t1, SSTATUS_SPIE
 	or	t0, t0, t1
@@ -250,7 +250,7 @@ __FBSDID("$FreeBSD$");
 	clc	ct0, (TF_SEPC)(csp)
 	cspecialw sepcc, ct0
 
-.if \el == 0
+.if \mode == 0
 	/* We go to userspace. Load user csp */
 	clc	ct0, (TF_SP)(csp)
 	cspecialw sscratchc, ct0
@@ -301,7 +301,7 @@ __FBSDID("$FreeBSD$");
 	ld	t0, (TF_SEPC)(sp)
 	csrw	sepc, t0
 
-.if \el == 0
+.if \mode == 0
 	/* We go to userspace. Load user sp */
 	ld	t0, (TF_SP)(sp)
 	csrw	sscratch, t0

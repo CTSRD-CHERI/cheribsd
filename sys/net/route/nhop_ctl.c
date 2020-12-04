@@ -164,8 +164,7 @@ cmp_priv(const struct nhop_priv *_one, const struct nhop_priv *_two)
 	if (memcmp(_one->nh, _two->nh, NHOP_END_CMP) != 0)
 		return (0);
 
-	if ((_one->nh_type != _two->nh_type) ||
-	    (_one->nh_family != _two->nh_family))
+	if (memcmp(_one, _two, NH_PRIV_END_CMP) != 0)
 		return (0);
 
 	return (1);
@@ -205,6 +204,7 @@ static void
 fill_sdl_from_ifp(struct sockaddr_dl_short *sdl, const struct ifnet *ifp)
 {
 
+	bzero(sdl, sizeof(struct sockaddr_dl_short));
 	sdl->sdl_family = AF_LINK;
 	sdl->sdl_len = sizeof(struct sockaddr_dl_short);
 	sdl->sdl_index = ifp->if_index;
@@ -217,6 +217,8 @@ set_nhop_gw_from_info(struct nhop_object *nh, struct rt_addrinfo *info)
 	struct sockaddr *gw;
 
 	gw = info->rti_info[RTAX_GATEWAY];
+	KASSERT(gw != NULL, ("gw is NULL"));
+
 	if (info->rti_flags & RTF_GATEWAY) {
 		if (gw->sa_len > sizeof(struct sockaddr_in6)) {
 			DPRINTF("nhop SA size too big: AF %d len %u",
@@ -318,6 +320,9 @@ nhop_create_from_info(struct rib_head *rnh, struct rt_addrinfo *info,
 	int error;
 
 	NET_EPOCH_ASSERT();
+
+	if (info->rti_info[RTAX_GATEWAY] == NULL)
+		return (EINVAL);
 
 	nh_priv = alloc_nhop_structure();
 
@@ -685,18 +690,18 @@ nhop_free(struct nhop_object *nh)
 	    &nh_priv->nh_epoch_ctx);
 }
 
-int
-nhop_ref_any(struct nhop_object *nh)
-{
-
-	return (nhop_try_ref_object(nh));
-}
-
 void
 nhop_free_any(struct nhop_object *nh)
 {
 
+#ifdef ROUTE_MPATH
+	if (!NH_IS_NHGRP(nh))
+		nhop_free(nh);
+	else
+		nhgrp_free((struct nhgrp_object *)nh);
+#else
 	nhop_free(nh);
+#endif
 }
 
 /* Helper functions */

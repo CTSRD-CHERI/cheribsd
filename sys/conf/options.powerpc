@@ -8,6 +8,7 @@ CELL
 
 POWERPC
 POWERPC64
+POWERPC64LE
 POWERPCSPE
 
 FPU_EMU
@@ -28,6 +29,7 @@ MAMBO
 POWERNV			opt_platform.h
 PSERIES
 PSIM
+QEMU			opt_platform.h
 
 SC_OFWFB		opt_ofwfb.h
 

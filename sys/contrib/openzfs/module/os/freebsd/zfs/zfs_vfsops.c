@@ -592,6 +592,14 @@ acl_inherit_changed_cb(void *arg, uint64_t newval)
 	zfsvfs->z_acl_inherit = newval;
 }
 
+static void
+acl_type_changed_cb(void *arg, uint64_t newval)
+{
+	zfsvfs_t *zfsvfs = arg;
+
+	zfsvfs->z_acl_type = newval;
+}
+
 static int
 zfs_register_callbacks(vfs_t *vfsp)
 {
@@ -723,6 +731,8 @@ zfs_register_callbacks(vfs_t *vfsp)
 	error = error ? error : dsl_prop_register(ds,
 	    zfs_prop_to_name(ZFS_PROP_SNAPDIR), snapdir_changed_cb, zfsvfs);
 	error = error ? error : dsl_prop_register(ds,
+	    zfs_prop_to_name(ZFS_PROP_ACLTYPE), acl_type_changed_cb, zfsvfs);
+	error = error ? error : dsl_prop_register(ds,
 	    zfs_prop_to_name(ZFS_PROP_ACLMODE), acl_mode_changed_cb, zfsvfs);
 	error = error ? error : dsl_prop_register(ds,
 	    zfs_prop_to_name(ZFS_PROP_ACLINHERIT), acl_inherit_changed_cb,
@@ -796,6 +806,11 @@ zfsvfs_init(zfsvfs_t *zfsvfs, objset_t *os)
 	if (error != 0)
 		return (error);
 	zfsvfs->z_case = (uint_t)val;
+
+	error = zfs_get_zplprop(os, ZFS_PROP_ACLTYPE, &val);
+	if (error != 0)
+		return (error);
+	zfsvfs->z_acl_type = (uint_t)val;
 
 	/*
 	 * Fold case on file systems that are always or sometimes case
@@ -1103,21 +1118,10 @@ zfsvfs_setup(zfsvfs_t *zfsvfs, boolean_t mounting)
 	return (0);
 }
 
-extern krwlock_t zfsvfs_lock; /* in zfs_znode.c */
-
 void
 zfsvfs_free(zfsvfs_t *zfsvfs)
 {
 	int i;
-
-	/*
-	 * This is a barrier to prevent the filesystem from going away in
-	 * zfs_znode_move() until we can safely ensure that the filesystem is
-	 * not unmounted. We consider the filesystem valid before the barrier
-	 * and invalid after the barrier.
-	 */
-	rw_enter(&zfsvfs_lock, RW_READER);
-	rw_exit(&zfsvfs_lock);
 
 	zfs_fuid_destroy(zfsvfs);
 
@@ -1232,6 +1236,10 @@ zfs_domount(vfs_t *vfsp, char *osname)
 		    "xattr", &pval, NULL)))
 			goto out;
 		xattr_changed_cb(zfsvfs, pval);
+		if ((error = dsl_prop_get_integer(osname,
+		    "acltype", &pval, NULL)))
+			goto out;
+		acl_type_changed_cb(zfsvfs, pval);
 		zfsvfs->z_issnap = B_TRUE;
 		zfsvfs->z_os->os_sync = ZFS_SYNC_DISABLED;
 
@@ -1532,7 +1540,11 @@ zfsvfs_teardown(zfsvfs_t *zfsvfs, boolean_t unmounting)
 		 * 'z_parent' is self referential for non-snapshots.
 		 */
 #ifdef FREEBSD_NAMECACHE
+#if __FreeBSD_version >= 1300117
+		cache_purgevfs(zfsvfs->z_parent->z_vfs);
+#else
 		cache_purgevfs(zfsvfs->z_parent->z_vfs, true);
+#endif
 #endif
 	}
 
@@ -2215,6 +2227,9 @@ zfs_get_zplprop(objset_t *os, zfs_prop_t prop, uint64_t *value)
 			break;
 		case ZFS_PROP_CASE:
 			*value = ZFS_CASE_SENSITIVE;
+			break;
+		case ZFS_PROP_ACLTYPE:
+			*value = ZFS_ACLTYPE_NFSV4;
 			break;
 		default:
 			return (error);

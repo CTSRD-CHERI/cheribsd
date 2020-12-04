@@ -89,7 +89,7 @@
 #elif defined(__mips__)
 #define	TRAPNO_CHERI	(T_C2E)
 #elif defined(__riscv)
-#define	TRAPNO_CHERI	(EXCP_CHERI)
+#define	TRAPNO_CHERI	(SCAUSE_CHERI)
 #else
 #error "Unsupported architecture"
 #endif
@@ -1020,7 +1020,7 @@ static const struct cheri_test cheri_tests[] = {
 	  .ct_signum = SIGSEGV,
 	  .ct_si_code = SEGV_STORETAG,
 #ifdef __riscv
-	  .ct_si_trapno = EXCP_STORE_AMO_CAP_PAGE_FAULT,
+	  .ct_si_trapno = SCAUSE_STORE_AMO_CAP_PAGE_FAULT,
 #else
 	  .ct_si_trapno = TRAPNO_CHERI,
 #endif

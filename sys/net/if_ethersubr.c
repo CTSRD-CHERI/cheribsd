@@ -110,7 +110,7 @@ void	(*vlan_input_p)(struct ifnet *, struct mbuf *);
 void	(*bridge_dn_p)(struct mbuf *, struct ifnet *);
 
 /* if_lagg(4) support */
-struct mbuf *(*lagg_input_p)(struct ifnet *, struct mbuf *); 
+struct mbuf *(*lagg_input_ethernet_p)(struct ifnet *, struct mbuf *); 
 
 static const u_char etherbroadcastaddr[ETHER_ADDR_LEN] =
 			{ 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
@@ -441,11 +441,18 @@ bad:			if (m != NULL)
 static bool
 ether_set_pcp(struct mbuf **mp, struct ifnet *ifp, uint8_t pcp)
 {
+	struct ether_8021q_tag qtag;
 	struct ether_header *eh;
 
 	eh = mtod(*mp, struct ether_header *);
 	if (ntohs(eh->ether_type) == ETHERTYPE_VLAN ||
-	    ether_8021q_frame(mp, ifp, ifp, 0, pcp))
+	    ntohs(eh->ether_type) == ETHERTYPE_QINQ)
+		return (true);
+
+	qtag.vid = 0;
+	qtag.pcp = pcp;
+	qtag.proto = ETHERTYPE_VLAN;
+	if (ether_8021q_frame(mp, ifp, ifp, &qtag))
 		return (true);
 	if_inc_counter(ifp, IFCOUNTER_OERRORS, 1);
 	return (false);
@@ -601,9 +608,9 @@ ether_input_internal(struct ifnet *ifp, struct mbuf *m)
 
 	/* Handle input from a lagg(4) port */
 	if (ifp->if_type == IFT_IEEE8023ADLAG) {
-		KASSERT(lagg_input_p != NULL,
+		KASSERT(lagg_input_ethernet_p != NULL,
 		    ("%s: if_lagg not loaded!", __func__));
-		m = (*lagg_input_p)(ifp, m);
+		m = (*lagg_input_ethernet_p)(ifp, m);
 		if (m != NULL)
 			ifp = m->m_pkthdr.rcvif;
 		else {
@@ -616,9 +623,9 @@ ether_input_internal(struct ifnet *ifp, struct mbuf *m)
 	 * If the hardware did not process an 802.1Q tag, do this now,
 	 * to allow 802.1P priority frames to be passed to the main input
 	 * path correctly.
-	 * TODO: Deal with Q-in-Q frames, but not arbitrary nesting levels.
 	 */
-	if ((m->m_flags & M_VLANTAG) == 0 && etype == ETHERTYPE_VLAN) {
+	if ((m->m_flags & M_VLANTAG) == 0 &&
+	    ((etype == ETHERTYPE_VLAN) || (etype == ETHERTYPE_QINQ))) {
 		struct ether_vlan_header *evl;
 
 		if (m->m_len < sizeof(*evl) &&
@@ -1303,7 +1310,7 @@ ether_vlan_mtap(struct bpf_if *bp, struct mbuf *m, void *data, u_int dlen)
 }
 
 struct mbuf *
-ether_vlanencap(struct mbuf *m, uint16_t tag)
+ether_vlanencap_proto(struct mbuf *m, uint16_t tag, uint16_t proto)
 {
 	struct ether_vlan_header *evl;
 
@@ -1325,7 +1332,7 @@ ether_vlanencap(struct mbuf *m, uint16_t tag)
 	evl = mtod(m, struct ether_vlan_header *);
 	bcopy((char *)evl + ETHER_VLAN_ENCAP_LEN,
 	    (char *)evl, ETHER_HDR_LEN - ETHER_TYPE_LEN);
-	evl->evl_encap_proto = htons(ETHERTYPE_VLAN);
+	evl->evl_encap_proto = htons(proto);
 	evl->evl_tag = htons(tag);
 	return (m);
 }
@@ -1354,7 +1361,7 @@ SYSCTL_INT(_net_link_vlan, OID_AUTO, mtag_pcp, CTLFLAG_RW,
 
 bool
 ether_8021q_frame(struct mbuf **mp, struct ifnet *ife, struct ifnet *p,
-    uint16_t vid, uint8_t pcp)
+    struct ether_8021q_tag *qtag)
 {
 	struct m_tag *mtag;
 	int n;
@@ -1388,6 +1395,13 @@ ether_8021q_frame(struct mbuf **mp, struct ifnet *ife, struct ifnet *p,
 	}
 
 	/*
+	 * If PCP is set in mbuf, use it
+	 */
+	if ((*mp)->m_flags & M_VLANTAG) {
+		qtag->pcp = EVL_PRIOFTAG((*mp)->m_pkthdr.ether_vtag);
+	}
+
+	/*
 	 * If underlying interface can do VLAN tag insertion itself,
 	 * just pass the packet along. However, we need some way to
 	 * tell the interface where the packet came from so that it
@@ -1396,14 +1410,15 @@ ether_8021q_frame(struct mbuf **mp, struct ifnet *ife, struct ifnet *p,
 	 */
 	if (vlan_mtag_pcp && (mtag = m_tag_locate(*mp, MTAG_8021Q,
 	    MTAG_8021Q_PCP_OUT, NULL)) != NULL)
-		tag = EVL_MAKETAG(vid, *(uint8_t *)(mtag + 1), 0);
+		tag = EVL_MAKETAG(qtag->vid, *(uint8_t *)(mtag + 1), 0);
 	else
-		tag = EVL_MAKETAG(vid, pcp, 0);
-	if (p->if_capenable & IFCAP_VLAN_HWTAGGING) {
+		tag = EVL_MAKETAG(qtag->vid, qtag->pcp, 0);
+	if ((p->if_capenable & IFCAP_VLAN_HWTAGGING) &&
+	    (qtag->proto == ETHERTYPE_VLAN)) {
 		(*mp)->m_pkthdr.ether_vtag = tag;
 		(*mp)->m_flags |= M_VLANTAG;
 	} else {
-		*mp = ether_vlanencap(*mp, tag);
+		*mp = ether_vlanencap_proto(*mp, tag, qtag->proto);
 		if (*mp == NULL) {
 			if_printf(ife, "unable to prepend 802.1Q header");
 			return (false);

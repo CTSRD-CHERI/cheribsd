@@ -3915,7 +3915,7 @@ int t4_link_l1cfg(struct adapter *adap, unsigned int mbox, unsigned int port,
 		speed = fwcap_top_speed(lc->pcaps);
 
 	fec = 0;
-	if (fec_supported(lc->pcaps)) {
+	if (fec_supported(speed)) {
 		if (lc->requested_fec == FEC_AUTO) {
 			if (lc->pcaps & FW_PORT_CAP32_FORCE_FEC) {
 				if (speed & FW_PORT_CAP32_SPEED_100G) {
@@ -6852,8 +6852,8 @@ void t4_get_port_stats_offset(struct adapter *adap, int idx,
  */
 void t4_get_port_stats(struct adapter *adap, int idx, struct port_stats *p)
 {
-	u32 bgmap = adap2pinfo(adap, idx)->mps_bg_map;
-	struct link_config *lc = &adap->port[idx]->link_cfg;
+	struct port_info *pi = adap->port[idx];
+	u32 bgmap = pi->mps_bg_map;
 	u32 stat_ctl = t4_read_reg(adap, A_MPS_STAT_CTL);
 
 #define GET_STAT(name) \
@@ -6922,25 +6922,8 @@ void t4_get_port_stats(struct adapter *adap, int idx, struct port_stats *p)
 	p->rx_ppp6		= GET_STAT(RX_PORT_PPP6);
 	p->rx_ppp7		= GET_STAT(RX_PORT_PPP7);
 
-	/*
-	 * The T6's MPS's RX_PORT_CRC_ERROR register doesn't actually count CRC
-	 * errors so get that information from the MAC instead.  Which MAC is in
-	 * use depends on speed and FEC.  The MAC counters clear on reset or
-	 * link state change so we are only reporting errors for this
-	 * incarnation of the link here.
-	 */
-	if (chip_id(adap) != CHELSIO_T6)
-		p->rx_fcs_err = GET_STAT(RX_PORT_CRC_ERROR);
-	else if (lc->link_ok) {
-		if (lc->speed > 25000 ||
-		    (lc->speed == 25000 && lc->fec == FEC_RS)) {
-			p->rx_fcs_err = t4_read_reg64(adap, T5_PORT_REG(idx,
-			    A_MAC_PORT_AFRAMECHECKSEQUENCEERRORS));
-		} else {
-			p->rx_fcs_err = t4_read_reg64(adap, T5_PORT_REG(idx,
-			    A_MAC_PORT_MTIP_1G10G_RX_CRCERRORS));
-		}
-	}
+	if (pi->fcs_reg != -1)
+		p->rx_fcs_err = t4_read_reg64(adap, pi->fcs_reg) - pi->fcs_base;
 
 	if (chip_id(adap) >= CHELSIO_T5) {
 		if (stat_ctl & F_COUNTPAUSESTATRX) {
@@ -6974,7 +6957,6 @@ void t4_get_port_stats(struct adapter *adap, int idx, struct port_stats *p)
  */
 void t4_get_lb_stats(struct adapter *adap, int idx, struct lb_port_stats *p)
 {
-	u32 bgmap = adap2pinfo(adap, idx)->mps_bg_map;
 
 #define GET_STAT(name) \
 	t4_read_reg64(adap, \
@@ -6999,14 +6981,18 @@ void t4_get_lb_stats(struct adapter *adap, int idx, struct lb_port_stats *p)
 	p->frames_1519_max	= GET_STAT(1519B_MAX);
 	p->drop			= GET_STAT(DROP_FRAMES);
 
-	p->ovflow0 = (bgmap & 1) ? GET_STAT_COM(RX_BG_0_LB_DROP_FRAME) : 0;
-	p->ovflow1 = (bgmap & 2) ? GET_STAT_COM(RX_BG_1_LB_DROP_FRAME) : 0;
-	p->ovflow2 = (bgmap & 4) ? GET_STAT_COM(RX_BG_2_LB_DROP_FRAME) : 0;
-	p->ovflow3 = (bgmap & 8) ? GET_STAT_COM(RX_BG_3_LB_DROP_FRAME) : 0;
-	p->trunc0 = (bgmap & 1) ? GET_STAT_COM(RX_BG_0_LB_TRUNC_FRAME) : 0;
-	p->trunc1 = (bgmap & 2) ? GET_STAT_COM(RX_BG_1_LB_TRUNC_FRAME) : 0;
-	p->trunc2 = (bgmap & 4) ? GET_STAT_COM(RX_BG_2_LB_TRUNC_FRAME) : 0;
-	p->trunc3 = (bgmap & 8) ? GET_STAT_COM(RX_BG_3_LB_TRUNC_FRAME) : 0;
+	if (idx < adap->params.nports) {
+		u32 bg = adap2pinfo(adap, idx)->mps_bg_map;
+
+		p->ovflow0 = (bg & 1) ? GET_STAT_COM(RX_BG_0_LB_DROP_FRAME) : 0;
+		p->ovflow1 = (bg & 2) ? GET_STAT_COM(RX_BG_1_LB_DROP_FRAME) : 0;
+		p->ovflow2 = (bg & 4) ? GET_STAT_COM(RX_BG_2_LB_DROP_FRAME) : 0;
+		p->ovflow3 = (bg & 8) ? GET_STAT_COM(RX_BG_3_LB_DROP_FRAME) : 0;
+		p->trunc0 = (bg & 1) ? GET_STAT_COM(RX_BG_0_LB_TRUNC_FRAME) : 0;
+		p->trunc1 = (bg & 2) ? GET_STAT_COM(RX_BG_1_LB_TRUNC_FRAME) : 0;
+		p->trunc2 = (bg & 4) ? GET_STAT_COM(RX_BG_2_LB_TRUNC_FRAME) : 0;
+		p->trunc3 = (bg & 8) ? GET_STAT_COM(RX_BG_3_LB_TRUNC_FRAME) : 0;
+	}
 
 #undef GET_STAT
 #undef GET_STAT_COM
@@ -10769,12 +10755,6 @@ void t4_clr_port_stats(struct adapter *adap, int idx)
 			t4_write_reg(adap,
 			A_MPS_STAT_RX_BG_0_MAC_TRUNC_FRAME_L + i * 8, 0);
 		}
-	if (chip_id(adap) == CHELSIO_T6) {
-		t4_write_reg64(adap, T5_PORT_REG(idx,
-		    A_MAC_PORT_AFRAMECHECKSEQUENCEERRORS), 0);
-		t4_write_reg64(adap, T5_PORT_REG(idx,
-		    A_MAC_PORT_MTIP_1G10G_RX_CRCERRORS), 0);
-	}
 }
 
 /**

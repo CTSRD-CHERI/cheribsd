@@ -641,9 +641,19 @@ void	cache_vnode_init(struct vnode *vp);
 void	cache_purge(struct vnode *vp);
 void	cache_purge_vgone(struct vnode *vp);
 void	cache_purge_negative(struct vnode *vp);
-void	cache_rename(struct vnode *fdvp, struct vnode *fvp, struct vnode *tdvp,
+void	cache_purgevfs(struct mount *mp);
+void	cache_vop_rename(struct vnode *fdvp, struct vnode *fvp, struct vnode *tdvp,
     struct vnode *tvp, struct componentname *fcnp, struct componentname *tcnp);
-void	cache_purgevfs(struct mount *mp, bool force);
+void	cache_vop_rmdir(struct vnode *dvp, struct vnode *vp);
+#ifdef INVARIANTS
+void	cache_validate(struct vnode *dvp, struct vnode *vp,
+	    struct componentname *cnp);
+#else
+static inline void
+cache_validate(struct vnode *dvp, struct vnode *vp, struct componentname *cnp)
+{
+}
+#endif
 int	change_dir(struct vnode *vp, struct thread *td);
 void	cvtstat(struct stat *st, struct ostat *ost);
 void	freebsd11_cvtnstat(struct stat *sb, struct nstat *nsb);
@@ -657,8 +667,7 @@ int	insmntque1(struct vnode *vp, struct mount *mp,
 int	insmntque(struct vnode *vp, struct mount *mp);
 u_quad_t init_va_filerev(void);
 int	speedup_syncer(void);
-int	vn_vptocnp(struct vnode **vp, struct ucred *cred, char *buf,
-	    size_t *buflen);
+int	vn_vptocnp(struct vnode **vp, char *buf, size_t *buflen);
 int	vn_getcwd(char *buf, char **retbuf, size_t *buflen);
 int	vn_fullpath(struct vnode *vp, char **retbuf, char **freebuf);
 int	vn_fullpath_global(struct vnode *vp, char **retbuf, char **freebuf);
@@ -828,6 +837,7 @@ int	vop_ebadf(struct vop_generic_args *ap);
 int	vop_einval(struct vop_generic_args *ap);
 int	vop_enoent(struct vop_generic_args *ap);
 int	vop_enotty(struct vop_generic_args *ap);
+int	vop_eagain(struct vop_generic_args *ap);
 int	vop_null(struct vop_generic_args *ap);
 int	vop_panic(struct vop_generic_args *ap);
 int	dead_poll(struct vop_poll_args *ap);
@@ -880,6 +890,7 @@ void	vop_lock_debugpost(void *a, int rc);
 void	vop_unlock_debugpre(void *a);
 void	vop_need_inactive_debugpre(void *a);
 void	vop_need_inactive_debugpost(void *a, int rc);
+void	vop_mkdir_debugpost(void *a, int rc);
 #else
 #define	vop_fplookup_vexec_debugpre(x)		do { } while (0)
 #define	vop_fplookup_vexec_debugpost(x, y)	do { } while (0)
@@ -889,6 +900,7 @@ void	vop_need_inactive_debugpost(void *a, int rc);
 #define	vop_unlock_debugpre(x)			do { } while (0)
 #define	vop_need_inactive_debugpre(x)		do { } while (0)
 #define	vop_need_inactive_debugpost(x, y)	do { } while (0)
+#define	vop_mkdir_debugpost(x, y)		do { } while (0)
 #endif
 
 void	vop_rename_fail(struct vop_rename_args *ap);
@@ -1001,6 +1013,7 @@ extern struct vop_vector default_vnodeops;
 #define VOP_EINVAL	((void*)(uintptr_t)vop_einval)
 #define VOP_ENOENT	((void*)(uintptr_t)vop_enoent)
 #define VOP_EOPNOTSUPP	((void*)(uintptr_t)vop_eopnotsupp)
+#define VOP_EAGAIN	((void*)(uintptr_t)vop_eagain)
 
 /* fifo_vnops.c */
 int	fifo_printinfo(struct vnode *);

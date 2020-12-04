@@ -104,6 +104,10 @@ struct rt_metrics {
 /* lle state is exported in rmx_state rt_metrics field */
 #define	rmx_state	rmx_weight
 
+/* default route weight */
+#define	RT_DEFAULT_WEIGHT	1
+#define	RT_MAX_WEIGHT		16777215	/* 3 bytes */
+
 /*
  * Keep a generation count of routing table, incremented on route addition,
  * so we can invalidate caches.  This is accessed without a lock, as precision
@@ -121,7 +125,41 @@ VNET_DECLARE(uint32_t, _rt_numfibs);	/* number of existing route tables */
 #define	rt_numfibs		V_rt_numfibs
 VNET_DECLARE(u_int, rt_add_addr_allfibs); /* Announce interfaces to all fibs */
 #define	V_rt_add_addr_allfibs	VNET(rt_add_addr_allfibs)
+
+/* Calculate flowid for locally-originated packets */
+#define	V_fib_hash_outbound	VNET(fib_hash_outbound)
+VNET_DECLARE(u_int, fib_hash_outbound);
+
+/* Outbound flowid generation rules */
+#ifdef RSS
+
+#define fib4_calc_packet_hash		xps_proto_software_hash_v4
+#define fib6_calc_packet_hash		xps_proto_software_hash_v6
+#define	CALC_FLOWID_OUTBOUND_SENDTO	true
+
+#ifdef ROUTE_MPATH
+#define	CALC_FLOWID_OUTBOUND		V_fib_hash_outbound
+#else
+#define	CALC_FLOWID_OUTBOUND		false
 #endif
+
+#else /* !RSS */
+
+#define fib4_calc_packet_hash		fib4_calc_software_hash
+#define fib6_calc_packet_hash		fib6_calc_software_hash
+
+#ifdef ROUTE_MPATH
+#define	CALC_FLOWID_OUTBOUND_SENDTO	V_fib_hash_outbound
+#define	CALC_FLOWID_OUTBOUND		V_fib_hash_outbound
+#else
+#define	CALC_FLOWID_OUTBOUND_SENDTO	false
+#define	CALC_FLOWID_OUTBOUND		false
+#endif
+
+#endif /* RSS */
+
+
+#endif /* _KERNEL */
 
 /*
  * We distinguish between routes to hosts and routes to networks,
@@ -174,6 +212,7 @@ VNET_DECLARE(u_int, rt_add_addr_allfibs); /* Announce interfaces to all fibs */
  */
 
 /* Consumer-visible nexthop info flags */
+#define	NHF_MULTIPATH		0x0008	/* Nexhop is a nexthop group */
 #define	NHF_REJECT		0x0010	/* RTF_REJECT */
 #define	NHF_BLACKHOLE		0x0020	/* RTF_BLACKHOLE */
 #define	NHF_REDIRECT		0x0040	/* RTF_DYNAMIC|RTF_MODIFIED */
@@ -204,6 +243,10 @@ struct rtstat {
 	uint64_t rts_wildcard;		/* lookups satisfied by a wildcard */
 	uint64_t rts_nh_idx_alloc_failure;	/* nexthop index alloc failure*/
 	uint64_t rts_nh_alloc_failure;	/* nexthop allocation failure*/
+	uint64_t rts_add_failure;	/* # of route addition failures */
+	uint64_t rts_add_retry;		/* # of route addition retries */
+	uint64_t rts_del_failure;	/* # of route deletion failure */
+	uint64_t rts_del_retry;		/* # of route deletion retries */
 };
 
 /*

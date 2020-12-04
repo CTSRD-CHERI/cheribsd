@@ -126,10 +126,9 @@ linux_fetch_syscall_args(struct thread *td)
 	else
 		sa->callp = &p->p_sysent->sv_table[sa->code];
 
-	sa->narg = sa->callp->sy_narg;
-	if (sa->narg > 8)
-		panic("ARM64TODO: Could we have more than 8 args?");
-	memcpy(sa->args, ap, 8 * sizeof(register_t));
+	if (sa->callp->sy_narg > MAXARGS)
+		panic("ARM64TODO: Could we have more than %d args?", MAXARGS);
+	memcpy(sa->args, ap, MAXARGS * sizeof(register_t));
 
 	td->td_retval[0] = 0;
 	return (0);
@@ -143,10 +142,8 @@ linux_set_syscall_retval(struct thread *td, int error)
 	cpu_set_syscall_retval(td, error);
 
 	if (__predict_false(error != 0)) {
-		if (error != ERESTART && error != EJUSTRETURN) {
-			td->td_frame->tf_x[0] =
-				linux_to_bsd_errno(error);
-		}
+		if (error != ERESTART && error != EJUSTRETURN)
+			td->td_frame->tf_x[0] = bsd_to_linux_errno(error);
 	}
 }
 

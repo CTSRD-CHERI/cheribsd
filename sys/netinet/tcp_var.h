@@ -246,6 +246,7 @@ struct tcpcb {
 	int	t_dupacks;		/* consecutive dup acks recd */
 	int	t_lognum;		/* Number of log entries */
 	int	t_loglimit;		/* Maximum number of log entries */
+	int64_t	t_pacing_rate;		/* bytes / sec, -1 => unlimited */
 	struct tcp_log_stailq t_logs;	/* Log buffer */
 	struct tcp_log_id_node *t_lin;
 	struct tcp_log_id_bucket *t_lib;
@@ -768,7 +769,13 @@ struct xtcpcb {
 	int32_t		tt_2msl;		/* (s) */
 	int32_t		tt_delack;		/* (s) */
 	int32_t		t_logstate;		/* (3) */
-	int32_t		spare32[32];
+	uint32_t	t_snd_cwnd;		/* (s) */
+	uint32_t	t_snd_ssthresh;		/* (s) */
+	uint32_t	t_maxseg;		/* (s) */
+	uint32_t	t_rcv_wnd;		/* (s) */
+	uint32_t	t_snd_wnd;		/* (s) */
+	uint32_t	xt_ecn;			/* (s) */
+	int32_t		spare32[26];
 } __aligned(8);
 
 #ifdef _KERNEL

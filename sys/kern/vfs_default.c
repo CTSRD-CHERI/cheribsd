@@ -198,6 +198,13 @@ vop_enoent(struct vop_generic_args *ap)
 }
 
 int
+vop_eagain(struct vop_generic_args *ap)
+{
+
+	return (EAGAIN);
+}
+
+int
 vop_null(struct vop_generic_args *ap)
 {
 
@@ -811,7 +818,7 @@ vop_stdvptocnp(struct vop_vptocnp_args *ap)
 {
 	struct vnode *vp = ap->a_vp;
 	struct vnode **dvp = ap->a_vpp;
-	struct ucred *cred = ap->a_cred;
+	struct ucred *cred;
 	char *buf = ap->a_buf;
 	size_t *buflen = ap->a_buflen;
 	char *dirbuf, *cpos;
@@ -828,6 +835,7 @@ vop_stdvptocnp(struct vop_vptocnp_args *ap)
 	error = 0;
 	covered = 0;
 	td = curthread;
+	cred = td->td_ucred;
 
 	if (vp->v_type != VDIR)
 		return (ENOENT);

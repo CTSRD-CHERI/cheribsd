@@ -1236,6 +1236,14 @@ initriscv(struct riscv_bootparams *rvbp)
 
 	cninit();
 
+	/*
+	 * Dump the boot metadata. We have to wait for cninit() since console
+	 * output is required. If it's grossly incorrect the kernel will never
+	 * make it this far.
+	 */
+	if (getenv_is_true("debug.dump_modinfo_at_boot"))
+		preload_dump();
+
 	init_proc0(rvbp->kern_stack);
 
 	msgbufinit(msgbufp, msgbufsize);

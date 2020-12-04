@@ -1783,6 +1783,7 @@ tcp_newtcpcb(struct inpcb *inp)
 	/* Initialize the per-TCPCB log data. */
 	tcp_log_tcpcbinit(tp);
 #endif
+	tp->t_pacing_rate = -1;
 	if (tp->t_fb->tfb_tcp_fb_init) {
 		if ((*tp->t_fb->tfb_tcp_fb_init)(tp)) {
 			refcount_release(&tp->t_fb->tfb_refcnt);
@@ -3013,7 +3014,6 @@ tcp_maxseg(const struct tcpcb *tp)
 	 * but this is harmless, since result of tcp_maxseg() is used
 	 * only in cwnd and ssthresh estimations.
 	 */
-#define	PAD(len)	((((len) / 4) + !!((len) % 4)) * 4)
 	if (TCPS_HAVEESTABLISHED(tp->t_state)) {
 		if (tp->t_flags & TF_RCVD_TSTMP)
 			optlen = TCPOLEN_TSTAMP_APPA;
@@ -3021,26 +3021,26 @@ tcp_maxseg(const struct tcpcb *tp)
 			optlen = 0;
 #if defined(IPSEC_SUPPORT) || defined(TCP_SIGNATURE)
 		if (tp->t_flags & TF_SIGNATURE)
-			optlen += PAD(TCPOLEN_SIGNATURE);
+			optlen += PADTCPOLEN(TCPOLEN_SIGNATURE);
 #endif
 		if ((tp->t_flags & TF_SACK_PERMIT) && tp->rcv_numsacks > 0) {
 			optlen += TCPOLEN_SACKHDR;
 			optlen += tp->rcv_numsacks * TCPOLEN_SACK;
-			optlen = PAD(optlen);
+			optlen = PADTCPOLEN(optlen);
 		}
 	} else {
 		if (tp->t_flags & TF_REQ_TSTMP)
 			optlen = TCPOLEN_TSTAMP_APPA;
 		else
-			optlen = PAD(TCPOLEN_MAXSEG);
+			optlen = PADTCPOLEN(TCPOLEN_MAXSEG);
 		if (tp->t_flags & TF_REQ_SCALE)
-			optlen += PAD(TCPOLEN_WINDOW);
+			optlen += PADTCPOLEN(TCPOLEN_WINDOW);
 #if defined(IPSEC_SUPPORT) || defined(TCP_SIGNATURE)
 		if (tp->t_flags & TF_SIGNATURE)
-			optlen += PAD(TCPOLEN_SIGNATURE);
+			optlen += PADTCPOLEN(TCPOLEN_SIGNATURE);
 #endif
 		if (tp->t_flags & TF_SACK_PERMIT)
-			optlen += PAD(TCPOLEN_SACK_PERMITTED);
+			optlen += PADTCPOLEN(TCPOLEN_SACK_PERMITTED);
 	}
 #undef PAD
 	optlen = min(optlen, TCP_MAXOLEN);
@@ -3438,6 +3438,13 @@ tcp_inptoxtp(const struct inpcb *inp, struct xtcpcb *xt)
 		xt->t_sndzerowin = tp->t_sndzerowin;
 		xt->t_sndrexmitpack = tp->t_sndrexmitpack;
 		xt->t_rcvoopack = tp->t_rcvoopack;
+		xt->t_rcv_wnd = tp->rcv_wnd;
+		xt->t_snd_wnd = tp->snd_wnd;
+		xt->t_snd_cwnd = tp->snd_cwnd;
+		xt->t_snd_ssthresh = tp->snd_ssthresh;
+		xt->t_maxseg = tp->t_maxseg;
+		xt->xt_ecn = (tp->t_flags2 & TF2_ECN_PERMIT) ? 1 : 0 +
+			     (tp->t_flags2 & TF2_ACE_PERMIT) ? 2 : 0;
 
 		now = getsbinuptime();
 #define	COPYTIMER(ttt)	do {						\

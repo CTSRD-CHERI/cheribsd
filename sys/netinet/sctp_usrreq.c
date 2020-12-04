@@ -2620,7 +2620,6 @@ flags_out:
 			 */
 			sstat->sstat_penddata = (stcb->asoc.cnt_on_reasm_queue +
 			    stcb->asoc.cnt_on_all_streams);
-
 			sstat->sstat_instrms = stcb->asoc.streamincnt;
 			sstat->sstat_outstrms = stcb->asoc.streamoutcnt;
 			sstat->sstat_fragmentation_point = sctp_get_frag_point(stcb, &stcb->asoc);
@@ -3078,43 +3077,27 @@ flags_out:
 			break;
 		}
 	case SCTP_RECVRCVINFO:
-		{
-			int onoff;
-
-			if (*optsize < sizeof(int)) {
-				SCTP_LTRACE_ERR_RET(inp, NULL, NULL, SCTP_FROM_SCTP_USRREQ, EINVAL);
-				error = EINVAL;
-			} else {
-				SCTP_INP_RLOCK(inp);
-				onoff = sctp_is_feature_on(inp, SCTP_PCB_FLAGS_RECVRCVINFO);
-				SCTP_INP_RUNLOCK(inp);
-			}
-			if (error == 0) {
-				/* return the option value */
-				*(int *)optval = onoff;
-				*optsize = sizeof(int);
-			}
-			break;
+		if (*optsize < sizeof(int)) {
+			SCTP_LTRACE_ERR_RET(inp, NULL, NULL, SCTP_FROM_SCTP_USRREQ, EINVAL);
+			error = EINVAL;
+		} else {
+			SCTP_INP_RLOCK(inp);
+			*(int *)optval = sctp_is_feature_on(inp, SCTP_PCB_FLAGS_RECVRCVINFO);
+			SCTP_INP_RUNLOCK(inp);
+			*optsize = sizeof(int);
 		}
+		break;
 	case SCTP_RECVNXTINFO:
-		{
-			int onoff;
-
-			if (*optsize < sizeof(int)) {
-				SCTP_LTRACE_ERR_RET(inp, NULL, NULL, SCTP_FROM_SCTP_USRREQ, EINVAL);
-				error = EINVAL;
-			} else {
-				SCTP_INP_RLOCK(inp);
-				onoff = sctp_is_feature_on(inp, SCTP_PCB_FLAGS_RECVNXTINFO);
-				SCTP_INP_RUNLOCK(inp);
-			}
-			if (error == 0) {
-				/* return the option value */
-				*(int *)optval = onoff;
-				*optsize = sizeof(int);
-			}
-			break;
+		if (*optsize < sizeof(int)) {
+			SCTP_LTRACE_ERR_RET(inp, NULL, NULL, SCTP_FROM_SCTP_USRREQ, EINVAL);
+			error = EINVAL;
+		} else {
+			SCTP_INP_RLOCK(inp);
+			*(int *)optval = sctp_is_feature_on(inp, SCTP_PCB_FLAGS_RECVNXTINFO);
+			SCTP_INP_RUNLOCK(inp);
+			*optsize = sizeof(int);
 		}
+		break;
 	case SCTP_DEFAULT_SNDINFO:
 		{
 			struct sctp_sndinfo *info;
@@ -5716,18 +5699,20 @@ sctp_setopt(struct socket *so, int optname, void *optval, size_t optsize,
 
 			SCTP_CHECK_AND_CAST(sasoc, optval, struct sctp_assocparams, optsize);
 			SCTP_FIND_STCB(inp, stcb, sasoc->sasoc_assoc_id);
-			if (sasoc->sasoc_cookie_life) {
+			if (sasoc->sasoc_cookie_life > 0) {
 				/* boundary check the cookie life */
-				if (sasoc->sasoc_cookie_life < 1000)
-					sasoc->sasoc_cookie_life = 1000;
+				if (sasoc->sasoc_cookie_life < SCTP_MIN_COOKIE_LIFE) {
+					sasoc->sasoc_cookie_life = SCTP_MIN_COOKIE_LIFE;
+				}
 				if (sasoc->sasoc_cookie_life > SCTP_MAX_COOKIE_LIFE) {
 					sasoc->sasoc_cookie_life = SCTP_MAX_COOKIE_LIFE;
 				}
 			}
 			if (stcb) {
-				if (sasoc->sasoc_asocmaxrxt)
+				if (sasoc->sasoc_asocmaxrxt > 0) {
 					stcb->asoc.max_send_times = sasoc->sasoc_asocmaxrxt;
-				if (sasoc->sasoc_cookie_life) {
+				}
+				if (sasoc->sasoc_cookie_life > 0) {
 					stcb->asoc.cookie_life = sctp_msecs_to_ticks(sasoc->sasoc_cookie_life);
 				}
 				SCTP_TCB_UNLOCK(stcb);
@@ -5737,9 +5722,10 @@ sctp_setopt(struct socket *so, int optname, void *optval, size_t optsize,
 				    ((inp->sctp_flags & SCTP_PCB_FLAGS_UDPTYPE) &&
 				    (sasoc->sasoc_assoc_id == SCTP_FUTURE_ASSOC))) {
 					SCTP_INP_WLOCK(inp);
-					if (sasoc->sasoc_asocmaxrxt)
+					if (sasoc->sasoc_asocmaxrxt > 0) {
 						inp->sctp_ep.max_send_times = sasoc->sasoc_asocmaxrxt;
-					if (sasoc->sasoc_cookie_life) {
+					}
+					if (sasoc->sasoc_cookie_life > 0) {
 						inp->sctp_ep.def_cookie_life = sctp_msecs_to_ticks(sasoc->sasoc_cookie_life);
 					}
 					SCTP_INP_WUNLOCK(inp);

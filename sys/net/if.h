@@ -209,7 +209,7 @@ struct if_data {
  *   contains the enabled optional feature & capabilites that can be used
  *   individually per packet and are specified in the mbuf pkthdr.csum_flags
  *   field.  IFCAP_* and CSUM_* do not match one to one and CSUM_* may be
- *   more detailed or differenciated than IFCAP_*.
+ *   more detailed or differentiated than IFCAP_*.
  *   Hwassist features are defined CSUM_* in sys/mbuf.h
  *
  * Capabilities that cannot be arbitrarily changed with ifconfig/ioctl
@@ -250,6 +250,7 @@ struct if_data {
 #define	IFCAP_TXTLS6		0x10000000 /* can do TLS encryption and segmentation for TCP6 */
 #define	IFCAP_VXLAN_HWCSUM	0x20000000 /* can do IFCAN_HWCSUM on VXLANs */
 #define	IFCAP_VXLAN_HWTSO	0x40000000 /* can do IFCAP_TSO on VXLANs */
+#define	IFCAP_TXTLS_RTLMT	0x80000000 /* can do TLS with rate limiting */
 
 #define IFCAP_HWCSUM_IPV6	(IFCAP_RXCSUM_IPV6 | IFCAP_TXCSUM_IPV6)
 

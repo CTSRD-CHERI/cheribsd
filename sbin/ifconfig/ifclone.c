@@ -41,6 +41,7 @@ static const char rcsid[] =
 #include <net/if.h>
 
 #include <err.h>
+#include <libifconfig.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -48,52 +49,43 @@ static const char rcsid[] =
 
 #include "ifconfig.h"
 
+typedef enum {
+	MT_PREFIX,
+	MT_FILTER,
+} clone_match_type;
+
 static void
 list_cloners(void)
 {
-	struct if_clonereq ifcr;
-	char *cp, *buf;
-	int idx;
-	int s;
+	ifconfig_handle_t *lifh;
+	char *cloners;
+	size_t cloners_count;
 
-	s = socket(AF_LOCAL, SOCK_DGRAM, 0);
-	if (s == -1)
-		err(1, "socket(AF_LOCAL,SOCK_DGRAM)");
+	lifh = ifconfig_open();
+	if (lifh == NULL)
+		return;
 
-	memset(&ifcr, 0, sizeof(ifcr));
+	if (ifconfig_list_cloners(lifh, &cloners, &cloners_count) < 0)
+		errc(1, ifconfig_err_errno(lifh), "unable to list cloners");
+	ifconfig_close(lifh);
 
-	if (ioctl(s, SIOCIFGCLONERS, &ifcr) < 0)
-		err(1, "SIOCIFGCLONERS for count");
-
-	buf = malloc(ifcr.ifcr_total * IFNAMSIZ);
-	if (buf == NULL)
-		err(1, "unable to allocate cloner name buffer");
-
-	ifcr.ifcr_count = ifcr.ifcr_total;
-	ifcr.ifcr_buffer = buf;
-
-	if (ioctl(s, SIOCIFGCLONERS, &ifcr) < 0)
-		err(1, "SIOCIFGCLONERS for names");
-
-	/*
-	 * In case some disappeared in the mean time, clamp it down.
-	 */
-	if (ifcr.ifcr_count > ifcr.ifcr_total)
-		ifcr.ifcr_count = ifcr.ifcr_total;
-
-	for (cp = buf, idx = 0; idx < ifcr.ifcr_count; idx++, cp += IFNAMSIZ) {
-		if (idx > 0)
+	for (const char *name = cloners;
+	    name < cloners + cloners_count * IFNAMSIZ;
+	    name += IFNAMSIZ) {
+		if (name > cloners)
 			putchar(' ');
-		printf("%s", cp);
+		printf("%s", name);
 	}
-
 	putchar('\n');
-	free(buf);
-	close(s);
+	free(cloners);
 }
 
 struct clone_defcb {
-	char ifprefix[IFNAMSIZ];
+	union {
+		char ifprefix[IFNAMSIZ];
+		clone_match_func *ifmatch;
+	};
+	clone_match_type clone_mt;
 	clone_callback_func *clone_cb;
 	SLIST_ENTRY(clone_defcb) next;
 };
@@ -102,12 +94,25 @@ static SLIST_HEAD(, clone_defcb) clone_defcbh =
    SLIST_HEAD_INITIALIZER(clone_defcbh);
 
 void
-clone_setdefcallback(const char *ifprefix, clone_callback_func *p)
+clone_setdefcallback_prefix(const char *ifprefix, clone_callback_func *p)
 {
 	struct clone_defcb *dcp;
 
 	dcp = malloc(sizeof(*dcp));
 	strlcpy(dcp->ifprefix, ifprefix, IFNAMSIZ-1);
+	dcp->clone_mt = MT_PREFIX;
+	dcp->clone_cb = p;
+	SLIST_INSERT_HEAD(&clone_defcbh, dcp, next);
+}
+
+void
+clone_setdefcallback_filter(clone_match_func *filter, clone_callback_func *p)
+{
+	struct clone_defcb *dcp;
+
+	dcp = malloc(sizeof(*dcp));
+	dcp->ifmatch  = filter;
+	dcp->clone_mt = MT_FILTER;
 	dcp->clone_cb = p;
 	SLIST_INSERT_HEAD(&clone_defcbh, dcp, next);
 }
@@ -131,8 +136,14 @@ ifclonecreate(int s, void *arg)
 	if (clone_cb == NULL) {
 		/* Try to find a default callback */
 		SLIST_FOREACH(dcp, &clone_defcbh, next) {
-			if (strncmp(dcp->ifprefix, ifr.ifr_name,
-			    strlen(dcp->ifprefix)) == 0) {
+			if ((dcp->clone_mt == MT_PREFIX) &&
+			    (strncmp(dcp->ifprefix, ifr.ifr_name,
+			             strlen(dcp->ifprefix)) == 0)) {
+				clone_cb = dcp->clone_cb;
+				break;
+			}
+			if ((dcp->clone_mt == MT_FILTER) &&
+			          dcp->ifmatch(ifr.ifr_name)) {
 				clone_cb = dcp->clone_cb;
 				break;
 			}

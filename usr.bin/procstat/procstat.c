@@ -26,9 +26,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD$");
 
 #include <sys/param.h>
 #include <sys/sysctl.h>
@@ -424,9 +425,7 @@ main(int argc, char *argv[])
 	argc -= optind;
 	argv += optind;
 
-	if (cmd == NULL && argv[0] != NULL)
-		cmd = getcmd(argv[0]);
-	if (cmd != NULL) {
+	if (cmd == NULL && argv[0] != NULL && (cmd = getcmd(argv[0])) != NULL) {
 		if ((procstat_opts & PS_SUBCOMMAND_OPTS) != 0)
 			usage(cmd);
 		if (cmd->opt != NULL) {
@@ -442,12 +441,13 @@ main(int argc, char *argv[])
 			argv += 1;
 		}
 	} else {
-		cmd = getcmd("basic");
+		if (cmd == NULL)
+			cmd = getcmd("basic");
+		if (cmd->cmd != procstat_files &&
+		    (procstat_opts & PS_OPT_CAPABILITIES) != 0 &&
+		    (cmd->cmp & PS_MODE_COMPAT) == 0)
+			usage(cmd);
 	}
-	if (cmd->cmd != procstat_files &&
-	    (procstat_opts & PS_OPT_CAPABILITIES) != 0 &&
-	    (cmd->cmp & PS_MODE_COMPAT) == 0)
-		usage(cmd);
 
 	/* Must specify either the -a flag or a list of pids. */
 	if (!(aflag == 1 && argc == 0) && !(aflag == 0 && argc > 0))

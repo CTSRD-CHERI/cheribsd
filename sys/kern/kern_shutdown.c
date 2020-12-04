@@ -682,7 +682,6 @@ shutdown_reset(void *junk, int howto)
 	spinlock_enter();
 #endif
 
-	/* cpu_boot(howto); */ /* doesn't do anything at the moment */
 	cpu_reset();
 	/* NOTREACHED */ /* assuming reset worked */
 }

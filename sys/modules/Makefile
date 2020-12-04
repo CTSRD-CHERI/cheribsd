@@ -41,7 +41,6 @@ SUBDIR=	\
 	amr \
 	${_an} \
 	${_aout} \
-	${_apm} \
 	${_arcmsr} \
 	${_allwinner} \
 	${_armv8crypto} \
@@ -59,6 +58,8 @@ SUBDIR=	\
 	ath_rate \
 	ath_pci \
 	${_autofs} \
+	axgbe \
+	backlight \
 	${_bce} \
 	${_bcm283x_clkman} \
 	${_bcm283x_pwm} \
@@ -153,6 +154,7 @@ SUBDIR=	\
 	${_if_gif} \
 	${_if_gre} \
 	${_if_me} \
+	if_infiniband \
 	if_lagg \
 	${_if_ndis} \
 	${_if_stf} \
@@ -223,7 +225,7 @@ SUBDIR=	\
 	mac_seeotheruids \
 	mac_stub \
 	mac_test \
-	malo \
+	${_malo} \
 	md \
 	mdio \
 	mem \
@@ -273,6 +275,7 @@ SUBDIR=	\
 	${_nvram} \
 	${_oce} \
 	${_ocs_fc} \
+	${_ossl} \
 	otus \
 	${_otusfw} \
 	ow \
@@ -514,6 +517,7 @@ _mthca=		mthca
 _mlx4ib=	mlx4ib
 _mlx5ib=	mlx5ib
 .endif
+_vmware=	vmware
 .endif
 
 .if ${MK_NETGRAPH} != "no" || defined(ALL_MODULES)
@@ -633,6 +637,7 @@ _nctgpio=	nctgpio
 _ndis=		ndis
 _ntb=		ntb
 _ocs_fc=	ocs_fc
+_ossl=		ossl
 _pccard=	pccard
 .if ${MK_OFED} != "no" || defined(ALL_MODULES)
 _rdma=		rdma
@@ -641,7 +646,6 @@ _safe=		safe
 _speaker=	speaker
 _splash=	splash
 _sppp=		sppp
-_vmware=	vmware
 _wbwd=		wbwd
 _wi=		wi
 
@@ -752,7 +756,6 @@ _vmm=		vmm
 # XXX some of these can move now, but are untested on other architectures.
 _3dfx=		3dfx
 _3dfx_linux=	3dfx_linux
-_apm=		apm
 .if ${MK_SOURCELESS_HOST} != "no"
 _ce=		ce
 .endif
@@ -788,7 +791,7 @@ _wi=		wi
 _virtio=	virtio
 .endif
 
-.if ${MACHINE_ARCH} == "powerpc64"
+.if ${MACHINE_ARCH:Mpowerpc64*} != ""
 _ipmi=		ipmi
 _ixl=		ixl
 _nvram=		opal_nvram
@@ -811,6 +814,12 @@ _cloudabi64=	cloudabi64
 .if ${MACHINE_ARCH:Marmv[67]*} != "" || ${MACHINE_CPUARCH} == "aarch64"
 _bcm283x_clkman=  bcm283x_clkman
 _bcm283x_pwm=  bcm283x_pwm
+.endif
+
+.if !(${COMPILER_TYPE} == "clang" && ${COMPILER_VERSION} < 110000)
+# LLVM 10 crashes when building if_malo_pci.c, fixed in LLVM11:
+# https://bugs.llvm.org/show_bug.cgi?id=44351
+_malo=	malo
 .endif
 
 .if ${CPUTYPE} != "cheri"

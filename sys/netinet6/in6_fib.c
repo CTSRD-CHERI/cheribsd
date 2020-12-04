@@ -33,7 +33,6 @@ __FBSDID("$FreeBSD$");
 #include "opt_inet.h"
 #include "opt_inet6.h"
 #include "opt_route.h"
-#include "opt_mpath.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -49,13 +48,11 @@ __FBSDID("$FreeBSD$");
 #include <net/if_var.h>
 #include <net/if_dl.h>
 #include <net/route.h>
+#include <net/route/route_ctl.h>
 #include <net/route/route_var.h>
 #include <net/route/nhop.h>
+#include <net/toeplitz.h>
 #include <net/vnet.h>
-
-#ifdef RADIX_MPATH
-#include <net/radix_mpath.h>
-#endif
 
 #include <netinet/in.h>
 #include <netinet/in_var.h>
@@ -71,6 +68,39 @@ __FBSDID("$FreeBSD$");
 #ifdef INET6
 
 CHK_STRUCT_ROUTE_COMPAT(struct route_in6, ro_dst);
+
+#ifdef ROUTE_MPATH
+struct _hash_5tuple_ipv6 {
+	struct in6_addr src;
+	struct in6_addr dst;
+	unsigned short src_port;
+	unsigned short dst_port;
+	char proto;
+	char spare[3];
+};
+_Static_assert(sizeof(struct _hash_5tuple_ipv6) == 40,
+    "_hash_5tuple_ipv6 size is wrong");
+
+uint32_t
+fib6_calc_software_hash(const struct in6_addr *src, const struct in6_addr *dst,
+    unsigned short src_port, unsigned short dst_port, char proto,
+    uint32_t *phashtype)
+{
+	struct _hash_5tuple_ipv6 data;
+
+	data.src = *src;
+	data.dst = *dst;
+	data.src_port = src_port;
+	data.dst_port = dst_port;
+	data.proto = proto;
+	data.spare[0] = data.spare[1] = data.spare[2] = 0;
+
+	*phashtype = M_HASHTYPE_OPAQUE_HASH;
+
+	return (toeplitz_hash(MPATH_ENTROPY_KEY_LEN, mpath_entropy_key,
+	  sizeof(data), (uint8_t *)&data));
+}
+#endif
 
 /*
  * Looks up path in fib @fibnum specified by @dst.
@@ -88,7 +118,6 @@ fib6_lookup(uint32_t fibnum, const struct in6_addr *dst6,
 	RIB_RLOCK_TRACKER;
 	struct rib_head *rh;
 	struct radix_node *rn;
-	struct rtentry *rt;
 	struct nhop_object *nh;
 	struct sockaddr_in6 sin6;
 
@@ -111,12 +140,7 @@ fib6_lookup(uint32_t fibnum, const struct in6_addr *dst6,
 	RIB_RLOCK(rh);
 	rn = rh->rnh_matchaddr((void *)&sin6, &rh->head);
 	if (rn != NULL && ((rn->rn_flags & RNF_ROOT) == 0)) {
-		rt = RNTORT(rn);
-#ifdef RADIX_MPATH
-		if (rt_mpath_next(rt) != NULL)
-			rt = rt_mpath_selectrte(rt, flowid);
-#endif
-		nh = rt->rt_nhop;
+		nh = nhop_select((RNTORT(rn))->rt_nhop, flowid);
 		/* Ensure route & ifp is UP */
 		if (RT_LINK_IS_UP(nh->nh_ifp)) {
 			if (flags & NHR_REF)
@@ -132,7 +156,7 @@ fib6_lookup(uint32_t fibnum, const struct in6_addr *dst6,
 }
 
 inline static int
-check_urpf(const struct nhop_object *nh, uint32_t flags,
+check_urpf_nhop(const struct nhop_object *nh, uint32_t flags,
     const struct ifnet *src_if)
 {
 
@@ -149,21 +173,24 @@ check_urpf(const struct nhop_object *nh, uint32_t flags,
 	return (0);
 }
 
-#ifdef RADIX_MPATH
-inline static int
-check_urpf_mpath(struct rtentry *rt, uint32_t flags,
+static int
+check_urpf(struct nhop_object *nh, uint32_t flags,
     const struct ifnet *src_if)
 {
-
-	while (rt != NULL) {
-		if (check_urpf(rt->rt_nhop, flags, src_if) != 0)
-			return (1);
-		rt = rt_mpath_next(rt);
-	}
-
-	return (0);
-}
+#ifdef ROUTE_MPATH
+	if (NH_IS_NHGRP(nh)) {
+		struct weightened_nhop *wn;
+		uint32_t num_nhops;
+		wn = nhgrp_get_nhops((struct nhgrp_object *)nh, &num_nhops);
+		for (int i = 0; i < num_nhops; i++) {
+			if (check_urpf_nhop(wn[i].nh, flags, src_if) != 0)
+				return (1);
+		}
+		return (0);
+	} else
 #endif
+		return (check_urpf_nhop(nh, flags, src_if));
+}
 
 /*
  * Performs reverse path forwarding lookup.
@@ -181,7 +208,6 @@ fib6_check_urpf(uint32_t fibnum, const struct in6_addr *dst6,
 	RIB_RLOCK_TRACKER;
 	struct rib_head *rh;
 	struct radix_node *rn;
-	struct rtentry *rt;
 	struct sockaddr_in6 sin6;
 	int ret;
 
@@ -203,12 +229,7 @@ fib6_check_urpf(uint32_t fibnum, const struct in6_addr *dst6,
 	RIB_RLOCK(rh);
 	rn = rh->rnh_matchaddr((void *)&sin6, &rh->head);
 	if (rn != NULL && ((rn->rn_flags & RNF_ROOT) == 0)) {
-		rt = RNTORT(rn);
-#ifdef	RADIX_MPATH
-		ret = check_urpf_mpath(rt, flags, src_if);
-#else
-		ret = check_urpf(rt->rt_nhop, flags, src_if);
-#endif
+		ret = check_urpf(RNTORT(rn)->rt_nhop, flags, src_if);
 		RIB_RUNLOCK(rh);
 		return (ret);
 	}
@@ -223,7 +244,6 @@ fib6_lookup_debugnet(uint32_t fibnum, const struct in6_addr *dst6,
 {
 	struct rib_head *rh;
 	struct radix_node *rn;
-	struct rtentry *rt;
 	struct nhop_object *nh;
 	struct sockaddr_in6 sin6;
 
@@ -245,8 +265,7 @@ fib6_lookup_debugnet(uint32_t fibnum, const struct in6_addr *dst6,
 
 	rn = rh->rnh_matchaddr((void *)&sin6, &rh->head);
 	if (rn != NULL && ((rn->rn_flags & RNF_ROOT) == 0)) {
-		rt = RNTORT(rn);
-		nh = rt->rt_nhop;
+		nh = nhop_select((RNTORT(rn))->rt_nhop, 0);
 		/* Ensure route & ifp is UP */
 		if (RT_LINK_IS_UP(nh->nh_ifp)) {
 			if (flags & NHR_REF)

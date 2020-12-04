@@ -149,6 +149,7 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_phys.h>
 #include <vm/vm_radix.h>
 #include <vm/vm_reserv.h>
+#include <vm/vm_dumpset.h>
 #include <vm/uma.h>
 
 #include <machine/intr_machdep.h>
@@ -5935,22 +5936,20 @@ pmap_remove(pmap_t pmap, vm_offset_t sva, vm_offset_t eva)
 			continue;
 		}
 
-		pdpe = pmap_pml4e_to_pdpe(pml4e, sva);
 		va_next = (sva + NBPDP) & ~PDPMASK;
-		if ((*pdpe & PG_V) == 0) {
-			if (va_next < sva)
-				va_next = eva;
+		if (va_next < sva)
+			va_next = eva;
+		pdpe = pmap_pml4e_to_pdpe(pml4e, sva);
+		if ((*pdpe & PG_V) == 0)
 			continue;
-		}
-
-		KASSERT((*pdpe & PG_PS) == 0 || va_next <= eva,
-		    ("pmap_remove of non-transient 1G page "
-		    "pdpe %#lx sva %#lx eva %#lx va_next %#lx",
-		    *pdpe, sva, eva, va_next));
 		if ((*pdpe & PG_PS) != 0) {
+			KASSERT(va_next <= eva,
+			    ("partial update of non-transparent 1G mapping "
+			    "pdpe %#lx sva %#lx eva %#lx va_next %#lx",
+			    *pdpe, sva, eva, va_next));
 			MPASS(pmap != kernel_pmap); /* XXXKIB */
 			MPASS((*pdpe & (PG_MANAGED | PG_G)) == 0);
-			anyvalid =  1;
+			anyvalid = 1;
 			*pdpe = 0;
 			pmap_resident_count_dec(pmap, NBPDP / PAGE_SIZE);
 			mt = PHYS_TO_VM_PAGE(*pmap_pml4e(pmap, sva) & PG_FRAME);
@@ -6221,26 +6220,24 @@ pmap_protect(pmap_t pmap, vm_offset_t sva, vm_offset_t eva, vm_prot_t prot)
 	PMAP_LOCK(pmap);
 	for (; sva < eva; sva = va_next) {
 		pml4e = pmap_pml4e(pmap, sva);
-		if ((*pml4e & PG_V) == 0) {
+		if (pml4e == NULL || (*pml4e & PG_V) == 0) {
 			va_next = (sva + NBPML4) & ~PML4MASK;
 			if (va_next < sva)
 				va_next = eva;
 			continue;
 		}
 
-		pdpe = pmap_pml4e_to_pdpe(pml4e, sva);
 		va_next = (sva + NBPDP) & ~PDPMASK;
-		if ((*pdpe & PG_V) == 0) {
-			if (va_next < sva)
-				va_next = eva;
+		if (va_next < sva)
+			va_next = eva;
+		pdpe = pmap_pml4e_to_pdpe(pml4e, sva);
+		if ((*pdpe & PG_V) == 0)
 			continue;
-		}
-
-		KASSERT((*pdpe & PG_PS) == 0 || va_next <= eva,
-		    ("pmap_remove of non-transient 1G page "
-		    "pdpe %#lx sva %#lx eva %#lx va_next %#lx",
-		    *pdpe, sva, eva, va_next));
 		if ((*pdpe & PG_PS) != 0) {
+			KASSERT(va_next <= eva,
+			    ("partial update of non-transparent 1G mapping "
+			    "pdpe %#lx sva %#lx eva %#lx va_next %#lx",
+			    *pdpe, sva, eva, va_next));
 retry_pdpe:
 			obits = pbits = *pdpe;
 			MPASS((pbits & (PG_MANAGED | PG_G)) == 0);
@@ -6483,7 +6480,7 @@ pmap_enter_largepage(pmap_t pmap, vm_offset_t va, pt_entry_t newpte, int flags,
 	pt_entry_t origpte, *pml4e, *pdpe, *pde, pten, PG_V;
 
 	PMAP_LOCK_ASSERT(pmap, MA_OWNED);
-	KASSERT(psind > 0 && psind < MAXPAGESIZES,
+	KASSERT(psind > 0 && psind < MAXPAGESIZES && pagesizes[psind] != 0,
 	    ("psind %d unexpected", psind));
 	KASSERT(((newpte & PG_FRAME) & (pagesizes[psind] - 1)) == 0,
 	    ("unaligned phys address %#lx newpte %#lx psind %d",
@@ -6498,94 +6495,75 @@ pmap_enter_largepage(pmap_t pmap, vm_offset_t va, pt_entry_t newpte, int flags,
 	PG_V = pmap_valid_bit(pmap);
 
 restart:
+	if (!pmap_pkru_same(pmap, va, va + pagesizes[psind]))
+		return (KERN_PROTECTION_FAILURE);
 	pten = newpte;
 	if (va < VM_MAXUSER_ADDRESS && pmap->pm_type == PT_X86)
 		pten |= pmap_pkru_get(pmap, va);
 
 	if (psind == 2) {	/* 1G */
-		if (!pmap_pkru_same(pmap, va, va + NBPDP))
-			return (KERN_PROTECTION_FAILURE);
 		pml4e = pmap_pml4e(pmap, va);
-		if ((*pml4e & PG_V) == 0) {
+		if (pml4e == NULL || (*pml4e & PG_V) == 0) {
 			mp = _pmap_allocpte(pmap, pmap_pml4e_pindex(va),
 			    NULL, va);
-			if (mp == NULL) {
-				if ((flags & PMAP_ENTER_NOSLEEP) != 0)
-					return (KERN_RESOURCE_SHORTAGE);
-				PMAP_UNLOCK(pmap);
-				vm_wait(NULL);
-				PMAP_LOCK(pmap);
-
-				/*
-				 * Restart at least to recalcuate the pkru
-				 * key.  Our caller must keep the map locked
-				 * so no paging structure can be validated
-				 * under us.
-				 */
-				goto restart;
-			}
-			pdpe = pmap_pdpe(pmap, va);
-			KASSERT(pdpe != NULL, ("va %#lx lost pdpe", va));
+			if (mp == NULL)
+				goto allocf;
+			pdpe = (pdp_entry_t *)PHYS_TO_DMAP(VM_PAGE_TO_PHYS(mp));
+			pdpe = &pdpe[pmap_pdpe_index(va)];
 			origpte = *pdpe;
 			MPASS(origpte == 0);
 		} else {
-			mp = PHYS_TO_VM_PAGE(*pml4e & PG_FRAME);
-			pdpe = pmap_pdpe(pmap, va);
+			pdpe = pmap_pml4e_to_pdpe(pml4e, va);
 			KASSERT(pdpe != NULL, ("va %#lx lost pdpe", va));
 			origpte = *pdpe;
-			if ((origpte & PG_V) == 0)
+			if ((origpte & PG_V) == 0) {
+				mp = PHYS_TO_VM_PAGE(*pml4e & PG_FRAME);
 				mp->ref_count++;
+			}
 		}
-		KASSERT((origpte & PG_V) == 0 || ((origpte & PG_PS) != 0 &&
-		    (origpte & PG_FRAME) == (pten & PG_FRAME)),
-		    ("va %#lx changing 1G phys page pdpe %#lx pten %#lx",
-		    va, origpte, pten));
-		if ((pten & PG_W) != 0 && (origpte & PG_W) == 0)
-			pmap->pm_stats.wired_count += NBPDP / PAGE_SIZE;
-		else if ((pten & PG_W) == 0 && (origpte & PG_W) != 0)
-			pmap->pm_stats.wired_count -= NBPDP / PAGE_SIZE;
 		*pdpe = pten;
 	} else /* (psind == 1) */ {	/* 2M */
-		if (!pmap_pkru_same(pmap, va, va + NBPDR))
-			return (KERN_PROTECTION_FAILURE);
 		pde = pmap_pde(pmap, va);
 		if (pde == NULL) {
 			mp = _pmap_allocpte(pmap, pmap_pdpe_pindex(va),
 			    NULL, va);
-			if (mp == NULL) {
-				if ((flags & PMAP_ENTER_NOSLEEP) != 0)
-					return (KERN_RESOURCE_SHORTAGE);
-				PMAP_UNLOCK(pmap);
-				vm_wait(NULL);
-				PMAP_LOCK(pmap);
-				goto restart;
-			}
+			if (mp == NULL)
+				goto allocf;
 			pde = (pd_entry_t *)PHYS_TO_DMAP(VM_PAGE_TO_PHYS(mp));
 			pde = &pde[pmap_pde_index(va)];
 			origpte = *pde;
 			MPASS(origpte == 0);
 		} else {
-			pdpe = pmap_pdpe(pmap, va);
-			MPASS(pdpe != NULL && (*pdpe & PG_V) != 0);
-			mp = PHYS_TO_VM_PAGE(*pdpe & PG_FRAME);
 			origpte = *pde;
-			if ((origpte & PG_V) == 0)
+			if ((origpte & PG_V) == 0) {
+				pdpe = pmap_pdpe(pmap, va);
+				MPASS(pdpe != NULL && (*pdpe & PG_V) != 0);
+				mp = PHYS_TO_VM_PAGE(*pdpe & PG_FRAME);
 				mp->ref_count++;
+			}
 		}
-		KASSERT((origpte & PG_V) == 0 || ((origpte & PG_PS) != 0 &&
-		    (origpte & PG_FRAME) == (pten & PG_FRAME)),
-		    ("va %#lx changing 2M phys page pde %#lx pten %#lx",
-		    va, origpte, pten));
-		if ((pten & PG_W) != 0 && (origpte & PG_W) == 0)
-			pmap->pm_stats.wired_count += NBPDR / PAGE_SIZE;
-		else if ((pten & PG_W) == 0 && (origpte & PG_W) != 0)
-			pmap->pm_stats.wired_count -= NBPDR / PAGE_SIZE;
 		*pde = pten;
 	}
+	KASSERT((origpte & PG_V) == 0 || ((origpte & PG_PS) != 0 &&
+	    (origpte & PG_PS_FRAME) == (pten & PG_PS_FRAME)),
+	    ("va %#lx changing %s phys page origpte %#lx pten %#lx",
+	    va, psind == 2 ? "1G" : "2M", origpte, pten));
+	if ((pten & PG_W) != 0 && (origpte & PG_W) == 0)
+		pmap->pm_stats.wired_count += pagesizes[psind] / PAGE_SIZE;
+	else if ((pten & PG_W) == 0 && (origpte & PG_W) != 0)
+		pmap->pm_stats.wired_count -= pagesizes[psind] / PAGE_SIZE;
 	if ((origpte & PG_V) == 0)
 		pmap_resident_count_inc(pmap, pagesizes[psind] / PAGE_SIZE);
 
 	return (KERN_SUCCESS);
+
+allocf:
+	if ((flags & PMAP_ENTER_NOSLEEP) != 0)
+		return (KERN_RESOURCE_SHORTAGE);
+	PMAP_UNLOCK(pmap);
+	vm_wait(NULL);
+	PMAP_LOCK(pmap);
+	goto restart;
 }
 
 /*
@@ -7367,23 +7345,24 @@ pmap_unwire(pmap_t pmap, vm_offset_t sva, vm_offset_t eva)
 	PMAP_LOCK(pmap);
 	for (; sva < eva; sva = va_next) {
 		pml4e = pmap_pml4e(pmap, sva);
-		if ((*pml4e & PG_V) == 0) {
+		if (pml4e == NULL || (*pml4e & PG_V) == 0) {
 			va_next = (sva + NBPML4) & ~PML4MASK;
 			if (va_next < sva)
 				va_next = eva;
 			continue;
 		}
-		pdpe = pmap_pml4e_to_pdpe(pml4e, sva);
+
 		va_next = (sva + NBPDP) & ~PDPMASK;
 		if (va_next < sva)
 			va_next = eva;
+		pdpe = pmap_pml4e_to_pdpe(pml4e, sva);
 		if ((*pdpe & PG_V) == 0)
 			continue;
-		KASSERT((*pdpe & PG_PS) == 0 || va_next <= eva,
-		    ("pmap_unwire of non-transient 1G page "
-		    "pdpe %#lx sva %#lx eva %#lx va_next %#lx",
-		    *pdpe, sva, eva, va_next));
 		if ((*pdpe & PG_PS) != 0) {
+			KASSERT(va_next <= eva,
+			    ("partial update of non-transparent 1G mapping "
+			    "pdpe %#lx sva %#lx eva %#lx va_next %#lx",
+			    *pdpe, sva, eva, va_next));
 			MPASS(pmap != kernel_pmap); /* XXXKIB */
 			MPASS((*pdpe & (PG_MANAGED | PG_G)) == 0);
 			atomic_clear_long(pdpe, PG_W);
@@ -7491,28 +7470,49 @@ pmap_copy(pmap_t dst_pmap, pmap_t src_pmap, vm_offset_t dst_addr, vm_size_t len,
 		    ("pmap_copy: invalid to pmap_copy page tables"));
 
 		pml4e = pmap_pml4e(src_pmap, addr);
-		if ((*pml4e & PG_V) == 0) {
+		if (pml4e == NULL || (*pml4e & PG_V) == 0) {
 			va_next = (addr + NBPML4) & ~PML4MASK;
 			if (va_next < addr)
 				va_next = end_addr;
 			continue;
 		}
 
+		va_next = (addr + NBPDP) & ~PDPMASK;
+		if (va_next < addr)
+			va_next = end_addr;
 		pdpe = pmap_pml4e_to_pdpe(pml4e, addr);
-		if ((*pdpe & PG_V) == 0) {
-			va_next = (addr + NBPDP) & ~PDPMASK;
-			if (va_next < addr)
-				va_next = end_addr;
+		if ((*pdpe & PG_V) == 0)
+			continue;
+		if ((*pdpe & PG_PS) != 0) {
+			KASSERT(va_next <= end_addr,
+			    ("partial update of non-transparent 1G mapping "
+			    "pdpe %#lx sva %#lx eva %#lx va_next %#lx",
+			    *pdpe, addr, end_addr, va_next));
+			MPASS((addr & PDPMASK) == 0);
+			MPASS((*pdpe & PG_MANAGED) == 0);
+			srcptepaddr = *pdpe;
+			pdpe = pmap_pdpe(dst_pmap, addr);
+			if (pdpe == NULL) {
+				if (_pmap_allocpte(dst_pmap,
+				    pmap_pml4e_pindex(addr), NULL, addr) ==
+				    NULL)
+					break;
+				pdpe = pmap_pdpe(dst_pmap, addr);
+			} else {
+				pml4e = pmap_pml4e(dst_pmap, addr);
+				dst_pdpg = PHYS_TO_VM_PAGE(*pml4e & PG_FRAME);
+				dst_pdpg->ref_count++;
+			}
+			KASSERT(*pdpe == 0,
+			    ("1G mapping present in dst pmap "
+			    "pdpe %#lx sva %#lx eva %#lx va_next %#lx",
+			    *pdpe, addr, end_addr, va_next));
+			*pdpe = srcptepaddr & ~PG_W;
+			pmap_resident_count_inc(dst_pmap, NBPDP / PAGE_SIZE);
 			continue;
 		}
 
 		va_next = (addr + NBPDR) & ~PDRMASK;
-		KASSERT((*pdpe & PG_PS) == 0 || va_next <= end_addr,
-		    ("pmap_copy of partial non-transient 1G page "
-		    "pdpe %#lx sva %#lx eva %#lx va_next %#lx",
-		    *pdpe, addr, end_addr, va_next));
-		if ((*pdpe & PG_PS) != 0)
-			continue;
 		if (va_next < addr)
 			va_next = end_addr;
 
@@ -8553,28 +8553,30 @@ pmap_advise(pmap_t pmap, vm_offset_t sva, vm_offset_t eva, int advice)
 	PMAP_LOCK(pmap);
 	for (; sva < eva; sva = va_next) {
 		pml4e = pmap_pml4e(pmap, sva);
-		if ((*pml4e & PG_V) == 0) {
+		if (pml4e == NULL || (*pml4e & PG_V) == 0) {
 			va_next = (sva + NBPML4) & ~PML4MASK;
 			if (va_next < sva)
 				va_next = eva;
 			continue;
 		}
+
+		va_next = (sva + NBPDP) & ~PDPMASK;
+		if (va_next < sva)
+			va_next = eva;
 		pdpe = pmap_pml4e_to_pdpe(pml4e, sva);
-		if ((*pdpe & PG_V) == 0) {
-			va_next = (sva + NBPDP) & ~PDPMASK;
-			if (va_next < sva)
-				va_next = eva;
+		if ((*pdpe & PG_V) == 0)
+			continue;
+		if ((*pdpe & PG_PS) != 0) {
+			KASSERT(va_next <= eva,
+			    ("partial update of non-transparent 1G mapping "
+			    "pdpe %#lx sva %#lx eva %#lx va_next %#lx",
+			    *pdpe, sva, eva, va_next));
 			continue;
 		}
+
 		va_next = (sva + NBPDR) & ~PDRMASK;
 		if (va_next < sva)
 			va_next = eva;
-		KASSERT((*pdpe & PG_PS) == 0 || va_next <= eva,
-		    ("pmap_advise of non-transient 1G page "
-		    "pdpe %#lx sva %#lx eva %#lx va_next %#lx",
-		    *pdpe, sva, eva, va_next));
-		if ((*pdpe & PG_PS) != 0)
-			continue;
 		pde = pmap_pdpe_to_pde(pdpe, sva);
 		oldpde = *pde;
 		if ((oldpde & PG_V) == 0)
@@ -9775,6 +9777,8 @@ pmap_get_mapping(pmap_t pmap, vm_offset_t va, uint64_t *ptr, int *num)
 	PMAP_LOCK(pmap);
 
 	pml4 = pmap_pml4e(pmap, va);
+	if (pml4 == NULL)
+		goto done;
 	ptr[idx++] = *pml4;
 	if ((*pml4 & PG_V) == 0)
 		goto done;
@@ -10476,7 +10480,7 @@ pmap_pti_init(void)
 	    sizeof(struct gate_descriptor) * NIDT, false);
 	CPU_FOREACH(i) {
 		/* Doublefault stack IST 1 */
-		va = __pcpu[i].pc_common_tss.tss_ist1;
+		va = __pcpu[i].pc_common_tss.tss_ist1 + sizeof(struct nmi_pcpu);
 		pmap_pti_add_kva_locked(va - PAGE_SIZE, va, false);
 		/* NMI stack IST 2 */
 		va = __pcpu[i].pc_common_tss.tss_ist2 + sizeof(struct nmi_pcpu);
@@ -10873,7 +10877,7 @@ pmap_pkru_update_range(pmap_t pmap, vm_offset_t sva, vm_offset_t eva,
 
 	for (changed = false, va = sva; va < eva; va = va_next) {
 		pml4e = pmap_pml4e(pmap, va);
-		if ((*pml4e & X86_PG_V) == 0) {
+		if (pml4e == NULL || (*pml4e & X86_PG_V) == 0) {
 			va_next = (va + NBPML4) & ~PML4MASK;
 			if (va_next < va)
 				va_next = eva;

@@ -784,7 +784,6 @@ linux_fetch_syscall_args(struct thread *td)
 		sa->callp = &p->p_sysent->sv_table[p->p_sysent->sv_size - 1];
 	else
 		sa->callp = &p->p_sysent->sv_table[sa->code];
-	sa->narg = sa->callp->sy_narg;
 
 	td->td_retval[0] = 0;
 	td->td_retval[1] = frame->tf_edx;
@@ -801,7 +800,7 @@ linux_set_syscall_retval(struct thread *td, int error)
 
 	if (__predict_false(error != 0)) {
 		if (error != ERESTART && error != EJUSTRETURN)
-			frame->tf_eax = linux_to_bsd_errno(error);
+			frame->tf_eax = bsd_to_linux_errno(error);
 	}
 }
 

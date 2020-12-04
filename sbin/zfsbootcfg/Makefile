@@ -2,14 +2,9 @@
 # $FreeBSD$
 
 PROG=	zfsbootcfg
-WARNS?=	2
 MAN=	zfsbootcfg.8
 
-LIBADD+=zfs
-LIBADD+=nvpair
-LIBADD+=umem
-LIBADD+=uutil
-LIBADD+=geom
+LIBADD+=zfsbootenv
 
 CFLAGS+= -DIN_BASE
 CFLAGS+= -I${SRCTOP}/sys/contrib/openzfs/include

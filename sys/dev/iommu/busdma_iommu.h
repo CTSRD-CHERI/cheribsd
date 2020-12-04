@@ -35,6 +35,7 @@
 #define __X86_IOMMU_BUSDMA_DMAR_H
 
 #include <dev/iommu/iommu.h>
+#include <dev/iommu/iommu_gas.h>
 
 struct bus_dma_tag_iommu {
 	struct bus_dma_tag_common common;
@@ -60,7 +61,5 @@ struct bus_dmamap_iommu {
 #define	BUS_DMAMAP_IOMMU_KMEM_ALLOC 0x0002
 
 extern struct bus_dma_impl bus_dma_iommu_impl;
-
-bus_dma_tag_t acpi_iommu_get_dma_tag(device_t dev, device_t child);
 
 #endif

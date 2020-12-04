@@ -204,6 +204,15 @@ static int lro_mbufs = 0;
 SYSCTL_INT(_hw_cxgbe, OID_AUTO, lro_mbufs, CTLFLAG_RDTUN, &lro_mbufs, 0,
     "Enable presorting of LRO frames");
 
+static counter_u64_t pullups;
+SYSCTL_COUNTER_U64(_hw_cxgbe, OID_AUTO, pullups, CTLFLAG_RD, &pullups,
+    "Number of mbuf pullups performed");
+
+static counter_u64_t defrags;
+SYSCTL_COUNTER_U64(_hw_cxgbe, OID_AUTO, defrags, CTLFLAG_RD, &defrags,
+    "Number of mbuf defrags performed");
+
+
 static int service_iq(struct sge_iq *, int);
 static int service_iq_fl(struct sge_iq *, int);
 static struct mbuf *get_fl_payload(struct adapter *, struct sge_fl *, uint32_t);
@@ -269,7 +278,7 @@ static void add_fl_to_sfl(struct adapter *, struct sge_fl *);
 static inline void get_pkt_gl(struct mbuf *, struct sglist *);
 static inline u_int txpkt_len16(u_int, const u_int);
 static inline u_int txpkt_vm_len16(u_int, const u_int);
-static inline void calculate_mbuf_len16(struct adapter *, struct mbuf *);
+static inline void calculate_mbuf_len16(struct mbuf *, bool);
 static inline u_int txpkts0_len16(u_int);
 static inline u_int txpkts1_len16(void);
 static u_int write_raw_wr(struct sge_txq *, void *, struct mbuf *, u_int);
@@ -533,10 +542,36 @@ t4_sge_modload(void)
 		tscale = 1;
 	}
 
+	if (largest_rx_cluster != MCLBYTES &&
+#if MJUMPAGESIZE != MCLBYTES
+	    largest_rx_cluster != MJUMPAGESIZE &&
+#endif
+	    largest_rx_cluster != MJUM9BYTES &&
+	    largest_rx_cluster != MJUM16BYTES) {
+		printf("Invalid hw.cxgbe.largest_rx_cluster value (%d),"
+		    " using %d instead.\n", largest_rx_cluster, MJUM16BYTES);
+		largest_rx_cluster = MJUM16BYTES;
+	}
+
+	if (safest_rx_cluster != MCLBYTES &&
+#if MJUMPAGESIZE != MCLBYTES
+	    safest_rx_cluster != MJUMPAGESIZE &&
+#endif
+	    safest_rx_cluster != MJUM9BYTES &&
+	    safest_rx_cluster != MJUM16BYTES) {
+		printf("Invalid hw.cxgbe.safest_rx_cluster value (%d),"
+		    " using %d instead.\n", safest_rx_cluster, MJUMPAGESIZE);
+		safest_rx_cluster = MJUMPAGESIZE;
+	}
+
 	extfree_refs = counter_u64_alloc(M_WAITOK);
 	extfree_rels = counter_u64_alloc(M_WAITOK);
+	pullups = counter_u64_alloc(M_WAITOK);
+	defrags = counter_u64_alloc(M_WAITOK);
 	counter_u64_zero(extfree_refs);
 	counter_u64_zero(extfree_rels);
+	counter_u64_zero(pullups);
+	counter_u64_zero(defrags);
 
 	t4_init_shared_cpl_handlers();
 	t4_register_cpl_handler(CPL_FW4_MSG, handle_fw_msg);
@@ -556,6 +591,8 @@ t4_sge_modunload(void)
 
 	counter_u64_free(extfree_refs);
 	counter_u64_free(extfree_rels);
+	counter_u64_free(pullups);
+	counter_u64_free(defrags);
 }
 
 uint64_t
@@ -926,7 +963,7 @@ t4_sge_sysctls(struct adapter *sc, struct sysctl_ctx_list *ctx,
 	struct sge_params *sp = &sc->params.sge;
 
 	SYSCTL_ADD_PROC(ctx, children, OID_AUTO, "buffer_sizes",
-	    CTLTYPE_STRING | CTLFLAG_RD | CTLFLAG_NEEDGIANT, sc, 0,
+	    CTLTYPE_STRING | CTLFLAG_RD | CTLFLAG_MPSAFE, sc, 0,
 	    sysctl_bufsizes, "A", "freelist buffer sizes");
 
 	SYSCTL_ADD_INT(ctx, children, OID_AUTO, "fl_pktshift", CTLFLAG_RD,
@@ -2308,6 +2345,8 @@ set_mbuf_len16(struct mbuf *m, uint8_t len16)
 {
 
 	M_ASSERTPKTHDR(m);
+	if (!(mbuf_cflags(m) & MC_TLS))
+		MPASS(len16 > 0 && len16 <= SGE_MAX_WR_LEN / 16);
 	m->m_pkthdr.PH_loc.eight[0] = len16;
 }
 
@@ -2365,10 +2404,10 @@ set_mbuf_eo_tsclk_tsoff(struct mbuf *m, uint8_t tsclk_tsoff)
 }
 
 static inline int
-needs_eo(struct cxgbe_snd_tag *cst)
+needs_eo(struct m_snd_tag *mst)
 {
 
-	return (cst != NULL && cst->type == IF_SND_TAG_TYPE_RATE_LIMIT);
+	return (mst != NULL && mst->type == IF_SND_TAG_TYPE_RATE_LIMIT);
 }
 #endif
 
@@ -2642,8 +2681,14 @@ count_mbuf_nsegs(struct mbuf *m, int skip, uint8_t *cflags)
  * The maximum number of segments that can fit in a WR.
  */
 static int
-max_nsegs_allowed(struct mbuf *m)
+max_nsegs_allowed(struct mbuf *m, bool vm_wr)
 {
+
+	if (vm_wr) {
+		if (needs_tso(m))
+			return (TX_SGL_SEGS_VM_TSO);
+		return (TX_SGL_SEGS_VM);
+	}
 
 	if (needs_tso(m)) {
 		if (needs_vxlan_tso(m))
@@ -2661,7 +2706,7 @@ max_nsegs_allowed(struct mbuf *m)
  * b) it may get defragged up if the gather list is too long for the hardware.
  */
 int
-parse_pkt(struct adapter *sc, struct mbuf **mp)
+parse_pkt(struct mbuf **mp, bool vm_wr)
 {
 	struct mbuf *m0 = *mp, *m;
 	int rc, nsegs, defragged = 0, offset;
@@ -2671,7 +2716,7 @@ parse_pkt(struct adapter *sc, struct mbuf **mp)
 	struct tcphdr *tcp;
 #endif
 #if defined(KERN_TLS) || defined(RATELIMIT)
-	struct cxgbe_snd_tag *cst;
+	struct m_snd_tag *mst;
 #endif
 	uint16_t eh_type;
 	uint8_t cflags;
@@ -2695,12 +2740,12 @@ restart:
 	nsegs = count_mbuf_nsegs(m0, 0, &cflags);
 #if defined(KERN_TLS) || defined(RATELIMIT)
 	if (m0->m_pkthdr.csum_flags & CSUM_SND_TAG)
-		cst = mst_to_cst(m0->m_pkthdr.snd_tag);
+		mst = m0->m_pkthdr.snd_tag;
 	else
-		cst = NULL;
+		mst = NULL;
 #endif
 #ifdef KERN_TLS
-	if (cst != NULL && cst->type == IF_SND_TAG_TYPE_TLS) {
+	if (mst != NULL && mst->type == IF_SND_TAG_TYPE_TLS) {
 		int len16;
 
 		cflags |= MC_TLS;
@@ -2713,9 +2758,14 @@ restart:
 		return (0);
 	}
 #endif
-	if (nsegs > max_nsegs_allowed(m0)) {
-		if (defragged++ > 0 || (m = m_defrag(m0, M_NOWAIT)) == NULL) {
+	if (nsegs > max_nsegs_allowed(m0, vm_wr)) {
+		if (defragged++ > 0) {
 			rc = EFBIG;
+			goto fail;
+		}
+		counter_u64_add(defrags, 1);
+		if ((m = m_defrag(m0, M_NOWAIT)) == NULL) {
+			rc = ENOMEM;
 			goto fail;
 		}
 		*mp = m0 = m;	/* update caller's copy after defrag */
@@ -2724,6 +2774,7 @@ restart:
 
 	if (__predict_false(nsegs > 2 && m0->m_pkthdr.len <= MHLEN &&
 	    !(cflags & MC_NOMAP))) {
+		counter_u64_add(pullups, 1);
 		m0 = m_pullup(m0, m0->m_pkthdr.len);
 		if (m0 == NULL) {
 			/* Should have left well enough alone. */
@@ -2735,7 +2786,7 @@ restart:
 	}
 	set_mbuf_nsegs(m0, nsegs);
 	set_mbuf_cflags(m0, cflags);
-	calculate_mbuf_len16(sc, m0);
+	calculate_mbuf_len16(m0, vm_wr);
 
 #ifdef RATELIMIT
 	/*
@@ -2743,17 +2794,17 @@ restart:
 	 * checksumming is enabled.  needs_outer_l4_csum happens to check for
 	 * all the right things.
 	 */
-	if (__predict_false(needs_eo(cst) && !needs_outer_l4_csum(m0))) {
+	if (__predict_false(needs_eo(mst) && !needs_outer_l4_csum(m0))) {
 		m_snd_tag_rele(m0->m_pkthdr.snd_tag);
 		m0->m_pkthdr.snd_tag = NULL;
 		m0->m_pkthdr.csum_flags &= ~CSUM_SND_TAG;
-		cst = NULL;
+		mst = NULL;
 	}
 #endif
 
 	if (!needs_hwcsum(m0)
 #ifdef RATELIMIT
-   		 && !needs_eo(cst)
+   		 && !needs_eo(mst)
 #endif
 	)
 		return (0);
@@ -2872,7 +2923,7 @@ restart:
 #endif
 	}
 #ifdef RATELIMIT
-	if (needs_eo(cst)) {
+	if (needs_eo(mst)) {
 		u_int immhdrs;
 
 		/* EO WRs have the headers in the WR and not the GL. */
@@ -3147,7 +3198,7 @@ eth_tx(struct mp_ring *r, u_int cidx, u_int pidx, bool *coalescing)
 
 		if (txp->npkt > 0 || remaining > 1 || txp->score > 3 ||
 		    atomic_load_int(&txq->eq.equiq) != 0) {
-			if (sc->flags & IS_VF)
+			if (vi->flags & TX_USES_VM_WR)
 				rc = add_to_txpkts_vf(sc, txq, m0, avail, &snd);
 			else
 				rc = add_to_txpkts_pf(sc, txq, m0, avail, &snd);
@@ -3163,14 +3214,14 @@ eth_tx(struct mp_ring *r, u_int cidx, u_int pidx, bool *coalescing)
 				if (txp->score++ >= 10)
 					txp->score = 10;
 				MPASS(avail >= tx_len16_to_desc(txp->len16));
-				if (sc->flags & IS_VF)
+				if (vi->flags & TX_USES_VM_WR)
 					n = write_txpkts_vm_wr(sc, txq);
 				else
 					n = write_txpkts_wr(sc, txq);
 			} else {
 				MPASS(avail >=
 				    tx_len16_to_desc(mbuf_len16(txp->mb[0])));
-				if (sc->flags & IS_VF)
+				if (vi->flags & TX_USES_VM_WR)
 					n = write_txpkt_vm_wr(sc, txq,
 					    txp->mb[0]);
 				else
@@ -3220,7 +3271,7 @@ eth_tx(struct mp_ring *r, u_int cidx, u_int pidx, bool *coalescing)
 #endif
 		} else {
 			ETHER_BPF_MTAP(ifp, m0);
-			if (sc->flags & IS_VF)
+			if (vi->flags & TX_USES_VM_WR)
 				n = write_txpkt_vm_wr(sc, txq, m0);
 			else
 				n = write_txpkt_wr(sc, txq, m0, avail);
@@ -3264,14 +3315,14 @@ send_txpkts:
 			ETHER_BPF_MTAP(ifp, txp->mb[i]);
 		if (txp->npkt > 1) {
 			MPASS(avail >= tx_len16_to_desc(txp->len16));
-			if (sc->flags & IS_VF)
+			if (vi->flags & TX_USES_VM_WR)
 				n = write_txpkts_vm_wr(sc, txq);
 			else
 				n = write_txpkts_wr(sc, txq);
 		} else {
 			MPASS(avail >=
 			    tx_len16_to_desc(mbuf_len16(txp->mb[0])));
-			if (sc->flags & IS_VF)
+			if (vi->flags & TX_USES_VM_WR)
 				n = write_txpkt_vm_wr(sc, txq, txp->mb[0]);
 			else
 				n = write_txpkt_wr(sc, txq, txp->mb[0], avail);
@@ -3516,9 +3567,9 @@ alloc_iq_fl(struct vi_info *vi, struct sge_iq *iq, struct sge_fl *fl,
 	iq->flags |= IQ_ALLOCATED;
 
 	cntxt_id = iq->cntxt_id - sc->sge.iq_start;
-	if (cntxt_id >= sc->sge.niq) {
+	if (cntxt_id >= sc->sge.iqmap_sz) {
 		panic ("%s: iq->cntxt_id (%d) more than the max (%d)", __func__,
-		    cntxt_id, sc->sge.niq - 1);
+		    cntxt_id, sc->sge.iqmap_sz - 1);
 	}
 	sc->sge.iqmap[cntxt_id] = iq;
 
@@ -3530,9 +3581,9 @@ alloc_iq_fl(struct vi_info *vi, struct sge_iq *iq, struct sge_fl *fl,
 		fl->pidx = fl->cidx = 0;
 
 		cntxt_id = fl->cntxt_id - sc->sge.eq_start;
-		if (cntxt_id >= sc->sge.neq) {
+		if (cntxt_id >= sc->sge.eqmap_sz) {
 			panic("%s: fl->cntxt_id (%d) more than the max (%d)",
-			    __func__, cntxt_id, sc->sge.neq - 1);
+			    __func__, cntxt_id, sc->sge.eqmap_sz - 1);
 		}
 		sc->sge.eqmap[cntxt_id] = (void *)fl;
 
@@ -3647,13 +3698,13 @@ add_iq_sysctls(struct sysctl_ctx_list *ctx, struct sysctl_oid *oid,
 	SYSCTL_ADD_INT(ctx, children, OID_AUTO, "dmalen", CTLFLAG_RD, NULL,
 	    iq->qsize * IQ_ESIZE, "descriptor ring size in bytes");
 	SYSCTL_ADD_PROC(ctx, children, OID_AUTO, "abs_id",
-	    CTLTYPE_INT | CTLFLAG_RD | CTLFLAG_NEEDGIANT, &iq->abs_id, 0,
+	    CTLTYPE_INT | CTLFLAG_RD | CTLFLAG_MPSAFE, &iq->abs_id, 0,
 	    sysctl_uint16, "I", "absolute id of the queue");
 	SYSCTL_ADD_PROC(ctx, children, OID_AUTO, "cntxt_id",
-	    CTLTYPE_INT | CTLFLAG_RD | CTLFLAG_NEEDGIANT, &iq->cntxt_id, 0,
+	    CTLTYPE_INT | CTLFLAG_RD | CTLFLAG_MPSAFE, &iq->cntxt_id, 0,
 	    sysctl_uint16, "I", "SGE context id of the queue");
 	SYSCTL_ADD_PROC(ctx, children, OID_AUTO, "cidx",
-	    CTLTYPE_INT | CTLFLAG_RD | CTLFLAG_NEEDGIANT, &iq->cidx, 0,
+	    CTLTYPE_INT | CTLFLAG_RD | CTLFLAG_MPSAFE, &iq->cidx, 0,
 	    sysctl_uint16, "I", "consumer index");
 }
 
@@ -3673,7 +3724,7 @@ add_fl_sysctls(struct adapter *sc, struct sysctl_ctx_list *ctx,
 	    fl->sidx * EQ_ESIZE + sc->params.sge.spg_len,
 	    "desc ring size in bytes");
 	SYSCTL_ADD_PROC(ctx, children, OID_AUTO, "cntxt_id",
-	    CTLTYPE_INT | CTLFLAG_RD | CTLFLAG_NEEDGIANT, &fl->cntxt_id, 0,
+	    CTLTYPE_INT | CTLFLAG_RD | CTLFLAG_MPSAFE, &fl->cntxt_id, 0,
 	    sysctl_uint16, "I", "SGE context id of the freelist");
 	SYSCTL_ADD_UINT(ctx, children, OID_AUTO, "padding", CTLFLAG_RD, NULL,
 	    fl_pad ? 1 : 0, "padding enabled");
@@ -3937,13 +3988,13 @@ alloc_nm_rxq(struct vi_info *vi, struct sge_nm_rxq *nm_rxq, int intr_idx,
 	children = SYSCTL_CHILDREN(oid);
 
 	SYSCTL_ADD_PROC(ctx, children, OID_AUTO, "abs_id",
-	    CTLTYPE_INT | CTLFLAG_RD | CTLFLAG_NEEDGIANT, &nm_rxq->iq_abs_id,
+	    CTLTYPE_INT | CTLFLAG_RD | CTLFLAG_MPSAFE, &nm_rxq->iq_abs_id,
 	    0, sysctl_uint16, "I", "absolute id of the queue");
 	SYSCTL_ADD_PROC(ctx, children, OID_AUTO, "cntxt_id",
-	    CTLTYPE_INT | CTLFLAG_RD | CTLFLAG_NEEDGIANT, &nm_rxq->iq_cntxt_id,
+	    CTLTYPE_INT | CTLFLAG_RD | CTLFLAG_MPSAFE, &nm_rxq->iq_cntxt_id,
 	    0, sysctl_uint16, "I", "SGE context id of the queue");
 	SYSCTL_ADD_PROC(ctx, children, OID_AUTO, "cidx",
-	    CTLTYPE_INT | CTLFLAG_RD | CTLFLAG_NEEDGIANT, &nm_rxq->iq_cidx, 0,
+	    CTLTYPE_INT | CTLFLAG_RD | CTLFLAG_MPSAFE, &nm_rxq->iq_cidx, 0,
 	    sysctl_uint16, "I", "consumer index");
 
 	children = SYSCTL_CHILDREN(oid);
@@ -3952,7 +4003,7 @@ alloc_nm_rxq(struct vi_info *vi, struct sge_nm_rxq *nm_rxq, int intr_idx,
 	children = SYSCTL_CHILDREN(oid);
 
 	SYSCTL_ADD_PROC(ctx, children, OID_AUTO, "cntxt_id",
-	    CTLTYPE_INT | CTLFLAG_RD | CTLFLAG_NEEDGIANT, &nm_rxq->fl_cntxt_id,
+	    CTLTYPE_INT | CTLFLAG_RD | CTLFLAG_MPSAFE, &nm_rxq->fl_cntxt_id,
 	    0, sysctl_uint16, "I", "SGE context id of the freelist");
 	SYSCTL_ADD_UINT(ctx, children, OID_AUTO, "cidx", CTLFLAG_RD,
 	    &nm_rxq->fl_cidx, 0, "consumer index");
@@ -4020,10 +4071,10 @@ alloc_nm_txq(struct vi_info *vi, struct sge_nm_txq *nm_txq, int iqidx, int idx,
 	SYSCTL_ADD_UINT(&vi->ctx, children, OID_AUTO, "cntxt_id", CTLFLAG_RD,
 	    &nm_txq->cntxt_id, 0, "SGE context id of the queue");
 	SYSCTL_ADD_PROC(&vi->ctx, children, OID_AUTO, "cidx",
-	    CTLTYPE_INT | CTLFLAG_RD | CTLFLAG_NEEDGIANT, &nm_txq->cidx, 0,
+	    CTLTYPE_INT | CTLFLAG_RD | CTLFLAG_MPSAFE, &nm_txq->cidx, 0,
 	    sysctl_uint16, "I", "consumer index");
 	SYSCTL_ADD_PROC(&vi->ctx, children, OID_AUTO, "pidx",
-	    CTLTYPE_INT | CTLFLAG_RD | CTLFLAG_NEEDGIANT, &nm_txq->pidx, 0,
+	    CTLTYPE_INT | CTLFLAG_RD | CTLFLAG_MPSAFE, &nm_txq->pidx, 0,
 	    sysctl_uint16, "I", "producer index");
 
 	return (rc);
@@ -4101,9 +4152,9 @@ ctrl_eq_alloc(struct adapter *sc, struct sge_eq *eq)
 
 	eq->cntxt_id = G_FW_EQ_CTRL_CMD_EQID(be32toh(c.cmpliqid_eqid));
 	cntxt_id = eq->cntxt_id - sc->sge.eq_start;
-	if (cntxt_id >= sc->sge.neq)
+	if (cntxt_id >= sc->sge.eqmap_sz)
 	    panic("%s: eq->cntxt_id (%d) more than the max (%d)", __func__,
-		cntxt_id, sc->sge.neq - 1);
+		cntxt_id, sc->sge.eqmap_sz - 1);
 	sc->sge.eqmap[cntxt_id] = eq;
 
 	return (rc);
@@ -4147,9 +4198,9 @@ eth_eq_alloc(struct adapter *sc, struct vi_info *vi, struct sge_eq *eq)
 	eq->cntxt_id = G_FW_EQ_ETH_CMD_EQID(be32toh(c.eqid_pkd));
 	eq->abs_id = G_FW_EQ_ETH_CMD_PHYSEQID(be32toh(c.physeqid_pkd));
 	cntxt_id = eq->cntxt_id - sc->sge.eq_start;
-	if (cntxt_id >= sc->sge.neq)
+	if (cntxt_id >= sc->sge.eqmap_sz)
 	    panic("%s: eq->cntxt_id (%d) more than the max (%d)", __func__,
-		cntxt_id, sc->sge.neq - 1);
+		cntxt_id, sc->sge.eqmap_sz - 1);
 	sc->sge.eqmap[cntxt_id] = eq;
 
 	return (rc);
@@ -4192,9 +4243,9 @@ ofld_eq_alloc(struct adapter *sc, struct vi_info *vi, struct sge_eq *eq)
 
 	eq->cntxt_id = G_FW_EQ_OFLD_CMD_EQID(be32toh(c.eqid_pkd));
 	cntxt_id = eq->cntxt_id - sc->sge.eq_start;
-	if (cntxt_id >= sc->sge.neq)
+	if (cntxt_id >= sc->sge.eqmap_sz)
 	    panic("%s: eq->cntxt_id (%d) more than the max (%d)", __func__,
-		cntxt_id, sc->sge.neq - 1);
+		cntxt_id, sc->sge.eqmap_sz - 1);
 	sc->sge.eqmap[cntxt_id] = eq;
 
 	return (rc);
@@ -4341,10 +4392,10 @@ alloc_wrq(struct adapter *sc, struct vi_info *vi, struct sge_wrq *wrq,
 	SYSCTL_ADD_UINT(ctx, children, OID_AUTO, "cntxt_id", CTLFLAG_RD,
 	    &wrq->eq.cntxt_id, 0, "SGE context id of the queue");
 	SYSCTL_ADD_PROC(ctx, children, OID_AUTO, "cidx",
-	    CTLTYPE_INT | CTLFLAG_RD | CTLFLAG_NEEDGIANT, &wrq->eq.cidx, 0,
+	    CTLTYPE_INT | CTLFLAG_RD | CTLFLAG_MPSAFE, &wrq->eq.cidx, 0,
 	    sysctl_uint16, "I", "consumer index");
 	SYSCTL_ADD_PROC(ctx, children, OID_AUTO, "pidx",
-	    CTLTYPE_INT | CTLFLAG_RD | CTLFLAG_NEEDGIANT, &wrq->eq.pidx, 0,
+	    CTLTYPE_INT | CTLFLAG_RD | CTLFLAG_MPSAFE, &wrq->eq.pidx, 0,
 	    sysctl_uint16, "I", "producer index");
 	SYSCTL_ADD_INT(ctx, children, OID_AUTO, "sidx", CTLFLAG_RD, NULL,
 	    wrq->eq.sidx, "status page index");
@@ -4410,7 +4461,7 @@ alloc_txq(struct vi_info *vi, struct sge_txq *txq, int idx,
 	TASK_INIT(&txq->tx_reclaim_task, 0, tx_reclaim, eq);
 	txq->ifp = vi->ifp;
 	txq->gl = sglist_alloc(TX_SGL_SEGS, M_WAITOK);
-	if (sc->flags & IS_VF)
+	if (vi->flags & TX_USES_VM_WR)
 		txq->cpl_ctrl0 = htobe32(V_TXPKT_OPCODE(CPL_TX_PKT_XT) |
 		    V_TXPKT_INTF(pi->tx_chan));
 	else
@@ -4426,6 +4477,8 @@ alloc_txq(struct vi_info *vi, struct sge_txq *txq, int idx,
 	MPASS(nitems(txp->mb) >= sc->params.max_pkts_per_eth_tx_pkts_wr);
 	txq->txp.max_npkt = min(nitems(txp->mb),
 	    sc->params.max_pkts_per_eth_tx_pkts_wr);
+	if (vi->flags & TX_USES_VM_WR && !(sc->flags & IS_VF))
+		txq->txp.max_npkt--;
 
 	snprintf(name, sizeof(name), "%d", idx);
 	oid = SYSCTL_ADD_NODE(&vi->ctx, children, OID_AUTO, name,
@@ -4442,16 +4495,16 @@ alloc_txq(struct vi_info *vi, struct sge_txq *txq, int idx,
 	SYSCTL_ADD_UINT(&vi->ctx, children, OID_AUTO, "cntxt_id", CTLFLAG_RD,
 	    &eq->cntxt_id, 0, "SGE context id of the queue");
 	SYSCTL_ADD_PROC(&vi->ctx, children, OID_AUTO, "cidx",
-	    CTLTYPE_INT | CTLFLAG_RD | CTLFLAG_NEEDGIANT, &eq->cidx, 0,
+	    CTLTYPE_INT | CTLFLAG_RD | CTLFLAG_MPSAFE, &eq->cidx, 0,
 	    sysctl_uint16, "I", "consumer index");
 	SYSCTL_ADD_PROC(&vi->ctx, children, OID_AUTO, "pidx",
-	    CTLTYPE_INT | CTLFLAG_RD | CTLFLAG_NEEDGIANT, &eq->pidx, 0,
+	    CTLTYPE_INT | CTLFLAG_RD | CTLFLAG_MPSAFE, &eq->pidx, 0,
 	    sysctl_uint16, "I", "producer index");
 	SYSCTL_ADD_INT(&vi->ctx, children, OID_AUTO, "sidx", CTLFLAG_RD, NULL,
 	    eq->sidx, "status page index");
 
 	SYSCTL_ADD_PROC(&vi->ctx, children, OID_AUTO, "tc",
-	    CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_NEEDGIANT, vi, idx, sysctl_tc,
+	    CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_MPSAFE, vi, idx, sysctl_tc,
 	    "I", "traffic class (-1 means none)");
 
 	SYSCTL_ADD_UQUAD(&vi->ctx, children, OID_AUTO, "txcsum", CTLFLAG_RD,
@@ -4775,9 +4828,11 @@ get_pkt_gl(struct mbuf *m, struct sglist *gl)
 	KASSERT(gl->sg_nseg == mbuf_nsegs(m),
 	    ("%s: nsegs changed for mbuf %p from %d to %d", __func__, m,
 	    mbuf_nsegs(m), gl->sg_nseg));
-	KASSERT(gl->sg_nseg > 0 && gl->sg_nseg <= max_nsegs_allowed(m),
+#if 0	/* vm_wr not readily available here. */
+	KASSERT(gl->sg_nseg > 0 && gl->sg_nseg <= max_nsegs_allowed(m, vm_wr),
 	    ("%s: %d segments, should have been 1 <= nsegs <= %d", __func__,
-		gl->sg_nseg, max_nsegs_allowed(m)));
+		gl->sg_nseg, max_nsegs_allowed(m, vm_wr)));
+#endif
 }
 
 /*
@@ -4818,12 +4873,12 @@ txpkt_vm_len16(u_int nsegs, const u_int extra)
 }
 
 static inline void
-calculate_mbuf_len16(struct adapter *sc, struct mbuf *m)
+calculate_mbuf_len16(struct mbuf *m, bool vm_wr)
 {
 	const int lso = sizeof(struct cpl_tx_pkt_lso_core);
 	const int tnl_lso = sizeof(struct cpl_tx_tnl_lso);
 
-	if (sc->flags & IS_VF) {
+	if (vm_wr) {
 		if (needs_tso(m))
 			set_mbuf_len16(m, txpkt_vm_len16(mbuf_nsegs(m), lso));
 		else
@@ -5326,8 +5381,6 @@ add_to_txpkts_vf(struct adapter *sc, struct sge_txq *txq, struct mbuf *m,
     int avail, bool *send)
 {
 	struct txpkts *txp = &txq->txp;
-
-	MPASS(sc->flags & IS_VF);
 
 	/* Cannot have TSO and coalesce at the same time. */
 	if (cannot_use_txpkts(m)) {
@@ -6431,7 +6484,7 @@ ethofld_tx(struct cxgbe_rate_tag *cst)
 		cst->tx_credits -= next_credits;
 		cst->tx_nocompl += next_credits;
 		compl = cst->ncompl == 0 || cst->tx_nocompl >= cst->tx_total / 2;
-		ETHER_BPF_MTAP(cst->com.com.ifp, m);
+		ETHER_BPF_MTAP(cst->com.ifp, m);
 		write_ethofld_wr(cst, wr, m, compl);
 		commit_wrq_wr(cst->eo_txq, wr, &cookie);
 		if (compl) {
@@ -6452,7 +6505,7 @@ ethofld_tx(struct cxgbe_rate_tag *cst)
 		 */
 		m->m_pkthdr.snd_tag = NULL;
 		m->m_pkthdr.csum_flags &= ~CSUM_SND_TAG;
-		m_snd_tag_rele(&cst->com.com);
+		m_snd_tag_rele(&cst->com);
 
 		mbufq_enqueue(&cst->pending_fwack, m);
 	}
@@ -6506,10 +6559,10 @@ ethofld_transmit(struct ifnet *ifp, struct mbuf *m0)
 	 * ethofld_tx() in case we are sending the final mbuf after
 	 * the inp was freed.
 	 */
-	m_snd_tag_ref(&cst->com.com);
+	m_snd_tag_ref(&cst->com);
 	ethofld_tx(cst);
 	mtx_unlock(&cst->lock);
-	m_snd_tag_rele(&cst->com.com);
+	m_snd_tag_rele(&cst->com);
 	return (0);
 
 done:
@@ -6580,12 +6633,12 @@ ethofld_fw4_ack(struct sge_iq *iq, const struct rss_header *rss, struct mbuf *m0
 		 * As with ethofld_transmit(), hold an extra reference
 		 * so that the tag is stable across ethold_tx().
 		 */
-		m_snd_tag_ref(&cst->com.com);
+		m_snd_tag_ref(&cst->com);
 		m = mbufq_first(&cst->pending_tx);
 		if (m != NULL && cst->tx_credits >= mbuf_eo_len16(m))
 			ethofld_tx(cst);
 		mtx_unlock(&cst->lock);
-		m_snd_tag_rele(&cst->com.com);
+		m_snd_tag_rele(&cst->com);
 	} else {
 		/*
 		 * There shouldn't be any pending packets if the tag

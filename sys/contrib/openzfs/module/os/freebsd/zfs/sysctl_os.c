@@ -243,8 +243,9 @@ sysctl_vfs_zfs_arc_no_grow_shift(SYSCTL_HANDLER_ARGS)
 	return (0);
 }
 
-SYSCTL_PROC(_vfs_zfs, OID_AUTO, arc_no_grow_shift, CTLTYPE_U32 | CTLFLAG_RWTUN,
-    0, sizeof (uint32_t), sysctl_vfs_zfs_arc_no_grow_shift, "U",
+SYSCTL_PROC(_vfs_zfs, OID_AUTO, arc_no_grow_shift,
+    CTLTYPE_U32 | CTLFLAG_RWTUN | CTLFLAG_MPSAFE, 0, sizeof (uint32_t),
+    sysctl_vfs_zfs_arc_no_grow_shift, "U",
     "log2(fraction of ARC which must be free to allow growing)");
 
 int
@@ -275,10 +276,12 @@ param_set_arc_int(SYSCTL_HANDLER_ARGS)
 	return (0);
 }
 
-SYSCTL_PROC(_vfs_zfs, OID_AUTO, arc_min, CTLTYPE_ULONG | CTLFLAG_RWTUN,
+SYSCTL_PROC(_vfs_zfs, OID_AUTO, arc_min,
+    CTLTYPE_ULONG | CTLFLAG_RWTUN | CTLFLAG_MPSAFE,
     &zfs_arc_min, sizeof (zfs_arc_min), param_set_arc_long, "LU",
     "min arc size (LEGACY)");
-SYSCTL_PROC(_vfs_zfs, OID_AUTO, arc_max, CTLTYPE_ULONG | CTLFLAG_RWTUN,
+SYSCTL_PROC(_vfs_zfs, OID_AUTO, arc_max,
+    CTLTYPE_ULONG | CTLFLAG_RWTUN | CTLFLAG_MPSAFE,
     &zfs_arc_max, sizeof (zfs_arc_max), param_set_arc_long, "LU",
     "max arc size (LEGACY)");
 
@@ -297,8 +300,9 @@ SYSCTL_UINT(_vfs_zfs_zfetch, OID_AUTO, max_distance, CTLFLAG_RWTUN,
 
 /* max bytes to prefetch indirects for per stream (default 64MB) */
 extern uint32_t	zfetch_max_idistance;
-SYSCTL_UINT(_vfs_zfs_prefetch, OID_AUTO, max_idistance, CTLFLAG_RWTUN,
-    &zfetch_max_idistance, 0, "Max bytes to prefetch indirects for per stream");
+SYSCTL_UINT(_vfs_zfs_zfetch, OID_AUTO, max_idistance, CTLFLAG_RWTUN,
+    &zfetch_max_idistance, 0,
+    "Max bytes to prefetch indirects for per stream (LEGACY)");
 
 /* dsl_pool.c */
 
@@ -558,11 +562,13 @@ param_set_max_auto_ashift(SYSCTL_HANDLER_ARGS)
 	return (0);
 }
 
-SYSCTL_PROC(_vfs_zfs, OID_AUTO, min_auto_ashift, CTLTYPE_U64 | CTLFLAG_RWTUN,
+SYSCTL_PROC(_vfs_zfs, OID_AUTO, min_auto_ashift,
+    CTLTYPE_U64 | CTLFLAG_RWTUN | CTLFLAG_MPSAFE,
     &zfs_vdev_min_auto_ashift, sizeof (zfs_vdev_min_auto_ashift),
     param_set_min_auto_ashift, "QU",
     "Min ashift used when creating new top-level vdev. (LEGACY)");
-SYSCTL_PROC(_vfs_zfs, OID_AUTO, max_auto_ashift, CTLTYPE_U64 | CTLFLAG_RWTUN,
+SYSCTL_PROC(_vfs_zfs, OID_AUTO, max_auto_ashift,
+    CTLTYPE_U64 | CTLFLAG_RWTUN | CTLFLAG_MPSAFE,
     &zfs_vdev_max_auto_ashift, sizeof (zfs_vdev_max_auto_ashift),
     param_set_max_auto_ashift, "QU",
     "Max ashift used when optimizing for logical -> physical sector size on "

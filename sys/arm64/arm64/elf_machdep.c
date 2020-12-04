@@ -86,10 +86,10 @@ static struct sysentvec elf64_freebsd_sysvec = {
 	.sv_maxssiz	= NULL,
 #if __has_feature(capabilities)
 	.sv_flags	= SV_SHP | SV_TIMEKEEP | SV_ABI_FREEBSD | SV_LP64 |
-	    SV_CHERI,
+	    SV_RNG_SEED_VER | SV_CHERI,
 #else
 	.sv_flags	= SV_SHP | SV_TIMEKEEP | SV_ABI_FREEBSD | SV_LP64 |
-	    SV_ASLR,
+	    SV_ASLR | SV_RNG_SEED_VER,
 #endif
 	.sv_set_syscall_retval = cpu_set_syscall_retval,
 	.sv_fetch_syscall_args = cpu_fetch_syscall_args,
@@ -240,7 +240,8 @@ elf_reloc_internal(linker_file_t lf, Elf_Addr relocbase, const void *data,
 			*where = val;
 		break;
 	default:
-		printf("kldload: unexpected relocation type %d\n", rtype);
+		printf("kldload: unexpected relocation type %d, "
+		    "symbol index %d\n", rtype, symidx);
 		return (-1);
 	}
 	return (error);

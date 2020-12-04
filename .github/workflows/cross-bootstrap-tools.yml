@@ -4,7 +4,7 @@ on:
   push:
     branches: [ master, dev ]
   pull_request:
-    branches: [ master ]
+    branches: [ master, dev ]
 
 jobs:
   build:
@@ -22,7 +22,7 @@ jobs:
           chmod +x /tmp/llvm.sh
           sudo /tmp/llvm.sh 11
           sudo apt install -y libarchive-dev
-          echo "::set-env name=EXTRA_MAKE_ARGS::--cross-bindir=/usr/lib/llvm-11/bin"
+          echo "EXTRA_MAKE_ARGS=--cross-bindir=/usr/lib/llvm-11/bin" >> $GITHUB_ENV
         if: ${{ startsWith(matrix.os, 'ubuntu') }}
       - name: install LLVM+libarchive (macOS)
         run: brew install llvm coreutils libarchive xz

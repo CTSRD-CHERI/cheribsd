@@ -108,6 +108,7 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_radix.h>
 #include <vm/vm_reserv.h>
 #include <vm/vm_extern.h>
+#include <vm/vm_dumpset.h>
 #include <vm/uma.h>
 #include <vm/uma_int.h>
 
@@ -154,6 +155,9 @@ vm_page_t bogus_page;
 vm_page_t vm_page_array;
 long vm_page_array_size;
 long first_page;
+
+struct bitset *vm_page_dump;
+long vm_page_dump_pages;
 
 static TAILQ_HEAD(, vm_page) blacklist_head;
 static int sysctl_vm_page_blacklist(SYSCTL_HANDLER_ARGS);
@@ -554,6 +558,9 @@ vm_page_startup(vm_offset_t vaddr)
 	vm_paddr_t page_range __unused;
 	vm_paddr_t last_pa, pa;
 	u_long pagecount;
+#if MINIDUMP_PAGE_TRACKING
+	u_long vm_page_dump_size;
+#endif
 	int biggestone, i, segind;
 #ifdef WITNESS
 	vm_offset_t mapped;
@@ -588,9 +595,7 @@ vm_page_startup(vm_offset_t vaddr)
 	witness_startup((void *)mapped);
 #endif
 
-#if defined(__aarch64__) || defined(__amd64__) || defined(__arm__) || \
-    defined(__i386__) || defined(__mips__) || defined(__riscv) || \
-    defined(__powerpc64__)
+#if MINIDUMP_PAGE_TRACKING
 	/*
 	 * Allocate a bitmap to indicate that a random physical page
 	 * needs to be included in a minidump.
@@ -603,11 +608,14 @@ vm_page_startup(vm_offset_t vaddr)
 	 * included should the sf_buf code decide to use them.
 	 */
 	last_pa = 0;
-	for (i = 0; dump_avail[i + 1] != 0; i += 2)
+	vm_page_dump_pages = 0;
+	for (i = 0; dump_avail[i + 1] != 0; i += 2) {
+		vm_page_dump_pages += howmany(dump_avail[i + 1], PAGE_SIZE) -
+		    dump_avail[i] / PAGE_SIZE;
 		if (dump_avail[i + 1] > last_pa)
 			last_pa = dump_avail[i + 1];
-	page_range = last_pa / PAGE_SIZE;
-	vm_page_dump_size = round_page(roundup2(page_range, NBBY) / NBBY);
+	}
+	vm_page_dump_size = round_page(BITSET_SIZE(vm_page_dump_pages));
 	new_end -= vm_page_dump_size;
 	vm_page_dump = (void *)(uintptr_t)pmap_map(&vaddr, new_end,
 	    new_end + vm_page_dump_size, VM_PROT_READ | VM_PROT_WRITE);
@@ -1688,6 +1696,21 @@ vm_page_lookup(vm_object_t object, vm_pindex_t pindex)
 
 	VM_OBJECT_ASSERT_LOCKED(object);
 	return (vm_radix_lookup(&object->rtree, pindex));
+}
+
+/*
+ *	vm_page_lookup_unlocked:
+ *
+ *	Returns the page associated with the object/offset pair specified;
+ *	if none is found, NULL is returned.  The page may be no longer be
+ *	present in the object at the time that this function returns.  Only
+ *	useful for opportunistic checks such as inmem().
+ */
+vm_page_t
+vm_page_lookup_unlocked(vm_object_t object, vm_pindex_t pindex)
+{
+
+	return (vm_radix_lookup_unlocked(&object->rtree, pindex));
 }
 
 /*

@@ -26,6 +26,34 @@ NOTE TO PEOPLE WHO THINK THAT FreeBSD 13.x IS SLOW:
 	world, or to merely disable the most expensive debugging functionality
 	at runtime, run "ln -s 'abort:false,junk:false' /etc/malloc.conf".)
 
+20101030:
+	The internal pre-processor in the calendar(1) program has been
+	extended to support more C pre-processor commands (e.g. #ifdef, #else,
+	and #undef) and to detect unbalanced conditional statements.
+	Error messages have been extended to include the filename and line
+	number if processing stops to help fixing malformed data files.
+
+20101026:
+	All the data files for the calendar(1) program, except calendar.freebsd,
+	have been moved to the deskutils/calendar-data port, much like the
+	jewish calendar entries were moved to deskutils/hebcal years ago. After
+	make delete-old-files, you need to install it to retain full
+	functionality. calendar(1) will issue a reminder for files it can't
+	find.
+
+20200923:
+	LINT files are no longer generated. We now include the relevant NOTES
+	files. Note: This may cause conflicts with updating in some cases.
+	        find sys -name LINT\* -delete
+	is suggested across this commit	to remove the generated	LINT files.
+
+	If you have tried to update with generated files there, the svn
+	command you want to un-auger the tree is
+		cd sys/amd64/conf
+		svn revert -R .
+	and then do the above find from the top level. Substitute 'amd64'
+	above with where the error message indicates a conflict.
+
 20200824:
 	OpenZFS support has been integrated. Do not upgrade root pools until
 	the loader is updated to support zstd. Furthermore, we caution against
@@ -89,7 +117,7 @@ NOTE TO PEOPLE WHO THINK THAT FreeBSD 13.x IS SLOW:
 	successful or not) and run installworld once more.
 
 20200627:
-	A new implementation of bc and dc has been imorted in r362681. This
+	A new implementation of bc and dc has been imported in r362681. This
 	implementation corrects non-conformant behavior of the previous bc
 	and adds GNU bc compatible options. It offers a number of extensions,
 	is much faster on large values, and has support for message catalogs
@@ -2182,9 +2210,11 @@ COMMON ITEMS:
 
 	2.) update the ZFS boot block on your boot drive
 
-	The following example updates the ZFS boot block on the first
-	partition (freebsd-boot) of a GPT partitioned drive ada0:
-	"gpart bootcode -p /boot/gptzfsboot -i 1 ada0"
+	The following example updates the ZFS boot block on the
+	freebsd-boot partition of a GPT partitioned drive ada0:
+	"gpart bootcode -p /boot/gptzfsboot -i $N ada0"
+	The value $N will typically be 1 (if booting from BIOS) or 2 (if
+	booting from EFI).
 
 	Non-boot pools do not need these updates.
 

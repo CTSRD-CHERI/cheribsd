@@ -79,6 +79,7 @@ options 	RACCT_DEFAULT_TO_DISABLED # Set kern.racct.enable=0 by default
 options 	RCTL			# Resource limits
 options 	SMP
 options 	INTRNG
+options 	LINUX_BOOT_ABI		# Boot using booti command from U-Boot
 
 # Debugging support.  Always need this:
 options 	KDB			# Enable kernel debugger support.
@@ -166,7 +167,7 @@ device		mdio
 device		mii
 device		miibus		# MII bus support
 device		awg		# Allwinner EMAC Gigabit Ethernet
-device		axgbe		# AMD Opteron A1100 integrated NIC
+device		axa		# AMD Opteron A1100 integrated NIC
 device		msk		# Marvell/SysKonnect Yukon II Gigabit Ethernet
 device		neta		# Marvell Armada 370/38x/XP/3700 NIC
 device  	smc		# SMSC LAN91C111
@@ -188,6 +189,7 @@ device		scbus
 device		da
 
 # ATA/SCSI peripherals
+device		cd		# CD
 device		pass		# Passthrough device (direct ATA/SCSI access)
 
 # NVM Express (NVMe) support
@@ -218,12 +220,14 @@ device		uart_snps
 device		pl011
 
 # USB support
+options 	USB_HOST_ALIGN=64	# Align usb buffers to cache line size.
 device		aw_usbphy		# Allwinner USB PHY
 device		rk_usb2phy		# Rockchip USB2PHY
 device		rk_typec_phy		# Rockchip TypeC PHY
 device		dwcotg			# DWC OTG controller
 device		musb			# Mentor Graphics USB OTG controller
 device		ohci			# OHCI USB interface
+device		uhci			# UHCI USB interface
 device		ehci			# EHCI USB interface (USB 2.0)
 device		ehci_mv			# Marvell EHCI USB interface
 device		xhci			# XHCI USB interface (USB 3.0)

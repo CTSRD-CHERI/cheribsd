@@ -192,6 +192,23 @@ vn_open(struct nameidata *ndp, int *flagp, int cmode, struct file *fp)
 	return (vn_open_cred(ndp, flagp, cmode, 0, td->td_ucred, fp));
 }
 
+static uint64_t
+open2nameif(int fmode, u_int vn_open_flags)
+{
+	uint64_t res;
+
+	res = ISOPEN | LOCKLEAF;
+	if ((fmode & O_BENEATH) != 0)
+		res |= BENEATH;
+	if ((fmode & O_RESOLVE_BENEATH) != 0)
+		res |= RBENEATH;
+	if ((vn_open_flags & VN_OPEN_NOAUDIT) == 0)
+		res |= AUDITVNODE1;
+	if ((vn_open_flags & VN_OPEN_NOCAPCHECK) != 0)
+		res |= NOCAPCHECK;
+	return (res);
+}
+
 /*
  * Common code for vnode open operations via a name lookup.
  * Lookup the vnode and invoke VOP_CREATE if needed.
@@ -218,19 +235,14 @@ restart:
 		return (EINVAL);
 	else if ((fmode & (O_CREAT | O_DIRECTORY)) == O_CREAT) {
 		ndp->ni_cnd.cn_nameiop = CREATE;
+		ndp->ni_cnd.cn_flags = open2nameif(fmode, vn_open_flags);
 		/*
 		 * Set NOCACHE to avoid flushing the cache when
 		 * rolling in many files at once.
 		*/
-		ndp->ni_cnd.cn_flags = ISOPEN | LOCKPARENT | LOCKLEAF | NOCACHE;
+		ndp->ni_cnd.cn_flags |= LOCKPARENT | NOCACHE;
 		if ((fmode & O_EXCL) == 0 && (fmode & O_NOFOLLOW) == 0)
 			ndp->ni_cnd.cn_flags |= FOLLOW;
-		if ((fmode & O_BENEATH) != 0)
-			ndp->ni_cnd.cn_flags |= BENEATH;
-		if (!(vn_open_flags & VN_OPEN_NOAUDIT))
-			ndp->ni_cnd.cn_flags |= AUDITVNODE1;
-		if (vn_open_flags & VN_OPEN_NOCAPCHECK)
-			ndp->ni_cnd.cn_flags |= NOCAPCHECK;
 		if ((vn_open_flags & VN_OPEN_INVFS) == 0)
 			bwillwrite();
 		if ((error = namei(ndp)) != 0)
@@ -247,6 +259,7 @@ restart:
 				if ((error = vn_start_write(NULL, &mp,
 				    V_XSLEEP | PCATCH)) != 0)
 					return (error);
+				NDREINIT(ndp);
 				goto restart;
 			}
 			if ((vn_open_flags & VN_OPEN_NAMECACHE) != 0)
@@ -285,16 +298,11 @@ restart:
 		}
 	} else {
 		ndp->ni_cnd.cn_nameiop = LOOKUP;
-		ndp->ni_cnd.cn_flags = ISOPEN |
-		    ((fmode & O_NOFOLLOW) ? NOFOLLOW : FOLLOW) | LOCKLEAF;
-		if (!(fmode & FWRITE))
+		ndp->ni_cnd.cn_flags = open2nameif(fmode, vn_open_flags);
+		ndp->ni_cnd.cn_flags |= (fmode & O_NOFOLLOW) != 0 ? NOFOLLOW :
+		    FOLLOW;
+		if ((fmode & FWRITE) == 0)
 			ndp->ni_cnd.cn_flags |= LOCKSHARED;
-		if ((fmode & O_BENEATH) != 0)
-			ndp->ni_cnd.cn_flags |= BENEATH;
-		if (!(vn_open_flags & VN_OPEN_NOAUDIT))
-			ndp->ni_cnd.cn_flags |= AUDITVNODE1;
-		if (vn_open_flags & VN_OPEN_NOCAPCHECK)
-			ndp->ni_cnd.cn_flags |= NOCAPCHECK;
 		if ((error = namei(ndp)) != 0)
 			return (error);
 		vp = ndp->ni_vp;
@@ -688,7 +696,7 @@ vn_rdwr_inchunks(enum uio_rw rw, struct vnode *vp, void *base, size_t len,
 	return (error);
 }
 
-#if OFF_MAX <= LONG_MAX && !defined(__mips__)
+#if OFF_MAX <= LONG_MAX
 off_t
 foffset_lock(struct file *fp, int flags)
 {
@@ -2788,25 +2796,31 @@ vn_copy_file_range(struct vnode *invp, off_t *inoffp, struct vnode *outvp,
 {
 	int error;
 	size_t len;
-	uint64_t uvalin, uvalout;
+	uint64_t uval;
 
 	len = *lenp;
 	*lenp = 0;		/* For error returns. */
 	error = 0;
 
 	/* Do some sanity checks on the arguments. */
-	uvalin = *inoffp;
-	uvalin += len;
-	uvalout = *outoffp;
-	uvalout += len;
 	if (invp->v_type == VDIR || outvp->v_type == VDIR)
 		error = EISDIR;
-	else if (*inoffp < 0 || uvalin > INT64_MAX || uvalin <
-	    (uint64_t)*inoffp || *outoffp < 0 || uvalout > INT64_MAX ||
-	    uvalout < (uint64_t)*outoffp || invp->v_type != VREG ||
-	    outvp->v_type != VREG)
+	else if (*inoffp < 0 || *outoffp < 0 ||
+	    invp->v_type != VREG || outvp->v_type != VREG)
 		error = EINVAL;
 	if (error != 0)
+		goto out;
+
+	/* Ensure offset + len does not wrap around. */
+	uval = *inoffp;
+	uval += len;
+	if (uval > INT64_MAX)
+		len = INT64_MAX - *inoffp;
+	uval = *outoffp;
+	uval += len;
+	if (uval > INT64_MAX)
+		len = INT64_MAX - *outoffp;
+	if (len == 0)
 		goto out;
 
 	/*
@@ -2967,18 +2981,22 @@ vn_write_outvp(struct vnode *outvp, char *dat, off_t outoff, off_t xfer,
 		bwillwrite();
 		mp = NULL;
 		error = vn_start_write(outvp, &mp, V_WAIT);
-		if (error == 0) {
+		if (error != 0)
+			break;
+		if (growfile) {
+			error = vn_lock(outvp, LK_EXCLUSIVE);
+			if (error == 0) {
+				error = vn_truncate_locked(outvp, outoff + xfer,
+				    false, cred);
+				VOP_UNLOCK(outvp);
+			}
+		} else {
 			if (MNT_SHARED_WRITES(mp))
 				lckf = LK_SHARED;
 			else
 				lckf = LK_EXCLUSIVE;
 			error = vn_lock(outvp, lckf);
-		}
-		if (error == 0) {
-			if (growfile)
-				error = vn_truncate_locked(outvp, outoff + xfer,
-				    false, cred);
-			else {
+			if (error == 0) {
 				error = vn_rdwr(UIO_WRITE, outvp, dat, xfer2,
 				    outoff, UIO_SYSSPACE, IO_NODELOCKED,
 				    curthread->td_ucred, cred, NULL, curthread);
@@ -3009,16 +3027,17 @@ vn_generic_copy_file_range(struct vnode *invp, off_t *inoffp,
 	struct uio io;
 	off_t startoff, endoff, xfer, xfer2;
 	u_long blksize;
-	int error;
+	int error, interrupted;
 	bool cantseek, readzeros, eof, lastblock;
 	ssize_t aresid;
-	size_t copylen, len, savlen;
+	size_t copylen, len, rem, savlen;
 	char *dat;
 	long holein, holeout;
 
 	holein = holeout = 0;
 	savlen = len = *lenp;
 	error = 0;
+	interrupted = 0;
 	dat = NULL;
 
 	error = vn_lock(invp, LK_SHARED);
@@ -3081,7 +3100,17 @@ vn_generic_copy_file_range(struct vnode *invp, off_t *inoffp,
 	 * This value is clipped at 4Kbytes and 1Mbyte.
 	 */
 	blksize = MAX(holein, holeout);
-	if (blksize == 0)
+
+	/* Clip len to end at an exact multiple of hole size. */
+	if (blksize > 1) {
+		rem = *inoffp % blksize;
+		if (rem > 0)
+			rem = blksize - rem;
+		if (len - rem > blksize)
+			len = savlen = rounddown(len - rem, blksize) + rem;
+	}
+
+	if (blksize <= 1)
 		blksize = MAX(invp->v_mount->mnt_stat.f_iosize,
 		    outvp->v_mount->mnt_stat.f_iosize);
 	if (blksize < 4096)
@@ -3098,7 +3127,7 @@ vn_generic_copy_file_range(struct vnode *invp, off_t *inoffp,
 	 * support holes on the server, but do not support FIOSEEKHOLE.
 	 */
 	eof = false;
-	while (len > 0 && error == 0 && !eof) {
+	while (len > 0 && error == 0 && !eof && interrupted == 0) {
 		endoff = 0;			/* To shut up compilers. */
 		cantseek = true;
 		startoff = *inoffp;
@@ -3159,6 +3188,8 @@ vn_generic_copy_file_range(struct vnode *invp, off_t *inoffp,
 					*inoffp += xfer;
 					*outoffp += xfer;
 					len -= xfer;
+					if (len < savlen)
+						interrupted = sig_intr();
 				}
 			}
 			copylen = MIN(len, endoff - startoff);
@@ -3180,7 +3211,7 @@ vn_generic_copy_file_range(struct vnode *invp, off_t *inoffp,
 			xfer -= (*inoffp % blksize);
 		}
 		/* Loop copying the data block. */
-		while (copylen > 0 && error == 0 && !eof) {
+		while (copylen > 0 && error == 0 && !eof && interrupted == 0) {
 			if (copylen < xfer)
 				xfer = copylen;
 			error = vn_lock(invp, LK_SHARED);
@@ -3221,6 +3252,8 @@ vn_generic_copy_file_range(struct vnode *invp, off_t *inoffp,
 					*outoffp += xfer;
 					copylen -= xfer;
 					len -= xfer;
+					if (len < savlen)
+						interrupted = sig_intr();
 				}
 			}
 			xfer = blksize;

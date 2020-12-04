@@ -35,8 +35,6 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
-#include "opt_mpath.h"
-
 #include <sys/param.h>
 #include <sys/eventhandler.h>
 #include <sys/systm.h>
@@ -74,6 +72,7 @@ __FBSDID("$FreeBSD$");
 
 static int in_aifaddr_ioctl(u_long, caddr_t, struct ifnet *, struct thread *);
 static int in_difaddr_ioctl(u_long, caddr_t, struct ifnet *, struct thread *);
+static int in_gifaddr_ioctl(u_long, caddr_t, struct ifnet *, struct thread *);
 
 static void	in_socktrim(struct sockaddr_in *);
 static void	in_purgemaddrs(struct ifnet *);
@@ -238,6 +237,11 @@ in_control(struct socket *so, u_long cmd, caddr_t data, struct ifnet *ifp,
 	case CASE_IOC_IFREQ(SIOCGIFDSTADDR):
 	case CASE_IOC_IFREQ(SIOCGIFNETMASK):
 		break;
+	case SIOCGIFALIAS:
+		sx_xlock(&in_control_sx);
+		error = in_gifaddr_ioctl(cmd, data, ifp, td);
+		sx_xunlock(&in_control_sx);
+		return (error);
 	case CASE_IOC_IFREQ(SIOCDIFADDR):
 		sx_xlock(&in_control_sx);
 		error = in_difaddr_ioctl(cmd, data, ifp, td);
@@ -378,10 +382,11 @@ in_aifaddr_ioctl(u_long cmd, caddr_t data, struct ifnet *ifp, struct thread *td)
 			continue;
 
 		it = (struct in_ifaddr *)ifa;
-		iaIsFirst = false;
 		if (it->ia_addr.sin_addr.s_addr == addr->sin_addr.s_addr &&
 		    prison_check_ip4(td->td_ucred, &addr->sin_addr) == 0)
 			ia = it;
+		else
+			iaIsFirst = false;
 	}
 	NET_EPOCH_EXIT(et);
 
@@ -654,6 +659,60 @@ in_difaddr_ioctl(u_long cmd, caddr_t data, struct ifnet *ifp, struct thread *td)
 	return (0);
 }
 
+static int
+in_gifaddr_ioctl(u_long cmd, caddr_t data, struct ifnet *ifp, struct thread *td)
+{
+	struct in_aliasreq *ifra = (struct in_aliasreq *)data;
+	const struct sockaddr_in *addr = &ifra->ifra_addr;
+	struct epoch_tracker et;
+	struct ifaddr *ifa;
+	struct in_ifaddr *ia;
+
+	/*
+	 * ifra_addr must be present and be of INET family.
+	 */
+	if (addr->sin_len != sizeof(struct sockaddr_in) ||
+	    addr->sin_family != AF_INET)
+		return (EINVAL);
+
+	/*
+	 * See whether address exist.
+	 */
+	ia = NULL;
+	NET_EPOCH_ENTER(et);
+	CK_STAILQ_FOREACH(ifa, &ifp->if_addrhead, ifa_link) {
+		struct in_ifaddr *it;
+
+		if (ifa->ifa_addr->sa_family != AF_INET)
+			continue;
+
+		it = (struct in_ifaddr *)ifa;
+		if (it->ia_addr.sin_addr.s_addr == addr->sin_addr.s_addr &&
+		    prison_check_ip4(td->td_ucred, &addr->sin_addr) == 0) {
+			ia = it;
+			break;
+		}
+	}
+	if (ia == NULL) {
+		NET_EPOCH_EXIT(et);
+		return (EADDRNOTAVAIL);
+	}
+
+	ifra->ifra_mask = ia->ia_sockmask;
+	if ((ifp->if_flags & IFF_POINTOPOINT) &&
+	    ia->ia_dstaddr.sin_family == AF_INET)
+		ifra->ifra_dstaddr = ia->ia_dstaddr;
+	else if ((ifp->if_flags & IFF_BROADCAST) &&
+	    ia->ia_broadaddr.sin_family == AF_INET)
+		ifra->ifra_broadaddr = ia->ia_broadaddr;
+	else
+		memset(&ifra->ifra_broadaddr, 0,
+		    sizeof(ifra->ifra_broadaddr));
+
+	NET_EPOCH_EXIT(et);
+	return (0);
+}
+
 #define rtinitflags(x) \
 	((((x)->ia_ifp->if_flags & (IFF_LOOPBACK | IFF_POINTOPOINT)) != 0) \
 	    ? RTF_HOST : 0)
@@ -703,14 +762,6 @@ in_addprefix(struct in_ifaddr *target, int flags)
 		 * interface address, we are done here.
 		 */
 		if (ia->ia_flags & IFA_ROUTE) {
-#ifdef RADIX_MPATH
-			if (ia->ia_addr.sin_addr.s_addr ==
-			    target->ia_addr.sin_addr.s_addr) {
-				IN_IFADDR_RUNLOCK(&in_ifa_tracker);
-				return (EEXIST);
-			} else
-				break;
-#endif
 			if (V_nosameprefix) {
 				IN_IFADDR_RUNLOCK(&in_ifa_tracker);
 				return (EEXIST);

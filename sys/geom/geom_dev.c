@@ -346,9 +346,15 @@ g_dev_taste(struct g_class *mp, struct g_provider *pp, int insist __unused)
 	cp->private = sc;
 	cp->flags |= G_CF_DIRECT_SEND | G_CF_DIRECT_RECEIVE;
 	error = g_attach(cp, pp);
-	KASSERT(error == 0,
-	    ("g_dev_taste(%s) failed to g_attach, err=%d", pp->name, error));
-
+	if (error != 0) {
+		printf("%s: g_dev_taste(%s) failed to g_attach, error=%d\n",
+		    __func__, pp->name, error);
+		g_destroy_consumer(cp);
+		g_destroy_geom(gp);
+		mtx_destroy(&sc->sc_mtx);
+		g_free(sc);
+		return (NULL);
+	}
 	make_dev_args_init(&args);
 	args.mda_flags = MAKEDEV_CHECKNAME | MAKEDEV_WAITOK;
 	args.mda_devsw = &g_dev_cdevsw;
@@ -543,9 +549,6 @@ g_dev_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag, struct thread
 		error = g_io_getattr("GEOM::fwheads", cp, &i, data);
 		if (error == 0 && *(u_int *)data == 0)
 			error = ENOENT;
-		break;
-	case DIOCGFRONTSTUFF:
-		error = g_io_getattr("GEOM::frontstuff", cp, &i, data);
 		break;
 #ifdef COMPAT_FREEBSD11
 	case DIOCSKERNELDUMP_FREEBSD11:

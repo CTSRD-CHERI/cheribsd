@@ -1251,9 +1251,13 @@ linprocfs_doprocmaps(PFS_FILL_ARGS)
 		    0,
 		    0,
 		    (u_long)ino,
-		    *name ? "     " : "",
+		    *name ? "     " : " ",
 		    name
 		    );
+		if (error == -1) {
+			linux_msg(td, "cannot fill /proc/self/maps; "
+			    "consider bumping PFS_MAXBUFSIZ");
+		}
 		if (freename)
 			free(freename, M_TEMP);
 		vm_map_lock_read(map);
@@ -1273,6 +1277,27 @@ linprocfs_doprocmaps(PFS_FILL_ARGS)
 	}
 	vm_map_unlock_read(map);
 	vmspace_free(vm);
+
+	return (error);
+}
+
+/*
+ * Filler function for proc/pid/mem
+ */
+static int
+linprocfs_doprocmem(PFS_FILL_ARGS)
+{
+	ssize_t resid;
+	int error;
+
+	resid = uio->uio_resid;
+	error = procfs_doprocmem(PFS_FILL_ARGNAMES);
+
+	if (uio->uio_rw == UIO_READ && resid != uio->uio_resid)
+		return (0);
+
+	if (error == EFAULT)
+		error = EIO;
 
 	return (error);
 }
@@ -1430,6 +1455,19 @@ linprocfs_domsgmnb(PFS_FILL_ARGS)
 {
 
 	sbuf_printf(sb, "%d\n", msginfo.msgmnb);
+	return (0);
+}
+
+/*
+ * Filler function for proc/sys/kernel/ngroups_max
+ *
+ * Note that in Linux it defaults to 65536, not 1023.
+ */
+static int
+linprocfs_dongroups_max(PFS_FILL_ARGS)
+{
+
+	sbuf_printf(sb, "%d\n", ngroups_max);
 	return (0);
 }
 
@@ -1855,7 +1893,7 @@ linprocfs_init(PFS_INIT_ARGS)
 	    NULL, &procfs_notsystem, NULL, 0);
 	pfs_create_file(dir, "maps", &linprocfs_doprocmaps,
 	    NULL, NULL, NULL, PFS_RD);
-	pfs_create_file(dir, "mem", &procfs_doprocmem,
+	pfs_create_file(dir, "mem", &linprocfs_doprocmem,
 	    procfs_attr_rw, &procfs_candebug, NULL, PFS_RDWR | PFS_RAW);
 	pfs_create_file(dir, "mounts", &linprocfs_domtab,
 	    NULL, NULL, NULL, PFS_RD);
@@ -1902,6 +1940,8 @@ linprocfs_init(PFS_INIT_ARGS)
 	pfs_create_file(dir, "msgmni", &linprocfs_domsgmni,
 	    NULL, NULL, NULL, PFS_RD);
 	pfs_create_file(dir, "msgmnb", &linprocfs_domsgmnb,
+	    NULL, NULL, NULL, PFS_RD);
+	pfs_create_file(dir, "ngroups_max", &linprocfs_dongroups_max,
 	    NULL, NULL, NULL, PFS_RD);
 	pfs_create_file(dir, "pid_max", &linprocfs_dopid_max,
 	    NULL, NULL, NULL, PFS_RD);

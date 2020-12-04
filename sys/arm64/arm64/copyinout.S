@@ -158,7 +158,6 @@ ENTRY(copyinstr)
 2:	EXIT_C64
 	SET_FAULT_HANDLER(xzr, x7) /* Clear the handler */
 
-
 3:	cbz	x3, 4f		/* Check if done != NULL */
 	str	x5, [x3]	/* done = count */
 

@@ -1027,6 +1027,14 @@ initarm(struct arm_boot_params *abp)
 	debugf(" dtbp = 0x%08x\n", (uint32_t)dtbp);
 	arm_print_kenv();
 
+	/*
+	 * Dump the boot metadata. We have to wait for cninit() since console
+	 * output is required. If it's grossly incorrect the kernel will never
+	 * make it this far.
+	 */
+	if (getenv_is_true("debug.dump_modinfo_at_boot"))
+		preload_dump();
+
 	env = kern_getenv("kernelname");
 	if (env != NULL) {
 		strlcpy(kernelname, env, sizeof(kernelname));
@@ -1102,6 +1110,8 @@ initarm(struct arm_boot_params *abp)
 	char *env;
 	void *kmdp;
 	int err_devmap, mem_regions_sz;
+	phandle_t root;
+	char dts_version[255];
 #ifdef EFI
 	struct efi_map_header *efihdr;
 #endif
@@ -1263,6 +1273,18 @@ initarm(struct arm_boot_params *abp)
 		    err_devmap);
 
 	platform_late_init();
+
+	root = OF_finddevice("/");
+	if (OF_getprop(root, "freebsd,dts-version", dts_version, sizeof(dts_version)) > 0) {
+		if (strcmp(LINUX_DTS_VERSION, dts_version) != 0)
+			printf("WARNING: DTB version is %s while kernel expects %s, "
+			    "please update the DTB in the ESP\n",
+			    dts_version,
+			    LINUX_DTS_VERSION);
+	} else {
+		printf("WARNING: Cannot find freebsd,dts-version property, "
+		    "cannot check DTB compliance\n");
+	}
 
 	/*
 	 * We must now clean the cache again....

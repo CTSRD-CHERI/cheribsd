@@ -327,8 +327,8 @@ swcr_authcompute(struct swcr_session *ses, struct cryptop *crp)
 
 	axf = sw->sw_axf;
 
+	csp = crypto_get_params(crp->crp_session);
 	if (crp->crp_auth_key != NULL) {
-		csp = crypto_get_params(crp->crp_session);
 		swcr_authprepare(axf, sw, crp->crp_auth_key,
 		    csp->csp_auth_klen);
 	}
@@ -341,7 +341,7 @@ swcr_authcompute(struct swcr_session *ses, struct cryptop *crp)
 		err = crypto_apply(crp, crp->crp_aad_start, crp->crp_aad_length,
 		    axf->Update, &ctx);
 	if (err)
-		return err;
+		goto out;
 
 	if (CRYPTO_HAS_OUTPUT_BUFFER(crp) &&
 	    CRYPTO_OP_IS_ENCRYPT(crp->crp_op))
@@ -352,38 +352,16 @@ swcr_authcompute(struct swcr_session *ses, struct cryptop *crp)
 		err = crypto_apply(crp, crp->crp_payload_start,
 		    crp->crp_payload_length, axf->Update, &ctx);
 	if (err)
-		return err;
+		goto out;
 
-	switch (axf->type) {
-	case CRYPTO_SHA1:
-	case CRYPTO_SHA2_224:
-	case CRYPTO_SHA2_256:
-	case CRYPTO_SHA2_384:
-	case CRYPTO_SHA2_512:
-		axf->Final(aalg, &ctx);
-		break;
+	if (csp->csp_flags & CSP_F_ESN)
+		axf->Update(&ctx, crp->crp_esn, 4);
 
-	case CRYPTO_SHA1_HMAC:
-	case CRYPTO_SHA2_224_HMAC:
-	case CRYPTO_SHA2_256_HMAC:
-	case CRYPTO_SHA2_384_HMAC:
-	case CRYPTO_SHA2_512_HMAC:
-	case CRYPTO_RIPEMD160_HMAC:
-		if (sw->sw_octx == NULL)
-			return EINVAL;
-
-		axf->Final(aalg, &ctx);
+	axf->Final(aalg, &ctx);
+	if (sw->sw_octx != NULL) {
 		bcopy(sw->sw_octx, &ctx, axf->ctxsize);
 		axf->Update(&ctx, aalg, axf->hashsize);
 		axf->Final(aalg, &ctx);
-		break;
-
-	case CRYPTO_BLAKE2B:
-	case CRYPTO_BLAKE2S:
-	case CRYPTO_NULL_HMAC:
-	case CRYPTO_POLY1305:
-		axf->Final(aalg, &ctx);
-		break;
 	}
 
 	if (crp->crp_op & CRYPTO_OP_VERIFY_DIGEST) {
@@ -398,6 +376,8 @@ swcr_authcompute(struct swcr_session *ses, struct cryptop *crp)
 		crypto_copyback(crp, crp->crp_digest_start, sw->sw_mlen, aalg);
 	}
 	explicit_bzero(aalg, sizeof(aalg));
+out:
+	explicit_bzero(&ctx, sizeof(ctx));
 	return (err);
 }
 
@@ -1258,12 +1238,12 @@ swcr_cipher_supported(const struct crypto_session_params *csp)
 	return (true);
 }
 
+#define SUPPORTED_SES (CSP_F_SEPARATE_OUTPUT | CSP_F_SEPARATE_AAD | CSP_F_ESN)
+
 static int
 swcr_probesession(device_t dev, const struct crypto_session_params *csp)
 {
-
-	if ((csp->csp_flags & ~(CSP_F_SEPARATE_OUTPUT | CSP_F_SEPARATE_AAD)) !=
-	    0)
+	if ((csp->csp_flags & ~(SUPPORTED_SES)) != 0)
 		return (EINVAL);
 	switch (csp->csp_mode) {
 	case CSP_MODE_COMPRESS:

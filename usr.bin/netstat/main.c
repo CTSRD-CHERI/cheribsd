@@ -205,7 +205,8 @@ int	Aflag;		/* show addresses of protocol control block */
 int	aflag;		/* show all sockets (including servers) */
 static int	Bflag;		/* show information about bpf consumers */
 int	bflag;		/* show i/f total bytes in/out */
-int	Cflag;		/* show congestion control */
+int	cflag;		/* show TCP congestion control stack */
+int	Cflag;		/* show congestion control algo and vars */
 int	dflag;		/* show i/f dropped packets */
 int	gflag;		/* show group (multicast) routing or stats */
 int	hflag;		/* show counters in human readable format */
@@ -215,6 +216,7 @@ int	mflag;		/* show memory stats */
 int	noutputs = 0;	/* how much outputs before we exit */
 int	numeric_addr;	/* show addresses numerically */
 int	numeric_port;	/* show ports numerically */
+int	Oflag;		/* show nhgrp objects*/
 int	oflag;		/* show nexthop objects*/
 int	Pflag;		/* show TCP log ID */
 static int pflag;	/* show given protocol */
@@ -250,7 +252,7 @@ main(int argc, char *argv[])
 	if (argc < 0)
 		exit(EXIT_FAILURE);
 
-	while ((ch = getopt(argc, argv, "46AaBbCdF:f:ghI:iLlM:mN:noPp:Qq:RrSTsuWw:xz"))
+	while ((ch = getopt(argc, argv, "46AaBbCcdF:f:ghI:iLlM:mN:nOoPp:Qq:RrSTsuWw:xz"))
 	    != -1)
 		switch(ch) {
 		case '4':
@@ -278,6 +280,9 @@ main(int argc, char *argv[])
 			break;
 		case 'b':
 			bflag = 1;
+			break;
+		case 'c':
+			cflag = 1;
 			break;
 		case 'C':
 			Cflag = 1;
@@ -352,6 +357,9 @@ main(int argc, char *argv[])
 			break;
 		case 'o':
 			oflag = 1;
+			break;
+		case 'O':
+			Oflag = 1;
 			break;
 		case 'P':
 			Pflag = 1;
@@ -509,6 +517,14 @@ main(int argc, char *argv[])
 		xo_finish();
 		exit(0);
 	}
+	if (Oflag) {
+		xo_open_container("statistics");
+		nhgrp_print(fib, af);
+		xo_close_container("statistics");
+		xo_finish();
+		exit(0);
+	}
+
 
 
 	if (gflag) {
@@ -874,7 +890,7 @@ static void
 usage(void)
 {
 	(void)xo_error("%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n",
-"usage: netstat [-46AaLnRSTWx] [-f protocol_family | -p protocol]\n"
+"usage: netstat [-46AaCcLnRSTWx] [-f protocol_family | -p protocol]\n"
 "               [-M core] [-N system]",
 "       netstat -i | -I interface [-46abdhnW] [-f address_family]\n"
 "               [-M core] [-N system]",

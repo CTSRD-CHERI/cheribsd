@@ -36,11 +36,18 @@ __FBSDID("$FreeBSD$");
 #include <sys/param.h>
 #include <sys/reboot.h>
 #include <sys/boot.h>
+#ifdef EFI_ZFS_BOOT
+#include <sys/zfs_bootenv.h>
+#endif
 #include <paths.h>
+#include <netinet/in.h>
+#include <netinet/in_systm.h>
 #include <stdint.h>
 #include <string.h>
 #include <setjmp.h>
 #include <disk.h>
+#include <dev_net.h>
+#include <net.h>
 
 #include <efi.h>
 #include <efilib.h>
@@ -275,11 +282,14 @@ probe_zfs_currdev(uint64_t guid)
 	if (rv) {
 		buf = malloc(VDEV_PAD_SIZE);
 		if (buf != NULL) {
-			if (zfs_nextboot(&currdev, buf, VDEV_PAD_SIZE) == 0) {
-				printf("zfs nextboot: %s\n", buf);
+			if (zfs_get_bootonce(&currdev, OS_BOOTONCE, buf,
+			    VDEV_PAD_SIZE) == 0) {
+				printf("zfs bootonce: %s\n", buf);
 				set_currdev(buf);
+				setenv("zfs-bootonce", buf, 1);
 			}
 			free(buf);
+			(void) zfs_attach_nvstore(&currdev);
 		}
 	}
 	return (rv);
@@ -733,6 +743,10 @@ parse_uefi_con_out(void)
 	ep = buf + sz;
 	node = (EFI_DEVICE_PATH *)buf;
 	while ((char *)node < ep) {
+		if (IsDevicePathEndType(node)) {
+			if (pci_pending && vid_seen == 0)
+				vid_seen = ++seen;
+		}
 		pci_pending = false;
 		if (DevicePathType(node) == ACPI_DEVICE_PATH &&
 		    (DevicePathSubType(node) == ACPI_DP ||
@@ -766,8 +780,6 @@ parse_uefi_con_out(void)
 		}
 		node = NextDevicePathNode(node);
 	}
-	if (pci_pending && vid_seen == 0)
-		vid_seen = ++seen;
 
 	/*
 	 * Truth table for RB_MULTIPLE | RB_SERIAL
@@ -1586,3 +1598,34 @@ command_chain(int argc, char *argv[])
 }
 
 COMMAND_SET(chain, "chain", "chain load file", command_chain);
+
+extern struct in_addr servip;
+static int
+command_netserver(int argc, char *argv[])
+{
+	char *proto;
+	n_long rootaddr;
+
+	if (argc > 2) {
+		command_errmsg = "wrong number of arguments";
+		return (CMD_ERROR);
+	}
+	if (argc < 2) {
+		proto = netproto == NET_TFTP ? "tftp://" : "nfs://";
+		printf("Netserver URI: %s%s%s\n", proto, intoa(rootip.s_addr),
+		    rootpath);
+		return (CMD_OK);
+	}
+	if (argc == 2) {
+		strncpy(rootpath, argv[1], sizeof(rootpath));
+		rootpath[sizeof(rootpath) -1] = '\0';
+		if ((rootaddr = net_parse_rootpath()) != INADDR_NONE)
+			servip.s_addr = rootip.s_addr = rootaddr;
+		return (CMD_OK);
+	}
+	return (CMD_ERROR);	/* not reached */
+
+}
+
+COMMAND_SET(netserver, "netserver", "change or display netserver URI",
+    command_netserver);
