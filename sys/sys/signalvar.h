@@ -437,6 +437,12 @@ void	tdsigcleanup(struct thread *td);
 void	tdsignal(struct thread *td, int sig);
 void	trapsignal(struct thread *td, ksiginfo_t *ksi);
 
+#ifdef CHERI_CAPREVOKE
+struct vm_cheri_revoke_cookie;
+void sigaltstack_cheri_revoke(struct thread *,
+    const struct vm_cheri_revoke_cookie *);
+#endif
+
 #endif /* _KERNEL */
 
 #endif /* !_SYS_SIGNALVAR_H_ */
