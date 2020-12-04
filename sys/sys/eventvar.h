@@ -57,6 +57,7 @@ struct kqueue {
 #define KQ_CLOSING	0x10
 #define	KQ_TASKSCHED	0x20			/* task scheduled */
 #define	KQ_TASKDRAIN	0x40			/* waiting for task to drain */
+#define KQ_CAPREV_EPOCH	0x80
 	int		kq_knlistsize;		/* size of knlist */
 	struct		klist *kq_knlist;	/* list of knotes */
 	u_long		kq_knhashmask;		/* size of knhash */
