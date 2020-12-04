@@ -31,15 +31,15 @@
  * SUCH DAMAGE.
  */
 
-#ifndef	_VM_CAPREVOKE_
-#define	_VM_CAPREVOKE_
+#ifndef	_VM_CHERI_REVOKE_
+#define	_VM_CHERI_REVOKE_
 #ifdef CHERI_CAPREVOKE
 
 /**************************** FORWARD DECLARATIONS ***************************/
 
-struct caprevoke_epochs;
-struct caprevoke_info_page;
-struct caprevoke_stats;
+struct cheri_revoke_epochs;
+struct cheri_revoke_info_page;
+struct cheri_revoke_stats;
 struct file;
 struct sysentvec;
 struct vm_cheri_revoke_cookie;
@@ -100,16 +100,16 @@ void vm_cheri_revoke_info_page(struct vm_map *map, struct sysentvec *,
 
 enum {
 	/* Set externally, checked per page */
-	VM_CAPREVOKE_INCREMENTAL = 0x04, /* Scan capdirty, not capstore */
-	VM_CAPREVOKE_BARRIERED   = 0x08, /* world is stopped (debug) */
-	VM_CAPREVOKE_LOAD_SIDE   = 0x10, /* this is the load-side scan */
+	VM_CHERI_REVOKE_INCREMENTAL = 0x04, /* Scan capdirty, not capstore */
+	VM_CHERI_REVOKE_BARRIERED   = 0x08, /* world is stopped (debug) */
+	VM_CHERI_REVOKE_LOAD_SIDE   = 0x10, /* this is the load-side scan */
 
 	/* Set internally, checked per page */
-	VM_CAPREVOKE_QUICK_SUCCESSOR = 0x20,
+	VM_CHERI_REVOKE_QUICK_SUCCESSOR = 0x20,
 
 	/* Set externally, checked per pass */
-	VM_CAPREVOKE_TLB_FLUSH   = 0x40, /* shootdown TLBs */
-	VM_CAPREVOKE_SYNC_CD     = 0x80, /* pmap capdirty -> MI */
+	VM_CHERI_REVOKE_TLB_FLUSH   = 0x40, /* shootdown TLBs */
+	VM_CHERI_REVOKE_SYNC_CD     = 0x80, /* pmap capdirty -> MI */
 };
 
 int vm_cheri_revoke_pass(const struct vm_cheri_revoke_cookie *, int);
@@ -133,17 +133,17 @@ int vm_cheri_revoke_test(const struct vm_cheri_revoke_cookie *, uintcap_t);
 
 enum {
 	/* If no coarse bits set, VMMAP-bearing caps are imune */
-	VM_CAPREVOKE_CF_NO_COARSE_MEM = 0x01,
+	VM_CHERI_REVOKE_CF_NO_COARSE_MEM = 0x01,
 
 	/* If no otype bits set, Permit_Seal and _Unseal are imune */
-	VM_CAPREVOKE_CF_NO_OTYPES = 0x02,
-	VM_CAPREVOKE_CF_NO_CIDS = 0x04,
+	VM_CHERI_REVOKE_CF_NO_OTYPES = 0x02,
+	VM_CHERI_REVOKE_CF_NO_CIDS = 0x04,
 };
 void vm_cheri_revoke_set_test(struct vm_map *map, int flags);
 
 /*  Walking a particular page */
-#define VM_CAPREVOKE_PAGE_HASCAPS 0x01
-#define VM_CAPREVOKE_PAGE_DIRTY 0x02
+#define VM_CHERI_REVOKE_PAGE_HASCAPS 0x01
+#define VM_CHERI_REVOKE_PAGE_DIRTY 0x02
 int vm_cheri_revoke_page_rw(
     const struct vm_cheri_revoke_cookie *c, struct vm_page *m);
 int vm_cheri_revoke_page_ro(
@@ -151,9 +151,9 @@ int vm_cheri_revoke_page_ro(
 
 /* callback from MD layer */
 enum vm_cheri_revoke_fault_res {
-	VM_CAPREVOKE_FAULT_RESOLVED,	/* Situation averted */
-	VM_CAPREVOKE_FAULT_UNRESOLVED,	/* Continue with fault handling */
-	VM_CAPREVOKE_FAULT_CAPSTORE,	/* Convert to cap. store fault */
+	VM_CHERI_REVOKE_FAULT_RESOLVED,	/* Situation averted */
+	VM_CHERI_REVOKE_FAULT_UNRESOLVED, /* Continue with fault handling */
+	VM_CHERI_REVOKE_FAULT_CAPSTORE,	/* Convert to cap. store fault */
 };
 enum vm_cheri_revoke_fault_res vm_cheri_revoke_fault_visit(
     struct vmspace *, vm_offset_t);
@@ -161,16 +161,16 @@ enum vm_cheri_revoke_fault_res vm_cheri_revoke_fault_visit(
 /**************************** STATISTICS COUNTING *****************************/
 
 #ifdef CHERI_CAPREVOKE_STATS
-#define CAPREVOKE_STATS_FOR(st, crc) \
-	struct caprevoke_stats *st = \
-	    (struct caprevoke_stats*)&(crc)->map->vm_caprev_stats
-#define CAPREVOKE_STATS_INC(st, ctr, d) \
+#define CHERI_REVOKE_STATS_FOR(st, crc) \
+	struct cheri_revoke_stats *st = \
+	    (struct cheri_revoke_stats*)&(crc)->map->vm_cheri_revoke_stats
+#define CHERI_REVOKE_STATS_INC(st, ctr, d) \
 	do { __atomic_fetch_add(&(st)->ctr, (d), __ATOMIC_RELAXED); } while (0)
 #else
-#define CAPREVOKE_STATS_FOR(st, crc) do { } while (0)
-#define CAPREVOKE_STATS_INC(st, ctr, d) do { } while (0)
+#define CHERI_REVOKE_STATS_FOR(st, crc) do { } while (0)
+#define CHERI_REVOKE_STATS_INC(st, ctr, d) do { } while (0)
 #endif
-#define CAPREVOKE_STATS_BUMP(st, ctr) CAPREVOKE_STATS_INC(st, ctr, 1)
+#define CHERI_REVOKE_STATS_BUMP(st, ctr) CHERI_REVOKE_STATS_INC(st, ctr, 1)
 
 #endif
 #endif
