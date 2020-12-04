@@ -89,6 +89,20 @@ __FBSDID("$FreeBSD$");
 
 #include <sys/jail.h>
 
+// TODO NWF: Audit headers
+#if __has_feature(capabilities)
+#include <cheri/cheri.h>
+#include <cheri/cheric.h>
+#ifdef CHERI_CAPREVOKE
+#ifdef CHERI_CAPREVOKE_STATS
+#include <vm/pmap.h>
+#include <vm/vm_map.h>
+#endif
+#include <vm/vm_cheri_revoke.h>
+#include <cheri/revoke.h>
+#endif
+#endif
+
 #include <machine/cpu.h>
 
 #include <security/audit/audit.h>
@@ -1754,6 +1768,26 @@ kern_sigaltstack(struct thread *td, stack_t *ss, stack_t *oss)
 	}
 	return (0);
 }
+
+#ifdef CHERI_CAPREVOKE
+void
+sigaltstack_cheri_revoke(struct thread *td,
+    const struct vm_cheri_revoke_cookie *crc)
+{
+	CHERI_REVOKE_STATS_FOR(crst, crc);
+
+	uintcap_t sp = (uintcap_t)td->td_sigstk.ss_sp;
+
+	if (cheri_gettag(sp)) {
+		CHERI_REVOKE_STATS_BUMP(crst, caps_found);
+		if (vm_cheri_revoke_test(crc, sp)) {
+			CHERI_REVOKE_STATS_BUMP(crst, caps_cleared);
+			td->td_sigstk.ss_sp =
+			    (void * __capability)cheri_revoke_cap(sp);
+		}
+	}
+}
+#endif
 
 struct killpg1_ctx {
 	struct thread *td;
