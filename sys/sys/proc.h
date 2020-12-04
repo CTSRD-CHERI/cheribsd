@@ -1244,8 +1244,15 @@ void	thread_unlink(struct thread *td);
 void	thread_unsuspend(struct proc *p);
 void	thread_wait(struct proc *p);
 
+#ifdef CHERI_CAPREVOKE
+struct vm_cheri_revoke_cookie;
+void cheri_revoke_td_frame(struct thread *td,
+    const struct vm_cheri_revoke_cookie *);
+#endif
+
 bool	stop_all_proc_block(void);
 void	stop_all_proc_unblock(void);
+
 void	stop_all_proc(void);
 void	resume_all_proc(void);
 
