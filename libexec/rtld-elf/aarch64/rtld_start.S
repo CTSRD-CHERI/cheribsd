@@ -101,7 +101,6 @@ END(.rtld_start)
  * x17 = &_rtld_bind_start
  */
 ENTRY(_rtld_bind_start)
-	.cfi_startproc
 	mov	PTR(17), PTRN(sp)
 
 	/* Save frame pointer and SP */
@@ -171,7 +170,6 @@ ENTRY(_rtld_bind_start)
 
 	/* Call into the correct function */
 	br	PTR(16)
-	.cfi_endproc
 END(_rtld_bind_start)
 
 /*
@@ -189,10 +187,8 @@ ENTRY(_rtld_tlsdesc_static)
 	/* Currently unused and unimplemented for pure-capability code */
 	brk #0x1
 #else /* defined(__CHERI_PURE_CAPABILITY__) */
-	.cfi_startproc
 	ldr	x0, [x0, #8]
 	ret
-	.cfi_endproc
 #endif /* defined(__CHERI_PURE_CAPABILITY__) */
 END(_rtld_tlsdesc_static)
 
@@ -206,7 +202,6 @@ ENTRY(_rtld_tlsdesc_undef)
 	/* Currently unused and unimplemented for pure-capability code */
 	brk #0x1
 #else /* defined(__CHERI_PURE_CAPABILITY__) */
-	.cfi_startproc
 	str	x1, [sp, #-16]!
 	.cfi_adjust_cfa_offset	16
 
@@ -216,7 +211,6 @@ ENTRY(_rtld_tlsdesc_undef)
 
 	ldr	x1, [sp], #16
 	.cfi_adjust_cfa_offset 	-16
-	.cfi_endproc
 	ret
 #endif /* defined(__CHERI_PURE_CAPABILITY__) */
 END(_rtld_tlsdesc_undef)
@@ -231,8 +225,6 @@ ENTRY(_rtld_tlsdesc_dynamic)
 	/* Currently unused and unimplemented for pure-capability code */
 	brk #0x1
 #else /* defined(__CHERI_PURE_CAPABILITY__) */
-	.cfi_startproc
-
 	/* Save registers used in fast path */
 	stp	x1,  x2, [sp, #(-2 * 16)]!
 	stp	x3,  x4, [sp, #(1 * 16)]
@@ -328,7 +320,6 @@ ENTRY(_rtld_tlsdesc_dynamic)
 	ldp	 x3,  x4, [sp, #16]
 	ldp	 x1,  x2, [sp], #(2 * 16)
 	.cfi_adjust_cfa_offset	-2 * 16
-	.cfi_endproc
 	ret
 #endif /* defined(__CHERI_PURE_CAPABILITY__) */
 END(_rtld_tlsdesc_dynamic)
