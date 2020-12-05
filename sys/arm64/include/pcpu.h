@@ -42,7 +42,7 @@ struct debug_monitor_state;
 #ifdef __CHERI_PURE_CAPABILITY__
 #define	PCPU_MD_FIELDS_PAD 0
 #else
-#define	PCPU_MD_FIELDS_PAD 205
+#define	PCPU_MD_FIELDS_PAD 201
 #endif
 
 #define	PCPU_MD_FIELDS							\
@@ -54,7 +54,8 @@ struct debug_monitor_state;
 	struct pmap *pc_curpmap;					\
 	struct pmap *pc_curvmpmap;					\
 	u_int	pc_bcast_tlbi_workaround;				\
-	char __pad[PCPU_MD_FIELDS_PAD]	/* Pad to factor of PAGE_SIZE */
+	u_int	pc_mpidr;	/* stored MPIDR value */		\
+	char __pad[PCPU_MD_FIELDS_PAD]	/* Pad to factor of PAGE_SIZE */ \
 
 #ifdef _KERNEL
 
