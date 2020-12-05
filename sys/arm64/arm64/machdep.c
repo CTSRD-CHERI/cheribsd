@@ -1088,7 +1088,7 @@ bus_probe(void)
 	has_fdt = (OF_peer(0) != 0);
 #endif
 #ifdef DEV_ACPI
-	has_acpi = (acpi_find_table(ACPI_SIG_SPCR) != 0);
+	has_acpi = (AcpiOsGetRootPointer() != 0);
 #endif
 
 	env = kern_getenv("kern.cfg.order");
@@ -1299,8 +1299,7 @@ initarm(struct arm64_bootparams *abp)
 	 * output is required. If it's grossly incorrect the kernel will never
 	 * make it this far.
 	 */
-	if ((boothowto & RB_VERBOSE) &&
-	    getenv_is_true("debug.dump_modinfo_at_boot"))
+	if (getenv_is_true("debug.dump_modinfo_at_boot"))
 		preload_dump();
 
 	init_proc0(abp->kern_stack);

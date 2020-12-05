@@ -2405,7 +2405,31 @@ regdomain_makechannels(
 				    &dc->dc_chaninfo);
 			}
 
-			/* XXX TODO: VHT80P80, VHT160 */
+			/* VHT160 */
+			if (IEEE80211_VHTCAP_SUPP_CHAN_WIDTH_IS_160MHZ(
+			    dc->dc_vhtcaps)) {
+				regdomain_addchans(ci, &rd->bands_11ac, reg,
+				    IEEE80211_CHAN_A | IEEE80211_CHAN_HT40U |
+				    IEEE80211_CHAN_VHT160,
+				    &dc->dc_chaninfo);
+				regdomain_addchans(ci, &rd->bands_11ac, reg,
+				    IEEE80211_CHAN_A | IEEE80211_CHAN_HT40D |
+				    IEEE80211_CHAN_VHT160,
+				    &dc->dc_chaninfo);
+			}
+
+			/* VHT80P80 */
+			if (IEEE80211_VHTCAP_SUPP_CHAN_WIDTH_IS_160_80P80MHZ(
+			    dc->dc_vhtcaps)) {
+				regdomain_addchans(ci, &rd->bands_11ac, reg,
+				    IEEE80211_CHAN_A | IEEE80211_CHAN_HT40U |
+				    IEEE80211_CHAN_VHT80P80,
+				    &dc->dc_chaninfo);
+				regdomain_addchans(ci, &rd->bands_11ac, reg,
+				    IEEE80211_CHAN_A | IEEE80211_CHAN_HT40D |
+				    IEEE80211_CHAN_VHT80P80,
+				    &dc->dc_chaninfo);
+			}
 		}
 
 		if (!LIST_EMPTY(&rd->bands_11ng) && dc->dc_htcaps != 0) {
@@ -5734,8 +5758,7 @@ wlan_create(int s, struct ifreq *ifr)
 	    memcmp(params.icp_bssid, zerobssid, sizeof(zerobssid)) == 0)
 		errx(1, "no bssid specified for WDS (use wlanbssid)");
 	ifr->ifr_data = (caddr_t) &params;
-	if (ioctl(s, SIOCIFCREATE2, ifr) < 0)
-		err(1, "SIOCIFCREATE2");
+	ioctl_ifcreate(s, ifr);
 
 	/* XXX preserve original name for ifclonecreate(). */
 	strlcpy(orig_name, name, sizeof(orig_name));
@@ -6045,5 +6068,5 @@ ieee80211_ctor(void)
 	for (i = 0; i < nitems(ieee80211_cmds);  i++)
 		cmd_register(&ieee80211_cmds[i]);
 	af_register(&af_ieee80211);
-	clone_setdefcallback("wlan", wlan_create);
+	clone_setdefcallback_prefix("wlan", wlan_create);
 }

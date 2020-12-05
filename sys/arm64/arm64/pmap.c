@@ -143,6 +143,7 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_phys.h>
 #include <vm/vm_radix.h>
 #include <vm/vm_reserv.h>
+#include <vm/vm_dumpset.h>
 #include <vm/uma.h>
 
 #include <machine/machdep.h>
@@ -988,6 +989,8 @@ pmap_bootstrap(vm_offset_t l0pt, vm_offset_t l1pt, vm_paddr_t kernstart,
 	kernel_pmap->pm_l0_paddr = l0pt - kern_delta;
 	kernel_pmap->pm_cookie = COOKIE_FROM(-1, INT_MIN);
 	kernel_pmap->pm_stage = PM_STAGE1;
+	kernel_pmap->pm_levels = 4;
+	kernel_pmap->pm_ttbr = kernel_pmap->pm_l0_paddr;
 	kernel_pmap->pm_asid_set = &asids;
 
 	/* Assume the address we were loaded to is a valid physical address */
@@ -1732,33 +1735,37 @@ pmap_pinit0(pmap_t pmap)
 	pmap->pm_root.rt_root = 0;
 	pmap->pm_cookie = COOKIE_FROM(ASID_RESERVED_FOR_PID_0, INT_MIN);
 	pmap->pm_stage = PM_STAGE1;
+	pmap->pm_levels = 4;
+	pmap->pm_ttbr = pmap->pm_l0_paddr;
 	pmap->pm_asid_set = &asids;
 
 	PCPU_SET(curpmap, pmap);
 }
 
 int
-pmap_pinit_stage(pmap_t pmap, enum pmap_stage stage)
+pmap_pinit_stage(pmap_t pmap, enum pmap_stage stage, int levels)
 {
-	vm_page_t l0pt;
+	vm_page_t m;
 
 	/*
 	 * allocate the l0 page
 	 */
-	while ((l0pt = vm_page_alloc(NULL, 0, VM_ALLOC_NORMAL |
+	while ((m = vm_page_alloc(NULL, 0, VM_ALLOC_NORMAL |
 	    VM_ALLOC_NOOBJ | VM_ALLOC_WIRED | VM_ALLOC_ZERO)) == NULL)
 		vm_wait(NULL);
 
-	pmap->pm_l0_paddr = VM_PAGE_TO_PHYS(l0pt);
+	pmap->pm_l0_paddr = VM_PAGE_TO_PHYS(m);
 	pmap->pm_l0 = (pd_entry_t *)PHYS_TO_DMAP(pmap->pm_l0_paddr);
 
-	if ((l0pt->flags & PG_ZERO) == 0)
+	if ((m->flags & PG_ZERO) == 0)
 		pagezero(pmap->pm_l0);
 
 	pmap->pm_root.rt_root = 0;
 	bzero(&pmap->pm_stats, sizeof(pmap->pm_stats));
 	pmap->pm_cookie = COOKIE_FROM(-1, INT_MAX);
 
+	MPASS(levels == 3 || levels == 4);
+	pmap->pm_levels = levels;
 	pmap->pm_stage = stage;
 	switch (stage) {
 	case PM_STAGE1:
@@ -1775,6 +1782,18 @@ pmap_pinit_stage(pmap_t pmap, enum pmap_stage stage)
 	/* XXX Temporarily disable deferred ASID allocation. */
 	pmap_alloc_asid(pmap);
 
+	/*
+	 * Allocate the level 1 entry to use as the root. This will increase
+	 * the refcount on the level 1 page so it won't be removed until
+	 * pmap_release() is called.
+	 */
+	if (pmap->pm_levels == 3) {
+		PMAP_LOCK(pmap);
+		m = _pmap_alloc_l3(pmap, NUL2E + NUL1E, NULL);
+		PMAP_UNLOCK(pmap);
+	}
+	pmap->pm_ttbr = VM_PAGE_TO_PHYS(m);
+
 	return (1);
 }
 
@@ -1782,7 +1801,7 @@ int
 pmap_pinit(pmap_t pmap)
 {
 
-	return (pmap_pinit_stage(pmap, PM_STAGE1));
+	return (pmap_pinit_stage(pmap, PM_STAGE1, 4));
 }
 
 /*
@@ -2035,9 +2054,28 @@ retry:
 void
 pmap_release(pmap_t pmap)
 {
+	boolean_t rv;
+	struct spglist free;
 	struct asid_set *set;
 	vm_page_t m;
 	int asid;
+
+	if (pmap->pm_levels != 4) {
+		PMAP_ASSERT_STAGE2(pmap);
+		KASSERT(pmap->pm_stats.resident_count == 1,
+		    ("pmap_release: pmap resident count %ld != 0",
+		    pmap->pm_stats.resident_count));
+		KASSERT((pmap->pm_l0[0] & ATTR_DESCR_VALID) == ATTR_DESCR_VALID,
+		    ("pmap_release: Invalid l0 entry: %lx", pmap->pm_l0[0]));
+
+		SLIST_INIT(&free);
+		m = PHYS_TO_VM_PAGE(pmap->pm_ttbr);
+		PMAP_LOCK(pmap);
+		rv = pmap_unwire_l3(pmap, 0, m, &free);
+		PMAP_UNLOCK(pmap);
+		MPASS(rv == TRUE);
+		vm_page_free_pages_toq(&free, true);
+	}
 
 	KASSERT(pmap->pm_stats.resident_count == 0,
 	    ("pmap_release: pmap resident count %ld != 0",
@@ -3623,6 +3661,184 @@ restart:
 }
 
 /*
+ * Add a single SMMU entry. This function does not sleep.
+ */
+int
+pmap_senter(pmap_t pmap, vm_offset_t va, vm_paddr_t pa,
+    vm_prot_t prot, u_int flags)
+{
+	pd_entry_t *pde;
+	pt_entry_t new_l3, orig_l3;
+	pt_entry_t *l3;
+	vm_page_t mpte;
+	int lvl;
+	int rv;
+
+	PMAP_ASSERT_STAGE1(pmap);
+	KASSERT(va < VM_MAXUSER_ADDRESS, ("wrong address space"));
+
+	va = trunc_page(va);
+	new_l3 = (pt_entry_t)(pa | ATTR_DEFAULT |
+	    ATTR_S1_IDX(VM_MEMATTR_DEVICE) | L3_PAGE);
+	if ((prot & VM_PROT_WRITE) == 0)
+		new_l3 |= ATTR_S1_AP(ATTR_S1_AP_RO);
+	new_l3 |= ATTR_S1_XN; /* Execute never. */
+	new_l3 |= ATTR_S1_AP(ATTR_S1_AP_USER);
+	new_l3 |= ATTR_S1_nG; /* Non global. */
+
+	CTR2(KTR_PMAP, "pmap_senter: %.16lx -> %.16lx", va, pa);
+
+	PMAP_LOCK(pmap);
+
+	/*
+	 * In the case that a page table page is not
+	 * resident, we are creating it here.
+	 */
+retry:
+	pde = pmap_pde(pmap, va, &lvl);
+	if (pde != NULL && lvl == 2) {
+		l3 = pmap_l2_to_l3(pde, va);
+	} else {
+		mpte = _pmap_alloc_l3(pmap, pmap_l2_pindex(va), NULL);
+		if (mpte == NULL) {
+			CTR0(KTR_PMAP, "pmap_enter: mpte == NULL");
+			rv = KERN_RESOURCE_SHORTAGE;
+			goto out;
+		}
+		goto retry;
+	}
+
+	orig_l3 = pmap_load(l3);
+	KASSERT(!pmap_l3_valid(orig_l3), ("l3 is valid"));
+
+	/* New mapping */
+	pmap_store(l3, new_l3);
+	pmap_resident_count_inc(pmap, 1);
+	dsb(ishst);
+
+	rv = KERN_SUCCESS;
+out:
+	PMAP_UNLOCK(pmap);
+
+	return (rv);
+}
+
+/*
+ * Remove a single SMMU entry.
+ */
+int
+pmap_sremove(pmap_t pmap, vm_offset_t va)
+{
+	pt_entry_t *pte;
+	int lvl;
+	int rc;
+
+	PMAP_LOCK(pmap);
+
+	pte = pmap_pte(pmap, va, &lvl);
+	KASSERT(lvl == 3,
+	    ("Invalid SMMU pagetable level: %d != 3", lvl));
+
+	if (pte != NULL) {
+		pmap_resident_count_dec(pmap, 1);
+		pmap_clear(pte);
+		rc = KERN_SUCCESS;
+	} else
+		rc = KERN_FAILURE;
+
+	PMAP_UNLOCK(pmap);
+
+	return (rc);
+}
+
+/*
+ * Remove all the allocated L1, L2 pages from SMMU pmap.
+ * All the L3 entires must be cleared in advance, otherwise
+ * this function panics.
+ */
+void
+pmap_sremove_pages(pmap_t pmap)
+{
+	pd_entry_t l0e, *l1, l1e, *l2, l2e;
+	pt_entry_t *l3, l3e;
+	vm_page_t m, m0, m1;
+	vm_offset_t sva;
+	vm_paddr_t pa;
+	vm_paddr_t pa0;
+	vm_paddr_t pa1;
+	int i, j, k, l;
+
+	PMAP_LOCK(pmap);
+
+	for (sva = VM_MINUSER_ADDRESS, i = pmap_l0_index(sva);
+	    (i < Ln_ENTRIES && sva < VM_MAXUSER_ADDRESS); i++) {
+		l0e = pmap->pm_l0[i];
+		if ((l0e & ATTR_DESCR_VALID) == 0) {
+			sva += L0_SIZE;
+			continue;
+		}
+		pa0 = l0e & ~ATTR_MASK;
+		m0 = PHYS_TO_VM_PAGE(pa0);
+		l1 = (pd_entry_t *)PHYS_TO_DMAP(pa0);
+
+		for (j = pmap_l1_index(sva); j < Ln_ENTRIES; j++) {
+			l1e = l1[j];
+			if ((l1e & ATTR_DESCR_VALID) == 0) {
+				sva += L1_SIZE;
+				continue;
+			}
+			if ((l1e & ATTR_DESCR_MASK) == L1_BLOCK) {
+				sva += L1_SIZE;
+				continue;
+			}
+			pa1 = l1e & ~ATTR_MASK;
+			m1 = PHYS_TO_VM_PAGE(pa1);
+			l2 = (pd_entry_t *)PHYS_TO_DMAP(pa1);
+
+			for (k = pmap_l2_index(sva); k < Ln_ENTRIES; k++) {
+				l2e = l2[k];
+				if ((l2e & ATTR_DESCR_VALID) == 0) {
+					sva += L2_SIZE;
+					continue;
+				}
+				pa = l2e & ~ATTR_MASK;
+				m = PHYS_TO_VM_PAGE(pa);
+				l3 = (pt_entry_t *)PHYS_TO_DMAP(pa);
+
+				for (l = pmap_l3_index(sva); l < Ln_ENTRIES;
+				    l++, sva += L3_SIZE) {
+					l3e = l3[l];
+					if ((l3e & ATTR_DESCR_VALID) == 0)
+						continue;
+					panic("%s: l3e found for va %jx\n",
+					    __func__, sva);
+				}
+
+				vm_page_unwire_noq(m1);
+				vm_page_unwire_noq(m);
+				pmap_resident_count_dec(pmap, 1);
+				vm_page_free(m);
+				pmap_clear(&l2[k]);
+			}
+
+			vm_page_unwire_noq(m0);
+			pmap_resident_count_dec(pmap, 1);
+			vm_page_free(m1);
+			pmap_clear(&l1[j]);
+		}
+
+		pmap_resident_count_dec(pmap, 1);
+		vm_page_free(m0);
+		pmap_clear(&pmap->pm_l0[i]);
+	}
+
+	KASSERT(pmap->pm_stats.resident_count == 0,
+	    ("Invalid resident count %jd", pmap->pm_stats.resident_count));
+
+	PMAP_UNLOCK(pmap);
+}
+
+/*
  *	Insert the given physical page (p) at
  *	the specified virtual address (v) in the
  *	target physical map with the protection requested.
@@ -4866,8 +5082,6 @@ pmap_remove_pages(pmap_t pmap)
 	uint64_t inuse, bitmask;
 	int allfree, field, freed, idx, lvl;
 	vm_paddr_t pa;
-
-	KASSERT(pmap == PCPU_GET(curpmap), ("non-current pmap %p", pmap));
 
 	lock = NULL;
 
@@ -6367,7 +6581,7 @@ pmap_to_ttbr0(pmap_t pmap)
 {
 
 	return (ASID_TO_OPERAND(COOKIE_TO_ASID(pmap->pm_cookie)) |
-	    pmap->pm_l0_paddr);
+	    pmap->pm_ttbr);
 }
 
 static bool

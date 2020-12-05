@@ -167,7 +167,7 @@ device		mdio
 device		mii
 device		miibus		# MII bus support
 device		awg		# Allwinner EMAC Gigabit Ethernet
-device		axgbe		# AMD Opteron A1100 integrated NIC
+device		axa		# AMD Opteron A1100 integrated NIC
 device		msk		# Marvell/SysKonnect Yukon II Gigabit Ethernet
 device		neta		# Marvell Armada 370/38x/XP/3700 NIC
 device  	smc		# SMSC LAN91C111
@@ -227,6 +227,7 @@ device		rk_typec_phy		# Rockchip TypeC PHY
 device		dwcotg			# DWC OTG controller
 device		musb			# Mentor Graphics USB OTG controller
 device		ohci			# OHCI USB interface
+device		uhci			# UHCI USB interface
 device		ehci			# EHCI USB interface (USB 2.0)
 device		ehci_mv			# Marvell EHCI USB interface
 device		xhci			# XHCI USB interface (USB 3.0)

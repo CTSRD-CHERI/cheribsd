@@ -75,6 +75,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/mutex.h>
 #include <sys/proc.h>
 #include <sys/racct.h>
+#include <sys/refcount.h>
 #include <sys/resourcevar.h>
 #include <sys/rwlock.h>
 #include <sys/sched.h>
@@ -158,28 +159,12 @@ useracc(void * __capability cap, int len, int rw)
 	boolean_t rv;
 	vm_prot_t prot;
 	vm_map_t map;
-#if __has_feature(capabilities)
-	register_t reqperm;
-#endif
 
 	KASSERT((rw & ~VM_PROT_ALL) == 0,
 	    ("illegal ``rw'' argument to useracc (%x)\n", rw));
 	prot = rw;
 #if __has_feature(capabilities)
-	if (!__CAP_CHECK(cap, len))
-		return (FALSE);
-	reqperm = CHERI_PERM_GLOBAL;
-	if (prot & VM_PROT_READ)
-		reqperm |= CHERI_PERM_LOAD;
-	if (prot & VM_PROT_READ_CAP)
-		reqperm |= CHERI_PERM_LOAD_CAP;
-	if (prot & VM_PROT_WRITE)
-		reqperm |= CHERI_PERM_STORE;
-	if (prot & VM_PROT_WRITE_CAP)
-		reqperm |= CHERI_PERM_STORE_CAP;
-	if (prot & VM_PROT_EXECUTE)
-		reqperm |= CHERI_PERM_EXECUTE;
-	if ((cheri_getperm(cap) & reqperm) != reqperm)
+	if (!__CAP_CHECK(cap, len) || !vm_cap_allows_prot(cap, prot))
 		return (FALSE);
 #endif
 	addr = (__cheri_addr vm_offset_t)cap;
@@ -617,7 +602,7 @@ vm_forkproc(struct thread *td, struct proc *p2, struct thread *td2,
 		 * COW locally.
 		 */
 		if ((flags & RFMEM) == 0) {
-			if (p1->p_vmspace->vm_refcnt > 1) {
+			if (refcount_load(&p1->p_vmspace->vm_refcnt) > 1) {
 				error = vmspace_unshare(p1);
 				if (error)
 					return (error);
@@ -629,7 +614,7 @@ vm_forkproc(struct thread *td, struct proc *p2, struct thread *td2,
 
 	if (flags & RFMEM) {
 		p2->p_vmspace = p1->p_vmspace;
-		atomic_add_int(&p1->p_vmspace->vm_refcnt, 1);
+		refcount_acquire(&p1->p_vmspace->vm_refcnt);
 	}
 	dset = td2->td_domain.dr_policy;
 	while (vm_page_count_severe_set(&dset->ds_mask)) {
@@ -669,6 +654,29 @@ kick_proc0(void)
 
 	wakeup(&proc0);
 }
+
+#if __has_feature(capabilities)
+bool
+vm_cap_allows_prot(const void * __capability cap, vm_prot_t prot)
+{
+	register_t reqperm;
+
+	reqperm = 0;
+	if (prot & VM_PROT_READ)
+		reqperm |= CHERI_PERM_LOAD;
+	if (prot & VM_PROT_READ_CAP)
+		reqperm |= CHERI_PERM_LOAD_CAP;
+	if (prot & VM_PROT_WRITE)
+		reqperm |= CHERI_PERM_STORE;
+	if (prot & VM_PROT_WRITE_CAP)
+		reqperm |= CHERI_PERM_STORE_CAP;
+	if (prot & VM_PROT_EXECUTE)
+		reqperm |= CHERI_PERM_EXECUTE;
+	if ((cheri_getperm(cap) & reqperm) != reqperm)
+		return (false);
+	return (true);
+}
+#endif
 // CHERI CHANGES START
 // {
 //   "updated": 20200706,

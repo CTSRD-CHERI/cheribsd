@@ -1662,6 +1662,8 @@ __elfN(freebsd_copyout_auxargs)(struct image_params *imgp, uintcap_t base)
 	AUXARGS_ENTRY(pos, AT_ENVC, imgp->args->envc);
 	AUXARGS_ENTRY_PTR(pos, AT_ENVV, imgp->envv);
 	AUXARGS_ENTRY_PTR(pos, AT_PS_STRINGS, imgp->ps_strings);
+	if (imgp->sysent->sv_fxrng_gen_base != 0)
+		AUXARGS_ENTRY(pos, AT_FXRNG, imgp->sysent->sv_fxrng_gen_base);
 	AUXARGS_ENTRY(pos, AT_NULL, 0);
 
 	free(imgp->auxargs, M_TEMP);
@@ -1813,15 +1815,15 @@ core_write(struct coredump_params *p, const void *base, size_t len,
 }
 
 static int
-core_output(void * __capability base_cap, size_t len, off_t offset,
+core_output(char * __capability base_cap, size_t len, off_t offset,
     struct coredump_params *p, void *tmpbuf)
 {
 	vm_map_t map;
 	struct mount *mp;
 	size_t resid, runlen;
 	int error;
-	char *base = (char *)(uintptr_t)(uintcap_t)base_cap;
 	bool success;
+	char *base = (char *)(uintptr_t)(uintcap_t)base_cap;
 
 	KASSERT(is_aligned(base, PAGE_SIZE),
 	    ("%s: user address %p is not page-aligned", __func__, base));
@@ -1848,8 +1850,8 @@ core_output(void * __capability base_cap, size_t len, off_t offset,
 
 		if (success) {
 			/*
-			 * NB: The hybrid kernel drops the capability here,
-			 * it will be re-derived in vn_rdwr().
+			 * NB: The hybrid kernel drops the capability here, it
+			 * will be re-derived in vn_rdwr().
 			 */
 			error = core_write(p, base, runlen, offset,
 			    UIO_USERSPACE, &resid);
@@ -2836,12 +2838,12 @@ note_procstat_umask(void *arg, struct sbuf *sb, size_t *sizep)
 	int structsize;
 
 	p = (struct proc *)arg;
-	size = sizeof(structsize) + sizeof(p->p_fd->fd_cmask);
+	size = sizeof(structsize) + sizeof(p->p_pd->pd_cmask);
 	if (sb != NULL) {
 		KASSERT(*sizep == size, ("invalid size"));
-		structsize = sizeof(p->p_fd->fd_cmask);
+		structsize = sizeof(p->p_pd->pd_cmask);
 		sbuf_bcat(sb, &structsize, sizeof(structsize));
-		sbuf_bcat(sb, &p->p_fd->fd_cmask, sizeof(p->p_fd->fd_cmask));
+		sbuf_bcat(sb, &p->p_pd->pd_cmask, sizeof(p->p_pd->pd_cmask));
 	}
 	*sizep = size;
 }

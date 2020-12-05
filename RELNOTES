@@ -10,6 +10,29 @@ newline.  Entries should be separated by a newline.
 
 Changes to this file should not be MFCed.
 
+r367660:
+	Fixes the case where gssd will not startup because /usr is a separate
+	local file system that is not yet mounted.  It does not fix the case
+	where /usr is a separately mounted remote file system (such as NFS).
+	This latter case can be fixed by adding mountcritremote to the
+	REQUIRED line.  Unfortunately doing so implies that all Kerberized
+	NFS mounts in /etc/fstab will need the "late" mount option.
+	This was not done, since the requirement for "late" would introduce
+	a POLA violation.
+
+r367423:
+	This commit added a new startup scripts variable called
+	nfsv4_server_only which uses the -R option on mountd added by r367026.
+	When nfsv4_server_only is set to "YES" in /etc/rc.conf, the NFS server
+	only handles NFSv4 and does not register with rpcbind.  As such, rpcbind
+	does not need to be running.  Useful for sites which consider rpcbind a
+	security issue.
+
+r366267:
+        Kernel option ACPI_DMAR was renamed to IOMMU.  amd64's IOMMU subsystem
+        was split out from amd64 DMAR support and is now generic, i.e., it can
+        be used by all architectures.
+
 r364896:
 	A series of commits ending with r364896 added NFS over TLS
 	to the kernel.  This is believed to be compatible with
@@ -151,6 +174,13 @@ r352668:
 r352304:
 	ntpd is no longer by default locked in memory. rlimit memlock 32
 	or rlimit memlock 0 can be used to restore this behaviour.
+
+r351863:
+	rc.subr(8) now honors ${name}_env in all rc(8) scripts.  Previously,
+	environment variables set by a user via ${name}_env were ignored
+	if the service defined a custom *_cmd variable to control the behavior
+	of the run_rc_command function, e.g., start_cmd, instead of relying on
+	the variables like command and command_args,
 
 r351770,r352920,r352922,r352923:
 	dd(1) now supports conv=fsync, conv=fdatasync, oflag=fsync, oflag=sync,

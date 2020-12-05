@@ -142,10 +142,8 @@ linux_set_syscall_retval(struct thread *td, int error)
 	cpu_set_syscall_retval(td, error);
 
 	if (__predict_false(error != 0)) {
-		if (error != ERESTART && error != EJUSTRETURN) {
-			td->td_frame->tf_x[0] =
-				linux_to_bsd_errno(error);
-		}
+		if (error != ERESTART && error != EJUSTRETURN)
+			td->td_frame->tf_x[0] = bsd_to_linux_errno(error);
 	}
 }
 
@@ -421,6 +419,9 @@ struct sysentvec elf_linux_sysvec = {
 	.sv_schedtail	= linux_schedtail,
 	.sv_thread_detach = linux_thread_detach,
 	.sv_trap	= linux_vsyscall,
+	.sv_onexec	= linux_on_exec,
+	.sv_onexit	= linux_on_exit,
+	.sv_ontdexit	= linux_thread_dtor,
 };
 
 static void

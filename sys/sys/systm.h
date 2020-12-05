@@ -133,6 +133,7 @@ void	vpanic(const char *, __va_list) __dead2 __printflike(1, 0);
 
 
 #if defined(_STANDALONE)
+struct ucred;
 /*
  * Until we have more experience with KASSERTS that are called
  * from the boot loader, they are off. The bootloader does this
@@ -624,11 +625,6 @@ void set_cputicker(cpu_tick_f *func, uint64_t freq, unsigned var);
 extern cpu_tick_f *cpu_ticks;
 uint64_t cpu_tickrate(void);
 uint64_t cputick2usec(uint64_t tick);
-
-#ifdef APM_FIXUP_CALLTODO
-struct timeval;
-void	adjust_timeout_calltodo(struct timeval *time_change);
-#endif /* APM_FIXUP_CALLTODO */
 
 #include <sys/libkern.h>
 

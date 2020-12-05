@@ -72,6 +72,8 @@ __FBSDID("$FreeBSD$");
 #include <sys/sdt.h>
 #include <sys/shm.h>
 #include <sys/sem.h>
+#include <sys/sysent.h>
+#include <sys/timers.h>
 #include <sys/umtx.h>
 #ifdef KTRACE
 #include <sys/ktrace.h>
@@ -324,6 +326,11 @@ exit1(struct thread *td, int rval, int signo)
 		mtx_unlock(&ppeers_lock);
 	}
 
+	itimers_exit(p);
+
+	if (p->p_sysent->sv_onexit != NULL)
+		p->p_sysent->sv_onexit(p);
+
 	/*
 	 * Check if any loadable modules need anything done at process exit.
 	 * E.g. SYSV IPC stuff.
@@ -355,10 +362,11 @@ exit1(struct thread *td, int rval, int signo)
 	PROC_UNLOCK(p);
 
 	umtx_thread_exit(td);
+	seltdfini(td);
 
 	/*
 	 * Reset any sigio structures pointing to us as a result of
-	 * F_SETOWN with our pid.
+	 * F_SETOWN with our pid.  The P_WEXIT flag interlocks with fsetown().
 	 */
 	funsetownlst(&p->p_sigiolst);
 
@@ -366,6 +374,7 @@ exit1(struct thread *td, int rval, int signo)
 	 * Close open files and release open-file table.
 	 * This may block!
 	 */
+	pdescfree(td);
 	fdescfree(td);
 
 	/*
@@ -555,6 +564,9 @@ exit1(struct thread *td, int rval, int signo)
 	/* Save exit status. */
 	PROC_LOCK(p);
 	p->p_xthread = td;
+
+	if (p->p_sysent->sv_ontdexit != NULL)
+		p->p_sysent->sv_ontdexit(td);
 
 #ifdef KDTRACE_HOOKS
 	/*

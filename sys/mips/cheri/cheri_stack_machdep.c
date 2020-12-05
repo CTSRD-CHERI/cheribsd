@@ -70,6 +70,34 @@ stack_register_fetch(uintptr_t sp, u_register_t stack_pos)
 	return (*stack);
 }
 
+static uintptr_t
+stack_fetch_ra(uintptr_t sp, u_register_t stack_pos)
+{
+	uintptr_t ra = stack_register_fetch(sp, stack_pos);
+
+	if (!ra)
+		return (ra);
+	/* Re-derive sentry capability */
+	if (cheri_getsealed(ra)) {
+		KASSERT(cheri_gettype(ra) == CHERI_OTYPE_SENTRY,
+		    ("Return address is not a SealedEntry capability %#p",
+		    (void *)ra));
+		/*
+		 * XXX-AM: The exception handlers have base=0, this should
+		 * probably change.
+		 */
+		if (cheri_getbase(ra) < cheri_getbase(cheri_kcode_capability))
+			ra = cheri_setaddress(
+			    (uintptr_t)cheri_kcode_capability, ra);
+		else
+			ra = cheri_setaddress(cheri_setbounds(
+			    cheri_setaddress((uintptr_t)cheri_kcode_capability,
+			    cheri_getbase(ra)), cheri_getlen(ra)), ra);
+	}
+
+	return (cheri_andperm(ra, CHERI_PERM_LOAD | CHERI_PERM_GLOBAL));
+}
+
 static bool
 op_is_cheri_cincoffsetimm(InstFmt insn)
 {
@@ -123,8 +151,6 @@ stack_capture(struct stack *st, struct thread *td, uintptr_t pc, uintptr_t sp)
 	InstFmt insn;
 	uintptr_t exc_saved_ra = 0;
 	boolean_t is_exc_handler;
-	vaddr_t va;
-	void *kcode = cheri_kcode_capability;
 
 	stack_zero(st);
 
@@ -201,15 +227,11 @@ stack_capture(struct stack *st, struct thread *td, uintptr_t pc, uintptr_t sp)
 		if (is_exc_handler) {
 			if (!stack_addr_ok(td, sp, CALLFRAME_SIZ + SZREG * C17))
 				return;
-			va = stack_register_fetch(sp,
+			exc_saved_ra = stack_fetch_ra(sp,
 			    (CALLFRAME_SIZ + SZREG * C17));
-			exc_saved_ra = (va) ?
-			    (uintptr_t)cheri_setaddress(kcode, va) : 0;
 			if (!stack_addr_ok(td, sp, ra_stack_pos))
 				return;
-			va = stack_register_fetch(sp, ra_stack_pos);
-			pc = (va) ?
-			    (uintptr_t)cheri_setaddress(kcode, va) : 0;
+			pc = stack_fetch_ra(sp, ra_stack_pos);
 		}
 		else {
 			if (ra_stack_pos < 0) {
@@ -222,10 +244,9 @@ stack_capture(struct stack *st, struct thread *td, uintptr_t pc, uintptr_t sp)
 			else {
 				if (!stack_addr_ok(td, sp, ra_stack_pos))
 					return;
-				va = stack_register_fetch(sp, ra_stack_pos);
-				if (!va)
+				ra = stack_fetch_ra(sp, ra_stack_pos);
+				if (!ra)
 					break;
-				ra = (uintptr_t)cheri_setaddress(kcode, va);
 				pc = ra - sizeof(insn);
 			}
 		}
@@ -251,13 +272,6 @@ stack_save_td(struct stack *st, struct thread *td)
 	sp = (uintptr_t)td->td_pcb->pcb_cherikframe.ckf_stc;
 	stack_capture(st, td, pc, sp);
         return (0);
-}
-
-int
-stack_save_td_running(struct stack *st, struct thread *td)
-{
-
-	return (EOPNOTSUPP);
 }
 
 void

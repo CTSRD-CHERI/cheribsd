@@ -39,6 +39,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/resourcevar.h>
 #include <sys/rwlock.h>
 #include <sys/signalvar.h>
+#include <sys/sysent.h>
 #include <sys/sx.h>
 #include <sys/umtx.h>
 #include <sys/unistd.h>
@@ -350,15 +351,16 @@ kthread_exit(void)
 	 * The last exiting thread in a kernel process must tear down
 	 * the whole process.
 	 */
-	rw_wlock(&tidhash_lock);
 	PROC_LOCK(p);
 	if (p->p_numthreads == 1) {
 		PROC_UNLOCK(p);
-		rw_wunlock(&tidhash_lock);
 		kproc_exit(0);
 	}
-	LIST_REMOVE(td, td_hash);
-	rw_wunlock(&tidhash_lock);
+
+	if (p->p_sysent->sv_ontdexit != NULL)
+		p->p_sysent->sv_ontdexit(td);
+
+	tidhash_remove(td);
 	umtx_thread_exit(td);
 	tdsigcleanup(td);
 	PROC_SLOCK(p);

@@ -35,4 +35,6 @@ SUBDIR+=	xray-profiling
 
 SUBDIR+=	profile
 
+SUBDIR_PARALLEL=
+
 .include <bsd.subdir.mk>

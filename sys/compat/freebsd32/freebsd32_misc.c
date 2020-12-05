@@ -84,6 +84,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/thr.h>
 #include <sys/unistd.h>
 #include <sys/ucontext.h>
+#include <sys/umtx.h>
 #include <sys/vnode.h>
 #include <sys/wait.h>
 #include <sys/ipc.h>
@@ -372,6 +373,7 @@ freebsd32_execve(struct thread *td, struct freebsd32_execve_args *uap)
 	if (error == 0)
 		error = kern_execve(td, &eargs, NULL, oldvmspace);
 	post_execve(td, error, oldvmspace);
+	AUDIT_SYSCALL_EXIT(error == EJUSTRETURN ? 0 : error, td);
 	return (error);
 }
 
@@ -392,6 +394,7 @@ freebsd32_fexecve(struct thread *td, struct freebsd32_fexecve_args *uap)
 		error = kern_execve(td, &eargs, NULL, oldvmspace);
 	}
 	post_execve(td, error, oldvmspace);
+	AUDIT_SYSCALL_EXIT(error == EJUSTRETURN ? 0 : error, td);
 	return (error);
 }
 

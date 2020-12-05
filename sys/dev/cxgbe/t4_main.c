@@ -1358,6 +1358,8 @@ t4_attach(device_t dev)
 	s->nm_txq = malloc(s->nnmtxq * sizeof(struct sge_nm_txq),
 	    M_CXGBE, M_ZERO | M_WAITOK);
 #endif
+	MPASS(s->niq <= s->iqmap_sz);
+	MPASS(s->neq <= s->eqmap_sz);
 
 	s->ctrlq = malloc(nports * sizeof(struct sge_wrq), M_CXGBE,
 	    M_ZERO | M_WAITOK);
@@ -1365,9 +1367,9 @@ t4_attach(device_t dev)
 	    M_ZERO | M_WAITOK);
 	s->txq = malloc(s->ntxq * sizeof(struct sge_txq), M_CXGBE,
 	    M_ZERO | M_WAITOK);
-	s->iqmap = malloc(s->niq * sizeof(struct sge_iq *), M_CXGBE,
+	s->iqmap = malloc(s->iqmap_sz * sizeof(struct sge_iq *), M_CXGBE,
 	    M_ZERO | M_WAITOK);
-	s->eqmap = malloc(s->neq * sizeof(struct sge_eq *), M_CXGBE,
+	s->eqmap = malloc(s->eqmap_sz * sizeof(struct sge_eq *), M_CXGBE,
 	    M_ZERO | M_WAITOK);
 
 	sc->irq = malloc(sc->intr_count * sizeof(struct irq), M_CXGBE,
@@ -4458,6 +4460,19 @@ get_params__post_init(struct adapter *sc)
 	    __func__, sc->vres.l2t.size, L2T_SIZE));
 	sc->params.core_vdd = val[6];
 
+	param[0] = FW_PARAM_PFVF(IQFLINT_END);
+	param[1] = FW_PARAM_PFVF(EQ_END);
+	rc = -t4_query_params(sc, sc->mbox, sc->pf, 0, 2, param, val);
+	if (rc != 0) {
+		device_printf(sc->dev,
+		    "failed to query parameters (post_init2): %d.\n", rc);
+		return (rc);
+	}
+	MPASS((int)val[0] >= sc->sge.iq_start);
+	sc->sge.iqmap_sz = val[0] - sc->sge.iq_start + 1;
+	MPASS((int)val[1] >= sc->sge.eq_start);
+	sc->sge.eqmap_sz = val[1] - sc->sge.eq_start + 1;
+
 	if (chip_id(sc) >= CHELSIO_T6) {
 
 		sc->tids.tid_base = t4_read_reg(sc,
@@ -4824,7 +4839,7 @@ set_params__post_init(struct adapter *sc)
 	    F_DROPERRORIPHDRLEN | F_DROPERRORTCPHDRLEN | F_DROPERRORPKTLEN |
 	    F_DROPERRORTCPOPT | F_DROPERRORCSUMIP | F_DROPERRORCSUM;
 	val = 0;
-	if (t4_attack_filter != 0) {
+	if (chip_id(sc) < CHELSIO_T6 && t4_attack_filter != 0) {
 		t4_set_reg_field(sc, A_TP_GLOBAL_CONFIG, F_ATTACKFILTERENABLE,
 		    F_ATTACKFILTERENABLE);
 		val |= F_DROPERRORATTACK;
@@ -9326,8 +9341,10 @@ sysctl_tids(SYSCTL_HANDLER_ARGS)
 			if (b)
 				sbuf_printf(sb, "%u-%u, ", t->tid_base, b - 1);
 			sbuf_printf(sb, "%u-%u", hb, t->ntids - 1);
-		} else
-			sbuf_printf(sb, "%u-%u", t->tid_base, t->ntids - 1);
+		} else {
+			sbuf_printf(sb, "%u-%u", t->tid_base, t->tid_base +
+			    t->ntids - 1);
+		}
 		sbuf_printf(sb, ", in use: %u\n",
 		    atomic_load_acq_int(&t->tids_in_use));
 	}

@@ -186,7 +186,7 @@ test_printf_cap(const struct cheri_test *ctp __unused)
 		    "with precision and padding");
 
 #ifndef __CHERI_PURE_CAPABILITY__
-	snprintf(data, sizeof(data) / 2, "%lp", &datap);
+	snprintf(data, sizeof(data) / 2, "%lp", datap);
 	snprintf(data + sizeof(data) / 2, sizeof(data) / 2, "%p", data);
 	if (strcmp(data, data + sizeof(data) / 2) != 0)
 		cheribsdtest_failure_errx("Mismatched output for %%p (%s) and "

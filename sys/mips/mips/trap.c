@@ -538,11 +538,11 @@ cpu_fetch_syscall_args(struct thread *td)
 	bzero(sa->args, sizeof(sa->args));
 
 	/* compute next PC after syscall instruction */
-	td->td_pcb->pcb_tpc = sa->trapframe->pc; /* Remember if restart */
-	if (DELAYBRANCH(sa->trapframe->cause)) { /* Check BD bit */
-		fetch_bad_branch_instr(sa->trapframe);
-		locr0->pc = MipsEmulateBranch(locr0, sa->trapframe->pc, 0,
-		    &sa->trapframe->badinstr_p.inst);
+	td->td_pcb->pcb_tpc = locr0->pc; /* Remember if restart */
+	if (DELAYBRANCH(locr0->cause)) { /* Check BD bit */
+		fetch_bad_branch_instr(locr0);
+		locr0->pc = MipsEmulateBranch(locr0, locr0->pc, 0,
+		    &locr0->badinstr_p.inst);
 	} else {
 		TRAPF_PC_INCREMENT(locr0, sizeof(int));
 	}
@@ -1050,7 +1050,6 @@ dofault:
 
 	case T_SYSCALL + T_USER:
 		{
-			td->td_sa.trapframe = trapframe;
 			syscallenter(td);
 
 #if !defined(SMP) && (defined(DDB) || defined(DEBUG))

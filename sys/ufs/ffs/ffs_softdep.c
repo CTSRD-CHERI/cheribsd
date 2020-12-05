@@ -609,6 +609,27 @@ softdep_freework(wkhd)
 	panic("softdep_freework called");
 }
 
+int
+softdep_prerename(fdvp, fvp, tdvp, tvp)
+	struct vnode *fdvp;
+	struct vnode *fvp;
+	struct vnode *tdvp;
+	struct vnode *tvp;
+{
+
+	panic("softdep_prerename called");
+}
+
+int
+softdep_prelink(dvp, vp, will_direnter)
+	struct vnode *dvp;
+	struct vnode *vp;
+	int will_direnter;
+{
+
+	panic("softdep_prelink called");
+}
+
 #else
 
 FEATURE(softupdates, "FFS soft-updates support");
@@ -748,7 +769,7 @@ static	void unlinked_inodedep(struct mount *, struct inodedep *);
 static	void clear_unlinked_inodedep(struct inodedep *);
 static	struct inodedep *first_unlinked_inodedep(struct ufsmount *);
 static	int flush_pagedep_deps(struct vnode *, struct mount *,
-	    struct diraddhd *);
+	    struct diraddhd *, struct buf *);
 static	int free_pagedep(struct pagedep *);
 static	int flush_newblk_dep(struct vnode *, struct mount *, ufs_lbn_t);
 static	int flush_inodedep_deps(struct vnode *, struct mount *, ino_t);
@@ -925,7 +946,6 @@ static	void journal_unmount(struct ufsmount *);
 static	int journal_space(struct ufsmount *, int);
 static	void journal_suspend(struct ufsmount *);
 static	int journal_unsuspend(struct ufsmount *ump);
-static	void softdep_prelink(struct vnode *, struct vnode *);
 static	void add_to_journal(struct worklist *);
 static	void remove_from_journal(struct worklist *);
 static	bool softdep_excess_items(struct ufsmount *, int);
@@ -1389,6 +1409,145 @@ SYSCTL_INT(_debug_softdep, OID_AUTO, print_threads, CTLFLAG_RW,
 /* List of all filesystems mounted with soft updates */
 static TAILQ_HEAD(, mount_softdeps) softdepmounts;
 
+static void
+get_parent_vp_unlock_bp(struct mount *mp, struct buf *bp,
+    struct diraddhd *diraddhdp, struct diraddhd *unfinishedp)
+{
+	struct diradd *dap;
+
+	/*
+	 * Requeue unfinished dependencies before
+	 * unlocking buffer, which could make
+	 * diraddhdp invalid.
+	 */
+	ACQUIRE_LOCK(VFSTOUFS(mp));
+	while ((dap = LIST_FIRST(unfinishedp)) != NULL) {
+		LIST_REMOVE(dap, da_pdlist);
+		LIST_INSERT_HEAD(diraddhdp, dap, da_pdlist);
+	}
+	FREE_LOCK(VFSTOUFS(mp));
+
+	bp->b_vflags &= ~BV_SCANNED;
+	BUF_NOREC(bp);
+	BUF_UNLOCK(bp);
+}
+
+/*
+ * This function fetches inode inum on mount point mp.  We already
+ * hold a locked vnode vp, and might have a locked buffer bp belonging
+ * to vp.
+
+ * We must not block on acquiring the new inode lock as we will get
+ * into a lock-order reversal with the buffer lock and possibly get a
+ * deadlock.  Thus if we cannot instantiate the requested vnode
+ * without sleeping on its lock, we must unlock the vnode and the
+ * buffer before doing a blocking on the vnode lock.  We return
+ * ERELOOKUP if we have had to unlock either the vnode or the buffer so
+ * that the caller can reassess its state.
+ *
+ * Top-level VFS code (for syscalls and other consumers, e.g. callers
+ * of VOP_FSYNC() in syncer) check for ERELOOKUP and restart at safe
+ * point.
+ *
+ * Since callers expect to operate on fully constructed vnode, we also
+ * recheck v_data after relock, and return ENOENT if NULL.
+ *
+ * If unlocking bp, we must unroll dequeueing its unfinished
+ * dependencies, and clear scan flag, before unlocking.  If unlocking
+ * vp while it is under deactivation, we re-queue deactivation.
+ */
+static int
+get_parent_vp(struct vnode *vp, struct mount *mp, ino_t inum, struct buf *bp,
+    struct diraddhd *diraddhdp, struct diraddhd *unfinishedp,
+    struct vnode **rvp)
+{
+	struct vnode *pvp;
+	int error;
+	bool bplocked;
+
+	ASSERT_VOP_ELOCKED(vp, "child vnode must be locked");
+	for (bplocked = true, pvp = NULL;;) {
+		error = ffs_vgetf(mp, inum, LK_EXCLUSIVE | LK_NOWAIT, &pvp,
+		    FFSV_FORCEINSMQ);
+		if (error == 0) {
+			/*
+			 * Since we could have unlocked vp, the inode
+			 * number could no longer indicate a
+			 * constructed node.  In this case, we must
+			 * restart the syscall.
+			 */
+			if (VTOI(pvp)->i_mode == 0 || !bplocked) {
+				if (bp != NULL && bplocked)
+					get_parent_vp_unlock_bp(mp, bp,
+					    diraddhdp, unfinishedp);
+				if (VTOI(pvp)->i_mode == 0)
+					vgone(pvp);
+				error = ERELOOKUP;
+				goto out2;
+			}
+			goto out1;
+		}
+		if (bp != NULL && bplocked) {
+			get_parent_vp_unlock_bp(mp, bp, diraddhdp, unfinishedp);
+			bplocked = false;
+		}
+
+		/*
+		 * Do not drop vnode lock while inactivating.  This
+		 * would result in leaks of the VI flags and
+		 * reclaiming of non-truncated vnode.  Instead,
+		 * re-schedule inactivation hoping that we would be
+		 * able to sync inode later.
+		 */
+		if ((vp->v_iflag & VI_DOINGINACT) != 0) {
+			VI_LOCK(vp);
+			vp->v_iflag |= VI_OWEINACT;
+			VI_UNLOCK(vp);
+			return (ERELOOKUP);
+		}
+
+		VOP_UNLOCK(vp);
+		error = ffs_vgetf(mp, inum, LK_EXCLUSIVE, &pvp,
+		    FFSV_FORCEINSMQ);
+		if (error != 0) {
+			MPASS(error != ERELOOKUP);
+			vn_lock(vp, LK_EXCLUSIVE | LK_RETRY);
+			break;
+		}
+		if (VTOI(pvp)->i_mode == 0) {
+			vgone(pvp);
+			vput(pvp);
+			pvp = NULL;
+			vn_lock(vp, LK_EXCLUSIVE | LK_RETRY);
+			error = ERELOOKUP;
+			break;
+		}
+		error = vn_lock(vp, LK_EXCLUSIVE | LK_NOWAIT);
+		if (error == 0)
+			break;
+		vput(pvp);
+		pvp = NULL;
+		vn_lock(vp, LK_EXCLUSIVE | LK_RETRY);
+		if (vp->v_data == NULL) {
+			error = ENOENT;
+			break;
+		}
+	}
+	if (bp != NULL) {
+		MPASS(!bplocked);
+		error = ERELOOKUP;
+	}
+out2:
+	if (error != 0 && pvp != NULL) {
+		vput(pvp);
+		pvp = NULL;
+	}
+out1:
+	*rvp = pvp;
+	ASSERT_VOP_ELOCKED(vp, "child vnode must be locked on return");
+	return (error);
+}
+
 /*
  * This function cleans the worklist for a filesystem.
  * Each filesystem running with soft dependencies gets its own
@@ -1464,7 +1623,7 @@ worklist_speedup(mp)
 }
 
 static void
-softdep_send_speedup(struct ufsmount *ump, size_t shortage, u_int flags)
+softdep_send_speedup(struct ufsmount *ump, off_t shortage, u_int flags)
 {
 	struct buf *bp;
 
@@ -1474,7 +1633,7 @@ softdep_send_speedup(struct ufsmount *ump, size_t shortage, u_int flags)
 	bp = malloc(sizeof(*bp), M_TRIM, M_WAITOK | M_ZERO);
 	bp->b_iocmd = BIO_SPEEDUP;
 	bp->b_ioflags = flags;
-	bp->b_bcount = shortage;
+	bp->b_bcount = omin(shortage, LONG_MAX);
 	g_vfs_strategy(ump->um_bo, bp);
 	bufwait(bp);
 	free(bp, M_TRIM);
@@ -3096,40 +3255,84 @@ softdep_prealloc(vp, waitok)
 }
 
 /*
- * Before adjusting a link count on a vnode verify that we have sufficient
- * journal space.  If not, process operations that depend on the currently
- * locked pair of vnodes to try to flush space as the syncer, buf daemon,
- * and softdep flush threads can not acquire these locks to reclaim space.
+ * Try hard to sync all data and metadata for the vnode, and workitems
+ * flushing which might conflict with the vnode lock.  This is a
+ * helper for softdep_prerename().
  */
-static void
-softdep_prelink(dvp, vp)
-	struct vnode *dvp;
+static int
+softdep_prerename_vnode(ump, vp)
+	struct ufsmount *ump;
 	struct vnode *vp;
 {
-	struct ufsmount *ump;
+	int error;
 
-	ump = VFSTOUFS(dvp->v_mount);
-	LOCK_OWNED(ump);
-	/*
-	 * Nothing to do if we have sufficient journal space.
-	 * If we currently hold the snapshot lock, we must avoid
-	 * handling other resources that could cause deadlock.
-	 */
-	if (journal_space(ump, 0) || (vp && IS_SNAPSHOT(VTOI(vp))))
-		return;
-	stat_journal_low++;
-	FREE_LOCK(ump);
-	if (vp)
-		ffs_syncvnode(vp, MNT_NOWAIT, 0);
-	ffs_syncvnode(dvp, MNT_WAIT, 0);
+	ASSERT_VOP_ELOCKED(vp, "prehandle");
+	if (vp->v_data == NULL)
+		return (0);
+	error = VOP_FSYNC(vp, MNT_WAIT, curthread);
+	if (error != 0)
+		return (error);
 	ACQUIRE_LOCK(ump);
-	/* Process vp before dvp as it may create .. removes. */
-	if (vp) {
-		process_removes(vp);
-		process_truncates(vp);
+	process_removes(vp);
+	process_truncates(vp);
+	FREE_LOCK(ump);
+	return (0);
+}
+
+/*
+ * Must be called from VOP_RENAME() after all vnodes are locked.
+ * Ensures that there is enough journal space for rename.  It is
+ * sufficiently different from softdep_prelink() by having to handle
+ * four vnodes.
+ */
+int
+softdep_prerename(fdvp, fvp, tdvp, tvp)
+	struct vnode *fdvp;
+	struct vnode *fvp;
+	struct vnode *tdvp;
+	struct vnode *tvp;
+{
+	struct ufsmount *ump;
+	int error;
+
+	ump = VFSTOUFS(fdvp->v_mount);
+
+	if (journal_space(ump, 0))
+		return (0);
+
+	VOP_UNLOCK(tdvp);
+	VOP_UNLOCK(fvp);
+	if (tvp != NULL && tvp != tdvp)
+		VOP_UNLOCK(tvp);
+
+	error = softdep_prerename_vnode(ump, fdvp);
+	VOP_UNLOCK(fdvp);
+	if (error != 0)
+		return (error);
+
+	VOP_LOCK(fvp, LK_EXCLUSIVE | LK_RETRY);
+	error = softdep_prerename_vnode(ump, fvp);
+	VOP_UNLOCK(fvp);
+	if (error != 0)
+		return (error);
+
+	if (tdvp != fdvp) {
+		VOP_LOCK(tdvp, LK_EXCLUSIVE | LK_RETRY);
+		error = softdep_prerename_vnode(ump, tdvp);
+		VOP_UNLOCK(tdvp);
+		if (error != 0)
+			return (error);
 	}
-	process_removes(dvp);
-	process_truncates(dvp);
+
+	if (tvp != fvp && tvp != NULL) {
+		VOP_LOCK(tvp, LK_EXCLUSIVE | LK_RETRY);
+		error = softdep_prerename_vnode(ump, tvp);
+		VOP_UNLOCK(tvp);
+		if (error != 0)
+			return (error);
+	}
+
+	ACQUIRE_LOCK(ump);
 	softdep_speedup(ump);
 	process_worklist_item(UFSTOVFS(ump), 2, LK_NOWAIT);
 	if (journal_space(ump, 0) == 0) {
@@ -3137,6 +3340,121 @@ softdep_prelink(dvp, vp)
 		if (journal_space(ump, 1) == 0)
 			journal_suspend(ump);
 	}
+	FREE_LOCK(ump);
+	return (ERELOOKUP);
+}
+
+/*
+ * Before adjusting a link count on a vnode verify that we have sufficient
+ * journal space.  If not, process operations that depend on the currently
+ * locked pair of vnodes to try to flush space as the syncer, buf daemon,
+ * and softdep flush threads can not acquire these locks to reclaim space.
+ *
+ * Returns 0 if all owned locks are still valid and were not dropped
+ * in the process, in other case it returns either an error from sync,
+ * or ERELOOKUP if any of the locks were re-acquired.  In the later
+ * case, the state of the vnodes cannot be relied upon and our VFS
+ * syscall must be restarted at top level from the lookup.
+ */
+int
+softdep_prelink(dvp, vp, will_direnter)
+	struct vnode *dvp;
+	struct vnode *vp;
+	int will_direnter;
+{
+	struct ufsmount *ump;
+	int error, error1;
+
+	ASSERT_VOP_ELOCKED(dvp, "prelink dvp");
+	if (vp != NULL)
+		ASSERT_VOP_ELOCKED(vp, "prelink vp");
+	ump = VFSTOUFS(dvp->v_mount);
+
+	/*
+	 * Nothing to do if we have sufficient journal space.
+	 * If we currently hold the snapshot lock, we must avoid
+	 * handling other resources that could cause deadlock.
+	 *
+	 * will_direnter == 1: In case allocated a directory block in
+	 * an indirect block, we must prevent holes in the directory
+	 * created if directory entries are written out of order.  To
+	 * accomplish this we fsync when we extend a directory into
+	 * indirects.  During rename it's not safe to drop the tvp
+	 * lock so sync must be delayed until it is.
+	 *
+	 * This synchronous step could be removed if fsck and the
+	 * kernel were taught to fill in sparse directories rather
+	 * than panic.
+	 */
+	if (journal_space(ump, 0) || (vp != NULL && IS_SNAPSHOT(VTOI(vp)))) {
+		error = 0;
+		if (will_direnter && (vp == NULL || !IS_SNAPSHOT(VTOI(vp)))) {
+			if (vp != NULL)
+				VOP_UNLOCK(vp);
+			error = ffs_syncvnode(dvp, MNT_WAIT, 0);
+			if (vp != NULL) {
+				error1 = vn_lock(vp, LK_EXCLUSIVE | LK_NOWAIT);
+				if (error1 != 0) {
+					vn_lock_pair(dvp, true, vp, false);
+					if (error == 0)
+						error = ERELOOKUP;
+				} else if (vp->v_data == NULL) {
+					error = ERELOOKUP;
+				}
+			}
+		}
+		return (error);
+	}
+
+	stat_journal_low++;
+	if (vp != NULL) {
+		VOP_UNLOCK(dvp);
+		ffs_syncvnode(vp, MNT_NOWAIT, 0);
+		vn_lock_pair(dvp, false, vp, true);
+		if (dvp->v_data == NULL)
+			return (ERELOOKUP);
+	}
+	if (vp != NULL)
+		VOP_UNLOCK(vp);
+	ffs_syncvnode(dvp, MNT_WAIT, 0);
+	VOP_UNLOCK(dvp);
+
+	/* Process vp before dvp as it may create .. removes. */
+	if (vp != NULL) {
+		vn_lock(vp, LK_EXCLUSIVE | LK_RETRY);
+		if (vp->v_data == NULL) {
+			vn_lock_pair(dvp, false, vp, true);
+			return (ERELOOKUP);
+		}
+		ACQUIRE_LOCK(ump);
+		process_removes(vp);
+		process_truncates(vp);
+		FREE_LOCK(ump);
+		VOP_UNLOCK(vp);
+	}
+
+	vn_lock(dvp, LK_EXCLUSIVE | LK_RETRY);
+	if (dvp->v_data == NULL) {
+		vn_lock_pair(dvp, true, vp, false);
+		return (ERELOOKUP);
+	}
+
+	ACQUIRE_LOCK(ump);
+	process_removes(dvp);
+	process_truncates(dvp);
+	VOP_UNLOCK(dvp);
+	softdep_speedup(ump);
+
+	process_worklist_item(UFSTOVFS(ump), 2, LK_NOWAIT);
+	if (journal_space(ump, 0) == 0) {
+		softdep_speedup(ump);
+		if (journal_space(ump, 1) == 0)
+			journal_suspend(ump);
+	}
+	FREE_LOCK(ump);
+
+	vn_lock_pair(dvp, false, vp, false);
+	return (ERELOOKUP);
 }
 
 static void
@@ -4742,7 +5060,6 @@ softdep_setup_create(dp, ip)
 		KASSERT(jaddref != NULL && jaddref->ja_parent == dp->i_number,
 		    ("softdep_setup_create: No addref structure present."));
 	}
-	softdep_prelink(dvp, NULL);
 	FREE_LOCK(ITOUMP(dp));
 }
 
@@ -4777,7 +5094,6 @@ softdep_setup_dotdot_link(dp, ip)
 	if (jaddref)
 		TAILQ_INSERT_TAIL(&inodedep->id_inoreflst, &jaddref->ja_ref,
 		    if_deps);
-	softdep_prelink(dvp, ITOV(ip));
 	FREE_LOCK(ITOUMP(dp));
 }
 
@@ -4808,7 +5124,6 @@ softdep_setup_link(dp, ip)
 	if (jaddref)
 		TAILQ_INSERT_TAIL(&inodedep->id_inoreflst, &jaddref->ja_ref,
 		    if_deps);
-	softdep_prelink(dvp, ITOV(ip));
 	FREE_LOCK(ITOUMP(dp));
 }
 
@@ -4858,7 +5173,6 @@ softdep_setup_mkdir(dp, ip)
 	if (DOINGSUJ(dvp))
 		TAILQ_INSERT_TAIL(&inodedep->id_inoreflst,
 		    &dotdotaddref->ja_ref, if_deps);
-	softdep_prelink(ITOV(dp), NULL);
 	FREE_LOCK(ITOUMP(dp));
 }
 
@@ -4879,7 +5193,6 @@ softdep_setup_rmdir(dp, ip)
 	ACQUIRE_LOCK(ITOUMP(dp));
 	(void) inodedep_lookup_ip(ip);
 	(void) inodedep_lookup_ip(dp);
-	softdep_prelink(dvp, ITOV(ip));
 	FREE_LOCK(ITOUMP(dp));
 }
 
@@ -4900,7 +5213,6 @@ softdep_setup_unlink(dp, ip)
 	ACQUIRE_LOCK(ITOUMP(dp));
 	(void) inodedep_lookup_ip(ip);
 	(void) inodedep_lookup_ip(dp);
-	softdep_prelink(dvp, ITOV(ip));
 	FREE_LOCK(ITOUMP(dp));
 }
 
@@ -8764,11 +9076,11 @@ softdep_change_directoryentry_offset(bp, dp, base, oldloc, newloc, entrysize)
 	if (MOUNTEDSUJ(mp)) {
 		flags = DEPALLOC;
 		jmvref = newjmvref(dp, de->d_ino,
-		    dp->i_offset + (oldloc - base),
-		    dp->i_offset + (newloc - base));
+		    I_OFFSET(dp) + (oldloc - base),
+		    I_OFFSET(dp) + (newloc - base));
 	}
-	lbn = lblkno(ump->um_fs, dp->i_offset);
-	offset = blkoff(ump->um_fs, dp->i_offset);
+	lbn = lblkno(ump->um_fs, I_OFFSET(dp));
+	offset = blkoff(ump->um_fs, I_OFFSET(dp));
 	oldoffset = offset + (oldloc - base);
 	newoffset = offset + (newloc - base);
 	ACQUIRE_LOCK(ump);
@@ -9280,7 +9592,7 @@ newdirrem(bp, dp, ip, isrmdir, prevdirremp)
 	jremref = dotremref = dotdotremref = NULL;
 	if (DOINGSUJ(dvp)) {
 		if (isrmdir) {
-			jremref = newjremref(dirrem, dp, ip, dp->i_offset,
+			jremref = newjremref(dirrem, dp, ip, I_OFFSET(dp),
 			    ip->i_effnlink + 2);
 			dotremref = newjremref(dirrem, ip, ip, DOT_OFFSET,
 			    ip->i_effnlink + 1);
@@ -9288,12 +9600,12 @@ newdirrem(bp, dp, ip, isrmdir, prevdirremp)
 			    dp->i_effnlink + 1);
 			dotdotremref->jr_state |= MKDIR_PARENT;
 		} else
-			jremref = newjremref(dirrem, dp, ip, dp->i_offset,
+			jremref = newjremref(dirrem, dp, ip, I_OFFSET(dp),
 			    ip->i_effnlink + 1);
 	}
 	ACQUIRE_LOCK(ump);
-	lbn = lblkno(ump->um_fs, dp->i_offset);
-	offset = blkoff(ump->um_fs, dp->i_offset);
+	lbn = lblkno(ump->um_fs, I_OFFSET(dp));
+	offset = blkoff(ump->um_fs, I_OFFSET(dp));
 	pagedep_lookup(UFSTOVFS(ump), bp, dp->i_number, lbn, DEPALLOC,
 	    &pagedep);
 	dirrem->dm_pagedep = pagedep;
@@ -9304,7 +9616,7 @@ newdirrem(bp, dp, ip, isrmdir, prevdirremp)
 	 * the jremref is preserved for any potential diradd in this
 	 * location.  This can not coincide with a rmdir.
 	 */
-	if (dp->i_offset == DOTDOT_OFFSET) {
+	if (I_OFFSET(dp) == DOTDOT_OFFSET) {
 		if (isrmdir)
 			panic("newdirrem: .. directory change during remove?");
 		jremref = cancel_mkdir_dotdot(dp, dirrem, jremref);
@@ -9405,7 +9717,7 @@ softdep_setup_directory_change(bp, dp, ip, newinum, isrmdir)
 
 	mp = ITOVFS(dp);
 	ump = VFSTOUFS(mp);
-	offset = blkoff(ump->um_fs, dp->i_offset);
+	offset = blkoff(ump->um_fs, I_OFFSET(dp));
 	KASSERT(MOUNTEDSOFTDEP(mp) != 0,
 	   ("softdep_setup_directory_change called on non-softdep filesystem"));
 
@@ -9508,7 +9820,7 @@ softdep_setup_directory_change(bp, dp, ip, newinum, isrmdir)
 		KASSERT(jaddref != NULL && jaddref->ja_parent == dp->i_number,
 		    ("softdep_setup_directory_change: bad jaddref %p",
 		    jaddref));
-		jaddref->ja_diroff = dp->i_offset;
+		jaddref->ja_diroff = I_OFFSET(dp);
 		jaddref->ja_diradd = dap;
 		LIST_INSERT_HEAD(&pagedep->pd_diraddhd[DIRADDHASH(offset)],
 		    dap, da_pdlist);
@@ -9527,7 +9839,7 @@ softdep_setup_directory_change(bp, dp, ip, newinum, isrmdir)
 	 * committed when need to move the dot and dotdot references to
 	 * this new name.
 	 */
-	if (inodedep->id_mkdiradd && dp->i_offset != DOTDOT_OFFSET)
+	if (inodedep->id_mkdiradd && I_OFFSET(dp) != DOTDOT_OFFSET)
 		merge_diradd(inodedep, dap);
 	FREE_LOCK(ump);
 }
@@ -12622,25 +12934,12 @@ restart:
 		 * for details on possible races.
 		 */
 		FREE_LOCK(ump);
-		if (ffs_vgetf(mp, parentino, LK_NOWAIT | LK_EXCLUSIVE, &pvp,
-		    FFSV_FORCEINSMQ)) {
-			/*
-			 * Unmount cannot proceed after unlock because
-			 * caller must have called vn_start_write().
-			 */
-			VOP_UNLOCK(vp);
-			error = ffs_vgetf(mp, parentino, LK_EXCLUSIVE,
-			    &pvp, FFSV_FORCEINSMQ);
-			MPASS(VTOI(pvp)->i_mode != 0);
-			vn_lock(vp, LK_EXCLUSIVE | LK_RETRY);
-			if (VN_IS_DOOMED(vp)) {
-				if (error == 0)
-					vput(pvp);
-				error = ENOENT;
-			}
-			if (error != 0)
-				return (error);
-		}
+		error = get_parent_vp(vp, mp, parentino, NULL, NULL, NULL,
+		    &pvp);
+		if (error == ERELOOKUP)
+			error = 0;
+		if (error != 0)
+			return (error);
 		/*
 		 * All MKDIR_PARENT dependencies and all the NEWBLOCK pagedeps
 		 * that are contained in direct blocks will be resolved by 
@@ -12964,9 +13263,11 @@ top:
 			for (i = 0; i < DAHASHSZ; i++) {
 				if (LIST_FIRST(&pagedep->pd_diraddhd[i]) == 0)
 					continue;
-				if ((error = flush_pagedep_deps(vp, wk->wk_mp,
-				    &pagedep->pd_diraddhd[i]))) {
-					BUF_NOREC(bp);
+				error = flush_pagedep_deps(vp, wk->wk_mp,
+				    &pagedep->pd_diraddhd[i], bp);
+				if (error != 0) {
+					if (error != ERELOOKUP)
+						BUF_NOREC(bp);
 					goto out_unlock;
 				}
 			}
@@ -13200,10 +13501,11 @@ flush_newblk_dep(vp, mp, lbn)
  * Eliminate a pagedep dependency by flushing out all its diradd dependencies.
  */
 static int
-flush_pagedep_deps(pvp, mp, diraddhdp)
+flush_pagedep_deps(pvp, mp, diraddhdp, locked_bp)
 	struct vnode *pvp;
 	struct mount *mp;
 	struct diraddhd *diraddhdp;
+	struct buf *locked_bp;
 {
 	struct inodedep *inodedep;
 	struct inoref *inoref;
@@ -13270,10 +13572,10 @@ restart:
 		}
 		if (dap->da_state & MKDIR_BODY) {
 			FREE_LOCK(ump);
-			if ((error = ffs_vgetf(mp, inum, LK_EXCLUSIVE, &vp,
-			    FFSV_FORCEINSMQ)))
+			error = get_parent_vp(pvp, mp, inum, locked_bp,
+			    diraddhdp, &unfinished, &vp);
+			if (error != 0)
 				break;
-			MPASS(VTOI(vp)->i_mode != 0);
 			error = flush_newblk_dep(vp, mp, 0);
 			/*
 			 * If we still have the dependency we might need to
@@ -13335,10 +13637,10 @@ retry:
 		 */
 		if (dap == LIST_FIRST(diraddhdp)) {
 			FREE_LOCK(ump);
-			if ((error = ffs_vgetf(mp, inum, LK_EXCLUSIVE, &vp,
-			    FFSV_FORCEINSMQ)))
+			error = get_parent_vp(pvp, mp, inum, locked_bp,
+			    diraddhdp, &unfinished, &vp);
+			if (error != 0)
 				break;
-			MPASS(VTOI(vp)->i_mode != 0);
 			error = ffs_update(vp, 1);
 			vput(vp);
 			if (error)
@@ -14019,7 +14321,10 @@ clear_inodedeps(mp)
 		if (VTOI(vp)->i_mode == 0) {
 			vgone(vp);
 		} else if (ino == lastino) {
-			if ((error = ffs_syncvnode(vp, MNT_WAIT, 0)))
+			do {
+				error = ffs_syncvnode(vp, MNT_WAIT, 0);
+			} while (error == ERELOOKUP);
+			if (error != 0)
 				softdep_error("clear_inodedeps: fsync1", error);
 		} else {
 			if ((error = ffs_syncvnode(vp, MNT_NOWAIT, 0)))

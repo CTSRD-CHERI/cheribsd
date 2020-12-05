@@ -152,6 +152,7 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_phys.h>
 #include <vm/vm_radix.h>
 #include <vm/vm_reserv.h>
+#include <vm/vm_dumpset.h>
 #include <vm/uma.h>
 
 #include <machine/machdep.h>
@@ -607,7 +608,12 @@ pmap_bootstrap(vm_ptr_t l1pt, vm_paddr_t kernstart, vm_size_t kernlen)
 
 	rw_init(&pvh_global_lock, "pmap pv global");
 
-	CPU_FILL(&kernel_pmap->pm_active);
+	/*
+	 * Set the current CPU as active in the kernel pmap. Secondary cores
+	 * will add themselves later in init_secondary(). The SBI firmware
+	 * may rely on this mask being precise, so CPU_FILL() is not used.
+	 */
+	CPU_SET(PCPU_GET(hart), &kernel_pmap->pm_active);
 
 	/* Assume the address we were loaded to is a valid physical address. */
 	min_pa = max_pa = kernstart;

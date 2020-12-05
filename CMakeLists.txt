@@ -165,6 +165,36 @@ message(STATUS "BUILTIN_HEADERS_DIR=${BUILTIN_HEADERS_DIR}")
 add_compile_options(-idirafter ${BUILTIN_HEADERS_DIR}/include)
 
 add_subdirectory(libexec/rtld-elf)
+
+function(add_fake_targets_for_subdir _subdir)
+    file(GLOB _dirs LIST_DIRECTORIES TRUE "${_subdir}/*")
+    foreach(_dirpath ${_dirs})
+        message(STATUS "Checking ${_dirpath}")
+        if (IS_DIRECTORY "${_dirpath}")
+            get_filename_component(_dirname "${_dirpath}" NAME)
+            file(GLOB_RECURSE _fake_srcs LIST_DIRECTORIES FALSE "${_dirpath}/*.c" "${_dirpath}/*.cc" "${_dirpath}/*.cpp")
+            if (NOT _fake_srcs)
+                message(STATUS "No sources found for ${_subdir}/${_dirname}. Contrib program?")
+                continue()
+            endif()
+            add_executable(${_subdir}_${_dirname} ${_fake_srcs})
+            # Add include paths for commonly used libraries
+            target_include_directories(${_subdir}_${_dirname} PRIVATE
+                lib/libutil
+                contrib/libxo
+                contrib/atf  # for tests
+            )
+        endif()
+    endforeach()
+endfunction()
+
+add_fake_targets_for_subdir(bin)
+add_fake_targets_for_subdir(usr.bin)
+add_fake_targets_for_subdir(sbin)
+add_fake_targets_for_subdir(usr.sbin)
+target_include_directories(usr.bin_truss PRIVATE lib/libsysdecode)
+
+
 set(AWK "awk" CACHE FILEPATH "Path to awk")
 function(generate_if_headers _if_files_dir)
     file(GLOB_RECURSE _if_files LIST_DIRECTORIES FALSE "${_if_files_dir}/*_if.m")

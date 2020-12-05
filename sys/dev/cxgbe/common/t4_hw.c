@@ -3915,7 +3915,7 @@ int t4_link_l1cfg(struct adapter *adap, unsigned int mbox, unsigned int port,
 		speed = fwcap_top_speed(lc->pcaps);
 
 	fec = 0;
-	if (fec_supported(lc->pcaps)) {
+	if (fec_supported(speed)) {
 		if (lc->requested_fec == FEC_AUTO) {
 			if (lc->pcaps & FW_PORT_CAP32_FORCE_FEC) {
 				if (speed & FW_PORT_CAP32_SPEED_100G) {
@@ -6957,7 +6957,6 @@ void t4_get_port_stats(struct adapter *adap, int idx, struct port_stats *p)
  */
 void t4_get_lb_stats(struct adapter *adap, int idx, struct lb_port_stats *p)
 {
-	u32 bgmap = adap2pinfo(adap, idx)->mps_bg_map;
 
 #define GET_STAT(name) \
 	t4_read_reg64(adap, \
@@ -6982,14 +6981,18 @@ void t4_get_lb_stats(struct adapter *adap, int idx, struct lb_port_stats *p)
 	p->frames_1519_max	= GET_STAT(1519B_MAX);
 	p->drop			= GET_STAT(DROP_FRAMES);
 
-	p->ovflow0 = (bgmap & 1) ? GET_STAT_COM(RX_BG_0_LB_DROP_FRAME) : 0;
-	p->ovflow1 = (bgmap & 2) ? GET_STAT_COM(RX_BG_1_LB_DROP_FRAME) : 0;
-	p->ovflow2 = (bgmap & 4) ? GET_STAT_COM(RX_BG_2_LB_DROP_FRAME) : 0;
-	p->ovflow3 = (bgmap & 8) ? GET_STAT_COM(RX_BG_3_LB_DROP_FRAME) : 0;
-	p->trunc0 = (bgmap & 1) ? GET_STAT_COM(RX_BG_0_LB_TRUNC_FRAME) : 0;
-	p->trunc1 = (bgmap & 2) ? GET_STAT_COM(RX_BG_1_LB_TRUNC_FRAME) : 0;
-	p->trunc2 = (bgmap & 4) ? GET_STAT_COM(RX_BG_2_LB_TRUNC_FRAME) : 0;
-	p->trunc3 = (bgmap & 8) ? GET_STAT_COM(RX_BG_3_LB_TRUNC_FRAME) : 0;
+	if (idx < adap->params.nports) {
+		u32 bg = adap2pinfo(adap, idx)->mps_bg_map;
+
+		p->ovflow0 = (bg & 1) ? GET_STAT_COM(RX_BG_0_LB_DROP_FRAME) : 0;
+		p->ovflow1 = (bg & 2) ? GET_STAT_COM(RX_BG_1_LB_DROP_FRAME) : 0;
+		p->ovflow2 = (bg & 4) ? GET_STAT_COM(RX_BG_2_LB_DROP_FRAME) : 0;
+		p->ovflow3 = (bg & 8) ? GET_STAT_COM(RX_BG_3_LB_DROP_FRAME) : 0;
+		p->trunc0 = (bg & 1) ? GET_STAT_COM(RX_BG_0_LB_TRUNC_FRAME) : 0;
+		p->trunc1 = (bg & 2) ? GET_STAT_COM(RX_BG_1_LB_TRUNC_FRAME) : 0;
+		p->trunc2 = (bg & 4) ? GET_STAT_COM(RX_BG_2_LB_TRUNC_FRAME) : 0;
+		p->trunc3 = (bg & 8) ? GET_STAT_COM(RX_BG_3_LB_TRUNC_FRAME) : 0;
+	}
 
 #undef GET_STAT
 #undef GET_STAT_COM
@@ -10196,6 +10199,48 @@ void t4_idma_monitor(struct adapter *adapter,
 			debug0, debug11);
 		t4_sge_decode_idma_state(adapter, idma->idma_state[i]);
 	}
+}
+
+/**
+ *     t4_set_vf_mac - Set MAC address for the specified VF
+ *     @adapter: The adapter
+ *     @pf: the PF used to instantiate the VFs
+ *     @vf: one of the VFs instantiated by the specified PF
+ *     @naddr: the number of MAC addresses
+ *     @addr: the MAC address(es) to be set to the specified VF
+ */
+int t4_set_vf_mac(struct adapter *adapter, unsigned int pf, unsigned int vf,
+		  unsigned int naddr, u8 *addr)
+{
+	struct fw_acl_mac_cmd cmd;
+
+	memset(&cmd, 0, sizeof(cmd));
+	cmd.op_to_vfn = cpu_to_be32(V_FW_CMD_OP(FW_ACL_MAC_CMD) |
+				    F_FW_CMD_REQUEST |
+				    F_FW_CMD_WRITE |
+				    V_FW_ACL_MAC_CMD_PFN(pf) |
+				    V_FW_ACL_MAC_CMD_VFN(vf));
+
+	/* Note: Do not enable the ACL */
+	cmd.en_to_len16 = cpu_to_be32((unsigned int)FW_LEN16(cmd));
+	cmd.nmac = naddr;
+
+	switch (pf) {
+	case 3:
+		memcpy(cmd.macaddr3, addr, sizeof(cmd.macaddr3));
+		break;
+	case 2:
+		memcpy(cmd.macaddr2, addr, sizeof(cmd.macaddr2));
+		break;
+	case 1:
+		memcpy(cmd.macaddr1, addr, sizeof(cmd.macaddr1));
+		break;
+	case 0:
+		memcpy(cmd.macaddr0, addr, sizeof(cmd.macaddr0));
+		break;
+	}
+
+	return t4_wr_mbox(adapter, adapter->mbox, &cmd, sizeof(cmd), &cmd);
 }
 
 /**

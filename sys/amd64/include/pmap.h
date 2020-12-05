@@ -259,8 +259,8 @@
 #define	PMAP_PCID_OVERMAX_KERN	0x800
 #define	PMAP_PCID_USER_PT	0x800
 
-#define	PMAP_NO_CR3		(~0UL)
-#define	PMAP_UCR3_NOMASK	(~0UL)
+#define	PMAP_NO_CR3		0xffffffffffffffff
+#define	PMAP_UCR3_NOMASK	0xffffffffffffffff
 
 #ifndef LOCORE
 
@@ -270,6 +270,7 @@
 #include <sys/_mutex.h>
 #include <sys/_pctrie.h>
 #include <sys/_rangeset.h>
+#include <sys/_smr.h>
 
 #include <vm/_vm_radix.h>
 
@@ -371,6 +372,7 @@ struct pmap {
 	struct pmap_statistics	pm_stats;	/* pmap statistics */
 	struct vm_radix		pm_root;	/* spare page table pages */
 	long			pm_eptgen;	/* EPT pmap generation id */
+	smr_t			pm_eptsmr;
 	int			pm_flags;
 	struct pmap_pcids	pm_pcids[MAXCPU];
 	struct rangeset		pm_pkru;

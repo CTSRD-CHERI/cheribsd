@@ -7,9 +7,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-// UNSUPPORTED: c++98, c++03, c++11, c++14, libcpp-no-rtti
+// UNSUPPORTED: c++03, c++11, c++14, libcpp-no-rtti
 
-// XFAIL: dylib-has-no-bad_variant_access && !libcpp-no-exceptions
+// XFAIL: dylib-has-no-bad_variant_access && !no-exceptions
 
 // <variant>
 // template <class Visitor, class... Variants>

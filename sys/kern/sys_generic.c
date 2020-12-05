@@ -155,11 +155,10 @@ struct selfd {
 	struct selinfo		*sf_si;		/* (f) selinfo when linked. */
 	struct mtx		*sf_mtx;	/* Pointer to selinfo mtx. */
 	struct seltd		*sf_td;		/* (k) owning seltd. */
-	void *			sf_cookie;	/* (k) fd or pollfd. */
-	u_int			sf_refs;
+	void			*sf_cookie;	/* (k) fd or pollfd. */
 };
 
-static uma_zone_t selfd_zone;
+MALLOC_DEFINE(M_SELFD, "selfd", "selfd");
 static struct mtx_pool *mtxpool_select;
 
 #if defined(__LP64__) || defined(__CHERI_PURE_CAPABILITY__)
@@ -1786,11 +1785,11 @@ selfdalloc(struct thread *td, void * cookie)
 
 	stp = td->td_sel;
 	if (stp->st_free1 == NULL)
-		stp->st_free1 = uma_zalloc(selfd_zone, M_WAITOK|M_ZERO);
+		stp->st_free1 = malloc(sizeof(*stp->st_free1), M_SELFD, M_WAITOK|M_ZERO);
 	stp->st_free1->sf_td = stp;
 	stp->st_free1->sf_cookie = cookie;
 	if (stp->st_free2 == NULL)
-		stp->st_free2 = uma_zalloc(selfd_zone, M_WAITOK|M_ZERO);
+		stp->st_free2 = malloc(sizeof(*stp->st_free2), M_SELFD, M_WAITOK|M_ZERO);
 	stp->st_free2->sf_td = stp;
 	stp->st_free2->sf_cookie = cookie;
 }
@@ -1799,16 +1798,17 @@ static void
 selfdfree(struct seltd *stp, struct selfd *sfp)
 {
 	STAILQ_REMOVE(&stp->st_selq, sfp, selfd, sf_link);
-	if (sfp->sf_si != NULL) {
+	/*
+	 * Paired with doselwakeup.
+	 */
+	if (atomic_load_acq_ptr((uintptr_t *)&sfp->sf_si) != (uintptr_t)NULL) {
 		mtx_lock(sfp->sf_mtx);
 		if (sfp->sf_si != NULL) {
 			TAILQ_REMOVE(&sfp->sf_si->si_tdlist, sfp, sf_threads);
-			refcount_release(&sfp->sf_refs);
 		}
 		mtx_unlock(sfp->sf_mtx);
 	}
-	if (refcount_release(&sfp->sf_refs))
-		uma_zfree(selfd_zone, sfp);
+	free(sfp, M_SELFD);
 }
 
 /* Drain the waiters tied to all the selfd belonging the specified selinfo. */
@@ -1861,7 +1861,6 @@ selrecord(struct thread *selector, struct selinfo *sip)
 	 */
 	sfp->sf_si = sip;
 	sfp->sf_mtx = mtxp;
-	refcount_init(&sfp->sf_refs, 2);
 	STAILQ_INSERT_TAIL(&stp->st_selq, sfp, sf_link);
 	/*
 	 * Now that we've locked the sip, check for initialization.
@@ -1915,14 +1914,15 @@ doselwakeup(struct selinfo *sip, int pri)
 		 * sf_si seltdclear will know to ignore this si.
 		 */
 		TAILQ_REMOVE(&sip->si_tdlist, sfp, sf_threads);
-		sfp->sf_si = NULL;
 		stp = sfp->sf_td;
+		/*
+		 * Paired with selfdfree.
+		 */
+		atomic_store_rel_ptr((uintptr_t *)&sfp->sf_si, (uintptr_t)NULL);
 		mtx_lock(&stp->st_mtx);
 		stp->st_flags |= SELTD_PENDING;
 		cv_broadcastpri(&stp->st_wait, pri);
 		mtx_unlock(&stp->st_mtx);
-		if (refcount_release(&sfp->sf_refs))
-			uma_zfree(selfd_zone, sfp);
 	}
 	mtx_unlock(sip->si_mtx);
 }
@@ -1983,9 +1983,9 @@ seltdfini(struct thread *td)
 	if (stp == NULL)
 		return;
 	if (stp->st_free1)
-		uma_zfree(selfd_zone, stp->st_free1);
+		free(stp->st_free1, M_SELFD);
 	if (stp->st_free2)
-		uma_zfree(selfd_zone, stp->st_free2);
+		free(stp->st_free2, M_SELFD);
 	td->td_sel = NULL;
 	cv_destroy(&stp->st_wait);
 	mtx_destroy(&stp->st_mtx);
@@ -2015,8 +2015,6 @@ static void
 selectinit(void *dummy __unused)
 {
 
-	selfd_zone = uma_zcreate("selfd", sizeof(struct selfd), NULL, NULL,
-	    NULL, NULL, UMA_ALIGN_PTR, 0);
 	mtxpool_select = mtx_pool_create("select mtxpool", 128, MTX_DEF);
 }
 

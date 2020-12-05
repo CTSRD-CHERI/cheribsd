@@ -449,8 +449,11 @@ static __inline int atomic_fcmpset_8(__volatile uint8_t *, uint8_t *, uint8_t);
 static __inline int atomic_cmpset_16(__volatile uint16_t *, uint16_t, uint16_t);
 static __inline int atomic_fcmpset_16(__volatile uint16_t *, uint16_t *, uint16_t);
 
-static __inline void
 /* Work around https://github.com/CTSRD-CHERI/qemu/issues/4 */
+#define QEMU_TLB_WORKAROUND8(register) \
+	"clb $zero, $zero, 0(" register ")\n\t"
+#define QEMU_TLB_WORKAROUND16(register) \
+	"clh $zero, $zero, 0(" register ")\n\t"
 #define QEMU_TLB_WORKAROUND32(register) \
 	"clw $zero, $zero, 0(" register ")\n\t"
 #define QEMU_TLB_WORKAROUND64(register) \
@@ -463,6 +466,7 @@ static __inline void
 #define __INLINE_ASM_PUSH_NOAT	".set push\n\t.set noat\n\t"
 #define __INLINE_ASM_POP_NOAT	".set pop"
 
+static __inline void
 atomic_set_32(__volatile uint32_t *p, uint32_t v)
 {
 	uint32_t temp;
@@ -912,6 +916,141 @@ ATOMIC_STORE_LOAD(64)
  */
 #if defined(__mips_n32)
 #define	atomic_load_64	atomic_load_acq_64
+#endif
+
+#ifdef __CHERI_PURE_CAPABILITY__
+/*
+ * In a purecap kernel we can not use the generic sub-word implementation
+ * as it will break with subobject bounds.
+ */
+static __inline int
+atomic_cmpset_8(__volatile uint8_t *p, uint8_t cmpval, uint8_t newval)
+{
+	int ret;
+
+	__asm __volatile (
+		__INLINE_ASM_PUSH_NOAT
+		"1:\n\t"
+		QEMU_TLB_WORKAROUND8("%1")
+		"cllb	%0, %1\n\t"		/* load old value */
+		"bne	%0, %2, 2f\n\t"		/* compare */
+		"move	%0, %3\n\t"		/* value to store */
+		"cscb	%0, %0, %1\n\t"		/* attempt to store */
+		"beqz	%0, 1b\n\t"		/* if it failed, spin */
+		"b 3f\n\t"
+		"2:\n\t"
+		"li	%0, 0\n\t"
+		"3:\n"
+		__INLINE_ASM_POP_NOAT
+		: "=&r" (ret), "+C" (p)
+		: "r" (cmpval), "r" (newval)
+		: "memory");
+
+	return (ret);
+}
+#define	atomic_cmpset_8 atomic_cmpset_8
+
+/*
+ * Atomically compare the value stored at *p with cmpval and if the
+ * two values are equal, update the value of *p with newval. Returns
+ * zero if the compare failed, nonzero otherwise.
+ */
+static __inline int
+atomic_fcmpset_8(__volatile uint8_t *p, uint8_t *cmpval, uint8_t newval)
+{
+	int ret;
+
+	uint8_t tmp;
+	uint8_t expected = *cmpval;
+
+	__asm __volatile (
+		__INLINE_ASM_PUSH_NOAT
+		"cllb	%[tmp], %[ptr]\n\t"		/* load old value */
+		"bne	%[tmp], %[expected], 1f\n\t"	/* compare */
+		"nop\n\t"
+		"cscb	%[ret], %[newval], %[ptr]\n\t"	/* attempt to store */
+		"j	2f\n\t"			/* exit regardless of success */
+		"nop\n\t"			/* avoid delay slot accident */
+		"1:\n\t"
+		"csb	%[tmp], $0, 0(%[cmpval])\n\t"	/* store loaded value */
+		"li	%[ret], 0\n\t"
+		"2:\n"
+		__INLINE_ASM_POP_NOAT
+		: [ret] "=&r" (ret), [tmp] "=&r" (tmp), [ptr]"+C" (p),
+		    [cmpval]"+C" (cmpval)
+		: [newval] "r" (newval), [expected] "r" (expected)
+		: "memory");
+
+	return ret;
+}
+#define	atomic_fcmpset_8 atomic_fcmpset_8
+
+/*
+ * Atomically compare the value stored at *p with cmpval and if the
+ * two values are equal, update the value of *p with newval. Returns
+ * zero if the compare failed, nonzero otherwise.
+ */
+static __inline int
+atomic_cmpset_16(__volatile uint16_t *p, uint16_t cmpval, uint16_t newval)
+{
+	int ret;
+
+	__asm __volatile (
+		__INLINE_ASM_PUSH_NOAT
+		"1:\n\t"
+		QEMU_TLB_WORKAROUND16("%1")
+		"cllh	%0, %1\n\t"		/* load old value */
+		"bne	%0, %2, 2f\n\t"		/* compare */
+		"move	%0, %3\n\t"		/* value to store */
+		"csch	%0, %0, %1\n\t"		/* attempt to store */
+		"beqz	%0, 1b\n\t"		/* if it failed, spin */
+		"b 3f\n\t"
+		"2:\n\t"
+		"li	%0, 0\n\t"
+		"3:\n"
+		__INLINE_ASM_POP_NOAT
+		: "=&r" (ret), "+C" (p)
+		: "r" (cmpval), "r" (newval)
+		: "memory");
+
+	return (ret);
+}
+#define	atomic_cmpset_16 atomic_cmpset_16
+
+/*
+ * Atomically compare the value stored at *p with cmpval and if the
+ * two values are equal, update the value of *p with newval. Returns
+ * zero if the compare failed, nonzero otherwise.
+ */
+static __inline int
+atomic_fcmpset_16(__volatile uint16_t *p, uint16_t *cmpval, uint16_t newval)
+{
+	int ret;
+
+	uint16_t tmp;
+	uint16_t expected = *cmpval;
+
+	__asm __volatile (
+		__INLINE_ASM_PUSH_NOAT
+		"cllh	%[tmp], %[ptr]\n\t"		/* load old value */
+		"bne	%[tmp], %[expected], 1f\n\t"	/* compare */
+		"nop\n\t"
+		"csch	%[ret], %[newval], %[ptr]\n\t"	/* attempt to store */
+		"j	2f\n\t"			/* exit regardless of success */
+		"nop\n\t"			/* avoid delay slot accident */
+		"1:\n\t"
+		"csh	%[tmp], $0, 0(%[cmpval])\n\t"	/* store loaded value */
+		"li	%[ret], 0\n\t"
+		"2:\n"
+		__INLINE_ASM_POP_NOAT
+		: [ret] "=&r" (ret), [tmp] "=&r" (tmp), [ptr]"+C" (p),
+		    [cmpval]"+C" (cmpval)
+		: [newval] "r" (newval), [expected] "r" (expected)
+		: "memory");
+
+	return ret;
+}
+#define	atomic_fcmpset_16 atomic_fcmpset_16
 #endif
 
 /*
@@ -1757,7 +1896,22 @@ atomic_swap_long(volatile unsigned long *ptr, const unsigned long value)
 	return (retval);
 }
 #endif
+
+#ifdef __CHERI_PURE_CAPABILITY__
+static __inline uintptr_t
+atomic_swap_ptr(volatile uintptr_t *ptr, const uintptr_t value)
+{
+	uintptr_t retval;
+
+	retval = *ptr;
+
+	while (!atomic_fcmpset_ptr(ptr, &retval, value))
+		;
+	return (retval);
+}
+#else
 #define	atomic_swap_ptr(ptr, value) atomic_swap_long((unsigned long *)(ptr), value)
+#endif
 
 #include <sys/_atomic_subword.h>
 

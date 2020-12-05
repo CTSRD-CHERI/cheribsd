@@ -7876,8 +7876,8 @@ bbr_process_ack(struct mbuf *m, struct tcphdr *th, struct socket *so,
 	acked_amount = min(acked, (int)sbavail(&so->so_snd));
 	tp->snd_wnd -= acked_amount;
 	mfree = sbcut_locked(&so->so_snd, acked_amount);
-	/* NB: sowwakeup_locked() does an implicit unlock. */
-	sowwakeup_locked(so);
+	SOCKBUF_UNLOCK(&so->so_snd);
+	tp->t_flags |= TF_WAKESOW;
 	m_freem(mfree);
 	if (SEQ_GT(th->th_ack, tp->snd_una)) {
 		bbr_collapse_rtt(tp, bbr, TCP_REXMTVAL(tp));
@@ -8353,8 +8353,8 @@ bbr_process_data(struct mbuf *m, struct tcphdr *th, struct socket *so,
 				appended =
 #endif
 					sbappendstream_locked(&so->so_rcv, m, 0);
-			/* NB: sorwakeup_locked() does an implicit unlock. */
-			sorwakeup_locked(so);
+			SOCKBUF_UNLOCK(&so->so_rcv);
+			tp->t_flags |= TF_WAKESOR;
 #ifdef NETFLIX_SB_LIMITS
 			if (so->so_rcv.sb_shlim && appended != mcnt)
 				counter_fo_release(so->so_rcv.sb_shlim,
@@ -8414,6 +8414,8 @@ bbr_process_data(struct mbuf *m, struct tcphdr *th, struct socket *so,
 	if (thflags & TH_FIN) {
 		if (TCPS_HAVERCVDFIN(tp->t_state) == 0) {
 			socantrcvmore(so);
+			/* The socket upcall is handled by socantrcvmore. */
+			tp->t_flags &= ~TF_WAKESOR;
 			/*
 			 * If connection is half-synchronized (ie NEEDSYN
 			 * flag on) then delay ACK, so it may be piggybacked
@@ -8604,8 +8606,8 @@ bbr_do_fastnewdata(struct mbuf *m, struct tcphdr *th, struct socket *so,
 			sbappendstream_locked(&so->so_rcv, m, 0);
 		ctf_calc_rwin(so, tp);
 	}
-	/* NB: sorwakeup_locked() does an implicit unlock. */
-	sorwakeup_locked(so);
+	SOCKBUF_UNLOCK(&so->so_rcv);
+	tp->t_flags |= TF_WAKESOR;
 #ifdef NETFLIX_SB_LIMITS
 	if (so->so_rcv.sb_shlim && mcnt != appended)
 		counter_fo_release(so->so_rcv.sb_shlim, mcnt - appended);
@@ -8796,7 +8798,7 @@ bbr_fastack(struct mbuf *m, struct tcphdr *th, struct socket *so,
 		    &tcp_savetcp, 0);
 #endif
 	/* Wake up the socket if we have room to write more */
-	sowwakeup(so);
+	tp->t_flags |= TF_WAKESOW;
 	if (tp->snd_una == tp->snd_max) {
 		/* Nothing left outstanding */
 		bbr_log_progress_event(bbr, tp, ticks, PROGRESS_CLEAR, __LINE__);
@@ -11428,12 +11430,6 @@ bbr_do_segment_nounlock(struct mbuf *m, struct tcphdr *th, struct socket *so,
 #ifdef STATS
 	stats_voi_update_abs_ulong(tp->t_stats, VOI_TCP_FRWIN, tiwin);
 #endif
-	/*
-	 * Parse options on any incoming segment.
-	 */
-	tcp_dooptions(&to, (u_char *)(th + 1),
-	    (th->th_off << 2) - sizeof(struct tcphdr),
-	    (thflags & TH_SYN) ? TO_SYN : 0);
 
 	if (m->m_flags & M_TSTMP) {
 		/* Prefer the hardware timestamp if present */
@@ -11456,6 +11452,23 @@ bbr_do_segment_nounlock(struct mbuf *m, struct tcphdr *th, struct socket *so,
 		 * Ok just get the current time.
 		 */
 		bbr->r_ctl.rc_rcvtime = lcts = cts = tcp_get_usecs(&bbr->rc_tv);
+	}
+	/*
+	 * Parse options on any incoming segment.
+	 */
+	tcp_dooptions(&to, (u_char *)(th + 1),
+	    (th->th_off << 2) - sizeof(struct tcphdr),
+	    (thflags & TH_SYN) ? TO_SYN : 0);
+
+	/*
+	 * If timestamps were negotiated during SYN/ACK and a
+	 * segment without a timestamp is received, silently drop
+	 * the segment.
+	 * See section 3.2 of RFC 7323.
+	 */
+	if ((tp->t_flags & TF_RCVD_TSTMP) && !(to.to_flags & TOF_TS)) {
+		retval = 0;
+		goto done_with_input;
 	}
 	/*
 	 * If echoed timestamp is later than the current time, fall back to
@@ -11740,8 +11753,10 @@ bbr_do_segment(struct mbuf *m, struct tcphdr *th, struct socket *so,
 	}
 	retval = bbr_do_segment_nounlock(m, th, so, tp,
 					 drop_hdrlen, tlen, iptos, 0, &tv);
-	if (retval == 0)
+	if (retval == 0) {
+		tcp_handle_wakeup(tp, so);
 		INP_WUNLOCK(tp->t_inpcb);
+	}
 }
 
 /*

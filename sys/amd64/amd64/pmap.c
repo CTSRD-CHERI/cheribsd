@@ -125,6 +125,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/rangeset.h>
 #include <sys/rwlock.h>
 #include <sys/sbuf.h>
+#include <sys/smr.h>
 #include <sys/sx.h>
 #include <sys/turnstile.h>
 #include <sys/vmem.h>
@@ -149,6 +150,7 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_phys.h>
 #include <vm/vm_radix.h>
 #include <vm/vm_reserv.h>
+#include <vm/vm_dumpset.h>
 #include <vm/uma.h>
 
 #include <machine/intr_machdep.h>
@@ -156,6 +158,7 @@ __FBSDID("$FreeBSD$");
 #include <x86/ifunc.h>
 #include <machine/cpu.h>
 #include <machine/cputypes.h>
+#include <machine/intr_machdep.h>
 #include <machine/md_var.h>
 #include <machine/pcb.h>
 #include <machine/specialreg.h>
@@ -449,7 +452,7 @@ static __inline int
 pc_to_domain(struct pv_chunk *pc)
 {
 
-	return (_vm_phys_domain(DMAP_TO_PHYS((vm_offset_t)pc)));
+	return (vm_phys_domain(DMAP_TO_PHYS((vm_offset_t)pc)));
 }
 #else
 static __inline int
@@ -2645,7 +2648,7 @@ pmap_update_pde_store(pmap_t pmap, pd_entry_t *pde, pd_entry_t newpde)
 		 * "all" host cpus and force any vcpu context to exit as a
 		 * side-effect.
 		 */
-		atomic_add_acq_long(&pmap->pm_eptgen, 1);
+		atomic_add_long(&pmap->pm_eptgen, 1);
 		break;
 	default:
 		panic("pmap_update_pde_store: bad pm_type %d", pmap->pm_type);
@@ -2720,6 +2723,7 @@ pmap_update_pde_invalidate(pmap_t pmap, vm_offset_t va, pd_entry_t newpde)
 static __inline void
 pmap_invalidate_ept(pmap_t pmap)
 {
+	smr_seq_t goal;
 	int ipinum;
 
 	sched_pin();
@@ -2740,8 +2744,17 @@ pmap_invalidate_ept(pmap_t pmap)
 	 * Each vcpu keeps a cache of this counter and compares it
 	 * just before a vmresume. If the counter is out-of-date an
 	 * invept will be done to flush stale mappings from the TLB.
+	 *
+	 * To ensure that all vCPU threads have observed the new counter
+	 * value before returning, we use SMR.  Ordering is important here:
+	 * the VMM enters an SMR read section before loading the counter
+	 * and after updating the pm_active bit set.  Thus, pm_active is
+	 * a superset of active readers, and any reader that has observed
+	 * the goal has observed the new counter value.
 	 */
-	atomic_add_acq_long(&pmap->pm_eptgen, 1);
+	atomic_add_long(&pmap->pm_eptgen, 1);
+
+	goal = smr_advance(pmap->pm_eptsmr);
 
 	/*
 	 * Force the vcpu to exit and trap back into the hypervisor.
@@ -2749,6 +2762,12 @@ pmap_invalidate_ept(pmap_t pmap)
 	ipinum = pmap->pm_flags & PMAP_NESTED_IPIMASK;
 	ipi_selected(pmap->pm_active, ipinum);
 	sched_unpin();
+
+	/*
+	 * Ensure that all active vCPUs will observe the new generation counter
+	 * value before executing any more guest instructions.
+	 */
+	smr_wait(pmap->pm_eptsmr, goal);
 }
 
 static cpuset_t
@@ -4084,7 +4103,8 @@ pmap_pinit_type(pmap_t pmap, enum pmap_type pm_type, int flags)
 	 * address space.
 	 * Install minimal kernel mappings in PTI case.
 	 */
-	if (pm_type == PT_X86) {
+	switch (pm_type) {
+	case PT_X86:
 		pmap->pm_cr3 = pmltop_phys;
 		if (pmap_is_la57(pmap))
 			pmap_pinit_pml5(pmltop_pg);
@@ -4105,6 +4125,11 @@ pmap_pinit_type(pmap_t pmap, enum pmap_type pm_type, int flags)
 			rangeset_init(&pmap->pm_pkru, pkru_dup_range,
 			    pkru_free_range, pmap, M_NOWAIT);
 		}
+		break;
+	case PT_EPT:
+	case PT_RVI:
+		pmap->pm_eptsmr = smr_create("pmap", 0, 0);
+		break;
 	}
 
 	pmap->pm_root.rt_root = 0;
@@ -4586,7 +4611,7 @@ pmap_page_array_startup(long pages)
 	end = start + pages * sizeof(struct vm_page);
 	for (va = start; va < end; va += NBPDR) {
 		pfn = first_page + (va - start) / sizeof(struct vm_page);
-		domain = _vm_phys_domain(ptoa(pfn));
+		domain = vm_phys_domain(ptoa(pfn));
 		pdpe = pmap_pdpe(kernel_pmap, va);
 		if ((*pdpe & X86_PG_V) == 0) {
 			pa = vm_phys_early_alloc(domain, PAGE_SIZE);
@@ -5122,7 +5147,7 @@ retry:
 	pc->pc_map[0] = PC_FREE0 & ~1ul;	/* preallocated bit 0 */
 	pc->pc_map[1] = PC_FREE1;
 	pc->pc_map[2] = PC_FREE2;
-	pvc = &pv_chunks[_vm_phys_domain(m->phys_addr)];
+	pvc = &pv_chunks[vm_phys_domain(m->phys_addr)];
 	mtx_lock(&pvc->pvc_lock);
 	TAILQ_INSERT_TAIL(&pvc->pvc_list, pc, pc_lru);
 	mtx_unlock(&pvc->pvc_lock);
@@ -10479,17 +10504,17 @@ pmap_pti_init(void)
 	CPU_FOREACH(i) {
 		/* Doublefault stack IST 1 */
 		va = __pcpu[i].pc_common_tss.tss_ist1 + sizeof(struct nmi_pcpu);
-		pmap_pti_add_kva_locked(va - PAGE_SIZE, va, false);
+		pmap_pti_add_kva_locked(va - DBLFAULT_STACK_SIZE, va, false);
 		/* NMI stack IST 2 */
 		va = __pcpu[i].pc_common_tss.tss_ist2 + sizeof(struct nmi_pcpu);
-		pmap_pti_add_kva_locked(va - PAGE_SIZE, va, false);
+		pmap_pti_add_kva_locked(va - NMI_STACK_SIZE, va, false);
 		/* MC# stack IST 3 */
 		va = __pcpu[i].pc_common_tss.tss_ist3 +
 		    sizeof(struct nmi_pcpu);
-		pmap_pti_add_kva_locked(va - PAGE_SIZE, va, false);
+		pmap_pti_add_kva_locked(va - MCE_STACK_SIZE, va, false);
 		/* DB# stack IST 4 */
 		va = __pcpu[i].pc_common_tss.tss_ist4 + sizeof(struct nmi_pcpu);
-		pmap_pti_add_kva_locked(va - PAGE_SIZE, va, false);
+		pmap_pti_add_kva_locked(va - DBG_STACK_SIZE, va, false);
 	}
 	pmap_pti_add_kva_locked((vm_offset_t)kernphys + KERNBASE,
 	    (vm_offset_t)etext, true);

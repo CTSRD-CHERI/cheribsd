@@ -42,6 +42,9 @@ __FBSDID("$FreeBSD$");
 #include "zfsimpl.h"
 #include "zfssubr.c"
 
+#ifdef HAS_ZSTD_ZFS
+extern int zstd_init(void);
+#endif
 
 struct zfsmount {
 	const spa_t	*spa;
@@ -170,6 +173,9 @@ zfs_init(void)
 	dnode_cache_buf = malloc(SPA_MAXBLOCKSIZE);
 
 	zfs_init_crc();
+#ifdef HAS_ZSTD_ZFS
+	zstd_init();
+#endif
 }
 
 static int

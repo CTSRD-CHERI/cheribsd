@@ -38,6 +38,7 @@ __FBSDID("$FreeBSD$");
 
 #include "opt_ddb.h"
 #include "opt_hwpmc_hooks.h"
+#include "opt_iommu.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -50,6 +51,8 @@ __FBSDID("$FreeBSD$");
 #include <sys/queue.h>
 #include <sys/bus.h>
 #include <sys/interrupt.h>
+#include <sys/taskqueue.h>
+#include <sys/tree.h>
 #include <sys/conf.h>
 #include <sys/cpuset.h>
 #include <sys/rman.h>
@@ -68,6 +71,10 @@ __FBSDID("$FreeBSD$");
 
 #ifdef DDB
 #include <ddb/ddb.h>
+#endif
+
+#ifdef IOMMU
+#include <dev/iommu/iommu_msi.h>
 #endif
 
 #include "pic_if.h"
@@ -581,9 +588,6 @@ intr_isrc_assign_cpu(void *arg, int cpu)
 	struct intr_irqsrc *isrc = arg;
 	int error;
 
-	if (isrc->isrc_dev != intr_irq_root_dev)
-		return (EINVAL);
-
 	mtx_lock(&isrc_table_lock);
 	if (cpu == NOCPU) {
 		CPU_ZERO(&isrc->isrc_cpu);
@@ -939,6 +943,21 @@ intr_resolve_irq(device_t dev, intptr_t xref, struct intr_map_data *data,
 	}
 }
 
+bool
+intr_is_per_cpu(struct resource *res)
+{
+	u_int res_id;
+	struct intr_irqsrc *isrc;
+
+	res_id = (u_int)rman_get_start(res);
+	isrc = intr_map_get_isrc(res_id);
+
+	if (isrc == NULL)
+		panic("Attempt to get isrc for non-active resource id: %u\n",
+		    res_id);
+	return ((isrc->isrc_flags & INTR_ISRCF_PPI) != 0);
+}
+
 int
 intr_activate_irq(device_t dev, struct resource *res)
 {
@@ -1290,6 +1309,7 @@ int
 intr_alloc_msi(device_t pci, device_t child, intptr_t xref, int count,
     int maxcount, int *irqs)
 {
+	struct iommu_domain *domain;
 	struct intr_irqsrc **isrc;
 	struct intr_pic *pic;
 	device_t pdev;
@@ -1304,6 +1324,14 @@ intr_alloc_msi(device_t pci, device_t child, intptr_t xref, int count,
 	    ("%s: Found a non-MSI controller: %s", __func__,
 	     device_get_name(pic->pic_dev)));
 
+	/*
+	 * If this is the first time we have used this context ask the
+	 * interrupt controller to map memory the msi source will need.
+	 */
+	err = MSI_IOMMU_INIT(pic->pic_dev, child, &domain);
+	if (err != 0)
+		return (err);
+
 	isrc = malloc(sizeof(*isrc) * count, M_INTRNG, M_WAITOK);
 	err = MSI_ALLOC_MSI(pic->pic_dev, child, count, maxcount, &pdev, isrc);
 	if (err != 0) {
@@ -1312,9 +1340,11 @@ intr_alloc_msi(device_t pci, device_t child, intptr_t xref, int count,
 	}
 
 	for (i = 0; i < count; i++) {
+		isrc[i]->isrc_iommu = domain;
 		msi = (struct intr_map_data_msi *)intr_alloc_map_data(
 		    INTR_MAP_DATA_MSI, sizeof(*msi), M_WAITOK | M_ZERO);
 		msi-> isrc = isrc[i];
+
 		irqs[i] = intr_map_irq(pic->pic_dev, xref,
 		    (struct intr_map_data *)msi);
 	}
@@ -1351,6 +1381,8 @@ intr_release_msi(device_t pci, device_t child, intptr_t xref, int count,
 		isrc[i] = msi->isrc;
 	}
 
+	MSI_IOMMU_DEINIT(pic->pic_dev, child);
+
 	err = MSI_RELEASE_MSI(pic->pic_dev, child, count, isrc);
 
 	for (i = 0; i < count; i++) {
@@ -1365,6 +1397,7 @@ intr_release_msi(device_t pci, device_t child, intptr_t xref, int count,
 int
 intr_alloc_msix(device_t pci, device_t child, intptr_t xref, int *irq)
 {
+	struct iommu_domain *domain;
 	struct intr_irqsrc *isrc;
 	struct intr_pic *pic;
 	device_t pdev;
@@ -1379,10 +1412,19 @@ intr_alloc_msix(device_t pci, device_t child, intptr_t xref, int *irq)
 	    ("%s: Found a non-MSI controller: %s", __func__,
 	     device_get_name(pic->pic_dev)));
 
+	/*
+	 * If this is the first time we have used this context ask the
+	 * interrupt controller to map memory the msi source will need.
+	 */
+	err = MSI_IOMMU_INIT(pic->pic_dev, child, &domain);
+	if (err != 0)
+		return (err);
+
 	err = MSI_ALLOC_MSIX(pic->pic_dev, child, &pdev, &isrc);
 	if (err != 0)
 		return (err);
 
+	isrc->isrc_iommu = domain;
 	msi = (struct intr_map_data_msi *)intr_alloc_map_data(
 		    INTR_MAP_DATA_MSI, sizeof(*msi), M_WAITOK | M_ZERO);
 	msi->isrc = isrc;
@@ -1417,6 +1459,8 @@ intr_release_msix(device_t pci, device_t child, intptr_t xref, int irq)
 		return (EINVAL);
 	}
 
+	MSI_IOMMU_DEINIT(pic->pic_dev, child);
+
 	err = MSI_RELEASE_MSIX(pic->pic_dev, child, isrc);
 	intr_unmap_irq(irq);
 
@@ -1444,6 +1488,12 @@ intr_map_msi(device_t pci, device_t child, intptr_t xref, int irq,
 		return (EINVAL);
 
 	err = MSI_MAP_MSI(pic->pic_dev, child, isrc, addr, data);
+
+#ifdef IOMMU
+	if (isrc->isrc_iommu != NULL)
+		iommu_translate_msi(isrc->isrc_iommu, addr);
+#endif
+
 	return (err);
 }
 

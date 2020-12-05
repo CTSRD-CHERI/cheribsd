@@ -149,7 +149,7 @@ struct nameicap_tracker {
 };
 
 /* Zone for cap mode tracker elements used for dotdot capability checks. */
-static uma_zone_t nt_zone;
+MALLOC_DEFINE(M_NAMEITRACKER, "namei_tracker", "namei tracking for dotdot");
 
 static void
 nameiinit(void *dummy __unused)
@@ -157,8 +157,6 @@ nameiinit(void *dummy __unused)
 
 	namei_zone = uma_zcreate("NAMEI", MAXPATHLEN, NULL, NULL, NULL, NULL,
 	    UMA_ALIGN_PTR, 0);
-	nt_zone = uma_zcreate("rentr", sizeof(struct nameicap_tracker),
-	    NULL, NULL, NULL, NULL, UMA_ALIGN_PTR, 0);
 	vfs_vector_op_register(&crossmp_vnodeops);
 	getnewvnode("crossmp", NULL, &crossmp_vnodeops, &vp_crossmp);
 }
@@ -190,7 +188,7 @@ nameicap_tracker_add(struct nameidata *ndp, struct vnode *dp)
 			return;
 		ndp->ni_lcf |= NI_LCF_BENEATH_LATCHED;
 	}
-	nt = uma_zalloc(nt_zone, M_WAITOK);
+	nt = malloc(sizeof(*nt), M_NAMEITRACKER, M_WAITOK);
 	vhold(dp);
 	nt->dp = dp;
 	TAILQ_INSERT_TAIL(&ndp->ni_cap_tracker, nt, nm_link);
@@ -206,7 +204,7 @@ nameicap_cleanup(struct nameidata *ndp, bool clean_latch)
 	TAILQ_FOREACH_SAFE(nt, &ndp->ni_cap_tracker, nm_link, nt1) {
 		TAILQ_REMOVE(&ndp->ni_cap_tracker, nt, nm_link);
 		vdrop(nt->dp);
-		uma_zfree(nt_zone, nt);
+		free(nt, M_NAMEITRACKER);
 	}
 	if (clean_latch && (ndp->ni_lcf & NI_LCF_LATCH) != 0) {
 		ndp->ni_lcf &= ~NI_LCF_LATCH;
@@ -502,6 +500,13 @@ namei(struct nameidata *ndp)
 	cnp = &ndp->ni_cnd;
 	td = cnp->cn_thread;
 #ifdef INVARIANTS
+	KASSERT((ndp->ni_debugflags & NAMEI_DBG_CALLED) == 0,
+	    ("%s: repeated call to namei without NDREINIT", __func__));
+	KASSERT(ndp->ni_debugflags == NAMEI_DBG_INITED,
+	    ("%s: bad debugflags %d", __func__, ndp->ni_debugflags));
+	ndp->ni_debugflags |= NAMEI_DBG_CALLED;
+	if (ndp->ni_startdir != NULL)
+		ndp->ni_debugflags |= NAMEI_DBG_HADSTARTDIR;
 	/*
 	 * For NDVALIDATE.
 	 *
@@ -511,6 +516,8 @@ namei(struct nameidata *ndp)
 	cnp->cn_origflags = cnp->cn_flags;
 #endif
 	ndp->ni_cnd.cn_cred = ndp->ni_cnd.cn_thread->td_ucred;
+	KASSERT(ndp->ni_resflags == 0, ("%s: garbage in ni_resflags: %x\n",
+	    __func__, ndp->ni_resflags));
 	KASSERT(cnp->cn_cred && td->td_proc, ("namei: bad cred/proc"));
 	KASSERT((cnp->cn_flags & NAMEI_INTERNAL_FLAGS) == 0,
 	    ("namei: unexpected flags: %" PRIx64 "\n",
@@ -1297,7 +1304,6 @@ int
 relookup(struct vnode *dvp, struct vnode **vpp, struct componentname *cnp)
 {
 	struct vnode *dp = NULL;		/* the directory we are searching */
-	int wantparent;			/* 1 => wantparent or lockparent flag */
 	int rdonly;			/* lookup read-only flag bit */
 	int error = 0;
 
@@ -1306,8 +1312,8 @@ relookup(struct vnode *dvp, struct vnode **vpp, struct componentname *cnp)
 	/*
 	 * Setup: break out flag bits into variables.
 	 */
-	wantparent = cnp->cn_flags & (LOCKPARENT|WANTPARENT);
-	KASSERT(wantparent, ("relookup: parent not wanted."));
+	KASSERT((cnp->cn_flags & (LOCKPARENT | WANTPARENT)) != 0,
+	    ("relookup: parent not wanted"));
 	rdonly = cnp->cn_flags & RDONLY;
 	cnp->cn_flags &= ~ISSYMLINK;
 	dp = dvp;
@@ -1398,13 +1404,8 @@ relookup(struct vnode *dvp, struct vnode **vpp, struct componentname *cnp)
 	/*
 	 * Set the parent lock/ref state to the requested state.
 	 */
-	if ((cnp->cn_flags & LOCKPARENT) == 0 && dvp != dp) {
-		if (wantparent)
-			VOP_UNLOCK(dvp);
-		else
-			vput(dvp);
-	} else if (!wantparent)
-		vrele(dvp);
+	if ((cnp->cn_flags & LOCKPARENT) == 0 && dvp != dp)
+		VOP_UNLOCK(dvp);
 	/*
 	 * Check for symbolic link
 	 */

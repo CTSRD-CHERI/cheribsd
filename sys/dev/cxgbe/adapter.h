@@ -749,6 +749,9 @@ struct sge_nm_rxq {
 	bus_dma_tag_t fl_desc_tag;
 	bus_dmamap_t fl_desc_map;
 	bus_addr_t fl_ba;
+
+	void *bb;		/* bit bucket for packets with nowhere to go. */
+	uma_zone_t bb_zone;
 };
 
 #define INVALID_NM_TXQ_CNTXT_ID ((u_int)(-1))
@@ -799,6 +802,8 @@ struct sge {
 	uint16_t iq_base;	/* first abs_id */
 	int eq_start;		/* first cntxt_id */
 	int eq_base;		/* first abs_id */
+	int iqmap_sz;
+	int eqmap_sz;
 	struct sge_iq **iqmap;	/* iq->cntxt_id to iq mapping */
 	struct sge_eq **eqmap;	/* eq->cntxt_id to eq mapping */
 

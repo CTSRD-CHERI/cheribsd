@@ -6,7 +6,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-// UNSUPPORTED: c++98, c++03, libcpp-no-rtti
+// UNSUPPORTED: c++03, libcpp-no-rtti
 
 // <scoped_allocator>
 

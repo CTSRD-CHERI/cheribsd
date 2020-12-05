@@ -25,7 +25,7 @@
 .\"
 .\" $FreeBSD$
 .\"
-.Dd August 3, 2020
+.Dd November 10, 2020
 .Dt PORTS 7
 .Os
 .Sh NAME
@@ -417,14 +417,7 @@ You can change all of these.
 Location of the ports tree.
 This is
 .Pa /usr/ports
-on
-.Fx
-and
-.Ox ,
-and
-.Pa /usr/pkgsrc
-on
-.Nx .
+by default.
 .It Va WRKDIRPREFIX
 Where to create any temporary files.
 Useful if
@@ -442,7 +435,10 @@ The unprivileged user must have write access to
 and
 .Va DISTDIR .
 The default is
-.Ql /usr/bin/su root -c
+.Ql /usr/bin/su root -c .
+Many users set it to
+.Ql /usr/local/bin/sudo -E sh -c
+for convenience.
 .It Va PACKAGES
 Used only for the
 .Cm package
@@ -513,9 +509,6 @@ Normally
 .Xr fetch 1 .
 .It Va FORCE_PKG_REGISTER
 If set, overwrite any existing package registration on the system.
-.It Va MOTIFLIB
-Location of
-.Pa "libXm\&." Ns Brq Pa a , Ns Pa so .
 .It Va INTERACTIVE
 If defined, only operate on a port if it requires interaction.
 .It Va BATCH
@@ -564,7 +557,7 @@ Porter's Handbook.
 If set, debugging symbols are installed for ports binaries.
 .It Va WITH_DEBUG_PORTS
 A list of origins for which to set
-.Va WITH_DEBUG_PORTS .
+.Va WITH_DEBUG .
 .It Va WITH_CCACHE_BUILD
 .Pq Vt bool
 If set, enables the use of
@@ -619,6 +612,25 @@ is going to be built with Python 3.7 support.)
 .Li # Ic cd /usr/ports/devel/py-pip
 .Li # Ic env FLAVOR=py37 make build
 .Ed
+.It Sy Example 4\&: No Setting Ports Options via Xr make.conf 5
+.Pp
+The following lines present various ways of configuring ports options via
+.Xr make.conf 5
+(as an alternative to, e.g., running
+.Dq Li make config ) :
+.Bd -literal -offset 2n
+# Enable NLS for all ports unless configured otherwise
+# using the options dialog.
+OPTIONS_SET=		NLS
+# Disable DOCS for all ports overriding the options set
+# via the options dialog.
+OPTIONS_UNSET_FORCE=	DOCS
+# Disable DOCS and EXAMPLES for the shells/zsh port.
+shells_zsh_UNSET=	DOCS EXAMPLES
+.Ed
+.Pp
+These and other options-related variables are documented in
+.Pa /usr/ports/Mk/bsd.options.mk .
 .El
 .Sh SEE ALSO
 .Xr make 1 ,

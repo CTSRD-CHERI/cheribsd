@@ -214,10 +214,9 @@ pagetables:
 #else
 	lla	s1, pagetable_l2
 #endif
-	srli	t4, s9, 21		/* Div physmem base by 2 MiB */
+	srli	t4, s9, L2_SHIFT	/* Div physmem base by 2 MiB */
 	li	t2, 512			/* Build 512 entries */
 	add	t3, t4, t2
-	li	t5, 0
 	li	t0, (PTE_KERN_CAP | PTE_X)
 1:
 	slli	t2, t4, PTE_PPN1_S	/* << PTE_PPN1_S */
@@ -547,7 +546,7 @@ initstack_end:
  * to execute.
  */
 #define	SIGCODE(sym)						\
-	.text; .globl sym; .type sym,@object; .align 4; sym:
+	.text; .globl sym; .type sym,@object; .align 4; sym: .cfi_startproc
 
 .option push
 #if __has_feature(capabilities)

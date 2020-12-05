@@ -499,7 +499,7 @@ mlx5e_media_status(struct ifnet *dev, struct ifmediareq *ifmr)
 	struct mlx5e_priv *priv = dev->if_softc;
 
 	ifmr->ifm_status = priv->media_status_last;
-	ifmr->ifm_active = priv->media_active_last |
+	ifmr->ifm_current = ifmr->ifm_active = priv->media_active_last |
 	    (priv->params.rx_pauseframe_control ? IFM_ETH_RXPAUSE : 0) |
 	    (priv->params.tx_pauseframe_control ? IFM_ETH_TXPAUSE : 0);
 
@@ -1898,7 +1898,7 @@ mlx5e_drain_sq(struct mlx5e_sq *sq)
 	    mdev->state != MLX5_DEVICE_STATE_INTERNAL_ERROR) {
 		mtx_unlock(&sq->lock);
 		msleep(1);
-		sq->cq.mcq.comp(&sq->cq.mcq);
+		sq->cq.mcq.comp(&sq->cq.mcq, NULL);
 		mtx_lock(&sq->lock);
 	}
 	mtx_unlock(&sq->lock);
@@ -1916,7 +1916,7 @@ mlx5e_drain_sq(struct mlx5e_sq *sq)
 	       mdev->state != MLX5_DEVICE_STATE_INTERNAL_ERROR) {
 		mtx_unlock(&sq->lock);
 		msleep(1);
-		sq->cq.mcq.comp(&sq->cq.mcq);
+		sq->cq.mcq.comp(&sq->cq.mcq, NULL);
 		mtx_lock(&sq->lock);
 	}
 	mtx_unlock(&sq->lock);
@@ -1989,6 +1989,7 @@ static int
 mlx5e_enable_cq(struct mlx5e_cq *cq, struct mlx5e_cq_param *param, int eq_ix)
 {
 	struct mlx5_core_cq *mcq = &cq->mcq;
+	u32 out[MLX5_ST_SZ_DW(create_cq_out)];
 	void *in;
 	void *cqc;
 	int inlen;
@@ -2017,7 +2018,7 @@ mlx5e_enable_cq(struct mlx5e_cq *cq, struct mlx5e_cq_param *param, int eq_ix)
 	    PAGE_SHIFT);
 	MLX5_SET64(cqc, cqc, dbr_addr, cq->wq_ctrl.db.dma);
 
-	err = mlx5_core_create_cq(cq->priv->mdev, mcq, in, inlen);
+	err = mlx5_core_create_cq(cq->priv->mdev, mcq, in, inlen, out, sizeof(out));
 
 	kvfree(in);
 
@@ -2228,7 +2229,7 @@ mlx5e_open_channel(struct mlx5e_priv *priv,
 
 	/* poll receive queue initially */
 	NET_EPOCH_ENTER(et);
-	c->rq.cq.mcq.comp(&c->rq.cq.mcq);
+	c->rq.cq.mcq.comp(&c->rq.cq.mcq, NULL);
 	NET_EPOCH_EXIT(et);
 
 	return (0);
@@ -3349,6 +3350,10 @@ mlx5e_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 			ifp->if_capenable ^= IFCAP_TXTLS4;
 		if (mask & IFCAP_TXTLS6)
 			ifp->if_capenable ^= IFCAP_TXTLS6;
+#ifdef RATELIMIT
+		if (mask & IFCAP_TXTLS_RTLMT)
+			ifp->if_capenable ^= IFCAP_TXTLS_RTLMT;
+#endif
 		if (mask & IFCAP_RXCSUM)
 			ifp->if_capenable ^= IFCAP_RXCSUM;
 		if (mask & IFCAP_RXCSUM_IPV6)
@@ -3800,7 +3805,7 @@ mlx5e_disable_rx_dma(struct mlx5e_channel *ch)
 	while (!mlx5_wq_ll_is_empty(&rq->wq)) {
 		msleep(1);
 		NET_EPOCH_ENTER(et);
-		rq->cq.mcq.comp(&rq->cq.mcq);
+		rq->cq.mcq.comp(&rq->cq.mcq, NULL);
 		NET_EPOCH_EXIT(et);
 	}
 
@@ -3833,7 +3838,7 @@ mlx5e_enable_rx_dma(struct mlx5e_channel *ch)
 	rq->enabled = 1;
 
 	NET_EPOCH_ENTER(et);
-	rq->cq.mcq.comp(&rq->cq.mcq);
+	rq->cq.mcq.comp(&rq->cq.mcq, NULL);
 	NET_EPOCH_EXIT(et);
 }
 
@@ -4122,7 +4127,7 @@ mlx5e_snd_tag_alloc(struct ifnet *ifp,
 #ifdef RATELIMIT
 	case IF_SND_TAG_TYPE_RATE_LIMIT:
 		return (mlx5e_rl_snd_tag_alloc(ifp, params, ppmt));
-#if defined(KERN_TLS) && defined(IF_SND_TAG_TYPE_TLS_RATE_LIMIT)
+#ifdef KERN_TLS
 	case IF_SND_TAG_TYPE_TLS_RATE_LIMIT:
 		return (mlx5e_tls_snd_tag_alloc(ifp, params, ppmt));
 #endif
@@ -4146,7 +4151,7 @@ mlx5e_snd_tag_modify(struct m_snd_tag *pmt, union if_snd_tag_modify_params *para
 #ifdef RATELIMIT
 	case IF_SND_TAG_TYPE_RATE_LIMIT:
 		return (mlx5e_rl_snd_tag_modify(pmt, params));
-#if defined(KERN_TLS) && defined(IF_SND_TAG_TYPE_TLS_RATE_LIMIT)
+#ifdef KERN_TLS
 	case IF_SND_TAG_TYPE_TLS_RATE_LIMIT:
 		return (mlx5e_tls_snd_tag_modify(pmt, params));
 #endif
@@ -4168,7 +4173,7 @@ mlx5e_snd_tag_query(struct m_snd_tag *pmt, union if_snd_tag_query_params *params
 #ifdef RATELIMIT
 	case IF_SND_TAG_TYPE_RATE_LIMIT:
 		return (mlx5e_rl_snd_tag_query(pmt, params));
-#if defined(KERN_TLS) && defined(IF_SND_TAG_TYPE_TLS_RATE_LIMIT)
+#ifdef KERN_TLS
 	case IF_SND_TAG_TYPE_TLS_RATE_LIMIT:
 		return (mlx5e_tls_snd_tag_query(pmt, params));
 #endif
@@ -4237,7 +4242,7 @@ mlx5e_snd_tag_free(struct m_snd_tag *pmt)
 	case IF_SND_TAG_TYPE_RATE_LIMIT:
 		mlx5e_rl_snd_tag_free(pmt);
 		break;
-#if defined(KERN_TLS) && defined(IF_SND_TAG_TYPE_TLS_RATE_LIMIT)
+#ifdef KERN_TLS
 	case IF_SND_TAG_TYPE_TLS_RATE_LIMIT:
 		mlx5e_tls_snd_tag_free(pmt);
 		break;
@@ -4254,6 +4259,23 @@ mlx5e_snd_tag_free(struct m_snd_tag *pmt)
 	default:
 		break;
 	}
+}
+
+static void
+mlx5e_ifm_add(struct mlx5e_priv *priv, int type)
+{
+	ifmedia_add(&priv->media, type | IFM_ETHER, 0, NULL);
+	ifmedia_add(&priv->media, type | IFM_ETHER |
+	    IFM_ETH_RXPAUSE | IFM_ETH_TXPAUSE, 0, NULL);
+	ifmedia_add(&priv->media, type | IFM_ETHER | IFM_ETH_RXPAUSE, 0, NULL);
+	ifmedia_add(&priv->media, type | IFM_ETHER | IFM_ETH_TXPAUSE, 0, NULL);
+	ifmedia_add(&priv->media, type | IFM_ETHER | IFM_FDX, 0, NULL);
+	ifmedia_add(&priv->media, type | IFM_ETHER | IFM_FDX |
+	    IFM_ETH_RXPAUSE, 0, NULL);
+	ifmedia_add(&priv->media, type | IFM_ETHER | IFM_FDX |
+	    IFM_ETH_TXPAUSE, 0, NULL);
+	ifmedia_add(&priv->media, type | IFM_ETHER | IFM_FDX |
+	    IFM_ETH_RXPAUSE | IFM_ETH_TXPAUSE, 0, NULL);
 }
 
 static void *
@@ -4320,7 +4342,9 @@ mlx5e_create_ifp(struct mlx5_core_dev *mdev)
 	ifp->if_capabilities |= IFCAP_HWSTATS | IFCAP_HWRXTSTMP;
 	ifp->if_capabilities |= IFCAP_NOMAP;
 	ifp->if_capabilities |= IFCAP_TXTLS4 | IFCAP_TXTLS6;
-	ifp->if_capabilities |= IFCAP_TXRTLMT;
+#ifdef RATELIMIT
+	ifp->if_capabilities |= IFCAP_TXRTLMT | IFCAP_TXTLS_RTLMT;
+#endif
 	ifp->if_snd_tag_alloc = mlx5e_snd_tag_alloc;
 	ifp->if_snd_tag_free = mlx5e_snd_tag_free;
 	ifp->if_snd_tag_modify = mlx5e_snd_tag_modify;
@@ -4426,8 +4450,7 @@ mlx5e_create_ifp(struct mlx5_core_dev *mdev)
 
 	/* Set default media status */
 	priv->media_status_last = IFM_AVALID;
-	priv->media_active_last = IFM_ETHER | IFM_AUTO |
-	    IFM_ETH_RXPAUSE | IFM_FDX;
+	priv->media_active_last = IFM_ETHER | IFM_AUTO | IFM_FDX;
 
 	/* setup default pauseframes configuration */
 	mlx5e_setup_pauseframes(priv);
@@ -4447,7 +4470,7 @@ mlx5e_create_ifp(struct mlx5_core_dev *mdev)
 		mlx5_en_err(ifp, "Query port media capability failed, %d\n", err);
 	}
 
-	ifmedia_init(&priv->media, IFM_IMASK | IFM_ETH_FMASK,
+	ifmedia_init(&priv->media, IFM_IMASK,
 	    mlx5e_media_change, mlx5e_media_status);
 
 	speeds_num = ext ? MLX5E_EXT_LINK_SPEEDS_NUMBER : MLX5E_LINK_SPEEDS_NUMBER;
@@ -4457,21 +4480,12 @@ mlx5e_create_ifp(struct mlx5_core_dev *mdev)
 			    mlx5e_mode_table[i][j];
 			if (media_entry.baudrate == 0)
 				continue;
-			if (MLX5E_PROT_MASK(i) & eth_proto_cap) {
-				ifmedia_add(&priv->media,
-				    media_entry.subtype |
-				    IFM_ETHER, 0, NULL);
-				ifmedia_add(&priv->media,
-				    media_entry.subtype |
-				    IFM_ETHER | IFM_FDX |
-				    IFM_ETH_RXPAUSE | IFM_ETH_TXPAUSE, 0, NULL);
-			}
+			if (MLX5E_PROT_MASK(i) & eth_proto_cap)
+				mlx5e_ifm_add(priv, media_entry.subtype);
 		}
 	}
 
-	ifmedia_add(&priv->media, IFM_ETHER | IFM_AUTO, 0, NULL);
-	ifmedia_add(&priv->media, IFM_ETHER | IFM_AUTO | IFM_FDX |
-	    IFM_ETH_RXPAUSE | IFM_ETH_TXPAUSE, 0, NULL);
+	mlx5e_ifm_add(priv, IFM_AUTO);
 
 	/* Set autoselect by default */
 	ifmedia_set(&priv->media, IFM_ETHER | IFM_AUTO | IFM_FDX |

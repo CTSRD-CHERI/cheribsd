@@ -1407,7 +1407,8 @@ domemstat_malloc(void)
 {
 	struct memory_type_list *mtlp;
 	struct memory_type *mtp;
-	int error, first, i;
+	size_t i, zones;
+	int error, first;
 
 	mtlp = memstat_mtl_alloc();
 	if (mtlp == NULL) {
@@ -1433,13 +1434,14 @@ domemstat_malloc(void)
 	}
 	xo_open_container("malloc-statistics");
 #if __has_feature(capabilities)
-	xo_emit("{T:/%13s} {T:/%5s} {T:/%6s} {T:/%7s} {T:/%8s} {T:/%8s}  {T:Size(s)}\n",
-	    "Type", "InUse", "MemUse", "HighUse", "Requests", "ReservUse");
+	xo_emit("{T:/%13s} {T:/%5s} {T:/%6s} {T:/%8s} {T:/%8s}  {T:Size(s)}\n",
+	    "Type", "InUse", "MemUse", "Requests", "ReservUse");
 #else
-	xo_emit("{T:/%13s} {T:/%5s} {T:/%6s} {T:/%7s} {T:/%8s}  {T:Size(s)}\n",
-	    "Type", "InUse", "MemUse", "HighUse", "Requests");
+	xo_emit("{T:/%13s} {T:/%5s} {T:/%6s} {T:/%8s}  {T:Size(s)}\n",
+	    "Type", "InUse", "MemUse", "Requests");
 #endif
 	xo_open_list("memory");
+	zones = memstat_malloc_zone_get_count();
 	for (mtp = memstat_mtl_first(mtlp); mtp != NULL;
 	    mtp = memstat_mtl_next(mtp)) {
 		if (memstat_get_numallocs(mtp) == 0 &&
@@ -1456,19 +1458,18 @@ domemstat_malloc(void)
 		    ((uintmax_t)memstat_get_reserved_bytes(mtp) + 1023) / 1024);
 #else
 		xo_emit("{k:type/%13s/%s} {:in-use/%5ju} "
-		    "{:memory-use/%5ju}{U:K} {:high-use/%7s} "
-		    "{:requests/%8ju}  ",
+		    "{:memory-use/%5ju}{U:K} {:requests/%8ju}  ",
 		    memstat_get_name(mtp), (uintmax_t)memstat_get_count(mtp),
-		    ((uintmax_t)memstat_get_bytes(mtp) + 1023) / 1024, "-",
+		    ((uintmax_t)memstat_get_bytes(mtp) + 1023) / 1024,
 		    (uintmax_t)memstat_get_numallocs(mtp));
 #endif
 		first = 1;
 		xo_open_list("size");
-		for (i = 0; i < 32; i++) {
-			if (memstat_get_sizemask(mtp) & (1 << i)) {
+		for (i = 0; i < zones; i++) {
+			if (memstat_malloc_zone_used(mtp, i)) {
 				if (!first)
 					xo_emit(",");
-				xo_emit("{l:size/%d}", 1 << (i + 4));
+				xo_emit("{l:size/%d}", memstat_malloc_zone_get_size(i));
 				first = 0;
 			}
 		}
@@ -1513,7 +1514,7 @@ domemstat_zone(void)
 	}
 	xo_open_container("memory-zone-statistics");
 	xo_emit("{T:/%-20s} {T:/%6s} {T:/%6s} {T:/%8s} {T:/%8s} {T:/%8s} {T:/%8s}"
-	    "{T:/%4s} {T:/%4s}\n\n", "ITEM", "SIZE",
+	    "{T:/%4s} {T:/%4s}\n", "ITEM", "SIZE",
 	    "LIMIT", "USED", "FREE", "REQ", "FAIL", "SLEEP", "XDOMAIN");
 	xo_open_list("zone");
 	for (mtp = memstat_mtl_first(mtlp); mtp != NULL;
@@ -1539,7 +1540,6 @@ domemstat_zone(void)
 	memstat_mtl_free(mtlp);
 	xo_close_list("zone");
 	xo_close_container("memory-zone-statistics");
-	xo_emit("\n");
 }
 
 static void

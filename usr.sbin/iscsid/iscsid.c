@@ -2,7 +2,6 @@
  * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
  *
  * Copyright (c) 2012 The FreeBSD Foundation
- * All rights reserved.
  *
  * This software was developed by Edward Tomasz Napierala under sponsorship
  * from the FreeBSD Foundation.
@@ -172,6 +171,7 @@ connection_new(int iscsi_fd, const struct iscsi_daemon_request *request)
 	/*
 	 * Default values, from RFC 3720, section 12.
 	 */
+	conn->conn_protocol_level = 0;
 	conn->conn_header_digest = CONN_DIGEST_NONE;
 	conn->conn_data_digest = CONN_DIGEST_NONE;
 	conn->conn_initial_r2t = true;
@@ -296,6 +296,25 @@ connection_new(int iscsi_fd, const struct iscsi_daemon_request *request)
 				    from_addr);
 		}
 	}
+	if (conn->conn_conf.isc_pcp != -1) {
+		int pcp = conn->conn_conf.isc_pcp;
+		if (to_ai->ai_family == AF_INET) {
+			if (setsockopt(conn->conn_socket,
+			    IPPROTO_IP, IP_VLAN_PCP,
+			    &pcp, sizeof(pcp)) == -1)
+				log_warn("setsockopt(IP_VLAN_PCP) "
+				    "failed for %s",
+				    from_addr);
+		} else
+		if (to_ai->ai_family == AF_INET6) {
+			if (setsockopt(conn->conn_socket,
+			    IPPROTO_IPV6, IPV6_VLAN_PCP,
+			    &pcp, sizeof(pcp)) == -1)
+				log_warn("setsockopt(IPV6_VLAN_PCP) "
+				    "failed for %s",
+				    from_addr);
+		}
+	}
 	if (from_ai != NULL) {
 		error = bind(conn->conn_socket, from_ai->ai_addr,
 		    from_ai->ai_addrlen);
@@ -329,6 +348,7 @@ handoff(struct connection *conn)
 	    sizeof(idh.idh_target_alias));
 	idh.idh_tsih = conn->conn_tsih;
 	idh.idh_statsn = conn->conn_statsn;
+	idh.idh_protocol_level = conn->conn_protocol_level;
 	idh.idh_header_digest = conn->conn_header_digest;
 	idh.idh_data_digest = conn->conn_data_digest;
 	idh.idh_initial_r2t = conn->conn_initial_r2t;

@@ -36,6 +36,80 @@
 #   xargs -n1 | sort | uniq -d;
 # done
 
+# 20201124: ping6(8) was merged into ping(8)
+OLD_FILES+=usr/lib/debug/sbin/ping6.debug
+OLD_FILES+=usr/share/man/man8/ping6.8.gz
+OLD_FILES+=usr/tests/sbin/ping6/Kyuafile
+OLD_FILES+=usr/tests/sbin/ping6/ping6_c1_s8_t1.out
+OLD_FILES+=usr/tests/sbin/ping6/ping6_test
+OLD_DIRS+=usr/tests/sbin/ping6
+
+# 20201025: Remove cal data files
+OLD_FILES+=usr/share/calendar/calendar.all
+OLD_FILES+=usr/share/calendar/calendar.australia
+OLD_FILES+=usr/share/calendar/calendar.birthday
+OLD_FILES+=usr/share/calendar/calendar.brazilian
+OLD_FILES+=usr/share/calendar/calendar.christian
+OLD_FILES+=usr/share/calendar/calendar.computer
+OLD_FILES+=usr/share/calendar/calendar.croatian
+OLD_FILES+=usr/share/calendar/calendar.dutch
+OLD_FILES+=usr/share/calendar/calendar.french
+OLD_FILES+=usr/share/calendar/calendar.german
+OLD_FILES+=usr/share/calendar/calendar.history
+OLD_FILES+=usr/share/calendar/calendar.holiday
+OLD_FILES+=usr/share/calendar/calendar.hungarian
+OLD_FILES+=usr/share/calendar/calendar.judaic
+OLD_FILES+=usr/share/calendar/calendar.lotr
+OLD_FILES+=usr/share/calendar/calendar.music
+OLD_FILES+=usr/share/calendar/calendar.newzealand
+OLD_FILES+=usr/share/calendar/calendar.russian
+OLD_FILES+=usr/share/calendar/calendar.southafrica
+OLD_FILES+=usr/share/calendar/calendar.ukrainian
+OLD_FILES+=usr/share/calendar/calendar.usholiday
+OLD_FILES+=usr/share/calendar/calendar.world
+OLD_FILES+=usr/share/calendar/de_AT.ISO_8859-15/calendar.feiertag
+OLD_FILES+=usr/share/calendar/de_DE.ISO8859-1/calendar.all
+OLD_FILES+=usr/share/calendar/de_DE.ISO8859-1/calendar.feiertag
+OLD_FILES+=usr/share/calendar/de_DE.ISO8859-1/calendar.geschichte
+OLD_FILES+=usr/share/calendar/de_DE.ISO8859-1/calendar.kirche
+OLD_FILES+=usr/share/calendar/de_DE.ISO8859-1/calendar.literatur
+OLD_FILES+=usr/share/calendar/de_DE.ISO8859-1/calendar.musik
+OLD_FILES+=usr/share/calendar/de_DE.ISO8859-1/calendar.wissenschaft
+OLD_FILES+=usr/share/calendar/fr_FR.ISO8859-1/calendar.all
+OLD_FILES+=usr/share/calendar/fr_FR.ISO8859-1/calendar.fetes
+OLD_FILES+=usr/share/calendar/fr_FR.ISO8859-1/calendar.french
+OLD_FILES+=usr/share/calendar/fr_FR.ISO8859-1/calendar.jferies
+OLD_FILES+=usr/share/calendar/fr_FR.ISO8859-1/calendar.proverbes
+OLD_FILES+=usr/share/calendar/hr_HR.ISO8859-2/calendar.all
+OLD_FILES+=usr/share/calendar/hr_HR.ISO8859-2/calendar.praznici
+OLD_FILES+=usr/share/calendar/hu_HU.ISO8859-2/calendar.all
+OLD_FILES+=usr/share/calendar/hu_HU.ISO8859-2/calendar.nevnapok
+OLD_FILES+=usr/share/calendar/hu_HU.ISO8859-2/calendar.unnepek
+OLD_FILES+=usr/share/calendar/pt_BR.ISO8859-1/calendar.all
+OLD_FILES+=usr/share/calendar/pt_BR.ISO8859-1/calendar.commemorative
+OLD_FILES+=usr/share/calendar/pt_BR.ISO8859-1/calendar.holidays
+OLD_FILES+=usr/share/calendar/pt_BR.ISO8859-1/calendar.mcommemorative
+OLD_FILES+=usr/share/calendar/pt_BR.UTF-8/calendar.all
+OLD_FILES+=usr/share/calendar/pt_BR.UTF-8/calendar.commemorative
+OLD_FILES+=usr/share/calendar/pt_BR.UTF-8/calendar.holidays
+OLD_FILES+=usr/share/calendar/pt_BR.UTF-8/calendar.mcommemorative
+OLD_FILES+=usr/share/calendar/ru_RU.KOI8-R/calendar.all
+OLD_FILES+=usr/share/calendar/ru_RU.KOI8-R/calendar.common
+OLD_FILES+=usr/share/calendar/ru_RU.KOI8-R/calendar.holiday
+OLD_FILES+=usr/share/calendar/ru_RU.KOI8-R/calendar.military
+OLD_FILES+=usr/share/calendar/ru_RU.KOI8-R/calendar.orthodox
+OLD_FILES+=usr/share/calendar/ru_RU.KOI8-R/calendar.pagan
+OLD_FILES+=usr/share/calendar/ru_RU.UTF-8/calendar.all
+OLD_FILES+=usr/share/calendar/ru_RU.UTF-8/calendar.common
+OLD_FILES+=usr/share/calendar/ru_RU.UTF-8/calendar.holiday
+OLD_FILES+=usr/share/calendar/ru_RU.UTF-8/calendar.military
+OLD_FILES+=usr/share/calendar/ru_RU.UTF-8/calendar.orthodox
+OLD_FILES+=usr/share/calendar/ru_RU.UTF-8/calendar.pagan
+OLD_FILES+=usr/share/calendar/uk_UA.KOI8-U/calendar.all
+OLD_FILES+=usr/share/calendar/uk_UA.KOI8-U/calendar.holiday
+OLD_FILES+=usr/share/calendar/uk_UA.KOI8-U/calendar.misc
+OLD_FILES+=usr/share/calendar/uk_UA.KOI8-U/calendar.orthodox
+
 # 20201004: logo files renamed to type-agnostic gfx-*.lua
 OLD_FILES+=boot/lua/logo-beastie.lua
 OLD_FILES+=boot/lua/logo-beastiebw.lua
@@ -848,9 +922,9 @@ OLD_FILES+=usr/share/man/man1/gdbserver.1.gz
 OLD_FILES+=usr/share/man/man1/kgdb.1.gz
 
 # 20200327: OCF refactoring
-OLD_FILES+=usr/share/man/man9/crypto_find_driver.9
-OLD_FILES+=usr/share/man/man9/crypto_register.9
-OLD_FILES+=usr/share/man/man9/crypto_unregister.9
+OLD_FILES+=usr/share/man/man9/crypto_find_driver.9.gz
+OLD_FILES+=usr/share/man/man9/crypto_register.9.gz
+OLD_FILES+=usr/share/man/man9/crypto_unregister.9.gz
 
 # 20200323: INTERNALLIB don't install headers anymore
 OLD_FILES+=usr/include/libelftc.h

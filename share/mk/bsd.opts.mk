@@ -124,7 +124,7 @@ MK_CLANG:=	no
 .endif
 
 .if ${MK_INIT_ALL_PATTERN} == "yes" && ${MK_INIT_ALL_ZERO} == "yes"
-.error WITH_INIT_ALL_PATTERN and WITH_INIT_ALL_ZERO are mutually exclusive.
+.warning WITH_INIT_ALL_PATTERN and WITH_INIT_ALL_ZERO are mutually exclusive.
 .endif
 
 #

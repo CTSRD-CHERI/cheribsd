@@ -43,119 +43,29 @@ __FBSDID("$FreeBSD$");
 /* DTrace init */
 LIN_SDT_PROVIDER_DECLARE(LINUX_DTRACE);
 
-UNIMPLEMENTED(afs_syscall);
 UNIMPLEMENTED(break);
-UNIMPLEMENTED(create_module);	/* Added in Linux 1.0 removed in 2.6. */
 UNIMPLEMENTED(ftime);
-UNIMPLEMENTED(get_kernel_syms);	/* Added in Linux 1.0 removed in 2.6. */
-UNIMPLEMENTED(getpmsg);
 UNIMPLEMENTED(gtty);
 UNIMPLEMENTED(stty);
 UNIMPLEMENTED(lock);
 UNIMPLEMENTED(mpx);
-UNIMPLEMENTED(nfsservctl);	/* Added in Linux 2.2 removed in 3.1. */
 UNIMPLEMENTED(prof);
 UNIMPLEMENTED(profil);
-UNIMPLEMENTED(putpmsg);
-UNIMPLEMENTED(query_module);	/* Added in Linux 2.2 removed in 2.6. */
 UNIMPLEMENTED(ulimit);
-UNIMPLEMENTED(vserver);
 
 DUMMY(stime);
 DUMMY(olduname);
 DUMMY(uname);
-DUMMY(vhangup);
-DUMMY(swapoff);
-DUMMY(adjtimex);
-DUMMY(init_module);
-DUMMY(delete_module);
-DUMMY(quotactl);
 DUMMY(bdflush);
-DUMMY(sysfs);
-DUMMY(setfsuid);
-DUMMY(setfsgid);
-DUMMY(pivot_root);
 DUMMY(ptrace);
-DUMMY(lookup_dcookie);
-DUMMY(remap_file_pages);
-DUMMY(mbind);
-DUMMY(get_mempolicy);
-DUMMY(set_mempolicy);
 DUMMY(mq_open);
 DUMMY(mq_unlink);
 DUMMY(mq_timedsend);
 DUMMY(mq_timedreceive);
 DUMMY(mq_notify);
 DUMMY(mq_getsetattr);
-DUMMY(kexec_load);
-/* Linux 2.6.11: */
-DUMMY(add_key);
-DUMMY(request_key);
-DUMMY(keyctl);
-/* Linux 2.6.13: */
-DUMMY(ioprio_set);
-DUMMY(ioprio_get);
-DUMMY(inotify_init);
-DUMMY(inotify_add_watch);
-DUMMY(inotify_rm_watch);
-/* Linux 2.6.16: */
-DUMMY(migrate_pages);
-DUMMY(unshare);
-/* Linux 2.6.17: */
-DUMMY(tee);
-DUMMY(vmsplice);
-/* Linux 2.6.18: */
-DUMMY(move_pages);
-/* Linux 2.6.22: */
-DUMMY(signalfd);
-/* Linux 2.6.27: */
-DUMMY(signalfd4);
-DUMMY(inotify_init1);
-/* Linux 2.6.31: */
-DUMMY(perf_event_open);
-/* Linux 2.6.36: */
-DUMMY(fanotify_init);
-DUMMY(fanotify_mark);
-/* Linux 2.6.39: */
-DUMMY(name_to_handle_at);
-DUMMY(open_by_handle_at);
-DUMMY(clock_adjtime);
-/* Linux 3.0: */
-DUMMY(setns);
-/* Linux 3.2: */
-DUMMY(process_vm_readv);
-DUMMY(process_vm_writev);
-/* Linux 3.5: */
-DUMMY(kcmp);
-/* Linux 3.8: */
-DUMMY(finit_module);
-DUMMY(sched_setattr);
-DUMMY(sched_getattr);
-/* Linux 3.17: */
-DUMMY(seccomp);
-/* Linux 3.18: */
-DUMMY(bpf);
-/* Linux 3.19: */
-DUMMY(execveat);
-/* Linux 4.2: */
-DUMMY(userfaultfd);
-/* Linux 4.3: */
-DUMMY(membarrier);
-/* Linux 4.4: */
-DUMMY(mlock2);
-/* Linux 4.6: */
-DUMMY(preadv2);
-DUMMY(pwritev2);
-/* Linux 4.8: */
-DUMMY(pkey_mprotect);
-DUMMY(pkey_alloc);
-DUMMY(pkey_free);
 /* Linux 4.11: */
-DUMMY(statx);
 DUMMY(arch_prctl);
-/* Linux 4.18: */
-DUMMY(io_pgetevents);
-DUMMY(rseq);
 /* Linux 5.0: */
 DUMMY(clock_gettime64);
 DUMMY(clock_settime64);
@@ -177,28 +87,3 @@ DUMMY(semtimedop_time64);
 DUMMY(rt_sigtimedwait_time64);
 DUMMY(futex_time64);
 DUMMY(sched_rr_get_interval_time64);
-DUMMY(pidfd_send_signal);
-DUMMY(io_uring_setup);
-DUMMY(io_uring_enter);
-DUMMY(io_uring_register);
-
-#define DUMMY_XATTR(s)						\
-int								\
-linux_ ## s ## xattr(						\
-    struct thread *td, struct linux_ ## s ## xattr_args *arg)	\
-{								\
-								\
-	return (EOPNOTSUPP);					\
-}
-DUMMY_XATTR(set);
-DUMMY_XATTR(lset);
-DUMMY_XATTR(fset);
-DUMMY_XATTR(get);
-DUMMY_XATTR(lget);
-DUMMY_XATTR(fget);
-DUMMY_XATTR(list);
-DUMMY_XATTR(llist);
-DUMMY_XATTR(flist);
-DUMMY_XATTR(remove);
-DUMMY_XATTR(lremove);
-DUMMY_XATTR(fremove);

@@ -1270,7 +1270,7 @@ vopunlock_exit:
  * attributes stripped.
  */
 void
-ufs_extattr_vnode_inactive(struct vnode *vp, struct thread *td)
+ufs_extattr_vnode_inactive(struct vnode *vp)
 {
 	struct ufs_extattr_list_entry *uele;
 	struct mount *mp = vp->v_mount;
@@ -1293,7 +1293,7 @@ ufs_extattr_vnode_inactive(struct vnode *vp, struct thread *td)
 
 	LIST_FOREACH(uele, &ump->um_extattr.uepm_list, uele_entries)
 		ufs_extattr_rm(vp, uele->uele_attrnamespace,
-		    uele->uele_attrname, NULL, td);
+		    uele->uele_attrname, NULL, curthread);
 
 	ufs_extattr_uepm_unlock(ump);
 }

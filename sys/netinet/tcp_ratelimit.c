@@ -464,19 +464,14 @@ rl_attach_txrtlmt(struct ifnet *ifp,
 		.rate_limit.flags = M_NOWAIT,
 	};
 
-	if (ifp->if_snd_tag_alloc == NULL) {
-		error = EOPNOTSUPP;
-	} else {
-		error = ifp->if_snd_tag_alloc(ifp, &params, tag);
+	error = m_snd_tag_alloc(ifp, &params, tag);
 #ifdef INET
-		if (error == 0) {
-			if_ref((*tag)->ifp);
-			counter_u64_add(rate_limit_set_ok, 1);
-			counter_u64_add(rate_limit_active, 1);
-		} else
-			counter_u64_add(rate_limit_alloc_fail, 1);
+	if (error == 0) {
+		counter_u64_add(rate_limit_set_ok, 1);
+		counter_u64_add(rate_limit_active, 1);
+	} else if (error != EOPNOTSUPP)
+		counter_u64_add(rate_limit_alloc_fail, 1);
 #endif
-	}
 	return (error);
 }
 
@@ -1015,13 +1010,7 @@ rt_find_real_interface(struct ifnet *ifp, struct inpcb *inp, int *error)
 #else
 	params.rate_limit.hdr.flowtype = M_HASHTYPE_OPAQUE_HASH;
 #endif
-	tag = NULL;
-	if (ifp->if_snd_tag_alloc) {
-		if (error)
-			*error = ENODEV;
-		return (NULL);
-	}
-	err = ifp->if_snd_tag_alloc(ifp, &params, &tag);
+	err = m_snd_tag_alloc(ifp, &params, &tag);
 	if (err) {
 		/* Failed to setup a tag? */
 		if (error)
@@ -1029,7 +1018,7 @@ rt_find_real_interface(struct ifnet *ifp, struct inpcb *inp, int *error)
 		return (NULL);
 	}
 	tifp = tag->ifp;
-	tifp->if_snd_tag_free(tag);
+	m_snd_tag_rele(tag);
 	return (tifp);
 }
 
@@ -1162,7 +1151,6 @@ static void
 tcp_rl_ifnet_departure(void *arg __unused, struct ifnet *ifp)
 {
 	struct tcp_rate_set *rs, *nrs;
-	struct ifnet *tifp;
 	int i;
 
 	mtx_lock(&rs_mtx);
@@ -1174,8 +1162,7 @@ tcp_rl_ifnet_departure(void *arg __unused, struct ifnet *ifp)
 			rs->rs_flags |= RS_IS_DEAD;
 			for (i = 0; i < rs->rs_rate_cnt; i++) {
 				if (rs->rs_rlt[i].flags & HDWRPACE_TAGPRESENT) {
-					tifp = rs->rs_rlt[i].tag->ifp;
-					in_pcbdetach_tag(tifp, rs->rs_rlt[i].tag);
+					in_pcbdetach_tag(rs->rs_rlt[i].tag);
 					rs->rs_rlt[i].tag = NULL;
 				}
 				rs->rs_rlt[i].flags = HDWRPACE_IFPDEPARTED;
@@ -1192,7 +1179,6 @@ static void
 tcp_rl_shutdown(void *arg __unused, int howto __unused)
 {
 	struct tcp_rate_set *rs, *nrs;
-	struct ifnet *tifp;
 	int i;
 
 	mtx_lock(&rs_mtx);
@@ -1202,8 +1188,7 @@ tcp_rl_shutdown(void *arg __unused, int howto __unused)
 		rs->rs_flags |= RS_IS_DEAD;
 		for (i = 0; i < rs->rs_rate_cnt; i++) {
 			if (rs->rs_rlt[i].flags & HDWRPACE_TAGPRESENT) {
-				tifp = rs->rs_rlt[i].tag->ifp;
-				in_pcbdetach_tag(tifp, rs->rs_rlt[i].tag);
+				in_pcbdetach_tag(rs->rs_rlt[i].tag);
 				rs->rs_rlt[i].tag = NULL;
 			}
 			rs->rs_rlt[i].flags = HDWRPACE_IFPDEPARTED;
@@ -1219,6 +1204,11 @@ tcp_set_pacing_rate(struct tcpcb *tp, struct ifnet *ifp,
     uint64_t bytes_per_sec, int flags, int *error)
 {
 	const struct tcp_hwrate_limit_table *rte;
+#ifdef KERN_TLS
+	struct ktls_session *tls;
+#endif
+
+	INP_WLOCK_ASSERT(tp->t_inpcb);
 
 	if (tp->t_inpcb->inp_snd_tag == NULL) {
 		/*
@@ -1231,17 +1221,30 @@ tcp_set_pacing_rate(struct tcpcb *tp, struct ifnet *ifp,
 			return (NULL);
 		}
 #ifdef KERN_TLS
+		tls = NULL;
 		if (tp->t_inpcb->inp_socket->so_snd.sb_flags & SB_TLS_IFNET) {
-			/*
-			 * We currently can't do both TLS and hardware
-			 * pacing
-			 */
-			if (error)
-				*error = EINVAL;
-			return (NULL);
+			tls = tp->t_inpcb->inp_socket->so_snd.sb_tls_info;
+
+			if ((ifp->if_capenable & IFCAP_TXTLS_RTLMT) == 0 ||
+			    tls->mode != TCP_TLS_MODE_IFNET) {
+				if (error)
+					*error = ENODEV;
+				return (NULL);
+			}
 		}
 #endif
 		rte = rt_setup_rate(tp->t_inpcb, ifp, bytes_per_sec, flags, error);
+#ifdef KERN_TLS
+		if (rte != NULL && tls != NULL && tls->snd_tag != NULL) {
+			/*
+			 * Fake a route change error to reset the TLS
+			 * send tag.  This will convert the existing
+			 * tag to a TLS ratelimit tag.
+			 */
+			MPASS(tls->snd_tag->type == IF_SND_TAG_TYPE_TLS);
+			ktls_output_eagain(tp->t_inpcb, tls);
+		}
+#endif
 	} else {
 		/*
 		 * We are modifying a rate, wrong interface?
@@ -1250,6 +1253,7 @@ tcp_set_pacing_rate(struct tcpcb *tp, struct ifnet *ifp,
 			*error = EINVAL;
 		rte = NULL;
 	}
+	tp->t_pacing_rate = rte->rate;
 	*error = 0;
 	return (rte);
 }
@@ -1261,11 +1265,39 @@ tcp_chg_pacing_rate(const struct tcp_hwrate_limit_table *crte,
 {
 	const struct tcp_hwrate_limit_table *nrte;
 	const struct tcp_rate_set *rs;
+#ifdef KERN_TLS
+	struct ktls_session *tls = NULL;
+#endif
 	int is_indirect = 0;
 	int err;
 
-	if ((tp->t_inpcb->inp_snd_tag == NULL) ||
-	    (crte == NULL)) {
+	INP_WLOCK_ASSERT(tp->t_inpcb);
+
+	if (crte == NULL) {
+		/* Wrong interface */
+		if (error)
+			*error = EINVAL;
+		return (NULL);
+	}
+
+#ifdef KERN_TLS
+	if (tp->t_inpcb->inp_socket->so_snd.sb_flags & SB_TLS_IFNET) {
+		tls = tp->t_inpcb->inp_socket->so_snd.sb_tls_info;
+		MPASS(tls->mode == TCP_TLS_MODE_IFNET);
+		if (tls->snd_tag != NULL &&
+		    tls->snd_tag->type != IF_SND_TAG_TYPE_TLS_RATE_LIMIT) {
+			/*
+			 * NIC probably doesn't support ratelimit TLS
+			 * tags if it didn't allocate one when an
+			 * existing rate was present, so ignore.
+			 */
+			if (error)
+				*error = EOPNOTSUPP;
+			return (NULL);
+		}
+	}
+#endif
+	if (tp->t_inpcb->inp_snd_tag == NULL) {
 		/* Wrong interface */
 		if (error)
 			*error = EINVAL;
@@ -1322,7 +1354,12 @@ re_rate:
 		return (NULL);
 	}
 	/* Change rates to our new entry */
-	err = in_pcbmodify_txrtlmt(tp->t_inpcb, nrte->rate);
+#ifdef KERN_TLS
+	if (tls != NULL)
+		err = ktls_modify_txrtlmt(tls, nrte->rate);
+	else
+#endif
+		err = in_pcbmodify_txrtlmt(tp->t_inpcb, nrte->rate);
 	if (err) {
 		if (error)
 			*error = err;
@@ -1330,6 +1367,7 @@ re_rate:
 	}
 	if (error)
 		*error = 0;
+	tp->t_pacing_rate = nrte->rate;
 	return (nrte);
 }
 
@@ -1340,6 +1378,9 @@ tcp_rel_pacing_rate(const struct tcp_hwrate_limit_table *crte, struct tcpcb *tp)
 	struct tcp_rate_set *rs;
 	uint64_t pre;
 
+	INP_WLOCK_ASSERT(tp->t_inpcb);
+
+	tp->t_pacing_rate = -1;
 	crs = crte->ptbl;
 	/*
 	 * Now we must break the const
@@ -1356,6 +1397,13 @@ tcp_rel_pacing_rate(const struct tcp_hwrate_limit_table *crte, struct tcpcb *tp)
 			rs_defer_destroy(rs);
 		mtx_unlock(&rs_mtx);
 	}
+
+	/*
+	 * XXX: If this connection is using ifnet TLS, should we
+	 * switch it to using an unlimited rate, or perhaps use
+	 * ktls_output_eagain() to reset the send tag to a plain
+	 * TLS tag?
+	 */
 	in_pcbdetach_txrtlmt(tp->t_inpcb);
 }
 

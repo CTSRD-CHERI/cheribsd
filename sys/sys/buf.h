@@ -575,7 +575,7 @@ void	vfs_bio_set_flags(struct buf *bp, int ioflags);
 void	vfs_bio_set_valid(struct buf *, int base, int size);
 void	vfs_busy_pages(struct buf *, int clear_modify);
 void	vfs_unbusy_pages(struct buf *);
-int	vmapbuf(struct buf *, void * __capability, int);
+int	vmapbuf(struct buf *, void * __capability, size_t, int);
 void	vunmapbuf(struct buf *);
 void	brelvp(struct buf *);
 void	bgetvp(struct vnode *, struct buf *);

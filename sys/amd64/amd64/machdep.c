@@ -95,14 +95,15 @@ __FBSDID("$FreeBSD$");
 #include <sys/vmmeter.h>
 
 #include <vm/vm.h>
+#include <vm/vm_param.h>
 #include <vm/vm_extern.h>
 #include <vm/vm_kern.h>
 #include <vm/vm_page.h>
 #include <vm/vm_map.h>
 #include <vm/vm_object.h>
 #include <vm/vm_pager.h>
-#include <vm/vm_param.h>
 #include <vm/vm_phys.h>
+#include <vm/vm_dumpset.h>
 
 #ifdef DDB
 #ifndef KDB
@@ -669,10 +670,10 @@ cpu_setregs(void)
 static struct gate_descriptor idt0[NIDT];
 struct gate_descriptor *idt = &idt0[0];	/* interrupt descriptor table */
 
-static char dblfault_stack[PAGE_SIZE] __aligned(16);
-static char mce0_stack[PAGE_SIZE] __aligned(16);
-static char nmi0_stack[PAGE_SIZE] __aligned(16);
-static char dbg0_stack[PAGE_SIZE] __aligned(16);
+static char dblfault_stack[DBLFAULT_STACK_SIZE] __aligned(16);
+static char mce0_stack[MCE_STACK_SIZE] __aligned(16);
+static char nmi0_stack[NMI_STACK_SIZE] __aligned(16);
+static char dbg0_stack[DBG_STACK_SIZE] __aligned(16);
 CTASSERT(sizeof(struct nmi_pcpu) == 16);
 
 /*
@@ -1858,8 +1859,7 @@ hammer_time(u_int64_t modulep, u_int64_t physfree)
 	 * output is required. If it's grossly incorrect the kernel will never
 	 * make it this far.
 	 */
-	if ((boothowto & RB_VERBOSE) &&
-	    getenv_is_true("debug.dump_modinfo_at_boot"))
+	if (getenv_is_true("debug.dump_modinfo_at_boot"))
 		preload_dump();
 
 #ifdef DEV_ISA
@@ -1926,8 +1926,6 @@ hammer_time(u_int64_t modulep, u_int64_t physfree)
         env = kern_getenv("kernelname");
 	if (env != NULL)
 		strlcpy(kernelname, env, sizeof(kernelname));
-
-	cpu_probe_amdc1e();
 
 	kcsan_cpu_init(0);
 

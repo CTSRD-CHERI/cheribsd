@@ -28,17 +28,19 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
+ *
+ * $FreeBSD$
  */
 
 #include <sys/cdefs.h>
 
-	.section mfs, "a", @progbits
+	.section mfs, "a", %progbits
 	.globl	mfs_root
-	.type	mfs_root, @object
+	.type	mfs_root, %object
 mfs_root:
 	.incbin	__XSTRING(MFS_IMAGE)
 	.size	mfs_root, . - mfs_root
 	.globl	mfs_root_end
-	.type	mfs_root_end, @object
+	.type	mfs_root_end, %object
 mfs_root_end:
 	.size	mfs_root_end, . - mfs_root_end

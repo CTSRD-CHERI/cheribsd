@@ -137,11 +137,24 @@ cddl/dev/dtrace/amd64/dtrace_asm.S			optional dtrace compile-with "${DTRACE_S}"
 cddl/dev/dtrace/amd64/dtrace_subr.c			optional dtrace compile-with "${DTRACE_C}"
 crypto/aesni/aeskeys_amd64.S	optional aesni
 crypto/des/des_enc.c		optional	netsmb
+crypto/openssl/amd64/sha1-x86_64.S	optional ossl
+crypto/openssl/amd64/sha256-x86_64.S	optional ossl
+crypto/openssl/amd64/sha512-x86_64.S	optional ossl
 dev/acpi_support/acpi_wmi_if.m	standard
 dev/agp/agp_amd64.c		optional	agp
 dev/agp/agp_i810.c		optional	agp
 dev/agp/agp_via.c		optional	agp
 dev/amdgpio/amdgpio.c		optional	amdgpio
+dev/axgbe/if_axgbe_pci.c	optional	axp
+dev/axgbe/xgbe-desc.c		optional	axp
+dev/axgbe/xgbe-dev.c		optional	axp
+dev/axgbe/xgbe-drv.c		optional	axp
+dev/axgbe/xgbe-mdio.c		optional	axp
+dev/axgbe/xgbe-sysctl.c		optional	axp
+dev/axgbe/xgbe-txrx.c		optional	axp
+dev/axgbe/xgbe_osdep.c		optional	axp
+dev/axgbe/xgbe-i2c.c		optional	axp
+dev/axgbe/xgbe-phy-v2.c		optional	axp
 dev/hyperv/vmbus/amd64/hyperv_machdep.c			optional	hyperv
 dev/hyperv/vmbus/amd64/vmbus_vector.S			optional	hyperv
 dev/ice/if_ice_iflib.c		optional	ice pci \
@@ -368,18 +381,6 @@ dev/tpm/tpm_acpi.c		optional	tpm acpi
 dev/tpm/tpm_isa.c		optional	tpm isa
 dev/uart/uart_cpu_x86.c		optional	uart
 dev/viawd/viawd.c		optional	viawd
-dev/vmware/vmxnet3/if_vmx.c	optional	vmx
-dev/vmware/vmci/vmci.c			optional	vmci
-dev/vmware/vmci/vmci_datagram.c		optional	vmci
-dev/vmware/vmci/vmci_doorbell.c		optional	vmci
-dev/vmware/vmci/vmci_driver.c		optional	vmci
-dev/vmware/vmci/vmci_event.c		optional	vmci
-dev/vmware/vmci/vmci_hashtable.c	optional	vmci
-dev/vmware/vmci/vmci_kernel_if.c	optional	vmci
-dev/vmware/vmci/vmci_qpair.c		optional	vmci
-dev/vmware/vmci/vmci_queue_pair.c	optional	vmci
-dev/vmware/vmci/vmci_resource.c		optional	vmci
-dev/vmware/pvscsi/pvscsi.c		optional	pvscsi
 dev/vmd/vmd.c			optional	vmd
 dev/vmd/vmd_bus.c		optional	vmd_bus
 dev/wbwd/wbwd.c			optional	wbwd
@@ -387,7 +388,6 @@ dev/xen/pci/xen_acpi_pci.c	optional	xenhvm
 dev/xen/pci/xen_pci.c		optional	xenhvm
 isa/syscons_isa.c		optional	sc
 isa/vga_isa.c			optional	vga
-kern/kern_clocksource.c		standard
 kern/imgact_aout.c		optional compat_aout
 kern/link_elf_obj.c		standard
 #
@@ -411,6 +411,7 @@ amd64/linux32/linux32_support.s	optional	compat_linux32		\
 	dependency 	"linux32_assym.h"
 amd64/linux32/linux32_sysent.c	optional	compat_linux32
 amd64/linux32/linux32_sysvec.c	optional	compat_linux32
+compat/linux/linux_dummy.c	optional	compat_linux32
 compat/linux/linux_emul.c	optional	compat_linux32
 compat/linux/linux_errno.c	optional	compat_linux32
 compat/linux/linux_file.c	optional	compat_linux32
@@ -434,6 +435,7 @@ compat/linux/linux_vdso.c	optional	compat_linux32
 compat/linux/linux_common.c	optional	compat_linux32
 compat/linux/linux_event.c	optional	compat_linux32
 compat/linux/linux.c		optional	compat_linux32
+x86/linux/linux_dummy_x86.c	optional	compat_linux32
 dev/amr/amr_linux.c		optional	compat_linux32 amr
 dev/mfi/mfi_linux.c		optional	compat_linux32 mfi
 compat/ndis/winx64_wrap.S	optional	ndisapi pci
