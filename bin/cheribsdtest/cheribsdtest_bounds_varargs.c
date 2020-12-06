@@ -1,0 +1,117 @@
+/*-
+ * Copyright (c) 2020 Robert N. M. Watson
+ * All rights reserved.
+ *
+ * This software was developed by SRI International and the University of
+ * Cambridge Computer Laboratory under DARPA/AFRL contract (FA8750-10-C-0237)
+ * ("CTSRD"), as part of the DARPA CRASH research programme.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ */
+
+#include <sys/cdefs.h>
+
+#if !__has_feature(capabilities)
+#error "This code requires a CHERI-aware compiler"
+#endif
+
+#include <sys/types.h>
+#include <sys/sysctl.h>
+#include <sys/time.h>
+
+#include <cheri/cheri.h>
+#include <cheri/cheric.h>
+
+#include <err.h>
+#include <errno.h>
+#include <stdarg.h>
+#include <stdio.h>
+
+#include "cheribsdtest.h"
+
+/*
+ * Perform a few tests relating to varargs processing to ensure that the
+ * underlying ABI and code generation enforce bounds on their use.  We expect
+ * bounds checking only in pure-capability code, currently.
+ */
+
+/*
+ * Directly overflow the varargs array by accessing off the end using
+ * va_arg() one too many times.
+ */
+static volatile char *cp;
+static void
+varargs_test_onearg(const char *fmt, ...)
+{
+	va_list ap;
+
+	va_start(ap, fmt);
+
+	/* Ignore valid first pointer argument. */
+	(void)va_arg(ap, void *);
+
+	/* Improperly access invalid second pointer argument. */
+	cp = va_arg(ap, char *);
+
+	cheribsdtest_failure_errx("va_arg() overran bounds without fault");
+}
+
+void
+test_bounds_varargs_vaarg_overflow(const struct cheri_test *ctp __unused)
+{
+
+	varargs_test_onearg("%p", NULL);
+}
+
+/*
+ * Perform end-to-end tests using printf(3).
+ */
+
+/*
+ * Perform a load off the end by passing an improper format string.
+ */
+void
+test_bounds_varargs_printf_load(const struct cheri_test *ctp __unused)
+{
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wformat"
+	printf("%c%p", 1);
+#pragma clang diagnostic pop
+
+	cheribsdtest_failure_errx("printf(\"%%c, %%p\", 1) did not fault");
+}
+
+/*
+ * Perform a write off the end by passing an improper format string.
+ */
+void
+test_bounds_varargs_printf_store(const struct cheri_test *ctp __unused)
+{
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wformat"
+	printf("%c%n", 0);
+#pragma clang diagnostic pop
+
+	cheribsdtest_failure_errx("printf(\"%%c%%n\", 1) did not fault");
+}

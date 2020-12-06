@@ -946,6 +946,45 @@ static const struct cheri_test cheri_tests[] = {
 	  .ct_func = test_bounds_stack_dynamic_1048576, },
 
 	/*
+	 * Test bounds on varargs.
+	 */
+	{ .ct_name = "test_bounds_varargs_vaarg_overflow",
+	  .ct_desc = "check that va_arg() triggers a fault on overrun",
+	  .ct_func = test_bounds_varargs_vaarg_overflow,
+	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
+	  .ct_signum = SIGPROT,
+	  .ct_si_code = PROT_CHERI_BOUNDS,
+	  .ct_si_trapno = TRAPNO_CHERI,
+#ifndef __CHERI_PURE_CAPABILITY__
+	  .ct_xfail_reason = "No varargs bounds in hybrid compilation",
+#endif
+	  },
+
+	{ .ct_name = "test_bounds_varargs_printf_load",
+	  .ct_desc = "check that load via printf varargs overflow faults",
+	  .ct_func = test_bounds_varargs_printf_load,
+	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
+	  .ct_signum = SIGPROT,
+	  .ct_si_code = PROT_CHERI_BOUNDS,
+	  .ct_si_trapno = TRAPNO_CHERI,
+#ifndef __CHERI_PURE_CAPABILITY__
+	  .ct_xfail_reason = "No varargs bounds in hybrid compilation",
+#endif
+	  },
+
+	{ .ct_name = "test_bounds_varargs_printf_store",
+	  .ct_desc = "check that store via printf varargs overflow faults",
+	  .ct_func = test_bounds_varargs_printf_store,
+	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
+	  .ct_signum = SIGPROT,
+	  .ct_si_code = PROT_CHERI_BOUNDS,
+	  .ct_si_trapno = TRAPNO_CHERI,
+#ifndef __CHERI_PURE_CAPABILITY__
+	  .ct_xfail_reason = "No varargs bounds in hybrid compilation",
+#endif
+	  },
+
+	/*
 	 * Unsandboxed virtual-memory tests.
 	 */
 	{ .ct_name = "cheribsdtest_vm_tag_mmap_anon",
