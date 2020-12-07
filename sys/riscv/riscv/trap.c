@@ -490,7 +490,7 @@ do_trap_user(struct trapframe *frame)
 		break;
 	case SCAUSE_ECALL_USER:
 		frame->tf_sepc += 4;	/* Next instruction */
-		colocation_unborrow(td, frame);
+		colocation_unborrow(td);
 		ecall_handler();
 		break;
 	case SCAUSE_ILLEGAL_INSTRUCTION:

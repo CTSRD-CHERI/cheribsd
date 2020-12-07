@@ -1032,7 +1032,7 @@ dofault:
 
 	case T_SYSCALL + T_USER:
 		{
-			colocation_unborrow(td, trapframe);
+			colocation_unborrow(td);
 			syscallenter(td);
 
 #if !defined(SMP) && (defined(DDB) || defined(DEBUG))
