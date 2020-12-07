@@ -523,6 +523,7 @@ DB_SHOW_COMMAND(thread, db_show_thread)
 		    delta / hz, (delta % hz) * 1000 / hz);
 	}
 #ifdef CPU_CHERI
+	db_printf(" scb: %p\n", (void *)td->td_md.md_scb);
 	db_print_scb_td(td);
 #endif
 }
