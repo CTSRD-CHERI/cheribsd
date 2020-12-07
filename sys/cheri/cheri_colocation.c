@@ -352,6 +352,8 @@ colocation_unborrow(struct thread *td)
 		return;
 	}
 
+	KASSERT(td == scb.scb_td,
+	    ("%s: td %p != scb_td %p\n", __func__, td, scb.scb_td));
 	KASSERT(peertd != td,
 	    ("%s: peertd %p == td %p\n", __func__, peertd, td));
 
