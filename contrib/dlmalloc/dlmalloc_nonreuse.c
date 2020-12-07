@@ -71,7 +71,7 @@
 #ifdef __CHERI_PURE_CAPABILITY__
 #include <cheri/cherireg.h>
 #ifdef CAPREVOKE
-#include <sys/caprevoke.h>
+#include <cheri/revoke.h>
 #include <sys/stdatomic.h>
 #include <cheri/libcaprevoke.h>
 #endif /* CAPREVOKE */
@@ -1158,7 +1158,7 @@ static struct malloc_state _gm_;
 #define is_initialized(M)  ((M)->top != 0)
 
 #ifdef CAPREVOKE
-static volatile const struct caprevoke_info *cri;
+static volatile const struct cheri_revoke_info *cri;
 #endif
 
 /* -------------------------- system alloc setup ------------------------- */
@@ -2642,7 +2642,8 @@ static void add_segment(mstate m, char* tbase, size_t tsize, flag_t mmapped) {
   m->seg.next = ss;
 #ifdef CAPREVOKE
   if (do_revocation(m) &&
-      caprevoke_shadow(CAPREVOKE_SHADOW_NOVMMAP, tbase, &m->seg.shadow) != 0)
+      cheri_revoke_shadow(CHERI_REVOKE_SHADOW_NOVMMAP, tbase, &m->seg.shadow)
+      != 0)
     ABORT;
 #endif
 
@@ -2752,7 +2753,8 @@ static void* sys_alloc(mstate m, size_t nb) {
       m->seg.sflags = mmap_flag;
 #ifdef CAPREVOKE
       if (do_revocation(m) &&
-          caprevoke_shadow(CAPREVOKE_SHADOW_NOVMMAP, tbase, &m->seg.shadow) != 0)
+          cheri_revoke_shadow(CHERI_REVOKE_SHADOW_NOVMMAP, tbase,
+              &m->seg.shadow) != 0)
         ABORT;
 #endif
       m->magic = mparams.magic;
@@ -3696,31 +3698,35 @@ malloc_revoke_internal(const char *reason) {
   gm->sweptBytes += gm->footprint;
 #endif // SWEEP_STATS
   mchunkptr freebin = &gm->freebufbin;
+
+#ifdef CAPREVOKE
+  if (cri == NULL) {
+    int error;
+    error = cheri_revoke_shadow(CHERI_REVOKE_SHADOW_INFO_STRUCT, NULL,
+        __DECONST(void **, &cri));
+    assert(error == 0);
+    (void)error; // silence unused warning if asserts are disabled
+  }
+#endif
+
   for (mchunkptr thePtr = freebin->fd; thePtr != freebin; thePtr = thePtr->fd) {
 #if defined(REVOKE) && !defined(__CHERI_PURE_CAPABILITY__)
     shadow_paint(thePtr, chunksize(thePtr));
 #else
 #ifdef CAPREVOKE
     vaddr_t addr = __builtin_cheri_address_get(chunk2mem(thePtr));
-    caprev_shadow_nomap_set_raw(thePtr->pad, addr, addr + chunksize(thePtr));
+    caprev_shadow_nomap_set_raw(cri->base_mem_nomap, thePtr->pad, addr,
+        addr + chunksize(thePtr));
 #endif
 #endif   /* defined(REVOKE) && !defined(__CHERI_PURE_CAPABILITY__) */
   }
 
 #ifdef CAPREVOKE
-  struct caprevoke_stats crst;
-  if (cri == NULL) {
-    int error;
-    error = caprevoke_shadow(CAPREVOKE_SHADOW_INFO_STRUCT, NULL,
-        __DECONST(void **, &cri));
-    assert(error == 0);
-  }
-
   atomic_thread_fence(memory_order_acq_rel);
-  caprevoke_epoch start_epoch = cri->epoch_enqueue;
+  cheri_revoke_epoch start_epoch = cri->epochs.enqueue;
 
-  while (!caprevoke_epoch_clears(cri->epoch_dequeue, start_epoch)) {
-    caprevoke(CAPREVOKE_LAST_PASS, start_epoch, &crst);
+  while (!cheri_revoke_epoch_clears(cri->epochs.dequeue, start_epoch)) {
+    cheri_revoke(CHERI_REVOKE_LAST_PASS, start_epoch, NULL);
   }
 #endif
 
@@ -3734,7 +3740,8 @@ malloc_revoke_internal(const char *reason) {
 #else
 #ifdef CAPREVOKE
     vaddr_t addr = __builtin_cheri_address_get(chunk2mem(thePtr));
-    caprev_shadow_nomap_clear_raw(thePtr->pad, addr, addr + chunksize(thePtr));
+    caprev_shadow_nomap_clear_raw(cri->base_mem_nomap,
+        thePtr->pad, addr, addr + chunksize(thePtr));
 #endif
 #endif   /* defined(REVOKE) && !defined(__CHERI_PURE_CAPABILITY__) */
 #if CONSOLIDATE_ON_FREE == 1
