@@ -132,8 +132,7 @@ struct cheri_kframe {
 /* purecap kernel specific startup */
 void process_kernel_cap_relocs(Elf64_Capreloc *start, Elf64_Capreloc *end,
     void *code_cap, void *data_cap);
-void process_kernel_dyn_relocs(Elf64_Rel *start, Elf64_Rel *end,
-    Elf64_Sym *dynsym, void *code_cap, void *data_cap);
+void process_kernel_dyn_relocs(void *code_cap, void *data_cap);
 #endif
 void cheri_init_capabilities(void * __capability kroot);
 
