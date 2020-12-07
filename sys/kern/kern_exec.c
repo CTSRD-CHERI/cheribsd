@@ -1060,6 +1060,9 @@ exec_new_vmspace(struct image_params *imgp, struct sysentvec *sv)
 	vm_object_t obj;
 	struct rlimit rlim_stack;
 	vm_offset_t sv_minuser, stack_addr;
+#if __has_feature(capabilities)
+	vm_offset_t strings_addr, rounded_stack_addr, stack_offset;
+#endif
 	vm_map_t map;
 	u_long ssiz;
 
@@ -1174,11 +1177,57 @@ exec_new_vmspace(struct image_params *imgp, struct sysentvec *sv)
 	p->p_psstrings = p->p_usrstack - sv->sv_szpsstrings;
 
 	stack_addr =  p->p_usrstack - ssiz;
+	imgp->stack_sz = ssiz;
 	error = vm_map_stack(map, stack_addr, (vm_size_t)ssiz,
 	    obj != NULL && imgp->stack_prot != 0 ? imgp->stack_prot :
 	    sv->sv_stackprot, VM_PROT_ALL, MAP_STACK_GROWS_DOWN);
 	if (error != KERN_SUCCESS)
 		return (vm_mmap_to_errno(error));
+#if __has_feature(capabilities)
+	/*
+	 * Our capability must cover the whole stack, so roundup the
+	 * length to be representable even if it means the capability
+	 * extends beyond the stack bounds.
+	 *
+	 * XXX: Should we instead unconditionally adjust the actual
+	 * stack location?
+	 */
+	stack_offset = 0;
+	do {
+		rounded_stack_addr = CHERI_REPRESENTABLE_BASE(
+		    stack_addr, ssiz + stack_offset);
+		stack_offset = stack_addr - rounded_stack_addr;
+	} while (rounded_stack_addr != CHERI_REPRESENTABLE_BASE(
+	    stack_addr, ssiz + stack_offset));
+        imgp->stack = cheri_capability_build_user_data(
+            CHERI_CAP_USER_DATA_PERMS, rounded_stack_addr,
+	    CHERI_REPRESENTABLE_LENGTH(ssiz + stack_offset),
+	    ssiz + stack_offset);
+
+	if (sv->sv_flags & SV_CHERI) {
+		/*
+		 * Map a seperate space for strings outside the stack.
+		 * We currently place it just just below the stack as
+		 * this avoides collisions with init which is linked
+		 * near the bottom of the address space.
+		 */
+		strings_addr =
+		    CHERI_REPRESENTABLE_BASE(stack_addr - ARG_MAX, ARG_MAX);
+		error = vm_mmap_object(map, &strings_addr, 0, ARG_MAX,
+		    sv->sv_stackprot, sv->sv_stackprot, MAP_ANON | MAP_FIXED,
+		    NULL, 0, FALSE, td);
+		if (error != KERN_SUCCESS)
+			return (vm_mmap_to_errno(error));
+		imgp->strings = cheri_capability_build_user_data(
+		    CHERI_CAP_USER_DATA_PERMS, strings_addr, ARG_MAX, ARG_MAX);
+	} else
+		imgp->strings = imgp->stack;
+
+	if (sv->sv_flags & SV_CHERI)
+		p->p_psstrings = strings_addr + ARG_MAX - sv->sv_szpsstrings;
+	else
+#endif
+		p->p_psstrings = p->p_usrstack - sv->sv_szpsstrings;
 
 	/*
 	 * vm_ssize and vm_maxsaddr are somewhat antiquated concepts, but they
@@ -1640,16 +1689,13 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	int argc, envc;
 	char * __capability * __capability vectp;
 	char *stringp;
-#if __has_feature(capabilities)
-	vaddr_t rounded_stack_vaddr, stack_vaddr, stack_offset;
-	size_t ssiz;
-#endif
 	uintcap_t destp, ustringp;
 	struct ps_strings * __capability arginfo;
 	struct proc *p;
 	size_t execpath_len, len;
 	int error, szsigcode, szps;
 	char canary[sizeof(long) * 8];
+	bool strings_on_stack;
 
 	szps = sizeof(pagesizes[0]) * MAXPAGESIZES;
 	/*
@@ -1663,25 +1709,11 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	p = imgp->proc;
 	szsigcode = 0;
 
+	strings_on_stack = true;
 #if __has_feature(capabilities)
-	/*
-	 * destp must cover all of the smaller buffers copied out
-	 * onto the stack, so roundup the length to be representable
-	 * even if it means the capability extends beyond the stack
-	 * bounds.
-	 */
-	stack_vaddr = (vaddr_t)p->p_vmspace->vm_maxsaddr;
-	ssiz = p->p_usrstack - stack_vaddr;
-	stack_offset = 0;
-	do {
-		rounded_stack_vaddr = CHERI_REPRESENTABLE_BASE(stack_vaddr,
-		    ssiz + stack_offset);
-		stack_offset = stack_vaddr - rounded_stack_vaddr;
-	} while (rounded_stack_vaddr != CHERI_REPRESENTABLE_BASE(stack_vaddr,
-	    ssiz + stack_offset));
-	destp = (uintcap_t)cheri_capability_build_user_data(
-	    CHERI_CAP_USER_DATA_PERMS, rounded_stack_vaddr,
-	    CHERI_REPRESENTABLE_LENGTH(ssiz + stack_offset), stack_offset);
+	if (imgp->stack != imgp->strings)
+		strings_on_stack = false;
+	destp = (uintcap_t)imgp->strings;
 	destp = cheri_setaddress(destp, p->p_psstrings);
 	arginfo = (struct ps_strings * __capability)cheri_setboundsexact(destp,
 	    sizeof(*arginfo));
@@ -1787,10 +1819,14 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	 */
 	vectp -= imgp->args->argc + 1 + imgp->args->envc + 1;
 
-	/*
-	 * vectp also becomes our initial stack base
-	 */
-	*stack_base = (uintcap_t)vectp;
+	if (!strings_on_stack) {
+		*stack_base = (uintcap_t)imgp->stack;
+	} else {
+		/*
+		 * vectp also becomes our initial stack base
+		 */
+		*stack_base = (uintcap_t)vectp;
+	}
 
 	stringp = imgp->args->begin_argv;
 	argc = imgp->args->argc;
@@ -1867,13 +1903,13 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 
 	if (imgp->auxargs) {
 		vectp++;
-		error = imgp->sysent->sv_copyout_auxargs(imgp,
 #if __has_feature(capabilities)
-		    (uintcap_t)cheri_setbounds(vectp,
-		    AT_COUNT * sizeof(Elf_Auxinfo)));
+		imgp->auxv = cheri_setbounds(vectp,
+		    AT_COUNT * sizeof(Elf_Auxinfo));
 #else
-		    (uintptr_t)vectp);
+		imgp->auxv = vectp;
 #endif
+		error = imgp->sysent->sv_copyout_auxargs(imgp, (uintcap_t)imgp->auxv);
 		if (error != 0)
 			return (error);
 	}

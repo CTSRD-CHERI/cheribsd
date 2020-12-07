@@ -98,11 +98,7 @@
  * offset is calculated.
  */
 #define	SHAREDPAGE		(VM_MAXUSER_ADDRESS - PAGE_SIZE)
-/*
- * To ensure that the stack base address that is sufficiently aligned to create
- * a precisely bounded capability we must round down by 16 pages (0x7ffbff0000).
- */
-#define	USRSTACK		(SHAREDPAGE - (15 * PAGE_SIZE))
+#define	USRSTACK		SHAREDPAGE
 #ifdef __mips_n64
 #define	FREEBSD32_SHAREDPAGE	(((vm_offset_t)0x80000000) - PAGE_SIZE)
 #define	FREEBSD32_USRSTACK	FREEBSD32_SHAREDPAGE

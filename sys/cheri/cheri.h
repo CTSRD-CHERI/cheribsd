@@ -124,12 +124,8 @@ extern void * __capability kernel_root_sealcap;
  */
 struct image_params;
 struct thread;
-void * __capability cheri_auxv_capability(struct image_params *imgp,
-	    uintcap_t stack);
 void * __capability cheri_exec_pcc(struct thread *td,
 	    struct image_params *imgp);
-void * __capability cheri_exec_stack_pointer(struct image_params *imgp,
-	    uintcap_t stack);
 void	cheri_set_mmap_capability(struct thread *td, struct image_params *imgp,
 	    void * __capability csp);
 void * __capability cheri_sigcode_capability(struct thread *td);
