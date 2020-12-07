@@ -449,8 +449,8 @@ exec_setregs(struct thread *td, struct image_params *imgp, uintcap_t stack)
 
 #if __has_feature(capabilities)
 	if (SV_PROC_FLAG(td->td_proc, SV_CHERI)) {
-		tf->tf_a[0] = (uintcap_t)cheri_auxv_capability(imgp, stack);
-		tf->tf_sp = (uintcap_t)cheri_exec_stack_pointer(imgp, stack);
+		tf->tf_a[0] = (uintcap_t)imgp->auxv;
+		tf->tf_sp = stack;
 		cheri_set_mmap_capability(td, imgp,
 		    (void * __capability)tf->tf_sp);
 
