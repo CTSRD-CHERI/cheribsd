@@ -51,13 +51,14 @@
 #ifndef CRT_INIT_GLOBALS_GDC_ONLY
 CRT_INIT_GLOBALS_STATIC void crt_init_globals(void) __hidden;
 #endif
-CRT_INIT_GLOBALS_STATIC void crt_init_globals_3(
-    void * __capability, const void * __capability, const void * __capability) __hidden;
+CRT_INIT_GLOBALS_STATIC void crt_init_globals_3(void * __capability,
+    const void * __capability, const void * __capability) __hidden;
 
 __attribute__((weak)) extern int _DYNAMIC __no_subobject_bounds;
 
 CRT_INIT_GLOBALS_STATIC void
-crt_init_globals_3(void * __capability data_cap, const void * __capability code_cap, const void * __capability rodata_cap)
+crt_init_globals_3(void * __capability data_cap,
+    const void * __capability code_cap, const void * __capability rodata_cap)
 {
 	/* Otherwise we need to initialize globals manually */
 	cheri_init_globals_3(data_cap, code_cap, rodata_cap);
