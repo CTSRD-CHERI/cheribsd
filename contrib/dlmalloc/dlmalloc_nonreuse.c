@@ -3708,7 +3708,6 @@ malloc_revoke_internal(const char *reason) {
   }
 
 #ifdef CAPREVOKE
-  struct caprevoke_stats crst;
   if (cri == NULL) {
     int error;
     error = caprevoke_shadow(CAPREVOKE_SHADOW_INFO_STRUCT, NULL,
@@ -3720,7 +3719,7 @@ malloc_revoke_internal(const char *reason) {
   caprevoke_epoch start_epoch = cri->epoch_enqueue;
 
   while (!caprevoke_epoch_clears(cri->epoch_dequeue, start_epoch)) {
-    caprevoke(CAPREVOKE_LAST_PASS, start_epoch, &crst);
+    caprevoke(CAPREVOKE_LAST_PASS|CAPREVOKE_LOAD_SIDE, start_epoch, NULL);
   }
 #endif
 
