@@ -52,17 +52,16 @@
 
 #ifdef DDB
 
-static inline void
+void
 db_print_cap(struct thread *td, const char* msg, void * __capability cap)
 {
 	pid_t pid;
 
 	pid = vm_get_cap_owner(td, (uintcap_t)cap);
-	if (pid >= 0) {
-		db_printf("%s %#.16lp (pid %d)\n", msg, cap, pid);
-	} else {
-		db_printf("%s %#.16lp\n", msg, cap);
-	}
+	if (pid >= 0)
+		db_printf("%s%#.16lp (pid %d)\n", msg, cap, pid);
+	else
+		db_printf("%s%#.16lp\n", msg, cap);
 }
 
 static void * __capability
@@ -107,12 +106,12 @@ DB_SHOW_COMMAND(cp2, ddb_dump_cp2)
 		db_printf("RegNum: invalid (%d) ", regnum);
 	db_printf("(%s)\n", cheri_exccode_string(exccode));
 
-	db_print_cap(NULL, "$ddc: ",  cheri_getdefault());
-	db_print_cap(NULL, "$pcc: ",  cheri_getpcc());
+	db_print_cap(NULL, "$ddc:  ",  cheri_getdefault());
+	db_print_cap(NULL, "$pcc:  ",  cheri_getpcc());
 	db_print_cap(NULL, "$culr: ", cheri_getculr());
 	db_print_cap(NULL, "$cplr: ", cheri_getcplr());
-	db_print_cap(NULL, "$kcc: ",  cheri_getkcc());
-	db_print_cap(NULL, "$kdc: ",  cheri_getkdc());
+	db_print_cap(NULL, "$kcc:  ",  cheri_getkcc());
+	db_print_cap(NULL, "$kdc:  ",  cheri_getkdc());
 	db_print_cap(NULL, "$epcc: ",  cheri_getepcc());
 	db_print_cap(NULL, "$kr1c: ",  cheri_getkr1c());
 	db_print_cap(NULL, "$kr2c: ",  cheri_getkr2c());

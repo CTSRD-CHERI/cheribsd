@@ -87,5 +87,6 @@ int db_inst_type(int);
 db_addr_t branch_taken(int inst, db_addr_t pc);
 int32_t kdbpeek(int *);
 int64_t kdbpeekd(int *);
+void db_print_cap(struct thread *td, const char *name, void * __capability value);
 
 #endif	/* !_MIPS_DB_MACHDEP_H_ */

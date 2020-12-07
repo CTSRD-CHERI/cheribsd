@@ -1000,32 +1000,32 @@ sys_coaccept_slow(struct thread *td, struct coaccept_slow_args *uap)
 
 #ifdef DDB
 static void
-db_print_scb(struct switchercb *scb)
+db_print_scb(struct thread *td, struct switchercb *scb)
 {
 
 	if (cheri_getlen(scb->scb_caller_scb) == 0) {
-		db_printf("    scb_caller_scb:    <errno %lu>\n",
+		db_printf(       "    scb_caller_scb:    <errno %lu>\n",
 		    cheri_getoffset(scb->scb_caller_scb));
 	} else {
-		db_printf("    scb_caller_scb:    %#lp\n", scb->scb_caller_scb);
+		db_print_cap(td, "    scb_caller_scb:    ", scb->scb_caller_scb);
 	}
-	db_printf("    scb_callee_scb:    %#lp\n", scb->scb_callee_scb);
-	db_printf("    scb_td:            %p\n", scb->scb_td);
-	db_printf("    scb_borrower_td:   %p\n", scb->scb_borrower_td);
-	db_printf("    scb_unsealcap:     %#lp\n", scb->scb_unsealcap);
+	db_print_cap(td, "    scb_callee_scb:    ", scb->scb_callee_scb);
+	db_printf(       "    scb_td:            %p\n", scb->scb_td);
+	db_printf(       "    scb_borrower_td:   %p\n", scb->scb_borrower_td);
+	db_print_cap(td, "    scb_unsealcap:     ", scb->scb_unsealcap);
 #ifdef __mips__
-	db_printf("    scb_tls:           %#lp\n", scb->scb_tls);
-	db_printf("    scb_csp (c11):     %#lp\n", scb->scb_csp);
-	db_printf("    scb_cra (c13):     %#lp\n", scb->scb_cra);
-	db_printf("    scb_buf (c6):      %#lp\n", scb->scb_buf);
-	db_printf("    scb_buflen (a0):   %zd\n", scb->scb_buflen);
-	db_printf("    scb_cookiep:       %#lp\n", scb->scb_cookiep);
+	db_print_cap(td, "    scb_tls:           ", scb->scb_tls);
+	db_print_cap(td, "    scb_csp (c11):     ", scb->scb_csp);
+	db_print_cap(td, "    scb_cra (c13):     ", scb->scb_cra);
+	db_print_cap(td, "    scb_buf (c6):      ", scb->scb_buf);
+	db_printf(       "    scb_buflen (a0):   %zd\n", scb->scb_buflen);
+	db_print_cap(td, "    scb_cookiep:       ", scb->scb_cookiep);
 #else
-	db_printf("    scb_csp:           %#lp\n", scb->scb_csp);
-	db_printf("    scb_cra:           %#lp\n", scb->scb_cra);
-	db_printf("    scb_cookiep (ca2): %#lp\n", scb->scb_cookiep);
-	db_printf("    scb_buf (ca3):     %#lp\n", scb->scb_buf);
-	db_printf("    scb_buflen (a4):   %zd\n", scb->scb_buflen);
+	db_print_cap(td, "    scb_csp:           ", scb->scb_csp);
+	db_print_cap(td, "    scb_cra:           ", scb->scb_cra);
+	db_print_cap(td, "    scb_cookiep (ca2): ", scb->scb_cookiep);
+	db_print_cap(td, "    scb_buf (ca3):     ", scb->scb_buf);
+	db_printf(       "    scb_buflen (a4):   %zd\n", scb->scb_buflen);
 #endif
 }
 
@@ -1039,7 +1039,7 @@ db_print_scb_td(struct thread *td)
 	if (!have_scb)
 		return;
 
-	db_print_scb(&scb);
+	db_print_scb(td, &scb);
 }
 
 /*
@@ -1097,7 +1097,7 @@ DB_SHOW_COMMAND(scb, db_show_scb)
 			db_printf("%s: copyincap failed, error %d\n", __func__, error);
 			return;
 		}
-		db_print_scb(&scb);
+		db_print_scb(NULL, &scb);
 	} else {
 		td = curthread;
 		p = td->td_proc;
@@ -1127,7 +1127,7 @@ DB_SHOW_COMMAND(scb, db_show_scb)
 				    (void *)td->td_md.md_scb, td, p->p_pid, p->p_comm, db_get_stack_pid(td));
 				shown_borrowertd = true;
 			}
-			db_print_scb(&scb);
+			db_print_scb(td, &scb);
 		}
 
 		td = curthread;
@@ -1145,7 +1145,7 @@ DB_SHOW_COMMAND(scb, db_show_scb)
 				    (void *)td->td_md.md_scb, td, p->p_pid, p->p_comm, db_get_stack_pid(td));
 				shown_borrowertd = true;
 			}
-			db_print_scb(&scb);
+			db_print_scb(td, &scb);
 		}
 
 		if (!shown_borrowertd && borrowertd != NULL) {
