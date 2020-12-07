@@ -74,7 +74,7 @@ crt_init_globals(void)
 }
 #endif /* !CRT_INIT_GLOBALS_GDC_ONLY */
 
-#ifndef POSITION_INDEPENDENT_STARTUP
+#ifndef PIC
 /* This is __always_inline since it is called before globals have been set up */
 static __always_inline void
 do_crt_init_globals(const Elf_Phdr *phdr, long phnum)
@@ -196,4 +196,4 @@ do_crt_init_globals(const Elf_Phdr *phdr, long phnum)
 	}
 	crt_init_globals_3(data_cap, code_cap, rodata_cap);
 }
-#endif /* !defined(POSITION_INDEPENDENT_STARTUP) */
+#endif /* !defined(PIC) */
