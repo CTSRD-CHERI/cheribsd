@@ -364,6 +364,8 @@ virtdone:
 	/* Branch to C code */
 	clear_capregs
 	bl	initarm
+	/* We are done with the boot params */
+	add	PTRN(sp), PTRN(sp), #BOOTPARAMS_SIZE
 	bl	mi_startup
 
 	/* We should not get here */
