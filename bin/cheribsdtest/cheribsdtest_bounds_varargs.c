@@ -3,8 +3,9 @@
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
- * Cambridge Computer Laboratory under DARPA/AFRL contract (FA8750-10-C-0237)
- * ("CTSRD"), as part of the DARPA CRASH research programme.
+ * Cambridge Computer Laboratory (Department of Computer Science and
+ * Technology) under DARPA contract HR0011-18-C-0016 ("ECATS"), as part of the
+ * DARPA SSITH research programme.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -58,7 +59,7 @@
  * Directly overflow the varargs array by accessing off the end using
  * va_arg() one too many times.
  */
-static volatile char *cp;
+static volatile int *p;
 static void
 varargs_test_onearg(const char *fmt, ...)
 {
@@ -70,7 +71,7 @@ varargs_test_onearg(const char *fmt, ...)
 	(void)va_arg(ap, void *);
 
 	/* Improperly access invalid second pointer argument. */
-	cp = va_arg(ap, char *);
+	p = va_arg(ap, int *);
 
 	cheribsdtest_failure_errx("va_arg() overran bounds without fault");
 }
@@ -87,7 +88,27 @@ test_bounds_varargs_vaarg_overflow(const struct cheri_test *ctp __unused)
  */
 
 /*
- * Perform a load off the end by passing an improper format string.
+ * Check that accessing the varargs array when there have been no variable
+ * arguments leads to a tag violation.  If it is left uninitialized in the
+ * ABI, then this could allow accesses via a shadowed value.  In principle a
+ * zero-length pointer would also be fine -- if one arises in one of our ABIs,
+ * the acceptable conditions may need to be updated.
+ */
+void
+test_bounds_varargs_empty_pointer_null(const struct cheri_test *ctp __unused)
+{
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wformat"
+	printf("%p");
+#pragma clang diagnostic pop
+
+	cheribsdtest_failure_errx("printf(\"%%p\", 1) did not fault");
+}
+
+/*
+ * Check that if we overflow the varargs array with a load, we get a bounds
+ * violation.
  */
 void
 test_bounds_varargs_printf_load(const struct cheri_test *ctp __unused)
@@ -102,7 +123,9 @@ test_bounds_varargs_printf_load(const struct cheri_test *ctp __unused)
 }
 
 /*
- * Perform a write off the end by passing an improper format string.
+ * Check that if we overflow the varargs array to load a pointer we will
+ * store via (%n), we get a bounds violation -- rather than, say, a tag
+ * violation as a result of dereferencing that pointer.
  */
 void
 test_bounds_varargs_printf_store(const struct cheri_test *ctp __unused)

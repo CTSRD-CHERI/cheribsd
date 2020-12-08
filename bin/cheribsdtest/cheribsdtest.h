@@ -349,6 +349,7 @@ DECLARE_CHERIBSD_TEST(test_bounds_stack_dynamic_524288);
 DECLARE_CHERIBSD_TEST(test_bounds_stack_dynamic_1048576);
 
 /* cheribsdtest_bounds_varargs.c */
+DECLARE_CHERIBSD_TEST(test_bounds_varargs_empty_pointer_null);
 DECLARE_CHERIBSD_TEST(test_bounds_varargs_vaarg_overflow);
 DECLARE_CHERIBSD_TEST(test_bounds_varargs_printf_load);
 DECLARE_CHERIBSD_TEST(test_bounds_varargs_printf_store);

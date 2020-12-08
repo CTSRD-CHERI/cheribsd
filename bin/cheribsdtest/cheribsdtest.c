@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2012-2018 Robert N. M. Watson
+ * Copyright (c) 2012-2018, 2020 Robert N. M. Watson
  * Copyright (c) 2014-2016 SRI International
  * All rights reserved.
  *
@@ -945,9 +945,24 @@ static const struct cheri_test cheri_tests[] = {
 	  .ct_desc = "Check bounds on a 1,048,576-byte dynamic stack allocation",
 	  .ct_func = test_bounds_stack_dynamic_1048576, },
 
+#ifdef __CHERI_PURE_CAPABILITY__
 	/*
-	 * Test bounds on varargs.
+	 * Test bounds on varargs.  Bounds checking of varargs is supported
+	 * only in our pure-capability ABIs, so don't these tests on hybrid
+	 * code.
 	 */
+	{ .ct_name = "test_bounds_varargs_empty_pointer_null",
+	  .ct_desc = "check that empty varargs gives a tag violation on load",
+	  .ct_func = test_bounds_varargs_empty_pointer_null,
+	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
+	  .ct_signum = SIGPROT,
+	  .ct_si_code = PROT_CHERI_TAG,
+	  .ct_si_trapno = TRAPNO_CHERI,
+#if defined(__riscv) || defined(__aarch64__)
+	  .ct_xfail_reason = "varargs bounds broken on pure-capability RISC-V and Morello",
+#endif
+	},
+
 	{ .ct_name = "test_bounds_varargs_vaarg_overflow",
 	  .ct_desc = "check that va_arg() triggers a fault on overrun",
 	  .ct_func = test_bounds_varargs_vaarg_overflow,
@@ -955,8 +970,8 @@ static const struct cheri_test cheri_tests[] = {
 	  .ct_signum = SIGPROT,
 	  .ct_si_code = PROT_CHERI_BOUNDS,
 	  .ct_si_trapno = TRAPNO_CHERI,
-#ifndef __CHERI_PURE_CAPABILITY__
-	  .ct_xfail_reason = "No varargs bounds in hybrid compilation",
+#if defined(__riscv) || defined(__aarch64__)
+	  .ct_xfail_reason = "varargs bounds broken on pure-capability RISC-V and Morello",
 #endif
 	  },
 
@@ -967,8 +982,8 @@ static const struct cheri_test cheri_tests[] = {
 	  .ct_signum = SIGPROT,
 	  .ct_si_code = PROT_CHERI_BOUNDS,
 	  .ct_si_trapno = TRAPNO_CHERI,
-#ifndef __CHERI_PURE_CAPABILITY__
-	  .ct_xfail_reason = "No varargs bounds in hybrid compilation",
+#if defined(__riscv) || defined(__aarch64__)
+	  .ct_xfail_reason = "varargs bounds broken on pure-capability RISC-V and Morello",
 #endif
 	  },
 
@@ -979,10 +994,11 @@ static const struct cheri_test cheri_tests[] = {
 	  .ct_signum = SIGPROT,
 	  .ct_si_code = PROT_CHERI_BOUNDS,
 	  .ct_si_trapno = TRAPNO_CHERI,
-#ifndef __CHERI_PURE_CAPABILITY__
-	  .ct_xfail_reason = "No varargs bounds in hybrid compilation",
+#if defined(__riscv) || defined(__aarch64__)
+	  .ct_xfail_reason = "varargs bounds broken on pure-capability RISC-V and Morello",
 #endif
 	  },
+#endif
 
 	/*
 	 * Unsandboxed virtual-memory tests.
