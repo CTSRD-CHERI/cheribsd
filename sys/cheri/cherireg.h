@@ -115,10 +115,6 @@
     (CHERI_OTYPE_KERN_MAX - CHERI_OTYPE_KERN_MIN + 1)
 #define	CHERI_SEALCAP_KERNEL_OFFSET	0x0
 
-/* Reserved CHERI object types: */
-#define	CHERI_OTYPE_UNSEALED	(-1l)
-#define	CHERI_OTYPE_SENTRY	(-2l)
-
 #define	CHERI_REPRESENTABLE_LENGTH(len) \
 	__builtin_cheri_round_representable_length(len)
 #define	CHERI_REPRESENTABLE_ALIGNMENT_MASK(len) \

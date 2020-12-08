@@ -151,6 +151,10 @@
 #define	CHERI_OTYPE_ISKERN(x)	(((x) & CHERI_OTYPE_KERN_FLAG) != 0)
 #define	CHERI_OTYPE_ISUSER(x)	(!(CHERI_OTYPE_ISKERN(x)))
 
+/* Reserved CHERI object types: */
+#define	CHERI_OTYPE_UNSEALED	(-1l)
+#define	CHERI_OTYPE_SENTRY	(-2l)
+
 /*
  * List of CHERI capability cause code constants, which are used to
  * characterise various CP2 exceptions.
