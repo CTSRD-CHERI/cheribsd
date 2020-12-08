@@ -355,8 +355,8 @@ virtdone:
 	str	x29, [PTR(0), #BP_KERN_DELTA]
 	str	PTR(25), [PTR(0), #BP_KERN_STACK]
 	str	PTR(24), [PTR(0), #BP_KERN_L0PT]
-	str	x23, [PTR(0), #BP_BOOT_EL]
 	str	x27, [PTR(0), #BP_KERN_TTBR0]
+	str	x23, [PTR(0), #BP_BOOT_EL]
 
 	/* trace back starts here */
 	mov	fp, #0
