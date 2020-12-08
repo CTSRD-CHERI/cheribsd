@@ -53,7 +53,7 @@ extern long * _end;
  * For -pie executables rtld will process capability relocations, so we don't
  * need to include the code here.
  */
-#if __has_feature(capabilities) && !defined(POSITION_INDEPENDENT_STARTUP)
+#if __has_feature(capabilities) && !defined(PIC)
 #define SHOULD_PROCESS_CAP_RELOCS
 #endif
 
