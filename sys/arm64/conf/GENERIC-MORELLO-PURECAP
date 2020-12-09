@@ -27,3 +27,5 @@ machine 	arm64 aarch64c
 makeoptions	CHERI_SUBOBJECT_BOUNDS=subobject-safe
 
 options 	CHERI_PURECAP_KERNEL
+
+nooptions	GDB	# Hangs on boot
