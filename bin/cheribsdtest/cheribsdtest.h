@@ -378,6 +378,9 @@ DECLARE_CHERIBSD_TEST(test_cheriabi_mprotect_invalid_ptr);
 DECLARE_CHERIBSD_TEST(test_cheriabi_minherit_invalid_ptr);
 DECLARE_CHERIBSD_TEST(test_cheriabi_shmdt_invalid_ptr);
 
+/* cheribsdtest_cheriabi_libc.c */
+DECLARE_CHERIBSD_TEST(test_cheriabi_libc_memchr);
+
 /* cheribsdtest_cheriabi_open.c */
 DECLARE_CHERIBSD_TEST(test_cheriabi_open_ordinary);
 DECLARE_CHERIBSD_TEST(test_cheriabi_open_offset);
