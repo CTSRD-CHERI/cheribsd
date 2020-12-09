@@ -551,7 +551,11 @@ exec_setregs(struct thread *td, struct image_params *imgp, uintcap_t stack)
 	tf->tf_x[0] = stack;
 	tf->tf_sp = STACKALIGN(stack);
 	tf->tf_lr = imgp->entry_addr;
+#if __has_feature(capabilities)
+	hybridabi_thread_setregs(td, imgp->entry_addr);
+#else
 	tf->tf_elr = imgp->entry_addr;
+#endif
 }
 
 /* Sanity check these are the same size, they will be memcpy'd to and fro */
