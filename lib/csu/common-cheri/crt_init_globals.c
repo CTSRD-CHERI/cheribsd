@@ -165,7 +165,7 @@ do_crt_init_globals(const Elf_Phdr *phdr, long phnum)
 			__builtin_trap();
 
 		/* Abort if text and writeable overlap: */
-		if (MAX(writable_start, text_start) <=
+		if (MAX(writable_start, text_start) <
 		    MIN(writable_end, text_end)) {
 			/* TODO: should we allow a single RWX segment? */
 			__builtin_trap();
