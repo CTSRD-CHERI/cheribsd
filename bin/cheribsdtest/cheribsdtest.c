@@ -1730,6 +1730,13 @@ static const struct cheri_test cheri_tests[] = {
 	  .ct_func = test_cheriabi_shmdt_invalid_ptr },
 
 	/*
+	 * CheriABI libc implementation.
+	 */
+	{ .ct_name = "test_cheriabi_libc_memchr",
+	  .ct_desc = "Check that memchr() works as required",
+	  .ct_func = test_cheriabi_libc_memchr },
+
+	/*
 	 * Tests for pathname handling in open(2).
 	 */
 	{ .ct_name = "test_cheriabi_open_ordinary",
