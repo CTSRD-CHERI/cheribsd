@@ -59,7 +59,7 @@
  * Directly overflow the varargs array by accessing off the end using
  * va_arg() one too many times.
  */
-static void
+static __noinline void
 varargs_test_onearg(const char *fmt, ...)
 {
 	int * volatile p;
