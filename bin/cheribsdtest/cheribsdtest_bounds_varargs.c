@@ -98,7 +98,7 @@ test_bounds_varargs_empty_pointer_null(const struct cheri_test *ctp __unused)
 	printf("%p");
 #pragma clang diagnostic pop
 
-	cheribsdtest_failure_errx("printf(\"%%p\", 1) did not fault");
+	cheribsdtest_failure_errx("printf(\"%%p\") did not fault");
 }
 
 /*
@@ -114,7 +114,7 @@ test_bounds_varargs_printf_load(const struct cheri_test *ctp __unused)
 	printf("%c%p", 1);
 #pragma clang diagnostic pop
 
-	cheribsdtest_failure_errx("printf(\"%%c, %%p\", 1) did not fault");
+	cheribsdtest_failure_errx("printf(\"%%c%%p\", 1) did not fault");
 }
 
 /*
@@ -131,5 +131,5 @@ test_bounds_varargs_printf_store(const struct cheri_test *ctp __unused)
 	printf("%c%n", 0);
 #pragma clang diagnostic pop
 
-	cheribsdtest_failure_errx("printf(\"%%c%%n\", 1) did not fault");
+	cheribsdtest_failure_errx("printf(\"%%c%%n\", 0) did not fault");
 }
