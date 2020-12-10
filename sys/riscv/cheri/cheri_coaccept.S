@@ -114,11 +114,9 @@ _C_LABEL(switcher_coaccept):
 	/*
 	 * Save the pointer to the caller's kernel in the callee control
 	 * block.  This is used by kernel to look up the real thread.
-	 * Also clear the same field on the caller side.
 	 */
 	cld	t3, SCB_TD(ct0)
 	csd	t3, SCB_BORROWER_TD(idc)
-	csd	zero, SCB_BORROWER_TD(ct0)
 
 	/*
 	 * Restore the caller's context.
