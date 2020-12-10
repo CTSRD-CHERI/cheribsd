@@ -8,6 +8,7 @@ SRCS+=	cheribsdtest_bounds_globals.c					\
 	cheribsdtest_bounds_globals_x.c					\
 	cheribsdtest_bounds_heap.c					\
 	cheribsdtest_bounds_stack.c					\
+	cheribsdtest_bounds_varargs.c					\
 	cheribsdtest_fault.c						\
 	cheribsdtest_flag_captured.c					\
 	cheribsdtest_kbounce.c						\
