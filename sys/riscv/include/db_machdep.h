@@ -91,4 +91,6 @@ typedef long		db_expr_t;
 
 #define	DB_ELFSIZE		64
 
+void db_print_cap(struct thread *td, const char *name, void * __capability value);
+
 #endif /* !_MACHINE_DB_MACHDEP_H_ */

@@ -490,7 +490,7 @@ do_trap_user(struct trapframe *frame)
 		break;
 	case SCAUSE_ECALL_USER:
 		frame->tf_sepc += 4;	/* Next instruction */
-		colocation_unborrow(td, frame);
+		colocation_unborrow(td);
 		ecall_handler();
 		break;
 	case SCAUSE_ILLEGAL_INSTRUCTION:
@@ -557,20 +557,20 @@ do_trap_user(struct trapframe *frame)
 	}
 }
 
-static void
-db_show_reg(struct thread *td, const char *name, uintcap_t value)
+void
+db_print_cap(struct thread *td, const char *name, void * __capability value)
 {
 	pid_t pid;
 	void * __capability tmp;
 
 	tmp = (void * __capability)value;
-	pid = vm_get_cap_owner(td, value);
+	pid = vm_get_cap_owner(td, (uintcap_t)value);
 
 	if (pid >= 0) {
-		(kdb_active ? db_printf : printf)("%s %#lp (pid %d)\n",
+		(kdb_active ? db_printf : printf)("%s%#lp (pid %d)\n",
 		    name, &tmp, pid);
 	} else {
-		(kdb_active ? db_printf : printf)("%s %#lp\n", name, &tmp);
+		(kdb_active ? db_printf : printf)("%s%#lp\n", name, &tmp);
 	}
 }
 
@@ -581,42 +581,42 @@ db_show_frame_td(struct thread *td)
 
 	frame = td->td_frame;
 
-	db_show_reg(td, " x1/ra: ", frame->tf_ra);
-	db_show_reg(td, " x2/sp: ", frame->tf_sp);
-	db_show_reg(td, " x3/gp: ", frame->tf_gp);
-	db_show_reg(td, " x4/tp: ", frame->tf_tp);
-	db_show_reg(td, " x5/t0: ", frame->tf_t[0]);
-	db_show_reg(td, " x6/t1: ", frame->tf_t[1]);
-	db_show_reg(td, " x7/t2: ", frame->tf_t[2]);
-	db_show_reg(td, " x8/s0: ", frame->tf_s[0]);
-	db_show_reg(td, " x9/s1: ", frame->tf_s[1]);
-	db_show_reg(td, "x10/a0: ", frame->tf_a[0]);
-	db_show_reg(td, "x11/a1: ", frame->tf_a[1]);
-	db_show_reg(td, "x12/a2: ", frame->tf_a[2]);
-	db_show_reg(td, "x13/a3: ", frame->tf_a[3]);
-	db_show_reg(td, "x14/a4: ", frame->tf_a[4]);
-	db_show_reg(td, "x15/a5: ", frame->tf_a[5]);
-	db_show_reg(td, "x16/a6: ", frame->tf_a[6]);
-	db_show_reg(td, "x17/a7: ", frame->tf_a[7]);
-	db_show_reg(td, "x18/s2: ", frame->tf_s[2]);
-	db_show_reg(td, "x19/s3: ", frame->tf_s[3]);
-	db_show_reg(td, "x20/s4: ", frame->tf_s[4]);
-	db_show_reg(td, "x21/s5: ", frame->tf_s[5]);
-	db_show_reg(td, "x22/s6: ", frame->tf_s[6]);
-	db_show_reg(td, "x23/s7: ", frame->tf_s[7]);
-	db_show_reg(td, "x24/s8: ", frame->tf_s[8]);
-	db_show_reg(td, "x25/s9: ", frame->tf_s[9]);
-	db_show_reg(td, "x26/s10:", frame->tf_s[10]);
-	db_show_reg(td, "x27/s11:", frame->tf_s[11]);
-	db_show_reg(td, "x28/t3: ", frame->tf_t[3]);
-	db_show_reg(td, "x29/t4: ", frame->tf_t[4]);
-	db_show_reg(td, "x30/t5: ", frame->tf_t[5]);
-	db_show_reg(td, "x31/t6: ", frame->tf_t[6]);
-	db_show_reg(td, "  sepc: ", frame->tf_sepc);
-	db_show_reg(td, "   ddc: ", frame->tf_ddc);
-	db_show_reg(td, "sstatus:", frame->tf_sstatus);
-	db_show_reg(td, " stval: ", frame->tf_stval);
-	db_show_reg(td, "scause: ", frame->tf_scause);
+	db_print_cap(td, " x1/ra:  ", (void * __capability)frame->tf_ra);
+	db_print_cap(td, " x2/sp:  ", (void * __capability)frame->tf_sp);
+	db_print_cap(td, " x3/gp:  ", (void * __capability)frame->tf_gp);
+	db_print_cap(td, " x4/tp:  ", (void * __capability)frame->tf_tp);
+	db_print_cap(td, " x5/t0:  ", (void * __capability)frame->tf_t[0]);
+	db_print_cap(td, " x6/t1:  ", (void * __capability)frame->tf_t[1]);
+	db_print_cap(td, " x7/t2:  ", (void * __capability)frame->tf_t[2]);
+	db_print_cap(td, " x8/s0:  ", (void * __capability)frame->tf_s[0]);
+	db_print_cap(td, " x9/s1:  ", (void * __capability)frame->tf_s[1]);
+	db_print_cap(td, "x10/a0:  ", (void * __capability)frame->tf_a[0]);
+	db_print_cap(td, "x11/a1:  ", (void * __capability)frame->tf_a[1]);
+	db_print_cap(td, "x12/a2:  ", (void * __capability)frame->tf_a[2]);
+	db_print_cap(td, "x13/a3:  ", (void * __capability)frame->tf_a[3]);
+	db_print_cap(td, "x14/a4:  ", (void * __capability)frame->tf_a[4]);
+	db_print_cap(td, "x15/a5:  ", (void * __capability)frame->tf_a[5]);
+	db_print_cap(td, "x16/a6:  ", (void * __capability)frame->tf_a[6]);
+	db_print_cap(td, "x17/a7:  ", (void * __capability)frame->tf_a[7]);
+	db_print_cap(td, "x18/s2:  ", (void * __capability)frame->tf_s[2]);
+	db_print_cap(td, "x19/s3:  ", (void * __capability)frame->tf_s[3]);
+	db_print_cap(td, "x20/s4:  ", (void * __capability)frame->tf_s[4]);
+	db_print_cap(td, "x21/s5:  ", (void * __capability)frame->tf_s[5]);
+	db_print_cap(td, "x22/s6:  ", (void * __capability)frame->tf_s[6]);
+	db_print_cap(td, "x23/s7:  ", (void * __capability)frame->tf_s[7]);
+	db_print_cap(td, "x24/s8:  ", (void * __capability)frame->tf_s[8]);
+	db_print_cap(td, "x25/s9:  ", (void * __capability)frame->tf_s[9]);
+	db_print_cap(td, "x26/s10: ", (void * __capability)frame->tf_s[10]);
+	db_print_cap(td, "x27/s11: ", (void * __capability)frame->tf_s[11]);
+	db_print_cap(td, "x28/t3:  ", (void * __capability)frame->tf_t[3]);
+	db_print_cap(td, "x29/t4:  ", (void * __capability)frame->tf_t[4]);
+	db_print_cap(td, "x30/t5:  ", (void * __capability)frame->tf_t[5]);
+	db_print_cap(td, "x31/t6:  ", (void * __capability)frame->tf_t[6]);
+	db_print_cap(td, "  sepc:  ", (void * __capability)frame->tf_sepc);
+	db_print_cap(td, "   ddc:  ", (void * __capability)frame->tf_ddc);
+	db_print_cap(td, "sstatus: ", (void * __capability)frame->tf_sstatus);
+	db_print_cap(td, " stval:  ", (void * __capability)frame->tf_stval);
+	db_print_cap(td, "scause:  ", (void * __capability)frame->tf_scause);
 }
 
 DB_SHOW_COMMAND(frame, db_show_frame)

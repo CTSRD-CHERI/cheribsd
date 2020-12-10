@@ -180,13 +180,11 @@ _C_LABEL(switcher_coaccept):
 
 1:
 	/*
-	 * Save the capability to the caller's thread in the callee control block.
-	 * This is used by kernel to look up the real thread.  Also clear
-	 * the same field on the caller side.
+	 * Save the pointer to the caller's kernel thread in the callee control
+	 * block.  This is used by kernel to look up the real thread.
 	 */
 	cld	t8, zero, SCB_TD($c25)
 	csd	t8, zero, SCB_BORROWER_TD($idc)
-	csd	zero, zero, SCB_BORROWER_TD($c25)
 
 	/*
 	 * Restore caller's TLS pointer.

@@ -185,7 +185,7 @@ colocation_fetch_caller_scb(struct thread *td, struct switchercb *scbp)
 
 	error = copyincap(scbp->scb_caller_scb, &(*scbp), sizeof(*scbp));
 	KASSERT(error == 0,
-	    ("%s: copyincap from peer %p failed with error %d\n",
+	    ("%s: copyincap from caller %p failed with error %d\n",
 	    __func__, (__cheri_fromcap void *)scbp->scb_caller_scb, error));
 
 	return (true);
@@ -220,7 +220,7 @@ colocation_fetch_callee_scb(struct thread *td, struct switchercb *scbp)
 
 	error = copyincap(scbp->scb_callee_scb, &(*scbp), sizeof(*scbp));
 	KASSERT(error == 0,
-	    ("%s: copyincap from peer %p failed with error %d\n",
+	    ("%s: copyincap from callee %p failed with error %d\n",
 	    __func__, (__cheri_fromcap void *)scbp->scb_callee_scb, error));
 
 	return (true);
@@ -238,11 +238,7 @@ colocation_get_peer(struct thread *td, struct thread **peertdp)
 		return;
 	}
 
-	if (cheri_gettag(scb.scb_caller_scb) != 0 &&
-	    cheri_getlen(scb.scb_caller_scb) > 0)
-		*peertdp = scb.scb_borrower_td;
-	else
-		*peertdp = NULL;
+	*peertdp = scb.scb_borrower_td;
 }
 
 void
@@ -252,10 +248,8 @@ colocation_thread_exit(struct thread *td)
 	struct coname *con, *con_temp;
 
 	struct mdthread *md, *callermd;
-	struct switchercb scb, *peerscb;
-	vaddr_t addr;
+	struct switchercb scb;
 	bool have_scb;
-	int error;
 
 	have_scb = colocation_fetch_scb(td, &scb);
 	if (!have_scb)
@@ -290,9 +284,8 @@ colocation_thread_exit(struct thread *td)
 		cv_signal(&callermd->md_slow_cv);
 	}
 
-	peerscb = (__cheri_fromcap struct switchercb *)scb.scb_caller_scb;
-	COLOCATION_DEBUG("terminating thread %p, scb %p, peer scb %p",
-	    td, (void *)td->td_md.md_scb, peerscb);
+	COLOCATION_DEBUG("terminating thread %p, scb %p",
+	    td, (void *)td->td_md.md_scb);
 
 	/*
 	 * Set scb_caller_scb to a special "null" capability, so that cocall(2)
@@ -302,34 +295,8 @@ colocation_thread_exit(struct thread *td)
 	scb.scb_td = NULL;
 	scb.scb_borrower_td = NULL;
 
-	addr = td->td_md.md_scb;
+	colocation_copyout_scb(td, &scb);
 	td->td_md.md_scb = 0;
-	error = copyoutcap(&scb, ___USER_CFROMPTR((void *)addr, userspace_cap), sizeof(scb));
-	if (error != 0) {
-		COLOCATION_DEBUG("copyoutcap to %p failed with error %d",
-		    (void *)addr, error);
-		return;
-	}
-
-	if (peerscb == NULL)
-		return;
-
-	error = copyincap(___USER_CFROMPTR((void *)peerscb, userspace_cap), &scb, sizeof(scb));
-	if (error != 0) {
-		COLOCATION_DEBUG("peer copyincap from %p failed with error %d",
-		    (void *)peerscb, error);
-		return;
-	}
-
-	scb.scb_caller_scb = NULL;
-	scb.scb_borrower_td = NULL;
-
-	error = copyoutcap(&scb, ___USER_CFROMPTR((void *)peerscb, userspace_cap), sizeof(scb));
-	if (error != 0) {
-		COLOCATION_DEBUG("peer copyoutcap to %p failed with error %d",
-		    (void *)peerscb, error);
-		return;
-	}
 }
 
 /*
@@ -340,11 +307,11 @@ colocation_thread_exit(struct thread *td)
  * Called from trap().
  */
 void
-colocation_unborrow(struct thread *td, struct trapframe *trapframe)
+colocation_unborrow(struct thread *td)
 {
 	struct switchercb scb;
 	struct thread *peertd;
-	struct trapframe peertrapframe;
+	struct trapframe *trapframe, peertrapframe;
 #ifdef __mips__
 	trapf_pc_t peertpc;
 #endif
@@ -354,6 +321,7 @@ colocation_unborrow(struct thread *td, struct trapframe *trapframe)
 	if (!have_scb)
 		return;
 
+	trapframe = td->td_frame;
 	peertd = scb.scb_borrower_td;
 	if (peertd == NULL) {
 		/*
@@ -362,10 +330,10 @@ colocation_unborrow(struct thread *td, struct trapframe *trapframe)
 		return;
 	}
 
+	KASSERT(td == scb.scb_td,
+	    ("%s: td %p != scb_td %p\n", __func__, td, scb.scb_td));
 	KASSERT(peertd != td,
 	    ("%s: peertd %p == td %p\n", __func__, peertd, td));
-	KASSERT(trapframe == td->td_frame,
-	    ("%s: %p != %p", __func__, trapframe, td->td_frame));
 
 #ifdef __mips__
 	COLOCATION_DEBUG("replacing current td %p, pid %d (%s), switchercb %#lx, "
@@ -427,6 +395,14 @@ colocation_unborrow(struct thread *td, struct trapframe *trapframe)
 	    __func__, (long)td->td_frame->v0, SYS_copark, (long)peertd->td_frame->v0,
 	    td, td->td_proc->p_pid, td->td_proc->p_comm,
 	    peertd, peertd->td_proc->p_pid, peertd->td_proc->p_comm));
+#elif defined(__riscv)
+	KASSERT(td->td_frame->tf_t[0] == SYS_copark,
+	    ("%s: td_sa.code %ld != SYS_copark %d; peer td_sa.code %ld; td %p, pid %d (%s); peer td %p, peer pid %d (%s)\n",
+	    __func__, (long)td->td_frame->tf_t[0], SYS_copark, (long)peertd->td_frame->tf_t[0],
+	    td, td->td_proc->p_pid, td->td_proc->p_comm,
+	    peertd, peertd->td_proc->p_pid, peertd->td_proc->p_comm));
+#else
+#error "what architecture is this?"
 #endif
 
 	scb.scb_borrower_td = NULL;
@@ -503,7 +479,7 @@ setup_scb(struct thread *td)
 	vm_map_entry_t entry;
 	vm_offset_t addr;
 	boolean_t found;
-	int error, rv;
+	int rv;
 
 	KASSERT(td->td_md.md_scb == 0, ("%s: already initialized\n", __func__));
 
@@ -546,11 +522,7 @@ setup_scb(struct thread *td)
 #ifdef __mips__
 	scb.scb_tls = (char * __capability)td->td_md.md_tls + td->td_proc->p_md.md_tls_tcb_offset;
 #endif
-
-	error = copyoutcap(&scb,
-	    ___USER_CFROMPTR((void *)addr, userspace_cap), sizeof(scb));
-	KASSERT(error == 0,
-	    ("%s: copyoutcap() failed with error %d\n", __func__, error));
+	colocation_copyout_scb(td, &scb);
 
 	/*
 	 * Stuff neccessary for cocall_slow(2)/coaccept_slow(2).
@@ -1021,32 +993,32 @@ sys_coaccept_slow(struct thread *td, struct coaccept_slow_args *uap)
 
 #ifdef DDB
 static void
-db_print_scb(struct switchercb *scb)
+db_print_scb(struct thread *td, struct switchercb *scb)
 {
 
 	if (cheri_getlen(scb->scb_caller_scb) == 0) {
-		db_printf("    scb_caller_scb:    <errno %lu>\n",
+		db_printf(       "    scb_caller_scb:    <errno %lu>\n",
 		    cheri_getoffset(scb->scb_caller_scb));
 	} else {
-		db_printf("    scb_caller_scb:    %#lp\n", scb->scb_caller_scb);
+		db_print_cap(td, "    scb_caller_scb:    ", scb->scb_caller_scb);
 	}
-	db_printf("    scb_callee_scb:    %#lp\n", scb->scb_callee_scb);
-	db_printf("    scb_td:            %p\n", scb->scb_td);
-	db_printf("    scb_borrower_td:   %p\n", scb->scb_borrower_td);
-	db_printf("    scb_unsealcap:     %#lp\n", scb->scb_unsealcap);
+	db_print_cap(td, "    scb_callee_scb:    ", scb->scb_callee_scb);
+	db_printf(       "    scb_td:            %p\n", scb->scb_td);
+	db_printf(       "    scb_borrower_td:   %p\n", scb->scb_borrower_td);
+	db_print_cap(td, "    scb_unsealcap:     ", scb->scb_unsealcap);
 #ifdef __mips__
-	db_printf("    scb_tls:           %#lp\n", scb->scb_tls);
-	db_printf("    scb_csp (c11):     %#lp\n", scb->scb_csp);
-	db_printf("    scb_cra (c13):     %#lp\n", scb->scb_cra);
-	db_printf("    scb_buf (c6):      %#lp\n", scb->scb_buf);
-	db_printf("    scb_buflen (a0):   %zd\n", scb->scb_buflen);
-	db_printf("    scb_cookiep:       %#lp\n", scb->scb_cookiep);
+	db_print_cap(td, "    scb_tls:           ", scb->scb_tls);
+	db_print_cap(td, "    scb_csp (c11):     ", scb->scb_csp);
+	db_print_cap(td, "    scb_cra (c13):     ", scb->scb_cra);
+	db_print_cap(td, "    scb_buf (c6):      ", scb->scb_buf);
+	db_printf(       "    scb_buflen (a0):   %zd\n", scb->scb_buflen);
+	db_print_cap(td, "    scb_cookiep:       ", scb->scb_cookiep);
 #else
-	db_printf("    scb_csp:           %#lp\n", scb->scb_csp);
-	db_printf("    scb_cra:           %#lp\n", scb->scb_cra);
-	db_printf("    scb_cookiep (ca2): %#lp\n", scb->scb_cookiep);
-	db_printf("    scb_buf (ca3):     %#lp\n", scb->scb_buf);
-	db_printf("    scb_buflen (a4):   %zd\n", scb->scb_buflen);
+	db_print_cap(td, "    scb_csp:           ", scb->scb_csp);
+	db_print_cap(td, "    scb_cra:           ", scb->scb_cra);
+	db_print_cap(td, "    scb_cookiep (ca2): ", scb->scb_cookiep);
+	db_print_cap(td, "    scb_buf (ca3):     ", scb->scb_buf);
+	db_printf(       "    scb_buflen (a4):   %zd\n", scb->scb_buflen);
 #endif
 }
 
@@ -1060,7 +1032,7 @@ db_print_scb_td(struct thread *td)
 	if (!have_scb)
 		return;
 
-	db_print_scb(&scb);
+	db_print_scb(td, &scb);
 }
 
 /*
@@ -1118,7 +1090,7 @@ DB_SHOW_COMMAND(scb, db_show_scb)
 			db_printf("%s: copyincap failed, error %d\n", __func__, error);
 			return;
 		}
-		db_print_scb(&scb);
+		db_print_scb(NULL, &scb);
 	} else {
 		td = curthread;
 		p = td->td_proc;
@@ -1148,7 +1120,7 @@ DB_SHOW_COMMAND(scb, db_show_scb)
 				    (void *)td->td_md.md_scb, td, p->p_pid, p->p_comm, db_get_stack_pid(td));
 				shown_borrowertd = true;
 			}
-			db_print_scb(&scb);
+			db_print_scb(td, &scb);
 		}
 
 		td = curthread;
@@ -1166,7 +1138,7 @@ DB_SHOW_COMMAND(scb, db_show_scb)
 				    (void *)td->td_md.md_scb, td, p->p_pid, p->p_comm, db_get_stack_pid(td));
 				shown_borrowertd = true;
 			}
-			db_print_scb(&scb);
+			db_print_scb(td, &scb);
 		}
 
 		if (!shown_borrowertd && borrowertd != NULL) {

@@ -171,7 +171,7 @@ struct trapframe;
 void	colocation_cleanup(struct thread *td);
 void	colocation_get_peer(struct thread *td, struct thread **peertdp);
 void	colocation_thread_exit(struct thread *td);
-void	colocation_unborrow(struct thread *td, struct trapframe *trapframe);
+void	colocation_unborrow(struct thread *td);
 bool	colocation_trap_in_switcher(struct thread *td,
 	    struct trapframe *trapframe, const char *msg);
 void	colocation_update_tls(struct thread *td);

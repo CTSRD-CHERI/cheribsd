@@ -38,6 +38,7 @@
 .Sh SYNOPSIS
 .Nm
 .Op Fl k
+.Op Fl s Ar time
 .Op Fl v
 .Op Fl x
 .Ar service-name
@@ -61,6 +62,10 @@ Use
 .Xr coaccept_slow 2
 instead of
 .Xr coaccept 2 .
+.It Fl s Ar time
+Number of seconds to pause before calling
+.Xr coaccept 2 .
+Defaults to zero.
 .It Fl v
 Be verbose.
 .It Fl x

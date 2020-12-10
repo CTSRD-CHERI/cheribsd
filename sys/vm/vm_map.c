@@ -1832,6 +1832,59 @@ vm_map_lookup_entry(
 	return (FALSE);
 }
 
+/*
+ * Simplified version of vm_map_trylock() that doesn't modify the splay tree,
+ * and thus can be (relatively) safely used from ddb(4).
+ */
+static boolean_t
+db_vm_map_lookup_entry(
+	vm_map_t map,
+	vm_offset_t address,
+	vm_map_entry_t *entry)	/* OUT */
+{
+	vm_map_entry_t cur, header, lbound, ubound;
+
+	KASSERT(kdb_active, ("%s: you're not supposed to be here", __func__));
+
+	/*
+	 * If the map is empty, then the map entry immediately preceding
+	 * "address" is the map's header.
+	 */
+	header = &map->header;
+	cur = map->root;
+	if (cur == NULL) {
+		*entry = header;
+		return (FALSE);
+	}
+	if (address >= cur->start && cur->end > address) {
+		*entry = cur;
+		return (TRUE);
+	}
+
+	/*
+	 * Perform a standard binary search tree lookup for "address".
+	 */
+	lbound = ubound = header;
+	for (;;) {
+		if (address < cur->start) {
+			ubound = cur;
+			cur = cur->left;
+			if (cur == lbound)
+				break;
+		} else if (cur->end <= address) {
+			lbound = cur;
+			cur = cur->right;
+			if (cur == ubound)
+				break;
+		} else {
+			*entry = cur;
+			return (TRUE);
+		}
+	}
+	*entry = lbound;
+	return (FALSE);
+}
+
 #define	VM_PROT_SANITY(prot) do {					\
 	if (((prot) & VM_PROT_WRITE_CAP) != 0)				\
 		KASSERT(((prot) & VM_PROT_WRITE) != 0,			\
@@ -5791,7 +5844,7 @@ vm_get_cap_owner(struct thread *td, uintcap_t c)
 	vm_map_t map;
 	vm_map_entry_t entry;
 	vm_offset_t addr;
-	boolean_t found, need_lock;
+	boolean_t found;
 	pid_t pid;
 
 	if (td == NULL)
@@ -5800,21 +5853,21 @@ vm_get_cap_owner(struct thread *td, uintcap_t c)
 	addr = __builtin_cheri_address_get(c);
 	map = &td->td_proc->p_vmspace->vm_map;
 
-	/*
-	 * Don't call vm_map_lock()/vm_map_unlock() if called from kdb;
-	 * it would panic due to mutex recursion.
-	 */
-	need_lock = !kdb_active;
-
-	if (need_lock)
-		need_lock = vm_map_trylock(map);
-	found = vm_map_lookup_entry(map, addr, &entry);
-	if (found)
-		pid = entry->owner;
-	else
-		pid = -1;
-	if (need_lock)
+	if (kdb_active) {
+		found = db_vm_map_lookup_entry(map, addr, &entry);
+		if (found)
+			pid = entry->owner;
+		else
+			pid = -1;
+	} else {
+		vm_map_lock(map);
+		found = vm_map_lookup_entry(map, addr, &entry);
+		if (found)
+			pid = entry->owner;
+		else
+			pid = -1;
 		vm_map_unlock(map);
+	}
 
 	return (pid);
 }
