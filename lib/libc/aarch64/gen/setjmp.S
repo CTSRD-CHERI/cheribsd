@@ -39,7 +39,7 @@ ENTRY(setjmp)
 	stp	REG(0), lr, [sp]
 
 	/* Store the signal mask */
-	add	REG(2), REG(0), #(_JB_SIGMASK * 8)	/* oset */
+	add	REG(2), REG(0), #(_JB_SIGMASK * REG_WIDTH)	/* oset */
 	mov	x1, #0				/* set */
 	mov	x0, #1				/* SIG_BLOCK */
 	bl	sigprocmask
@@ -81,7 +81,7 @@ ENTRY(longjmp)
 
 	/* Restore the signal mask */
 	mov	x2, #0				/* oset */
-	add	REG(1), REG(0), #(_JB_SIGMASK * 8)	/* set */
+	add	REG(1), REG(0), #(_JB_SIGMASK * REG_WIDTH)	/* set */
 	mov	x0, #3				/* SIG_SETMASK */
 	bl	sigprocmask
 
