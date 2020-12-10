@@ -248,9 +248,8 @@ colocation_thread_exit(struct thread *td)
 	struct coname *con, *con_temp;
 
 	struct mdthread *md, *callermd;
-	struct switchercb scb, *peerscb;
+	struct switchercb scb;
 	bool have_scb;
-	int error;
 
 	have_scb = colocation_fetch_scb(td, &scb);
 	if (!have_scb)
@@ -285,9 +284,8 @@ colocation_thread_exit(struct thread *td)
 		cv_signal(&callermd->md_slow_cv);
 	}
 
-	peerscb = (__cheri_fromcap struct switchercb *)scb.scb_caller_scb;
-	COLOCATION_DEBUG("terminating thread %p, scb %p, peer scb %p",
-	    td, (void *)td->td_md.md_scb, peerscb);
+	COLOCATION_DEBUG("terminating thread %p, scb %p",
+	    td, (void *)td->td_md.md_scb);
 
 	/*
 	 * Set scb_caller_scb to a special "null" capability, so that cocall(2)
@@ -299,26 +297,6 @@ colocation_thread_exit(struct thread *td)
 
 	colocation_copyout_scb(td, &scb);
 	td->td_md.md_scb = 0;
-
-	if (peerscb == NULL)
-		return;
-
-	error = copyincap(___USER_CFROMPTR((void *)peerscb, userspace_cap), &scb, sizeof(scb));
-	if (error != 0) {
-		COLOCATION_DEBUG("peer copyincap from %p failed with error %d",
-		    (void *)peerscb, error);
-		return;
-	}
-
-	scb.scb_caller_scb = NULL;
-	scb.scb_borrower_td = NULL;
-
-	error = copyoutcap(&scb, ___USER_CFROMPTR((void *)peerscb, userspace_cap), sizeof(scb));
-	if (error != 0) {
-		COLOCATION_DEBUG("peer copyoutcap to %p failed with error %d",
-		    (void *)peerscb, error);
-		return;
-	}
 }
 
 /*
