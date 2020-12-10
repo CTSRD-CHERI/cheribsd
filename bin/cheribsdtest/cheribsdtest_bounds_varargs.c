@@ -30,11 +30,6 @@
  */
 
 #include <sys/cdefs.h>
-
-#if !__has_feature(capabilities)
-#error "This code requires a CHERI-aware compiler"
-#endif
-
 #include <sys/types.h>
 #include <sys/sysctl.h>
 #include <sys/time.h>
@@ -62,7 +57,7 @@
 static __noinline void
 varargs_test_onearg(const char *fmt, ...)
 {
-	int * volatile p;
+	int volatile i;
 	va_list ap;
 
 	va_start(ap, fmt);
@@ -71,7 +66,7 @@ varargs_test_onearg(const char *fmt, ...)
 	(void)va_arg(ap, void *);
 
 	/* Improperly access invalid second pointer argument. */
-	p = va_arg(ap, int *);
+	i = va_arg(ap, int);
 
 	cheribsdtest_failure_errx("va_arg() overran bounds without fault");
 }
