@@ -973,7 +973,7 @@ static const struct cheri_test cheri_tests[] = {
 #if defined(__riscv) || defined(__aarch64__)
 	  .ct_xfail_reason = "varargs bounds broken on pure-capability RISC-V and Morello",
 #endif
-	  },
+	},
 
 	{ .ct_name = "test_bounds_varargs_printf_load",
 	  .ct_desc = "check that load via printf varargs overflow faults",
