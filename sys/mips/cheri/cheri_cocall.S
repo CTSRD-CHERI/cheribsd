@@ -162,13 +162,11 @@ _C_LABEL(switcher_cocall):
 	/* no branch delay slot needed */
 
 	/*
-	 * Save the capability to the callee's thread in the caller context.
-	 * This is used by kernel to look up the real thread.  Also clear
-	 * the same field on the callee side.
+	 * Save the pointer to the callee's kernel thread in the caller
+	 * context.  This is used by kernel to look up the real thread.
 	 */
 	cld	t8, zero, SCB_TD($c25)
 	csd	t8, zero, SCB_BORROWER_TD($idc)
-	csd	zero, zero, SCB_BORROWER_TD($c25)
 
 	/*
 	 * Save the capability to the callee's control block in the caller
