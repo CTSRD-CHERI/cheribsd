@@ -57,7 +57,7 @@
 static __noinline void
 varargs_test_onearg(const char *fmt, ...)
 {
-	int volatile i;
+	volatile int i;
 	va_list ap;
 
 	va_start(ap, fmt);
