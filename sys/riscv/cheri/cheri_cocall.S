@@ -110,9 +110,9 @@ _C_LABEL(switcher_cocall):
 #endif
 
 	/*
-	 * Save the capability to the callee's thread in the caller context.
-	 * This is used by kernel to look up the real thread.  Also clear
-	 * the same field on the callee side.
+	 * Save the pointer to the callee's kernel thread in the caller
+	 * context.  This is used by kernel to look up the real thread.
+	 * Also clear the same field on the callee side.
 	 */
 	cld	t4, SCB_TD(ct0)
 	csd	t4, SCB_BORROWER_TD(idc)
