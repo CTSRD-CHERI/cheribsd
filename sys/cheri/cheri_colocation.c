@@ -185,7 +185,7 @@ colocation_fetch_caller_scb(struct thread *td, struct switchercb *scbp)
 
 	error = copyincap(scbp->scb_caller_scb, &(*scbp), sizeof(*scbp));
 	KASSERT(error == 0,
-	    ("%s: copyincap from peer %p failed with error %d\n",
+	    ("%s: copyincap from caller %p failed with error %d\n",
 	    __func__, (__cheri_fromcap void *)scbp->scb_caller_scb, error));
 
 	return (true);
@@ -220,7 +220,7 @@ colocation_fetch_callee_scb(struct thread *td, struct switchercb *scbp)
 
 	error = copyincap(scbp->scb_callee_scb, &(*scbp), sizeof(*scbp));
 	KASSERT(error == 0,
-	    ("%s: copyincap from peer %p failed with error %d\n",
+	    ("%s: copyincap from callee %p failed with error %d\n",
 	    __func__, (__cheri_fromcap void *)scbp->scb_callee_scb, error));
 
 	return (true);
