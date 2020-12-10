@@ -65,7 +65,7 @@ varargs_test_onearg(const char *fmt, ...)
 	/* Ignore valid first pointer argument. */
 	(void)va_arg(ap, void *);
 
-	/* Improperly access invalid second pointer argument. */
+	/* Improperly access invalid second argument. */
 	i = va_arg(ap, int);
 
 	cheribsdtest_failure_errx("va_arg() overran bounds without fault");
