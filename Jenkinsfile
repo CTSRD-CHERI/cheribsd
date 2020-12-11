@@ -115,6 +115,7 @@ def runTests(params, String suffix) {
         testExtraArgs += [
                 '--kyua-tests-files', '/usr/tests/Kyuafile',
                 '--no-run-cheribsdtest', // only run kyua tests
+                '--disable-coredumps',  // coredumps slow down the testsuite unnecessarily
         ]
     } else {
         // Run a small subset of tests to check that we didn't break running tests (since the full testsuite takes too long)
