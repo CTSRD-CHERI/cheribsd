@@ -63,7 +63,7 @@
 /*
  * Switch into C64 mode to use instructions only available in Morello.
  */
-#if __has_feature(capabilities) && !defined __CHERI_PURE_CAPABILITY__
+#if __has_feature(capabilities) && !defined(__CHERI_PURE_CAPABILITY__)
 #define	ENTER_C64		\
 	bx #4;			\
 	.arch_extension	c64
