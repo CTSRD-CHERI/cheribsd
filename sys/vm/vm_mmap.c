@@ -118,7 +118,7 @@ SYSCTL_INT(_vm, OID_AUTO, old_mlock, CTLFLAG_RWTUN, &old_mlock, 0,
 static int mincore_mapped = 1;
 SYSCTL_INT(_vm, OID_AUTO, mincore_mapped, CTLFLAG_RWTUN, &mincore_mapped, 0,
     "mincore reports mappings, not residency");
-static int imply_prot_max = 0;
+static int imply_prot_max = 1;
 SYSCTL_INT(_vm, OID_AUTO, imply_prot_max, CTLFLAG_RWTUN, &imply_prot_max, 0,
     "Imply maximum page protections in mmap() when none are specified");
 static int log_wxrequests = 0;
