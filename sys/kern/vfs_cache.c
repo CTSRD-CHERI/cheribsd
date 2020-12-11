@@ -4612,6 +4612,7 @@ out:
 			cache_fpl_cleanup_cnp(cnp);
 		return (error);
 	}
+	__assert_unreachable();
 }
 
 /*
