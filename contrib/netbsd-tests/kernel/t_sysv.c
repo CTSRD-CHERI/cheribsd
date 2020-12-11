@@ -54,11 +54,8 @@
 #include <sys/shm.h>
 #include <sys/wait.h>
 
-volatile int did_sigsys, did_sigchild;
-volatile int child_status, child_count;
-
+volatile sig_atomic_t did_sigsys;
 void	sigsys_handler(int);
-void	sigchld_handler(int);
 
 key_t	get_ftok(int);
 
@@ -134,29 +131,22 @@ read_int(const char *path)
 	}
 }
 
+static pid_t
+waitpid_eintr(pid_t child, int *status)
+{
+	pid_t result;
+	result = waitpid(child, status, 0);
+	if (result < 0 && errno == EINTR) {
+		return waitpid_eintr(child, status); /* try again */
+	}
+	return result;
+}
 
 void
 sigsys_handler(int signo)
 {
 
 	did_sigsys = 1;
-}
-
-void
-sigchld_handler(int signo)
-{
-	int c_status;
-
-	did_sigchild = 1;
-	/*
-	 * Reap the child and return its status
-	 */
-	if (wait(&c_status) == -1)
-		child_status = -errno;
-	else
-		child_status = c_status;
-
-	child_count--;
 }
 
 key_t get_ftok(int id)
@@ -206,7 +196,6 @@ ATF_TC_BODY(msg, tc)
 	struct sigaction sa;
 	struct msqid_ds m_ds;
 	struct testmsg m;
-	sigset_t sigmask;
 	int sender_msqid;
 	int loop;
 	int c_status;
@@ -224,18 +213,6 @@ ATF_TC_BODY(msg, tc)
 	sa.sa_flags = 0;
 	ATF_REQUIRE_MSG(sigaction(SIGSYS, &sa, NULL) != -1,
 	    "sigaction SIGSYS: %d", errno);
-
-	/*
-	 * Install a SIGCHLD handler to deal with all possible exit
-	 * conditions of the receiver.
-	 */
-	did_sigchild = 0;
-	child_count = 0;
-	sa.sa_handler = sigchld_handler;
-	sigemptyset(&sa.sa_mask);
-	sa.sa_flags = 0;
-	ATF_REQUIRE_MSG(sigaction(SIGCHLD, &sa, NULL) != -1,
-	    "sigaction SIGCHLD: %d", errno);
 
 	msgkey = get_ftok(4160);
 	ATF_REQUIRE_MSG(msgkey != (key_t)-1, "get_ftok failed");
@@ -275,7 +252,6 @@ ATF_TC_BODY(msg, tc)
 		return;
 
 	case 0:
-		child_count++;
 		receiver();
 		break;
 
@@ -314,29 +290,22 @@ ATF_TC_BODY(msg, tc)
 	/*
 	 * Wait for child to finish
 	 */
-	sigemptyset(&sigmask);
-	(void) sigsuspend(&sigmask);
-
-	/*
-	 * ...and any other signal is an unexpected error.
-	 */
-	if (did_sigchild) {
-		c_status = child_status;
-		if (c_status < 0)
-			atf_tc_fail("waitpid: %d", -c_status);
-		else if (WIFEXITED(c_status) == 0)
+	if (waitpid_eintr(child_pid, &c_status) > 0) {
+		if (!WIFEXITED(c_status))
 			atf_tc_fail("child abnormal exit: %d", c_status);
 		else if (WEXITSTATUS(c_status) != 0)
 			atf_tc_fail("c status: %d", WEXITSTATUS(c_status));
 		else {
+			fprintf(stderr, "child %d exited\n", child_pid);
 			ATF_REQUIRE_MSG(msgctl(sender_msqid, IPC_STAT, &m_ds)
 			    != -1, "msgctl IPC_STAT: %d", errno);
 
 			print_msqid_ds(&m_ds, 0600);
 			atf_tc_pass();
 		}
-	} else
-		atf_tc_fail("sender: received unexpected signal");
+	} else {
+		atf_tc_fail("sender: waitpid failed: %d\n", errno);
+	}
 }
 
 ATF_TC_CLEANUP(msg, tc)
@@ -447,10 +416,9 @@ ATF_TC_BODY(sem, tc)
 	struct sigaction sa;
 	union semun sun;
 	struct semid_ds s_ds;
-	sigset_t sigmask;
 	int sender_semid;
 	int i;
-	int c_status;
+	int child_count;
 
 	/*
 	 * Install a SIGSYS handler so that we can exit gracefully if
@@ -462,18 +430,6 @@ ATF_TC_BODY(sem, tc)
 	sa.sa_flags = 0;
 	ATF_REQUIRE_MSG(sigaction(SIGSYS, &sa, NULL) != -1,
 	    "sigaction SIGSYS: %d", errno);
-
-	/*
-	 * Install a SIGCHLD handler to deal with all possible exit
-	 * conditions of the receiver.
-	 */
-	did_sigchild = 0;
-	child_count = 0;
-	sa.sa_handler = sigchld_handler;
-	sigemptyset(&sa.sa_mask);
-	sa.sa_flags = 0;
-	ATF_REQUIRE_MSG(sigaction(SIGCHLD, &sa, NULL) != -1,
-	    "sigaction SIGCHLD: %d", errno);
 
 	semkey = get_ftok(4160);
 	ATF_REQUIRE_MSG(semkey != (key_t)-1, "get_ftok failed");
@@ -548,35 +504,30 @@ ATF_TC_BODY(sem, tc)
 	/*
 	 * Wait for all children to finish
 	 */
-	sigemptyset(&sigmask);
-	for (;;) {
-		(void) sigsuspend(&sigmask);
-		if (did_sigchild) {
-			c_status = child_status;
-			if (c_status < 0)
-				atf_tc_fail("waitpid: %d", -c_status);
-			else if (WIFEXITED(c_status) == 0)
-				atf_tc_fail("c abnormal exit: %d", c_status);
-			else if (WEXITSTATUS(c_status) != 0)
-				atf_tc_fail("c status: %d",
-				    WEXITSTATUS(c_status));
-			else {
-				sun.buf = &s_ds;
-				ATF_REQUIRE_MSG(semctl(sender_semid, 0,
-						    IPC_STAT, sun) != -1,
-				    "semctl IPC_STAT: %d", errno);
-
-				print_semid_ds(&s_ds, 0600);
-				atf_tc_pass();
-			}
-			if (child_count <= 0)
-				break;
-			did_sigchild = 0;
-		} else {
-			atf_tc_fail("sender: received unexpected signal");
-			break;
-		}
+	fprintf(stderr, "waiting for children to exit\n");
+	while (child_count > 0) {
+		fprintf(stderr, "remaining children: %d\n", child_count);
+		pid_t child;
+		int c_status;
+		if ((child = waitpid_eintr(-1, &c_status)) < 0)
+			atf_tc_fail("waitpid: %d", errno);
+		child_count--;
+		if (WIFEXITED(c_status) == 0)
+			atf_tc_fail("c %d abnormal exit: %d", child, c_status);
+		else if (WEXITSTATUS(c_status) != 0)
+			atf_tc_fail("c %d status: %d", child,
+			    WEXITSTATUS(c_status));
+		else
+			fprintf(stderr, "c %d exited: %d\n", child, c_status);
 	}
+	/* All children have exited, delete the semid */
+	fprintf(stderr, "all children have exited\n");
+	sun.buf = &s_ds;
+	ATF_REQUIRE_MSG(semctl(sender_semid, 0, IPC_STAT, sun) != -1,
+	    "semctl IPC_STAT: %d", errno);
+
+	print_semid_ds(&s_ds, 0600);
+	atf_tc_pass();
 }
 
 ATF_TC_CLEANUP(sem, tc)
@@ -641,7 +592,7 @@ waiter(void)
 	if (semop(semid, &s, 1) == -1)
 		err(1, "waiter: semop -1");
 
-	printf("WOO!  GOT THE SEMAPHORE!\n");
+	printf("WOO! %d GOT THE SEMAPHORE!\n", getpid());
 	sleep(1);
 
 	/*
@@ -654,6 +605,7 @@ waiter(void)
 	if (semop(semid, &s, 1) == -1)
 		err(1, "waiter: semop +1");
 
+	printf("waiter %d exiting.\n", getpid());
 	exit(0);
 }
 
@@ -673,7 +625,6 @@ ATF_TC_BODY(shm, tc)
 {
 	struct sigaction sa;
 	struct shmid_ds s_ds;
-	sigset_t sigmask;
 	char *shm_buf;
 	int sender_shmid;
 	int c_status;
@@ -688,18 +639,6 @@ ATF_TC_BODY(shm, tc)
 	sa.sa_flags = 0;
 	ATF_REQUIRE_MSG(sigaction(SIGSYS, &sa, NULL) != -1,
 	    "sigaction SIGSYS: %d", errno);
-
-	/*
-	 * Install a SIGCHLD handler to deal with all possible exit
-	 * conditions of the sharer.
-	 */
-	did_sigchild = 0;
-	child_count = 0;
-	sa.sa_handler = sigchld_handler;
-	sigemptyset(&sa.sa_mask);
-	sa.sa_flags = 0;
-	ATF_REQUIRE_MSG(sigaction(SIGCHLD, &sa, NULL) != -1,
-	    "sigaction SIGCHLD: %d", errno);
 
 	pgsize = sysconf(_SC_PAGESIZE);
 
@@ -755,18 +694,13 @@ ATF_TC_BODY(shm, tc)
 	/*
 	 * Wait for child to finish
 	 */
-	sigemptyset(&sigmask);
-	(void) sigsuspend(&sigmask);
-
-	if (did_sigchild) {
-		c_status = child_status;
-		if (c_status < 0)
-			atf_tc_fail("waitpid: %d", -c_status);
-		else if (WIFEXITED(c_status) == 0)
+	if (waitpid_eintr(child_pid, &c_status) > 0) {
+		if (!WIFEXITED(c_status))
 			atf_tc_fail("c abnormal exit: %d", c_status);
 		else if (WEXITSTATUS(c_status) != 0)
 			atf_tc_fail("c status: %d", WEXITSTATUS(c_status));
 		else {
+			fprintf(stderr, "child %d exited\n", child_pid);
 			ATF_REQUIRE_MSG(shmctl(sender_shmid, IPC_STAT,
 					       &s_ds) != -1,
 			    "shmctl IPC_STAT: %d", errno);
@@ -774,8 +708,9 @@ ATF_TC_BODY(shm, tc)
 			print_shmid_ds(&s_ds, 0600);
 			atf_tc_pass();
 		}
-	} else
-		atf_tc_fail("sender: received unexpected signal");
+	} else {
+		atf_tc_fail("waitpid: %d", errno);
+	}
 }
 
 static void
