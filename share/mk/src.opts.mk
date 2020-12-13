@@ -391,8 +391,7 @@ BROKEN_OPTIONS+=LIBCHERI
 .endif
 
 # EFI doesn't exist on mips or powerpc.
-# It's also broken on purecap.
-.if ${__T:Mmips*} || ${__T:Mpowerpc*} || ${__T:Mriscv64*c*}
+.if ${__T:Mmips*} || ${__T:Mpowerpc*}
 BROKEN_OPTIONS+=EFI
 .endif
 # OFW is only for powerpc, exclude others
