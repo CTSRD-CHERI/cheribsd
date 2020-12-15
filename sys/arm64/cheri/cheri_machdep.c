@@ -41,6 +41,30 @@
 #include <machine/vmparam.h>
 
 void
+cheri_init_capabilities(void * __capability kroot)
+{
+	void * __capability ctemp;
+
+	ctemp = cheri_setaddress(kroot, CHERI_SEALCAP_KERNEL_BASE);
+	ctemp = cheri_setbounds(kroot, CHERI_SEALCAP_KERNEL_LENGTH);
+	ctemp = cheri_andperm(kroot, CHERI_SEALCAP_KERNEL_PERMS);
+	kernel_root_sealcap = ctemp;
+
+	ctemp = cheri_setaddress(kroot, CHERI_CAP_USER_DATA_BASE);
+	ctemp = cheri_setbounds(ctemp, CHERI_CAP_USER_DATA_LENGTH);
+	ctemp = cheri_andperm(ctemp, CHERI_CAP_USER_DATA_PERMS |
+	    CHERI_CAP_USER_CODE_PERMS);
+	userspace_root_cap = ctemp;
+
+	ctemp = cheri_setaddress(kroot, CHERI_SEALCAP_USERSPACE_BASE);
+	ctemp = cheri_setbounds(ctemp, CHERI_SEALCAP_USERSPACE_LENGTH);
+	ctemp = cheri_andperm(ctemp, CHERI_SEALCAP_USERSPACE_PERMS);
+	userspace_root_sealcap = ctemp;
+
+	swap_restore_cap = kroot;
+}
+
+void
 hybridabi_thread_setregs(struct thread *td, unsigned long entry_addr)
 {
 	struct trapframe *tf;
