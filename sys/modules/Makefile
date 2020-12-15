@@ -472,8 +472,10 @@ _ipfw_nat64=	ipfw_nat64
 _ipfw_nptv6=	ipfw_nptv6
 .endif
 
+.if !${MACHINE_ABI:Mpurecap}
 .if ${MK_IPFILTER} != "no" || defined(ALL_MODULES)
 _ipfilter=	ipfilter
+.endif
 .endif
 
 .if ${MK_ISCSI} != "no" || defined(ALL_MODULES)
@@ -527,12 +529,14 @@ _vmware=	vmware
 _netgraph=	netgraph
 .endif
 
+.if !${MACHINE_ABI:Mpurecap}
 .if (${MK_PF} != "no" && (${MK_INET_SUPPORT} != "no" || \
 	${MK_INET6_SUPPORT} != "no")) || defined(ALL_MODULES)
 _pf=		pf
 _pflog=		pflog
 .if ${MK_INET_SUPPORT} != "no"
 _pfsync=	pfsync
+.endif
 .endif
 .endif
 
@@ -596,9 +600,11 @@ _syscons=	syscons
 .endif
 
 .if ${MACHINE_CPUARCH} != "mips"
+.if !${MACHINE_ABI:Mpurecap}
 # no BUS_SPACE_UNSPECIFIED
 # No barrier instruction support (specific to this driver)
 _sym=		sym
+.endif
 # intr_disable() is a macro, causes problems
 .if ${MK_SOURCELESS_UCODE} != "no"
 _cxgb=		cxgb
@@ -827,7 +833,7 @@ _bcm283x_pwm=  bcm283x_pwm
 _malo=	malo
 .endif
 
-.if ${CPUTYPE} != "cheri"
+.if !${MACHINE_CPU:Mcheri}
 _linuxkpi=	linuxkpi
 .endif
 

@@ -32,7 +32,12 @@ if (!env.CHANGE_ID && archiveBranches.contains(env.BRANCH_NAME)) {
     }
 }
 // Add an architecture selector for manual builds
-def allArchitectures = ["aarch64", "amd64", "mips64", "mips64-hybrid", "mips64-purecap", "riscv64", "riscv64-hybrid", "riscv64-purecap"]
+def allArchitectures = [
+    "aarch64", "amd64",
+    // TODO: enable once dependencies have been merged: "morello-hybrid", "morello-purecap",
+    "mips64", "mips64-hybrid", "mips64-purecap",
+    "riscv64", "riscv64-hybrid", "riscv64-purecap"
+]
 // Build a subset of the architectures for morello-dev: Just check that we didn't break aarch64 (with CHERI LLVM) and *-purecap
 allArchitectures = ["morello-hybrid", "morello-purecap", "aarch64", "mips64-purecap", "riscv64-purecap"]
 jobProperties.add(parameters([text(defaultValue: allArchitectures.join('\n'),
@@ -142,7 +147,11 @@ ls -la "artifacts-${suffix}/"
         }
     }
 }
-def selectedArchitectures = params.architectures.split('\n')
+
+// Work around for https://issues.jenkins.io/browse/JENKINS-46941
+// Jenkins appears to use the last selected manual override for automatically triggered builds.
+// Therefore, only read the parameter value for manually-triggered builds.
+def selectedArchitectures = isManualBuild() ? params.architectures.split('\n') : allArchitectures
 echo("Selected architectures: ${selectedArchitectures}")
 selectedArchitectures.each { suffix ->
     String name = "cheribsd-${suffix}"

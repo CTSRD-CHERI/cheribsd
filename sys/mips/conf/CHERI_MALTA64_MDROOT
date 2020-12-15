@@ -1,5 +1,5 @@
 #
-# CHERI_MALTH64_MDROOT -- Kernel for the SRI/Cambridge CHERI port to
+# CHERI_MALTA64_MDROOT -- Kernel for the SRI/Cambridge CHERI port to
 # MALTA64 (qemu) with MDROOT support.
 #
 # $FreeBSD$

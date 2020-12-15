@@ -36,10 +36,10 @@
 #include <cheri/cheric.h>
 
 /* Set to -1 to prevent it from being zeroed with the rest of BSS */
-void * __capability userspace_cap = (void * __capability)(intcap_t)-1;
+void * __capability userspace_root_cap = (void * __capability)(intcap_t)-1;
 
 /*
- * Build a new userspace capability derived from userspace_cap.
+ * Build a new userspace capability derived from userspace_root_cap.
  * The resulting capability may include both read and execute permissions,
  * but not write, and will be a sentry capability. For architectures that use
  * flags, the flags for the resulting capability will be set based on what is
@@ -77,7 +77,7 @@ _cheri_capability_build_user_code(struct thread *td, uint32_t perms,
 }
 
 /*
- * Build a new userspace capability derived from userspace_cap.
+ * Build a new userspace capability derived from userspace_root_cap.
  * The resulting capability may include read and write permissions, but
  * not execute.
  */
@@ -95,7 +95,7 @@ _cheri_capability_build_user_data(uint32_t perms, vaddr_t basep, size_t length,
 }
 
 /*
- * Build a new userspace capability derived from userspace_cap.
+ * Build a new userspace capability derived from userspace_root_cap.
  * The resulting capability may include read, write, and execute permissions.
  *
  * This function violates W^X and its use is discouraged and the reason for
@@ -108,7 +108,7 @@ _cheri_capability_build_user_rwx(uint32_t perms, vaddr_t basep, size_t length,
 	void * __capability tmpcap;
 
 	tmpcap = cheri_setoffset(cheri_andperm(cheri_setbounds(
-	    cheri_setoffset(userspace_cap, basep), length), perms), off);
+	    cheri_setoffset(userspace_root_cap, basep), length), perms), off);
 
 	KASSERT(cheri_getlen(tmpcap) == length,
 	    ("%s:%d: Constructed capability has wrong length 0x%zx != 0x%zx: "

@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2012-2018 Robert N. M. Watson
+ * Copyright (c) 2012-2018, 2020 Robert N. M. Watson
  * Copyright (c) 2014 SRI International
  * All rights reserved.
  *
@@ -348,6 +348,12 @@ DECLARE_CHERIBSD_TEST(test_bounds_stack_dynamic_262144);
 DECLARE_CHERIBSD_TEST(test_bounds_stack_dynamic_524288);
 DECLARE_CHERIBSD_TEST(test_bounds_stack_dynamic_1048576);
 
+/* cheribsdtest_bounds_varargs.c */
+DECLARE_CHERIBSD_TEST(test_bounds_varargs_empty_pointer_null);
+DECLARE_CHERIBSD_TEST(test_bounds_varargs_vaarg_overflow);
+DECLARE_CHERIBSD_TEST(test_bounds_varargs_printf_load);
+DECLARE_CHERIBSD_TEST(test_bounds_varargs_printf_store);
+
 /* cheribsdtest_ccall.c */
 void	cheribsdtest_ccall_setup(void);
 DECLARE_CHERIBSD_TEST(test_nofault_ccall_creturn);
@@ -371,6 +377,9 @@ DECLARE_CHERIBSD_TEST(test_cheriabi_munmap_invalid_ptr);
 DECLARE_CHERIBSD_TEST(test_cheriabi_mprotect_invalid_ptr);
 DECLARE_CHERIBSD_TEST(test_cheriabi_minherit_invalid_ptr);
 DECLARE_CHERIBSD_TEST(test_cheriabi_shmdt_invalid_ptr);
+
+/* cheribsdtest_cheriabi_libc.c */
+DECLARE_CHERIBSD_TEST(test_cheriabi_libc_memchr);
 
 /* cheribsdtest_cheriabi_open.c */
 DECLARE_CHERIBSD_TEST(test_cheriabi_open_ordinary);
