@@ -217,6 +217,17 @@ ENTRY(mpentry)
 	/* Drop to EL1 */
 	bl	drop_to_el1
 
+#if __has_feature(capabilities)
+	/*
+	 * Enable Morello instructions at EL1. We will enable them at EL0
+	 * later when we know userspace is expecting to use them.
+	 */
+	mrs	x2, cpacr_el1
+	bic	x2, x2, CPACR_CEN_MASK
+	orr	x2, x2, CPACR_CEN_TRAP_EL0
+	msr	cpacr_el1, x2
+#endif
+
 	/* Set the context id */
 	msr	contextidr_el1, xzr
 
