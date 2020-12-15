@@ -523,6 +523,9 @@ setup_scb(struct thread *td)
 	scb.scb_caller_scb = cheri_capability_build_user_data(0, 0, 0, EAGAIN);
 #ifdef __mips__
 	scb.scb_tls = (char * __capability)td->td_md.md_tls + td->td_proc->p_md.md_tls_tcb_offset;
+#elif defined(__riscv)
+	scb.scb_pid = td->td_proc->p_pid;
+	scb.scb_tip = td->td_tid;
 #endif
 	colocation_store_scb(td, &scb);
 
