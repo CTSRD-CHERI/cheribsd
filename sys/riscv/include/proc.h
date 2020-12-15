@@ -105,6 +105,16 @@ struct switchercb {
 	 * XXX
 	 */
 	void * __capability			scb_cookiep;
+
+	/*
+	 * XXX-PBB
+	 */
+	lwpid_t						scb_tid;
+
+	/*
+	 * XXX-PBB
+	 */
+	pid_t						scb_pid;
 };
 #endif
 
