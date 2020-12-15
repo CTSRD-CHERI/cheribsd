@@ -207,7 +207,6 @@ __DEFAULT_NO_OPTIONS = \
     CLANG_FORMAT \
     DTRACE_TESTS \
     EXPERIMENTAL \
-    GDB \
     GNU_GREP \
     HESIOD \
     LIBSOFT \
@@ -322,10 +321,6 @@ BROKEN_OPTIONS+=LIB32
 BROKEN_OPTIONS+=OFED
 .endif
 
-# In-tree gdb is an older versions without modern architecture support.
-.if ${__T:Maarch64*} || ${__T:Mriscv*} != ""
-BROKEN_OPTIONS+=GDB
-.endif
 .if ${__T:Mriscv*} != ""
 BROKEN_OPTIONS+=OFED
 .endif
@@ -579,7 +574,6 @@ MK_LLD_BOOTSTRAP:= no
 
 .if ${MK_TOOLCHAIN} == "no"
 MK_CLANG:=	no
-MK_GDB:=	no
 MK_INCLUDES:=	no
 MK_LLD:=	no
 MK_LLDB:=	no
