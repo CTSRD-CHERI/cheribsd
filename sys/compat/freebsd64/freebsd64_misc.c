@@ -623,7 +623,7 @@ freebsd64_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	int error, szsigcode, szps;
 	char canary[sizeof(long) * 8];
 	size_t ssiz;
-	vm_offset_t stack_vaddr, rounded_stack_vaddr, stack_offset;
+	vm_offset_t stack_vaddr;
 
 	szps = sizeof(pagesizes[0]) * MAXPAGESIZES;
 	/*
@@ -644,16 +644,8 @@ freebsd64_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	 */
 	stack_vaddr = (vm_offset_t)p->p_vmspace->vm_maxsaddr;
 	ssiz = p->p_usrstack - stack_vaddr;
-	stack_offset = 0;
-	do {
-		rounded_stack_vaddr = CHERI_REPRESENTABLE_BASE(stack_vaddr,
-		    ssiz + stack_offset);
-		stack_offset = stack_vaddr - rounded_stack_vaddr;
-	} while (rounded_stack_vaddr != CHERI_REPRESENTABLE_BASE(stack_vaddr,
-	    ssiz + stack_offset));
 	destp = (uintcap_t)cheri_capability_build_user_data(
-	    CHERI_CAP_USER_DATA_PERMS, rounded_stack_vaddr,
-	    CHERI_REPRESENTABLE_LENGTH(ssiz + stack_offset), stack_offset);
+	    CHERI_CAP_USER_DATA_PERMS, stack_vaddr, ssiz, ssiz);
 	destp = cheri_setaddress(destp, p->p_psstrings);
 	arginfo = (struct freebsd64_ps_strings * __capability)
 	    cheri_setboundsexact(destp, sizeof(*arginfo));

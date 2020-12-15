@@ -1061,7 +1061,7 @@ exec_new_vmspace(struct image_params *imgp, struct sysentvec *sv)
 	struct rlimit rlim_stack;
 	vm_offset_t sv_minuser, stack_addr;
 #if __has_feature(capabilities)
-	vm_offset_t strings_addr, rounded_stack_addr, stack_offset;
+	vm_offset_t strings_addr;
 #endif
 	vm_map_t map;
 	u_long ssiz;
@@ -1158,21 +1158,18 @@ exec_new_vmspace(struct image_params *imgp, struct sysentvec *sv)
 		ssiz = maxssiz;
 	}
 #if __has_feature(capabilities)
-	if (sv->sv_flags & SV_CHERI) {
-		/*
-		 * NB: This may cause the stack to exceed the administrator-
-		 * configured stack size limit.
-		 */
-		ssiz = CHERI_REPRESENTABLE_LENGTH(ssiz);
-	}
+	/*
+	 * NB: This may cause the stack to exceed the administrator-
+	 * configured stack size limit.
+	 */
+	ssiz = CHERI_REPRESENTABLE_LENGTH(ssiz);
 #endif
 	imgp->eff_stack_sz = lim_cur(curthread, RLIMIT_STACK);
 	if (ssiz < imgp->eff_stack_sz)
 		imgp->eff_stack_sz = ssiz;
 	p->p_usrstack = sv->sv_usrstack;
 #if __has_feature(capabilities)
-	if (sv->sv_flags & SV_CHERI)
-		p->p_usrstack = CHERI_REPRESENTABLE_BASE(p->p_usrstack, ssiz);
+	p->p_usrstack = CHERI_REPRESENTABLE_BASE(p->p_usrstack, ssiz);
 #endif
 	p->p_psstrings = p->p_usrstack - sv->sv_szpsstrings;
 
@@ -1184,25 +1181,8 @@ exec_new_vmspace(struct image_params *imgp, struct sysentvec *sv)
 	if (error != KERN_SUCCESS)
 		return (vm_mmap_to_errno(error));
 #if __has_feature(capabilities)
-	/*
-	 * Our capability must cover the whole stack, so roundup the
-	 * length to be representable even if it means the capability
-	 * extends beyond the stack bounds.
-	 *
-	 * XXX: Should we instead unconditionally adjust the actual
-	 * stack location?
-	 */
-	stack_offset = 0;
-	do {
-		rounded_stack_addr = CHERI_REPRESENTABLE_BASE(
-		    stack_addr, ssiz + stack_offset);
-		stack_offset = stack_addr - rounded_stack_addr;
-	} while (rounded_stack_addr != CHERI_REPRESENTABLE_BASE(
-	    stack_addr, ssiz + stack_offset));
         imgp->stack = cheri_capability_build_user_data(
-            CHERI_CAP_USER_DATA_PERMS, rounded_stack_addr,
-	    CHERI_REPRESENTABLE_LENGTH(ssiz + stack_offset),
-	    ssiz + stack_offset);
+	    CHERI_CAP_USER_DATA_PERMS, stack_addr, ssiz, ssiz);
 
 	if (sv->sv_flags & SV_CHERI) {
 		/*
