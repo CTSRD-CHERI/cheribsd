@@ -357,6 +357,12 @@ BROKEN_OPTIONS+=LIB64
 .if ${__T} != "armv6" && ${__T} != "armv7"
 BROKEN_OPTIONS+=LIBSOFT
 .endif
+# XXX: Fails to link due to old broken C++ mangling; remove once
+# https://git.morello-project.org/morello/llvm-project/-/merge_requests/23
+# has been merged.
+.if ${__T} == "aarch64c"
+BROKEN_OPTIONS+=GOOGLETEST
+.endif
 .if ${__T:Mmips*}
 # GOOGLETEST cannot currently be compiled on mips due to external circumstances.
 # Notably, the freebsd-gcc port isn't linking in libgcc so we end up trying ot
