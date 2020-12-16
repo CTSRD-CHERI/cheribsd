@@ -196,7 +196,6 @@ END(fuecap)
 
 /*
  * int subyte(volatile void * __capability, int)
- * TODO: __capability
  */
 ENTRY(subyte)
 	check_user_access 0, (VM_MAXUSER_ADDRESS), fsu_fault_nopcb
@@ -207,7 +206,6 @@ END(subyte)
 
 /*
  * int suword16(volatile void * __capability, int)
- * TODO: __capability
  */
 ENTRY(suword16)
 	check_user_access 0, (VM_MAXUSER_ADDRESS-1), fsu_fault_nopcb

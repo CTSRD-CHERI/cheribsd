@@ -158,6 +158,7 @@ ENTRY(copyinstr)
 2:	EXIT_C64
 	SET_FAULT_HANDLER(xzr, x7) /* Clear the handler */
 
+
 3:	cbz	x3, 4f		/* Check if done != NULL */
 	str	x5, [x3]	/* done = count */
 
@@ -415,31 +416,6 @@ copycommon:
 	ENTER_USER_ACCESS(w6, x7)
 
 	mov	x5, #0			/* x5 is the offset to load/store */
-
-	cmp	x2, #8
-	b.lo	copy_end_bytes		/* Byte-copy if len < 8 */
-
-	/*
-	 * Compare lower bits of src and dest.
-	 * If they are aligned with each other, we can do a dword copy.
-	 */
-	gcvalue	x3, c0
-	gcvalue	x4, c1
-	and	x3, x3, #0x03
-	and	x4, x4, #0x03
-	cmp	x3, x4
-	b.ne	copy_end_bytes		/* Misaligned. Go to byte copy */
-	cbz	x3, copy_main		/* Already word-aligned, skip ahead */
-
-	/* Byte copy until the first word-aligned address */
-copy_byte_by_byte:
-	ldrb	w4, [c0, x5]		/* Load byte from src */
-	strb	w4, [c1, x5]		/* Store byte in dest */
-	sub	x2, x2, #1		/* len-- */
-	add	x3, x3, #1		/* dword_off++ */
-	add	x5, x5, #1		/* off++ */
-	cmp	x3, #8
-	b.lo	copy_byte_by_byte	/* Again if dword_off < 8 */
 
 	/* Copy words */
 copy_main:

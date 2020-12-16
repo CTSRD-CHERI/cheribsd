@@ -51,6 +51,7 @@ SUBDIR=	${SUBDIR_BOOTSTRAP} \
 	libcasper \
 	libcompat \
 	libcrypt \
+	libdevctl \
 	libdevinfo \
 	libdevstat \
 	libdl \
@@ -110,8 +111,6 @@ SUBDIR=	${SUBDIR_BOOTSTRAP} \
 	libz \
 	libzstd \
 	ncurses
-
-SUBDIR+=	libdevctl
 
 .if !${MACHINE_ABI:Mpurecap}
 # Needs changes to be useful for purecap and not used by anything (yet)

@@ -46,7 +46,7 @@ SUBDIR.${MK_LIBCHERI}+=	cheri_bench
 .endif
 
 # Small cheri programs
-.if (${MACHINE_ABI:Mpurecap} || ${MK_COMPAT_CHERIABI} == "yes")
+.if ${MACHINE_ABI:Mpurecap} || ${MK_COMPAT_CHERIABI} == "yes"
 .if !${MACHINE_ARCH:Maarch64*}
 # FIXME: linker assertion when building for Morello
 SUBDIR.${MK_CHERI}+=	cheri_minimal_dynamic_exe

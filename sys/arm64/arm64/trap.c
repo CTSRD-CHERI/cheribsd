@@ -227,6 +227,7 @@ align_abort(struct thread *td, struct trapframe *frame, uint64_t esr,
 	userret(td, frame);
 }
 
+
 static void
 external_abort(struct thread *td, struct trapframe *frame, uint64_t esr,
     uint64_t far, int lower)
@@ -238,7 +239,9 @@ external_abort(struct thread *td, struct trapframe *frame, uint64_t esr,
 	 */
 	if (!lower && test_bs_fault((uintcap_t)frame->tf_elr)) {
 #if __has_feature(capabilities)
-		trapframe_set_elr(frame, (uintcap_t)generic_bs_fault);
+		trapframe_set_elr(frame,
+		    (uintcap_t)cheri_setaddress(cheri_getpcc(),
+		    (uint64_t)generic_bs_fault));
 #else
 		frame->tf_elr = (uint64_t)generic_bs_fault;
 #endif
@@ -272,6 +275,7 @@ cap_abort(struct thread *td, struct trapframe *frame, uint64_t esr,
 		printf(" esr:         %.8lx\n", esr);
 		panic("Capability abort from kernel space!");
 	}
+
 	call_trapsignal(td, SIGPROT, cheri_esr_to_sicode(esr),
 	    (void * __capability)frame->tf_elr, ESR_ELx_EXCEPTION(esr));
 	userret(td, frame);

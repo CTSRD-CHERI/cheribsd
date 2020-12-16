@@ -1054,7 +1054,6 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	tf->tf_elr = (uintcap_t)catcher;
 #endif
 	tf->tf_sp = (uintcap_t)fp;
-
 	sysent = p->p_sysent;
 #if __has_feature(capabilities)
 	tf->tf_lr = (uintcap_t)p->p_md.md_sigcode;

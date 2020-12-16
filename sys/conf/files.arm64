@@ -164,7 +164,7 @@ arm64/arm64/locore.S		standard	no-obj
 arm64/arm64/machdep.c		standard
 arm64/arm64/machdep_boot.c	standard
 arm64/arm64/mem.c		standard
-# Morello needs cap-aware memcpy
+# CHERI needs capability-aware memcpy
 arm64/arm64/memcpy.S		optional	!cpu_cheri
 arm64/arm64/memmove.S		optional	!cpu_cheri
 arm64/arm64/minidump_machdep.c	standard
@@ -378,8 +378,8 @@ kern/subr_devmap.c		standard
 kern/subr_intr.c		optional	intrng
 kern/subr_physmem.c		standard
 libkern/bcmp.c			standard
-# Morello needs cap-aware memcpy
-libkern/bcopy.c		optional	cpu_cheri
+# CHERI needs capability-aware memcpy
+libkern/bcopy.c			optional	cpu_cheri
 libkern/bcopy_c.c		optional	cpu_cheri
 libkern/memcmp.c		standard				\
 	compile-with "${NORMAL_C:N-fsanitize*}"

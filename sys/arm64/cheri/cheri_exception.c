@@ -32,6 +32,7 @@
 
 #include <sys/param.h>
 #include <sys/signal.h>
+#include <sys/systm.h>
 
 #include <cheri/cheri.h>
 
@@ -65,21 +66,18 @@ cheri_esr_to_sicode(uint64_t esr)
 {
 	uint8_t fsc = esr & ISS_DATA_DFSC_MASK;
 	switch (fsc) {
-		case ISS_DATA_DFSC_CAP_TAG:
-			return (PROT_CHERI_TAG);
-			break;
-		case ISS_DATA_DFSC_CAP_SEALED:
-			return (PROT_CHERI_SEALED);
-			break;
-		case ISS_DATA_DFSC_CAP_BOUND:
-			return (PROT_CHERI_BOUNDS);
-			break;
-		case ISS_DATA_DFSC_CAP_PERM:
-			return (PROT_CHERI_PERM);
-			break;
-		default:
-			return 0;
-			break;
+	case ISS_DATA_DFSC_CAP_TAG:
+		return (PROT_CHERI_TAG);
+	case ISS_DATA_DFSC_CAP_SEALED:
+		return (PROT_CHERI_SEALED);
+	case ISS_DATA_DFSC_CAP_BOUND:
+		return (PROT_CHERI_BOUNDS);
+	case ISS_DATA_DFSC_CAP_PERM:
+		return (PROT_CHERI_PERM);
+	default:
+		printf("%s: Warning: Unknown abort %x, returning si_code 0\n",
+		    __func__, fsc);
+		return (0);
 	}
 }
 

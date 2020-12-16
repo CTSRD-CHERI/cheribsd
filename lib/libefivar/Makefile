@@ -41,11 +41,6 @@ INCS=		efivar.h efivar-dp.h
 SHLIB_MAJOR=	1
 MAN=		efivar.3
 
-# XXXBFG maybe fix properly later
-.if ${MACHINE_ABI:Mpurecap} != ""
-CFLAGS+=	-Wno-cheri-provenance
-.endif
-
 CFLAGS+=	-I${EFIBOOT}/include
 CFLAGS+=	-I${.CURDIR} -I${EDK2INC}
 

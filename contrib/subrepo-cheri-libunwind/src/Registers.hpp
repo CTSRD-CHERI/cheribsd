@@ -1795,7 +1795,6 @@ inline const char *Registers_ppc64::getRegisterName(int regNum) {
 #if defined(_LIBUNWIND_TARGET_AARCH64)
 /// Registers_arm64  holds the register state of a thread in a 64-bit arm
 /// process.
-
 class _LIBUNWIND_HIDDEN Registers_arm64 {
 public:
   Registers_arm64();

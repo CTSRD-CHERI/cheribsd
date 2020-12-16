@@ -116,10 +116,6 @@
 #define	CHERI_PERMS_KERNEL						\
 	(CHERI_PERM_GLOBAL | CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP)	\
 
-/*
- * XXX Will probaby want non-executive PCC when we add comparmentalization
- * support, but make all code caps executive for now.
- */
 #define	CHERI_PERMS_KERNEL_CODE						\
 	(CHERI_PERMS_KERNEL | CHERI_PERM_EXECUTE |			\
 	CHERI_PERM_SYSTEM_REGS | CHERI_PERM_EXECUTIVE)
@@ -150,15 +146,8 @@
 #define	CHERI_OTYPE_ISKERN(x)	(((x) & CHERI_OTYPE_KERN_FLAG) != 0)
 #define	CHERI_OTYPE_ISUSER(x)	(!(CHERI_OTYPE_ISKERN(x)))
 
-/*
- * When performing a userspace-to-userspace CCall, capability flow-control
- * checks normally prevent local capabilities from being delegated.  This can
- * be disabled on call (but not return) by using an object type with the 22nd
- * bit set -- combined with a suitable selector on the CCall instruction to
- * ensure that this behaviour is intended.
- */
-#define	CHERI_OTYPE_LOCALOK_SHIFT	(CHERI_OTYPE_BITS - 2)
-#define	CHERI_OTYPE_LOCALOK_FLAG	(1 << CHERI_OTYPE_LOCALOK_SHIFT
-#define	CHERI_OTYPE_IS_LOCALOK(x)	(((x) & CHERI_OTYPE_LOCALOK_FLAG) != 0)
+/* Reserved CHERI object types: */
+#define	CHERI_OTYPE_UNSEALED	(0l)
+#define	CHERI_OTYPE_SENTRY	(1l)
 
 #endif /* _ARM64_INCLUDE_CHERIREG_H_ */

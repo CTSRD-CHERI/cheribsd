@@ -45,6 +45,7 @@ trapframe_set_elr(struct trapframe *tf, uintcap_t elr)
 
 	if (cheri_getsealed(elr))
 		elr = cheri_unseal(elr, sentry_unsealcap);
+
 	if (elr & 0x1) {
 		tf->tf_spsr |= PSR_C64;
 		--elr;
