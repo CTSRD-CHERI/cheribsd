@@ -415,12 +415,10 @@ data_abort(struct thread *td, struct trapframe *frame, uint64_t esr,
 
 #if __has_feature(capabilities)
 #define PRINT_REG(name, value)					\
-	printf(name ": " _CHERI_PRINTF_CAP_FMT "\n",		\
-	    _CHERI_PRINTF_CAP_ARG(value))
+	printf(name " = %#.16lp\n", (void * __capability)(value))
 #define PRINT_REG_N(array, n)					\
-	printf(" %sc%d: " _CHERI_PRINTF_CAP_FMT "\n",		\
-	    ((n) < 10) ? " " : "", n, 				\
-	    _CHERI_PRINTF_CAP_ARG((array)[n]))
+	printf(" %sc%d: %#.16lp\n",				\
+	    ((n) < 10) ? " " : "", n, (void * __capability)(array)[n])
 #else
 #define PRINT_REG(name, value)	printf(name ": 0x%016lx\n", value)
 #define PRINT_REG_N(array, n)					\
@@ -431,14 +429,8 @@ data_abort(struct thread *td, struct trapframe *frame, uint64_t esr,
 static void
 print_registers(struct trapframe *frame)
 {
-#if 0
-	/* Disable for now */
 	u_int reg;
 
-	/*
-	 * TODO: We use uint64_t to be compatible with aarch64, but should
-	 * use the macros to print the full capability.
-	 */
 	for (reg = 0; reg < nitems(frame->tf_x); reg++) {
 		PRINT_REG_N(frame->tf_x, reg);
 	}
@@ -449,7 +441,6 @@ print_registers(struct trapframe *frame)
 	PRINT_REG("  lr", frame->tf_lr);
 	PRINT_REG(" elr", frame->tf_elr);
 	printf("spsr:         %8x\n", frame->tf_spsr);
-#endif
 }
 
 void
