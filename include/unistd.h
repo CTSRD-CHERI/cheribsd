@@ -628,6 +628,11 @@ int	 coaccept_slow(void * __capability * __capability,
 	    const void * __capability, size_t, void * __capability, size_t);
 int	 cocall_slow(void * __capability,
 	    const void * __capability, size_t, void * __capability, size_t);
+/*
+ * Switcher-based methods for inspecting pid and tid of switchercb subject
+ */
+pid_t	 cogetpid2(void * __capability, void * __capability);
+lwpid_t	 cogettid(void * __capability, void * __capability);
 #endif /* __has_feature(capabilities) */
 #endif /* __BSD_VISIBLE */
 __END_DECLS

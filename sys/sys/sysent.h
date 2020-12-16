@@ -142,6 +142,10 @@ struct sysentvec {
 	vm_offset_t	sv_cocall_len;
 	vm_offset_t	sv_coaccept_base;
 	vm_offset_t	sv_coaccept_len;
+	vm_offset_t	sv_cogetpid_base;
+	vm_offset_t	sv_cogetpid_len;
+	vm_offset_t	sv_cogettid_base;
+	vm_offset_t	sv_cogettid_len;
 	void		(*sv_schedtail)(struct thread *);
 	void		(*sv_thread_detach)(struct thread *);
 	int		(*sv_trap)(struct thread *);

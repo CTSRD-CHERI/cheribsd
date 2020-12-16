@@ -356,6 +356,14 @@ exec_sysvec_init(void *param)
 		sv->sv_coaccept_base = sv->sv_shared_page_base +
 		    shared_page_fill(szswitcher_coaccept, 16, switcher_coaccept);
 		sv->sv_coaccept_len = szswitcher_coaccept;
+
+		sv->sv_cogetpid_base = sv->sv_shared_page_base +
+		    shared_page_fill(szswitcher_cogetpid, 16, switcher_cogetpid);
+		sv->sv_cogetpid_len = szswitcher_cogetpid;
+		sv->sv_cogettid_base = sv->sv_shared_page_base +
+		    shared_page_fill(szswitcher_cogettid, 16, switcher_cogettid);
+		sv->sv_cogettid_len = szswitcher_cogettid;
+
 	}
 }
 

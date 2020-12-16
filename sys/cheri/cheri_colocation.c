@@ -134,6 +134,71 @@ colocation_copyin_scb_at(const void *addr, struct switchercb *scbp)
 	    ___USER_CFROMPTR(addr, userspace_cap), scbp));
 }
 
+void * __capability
+colocation_get_codecap(struct thread *td, int what)
+{
+	void * __capability codecap;
+
+	switch (what) {
+	case COSETUP_COCALL:
+		/*
+		 * XXX: This should should use cheri_capability_build_user_code()
+		 *      instead.  It fails to seal, though; I guess there's something
+		 *      wrong with perms.
+		 */
+		codecap = cheri_capability_build_user_rwx(CHERI_CAP_USER_CODE_PERMS,
+		    td->td_proc->p_sysent->sv_cocall_base,
+		    td->td_proc->p_sysent->sv_cocall_len, 0);
+		break;
+
+	case COSETUP_COACCEPT:
+		codecap = cheri_capability_build_user_rwx(CHERI_CAP_USER_CODE_PERMS,
+		    td->td_proc->p_sysent->sv_coaccept_base,
+		    td->td_proc->p_sysent->sv_coaccept_len, 0);
+		break;
+
+	case COSETUP_COGETPID:
+		codecap = cheri_capability_build_user_rwx(CHERI_CAP_USER_CODE_PERMS,
+		    td->td_proc->p_sysent->sv_cogetpid_base,
+		    td->td_proc->p_sysent->sv_cogetpid_len, 0);
+		break;
+
+	case COSETUP_COGETTID:
+		codecap = cheri_capability_build_user_rwx(CHERI_CAP_USER_CODE_PERMS,
+		    td->td_proc->p_sysent->sv_cogettid_base,
+		    td->td_proc->p_sysent->sv_cogettid_len, 0);
+		break;
+
+	default:
+		return (NULL);
+	}
+
+#ifdef CHERI_FLAGS_CAP_MODE
+	if (SV_PROC_FLAG(td->td_proc, SV_CHERI))
+		codecap = cheri_setflags(codecap, CHERI_FLAGS_CAP_MODE);
+#endif
+	codecap = cheri_seal(codecap, switcher_sealcap);
+
+	return (codecap);
+}
+
+void * __capability
+colocation_get_scbcap(struct thread *td)
+{
+	void * __capability datacap;
+	vaddr_t addr;
+
+	addr = td->td_md.md_scb;
+	if (addr == 0)
+		return (NULL);
+
+	datacap = cheri_capability_build_user_data(CHERI_CAP_USER_DATA_PERMS,
+	    addr, PAGE_SIZE, 0);
+	datacap = cheri_seal(datacap, switcher_sealcap);
+
+	return (datacap);
+}
+
 static bool
 colocation_fetch_scb(struct thread *td, struct switchercb *scbp)
 {
@@ -547,7 +612,7 @@ setup_scb(struct thread *td)
 	scb.scb_tls = (char * __capability)td->td_md.md_tls + td->td_proc->p_md.md_tls_tcb_offset;
 #elif defined(__riscv)
 	scb.scb_pid = td->td_proc->p_pid;
-	scb.scb_tip = td->td_tid;
+	scb.scb_tid = td->td_tid;
 #endif
 	colocation_copyout_scb(td, &scb);
 
@@ -596,43 +661,44 @@ kern_cosetup(struct thread *td, int what,
 		codecap = cheri_capability_build_user_rwx(CHERI_CAP_USER_CODE_PERMS,
 		    td->td_proc->p_sysent->sv_cocall_base,
 		    td->td_proc->p_sysent->sv_cocall_len, 0);
-#ifdef CHERI_FLAGS_CAP_MODE
-		if (SV_PROC_FLAG(td->td_proc, SV_CHERI))
-			codecap = cheri_setflags(codecap, CHERI_FLAGS_CAP_MODE);
-#endif
-		codecap = cheri_seal(codecap, switcher_sealcap);
-		error = copyoutcap(&codecap, codep, sizeof(codecap));
-		if (error != 0)
-			return (error);
-
-		datacap = cheri_capability_build_user_data(CHERI_CAP_USER_DATA_PERMS,
-		    addr, PAGE_SIZE, 0);
-		datacap = cheri_seal(datacap, switcher_sealcap);
-		error = copyoutcap(&datacap, datap, sizeof(datacap));
-		return (0);
+		break;
 
 	case COSETUP_COACCEPT:
 		codecap = cheri_capability_build_user_rwx(CHERI_CAP_USER_CODE_PERMS,
 		    td->td_proc->p_sysent->sv_coaccept_base,
 		    td->td_proc->p_sysent->sv_coaccept_len, 0);
-#ifdef CHERI_FLAGS_CAP_MODE
-		if (SV_PROC_FLAG(td->td_proc, SV_CHERI))
-			codecap = cheri_setflags(codecap, CHERI_FLAGS_CAP_MODE);
-#endif
-		codecap = cheri_seal(codecap, switcher_sealcap);
-		error = copyoutcap(&codecap, codep, sizeof(codecap));
-		if (error != 0)
-			return (error);
+		break;
 
-		datacap = cheri_capability_build_user_data(CHERI_CAP_USER_DATA_PERMS,
-		    addr, PAGE_SIZE, 0);
-		datacap = cheri_seal(datacap, switcher_sealcap);
-		error = copyoutcap(&datacap, datap, sizeof(datacap));
-		return (0);
+	case COSETUP_COGETPID:
+		codecap = cheri_capability_build_user_rwx(CHERI_CAP_USER_CODE_PERMS,
+		    td->td_proc->p_sysent->sv_cogetpid_base,
+		    td->td_proc->p_sysent->sv_cogetpid_len, 0);
+		break;
+
+	case COSETUP_COGETTID:
+		codecap = cheri_capability_build_user_rwx(CHERI_CAP_USER_CODE_PERMS,
+		    td->td_proc->p_sysent->sv_cogettid_base,
+		    td->td_proc->p_sysent->sv_cogettid_len, 0);
+		break;
 
 	default:
 		return (EINVAL);
 	}
+
+#ifdef CHERI_FLAGS_CAP_MODE
+	if (SV_PROC_FLAG(td->td_proc, SV_CHERI))
+		codecap = cheri_setflags(codecap, CHERI_FLAGS_CAP_MODE);
+#endif
+	codecap = cheri_seal(codecap, switcher_sealcap);
+	error = copyoutcap(&codecap, codep, sizeof(codecap));
+	if (error != 0)
+		return (error);
+
+	datacap = cheri_capability_build_user_data(CHERI_CAP_USER_DATA_PERMS,
+	    addr, PAGE_SIZE, 0);
+	datacap = cheri_seal(datacap, switcher_sealcap);
+	error = copyoutcap(&datacap, datap, sizeof(datacap));
+	return (0);
 }
 
 int
