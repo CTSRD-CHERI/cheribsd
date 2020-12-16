@@ -1,6 +1,11 @@
-/*-
- * Copyright (c) 1995 Bruce D. Evans.
+/*
+ * Copyright (c) 2020 Peter S. Blandford-Baker
  * All rights reserved.
+ *
+ * This software was developed by SRI International and the University of
+ * Cambridge Computer Laboratory (Department of Computer Science and
+ * Technology) under DARPA contract HR0011-18-C-0016 ("ECATS"), as part of the
+ * DARPA SSITH research programme.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -10,9 +15,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. Neither the name of the author nor the names of contributors
- *    may be used to endorse or promote products derived from this software
- *    without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
@@ -25,40 +27,47 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *	from: FreeBSD: src/sys/i386/include/md_var.h,v 1.40 2001/07/12
- * $FreeBSD$
  */
 
-#ifndef	_MACHINE_MD_VAR_H_
-#define	_MACHINE_MD_VAR_H_
+#include <sys/errno.h>
+#include <machine/asm.h>
+#include <machine/cherireg.h>
+#include <machine/switcher.h>
 
-extern long Maxmem;
-extern char sigcode[];
-extern int szsigcode;
-#ifdef COMPAT_FREEBSD64
-extern char freebsd64_sigcode[];
-extern int freebsd64_szsigcode;
-#endif
-extern	char	switcher_cocall[];
-extern	char	switcher_cocall_copy_start[];
-extern	char	switcher_cocall_copy_end[];
-extern	char	switcher_cocall_copy_onfault[];
-extern	int	szswitcher_cocall;
-extern	char	switcher_coaccept[];
-extern	int	szswitcher_coaccept;
-extern	char	switcher_cogetpid[];
-extern	int	szswitcher_cogetpid;
-extern	char	switcher_cogettid[];
-extern	int	szswitcher_cogettid;
-extern u_long elf_hwcap;
-extern register_t mvendorid;
-extern register_t marchid;
-extern register_t mimpid;
+#define	idc ct6
+.option capmode
 
-struct dumperinfo;
+/*
+ *
+ */
+.text
+.globl _C_LABEL(switcher_cogetpid)
+_C_LABEL(switcher_cogetpid):
+	cld a0, SCB_PID(idc)
+	cmove ct6, cnull
+	li t0, 0
+	cret
+.globl _C_LABEL(eswitcher_cogetpid)
+_C_LABEL(eswitcher_cogetpid):
 
-void busdma_swi(void);
-int minidumpsys(struct dumperinfo *);
+/*
+ *
+ */
+.text
+.globl _C_LABEL(switcher_cogettid)
+_C_LABEL(switcher_cogettid):
+	cld a0, SCB_TID(idc)
+	cmove ct6, cnull
+	li t0, 0
+	cret
+.globl _C_LABEL(eswitcher_cogettid)
+_C_LABEL(eswitcher_cogettid):
 
-#endif /* !_MACHINE_MD_VAR_H_ */
+.data
+.globl szswitcher_cogetpid
+szswitcher_cogetpid:
+.long eswitcher_cogetpid-switcher_cogetpid
+
+.global szswitcher_cogettid
+szswitcher_cogettid:
+.long eswitcher_cogettid-switcher_cogettid

@@ -525,7 +525,7 @@ setup_scb(struct thread *td)
 	scb.scb_tls = (char * __capability)td->td_md.md_tls + td->td_proc->p_md.md_tls_tcb_offset;
 #elif defined(__riscv)
 	scb.scb_pid = td->td_proc->p_pid;
-	scb.scb_tip = td->td_tid;
+	scb.scb_tid = td->td_tid;
 #endif
 	colocation_store_scb(td, &scb);
 
@@ -592,10 +592,36 @@ kern_cosetup(struct thread *td, int what,
 		error = sucap(datap, (intcap_t)datacap);
 		return (error);
 
+
 	case COSETUP_COACCEPT:
 		codecap = switcher_code_cap(td,
 		    td->td_proc->p_sysent->sv_coaccept_base,
 		    td->td_proc->p_sysent->sv_coaccept_len);
+		error = sucap(codep, (intcap_t)codecap);
+		if (error != 0)
+			return (error);
+
+		datacap = cheri_seal(td->td_scb, switcher_sealcap);
+		error = sucap(datap, (intcap_t)datacap);
+		return (error);
+		break;
+
+	case COSETUP_COGETPID:
+		codecap = switcher_code_cap(td,
+			td->td_proc->p_sysent->sv_cogetpid_base,
+			td->td_proc->p_sysent->sv_cogetpid_len);
+		error = sucap(codep, (intcap_t)codecap);
+		if (error != 0)
+			return (error);
+
+		datacap = cheri_seal(td->td_scb, switcher_sealcap);
+		error = sucap(datap, (intcap_t)datacap);
+		return (error);
+
+	case COSETUP_COGETTID:
+		codecap = switcher_code_cap(td,
+			td->td_proc->p_sysent->sv_cogettid_base,
+			td->td_proc->p_sysent->sv_cogettid_len);
 		error = sucap(codep, (intcap_t)codecap);
 		if (error != 0)
 			return (error);

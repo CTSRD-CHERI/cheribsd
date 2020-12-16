@@ -33,8 +33,9 @@ libkern/flsll.c			standard
 libkern/memcmp.c		standard
 libkern/memset.c		standard
 libkern/strlen.c		standard
-riscv/cheri/cheri_coaccept.S	optional	cpu_cheri
-riscv/cheri/cheri_cocall.S	optional	cpu_cheri
+riscv/cheri/cheri_coaccept.S		optional cpu_cheri
+riscv/cheri/cheri_cocall.S		optional cpu_cheri
+riscv/cheri/cheri_copid.S		optional cpu_cheri
 riscv/cheri/cheri_debug.c	optional	cpu_cheri ddb
 riscv/cheri/cheri_exception.c	optional	cpu_cheri
 riscv/cheri/cheri_machdep.c	optional	cpu_cheri

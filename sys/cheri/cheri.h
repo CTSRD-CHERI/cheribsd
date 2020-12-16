@@ -163,6 +163,8 @@ bool	colocation_trap_in_switcher(struct thread *td,
 	    struct trapframe *trapframe, const char *msg);
 void	colocation_update_tls(struct thread *td);
 void	db_print_scb_td(struct thread *td);
+void * __capability colocation_get_codecap(struct thread *td, int what);
+void * __capability colocation_get_scbcap(struct thread *td);
 #endif /* !_KERNEL */
 
 /*
