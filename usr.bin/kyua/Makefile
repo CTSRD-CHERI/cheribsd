@@ -168,7 +168,11 @@ SRCS+=	cli/cmd_about.cpp		\
 	cli/config.cpp			\
 	cli/main.cpp
 
-FILESGROUPS=	DOCS EXAMPLES MISC STORE
+FILESGROUPS=	DOCS MISC STORE
+
+.if ${MK_EXAMPLES} != "no"
+FILESGROUPS+=	EXAMPLES
+.endif
 
 # Install a minimal default config that uses the 'tests' user.
 # The examples config is not appropriate for general use.
