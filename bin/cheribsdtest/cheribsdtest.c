@@ -93,9 +93,7 @@ static const struct cheri_test cheri_tests[] = {
 	  .ct_func = test_initregs_stack },
 	{ .ct_name = "test_initregs_stack_user_perms",
 	  .ct_desc = "Test user permissions of stack capability",
-	  .ct_func = test_initregs_stack_user_perms,
-	  .ct_xfail_reason = "CHERI_PERM_CHERIABI_VMMAP "
-	    "unnecessarily set in stack capability" },
+	  .ct_func = test_initregs_stack_user_perms },
 	{ .ct_name = "test_initregs_returncap",
 	  .ct_desc = "Test value of return capability",
 	  .ct_func = test_initregs_returncap },

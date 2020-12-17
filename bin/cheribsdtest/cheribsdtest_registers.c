@@ -284,9 +284,10 @@ check_initreg_data_full_addrspace(void * __capability c)
 
 	/* Permissions. */
 	v = cheri_getperm(c);
-	if (v != CHERI_CAP_USER_DATA_PERMS)
+	if (v != (CHERI_CAP_USER_DATA_PERMS | CHERI_PERM_CHERIABI_VMMAP))
 		cheribsdtest_failure_errx("perms %jx (expected %jx)", v,
-		    (uintmax_t)CHERI_CAP_USER_DATA_PERMS);
+		    (uintmax_t)CHERI_CAP_USER_DATA_PERMS |
+		    CHERI_PERM_CHERIABI_VMMAP);
 
 	/*
 	 * More overt tests for permissions that should -- or should not -- be
@@ -383,10 +384,6 @@ test_initregs_stack_user_perms(const struct cheri_test *ctp __unused)
 {
 	register_t v;
 
-	/*
-	 * Note: this test is an expected failure since we set VMMAP
-	 * TODO: move this into test_initregs_stack once it passes
-	 */
 	v = cheri_getperm(cheri_getstack());
 	if ((v & CHERI_PERMS_SWALL) !=
 	    (CHERI_PERMS_SWALL & ~CHERI_PERM_CHERIABI_VMMAP))
@@ -468,7 +465,7 @@ test_initregs_stack(const struct cheri_test *ctp __unused)
 
 	if (v != CHERI_CAP_USER_DATA_PERMS)
 		cheribsdtest_failure_errx("perms %jx (expected %jx)", v,
-		    (uintmax_t)CHERI_CAP_USER_DATA_PERMS);
+		    (uintmax_t)(CHERI_CAP_USER_DATA_PERMS));
 
 	/* Sealed bit. */
 	v = cheri_getsealed(c);
