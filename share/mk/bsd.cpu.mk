@@ -161,7 +161,7 @@ _CPUCFLAGS = -march=${CPUTYPE:S/^mips//}
 # Use -march when the CPU type is an architecture value, e.g. armv8.1-a
 _CPUCFLAGS = -march=${CPUTYPE}
 .   endif
-.  elif ${CPUTYPE:Mmorello*} != ""
+.  elif ${CPUTYPE} == "morello"
 # Don't use -march; we will add -march=morello or -march=morello+c64 later but
 # adding -march=morello here would override that as _CPUCFLAGS is added late.
 # It is also not a valid value for -mcpu.
@@ -296,7 +296,7 @@ MACHINE_CPU = sse3
 MACHINE_CPU += amd64 sse2 sse mmx
 ########## arm64
 . elif ${MACHINE_CPUARCH} == "aarch64"
-.  if ${CPUTYPE:Mmorello} != ""
+.  if ${CPUTYPE} == "morello"
 MACHINE_CPU = cheri
 .  endif
 MACHINE_CPU += arm64
