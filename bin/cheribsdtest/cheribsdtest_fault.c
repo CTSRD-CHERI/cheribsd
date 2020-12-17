@@ -111,8 +111,8 @@ test_fault_perm_seal(const struct cheri_test *ctp __unused)
 	sealed = cheri_seal(ip, sealcap);
   /* Morello clears tag rather than faulting. */
 #ifdef __aarch64__
-  if (!cheri_gettag(sealed))
-    cheribsdtest_success();
+	if (!cheri_gettag(sealed))
+		cheribsdtest_success();
 #endif
 	/*
 	 * Ensure that sealed is actually use, otherwise the faulting
@@ -161,8 +161,8 @@ test_fault_perm_unseal(const struct cheri_test *ctp __unused)
 	unsealed = cheri_unseal(sealed, sealcap);
   /* Morello clears tag rather than faulting. */
 #ifdef __aarch64__
-  if (!cheri_gettag(unsealed))
-    cheribsdtest_success();
+	if (!cheri_gettag(unsealed))
+		cheribsdtest_success();
 #endif
 	/*
 	 * Ensure that unsealed is actually use, otherwise the faulting
