@@ -111,6 +111,11 @@ extern void * __capability userspace_root_sealcap;
  */
 extern void * __capability swap_restore_cap;
 
+#ifdef __CHERI_PURE_CAPABILITY__
+/* Root kernel capability */
+extern void * __capability kernel_root_cap;
+#endif
+
 /* Root of all sealed kernel capabilities. */
 extern void * __capability kernel_root_sealcap;
 
@@ -164,3 +169,12 @@ extern u_int	security_cheri_bound_legacy_capabilities;
 #include <machine/cheri.h>
 
 #endif /* _SYS_CHERI_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20200803,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "support"
+//   ]
+// }
+// CHERI CHANGES END
