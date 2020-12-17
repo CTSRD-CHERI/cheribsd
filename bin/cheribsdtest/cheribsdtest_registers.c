@@ -240,7 +240,8 @@ check_initreg_code(void * __capability c)
 
 	if ((v & CHERI_PERMS_SWALL) !=
 	    (CHERI_PERMS_SWALL & ~CHERI_PERM_CHERIABI_VMMAP))
-		cheribsdtest_failure_errx("perms %jx (expected swperms %x)", v,
+		cheribsdtest_failure_errx("swperms %jx (expected swperms %x)",
+		    v & CHERI_PERMS_SWALL,
 		    (CHERI_PERMS_SWALL & ~CHERI_PERM_CHERIABI_VMMAP));
 
 	/* Check that the raw permission bits match the kernel header: */
@@ -326,8 +327,8 @@ check_initreg_data_full_addrspace(void * __capability c)
 		cheribsdtest_failure_errx("perms %jx (system_regs present)", v);
 
 	if ((v & CHERI_PERMS_SWALL) != CHERI_PERMS_SWALL)
-		cheribsdtest_failure_errx("perms %jx (expected swperms %x)", v,
-		    CHERI_PERMS_SWALL);
+		cheribsdtest_failure_errx("swperms %jx (expected swperms %x)",
+		    v & CHERI_PERMS_SWALL, CHERI_PERMS_SWALL);
 
 	/* Sealed bit. */
 	v = cheri_getsealed(c);
@@ -389,7 +390,8 @@ test_initregs_stack_user_perms(const struct cheri_test *ctp __unused)
 	v = cheri_getperm(cheri_getstack());
 	if ((v & CHERI_PERMS_SWALL) !=
 	    (CHERI_PERMS_SWALL & ~CHERI_PERM_CHERIABI_VMMAP))
-		cheribsdtest_failure_errx("perms %jx (expected swperms %x)", v,
+		cheribsdtest_failure_errx("swperms %jx (expected swperms %x)",
+		    v & CHERI_PERMS_SWALL,
 		    (CHERI_PERMS_SWALL & ~CHERI_PERM_CHERIABI_VMMAP));
 	cheribsdtest_success();
 }
