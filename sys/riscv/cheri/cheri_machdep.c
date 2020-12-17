@@ -57,7 +57,7 @@ cheri_init_capabilities(void * __capability kroot)
 	ctemp = cheri_setaddress(kroot, CHERI_CAP_USER_DATA_BASE);
 	ctemp = cheri_setbounds(ctemp, CHERI_CAP_USER_DATA_LENGTH);
 	ctemp = cheri_andperm(ctemp, CHERI_CAP_USER_DATA_PERMS |
-	    CHERI_CAP_USER_CODE_PERMS);
+	    CHERI_CAP_USER_CODE_PERMS | CHERI_PERM_CHERIABI_VMMAP);
 	userspace_root_cap = ctemp;
 
 	ctemp = cheri_setaddress(kroot, CHERI_SEALCAP_USERSPACE_BASE);
@@ -85,9 +85,10 @@ hybridabi_thread_setregs(struct thread *td, unsigned long entry_addr)
 	tf = td->td_frame;
 
 	/* Set DDC to full user privilege. */
-	tf->tf_ddc = (uintcap_t)cheri_capability_build_user_data(
-	    CHERI_CAP_USER_DATA_PERMS, CHERI_CAP_USER_DATA_BASE,
-	    CHERI_CAP_USER_DATA_LENGTH, CHERI_CAP_USER_DATA_OFFSET);
+	tf->tf_ddc = (uintcap_t)cheri_capability_build_user_rwx(
+	    CHERI_CAP_USER_DATA_PERMS | CHERI_PERM_CHERIABI_VMMAP,
+	    CHERI_CAP_USER_DATA_BASE, CHERI_CAP_USER_DATA_LENGTH,
+	    CHERI_CAP_USER_DATA_OFFSET);
 
 	/* Use 'entry_addr' as offset of PCC. */
 	tf->tf_sepc = (uintcap_t)cheri_capability_build_user_code(
