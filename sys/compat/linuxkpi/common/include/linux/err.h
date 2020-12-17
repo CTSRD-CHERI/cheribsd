@@ -48,7 +48,7 @@ ERR_PTR(long error)
 static inline long
 PTR_ERR(const void *ptr)
 {
-	return (long)(intptr_t)ptr;
+	return (intptr_t)ptr;
 }
 
 static inline bool
