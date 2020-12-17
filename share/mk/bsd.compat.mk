@@ -169,10 +169,6 @@ LIB64_MACHINE_ABI=	${MACHINE_ABI:Npurecap}
 .if ${COMPAT_ARCH} == "aarch64"
 HAS_COMPAT+=CHERI
 LIBCHERICPUFLAGS=  -target aarch64-unknown-freebsd13.0 -march=morello+c64 -mabi=purecap -femulated-tls
-.if !defined(_LIBCOMPAT)  # XXX: HACK: Avoid adding the flag twice in Makefile.libcompat
-# Workaround to avoid using memcpy_c, etc. until the compiler default has changed.
-LIBCHERICPUFLAGS += -mllvm -cheri-no-pure-cap-libfunc
-.endif
 LIBCHERI_MACHINE=	arm64
 LIBCHERI_MACHINE_ARCH=	aarch64c
 .elif ${COMPAT_ARCH:Mmips64*} && !${COMPAT_ARCH:Mmips64*c*}
