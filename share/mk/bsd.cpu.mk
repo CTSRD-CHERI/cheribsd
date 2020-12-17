@@ -9,7 +9,7 @@ _CPUCFLAGS =
 . if ${MACHINE_CPUARCH} == "aarch64"
 .  if ${MACHINE_ARCH:Maarch64*c*}
 MACHINE_CPU = cheri
-.endif
+.  endif
 MACHINE_CPU += arm64
 . elif ${MACHINE_CPUARCH} == "amd64"
 MACHINE_CPU = amd64 sse2 sse mmx
