@@ -40,7 +40,7 @@
 #define IS_ERR_VALUE(x) unlikely((x) >= (uintptr_t)-MAX_ERRNO)
 
 static inline void *
-ERR_PTR(intptr_t error)
+ERR_PTR(long error)
 {
 	return (void *)(intptr_t)error;
 }
