@@ -53,7 +53,9 @@ __FBSDID("$FreeBSD$");
 #include "core/geom.h"
 #include "misc/subr.h"
 
+#pragma clang diagnostic push
 #ifdef STATIC_GEOM_CLASSES
+#pragma clang diagnostic ignored "-Wmissing-variable-declarations"
 #define	PUBSYM(x)	gpart_##x
 #else
 #define	PUBSYM(x)	x
@@ -196,6 +198,7 @@ struct g_command PUBSYM(class_commands)[] = {
 	},
 	G_CMD_SENTINEL
 };
+#pragma clang diagnostic pop
 
 static struct gclass *
 find_class(struct gmesh *mesh, const char *name)
