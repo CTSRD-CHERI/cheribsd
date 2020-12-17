@@ -391,6 +391,7 @@ test_initregs_stack_user_perms(const struct cheri_test *ctp __unused)
 	    (CHERI_PERMS_SWALL & ~CHERI_PERM_CHERIABI_VMMAP))
 		cheribsdtest_failure_errx("perms %jx (expected swperms %x)", v,
 		    (CHERI_PERMS_SWALL & ~CHERI_PERM_CHERIABI_VMMAP));
+	cheribsdtest_success();
 }
 
 void
