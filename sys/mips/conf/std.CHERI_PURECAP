@@ -12,7 +12,6 @@ nomakeoptions	ARCH_FLAGS
 makeoptions 	WERROR="-Wno-error"
 makeoptions 	CHERI_USE_CAP_TABLE=plt
 makeoptions	CHERI_SUBOBJECT_BOUNDS=subobject-safe
-makeoptions	LDSCRIPT_NAME=ldscript.mips.cheri
 
 # purecap kernel options
 options		CHERI_PURECAP_KERNEL
