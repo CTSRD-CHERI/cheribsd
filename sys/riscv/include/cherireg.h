@@ -111,8 +111,7 @@
  */
 #define	CHERI_PERMS_USERSPACE_DATA					\
 	(CHERI_PERMS_USERSPACE | CHERI_PERM_STORE |			\
-	CHERI_PERM_STORE_CAP | CHERI_PERM_STORE_LOCAL_CAP |		\
-	CHERI_PERM_CHERIABI_VMMAP)
+	CHERI_PERM_STORE_CAP | CHERI_PERM_STORE_LOCAL_CAP)
 
 /*
  * Corresponding permission masks for kernel code and data; these are
