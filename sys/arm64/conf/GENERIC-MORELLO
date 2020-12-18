@@ -36,11 +36,3 @@ nooptions 	KDTRACE_HOOKS		# Kernel DTrace hooks
 # Hybrid kernels need CHERI-aware firmware and pure-capability kernels need a
 # pure-capability interface or shims.
 nooptions 	EFIRT		# EFI Runtime Services
-
-# Arm Fast Models have a broken implementation for legacy transport and fail to
-# allow for the increased header size on the transmit path (which is just zero
-# padding there), only allowing for it on the receive path.
-envvar		hw.vtnet.mrg_rxbuf_disable="1"
-# Arm Fast Models have a broken implementation at least for legacy transport
-# that never seems to update avail_event_idx for the transmit queue.
-envvar		hw.vtnet.event_idx_disable="1"
