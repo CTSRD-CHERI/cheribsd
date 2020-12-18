@@ -1410,6 +1410,14 @@ DB_SHOW_COMMAND(specialregs, db_show_spregs)
 #define	PRINT_REG(reg)	\
     db_printf(__STRING(reg) " = %#016lx\n", READ_SPECIALREG(reg))
 
+#if __has_feature(capabilities)
+#define	PRINT_REG_CAP(reg)						\
+do {									\
+    void * __capability _tmp = (void * __capability)READ_SPECIALREG_CAP(reg); \
+    db_printf(__STRING(reg) " = %#.16lp\n", _tmp);				\
+} while (0)
+#endif
+
 	PRINT_REG(actlr_el1);
 	PRINT_REG(afsr0_el1);
 	PRINT_REG(afsr1_el1);
@@ -1478,6 +1486,9 @@ DB_SHOW_COMMAND(specialregs, db_show_spregs)
 	PRINT_REG(ttbr1_el1);
 	PRINT_REG(vbar_el1);
 #undef PRINT_REG
+#if __has_feature(capabilities)
+#undef PRINT_REG_CAP
+#endif
 }
 
 DB_SHOW_COMMAND(vtop, db_show_vtop)
