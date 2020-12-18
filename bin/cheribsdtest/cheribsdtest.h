@@ -607,6 +607,11 @@ DECLARE_CHERIBSD_TEST(test_initregs_returncap);
 #endif
 DECLARE_CHERIBSD_TEST(test_initregs_idc);
 DECLARE_CHERIBSD_TEST(test_initregs_pcc);
+#ifdef __aarch64__
+DECLARE_CHERIBSD_TEST(test_initregs_restricted_default);
+DECLARE_CHERIBSD_TEST(test_initregs_restricted_stack);
+DECLARE_CHERIBSD_TEST(test_initregs_restricted_thread);
+#endif
 DECLARE_CHERIBSD_TEST(test_copyregs);
 DECLARE_CHERIBSD_TEST(test_listregs);
 
