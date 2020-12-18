@@ -125,6 +125,14 @@ test_sealcap_sysctl(const struct cheri_test *ctp __unused)
 	if ((v & CHERI_PERM_SYSTEM_REGS) != 0)
 		cheribsdtest_failure_errx("perms %jx (system_regs present)", v);
 
+#ifdef __aarch64__
+	if ((v & CHERI_PERM_EXECUTIVE) != 0)
+		cheribsdtest_failure_errx("perms %jx (executive present)", v);
+
+	if ((v & CHERI_PERM_MUTABLE_LOAD) != 0)
+		cheribsdtest_failure_errx("perms %jx (mutable_load present)", v);
+#endif
+
 	if ((v & CHERI_PERMS_SWALL) != 0)
 		cheribsdtest_failure_errx("perms %jx (swperms present)", v);
 
