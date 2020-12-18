@@ -35,12 +35,13 @@
 #define	FIRMW_START(S)	__CONCAT(_binary_, __CONCAT(S, _start))
 #define	FIRMW_END(S)	__CONCAT(_binary_, __CONCAT(S, _end))
 
-	.section rodata, "a", @progbits
-	.type	FIRMW_START(FIRMW_SYMBOL), @object
+	.section rodata, "a", %progbits
+	.globl	FIRMW_START(FIRMW_SYMBOL)
+	.type	FIRMW_START(FIRMW_SYMBOL), %object
 FIRMW_START(FIRMW_SYMBOL):
 	.incbin	__XSTRING(FIRMW_FILE)
 	.size	FIRMW_START(FIRMW_SYMBOL), . - FIRMW_START(FIRMW_SYMBOL)
 	.globl	FIRMW_END(FIRMW_SYMBOL)
-	.type	FIRMW_END(FIRMW_SYMBOL), @object
+	.type	FIRMW_END(FIRMW_SYMBOL), %object
 FIRMW_END(FIRMW_SYMBOL):
 	.size	FIRMW_END(FIRMW_SYMBOL), . - FIRMW_END(FIRMW_SYMBOL)

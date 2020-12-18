@@ -83,7 +83,7 @@
 
 #define	alt_next next
 #define	UHCI_BUS2SC(bus) \
-	__containerof((bus), uhci_softc_t, sc_bus)
+	__containerof(bus, uhci_softc_t, sc_bus)
 
 #ifdef USB_DEBUG
 static int uhcidebug = 0;
