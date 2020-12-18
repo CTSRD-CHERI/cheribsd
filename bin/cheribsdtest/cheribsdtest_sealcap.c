@@ -75,11 +75,11 @@ test_sealcap_sysctl(const struct cheri_test *ctp __unused)
 		cheribsdtest_failure_errx("offset %jx (expected %jx)", v,
 		    (uintmax_t)CHERI_SEALCAP_USERSPACE_OFFSET);
 
-	/* Type -- should be (-1) for an unsealed capability. */
+	/* Type -- should have unsealed type. */
 	v = cheri_gettype(sealcap);
-	if (v != 0xffffffffffffffff)
+	if (v != (u_register_t)CHERI_OTYPE_UNSEALED)
 		cheribsdtest_failure_errx("otype %jx (expected %jx)", v,
-		    (uintmax_t)0xffffffffffffffff);
+		    (uintmax_t)CHERI_OTYPE_UNSEALED);
 
 	/* Permissions. */
 	v = cheri_getperm(sealcap);
@@ -239,11 +239,11 @@ test_sealcap_seal_unseal(const struct cheri_test *ctp __unused)
 		cheribsdtest_failure_errx("offset %jx (expected %jx)", v,
 		    (uintmax_t)cheri_getoffset(sealdatap));
 
-	/* Type -- should be (-1) for an unsealed capability. */
+	/* Type -- should have unsealed type. */
 	v = cheri_gettype(unsealed);
-	if (v != 0xffffffffffffffff)
+	if (v != (u_register_t)CHERI_OTYPE_UNSEALED)
 		cheribsdtest_failure_errx("otype %jx (expected %jx)", v,
-		    (uintmax_t)0xffffffffffffffff);
+		    (uintmax_t)CHERI_OTYPE_UNSEALED);
 
 	/* Sealed bit. */
 	v = cheri_getsealed(unsealed);
