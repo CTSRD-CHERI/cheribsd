@@ -167,7 +167,7 @@ check_initreg_code(void * __capability c)
 	/* Offset. */
 	CHERIBSDTEST_VERIFY(cheri_getoffset(c) == 0);
 
-	/* Type -- should be (-1) for an unsealed capability. */
+	/* Type -- should have unsealed type. */
 	v = cheri_gettype(c);
 	if (v != (uintmax_t)CHERI_OTYPE_UNSEALED)
 		cheribsdtest_failure_errx("otype %jx (expected %jx)", v,
@@ -260,11 +260,11 @@ check_initreg_data_full_addrspace(void * __capability c)
 		cheribsdtest_failure_errx("offset %jx (expected %jx)", v,
 		    (uintmax_t)CHERI_CAP_USER_DATA_OFFSET);
 
-	/* Type -- should be (-1) for an unsealed capability. */
+	/* Type -- should have unsealed type. */
 	v = cheri_gettype(c);
-	if (v != 0xffffffffffffffff)
+	if (v != (uintmax_t)CHERI_OTYPE_UNSEALED)
 		cheribsdtest_failure_errx("otype %jx (expected %jx)", v,
-		    (uintmax_t)0xffffffffffffffff);
+		    (uintmax_t)CHERI_OTYPE_UNSEALED);
 
 	/* Permissions. */
 	v = cheri_getperm(c);
@@ -402,10 +402,10 @@ test_initregs_stack(const struct cheri_test *ctp __unused)
 		    "(0x%jx)", (intmax_t)CHERI_STACK_USE_MAX,
 		    cheri_getlen(c) - cheri_getoffset(c));
 
-	/* Type -- should be zero for an unsealed capability. */
-	if (cheri_gettype(c) != -1)
+	/* Type -- should have unsealed type. */
+	if (cheri_gettype(c) != CHERI_OTYPE_UNSEALED)
 		cheribsdtest_failure_errx("otype 0x%jx (expected 0x%jx)",
-		    cheri_gettype(c), (uintmax_t)0);
+		    cheri_gettype(c), (uintmax_t)CHERI_OTYPE_UNSEALED);
 
 	/* Permissions. */
 	v = cheri_getperm(c);
