@@ -29,6 +29,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/param.h>
 #include <sys/kernel.h>
 #include <sys/malloc.h>
+#include <sys/proc.h>
 #include <sys/systm.h>
 #include <sys/uio.h>
 
@@ -49,11 +50,11 @@ cloudabi64_sys_sock_recv(struct thread *td,
 	cloudabi64_recv_out_t ro = {};
 	cloudabi64_iovec_t iovobj;
 	struct iovec *iov;
-	const cloudabi64_iovec_t *user_iov;
+	const cloudabi64_iovec_t * __capability user_iov;
 	size_t i, rdatalen, rfdslen;
 	int error;
 
-	error = copyin(uap->in, &ri, sizeof(ri));
+	error = copyin(__USER_CAP_OBJ(uap->in), &ri, sizeof(ri));
 	if (error != 0)
 		return (error);
 
@@ -62,14 +63,15 @@ cloudabi64_sys_sock_recv(struct thread *td,
 		return (EINVAL);
 	iov = mallocarray(ri.ri_data_len, sizeof(struct iovec),
 	    M_SOCKET, M_WAITOK);
-	user_iov = TO_PTR(ri.ri_data);
+	user_iov = __USER_CAP(ri.ri_data, ri.ri_data_len * sizeof(*user_iov));
 	for (i = 0; i < ri.ri_data_len; i++) {
 		error = copyin(&user_iov[i], &iovobj, sizeof(iovobj));
 		if (error != 0) {
 			free(iov, M_SOCKET);
 			return (error);
 		}
-		IOVEC_INIT(&iov[i], TO_PTR(iovobj.buf), iovobj.buf_len);
+		IOVEC_INIT_C(&iov[i], __USER_CAP(iovobj.buf, iovobj.buf_len),
+		    iovobj.buf_len);
 	}
 
 	error = cloudabi_sock_recv(td, uap->sock, iov, ri.ri_data_len,
@@ -81,7 +83,7 @@ cloudabi64_sys_sock_recv(struct thread *td,
 
 	ro.ro_datalen = rdatalen;
 	ro.ro_fdslen = rfdslen;
-	return (copyout(&ro, uap->out, sizeof(ro)));
+	return (copyout(&ro, __USER_CAP_OBJ(uap->out), sizeof(ro)));
 }
 
 int
@@ -92,11 +94,11 @@ cloudabi64_sys_sock_send(struct thread *td,
 	cloudabi64_send_out_t so = {};
 	cloudabi64_ciovec_t iovobj;
 	struct iovec *iov;
-	const cloudabi64_ciovec_t *user_iov;
+	const cloudabi64_ciovec_t * __capability user_iov;
 	size_t datalen, i;
 	int error;
 
-	error = copyin(uap->in, &si, sizeof(si));
+	error = copyin(__USER_CAP_OBJ(uap->in), &si, sizeof(si));
 	if (error != 0)
 		return (error);
 
@@ -105,14 +107,15 @@ cloudabi64_sys_sock_send(struct thread *td,
 		return (EINVAL);
 	iov = mallocarray(si.si_data_len, sizeof(struct iovec),
 	    M_SOCKET, M_WAITOK);
-	user_iov = TO_PTR(si.si_data);
+	user_iov = __USER_CAP(si.si_data, si.si_data_len * sizeof(*user_iov));
 	for (i = 0; i < si.si_data_len; i++) {
 		error = copyin(&user_iov[i], &iovobj, sizeof(iovobj));
 		if (error != 0) {
 			free(iov, M_SOCKET);
 			return (error);
 		}
-		IOVEC_INIT(&iov[i], TO_PTR(iovobj.buf), iovobj.buf_len);
+		IOVEC_INIT_C(&iov[i], __USER_CAP(iovobj.buf, iovobj.buf_len),
+		    iovobj.buf_len);
 	}
 
 	error = cloudabi_sock_send(td, uap->sock, iov, si.si_data_len,
@@ -122,14 +125,15 @@ cloudabi64_sys_sock_send(struct thread *td,
 		return (error);
 
 	so.so_datalen = datalen;
-	return (copyout(&so, uap->out, sizeof(so)));
+	return (copyout(&so, __USER_CAP_OBJ(uap->out), sizeof(so)));
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20191025,
+//   "updated": 20201217,
 //   "target_type": "kernel",
 //   "changes": [
-//     "iovec-macros"
+//     "iovec-macros",
+//     "user_capabilities"
 //   ]
 // }
 // CHERI CHANGES END

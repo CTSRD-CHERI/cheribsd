@@ -60,7 +60,8 @@ cloudabi32_sys_thread_create(struct thread *td,
 	struct thread_create_args args;
 	int error;
 
-	error = copyin(uap->attr, &args.attr, sizeof(args.attr));
+	error = copyin(__USER_CAP_OBJ(uap->attr), &args.attr,
+	    sizeof(args.attr));
 	if (error != 0)
 		return (error);
 
@@ -75,3 +76,12 @@ cloudabi32_sys_thread_create(struct thread *td,
 	td->td_retval[0] = args.tid;
 	return (0);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20201217,
+//   "target_type": "kernel",
+//   "changes": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

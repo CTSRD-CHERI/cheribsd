@@ -30,6 +30,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/kernel.h>
 #include <sys/limits.h>
 #include <sys/malloc.h>
+#include <sys/proc.h>
 #include <sys/syscallsubr.h>
 #include <sys/systm.h>
 #include <sys/uio.h>
@@ -71,7 +72,8 @@ cloudabi32_copyinuio(const cloudabi32_iovec_t *iovp, size_t iovcnt,
 			free(uio, M_IOV);
 			return (error);
 		}
-		IOVEC_INIT(&iov[i], TO_PTR(iovobj.buf), iovobj.buf_len);
+		IOVEC_INIT_C(&iov[i], __USER_CAP(iovobj.buf, iovobj.buf_len),
+		    iovobj.buf_len);
 		if (iov[i].iov_len > INT32_MAX - uio->uio_resid) {
 			free(uio, M_IOV);
 			return (EINVAL);

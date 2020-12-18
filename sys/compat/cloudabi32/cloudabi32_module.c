@@ -36,6 +36,15 @@ __FBSDID("$FreeBSD$");
 #include <sys/sysent.h>
 #include <sys/systm.h>
 
+#include <vm/vm.h>
+#include <vm/pmap.h>
+#include <vm/vm_map.h>
+
+#if __has_feature(capabilities)
+#include <cheri/cheri.h>
+#include <cheri/cheric.h>
+#endif
+
 #include <contrib/cloudabi/cloudabi32_types.h>
 
 #include <compat/cloudabi/cloudabi_util.h>
@@ -46,27 +55,54 @@ extern char _binary_cloudabi32_vdso_o_start[];
 extern char _binary_cloudabi32_vdso_o_end[];
 
 int
-cloudabi32_copyout_strings(struct image_params *imgp, uintptr_t *stack_base)
+cloudabi32_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 {
 	struct image_args *args;
-	uintptr_t begin;
+	uintcap_t begin;
 	size_t len;
+#if __has_feature(capabilities)
+	vm_offset_t stack_vaddr, rounded_stack_vaddr, stack_offset;
+	size_t ssiz;
+#endif
+
+#if __has_feature(capabilities)
+	/*
+	 * Here we do not care about the representability of the
+	 * resulting stack as the capability will not be handed out
+	 * to userspace.
+	 */
+	stack_vaddr = (vm_offset_t)imgp->proc->p_vmspace->vm_maxsaddr;
+	ssiz = imgp->proc->p_sysent->sv_usrstack - stack_vaddr;
+	stack_offset = 0;
+	do {
+		rounded_stack_vaddr = CHERI_REPRESENTABLE_BASE(stack_vaddr,
+		    ssiz + stack_offset);
+		stack_offset = stack_vaddr - rounded_stack_vaddr;
+	} while (rounded_stack_vaddr != CHERI_REPRESENTABLE_BASE(stack_vaddr,
+	    ssiz + stack_offset));
+	begin = (uintcap_t)cheri_capability_build_user_data(
+	    CHERI_CAP_USER_DATA_PERMS, rounded_stack_vaddr,
+	    CHERI_REPRESENTABLE_LENGTH(ssiz + stack_offset), stack_offset);
+	begin = cheri_setaddress(begin, imgp->sysent->sv_usrstack);
+#else
+	begin = imgp->sysent->sv_usrstack;
+#endif
 
 	/* Copy out program arguments. */
 	args = imgp->args;
 	len = exec_args_get_begin_envv(args) - args->begin_argv;
-	begin = rounddown2(imgp->sysent->sv_usrstack - len, sizeof(register_t));
+	begin = rounddown2(begin - len, sizeof(register_t));
 	*stack_base = begin;
-	return (copyout(args->begin_argv, (void *)begin, len));
+	return (copyout(args->begin_argv, (void * __capability)begin, len));
 }
 
 int
-cloudabi32_fixup(uintptr_t *stack_base, struct image_params *imgp)
+cloudabi32_fixup(uintcap_t *stack_base, struct image_params *imgp)
 {
 	char canarybuf[64], pidbuf[16];
 	Elf32_Auxargs *args;
 	struct thread *td;
-	void *argdata, *canary, *pid;
+	void * __capability argdata, * __capability canary, * __capability pid;
 	size_t argdatalen;
 	int error;
 
@@ -79,12 +115,12 @@ cloudabi32_fixup(uintptr_t *stack_base, struct image_params *imgp)
 	td = curthread;
 	td->td_proc->p_osrel = __FreeBSD_version;
 
-	argdata = (void *)*stack_base;
+	argdata = (void * __capability)*stack_base;
 
 	/* Store canary for stack smashing protection. */
 	arc4rand(canarybuf, sizeof(canarybuf), 0);
 	*stack_base -= roundup(sizeof(canarybuf), sizeof(register_t));
-	canary = (void *)*stack_base;
+	canary = (void * __capability)*stack_base;
 	error = copyout(canarybuf, canary, sizeof(canarybuf));
 	if (error != 0)
 		return (error);
@@ -98,7 +134,7 @@ cloudabi32_fixup(uintptr_t *stack_base, struct image_params *imgp)
 	pidbuf[6] = (pidbuf[6] & 0x0f) | 0x40;
 	pidbuf[8] = (pidbuf[8] & 0x3f) | 0x80;
 	*stack_base -= roundup(sizeof(pidbuf), sizeof(register_t));
-	pid = (void *)*stack_base;
+	pid = (void * __capability)*stack_base;
 	error = copyout(pidbuf, pid, sizeof(pidbuf));
 	if (error != 0)
 		return (error);
@@ -117,7 +153,7 @@ cloudabi32_fixup(uintptr_t *stack_base, struct image_params *imgp)
 	/* Write out an auxiliary vector. */
 	cloudabi32_auxv_t auxv[] = {
 #define	VAL(type, val)	{ .a_type = (type), .a_val = (val) }
-#define	PTR(type, ptr)	{ .a_type = (type), .a_ptr = (uintptr_t)(ptr) }
+#define	PTR(type, ptr)	{ .a_type = (type), .a_ptr = (uintcap_t)(ptr) }
 		PTR(CLOUDABI_AT_ARGDATA, argdata),
 		VAL(CLOUDABI_AT_ARGDATALEN, argdatalen),
 		VAL(CLOUDABI_AT_BASE, args->base),
@@ -136,7 +172,7 @@ cloudabi32_fixup(uintptr_t *stack_base, struct image_params *imgp)
 		{ .a_type = CLOUDABI_AT_NULL },
 	};
 	*stack_base -= roundup(sizeof(auxv), sizeof(register_t));
-	error = copyout(auxv, (void *)*stack_base, sizeof(auxv));
+	error = copyout(auxv, (void * __capability)*stack_base, sizeof(auxv));
 	if (error != 0)
 		return (error);
 
@@ -182,3 +218,12 @@ static moduledata_t cloudabi32_module = {
 DECLARE_MODULE_TIED(cloudabi32, cloudabi32_module, SI_SUB_EXEC, SI_ORDER_ANY);
 MODULE_DEPEND(cloudabi32, cloudabi, 1, 1, 1);
 FEATURE(cloudabi32, "CloudABI 32bit support");
+// CHERI CHANGES START
+// {
+//   "updated": 20201217,
+//   "target_type": "kernel",
+//   "changes": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

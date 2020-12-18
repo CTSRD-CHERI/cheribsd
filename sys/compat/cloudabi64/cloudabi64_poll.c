@@ -93,12 +93,14 @@ cloudabi64_kevent_copyin(void *arg, struct kevent *kevp, int count)
 	args = arg;
 	while (count-- > 0) {
 		/* TODO(ed): Copy in multiple entries at once. */
-		error = copyin(args->in++, &sub, sizeof(sub));
+		error = copyin(__USER_CAP_OBJ(args->in), &sub, sizeof(sub));
+		++args->in;
 		if (error != 0)
 			return (error);
 
 		memset(kevp, 0, sizeof(*kevp));
-		kevp->udata = TO_PTR(sub.userdata);
+		/* Store untagged. */
+		kevp->udata = (void * __capability)(intcap_t)sub.userdata;
 		switch (sub.type) {
 		case CLOUDABI_EVENTTYPE_CLOCK:
 			kevp->filter = EVFILT_TIMER;
@@ -153,7 +155,7 @@ cloudabi64_kevent_copyout(void *arg, struct kevent *kevp, int count)
 	while (count-- > 0) {
 		/* Convert fields that should always be present. */
 		memset(&ev, 0, sizeof(ev));
-		ev.userdata = (uintptr_t)kevp->udata;
+		ev.userdata = (uintptr_t)(uintcap_t)kevp->udata;
 		switch (kevp->filter) {
 		case EVFILT_TIMER:
 			ev.type = CLOUDABI_EVENTTYPE_CLOCK;
@@ -201,7 +203,8 @@ cloudabi64_kevent_copyout(void *arg, struct kevent *kevp, int count)
 		++kevp;
 
 		/* TODO(ed): Copy out multiple entries at once. */
-		error = copyout(&ev, args->out++, sizeof(ev));
+		error = copyout(&ev, __USER_CAP_OBJ(args->out), sizeof(ev));
+		++args->out;
 		if (error != 0)
 			return (error);
 	}
@@ -230,7 +233,7 @@ cloudabi64_sys_poll(struct thread *td, struct cloudabi64_sys_poll_args *uap)
 		cloudabi_event_t ev = {};
 		int error;
 
-		error = copyin(uap->in, &sub, sizeof(sub));
+		error = copyin(__USER_CAP_OBJ(uap->in), &sub, sizeof(sub));
 		if (error != 0)
 			return (error);
 		ev.userdata = sub.userdata;
@@ -245,7 +248,8 @@ cloudabi64_sys_poll(struct thread *td, struct cloudabi64_sys_poll_args *uap)
 			        sub.condvar.lock_scope,
 			        CLOUDABI_CLOCK_MONOTONIC, UINT64_MAX, 0, true));
 			td->td_retval[0] = 1;
-			return (copyout(&ev, uap->out, sizeof(ev)));
+			return (copyout(&ev, __USER_CAP_OBJ(uap->out),
+			    sizeof(ev)));
 		} else if (sub.type == CLOUDABI_EVENTTYPE_LOCK_RDLOCK) {
 			/* Acquire a read lock. */
 			ev.error = cloudabi_convert_errno(
@@ -254,7 +258,8 @@ cloudabi64_sys_poll(struct thread *td, struct cloudabi64_sys_poll_args *uap)
 			        sub.lock.lock_scope, CLOUDABI_CLOCK_MONOTONIC,
 			        UINT64_MAX, 0, true));
 			td->td_retval[0] = 1;
-			return (copyout(&ev, uap->out, sizeof(ev)));
+			return (copyout(&ev, __USER_CAP_OBJ(uap->out),
+			    sizeof(ev)));
 		} else if (sub.type == CLOUDABI_EVENTTYPE_LOCK_WRLOCK) {
 			/* Acquire a write lock. */
 			ev.error = cloudabi_convert_errno(
@@ -263,14 +268,15 @@ cloudabi64_sys_poll(struct thread *td, struct cloudabi64_sys_poll_args *uap)
 			        sub.lock.lock_scope, CLOUDABI_CLOCK_MONOTONIC,
 			        UINT64_MAX, 0, true));
 			td->td_retval[0] = 1;
-			return (copyout(&ev, uap->out, sizeof(ev)));
+			return (copyout(&ev, __USER_CAP_OBJ(uap->out),
+			    sizeof(ev)));
 		}
 	} else if (uap->nsubscriptions == 2) {
 		cloudabi64_subscription_t sub[2];
 		cloudabi_event_t ev[2] = {};
 		int error;
 
-		error = copyin(uap->in, &sub, sizeof(sub));
+		error = copyin(__USER_CAP_OBJ(uap->in), &sub, sizeof(sub));
 		if (error != 0)
 			return (error);
 		ev[0].userdata = sub[0].userdata;
@@ -290,13 +296,14 @@ cloudabi64_sys_poll(struct thread *td, struct cloudabi64_sys_poll_args *uap)
 			    CLOUDABI_SUBSCRIPTION_CLOCK_ABSTIME) != 0);
 			if (error == ETIMEDOUT) {
 				td->td_retval[0] = 1;
-				return (copyout(&ev[1], uap->out,
-				    sizeof(ev[1])));
+				return (copyout(&ev[1],
+				    __USER_CAP_OBJ(uap->out), sizeof(ev[1])));
 			}
 
 			ev[0].error = cloudabi_convert_errno(error);
 			td->td_retval[0] = 1;
-			return (copyout(&ev[0], uap->out, sizeof(ev[0])));
+			return (copyout(&ev[0], __USER_CAP_OBJ(uap->out),
+			    sizeof(ev[0])));
 		} else if (sub[0].type == CLOUDABI_EVENTTYPE_LOCK_RDLOCK &&
 		    sub[1].type == CLOUDABI_EVENTTYPE_CLOCK) {
 			/* Acquire a read lock with a timeout. */
@@ -308,13 +315,14 @@ cloudabi64_sys_poll(struct thread *td, struct cloudabi64_sys_poll_args *uap)
 			    CLOUDABI_SUBSCRIPTION_CLOCK_ABSTIME) != 0);
 			if (error == ETIMEDOUT) {
 				td->td_retval[0] = 1;
-				return (copyout(&ev[1], uap->out,
-				    sizeof(ev[1])));
+				return (copyout(&ev[1],
+				    __USER_CAP_OBJ(uap->out), sizeof(ev[1])));
 			}
 
 			ev[0].error = cloudabi_convert_errno(error);
 			td->td_retval[0] = 1;
-			return (copyout(&ev[0], uap->out, sizeof(ev[0])));
+			return (copyout(&ev[0], __USER_CAP_OBJ(uap->out),
+			    sizeof(ev[0])));
 		} else if (sub[0].type == CLOUDABI_EVENTTYPE_LOCK_WRLOCK &&
 		    sub[1].type == CLOUDABI_EVENTTYPE_CLOCK) {
 			/* Acquire a write lock with a timeout. */
@@ -326,15 +334,25 @@ cloudabi64_sys_poll(struct thread *td, struct cloudabi64_sys_poll_args *uap)
 			    CLOUDABI_SUBSCRIPTION_CLOCK_ABSTIME) != 0);
 			if (error == ETIMEDOUT) {
 				td->td_retval[0] = 1;
-				return (copyout(&ev[1], uap->out,
-				    sizeof(ev[1])));
+				return (copyout(&ev[1],
+				    __USER_CAP_OBJ(uap->out), sizeof(ev[1])));
 			}
 
 			ev[0].error = cloudabi_convert_errno(error);
 			td->td_retval[0] = 1;
-			return (copyout(&ev[0], uap->out, sizeof(ev[0])));
+			return (copyout(&ev[0], __USER_CAP_OBJ(uap->out),
+			    sizeof(ev[0])));
 		}
 	}
 
 	return (kern_kevent_anonymous(td, uap->nsubscriptions, &copyops));
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20201217,
+//   "target_type": "kernel",
+//   "changes": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END
