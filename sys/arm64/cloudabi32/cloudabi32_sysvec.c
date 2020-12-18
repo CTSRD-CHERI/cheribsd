@@ -39,6 +39,11 @@ __FBSDID("$FreeBSD$");
 #include <machine/pcb.h>
 #include <machine/vmparam.h>
 
+#if __has_feature(capabilities)
+#include <machine/cheri.h>
+#include <cheri/cheric.h>
+#endif
+
 #include <compat/cloudabi/cloudabi_util.h>
 
 #include <compat/cloudabi32/cloudabi32_syscall.h>
@@ -49,7 +54,7 @@ extern struct sysent cloudabi32_sysent[];
 
 static void
 cloudabi32_proc_setregs(struct thread *td, struct image_params *imgp,
-    uintptr_t stack)
+    uintcap_t stack)
 {
 	struct trapframe *regs;
 
@@ -58,9 +63,14 @@ cloudabi32_proc_setregs(struct thread *td, struct image_params *imgp,
 	regs->tf_x[0] =
 	    stack + roundup(sizeof(cloudabi32_tcb_t), sizeof(register_t));
 	regs->tf_x[13] = STACKALIGN(stack);
+#if __has_feature(capabilities)
+	hybridabi_thread_setregs(td, imgp->entry_addr);
+#else
 	regs->tf_elr = imgp->entry_addr;
+#endif
 	regs->tf_spsr |= PSR_AARCH32;
-	(void)cpu_set_user_tls(td, TO_PTR(stack));
+	(void)cpu_set_user_tls(td,
+	    (void * __capability)(uintcap_t)(uint32_t)stack);
 }
 
 static int
@@ -68,7 +78,13 @@ cloudabi32_fetch_syscall_args(struct thread *td)
 {
 	struct trapframe *frame;
 	struct syscall_args *sa;
-	int error;
+	int error, narg;
+#if __has_feature(capabilities)
+	register_t args[nitems(sa->args)];
+	int i;
+#else
+	register_t *args = sa->args;
+#endif
 
 	frame = td->td_frame;
 	sa = &td->td_sa;
@@ -78,6 +94,7 @@ cloudabi32_fetch_syscall_args(struct thread *td)
 	if (sa->code >= CLOUDABI32_SYS_MAXSYSCALL)
 		return (ENOSYS);
 	sa->callp = &cloudabi32_sysent[sa->code];
+	narg = sa->callp->sy_narg;
 
 	/*
 	 * Fetch system call arguments.
@@ -88,11 +105,20 @@ cloudabi32_fetch_syscall_args(struct thread *td)
 	 * arguments directly. As long as the call doesn't use 32-bit
 	 * data structures, we can just invoke the same system call
 	 * implementation used by 64-bit processes.
+	 *
+	 * For CHERI kernels we have to copy to a temporary buffer and
+	 * convert as we don't have a vDSO that pads to 128-bit
+	 * integers.
 	 */
-	error = copyin((void *)frame->tf_x[2], sa->args,
-	    sa->callp->sy_narg * sizeof(sa->args[0]));
+	error = copyin(
+	    __USER_CAP_ARRAY((register_t *)(uintptr_t)frame->tf_x[2], narg),
+	    sa->args, narg * sizeof(args[0]));
 	if (error != 0)
 		return (error);
+#if __has_feature(capabilities)
+	for (i = 0; i < narg; ++i)
+		sa->args[i] = args[i];
+#endif
 
 	/* Default system call return values. */
 	td->td_retval[0] = 0;
@@ -104,6 +130,12 @@ static void
 cloudabi32_set_syscall_retval(struct thread *td, int error)
 {
 	struct trapframe *frame = td->td_frame;
+#if __has_feature(capabilities)
+	register_t retval[nitems(td->td_retval)];
+	int i;
+#else
+	register_t *retval = td->td_retval;
+#endif
 
 	switch (error) {
 	case 0:
@@ -114,9 +146,20 @@ cloudabi32_set_syscall_retval(struct thread *td, int error)
 		 * same buffer provided for system call arguments. The
 		 * vDSO will copy them to the right spot, truncating
 		 * pointers and size_t values to 32 bits.
+		 *
+		 * For CHERI kernels we have to copy to a temporary
+		 * buffer and convert as we don't have a vDSO that pads
+		 * to * 128-bit integers.
 		 */
-		if (copyout(td->td_retval, (void *)frame->tf_x[2],
-		    sizeof(td->td_retval)) == 0) {
+#if __has_feature(capabilities)
+		for (i = 0; i < nitems(td->td_retval); ++i)
+			retval[i] = (register_t)td->td_retval[i];
+#endif
+		if (copyout(retval,
+		    __USER_CAP_ARRAY(
+		        (register_t *)(uintptr_t)frame->tf_x[2],
+		        nitems(td->td_retval)),
+		    nitems(td->td_retval) * sizeof(*retval)) == 0) {
 			frame->tf_x[0] = 0;
 			frame->tf_spsr &= ~PSR_C;
 		} else {
@@ -147,8 +190,9 @@ cloudabi32_schedtail(struct thread *td)
 	/* Return values for processes returning from fork. */
 	if ((td->td_pflags & TDP_FORKING) != 0) {
 		retval[0] = CLOUDABI_PROCESS_CHILD;
-		retval[1] = td->td_tid;
-		copyout(retval, (void *)frame->tf_x[2], sizeof(retval));
+		retval[1] = (uintcap_t)td->td_tid;
+		copyout(retval, (void * __capability)frame->tf_x[2],
+		    sizeof(retval));
 	}
 	frame->tf_spsr |= PSR_AARCH32;
 }
@@ -169,10 +213,15 @@ cloudabi32_thread_setregs(struct thread *td,
 	frame->tf_x[0] = td->td_tid;
 	frame->tf_x[1] = attr->argument;
 	frame->tf_x[13] = STACKALIGN(attr->stack + attr->stack_len);
-	frame->tf_elr = attr->entry_point;
+#if __has_feature(capabilities)
+	hybridabi_thread_setregs(td, attr->entry_point);
+#else
+	regs->tf_elr = attr->entry_point;
+#endif
 
 	/* Set up TLS. */
-	return (cpu_set_user_tls(td, TO_PTR(tcb)));
+	return (cpu_set_user_tls(td,
+	    (void * __capability)(uintcap_t)tcb));
 }
 
 static struct sysentvec cloudabi32_elf_sysvec = {

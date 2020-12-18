@@ -39,6 +39,11 @@ __FBSDID("$FreeBSD$");
 #include <machine/pcb.h>
 #include <machine/vmparam.h>
 
+#if __has_feature(capabilities)
+#include <machine/cheri.h>
+#include <cheri/cheric.h>
+#endif
+
 #include <compat/cloudabi/cloudabi_util.h>
 
 #include <compat/cloudabi64/cloudabi64_syscall.h>
@@ -49,7 +54,7 @@ extern struct sysent cloudabi64_sysent[];
 
 static void
 cloudabi64_proc_setregs(struct thread *td, struct image_params *imgp,
-    uintptr_t stack)
+    uintcap_t stack)
 {
 	struct trapframe *regs;
 
@@ -63,7 +68,8 @@ cloudabi64_proc_setregs(struct thread *td, struct image_params *imgp,
 	regs = td->td_frame;
 	regs->tf_x[0] =
 	    stack + roundup(sizeof(cloudabi64_tcb_t), sizeof(register_t));
-	(void)cpu_set_user_tls(td, TO_PTR(stack));
+	(void)cpu_set_user_tls(td,
+	    (void * __capability)(uintcap_t)(uint64_t)stack);
 }
 
 static int
@@ -142,9 +148,11 @@ cloudabi64_thread_setregs(struct thread *td,
 	stack_t stack;
 
 	/* Perform standard register initialization. */
-	stack.ss_sp = TO_PTR(attr->stack);
+	stack.ss_sp = __USER_CAP_UNBOUND(attr->stack);
 	stack.ss_size = attr->stack_len;
-	cpu_set_upcall(td, TO_PTR(attr->entry_point), NULL, &stack);
+	cpu_set_upcall(td,
+	    (void (* __capability)(void *))(uintcap_t)attr->entry_point,
+	    NULL, &stack);
 
 	/*
 	 * Pass in the thread ID of the new thread and the argument
@@ -156,7 +164,8 @@ cloudabi64_thread_setregs(struct thread *td,
 	frame->tf_x[1] = attr->argument;
 
 	/* Set up TLS. */
-	return (cpu_set_user_tls(td, TO_PTR(tcb)));
+	return (cpu_set_user_tls(td,
+	    (void * __capability)(uintcap_t)tcb));
 }
 
 static struct sysentvec cloudabi64_elf_sysvec = {
