@@ -430,6 +430,8 @@ static const struct cheri_test cheri_tests[] = {
 #if !defined(__CHERI_PURE_CAPABILITY__)
 	  .ct_xfail_reason =
 	    "Bounds not supported for static globals in hybrid code",
+#elif defined(__aarch64__)
+	  .ct_xfail_reason = "Morello compiler pads excessively",
 #endif
 	},
 
@@ -439,6 +441,8 @@ static const struct cheri_test cheri_tests[] = {
 #if !defined(__CHERI_PURE_CAPABILITY__)
 	  .ct_xfail_reason =
 	    "Bounds not supported for globals in hybrid code",
+#elif defined(__aarch64__)
+	  .ct_xfail_reason = "Morello compiler pads excessively",
 #endif
 	},
 
@@ -723,6 +727,8 @@ static const struct cheri_test cheri_tests[] = {
 #if !defined(__CHERI_PURE_CAPABILITY__)
 	  .ct_xfail_reason =
 	    "Bounds not supported for extern globals in hybrid code",
+#elif defined(__aarch64__)
+	  .ct_xfail_reason = "Morello compiler pads excessively",
 #endif
 	},
 
@@ -859,19 +865,35 @@ static const struct cheri_test cheri_tests[] = {
 	 */
 	{ .ct_name = "test_bounds_stack_dynamic_uint8",
 	  .ct_desc = "Check bounds on 8-bit dynamic stack allocation",
-	  .ct_func = test_bounds_stack_dynamic_uint8, },
+	  .ct_func = test_bounds_stack_dynamic_uint8,
+#if defined(__aarch64__)
+	  .ct_xfail_reason = "Morello compiler pads excessively",
+#endif
+	},
 
 	{ .ct_name = "test_bounds_stack_dynamic_uint16",
 	  .ct_desc = "Check bounds on 16-bit dynamic stack allocation",
-	  .ct_func = test_bounds_stack_dynamic_uint16, },
+	  .ct_func = test_bounds_stack_dynamic_uint16,
+#if defined(__aarch64__)
+	  .ct_xfail_reason = "Morello compiler pads excessively",
+#endif
+	},
 
 	{ .ct_name = "test_bounds_stack_dynamic_uint32",
 	  .ct_desc = "Check bounds 32-bit dynamic stack allocation",
-	  .ct_func = test_bounds_stack_dynamic_uint32, },
+	  .ct_func = test_bounds_stack_dynamic_uint32,
+#if defined(__aarch64__)
+	  .ct_xfail_reason = "Morello compiler pads excessively",
+#endif
+	},
 
 	{ .ct_name = "test_bounds_stack_dynamic_uint64",
 	  .ct_desc = "Check bounds on 64-bit dynamic stack allocation",
-	  .ct_func = test_bounds_stack_dynamic_uint64, },
+	  .ct_func = test_bounds_stack_dynamic_uint64,
+#if defined(__aarch64__)
+	  .ct_xfail_reason = "Morello compiler pads excessively",
+#endif
+	},
 
 	{ .ct_name = "test_bounds_stack_dynamic_cap",
 	  .ct_desc = "Check bounds on a capability dynamic stack allocation",
