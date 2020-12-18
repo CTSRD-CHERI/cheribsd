@@ -47,9 +47,6 @@
 #include <cheri/cheric.h>
 
 #include <machine/frame.h>
-#ifdef __riscv
-#include <machine/riscvreg.h>
-#endif
 #include <machine/trap.h>
 
 #ifdef CHERIBSD_LIBCHERI_TESTS
@@ -82,14 +79,6 @@
 #include <libxo/xo.h>
 
 #include "cheribsdtest.h"
-
-#ifdef __mips__
-#define	TRAPNO_CHERI	(T_C2E)
-#elif defined(__riscv)
-#define	TRAPNO_CHERI	(SCAUSE_CHERI)
-#else
-#error "Unsupported architecture"
-#endif
 
 static const struct cheri_test cheri_tests[] = {
 	/*
@@ -156,7 +145,7 @@ static const struct cheri_test cheri_tests[] = {
 	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
 	  .ct_signum = SIGPROT,
 	  .ct_si_code = PROT_CHERI_BOUNDS,
-	  .ct_si_trapno = TRAPNO_CHERI },
+	  .ct_si_trapno = TRAPNO_LOAD_STORE },
 
 	{ .ct_name = "test_fault_perm_load",
 	  .ct_desc = "Exercise capability load permission failure",
@@ -164,7 +153,7 @@ static const struct cheri_test cheri_tests[] = {
 	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
 	  .ct_signum = SIGPROT,
 	  .ct_si_code = PROT_CHERI_PERM,
-	  .ct_si_trapno = TRAPNO_CHERI },
+	  .ct_si_trapno = TRAPNO_LOAD_STORE },
 
 	{ .ct_name = "test_nofault_perm_load",
 	  .ct_desc = "Exercise capability load permission success",
@@ -184,7 +173,7 @@ static const struct cheri_test cheri_tests[] = {
 	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
 	  .ct_signum = SIGPROT,
 	  .ct_si_code = PROT_CHERI_PERM,
-	  .ct_si_trapno = TRAPNO_CHERI },
+	  .ct_si_trapno = TRAPNO_LOAD_STORE },
 
 	{ .ct_name = "test_nofault_perm_store",
 	  .ct_desc = "Exercise capability store permission success",
@@ -204,7 +193,7 @@ static const struct cheri_test cheri_tests[] = {
 	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
 	  .ct_signum = SIGPROT,
 	  .ct_si_code = PROT_CHERI_TAG,
-	  .ct_si_trapno = TRAPNO_CHERI },
+	  .ct_si_trapno = TRAPNO_LOAD_STORE },
 
 #ifdef __mips__
 	{ .ct_name = "test_fault_ccheck_user_fail",
@@ -300,362 +289,204 @@ static const struct cheri_test cheri_tests[] = {
 	{ .ct_name = "test_bounds_global_static_uint8",
 	  .ct_desc = "Check bounds on global static uint8_t",
 	  .ct_func = test_bounds_global_static_uint8,
-#if !defined(__CHERI_PURE_CAPABILITY__)
-	  .ct_xfail_reason =
-	    "Bounds not supported for static globals in hybrid code",
-#endif
-	},
+	  .ct_xfail_reason = XFAIL_HYBRID_BOUNDS_GLOBALS_STATIC, },
 
 	{ .ct_name = "test_bounds_global_uint8",
 	  .ct_desc = "Check bounds on global uint8_t",
 	  .ct_func = test_bounds_global_uint8,
-#if !defined(__CHERI_PURE_CAPABILITY__)
-	  .ct_xfail_reason =
-	    "Bounds not supported for globals in hybrid code",
-#endif
-	},
+	  .ct_xfail_reason = XFAIL_HYBRID_BOUNDS_GLOBALS, },
 
 	{ .ct_name = "test_bounds_global_static_uint16",
 	  .ct_desc = "Check bounds on global static uint16_t",
 	  .ct_func = test_bounds_global_static_uint16,
-#if !defined(__CHERI_PURE_CAPABILITY__)
-	  .ct_xfail_reason =
-	    "Bounds not supported for static globals in hybrid code",
-#endif
-	},
+	  .ct_xfail_reason = XFAIL_HYBRID_BOUNDS_GLOBALS_STATIC, },
 
 	{ .ct_name = "test_bounds_global_uint16",
 	  .ct_desc = "Check bounds on global uint16_t",
 	  .ct_func = test_bounds_global_uint16,
-#if !defined(__CHERI_PURE_CAPABILITY__)
-	  .ct_xfail_reason =
-	    "Bounds not supported for globals in hybrid code",
-#endif
-	},
+	  .ct_xfail_reason = XFAIL_HYBRID_BOUNDS_GLOBALS, },
 
 	{ .ct_name = "test_bounds_global_static_uint32",
 	  .ct_desc = "Check bounds on global static uint32_t",
 	  .ct_func = test_bounds_global_static_uint32,
-#if !defined(__CHERI_PURE_CAPABILITY__)
-	  .ct_xfail_reason =
-	    "Bounds not supported for static globals in hybrid code",
-#endif
-	},
+	  .ct_xfail_reason = XFAIL_HYBRID_BOUNDS_GLOBALS_STATIC, },
 
 	{ .ct_name = "test_bounds_global_uint32",
 	  .ct_desc = "Check bounds on global uint32_t",
 	  .ct_func = test_bounds_global_uint32,
-#if !defined(__CHERI_PURE_CAPABILITY__)
-	  .ct_xfail_reason =
-	    "Bounds not supported for static globals in hybrid code",
-#endif
-	},
+	  .ct_xfail_reason = XFAIL_HYBRID_BOUNDS_GLOBALS, },
 
 	{ .ct_name = "test_bounds_global_static_uint64",
 	  .ct_desc = "Check bounds on global static uint64_t",
 	  .ct_func = test_bounds_global_static_uint64,
-#if !defined(__CHERI_PURE_CAPABILITY__)
-	  .ct_xfail_reason =
-	    "Bounds not supported for static globals in hybrid code",
-#endif
-	},
+	  .ct_xfail_reason = XFAIL_HYBRID_BOUNDS_GLOBALS_STATIC, },
 
 	{ .ct_name = "test_bounds_global_uint64",
 	  .ct_desc = "Check bounds on global uint64_t",
 	  .ct_func = test_bounds_global_uint64,
-#if !defined(__CHERI_PURE_CAPABILITY__)
-	  .ct_xfail_reason =
-	    "Bounds not supported for static globals in hybrid code",
-#endif
-	},
+	  .ct_xfail_reason = XFAIL_HYBRID_BOUNDS_GLOBALS, },
 
 	{ .ct_name = "test_bounds_global_static_uint8_array1",
 	  .ct_desc = "Check bounds on global static uint8_t[1]",
 	  .ct_func = test_bounds_global_static_uint8_array1,
-#if !defined(__CHERI_PURE_CAPABILITY__)
-	  .ct_xfail_reason =
-	    "Bounds not supported for static globals in hybrid code",
-#endif
-	},
+	  .ct_xfail_reason = XFAIL_HYBRID_BOUNDS_GLOBALS_STATIC, },
 
 	{ .ct_name = "test_bounds_global_uint8_array1",
 	  .ct_desc = "Check bounds on global uint8_t[1]",
 	  .ct_func = test_bounds_global_uint8_array1,
-#if !defined(__CHERI_PURE_CAPABILITY__)
-	  .ct_xfail_reason =
-	    "Bounds not supported for globals in hybrid code",
-#endif
-	},
+	  .ct_xfail_reason = XFAIL_HYBRID_BOUNDS_GLOBALS, },
 
 	{ .ct_name = "test_bounds_global_static_uint8_array3",
 	  .ct_desc = "Check bounds on global static uint8_t[3]",
 	  .ct_func = test_bounds_global_static_uint8_array3,
-#if !defined(__CHERI_PURE_CAPABILITY__)
-	  .ct_xfail_reason =
-	    "Bounds not supported for static globals in hybrid code",
-#endif
-	},
+	  .ct_xfail_reason = XFAIL_HYBRID_BOUNDS_GLOBALS_STATIC, },
 
 	{ .ct_name = "test_bounds_global_uint8_array3",
 	  .ct_desc = "Check bounds on global uint8_t[3]",
 	  .ct_func = test_bounds_global_uint8_array3,
-#if !defined(__CHERI_PURE_CAPABILITY__)
-	  .ct_xfail_reason =
-	    "Bounds not supported for globals in hybrid code",
-#endif
-	},
+	  .ct_xfail_reason = XFAIL_HYBRID_BOUNDS_GLOBALS, },
 
 	{ .ct_name = "test_bounds_global_static_uint8_array17",
 	  .ct_desc = "Check bounds on global static uint_t[17]",
 	  .ct_func = test_bounds_global_static_uint8_array17,
-#if !defined(__CHERI_PURE_CAPABILITY__)
-	  .ct_xfail_reason =
-	    "Bounds not supported for static globals in hybrid code",
-#endif
-	},
+	  .ct_xfail_reason = XFAIL_HYBRID_BOUNDS_GLOBALS_STATIC, },
 
 	{ .ct_name = "test_bounds_global_uint8_array17",
 	  .ct_desc = "Check bounds on global uint_t[17]",
 	  .ct_func = test_bounds_global_uint8_array17,
-#if !defined(__CHERI_PURE_CAPABILITY__)
-	  .ct_xfail_reason =
-	    "Bounds not supported for globals in hybrid code",
-#endif
-	},
+	  .ct_xfail_reason = XFAIL_HYBRID_BOUNDS_GLOBALS, },
 
 	{ .ct_name = "test_bounds_global_static_uint8_array65537",
 	  .ct_desc = "Check bounds on global static uint8_t[65537]",
 	  .ct_func = test_bounds_global_static_uint8_array65537,
-#if !defined(__CHERI_PURE_CAPABILITY__)
-	  .ct_xfail_reason =
-	    "Bounds not supported for static globals in hybrid code",
-#endif
-	},
+	  .ct_xfail_reason = XFAIL_HYBRID_BOUNDS_GLOBALS_STATIC,
+	  .ct_flaky_reason = FLAKY_COMPILER_BOUNDS, },
 
 	{ .ct_name = "test_bounds_global_uint8_array65537",
 	  .ct_desc = "Check bounds on global uint8_t[65537]",
 	  .ct_func = test_bounds_global_uint8_array65537,
-#if !defined(__CHERI_PURE_CAPABILITY__)
-	  .ct_xfail_reason =
-	    "Bounds not supported for globals in hybrid code",
-#endif
-	},
+	  .ct_xfail_reason = XFAIL_HYBRID_BOUNDS_GLOBALS,
+	  .ct_flaky_reason = FLAKY_COMPILER_BOUNDS, },
 
 	{ .ct_name = "test_bounds_global_static_uint8_array32",
 	  .ct_desc = "Check bounds on global static uint8_t[32]",
 	  .ct_func = test_bounds_global_static_uint8_array32,
-#if !defined(__CHERI_PURE_CAPABILITY__)
-	  .ct_xfail_reason =
-	    "Bounds not supported for static globals in hybrid code",
-#endif
-	},
+	  .ct_xfail_reason = XFAIL_HYBRID_BOUNDS_GLOBALS_STATIC, },
 
 	{ .ct_name = "test_bounds_global_uint8_array32",
 	  .ct_desc = "Check bounds on global uint8_t[32]",
 	  .ct_func = test_bounds_global_uint8_array32,
-#if !defined(__CHERI_PURE_CAPABILITY__)
-	  .ct_xfail_reason =
-	    "Bounds not supported for globals in hybrid code",
-#endif
-	},
+	  .ct_xfail_reason = XFAIL_HYBRID_BOUNDS_GLOBALS, },
 
 	{ .ct_name = "test_bounds_global_static_uint8_array64",
 	  .ct_desc = "Check bounds on global static uint8_t[64]",
 	  .ct_func = test_bounds_global_static_uint8_array64,
-#if !defined(__CHERI_PURE_CAPABILITY__)
-	  .ct_xfail_reason =
-	    "Bounds not supported for static globals in hybrid code",
-#endif
-	},
+	  .ct_xfail_reason = XFAIL_HYBRID_BOUNDS_GLOBALS_STATIC, },
 
 	{ .ct_name = "test_bounds_global_uint8_array64",
 	  .ct_desc = "Check bounds on global uint8_t[64]",
 	  .ct_func = test_bounds_global_uint8_array64,
-#if !defined(__CHERI_PURE_CAPABILITY__)
-	  .ct_xfail_reason =
-	    "Bounds not supported for globals in hybrid code",
-#endif
-	},
+	  .ct_xfail_reason = XFAIL_HYBRID_BOUNDS_GLOBALS, },
 
 	{ .ct_name = "test_bounds_global_static_uint8_array128",
 	  .ct_desc = "Check bounds on global static uint8_t[128]",
 	  .ct_func = test_bounds_global_static_uint8_array128,
-#if !defined(__CHERI_PURE_CAPABILITY__)
-	  .ct_xfail_reason =
-	    "Bounds not supported for static globals in hybrid code",
-#endif
-	},
+	  .ct_xfail_reason = XFAIL_HYBRID_BOUNDS_GLOBALS_STATIC, },
 
 	{ .ct_name = "test_bounds_global_uint8_array128",
 	  .ct_desc = "Check bounds on global uint8_t[128]",
 	  .ct_func = test_bounds_global_uint8_array128,
-#if !defined(__CHERI_PURE_CAPABILITY__)
-	  .ct_xfail_reason =
-	    "Bounds not supported for globals in hybrid code",
-#endif
-	},
+	  .ct_xfail_reason = XFAIL_HYBRID_BOUNDS_GLOBALS, },
 
 	{ .ct_name = "test_bounds_global_static_uint8_array256",
 	  .ct_desc = "Check bounds on global static uint8_t[256]",
 	  .ct_func = test_bounds_global_static_uint8_array256,
-#if !defined(__CHERI_PURE_CAPABILITY__)
-	  .ct_xfail_reason =
-	    "Bounds not supported for static globals in hybrid code",
-#endif
-	},
+	  .ct_xfail_reason = XFAIL_HYBRID_BOUNDS_GLOBALS_STATIC, },
 
 	{ .ct_name = "test_bounds_global_uint8_array256",
 	  .ct_desc = "Check bounds on global uint8_t[256]",
 	  .ct_func = test_bounds_global_uint8_array256,
-#if !defined(__CHERI_PURE_CAPABILITY__)
-	  .ct_xfail_reason =
-	    "Bounds not supported for globals in hybrid code",
-#endif
-	},
+	  .ct_xfail_reason = XFAIL_HYBRID_BOUNDS_GLOBALS, },
 
 	{ .ct_name = "test_bounds_global_static_uint8_array512",
 	  .ct_desc = "Check bounds on global static uint8_t[512]",
 	  .ct_func = test_bounds_global_static_uint8_array512,
-#if !defined(__CHERI_PURE_CAPABILITY__)
-	  .ct_xfail_reason =
-	    "Bounds not supported for static globals in hybrid code",
-#endif
-	},
+	  .ct_xfail_reason = XFAIL_HYBRID_BOUNDS_GLOBALS_STATIC, },
 
 	{ .ct_name = "test_bounds_global_uint8_array512",
 	  .ct_desc = "Check bounds on global uint8_t[512]",
 	  .ct_func = test_bounds_global_uint8_array512,
-#if !defined(__CHERI_PURE_CAPABILITY__)
-	  .ct_xfail_reason =
-	    "Bounds not supported for globals in hybrid code",
-#endif
-	},
+	  .ct_xfail_reason = XFAIL_HYBRID_BOUNDS_GLOBALS, },
 
 	{ .ct_name = "test_bounds_global_static_uint8_array1024",
 	  .ct_desc = "Check bounds on global static uint8_t[1024]",
 	  .ct_func = test_bounds_global_static_uint8_array1024,
-#if !defined(__CHERI_PURE_CAPABILITY__)
-	  .ct_xfail_reason =
-	    "Bounds not supported for static globals in hybrid code",
-#endif
-	},
+	  .ct_xfail_reason = XFAIL_HYBRID_BOUNDS_GLOBALS_STATIC, },
 
 	{ .ct_name = "test_bounds_global_uint8_array1024",
 	  .ct_desc = "Check bounds on global  uint8_t[1024]",
 	  .ct_func = test_bounds_global_uint8_array1024,
-#if !defined(__CHERI_PURE_CAPABILITY__)
-	  .ct_xfail_reason =
-	    "Bounds not supported for globals in hybrid code",
-#endif
-	},
+	  .ct_xfail_reason = XFAIL_HYBRID_BOUNDS_GLOBALS, },
 
 	{ .ct_name = "test_bounds_global_static_uint8_array2048",
 	  .ct_desc = "Check bounds on global static uint8_t[2048]",
 	  .ct_func = test_bounds_global_static_uint8_array2048,
-#if !defined(__CHERI_PURE_CAPABILITY__)
-	  .ct_xfail_reason =
-	    "Bounds not supported for static globals in hybrid code",
-#endif
-	},
+	  .ct_xfail_reason = XFAIL_HYBRID_BOUNDS_GLOBALS_STATIC, },
 
 	{ .ct_name = "test_bounds_global_uint8_array2048",
 	  .ct_desc = "Check bounds on global uint8_t[2048]",
 	  .ct_func = test_bounds_global_uint8_array2048,
-#if !defined(__CHERI_PURE_CAPABILITY__)
-	  .ct_xfail_reason =
-	    "Bounds not supported for globals in hybrid code",
-#endif
-	},
+	  .ct_xfail_reason = XFAIL_HYBRID_BOUNDS_GLOBALS, },
 
 	{ .ct_name = "test_bounds_global_static_uint8_array4096",
 	  .ct_desc = "Check bounds on global static uint8_t[4096]",
 	  .ct_func = test_bounds_global_static_uint8_array4096,
-#if !defined(__CHERI_PURE_CAPABILITY__)
-	  .ct_xfail_reason =
-	    "Bounds not supported for static globals in hybrid code",
-#endif
-	},
+	  .ct_xfail_reason = XFAIL_HYBRID_BOUNDS_GLOBALS_STATIC, },
 
 	{ .ct_name = "test_bounds_global_uint8_array4096",
 	  .ct_desc = "Check bounds on global uint8_t[4096]",
 	  .ct_func = test_bounds_global_uint8_array4096,
-#if !defined(__CHERI_PURE_CAPABILITY__)
-	  .ct_xfail_reason =
-	    "Bounds not supported for globals in hybrid code",
-#endif
-	},
+	  .ct_xfail_reason = XFAIL_HYBRID_BOUNDS_GLOBALS, },
 
 	{ .ct_name = "test_bounds_global_static_uint8_array8192",
 	  .ct_desc = "Check bounds on global uint8_t[8192]",
 	  .ct_func = test_bounds_global_static_uint8_array8192,
-#if !defined(__CHERI_PURE_CAPABILITY__)
-	  .ct_xfail_reason =
-	    "Bounds not supported for static globals in hybrid code",
-#endif
-	},
+	  .ct_xfail_reason = XFAIL_HYBRID_BOUNDS_GLOBALS_STATIC, },
 
 	{ .ct_name = "test_bounds_global_uint8_array8192",
 	  .ct_desc = "Check bounds on global uint8_t[8192]",
 	  .ct_func = test_bounds_global_uint8_array8192,
-#if !defined(__CHERI_PURE_CAPABILITY__)
-	  .ct_xfail_reason =
-	    "Bounds not supported for globals in hybrid code",
-#endif
-	},
+	  .ct_xfail_reason = XFAIL_HYBRID_BOUNDS_GLOBALS, },
 
 	{ .ct_name = "test_bounds_global_static_uint8_array16384",
 	  .ct_desc = "Check bounds on global static uint8_t[16384]",
 	  .ct_func = test_bounds_global_static_uint8_array16384,
-#if !defined(__CHERI_PURE_CAPABILITY__)
-	  .ct_xfail_reason =
-	    "Bounds not supported for static globals in hybrid code",
-#endif
-	},
+	  .ct_xfail_reason = XFAIL_HYBRID_BOUNDS_GLOBALS_STATIC, },
 
 	{ .ct_name = "test_bounds_global_uint8_array16384",
 	  .ct_desc = "Check bounds on global uint8_t[16384]",
 	  .ct_func = test_bounds_global_uint8_array16384,
-#if !defined(__CHERI_PURE_CAPABILITY__)
-	  .ct_xfail_reason =
-	    "Bounds not supported for globals in hybrid code",
-#endif
-	},
+	  .ct_xfail_reason = XFAIL_HYBRID_BOUNDS_GLOBALS, },
 
 	{ .ct_name = "test_bounds_global_static_uint8_array32768",
 	  .ct_desc = "Check bounds on global static uint8_t[32768]",
 	  .ct_func = test_bounds_global_static_uint8_array32768,
-#if !defined(__CHERI_PURE_CAPABILITY__)
-	  .ct_xfail_reason =
-	    "Bounds not supported for static globals in hybrid code",
-#endif
-	},
+	  .ct_xfail_reason = XFAIL_HYBRID_BOUNDS_GLOBALS_STATIC, },
 
 	{ .ct_name = "test_bounds_global_uint8_array32768",
 	  .ct_desc = "Check bounds on global uint8_t[32768]",
 	  .ct_func = test_bounds_global_uint8_array32768,
-#if !defined(__CHERI_PURE_CAPABILITY__)
-	  .ct_xfail_reason =
-	    "Bounds not supported for globals in hybrid code",
-#endif
-	},
+	  .ct_xfail_reason = XFAIL_HYBRID_BOUNDS_GLOBALS, },
 
 	{ .ct_name = "test_bounds_global_static_uint8_array65536",
 	  .ct_desc = "Check bounds on global static uint8_t[65536]",
 	  .ct_func = test_bounds_global_static_uint8_array65536,
-#if !defined(__CHERI_PURE_CAPABILITY__)
-	  .ct_xfail_reason =
-	    "Bounds not supported for static globals in hybrid code",
-#endif
-	},
+	  .ct_xfail_reason = XFAIL_HYBRID_BOUNDS_GLOBALS_STATIC, },
 
 	{ .ct_name = "test_bounds_global_uint8_array65536",
 	  .ct_desc = "Check bounds on global uint8_t[65536]",
 	  .ct_func = test_bounds_global_uint8_array65536,
-#if !defined(__CHERI_PURE_CAPABILITY__)
-	  .ct_xfail_reason =
-	    "Bounds not supported for globals in hybrid code",
-#endif
-	},
+	  .ct_xfail_reason = XFAIL_HYBRID_BOUNDS_GLOBALS, },
 
 	/*
 	 * Test bounds on globals that are allocated in a different file from
@@ -664,94 +495,55 @@ static const struct cheri_test cheri_tests[] = {
 	{ .ct_name = "test_bounds_extern_global_uint8",
 	  .ct_desc = "Check bounds on extern global uint8_t (C size)",
 	  .ct_func = test_bounds_extern_global_uint8,
-#if !defined(__CHERI_PURE_CAPABILITY__)
-	  .ct_xfail_reason =
-	    "Bounds not supported for extern globals in hybrid code",
-#endif
-	},
+	  .ct_xfail_reason = XFAIL_HYBRID_BOUNDS_GLOBALS_EXTERN, },
 
 	{ .ct_name = "test_bounds_extern_global_uint16",
 	  .ct_desc = "Check bounds on extern global uint16_t (dynamic size)",
 	  .ct_func = test_bounds_extern_global_uint16,
-#if !defined(__CHERI_PURE_CAPABILITY__)
-	  .ct_xfail_reason =
-	    "Bounds not supported for extern globals in hybrid code",
-#endif
-	},
+	  .ct_xfail_reason = XFAIL_HYBRID_BOUNDS_GLOBALS_EXTERN, },
 
 	{ .ct_name = "test_bounds_extern_global_uint32",
 	  .ct_desc = "Check bounds on extern global uint32_t (C size)",
 	  .ct_func = test_bounds_extern_global_uint32,
-#if !defined(__CHERI_PURE_CAPABILITY__)
-	  .ct_xfail_reason =
-	    "Bounds not supported for extern globals in hybrid code",
-#endif
-	},
+	  .ct_xfail_reason = XFAIL_HYBRID_BOUNDS_GLOBALS_EXTERN, },
 
 	{ .ct_name = "test_bounds_extern_global_uint64",
 	  .ct_desc = "Check bounds on extern global uint64_t (dynamic size)",
 	  .ct_func = test_bounds_extern_global_uint64,
-#if !defined(__CHERI_PURE_CAPABILITY__)
-	  .ct_xfail_reason =
-	    "Bounds not supported for extern globals in hybrid code",
-#endif
-	},
+	  .ct_xfail_reason = XFAIL_HYBRID_BOUNDS_GLOBALS_EXTERN, },
 
 	{ .ct_name = "test_bounds_extern_global_array1",
 	  .ct_desc = "Check bounds on extern global uint8_t[1] (dynamic size)",
 	  .ct_func = test_bounds_extern_global_array1,
-#if !defined(__CHERI_PURE_CAPABILITY__)
-	  .ct_xfail_reason =
-	    "Bounds not supported for extern globals in hybrid code",
-#endif
-	},
+	  .ct_xfail_reason = XFAIL_HYBRID_BOUNDS_GLOBALS_EXTERN, },
 
 	{ .ct_name = "test_bounds_extern_global_array7",
 	  .ct_desc = "Check bounds on extern global uint8_t[7] (C size)",
 	  .ct_func = test_bounds_extern_global_array7,
-#if !defined(__CHERI_PURE_CAPABILITY__)
-	  .ct_xfail_reason =
-	    "Bounds not supported for extern globals in hybrid code",
-#endif
-	},
+	  .ct_xfail_reason = XFAIL_HYBRID_BOUNDS_GLOBALS_EXTERN, },
 
 	{ .ct_name = "test_bounds_extern_global_array65537",
 	  .ct_desc = "Check bounds on extern global uint8_t[65537] "
 	    "(dynamic size)",
 	  .ct_func = test_bounds_extern_global_array65537,
-#if !defined(__CHERI_PURE_CAPABILITY__)
-	  .ct_xfail_reason =
-	    "Bounds not supported for extern globals in hybrid code",
-#endif
-	},
+	  .ct_xfail_reason = XFAIL_HYBRID_BOUNDS_GLOBALS_EXTERN,
+	  .ct_flaky_reason = FLAKY_COMPILER_BOUNDS, },
 
 	{ .ct_name = "test_bounds_extern_global_array16",
 	  .ct_desc = "Check bounds on extern global uint8_t[16] (C size)",
 	  .ct_func = test_bounds_extern_global_array16,
-#if !defined(__CHERI_PURE_CAPABILITY__)
-	  .ct_xfail_reason =
-	    "Bounds not supported for extern globals in hybrid code",
-#endif
-	},
+	  .ct_xfail_reason = XFAIL_HYBRID_BOUNDS_GLOBALS_EXTERN, },
 
 	{ .ct_name = "test_bounds_extern_global_array65536",
 	  .ct_desc = "Check bounds on extern global uint8_t[65536] (C size)",
 	  .ct_func = test_bounds_extern_global_array65536,
-#if !defined(__CHERI_PURE_CAPABILITY__)
-	  .ct_xfail_reason =
-	    "Bounds not supported for extern globals in hybrid code",
-#endif
-	},
+	  .ct_xfail_reason = XFAIL_HYBRID_BOUNDS_GLOBALS_EXTERN, },
 
 	{ .ct_name = "test_bounds_extern_global_array256",
 	  .ct_desc = "Check bounds on extern global uint8_t[256] "
 	    "(dynamic size)",
 	  .ct_func = test_bounds_extern_global_array256,
-#if !defined(__CHERI_PURE_CAPABILITY__)
-	  .ct_xfail_reason =
-	    "Bounds not supported for extern globals in hybrid code",
-#endif
-	},
+	  .ct_xfail_reason = XFAIL_HYBRID_BOUNDS_GLOBALS_EXTERN, },
 
 	/*
 	 * Test bounds on heap allocation.
@@ -858,19 +650,23 @@ static const struct cheri_test cheri_tests[] = {
 	 */
 	{ .ct_name = "test_bounds_stack_dynamic_uint8",
 	  .ct_desc = "Check bounds on 8-bit dynamic stack allocation",
-	  .ct_func = test_bounds_stack_dynamic_uint8, },
+	  .ct_func = test_bounds_stack_dynamic_uint8,
+	  .ct_flaky_reason = FLAKY_COMPILER_BOUNDS, },
 
 	{ .ct_name = "test_bounds_stack_dynamic_uint16",
 	  .ct_desc = "Check bounds on 16-bit dynamic stack allocation",
-	  .ct_func = test_bounds_stack_dynamic_uint16, },
+	  .ct_func = test_bounds_stack_dynamic_uint16,
+	  .ct_flaky_reason = FLAKY_COMPILER_BOUNDS, },
 
 	{ .ct_name = "test_bounds_stack_dynamic_uint32",
 	  .ct_desc = "Check bounds 32-bit dynamic stack allocation",
-	  .ct_func = test_bounds_stack_dynamic_uint32, },
+	  .ct_func = test_bounds_stack_dynamic_uint32,
+	  .ct_flaky_reason = FLAKY_COMPILER_BOUNDS, },
 
 	{ .ct_name = "test_bounds_stack_dynamic_uint64",
 	  .ct_desc = "Check bounds on 64-bit dynamic stack allocation",
-	  .ct_func = test_bounds_stack_dynamic_uint64, },
+	  .ct_func = test_bounds_stack_dynamic_uint64,
+	  .ct_flaky_reason = FLAKY_COMPILER_BOUNDS, },
 
 	{ .ct_name = "test_bounds_stack_dynamic_cap",
 	  .ct_desc = "Check bounds on a capability dynamic stack allocation",
@@ -957,9 +753,7 @@ static const struct cheri_test cheri_tests[] = {
 	  .ct_signum = SIGPROT,
 	  .ct_si_code = PROT_CHERI_TAG,
 	  .ct_si_trapno = TRAPNO_CHERI,
-#if defined(__riscv) || defined(__aarch64__)
-	  .ct_xfail_reason = "varargs bounds broken on pure-capability RISC-V and Morello",
-#endif
+	  .ct_xfail_reason = XFAIL_VARARG_BOUNDS,
 	},
 
 	{ .ct_name = "test_bounds_varargs_vaarg_overflow",
@@ -969,9 +763,7 @@ static const struct cheri_test cheri_tests[] = {
 	  .ct_signum = SIGPROT,
 	  .ct_si_code = PROT_CHERI_BOUNDS,
 	  .ct_si_trapno = TRAPNO_CHERI,
-#if defined(__riscv) || defined(__aarch64__)
-	  .ct_xfail_reason = "varargs bounds broken on pure-capability RISC-V and Morello",
-#endif
+	  .ct_xfail_reason = XFAIL_VARARG_BOUNDS,
 	},
 
 	{ .ct_name = "test_bounds_varargs_printf_load",
@@ -981,9 +773,7 @@ static const struct cheri_test cheri_tests[] = {
 	  .ct_signum = SIGPROT,
 	  .ct_si_code = PROT_CHERI_BOUNDS,
 	  .ct_si_trapno = TRAPNO_CHERI,
-#if defined(__riscv) || defined(__aarch64__)
-	  .ct_xfail_reason = "varargs bounds broken on pure-capability RISC-V and Morello",
-#endif
+	  .ct_xfail_reason = XFAIL_VARARG_BOUNDS,
 	},
 
 	{ .ct_name = "test_bounds_varargs_printf_store",
@@ -993,9 +783,7 @@ static const struct cheri_test cheri_tests[] = {
 	  .ct_signum = SIGPROT,
 	  .ct_si_code = PROT_CHERI_BOUNDS,
 	  .ct_si_trapno = TRAPNO_CHERI,
-#if defined(__riscv) || defined(__aarch64__)
-	  .ct_xfail_reason = "varargs bounds broken on pure-capability RISC-V and Morello",
-#endif
+	  .ct_xfail_reason = XFAIL_VARARG_BOUNDS,
 	},
 #endif
 
@@ -1053,11 +841,7 @@ static const struct cheri_test cheri_tests[] = {
 	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
 	  .ct_signum = SIGSEGV,
 	  .ct_si_code = SEGV_STORETAG,
-#ifdef __riscv
-	  .ct_si_trapno = SCAUSE_STORE_AMO_CAP_PAGE_FAULT,
-#else
-	  .ct_si_trapno = TRAPNO_CHERI,
-#endif
+	  .ct_si_trapno = TRAPNO_STORE_CAP_PF,
 	  .ct_check_xfail = xfail_need_writable_tmp },
 
 	{ .ct_name = "cheribsdtest_vm_tag_tmpfile_private",
