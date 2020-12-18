@@ -95,7 +95,7 @@ test_nofault_perm_load(const struct cheri_test *ctp __unused)
 }
 
 void
-test_fault_perm_seal(const struct cheri_test *ctp __unused)
+test_illegal_perm_seal(const struct cheri_test *ctp __unused)
 {
 	int i;
 	void * __capability ip = &i;
@@ -109,10 +109,10 @@ test_fault_perm_seal(const struct cheri_test *ctp __unused)
 		cheribsdtest_failure_err("sysctlbyname(security.cheri.sealcap)");
 	sealcap = cheri_andperm(sealcap, ~CHERI_PERM_SEAL);
 	sealed = cheri_seal(ip, sealcap);
-	/*
-	 * Ensure that sealed is actually use, otherwise the faulting
-	 * instruction can be optimized away since it is dead.
-	 */
+#if !CHERI_SEAL_VIOLATION_EXCEPTION
+	if (!cheri_gettag(sealed))
+		cheribsdtest_success();
+#endif
 	cheribsdtest_failure_errx("cheri_seal() performed successfully "
 	    "%#lp with bad sealcap %#lp", sealed, sealcap);
 }
@@ -136,7 +136,7 @@ test_nofault_perm_store(const struct cheri_test *ctp __unused)
 }
 
 void
-test_fault_perm_unseal(const struct cheri_test *ctp __unused)
+test_illegal_perm_unseal(const struct cheri_test *ctp __unused)
 {
 	int i;
 	void * __capability ip = &i;
@@ -154,10 +154,10 @@ test_fault_perm_unseal(const struct cheri_test *ctp __unused)
 	sealed = cheri_seal(ip, sealcap);
 	sealcap = cheri_andperm(sealcap, ~CHERI_PERM_UNSEAL);
 	unsealed = cheri_unseal(sealed, sealcap);
-	/*
-	 * Ensure that unsealed is actually use, otherwise the faulting
-	 * instruction can be optimized away since it is dead.
-	 */
+#if !CHERI_SEAL_VIOLATION_EXCEPTION
+	if (!cheri_gettag(unsealed))
+		cheribsdtest_success();
+#endif
 	cheribsdtest_failure_errx("cheri_unseal() performed successfully "
 	    "%#lp with bad unsealcap %#lp", unsealed, sealcap);
 }
