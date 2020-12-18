@@ -82,7 +82,6 @@
 #include <libxo/xo.h>
 
 #include "cheribsdtest.h"
-#include "cheribsdtest.h"
 
 #ifdef __mips__
 #define	TRAPNO_CHERI	(T_C2E)
