@@ -42,6 +42,8 @@
 #define	TRAPNO_STORE_CAP_PF	(SCAUSE_STORE_AMO_CAP_PAGE_FAULT)
 #define	TRAPNO_LOAD_STORE	(SCAUSE_CHERI)
 
+#define	CHERI_SEAL_VIOLATION_EXCEPTION	1
+
 #ifdef __CHERI_PURE_CAPABILITY__
 #define	XFAIL_VARARG_BOUNDS	"varargs bounds known to be unimplemented"
 #endif
