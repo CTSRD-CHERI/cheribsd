@@ -266,6 +266,7 @@ test_aio_sival(const struct cheri_test *cpt __unused)
 	res = socketpair(AF_UNIX, SOCK_STREAM, 0, pfd);
 	CHERIBSDTEST_VERIFY2(res == 0, "Could not create socketpair; errno=%d", errno);
 
+	bzero(&aiocb, sizeof(aiocb));
 	aiocb.aio_fildes = pfd[0];
 	aiocb.aio_buf = buf;
 	aiocb.aio_nbytes = sizeof(buf);
