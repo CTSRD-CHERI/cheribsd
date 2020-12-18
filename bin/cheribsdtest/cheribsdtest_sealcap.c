@@ -116,13 +116,8 @@ test_sealcap_sysctl(const struct cheri_test *ctp __unused)
 	if ((v & CHERI_PERM_SEAL) == 0)
 		cheribsdtest_failure_errx("perms %jx (seal missing)", v);
 
-#ifdef __aarch64__
-	if ((v & CHERI_PERM_BRANCH_SEALED_PAIR) != 0)
-		cheribsdtest_failure_errx("perms %jx (branch_sealed_pair present)", v);
-#else
 	if ((v & CHERI_PERM_CCALL) != 0)
 		cheribsdtest_failure_errx("perms %jx (ccall present)", v);
-#endif
 
 	if ((v & CHERI_PERM_UNSEAL) == 0)
 		cheribsdtest_failure_errx("perms %jx (unseal missing)", v);
