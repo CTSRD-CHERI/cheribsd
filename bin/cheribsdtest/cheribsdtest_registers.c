@@ -550,3 +550,41 @@ test_initregs_pcc(const struct cheri_test *ctp __unused)
 	c = cheri_setoffset(c, 0);
 	check_initreg_code(c);
 }
+
+#ifdef __aarch64__
+void
+test_initregs_restricted_default(const struct cheri_test *ctp __unused)
+{
+	void * __capability c;
+
+	/* XXX: There don't seem to be intrisics; use once they exist */
+	__asm__ ("mrs %0, rddc_el0" : "=C"(c));
+	CHERIBSDTEST_CHECK_EQ_CAP(c, NULL);
+
+	cheribsdtest_success();
+}
+
+void
+test_initregs_restricted_stack(const struct cheri_test *ctp __unused)
+{
+	void * __capability c;
+
+	/* XXX: There don't seem to be intrisics; use once they exist */
+	__asm__ ("mrs %0, rcsp_el0" : "=C"(c));
+	CHERIBSDTEST_CHECK_EQ_CAP(c, NULL);
+
+	cheribsdtest_success();
+}
+
+void
+test_initregs_restricted_thread(const struct cheri_test *ctp __unused)
+{
+	void * __capability c;
+
+	/* XXX: There don't seem to be intrisics; use once they exist */
+	__asm__ ("mrs %0, rctpidr_el0" : "=C"(c));
+	CHERIBSDTEST_CHECK_EQ_CAP(c, NULL);
+
+	cheribsdtest_success();
+}
+#endif

@@ -110,6 +110,18 @@ static const struct cheri_test cheri_tests[] = {
 	  .ct_desc = "Test initial value of program-counter capability",
 	  .ct_func = test_initregs_pcc },
 
+#ifdef __aarch64__
+	{ .ct_name = "test_initregs_restricted_default",
+	  .ct_desc = "Test initial value of restricted default capability",
+	  .ct_func = test_initregs_restricted_default },
+	{ .ct_name = "test_initregs_restricted_stack",
+	  .ct_desc = "Test initial value of restricted stack capability",
+	  .ct_func = test_initregs_restricted_stack },
+	{ .ct_name = "test_initregs_restricted_thread",
+	  .ct_desc = "Test initial value of restricted thread capability",
+	  .ct_func = test_initregs_restricted_thread },
+#endif
+
 #ifdef __mips__
 	{ .ct_name = "test_copyregs",
 	  .ct_desc = "Exercise CP2 register assignments",
