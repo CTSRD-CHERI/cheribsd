@@ -3225,8 +3225,6 @@ __elfN(stackgap)(struct image_params *imgp, uintcap_t *stack_base)
 	vm_offset_t range, gap;
 	int pct;
 
-	if ((imgp->map_flags & MAP_ASLR) == 0)
-		return;
 	pct = __elfN(aslr_stack_gap);
 	if (pct == 0)
 		return;
