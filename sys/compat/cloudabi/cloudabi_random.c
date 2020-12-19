@@ -27,6 +27,7 @@
 __FBSDID("$FreeBSD$");
 
 #include <sys/types.h>
+#include <sys/proc.h>
 #include <sys/random.h>
 #include <sys/uio.h>
 
@@ -37,7 +38,7 @@ cloudabi_sys_random_get(struct thread *td,
     struct cloudabi_sys_random_get_args *uap)
 {
 	struct iovec iov;
-	IOVEC_INIT(&iov, uap->buf, uap->buf_len);
+	IOVEC_INIT_C(&iov, __USER_CAP(uap->buf, uap->buf_len), uap->buf_len);
 	struct uio uio = {
 		.uio_iov = &iov,
 		.uio_iovcnt = 1,

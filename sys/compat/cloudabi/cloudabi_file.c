@@ -379,7 +379,7 @@ cloudabi_sys_file_readdir(struct thread *td,
     struct cloudabi_sys_file_readdir_args *uap)
 {
 	struct iovec iov;
-	IOVEC_INIT(&iov, uap->buf, uap->buf_len);
+	IOVEC_INIT_C(&iov, __USER_CAP(uap->buf, uap->buf_len), uap->buf_len);
 	struct uio uio = {
 		.uio_iov = &iov,
 		.uio_iovcnt = 1,
