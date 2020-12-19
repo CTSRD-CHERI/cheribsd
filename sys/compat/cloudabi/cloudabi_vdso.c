@@ -38,6 +38,11 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_object.h>
 #include <vm/vm_page.h>
 #include <vm/vm_pager.h>
+#include <vm/vm_param.h>
+
+#if __has_feature(capabilities)
+#include <cheri/cheric.h>
+#endif
 
 #include <compat/cloudabi/cloudabi_util.h>
 
@@ -48,6 +53,9 @@ cloudabi_vdso_init(struct sysentvec *sv, char *begin, char *end)
 	vm_object_t obj;
 	vm_offset_t addr;
 	size_t i, pages, pages_length, vdso_length;
+#if __has_feature(capabilities)
+	size_t ssiz;
+#endif
 
 	/* Determine the number of pages needed to store the vDSO. */
 	vdso_length = end - begin;
@@ -80,6 +88,17 @@ cloudabi_vdso_init(struct sysentvec *sv, char *begin, char *end)
 	sv->sv_shared_page_len = pages_length;
 	sv->sv_shared_page_obj = obj;
 	sv->sv_usrstack = sv->sv_shared_page_base;
+#if __has_feature(capabilities)
+	/*
+	 * To ensure that the stack base address is sufficiently aligned to
+	 * create a precisely bounded capability we must round down.
+	 */
+	if (sv->sv_maxssiz != NULL)
+		ssiz = *sv->sv_maxssiz;
+	else
+		ssiz = maxssiz;
+	sv->sv_usrstack = CHERI_REPRESENTABLE_BASE(sv->sv_usrstack, ssiz);
+#endif
 }
 
 void
