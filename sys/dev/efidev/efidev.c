@@ -51,6 +51,7 @@ efidev_ioctl(struct cdev *dev __unused, u_long cmd, caddr_t addr,
     int flags __unused, struct thread *td __unused)
 {
 	int error;
+	void *ptr;
 
 	switch (cmd) {
 	case EFIIOC_GET_TABLE:
@@ -58,7 +59,10 @@ efidev_ioctl(struct cdev *dev __unused, u_long cmd, caddr_t addr,
 		struct efi_get_table_ioc *egtioc =
 		    (struct efi_get_table_ioc *)addr;
 
-		error = efi_get_table(&egtioc->uuid, &egtioc->ptr);
+		error = efi_get_table(&egtioc->uuid, &ptr);
+		/* Only leak the KVA, not a full capability */
+		egtioc->ptr =
+		    (void * __capability)(uintcap_t)(ptraddr_t)(uintptr_t)ptr;
 		break;
 	}
 	case EFIIOC_GET_TIME:
