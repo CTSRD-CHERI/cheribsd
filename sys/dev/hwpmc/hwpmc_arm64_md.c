@@ -111,7 +111,7 @@ int
 pmc_save_user_callchain(uintptr_t *cc, int maxsamples,
     struct trapframe *tf)
 {
-	uintptr_t pc, r, oldfp, fp;
+	uintcap_t pc, r, oldfp, fp;
 	struct thread *td;
 	int count;
 
@@ -120,7 +120,7 @@ pmc_save_user_callchain(uintptr_t *cc, int maxsamples,
 
 	td = curthread;
 	pc = PMC_TRAPFRAME_TO_PC(tf);
-	*cc++ = pc;
+	*cc++ = (uintptr_t)pc;
 
 	if (maxsamples <= 1)
 		return (1);
@@ -133,8 +133,8 @@ pmc_save_user_callchain(uintptr_t *cc, int maxsamples,
 
 	for (count = 1; count < maxsamples; count++) {
 		/* Use saved lr as pc. */
-		r = fp + sizeof(uintptr_t);
-		if (copyin((void *)r, &pc, sizeof(pc)) != 0)
+		r = fp + sizeof(uintcap_t);
+		if (copyin((void * __capability)r, &pc, sizeof(pc)) != 0)
 			break;
 		if (!PMC_IN_USERSPACE(pc))
 			break;
@@ -144,7 +144,7 @@ pmc_save_user_callchain(uintptr_t *cc, int maxsamples,
 		/* Switch to next frame up */
 		oldfp = fp;
 		r = fp;
-		if (copyin((void *)r, &fp, sizeof(fp)) != 0)
+		if (copyin((void * __capability)r, &fp, sizeof(fp)) != 0)
 			break;
 		if (fp < oldfp || !PMC_IN_USERSPACE(fp))
 			break;
