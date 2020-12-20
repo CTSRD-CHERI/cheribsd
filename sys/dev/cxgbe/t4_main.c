@@ -10324,7 +10324,8 @@ cudbg_dump(struct adapter *sc, struct t4_cudbg_dump *dump)
 
 #ifndef notyet
 	device_printf(sc->dev, "%s: wr_flash %u, len %u, data %p.\n",
-	    __func__, dump->wr_flash, dump->len, dump->data);
+	    __func__, dump->wr_flash, dump->len,
+	    (__cheri_fromcap void *)dump->data);
 #endif
 
 	if (dump->wr_flash)
@@ -10368,7 +10369,7 @@ set_offload_policy(struct adapter *sc, struct t4_offload_policy *uop)
 	struct bpf_program *bf;
 	const struct offload_settings *s;
 	struct offload_rule *r;
-	void *u;
+	void * __capability u;
 
 	if (!is_offload(sc))
 		return (ENODEV);
@@ -10386,7 +10387,7 @@ set_offload_policy(struct adapter *sc, struct t4_offload_policy *uop)
 	op->nrules = uop->nrules;
 	len = op->nrules * sizeof(struct offload_rule);
 	op->rule = malloc(len, M_CXGBE, M_ZERO | M_WAITOK);
-	rc = copyin(uop->rule, op->rule, len);
+	rc = copyin(uop->user_rule, op->rule, len);
 	if (rc) {
 		free(op->rule, M_CXGBE);
 		free(op, M_CXGBE);
@@ -10423,13 +10424,13 @@ error:
 		}
 
 		bf = &r->bpf_prog;
-		u = bf->bf_insns;	/* userspace ptr */
-		bf->bf_insns = NULL;
+		u = bf->bf_user_insns;	/* userspace ptr */
+		bf->bf_user_insns = NULL;
 		if (bf->bf_len == 0) {
 			/* legal, matches everything */
 			continue;
 		}
-		len = bf->bf_len * sizeof(*bf->bf_insns);
+		len = bf->bf_len * sizeof(*bf->bf_user_insns);
 		bf->bf_insns = malloc(len, M_CXGBE, M_ZERO | M_WAITOK);
 		rc = copyin(u, bf->bf_insns, len);
 		if (rc != 0)
@@ -10457,7 +10458,7 @@ read_card_mem(struct adapter *sc, int win, struct t4_mem_range *mr)
 	uint32_t addr, remaining, n;
 	uint32_t *buf;
 	int rc;
-	uint8_t *dst;
+	uint8_t * __capability dst;
 
 	rc = validate_mem_range(sc, mr->addr, mr->len);
 	if (rc != 0)
@@ -10466,7 +10467,7 @@ read_card_mem(struct adapter *sc, int win, struct t4_mem_range *mr)
 	buf = malloc(min(mr->len, MAX_READ_BUF_SIZE), M_CXGBE, M_WAITOK);
 	addr = mr->addr;
 	remaining = mr->len;
-	dst = (void *)mr->data;
+	dst = (void * __capability)mr->data;
 
 	while (remaining) {
 		n = min(remaining, MAX_READ_BUF_SIZE);
