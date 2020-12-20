@@ -34,12 +34,12 @@
 
 struct efi_var_ioc
 {
-	efi_char *name;		/* User pointer to name, in wide chars */
-	size_t namesize;	/* Number of wide characters in name */
-	struct uuid vendor;	/* Vendor's UUID for variable */
-	uint32_t attrib;	/* Attributes */
-	void *data;		/* User pointer to the data */
-	size_t datasize;	/* Number of *bytes* in the data */
+	efi_char * __kerncap name;	/* User pointer to name, in wide chars */
+	size_t namesize;		/* Number of wide characters in name */
+	struct uuid vendor;		/* Vendor's UUID for variable */
+	uint32_t attrib;		/* Attributes */
+	void * __kerncap data;		/* User pointer to the data */
+	size_t datasize;		/* Number of *bytes* in the data */
 };
 
 #define EFIIOC_GET_TIME		_IOR('E',   2, struct efi_tm)
