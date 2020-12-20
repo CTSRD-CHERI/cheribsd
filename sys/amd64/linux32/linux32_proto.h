@@ -379,9 +379,9 @@ struct linux_sigreturn_args {
 struct linux_clone_args {
 	char flags_l_[PADL_(l_int)]; l_int flags; char flags_r_[PADR_(l_int)];
 	char stack_l_[PADL_(void *)]; void * stack; char stack_r_[PADR_(void *)];
-	char parent_tidptr_l_[PADL_(void *)]; void * parent_tidptr; char parent_tidptr_r_[PADR_(void *)];
+	char parent_tidptr_l_[PADL_(l_pid_t *)]; l_pid_t * parent_tidptr; char parent_tidptr_r_[PADR_(l_pid_t *)];
 	char tls_l_[PADL_(void *)]; void * tls; char tls_r_[PADR_(void *)];
-	char child_tidptr_l_[PADL_(void *)]; void * child_tidptr; char child_tidptr_r_[PADR_(void *)];
+	char child_tidptr_l_[PADL_(l_pid_t *)]; l_pid_t * child_tidptr; char child_tidptr_r_[PADR_(l_pid_t *)];
 };
 struct linux_setdomainname_args {
 	char name_l_[PADL_(char *)]; char * name; char name_r_[PADR_(char *)];
@@ -838,18 +838,18 @@ struct linux_set_tid_address_args {
 };
 struct linux_timer_create_args {
 	char clock_id_l_[PADL_(clockid_t)]; clockid_t clock_id; char clock_id_r_[PADR_(clockid_t)];
-	char evp_l_[PADL_(struct sigevent *)]; struct sigevent * evp; char evp_r_[PADR_(struct sigevent *)];
+	char evp_l_[PADL_(struct l_sigevent *)]; struct l_sigevent * evp; char evp_r_[PADR_(struct l_sigevent *)];
 	char timerid_l_[PADL_(l_timer_t *)]; l_timer_t * timerid; char timerid_r_[PADR_(l_timer_t *)];
 };
 struct linux_timer_settime_args {
 	char timerid_l_[PADL_(l_timer_t)]; l_timer_t timerid; char timerid_r_[PADR_(l_timer_t)];
 	char flags_l_[PADL_(l_int)]; l_int flags; char flags_r_[PADR_(l_int)];
-	char new_l_[PADL_(const struct itimerspec *)]; const struct itimerspec * new; char new_r_[PADR_(const struct itimerspec *)];
-	char old_l_[PADL_(struct itimerspec *)]; struct itimerspec * old; char old_r_[PADR_(struct itimerspec *)];
+	char new_l_[PADL_(const struct l_itimerspec *)]; const struct l_itimerspec * new; char new_r_[PADR_(const struct l_itimerspec *)];
+	char old_l_[PADL_(struct l_itimerspec *)]; struct l_itimerspec * old; char old_r_[PADR_(struct l_itimerspec *)];
 };
 struct linux_timer_gettime_args {
 	char timerid_l_[PADL_(l_timer_t)]; l_timer_t timerid; char timerid_r_[PADR_(l_timer_t)];
-	char setting_l_[PADL_(struct itimerspec *)]; struct itimerspec * setting; char setting_r_[PADR_(struct itimerspec *)];
+	char setting_l_[PADL_(struct l_itimerspec *)]; struct l_itimerspec * setting; char setting_r_[PADR_(struct l_itimerspec *)];
 };
 struct linux_timer_getoverrun_args {
 	char timerid_l_[PADL_(l_timer_t)]; l_timer_t timerid; char timerid_r_[PADR_(l_timer_t)];

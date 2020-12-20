@@ -653,9 +653,9 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		struct linux_clone_args *p = params;
 		iarg[0] = p->flags; /* l_int */
 		uarg[1] = (intptr_t) p->stack; /* void * */
-		uarg[2] = (intptr_t) p->parent_tidptr; /* void * */
+		uarg[2] = (intptr_t) p->parent_tidptr; /* l_pid_t * */
 		uarg[3] = (intptr_t) p->tls; /* void * */
-		uarg[4] = (intptr_t) p->child_tidptr; /* void * */
+		uarg[4] = (intptr_t) p->child_tidptr; /* l_pid_t * */
 		*n_args = 5;
 		break;
 	}
@@ -1559,7 +1559,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 257: {
 		struct linux_timer_create_args *p = params;
 		iarg[0] = p->clock_id; /* clockid_t */
-		uarg[1] = (intptr_t) p->evp; /* struct sigevent * */
+		uarg[1] = (intptr_t) p->evp; /* struct l_sigevent * */
 		uarg[2] = (intptr_t) p->timerid; /* l_timer_t * */
 		*n_args = 3;
 		break;
@@ -1569,8 +1569,8 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		struct linux_timer_settime_args *p = params;
 		iarg[0] = p->timerid; /* l_timer_t */
 		iarg[1] = p->flags; /* l_int */
-		uarg[2] = (intptr_t) p->new; /* const struct itimerspec * */
-		uarg[3] = (intptr_t) p->old; /* struct itimerspec * */
+		uarg[2] = (intptr_t) p->new; /* const struct l_itimerspec * */
+		uarg[3] = (intptr_t) p->old; /* struct l_itimerspec * */
 		*n_args = 4;
 		break;
 	}
@@ -1578,7 +1578,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 259: {
 		struct linux_timer_gettime_args *p = params;
 		iarg[0] = p->timerid; /* l_timer_t */
-		uarg[1] = (intptr_t) p->setting; /* struct itimerspec * */
+		uarg[1] = (intptr_t) p->setting; /* struct l_itimerspec * */
 		*n_args = 2;
 		break;
 	}
@@ -3483,13 +3483,13 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "userland void *";
 			break;
 		case 2:
-			p = "userland void *";
+			p = "userland l_pid_t *";
 			break;
 		case 3:
 			p = "userland void *";
 			break;
 		case 4:
-			p = "userland void *";
+			p = "userland l_pid_t *";
 			break;
 		default:
 			break;
@@ -4875,7 +4875,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "clockid_t";
 			break;
 		case 1:
-			p = "userland struct sigevent *";
+			p = "userland struct l_sigevent *";
 			break;
 		case 2:
 			p = "userland l_timer_t *";
@@ -4894,10 +4894,10 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "l_int";
 			break;
 		case 2:
-			p = "userland const struct itimerspec *";
+			p = "userland const struct l_itimerspec *";
 			break;
 		case 3:
-			p = "userland struct itimerspec *";
+			p = "userland struct l_itimerspec *";
 			break;
 		default:
 			break;
@@ -4910,7 +4910,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "l_timer_t";
 			break;
 		case 1:
-			p = "userland struct itimerspec *";
+			p = "userland struct l_itimerspec *";
 			break;
 		default:
 			break;

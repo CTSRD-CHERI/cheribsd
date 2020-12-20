@@ -648,13 +648,13 @@
 107	AUE_NULL	STD	{
 		int linux_timer_create(
 		    clockid_t clock_id,
-		    struct sigevent *evp,
+		    struct l_sigevent *evp,
 		    l_timer_t *timerid);
 	}
 108	AUE_NULL	STD	{
 		int linux_timer_gettime(
 		    l_timer_t timerid,
-		    struct itimerspec *setting
+		    struct l_itimerspec *setting
 		);
 	}
 109	AUE_NULL	STD	{
@@ -665,8 +665,8 @@
 		int linux_timer_settime(
 		    l_timer_t timerid,
 		    l_int flags,
-		    const struct itimerspec *new,
-		    struct itimerspec *old);
+		    const struct l_itimerspec *new,
+		    struct l_itimerspec *old);
 	}
 111	AUE_NULL	STD	{
 		int linux_timer_delete(
@@ -1318,9 +1318,9 @@
 		int linux_clone(
 		    l_ulong flags,
 		    void *stack,
-		    void *parent_tidptr,
+		    l_pid_t *parent_tidptr,
 		    void *tls,
-		    void *child_tidptr
+		    l_pid_t *child_tidptr
 		);
 	}
 221	AUE_EXECVE	STD	{
