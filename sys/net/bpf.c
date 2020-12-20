@@ -1926,7 +1926,7 @@ bf_insns_get_ptr(void *fpp)
 		    (struct bpf_insn *)(uintptr_t)fpup->fp64.bf_insns,
 		    fpup->fp64.bf_len * sizeof(struct bpf_insn)));
 #endif
-	return (fpup->fp.bf_insns);
+	return (fpup->fp.bf_user_insns);
 }
 
 /*
@@ -1964,7 +1964,7 @@ bpf_setf(struct bpf_d *d, struct bpf_program *fp, u_long cmd)
 	flen = fp->bf_len;
 	if (flen > bpf_maxinsns || (bf_insns_get_ptr(fp) == NULL && flen != 0))
 		return (EINVAL);
-	size = flen * sizeof(*fp->bf_insns);
+	size = flen * sizeof(*fp->bf_user_insns);
 	if (size > 0) {
 		/* We're setting up new filter. Copy and check actual data. */
 		fcode = bpf_program_buffer_alloc(size, M_WAITOK);
