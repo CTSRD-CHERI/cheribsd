@@ -70,7 +70,14 @@ typedef	u_int64_t bpf_u_int64;
  */
 struct bpf_program {
 	u_int bf_len;
-	struct bpf_insn * __kerncap bf_insns;
+#ifdef _KERNEL
+	union {
+		struct bpf_insn * __capability bf_user_insns;
+#endif
+		struct bpf_insn *bf_insns;
+#ifdef _KERNEL
+	};
+#endif
 };
 
 /*
