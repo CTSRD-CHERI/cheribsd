@@ -2062,7 +2062,7 @@ cheribsdtest_run_test(const struct cheri_test *ctp)
 	char reason[TESTRESULT_STR_LEN * 2]; /* Potential output, plus some extra */
 	char visreason[sizeof(reason) * 4]; /* Space for vis(3) the string */
 	char buffer[TEST_BUFFER_LEN];
-	const char *xfail_reason;
+	const char *xfail_reason, *flaky_reason;
 	char* failure_message;
 	ssize_t len;
 	xo_attr("classname", "%s.%s", PROG, ctp->ct_name);
@@ -2078,6 +2078,7 @@ cheribsdtest_run_test(const struct cheri_test *ctp)
 		xfail_reason = ctp->ct_check_xfail(ctp->ct_name);
 	else
 		xfail_reason = ctp->ct_xfail_reason;
+	flaky_reason = ctp->ct_flaky_reason;
 	if (xfail_reason != NULL) {
 		expected_failures++;
 	}
@@ -2363,11 +2364,15 @@ fail:
 	 */
 	strnvis(visreason, sizeof(visreason), reason, VIS_TAB);
 	asprintf(&failure_message, "%s: %s", ctp->ct_name, visreason);
-	if (xfail_reason == NULL) {
+	if (xfail_reason == NULL && flaky_reason == NULL) {
 		xo_emit("FAIL: {d:name/%s}: {:failure/%s}\n",
 		    ctp->ct_name, visreason);
 		sl_add(cheri_failed_tests, failure_message);
 	} else {
+		if (xfail_reason == NULL)
+			expected_failures++;
+		if (flaky_reason != NULL)
+			xfail_reason = flaky_reason;
 		if (xo_get_style(NULL) == XO_STYLE_XML) {
 			xo_attr("message", "%s", xfail_reason);
 			xo_emit("{e:skipped/%s}", "");

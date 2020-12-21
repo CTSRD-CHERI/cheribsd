@@ -129,6 +129,7 @@ struct cheri_test {
 	const char	*ct_stdin_string;
 	const char	*ct_stdout_string;
 	const char	*ct_xfail_reason;
+	const char	*ct_flaky_reason;
 };
 
 /*
