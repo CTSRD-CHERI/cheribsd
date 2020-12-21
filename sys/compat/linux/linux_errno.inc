@@ -156,7 +156,7 @@ static const int linux_errtbl[ELAST + 1] = {
 	[ENOTRECOVERABLE] = -LINUX_ENOTRECOVERABLE,
 	[EOWNERDEAD] = -LINUX_EOWNERDEAD,
 	[EINTEGRITY] = -LINUX_EINVAL,	/* XXX */
-	[EPROT] = -LINUX_EINVAL,	/* XXX */
+	[EPROT] = -LINUX_EFAULT,	/* XXX */
 };
 
 _Static_assert(ELAST == 98,
