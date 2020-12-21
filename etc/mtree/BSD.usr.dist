@@ -170,7 +170,7 @@
     sbin
     ..
     share
-        atf
+        atf             tags=package=tests
         ..
         bsdconfig
             media
@@ -221,9 +221,9 @@
         doc
             IPv6
             ..
-            atf
+            atf             tags=package=tests
             ..
-            kyua
+            kyua             tags=package=tests
             ..
             legal
             ..
@@ -321,7 +321,7 @@
                     ..
                 ..
             ..
-            kyua
+            kyua             tags=package=tests
             ..
             libusb20
             ..
@@ -462,10 +462,10 @@
                 ..
             ..
         ..
-        kyua
-            misc
+        kyua             tags=package=tests
+            misc         tags=package=tests
             ..
-            store
+            store        tags=package=tests
             ..
         ..
         locale

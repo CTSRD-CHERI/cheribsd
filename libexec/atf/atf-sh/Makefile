@@ -40,6 +40,7 @@ NO_SHARED=	yes
 ATF=		${SRCTOP}/contrib/atf
 .PATH:		${ATF}/atf-sh
 
+PACKAGE=	tests
 PROG_CXX=	atf-sh
 SRCS=		atf-sh.cpp
 MAN=		atf-sh.1 atf-sh.3
@@ -83,6 +84,7 @@ FILESGROUPS=	SUBR
 
 SUBRDIR=	${SHAREDIR}/atf
 SUBR=		libatf-sh.subr
+SUBRTAGS=	package=tests
 
 HAS_TESTS=
 SUBDIR.${MK_TESTS}+= tests
