@@ -54,8 +54,8 @@ __RCSID("$NetBSD: t_barrier.c,v 1.2 2010/11/03 16:10:22 christos Exp $");
 
 pthread_barrier_t barrier;
 pthread_mutex_t mutex;
-int serial_count;
-int after_barrier_count;
+static _Atomic(int) serial_count;
+static _Atomic(int) after_barrier_count;
 
 static void *
 threadfunc(void *arg)
@@ -96,7 +96,6 @@ ATF_TC_BODY(barrier, tc)
 		PTHREAD_REQUIRE(pthread_mutex_unlock(&mutex));
 		PTHREAD_REQUIRE(pthread_create(&new[i], NULL, threadfunc,
 						(void *)(intptr_t)i));
-		sleep(2);
 	}
 
 	for (i = 0; i < COUNT; i++) {

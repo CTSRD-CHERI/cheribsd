@@ -390,7 +390,7 @@ ATF_TC_BODY(mutex3, tc)
 static void *
 mutex4_threadfunc(void *arg)
 {
-	int *param;
+	_Atomic(int) *param;
 
 	printf("2: Second thread.\n");
 
@@ -412,7 +412,7 @@ ATF_TC_HEAD(mutex4, tc)
 }
 ATF_TC_BODY(mutex4, tc)
 {
-	int x;
+	_Atomic(int) x;
 	pthread_t new;
 	pthread_mutexattr_t mattr;
 	void *joinval;
@@ -434,14 +434,12 @@ ATF_TC_BODY(mutex4, tc)
 	PTHREAD_REQUIRE(mutex_lock(&mutex, &ts_lengthy));
 
 	printf("1: Before releasing the mutex once.\n");
-	sleep(2);
 	PTHREAD_REQUIRE(pthread_mutex_unlock(&mutex));
 	printf("1: After releasing the mutex once.\n");
 
 	x = 20;
 
 	printf("1: Before releasing the mutex twice.\n");
-	sleep(2);
 	PTHREAD_REQUIRE(pthread_mutex_unlock(&mutex));
 	printf("1: After releasing the mutex twice.\n");
 
