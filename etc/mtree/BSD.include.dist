@@ -173,10 +173,6 @@
         virstor
         ..
     ..
-    gnu
-        posix
-        ..
-    ..
     gssapi
     ..
     infiniband

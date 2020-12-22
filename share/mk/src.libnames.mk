@@ -123,7 +123,6 @@ _LIBRARIES=	\
 		fetch \
 		figpar \
 		geom \
-		gnuregex \
 		gpio \
 		gssapi \
 		gssapi_krb5 \
@@ -620,7 +619,6 @@ LIBOPENSMDIR=	${_LIB_OBJTOP}/lib/ofed/libopensm
 LIBOSMVENDORDIR=${_LIB_OBJTOP}/lib/ofed/libvendor
 
 LIBDIALOGDIR=	${_LIB_OBJTOP}/gnu/lib/libdialog
-LIBGNUREGEXDIR=	${_LIB_OBJTOP}/gnu/lib/libregex
 LIBSSPDIR=	${_LIB_OBJTOP}/lib/libssp
 LIBSSP_NONSHAREDDIR=	${_LIB_OBJTOP}/lib/libssp_nonshared
 LIBASN1DIR=	${_LIB_OBJTOP}/kerberos5/lib/libasn1
