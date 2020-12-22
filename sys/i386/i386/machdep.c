@@ -1145,8 +1145,8 @@ exec_setregs(struct thread *td, struct image_params *imgp, uintptr_t stack)
 		mtx_unlock_spin(&dt_lock);
 
 #ifdef COMPAT_43
-	if (td->td_proc->p_psstrings !=
-	    elf32_freebsd_sysvec.sv_psstrings)
+	if (td->td_proc->p_psstrings != elf32_freebsd_sysvec.sv_usrstack -
+	    elf32_freebsd_sysvec.sv_szpsstrings)
 		setup_priv_lcall_gate(td->td_proc);
 #endif
   
@@ -2608,7 +2608,8 @@ i386_setup_lcall_gate(void)
 	u_int lcall_addr;
 
 	sv = &elf32_freebsd_sysvec;
-	lcall_addr = (uintptr_t)sv->sv_psstrings - sz_lcall_tramp;
+	lcall_addr = (uintptr_t)sv->sv_usrstack - sv->ps_strings_sz -
+	    sz_lcall_tramp;
 
 	bzero(&desc, sizeof(desc));
 	desc.sd_type = SDT_MEMERA;

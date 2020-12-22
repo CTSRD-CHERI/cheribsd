@@ -75,8 +75,6 @@ __FBSDID("$FreeBSD$");
 
 MODULE_VERSION(linux, 1);
 
-#define	LINUX_PS_STRINGS	(LINUX_USRSTACK - sizeof(struct ps_strings))
-
 static int linux_szsigcode;
 static vm_object_t linux_shared_page_obj;
 static char *linux_shared_page_mapping;
@@ -855,7 +853,7 @@ struct sysentvec linux_sysvec = {
 	.sv_minuser	= VM_MIN_ADDRESS,
 	.sv_maxuser	= VM_MAXUSER_ADDRESS,
 	.sv_usrstack	= LINUX_USRSTACK,
-	.sv_psstrings	= PS_STRINGS,
+	.sv_szpsstrings	= sizeof(struct ps_strings),
 	.sv_stackprot	= VM_PROT_ALL,
 	.sv_copyout_strings = exec_copyout_strings,
 	.sv_setregs	= linux_exec_setregs,
@@ -891,7 +889,7 @@ struct sysentvec elf_linux_sysvec = {
 	.sv_minuser	= VM_MIN_ADDRESS,
 	.sv_maxuser	= VM_MAXUSER_ADDRESS,
 	.sv_usrstack	= LINUX_USRSTACK,
-	.sv_psstrings	= LINUX_PS_STRINGS,
+	.sv_szpsstrings	= sizeof(struct ps_strings),
 	.sv_stackprot	= VM_PROT_ALL,
 	.sv_copyout_auxargs = linux_copyout_auxargs,
 	.sv_copyout_strings = linux_copyout_strings,

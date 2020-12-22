@@ -80,7 +80,7 @@ static struct sysentvec elf_freebsd_sysvec = {
 #endif
 	.sv_maxuser	= VM_MAXUSER_ADDRESS,
 	.sv_usrstack	= USRSTACK,
-	.sv_psstrings	= PS_STRINGS,
+	.sv_szpsstrings	= sizeof(struct ps_strings),
 #if __has_feature(capabilities)
 	.sv_stackprot	= VM_PROT_RW_CAP,
 #else

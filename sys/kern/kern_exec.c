@@ -1647,7 +1647,7 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	p = imgp->proc;
 	szsigcode = 0;
 
-	p->p_psstrings = p->p_sysent->sv_psstrings;
+	p->p_psstrings = p->p_usrstack - p->p_sysent->sv_szpsstrings;
 
 #if __has_feature(capabilities)
 	/*
