@@ -60,9 +60,6 @@ struct freebsd32_ps_strings {
 #include <compat/ia32/ia32_util.h>
 #endif
 
-#define FREEBSD32_PS_STRINGS	\
-	(FREEBSD32_USRSTACK - sizeof(struct freebsd32_ps_strings))
-
 extern struct sysent freebsd32_sysent[];
 
 #define SYSCALL32_MODULE(name, offset, new_sysent, evh, arg)   \
