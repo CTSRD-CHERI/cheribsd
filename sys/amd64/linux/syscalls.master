@@ -890,13 +890,13 @@
 137	AUE_STATFS	STD {
 		int linux_statfs(
 		    char *path,
-		    struct l_statfs_buf *buf
+		    struct l_statfs *buf
 		);
 	}
 138	AUE_FSTATFS	STD {
 		int linux_fstatfs(
 		    l_uint fd,
-		    struct l_statfs_buf *buf
+		    struct l_statfs *buf
 		);
 	}
 139	AUE_NULL	STD {
@@ -1519,7 +1519,7 @@
 		int linux_newfstatat(
 		    l_int dfd,
 		    char *pathname,
-		    struct l_stat64 *statbuf,
+		    struct l_stat *statbuf,
 		    l_int flag
 		);
 	}

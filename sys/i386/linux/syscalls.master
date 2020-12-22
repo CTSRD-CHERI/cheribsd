@@ -545,13 +545,13 @@
 99	AUE_STATFS	STD {
 		int linux_statfs(
 		    char *path,
-		    struct l_statfs_buf *buf
+		    struct l_statfs *buf
 		);
 	}
 100	AUE_FSTATFS	STD {
 		int linux_fstatfs(
 		    l_uint fd,
-		    struct l_statfs_buf *buf
+		    struct l_statfs *buf
 		);
 	}
 101	AUE_NULL	STD {
