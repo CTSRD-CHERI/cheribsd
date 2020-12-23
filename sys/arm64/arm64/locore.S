@@ -208,9 +208,7 @@
 #endif
 .endmacro
 
-	.text
-	.globl _start
-_start:
+ENTRY(_start)
 #ifdef __CHERI_PURE_CAPABILITY__
 	.arch_extension noc64
 	.arch_extension a64c
@@ -372,6 +370,7 @@ virtdone:
 	brk	0
 
 	.align 3
+END(_start)
 #ifdef __CHERI_PURE_CAPABILITY__
 .Lpagetable_clrperms:
 	.quad ~(CHERI_PERM_GLOBAL | CHERI_PERM_LOAD | CHERI_PERM_STORE)
@@ -442,7 +441,7 @@ END(mpentry)
  * If we are started in EL2, configure the required hypervisor
  * registers and drop to EL1.
  */
-drop_to_el1:
+LENTRY(drop_to_el1)
 #ifdef __CHERI_PURE_CAPABILITY__
 	.arch_extension noc64
 	.arch_extension a64c
@@ -538,6 +537,7 @@ drop_to_el1:
 	.align 3
 .Lsctlr_res1:
 	.quad SCTLR_RES1
+LEND(drop_to_el1)
 
 #define	VECT_EMPTY	\
 	.align 7;	\
@@ -570,7 +570,7 @@ hyp_vectors:
  * virtual address we expect to run from. This is used when building the
  * initial page table.
  */
-get_virt_delta:
+LENTRY(get_virt_delta)
 	/* Load the physical address of virt_map */
 	adrp	PTR(29), virt_map
 	add	PTR(29), PTR(29), :lo12:virt_map
@@ -586,6 +586,7 @@ get_virt_delta:
 	.align 3
 virt_map:
 	.quad	virt_map
+LEND(get_virt_delta)
 
 /*
  * This builds the page tables containing the identity map, and the kernel
@@ -612,7 +613,7 @@ virt_map:
  *    - The identity (PA = VA) L0 table (TTBR0)
  *    - The DMAP L1 tables
  */
-create_pagetables:
+LENTRY(create_pagetables)
 	/* Save the Link register */
 	mov	PTR(5), PTR(30)
 
@@ -812,6 +813,7 @@ common:
 	/* Restore the Link register */
 	mov	PTR(30), PTR(5)
 	ret
+LEND(create_pagetables)
 
 /*
  * Builds an L0 -> L1 table descriptor
@@ -822,7 +824,7 @@ common:
  *  x10 = Entry count (trashed)
  *  x11, x12 and x13 are trashed
  */
-link_l0_pagetable:
+LENTRY(link_l0_pagetable)
 	/*
 	 * Link an L0 -> L1 table entry.
 	 */
@@ -846,6 +848,7 @@ link_l0_pagetable:
 	cbnz	x10, 1b
 
 	ret
+LEND(link_l0_pagetable)
 
 /*
  * Builds an L1 -> L2 table descriptor
@@ -855,7 +858,7 @@ link_l0_pagetable:
  *  x9  = L2 PA (trashed)
  *  x11, x12 and x13 are trashed
  */
-link_l1_pagetable:
+LENTRY(link_l1_pagetable)
 	/*
 	 * Link an L1 -> L2 table entry.
 	 */
@@ -874,6 +877,45 @@ link_l1_pagetable:
 	str	x13, [PTR(6), x11, lsl #3]
 
 	ret
+LEND(link_l1_pagetable)
+
+/*
+ * Builds count 1 GiB page table entry
+ *  x6  = L1 table
+ *  x7  = Variable lower block attributes
+ *  x8  = VA start
+ *  x9  = PA start (trashed)
+ *  x10 = Entry count
+ *  x11, x12 and x13 are trashed
+ */
+LENTRY(build_l1_block_pagetable)
+	/*
+	 * Build the L1 table entry.
+	 */
+	/* Find the table index */
+	lsr	x11, x8, #L1_SHIFT
+	and	x11, x11, #Ln_ADDR_MASK
+
+	/* Build the L1 block entry */
+	orr	x12, x7, #L1_BLOCK
+	orr	x12, x12, #(ATTR_DEFAULT)
+
+	/* Only use the output address bits */
+	lsr	x9, x9, #L1_SHIFT
+
+	/* Set the physical address for this virtual address */
+1:	orr	x13, x12, x9, lsl #L1_SHIFT
+
+	/* Store the entry */
+	str	x13, [x6, x11, lsl #3]
+
+	sub	x10, x10, #1
+	add	x11, x11, #1
+	add	x9, x9, #1
+	cbnz	x10, 1b
+
+	ret
+LEND(build_l1_block_pagetable)
 
 /*
  * Builds count 2 MiB page table entry
@@ -884,7 +926,7 @@ link_l1_pagetable:
  *  x10 = Entry count (trashed)
  *  x11, x12 and x13 are trashed
  */
-build_l2_block_pagetable:
+LENTRY(build_l2_block_pagetable)
 	/*
 	 * Build the L2 table entry.
 	 */
@@ -915,8 +957,9 @@ build_l2_block_pagetable:
 	cbnz	x10, 1b
 
 	ret
+LEND(build_l2_block_pagetable)
 
-start_mmu:
+LENTRY(start_mmu)
 	dsb	sy
 
 	/* Load the exception vectors */
@@ -1024,6 +1067,7 @@ sctlr_clear:
 	/* Bits to clear */
 	.quad (SCTLR_EE | SCTLR_EOE | SCTLR_IESB | SCTLR_WXN | SCTLR_UMA | \
 	    SCTLR_ITD | SCTLR_A)
+LEND(start_mmu)
 
 ENTRY(abort)
 	b abort
