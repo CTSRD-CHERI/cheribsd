@@ -6,6 +6,9 @@ include		"std.MALTA"
 include		"std.CHERI_PURECAP"
 ident		CHERI_PURECAP_MALTA64
 
+nomakeoptions	KERNLOADADDR
+makeoptions 	KERNLOADADDR=0xffffffff80100000
+
 #
 # Qemu-CHERI tracing is permitted per thread, not just globally.
 #
