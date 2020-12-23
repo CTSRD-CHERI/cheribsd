@@ -392,12 +392,13 @@ _rtld_validate_target_eflags(const char* path, Elf_Ehdr *hdr, const char* main_p
 
 #ifdef __CHERI_PURE_CAPABILITY__
 	if (hdr->e_ident[EI_ABIVERSION] != ELF_CHERIABI_ABIVERSION) {
-		const char* allow_mismatch = getenv("LD_CHERI_ALLOW_ABIVERSION_MISMATCH");
+		const char *allow_mismatch = get_ld_env_var(
+		    "ALLOW_ABIVERSION_MISMATCH");
 		if (allow_mismatch == NULL || *allow_mismatch == '\0' ||
 		    *allow_mismatch == '0') {
 			_rtld_error("%s: cannot load %s since it is CheriABI "
 			    "version %d and not %d. Set "
-			    "LD_CHERI_ALLOW_ABIVERSION_MISMATCH to ignore this "
+			    _LD("ALLOW_ABIVERSION_MISMATCH") " to ignore this "
 			    "error.", main_path, path,
 			    hdr->e_ident[EI_ABIVERSION], ELF_CHERIABI_ABIVERSION);
 			return false;
