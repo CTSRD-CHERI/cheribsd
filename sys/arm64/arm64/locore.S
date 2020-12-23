@@ -1029,8 +1029,12 @@ ENTRY(abort)
 	b abort
 END(abort)
 
-	.section .init_pagetable, "aw"
-	.align 12 /* 4KiB aligned */
+	.align 3
+init_pt_va:
+	.quad pagetable		/* XXX: Keep page tables VA */
+
+	.section .init_pagetable, "aw", %nobits
+	.align PAGE_SHIFT
 	/*
 	 * 6 initial tables (in the following order):
 	 *           L2 for kernel (High addresses)
@@ -1068,8 +1072,6 @@ el2_pagetable:
 	.size	el2_pagetable, . - el2_pagetable
 
 	.globl init_pt_va
-init_pt_va:
-	.quad pagetable		/* XXX: Keep page tables VA */
 
 	.align	4
 	.type	initstack,#object
