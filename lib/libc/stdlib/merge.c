@@ -79,6 +79,7 @@ typedef int (*cmp_t)(const void *, const void *);
 #define	CMP(x, y)	cmp(x, y)
 #endif
 
+#ifndef __CHERI_PURE_CAPABILITY__
 static void setup(u_char *, u_char *, size_t, size_t, cmp_t);
 static void insertionsort(u_char *, size_t, size_t, cmp_t);
 
@@ -108,9 +109,14 @@ static void insertionsort(u_char *, size_t, size_t, cmp_t);
  * boundaries.
  */
 /* Assumption: PSIZE is a power of 2. */
+#if __has_builtin(__builtin_align_up)
+#define EVAL(p) ((u_char **)__builtin_align_up(p, PSIZE))
+#else
 #define EVAL(p) (u_char **)						\
 	((u_char *)0 +							\
 	    (((u_char *)p + PSIZE - 1 - (u_char *) 0) & ~(PSIZE - 1)))
+#endif
+#endif /* !__CHERI_PURE_CAPABILITY__ */
 
 #ifdef I_AM_MERGESORT_B
 int mergesort_b(void *, size_t, size_t, cmp_t);
@@ -268,6 +274,7 @@ COPY:	    			b = t;
 #endif /* __CHERI_PURE_CAPABILITY__ */
 }
 
+#ifndef __CHERI_PURE_CAPABILITY__
 #define	swap(a, b) {					\
 		s = b;					\
 		i = size;				\
@@ -378,3 +385,4 @@ insertionsort(u_char *a, size_t n, size_t size, cmp_t cmp)
 			swap(u, t);
 		}
 }
+#endif /* !__CHERI_PURE_CAPABILITY__ */
