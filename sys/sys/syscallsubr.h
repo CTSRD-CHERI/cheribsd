@@ -507,6 +507,7 @@ int	kern_statat(struct thread *td, int flag, int fd,
 	    const char * __capability path,
 	    enum uio_seg pathseg, struct stat *sbp,
 	    void (*hook)(struct vnode *vp, struct stat *sbp));
+int	kern_specialfd(struct thread *td, int type, void * __capability arg);
 int	kern_statfs(struct thread *td, const char * __capability path,
 	    enum uio_seg pathseg, struct statfs *buf);
 int	kern_swapoff(struct thread *td, const char * __capability name);
@@ -672,6 +673,8 @@ int	user_sigwaitinfo(struct thread *td, const sigset_t * __capability uset,
 	    void * __capability info, copyout_siginfo_t *copyout_siginfop);
 int	user_socketpair(struct thread *td, int domain, int type, int protocol,
 	    int * __capability rsv);
+int	user_specialfd(struct thread *td, int type, const void * __capability req,
+	    size_t len);
 int	user_statfs(struct thread *td, const char * __capability path,
 	    struct statfs * __capability buf);
 int	user_uuidgen(struct thread *td, struct uuid * __capability storep,

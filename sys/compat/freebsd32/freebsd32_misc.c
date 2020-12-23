@@ -74,6 +74,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/signalvar.h>
 #include <sys/socket.h>
 #include <sys/socketvar.h>
+#include <sys/specialfd.h>
 #include <sys/stat.h>
 #include <sys/syscall.h>
 #include <sys/syscallsubr.h>
@@ -3381,6 +3382,23 @@ freebsd32_posix_fallocate(struct thread *td,
 	error = kern_posix_fallocate(td, uap->fd,
 	    PAIR32TO64(off_t, uap->offset), PAIR32TO64(off_t, uap->len));
 	return (kern_posix_error(td, error));
+}
+
+int
+freebsd32___specialfd(struct thread *td,
+    struct freebsd32___specialfd_args *args)
+{
+	void * __capability req;
+
+	switch(args->type) {
+	case SPECIALFD_EVENTFD:
+		req = __USER_CAP(args->req, sizeof(struct specialfd_eventfd));
+		break;
+	default:
+		return (EINVAL);
+	}
+
+	return (user_specialfd(td, args->type, req, args->len));
 }
 
 int
