@@ -850,44 +850,6 @@ LENTRY(link_l1_pagetable)
 LEND(link_l1_pagetable)
 
 /*
- * Builds count 1 GiB page table entry
- *  x6  = L1 table
- *  x7  = Variable lower block attributes
- *  x8  = VA start
- *  x9  = PA start (trashed)
- *  x10 = Entry count
- *  x11, x12 and x13 are trashed
- */
-LENTRY(build_l1_block_pagetable)
-	/*
-	 * Build the L1 table entry.
-	 */
-	/* Find the table index */
-	lsr	x11, x8, #L1_SHIFT
-	and	x11, x11, #Ln_ADDR_MASK
-
-	/* Build the L1 block entry */
-	orr	x12, x7, #L1_BLOCK
-	orr	x12, x12, #(ATTR_DEFAULT)
-
-	/* Only use the output address bits */
-	lsr	x9, x9, #L1_SHIFT
-
-	/* Set the physical address for this virtual address */
-1:	orr	x13, x12, x9, lsl #L1_SHIFT
-
-	/* Store the entry */
-	str	x13, [x6, x11, lsl #3]
-
-	sub	x10, x10, #1
-	add	x11, x11, #1
-	add	x9, x9, #1
-	cbnz	x10, 1b
-
-	ret
-LEND(build_l1_block_pagetable)
-
-/*
  * Builds count 2 MiB page table entry
  *  x/c6  = L2 table
  *  x7  = Block attributes
