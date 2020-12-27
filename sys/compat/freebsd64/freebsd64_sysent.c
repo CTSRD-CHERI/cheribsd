@@ -621,4 +621,5 @@ struct sysent freebsd64_sysent[] = {
 	{ .sy_narg = AS(freebsd64___realpathat_args), .sy_call = (sy_call_t *)freebsd64___realpathat, .sy_auevent = AUE_REALPATHAT, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 574 = freebsd64___realpathat */
 	{ .sy_narg = AS(close_range_args), .sy_call = (sy_call_t *)sys_close_range, .sy_auevent = AUE_CLOSERANGE, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 575 = close_range */
 	{ .sy_narg = AS(freebsd64_rpctls_syscall_args), .sy_call = (sy_call_t *)lkmressys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },	/* 576 = freebsd64_rpctls_syscall */
+	{ .sy_narg = AS(freebsd64___specialfd_args), .sy_call = (sy_call_t *)freebsd64___specialfd, .sy_auevent = AUE_SPECIALFD, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 577 = freebsd64___specialfd */
 };
