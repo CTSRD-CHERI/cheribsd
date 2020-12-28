@@ -3669,6 +3669,7 @@ kern_renameat(struct thread *td, int oldfd, const char * __capability old,
 	struct mount *mp = NULL;
 	struct vnode *tvp, *fvp, *tdvp;
 	struct nameidata fromnd, tond;
+	u_int64_t tondflags;
 	int error;
 
 again:
@@ -3689,11 +3690,11 @@ again:
 	}
 #endif
 	fvp = fromnd.ni_vp;
-	NDINIT_ATRIGHTS(&tond, RENAME, LOCKPARENT | LOCKLEAF | NOCACHE |
-	    SAVESTART | AUDITVNODE2, pathseg, new, newfd,
-	    &cap_renameat_target_rights, td);
+	tondflags = LOCKPARENT | LOCKLEAF | NOCACHE | SAVESTART | AUDITVNODE2;
 	if (fromnd.ni_vp->v_type == VDIR)
-		tond.ni_cnd.cn_flags |= WILLBEDIR;
+		tondflags |= WILLBEDIR;
+	NDINIT_ATRIGHTS(&tond, RENAME, tondflags, pathseg, new, newfd,
+	    &cap_renameat_target_rights, td);
 	if ((error = namei(&tond)) != 0) {
 		/* Translate error code for rename("dir1", "dir2/."). */
 		if (error == EISDIR && fvp->v_type == VDIR)
@@ -3835,9 +3836,8 @@ kern_mkdirat(struct thread *td, int fd, const char * __capability path,
 restart:
 	bwillwrite();
 	NDINIT_ATRIGHTS(&nd, CREATE, LOCKPARENT | SAVENAME | AUDITVNODE1 |
-	    NC_NOMAKEENTRY | NC_KEEPPOSENTRY | FAILIFEXISTS, segflg, path, fd,
-	    &cap_mkdirat_rights, td);
-	nd.ni_cnd.cn_flags |= WILLBEDIR;
+	    NC_NOMAKEENTRY | NC_KEEPPOSENTRY | FAILIFEXISTS | WILLBEDIR,
+	    segflg, path, fd, &cap_mkdirat_rights, td);
 	if ((error = namei(&nd)) != 0)
 		return (error);
 	if (vn_start_write(nd.ni_dvp, &mp, V_NOWAIT) != 0) {
