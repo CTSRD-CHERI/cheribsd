@@ -4578,8 +4578,7 @@ static bool
 cache_fplookup_mp_supported(struct mount *mp)
 {
 
-	if (mp == NULL)
-		return (false);
+	MPASS(mp != NULL);
 	if ((mp->mnt_kern_flag & MNTK_FPLOOKUP) == 0)
 		return (false);
 	return (true);
@@ -4956,8 +4955,8 @@ cache_fplookup_impl(struct vnode *dvp, struct cache_fpl *fpl)
 		cache_fpl_aborted(fpl);
 		goto out;
 	}
-	mp = atomic_load_ptr(&fpl->dvp->v_mount);
-	if (!cache_fplookup_mp_supported(mp)) {
+	mp = atomic_load_ptr(&dvp->v_mount);
+	if (__predict_false(mp == NULL || !cache_fplookup_mp_supported(mp))) {
 		cache_fpl_aborted(fpl);
 		goto out;
 	}
