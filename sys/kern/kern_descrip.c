@@ -3679,16 +3679,6 @@ pwd_hold(struct thread *td)
 	return (pwd);
 }
 
-struct pwd *
-pwd_get_smr(void)
-{
-	struct pwd *pwd;
-
-	pwd = vfs_smr_entered_load(&curproc->p_pd->pd_pwd);
-	MPASS(pwd != NULL);
-	return (pwd);
-}
-
 static struct pwd *
 pwd_alloc(void)
 {
