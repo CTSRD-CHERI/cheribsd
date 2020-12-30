@@ -38,19 +38,10 @@
  */
 #ifdef __CHERI_PURE_CAPABILITY__
 /*
- * bus_addr_t: a dereferenceable address in the bus space.
- * Here dereferenceable means that this address is accessible
- * DMA memory.
- * bus_offset_t: an offset (virtual address) in the bus space.
+ * bus_addr_t: an address in the bus space.
  * bus_size_t: size of objects in the bus space.
- *
- * bus_addr_t and bus_offset_t mirror the relationship between
- *  vm_pointer_t and vm_offset_t for host memory.
- * Ideally if CHERI will support physical capabilities, bus_addr_t
- * will become void* or uintptr_t.
  */
 typedef vm_paddr_t bus_addr_t;
-typedef vm_paddr_t bus_offset_t;
 typedef vm_size_t bus_size_t;
 #else /* ! __CHERI_PURE_CAPABILITY__ */
 #if defined(CPU_CNMIPS) && !defined(__mips_n64)
@@ -58,7 +49,6 @@ typedef uint64_t bus_addr_t;
 #else
 typedef uintptr_t bus_addr_t;
 #endif
-typedef bus_addr_t bus_offset_t;
 typedef uintptr_t bus_size_t;
 #endif /* ! __CHERI_PURE_CAPABILITY__ */
 
@@ -70,9 +60,6 @@ typedef struct bus_space *bus_space_tag_t;
 /*
  * With CHERI, the bus space handle is a capability to a mapped
  * bus space memory object.
- *
- * XXX-AM: The fact that this should be dereferenceable seems true
- * in general and so it seems wrong to have a bus_addr_t bus_space_handle.
  */
 typedef uintptr_t bus_space_handle_t;
 #else /* ! __CHERI_PURE_CAPABILITY__ */
@@ -82,7 +69,7 @@ typedef bus_addr_t bus_space_handle_t;
 
 // CHERI CHANGES START
 // {
-//   "updated": 20180613,
+//   "updated": 20201230,
 //   "target_type": "header",
 //   "changes_purecap": [
 //     "pointer_as_integer"
