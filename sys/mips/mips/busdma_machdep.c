@@ -84,9 +84,9 @@ struct bounce_zone;
 struct bus_dma_tag {
 	bus_dma_tag_t		parent;
 	bus_size_t		alignment;
-	bus_offset_t		boundary;
-	bus_offset_t		lowaddr;
-	bus_offset_t		highaddr;
+	bus_addr_t		boundary;
+	bus_addr_t		lowaddr;
+	bus_addr_t		highaddr;
 	bus_dma_filter_t	*filter;
 	void			*filterarg;
 	bus_size_t		maxsize;
@@ -130,7 +130,7 @@ struct bounce_zone {
 	int		total_deferred;
 	int		map_count;
 	size_t		alignment;
-	bus_offset_t	lowaddr;
+	bus_addr_t	lowaddr;
 	char		zoneid[8];
 	char		lowaddrid[20];
 	struct sysctl_ctx_list sysctl_tree;
@@ -264,7 +264,7 @@ static int
 run_filter(bus_dma_tag_t dmat, bus_addr_t paddr)
 {
 	int retval;
-	bus_offset_t poff = paddr;
+	bus_addr_t poff = paddr;
 
 	retval = 0;
 
@@ -285,7 +285,7 @@ run_filter(bus_dma_tag_t dmat, bus_addr_t paddr)
  */
 
 static __inline int
-_bus_dma_can_bounce(bus_offset_t lowaddr, bus_offset_t highaddr)
+_bus_dma_can_bounce(bus_addr_t lowaddr, bus_addr_t highaddr)
 {
 	int i;
 	for (i = 0; phys_avail[i] && phys_avail[i + 1]; i += 2) {
