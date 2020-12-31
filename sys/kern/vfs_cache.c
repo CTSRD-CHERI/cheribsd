@@ -3610,6 +3610,7 @@ struct cache_fpl {
 	enum cache_fpl_status status:8;
 	bool in_smr;
 	bool fsearch;
+	bool savename;
 };
 
 static bool cache_fplookup_is_mp(struct cache_fpl *fpl);
@@ -3782,20 +3783,39 @@ cache_fpl_partial_impl(struct cache_fpl *fpl, int line)
 #define cache_fpl_partial(x)	cache_fpl_partial_impl((x), __LINE__)
 
 static int
-cache_fpl_handled_impl(struct cache_fpl *fpl, int error, int line)
+cache_fpl_handled_impl(struct cache_fpl *fpl, int line)
 {
 
 	KASSERT(fpl->status == CACHE_FPL_STATUS_UNSET,
 	    ("%s: setting to handled at %d, but already set to %d at %d\n",
 	    __func__, line, fpl->status, fpl->line));
 	cache_fpl_smr_assert_not_entered(fpl);
-	MPASS(error != CACHE_FPL_FAILED);
 	fpl->status = CACHE_FPL_STATUS_HANDLED;
 	fpl->line = line;
+	return (0);
+}
+
+#define cache_fpl_handled(x)	cache_fpl_handled_impl((x), __LINE__)
+
+static int
+cache_fpl_handled_error_impl(struct cache_fpl *fpl, int error, int line)
+{
+
+	KASSERT(fpl->status == CACHE_FPL_STATUS_UNSET,
+	    ("%s: setting to handled at %d, but already set to %d at %d\n",
+	    __func__, line, fpl->status, fpl->line));
+	MPASS(error != 0);
+	MPASS(error != CACHE_FPL_FAILED);
+	cache_fpl_smr_assert_not_entered(fpl);
+	fpl->status = CACHE_FPL_STATUS_HANDLED;
+	fpl->line = line;
+	fpl->dvp = NULL;
+	fpl->tvp = NULL;
+	fpl->savename = false;
 	return (error);
 }
 
-#define cache_fpl_handled(x, e)	cache_fpl_handled_impl((x), (e), __LINE__)
+#define cache_fpl_handled_error(x, e)	cache_fpl_handled_error_impl((x), (e), __LINE__)
 
 static bool
 cache_fpl_terminated(struct cache_fpl *fpl)
@@ -3907,7 +3927,7 @@ cache_fplookup_negative_promote(struct cache_fpl *fpl, struct namecache *oncp,
 
 	cache_fpl_smr_exit(fpl);
 	if (cache_neg_promote_cond(dvp, cnp, oncp, hash))
-		return (cache_fpl_handled(fpl, ENOENT));
+		return (cache_fpl_handled_error(fpl, ENOENT));
 	else
 		return (cache_fpl_aborted(fpl));
 }
@@ -4003,7 +4023,7 @@ cache_fplookup_final_child(struct cache_fpl *fpl, enum vgetstate tvs)
 		return (cache_fpl_aborted(fpl));
 	}
 
-	return (cache_fpl_handled(fpl, 0));
+	return (cache_fpl_handled(fpl));
 }
 
 /*
@@ -4053,12 +4073,12 @@ cache_fplookup_final_modifying(struct cache_fpl *fpl)
 		if (cnp->cn_nameiop == CREATE) {
 			return (cache_fpl_aborted(fpl));
 		}
-		return (cache_fpl_handled(fpl, EROFS));
+		return (cache_fpl_handled_error(fpl, EROFS));
 	}
 
 	if (fpl->tvp != NULL && (cnp->cn_flags & FAILIFEXISTS) != 0) {
 		cache_fpl_smr_exit(fpl);
-		return (cache_fpl_handled(fpl, EEXIST));
+		return (cache_fpl_handled_error(fpl, EEXIST));
 	}
 
 	/*
@@ -4108,25 +4128,27 @@ cache_fplookup_final_modifying(struct cache_fpl *fpl)
 	case ENOTDIR:
 	case ENOENT:
 		vput(dvp);
-		return (cache_fpl_handled(fpl, error));
+		return (cache_fpl_handled_error(fpl, error));
 	default:
 		vput(dvp);
 		return (cache_fpl_aborted(fpl));
 	}
 
 	fpl->tvp = tvp;
+	fpl->savename = (cnp->cn_flags & SAVENAME) != 0;
 
 	if (tvp == NULL) {
 		if ((cnp->cn_flags & SAVESTART) != 0) {
 			ndp->ni_startdir = dvp;
 			vrefact(ndp->ni_startdir);
 			cnp->cn_flags |= SAVENAME;
+			fpl->savename = true;
 		}
 		MPASS(error == EJUSTRETURN);
 		if ((cnp->cn_flags & LOCKPARENT) == 0) {
 			VOP_UNLOCK(dvp);
 		}
-		return (cache_fpl_handled(fpl, 0));
+		return (cache_fpl_handled(fpl));
 	}
 
 	/*
@@ -4157,7 +4179,7 @@ cache_fplookup_final_modifying(struct cache_fpl *fpl)
 	if ((cnp->cn_flags & FAILIFEXISTS) != 0) {
 		vput(dvp);
 		vput(tvp);
-		return (cache_fpl_handled(fpl, EEXIST));
+		return (cache_fpl_handled_error(fpl, EEXIST));
 	}
 
 	if ((cnp->cn_flags & LOCKLEAF) == 0) {
@@ -4172,9 +4194,10 @@ cache_fplookup_final_modifying(struct cache_fpl *fpl)
 		ndp->ni_startdir = dvp;
 		vrefact(ndp->ni_startdir);
 		cnp->cn_flags |= SAVENAME;
+		fpl->savename = true;
 	}
 
-	return (cache_fpl_handled(fpl, 0));
+	return (cache_fpl_handled(fpl));
 }
 
 static int __noinline
@@ -4311,7 +4334,7 @@ cache_fplookup_degenerate(struct cache_fpl *fpl)
 
 	if (__predict_false(cnp->cn_nameiop != LOOKUP)) {
 		cache_fpl_smr_exit(fpl);
-		return (cache_fpl_handled(fpl, EISDIR));
+		return (cache_fpl_handled_error(fpl, EISDIR));
 	}
 
 	MPASS((cnp->cn_flags & SAVESTART) == 0);
@@ -4337,7 +4360,7 @@ cache_fplookup_degenerate(struct cache_fpl *fpl)
 	} else {
 		vget_finish_ref(dvp, dvs);
 	}
-	return (cache_fpl_handled(fpl, 0));
+	return (cache_fpl_handled(fpl));
 }
 
 static int __noinline
@@ -4365,7 +4388,7 @@ cache_fplookup_noentry(struct cache_fpl *fpl)
 	 */
 	if (__predict_false(cnp->cn_namelen > NAME_MAX)) {
 		cache_fpl_smr_exit(fpl);
-		return (cache_fpl_handled(fpl, ENAMETOOLONG));
+		return (cache_fpl_handled_error(fpl, ENAMETOOLONG));
 	}
 
 	if (cnp->cn_nameiop != LOOKUP) {
@@ -4426,13 +4449,16 @@ cache_fplookup_noentry(struct cache_fpl *fpl)
 	case ENOTDIR:
 	case ENOENT:
 		vput(dvp);
-		return (cache_fpl_handled(fpl, error));
+		return (cache_fpl_handled_error(fpl, error));
 	default:
 		vput(dvp);
 		return (cache_fpl_aborted(fpl));
 	}
 
 	fpl->tvp = tvp;
+	if (!fpl->savename) {
+		MPASS((cnp->cn_flags & SAVENAME) == 0);
+	}
 
 	if (tvp == NULL) {
 		MPASS(error == EJUSTRETURN);
@@ -4441,7 +4467,7 @@ cache_fplookup_noentry(struct cache_fpl *fpl)
 		} else if ((cnp->cn_flags & LOCKPARENT) == 0) {
 			VOP_UNLOCK(dvp);
 		}
-		return (cache_fpl_handled(fpl, 0));
+		return (cache_fpl_handled(fpl));
 	}
 
 	if (__predict_false(!cache_fplookup_vnode_supported(tvp) ||
@@ -4460,7 +4486,7 @@ cache_fplookup_noentry(struct cache_fpl *fpl)
 	} else if ((cnp->cn_flags & LOCKPARENT) == 0) {
 		VOP_UNLOCK(dvp);
 	}
-	return (cache_fpl_handled(fpl, 0));
+	return (cache_fpl_handled(fpl));
 }
 
 static int __noinline
@@ -4584,7 +4610,7 @@ cache_fplookup_neg(struct cache_fpl *fpl, struct namecache *ncp, uint32_t hash)
 	}
 	cache_neg_hit_finish(ncp);
 	cache_fpl_smr_exit(fpl);
-	return (cache_fpl_handled(fpl, ENOENT));
+	return (cache_fpl_handled_error(fpl, ENOENT));
 }
 
 static int
@@ -4950,7 +4976,7 @@ cache_fplookup_failed_vexec(struct cache_fpl *fpl, int error)
 	 */
 	if (__predict_false(cnp->cn_namelen > NAME_MAX)) {
 		cache_fpl_smr_exit(fpl);
-		return (cache_fpl_handled(fpl, ENAMETOOLONG));
+		return (cache_fpl_handled_error(fpl, ENAMETOOLONG));
 	}
 
 	/*
@@ -5010,7 +5036,7 @@ cache_fplookup_failed_vexec(struct cache_fpl *fpl, int error)
 			error = cache_fpl_aborted(fpl);
 		} else {
 			cache_fpl_smr_exit(fpl);
-			cache_fpl_handled(fpl, error);
+			cache_fpl_handled_error(fpl, error);
 		}
 		break;
 	}
@@ -5178,7 +5204,6 @@ cache_fplookup(struct nameidata *ndp, enum cache_fpl_status *status,
 	fpl.in_smr = false;
 	fpl.ndp = ndp;
 	fpl.cnp = cnp = &ndp->ni_cnd;
-
 	MPASS(ndp->ni_lcf == 0);
 	MPASS(curthread == cnp->cn_thread);
 	KASSERT ((cnp->cn_flags & CACHE_FPL_INTERNAL_CN_FLAGS) == 0,
@@ -5199,6 +5224,7 @@ cache_fplookup(struct nameidata *ndp, enum cache_fpl_status *status,
 
 	cache_fpl_smr_enter_initial(&fpl);
 	fpl.fsearch = false;
+	fpl.savename = (cnp->cn_flags & SAVENAME) != 0;
 	fpl.pwd = pwdp;
 	pwd = pwd_get_smr();
 	*(fpl.pwd) = pwd;
@@ -5233,21 +5259,18 @@ out:
 
 	if (__predict_true(fpl.status == CACHE_FPL_STATUS_HANDLED)) {
 		MPASS(error != CACHE_FPL_FAILED);
-		/*
-		 * A common error is ENOENT.
-		 */
 		if (error != 0) {
-			ndp->ni_dvp = NULL;
-			ndp->ni_vp = NULL;
-			cache_fpl_cleanup_cnp(cnp);
-			return (error);
+			MPASS(fpl.dvp == NULL);
+			MPASS(fpl.tvp == NULL);
+			MPASS(fpl.savename == false);
 		}
 		ndp->ni_dvp = fpl.dvp;
 		ndp->ni_vp = fpl.tvp;
-		if (cnp->cn_flags & SAVENAME)
+		if (fpl.savename) {
 			cnp->cn_flags |= HASBUF;
-		else
+		} else {
 			cache_fpl_cleanup_cnp(cnp);
+		}
 	}
 	return (error);
 }
