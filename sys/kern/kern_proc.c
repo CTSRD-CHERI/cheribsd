@@ -107,7 +107,6 @@ __FBSDID("$FreeBSD$");
 
 SDT_PROVIDER_DEFINE(proc);
 
-MALLOC_DEFINE(M_PGRP, "pgrp", "process group header");
 MALLOC_DEFINE(M_SESSION, "session", "session header");
 static MALLOC_DEFINE(M_PROC, "proc", "Proc structures");
 MALLOC_DEFINE(M_SUBPROC, "subproc", "Proc sub-structures");
@@ -121,6 +120,7 @@ static void fill_kinfo_thread(struct thread *td, struct kinfo_proc *kp,
     int preferthread);
 static void pgadjustjobc(struct pgrp *pgrp, bool entering);
 static void pgdelete(struct pgrp *);
+static int pgrp_init(void *mem, int size, int flags);
 static int proc_ctor(void *mem, int size, void *arg, int flags);
 static void proc_dtor(void *mem, int size, void *arg);
 static int proc_init(void *mem, int size, int flags);
@@ -142,6 +142,7 @@ struct sx __exclusive_cache_line proctree_lock;
 struct mtx __exclusive_cache_line ppeers_lock;
 struct mtx __exclusive_cache_line procid_lock;
 uma_zone_t proc_zone;
+uma_zone_t pgrp_zone;
 
 /*
  * The offset of various fields in struct proc and struct thread.
@@ -207,6 +208,8 @@ procinit(void)
 	proc_zone = uma_zcreate("PROC", sched_sizeof_proc(),
 	    proc_ctor, proc_dtor, proc_init, proc_fini,
 	    UMA_ALIGN_PTR, UMA_ZONE_NOFREE);
+	pgrp_zone = uma_zcreate("PGRP", sizeof(struct pgrp), NULL, NULL,
+	    pgrp_init, NULL, UMA_ALIGN_PTR, UMA_ZONE_NOFREE);
 	uihashinit();
 }
 
@@ -308,6 +311,16 @@ proc_fini(void *mem, int size)
 #else
 	panic("proc reclaimed");
 #endif
+}
+
+static int
+pgrp_init(void *mem, int size, int flags)
+{
+	struct pgrp *pg;
+
+	pg = mem;
+	mtx_init(&pg->pg_mtx, "process group", NULL, MTX_DEF | MTX_DUPOK);
+	return (0);
 }
 
 /*
@@ -581,8 +594,6 @@ enterpgrp(struct proc *p, pid_t pgid, struct pgrp *pgrp, struct session *sess)
 	KASSERT(!SESS_LEADER(p),
 	    ("enterpgrp: session leader attempted setpgrp"));
 
-	mtx_init(&pgrp->pg_mtx, "process group", NULL, MTX_DEF | MTX_DUPOK);
-
 	if (sess != NULL) {
 		/*
 		 * new session
@@ -809,8 +820,7 @@ pgdelete(struct pgrp *pgrp)
 	}
 
 	proc_id_clear(PROC_ID_GROUP, pgrp->pg_id);
-	mtx_destroy(&pgrp->pg_mtx);
-	free(pgrp, M_PGRP);
+	uma_zfree(pgrp_zone, pgrp);
 	sess_release(savesess);
 }
 
