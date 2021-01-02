@@ -1017,7 +1017,7 @@ freebsd32_ptrace(struct thread *td, struct freebsd32_ptrace_args *uap)
 	return (error);
 }
 
-static int
+int
 freebsd32_copyinuio(const struct iovec * __capability cb_arg, u_int iovcnt,
     struct uio **uiop)
 {

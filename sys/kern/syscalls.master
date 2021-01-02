@@ -3256,6 +3256,16 @@
 		    size_t len
 		);
 	}
+578	AUE_AIO_WRITEV	STD {
+		int aio_writev(
+		    _Inout_ struct aiocb *aiocbp
+		);
+	}
+579	AUE_AIO_READV	STD {
+		int aio_readv(
+		    _Inout_ struct aiocb *aiocbp
+		);
+	}
 
 ; Please copy any additions and changes to the following compatability tables:
 ; sys/compat/freebsd32/syscalls.master
