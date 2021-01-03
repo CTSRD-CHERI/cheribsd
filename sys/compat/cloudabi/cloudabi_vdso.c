@@ -46,7 +46,7 @@ cloudabi_vdso_init(struct sysentvec *sv, char *begin, char *end)
 {
 	vm_page_t m;
 	vm_object_t obj;
-	vm_offset_t addr;
+	vm_pointer_t addr;
 	size_t i, pages, pages_length, vdso_length;
 
 	/* Determine the number of pages needed to store the vDSO. */
@@ -88,3 +88,12 @@ cloudabi_vdso_destroy(struct sysentvec *sv)
 
 	vm_object_deallocate(sv->sv_shared_page_obj);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20210103,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_as_integer"
+//   ]
+// }
+// CHERI CHANGES END
