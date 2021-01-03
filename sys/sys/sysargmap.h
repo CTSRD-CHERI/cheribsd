@@ -403,6 +403,8 @@ static int sysargmask[] = {
 	[SYS_close_range] = (0x0),
 	[SYS_rpctls_syscall] = (0x0 | 0x2),
 	[SYS___specialfd] = (0x0 | 0x2),
+	[SYS_aio_writev] = (0x0 | 0x1),
+	[SYS_aio_readv] = (0x0 | 0x1),
 };
 
 #endif /* !_SYSARGMAP_H_ */

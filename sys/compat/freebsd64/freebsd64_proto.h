@@ -1504,6 +1504,12 @@ struct freebsd64___specialfd_args {
 	char req_l_[PADL_(const void *)]; const void * req; char req_r_[PADR_(const void *)];
 	char len_l_[PADL_(size_t)]; size_t len; char len_r_[PADR_(size_t)];
 };
+struct freebsd64_aio_writev_args {
+	char aiocbp_l_[PADL_(struct aiocb *)]; struct aiocb * aiocbp; char aiocbp_r_[PADR_(struct aiocb *)];
+};
+struct freebsd64_aio_readv_args {
+	char aiocbp_l_[PADL_(struct aiocb *)]; struct aiocb * aiocbp; char aiocbp_r_[PADR_(struct aiocb *)];
+};
 int	freebsd64_read(struct thread *, struct freebsd64_read_args *);
 int	freebsd64_write(struct thread *, struct freebsd64_write_args *);
 int	freebsd64_open(struct thread *, struct freebsd64_open_args *);
@@ -1806,6 +1812,8 @@ int	freebsd64_sigfastblock(struct thread *, struct freebsd64_sigfastblock_args *
 int	freebsd64___realpathat(struct thread *, struct freebsd64___realpathat_args *);
 int	freebsd64_rpctls_syscall(struct thread *, struct freebsd64_rpctls_syscall_args *);
 int	freebsd64___specialfd(struct thread *, struct freebsd64___specialfd_args *);
+int	freebsd64_aio_writev(struct thread *, struct freebsd64_aio_writev_args *);
+int	freebsd64_aio_readv(struct thread *, struct freebsd64_aio_readv_args *);
 
 #ifdef COMPAT_43
 
@@ -2348,6 +2356,8 @@ int	freebsd12_freebsd64_shm_open(struct thread *, struct freebsd12_freebsd64_shm
 #define	FREEBSD64_SYS_AUE_freebsd64___realpathat	AUE_REALPATHAT
 #define	FREEBSD64_SYS_AUE_freebsd64_rpctls_syscall	AUE_NULL
 #define	FREEBSD64_SYS_AUE_freebsd64___specialfd	AUE_SPECIALFD
+#define	FREEBSD64_SYS_AUE_freebsd64_aio_writev	AUE_AIO_WRITEV
+#define	FREEBSD64_SYS_AUE_freebsd64_aio_readv	AUE_AIO_READV
 
 #undef PAD_
 #undef PADL_

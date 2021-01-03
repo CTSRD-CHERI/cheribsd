@@ -515,4 +515,6 @@
 #define	SYS_close_range	575
 #define	SYS_rpctls_syscall	576
 #define	SYS___specialfd	577
-#define	SYS_MAXSYSCALL	578
+#define	SYS_aio_writev	578
+#define	SYS_aio_readv	579
+#define	SYS_MAXSYSCALL	580

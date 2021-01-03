@@ -614,4 +614,6 @@ const char *freebsd32_syscallnames[] = {
 	"close_range",			/* 575 = close_range */
 	"rpctls_syscall",			/* 576 = rpctls_syscall */
 	"freebsd32___specialfd",			/* 577 = freebsd32___specialfd */
+	"freebsd32_aio_writev",			/* 578 = freebsd32_aio_writev */
+	"freebsd32_aio_readv",			/* 579 = freebsd32_aio_readv */
 };
