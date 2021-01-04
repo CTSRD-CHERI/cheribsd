@@ -1148,8 +1148,6 @@ mdstart_swap(struct md_s *sc, struct bio *bp)
 			VM_OBJECT_WUNLOCK(sc->object);
 		}
 		if (m != NULL) {
-			vm_page_xunbusy(m);
-
 			/*
 			 * The page may be deactivated prior to setting
 			 * PGA_REFERENCED, but in this case it will be
@@ -1159,6 +1157,7 @@ mdstart_swap(struct md_s *sc, struct bio *bp)
 				vm_page_reference(m);
 			else
 				vm_page_activate(m);
+			vm_page_xunbusy(m);
 		}
 
 		/* Actions on further pages start at offset 0 */
