@@ -96,7 +96,7 @@ build${libcompat}: .PHONY
 	@echo "Morello: creating libcheri link in WORLDTMP"
 	ln -sfnv lib64c ${WORLDTMP}/usr/libcheri
 .endif
-.for _dir in lib/ncurses/ncurses lib/ncurses/ncursesw ${_libmagic} ${_jevents}
+.for _dir in lib/ncurses/ncurses ${_libmagic} ${_jevents}
 .for _t in ${_obj} build-tools
 	${_+_}cd ${.CURDIR}/${_dir}; \
 	    WORLDTMP=${WORLDTMP} \
