@@ -7,19 +7,11 @@
 # $FreeBSD$
 #
 
-include		"std.DE4"
+include		BERI_DE4_BASE
 include		"std.CHERI_PURECAP"
 include		"std.MFS_ROOT"
 
 ident		CHERI_PURECAP_DE4_MFS_ROOT
-
-# Reuse BERI FDT and hints
-options         FDT
-options         FDT_DTB_STATIC
-makeoptions     FDT_DTS_FILE=beripad-de4.dts
-device		fdt_clock
-
-hints		"BERI_DE4.hints"	# Flash partitions still use hints.
 
 makeoptions	EMBED_CHERITEST_LIST=YES
 
