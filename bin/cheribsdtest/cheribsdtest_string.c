@@ -467,7 +467,7 @@ test_unaligned_capability_copy_memcpy(const struct cheri_test *ctp __unused)
 	/* TODO: verify the contents of the buffer? */
 
 	/* Even if we have a valid cap and operate misaligned, we should not fault. */
-	src_buffer[1] = (__cheri_tocap void* __capability)&strcpy;
+	src_buffer[1] = (__cheri_tocap void* __capability)&expected_y;
 	CHERIBSDTEST_VERIFY(!cheri_gettag(src_buffer[0]));
 	CHERIBSDTEST_VERIFY(cheri_gettag(src_buffer[1]));
 
@@ -500,7 +500,7 @@ test_unaligned_capability_copy_memmove(const struct cheri_test *ctp __unused)
 	/* TODO: verify the contents of the buffer? */
 
 	/* Even if we have a valid cap and operate misaligned, we should not fault. */
-	src_buffer[1] =  (__cheri_tocap void* __capability)&strcpy;
+	src_buffer[1] = (__cheri_tocap void* __capability)&expected_y;
 	CHERIBSDTEST_VERIFY(!cheri_gettag(src_buffer[0]));
 	CHERIBSDTEST_VERIFY(cheri_gettag(src_buffer[1]));
 
