@@ -49,7 +49,7 @@ setDefaultJobProperties(jobProperties)
 
 jobs = [:]
 
-def buildImageAndRunTests(params, String suffix) {
+def buildImage(params, String suffix) {
     stage("Building disk image") {
         sh "./cheribuild/jenkins-cheri-build.py --build disk-image-${suffix} ${params.extraArgs}"
     }
@@ -67,6 +67,9 @@ def buildImageAndRunTests(params, String suffix) {
         maybeArchiveArtifacts(params, suffix)
         return
     }
+}
+
+def runTests(params, String suffix) {
     stage("Running tests") {
         // copy qemu archive and run directly on the host
         dir("qemu-${params.buildOS}") { deleteDir() }
@@ -110,6 +113,11 @@ find test-results
             archiveArtifacts allowEmptyArchive: true, artifacts: "test-results/${suffix}/*.xml", onlyIfSuccessful: false
         }
     }
+}
+
+def buildImageAndRunTests(params, String suffix) {
+    buildImage(params, suffix)
+    runTests(params, suffix)
     maybeArchiveArtifacts(params, suffix)
 }
 
@@ -198,7 +206,10 @@ selectedPurecapKernelArchitectures.each { suffix ->
                 // Delete stale compiler/sysroot
                 beforeBuild: { params -> dir('cherisdk') { deleteDir() } },
                 /* Custom function to run tests since --test will not work (yet) */
-                runTests: false, afterBuild: { params -> buildImageAndRunTests(params, suffix) }
+                runTests: false, afterBuild: { params ->
+			  buildImage(params, suffix)
+			  maybeArchiveArtifacts(params, suffix)
+		}
         )
     }
 }
