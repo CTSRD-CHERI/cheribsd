@@ -130,7 +130,7 @@ linux_alloc_pages(gfp_t flags, unsigned int order)
 			}
 		}
 	} else {
-		vm_offset_t vaddr;
+		vm_pointer_t vaddr;
 
 		vaddr = linux_alloc_kmem(flags, order);
 		if (vaddr == 0)
@@ -138,7 +138,7 @@ linux_alloc_pages(gfp_t flags, unsigned int order)
 
 		page = PHYS_TO_VM_PAGE(vtophys((void *)vaddr));
 
-		KASSERT(vaddr == (vm_offset_t)page_address(page),
+		KASSERT(vaddr == (vm_pointer_t)page_address(page),
 		    ("Page address mismatch"));
 	}
 
@@ -159,19 +159,19 @@ linux_free_pages(vm_page_t page, unsigned int order)
 				vm_page_free(pgo);
 		}
 	} else {
-		vm_offset_t vaddr;
+		vm_pointer_t vaddr;
 
-		vaddr = (vm_offset_t)page_address(page);
+		vaddr = (vm_pointer_t)page_address(page);
 
 		linux_free_kmem(vaddr, order);
 	}
 }
 
-vm_offset_t
+vm_pointer_t
 linux_alloc_kmem(gfp_t flags, unsigned int order)
 {
 	size_t size = ((size_t)PAGE_SIZE) << order;
-	vm_offset_t addr;
+	vm_pointer_t addr;
 
 	if ((flags & GFP_DMA32) == 0) {
 		addr = kmem_malloc(size, flags & GFP_NATIVE_MASK);
@@ -183,7 +183,7 @@ linux_alloc_kmem(gfp_t flags, unsigned int order)
 }
 
 void
-linux_free_kmem(vm_offset_t addr, unsigned int order)
+linux_free_kmem(vm_pointer_t addr, unsigned int order)
 {
 	size_t size = ((size_t)PAGE_SIZE) << order;
 
@@ -275,3 +275,12 @@ is_vmalloc_addr(const void *addr)
 {
 	return (vtoslab((vm_offset_t)addr & ~UMA_SLAB_MASK) != NULL);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20200104,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_as_integer"
+//   ]
+// }
+// CHERI CHANGES END

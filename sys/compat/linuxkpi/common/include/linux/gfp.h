@@ -133,24 +133,24 @@ __free_page(struct page *page)
 /*
  * Page management for mapped pages:
  */
-extern vm_offset_t linux_alloc_kmem(gfp_t flags, unsigned int order);
-extern void linux_free_kmem(vm_offset_t, unsigned int order);
+extern vm_pointer_t linux_alloc_kmem(gfp_t flags, unsigned int order);
+extern void linux_free_kmem(vm_pointer_t, unsigned int order);
 
-static inline vm_offset_t
+static inline vm_pointer_t
 get_zeroed_page(gfp_t flags)
 {
 
 	return (linux_alloc_kmem(flags | __GFP_ZERO, 0));
 }
 
-static inline vm_offset_t
+static inline vm_pointer_t
 __get_free_page(gfp_t flags)
 {
 
 	return (linux_alloc_kmem(flags, 0));
 }
 
-static inline vm_offset_t
+static inline vm_pointer_t
 __get_free_pages(gfp_t flags, unsigned int order)
 {
 
@@ -185,3 +185,12 @@ gfpflags_allow_blocking(const gfp_t gfp_flags)
 #define	ClearPageReserved(page)	do { } while (0)	/* NOP */
 
 #endif	/* _LINUX_GFP_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20200104,
+//   "target_type": "header",
+//   "changes_purecap": [
+//     "pointer_as_integer"
+//   ]
+// }
+// CHERI CHANGES END
