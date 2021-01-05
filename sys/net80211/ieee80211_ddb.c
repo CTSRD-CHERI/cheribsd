@@ -91,25 +91,34 @@ static void _db_show_mesh(const struct ieee80211_mesh_state *);
 
 DB_SHOW_COMMAND(sta, db_show_sta)
 {
+	const struct ieee80211_node *sta;
+
 	if (!have_addr) {
 		db_printf("usage: show sta <addr>\n");
 		return;
 	}
-	_db_show_sta((const struct ieee80211_node *) addr);
+
+	sta = DB_DATA_PTR(addr, sizeof(*sta));
+	_db_show_sta(sta);
 }
 
 DB_SHOW_COMMAND(statab, db_show_statab)
 {
+	const struct ieee80211_node_table *node_table;
+
 	if (!have_addr) {
 		db_printf("usage: show statab <addr>\n");
 		return;
 	}
-	_db_show_node_table("", (const struct ieee80211_node_table *) addr);
+
+	node_table = DB_DATA_PTR(addr, sizeof(*node_table));
+	_db_show_node_table("", node_table);
 }
 
 DB_SHOW_COMMAND(vap, db_show_vap)
 {
 	int i, showmesh = 0, showprocs = 0;
+	const struct ieee80211vap *vap;
 
 	if (!have_addr) {
 		db_printf("usage: show vap <addr>\n");
@@ -128,7 +137,9 @@ DB_SHOW_COMMAND(vap, db_show_vap)
 			showprocs = 1;
 			break;
 		}
-	_db_show_vap((const struct ieee80211vap *) addr, showmesh, showprocs);
+
+	vap = DB_DATA_PTR(addr, sizeof(*vap));
+	_db_show_vap(vap, showmesh, showprocs);
 }
 
 DB_SHOW_COMMAND(com, db_show_com)
@@ -159,7 +170,7 @@ DB_SHOW_COMMAND(com, db_show_com)
 			break;
 		}
 
-	ic = (const struct ieee80211com *) addr;
+	ic = DB_DATA_PTR(addr, sizeof(*ic));
 	_db_show_com(ic, showvaps, showsta, showmesh, showprocs);
 }
 
@@ -186,7 +197,7 @@ DB_SHOW_ALL_COMMAND(mesh, db_show_mesh)
 		db_printf("usage: show mesh <addr>\n");
 		return;
 	}
-	ms = (const struct ieee80211_mesh_state *) addr;
+	ms = DB_DATA_PTR(addr, sizeof(*ms));
 	_db_show_mesh(ms);
 }
 #endif /* IEEE80211_SUPPORT_MESH */
@@ -904,3 +915,13 @@ _db_show_mesh(const struct ieee80211_mesh_state *ms)
 }
 #endif /* IEEE80211_SUPPORT_MESH */
 #endif /* DDB */
+
+// CHERI CHANGES START
+// {
+//   "updated": 20200803,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "kdb"
+//   ]
+// }
+// CHERI CHANGES END
