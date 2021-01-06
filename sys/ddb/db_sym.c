@@ -244,7 +244,7 @@ db_value_of_name_pcpu(const char *name, db_expr_t *valuep)
 	if (sym == C_DB_SYM_NULL)
 		return (false);
 	db_symbol_values(sym, &name, &value);
-	if (value < (db_expr_t)DPCPU_START || value >= (db_expr_t)DPCPU_STOP)
+	if (value < DPCPU_START || value >= DPCPU_STOP)
 		return (false);
 	*valuep = (db_expr_t)(dpcpu_off[cpu] - DPCPU_BIAS +
 	    ((ptraddr_t)value - (ptraddr_t)DPCPU_START));
@@ -269,7 +269,7 @@ db_value_of_name_vnet(const char *name, db_expr_t *valuep)
 	if (sym == C_DB_SYM_NULL)
 		return (false);
 	db_symbol_values(sym, &name, &value);
-	if (value < (db_expr_t)VNET_START || value >= (db_expr_t)VNET_STOP)
+	if (value < VNET_START || value >= VNET_STOP)
 		return (false);
 	*valuep = (db_expr_t)((uintptr_t)vnet->vnet_data_mem +
 	    ((ptraddr_t)value - (ptraddr_t)VNET_START));
