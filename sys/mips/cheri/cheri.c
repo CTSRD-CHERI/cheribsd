@@ -90,7 +90,7 @@ CTASSERT(sizeof(struct cheri_object) == 32);
 
 #ifdef __CHERI_PURE_CAPABILITY__
 __attribute__((weak))
-extern Elf64_Capreloc __start___cap_relocs;
+extern Elf64_Dyn _DYNAMIC[];
 __attribute__((weak))
 
 
@@ -153,13 +153,34 @@ process_kernel_cap_relocs(Elf64_Capreloc *start, Elf64_Capreloc *end,
  * In the PLT ABI function pointers use R_MIPS_CHERI_CAPABILITY entries.
  */
 void
-process_kernel_dyn_relocs(Elf64_Rel *start, Elf64_Rel *end,
-    Elf64_Sym *dynsym, void *code_cap, void *data_cap)
+process_kernel_dyn_relocs(void *code_cap, void *data_cap)
 {
+	Elf64_Dyn *dyn;
+	Elf64_Rel *rel_start = NULL;
+	Elf64_Rel *rel_end = NULL;
+	Elf64_Sym *dynsym = NULL;
+	size_t rel_size = 0;
+
 	code_cap = cheri_andperm(code_cap, CHERI_PERMS_KERNEL_CODE);
 	data_cap = cheri_andperm(data_cap, CHERI_PERMS_KERNEL_DATA);
 
-	for (Elf64_Rel *reloc = start; reloc < end; reloc++) {
+	for (dyn = _DYNAMIC; dyn->d_tag != DT_NULL; dyn++) {
+		switch (dyn->d_tag) {
+		case DT_REL:
+			rel_start = cheri_setaddress(data_cap, dyn->d_un.d_ptr);
+			break;
+		case DT_RELSZ:
+			rel_size = dyn->d_un.d_val;
+			break;
+		case DT_SYMTAB:
+			dynsym = cheri_setaddress(data_cap, dyn->d_un.d_ptr);
+			break;
+		}
+	}
+	rel_start = cheri_setbounds(rel_start, rel_size);
+	rel_end = (Elf64_Rel *)((uintptr_t)rel_start + rel_size);
+
+	for (Elf64_Rel *reloc = rel_start; reloc < rel_end; reloc++) {
 		void *cap;
 		Elf64_Sym *symentry;
 		void **dst = cheri_setaddress(data_cap, reloc->r_offset);

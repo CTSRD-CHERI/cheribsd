@@ -51,9 +51,9 @@ struct thread_args {
 
 static pthread_mutex_t global_mutex;
 
-static inline vaddr_t
+static inline ptraddr_t
 read_tls_register(void) {
-	vaddr_t tls = 0;
+	ptraddr_t tls = 0;
 #ifdef __mips
 	__asm__ volatile("rdhwr %0, $29\n" : "=r"(tls));
 #elif defined(__riscv)

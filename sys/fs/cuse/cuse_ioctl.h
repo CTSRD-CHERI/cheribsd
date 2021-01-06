@@ -52,16 +52,16 @@ struct cuse_alloc_info {
 };
 
 struct cuse_command {
-	struct cuse_dev *dev;
+	struct cuse_dev * __kerncap dev;
 	unsigned long fflags;
-	uintptr_t per_file_handle;
-	uintptr_t data_pointer;
+	kuintcap_t per_file_handle;
+	kuintcap_t data_pointer;
 	unsigned long argument;
 	unsigned long command;		/* see CUSE_CMD_XXX */
 };
 
 struct cuse_create_dev {
-	struct cuse_dev *dev;
+	struct cuse_dev * __kerncap dev;
 	uid_t	user_id;
 	gid_t	group_id;
 	int	permissions;
@@ -77,9 +77,9 @@ struct cuse_create_dev {
 #define	CUSE_IOCTL_GET_SIG		_IOR('C', 4, int)
 #define	CUSE_IOCTL_ALLOC_MEMORY		_IOW('C', 5, struct cuse_alloc_info)
 #define	CUSE_IOCTL_FREE_MEMORY		_IOW('C', 6, struct cuse_alloc_info)
-#define	CUSE_IOCTL_SET_PFH		_IOW('C', 7, uintptr_t)
+#define	CUSE_IOCTL_SET_PFH		_IOW('C', 7, kuintcap_t)
 #define	CUSE_IOCTL_CREATE_DEV		_IOW('C', 8, struct cuse_create_dev)
-#define	CUSE_IOCTL_DESTROY_DEV		_IOW('C', 9, struct cuse_dev *)
+#define	CUSE_IOCTL_DESTROY_DEV		_IOW('C', 9, struct cuse_dev * __kerncap)
 #define	CUSE_IOCTL_ALLOC_UNIT		_IOR('C',10, int)
 #define	CUSE_IOCTL_FREE_UNIT		_IOW('C',11, int)
 #define	CUSE_IOCTL_SELWAKEUP		_IOW('C',12, int)

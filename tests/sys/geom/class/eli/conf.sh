@@ -20,6 +20,24 @@ attach_md()
 for_each_geli_config() {
 	func=$1
 	backing_filename=$2
+	local ciphers aalgos secsizes
+	ciphers=aes-xts:128 aes-xts:256 \
+	    aes-cbc:128 aes-cbc:192 aes-cbc:256 \
+	    camellia-cbc:128 camellia-cbc:192 camellia-cbc:256
+	aalgos=hmac/sha1 hmac/ripemd160 hmac/sha256 hmac/sha384 hmac/sha512
+	secsizes=512 1024 2048 4096 $MAX_SECSIZE
+	# Note: The combinatorics explosion here results in tests taking an
+	# extremely long time for RISC-V purecap. For example, integrity_test
+	# runs for 2 hours and times out and init_test takes about 40 minutes.
+	# Unless the include_slow_tests option is set, we run only
+	# one configuration instead of the full matrix to reduce CI test time
+	# by almost 4 hours.
+	if [ "$(atf_config_get include_slow_tests false)" != "true" ]; then
+		# FIXME: which configuration is best for test coverage?
+		ciphers=aes-cbc:256
+		aalgos=hmac/ripemd160
+		secsizes=2048
+	fi
 
 	# Double the sector size to allow for the HMACs' storage space.
 	osecsize=$(( $MAX_SECSIZE * 2 ))
@@ -35,14 +53,12 @@ for_each_geli_config() {
 		md=$(attach_md -t malloc -s $bytes)
 	fi
 
-	for cipher in aes-xts:128 aes-xts:256 \
-	    aes-cbc:128 aes-cbc:192 aes-cbc:256 \
-	    camellia-cbc:128 camellia-cbc:192 camellia-cbc:256; do
+
+	for cipher in $ciphers; do
 		ealgo=${cipher%%:*}
 		keylen=${cipher##*:}
-		for aalgo in hmac/sha1 hmac/ripemd160 hmac/sha256 \
-		    hmac/sha384 hmac/sha512; do
-			for secsize in 512 1024 2048 4096 $MAX_SECSIZE; do
+		for aalgo in $aalgos; do
+			for secsize in $secsizes; do
 				${func} $cipher $aalgo $secsize
 				geli detach ${md} 2>/dev/null
 			done
@@ -55,16 +71,30 @@ for_each_geli_config() {
 # func <cipher> <secsize>
 for_each_geli_config_nointegrity() {
 	func=$1
+	local ciphers secsizes
+	ciphers=aes-xts:128 aes-xts:256 \
+	    aes-cbc:128 aes-cbc:192 aes-cbc:256 \
+	    camellia-cbc:128 camellia-cbc:192 camellia-cbc:256
+	secsizes=512 1024 2048 4096 $MAX_SECSIZE
+	# Note: The combinatorics explosion here results in tests taking an
+	# extremely long time for RISC-V purecap. For example, integrity_test
+	# runs for 2 hours and times out and init_test takes about 40 minutes.
+	# Unless the include_slow_tests option is set, we run only
+	# one configuration instead of the full matrix to reduce CI test time
+	# by almost 4 hours.
+	if [ "$(atf_config_get include_slow_tests false)" != "true" ]; then
+		# FIXME: which configuration is best for test coverage?
+		ciphers=aes-cbc:256
+		secsizes=2048
+	fi
 
 	# geli needs 512B for the label.
 	bytes=`expr $MAX_SECSIZE \* $sectors + 512`b
 	md=$(attach_md -t malloc -s $bytes)
-	for cipher in aes-xts:128 aes-xts:256 \
-	    aes-cbc:128 aes-cbc:192 aes-cbc:256 \
-	    camellia-cbc:128 camellia-cbc:192 camellia-cbc:256; do
+	for cipher in $ciphers; do
 		ealgo=${cipher%%:*}
 		keylen=${cipher##*:}
-		for secsize in 512 1024 2048 4096 $MAX_SECSIZE; do
+		for secsize in $secsizes; do
 			${func} $cipher $secsize
 			geli detach ${md} 2>/dev/null
 		done

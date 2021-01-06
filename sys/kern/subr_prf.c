@@ -837,11 +837,7 @@ reswitch:	switch (ch = (u_char)*fmt++) {
 						PCHAR(' ');
 
 				/* Skip attributes if NULL-derived. */
-				if (cheri_getperm(cap) == 0 &&
-				    cheri_getflags(cap) == 0 &&
-				    cheri_getbase(cap) == 0 &&
-				    cheri_getlen(cap) + 1 == 0 &&
-				    cheri_gettype(cap) == CHERI_OTYPE_UNSEALED)
+				if (cheri_is_null_derived(cap))
 					break;
 
 				PCHAR(' ');

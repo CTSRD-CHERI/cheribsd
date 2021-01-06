@@ -80,6 +80,11 @@ LINKS+= ${BINDIR}/${PROG} ${BINDIR}/${A}
 all: ${PROG}
 .endif
 exe: ${PROG}
+.if defined(DEBUG_FLAGS) && ${LINKER_FEATURES:Mgdb-index}
+# Add the --gdb-index flag when building the final program (but don't add it to
+# LDFLAGS since that is also used for the -Wl,-r linker steps):
+CRUNCH_LIBS+=	-Wl,--gdb-index
+.endif
 
 ${CONF}: Makefile
 	echo \# Auto-generated, do not edit >${.TARGET}
@@ -130,10 +135,12 @@ ${OUTPUTS}: ${CONF}
 
 # These 2 targets cannot use .MAKE since they depend on the generated
 # ${OUTMK} above.
+# Note: the generated makefile use -r to generate .o files, so we can't pass
+# --Wl,--gdb-index since ld.lld complains about those flags being incompatible.
 ${PROG}: ${OUTPUTS} objs .NOMETA .PHONY
 	${CRUNCHENV} \
-	    CC="${CC} ${CFLAGS} ${LDFLAGS}" \
-	    CXX="${CXX} ${CXXFLAGS} ${LDFLAGS}" \
+	    CC="${CC} ${CFLAGS} ${LDFLAGS:N-Wl,--gdb-index}" \
+	    CXX="${CXX} ${CXXFLAGS} ${LDFLAGS:N-Wl,--gdb-index}" \
 	    ${MAKE} ${CRUNCHARGS} .MAKE.MODE="${.MAKE.MODE} curdirOk=yes" \
 	    .MAKE.META.IGNORE_PATHS="${.MAKE.META.IGNORE_PATHS}" \
 	    -f ${OUTMK} exe

@@ -271,17 +271,18 @@ CFLAGS+=	-gdwarf-2
 .if ${MACHINE_ABI:Mpurecap}
 CWARNFLAGS+=	-Werror=implicit-function-declaration
 
-.ifdef CHERI_USE_CAP_TABLE
+.if defined(CHERI_USE_CAP_TABLE)
 CFLAGS+=	-cheri-cap-table-abi=${CHERI_USE_CAP_TABLE}
 .endif
 
 .if defined(CHERI_SUBOBJECT_BOUNDS)
 CFLAGS+=	-Xclang -cheri-bounds=${CHERI_SUBOBJECT_BOUNDS}
+.endif
+
 .if defined(CHERI_SUBOBJECT_BOUNDS_STATS)
 CHERI_SUBOBJECT_BOUNDS_STATS_FILE?=kernel-subobject-bounds-stats.csv
 CFLAGS+=	-mllvm -collect-csetbounds-stats=csv \
 	-Xclang -cheri-stats-file="${CHERI_SUBOBJECT_BOUNDS_STATS_FILE}"
-.endif
 .endif
 .endif
 
@@ -344,7 +345,7 @@ LD_EMULATION_i386=elf_i386_fbsd
 LD_EMULATION_mips= elf32btsmip_fbsd
 LD_EMULATION_mipshf= elf32btsmip_fbsd
 LD_EMULATION_mips64= elf64btsmip_fbsd
-LD_EMULATION_mips64c128= elf64btsmip_cheri_fbsd
+LD_EMULATION_mips64c128= elf64btsmip_fbsd
 LD_EMULATION_mips64hf= elf64btsmip_fbsd
 LD_EMULATION_mipsel= elf32ltsmip_fbsd
 LD_EMULATION_mipselhf= elf32ltsmip_fbsd

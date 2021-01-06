@@ -307,9 +307,7 @@ __cheri_ptr_alt(void * __capability pointer, CHAR *cp, const char *xdigs,
 	int padding, size;
 
 	/* Skip attributes if NULL-derived. */
-	if (cheri_getperm(pointer) == 0 && cheri_getflags(pointer) == 0 &&
-	    cheri_getbase(pointer) == 0 && cheri_getlen(pointer) + 1 == 0 &&
-	    cheri_gettype(pointer) == CHERI_OTYPE_UNSEALED)
+	if (cheri_is_null_derived(pointer))
 		goto address;
 
 	/* tag and sealing */

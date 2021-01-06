@@ -1,19 +1,19 @@
 #
-# CHERI -- Benchmark coverage configuration for pure capability kernel for
-# the SRI/Cambridge "CHERI" (Capability Hardware Enhanced
+# CHERI -- Kernel for the SRI/Cambridge "CHERI" (Capability Hardware Enhanced
 # RISC Instructions) FPGA soft core, as configured in its Terasic DE-4
-# reference configuration - 128bit version.
+# reference configuration.
+#
+# This configuration is the same as the pure capability kernel with MFS root,
+# with the addition of kernel coverage.
 #
 # $FreeBSD$
 #
 
-include		"CHERI_PURECAP_DE4_MFS_ROOT_BASE"
-ident		CHERI128_PURECAP_DE4_MFS_ROOT_FUZZ
+#NO_UNIVERSE
 
-# Disable slow things
-include "std.BENCHMARK"
+include		"CHERI_PURECAP_DE4_MFS_ROOT"
+ident		CHERI_PURECAP_DE4_MFS_ROOT_FUZZ
 
 # kernel coverage
 options		COVERAGE
 options		KCOV
-options		KCOV_DIRECT_MAP

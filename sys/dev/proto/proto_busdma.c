@@ -109,7 +109,7 @@ proto_busdma_tag_create(struct proto_busdma *busdma, struct proto_tag *parent,
 		tag->datarate = ioc->u.tag.datarate;
 	}
 	LIST_INSERT_HEAD(&busdma->tags, tag, tags);
-	ioc->result = (uintptr_t)(void *)tag;
+	ioc->result = (ptraddr_t)(uintptr_t)tag;
 	return (0);
 }
 
@@ -137,7 +137,7 @@ proto_busdma_tag_lookup(struct proto_busdma *busdma, u_long key)
 	struct proto_tag *tag;
 
 	LIST_FOREACH(tag, &busdma->tags, tags) {
-		if ((void *)tag == (void *)key)
+		if ((ptraddr_t)(uintptr_t)tag == key)
 			return (tag);
 	}
 	return (NULL);
@@ -213,7 +213,7 @@ proto_busdma_mem_alloc(struct proto_busdma *busdma, struct proto_tag *tag,
 	ioc->u.md.virt_size = tag->maxsz;
 	ioc->u.md.phys_nsegs = 1;
 	ioc->u.md.phys_addr = md->physaddr;
-	ioc->result = (uintptr_t)(void *)md;
+	ioc->result = (ptraddr_t)(uintptr_t)md;
 	return (0);
 }
 
@@ -252,7 +252,7 @@ proto_busdma_md_create(struct proto_busdma *busdma, struct proto_tag *tag,
 
 	LIST_INSERT_HEAD(&tag->mds, md, peers);
 	LIST_INSERT_HEAD(&busdma->mds, md, mds);
-	ioc->result = (uintptr_t)(void *)md;
+	ioc->result = (ptraddr_t)(uintptr_t)md;
 	return (0);
 }
 
@@ -344,7 +344,7 @@ proto_busdma_md_lookup(struct proto_busdma *busdma, u_long key)
 	struct proto_md *md;
 
 	LIST_FOREACH(md, &busdma->mds, mds) {
-		if ((void *)md == (void *)key)
+		if ((ptraddr_t)(uintptr_t)md == key)
 			return (md);
 	}
 	return (NULL);

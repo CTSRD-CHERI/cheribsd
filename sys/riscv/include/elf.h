@@ -99,6 +99,9 @@ __ElfType(Auxinfo);
 /* TODO: set correct value */
 #define	ET_DYN_LOAD_ADDR 0x100000
 
+#define	DT_CHERI___CAPRELOCS	DT_RISCV_CHERI___CAPRELOCS
+#define	DT_CHERI___CAPRELOCSSZ	DT_RISCV_CHERI___CAPRELOCSSZ
+
 /* Flags passed in AT_HWCAP */
 #define	HWCAP_ISA_BIT(c)	(1 << ((c) - 'A'))
 #define	HWCAP_ISA_I		HWCAP_ISA_BIT('I')

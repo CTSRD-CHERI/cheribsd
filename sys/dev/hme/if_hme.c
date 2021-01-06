@@ -636,8 +636,8 @@ hme_meminit(struct hme_softc *sc)
 	 * We have reserved descriptor space until the next 2048 byte
 	 * boundary.
 	 */
-	dma = (bus_addr_t)roundup((u_long)dma, 2048);
-	p = (caddr_t)roundup((u_long)p, 2048);
+	dma = roundup2(dma, 2048);
+	p = (caddr_t)roundup2((uintptr_t)p, 2048);
 
 	/*
 	 * Allocate receive descriptors
@@ -647,8 +647,8 @@ hme_meminit(struct hme_softc *sc)
 	p += HME_NRXDESC * HME_XD_SIZE;
 	dma += HME_NRXDESC * HME_XD_SIZE;
 	/* Again move forward to the next 2048 byte boundary.*/
-	dma = (bus_addr_t)roundup((u_long)dma, 2048);
-	p = (caddr_t)roundup((u_long)p, 2048);
+	dma = roundup2(dma, 2048);
+	p = (caddr_t)roundup2((uintptr_t)p, 2048);
 
 	/*
 	 * Initialize transmit buffer descriptors

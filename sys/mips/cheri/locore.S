@@ -174,9 +174,9 @@ VECTOR(_locore, unknown)
 	 * Set up global pointer.
 	 * XXX-AM: Note that when we change linkage this will need rebasing.
 	 */
-	ABSRELOC_LA(t0, _C_LABEL(_captable))
+	ABSRELOC_LA(t0, _C_LABEL(__cap_table_start))
 	csetoffset CHERI_REG_GPC, $c28, t0
-	ABSRELOC_LA(t1, _C_LABEL(_ecaptable))
+	ABSRELOC_LA(t1, _C_LABEL(__cap_table_end))
 	PTR_SUBU t0, t1, t0
 	csetbounds CHERI_REG_GPC, CHERI_REG_GPC, t0
 	REG_LI	t0, (CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP)
@@ -266,23 +266,10 @@ VECTOR(_locore, unknown)
 	/*
 	 * Process dynamic kernel relocations.
 	 *
-	 * process_kernel_dyn_relocs(reloc_start, reloc_end,
-	 *   code_cap, data_cap)
+	 * process_kernel_dyn_relocs(code_cap, data_cap)
 	 */
-	ABSRELOC_LA(t0, _C_LABEL(_rel_dyn))
-	cmove		$c2, $c28
-	csetoffset	$c3, $c2, t0
-	ABSRELOC_LA(t1, _C_LABEL(_erel_dyn))
-	PTR_SUBU	t0, t1, t0
-	csetbounds	$c3, $c3, t0
-	csetoffset	$c4, $c3, t0
-	ABSRELOC_LA(t0, _C_LABEL(_dynsym))
-	csetoffset	$c5, $c2, t0
-	ABSRELOC_LA(t1, _C_LABEL(_edynsym))
-	PTR_SUBU	t0, t1, t0
-	csetbounds	$c5, $c5, t0
-	cgetpccsetoffset	$c6, zero
-	cmove		$c7, $c28
+	cgetpccsetoffset	$c3, zero
+	cmove		$c4, $c28
 	ABSRELOC_LA(t0, _C_LABEL(process_kernel_dyn_relocs))
 	cgetpcc		$c12
 	csetaddr	$c12, $c12, t0

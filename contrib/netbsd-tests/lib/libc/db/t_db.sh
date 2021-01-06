@@ -837,6 +837,10 @@ bsize_ffactor_head()
 }
 bsize_ffactor_body()
 {
+	if [ "$(atf_config_get include_slow_tests false)" != "true" ]; then
+		atf_skip "test_suites.FreeBSD.include_slow_tests is false"
+	fi
+
 	TMPDIR="$(pwd)/db_dir"; export TMPDIR
 	mkdir ${TMPDIR}
 
@@ -955,6 +959,9 @@ bsize_torture_head()
 }
 bsize_torture_body()
 {
+	if [ "$(atf_config_get include_slow_tests false)" != "true" ]; then
+		atf_skip "test_suites.FreeBSD.include_slow_tests is false"
+	fi
 	TMPDIR="$(pwd)/db_dir"; export TMPDIR
 	mkdir ${TMPDIR}
 	# Begin FreeBSD

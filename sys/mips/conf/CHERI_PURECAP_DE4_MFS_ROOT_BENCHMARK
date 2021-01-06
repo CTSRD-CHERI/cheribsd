@@ -7,7 +7,7 @@
 # $FreeBSD$
 #
 
-include		"CHERI_PURECAP_DE4_MFS_ROOT_BASE"
+include		"CHERI_PURECAP_DE4_MFS_ROOT"
 ident		CHERI128_PURECAP_DE4_MFS_ROOT_BENCHMARK
 
 # Disable slow things

@@ -1449,6 +1449,17 @@ digest_dynamic1(Obj_Entry *obj, int early, const Elf_Dyn **dyn_rpath,
 		if (dynp->d_un.d_val & DF_STATIC_TLS)
 		    obj->static_tls = true;
 	    break;
+
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(DT_CHERI___CAPRELOCS)
+	case DT_CHERI___CAPRELOCS:
+		obj->cap_relocs = (obj->relocbase + dynp->d_un.d_ptr);
+		break;
+
+	case DT_CHERI___CAPRELOCSSZ:
+		obj->cap_relocs_size = dynp->d_un.d_val;
+		break;
+#endif
+
 #ifdef __mips__
 	case DT_MIPS_LOCAL_GOTNO:
 		obj->local_gotno = dynp->d_un.d_val;
@@ -1491,14 +1502,6 @@ digest_dynamic1(Obj_Entry *obj, int early, const Elf_Dyn **dyn_rpath,
 		break;
 
 #ifdef __CHERI_PURE_CAPABILITY__
-	case DT_MIPS_CHERI___CAPRELOCS:
-	    obj->cap_relocs = (obj->relocbase + dynp->d_un.d_ptr);
-	    break;
-
-	case DT_MIPS_CHERI___CAPRELOCSSZ:
-	    obj->cap_relocs_size = dynp->d_un.d_val;
-	    break;
-
 	case DT_MIPS_CHERI_FLAGS: {
 	    size_t flags = dynp->d_un.d_val;
 	    unsigned abi = flags & DF_MIPS_CHERI_ABI_MASK;
@@ -1554,18 +1557,6 @@ digest_dynamic1(Obj_Entry *obj, int early, const Elf_Dyn **dyn_rpath,
 #else
 	case DT_PPC_GOT:
 		obj->gotptr = (Elf_Addr *)(obj->relocbase + dynp->d_un.d_ptr);
-		break;
-#endif
-#endif
-
-#ifdef __riscv
-#ifdef __CHERI_PURE_CAPABILITY__
-	case DT_RISCV_CHERI___CAPRELOCS:
-		obj->cap_relocs = (obj->relocbase + dynp->d_un.d_ptr);
-		break;
-
-	case DT_RISCV_CHERI___CAPRELOCSSZ:
-		obj->cap_relocs_size = dynp->d_un.d_val;
 		break;
 #endif
 #endif

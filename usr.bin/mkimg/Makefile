@@ -34,10 +34,7 @@ BINDIR?=/usr/bin
 
 LIBADD=	util
 
-.if ${MACHINE_CPUARCH} != "mips"
-# XXX: the process of listing tests times out under qemu
 HAS_TESTS=
 SUBDIR.${MK_TESTS}+= tests
-.endif
 
 .include <bsd.prog.mk>

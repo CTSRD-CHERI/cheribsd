@@ -32,7 +32,12 @@ if (!env.CHANGE_ID && archiveBranches.contains(env.BRANCH_NAME)) {
     }
 }
 // Add an architecture selector for manual builds
-def allArchitectures = ["aarch64", "amd64", "mips64", "mips64-hybrid", "mips64-purecap", "riscv64", "riscv64-hybrid", "riscv64-purecap"]
+def allArchitectures = [
+    "aarch64", "amd64",
+    // TODO: enable once dependencies have been merged: "morello-hybrid", "morello-purecap",
+    "mips64", "mips64-hybrid", "mips64-purecap",
+    "riscv64", "riscv64-hybrid", "riscv64-purecap"
+]
 jobProperties.add(parameters([text(defaultValue: allArchitectures.join('\n'),
         description: 'The architectures (cheribuild suffixes) to build for (one per line)',
         name: 'architectures'),
@@ -44,7 +49,7 @@ setDefaultJobProperties(jobProperties)
 
 jobs = [:]
 
-def buildImageAndRunTests(params, String suffix) {
+def buildImage(params, String suffix) {
     stage("Building disk image") {
         sh "./cheribuild/jenkins-cheri-build.py --build disk-image-${suffix} ${params.extraArgs}"
     }
@@ -57,6 +62,14 @@ def buildImageAndRunTests(params, String suffix) {
             sh "./cheribuild/jenkins-cheri-build.py --build cheribsd-mfs-root-kernel-${suffix} --cheribsd-mfs-root-kernel-${suffix}/build-fpga-kernels ${params.extraArgs}"
         }
     }
+    if (suffix.startsWith("morello")) {
+        echo("Can't run tests on the FVP yet!")
+        maybeArchiveArtifacts(params, suffix)
+        return
+    }
+}
+
+def runTests(params, String suffix) {
     stage("Running tests") {
         // copy qemu archive and run directly on the host
         dir("qemu-${params.buildOS}") { deleteDir() }
@@ -100,6 +113,15 @@ find test-results
             archiveArtifacts allowEmptyArchive: true, artifacts: "test-results/${suffix}/*.xml", onlyIfSuccessful: false
         }
     }
+}
+
+def buildImageAndRunTests(params, String suffix) {
+    buildImage(params, suffix)
+    runTests(params, suffix)
+    maybeArchiveArtifacts(params, suffix)
+}
+
+def maybeArchiveArtifacts(params, String suffix) {
     if (GlobalVars.archiveArtifacts) {
         if (GlobalVars.isTestSuiteJob) {
             error("Should not happen!")
@@ -135,7 +157,10 @@ ls -la "artifacts-${suffix}/"
     }
 }
 
-def selectedArchitectures = params.architectures.split('\n')
+// Work around for https://issues.jenkins.io/browse/JENKINS-46941
+// Jenkins appears to use the last selected manual override for automatically triggered builds.
+// Therefore, only read the parameter value for manually-triggered builds.
+def selectedArchitectures = isManualBuild() ? params.architectures.split('\n') : allArchitectures
 echo("Selected architectures: ${selectedArchitectures}")
 selectedArchitectures.each { suffix ->
     String name = "cheribsd-${suffix}"
@@ -158,7 +183,7 @@ selectedArchitectures.each { suffix ->
                 extraArgs: cheribuildArgs.join(" "),
                 skipArchiving: true, skipTarball: true,
                 sdkCompilerOnly: true, // We only need clang not the CheriBSD sysroot since we are building that.
-                customGitCheckoutDir: 'cheribsd',
+                customGitCheckoutDir: suffix.startsWith('morello') ? 'morello-cheribsd' : 'cheribsd',
                 gitHubStatusContext: GlobalVars.isTestSuiteJob ? "testsuite/${suffix}" : "ci/${suffix}",
                 // Delete stale compiler/sysroot
                 beforeBuild: { params -> dir('cherisdk') { deleteDir() } },
@@ -181,7 +206,10 @@ selectedPurecapKernelArchitectures.each { suffix ->
                 // Delete stale compiler/sysroot
                 beforeBuild: { params -> dir('cherisdk') { deleteDir() } },
                 /* Custom function to run tests since --test will not work (yet) */
-                runTests: false, afterBuild: { params -> buildImageAndRunTests(params, suffix) }
+                runTests: false, afterBuild: { params ->
+			  buildImage(params, suffix)
+			  maybeArchiveArtifacts(params, suffix)
+		}
         )
     }
 }

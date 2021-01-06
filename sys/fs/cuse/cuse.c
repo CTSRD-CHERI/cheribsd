@@ -123,7 +123,7 @@ struct cuse_server_dev {
 	TAILQ_ENTRY(cuse_server_dev) entry;
 	struct cuse_server *server;
 	struct cdev *kern_dev;
-	struct cuse_dev *user_dev;
+	struct cuse_dev * __capability user_dev;
 };
 
 struct cuse_server {
@@ -542,7 +542,7 @@ cuse_client_is_closing(struct cuse_client *pcc)
 
 static void
 cuse_client_send_command_locked(struct cuse_client_command *pccmd,
-    uintptr_t data_ptr, unsigned long arg, int fflags, int ioflag)
+    uintcap_t data_ptr, unsigned long arg, int fflags, int ioflag)
 {
 	unsigned long cuse_fflags = 0;
 	struct cuse_server *pcs;
@@ -1191,7 +1191,7 @@ cuse_server_ioctl(struct cdev *dev, unsigned long cmd,
 		if (pccmd != NULL) {
 			pcc = pccmd->client;
 			for (n = 0; n != CUSE_CMD_MAX; n++) {
-				pcc->cmds[n].sub.per_file_handle = *(uintptr_t *)data;
+				pcc->cmds[n].sub.per_file_handle = *(uintcap_t *)data;
 			}
 		} else {
 			error = ENXIO;
@@ -1256,7 +1256,7 @@ cuse_server_ioctl(struct cdev *dev, unsigned long cmd,
 
 		pcsd = TAILQ_FIRST(&pcs->hdev);
 		while (pcsd != NULL) {
-			if (pcsd->user_dev == *(struct cuse_dev **)data) {
+			if (pcsd->user_dev == *(struct cuse_dev * __capability *)data) {
 				TAILQ_REMOVE(&pcs->hdev, pcsd, entry);
 				cuse_server_unlock(pcs);
 				cuse_server_free_dev(pcsd);
@@ -1402,7 +1402,7 @@ cuse_client_open(struct cdev *dev, int fflags, int devtype, struct thread *td)
 	struct cuse_server_dev *pcsd;
 	struct cuse_client *pcc;
 	struct cuse_server *pcs;
-	struct cuse_dev *pcd;
+	struct cuse_dev * __capability pcd;
 	int error;
 	int n;
 
@@ -1588,7 +1588,7 @@ cuse_client_read(struct cdev *dev, struct uio *uio, int ioflag)
 
 		cuse_server_lock(pcs);
 		cuse_client_send_command_locked(pccmd,
-		    (__cheri_addr uintptr_t)uio->uio_iov->iov_base,
+		    (uintcap_t)uio->uio_iov->iov_base,
 		    (unsigned long)(unsigned int)len, pcc->fflags, ioflag);
 
 		error = cuse_client_receive_command_locked(pccmd, 0, 0);
@@ -1648,7 +1648,7 @@ cuse_client_write(struct cdev *dev, struct uio *uio, int ioflag)
 
 		cuse_server_lock(pcs);
 		cuse_client_send_command_locked(pccmd,
-		    (__cheri_addr uintptr_t)uio->uio_iov->iov_base,
+		    (uintcap_t)uio->uio_iov->iov_base,
 		    (unsigned long)(unsigned int)len, pcc->fflags, ioflag);
 
 		error = cuse_client_receive_command_locked(pccmd, 0, 0);
@@ -1710,7 +1710,7 @@ cuse_client_ioctl(struct cdev *dev, unsigned long cmd,
 
 	cuse_server_lock(pcs);
 	cuse_client_send_command_locked(pccmd,
-	    (len == 0) ? *(long *)data : CUSE_BUF_MIN_PTR,
+	    (len == 0) ? *(uintcap_t *)data : CUSE_BUF_MIN_PTR,
 	    (unsigned long)cmd, pcc->fflags,
 	    (fflag & O_NONBLOCK) ? IO_NDELAY : 0);
 

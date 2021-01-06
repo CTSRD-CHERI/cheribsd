@@ -46,16 +46,18 @@ ARCH_FLAGS?=-march=mips64
 .else
 ARCH_FLAGS?=-march=mips32
 .endif
-
 ARCH_FLAGS+=-mabi=${MIPS_ABI}
-ARCH_PIC_FLAGS?=-fno-pic -mno-abicalls
-EXTRA_FLAGS=-G0 -DKERNLOADADDR=${KERNLOADADDR}
-EXTRA_FLAGS+=-${MIPS_ENDIAN}
+.if ${MACHINE_ABI:Mpurecap}
+EXTRA_FLAGS=-fpic
+.else
+EXTRA_FLAGS=-fno-pic -mno-abicalls
+.endif
+EXTRA_FLAGS+=-G0 -DKERNLOADADDR=${KERNLOADADDR} -${MIPS_ENDIAN}
 
 # We add the -fno-pic flag to kernels because otherwise performance
 # is extremely poor, as well as -mno-abicalls to force no ABI usage.
-CFLAGS+=${EXTRA_FLAGS} $(ARCH_PIC_FLAGS) $(ARCH_FLAGS)
-TRAMP_ARCH_FLAGS?=$(ARCH_PIC_FLAGS) $(ARCH_FLAGS)
+CFLAGS+=${EXTRA_FLAGS} $(ARCH_FLAGS)
+TRAMP_ARCH_FLAGS?=$(ARCH_FLAGS)
 TRAMP_EXTRA_FLAGS=${EXTRA_FLAGS} ${TRAMP_ARCH_FLAGS}
 # Kernel code is always compiled with soft-float on MIPS
 TRAMP_EXTRA_FLAGS+=-msoft-float
@@ -64,8 +66,6 @@ TRAMP_ELFSIZE=64
 .else
 TRAMP_ELFSIZE=32
 .endif
-# XXX-AM: Hack to clear trampoline flags
-TRAMP_EXTRA_LDFLAGS=${TRAMP_LDFLAGS:N-fuse-ld*}
 
 ASM_CFLAGS+=${CFLAGS} -D_LOCORE -DLOCORE
 

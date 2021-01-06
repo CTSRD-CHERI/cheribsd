@@ -10,7 +10,7 @@ ROOTDIR=	/root
 ROOTNAME_dot.shrc=	.shrc
 ROOTNAME_dot.profile=	.profile
 PACKAGE=runtime
-PROG=	sh
+PROG?=	sh
 INSTALLFLAGS= -S
 SHSRCS=	alias.c arith_yacc.c arith_yylex.c cd.c echo.c error.c eval.c \
 	exec.c expand.c \
@@ -27,13 +27,14 @@ SRCS= ${SHSRCS} ${GENSRCS} ${GENHDRS}
 
 LIBADD=	edit
 
-CFLAGS+=-DSHELL -I. -I${.CURDIR}
+SRCDIR:=	${.PARSEDIR}
+CFLAGS+=	-DSHELL -I. -I${SRCDIR}
 # for debug:
 # DEBUG_FLAGS+= -g -DDEBUG=2 -fno-inline
-
-.PATH:	${.CURDIR}/bltin \
-	${.CURDIR:H}/kill \
-	${.CURDIR:H}/test \
+.PATH:	${SRCDIR} \
+	${SRCDIR}/bltin \
+	${SRCDIR:H}/kill \
+	${SRCDIR:H}/test \
 	${SRCTOP}/usr.bin/printf
 
 CLEANFILES+= mknodes mksyntax
@@ -44,7 +45,7 @@ build-tools: mknodes mksyntax
 .ORDER: builtins.c builtins.h
 builtins.h: .NOMETA
 builtins.c builtins.h: mkbuiltins builtins.def
-	sh ${.CURDIR}/mkbuiltins ${.CURDIR}
+	sh ${SRCDIR}/mkbuiltins ${SRCDIR}
 
 DEPENDOBJS+= mknodes mksyntax
 mknodes: mknodes.c ${BUILD_TOOLS_META}
@@ -57,7 +58,7 @@ mksyntax: mksyntax.c ${BUILD_TOOLS_META}
 .ORDER: nodes.c nodes.h
 nodes.h: .NOMETA
 nodes.c nodes.h: mknodes nodetypes nodes.c.pat
-	${BTOOLSPATH:U.}/mknodes ${.CURDIR}/nodetypes ${.CURDIR}/nodes.c.pat
+	${BTOOLSPATH:U.}/mknodes ${SRCDIR}/nodetypes ${SRCDIR}/nodes.c.pat
 
 .ORDER: syntax.c syntax.h
 syntax.h: .NOMETA
@@ -65,8 +66,10 @@ syntax.c syntax.h: mksyntax
 	${BTOOLSPATH:U.}/mksyntax
 
 token.h: mktokens
-	sh ${.CURDIR}/mktokens
+	sh ${SRCDIR}/mktokens
 
+# Don't include tests or .profile for the static sh used by atf.
+.if ${.CURDIR} == ${SRCDIR}
 HAS_TESTS=
 SUBDIR.${MK_TESTS}+= tests
 
@@ -75,5 +78,6 @@ beforeinstallconfig:
 
 afterinstallconfig:
 	${INSTALL_LINK} ${TAG_ARGS} ${DESTDIR}/root/.profile ${DESTDIR}/.profile
+.endif
 
 .include <bsd.prog.mk>
