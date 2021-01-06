@@ -413,13 +413,13 @@
 	}
 78	AUE_NULL	STD {
 		int linux_gettimeofday(
-		    struct l_timeval *tp,
+		    l_timeval *tp,
 		    struct timezone *tzp
 		);
 	}
 79	AUE_SETTIMEOFDAY STD {
 		int linux_settimeofday(
-		    struct l_timeval *tp,
+		    l_timeval *tp,
 		    struct timezone *tzp
 		);
 	}
@@ -748,7 +748,7 @@
 		    l_fd_set *readfds,
 		    l_fd_set *writefds,
 		    l_fd_set *exceptfds,
-		    struct l_timeval *timeout
+		    l_timeval *timeout
 		);
 	}
 143	AUE_FLOCK	NOPROTO {
@@ -949,7 +949,7 @@
 		int linux_rt_sigtimedwait(
 		    l_sigset_t *mask,
 		    l_siginfo_t *ptr,
-		    struct l_timeval *timeout,
+		    l_timeval *timeout,
 		    l_size_t sigsetsize
 		);
 	}
@@ -1483,7 +1483,7 @@
 271	AUE_UTIMES	STD {
 		int linux_utimes(
 		    char *fname,
-		    struct l_timeval *tptr
+		    l_timeval *tptr
 		);
 	}
 272	AUE_NULL	STD {
@@ -1630,7 +1630,7 @@
 		int linux_futimesat(
 		    l_int dfd,
 		    char *filename,
-		    struct l_timeval *utimes
+		    l_timeval *utimes
 		);
 	}
 300	AUE_FSTATAT	STD {

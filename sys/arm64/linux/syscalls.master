@@ -491,7 +491,7 @@
 		int linux_newfstatat(
 		    l_int dfd,
 		    char *pathname,
-		    struct l_stat *statbuf,
+		    struct l_newstat *statbuf,
 		    l_int flag
 		);
 	}
@@ -829,7 +829,7 @@
 		int linux_rt_sigtimedwait(
 		    l_sigset_t *mask,
 		    l_siginfo_t *ptr,
-		    struct l_timeval *timeout,
+		    l_timeval *timeout,
 		    l_size_t sigsetsize
 		);
 	}
@@ -1007,13 +1007,13 @@
 	}
 169	AUE_NULL	NOPROTO	{
 		int gettimeofday(
-		    struct l_timeval *tp,
+		    l_timeval *tp,
 		    struct timezone *tzp
 		);
 	}
 170	AUE_SETTIMEOFDAY	NOPROTO	{
 		int settimeofday(
-		    struct l_timeval *tv,
+		    l_timeval *tv,
 		    struct timezone *tzp
 		);
 	}
@@ -1141,7 +1141,7 @@
 193	AUE_NULL	STD	{
 		int linux_semop(
 		    l_int semid,
-		    struct l_sembuf *tsops,
+		    struct sembuf *tsops,
 		    l_uint nsops
 		);
 	}

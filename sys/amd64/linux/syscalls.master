@@ -199,7 +199,7 @@
 		    l_fd_set *readfds,
 		    l_fd_set *writefds,
 		    l_fd_set *exceptfds,
-		    struct l_timeval *timeout
+		    l_timeval *timeout
 		);
 	}
 24	AUE_NULL	NOPROTO {
@@ -475,7 +475,7 @@
 65	AUE_NULL	STD {
 		int linux_semop(
 		    l_int semid,
-		    struct l_sembuf *tsops,
+		    struct sembuf *tsops,
 		    l_uint nsops
 		);
 	}
@@ -667,7 +667,7 @@
 	}
 96	AUE_NULL	NOPROTO {
 		int gettimeofday(
-		    struct l_timeval *tp,
+		    l_timeval *tp,
 		    struct timezone *tzp
 		);
 	}
@@ -839,7 +839,7 @@
 		int linux_rt_sigtimedwait(
 		    l_sigset_t *mask,
 		    l_siginfo_t *ptr,
-		    struct l_timeval *timeout,
+		    l_timeval *timeout,
 		    l_size_t sigsetsize
 		);
 	}
@@ -1032,7 +1032,7 @@
 	}
 164	AUE_SETTIMEOFDAY	NOPROTO {
 		int settimeofday(
-		    struct l_timeval *tv,
+		    l_timeval *tv,
 		    struct timezone *tzp
 		);
 	}
@@ -1380,7 +1380,7 @@
 235	AUE_UTIMES	STD {
 		int linux_utimes(
 		    char *fname,
-		    struct l_timeval *tptr
+		    l_timeval *tptr
 		);
 	}
 236	AUE_NULL	UNIMPL	vserver
@@ -1512,14 +1512,14 @@
 		int linux_futimesat(
 		    l_int dfd,
 		    char *filename,
-		    struct l_timeval *utimes
+		    l_timeval *utimes
 		);
 	}
 262	AUE_FSTATAT	STD {
 		int linux_newfstatat(
 		    l_int dfd,
 		    char *pathname,
-		    struct l_stat *statbuf,
+		    struct l_newstat *statbuf,
 		    l_int flag
 		);
 	}
