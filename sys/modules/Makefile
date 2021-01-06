@@ -511,6 +511,7 @@ _ibcore=	ibcore
 _ipoib=		ipoib
 _iser=		iser
 .endif
+_ipmi=		ipmi
 _mlx4=		mlx4
 _mlx5=		mlx5
 .if (${MK_INET_SUPPORT} != "no" && ${MK_INET6_SUPPORT} != "no") || \
@@ -699,7 +700,6 @@ _ichwd=		ichwd
 _ida=		ida
 _iir=		iir
 _intelspi=	intelspi
-_ipmi=		ipmi
 _ips=		ips
 _isci=		isci
 _ipw=		ipw
