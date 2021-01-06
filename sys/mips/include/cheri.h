@@ -117,6 +117,8 @@ struct cheri_kframe {
 /*
  * CHERI-MIPS-specific kernel utility functions.
  */
+void cheri_init_capabilities(void * __capability kroot);
+
 struct cheri_frame;
 struct sysentvec;
 struct trapframe;
@@ -191,3 +193,13 @@ void cheri_trace_log(void *buf, size_t len, int format);
 #endif /* !_KERNEL */
 
 #endif /* _MIPS_INCLUDE_CHERI_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20210112,
+//   "target_type": "header",
+//   "changes_purecap": [
+//     "support"
+//   ],
+//   "change_comment": "purecap caprelocs"
+// }
+// CHERI CHANGES END

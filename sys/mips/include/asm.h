@@ -263,12 +263,21 @@ _C_LABEL(x):
 /*
  * Macros to panic and printf from assembly language.
  */
+#ifdef __CHERI_PURE_CAPABILITY__
+#define	PANIC(msg)				\
+	CAPTABLE_LOAD($c3, 9f);			\
+	CAPCALL_LOAD($c12, _C_LABEL(panic));	\
+	cjalr $c12, $c17;			\
+	nop;					\
+	MSG(msg)
+#else /* ! __CHERI_PURE_CAPABILITY__ */
 #define	PANIC(msg)			\
 	PTR_LA	a0, 9f;			\
 	PTR_LA	t9, _C_LABEL(panic);	\
 	jalr	t9;			\
 	nop;				\
 	MSG(msg)
+#endif /* ! __CHERI_PURE_CAPABILITY__ */
 
 #define	PANIC_KSEG0(msg, reg)	PANIC(msg)
 
@@ -777,12 +786,24 @@ _C_LABEL(x):
 #define	HAZARD_DELAY	nop;nop;nop;nop;sll $0,$0,3;
 #endif
 
+/* Force an absolute relocation for the given symbol */
+#define ABSRELOC_LA(dst, sym)				\
+	lui	dst, %highest(sym);			\
+	daddiu	dst, dst, %higher(sym);			\
+	dsll	dst, dst, 16;				\
+	daddiu	dst, dst, %hi(sym);			\
+	dsll	dst, dst, 16;				\
+	daddiu	dst, dst, %lo(sym)
+
 #endif /* !_MACHINE_ASM_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20190712,
 //   "target_type": "header",
 //   "changes": [
+//     "support"
+//   ],
+//   "changes_purecap": [
 //     "support"
 //   ],
 //   "change_comment": "jmpbuf, call frame, etc"
