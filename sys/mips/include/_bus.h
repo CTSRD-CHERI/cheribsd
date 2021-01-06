@@ -36,11 +36,12 @@
 /*
  * Bus address and size types
  */
-#if defined(CPU_CNMIPS) && !defined(__mips_n64)
-typedef uint64_t bus_addr_t;
-#else
-typedef uintptr_t bus_addr_t;
-#endif
+
+/*
+ * bus_addr_t: an address in the bus space.
+ * bus_size_t: size of objects in the bus space.
+ */
+typedef vm_paddr_t bus_addr_t;
 typedef vm_size_t bus_size_t;
 
 /*
