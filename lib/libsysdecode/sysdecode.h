@@ -42,6 +42,7 @@ enum sysdecode_abi {
 	 * value when merged upstream.
 	 */
 	SYSDECODE_ABI_FREEBSD64 = 100,
+	SYSDECODE_ABI_LINUX64,
 };
 
 int	sysdecode_abi_to_freebsd_errno(enum sysdecode_abi _abi, int _error);

@@ -69,6 +69,13 @@ static
 #include <amd64/linux32/linux32_syscalls.c>
 #endif
 
+#if __has_feature(capabilities)
+#ifdef __aarch64__
+static
+#include <arm64/linux64/linux64_syscalls.c>
+#endif
+#endif
+
 static
 #include <compat/cloudabi32/cloudabi32_syscalls.c>
 static
@@ -106,6 +113,14 @@ sysdecode_syscallname(enum sysdecode_abi abi, unsigned int code)
 		if (code < nitems(linux32_syscallnames))
 			return (linux32_syscallnames[code]);
 		break;
+#endif
+#if defined(__aarch64__)
+#if __has_feature(capabilities)
+	case SYSDECODE_ABI_LINUX64:
+		if (code < nitems(linux64_syscallnames))
+			return (linux64_syscallnames[code]);
+		break;
+#endif
 #endif
 	case SYSDECODE_ABI_CLOUDABI32:
 		if (code < nitems(cloudabi32_syscallnames))
