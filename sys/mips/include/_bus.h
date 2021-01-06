@@ -41,11 +41,29 @@ typedef uint64_t bus_addr_t;
 #else
 typedef uintptr_t bus_addr_t;
 #endif
-typedef uintptr_t bus_size_t;
+typedef vm_size_t bus_size_t;
 
 /*
  * Access methods for bus resources and address space.
  */
 typedef struct bus_space *bus_space_tag_t;
+#ifdef __CHERI_PURE_CAPABILITY__
+/*
+ * With CHERI, the bus space handle is a capability to a mapped
+ * bus space memory object.
+ */
+typedef uintptr_t bus_space_handle_t;
+#else /* ! __CHERI_PURE_CAPABILITY__ */
 typedef bus_addr_t bus_space_handle_t;
+#endif /* ! __CHERI_PURE_CAPABILITY__ */
 #endif /* MIPS_INCLUDE__BUS_H */
+
+// CHERI CHANGES START
+// {
+//   "updated": 20201230,
+//   "target_type": "header",
+//   "changes_purecap": [
+//     "pointer_as_integer"
+//   ]
+// }
+// CHERI CHANGES END
