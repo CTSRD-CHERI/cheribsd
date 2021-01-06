@@ -1394,8 +1394,8 @@ struct ib_uobject {
 };
 
 struct ib_udata {
-	const void __user *inbuf;
-	void __user *outbuf;
+	const void __user * __kerncap inbuf;
+	void __user * __kerncap outbuf;
 	size_t       inlen;
 	size_t       outlen;
 };
@@ -2180,7 +2180,8 @@ static inline bool ib_is_udata_cleared(struct ib_udata *udata,
 				       size_t offset,
 				       size_t len)
 {
-	const void __user *p = (const char __user *)udata->inbuf + offset;
+	const void __user * __kerncap p =
+	    (const char __user * __kerncap)udata->inbuf + offset;
 	bool ret;
 	u8 *buf;
 
