@@ -313,7 +313,7 @@ void
 generic_bs_rm_2(void *t, bus_space_handle_t bsh,
     bus_size_t offset, uint16_t *addr, bus_size_t count)
 {
-	uintptr_t baddr = bsh + offset;
+	bus_space_handle_t baddr = bsh + offset;
 
 	while (count--)
 		*addr++ = rd16(baddr);
@@ -323,7 +323,7 @@ void
 generic_bs_rm_4(void *t, bus_space_handle_t bsh,
     bus_size_t offset, uint32_t *addr, bus_size_t count)
 {
-	uintptr_t baddr = bsh + offset;
+	bus_space_handle_t baddr = bsh + offset;
 
 	while (count--)
 		*addr++ = rd32(baddr);
@@ -334,7 +334,7 @@ generic_bs_rm_8(void *t, bus_space_handle_t bsh, bus_size_t offset,
     uint64_t *addr, bus_size_t count)
 {
 #ifdef rd64
-	uintptr_t baddr = bsh + offset;
+	bus_space_handle_t baddr = bsh + offset;
 
 	while (count--)
 		*addr++ = rd64(baddr);
@@ -352,7 +352,7 @@ void
 generic_bs_rr_1(void *t, bus_space_handle_t bsh,
     bus_size_t offset, uint8_t *addr, bus_size_t count)
 {
-	uintptr_t baddr = bsh + offset;
+	bus_space_handle_t baddr = bsh + offset;
 
 	while (count--) {
 		*addr++ = rd8(baddr);
@@ -364,7 +364,7 @@ void
 generic_bs_rr_2(void *t, bus_space_handle_t bsh,
     bus_size_t offset, uint16_t *addr, bus_size_t count)
 {
-	uintptr_t baddr = bsh + offset;
+	bus_space_handle_t baddr = bsh + offset;
 
 	while (count--) {
 		*addr++ = rd16(baddr);
@@ -376,7 +376,7 @@ void
 generic_bs_rr_4(void *t, bus_space_handle_t bsh,
     bus_size_t offset, uint32_t *addr, bus_size_t count)
 {
-	uintptr_t baddr = bsh + offset;
+	bus_space_handle_t baddr = bsh + offset;
 
 	while (count--) {
 		*addr++ = rd32(baddr);
@@ -389,7 +389,7 @@ generic_bs_rr_8(void *t, bus_space_handle_t bsh, bus_size_t offset,
     uint64_t *addr, bus_size_t count)
 {
 #ifdef rd64
-	uintptr_t baddr = bsh + offset;
+	bus_space_handle_t baddr = bsh + offset;
 
 	while (count--) {
 		*addr++ = rd64(baddr);
@@ -448,7 +448,7 @@ void
 generic_bs_wm_1(void *t, bus_space_handle_t bsh,
     bus_size_t offset, const uint8_t *addr, bus_size_t count)
 {
-	uintptr_t baddr = bsh + offset;
+	bus_space_handle_t baddr = bsh + offset;
 
 	while (count--)
 		wr8(baddr, *addr++);
@@ -458,7 +458,7 @@ void
 generic_bs_wm_2(void *t, bus_space_handle_t bsh,
     bus_size_t offset, const uint16_t *addr, bus_size_t count)
 {
-	uintptr_t baddr = bsh + offset;
+	bus_space_handle_t baddr = bsh + offset;
 
 	while (count--)
 		wr16(baddr, *addr++);
@@ -468,7 +468,7 @@ void
 generic_bs_wm_4(void *t, bus_space_handle_t bsh,
     bus_size_t offset, const uint32_t *addr, bus_size_t count)
 {
-	uintptr_t baddr = bsh + offset;
+	bus_space_handle_t baddr = bsh + offset;
 
 	while (count--)
 		wr32(baddr, *addr++);
@@ -479,7 +479,7 @@ generic_bs_wm_8(void *t, bus_space_handle_t bsh, bus_size_t offset,
     const uint64_t *addr, bus_size_t count)
 {
 #ifdef wr64
-	uintptr_t baddr = bsh + offset;
+	bus_space_handle_t baddr = bsh + offset;
 
 	while (count--)
 		wr64(baddr, *addr++);
@@ -496,7 +496,7 @@ void
 generic_bs_wr_1(void *t, bus_space_handle_t bsh,
     bus_size_t offset, const uint8_t *addr, bus_size_t count)
 {
-	uintptr_t baddr = bsh + offset;
+	bus_space_handle_t baddr = bsh + offset;
 
 	while (count--) {
 		wr8(baddr, *addr++);
@@ -508,7 +508,7 @@ void
 generic_bs_wr_2(void *t, bus_space_handle_t bsh,
     bus_size_t offset, const uint16_t *addr, bus_size_t count)
 {
-	uintptr_t baddr = bsh + offset;
+	bus_space_handle_t baddr = bsh + offset;
 
 	while (count--) {
 		wr16(baddr, *addr++);
@@ -520,7 +520,7 @@ void
 generic_bs_wr_4(void *t, bus_space_handle_t bsh,
     bus_size_t offset, const uint32_t *addr, bus_size_t count)
 {
-	uintptr_t baddr = bsh + offset;
+	bus_space_handle_t baddr = bsh + offset;
 
 	while (count--) {
 		wr32(baddr, *addr++);
@@ -533,7 +533,7 @@ generic_bs_wr_8(void *t, bus_space_handle_t bsh, bus_size_t offset,
     const uint64_t *addr, bus_size_t count)
 {
 #ifdef wr64
-	uintptr_t baddr = bsh + offset;
+	bus_space_handle_t baddr = bsh + offset;
 
 	while (count--) {
 		wr64(baddr, *addr++);
@@ -552,7 +552,7 @@ void
 generic_bs_sm_1(void *t, bus_space_handle_t bsh,
     bus_size_t offset, uint8_t value, bus_size_t count)
 {
-	uintptr_t addr = bsh + offset;
+	bus_space_handle_t addr = bsh + offset;
 
 	while (count--)
 		wr8(addr, value);
@@ -562,7 +562,7 @@ void
 generic_bs_sm_2(void *t, bus_space_handle_t bsh,
     bus_size_t offset, uint16_t value, bus_size_t count)
 {
-	uintptr_t addr = bsh + offset;
+	bus_space_handle_t addr = bsh + offset;
 
 	while (count--)
 		wr16(addr, value);
@@ -572,7 +572,7 @@ void
 generic_bs_sm_4(void *t, bus_space_handle_t bsh,
     bus_size_t offset, uint32_t value, bus_size_t count)
 {
-	uintptr_t addr = bsh + offset;
+	bus_space_handle_t addr = bsh + offset;
 
 	while (count--)
 		wr32(addr, value);
@@ -583,7 +583,7 @@ generic_bs_sm_8(void *t, bus_space_handle_t bsh, bus_size_t offset,
     uint64_t value, bus_size_t count)
 {
 #ifdef wr64
-	uintptr_t addr = bsh + offset;
+	bus_space_handle_t addr = bsh + offset;
 
 	while (count--)
 		wr64(addr, value);
@@ -600,7 +600,7 @@ void
 generic_bs_sr_1(void *t, bus_space_handle_t bsh,
     bus_size_t offset, uint8_t value, bus_size_t count)
 {
-	uintptr_t addr = bsh + offset;
+	bus_space_handle_t addr = bsh + offset;
 
 	for (; count != 0; count--, addr++)
 		wr8(addr, value);
@@ -610,7 +610,7 @@ void
 generic_bs_sr_2(void *t, bus_space_handle_t bsh,
 		       bus_size_t offset, uint16_t value, bus_size_t count)
 {
-	uintptr_t addr = bsh + offset;
+	bus_space_handle_t addr = bsh + offset;
 
 	for (; count != 0; count--, addr += 2)
 		wr16(addr, value);
@@ -620,7 +620,7 @@ void
 generic_bs_sr_4(void *t, bus_space_handle_t bsh,
     bus_size_t offset, uint32_t value, bus_size_t count)
 {
-	uintptr_t addr = bsh + offset;
+	bus_space_handle_t addr = bsh + offset;
 
 	for (; count != 0; count--, addr += 4)
 		wr32(addr, value);
@@ -631,7 +631,7 @@ generic_bs_sr_8(void *t, bus_space_handle_t bsh, bus_size_t offset,
     uint64_t value, bus_size_t count)
 {
 #ifdef wr64
-	uintptr_t addr = bsh + offset;
+	bus_space_handle_t addr = bsh + offset;
 
 	for (; count != 0; count--, addr += 8)
 		wr64(addr, value);
@@ -649,8 +649,8 @@ generic_bs_c_1(void *t, bus_space_handle_t bsh1,
     bus_size_t off1, bus_space_handle_t bsh2,
     bus_size_t off2, bus_size_t count)
 {
-	uintptr_t addr1 = bsh1 + off1;
-	uintptr_t addr2 = bsh2 + off2;
+	bus_space_handle_t addr1 = bsh1 + off1;
+	bus_space_handle_t addr2 = bsh2 + off2;
 
 	if (addr1 >= addr2) {
 		/* src after dest: copy forward */
@@ -669,8 +669,8 @@ generic_bs_c_2(void *t, bus_space_handle_t bsh1,
     bus_size_t off1, bus_space_handle_t bsh2,
     bus_size_t off2, bus_size_t count)
 {
-	uintptr_t addr1 = bsh1 + off1;
-	uintptr_t addr2 = bsh2 + off2;
+	bus_space_handle_t addr1 = bsh1 + off1;
+	bus_space_handle_t addr2 = bsh2 + off2;
 
 	if (addr1 >= addr2) {
 		/* src after dest: copy forward */
@@ -689,8 +689,8 @@ generic_bs_c_4(void *t, bus_space_handle_t bsh1,
     bus_size_t off1, bus_space_handle_t bsh2,
     bus_size_t off2, bus_size_t count)
 {
-	uintptr_t addr1 = bsh1 + off1;
-	uintptr_t addr2 = bsh2 + off2;
+	bus_space_handle_t addr1 = bsh1 + off1;
+	bus_space_handle_t addr2 = bsh2 + off2;
 
 	if (addr1 >= addr2) {
 		/* src after dest: copy forward */
@@ -709,8 +709,8 @@ generic_bs_c_8(void *t, bus_space_handle_t bsh1, bus_size_t off1,
     bus_space_handle_t bsh2, bus_size_t off2, bus_size_t count)
 {
 #if defined(rd64) && defined(wr64)
-	uintptr_t addr1 = bsh1 + off1;
-	uintptr_t addr2 = bsh2 + off2;
+	bus_space_handle_t addr1 = bsh1 + off1;
+	bus_space_handle_t addr2 = bsh2 + off2;
 
 	if (addr1 >= addr2) {
 		/* src after dest: copy forward */
