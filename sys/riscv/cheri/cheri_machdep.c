@@ -117,7 +117,6 @@ cheri_signal_sandboxed(struct thread *td)
 	}
 	return (0);
 }
-
 // CHERI CHANGES START
 // {
 //   "updated": 20200803,
