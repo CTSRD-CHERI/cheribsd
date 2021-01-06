@@ -220,7 +220,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		uarg[1] = (intptr_t) p->readfds; /* l_fd_set * */
 		uarg[2] = (intptr_t) p->writefds; /* l_fd_set * */
 		uarg[3] = (intptr_t) p->exceptfds; /* l_fd_set * */
-		uarg[4] = (intptr_t) p->timeout; /* struct l_timeval * */
+		uarg[4] = (intptr_t) p->timeout; /* l_timeval * */
 		*n_args = 5;
 		break;
 	}
@@ -580,7 +580,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 65: {
 		struct linux_semop_args *p = params;
 		iarg[0] = p->semid; /* l_int */
-		uarg[1] = (intptr_t) p->tsops; /* struct l_sembuf * */
+		uarg[1] = (intptr_t) p->tsops; /* struct sembuf * */
 		iarg[2] = p->nsops; /* l_uint */
 		*n_args = 3;
 		break;
@@ -834,7 +834,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* gettimeofday */
 	case 96: {
 		struct gettimeofday_args *p = params;
-		uarg[0] = (intptr_t) p->tp; /* struct l_timeval * */
+		uarg[0] = (intptr_t) p->tp; /* l_timeval * */
 		uarg[1] = (intptr_t) p->tzp; /* struct timezone * */
 		*n_args = 2;
 		break;
@@ -1070,7 +1070,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		struct linux_rt_sigtimedwait_args *p = params;
 		uarg[0] = (intptr_t) p->mask; /* l_sigset_t * */
 		uarg[1] = (intptr_t) p->ptr; /* l_siginfo_t * */
-		uarg[2] = (intptr_t) p->timeout; /* struct l_timeval * */
+		uarg[2] = (intptr_t) p->timeout; /* l_timeval * */
 		iarg[3] = p->sigsetsize; /* l_size_t */
 		*n_args = 4;
 		break;
@@ -1136,7 +1136,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 137: {
 		struct linux_statfs_args *p = params;
 		uarg[0] = (intptr_t) p->path; /* char * */
-		uarg[1] = (intptr_t) p->buf; /* struct l_statfs_buf * */
+		uarg[1] = (intptr_t) p->buf; /* struct l_statfs * */
 		*n_args = 2;
 		break;
 	}
@@ -1144,7 +1144,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 138: {
 		struct linux_fstatfs_args *p = params;
 		iarg[0] = p->fd; /* l_uint */
-		uarg[1] = (intptr_t) p->buf; /* struct l_statfs_buf * */
+		uarg[1] = (intptr_t) p->buf; /* struct l_statfs * */
 		*n_args = 2;
 		break;
 	}
@@ -1332,7 +1332,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* settimeofday */
 	case 164: {
 		struct settimeofday_args *p = params;
-		uarg[0] = (intptr_t) p->tv; /* struct l_timeval * */
+		uarg[0] = (intptr_t) p->tv; /* l_timeval * */
 		uarg[1] = (intptr_t) p->tzp; /* struct timezone * */
 		*n_args = 2;
 		break;
@@ -1783,7 +1783,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 235: {
 		struct linux_utimes_args *p = params;
 		uarg[0] = (intptr_t) p->fname; /* char * */
-		uarg[1] = (intptr_t) p->tptr; /* struct l_timeval * */
+		uarg[1] = (intptr_t) p->tptr; /* l_timeval * */
 		*n_args = 2;
 		break;
 	}
@@ -1964,7 +1964,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		struct linux_futimesat_args *p = params;
 		iarg[0] = p->dfd; /* l_int */
 		uarg[1] = (intptr_t) p->filename; /* char * */
-		uarg[2] = (intptr_t) p->utimes; /* struct l_timeval * */
+		uarg[2] = (intptr_t) p->utimes; /* l_timeval * */
 		*n_args = 3;
 		break;
 	}
@@ -1973,7 +1973,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		struct linux_newfstatat_args *p = params;
 		iarg[0] = p->dfd; /* l_int */
 		uarg[1] = (intptr_t) p->pathname; /* char * */
-		uarg[2] = (intptr_t) p->statbuf; /* struct l_stat64 * */
+		uarg[2] = (intptr_t) p->statbuf; /* struct l_newstat * */
 		iarg[3] = p->flag; /* l_int */
 		*n_args = 4;
 		break;
@@ -3017,7 +3017,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "userland l_fd_set *";
 			break;
 		case 4:
-			p = "userland struct l_timeval *";
+			p = "userland l_timeval *";
 			break;
 		default:
 			break;
@@ -3630,7 +3630,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "l_int";
 			break;
 		case 1:
-			p = "userland struct l_sembuf *";
+			p = "userland struct sembuf *";
 			break;
 		case 2:
 			p = "l_uint";
@@ -4051,7 +4051,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 96:
 		switch(ndx) {
 		case 0:
-			p = "userland struct l_timeval *";
+			p = "userland l_timeval *";
 			break;
 		case 1:
 			p = "userland struct timezone *";
@@ -4400,7 +4400,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "userland l_siginfo_t *";
 			break;
 		case 2:
-			p = "userland struct l_timeval *";
+			p = "userland l_timeval *";
 			break;
 		case 3:
 			p = "l_size_t";
@@ -4510,7 +4510,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "userland char *";
 			break;
 		case 1:
-			p = "userland struct l_statfs_buf *";
+			p = "userland struct l_statfs *";
 			break;
 		default:
 			break;
@@ -4523,7 +4523,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "l_uint";
 			break;
 		case 1:
-			p = "userland struct l_statfs_buf *";
+			p = "userland struct l_statfs *";
 			break;
 		default:
 			break;
@@ -4795,7 +4795,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 164:
 		switch(ndx) {
 		case 0:
-			p = "userland struct l_timeval *";
+			p = "userland l_timeval *";
 			break;
 		case 1:
 			p = "userland struct timezone *";
@@ -5494,7 +5494,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "userland char *";
 			break;
 		case 1:
-			p = "userland struct l_timeval *";
+			p = "userland l_timeval *";
 			break;
 		default:
 			break;
@@ -5749,7 +5749,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "userland char *";
 			break;
 		case 2:
-			p = "userland struct l_timeval *";
+			p = "userland l_timeval *";
 			break;
 		default:
 			break;
@@ -5765,7 +5765,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "userland char *";
 			break;
 		case 2:
-			p = "userland struct l_stat64 *";
+			p = "userland struct l_newstat *";
 			break;
 		case 3:
 			p = "l_int";

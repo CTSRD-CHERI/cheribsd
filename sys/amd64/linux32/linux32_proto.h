@@ -249,11 +249,11 @@ struct linux_getrusage_args {
 	char rusage_l_[PADL_(struct l_rusage *)]; struct l_rusage * rusage; char rusage_r_[PADR_(struct l_rusage *)];
 };
 struct linux_gettimeofday_args {
-	char tp_l_[PADL_(struct l_timeval *)]; struct l_timeval * tp; char tp_r_[PADR_(struct l_timeval *)];
+	char tp_l_[PADL_(l_timeval *)]; l_timeval * tp; char tp_r_[PADR_(l_timeval *)];
 	char tzp_l_[PADL_(struct timezone *)]; struct timezone * tzp; char tzp_r_[PADR_(struct timezone *)];
 };
 struct linux_settimeofday_args {
-	char tp_l_[PADL_(struct l_timeval *)]; struct l_timeval * tp; char tp_r_[PADR_(struct l_timeval *)];
+	char tp_l_[PADL_(l_timeval *)]; l_timeval * tp; char tp_r_[PADR_(l_timeval *)];
 	char tzp_l_[PADL_(struct timezone *)]; struct timezone * tzp; char tzp_r_[PADR_(struct timezone *)];
 };
 struct linux_getgroups16_args {
@@ -308,11 +308,11 @@ struct linux_getpriority_args {
 };
 struct linux_statfs_args {
 	char path_l_[PADL_(char *)]; char * path; char path_r_[PADR_(char *)];
-	char buf_l_[PADL_(struct l_statfs_buf *)]; struct l_statfs_buf * buf; char buf_r_[PADR_(struct l_statfs_buf *)];
+	char buf_l_[PADL_(struct l_statfs *)]; struct l_statfs * buf; char buf_r_[PADR_(struct l_statfs *)];
 };
 struct linux_fstatfs_args {
 	char fd_l_[PADL_(l_uint)]; l_uint fd; char fd_r_[PADR_(l_uint)];
-	char buf_l_[PADL_(struct l_statfs_buf *)]; struct l_statfs_buf * buf; char buf_r_[PADR_(struct l_statfs_buf *)];
+	char buf_l_[PADL_(struct l_statfs *)]; struct l_statfs * buf; char buf_r_[PADR_(struct l_statfs *)];
 };
 struct linux_socketcall_args {
 	char what_l_[PADL_(l_int)]; l_int what; char what_r_[PADR_(l_int)];
@@ -446,7 +446,7 @@ struct linux_select_args {
 	char readfds_l_[PADL_(l_fd_set *)]; l_fd_set * readfds; char readfds_r_[PADR_(l_fd_set *)];
 	char writefds_l_[PADL_(l_fd_set *)]; l_fd_set * writefds; char writefds_r_[PADR_(l_fd_set *)];
 	char exceptfds_l_[PADL_(l_fd_set *)]; l_fd_set * exceptfds; char exceptfds_r_[PADR_(l_fd_set *)];
-	char timeout_l_[PADL_(struct l_timeval *)]; struct l_timeval * timeout; char timeout_r_[PADR_(struct l_timeval *)];
+	char timeout_l_[PADL_(l_timeval *)]; l_timeval * timeout; char timeout_r_[PADR_(l_timeval *)];
 };
 struct linux_msync_args {
 	char addr_l_[PADL_(l_ulong)]; l_ulong addr; char addr_r_[PADR_(l_ulong)];
@@ -558,7 +558,7 @@ struct linux_rt_sigpending_args {
 struct linux_rt_sigtimedwait_args {
 	char mask_l_[PADL_(l_sigset_t *)]; l_sigset_t * mask; char mask_r_[PADR_(l_sigset_t *)];
 	char ptr_l_[PADL_(l_siginfo_t *)]; l_siginfo_t * ptr; char ptr_r_[PADR_(l_siginfo_t *)];
-	char timeout_l_[PADL_(struct l_timeval *)]; struct l_timeval * timeout; char timeout_r_[PADR_(struct l_timeval *)];
+	char timeout_l_[PADL_(l_timeval *)]; l_timeval * timeout; char timeout_r_[PADR_(l_timeval *)];
 	char sigsetsize_l_[PADL_(l_size_t)]; l_size_t sigsetsize; char sigsetsize_r_[PADR_(l_size_t)];
 };
 struct linux_rt_sigqueueinfo_args {
@@ -892,7 +892,7 @@ struct linux_tgkill_args {
 };
 struct linux_utimes_args {
 	char fname_l_[PADL_(char *)]; char * fname; char fname_r_[PADR_(char *)];
-	char tptr_l_[PADL_(struct l_timeval *)]; struct l_timeval * tptr; char tptr_r_[PADR_(struct l_timeval *)];
+	char tptr_l_[PADL_(l_timeval *)]; l_timeval * tptr; char tptr_r_[PADR_(l_timeval *)];
 };
 struct linux_fadvise64_64_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
@@ -1007,7 +1007,7 @@ struct linux_fchownat_args {
 struct linux_futimesat_args {
 	char dfd_l_[PADL_(l_int)]; l_int dfd; char dfd_r_[PADR_(l_int)];
 	char filename_l_[PADL_(char *)]; char * filename; char filename_r_[PADR_(char *)];
-	char utimes_l_[PADL_(struct l_timeval *)]; struct l_timeval * utimes; char utimes_r_[PADR_(struct l_timeval *)];
+	char utimes_l_[PADL_(l_timeval *)]; l_timeval * utimes; char utimes_r_[PADR_(l_timeval *)];
 };
 struct linux_fstatat64_args {
 	char dfd_l_[PADL_(l_int)]; l_int dfd; char dfd_r_[PADR_(l_int)];
