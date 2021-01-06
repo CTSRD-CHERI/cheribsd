@@ -805,5 +805,9 @@ int	linux_ioctl_unregister_handler(struct linux_ioctl_handler *h);
 int	linux32_ioctl_register_handler(struct linux_ioctl_handler *h);
 int	linux32_ioctl_unregister_handler(struct linux_ioctl_handler *h);
 #endif
+#ifdef COMPAT_LINUX64
+int	linux64_ioctl_register_handler(struct linux_ioctl_handler *h);
+int	linux64_ioctl_unregister_handler(struct linux_ioctl_handler *h);
+#endif
 
 #endif /* !_LINUX_IOCTL_H_ */

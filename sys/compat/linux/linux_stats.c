@@ -48,9 +48,12 @@ __FBSDID("$FreeBSD$");
 #include <sys/conf.h>
 #include <sys/fcntl.h>
 
-#ifdef COMPAT_LINUX32
+#if defined(COMPAT_LINUX32)
 #include <machine/../linux32/linux.h>
 #include <machine/../linux32/linux32_proto.h>
+#elif defined(COMPAT_LINUX64)
+#include <machine/../linux64/linux.h>
+#include <machine/../linux64/linux64_proto.h>
 #else
 #include <machine/../linux/linux.h>
 #include <machine/../linux/linux_proto.h>
@@ -171,7 +174,7 @@ translate_fd_major_minor(struct thread *td, int fd, struct stat *buf)
 #define	dev_to_ldev(d)	((uint16_t)(d))
 
 static int
-newstat_copyout(struct stat *buf, void *ubuf)
+newstat_copyout(struct stat *buf, void * __capability ubuf)
 {
 	struct l_newstat tbuf;
 
@@ -205,16 +208,16 @@ linux_newstat(struct thread *td, struct linux_newstat_args *args)
 	int error;
 
 	if (!LUSECONVPATH(td)) {
-		error = linux_kern_stat(td, __USER_CAP_PATH(args->path),
+		error = linux_kern_stat(td, LINUX_USER_CAP_PATH(args->path),
 		    UIO_USERSPACE, &buf);
 	} else {
-		LCONVPATHEXIST(td, args->path, &path);
+		LCONVPATHEXIST(td, LINUX_USER_CAP_PATH(args->path), &path);
 		error = linux_kern_stat(td, PTR2CAP(path), UIO_SYSSPACE, &buf);
 		LFREEPATH(path);
 	}
 	if (error)
 		return (error);
-	return (newstat_copyout(&buf, args->buf));
+	return (newstat_copyout(&buf, LINUX_USER_CAP_OBJ(args->buf)));
 }
 
 int
@@ -225,16 +228,16 @@ linux_newlstat(struct thread *td, struct linux_newlstat_args *args)
 	int error;
 
 	if (!LUSECONVPATH(td)) {
-		error = linux_kern_lstat(td, __USER_CAP_PATH(args->path),
+		error = linux_kern_lstat(td, LINUX_USER_CAP_PATH(args->path),
 		    UIO_USERSPACE, &sb);
 	} else {
-		LCONVPATHEXIST(td, args->path, &path);
+		LCONVPATHEXIST(td, LINUX_USER_CAP_PATH(args->path), &path);
 		error = linux_kern_lstat(td, PTR2CAP(path), UIO_SYSSPACE, &sb);
 		LFREEPATH(path);
 	}
 	if (error)
 		return (error);
-	return (newstat_copyout(&sb, args->buf));
+	return (newstat_copyout(&sb, LINUX_USER_CAP_OBJ(args->buf)));
 }
 #endif
 
@@ -247,7 +250,7 @@ linux_newfstat(struct thread *td, struct linux_newfstat_args *args)
 	error = kern_fstat(td, args->fd, &buf);
 	translate_fd_major_minor(td, args->fd, &buf);
 	if (!error)
-		error = newstat_copyout(&buf, args->buf);
+		error = newstat_copyout(&buf, LINUX_USER_CAP_OBJ(args->buf));
 
 	return (error);
 }
@@ -289,10 +292,10 @@ linux_stat(struct thread *td, struct linux_stat_args *args)
 	int error;
 
 	if (!LUSECONVPATH(td)) {
-		error = linux_kern_stat(td, __USER_CAP_PATH(args->path),
+		error = linux_kern_stat(td, LINUX_USER_CAP_PATH(args->path),
 		    UIO_USERSPACE, &buf);
 	} else {
-		LCONVPATHEXIST(td, args->path, &path);
+		LCONVPATHEXIST(td, LINUX_USER_CAP_PATH(args->path), &path);
 		error = linux_kern_stat(td, PTR2CAP(path), UIO_SYSSPACE, &buf);
 		LFREEPATH(path);
 	}
@@ -310,10 +313,10 @@ linux_lstat(struct thread *td, struct linux_lstat_args *args)
 	int error;
 
 	if (!LUSECONVPATH(td)) {
-		error = linux_kern_lstat(td, __USER_CAP_PATH(args->path),
+		error = linux_kern_lstat(td, LINUX_USER_CAP_PATH(args->path),
 		    UIO_USERSPACE, &buf);
 	} else {
-		LCONVPATHEXIST(td, args->path, &path);
+		LCONVPATHEXIST(td, LINUX_USER_CAP_PATH(args->path), &path);
 		error = linux_kern_lstat(td, PTR2CAP(path), UIO_SYSSPACE, &buf);
 		LFREEPATH(path);
 	}
@@ -423,10 +426,10 @@ linux_statfs(struct thread *td, struct linux_statfs_args *args)
 
 	if (!LUSECONVPATH(td)) {
 		bsd_statfs = malloc(sizeof(struct statfs), M_STATFS, M_WAITOK);
-		error = kern_statfs(td, __USER_CAP_PATH(args->path),
+		error = kern_statfs(td, LINUX_USER_CAP_PATH(args->path),
 		    UIO_USERSPACE, bsd_statfs);
 	} else {
-		LCONVPATHEXIST(td, args->path, &path);
+		LCONVPATHEXIST(td, LINUX_USER_CAP_PATH(args->path), &path);
 		bsd_statfs = malloc(sizeof(struct statfs), M_STATFS, M_WAITOK);
 		error = kern_statfs(td, PTR2CAP(path), UIO_SYSSPACE, bsd_statfs);
 		LFREEPATH(path);
@@ -436,7 +439,8 @@ linux_statfs(struct thread *td, struct linux_statfs_args *args)
 	free(bsd_statfs, M_STATFS);
 	if (error != 0)
 		return (error);
-	return (copyout(&linux_statfs, args->buf, sizeof(linux_statfs)));
+	return (copyout(&linux_statfs, LINUX_USER_CAP_OBJ(args->buf),
+	    sizeof(linux_statfs)));
 }
 
 #if defined(__i386__) || (defined(__amd64__) && defined(COMPAT_LINUX32))
@@ -472,10 +476,10 @@ linux_statfs64(struct thread *td, struct linux_statfs64_args *args)
 
 	if (!LUSECONVPATH(td)) {
 		bsd_statfs = malloc(sizeof(struct statfs), M_STATFS, M_WAITOK);
-		error = kern_statfs(td, __USER_CAP_PATH(args->path),
+		error = kern_statfs(td, LINUX_USER_CAP_PATH(args->path),
 		    UIO_USERSPACE, bsd_statfs);
 	} else {
-		LCONVPATHEXIST(td, args->path, &path);
+		LCONVPATHEXIST(td, LINUX_USER_CAP_PATH(args->path), &path);
 		bsd_statfs = malloc(sizeof(struct statfs), M_STATFS, M_WAITOK);
 		error = kern_statfs(td, PTR2CAP(path), UIO_SYSSPACE, bsd_statfs);
 		LFREEPATH(path);
@@ -523,7 +527,8 @@ linux_fstatfs(struct thread *td, struct linux_fstatfs_args *args)
 	free(bsd_statfs, M_STATFS);
 	if (error != 0)
 		return (error);
-	return (copyout(&linux_statfs, args->buf, sizeof(linux_statfs)));
+	return (copyout(&linux_statfs, LINUX_USER_CAP_OBJ(args->buf),
+	    sizeof(linux_statfs)));
 }
 
 struct l_ustat
@@ -587,10 +592,10 @@ linux_stat64(struct thread *td, struct linux_stat64_args *args)
 	int error;
 
 	if (!LUSECONVPATH(td)) {
-		error = linux_kern_stat(td, __USER_CAP_PATH(args->filename),
+		error = linux_kern_stat(td, LINUX_USER_CAP_PATH(args->filename),
 		    UIO_USERSPACE, &buf);
 	} else {
-		LCONVPATHEXIST(td, args->filename, &filename);
+		LCONVPATHEXIST(td, LINUX_USER_CAP_PATH(args->filename), &filename);
 		error = linux_kern_stat(td, PTR2CAP(filename), UIO_SYSSPACE, &buf);
 		LFREEPATH(filename);
 	}
@@ -607,10 +612,10 @@ linux_lstat64(struct thread *td, struct linux_lstat64_args *args)
 	int error;
 
 	if (!LUSECONVPATH(td)) {
-		error = linux_kern_lstat(td, __USER_CAP_PATH(args->filename),
+		error = linux_kern_lstat(td, LINUX_USER_CAP_PATH(args->filename),
 		    UIO_USERSPACE, &sb);
 	} else {
-		LCONVPATHEXIST(td, args->filename, &filename);
+		LCONVPATHEXIST(td, LINUX_USER_CAP_PATH(args->filename), &filename);
 		error = linux_kern_lstat(td, PTR2CAP(filename), UIO_SYSSPACE, &sb);
 		LFREEPATH(filename);
 	}
@@ -648,15 +653,16 @@ linux_fstatat64(struct thread *td, struct linux_fstatat64_args *args)
 	dfd = (args->dfd == LINUX_AT_FDCWD) ? AT_FDCWD : args->dfd;
 	if (!LUSECONVPATH(td)) {
 		error = linux_kern_statat(td, flag, dfd,
-		    __USER_CAP_PATH(args->pathname), UIO_USERSPACE, &buf);
+		    LINUX_USER_CAP_PATH(args->pathname), UIO_USERSPACE, &buf);
 	} else {
-		LCONVPATHEXIST_AT(td, args->pathname, &path, dfd);
+		LCONVPATHEXIST_AT(td, LINUX_USER_CAP_PATH(args->pathname), &path,
+		    dfd);
 		error = linux_kern_statat(td, flag, dfd, PTR2CAP(path),
 		    UIO_SYSSPACE, &buf);
 		LFREEPATH(path);
 	}
 	if (error == 0)
-		error = stat64_copyout(&buf, args->statbuf);
+		error = stat64_copyout(&buf, LINUX_USER_CAP_OBJ(args->statbuf));
 
 	return (error);
 }
@@ -678,15 +684,16 @@ linux_newfstatat(struct thread *td, struct linux_newfstatat_args *args)
 	dfd = (args->dfd == LINUX_AT_FDCWD) ? AT_FDCWD : args->dfd;
 	if (!LUSECONVPATH(td)) {
 		error = linux_kern_statat(td, flag, dfd,
-		    __USER_CAP_PATH(args->pathname), UIO_USERSPACE, &buf);
+		    LINUX_USER_CAP_PATH(args->pathname), UIO_USERSPACE, &buf);
 	} else {
-		LCONVPATHEXIST_AT(td, args->pathname, &path, dfd);
+		LCONVPATHEXIST_AT(td, LINUX_USER_CAP_PATH(args->pathname), &path,
+		    dfd);
 		error = linux_kern_statat(td, flag, dfd, PTR2CAP(path),
 		    UIO_SYSSPACE, &buf);
 		LFREEPATH(path);
 	}
 	if (error == 0)
-		error = newstat_copyout(&buf, args->statbuf);
+		error = newstat_copyout(&buf, LINUX_USER_CAP_OBJ(args->statbuf));
 
 	return (error);
 }

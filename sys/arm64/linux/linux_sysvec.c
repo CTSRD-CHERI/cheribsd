@@ -29,6 +29,10 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
+#ifdef COMPAT_LINUX64
+#define __ELF_WORD_SIZE 64
+#endif
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/cdefs.h>
@@ -46,9 +50,22 @@ __FBSDID("$FreeBSD$");
 #include <sys/sysent.h>
 
 #include <vm/vm_param.h>
+#include <vm/pmap.h>
+#include <vm/vm_map.h>
 
+#if __has_feature(capabilities)
+#include <cheri/cheri.h>
+#include <cheri/cheric.h>
+#endif
+
+#ifdef COMPAT_LINUX64
+#include <arm64/linux64/linux.h>
+#include <arm64/linux64/linux64_proto.h>
+#include <compat/freebsd64/freebsd64_util.h>
+#else
 #include <arm64/linux/linux.h>
 #include <arm64/linux/linux_proto.h>
+#endif
 #include <compat/linux/linux_dtrace.h>
 #include <compat/linux/linux_emul.h>
 #include <compat/linux/linux_ioctl.h>
@@ -57,22 +74,35 @@ __FBSDID("$FreeBSD$");
 #include <compat/linux/linux_util.h>
 #include <compat/linux/linux_vdso.h>
 
+#if __has_feature(capabilities) && !defined(COMPAT_LINUX64)
+MODULE_VERSION(linux64celf, 1);
+#else
 MODULE_VERSION(linux64elf, 1);
+#endif
 
 const char *linux_kplatform;
 static int linux_szsigcode;
 static vm_object_t linux_shared_page_obj;
 static char *linux_shared_page_mapping;
+#ifdef COMPAT_LINUX64
+extern char _binary_linux64_locore_o_start;
+extern char _binary_linux64_locore_o_end;
+#else
 extern char _binary_linux_locore_o_start;
 extern char _binary_linux_locore_o_end;
+#endif
 
+#ifdef COMPAT_LINUX64
+extern struct sysent linux64_sysent[LINUX64_SYS_MAXSYSCALL];
+#else
 extern struct sysent linux_sysent[LINUX_SYS_MAXSYSCALL];
+#endif
 
 SET_DECLARE(linux_ioctl_handler_set, struct linux_ioctl_handler);
 
 static int	linux_copyout_strings(struct image_params *imgp,
-		    uintptr_t *stack_base);
-static int	linux_elf_fixup(uintptr_t *stack_base,
+		    uintcap_t *stack_base);
+static int	linux_elf_fixup(uintcap_t *stack_base,
 		    struct image_params *iparams);
 static bool	linux_trans_osrel(const Elf_Note *note, int32_t *osrel);
 static void	linux_vdso_install(const void *param);
@@ -80,8 +110,14 @@ static void	linux_vdso_deinstall(const void *param);
 static void	linux_set_syscall_retval(struct thread *td, int error);
 static int	linux_fetch_syscall_args(struct thread *td);
 static void	linux_exec_setregs(struct thread *td, struct image_params *imgp,
-		    uintptr_t stack);
+		    uintcap_t stack);
 static int	linux_vsyscall(struct thread *td);
+
+#ifdef COMPAT_LINUX64
+typedef struct freebsd64_ps_strings	l_ps_strings;
+#else
+typedef struct ps_strings		l_ps_strings;
+#endif
 
 /* DTrace init */
 LIN_SDT_PROVIDER_DECLARE(LINUX_DTRACE);
@@ -113,7 +149,7 @@ linux_fetch_syscall_args(struct thread *td)
 {
 	struct proc *p;
 	struct syscall_args *sa;
-	register_t *ap;
+	syscallarg_t *ap;
 
 	p = td->td_proc;
 	ap = td->td_frame->tf_x;
@@ -128,7 +164,7 @@ linux_fetch_syscall_args(struct thread *td)
 
 	if (sa->callp->sy_narg > MAXARGS)
 		panic("ARM64TODO: Could we have more than %d args?", MAXARGS);
-	memcpy(sa->args, ap, MAXARGS * sizeof(register_t));
+	memcpy(sa->args, ap, MAXARGS * sizeof(syscallarg_t));
 
 	td->td_retval[0] = 0;
 	return (0);
@@ -148,7 +184,7 @@ linux_set_syscall_retval(struct thread *td, int error)
 }
 
 static int
-linux_copyout_auxargs(struct image_params *imgp, uintptr_t base)
+linux_copyout_auxargs(struct image_params *imgp, uintcap_t base)
 {
 	Elf_Auxargs *args;
 	Elf_Auxinfo *argarray, *pos;
@@ -158,7 +194,7 @@ linux_copyout_auxargs(struct image_params *imgp, uintptr_t base)
 	LIN_SDT_PROBE0(sysvec, linux_copyout_auxargs, todo);
 	p = imgp->proc;
 
-	args = (Elf64_Auxargs *)imgp->auxargs;
+	args = (Elf_Auxargs *)imgp->auxargs;
 	argarray = pos = malloc(LINUX_AT_COUNT * sizeof(*pos), M_TEMP,
 	    M_WAITOK | M_ZERO);
 
@@ -194,14 +230,14 @@ linux_copyout_auxargs(struct image_params *imgp, uintptr_t base)
 	imgp->auxargs = NULL;
 	KASSERT(pos - argarray <= LINUX_AT_COUNT, ("Too many auxargs"));
 
-	error = copyout(argarray, (void *)base,
+	error = copyout(argarray, (void * __capability)base,
 	    sizeof(*argarray) * LINUX_AT_COUNT);
 	free(argarray, M_TEMP);
 	return (error);
 }
 
 static int
-linux_elf_fixup(uintptr_t *stack_base, struct image_params *imgp)
+linux_elf_fixup(uintcap_t *stack_base, struct image_params *imgp)
 {
 
 	LIN_SDT_PROBE0(sysvec, linux_elf_fixup, todo);
@@ -216,12 +252,16 @@ linux_elf_fixup(uintptr_t *stack_base, struct image_params *imgp)
  * LINUXTODO: deduplicate against other linuxulator archs
  */
 static int
-linux_copyout_strings(struct image_params *imgp, uintptr_t *stack_base)
+linux_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 {
-	char **vectp;
+	l_uintptr_t * __capability vectp;
 	char *stringp;
-	uintptr_t destp, ustringp;
-	struct ps_strings *arginfo;
+#if __has_feature(capabilities)
+	vm_offset_t stack_vaddr, rounded_stack_vaddr, stack_offset;
+	size_t ssiz;
+#endif
+	uintcap_t destp, ustringp;
+	l_ps_strings * __capability arginfo;
 	char canary[LINUX_AT_RANDOM_LEN];
 	size_t execpath_len;
 	struct proc *p;
@@ -234,13 +274,39 @@ linux_copyout_strings(struct image_params *imgp, uintptr_t *stack_base)
 		execpath_len = 0;
 
 	p = imgp->proc;
-	arginfo = (struct ps_strings *)p->p_sysent->sv_psstrings;
+
+#if __has_feature(capabilities)
+	/*
+	 * destp must cover all of the smaller buffers copied out
+	 * onto the stack, so roundup the length to be representable
+	 * even if it means the capability extends beyond the stack
+	 * bounds.
+	 */
+	stack_vaddr = (vaddr_t)p->p_vmspace->vm_maxsaddr;
+	ssiz = p->p_sysent->sv_usrstack - stack_vaddr;
+	stack_offset = 0;
+	do {
+		rounded_stack_vaddr = CHERI_REPRESENTABLE_BASE(stack_vaddr,
+		    ssiz + stack_offset);
+		stack_offset = stack_vaddr - rounded_stack_vaddr;
+	} while (rounded_stack_vaddr != CHERI_REPRESENTABLE_BASE(stack_vaddr,
+	    ssiz + stack_offset));
+	destp = (uintcap_t)cheri_capability_build_user_data(
+	    CHERI_CAP_USER_DATA_PERMS, rounded_stack_vaddr,
+	    CHERI_REPRESENTABLE_LENGTH(ssiz + stack_offset), stack_offset);
+	destp = cheri_setaddress(destp, p->p_sysent->sv_psstrings);
+	arginfo = (l_ps_strings * __capability)cheri_setboundsexact(destp,
+	    sizeof(*arginfo));
+#else
+	arginfo = (l_ps_strings *)p->p_sysent->sv_psstrings;
 	destp = (uintptr_t)arginfo;
+#endif
+	imgp->ps_strings = arginfo;
 
 	if (execpath_len != 0) {
 		destp -= execpath_len;
-		destp = rounddown2(destp, sizeof(void *));
-		imgp->execpathp = (void *)destp;
+		destp = rounddown2(destp, sizeof(l_uintptr_t));
+		imgp->execpathp = (void * __capability)destp;
 		error = copyout(imgp->execpath, imgp->execpathp, execpath_len);
 		if (error != 0)
 			return (error);
@@ -248,15 +314,15 @@ linux_copyout_strings(struct image_params *imgp, uintptr_t *stack_base)
 
 	/* Prepare the canary for SSP. */
 	arc4rand(canary, sizeof(canary), 0);
-	destp -= roundup(sizeof(canary), sizeof(void *));
-	imgp->canary = (void *)destp;
+	destp -= roundup(sizeof(canary), sizeof(l_uintptr_t));
+	imgp->canary = (void * __capability)destp;
 	error = copyout(canary, imgp->canary, sizeof(canary));
 	if (error != 0)
 		return (error);
 
 	/* Allocate room for the argument and environment strings. */
 	destp -= ARG_MAX - imgp->args->stringspace;
-	destp = rounddown2(destp, sizeof(void *));
+	destp = rounddown2(destp, sizeof(l_uintptr_t));
 	ustringp = destp;
 
 	if (imgp->auxargs) {
@@ -265,34 +331,34 @@ linux_copyout_strings(struct image_params *imgp, uintptr_t *stack_base)
 		 * array.  It has up to LINUX_AT_COUNT entries.
 		 */
 		destp -= LINUX_AT_COUNT * sizeof(Elf64_Auxinfo);
-		destp = rounddown2(destp, sizeof(void *));
+		destp = rounddown2(destp, sizeof(l_uintptr_t));
 	}
 
-	vectp = (char **)destp;
+	vectp = (l_uintptr_t * __capability)destp;
 
 	/*
 	 * Allocate room for argc and the argv[] and env vectors including the
 	 * terminating NULL pointers.
 	 */
 	vectp -= 1 + imgp->args->argc + 1 + imgp->args->envc + 1;
-	vectp = (char **)STACKALIGN(vectp);
+	vectp = (l_uintptr_t * __capability)STACKALIGN(vectp);
 
 	/* vectp also becomes our initial stack base. */
-	*stack_base = (uintptr_t)vectp;
+	*stack_base = (uintcap_t)vectp;
 
 	stringp = imgp->args->begin_argv;
 	argc = imgp->args->argc;
 	envc = imgp->args->envc;
 
 	/* Copy out strings - arguments and environment. */
-	error = copyout(stringp, (void *)ustringp,
+	error = copyout(stringp, (void * __capability)ustringp,
 	    ARG_MAX - imgp->args->stringspace);
 	if (error != 0)
 		return (error);
 
 	/* Fill in "ps_strings" struct for ps, w, etc. */
-	if (suword(&arginfo->ps_argvstr, (long)(intptr_t)vectp) != 0 ||
-	    suword(&arginfo->ps_nargvstr, argc) != 0)
+	if (suword(&arginfo->ps_argvstr, (intcap_t)vectp) != 0 ||
+	    suword32(&arginfo->ps_nargvstr, argc) != 0)
 		return (EFAULT);
 
 	if (suword(vectp++, argc) != 0)
@@ -311,8 +377,8 @@ linux_copyout_strings(struct image_params *imgp, uintptr_t *stack_base)
 	if (suword(vectp++, 0) != 0)
 		return (EFAULT);
 
-	if (suword(&arginfo->ps_envstr, (long)(intptr_t)vectp) != 0 ||
-	    suword(&arginfo->ps_nenvstr, envc) != 0)
+	if (suword(&arginfo->ps_envstr, (intcap_t)vectp) != 0 ||
+	    suword32(&arginfo->ps_nenvstr, envc) != 0)
 		return (EFAULT);
 
 	/* Fill in environment portion of vector table. */
@@ -331,7 +397,12 @@ linux_copyout_strings(struct image_params *imgp, uintptr_t *stack_base)
 	if (imgp->auxargs) {
 		vectp++;
 		error = imgp->sysent->sv_copyout_auxargs(imgp,
+#if __has_feature(capabilities)
+		    (uintcap_t)cheri_setbounds(vectp,
+		    LINUX_AT_COUNT * sizeof(Elf_Auxinfo)));
+#else
 		    (uintptr_t)vectp);
+#endif
 		if (error != 0)
 			return (error);
 	}
@@ -344,22 +415,36 @@ linux_copyout_strings(struct image_params *imgp, uintptr_t *stack_base)
  */
 static void
 linux_exec_setregs(struct thread *td, struct image_params *imgp,
-    uintptr_t stack)
+    uintcap_t stack)
 {
-	struct trapframe *regs = td->td_frame;
+	struct trapframe *tf = td->td_frame;
 
 	/* LINUXTODO: validate */
 	LIN_SDT_PROBE0(sysvec, linux_exec_setregs, todo);
 
-	memset(regs, 0, sizeof(*regs));
+	memset(tf, 0, sizeof(*tf));
 	/* glibc start.S registers function pointer in x0 with atexit. */
-        regs->tf_sp = stack;
-#if 0	/* LINUXTODO: See if this is used. */
-	regs->tf_lr = imgp->entry_addr;
+
+#if __has_feature(capabilities) && !defined(COMPAT_LINUX64)
+	tf->tf_x[0] = (uintcap_t)cheri_auxv_capability(imgp, stack);
+	tf->tf_sp = (uintcap_t)cheri_exec_stack_pointer(imgp, stack);
+	/* Purecap binaries have low bit of entry address set. */
+	tf->tf_elr = (uintcap_t)cheri_exec_pcc(td, imgp) - 1;
+	cheri_set_mmap_capability(td, imgp, (void * __capability)tf->tf_sp);
+
+	/* TODO: set md_sigcode when signals implemented for aarch64 */
+	tf->tf_spsr |= PSR_C64;
 #else
-        regs->tf_lr = 0xffffffffffffffff;
+        tf->tf_sp = (l_uintptr_t)stack;
+#if __has_feature(capabilities)
+	hybridabi_thread_setregs(td, imgp->entry_addr);
+#else
+	tf->tf_elr = imgp->entry_addr;
 #endif
-        regs->tf_elr = imgp->entry_addr;
+	tf->tf_spsr &= ~PSR_C64;
+#endif
+
+	tf->tf_lr = tf->tf_elr;
 }
 
 int
@@ -389,15 +474,28 @@ linux_vsyscall(struct thread *td)
 }
 
 struct sysentvec elf_linux_sysvec = {
+#ifdef COMPAT_LINUX64
+	.sv_size	= LINUX64_SYS_MAXSYSCALL,
+	.sv_table	= linux64_sysent,
+#else
 	.sv_size	= LINUX_SYS_MAXSYSCALL,
 	.sv_table	= linux_sysent,
+#endif
 	.sv_transtrap	= linux_translate_traps,
 	.sv_fixup	= linux_elf_fixup,
 	.sv_sendsig	= linux_rt_sendsig,
+#ifdef COMPAT_LINUX64
+	.sv_sigcode	= &_binary_linux64_locore_o_start,
+#else
 	.sv_sigcode	= &_binary_linux_locore_o_start,
+#endif
 	.sv_szsigcode	= &linux_szsigcode,
+#if __has_feature(capabilities) && !defined(COMPAT_LINUX64)
+	.sv_name	= "Linux ELF64C",
+#else
 	.sv_name	= "Linux ELF64",
-	.sv_coredump	= elf64_coredump,
+#endif
+	.sv_coredump	= __elfN(coredump),
 	.sv_imgact_try	= linux_exec_imgact_try,
 	.sv_minsigstksz	= LINUX_MINSIGSTKSZ,
 	.sv_minuser	= VM_MIN_ADDRESS,
@@ -410,7 +508,11 @@ struct sysentvec elf_linux_sysvec = {
 	.sv_setregs	= linux_exec_setregs,
 	.sv_fixlimit	= NULL,
 	.sv_maxssiz	= NULL,
+#if __has_feature(capabilities) && !defined(COMPAT_LINUX64)
+	.sv_flags	= SV_ABI_LINUX | SV_LP64 | SV_SHP | SV_CHERI,
+#else
 	.sv_flags	= SV_ABI_LINUX | SV_LP64 | SV_SHP,
+#endif
 	.sv_set_syscall_retval = linux_set_syscall_retval,
 	.sv_fetch_syscall_args = linux_fetch_syscall_args,
 	.sv_syscallnames = NULL,
@@ -428,8 +530,13 @@ static void
 linux_vdso_install(const void *param)
 {
 
+#ifdef COMPAT_LINUX64
+	linux_szsigcode = (&_binary_linux64_locore_o_end -
+	    &_binary_linux64_locore_o_start);
+#else
 	linux_szsigcode = (&_binary_linux_locore_o_end -
 	    &_binary_linux_locore_o_start);
+#endif
 
 	if (linux_szsigcode > elf_linux_sysvec.sv_shared_page_len)
 		panic("invalid Linux VDSO size\n");
@@ -487,7 +594,7 @@ linux_trans_osrel(const Elf_Note *note, int32_t *osrel)
 	return (true);
 }
 
-static Elf_Brandnote linux64_brandnote = {
+static Elf_Brandnote linux_brandnote = {
 	.hdr.n_namesz	= sizeof(GNU_ABI_VENDOR),
 	.hdr.n_descsz	= 16,
 	.hdr.n_type	= 1,
@@ -504,7 +611,7 @@ static Elf64_Brandinfo linux_glibc2brand = {
 	.interp_path	= "/lib64/ld-linux-x86-64.so.2",
 	.sysvec		= &elf_linux_sysvec,
 	.interp_newpath	= NULL,
-	.brand_note	= &linux64_brandnote,
+	.brand_note	= &linux_brandnote,
 	.flags		= BI_CAN_EXEC_DYN | BI_BRAND_NOTE
 };
 
@@ -514,7 +621,7 @@ Elf64_Brandinfo *linux_brandlist[] = {
 };
 
 static int
-linux64_elf_modevent(module_t mod, int type, void *data)
+linux_elf_modevent(module_t mod, int type, void *data)
 {
 	Elf64_Brandinfo **brandinfo;
 	struct linux_ioctl_handler**lihp;
@@ -525,7 +632,7 @@ linux64_elf_modevent(module_t mod, int type, void *data)
 	case MOD_LOAD:
 		for (brandinfo = &linux_brandlist[0]; *brandinfo != NULL;
 		    ++brandinfo)
-			if (elf64_insert_brand_entry(*brandinfo) < 0)
+			if (__elfN(insert_brand_entry)(*brandinfo) < 0)
 				error = EINVAL;
 		if (error == 0) {
 			SET_FOREACH(lihp, linux_ioctl_handler_set)
@@ -538,12 +645,12 @@ linux64_elf_modevent(module_t mod, int type, void *data)
 	case MOD_UNLOAD:
 		for (brandinfo = &linux_brandlist[0]; *brandinfo != NULL;
 		    ++brandinfo)
-			if (elf64_brand_inuse(*brandinfo))
+			if (__elfN(brand_inuse)(*brandinfo))
 				error = EBUSY;
 		if (error == 0) {
 			for (brandinfo = &linux_brandlist[0];
 			    *brandinfo != NULL; ++brandinfo)
-				if (elf64_remove_brand_entry(*brandinfo) < 0)
+				if (__elfN(remove_brand_entry)(*brandinfo) < 0)
 					error = EINVAL;
 		}
 		if (error == 0) {
@@ -560,12 +667,22 @@ linux64_elf_modevent(module_t mod, int type, void *data)
 	return (error);
 }
 
-static moduledata_t linux64_elf_mod = {
+static moduledata_t linux_elf_mod = {
+#if __has_feature(capabilities) && !defined(COMPAT_LINUX64)
+	"linux64celf",
+#else
 	"linux64elf",
-	linux64_elf_modevent,
+#endif
+	linux_elf_modevent,
 	0
 };
 
-DECLARE_MODULE_TIED(linux64elf, linux64_elf_mod, SI_SUB_EXEC, SI_ORDER_ANY);
+#if __has_feature(capabilities) && !defined(COMPAT_LINUX64)
+DECLARE_MODULE_TIED(linux64celf, linux_elf_mod, SI_SUB_EXEC, SI_ORDER_ANY);
+MODULE_DEPEND(linux64celf, linux_common, 1, 1, 1);
+FEATURE(linux64c, "AArch64 Linux 64bit CheriABI support");
+#else
+DECLARE_MODULE_TIED(linux64elf, linux_elf_mod, SI_SUB_EXEC, SI_ORDER_ANY);
 MODULE_DEPEND(linux64elf, linux_common, 1, 1, 1);
 FEATURE(linux64, "AArch64 Linux 64bit support");
+#endif

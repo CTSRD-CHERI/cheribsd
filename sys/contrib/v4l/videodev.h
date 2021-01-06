@@ -150,7 +150,7 @@ struct video_window
 	__u32	width,height;		/* Its size */
 	__u32	chromakey;
 	__u32	flags;
-	struct	video_clip *clips;	/* Set only */
+	struct	video_clip * __kerncap clips;	/* Set only */
 	int	clipcount;
 #define VIDEO_WINDOW_INTERLACE	1
 #define VIDEO_WINDOW_CHROMAKEY	16	/* Overlay by chromakey */
@@ -171,7 +171,7 @@ struct video_capture
 
 struct video_buffer
 {
-	void	*base;
+	void	* __kerncap base;
 	int	height,width;
 	int	depth;
 	int	bytesperline;
@@ -248,7 +248,7 @@ struct video_code
 {
 	char	loadwhat[16];	/* name or tag of file being passed */
 	int	datasize;
-	__u8	*data;
+	__u8	* __kerncap data;
 };
 
 #define VIDIOCGCAP		_IOR('v',1,struct video_capability)	/* Get capabilities */

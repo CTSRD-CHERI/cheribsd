@@ -424,8 +424,8 @@ out:
 }
 
 int
-linux_to_bsd_sockaddr(const struct l_sockaddr *osa, struct sockaddr **sap,
-    socklen_t *len)
+linux_to_bsd_sockaddr(const struct l_sockaddr * __capability osa,
+    struct sockaddr **sap, socklen_t *len)
 {
 	struct sockaddr *sa;
 	struct l_sockaddr *kosa;

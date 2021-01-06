@@ -40,8 +40,13 @@ __FBSDID("$FreeBSD$");
 
 #include <security/audit/audit.h>
 
+#ifdef COMPAT_LINUX64
+#include <arm64/linux64/linux.h>
+#include <arm64/linux64/linux64_proto.h>
+#else
 #include <arm64/linux/linux.h>
 #include <arm64/linux/linux_proto.h>
+#endif
 #include <compat/linux/linux_dtrace.h>
 #include <compat/linux/linux_emul.h>
 #include <compat/linux/linux_misc.h>
@@ -69,14 +74,14 @@ linux_execve(struct thread *td, struct linux_execve_args *uap)
 	int error;
 
 	if (!LUSECONVPATH(td)) {
-		error = exec_copyin_args(&eargs, __USER_CAP_PATH(uap->path),
-		    UIO_USERSPACE, __USER_CAP_UNBOUND(uap->argp),
-		    __USER_CAP_UNBOUND(uap->envp));
+		error = exec_copyin_args(&eargs, LINUX_USER_CAP_PATH(uap->path),
+		    UIO_USERSPACE, LINUX_USER_CAP_UNBOUND(uap->argp),
+		    LINUX_USER_CAP_UNBOUND(uap->envp));
 	} else {
-		LCONVPATHEXIST(td, uap->path, &path);
+		LCONVPATHEXIST(td, LINUX_USER_CAP_PATH(uap->path), &path);
 		error = exec_copyin_args(&eargs, PTR2CAP(path), UIO_SYSSPACE,
-		    __USER_CAP_UNBOUND(uap->argp),
-		    __USER_CAP_UNBOUND(uap->envp));
+		    LINUX_USER_CAP_UNBOUND(uap->argp),
+		    LINUX_USER_CAP_UNBOUND(uap->envp));
 		LFREEPATH(path);
 	}
 	if (error == 0)
@@ -139,7 +144,7 @@ linux_sigaltstack(struct thread *td, struct linux_sigaltstack_args *uap)
 
 /* LINUXTODO: implement arm64 linux_set_cloned_tls */
 int
-linux_set_cloned_tls(struct thread *td, void *desc)
+linux_set_cloned_tls(struct thread *td, void * __linuxcap desc)
 {
 
 	LIN_SDT_PROBE0(machdep, linux_set_cloned_tls, todo);

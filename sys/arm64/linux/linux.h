@@ -34,7 +34,11 @@
 #include <sys/abi_compat.h>
 
 #include <compat/linux/linux.h>
+#ifdef COMPAT_LINUX64
+#include <arm64/linux64/linux64_syscall.h>
+#else
 #include <arm64/linux/linux_syscall.h>
+#endif
 
 #define	LINUX_DTRACE	linuxulator
 
@@ -45,8 +49,13 @@ typedef int16_t		l_short;
 typedef uint32_t	l_uint;
 typedef uint64_t	l_ulong;
 typedef uint16_t	l_ushort;
+typedef uintcap_t	l_uintcap_t;
 
+#ifdef COMPAT_LINUX64
 typedef l_ulong		l_uintptr_t;
+#else
+typedef l_uintcap_t	l_uintptr_t;
+#endif
 typedef l_long		l_clock_t;
 typedef l_int		l_daddr_t;
 typedef l_ulong		l_dev_t;
@@ -159,7 +168,11 @@ struct l_newstat {
 /* sigaltstack */
 #define	LINUX_MINSIGSTKSZ	2048		/* XXX */
 
+#ifdef COMPAT_LINUX64
+typedef l_uintptr_t	l_handler_t;
+#else
 typedef void	(*l_handler_t)(l_int);
+#endif
 
 typedef struct {
 	l_handler_t	lsa_handler;
@@ -258,7 +271,7 @@ struct l_ifmap {
 	u_char		irq;
 	u_char		dma;
 	u_char		port;
-} __packed;
+};
 
 struct l_ifreq {
 	union {
@@ -278,11 +291,19 @@ struct l_ifreq {
 		char		ifru_slave[LINUX_IFNAMSIZ];
 		l_uintptr_t	ifru_data;
 	} ifr_ifru;
-} __packed;
+};
 
 #define	ifr_name	ifr_ifrn.ifrn_name	/* Interface name */
 #define	ifr_hwaddr	ifr_ifru.ifru_hwaddr	/* MAC address */
 #define	ifr_ifindex	ifr_ifru.ifru_ivalue	/* Interface index */
+
+struct l_ifconf {
+	int	ifc_len;
+	union {
+		l_uintptr_t	ifcu_buf;
+		l_uintptr_t	ifcu_req;
+	} ifc_ifcu;
+};
 
 #define	linux_copyout_rusage(r, u)	copyout(r, u, sizeof(*r))
 

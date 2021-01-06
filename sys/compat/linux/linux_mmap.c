@@ -52,6 +52,7 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_map.h>
 #include <vm/vm_object.h>
 
+#include <compat/linux/linux.h>
 #include <compat/linux/linux_emul.h>
 #include <compat/linux/linux_mmap.h>
 #include <compat/linux/linux_persona.h>

@@ -471,6 +471,14 @@ struct l_ifreq {
 #define	ifr_hwaddr	ifr_ifru.ifru_hwaddr	/* MAC address */
 #define	ifr_ifindex	ifr_ifru.ifru_ivalue	/* Interface index */
 
+struct l_ifconf {
+	int	ifc_len;
+	union {
+		l_uintptr_t	ifcu_buf;
+		l_uintptr_t	ifcu_req;
+	} ifc_ifcu;
+};
+
 /*
  * poll()
  */

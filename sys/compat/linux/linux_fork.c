@@ -53,9 +53,12 @@ __FBSDID("$FreeBSD$");
 #include <vm/pmap.h>
 #include <vm/vm_map.h>
 
-#ifdef COMPAT_LINUX32
+#if defined(COMPAT_LINUX32)
 #include <machine/../linux32/linux.h>
 #include <machine/../linux32/linux32_proto.h>
+#elif defined(COMPAT_LINUX64)
+#include <machine/../linux64/linux.h>
+#include <machine/../linux64/linux64_proto.h>
 #else
 #include <machine/../linux/linux.h>
 #include <machine/../linux/linux_proto.h>
@@ -191,8 +194,8 @@ linux_clone_proc(struct thread *td, struct linux_clone_args *args)
 		em->child_clear_tid = NULL;
 
 	if (args->flags & LINUX_CLONE_PARENT_SETTID) {
-		error = copyout(&p2->p_pid, args->parent_tidptr,
-		    sizeof(p2->p_pid));
+		error = copyout(&p2->p_pid,
+		    LINUX_USER_CAP_OBJ(args->parent_tidptr), sizeof(p2->p_pid));
 		if (error)
 			linux_msg(td, "copyout p_pid failed!");
 	}
@@ -205,7 +208,7 @@ linux_clone_proc(struct thread *td, struct linux_clone_args *args)
 	 * stack. This is what normal fork() does, so we just keep tf_rsp arg
 	 * intact.
 	 */
-	linux_set_upcall_kse(td2, PTROUT(args->stack));
+	linux_set_upcall_kse(td2, (uintcap_t)args->stack);
 
 	if (args->flags & LINUX_CLONE_SETTLS)
 		linux_set_cloned_tls(td2, args->tls);
@@ -304,7 +307,7 @@ linux_clone_thread(struct thread *td, struct linux_clone_args *args)
 
 	cpu_thread_clean(newtd);
 
-	linux_set_upcall_kse(newtd, PTROUT(args->stack));
+	linux_set_upcall_kse(newtd, (uintcap_t)args->stack);
 
 	PROC_LOCK(p);
 	p->p_flag |= P_HADTHREADS;
@@ -328,7 +331,8 @@ linux_clone_thread(struct thread *td, struct linux_clone_args *args)
 	    td->td_tid, newtd->td_tid);
 
 	if (args->flags & LINUX_CLONE_PARENT_SETTID) {
-		error = copyout(&newtd->td_tid, args->parent_tidptr,
+		error = copyout(&newtd->td_tid,
+		    LINUX_USER_CAP_OBJ(args->parent_tidptr),
 		    sizeof(newtd->td_tid));
 		if (error)
 			linux_msg(td, "clone_thread: copyout td_tid failed!");
@@ -412,7 +416,7 @@ linux_thread_detach(struct thread *td)
 {
 	struct linux_sys_futex_args cup;
 	struct linux_emuldata *em;
-	int *child_clear_tid;
+	int * __linuxcap child_clear_tid;
 	int error;
 
 	em = em_find(td);
@@ -425,10 +429,10 @@ linux_thread_detach(struct thread *td)
 	child_clear_tid = em->child_clear_tid;
 
 	if (child_clear_tid != NULL) {
-		LINUX_CTR2(thread_detach, "thread(%d) %p",
-		    em->em_tid, child_clear_tid);
+		LINUX_CTR2(thread_detach, "thread(%d) %#zx",
+		    em->em_tid, (__cheri_addr ptraddr_t)child_clear_tid);
 
-		error = suword32(child_clear_tid, 0);
+		error = suword32(LINUX_USER_CAP_OBJ(child_clear_tid), 0);
 		if (error != 0)
 			return;
 

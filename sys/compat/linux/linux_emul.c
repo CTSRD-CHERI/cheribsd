@@ -46,6 +46,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/syscallsubr.h>
 #include <sys/sysent.h>
 
+#include <compat/linux/linux.h>
 #include <compat/linux/linux_emul.h>
 #include <compat/linux/linux_mib.h>
 #include <compat/linux/linux_misc.h>
@@ -253,8 +254,8 @@ linux_exec_imgact_try(struct image_params *imgp)
 		 */
 		if ((error = exec_shell_imgact(imgp)) == 0) {
 			linux_emul_convpath(FIRST_THREAD_IN_PROC(imgp->proc),
-			    imgp->interpreter_name, UIO_SYSSPACE, &rpath, 0,
-			    AT_FDCWD);
+			    PTR2CAP(imgp->interpreter_name), UIO_SYSSPACE,
+			    &rpath, 0, AT_FDCWD);
 			if (rpath != NULL)
 				imgp->args->fname_buf =
 				    imgp->interpreter_name = rpath;
@@ -386,7 +387,7 @@ linux_schedtail(struct thread *td)
 	struct linux_emuldata *em;
 	struct proc *p;
 	int error = 0;
-	int *child_set_tid;
+	int * __capability child_set_tid;
 
 	p = td->td_proc;
 
@@ -398,7 +399,8 @@ linux_schedtail(struct thread *td)
 		error = copyout(&em->em_tid, child_set_tid,
 		    sizeof(em->em_tid));
 		LINUX_CTR4(schedtail, "thread(%d) %p stored %d error %d",
-		    td->td_tid, child_set_tid, em->em_tid, error);
+		    td->td_tid, (__cheri_fromcap void *)child_set_tid,
+		    em->em_tid, error);
 	} else
 		LINUX_CTR1(schedtail, "thread(%d)", em->em_tid);
 }

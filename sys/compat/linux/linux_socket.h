@@ -84,7 +84,8 @@ struct l_cmsghdr {
 /* Ancillary data object information macros */
 
 #define LINUX_CMSG_ALIGN(len)	roundup2(len, sizeof(l_ulong))
-#define LINUX_CMSG_DATA(cmsg)	((void *)((char *)(cmsg) + \
+#define LINUX_CMSG_DATA(cmsg)	((void * __capability) \
+				    ((char * __capability)(cmsg) + \
 				    LINUX_CMSG_ALIGN(sizeof(struct l_cmsghdr))))
 #define LINUX_CMSG_SPACE(len)	(LINUX_CMSG_ALIGN(sizeof(struct l_cmsghdr)) + \
 				    LINUX_CMSG_ALIGN(len))
@@ -93,17 +94,18 @@ struct l_cmsghdr {
 #define LINUX_CMSG_FIRSTHDR(msg) \
 				((msg)->msg_controllen >= \
 				    sizeof(struct l_cmsghdr) ? \
-				    (struct l_cmsghdr *) \
-				        PTRIN((msg)->msg_control) : \
-				    (struct l_cmsghdr *)(NULL))
+				    (struct l_cmsghdr * __capability) \
+				        LINUX_USER_CAP((msg)->msg_control, \
+				            (msg)->msg_controllen) : \
+				    (struct l_cmsghdr * __capability)(NULL))
 #define LINUX_CMSG_NXTHDR(msg, cmsg) \
-				((((char *)(cmsg) + \
+				((((uintcap_t)(cmsg) + \
 				    LINUX_CMSG_ALIGN((cmsg)->cmsg_len) + \
 				    sizeof(*(cmsg))) > \
-				    (((char *)PTRIN((msg)->msg_control)) + \
+				    (((uintptr_t)PTRIN((msg)->msg_control)) + \
 				    (msg)->msg_controllen)) ? \
 				    (struct l_cmsghdr *) NULL : \
-				    (struct l_cmsghdr *)((char *)(cmsg) + \
+				    (struct l_cmsghdr *)((char * __capability)(cmsg) + \
 				    LINUX_CMSG_ALIGN((cmsg)->cmsg_len)))
 
 #define CMSG_HDRSZ		CMSG_LEN(0)

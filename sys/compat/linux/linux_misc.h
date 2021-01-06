@@ -181,7 +181,7 @@ int linux_ptrace_status(struct thread *td, int pid, int status);
 #endif
 void linux_to_bsd_waitopts(int options, int *bsdopts);
 int linux_set_upcall_kse(struct thread *td, register_t stack);
-int linux_set_cloned_tls(struct thread *td, void *desc);
+int linux_set_cloned_tls(struct thread *td, void * __linuxcap desc);
 struct thread	*linux_tdfind(struct thread *, lwpid_t, pid_t);
 
 #endif	/* _LINUX_MISC_H_ */

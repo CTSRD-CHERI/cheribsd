@@ -26,7 +26,7 @@ struct l_v4l2_buffer {
 	enum v4l2_memory	memory;
 	union {
 		uint32_t	offset;
-		l_ulong		userptr;
+		l_uintptr_t	userptr;
 	} m;
 	uint32_t		length;
 	uint32_t		input;
@@ -79,7 +79,11 @@ struct l_v4l2_ext_control {
 		int64_t value64;
 		l_uintptr_t string;
 	} u;
-} __attribute__ ((packed));
+}
+#if !__has_feature(capabilities) || defined(COMPAT_LINUX32) || defined(COMPAT_LINUX64)
+__attribute__ ((packed))
+#endif
+;
 
 struct l_v4l2_ext_controls {
 	uint32_t ctrl_class;

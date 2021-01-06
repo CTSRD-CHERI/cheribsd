@@ -53,9 +53,12 @@ __FBSDID("$FreeBSD$");
 #include <sys/syscallsubr.h>
 #include <sys/timespec.h>
 
-#ifdef COMPAT_LINUX32
+#if defined(COMPAT_LINUX32)
 #include <machine/../linux32/linux.h>
 #include <machine/../linux32/linux32_proto.h>
+#elif defined(COMPAT_LINUX64)
+#include <machine/../linux64/linux.h>
+#include <machine/../linux64/linux64_proto.h>
 #else
 #include <machine/../linux/linux.h>
 #include <machine/../linux/linux_proto.h>
@@ -116,7 +119,7 @@ struct epoll_copyin_args {
 };
 
 struct epoll_copyout_args {
-	struct epoll_event	*leventlist;
+	struct epoll_event	* __capability leventlist;
 	struct proc		*p;
 	uint32_t		count;
 	int			error;
@@ -461,7 +464,7 @@ linux_epoll_ctl(struct thread *td, struct linux_epoll_ctl_args *args)
 	int error;
 
 	if (args->op != LINUX_EPOLL_CTL_DEL) {
-		error = copyin(args->event, &le, sizeof(le));
+		error = copyin(LINUX_USER_CAP_OBJ(args->event), &le, sizeof(le));
 		if (error != 0)
 			return (error);
 	}
@@ -534,8 +537,9 @@ leave1:
  * Wait for a filter to be triggered on the epoll file descriptor.
  */
 static int
-linux_epoll_wait_common(struct thread *td, int epfd, struct epoll_event *events,
-    int maxevents, int timeout, sigset_t *uset)
+linux_epoll_wait_common(struct thread *td, int epfd,
+    struct epoll_event * __capability events, int maxevents, int timeout,
+    sigset_t *uset)
 {
 	struct epoll_copyout_args coargs;
 	struct kevent_copyops k_ops = { &coargs,
@@ -617,7 +621,8 @@ int
 linux_epoll_wait(struct thread *td, struct linux_epoll_wait_args *args)
 {
 
-	return (linux_epoll_wait_common(td, args->epfd, args->events,
+	return (linux_epoll_wait_common(td, args->epfd,
+	    LINUX_USER_CAP_ARRAY(args->events, args->maxevents),
 	    args->maxevents, args->timeout, NULL));
 }
 #endif
@@ -632,14 +637,16 @@ linux_epoll_pwait(struct thread *td, struct linux_epoll_pwait_args *args)
 	if (args->mask != NULL) {
 		if (args->sigsetsize != sizeof(l_sigset_t))
 			return (EINVAL);
-		error = copyin(args->mask, &lmask, sizeof(l_sigset_t));
+		error = copyin(LINUX_USER_CAP_OBJ(args->mask), &lmask,
+		    sizeof(l_sigset_t));
 		if (error != 0)
 			return (error);
 		linux_to_bsd_sigset(&lmask, &mask);
 		pmask = &mask;
 	} else
 		pmask = NULL;
-	return (linux_epoll_wait_common(td, args->epfd, args->events,
+	return (linux_epoll_wait_common(td, args->epfd,
+	    LINUX_USER_CAP_ARRAY(args->events, args->maxevents),
 	    args->maxevents, args->timeout, pmask));
 }
 
@@ -1230,7 +1237,8 @@ linux_timerfd_gettime(struct thread *td, struct linux_timerfd_gettime_args *args
 
 	error = native_to_linux_itimerspec(&lots, &ots);
 	if (error == 0)
-		error = copyout(&lots, args->old_value, sizeof(lots));
+		error = copyout(&lots, LINUX_USER_CAP_OBJ(args->old_value),
+		    sizeof(lots));
 
 out:
 	fdrop(fp, td);
@@ -1251,7 +1259,7 @@ linux_timerfd_settime(struct thread *td, struct linux_timerfd_settime_args *args
 	if ((args->flags & ~LINUX_TFD_SETTIME_FLAGS) != 0)
 		return (EINVAL);
 
-	error = copyin(args->new_value, &lots, sizeof(lots));
+	error = copyin(LINUX_USER_CAP_OBJ(args->new_value), &lots, sizeof(lots));
 	if (error != 0)
 		return (error);
 	error = linux_to_native_itimerspec(&nts, &lots);
@@ -1296,7 +1304,8 @@ linux_timerfd_settime(struct thread *td, struct linux_timerfd_settime_args *args
 	if (args->old_value != NULL) {
 		error = native_to_linux_itimerspec(&lots, &ots);
 		if (error == 0)
-			error = copyout(&lots, args->old_value, sizeof(lots));
+			error = copyout(&lots, LINUX_USER_CAP_OBJ(args->old_value),
+			    sizeof(lots));
 	}
 
 out:

@@ -34,7 +34,11 @@
 
 #include <machine/asm.h>
 
+#ifdef COMPAT_LINUX64
+#include <arm64/linux64/linux64_syscall.h>
+#else
 #include <arm64/linux/linux_syscall.h>
+#endif
 
 	.data
 

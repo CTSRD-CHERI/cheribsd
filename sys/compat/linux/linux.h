@@ -205,4 +205,35 @@ int linux_to_bsd_bits_(int value, struct bsd_to_linux_bitmap *bitmap,
 int bsd_to_linux_errno(int error);
 void linux_check_errtbl(void);
 
+/*
+ * Versions of __USER_CAP and variants that are no-ops when compiling a
+ * Linuxulator for native (ish) CheriABI userspace, allowing unconditional use
+ * throughout.
+ */
+#if defined(COMPAT_LINUX32) || defined(COMPAT_LINUX64)
+#define	LINUX_USER_CAP_UNBOUND(ptr)	__USER_CAP_UNBOUND(ptr)
+#define	LINUX_USER_CODE_CAP(ptr)	__USER_CODE_CAP(ptr)
+#define	LINUX_USER_CAP(ptr, len)	__USER_CAP(ptr, len)
+#define	LINUX_USER_CAP_ADDR(ptr)	__USER_CAP_ADDR(ptr)
+#define	LINUX_USER_CAP_ARRAY(objp, cnt)	__USER_CAP_ARRAY(objp, cnt)
+#define	LINUX_USER_CAP_OBJ(objp)	__USER_CAP_OBJ(objp)
+#define	LINUX_USER_CAP_STR(strp)	__USER_CAP_STR(strp)
+#define	LINUX_USER_CAP_PATH(path)	__USER_CAP_PATH(path)
+#else
+#define	LINUX_USER_CAP_UNBOUND(ptr)	((void * __capability)(uintcap_t)(ptr))
+#define	LINUX_USER_CODE_CAP(ptr)	((void * __capability)(uintcap_t)(ptr))
+#define	LINUX_USER_CAP(ptr, len)	((void * __capability)(uintcap_t)(ptr))
+#define	LINUX_USER_CAP_ADDR(ptr)	((void * __capability)(uintcap_t)(ptr))
+#define	LINUX_USER_CAP_ARRAY(objp, cnt)	((void * __capability)(uintcap_t)(objp))
+#define	LINUX_USER_CAP_OBJ(objp)	((void * __capability)(uintcap_t)(objp))
+#define	LINUX_USER_CAP_STR(strp)	((void * __capability)(uintcap_t)(strp))
+#define	LINUX_USER_CAP_PATH(path)	((void * __capability)(uintcap_t)(path))
+#endif
+
+#if defined(COMPAT_LINUX32) || defined(COMPAT_LINUX64)
+#define	__linuxcap
+#else
+#define	__linuxcap	__capability
+#endif
+
 #endif /* _LINUX_MI_H_ */

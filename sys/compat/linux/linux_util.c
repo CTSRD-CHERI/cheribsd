@@ -76,8 +76,8 @@ SYSCTL_STRING(_compat_linux, OID_AUTO, emul_path, CTLFLAG_RWTUN,
  * named file, i.e. we check if the directory it should be in exists.
  */
 int
-linux_emul_convpath(struct thread *td, const char *path, enum uio_seg pathseg,
-    char **pbuf, int cflag, int dfd)
+linux_emul_convpath(struct thread *td, const char * __capability path,
+    enum uio_seg pathseg, char **pbuf, int cflag, int dfd)
 {
 	int retval;
 

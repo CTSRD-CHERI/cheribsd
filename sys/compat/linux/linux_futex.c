@@ -60,9 +60,12 @@ __KERNEL_RCSID(1, "$NetBSD: linux_futex.c,v 1.7 2006/07/24 19:01:49 manu Exp $")
 
 #include <vm/vm_extern.h>
 
-#ifdef COMPAT_LINUX32
+#if defined(COMPAT_LINUX32)
 #include <machine/../linux32/linux.h>
 #include <machine/../linux32/linux32_proto.h>
+#elif defined(COMPAT_LINUX64)
+#include <machine/../linux64/linux.h>
+#include <machine/../linux64/linux64_proto.h>
 #else
 #include <machine/../linux/linux.h>
 #include <machine/../linux/linux_proto.h>
@@ -199,7 +202,7 @@ struct waiting_proc {
 
 struct futex {
 	struct mtx	f_lck;
-	uint32_t	*f_uaddr;	/* user-supplied value, for debug */
+	uint32_t	* __capability f_uaddr;	/* user-supplied value, for debug */
 	struct umtx_key	f_key;
 	uint32_t	f_refcount;
 	uint32_t	f_bitset;
@@ -252,27 +255,27 @@ struct futex {
 					 */
 
 static void futex_put(struct futex *, struct waiting_proc *);
-static int futex_get0(uint32_t *, struct futex **f, uint32_t);
-static int futex_get(uint32_t *, struct waiting_proc **, struct futex **,
-    uint32_t);
+static int futex_get0(uint32_t * __capability, struct futex **f, uint32_t);
+static int futex_get(uint32_t * __capability, struct waiting_proc **,
+    struct futex **, uint32_t);
 static int futex_sleep(struct futex *, struct waiting_proc *, struct timespec *);
 static int futex_wake(struct futex *, int, uint32_t);
 static int futex_requeue(struct futex *, int, struct futex *, int);
-static int futex_copyin_timeout(int, struct l_timespec *, int,
+static int futex_copyin_timeout(int, struct l_timespec * __capability, int,
     struct timespec *);
 static int futex_wait(struct futex *, struct waiting_proc *, struct timespec *,
     uint32_t);
 static void futex_lock(struct futex *);
 static void futex_unlock(struct futex *);
-static int futex_atomic_op(struct thread *, int, uint32_t *);
-static int handle_futex_death(struct linux_emuldata *, uint32_t *,
+static int futex_atomic_op(struct thread *, int, uint32_t * __capability);
+static int handle_futex_death(struct linux_emuldata *, uint32_t * __capability,
     unsigned int);
-static int fetch_robust_entry(struct linux_robust_list **,
-    struct linux_robust_list **, unsigned int *);
+static int fetch_robust_entry(struct linux_robust_list * __capability *,
+    l_uintptr_t * __capability, unsigned int *);
 
 static int
-futex_copyin_timeout(int op, struct l_timespec *luts, int clockrt,
-    struct timespec *ts)
+futex_copyin_timeout(int op, struct l_timespec * __capability luts,
+    int clockrt, struct timespec *ts)
 {
 	struct l_timespec lts;
 	struct timespec kts;
@@ -337,7 +340,7 @@ futex_put(struct futex *f, struct waiting_proc *wp)
 }
 
 static int
-futex_get0(uint32_t *uaddr, struct futex **newf, uint32_t flags)
+futex_get0(uint32_t * __capability uaddr, struct futex **newf, uint32_t flags)
 {
 	struct futex *f, *tmpf;
 	struct umtx_key key;
@@ -437,8 +440,8 @@ retry:
 }
 
 static int
-futex_get(uint32_t *uaddr, struct waiting_proc **wp, struct futex **f,
-    uint32_t flags)
+futex_get(uint32_t * __capability uaddr, struct waiting_proc **wp,
+    struct futex **f, uint32_t flags)
 {
 	int error;
 
@@ -659,7 +662,8 @@ futex_wait(struct futex *f, struct waiting_proc *wp, struct timespec *ts,
 }
 
 static int
-futex_atomic_op(struct thread *td, int encoded_op, uint32_t *uaddr)
+futex_atomic_op(struct thread *td, int encoded_op,
+    uint32_t * __capability uaddr)
 {
 	int op = (encoded_op >> 28) & 7;
 	int cmp = (encoded_op >> 24) & 15;
@@ -743,6 +747,7 @@ linux_sys_futex(struct thread *td, struct linux_sys_futex_args *args)
 	struct timespec uts, *ts;
 	int error, save;
 	uint32_t flags, val;
+	uint32_t * __capability uaddr, * __capability uaddr2;
 
 	LIN_SDT_PROBE2(futex, linux_sys_futex, entry, td, args);
 
@@ -783,8 +788,8 @@ linux_sys_futex(struct thread *td, struct linux_sys_futex_args *args)
 		    args->uaddr, args->val, args->val3);
 
 		if (args->timeout != NULL) {
-			error = futex_copyin_timeout(args->op, args->timeout,
-			    clockrt, &uts);
+			error = futex_copyin_timeout(args->op,
+			    LINUX_USER_CAP_OBJ(args->timeout), clockrt, &uts);
 			if (error) {
 				LIN_SDT_PROBE1(futex, linux_sys_futex, copyin_error,
 				    error);
@@ -795,18 +800,19 @@ linux_sys_futex(struct thread *td, struct linux_sys_futex_args *args)
 		} else
 			ts = NULL;
 
+		uaddr = LINUX_USER_CAP(args->uaddr, sizeof(val));
+
 retry0:
-		error = futex_get(args->uaddr, &wp, &f,
-		    flags | FUTEX_CREATE_WP);
+		error = futex_get(uaddr, &wp, &f, flags | FUTEX_CREATE_WP);
 		if (error) {
 			LIN_SDT_PROBE1(futex, linux_sys_futex, return, error);
 			return (error);
 		}
 
-		error = copyin_nofault(args->uaddr, &val, sizeof(val));
+		error = copyin_nofault(uaddr, &val, sizeof(val));
 		if (error) {
 			futex_put(f, wp);
-			error = copyin(args->uaddr, &val, sizeof(val));
+			error = copyin(uaddr, &val, sizeof(val));
 			if (error == 0)
 				goto retry0;
 			LIN_SDT_PROBE1(futex, linux_sys_futex, copyin_error,
@@ -843,8 +849,8 @@ retry0:
 		LINUX_CTR3(sys_futex, "WAKE uaddr %p nrwake 0x%x bitset 0x%x",
 		    args->uaddr, args->val, args->val3);
 
-		error = futex_get(args->uaddr, NULL, &f,
-		    flags | FUTEX_DONTCREATE);
+		uaddr = LINUX_USER_CAP(args->uaddr, sizeof(val));
+		error = futex_get(uaddr, NULL, &f, flags | FUTEX_DONTCREATE);
 		if (error) {
 			LIN_SDT_PROBE1(futex, linux_sys_futex, return, error);
 			return (error);
@@ -880,8 +886,10 @@ retry0:
 			return (EINVAL);
 		}
 
+		uaddr = LINUX_USER_CAP(args->uaddr, sizeof(val));
+		uaddr2 = LINUX_USER_CAP(args->uaddr2, sizeof(val));
 retry1:
-		error = futex_get(args->uaddr, NULL, &f, flags | FUTEX_DONTLOCK);
+		error = futex_get(uaddr, NULL, &f, flags | FUTEX_DONTLOCK);
 		if (error) {
 			LIN_SDT_PROBE1(futex, linux_sys_futex, return, error);
 			return (error);
@@ -894,7 +902,7 @@ retry1:
 		 * Glibc fall back to FUTEX_WAKE in case of any error
 		 * returned by FUTEX_CMP_REQUEUE.
 		 */
-		error = futex_get(args->uaddr2, NULL, &f2,
+		error = futex_get(uaddr2, NULL, &f2,
 		    flags | FUTEX_DONTEXISTS | FUTEX_DONTLOCK);
 		if (error) {
 			futex_put(f, NULL);
@@ -904,11 +912,11 @@ retry1:
 		}
 		futex_lock(f);
 		futex_lock(f2);
-		error = copyin_nofault(args->uaddr, &val, sizeof(val));
+		error = copyin_nofault(uaddr, &val, sizeof(val));
 		if (error) {
 			futex_put(f2, NULL);
 			futex_put(f, NULL);
-			error = copyin(args->uaddr, &val, sizeof(val));
+			error = copyin(uaddr, &val, sizeof(val));
 			if (error == 0)
 				goto retry1;
 			LIN_SDT_PROBE1(futex, linux_sys_futex, copyin_error,
@@ -930,7 +938,7 @@ retry1:
 			return (EAGAIN);
 		}
 
-		nrwake = (int)(unsigned long)args->timeout;
+		nrwake = (int)(uintcap_t)args->timeout;
 		td->td_retval[0] = futex_requeue(f, args->val, f2, nrwake);
 		futex_put(f2, NULL);
 		futex_put(f, NULL);
@@ -949,14 +957,16 @@ retry1:
 			return (EINVAL);
 		}
 
+		uaddr = LINUX_USER_CAP(args->uaddr, sizeof(val));
+		uaddr2 = LINUX_USER_CAP(args->uaddr2, sizeof(val));
 retry2:
-		error = futex_get(args->uaddr, NULL, &f, flags | FUTEX_DONTLOCK);
+		error = futex_get(uaddr, NULL, &f, flags | FUTEX_DONTLOCK);
 		if (error) {
 			LIN_SDT_PROBE1(futex, linux_sys_futex, return, error);
 			return (error);
 		}
 
-		error = futex_get(args->uaddr2, NULL, &f2, flags | FUTEX_DONTLOCK);
+		error = futex_get(uaddr2, NULL, &f2, flags | FUTEX_DONTLOCK);
 		if (error) {
 			futex_put(f, NULL);
 
@@ -971,7 +981,7 @@ retry2:
 		 * negative as errors
 		 */
 		save = vm_fault_disable_pagefaults();
-		op_ret = futex_atomic_op(td, args->val3, args->uaddr2);
+		op_ret = futex_atomic_op(td, args->val3, uaddr2);
 		vm_fault_enable_pagefaults(save);
 
 		LINUX_CTR2(sys_futex, "WAKE_OP atomic_op uaddr %p ret 0x%x",
@@ -981,7 +991,7 @@ retry2:
 			if (f2 != NULL)
 				futex_put(f2, NULL);
 			futex_put(f, NULL);
-			error = copyin(args->uaddr2, &val, sizeof(val));
+			error = copyin(uaddr2, &val, sizeof(val));
 			if (error == 0)
 				goto retry2;
 			LIN_SDT_PROBE1(futex, linux_sys_futex, return, error);
@@ -992,7 +1002,7 @@ retry2:
 
 		if (op_ret > 0) {
 			op_ret = 0;
-			nrwake = (int)(unsigned long)args->timeout;
+			nrwake = (int)(uintcap_t)args->timeout;
 
 			if (f2 != NULL)
 				op_ret += futex_wake(f2, nrwake, args->val3);
@@ -1120,7 +1130,7 @@ int
 linux_get_robust_list(struct thread *td, struct linux_get_robust_list_args *args)
 {
 	struct linux_emuldata *em;
-	struct linux_robust_list_head *head;
+	l_uintptr_t head;
 	l_size_t len = sizeof(struct linux_robust_list_head);
 	struct thread *td2;
 	int error = 0;
@@ -1130,7 +1140,7 @@ linux_get_robust_list(struct thread *td, struct linux_get_robust_list_args *args
 	if (!args->pid) {
 		em = em_find(td);
 		KASSERT(em != NULL, ("get_robust_list: emuldata notfound.\n"));
-		head = em->robust_futexes;
+		head = (l_uintptr_t)em->robust_futexes;
 	} else {
 		td2 = tdfind(args->pid, -1);
 		if (td2 == NULL) {
@@ -1157,12 +1167,12 @@ linux_get_robust_list(struct thread *td, struct linux_get_robust_list_args *args
 			    EPERM);
 			return (EPERM);
 		}
-		head = em->robust_futexes;
+		head = (l_uintptr_t)em->robust_futexes;
 
 		PROC_UNLOCK(td2->td_proc);
 	}
 
-	error = copyout(&len, args->len, sizeof(l_size_t));
+	error = copyout(&len, LINUX_USER_CAP_OBJ(args->len), sizeof(l_size_t));
 	if (error) {
 		LIN_SDT_PROBE1(futex, linux_get_robust_list, copyout_error,
 		    error);
@@ -1170,7 +1180,12 @@ linux_get_robust_list(struct thread *td, struct linux_get_robust_list_args *args
 		return (EFAULT);
 	}
 
-	error = copyout(&head, args->head, sizeof(head));
+	/*
+	 * NB: args->head is a `struct linux_robust_list_head **`, so we need
+	 * to manually provide the right size.
+	 */
+	error = copyout(&head, LINUX_USER_CAP(args->head, sizeof(head)),
+	    sizeof(head));
 	if (error) {
 		LIN_SDT_PROBE1(futex, linux_get_robust_list, copyout_error,
 		    error);
@@ -1181,7 +1196,7 @@ linux_get_robust_list(struct thread *td, struct linux_get_robust_list_args *args
 }
 
 static int
-handle_futex_death(struct linux_emuldata *em, uint32_t *uaddr,
+handle_futex_death(struct linux_emuldata *em, uint32_t * __capability uaddr,
     unsigned int pi)
 {
 	uint32_t uval, nval, mval;
@@ -1230,22 +1245,34 @@ retry:
 }
 
 static int
-fetch_robust_entry(struct linux_robust_list **entry,
-    struct linux_robust_list **head, unsigned int *pi)
+fetch_robust_entry(struct linux_robust_list * __capability *entry,
+    l_uintptr_t * __capability head, unsigned int *pi)
 {
-	l_ulong uentry;
+	l_uintptr_t uentry;
 	int error;
 
 	LIN_SDT_PROBE3(futex, fetch_robust_entry, entry, entry, head, pi);
 
-	error = copyin((const void *)head, &uentry, sizeof(l_ulong));
+	error = copyin(head, &uentry, sizeof(uentry));
 	if (error) {
 		LIN_SDT_PROBE1(futex, fetch_robust_entry, copyin_error, error);
 		LIN_SDT_PROBE1(futex, fetch_robust_entry, return, EFAULT);
 		return (EFAULT);
 	}
 
-	*entry = (void *)(uentry & ~1UL);
+	/*
+	 * NB: Can't set tight bounds as this is an slist-like struct with a
+	 * single next pointer. The futex itself is derived from this pointer
+	 * using the thread-local futex_offset, with the intent that the futex
+	 * and robust list entries both live inside a larger structure (with
+	 * the same layout in use for all the thread's entries). A
+	 * pure-capability Linux ABI would thus not be able to use subobject
+	 * bounds when passing to the syscall.
+	 *
+	 * If we wanted bounds we could use MIN(uentry, uentry + futex_offset)
+	 * and MAX(uentry + sizeof(**entry), uentry + futex_offset + 4).
+	 */
+	*entry = LINUX_USER_CAP_UNBOUND(uentry & ~1UL);
 	*pi = uentry & 1;
 
 	LIN_SDT_PROBE1(futex, fetch_robust_entry, return, 0);
@@ -1256,45 +1283,45 @@ fetch_robust_entry(struct linux_robust_list **entry,
 void
 release_futexes(struct thread *td, struct linux_emuldata *em)
 {
-	struct linux_robust_list_head *head = NULL;
-	struct linux_robust_list *entry, *next_entry, *pending;
+	struct linux_robust_list_head * __capability head = NULL;
+	struct linux_robust_list * __capability entry,
+	    * __capability next_entry, * __capability pending;
 	unsigned int limit = 2048, pi, next_pi, pip;
 	l_long futex_offset;
 	int rc, error;
 
 	LIN_SDT_PROBE2(futex, release_futexes, entry, td, em);
 
-	head = em->robust_futexes;
+	head = LINUX_USER_CAP_OBJ(em->robust_futexes);
 
 	if (head == NULL) {
 		LIN_SDT_PROBE0(futex, release_futexes, return);
 		return;
 	}
 
-	if (fetch_robust_entry(&entry, PTRIN(&head->list.next), &pi)) {
+	if (fetch_robust_entry(&entry, &head->list.next, &pi)) {
 		LIN_SDT_PROBE0(futex, release_futexes, return);
 		return;
 	}
 
-	error = copyin(&head->futex_offset, &futex_offset,
-	    sizeof(futex_offset));
+	error = copyin(&head->futex_offset, &futex_offset, sizeof(futex_offset));
 	if (error) {
 		LIN_SDT_PROBE1(futex, release_futexes, copyin_error, error);
 		LIN_SDT_PROBE0(futex, release_futexes, return);
 		return;
 	}
 
-	if (fetch_robust_entry(&pending, PTRIN(&head->pending_list), &pip)) {
+	if (fetch_robust_entry(&pending, &head->pending_list, &pip)) {
 		LIN_SDT_PROBE0(futex, release_futexes, return);
 		return;
 	}
 
 	while (entry != &head->list) {
-		rc = fetch_robust_entry(&next_entry, PTRIN(&entry->next), &next_pi);
+		rc = fetch_robust_entry(&next_entry, &entry->next, &next_pi);
 
 		if (entry != pending)
-			if (handle_futex_death(em,
-			    (uint32_t *)((caddr_t)entry + futex_offset), pi)) {
+			if (handle_futex_death(em, (uint32_t * __capability)
+			    ((char * __capability)entry + futex_offset), pi)) {
 				LIN_SDT_PROBE0(futex, release_futexes, return);
 				return;
 			}
@@ -1313,7 +1340,8 @@ release_futexes(struct thread *td, struct linux_emuldata *em)
 	}
 
 	if (pending)
-		handle_futex_death(em, (uint32_t *)((caddr_t)pending + futex_offset), pip);
+		handle_futex_death(em, (uint32_t * __capability)
+		    ((char * __capability)pending + futex_offset), pip);
 
 	LIN_SDT_PROBE0(futex, release_futexes, return);
 }

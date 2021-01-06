@@ -2,31 +2,26 @@
 
 .include "${SYSDIR}/conf/kern.opts.mk"
 
-.if ${MACHINE_CPU:Mcheri}
-SFX=	64
-CFLAGS+=	-DCOMPAT_FREEBSD64 -DCOMPAT_LINUX64
-.endif
-
-.PATH: ${SRCTOP}/sys/compat/linux ${SRCTOP}/sys/${MACHINE}/linux${SFX}
+.PATH: ${SRCTOP}/sys/compat/linux ${SRCTOP}/sys/${MACHINE}/linux
 .if ${MACHINE_CPUARCH} == "i386" || ${MACHINE_CPUARCH} == "amd64"
 .PATH: ${SRCTOP}/sys/x86/linux
 .endif
 
-VDSO=	linux${SFX}_vdso
+VDSO=	linux_vdso
 
-KMOD=	linux64
-SRCS=	linux_fork.c linux${SFX}_dummy_machdep.c linux_file.c linux_event.c \
+KMOD=	linux64c
+SRCS=	linux_fork.c linux_dummy_machdep.c linux_file.c linux_event.c \
 	linux_futex.c linux_getcwd.c linux_ioctl.c linux_ipc.c \
-	linux${SFX}_machdep.c linux_misc.c linux${SFX}_ptrace.c linux_signal.c \
-	linux_socket.c linux_stats.c linux_sysctl.c linux${SFX}_sysent.c \
-	linux${SFX}_sysvec.c linux_time.c linux_vdso.c linux_timer.c \
+	linux_machdep.c linux_misc.c linux_ptrace.c linux_signal.c \
+	linux_socket.c linux_stats.c linux_sysctl.c linux_sysent.c \
+	linux_sysvec.c linux_time.c linux_vdso.c linux_timer.c \
 	opt_compat.h opt_inet6.h opt_posix.h opt_usb.h \
 	vnode_if.h device_if.h bus_if.h \
-	linux${SFX}_support.s
+	linux_support.s
 .if ${MACHINE_CPUARCH} == "i386" || ${MACHINE_CPUARCH} == "amd64"
 SRCS+=	linux_dummy_x86.c
 .endif
-DPSRCS=	assym.inc linux${SFX}_genassym.c
+DPSRCS=	assym.inc linux_genassym.c
 
 # XXX: for assym.inc
 SRCS+=  opt_kstack_pages.h opt_nfs.h opt_hwpmc_hooks.h
@@ -34,18 +29,18 @@ SRCS+=  opt_kstack_pages.h opt_nfs.h opt_hwpmc_hooks.h
 SRCS+=	opt_apic.h
 .endif
 
-CLEANFILES=	linux${SFX}_assym.h linux${SFX}_genassym.o linux${SFX}_locore.o \
+CLEANFILES=	linux_assym.h linux_genassym.o linux_locore.o \
 		genassym.o
 
 OBJS=	${VDSO}.so
 
-linux${SFX}_assym.h: linux${SFX}_genassym.o
-	sh ${SYSDIR}/kern/genassym.sh linux${SFX}_genassym.o > ${.TARGET}
+linux_assym.h: linux_genassym.o
+	sh ${SYSDIR}/kern/genassym.sh linux_genassym.o > ${.TARGET}
 
-linux${SFX}_locore.o: linux${SFX}_locore.asm linux${SFX}_assym.h
+linux_locore.o: linux_locore.asm linux_assym.h
 	${CC} ${CCLDFLAGS} -x assembler-with-cpp -DLOCORE -shared -mcmodel=small	\
 	-pipe -I. -I${SYSDIR} ${WERROR} -Wall -fno-common -fPIC -nostdinc	\
-	-Wl,-T${SRCTOP}/sys/${MACHINE}/linux${SFX}/${VDSO}.lds.s	\
+	-Wl,-T${SRCTOP}/sys/${MACHINE}/linux/${VDSO}.lds.s	\
 	-Wl,-soname=${VDSO}.so.1,-warn-common -nostdlib			\
 	    ${.IMPSRC} -o ${.TARGET}
 
@@ -54,18 +49,18 @@ OBJCOPY_TARGET=--output-target elf64-littleaarch64 --binary-architecture aarch64
 .elif ${MACHINE_CPUARCH} == "amd64"
 OBJCOPY_TARGET=--output-target elf64-x86-64 --binary-architecture i386:x86-64
 .else
-.error ${MACHINE_CPUARCH} not yet supported by linux64
+.error ${MACHINE_CPUARCH} not yet supported by linux64c
 .endif
-${VDSO}.so: linux${SFX}_locore.o
+${VDSO}.so: linux_locore.o
 	${OBJCOPY} --input-target binary ${OBJCOPY_TARGET} \
-	    linux${SFX}_locore.o ${.TARGET}
-	${STRIPBIN} -N _binary_linux${SFX}_locore_o_size ${.TARGET}
+	    linux_locore.o ${.TARGET}
+	${STRIPBIN} -N _binary_linux_locore_o_size ${.TARGET}
 
-linux${SFX}_support.o: assym.inc linux${SFX}_assym.h
+linux_support.o: assym.inc linux_assym.h
 	${CC} -c -x assembler-with-cpp -DLOCORE ${CFLAGS} \
 	    ${.IMPSRC} -o ${.TARGET}
 
-linux${SFX}_genassym.o: offset.inc
+linux_genassym.o: offset.inc
 	${CC} -c ${CFLAGS:N-flto:N-fno-common} -fcommon ${.IMPSRC}
 
 .if !defined(KERNBUILDDIR)

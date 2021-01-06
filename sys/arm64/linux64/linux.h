@@ -1,8 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
- *
- * Copyright (c) 2013 Dmitry Chagin
- * All rights reserved.
+ * Copyright (c) 2020 Jessica Clarke
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -26,43 +23,25 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
-#include "opt_compat.h"
-
-#include <sys/param.h>
-#include <sys/kernel.h>
-#include <sys/sdt.h>
-#include <sys/systm.h>
-#include <sys/proc.h>
-
-#ifdef COMPAT_LINUX64
-#include <arm64/linux64/linux.h>
-#include <arm64/linux64/linux64_proto.h>
-#else
-#include <arm64/linux/linux.h>
-#include <arm64/linux/linux_proto.h>
-#endif
-#include <compat/linux/linux_dtrace.h>
-#include <compat/linux/linux_util.h>
-
-/* DTrace init */
-LIN_SDT_PROVIDER_DECLARE(LINUX_DTRACE);
-
 /*
- * Before adding new stubs to this file, please check if a stub can be added to
- * the machine-independent code in sys/compat/linux/linux_dummy.c.
+ * $FreeBSD$
  */
+#ifndef _ARM64_LINUX64_LINUX_H_
+#define	_ARM64_LINUX64_LINUX_H_
 
-UNIMPLEMENTED(get_thread_area);
-UNIMPLEMENTED(set_thread_area);
-UNIMPLEMENTED(uselib);
+#include "../linux/linux.h"
 
-DUMMY(mq_open);
-DUMMY(mq_unlink);
-DUMMY(mq_timedsend);
-DUMMY(mq_timedreceive);
-DUMMY(mq_notify);
-DUMMY(mq_getsetattr);
-DUMMY(semtimedop);
+struct iovec;
+struct uio;
+
+struct l_iovec64 {
+	l_uintptr_t	iov_base;
+	l_size_t	iov_len;
+};
+
+int	linux64_copyiniov(struct l_iovec64 * __capability iovp64,
+	    l_ulong iovcnt, struct iovec **iovp, int error);
+int	linux64_copyinuio(struct l_iovec64 * __capability iovp64,
+	    l_ulong iovcnt, struct uio **uiop);
+
+#endif /* _ARM64_LINUX_H_ */

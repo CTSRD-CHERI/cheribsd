@@ -68,9 +68,12 @@ __FBSDID("$FreeBSD$");
 #include <netinet6/ip6_var.h>
 #endif
 
-#ifdef COMPAT_LINUX32
+#if defined(COMPAT_LINUX32)
 #include <machine/../linux32/linux.h>
 #include <machine/../linux32/linux32_proto.h>
+#elif defined(COMPAT_LINUX64)
+#include <machine/../linux64/linux.h>
+#include <machine/../linux64/linux64_proto.h>
 #else
 #include <machine/../linux/linux.h>
 #include <machine/../linux/linux_proto.h>
@@ -82,11 +85,11 @@ __FBSDID("$FreeBSD$");
 #include <compat/linux/linux_timer.h>
 #include <compat/linux/linux_util.h>
 
-static int linux_sendmsg_common(struct thread *, l_int, struct l_msghdr *,
-					l_uint);
-static int linux_recvmsg_common(struct thread *, l_int, struct l_msghdr *,
-					l_uint, struct msghdr *);
-static int linux_set_socket_flags(int, int *);
+static int	linux_sendmsg_common(struct thread *, l_int,
+		    struct l_msghdr * __capability, l_uint);
+static int	linux_recvmsg_common(struct thread *, l_int,
+		    struct l_msghdr * __capability, l_uint, struct msghdr *);
+static int	linux_set_socket_flags(int, int *);
 
 static int
 linux_to_bsd_sockopt_level(int level)
@@ -658,11 +661,22 @@ linux_to_bsd_msghdr(struct msghdr *bhdr, const struct l_msghdr *lhdr)
 	if (lhdr->msg_controllen > INT_MAX)
 		return (ENOBUFS);
 
-	bhdr->msg_name		= PTRIN(lhdr->msg_name);
+	bhdr->msg_name		= LINUX_USER_CAP(lhdr->msg_name,
+	    lhdr->msg_namelen);
 	bhdr->msg_namelen	= lhdr->msg_namelen;
-	bhdr->msg_iov		= PTRIN(lhdr->msg_iov);
+#if defined(COMPAT_LINUX32)
+	bhdr->msg_iov		= (struct iovec *__capability)LINUX_USER_CAP_ARRAY(
+	    (struct l_iovec32 *)(uintptr_t)lhdr->msg_iov, lhdr->msg_iovlen);
+#elif defined(COMPAT_LINUX64)
+	bhdr->msg_iov		= (struct iovec *__capability)LINUX_USER_CAP_ARRAY(
+	    (struct l_iovec64 *)(uintptr_t)lhdr->msg_iov, lhdr->msg_iovlen);
+#else
+	bhdr->msg_iov		= (struct iovec * __capability)(uintcap_t)
+	    lhdr->msg_iov;
+#endif
 	bhdr->msg_iovlen	= lhdr->msg_iovlen;
-	bhdr->msg_control	= PTRIN(lhdr->msg_control);
+	bhdr->msg_control	= LINUX_USER_CAP(lhdr->msg_control,
+	    lhdr->msg_controllen);
 
 	/*
 	 * msg_controllen is skipped since BSD and LINUX control messages
@@ -680,11 +694,11 @@ linux_to_bsd_msghdr(struct msghdr *bhdr, const struct l_msghdr *lhdr)
 static int
 bsd_to_linux_msghdr(const struct msghdr *bhdr, struct l_msghdr *lhdr)
 {
-	lhdr->msg_name		= PTROUT(bhdr->msg_name);
+	lhdr->msg_name		= (uintcap_t)bhdr->msg_name;
 	lhdr->msg_namelen	= bhdr->msg_namelen;
-	lhdr->msg_iov		= PTROUT(bhdr->msg_iov);
+	lhdr->msg_iov		= (uintcap_t)bhdr->msg_iov;
 	lhdr->msg_iovlen	= bhdr->msg_iovlen;
-	lhdr->msg_control	= PTROUT(bhdr->msg_control);
+	lhdr->msg_control	= (uintcap_t)bhdr->msg_control;
 
 	/*
 	 * msg_controllen is skipped since BSD and LINUX control messages
@@ -713,7 +727,8 @@ linux_set_socket_flags(int lflags, int *flags)
 }
 
 static int
-linux_copyout_sockaddr(const struct sockaddr *sa, void *uaddr, size_t len)
+linux_copyout_sockaddr(const struct sockaddr *sa, void * __capability uaddr,
+    size_t len)
 {
 	struct l_sockaddr *lsa;
 	int error;
@@ -740,7 +755,7 @@ linux_sendit(struct thread *td, int s, struct msghdr *mp, int flags,
 		error = linux_to_bsd_sockaddr(mp->msg_name, &to, &len);
 		if (error != 0)
 			return (error);
-		mp->msg_name = to;
+		mp->msg_name = PTR2CAP(to);
 	} else
 		to = NULL;
 
@@ -795,8 +810,8 @@ linux_sendto_hdrincl(struct thread *td, struct linux_sendto_args *linux_args)
 	packet = (struct ip *)malloc(linux_args->len, M_LINUX, M_WAITOK);
 
 	/* Make kernel copy of the packet to be sent */
-	if ((error = copyin(PTRIN(linux_args->msg), packet,
-	    linux_args->len)))
+	if ((error = copyin(LINUX_USER_CAP(linux_args->msg, linux_args->len),
+	    packet, linux_args->len)))
 		goto goout;
 
 	/* Convert fields from Linux to BSD raw IP socket format */
@@ -804,7 +819,7 @@ linux_sendto_hdrincl(struct thread *td, struct linux_sendto_args *linux_args)
 	packet->ip_off = ntohs(packet->ip_off);
 
 	/* Prepare the msghdr and iovec structures describing the new packet */
-	msg.msg_name = PTRIN(linux_args->to);
+	msg.msg_name = LINUX_USER_CAP(linux_args->to, linux_args->tolen);
 	msg.msg_namelen = linux_args->tolen;
 	msg.msg_iov = aiov;
 	msg.msg_iovlen = 1;
@@ -910,8 +925,8 @@ linux_bind(struct thread *td, struct linux_bind_args *args)
 	struct sockaddr *sa;
 	int error;
 
-	error = linux_to_bsd_sockaddr(PTRIN(args->name), &sa,
-	    &args->namelen);
+	error = linux_to_bsd_sockaddr(LINUX_USER_CAP(args->name, args->namelen),
+	    &sa, &args->namelen);
 	if (error != 0)
 		return (error);
 
@@ -933,8 +948,8 @@ linux_connect(struct thread *td, struct linux_connect_args *args)
 	u_int fflag;
 	int error;
 
-	error = linux_to_bsd_sockaddr(PTRIN(args->name), &sa,
-	    &args->namelen);
+	error = linux_to_bsd_sockaddr(LINUX_USER_CAP(args->name, args->namelen),
+	    &sa, &args->namelen);
 	if (error != 0)
 		return (error);
 
@@ -996,7 +1011,8 @@ linux_accept_common(struct thread *td, int s, l_uintptr_t addr,
 		len = 0;
 		error = kern_accept4(td, s, NULL, NULL, bflags, NULL);
 	} else {
-		error = copyin(PTRIN(namelen), &len, sizeof(len));
+		error = copyin(LINUX_USER_CAP(namelen, sizeof(len)), &len,
+		    sizeof(len));
 		if (error != 0)
 			return (error);
 		if (len < 0)
@@ -1033,7 +1049,7 @@ linux_accept_common(struct thread *td, int s, l_uintptr_t addr,
 	}
 
 	if (len != 0) {
-		error = linux_copyout_sockaddr(sa, PTRIN(addr), len);
+		error = linux_copyout_sockaddr(sa, LINUX_USER_CAP(addr, len), len);
 
 		/*
 		 * XXX: We should also copyout the len, shouldn't we?
@@ -1070,9 +1086,10 @@ int
 linux_getsockname(struct thread *td, struct linux_getsockname_args *args)
 {
 	struct sockaddr *sa;
-	int len, error;
+	int len, * __capability unamelen, error;
 
-	error = copyin(PTRIN(args->namelen), &len, sizeof(len));
+	unamelen = LINUX_USER_CAP(args->namelen, sizeof(*unamelen));
+	error = copyin(unamelen, &len, sizeof(len));
 	if (error != 0)
 		return (error);
 
@@ -1081,11 +1098,12 @@ linux_getsockname(struct thread *td, struct linux_getsockname_args *args)
 		return (error);
 
 	if (len != 0)
-		error = linux_copyout_sockaddr(sa, PTRIN(args->addr), len);
+		error = linux_copyout_sockaddr(sa, LINUX_USER_CAP(args->addr,
+		    len), len);
 
 	free(sa, M_SONAME);
 	if (error == 0)
-		error = copyout(&len, PTRIN(args->namelen), sizeof(len));
+		error = copyout(&len, unamelen, sizeof(len));
 	return (error);
 }
 
@@ -1093,9 +1111,10 @@ int
 linux_getpeername(struct thread *td, struct linux_getpeername_args *args)
 {
 	struct sockaddr *sa;
-	int len, error;
+	int len, * __capability unamelen, error;
 
-	error = copyin(PTRIN(args->namelen), &len, sizeof(len));
+	unamelen = LINUX_USER_CAP(args->namelen, sizeof(*unamelen));
+	error = copyin(unamelen, &len, sizeof(len));
 	if (error != 0)
 		return (error);
 	if (len < 0)
@@ -1106,11 +1125,12 @@ linux_getpeername(struct thread *td, struct linux_getpeername_args *args)
 		return (error);
 
 	if (len != 0)
-		error = linux_copyout_sockaddr(sa, PTRIN(args->addr), len);
+		error = linux_copyout_sockaddr(sa, LINUX_USER_CAP(args->addr, len),
+		    len);
 
 	free(sa, M_SONAME);
 	if (error == 0)
-		error = copyout(&len, PTRIN(args->namelen), sizeof(len));
+		error = copyout(&len, unamelen, sizeof(len));
 	return (error);
 }
 
@@ -1141,7 +1161,8 @@ linux_socketpair(struct thread *td, struct linux_socketpair_args *args)
 	error = kern_socketpair(td, domain, type, 0, sv);
 	if (error != 0)
                 return (error);
-        error = copyout(sv, PTRIN(args->rsv), 2 * sizeof(int));
+        error = copyout(sv, LINUX_USER_CAP(args->rsv, 2 * sizeof(int)),
+	    2 * sizeof(int));
         if (error != 0) {
                 (void)kern_close(td, sv[0]);
                 (void)kern_close(td, sv[1]);
@@ -1233,13 +1254,13 @@ linux_sendto(struct thread *td, struct linux_sendto_args *args)
 		/* IP_HDRINCL set, tweak the packet before sending */
 		return (linux_sendto_hdrincl(td, args));
 
-	msg.msg_name = PTRIN(args->to);
+	msg.msg_name = LINUX_USER_CAP(args->to, args->tolen);
 	msg.msg_namelen = args->tolen;
 	msg.msg_iov = &aiov;
 	msg.msg_iovlen = 1;
 	msg.msg_control = NULL;
 	msg.msg_flags = 0;
-	IOVEC_INIT(&aiov, PTRIN(args->msg), args->len);
+	IOVEC_INIT_C(&aiov, LINUX_USER_CAP(args->msg, args->len), args->len);
 	return (linux_sendit(td, args->s, &msg, args->flags, NULL,
 	    UIO_USERSPACE));
 }
@@ -1250,11 +1271,11 @@ linux_recvfrom(struct thread *td, struct linux_recvfrom_args *args)
 	struct sockaddr *sa;
 	struct msghdr msg;
 	struct iovec aiov;
-	int error, fromlen;
+	int error, fromlen, * __capability ufromlen;
 
 	if (PTRIN(args->fromlen) != NULL) {
-		error = copyin(PTRIN(args->fromlen), &fromlen,
-		    sizeof(fromlen));
+		ufromlen = LINUX_USER_CAP(args->fromlen, sizeof(*ufromlen));
+		error = copyin(ufromlen, &fromlen, sizeof(fromlen));
 		if (error != 0)
 			return (error);
 		if (fromlen < 0)
@@ -1265,11 +1286,11 @@ linux_recvfrom(struct thread *td, struct linux_recvfrom_args *args)
 		sa = NULL;
 	}
 
-	msg.msg_name = sa;
+	msg.msg_name = PTR2CAP(sa);
 	msg.msg_namelen = fromlen;
 	msg.msg_iov = &aiov;
 	msg.msg_iovlen = 1;
-	IOVEC_INIT(&aiov, PTRIN(args->buf), args->len);
+	IOVEC_INIT_C(&aiov, LINUX_USER_CAP(args->buf, args->len), args->len);
 	msg.msg_control = 0;
 	msg.msg_flags = linux_to_bsd_msg_flags(args->flags);
 
@@ -1278,10 +1299,11 @@ linux_recvfrom(struct thread *td, struct linux_recvfrom_args *args)
 		goto out;
 
 	if (PTRIN(args->from) != NULL)
-		error = linux_copyout_sockaddr(sa, PTRIN(args->from), msg.msg_namelen);
+		error = linux_copyout_sockaddr(sa, LINUX_USER_CAP(args->from,
+		    fromlen), msg.msg_namelen);
 
 	if (error == 0 && PTRIN(args->fromlen) != NULL)
-		error = copyout(&msg.msg_namelen, PTRIN(args->fromlen),
+		error = copyout(&msg.msg_namelen, ufromlen,
 		    sizeof(msg.msg_namelen));
 out:
 	free(sa, M_SONAME);
@@ -1289,14 +1311,14 @@ out:
 }
 
 static int
-linux_sendmsg_common(struct thread *td, l_int s, struct l_msghdr *msghdr,
-    l_uint flags)
+linux_sendmsg_common(struct thread *td, l_int s,
+    struct l_msghdr * __capability msghdr, l_uint flags)
 {
 	struct cmsghdr *cmsg;
 	struct mbuf *control;
 	struct msghdr msg;
 	struct l_cmsghdr linux_cmsg;
-	struct l_cmsghdr *ptr_cmsg;
+	struct l_cmsghdr * __capability ptr_cmsg;
 	struct l_msghdr linux_msghdr;
 	struct iovec *iov;
 	socklen_t datalen;
@@ -1328,9 +1350,12 @@ linux_sendmsg_common(struct thread *td, l_int s, struct l_msghdr *msghdr,
 	if (error != 0)
 		return (error);
 
-#ifdef COMPAT_LINUX32
-	error = linux32_copyiniov(PTRIN(msg.msg_iov), msg.msg_iovlen,
-	    &iov, EMSGSIZE);
+#if defined(COMPAT_LINUX32)
+	error = linux32_copyiniov((struct l_iovec32 * __capability)msg.msg_iov,
+	    msg.msg_iovlen, &iov, EMSGSIZE);
+#elif defined(COMPAT_LINUX64)
+	error = linux64_copyiniov((struct l_iovec64 * __capability)msg.msg_iov,
+		msg.msg_iovlen, &iov, EMSGSIZE);
 #else
 	error = copyiniov(msg.msg_iov, msg.msg_iovlen, &iov, EMSGSIZE);
 #endif
@@ -1369,7 +1394,8 @@ linux_sendmsg_common(struct thread *td, l_int s, struct l_msghdr *msghdr,
 		data = mtod(control, void *);
 		datalen = 0;
 
-		ptr_cmsg = PTRIN(linux_msghdr.msg_control);
+		ptr_cmsg = LINUX_USER_CAP(linux_msghdr.msg_control,
+		    linux_msghdr.msg_controllen);
 		clen = linux_msghdr.msg_controllen;
 		do {
 			error = copyin(ptr_cmsg, &linux_cmsg,
@@ -1441,7 +1467,8 @@ next:
 				break;
 
 			clen -= LINUX_CMSG_ALIGN(linux_cmsg.cmsg_len);
-			ptr_cmsg = (struct l_cmsghdr *)((char *)ptr_cmsg +
+			ptr_cmsg = (struct l_cmsghdr * __capability)
+			    ((char * __capability)ptr_cmsg +
 			    LINUX_CMSG_ALIGN(linux_cmsg.cmsg_len));
 		} while(clen >= sizeof(struct l_cmsghdr));
 
@@ -1452,7 +1479,7 @@ next:
 		}
 	}
 
-	msg.msg_iov = iov;
+	msg.msg_iov = PTR2CAP(iov);
 	msg.msg_flags = 0;
 	error = linux_sendit(td, s, &msg, flags, control, UIO_USERSPACE);
 	control = NULL;
@@ -1467,21 +1494,21 @@ int
 linux_sendmsg(struct thread *td, struct linux_sendmsg_args *args)
 {
 
-	return (linux_sendmsg_common(td, args->s, PTRIN(args->msg),
-	    args->flags));
+	return (linux_sendmsg_common(td, args->s, LINUX_USER_CAP(args->msg,
+	    sizeof(struct l_msghdr)), args->flags));
 }
 
 int
 linux_sendmmsg(struct thread *td, struct linux_sendmmsg_args *args)
 {
-	struct l_mmsghdr *msg;
+	struct l_mmsghdr * __capability msg;
 	l_uint retval;
 	int error, datagrams;
 
 	if (args->vlen > UIO_MAXIOV)
 		args->vlen = UIO_MAXIOV;
 
-	msg = PTRIN(args->msg);
+	msg = LINUX_USER_CAP_ARRAY(args->msg, args->vlen);
 	datagrams = 0;
 	while (datagrams < args->vlen) {
 		error = linux_sendmsg_common(td, args->s, &msg->msg_hdr,
@@ -1502,8 +1529,8 @@ linux_sendmmsg(struct thread *td, struct linux_sendmmsg_args *args)
 }
 
 static int
-linux_recvmsg_common(struct thread *td, l_int s, struct l_msghdr *msghdr,
-    l_uint flags, struct msghdr *msg)
+linux_recvmsg_common(struct thread *td, l_int s,
+    struct l_msghdr * __capability msghdr, l_uint flags, struct msghdr *msg)
 {
 	struct cmsghdr *cm;
 	struct cmsgcred *cmcred;
@@ -1512,13 +1539,13 @@ linux_recvmsg_common(struct thread *td, l_int s, struct l_msghdr *msghdr,
 	struct l_ucred linux_ucred;
 	socklen_t datalen, maxlen, outlen;
 	struct l_msghdr linux_msghdr;
-	struct iovec *iov, *uiov;
+	struct iovec *iov, * __capability uiov;
 	struct mbuf *control = NULL;
 	struct mbuf **controlp;
 	struct timeval *ftmvl;
 	struct sockaddr *sa;
 	l_timeval ltmvl;
-	caddr_t outbuf;
+	char * __capability outbuf;
 	void *data;
 	int error, i, fd, fds, *fdp;
 
@@ -1530,9 +1557,12 @@ linux_recvmsg_common(struct thread *td, l_int s, struct l_msghdr *msghdr,
 	if (error != 0)
 		return (error);
 
-#ifdef COMPAT_LINUX32
-	error = linux32_copyiniov(PTRIN(msg->msg_iov), msg->msg_iovlen,
-	    &iov, EMSGSIZE);
+#if defined(COMPAT_LINUX32)
+	error = linux32_copyiniov((struct l_iovec32 * __capability)msg->msg_iov,
+	    msg->msg_iovlen, &iov, EMSGSIZE);
+#elif defined(COMPAT_LINUX64)
+	error = linux64_copyiniov((struct l_iovec64 * __capability)msg->msg_iov,
+	    msg->msg_iovlen, &iov, EMSGSIZE);
 #else
 	error = copyiniov(msg->msg_iov, msg->msg_iovlen, &iov, EMSGSIZE);
 #endif
@@ -1542,14 +1572,14 @@ linux_recvmsg_common(struct thread *td, l_int s, struct l_msghdr *msghdr,
 	if (msg->msg_name != NULL && msg->msg_namelen > 0) {
 		msg->msg_namelen = min(msg->msg_namelen, SOCK_MAXADDRLEN);
 		sa = malloc(msg->msg_namelen, M_SONAME, M_WAITOK);
-		msg->msg_name = sa;
+		msg->msg_name = PTR2CAP(sa);
 	} else {
 		sa = NULL;
 		msg->msg_name = NULL;
 	}
 
 	uiov = msg->msg_iov;
-	msg->msg_iov = iov;
+	msg->msg_iov = PTR2CAP(iov);
 	controlp = (msg->msg_control != NULL) ? &control : NULL;
 	error = kern_recvit(td, s, msg, UIO_SYSSPACE, controlp);
 	msg->msg_iov = uiov;
@@ -1560,9 +1590,10 @@ linux_recvmsg_common(struct thread *td, l_int s, struct l_msghdr *msghdr,
 	 * Note that kern_recvit() updates msg->msg_namelen.
 	 */
 	if (msg->msg_name != NULL && msg->msg_namelen > 0) {
-		msg->msg_name = PTRIN(linux_msghdr.msg_name);
-		error = linux_copyout_sockaddr(sa,
-		    PTRIN(msg->msg_name), msg->msg_namelen);
+		msg->msg_name = LINUX_USER_CAP(linux_msghdr.msg_name,
+		    linux_msghdr.msg_namelen);
+		error = linux_copyout_sockaddr(sa, msg->msg_name,
+		    msg->msg_namelen);
 		if (error != 0)
 			goto bad;
 	}
@@ -1576,11 +1607,11 @@ linux_recvmsg_common(struct thread *td, l_int s, struct l_msghdr *msghdr,
 	if (control) {
 		linux_cmsg = malloc(L_CMSG_HDRSZ, M_LINUX, M_WAITOK | M_ZERO);
 
-		msg->msg_control = mtod(control, struct cmsghdr *);
+		msg->msg_control = PTR2CAP(mtod(control, struct cmsghdr *));
 		msg->msg_controllen = control->m_len;
 
 		cm = CMSG_FIRSTHDR(msg);
-		outbuf = PTRIN(linux_msghdr.msg_control);
+		outbuf = LINUX_USER_CAP(linux_msghdr.msg_control, maxlen);
 		outlen = 0;
 		while (cm != NULL) {
 			linux_cmsg->cmsg_type =
@@ -1705,14 +1736,14 @@ linux_recvmsg(struct thread *td, struct linux_recvmsg_args *args)
 {
 	struct msghdr bsd_msg;
 
-	return (linux_recvmsg_common(td, args->s, PTRIN(args->msg),
-	    args->flags, &bsd_msg));
+	return (linux_recvmsg_common(td, args->s, LINUX_USER_CAP(args->msg,
+	    sizeof(struct l_msghdr)), args->flags, &bsd_msg));
 }
 
 int
 linux_recvmmsg(struct thread *td, struct linux_recvmmsg_args *args)
 {
-	struct l_mmsghdr *msg;
+	struct l_mmsghdr * __capability msg;
 	struct msghdr bsd_msg;
 	struct l_timespec lts;
 	struct timespec ts, tts;
@@ -1720,7 +1751,8 @@ linux_recvmmsg(struct thread *td, struct linux_recvmmsg_args *args)
 	int error, datagrams;
 
 	if (args->timeout) {
-		error = copyin(args->timeout, &lts, sizeof(struct l_timespec));
+		error = copyin(LINUX_USER_CAP_OBJ(args->timeout), &lts,
+		    sizeof(struct l_timespec));
 		if (error != 0)
 			return (error);
 		error = linux_to_native_timespec(&ts, &lts);
@@ -1730,7 +1762,12 @@ linux_recvmmsg(struct thread *td, struct linux_recvmmsg_args *args)
 		timespecadd(&tts, &ts, &tts);
 	}
 
-	msg = PTRIN(args->msg);
+#if defined(COMPAT_LINUX32) || defined(COMPAT_LINUX64)
+	msg = LINUX_USER_CAP_ARRAY((struct l_mmsghdr *)(uintptr_t)args->msg,
+	    args->vlen);
+#else
+	msg = args->msg;
+#endif
 	datagrams = 0;
 	while (datagrams < args->vlen) {
 		error = linux_recvmsg_common(td, args->s, &msg->msg_hdr,
@@ -1779,6 +1816,7 @@ linux_shutdown(struct thread *td, struct linux_shutdown_args *args)
 int
 linux_setsockopt(struct thread *td, struct linux_setsockopt_args *args)
 {
+	const void * __capability uoptval;
 	l_timeval linux_tv;
 	struct sockaddr *sa;
 	struct timeval tv;
@@ -1786,6 +1824,7 @@ linux_setsockopt(struct thread *td, struct linux_setsockopt_args *args)
 	int error, level, name;
 
 	level = linux_to_bsd_sockopt_level(args->level);
+	uoptval = LINUX_USER_CAP(args->optval, args->optlen);
 	switch (level) {
 	case SOL_SOCKET:
 		name = linux_to_bsd_so_sockopt(args->optname);
@@ -1796,8 +1835,7 @@ linux_setsockopt(struct thread *td, struct linux_setsockopt_args *args)
 		case SO_RCVTIMEO:
 			/* FALLTHROUGH */
 		case SO_SNDTIMEO:
-			error = copyin(PTRIN(args->optval), &linux_tv,
-			    sizeof(linux_tv));
+			error = copyin(uoptval, &linux_tv, sizeof(linux_tv));
 			if (error != 0)
 				return (error);
 			tv.tv_sec = linux_tv.tv_sec;
@@ -1840,16 +1878,16 @@ linux_setsockopt(struct thread *td, struct linux_setsockopt_args *args)
 
 	if (name == IPV6_NEXTHOP) {
 		len = args->optlen;
-		error = linux_to_bsd_sockaddr(PTRIN(args->optval), &sa, &len);
+		error = linux_to_bsd_sockaddr(uoptval, &sa, &len);
 		if (error != 0)
 			return (error);
 
 		error = kern_setsockopt(td, args->s, level,
-		    name, sa, UIO_SYSSPACE, len);
+		    name, PTR2CAP(sa), UIO_SYSSPACE, len);
 		free(sa, M_SONAME);
 	} else {
 		error = kern_setsockopt(td, args->s, level,
-		    name, PTRIN(args->optval), UIO_USERSPACE, args->optlen);
+		    name, uoptval, UIO_USERSPACE, args->optlen);
 	}
 
 	return (error);
@@ -1858,15 +1896,18 @@ linux_setsockopt(struct thread *td, struct linux_setsockopt_args *args)
 int
 linux_getsockopt(struct thread *td, struct linux_getsockopt_args *args)
 {
+	void * __capability uoptval;
 	l_timeval linux_tv;
 	struct timeval tv;
-	socklen_t tv_len, xulen, len;
+	socklen_t tv_len, xulen, len, * __capability uoptlen;
 	struct sockaddr *sa;
 	struct xucred xu;
 	struct l_ucred lxu;
 	int error, level, name, newval;
 
 	level = linux_to_bsd_sockopt_level(args->level);
+	uoptval = LINUX_USER_CAP_UNBOUND(args->optval);
+	uoptlen = LINUX_USER_CAP(args->optlen, sizeof(len));
 	switch (level) {
 	case SOL_SOCKET:
 		name = linux_to_bsd_so_sockopt(args->optname);
@@ -1884,8 +1925,7 @@ linux_getsockopt(struct thread *td, struct linux_getsockopt_args *args)
 				return (error);
 			linux_tv.tv_sec = tv.tv_sec;
 			linux_tv.tv_usec = tv.tv_usec;
-			return (copyout(&linux_tv, PTRIN(args->optval),
-			    sizeof(linux_tv)));
+			return (copyout(&linux_tv, uoptval, sizeof(linux_tv)));
 			/* NOTREACHED */
 		case LOCAL_PEERCRED:
 			if (args->optlen < sizeof(lxu))
@@ -1903,7 +1943,7 @@ linux_getsockopt(struct thread *td, struct linux_getsockopt_args *args)
 			lxu.pid = xu.cr_pid;
 			lxu.uid = xu.cr_uid;
 			lxu.gid = xu.cr_gid;
-			return (copyout(&lxu, PTRIN(args->optval), sizeof(lxu)));
+			return (copyout(&lxu, uoptval, sizeof(lxu)));
 			/* NOTREACHED */
 		case SO_ERROR:
 			len = sizeof(newval);
@@ -1912,7 +1952,7 @@ linux_getsockopt(struct thread *td, struct linux_getsockopt_args *args)
 			if (error != 0)
 				return (error);
 			newval = -bsd_to_linux_errno(newval);
-			return (copyout(&newval, PTRIN(args->optval), len));
+			return (copyout(&newval, uoptval, len));
 			/* NOTREACHED */
 		default:
 			break;
@@ -1940,33 +1980,31 @@ linux_getsockopt(struct thread *td, struct linux_getsockopt_args *args)
 	}
 
 	if (name == IPV6_NEXTHOP) {
-		error = copyin(PTRIN(args->optlen), &len, sizeof(len));
+		error = copyin(uoptlen, &len, sizeof(len));
                 if (error != 0)
                         return (error);
 		sa = malloc(len, M_SONAME, M_WAITOK);
 
 		error = kern_getsockopt(td, args->s, level,
-		    name, sa, UIO_SYSSPACE, &len);
+		    name, PTR2CAP(sa), UIO_SYSSPACE, &len);
 		if (error != 0)
 			goto out;
 
-		error = linux_copyout_sockaddr(sa, PTRIN(args->optval), len);
+		error = linux_copyout_sockaddr(sa, uoptval, len);
 		if (error == 0)
-			error = copyout(&len, PTRIN(args->optlen),
-			    sizeof(len));
+			error = copyout(&len, uoptlen, sizeof(len));
 out:
 		free(sa, M_SONAME);
 	} else {
 		if (args->optval) {
-			error = copyin(PTRIN(args->optlen), &len, sizeof(len));
+			error = copyin(uoptlen, &len, sizeof(len));
 			if (error != 0)
 				return (error);
 		}
 		error = kern_getsockopt(td, args->s, level,
-		    name, PTRIN(args->optval), UIO_USERSPACE, &len);
+		    name, uoptval, UIO_USERSPACE, &len);
 		if (error == 0)
-			error = copyout(&len, PTRIN(args->optlen),
-			    sizeof(len));
+			error = copyout(&len, uoptlen, sizeof(len));
 	}
 
 	return (error);
@@ -2044,12 +2082,13 @@ linux_sendfile(struct thread *td, struct linux_sendfile_args *arg)
 	 */
 
 	l_loff_t offset64;
-	l_long offset;
+	l_off_t offset, * __capability uoffset;
 	int ret;
 	int error;
 
 	if (arg->offset != NULL) {
-		error = copyin(arg->offset, &offset, sizeof(offset));
+		uoffset = LINUX_USER_CAP_OBJ(arg->offset);
+		error = copyin(uoffset, &offset, sizeof(offset));
 		if (error != 0)
 			return (error);
 		offset64 = (l_loff_t)offset;
@@ -2065,7 +2104,7 @@ linux_sendfile(struct thread *td, struct linux_sendfile_args *arg)
 			return (EOVERFLOW);
 #endif
 		offset = (l_long)offset64;
-		error = copyout(&offset, arg->offset, sizeof(offset));
+		error = copyout(&offset, uoffset, sizeof(offset));
 		if (error != 0)
 			return (error);
 	}
@@ -2079,12 +2118,13 @@ linux_sendfile(struct thread *td, struct linux_sendfile_args *arg)
 int
 linux_sendfile64(struct thread *td, struct linux_sendfile64_args *arg)
 {
-	l_loff_t offset;
+	l_loff_t offset, * __capability uoffset;
 	int ret;
 	int error;
 
 	if (arg->offset != NULL) {
-		error = copyin(arg->offset, &offset, sizeof(offset));
+		uoffset = LINUX_USER_CAP_OBJ(arg->offset);
+		error = copyin(uoffset, &offset, sizeof(offset));
 		if (error != 0)
 			return (error);
 	}
@@ -2093,7 +2133,7 @@ linux_sendfile64(struct thread *td, struct linux_sendfile64_args *arg)
 		arg->offset != NULL ? &offset : NULL, arg->count);
 
 	if (arg->offset != NULL) {
-		error = copyout(&offset, arg->offset, sizeof(offset));
+		error = copyout(&offset, uoffset, sizeof(offset));
 		if (error != 0)
 			return (error);
 	}

@@ -544,7 +544,7 @@ struct v4l2_buffer {
 	enum v4l2_memory        memory;
 	union {
 		__u32           offset;
-		unsigned long   userptr;
+		uintcap_t       userptr;
 	} m;
 	__u32			length;
 	__u32			input;
@@ -569,7 +569,7 @@ struct v4l2_framebuffer {
 	__u32			flags;
 /* FIXME: in theory we should pass something like PCI device + memory
  * region + offset instead of some physical address */
-	void                    *base;
+	void                    * __kerncap base;
 	struct v4l2_pix_format	fmt;
 };
 /*  Flags for the 'capability' field. Read only */
@@ -599,9 +599,9 @@ struct v4l2_window {
 	struct v4l2_rect        w;
 	enum v4l2_field  	field;
 	__u32			chromakey;
-	struct v4l2_clip	__user *clips;
+	struct v4l2_clip	__user * __kerncap clips;
 	__u32			clipcount;
-	void			__user *bitmap;
+	void			__user * __kerncap bitmap;
 	__u8                    global_alpha;
 };
 

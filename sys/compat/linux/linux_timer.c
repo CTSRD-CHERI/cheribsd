@@ -34,15 +34,19 @@ __FBSDID("$FreeBSD$");
 
 #include <sys/param.h>
 #include <sys/errno.h>
+#include <sys/proc.h>
 #include <sys/signal.h>
 #include <sys/syscallsubr.h>
 #include <sys/systm.h>
 #include <sys/time.h>
 #include <sys/types.h>
 
-#ifdef COMPAT_LINUX32
+#if defined(COMPAT_LINUX32)
 #include <machine/../linux32/linux.h>
 #include <machine/../linux32/linux32_proto.h>
+#elif defined(COMPAT_LINUX64)
+#include <machine/../linux64/linux.h>
+#include <machine/../linux64/linux64_proto.h>
 #else
 #include <machine/../linux/linux.h>
 #include <machine/../linux/linux_proto.h>
@@ -60,7 +64,8 @@ linux_convert_l_sigevent(struct l_sigevent *l_sig, struct sigevent *sig)
 			return (EINVAL);
 		sig->sigev_notify = SIGEV_SIGNAL;
 		sig->sigev_signo = linux_to_bsd_signal(l_sig->sigev_signo);
-		PTRIN_CP(*l_sig, *sig, sigev_value.sival_ptr);
+		sig->sigev_value.sival_ptr = (void * __capability)
+		    (uintcap_t)l_sig->sigev_value.sival_ptr;
 		break;
 	case L_SIGEV_NONE:
 		sig->sigev_notify = SIGEV_NONE;
@@ -79,7 +84,8 @@ linux_convert_l_sigevent(struct l_sigevent *l_sig, struct sigevent *sig)
 		sig->sigev_notify = SIGEV_THREAD_ID;
 		CP2(*l_sig, *sig, _l_sigev_un._tid, sigev_notify_thread_id);
 		sig->sigev_signo = linux_to_bsd_signal(l_sig->sigev_signo);
-		PTRIN_CP(*l_sig, *sig, sigev_value.sival_ptr);
+		sig->sigev_value.sival_ptr = (void * __capability)
+		    (uintcap_t)l_sig->sigev_value.sival_ptr;
 		break;
 	default:
 		return (EINVAL);
@@ -98,7 +104,7 @@ linux_timer_create(struct thread *td, struct linux_timer_create_args *uap)
 	if (uap->evp == NULL) {
 		evp = NULL;
 	} else {
-		error = copyin(uap->evp, &l_ev, sizeof(l_ev));
+		error = copyin(LINUX_USER_CAP_OBJ(uap->evp), &l_ev, sizeof(l_ev));
 		if (error != 0)
 			return (error);
 		error = linux_convert_l_sigevent(&l_ev, &ev);
@@ -111,7 +117,8 @@ linux_timer_create(struct thread *td, struct linux_timer_create_args *uap)
 		return (error);
 	error = kern_ktimer_create(td, nwhich, evp, &id, -1);
 	if (error == 0) {
-		error = copyout(&id, uap->timerid, sizeof(int));
+		error = copyout(&id, LINUX_USER_CAP_OBJ(uap->timerid),
+		    sizeof(int));
 		if (error != 0)
 			kern_ktimer_delete(td, id);
 	}
@@ -125,7 +132,7 @@ linux_timer_settime(struct thread *td, struct linux_timer_settime_args *uap)
 	struct itimerspec val, oval, *ovalp;
 	int error;
 
-	error = copyin(uap->new, &l_val, sizeof(l_val));
+	error = copyin(LINUX_USER_CAP_OBJ(uap->new), &l_val, sizeof(l_val));
 	if (error != 0)
 		return (error);
 	ITS_CP(l_val, val);
@@ -133,7 +140,8 @@ linux_timer_settime(struct thread *td, struct linux_timer_settime_args *uap)
 	error = kern_ktimer_settime(td, uap->timerid, uap->flags, &val, ovalp);
 	if (error == 0 && uap->old != NULL) {
 		ITS_CP(oval, l_oval);
-		error = copyout(&l_oval, uap->old, sizeof(l_oval));
+		error = copyout(&l_oval, LINUX_USER_CAP_OBJ(uap->old),
+		    sizeof(l_oval));
 	}
 	return (error);
 }
@@ -148,7 +156,8 @@ linux_timer_gettime(struct thread *td, struct linux_timer_gettime_args *uap)
 	error = kern_ktimer_gettime(td, uap->timerid, &val);
 	if (error == 0) {
 		ITS_CP(val, l_val);
-		error = copyout(&l_val, uap->setting, sizeof(l_val));
+		error = copyout(&l_val, LINUX_USER_CAP_OBJ(uap->setting),
+		    sizeof(l_val));
 	}
 	return (error);
 }

@@ -56,9 +56,12 @@ __KERNEL_RCSID(0, "$NetBSD: linux_time.c,v 1.14 2006/05/14 03:40:54 christos Exp
 #include <sys/systm.h>
 #include <sys/proc.h>
 
-#ifdef COMPAT_LINUX32
+#if defined(COMPAT_LINUX32)
 #include <machine/../linux32/linux.h>
 #include <machine/../linux32/linux32_proto.h>
+#elif defined(COMPAT_LINUX64)
+#include <machine/../linux64/linux.h>
+#include <machine/../linux64/linux64_proto.h>
 #else
 #include <machine/../linux/linux.h>
 #include <machine/../linux/linux_proto.h>
@@ -381,7 +384,7 @@ linux_clock_gettime(struct thread *td, struct linux_clock_gettime_args *args)
 	error = native_to_linux_timespec(&lts, &tp);
 	if (error != 0)
 		return (error);
-	error = copyout(&lts, args->tp, sizeof lts);
+	error = copyout(&lts, LINUX_USER_CAP_OBJ(args->tp), sizeof lts);
 	if (error != 0)
 		LIN_SDT_PROBE1(time, linux_clock_gettime, copyout_error, error);
 
@@ -408,7 +411,7 @@ linux_clock_settime(struct thread *td, struct linux_clock_settime_args *args)
 		LIN_SDT_PROBE1(time, linux_clock_settime, return, error);
 		return (error);
 	}
-	error = copyin(args->tp, &lts, sizeof lts);
+	error = copyin(LINUX_USER_CAP_OBJ(args->tp), &lts, sizeof lts);
 	if (error != 0) {
 		LIN_SDT_PROBE1(time, linux_clock_settime, copyin_error, error);
 		LIN_SDT_PROBE1(time, linux_clock_settime, return, error);
@@ -530,7 +533,7 @@ out:
 	error = native_to_linux_timespec(&lts, &ts);
 	if (error != 0)
 		return (error);
-	error = copyout(&lts, args->tp, sizeof lts);
+	error = copyout(&lts, LINUX_USER_CAP_OBJ(args->tp), sizeof lts);
 	if (error != 0)
 		LIN_SDT_PROBE1(time, linux_clock_getres, copyout_error, error);
 
@@ -548,7 +551,7 @@ linux_nanosleep(struct thread *td, struct linux_nanosleep_args *args)
 
 	LIN_SDT_PROBE2(time, linux_nanosleep, entry, args->rqtp, args->rmtp);
 
-	error = copyin(args->rqtp, &lrqts, sizeof lrqts);
+	error = copyin(LINUX_USER_CAP_OBJ(args->rqtp), &lrqts, sizeof lrqts);
 	if (error != 0) {
 		LIN_SDT_PROBE1(time, linux_nanosleep, copyin_error, error);
 		LIN_SDT_PROBE1(time, linux_nanosleep, return, error);
@@ -571,7 +574,8 @@ linux_nanosleep(struct thread *td, struct linux_nanosleep_args *args)
 		error2 = native_to_linux_timespec(&lrmts, rmtp);
 		if (error2 != 0)
 			return (error2);
-		error2 = copyout(&lrmts, args->rmtp, sizeof(lrmts));
+		error2 = copyout(&lrmts, LINUX_USER_CAP_OBJ(args->rmtp),
+		    sizeof(lrmts));
 		if (error2 != 0) {
 			LIN_SDT_PROBE1(time, linux_nanosleep, copyout_error,
 			    error2);
@@ -614,7 +618,7 @@ linux_clock_nanosleep(struct thread *td, struct linux_clock_nanosleep_args *args
 		return (error);
 	}
 
-	error = copyin(args->rqtp, &lrqts, sizeof(lrqts));
+	error = copyin(LINUX_USER_CAP_OBJ(args->rqtp), &lrqts, sizeof(lrqts));
 	if (error != 0) {
 		LIN_SDT_PROBE1(time, linux_clock_nanosleep, copyin_error,
 		    error);
@@ -640,7 +644,8 @@ linux_clock_nanosleep(struct thread *td, struct linux_clock_nanosleep_args *args
 		error2 = native_to_linux_timespec(&lrmts, rmtp);
 		if (error2 != 0)
 			return (error2);
-		error2 = copyout(&lrmts, args->rmtp, sizeof(lrmts));
+		error2 = copyout(&lrmts, LINUX_USER_CAP_OBJ(args->rmtp),
+		    sizeof(lrmts));
 		if (error2 != 0) {
 			LIN_SDT_PROBE1(time, linux_clock_nanosleep,
 			    copyout_error, error2);
@@ -653,3 +658,24 @@ linux_clock_nanosleep(struct thread *td, struct linux_clock_nanosleep_args *args
 	LIN_SDT_PROBE1(time, linux_clock_nanosleep, return, error);
 	return (error);
 }
+
+#if __has_feature(capabilities)
+#if defined(COMPAT_LINUX32) || defined(COMPAT_LINUX64)
+int
+linux_gettimeofday(struct thread *td, struct linux_gettimeofday_args *uap)
+{
+
+	return (kern_gettimeofday(td, LINUX_USER_CAP_OBJ(uap->tp),
+	     LINUX_USER_CAP_OBJ(uap->tzp)));
+}
+
+int
+linux_settimeofday(struct thread *td,
+    struct linux_settimeofday_args *uap)
+{
+
+	return (user_settimeofday(td, LINUX_USER_CAP_OBJ(uap->tv),
+	    LINUX_USER_CAP_OBJ(uap->tzp)));
+}
+#endif
+#endif

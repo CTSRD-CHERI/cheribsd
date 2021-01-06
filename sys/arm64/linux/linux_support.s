@@ -30,6 +30,8 @@
 #include "linux_assym.h"
 #include <machine/asm.h>
 
+#include <sys/errno.h>
+
 #include "assym.inc"
 
 /*
@@ -37,21 +39,21 @@
  */
 
 ENTRY(futex_xchgl)
-	brk #0
+	mov x0, #ENOSYS
 	ret
 
 ENTRY(futex_addl)
-	brk #0
+	mov x0, #ENOSYS
 	ret
 
 ENTRY(futex_orl)
-	brk #0
+	mov x0, #ENOSYS
 	ret
 
 ENTRY(futex_andl)
-	brk #0
+	mov x0, #ENOSYS
 	ret
 
 ENTRY(futex_xorl)
-	brk #0
+	mov x0, #ENOSYS
 	ret

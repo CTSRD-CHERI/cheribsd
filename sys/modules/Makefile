@@ -500,6 +500,9 @@ SUBDIR+=	linux
 .if ${MACHINE_CPUARCH} == "aarch64" || ${MACHINE_CPUARCH} == "amd64"
 SUBDIR+=	linux64
 SUBDIR+=	linux_common
+.if ${MACHINE_CPU:Mcheri}
+SUBDIR+=	linux64c
+.endif
 .endif
 
 .if ${MACHINE_CPUARCH} == "aarch64" || ${MACHINE_CPUARCH} == "amd64" || \

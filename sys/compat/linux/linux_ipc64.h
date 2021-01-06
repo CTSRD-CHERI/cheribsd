@@ -70,15 +70,15 @@ struct l_ipc64_perm
 struct l_msqid64_ds {
 	struct l_ipc64_perm msg_perm;
 	l_time_t	msg_stime;	/* last msgsnd time */
-#if !defined(__LP64__) || defined(COMPAT_LINUX32)
+#if __SIZEOF_LONG__ == 4 || defined(COMPAT_LINUX32)
 	l_ulong		__unused1;
 #endif
 	l_time_t	msg_rtime;	/* last msgrcv time */
-#if !defined(__LP64__) || defined(COMPAT_LINUX32)
+#if __SIZEOF_LONG__ == 4 || defined(COMPAT_LINUX32)
 	l_ulong		__unused2;
 #endif
 	l_time_t	msg_ctime;	/* last change time */
-#if !defined(__LP64__) || defined(COMPAT_LINUX32)
+#if __SIZEOF_LONG__ == 4 || defined(COMPAT_LINUX32)
 	l_ulong		__unused3;
 #endif
 	l_ulong		msg_cbytes;	/* current number of bytes on queue */
@@ -125,15 +125,15 @@ struct l_shmid64_ds {
 	struct l_ipc64_perm shm_perm;	/* operation perms */
 	l_size_t	shm_segsz;	/* size of segment (bytes) */
 	l_time_t	shm_atime;	/* last attach time */
-#if !defined(__LP64__) || defined(COMPAT_LINUX32)
+#if __SIZEOF_LONG__ == 4 || defined(COMPAT_LINUX32)
 	l_ulong		__unused1;
 #endif
 	l_time_t	shm_dtime;	/* last detach time */
-#if !defined(__LP64__) || defined(COMPAT_LINUX32)
+#if __SIZEOF_LONG__ == 4 || defined(COMPAT_LINUX32)
 	l_ulong		__unused2;
 #endif
 	l_time_t	shm_ctime;	/* last change time */
-#if !defined(__LP64__) || defined(COMPAT_LINUX32)
+#if __SIZEOF_LONG__ == 4 || defined(COMPAT_LINUX32)
 	l_ulong		__unused3;
 #endif
 	l_pid_t		shm_cpid;	/* pid of creator */

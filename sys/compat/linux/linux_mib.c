@@ -41,6 +41,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/lock.h>
 #include <sys/sx.h>
 
+#include <compat/linux/linux.h>
 #include <compat/linux/linux_mib.h>
 #include <compat/linux/linux_misc.h>
 

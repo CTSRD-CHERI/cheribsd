@@ -54,10 +54,13 @@ __FBSDID("$FreeBSD$");
 #include <sys/unistd.h>
 #include <sys/vnode.h>
 
-#ifdef COMPAT_LINUX32
+#if defined(COMPAT_LINUX32)
 #include <compat/freebsd32/freebsd32_misc.h>
 #include <machine/../linux32/linux.h>
 #include <machine/../linux32/linux32_proto.h>
+#elif defined(COMPAT_LINUX64)
+#include <machine/../linux64/linux.h>
+#include <machine/../linux64/linux64_proto.h>
 #else
 #include <machine/../linux/linux.h>
 #include <machine/../linux/linux_proto.h>
@@ -66,8 +69,8 @@ __FBSDID("$FreeBSD$");
 #include <compat/linux/linux_util.h>
 #include <compat/linux/linux_file.h>
 
-static int	linux_common_open(struct thread *, int, const char *, int, int,
-		    enum uio_seg);
+static int	linux_common_open(struct thread *, int,
+		    const char * __capability, int, int, enum uio_seg);
 static int	linux_getdents_error(struct thread *, int, int);
 
 static struct bsd_to_linux_bitmap seal_bitmap[] = {
@@ -109,10 +112,10 @@ linux_creat(struct thread *td, struct linux_creat_args *args)
 	int error;
 
 	if (!LUSECONVPATH(td)) {
-		return (kern_openat(td, AT_FDCWD, __USER_CAP_PATH(args->path),
+		return (kern_openat(td, AT_FDCWD, LINUX_USER_CAP_PATH(args->path),
 		    UIO_USERSPACE, O_WRONLY | O_CREAT | O_TRUNC, args->mode));
 	}
-	LCONVPATHEXIST(td, args->path, &path);
+	LCONVPATHEXIST(td, __USRE_CAP_STR(args->path), &path);
 	error = kern_openat(td, AT_FDCWD, PTR2CAP(path), UIO_SYSSPACE,
 	    O_WRONLY | O_CREAT | O_TRUNC, args->mode);
 	LFREEPATH(path);
@@ -225,16 +228,19 @@ linux_openat(struct thread *td, struct linux_openat_args *args)
 
 	dfd = (args->dfd == LINUX_AT_FDCWD) ? AT_FDCWD : args->dfd;
 	if (!LUSECONVPATH(td)) {
-		return (linux_common_open(td, dfd, args->filename, args->flags,
+		return (linux_common_open(td, dfd,
+		    LINUX_USER_CAP_PATH(args->filename), args->flags,
 		    args->mode, UIO_USERSPACE));
 	}
 	if (args->flags & LINUX_O_CREAT)
-		LCONVPATH_AT(td, args->filename, &path, 1, dfd);
+		LCONVPATH_AT(td, LINUX_USER_CAP_PATH(args->filename), &path, 1,
+		    dfd);
 	else
-		LCONVPATH_AT(td, args->filename, &path, 0, dfd);
+		LCONVPATH_AT(td, LINUX_USER_CAP_PATH(args->filename), &path, 0,
+		    dfd);
 
-	error = linux_common_open(td, dfd, path, args->flags, args->mode,
-	    UIO_SYSSPACE);
+	error = linux_common_open(td, dfd, PTR2CAP(path), args->flags,
+	    args->mode, UIO_SYSSPACE);
 	LFREEPATH(path);
 	return (error);
 }
@@ -251,9 +257,9 @@ linux_open(struct thread *td, struct linux_open_args *args)
 		    args->mode, UIO_USERSPACE));
 	}
 	if (args->flags & LINUX_O_CREAT)
-		LCONVPATHCREAT(td, args->path, &path);
+		LCONVPATHCREAT(td, LINUX_USER_CAP_PATH(args->path), &path);
 	else
-		LCONVPATHEXIST(td, args->path, &path);
+		LCONVPATHEXIST(td, LINUX_USER_CAP_PATH(args->path), &path);
 
 	error = linux_common_open(td, AT_FDCWD, path, args->flags, args->mode,
 	    UIO_SYSSPACE);
@@ -290,14 +296,15 @@ linux_name_to_handle_at(struct thread *td,
 		bsd_flags |= AT_SYMLINK_NOFOLLOW;
 
 	if (!LUSECONVPATH(td)) {
-		error = kern_getfhat(td, bsd_flags, fd, args->name,
-		    UIO_USERSPACE, &fh, UIO_SYSSPACE);
+		error = kern_getfhat(td, bsd_flags, fd,
+		    LINUX_USER_CAP_PATH(args->name), UIO_USERSPACE, &fh,
+		    UIO_SYSSPACE);
 	} else {
 		char *path;
 
-		LCONVPATH_AT(td, args->name, &path, 0, fd);
-		error = kern_getfhat(td, bsd_flags, fd, path, UIO_SYSSPACE,
-		    &fh, UIO_SYSSPACE);
+		LCONVPATH_AT(td, LINUX_USER_CAP_PATH(args->name), &path, 0, fd);
+		error = kern_getfhat(td, bsd_flags, fd, PTR2CAP(path),
+		    UIO_SYSSPACE, &fh, UIO_SYSSPACE);
 		LFREEPATH(path);
 	}
 	if (error != 0)
@@ -305,7 +312,8 @@ linux_name_to_handle_at(struct thread *td,
 
 	/* Emit mount_id -- required before EOVERFLOW case. */
 	mount_id = (fh.fh_fsid.val[0] ^ fh.fh_fsid.val[1]);
-	error = copyout(&mount_id, args->mnt_id, sizeof(mount_id));
+	error = copyout(&mount_id, LINUX_USER_CAP_OBJ(args->mnt_id),
+	    sizeof(mount_id));
 	if (error != 0)
 		return (error);
 
@@ -355,7 +363,8 @@ linux_open_by_handle_at(struct thread *td,
 		return (EINVAL);
 
 	bsd_flags = linux_common_openflags(args->flags);
-	return (kern_fhopen(td, (void *)&args->handle->f_handle, bsd_flags));
+	return (kern_fhopen(td, LINUX_USER_CAP(&args->handle->f_handle, fh_bytes),
+	    bsd_flags));
 }
 
 int
@@ -529,7 +538,7 @@ linux_getdents64(struct thread *td, struct linux_getdents64_args *args)
 	struct dirent *bdp;
 	caddr_t inp, buf;		/* BSD-format */
 	int len, reclen;		/* BSD-format */
-	caddr_t outp;			/* Linux-format */
+	char * __capability outp;	/* Linux-format */
 	int resid, linuxreclen;		/* Linux-format */
 	caddr_t lbuf;			/* Linux-format */
 	off_t base;
@@ -551,7 +560,7 @@ linux_getdents64(struct thread *td, struct linux_getdents64_args *args)
 
 	len = td->td_retval[0];
 	inp = buf;
-	outp = (caddr_t)args->dirent;
+	outp = LINUX_USER_CAP(args->dirent, args->count);
 	resid = args->count;
 	retval = 0;
 
@@ -658,10 +667,10 @@ linux_access(struct thread *td, struct linux_access_args *args)
 		return (EINVAL);
 
 	if (!LUSECONVPATH(td)) {
-		error = kern_accessat(td, AT_FDCWD, __USER_CAP_PATH(args->path),
+		error = kern_accessat(td, AT_FDCWD, LINUX_USER_CAP_PATH(args->path),
 		    UIO_USERSPACE, 0, args->amode);
 	} else {
-		LCONVPATHEXIST(td, args->path, &path);
+		LCONVPATHEXIST(td, LINUX_USER_CAP_PATH(args->path), &path);
 		error = kern_accessat(td, AT_FDCWD, PTR2CAP(path),
 		    UIO_SYSSPACE, 0, args->amode);
 		LFREEPATH(path);
@@ -683,10 +692,11 @@ linux_faccessat(struct thread *td, struct linux_faccessat_args *args)
 
 	dfd = (args->dfd == LINUX_AT_FDCWD) ? AT_FDCWD : args->dfd;
 	if (!LUSECONVPATH(td)) {
-		error = kern_accessat(td, dfd, __USER_CAP_PATH(args->filename),
+		error = kern_accessat(td, dfd, LINUX_USER_CAP_PATH(args->filename),
 		    UIO_USERSPACE, 0, args->amode);
 	} else {
-		LCONVPATHEXIST_AT(td, args->filename, &path, dfd);
+		LCONVPATHEXIST_AT(td, LINUX_USER_CAP_PATH(args->filename), &path,
+		    dfd);
 		error = kern_accessat(td, dfd, PTR2CAP(path), UIO_SYSSPACE,
 		    0, args->amode);
 		LFREEPATH(path);
@@ -705,18 +715,18 @@ linux_unlink(struct thread *td, struct linux_unlink_args *args)
 
 	if (!LUSECONVPATH(td)) {
 		error = kern_funlinkat(td, AT_FDCWD,
-		    __USER_CAP_PATH(args->path), FD_NONE, UIO_USERSPACE, 0, 0);
+		    LINUX_USER_CAP_PATH(args->path), FD_NONE, UIO_USERSPACE, 0, 0);
 		if (error == EPERM) {
 			/* Introduce POSIX noncompliant behaviour of Linux */
 			if (kern_statat(td, 0, AT_FDCWD,
-			    __USER_CAP_PATH(args->path), UIO_SYSSPACE, &st,
+			    LINUX_USER_CAP_PATH(args->path), UIO_SYSSPACE, &st,
 			    NULL) == 0) {
 				if (S_ISDIR(st.st_mode))
 					error = EISDIR;
 			}
 		}
 	} else {
-		LCONVPATHEXIST(td, args->path, &path);
+		LCONVPATHEXIST(td, LINUX_USER_CAP_PATH(args->path), &path);
 		error = kern_funlinkat(td, AT_FDCWD, PTR2CAP(path), FD_NONE, UIO_SYSSPACE, 0, 0);
 		if (error == EPERM) {
 			/* Introduce POSIX noncompliant behaviour of Linux */
@@ -747,7 +757,7 @@ linux_unlinkat_impl(struct thread *td, enum uio_seg pathseg,
 		error = kern_funlinkat(td, dfd, path, FD_NONE, pathseg, 0, 0);
 	if (error == EPERM && !(args->flag & LINUX_AT_REMOVEDIR)) {
 		/* Introduce POSIX noncompliant behaviour of Linux */
-		if (kern_statat(td, AT_SYMLINK_NOFOLLOW, dfd, PTR2CAP(path),
+		if (kern_statat(td, AT_SYMLINK_NOFOLLOW, dfd, path,
 		    UIO_SYSSPACE, &st, NULL) == 0 && S_ISDIR(st.st_mode))
 			error = EISDIR;
 	}
@@ -764,11 +774,11 @@ linux_unlinkat(struct thread *td, struct linux_unlinkat_args *args)
 		return (EINVAL);
 	dfd = (args->dfd == LINUX_AT_FDCWD) ? AT_FDCWD : args->dfd;
 	if (!LUSECONVPATH(td)) {
-		return (linux_unlinkat_impl(td, UIO_USERSPACE, args->pathname,
-		    dfd, args));
+		return (linux_unlinkat_impl(td, UIO_USERSPACE,
+		    LINUX_USER_CAP_PATH(args->pathname), dfd, args));
 	}
-	LCONVPATHEXIST_AT(td, args->pathname, &path, dfd);
-	error = linux_unlinkat_impl(td, UIO_SYSSPACE, path, dfd, args);
+	LCONVPATHEXIST_AT(td, LINUX_USER_CAP_PATH(args->pathname), &path, dfd);
+	error = linux_unlinkat_impl(td, UIO_SYSSPACE, PTR2CAP(path), dfd, args);
 	LFREEPATH(path);
 	return (error);
 }
@@ -779,13 +789,25 @@ linux_chdir(struct thread *td, struct linux_chdir_args *args)
 	int error;
 
 	if (!LUSECONVPATH(td)) {
-		return (kern_chdir(td, args->path, UIO_USERSPACE));
+		return (kern_chdir(td, LINUX_USER_CAP_PATH(args->path),
+		    UIO_USERSPACE));
 	}
-	LCONVPATHEXIST(td, args->path, &path);
+	LCONVPATHEXIST(td, LINUX_USER_CAP_PATH(args->path), &path);
 	error = kern_chdir(td, PTR2CAP(path), UIO_SYSSPACE);
 	LFREEPATH(path);
 	return (error);
 }
+
+#if __has_feature(capabilities)
+#if defined(COMPAT_LINUX32) || defined(COMPAT_LINUX64)
+int
+linux_chroot(struct thread *td, struct linux_chroot_args *uap)
+{
+
+	return (kern_chroot(td, LINUX_USER_CAP_PATH(uap->path)));
+}
+#endif
+#endif
 
 #ifdef LINUX_LEGACY_SYSCALLS
 int
@@ -795,10 +817,11 @@ linux_chmod(struct thread *td, struct linux_chmod_args *args)
 	int error;
 
 	if (!LUSECONVPATH(td)) {
-		return (kern_fchmodat(td, AT_FDCWD, args->path, UIO_USERSPACE,
+		return (kern_fchmodat(td, AT_FDCWD,
+		    LINUX_USER_CAP_PATH(args->path), UIO_USERSPACE,
 		    args->mode, 0));
 	}
-	LCONVPATHEXIST(td, args->path, &path);
+	LCONVPATHEXIST(td, LINUX_USER_CAP_PATH(args->path), &path);
 	error = kern_fchmodat(td, AT_FDCWD, PTR2CAP(path), UIO_SYSSPACE,
 	    args->mode, 0);
 	LFREEPATH(path);
@@ -814,10 +837,10 @@ linux_fchmodat(struct thread *td, struct linux_fchmodat_args *args)
 
 	dfd = (args->dfd == LINUX_AT_FDCWD) ? AT_FDCWD : args->dfd;
 	if (!LUSECONVPATH(td)) {
-		return (kern_fchmodat(td, dfd, args->filename, UIO_USERSPACE,
-		    args->mode, 0));
+		return (kern_fchmodat(td, dfd, LINUX_USER_CAP_PATH(args->filename),
+		    UIO_USERSPACE, args->mode, 0));
 	}
-	LCONVPATHEXIST_AT(td, args->filename, &path, dfd);
+	LCONVPATHEXIST_AT(td, LINUX_USER_CAP_PATH(args->filename), &path, dfd);
 	error = kern_fchmodat(td, dfd, PTR2CAP(path), UIO_SYSSPACE,
 	    args->mode, 0);
 	LFREEPATH(path);
@@ -834,7 +857,7 @@ linux_mkdir(struct thread *td, struct linux_mkdir_args *args)
 	if (!LUSECONVPATH(td)) {
 		return (kern_mkdirat(td, AT_FDCWD, args->path, UIO_USERSPACE, args->mode));
 	}
-	LCONVPATHCREAT(td, args->path, &path);
+	LCONVPATHCREAT(td, LINUX_USER_CAP_PATH(args->path), &path);
 	error = kern_mkdirat(td, AT_FDCWD, PTR2CAP(path), UIO_SYSSPACE,
 	    args->mode);
 	LFREEPATH(path);
@@ -850,9 +873,10 @@ linux_mkdirat(struct thread *td, struct linux_mkdirat_args *args)
 
 	dfd = (args->dfd == LINUX_AT_FDCWD) ? AT_FDCWD : args->dfd;
 	if (!LUSECONVPATH(td)) {
-		return (kern_mkdirat(td, dfd, args->pathname, UIO_USERSPACE, args->mode));
+		return (kern_mkdirat(td, dfd, LINUX_USER_CAP_PATH(args->pathname),
+		    UIO_USERSPACE, args->mode));
 	}
-	LCONVPATHCREAT_AT(td, args->pathname, &path, dfd);
+	LCONVPATHCREAT_AT(td, LINUX_USER_CAP_PATH(args->pathname), &path, dfd);
 	error = kern_mkdirat(td, dfd, PTR2CAP(path), UIO_SYSSPACE, args->mode);
 	LFREEPATH(path);
 	return (error);
@@ -869,7 +893,7 @@ linux_rmdir(struct thread *td, struct linux_rmdir_args *args)
 		return (kern_frmdirat(td, AT_FDCWD, args->path, FD_NONE,
 		    UIO_USERSPACE, 0));
 	}
-	LCONVPATHEXIST(td, args->path, &path);
+	LCONVPATHEXIST(td, LINUX_USER_CAP_PATH(args->path), &path);
 	error = kern_frmdirat(td, AT_FDCWD, PTR2CAP(path), FD_NONE,
 	    UIO_SYSSPACE, 0);
 	LFREEPATH(path);
@@ -886,7 +910,7 @@ linux_rename(struct thread *td, struct linux_rename_args *args)
 		return (kern_renameat(td, AT_FDCWD, args->from, AT_FDCWD,
 		    args->to, UIO_USERSPACE));
 	}
-	LCONVPATHEXIST(td, args->from, &from);
+	LCONVPATHEXIST(td, LINUX_USER_CAP_PATH(args->from), &from);
 	/* Expand LCONVPATHCREATE so that `from' can be freed on errors */
 	error = linux_emul_convpath(td, args->to, UIO_USERSPACE, &to, 1, AT_FDCWD);
 	if (to == NULL) {
@@ -945,12 +969,14 @@ linux_renameat2(struct thread *td, struct linux_renameat2_args *args)
 	olddfd = (args->olddfd == LINUX_AT_FDCWD) ? AT_FDCWD : args->olddfd;
 	newdfd = (args->newdfd == LINUX_AT_FDCWD) ? AT_FDCWD : args->newdfd;
 	if (!LUSECONVPATH(td)) {
-		return (kern_renameat(td, olddfd, args->oldname, newdfd,
-		    args->newname, UIO_USERSPACE));
+		return (kern_renameat(td, olddfd,
+		    LINUX_USER_CAP_PATH(args->oldname), newdfd,
+		    LINUX_USER_CAP_PATH(args->newname), UIO_USERSPACE));
 	}
-	LCONVPATHEXIST_AT(td, args->oldname, &from, olddfd);
+	LCONVPATHEXIST_AT(td, LINUX_USER_CAP_PATH(args->oldname), &from, olddfd);
 	/* Expand LCONVPATHCREATE so that `from' can be freed on errors */
-	error = linux_emul_convpath(td, args->newname, UIO_USERSPACE, &to, 1, newdfd);
+	error = linux_emul_convpath(td, LINUX_USER_CAP_PATH(args->newname),
+	    UIO_USERSPACE, &to, 1, newdfd);
 	if (to == NULL) {
 		LFREEPATH(from);
 		return (error);
@@ -973,7 +999,7 @@ linux_symlink(struct thread *td, struct linux_symlink_args *args)
 		return (kern_symlinkat(td, args->path, AT_FDCWD, args->to,
 		    UIO_USERSPACE));
 	}
-	LCONVPATHEXIST(td, args->path, &path);
+	LCONVPATHEXIST(td, LINUX_USER_CAP_PATH(args->path), &path);
 	/* Expand LCONVPATHCREATE so that `path' can be freed on errors */
 	error = linux_emul_convpath(td, args->to, UIO_USERSPACE, &to, 1, AT_FDCWD);
 	if (to == NULL) {
@@ -995,17 +1021,19 @@ linux_symlinkat(struct thread *td, struct linux_symlinkat_args *args)
 
 	dfd = (args->newdfd == LINUX_AT_FDCWD) ? AT_FDCWD : args->newdfd;
 	if (!LUSECONVPATH(td)) {
-		return (kern_symlinkat(td, args->oldname, dfd, args->newname,
-		    UIO_USERSPACE));
+		return (kern_symlinkat(td, LINUX_USER_CAP_PATH(args->oldname),
+		    dfd, LINUX_USER_CAP_PATH(args->newname), UIO_USERSPACE));
 	}
-	LCONVPATHEXIST(td, args->oldname, &path);
+	LCONVPATHEXIST(td, LINUX_USER_CAP_PATH(args->oldname), &path);
 	/* Expand LCONVPATHCREATE so that `path' can be freed on errors */
-	error = linux_emul_convpath(td, args->newname, UIO_USERSPACE, &to, 1, dfd);
+	error = linux_emul_convpath(td, LINUX_USER_CAP_PATH(args->newname),
+	    UIO_USERSPACE, &to, 1, dfd);
 	if (to == NULL) {
 		LFREEPATH(path);
 		return (error);
 	}
-	error = kern_symlinkat(td, PTR2CAP(path), dfd, to, UIO_SYSSPACE);
+	error = kern_symlinkat(td, PTR2CAP(path), dfd, PTR2CAP(to),
+	    UIO_SYSSPACE);
 	LFREEPATH(path);
 	LFREEPATH(to);
 	return (error);
@@ -1022,7 +1050,7 @@ linux_readlink(struct thread *td, struct linux_readlink_args *args)
 		return (kern_readlinkat(td, AT_FDCWD, args->name, UIO_USERSPACE,
 		    args->buf, UIO_USERSPACE, args->count));
 	}
-	LCONVPATHEXIST(td, args->name, &name);
+	LCONVPATHEXIST(td, LINUX_USER_CAP_PATH(args->name), &name);
 	error = kern_readlinkat(td, AT_FDCWD, PTR2CAP(name), UIO_SYSSPACE,
 	    args->buf, UIO_USERSPACE, args->count);
 	LFREEPATH(name);
@@ -1038,12 +1066,13 @@ linux_readlinkat(struct thread *td, struct linux_readlinkat_args *args)
 
 	dfd = (args->dfd == LINUX_AT_FDCWD) ? AT_FDCWD : args->dfd;
 	if (!LUSECONVPATH(td)) {
-		return (kern_readlinkat(td, dfd, args->path, UIO_USERSPACE,
-		    args->buf, UIO_USERSPACE, args->bufsiz));
+		return (kern_readlinkat(td, dfd, LINUX_USER_CAP_PATH(args->path),
+		    UIO_USERSPACE, LINUX_USER_CAP(args->buf, args->bufsiz),
+		    UIO_USERSPACE, args->bufsiz));
 	}
-	LCONVPATHEXIST_AT(td, args->path, &name, dfd);
-	error = kern_readlinkat(td, dfd, PTR2CAP(name), UIO_SYSSPACE, args->buf,
-	    UIO_USERSPACE, args->bufsiz);
+	LCONVPATHEXIST_AT(td, LINUX_USER_CAP_PATH(args->path), &name, dfd);
+	error = kern_readlinkat(td, dfd, PTR2CAP(name), UIO_SYSSPACE,
+	    LINUX_USER_CAP(args->buf, args->bufsiz), UIO_USERSPACE, args->bufsiz);
 	LFREEPATH(name);
 	return (error);
 }
@@ -1055,9 +1084,10 @@ linux_truncate(struct thread *td, struct linux_truncate_args *args)
 	int error;
 
 	if (!LUSECONVPATH(td)) {
-		return (kern_truncate(td, args->path, UIO_USERSPACE, args->length));
+		return (kern_truncate(td, LINUX_USER_CAP_PATH(args->path),
+		    UIO_USERSPACE, args->length));
 	}
-	LCONVPATHEXIST(td, args->path, &path);
+	LCONVPATHEXIST(td, LINUX_USER_CAP_PATH(args->path), &path);
 	error = kern_truncate(td, PTR2CAP(path), UIO_SYSSPACE, args->length);
 	LFREEPATH(path);
 	return (error);
@@ -1080,7 +1110,7 @@ linux_truncate64(struct thread *td, struct linux_truncate64_args *args)
 	if (!LUSECONVPATH(td)) {
 		return (kern_truncate(td, args->path, UIO_USERSPACE, length));
 	}
-	LCONVPATHEXIST(td, args->path, &path);
+	LCONVPATHEXIST(td, LINUX_USER_CAP_PATH(args->path), &path);
 	error = kern_truncate(td, PTR2CAP(path), UIO_SYSSPACE, length);
 	LFREEPATH(path);
 	return (error);
@@ -1121,7 +1151,7 @@ linux_link(struct thread *td, struct linux_link_args *args)
 		return (kern_linkat(td, AT_FDCWD, AT_FDCWD, args->path, args->to,
 		    UIO_USERSPACE, FOLLOW));
 	}
-	LCONVPATHEXIST(td, args->path, &path);
+	LCONVPATHEXIST(td, LINUX_USER_CAP_PATH(args->path), &path);
 	/* Expand LCONVPATHCREATE so that `path' can be freed on errors */
 	error = linux_emul_convpath(td, args->to, UIO_USERSPACE, &to, 1, AT_FDCWD);
 	if (to == NULL) {
@@ -1150,12 +1180,15 @@ linux_linkat(struct thread *td, struct linux_linkat_args *args)
 	follow = (args->flag & LINUX_AT_SYMLINK_FOLLOW) == 0 ? NOFOLLOW :
 	    FOLLOW;
 	if (!LUSECONVPATH(td)) {
-		return (kern_linkat(td, olddfd, newdfd, args->oldname,
-		    args->newname, UIO_USERSPACE, follow));
+		return (kern_linkat(td, olddfd, newdfd,
+		    LINUX_USER_CAP_PATH(args->oldname),
+		    LINUX_USER_CAP_PATH(args->newname),
+		    UIO_USERSPACE, follow));
 	}
-	LCONVPATHEXIST_AT(td, args->oldname, &path, olddfd);
+	LCONVPATHEXIST_AT(td, LINUX_USER_CAP_PATH(args->oldname), &path, olddfd);
 	/* Expand LCONVPATHCREATE so that `path' can be freed on errors */
-	error = linux_emul_convpath(td, args->newname, UIO_USERSPACE, &to, 1, newdfd);
+	error = linux_emul_convpath(td, LINUX_USER_CAP_PATH(args->newname),
+	    UIO_USERSPACE, &to, 1, newdfd);
 	if (to == NULL) {
 		LFREEPATH(path);
 		return (error);
@@ -1197,6 +1230,56 @@ linux_sync_file_range(struct thread *td, struct linux_sync_file_range_args *uap)
 	return (kern_fsync(td, uap->fd, false));
 }
 
+#if __has_feature(capabilities)
+#if defined(COMPAT_LINUX32) || defined(COMPAT_LINUX64)
+int
+linux_read(struct thread *td, struct linux_read_args *uap)
+{
+
+	return (user_read(td, uap->fd, LINUX_USER_CAP(uap->buf, uap->nbyte),
+	    uap->nbyte));
+}
+
+int
+linux_write(struct thread *td, struct linux_write_args *uap)
+{
+
+	return (kern_write(td, uap->fd, LINUX_USER_CAP(uap->buf, uap->nbyte),
+	    uap->nbyte));
+}
+
+int
+linux_readv(struct thread *td, struct linux_readv_args *uap)
+{
+	void *linux_copyinuio;
+
+#ifdef COMPAT_LINUX32
+	linux_copyinuio = (void *)linux32_copyinuio;
+#else
+	linux_copyinuio = (void *)linux64_copyinuio;
+#endif
+
+	return (user_readv(td, uap->fd, LINUX_USER_CAP_ARRAY(uap->iovp,
+	    uap->iovcnt), uap->iovcnt, linux_copyinuio));
+}
+
+int
+linux_writev(struct thread *td, struct linux_writev_args *uap)
+{
+	void *linux_copyinuio;
+
+#ifdef COMPAT_LINUX32
+	linux_copyinuio = (void *)linux32_copyinuio;
+#else
+	linux_copyinuio = (void *)linux64_copyinuio;
+#endif
+
+	return (user_writev(td, uap->fd, LINUX_USER_CAP_ARRAY(uap->iovp,
+	    uap->iovcnt), uap->iovcnt, linux_copyinuio));
+}
+#endif
+#endif
+
 int
 linux_pread(struct thread *td, struct linux_pread_args *uap)
 {
@@ -1210,7 +1293,8 @@ linux_pread(struct thread *td, struct linux_pread_args *uap)
 	offset = uap->offset;
 #endif
 
-	error = kern_pread(td, uap->fd, uap->buf, uap->nbyte, offset);
+	error = kern_pread(td, uap->fd, LINUX_USER_CAP(uap->buf, uap->nbyte),
+	    uap->nbyte, offset);
 	if (error == 0) {
 		/* This seems to violate POSIX but Linux does it. */
 		error = fgetvp(td, uap->fd, &cap_pread_rights, &vp);
@@ -1234,7 +1318,8 @@ linux_pwrite(struct thread *td, struct linux_pwrite_args *uap)
 	offset = uap->offset;
 #endif
 
-	return (kern_pwrite(td, uap->fd, uap->buf, uap->nbyte, offset));
+	return (kern_pwrite(td, uap->fd, LINUX_USER_CAP(uap->buf, uap->nbyte),
+	    uap->nbyte, offset));
 }
 
 int
@@ -1253,8 +1338,12 @@ linux_preadv(struct thread *td, struct linux_preadv_args *uap)
 	    (sizeof(offset) * 4)) | uap->pos_l;
 	if (offset < 0)
 		return (EINVAL);
-#ifdef COMPAT_LINUX32
-	error = linux32_copyinuio(PTRIN(uap->vec), uap->vlen, &auio);
+#if defined(COMPAT_LINUX32)
+	error = linux32_copyinuio(LINUX_USER_CAP_ARRAY(uap->vec, uap->vlen),
+	    uap->vlen, &auio);
+#elif defined(COMPAT_LINUX64)
+	error = linux64_copyinuio(LINUX_USER_CAP_ARRAY(uap->vec, uap->vlen),
+	    uap->vlen, &auio);
 #else
 	error = copyinuio(uap->vec, uap->vlen, &auio);
 #endif
@@ -1281,8 +1370,12 @@ linux_pwritev(struct thread *td, struct linux_pwritev_args *uap)
 	    (sizeof(offset) * 4)) | uap->pos_l;
 	if (offset < 0)
 		return (EINVAL);
-#ifdef COMPAT_LINUX32
-	error = linux32_copyinuio(PTRIN(uap->vec), uap->vlen, &auio);
+#if defined(COMPAT_LINUX32)
+	error = linux32_copyinuio(LINUX_USER_CAP_ARRAY(uap->vec, uap->vlen),
+	    uap->vlen, &auio);
+#elif defined(COMPAT_LINUX64)
+	error = linux64_copyinuio(LINUX_USER_CAP_ARRAY(uap->vec, uap->vlen),
+	    uap->vlen, &auio);
 #else
 	error = copyinuio(uap->vec, uap->vlen, &auio);
 #endif
@@ -1304,18 +1397,20 @@ linux_mount(struct thread *td, struct linux_mount_args *args)
 	mntonname = malloc(MNAMELEN, M_TEMP, M_WAITOK);
 	mntfromname = malloc(MNAMELEN, M_TEMP, M_WAITOK);
 	data = NULL;
-	error = copyinstr(args->filesystemtype, fstypename, MNAMELEN - 1,
-	    NULL);
+	error = copyinstr(LINUX_USER_CAP(args->filesystemtype, MNAMELEN),
+	    fstypename, MNAMELEN - 1, NULL);
 	if (error != 0)
 		goto out;
 	if (args->specialfile != NULL) {
-		error = copyinstr(args->specialfile, mntfromname, MNAMELEN - 1, NULL);
+		error = copyinstr(LINUX_USER_CAP(args->specialfile, MNAMELEN),
+		    mntfromname, MNAMELEN - 1, NULL);
 		if (error != 0)
 			goto out;
 	} else {
 		mntfromname[0] = '\0';
 	}
-	error = copyinstr(args->dir, mntonname, MNAMELEN - 1, NULL);
+	error = copyinstr(LINUX_USER_CAP(args->dir, MNAMELEN), mntonname,
+	    MNAMELEN - 1, NULL);
 	if (error != 0)
 		goto out;
 
@@ -1333,7 +1428,8 @@ linux_mount(struct thread *td, struct linux_mount_args *args)
 
 		strcpy(fstypename, "fusefs");
 		data = malloc(MNAMELEN, M_TEMP, M_WAITOK);
-		error = copyinstr(args->data, data, MNAMELEN - 1, NULL);
+		error = copyinstr(LINUX_USER_CAP(args->data, MNAMELEN), data,
+		    MNAMELEN - 1, NULL);
 		if (error != 0)
 			goto out;
 
@@ -1534,6 +1630,7 @@ fcntl_common(struct thread *td, struct linux_fcntl_args *args)
 	struct file *fp;
 	long arg;
 	int error, result;
+	void * __capability ptrarg;
 
 	switch (args->cmd) {
 	case LINUX_F_DUPFD:
@@ -1594,8 +1691,8 @@ fcntl_common(struct thread *td, struct linux_fcntl_args *args)
 		return (kern_fcntl(td, args->fd, F_SETFL, arg));
 
 	case LINUX_F_GETLK:
-		error = copyin((void *)args->arg, &linux_flock,
-		    sizeof(linux_flock));
+		ptrarg = LINUX_USER_CAP(args->arg, sizeof(linux_flock));
+		error = copyin(ptrarg, &linux_flock, sizeof(linux_flock));
 		if (error)
 			return (error);
 		linux_to_bsd_flock(&linux_flock, &bsd_flock);
@@ -1603,12 +1700,11 @@ fcntl_common(struct thread *td, struct linux_fcntl_args *args)
 		if (error)
 			return (error);
 		bsd_to_linux_flock(&bsd_flock, &linux_flock);
-		return (copyout(&linux_flock, (void *)args->arg,
-		    sizeof(linux_flock)));
+		return (copyout(&linux_flock, ptrarg, sizeof(linux_flock)));
 
 	case LINUX_F_SETLK:
-		error = copyin((void *)args->arg, &linux_flock,
-		    sizeof(linux_flock));
+		ptrarg = LINUX_USER_CAP(args->arg, sizeof(linux_flock));
+		error = copyin(ptrarg, &linux_flock, sizeof(linux_flock));
 		if (error)
 			return (error);
 		linux_to_bsd_flock(&linux_flock, &bsd_flock);
@@ -1616,8 +1712,8 @@ fcntl_common(struct thread *td, struct linux_fcntl_args *args)
 		    (intptr_t)&bsd_flock));
 
 	case LINUX_F_SETLKW:
-		error = copyin((void *)args->arg, &linux_flock,
-		    sizeof(linux_flock));
+		ptrarg = LINUX_USER_CAP(args->arg, sizeof(linux_flock));
+		error = copyin(ptrarg, &linux_flock, sizeof(linux_flock));
 		if (error)
 			return (error);
 		linux_to_bsd_flock(&linux_flock, &bsd_flock);
@@ -1735,7 +1831,7 @@ linux_chown(struct thread *td, struct linux_chown_args *args)
 		return (kern_fchownat(td, AT_FDCWD, args->path, UIO_USERSPACE,
 		    args->uid, args->gid, 0));
 	}
-	LCONVPATHEXIST(td, args->path, &path);
+	LCONVPATHEXIST(td, LINUX_USER_CAP_PATH(args->path), &path);
 	error = kern_fchownat(td, AT_FDCWD, PTR2CAP(path), UIO_SYSSPACE,
 	    args->uid, args->gid, 0);
 	LFREEPATH(path);
@@ -1756,10 +1852,10 @@ linux_fchownat(struct thread *td, struct linux_fchownat_args *args)
 	flag = (args->flag & LINUX_AT_SYMLINK_NOFOLLOW) == 0 ? 0 :
 	    AT_SYMLINK_NOFOLLOW;
 	if (!LUSECONVPATH(td)) {
-		return (kern_fchownat(td, dfd, __USER_CAP_PATH(args->filename),
+		return (kern_fchownat(td, dfd, LINUX_USER_CAP_PATH(args->filename),
 		    UIO_USERSPACE, args->uid, args->gid, flag));
 	}
-	LCONVPATHEXIST_AT(td, args->filename, &path, dfd);
+	LCONVPATHEXIST_AT(td, LINUX_USER_CAP_PATH(args->filename), &path, dfd);
 	error = kern_fchownat(td, dfd, PTR2CAP(path), UIO_SYSSPACE, args->uid,
 	    args->gid, flag);
 	LFREEPATH(path);
@@ -1777,7 +1873,7 @@ linux_lchown(struct thread *td, struct linux_lchown_args *args)
 		return (kern_fchownat(td, AT_FDCWD, args->path, UIO_USERSPACE, args->uid,
 		    args->gid, AT_SYMLINK_NOFOLLOW));
 	}
-	LCONVPATHEXIST(td, args->path, &path);
+	LCONVPATHEXIST(td, LINUX_USER_CAP_PATH(args->path), &path);
 	error = kern_fchownat(td, AT_FDCWD, PTR2CAP(path), UIO_SYSSPACE,
 	    args->uid, args->gid, AT_SYMLINK_NOFOLLOW);
 	LFREEPATH(path);
@@ -1885,7 +1981,8 @@ linux_pipe2(struct thread *td, struct linux_pipe2_args *args)
 	if (error != 0)
 		return (error);
 
-	error = copyout(fildes, args->pipefds, sizeof(fildes));
+	error = copyout(fildes, LINUX_USER_CAP_ARRAY(args->pipefds, 2),
+	    sizeof(fildes));
 	if (error != 0) {
 		(void)kern_close(td, fildes[0]);
 		(void)kern_close(td, fildes[1]);
@@ -1955,13 +2052,15 @@ linux_copy_file_range(struct thread *td, struct linux_copy_file_range_args
 	flags = 0;
 	inoffp = outoffp = NULL;
 	if (args->off_in != NULL) {
-		error = copyin(args->off_in, &inoff, sizeof(l_loff_t));
+		error = copyin(LINUX_USER_CAP_OBJ(args->off_in), &inoff,
+		    sizeof(l_loff_t));
 		if (error != 0)
 			return (error);
 		inoffp = &inoff;
 	}
 	if (args->off_out != NULL) {
-		error = copyin(args->off_out, &outoff, sizeof(l_loff_t));
+		error = copyin(LINUX_USER_CAP_OBJ(args->off_out), &outoff,
+		    sizeof(l_loff_t));
 		if (error != 0)
 			return (error);
 		outoffp = &outoff;
@@ -1970,9 +2069,11 @@ linux_copy_file_range(struct thread *td, struct linux_copy_file_range_args
 	error = kern_copy_file_range(td, args->fd_in, inoffp, args->fd_out,
 	    outoffp, args->len, flags);
 	if (error == 0 && args->off_in != NULL)
-		error = copyout(inoffp, args->off_in, sizeof(l_loff_t));
+		error = copyout(inoffp, LINUX_USER_CAP_OBJ(args->off_in),
+		    sizeof(l_loff_t));
 	if (error == 0 && args->off_out != NULL)
-		error = copyout(outoffp, args->off_out, sizeof(l_loff_t));
+		error = copyout(outoffp, LINUX_USER_CAP_OBJ(args->off_out),
+		    sizeof(l_loff_t));
 	return (error);
 }
 
@@ -1990,7 +2091,8 @@ linux_memfd_create(struct thread *td, struct linux_memfd_create_args *args)
 	 * does keep the rest of this function fairly clean as they don't have
 	 * to worry about cleanup on the way out.
 	 */
-	error = copyinstr(args->uname_ptr,
+	error = copyinstr(LINUX_USER_CAP(args->uname_ptr,
+	    LINUX_NAME_MAX - sizeof(LINUX_MEMFD_PREFIX) - 1),
 	    memfd_name + sizeof(LINUX_MEMFD_PREFIX) - 1,
 	    LINUX_NAME_MAX - sizeof(LINUX_MEMFD_PREFIX) - 1, NULL);
 	if (error != 0) {
