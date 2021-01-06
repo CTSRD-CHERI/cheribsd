@@ -38,10 +38,11 @@
 #include <cheri/cheric.h>
 
 #include <machine/frame.h>
+#include <machine/pte.h>
 #include <machine/riscvreg.h>
 #include <machine/vmparam.h>
 
-void *cheri_kall_capability = (void *)(intcap_t)-1;
+void *kernel_root_cap = (void *)(intcap_t)-1;
 
 void
 cheri_init_capabilities(void * __capability kroot)
@@ -65,6 +66,15 @@ cheri_init_capabilities(void * __capability kroot)
 	userspace_root_sealcap = ctemp;
 
 	swap_restore_cap = kroot;
+
+#ifdef __CHERI_PURE_CAPABILITY__
+	ctemp = cheri_setaddress(kroot, VM_MAX_KERNEL_ADDRESS - L2_SIZE);
+	ctemp = cheri_setboundsexact(ctemp, L2_SIZE);
+	ctemp = cheri_andperm(ctemp, CHERI_PERMS_KERNEL_DATA);
+
+	kernel_root_cap = cheri_andperm(kroot,
+	    ~(CHERI_PERM_SEAL | CHERI_PERM_UNSEAL));
+#endif
 }
 
 void
@@ -105,3 +115,12 @@ cheri_signal_sandboxed(struct thread *td)
 	}
 	return (0);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20200803,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "support"
+//   ]
+// }
+// CHERI CHANGES END
