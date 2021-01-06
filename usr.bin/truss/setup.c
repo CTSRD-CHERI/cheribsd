@@ -128,6 +128,15 @@ static struct procabi linux32 = {
 };
 #endif
 
+#ifdef __CHERI_PURE_CAPABILITY__
+static struct procabi linux64 = {
+	"Linux64",
+	SYSDECODE_ABI_LINUX64,
+	STAILQ_HEAD_INITIALIZER(linux64.extra_syscalls),
+	{ NULL }
+};
+#endif
+
 static struct procabi_table abis[] = {
 	{ "CloudABI ELF32", &cloudabi32 },
 	{ "CloudABI ELF64", &cloudabi64 },
@@ -155,11 +164,18 @@ static struct procabi_table abis[] = {
 #if defined(__i386__)
 	{ "FreeBSD a.out", &freebsd },
 #endif
-#ifdef __LP64__
-	{ "Linux ELF64", &linux },
-	{ "Linux ELF32", &linux32 },
-#else
+#ifdef __ILP32__
 	{ "Linux ELF", &linux },
+#else
+#ifdef __CHERI_PURE_CAPABILITY__
+	{ "Linux ELF64C", &linux },
+	{ "Linux ELF64", &linux64 },
+#else
+	/* This permits hybrid truss to trace CheriABI. */
+	{ "Linux ELF64C", &linux },
+	{ "Linux ELF64", &linux },
+#endif
+	{ "Linux ELF32", &linux32 },
 #endif
 	/*
 	 * XXX: Temporary hack for COMPAT_CHERIABI.
