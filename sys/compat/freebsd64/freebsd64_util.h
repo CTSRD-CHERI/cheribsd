@@ -56,9 +56,6 @@ struct freebsd64_ps_strings {
 	size_t		ps_sbobjectslen;
 };
 
-#define	FREEBSD64_PS_STRINGS	\
-	(USRSTACK - sizeof(struct freebsd64_ps_strings))
-
 typedef struct {	/* Auxiliary vector entry on initial stack */
 	long	a_type;		/* Entry type. */
 	union {

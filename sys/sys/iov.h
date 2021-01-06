@@ -159,7 +159,7 @@
  */
 struct pci_iov_schema
 {
-	void *schema;
+	void * __kerncap schema;
 	size_t len;
 	int error;
 };
@@ -247,7 +247,7 @@ struct pci_iov_schema
  */
 struct pci_iov_arg
 {
-	void *config;
+	void * __kerncap config;
 	size_t len;
 };
 

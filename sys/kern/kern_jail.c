@@ -4272,7 +4272,7 @@ DB_SHOW_COMMAND(prison, db_show_prison_command)
 					break;
 		if (pr == NULL)
 			/* Assume address points to a valid prison. */
-			pr = DB_DATA_PTR(addr, sizeof(*pr));
+			pr = DB_DATA_PTR(addr, struct prison);
 	}
 	db_show_prison(pr);
 }

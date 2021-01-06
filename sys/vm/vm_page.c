@@ -5522,7 +5522,7 @@ DB_SHOW_COMMAND(pginfo, vm_page_print_pginfo)
 	else if (phys)
 		m = PHYS_TO_VM_PAGE(addr);
 	else
-		m = DB_DATA_PTR(addr, sizeof(*m));
+		m = DB_DATA_PTR(addr, struct vm_page);
 	db_printf(
     "page %p obj %p pidx 0x%jx phys 0x%jx q %d ref 0x%x\n"
     "  af 0x%x of 0x%x f 0x%x act %d busy %x valid 0x%x dirty 0x%x\n",

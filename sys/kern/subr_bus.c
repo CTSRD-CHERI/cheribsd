@@ -6105,7 +6105,7 @@ DB_SHOW_COMMAND(device, db_show_device)
 	if (!have_addr)
 		return;
 
-	dev = DB_DATA_PTR(addr, sizeof(struct device));
+	dev = DB_DATA_PTR(addr, struct device);
 	db_print_device(dev);
 }
 
@@ -6118,7 +6118,6 @@ DB_SHOW_ALL_COMMAND(devices, db_show_all_devices)
 	}
 }
 #endif
-
 // CHERI CHANGES START
 // {
 //   "updated": 20200803,

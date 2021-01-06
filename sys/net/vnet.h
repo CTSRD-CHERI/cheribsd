@@ -288,17 +288,23 @@ extern struct sx vnet_sxlock;
     static t VNET_NAME(n) __section(VNET_SETNAME) __used
 #endif
 #ifdef __CHERI_PURE_CAPABILITY__
+#define	VNET_BIAS	0
+
 /*
  * XXX: This cannot use exact bounds currently as vnet variables are
- * not suitably aligned.  In particular, V_ip6qb in
+ * not suitably aligned by the toolchain (CHERI padding is not added
+ * for variables with section attributes).  For example, V_ip6qb in
  * sys/netinet6/frag6.c is a large variable requiring larger
  * alignment.
+ *
+ * See https://github.com/CTSRD-CHERI/llvm-project/issues/495
  */
-#define	_VNET_PTR(b, n)						\
-	cheri_setbounds((__typeof(VNET_NAME(n)) *)((b) +	\
-	    ((vaddr_t)&VNET_NAME(n) - (vaddr_t)VNET_START)),	\
+#define	_VNET_PTR(b, n)							\
+	cheri_setbounds((__typeof(VNET_NAME(n)) *)((b) +		\
+	    ((ptraddr_t)&VNET_NAME(n) - (ptraddr_t)VNET_START)),	\
 	    sizeof(VNET_NAME(n)))
 #else
+#define	VNET_BIAS	((char *)NULL - (char *)VNET_START)
 #define	_VNET_PTR(b, n)		(__typeof(VNET_NAME(n))*)		\
 				    ((b) + (uintptr_t)&VNET_NAME(n))
 #endif

@@ -77,15 +77,14 @@ KDB_BACKEND(ddb, db_init, db_trace_self_wrapper, db_trace_thread_wrapper,
  * boot loaders different than the native one (like Xen).
  */
 vm_pointer_t ksymtab, kstrtab;
-vm_offset_t ksymtab_relbase;
 vm_size_t ksymtab_size;
+vm_offset_t ksymtab_relbase;
+static struct db_private ksymtab_private;
 
 #ifdef __CHERI_PURE_CAPABILITY__
 void *db_code_cap;
 void *db_data_cap;
 #endif
-
-static struct db_private ksymtab_private;
 
 bool
 X_db_line_at_pc(db_symtab_t *symtab, c_db_sym_t sym, char **file, int *line,
@@ -221,10 +220,8 @@ db_fetch_ksymtab(vm_pointer_t ksym_start, vm_pointer_t ksym_end, vm_offset_t rel
 			    = 0;
 		} else {
 #ifdef __CHERI_PURE_CAPABILITY__
-			ksymtab = (vm_pointer_t)cheri_setbounds((char *)ksymtab,
-			    ksymtab_size);
-			kstrtab = (vm_pointer_t)cheri_setbounds((char *)kstrtab,
-			    strsz);
+			ksymtab = cheri_setbounds(ksymtab, ksymtab_size);
+			kstrtab = cheri_setbounds(kstrtab, strsz);
 #endif
 		}
 	}
@@ -249,10 +246,8 @@ db_init(void)
 	}
 	db_add_symbol_table(NULL, NULL, "kld", NULL);
 #ifdef __CHERI_PURE_CAPABILITY__
-	db_code_cap = cheri_andperm(kernel_root_cap,
-	    CHERI_PERMS_KERNEL_CODE);
-	db_data_cap = cheri_andperm(kernel_root_cap,
-	    CHERI_PERMS_KERNEL_DATA);
+	db_code_cap = cheri_andperm(kernel_root_cap, CHERI_PERMS_KERNEL_CODE);
+	db_data_cap = cheri_andperm(kernel_root_cap, CHERI_PERMS_KERNEL_DATA);
 #endif
 	return (1);	/* We're the default debugger. */
 }
@@ -343,7 +338,6 @@ db_data_ptr(db_addr_t addr, size_t len)
 	return (cheri_setbounds(db_data_ptr_unbound(addr), len));
 }
 #endif
-
 // CHERI CHANGES START
 // {
 //   "updated": 20200706,

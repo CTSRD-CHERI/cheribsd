@@ -42,13 +42,13 @@
 static inline void *
 ERR_PTR(intptr_t error)
 {
-	return (void *)error;
+	return (void *)(intptr_t)error;
 }
 
-static inline intptr_t
+static inline long
 PTR_ERR(const void *ptr)
 {
-	return (intptr_t)ptr;
+	return (long)(intptr_t)ptr;
 }
 
 static inline bool

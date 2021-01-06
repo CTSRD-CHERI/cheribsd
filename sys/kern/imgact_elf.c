@@ -1687,6 +1687,9 @@ __elfN(freebsd_fixup)(uintcap_t *stack_base, struct image_params *imgp)
 	if (suword(base, imgp->args->argc) == -1)
 		return (EFAULT);
 	*stack_base = (uintcap_t)base;
+#else
+	KASSERT(__builtin_is_aligned(*stack_base, sizeof(void * __capability)),
+	    ("CheriABI stack pointer not properly aligned"));
 #endif
 	return (0);
 }
@@ -2903,9 +2906,9 @@ __elfN(note_procstat_psstrings)(void *arg, struct sbuf *sb, size_t *sizep)
 		KASSERT(*sizep == size, ("invalid size"));
 		structsize = sizeof(ps_strings);
 #if defined(COMPAT_FREEBSD32) && __ELF_WORD_SIZE == 32
-		ps_strings = PTROUT(p->p_sysent->sv_psstrings);
+		ps_strings = PTROUT(p->p_psstrings);
 #else
-		ps_strings = p->p_sysent->sv_psstrings;
+		ps_strings = p->p_psstrings;
 #endif
 		sbuf_bcat(sb, &structsize, sizeof(structsize));
 		sbuf_bcat(sb, &ps_strings, sizeof(ps_strings));

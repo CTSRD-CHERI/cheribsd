@@ -3108,7 +3108,7 @@ DB_SHOW_COMMAND(bpf_if, db_show_bpf_if)
 		return;
 	}
 
-	bpf_show_bpf_if(DB_DATA_PTR(addr, sizeof(struct bpf_if)));
+	bpf_show_bpf_if(DB_DATA_PTR(addr, struct bpf_if));
 }
 #endif
 // CHERI CHANGES START

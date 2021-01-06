@@ -88,7 +88,7 @@ struct sysentvec elf_freebsd_freebsd64_sysvec = {
 	.sv_minuser	= VM_MIN_ADDRESS,
 	.sv_maxuser	= VM_MAXUSER_ADDRESS,
 	.sv_usrstack	= USRSTACK,
-	.sv_psstrings	= FREEBSD64_PS_STRINGS,
+	.sv_szpsstrings	= sizeof(struct freebsd64_ps_strings),
 	.sv_stackprot	= VM_PROT_RW_CAP,
 	.sv_copyout_auxargs = __elfN(freebsd_copyout_auxargs),
 	.sv_copyout_strings = freebsd64_copyout_strings,
@@ -308,7 +308,7 @@ freebsd64_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	if (sysent->sv_sigcode_base != 0)
 		tf->tf_ra = (register_t)sysent->sv_sigcode_base;
 	else
-		tf->tf_ra = (register_t)(sysent->sv_psstrings -
+		tf->tf_ra = (register_t)(p->p_psstrings -
 		    *(sysent->sv_szsigcode));
 
 	CTR3(KTR_SIG, "sendsig: return td=%p pc=%#x sp=%#x", td, tf->tf_sepc,

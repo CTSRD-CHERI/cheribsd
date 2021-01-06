@@ -1499,7 +1499,7 @@ DB_SHOW_COMMAND(multizone_matches, db_show_multizone_matches)
 		db_printf("Usage: show multizone_matches <malloc type/addr>\n");
 		return;
 	}
-	mtp = DB_DATA_PTR(addr, sizeof(*mtp));
+	mtp = DB_DATA_PTR(addr, struct malloc_type);
 	if (mtp->ks_version != M_VERSION) {
 		db_printf("Version %lx does not match expected %x\n",
 		    mtp->ks_version, M_VERSION);

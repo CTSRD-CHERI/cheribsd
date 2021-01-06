@@ -1850,7 +1850,7 @@ DB_SHOW_COMMAND(vmemdump, vmemdump)
 		return;
 	}
 
-	vmem_dump(DB_DATA_PTR(addr, sizeof(vmem_t)), db_printf);
+	vmem_dump(DB_DATA_PTR(addr, const vmem_t), db_printf);
 }
 
 DB_SHOW_ALL_COMMAND(vmemdump, vmemdumpall)
@@ -1874,7 +1874,7 @@ DB_SHOW_COMMAND(vmem, vmem_summ)
 		return;
 	}
 
-	vm = DB_DATA_PTR(addr, sizeof(*vm));
+	vm = DB_DATA_PTR(addr, const vmem_t);
 	db_printf("vmem %p '%s'\n", vm, vm->vm_name);
 	db_printf("\tquantum:\t%zu\n", vm->vm_quantum_mask + 1);
 	db_printf("\tsize:\t%zu\n", vm->vm_size);

@@ -2673,7 +2673,7 @@ DB_SHOW_COMMAND(ffs, db_show_ffs)
 	struct ufsmount *ump;
 
 	if (have_addr) {
-		mp = DB_DATA_PTR(addr, sizeof(*mp));
+		mp = DB_DATA_PTR(addr, struct mount);
 		ump = VFSTOUFS(mp);
 		db_print_ffs(ump);
 		return;

@@ -79,7 +79,7 @@
 #include <dev/usb/controller/ohcireg.h>
 
 #define	OHCI_BUS2SC(bus) \
-	__containerof((bus), ohci_softc_t, sc_bus)
+	__containerof(bus, ohci_softc_t, sc_bus)
 
 #ifdef USB_DEBUG
 static int ohcidebug = 0;

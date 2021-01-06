@@ -916,7 +916,6 @@ db_hex2dec(db_expr_t expr)
 	}
 	return (val);
 }
-
 // CHERI CHANGES START
 // {
 //   "updated": 20200803,

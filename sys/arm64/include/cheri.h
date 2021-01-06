@@ -36,6 +36,14 @@
 #ifdef _KERNEL
 #define	__USER_DDC	((void * __capability)curthread->td_frame->tf_ddc)
 #define	__USER_PCC	((void * __capability)curthread->td_frame->tf_elr)
+
+/*
+ * Morello specific kernel utility functions.
+ */
+void		cheri_init_capabilities(void * __capability kroot);
+void		hybridabi_thread_setregs(struct thread *td, unsigned long entry_addr);
+int		cheri_esr_to_sicode(uint64_t esr);
+const char	*cheri_fsc_string(uint8_t fsc);
 #endif
 
 #endif /* _MACHINE_CHERI_H_ */

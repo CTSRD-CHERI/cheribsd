@@ -860,7 +860,7 @@ DB_SHOW_COMMAND(llentry, db_show_llentry)
 		return;
 	}
 
-	llatbl_lle_show(DB_DATA_PTR(addr, sizeof(struct llentry_sa)));
+	llatbl_lle_show(DB_DATA_PTR(addr, struct llentry_sa));
 }
 
 static void
@@ -889,7 +889,7 @@ DB_SHOW_COMMAND(lltable, db_show_lltable)
 		return;
 	}
 
-	llatbl_llt_show(DB_DATA_PTR(addr, sizeof(struct lltable)));
+	llatbl_llt_show(DB_DATA_PTR(addr, struct lltable));
 }
 
 DB_SHOW_ALL_COMMAND(lltables, db_show_all_lltables)
@@ -918,7 +918,6 @@ DB_SHOW_ALL_COMMAND(lltables, db_show_all_lltables)
 	}
 }
 #endif
-
 // CHERI CHANGES START
 // {
 //   "updated": 20200803,

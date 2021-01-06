@@ -2736,7 +2736,7 @@ DB_SHOW_COMMAND(object, vm_object_print_static)
 	if (!have_addr)
 		return;
 
-	object = DB_DATA_PTR(addr, sizeof(*object));
+	object = DB_DATA_PTR(addr, struct vm_object);
 	db_iprintf(
 	    "Object %p: type=%d, size=0x%jx, res=%d, ref=%d, flags=0x%x ruid %d charge %jx\n",
 	    object, (int)object->type, (uintmax_t)object->size,

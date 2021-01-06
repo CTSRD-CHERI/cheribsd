@@ -4161,7 +4161,7 @@ DB_SHOW_COMMAND(vnode, db_show_vnode)
 
 	if (!have_addr)
 		return;
-	vp = DB_DATA_PTR(addr, sizeof(*vp));
+	vp = DB_DATA_PTR(addr, struct vnode);
 	vn_printf(vp, "vnode ");
 }
 
@@ -4192,7 +4192,7 @@ DB_SHOW_COMMAND(mount, db_show_mount)
 		return;
 	}
 
-	mp = DB_DATA_PTR(addr, sizeof(*mp));
+	mp = DB_DATA_PTR(addr, struct mount);
 	db_printf("%p %s on %s (%s)\n", mp, mp->mnt_stat.f_mntfromname,
 	    mp->mnt_stat.f_mntonname, mp->mnt_stat.f_fstypename);
 

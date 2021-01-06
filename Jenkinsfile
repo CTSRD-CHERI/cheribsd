@@ -34,8 +34,9 @@ if (!env.CHANGE_ID && archiveBranches.contains(env.BRANCH_NAME)) {
 // Add an architecture selector for manual builds
 def allArchitectures = [
     "aarch64", "amd64",
-    // TODO: enable once dependencies have been merged: "morello-hybrid", "morello-purecap",
     "mips64", "mips64-hybrid", "mips64-purecap",
+    "morello-hybrid",
+    // XXX: Enable once kernel-toolchain can handle aarch64c: "morello-purecap",
     "riscv64", "riscv64-hybrid", "riscv64-purecap"
 ]
 jobProperties.add(parameters([text(defaultValue: allArchitectures.join('\n'),
@@ -67,9 +68,6 @@ def buildImage(params, String suffix) {
         maybeArchiveArtifacts(params, suffix)
         return
     }
-}
-
-def runTests(params, String suffix) {
     stage("Running tests") {
         // copy qemu archive and run directly on the host
         dir("qemu-${params.buildOS}") { deleteDir() }
@@ -113,11 +111,6 @@ find test-results
             archiveArtifacts allowEmptyArchive: true, artifacts: "test-results/${suffix}/*.xml", onlyIfSuccessful: false
         }
     }
-}
-
-def buildImageAndRunTests(params, String suffix) {
-    buildImage(params, suffix)
-    runTests(params, suffix)
     maybeArchiveArtifacts(params, suffix)
 }
 
@@ -179,16 +172,30 @@ selectedArchitectures.each { suffix ->
         } else {
             cheribuildArgs.add('--cheribsd/no-debug-info')
         }
+        // XXX: Remove once dev can build world
+        if (suffix.startsWith("morello")) {
+            def gitBranch = 'master'
+            if (env.CHANGE_ID) {
+                gitBranch = env.CHANGE_TARGET
+            } else if (env.BRANCH_NAME) {
+                gitBranch = env.BRANCH_NAME
+            }
+            if (gitBranch != 'morello-dev') {
+                cheribuildArgs.add('--skip-world')
+            }
+        }
         cheribuildProject(target: "cheribsd-${suffix}", architecture: suffix,
                 extraArgs: cheribuildArgs.join(" "),
                 skipArchiving: true, skipTarball: true,
                 sdkCompilerOnly: true, // We only need clang not the CheriBSD sysroot since we are building that.
+                // XXX: Remove once morello-dev is gone
                 customGitCheckoutDir: suffix.startsWith('morello') ? 'morello-cheribsd' : 'cheribsd',
                 gitHubStatusContext: GlobalVars.isTestSuiteJob ? "testsuite/${suffix}" : "ci/${suffix}",
                 // Delete stale compiler/sysroot
                 beforeBuild: { params -> dir('cherisdk') { deleteDir() } },
                 /* Custom function to run tests since --test will not work (yet) */
-                runTests: false, afterBuild: { params -> buildImageAndRunTests(params, suffix) })
+                runTests: false,
+                afterBuild: { params -> if (!cheribuildArgs.contains('--skip-world')) { buildImageAndRunTests(params, suffix) } })
     }
 }
 

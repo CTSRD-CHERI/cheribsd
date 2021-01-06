@@ -70,11 +70,12 @@ DB_SHOW_COMMAND(sin, db_show_sin)
 	struct sockaddr_in *sin;
 
 	if (!have_addr) {
+		/* usage: No need to confess if you didn't sin. */
 		db_printf("usage: show sin <struct sockaddr_in *>\n");
 		return;
 	}
 
-	sin = DB_DATA_PTR(addr, sizeof(*sin));
+	sin = DB_DATA_PTR(addr, struct sockaddr_in);
 	in_show_sockaddr_in(sin);
 }
 
@@ -110,11 +111,10 @@ DB_SHOW_COMMAND(in_ifaddr, db_show_in_ifaddr)
 		return;
 	}
 
-	ia = DB_DATA_PTR(addr, sizeof(*ia));
+	ia = DB_DATA_PTR(addr, struct in_ifaddr);
 	in_show_in_ifaddr(ia);
 }
 #endif
-
 // CHERI CHANGES START
 // {
 //   "updated": 20200803,

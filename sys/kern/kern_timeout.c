@@ -1476,7 +1476,7 @@ DB_SHOW_COMMAND(callout, db_show_callout)
 		return;
 	}
 
-	_show_callout(DB_DATA_PTR(addr, sizeof(struct callout)));
+	_show_callout(DB_DATA_PTR(addr, struct callout));
 }
 
 static void
@@ -1517,7 +1517,6 @@ DB_SHOW_COMMAND(callout_last, db_show_callout_last)
 	}
 }
 #endif /* DDB */
-
 // CHERI CHANGES START
 // {
 //   "updated": 20200803,

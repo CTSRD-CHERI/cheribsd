@@ -5316,7 +5316,7 @@ DB_SHOW_COMMAND(buffer, db_show_buffer)
 		return;
 	}
 
-	bp = DB_DATA_PTR(addr, sizeof(*bp));
+	bp = DB_DATA_PTR(addr, struct buf);
 	db_printf("buf at %p\n", bp);
 	db_printf("b_flags = 0x%b, b_xflags=0x%b\n",
 	    (u_int)bp->b_flags, PRINT_BUF_FLAGS,
@@ -5454,7 +5454,7 @@ DB_SHOW_COMMAND(vnodebufs, db_show_vnodebufs)
 		db_printf("usage: show vnodebufs <addr>\n");
 		return;
 	}
-	vp = DB_DATA_PTR(addr, sizeof(*vp));
+	vp = DB_DATA_PTR(addr, struct vnode);
 	db_printf("Clean buffers:\n");
 	TAILQ_FOREACH(bp, &vp->v_bufobj.bo_clean.bv_hd, b_bobufs) {
 		db_show_buffer((uintptr_t)bp, 1, 0, NULL);

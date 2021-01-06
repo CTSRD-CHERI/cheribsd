@@ -351,7 +351,7 @@ DB_SHOW_COMMAND(rangeset, rangeset_show_fn)
 		return;
 	}
 
-	rs = DB_DATA_PTR(addr, sizeof(*rs));
+	rs = DB_DATA_PTR(addr, struct rangeset);
 	db_printf("rangeset %p\n", rs);
 	for (cursor = 0;; cursor = r->re_start + 1) {
 		r1 = pctrie_lookup_ge(&rs->rs_trie, cursor);
@@ -363,7 +363,6 @@ DB_SHOW_COMMAND(rangeset, rangeset_show_fn)
 	}
 }
 #endif
-
 // CHERI CHANGES START
 // {
 //   "updated": 20200803,

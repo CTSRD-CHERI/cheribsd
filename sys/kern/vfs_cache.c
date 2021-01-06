@@ -3558,7 +3558,7 @@ DB_SHOW_COMMAND(vpath, db_show_vpath)
 		return;
 	}
 
-	vp = DB_DATA_PTR(addr, sizeof(*vp));
+	vp = DB_DATA_PTR(addr, struct vnode);
 	db_print_vpath(vp);
 }
 
@@ -4782,8 +4782,6 @@ out:
 //     "user_capabilities"
 //   ],
 //   "changes_purecap": [
-//     "hashing",
-//     "subobject_bounds",
 //     "kdb"
 //   ]
 // }

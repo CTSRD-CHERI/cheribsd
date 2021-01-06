@@ -307,14 +307,15 @@ void	textdump_dumpsys(struct dumperinfo *di);
  * Macros to construct valid pointers from addresses.
  */
 #ifdef __CHERI_PURE_CAPABILITY__
-#define	DB_CODE_PTR(addr)	db_code_ptr((addr))
-#define	DB_DATA_PTR(addr, len)	db_data_ptr((addr), (len))
-#define	DB_DATA_PTR_UNBOUND(addr)	db_data_ptr_unbound((addr))
+#define	DB_CODE_PTR(addr)			db_code_ptr((addr))
+#define	DB_DATA_PTR_LEN(addr, type, len)	((type *)db_data_ptr((addr), (len)))
+#define	DB_DATA_PTR_UNBOUND(addr, type)		((type *)db_data_ptr_unbound((addr)))
 #else
-#define	DB_CODE_PTR(addr)	((void *)(addr))
-#define	DB_DATA_PTR(addr, len)	((void *)(addr))
-#define	DB_DATA_PTR_UNBOUND(addr)	((void *)(addr))
+#define	DB_CODE_PTR(addr)			((void *)(addr))
+#define	DB_DATA_PTR_LEN(addr, type, len)	((type *)(addr))
+#define	DB_DATA_PTR_UNBOUND(addr, type)		((type *)(addr))
 #endif
+#define	DB_DATA_PTR(addr, type)			DB_DATA_PTR_LEN(addr, type, sizeof(type))
 
 #endif /* !_DDB_DDB_H_ */
 // CHERI CHANGES START

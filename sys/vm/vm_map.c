@@ -5143,7 +5143,7 @@ retry:
 	 * limit.
 	 */
 	is_procstack = addr >= vm->vm_maxsaddr &&
-	    addr < (vm_offset_t)p->p_sysent->sv_usrstack;
+	    addr < (vm_offset_t)p->p_usrstack;
 	if (is_procstack && (ctob(vm->vm_ssize) + grow_amount > stacklim))
 		return (KERN_NO_SPACE);
 
@@ -6160,7 +6160,7 @@ DB_SHOW_COMMAND(map, map)
 		db_printf("usage: show map <addr>\n");
 		return;
 	}
-	vm_map_print(DB_DATA_PTR(addr, sizeof(struct vm_map)));
+	vm_map_print(DB_DATA_PTR(addr, struct vm_map));
 }
 
 DB_SHOW_COMMAND(procvm, procvm)

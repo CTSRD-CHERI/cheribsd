@@ -805,7 +805,7 @@ DB_SHOW_COMMAND(pctrienode, db_show_pctrienode)
 
         if (!have_addr)
                 return;
-	node = DB_DATA_PTR(addr, sizeof(*node));
+	node = DB_DATA_PTR(addr, struct pctrie_node);
 	db_printf("node %p, owner %jx, children count %u, level %u:\n",
 	    (void *)node, (uintmax_t)node->pn_owner, node->pn_count,
 	    node->pn_clev);

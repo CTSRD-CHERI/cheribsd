@@ -124,7 +124,7 @@ db_read_bytes(vm_offset_t addr, size_t size, char *data)
 	ret = setjmp(jb);
 
 	if (ret == 0) {
-		src = (const char *)DB_DATA_PTR(addr, size);
+		src = DB_DATA_PTR_LEN(addr, const char, size);
 		while (size-- > 0)
 			*data++ = *src++;
 	}
@@ -147,7 +147,7 @@ db_write_bytes(vm_offset_t addr, size_t size, char *data)
 	prev_jb = kdb_jmpbuf(jb);
 	ret = setjmp(jb);
 	if (ret == 0) {
-		dst = (char *)DB_DATA_PTR(addr, size);
+		dst = DB_DATA_PTR_LEN(addr, char, size);
 		while (size-- > 0)
 			*dst++ = *data++;
 
@@ -158,7 +158,6 @@ db_write_bytes(vm_offset_t addr, size_t size, char *data)
 
 	return (ret);
 }
-
 // CHERI CHANGES START
 // {
 //   "updated": 20200803,

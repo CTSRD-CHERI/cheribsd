@@ -246,10 +246,8 @@ db_value_of_name_pcpu(const char *name, db_expr_t *valuep)
 	db_symbol_values(sym, &name, &value);
 	if (value < (db_expr_t)DPCPU_START || value >= (db_expr_t)DPCPU_STOP)
 		return (false);
-#ifdef __CHERI_PURE_CAPABILITY__
-	value -= (db_expr_t)DPCPU_START;
-#endif
-	*valuep = (db_expr_t)((uintptr_t)value + dpcpu_off[cpu]);
+	*valuep = (db_expr_t)(dpcpu_off[cpu] - DPCPU_BIAS +
+	    ((ptraddr_t)value - (ptraddr_t)DPCPU_START));
 	return (true);
 }
 
@@ -273,10 +271,8 @@ db_value_of_name_vnet(const char *name, db_expr_t *valuep)
 	db_symbol_values(sym, &name, &value);
 	if (value < (db_expr_t)VNET_START || value >= (db_expr_t)VNET_STOP)
 		return (false);
-#ifdef __CHERI_PURE_CAPABILITY__
-	value -= (db_expr_t)VNET_START;
-#endif
-	*valuep = (db_expr_t)((uintptr_t)value + vnet->vnet_data_base);
+	*valuep = (db_expr_t)((uintptr_t)vnet->vnet_data_mem +
+	    ((ptraddr_t)value - (ptraddr_t)VNET_START));
 	return (true);
 #else
 	return (false);

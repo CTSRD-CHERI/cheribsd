@@ -97,6 +97,7 @@ __FBSDID("$FreeBSD$");
 #if __has_feature(capabilities)
 #include <cheri/cheri.h>
 #include <cheri/cheric.h>
+#include <cheri/cherireg.h>
 #endif
 
 #ifdef KDTRACE_HOOKS
@@ -165,12 +166,12 @@ sysctl_kern_ps_strings(SYSCTL_HANDLER_ARGS)
 #ifdef SCTL_MASK32
 	if (req->flags & SCTL_MASK32) {
 		unsigned int val;
-		val = (unsigned int)p->p_sysent->sv_psstrings;
+		val = (unsigned int)p->p_psstrings;
 		error = SYSCTL_OUT(req, &val, sizeof(val));
 	} else
 #endif
-		error = SYSCTL_OUT(req, &p->p_sysent->sv_psstrings,
-		   sizeof(p->p_sysent->sv_psstrings));
+		error = SYSCTL_OUT(req, &p->p_psstrings,
+		   sizeof(p->p_psstrings));
 	return error;
 }
 
@@ -184,12 +185,12 @@ sysctl_kern_usrstack(SYSCTL_HANDLER_ARGS)
 #ifdef SCTL_MASK32
 	if (req->flags & SCTL_MASK32) {
 		unsigned int val;
-		val = (unsigned int)p->p_sysent->sv_usrstack;
+		val = (unsigned int)p->p_usrstack;
 		error = SYSCTL_OUT(req, &val, sizeof(val));
 	} else
 #endif
-		error = SYSCTL_OUT(req, &p->p_sysent->sv_usrstack,
-		    sizeof(p->p_sysent->sv_usrstack));
+		error = SYSCTL_OUT(req, &p->p_usrstack,
+		    sizeof(p->p_usrstack));
 	return error;
 }
 
@@ -1060,6 +1061,9 @@ exec_new_vmspace(struct image_params *imgp, struct sysentvec *sv)
 	struct rlimit rlim_stack;
 	vm_offset_t sv_minuser;
 	vm_pointer_t stack_addr;
+#if __has_feature(capabilities)
+	vm_pointer_t strings_addr;
+#endif
 	vm_map_t map;
 	u_long ssiz;
 	vm_pointer_t shared_page_addr;
@@ -1169,13 +1173,27 @@ exec_new_vmspace(struct image_params *imgp, struct sysentvec *sv)
 	} else {
 		ssiz = maxssiz;
 	}
+#if __has_feature(capabilities)
+	/*
+	 * NB: This may cause the stack to exceed the administrator-
+	 * configured stack size limit.
+	 */
+	ssiz = CHERI_REPRESENTABLE_LENGTH(ssiz);
+#endif
 	imgp->eff_stack_sz = lim_cur(curthread, RLIMIT_STACK);
 	if (ssiz < imgp->eff_stack_sz)
 		imgp->eff_stack_sz = ssiz;
+	p->p_usrstack = sv->sv_usrstack;
+#if __has_feature(capabilities)
+	p->p_usrstack = CHERI_REPRESENTABLE_BASE(p->p_usrstack, ssiz);
+#endif
+	p->p_psstrings = p->p_usrstack - sv->sv_szpsstrings;
+
 	/* We reserve the whole max stack size with restricted permission */
-	stack_addr = sv->sv_usrstack - ssiz;
+	stack_addr =  p->p_usrstack - ssiz;
 	stack_prot = (obj != NULL && imgp->stack_prot != 0) ? imgp->stack_prot :
 	    sv->sv_stackprot;
+	imgp->stack_sz = ssiz;
 	error = vm_map_reservation_create_fixed(map, &stack_addr, ssiz,
 	    PAGE_SIZE, stack_prot);
 	if (error != KERN_SUCCESS)
@@ -1187,17 +1205,44 @@ exec_new_vmspace(struct image_params *imgp, struct sysentvec *sv)
 		vm_map_reservation_delete(map, cheri_kern_getbase(stack_addr));
 		return (vm_mmap_to_errno(error));
 	}
+
 #if __has_feature(capabilities)
 #ifdef __CHERI_PURE_CAPABILITY__
-	imgp->ustack_capability = (void *)stack_addr;
+	imgp->stack = (void *)stack_addr;
 #else
-	imgp->ustack_capability = cheri_capability_build_user_data(
+	imgp->stack = cheri_capability_build_user_data(
 	    (~CHERI_CAP_PERM_RWX | vm_map_prot2perms(stack_prot)) &
-	    CHERI_CAP_USER_DATA_PERMS,
-	    CHERI_REPRESENTABLE_BASE(stack_addr, ssiz),
-	    CHERI_REPRESENTABLE_LENGTH(ssiz), 0);
+	    CHERI_CAP_USER_DATA_PERMS, stack_addr, ssiz, ssiz);
 #endif
+
+	if (sv->sv_flags & SV_CHERI) {
+		/*
+		 * Map a seperate space for strings outside the stack.
+		 * We currently place it just just below the stack as
+		 * this avoides collisions with init which is linked
+		 * near the bottom of the address space.
+		 */
+		strings_addr =
+		    CHERI_REPRESENTABLE_BASE(stack_addr - ARG_MAX, ARG_MAX);
+		error = vm_mmap_object(map, &strings_addr, 0, ARG_MAX,
+		    sv->sv_stackprot, sv->sv_stackprot, MAP_ANON | MAP_FIXED,
+		    NULL, 0, FALSE, td);
+		if (error != KERN_SUCCESS)
+			return (vm_mmap_to_errno(error));
+#ifdef __CHERI_PURE_CAPABILITY__
+		imgp->strings = (void *)strings_addr;
+#else
+		imgp->strings = cheri_capability_build_user_data(
+		    CHERI_CAP_USER_DATA_PERMS, strings_addr, ARG_MAX, ARG_MAX);
 #endif
+	} else
+		imgp->strings = imgp->stack;
+
+	if (sv->sv_flags & SV_CHERI)
+		p->p_psstrings = strings_addr + ARG_MAX - sv->sv_szpsstrings;
+	else
+#endif
+		p->p_psstrings = p->p_usrstack - sv->sv_szpsstrings;
 
 	/*
 	 * vm_ssize and vm_maxsaddr are somewhat antiquated concepts, but they
@@ -1659,12 +1704,13 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	int argc, envc;
 	char * __capability * __capability vectp;
 	char *stringp;
-	char * __capability destp, * __capability ustringp;
+	uintcap_t destp, ustringp;
 	struct ps_strings * __capability arginfo;
 	struct proc *p;
 	size_t execpath_len, len;
 	int error, szsigcode, szps;
 	char canary[sizeof(long) * 8];
+	bool strings_on_stack;
 
 	szps = sizeof(pagesizes[0]) * MAXPAGESIZES;
 	/*
@@ -1678,14 +1724,17 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	p = imgp->proc;
 	szsigcode = 0;
 
+	strings_on_stack = true;
 #if __has_feature(capabilities)
-	destp = cheri_setaddress(imgp->ustack_capability,
-	    p->p_sysent->sv_psstrings);
-	arginfo = (struct ps_strings * __capability)cheri_setbounds(destp,
+	if (imgp->stack != imgp->strings)
+		strings_on_stack = false;
+	destp = (uintcap_t)imgp->strings;
+	destp = cheri_setaddress(destp, p->p_psstrings);
+	arginfo = (struct ps_strings * __capability)cheri_setboundsexact(destp,
 	    sizeof(*arginfo));
 #else
-	arginfo = (struct ps_strings *)p->p_sysent->sv_psstrings;
-	destp = (void *)arginfo;
+	destp = (uintptr_t)p->p_psstrings;
+	arginfo = (struct ps_strings *)destp;
 #endif
 	imgp->ps_strings = arginfo;
 	if (p->p_sysent->sv_sigcode_base == 0) {
@@ -1699,7 +1748,8 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	if (szsigcode != 0) {
 		destp -= szsigcode;
 		destp = rounddown2(destp, sizeof(void * __capability));
-		error = copyout(p->p_sysent->sv_sigcode, destp, szsigcode);
+		error = copyout(p->p_sysent->sv_sigcode,
+		    (void * __capability)destp, szsigcode);
 		if (error != 0)
 			return (error);
 	}
@@ -1711,9 +1761,10 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 		destp -= execpath_len;
 		destp = rounddown2(destp, sizeof(void * __capability));
 #if __has_feature(capabilities)
-		imgp->execpathp = cheri_setboundsexact(destp, execpath_len);
+		imgp->execpathp = (void * __capability)
+		    cheri_setboundsexact(destp, execpath_len);
 #else
-		imgp->execpathp = destp;
+		imgp->execpathp = (void *)destp;
 #endif
 		error = copyout(imgp->execpath, imgp->execpathp, execpath_len);
 		if (error != 0)
@@ -1726,9 +1777,10 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	arc4rand(canary, sizeof(canary), 0);
 	destp -= sizeof(canary);
 #if __has_feature(capabilities)
-	imgp->canary = cheri_setboundsexact(destp, sizeof(canary));
+	imgp->canary = (void * __capability)cheri_setboundsexact(destp,
+	    sizeof(canary));
 #else
-	imgp->canary = destp;
+	imgp->canary = (void *)destp;
 #endif
 	error = copyout(canary, imgp->canary, sizeof(canary));
 	if (error != 0)
@@ -1741,9 +1793,10 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	destp -= szps;
 	destp = rounddown2(destp, sizeof(void * __capability));
 #if __has_feature(capabilities)
-	imgp->pagesizes = cheri_setboundsexact(destp, szps);
+	imgp->pagesizes = (void * __capability)cheri_setboundsexact(destp,
+	    szps);
 #else
-	imgp->pagesizes = destp;
+	imgp->pagesizes = (void *)destp;
 #endif
 	error = copyout(pagesizes, imgp->pagesizes, szps);
 	if (error != 0)
@@ -1762,7 +1815,7 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 #endif
 
 	if (imgp->sysent->sv_stackgap != NULL)
-		imgp->sysent->sv_stackgap(imgp, (uintcap_t *)&destp);
+		imgp->sysent->sv_stackgap(imgp, &destp);
 
 	if (imgp->auxargs) {
 		/*
@@ -1781,10 +1834,14 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	 */
 	vectp -= imgp->args->argc + 1 + imgp->args->envc + 1;
 
-	/*
-	 * vectp also becomes our initial stack base
-	 */
-	*stack_base = (uintcap_t)vectp;
+	if (!strings_on_stack) {
+		*stack_base = (uintcap_t)imgp->stack;
+	} else {
+		/*
+		 * vectp also becomes our initial stack base
+		 */
+		*stack_base = (uintcap_t)vectp;
+	}
 
 	stringp = imgp->args->begin_argv;
 	argc = imgp->args->argc;
@@ -1793,7 +1850,8 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	/*
 	 * Copy out strings - arguments and environment.
 	 */
-	error = copyout(stringp, ustringp, ARG_MAX - imgp->args->stringspace);
+	error = copyout(stringp, (void * __capability)ustringp,
+	    ARG_MAX - imgp->args->stringspace);
 	if (error != 0)
 		return (error);
 
@@ -1815,11 +1873,10 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	for (; argc > 0; --argc) {
 		len = strlen(stringp) + 1;
 #if __has_feature(capabilities)
-		if (sucap(vectp++, (uintcap_t)cheri_setbounds(ustringp, len))
-		    != 0)
+		if (sucap(vectp++, cheri_setbounds(ustringp, len)) != 0)
 			return (EFAULT);
 #else
-		if (suword(vectp++, (uintptr_t)ustringp) != 0)
+		if (suword(vectp++, ustringp) != 0)
 			return (EFAULT);
 #endif
 		stringp += len;
@@ -1845,11 +1902,10 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	for (; envc > 0; --envc) {
 		len = strlen(stringp) + 1;
 #if __has_feature(capabilities)
-		if (sucap(vectp++, (uintcap_t)cheri_setbounds(ustringp, len))
-		    != 0)
+		if (sucap(vectp++, cheri_setbounds(ustringp, len)) != 0)
 			return (EFAULT);
 #else
-		if (suword(vectp++, (uintptr_t)ustringp) != 0)
+		if (suword(vectp++, ustringp) != 0)
 			return (EFAULT);
 #endif
 		stringp += len;
@@ -1862,13 +1918,13 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 
 	if (imgp->auxargs) {
 		vectp++;
-		error = imgp->sysent->sv_copyout_auxargs(imgp,
 #if __has_feature(capabilities)
-		    (uintcap_t)cheri_setbounds(vectp,
-		    AT_COUNT * sizeof(Elf_Auxinfo)));
+		imgp->auxv = cheri_setbounds(vectp,
+		    AT_COUNT * sizeof(Elf_Auxinfo));
 #else
-		    (uintptr_t)vectp);
+		imgp->auxv = vectp;
 #endif
+		error = imgp->sysent->sv_copyout_auxargs(imgp, (uintcap_t)imgp->auxv);
 		if (error != 0)
 			return (error);
 	}

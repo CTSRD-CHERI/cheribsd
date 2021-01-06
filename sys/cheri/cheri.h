@@ -111,25 +111,21 @@ extern void * __capability userspace_root_sealcap;
  */
 extern void * __capability swap_restore_cap;
 
-/* Root of all sealed kernel capabilities. */
-extern void * __capability kernel_root_sealcap;
-
 #ifdef __CHERI_PURE_CAPABILITY__
 /* Root kernel capability */
 extern void * __capability kernel_root_cap;
 #endif
+
+/* Root of all sealed kernel capabilities. */
+extern void * __capability kernel_root_sealcap;
 
 /*
  * Functions to create capabilities used in exec.
  */
 struct image_params;
 struct thread;
-void * __capability cheri_auxv_capability(struct image_params *imgp,
-	    uintcap_t stack);
 void * __capability cheri_exec_pcc(struct thread *td,
 	    struct image_params *imgp);
-void * __capability cheri_exec_stack_pointer(struct image_params *imgp,
-	    uintcap_t stack);
 void	cheri_set_mmap_capability(struct thread *td, struct image_params *imgp,
 	    void * __capability csp);
 void * __capability cheri_sigcode_capability(struct thread *td);

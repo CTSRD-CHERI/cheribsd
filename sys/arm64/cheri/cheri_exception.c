@@ -1,7 +1,7 @@
 /*-
  * SPDX-License-Identifier: BSD-2-Clause
  *
- * Copyright (c) 2020 John Baldwin <jhb@FreeBSD.org>
+ * Copyright (c) 2020 Brett F. Gutstein
  *
  * This software was developed by SRI International and the University of
  * Cambridge Computer Laboratory (Department of Computer Science and
@@ -30,18 +30,54 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
+#include <sys/param.h>
+#include <sys/signal.h>
+#include <sys/systm.h>
 
-#define	FIRMW_START(S)	__CONCAT(_binary_, __CONCAT(S, _start))
-#define	FIRMW_END(S)	__CONCAT(_binary_, __CONCAT(S, _end))
+#include <cheri/cheri.h>
 
-	.section rodata, "a", %progbits
-	.globl	FIRMW_START(FIRMW_SYMBOL)
-	.type	FIRMW_START(FIRMW_SYMBOL), %object
-FIRMW_START(FIRMW_SYMBOL):
-	.incbin	__XSTRING(FIRMW_FILE)
-	.size	FIRMW_START(FIRMW_SYMBOL), . - FIRMW_START(FIRMW_SYMBOL)
-	.globl	FIRMW_END(FIRMW_SYMBOL)
-	.type	FIRMW_END(FIRMW_SYMBOL), %object
-FIRMW_END(FIRMW_SYMBOL):
-	.size	FIRMW_END(FIRMW_SYMBOL), . - FIRMW_END(FIRMW_SYMBOL)
+#include <machine/armreg.h>
+
+/*
+ * Data Abort DFSC values are a superset
+ * of Instruction Abort IFSC values.
+ */
+
+#define CHERI_FSC_SHIFT ISS_DATA_DFSC_CAP_TAG
+static const char *cheri_fsc_descr[] = {
+	[ISS_DATA_DFSC_CAP_TAG - CHERI_FSC_SHIFT] = "tag violation",
+	[ISS_DATA_DFSC_CAP_SEALED - CHERI_FSC_SHIFT] = "seal violation",
+	[ISS_DATA_DFSC_CAP_BOUND - CHERI_FSC_SHIFT] = "bounds violation",
+	[ISS_DATA_DFSC_CAP_PERM - CHERI_FSC_SHIFT] = "permissions violation"
+};
+
+const char *
+cheri_fsc_string(uint8_t fsc)
+{
+	uint8_t shifted = fsc - CHERI_FSC_SHIFT;
+	if (shifted < 0 || shifted >= nitems(cheri_fsc_descr)) {
+		return ("unknown fault status code");
+	}
+	return (cheri_fsc_descr[shifted]);
+}
+
+int
+cheri_esr_to_sicode(uint64_t esr)
+{
+	uint8_t fsc = esr & ISS_DATA_DFSC_MASK;
+	switch (fsc) {
+	case ISS_DATA_DFSC_CAP_TAG:
+		return (PROT_CHERI_TAG);
+	case ISS_DATA_DFSC_CAP_SEALED:
+		return (PROT_CHERI_SEALED);
+	case ISS_DATA_DFSC_CAP_BOUND:
+		return (PROT_CHERI_BOUNDS);
+	case ISS_DATA_DFSC_CAP_PERM:
+		return (PROT_CHERI_PERM);
+	default:
+		printf("%s: Warning: Unknown abort %x, returning si_code 0\n",
+		    __func__, fsc);
+		return (0);
+	}
+}
+

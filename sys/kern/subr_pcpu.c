@@ -104,16 +104,7 @@ dpcpu_init(void *dpcpu, int cpuid)
 	struct pcpu *pcpu;
 
 	pcpu = pcpu_find(cpuid);
-#ifndef __CHERI_PURE_CAPABILITY__
-	pcpu->pc_dynamic = (uintptr_t)dpcpu - (uintptr_t)DPCPU_START;
-#else
-	/*
-	 * We can't subtract the linker set start address
-	 * because it would make the dpcpu capability
-	 * unrepresentable.
-	 */
-	pcpu->pc_dynamic = (uintptr_t)dpcpu;
-#endif
+	pcpu->pc_dynamic = (uintptr_t)dpcpu + DPCPU_BIAS;
 
 	/*
 	 * Initialize defaults from our linker section.
@@ -266,10 +257,10 @@ dpcpu_copy(void *s, int size)
 		dpcpu = dpcpu_off[i];
 		if (dpcpu == 0)
 			continue;
-		memcpy((void *)(dpcpu + (vaddr_t)s), s, size);
+		memcpy((void *)(dpcpu + (ptraddr_t)s), s, size);
 	}
 #else
-	memcpy((void *)(dpcpu_off[0] + (vaddr_t)s), s, size);
+	memcpy((void *)(dpcpu_off[0] + (ptraddr_t)s), s, size);
 #endif
 }
 
@@ -303,14 +294,12 @@ sysctl_dpcpu_quad(SYSCTL_HANDLER_ARGS)
 	int i;
 
 	count = 0;
-#ifdef __CHERI_PURE_CAPABILITY__
-	arg1 = (char *)arg1 - (vaddr_t)DPCPU_START;
-#endif
+	arg1 = (char *)arg1 - (ptraddr_t)DPCPU_START - DPCPU_BIAS;
 	CPU_FOREACH(i) {
 		dpcpu = dpcpu_off[i];
 		if (dpcpu == 0)
 			continue;
-		count += *(int64_t *)(dpcpu + (vaddr_t)arg1);
+		count += *(int64_t *)(dpcpu + (ptraddr_t)arg1);
 	}
 	return (SYSCTL_OUT(req, &count, sizeof(count)));
 }
@@ -323,14 +312,12 @@ sysctl_dpcpu_long(SYSCTL_HANDLER_ARGS)
 	int i;
 
 	count = 0;
-#ifdef __CHERI_PURE_CAPABILITY__
-	arg1 = (char *)arg1 - (vaddr_t)DPCPU_START;
-#endif
+	arg1 = (char *)arg1 - (ptraddr_t)DPCPU_START - DPCPU_BIAS;
 	CPU_FOREACH(i) {
 		dpcpu = dpcpu_off[i];
 		if (dpcpu == 0)
 			continue;
-		count += *(long *)(dpcpu + (vaddr_t)arg1);
+		count += *(long *)(dpcpu + (ptraddr_t)arg1);
 	}
 	return (SYSCTL_OUT(req, &count, sizeof(count)));
 }
@@ -343,14 +330,12 @@ sysctl_dpcpu_int(SYSCTL_HANDLER_ARGS)
 	int i;
 
 	count = 0;
-#ifdef __CHERI_PURE_CAPABILITY__
-	arg1 = (char *)arg1 - (vaddr_t)DPCPU_START;
-#endif
+	arg1 = (char *)arg1 - (ptraddr_t)DPCPU_START - DPCPU_BIAS;
 	CPU_FOREACH(i) {
 		dpcpu = dpcpu_off[i];
 		if (dpcpu == 0)
 			continue;
-		count += *(int *)(dpcpu + (vaddr_t)arg1);
+		count += *(int *)(dpcpu + (ptraddr_t)arg1);
 	}
 	return (SYSCTL_OUT(req, &count, sizeof(count)));
 }
@@ -361,13 +346,9 @@ DB_SHOW_COMMAND(dpcpu_off, db_show_dpcpu_off)
 	int id;
 
 	CPU_FOREACH(id) {
-#ifdef __CHERI_PURE_CAPABILITY__
-		db_printf("dpcpu_off[%2d] = %p)\n", id, (void *)dpcpu_off[id]);
-#else
-		db_printf("dpcpu_off[%2d] = 0x%jx (+ DPCPU_START = %p)\n",
-		    id, (uintmax_t)dpcpu_off[id],
-		    (void *)(uintptr_t)(dpcpu_off[id] + DPCPU_START));
-#endif
+		db_printf("dpcpu_off[%2d] = %p\n", id, (void *)dpcpu_off[id]);
+		db_printf("dpcpu_ptr[%2d] = %p\n", id, (void *)(dpcpu_off[id] -
+		    DPCPU_BIAS));
 	}
 }
 

@@ -51,43 +51,6 @@ FEATURE(cheriabi, "CheriABI process support");
  */
 
 /*
- * Construct a capability stack pointer for the main thread.
- */
-void * __capability
-cheri_exec_stack_pointer(struct image_params *imgp, uintcap_t stack)
-{
-	vm_offset_t stackbase, stacktop;
-	size_t stacklen;
-	char * __capability csp;
-
-	KASSERT(__builtin_is_aligned(stack, sizeof(void * __capability)),
-	    ("CheriABI stack pointer not properly aligned"));
-
-	/*
-	 * Restrict the stack capability to the maximum region allowed
-	 * for this process and adjust csp accordingly.
-	 */
-	stackbase = (vaddr_t)imgp->proc->p_vmspace->vm_maxsaddr;
-	stacktop = (__cheri_addr vaddr_t)stack;
-	KASSERT(stacktop > stackbase,
-	    ("top of stack 0x%lx is below stack base 0x%lx", stacktop,
-	    stackbase));
-	stacklen = stacktop - stackbase;
-
-	/*
-	 * Round the stack down as required to make it representable.
-	 */
-	stacklen = rounddown2(stacklen,
-	    CHERI_REPRESENTABLE_ALIGNMENT(stacklen));
-	KASSERT(stackbase == CHERI_REPRESENTABLE_BASE(stackbase, stacklen),
-	    ("%s: rounded base (0x%zx) != base (0x%zx)", __func__,
-		CHERI_REPRESENTABLE_BASE(stackbase, stacklen), stackbase));
-	csp = cheri_setaddress((void * __capability)stack, stackbase);
-	csp = cheri_setbounds(csp, stacklen);
-	return (csp + stacklen);
-}
-
-/*
  * Build a capability to describe the MMAP'able space from the end of
  * the program's heap to the bottom of the stack.
  *
@@ -176,14 +139,4 @@ cheri_sigcode_capability(struct thread *td)
 	    ("CheriABI requires shared page for sigcode"));
 	return (cheri_capability_build_user_code(td, CHERI_CAP_USER_CODE_PERMS,
 	    sv->sv_sigcode_base, *sv->sv_szsigcode, 0));
-}
-
-void * __capability
-cheri_auxv_capability(struct image_params *imgp, uintcap_t stack)
-{
-	void * __capability auxv;
-
-	auxv = ((void * __capability * __capability)stack +
-	    imgp->args->argc + 1 + imgp->args->envc + 1);
-	return (cheri_setbounds(auxv, AT_COUNT * sizeof(Elf_Auxinfo)));
 }

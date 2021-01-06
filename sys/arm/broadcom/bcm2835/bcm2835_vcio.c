@@ -48,14 +48,14 @@ static struct cdevsw vcio_devsw = {
 };
 
 #define VCIO_IOC_MAGIC 100
-#define IOCTL_MBOX_PROPERTY _IOWR(VCIO_IOC_MAGIC, 0, char *)
+#define IOCTL_MBOX_PROPERTY _IOWR(VCIO_IOC_MAGIC, 0, char * __capability)
 
 int
 vcio_ioctl(struct cdev *dev, u_long cmd, caddr_t arg, int mode,
     struct thread *td)
 {
     int error;
-    void *ptr;
+    void * __capability ptr;
     uint32_t size;
     uint8_t *property;
 

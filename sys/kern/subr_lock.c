@@ -199,7 +199,7 @@ DB_SHOW_COMMAND(lock, db_show_lock)
 	 * XXX: Can't narrow bounds as this is a base class and lc_ddb_show
 	 * can access members in the subclass.
 	 */
-	lock = DB_DATA_PTR_UNBOUND(addr);
+	lock = DB_DATA_PTR_UNBOUND(addr, struct lock_object);
 	if (LO_CLASSINDEX(lock) > LOCK_CLASS_MAX) {
 		db_printf("Unknown lock class: %d\n", LO_CLASSINDEX(lock));
 		return;
@@ -754,7 +754,6 @@ SYSCTL_PROC(_debug_lock_prof, OID_AUTO, enable,
     "Enable lock profiling");
 
 #endif
-
 // CHERI CHANGES START
 // {
 //   "updated": 20200803,

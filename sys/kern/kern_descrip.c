@@ -4635,7 +4635,7 @@ DB_SHOW_COMMAND(file, db_show_file)
 		db_printf("usage: show file <addr>\n");
 		return;
 	}
-	fp = DB_DATA_PTR(addr, sizeof(*fp));
+	fp = DB_DATA_PTR(addr, struct file);
 	db_print_file(fp, 1);
 }
 
