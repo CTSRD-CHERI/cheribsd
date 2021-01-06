@@ -161,8 +161,8 @@ __GLOBL(__start_set_vnet);
 extern uintptr_t	*__stop_set_vnet;
 __GLOBL(__stop_set_vnet);
 
-#define	VNET_START	(char *)&__start_set_vnet
-#define	VNET_STOP	(char *)&__stop_set_vnet
+#define	VNET_START	(uintptr_t)&__start_set_vnet
+#define	VNET_STOP	(uintptr_t)&__stop_set_vnet
 
 /*
  * Functions to allocate and destroy virtual network stacks.
