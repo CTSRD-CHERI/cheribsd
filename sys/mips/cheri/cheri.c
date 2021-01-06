@@ -77,13 +77,12 @@ CTASSERT(offsetof(struct thread, td_cheri_mmap_cap) % CHERICAP_SIZE == 0);
 
 /*
  * Ensure that the compiler being used to build the kernel agrees with the
- * kernel configuration on the size of a capability, and that we are compiling
- * for the hybrid or pure ABI.
+ * kernel configuration on the size of a capability.
  */
-#ifndef __CHERI_PURE_CAPABILITY__
-CTASSERT(sizeof(void *) == 8);
-#else
+#ifdef __CHERI_PURE_CAPABILITY__
 CTASSERT(sizeof(void *) == 16);
+#else
+CTASSERT(sizeof(void *) == 8);
 #endif
 CTASSERT(sizeof(void * __capability) == 16);
 CTASSERT(sizeof(struct cheri_object) == 32);
@@ -95,13 +94,13 @@ extern char etext[], end[];
 /*
  * Global capabilities for various address-space segments.
  */
-caddr_t mips_xkphys_cap = (void *)(intcap_t)-1;
-caddr_t mips_xkseg_cap = (void *)(intcap_t)-1;
-caddr_t mips_kseg0_cap = (void *)(intcap_t)-1;
-caddr_t mips_kseg1_cap = (void *)(intcap_t)-1;
-caddr_t mips_kseg2_cap = (void *)(intcap_t)-1;
-caddr_t kernel_code_cap = (void *)(intcap_t)-1;
-caddr_t kernel_data_cap = (void *)(intcap_t)-1;
+char *mips_xkphys_cap = (char *)(intcap_t)-1;
+char *mips_xkseg_cap = (char *)(intcap_t)-1;
+char *mips_kseg0_cap = (char *)(intcap_t)-1;
+char *mips_kseg1_cap = (char *)(intcap_t)-1;
+char *mips_kseg2_cap = (char *)(intcap_t)-1;
+char *kernel_code_cap = (char *)(intcap_t)-1;
+char *kernel_data_cap = (char *)(intcap_t)-1;
 void *kernel_root_cap = (void *)(intcap_t)-1;
 
 #endif /* __CHERI_PURE_CAPABILITY__ */

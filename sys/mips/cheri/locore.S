@@ -114,7 +114,7 @@ VECTOR(_locore, unknown)
 	mtc0	t0, MIPS_COP_0_CONFIG
 	COP0_SYNC
 
-#if defined(CPU_BERI) || defined(CPU_MALTA)
+#if defined(CPU_MALTA)
 	/*
 	 * Enable userspace cycle-count, cycle-count resolution, and CPU
 	 * number registers available via rdhwr.
@@ -247,12 +247,12 @@ VECTOR(_locore, unknown)
 
 	/*
 	 * thread0 set thread0 kstack to the bottom of the stack
-	 * page, realign thread0 kstack and start using it.
+	 * region, realign thread0 kstack and start using it.
 	 */
 	CAPTABLE_LOAD($c3, _C_LABEL(thread0_st))
 	clc	CHERI_REG_STC, zero, TD_KSTACK($c3)
 	cgetlen	a0, CHERI_REG_STC
-	REG_LI	t0, ~7
+	REG_LI	t0, ~(CHERICAP_SIZE - 1)
 	and	a0, a0, t0
 	LONG_SUBU	a0, a0, CALLFRAME_SIZ
 	csetoffset	CHERI_REG_STC, CHERI_REG_STC, a0
