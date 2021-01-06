@@ -44,20 +44,20 @@ struct mlx5_tool_addr {
 
 struct mlx5_fwdump_get {
 	struct mlx5_tool_addr devaddr;
-	struct mlx5_fwdump_reg *buf;
+	struct mlx5_fwdump_reg * __kerncap buf;
 	size_t reg_cnt;
 	size_t reg_filled; /* out */
 };
 
 struct mlx5_fw_update {
 	struct mlx5_tool_addr devaddr;
-	void *img_fw_data;
+	void * __kerncap img_fw_data;
 	size_t img_fw_data_len;
 };
 
 struct mlx5_eeprom_get {
 	struct mlx5_tool_addr devaddr;
-	uint32_t *eeprom_info_buf;
+	uint32_t * __kerncap eeprom_info_buf;
 	uint8_t eeprom_info_page_valid;
 	size_t eeprom_info_out_len;
 };
