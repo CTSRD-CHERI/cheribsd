@@ -1208,7 +1208,7 @@ exec_new_vmspace(struct image_params *imgp, struct sysentvec *sv)
 
 #if __has_feature(capabilities)
 #ifdef __CHERI_PURE_CAPABILITY__
-	imgp->stack = (void *)stack_addr;
+	imgp->stack = (void *)cheri_setoffset(stack_addr, ssiz);
 #else
 	imgp->stack = cheri_capability_build_user_data(
 	    (~CHERI_CAP_PERM_RWX | vm_map_prot2perms(stack_prot)) &
