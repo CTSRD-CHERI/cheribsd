@@ -80,13 +80,6 @@
 	/* Don't warn about uses of c27-c30 */
 	.set cheri_sysregs_accessible
 
-/*
- * Check that we are compiling with the expected flags
- */
-#if !defined(__CHERI_PURE_CAPABILITY__) || !defined(CPU_CHERI) || !defined(__CHERI_PURE_CAPABILITY__)
-#error CHERI kernel requires CPU_CHERI and __CHERI_PURE_CAPABILITY__
-#endif
-
 	.data
 #ifdef YAMON
 GLOBAL(fenvp)
