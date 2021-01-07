@@ -169,7 +169,7 @@ VECTOR(_locore, unknown)
 	ABSRELOC_LA(t0, _C_LABEL(__cap_table_start))
 	csetoffset CHERI_REG_GPC, $c28, t0
 	ABSRELOC_LA(t1, _C_LABEL(__cap_table_end))
-	PTR_SUBU t0, t1, t0
+	LONG_SUBU t0, t1, t0
 	csetbounds CHERI_REG_GPC, CHERI_REG_GPC, t0
 	REG_LI	t0, (CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP)
 	candperm CHERI_REG_GPC, CHERI_REG_GPC, t0
@@ -215,7 +215,7 @@ VECTOR(_locore, unknown)
 	cincoffset	CHERI_REG_STC, CHERI_REG_STC, t0
 	REG_LI		t0, (PAGE_SIZE * 2) - PCPU_SIZE
 	csetbounds	CHERI_REG_STC, CHERI_REG_STC, t0	# Boot stack capability
-	PTR_SUBU	t0, t0, CALLFRAME_SIZ
+	LONG_SUBU	t0, t0, CALLFRAME_SIZ
 	cincoffset	CHERI_REG_STC, CHERI_REG_STC, t0	# Make room for initial callframe
 
 	/* XXX-AM: zero out ra so we catch anything that returns improperly */
@@ -240,7 +240,7 @@ VECTOR(_locore, unknown)
 	cmove		$c3, $c28
 	csetoffset	$c3, $c3, t0
 	ABSRELOC_LA(t1, _C_LABEL(__stop___cap_relocs))
-	PTR_SUBU	t0, t1, t0
+	LONG_SUBU	t0, t1, t0
 	csetbounds	$c3, $c3, t0
 	cincoffset	$c4, $c3, t0
 	cgetpccsetoffset	$c5, zero
@@ -292,7 +292,7 @@ VECTOR(_locore, unknown)
 	cgetlen	a0, CHERI_REG_STC
 	REG_LI	t0, ~7
 	and	a0, a0, t0
-	PTR_SUBU	a0, a0, CALLFRAME_SIZ
+	LONG_SUBU	a0, a0, CALLFRAME_SIZ
 	csetoffset	CHERI_REG_STC, CHERI_REG_STC, a0
 #ifdef STACK
 	/* Stop stack backtrace here */
