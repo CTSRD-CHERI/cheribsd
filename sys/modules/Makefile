@@ -384,7 +384,6 @@ SUBDIR=	\
 	vr \
 	vte \
 	${_wbwd} \
-	${_wi} \
 	wlan \
 	wlan_acl \
 	wlan_amrr \
@@ -663,7 +662,6 @@ _speaker=	speaker
 _splash=	splash
 _sppp=		sppp
 _wbwd=		wbwd
-_wi=		wi
 
 _aac=		aac
 _aacraid=	aacraid
@@ -801,7 +799,6 @@ _ffec=		ffec
 _nvd=		nvd
 _nvme=		nvme
 _pccard=	pccard
-_wi=		wi
 _virtio=	virtio
 .endif
 
