@@ -2130,11 +2130,10 @@ vm_map_fixed(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 	if ((map->flags & MAP_RESERVATIONS) != 0) {
 		if (vm_map_lookup_entry(map, start, &entry)) {
 			reservation = entry->reservation;
-			while ((entry->eflags & MAP_ENTRY_HEADER) == 0 &&
-			    entry->start <= end) {
+			while (entry->end < end) {
 				next_entry = vm_map_entry_succ(entry);
 				if (entry->reservation != reservation ||
-				    (next_entry->start > end && entry->end < end)) {
+				    next_entry->start > end) {
 					result = KERN_NO_SPACE;
 					goto out;
 				}
