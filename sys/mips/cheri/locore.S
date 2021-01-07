@@ -199,15 +199,11 @@ VECTOR(_locore, unknown)
 	csetkcc		$c27
 
 	/* Install the new PCC. */
-	REG_LI		t0, CHERI_CAP_KERN_BASE
-	cgetpcc		CHERI_REG_C29
-	cgetoffset	t1, CHERI_REG_C29			# 1
-	PTR_SUBU	t1, t1, t0				# 2
-	PTR_ADDIU	t1, t1, (4 * 7)				# 3
-	csetoffset	$c27, $c27, t1	# 4
-	cjr		$c27				# 5
-	nop							# 6
-	# 7 (land here)
+	ABSRELOC_LA(t0, 1f)
+	csetaddr	$c27, $c27, t0
+	cjr		$c27
+	nop
+1:
 
 	/*
 	 * Initialize stack and call machine startup.
