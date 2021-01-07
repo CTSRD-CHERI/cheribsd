@@ -83,7 +83,7 @@
 	.data
 #ifdef YAMON
 GLOBAL(fenvp)
-	.space 4			# Assumes mips32?  Is that OK?
+	.space 4
 #endif
 
 	.set noreorder
@@ -165,7 +165,6 @@ VECTOR(_locore, unknown)
 
 	/*
 	 * Set up global pointer.
-	 * XXX-AM: Note that when we change linkage this will need rebasing.
 	 */
 	ABSRELOC_LA(t0, _C_LABEL(__cap_table_start))
 	csetoffset CHERI_REG_GPC, $c28, t0
@@ -275,7 +274,7 @@ VECTOR(_locore, unknown)
 	cjalr	$c12, $c17
 	nop
 
-	/* Clear all remaining capabilities */
+	/* Clear most remaining capabilities */
 	cclearlo	0xf7fe	# keep c0, c11 /* XXX-AM c0 will eventually be cleared */
 	cclearhi	0x9bff	# keep c26, c29, c30
 
