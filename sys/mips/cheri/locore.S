@@ -218,9 +218,6 @@ VECTOR(_locore, unknown)
 	LONG_SUBU	t0, t0, CALLFRAME_SIZ
 	cincoffset	CHERI_REG_STC, CHERI_REG_STC, t0	# Make room for initial callframe
 
-	/* XXX-AM: zero out ra so we catch anything that returns improperly */
-	move	ra, zero
-
 	/* Need to preserve a0-a3 for platform start */
 	move s0, a0
 	move s1, a1
@@ -271,7 +268,7 @@ VECTOR(_locore, unknown)
 	nop
 
 	/* Clear most remaining capabilities */
-	cclearlo	0xf7fe	# keep c0, c11 /* XXX-AM c0 will eventually be cleared */
+	cclearlo	0xf7ff	# keep c11
 	cclearhi	0x9bff	# keep c26, c29, c30
 
 	/* Call the platform-specific startup code. */
