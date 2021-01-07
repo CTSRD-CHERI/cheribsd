@@ -1225,8 +1225,8 @@ exec_new_vmspace(struct image_params *imgp, struct sysentvec *sv)
 		strings_addr =
 		    CHERI_REPRESENTABLE_BASE(stack_addr - ARG_MAX, ARG_MAX);
 		error = vm_mmap_object(map, &strings_addr, 0, ARG_MAX,
-		    sv->sv_stackprot, sv->sv_stackprot, MAP_ANON | MAP_FIXED,
-		    NULL, 0, FALSE, td);
+		    VM_PROT_RW_CAP, VM_PROT_RW_CAP, MAP_ANON | MAP_FIXED |
+		    MAP_RESERVATION_CREATE, NULL, 0, FALSE, td);
 		if (error != KERN_SUCCESS)
 			return (vm_mmap_to_errno(error));
 #ifdef __CHERI_PURE_CAPABILITY__
