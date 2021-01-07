@@ -723,10 +723,10 @@ restart:
 
 /*
  * Move all data to a permanent storage device.  This code
- * simulates the fsync syscall.
+ * simulates the fsync and fdatasync syscalls.
  */
 static int
-aio_fsync_vnode(struct thread *td, struct vnode *vp)
+aio_fsync_vnode(struct thread *td, struct vnode *vp, int op)
 {
 	struct mount *mp;
 	int error;
@@ -739,7 +739,10 @@ aio_fsync_vnode(struct thread *td, struct vnode *vp)
 		vm_object_page_clean(vp->v_object, 0, 0, 0);
 		VM_OBJECT_WUNLOCK(vp->v_object);
 	}
-	error = VOP_FSYNC(vp, MNT_WAIT, td);
+	if (op == LIO_DSYNC)
+		error = VOP_FDATASYNC(vp, td);
+	else
+		error = VOP_FSYNC(vp, MNT_WAIT, td);
 
 	VOP_UNLOCK(vp);
 	vn_finished_write(mp);
@@ -843,12 +846,15 @@ aio_process_sync(struct kaiocb *job)
 	struct file *fp = job->fd_file;
 	int error = 0;
 
-	KASSERT(job->uaiocb.aio_lio_opcode == LIO_SYNC,
+	KASSERT(job->uaiocb.aio_lio_opcode == LIO_SYNC ||
+	    job->uaiocb.aio_lio_opcode == LIO_DSYNC,
 	    ("%s: opcode %d", __func__, job->uaiocb.aio_lio_opcode));
 
 	td->td_ucred = job->cred;
-	if (fp->f_vnode != NULL)
-		error = aio_fsync_vnode(td, fp->f_vnode);
+	if (fp->f_vnode != NULL) {
+		error = aio_fsync_vnode(td, fp->f_vnode,
+		    job->uaiocb.aio_lio_opcode);
+	}
 	td->td_ucred = td_savedcred;
 	if (error)
 		aio_complete(job, -1, error);
@@ -1606,6 +1612,7 @@ aio_aqueue(struct thread *td, struct aiocb * __capability ujob,
 		error = fget_read(td, fd, &cap_pread_rights, &fp);
 		break;
 	case LIO_SYNC:
+	case LIO_DSYNC:
 		error = fget(td, fd, &cap_fsync_rights, &fp);
 		break;
 	case LIO_MLOCK:
@@ -1619,7 +1626,7 @@ aio_aqueue(struct thread *td, struct aiocb * __capability ujob,
 	if (error)
 		goto err3;
 
-	if (opcode == LIO_SYNC && fp->f_vnode == NULL) {
+	if ((opcode == LIO_SYNC || opcode == LIO_DSYNC) && fp->f_vnode == NULL) {
 		error = EINVAL;
 		goto err3;
 	}
@@ -1833,10 +1840,12 @@ aio_queue_file(struct file *fp, struct kaiocb *job)
 		error = 0;
 		break;
 	case LIO_SYNC:
+	case LIO_DSYNC:
 		AIO_LOCK(ki);
 		TAILQ_FOREACH(job2, &ki->kaio_jobqueue, plist) {
 			if (job2->fd_file == job->fd_file &&
 			    job2->uaiocb.aio_lio_opcode != LIO_SYNC &&
+			    job2->uaiocb.aio_lio_opcode != LIO_DSYNC &&
 			    job2->seqno < job->seqno) {
 				job2->jobflags |= KAIOCB_CHECKSYNC;
 				job->pending++;
@@ -2637,10 +2646,20 @@ static int
 kern_aio_fsync(struct thread *td, int op, struct aiocb * __capability ujob,
     struct aiocb_ops *ops)
 {
+	int listop;
 
-	if (op != O_SYNC) /* XXX lack of O_DSYNC */
+	switch (op) {
+	case O_SYNC:
+		listop = LIO_SYNC;
+		break;
+	case O_DSYNC:
+		listop = LIO_DSYNC;
+		break;
+	default:
 		return (EINVAL);
-	return (aio_aqueue(td, ujob, NULL, LIO_SYNC, ops));
+	}
+
+	return (aio_aqueue(td, ujob, NULL, listop, ops));
 }
 
 int
