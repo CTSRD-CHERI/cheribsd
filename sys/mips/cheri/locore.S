@@ -51,16 +51,6 @@
  */
 
 /*
- * FREEBSD_DEVELOPERS_FIXME
- * The start routine below was written for a multi-core CPU
- * with each core being hyperthreaded. This serves as an example
- * for a complex CPU architecture. For a different CPU complex
- * please make necessary changes to read CPU-ID etc.
- * A clean solution would be to have a different locore file for
- * each CPU type.
- */
-
-/*
  *	Contains code that is the first executed at boot time on a CHERI CPU
  */
 
