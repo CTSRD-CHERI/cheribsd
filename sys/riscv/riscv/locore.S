@@ -475,9 +475,6 @@ va:
 	/* Save modulep in s2. */
 	mv	s2, a0
 
-	/* Save modulep in s2. */
-	mv	s2, a0
-
 	/* Save DTB physical pointer in s1. */
 	mv	s1, a1
 
