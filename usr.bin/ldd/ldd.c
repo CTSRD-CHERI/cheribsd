@@ -51,14 +51,7 @@ __FBSDID("$FreeBSD$");
 #include <unistd.h>
 #include <spawn.h>
 
-#include "extern.h"
 #include "paths.h"
-
-/* We don't support a.out executables on arm64 and riscv */
-#if !defined(__aarch64__) && !defined(__riscv)
-#include <a.out.h>
-#define	AOUT_SUPPORTED
-#endif
 
 #if defined(__mips)
 #define RTLD_DIRECT_EXEC_TRACE_SUPPORTED 1
@@ -94,7 +87,6 @@ static int	is_executable(const char *fname, int fd, int *is_shlib,
 static void	usage(void);
 
 #define	TYPE_UNKNOWN	0
-#define	TYPE_AOUT	1
 #define	TYPE_ELF	2	/* Architecture default */
 #if __ELF_WORD_SIZE > 32 && defined(ELF32_SUPPORTED)
 #define	TYPE_ELF32	3	/* Explicit 32 bits on architectures >32 bits */
@@ -223,14 +215,6 @@ main(int argc, char *argv[])
 		/* NOTREACHED */
 	}
 
-#ifdef __i386__
-	if (vflag) {
-		for (c = 0; c < argc; c++)
-			dump_file(argv[c]);
-		exit(error_count == 0 ? EXIT_SUCCESS : EXIT_FAILURE);
-	}
-#endif
-
 	rval = 0;
 	for (; argc > 0; argc--, argv++) {
 		int fd, status, is_shlib, rv, type;
@@ -250,7 +234,6 @@ main(int argc, char *argv[])
 
 		switch (type) {
 		case TYPE_ELF:
-		case TYPE_AOUT:
 			break;
 #if __ELF_WORD_SIZE > 32 && defined(ELF32_SUPPORTED)
 		case TYPE_ELF32:
@@ -351,9 +334,6 @@ is_executable(const char *fname, int fd, int *is_shlib, int *type,
     const char** rtld)
 {
 	union {
-#ifdef AOUT_SUPPORTED
-		struct exec aout;
-#endif
 #if __ELF_WORD_SIZE > 32 && defined(ELF32_SUPPORTED)
 		Elf32_Ehdr elf32;
 #endif
@@ -377,23 +357,6 @@ is_executable(const char *fname, int fd, int *is_shlib, int *type,
 		warn("%s: can't read program header", fname);
 		return (0);
 	}
-
-#ifdef AOUT_SUPPORTED
-	if ((size_t)n >= sizeof(hdr.aout) && !N_BADMAG(hdr.aout)) {
-		/* a.out file */
-		if ((N_GETFLAG(hdr.aout) & EX_DPMASK) != EX_DYNAMIC
-#if 1 /* Compatibility */
-		    || hdr.aout.a_entry < __LDPGSZ
-#endif
-			) {
-			warnx("%s: not a dynamic executable", fname);
-			return (0);
-		}
-		*type = TYPE_AOUT;
-		warnx("%s: aout support is deprecated", fname);
-		return (1);
-	}
-#endif
 
 #if __ELF_WORD_SIZE > 32 && defined(ELF32_SUPPORTED)
 	if ((size_t)n >= sizeof(hdr.elf32) && IS_ELF(hdr.elf32) &&
