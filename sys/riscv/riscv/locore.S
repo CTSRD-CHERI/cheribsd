@@ -91,13 +91,12 @@ _alt_start:
 #endif
 
 	/* Pick a hart to run the boot process. */
+	li	t1, 1
 #ifdef __CHERI_PURE_CAPABILITY__
 	cllc	ct0, hart_lottery
-	li	t1, 1
 	camoadd.w t0, t1, 0(ct0)
 #else
 	lla	t0, hart_lottery
-	li	t1, 1
 	amoadd.w t0, t1, 0(t0)
 #endif
 
@@ -294,16 +293,14 @@ pagetables:
 
 	/* Setup supervisor trap vector */
 2:
-#ifdef __CHERI_PURE_CAPABILITY__
-	cllc	ct0, va
 	li	t1, KERNBASE
 	sub	t1, t1, s9
+#ifdef __CHERI_PURE_CAPABILITY__
+	cllc	ct0, va
 	cincoffset ct0, ct0, t1
 	cspecialw stcc, ct0
 #else
 	lla	t0, va
-	sub	t0, t0, s9
-	li	t1, KERNBASE
 	add	t0, t0, t1
 	csrw	stvec, t0
 #endif
