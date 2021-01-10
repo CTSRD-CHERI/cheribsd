@@ -1583,15 +1583,25 @@ aio_aqueue(struct thread *td, struct aiocb * __capability ujob,
 		goto err2;
 	}
 
+	/* Get the opcode. */
+	if (type == LIO_NOP) {
+		switch (job->uaiocb.aio_lio_opcode) {
+		case LIO_WRITE:
+		case LIO_NOP:
+		case LIO_READ:
+			opcode = job->uaiocb.aio_lio_opcode;
+			break;
+		default:
+			error = EINVAL;
+			goto err2;
+		}
+	} else
+		opcode = job->uaiocb.aio_lio_opcode = type;
+
 	ksiginfo_init(&job->ksi);
 
 	/* Save userspace address of the job info. */
 	job->ujob = ujob;
-
-	/* Get the opcode. */
-	if (type != LIO_NOP)
-		job->uaiocb.aio_lio_opcode = type;
-	opcode = job->uaiocb.aio_lio_opcode;
 
 	/*
 	 * Validate the opcode and fetch the file object for the specified
