@@ -238,6 +238,7 @@ enum {
 	INTERPOS_fdatasync,
 	INTERPOS_clock_nanosleep,
 	INTERPOS_distribute_static_tls,
+	INTERPOS_pdfork,
 	INTERPOS_MAX
 };
 
@@ -362,6 +363,7 @@ int		__sys_msync(void *, __size_t, int);
 int		__sys_nanosleep(const struct timespec *, struct timespec *);
 		/* openat declared to match the kernel so we can call directly */
 int		__sys_openat(int, const char *, int, int);
+int		__sys_pdfork(int *, int);
 int		__sys_pselect(int, struct fd_set *, struct fd_set *,
 		    struct fd_set *, const struct timespec *,
 		    const __sigset_t *);
