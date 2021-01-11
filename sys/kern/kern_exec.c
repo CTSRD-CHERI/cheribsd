@@ -1066,9 +1066,9 @@ exec_new_vmspace(struct image_params *imgp, struct sysentvec *sv)
 	register_t perms;
 #endif
 	vm_map_t map;
+	vm_prot_t stack_prot;
 	u_long ssiz;
 	vm_pointer_t shared_page_addr;
-	vm_prot_t stack_prot;
 
 	imgp->vmspace_destroyed = 1;
 	imgp->sysent = sv;
@@ -1191,8 +1191,8 @@ exec_new_vmspace(struct image_params *imgp, struct sysentvec *sv)
 
 	/* We reserve the whole max stack size with restricted permission */
 	stack_addr = p->p_usrstack - ssiz;
-	stack_prot = (obj != NULL && imgp->stack_prot != 0) ? imgp->stack_prot :
-	    sv->sv_stackprot;
+	stack_prot = obj != NULL && imgp->stack_prot != 0 ?
+	    imgp->stack_prot : sv->sv_stackprot;
 	imgp->stack_sz = ssiz;
 	error = vm_map_reservation_create(map, &stack_addr, ssiz,
 	    PAGE_SIZE, stack_prot);
@@ -1202,6 +1202,9 @@ exec_new_vmspace(struct image_params *imgp, struct sysentvec *sv)
 	error = vm_map_stack(map, stack_addr, (vm_size_t)ssiz, stack_prot,
 	    stack_prot, MAP_STACK_GROWS_DOWN);
 	if (error != KERN_SUCCESS) {
+		uprintf("exec_new_vmspace: mapping stack size %#jx prot %#x "
+		    "failed mach error %d errno %d\n", (uintmax_t)ssiz,
+		    stack_prot, error, vm_mmap_to_errno(error));
 		vm_map_reservation_delete(map, stack_addr);
 		return (vm_mmap_to_errno(error));
 	}
