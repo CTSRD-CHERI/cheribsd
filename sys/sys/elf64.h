@@ -265,28 +265,4 @@ typedef struct {
 	Elf64_Xword	ch_size;
 	Elf64_Xword	ch_addralign;
 } Elf64_Chdr;
-
-#ifdef __CHERI_PURE_CAPABILITY__
-/* CHERI capability relocation format */
-typedef struct {
-	Elf64_Addr	location;
-	Elf64_Addr	object;
-	Elf64_Off	offset;
-	Elf64_Xword	size;
-	Elf64_Xword	permissions;
-} Elf64_Capreloc;
-
-#define ELF64_CAPRELOC_FUNCTION (1UL << 63)
-#define ELF64_CAPRELOC_RODATA (1UL << 62)
-#endif
-
 #endif /* !_SYS_ELF64_H_ */
-// CHERI CHANGES START
-// {
-//   "updated": 20190530,
-//   "target_type": "header",
-//   "changes_purecap": [
-//     "support"
-//   ]
-// }
-// CHERI CHANGES END

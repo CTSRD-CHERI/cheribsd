@@ -32,12 +32,6 @@
 #ifndef _MIPS_INCLUDE_CHERI_H_
 #define	_MIPS_INCLUDE_CHERI_H_
 
-#if defined(_KERNEL) && defined(__CHERI_PURE_CAPABILITY__)
-#include <sys/elf.h>
-#endif
-#include <sys/types.h>
-#include <machine/cherireg.h>
-
 /*
  * In the past, struct cheri_frame was the in-kernel and kernel<->user
  * structure holding CHERI register state for context switching.  It is now a
@@ -128,12 +122,6 @@ struct cheri_kframe {
 /*
  * CHERI-MIPS-specific kernel utility functions.
  */
-#ifdef __CHERI_PURE_CAPABILITY__
-/* purecap kernel specific startup */
-void process_kernel_cap_relocs(Elf64_Capreloc *start, Elf64_Capreloc *end,
-    void *code_cap, void *data_cap);
-void process_kernel_dyn_relocs(void *code_cap, void *data_cap);
-#endif
 void cheri_init_capabilities(void * __capability kroot);
 
 struct cheri_frame;
@@ -213,7 +201,7 @@ void cheri_trace_log(void *buf, size_t len, int format);
 
 // CHERI CHANGES START
 // {
-//   "updated": 20190605,
+//   "updated": 20210112,
 //   "target_type": "header",
 //   "changes_purecap": [
 //     "support"
