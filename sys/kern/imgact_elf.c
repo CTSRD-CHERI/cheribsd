@@ -820,7 +820,7 @@ __elfN(load_section)(const struct image_params *imgp, vm_ooffset_t offset,
 	 */
 	if ((prot & VM_PROT_WRITE) == 0)
 		vm_map_protect(map, trunc_page(map_addr), round_page(map_addr +
-		    map_len), prot, FALSE, FALSE);
+		    map_len), prot, 0, VM_MAP_PROTECT_SET_PROT);
 
 	return (0);
 }
