@@ -133,7 +133,7 @@
 	alias = sym
 
 #define	GLOBAL(sym)						\
-	.globl sym; sym:
+	.globl sym; .type sym,@object; sym:
 
 #define	ENTRY(sym)						\
 	.text; .globl sym; .ent sym; sym:
@@ -224,6 +224,7 @@ _C_LABEL(x):
  *	Mark end of a procedure.
  */
 #define	END(x)			\
+	.size _C_LABEL(x), . - _C_LABEL(x);\
 	.end _C_LABEL(x)
 
 /*
@@ -245,6 +246,7 @@ _C_LABEL(x):
  */
 #define	EXPORT(x)		\
 	.globl	_C_LABEL(x);	\
+	.type _C_LABEL(x),@object;	\
 _C_LABEL(x):
 
 /*
@@ -253,12 +255,11 @@ _C_LABEL(x):
  *	XXX: regmask should be used to generate .mask
  */
 #define	VECTOR(x, regmask)	\
-	.ent	_C_LABEL(x);	\
-	EXPORT(x);		\
+	EXPORT(x);
 
-#define	VECTOR_END(x)		\
-	EXPORT(x ## End);	\
-	END(x)
+#define	VECTOR_END(x)				\
+	EXPORT(x ## End);			\
+	.size _C_LABEL(x), . - _C_LABEL(x)
 
 /*
  * Macros to panic and printf from assembly language.
