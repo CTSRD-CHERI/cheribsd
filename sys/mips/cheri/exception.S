@@ -258,8 +258,6 @@ LEAF(MipsDoTLBMiss)
 	nop
 	.set pop
 END(MipsDoTLBMiss)
-/* Force size 0 so that we do not set the capability bounds in relocations */
-.size _C_LABEL(MipsDoTLBMiss), 0
 
 /*
  * This code is copied to the general exception vector address to
@@ -896,7 +894,7 @@ NESTED(mips_wait, CALLFRAME_SIZ, ra)
 	mfc0	t0, MIPS_COP_0_STATUS
 	ori	t1, t0, MIPS_SR_INT_IE
 	.align 4
-XNESTED(MipsWaitStart)			# this is 16 byte aligned
+GLOBAL(MipsWaitStart)			# this is 16 byte aligned
 	mtc0	t1, MIPS_COP_0_STATUS
 	bnez	v0, MipsWaitEnd
 	nop
@@ -1253,8 +1251,6 @@ LEAF_NOPROFILE(MipsTLBModException)
 	nop
 	.set pop
 END(MipsTLBModException)
-/* Force size 0 so that we do not set the capability bounds in relocations */
-.size _C_LABEL(MipsTLBModException), 0
 #endif /* defined(MIPS_EXC_CNTRS) */
 
 
@@ -1415,8 +1411,6 @@ MipsKStackOverflow:
 
 	.set pop
 END(MipsTLBInvalidException)
-/* Force size 0 so that we do not set the capability bounds in relocations */
-.size _C_LABEL(MipsTLBInvalidException), 0
 
 /*----------------------------------------------------------------------------
  *
@@ -1492,8 +1486,6 @@ LEAF_NOPROFILE(MipsTLBMissException)
 	eret					# return from exception
 	.set	at
 END(MipsTLBMissException)
-/* Force size 0 so that we do not set the capability bounds in relocations */
-.size _C_LABEL(MipsTLBMissException), 0
 
 /*----------------------------------------------------------------------------
  *

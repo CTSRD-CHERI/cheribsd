@@ -10,7 +10,7 @@ machine		mips mips64c128
 
 nomakeoptions	ARCH_FLAGS
 makeoptions 	WERROR="-Wno-error"
-makeoptions 	CHERI_USE_CAP_TABLE=plt
+makeoptions 	CHERI_USE_CAP_TABLE=pcrel
 makeoptions	CHERI_SUBOBJECT_BOUNDS=subobject-safe
 
 # purecap kernel options
