@@ -2643,7 +2643,7 @@ _libmagic=lib/libmagic
 .endif
 
 .if ${MK_PMC} != "no" && \
-    (${TARGET_ARCH} == "aarch64" || ${TARGET_ARCH} == "amd64" || \
+    (${TARGET_ARCH} == "amd64" || ${TARGET} == "arm64" || \
     ${TARGET_ARCH} == "i386")
 _jevents=lib/libpmc/pmu-events
 .endif
