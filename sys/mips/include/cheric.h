@@ -50,6 +50,8 @@
 #endif
 
 #if __has_feature(capabilities)
+#define	cheri_capmode(cap)	(cap)
+
 #define	cheri_getcause()	__builtin_mips_cheri_get_cause()
 #define	cheri_setcause(x)	__builtin_mips_cheri_set_cause(x)
 

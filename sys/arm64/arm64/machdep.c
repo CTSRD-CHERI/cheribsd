@@ -566,19 +566,17 @@ exec_setregs(struct thread *td, struct image_params *imgp, uintcap_t stack)
 
 #if __has_feature(capabilities)
 	if (SV_PROC_FLAG(td->td_proc, SV_CHERI)) {
+		uintcap_t entry;
+
 		tf->tf_x[0] = (uintcap_t)cheri_auxv_capability(imgp, stack);
 		tf->tf_sp = (uintcap_t)cheri_exec_stack_pointer(imgp, stack);
-		/* Purecap binaries have low bit of entry address set. */
-		uintcap_t entry = (uintcap_t)cheri_incoffset(cheri_exec_pcc(td, imgp), -1);
-		tf->tf_lr = entry;
-		tf->tf_elr = entry;
 		cheri_set_mmap_capability(td, imgp,
 		    (void * __capability)tf->tf_sp);
 
-		/* Set LSB of the signal code address since it is C64. */
-		td->td_proc->p_md.md_sigcode = cheri_incoffset(
-		    cheri_sigcode_capability(td), 1);
-		tf->tf_spsr |= PSR_C64;
+		entry = (uintcap_t)cheri_exec_pcc(td, imgp);
+		trapframe_set_elr(tf, (uintcap_t)entry);
+		tf->tf_lr = entry;
+		td->td_proc->p_md.md_sigcode = cheri_sigcode_capability(td);
 	} else
 #endif
 	{
@@ -589,8 +587,7 @@ exec_setregs(struct thread *td, struct image_params *imgp, uintcap_t stack)
 #else
 		tf->tf_elr = imgp->entry_addr;
 #endif
-		tf->tf_lr = tf->tf_lr;
-		tf->tf_spsr &= ~PSR_C64;
+		tf->tf_lr = tf->tf_elr;
 	}
 
 	td->td_pcb->pcb_tpidr_el0 = 0;
