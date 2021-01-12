@@ -89,11 +89,6 @@ CTASSERT(sizeof(void * __capability) == 16);
 CTASSERT(sizeof(struct cheri_object) == 32);
 
 #ifdef __CHERI_PURE_CAPABILITY__
-__attribute__((weak))
-extern Elf64_Dyn _DYNAMIC[];
-__attribute__((weak))
-
-
 /* Defined in linker script, mark the end of .text and kernel image */
 extern char etext[], end[];
 
@@ -109,111 +104,6 @@ caddr_t kernel_code_cap = (void *)(intcap_t)-1;
 caddr_t kernel_data_cap = (void *)(intcap_t)-1;
 void *kernel_root_cap = (void *)(intcap_t)-1;
 
-/*
- * This is called from locore to initialise the cap table entries
- * and other capability relocations.
- */
-void
-process_kernel_cap_relocs(Elf64_Capreloc *start, Elf64_Capreloc *end,
-    void *code_cap, void *data_cap)
-{
-	void *rodata_cap = cheri_andperm(data_cap, CHERI_PERMS_KERNEL);
-
-	code_cap = cheri_andperm(code_cap, CHERI_PERMS_KERNEL_CODE);
-	data_cap = cheri_andperm(data_cap, CHERI_PERMS_KERNEL_DATA);
-
-	for (Elf64_Capreloc *reloc = start; reloc < end; reloc++) {
-		void *cap;
-		void **dst = cheri_setoffset(data_cap, reloc->location);
-
-		if ((reloc->permissions & ELF64_CAPRELOC_FUNCTION) != 0) {
-			cap = cheri_setaddress(code_cap, reloc->object);
-		}
-		else {
-			if ((reloc->permissions & ELF64_CAPRELOC_RODATA) != 0)
-				cap = rodata_cap;
-			else
-				cap = data_cap;
-			cap = cheri_setaddress(cap, reloc->object);
-		}
-		/*
-		 * XXX-AM: do not set 0 bounds, this is a workaround to make
-		 * branches across exception handlers work without changes.
-		 * Should probably go away at some point.
-		 */
-		if (reloc->size != 0)
-			cap = cheri_setbounds(cap, reloc->size);
-		cap = cheri_incoffset(cap, reloc->offset);
-		*dst = cap;
-	}
-}
-
-/*
- * This is called from locore to initialize capability function pointers.
- * In the PLT ABI function pointers use R_MIPS_CHERI_CAPABILITY entries.
- */
-void
-process_kernel_dyn_relocs(void *code_cap, void *data_cap)
-{
-	Elf64_Dyn *dyn;
-	Elf64_Rel *rel_start = NULL;
-	Elf64_Rel *rel_end = NULL;
-	Elf64_Sym *dynsym = NULL;
-	size_t rel_size = 0;
-
-	code_cap = cheri_andperm(code_cap, CHERI_PERMS_KERNEL_CODE);
-	data_cap = cheri_andperm(data_cap, CHERI_PERMS_KERNEL_DATA);
-
-	for (dyn = _DYNAMIC; dyn->d_tag != DT_NULL; dyn++) {
-		switch (dyn->d_tag) {
-		case DT_REL:
-			rel_start = cheri_setaddress(data_cap, dyn->d_un.d_ptr);
-			break;
-		case DT_RELSZ:
-			rel_size = dyn->d_un.d_val;
-			break;
-		case DT_SYMTAB:
-			dynsym = cheri_setaddress(data_cap, dyn->d_un.d_ptr);
-			break;
-		}
-	}
-	rel_start = cheri_setbounds(rel_start, rel_size);
-	rel_end = (Elf64_Rel *)((uintptr_t)rel_start + rel_size);
-
-	for (Elf64_Rel *reloc = rel_start; reloc < rel_end; reloc++) {
-		void *cap;
-		Elf64_Sym *symentry;
-		void **dst = cheri_setaddress(data_cap, reloc->r_offset);
-
-		switch (ELF64_R_TYPE(reloc->r_info)) {
-		case R_MIPS_CHERI_CAPABILITY:
-			symentry = &dynsym[ELF64_R_SYM(reloc->r_info)];
-			if (symentry->st_value == 0) {
-				cap = NULL;
-			}
-			else if (ELF64_ST_TYPE(symentry->st_info) == STT_FUNC) {
-				cap = cheri_setaddress(code_cap,
-				    symentry->st_value);
-				/*
-				 * XXX-AM: do not set 0 bounds, this is a workaround to make
-				 * branches across exception handlers work without changes.
-				 * Should probably go away at some point.
-				 */
-				if (symentry->st_size != 0)
-				  cap = cheri_setbounds(cap, symentry->st_size);
-			}
-			else {
-				cap = cheri_setaddress(data_cap,
-				    symentry->st_value);
-				cap = cheri_setbounds(cap, symentry->st_size);
-			}
-			*dst = cap;
-			break;
-		default:
-			panic("Invalid capability relocation");
-		}
-	}
-}
 #endif /* __CHERI_PURE_CAPABILITY__ */
 
 /*
@@ -326,7 +216,7 @@ SYSINIT(cheri_cpu_startup, SI_SUB_CPU, SI_ORDER_FIRST, cheri_cpu_startup,
     NULL);
 // CHERI CHANGES START
 // {
-//   "updated": 20200429,
+//   "updated": 20210112,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "support"

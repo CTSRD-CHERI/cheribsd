@@ -217,35 +217,10 @@ VECTOR(_locore, unknown)
 	/*
 	 * Process capability relocations.
 	 * This must be done before any PIC global access that uses the cap-table.
-	 * Pointers to the start and end of the __cap_relocs section are created
-	 * here in position-dependant code to avoid accessing the capability table.
-	 *
-	 * process_kernel_cap_relocs(reloc_start, reloc_end,
-	 *    code_cap, data_cap)
 	 */
-	ABSRELOC_LA(t0, _C_LABEL(__start___cap_relocs))
 	cmove		$c3, $c28
-	csetoffset	$c3, $c3, t0
-	ABSRELOC_LA(t1, _C_LABEL(__stop___cap_relocs))
-	LONG_SUBU	t0, t1, t0
-	csetbounds	$c3, $c3, t0
-	cincoffset	$c4, $c3, t0
-	cgetpccsetoffset	$c5, zero
-	cmove		$c6, $c28
-	ABSRELOC_LA(t0, _C_LABEL(process_kernel_cap_relocs))
-	cgetpcc		$c12
-	csetaddr	$c12, $c12, t0
-	cjalr	$c12, $c17
-	nop
-
-	/*
-	 * Process dynamic kernel relocations.
-	 *
-	 * process_kernel_dyn_relocs(code_cap, data_cap)
-	 */
-	cgetpccsetoffset	$c3, zero
-	cmove		$c4, $c28
-	ABSRELOC_LA(t0, _C_LABEL(process_kernel_dyn_relocs))
+	cgetpccsetoffset	$c4, zero
+	ABSRELOC_LA(t0, _C_LABEL(init_cap_relocs))
 	cgetpcc		$c12
 	csetaddr	$c12, $c12, t0
 	cjalr	$c12, $c17
