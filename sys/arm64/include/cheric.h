@@ -30,7 +30,9 @@
 #ifndef _MACHINE_CHERIC_H_
 #define	_MACHINE_CHERIC_H_
 
-#if __has_feature(capabilities) && defined(_KERNEL)
+#if __has_feature(capabilities) && defined(_KERNEL) && \
+    defined(_MACHINE_FRAME_H_)
+
 /*
  * ERET in Morello does not use the LSB of the saved elr to set
  * PSR_C64, nor does it support unsealing sentry capabilities.
