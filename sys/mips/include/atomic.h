@@ -355,14 +355,14 @@ atomic_cmpset_rel_##WIDTH(__volatile TYPE *p, TYPE cmpval, TYPE newval)	\
  * Returns zero if the compare failed, nonzero otherwise.
  */
 #define ATOMIC_FCMPSET(WIDTH, TYPE)					\
-static __inline TYPE							\
+static __inline int							\
 atomic_fcmpset_##WIDTH(__volatile TYPE *p, TYPE *cmpval, TYPE newval)	\
 {									\
 	return (atomic_compare_exchange_weak((__volatile _Atomic(TYPE)*)p, \
 					     cmpval, newval));		\
 }									\
 									\
-static __inline TYPE							\
+static __inline int							\
 atomic_fcmpset_acq_##WIDTH(__volatile TYPE *p, TYPE *cmpval, TYPE newval) \
 {									\
 	return (atomic_compare_exchange_weak_explicit(			\
@@ -370,7 +370,7 @@ atomic_fcmpset_acq_##WIDTH(__volatile TYPE *p, TYPE *cmpval, TYPE newval) \
 			__ATOMIC_ACQUIRE, __ATOMIC_ACQUIRE));		\
 }									\
 									\
-static __inline TYPE							\
+static __inline int							\
 atomic_fcmpset_rel_##WIDTH(__volatile TYPE *p, TYPE *cmpval, TYPE newval) \
 {									\
 	return (atomic_compare_exchange_weak_explicit(			\
@@ -943,7 +943,7 @@ atomic_cmpset_8(__volatile uint8_t *p, uint8_t cmpval, uint8_t newval)
 		"3:\n"
 		__INLINE_ASM_POP_NOAT
 		: "=&r" (ret), "+C" (p)
-		: "r" (cmpval), "r" (newval)
+		: "r" ((long)(int8_t)cmpval), "r" (newval)
 		: "memory");
 
 	return (ret);
@@ -978,7 +978,7 @@ atomic_fcmpset_8(__volatile uint8_t *p, uint8_t *cmpval, uint8_t newval)
 		__INLINE_ASM_POP_NOAT
 		: [ret] "=&r" (ret), [tmp] "=&r" (tmp), [ptr]"+C" (p),
 		    [cmpval]"+C" (cmpval)
-		: [newval] "r" (newval), [expected] "r" (expected)
+		: [newval] "r" (newval), [expected] "r" ((long)(int8_t)expected)
 		: "memory");
 
 	return ret;
@@ -1010,7 +1010,7 @@ atomic_cmpset_16(__volatile uint16_t *p, uint16_t cmpval, uint16_t newval)
 		"3:\n"
 		__INLINE_ASM_POP_NOAT
 		: "=&r" (ret), "+C" (p)
-		: "r" (cmpval), "r" (newval)
+		: "r" ((long)(int16_t)cmpval), "r" (newval)
 		: "memory");
 
 	return (ret);
@@ -1045,7 +1045,7 @@ atomic_fcmpset_16(__volatile uint16_t *p, uint16_t *cmpval, uint16_t newval)
 		__INLINE_ASM_POP_NOAT
 		: [ret] "=&r" (ret), [tmp] "=&r" (tmp), [ptr]"+C" (p),
 		    [cmpval]"+C" (cmpval)
-		: [newval] "r" (newval), [expected] "r" (expected)
+		: [newval] "r" (newval), [expected] "r" ((long)(int16_t)expected)
 		: "memory");
 
 	return ret;
@@ -1093,7 +1093,7 @@ atomic_cmpset_32(__volatile uint32_t *p, uint32_t cmpval, uint32_t newval)
 		"3:\n"
 		__INLINE_ASM_POP_NOAT
 		: "=&r" (ret), "+C" (p)
-		: "r" (cmpval), "r" (newval)
+		: "r" ((long)(int32_t)cmpval), "r" (newval)
 		: "memory");
 #endif
 
@@ -1152,7 +1152,7 @@ atomic_fcmpset_32(__volatile uint32_t *p, uint32_t *cmpval, uint32_t newval)
 		__INLINE_ASM_POP_NOAT
 		: [ret] "=&r" (ret), [tmp] "=&r" (tmp), [ptr]"+C" (p),
 		    [cmpval]"+C" (cmpval)
-		: [newval] "r" (newval), [expected] "r" (expected)
+		: [newval] "r" (newval), [expected] "r" ((long)(int32_t)expected)
 		: "memory");
 #endif
 	return ret;
@@ -1486,10 +1486,10 @@ ATOMIC_ACQ_REL_CAP(subtract)
 
 #undef ATOMIC_ACQ_REL_CAP
 
-static __inline uint64_t
+static __inline int
 atomic_cmpset_cap(__volatile uintptr_t *p, uintptr_t cmpval, uintptr_t newval)
 {
-	uint64_t ret;
+	int ret;
 	uintptr_t temp;
 
 	__asm __volatile (
@@ -1508,7 +1508,7 @@ atomic_cmpset_cap(__volatile uintptr_t *p, uintptr_t cmpval, uintptr_t newval)
 	return (ret);
 }
 
-static __inline uint64_t
+static __inline int
 atomic_cmpset_acq_cap(__volatile uintptr_t *p, uintptr_t cmpval, uintptr_t newval)
 {
 	int retval;
@@ -1518,17 +1518,17 @@ atomic_cmpset_acq_cap(__volatile uintptr_t *p, uintptr_t cmpval, uintptr_t newva
 	return (retval);
 }
 
-static __inline uint64_t
+static __inline int
 atomic_cmpset_rel_cap(__volatile uintptr_t *p, uintptr_t cmpval, uintptr_t newval)
 {
 	mips_sync();
 	return (atomic_cmpset_cap(p, cmpval, newval));
 }
 
-static __inline uint64_t
+static __inline int
 atomic_fcmpset_cap(__volatile uintptr_t *p, uintptr_t *cmpval, uintptr_t newval)
 {
-	uint64_t ret;
+	int ret;
 	uintptr_t tmp, cmp = *cmpval;
 
 	__asm __volatile (
@@ -1550,7 +1550,7 @@ atomic_fcmpset_cap(__volatile uintptr_t *p, uintptr_t *cmpval, uintptr_t newval)
 	return ret;
 }
 
-static __inline uint64_t
+static __inline int
 atomic_fcmpset_acq_cap(__volatile uintptr_t *p, uintptr_t *cmpval, uintptr_t newval)
 {
 	int retval;
@@ -1560,7 +1560,7 @@ atomic_fcmpset_acq_cap(__volatile uintptr_t *p, uintptr_t *cmpval, uintptr_t new
 	return (retval);
 }
 
-static __inline uint64_t
+static __inline int
 atomic_fcmpset_rel_cap(__volatile uintptr_t *p, uintptr_t *cmpval, uintptr_t newval)
 {
 	mips_sync();
