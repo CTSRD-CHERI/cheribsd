@@ -2629,14 +2629,14 @@ vn_mmap(struct file *fp, vm_map_t map, vm_offset_t *addr,
 			maxprot |= VM_PROT_WRITE;
 		else if ((prot & VM_PROT_WRITE) != 0)
 			return (EACCES);
+
+		prot = VM_PROT_REMOVE_CAP(prot);
 	} else {
 		maxprot |= VM_PROT_WRITE;
 		cap_maxprot |= VM_PROT_WRITE;
 
 		/* Permit capability loads and stores for MAP_PRIVATE. */
-		prot = VM_PROT_ADD_CAP(prot);
 		maxprot = VM_PROT_ADD_CAP(maxprot);
-		cap_maxprot = VM_PROT_ADD_CAP(cap_maxprot);
 	}
 	maxprot &= cap_maxprot;
 

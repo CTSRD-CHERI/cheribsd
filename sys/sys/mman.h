@@ -56,8 +56,26 @@
 #define	PROT_WRITE	0x02	/* pages can be written */
 #define	PROT_EXEC	0x04	/* pages can be executed */
 #if __BSD_VISIBLE
-#define	_PROT_ALL	(PROT_READ | PROT_WRITE | PROT_EXEC)
-#define	PROT_EXTRACT(prot)	((prot) & _PROT_ALL)
+/*
+ * For backwards capability load and store protections are implied by the
+ * values of PROT_READ and PROT_WRITE or-ed together unless any PROT_CAP_*
+ * value is included.
+ */
+#define	PROT_CAP_NONE	0x4000
+#define	PROT_CAP_READ	0x0008	/* capabilities can be loaded from pages */
+#define	PROT_CAP_WRITE	0x0010	/* capabilities can be stored in pages */
+#define	_PROT_CAP_ALL	(PROT_CAP_NONE | PROT_CAP_READ | PROT_CAP_WRITE)
+#define	PROT_CAP_IMPLIED(prot) __extension__ ({				\
+	int p = (prot);							\
+	if ((p & _PROT_CAP_ALL) == 0) {					\
+		p |= ((p & PROT_READ) != 0) ? PROT_CAP_READ : 0;	\
+		p |= ((p & PROT_WRITE) != 0) ? PROT_CAP_WRITE : 0;	\
+	}								\
+	p;								\
+})
+
+#define	_PROT_ALL	(PROT_READ | PROT_WRITE | PROT_EXEC | _PROT_CAP_ALL)
+#define	PROT_EXTRACT(prot) 	((prot) & _PROT_ALL)
 
 #define	_PROT_MAX_SHIFT	16
 #define	PROT_MAX(prot)		((prot) << _PROT_MAX_SHIFT)

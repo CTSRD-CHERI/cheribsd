@@ -152,23 +152,29 @@ cap_covers_pages(const void * __capability cap, size_t size)
 			    CHERI_PERM_STORE_LOCAL_CAP)
 #define	PERM_EXEC	CHERI_PERM_EXECUTE
 #define	PERM_RWX	(PERM_READ | PERM_WRITE | PERM_EXEC)
+
 /*
- * Given a starting set of CHERI permissions (operms), set (not AND) the load,
- * store, and execute permissions based on the mmap permissions (prot).
+ * mmap_prot2perms - convert an mmap protection value to capability
+ * permissions.
  *
- * This function is intended to be used when creating a capability to a
- * new region or rederiving a capability when upgrading a sub-region.
+ * This function implies PROT_CAP_* from PROT_READ and PROT_WRITE when no
+ * PROT_CAP_* bits are set and must not be called with a vm_prot_t.
  */
 static register_t
 mmap_prot2perms(int prot)
 {
 	register_t perms = 0;
 
+	prot = PROT_CAP_IMPLIED(prot);
+
 	if (prot & PROT_READ)
-		perms |= CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP;
+		perms |= CHERI_PERM_LOAD;
+	if (prot & PROT_CAP_READ)
+		perms |= CHERI_PERM_LOAD_CAP;
 	if (prot & PROT_WRITE)
-		perms |= CHERI_PERM_STORE | CHERI_PERM_STORE_CAP |
-		CHERI_PERM_STORE_LOCAL_CAP;
+		perms |= CHERI_PERM_STORE;
+	if (prot & PROT_CAP_WRITE)
+		perms |= CHERI_PERM_STORE_CAP | CHERI_PERM_STORE_LOCAL_CAP;
 	if (prot & PROT_EXEC)
 		perms |= CHERI_PERM_EXECUTE;
 
@@ -544,8 +550,8 @@ kern_mmap_req(struct thread *td, struct mmap_req *mrp)
 		    (prot & ~(_PROT_ALL | PROT_MAX(_PROT_ALL))));
 		return (EINVAL);
 	}
-	max_prot = PROT_MAX_EXTRACT(prot);
 	prot = PROT_EXTRACT(prot);
+	max_prot = PROT_MAX_EXTRACT(prot);
 	if (max_prot != 0 && (max_prot & prot) != prot) {
 		SYSERRCAUSE(
 		    "%s: requested page permissions exceed requesed maximum",
@@ -555,6 +561,9 @@ kern_mmap_req(struct thread *td, struct mmap_req *mrp)
 	if ((prot & (PROT_WRITE | PROT_EXEC)) == (PROT_WRITE | PROT_EXEC) &&
 	    (error = vm_wxcheck(p, "mmap")))
 		return (error);
+
+	prot = PROT_CAP_IMPLIED(prot) & ~PROT_CAP_NONE;
+	max_prot = PROT_CAP_IMPLIED(max_prot) & ~PROT_CAP_NONE;
 
 	/*
 	 * Always honor PROT_MAX if set.  If not, default to all
@@ -814,8 +823,7 @@ kern_mmap_req(struct thread *td, struct mmap_req *mrp)
 		 * This relies on VM_PROT_* matching PROT_*.
 		 */
 		error = vm_mmap_object(&vms->vm_map, &addr, max_addr, size,
-		    VM_PROT_ADD_CAP(prot), VM_PROT_ADD_CAP(max_prot), flags,
-		    NULL, pos, FALSE, td);
+		    prot, max_prot, flags, NULL, pos, FALSE, td);
 	} else {
 		/*
 		 * Mapping file, get fp for validation and don't let the
@@ -835,6 +843,7 @@ kern_mmap_req(struct thread *td, struct mmap_req *mrp)
 		error = fget_mmap(td, fd, &rights, &cap_maxprot, &fp);
 		if (error != 0)
 			goto done;
+		cap_maxprot = PROT_CAP_IMPLIED(cap_maxprot);
 		if ((flags & (MAP_SHARED | MAP_PRIVATE)) == 0 &&
 		    p->p_osrel >= P_OSREL_MAP_FSTRICT) {
 			error = EINVAL;
@@ -1142,8 +1151,8 @@ kern_mprotect(struct thread *td, uintptr_t addr0, size_t size, int prot)
 	addr = addr0;
 	if ((prot & ~(_PROT_ALL | PROT_MAX(_PROT_ALL))) != 0)
 		return (EINVAL);
-	max_prot = PROT_MAX_EXTRACT(prot);
-	prot = PROT_EXTRACT(prot);
+	max_prot = PROT_CAP_IMPLIED(PROT_MAX_EXTRACT(prot)) & ~PROT_CAP_NONE;
+	prot = PROT_CAP_IMPLIED(PROT_EXTRACT(prot)) & ~PROT_CAP_NONE;
 	pageoff = (addr & PAGE_MASK);
 	addr -= pageoff;
 	size += pageoff;
@@ -1932,7 +1941,6 @@ vm_mmap_cdev(struct thread *td, vm_size_t objsize, vm_prot_t *protp,
 		*objp = NULL;
 		*foff = 0;
 		*maxprotp = VM_PROT_ALL;
-		*protp = VM_PROT_ADD_CAP(*protp);
 		*flagsp |= MAP_ANON;
 		return (0);
 	}
@@ -2027,7 +2035,7 @@ vm_mmap(vm_map_t map, vm_offset_t *addr, vm_size_t size, vm_prot_t prot,
 	case OBJT_DEFAULT:
 		if (handle == NULL) {
 			prot = VM_PROT_ADD_CAP(prot);
-			maxprot = VM_PROT_ADD_CAP(prot);
+			maxprot = prot;
 			error = 0;
 			break;
 		}

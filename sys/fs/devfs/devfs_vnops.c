@@ -2007,6 +2007,7 @@ devfs_mmap_f(struct file *fp, vm_map_t map, vm_offset_t *addr,
 		else if ((prot & VM_PROT_WRITE) != 0)
 			return (EACCES);
 	}
+	maxprot = VM_PROT_ADD_CAP(maxprot);
 	maxprot &= cap_maxprot;
 
 	fpop = td->td_fpop;

@@ -2865,7 +2865,6 @@ again:
 	/*
 	 * Make a first pass to check for protection violations.
 	 */
-restart_checks:
 	for (entry = first_entry; entry->start < end;
 	    entry = vm_map_entry_succ(entry)) {
 		if ((entry->eflags &
@@ -2874,27 +2873,6 @@ restart_checks:
 		if ((entry->eflags & MAP_ENTRY_IS_SUB_MAP) != 0) {
 			vm_map_unlock(map);
 			return (KERN_INVALID_ARGUMENT);
-		}
-
-		/*
-		 * When keep_cap is used (for mprotect()), upgrade
-		 * new_prot to include the associated VM_PROT_CAP bits
-		 * and retry the the scan.  This means that the
-		 * mprotect will fail if it spans map entries with and
-		 * without VM_PROT_CAP set.
-		 *
-		 * Alternatively, keep_cap could be applied to
-		 * individual map entries.  The current approach gives
-		 * more conservative semantics at the cost of
-		 * potential compatibility breakage.  The alternative
-		 * would maximize compatibility.
-		 */
-		if (keep_cap &&
-		    ((set_max && (entry->max_protection & VM_PROT_CAP) != 0) ||
-		    (!set_max && (entry->protection & VM_PROT_CAP) != 0))) {
-			new_prot = VM_PROT_ADD_CAP(new_prot);
-			keep_cap = FALSE;
-			goto restart_checks;
 		}
 
 		if ((new_prot & entry->max_protection) != new_prot) {
