@@ -153,6 +153,11 @@ file(WRITE ${CMAKE_BINARY_DIR}/kern_opt/opt_global.h "
 // #define MAC 1
 // #define AUDIT 1")
 
+file(WRITE ${CMAKE_BINARY_DIR}/kern_opt/opt_capsicum.h "
+#define CAPABILITIES 1
+#define CAPABILITY_MODE 1
+")
+
 
 set(CMAKE_C_COMPILER_TARGET ${CLANG_TRIPLE})
 set(CMAKE_CXX_COMPILER_TARGET ${CLANG_TRIPLE})
@@ -268,7 +273,7 @@ add_kernel_srcs("sys/xdr")
 function(add_kernel_compile_flags _target)
     target_compile_definitions(${_target} PRIVATE _KERNEL=1)
     target_include_directories(${_target} PRIVATE ${CMAKE_BINARY_DIR}/kern_opt ${CMAKE_SOURCE_DIR}/sys/contrib/ck/include)
-    target_compile_options(${_target} PRIVATE "-include${CMAKE_BINARY_DIR}/kern_opt/opt_global.h")
+    target_compile_options(${_target} PRIVATE "-include${CMAKE_BINARY_DIR}/kern_opt/opt_global.h" -Wno-cast-qual)
 endfunction()
 # Add targets for sys/dev:
 function(add_kernel_modules _prefix _subdir)
@@ -295,6 +300,13 @@ endfunction()
 
 add_kernel_modules(sys_dev sys/dev)
 add_library(fake_kernel STATIC ${FAKE_KERNEL_SRCS})
+execute_process(COMMAND ${AWK} -f "${CMAKE_SOURCE_DIR}/sys/tools/vnode_if.awk" "${CMAKE_SOURCE_DIR}/sys/kern/vnode_if.src" -h
+                WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/kern_opt COMMAND_ECHO STDOUT)
+execute_process(COMMAND ${AWK} -f "${CMAKE_SOURCE_DIR}/sys/tools/vnode_if.awk" "${CMAKE_SOURCE_DIR}/sys/kern/vnode_if.src" -p
+                WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/kern_opt COMMAND_ECHO STDOUT)
+execute_process(COMMAND ${AWK} -f "${CMAKE_SOURCE_DIR}/sys/tools/vnode_if.awk" "${CMAKE_SOURCE_DIR}/sys/kern/vnode_if.src" -q
+                WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/kern_opt COMMAND_ECHO STDOUT)
+
 add_kernel_compile_flags(fake_kernel)
 
 
