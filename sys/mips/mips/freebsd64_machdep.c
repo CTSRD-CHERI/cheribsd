@@ -132,7 +132,7 @@ struct sysentvec elf_freebsd_freebsd64_sysvec = {
 INIT_SYSENTVEC(freebsd64_sysent, &elf_freebsd_freebsd64_sysvec);
 
 #ifdef CPU_CHERI
-static __inline boolean_t
+static __inline bool
 mips_hybrid_check_cap_size(uint32_t bits, const char *execpath)
 {
 	static struct timeval lastfail;
@@ -140,23 +140,23 @@ mips_hybrid_check_cap_size(uint32_t bits, const char *execpath)
 	const uint32_t expected = CHERICAP_SIZE * 8;
 
 	if (bits == expected)
-		return TRUE;
+		return true;
 	if (ppsratecheck(&lastfail, &curfail, 1))
 		printf("warning: attempting to execute %d-bit hybrid binary "
 		    "'%s' on a %d-bit kernel\n", bits, execpath, expected);
-	return FALSE;
+	return false;
 }
 
-static boolean_t
-mips_elf_header_supported(struct image_params * imgp, int32_t *osrel __unused,
-    uint32_t *fctl0 __unused)
+static bool
+mips_elf_header_supported(const struct image_params *imgp,
+    const int32_t *osrel __unused, const uint32_t *fctl0 __unused)
 {
 	const Elf_Ehdr *hdr = (const Elf_Ehdr *)imgp->image_header;
 	if ((hdr->e_flags & EF_MIPS_MACH) == EF_MIPS_MACH_CHERI128)
 		return mips_hybrid_check_cap_size(128, imgp->execpath);
 	if ((hdr->e_flags & EF_MIPS_MACH) == EF_MIPS_MACH_CHERI256)
 		return mips_hybrid_check_cap_size(256, imgp->execpath);
-	return TRUE;
+	return true;
 }
 #endif
 
