@@ -160,9 +160,24 @@ check_initreg_code(void * __capability c)
 	CHERIBSDTEST_VERIFY2(cheri_getbase(c) == CHERI_CAP_USER_CODE_BASE,
 	    "code base 0x%jx (expected 0x%jx)", cheri_getbase(c),
 	    (uintmax_t)CHERI_CAP_USER_CODE_BASE);
+
+#ifdef __mips__
+	/*
+	 * The MIPS purecap kernel has a smaller user address space
+	 * because it stores capabilities in its software page tables
+	 * (so PTEs are twice as large).  The
+	 * CHERI_CAP_USER_CODE_LENGTH constant here reflects the
+	 * hybrid size.
+	 */
+	CHERIBSDTEST_VERIFY2(cheri_getlength(c) == CHERI_CAP_USER_CODE_LENGTH ||
+	    cheri_getlength(c) == CHERI_CAP_USER_CODE_LENGTH / 4,
+	    "code length 0x%jx should be 0x%jx", cheri_getlength(c),
+	    (uintmax_t)CHERI_CAP_USER_CODE_LENGTH);
+#else
 	CHERIBSDTEST_VERIFY2(cheri_getlength(c) == CHERI_CAP_USER_CODE_LENGTH,
 	    "code length 0x%jx should be 0x%jx", cheri_getlength(c),
 	    (uintmax_t)CHERI_CAP_USER_CODE_LENGTH);
+#endif
 #endif
 	/* Offset. */
 	CHERIBSDTEST_VERIFY(cheri_getoffset(c) == 0);
