@@ -355,8 +355,8 @@ __cheri_clear_low_ptr_bits(uintptr_t ptr, size_t bits_mask) {
 	__builtin_cheri_representable_alignment_mask(len)
 
 /*
- * TODO: avoid using these since count leading/trailing zeroes is expensive on
- * BERI/CHERI
+ * These should be avoided on CHERI MIPS and RISCV64 since count
+ * leading/trailing zeroes is expensive.
  */
 #define	CHERI_ALIGN_SHIFT(l)	\
 	__builtin_ctzll(CHERI_REPRESENTABLE_ALIGNMENT_MASK(l))
