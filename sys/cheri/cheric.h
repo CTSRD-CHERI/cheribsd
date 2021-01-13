@@ -337,6 +337,51 @@ __cheri_clear_low_ptr_bits(uintptr_t ptr, size_t bits_mask) {
 #define cheri_clear_low_ptr_bits(ptr, mask)                                    \
   __cheri_clear_low_ptr_bits((uintptr_t)(ptr), __static_assert_sensible_low_bits(mask))
 
+#if __has_feature(capabilities)
+#define	CHERI_REPRESENTABLE_LENGTH(len) \
+	__builtin_cheri_round_representable_length(len)
+#define	CHERI_REPRESENTABLE_ALIGNMENT_MASK(len) \
+	__builtin_cheri_representable_alignment_mask(len)
+
+/*
+ * These should be avoided on CHERI MIPS and RISCV64 since count
+ * leading/trailing zeroes is expensive.
+ */
+#define	CHERI_ALIGN_SHIFT(l)	\
+	__builtin_ctzll(CHERI_REPRESENTABLE_ALIGNMENT_MASK(l))
+#define	CHERI_SEAL_ALIGN_SHIFT(l)	\
+	__builtin_ctzll(CHERI_SEALABLE_ALIGNMENT_MASK(l))
+
+#else /* !__has_feature(capabilities) */
+#define	CHERI_REPRESENTABLE_LENGTH(len) (len)
+#define	CHERI_REPRESENTABLE_ALIGNMENT_MASK(len) UINT64_MAX
+#endif /* !__has_feature(capabilities) */
+
+/* Provide macros to make it easier to work with the raw CRAM/CRRL results: */
+#define	CHERI_REPRESENTABLE_ALIGNMENT(len) \
+	(~CHERI_REPRESENTABLE_ALIGNMENT_MASK(len) + 1)
+#define	CHERI_REPRESENTABLE_BASE(base, len) \
+	((base) & CHERI_REPRESENTABLE_ALIGNMENT_MASK(len))
+
+/*
+ * In the current encoding sealed and unsealed capabilities have the same
+ * alignment constraints.
+ */
+#define	CHERI_SEALABLE_LENGTH(len)	\
+	CHERI_REPRESENTABLE_LENGTH(len)
+#define	CHERI_SEALABLE_ALIGNMENT_MASK(len)	\
+	CHERI_REPRESENTABLE_ALIGNMENT_MASK(len)
+#define	CHERI_SEALABLE_ALIGNMENT(len)	\
+	CHERI_REPRESENTABLE_ALIGNMENT(len)
+#define	CHERI_SEALABLE_BASE(base, len)	\
+	CHERI_REPRESENTABLE_BASE(base, len)
+
+/* A mask for the lower bits, i.e. the negated alignment mask */
+#define	CHERI_SEAL_ALIGN_MASK(l)	~(CHERI_SEALABLE_ALIGNMENT_MASK(l))
+#define	CHERI_ALIGN_MASK(l)		~(CHERI_REPRESENTABLE_ALIGNMENT_MASK(l))
+
+#if __has_feature(capabilities)
 #include <machine/cheric.h>
+#endif
 
 #endif /* _SYS_CHERIC_H_ */
