@@ -122,9 +122,9 @@ static struct sysentvec elf_freebsd_sysvec = {
 INIT_SYSENTVEC(elf_sysvec, &elf_freebsd_sysvec);
 
 #if __has_feature(capabilities)
-static boolean_t
-mips_elf_header_supported(struct image_params * imgp, int32_t *osrel __unused,
-    uint32_t *fctl0 __unused)
+static bool
+mips_elf_header_supported(const struct image_params *imgp,
+    const int32_t *osrel __unused, const uint32_t *fctl0 __unused)
 {
 	const Elf_Ehdr *hdr = (const Elf_Ehdr *)imgp->image_header;
 	const uint32_t machine = hdr->e_flags & EF_MIPS_MACH;
@@ -137,10 +137,10 @@ mips_elf_header_supported(struct image_params * imgp, int32_t *osrel __unused,
 			printf(
 	    "warning: attempting to execute 256-bit CheriABI binary '%s'\n",
 			    imgp->execpath);
-		return FALSE;
+		return false;
 	}
 
-	return TRUE;
+	return true;
 }
 #endif
 
