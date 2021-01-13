@@ -317,17 +317,8 @@ mips_proc0_init(void)
 	 * thread0 is the only thread that has kstack located in KSEG0 
 	 * while cpu_thread_alloc handles kstack allocated in KSEG2.
 	 */
-#ifndef __CHERI_PURE_CAPABILITY__
-	thread0.td_pcb = (struct pcb *)(thread0.td_kstack +
-	    thread0.td_kstack_pages * PAGE_SIZE) - 1;
-#else /* __CHERI_PURE_CAPABILITY__ */
-	/* Adjust the bounds of the thread0 kernel stack and pcb. */
-	thread0.td_pcb = cheri_setbounds((struct pcb *)(thread0.td_kstack +
-		thread0.td_kstack_pages * PAGE_SIZE) - 1,
-		sizeof(struct pcb));
-	thread0.td_kstack = (vm_pointer_t) cheri_setbounds((void *)thread0.td_kstack,
-		thread0.td_kstack_pages * PAGE_SIZE - sizeof(struct pcb));
-#endif /* __CHERI_PURE_CAPABILITY__ */
+	mips_setup_thread_pcb(&thread0);
+
 	thread0.td_frame = &thread0.td_pcb->pcb_regs;
 
 	/* Steal memory for the dynamic per-cpu area. */

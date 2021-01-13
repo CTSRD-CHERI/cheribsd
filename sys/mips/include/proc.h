@@ -108,6 +108,8 @@ struct syscall_args {
 #define	KINFO_PROC_SIZE 816
 #endif /* !__mips_n64 */
 
+void mips_setup_thread_pcb(struct thread *td);
+
 #endif	/* !_MACHINE_PROC_H_ */
 // CHERI CHANGES START
 // {

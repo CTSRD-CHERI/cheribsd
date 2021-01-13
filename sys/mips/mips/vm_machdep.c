@@ -72,8 +72,8 @@ __FBSDID("$FreeBSD$");
 
 #if __has_feature(capabilities)
 #include <cheri/cheri.h>
-#include <cheri/cheric.h>
 #endif
+#include <cheri/cheric.h>
 
 #include <vm/vm.h>
 #include <vm/vm_extern.h>
@@ -89,6 +89,41 @@ __FBSDID("$FreeBSD$");
 
 #include <sys/user.h>
 #include <sys/mbuf.h>
+
+/*
+ * Create the PCB for the given thread.
+ * The PCB space is allocated at the bottom of the kernel stack for
+ * the given thread.
+ * Adjust the bounds of the thread kernel stack and PCB
+ * so that both the capabilities are exactly representable.
+ * There may be padding inserted between the stack and the PCB as
+ * a result of this.
+ */
+void
+mips_setup_thread_pcb(struct thread *td)
+{
+	vm_pointer_t pcb_addr;
+	size_t pcb_size, stack_size;
+
+	pcb_size = CHERI_REPRESENTABLE_LENGTH(sizeof(struct pcb));
+	pcb_addr = CHERI_REPRESENTABLE_BASE(
+	    td->td_kstack + KSTACK_PAGES * PAGE_SIZE - pcb_size,
+	    pcb_size);
+	td->td_pcb = (struct pcb *)cheri_kern_setboundsexact(
+	    pcb_addr, pcb_size);
+
+	/*
+	 * We assume that td_kstack is well aligned as the stack
+	 * must already be page or superpage aligned, so we reduce the
+	 * length to the closest representable boundary.
+	 */
+	stack_size = (ptraddr_t)pcb_addr - (ptraddr_t)td->td_kstack;
+	stack_size = rounddown2(stack_size,
+	    CHERI_REPRESENTABLE_ALIGNMENT(stack_size));
+	td->td_kstack = cheri_kern_andperm(
+	    cheri_kern_setboundsexact(td->td_kstack, stack_size),
+	    CHERI_PERMS_KERNEL_DATA);
+}
 
 /*
  * Finish a fork operation, with process p2 nearly set up.
@@ -355,26 +390,7 @@ cpu_thread_alloc(struct thread *td)
 	KASSERT(is_aligned(td->td_kstack, KSTACK_PAGE_SIZE * 2),
 	    ("kernel stack must be aligned."));
 #endif
-#ifndef __CHERI_PURE_CAPABILITY__
-	td->td_pcb = (struct pcb *)(td->td_kstack +
-	    td->td_kstack_pages * PAGE_SIZE) - 1;
-#else
-	/*
-	 * XXX-AM: kstack and pcb are allocated toghether, so we need to split
-	 * the two capabilities properly.
-	 * Note that this also cuts out the guard pages if any.
-	 */
-	struct pcb *pcb_base = (struct pcb *)(td->td_kstack +
-	    td->td_kstack_pages * PAGE_SIZE) - 1;
-	size_t kstack_size = td->td_kstack_pages * PAGE_SIZE -
-	    sizeof(struct pcb);
-
-	td->td_pcb = cheri_setbounds((void *)pcb_base, sizeof(struct pcb));
-	td->td_kstack = (vm_pointer_t)cheri_setbounds(
-	    (void *)td->td_kstack, kstack_size);
-	td->td_kstack = (vm_pointer_t)cheri_andperm((void *)td->td_kstack,
-	    CHERI_PERMS_KERNEL_DATA);
-#endif
+	mips_setup_thread_pcb(td);
 	td->td_frame = &td->td_pcb->pcb_regs;
 #ifdef KSTACK_LARGE_PAGE
 #if defined(__CHERI_PURE_CAPABILITY__)
