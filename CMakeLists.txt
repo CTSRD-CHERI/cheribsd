@@ -218,6 +218,7 @@ endfunction()
 
 add_fake_targets_for_subdir(lib LIBRARIES)
 add_contrib_sources(lib_libc contrib/jemalloc)
+target_include_directories(lib_libsimple_printf PRIVATE lib/libc/stdio)
 add_fake_targets_for_subdir(bin)
 add_fake_targets_for_subdir(usr.bin)
 add_fake_targets_for_subdir(sbin)
