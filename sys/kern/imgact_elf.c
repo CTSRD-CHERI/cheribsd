@@ -338,7 +338,8 @@ __elfN(get_brandinfo)(struct image_params *imgp, const char *interp,
 	const Elf_Ehdr *hdr = (const Elf_Ehdr *)imgp->image_header;
 	Elf_Brandinfo *bi, *bi_m;
 	boolean_t ret, has_fctl0;
-	int i, interp_name_len;
+	int i;
+	size_t interp_name_len;
 
 	interp_name_len = interp != NULL ? strlen(interp) + 1 : 0;
 
