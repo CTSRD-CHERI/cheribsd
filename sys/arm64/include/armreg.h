@@ -71,7 +71,7 @@
 	_val;								\
 })
 #define	WRITE_SPECIALREG_CAP(reg, _val)					\
-	__asm __volatile("msr	" __STRING(reg) ", %0" :: "C" ((uintcap_t)_val))
+	__asm __volatile("msr	" __STRING(reg) ", %0" : : "C"((uintcap_t)_val))
 #endif
 
 #define	UL(x)	UINT64_C(x)
