@@ -112,19 +112,18 @@ cheri_exec_pcc(struct thread *td, struct image_params *imgp)
 	 * use end_addr to find the end of the rtld mapping.
 	 */
 	if (imgp->interp_end != 0) {
-		code_start = imgp->reloc_base;
+		code_start = imgp->interp_start;
 		code_end = imgp->interp_end;
 	} else {
 		code_start = imgp->start_addr;
 		code_end = imgp->end_addr;
 	}
 
-	/* Ensure CHERI128 representability */
 	code_length = code_end - code_start;
-	code_start = CHERI_REPRESENTABLE_BASE(code_start, code_length);
-	code_length = CHERI_REPRESENTABLE_LENGTH(code_length);
-	KASSERT(code_start + code_length >= code_end,
-	    ("%s: truncated PCC", __func__));
+	/* Check that imgact_elf enforced capability representability. */
+	MPASS(code_start == CHERI_REPRESENTABLE_BASE(code_start, code_length));
+	MPASS(code_length == CHERI_REPRESENTABLE_LENGTH(code_length));
+	KASSERT(code_start < code_end, ("%s: truncated PCC", __func__));
 	return (cheri_capability_build_user_code(td, CHERI_CAP_USER_CODE_PERMS,
 	    code_start, code_length, imgp->entry_addr - code_start));
 }

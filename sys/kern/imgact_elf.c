@@ -109,7 +109,7 @@ static int __elfN(check_header)(const Elf_Ehdr *hdr);
 static Elf_Brandinfo *__elfN(get_brandinfo)(struct image_params *imgp,
     const char *interp, int32_t *osrel, uint32_t *fctl0);
 static int __elfN(load_file)(struct proc *p, const char *file, u_long *addr,
-    u_long *end_addr, u_long *entry);
+    u_long *end_addr, u_long *entry, u_long *repr_start, u_long *repr_end);
 static int __elfN(load_section)(const struct image_params *imgp,
     vm_ooffset_t offset, caddr_t vmaddr, size_t memsz, size_t filsz,
     vm_prot_t prot);
@@ -798,11 +798,79 @@ __elfN(ensure_representable_base)(const char *execpath, const Elf_Ehdr *hdr,
 	*preferred_rbase = adjusted_base;
 	return (0);
 }
+
+static int
+reserve_address_space(vm_map_t map, Elf_Addr map_start, Elf_Addr map_end,
+    vm_offset_t reservation_id)
+{
+	int error;
+
+	MPASS(map_start < map_end);
+	vm_map_lock(map);
+	error = vm_map_insert(map, NULL, 0, map_start, map_end, VM_PROT_NONE,
+	    VM_PROT_NONE, MAP_CREATE_UNMAPPED, reservation_id);
+	vm_map_unlock(map);
+	if (error != 0) {
+		uprintf("%s: Failed to reserve space for padding: %d!\n",
+		    __func__, error);
+		return (error);
+	}
+	return (0);
+}
+
+/*
+ * Claim the space around the executable that is required to represent a
+ * capability spanning the executable.
+ */
+static int
+__elfN(reserve_representability_padding)(const char *execpath, vm_map_t map,
+    Elf_Addr mapbase, Elf_Addr start_addr, Elf_Addr end_addr,
+    u_long *representable_start, u_long *representable_end)
+{
+	size_t representable_length;
+	int error;
+	size_t maplen = end_addr - start_addr;
+	/*
+	 * Sanity check that the base address was aligned correctly so that we
+	 * can represent a capability spanning the entire executable.
+	 */
+	MPASS2(trunc_page(mapbase) == mapbase, "Not page-aligned?");
+	MPASS2(trunc_page(start_addr) == start_addr, "Not page-aligned?");
+	*representable_start = CHERI_REPRESENTABLE_BASE(start_addr, maplen);
+	MPASS(mapbase <= *representable_start);
+	representable_length = CHERI_REPRESENTABLE_LENGTH(maplen);
+	if (*representable_start != start_addr) {
+		uprintf("%s: Reserving space before start: [%#jx-%#jx] for "
+		    "%s mapping at [%#jx-%#jx]\n", __func__,
+		    (uintmax_t)*representable_start, (uintmax_t)start_addr,
+		    execpath, (uintmax_t)start_addr, (uintmax_t)end_addr);
+		error = reserve_address_space(map, *representable_start,
+		    start_addr, /*reservation=*/start_addr);
+		if (error)
+			return (error);
+	}
+	*representable_end = *representable_start +
+	    CHERI_REPRESENTABLE_LENGTH(maplen);
+	/* We must have mapped up to the end of a page. */
+	if (round_page(*representable_end) != round_page(end_addr)) {
+		uprintf("%s: Reserving space after end: [%#jx-%#jx] for "
+		    "%s mapping at [%#jx-%#jx]\n", __func__,
+		    (uintmax_t)round_page(end_addr),
+		    (uintmax_t)round_page(*representable_end), execpath,
+		    (uintmax_t)start_addr, (uintmax_t)end_addr);
+		error = reserve_address_space(map, round_page(end_addr),
+		    round_page(*representable_end), /*reservation=*/start_addr);
+		if (error)
+			return (error);
+	}
+	return (0);
+}
 #endif
 
 static int
 __elfN(load_sections)(const struct image_params *imgp, const Elf_Ehdr *hdr,
-    const Elf_Phdr *phdr, u_long rbase, u_long *base_addrp, u_long *max_addrp)
+    const Elf_Phdr *phdr, u_long rbase, u_long *base_addrp, u_long *max_addrp,
+    u_long *representable_start, u_long *representable_end, const char *file)
 {
 	vm_prot_t prot;
 	u_long base_vaddr, max_vaddr;
@@ -841,6 +909,21 @@ __elfN(load_sections)(const struct image_params *imgp, const Elf_Ehdr *hdr,
 		*base_addrp = rbase + base_vaddr;
 	if (max_addrp != NULL)
 		*max_addrp = rbase + max_vaddr;
+#ifdef __ELF_CHERI
+	/* Note: max_vaddr is the actual end, not rounded to PAGE_SIZE. */
+	error = __elfN(reserve_representability_padding)(file,
+	    &imgp->proc->p_vmspace->vm_map, rbase, rbase + base_vaddr,
+	    rbase + max_vaddr, representable_start, representable_end);
+	if (error != 0)
+		return (error);
+#else
+	/*
+	 * For non-CHERI binaries there is no need to pad for representability,
+	 * so we can set {start,end}_addr or interp_{end,start} directly.
+	 */
+	*representable_start = rbase + base_vaddr;
+	*representable_end = rbase + max_vaddr;
+#endif /* __ELF_CHERI */
 
 	return (0);
 }
@@ -863,7 +946,7 @@ __elfN(load_sections)(const struct image_params *imgp, const Elf_Ehdr *hdr,
  */
 static int
 __elfN(load_file)(struct proc *p, const char *file, u_long *addr,
-	u_long *end_addr, u_long *entry)
+	u_long *end_addr, u_long *entry, u_long *repr_start, u_long *repr_end)
 {
 	struct {
 		struct nameidata nd;
@@ -954,7 +1037,7 @@ __elfN(load_file)(struct proc *p, const char *file, u_long *addr,
 #endif
 
 	error = __elfN(load_sections)(imgp, hdr, phdr, rbase, &base_addr,
-	   &max_addr);
+	    &max_addr, repr_start, repr_end, file);
 	if (error != 0)
 		goto fail;
 
@@ -1001,33 +1084,27 @@ __CONCAT(rnd_, __elfN(base))(vm_map_t map __unused, u_long minv, u_long maxv,
 }
 
 static int
-__elfN(enforce_limits)(struct image_params *imgp, const Elf_Ehdr *hdr,
+__elfN(enforce_limits)(const struct image_params *imgp, const Elf_Ehdr *hdr,
     const Elf_Phdr *phdr, u_long et_dyn_addr)
 {
 	struct vmspace *vmspace;
 	const char *err_str;
 	u_long text_size, data_size, total_size, text_addr, data_addr;
-	u_long seg_size, seg_addr;
-	u_long end_addr;
 	int i;
 
 	err_str = NULL;
 	text_size = data_size = total_size = text_addr = data_addr = 0;
 
-	/* Initialize start_addr so that MIN() produces something useful. */
-	imgp->start_addr = ~0UL;
-
 	for (i = 0; i < hdr->e_phnum; i++) {
+		u_long seg_size, seg_addr, end_addr;
+
 		if (phdr[i].p_type != PT_LOAD || phdr[i].p_memsz == 0)
 			continue;
 
 		seg_addr = trunc_page(phdr[i].p_vaddr + et_dyn_addr);
 		seg_size = round_page(phdr[i].p_memsz +
 		    phdr[i].p_vaddr + et_dyn_addr - seg_addr);
-
-		imgp->start_addr = MIN(imgp->start_addr, seg_addr);
 		end_addr = seg_addr + seg_size;
-		imgp->end_addr = MAX(imgp->end_addr, end_addr);
 
 		/*
 		 * Make the largest executable segment the official
@@ -1054,6 +1131,19 @@ __elfN(enforce_limits)(struct image_params *imgp, const Elf_Ehdr *hdr,
 		data_size = text_size;
 	}
 
+#ifdef __ELF_CHERI
+	/*
+	 * Sanity check that the base address was aligned correctly so that we
+	 * can represent a capability spanning the entire executable.
+	 */
+	KASSERT(imgp->start_addr == CHERI_REPRESENTABLE_BASE(imgp->start_addr,
+	    imgp->end_addr - imgp->start_addr) && imgp->end_addr ==
+	    imgp->start_addr + CHERI_REPRESENTABLE_LENGTH(imgp->end_addr -
+	    imgp->start_addr), ("Image range [%#jx-%#jx] is not representable "
+	    "with mapping base %#jx", (uintmax_t)imgp->start_addr,
+	    (uintmax_t)imgp->end_addr, (uintmax_t)et_dyn_addr));
+#endif
+	MPASS(imgp->end_addr > imgp->start_addr);
 	/*
 	 * Check limits.  It should be safe to check the
 	 * limits after loading the segments since we do
@@ -1081,7 +1171,6 @@ __elfN(enforce_limits)(struct image_params *imgp, const Elf_Ehdr *hdr,
 	vmspace->vm_taddr = (caddr_t)(uintptr_t)text_addr;
 	vmspace->vm_dsize = data_size >> PAGE_SHIFT;
 	vmspace->vm_daddr = (caddr_t)(uintptr_t)data_addr;
-
 	return (0);
 }
 
@@ -1153,18 +1242,18 @@ __elfN(get_interp)(struct image_params *imgp, const Elf_Phdr *phdr,
 
 static int
 __elfN(load_interp)(struct image_params *imgp, const Elf_Brandinfo *brand_info,
-    const char *interp, u_long *addr, u_long *end_addr, u_long *entry)
+    const char *interp, u_long *addr, u_long *entry)
 {
 	char *path;
 	int error;
-
+	u_long end_addr;
 	if (brand_info->emul_path != NULL &&
 	    brand_info->emul_path[0] != '\0') {
 		path = malloc(MAXPATHLEN, M_TEMP, M_WAITOK);
 		snprintf(path, MAXPATHLEN, "%s%s",
 		    brand_info->emul_path, interp);
-		error = __elfN(load_file)(imgp->proc, path, addr, end_addr,
-		    entry);
+		error = __elfN(load_file)(imgp->proc, path, addr, &end_addr,
+		    entry, &imgp->interp_start, &imgp->interp_end);
 		free(path, M_TEMP);
 		if (error == 0)
 			return (0);
@@ -1174,14 +1263,18 @@ __elfN(load_interp)(struct image_params *imgp, const Elf_Brandinfo *brand_info,
 	    (brand_info->interp_path == NULL ||
 	    strcmp(interp, brand_info->interp_path) == 0)) {
 		error = __elfN(load_file)(imgp->proc,
-		    brand_info->interp_newpath, addr, end_addr, entry);
+		    brand_info->interp_newpath, addr, &end_addr, entry,
+		    &imgp->interp_start, &imgp->interp_end);
 		if (error == 0)
 			return (0);
 	}
 
-	error = __elfN(load_file)(imgp->proc, interp, addr, end_addr, entry);
-	if (error == 0)
+	error = __elfN(load_file)(imgp->proc, interp, addr, &end_addr, entry,
+	    &imgp->interp_start, &imgp->interp_end);
+	if (error == 0) {
+
 		return (0);
+	}
 
 	uprintf("ELF interpreter %s not found, error %d\n", interp, error);
 	return (error);
@@ -1403,7 +1496,8 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 	if (error != 0)
 		goto ret;
 
-	error = __elfN(load_sections)(imgp, hdr, phdr, et_dyn_addr, NULL, NULL);
+	error = __elfN(load_sections)(imgp, hdr, phdr, et_dyn_addr, NULL, NULL,
+	    &imgp->start_addr, &imgp->end_addr, imgp->execpath);
 	if (error != 0)
 		goto ret;
 
@@ -1421,10 +1515,6 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 	 */
 	addr = round_page((vm_offset_t)vmspace->vm_daddr + lim_max(td,
 	    RLIMIT_DATA));
-#ifdef __ELF_CHERI
-	/* Round up so signficant bits of rtld addresses aren't touched */
-	addr = roundup2(addr, 0x1000000);
-#endif
 	if ((map->flags & MAP_ASLR) != 0) {
 		maxv1 = maxv / 2 + addr / 2;
 		MPASS(maxv1 >= addr);	/* No overflow */
@@ -1435,6 +1525,8 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 	}
 
 	imgp->entry_addr = entry;
+	/* If needed, these will be set to valid values inside load_interp(). */
+	imgp->interp_start = 0;
 	imgp->interp_end = 0;
 
 	if (interp != NULL) {
@@ -1447,7 +1539,7 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 			    maxv1, PAGE_SIZE);
 		}
 		error = __elfN(load_interp)(imgp, brand_info, interp, &addr,
-		    &imgp->interp_end, &imgp->entry_addr);
+		    &imgp->entry_addr);
 		vn_lock(imgp->vp, LK_SHARED | LK_RETRY);
 		if (error != 0)
 			goto ret;
@@ -1494,17 +1586,21 @@ ret:
 static void * __capability
 prog_cap(struct image_params *imgp, uint64_t perms)
 {
-	vaddr_t prog_base;
-	ssize_t prog_len;
+	Elf_Addr prog_base;
+	size_t prog_len;
 
 	prog_base = imgp->start_addr;
-	prog_len = imgp->end_addr - prog_base;
+	prog_len = imgp->end_addr - imgp->start_addr;
 
-	/* Ensure program base and length are representable. */
-	prog_base = CHERI_REPRESENTABLE_BASE(prog_base, prog_len);
-	prog_len = CHERI_REPRESENTABLE_LENGTH(prog_len);
-	KASSERT(prog_len != 0, ("prog_len overflowed: %ld",
-	    (long)(imgp->end_addr - imgp->start_addr)));
+	/*
+	 * Ensure that a capability spanning the program is representable.
+	 * We don't round here since the mapping code is responsible for
+	 * choosing a sensible start address and length.
+	 */
+	KASSERT(prog_len == CHERI_REPRESENTABLE_LENGTH(prog_len) &&
+	    prog_base == CHERI_REPRESENTABLE_BASE(prog_base, prog_len),
+	    ("program capability [%#jx-%#jx] not representable (length=%#zx)",
+	    (uintmax_t)prog_base, (uintmax_t)imgp->end_addr, prog_len));
 
 	return (cheri_capability_build_user_rwx(perms, prog_base, prog_len,
 	    imgp->start_addr - prog_base));
@@ -1513,17 +1609,22 @@ prog_cap(struct image_params *imgp, uint64_t perms)
 static void * __capability
 interp_cap(struct image_params *imgp, Elf_Auxargs *args, uint64_t perms)
 {
-	vaddr_t interp_base;
-	ssize_t interp_len;
+	Elf_Addr interp_base;
+	size_t interp_len;
 
-	interp_base = args->base;
-	interp_len = imgp->interp_end - interp_base;
+	interp_base = imgp->interp_start;
+	interp_len = imgp->interp_end - imgp->interp_start;
 
-	/* Ensure rtld base and length are representable. */
-	interp_base = CHERI_REPRESENTABLE_BASE(interp_base, interp_len);
-	interp_len = CHERI_REPRESENTABLE_LENGTH(interp_len);
-	KASSERT(interp_len != 0, ("interp_len overflowed: %ld",
-	    (long)(imgp->end_addr - imgp->start_addr)));
+	/*
+	 * Ensure that a capability spanning RTLD is representable.
+	 * We don't round here since the mapping code is responsible for
+	 * choosing a sensible start address.
+	 */
+	KASSERT(interp_len == CHERI_REPRESENTABLE_LENGTH(interp_len) &&
+	    interp_base == CHERI_REPRESENTABLE_BASE(interp_base, interp_len),
+	    ("interp capability [%#jx-%#jx] not representable (length=%#zx)",
+	    (uintmax_t)interp_base, (uintmax_t)imgp->interp_end, interp_len));
+	MPASS(args->base >= interp_base);
 
 	return (cheri_capability_build_user_rwx(perms, interp_base, interp_len,
 	    args->base - interp_base));
