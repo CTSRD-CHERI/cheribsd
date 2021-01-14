@@ -568,22 +568,22 @@ exec_setregs(struct thread *td, struct image_params *imgp, uintcap_t stack)
 	if (SV_PROC_FLAG(td->td_proc, SV_CHERI)) {
 		tf->tf_x[0] = (uintcap_t)imgp->auxv;
 		tf->tf_sp = stack;
-		/* Purecap binaries have low bit of entry address set. */
-		uintcap_t entry = (uintcap_t)cheri_incoffset(cheri_exec_pcc(td, imgp), -1);
+		uintcap_t entry = (uintcap_t)cheri_exec_pcc(td, imgp);
 		tf->tf_lr = entry;
-		tf->tf_elr = entry;
+		/* Purecap binaries have low bit of entry address set. */
+		tf->tf_elr = entry - 1;
 		cheri_set_mmap_capability(td, imgp,
 		    (void * __capability)tf->tf_sp);
 
 		/* Set LSB of the signal code address since it is C64. */
-		td->td_proc->p_md.md_sigcode = cheri_incoffset(
-		    cheri_sigcode_capability(td), 1);
+		td->td_proc->p_md.md_sigcode = (void * __capability)
+		    ((uintcap_t)cheri_sigcode_capability(td) + 1);
 		tf->tf_spsr |= PSR_C64;
 	} else
 #endif
 	{
-		tf->tf_x[0] = stack;
-		tf->tf_sp = STACKALIGN(stack);
+		tf->tf_x[0] = (register_t)stack;
+		tf->tf_sp = STACKALIGN((register_t)stack);
 		tf->tf_lr = imgp->entry_addr;
 #if __has_feature(capabilities)
 		hybridabi_thread_setregs(td, imgp->entry_addr);
