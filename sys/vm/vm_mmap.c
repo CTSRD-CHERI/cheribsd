@@ -331,7 +331,6 @@ sys_mmap(struct thread *td, struct mmap_args *uap)
 	void * __capability source_cap;
 	register_t perms, reqperms;
 	vm_offset_t hint;
-	struct mmap_req mr;
 
 	if (flags & MAP_32BIT) {
 		SYSERRCAUSE("MAP_32BIT not supported in CheriABI");
@@ -468,17 +467,17 @@ sys_mmap(struct thread *td, struct mmap_args *uap)
 	 * set at this point.  A simple assert is not easy to contruct...
 	 */
 
-	memset(&mr, 0, sizeof(mr));
-	mr.mr_hint = hint;
-	mr.mr_max_addr = cheri_gettop(source_cap);
-	mr.mr_len = uap->len;
-	mr.mr_prot = uap->prot;
-	mr.mr_flags = flags;
-	mr.mr_fd = uap->fd;
-	mr.mr_pos = uap->pos;
-	mr.mr_source_cap = source_cap;
-
-	return (kern_mmap(td, &mr));
+	return (kern_mmap(td,
+	    &(struct mmap_req){
+		.mr_hint = hint,
+		.mr_max_addr = cheri_gettop(source_cap),
+		.mr_len = uap->len,
+		.mr_prot = uap->prot,
+		.mr_flags = flags,
+		.mr_fd = uap->fd,
+		.mr_pos = uap->pos,
+		.mr_source_cap = source_cap,
+	    }));
 #endif
 }
 
