@@ -735,6 +735,71 @@ __elfN(load_section)(const struct image_params *imgp,
 	return (0);
 }
 
+#ifdef __ELF_CHERI
+/*
+ * Note: this needs to be called before load_sections() since we need to know
+ * the correct base before mapping the segments.
+ */
+static int
+__elfN(ensure_representable_base)(const char *execpath, const Elf_Ehdr *hdr,
+    const Elf_Phdr *phdr, Elf_Addr *preferred_rbase)
+{
+	/* Initialize start_addr so that MIN() produces something useful. */
+	Elf_Addr start_addr = ~0UL;
+	Elf_Addr max_addr = 0;
+	size_t total_size;
+	Elf_Addr adjusted_base;
+
+	for (size_t i = 0; i < hdr->e_phnum; i++) {
+		u_long seg_size, seg_addr, end_addr;
+
+		if (phdr[i].p_type != PT_LOAD || phdr[i].p_memsz == 0)
+			continue;
+
+		seg_addr = trunc_page(phdr[i].p_vaddr);
+		seg_size = round_page(phdr[i].p_memsz + phdr[i].p_vaddr -
+		    seg_addr);
+		end_addr = seg_addr + seg_size;
+
+		start_addr = MIN(start_addr, seg_addr);
+		max_addr = MAX(max_addr, end_addr);
+	}
+
+	/*
+	 * Ensure that we can represent a capability spanning the entire
+	 * mapping and move it if not (only possible for PIE).
+	 */
+	total_size = max_addr - start_addr;
+	if (__predict_true(*preferred_rbase ==
+	    CHERI_REPRESENTABLE_BASE(*preferred_rbase, total_size))) {
+		/* No adjustment required */
+		return (0);
+	}
+	if (hdr->e_type == ET_EXEC) {
+		/*
+		 * We can't change the load address for position dependent
+		 *  executables, so we have to give up and report an error.
+		 */
+		uprintf("Warning: Attempted to load position-dependent "
+		    "executable with non-representable base: %s\n", execpath);
+		return (ERANGE); /* XXX: EPRECISION or similar? */
+	}
+	/*
+	 * Note: CHERI_REPRESENTABLE_BASE aligns down, but we have to align
+	 * upwards here to avoid rounding down to zero for the main executable.
+	 * For RTLD we also align upwards to avoid aligning down into the
+	 * memory region for the main binary.
+	 */
+	adjusted_base = roundup2(*preferred_rbase,
+	    CHERI_REPRESENTABLE_ALIGNMENT(total_size));
+	uprintf("Attempted to load %s with non-representable mapping: moving "
+	    "from %#jx to %#jx\n", execpath, (uintmax_t)*preferred_rbase,
+	    (uintmax_t)adjusted_base);
+	*preferred_rbase = adjusted_base;
+	return (0);
+}
+#endif
+
 static int
 __elfN(load_sections)(const struct image_params *imgp, const Elf_Ehdr *hdr,
     const Elf_Phdr *phdr, u_long rbase, u_long *base_addrp, u_long *max_addrp)
@@ -880,6 +945,13 @@ __elfN(load_file)(struct proc *p, const char *file, u_long *addr,
 		error = ENOEXEC;
 		goto fail;
 	}
+
+#ifdef __ELF_CHERI
+	/* Ensure representability of the capability spanning the file. */
+	error = __elfN(ensure_representable_base)(file, hdr, phdr, &rbase);
+	if (error != 0)
+		goto fail;
+#endif
 
 	error = __elfN(load_sections)(imgp, hdr, phdr, rbase, &base_addr,
 	   &max_addr);
@@ -1315,6 +1387,17 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 		    /* reserve half of the address space to interpreter */
 		    maxv / 2, 1UL << flsl(maxalign));
 	}
+
+#ifdef __ELF_CHERI
+	/*
+	 * Ensure that the base is sufficiently aligned to create a capability
+	 * that spans the entire mapping.
+	 */
+	error = __elfN(ensure_representable_base)(imgp->execpath, hdr, phdr,
+	    &et_dyn_addr);
+	if (error != 0)
+		goto ret;
+#endif
 
 	vn_lock(imgp->vp, LK_SHARED | LK_RETRY);
 	if (error != 0)
