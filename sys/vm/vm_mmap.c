@@ -317,7 +317,7 @@ int
 sys_mmap(struct thread *td, struct mmap_args *uap)
 {
 #if !__has_feature(capabilities)
-	return (kern_mmap_req(td,
+	return (kern_mmap(td,
 	    &(struct mmap_req){
 		.mr_hint = (uintptr_t)uap->addr,
 		.mr_len = uap->len,
@@ -478,7 +478,7 @@ sys_mmap(struct thread *td, struct mmap_args *uap)
 	mr.mr_pos = uap->pos;
 	mr.mr_source_cap = source_cap;
 
-	return (kern_mmap_req(td, &mr));
+	return (kern_mmap(td, &mr));
 #endif
 }
 
@@ -500,7 +500,7 @@ kern_mmap_maxprot(struct proc *p, int prot)
 }
 
 int
-kern_mmap_req(struct thread *td, struct mmap_req *mrp)
+kern_mmap(struct thread *td, struct mmap_req *mrp)
 {
 	struct vmspace *vms;
 	struct file *fp;
@@ -876,7 +876,7 @@ done:
 int
 freebsd6_mmap(struct thread *td, struct freebsd6_mmap_args *uap)
 {
-	return (kern_mmap_req(td,
+	return (kern_mmap(td,
 	    &(struct mmap_req){
 		.mr_hint = (uintptr_t)uap->addr,
 		.mr_len = uap->len,
@@ -936,7 +936,7 @@ ommap(struct thread *td, struct ommap_args *uap)
 		flags |= MAP_PRIVATE;
 	if (uap->flags & OMAP_FIXED)
 		flags |= MAP_FIXED;
-	return (kern_mmap_req(td,
+	return (kern_mmap(td,
 	    &(struct mmap_req){
 		.mr_hint = (uintptr_t)uap->addr,
 		.mr_len = uap->len,
