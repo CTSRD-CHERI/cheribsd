@@ -740,14 +740,14 @@ __elfN(load_sections)(const struct image_params *imgp, const Elf_Ehdr *hdr,
     const Elf_Phdr *phdr, u_long rbase, u_long *base_addrp, u_long *max_addrp)
 {
 	vm_prot_t prot;
-	u_long base_addr, max_addr;
+	u_long base_vaddr, max_vaddr;
 	bool first;
 	int error, i;
 
 	ASSERT_VOP_LOCKED(imgp->vp, __func__);
 
-	base_addr = 0;
-	max_addr = 0;
+	base_vaddr = 0;
+	max_vaddr = 0;
 	first = true;
 
 	for (i = 0; i < hdr->e_phnum; i++) {
@@ -766,16 +766,16 @@ __elfN(load_sections)(const struct image_params *imgp, const Elf_Ehdr *hdr,
 		 * Establish the base address if this is the first segment.
 		 */
 		if (first) {
-  			base_addr = trunc_page(phdr[i].p_vaddr + rbase);
+			base_vaddr = trunc_page(phdr[i].p_vaddr);
 			first = false;
 		}
-		max_addr = MAX(max_addr, phdr[i].p_vaddr + phdr[i].p_memsz);
+		max_vaddr = MAX(max_vaddr, phdr[i].p_vaddr + phdr[i].p_memsz);
 	}
 
 	if (base_addrp != NULL)
-		*base_addrp = base_addr;
+		*base_addrp = rbase + base_vaddr;
 	if (max_addrp != NULL)
-		*max_addrp = max_addr;
+		*max_addrp = rbase + max_vaddr;
 
 	return (0);
 }
@@ -887,7 +887,7 @@ __elfN(load_file)(struct proc *p, const char *file, u_long *addr,
 		goto fail;
 
 	*addr = base_addr;
-	*end_addr = base_addr + max_addr;
+	*end_addr = max_addr;
 	*entry = (unsigned long)hdr->e_entry + rbase;
 
 fail:
