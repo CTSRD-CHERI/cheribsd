@@ -535,9 +535,9 @@ __elfN(map_partial)(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 	/*
 	 * Create the page if it doesn't exist yet. Ignore errors.
 	 */
-	vm_map_fixed(map, NULL, 0, trunc_page(start), round_page(end) -
-	    trunc_page(start), VM_PROT_ALL, VM_PROT_ALL,
-	    MAP_CHECK_EXCL);
+	vm_map_fixed(map, NULL, 0, trunc_page(start),
+	    round_page(end) - trunc_page(start), prot,
+	    prot /* XXX: or VM_PROT_ALL? */, MAP_CHECK_EXCL);
 
 	/*
 	 * Find the page from the underlying object.
