@@ -92,8 +92,15 @@ int
 freebsd64_mmap(struct thread *td, struct freebsd64_mmap_args *uap)
 {
 
-	return (kern_mmap(td, (uintptr_t)uap->addr, uap->len, uap->prot,
-	    uap->flags, uap->fd, uap->pos));
+	return (kern_mmap_req(td,
+	    &(struct mmap_req){
+		.mr_hint = (uintptr_t)uap->addr,
+		.mr_len = uap->len,
+		.mr_prot = uap->prot,
+		.mr_flags = uap->flags,
+		.mr_fd = uap->fd,
+		.mr_pos = uap->pos,
+	    }));
 }
 
 #if defined(COMPAT_FREEBSD6)
@@ -102,8 +109,15 @@ freebsd6_freebsd64_mmap(struct thread *td,
     struct freebsd6_freebsd64_mmap_args *uap)
 {
 
-	return (kern_mmap(td, (uintptr_t)uap->addr, 0, uap->len, uap->prot,
-	    uap->flags, uap->fd, uap->pos));
+	return (kern_mmap_req(td,
+	    &(struct mmap_req){
+		.mr_hint = (uintptr_t)uap->addr,
+		.mr_len = uap->len,
+		.mr_prot = uap->prot,
+		.mr_flags = uap->flags,
+		.mr_fd = uap->fd,
+		.mr_pos = uap->pos,
+	    }));
 }
 #endif
 
