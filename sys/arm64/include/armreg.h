@@ -65,7 +65,7 @@
 	__asm __volatile("msr	" __STRING(reg) ", %0" : : "r"((uint64_t)_val))
 
 #if __has_feature(capabilities)
-#define	READ_SPECIALREG_CAP(reg)						\
+#define	READ_SPECIALREG_CAP(reg)					\
 ({	uintcap_t _val;							\
 	__asm __volatile("mrs	%0, " __STRING(reg) : "=&C" (_val));	\
 	_val;								\
