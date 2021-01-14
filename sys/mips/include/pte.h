@@ -42,18 +42,18 @@ typedef	uint64_t pt_entry_t;
 typedef	uint32_t pt_entry_t;
 #endif
 
-#ifdef _KERNEL
-#ifdef __CHERI_PURE_CAPABILITY__
 /*
  * The pointer to the second-level page table entry can is a capability
  * in the purecap kernel.
  */
 typedef	pt_entry_t *pd_entry_t;
 
+#ifdef _KERNEL
+#ifdef __CHERI_PURE_CAPABILITY__
 /*
  * Create a CHERI bounded pointer to a page table page.
  */
-static __inline pd_entry_t
+static inline pd_entry_t
 pde_page_bound(vm_pointer_t ptr)
 {
 	pd_entry_t pde = cheri_setbounds((pd_entry_t)ptr, PAGE_SIZE);
@@ -61,28 +61,11 @@ pde_page_bound(vm_pointer_t ptr)
 	    CHERI_PERM_LOAD_CAP | CHERI_PERM_STORE_CAP |
 	    CHERI_PERM_STORE_LOCAL_CAP));
 }
-#else /* ! __CHERI_PURE_CAPABILITY__ */
-
+#else /* !__CHERI_PURECAP_KERNEL__ */
 #define	pde_page_bound(ptr) (pd_entry_t)(ptr)
-#if !defined(__CHERI_PURE_CAPABILITY__)
-typedef	pt_entry_t *pd_entry_t;
-#else
-/*
- * XXX: used in the kernel to set VM system paramaters.  Only used for
- * the parameter macros (which use its size) in usespace.
- */
-typedef uint64_t pd_entry_t;
-#endif
-
-#endif /* ! __CHERI_PURE_CAPABILITY__ */
-#else /* ! _KERNEL */
-/*
- * XXX: used in the kernel to set VM system paramaters.  Only used for
- * the parameter macros (which use its size) in usespace.
- */
-typedef uint64_t pd_entry_t;
-#endif /* ! _KERNEL */
-#endif /* ! _LOCORE */
+#endif /* !__CHERI_PURECAP_KERNEL__ */
+#endif /* _KERNEL */
+#endif /* !_LOCORE */
 
 /*
  * TLB and PTE management.  Most things operate within the context of
@@ -505,9 +488,9 @@ TLBLO_PTE_TO_PA(pt_entry_t pte)
 #endif /* ! defined(__mips_n64) || defined(__mips_n32) */
 
 #if defined(CPU_CHERI) && defined(__CHERI_PURE_CAPABILITY__)
-#define PTRSHIFT		CHERICAP_SHIFT
-#define PDEPTRMASK		(0xfff & ~(CHERICAP_SIZE - 1))
-#else /* ! (CPU_HERI && __CHERI_PURE_CAPABILITY__) */
+#define	PTRSHIFT		CHERICAP_SHIFT
+#define	PDEPTRMASK		(0xfff & ~(CHERICAP_SIZE - 1))
+#else /* ! (CPU_CHERI && __CHERI_PURE_CAPABILITY__) */
 #if defined(__mips_n64)
 #define	PTRSHIFT		3
 #define	PDEPTRMASK		0xff8

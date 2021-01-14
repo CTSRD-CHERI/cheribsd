@@ -1422,7 +1422,7 @@ pmap_growkernel(vm_offset_t addr)
 CTASSERT(sizeof(struct pv_chunk) == PAGE_SIZE);
 #ifdef __CHERI_PURE_CAPABILITY__
 CTASSERT(_NPCM == 2);
-CTASSERT(_NPCPV	== 83);
+CTASSERT(_NPCPV == 83);
 #elif defined(__mips_n64)
 CTASSERT(_NPCM == 3);
 CTASSERT(_NPCPV == 168);
@@ -1443,9 +1443,9 @@ pv_to_chunk(pv_entry_t pv)
 #ifdef __mips_n64
 #define	PC_FREE0_1	0xfffffffffffffffful
 #ifdef __CHERI_PURE_CAPABILITY__
-#define PC_FREE2	0x000000000007fffful
+#define	PC_FREE2	0x000000000007fffful
 #else
-#define PC_FREE2	0x000000fffffffffful
+#define	PC_FREE2	0x000000fffffffffful
 #endif
 #else
 #define	PC_FREE0_9	0xfffffffful	/* Free values for index 0 through 9 */
@@ -3344,8 +3344,7 @@ void *
 pmap_mapdev_attr(vm_paddr_t pa, vm_size_t size, vm_memattr_t ma)
 {
 	vm_offset_t offset;
-	caddr_t va;
-	caddr_t tmpva;
+	caddr_t tmpva, va;
 
 	/*
 	 * KSEG1 maps only first 512M of phys address space. For
