@@ -102,7 +102,7 @@ __ElfType(Brandinfo);
 
 #define	MAX_BRANDS	8
 
-int	__elfN(brand_inuse)(Elf_Brandinfo *entry);
+bool	__elfN(brand_inuse)(Elf_Brandinfo *entry);
 int	__elfN(insert_brand_entry)(Elf_Brandinfo *entry);
 int	__elfN(remove_brand_entry)(Elf_Brandinfo *entry);
 int	__elfN(freebsd_fixup)(uintcap_t *, struct image_params *);

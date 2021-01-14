@@ -117,9 +117,8 @@ static int __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp);
 static bool __elfN(freebsd_trans_osrel)(const Elf_Note *note,
     int32_t *osrel);
 static bool kfreebsd_trans_osrel(const Elf_Note *note, int32_t *osrel);
-static boolean_t __elfN(check_note)(struct image_params *imgp,
-    Elf_Brandnote *checknote, int32_t *osrel, boolean_t *has_fctl0,
-    uint32_t *fctl0);
+static bool __elfN(check_note)(struct image_params *imgp,
+    Elf_Brandnote *checknote, int32_t *osrel, bool *has_fctl0, uint32_t *fctl0);
 static vm_prot_t __elfN(trans_prot)(Elf_Word);
 static Elf_Word __elfN(untrans_prot)(vm_prot_t);
 
@@ -313,16 +312,16 @@ __elfN(remove_brand_entry)(Elf_Brandinfo *entry)
 	return (0);
 }
 
-int
+bool
 __elfN(brand_inuse)(Elf_Brandinfo *entry)
 {
 	struct proc *p;
-	int rval = FALSE;
+	int rval = false;
 
 	sx_slock(&allproc_lock);
 	FOREACH_PROC_IN_SYSTEM(p) {
 		if (p->p_sysent == entry->sysvec) {
-			rval = TRUE;
+			rval = true;
 			break;
 		}
 	}
@@ -337,7 +336,7 @@ __elfN(get_brandinfo)(struct image_params *imgp, const char *interp,
 {
 	const Elf_Ehdr *hdr = (const Elf_Ehdr *)imgp->image_header;
 	Elf_Brandinfo *bi, *bi_m;
-	boolean_t ret, has_fctl0;
+	bool ret, has_fctl0;
 	int i;
 	size_t interp_name_len;
 
@@ -633,7 +632,8 @@ __elfN(map_insert)(const struct image_params *imgp, vm_map_t map,
 	return (KERN_SUCCESS);
 }
 
-static int __elfN(load_section)(const struct image_params *imgp,
+static int
+__elfN(load_section)(const struct image_params *imgp,
     vm_ooffset_t offset, caddr_t vmaddr, size_t memsz, size_t filsz,
     vm_prot_t prot)
 {
@@ -2880,20 +2880,20 @@ __elfN(note_procstat_auxv)(void *arg, struct sbuf *sb, size_t *sizep)
 	}
 }
 
-static boolean_t
+static bool
 __elfN(parse_notes)(const struct image_params *imgp,
     Elf_Note *checknote, const char *note_vendor, const Elf_Phdr *pnote,
-    boolean_t (*cb)(const Elf_Note *, void *, boolean_t *), void *cb_arg)
+    bool (*cb)(const Elf_Note *, void *, bool *), void *cb_arg)
 {
 	const Elf_Note *note, *note0, *note_end;
 	const char *note_name;
 	char *buf;
 	int i, error;
-	boolean_t res;
+	bool res;
 
 	/* We need some limit, might as well use PAGE_SIZE. */
 	if (pnote == NULL || pnote->p_filesz > PAGE_SIZE)
-		return (FALSE);
+		return (false);
 	ASSERT_VOP_LOCKED(imgp->vp, "parse_notes");
 	if (pnote->p_offset > PAGE_SIZE ||
 	    pnote->p_filesz > PAGE_SIZE - pnote->p_offset) {
@@ -2942,7 +2942,7 @@ nextnote:
 		    roundup2(note->n_descsz, ELF_NOTE_ROUNDSIZE));
 	}
 retf:
-	res = FALSE;
+	res = false;
 ret:
 	free(buf, M_TEMP);
 	return (res);
@@ -2953,8 +2953,8 @@ struct brandnote_cb_arg {
 	int32_t *osrel;
 };
 
-static boolean_t
-brandnote_cb(const Elf_Note *note, void *arg0, boolean_t *res)
+static bool
+brandnote_cb(const Elf_Note *note, void *arg0, bool *res)
 {
 	struct brandnote_cb_arg *arg;
 
@@ -2966,9 +2966,9 @@ brandnote_cb(const Elf_Note *note, void *arg0, boolean_t *res)
 	 */
 	*res = (arg->brandnote->flags & BN_TRANSLATE_OSREL) != 0 &&
 	    arg->brandnote->trans_osrel != NULL ?
-	    arg->brandnote->trans_osrel(note, arg->osrel) : TRUE;
+	    arg->brandnote->trans_osrel(note, arg->osrel) : true;
 
-	return (TRUE);
+	return (true);
 }
 
 static Elf_Note fctl_note = {
@@ -2978,12 +2978,12 @@ static Elf_Note fctl_note = {
 };
 
 struct fctl_cb_arg {
-	boolean_t *has_fctl0;
+	bool *has_fctl0;
 	uint32_t *fctl0;
 };
 
-static boolean_t
-note_fctl_cb(const Elf_Note *note, void *arg0, boolean_t *res)
+static bool
+note_fctl_cb(const Elf_Note *note, void *arg0, bool *res)
 {
 	struct fctl_cb_arg *arg;
 	const Elf32_Word *desc;
@@ -2993,9 +2993,9 @@ note_fctl_cb(const Elf_Note *note, void *arg0, boolean_t *res)
 	p = (uintptr_t)(note + 1);
 	p += roundup2(note->n_namesz, ELF_NOTE_ROUNDSIZE);
 	desc = (const Elf32_Word *)p;
-	*arg->has_fctl0 = TRUE;
+	*arg->has_fctl0 = true;
 	*arg->fctl0 = desc[0];
-	return (TRUE);
+	return (true);
 }
 
 /*
@@ -3004,9 +3004,9 @@ note_fctl_cb(const Elf_Note *note, void *arg0, boolean_t *res)
  * OSABI-note.  Only the first page of the image is searched, the same
  * as for headers.
  */
-static boolean_t
+static bool
 __elfN(check_note)(struct image_params *imgp, Elf_Brandnote *brandnote,
-    int32_t *osrel, boolean_t *has_fctl0, uint32_t *fctl0)
+    int32_t *osrel, bool *has_fctl0, uint32_t *fctl0)
 {
 	const Elf_Phdr *phdr;
 	const Elf_Ehdr *hdr;
@@ -3032,10 +3032,10 @@ __elfN(check_note)(struct image_params *imgp, Elf_Brandnote *brandnote,
 				    note_fctl_cb, &f_arg))
 					break;
 			}
-			return (TRUE);
+			return (true);
 		}
 	}
-	return (FALSE);
+	return (false);
 
 }
 
