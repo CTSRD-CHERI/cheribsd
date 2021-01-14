@@ -791,8 +791,7 @@ kern_mmap_req(struct thread *td, struct mmap_req *mrp)
 			return (error);
 		flags &= ~MAP_EXCL;
 		flags |= MAP_FIXED;
-		mrp->mr_source_cap = mmap_retcap(td,
-		    addr + pageoff, mrp);
+		mrp->mr_source_cap = mmap_retcap(td, addr + pageoff, mrp);
 		mrp->mr_flags = flags;
 	}
 #endif	/* __has_feature(capabilities) */
