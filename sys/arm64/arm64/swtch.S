@@ -355,16 +355,16 @@ ENTRY(savectx)
 	/* And the old stack pointer */
 	mov	x5, sp
 #if __has_feature(capabilities)
-	str	x5, [x4, #PCB_SP]
+	str	x5, [x0, #PCB_SP]
 	mrs	c5, ctpidr_el0
 	mrs	c6, ctpidrro_el0
-	stp	c5, c6, [x4, #PCB_TPIDR]
+	stp	c5, c6, [x0, #PCB_TPIDR]
 	mrs	c5, cid_el0
 	mrs	c6, rcsp_el0
-	stp	c5, c6, [x4, #PCB_CID]
+	stp	c5, c6, [x0, #PCB_CID]
 	mrs	c5, rddc_el0
 	mrs	c6, rctpidr_el0
-	stp	c5, c6, [x4, #PCB_RDDC]
+	stp	c5, c6, [x0, #PCB_RDDC]
 #else
 	mrs	x6, tpidrro_el0
 	str	x6, [x0, #PCB_TPIDRRO]

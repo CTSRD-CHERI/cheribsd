@@ -1314,7 +1314,7 @@ DB_SHOW_COMMAND(locktree, db_show_locktree)
 
 	if (!have_addr)
 		return;
-	lock = (struct lock_object *)addr;
+	lock = DB_DATA_PTR(addr, struct lock_object);
 	tc = TC_LOOKUP(lock);
 	LIST_FOREACH(ts, &tc->tc_turnstiles, ts_hash)
 		if (ts->ts_lockobj == lock)
@@ -1327,3 +1327,12 @@ DB_SHOW_COMMAND(locktree, db_show_locktree)
 		print_waiters(ts, 0);
 }
 #endif
+// CHERI CHANGES START
+// {
+//   "updated": 20200803,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "kdb"
+//   ]
+// }
+// CHERI CHANGES END

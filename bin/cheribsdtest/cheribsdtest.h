@@ -35,6 +35,8 @@
 #include <string.h>
 #include <cheri/cheric.h>
 
+#include "cheribsdtest_md.h"
+
 #define	CHERI_CAP_PRINT(cap) do {					\
 	printf("tag %ju s %ju perms %08jx type %016jx\n",		\
 	    (uintmax_t)cheri_gettag(cap),				\
@@ -115,6 +117,46 @@ extern struct cheribsdtest_child_state *ccsp;
 
 #define	CHERIBSDTEST_SANDBOX_UNWOUND	0x123456789ULL
 
+/*
+ * Macros defined in one or more cheribsdtest_md.h to indicate the
+ * reason for failure or flaky behavior.  Define to NULL here to
+ * reduce the size of MD headers.
+ */
+#ifndef FLAKY_COMPILER_BOUNDS
+#define	FLAKY_COMPILER_BOUNDS	NULL
+#endif
+
+#ifndef	XFAIL_HYBRID_BOUNDS_GLOBALS
+#ifdef __CHERI_PURE_CAPABILITY__
+#define	XFAIL_HYBRID_BOUNDS_GLOBALS	NULL
+#else
+#define	XFAIL_HYBRID_BOUNDS_GLOBALS \
+    "Bounds not supported for globals in hybrid ABI"
+#endif
+#endif
+
+#ifndef	XFAIL_HYBRID_BOUNDS_GLOBALS_EXTERN
+#ifdef __CHERI_PURE_CAPABILITY__
+#define	XFAIL_HYBRID_BOUNDS_GLOBALS_EXTERN	NULL
+#else
+#define	XFAIL_HYBRID_BOUNDS_GLOBALS_EXTERN \
+    "Bounds not supported for extern globals in hybrid ABI"
+#endif
+#endif
+
+#ifndef	XFAIL_HYBRID_BOUNDS_GLOBALS_STATIC
+#ifdef __CHERI_PURE_CAPABILITY__
+#define	XFAIL_HYBRID_BOUNDS_GLOBALS_STATIC	NULL
+#else
+#define	XFAIL_HYBRID_BOUNDS_GLOBALS_STATIC \
+    "Bounds not supported for static globals in hybrid ABI"
+#endif
+#endif
+
+#ifndef XFAIL_VARARG_BOUNDS
+#define	XFAIL_VARARG_BOUNDS	NULL
+#endif
+
 struct cheri_test {
 	const char	*ct_name;
 	const char	*ct_desc;
@@ -129,6 +171,7 @@ struct cheri_test {
 	const char	*ct_stdin_string;
 	const char	*ct_stdout_string;
 	const char	*ct_xfail_reason;
+	const char	*ct_flaky_reason;
 };
 
 /*
@@ -399,10 +442,10 @@ DECLARE_CHERIBSD_TEST(test_fault_cgetcause);
 DECLARE_CHERIBSD_TEST(test_nofault_cfromptr);
 DECLARE_CHERIBSD_TEST(test_fault_perm_load);
 DECLARE_CHERIBSD_TEST(test_nofault_perm_load);
-DECLARE_CHERIBSD_TEST(test_fault_perm_seal);
+DECLARE_CHERIBSD_TEST(test_illegal_perm_seal);
 DECLARE_CHERIBSD_TEST(test_fault_perm_store);
 DECLARE_CHERIBSD_TEST(test_nofault_perm_store);
-DECLARE_CHERIBSD_TEST(test_fault_perm_unseal);
+DECLARE_CHERIBSD_TEST(test_illegal_perm_unseal);
 DECLARE_CHERIBSD_TEST(test_fault_tag);
 DECLARE_CHERIBSD_TEST(test_fault_ccheck_user_fail);
 DECLARE_CHERIBSD_TEST(test_fault_read_kr1c);

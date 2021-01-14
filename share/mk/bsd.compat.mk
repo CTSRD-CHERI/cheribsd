@@ -112,11 +112,8 @@ LIB64WMAKEENV=	MACHINE_CPU="arm64 cheri"
 LIB64WMAKEFLAGS= LD="${XLD}" CPUTYPE=morello
 # XXX: clang specific
 LIB64CPUFLAGS=	-target aarch64-unknown-freebsd13.0
-LIB64CPUFLAGS+=	-march=morello
-# strip existing CFLAGS switches that would force the
-# compiler to emit purecap code
-LIB64_STRIP_CFLAGS=	-mabi=purecap -march=morello+c64 -femulated-tls
-LIB64_STRIP_LDFLAGS=	-mabi=purecap -march=morello+c64 -femulated-tls
+# XXX: Drop -fno-emulated-tls once bsd.cpu.mk no longer enables it
+LIB64CPUFLAGS+=	-march=morello -mabi=aapcs -fno-emulated-tls
 .endif
 
 .if ${COMPAT_ARCH:Mmips64*c*}
@@ -168,9 +165,11 @@ LIB64_MACHINE_ABI=	${MACHINE_ABI:Npurecap}
 .if ${MK_COMPAT_CHERIABI} != "no"
 .if ${COMPAT_ARCH} == "aarch64"
 HAS_COMPAT+=CHERI
-LIBCHERICPUFLAGS=  -target aarch64-unknown-freebsd13.0 -march=morello+c64 -mabi=purecap -femulated-tls
 LIBCHERI_MACHINE=	arm64
 LIBCHERI_MACHINE_ARCH=	aarch64c
+LIBCHERICPUFLAGS=	-target aarch64-unknown-freebsd13.0
+# XXX: Drop -femulated-tls once bsd.cpu.mk no longer passes it
+LIBCHERICPUFLAGS+=	-march=morello+c64 -mabi=purecap -femulated-tls
 .elif ${COMPAT_ARCH:Mmips64*} && !${COMPAT_ARCH:Mmips64*c*}
 .if ${COMPAT_ARCH:Mmips*el*}
 .error No little endian CHERI
@@ -285,7 +284,6 @@ _LIBCOMPAT:=	${WANT_COMPAT}
 # Set defaults based on type.
 libcompat=	${_LIBCOMPAT:tl}
 _LIBCOMPAT_MAKEVARS=	_OBJTOP TMP CPUFLAGS CFLAGS CXXFLAGS LDFLAGS \
-			_STRIP_CFLAGS _STRIP_LDFLAGS \
 			_MACHINE _MACHINE_ARCH _MACHINE_ABI \
 			WMAKEENV WMAKEFLAGS WMAKE WORLDTMP
 .for _var in ${_LIBCOMPAT_MAKEVARS}
@@ -320,12 +318,6 @@ LIBCOMPATCFLAGS+=	-B${WORLDTMP}/usr/lib${libcompat}
 .if defined(WANT_COMPAT)
 LIBDIR_BASE:=	/usr/lib${libcompat}
 _LIB_OBJTOP=	${LIBCOMPAT_OBJTOP}
-.for _strip in ${LIBCOMPAT_STRIP_CFLAGS}
-CFLAGS:=	${CFLAGS:N${_strip}}
-.endfor
-.for _strip in ${LIBCOMPAT_STRIP_LDFLAGS}
-LDFLAGS:=	${LDFLAGS:N${_strip}}
-.endfor
 CFLAGS+=	${LIBCOMPATCFLAGS}
 LDFLAGS+=	${CFLAGS} ${LIBCOMPATLDFLAGS}
 MACHINE:=	${LIBCOMPAT_MACHINE}

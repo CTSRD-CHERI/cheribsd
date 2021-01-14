@@ -449,8 +449,8 @@ exec_setregs(struct thread *td, struct image_params *imgp, uintcap_t stack)
 
 #if __has_feature(capabilities)
 	if (SV_PROC_FLAG(td->td_proc, SV_CHERI)) {
-		tf->tf_a[0] = (uintcap_t)cheri_auxv_capability(imgp, stack);
-		tf->tf_sp = (uintcap_t)cheri_exec_stack_pointer(imgp, stack);
+		tf->tf_a[0] = (uintcap_t)imgp->auxv;
+		tf->tf_sp = stack;
 		cheri_set_mmap_capability(td, imgp,
 		    (void * __capability)tf->tf_sp);
 
@@ -940,7 +940,7 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	if (sysent->sv_sigcode_base != 0)
 		tf->tf_ra = (register_t)sysent->sv_sigcode_base;
 	else
-		tf->tf_ra = (register_t)(sysent->sv_psstrings -
+		tf->tf_ra = (register_t)(p->p_psstrings -
 		    *(sysent->sv_szsigcode));
 #endif
 
@@ -1105,7 +1105,7 @@ parse_metadata(void)
 	caddr_t kmdp;
 	vm_offset_t lastaddr;
 #ifdef DDB
-	vm_offset_t ksym_start, ksym_end;
+	vm_pointer_t ksym_start, ksym_end;
 #endif
 	char *kern_envp;
 
@@ -1275,3 +1275,12 @@ bzero(void *buf, size_t len)
 	while(len-- > 0)
 		*p++ = 0;
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20200803,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_as_integer"
+//   ]
+// }
+// CHERI CHANGES END

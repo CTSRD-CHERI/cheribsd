@@ -2723,8 +2723,8 @@ DB_SHOW_COMMAND(vmochk, vm_object_check)
 DB_SHOW_COMMAND(object, vm_object_print_static)
 {
 	/* XXX convert args. */
-	vm_object_t object = (vm_object_t)addr;
-	boolean_t full = have_addr;
+	vm_object_t object;
+	boolean_t full = true; /* XXX */
 
 	vm_page_t p;
 
@@ -2733,9 +2733,10 @@ DB_SHOW_COMMAND(object, vm_object_print_static)
 
 	int count;
 
-	if (object == NULL)
+	if (!have_addr)
 		return;
 
+	object = DB_DATA_PTR(addr, struct vm_object);
 	db_iprintf(
 	    "Object %p: type=%d, size=0x%jx, res=%d, ref=%d, flags=0x%x ruid %d charge %jx\n",
 	    object, (int)object->type, (uintmax_t)object->size,
@@ -2866,6 +2867,9 @@ DB_SHOW_COMMAND(vmopag, vm_object_print_pages)
 //   "target_type": "kernel",
 //   "changes": [
 //     "support"
+//   ],
+//   "changes_purecap": [
+//     "kdb"
 //   ],
 //   "change_comment": ""
 // }

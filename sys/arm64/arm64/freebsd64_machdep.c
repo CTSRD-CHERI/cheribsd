@@ -90,7 +90,7 @@ struct sysentvec elf_freebsd_freebsd64_sysvec = {
 	.sv_minuser	= VM_MIN_ADDRESS,
 	.sv_maxuser	= VM_MAXUSER_ADDRESS,
 	.sv_usrstack	= USRSTACK,
-	.sv_psstrings	= FREEBSD64_PS_STRINGS,
+	.sv_szpsstrings	= sizeof(struct freebsd64_ps_strings),
 	.sv_stackprot	= VM_PROT_RW_CAP,
 	.sv_copyout_auxargs = __elfN(freebsd_copyout_auxargs),
 	.sv_copyout_strings = freebsd64_copyout_strings,
@@ -144,9 +144,8 @@ mcontext_to_mcontext64(mcontext_t *mc, mcontext64_t *mc64)
 	creg = (uintcap_t *)&mc->mc_capregs;
 	greg = (register_t *)&mc64->mc_gpregs;
 	for (i = 0; i < CONTEXT64_COPYREGS; i++)
-		greg[i] = (__cheri_addr register_t)creg[i];
-	mc64->mc_gpregs.gp_elr =
-	    (__cheri_offset register_t)mc->mc_capregs.cap_elr;
+		greg[i] = (register_t)creg[i];
+	mc64->mc_gpregs.gp_elr = cheri_getoffset(mc->mc_capregs.cap_elr);
 	mc64->mc_gpregs.gp_spsr = mc->mc_spsr;
 	mc64->mc_flags = mc->mc_flags;
 	if (mc->mc_flags & _MC_FP_VALID)
@@ -187,8 +186,7 @@ freebsd64_set_mcontext(struct thread *td, mcontext64_t *mcp)
 		/* XXX: Permit userland to change GPRs for sigreturn? */
 
 		/* Honor 64-bit PC. */
-		mc.mc_capregs.cap_elr = (uintcap_t)cheri_setoffset(
-		    (void * __capability)mc.mc_capregs.cap_elr,
+		mc.mc_capregs.cap_elr = cheri_setoffset(mc.mc_capregs.cap_elr,
 		    mcp->mc_gpregs.gp_elr);
 	} else {
 		creg = (uintcap_t *)&mc.mc_capregs;
@@ -196,8 +194,7 @@ freebsd64_set_mcontext(struct thread *td, mcontext64_t *mcp)
 		for (i = 0; i < CONTEXT64_COPYREGS; i++)
 			creg[i] = (uintcap_t)greg[i];
 
-		mc.mc_capregs.cap_elr = (uintcap_t)cheri_setoffset(
-		    (void * __capability)td->td_frame->tf_elr,
+		mc.mc_capregs.cap_elr = cheri_setoffset(td->td_frame->tf_elr,
 		    mcp->mc_gpregs.gp_elr);
 		mc.mc_capregs.cap_ddc = td->td_frame->tf_ddc;
 	}
@@ -292,7 +289,7 @@ freebsd64_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 		sigexit(td, SIGILL);
 	}
 
-	tf->tf_x[0]= sig;
+	tf->tf_x[0] = sig;
 	tf->tf_x[1] = (uintcap_t)&fp->sf_si;
 	tf->tf_x[2] = (uintcap_t)&fp->sf_uc;
 
@@ -303,7 +300,7 @@ freebsd64_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	if (sysent->sv_sigcode_base != 0)
 		tf->tf_lr = (register_t)sysent->sv_sigcode_base;
 	else
-		tf->tf_lr = (register_t)(sysent->sv_psstrings -
+		tf->tf_lr = (register_t)(p->p_psstrings -
 		    *(sysent->sv_szsigcode));
 
 	CTR3(KTR_SIG, "sendsig: return td=%p pc=%#x sp=%#x", td, tf->tf_elr,

@@ -1574,18 +1574,20 @@ DB_SHOW_COMMAND(geom, db_show_geom)
 				break;
 		}
 	} else {
-		switch (g_valid_obj((void *)addr)) {
+		switch (g_valid_obj((void *)(uintptr_t)addr)) {
 		case 1:
-			db_show_geom_class((struct g_class *)addr);
+			db_show_geom_class(DB_DATA_PTR(addr, struct g_class));
 			break;
 		case 2:
-			db_show_geom_geom(0, (struct g_geom *)addr);
+			db_show_geom_geom(0, DB_DATA_PTR(addr, struct g_geom));
 			break;
 		case 3:
-			db_show_geom_consumer(0, (struct g_consumer *)addr);
+			db_show_geom_consumer(0, DB_DATA_PTR(addr,
+			    struct g_consumer));
 			break;
 		case 4:
-			db_show_geom_provider(0, (struct g_provider *)addr);
+			db_show_geom_provider(0, DB_DATA_PTR(addr,
+			    struct g_provider));
 			break;
 		default:
 			db_printf("Not a GEOM object.\n");
@@ -1641,7 +1643,7 @@ DB_SHOW_COMMAND(bio, db_show_bio)
 	struct bio *bp;
 
 	if (have_addr) {
-		bp = (struct bio *)addr;
+		bp = DB_DATA_PTR(addr, struct bio);
 		db_printf("BIO %p\n", bp);
 		db_print_bio_cmd(bp);
 		db_print_bio_flags(bp);
@@ -1674,3 +1676,12 @@ DB_SHOW_COMMAND(bio, db_show_bio)
 #undef	ADDFLAG
 
 #endif	/* DDB */
+// CHERI CHANGES START
+// {
+//   "updated": 20200803,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "kdb"
+//   ]
+// }
+// CHERI CHANGES END

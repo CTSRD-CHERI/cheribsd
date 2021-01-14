@@ -8,7 +8,7 @@
 _CPUCFLAGS =
 . if ${MACHINE_CPUARCH} == "aarch64"
 .  if ${MACHINE_ARCH:Maarch64*c*}
-MACHINE_CPU = cheri
+MACHINE_CPU = cheri morello
 .  endif
 MACHINE_CPU += arm64
 . elif ${MACHINE_CPUARCH} == "amd64"
@@ -157,10 +157,8 @@ _CPUCFLAGS = -march=${CPUTYPE:S/^mips//}
 . endif
 . elif ${MACHINE_CPUARCH} == "aarch64"
 .  if ${CPUTYPE:Marmv*} != ""
-.   if !defined(NO_CHERI)
 # Use -march when the CPU type is an architecture value, e.g. armv8.1-a
 _CPUCFLAGS = -march=${CPUTYPE}
-.   endif
 .  elif ${CPUTYPE} == "morello"
 # Don't use -march; we will add -march=morello or -march=morello+c64 later but
 # adding -march=morello here would override that as _CPUCFLAGS is added late.
@@ -297,7 +295,7 @@ MACHINE_CPU += amd64 sse2 sse mmx
 ########## arm64
 . elif ${MACHINE_CPUARCH} == "aarch64"
 .  if ${CPUTYPE} == "morello"
-MACHINE_CPU = cheri
+MACHINE_CPU = cheri morello
 .  endif
 MACHINE_CPU += arm64
 ########## Mips
@@ -321,14 +319,15 @@ MACHINE_CPU += riscv
 .endif
 
 .if ${MACHINE_CPUARCH} == "aarch64"
-# Morello purecap
 . if ${MACHINE_ARCH:Maarch64*c*}
-CFLAGS += -march=morello+c64 -mabi=purecap -femulated-tls
-LDFLAGS += -march=morello+c64 -mabi=purecap -femulated-tls
-# Morello hybrid
+# XXX: Stop using emulated TLS once purecap TLSDESC is properly specified (and
+# CheriBSD implements the resolvers) or the Morello toolchain implements a
+# pure-capability traditional TLS like MIPS or RISC-V.
+CFLAGS+=	-march=morello+c64 -mabi=purecap -femulated-tls
+LDFLAGS+=	-march=morello+c64 -mabi=purecap
 . elif defined(CPUTYPE) && ${CPUTYPE} == "morello"
-CFLAGS += -march=morello
-LDFLAGS += -march=morello
+CFLAGS+=	-march=morello -mabi=aapcs
+LDFLAGS+=	-march=morello -mabi=aapcs
 . endif
 .endif
 
@@ -477,7 +476,7 @@ MACHINE_ABI+=	soft-float
 .else
 MACHINE_ABI+=	hard-float
 .endif
-.if (${MACHINE_ARCH:Mmips*c*} || ${MACHINE_ARCH:Mriscv*c*} || ${MACHINE_ARCH:Maarch64*c*})
+.if (${MACHINE_ARCH:Maarch64*c*} || ${MACHINE_ARCH:Mmips*c*} || ${MACHINE_ARCH:Mriscv*c*})
 MACHINE_ABI+=	purecap
 .endif
 # Currently all 64-bit architectures include 64 in their name (see arch(7)).

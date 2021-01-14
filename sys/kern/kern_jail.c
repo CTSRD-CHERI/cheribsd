@@ -4272,7 +4272,7 @@ DB_SHOW_COMMAND(prison, db_show_prison_command)
 					break;
 		if (pr == NULL)
 			/* Assume address points to a valid prison. */
-			pr = (struct prison *)addr;
+			pr = DB_DATA_PTR(addr, struct prison);
 	}
 	db_show_prison(pr);
 }
@@ -4285,6 +4285,9 @@ DB_SHOW_COMMAND(prison, db_show_prison_command)
 //   "changes": [
 //     "iovec-macros",
 //     "user_capabilities"
+//   ],
+//   "changes_purecap": [
+//     "kdb"
 //   ]
 // }
 // CHERI CHANGES END

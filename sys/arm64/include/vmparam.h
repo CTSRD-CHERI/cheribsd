@@ -195,15 +195,7 @@
 
 #define	KERNBASE		(VM_MIN_KERNEL_ADDRESS)
 #define	SHAREDPAGE		(VM_MAXUSER_ADDRESS - PAGE_SIZE)
-#if __has_feature(capabilities)
-/*
- * To ensure that the stack base address that is sufficiently aligned to create
- * a precisely bounded capability we must round down by 64 pages.
- */
-#define	USRSTACK		(SHAREDPAGE - (63 * PAGE_SIZE))
-#else
 #define	USRSTACK		SHAREDPAGE
-#endif
 
 /*
  * How many physical pages per kmem arena virtual page.

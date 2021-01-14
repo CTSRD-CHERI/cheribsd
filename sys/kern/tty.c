@@ -2349,7 +2349,7 @@ DB_SHOW_COMMAND(tty, db_show_tty)
 		db_printf("usage: show tty <addr>\n");
 		return;
 	}
-	tp = (struct tty *)addr;
+	tp = DB_DATA_PTR(addr, struct tty);
 
 	db_printf("%p: %s\n", tp, tty_devname(tp));
 	db_printf("\tmtx: %p\n", tp->t_mtx);
@@ -2442,3 +2442,12 @@ DB_SHOW_ALL_COMMAND(ttys, db_show_all_ttys)
 	}
 }
 #endif /* DDB */
+// CHERI CHANGES START
+// {
+//   "updated": 20200803,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "kdb"
+//   ]
+// }
+// CHERI CHANGES END

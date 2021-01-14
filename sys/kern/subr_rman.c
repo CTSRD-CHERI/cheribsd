@@ -1111,10 +1111,12 @@ dump_rman(struct rman *rm)
 
 DB_SHOW_COMMAND(rman, db_show_rman)
 {
+	struct rman *rm;
 
 	if (have_addr) {
-		dump_rman_header((struct rman *)addr);
-		dump_rman((struct rman *)addr);
+		rm = DB_DATA_PTR(addr, struct rman);
+		dump_rman_header(rm);
+		dump_rman(rm);
 	}
 }
 
@@ -1138,3 +1140,12 @@ DB_SHOW_ALL_COMMAND(rman, db_show_all_rman)
 }
 DB_SHOW_ALIAS(allrman, db_show_all_rman);
 #endif
+// CHERI CHANGES START
+// {
+//   "updated": 20200803,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "kdb"
+//   ]
+// }
+// CHERI CHANGES END

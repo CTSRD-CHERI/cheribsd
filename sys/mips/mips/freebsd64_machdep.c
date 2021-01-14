@@ -105,7 +105,7 @@ struct sysentvec elf_freebsd_freebsd64_sysvec = {
 	.sv_minuser	= VM_MIN_ADDRESS,
 	.sv_maxuser	= VM_MAXUSER_ADDRESS,
 	.sv_usrstack	= USRSTACK,
-	.sv_psstrings	= FREEBSD64_PS_STRINGS,
+	.sv_szpsstrings	= sizeof(struct freebsd64_ps_strings),
 	.sv_stackprot	= VM_PROT_ALL,
 	.sv_copyout_auxargs = __elfN(freebsd_copyout_auxargs),
 	.sv_copyout_strings = freebsd64_copyout_strings,
@@ -482,7 +482,7 @@ freebsd64_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	} else {
 		/* Signal trampoline code is at base of user stack. */
 		/* XXX: GC this code path once shared page is stable */
-		regs->ra = (register_t)(intptr_t)FREEBSD64_PS_STRINGS -
+		regs->ra = (register_t)p->p_psstrings -
 		    *(p->p_sysent->sv_szsigcode);
 	}
 	PROC_LOCK(p);

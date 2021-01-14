@@ -3657,7 +3657,7 @@ DB_SHOW_COMMAND(igi_list, db_show_igi_list)
 		db_printf("usage: show igi_list <addr>\n");
 		return;
 	}
-	igi_head = (struct _igi_list *)addr;
+	igi_head = DB_DATA_PTR(addr, struct _igi_list);
 
 	LIST_FOREACH_SAFE(igi, igi_head, igi_link, tigi) {
 		db_printf("igmp_ifsoftc %p:\n", igi);
@@ -3707,3 +3707,12 @@ static moduledata_t igmp_mod = {
     0
 };
 DECLARE_MODULE(igmp, igmp_mod, SI_SUB_PROTO_MC, SI_ORDER_MIDDLE);
+// CHERI CHANGES START
+// {
+//   "updated": 20200803,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "kdb"
+//   ]
+// }
+// CHERI CHANGES END

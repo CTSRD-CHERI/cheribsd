@@ -162,16 +162,7 @@ selectedArchitectures.each { suffix ->
             // Enable additional debug checks when running the testsuite
             extraBuildOptions += ' -DMALLOC_DEBUG'
         }
-        def cheribuildArgs = ["'--cheribsd/build-options=${extraBuildOptions}'",
-                              '--keep-install-dir',
-                              '--install-prefix=/rootfs',
-                              '--cheribsd/build-tests',]
-        if (GlobalVars.isTestSuiteJob) {
-            cheribuildArgs.add('--cheribsd/debug-info')
-        } else {
-            cheribuildArgs.add('--cheribsd/no-debug-info')
-        }
-        // XXX: Remove once dev can build world
+        // XXX: Remove once dev can build a purecap world
         if (suffix.startsWith("morello")) {
             def gitBranch = 'master'
             if (env.CHANGE_ID) {
@@ -180,8 +171,17 @@ selectedArchitectures.each { suffix ->
                 gitBranch = env.BRANCH_NAME
             }
             if (gitBranch != 'morello-dev') {
-                cheribuildArgs.add('--skip-world')
+                extraBuildOptions += ' -DWITHOUT_COMPAT_CHERIABI'
             }
+        }
+        def cheribuildArgs = ["'--cheribsd/build-options=${extraBuildOptions}'",
+                              '--keep-install-dir',
+                              '--install-prefix=/rootfs',
+                              '--cheribsd/build-tests',]
+        if (GlobalVars.isTestSuiteJob) {
+            cheribuildArgs.add('--cheribsd/debug-info')
+        } else {
+            cheribuildArgs.add('--cheribsd/no-debug-info')
         }
         cheribuildProject(target: "cheribsd-${suffix}", architecture: suffix,
                 extraArgs: cheribuildArgs.join(" "),
@@ -194,7 +194,7 @@ selectedArchitectures.each { suffix ->
                 beforeBuild: { params -> dir('cherisdk') { deleteDir() } },
                 /* Custom function to run tests since --test will not work (yet) */
                 runTests: false,
-                afterBuild: { params -> if (!cheribuildArgs.contains('--skip-world')) { buildImageAndRunTests(params, suffix) } })
+                afterBuild: { params -> buildImageAndRunTests(params, suffix) })
     }
 }
 

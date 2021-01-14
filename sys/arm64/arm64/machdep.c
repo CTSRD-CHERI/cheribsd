@@ -566,8 +566,8 @@ exec_setregs(struct thread *td, struct image_params *imgp, uintcap_t stack)
 
 #if __has_feature(capabilities)
 	if (SV_PROC_FLAG(td->td_proc, SV_CHERI)) {
-		tf->tf_x[0] = (uintcap_t)cheri_auxv_capability(imgp, stack);
-		tf->tf_sp = (uintcap_t)cheri_exec_stack_pointer(imgp, stack);
+		tf->tf_x[0] = (uintcap_t)imgp->auxv;
+		tf->tf_sp = stack;
 		/* Purecap binaries have low bit of entry address set. */
 		uintcap_t entry = (uintcap_t)cheri_incoffset(cheri_exec_pcc(td, imgp), -1);
 		tf->tf_lr = entry;
@@ -584,12 +584,12 @@ exec_setregs(struct thread *td, struct image_params *imgp, uintcap_t stack)
 	{
 		tf->tf_x[0] = stack;
 		tf->tf_sp = STACKALIGN(stack);
+		tf->tf_lr = imgp->entry_addr;
 #if __has_feature(capabilities)
 		hybridabi_thread_setregs(td, imgp->entry_addr);
 #else
 		tf->tf_elr = imgp->entry_addr;
 #endif
-		tf->tf_lr = tf->tf_lr;
 		tf->tf_spsr &= ~PSR_C64;
 	}
 
@@ -1061,7 +1061,7 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	if (sysent->sv_sigcode_base != 0)
 		tf->tf_lr = (register_t)sysent->sv_sigcode_base;
 	else
-		tf->tf_lr = (register_t)(sysent->sv_psstrings -
+		tf->tf_lr = (register_t)(p->p_psstrings -
 		    *(sysent->sv_szsigcode));
 #endif
 
@@ -1552,7 +1552,7 @@ DB_SHOW_COMMAND(specialregs, db_show_spregs)
 #define	PRINT_REG_CAP(reg)						\
 do {									\
     void * __capability _tmp = (void * __capability)READ_SPECIALREG_CAP(reg); \
-    db_printf(__STRING(reg) " = %#lp\n", _tmp);				\
+    db_printf(__STRING(reg) " = %#.16lp\n", _tmp);				\
 } while (0)
 #endif
 

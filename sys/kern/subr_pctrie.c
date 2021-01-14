@@ -802,7 +802,7 @@ DB_SHOW_COMMAND(pctrienode, db_show_pctrienode)
 
         if (!have_addr)
                 return;
-	node = (struct pctrie_node *)addr;
+	node = DB_DATA_PTR(addr, struct pctrie_node);
 	db_printf("node %p, owner %jx, children count %u, level %u:\n",
 	    (void *)node, (uintmax_t)node->pn_owner, node->pn_count,
 	    node->pn_clev);
@@ -817,3 +817,12 @@ DB_SHOW_COMMAND(pctrienode, db_show_pctrienode)
 	}
 }
 #endif /* DDB */
+// CHERI CHANGES START
+// {
+//   "updated": 20200127,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "kdb"
+//   ]
+// }
+// CHERI CHANGES END

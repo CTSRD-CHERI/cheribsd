@@ -4913,7 +4913,7 @@ retry:
 	 * limit.
 	 */
 	is_procstack = addr >= (vm_offset_t)vm->vm_maxsaddr &&
-	    addr < (vm_offset_t)p->p_sysent->sv_usrstack;
+	    addr < (vm_offset_t)p->p_usrstack;
 	if (is_procstack && (ctob(vm->vm_ssize) + grow_amount > stacklim))
 		return (KERN_NO_SPACE);
 
@@ -5622,7 +5622,7 @@ DB_SHOW_COMMAND(map, map)
 		db_printf("usage: show map <addr>\n");
 		return;
 	}
-	vm_map_print((vm_map_t)addr);
+	vm_map_print(DB_DATA_PTR(addr, struct vm_map));
 }
 
 DB_SHOW_COMMAND(procvm, procvm)
@@ -5649,6 +5649,9 @@ DB_SHOW_COMMAND(procvm, procvm)
 //   "target_type": "kernel",
 //   "changes": [
 //     "platform"
+//   ],
+//   "changes_purecap": [
+//     "kdb"
 //   ]
 // }
 // CHERI CHANGES END

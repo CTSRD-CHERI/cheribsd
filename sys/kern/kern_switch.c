@@ -116,7 +116,7 @@ static int
 sysctl_stats_reset(SYSCTL_HANDLER_ARGS)
 {
 	struct sysctl_oid *p;
-	uintptr_t counter;
+	ptraddr_t counter;
         int error;
 	int val;
 	int i;
@@ -134,9 +134,9 @@ sysctl_stats_reset(SYSCTL_HANDLER_ARGS)
 	SLIST_FOREACH(p, oidp->oid_parent, oid_link) {
 		if (p == oidp || p->oid_arg1 == NULL)
 			continue;
-		counter = (uintptr_t)p->oid_arg1;
+		counter = ((ptraddr_t)p->oid_arg1 - (ptraddr_t)DPCPU_START);
 		CPU_FOREACH(i) {
-			*(long *)(dpcpu_off[i] + counter) = 0;
+			*(long *)(dpcpu_off[i] - DPCPU_BIAS + counter) = 0;
 		}
 	}
 	return (0);
@@ -542,3 +542,12 @@ runq_remove_idx(struct runq *rq, struct thread *td, u_char *idx)
 			*idx = (pri + 1) % RQ_NQS;
 	}
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20200803,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_provenance"
+//   ]
+// }
+// CHERI CHANGES END

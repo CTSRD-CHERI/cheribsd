@@ -156,7 +156,7 @@ SYSCTL_PROC(parent, nbr, name,						\
 /*
  * Location of the kernel's 'set_vnet' linker set.
  */
-extern uintptr_t	*__start_set_vnet;
+extern uintptr_t	*__start_set_vnet __no_subobject_bounds;
 __GLOBL(__start_set_vnet);
 extern uintptr_t	*__stop_set_vnet;
 __GLOBL(__stop_set_vnet);
@@ -287,8 +287,27 @@ extern struct sx vnet_sxlock;
 #define	VNET_DEFINE_STATIC(t, n) \
     static t VNET_NAME(n) __section(VNET_SETNAME) __used
 #endif
+#ifdef __CHERI_PURE_CAPABILITY__
+#define	VNET_BIAS	0
+
+/*
+ * XXX: This cannot use exact bounds currently as vnet variables are
+ * not suitably aligned by the toolchain (CHERI padding is not added
+ * for variables with section attributes).  For example, V_ip6qb in
+ * sys/netinet6/frag6.c is a large variable requiring larger
+ * alignment.
+ *
+ * See https://github.com/CTSRD-CHERI/llvm-project/issues/495
+ */
+#define	_VNET_PTR(b, n)							\
+	cheri_setbounds((__typeof(VNET_NAME(n)) *)((b) +		\
+	    ((ptraddr_t)&VNET_NAME(n) - (ptraddr_t)VNET_START)),	\
+	    sizeof(VNET_NAME(n)))
+#else
+#define	VNET_BIAS	((char *)NULL - (char *)VNET_START)
 #define	_VNET_PTR(b, n)		(__typeof(VNET_NAME(n))*)		\
 				    ((b) + (uintptr_t)&VNET_NAME(n))
+#endif
 
 #define	_VNET(b, n)		(*_VNET_PTR(b, n))
 
@@ -455,3 +474,13 @@ do {									\
 #endif /* _KERNEL */
 
 #endif /* !_NET_VNET_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20200803,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_provenance",
+//     "subobject_bounds"
+//   ]
+// }
+// CHERI CHANGES END
