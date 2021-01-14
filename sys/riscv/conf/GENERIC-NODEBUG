@@ -27,6 +27,6 @@
 # $FreeBSD$
 
 include GENERIC
-include "std.NODEBUG"
+include "../../conf/std.nodebug"
 
 ident   GENERIC-NODEBUG

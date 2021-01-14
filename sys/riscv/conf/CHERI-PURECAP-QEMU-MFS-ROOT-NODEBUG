@@ -1,6 +1,6 @@
 #NO_UNIVERSE
 
 include "CHERI-PURECAP-QEMU-MFS-ROOT"
-include "std.NODEBUG"
+include "../../conf/std.nodebug"
 
 ident CHERI-PURECAP-QEMU-MFS-ROOT-NODEBUG
