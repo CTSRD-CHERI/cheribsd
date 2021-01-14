@@ -107,7 +107,7 @@ argument by
 .Em or Ns 'ing
 the following values:
 .Pp
-.Bl -tag -width PROT_WRITE -compact
+.Bl -tag -width PROT_CAP_WRITE -compact
 .It Dv PROT_NONE
 Pages may not be accessed.
 .It Dv PROT_READ
@@ -116,7 +116,34 @@ Pages may be read.
 Pages may be written.
 .It Dv PROT_EXEC
 Pages may be executed.
+.It Dv PROT_CAP_READ
+CHERI capabilities may be written to pages.
+.It Dv PROT_CAP_WRITE
+CHERI capabilities may be read from pages.
+.It Dv PROT_CAP_NONE
+CHERI capabilities may not be accessed in pages.
 .El
+.Pp
+When
+.Dv PROT_CAP_NONE
+is combined with
+.Dv PROT_CAP_READ
+or
+.Dv PROT_CAP_WRITE
+it has no effect.
+If no
+.Dv PROT_CAP_*
+flags are included in
+.Fa prot
+than
+.Dv PROT_CAP_READ
+and
+.Dv PROT_CAP_WRITE
+are implied by the presence of
+.Dv PROT_READ
+and
+.Dv PROT_WRITE
+respectively.
 .Pp
 In addition to these protection flags,
 .Fx
