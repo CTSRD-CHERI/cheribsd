@@ -73,12 +73,15 @@ file(WRITE ${CMAKE_BINARY_DIR}/kern_opt/opt_ddb.h "#define DDB 1\n")
 file(WRITE ${CMAKE_BINARY_DIR}/kern_opt/opt_ktrace.h "#define KTRACE 1\n")
 file(WRITE ${CMAKE_BINARY_DIR}/cheri_builtins.h "
 // Pretend that we have capabilities in CLion
-#ifdef __JETBRAINS_IDE__
 #define __CHERI__
 #define __has_feature(x) __fake_has_feature_##x
 #define __fake_has_feature_capabilities 1
+#define __fake_has_feature_nullability 1
 // But we don't really so define __capability to nothing
 #define __capability
+// Same thing for __(u)intcap_t
+typedef unsigned long __uintcap_t;
+typedef long __intcap_t;
 // And provide the builtins for code completion
 long __builtin_cheri_length_get(const void* __capability);
 long __builtin_cheri_base_get(const void* __capability);
@@ -104,6 +107,8 @@ void* __capability __builtin_cheri_program_counter_get(void);
 void* __capability __builtin_cheri_stack_get(void);
 void* __capability __builtin_cheri_bounds_set(const void* __capability, long);
 void* __capability __builtin_cheri_bounds_set_exact(const void* __capability, long);
+unsigned long __builtin_cheri_representable_alignment_mask(unsigned long);
+unsigned long __builtin_cheri_round_representable_length(unsigned long);
 // Also define some compiler defines:
 #define __CHERI_ADDRESS_BITS__ 64
 #define __CHERI_CAPABILITY_WIDTH__ 128
@@ -121,18 +126,14 @@ void* __capability __builtin_cheri_bounds_set_exact(const void* __capability, lo
 #define __SIZEOF_CHERI_CAPABILITY__ 16
 #define __SIZEOF_UINTCAP__ 16
 #define __SIZEOF_INTCAP__ 16
-#endif /* __JETBRAINS_IDE__ */
 ")
 
 file(WRITE ${CMAKE_BINARY_DIR}/cheri_purecap.h "
 // Pretend that we have capabilities in CLion
-#ifdef __JETBRAINS_IDE__
 #define __CHERI_PURE_CAPABILITY__ 1
 #define __CHERI_CAPABILITY_TABLE__ 3
 #include \"cheri_builtins.h\"
-#endif
 ")
-add_compile_options(-include ${CMAKE_BINARY_DIR}/cheri_purecap.h)
 
 file(WRITE ${CMAKE_BINARY_DIR}/kern_opt/opt_global.h "
 #include \"../cheri_builtins.h\"
@@ -149,7 +150,13 @@ file(WRITE ${CMAKE_BINARY_DIR}/kern_opt/opt_global.h "
 #define TICK_USE_YAMON_FREQ defined
 #define YAMON 1
 #define INVARIANTS 1
-#define CPU_QEMU_RISCV
+#define CPU_QEMU_RISCV 1
+
+struct thread_lite {
+    unsigned td_pinned;
+    unsigned td_critnest;
+    unsigned td_owepreempt;
+};
 // #define MAC 1
 // #define AUDIT 1")
 
@@ -174,8 +181,6 @@ message(STATUS "BUILTIN_HEADERS_DIR=${BUILTIN_HEADERS_DIR}")
 add_compile_options(-idirafter ${BUILTIN_HEADERS_DIR}/include)
 add_compile_options(-Wall -Wextra -Wcast-align)
 add_definitions(-DDEBUG)
-
-add_subdirectory(libexec/rtld-elf)
 
 function(add_fake_targets_for_subdir _subdir)
     cmake_parse_arguments(aftfs "LIBRARIES" "" "" ${ARGN})
@@ -206,6 +211,7 @@ function(add_fake_targets_for_subdir _subdir)
                 contrib/libxo
                 contrib/atf  # for tests
             )
+            target_compile_options(${_subdir}_${_dirname} PRIVATE "-include${CMAKE_BINARY_DIR}/cheri_purecap.h")
         endif()
     endforeach()
 endfunction()
@@ -274,7 +280,7 @@ add_kernel_srcs("sys/xdr")
 function(add_kernel_compile_flags _target)
     target_compile_definitions(${_target} PRIVATE _KERNEL=1)
     target_include_directories(${_target} PRIVATE ${CMAKE_BINARY_DIR}/kern_opt ${CMAKE_SOURCE_DIR}/sys/contrib/ck/include)
-    target_compile_options(${_target} PRIVATE "-include${CMAKE_BINARY_DIR}/kern_opt/opt_global.h" -Wno-cast-qual)
+    target_compile_options(${_target} PRIVATE "-include${CMAKE_BINARY_DIR}/kern_opt/opt_global.h" -ffreestanding -Wno-cast-align)
 endfunction()
 # Add targets for sys/dev:
 function(add_kernel_modules _prefix _subdir)
@@ -309,5 +315,10 @@ execute_process(COMMAND ${AWK} -f "${CMAKE_SOURCE_DIR}/sys/tools/vnode_if.awk" "
                 WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/kern_opt COMMAND_ECHO STDOUT)
 
 add_kernel_compile_flags(fake_kernel)
+# Correct completion for imgact_elf.c:
+target_compile_definitions(fake_kernel PRIVATE -D__ELF_CHERI=1 -D__ELF_WORD_SIZE=64)
 
+# Default to purecap compile options for all other files
+add_compile_options("-include${CMAKE_BINARY_DIR}/cheri_purecap.h")
 
+add_subdirectory(libexec/rtld-elf)
