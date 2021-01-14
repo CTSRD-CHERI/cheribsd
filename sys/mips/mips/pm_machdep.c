@@ -654,30 +654,6 @@ exec_setregs(struct thread *td, struct image_params *imgp, uintcap_t stack)
 		 * Pass a pointer to the ELF auxiliary argument vector.
 		 */
 		td->td_frame->c3 = imgp->auxv;
-
-		/*
-		 * Load relocbase for RTLD into $c4 so that rtld has a
-		 * capability with the correct bounds available on
-		 * startup
-		 *
-		 * XXXAR: this should not be necessary since it should
-		 * be the same as auxv[AT_BASE] but trying to load
-		 * that from $c3 crashes...
-		 *
-		 * TODO: load the AT_BASE value instead of using
-		 * duplicated code!
-		 */
-		if (imgp->reloc_base) {
-			vaddr_t rtld_base = imgp->reloc_base;
-			vaddr_t rtld_end = imgp->interp_end ? imgp->interp_end : imgp->end_addr;
-			vaddr_t rtld_len = rtld_end - rtld_base;
-			rtld_base = CHERI_REPRESENTABLE_BASE(rtld_base,
-			    rtld_len);
-			rtld_len = CHERI_REPRESENTABLE_LENGTH(rtld_len);
-			td->td_frame->c4 = cheri_capability_build_user_data(
-			    CHERI_CAP_USER_DATA_PERMS, rtld_base, rtld_len, 0);
-		}
-
 		/*
 		 * Update privileged signal-delivery environment for
 		 * actual stack.
