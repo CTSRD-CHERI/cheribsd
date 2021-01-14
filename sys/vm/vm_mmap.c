@@ -630,12 +630,6 @@ kern_mmap_req(struct thread *td, struct mmap_req *mrp)
 		SYSERRCAUSE("%s: both MAP_SHARED and MAP_PRIVATE", __func__);
 		return (EINVAL);
 	}
-	if (prot != PROT_NONE &&
-	    (prot & ~(PROT_READ | PROT_WRITE | PROT_EXEC)) != 0) {
-		SYSERRCAUSE("%s: Unexpected protections 0x%x", __func__,
-		    (prot & ~(PROT_READ | PROT_WRITE | PROT_EXEC)));
-		return (EINVAL);
-	}
 	if ((flags & MAP_GUARD) != 0 && (prot != PROT_NONE || fd != -1 ||
 	    pos != 0 || (flags & ~(MAP_FIXED | MAP_GUARD | MAP_EXCL |
 	    MAP_CHERI_NOSETBOUNDS |
