@@ -33,7 +33,7 @@ SRCS+=	time.c
 # time_event.c takes hours to count down so is even less usable. Thus we use
 # time.c as the lesser of two evils.
 SRCS+=	time.c
-.elif ${MACHINE_CPUARCH} == "aarch64" || ${MACHINE_CPUARCH} == "riscv"
+.elif ${MACHINE_CPUARCH} == "arm" || ${MACHINE_CPUARCH} == "riscv"
 SRCS+=	time_event.c
 .endif
 
