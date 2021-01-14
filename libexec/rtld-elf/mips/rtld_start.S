@@ -82,16 +82,10 @@ LEAF(rtld_start)
 	cmove		$c24, $c11
 
 	/* $pcc still has large bounds here -> load _DYNAMIC from $pcc */
-	PCREL_LOAD_CODE_PTR($c3, a0, _DYNAMIC)
-	/* XXXAR: this assumes relocbase is R/W */
-	/* TODO: Could also use cgetaddr+csetaddr to rederive from relocbase */
-	csub		a0, $c3, $c4	/* get difference between relocbase and
-					 * &_DYNAMIC (needed since they don't
-					 * have the same base) */
-
+	PCREL_LOAD_CODE_PTR($c4, a0, _DYNAMIC)
 	PCREL_LOAD_CODE_PTR($c12, t9, _rtld_relocate_nonplt_self)
-	cjalr $c12, $c17; /* (&_DYNAMIC, relocbase) */
-	cincoffset	$c3, $c4, a0	/* dynp (in delay slot) */
+	cjalr $c12, $c17; /* (auxv, &_DYNAMIC) */
+	nop /* delay slot */
 
 #if __CHERI_CAPABILITY_TABLE__ != 3
 	/* For the non-pc-relative case set up $cgp now */
