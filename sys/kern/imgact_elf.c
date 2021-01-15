@@ -111,8 +111,9 @@ static Elf_Brandinfo *__elfN(get_brandinfo)(struct image_params *imgp,
 static int __elfN(load_file)(struct proc *p, const char *file, u_long *addr,
     u_long *end_addr, u_long *entry, u_long *repr_start, u_long *repr_end);
 static int __elfN(load_section)(const struct image_params *imgp,
-    vm_ooffset_t offset, caddr_t vmaddr, size_t memsz, size_t filsz,
-    vm_prot_t prot);
+    vm_ooffset_t offset, vm_offset_t vmaddr, size_t memsz, size_t filsz,
+    vm_prot_t prot, vm_offset_t *last_seg_start, vm_offset_t *last_seg_end,
+    const char* file);
 static int __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp);
 static bool __elfN(freebsd_trans_osrel)(const Elf_Note *note,
     int32_t *osrel);
@@ -633,9 +634,30 @@ __elfN(map_insert)(const struct image_params *imgp, vm_map_t map,
 }
 
 static int
-__elfN(load_section)(const struct image_params *imgp,
-    vm_ooffset_t offset, caddr_t vmaddr, size_t memsz, size_t filsz,
-    vm_prot_t prot)
+reserve_address_space(vm_map_t map, vm_offset_t map_start, vm_offset_t map_end,
+    vm_offset_t reservation_id, const char* file)
+{
+	int error;
+
+	MPASS(map_start < map_end);
+	vm_map_lock(map);
+	error = vm_map_insert(map, NULL, 0, map_start, map_end, VM_PROT_NONE,
+	    VM_PROT_NONE, MAP_CREATE_UNMAPPED, reservation_id);
+	vm_map_unlock(map);
+	if (error != 0) {
+		uprintf("%s: Failed to reserve [%#jx-%#jx) padding for %s: "
+		    "%d!\n", __func__, (uintmax_t)map_start, (uintmax_t)map_end,
+		    file, error);
+		return (ENOMEM);
+	}
+	return (0);
+}
+
+
+static int
+__elfN(load_section)(const struct image_params *imgp, vm_ooffset_t offset,
+    vm_offset_t vmaddr, size_t memsz, size_t filsz, vm_prot_t prot,
+    vm_offset_t *last_seg_start, vm_offset_t *last_seg_end, const char *file)
 {
 	struct sf_buf *sf;
 	size_t map_len;
@@ -665,6 +687,36 @@ __elfN(load_section)(const struct image_params *imgp,
 	map = &imgp->proc->p_vmspace->vm_map;
 	map_addr = trunc_page((vm_offset_t)vmaddr);
 	file_addr = trunc_page(offset);
+
+	if (*last_seg_end != 0 && map_addr != *last_seg_end) {
+		/*
+		 * For non-consecutive segments we have to mark the address
+		 * space between the last segment end and this segment as
+		 * reserved to prevent mmap() from using the gaps inside DSOs
+		 * for allocations (since we create capabilities spanning the
+		 * whole region and overlapping caps could be a security issue).
+		 */
+#if 0 /* enable to debug ELF loading issues/see how much padding we need. */
+		uprintf("%s: Reserving space [%#jx-%#jx) for %s between "
+		    "segments. Previous segment: [%#jx-%#jx), current segment: "
+		    "[%#jx-%#jx)\n", __func__, (uintmax_t)*last_seg_end,
+		    (uintmax_t)map_addr, file, (uintmax_t)*last_seg_start,
+		    (uintmax_t)*last_seg_end, (uintmax_t)map_addr,
+		    (uintmax_t)round_page(vmaddr + memsz));
+#endif
+		rv = reserve_address_space(map, *last_seg_end, map_addr,
+		    /*reservation_id=*/*last_seg_start, file);
+		if (rv != 0)
+			return (rv);
+	}
+	/*
+	 * We can update the values now that the address space is reserved. We
+	 * have to be careful to round both start and end so that all touched
+	 * pages are included in the [last_seg_start,last_seg_end) range
+	 * (important for non-page-aligned segments).
+	 */
+	*last_seg_start = trunc_page(vmaddr);
+	*last_seg_end = round_page(vmaddr + memsz);
 
 	/*
 	 * We have two choices.  We can either clear the data in the last page
@@ -702,8 +754,8 @@ __elfN(load_section)(const struct image_params *imgp,
 	 */
 	copy_len = filsz == 0 ? 0 : (offset + filsz) - trunc_page(offset +
 	    filsz);
-	map_addr = trunc_page((vm_offset_t)vmaddr + filsz);
-	map_len = round_page((vm_offset_t)vmaddr + memsz) - map_addr;
+	map_addr = trunc_page(vmaddr + filsz);
+	map_len = round_page(vmaddr + memsz) - map_addr;
 
 	/* This had damn well better be true! */
 	if (map_len != 0) {
@@ -801,25 +853,6 @@ __elfN(ensure_representable_base)(const char *execpath, const Elf_Ehdr *hdr,
 	return (0);
 }
 
-static int
-reserve_address_space(vm_map_t map, Elf_Addr map_start, Elf_Addr map_end,
-    vm_offset_t reservation_id)
-{
-	int error;
-
-	MPASS(map_start < map_end);
-	vm_map_lock(map);
-	error = vm_map_insert(map, NULL, 0, map_start, map_end, VM_PROT_NONE,
-	    VM_PROT_NONE, MAP_CREATE_UNMAPPED, reservation_id);
-	vm_map_unlock(map);
-	if (error != 0) {
-		uprintf("%s: Failed to reserve space for padding: %d!\n",
-		    __func__, error);
-		return (error);
-	}
-	return (0);
-}
-
 /*
  * Claim the space around the executable that is required to represent a
  * capability spanning the executable.
@@ -842,12 +875,16 @@ __elfN(reserve_representability_padding)(const char *execpath, vm_map_t map,
 	MPASS(mapbase <= *representable_start);
 	representable_length = CHERI_REPRESENTABLE_LENGTH(maplen);
 	if (*representable_start != start_addr) {
+		/*
+		 * This should rarely be needed, so keep an uprintf() to
+		 * discover weird ELF files.
+		 */
 		uprintf("%s: Reserving space before start: [%#jx-%#jx] for "
 		    "%s mapping at [%#jx-%#jx]\n", __func__,
 		    (uintmax_t)*representable_start, (uintmax_t)start_addr,
 		    execpath, (uintmax_t)start_addr, (uintmax_t)end_addr);
 		error = reserve_address_space(map, *representable_start,
-		    start_addr, /*reservation=*/start_addr);
+		    start_addr, /*reservation=*/start_addr, execpath);
 		if (error)
 			return (error);
 	}
@@ -855,13 +892,18 @@ __elfN(reserve_representability_padding)(const char *execpath, vm_map_t map,
 	    CHERI_REPRESENTABLE_LENGTH(maplen);
 	/* We must have mapped up to the end of a page. */
 	if (round_page(*representable_end) != round_page(end_addr)) {
+		/*
+		 * This should rarely be needed, so keep an uprintf() to
+		 * discover weird ELF files.
+		 */
 		uprintf("%s: Reserving space after end: [%#jx-%#jx] for "
 		    "%s mapping at [%#jx-%#jx]\n", __func__,
 		    (uintmax_t)round_page(end_addr),
 		    (uintmax_t)round_page(*representable_end), execpath,
 		    (uintmax_t)start_addr, (uintmax_t)end_addr);
 		error = reserve_address_space(map, round_page(end_addr),
-		    round_page(*representable_end), /*reservation=*/start_addr);
+		    round_page(*representable_end), /*reservation=*/start_addr,
+		    execpath);
 		if (error)
 			return (error);
 	}
@@ -878,6 +920,8 @@ __elfN(load_sections)(const struct image_params *imgp, const Elf_Ehdr *hdr,
 	u_long base_vaddr, max_vaddr;
 	bool first;
 	int error, i;
+	vm_offset_t last_seg_start = 0;
+	vm_offset_t last_seg_end = 0;
 
 	ASSERT_VOP_LOCKED(imgp->vp, __func__);
 
@@ -892,8 +936,8 @@ __elfN(load_sections)(const struct image_params *imgp, const Elf_Ehdr *hdr,
 		/* Loadable segment */
 		prot = __elfN(trans_prot)(phdr[i].p_flags);
 		error = __elfN(load_section)(imgp, phdr[i].p_offset,
-		    (caddr_t)(uintptr_t)phdr[i].p_vaddr + rbase,
-		    phdr[i].p_memsz, phdr[i].p_filesz, prot);
+		    phdr[i].p_vaddr + rbase, phdr[i].p_memsz, phdr[i].p_filesz,
+		    prot, &last_seg_start, &last_seg_end, file);
 		if (error != 0)
 			return (error);
 
@@ -903,6 +947,16 @@ __elfN(load_sections)(const struct image_params *imgp, const Elf_Ehdr *hdr,
 		if (first) {
 			base_vaddr = trunc_page(phdr[i].p_vaddr);
 			first = false;
+		}
+		/*
+		 * In order to reserve space after segments, they must be
+		 * defined in ascending order since otherwise we may reserve
+		 * space that would be used by a later PT_LOAD.
+		 */
+		if (phdr[i].p_vaddr < max_vaddr) {
+			uprintf("%s: %s PT_LOADs not in ascending order.\n",
+			    __func__, file);
+			return (ENOEXEC);
 		}
 		max_vaddr = MAX(max_vaddr, phdr[i].p_vaddr + phdr[i].p_memsz);
 	}
