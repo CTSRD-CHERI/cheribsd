@@ -50,7 +50,7 @@ setDefaultJobProperties(jobProperties)
 
 jobs = [:]
 
-def buildImage(params, String suffix) {
+def buildImageAndRunTests(params, String suffix) {
     stage("Building disk image") {
         sh "./cheribuild/jenkins-cheri-build.py --build disk-image-${suffix} ${params.extraArgs}"
     }
@@ -213,11 +213,7 @@ selectedPurecapKernelArchitectures.each { suffix ->
                 // Delete stale compiler/sysroot
                 beforeBuild: { params -> dir('cherisdk') { deleteDir() } },
                 /* Custom function to run tests since --test will not work (yet) */
-                runTests: false, afterBuild: { params ->
-			  buildImage(params, suffix)
-			  maybeArchiveArtifacts(params, suffix)
-		}
-        )
+                runTests: false, afterBuild: { params -> buildImageAndRunTests(params, suffix) })
     }
 }
 
