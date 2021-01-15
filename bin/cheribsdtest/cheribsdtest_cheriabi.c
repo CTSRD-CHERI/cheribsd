@@ -273,8 +273,20 @@ create_adjacent_mappings(struct adjacent_mappings *mappings)
 	size_t len;
 
 	len = getpagesize() * 2;
-	mappings->first = CHERIBSDTEST_CHECK_SYSCALL(
-	    mmap(0, len, PROT_READ | PROT_WRITE, MAP_ANON, -1, 0));
+	memset(mappings, 0, sizeof(*mappings));
+	/*
+	 * Note: requesting a 2 page mapping might fill a gap between existing
+	 * mappings so the next 4 pages might not be available.
+	 * To work around this, we allocate 6 pages first, unmap them and then
+	 * allocate all mappings with MAP_FIXED.
+	 */
+	requested_addr = CHERIBSDTEST_CHECK_SYSCALL(
+	    mmap(0, len * 3, PROT_READ | PROT_WRITE, MAP_ANON, -1, 0));
+	CHERIBSDTEST_CHECK_SYSCALL(munmap(requested_addr, len * 3));
+	/* Reset requested_addr to a NULL-derived capability for MAP_FIXED. */
+	requested_addr = (void *)(uintcap_t)cheri_getaddress(requested_addr);
+	mappings->first = CHERIBSDTEST_CHECK_SYSCALL(mmap(requested_addr, len,
+	    PROT_READ | PROT_WRITE, MAP_ANON | MAP_FIXED, -1, 0));
 	CHERIBSDTEST_VERIFY(cheri_gettag(mappings->first));
 	/* Try to create a mapping immediately following the latest one. */
 	requested_addr =
