@@ -78,18 +78,16 @@
 #define	cheri_setbounds(x, y)	__builtin_cheri_bounds_set((x), (y))
 #define	cheri_setboundsexact(x, y)	__builtin_cheri_bounds_set_exact((x), (y))
 
+#define	cheri_is_subset(x, y)	__builtin_cheri_subset_test(x, y)
+#define	cheri_is_null_derived(x)					\
+	__builtin_cheri_equal_exact((uintcap_t)cheri_getaddress(x), x)
+
 /* Create an untagged capability from an integer */
 #define cheri_fromint(x)	cheri_incoffset(NULL, x)
 
 /* Increment @p dst to have the address of @p src */
 #define cheri_copyaddress(dst, src)	(cheri_setaddress(dst, cheri_getaddress(src)))
 
-/*
- * XXX-AM: Ugly thing to make this importable from linux compat,
- * which redefines __always_inline
- */
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wduplicate-decl-specifier"
 /* Get the top of a capability (i.e. one byte past the last accessible one) */
 static inline vaddr_t
 cheri_gettop(const void * __capability cap)
@@ -108,38 +106,7 @@ cheri_is_address_inbounds(const void * __capability cap, vaddr_t addr)
 	return (addr >= cheri_getbase(cap) && addr < cheri_gettop(cap));
 }
 
-/*
- * Check whether a capability is NULL-derived
- */
-#ifdef __cplusplus
-static inline inline bool
-#else
-static inline inline _Bool
-#endif
-cheri_is_null_derived(const void * __capability cap)
-{
-
-	return (__builtin_cheri_equal_exact((uintcap_t)cheri_getaddress(cap),
-	    cap));
-}
-
-#pragma clang diagnostic pop
-
 #ifdef _KERNEL
-/*
- * Test whether a capability is a subset of another.
- * This mimics the semantics of the experimental ctestsubset instruction.
- */
-static __inline _Bool
-cheri_is_subset(const void * __capability parent, const void * __capability ptr)
-{
-
-	return (cheri_gettag(parent) == cheri_gettag(ptr) &&
-		cheri_getbase(ptr) >= cheri_getbase(parent) &&
-		cheri_gettop(ptr) <= cheri_gettop(parent) &&
-		(cheri_getperm(ptr) & cheri_getperm(parent)) == cheri_getperm(ptr));
-}
-
 #ifdef __CHERI_PURE_CAPABILITY__
 
 /* Check that a capability is tagged */
