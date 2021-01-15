@@ -53,7 +53,7 @@ ef_reloc(struct elf_file *ef, const void *reldata, int reltype, Elf_Off relbase,
 		return (EINVAL);
 
 	rela = (const Elf_Rela *)reldata;
-	where = (Elf_Addr *) ((Elf_Off)dest - dataoff + rela->r_offset);
+	where = (Elf_Addr *) ((uintptr_t)dest - dataoff + rela->r_offset);
 	addend = rela->r_addend;
 	rtype = ELF_R_TYPE(rela->r_info);
 
