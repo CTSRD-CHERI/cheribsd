@@ -1126,7 +1126,6 @@ kern_jail_set(struct thread *td, struct uio *optuio, int flags)
 				if (tpr != pr && tpr->pr_ref > 0 &&
 				    !strcmp(tpr->pr_name + pnamelen, namelc)) {
 					mtx_lock(&tpr->pr_mtx);
-					drflags |= PD_LOCKED;
 					if (prison_isalive(tpr)) {
 						if (pr == NULL &&
 						    cuflags != JAIL_CREATE) {
@@ -1135,6 +1134,7 @@ kern_jail_set(struct thread *td, struct uio *optuio, int flags)
 							 * for updates.
 							 */
 							pr = tpr;
+							drflags |= PD_LOCKED;
 							break;
 						}
 						/*
@@ -1143,6 +1143,7 @@ kern_jail_set(struct thread *td, struct uio *optuio, int flags)
 						 * active sibling jail.
 						 */
 						error = EEXIST;
+						mtx_unlock(&tpr->pr_mtx);
 						vfs_opterror(opts,
 						   "jail \"%s\" already exists",
 						   name);
@@ -1153,7 +1154,6 @@ kern_jail_set(struct thread *td, struct uio *optuio, int flags)
 					    prison_isvalid(tpr))
 						deadpr = tpr;
 					mtx_unlock(&tpr->pr_mtx);
-					drflags &= ~PD_LOCKED;
 				}
 			}
 			/* If no active jail is found, use a dying one. */
