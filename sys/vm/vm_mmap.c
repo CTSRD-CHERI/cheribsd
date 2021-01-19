@@ -170,7 +170,7 @@ mmap_retcap(struct thread *td, vm_pointer_t addr,
 		return (mrp->mr_source_cap);
 
 #ifdef __CHERI_PURE_CAPABILITY__
-	CHERI_ASSERT_VALID(addr);
+	KASSERT(cheri_gettag(addr), ("Expected valid capability"));
 	newcap = (void *)addr;
 	/* Enforce per-thread mmap capability permission */
 	newcap = cheri_andperm(newcap, cheri_getperm(mrp->mr_source_cap));
@@ -2046,7 +2046,11 @@ vm_mmap_object(vm_map_t map, vm_pointer_t *addr, vm_offset_t max_addr,
 	vm_size_t padded_size;
 	vm_pointer_t reservation;
 
-	CHERI_ASSERT_PTRSIZE_BOUNDS(addr);
+#ifdef __CHERI_PURE_CAPABILITY__
+	KASSERT(cheri_getlen(addr) == sizeof(void *),
+	    ("Invalid bounds for pointer-sized object %zx",
+	    (size_t)cheri_getlen(addr)));
+#endif
 
 	curmap = map == &td->td_proc->p_vmspace->vm_map;
 	if (curmap) {

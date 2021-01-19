@@ -1616,7 +1616,12 @@ keg_alloc_slab(uma_keg_t keg, uma_zone_t zone, int domain, int flags,
 			    slab_tohashslab(slab), NULL, SKIP_NONE);
 		goto fail;
 	}
-	CHERI_ASSERT_BOUNDS(mem, size);
+#ifdef __CHERI_PURE_CAPABILITY__
+	KASSERT(cheri_getlen(mem) <= CHERI_REPRESENTABLE_LENGTH(size),
+	    ("Invalid bounds expected %zx found %zx",
+	        (size_t)CHERI_REPRESENTABLE_LENGTH(size),
+	        (size_t)cheri_getlen(mem)));
+#endif
 	uma_total_inc(size);
 
 	/* For HASH zones all pages go to the same uma_domain. */
@@ -1830,7 +1835,12 @@ pcpu_page_alloc(uma_zone_t zone, vm_size_t bytes, int domain, uint8_t *pflag,
 	if ((addr = kva_alloc(bytes)) == 0)
 #endif
 		goto fail;
-	CHERI_ASSERT_BOUNDS(addr, bytes);
+#ifdef __CHERI_PURE_CAPABILITY__
+	KASSERT(cheri_getlen(addr) <= CHERI_REPRESENTABLE_LENGTH(bytes),
+	    ("Invalid bounds expected %zx found %zx",
+	        (size_t)CHERI_REPRESENTABLE_LENGTH(bytes),
+	        (size_t)cheri_getlen(addr)));
+#endif
 	zkva = addr;
 	TAILQ_FOREACH(p, &alloctail, listq) {
 		pmap_qenter(zkva, &p, 1);
@@ -1903,7 +1913,9 @@ noobj_alloc(uma_zone_t zone, vm_size_t bytes, int domain, uint8_t *flags,
 		zkva += PAGE_SIZE;
 	}
 
-	CHERI_ASSERT_VALID(retkva);
+#ifdef __CHERI_PURE_CAPABILITY__
+	KASSERT(cheri_gettag(retkva), ("Expected valid capability"));
+#endif
 	return (cheri_kern_setboundsexact((void *)retkva, bytes));
 }
 
@@ -1990,7 +2002,10 @@ pcpu_page_free(void *mem, vm_size_t size, uint8_t flags)
 static int
 zero_init(void *mem, int size, int flags)
 {
-	CHERI_ASSERT_VALID(mem);
+
+#ifdef __CHERI_PURE_CAPABILITY__
+	KASSERT(cheri_gettag(mem), ("Expected valid capability"));
+#endif
 	bzero(mem, size);
 	return (0);
 }
@@ -2686,7 +2701,10 @@ zone_ctor(void *mem, int size, void *udata, int flags)
 	 * This is a pure cache zone, no kegs.
 	 */
 	if (arg->import) {
-		CHERI_ASSERT_VALID(arg->import);
+#ifdef __CHERI_PURE_CAPABILITY__
+		KASSERT(cheri_gettag(arg->import),
+		    ("Expected valid capability"));
+#endif
 		KASSERT((arg->flags & UMA_ZFLAG_CACHE) != 0,
 		    ("zone_ctor: Import specified for non-cache zone."));
 		zone->uz_flags = arg->flags;
@@ -4582,8 +4600,8 @@ zone_free_item(uma_zone_t zone, void *item, void *udata, enum zfreeskip skip)
 {
 
 #ifdef __CHERI_PURE_CAPABILITY__
-	CHERI_ASSERT_VALID(item);
-	CHERI_ASSERT_UNSEALED(item);
+	KASSERT(cheri_gettag(item), ("Expected valid capability"));
+	KASSERT(!cheri_getsealed(item), ("Expect unsealed capability"));
 	if (!cheri_gettag(item) || cheri_getsealed(item))
 		return;
 #endif
