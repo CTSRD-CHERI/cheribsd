@@ -116,10 +116,6 @@
 #define THREAD_LOCAL_after 2
 #define THREAD_LOCAL_declspec 3
 
-#ifdef __CHERI_PURE_CAPABILITY__
-#undef HAVE_THREAD_LOCAL
-#endif
-
 #ifndef HAVE_THREAD_LOCAL
 #define THREAD_LOCAL(_x) _x
 #elif HAVE_THREAD_LOCAL == THREAD_LOCAL_before
