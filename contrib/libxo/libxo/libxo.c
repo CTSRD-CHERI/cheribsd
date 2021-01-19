@@ -2936,7 +2936,7 @@ xo_format_string (xo_handle_t *xop, xo_buffer_t *xbp, xo_xff_flags_t flags,
 	}
 
     } else {
-	cp = va_arg(xop->xo_vap, char *); /* UTF-8 or native */ /* FIXME: this sometimes crashes on CHERI */
+	cp = va_arg(xop->xo_vap, char *); /* UTF-8 or native */
 
     normal_string:
 	if (xfp->xf_skip)
