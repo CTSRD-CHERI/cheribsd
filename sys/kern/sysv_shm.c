@@ -571,8 +571,12 @@ kern_shmat_locked(struct thread *td, int shmid,
 		vm_object_deallocate(shmseg->object);
 		return (ENOMEM);
 	}
-	CHERI_ASSERT_VALID(attach_addr);
-	CHERI_ASSERT_EXBOUNDS(attach_addr, size);
+#ifdef __CHERI_PURE_CAPABILITY__
+	KASSERT(cheri_gettag(attach_addr), ("Expected valid capability"));
+	KASSERT(cheri_getlen(attach_addr) == size,
+	    ("Inexact bounds expected %zx found %zx",
+	    (size_t)size, (size_t)cheri_getlen(attach_addr)));
+#endif
 
 	shmmap_s->va = attach_addr;
 	shmmap_s->shmid = shmid;

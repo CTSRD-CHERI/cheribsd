@@ -480,7 +480,10 @@ contigmalloc(unsigned long size, struct malloc_type *type, int flags,
 	    boundary, VM_MEMATTR_DEFAULT);
 	if (ret != NULL)
 		malloc_type_allocated(type, ret, round_page(size));
-	CHERI_ASSERT_VALID(ret);
+#ifdef __CHERI_PURE_CAPABILITY__
+	KASSERT(cheri_gettag(ret), ("Expected valid capability"));
+#endif
+
 	return (ret);
 }
 
@@ -508,7 +511,10 @@ contigmalloc_domainset(unsigned long size, struct malloc_type *type,
 void
 contigfree(void *addr, unsigned long size, struct malloc_type *type)
 {
-	CHERI_ASSERT_VALID(addr);
+
+#ifdef __CHERI_PURE_CAPABILITY__
+	KASSERT(cheri_gettag(addr), ("Expected valid capability"));
+#endif
 	kmem_free((vm_pointer_t)addr, size);
 	malloc_type_freed(type, addr, round_page(size));
 }
@@ -614,7 +620,12 @@ malloc_large(size_t *size, struct malloc_type *mtp, struct domainset *policy,
 		vsetzoneslab(kva, NULL, (void *)(uintptr_t)((sz << 1) | 1));
 		uma_total_inc(sz);
 		*size = sz;
-		CHERI_ASSERT_BOUNDS(kva, sz);
+#ifdef __CHERI_PURE_CAPABILITY__
+		KASSERT(cheri_getlen(kva) <= CHERI_REPRESENTABLE_LENGTH(sz),
+		    ("Invalid bounds expected %zx found %zx",
+		        (size_t)CHERI_REPRESENTABLE_LENGTH(sz),
+		        (size_t)cheri_getlen(kva)));
+#endif
 	}
 	va = (caddr_t)kva;
 	malloc_type_allocated(mtp, va, va == NULL ? 0 : sz);
@@ -683,7 +694,12 @@ void *
 	if (va != NULL)
 		va = redzone_setup(va, osize);
 #endif
-	CHERI_ASSERT_BOUNDS(va, size);
+#ifdef __CHERI_PURE_CAPABILITY__
+	KASSERT(cheri_getlen(va) <= CHERI_REPRESENTABLE_LENGTH(size),
+	    ("Invalid bounds expected %zx found %zx",
+	        (size_t)CHERI_REPRESENTABLE_LENGTH(size),
+	        (size_t)cheri_getlen(va)));
+#endif
 	return ((void *) va);
 }
 
@@ -707,7 +723,9 @@ malloc_domain(size_t *sizep, int *indxp, struct malloc_type *mtp, int domain,
 	if (va != NULL)
 		*sizep = zone->uz_size;
 	*indxp = indx;
-	CHERI_ASSERT_VALID(va);
+#ifdef __CHERI_PURE_CAPABILITY__
+	KASSERT(cheri_gettag(va), ("Expected valid capability"));
+#endif
 
 	return ((void *)va);
 }
@@ -842,7 +860,9 @@ free_dbg(void **addrp, struct malloc_type *mtp)
 	/* free(NULL, ...) does nothing */
 	if (addr == NULL)
 		return (EJUSTRETURN);
-	CHERI_ASSERT_VALID(addr);
+#ifdef __CHERI_PURE_CAPABILITY__
+	KASSERT(cheri_gettag(addr), ("Expected valid capability"));
+#endif
 
 #ifdef DEBUG_MEMGUARD
 	if (is_memguard_addr(addr)) {
@@ -882,8 +902,8 @@ free(void *addr, struct malloc_type *mtp)
 	if (addr == NULL)
 		return;
 #ifdef __CHERI_PURE_CAPABILITY__
-	CHERI_ASSERT_VALID(addr);
-	CHERI_ASSERT_UNSEALED(addr);
+	KASSERT(cheri_gettag(addr), ("Expected valid capability"));
+	KASSERT(!cheri_getsealed(addr), ("Expect unsealed capability"));
 	if (!cheri_gettag(addr) || cheri_getsealed(addr))
 		return;
 #endif
@@ -895,14 +915,24 @@ free(void *addr, struct malloc_type *mtp)
 
 	if (__predict_true(!malloc_large_slab(slab))) {
 		size = zone->uz_size;
-		CHERI_ASSERT_BOUNDS(addr, size);
+#ifdef __CHERI_PURE_CAPABILITY__
+	KASSERT(cheri_getlen(addr) <= CHERI_REPRESENTABLE_LENGTH(size),
+	    ("Invalid bounds expected %zx found %zx",
+	        (size_t)CHERI_REPRESENTABLE_LENGTH(size),
+	        (size_t)cheri_getlen(addr)));
+#endif
 #ifdef INVARIANTS
 		free_save_type(addr, mtp, size);
 #endif
 		uma_zfree_arg(zone, addr, slab);
 	} else {
 		size = malloc_large_size(slab);
-		CHERI_ASSERT_BOUNDS(addr, size);
+#ifdef __CHERI_PURE_CAPABILITY__
+	KASSERT(cheri_getlen(addr) <= CHERI_REPRESENTABLE_LENGTH(size),
+	    ("Invalid bounds expected %zx found %zx",
+	        (size_t)CHERI_REPRESENTABLE_LENGTH(size),
+	        (size_t)cheri_getlen(addr)));
+#endif
 		free_large(addr, size);
 	}
 	malloc_type_freed(mtp, addr, size);
@@ -969,7 +999,9 @@ realloc(void *addr, size_t size, struct malloc_type *mtp, int flags)
 	/* realloc(NULL, ...) is equivalent to malloc(...) */
 	if (addr == NULL)
 		return (malloc(size, mtp, flags));
-	CHERI_ASSERT_VALID(addr);
+#ifdef __CHERI_PURE_CAPABILITY__
+	KASSERT(cheri_gettag(addr), ("Expected valid capability"));
+#endif
 
 	/*
 	 * XXX: Should report free of old memory and alloc of new memory to

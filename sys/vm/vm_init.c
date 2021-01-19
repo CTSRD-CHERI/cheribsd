@@ -223,7 +223,11 @@ again:
 	size = CHERI_REPRESENTABLE_LENGTH(size);
 #endif
 	firstaddr = kva_alloc(size);
-	CHERI_ASSERT_EXBOUNDS(firstaddr, size);
+#ifdef __CHERI_PURE_CAPABILITY__
+	KASSERT(cheri_getlen(firstaddr) == size,
+	    ("Inexact bounds expected %zx found %zx",
+	    (size_t)size, (size_t)cheri_getlen(firstaddr)));
+#endif
 	kmi->buffer_sva = (vm_offset_t)firstaddr;
 	kmi->buffer_eva = kmi->buffer_sva + size;
 	vmem_init(buffer_arena, "buffer arena", firstaddr, size,
@@ -239,7 +243,11 @@ again:
 		size = CHERI_REPRESENTABLE_LENGTH(size);
 #endif
 		firstaddr = kva_alloc(size);
-		CHERI_ASSERT_EXBOUNDS(firstaddr, size);
+#ifdef __CHERI_PURE_CAPABILITY__
+		KASSERT(cheri_getlen(firstaddr) == size,
+		    ("Inexact bounds expected %zx found %zx",
+		    (size_t)size, (size_t)cheri_getlen(firstaddr)));
+#endif
 		kmi->transient_sva = (vm_offset_t)firstaddr;
 		kmi->transient_eva = kmi->transient_sva + size;
 		vmem_init(transient_arena, "transient arena",

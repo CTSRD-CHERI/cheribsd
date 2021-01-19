@@ -973,8 +973,11 @@ vmspace_resident_count(struct vmspace *vmspace)
 static void
 _vm_map_init(vm_map_t map, pmap_t pmap, vm_pointer_t min, vm_pointer_t max)
 {
-	CHERI_ASSERT_VALID(min);
-	CHERI_ASSERT_VALID(max);
+
+#ifdef __CHERI_PURE_CAPABILITY__
+	KASSERT(cheri_gettag(min), ("Expected valid min capability"));
+	KASSERT(cheri_gettag(max), ("Expected valid max capability"));
+#endif
 
 	map->header.eflags = MAP_ENTRY_HEADER;
 	map->needs_wakeup = FALSE;
@@ -2109,7 +2112,7 @@ vm_map_fixed(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 	int result;
 
 #ifdef __CHERI_PURE_CAPABILITY__
-	CHERI_ASSERT_VALID(start);
+	KASSERT(cheri_gettag(start), ("Expected valid capability"));
 	if (cheri_getlen((void *)start) < length)
 		return (KERN_INVALID_ARGUMENT);
 #endif
@@ -2317,7 +2320,11 @@ vm_map_find(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 	    ("vm_map_find: non-NULL backing object for stack"));
 	MPASS((cow & MAP_REMAP) == 0 || (find_space == VMFS_NO_SPACE &&
 	    (cow & (MAP_STACK_GROWS_DOWN | MAP_STACK_GROWS_UP)) == 0));
-	CHERI_ASSERT_PTRSIZE_BOUNDS(addr);
+#ifdef __CHERI_PURE_CAPABILITY__
+	KASSERT(cheri_getlen(addr) == sizeof(void *),
+	    ("Invalid bounds for pointer-sized object %zx",
+	    (size_t)cheri_getlen(addr)));
+#endif
 
 	if (find_space == VMFS_OPTIMAL_SPACE && (object == NULL ||
 	    (object->flags & OBJ_COLORED) == 0))
@@ -2479,7 +2486,10 @@ again:
 done:
 	vm_map_unlock(map);
 	if (rv == KERN_SUCCESS) {
-		CHERI_ASSERT_VALID(reservation);
+#ifdef __CHERI_PURE_CAPABILITY__
+		KASSERT(cheri_gettag(reservation),
+		    ("Expected valid capability"));
+#endif
 		*addr = reservation;
 	}
 	return (rv);
@@ -2821,8 +2831,10 @@ vm_map_submap(
 	vm_map_entry_t entry;
 	int result = KERN_INVALID_ARGUMENT;
 
-	CHERI_ASSERT_VALID(start);
-	CHERI_ASSERT_VALID(end);
+#ifdef __CHERI_PURE_CAPABILITY__
+	KASSERT(cheri_gettag(start), ("Expected valid start capability"));
+	KASSERT(cheri_gettag(end), ("Expected valid end capability"));
+#endif
 
 	vm_map_lock(submap);
 	submap->flags |= MAP_IS_SUB_MAP;
@@ -5839,7 +5851,11 @@ vm_map_reservation_create_locked(vm_map_t map, vm_pointer_t *addr,
 	vm_map_entry_t entry;
 
 	VM_MAP_ASSERT_LOCKED(map);
-	CHERI_ASSERT_PTRSIZE_BOUNDS(addr);
+#ifdef __CHERI_PURE_CAPABILITY__
+	KASSERT(cheri_getlen(addr) == sizeof(void *),
+	    ("Invalid bounds for pointer-sized object %zx",
+	    (size_t)cheri_getlen(addr)));
+#endif
 
 	if ((map->flags & MAP_RESERVATIONS) == 0) {
 		*addr = vm_map_buildcap(map, start, length, max_prot);
@@ -5867,8 +5883,12 @@ vm_map_reservation_create_locked(vm_map_t map, vm_pointer_t *addr,
 	CTR3(KTR_VM, "%s: reserve %lx-%lx", __func__, start, end);
 
 	*addr = vm_map_buildcap(map, start, length, max_prot);
-	CHERI_ASSERT_VALID(*addr);
-	CHERI_ASSERT_EXBOUNDS(*addr, length);
+#ifdef __CHERI_PURE_CAPABILITY__
+	KASSERT(cheri_gettag(*addr), ("Expected valid capability"));
+	KASSERT(cheri_getlen(*addr) == length,
+	    ("Inexact bounds expected %zx found %zx",
+	    (size_t)length, (size_t)cheri_getlen(*addr)));
+#endif
 
 	return (KERN_SUCCESS);
 }
