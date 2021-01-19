@@ -224,9 +224,7 @@ SUBDIR.${MK_GAMES}+=	number
 SUBDIR.${MK_GAMES}+=	pom
 SUBDIR.${MK_GAMES}+=	primes
 SUBDIR.${MK_GAMES}+=	random
-.if ${COMPILER_FEATURES:Mc++11}
 SUBDIR.${MK_CXX}+=	dtc
-.endif
 .if ${MK_GH_BC} == "yes"
 SUBDIR+=		gh-bc
 .else
