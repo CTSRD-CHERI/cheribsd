@@ -96,6 +96,7 @@ SUBDIR=	${SUBDIR_BOOTSTRAP} \
 	libstdthreads \
 	libsysdecode \
 	libtacplus \
+	libthr \
 	libucl \
 	libufs \
 	libugidfw \
@@ -146,7 +147,7 @@ SUBDIR_DEPEND_libsmb= libkiconv
 SUBDIR_DEPEND_libtacplus= libmd
 SUBDIR_DEPEND_libulog= libmd
 SUBDIR_DEPEND_libunbound= ${_libldns}
-SUBDIR_DEPEND_liblzma= ${_libthr}
+SUBDIR_DEPEND_liblzma= libthr
 .if ${MK_OFED} != "no"
 SUBDIR_DEPEND_libpcap= ofed
 .endif
@@ -219,7 +220,6 @@ _libcplusplus+=	libc++experimental
 
 SUBDIR.${MK_EFI}+=	libefivar
 SUBDIR.${MK_GOOGLETEST}+=	googletest
-SUBDIR.${MK_LIBTHR}+=	libthr
 SUBDIR.${MK_NETGRAPH}+=	libnetgraph
 SUBDIR.${MK_NIS}+=	libypclnt
 
