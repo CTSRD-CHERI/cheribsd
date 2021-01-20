@@ -338,7 +338,7 @@ sys_mmap(struct thread *td, struct mmap_args *uap)
 	 * yield different results (and even failure modes) is potentially
 	 * confusing and incompatible with non-CHERI code.  One could
 	 * potentially check if the region contains any mappings and
-	 * switch to using the per-thread mmap capability as the source
+	 * switch to using userspace_root_cap as the source
 	 * capability if this pattern proves common.
 	 */
 	hint = cheri_getaddress(uap->addr);
@@ -367,8 +367,8 @@ sys_mmap(struct thread *td, struct mmap_args *uap)
 			    "addr capability");
 			return (EINVAL);
 		}
-		/* Allocate from the per-thread capability. */
-		source_cap = td->td_cheri_mmap_cap;
+
+		source_cap = userspace_root_cap;
 	}
 	KASSERT(cheri_gettag(source_cap),
 	    ("td->td_cheri_mmap_cap is untagged!"));
