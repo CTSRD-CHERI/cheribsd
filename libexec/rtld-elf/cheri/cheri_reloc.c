@@ -46,6 +46,7 @@ __FBSDID("$FreeBSD$");
 #include "debug.h"
 #include "rtld.h"
 
+#ifdef RTLD_HAS_CAPRELOCS
 void
 process___cap_relocs(Obj_Entry* obj)
 {
@@ -95,3 +96,4 @@ process___cap_relocs(Obj_Entry* obj)
 #endif
 	obj->cap_relocs_processed = true;
 }
+#endif

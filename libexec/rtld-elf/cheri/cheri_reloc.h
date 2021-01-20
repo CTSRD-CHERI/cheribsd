@@ -36,6 +36,7 @@
 #include "debug.h"
 #include "rtld.h"
 
+#ifdef RTLD_HAS_CAPRELOCS
 /* The clang-provided header is not warning-clean: */
 __unused static void cheri_init_globals(void);
 #include <cheri_init_globals.h>
@@ -53,6 +54,7 @@ void _do___caprelocs(const struct capreloc *start_relocs,
 	    /*code_cap=*/pcc, /*rodata_cap=*/pcc,
 	    /*tight_code_bounds=*/tight_pcc_bounds, base_addr);
 }
+#endif
 
 static inline int
 process_r_cheri_capability(Obj_Entry *obj, Elf_Word r_symndx,
