@@ -41,20 +41,6 @@
 #define	MIPS_GET_TLS	2
 
 /*
- * CHERI sysarch()s to get and set the trusted stack.
- *
- * XXXRW: These have imperfect ABIs since we'd like the kernel to be able to
- * grow the stack, and the API here assumes a fixed-size structure (as does
- * sysarch() itself).  We may want to move to actual system calls (or
- * sysctl()).
- *
- * XXXRW: Is there an ifdef of some sort I should be using here?  The kernel
- * code is ifdef'd so it probably doesn't matter.
- */
-#define	CHERI_GET_STACK		4	/* Get trusted stack. */
-#define	CHERI_SET_STACK		5	/* Set trusted stack. */
-
-/*
  * Query, enable, and disable QEMU ISA-level tracing on threads. To use this
  * feature, the sysctl hw.qemu_trace_perthread must be enabled.
  */
