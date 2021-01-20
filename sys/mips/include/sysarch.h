@@ -55,21 +55,6 @@
 #define	CHERI_SET_STACK		5	/* Set trusted stack. */
 
 /*
- * Manipulate the mmap capability.
- */
-#define	CHERI_MMAP_GETPERM	7	/* Get permissions */
-#define	CHERI_MMAP_ANDPERM	8	/* Reduce permissions */
-#define	CHERI_MMAP_GETBASE	9	/* Get capability base. */
-#define	CHERI_MMAP_GETLEN	10	/* Get capability length. */
-/*
- * XXX-BD: we may want to replaced these with a two argument atomic bounds
- * setting operation and require zero offsets.
- */
-#define	CHERI_MMAP_GETOFFSET	11	/* Get capability offset. */
-#define	CHERI_MMAP_SETOFFSET	12	/* Set capability offset. */
-#define	CHERI_MMAP_SETBOUNDS	13	/* Set capability bounds. */
-
-/*
  * Query, enable, and disable QEMU ISA-level tracing on threads. To use this
  * feature, the sysctl hw.qemu_trace_perthread must be enabled.
  */
