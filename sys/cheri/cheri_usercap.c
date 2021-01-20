@@ -58,10 +58,8 @@ _cheri_capability_build_user_code(struct thread *td, uint32_t perms,
 	tmpcap = _cheri_capability_build_user_rwx(
 	    perms & CHERI_CAP_USER_CODE_PERMS, basep, length, off, func, line);
 
-#ifdef CHERI_FLAGS_CAP_MODE
 	if (SV_PROC_FLAG(td->td_proc, SV_CHERI))
-		tmpcap = cheri_setflags(tmpcap, CHERI_FLAGS_CAP_MODE);
-#endif
+		tmpcap = cheri_capmode(tmpcap);
 
 
 	/*
