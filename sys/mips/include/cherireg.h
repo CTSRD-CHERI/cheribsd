@@ -107,12 +107,6 @@
 #define	CHERI_PERMS_USERSPACE_SEALCAP					\
 	(CHERI_PERM_GLOBAL | CHERI_PERM_SEAL | CHERI_PERM_UNSEAL)
 
-/*
- * _DATA includes _VMMAP so that we can derive the MMAP cap from it.
- *
- * XXX: We may not want to include VMMAP here and instead only in
- * CHERI_CAP_USER_MMAP_PERMS
- */
 #define	CHERI_PERMS_USERSPACE_DATA					\
 	(CHERI_PERMS_USERSPACE | CHERI_PERM_STORE |			\
 	CHERI_PERM_STORE_CAP | CHERI_PERM_STORE_LOCAL_CAP)
