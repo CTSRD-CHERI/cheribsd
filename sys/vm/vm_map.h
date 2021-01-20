@@ -281,7 +281,6 @@ vm_map_range_valid(vm_map_t map, vm_offset_t start, vm_offset_t end)
 
 struct coname {
 	LIST_ENTRY(coname)	c_next;
-	struct thread		*c_td;
 	char			*c_name;
 	void * __capability	c_value;
 };
