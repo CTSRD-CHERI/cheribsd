@@ -55,6 +55,10 @@ __FBSDID("$FreeBSD$");
 #include <machine/vfp.h>
 #endif
 
+#if __has_feature(capabilities)
+#include <cheri/cheric.h>
+#endif
+
 #include <dev/psci/psci.h>
 
 /*
@@ -209,7 +213,15 @@ cpu_set_upcall(struct thread *td, void (* __capability entry)(void *),
 		tf->tf_x[13] = STACKALIGN((uintcap_t)stack->ss_sp + stack->ss_size);
 	else
 		tf->tf_sp = STACKALIGN((uintcap_t)stack->ss_sp + stack->ss_size);
+
+#if __has_feature(capabilities)
+	if (SV_PROC_FLAG(td->td_proc, SV_CHERI))
+		trapframe_set_elr(tf, (uintcap_t)entry);
+	else
+		hybridabi_thread_setregs(td, (unsigned long)(uintcap_t)entry);
+#else
 	tf->tf_elr = (uintcap_t)entry;
+#endif
 	tf->tf_x[0] = (uintcap_t)arg;
 }
 
