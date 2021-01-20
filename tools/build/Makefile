@@ -276,7 +276,15 @@ _host_tools_to_symlink=	basename bzip2 bunzip2 chmod chown cmp comm cp date dd \
 _make_abs!=	which "${MAKE}"
 _host_abs_tools_to_symlink=	${_make_abs}:make ${_make_abs}:bmake
 
-.if ${.MAKE.OS} != "FreeBSD"
+.if ${.MAKE.OS} == "FreeBSD"
+# When building on FreeBSD we always copy the host tools instead of linking
+# into WORLDTMP to avoid issues with incompatible libraries (see r364030).
+# Note: we could create links if we don't intend to update the current machine.
+_COPY_HOST_TOOL=cp -pf
+.else
+# However, this is not necessary on Linux/macOS (and may even be the root cause
+# for the build problems on macOS since Big Sur).
+_COPY_HOST_TOOL=ln -sfn
 _make_abs!=	which "${MAKE}"
 _host_abs_tools_to_symlink+=	${_make_abs}:make ${_make_abs}:bmake
 .if ${.MAKE.OS} == "Darwin"
@@ -309,7 +317,7 @@ host-symlinks:
 		echo "Cannot find host tool '${_tool}' in PATH ($$PATH)." >&2; false; \
 	fi; \
 	rm -f "${DESTDIR}/bin/${_tool}"; \
-	cp -pf "$${source_path}" "${DESTDIR}/bin/${_tool}"
+	${_COPY_HOST_TOOL} "$${source_path}" "${DESTDIR}/bin/${_tool}"
 .endfor
 .for _tool in ${_host_abs_tools_to_symlink}
 	@source_path="${_tool:S/:/ /:[1]}"; \
@@ -318,11 +326,11 @@ host-symlinks:
 		echo "Host tool '${src_path}' is missing"; false; \
 	fi; \
 	rm -f "$${target_path}"; \
-	cp -pf "$${source_path}" "$${target_path}"
+	${_COPY_HOST_TOOL} "$${source_path}" "$${target_path}"
 .endfor
 .if exists(/usr/libexec/flua)
 	rm -f ${DESTDIR}/usr/libexec/flua
-	cp -pf /usr/libexec/flua ${DESTDIR}/usr/libexec/flua
+	${_COPY_HOST_TOOL} /usr/libexec/flua ${DESTDIR}/usr/libexec/flua
 .endif
 
 # Create all the directories that are needed during the legacy, bootstrap-tools
