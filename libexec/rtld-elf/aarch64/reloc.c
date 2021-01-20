@@ -77,32 +77,23 @@ init_pltgot(Obj_Entry *obj)
  * 8-bit permission field.
  */
 static void
-init_cap_from_fragment(caddr_t relocbase, const void *text_rodata_cap,
-    Elf_Addr fragment_offset, Elf_Size addend)
+init_cap_from_fragment(void *where, void * __capability data_cap,
+    const void * __capability text_rodata_cap, Elf_Addr base_addr,
+    Elf_Size addend)
 {
-	void *fragment;
+	Elf_Addr *fragment;
 	uintcap_t cap;
-	uint64_t address, len;
+	Elf_Addr address, len;
 	uint8_t perms;
 
-	fragment = (void *)(relocbase + fragment_offset);
-	address = *((uint64_t *)fragment);
-	len = *((uint64_t *)fragment + 1) & 0xffffffffffffffULL;
-	perms = *((uint64_t *)fragment + 1) >> 56;
+	fragment = (Elf_Addr *)where;
+	address = fragment[0];
+	len = fragment[1] & ((1UL << (8 * sizeof(*fragment) - 8)) - 1);
+	perms = fragment[1] >> (8 * sizeof(*fragment) - 8);
 
-#ifdef __CHERI_PURE_CAPABILITY__
 	cap = perms == MORELLO_FRAG_EXECUTABLE ?
-	    (uintcap_t)text_rodata_cap : (uintcap_t)relocbase;
-#else
-	(void)text_rodata_cap;
-	cap = (uintcap_t)cheri_setoffset(cheri_getdefault(), (uintptr_t)relocbase);
-#endif
-
-	if (perms == MORELLO_FRAG_EXECUTABLE && addend != 0) {
-		rtld_fdprintf(STDERR_FILENO, "Warning: function relocation based on"
-		    "fragment at %p has non-zero addend, which is deprecated\n", fragment);
-	}
-	cap = cheri_incoffset(cap, address + addend);
+	    (uintcap_t)text_rodata_cap : (uintcap_t)data_cap;
+	cap = cheri_setaddress(cap, base_addr + address);
 
 	if (perms == MORELLO_FRAG_EXECUTABLE || perms == MORELLO_FRAG_RODATA) {
 		cap = cheri_clearperm(cap, FUNC_PTR_REMOVE_PERMS);
@@ -112,6 +103,14 @@ init_cap_from_fragment(caddr_t relocbase, const void *text_rodata_cap,
 		cap = cheri_setbounds(cap, len);
 	}
 
+	if (perms == MORELLO_FRAG_EXECUTABLE && addend != 0) {
+		rtld_fdprintf(STDERR_FILENO,
+		    "Warning: function relocation based on fragment at %p"
+		    " has non-zero addend, which is deprecated\n", where);
+	}
+
+	cap += addend;
+
 	if (perms == MORELLO_FRAG_EXECUTABLE) {
 		/*
 		 * TODO tight bounds: lower bound and len should be set
@@ -120,7 +119,7 @@ init_cap_from_fragment(caddr_t relocbase, const void *text_rodata_cap,
 		cap = cheri_sealentry(cap);
 	}
 
-	*((uintcap_t *)fragment) = cap;
+	*((uintcap_t *)where) = cap;
 }
 #endif /* __has_feature(capabilities) */
 
@@ -139,6 +138,8 @@ _rtld_relocate_nonplt_self(Elf_Dyn *dynp, Elf_Auxinfo *aux)
 	caddr_t relocbase = NULL;
 	const Elf_Rela *rela = NULL, *relalim;
 	unsigned long relasz;
+	Elf_Addr *where;
+	void *pcc;
 
 	for (; aux->a_type != AT_NULL; aux++) {
 		if (aux->a_type == AT_BASE) {
@@ -163,10 +164,12 @@ _rtld_relocate_nonplt_self(Elf_Dyn *dynp, Elf_Auxinfo *aux)
 
 	/* Self-relocations should all be local, i.e. R_MORELLO_RELATIVE. */
 	for (; rela < relalim; rela++) {
-		if (ELF_R_TYPE(rela->r_info) != R_MORELLO_RELATIVE) {
-			continue;
-		}
-		init_cap_from_fragment(relocbase, relocbase, rela->r_offset, rela->r_addend);
+		if (ELF_R_TYPE(rela->r_info) != R_MORELLO_RELATIVE)
+			__builtin_trap();
+
+		where = (Elf_Addr *)(relocbase + rela->r_offset);
+		init_cap_from_fragment(where, relocbase, pcc,
+		    (Elf_Addr)(uintptr_t)relocbase, rela->r_addend);
 	}
 }
 #endif /* __CHERI_PURE_CAPABILITY__ */
@@ -502,6 +505,10 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 	const Elf_Sym *def;
 	SymCache *cache;
 	Elf_Addr *where, symval;
+#if __has_feature(capabilities)
+	void * __capability data_cap;
+	const void * __capability text_rodata_cap;
+#endif
 
 #ifdef __CHERI_PURE_CAPABILITY__
 	/*
@@ -510,6 +517,14 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 	 */
 	if (obj == obj_rtld)
 		return (0);
+#endif
+
+#ifdef __CHERI_PURE_CAPABILITY__
+	data_cap = obj->relocbase;
+	text_rodata_cap = obj->text_rodata_cap;
+#elif __has_feature(capabilities)
+	data_cap = cheri_getdefault();
+	text_rodata_cap = cheri_getpcc();
 #endif
 
 	/*
@@ -588,18 +603,16 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 		 */
 		case R_MORELLO_CAPINIT:
 		case R_MORELLO_GLOB_DAT:
-			if (process_r_cheri_capability(obj, ELF_R_SYM(rela->r_info), lockstate,
-			    flags, where, rela->r_addend) != 0)
+			if (process_r_cheri_capability(obj,
+			    ELF_R_SYM(rela->r_info), lockstate, flags,
+			    where, rela->r_addend) != 0)
 				return (-1);
 			break;
 		case R_MORELLO_RELATIVE:
-#ifdef __CHERI_PURE_CAPABILITY__
-			init_cap_from_fragment(obj->relocbase, obj->text_rodata_cap,
-			    rela->r_offset, rela->r_addend);
-#else
-			init_cap_from_fragment(obj->relocbase, obj->relocbase,
-			    rela->r_offset, rela->r_addend);
-#endif
+			init_cap_from_fragment(where, data_cap,
+			    text_rodata_cap,
+			    (Elf_Addr)(uintptr_t)obj->relocbase,
+			    rela->r_addend);
 			break;
 #endif /* __has_feature(capabilities) */
 		case R_AARCH64_ABS64:
