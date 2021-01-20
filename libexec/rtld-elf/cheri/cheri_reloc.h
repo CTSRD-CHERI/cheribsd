@@ -46,8 +46,7 @@ __unused static void cheri_init_globals(void);
 extern bool add_cheri_plt_stub(const Obj_Entry *obj, const Obj_Entry *rtldobj,
     Elf_Word r_symndx, void **where);
 
-/* Dynamically linked binaries for Morello don't have __caprelocs. */
-#ifndef __aarch64__
+#ifdef RTLD_HAS_CAPRELOCS
 /* FIXME: replace this with cheri_init_globals_impl once everyone has updated clang */
 static __attribute__((always_inline))
 void _do___caprelocs(const struct capreloc *start_relocs,

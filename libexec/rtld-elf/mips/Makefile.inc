@@ -6,6 +6,8 @@ CFLAGS.reloc.c+=-fno-jump-tables
 RTLD_ENTRY=	rtld_start
 
 .if ${MACHINE_ABI:Mpurecap}
+CFLAGS+=	-DRTLD_HAS_CAPRELOCS
+
 CLEANFILES+=	cheri_plt_code.dump cheri_plt_code.text cheri_plt_code.inc
 
 cheri_plt_code.dump: cheri_plt_code.o
