@@ -245,7 +245,7 @@ typedef struct Struct_Obj_Entry {
     const Elf_Sym *symtab;	/* Symbol table */
     const char *strtab;		/* String table */
     unsigned long strsize;	/* Size in bytes of string table */
-#if __has_feature(capabilities) && defined(DT_CHERI___CAPRELOCS)
+#ifdef RTLD_HAS_CAPRELOCS
     caddr_t cap_relocs;		/* start of the __cap_relocs section */
     size_t cap_relocs_size;	/* size of the __cap_relocs section */
 #endif

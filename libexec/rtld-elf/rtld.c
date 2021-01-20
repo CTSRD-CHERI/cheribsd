@@ -1450,7 +1450,7 @@ digest_dynamic1(Obj_Entry *obj, int early, const Elf_Dyn **dyn_rpath,
 		    obj->static_tls = true;
 	    break;
 
-#if __has_feature(capabilities) && defined(DT_CHERI___CAPRELOCS)
+#ifdef RTLD_HAS_CAPRELOCS
 	case DT_CHERI___CAPRELOCS:
 		obj->cap_relocs = (obj->relocbase + dynp->d_un.d_ptr);
 		break;
@@ -1668,7 +1668,9 @@ digest_dynamic2(Obj_Entry *obj, const Elf_Dyn *dyn_rpath,
 	set_bounds_if_nonnull(
 	    obj->fini_array_ptr, obj->fini_array_num * sizeof(InitArrayEntry));
 
+#ifdef RTLD_HAS_CAPRELOCS
 	set_bounds_if_nonnull(obj->cap_relocs, obj->cap_relocs_size);
+#endif
 
 	/* TODO: Bring the useful ABI features to RISC-V */
 #ifdef __mips__
@@ -2634,7 +2636,7 @@ init_rtld(caddr_t mapbase, Elf_Auxinfo **aux_info)
     /* Initialize the object list. */
     TAILQ_INIT(&obj_list);
 
-#if __has_feature(capabilities) && defined(DEBUG_VERBOSE)
+#if defined(RTLD_HAS_CAPRELOCS) && defined(DEBUG_VERBOSE)
     if (objtmp.cap_relocs) {
 	extern char __start___cap_relocs, __stop___cap_relocs;
 	size_t cap_relocs_size =
@@ -3427,7 +3429,7 @@ relocate_object(Obj_Entry *obj, bool bind_now, Obj_Entry *rtldobj,
 	if (reloc_non_plt(obj, rtldobj, flags, lockstate))
 		return (-1);
 
-#if __has_feature(capabilities)
+#ifdef RTLD_HAS_CAPRELOCS
 	/* Process the __cap_relocs section to initialize global capabilities */
 	if (obj->cap_relocs_size)
 		process___cap_relocs(obj);
