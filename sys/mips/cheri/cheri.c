@@ -73,7 +73,6 @@ CTASSERT(sizeof(struct cheri_frame) == (34 * CHERICAP_SIZE));
  * that work on other architectures might break alignment on CHERI.
  */
 CTASSERT(offsetof(struct trapframe, ddc) % CHERICAP_SIZE == 0);
-CTASSERT(offsetof(struct thread, td_cheri_mmap_cap) % CHERICAP_SIZE == 0);
 
 /*
  * Ensure that the compiler being used to build the kernel agrees with the
