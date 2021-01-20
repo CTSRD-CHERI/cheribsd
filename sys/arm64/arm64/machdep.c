@@ -228,6 +228,9 @@ int
 fill_regs(struct thread *td, struct reg *regs)
 {
 	struct trapframe *frame;
+#if __has_feature(capabilities)
+	int i;
+#endif
 
 	frame = td->td_frame;
 	regs->sp = frame->tf_sp;
@@ -235,7 +238,12 @@ fill_regs(struct thread *td, struct reg *regs)
 	regs->elr = frame->tf_elr;
 	regs->spsr = frame->tf_spsr;
 
+#if __has_feature(capabilities)
+	for (i = 0; i < nitems(frame->tf_x); i++)
+		regs->x[i] = frame->tf_x[i];
+#else
 	memcpy(regs->x, frame->tf_x, sizeof(regs->x));
+#endif
 
 #ifdef COMPAT_FREEBSD32
 	/*
@@ -254,6 +262,9 @@ int
 set_regs(struct thread *td, struct reg *regs)
 {
 	struct trapframe *frame;
+#if __has_feature(capabilities)
+	int i;
+#endif
 
 	frame = td->td_frame;
 	frame->tf_sp = regs->sp;
@@ -262,7 +273,12 @@ set_regs(struct thread *td, struct reg *regs)
 	frame->tf_spsr &= ~PSR_FLAGS;
 	frame->tf_spsr |= regs->spsr & PSR_FLAGS;
 
+#if __has_feature(capabilities)
+	for (i = 0; i < nitems(frame->tf_x); i++)
+		frame->tf_x[i] = regs->x[i];
+#else
 	memcpy(frame->tf_x, regs->x, sizeof(frame->tf_x));
+#endif
 
 #ifdef COMPAT_FREEBSD32
 	if (SV_PROC_FLAG(td->td_proc, SV_ILP32)) {
