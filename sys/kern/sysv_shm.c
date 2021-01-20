@@ -517,7 +517,7 @@ kern_shmat_locked(struct thread *td, int shmid,
 			/* As with mmap, untagged implies exclusive. */
 			if ((shmflg & SHM_REMAP) != 0)
 				return (EINVAL);
-			shmaddr = cheri_setaddress(td->td_cheri_mmap_cap,
+			shmaddr = cheri_setaddress(userspace_root_cap,
 			    attach_va);
 
 		}
@@ -526,6 +526,12 @@ kern_shmat_locked(struct thread *td, int shmid,
 			cow |= MAP_REMAP;
 		find_space = VMFS_NO_SPACE;
 	} else {
+		/*
+		 * This is just a hint to vm_map_find() about where to
+		 * put it.
+		 */
+		attach_va = round_page((vm_offset_t)p->p_vmspace->vm_daddr +
+		    lim_max(td, RLIMIT_DATA));
 #if __has_feature(capabilities)
 		if (SV_CURPROC_FLAG(SV_CHERI)) {
 			/*
@@ -539,20 +545,10 @@ kern_shmat_locked(struct thread *td, int shmid,
 			    CHERI_REPRESENTABLE_ALIGNMENT(size) < (1UL << 12) ?
 			    VMFS_OPTIMAL_SPACE :
 			    VMFS_ALIGNED_SPACE(CHERI_ALIGN_SHIFT(size));
-			shmaddr = td->td_cheri_mmap_cap;
-			attach_va = cheri_getaddress(shmaddr);
+			shmaddr = cheri_setaddress(userspace_root_cap, attach_va);
 		} else
 #endif
-		{
 			find_space = VMFS_OPTIMAL_SPACE;
-			/*
-			 * This is just a hint to vm_map_find() about where to
-			 * put it.
-			 */
-			attach_va = round_page(
-			    (vm_offset_t)p->p_vmspace->vm_daddr +
-			    lim_max(td, RLIMIT_DATA));
-		}
 	}
 #if __has_feature(capabilities)
 	reqperm = CHERI_PERM_LOAD;
