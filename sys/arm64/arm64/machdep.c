@@ -1530,7 +1530,11 @@ do {									\
 #endif
 	PRINT_REG(ttbr0_el1);
 	PRINT_REG(ttbr1_el1);
+#if __has_feature(capabilities)
+	PRINT_REG_CAP(cvbar_el1);
+#else
 	PRINT_REG(vbar_el1);
+#endif
 #undef PRINT_REG
 #if __has_feature(capabilities)
 #undef PRINT_REG_CAP
