@@ -109,7 +109,7 @@ static void insertionsort(u_char *, size_t, size_t, cmp_t);
  * boundaries.
  */
 /* Assumption: PSIZE is a power of 2. */
-#define EVAL(p) ((u_char **)roundup2((uintptr_t)p, PSIZE))
+#define EVAL(p) (u_char **)roundup2((uintptr_t)p, PSIZE)
 #endif /* !__CHERI_PURE_CAPABILITY__ */
 
 #ifdef I_AM_MERGESORT_B
