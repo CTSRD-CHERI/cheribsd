@@ -134,9 +134,10 @@ xz -T0 *.img kernel*
             //     at java.nio.file.spi.FileSystemProvider.newOutputStream(FileSystemProvider.java:434)
             //     at java.nio.file.Files.newOutputStream(Files.java:216)
             sh label: 'Create sysroot archive', script: """
+./cheribuild/jenkins-cheri-build.py cheribsd-sysroot-${suffix} --keep-install-dir --build --cheribsd/install-dir=\${WORKSPACE}/tarball/rootfs
+rm -f cheribsd-sysroot.tar.xz
+mv tarball/cherisdk/sysroot-${suffix}.tar.gz cheribsd-sysroot.tar.xz
 rm -rf tarball artifacts-*
-mkdir tarball && mv -f cherisdk/sysroot tarball/sysroot
-./cheribuild/jenkins-cheri-build.py --tarball cheribsd-sysroot-${suffix} --tarball-name cheribsd-sysroot.tar.xz
 chmod +w *.xz
 mkdir -p "artifacts-${suffix}"
 mv -v *.xz "artifacts-${suffix}"
