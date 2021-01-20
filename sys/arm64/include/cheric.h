@@ -58,4 +58,8 @@ trapframe_set_elr(struct trapframe *tf, uintcap_t elr)
 }
 #endif
 
+#if __has_feature(capabilities)
+#define	cheri_capmode(cap)	(cap)
+#endif
+
 #endif /* !_MACHINE_CHERIC_H_ */
