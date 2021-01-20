@@ -61,17 +61,7 @@ _cheri_capability_build_user_code(struct thread *td, uint32_t perms,
 	if (SV_PROC_FLAG(td->td_proc, SV_CHERI))
 		tmpcap = cheri_capmode(tmpcap);
 
-
-	/*
-	 *  XXX Morello doesn't seem to unseal sentry caps when they are moved from
-	 *  CELR_EL1 to PCC. However, we may want some of the caps returned by this
-	 *  function to be sealed in the future.
-	 */
-#ifdef __aarch64__
-	return tmpcap;
-#else
 	return (cheri_sealentry(tmpcap));
-#endif
 }
 
 /*
