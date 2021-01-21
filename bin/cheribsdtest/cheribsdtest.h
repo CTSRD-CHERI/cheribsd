@@ -633,7 +633,7 @@ DECLARE_CHERIBSD_TEST(test_tls_align_ptr);
 DECLARE_CHERIBSD_TEST(test_tls_threads);
 
 /* cheribsdtest_vm.c */
-DECLARE_CHERIBSD_TEST(cheribsdtest_vm_tag_mmap_anon);;
+DECLARE_CHERIBSD_TEST(cheribsdtest_vm_tag_mmap_anon);
 DECLARE_CHERIBSD_TEST(cheribsdtest_vm_tag_shm_open_anon_shared);
 DECLARE_CHERIBSD_TEST(cheribsdtest_vm_tag_shm_open_anon_private);
 DECLARE_CHERIBSD_TEST(cheribsdtest_vm_tag_shm_open_anon_shared2x);
