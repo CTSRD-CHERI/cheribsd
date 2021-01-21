@@ -840,6 +840,7 @@ files_setgrent(void *retval, void *mdata, va_list ap)
 			rewind(st->fp);
 		else if (stayopen)
 			st->fp = fopen(_PATH_GROUP, "re");
+		st->stayopen = stayopen;
 		break;
 	case ENDGRENT:
 		if (st->fp != NULL) {
@@ -1287,6 +1288,7 @@ compat_setgrent(void *retval, void *mdata, va_list ap)
 			rewind(st->fp);
 		else if (stayopen)
 			st->fp = fopen(_PATH_GROUP, "re");
+		st->stayopen = stayopen;
 		set_setent(dtab, mdata);
 		(void)_nsdispatch(NULL, dtab, NSDB_GROUP_COMPAT, "setgrent",
 		    compatsrc, 0);
