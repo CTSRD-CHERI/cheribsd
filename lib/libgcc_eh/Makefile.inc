@@ -1,6 +1,6 @@
 # $FreeBSD$
 
-COMPILERRTDIR=	${SRCTOP}/contrib/llvm-project/compiler-rt
+COMPILERRTDIR=	${SRCTOP}/contrib/subrepo-cheri-compiler-rt
 UNWINDINCDIR=	${SRCTOP}/contrib/subrepo-cheri-libunwind/include
 UNWINDSRCDIR=	${SRCTOP}/contrib/subrepo-cheri-libunwind/src
 
