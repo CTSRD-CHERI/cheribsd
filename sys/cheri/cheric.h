@@ -76,6 +76,10 @@
 #define	cheri_setbounds(x, y)	__builtin_cheri_bounds_set((x), (y))
 #define	cheri_setboundsexact(x, y)	__builtin_cheri_bounds_set_exact((x), (y))
 
+#define	cheri_is_subset(x, y)	__builtin_cheri_subset_test(x, y)
+#define	cheri_is_null_derived(x)					\
+	__builtin_cheri_equal_exact((uintcap_t)cheri_getaddress(x), x)
+
 /* Create an untagged capability from an integer */
 #define cheri_fromint(x)	cheri_incoffset(NULL, x)
 
@@ -98,17 +102,6 @@ static inline _Bool
 cheri_is_address_inbounds(const void * __capability cap, vaddr_t addr)
 {
 	return (addr >= cheri_getbase(cap) && addr < cheri_gettop(cap));
-}
-
-#ifdef __cplusplus
-static __always_inline inline bool
-#else
-static __always_inline inline _Bool
-#endif
-cheri_is_null_derived(const void * __capability cap)
-{
-	return (__builtin_cheri_equal_exact((uintcap_t)cheri_getaddress(cap),
-	    cap));
 }
 
 /*
