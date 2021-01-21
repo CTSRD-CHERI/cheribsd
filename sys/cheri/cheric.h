@@ -259,7 +259,7 @@ __cheri_clear_low_ptr_bits(uintptr_t ptr, size_t bits_mask) {
 #endif
 #define __runtime_assert_sensible_low_bits(bits)                               \
   __extension__({                                                              \
-    _cheri_bits_assert(bits < 32 && "Should only use the low 5 pointer bits"); \
+    _cheri_bits_assert((bits) < 32 && "Should only use the low 5 pointer bits"); \
     bits;                                                                      \
   })
 #else
@@ -267,7 +267,7 @@ __cheri_clear_low_ptr_bits(uintptr_t ptr, size_t bits_mask) {
 #endif
 #define __static_assert_sensible_low_bits(bits)                                \
   __extension__({                                                              \
-    _Static_assert(bits < 32, "Should only use the low 5 pointer bits");       \
+    _Static_assert((bits) < 32, "Should only use the low 5 pointer bits");     \
     bits;                                                                      \
   })
 
@@ -310,10 +310,7 @@ __cheri_clear_low_ptr_bits(uintptr_t ptr, size_t bits_mask) {
   __cheri_set_low_ptr_bits((uintptr_t)(ptr), __runtime_assert_sensible_low_bits(bits))
 
 /*
- * Clear the bits in @p mask from the capability/pointer @p ptr. Mask must be
- * a compile-time constant less than 31
- *
- * TODO: should we allow non-constant masks?
+ * Clear the bits in @p mask from the capability/pointer @p ptr.
  *
  * @param ptr the uintptr_t that may have low bits sets
  * @param mask this is the mask for the low pointer bits, not the mask for
@@ -328,7 +325,7 @@ __cheri_clear_low_ptr_bits(uintptr_t ptr, size_t bits_mask) {
  *
  */
 #define cheri_clear_low_ptr_bits(ptr, mask)                                    \
-  __cheri_clear_low_ptr_bits((uintptr_t)(ptr), __static_assert_sensible_low_bits(mask))
+  __cheri_clear_low_ptr_bits((uintptr_t)(ptr), __runtime_assert_sensible_low_bits(mask))
 
 #if __has_feature(capabilities)
 #define	CHERI_REPRESENTABLE_LENGTH(len) \
