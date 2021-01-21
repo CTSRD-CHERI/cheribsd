@@ -201,6 +201,22 @@ cheri_bytes_remaining(const void * __capability cap)
 
 #endif	/* __has_feature(capabilities) */
 
+#if defined(_KERNEL) && defined(__CHERI_PURE_CAPABILITY__)
+#define	cheri_kern_gettag(x)		cheri_gettag(x)
+#define	cheri_kern_setbounds(x, y)	cheri_setbounds(x, y)
+#define	cheri_kern_setboundsexact(x, y)	cheri_setboundsexact(x, y)
+#define	cheri_kern_setaddress(x, y)	cheri_setaddress(x, y)
+#define	cheri_kern_getaddress(x)	cheri_setaddress(x)
+#define	cheri_kern_andperm(x, y)	cheri_andperm(x, y)
+#else
+#define	cheri_kern_gettag(x)		1
+#define	cheri_kern_setbounds(x, y)	(x)
+#define	cheri_kern_setboundsexact(x, y)	(x)
+#define	cheri_kern_setaddress(x, y)	((__typeof__(x))(y))
+#define	cheri_kern_getaddress(x)	((uintptr_t)(x))
+#define	cheri_kern_andperm(x, y)	(x)
+#endif
+
 /*
  * The cheri_{get,set,clear}_low_pointer_bits() functions work both with and
  * without CHERI support so can be used unconditionally to fix
@@ -375,3 +391,12 @@ __cheri_clear_low_ptr_bits(uintptr_t ptr, size_t bits_mask) {
 #endif
 
 #endif /* _SYS_CHERIC_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20190531,
+//   "target_type": "header",
+//   "changes_purecap": [
+//     "support"
+//   ]
+// }
+// CHERI CHANGES END
