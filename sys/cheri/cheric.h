@@ -328,10 +328,7 @@ __cheri_clear_low_ptr_bits(uintptr_t ptr, size_t bits_mask) {
   __cheri_set_low_ptr_bits((uintptr_t)(ptr), __runtime_assert_sensible_low_bits(bits))
 
 /*
- * Clear the bits in @p mask from the capability/pointer @p ptr. Mask must be
- * a compile-time constant less than 31
- *
- * TODO: should we allow non-constant masks?
+ * Clear the bits in @p mask from the capability/pointer @p ptr.
  *
  * @param ptr the uintptr_t that may have low bits sets
  * @param mask this is the mask for the low pointer bits, not the mask for
