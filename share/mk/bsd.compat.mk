@@ -36,7 +36,7 @@ LIB32CPUFLAGS=	-march=${COMPAT_CPUTYPE}
 .endif
 .if ${COMPAT_COMPILER_TYPE} == gcc
 .else
-LIB32CPUFLAGS+=	-target x86_64-unknown-freebsd13.0
+LIB32CPUFLAGS+=	-target x86_64-unknown-freebsd14.0
 .endif
 LIB32CPUFLAGS+=	-m32
 LIB32_MACHINE=	i386
@@ -57,7 +57,7 @@ LIB32CPUFLAGS=	-mcpu=${COMPAT_CPUTYPE}
 .if ${COMPAT_COMPILER_TYPE} == "gcc"
 LIB32CPUFLAGS+=	-m32
 .else
-LIB32CPUFLAGS+=	-target powerpc-unknown-freebsd13.0
+LIB32CPUFLAGS+=	-target powerpc-unknown-freebsd14.0
 .endif
 
 LIB32_MACHINE=	powerpc
@@ -74,10 +74,10 @@ LIB32CPUFLAGS=	-march=mips3
 LIB32CPUFLAGS=	-march=${COMPAT_CPUTYPE}
 .endif
 .else
-.if ${COMPAT_ARCH:Mmips64el*}
-LIB32CPUFLAGS=  -target mipsel-unknown-freebsd13.0
+.if ${COMPAT_ARCH:Mmips64el*} != ""
+LIB32CPUFLAGS=  -target mipsel-unknown-freebsd14.0
 .else
-LIB32CPUFLAGS=  -target mips-unknown-freebsd13.0
+LIB32CPUFLAGS=  -target mips-unknown-freebsd14.0
 .endif
 .endif
 LIB32CPUFLAGS+= -mabi=32
