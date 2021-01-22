@@ -29,7 +29,7 @@
  */
 
 /*
- * A few non-faulting CHERI-related virtual-memory tests.
+ * CHERI-related virtual-memory tests.
  */
 
 #include <sys/cdefs.h>
@@ -60,6 +60,7 @@
 #include <fcntl.h>
 #include <inttypes.h>
 #include <signal.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -96,11 +97,78 @@ mmap_and_check_tag_stored(int fd, int protflags, int mapflags)
 		CHERIBSDTEST_CHECK_SYSCALL(close(fd));
 }
 
+static void
+mmap_and_check_tag_stripped(int fd, int protflags, int mapflags)
+{
+	void * __capability volatile *cp;
+	void * __capability cp_value;
+	int max_prot, prot, v;
+
+	/* Make sure we can load and store through the capability. */
+	max_prot = PROT_MAX_IMPLIED(protflags) | PROT_CAP_READ | PROT_CAP_WRITE;
+	/* Make sure we can store a capability to the page. */
+	prot = PROT_EXTRACT(protflags) | PROT_CAP_WRITE;
+	cp = CHERIBSDTEST_CHECK_SYSCALL(mmap(NULL, getpagesize(),
+	     prot | PROT_MAX(max_prot), mapflags, fd, 0));
+	cp_value = cheri_ptr(&v, sizeof(v));
+	*cp = cp_value;
+	cp_value = *cp;
+	CHERIBSDTEST_VERIFY2(cheri_gettag(cp_value) == 0, "tag preserved");
+	CHERIBSDTEST_CHECK_SYSCALL(munmap(__DEVOLATILE(void *, cp),
+	    getpagesize()));
+	if (fd != -1)
+		CHERIBSDTEST_CHECK_SYSCALL(close(fd));
+}
+
+static void
+mmap_and_page_store_fault(int fd, int protflags, int mapflags)
+{
+	void * __capability volatile *cp;
+	void * __capability cp_value;
+	int v;
+
+	/*
+	 * Add PROT_CAP_WRITE to PROT_MAX so the fault is triggered in
+	 * the MMU.
+	 */
+	cp = CHERIBSDTEST_CHECK_SYSCALL(mmap(NULL, getpagesize(),
+	    protflags | PROT_MAX(PROT_CAP_WRITE | PROT_MAX_IMPLIED(protflags)),
+	    mapflags, fd, 0));
+	cp_value = cheri_ptr(&v, sizeof(v));
+	*cp = cp_value;
+	cheribsdtest_failure_errx("failed to fault with prot 0x%x", protflags);
+}
+
 void
 cheribsdtest_vm_tag_mmap_anon(const struct cheri_test *ctp __unused)
 {
 	mmap_and_check_tag_stored(-1, PROT_READ | PROT_WRITE, MAP_ANON);
 	cheribsdtest_success();
+}
+
+void
+cheribsdtest_vm_tag_mmap_anon_cap_rw(const struct cheri_test *ctp __unused)
+{
+	mmap_and_check_tag_stored(-1,
+	    PROT_READ | PROT_WRITE | PROT_CAP_READ | PROT_CAP_WRITE, MAP_ANON);
+	cheribsdtest_success();
+}
+
+void
+cheribsdtest_vm_tag_mmap_anon_cap_w(
+    const struct cheri_test *ctp __unused)
+{
+	mmap_and_check_tag_stripped(-1,
+	    PROT_READ | PROT_WRITE | PROT_CAP_WRITE, MAP_ANON);
+	cheribsdtest_success();
+}
+
+void
+cheribsdtest_vm_tag_mmap_anon_cap_none_store(
+    const struct cheri_test *ctp __unused)
+{
+	mmap_and_page_store_fault(-1, PROT_READ | PROT_WRITE | PROT_CAP_NONE,
+	    MAP_ANON);
 }
 
 void
