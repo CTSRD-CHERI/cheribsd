@@ -1720,7 +1720,8 @@ static StringList* cheri_xpassed_tests;
 /* Shared memory page with child process. */
 struct cheribsdtest_child_state *ccsp;
 
-static int tests_failed, tests_passed, tests_xfailed;
+static int tests_run;
+static int tests_failed, tests_passed, tests_xfailed, tests_xpassed;
 static int expected_failures;
 static int list;
 static int run_all;
@@ -2043,6 +2044,8 @@ cheribsdtest_run_test(const struct cheri_test *ctp)
 	if (fcntl(pipefd_stdout[0], F_SETFL, O_NONBLOCK) < 0)
 		err(EX_OSERR, "fcntl(F_SETFL, O_NONBLOCK) on test stdout");
 
+	tests_run++;
+
 	if (debugger_enabled) {
 		char command[256];
 		snprintf(
@@ -2210,16 +2213,17 @@ cheribsdtest_run_test(const struct cheri_test *ctp)
 
 pass:
 	if (xfail_reason != NULL) {
-		// Passed but we expected failure:
+		/* Passed but we expected failure */
 		xo_emit("XPASS: {d:name/%s} (Expected failure due to "
 			"{d:reason/%s}) {e:failure/XPASS: %s}\n", ctp->ct_name,
 		    xfail_reason, xfail_reason);
 		asprintf(&failure_message, "%s: %s", ctp->ct_name, xfail_reason);
+		tests_xpassed++;
 		sl_add(cheri_xpassed_tests, failure_message);
 	} else {
 		xo_emit("{d:status/%s}: {d:name/%s}\n", "PASS", ctp->ct_name);
+		tests_passed++;
 	}
-	tests_passed++;
 	close(pipefd_stdin[1]);
 	close(pipefd_stdout[0]);
 	xo_close_instance("testcase");
@@ -2235,8 +2239,14 @@ fail:
 	if (xfail_reason == NULL && flaky_reason == NULL) {
 		xo_emit("FAIL: {d:name/%s}: {:failure/%s}\n",
 		    ctp->ct_name, visreason);
+		tests_failed++;
 		sl_add(cheri_failed_tests, failure_message);
 	} else {
+		/*
+		 * xfail_reason != NULL was already handled earlier. If
+		 * xfail_reason is NULL then we know that flaky_reason is not
+		 * NULL, and so we pretend that the failure is expected.
+		 */
 		if (xfail_reason == NULL)
 			expected_failures++;
 		if (flaky_reason != NULL)
@@ -2253,7 +2263,6 @@ fail:
 		tests_xfailed++;
 		sl_add(cheri_xfailed_tests, failure_message);
 	}
-	tests_failed++;
 	xo_close_instance("testcase");
 	xo_flush();
 	close(pipefd_stdin[1]);
@@ -2297,6 +2306,7 @@ main(int argc, char *argv[])
 	u_int t;
 	uint qemu_trace_perthread;
 	size_t len;
+	const char *sep;
 
 	argc = xo_parse_args(argc, argv);
 	if (argc < 0)
@@ -2508,20 +2518,23 @@ main(int argc, char *argv[])
 	sl_free(cheri_failed_tests, true);
 	sl_free(cheri_xfailed_tests, true);
 	sl_free(cheri_xpassed_tests, true);
-	if (tests_passed + tests_failed > 1) {
-		if (expected_failures == 0 && tests_xfailed == 0)
-			xo_emit("SUMMARY: passed {d:/%d} failed {d:/%d}\n",
-			    tests_passed, tests_failed);
-		else if (expected_failures == tests_xfailed)
-			xo_emit("SUMMARY: passed {d:/%d} failed {d:/%d} "
-			    "({d:/%d} expected {Np:failure,failures})\n",
-			    tests_passed, tests_failed, expected_failures);
-		else
-			xo_emit("SUMMARY: passed {d:/%d} failed {d:/%d} "
-			    "({d:/%d} expected {Np:failure,failures}) "
-			    "({d:/%d} unexpected {Np:pass,passes})\n",
-			    tests_passed, tests_failed, tests_xfailed,
-			    expected_failures - tests_xfailed);
+	if (tests_run > 1) {
+		xo_emit("{Lc:SUMMARY}");
+		sep = " ";
+#define	EMIT_SUMMARY_FIELD(label, value)				\
+		do {							\
+			if (value > 0) {				\
+				xo_emit("{P:/%s}{Lw:" label "}{d:/%d}",	\
+				    sep, value);			\
+				sep = ", ";				\
+			}						\
+		} while (0)
+		EMIT_SUMMARY_FIELD("passed", tests_passed);
+		EMIT_SUMMARY_FIELD("failed", tests_failed);
+		EMIT_SUMMARY_FIELD("expectedly failed", tests_xfailed);
+		EMIT_SUMMARY_FIELD("unexpectedly passed", tests_xpassed);
+#undef	EMIT_SUMMARY_FIELD
+		xo_emit("\n");
 	}
 	xo_finish();
 
@@ -2530,7 +2543,7 @@ main(int argc, char *argv[])
 	if (!unsandboxed_tests_only)
 		cheribsdtest_libcheri_destroy();
 #endif
-	if (tests_failed > tests_xfailed)
+	if (tests_failed > 0)
 		exit(-1);
 	exit(EX_OK);
 }
