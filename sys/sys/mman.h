@@ -62,6 +62,10 @@
 #define	_PROT_MAX_SHIFT	16
 #define	PROT_MAX(prot)		((prot) << _PROT_MAX_SHIFT)
 #define	PROT_MAX_EXTRACT(prot)	(((prot) >> _PROT_MAX_SHIFT) & _PROT_ALL)
+#define PROT_MAX_IMPLIED(prot) __extension__ ({				\
+	int p = (prot);							\
+	PROT_MAX_EXTRACT(p) == 0 ? PROT_EXTRACT(prot) : PROT_MAX_EXTRACT(p); \
+})
 #endif
 
 /*
