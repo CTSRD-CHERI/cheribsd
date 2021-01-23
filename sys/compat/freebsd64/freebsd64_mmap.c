@@ -92,8 +92,7 @@ int
 freebsd64_mmap(struct thread *td, struct freebsd64_mmap_args *uap)
 {
 
-	return (kern_mmap(td,
-	    &(struct mmap_req){
+	return (kern_mmap(td, &(struct mmap_req){
 		.mr_hint = (uintptr_t)uap->addr,
 		.mr_len = uap->len,
 		.mr_prot = uap->prot,
@@ -113,8 +112,7 @@ freebsd6_freebsd64_mmap(struct thread *td,
     struct freebsd6_freebsd64_mmap_args *uap)
 {
 
-	return (kern_mmap(td,
-	    &(struct mmap_req){
+	return (kern_mmap(td, &(struct mmap_req){
 		.mr_hint = (uintptr_t)uap->addr,
 		.mr_len = uap->len,
 		.mr_prot = uap->prot,

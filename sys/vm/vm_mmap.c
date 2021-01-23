@@ -302,8 +302,7 @@ int
 sys_mmap(struct thread *td, struct mmap_args *uap)
 {
 #if !__has_feature(capabilities)
-	return (kern_mmap(td,
-	    &(struct mmap_req){
+	return (kern_mmap(td, &(struct mmap_req){
 		.mr_hint = (uintptr_t)uap->addr,
 		.mr_len = uap->len,
 		.mr_prot = uap->prot,
@@ -429,8 +428,7 @@ sys_mmap(struct thread *td, struct mmap_args *uap)
 	 * set at this point.  A simple assert is not easy to contruct...
 	 */
 
-	return (kern_mmap(td,
-	    &(struct mmap_req){
+	return (kern_mmap(td, &(struct mmap_req){
 		.mr_hint = hint,
 		.mr_max_addr = cheri_gettop(source_cap),
 		.mr_len = uap->len,
@@ -462,7 +460,7 @@ kern_mmap_maxprot(struct proc *p, int prot)
 }
 
 int
-kern_mmap(struct thread *td, struct mmap_req *mrp)
+kern_mmap(struct thread *td, const struct mmap_req *mrp)
 {
 	struct vmspace *vms;
 	struct file *fp;
@@ -823,8 +821,7 @@ done:
 int
 freebsd6_mmap(struct thread *td, struct freebsd6_mmap_args *uap)
 {
-	return (kern_mmap(td,
-	    &(struct mmap_req){
+	return (kern_mmap(td, &(struct mmap_req){
 		.mr_hint = (uintptr_t)uap->addr,
 		.mr_len = uap->len,
 		.mr_prot = uap->prot,
@@ -883,8 +880,7 @@ ommap(struct thread *td, struct ommap_args *uap)
 		flags |= MAP_PRIVATE;
 	if (uap->flags & OMAP_FIXED)
 		flags |= MAP_FIXED;
-	return (kern_mmap(td,
-	    &(struct mmap_req){
+	return (kern_mmap(td, &(struct mmap_req){
 		.mr_hint = (uintptr_t)uap->addr,
 		.mr_len = uap->len,
 		.mr_prot = prot,
