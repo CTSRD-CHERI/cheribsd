@@ -1282,11 +1282,6 @@ again:
 
 out:
 	curthread_pflags2_restore(save2);
-	if ((curthread->td_pflags2 & TDP2_SBPAGES) == 0) {
-		NFSLOCKNODE(np);
-		ncl_pager_setsize(vp, NULL);
-	}
-
 	return (error);
 }
 
