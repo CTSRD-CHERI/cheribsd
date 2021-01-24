@@ -19,7 +19,7 @@ jobs:
             compiler: clang-9
             cross-bindir: /usr/lib/llvm-9/bin
             pkgs: bmake libarchive-dev
-          - os: macOS-11.0
+          - os: macos-11.0
             compiler: clang-11
             #cross-bindir: /usr/local/Cellar/llvm/11.0.0/bin  # script figures this out automatically
             pkgs: bmake libarchive llvm@11
