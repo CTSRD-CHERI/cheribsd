@@ -15,11 +15,11 @@ jobs:
       matrix:
         include:
           # TODO: both Ubuntu and macOS have bmake packages, we should try them instead of bootstrapping our own copy.
-          - os: ubuntu-20.04
+          - os: ubuntu-16.04
             compiler: clang-10
             cross-bindir: /usr/lib/llvm-10/bin
             pkgs: bmake libarchive-dev
-          - os: macOS-latest
+          - os: macOS-11.0
             compiler: clang-11
             #cross-bindir: /usr/local/Cellar/llvm/11.0.0/bin  # script figures this out automatically
             pkgs: bmake libarchive llvm@11
