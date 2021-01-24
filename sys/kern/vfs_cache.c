@@ -122,6 +122,7 @@ SDT_PROBE_DEFINE2(vfs, namecache, zap_negative, done, "struct vnode *",
     "char *");
 SDT_PROBE_DEFINE2(vfs, namecache, evict_negative, done, "struct vnode *",
     "char *");
+SDT_PROBE_DEFINE1(vfs, namecache, symlink, alloc__fail, "size_t");
 
 SDT_PROBE_DEFINE3(vfs, fplookup, lookup, done, "struct nameidata", "int", "bool");
 SDT_PROBE_DECLARE(vfs, namei, lookup, entry);
@@ -480,6 +481,7 @@ STATNODE_COUNTER(fullpathfail2, numfullpathfail2,
     "Number of fullpath search errors (VOP_VPTOCNP failures)");
 STATNODE_COUNTER(fullpathfail4, numfullpathfail4, "Number of fullpath search errors (ENOMEM)");
 STATNODE_COUNTER(fullpathfound, numfullpathfound, "Number of successful fullpath calls");
+STATNODE_COUNTER(symlinktoobig, symlinktoobig, "Number of times symlink did not fit the cache");
 
 /*
  * Debug or developer statistics.
@@ -579,6 +581,8 @@ cache_symlink_alloc(size_t size, int flags)
 	if (size < CACHE_ZONE_LARGE_SIZE) {
 		return (uma_zalloc_smr(cache_zone_large, flags));
 	}
+	counter_u64_add(symlinktoobig, 1);
+	SDT_PROBE1(vfs, namecache, symlink, alloc__fail, size);
 	return (NULL);
 }
 
@@ -587,6 +591,8 @@ cache_symlink_free(char *string, size_t size)
 {
 
 	MPASS(string != NULL);
+	KASSERT(size < CACHE_ZONE_LARGE_SIZE,
+	    ("%s: size %zu too big", __func__, size));
 
 	if (size < CACHE_ZONE_SMALL_SIZE) {
 		uma_zfree_smr(cache_zone_small, string);
