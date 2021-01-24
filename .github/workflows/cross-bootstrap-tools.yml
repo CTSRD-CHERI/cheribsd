@@ -16,8 +16,8 @@ jobs:
         include:
           # TODO: both Ubuntu and macOS have bmake packages, we should try them instead of bootstrapping our own copy.
           - os: ubuntu-16.04
-            compiler: clang-10
-            cross-bindir: /usr/lib/llvm-10/bin
+            compiler: clang-9
+            cross-bindir: /usr/lib/llvm-9/bin
             pkgs: bmake libarchive-dev
           - os: macOS-11.0
             compiler: clang-11
