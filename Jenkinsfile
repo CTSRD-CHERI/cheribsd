@@ -121,7 +121,7 @@ def maybeArchiveArtifacts(params, String suffix) {
             // Archive disk image
             sh label: 'Compress kernel and images', script: """
 # Move MFS_ROOT into tarball/ so they aren't deleted
-mv -fv kernel-${suffix}* tarball/
+mv -fv kernel-${suffix}* tarball/ || true
 rm -fv *.img *.xz kernel*
 mv -v tarball/*.img tarball/kernel-* tarball/rootfs/boot/kernel/kernel .
 # Use xz -T0 to speed up compression by using multiple threads
