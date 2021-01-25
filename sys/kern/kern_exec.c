@@ -1062,8 +1062,8 @@ exec_new_vmspace(struct image_params *imgp, struct sysentvec *sv)
 	vm_offset_t sv_minuser;
 	vm_pointer_t stack_addr;
 #if __has_feature(capabilities)
-	vm_offset_t strings_addr;
-        register_t perms;
+	vm_pointer_t strings_addr;
+	register_t perms;
 #endif
 	vm_map_t map;
 	u_long ssiz;
@@ -1195,7 +1195,7 @@ exec_new_vmspace(struct image_params *imgp, struct sysentvec *sv)
 	stack_prot = (obj != NULL && imgp->stack_prot != 0) ? imgp->stack_prot :
 	    sv->sv_stackprot;
 	imgp->stack_sz = ssiz;
-	error = vm_map_reservation_create_fixed(map, &stack_addr, ssiz,
+	error = vm_map_reservation_create(map, &stack_addr, ssiz,
 	    PAGE_SIZE, stack_prot);
 	if (error != KERN_SUCCESS)
 		return (vm_mmap_to_errno(error));
@@ -1203,11 +1203,7 @@ exec_new_vmspace(struct image_params *imgp, struct sysentvec *sv)
 	error = vm_map_stack(map, stack_addr, (vm_size_t)ssiz, stack_prot,
 	    stack_prot, MAP_STACK_GROWS_DOWN);
 	if (error != KERN_SUCCESS) {
-#ifdef __CHERI_PURE_CAPABILITY__
-		vm_map_reservation_delete(map, cheri_getbase(stack_addr));
-#else
 		vm_map_reservation_delete(map, stack_addr);
-#endif
 		return (vm_mmap_to_errno(error));
 	}
 
