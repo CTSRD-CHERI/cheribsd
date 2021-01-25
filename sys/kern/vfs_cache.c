@@ -401,7 +401,7 @@ static inline struct negstate *
 NCP2NEGSTATE(struct namecache *ncp)
 {
 
-	MPASS(ncp->nc_flag & NCF_NEGATIVE);
+	MPASS(atomic_load_char(&ncp->nc_flag) & NCF_NEGATIVE);
 	return (&ncp->nc_neg);
 }
 
@@ -1997,7 +1997,7 @@ negative_success:
 	}
 
 	cache_out_ts(ncp, tsp, ticksp);
-	whiteout = (ncp->nc_flag & NCF_WHITE);
+	whiteout = (atomic_load_char(&ncp->nc_flag) & NCF_WHITE);
 	neg_promote = cache_neg_hit_prep(ncp);
 	if (!cache_ncp_canuse(ncp)) {
 		cache_neg_hit_abort(ncp);
@@ -2152,6 +2152,7 @@ cache_enter_lock(struct celockstate *cel, struct vnode *dvp, struct vnode *vp,
 {
 	struct namecache *ncp;
 	struct mtx *blps[2];
+	u_char nc_flag;
 
 	blps[0] = HASH2BUCKETLOCK(hash);
 	for (;;) {
@@ -2162,11 +2163,12 @@ cache_enter_lock(struct celockstate *cel, struct vnode *dvp, struct vnode *vp,
 		ncp = vp->v_cache_dd;
 		if (ncp == NULL)
 			break;
-		if ((ncp->nc_flag & NCF_ISDOTDOT) == 0)
+		nc_flag = atomic_load_char(&ncp->nc_flag);
+		if ((nc_flag & NCF_ISDOTDOT) == 0)
 			break;
 		MPASS(ncp->nc_dvp == vp);
 		blps[1] = NCP2BUCKETLOCK(ncp);
-		if (ncp->nc_flag & NCF_NEGATIVE)
+		if ((nc_flag & NCF_NEGATIVE) != 0)
 			break;
 		if (cache_lock_vnodes_cel_3(cel, ncp->nc_vp))
 			break;
@@ -2193,6 +2195,7 @@ cache_enter_lock_dd(struct celockstate *cel, struct vnode *dvp, struct vnode *vp
 {
 	struct namecache *ncp;
 	struct mtx *blps[2];
+	u_char nc_flag;
 
 	blps[0] = HASH2BUCKETLOCK(hash);
 	for (;;) {
@@ -2201,11 +2204,12 @@ cache_enter_lock_dd(struct celockstate *cel, struct vnode *dvp, struct vnode *vp
 		ncp = dvp->v_cache_dd;
 		if (ncp == NULL)
 			break;
-		if ((ncp->nc_flag & NCF_ISDOTDOT) == 0)
+		nc_flag = atomic_load_char(&ncp->nc_flag);
+		if ((nc_flag & NCF_ISDOTDOT) == 0)
 			break;
 		MPASS(ncp->nc_dvp == dvp);
 		blps[1] = NCP2BUCKETLOCK(ncp);
-		if (ncp->nc_flag & NCF_NEGATIVE)
+		if ((nc_flag & NCF_NEGATIVE) != 0)
 			break;
 		if (cache_lock_vnodes_cel_3(cel, ncp->nc_vp))
 			break;
@@ -2439,7 +2443,7 @@ cache_enter_time(struct vnode *dvp, struct vnode *vp, struct componentname *cnp,
 		    vp);
 	} else {
 		if (cnp->cn_flags & ISWHITEOUT)
-			ncp->nc_flag |= NCF_WHITE;
+			atomic_store_char(&ncp->nc_flag, ncp->nc_flag | NCF_WHITE);
 		cache_neg_insert(ncp);
 		SDT_PROBE2(vfs, namecache, enter_negative, done, dvp,
 		    ncp->nc_name);
