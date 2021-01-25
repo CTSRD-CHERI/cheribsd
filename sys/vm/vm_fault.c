@@ -995,9 +995,11 @@ vm_fault_cow(struct faultstate *fs)
 		KASSERT(fs->first_object->flags & OBJ_HASCAP,
 		    ("%s: destination object %p doesn't have OBJ_HASCAP",
 		    __func__, fs->first_object));
-		if (fs->object->flags & OBJ_HASCAP)
+		if (fs->object->flags & OBJ_HASCAP) {
+			vm_page_aflag_set(fs->first_m, fs->m->a.flags &
+			    (PGA_CAPSTORE | PGA_CAPDIRTY));
 			pmap_copy_page_tags(fs->m, fs->first_m);
-		else
+		} else
 #endif
 			pmap_copy_page(fs->m, fs->first_m);
 
@@ -2099,9 +2101,12 @@ again:
 			 * Preserve tags if the source page contains tags.
 			 * See longer discussion in vm_fault_cow.
 			 */
-			if (object->flags & OBJ_HASCAP)
+			if (object->flags & OBJ_HASCAP) {
+				/* Copy across CAPSTORE | CAPDIRTY state, too */
+				vm_page_aflag_set(dst_m, src_m->a.flags &
+				    (PGA_CAPSTORE | PGA_CAPDIRTY));
 				pmap_copy_page_tags(src_m, dst_m);
-			else
+			} else
 #endif
 				pmap_copy_page(src_m, dst_m);
 			VM_OBJECT_RUNLOCK(object);
