@@ -169,6 +169,12 @@ SYSCTL_INT(_vm, OID_AUTO, pfault_oom_wait, CTLFLAG_RWTUN,
     "Number of seconds to wait for free pages before retrying "
     "the page fault handler");
 
+static bool capstore_on_alloc = 1;
+SYSCTL_BOOL(_vm, OID_AUTO, capstore_on_alloc, CTLFLAG_RW,
+    &capstore_on_alloc, 0,
+    "Mark cap-writable pages CAPSTORE on allocation; trades revoker effort for "
+    "the expense of upgrading.");
+
 static inline void
 fault_page_release(vm_page_t *mp)
 {
@@ -1226,7 +1232,7 @@ vm_fault_allocate(struct faultstate *fs)
 	}
 	fs->oom = 0;
 
-	if (fs->prot & VM_PROT_WRITE_CAP)
+	if (capstore_on_alloc && (fs->prot & VM_PROT_WRITE_CAP))
 		vm_page_aflag_set(fs->m, PGA_CAPSTORE);
 
 	return (KERN_NOT_RECEIVER);
