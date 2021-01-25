@@ -1113,7 +1113,7 @@ int vn_dir_check_exec(struct vnode *vp, struct componentname *cnp);
 	struct vnode *_vp = (vp);		\
 						\
 	VFS_SMR_ASSERT_ENTERED();		\
-	atomic_load_ptr(&(_vp)->v_data);	\
+	atomic_load_consume_ptr(&(_vp)->v_data);\
 })
 
 #endif /* _KERNEL */
