@@ -56,7 +56,6 @@ def buildImageAndRunTests(params, String suffix) {
     }
     // No need for minimal images when running the testsuite
     if (!GlobalVars.isTestSuiteJob && (suffix.startsWith('mips64') || suffix.startsWith('riscv64'))) {
-        sh label: 'deleting old MFS_ROOT_ kernels', script: 'rm -fv kernel-*'
         stage("Building MFS_ROOT kernels") {
             sh label: "Building minimal disk image", script: "./cheribuild/jenkins-cheri-build.py --build disk-image-minimal-${suffix} ${params.extraArgs}"
             sh label: "Building MFS_ROOT kernels", script: "./cheribuild/jenkins-cheri-build.py --build cheribsd-mfs-root-kernel-${suffix} --cheribsd-mfs-root-kernel-${suffix}/build-fpga-kernels ${params.extraArgs}"
@@ -195,7 +194,10 @@ selectedArchitectures.each { suffix ->
                 customGitCheckoutDir: suffix.startsWith('morello') ? 'morello-cheribsd' : 'cheribsd',
                 gitHubStatusContext: GlobalVars.isTestSuiteJob ? "testsuite/${suffix}" : "ci/${suffix}",
                 // Delete stale compiler/sysroot
-                beforeBuild: { params -> dir('cherisdk') { deleteDir() } },
+                beforeBuild: { params -> 
+                    dir('cherisdk') { deleteDir() } 
+                    sh label: 'Deleting outputs from previous builds', script: 'rm -rfv artifacts-* tarball kernel*'
+                },
                 /* Custom function to run tests since --test will not work (yet) */
                 runTests: false,
                 afterBuild: { params -> buildImageAndRunTests(params, suffix) })
