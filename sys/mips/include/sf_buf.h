@@ -33,13 +33,23 @@
 
 #ifdef __mips_n64	/* In 64 bit the whole memory is directly mapped */
 
-static inline vm_offset_t
+#ifdef __CHERI_PURE_CAPABILITY__
+#include <machine/param.h>
+#include <cheri/cheric.h>
+#endif
+
+static inline vm_pointer_t
 sf_buf_kva(struct sf_buf *sf)
 {
 	vm_page_t	m;
 
 	m = (vm_page_t)sf;
-	return (MIPS_PHYS_TO_DIRECT(VM_PAGE_TO_PHYS(m)));
+#ifdef __CHERI_PURE_CAPABILITY__
+	return ((vm_pointer_t)cheri_setboundsexact(
+	    MIPS_PHYS_TO_DIRECT(VM_PAGE_TO_PHYS(m)), PAGE_SIZE));
+#else
+	return ((vm_pointer_t)MIPS_PHYS_TO_DIRECT(VM_PAGE_TO_PHYS(m)));
+#endif
 }
 
 static inline struct vm_page *
@@ -69,3 +79,12 @@ sf_buf_unmap(struct sf_buf *sf)
 #endif	/* __mips_n64 */
 
 #endif /* !_MACHINE_SF_BUF_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20200706,
+//   "target_type": "header",
+//   "changes_purecap": [
+//     "pointer_as_integer"
+//   ]
+// }
+// CHERI CHANGES END
