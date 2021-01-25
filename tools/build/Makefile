@@ -288,8 +288,10 @@ _host_abs_tools_to_symlink=	${_make_abs}:make ${_make_abs}:bmake
 # Note: we could create links if we don't intend to update the current machine.
 _COPY_HOST_TOOL=cp -pf
 .else
-# However, this is not necessary on Linux/macOS (and may even be the root cause
-# for the build problems on macOS since Big Sur).
+# However, this is not necessary on Linux/macOS. Additionally, copying the host
+# tools to another directory with cp -p results in freezes on macOS Big Sur for
+# some unknown reason. It can also break building inside docker containers if
+# there are ACLs on shared volumes.
 _COPY_HOST_TOOL=ln -sfn
 _make_abs!=	which "${MAKE}"
 _host_abs_tools_to_symlink+=	${_make_abs}:make ${_make_abs}:bmake
