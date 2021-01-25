@@ -1059,13 +1059,16 @@ exec_new_vmspace(struct image_params *imgp, struct sysentvec *sv)
 	struct thread *td = curthread;
 	vm_object_t obj;
 	struct rlimit rlim_stack;
-	vm_offset_t sv_minuser, stack_addr;
+	vm_offset_t sv_minuser;
+	vm_pointer_t stack_addr;
 #if __has_feature(capabilities)
-	vm_offset_t strings_addr;
-        register_t perms;
+	vm_pointer_t strings_addr;
+	register_t perms;
 #endif
 	vm_map_t map;
 	u_long ssiz;
+	vm_pointer_t shared_page_addr;
+	vm_prot_t stack_prot;
 
 	imgp->vmspace_destroyed = 1;
 	imgp->sysent = sv;
@@ -1094,7 +1097,7 @@ exec_new_vmspace(struct image_params *imgp, struct sysentvec *sv)
 	    cpu_exec_vmspace_reuse(p, map)) {
 		shmexit(vmspace);
 		pmap_remove_pages(vmspace_pmap(vmspace));
-		vm_map_remove(map, vm_map_min(map), vm_map_max(map));
+		vm_map_clear(map);
 		/*
 		 * An exec terminates mlockall(MCL_FUTURE), ASLR state
 		 * must be re-evaluated.
@@ -1130,12 +1133,25 @@ exec_new_vmspace(struct image_params *imgp, struct sysentvec *sv)
 	obj = sv->sv_shared_page_obj;
 	if (obj != NULL) {
 		vm_object_reference(obj);
+		shared_page_addr = sv->sv_shared_page_base;
+#if __has_feature(capabilities)
+		error = vm_map_reservation_create(map, &shared_page_addr,
+		    sv->sv_shared_page_len, PAGE_SIZE,
+		    VM_PROT_READ | VM_PROT_EXECUTE);
+		if (error != KERN_SUCCESS) {
+			vm_object_deallocate(obj);
+			return (vm_mmap_to_errno(error));
+		}
+#endif
 		error = vm_map_fixed(map, obj, 0,
-		    sv->sv_shared_page_base, sv->sv_shared_page_len,
+		    shared_page_addr, sv->sv_shared_page_len,
 		    VM_PROT_READ | VM_PROT_EXECUTE,
 		    VM_PROT_READ | VM_PROT_EXECUTE,
 		    MAP_INHERIT_SHARE | MAP_ACC_NO_CHARGE);
 		if (error != KERN_SUCCESS) {
+#if __has_feature(capabilities)
+			vm_map_reservation_delete(map, shared_page_addr);
+#endif
 			vm_object_deallocate(obj);
 			return (vm_mmap_to_errno(error));
 		}
@@ -1174,13 +1190,23 @@ exec_new_vmspace(struct image_params *imgp, struct sysentvec *sv)
 #endif
 	p->p_psstrings = p->p_usrstack - sv->sv_szpsstrings;
 
+	/* We reserve the whole max stack size with restricted permission */
 	stack_addr =  p->p_usrstack - ssiz;
+	stack_prot = (obj != NULL && imgp->stack_prot != 0) ? imgp->stack_prot :
+	    sv->sv_stackprot;
 	imgp->stack_sz = ssiz;
-	error = vm_map_stack(map, stack_addr, (vm_size_t)ssiz,
-	    obj != NULL && imgp->stack_prot != 0 ? imgp->stack_prot :
-	    sv->sv_stackprot, VM_PROT_ALL, MAP_STACK_GROWS_DOWN);
+	error = vm_map_reservation_create(map, &stack_addr, ssiz,
+	    PAGE_SIZE, stack_prot);
 	if (error != KERN_SUCCESS)
 		return (vm_mmap_to_errno(error));
+
+	error = vm_map_stack(map, stack_addr, (vm_size_t)ssiz, stack_prot,
+	    stack_prot, MAP_STACK_GROWS_DOWN);
+	if (error != KERN_SUCCESS) {
+		vm_map_reservation_delete(map, stack_addr);
+		return (vm_mmap_to_errno(error));
+	}
+
 #if __has_feature(capabilities)
 	perms = ~MAP_CAP_PERM_MASK | vm_map_prot2perms(stack_prot);
 	imgp->stack = cheri_capability_build_user_data(
@@ -1197,8 +1223,8 @@ exec_new_vmspace(struct image_params *imgp, struct sysentvec *sv)
 		strings_addr =
 		    CHERI_REPRESENTABLE_BASE(stack_addr - ARG_MAX, ARG_MAX);
 		error = vm_mmap_object(map, &strings_addr, 0, ARG_MAX,
-		    sv->sv_stackprot, sv->sv_stackprot, MAP_ANON | MAP_FIXED,
-		    NULL, 0, FALSE, td);
+		    VM_PROT_RW_CAP, VM_PROT_RW_CAP, MAP_ANON | MAP_FIXED |
+		    MAP_RESERVATION_CREATE, NULL, 0, FALSE, td);
 		if (error != KERN_SUCCESS)
 			return (vm_mmap_to_errno(error));
 		imgp->strings = cheri_capability_build_user_data(
