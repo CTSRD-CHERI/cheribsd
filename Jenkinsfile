@@ -59,6 +59,8 @@ def buildImageAndRunTests(params, String suffix) {
         stage("Building MFS_ROOT kernels") {
             sh label: "Building minimal disk image", script: "./cheribuild/jenkins-cheri-build.py --build disk-image-minimal-${suffix} ${params.extraArgs}"
             sh label: "Building MFS_ROOT kernels", script: "./cheribuild/jenkins-cheri-build.py --build cheribsd-mfs-root-kernel-${suffix} --cheribsd-mfs-root-kernel-${suffix}/build-fpga-kernels ${params.extraArgs}"
+            // Move MFS_ROOT kernels into tarball/ so they aren't deleted
+            sh "mv -fv kernel-${suffix}* tarball/"
         }
     }
     if (suffix.startsWith("morello")) {
@@ -120,10 +122,9 @@ def maybeArchiveArtifacts(params, String suffix) {
         stage("Archiving artifacts") {
             // Archive disk image
             sh label: 'Compress kernel and images', script: """
-# Move MFS_ROOT into tarball/ so they aren't deleted
-mv -fv kernel-${suffix}* tarball/ || true
 rm -fv *.img *.xz kernel*
-mv -v tarball/*.img tarball/kernel-* tarball/rootfs/boot/kernel/kernel .
+mv -v tarball/rootfs/boot/kernel/kernel tarball/kernel
+mv -v tarball/*.img tarball/kernel* .
 # Use xz -T0 to speed up compression by using multiple threads
 xz -T0 *.img kernel*
 """
