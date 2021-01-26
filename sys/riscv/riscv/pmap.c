@@ -2485,13 +2485,13 @@ pmap_fault_fixup(pmap_t pmap, vm_offset_t va, vm_prot_t ftype)
 	}
 
 	if ((pmap != kernel_pmap && (oldpte & PTE_U) == 0) ||
-	    (ftype == VM_PROT_WRITE && (oldpte & PTE_W) == 0) ||
+	    (((ftype & VM_PROT_WRITE) != 0) && (oldpte & PTE_W) == 0) ||
 	    (ftype == VM_PROT_EXECUTE && (oldpte & PTE_X) == 0) ||
 	    (ftype == VM_PROT_READ && (oldpte & PTE_R) == 0))
 		goto done;
 
 	bits = PTE_A;
-	if (ftype == VM_PROT_WRITE)
+	if ((ftype & VM_PROT_WRITE) != 0)
 		bits |= PTE_D;
 
 	/*
