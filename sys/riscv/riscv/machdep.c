@@ -811,7 +811,7 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	 * than using the full capability.  Should we compare the
 	 * entire capability...?  Just pointer and bounds...?
 	 */
-	onstack = sigonstack((__cheri_addr vaddr_t)tf->tf_sp);
+	onstack = sigonstack(tf->tf_sp);
 
 	CTR4(KTR_SIG, "sendsig: td=%p (%s) catcher=%p sig=%d", td, p->p_comm,
 	    (__cheri_addr vaddr_t)catcher, sig);
