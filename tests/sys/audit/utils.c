@@ -25,7 +25,9 @@
  * $FreeBSD$
  */
 
+#include <sys/param.h>
 #include <sys/ioctl.h>
+#include <sys/mount.h>
 
 #include <bsm/libbsm.h>
 #include <security/audit/audit_ioctl.h>
@@ -202,6 +204,21 @@ check_audit(struct pollfd fd[], const char *auditrgx, FILE *pipestream) {
 
 	/* Teardown: /dev/auditpipe's instance opened for this test-suite */
 	ATF_REQUIRE_EQ(0, fclose(pipestream));
+}
+
+void
+mark_xfail_if_extattr_not_supported(const char *path)
+{
+	struct statfs fsinfo;
+	ATF_REQUIRE_EQ(0, statfs(path, &fsinfo));
+	/*
+	 * tmpfs does not support extattr, so we need to mark the tests that
+	 * use extattrs as XFAIL.
+	 */
+	if (strcmp(fsinfo.f_fstypename, "tmpfs") == 0) {
+		atf_tc_expect_fail("File system %s does not support extattrs",
+		    fsinfo.f_fstypename);
+	}
 }
 
 FILE
