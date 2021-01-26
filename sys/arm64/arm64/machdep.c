@@ -927,9 +927,6 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	struct sigframe * __capability fp, frame;
 	struct sigacts *psp;
 	struct sysentvec *sysent;
-#if __has_feature(capabilities)
-	int cheri_is_sandboxed;
-#endif
 	int onstack, sig;
 
 	td = curthread;
@@ -942,53 +939,6 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 
 	tf = td->td_frame;
 	onstack = sigonstack(tf->tf_sp);
-
-#if __has_feature(capabilities)
-	/*
-	 * CHERI affects signal delivery in the following ways:
-	 *
-	 * (1) Additional capability state is exposed via extensions
-	 *     to the context frame placed on the stack.
-	 *
-	 * (2) If the user $pcc doesn't include CHERI_PERM_SYSCALL,
-	 *     then we consider user state to be 'sandboxed'.
-	 *
-	 * (3) If an alternative signal stack is not defined, and we
-	 *     are in a 'sandboxed' state, then we will terminate the
-	 *     process unconditionally.
-	 */
-	cheri_is_sandboxed = cheri_signal_sandboxed(td);
-
-	/*
-	 * We provide the ability to drop into the debugger in two different
-	 * circumstances: (1) if the code running is sandboxed; and (2) if the
-	 * fault is a CHERI protection fault.  Handle both here for the
-	 * non-unwind case.  Do this before we rewrite any general-purpose or
-	 * capability register state for the thread.
-	 */
-#ifdef DDB
-	if (cheri_is_sandboxed && security_cheri_debugger_on_sandbox_signal)
-		kdb_enter(KDB_WHY_CHERI, "Signal delivery to CHERI sandbox");
-	else if (sig == SIGPROT && security_cheri_debugger_on_sigprot)
-		kdb_enter(KDB_WHY_CHERI,
-		    "SIGPROT delivered outside sandbox");
-#endif
-
-	/*
-	 * If a thread is running sandboxed, we can't rely on $sp which may
-	 * not point at a valid stack in the ambient context, or even be
-	 * maliciously manipulated.  We must therefore always use the
-	 * alternative stack.  We are also therefore unable to tell whether we
-	 * are on the alternative stack, so must clear 'oonstack' here.
-	 *
-	 * XXXRW: This requires significant further thinking; however, the net
-	 * upshot is that it is not a good idea to do an object-capability
-	 * invoke() from a signal handler, as with so many other things in
-	 * life.
-	 */
-	if (cheri_is_sandboxed != 0)
-		onstack = 0;
-#endif
 
 	CTR4(KTR_SIG, "sendsig: td=%p (%s) catcher=%p sig=%d", td, p->p_comm,
 	    catcher, sig);

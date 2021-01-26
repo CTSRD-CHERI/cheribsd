@@ -134,7 +134,6 @@ void * __capability cheri_sigcode_capability(struct thread *td);
 const char	*cheri_exccode_string(uint8_t exccode);
 int	cheri_syscall_authorize(struct thread *td, u_int code,
 	    int nargs, syscallarg_t *args);
-int	cheri_signal_sandboxed(struct thread *td);
 void	hybridabi_sendsig(struct thread *td);
 
 /*
