@@ -130,6 +130,7 @@ struct trapframe;
 int	cheri_capcause_to_sicode(register_t capcause);
 void	cheri_log_exception(struct trapframe *frame, int trap_type);
 void	cheri_log_exception_registers(struct trapframe *frame);
+int	cheri_signal_sandboxed(struct thread *td);
 void	cheri_trapframe_from_cheriframe(struct trapframe *frame,
 	    struct cheri_frame *cfp);
 void	_cheri_trapframe_to_cheriframe(struct trapframe *frame,
