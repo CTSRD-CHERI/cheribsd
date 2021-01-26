@@ -518,6 +518,7 @@ int vm_map_reservation_delete_locked(vm_map_t, vm_offset_t);
 int vm_map_reservation_create(vm_map_t, vm_pointer_t *, vm_size_t, vm_offset_t,
     vm_prot_t);
 int vm_map_reservation_create_locked(vm_map_t, vm_pointer_t *, vm_size_t, vm_prot_t);
+int vm_map_reservation_get(vm_map_t, vm_offset_t, vm_size_t, vm_offset_t *);
 #if __has_feature(capabilities)
 int vm_map_prot2perms(vm_prot_t prot);
 #endif
