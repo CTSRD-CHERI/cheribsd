@@ -84,8 +84,8 @@ __FBSDID("$FreeBSD$");
 
 #if __has_feature(capabilities)
 #include <cheri/cheri.h>
-#include <cheri/cheric.h>
 #endif
+#include <cheri/cheric.h>
 
 #include <machine/elf.h>
 #include <machine/md_var.h>
@@ -534,7 +534,7 @@ __elfN(check_header)(const Elf_Ehdr *hdr)
 static int
 __elfN(build_imgact_capability)(struct image_params *imgp,
     void * __capability *imgact_cap, const Elf_Ehdr *hdr, const Elf_Phdr *phdr,
-    u_long rbase)
+    Elf_Addr *preferred_rbase)
 {
 	u_long perm = CHERI_PERM_STORE | CHERI_PERM_GLOBAL |
 	    CHERI_PERM_STORE_CAP;
@@ -544,8 +544,9 @@ __elfN(build_imgact_capability)(struct image_params *imgp,
 	vm_size_t seg_size;
 	int i, result;
 	vm_pointer_t reservation;
-        void * __capability reservation_cap;
+	void * __capability reservation_cap;
 	vm_map_t map;
+	Elf_Addr rbase = *preferred_rbase;
 
 	map = &imgp->proc->p_vmspace->vm_map;
 
@@ -553,18 +554,39 @@ __elfN(build_imgact_capability)(struct image_params *imgp,
 		if (phdr[i].p_type != PT_LOAD || phdr[i].p_memsz == 0)
 			continue;
 
-		seg_addr = trunc_page(phdr[i].p_vaddr + rbase);
-		seg_size = round_page(phdr[i].p_memsz + phdr[i].p_vaddr +
-		    rbase - seg_addr);
+		seg_addr = trunc_page(phdr[i].p_vaddr);
+		seg_size = round_page(phdr[i].p_memsz + phdr[i].p_vaddr -
+		    seg_addr);
 		start = MIN(start, seg_addr);
 		end = MAX(end, seg_addr + seg_size);
 	}
 
-	reservation = start;
+	if (hdr->e_type == ET_EXEC && !is_aligned(start + rbase,
+	    CHERI_REPRESENTABLE_ALIGNMENT(end - start))) {
+		/*
+		 * We can't change the load address for position dependent
+		 *  executables, so we have to give up and report an error.
+		 */
+		uprintf("Warning: Attempted to load position-dependent "
+		    "executable with non-representable base: %s\n",
+		    imgp->execpath);
+		return (KERN_FAILURE); /* XXX: EPRECISION or similar? */
+	}
+
+	/*
+	 * Note: vm_map_reservation_create aligns down, but we have to align
+	 * upwards here to avoid rounding down to zero for the main executable.
+	 * For RTLD we also align upwards to avoid aligning down into the
+	 * memory region for the main binary.
+	 */
+	reservation = roundup2(start + rbase,
+	    CHERI_REPRESENTABLE_ALIGNMENT(end - start));
 	result = vm_map_reservation_create(map, &reservation, end - start,
 	    PAGE_SIZE, VM_PROT_ALL);
 	if (result != KERN_SUCCESS)
 		return (result);
+
+	*preferred_rbase = reservation - start;
 
 #ifdef __CHERI_PURE_CAPABILITY__
 	reservation_cap = (void *)reservation;
@@ -590,8 +612,8 @@ __elfN(map_partial)(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 	 * Create the page if it doesn't exist yet. Ignore errors.
 	 */
 	vm_map_fixed(map, NULL, 0, trunc_page(start),
-	    (ptraddr_t)round_page(end) - (ptraddr_t)trunc_page(start), prot,
-	    prot /* XXX: or VM_PROT_ALL? */, MAP_CHECK_EXCL);
+	    (ptraddr_t)round_page(end) - (ptraddr_t)trunc_page(start),
+	    prot, prot /* XXX: or VM_PROT_ALL? */, MAP_CHECK_EXCL);
 
 	/*
 	 * Find the page from the underlying object.
@@ -602,7 +624,7 @@ __elfN(map_partial)(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 			return (KERN_FAILURE);
 		off = offset - trunc_page(offset);
 		error = copyout((void *)(sf_buf_kva(sf) + off),
-		    (void * __capability)start, (vaddr_t)end - (vaddr_t)start);
+		    (void * __capability)start, (ptraddr_t)end - (ptraddr_t)start);
 		vm_imgact_unmap_page(sf);
 		if (error != 0)
 			return (KERN_FAILURE);
@@ -626,12 +648,12 @@ __elfN(map_insert)(const struct image_params *imgp, vm_map_t map,
 		    round_page(start), prot);
 		if (rv != KERN_SUCCESS)
 			return (rv);
-		offset += (vaddr_t)round_page(start) - (vaddr_t)start;
+		offset += (ptraddr_t)round_page(start) - (ptraddr_t)start;
 		start = round_page(start);
 	}
 	if (end != round_page(end)) {
 		rv = __elfN(map_partial)(map, object, offset +
-		    (vaddr_t)trunc_page(end) - (vaddr_t)start,
+		    (ptraddr_t)trunc_page(end) - (ptraddr_t)start,
 		    trunc_page(end), end, prot);
 		if (rv != KERN_SUCCESS)
 			return (rv);
@@ -645,7 +667,7 @@ __elfN(map_insert)(const struct image_params *imgp, vm_map_t map,
 		 * to copy the data.
 		 */
 		rv = vm_map_fixed(map, NULL, 0, start,
-		    (vaddr_t)end - (vaddr_t)start,
+		    (ptraddr_t)end - (ptraddr_t)start,
 		    prot | VM_PROT_WRITE, VM_PROT_ALL,
 		    MAP_CHECK_EXCL);
 		if (rv != KERN_SUCCESS)
@@ -657,12 +679,12 @@ __elfN(map_insert)(const struct image_params *imgp, vm_map_t map,
 			if (sf == NULL)
 				return (KERN_FAILURE);
 			off = offset - trunc_page(offset);
-			sz = (vaddr_t)end - (vaddr_t)start;
+			sz = (ptraddr_t)end - (ptraddr_t)start;
 			if (sz > PAGE_SIZE - off)
 				sz = PAGE_SIZE - off;
 			error = copyout((void *)(sf_buf_kva(sf) + off),
 			    (void * __capability)start,
-			    (vaddr_t)end - (vaddr_t)start);
+			    (ptraddr_t)end - (ptraddr_t)start);
 			vm_imgact_unmap_page(sf);
 			if (error != 0)
 				return (KERN_FAILURE);
@@ -671,7 +693,7 @@ __elfN(map_insert)(const struct image_params *imgp, vm_map_t map,
 	} else {
 		vm_object_reference(object);
 		rv = vm_map_fixed(map, object, offset, start,
-		    (vaddr_t)end - (vaddr_t)start,
+		    (ptraddr_t)end - (ptraddr_t)start,
 		    prot, VM_PROT_ALL, cow | MAP_CHECK_EXCL |
 		    (object != NULL ? MAP_VN_EXEC : 0));
 		if (rv != KERN_SUCCESS) {
@@ -688,9 +710,9 @@ __elfN(map_insert)(const struct image_params *imgp, vm_map_t map,
 	return (KERN_SUCCESS);
 }
 
-static int __elfN(load_section)(const struct image_params *imgp,
-    vm_ooffset_t offset, uintcap_t vmaddr, size_t memsz, size_t filsz,
-    vm_prot_t prot)
+static int
+__elfN(load_section)(const struct image_params *imgp, vm_ooffset_t offset,
+    uintcap_t vmaddr, size_t memsz, size_t filsz, vm_prot_t prot)
 {
 	struct sf_buf *sf;
 	size_t map_len;
@@ -761,7 +783,7 @@ static int __elfN(load_section)(const struct image_params *imgp,
 	copy_len = filsz == 0 ? 0 : (offset + filsz) - trunc_page(offset +
 	    filsz);
 	map_addr = trunc_page(vmaddr + filsz);
-	map_len = (vaddr_t)round_page(vmaddr + memsz) - (vaddr_t)map_addr;
+	map_len = (ptraddr_t)round_page(vmaddr + memsz) - (ptraddr_t)map_addr;
 #if __has_feature(capabilities)
 	map_addr = cheri_setbounds(map_addr, map_len);
 #endif
@@ -957,12 +979,12 @@ __elfN(load_file)(struct proc *p, const char *file, u_long *addr,
 
 #if __has_feature(capabilities)
 	error = __elfN(build_imgact_capability)(imgp, &imgp->imgact_capability,
-	    hdr, phdr, rbase);
+	    hdr, phdr, &rbase);
 	if (error != 0)
 		goto fail;
 #endif
 	error = __elfN(load_sections)(imgp, hdr, phdr, rbase, &base_addr,
-	   &max_addr);
+	    &max_addr);
 	if (error != 0)
 		goto fail;
 
@@ -1171,24 +1193,30 @@ __elfN(load_interp)(struct image_params *imgp, const Elf_Brandinfo *brand_info,
 		path = malloc(MAXPATHLEN, M_TEMP, M_WAITOK);
 		snprintf(path, MAXPATHLEN, "%s%s",
 		    brand_info->emul_path, interp);
-		error = __elfN(load_file)(imgp->proc, path, addr, end_addr,
+		error = __elfN(load_file)(imgp->proc, path, addr, &end_addr,
 		    entry);
 		free(path, M_TEMP);
 		if (error == 0)
-			return (0);
+			goto done;
 	}
 
 	if (brand_info->interp_newpath != NULL &&
 	    (brand_info->interp_path == NULL ||
 	    strcmp(interp, brand_info->interp_path) == 0)) {
 		error = __elfN(load_file)(imgp->proc,
-		    brand_info->interp_newpath, addr, end_addr, entry);
+		    brand_info->interp_newpath, addr, &end_addr, entry);
 		if (error == 0)
-			return (0);
+			goto done;
 	}
 
-	error = __elfN(load_file)(imgp->proc, interp, addr, end_addr, entry);
-	if (error == 0)
+	error = __elfN(load_file)(imgp->proc, interp, addr, &end_addr, entry);
+done:
+	if (error == 0) {
+		imgp->interp_start = CHERI_REPRESENTABLE_BASE(*addr,
+		    end_addr - *addr);
+		imgp->interp_end = imgp->interp_start +
+		    CHERI_REPRESENTABLE_LENGTH(end_addr - *addr);
+
 		return (0);
 
 	uprintf("ELF interpreter %s not found, error %d\n", interp, error);
@@ -1215,6 +1243,7 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 	struct sysentvec *sv;
 	u_long addr, baddr, et_dyn_addr, entry, proghdr;
 	u_long maxalign, mapsz, maxv, maxv1;
+	u_long representable_start, representable_end;
 	uint32_t fctl0;
 	int32_t osrel;
 	bool free_interp;
@@ -1414,15 +1443,23 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 	vn_lock(imgp->vp, LK_SHARED | LK_RETRY);
 	if (error != 0)
 		goto ret;
+
 #if __has_feature(capabilities)
 	error = __elfN(build_imgact_capability)(imgp, &imgp->imgact_capability,
-	    hdr, phdr, et_dyn_addr);
+	    hdr, phdr, &et_dyn_addr);
 	if (error != 0)
 		goto ret;
 #endif
-	error = __elfN(load_sections)(imgp, hdr, phdr, et_dyn_addr, NULL, NULL);
+	error = __elfN(load_sections)(imgp, hdr, phdr, et_dyn_addr,
+	    &representable_start, &representable_end);
 	if (error != 0)
 		goto ret;
+
+	/* Round start/end addresses to representability */
+	imgp->start_addr = CHERI_REPRESENTABLE_BASE(representable_start,
+	    representable_end - representable_start);
+	imgp->end_addr = imgp->start_addr +
+	    CHERI_REPRESENTABLE_LENGTH(representable_end - representable_start);
 
 	error = __elfN(enforce_limits)(imgp, hdr, phdr, et_dyn_addr);
 	if (error != 0)
@@ -1549,7 +1586,7 @@ interp_cap(struct image_params *imgp, Elf_Auxargs *args, uint64_t perms)
 static void * __capability
 timekeep_cap(struct image_params *imgp)
 {
-	vaddr_t timekeep_base;
+	ptraddr_t timekeep_base;
 	size_t timekeep_len;
 
 	timekeep_base = imgp->sysent->sv_timekeep_base;
