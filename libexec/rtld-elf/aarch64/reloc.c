@@ -161,6 +161,7 @@ _rtld_relocate_nonplt_self(Elf_Dyn *dynp, Elf_Auxinfo *aux)
 
 	rela = cheri_setbounds(rela, relasz);
 	relalim = (const Elf_Rela *)((const char *)rela + relasz);
+	pcc = __builtin_cheri_program_counter_get();
 
 	/* Self-relocations should all be local, i.e. R_MORELLO_RELATIVE. */
 	for (; rela < relalim; rela++) {
