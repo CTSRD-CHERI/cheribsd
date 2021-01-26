@@ -139,6 +139,7 @@ SYSCTL_INT(_debug, OID_AUTO, __elfN(legacy_coredump), CTLFLAG_RW,
     &elf_legacy_coredump, 0,
     "include all and only RW pages in core dumps");
 
+#ifndef __ELF_CHERI
 int __elfN(nxstack) =
 #if defined(__amd64__) || defined(__powerpc64__) /* both 64 and 32 bit */ || \
     (defined(__arm__) && __ARM_ARCH >= 7) || defined(__aarch64__) || \
@@ -150,6 +151,7 @@ int __elfN(nxstack) =
 SYSCTL_INT(ELF_NODE_OID, OID_AUTO,
     nxstack, CTLFLAG_RW, &__elfN(nxstack), 0,
     ELF_ABI_NAME ": enable non-executable stack");
+#endif
 
 #if __ELF_WORD_SIZE == 32 && (defined(__amd64__) || defined(__i386__))
 int i386_read_exec = 0;
@@ -1210,9 +1212,24 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 				goto ret;
 			break;
 		case PT_GNU_STACK:
+#ifdef __ELF_CHERI
+			/*
+			 * For CheriABI we don't set stack_prot and rely
+			 * on sv_stackprot being correct (VM_PROT_RW_CAP).
+			 *
+			 * Requests for executable stacks are not allowed
+			 * so refuse to run such programs entierly.
+			 */
+			if (phdr[i].p_flags & PF_X) {
+				uprintf("CheriABI forbids executable stacks\n");
+				error = ENOEXEC;
+				goto ret;
+			}
+#else
 			if (__elfN(nxstack))
 				imgp->stack_prot =
 				    __elfN(trans_prot)(phdr[i].p_flags);
+#endif
 			imgp->stack_sz = phdr[i].p_memsz;
 			break;
 		case PT_PHDR: 	/* Program header table info */
