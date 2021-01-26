@@ -84,8 +84,8 @@ __FBSDID("$FreeBSD$");
 
 #if __has_feature(capabilities)
 #include <cheri/cheri.h>
-#include <cheri/cheric.h>
 #endif
+#include <cheri/cheric.h>
 
 #include <machine/elf.h>
 #include <machine/md_var.h>
@@ -109,11 +109,10 @@ static int __elfN(check_header)(const Elf_Ehdr *hdr);
 static Elf_Brandinfo *__elfN(get_brandinfo)(struct image_params *imgp,
     const char *interp, int32_t *osrel, uint32_t *fctl0);
 static int __elfN(load_file)(struct proc *p, const char *file, u_long *addr,
-    u_long *end_addr, u_long *entry, u_long *repr_start, u_long *repr_end);
+    u_long *end_addr, u_long *entry);
 static int __elfN(load_section)(const struct image_params *imgp,
-    vm_ooffset_t offset, vm_offset_t vmaddr, size_t memsz, size_t filsz,
-    vm_prot_t prot, vm_offset_t *last_seg_start, vm_offset_t *last_seg_end,
-    const char* file);
+    vm_ooffset_t offset, uintcap_t vmaddr, size_t memsz, size_t filsz,
+    vm_prot_t prot);
 static int __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp);
 static bool __elfN(freebsd_trans_osrel)(const Elf_Note *note,
     int32_t *osrel);
@@ -527,9 +526,83 @@ __elfN(check_header)(const Elf_Ehdr *hdr)
 	return (0);
 }
 
+#if __has_feature(capabilities)
+/*
+ * Create a reservation for the image activator to map the executable
+ * image into.
+ */
+static int
+__elfN(build_imgact_capability)(struct image_params *imgp,
+    void * __capability *imgact_cap, const Elf_Ehdr *hdr, const Elf_Phdr *phdr,
+    Elf_Addr *preferred_rbase)
+{
+	u_long perm = CHERI_PERM_STORE | CHERI_PERM_GLOBAL |
+	    CHERI_PERM_STORE_CAP;
+	vm_offset_t start = (vm_offset_t)-1;
+	vm_offset_t end = 0;
+	vm_offset_t seg_addr;
+	vm_size_t seg_size;
+	int i, result;
+	vm_pointer_t reservation;
+	void * __capability reservation_cap;
+	vm_map_t map;
+	Elf_Addr rbase = *preferred_rbase;
+
+	map = &imgp->proc->p_vmspace->vm_map;
+
+	for (i = 0; i < hdr->e_phnum; i++) {
+		if (phdr[i].p_type != PT_LOAD || phdr[i].p_memsz == 0)
+			continue;
+
+		seg_addr = trunc_page(phdr[i].p_vaddr);
+		seg_size = round_page(phdr[i].p_memsz + phdr[i].p_vaddr -
+		    seg_addr);
+		start = MIN(start, seg_addr);
+		end = MAX(end, seg_addr + seg_size);
+	}
+
+	if (hdr->e_type == ET_EXEC && !is_aligned(start + rbase,
+	    CHERI_REPRESENTABLE_ALIGNMENT(end - start))) {
+		/*
+		 * We can't change the load address for position dependent
+		 *  executables, so we have to give up and report an error.
+		 */
+		uprintf("Warning: Attempted to load position-dependent "
+		    "executable with non-representable base: %s\n",
+		    imgp->execpath);
+		return (KERN_FAILURE); /* XXX: EPRECISION or similar? */
+	}
+
+	/*
+	 * Note: vm_map_reservation_create aligns down, but we have to align
+	 * upwards here to avoid rounding down to zero for the main executable.
+	 * For RTLD we also align upwards to avoid aligning down into the
+	 * memory region for the main binary.
+	 */
+	reservation = roundup2(start + rbase,
+	    CHERI_REPRESENTABLE_ALIGNMENT(end - start));
+	result = vm_map_reservation_create(map, &reservation, end - start,
+	    PAGE_SIZE, VM_PROT_ALL);
+	if (result != KERN_SUCCESS)
+		return (result);
+
+	*preferred_rbase = reservation - start;
+
+#ifdef __CHERI_PURE_CAPABILITY__
+	reservation_cap = (void *)reservation;
+#else
+	reservation_cap = cheri_setbounds(
+	    cheri_setaddress(userspace_root_cap, reservation), end - start);
+#endif
+	*imgact_cap = cheri_andperm(reservation_cap, perm);
+
+	return (KERN_SUCCESS);
+}
+#endif
+
 static int
 __elfN(map_partial)(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
-    vm_offset_t start, vm_offset_t end, vm_prot_t prot)
+    uintcap_t start, uintcap_t end, vm_prot_t prot)
 {
 	struct sf_buf *sf;
 	int error;
@@ -539,8 +612,8 @@ __elfN(map_partial)(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 	 * Create the page if it doesn't exist yet. Ignore errors.
 	 */
 	vm_map_fixed(map, NULL, 0, trunc_page(start),
-	    round_page(end) - trunc_page(start), prot,
-	    prot /* XXX: or VM_PROT_ALL? */, MAP_CHECK_EXCL);
+	    (ptraddr_t)round_page(end) - (ptraddr_t)trunc_page(start),
+	    prot, prot /* XXX: or VM_PROT_ALL? */, MAP_CHECK_EXCL);
 
 	/*
 	 * Find the page from the underlying object.
@@ -550,8 +623,8 @@ __elfN(map_partial)(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 		if (sf == NULL)
 			return (KERN_FAILURE);
 		off = offset - trunc_page(offset);
-		error = copyout_implicit_cap((caddr_t)sf_buf_kva(sf) + off, (caddr_t)start,
-		    end - start);
+		error = copyout((void *)(sf_buf_kva(sf) + off),
+		    (void * __capability)start, (ptraddr_t)end - (ptraddr_t)start);
 		vm_imgact_unmap_page(sf);
 		if (error != 0)
 			return (KERN_FAILURE);
@@ -562,7 +635,7 @@ __elfN(map_partial)(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 
 static int
 __elfN(map_insert)(const struct image_params *imgp, vm_map_t map,
-    vm_object_t object, vm_ooffset_t offset, vm_offset_t start, vm_offset_t end,
+    vm_object_t object, vm_ooffset_t offset, uintcap_t start, uintcap_t end,
     vm_prot_t prot, int cow)
 {
 	struct sf_buf *sf;
@@ -575,12 +648,13 @@ __elfN(map_insert)(const struct image_params *imgp, vm_map_t map,
 		    round_page(start), prot);
 		if (rv != KERN_SUCCESS)
 			return (rv);
-		offset += round_page(start) - start;
+		offset += (ptraddr_t)round_page(start) - (ptraddr_t)start;
 		start = round_page(start);
 	}
 	if (end != round_page(end)) {
 		rv = __elfN(map_partial)(map, object, offset +
-		    trunc_page(end) - start, trunc_page(end), end, prot);
+		    (ptraddr_t)trunc_page(end) - (ptraddr_t)start,
+		    trunc_page(end), end, prot);
 		if (rv != KERN_SUCCESS)
 			return (rv);
 		end = trunc_page(end);
@@ -592,8 +666,9 @@ __elfN(map_insert)(const struct image_params *imgp, vm_map_t map,
 		 * The mapping is not page aligned.  This means that we have
 		 * to copy the data.
 		 */
-		rv = vm_map_fixed(map, NULL, 0, start, end - start,
-		    prot | VM_PROT_WRITE | VM_PROT_WRITE_CAP, VM_PROT_ALL,
+		rv = vm_map_fixed(map, NULL, 0, start,
+		    (ptraddr_t)end - (ptraddr_t)start,
+		    prot | VM_PROT_WRITE, VM_PROT_ALL,
 		    MAP_CHECK_EXCL);
 		if (rv != KERN_SUCCESS)
 			return (rv);
@@ -604,11 +679,12 @@ __elfN(map_insert)(const struct image_params *imgp, vm_map_t map,
 			if (sf == NULL)
 				return (KERN_FAILURE);
 			off = offset - trunc_page(offset);
-			sz = end - start;
+			sz = (ptraddr_t)end - (ptraddr_t)start;
 			if (sz > PAGE_SIZE - off)
 				sz = PAGE_SIZE - off;
-			error = copyout_implicit_cap((caddr_t)sf_buf_kva(sf) + off,
-			    (caddr_t)start, sz);
+			error = copyout((void *)(sf_buf_kva(sf) + off),
+			    (void * __capability)start,
+			    (ptraddr_t)end - (ptraddr_t)start);
 			vm_imgact_unmap_page(sf);
 			if (error != 0)
 				return (KERN_FAILURE);
@@ -616,7 +692,8 @@ __elfN(map_insert)(const struct image_params *imgp, vm_map_t map,
 		}
 	} else {
 		vm_object_reference(object);
-		rv = vm_map_fixed(map, object, offset, start, end - start,
+		rv = vm_map_fixed(map, object, offset, start,
+		    (ptraddr_t)end - (ptraddr_t)start,
 		    prot, VM_PROT_ALL, cow | MAP_CHECK_EXCL |
 		    (object != NULL ? MAP_VN_EXEC : 0));
 		if (rv != KERN_SUCCESS) {
@@ -634,36 +711,14 @@ __elfN(map_insert)(const struct image_params *imgp, vm_map_t map,
 }
 
 static int
-reserve_address_space(vm_map_t map, vm_offset_t map_start, vm_offset_t map_end,
-    vm_offset_t reservation_id, const char* file)
-{
-	int error;
-
-	MPASS(map_start < map_end);
-	vm_map_lock(map);
-	error = vm_map_insert(map, NULL, 0, map_start, map_end, VM_PROT_NONE,
-	    VM_PROT_NONE, MAP_CREATE_UNMAPPED, reservation_id);
-	vm_map_unlock(map);
-	if (error != 0) {
-		uprintf("%s: Failed to reserve [%#jx-%#jx) padding for %s: "
-		    "%d!\n", __func__, (uintmax_t)map_start, (uintmax_t)map_end,
-		    file, error);
-		return (ENOMEM);
-	}
-	return (0);
-}
-
-
-static int
 __elfN(load_section)(const struct image_params *imgp, vm_ooffset_t offset,
-    vm_offset_t vmaddr, size_t memsz, size_t filsz, vm_prot_t prot,
-    vm_offset_t *last_seg_start, vm_offset_t *last_seg_end, const char *file)
+    uintcap_t vmaddr, size_t memsz, size_t filsz, vm_prot_t prot)
 {
 	struct sf_buf *sf;
 	size_t map_len;
 	vm_map_t map;
 	vm_object_t object;
-	vm_offset_t map_addr;
+	uintcap_t map_addr;
 	int error, rv, cow;
 	size_t copy_len;
 	vm_ooffset_t file_addr;
@@ -685,38 +740,8 @@ __elfN(load_section)(const struct image_params *imgp, vm_ooffset_t offset,
 
 	object = imgp->object;
 	map = &imgp->proc->p_vmspace->vm_map;
-	map_addr = trunc_page((vm_offset_t)vmaddr);
+	map_addr = trunc_page(vmaddr);
 	file_addr = trunc_page(offset);
-
-	if (*last_seg_end != 0 && map_addr != *last_seg_end) {
-		/*
-		 * For non-consecutive segments we have to mark the address
-		 * space between the last segment end and this segment as
-		 * reserved to prevent mmap() from using the gaps inside DSOs
-		 * for allocations (since we create capabilities spanning the
-		 * whole region and overlapping caps could be a security issue).
-		 */
-#if 0 /* enable to debug ELF loading issues/see how much padding we need. */
-		uprintf("%s: Reserving space [%#jx-%#jx) for %s between "
-		    "segments. Previous segment: [%#jx-%#jx), current segment: "
-		    "[%#jx-%#jx)\n", __func__, (uintmax_t)*last_seg_end,
-		    (uintmax_t)map_addr, file, (uintmax_t)*last_seg_start,
-		    (uintmax_t)*last_seg_end, (uintmax_t)map_addr,
-		    (uintmax_t)round_page(vmaddr + memsz));
-#endif
-		rv = reserve_address_space(map, *last_seg_end, map_addr,
-		    /*reservation_id=*/*last_seg_start, file);
-		if (rv != 0)
-			return (rv);
-	}
-	/*
-	 * We can update the values now that the address space is reserved. We
-	 * have to be careful to round both start and end so that all touched
-	 * pages are included in the [last_seg_start,last_seg_end) range
-	 * (important for non-page-aligned segments).
-	 */
-	*last_seg_start = trunc_page(vmaddr);
-	*last_seg_end = round_page(vmaddr + memsz);
 
 	/*
 	 * We have two choices.  We can either clear the data in the last page
@@ -730,6 +755,9 @@ __elfN(load_section)(const struct image_params *imgp, vm_ooffset_t offset,
 		map_len = trunc_page(offset + filsz) - file_addr;
 	else
 		map_len = round_page(offset + filsz) - file_addr;
+#if __has_feature(capabilities)
+	map_addr = cheri_setbounds(map_addr, map_len);
+#endif
 
 	if (map_len != 0) {
 		/* cow flags: don't dump readonly sections in core */
@@ -755,7 +783,10 @@ __elfN(load_section)(const struct image_params *imgp, vm_ooffset_t offset,
 	copy_len = filsz == 0 ? 0 : (offset + filsz) - trunc_page(offset +
 	    filsz);
 	map_addr = trunc_page(vmaddr + filsz);
-	map_len = round_page(vmaddr + memsz) - map_addr;
+	map_len = (ptraddr_t)round_page(vmaddr + memsz) - (ptraddr_t)map_addr;
+#if __has_feature(capabilities)
+	map_addr = cheri_setbounds(map_addr, map_len);
+#endif
 
 	/* This had damn well better be true! */
 	if (map_len != 0) {
@@ -771,8 +802,8 @@ __elfN(load_section)(const struct image_params *imgp, vm_ooffset_t offset,
 			return (EIO);
 
 		/* send the page fragment to user space */
-		error = copyout_implicit_cap((caddr_t)sf_buf_kva(sf),
-		    (caddr_t)map_addr, copy_len);
+		error = copyout((void *)sf_buf_kva(sf), (void * __capability)map_addr,
+		    copy_len);
 		vm_imgact_unmap_page(sf);
 		if (error != 0)
 			return (error);
@@ -789,139 +820,15 @@ __elfN(load_section)(const struct image_params *imgp, vm_ooffset_t offset,
 	return (0);
 }
 
-#ifdef __ELF_CHERI
-/*
- * Note: this needs to be called before load_sections() since we need to know
- * the correct base before mapping the segments.
- */
-static int
-__elfN(ensure_representable_base)(const char *execpath, const Elf_Ehdr *hdr,
-    const Elf_Phdr *phdr, Elf_Addr *preferred_rbase)
-{
-	/* Initialize start_addr so that MIN() produces something useful. */
-	Elf_Addr start_addr = ~0UL;
-	Elf_Addr max_addr = 0;
-	size_t total_size;
-	Elf_Addr adjusted_base;
-
-	for (size_t i = 0; i < hdr->e_phnum; i++) {
-		u_long seg_size, seg_addr, end_addr;
-
-		if (phdr[i].p_type != PT_LOAD || phdr[i].p_memsz == 0)
-			continue;
-
-		seg_addr = trunc_page(phdr[i].p_vaddr);
-		seg_size = round_page(phdr[i].p_memsz + phdr[i].p_vaddr -
-		    seg_addr);
-		end_addr = seg_addr + seg_size;
-
-		start_addr = MIN(start_addr, seg_addr);
-		max_addr = MAX(max_addr, end_addr);
-	}
-
-	/*
-	 * Ensure that we can represent a capability spanning the entire
-	 * mapping and move it if not (only possible for PIE).
-	 */
-	total_size = max_addr - start_addr;
-	if (__predict_true(*preferred_rbase ==
-	    CHERI_REPRESENTABLE_BASE(*preferred_rbase, total_size))) {
-		/* No adjustment required */
-		return (0);
-	}
-	if (hdr->e_type == ET_EXEC) {
-		/*
-		 * We can't change the load address for position dependent
-		 *  executables, so we have to give up and report an error.
-		 */
-		uprintf("Warning: Attempted to load position-dependent "
-		    "executable with non-representable base: %s\n", execpath);
-		return (ERANGE); /* XXX: EPRECISION or similar? */
-	}
-	/*
-	 * Note: CHERI_REPRESENTABLE_BASE aligns down, but we have to align
-	 * upwards here to avoid rounding down to zero for the main executable.
-	 * For RTLD we also align upwards to avoid aligning down into the
-	 * memory region for the main binary.
-	 */
-	adjusted_base = roundup2(*preferred_rbase,
-	    CHERI_REPRESENTABLE_ALIGNMENT(total_size));
-	uprintf("Attempted to load %s with non-representable mapping: moving "
-	    "from %#jx to %#jx\n", execpath, (uintmax_t)*preferred_rbase,
-	    (uintmax_t)adjusted_base);
-	*preferred_rbase = adjusted_base;
-	return (0);
-}
-
-/*
- * Claim the space around the executable that is required to represent a
- * capability spanning the executable.
- */
-static int
-__elfN(reserve_representability_padding)(const char *execpath, vm_map_t map,
-    Elf_Addr mapbase, Elf_Addr start_addr, Elf_Addr end_addr,
-    u_long *representable_start, u_long *representable_end)
-{
-	size_t representable_length;
-	int error;
-	size_t maplen = end_addr - start_addr;
-	/*
-	 * Sanity check that the base address was aligned correctly so that we
-	 * can represent a capability spanning the entire executable.
-	 */
-	MPASS2(trunc_page(mapbase) == mapbase, "Not page-aligned?");
-	MPASS2(trunc_page(start_addr) == start_addr, "Not page-aligned?");
-	*representable_start = CHERI_REPRESENTABLE_BASE(start_addr, maplen);
-	MPASS(mapbase <= *representable_start);
-	representable_length = CHERI_REPRESENTABLE_LENGTH(maplen);
-	if (*representable_start != start_addr) {
-		/*
-		 * This should rarely be needed, so keep an uprintf() to
-		 * discover weird ELF files.
-		 */
-		uprintf("%s: Reserving space before start: [%#jx-%#jx] for "
-		    "%s mapping at [%#jx-%#jx]\n", __func__,
-		    (uintmax_t)*representable_start, (uintmax_t)start_addr,
-		    execpath, (uintmax_t)start_addr, (uintmax_t)end_addr);
-		error = reserve_address_space(map, *representable_start,
-		    start_addr, /*reservation=*/start_addr, execpath);
-		if (error)
-			return (error);
-	}
-	*representable_end = *representable_start +
-	    CHERI_REPRESENTABLE_LENGTH(maplen);
-	/* We must have mapped up to the end of a page. */
-	if (round_page(*representable_end) != round_page(end_addr)) {
-		/*
-		 * This should rarely be needed, so keep an uprintf() to
-		 * discover weird ELF files.
-		 */
-		uprintf("%s: Reserving space after end: [%#jx-%#jx] for "
-		    "%s mapping at [%#jx-%#jx]\n", __func__,
-		    (uintmax_t)round_page(end_addr),
-		    (uintmax_t)round_page(*representable_end), execpath,
-		    (uintmax_t)start_addr, (uintmax_t)end_addr);
-		error = reserve_address_space(map, round_page(end_addr),
-		    round_page(*representable_end), /*reservation=*/start_addr,
-		    execpath);
-		if (error)
-			return (error);
-	}
-	return (0);
-}
-#endif
-
 static int
 __elfN(load_sections)(const struct image_params *imgp, const Elf_Ehdr *hdr,
-    const Elf_Phdr *phdr, u_long rbase, u_long *base_addrp, u_long *max_addrp,
-    u_long *representable_start, u_long *representable_end, const char *file)
+    const Elf_Phdr *phdr, u_long rbase, u_long *base_addrp, u_long *max_addrp)
 {
 	vm_prot_t prot;
 	u_long base_vaddr, max_vaddr;
 	bool first;
 	int error, i;
-	vm_offset_t last_seg_start = 0;
-	vm_offset_t last_seg_end = 0;
+	uintcap_t section_addr;
 
 	ASSERT_VOP_LOCKED(imgp->vp, __func__);
 
@@ -934,10 +841,15 @@ __elfN(load_sections)(const struct image_params *imgp, const Elf_Ehdr *hdr,
 			continue;
 
 		/* Loadable segment */
+#if __has_feature(capabilities)
+		section_addr = (uintcap_t)cheri_setaddress(
+		    imgp->imgact_capability, phdr[i].p_vaddr + rbase);
+#else
+		section_addr = phdr[i].p_vaddr + rbase;
+#endif
 		prot = __elfN(trans_prot)(phdr[i].p_flags);
 		error = __elfN(load_section)(imgp, phdr[i].p_offset,
-		    phdr[i].p_vaddr + rbase, phdr[i].p_memsz, phdr[i].p_filesz,
-		    prot, &last_seg_start, &last_seg_end, file);
+		    section_addr, phdr[i].p_memsz, phdr[i].p_filesz, prot);
 		if (error != 0)
 			return (error);
 
@@ -948,16 +860,6 @@ __elfN(load_sections)(const struct image_params *imgp, const Elf_Ehdr *hdr,
 			base_vaddr = trunc_page(phdr[i].p_vaddr);
 			first = false;
 		}
-		/*
-		 * In order to reserve space after segments, they must be
-		 * defined in ascending order since otherwise we may reserve
-		 * space that would be used by a later PT_LOAD.
-		 */
-		if (phdr[i].p_vaddr < max_vaddr) {
-			uprintf("%s: %s PT_LOADs not in ascending order.\n",
-			    __func__, file);
-			return (ENOEXEC);
-		}
 		max_vaddr = MAX(max_vaddr, phdr[i].p_vaddr + phdr[i].p_memsz);
 	}
 
@@ -965,21 +867,6 @@ __elfN(load_sections)(const struct image_params *imgp, const Elf_Ehdr *hdr,
 		*base_addrp = rbase + base_vaddr;
 	if (max_addrp != NULL)
 		*max_addrp = rbase + max_vaddr;
-#ifdef __ELF_CHERI
-	/* Note: max_vaddr is the actual end, not rounded to PAGE_SIZE. */
-	error = __elfN(reserve_representability_padding)(file,
-	    &imgp->proc->p_vmspace->vm_map, rbase, rbase + base_vaddr,
-	    rbase + max_vaddr, representable_start, representable_end);
-	if (error != 0)
-		return (error);
-#else
-	/*
-	 * For non-CHERI binaries there is no need to pad for representability,
-	 * so we can set {start,end}_addr or interp_{end,start} directly.
-	 */
-	*representable_start = rbase + base_vaddr;
-	*representable_end = rbase + max_vaddr;
-#endif /* __ELF_CHERI */
 
 	return (0);
 }
@@ -992,17 +879,22 @@ __elfN(load_sections)(const struct image_params *imgp, const Elf_Ehdr *hdr,
  * the address where a shared object should be loaded.  If the file is
  * an executable, this value is ignored.  On exit, "addr" specifies
  * where the file was actually loaded.
+ * On CHERI this is a capability, if a shared object is being loaded, this
+ * should be a capability for the region where the shared object
+ * is being loaded.
  *
  * The "end_addr" reference parameter is out only.  On exit, it specifies
  * the end address of the loaded file.
+ * On CHERI this is a capability.
  *
  * The "entry" reference parameter is out only.  On exit, it specifies
  * the entry point for the loaded file.
+ * On CHERI this is an offset in the capability returned in addr.
  *
  */
 static int
 __elfN(load_file)(struct proc *p, const char *file, u_long *addr,
-	u_long *end_addr, u_long *entry, u_long *repr_start, u_long *repr_end)
+	u_long *end_addr, u_long *entry)
 {
 	struct {
 		struct nameidata nd;
@@ -1085,15 +977,14 @@ __elfN(load_file)(struct proc *p, const char *file, u_long *addr,
 		goto fail;
 	}
 
-#ifdef __ELF_CHERI
-	/* Ensure representability of the capability spanning the file. */
-	error = __elfN(ensure_representable_base)(file, hdr, phdr, &rbase);
+#if __has_feature(capabilities)
+	error = __elfN(build_imgact_capability)(imgp, &imgp->imgact_capability,
+	    hdr, phdr, &rbase);
 	if (error != 0)
 		goto fail;
 #endif
-
 	error = __elfN(load_sections)(imgp, hdr, phdr, rbase, &base_addr,
-	    &max_addr, repr_start, repr_end, file);
+	    &max_addr);
 	if (error != 0)
 		goto fail;
 
@@ -1309,25 +1200,28 @@ __elfN(load_interp)(struct image_params *imgp, const Elf_Brandinfo *brand_info,
 		snprintf(path, MAXPATHLEN, "%s%s",
 		    brand_info->emul_path, interp);
 		error = __elfN(load_file)(imgp->proc, path, addr, &end_addr,
-		    entry, &imgp->interp_start, &imgp->interp_end);
+		    entry);
 		free(path, M_TEMP);
 		if (error == 0)
-			return (0);
+			goto done;
 	}
 
 	if (brand_info->interp_newpath != NULL &&
 	    (brand_info->interp_path == NULL ||
 	    strcmp(interp, brand_info->interp_path) == 0)) {
 		error = __elfN(load_file)(imgp->proc,
-		    brand_info->interp_newpath, addr, &end_addr, entry,
-		    &imgp->interp_start, &imgp->interp_end);
+		    brand_info->interp_newpath, addr, &end_addr, entry);
 		if (error == 0)
-			return (0);
+			goto done;
 	}
 
-	error = __elfN(load_file)(imgp->proc, interp, addr, &end_addr, entry,
-	    &imgp->interp_start, &imgp->interp_end);
+	error = __elfN(load_file)(imgp->proc, interp, addr, &end_addr, entry);
+done:
 	if (error == 0) {
+		imgp->interp_start = CHERI_REPRESENTABLE_BASE(*addr,
+		    end_addr - *addr);
+		imgp->interp_end = imgp->interp_start +
+		    CHERI_REPRESENTABLE_LENGTH(end_addr - *addr);
 
 		return (0);
 	}
@@ -1356,6 +1250,7 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 	struct sysentvec *sv;
 	u_long addr, baddr, et_dyn_addr, entry, proghdr;
 	u_long maxalign, mapsz, maxv, maxv1;
+	u_long representable_start, representable_end;
 	uint32_t fctl0;
 	int32_t osrel;
 	bool free_interp;
@@ -1552,25 +1447,26 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 		    maxv / 2, 1UL << flsl(maxalign));
 	}
 
-#ifdef __ELF_CHERI
-	/*
-	 * Ensure that the base is sufficiently aligned to create a capability
-	 * that spans the entire mapping.
-	 */
-	error = __elfN(ensure_representable_base)(imgp->execpath, hdr, phdr,
-	    &et_dyn_addr);
-	if (error != 0)
-		goto ret;
-#endif
-
 	vn_lock(imgp->vp, LK_SHARED | LK_RETRY);
 	if (error != 0)
 		goto ret;
 
-	error = __elfN(load_sections)(imgp, hdr, phdr, et_dyn_addr, NULL, NULL,
-	    &imgp->start_addr, &imgp->end_addr, imgp->execpath);
+#if __has_feature(capabilities)
+	error = __elfN(build_imgact_capability)(imgp, &imgp->imgact_capability,
+	    hdr, phdr, &et_dyn_addr);
 	if (error != 0)
 		goto ret;
+#endif
+	error = __elfN(load_sections)(imgp, hdr, phdr, et_dyn_addr,
+	    &representable_start, &representable_end);
+	if (error != 0)
+		goto ret;
+
+	/* Round start/end addresses to representability */
+	imgp->start_addr = CHERI_REPRESENTABLE_BASE(representable_start,
+	    representable_end - representable_start);
+	imgp->end_addr = imgp->start_addr +
+	    CHERI_REPRESENTABLE_LENGTH(representable_end - representable_start);
 
 	error = __elfN(enforce_limits)(imgp, hdr, phdr, et_dyn_addr);
 	if (error != 0)
@@ -1704,7 +1600,7 @@ interp_cap(struct image_params *imgp, Elf_Auxargs *args, uint64_t perms)
 static void * __capability
 timekeep_cap(struct image_params *imgp)
 {
-	vaddr_t timekeep_base;
+	ptraddr_t timekeep_base;
 	size_t timekeep_len;
 
 	timekeep_base = imgp->sysent->sv_timekeep_base;
@@ -2002,7 +1898,7 @@ core_output(char * __capability base_cap, size_t len, off_t offset,
 	bool success;
 	char *base = (char *)(uintptr_t)(uintcap_t)base_cap;
 
-	KASSERT((uintptr_t)base % PAGE_SIZE == 0,
+	KASSERT(is_aligned(base, PAGE_SIZE),
 	    ("%s: user address %p is not page-aligned", __func__, base));
 
 	if (p->comp != NULL)
@@ -3323,7 +3219,8 @@ __elfN(untrans_prot)(vm_prot_t prot)
 void
 __elfN(stackgap)(struct image_params *imgp, uintcap_t *stack_base)
 {
-	uintptr_t range, rbase, gap;
+	uintptr_t rbase;
+	vm_offset_t range, gap;
 	int pct;
 
 	if ((imgp->map_flags & MAP_ASLR) == 0)
@@ -3341,11 +3238,16 @@ __elfN(stackgap)(struct image_params *imgp, uintcap_t *stack_base)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20191014,
+//   "updated": 20200708,
 //   "target_type": "kernel",
 //   "changes": [
 //     "support",
 //     "user_capabilities"
+//   ],
+//   "changes_purecap": [
+//     "pointer_provenance",
+//     "pointer_as_integer",
+//     "uintcap_arithmetic"
 //   ]
 // }
 // CHERI CHANGES END
