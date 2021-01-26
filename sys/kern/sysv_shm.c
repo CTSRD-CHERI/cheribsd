@@ -433,7 +433,7 @@ kern_shmat_locked(struct thread *td, int shmid,
 	struct proc *p = td->td_proc;
 	struct shmid_kernel *shmseg;
 	struct shmmap_state *shmmap_s;
-	vm_offset_t attach_va = 0, max_va;
+	vm_pointer_t attach_va = 0, max_va;
 	vm_prot_t prot;
 	vm_size_t size;
 	int cow, error, find_space, i, rv;
@@ -575,6 +575,11 @@ kern_shmat_locked(struct thread *td, int shmid,
 	shmseg->u.shm_nattch++;
 #if __has_feature(capabilities)
 	if (SV_CURPROC_FLAG(SV_CHERI)) {
+		/*
+		 * XXX-AM: The purecap kernel reservations should have taken care of this
+		 * and just return attach_va, as the capability will be derived from the
+		 * root map capability.
+		 */
 		shmaddr = cheri_setboundsexact(cheri_setaddress(shmaddr,
 		     attach_va), size);
 		/* Remove inappropriate permissions. */
