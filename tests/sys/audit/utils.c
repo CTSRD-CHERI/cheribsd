@@ -229,7 +229,9 @@ FILE
 	nomask = get_audit_mask("no");
 	FILE *pipestream;
 
-	ATF_REQUIRE((fd[0].fd = open("/dev/auditpipe", O_RDONLY)) != -1);
+	ATF_REQUIRE((fd[0].fd = open("/dev/auditpipe", O_RDONLY | O_NONBLOCK)) != -1);
+	/* Ensure that the auditpipe is open in non-blocking mode */
+	ATF_REQUIRE(fcntl(fd[0].fd, F_GETFL) & O_NONBLOCK);
 	ATF_REQUIRE((pipestream = fdopen(fd[0].fd, "r")) != NULL);
 	fd[0].events = POLLIN;
 
