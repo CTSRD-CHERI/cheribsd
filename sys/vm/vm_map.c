@@ -2075,8 +2075,8 @@ vm_map_fixed(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
     vm_offset_t start, vm_size_t length, vm_prot_t prot,
     vm_prot_t max, int cow)
 {
-	vm_map_entry_t entry, next_entry;
-	vm_pointer_t end, reservation;
+	vm_pointer_t end;
+	vm_offset_t reservation_id = start;
 	int result;
 
 	end = start + length;
@@ -2093,22 +2093,10 @@ vm_map_fixed(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 	 * the existing reservation.
 	 */
 	if ((map->flags & MAP_RESERVATIONS) != 0) {
-		if (vm_map_lookup_entry(map, start, &entry)) {
-			reservation = entry->reservation;
-			while (entry->end < end) {
-				next_entry = vm_map_entry_succ(entry);
-				if (entry->reservation != reservation ||
-				    next_entry->start > end) {
-					result = KERN_NO_SPACE;
-					goto out;
-				}
-				entry = next_entry;
-			}
-		}
-		else {
-			result = KERN_MEM_PROT_FAILURE;
+		result = vm_map_reservation_get(map, start, length,
+		    &reservation_id);
+		if (result != KERN_SUCCESS)
 			goto out;
-		}
 	}
 	if ((cow & MAP_CHECK_EXCL) == 0) {
 		/*
@@ -2131,7 +2119,7 @@ vm_map_fixed(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 		    prot, max, cow);
 	} else {
 		result = vm_map_insert(map, object, offset, start, end,
-		    prot, max, cow, reservation);
+		    prot, max, cow, reservation_id);
 	}
 out:
 	vm_map_unlock(map);
@@ -5686,6 +5674,45 @@ vm_map_reservation_insert(vm_map_t map, vm_offset_t addr, vm_size_t length,
 	vm_map_log("reserve", new_entry);
 
 	return (new_entry);
+}
+
+/*
+ * Check whether there is a single reservation spanning the requested range and
+ * returns it in reservp.
+ * Assumes the map to be locked and leaves the map locked.
+ * Assumes that reservations are enabled for this map.
+ *
+ * Returns KERN_NO_SPACE if the requested range is not fully contained within a
+ * reservation. KERN_MEM_PROT_FAILURE if no reservation backing the rage can be
+ * found.
+ */
+int
+vm_map_reservation_get(vm_map_t map, vm_offset_t start, vm_size_t length,
+    vm_offset_t *reservp)
+{
+	vm_map_entry_t entry, next_entry;
+	vm_offset_t reservation;
+	vm_offset_t end = start + length;
+
+	VM_MAP_ASSERT_LOCKED(map);
+	MPASS((map->flags & MAP_RESERVATIONS));
+
+	if (vm_map_lookup_entry(map, start, &entry)) {
+		reservation = entry->reservation;
+		while (entry->end < end) {
+			next_entry = vm_map_entry_succ(entry);
+			if (entry->reservation != reservation ||
+			    next_entry->start > end) {
+				return (KERN_NO_SPACE);
+			}
+			entry = next_entry;
+		}
+	} else {
+		return (KERN_MEM_PROT_FAILURE);
+	}
+	*reservp = reservation;
+
+	return (KERN_SUCCESS);
 }
 
 /*
