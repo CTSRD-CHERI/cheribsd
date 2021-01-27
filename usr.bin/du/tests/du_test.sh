@@ -100,7 +100,10 @@ g_flag_body()
 	atf_check truncate -s 1k A
 	atf_check truncate -s 1m B
 	atf_check truncate -s 1g C
-	atf_check truncate -s 1t D
+	if ! truncate -s 1t D; then
+		atf_skip "Unable to create 1T sparse file (running on tmpfs?)"
+		rm -f A B C D
+	fi
 	atf_check -o inline:'1\tA\n1\tB\n1\tC\n1024\tD\n' du -Ag A B C D
 }
 
@@ -114,7 +117,10 @@ h_flag_body()
 	atf_check truncate -s 1k A
 	atf_check truncate -s 1m B
 	atf_check truncate -s 1g C
-	atf_check truncate -s 1t D
+	if ! truncate -s 1t D; then
+		atf_skip "Unable to create 1T sparse file (running on tmpfs?)"
+		rm -f A B C D
+	fi
 	atf_check -o inline:'1.0K\tA\n1.0M\tB\n1.0G\tC\n1.0T\tD\n' du -Ah A B C D
 }
 
