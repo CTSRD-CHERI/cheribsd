@@ -89,6 +89,8 @@ __FBSDID("$FreeBSD$");
 #include <machine/md_var.h>
 #endif
 
+#include <cheri/cheric.h>
+
 #include <security/audit/audit.h>
 #include <security/mac/mac_framework.h>
 
@@ -148,11 +150,13 @@ cap_covers_pages(const void * __capability cap, size_t size)
 }
 
 static void * __capability
-mmap_retcap(struct thread *td, vm_offset_t addr,
+mmap_retcap(struct thread *td, vm_pointer_t addr,
     const struct mmap_req *mrp)
 {
 	void * __capability newcap;
+#ifndef __CHERI_PURE_CAPABILITY__
 	size_t cap_base, cap_len;
+#endif
 	register_t perms, cap_prot;
 
 	/*
@@ -165,7 +169,14 @@ mmap_retcap(struct thread *td, vm_offset_t addr,
 	if (mrp->mr_flags & MAP_CHERI_NOSETBOUNDS)
 		return (mrp->mr_source_cap);
 
+#ifdef __CHERI_PURE_CAPABILITY__
+	KASSERT(cheri_gettag(addr), ("Expected valid capability"));
+	newcap = (void *)addr;
+	/* Enforce per-thread mmap capability permission */
+	newcap = cheri_andperm(newcap, cheri_getperm(mrp->mr_source_cap));
+#else
 	newcap = mrp->mr_source_cap;
+#endif
 
 	/*
 	 * If PROT_MAX() was not passed, use the prot value to derive
@@ -181,6 +192,8 @@ mmap_retcap(struct thread *td, vm_offset_t addr,
 	perms = ~MAP_CAP_PERM_MASK | vm_map_prot2perms(cap_prot);
 	newcap = cheri_andperm(newcap, perms);
 
+#ifndef __CHERI_PURE_CAPABILITY__
+	/* Reservations in the kernel ensure this */
 	if (mrp->mr_flags & MAP_FIXED) {
 		/*
 		 * If hint was under aligned, we need to return a
@@ -209,6 +222,7 @@ mmap_retcap(struct thread *td, vm_offset_t addr,
 		    cheri_setaddress(newcap, addr),
 		    roundup2(mrp->mr_len, PAGE_SIZE));
 	}
+#endif
 
 	return (newcap);
 }
@@ -307,6 +321,10 @@ sys_mmap(struct thread *td, struct mmap_args *uap)
 		SYSERRCAUSE("MAP_32BIT not supported in CheriABI");
 		return (EINVAL);
 	}
+#ifdef __CHERI_PURE_CAPABILITY__
+		/* Needed for fixed mappings */
+		.mr_source_cap = userspace_root_cap,
+#endif
 
 	/*
 	 * Allow existing mapping to be replaced using the MAP_FIXED
@@ -684,6 +702,17 @@ kern_mmap(struct thread *td, struct mmap_req *mrp)
 				return (EINVAL);
 			}
 		}
+#ifdef __CHERI_PURE_CAPABILITY__
+		/*
+		 * This makes sure we use the correct source capability and hint
+		 * address for hybrid userland and for MAP_FIXED.
+		 * If MAP_RESERVATION_CREATE is requested, addr is just the hint
+		 * virtual address and will not be a valid capability.
+		 */
+		if ((flags & MAP_RESERVATION_CREATE) == 0)
+			addr = cheri_setaddress((uintcap_t)mrp->mr_source_cap,
+			    addr);
+#endif
 	} else if (flags & MAP_32BIT) {
 		KASSERT(!SV_CURPROC_FLAG(SV_CHERI),
 		    ("MAP_32BIT on a CheriABI process"));
@@ -1897,7 +1926,7 @@ vm_mmap_cdev(struct thread *td, vm_size_t objsize, vm_prot_t *protp,
  * character device, or NULL for MAP_ANON.
  */
 int
-vm_mmap(vm_map_t map, vm_offset_t *addr, vm_size_t size, vm_prot_t prot,
+vm_mmap(vm_map_t map, vm_pointer_t *addr, vm_size_t size, vm_prot_t prot,
 	vm_prot_t maxprot, int flags,
 	objtype_t handle_type, void *handle,
 	vm_ooffset_t foff)
@@ -2006,7 +2035,7 @@ kern_mmap_racct_check(struct thread *td, vm_map_t map, vm_size_t size)
  * map.  Called by mmap for MAP_ANON, vm_mmap, shm_mmap, and vn_mmap.
  */
 int
-vm_mmap_object(vm_map_t map, vm_offset_t *addr, vm_offset_t max_addr,
+vm_mmap_object(vm_map_t map, vm_pointer_t *addr, vm_offset_t max_addr,
     vm_size_t size, vm_prot_t prot,
     vm_prot_t maxprot, int flags, vm_object_t object, vm_ooffset_t foff,
     boolean_t writecounted, struct thread *td)
@@ -2015,6 +2044,12 @@ vm_mmap_object(vm_map_t map, vm_offset_t *addr, vm_offset_t max_addr,
 	bool curmap, fitit, new_reservation;
 	vm_size_t padded_size;
 	vm_pointer_t reservation;
+
+#ifdef __CHERI_PURE_CAPABILITY__
+	KASSERT(cheri_getlen(addr) == sizeof(void *),
+	    ("Invalid bounds for pointer-sized object %zx",
+	    (size_t)cheri_getlen(addr)));
+#endif
 
 	curmap = map == &td->td_proc->p_vmspace->vm_map;
 	if (curmap) {
@@ -2151,18 +2186,23 @@ vm_mmap_to_errno(int rv)
 		return (ENOMEM);
 	case KERN_PROTECTION_FAILURE:
 		return (EACCES);
+	case KERN_MEM_PROT_FAILURE:
+		return (EPROT);
 	default:
 		return (EINVAL);
 	}
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20200123,
 //   "target_type": "kernel",
 //   "changes": [
 //     "support",
 //     "user_capabilities"
 //   ],
-//   "change_comment": ""
+//   "changes_purecap": [
+//     "support",
+//     "pointer_as_integer"
+//   ]
 // }
 // CHERI CHANGES END
