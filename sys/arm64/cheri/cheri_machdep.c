@@ -55,7 +55,7 @@ cheri_init_capabilities(void * __capability kroot)
 	ctemp = cheri_setaddress(kroot, CHERI_CAP_USER_DATA_BASE);
 	ctemp = cheri_setbounds(ctemp, CHERI_CAP_USER_DATA_LENGTH);
 	ctemp = cheri_andperm(ctemp, CHERI_CAP_USER_DATA_PERMS |
-	    CHERI_CAP_USER_CODE_PERMS);
+	    CHERI_CAP_USER_CODE_PERMS | CHERI_PERM_CHERIABI_VMMAP);
 	userspace_root_cap = ctemp;
 
 	ctemp = cheri_setaddress(kroot, CHERI_SEALCAP_USERSPACE_BASE);
@@ -79,9 +79,10 @@ hybridabi_thread_setregs(struct thread *td, unsigned long entry_addr)
 	tf = td->td_frame;
 
 	/* Set DDC to full user privilege. */
-	tf->tf_ddc = (uintcap_t)cheri_capability_build_user_data(
-	    CHERI_CAP_USER_DATA_PERMS, CHERI_CAP_USER_DATA_BASE,
-	    CHERI_CAP_USER_DATA_LENGTH, CHERI_CAP_USER_DATA_OFFSET);
+	tf->tf_ddc = (uintcap_t)cheri_capability_build_user_rwx(
+	    CHERI_CAP_USER_DATA_PERMS | CHERI_PERM_CHERIABI_VMMAP,
+	    CHERI_CAP_USER_DATA_BASE, CHERI_CAP_USER_DATA_LENGTH,
+	    CHERI_CAP_USER_DATA_OFFSET);
 
 	/* Use 'entry_addr' as offset of PCC. */
 	trapframe_set_elr(tf, (uintcap_t)cheri_capability_build_user_code(
@@ -100,14 +101,12 @@ hybridabi_thread_setregs(struct thread *td, unsigned long entry_addr)
 int
 cheri_signal_sandboxed(struct thread *td)
 {
-#if 0
 	uintmax_t c_perms;
 
-	c_perms = cheri_getperm((void * __capability)td->td_frame->tf_elr);
+	c_perms = cheri_getperm(td->td_frame->tf_elr);
 	if ((c_perms & CHERI_PERM_SYSCALL) == 0) {
 		atomic_add_int(&security_cheri_sandboxed_signals, 1);
 		return (ECAPMODE);
 	}
-#endif
 	return (0);
 }

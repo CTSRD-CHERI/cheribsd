@@ -317,15 +317,20 @@ int
 sys_mmap(struct thread *td, struct mmap_args *uap)
 {
 #if !__has_feature(capabilities)
-
-	return (kern_mmap(td, (__cheri_addr uintptr_t)uap->addr, uap->len,
-	    uap->prot, uap->flags, uap->fd, uap->pos));
+	return (kern_mmap(td,
+	    &(struct mmap_req){
+		.mr_hint = (uintptr_t)uap->addr,
+		.mr_len = uap->len,
+		.mr_prot = uap->prot,
+		.mr_flags = uap->flags,
+		.mr_fd = uap->fd,
+		.mr_pos = uap->pos,
+	    }));
 #else
 	int flags = uap->flags;
 	void * __capability source_cap;
 	register_t perms, reqperms;
 	vm_offset_t hint;
-	struct mmap_req mr;
 
 	if (flags & MAP_32BIT) {
 		SYSERRCAUSE("MAP_32BIT not supported in CheriABI");
@@ -348,7 +353,7 @@ sys_mmap(struct thread *td, struct mmap_args *uap)
 	 * yield different results (and even failure modes) is potentially
 	 * confusing and incompatible with non-CHERI code.  One could
 	 * potentially check if the region contains any mappings and
-	 * switch to using the per-thread mmap capability as the source
+	 * switch to using userspace_root_cap as the source
 	 * capability if this pattern proves common.
 	 */
 	hint = cheri_getaddress(uap->addr);
@@ -366,8 +371,7 @@ sys_mmap(struct thread *td, struct mmap_args *uap)
 			return (EINVAL);
 		}
 
-		/* Allocate from the per-thread capability. */
-		source_cap = td->td_cheri_mmap_cap;
+		source_cap = userspace_root_cap;
 	}
 	KASSERT(cheri_gettag(source_cap),
 	    ("td->td_cheri_mmap_cap is untagged!"));
@@ -462,34 +466,18 @@ sys_mmap(struct thread *td, struct mmap_args *uap)
 	 * set at this point.  A simple assert is not easy to contruct...
 	 */
 
-	memset(&mr, 0, sizeof(mr));
-	mr.mr_hint = hint;
-	mr.mr_max_addr = cheri_gettop(source_cap);
-	mr.mr_len = uap->len;
-	mr.mr_prot = uap->prot;
-	mr.mr_flags = flags;
-	mr.mr_fd = uap->fd;
-	mr.mr_pos = uap->pos;
-	mr.mr_source_cap = source_cap;
-
-	return (kern_mmap_req(td, &mr));
-#endif
-}
-
-int
-kern_mmap(struct thread *td, uintptr_t addr0, size_t len, int prot, int flags,
-    int fd, off_t pos)
-{
-	struct mmap_req mr = {
-		.mr_hint = addr0,
-		.mr_len = len,
-		.mr_prot = prot,
+	return (kern_mmap(td,
+	    &(struct mmap_req){
+		.mr_hint = hint,
+		.mr_max_addr = cheri_gettop(source_cap),
+		.mr_len = uap->len,
+		.mr_prot = uap->prot,
 		.mr_flags = flags,
-		.mr_fd = fd,
-		.mr_pos = pos
-	};
-
-	return (kern_mmap_req(td, &mr));
+		.mr_fd = uap->fd,
+		.mr_pos = uap->pos,
+		.mr_source_cap = source_cap,
+	    }));
+#endif
 }
 
 int
@@ -510,7 +498,7 @@ kern_mmap_maxprot(struct proc *p, int prot)
 }
 
 int
-kern_mmap_req(struct thread *td, struct mmap_req *mrp)
+kern_mmap(struct thread *td, struct mmap_req *mrp)
 {
 	struct vmspace *vms;
 	struct file *fp;
@@ -886,9 +874,15 @@ done:
 int
 freebsd6_mmap(struct thread *td, struct freebsd6_mmap_args *uap)
 {
-
-	return (kern_mmap(td, (uintptr_t)uap->addr, uap->len, uap->prot,
-	    uap->flags, uap->fd, uap->pos));
+	return (kern_mmap(td,
+	    &(struct mmap_req){
+		.mr_hint = (uintptr_t)uap->addr,
+		.mr_len = uap->len,
+		.mr_prot = uap->prot,
+		.mr_flags = uap->flags,
+		.mr_fd = uap->fd,
+		.mr_pos = uap->pos,
+	    }));
 }
 #endif
 
@@ -940,8 +934,15 @@ ommap(struct thread *td, struct ommap_args *uap)
 		flags |= MAP_PRIVATE;
 	if (uap->flags & OMAP_FIXED)
 		flags |= MAP_FIXED;
-	return (kern_mmap(td, (uintptr_t)uap->addr, 0, uap->len, prot, flags,
-	    uap->fd, uap->pos));
+	return (kern_mmap(td,
+	    &(struct mmap_req){
+		.mr_hint = (uintptr_t)uap->addr,
+		.mr_len = uap->len,
+		.mr_prot = prot,
+		.mr_flags = flags,
+		.mr_fd = uap->fd,
+		.mr_pos = uap->pos,
+	    }));
 }
 #endif				/* COMPAT_43 */
 

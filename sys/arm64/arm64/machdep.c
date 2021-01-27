@@ -570,8 +570,6 @@ exec_setregs(struct thread *td, struct image_params *imgp, uintcap_t stack)
 		tf->tf_sp = stack;
 		tf->tf_lr = (uintcap_t)cheri_exec_pcc(td, imgp);
 		trapframe_set_elr(tf, tf->tf_lr);
-		cheri_set_mmap_capability(td, imgp,
-		    (void * __capability)tf->tf_sp);
 		td->td_proc->p_md.md_sigcode = cheri_sigcode_capability(td);
 	} else
 #endif
@@ -1555,6 +1553,9 @@ do {									\
 	PRINT_REG(aidr_el1);
 	PRINT_REG(amair_el1);
 	PRINT_REG(ccsidr_el1);
+#if __has_feature(capabilities)
+	PRINT_REG(cctlr_el0);
+#endif
 	PRINT_REG(clidr_el1);
 	PRINT_REG(contextidr_el1);
 	PRINT_REG(cpacr_el1);
@@ -1623,11 +1624,13 @@ do {									\
 #endif
 	PRINT_REG(ttbr0_el1);
 	PRINT_REG(ttbr1_el1);
+#if __has_feature(capabilities)
+	PRINT_REG_CAP(cvbar_el1);
+#else
 	PRINT_REG(vbar_el1);
+#endif
 #undef PRINT_REG
 #if __has_feature(capabilities)
-	/* TODO: Print other cap registers of interest. */
-	PRINT_REG_CAP(cvbar_el1);
 #undef PRINT_REG_CAP
 #endif
 }

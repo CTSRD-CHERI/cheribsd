@@ -415,14 +415,14 @@ data_abort(struct thread *td, struct trapframe *frame, uint64_t esr,
 
 #if __has_feature(capabilities)
 #define PRINT_REG(name, value)					\
-	printf(name " = %#.16lp\n", (void * __capability)(value))
+	printf(name ": %#.16lp\n", (void * __capability)(value))
 #define PRINT_REG_N(array, n)					\
 	printf(" %sc%d: %#.16lp\n",				\
 	    ((n) < 10) ? " " : "", n, (void * __capability)(array)[n])
 #else
-#define PRINT_REG(name, value)	printf(name ": 0x%016lx\n", value)
+#define PRINT_REG(name, value)	printf(name ": %16lx\n", value)
 #define PRINT_REG_N(array, n)					\
-	printf(" %sx%d: = 0x%016lx\n",				\
+	printf(" %sx%d: %16lx\n",				\
 	    ((n) < 10) ? " " : "", n, (array)[n])
 #endif
 

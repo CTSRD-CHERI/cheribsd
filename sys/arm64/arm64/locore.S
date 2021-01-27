@@ -97,6 +97,7 @@ _start:
 	bic	x2, x2, CPACR_CEN_MASK
 	orr	x2, x2, CPACR_CEN_TRAP_NONE
 	msr	cpacr_el1, x2
+	isb
 
 	/*
 	 * Allow access to CNTVCT_EL0 without PCC System permission and enable
@@ -237,6 +238,7 @@ ENTRY(mpentry)
 	bic	x2, x2, CPACR_CEN_MASK
 	orr	x2, x2, CPACR_CEN_TRAP_NONE
 	msr	cpacr_el1, x2
+	isb
 
 	/*
 	 * Allow access to CNTVCT_EL0 without PCC System permission and enable

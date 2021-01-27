@@ -50,64 +50,6 @@ FEATURE(cheriabi, "CheriABI process support");
  * programs.
  */
 
-/*
- * Build a capability to describe the MMAP'able space from the end of
- * the program's heap to the bottom of the stack.
- *
- * XXX: We could probably use looser bounds and rely on the VM system
- * to manage the address space via vm_map instead of the more complex
- * calculations here.
- */
-void
-cheri_set_mmap_capability(struct thread *td, struct image_params *imgp,
-	void * __capability csp)
-{
-	vm_offset_t map_base, stack_base, text_end;
-	size_t map_length;
-
-	stack_base = cheri_getbase(csp);
-	text_end = roundup2(imgp->end_addr,
-	    CHERI_SEALABLE_ALIGNMENT(imgp->end_addr - imgp->start_addr));
-
-	/*
-	 * Less confusing rounded up to a page and 256-bit
-	 * requires no other rounding.
-	 */
-	text_end = roundup2(text_end, PAGE_SIZE);
-	KASSERT(text_end <= stack_base,
-	    ("text_end 0x%zx > stack_base 0x%lx", text_end, stack_base));
-
-	/*
-	 * XXXBFG on Morello stack_base - text_end is so large that map_base is
-	 * rounded up to be above where heap allocations are made. See
-	 * vm/vm_mmap.c:789. We probably want a better fix for this.
-	 */
-#ifdef __aarch64__
-	map_base = 0;
-#else
-	map_base = (text_end == stack_base) ?
-	    CHERI_CAP_USER_MMAP_BASE :
-	    roundup2(text_end,
-		CHERI_REPRESENTABLE_ALIGNMENT(stack_base - text_end));
-#endif
-	KASSERT(map_base < stack_base,
-	    ("map_base 0x%zx >= stack_base 0x%lx", map_base, stack_base));
-	map_length = stack_base - map_base;
-	map_length = rounddown2(map_length,
-	    CHERI_REPRESENTABLE_ALIGNMENT(map_length));
-
-	/*
-	 * Use cheri_capability_build_user_rwx so mmap() can return
-	 * appropriate permissions derived from a single capability.
-	 */
-	td->td_cheri_mmap_cap = cheri_capability_build_user_rwx(
-	    CHERI_CAP_USER_MMAP_PERMS, map_base, map_length,
-	    CHERI_CAP_USER_MMAP_OFFSET);
-	KASSERT(cheri_getperm(td->td_cheri_mmap_cap) &
-	    CHERI_PERM_CHERIABI_VMMAP,
-	    ("%s: mmap() cap lacks CHERI_PERM_CHERIABI_VMMAP", __func__));
-}
-
 void * __capability
 cheri_exec_pcc(struct thread *td, struct image_params *imgp)
 {

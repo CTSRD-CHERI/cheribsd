@@ -126,8 +126,6 @@ struct image_params;
 struct thread;
 void * __capability cheri_exec_pcc(struct thread *td,
 	    struct image_params *imgp);
-void	cheri_set_mmap_capability(struct thread *td, struct image_params *imgp,
-	    void * __capability csp);
 void * __capability cheri_sigcode_capability(struct thread *td);
 
 /*

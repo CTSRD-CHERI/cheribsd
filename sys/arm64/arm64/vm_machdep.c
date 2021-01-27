@@ -222,7 +222,7 @@ cpu_set_upcall(struct thread *td, void (* __capability entry)(void *),
 	if (SV_PROC_FLAG(td->td_proc, SV_CHERI))
 		trapframe_set_elr(tf, (uintcap_t)entry);
 	else
-		hybridabi_thread_setregs(td, (__cheri_addr unsigned long)entry);
+		hybridabi_thread_setregs(td, (unsigned long)(uintcap_t)entry);
 #else
 	tf->tf_elr = (uintcap_t)entry;
 #endif

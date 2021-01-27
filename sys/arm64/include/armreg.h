@@ -105,11 +105,11 @@
 
 #if __has_feature(capabilities)
 /* CCTLR_EL0 - Capability Control Register */
-#define	CCTLR_SBL_MASK	(0x1 << 7) /* Capability sealing by branch and link */
-#define	CCTLR_PERMVCT_MASK	(0x1 << 6) /*  Permit access to CNTVCT w/o System */
-#define	CCTLR_ADRDPB_MASK	(0x1 << 4) /*  ADRPD base selection */
-#define	CCTLR_PCCBO_MASK	(0x1 << 3) /*  PCC base offset enable */
-#define	CCTLR_DDCBO_MASK	(0x1 << 2) /*  PCC base offset enable */
+#define	CCTLR_SBL_MASK		(0x1 << 7) /* Capability sealing by branch and link */
+#define	CCTLR_PERMVCT_MASK	(0x1 << 6) /* Permit access to CNTVCT w/o System */
+#define	CCTLR_ADRDPB_MASK	(0x1 << 4) /* ADRPD base selection */
+#define	CCTLR_PCCBO_MASK	(0x1 << 3) /* PCC base offset enable */
+#define	CCTLR_DDCBO_MASK	(0x1 << 2) /* PCC base offset enable */
 #endif
 
 /* CTR_EL0 - Cache Type Register */
