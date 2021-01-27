@@ -805,7 +805,7 @@ kern_semctl(struct thread *td, int semid, int semnum, int cmd,
 	u_short usval, count;
 	int semidx;
 
-	DPRINTF(("call to semctl(%d, %d, %d, 0x%p)\n",
+	DPRINTF(("call to semctl(%d, %d, %d, %p)\n",
 	    semid, semnum, cmd, arg));
 
 	AUDIT_ARG_SVIPC_CMD(cmd);
@@ -1227,7 +1227,7 @@ kern_semop(struct thread *td, int usemid, struct sembuf * __capability usops,
 #ifdef SEM_DEBUG
 	sops = NULL;
 #endif
-	DPRINTF(("call to semop(%d, %p, %u)\n", usemid, sops, nsops));
+	DPRINTF(("call to semop(%d, %p, %zu)\n", usemid, sops, nsops));
 
 	AUDIT_ARG_SVIPC_ID(usemid);
 
@@ -1244,7 +1244,7 @@ kern_semop(struct thread *td, int usemid, struct sembuf * __capability usops,
 	if (nsops <= SMALL_SOPS)
 		sops = small_sops;
 	else if (nsops > seminfo.semopm) {
-		DPRINTF(("too many sops (max=%d, nsops=%d)\n", seminfo.semopm,
+		DPRINTF(("too many sops (max=%d, nsops=%zd)\n", seminfo.semopm,
 		    nsops));
 		return (E2BIG);
 	} else {
@@ -1263,7 +1263,7 @@ kern_semop(struct thread *td, int usemid, struct sembuf * __capability usops,
 		sops = malloc(nsops * sizeof(*sops), M_TEMP, M_WAITOK);
 	}
 	if ((error = copyin(usops, sops, nsops * sizeof(sops[0]))) != 0) {
-		DPRINTF(("error = %d from copyin(%p, %p, %d)\n", error,
+		DPRINTF(("error = %d from copyin(%p, %p, %zd)\n", error,
 		    (__cheri_fromcap struct sembuf *)usops, sops,
 		    nsops * sizeof(sops[0])));
 		if (sops != small_sops)
@@ -1373,7 +1373,7 @@ kern_semop(struct thread *td, int usemid, struct sembuf * __capability usops,
 		/*
 		 * No ... rollback anything that we've already done
 		 */
-		DPRINTF(("semop:  rollback 0 through %d\n", i-1));
+		DPRINTF(("semop:  rollback 0 through %ld\n", i-1));
 		for (j = 0; j < i; j++)
 			semakptr->u.__sem_base[sops[j].sem_num].semval -=
 			    sops[j].sem_op;
