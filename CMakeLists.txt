@@ -99,6 +99,17 @@ file(CREATE_LINK "${CMAKE_SOURCE_DIR}/lib/libcapsicum/capsicum_helpers.h" ${TMPS
 file(CREATE_LINK "${CMAKE_SOURCE_DIR}/lib/libcasper/libcasper/libcasper.h" ${TMPSYSROOT}/include/libcasper.h SYMBOLIC)
 add_compile_definitions(HAVE_CASPER=1)
 
+# Add code completion for casper
+file(MAKE_DIRECTORY ${TMPSYSROOT}/include/casper)
+file(GLOB _casper_hdrs LIST_DIRECTORIES FALSE "lib/libcasper/services/*/*.h")
+foreach(_hdrpath ${_casper_hdrs})
+    get_filename_component(_hdrname "${_hdrpath}" NAME)
+    file(CREATE_LINK "${_hdrpath}" ${TMPSYSROOT}/include/casper/${_hdrname} SYMBOLIC)
+endforeach()
+file(CREATE_LINK "${CMAKE_SOURCE_DIR}/lib/libcapsicum/capsicum_helpers.h" ${TMPSYSROOT}/include/capsicum_helpers.h SYMBOLIC)
+file(CREATE_LINK "${CMAKE_SOURCE_DIR}/lib/libcasper/libcasper/libcasper.h" ${TMPSYSROOT}/include/libcasper.h SYMBOLIC)
+add_compile_definitions(HAVE_CASPER=1)
+
 # TODO: should only be for CHERI
 file(MAKE_DIRECTORY ${TMPSYSROOT}/include/c++)
 file(CREATE_LINK ${CMAKE_SOURCE_DIR}/contrib/subrepo-cheri-libc++/include ${TMPSYSROOT}/include/c++/v1 SYMBOLIC)
