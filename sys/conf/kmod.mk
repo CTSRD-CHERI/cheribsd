@@ -317,7 +317,7 @@ ${_ILINKS}:
 	*) \
 		path=${SYSDIR}/${.TARGET:T}/include ;; \
 	esac ; \
-	path=`(cd $$path && /bin/pwd)` ; \
+	path=`realpath $$path`; \
 	${ECHO} ${.TARGET:T} "->" $$path ; \
 	ln -fns $$path ${.TARGET:T}
 
