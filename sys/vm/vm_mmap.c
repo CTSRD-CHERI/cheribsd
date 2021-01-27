@@ -321,6 +321,10 @@ sys_mmap(struct thread *td, struct mmap_args *uap)
 		SYSERRCAUSE("MAP_32BIT not supported in CheriABI");
 		return (EINVAL);
 	}
+#ifdef __CHERI_PURE_CAPABILITY__
+		/* Needed for fixed mappings */
+		.mr_source_cap = userspace_root_cap,
+#endif
 
 	/*
 	 * Allow existing mapping to be replaced using the MAP_FIXED
@@ -704,8 +708,10 @@ kern_mmap(struct thread *td, struct mmap_req *mrp)
 		}
 #ifdef __CHERI_PURE_CAPABILITY__
 		/*
-		 * Use the source capability for addr if a new reservation
-		 * is not requested.
+		 * This makes sure we use the correct source capability and hint
+		 * address for hybrid userland and for MAP_FIXED.
+		 * If MAP_RESERVATION_CREATE is requested, addr is just the hint
+		 * virtual address and will not be a valid capability.
 		 */
 		if ((flags & MAP_RESERVATION_CREATE) == 0)
 			addr = cheri_setaddress((uintcap_t)mrp->mr_source_cap,
@@ -2042,6 +2048,12 @@ vm_mmap_object(vm_map_t map, vm_pointer_t *addr, vm_offset_t max_addr,
 	bool curmap, fitit, new_reservation;
 	vm_size_t padded_size;
 	vm_pointer_t reservation;
+
+#ifdef __CHERI_PURE_CAPABILITY__
+	KASSERT(cheri_getlen(addr) == sizeof(void *),
+	    ("Invalid bounds for pointer-sized object %zx",
+	    (size_t)cheri_getlen(addr)));
+#endif
 
 	curmap = map == &td->td_proc->p_vmspace->vm_map;
 	if (curmap) {
