@@ -334,6 +334,8 @@ ATF_TC_BODY(o_search_revokex, tc)
 	fstatvfs(dfd, &vst);
 	if (strcmp(vst.f_fstypename, "nfs") == 0)
 		atf_tc_expect_fail("NFS protocol cannot observe O_SEARCH semantics");
+	if (strcmp(vst.f_fstypename, "tmpfs") == 0)
+		atf_tc_expect_fail("tmpfs does not handle O_SEARCH semantics");
 
 	ATF_REQUIRE(fstatat(dfd, BASEFILE, &sb, 0) == 0);
 
