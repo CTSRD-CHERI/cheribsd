@@ -1186,6 +1186,10 @@ sys_semget(struct thread *td, struct semget_args *uap)
 
 found:
 	td->td_retval[0] = IXSEQ_TO_IPCID(semid, sema[semid].u.sem_perm);
+	KASSERT(IPCID_TO_IX(td->td_retval[0]) == semid,
+	    ("Semid overflowed: %x", semid));
+	KASSERT(IPCID_TO_SEQ(td->td_retval[0]) == sema[semid].u.sem_perm.seq,
+	    ("Sem seq overflowed: %x", sema[semid].u.sem_perm.seq));
 done2:
 	mtx_unlock(&sem_mtx);
 	return (error);
