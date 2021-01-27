@@ -567,6 +567,12 @@ kern_shmat_locked(struct thread *td, int shmid,
 		vm_object_deallocate(shmseg->object);
 		return (ENOMEM);
 	}
+#ifdef __CHERI_PURE_CAPABILITY__
+	KASSERT(cheri_gettag(attach_addr), ("Expected valid capability"));
+	KASSERT(cheri_getlen(attach_addr) == size,
+	    ("Inexact bounds expected %zx found %zx",
+	    (size_t)size, (size_t)cheri_getlen(attach_addr)));
+#endif
 
 	shmmap_s->va = attach_va;
 	shmmap_s->shmid = shmid;
@@ -2185,10 +2191,14 @@ DECLARE_MODULE(sysvshm, sysvshm_mod, SI_SUB_SYSV_SHM, SI_ORDER_FIRST);
 MODULE_VERSION(sysvshm, 1);
 // CHERI CHANGES START
 // {
-//   "updated": 20181127,
+//   "updated": 20200708,
 //   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"
+//   ],
+//   "changes_purecap": [
+//     "pointer_as_integer",
+//     "support"
 //   ]
 // }
 // CHERI CHANGES END
