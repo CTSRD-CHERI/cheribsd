@@ -226,7 +226,7 @@ struct vm_map {
 	vm_offset_t anon_loc;
 	int busy;
 #ifdef __CHERI_PURE_CAPABILITY__
-	void *map_capability;		/* Capability spanning the whole map */
+	vm_pointer_t map_capability;	/* Capability spanning the whole map */
 #endif
 #ifdef DIAGNOSTIC
 	int nupdates;
@@ -290,7 +290,7 @@ vm_map_range_valid(vm_map_t map, vm_offset_t start, vm_offset_t end)
 
 #endif	/* KLD_MODULE */
 #ifdef __CHERI_PURE_CAPABILITY__
-static __inline void *
+static __inline vm_pointer_t
 vm_map_rootcap(vm_map_t map)
 {
 	return (map->map_capability);
@@ -491,7 +491,7 @@ vm_map_entry_read_succ(void *token, struct vm_map_entry *const clone,
 #ifdef _KERNEL
 boolean_t vm_map_check_protection (vm_map_t, vm_offset_t, vm_offset_t, vm_prot_t);
 int vm_map_delete(vm_map_t, vm_offset_t, vm_offset_t, bool);
-int vm_map_find(vm_map_t, vm_object_t, vm_ooffset_t, vm_offset_t *, vm_size_t,
+int vm_map_find(vm_map_t, vm_object_t, vm_ooffset_t, vm_pointer_t *, vm_size_t,
     vm_offset_t, int, vm_prot_t, vm_prot_t, int);
 int vm_map_find_min(vm_map_t, vm_object_t, vm_ooffset_t, vm_pointer_t *,
     vm_size_t, vm_offset_t, vm_offset_t, int, vm_prot_t, vm_prot_t, int);
@@ -522,7 +522,14 @@ int vm_map_reservation_get(vm_map_t, vm_offset_t, vm_size_t, vm_offset_t *);
 #if __has_feature(capabilities)
 int vm_map_prot2perms(vm_prot_t prot);
 #endif
+#ifdef __CHERI_PURE_CAPABILITY__
+vm_pointer_t _vm_map_buildcap(vm_map_t map, vm_offset_t addr, vm_size_t length,
+    vm_prot_t prot);
+#define	vm_map_buildcap(map, addr, length, prot)	\
+    _vm_map_buildcap(map, addr, length, prot)
+#else
 #define	vm_map_buildcap(map, addr, length, prot) (addr)
+#endif
 
 static inline vm_map_entry_t
 vm_map_entry_first(vm_map_t map)
