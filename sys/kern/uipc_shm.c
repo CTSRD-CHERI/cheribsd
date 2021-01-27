@@ -1585,7 +1585,7 @@ fail:
 }
 
 int
-shm_mmap(struct file *fp, vm_map_t map, vm_offset_t *addr,
+shm_mmap(struct file *fp, vm_map_t map, vm_pointer_t *addr,
     vm_offset_t max_addr, vm_size_t objsize,
     vm_prot_t prot, vm_prot_t cap_maxprot, int flags,
     vm_ooffset_t foff, struct thread *td)
@@ -1748,7 +1748,8 @@ int
 shm_map(struct file *fp, size_t size, off_t offset, void **memp)
 {
 	struct shmfd *shmfd;
-	vm_offset_t kva, ofs;
+	vm_pointer_t kva;
+	vm_offset_t ofs;
 	vm_object_t obj;
 	int rv;
 
@@ -2045,10 +2046,13 @@ sys_shm_open2(struct thread *td, struct shm_open2_args *uap)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20191022,
+//   "updated": 20200706,
 //   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"
+//   ],
+//   "changes_purecap": [
+//     "pointer_as_integer"
 //   ]
 // }
 // CHERI CHANGES END
