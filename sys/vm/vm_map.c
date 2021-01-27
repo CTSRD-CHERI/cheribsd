@@ -135,8 +135,8 @@ static uma_zone_t mapentzone;
 static uma_zone_t kmapentzone;
 static uma_zone_t vmspace_zone;
 static int vmspace_zinit(void *mem, int size, int flags);
-static void _vm_map_init(vm_map_t map, pmap_t pmap, vm_offset_t min,
-    vm_offset_t max);
+static void _vm_map_init(vm_map_t map, pmap_t pmap, vm_pointer_t min,
+    vm_pointer_t max);
 static void vm_map_entry_deallocate(vm_map_entry_t entry, boolean_t system_map);
 static void vm_map_entry_dispose(vm_map_t map, vm_map_entry_t entry);
 static void vm_map_entry_unwire(vm_map_t map, vm_map_entry_t entry);
@@ -147,7 +147,7 @@ static void vm_map_pmap_enter(vm_map_t map, vm_offset_t addr, vm_prot_t prot,
 #ifdef INVARIANTS
 static void vmspace_zdtor(void *mem, int size, void *arg);
 #endif
-static int vm_map_stack_locked(vm_map_t map, vm_offset_t addrbos,
+static int vm_map_stack_locked(vm_map_t map, vm_pointer_t addrbos,
     vm_size_t max_ssize, vm_size_t growsize, vm_prot_t prot, vm_prot_t max,
     int cow);
 static void vm_map_wire_entry_failure(vm_map_t map, vm_map_entry_t entry,
@@ -220,8 +220,8 @@ vm_map_log(const char *prefix, vm_map_entry_t entry)
 		prt[4] = '-';
 	prt[5] = '\0';
 	snprintf(buffer, sizeof(buffer), "VMMAP %d: %s: start=%p end=%p prt=%s",
-	    curproc->p_pid, prefix, (void *)entry->start, (void *)entry->end,
-	    prt);
+	    curproc->p_pid, prefix, (void *)(uintptr_t)entry->start,
+	    (void *)(uintptr_t)entry->end, prt);
 	CHERI_TRACE_STRING(buffer);
 }
 #else
@@ -375,7 +375,7 @@ vmspace_zdtor(void *mem, int size, void *arg)
  * and initialize those structures.  The refcnt is set to 1.
  */
 struct vmspace *
-vmspace_alloc(vm_offset_t min, vm_offset_t max, pmap_pinit_t pinit)
+vmspace_alloc(vm_pointer_t min, vm_pointer_t max, pmap_pinit_t pinit)
 {
 	struct vmspace *vm;
 
@@ -971,8 +971,13 @@ vmspace_resident_count(struct vmspace *vmspace)
  * such as that in the vmspace structure.
  */
 static void
-_vm_map_init(vm_map_t map, pmap_t pmap, vm_offset_t min, vm_offset_t max)
+_vm_map_init(vm_map_t map, pmap_t pmap, vm_pointer_t min, vm_pointer_t max)
 {
+
+#ifdef __CHERI_PURE_CAPABILITY__
+	KASSERT(cheri_gettag(min), ("Expected valid min capability"));
+	KASSERT(cheri_gettag(max), ("Expected valid max capability"));
+#endif
 
 	map->header.eflags = MAP_ENTRY_HEADER;
 	map->needs_wakeup = FALSE;
@@ -986,13 +991,24 @@ _vm_map_init(vm_map_t map, pmap_t pmap, vm_offset_t min, vm_offset_t max)
 	map->timestamp = 0;
 	map->busy = 0;
 	map->anon_loc = 0;
+#ifdef __CHERI_PURE_CAPABILITY__
+	/*
+	 * Do not enforce exact bounds here. The kernel map
+	 * can not be made representable without dropping some
+	 * physical memory, so restrict bounds as much as possible
+	 * and rely on the vm_map min/max enforcement.
+	 */
+	map->map_capability = cheri_setbounds(min,
+	    (ptraddr_t)max - (ptraddr_t)min);
+	map->flags |= MAP_RESERVATIONS;
+#endif
 #ifdef DIAGNOSTIC
 	map->nupdates = 0;
 #endif
 }
 
 void
-vm_map_init(vm_map_t map, pmap_t pmap, vm_offset_t min, vm_offset_t max)
+vm_map_init(vm_map_t map, pmap_t pmap, vm_pointer_t min, vm_pointer_t max)
 {
 
 	_vm_map_init(map, pmap, min, max);
@@ -1705,10 +1721,15 @@ vm_map_lookup_entry(
  *
  *	If object is non-NULL, ref count must be bumped by caller
  *	prior to making call to account for the new entry.
+ *
+ *	If the map is using reservations, the address range must be
+ *	backed by an existing reservation.
+ *	XXX-AM: The reservation argument can probably be dropped
+ *	as we require start
  */
 int
 vm_map_insert(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
-    vm_offset_t start, vm_offset_t end, vm_prot_t prot, vm_prot_t max, int cow,
+    vm_pointer_t start, vm_pointer_t end, vm_prot_t prot, vm_prot_t max, int cow,
     vm_offset_t reservation)
 {
 	vm_map_entry_t new_entry, next_entry, prev_entry;
@@ -1739,6 +1760,11 @@ vm_map_insert(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 
 	if (map->flags & MAP_RESERVATIONS) {
 		/* Make sure we fit into a single reservation entry. */
+#ifdef __CHERI_PURE_CAPABILITY__
+		if (cheri_gettag(start) == 0 ||
+		    cheri_getlen(start) < (ptraddr_t)end - (ptraddr_t)start)
+			return (KERN_INVALID_ARGUMENT);
+#endif
 		if (vm_map_lookup_entry(map, start, &new_entry) == 0 ||
 		    new_entry->reservation != reservation)
 			return (KERN_PROTECTION_FAILURE);
@@ -1810,7 +1836,8 @@ vm_map_insert(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 		goto charged;
 	if ((cow & MAP_ACC_CHARGED) || ((prot & VM_PROT_WRITE) &&
 	    ((protoeflags & MAP_ENTRY_NEEDS_COPY) || object == NULL))) {
-		if (!(cow & MAP_ACC_CHARGED) && !swap_reserve(end - start))
+		if (!(cow & MAP_ACC_CHARGED) &&
+		    !swap_reserve((ptraddr_t)end - (ptraddr_t)start))
 			return (KERN_RESOURCE_SHORTAGE);
 		KASSERT(object == NULL ||
 		    (protoeflags & MAP_ENTRY_NEEDS_COPY) != 0 ||
@@ -1955,7 +1982,8 @@ charged:
 
 	if ((cow & (MAP_PREFAULT | MAP_PREFAULT_PARTIAL)) != 0) {
 		vm_map_pmap_enter(map, start, prot, object, OFF_TO_IDX(offset),
-		    end - start, cow & MAP_PREFAULT_PARTIAL);
+		    (ptraddr_t)end - (ptraddr_t)start,
+		    cow & MAP_PREFAULT_PARTIAL);
 	}
 
 	return (KERN_SUCCESS);
@@ -2070,14 +2098,25 @@ vm_map_findspace(vm_map_t map, vm_offset_t start, vm_size_t length)
 	return (root->end);
 }
 
+/*
+ * Map an object into an existing reservation for the given map.
+ * The start address must be a valid capability for the reservation (or a
+ * subset of it). We do not care about exact representability of this mapping.
+ */
 int
 vm_map_fixed(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
-    vm_offset_t start, vm_size_t length, vm_prot_t prot,
+    vm_pointer_t start, vm_size_t length, vm_prot_t prot,
     vm_prot_t max, int cow)
 {
 	vm_pointer_t end;
 	vm_offset_t reservation_id = start;
 	int result;
+
+#ifdef __CHERI_PURE_CAPABILITY__
+	KASSERT(cheri_gettag(start), ("Expected valid capability"));
+	if (cheri_getlen(start) < length)
+		return (KERN_INVALID_ARGUMENT);
+#endif
 
 	end = start + length;
 	KASSERT((cow & (MAP_STACK_GROWS_DOWN | MAP_STACK_GROWS_UP)) == 0 ||
@@ -2135,7 +2174,7 @@ SYSCTL_INT(_vm, OID_AUTO, cluster_anon, CTLFLAG_RW,
     "Cluster anonymous mappings: 0 = no, 1 = yes if no hint, 2 = always");
 
 static bool
-clustering_anon_allowed(vm_offset_t addr)
+clustering_anon_allowed(vm_pointer_t addr)
 {
 
 	switch (cluster_anon) {
@@ -2179,7 +2218,7 @@ vm_map_alignspace(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 	free_addr = *addr;
 	KASSERT(free_addr == vm_map_findspace(map, free_addr, length),
 	    ("caller failed to provide space %#jx at address %p",
-	     (uintmax_t)length, (void *)(uintptr_t)free_addr));
+	    (uintmax_t)length, (void *)(uintptr_t)free_addr));
 	for (;;) {
 		/*
 		 * At the start of every iteration, the free space at address
@@ -2244,10 +2283,17 @@ vm_map_find_aligned(vm_map_t map, vm_offset_t *addr, vm_size_t length,
  *
  *	If object is non-NULL, ref count must be bumped by caller
  *	prior to making call to account for the new entry.
+ *
+ *	In the purecap kernel we always promote the alignment
+ *	requirements to the cheri representable alignment if the
+ *	map has reservations enabled.
+ *	It is currently assumed that all types of capabilities have
+ *	the same alignment requirements. This is true with the
+ *	CHERI Concentrate encoding.
  */
 int
 vm_map_find(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
-	    vm_offset_t *addr,	/* IN/OUT */
+	    vm_pointer_t *addr,	/* IN/OUT */
 	    vm_size_t length, vm_offset_t max_addr, int find_space,
 	    vm_prot_t prot, vm_prot_t max, int cow)
 {
@@ -2262,6 +2308,12 @@ vm_map_find(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 	    ("vm_map_find: non-NULL backing object for stack"));
 	MPASS((cow & MAP_REMAP) == 0 || (find_space == VMFS_NO_SPACE &&
 	    (cow & (MAP_STACK_GROWS_DOWN | MAP_STACK_GROWS_UP)) == 0));
+#ifdef __CHERI_PURE_CAPABILITY__
+	KASSERT(cheri_getlen(addr) == sizeof(void *),
+	    ("Invalid bounds for pointer-sized object %zx",
+	    cheri_getlen(addr)));
+#endif
+
 	if (find_space == VMFS_OPTIMAL_SPACE && (object == NULL ||
 	    (object->flags & OBJ_COLORED) == 0))
 		find_space = VMFS_ANY_SPACE;
@@ -2422,6 +2474,10 @@ again:
 done:
 	vm_map_unlock(map);
 	if (rv == KERN_SUCCESS) {
+#ifdef __CHERI_PURE_CAPABILITY__
+		KASSERT(cheri_gettag(reservation),
+		    ("Expected valid capability"));
+#endif
 		*addr = reservation;
 	}
 	return (rv);
@@ -2441,11 +2497,11 @@ done:
  */
 int
 vm_map_find_min(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
-    vm_offset_t *addr, vm_size_t length, vm_offset_t min_addr,
+    vm_pointer_t *addr, vm_size_t length, vm_offset_t min_addr,
     vm_offset_t max_addr, int find_space, vm_prot_t prot, vm_prot_t max,
     int cow)
 {
-	vm_offset_t hint;
+	vm_pointer_t hint;
 	int rv;
 
 	hint = *addr;
@@ -2756,13 +2812,17 @@ vm_map_clip_end(vm_map_t map, vm_map_entry_t entry, vm_offset_t endaddr)
 int
 vm_map_submap(
 	vm_map_t map,
-	vm_offset_t start,
-	vm_offset_t end,
+	vm_pointer_t start,
+	vm_pointer_t end,
 	vm_map_t submap)
 {
 	vm_map_entry_t entry;
 	int result = KERN_INVALID_ARGUMENT;
 
+#ifdef __CHERI_PURE_CAPABILITY__
+	KASSERT(cheri_gettag(start), ("Expected valid start capability"));
+	KASSERT(cheri_gettag(end), ("Expected valid end capability"));
+#endif
 
 	vm_map_lock(submap);
 	submap->flags |= MAP_IS_SUB_MAP;
@@ -4313,6 +4373,7 @@ vm_map_delete(vm_map_t map, vm_offset_t start, vm_offset_t end,
 			if ((entry->eflags & MAP_ENTRY_UNMAPPED) == 0) {
 				if ((entry->eflags & MAP_ENTRY_GUARD) == 0)
 					map->size -= (entry->end - entry->start);
+				/* XXX-AM: How do we reset maxprot? */
 				vm_map_reservation_init_entry(entry);
 			}
 			/* Attempt to consolidate the mapping anyway? */
@@ -4642,8 +4703,16 @@ vmspace_fork(struct vmspace *vm1, vm_ooffset_t *fork_charge)
 
 	old_map = &vm1->vm_map;
 	/* Copy immutable fields of vm1 to vm2. */
+#ifndef __CHERI_PURE_CAPABILITY__
 	vm2 = vmspace_alloc(vm_map_min(old_map), vm_map_max(old_map),
 	    pmap_pinit);
+#else
+	vm2 = vmspace_alloc(
+	    cheri_setaddress(vm_map_rootcap(old_map), vm_map_min(old_map)),
+	    cheri_setaddress(vm_map_rootcap(old_map), vm_map_max(old_map)),
+	    pmap_pinit);
+#endif
+
 	if (vm2 == NULL)
 		return (NULL);
 
@@ -4847,7 +4916,7 @@ vmspace_fork(struct vmspace *vm1, vm_ooffset_t *fork_charge)
  * asked to wire the newly created stack.
  */
 int
-vm_map_stack(vm_map_t map, vm_offset_t addrbos, vm_size_t max_ssize,
+vm_map_stack(vm_map_t map, vm_pointer_t addrbos, vm_size_t max_ssize,
     vm_prot_t prot, vm_prot_t max, int cow)
 {
 	vm_size_t growsize, init_ssize;
@@ -4876,12 +4945,17 @@ SYSCTL_INT(_security_bsd, OID_AUTO, stack_guard_page, CTLFLAG_RWTUN,
     &stack_guard_page, 0,
     "Specifies the number of guard pages for a stack that grows");
 
+/*
+ * If the map is using reservations, the stack address must be
+ * backed by an existing reservation. In the pure capability kernel
+ * the stack address must also be a valid capability.
+ */
 static int
-vm_map_stack_locked(vm_map_t map, vm_offset_t addrbos, vm_size_t max_ssize,
+vm_map_stack_locked(vm_map_t map, vm_pointer_t addrbos, vm_size_t max_ssize,
     vm_size_t growsize, vm_prot_t prot, vm_prot_t max, int cow)
 {
 	vm_map_entry_t new_entry, prev_entry;
-	vm_offset_t bot, gap_bot, gap_top, top;
+	vm_pointer_t bot, gap_bot, gap_top, top;
 	vm_size_t init_ssize, sgp;
 	int orient, rv;
 
@@ -4996,11 +5070,12 @@ vm_map_growstack(vm_map_t map, vm_offset_t addr, vm_map_entry_t gap_entry)
 	struct proc *p;
 	struct vmspace *vm;
 	struct ucred *cred;
-	vm_offset_t gap_end, gap_start, grow_start;
+	vm_pointer_t gap_end, gap_start, grow_start;
 	vm_size_t grow_amount, guard, max_grow;
 	rlim_t lmemlim, stacklim, vmemlim;
 	int rv, rv1;
 	bool gap_deleted, grow_down, is_procstack;
+	vm_pointer_t stack_reservation;
 #ifdef notyet
 	uint64_t limit;
 #endif
@@ -5062,7 +5137,7 @@ retry:
 	 * If this is the main process stack, see if we're over the stack
 	 * limit.
 	 */
-	is_procstack = addr >= (vm_offset_t)vm->vm_maxsaddr &&
+	is_procstack = addr >= vm->vm_maxsaddr &&
 	    addr < (vm_offset_t)p->p_usrstack;
 	if (is_procstack && (ctob(vm->vm_ssize) + grow_amount > stacklim))
 		return (KERN_NO_SPACE);
@@ -5143,11 +5218,24 @@ retry:
 		goto retry;
 	}
 
+	/*
+	 * XXX-AM: we need to recreate the capability for the
+	 * stack reservation. This is hacky, we should have
+	 * a way to recover it. Maybe save it as a capability
+	 * in the map entry?
+	 */
 	if (grow_down) {
-		grow_start = gap_entry->end - grow_amount;
+		stack_reservation = vm_map_buildcap(map, gap_entry->start,
+		    stack_entry->end - gap_entry->start,
+		    stack_entry->max_protection);
+
+		grow_start = (vm_pointer_t)cheri_kern_setaddress(
+		    stack_reservation, gap_entry->end - grow_amount);
 		if (gap_entry->start + grow_amount == gap_entry->end) {
-			gap_start = gap_entry->start;
-			gap_end = gap_entry->end;
+			gap_start = (vm_pointer_t)cheri_kern_setaddress(
+			    stack_reservation, gap_entry->start);
+			gap_end = (vm_pointer_t)cheri_kern_setaddress(
+			    stack_reservation, gap_entry->end);
 			vm_map_entry_delete(map, gap_entry);
 			gap_deleted = true;
 		} else {
@@ -5173,12 +5261,19 @@ retry:
 				    MAP_CREATE_GUARD | MAP_CREATE_STACK_GAP_DN,
 				    stack_entry->reservation);
 				MPASS(rv1 == KERN_SUCCESS);
-			} else
+			} else {
+				if (map->flags & MAP_RESERVATIONS)
+					vm_map_entry_delete(map, tmp_entry);
 				vm_map_entry_resize(map, gap_entry,
 				    grow_amount);
+			}
 		}
 	} else {
-		grow_start = stack_entry->end;
+		stack_reservation = vm_map_buildcap(map, stack_entry->start,
+		    gap_entry->end - stack_entry->start,
+		    stack_entry->max_protection);
+		grow_start = (vm_pointer_t)cheri_kern_setaddress(
+		    stack_reservation, stack_entry->end);
 		cred = stack_entry->cred;
 		if (cred == NULL && stack_entry->object.vm_object != NULL)
 			cred = stack_entry->object.vm_object->cred;
@@ -5245,10 +5340,40 @@ vmspace_exec(struct proc *p, vm_offset_t minuser, vm_offset_t maxuser)
 {
 	struct vmspace *oldvmspace = p->p_vmspace;
 	struct vmspace *newvmspace;
+#ifdef __CHERI_PURE_CAPABILITY__
+	vm_offset_t padded_minuser;
+	vm_pointer_t minuser_cap;
+	vm_pointer_t maxuser_cap;
+	vm_offset_t user_length;
+#endif
 
 	KASSERT((curthread->td_pflags & TDP_EXECVMSPC) == 0,
 	    ("vmspace_exec recursed"));
+#ifdef __CHERI_PURE_CAPABILITY__
+	/*
+	 * We create a new userspace capability for this map
+	 * Only allow non-representable map capability if the minuser
+	 * excludes the first page.
+	 */
+	user_length = MIN(maxuser - minuser,
+	    VM_MAXUSER_ADDRESS - VM_MINUSER_ADDRESS);
+	padded_minuser = rounddown2(minuser,
+	    CHERI_REPRESENTABLE_ALIGNMENT(user_length));
+	KASSERT(padded_minuser == minuser || minuser <= PAGE_SIZE,
+	    ("Unrepresentable base for new vmspace"));
+	KASSERT(maxuser - padded_minuser ==
+	    CHERI_REPRESENTABLE_LENGTH(user_length),
+	    ("Unrepresentable length for new vmspace"));
+
+	user_length = CHERI_REPRESENTABLE_LENGTH(user_length);
+	minuser_cap = (vm_pointer_t)cheri_capability_build_user_rwx(
+	    CHERI_CAP_USER_CODE_PERMS | CHERI_CAP_USER_DATA_PERMS |
+	    CHERI_PERMS_SWALL, padded_minuser, user_length, minuser);
+	maxuser_cap = cheri_setaddress(minuser_cap, maxuser);
+	newvmspace = vmspace_alloc(minuser_cap, maxuser_cap, pmap_pinit);
+#else
 	newvmspace = vmspace_alloc(minuser, maxuser, pmap_pinit);
+#endif
 	if (newvmspace == NULL)
 		return (ENOMEM);
 	newvmspace->vm_swrss = oldvmspace->vm_swrss;
@@ -5649,6 +5774,25 @@ vm_map_prot2perms(vm_prot_t prot)
 
 	return (perms);
 }
+
+#ifdef __CHERI_PURE_CAPABILITY__
+/*
+ * Create a capability for the given map, derived from the map root
+ * capability.
+ */
+vm_pointer_t
+_vm_map_buildcap(vm_map_t map, vm_offset_t addr, vm_size_t length,
+    vm_prot_t prot)
+{
+	vm_pointer_t retcap;
+	int perms = ~MAP_CAP_PERM_MASK | vm_map_prot2perms(prot);
+
+	retcap = cheri_setbounds(
+	    cheri_setaddress(vm_map_rootcap(map), addr), length);
+
+	return (cheri_andperm(retcap, perms));
+}
+#endif /* __CHERI_PURE_CAPABILITY__ */
 #endif /* has_feature(capabilities) */
 
 /*
@@ -5731,6 +5875,11 @@ vm_map_reservation_create_locked(vm_map_t map, vm_pointer_t *addr,
 	vm_map_entry_t entry;
 
 	VM_MAP_ASSERT_LOCKED(map);
+#ifdef __CHERI_PURE_CAPABILITY__
+	KASSERT(cheri_getlen(addr) == sizeof(void *),
+	    ("Invalid bounds for pointer-sized object %zx",
+	    cheri_getlen(addr)));
+#endif
 
 	if ((map->flags & MAP_RESERVATIONS) == 0) {
 		*addr = vm_map_buildcap(map, start, length, max_prot);
@@ -5758,6 +5907,12 @@ vm_map_reservation_create_locked(vm_map_t map, vm_pointer_t *addr,
 	CTR3(KTR_VM, "%s: reserve %lx-%lx", __func__, start, end);
 
 	*addr = vm_map_buildcap(map, start, length, max_prot);
+#ifdef __CHERI_PURE_CAPABILITY__
+	KASSERT(cheri_gettag(*addr), ("Expected valid capability"));
+	KASSERT(cheri_getlen(*addr) == length,
+	    ("Inexact bounds expected %zx found %zx",
+	    (size_t)length, cheri_getlen(*addr)));
+#endif
 
 	return (KERN_SUCCESS);
 }
@@ -5936,9 +6091,9 @@ vm_map_print(vm_map_t map)
 	db_indent += 2;
 	prev = &map->header;
 	VM_MAP_ENTRY_FOREACH(entry, map) {
-		db_iprintf("map entry %p: start=%p, end=%p, eflags=%#x, \n",
-		    (void *)entry, (void *)entry->start, (void *)entry->end,
-		    entry->eflags);
+		db_iprintf("map entry %p: start=%#jx, end=%#jx, eflags=%#x, \n",
+		    (void *)entry, (uintmax_t)entry->start,
+		    (uintmax_t)entry->end, entry->eflags);
 		{
 			static const char * const inheritance_name[4] =
 			{"share", "copy", "none", "donate_copy"};
@@ -6022,12 +6177,15 @@ DB_SHOW_COMMAND(procvm, procvm)
 #endif /* DDB */
 // CHERI CHANGES START
 // {
-//   "updated": 20181127,
+//   "updated": 20200708,
 //   "target_type": "kernel",
 //   "changes": [
 //     "platform"
 //   ],
 //   "changes_purecap": [
+//     "pointer_as_integer",
+//     "support",
+//     "uintcap_arithmetic",
 //     "kdb"
 //   ]
 // }
