@@ -1168,9 +1168,9 @@ sys_semget(struct thread *td, struct semget_args *uap)
 		sema[semid].u.sem_otime = 0;
 		sema[semid].u.sem_ctime = time_second;
 		sema[semid].u.__sem_base = &sem[semtot];
-		semtot += nsems;
 		bzero(&sem[semtot],
 		    sizeof(sema[semid].u.__sem_base[0])*nsems);
+		semtot += nsems;
 #ifdef MAC
 		mac_sysvsem_create(cred, &sema[semid]);
 #endif
