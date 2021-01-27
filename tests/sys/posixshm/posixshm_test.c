@@ -1437,8 +1437,9 @@ ATF_TC_BODY(largepage_mprotect, tc)
 	pscnt = pagesizes(ps);
 	for (int i = 1; i < pscnt; i++) {
 		fd = shm_open_large(i, SHM_LARGEPAGE_ALLOC_DEFAULT, ps[i]);
-		addr = mmap(NULL, ps[i], PROT_READ | PROT_WRITE, MAP_SHARED, fd,
-		    0);
+		addr = mmap(NULL, ps[i],
+		    PROT_MAX(PROT_READ | PROT_WRITE | PROT_EXEC) | PROT_READ |
+		    PROT_WRITE, MAP_SHARED, fd, 0);
 		ATF_REQUIRE_MSG(addr != MAP_FAILED,
 		    "mmap(%zu bytes) failed; error=%d", ps[i], errno);
 
