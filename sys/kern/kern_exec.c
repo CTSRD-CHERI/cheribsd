@@ -1208,9 +1208,13 @@ exec_new_vmspace(struct image_params *imgp, struct sysentvec *sv)
 	}
 
 #if __has_feature(capabilities)
-	perms = ~MAP_CAP_PERM_MASK | vm_map_prot2perms(stack_prot);
-	imgp->stack = cheri_capability_build_user_data(
-	    perms & CHERI_CAP_USER_DATA_PERMS, stack_addr, ssiz, ssiz);
+	perms = (~MAP_CAP_PERM_MASK | vm_map_prot2perms(stack_prot)) &
+	    CHERI_CAP_USER_DATA_PERMS;
+#ifdef __CHERI_PURE_CAPABILITY__
+	imgp->stack = (void *)cheri_andperm(stack_addr + ssiz, perms);
+#else
+	imgp->stack = cheri_capability_build_user_data(perms, stack_addr,
+	    ssiz, ssiz);
 #endif
 
 	if (sv->sv_flags & SV_CHERI) {
@@ -1227,8 +1231,12 @@ exec_new_vmspace(struct image_params *imgp, struct sysentvec *sv)
 		    MAP_RESERVATION_CREATE, NULL, 0, FALSE, td);
 		if (error != KERN_SUCCESS)
 			return (vm_mmap_to_errno(error));
+#ifdef __CHERI_PURE_CAPABILITY__
+		imgp->strings = (void *)strings_addr;
+#else
 		imgp->strings = cheri_capability_build_user_data(
 		    CHERI_CAP_USER_DATA_PERMS, strings_addr, ARG_MAX, ARG_MAX);
+#endif
 	} else
 		imgp->strings = imgp->stack;
 
@@ -1243,7 +1251,7 @@ exec_new_vmspace(struct image_params *imgp, struct sysentvec *sv)
 	 * are still used to enforce the stack rlimit on the process stack.
 	 */
 	vmspace->vm_ssize = sgrowsiz >> PAGE_SHIFT;
-	vmspace->vm_maxsaddr = (char *)stack_addr;
+	vmspace->vm_maxsaddr = stack_addr;
 
 	return (0);
 }
@@ -1423,7 +1431,7 @@ err_exit:
 }
 
 struct exec_args_kva {
-	vm_offset_t addr;
+	vm_pointer_t addr;
 	u_int gen;
 	SLIST_ENTRY(exec_args_kva) next;
 };
@@ -1451,7 +1459,7 @@ exec_prealloc_args_kva(void *arg __unused)
 }
 SYSINIT(exec_args_kva, SI_SUB_EXEC, SI_ORDER_ANY, exec_prealloc_args_kva, NULL);
 
-static vm_offset_t
+static vm_pointer_t
 exec_alloc_args_kva(void **cookie)
 {
 	struct exec_args_kva *argkva;
@@ -2059,11 +2067,14 @@ exec_unregister(const struct execsw *execsw_arg)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20181127,
+//   "updated": 20200123,
 //   "target_type": "kernel",
 //   "changes": [
 //     "integer_provenance",
 //     "user_capabilities"
+//   ],
+//   "changes_purecap": [
+//     "pointer_as_integer"
 //   ]
 // }
 // CHERI CHANGES END
