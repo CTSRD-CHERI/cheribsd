@@ -37,6 +37,31 @@
 #error These tests are not supported on this platform
 #endif
 
+#if defined(__amd64__) || defined(__i386__)
+#include <machine/cpufunc.h>
+#include <machine/specialreg.h>
+
+static void
+skip_test_if_cpu_features_missing(void)
+{
+
+	u_int cpu_registers[4], ecx;
+
+	do_cpuid(1, cpu_registers);
+
+	ecx = cpu_registers[2];
+
+	if ((ecx & CPUID2_SSE42) == 0) {
+		atf_tc_skip("SSE4.2 not supported.");
+	}
+}
+#else
+static void
+skip_test_if_cpu_features_missing(void)
+{
+}
+#endif
+
 ATF_TC_WITHOUT_HEAD(crc32c_basic_correctness);
 ATF_TC_BODY(crc32c_basic_correctness, tc)
 {
@@ -81,6 +106,8 @@ ATF_TC_BODY(crc32c_basic_correctness, tc)
 
 	ATF_REQUIRE(nitems(inputs) == nitems(results));
 
+	skip_test_if_cpu_features_missing();
+
 	for (i = 0; i < nitems(inputs); i++) {
 #if defined(__amd64__) || defined(__i386__)
 		act = sse42_crc32c(~0, (const void *)&inputs[i],
@@ -103,6 +130,8 @@ ATF_TC_BODY(crc32c_alignment, tc)
 	unsigned char buf[15];
 	size_t i;
 	uint32_t act;
+
+	skip_test_if_cpu_features_missing();
 
 
 	for (i = 1; i < 8; i++) {
@@ -128,6 +157,8 @@ ATF_TC_BODY(crc32c_trailing_bytes, tc)
 	};
 	const uint32_t result = 0xec638d62;
 	uint32_t act;
+
+	skip_test_if_cpu_features_missing();
 
 #if defined(__amd64__) || defined(__i386__)
 	act = sse42_crc32c(~0, input, sizeof(input));
