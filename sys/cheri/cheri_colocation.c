@@ -37,6 +37,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/kernel.h>
 #include <sys/mman.h>
 #include <sys/proc.h>
+#include <sys/sx.h>
 #include <sys/syscall.h>
 #include <sys/syscallsubr.h>
 #include <sys/sysent.h>
@@ -70,9 +71,12 @@ void * __capability	switcher_sealcap = (void * __capability)-1;
  */
 void * __capability	switcher_sealcap2 = (void * __capability)-1;
 
-struct mtx		switcher_lock;
+struct sx		switcher_lock;
 
-static int colocation_debug = 1;
+#define	SWITCHER_LOCK()		sx_xlock(&switcher_lock)
+#define	SWITCHER_UNLOCK()	sx_xunlock(&switcher_lock)
+
+static int colocation_debug;
 SYSCTL_INT(_debug, OID_AUTO, colocation_debug, CTLFLAG_RWTUN,
     &colocation_debug, 0, "Enable process colocation debugging");
 static int counregister_on_exit = 1;
@@ -98,7 +102,7 @@ static void
 colocation_startup(void)
 {
 
-	mtx_init(&switcher_lock, "switcher lock", NULL, MTX_DEF);
+	sx_init(&switcher_lock, "switchersx");
 }
 SYSINIT(colocation_startup, SI_SUB_CPU, SI_ORDER_FIRST, colocation_startup,
     NULL);
@@ -107,26 +111,27 @@ void
 colocation_cleanup(struct thread *td)
 {
 	td->td_md.md_scb = 0;
+}
 
-	/*
-	 * XXX: This should be only neccessary with INVARIANTS.
-	 */
-	memset(&td->td_md.md_slow_cv, 0, sizeof(struct cv));
-	memset(&td->td_md.md_slow_lock, 0, sizeof(struct sx));
-	td->td_md.md_slow_accepting = false;
+static void
+colocation_copyin_scb_atcap(const void * __capability cap,
+    struct switchercb *scbp)
+{
+	int error;
+
+	KASSERT(cap != NULL, ("%s: NULL addr", __func__));
+
+	error = copyincap(cap, &(*scbp), sizeof(*scbp));
+	KASSERT(error == 0, ("%s: copyincap from %#lp failed with error %d\n",
+	    __func__, cap, error));
 }
 
 static void
 colocation_copyin_scb_at(const void *addr, struct switchercb *scbp)
 {
-	int error;
 
-	KASSERT(addr != 0, ("%s: NULL addr", __func__));
-
-	error = copyincap(___USER_CFROMPTR(addr, userspace_cap),
-	    &(*scbp), sizeof(*scbp));
-	KASSERT(error == 0, ("%s: copyincap from %p failed with error %d\n",
-	    __func__, addr, error));
+	return (colocation_copyin_scb_atcap(
+	    ___USER_CFROMPTR(addr, userspace_cap), scbp));
 }
 
 static bool
@@ -148,16 +153,23 @@ colocation_fetch_scb(struct thread *td, struct switchercb *scbp)
 }
 
 static void
-colocation_copyout_scb_at(void *addr, struct switchercb *scbp)
+colocation_copyout_scb_atcap(void * __capability cap, struct switchercb *scbp)
 {
 	int error;
 
-	KASSERT(addr != 0, ("%s: NULL addr", __func__));
+	KASSERT(cap != NULL, ("%s: NULL addr", __func__));
 
-	error = copyoutcap(scbp, ___USER_CFROMPTR(addr, userspace_cap),
-	    sizeof(*scbp));
-	KASSERT(error == 0, ("%s: copyoutcap to %p failed with error %d",
-	    __func__, addr, error));
+	error = copyoutcap(scbp, cap, sizeof(*scbp));
+	KASSERT(error == 0, ("%s: copyoutcap to %#lp failed with error %d",
+	    __func__, cap, error));
+}
+
+static void
+colocation_copyout_scb_at(void *addr, struct switchercb *scbp)
+{
+
+	return (colocation_copyout_scb_atcap(
+	    ___USER_CFROMPTR(addr, userspace_cap), scbp));
 }
 
 static void
@@ -190,7 +202,7 @@ colocation_fetch_caller_scb(struct thread *td, struct switchercb *scbp)
 		return (false);
 	}
 
-	colocation_copyin_scb_at((__cheri_fromcap void *)scbp->scb_caller_scb, scbp);
+	colocation_copyin_scb_atcap(scbp->scb_caller_scb, scbp);
 
 	return (true);
 }
@@ -218,9 +230,34 @@ colocation_fetch_callee_scb(struct thread *td, struct switchercb *scbp)
 		return (false);
 	}
 
-	colocation_copyin_scb_at((__cheri_fromcap void *)scbp->scb_callee_scb, scbp);
+	colocation_copyin_scb_atcap(scbp->scb_callee_scb, scbp);
 
 	return (true);
+}
+
+static void
+wakeupcap(const void * __capability target, const char *who)
+{
+	const void *chan;
+
+	chan = (__cheri_fromcap const void *)target;
+	COLOCATION_DEBUG("waking up %s scb %p", who, chan);
+	wakeup(chan);
+}
+
+/*
+ * This function is intended to wake up threads waiting
+ * on this thread's SCB.
+ */
+static void
+wakeupself(void)
+{
+	const void *chan;
+
+	chan = (const void *)curthread->td_md.md_scb;
+
+	COLOCATION_DEBUG("waking up scb %p", chan);
+	wakeup(chan);
 }
 
 void
@@ -267,20 +304,11 @@ colocation_thread_exit(struct thread *td)
 	}
 
 	md = &td->td_md;
-	sx_xlock(&md->md_slow_lock);
-	md->md_slow_accepting = false;
-	sx_xunlock(&md->md_slow_lock);
 
-#if 0
 	/*
 	 * Wake up any thread waiting on cocall_slow(2).
 	 */
-	if (md->md_slow_caller_td != NULL) {
-		COLOCATION_DEBUG("waking up slow cocaller %p", md->md_slow_caller_td);
-		callermd = &md->md_slow_caller_td->td_md;
-		cv_signal(&callermd->md_slow_cv);
-	}
-#endif
+	wakeupself();
 
 	COLOCATION_DEBUG("terminating thread %p, scb %p",
 	    td, (void *)td->td_md.md_scb);
@@ -517,13 +545,6 @@ setup_scb(struct thread *td)
 #endif
 	colocation_copyout_scb(td, &scb);
 
-	/*
-	 * Stuff neccessary for cocall_slow(2)/coaccept_slow(2).
-	 */
-	cv_init(&td->td_md.md_slow_cv, "slowcv");
-	sx_init(&td->td_md.md_slow_lock, "slowlock");
-	td->td_md.md_slow_accepting = false;
-
 	return (0);
 }
 
@@ -748,10 +769,10 @@ kern_copark(struct thread *td)
 {
 	int error;
 
-	mtx_lock(&switcher_lock);
+	SWITCHER_LOCK();
 	error = msleep(&td->td_md.md_scb, &switcher_lock,
 	    PPAUSE | PCATCH, "copark", 0);
-	mtx_unlock(&switcher_lock);
+	SWITCHER_UNLOCK();
 
 	if (error == 0) {
 		/*
@@ -773,7 +794,6 @@ kern_cocall_slow(void * __capability target,
     void * __capability buf, size_t len)
 {
 	struct switchercb scb, calleescb;
-	struct mdthread *md, *calleemd;
 	struct thread *calleetd;
 	int error;
 	bool have_scb;
@@ -808,33 +828,49 @@ kern_cocall_slow(void * __capability target,
 	 */
 	target = cheri_unseal(target, switcher_sealcap2);
 
+	SWITCHER_LOCK();
 again:
-	colocation_copyin_scb_at((__cheri_fromcap const void *)target, &calleescb);
+	colocation_copyin_scb_atcap(target, &calleescb);
 
 	/*
-	 * See if the callee is available.
+	 * The protocol here is slightly different from the one used
+	 * by the switcher; this is to signal an error when the user
+	 * attempts to use kernel {cocall,coaccept}_slow() against
+	 * switcher {cocall,coaccept}().  Instead of signalling the
+	 * "available" status with NULL capability, instead we encode
+	 * it as zero-length capability, with offset set to EPROTOTYPE.
 	 */
-	if (cheri_gettag(calleescb.scb_caller_scb) != 0) {
+
+	if (cheri_gettag(calleescb.scb_caller_scb) == 0) {
+		COLOCATION_DEBUG("callee scb %#lp is waiting on switcher cocall", target);
+		SWITCHER_UNLOCK();
+		return (EPROTOTYPE);
+	}
+
+	if (cheri_getlen(calleescb.scb_caller_scb) != 0) {
 		/*
-		 * It's not; should we return an error?
+		 * Non-zero length means there's already a cocall in progress.
 		 */
-		error = cheri_getlen(calleescb.scb_caller_scb);
+		COLOCATION_DEBUG("callee is busy, waiting on %#lp", target);
+		error = msleep((__cheri_fromcap const void *)target,
+		    &switcher_lock, PCATCH, "cobusy", 0);
 		if (error != 0) {
-			COLOCATION_DEBUG("returning errno %d", error);
+			COLOCATION_DEBUG("cobusy msleep failed with error %d",
+			    error);
+			SWITCHER_UNLOCK();
 			return (error);
 		}
-
-		COLOCATION_DEBUG("callee is busy, waiting");
-
-		calleetd = calleescb.scb_td;
-		KASSERT(calleetd != NULL, ("%s: NULL calleetd?\n", __func__));
-		calleemd = &calleetd->td_md;
-		sx_slock(&calleemd->md_slow_lock);
-		error = cv_wait_sig(&calleemd->md_slow_cv, &calleemd->md_slow_lock);
-		sx_sunlock(&calleemd->md_slow_lock);
-		if (error != 0)
-			return (error);
 		goto again;
+	}
+
+	error = cheri_getoffset(calleescb.scb_caller_scb);
+	/*
+	 * EPROTOTYPE means we can proceed with cocall.
+	 */
+	if (error != EPROTOTYPE) {
+		COLOCATION_DEBUG("returning errno %d", error);
+		SWITCHER_UNLOCK();
+		return (error);
 	}
 
 	/*
@@ -846,7 +882,7 @@ again:
 	 * XXX: We should be using a capability-sized atomic store
 	 *      for scb_caller_scb.
 	 */
-	colocation_copyout_scb_at((__cheri_fromcap void *)target, &calleescb);
+	colocation_copyout_scb_atcap(target, &calleescb);
 
 	scb.scb_callee_scb = target;
 	scb.scb_buf = buf;
@@ -860,49 +896,43 @@ again:
 	calleetd = calleescb.scb_td;
 	KASSERT(calleetd != NULL, ("%s: NULL calleetd?\n", __func__));
 
-	calleemd = &calleetd->td_md;
-	sx_xlock(&calleemd->md_slow_lock);
-
-	if (!calleemd->md_slow_accepting) {
-		sx_xunlock(&calleemd->md_slow_lock);
-		COLOCATION_DEBUG("target not in coaccept_slow(2), returning EINVAL");
-		error = EINVAL;
-		goto out;
-	}
+	// XXX: What happens when the callee thread dies while we are here?
+	//      We need to hold it somehow.
 
 	/*
-	 * Wake up the callee and wait for them to complete.
+	 * Wake up the callee and wait for them to copy the buffer,
+	 * return from cocall_slow(2), call cocall_slow(2) again,
+	 * and copy the buffer back.
 	 */
-	cv_signal(&calleemd->md_slow_cv);
-	md = &curthread->td_md;
-	error = cv_wait_sig(&md->md_slow_cv, &calleemd->md_slow_lock);
-	if (error != 0) {
-		sx_xunlock(&calleemd->md_slow_lock);
-		COLOCATION_DEBUG("cv_wait_sig failed with error %d", error);
-		error = EINVAL;
+	wakeupcap(target, "callee");
+	COLOCATION_DEBUG("waiting on scb %#lp", target);
+	error = msleep((__cheri_fromcap const void *)target,
+	    &switcher_lock, PCATCH, "cocall", 0);
+	// XXX: Are we sure we are done once we wake up?
+	if (error != 0 && error != ERESTART) {
+		COLOCATION_DEBUG("msleep failed with error %d", error);
 		goto out;
 	}
 
-	sx_xunlock(&calleemd->md_slow_lock);
-
 out:
-	colocation_copyin_scb_at((__cheri_fromcap void *)target, &calleescb);
-	calleescb.scb_caller_scb = 0;
+	colocation_copyin_scb_atcap(target, &calleescb);
+	calleescb.scb_caller_scb = cheri_capability_build_user_data(0, 0, 0, EPROTOTYPE);
 	/*
 	 * Here we don't need atomics either; nobody else could have modified
 	 * callee's SCB.
 	 */
-	colocation_copyout_scb_at((__cheri_fromcap void *)target, &calleescb);
+	colocation_copyout_scb_atcap(target, &calleescb);
 
-#if 0
 	/*
 	 * Wake up other callers that might be waiting in kern_cocall_slow().
-	 *
-	 * XXX: We need to keep state somehow; otherwise the line below
-	 *      wakes up kern_coaccept_slow() without a caller.
 	 */
-	cv_signal(&calleemd->md_slow_cv);
-#endif
+	wakeupcap(target, "callers sleeping on callee scb");
+	SWITCHER_UNLOCK();
+
+	/*
+	 * XXX: There is currently no way to return an error to the caller,
+	 *      should the copyinout() fail.
+	 */
 
 	return (error);
 }
@@ -982,11 +1012,10 @@ kern_coaccept_slow(void * __capability * __capability cookiep,
 
 	if (cheri_getlen(scb.scb_caller_scb) == 0) {
 		/*
-		 * Zero-length tagged capability means there's nobody
-		 * listening; clear the tag to let subsequent cocall_slow(2)
-		 * know we're waiting.
+		 * Offset-encoded EPROTOTYPE means there's a cocall_slow(2)
+		 * waiting.
 		 */
-		 scb.scb_caller_scb = 0;
+		 scb.scb_caller_scb = cheri_capability_build_user_data(0, 0, 0, EPROTOTYPE);
 
 		/*
 		 * No atomics needed here; couldn't have raced with cocall(2),
@@ -995,11 +1024,6 @@ kern_coaccept_slow(void * __capability * __capability cookiep,
 		 * call coaccept_slow(2) and coaccept(2) at the same time.
 		 */
 		colocation_copyout_scb(curthread, &scb);
-
-		/*
-		 * NB: This is not supposed to be cleared until the thread exits.
-		 */
-		md->md_slow_accepting = true;
 	} else {
 		/*
 		 * There's a caller waiting for us, get them their data
@@ -1013,26 +1037,29 @@ kern_coaccept_slow(void * __capability * __capability cookiep,
 		 */
 		error = copyinout(buf, callerscb.scb_buf,
 		    MIN(len, callerscb.scb_buflen), false);
+		callermd = &callerscb.scb_td->td_md;
 		if (error != 0) {
-			/*
-			 * XXX: Wake up the cocall_slow(2) so it can
-			 *      return error.
-			 */
+			COLOCATION_DEBUG("copyinout error %d, waking up %p",
+			    error, (const void *)callermd->md_scb);
+			wakeupself();
 			return (error);
 		}
 
-		callermd = &callerscb.scb_td->td_md;
-		cv_signal(&callermd->md_slow_cv);
+		wakeupself();
 	}
 
+	SWITCHER_LOCK();
+again:
 	/*
-	 * Wait for a new caller.
+	 * Wait for new caller.
 	 */
-	sx_xlock(&md->md_slow_lock);
-	error = cv_wait_sig(&md->md_slow_cv, &md->md_slow_lock);
-	sx_xunlock(&md->md_slow_lock); // XXX
+	COLOCATION_DEBUG("waiting on %p",
+	    (const void *)curthread->td_md.md_scb);
+	error = msleep((const void *)curthread->td_md.md_scb,
+	    &switcher_lock, PCATCH, "coaccept", 0);
 	if (error != 0) {
-		COLOCATION_DEBUG("cv_wait_sig failed with error %d", error);
+		SWITCHER_UNLOCK();
+		COLOCATION_DEBUG("msleep failed with error %d", error);
 		return (error);
 	}
 
@@ -1042,7 +1069,11 @@ kern_coaccept_slow(void * __capability * __capability cookiep,
 	have_scb = colocation_fetch_scb(curthread, &scb);
 	KASSERT(have_scb, ("%s: lost scb?", __func__));
 	is_callee = colocation_fetch_caller_scb(curthread, &callerscb);
-	KASSERT(is_callee, ("%s: no new caller?", __func__));
+	if (!is_callee) {
+		COLOCATION_DEBUG("woken up, but no caller yet");
+		goto again;
+	}
+	SWITCHER_UNLOCK();
 
 	/*
 	 * Move data from caller to callee.
@@ -1050,9 +1081,8 @@ kern_coaccept_slow(void * __capability * __capability cookiep,
 	error = copyinout(callerscb.scb_buf, buf,
 	    MIN(len, callerscb.scb_buflen), true);
 	if (error != 0) {
-		/*
-		 * XXX: Signal an error to the caller.
-		 */
+		COLOCATION_DEBUG("copyinout error %d", error);
+		wakeupself();
 		return (error);
 	}
 
@@ -1063,9 +1093,8 @@ kern_coaccept_slow(void * __capability * __capability cookiep,
 		cookie = cheri_cleartag(scb.scb_caller_scb);
 		error = copyoutcap(&cookie, cookiep, sizeof(cookie));
 		if (error != 0) {
-			/*
-			 * XXX: Wake up the caller.
-			 */
+			COLOCATION_DEBUG("copyinout error %d", error);
+			wakeupself();
 			return (error);
 		}
 	}

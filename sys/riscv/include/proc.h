@@ -104,13 +104,6 @@ struct mdthread {
 	int	md_flags;		/* (k) */
 #ifdef	CPU_CHERI
 	vaddr_t		md_scb;
-
-	/*
-	 * Stuff below is used for cocall_slow(2)/cocaccept_slow(2).
-	 */
-	struct cv	md_slow_cv;
-	struct sx	md_slow_lock;
-	bool		md_slow_accepting;
 #endif
 };
 
