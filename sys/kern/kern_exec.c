@@ -1208,9 +1208,13 @@ exec_new_vmspace(struct image_params *imgp, struct sysentvec *sv)
 	}
 
 #if __has_feature(capabilities)
-	perms = ~MAP_CAP_PERM_MASK | vm_map_prot2perms(stack_prot);
-	imgp->stack = cheri_capability_build_user_data(
-	    perms & CHERI_CAP_USER_DATA_PERMS, stack_addr, ssiz, ssiz);
+	perms = (~MAP_CAP_PERM_MASK | vm_map_prot2perms(stack_prot)) &
+	    CHERI_CAP_USER_DATA_PERMS;
+#ifdef __CHERI_PURE_CAPABILITY__
+	imgp->stack = (void *)cheri_andperm(stack_addr + ssiz, perms);
+#else
+	imgp->stack = cheri_capability_build_user_data(perms, stack_addr,
+	    ssiz, ssiz);
 #endif
 
 	if (sv->sv_flags & SV_CHERI) {
