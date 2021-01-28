@@ -65,7 +65,7 @@ def buildImageAndRunTests(params, String suffix) {
         maybeArchiveArtifacts(params, suffix)
         return
     }
-    stage("Running tests") {
+    stage("Running tests (${suffix})") {
         // copy qemu archive and run directly on the host
         dir("qemu-${params.buildOS}") { deleteDir() }
         copyArtifacts projectName: "qemu/qemu-cheri", filter: "qemu-${params.buildOS}/**", target: '.', fingerprintArtifacts: false
@@ -77,6 +77,7 @@ def buildImageAndRunTests(params, String suffix) {
         if (GlobalVars.isTestSuiteJob) {
             testExtraArgs += ['--kyua-tests-files', '/usr/tests/Kyuafile',
                               '--no-run-cheribsdtest', // only run kyua tests
+                              '--disable-coredumps',  // coredumps slow down the testsuite unnecessarily
             ]
         } else {
             // Run a small subset of tests to check that we didn't break running tests (since the full testsuite takes too long)

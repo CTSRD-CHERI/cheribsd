@@ -9,7 +9,9 @@ PROG=	logger
 CFLAGS+= -DINET6
 .endif
 
-.if ${MK_CASPER} != "no"
+# XXX: don't bother with the extra fork()+socket I/O here to speed up running
+# the testsuite
+.if 0 && ${MK_CASPER} != "no"
 LIBADD+=        casper
 LIBADD+=        cap_syslog
 CFLAGS+=-DWITH_CASPER

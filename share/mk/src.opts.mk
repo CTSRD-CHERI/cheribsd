@@ -222,6 +222,7 @@ __DEFAULT_NO_OPTIONS = \
     RPCBIND_WARMSTART_SUPPORT \
     SORT_THREADS \
     SVN \
+    ZFS_TESTS \
     ZONEINFO_LEAPSECONDS_SUPPORT \
 
 __DEFAULT_NO_OPTIONS+= \
@@ -507,6 +508,10 @@ MK_SOURCELESS_UCODE:= no
 MK_ZFS:=	no
 MK_LOADER_ZFS:=	no
 MK_CTF:=	no
+.endif
+
+.if ${MK_ZFS} == "no"
+MK_ZFS_TESTS:=	no
 .endif
 
 .if ${MK_CRYPT} == "no"

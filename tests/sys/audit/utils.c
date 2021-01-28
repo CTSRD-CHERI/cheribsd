@@ -25,7 +25,9 @@
  * $FreeBSD$
  */
 
+#include <sys/param.h>
 #include <sys/ioctl.h>
+#include <sys/mount.h>
 
 #include <bsm/libbsm.h>
 #include <security/audit/audit_ioctl.h>
@@ -76,6 +78,7 @@ get_records(const char *auditregex, FILE *pipestream)
 
 		/* Print the tokens as they are obtained, in the default form */
 		au_print_flags_tok(memstream, &token, del, AU_OFLAG_NONE);
+		fputc(',', memstream);
 		bytes += token.len;
 	}
 
@@ -146,13 +149,18 @@ check_auditpipe(struct pollfd fd[], const char *auditregex, FILE *pipestream)
 
 	/* Set the expire time for poll(2) while waiting for syscall audit */
 	ATF_REQUIRE_EQ(0, clock_gettime(CLOCK_MONOTONIC, &endtime));
-	endtime.tv_sec += 10;
-	timeout.tv_nsec = endtime.tv_nsec;
+	/* Set limit to 30 seconds total and ~10s without an event. */
+	endtime.tv_sec += 30;
 
 	for (;;) {
 		/* Update the time left for auditpipe to return any event */
 		ATF_REQUIRE_EQ(0, clock_gettime(CLOCK_MONOTONIC, &currtime));
-		timeout.tv_sec = endtime.tv_sec - currtime.tv_sec;
+		timespecsub(&endtime, &currtime, &timeout);
+		timeout.tv_sec = MIN(timeout.tv_sec, 9);
+		if (timeout.tv_sec < 0) {
+			atf_tc_fail("%s not found in auditpipe within the "
+			    "time limit", auditregex);
+		}
 
 		switch (ppoll(fd, 1, &timeout, NULL)) {
 		/* ppoll(2) returns, check if it's what we want */
@@ -199,6 +207,21 @@ check_audit(struct pollfd fd[], const char *auditrgx, FILE *pipestream) {
 	ATF_REQUIRE_EQ(0, fclose(pipestream));
 }
 
+void
+mark_xfail_if_extattr_not_supported(const char *path)
+{
+	struct statfs fsinfo;
+	ATF_REQUIRE_EQ(0, statfs(path, &fsinfo));
+	/*
+	 * tmpfs does not support extattr, so we need to mark the tests that
+	 * use extattrs as XFAIL.
+	 */
+	if (strcmp(fsinfo.f_fstypename, "tmpfs") == 0) {
+		atf_tc_expect_fail("File system %s does not support extattrs",
+		    fsinfo.f_fstypename);
+	}
+}
+
 FILE
 *setup(struct pollfd fd[], const char *name)
 {
@@ -207,7 +230,9 @@ FILE
 	nomask = get_audit_mask("no");
 	FILE *pipestream;
 
-	ATF_REQUIRE((fd[0].fd = open("/dev/auditpipe", O_RDONLY)) != -1);
+	ATF_REQUIRE((fd[0].fd = open("/dev/auditpipe", O_RDONLY | O_NONBLOCK)) != -1);
+	/* Ensure that the auditpipe is open in non-blocking mode */
+	ATF_REQUIRE(fcntl(fd[0].fd, F_GETFL) & O_NONBLOCK);
 	ATF_REQUIRE((pipestream = fdopen(fd[0].fd, "r")) != NULL);
 	fd[0].events = POLLIN;
 

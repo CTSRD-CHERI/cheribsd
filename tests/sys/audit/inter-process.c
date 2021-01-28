@@ -35,6 +35,7 @@
 #include <sys/stat.h>
 
 #include <atf-c.h>
+#include <errno.h>
 #include <fcntl.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -49,7 +50,9 @@ struct msgstr {
 typedef struct msgstr msgstr_t;
 
 static pid_t pid;
-static int msqid, shmid, semid;
+static int shmid = -1;
+static int msqid = -1;
+static int semid = -1;
 static union semun semarg;
 static struct pollfd fds[1];
 static struct msqid_ds msgbuff;
@@ -60,6 +63,39 @@ static const char *auclass = "ip";
 static char path[BUFFSIZE] = "/fileforaudit";
 static unsigned short semvals[BUFFSIZE];
 
+static void
+cleanup_sem(void)
+{
+	if (semid != -1)
+		ATF_REQUIRE_EQ(0, semctl(semid, 0, IPC_RMID));
+	semid = -1;
+}
+
+static void
+cleanup_msq(void)
+{
+	if (msqid != -1)
+		ATF_REQUIRE_EQ(0, msgctl(msqid, IPC_RMID, NULL));
+	msqid = -1;
+}
+
+static void
+cleanup_shm(void)
+{
+	if (shmid != -1)
+		ATF_REQUIRE_EQ(0, shmctl(shmid, IPC_RMID, NULL));
+	shmid = -1;
+}
+
+/* Call cleanup, but also remove all open semaphores, etc. */
+static void
+cleanup_ipc_all(void)
+{
+	cleanup_sem();
+	cleanup_msq();
+	cleanup_shm();
+	cleanup();
+}
 
 ATF_TC_WITH_CLEANUP(msgget_success);
 ATF_TC_HEAD(msgget_success, tc)
@@ -79,12 +115,12 @@ ATF_TC_BODY(msgget_success, tc)
 	check_audit(fds, ipcregex, pipefd);
 
 	/* Destroy the message queue with ID = msqid */
-	ATF_REQUIRE_EQ(0, msgctl(msqid, IPC_RMID, NULL));
+	cleanup_msq();
 }
 
 ATF_TC_CLEANUP(msgget_success, tc)
 {
-	cleanup();
+	cleanup_ipc_all();
 }
 
 
@@ -105,7 +141,7 @@ ATF_TC_BODY(msgget_failure, tc)
 
 ATF_TC_CLEANUP(msgget_failure, tc)
 {
-	cleanup();
+	cleanup_ipc_all();
 }
 
 
@@ -135,12 +171,12 @@ ATF_TC_BODY(msgsnd_success, tc)
 	check_audit(fds, ipcregex, pipefd);
 
 	/* Destroy the message queue with ID = msqid */
-	ATF_REQUIRE_EQ(0, msgctl(msqid, IPC_RMID, NULL));
+	cleanup_msq();
 }
 
 ATF_TC_CLEANUP(msgsnd_success, tc)
 {
-	cleanup();
+	cleanup_ipc_all();
 }
 
 
@@ -161,7 +197,7 @@ ATF_TC_BODY(msgsnd_failure, tc)
 
 ATF_TC_CLEANUP(msgsnd_failure, tc)
 {
-	cleanup();
+	cleanup_ipc_all();
 }
 
 
@@ -195,12 +231,12 @@ ATF_TC_BODY(msgrcv_success, tc)
 	check_audit(fds, ipcregex, pipefd);
 
 	/* Destroy the message queue with ID = msqid */
-	ATF_REQUIRE_EQ(0, msgctl(msqid, IPC_RMID, NULL));
+	cleanup_msq();
 }
 
 ATF_TC_CLEANUP(msgrcv_success, tc)
 {
-	cleanup();
+	cleanup_ipc_all();
 }
 
 
@@ -221,7 +257,7 @@ ATF_TC_BODY(msgrcv_failure, tc)
 
 ATF_TC_CLEANUP(msgrcv_failure, tc)
 {
-	cleanup();
+	cleanup_ipc_all();
 }
 
 
@@ -238,7 +274,7 @@ ATF_TC_BODY(msgctl_rmid_success, tc)
 	ATF_REQUIRE((msqid = msgget(IPC_PRIVATE, IPC_CREAT | S_IRUSR)) != -1);
 
 	FILE *pipefd = setup(fds, auclass);
-	ATF_REQUIRE_EQ(0, msgctl(msqid, IPC_RMID, NULL));
+	cleanup_msq();
 	/* Check the presence of queue ID and IPC_RMID in audit record */
 	snprintf(ipcregex, sizeof(ipcregex),
 			"msgctl.*IPC_RMID.*%d.*return,success", msqid);
@@ -247,7 +283,7 @@ ATF_TC_BODY(msgctl_rmid_success, tc)
 
 ATF_TC_CLEANUP(msgctl_rmid_success, tc)
 {
-	cleanup();
+	cleanup_ipc_all();
 }
 
 
@@ -268,7 +304,7 @@ ATF_TC_BODY(msgctl_rmid_failure, tc)
 
 ATF_TC_CLEANUP(msgctl_rmid_failure, tc)
 {
-	cleanup();
+	cleanup_ipc_all();
 }
 
 
@@ -292,12 +328,12 @@ ATF_TC_BODY(msgctl_stat_success, tc)
 	check_audit(fds, ipcregex, pipefd);
 
 	/* Destroy the message queue with ID = msqid */
-	ATF_REQUIRE_EQ(0, msgctl(msqid, IPC_RMID, NULL));
+	cleanup_msq();
 }
 
 ATF_TC_CLEANUP(msgctl_stat_success, tc)
 {
-	cleanup();
+	cleanup_ipc_all();
 }
 
 
@@ -318,7 +354,7 @@ ATF_TC_BODY(msgctl_stat_failure, tc)
 
 ATF_TC_CLEANUP(msgctl_stat_failure, tc)
 {
-	cleanup();
+	cleanup_ipc_all();
 }
 
 
@@ -344,12 +380,12 @@ ATF_TC_BODY(msgctl_set_success, tc)
 	check_audit(fds, ipcregex, pipefd);
 
 	/* Destroy the message queue with ID = msqid */
-	ATF_REQUIRE_EQ(0, msgctl(msqid, IPC_RMID, NULL));
+	cleanup_msq();
 }
 
 ATF_TC_CLEANUP(msgctl_set_success, tc)
 {
-	cleanup();
+	cleanup_ipc_all();
 }
 
 
@@ -370,7 +406,7 @@ ATF_TC_BODY(msgctl_set_failure, tc)
 
 ATF_TC_CLEANUP(msgctl_set_failure, tc)
 {
-	cleanup();
+	cleanup_ipc_all();
 }
 
 
@@ -392,12 +428,12 @@ ATF_TC_BODY(msgctl_illegal_command, tc)
 	check_audit(fds, regex, pipefd);
 
 	/* Destroy the message queue with ID = msqid */
-	ATF_REQUIRE_EQ(0, msgctl(msqid, IPC_RMID, NULL));
+	cleanup_msq();
 }
 
 ATF_TC_CLEANUP(msgctl_illegal_command, tc)
 {
-	cleanup();
+	cleanup_ipc_all();
 }
 
 
@@ -418,12 +454,12 @@ ATF_TC_BODY(shmget_success, tc)
 	check_audit(fds, ipcregex, pipefd);
 
 	/* Destroy the shared memory with ID = shmid */
-	ATF_REQUIRE_EQ(0, shmctl(shmid, IPC_RMID, NULL));
+	cleanup_shm();
 }
 
 ATF_TC_CLEANUP(shmget_success, tc)
 {
-	cleanup();
+	cleanup_ipc_all();
 }
 
 
@@ -444,7 +480,7 @@ ATF_TC_BODY(shmget_failure, tc)
 
 ATF_TC_CLEANUP(shmget_failure, tc)
 {
-	cleanup();
+	cleanup_ipc_all();
 }
 
 
@@ -471,12 +507,12 @@ ATF_TC_BODY(shmat_success, tc)
 	check_audit(fds, ipcregex, pipefd);
 
 	/* Destroy the shared memory with ID = shmid */
-	ATF_REQUIRE_EQ(0, shmctl(shmid, IPC_RMID, NULL));
+	cleanup_shm();
 }
 
 ATF_TC_CLEANUP(shmat_success, tc)
 {
-	cleanup();
+	cleanup_ipc_all();
 }
 
 
@@ -497,7 +533,7 @@ ATF_TC_BODY(shmat_failure, tc)
 
 ATF_TC_CLEANUP(shmat_failure, tc)
 {
-	cleanup();
+	cleanup_ipc_all();
 }
 
 
@@ -526,12 +562,12 @@ ATF_TC_BODY(shmdt_success, tc)
 	check_audit(fds, ipcregex, pipefd);
 
 	/* Destroy the shared memory with ID = shmid */
-	ATF_REQUIRE_EQ(0, shmctl(shmid, IPC_RMID, NULL));
+	cleanup_shm();
 }
 
 ATF_TC_CLEANUP(shmdt_success, tc)
 {
-	cleanup();
+	cleanup_ipc_all();
 }
 
 
@@ -552,7 +588,7 @@ ATF_TC_BODY(shmdt_failure, tc)
 
 ATF_TC_CLEANUP(shmdt_failure, tc)
 {
-	cleanup();
+	cleanup_ipc_all();
 }
 
 
@@ -570,7 +606,7 @@ ATF_TC_BODY(shmctl_rmid_success, tc)
 		shmget(IPC_PRIVATE, 1, IPC_CREAT | S_IRUSR)) != -1);
 
 	FILE *pipefd = setup(fds, auclass);
-	ATF_REQUIRE_EQ(0, shmctl(shmid, IPC_RMID, NULL));
+	cleanup_shm();
 	/* Check the presence of shmid and IPC_RMID in audit record */
 	snprintf(ipcregex, sizeof(ipcregex),
 		"shmctl.*IPC_RMID.*%d.*return,success", shmid);
@@ -579,7 +615,7 @@ ATF_TC_BODY(shmctl_rmid_success, tc)
 
 ATF_TC_CLEANUP(shmctl_rmid_success, tc)
 {
-	cleanup();
+	cleanup_ipc_all();
 }
 
 
@@ -600,7 +636,7 @@ ATF_TC_BODY(shmctl_rmid_failure, tc)
 
 ATF_TC_CLEANUP(shmctl_rmid_failure, tc)
 {
-	cleanup();
+	cleanup_ipc_all();
 }
 
 
@@ -625,12 +661,12 @@ ATF_TC_BODY(shmctl_stat_success, tc)
 	check_audit(fds, ipcregex, pipefd);
 
 	/* Destroy the shared memory with ID = shmid */
-	ATF_REQUIRE_EQ(0, shmctl(shmid, IPC_RMID, NULL));
+	cleanup_shm();
 }
 
 ATF_TC_CLEANUP(shmctl_stat_success, tc)
 {
-	cleanup();
+	cleanup_ipc_all();
 }
 
 
@@ -651,7 +687,7 @@ ATF_TC_BODY(shmctl_stat_failure, tc)
 
 ATF_TC_CLEANUP(shmctl_stat_failure, tc)
 {
-	cleanup();
+	cleanup_ipc_all();
 }
 
 
@@ -678,12 +714,12 @@ ATF_TC_BODY(shmctl_set_success, tc)
 	check_audit(fds, ipcregex, pipefd);
 
 	/* Destroy the shared memory with ID = shmid */
-	ATF_REQUIRE_EQ(0, shmctl(shmid, IPC_RMID, NULL));
+	cleanup_shm();
 }
 
 ATF_TC_CLEANUP(shmctl_set_success, tc)
 {
-	cleanup();
+	cleanup_ipc_all();
 }
 
 
@@ -704,7 +740,7 @@ ATF_TC_BODY(shmctl_set_failure, tc)
 
 ATF_TC_CLEANUP(shmctl_set_failure, tc)
 {
-	cleanup();
+	cleanup_ipc_all();
 }
 
 
@@ -727,12 +763,12 @@ ATF_TC_BODY(shmctl_illegal_command, tc)
 	check_audit(fds, regex, pipefd);
 
 	/* Destroy the shared memory with ID = shmid */
-	ATF_REQUIRE_EQ(0, shmctl(shmid, IPC_RMID, NULL));
+	cleanup_shm();
 }
 
 ATF_TC_CLEANUP(shmctl_illegal_command, tc)
 {
-	cleanup();
+	cleanup_ipc_all();
 }
 
 
@@ -755,12 +791,12 @@ ATF_TC_BODY(semget_success, tc)
 	check_audit(fds, ipcregex, pipefd);
 
 	/* Destroy the semaphore set with ID = semid */
-	ATF_REQUIRE_EQ(0, semctl(semid, 0, IPC_RMID));
+	cleanup_sem();
 }
 
 ATF_TC_CLEANUP(semget_success, tc)
 {
-	cleanup();
+	cleanup_ipc_all();
 }
 
 
@@ -778,13 +814,13 @@ ATF_TC_BODY(semget_failure, tc)
 
 	FILE *pipefd = setup(fds, auclass);
 	/* Failure reason: nsems is a negative number */
-	ATF_REQUIRE_EQ(-1, semget(IPC_PRIVATE, -1, 0));
+	ATF_REQUIRE_ERRNO(EINVAL, semget(IPC_PRIVATE, -1, 0) == -1);
 	check_audit(fds, ipcregex, pipefd);
 }
 
 ATF_TC_CLEANUP(semget_failure, tc)
 {
-	cleanup();
+	cleanup_ipc_all();
 }
 
 
@@ -812,12 +848,12 @@ ATF_TC_BODY(semop_success, tc)
 	check_audit(fds, ipcregex, pipefd);
 
 	/* Destroy the semaphore set with ID = semid */
-	ATF_REQUIRE_EQ(0, semctl(semid, 0, IPC_RMID));
+	cleanup_sem();
 }
 
 ATF_TC_CLEANUP(semop_success, tc)
 {
-	cleanup();
+	cleanup_ipc_all();
 }
 
 
@@ -838,7 +874,7 @@ ATF_TC_BODY(semop_failure, tc)
 
 ATF_TC_CLEANUP(semop_failure, tc)
 {
-	cleanup();
+	cleanup_ipc_all();
 }
 
 
@@ -863,12 +899,12 @@ ATF_TC_BODY(semctl_getval_success, tc)
 	check_audit(fds, ipcregex, pipefd);
 
 	/* Destroy the semaphore set with ID = semid */
-	ATF_REQUIRE_EQ(0, semctl(semid, 0, IPC_RMID));
+	cleanup_sem();
 }
 
 ATF_TC_CLEANUP(semctl_getval_success, tc)
 {
-	cleanup();
+	cleanup_ipc_all();
 }
 
 
@@ -889,7 +925,7 @@ ATF_TC_BODY(semctl_getval_failure, tc)
 
 ATF_TC_CLEANUP(semctl_getval_failure, tc)
 {
-	cleanup();
+	cleanup_ipc_all();
 }
 
 
@@ -915,12 +951,12 @@ ATF_TC_BODY(semctl_setval_success, tc)
 	check_audit(fds, ipcregex, pipefd);
 
 	/* Destroy the semaphore set with ID = semid */
-	ATF_REQUIRE_EQ(0, semctl(semid, 0, IPC_RMID));
+	cleanup_sem();
 }
 
 ATF_TC_CLEANUP(semctl_setval_success, tc)
 {
-	cleanup();
+	cleanup_ipc_all();
 }
 
 
@@ -941,7 +977,7 @@ ATF_TC_BODY(semctl_setval_failure, tc)
 
 ATF_TC_CLEANUP(semctl_setval_failure, tc)
 {
-	cleanup();
+	cleanup_ipc_all();
 }
 
 
@@ -966,12 +1002,12 @@ ATF_TC_BODY(semctl_getpid_success, tc)
 	check_audit(fds, ipcregex, pipefd);
 
 	/* Destroy the semaphore set with ID = semid */
-	ATF_REQUIRE_EQ(0, semctl(semid, 0, IPC_RMID));
+	cleanup_sem();
 }
 
 ATF_TC_CLEANUP(semctl_getpid_success, tc)
 {
-	cleanup();
+	cleanup_ipc_all();
 }
 
 
@@ -992,7 +1028,7 @@ ATF_TC_BODY(semctl_getpid_failure, tc)
 
 ATF_TC_CLEANUP(semctl_getpid_failure, tc)
 {
-	cleanup();
+	cleanup_ipc_all();
 }
 
 
@@ -1017,12 +1053,12 @@ ATF_TC_BODY(semctl_getncnt_success, tc)
 	check_audit(fds, ipcregex, pipefd);
 
 	/* Destroy the semaphore set with ID = semid */
-	ATF_REQUIRE_EQ(0, semctl(semid, 0, IPC_RMID));
+	cleanup_sem();
 }
 
 ATF_TC_CLEANUP(semctl_getncnt_success, tc)
 {
-	cleanup();
+	cleanup_ipc_all();
 }
 
 
@@ -1043,7 +1079,7 @@ ATF_TC_BODY(semctl_getncnt_failure, tc)
 
 ATF_TC_CLEANUP(semctl_getncnt_failure, tc)
 {
-	cleanup();
+	cleanup_ipc_all();
 }
 
 
@@ -1068,12 +1104,12 @@ ATF_TC_BODY(semctl_getzcnt_success, tc)
 	check_audit(fds, ipcregex, pipefd);
 
 	/* Destroy the semaphore set with ID = semid */
-	ATF_REQUIRE_EQ(0, semctl(semid, 0, IPC_RMID));
+	cleanup_sem();
 }
 
 ATF_TC_CLEANUP(semctl_getzcnt_success, tc)
 {
-	cleanup();
+	cleanup_ipc_all();
 }
 
 
@@ -1094,7 +1130,7 @@ ATF_TC_BODY(semctl_getzcnt_failure, tc)
 
 ATF_TC_CLEANUP(semctl_getzcnt_failure, tc)
 {
-	cleanup();
+	cleanup_ipc_all();
 }
 
 
@@ -1120,12 +1156,12 @@ ATF_TC_BODY(semctl_getall_success, tc)
 	check_audit(fds, ipcregex, pipefd);
 
 	/* Destroy the semaphore set with ID = semid */
-	ATF_REQUIRE_EQ(0, semctl(semid, 0, IPC_RMID));
+	cleanup_sem();
 }
 
 ATF_TC_CLEANUP(semctl_getall_success, tc)
 {
-	cleanup();
+	cleanup_ipc_all();
 }
 
 
@@ -1146,7 +1182,7 @@ ATF_TC_BODY(semctl_getall_failure, tc)
 
 ATF_TC_CLEANUP(semctl_getall_failure, tc)
 {
-	cleanup();
+	cleanup_ipc_all();
 }
 
 
@@ -1175,12 +1211,12 @@ ATF_TC_BODY(semctl_setall_success, tc)
 	check_audit(fds, ipcregex, pipefd);
 
 	/* Destroy the semaphore set with ID = semid */
-	ATF_REQUIRE_EQ(0, semctl(semid, 0, IPC_RMID));
+	cleanup_sem();
 }
 
 ATF_TC_CLEANUP(semctl_setall_success, tc)
 {
-	cleanup();
+	cleanup_ipc_all();
 }
 
 
@@ -1201,7 +1237,7 @@ ATF_TC_BODY(semctl_setall_failure, tc)
 
 ATF_TC_CLEANUP(semctl_setall_failure, tc)
 {
-	cleanup();
+	cleanup_ipc_all();
 }
 
 
@@ -1227,12 +1263,12 @@ ATF_TC_BODY(semctl_stat_success, tc)
 	check_audit(fds, ipcregex, pipefd);
 
 	/* Destroy the semaphore set with ID = semid */
-	ATF_REQUIRE_EQ(0, semctl(semid, 0, IPC_RMID));
+	cleanup_sem();
 }
 
 ATF_TC_CLEANUP(semctl_stat_success, tc)
 {
-	cleanup();
+	cleanup_ipc_all();
 }
 
 
@@ -1253,7 +1289,7 @@ ATF_TC_BODY(semctl_stat_failure, tc)
 
 ATF_TC_CLEANUP(semctl_stat_failure, tc)
 {
-	cleanup();
+	cleanup_ipc_all();
 }
 
 
@@ -1282,12 +1318,12 @@ ATF_TC_BODY(semctl_set_success, tc)
 	check_audit(fds, ipcregex, pipefd);
 
 	/* Destroy the semaphore set with ID = semid */
-	ATF_REQUIRE_EQ(0, semctl(semid, 0, IPC_RMID));
+	cleanup_sem();
 }
 
 ATF_TC_CLEANUP(semctl_set_success, tc)
 {
-	cleanup();
+	cleanup_ipc_all();
 }
 
 
@@ -1314,12 +1350,12 @@ ATF_TC_BODY(semctl_set_failure, tc)
 	check_audit(fds, regex, pipefd);
 
 	/* Destroy the semaphore set with ID = semid */
-	ATF_REQUIRE_EQ(0, semctl(semid, 0, IPC_RMID));
+	cleanup_sem();
 }
 
 ATF_TC_CLEANUP(semctl_set_failure, tc)
 {
-	cleanup();
+	cleanup_ipc_all();
 }
 
 
@@ -1346,7 +1382,7 @@ ATF_TC_BODY(semctl_rmid_success, tc)
 
 ATF_TC_CLEANUP(semctl_rmid_success, tc)
 {
-	cleanup();
+	cleanup_ipc_all();
 }
 
 
@@ -1367,7 +1403,7 @@ ATF_TC_BODY(semctl_rmid_failure, tc)
 
 ATF_TC_CLEANUP(semctl_rmid_failure, tc)
 {
-	cleanup();
+	cleanup_ipc_all();
 }
 
 
@@ -1390,12 +1426,12 @@ ATF_TC_BODY(semctl_illegal_command, tc)
 	check_audit(fds, regex, pipefd);
 
 	/* Destroy the semaphore set with ID = semid */
-	ATF_REQUIRE_EQ(0, semctl(semid, 0, IPC_RMID));
+	cleanup_sem();
 }
 
 ATF_TC_CLEANUP(semctl_illegal_command, tc)
 {
-	cleanup();
+	cleanup_ipc_all();
 }
 
 
@@ -1418,7 +1454,7 @@ ATF_TC_BODY(shm_open_success, tc)
 
 ATF_TC_CLEANUP(shm_open_success, tc)
 {
-	cleanup();
+	cleanup_ipc_all();
 }
 
 
@@ -1440,7 +1476,7 @@ ATF_TC_BODY(shm_open_failure, tc)
 
 ATF_TC_CLEANUP(shm_open_failure, tc)
 {
-	cleanup();
+	cleanup_ipc_all();
 }
 
 
@@ -1467,7 +1503,7 @@ ATF_TC_BODY(shm_unlink_success, tc)
 
 ATF_TC_CLEANUP(shm_unlink_success, tc)
 {
-	cleanup();
+	cleanup_ipc_all();
 }
 
 
@@ -1488,7 +1524,7 @@ ATF_TC_BODY(shm_unlink_failure, tc)
 
 ATF_TC_CLEANUP(shm_unlink_failure, tc)
 {
-	cleanup();
+	cleanup_ipc_all();
 }
 
 
@@ -1514,7 +1550,7 @@ ATF_TC_BODY(pipe_success, tc)
 
 ATF_TC_CLEANUP(pipe_success, tc)
 {
-	cleanup();
+	cleanup_ipc_all();
 }
 
 
@@ -1537,7 +1573,7 @@ ATF_TC_BODY(pipe_failure, tc)
 
 ATF_TC_CLEANUP(pipe_failure, tc)
 {
-	cleanup();
+	cleanup_ipc_all();
 }
 
 
@@ -1562,7 +1598,7 @@ ATF_TC_BODY(posix_openpt_success, tc)
 
 ATF_TC_CLEANUP(posix_openpt_success, tc)
 {
-	cleanup();
+	cleanup_ipc_all();
 }
 
 
@@ -1583,7 +1619,7 @@ ATF_TC_BODY(posix_openpt_failure, tc)
 
 ATF_TC_CLEANUP(posix_openpt_failure, tc)
 {
-	cleanup();
+	cleanup_ipc_all();
 }
 
 
