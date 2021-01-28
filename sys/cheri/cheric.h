@@ -227,41 +227,33 @@ cheri_bytes_remaining(const void * __capability cap)
 
 static inline __result_use_check size_t
 __cheri_get_low_ptr_bits(uintptr_t ptr, size_t mask) {
-  /*
-   * Note: we continue to use bitwise and on the uintcap value and silence the
-   * warning instead of using __builtin_cheri_offset_get() in case we decide
-   * to use a virtual-address instead offset interpretation of capabilities in
-   * the future.
-   */
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wcheri-bitwise-operations"
-  /*
-   * We mustn't return a LHS-derived capability here so we need to explicitly
-   * cast the result to a non-capability integer
-   */
-  return (size_t)(ptr & mask);
-#pragma clang diagnostic pop
+	/*
+	 * Note: we continue to use bitwise and on the uintcap value and silence
+	 * the warning instead of using __builtin_cheri_offset_get() in case
+	 * we decide to use a virtual-address instead offset interpretation of
+	 * capabilities in the future.
+	 * We mustn't return a LHS-derived capability here so we need to
+	 * explicitly cast the result to a non-capability integer
+	 */
+	return (size_t)(ptr & mask);
 }
 
 static inline __result_use_check uintptr_t
 __cheri_set_low_ptr_bits(uintptr_t ptr, size_t bits) {
-  /*
-   * We want to return a LHS-derived capability here so using the default
-   * uintcap_t semantics is fine.
-   */
-  return ptr | bits;
+	/*
+	 * We want to return a LHS-derived capability here so using the default
+	 * uintcap_t semantics is fine.
+	 */
+	return ptr | bits;
 }
 
 static inline __result_use_check uintptr_t
 __cheri_clear_low_ptr_bits(uintptr_t ptr, size_t bits_mask) {
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wcheri-bitwise-operations"
-  /*
-   * We want to return a LHS-derived capability here so using the default
-   * uintcap_t semantics is fine.
-   */
-  return ptr & (~bits_mask);
-#pragma clang diagnostic pop
+	/*
+	 * We want to return a LHS-derived capability here so using the default
+	 * uintcap_t semantics is fine.
+	 */
+	return ptr & (~bits_mask);
 }
 
 /* Turn on the checking by default for now (until we have fixed everything)*/
