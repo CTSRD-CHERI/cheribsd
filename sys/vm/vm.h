@@ -154,6 +154,10 @@ struct kva_md_info {
 	vm_offset_t	transient_eva;
 };
 
+#define VA_IS_CLEANMAP(va)					\
+	(((va) >= kmi.buffer_sva && ((va) < kmi.buffer_eva)) ||	\
+	 ((va) >= kmi.transient_sva && ((va) < kmi.transient_eva)))
+
 extern struct kva_md_info	kmi;
 extern void vm_ksubmap_init(struct kva_md_info *);
 
