@@ -56,8 +56,6 @@ usage(void)
 int
 main(int argc, char **argv)
 {
-	void * __capability switcher_code;
-	void * __capability switcher_data;
 	void * __capability *lookedup;
 	char *tmp;
 	float dt = 1.0;
@@ -97,7 +95,7 @@ main(int argc, char **argv)
 
 	if (vflag)
 		fprintf(stderr, "%s: setting up...\n", getprogname());
-	error = cosetup(COSETUP_COCALL, &switcher_code, &switcher_data);
+	error = cosetup(COSETUP_COCALL);
 	if (error != 0)
 		err(1, "cosetup");
 
@@ -131,9 +129,9 @@ main(int argc, char **argv)
 			fprintf(stderr, "%s: cocalling \"%s\"...\n", getprogname(), argv[c]);
 
 		if (kflag)
-			error = cocall_slow(switcher_code, switcher_data, lookedup[c], buf, sizeof(buf));
+			error = cocall_slow(lookedup[c], buf, sizeof(buf));
 		else
-			error = cocall(switcher_code, switcher_data, lookedup[c], buf, sizeof(buf));
+			error = cocall(lookedup[c], buf, sizeof(buf));
 		if (error != 0)
 			warn("cocall");
 

@@ -56,10 +56,6 @@ usage(void)
 int
 main(int argc, char **argv)
 {
-	void * __capability coaccept_code;
-	void * __capability coaccept_data;
-	void * __capability cocall_code;
-	void * __capability cocall_data;
 	void * __capability cookie;
 	void * __capability *lookedup;
 	char *registered, *tmp;
@@ -102,7 +98,7 @@ main(int argc, char **argv)
 	if (vflag)
 		fprintf(stderr, "%s: %s: setting up...\n",
 		    getprogname(), registered);
-	error = cosetup(COSETUP_COACCEPT, &coaccept_code, &coaccept_data);
+	error = cosetup(COSETUP_COACCEPT);
 	if (error != 0)
 		err(1, "cosetup");
 
@@ -113,7 +109,7 @@ main(int argc, char **argv)
 		if (vflag)
 			fprintf(stderr, "%s: %s: setting up the caller side...\n",
 			    getprogname(), registered);
-		error = cosetup(COSETUP_COCALL, &cocall_code, &cocall_data);
+		error = cosetup(COSETUP_COCALL);
 		if (error != 0)
 			err(1, "cosetup");
 
@@ -147,9 +143,9 @@ main(int argc, char **argv)
 
 	for (;;) {
 		if (kflag)
-			error = coaccept_slow(coaccept_code, coaccept_data, &cookie, buf, sizeof(buf));
+			error = coaccept_slow(&cookie, buf, sizeof(buf));
 		else
-			error = coaccept(coaccept_code, coaccept_data, &cookie, buf, sizeof(buf));
+			error = coaccept(&cookie, buf, sizeof(buf));
 		if (error != 0)
 			warn("coaccept");
 		if (vflag) {
@@ -164,9 +160,9 @@ main(int argc, char **argv)
 				fprintf(stderr, "%s: %s: cocalling \"%s\"...\n",
 				    getprogname(), registered, argv[c]);
 			if (kflag)
-				error = cocall_slow(cocall_code, cocall_data, lookedup[c], buf, sizeof(buf));
+				error = cocall_slow(lookedup[c], buf, sizeof(buf));
 			else
-				error = cocall(cocall_code, cocall_data, lookedup[c], buf, sizeof(buf));
+				error = cocall(lookedup[c], buf, sizeof(buf));
 			if (error != 0)
 				warn("cocall");
 			if (vflag)

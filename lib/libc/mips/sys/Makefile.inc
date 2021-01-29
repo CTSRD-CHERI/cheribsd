@@ -11,5 +11,5 @@ NOASM+=	vfork.o
 SYM_MAPS+= ${LIBC_SRCTOP}/mips/sys/Symbol.map
 
 .if ${MACHINE_ABI:Mpurecap}
-SRCS+=	coaccept.S cocall.S
+SRCS+=	_coaccept.S _cocall.S coaccept.c cocall.c
 .endif

@@ -538,7 +538,7 @@ setup_scb(struct thread *td)
 }
 
 int
-sys_cosetup(struct thread *td, struct cosetup_args *uap)
+sys__cosetup(struct thread *td, struct _cosetup_args *uap)
 {
 
 	return (kern_cosetup(td, uap->what, uap->code, uap->data));
@@ -780,8 +780,8 @@ kern_copark(struct thread *td)
 }
 
 int
-kern_cocall_slow(void * __capability code, void * __capability data,
-    void * __capability target, void * __capability buf, size_t len)
+kern_cocall_slow(void * __capability target,
+    void * __capability buf, size_t len)
 {
 	struct mdthread *md, *calleemd;
 	struct thread *calleetd;
@@ -891,13 +891,12 @@ int
 sys_cocall_slow(struct thread *td, struct cocall_slow_args *uap)
 {
 
-	return (kern_cocall_slow(uap->code, uap->data,
-	    uap->target, uap->buf, uap->len));
+	return (kern_cocall_slow(uap->target, uap->buf, uap->len));
 }
 
 int
-kern_coaccept_slow(void * __capability code, void * __capability data,
-    void * __capability * __capability cookiep, void * __capability buf, size_t len)
+kern_coaccept_slow(void * __capability * __capability cookiep,
+    void * __capability buf, size_t len)
 {
 	struct mdthread *md, *callermd;
 	size_t minlen;
@@ -980,8 +979,7 @@ int
 sys_coaccept_slow(struct thread *td, struct coaccept_slow_args *uap)
 {
 
-	return (kern_coaccept_slow(uap->code, uap->data,
-	    uap->cookiep, uap->buf, uap->len));
+	return (kern_coaccept_slow(uap->cookiep, uap->buf, uap->len));
 }
 
 #ifdef DDB

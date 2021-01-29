@@ -40,7 +40,8 @@
 .Sh SYNOPSIS
 .In unistd.h
 .Ft int
-.Fn cocall "void * __capability code" "void * __capability data" "void * __capability target" "void * __capability buf" "size_t len"
+.Fn cocall "void * __capability target" "void * __capability buf" "size_t len"
+.Fn cocall_slow "void * __capability target" "void * __capability buf" "size_t len"
 .Sh DESCRIPTION
 The
 .Fn cocall
@@ -53,13 +54,11 @@ bytes pointed to by
 .Fa buf
 will be copied to the buffer provided by the callee; before returning the data
 will be copied from the callee back to the calling side.
-.Pp
+Any capabilities copied will have their tag bits cleared.
 The
-.Ar code
-and
-.Ar data
-arguments must point to a sealed capability pair obtained from
-.Xr cosetup 2 .
+.Fn cocall_slow 2
+provides the same semantics, but implemented as a traditional system call.
+.Pp
 The
 .Ar target
 argument is a sealed capability usually retrieved with
@@ -69,6 +68,12 @@ Both the
 and the
 .Fa len
 must be 8-byte aligned.
+.Pp
+Before calling those functions for the first time, one must call
+.Xr cosetup 2
+with
+.Dv COSETUP_COCALL
+argument.
 .Sh RETURN VALUES
 .Rv -std cocall
 .Sh ERRORS
@@ -83,13 +88,16 @@ The callee has not called
 yet.
 .It Bq Er EPIPE
 The callee is no longer available, usually because it exited.
+.It Bq Er EPROTOTYPE
+Used
+.Fn cocall 2
+against a callee waiting on
+.Fn coaccept_slow 2 ,
+or vice versa.
 .It Bq Er EINVAL
 The
-.Fa code ,
-.Fa data ,
-or
 .Fa target
-arguments are invalid.
+argument is invalid.
 .It Bq Er EFAULT
 The
 .Fa data
@@ -99,12 +107,10 @@ points outside the process's allocated address space.
 .Sh EXAMPLES
 Basic usage example:
 .Bd -literal
-	void * __capability switcher_code;
-	void * __capability switcher_data;
 	void * __capability lookedup;
 	uint64_t buf[MAXBSIZE];
 
-	error = cosetup(COSETUP_COCALL, &switcher_code, &switcher_data);
+	error = cosetup(COSETUP_COCALL);
 	if (error != 0)
 		err(1, "cosetup");
 
@@ -112,7 +118,7 @@ Basic usage example:
 	if (error != 0)
 		err(1, "colookup");
 
-	error = cocall(switcher_code, switcher_data, lookedup, buf, sizeof(buf));
+	error = cocall(lookedup, buf, sizeof(buf));
 	if (error != 0)
 		err(1, "cocall");
 .Ed

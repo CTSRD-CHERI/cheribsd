@@ -39,6 +39,7 @@ SRCS+= getdents.c lstat.c mknod.c stat.c
 .if !${MACHINE_ABI:Mpurecap}
 SRCS+= brk.c
 .endif
+SRCS+= cosetup.c
 SRCS+= closefrom.c
 SRCS+= pipe.c
 SRCS+= shm_open.c
@@ -379,6 +380,8 @@ MLINKS+=brk.2 sbrk.2
 MLINKS+=cap_enter.2 cap_getmode.2
 MLINKS+=cap_fcntls_limit.2 cap_fcntls_get.2
 MLINKS+=cap_ioctls_limit.2 cap_ioctls_get.2
+MLINKS+=coaccept.2 coaccept_slow.2
+MLINKS+=cocall.2 cocall_slow.2
 MLINKS+=coregister.2 colookup.2
 MLINKS+=chdir.2 fchdir.2
 MLINKS+=chflags.2 chflagsat.2 \

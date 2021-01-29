@@ -51,7 +51,7 @@ __FBSDID("$FreeBSD$");
 
 #define	JUMP_BUFFER_SIZE	(64 * _MIPS_SZCAP / 8)
 
-LEAF(coaccept)
+LEAF(_cocall)
 	/*
 	 * Save the CPU context before calling into switcher.
 	 * This mostly mimics setjmp(3).
@@ -204,7 +204,7 @@ LEAF(coaccept)
 	 *      want to save $c26, so let's just call it here, all in one place.
 	 *      Without it, stuff will crash if v0 != 0.
 	 */
-	PIC_PROLOGUE(coaccept)
+	PIC_PROLOGUE(_cocall)
 	PIC_TAILCALL(__cerror)
 	nop
-END(coaccept)
+END(_cocall)

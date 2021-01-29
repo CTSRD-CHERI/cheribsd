@@ -250,13 +250,11 @@ static uintmax_t
 test_coping(uintmax_t num, uintmax_t int_arg, const char *path)
 {
 	char buf[int_arg];
-	void * __capability switcher_code;
-	void * __capability switcher_data;
 	void * __capability lookedup;
 	uintmax_t i;
 	int error;
 
-	error = cosetup(COSETUP_COCALL, &switcher_code, &switcher_data);
+	error = cosetup(COSETUP_COCALL);
 	if (error != 0)
 		err(1, "cosetup");
 
@@ -271,7 +269,7 @@ test_coping(uintmax_t num, uintmax_t int_arg, const char *path)
 
 	benchmark_start();
 	BENCHMARK_FOREACH(i, num) {
-		error = cocall(switcher_code, switcher_data, lookedup, buf, int_arg);
+		error = cocall(lookedup, buf, int_arg);
 		if (error != 0)
 			err(1, "cocall");
 	}

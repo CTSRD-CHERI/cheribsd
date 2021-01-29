@@ -173,7 +173,7 @@
 				/* 174 is freebsd6 pwrite */
 #define	SYS_setfib	175
 #define	SYS_ntp_adjtime	176
-#define	SYS_cosetup	177
+#define	SYS__cosetup	177
 #define	SYS_coregister	178
 #define	SYS_colookup	179
 #define	SYS_copark	180

@@ -383,6 +383,7 @@ FBSD_1.4 {
 };
 
 FBSD_1.5 {
+	_cosetup;
 	clock_nanosleep;
 	coaccept_slow;
 	cocall_slow;

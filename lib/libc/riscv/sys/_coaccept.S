@@ -35,7 +35,7 @@ __FBSDID("$FreeBSD$");
 #define	CAP_LEN			16
 #define	JUMP_BUFFER_SIZE	(27 * CAP_LEN)
 
-ENTRY(coaccept)
+ENTRY(_coaccept)
 	cincoffsetimm	csp, csp, -JUMP_BUFFER_SIZE
 
 	/* Store the general purpose registers and ra */
@@ -119,4 +119,4 @@ ENTRY(coaccept)
 	cret
 2:
 	ASM_LOCAL_TAILCALL(t1, cerror)
-END(coaccept)
+END(_coaccept)

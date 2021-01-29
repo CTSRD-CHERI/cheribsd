@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014 SRI International
+ * Copyright (c) 2020 Edward Tomasz Napierala <trasz@FreeBSD.org>
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -28,29 +28,30 @@
  * SUCH DAMAGE.
  */
 
-#ifndef __LIBC_CHERI_PRIVATE_H__
-#define __LIBC_CHERI_PRIVATE_H__
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD$");
 
-#ifdef CAPABILITY_VERSION
-#if !__has_feature(capabilities)
-#error	This code requires a capability aware compiler.
-#endif
-#define	__CAPSUFFIX(func)	func ## _c
-#ifndef __CAP
-#define	__CAP		__capability
-#endif
-#else
-#define	__CAPSUFFIX(func)	func
-#ifndef __CAP
-#define	__CAP
-#endif
-#endif
+#include "namespace.h"
+#include <errno.h>
+#include <unistd.h>
+#include "cheri_private.h"
+#include "libc_private.h"
+#include "un-namespace.h"
 
-#if __has_feature(capabilities)
-extern _Thread_local void * __capability _cocall_code;
-extern _Thread_local void * __capability _cocall_data;
-extern _Thread_local void * __capability _coaccept_code;
-extern _Thread_local void * __capability _coaccept_data;
-#endif /* __has_feature(capabilities) */
+_Thread_local void * __capability _cocall_code;
+_Thread_local void * __capability _cocall_data;
+_Thread_local void * __capability _coaccept_code;
+_Thread_local void * __capability _coaccept_data;
 
-#endif /* __LIBC_CHERI_PRIVATE_H__ */
+int
+cosetup(int what)
+{
+	switch (what) {
+	case COSETUP_COACCEPT:
+		return (_cosetup(what, &_coaccept_code, &_coaccept_data));
+	case COSETUP_COCALL:
+		return (_cosetup(what, &_cocall_code, &_cocall_data));
+	default:
+		return (EINVAL);
+	}
+}

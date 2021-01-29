@@ -917,9 +917,9 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 1;
 		break;
 	}
-	/* cosetup */
+	/* _cosetup */
 	case 177: {
-		struct cosetup_args *p = params;
+		struct _cosetup_args *p = params;
 		iarg[0] = p->what; /* int */
 		uarg[1] = (intptr_t) p->code; /* void * __capability __capability * __capability */
 		uarg[2] = (intptr_t) p->data; /* void * __capability __capability * __capability */
@@ -3187,23 +3187,19 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* cocall_slow */
 	case 548: {
 		struct cocall_slow_args *p = params;
-		uarg[0] = (intptr_t) p->code; /* void * __capability __capability */
-		uarg[1] = (intptr_t) p->data; /* void * __capability __capability */
-		uarg[2] = (intptr_t) p->target; /* void * __capability __capability */
-		uarg[3] = (intptr_t) p->buf; /* void * __capability __capability */
-		uarg[4] = p->len; /* size_t */
-		*n_args = 5;
+		uarg[0] = (intptr_t) p->target; /* void * __capability __capability */
+		uarg[1] = (intptr_t) p->buf; /* void * __capability __capability */
+		uarg[2] = p->len; /* size_t */
+		*n_args = 3;
 		break;
 	}
 	/* coaccept_slow */
 	case 549: {
 		struct coaccept_slow_args *p = params;
-		uarg[0] = (intptr_t) p->code; /* void * __capability __capability */
-		uarg[1] = (intptr_t) p->data; /* void * __capability __capability */
-		uarg[2] = (intptr_t) p->cookiep; /* void * __capability __capability * __capability */
-		uarg[3] = (intptr_t) p->buf; /* void * __capability __capability */
-		uarg[4] = p->len; /* size_t */
-		*n_args = 5;
+		uarg[0] = (intptr_t) p->cookiep; /* void * __capability __capability * __capability */
+		uarg[1] = (intptr_t) p->buf; /* void * __capability __capability */
+		uarg[2] = p->len; /* size_t */
+		*n_args = 3;
 		break;
 	}
 	/* fdatasync */
@@ -4946,7 +4942,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* cosetup */
+	/* _cosetup */
 	case 177:
 		switch(ndx) {
 		case 0:
@@ -8758,12 +8754,6 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "userland void * __capability __capability";
 			break;
 		case 2:
-			p = "userland void * __capability __capability";
-			break;
-		case 3:
-			p = "userland void * __capability __capability";
-			break;
-		case 4:
 			p = "size_t";
 			break;
 		default:
@@ -8774,18 +8764,12 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 549:
 		switch(ndx) {
 		case 0:
-			p = "userland void * __capability __capability";
+			p = "userland void * __capability __capability * __capability";
 			break;
 		case 1:
 			p = "userland void * __capability __capability";
 			break;
 		case 2:
-			p = "userland void * __capability __capability * __capability";
-			break;
-		case 3:
-			p = "userland void * __capability __capability";
-			break;
-		case 4:
 			p = "size_t";
 			break;
 		default:
@@ -9798,7 +9782,7 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* cosetup */
+	/* _cosetup */
 	case 177:
 		if (ndx == 0 || ndx == 1)
 			p = "int";

@@ -4,6 +4,8 @@
 
 FBSDprivate_1.0 {
 	/* PSEUDO syscalls */
+	_coaccept;
+	_cocall;
 	coaccept;
 	cocall;
 };
