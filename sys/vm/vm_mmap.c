@@ -510,8 +510,30 @@ kern_mmap(struct thread *td, struct mmap_req *mrp)
 	 * Always honor PROT_MAX if set.  If not, default to all
 	 * permissions unless we're implying maximum permissions.
 	 */
-	if (max_prot == 0)
+	if (max_prot == 0 && prot != PROT_NONE) {
 		max_prot = kern_mmap_maxprot(p, prot);
+		/*
+		 * Limit the inferred maxprot to what capsicum allows to
+		 * avoid ENOTCAPABLE errors later.
+		 */
+		if ((flags & (MAP_GUARD | MAP_GUARD)) == 0 && fd != -1) {
+			cap_rights_init_one(&rights, CAP_MMAP);
+			if (max_prot & PROT_READ)
+				cap_rights_set_one(&rights, CAP_MMAP_R);
+			if ((flags & MAP_SHARED) != 0) {
+				if (max_prot & PROT_WRITE)
+					cap_rights_set_one(&rights, CAP_MMAP_W);
+			}
+			if (max_prot & PROT_EXEC)
+				cap_rights_set_one(&rights, CAP_MMAP_X);
+			error = fget_mmap(td, fd, &rights, &cap_maxprot, &fp);
+			if (error != 0)
+				goto done;
+			max_prot &= cap_maxprot;
+			MPASS(fp != NULL);
+			fdrop(fp, td);
+		}
+	}
 
 	vms = p->p_vmspace;
 	fp = NULL;
