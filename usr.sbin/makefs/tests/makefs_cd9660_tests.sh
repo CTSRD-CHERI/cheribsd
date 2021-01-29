@@ -69,7 +69,7 @@ check_cd9660_support() {
 atf_test_case D_flag cleanup
 D_flag_body()
 {
-	atf_skip "makefs crashes with SIGBUS with dupe mtree entries; see FreeBSD bug # 192839"
+	atf_expect_fail "makefs crashes with SIGBUS with dupe mtree entries; see FreeBSD bug # 192839"
 
 	create_test_inputs
 
