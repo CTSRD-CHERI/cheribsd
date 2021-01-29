@@ -49,7 +49,7 @@ H_flag_body()
 {
 	local paths1='testdir/A/B testdir/A testdir/C testdir'
 	local paths2='testdir/C/B testdir/C'
-	local lineprefix="^[0-9]+$(printf "\t")"
+	local lineprefix=$'^[0-9]+\t'
 	local sep="\$\n${lineprefix}"
 
 	atf_check mkdir testdir
