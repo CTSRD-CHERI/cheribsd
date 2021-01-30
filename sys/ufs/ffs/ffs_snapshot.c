@@ -2592,6 +2592,7 @@ process_deferred_inactive(struct mount *mp)
 			continue;
 		}
 		vholdl(vp);
+retry_vnode:
 		error = vn_lock(vp, LK_EXCLUSIVE | LK_INTERLOCK);
 		if (error != 0) {
 			vdrop(vp);
@@ -2606,7 +2607,12 @@ process_deferred_inactive(struct mount *mp)
 			UFS_INODE_SET_FLAG(ip, IN_MODIFIED);
 		}
 		VI_LOCK(vp);
-		vinactive(vp);
+		error = vinactive(vp);
+		if (error == ERELOOKUP && vp->v_usecount == 0) {
+			VI_UNLOCK(vp);
+			VOP_UNLOCK(vp);
+			goto retry_vnode;
+		}
 		VI_UNLOCK(vp);
 		VOP_UNLOCK(vp);
 		vdrop(vp);
