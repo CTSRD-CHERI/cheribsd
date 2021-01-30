@@ -212,7 +212,7 @@ _libclang_rt=	libclang_rt
 .endif
 .endif # ${COMPILER_TYPE} == "clang"
 
-.if ${MK_LIBCPLUSPLUS} != "no"
+.if ${MK_CXX} != "no"
 _libcxxrt=	libcxxrt
 _libcplusplus=	libc++
 _libcplusplus+=	libc++experimental

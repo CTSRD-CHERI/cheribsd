@@ -290,12 +290,7 @@ _EXTRADEPEND:
 .else
 	echo ${PROG_FULL}: ${LIBC} ${DPADD} >> ${DEPENDFILE}
 .if defined(PROG_CXX)
-.if (${COMPILER_TYPE} == "clang" && empty(CXXFLAGS:M-stdlib=libstdc++)) || \
-    !empty(CXXFLAGS:M-stdlib=libc++) || ${MK_CHERI} != "no"
 	echo ${PROG_FULL}: ${LIBCPLUSPLUS} >> ${DEPENDFILE}
-.else
-	echo ${PROG_FULL}: ${LIBSTDCPLUSPLUS} >> ${DEPENDFILE}
-.endif
 .endif
 .endif
 .endif	# !defined(NO_EXTRADEPEND)
