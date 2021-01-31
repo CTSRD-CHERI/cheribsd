@@ -3746,7 +3746,6 @@ static int cache_fplookup_cross_mount(struct cache_fpl *fpl);
 static int cache_fplookup_partial_setup(struct cache_fpl *fpl);
 static int cache_fplookup_skip_slashes(struct cache_fpl *fpl);
 static int cache_fplookup_trailingslash(struct cache_fpl *fpl);
-static int cache_fplookup_preparse(struct cache_fpl *fpl);
 static void cache_fpl_pathlen_dec(struct cache_fpl *fpl);
 static void cache_fpl_pathlen_inc(struct cache_fpl *fpl);
 static void cache_fpl_pathlen_add(struct cache_fpl *fpl, size_t n);
@@ -4527,12 +4526,23 @@ cache_fplookup_degenerate(struct cache_fpl *fpl)
 	struct vnode *dvp;
 	enum vgetstate dvs;
 	int error, lkflags;
+#ifdef INVARIANTS
+	char *cp;
+#endif
 
 	fpl->tvp = fpl->dvp;
 	fpl->tvp_seqc = fpl->dvp_seqc;
 
 	cnp = fpl->cnp;
 	dvp = fpl->dvp;
+
+#ifdef INVARIANTS
+	for (cp = cnp->cn_pnbuf; *cp != '\0'; cp++) {
+		KASSERT(*cp == '/',
+		    ("%s: encountered non-slash; string [%s]\n", __func__,
+		    cnp->cn_pnbuf));
+	}
+#endif
 
 	if (__predict_false(cnp->cn_nameiop != LOOKUP)) {
 		cache_fpl_smr_exit(fpl);
@@ -4598,6 +4608,9 @@ cache_fplookup_noentry(struct cache_fpl *fpl)
 	}
 
 	if (cnp->cn_nameptr[0] == '\0') {
+		if (fpl->tvp == NULL) {
+			return (cache_fplookup_degenerate(fpl));
+		}
 		return (cache_fplookup_trailingslash(fpl));
 	}
 
@@ -4906,7 +4919,7 @@ cache_symlink_resolve(struct cache_fpl *fpl, const char *string, size_t len)
 	cache_fpl_pathlen_add(fpl, adjust);
 	cnp->cn_nameptr = cnp->cn_pnbuf;
 	fpl->nulchar = &cnp->cn_nameptr[ndp->ni_pathlen - 1];
-
+	fpl->tvp = NULL;
 	return (0);
 }
 
@@ -4966,8 +4979,7 @@ cache_fplookup_symlink(struct cache_fpl *fpl)
 			return (cache_fpl_aborted(fpl));
 		}
 	}
-
-	return (cache_fplookup_preparse(fpl));
+	return (0);
 }
 
 static int
@@ -5247,30 +5259,6 @@ cache_fpl_pathlen_dec(struct cache_fpl *fpl)
 }
 #endif
 
-static int __always_inline
-cache_fplookup_preparse(struct cache_fpl *fpl)
-{
-	struct componentname *cnp;
-
-	cnp = fpl->cnp;
-
-	if (__predict_false(cnp->cn_nameptr[0] == '\0')) {
-		return (cache_fplookup_degenerate(fpl));
-	}
-
-	/*
-	 * By this point the shortest possible pathname is one character + nul
-	 * terminator, hence 2.
-	 */
-	KASSERT(fpl->debug.ni_pathlen >= 2, ("%s: pathlen %zu\n", __func__,
-	    fpl->debug.ni_pathlen));
-	KASSERT(&cnp->cn_nameptr[fpl->debug.ni_pathlen - 2] == fpl->nulchar - 1,
-	    ("%s: mismatch on string (%p != %p) [%s]\n", __func__,
-	    &cnp->cn_nameptr[fpl->debug.ni_pathlen - 2], fpl->nulchar - 1,
-	    cnp->cn_pnbuf));
-	return (0);
-}
-
 static void
 cache_fplookup_parse(struct cache_fpl *fpl)
 {
@@ -5543,6 +5531,13 @@ cache_fplookup_failed_vexec(struct cache_fpl *fpl, int error)
 	dvp_seqc = fpl->dvp_seqc;
 
 	/*
+	 * Hack: delayed degenerate path checking.
+	 */
+	if (cnp->cn_nameptr[0] == '\0' && fpl->tvp == NULL) {
+		return (cache_fplookup_degenerate(fpl));
+	}
+
+	/*
 	 * Hack: delayed name len checking.
 	 */
 	if (__predict_false(cnp->cn_namelen > NAME_MAX)) {
@@ -5633,10 +5628,7 @@ cache_fplookup_impl(struct vnode *dvp, struct cache_fpl *fpl)
 		return (cache_fpl_aborted(fpl));
 	}
 
-	error = cache_fplookup_preparse(fpl);
-	if (__predict_false(cache_fpl_terminated(fpl))) {
-		return (error);
-	}
+	MPASS(fpl->tvp == NULL);
 
 	for (;;) {
 		cache_fplookup_parse(fpl);
@@ -5796,6 +5788,7 @@ cache_fplookup(struct nameidata *ndp, enum cache_fpl_status *status,
 	fpl.nulchar = &cnp->cn_nameptr[ndp->ni_pathlen - 1];
 	fpl.fsearch = false;
 	fpl.savename = (cnp->cn_flags & SAVENAME) != 0;
+	fpl.tvp = NULL; /* for degenerate path handling */
 	fpl.pwd = pwdp;
 	pwd = pwd_get_smr();
 	*(fpl.pwd) = pwd;
