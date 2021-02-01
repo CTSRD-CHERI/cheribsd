@@ -319,6 +319,15 @@ drop_to_el1:
 	/* Don't trap to EL2 for exceptions */
 	mov	x2, #CPTR_RES1
 	msr	cptr_el2, x2
+#if __has_feature(capabilities)
+	/*
+	 * Wait for the write to cptr_el2 to complete. It will enable the
+	 * use of capabilities at EL2 that we need below. When not using
+	 * capabilities this is unneeded as the eret instruction will
+	 * act as in place of this barrier.
+	 */
+	isb
+#endif
 
 	/* Don't trap to EL2 for CP15 traps */
 	msr	hstr_el2, xzr
