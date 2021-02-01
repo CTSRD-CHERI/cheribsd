@@ -1223,7 +1223,8 @@ kern_openat(struct thread *td, int fd, char const * __capability path,
 	 * vnode operations here.
 	 */
 	if (fp->f_ops == &badfileops) {
-		KASSERT(vp->v_type != VFIFO, ("Unexpected fifo."));
+		KASSERT(vp->v_type != VFIFO,
+		    ("Unexpected fifo fp %p vp %p", fp, vp));
 		finit_vnode(fp, flags, NULL, &vnops);
 	}
 
