@@ -134,7 +134,7 @@ __FBSDID("$FreeBSD$");
 	ldp	c26, c27, [sp, #(TF_X + 26 * 16)]
 	ldp	c28, c29, [sp, #(TF_X + 28 * 16)]
 .else
-	ldr	     x29, [sp, #(TF_X + 29 * 16)]
+	ldr	     c29, [sp, #(TF_X + 29 * 16)]
 .endif
 .if \el == 0
 	add	sp, sp, #(TF_SIZE + 16)
