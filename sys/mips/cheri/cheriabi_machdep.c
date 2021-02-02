@@ -147,21 +147,3 @@ cheriabi_fetch_syscall_args(struct thread *td)
 
 	return (error);
 }
-
-/*
- * Common per-thread CHERI state initialisation across execve(2) and
- * additional thread creation.
- */
-void
-cheriabi_newthread_init(struct thread *td)
-{
-	struct trapframe *frame;
-
-	/*
-	 * We assume that the caller has initialised the trapframe to zeroes
-	 * and then set idc, and pcc appropriatly. We might want to check
-	 * this with a more thorough set of assertions in the future.
-	 */
-	frame = &td->td_pcb->pcb_regs;
-	KASSERT(frame->pcc != NULL, ("%s: NULL $epcc", __func__));
-}
