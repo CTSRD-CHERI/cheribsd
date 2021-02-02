@@ -61,8 +61,8 @@
 #include "cheribsdtest.h"
 
 #ifdef CHERI_BASELEN_BITS
-void
-test_cheriabi_mmap_unrepresentable(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_cheriabi_mmap_unrepresentable,
+    "Test CheriABI mmap() with unrepresentable lengths")
 {
 	size_t len = ((size_t)PAGE_SIZE << CHERI_BASELEN_BITS) + 1;
 	size_t expected_len;
@@ -84,8 +84,8 @@ test_cheriabi_mmap_unrepresentable(const struct cheri_test *ctp __unused)
 }
 #endif
 
-void
-test_cheriabi_malloc_zero_size(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_cheriabi_malloc_zero_size,
+    "Check that zero-sized mallocs are properly bounded")
 {
 	void *cap;
 
@@ -158,8 +158,8 @@ free_adjacent_mappings(struct adjacent_mappings *mappings)
 	CHERIBSDTEST_CHECK_SYSCALL(munmap(mappings->last, mappings->maplen));
 }
 
-void
-test_cheriabi_munmap_invalid_ptr(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_cheriabi_munmap_invalid_ptr,
+    "Check that munmap() rejects invalid pointer arguments")
 {
 	struct adjacent_mappings mappings;
 
@@ -191,8 +191,8 @@ test_cheriabi_munmap_invalid_ptr(const struct cheri_test *ctp __unused)
 	cheribsdtest_success();
 }
 
-void
-test_cheriabi_mprotect_invalid_ptr(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_cheriabi_mprotect_invalid_ptr,
+    "Check that mprotect() rejects invalid pointer arguments")
 {
 	struct adjacent_mappings mappings;
 
@@ -230,8 +230,8 @@ test_cheriabi_mprotect_invalid_ptr(const struct cheri_test *ctp __unused)
 	cheribsdtest_success();
 }
 
-void
-test_cheriabi_minherit_invalid_ptr(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_cheriabi_minherit_invalid_ptr,
+    "Check that minherit() rejects invalid pointer arguments")
 {
 	struct adjacent_mappings mappings;
 
@@ -308,8 +308,8 @@ free_adjacent_mappings_shm(struct adjacent_mappings *mappings)
 	CHERIBSDTEST_CHECK_SYSCALL(shmdt(mappings->last));
 }
 
-void
-test_cheriabi_shmdt_invalid_ptr(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_cheriabi_shmdt_invalid_ptr,
+    "Check that shmdt() rejects invalid pointer arguments")
 {
 	struct adjacent_mappings mappings;
 

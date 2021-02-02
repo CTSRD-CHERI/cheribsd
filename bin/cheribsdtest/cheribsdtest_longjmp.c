@@ -44,8 +44,7 @@
 
 #include "cheribsdtest.h"
 
-void
-cheribsdtest_setjmp(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(cheribsdtest_setjmp, "Exercise setjmp without longjmp")
 {
 	jmp_buf jumpbuf;
 	int ret;
@@ -56,8 +55,7 @@ cheribsdtest_setjmp(const struct cheri_test *ctp __unused)
 	cheribsdtest_success();
 }
 
-void
-cheribsdtest_setjmp_longjmp(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(cheribsdtest_setjmp_longjmp, "Exercise setjmp with longjmp")
 {
 	jmp_buf jumpbuf;
 	int ret;

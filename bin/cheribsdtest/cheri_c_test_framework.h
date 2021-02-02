@@ -15,11 +15,11 @@ do {									\
 void test_setup(void);
 
 #define	DECLARE_TEST(name, desc) \
-    void cheri_c_test_ ## name(const struct cheri_test *ctp __unused);
+    static const char cheri_c_test_ ## name ## _desc[] = desc;
 #define DECLARE_TEST_FAULT(name, desc)	\
-    void cheri_c_test_ ## name(const struct cheri_test *ctp __unused);
+    DECLARE_TEST(name, (desc))
 #define BEGIN_TEST(name) \
-    void cheri_c_test_ ## name(const struct cheri_test *ctp __unused) {	\
+    CHERIBSDTEST(cheri_c_test_ ## name, cheri_c_test_ ## name ## _desc) { \
 	test_setup();
 #define END_TEST cheribsdtest_success(); }
 

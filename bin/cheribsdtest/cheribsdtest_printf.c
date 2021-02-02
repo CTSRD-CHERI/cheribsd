@@ -154,8 +154,7 @@ test_printf_cap_one(void * __capability p, int expected_tokens,
 	}
 }
 
-void
-test_printf_cap(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_printf_cap, "Various checks of %#p")
 {
 	char data[64];
 	void * __capability scalar = (void * __capability)(uintcap_t)4;

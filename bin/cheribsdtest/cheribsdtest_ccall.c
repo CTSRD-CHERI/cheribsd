@@ -161,8 +161,12 @@ cheribsdtest_ccall_setup(void)
  * Trigger a CReturn underflow by trying to return from an unsandboxed
  * context.
  */
-void
-test_fault_creturn(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_fault_creturn,
+    "Exercise trusted stack underflow",
+    .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
+    .ct_signum = SIGPROT,
+    .ct_si_code = PROT_CHERI_UNDERFLOW,
+    .ct_si_trapno = TRAPNO_CHERI)
 {
 
 	__asm__ __volatile__("creturn" : : : "memory");
@@ -171,8 +175,7 @@ test_fault_creturn(const struct cheri_test *ctp __unused)
 /*
  * CCall code that will immediately CReturn.
  */
-void
-test_nofault_ccall_creturn(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_nofault_ccall_creturn, "Exercise CCall/CReturn")
 {
 	struct cheri_object co;
 
@@ -187,8 +190,8 @@ test_nofault_ccall_creturn(const struct cheri_test *ctp __unused)
 /*
  * CCall code that will execute a few NOPs, then CReturn.
  */
-void
-test_nofault_ccall_nop_creturn(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_nofault_ccall_nop_creturn,
+    "Exercise CCall/NOP/NOP/NOP/CReturn")
 {
 	struct cheri_object co;
 
@@ -207,8 +210,7 @@ test_nofault_ccall_nop_creturn(const struct cheri_test *ctp __unused)
  */
 #define	PRIOR_RETVAL	0x5678
 #define	DLI_RETVAL	0x1234
-void
-test_nofault_ccall_dli_creturn(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_nofault_ccall_dli_creturn, "Exercise CCall/DLI/CReturn")
 {
 	struct cheri_object co;
 	register_t v0;
@@ -242,8 +244,12 @@ test_nofault_ccall_dli_creturn(const struct cheri_test *ctp __unused)
 /*
  * CCall with an untagged code capability.
  */
-void
-test_fault_ccall_code_untagged(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_fault_ccall_code_untagged,
+    "Invoke CCall with untagged code capability",
+    .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
+    .ct_signum = SIGPROT,
+    .ct_si_code = PROT_CHERI_TAG,
+    .ct_si_trapno = TRAPNO_CHERI)
 {
 	struct cheri_object co;
 
@@ -262,8 +268,12 @@ test_fault_ccall_code_untagged(const struct cheri_test *ctp __unused)
 /*
  * CCall with an untagged data capability.
  */
-void
-test_fault_ccall_data_untagged(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_fault_ccall_data_untagged,
+    "Invoke CCall with an untagged data capability",
+    .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
+    .ct_signum = SIGPROT,
+    .ct_si_code = PROT_CHERI_TAG,
+    .ct_si_trapno = TRAPNO_CHERI)
 {
 	struct cheri_object co;
 
@@ -282,8 +292,12 @@ test_fault_ccall_data_untagged(const struct cheri_test *ctp __unused)
 /*
  * CCall with an unsealed code capability.
  */
-void
-test_fault_ccall_code_unsealed(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_fault_ccall_code_unsealed,
+    "Invoke CCall with an unsealed code capability",
+    .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
+    .ct_signum = SIGPROT,
+    .ct_si_code = PROT_CHERI_UNSEALED,
+    .ct_si_trapno = TRAPNO_CHERI)
 {
 	struct cheri_object co;
 
@@ -302,8 +316,12 @@ test_fault_ccall_code_unsealed(const struct cheri_test *ctp __unused)
 /*
  * CCall with an unsealed data capability.
  */
-void
-test_fault_ccall_data_unsealed(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_fault_ccall_data_unsealed,
+    "Invoke CCall with an unsealed data capability",
+    .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
+    .ct_signum = SIGPROT,
+    .ct_si_code = PROT_CHERI_UNSEALED,
+    .ct_si_trapno = TRAPNO_CHERI)
 {
 	struct cheri_object co;
 
@@ -322,8 +340,12 @@ test_fault_ccall_data_unsealed(const struct cheri_test *ctp __unused)
 /*
  * CCall with non-matching types for code and data.
  */
-void
-test_fault_ccall_typemismatch(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_fault_ccall_typemismatch,
+    "Invoke CCall with code/data type mismatch",
+    .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
+    .ct_signum = SIGPROT,
+    .ct_si_code = PROT_CHERI_TYPE,
+    .ct_si_trapno = TRAPNO_CHERI)
 {
 	struct cheri_object co;
 
@@ -341,8 +363,12 @@ test_fault_ccall_typemismatch(const struct cheri_test *ctp __unused)
 /*
  * CCall without execute permission on the code capability.
  */
-void
-test_fault_ccall_code_noexecute(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_fault_ccall_code_noexecute,
+    "Invoke CCall with a non-executable code capability",
+    .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
+    .ct_signum = SIGPROT,
+    .ct_si_code = PROT_CHERI_PERM,
+    .ct_si_trapno = TRAPNO_CHERI)
 {
 	struct cheri_object co;
 
@@ -359,8 +385,12 @@ test_fault_ccall_code_noexecute(const struct cheri_test *ctp __unused)
 /*
  * CCall with execute permission on the data capability.
  */
-void
-test_fault_ccall_data_execute(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_fault_ccall_data_execute,
+    "Invoke CCall with an executable data capability",
+    .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
+    .ct_signum = SIGPROT,
+    .ct_si_code = PROT_CHERI_PERM,
+    .ct_si_trapno = TRAPNO_CHERI)
 {
 	struct cheri_object co;
 

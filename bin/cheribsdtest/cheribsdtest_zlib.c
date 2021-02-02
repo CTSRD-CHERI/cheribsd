@@ -121,8 +121,7 @@ check_uncompressed_data(const uint8_t *data, size_t datalen)
 	}
 }
 
-void
-test_deflate_zeroes(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_deflate_zeroes, "Deflate a buffer of zeroes")
 {
 	int ret;
 	size_t compsize;
@@ -156,8 +155,7 @@ test_deflate_zeroes(const struct cheri_test *ctp __unused)
 	cheribsdtest_success();
 }
 
-void
-test_inflate_zeroes(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_inflate_zeroes, "Inflate a compressed buffer of zeroes")
 {
 	int ret;
 	uint8_t *outbuf;
@@ -188,8 +186,9 @@ test_inflate_zeroes(const struct cheri_test *ctp __unused)
 
 
 #ifdef CHERIBSD_LIBCHERI_TESTS
-void
-test_sandbox_inflate_zeroes(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_sandbox_inflate_zeroes,
+    "Inflate a compressed buffer of zeroes -- in a sandbox",
+    .ct_flags = CT_FLAG_SANDBOX)
 {
 	register_t v;
 	struct zstream_proxy zsp;
