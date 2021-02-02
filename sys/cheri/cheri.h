@@ -54,18 +54,6 @@ struct cheri_object {
     ((co).co_codecap == NULL && (co).co_datacap == NULL)
 #endif
 
-/*
- * Data structure describing CHERI's sigaltstack-like extensions to signal
- * delivery.  In the event that a thread takes a signal when $pcc doesn't hold
- * CHERI_PERM_SYSCALL, we will need to install new $pcc, $ddc, $csp, and $idc
- * state, and move execution to the per-thread alternative stack, whose
- * pointer should (presumably) be relative to the $ddc/$csp defined here.
- */
-struct cheri_signal {
-	void * __capability	csig_ddc;
-	void * __capability	csig_idc;
-};
-
 #ifdef _KERNEL
 /*
  * Functions to construct userspace capabilities.
