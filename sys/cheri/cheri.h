@@ -150,7 +150,6 @@ SYSCTL_DECL(_security_cheri_stats);
 extern u_int	security_cheri_debugger_on_sandbox_signal;
 extern u_int	security_cheri_debugger_on_sandbox_syscall;
 extern u_int	security_cheri_debugger_on_sandbox_unwind;
-extern u_int	security_cheri_debugger_on_sigprot;
 extern u_int	security_cheri_sandboxed_signals;
 extern u_int	security_cheri_syscall_violations;
 extern u_int	security_cheri_bound_legacy_capabilities;
