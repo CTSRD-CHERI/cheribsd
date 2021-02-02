@@ -310,15 +310,13 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	regs->c17 = p->p_md.md_sigcode;
 
 	/*
-	 * For now only change IDC if we were sandboxed. This makes cap-table
-	 * binaries work as expected (since they need cgp to remain the same).
+	 * Clear $ddc and $idc.
 	 *
-	 * TODO: remove csigp->csig_idc
+	 * XXX: Static binaries using the PLT ABI would need $idc
+	 * ($cgp) preserved.
 	 */
-	if (cheri_is_sandboxed) {
-		regs->ddc = td->td_pcb->pcb_cherisignal.csig_ddc;
-		regs->idc = td->td_pcb->pcb_cherisignal.csig_idc;
-	}
+	regs->ddc = NULL;
+	regs->idc = NULL;
 #else
 	regs->pc = (trapf_pc_t)catcher;
 	regs->t9 = (register_t)(intptr_t)catcher;
