@@ -41,8 +41,8 @@
 
 #include "cheribsdtest.h"
 
-void
-test_cheriabi_libc_memchr(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_cheriabi_libc_memchr,
+    "Check that memchr() works as required")
 {
 	_Alignas(16) char string[] = "0123456789abcde";
 

@@ -29,6 +29,10 @@
  * SUCH DAMAGE.
  */
 
+/*
+ * Exercise CHERI functions without an expectation of a signal.
+ */
+
 #include <sys/cdefs.h>
 
 #if !__has_feature(capabilities)
@@ -59,8 +63,7 @@
 #include "cheribsdtest.h"
 
 #ifdef __mips__
-void
-test_copyregs(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_copyregs, "Exercise CP2 register assignments")
 {
 
 	__asm__ __volatile__(
@@ -77,8 +80,8 @@ test_copyregs(const struct cheri_test *ctp __unused)
 	cheribsdtest_success();
 }
 
-void
-test_listregs(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_listregs, "Print out a list of CP2 registers and values",
+    .ct_flags = CT_FLAG_STDOUT_IGNORE)
 {
 
 	/*
@@ -344,8 +347,7 @@ check_initreg_data_full_addrspace(void * __capability c)
 }
 #endif
 
-void
-test_initregs_default(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_initregs_default, "Test initial value of default capability")
 {
 
 #ifdef __CHERI_PURE_CAPABILITY__
@@ -379,8 +381,8 @@ test_initregs_default(const struct cheri_test *ctp __unused)
 
 #define	CHERI_STACK_USE_MAX	(256 * 1024)
 
-void
-test_initregs_stack_user_perms(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_initregs_stack_user_perms,
+    "Test user permissions of stack capability")
 {
 	register_t v;
 
@@ -393,8 +395,8 @@ test_initregs_stack_user_perms(const struct cheri_test *ctp __unused)
 	cheribsdtest_success();
 }
 
-void
-test_initregs_stack(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_initregs_stack,
+    "Test initial value of stack capability")
 {
 	void * __capability c = cheri_getstack();
 	register_t v;
@@ -479,8 +481,7 @@ test_initregs_stack(const struct cheri_test *ctp __unused)
 	cheribsdtest_success();
 }
 
-void
-test_initregs_returncap(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_initregs_returncap, "Test value of return capability")
 {
 	void *c;
 	uintmax_t v;
@@ -512,8 +513,8 @@ test_initregs_returncap(const struct cheri_test *ctp __unused)
 #endif
 
 #ifdef __mips__
-void
-test_initregs_idc(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_initregs_idc,
+    "Test initial value of invoked data capability")
 {
 
 #ifndef __CHERI_PURE_CAPABILITY__
@@ -555,8 +556,8 @@ test_initregs_idc(const struct cheri_test *ctp __unused)
 }
 #endif
 
-void
-test_initregs_pcc(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_initregs_pcc,
+    "Test initial value of program-counter capability")
 {
 	void * __capability c;
 
@@ -567,8 +568,8 @@ test_initregs_pcc(const struct cheri_test *ctp __unused)
 }
 
 #ifdef __aarch64__
-void
-test_initregs_restricted_default(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_initregs_restricted_default,
+    "Test initial value of restricted default capability");
 {
 	void * __capability c;
 
@@ -579,8 +580,8 @@ test_initregs_restricted_default(const struct cheri_test *ctp __unused)
 	cheribsdtest_success();
 }
 
-void
-test_initregs_restricted_stack(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_initregs_restricted_stack,
+    "Test initial value of restricted stack capability");
 {
 	void * __capability c;
 
@@ -591,8 +592,8 @@ test_initregs_restricted_stack(const struct cheri_test *ctp __unused)
 	cheribsdtest_success();
 }
 
-void
-test_initregs_restricted_thread(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_initregs_restricted_thread,
+    "Test initial value of restricted thread capability");
 {
 	void * __capability c;
 

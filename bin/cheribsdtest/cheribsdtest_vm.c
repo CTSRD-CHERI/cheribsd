@@ -68,6 +68,8 @@
 
 #include "cheribsdtest.h"
 
+static const char * xfail_need_writable_tmp(const char *name __unused);
+
 /*
  * Tests to check that tags are ... or aren't ... preserved for various page
  * types.  'Anonymous' pages provided by the VM subsystem should always
@@ -96,15 +98,15 @@ mmap_and_check_tag_stored(int fd, int protflags, int mapflags)
 		CHERIBSDTEST_CHECK_SYSCALL(close(fd));
 }
 
-void
-cheribsdtest_vm_tag_mmap_anon(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(cheribsdtest_vm_tag_mmap_anon,
+    "check tags are stored for MAP_ANON pages")
 {
 	mmap_and_check_tag_stored(-1, PROT_READ | PROT_WRITE, MAP_ANON);
 	cheribsdtest_success();
 }
 
-void
-cheribsdtest_vm_tag_shm_open_anon_shared(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(cheribsdtest_vm_tag_shm_open_anon_shared,
+    "check tags are stored for SHM_ANON MAP_SHARED pages")
 {
 	int fd = CHERIBSDTEST_CHECK_SYSCALL(shm_open(SHM_ANON, O_RDWR, 0600));
 	CHERIBSDTEST_CHECK_SYSCALL(ftruncate(fd, getpagesize()));
@@ -112,8 +114,8 @@ cheribsdtest_vm_tag_shm_open_anon_shared(const struct cheri_test *ctp __unused)
 	cheribsdtest_success();
 }
 
-void
-cheribsdtest_vm_tag_shm_open_anon_private(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(cheribsdtest_vm_tag_shm_open_anon_private,
+    "check tags are stored for SHM_ANON MAP_PRIVATE pages")
 {
 	int fd = CHERIBSDTEST_CHECK_SYSCALL(shm_open(SHM_ANON, O_RDWR, 0600));
 	CHERIBSDTEST_CHECK_SYSCALL(ftruncate(fd, getpagesize()));
@@ -124,8 +126,8 @@ cheribsdtest_vm_tag_shm_open_anon_private(const struct cheri_test *ctp __unused)
 /*
  * Test aliasing of SHM_ANON objects
  */
-void
-cheribsdtest_vm_tag_shm_open_anon_shared2x(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(cheribsdtest_vm_tag_shm_open_anon_shared2x,
+    "test multiply-mapped SHM_ANON objects")
 {
 	void * __capability volatile * map2;
 	void * __capability c2;
@@ -150,8 +152,10 @@ cheribsdtest_vm_tag_shm_open_anon_shared2x(const struct cheri_test *ctp __unused
 	cheribsdtest_success();
 }
 
-void
-cheribsdtest_vm_shm_open_anon_unix_surprise(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(cheribsdtest_vm_shm_open_anon_unix_surprise,
+    "test SHM_ANON vs SCM_RIGHTS",
+    .ct_xfail_reason =
+	"Tags currently survive cross-AS aliasing of SHM_ANON objects")
 {
 	int sv[2];
 	int pid;
@@ -271,8 +275,9 @@ cheribsdtest_vm_shm_open_anon_unix_surprise(const struct cheri_test *ctp __unuse
  * them to flow between address spaces.  It is difficult to know what to do
  * about this case, but it seems important to acknowledge.
  */
-void
-cheribsdtest_vm_cap_share_fd_kqueue(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(cheribsdtest_vm_cap_share_fd_kqueue,
+    "Demonstrate capability passing via shared FD table",
+    .ct_xfail_reason = "Tags currently survive cross-AS shared FD tables")
 {
 	int kq, pid;
 
@@ -330,8 +335,9 @@ extern int __sys_sigaction(int, const struct sigaction *, struct sigaction *);
  * We can rfork and share the sigaction table across parent and child, which
  * again allows for capability passing across address spaces.
  */
-void
-cheribsdtest_vm_cap_share_sigaction(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(cheribsdtest_vm_cap_share_sigaction,
+    "Demonstrate capability passing via shared sigaction table",
+    .ct_xfail_reason = "Tags currently survive cross-AS shared sigaction table")
 {
 	int pid;
 
@@ -391,16 +397,16 @@ cheribsdtest_vm_cap_share_sigaction(const struct cheri_test *ctp __unused)
 
 #endif
 
-void
-cheribsdtest_vm_tag_dev_zero_shared(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(cheribsdtest_vm_tag_dev_zero_shared,
+    "check tags are stored for /dev/zero MAP_SHARED pages")
 {
 	int fd = CHERIBSDTEST_CHECK_SYSCALL(open("/dev/zero", O_RDWR));
 	mmap_and_check_tag_stored(fd, PROT_READ | PROT_WRITE, MAP_SHARED);
 	cheribsdtest_success();
 }
 
-void
-cheribsdtest_vm_tag_dev_zero_private(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(cheribsdtest_vm_tag_dev_zero_private,
+    "check tags are stored for /dev/zero MAP_PRIVATE pages")
 {
 	int fd = CHERIBSDTEST_CHECK_SYSCALL(open("/dev/zero", O_RDWR));
 	mmap_and_check_tag_stored(fd, PROT_READ | PROT_WRITE, MAP_PRIVATE);
@@ -420,9 +426,15 @@ create_tempfile()
 
 /*
  * This case should fault.
+ * XXXRW: I wonder if we also need some sort of load-related test?
  */
-void
-cheribsdtest_vm_notag_tmpfile_shared(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(cheribsdtest_vm_notag_tmpfile_shared,
+    "check tags are not stored for tmpfile() MAP_SHARED pages",
+    .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
+    .ct_signum = SIGSEGV,
+    .ct_si_code = SEGV_STORETAG,
+    .ct_si_trapno = TRAPNO_STORE_CAP_PF,
+    .ct_check_xfail = xfail_need_writable_tmp)
 {
 	void * __capability volatile *cp;
 	void * __capability cp_value;
@@ -436,16 +448,18 @@ cheribsdtest_vm_notag_tmpfile_shared(const struct cheri_test *ctp __unused)
 	cheribsdtest_failure_errx("tagged store succeeded");
 }
 
-void
-cheribsdtest_vm_tag_tmpfile_private(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(cheribsdtest_vm_tag_tmpfile_private,
+    "check tags are stored for tmpfile() MAP_PRIVATE pages",
+    .ct_check_xfail = xfail_need_writable_tmp)
 {
 	int fd = create_tempfile();
 	mmap_and_check_tag_stored(fd, PROT_READ | PROT_WRITE, MAP_PRIVATE);
 	cheribsdtest_success();
 }
 
-void
-cheribsdtest_vm_tag_tmpfile_private_prefault(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(cheribsdtest_vm_tag_tmpfile_private_prefault,
+    "check tags are stored for tmpfile() MAP_PRIVATE, MAP_PREFAULT_READ pages",
+    .ct_check_xfail = xfail_need_writable_tmp)
 {
 	int fd = create_tempfile();
 	mmap_and_check_tag_stored(fd, PROT_READ | PROT_WRITE,
@@ -453,7 +467,7 @@ cheribsdtest_vm_tag_tmpfile_private_prefault(const struct cheri_test *ctp __unus
 	cheribsdtest_success();
 }
 
-const char *
+static const char *
 xfail_need_writable_tmp(const char *name __unused)
 {
 	static const char *reason = NULL;
@@ -489,8 +503,8 @@ xfail_need_writable_tmp(const char *name __unused)
  * copy-on-write, then read back the capability and confirm that it still has
  * a tag.  (cheribsdtest_vm_cow_write)
  */
-void
-cheribsdtest_vm_cow_read(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(cheribsdtest_vm_cow_read,
+    "read capabilities from a copy-on-write page")
 {
 	void * __capability volatile *cp_copy;
 	void * __capability volatile *cp_real;
@@ -538,8 +552,8 @@ cheribsdtest_vm_cow_read(const struct cheri_test *ctp __unused)
 	cheribsdtest_success();
 }
 
-void
-cheribsdtest_vm_cow_write(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(cheribsdtest_vm_cow_write,
+    "read capabilities from a faulted copy-on-write page")
 {
 	void * __capability volatile *cp_copy;
 	void * __capability volatile *cp_real;

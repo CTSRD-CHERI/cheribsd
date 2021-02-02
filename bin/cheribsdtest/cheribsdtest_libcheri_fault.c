@@ -63,16 +63,22 @@
  * Exercises various faults inside of sandboxes, including VM faults,
  * arithmetic faults, etc.
  */
-void
-test_sandbox_cp2_bound_catch(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_sandbox_cp2_bound_catch,
+    "Exercise sandboxed CP2 bounds-check failure; caught",
+    .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO |
+	CT_FLAG_SIGNAL_UNWIND | CT_FLAG_SANDBOX,
+    .ct_signum = SIGPROT,
+    .ct_si_code = PROT_CHERI_BOUNDS,
+    .ct_si_trapno = TRAPNO_CHERI)
 {
-
 	invoke_cap_fault(CHERIBSDTEST_HELPER_CAP_FAULT_CP2_BOUND);
 	cheribsdtest_failure_errx("invoke returned");
 }
 
-void
-test_sandbox_cp2_bound_nocatch(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_sandbox_cp2_bound_nocatch,
+    "Exercise sandboxed CP2 bounds-check failure; uncaught",
+    .ct_flags = CT_FLAG_SIGEXIT | CT_FLAG_SANDBOX,
+    .ct_signum = SIGPROT)
 {
 
 	signal_handler_clear(SIGPROT);
@@ -80,9 +86,10 @@ test_sandbox_cp2_bound_nocatch(const struct cheri_test *ctp __unused)
 	cheribsdtest_failure_errx("invoke returned");
 }
 
-void
-test_sandbox_cp2_bound_nocatch_noaltstack(
-    const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_sandbox_cp2_bound_nocatch_noaltstack,
+    "Exercise sandboxed CP2 bounds-check failure; uncaught, no alt stack",
+    .ct_flags = CT_FLAG_SIGEXIT | CT_FLAG_SANDBOX,
+    .ct_signum = SIGILL)
 {
 	stack_t ss;
 
@@ -94,16 +101,23 @@ test_sandbox_cp2_bound_nocatch_noaltstack(
 	cheribsdtest_failure_errx("invoke returned");
 }
 
-void
-test_sandbox_cp2_perm_load_catch(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_sandbox_cp2_perm_load_catch,
+    "Exercise sandboxed CP2 load-perm-check failure; caught",
+    .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO |
+	CT_FLAG_SIGNAL_UNWIND | CT_FLAG_SANDBOX,
+    .ct_signum = SIGPROT,
+    .ct_si_code = PROT_CHERI_PERM,
+    .ct_si_trapno = TRAPNO_CHERI)
 {
 
 	invoke_cap_fault(CHERIBSDTEST_HELPER_CAP_FAULT_CP2_PERM_LOAD);
 	cheribsdtest_failure_errx("invoke returned");
 }
 
-void
-test_sandbox_cp2_perm_load_nocatch(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_sandbox_cp2_perm_load_nocatch,
+    "Exercise sandboxed CP2 load-perm-check failure; uncaught",
+    .ct_flags = CT_FLAG_SIGEXIT | CT_FLAG_SANDBOX,
+    .ct_signum = SIGPROT)
 {
 
 	signal_handler_clear(SIGPROT);
@@ -111,16 +125,23 @@ test_sandbox_cp2_perm_load_nocatch(const struct cheri_test *ctp __unused)
 	cheribsdtest_failure_errx("invoke returned");
 }
 
-void
-test_sandbox_cp2_perm_store_catch(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_sandbox_cp2_perm_store_catch,
+    "Exercise sandboxed CP2 store-perm-check failure; caught",
+    .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO |
+	CT_FLAG_SIGNAL_UNWIND | CT_FLAG_SANDBOX,
+    .ct_signum = SIGPROT,
+    .ct_si_code = PROT_CHERI_PERM,
+    .ct_si_trapno = TRAPNO_CHERI)
 {
 
 	invoke_cap_fault(CHERIBSDTEST_HELPER_CAP_FAULT_CP2_PERM_STORE);
 	cheribsdtest_failure_errx("invoke returned");
 }
 
-void
-test_sandbox_cp2_perm_store_nocatch(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_sandbox_cp2_perm_store_nocatch,
+    "Exercise sandboxed CP2 store-perm-check failure; uncaught",
+    .ct_flags = CT_FLAG_SIGEXIT | CT_FLAG_SANDBOX,
+    .ct_signum = SIGPROT)
 {
 
 	signal_handler_clear(SIGPROT);
@@ -128,16 +149,23 @@ test_sandbox_cp2_perm_store_nocatch(const struct cheri_test *ctp __unused)
 	cheribsdtest_failure_errx("invoke returned");
 }
 
-void
-test_sandbox_cp2_tag_catch(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_sandbox_cp2_tag_catch,
+    "Exercise sandboxed CP2 tag-check failure; caught",
+    .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO |
+	CT_FLAG_SIGNAL_UNWIND | CT_FLAG_SANDBOX,
+    .ct_signum = SIGPROT,
+    .ct_si_code = PROT_CHERI_TAG,
+    .ct_si_trapno = TRAPNO_CHERI)
 {
 
 	invoke_cap_fault(CHERIBSDTEST_HELPER_CAP_FAULT_CP2_TAG);
 	cheribsdtest_failure_errx("invoke returned");
 }
 
-void
-test_sandbox_cp2_tag_nocatch(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_sandbox_cp2_tag_nocatch,
+    "Exercise sandboxed CP2 tag-check failure; uncaught",
+    .ct_flags = CT_FLAG_SIGEXIT | CT_FLAG_SANDBOX,
+    .ct_signum = SIGPROT)
 {
 	register_t v;
 
@@ -149,16 +177,23 @@ test_sandbox_cp2_tag_nocatch(const struct cheri_test *ctp __unused)
 	cheribsdtest_failure_errx("invoke returned");
 }
 
-void
-test_sandbox_cp2_seal_catch(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_sandbox_cp2_seal_catch,
+    "Exercise sandboxed CP2 seal failure; caught",
+    .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO |
+	CT_FLAG_SIGNAL_UNWIND | CT_FLAG_SANDBOX,
+    .ct_signum = SIGPROT,
+    .ct_si_code = PROT_CHERI_PERM,
+    .ct_si_trapno = TRAPNO_CHERI)
 {
 
 	invoke_cap_fault(CHERIBSDTEST_HELPER_CAP_FAULT_CP2_SEAL);
 	cheribsdtest_failure_errx("invoke returned");
 }
 
-void
-test_sandbox_cp2_seal_nocatch(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_sandbox_cp2_seal_nocatch,
+    "Exercise sandboxed CP2 seal failure; uncaught",
+    .ct_flags = CT_FLAG_SIGEXIT | CT_FLAG_SANDBOX,
+    .ct_signum = SIGPROT)
 {
 
 	signal_handler_clear(SIGPROT);
@@ -166,16 +201,28 @@ test_sandbox_cp2_seal_nocatch(const struct cheri_test *ctp __unused)
 	cheribsdtest_failure_errx("invoke returned");
 }
 
-void
-test_sandbox_divzero_catch(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_sandbox_divzero_catch,
+    "Exercise sandboxed divide-by-zero exception; caught",
+    .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_TRAPNO |
+	CT_FLAG_SIGNAL_UNWIND | CT_FLAG_SANDBOX,
+    .ct_signum = SIGTRAP,
+    .ct_si_trapno = T_TRAP,
+    .ct_xfail_reason =
+	"LLVM assembler generates break rather than trap instruction")
 {
 
 	invoke_divzero();
 	cheribsdtest_failure_errx("invoke returned");
 }
 
-void
-test_sandbox_divzero_nocatch(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_sandbox_divzero_nocatch,
+    "Exercise sandboxed divide-by-zero exception; uncaught",
+    .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_TRAPNO | CT_FLAG_SIGNAL_UNWIND |
+	CT_FLAG_SANDBOX,
+    .ct_signum = SIGTRAP,
+    .ct_si_trapno = T_TRAP,
+    .ct_xfail_reason =
+	"LLVM assembler generates break rather than trap instruction")
 {
 
 	signal_handler_clear(SIGEMT);
@@ -183,16 +230,22 @@ test_sandbox_divzero_nocatch(const struct cheri_test *ctp __unused)
 	cheribsdtest_failure_errx("invoke returned");
 }
 
-void
-test_sandbox_vm_rfault_catch(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_sandbox_vm_rfault_catch,
+    "Exercise sandboxed VM read fault; caught",
+    .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_TRAPNO | CT_FLAG_SIGNAL_UNWIND |
+	CT_FLAG_SANDBOX,
+    .ct_signum = SIGSEGV,
+    .ct_si_trapno = T_TLB_LD_MISS)
 {
 
 	invoke_vm_fault(CHERIBSDTEST_HELPER_VM_FAULT_RFAULT);
 	cheribsdtest_failure_errx("invoke returned");
 }
 
-void
-test_sandbox_vm_rfault_nocatch(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_sandbox_vm_rfault_nocatch,
+    "Exercise sandboxed VM read fault; uncaught",
+    .ct_flags = CT_FLAG_SIGEXIT | CT_FLAG_SANDBOX,
+    .ct_signum = SIGSEGV)
 {
 
 	signal_handler_clear(SIGSEGV);
@@ -200,16 +253,22 @@ test_sandbox_vm_rfault_nocatch(const struct cheri_test *ctp __unused)
 	cheribsdtest_failure_errx("invoke returned");
 }
 
-void
-test_sandbox_vm_wfault_catch(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_sandbox_vm_wfault_catch,
+    "Exercise sandboxed VM write fault; caught",
+    .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_TRAPNO | CT_FLAG_SIGNAL_UNWIND |
+	CT_FLAG_SANDBOX,
+    .ct_signum = SIGSEGV,
+    .ct_si_trapno = T_TLB_ST_MISS)
 {
 
 	invoke_vm_fault(CHERIBSDTEST_HELPER_VM_FAULT_WFAULT);
 	cheribsdtest_failure_errx("invoke returned");
 }
 
-void
-test_sandbox_vm_wfault_nocatch(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_sandbox_vm_wfault_nocatch,
+    "Exercise sandboxed VM write fault; uncaught",
+    .ct_flags = CT_FLAG_SIGEXIT | CT_FLAG_SANDBOX,
+    .ct_signum = SIGSEGV)
 {
 
 	signal_handler_clear(SIGSEGV);
@@ -217,18 +276,23 @@ test_sandbox_vm_wfault_nocatch(const struct cheri_test *ctp __unused)
 	cheribsdtest_failure_errx("invoke returned");
 }
 
-void
-test_sandbox_vm_xfault_catch(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_sandbox_vm_xfault_catch,
+    "Exercise sandboxed VM exec fault; caught",
+    .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_TRAPNO | CT_FLAG_SIGNAL_UNWIND |
+	CT_FLAG_SANDBOX,
+    .ct_signum = SIGSEGV,
+    .ct_si_trapno = T_TLB_LD_MISS)
 {
 
 	invoke_vm_fault(CHERIBSDTEST_HELPER_VM_FAULT_XFAULT);
 	cheribsdtest_failure_errx("invoke returned");
 }
 
-void
-test_sandbox_vm_xfault_nocatch(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_sandbox_vm_xfault_nocatch,
+    "Exercise sandboxed VM exec fault; uncaught",
+    .ct_flags = CT_FLAG_SIGEXIT | CT_FLAG_SANDBOX,
+    .ct_signum = SIGSEGV)
 {
-
 	signal_handler_clear(SIGSEGV);
 	invoke_vm_fault(CHERIBSDTEST_HELPER_VM_FAULT_XFAULT);
 	cheribsdtest_failure_errx("invoke returned");
