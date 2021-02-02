@@ -810,6 +810,25 @@ static const struct cheri_test cheri_tests[] = {
 	  .ct_desc = "check tags are stored for MAP_ANON pages",
 	  .ct_func = cheribsdtest_vm_tag_mmap_anon, },
 
+	{ .ct_name = "cheribsdtest_vm_tag_mmap_anon_cap_rw",
+	  .ct_desc = "check tags are stored for MAP_ANON pages with "
+	    "explicit page capability read/write perms",
+	  .ct_func = cheribsdtest_vm_tag_mmap_anon_cap_rw, },
+
+	{ .ct_name = "cheribsdtest_vm_tag_mmap_anon_cap_w",
+	  .ct_desc = "check that a load from MAP_ANON pages without "
+	    "PROT_CAP_READ strips tags",
+	  .ct_func = cheribsdtest_vm_tag_mmap_anon_cap_w, },
+
+	{ .ct_name = "cheribsdtest_vm_tag_mmap_anon_cap_none_store",
+	  .ct_desc = "check that a store to MAP_ANON pages without "
+	    "PROT_CAP_WRITE faults",
+	  .ct_func = cheribsdtest_vm_tag_mmap_anon_cap_none_store,
+	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
+	  .ct_signum = SIGSEGV,
+	  .ct_si_code = SEGV_STORETAG,
+	  .ct_si_trapno = TRAPNO_STORE_CAP_PF, },
+
 	{ .ct_name = "cheribsdtest_vm_tag_shm_open_anon_shared",
 	  .ct_desc = "check tags are stored for SHM_ANON MAP_SHARED pages",
 	  .ct_func = cheribsdtest_vm_tag_shm_open_anon_shared, },
