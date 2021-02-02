@@ -898,8 +898,7 @@ ATOMIC_STORE_LOAD(64)
 
 #ifdef __CHERI_PURE_CAPABILITY__
 /*
- * In a purecap kernel we can not use the generic sub-word implementation
- * as it will break with subobject bounds.
+ * In a purecap kernel we cannot use the generic sub-word implementation.
  */
 static __inline int
 atomic_cmpset_8(__volatile uint8_t *p, uint8_t cmpval, uint8_t newval)
@@ -909,7 +908,6 @@ atomic_cmpset_8(__volatile uint8_t *p, uint8_t cmpval, uint8_t newval)
 	__asm __volatile (
 		__INLINE_ASM_PUSH_NOAT
 		"1:\n\t"
-		QEMU_TLB_WORKAROUND8("%1")
 		"cllb	%0, %1\n\t"		/* load old value */
 		"bne	%0, %2, 2f\n\t"		/* compare */
 		"move	%0, %3\n\t"		/* value to store */
@@ -976,7 +974,6 @@ atomic_cmpset_16(__volatile uint16_t *p, uint16_t cmpval, uint16_t newval)
 	__asm __volatile (
 		__INLINE_ASM_PUSH_NOAT
 		"1:\n\t"
-		QEMU_TLB_WORKAROUND16("%1")
 		"cllh	%0, %1\n\t"		/* load old value */
 		"bne	%0, %2, 2f\n\t"		/* compare */
 		"move	%0, %3\n\t"		/* value to store */
@@ -1357,21 +1354,21 @@ atomic_fetchadd_64(__volatile uint64_t *p, uint64_t v)
 
 #ifdef __CHERI_PURE_CAPABILITY__
 /*
- * cheri-only variants to perform atomic operations on pointers.
+ * CHERI-only variants to perform atomic operations on pointers.
  */
 
 static __inline void
-atomic_set_cap(__volatile uintptr_t *p, uintptr_t v)
+atomic_set_ptr(volatile uintptr_t *p, uintptr_t v)
 {
 	uintptr_t temp;
 
 	__asm __volatile (
 		"1:\n\t"
 		"cllc		%0, %1\n\t"	/* load old value */
-		"cgetoffset	$t0, %0\n\t"	/* calculate new value */
-		"cgetoffset	$t1, %2\n\t"
+		"cgetaddr	$t0, %0\n\t"	/* calculate new value */
+		"cgetaddr	$t1, %2\n\t"
 		"or		$t0, $t1, $t0\n\t"
-		"csetoffset	%0, %0, $t0\n\t"
+		"csetaddr	%0, %0, $t0\n\t"
 		"cscc		$t0, %0, %1\n\t" /* attempt to store */
 		"beqz		$t0, 1b\n\t"	/* spin if failed */
 		"nop\n\t"			/* delay slot */
@@ -1381,7 +1378,7 @@ atomic_set_cap(__volatile uintptr_t *p, uintptr_t v)
 }
 
 static __inline void
-atomic_clear_cap(__volatile uintptr_t *p, uintptr_t v)
+atomic_clear_ptr(volatile uintptr_t *p, uintptr_t v)
 {
 	uintptr_t temp;
 	v = ~v;
@@ -1389,10 +1386,10 @@ atomic_clear_cap(__volatile uintptr_t *p, uintptr_t v)
 	__asm __volatile (
 		"1:\n\t"
 		"cllc		%0, %1\n\t"	/* load old value */
-		"cgetoffset	$t0, %0\n\t"	/* calculate new value */
-		"cgetoffset	$t1, %2\n\t"
+		"cgetaddr	$t0, %0\n\t"	/* calculate new value */
+		"cgetaddr	$t1, %2\n\t"
 		"and		$t0, $t1, $t0\n\t"
-		"csetoffset	%0, %0, $t0\n\t"
+		"csetaddr	%0, %0, $t0\n\t"
 		"cscc		$t0, %0, %1\n\t" /* attempt to store */
 		"beqz		$t0, 1b\n\t"	/* spin if failed */
 		"nop\n\t"			/* delay slot */
@@ -1402,15 +1399,15 @@ atomic_clear_cap(__volatile uintptr_t *p, uintptr_t v)
 }
 
 static __inline void
-atomic_add_cap(__volatile uintptr_t *p, uintptr_t v)
+atomic_add_ptr(volatile uintptr_t *p, uintptr_t v)
 {
 	uintptr_t temp;
 
 	__asm __volatile (
 		"1:\n\t"
 		"cllc		%0, %1\n\t"	/* load old value */
-		"cgetoffset	$t0, %2\n\t"	/* calculate new value */
-		"cincoffset	%0, %0, $t0\n\t"
+		"cgetaddr	$t0, %2\n\t"	/* calculate new value */
+		"cincaddr	%0, %0, $t0\n\t"
 		"cscc		$t0, %0, %1\n\t" /* attempt to store */
 		"beqz		$t0, 1b\n\t"	/* spin if failed */
 		"nop\n\t"			/* delay slot */
@@ -1420,16 +1417,17 @@ atomic_add_cap(__volatile uintptr_t *p, uintptr_t v)
 }
 
 static __inline void
-atomic_subtract_cap(__volatile uintptr_t *p, uintptr_t v)
+atomic_subtract_ptr(volatile uintptr_t *p, uintptr_t v)
 {
 	uintptr_t temp;
 
 	__asm __volatile (
 		"1:\n\t"
 		"cllc		%0, %1\n\t"	/* load old value */
-		"cgetoffset	$t0, %2\n\t"	/* calculate new value */
-		"dsubu		$t0, $zero, $t0\n\t"
-		"cincoffset	%0, %0, $t0\n\t"
+		"cgetaddr	$t0, %2\n\t"	/* calculate new value */
+		"cgetaddr	$t1, %0\n\t"
+		"dsubu		$t0, $t1, $t0\n\t"
+		"csetaddr	%0, %0, $t0\n\t"
 		"cscc		$t0, %0, %1\n\t" /* attempt to store */
 		"beqz		$t0, 1b\n\t"	/* spin if failed */
 		"nop\n\t"			/* delay slot */
@@ -1438,30 +1436,30 @@ atomic_subtract_cap(__volatile uintptr_t *p, uintptr_t v)
 		: "t0", "memory");
 }
 
-#define ATOMIC_ACQ_REL_CAP(NAME)					\
+#define ATOMIC_ACQ_REL_PTR(NAME)					\
 static __inline  void							\
-atomic_##NAME##_acq_cap(__volatile uintptr_t *p, uintptr_t v)		\
+atomic_##NAME##_acq_ptr(volatile uintptr_t *p, uintptr_t v)		\
 {									\
-	atomic_##NAME##_cap(p, v);					\
+	atomic_##NAME##_ptr(p, v);					\
 	mips_sync(); 							\
 }									\
 									\
 static __inline  void							\
-atomic_##NAME##_rel_cap(__volatile uintptr_t *p, uintptr_t v)		\
+atomic_##NAME##_rel_ptr(volatile uintptr_t *p, uintptr_t v)		\
 {									\
 	mips_sync();							\
-	atomic_##NAME##_cap(p, v);					\
+	atomic_##NAME##_ptr(p, v);					\
 }
 
-ATOMIC_ACQ_REL_CAP(set)
-ATOMIC_ACQ_REL_CAP(clear)
-ATOMIC_ACQ_REL_CAP(add)
-ATOMIC_ACQ_REL_CAP(subtract)
+ATOMIC_ACQ_REL_PTR(set)
+ATOMIC_ACQ_REL_PTR(clear)
+ATOMIC_ACQ_REL_PTR(add)
+ATOMIC_ACQ_REL_PTR(subtract)
 
-#undef ATOMIC_ACQ_REL_CAP
+#undef ATOMIC_ACQ_REL_PTR
 
 static __inline int
-atomic_cmpset_cap(__volatile uintptr_t *p, uintptr_t cmpval, uintptr_t newval)
+atomic_cmpset_ptr(volatile uintptr_t *p, uintptr_t cmpval, uintptr_t newval)
 {
 	int ret;
 	uintptr_t temp;
@@ -1483,24 +1481,24 @@ atomic_cmpset_cap(__volatile uintptr_t *p, uintptr_t cmpval, uintptr_t newval)
 }
 
 static __inline int
-atomic_cmpset_acq_cap(__volatile uintptr_t *p, uintptr_t cmpval, uintptr_t newval)
+atomic_cmpset_acq_ptr(volatile uintptr_t *p, uintptr_t cmpval, uintptr_t newval)
 {
 	int retval;
 
-	retval = atomic_cmpset_cap(p, cmpval, newval);
+	retval = atomic_cmpset_ptr(p, cmpval, newval);
 	mips_sync();
 	return (retval);
 }
 
 static __inline int
-atomic_cmpset_rel_cap(__volatile uintptr_t *p, uintptr_t cmpval, uintptr_t newval)
+atomic_cmpset_rel_ptr(volatile uintptr_t *p, uintptr_t cmpval, uintptr_t newval)
 {
 	mips_sync();
-	return (atomic_cmpset_cap(p, cmpval, newval));
+	return (atomic_cmpset_ptr(p, cmpval, newval));
 }
 
 static __inline int
-atomic_fcmpset_cap(__volatile uintptr_t *p, uintptr_t *cmpval, uintptr_t newval)
+atomic_fcmpset_ptr(volatile uintptr_t *p, uintptr_t *cmpval, uintptr_t newval)
 {
 	int ret;
 	uintptr_t tmp, cmp = *cmpval;
@@ -1525,24 +1523,24 @@ atomic_fcmpset_cap(__volatile uintptr_t *p, uintptr_t *cmpval, uintptr_t newval)
 }
 
 static __inline int
-atomic_fcmpset_acq_cap(__volatile uintptr_t *p, uintptr_t *cmpval, uintptr_t newval)
+atomic_fcmpset_acq_ptr(volatile uintptr_t *p, uintptr_t *cmpval, uintptr_t newval)
 {
 	int retval;
 
-	retval = atomic_fcmpset_cap(p, cmpval, newval);
+	retval = atomic_fcmpset_ptr(p, cmpval, newval);
 	mips_sync();
 	return (retval);
 }
 
 static __inline int
-atomic_fcmpset_rel_cap(__volatile uintptr_t *p, uintptr_t *cmpval, uintptr_t newval)
+atomic_fcmpset_rel_ptr(volatile uintptr_t *p, uintptr_t *cmpval, uintptr_t newval)
 {
 	mips_sync();
-	return (atomic_fcmpset_cap(p, cmpval, newval));
+	return (atomic_fcmpset_ptr(p, cmpval, newval));
 }
 
 static __inline uintptr_t
-atomic_readandclear_cap(__volatile uintptr_t *p)
+atomic_readandclear_ptr(volatile uintptr_t *p)
 {
 	uintptr_t result, tmp;
 
@@ -1560,7 +1558,7 @@ atomic_readandclear_cap(__volatile uintptr_t *p)
 }
 
 static __inline uintptr_t
-atomic_load_acq_cap(__volatile uintptr_t *p)
+atomic_load_acq_ptr(volatile uintptr_t *p)
 {
 	uintptr_t value;
 
@@ -1570,7 +1568,7 @@ atomic_load_acq_cap(__volatile uintptr_t *p)
 }
 
 static __inline void
-atomic_store_rel_cap(__volatile uintptr_t *p, uintptr_t v)
+atomic_store_rel_ptr(volatile uintptr_t *p, uintptr_t v)
 {
 	mips_sync();
 	*p = v;
