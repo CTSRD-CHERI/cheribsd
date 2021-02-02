@@ -226,40 +226,6 @@ test_sandbox_malloc(const struct cheri_test *ctp __unused)
 		cheribsdtest_success();
 }
 
-static char string_to_md5[] = "hello world";
-static char string_md5[] = "5eb63bbbe01eeed093cb22bb8f5acdc3";
-
-void
-test_sandbox_md5_ccall(const struct cheri_test *ctp __unused, int class)
-{
-	void * __capability md5cap;
-	void * __capability bufcap;
-	char buf[33];
-
-	md5cap = cheri_ptrperm(string_to_md5, sizeof(string_to_md5),
-	    CHERI_PERM_LOAD);
-	bufcap = cheri_ptrperm(buf, sizeof(buf), CHERI_PERM_STORE);
-
-	switch (class) {
-	case 1:
-		invoke_md5(strlen(string_to_md5), md5cap, bufcap);
-		break;
-	case 2:
-		call_invoke_md5(strlen(string_to_md5), md5cap, bufcap);
-		break;
-	default:
-		cheribsdtest_failure_errx("invalid class %d", class);
-		break;
-	}
-
-	buf[32] = '\0';
-	if (strcmp(buf, string_md5) != 0)
-		cheribsdtest_failure_errx(
-		    "Incorrect MD5 checksum returned from sandbox ('%s')",
-		    buf);
-	cheribsdtest_success();
-}
-
 static register_t cheribsdtest_libcheri_userfn_handler(
     struct cheri_object system_object,
     register_t methodnum,

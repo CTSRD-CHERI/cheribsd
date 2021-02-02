@@ -496,7 +496,6 @@ DECLARE_CHERIBSD_TEST(test_sandbox_cs_puts);
 DECLARE_CHERIBSD_TEST(test_sandbox_cxx_exception);
 DECLARE_CHERIBSD_TEST(test_sandbox_cxx_no_exception);
 DECLARE_CHERIBSD_TEST(test_sandbox_malloc);
-DECLARE_CHERIBSD_TEST_WITH_ARGS(test_sandbox_md5_ccall, int class2);
 DECLARE_CHERIBSD_TEST(test_sandbox_printf);
 DECLARE_CHERIBSD_TEST(test_sandbox_ptrdiff);
 DECLARE_CHERIBSD_TEST(test_sandbox_varargs);

@@ -40,7 +40,6 @@
 #include <cheri/libcheri_system.h>
 
 #include <inttypes.h>
-#include <md5.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -64,26 +63,6 @@ invoke_abort(void)
 {
 
 	abort();
-}
-
-int
-invoke_md5(size_t len, char *data_input, char *data_output)
-{
-	MD5_CTX md5context;
-	char buf[33], ch;
-	u_int count;
-
-	MD5Init(&md5context);
-	for (count = 0; count < len; count++) {
-		/* XXXRW: Want a CMD5Update() to avoid copying byte by byte. */
-		ch = data_input[count];
-		MD5Update(&md5context, &ch, sizeof(ch));
-	}
-	MD5End(&md5context, buf);
-	for (count = 0; count < sizeof(buf); count++)
-		data_output[count] = buf[count];
-
-	return (123456);
 }
 
 #define	N	10
@@ -495,13 +474,6 @@ invoke_cheri_system_printf(void)
 {
 
 	return (printf("%s: printf in sandbox test\n", __func__));
-}
-
-int
-call_invoke_md5(size_t len, char *data_input, char *data_output)
-{
-
-	return (invoke_md5(len, data_input, data_output));
 }
 
 int
