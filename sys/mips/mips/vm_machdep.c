@@ -620,12 +620,6 @@ cpu_set_upcall(struct thread *td, void (* __capability entry)(void *),
 		 */
 
 		/*
-		 * Set up CHERI-related state: register state, signal
-		 * delivery, sealing capabilities, trusted stack.
-		 */
-		cheriabi_newthread_init(td);
-
-		/*
 		 * We don't perform validation on the new pcc or stack
 		 * capabilities and just let the caller fail on return
 		 * if they are bogus.

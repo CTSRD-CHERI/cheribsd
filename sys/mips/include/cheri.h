@@ -141,7 +141,6 @@ void	_cheri_trapframe_to_cheriframe(struct trapframe *frame,
 	_cheri_trapframe_to_cheriframe((tf), (cf), true)
 
 int	cheriabi_fetch_syscall_args(struct thread *td);
-void	cheriabi_newthread_init(struct thread *td);
 
 void	hybridabi_thread_setregs(struct thread *td, unsigned long entry_addr);
 void * __capability hybridabi_user_ddc(void);
