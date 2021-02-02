@@ -2007,10 +2007,7 @@ cheribsdtest_run_test(const struct cheri_test *ctp)
 		}
 
 		/* Run the actual test. */
-		if (ctp->ct_arg != 0)
-			ctp->ct_func_arg(ctp, ctp->ct_arg);
-		else
-			ctp->ct_func(ctp);
+		ctp->ct_func(ctp);
 		exit(0);
 	}
 	close(pipefd_stdin[0]);

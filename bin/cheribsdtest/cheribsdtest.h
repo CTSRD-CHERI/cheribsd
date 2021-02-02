@@ -160,9 +160,7 @@ extern struct cheribsdtest_child_state *ccsp;
 struct cheri_test {
 	const char	*ct_name;
 	const char	*ct_desc;
-	int		 ct_arg;	/* 0: ct_func; otherwise ct_func_arg. */
 	void		(*ct_func)(const struct cheri_test *);
-	void		(*ct_func_arg)(const struct cheri_test *, int);
 	const char *	(*ct_check_xfail)(const char *);
 	u_int		 ct_flags;
 	int		 ct_signum;
