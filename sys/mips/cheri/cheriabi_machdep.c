@@ -155,7 +155,6 @@ cheriabi_fetch_syscall_args(struct thread *td)
 void
 cheriabi_newthread_init(struct thread *td)
 {
-	struct cheri_signal *csigp;
 	struct trapframe *frame;
 
 	/*
@@ -165,17 +164,4 @@ cheriabi_newthread_init(struct thread *td)
 	 */
 	frame = &td->td_pcb->pcb_regs;
 	KASSERT(frame->pcc != NULL, ("%s: NULL $epcc", __func__));
-
-	/*
-	 * Initialise signal-handling state; this can't yet be modified
-	 * by userspace, but the principle is that signal handlers should run
-	 * with ambient authority unless given up by the userspace runtime
-	 * explicitly.  The caller will initialise the stack fields.
-	 *
-	 * Note that some fields are overwritten later in
-	 * exec_setregs() for the initial thread.
-	 */
-	csigp = &td->td_pcb->pcb_cherisignal;
-	bzero(csigp, sizeof(*csigp));
-	/* Note: csig_{ddc,idc} are set to NULL in the pure-capability abi */
 }
