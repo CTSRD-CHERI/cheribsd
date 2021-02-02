@@ -36,13 +36,21 @@
 #define	_COMPAT32_BASENAME_RTLD		"ld-elf32.so.1"
 #define	_COMPAT64_BASENAME_RTLD		"ld-elf64.so.1"
 
+#if defined(__CHERI_PURE_CAPABILITY__)
+#define	LD_			"LD_CHERI_"
+#elif __SIZEOF_POINTER__ == 4
+#define	LD_			"LD_32_"
+#elif  __SIZEOF_POINTER__ == 8
+#define	LD_			"LD_64_"
+#else
+#error "Unsupported pointer size"
+#endif
 
 #ifdef COMPAT_CHERI
 #define	_PATH_ELF_HINTS		"/var/run/ld-cheri-elf.so.hints"
 #define	_PATH_LIBMAP_CONF	"/etc/libmap-cheri.conf"
 #define	_BASENAME_RTLD		_CHERIABI_BASENAME_RTLD
 #define	STANDARD_LIBRARY_PATH	"/libcheri:/usr/libcheri"
-#define	LD_			"LD_CHERI_"
 #endif
 
 #ifdef COMPAT_32BIT
@@ -51,6 +59,8 @@
 #define	_BASENAME_RTLD		_COMPAT32_BASENAME_RTLD
 #define	STANDARD_LIBRARY_PATH	"/lib32:/usr/lib32"
 #define	LD_			"LD_32_"
+/* Don't check LD_* variables for 32-bit compat RTLD */
+#define LD_FALLBACK(var)	NULL
 #endif
 
 #ifdef COMPAT_64BIT
@@ -87,8 +97,8 @@
 #define	STANDARD_LIBRARY_PATH	"/lib/casper:/lib:/usr/lib"
 #endif
 
-#ifndef LD_
-#define	LD_			"LD_"
+#ifndef LD_FALLBACK
+#define	LD_FALLBACK(var)		"LD_" var
 #endif
 
 #ifdef __CHERI_PURE_CAPABILITY__

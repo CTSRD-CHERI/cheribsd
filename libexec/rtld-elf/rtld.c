@@ -374,15 +374,35 @@ _LD(const char *var)
 #define _LD(x)	LD_ x
 #endif
 
+/*
+ * For the default ABI RTLD (generally 64), we check both LD_{64,32}_<VAR> and
+ * if that is not set fall back to LD_<VAR>. For backwards-compatibility
+ * reasons, the compat32 RTLD only checks LD_32_<VAR>.
+ */
+#define get_ld_env(var) _get_ld_env(_LD(var), LD_FALLBACK(var))
+
+static char*
+_get_ld_env(const char* prefixed, const char* fallback)
+{
+	char* result;
+
+	result = getenv(prefixed);
+	if (result == NULL && fallback != NULL)
+		result = getenv(fallback);
+	return (result);
+}
+
 #ifdef DEBUG
+/* return true if the variable is non-empty and not equal to "0" */
+#define is_ld_env_set(var) _is_ld_env_set(_LD(var), LD_FALLBACK(var))
+
 static inline
-bool is_env_var_set(const char* varname)
+bool _is_ld_env_set(const char* prefixed, const char* fallback)
 {
 	char *env_var;
 
-	env_var = getenv(varname);
+	env_var = _get_ld_env(prefixed, fallback);
 
-	/* return true if the variable is nonnull and not equal to "0" */
 	return (env_var != NULL && *env_var != '\0' &&
 	    __builtin_strcmp(env_var, "0") != 0);
 }
@@ -622,7 +642,7 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 	}
     }
 
-    ld_bind_now = getenv(_LD("BIND_NOW"));
+    ld_bind_now = get_ld_env("BIND_NOW");
 
     /*
      * If the process is tainted, then we un-set the dangerous environment
@@ -641,17 +661,16 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 	}
     }
     if (ld_bind_now == NULL)
-	    ld_bind_not = getenv(_LD("BIND_NOT")) != NULL;
-    libmap_disable = getenv(_LD("LIBMAP_DISABLE")) != NULL;
-    libmap_override = getenv(_LD("LIBMAP"));
-    ld_library_path = getenv(_LD("LIBRARY_PATH"));
-    ld_library_dirs = getenv(_LD("LIBRARY_PATH_FDS"));
-    ld_preload = getenv(_LD("PRELOAD"));
-    ld_elf_hints_path = getenv(_LD("ELF_HINTS_PATH"));
-    ld_loadfltr = getenv(_LD("LOADFLTR")) != NULL;
-    library_path_rpath = getenv(_LD("LIBRARY_PATH_RPATH"));
-    ld_skip_init_funcs = getenv(_LD("SKIP_INIT_FUNCS")) != NULL;
-    library_path_rpath = getenv(_LD("LIBRARY_PATH_RPATH"));
+	    ld_bind_not = get_ld_env("BIND_NOT") != NULL;
+    libmap_disable = get_ld_env("LIBMAP_DISABLE") != NULL;
+    libmap_override = get_ld_env("LIBMAP");
+    ld_library_path = get_ld_env("LIBRARY_PATH");
+    ld_library_dirs = get_ld_env("LIBRARY_PATH_FDS");
+    ld_preload = get_ld_env("PRELOAD");
+    ld_elf_hints_path = get_ld_env("ELF_HINTS_PATH");
+    ld_loadfltr = get_ld_env("LOADFLTR") != NULL;
+    ld_skip_init_funcs = get_ld_env("SKIP_INIT_FUNCS") != NULL;
+    library_path_rpath = get_ld_env("LIBRARY_PATH_RPATH");
     if (library_path_rpath != NULL) {
 	    if (library_path_rpath[0] == 'y' ||
 		library_path_rpath[0] == 'Y' ||
@@ -664,20 +683,20 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 	(ld_library_path != NULL) || (ld_preload != NULL) ||
 	(ld_elf_hints_path != NULL) || ld_loadfltr;
     if (!ld_tracing)
-	ld_tracing = getenv(_LD("TRACE_LOADED_OBJECTS"));
-    ld_utrace = getenv(_LD("UTRACE"));
+	ld_tracing = get_ld_env("TRACE_LOADED_OBJECTS");
+    ld_utrace = get_ld_env("UTRACE");
 
     if ((ld_elf_hints_path == NULL) || strlen(ld_elf_hints_path) == 0)
 	ld_elf_hints_path = ld_elf_hints_default;
 
 #ifdef DEBUG
-    if (is_env_var_set(_LD("DEBUG")))
+    if (is_ld_env_set("DEBUG"))
 	debug = RTLD_DBG_NO_CATEGORY;
-    if (is_env_var_set(_LD("DEBUG_VERBOSE")))
+    if (is_ld_env_set("DEBUG_VERBOSE"))
 	debug = RTLD_DBG_ALL;
-    if (is_env_var_set(_LD("DEBUG_CHERI")))
+    if (is_ld_env_set("DEBUG_CHERI"))
 	debug |= RTLD_DBG_CHERI_PLT | RTLD_DBG_CHERI | RTLD_DBG_CHERI_PLT_VERBOSE;
-    if (is_env_var_set(_LD("DEBUG_STATS")))
+    if (is_ld_env_set("DEBUG_STATS"))
 	debug |= RTLD_DBG_RELOC_STATS;
     if (getenv(_LD("DEBUG_CATEGORIES")))
 	debug |= parse_integer(getenv(_LD("DEBUG_CATEGORIES")));
@@ -821,7 +840,7 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 	exit(0);
     }
 
-    if (getenv(_LD("DUMP_REL_PRE")) != NULL) {
+    if (get_ld_env("DUMP_REL_PRE") != NULL) {
        dump_relocations(obj_main);
        exit (0);
     }
@@ -852,7 +871,7 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 	rtld_die();
 #endif
 
-    if (getenv(_LD("DUMP_REL_POST")) != NULL) {
+    if (get_ld_env("DUMP_REL_POST") != NULL) {
        dump_relocations(obj_main);
        exit (0);
     }
@@ -5114,16 +5133,16 @@ trace_loaded_objects(Obj_Entry *obj)
     const char *fmt1, *fmt2, *fmt, *main_local, *list_containers;
     int c;
 
-    if ((main_local = getenv(_LD("TRACE_LOADED_OBJECTS_PROGNAME"))) == NULL)
+    if ((main_local = get_ld_env("TRACE_LOADED_OBJECTS_PROGNAME")) == NULL)
 	main_local = "";
 
-    if ((fmt1 = getenv(_LD("TRACE_LOADED_OBJECTS_FMT1"))) == NULL)
+    if ((fmt1 = get_ld_env("TRACE_LOADED_OBJECTS_FMT1")) == NULL)
 	fmt1 = "\t%o => %p (%x)\n";
 
-    if ((fmt2 = getenv(_LD("TRACE_LOADED_OBJECTS_FMT2"))) == NULL)
+    if ((fmt2 = get_ld_env("TRACE_LOADED_OBJECTS_FMT2")) == NULL)
 	fmt2 = "\t%o (%x)\n";
 
-    list_containers = getenv(_LD("TRACE_LOADED_OBJECTS_ALL"));
+    list_containers = get_ld_env("TRACE_LOADED_OBJECTS_ALL");
 
     for (; obj != NULL; obj = TAILQ_NEXT(obj, next)) {
 	Needed_Entry *needed;

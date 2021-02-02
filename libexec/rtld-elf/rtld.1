@@ -127,10 +127,16 @@ utility
 recognizes a number of environment variables that can be used to modify
 its behaviour.
 On 64-bit architectures, the linker for 32-bit objects recognizes
-all the environment variables listed below, but is being prefixed with
-.Ev LD_32_ ,
+all the environment variables listed below but prefixed with
+.Ev LD_32_
+instead of
+.Ev LD_ ,
 for example:
 .Ev LD_32_TRACE_LOADED_OBJECTS .
+On 64-bit systems,
+.Nm
+also recognizes variables prefixed with
+.Ev LD_64_ .
 .Bl -tag -width ".Ev LD_LIBMAP_DISABLE"
 .It Ev LD_DUMP_REL_POST
 If set,
