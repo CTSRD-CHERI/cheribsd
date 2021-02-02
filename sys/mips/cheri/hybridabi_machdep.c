@@ -39,8 +39,6 @@
 #include <machine/proc.h>
 #include <machine/vmparam.h>
 
-static void	hybridabi_capability_set_user_entry(struct thread *td,
-		    void * __capability *, unsigned long);
 static void	hybridabi_thread_init(struct thread *td, unsigned long);
 
 void * __capability
@@ -50,19 +48,6 @@ hybridabi_user_ddc(void)
 	    CHERI_CAP_USER_DATA_PERMS | CHERI_PERM_CHERIABI_VMMAP,
 	    CHERI_CAP_USER_DATA_BASE, CHERI_CAP_USER_DATA_LENGTH,
 	    CHERI_CAP_USER_DATA_OFFSET));
-}
-
-static void
-hybridabi_capability_set_user_entry(struct thread *td,
-    void * __capability *cp, unsigned long entry_addr)
-{
-
-	/*
-	 * Set the jump target register for the pure capability calling
-	 * convention.
-	 */
-	*cp = cheri_capability_build_user_code(td, CHERI_CAP_USER_CODE_PERMS,
-	    CHERI_CAP_USER_CODE_BASE, CHERI_CAP_USER_CODE_LENGTH, entry_addr);
 }
 
 /*
@@ -93,7 +78,9 @@ hybridabi_thread_init(struct thread *td, unsigned long entry_addr)
 	 * registers with no rights at all.
 	 */
 	frame->ddc = hybridabi_user_ddc();
-	hybridabi_capability_set_user_entry(td, (void * __capability *)&frame->pc, entry_addr);
+	frame->pc = (trapf_pc_t)cheri_capability_build_user_code(td,
+	    CHERI_CAP_USER_CODE_PERMS, CHERI_CAP_USER_CODE_BASE,
+	    CHERI_CAP_USER_CODE_LENGTH, entry_addr);
 
 	/*
 	 * Initialise signal-handling state; this can't yet be modified
