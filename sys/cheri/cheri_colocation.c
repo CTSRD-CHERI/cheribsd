@@ -873,11 +873,10 @@ again:
 		return (error);
 	}
 
-	/*
-	 * XXX: Handle unsealing failure.
-	 */
-	data = cheri_unseal(data, switcher_sealcap);
-	calleescb.scb_caller_scb = data;
+	calleescb.scb_caller_scb =
+	    cheri_capability_build_user_data(CHERI_CAP_USER_DATA_PERMS,
+	    curthread->td_md.md_scb, PAGE_SIZE, 0);
+
 	/*
 	 * XXX: We should be using a capability-sized atomic store
 	 *      for scb_caller_scb.
