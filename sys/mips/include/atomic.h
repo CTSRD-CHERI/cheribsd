@@ -90,13 +90,6 @@ static __inline int atomic_fcmpset_8(__volatile uint8_t *, uint8_t *, uint8_t);
 static __inline int atomic_cmpset_16(__volatile uint16_t *, uint16_t, uint16_t);
 static __inline int atomic_fcmpset_16(__volatile uint16_t *, uint16_t *, uint16_t);
 
-static __inline void
-/* Work around https://github.com/CTSRD-CHERI/qemu/issues/4 */
-#define QEMU_TLB_WORKAROUND32(register) \
-	"clw $zero, $zero, 0(" register ")\n\t"
-#define QEMU_TLB_WORKAROUND64(register) \
-	"cld $zero, $zero, 0(" register ")\n\t"
-
 /*
  * Avoid an error if the compiler decides to use $at as one of the registers.
  * This only seems to happen in the CHERI purecap case so far
@@ -121,7 +114,6 @@ atomic_set_32(__volatile uint32_t *p, uint32_t v)
 	__asm __volatile (
 		__INLINE_ASM_PUSH_NOAT
 		"1:\n\t"
-		QEMU_TLB_WORKAROUND32("%1")
 		"cllw	%0, %1\n\t"		/* load old value */
 		"or	%0, %2, %0\n\t"		/* calculate new value */
 		"cscw	%0, %0, %1\n\t"		/* attempt to store */
@@ -153,7 +145,6 @@ atomic_clear_32(__volatile uint32_t *p, uint32_t v)
 	__asm __volatile (
 		__INLINE_ASM_PUSH_NOAT
 		"1:\n\t"
-		QEMU_TLB_WORKAROUND32("%1")
 		"cllw	%0, %1\n\t"		/* load old value */
 		"and	%0, %2, %0\n\t"		/* calculate new value */
 		"cscw	%0, %0, %1\n\t"		/* attempt to store */
@@ -183,7 +174,6 @@ atomic_add_32(__volatile uint32_t *p, uint32_t v)
 	__asm __volatile (
 		__INLINE_ASM_PUSH_NOAT
 		"1:\n\t"
-		QEMU_TLB_WORKAROUND32("%1")
 		"cllw	%0, %1\n\t"	/* load old value */
 		"addu	%0, %2, %0\n\t"		/* calculate new value */
 		"cscw	%0, %0, %1\n\t"		/* attempt to store */
@@ -213,7 +203,6 @@ atomic_subtract_32(__volatile uint32_t *p, uint32_t v)
 	__asm __volatile (
 		__INLINE_ASM_PUSH_NOAT
 		"1:\n\t"
-		QEMU_TLB_WORKAROUND32("%1")
 		"cllw	%0, %1\n\t"		/* load old value */
 		"subu	%0, %2\n\t"		/* calculate new value */
 		"cscw	%0, %0, %1\n\t"		/* attempt to store */
@@ -243,7 +232,6 @@ atomic_readandclear_32(__volatile uint32_t *addr)
 	__asm __volatile (
 		__INLINE_ASM_PUSH_NOAT
 		"1:\n\t"
-		QEMU_TLB_WORKAROUND32("%2")
 		"cllw	%0, %2\n\t"	/* load current value, asserting lock */
 		"li	%1, 0\n\t"	/* value to store */
 		"cscw	%1, %1, %2\n\t"	/* attempt to store */
@@ -275,7 +263,6 @@ atomic_readandset_32(__volatile uint32_t *addr, uint32_t value)
 	__asm __volatile (
 		__INLINE_ASM_PUSH_NOAT
 		"1:\n\t"
-		QEMU_TLB_WORKAROUND32("%2")
 		"cllw	%0, %2\n\t"	/* load current value, asserting lock */
 		"or	%1, $0, %3\n\t"
 		"cscw	%1, %1, %2\n\t"	/* attempt to store */
@@ -309,7 +296,6 @@ atomic_set_64(__volatile uint64_t *p, uint64_t v)
 	__asm __volatile (
 		__INLINE_ASM_PUSH_NOAT
 		"1:\n\t"
-		QEMU_TLB_WORKAROUND64("%1")
 		"clld	%0, %1\n\t"		/* load old value */
 		"or	%0, %2, %0\n\t"		/* calculate new value */
 		"cscd	%0, %0, %1\n\t"		/* attempt to store */
@@ -342,7 +328,6 @@ atomic_clear_64(__volatile uint64_t *p, uint64_t v)
 	__asm __volatile (
 		__INLINE_ASM_PUSH_NOAT
 		"1:\n\t"
-		QEMU_TLB_WORKAROUND64("%1")
 		"clld	%0, %1\n\t"		/* load old value */
 		"and	%0, %2, %0\n\t"		/* calculate new value */
 		"cscd	%0, %0, %1\n\t"		/* attempt to store */
@@ -373,7 +358,6 @@ atomic_add_64(__volatile uint64_t *p, uint64_t v)
 	__asm __volatile (
 		__INLINE_ASM_PUSH_NOAT
 		"1:\n\t"
-		QEMU_TLB_WORKAROUND64("%1")
 		"clld	%0, %1\n\t"		/* load old value */
 		"daddu	%0, %2, %0\n\t"		/* calculate new value */
 		"cscd	%0, %0, %1\n\t"		/* attempt to store */
@@ -404,7 +388,6 @@ atomic_subtract_64(__volatile uint64_t *p, uint64_t v)
 	__asm __volatile (
 		__INLINE_ASM_PUSH_NOAT
 		"1:\n\t"
-		QEMU_TLB_WORKAROUND64("%1")
 		"clld	%0, %1\n\t"		/* load old value */
 		"dsubu	%0, %2\n\t"		/* calculate new value */
 		"cscd	%0, %0, %1\n\t"		/* attempt to store */
@@ -435,7 +418,6 @@ atomic_readandclear_64(__volatile uint64_t *addr)
 	__asm __volatile (
 		__INLINE_ASM_PUSH_NOAT
 		"1:\n\t"
-		QEMU_TLB_WORKAROUND64("%2")
 		"clld	 %0, %2\n\t"		/* load old value */
 		"li	 %1, 0\n\t"		/* value to store */
 		"cscd	 %1, %1, %2\n\t"	/* attempt to store */
@@ -468,7 +450,6 @@ atomic_readandset_64(__volatile uint64_t *addr, uint64_t value)
 	__asm __volatile (
 		__INLINE_ASM_PUSH_NOAT
 		"1:\n\t"
-		QEMU_TLB_WORKAROUND64("%2")
 		"clld	 %0, %2\n\t"		/* load old value*/
 		"or      %1, $0, %3\n\t"
 		"cscd	 %1, %1, %2\n\t"	/* attempt to store */
@@ -583,7 +564,6 @@ atomic_cmpset_32(__volatile uint32_t *p, uint32_t cmpval, uint32_t newval)
 	__asm __volatile (
 		__INLINE_ASM_PUSH_NOAT
 		"1:\n\t"
-		QEMU_TLB_WORKAROUND32("%1")
 		"cllw	%0, %1\n\t"		/* load old value */
 		"bne	%0, %2, 2f\n\t"		/* compare */
 		"move	%0, %3\n\t"		/* value to store */
@@ -733,7 +713,6 @@ atomic_fetchadd_32(__volatile uint32_t *p, uint32_t v)
 	__asm __volatile (
 		__INLINE_ASM_PUSH_NOAT
 		"1:\n\t"
-		QEMU_TLB_WORKAROUND32("%1")
 		"cllw	%0, %1\n\t"		/* load old value */
 		"addu	%2, %3, %0\n\t"		/* calculate new value */
 		"cscw	%2, %2, %1\n\t"		/* attempt to store */
@@ -775,7 +754,6 @@ atomic_cmpset_64(__volatile uint64_t *p, uint64_t cmpval, uint64_t newval)
 	__asm __volatile (
 		__INLINE_ASM_PUSH_NOAT
 		"1:\n\t"
-		QEMU_TLB_WORKAROUND64("%1")
 		"clld	%0, %1\n\t"		/* load old value */
 		"bne	%0, %2, 2f\n\t"		/* compare */
 		"move	%0, %3\n\t"		/* value to store */
@@ -869,7 +847,6 @@ atomic_fetchadd_64(__volatile uint64_t *p, uint64_t v)
 	__asm __volatile (
 		__INLINE_ASM_PUSH_NOAT
 		"1:\n\t"
-		QEMU_TLB_WORKAROUND64("%1")
 		"clld	%0, %1\n\t"		/* load old value */
 		"daddu	%2, %3, %0\n\t"		/* calculate new value */
 		"cscd	%2, %2, %1\n\t"		/* attempt to store */
