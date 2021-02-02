@@ -141,6 +141,8 @@ void	cheriabi_newthread_init(struct thread *td);
 void	hybridabi_exec_setregs(struct thread *td, unsigned long entry_addr);
 void	hybridabi_newthread_setregs(struct thread *td,
 	    unsigned long entry_addr);
+void * __capability hybridabi_user_ddc(void);
+
 #endif
 
 /*
