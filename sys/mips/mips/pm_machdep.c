@@ -635,13 +635,6 @@ exec_setregs(struct thread *td, struct image_params *imgp, uintcap_t stack)
 		td->td_proc->p_md.md_sigcode = cheri_sigcode_capability(td);
 
 		/*
-		 * Set up CHERI-related state: most register state,
-		 * signal delivery, sealing capabilities, trusted
-		 * stack.
-		 */
-		cheriabi_newthread_init(td);
-
-		/*
 		 * Pass a pointer to the ELF auxiliary argument vector.
 		 */
 		td->td_frame->c3 = imgp->auxv;
