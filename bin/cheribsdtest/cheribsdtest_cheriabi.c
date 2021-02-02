@@ -490,3 +490,58 @@ test_cheriabi_shmdt_invalid_ptr(const struct cheri_test *ctp __unused)
 	free_adjacent_mappings_shm(&mappings);
 	cheribsdtest_success();
 }
+
+void
+test_cheriabi_pipe_oob_write(const struct cheri_test *ctp __unused)
+{
+	char buf[8192];
+	int fds[2];
+	pid_t pid;
+
+	CHERIBSDTEST_CHECK_SYSCALL(pipe(fds));
+	memset(buf, '.', sizeof(buf));
+
+	CHERIBSDTEST_CHECK_SYSCALL(pid = fork());
+	if (pid != 0) {
+		close(fds[1]);
+		CHERIBSDTEST_CHECK_SYSCALL(write(fds[0], buf, sizeof(buf)));
+		CHERIBSDTEST_CHECK_CALL_ERROR(
+		    write(fds[0], buf, sizeof(buf) + 1), EFAULT);
+		cheribsdtest_success();
+		close(fds[0]);
+	} else {
+		close(fds[0]);
+		read(fds[1], buf, sizeof(buf));
+		read(fds[1], buf, sizeof(buf));
+		read(fds[1], buf, 1);
+		close(fds[1]);
+		exit(0);
+	}
+}
+
+void
+test_cheriabi_pipe_no_perm_write(const struct cheri_test *ctp __unused)
+{
+	char buf[8192];
+	int fds[2];
+	pid_t pid;
+
+	CHERIBSDTEST_CHECK_SYSCALL(pipe(fds));
+	memset(buf, '.', sizeof(buf));
+
+	CHERIBSDTEST_CHECK_SYSCALL(pid = fork());
+	if (pid != 0) {
+		close(fds[1]);
+		CHERIBSDTEST_CHECK_SYSCALL(write(fds[0], buf, sizeof(buf)));
+		CHERIBSDTEST_CHECK_CALL_ERROR(write(fds[0],
+		    cheri_andperm(buf, ~CHERI_PERM_LOAD), sizeof(buf)), EFAULT);
+		cheribsdtest_success();
+		close(fds[0]);
+	} else {
+		close(fds[0]);
+		read(fds[1], buf, sizeof(buf));
+		read(fds[1], buf, sizeof(buf));
+		close(fds[1]);
+		exit(0);
+	}
+}

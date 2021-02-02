@@ -1583,6 +1583,14 @@ static const struct cheri_test cheri_tests[] = {
 	  .ct_desc = "Check that shmdt() rejects invalid pointer arguments",
 	  .ct_func = test_cheriabi_shmdt_invalid_ptr },
 
+	{ .ct_name = "test_cheriabi_pipe_oob_write",
+	  .ct_desc = "Check that writes to a pipe obey bounds",
+	  .ct_func = test_cheriabi_pipe_oob_write },
+
+	{ .ct_name = "test_cheriabi_pipe_no_perm_write",
+	  .ct_desc = "Check that writes to a pipe obey permissions",
+	  .ct_func = test_cheriabi_pipe_no_perm_write},
+
 	/*
 	 * CheriABI libc implementation.
 	 */
