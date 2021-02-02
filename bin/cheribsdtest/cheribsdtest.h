@@ -412,8 +412,6 @@ DECLARE_CHERIBSD_TEST(test_fault_ccall_code_noexecute);
 DECLARE_CHERIBSD_TEST(test_fault_ccall_data_execute);
 
 /* cheribsdtest_cheriabi.c */
-DECLARE_CHERIBSD_TEST(test_cheriabi_mmap_nospace);
-DECLARE_CHERIBSD_TEST(test_cheriabi_mmap_perms);
 DECLARE_CHERIBSD_TEST(test_cheriabi_mmap_unrepresentable);
 DECLARE_CHERIBSD_TEST(test_cheriabi_malloc_zero_size);
 DECLARE_CHERIBSD_TEST(test_cheriabi_munmap_invalid_ptr);

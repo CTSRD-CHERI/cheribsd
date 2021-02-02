@@ -1613,18 +1613,6 @@ static const struct cheri_test cheri_tests[] = {
 	 * CheriABI specific tests.
 	 */
 #ifdef __CHERI_PURE_CAPABILITY__
-#ifdef CHERI_MMAP_SETBOUNDS
-	{ .ct_name = "test_cheriabi_mmap_nospace",
-	  .ct_desc = "Test CheriABI mmap() with no space in default capability",
-	  .ct_func = test_cheriabi_mmap_nospace },
-#endif
-
-#ifdef CHERI_MMAP_GETPERM
-	{ .ct_name = "test_cheriabi_mmap_perms",
-	  .ct_desc = "Test CheriABI mmap() permissions",
-	  .ct_func = test_cheriabi_mmap_perms },
-#endif
-
 #ifdef CHERI_BASELEN_BITS
 	{ .ct_name = "test_cheriabi_mmap_unrepresentable",
 	  .ct_desc = "Test CheriABI mmap() with unrepresentable lengths",
