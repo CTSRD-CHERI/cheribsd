@@ -135,10 +135,11 @@ xz -T0 *.img kernel*
             //     at java.nio.file.spi.FileSystemProvider.newOutputStream(FileSystemProvider.java:434)
             //     at java.nio.file.Files.newOutputStream(Files.java:216)
             sh label: 'Create sysroot archive', script: """
-./cheribuild/jenkins-cheri-build.py cheribsd-sysroot-${suffix} --keep-install-dir --build --cheribsd/install-dir=\${WORKSPACE}/tarball/rootfs
+./cheribuild/jenkins-cheri-build.py cheribsd-sysroot-${suffix} --keep-install-dir --build \
+    --cheribsd/install-dir=\${WORKSPACE}/tarball/rootfs \
+    --cheribsd-sysroot/install-dir \${WORKSPACE}/tarball/sysroot
 rm -f cheribsd-sysroot.tar.xz
-# Note: we use *sdk here to handle both tarball/cherisdk/ and tarball/morello-sdk/
-mv tarball/*sdk/sysroot-${suffix}.tar.gz cheribsd-sysroot.tar.xz
+mv tarball/sysroot-${suffix}.tar.gz cheribsd-sysroot.tar.xz
 rm -rf tarball artifacts-*
 chmod +w *.xz
 mkdir -p "artifacts-${suffix}"
