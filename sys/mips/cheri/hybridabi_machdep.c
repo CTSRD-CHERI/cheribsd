@@ -30,14 +30,9 @@
 
 #include <sys/param.h>
 #include <sys/proc.h>
-#include <sys/sysent.h>
 
 #include <cheri/cheri.h>
 #include <cheri/cheric.h>
-
-#include <machine/pcb.h>
-#include <machine/proc.h>
-#include <machine/vmparam.h>
 
 void * __capability
 hybridabi_user_ddc(void)
@@ -55,7 +50,6 @@ hybridabi_user_ddc(void)
 void
 hybridabi_thread_setregs(struct thread *td, unsigned long entry_addr)
 {
-	struct cheri_signal *csigp;
 	struct trapframe *frame;
 
 	/*
@@ -79,13 +73,4 @@ hybridabi_thread_setregs(struct thread *td, unsigned long entry_addr)
 	frame->pc = (trapf_pc_t)cheri_capability_build_user_code(td,
 	    CHERI_CAP_USER_CODE_PERMS, CHERI_CAP_USER_CODE_BASE,
 	    CHERI_CAP_USER_CODE_LENGTH, entry_addr);
-
-	/*
-	 * Initialise signal-handling state; this can't yet be modified
-	 * by userspace, but the principle is that signal handlers should run
-	 * with ambient authority unless given up by the userspace runtime
-	 * explicitly.
-	 */
-	csigp = &td->td_pcb->pcb_cherisignal;
-	bzero(csigp, sizeof(*csigp));
 }
