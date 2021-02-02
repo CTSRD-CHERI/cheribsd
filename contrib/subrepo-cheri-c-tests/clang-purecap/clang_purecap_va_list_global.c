@@ -60,13 +60,17 @@ void print_impl(struct print_info* info)
 		// va_arg should advance the va_list forward
 		assert_eq(__builtin_cheri_offset_get((void*)info->vap), sizeof(void*) * (i + 1));
 		assert(cp != NULL);
-		assert(*cp != '\0'); // this should trap on the third iteration
 		if (i == 2) {
+			// At this point we will have attempted to load
+			// from from past the end of the va_list.
+			// XXX: even with optnone, the load doesn't
+			// actually occur until after the assert()...
 			assert_eq(faults, 1);
 			// offset of the va_list should now be equal to the length (past end)
 			assert_eq(__builtin_cheri_offset_get((void*)info->vap), __builtin_cheri_length_get((void*)info->vap) + sizeof(void*));
 			break;
 		}
+		assert(*cp != '\0');
 		assert_eq(cp[0], 'a');
 		assert_eq(cp[1], 'r');
 		assert_eq(cp[2], 'g');
