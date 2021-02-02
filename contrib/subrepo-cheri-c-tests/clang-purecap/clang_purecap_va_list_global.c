@@ -34,7 +34,6 @@
 #include <stdarg.h>
 #include <stddef.h>
 
-
 /* Check that the crazy stuff libxo does (storing va_list and using later works) */
 struct print_info {
     va_list vap;
@@ -92,6 +91,6 @@ static void printstuff(int num_args, ...)
 }
 
 BEGIN_TEST(clang_purecap_va_list_global)
-	// THere are only two args so it should die after the second one
+	// There are only two args so it should die after the second one
 	printstuff(3, "arg1", "arg2");
 END_TEST
