@@ -39,8 +39,6 @@
 #include <machine/proc.h>
 #include <machine/vmparam.h>
 
-static void	hybridabi_thread_init(struct thread *td, unsigned long);
-
 void * __capability
 hybridabi_user_ddc(void)
 {
@@ -54,8 +52,8 @@ hybridabi_user_ddc(void)
  * Common per-thread CHERI state initialisation across execve(2) and
  * additional thread creation.
  */
-static void
-hybridabi_thread_init(struct thread *td, unsigned long entry_addr)
+void
+hybridabi_thread_setregs(struct thread *td, unsigned long entry_addr)
 {
 	struct cheri_signal *csigp;
 	struct trapframe *frame;
@@ -90,30 +88,4 @@ hybridabi_thread_init(struct thread *td, unsigned long entry_addr)
 	 */
 	csigp = &td->td_pcb->pcb_cherisignal;
 	bzero(csigp, sizeof(*csigp));
-}
-
-/*
- * Set per-thread CHERI register state for MIPS ABI processes.  In
- * particular, we need to set up the CHERI register state for MIPS ABI
- * processes with suitable capabilities.
- *
- * XXX: I also wonder if we should be inheriting signal-handling state...?
- */
-void
-hybridabi_newthread_setregs(struct thread *td, unsigned long entry_addr)
-{
-
-	hybridabi_thread_init(td, entry_addr);
-}
-
-/*
- * Set per-process CHERI state for MIPS ABI processes after exec.
- * Initializes process-wide state as well as per-thread state for the
- * process' initial thread.
- */
-void
-hybridabi_exec_setregs(struct thread *td, unsigned long entry_addr)
-{
-
-	hybridabi_thread_init(td, entry_addr);
 }

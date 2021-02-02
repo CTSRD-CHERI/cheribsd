@@ -646,9 +646,9 @@ cpu_set_upcall(struct thread *td, void (* __capability entry)(void *),
 		 * For the MIPS ABI, we can derive any required CHERI state from
 		 * the completed MIPS trapframe and existing process state.
 		 */
-		hybridabi_newthread_setregs(td, (__cheri_addr vaddr_t)entry);
+		hybridabi_thread_setregs(td, (__cheri_addr vaddr_t)entry);
 #else
-		/* For CHERI $pcc is set by hybridabi_newthread_setregs() */
+		/* For CHERI $pcc is set by hybridabi_thread_setregs() */
 		TRAPF_PC_SET_ADDR(tf, (vaddr_t)(intptr_t)entry);
 #endif
 
