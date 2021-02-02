@@ -45,8 +45,7 @@
 
 #include "cheribsdtest.h"
 
-void
-test_sealcap_sysctl(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_sealcap_sysctl, "Retrieve sealcap using sysctl(3)")
 {
 	void * __capability sealcap;
 	size_t sealcap_size;
@@ -150,8 +149,7 @@ test_sealcap_sysctl(const struct cheri_test *ctp __unused)
 
 static uint8_t sealdata[4096] __attribute__ ((aligned(4096)));
 
-void
-test_sealcap_seal(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_sealcap_seal, "Use sealcap to seal a capability")
 {
 	void * __capability sealdatap;
 	void * __capability sealcap;
@@ -210,8 +208,8 @@ test_sealcap_seal(const struct cheri_test *ctp __unused)
 	cheribsdtest_success();
 }
 
-void
-test_sealcap_seal_unseal(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_sealcap_seal_unseal,
+    "Use sealcap to seal and unseal a capability")
 {
 	void * __capability sealdatap;
 	void * __capability sealcap;

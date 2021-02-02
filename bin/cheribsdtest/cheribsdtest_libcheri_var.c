@@ -28,6 +28,11 @@
  * SUCH DAMAGE.
  */
 
+/*
+ * Tests relating to initialisation of, and permissions on, global
+ * variables in sandboxes.
+ */
+
 #include <sys/cdefs.h>
 
 #if !__has_feature(capabilities)
@@ -61,8 +66,9 @@
 
 #include "cheribsdtest.h"
 
-void
-test_sandbox_var_bss(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_sandbox_var_bss,
+    "Check initial value of .bss variable",
+    .ct_flags = CT_FLAG_SANDBOX)
 {
 	register_t v;
 
@@ -73,8 +79,9 @@ test_sandbox_var_bss(const struct cheri_test *ctp __unused)
 	cheribsdtest_success();
 }
 
-void
-test_sandbox_var_data(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_sandbox_var_data,
+    "Check initial value of .data variable",
+    .ct_flags = CT_FLAG_SANDBOX)
 {
 	register_t v;
 
@@ -87,8 +94,9 @@ test_sandbox_var_data(const struct cheri_test *ctp __unused)
 }
 
 
-void
-test_sandbox_var_data_getset(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_sandbox_var_data_getset,
+    "Get and set .data variables over multiple invocations",
+    .ct_flags = CT_FLAG_SANDBOX)
 {
 	register_t v;
 
@@ -111,8 +119,9 @@ test_sandbox_var_data_getset(const struct cheri_test *ctp __unused)
 	cheribsdtest_success();
 }
 
-void
-test_2sandbox_var_data_getset(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_2sandbox_var_data_getset,
+    "Instantiate second object and get/set variables",
+          .ct_flags = CT_FLAG_SLOW | CT_FLAG_SANDBOX)
 {
 	struct sandbox_object *sbop;
 	register_t v;
@@ -139,8 +148,9 @@ test_2sandbox_var_data_getset(const struct cheri_test *ctp __unused)
 	cheribsdtest_success();
 }
 
-void
-test_sandbox_var_constructor(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_sandbox_var_constructor,
+    "Check initial value of constructor-initalised variable",
+    .ct_flags = CT_FLAG_SANDBOX)
 {
 	register_t v;
 

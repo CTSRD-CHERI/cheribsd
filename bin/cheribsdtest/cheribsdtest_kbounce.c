@@ -87,8 +87,7 @@ checkbuf(const char *buf, size_t offset, size_t len, const char *where)
 	}
 }
 
-void
-test_kbounce(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_kbounce, "Exercise copyin/out via kbounce(2) syscall")
 {
 	char *buf, *dst, *src;
 
