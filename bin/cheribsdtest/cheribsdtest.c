@@ -1711,8 +1711,6 @@ static const struct cheri_test cheri_tests[] = {
 #undef DECLARE_TEST
 #endif
 };
-static const u_int cheri_tests_len = sizeof(cheri_tests) /
-	    sizeof(cheri_tests[0]);
 static StringList* cheri_failed_tests;
 static StringList* cheri_xfailed_tests;
 static StringList* cheri_xpassed_tests;
@@ -1762,37 +1760,32 @@ usage(void)
 static void
 list_tests(void)
 {
-	u_int i;
 	const char *xfail_reason;
+	const struct cheri_test *ct;
 
 	xo_attr("name", "%s", PROG);
 	xo_open_container("testsuite");
 	xo_open_list("testcase");
-	for (i = 0; i < cheri_tests_len; i++) {
-		if (fast_tests_only &&
-		    (cheri_tests[i].ct_flags & CT_FLAG_SLOW))
+	for (ct = cheri_tests; ct < cheri_tests + nitems(cheri_tests); ct++) {
+		if (fast_tests_only && (ct->ct_flags & CT_FLAG_SLOW))
 			continue;
-		if (unsandboxed_tests_only &&
-		    (cheri_tests[i].ct_flags & CT_FLAG_SANDBOX))
+		if (unsandboxed_tests_only && (ct->ct_flags & CT_FLAG_SANDBOX))
 			continue;
 		xo_open_instance("testcase");
 		if (verbose)
 			xo_emit("{cw:name/%s}{:description/%s}",
-			    cheri_tests[i].ct_name,
-			    cheri_tests[i].ct_desc);
+			    ct->ct_name, ct->ct_desc);
 		else
 			xo_emit("{:name/%s}{e:description/%s}",
-			    cheri_tests[i].ct_name,
-			    cheri_tests[i].ct_desc);
-		if (cheri_tests[i].ct_check_xfail)
-			xfail_reason = cheri_tests[i].ct_check_xfail(
-			    cheri_tests[i].ct_name);
+			    ct->ct_name, ct->ct_desc);
+		if (ct->ct_check_xfail)
+			xfail_reason = ct->ct_check_xfail(ct->ct_name);
 		else
-			xfail_reason = cheri_tests[i].ct_xfail_reason;
+			xfail_reason = ct->ct_xfail_reason;
 		if (xfail_reason)
 			xo_emit("{e:expected-failure-reason/%s}",
 			    xfail_reason);
-		if (cheri_tests[i].ct_flags & CT_FLAG_SLOW)
+		if (ct->ct_flags & CT_FLAG_SLOW)
 			xo_emit("{e:timeout/%s}", "LONG");
 		xo_emit("\n");
 		xo_close_instance("testcase");
@@ -2272,15 +2265,15 @@ fail:
 static void
 cheribsdtest_run_test_name(const char *name)
 {
-	u_int i;
+	const struct cheri_test *ct;
 
-	for (i = 0; i < cheri_tests_len; i++) {
-		if (strcmp(name, cheri_tests[i].ct_name) == 0)
-			break;
+	for (ct = cheri_tests; ct < cheri_tests + nitems(cheri_tests); ct++) {
+		if (strcmp(name, ct->ct_name) == 0) {
+			cheribsdtest_run_test(ct);
+			return;
+		}
 	}
-	if (i == cheri_tests_len)
-		errx(EX_USAGE, "unknown test: %s", name);
-	cheribsdtest_run_test(&cheri_tests[i]);
+	errx(EX_USAGE, "unknown test: %s", name);
 }
 
 __noinline void *
@@ -2303,10 +2296,10 @@ main(int argc, char *argv[])
 	int glob = 0;
 	stack_t stack;
 	int i;
-	u_int t;
 	uint qemu_trace_perthread;
 	size_t len;
 	const char *sep;
+	const struct cheri_test *ct;
 
 	argc = xo_parse_args(argc, argv);
 	if (argc < 0)
@@ -2456,30 +2449,30 @@ main(int argc, char *argv[])
 	xo_open_container("testsuite");
 	xo_open_list("test");
 	if (run_all) {
-		for (t = 0; t < cheri_tests_len; t++) {
-			if (fast_tests_only &&
-			    (cheri_tests[t].ct_flags & CT_FLAG_SLOW))
+		for (ct = cheri_tests; ct < cheri_tests + nitems(cheri_tests);
+		    ct++) {
+			if (fast_tests_only && (ct->ct_flags & CT_FLAG_SLOW))
 				continue;
 			if (unsandboxed_tests_only &&
-			    (cheri_tests[t].ct_flags & CT_FLAG_SANDBOX))
+			    (ct->ct_flags & CT_FLAG_SANDBOX))
 				continue;
-			cheribsdtest_run_test(&cheri_tests[t]);
+			cheribsdtest_run_test(ct);
 			if (sleep_after_test)
 				sleep(1);
 		}
 	} else if (glob) {
 		for (i = 0; i < argc; i++) {
-			for (t = 0; t < cheri_tests_len; t++) {
-				if (fnmatch(argv[i], cheri_tests[t].ct_name,
-				    0) != 0)
+			for (ct = cheri_tests;
+			    ct < cheri_tests + nitems(cheri_tests); ct++) {
+				if (fnmatch(argv[i], ct->ct_name, 0) != 0)
 					continue;
 				if (fast_tests_only &&
-				    (cheri_tests[t].ct_flags & CT_FLAG_SLOW))
+				    (ct->ct_flags & CT_FLAG_SLOW))
 					continue;
 				if (unsandboxed_tests_only &&
-				    (cheri_tests[t].ct_flags & CT_FLAG_SANDBOX))
+				    (ct->ct_flags & CT_FLAG_SANDBOX))
 					continue;
-				cheribsdtest_run_test(&cheri_tests[t]);
+				cheribsdtest_run_test(ct);
 				if (sleep_after_test)
 					sleep(1);
 			}
