@@ -39,19 +39,17 @@
 #include <machine/proc.h>
 #include <machine/vmparam.h>
 
-static void	hybridabi_capability_set_user_ddc(void * __capability *);
 static void	hybridabi_capability_set_user_entry(struct thread *td,
 		    void * __capability *, unsigned long);
 static void	hybridabi_thread_init(struct thread *td, unsigned long);
 
-static void
-hybridabi_capability_set_user_ddc(void * __capability *cp)
+void * __capability
+hybridabi_user_ddc(void)
 {
-
-	*cp = cheri_capability_build_user_rwx(
+	return (cheri_capability_build_user_rwx(
 	    CHERI_CAP_USER_DATA_PERMS | CHERI_PERM_CHERIABI_VMMAP,
 	    CHERI_CAP_USER_DATA_BASE, CHERI_CAP_USER_DATA_LENGTH,
-	    CHERI_CAP_USER_DATA_OFFSET);
+	    CHERI_CAP_USER_DATA_OFFSET));
 }
 
 static void
@@ -94,7 +92,7 @@ hybridabi_thread_init(struct thread *td, unsigned long entry_addr)
 	 * privilege, and all other user-accessible capability
 	 * registers with no rights at all.
 	 */
-	hybridabi_capability_set_user_ddc(&frame->ddc);
+	frame->ddc = hybridabi_user_ddc();
 	hybridabi_capability_set_user_entry(td, (void * __capability *)&frame->pc, entry_addr);
 
 	/*
@@ -105,7 +103,6 @@ hybridabi_thread_init(struct thread *td, unsigned long entry_addr)
 	 */
 	csigp = &td->td_pcb->pcb_cherisignal;
 	bzero(csigp, sizeof(*csigp));
-	hybridabi_capability_set_user_ddc(&csigp->csig_ddc);
 }
 
 /*
@@ -132,23 +129,4 @@ hybridabi_exec_setregs(struct thread *td, unsigned long entry_addr)
 {
 
 	hybridabi_thread_init(td, entry_addr);
-}
-
-/*
- * Configure CHERI register state for a thread about to resume in a signal
- * handler.  Eventually, csigp should contain configurable values, but for
- * now, this ensures handlers run with ambient authority in a useful way.
- * Note that this doesn't touch the already copied-out CHERI register frame
- * (see sendsig()), and hence when sigreturn() is called, the previous CHERI
- * state will be restored by default.
- */
-void
-hybridabi_sendsig(struct thread *td)
-{
-	struct trapframe *frame;
-	struct cheri_signal *csigp;
-
-	frame = &td->td_pcb->pcb_regs;
-	csigp = &td->td_pcb->pcb_cherisignal;
-	frame->ddc = csigp->csig_ddc;
 }

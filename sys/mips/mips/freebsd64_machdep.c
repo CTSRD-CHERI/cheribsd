@@ -467,11 +467,9 @@ freebsd64_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 
 #ifdef CPU_CHERI
 	/*
-	 * Install CHERI signal-delivery register state for handler to run
-	 * in.  As we don't install this in the CHERI frame on the user stack,
-	 * it will be (genrally) be removed automatically on sigreturn().
+	 * Always run the signal handler with the default hybrid DDC.
 	 */
-	hybridabi_sendsig(td);
+	regs->ddc = hybridabi_user_ddc();
 #endif
 
 	regs->pc = (trapf_pc_t)catcher;
