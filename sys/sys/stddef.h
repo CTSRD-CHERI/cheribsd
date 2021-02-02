@@ -35,6 +35,11 @@
 #include <sys/_null.h>
 #include <machine/_types.h>
 
+#ifndef _PTRADDR_T_DECLARED
+typedef	__ptraddr_t	ptraddr_t;
+#define	_PTRADDR_T_DECLARED
+#endif
+
 #ifndef _PTRDIFF_T_DECLARED
 typedef	__ptrdiff_t	ptrdiff_t;
 #define	_PTRDIFF_T_DECLARED

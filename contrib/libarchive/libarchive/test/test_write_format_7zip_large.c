@@ -25,9 +25,11 @@
 
 
 #include "test.h"
+#include "test_utils.h"
 __FBSDID("$FreeBSD$");
 
 #define LARGE_SIZE	(16*1024*1024)
+#define SLOW_HOST_LARGE_SIZE	(1*1024*1024)
 static void
 test_large(const char *compression_type)
 {
@@ -37,7 +39,18 @@ test_large(const char *compression_type)
 	size_t buffsize = LARGE_SIZE + 1024 * 256;
 	size_t datasize = LARGE_SIZE;
 	char *buff, *filedata, *filedata2;
-	unsigned i;
+
+	if (getenv("TEST_SLOW_HOST") != NULL) {
+		/*
+		 * Use a 1M data size instead of 16M when running on a slow(er)
+		 * host such as a fully-emulated QEMU. Using a 16M buffer size
+		 * results in many of these tests taking > 10 minutes (and
+		 * timing out) when running them as part of the FreeBSD test
+		 * suite on QEMU RISC-V.
+		 */
+		buffsize = SLOW_HOST_LARGE_SIZE + 1024 * 256;
+		datasize = SLOW_HOST_LARGE_SIZE;
+	}
 
 	assert((buff = malloc(buffsize)) != NULL);
 	assert((filedata = malloc(datasize)) != NULL);
@@ -87,8 +100,7 @@ test_large(const char *compression_type)
 		/* NOTE: PPMd cannot handle random data correctly.*/
 		memset(filedata, 'a', datasize);
 	} else {
-		for (i = 0; i < datasize; i++)
-			filedata[i] = (char)rand();
+		fill_with_pseudorandom_data(filedata, datasize);
 	}
 	assertEqualInt(datasize, archive_write_data(a, filedata, datasize));
 
