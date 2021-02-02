@@ -537,241 +537,50 @@ ATOMIC_STORE_LOAD(64)
 #define	atomic_load_64	atomic_load_acq_64
 #endif
 
+/*
+ * Atomically compare the value stored at *p with cmpval and if the
+ * two values are equal, update the value of *p with newval. Returns
+ * zero if the compare failed, nonzero otherwise.
+ */
+#define	ATOMIC_CMPSET(WIDTH)						\
+static __inline int							\
+atomic_cmpset_##WIDTH(__volatile uint##WIDTH##_t *p,			\
+    uint##WIDTH##_t cmpval, uint##WIDTH##_t newval)			\
+{									\
+	return (__atomic_compare_exchange_n(p, &cmpval, newval, 0,	\
+	    __ATOMIC_RELAXED, __ATOMIC_RELAXED));			\
+}
+
+/*
+ * Atomically compare the value stored at *p with cmpval and if the
+ * two values are equal, update the value of *p with newval. Returns
+ * zero if the compare failed, nonzero otherwise.
+ */
+#define	ATOMIC_FCMPSET(WIDTH)						\
+static __inline int							\
+atomic_fcmpset_##WIDTH(__volatile uint##WIDTH##_t *p,			\
+    uint##WIDTH##_t *cmpval, uint##WIDTH##_t newval)			\
+{									\
+	return (__atomic_compare_exchange_n(p, cmpval, newval, 1,	\
+	    __ATOMIC_RELAXED, __ATOMIC_RELAXED));			\
+}
+
 #ifdef __CHERI_PURE_CAPABILITY__
 /*
  * In a purecap kernel we cannot use the generic sub-word implementation.
  */
-static __inline int
-atomic_cmpset_8(__volatile uint8_t *p, uint8_t cmpval, uint8_t newval)
-{
-	int ret;
-
-	__asm __volatile (
-		__INLINE_ASM_PUSH_NOAT
-		"1:\n\t"
-		"cllb	%0, %1\n\t"		/* load old value */
-		"bne	%0, %2, 2f\n\t"		/* compare */
-		"move	%0, %3\n\t"		/* value to store */
-		"cscb	%0, %0, %1\n\t"		/* attempt to store */
-		"beqz	%0, 1b\n\t"		/* if it failed, spin */
-		"b 3f\n\t"
-		"2:\n\t"
-		"li	%0, 0\n\t"
-		"3:\n"
-		__INLINE_ASM_POP_NOAT
-		: "=&r" (ret), "+C" (p)
-		: "r" ((long)(int8_t)cmpval), "r" (newval)
-		: "memory");
-
-	return (ret);
-}
+ATOMIC_CMPSET(8)
+ATOMIC_FCMPSET(8)
+ATOMIC_CMPSET(16)
+ATOMIC_FCMPSET(16)
 #define	atomic_cmpset_8 atomic_cmpset_8
-
-/*
- * Atomically compare the value stored at *p with cmpval and if the
- * two values are equal, update the value of *p with newval. Returns
- * zero if the compare failed, nonzero otherwise.
- */
-static __inline int
-atomic_fcmpset_8(__volatile uint8_t *p, uint8_t *cmpval, uint8_t newval)
-{
-	int ret;
-
-	uint8_t tmp;
-	uint8_t expected = *cmpval;
-
-	__asm __volatile (
-		__INLINE_ASM_PUSH_NOAT
-		"cllb	%[tmp], %[ptr]\n\t"		/* load old value */
-		"bne	%[tmp], %[expected], 1f\n\t"	/* compare */
-		"nop\n\t"
-		"cscb	%[ret], %[newval], %[ptr]\n\t"	/* attempt to store */
-		"j	2f\n\t"			/* exit regardless of success */
-		"nop\n\t"			/* avoid delay slot accident */
-		"1:\n\t"
-		"csb	%[tmp], $0, 0(%[cmpval])\n\t"	/* store loaded value */
-		"li	%[ret], 0\n\t"
-		"2:\n"
-		__INLINE_ASM_POP_NOAT
-		: [ret] "=&r" (ret), [tmp] "=&r" (tmp), [ptr]"+C" (p),
-		    [cmpval]"+C" (cmpval)
-		: [newval] "r" (newval), [expected] "r" ((long)(int8_t)expected)
-		: "memory");
-
-	return ret;
-}
 #define	atomic_fcmpset_8 atomic_fcmpset_8
-
-/*
- * Atomically compare the value stored at *p with cmpval and if the
- * two values are equal, update the value of *p with newval. Returns
- * zero if the compare failed, nonzero otherwise.
- */
-static __inline int
-atomic_cmpset_16(__volatile uint16_t *p, uint16_t cmpval, uint16_t newval)
-{
-	int ret;
-
-	__asm __volatile (
-		__INLINE_ASM_PUSH_NOAT
-		"1:\n\t"
-		"cllh	%0, %1\n\t"		/* load old value */
-		"bne	%0, %2, 2f\n\t"		/* compare */
-		"move	%0, %3\n\t"		/* value to store */
-		"csch	%0, %0, %1\n\t"		/* attempt to store */
-		"beqz	%0, 1b\n\t"		/* if it failed, spin */
-		"b 3f\n\t"
-		"2:\n\t"
-		"li	%0, 0\n\t"
-		"3:\n"
-		__INLINE_ASM_POP_NOAT
-		: "=&r" (ret), "+C" (p)
-		: "r" ((long)(int16_t)cmpval), "r" (newval)
-		: "memory");
-
-	return (ret);
-}
 #define	atomic_cmpset_16 atomic_cmpset_16
-
-/*
- * Atomically compare the value stored at *p with cmpval and if the
- * two values are equal, update the value of *p with newval. Returns
- * zero if the compare failed, nonzero otherwise.
- */
-static __inline int
-atomic_fcmpset_16(__volatile uint16_t *p, uint16_t *cmpval, uint16_t newval)
-{
-	int ret;
-
-	uint16_t tmp;
-	uint16_t expected = *cmpval;
-
-	__asm __volatile (
-		__INLINE_ASM_PUSH_NOAT
-		"cllh	%[tmp], %[ptr]\n\t"		/* load old value */
-		"bne	%[tmp], %[expected], 1f\n\t"	/* compare */
-		"nop\n\t"
-		"csch	%[ret], %[newval], %[ptr]\n\t"	/* attempt to store */
-		"j	2f\n\t"			/* exit regardless of success */
-		"nop\n\t"			/* avoid delay slot accident */
-		"1:\n\t"
-		"csh	%[tmp], $0, 0(%[cmpval])\n\t"	/* store loaded value */
-		"li	%[ret], 0\n\t"
-		"2:\n"
-		__INLINE_ASM_POP_NOAT
-		: [ret] "=&r" (ret), [tmp] "=&r" (tmp), [ptr]"+C" (p),
-		    [cmpval]"+C" (cmpval)
-		: [newval] "r" (newval), [expected] "r" ((long)(int16_t)expected)
-		: "memory");
-
-	return ret;
-}
 #define	atomic_fcmpset_16 atomic_fcmpset_16
 #endif
 
-/*
- * Atomically compare the value stored at *p with cmpval and if the
- * two values are equal, update the value of *p with newval. Returns
- * zero if the compare failed, nonzero otherwise.
- */
-static __inline int
-atomic_cmpset_32(__volatile uint32_t *p, uint32_t cmpval, uint32_t newval)
-{
-	int ret;
-
-#ifndef __CHERI_PURE_CAPABILITY__
-	__asm __volatile (
-		"1:\tll	%0, %1\n\t"		/* load old value */
-		"bne %0, %2, 2f\n\t"		/* compare */
-		"move %0, %3\n\t"		/* value to store */
-		"sc %0, %1\n\t"			/* attempt to store */
-		"beqz %0, 1b\n\t"		/* if it failed, spin */
-		"j 3f\n\t"
-		"2:\n\t"
-		"li	%0, 0\n\t"
-		"3:\n"
-		: "=&r" (ret), "+m" (*p)
-		: "r" (cmpval), "r" (newval)
-		: "memory");
-#else
-	__asm __volatile (
-		__INLINE_ASM_PUSH_NOAT
-		"1:\n\t"
-		"cllw	%0, %1\n\t"		/* load old value */
-		"bne	%0, %2, 2f\n\t"		/* compare */
-		"move	%0, %3\n\t"		/* value to store */
-		"cscw	%0, %0, %1\n\t"		/* attempt to store */
-		"beqz	%0, 1b\n\t"		/* if it failed, spin */
-		"b 3f\n\t"
-		"2:\n\t"
-		"li	%0, 0\n\t"
-		"3:\n"
-		__INLINE_ASM_POP_NOAT
-		: "=&r" (ret), "+C" (p)
-		: "r" ((long)(int32_t)cmpval), "r" (newval)
-		: "memory");
-#endif
-
-	return ret;
-}
-
-/*
- * Atomically compare the value stored at *p with cmpval and if the
- * two values are equal, update the value of *p with newval. Returns
- * zero if the compare failed, nonzero otherwise.
- */
-static __inline int
-atomic_fcmpset_32(__volatile uint32_t *p, uint32_t *cmpval, uint32_t newval)
-{
-	int ret;
-
-#ifndef __CHERI_PURE_CAPABILITY__
-	/*
-	 * The following sequence (similar to that in atomic_fcmpset_64) will
-	 * attempt to update the value of *p with newval if the comparison
-	 * succeeds.  Note that they'll exit regardless of whether the store
-	 * actually succeeded, leaving *cmpval untouched.  This is in line with
-	 * the documentation of atomic_fcmpset_<type>() in atomic(9) for ll/sc
-	 * architectures.
-	 */
-	__asm __volatile (
-		"ll	%0, %1\n\t"		/* load old value */
-		"bne	%0, %4, 1f\n\t"		/* compare */
-		"move	%0, %3\n\t"		/* value to store */
-		"sc	%0, %1\n\t"		/* attempt to store */
-		"j	2f\n\t"			/* exit regardless of success */
-		"nop\n\t"			/* avoid delay slot accident */
-		"1:\n\t"
-		"sw	%0, %2\n\t"		/* save old value */
-		"li	%0, 0\n\t"
-		"2:\n"
-		: "=&r" (ret), "+m" (*p), "=m" (*cmpval)
-		: "r" (newval), "r" (*cmpval)
-		: "memory");
-#else
-	uint32_t tmp;
-	uint32_t expected = *cmpval;
-
-	__asm __volatile (
-		__INLINE_ASM_PUSH_NOAT
-		"cllw	%[tmp], %[ptr]\n\t"		/* load old value */
-		"bne	%[tmp], %[expected], 1f\n\t"	/* compare */
-		"nop\n\t"
-		"cscw	%[ret], %[newval], %[ptr]\n\t"	/* attempt to store */
-		"j	2f\n\t"			/* exit regardless of success */
-		"nop\n\t"			/* avoid delay slot accident */
-		"1:\n\t"
-		"csw	%[tmp], $0, 0(%[cmpval])\n\t"	/* store loaded value */
-		"li	%[ret], 0\n\t"
-		"2:\n"
-		__INLINE_ASM_POP_NOAT
-		: [ret] "=&r" (ret), [tmp] "=&r" (tmp), [ptr]"+C" (p),
-		    [cmpval]"+C" (cmpval)
-		: [newval] "r" (newval), [expected] "r" ((long)(int32_t)expected)
-		: "memory");
-#endif
-	return ret;
-}
+ATOMIC_CMPSET(32)
+ATOMIC_FCMPSET(32)
 
 #define	ATOMIC_CMPSET_ACQ_REL(WIDTH)					\
 static __inline  int							\
@@ -858,97 +667,8 @@ atomic_fetchadd_32(__volatile uint32_t *p, uint32_t v)
 }
 
 #if defined(__mips_n64) || defined(__mips_n32)
-/*
- * Atomically compare the value stored at *p with cmpval and if the
- * two values are equal, update the value of *p with newval. Returns
- * zero if the compare failed, nonzero otherwise.
- */
-static __inline int
-atomic_cmpset_64(__volatile uint64_t *p, uint64_t cmpval, uint64_t newval)
-{
-	int ret;
-
-#ifndef __CHERI_PURE_CAPABILITY__
-	__asm __volatile (
-		"1:\n\t"
-		"lld	%0, %1\n\t"		/* load old value */
-		"bne	%0, %2, 2f\n\t"		/* compare */
-		"move	%0, %3\n\t"		/* value to store */
-		"scd	%0, %1\n\t"		/* attempt to store */
-		"beqz	%0, 1b\n\t"		/* if it failed, spin */
-		"j	3f\n\t"
-		"2:\n\t"
-		"li	%0, 0\n\t"
-		"3:\n"
-		: "=&r" (ret), "+m" (*p)
-		: "r" (cmpval), "r" (newval)
-		: "memory");
-#else
-	__asm __volatile (
-		__INLINE_ASM_PUSH_NOAT
-		"1:\n\t"
-		"clld	%0, %1\n\t"		/* load old value */
-		"bne	%0, %2, 2f\n\t"		/* compare */
-		"move	%0, %3\n\t"		/* value to store */
-		"cscd	%0, %0, %1\n\t"		/* attempt to store */
-		"beqz	%0, 1b\n\t"		/* if it failed, spin */
-		"j	3f\n\t"
-		"2:\n\t"
-		"li	%0, 0\n\t"
-		"3:\n"
-		__INLINE_ASM_POP_NOAT
-		: "=&r" (ret), "+C" (p)
-		: "r" (cmpval), "r" (newval)
-		: "memory");
-#endif
-
-	return ret;
-}
-
-static __inline int
-atomic_fcmpset_64(__volatile uint64_t *p, uint64_t *cmpval, uint64_t newval)
-{
-        int ret;
-
-#ifndef __CHERI_PURE_CAPABILITY__
-        __asm __volatile (
-		"lld	%0, %1\n\t"		/* load old value */
-                "bne	%0, %4, 1f\n\t"		/* compare */
-                "move	%0, %3\n\t"		/* value to store */
-                "scd	%0, %1\n\t"		/* attempt to store */
-		"j	2f\n\t"			/* exit regardless of success */
-		"nop\n\t"			/* avoid delay slot accident */
-                "1:\n\t"
-                "sd	%0, %2\n\t"		/* save old value */
-                "li	%0, 0\n\t"
-                "2:\n"
-                : "=&r" (ret), "+m" (*p), "=m" (*cmpval)
-                : "r" (newval), "r" (*cmpval)
-                : "memory");
-#else
-	uint64_t tmp;
-	uint64_t expected = *cmpval;
-
-	__asm __volatile (
-		__INLINE_ASM_PUSH_NOAT
-		"clld	%[tmp], %[ptr]\n\t"		/* load old value */
-		"bne	%[tmp], %[expected], 1f\n\t"	/* compare */
-		"nop\n\t"			/* avoid delay slot accident */
-		"cscd	%[ret], %[newval], %[ptr]\n\t"	/* attempt to store */
-		"j	2f\n\t"			/* exit regardless of success */
-		"nop\n\t"			/* avoid delay slot accident */
-		"1:\n\t"
-		"csd	%[tmp], $0, 0(%[cmpval])\n\t"	/* store loaded value */
-		"li	%[ret], 0\n\t"
-		"2:\n"
-		__INLINE_ASM_POP_NOAT
-		: [ret] "=&r" (ret), [tmp] "=&r" (tmp), [ptr]"+C" (p),
-		    [cmpval]"+C" (cmpval)
-		: [newval] "r" (newval), [expected] "r" (expected)
-		: "memory");
-#endif
-	return ret;
-}
+ATOMIC_CMPSET(64)
+ATOMIC_FCMPSET(64)
 
 /*
  * Atomically compare the value stored at *p with cmpval and if the
@@ -992,6 +712,8 @@ atomic_fetchadd_64(__volatile uint64_t *p, uint64_t v)
 }
 #endif
 
+#undef ATOMIC_CMPSET
+#undef ATOMIC_FCMPSET
 
 #ifdef __CHERI_PURE_CAPABILITY__
 /*
