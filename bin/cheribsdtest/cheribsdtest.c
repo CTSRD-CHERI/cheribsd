@@ -1868,6 +1868,11 @@ cheribsdtest_run_test(const struct cheri_test *ctp)
 	reason[0] = '\0';
 	visreason[0] = '\0';
 
+	if (fast_tests_only && (ctp->ct_flags & CT_FLAG_SLOW))
+		return;
+	if (unsandboxed_tests_only && (ctp->ct_flags & CT_FLAG_SANDBOX))
+		return;
+
 	if (ctp->ct_check_xfail != NULL)
 		xfail_reason = ctp->ct_check_xfail(ctp->ct_name);
 	else
@@ -2153,6 +2158,8 @@ pass:
 	close(pipefd_stdout[0]);
 	xo_close_instance("testcase");
 	xo_flush();
+	if (sleep_after_test)
+		sleep(1);
 	return;
 
 fail:
@@ -2192,6 +2199,8 @@ fail:
 	xo_flush();
 	close(pipefd_stdin[1]);
 	close(pipefd_stdout[0]);
+	if (sleep_after_test)
+		sleep(1);
 }
 
 static void
@@ -2383,14 +2392,7 @@ main(int argc, char *argv[])
 	if (run_all) {
 		for (ct = cheri_tests; ct < cheri_tests + nitems(cheri_tests);
 		    ct++) {
-			if (fast_tests_only && (ct->ct_flags & CT_FLAG_SLOW))
-				continue;
-			if (unsandboxed_tests_only &&
-			    (ct->ct_flags & CT_FLAG_SANDBOX))
-				continue;
 			cheribsdtest_run_test(ct);
-			if (sleep_after_test)
-				sleep(1);
 		}
 	} else if (glob) {
 		for (i = 0; i < argc; i++) {
@@ -2398,25 +2400,11 @@ main(int argc, char *argv[])
 			    ct < cheri_tests + nitems(cheri_tests); ct++) {
 				if (fnmatch(argv[i], ct->ct_name, 0) != 0)
 					continue;
-				if (fast_tests_only &&
-				    (ct->ct_flags & CT_FLAG_SLOW))
-					continue;
-				if (unsandboxed_tests_only &&
-				    (ct->ct_flags & CT_FLAG_SANDBOX))
-					continue;
 				cheribsdtest_run_test(ct);
-				if (sleep_after_test)
-					sleep(1);
 			}
 		}
 	} else {
 		for (i = 0; i < argc; i++) {
-			if (fast_tests_only &&
-			    (cheri_tests[i].ct_flags & CT_FLAG_SLOW))
-				continue;
-			if (unsandboxed_tests_only &&
-			    (cheri_tests[i].ct_flags & CT_FLAG_SANDBOX))
-				continue;
 			cheribsdtest_run_test_name(argv[i]);
 		}
 	}
