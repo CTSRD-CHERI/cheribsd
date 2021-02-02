@@ -1191,18 +1191,6 @@ static const struct cheri_test cheri_tests[] = {
 	  .ct_flags = CT_FLAG_STDOUT_STRING | CT_FLAG_SANDBOX,
 	  .ct_stdout_string = "hello world\n" },
 
-	{ .ct_name = "test_sandbox_md5_ccall",
-	  .ct_desc = "Generate an MD5 checksum in a sandbox via direct ccall",
-	  .ct_func_arg = test_sandbox_md5_ccall,
-	  .ct_arg = 1,
-	  .ct_flags = CT_FLAG_SANDBOX, },
-
-	{ .ct_name = "test_sandbox_md5_ccall2",
-	  .ct_desc = "Generate an MD5 checksum in a sandbox via 2nd class",
-	  .ct_func_arg = test_sandbox_md5_ccall,
-	  .ct_arg = 2,
-	  .ct_flags = CT_FLAG_SANDBOX, },
-
 	{ .ct_name = "test_2sandbox_newdestroy",
 	  .ct_desc = "Instantiate and destroy a second sandbox object",
 	  .ct_func = test_2sandbox_newdestroy,
