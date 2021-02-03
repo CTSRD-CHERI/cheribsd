@@ -140,16 +140,11 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	 *     extensions to the context frame placed on the stack.
 	 *
 	 * (2) If the user $pcc doesn't include CHERI_PERM_SYSCALL, then we
-	 *     consider user state to be 'sandboxed' and therefore to require
-	 *     special delivery handling which includes a domain-switch to the
-	 *     thread's context-switch domain.  (This is done by
-	 *     hybridabi_sendsig()).
+	 *     consider user state to be 'sandboxed'.
 	 *
 	 * (3) If an alternative signal stack is not defined, and we are in a
-	 *     'sandboxed' state, then we have two choices: (a) if the signal
-	 *     is of type SA_SANDBOX_UNWIND, we will automatically unwind the
-	 *     trusted stack by one frame; (b) otherwise, we will terminate
-	 *     the process unconditionally.
+	 *     'sandboxed' state, then we terminate the process
+	 *     unconditionally.
 	 */
 	cheri_is_sandboxed = cheri_signal_sandboxed(td);
 
