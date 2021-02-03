@@ -177,7 +177,6 @@ mmap_retcap(struct thread *td, vm_pointer_t addr,
 #else
 	newcap = mrp->mr_source_cap;
 #endif
-	perms = cheri_getperm(newcap);
 
 	/*
 	 * If PROT_MAX() was not passed, use the prot value to derive
@@ -190,8 +189,8 @@ mmap_retcap(struct thread *td, vm_pointer_t addr,
 	 * Set the permissions to PROT_MAX to allow a full
 	 * range of access subject to page permissions.
 	 */
-	newcap = cheri_andperm(newcap,
-	    ~CHERI_CAP_PERM_RWX | vm_map_prot2perms(cap_prot));
+	perms = ~MAP_CAP_PERM_MASK | vm_map_prot2perms(cap_prot);
+	newcap = cheri_andperm(newcap, perms);
 
 #ifndef __CHERI_PURE_CAPABILITY__
 	/* Reservations in the kernel ensure this */
@@ -999,7 +998,7 @@ kern_munmap(struct thread *td, uintptr_t addr0, size_t size)
 	vm_offset_t addr, end;
 	vm_size_t pageoff;
 	vm_map_t map;
-        int rv = KERN_SUCCESS;
+	int rv = KERN_SUCCESS;
 
 	if (size == 0)
 		return (EINVAL);
@@ -1037,7 +1036,7 @@ kern_munmap(struct thread *td, uintptr_t addr0, size_t size)
 		}
 	}
 #endif
-	vm_map_remove_locked(map, addr, addr + size);
+	rv = vm_map_remove_locked(map, addr, addr + size);
 
 #ifdef HWPMC_HOOKS
 	if (rv == KERN_SUCCESS && __predict_false(pmc_handled)) {
@@ -2044,12 +2043,6 @@ vm_mmap_object(vm_map_t map, vm_pointer_t *addr, vm_offset_t max_addr,
 	vm_size_t padded_size;
 	vm_pointer_t reservation;
 
-#ifdef __CHERI_PURE_CAPABILITY__
-	KASSERT(cheri_getlen(addr) == sizeof(void *),
-	    ("Invalid bounds for pointer-sized object %zx",
-	    (size_t)cheri_getlen(addr)));
-#endif
-
 	curmap = map == &td->td_proc->p_vmspace->vm_map;
 	if (curmap) {
 		padded_size = CHERI_REPRESENTABLE_LENGTH(size);
@@ -2079,9 +2072,9 @@ vm_mmap_object(vm_map_t map, vm_pointer_t *addr, vm_offset_t max_addr,
 	}
 
 	if (flags & MAP_RESERVATION_CREATE)
-		new_reservation = TRUE;
+		new_reservation = true;
 	else
-		new_reservation = FALSE;
+		new_reservation = false;
 
 	if (flags & MAP_ANON) {
 		if (object != NULL || foff != 0)

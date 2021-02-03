@@ -156,6 +156,13 @@ struct vm_map_entry {
 
 #define	MAP_ENTRY_SPLIT_BOUNDARY_SHIFT	20
 
+/*
+ * Mask for all the capability permission bits that are mapped to vm_prot_t.
+ */
+#define	MAP_CAP_PERM_MASK					\
+	(CHERI_PERM_LOAD | CHERI_PERM_STORE | CHERI_PERM_EXECUTE |	\
+	 CHERI_PERM_LOAD_CAP | CHERI_PERM_STORE_CAP |			\
+	 CHERI_PERM_STORE_LOCAL_CAP)
 
 #ifdef	_KERNEL
 static __inline u_char
@@ -484,7 +491,7 @@ vm_map_entry_read_succ(void *token, struct vm_map_entry *const clone,
 #ifdef _KERNEL
 boolean_t vm_map_check_protection (vm_map_t, vm_offset_t, vm_offset_t, vm_prot_t);
 int vm_map_delete(vm_map_t, vm_offset_t, vm_offset_t, bool);
-int vm_map_find(vm_map_t, vm_object_t, vm_ooffset_t, vm_pointer_t *, vm_size_t,
+int vm_map_find(vm_map_t, vm_object_t, vm_ooffset_t, vm_offset_t *, vm_size_t,
     vm_offset_t, int, vm_prot_t, vm_prot_t, int);
 int vm_map_find_min(vm_map_t, vm_object_t, vm_ooffset_t, vm_pointer_t *,
     vm_size_t, vm_offset_t, vm_offset_t, int, vm_prot_t, vm_prot_t, int);
@@ -493,9 +500,8 @@ int vm_map_find_aligned(vm_map_t map, vm_offset_t *addr, vm_size_t length,
 int vm_map_fixed(vm_map_t, vm_object_t, vm_ooffset_t, vm_pointer_t, vm_size_t,
     vm_prot_t, vm_prot_t, int);
 vm_offset_t vm_map_findspace(vm_map_t, vm_offset_t, vm_size_t);
-int vm_map_alignspace(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
-    vm_offset_t *addr, vm_size_t length, vm_offset_t max_addr,
-    vm_offset_t alignment);
+int vm_map_alignspace(vm_map_t, vm_object_t, vm_ooffset_t,
+    vm_offset_t *, vm_size_t, vm_offset_t, vm_offset_t);
 int vm_map_inherit (vm_map_t, vm_offset_t, vm_offset_t, vm_inherit_t);
 void vm_map_init(vm_map_t, pmap_t, vm_pointer_t, vm_pointer_t);
 int vm_map_insert (vm_map_t, vm_object_t, vm_ooffset_t, vm_pointer_t,
@@ -511,20 +517,11 @@ int vm_map_reservation_delete(vm_map_t, vm_offset_t);
 int vm_map_reservation_delete_locked(vm_map_t, vm_offset_t);
 int vm_map_reservation_create(vm_map_t, vm_pointer_t *, vm_size_t, vm_offset_t,
     vm_prot_t);
-int vm_map_reservation_create_fixed(vm_map_t, vm_pointer_t *, vm_size_t,
-    vm_offset_t, vm_prot_t);
 int vm_map_reservation_create_locked(vm_map_t, vm_pointer_t *, vm_size_t, vm_prot_t);
 #if __has_feature(capabilities)
 int vm_map_prot2perms(vm_prot_t prot);
 #endif
-#ifdef __CHERI_PURE_CAPABILITY__
-vm_pointer_t _vm_map_buildcap(vm_map_t map, vm_offset_t addr, vm_size_t length,
-    vm_prot_t prot);
-#define	vm_map_buildcap(map, addr, length, prot)	\
-    _vm_map_buildcap(map, addr, length, prot)
-#else
 #define	vm_map_buildcap(map, addr, length, prot) (addr)
-#endif
 
 static inline vm_map_entry_t
 vm_map_entry_first(vm_map_t map)
