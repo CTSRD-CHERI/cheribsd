@@ -104,6 +104,24 @@ struct adjacent_mappings {
 };
 
 /*
+ * "Reserve" a chunk of address space by mapping pages, unmapping them,
+ * and returning the base address.  This is necessary because small
+ * mappings (e.g. 2 pages) might land between other mappings and thus
+ * the next N pages might not be free.
+ */
+static ptraddr_t
+reserve_address_space(size_t len)
+{
+	void *addr;
+
+	addr = CHERIBSDTEST_CHECK_SYSCALL(
+	    mmap(0, len, PROT_READ | PROT_WRITE, MAP_ANON, -1, 0));
+	CHERIBSDTEST_CHECK_SYSCALL(munmap(addr, len));
+	/* XXX: With temporal safety we will need to force revocation here. */
+	return ((ptraddr_t)addr);
+}
+
+/*
  * Create three adjacent memory mappings that be used to check that the memory
  * mapping system calls reject out-of-bounds capabilities that have the address
  * of a valid mapping.
@@ -116,17 +134,7 @@ create_adjacent_mappings(struct adjacent_mappings *mappings)
 
 	len = getpagesize() * 2;
 	memset(mappings, 0, sizeof(*mappings));
-	/*
-	 * Note: requesting a 2 page mapping might fill a gap between existing
-	 * mappings so the next 4 pages might not be available.
-	 * To work around this, we allocate 6 pages first, unmap them and then
-	 * allocate all mappings with MAP_FIXED.
-	 */
-	requested_addr = CHERIBSDTEST_CHECK_SYSCALL(
-	    mmap(0, len * 3, PROT_READ | PROT_WRITE, MAP_ANON, -1, 0));
-	CHERIBSDTEST_CHECK_SYSCALL(munmap(requested_addr, len * 3));
-	/* Reset requested_addr to a NULL-derived capability for MAP_FIXED. */
-	requested_addr = (void *)(uintcap_t)cheri_getaddress(requested_addr);
+	requested_addr = (void *)(uintcap_t)reserve_address_space(len * 3);
 	mappings->first = CHERIBSDTEST_CHECK_SYSCALL(mmap(requested_addr, len,
 	    PROT_READ | PROT_WRITE, MAP_ANON | MAP_FIXED, -1, 0));
 	CHERIBSDTEST_VERIFY(cheri_gettag(mappings->first));
@@ -277,8 +285,11 @@ create_adjacent_mappings_shm(struct adjacent_mappings *mappings)
 	int shmid;
 
 	len = getpagesize() * 2;
+	memset(mappings, 0, sizeof(*mappings));
 	shmid = CHERIBSDTEST_CHECK_SYSCALL(shmget(IPC_PRIVATE, len, 0600));
-	mappings->first = CHERIBSDTEST_CHECK_SYSCALL(shmat(shmid, NULL, 0));
+	requested_addr = (void *)(uintcap_t)reserve_address_space(len * 3);
+	mappings->first = CHERIBSDTEST_CHECK_SYSCALL(shmat(shmid,
+	    requested_addr, 0));
 	CHERIBSDTEST_VERIFY(cheri_gettag(mappings->first));
 	/* Try to create a mapping immediately following the latest one. */
 	requested_addr =
