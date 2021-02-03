@@ -396,7 +396,7 @@
 
 #define	GET_ABS_CAPTABLE_PTR(dst, tmp)					\
 	ABSRELOC_LA(tmp, _CHERI_CAPABILITY_TABLE_);			\
-	cgetpccsetaddr dst, tmp
+	cgetpccincoffset dst, tmp
 
 #define	CAPTABLE_LOAD(dst, tableptr, sym)		\
 	clcbi dst, %captab20(sym)(tableptr)

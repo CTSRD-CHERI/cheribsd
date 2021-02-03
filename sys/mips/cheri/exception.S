@@ -1,6 +1,7 @@
 /*	$OpenBSD: locore.S,v 1.18 1998/09/15 10:58:53 pefo Exp $	*/
 /*-
  * Copyright (c) 2016 Robert N. M. Watson
+ * Copyright (c) 2018 Alfredo Mazzinghi
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -76,9 +77,6 @@
  *	JNPR: exception.S,v 1.5 2007/01/08 04:58:37 katta
  * $FreeBSD$
  */
-
-/* XXX-AM add CTSRD license header? Do we keep the old header? */
-
 
 /*
  * Pure capability kernel exception handling routines.
@@ -212,7 +210,7 @@ LEAF(MipsDoTLBMiss)
 	csetkr1c	CHERI_REG_KSCRATCH
 	bltz		k0, 1f				#02: k0<0 -> 1f (kernel fault)
 	LONG_SRL	k0, k0, SEGSHIFT - PTRSHIFT	#03: k0=seg offset (almost)
-	/* __CHERI_PURE_CAPABILITY__ - assumes __mips64 and ! MIPS64_NEW_PMAP */
+	/* __CHERI_PURE_CAPABILITY__ - assumes __mips64 */
 	GET_CPU_PCPU_2(CHERI_REG_KSCRATCH, k1)
 	clc		CHERI_REG_KSCRATCH, zero, PC_SEGBASE(CHERI_REG_KSCRATCH)
 	cbez		CHERI_REG_KSCRATCH, 2f			# == NULL no segbase
@@ -873,7 +871,7 @@ END(MipsUserGenException)
 	.set	noat
 NESTED(mips_wait, CALLFRAME_SIZ, ra)
 	cincoffset	CHERI_REG_STC, CHERI_REG_STC, -CALLFRAME_SIZ
-	csc	$c17, zero, CALLFRAME_RA(CHERI_REG_STC)
+	csc	$c17, zero, CALLFRAME_CRA(CHERI_REG_STC)
 
 	mfc0	t0, MIPS_COP_0_STATUS
 	xori	t1, t0, MIPS_SR_INT_IE
@@ -882,7 +880,7 @@ NESTED(mips_wait, CALLFRAME_SIZ, ra)
 	CAPCALL_PCREL_LOAD($c12, t0, sched_runnable)
 	cjalr	$c12, $c17
 	nop
-	clc	$c17, zero, CALLFRAME_RA(CHERI_REG_STC)
+	clc	$c17, zero, CALLFRAME_CRA(CHERI_REG_STC)
 
 	mfc0	t0, MIPS_COP_0_STATUS
 	ori	t1, t0, MIPS_SR_INT_IE
@@ -1284,7 +1282,7 @@ LEAF_NOPROFILE(MipsTLBInvalidException)
 	cbez		CHERI_REG_KSCRATCH, 3f
 	nop
 
-	/* Assumes __mips_n64 and ! defined(MIPS64_NEW_PMAP) */
+	/* Assumes __mips_n64 */
 
 	MFC0		k0, MIPS_COP_0_BAD_VADDR
 	LONG_SRL	k0, PDRSHIFT - PTRSHIFT		# k0=pde offset (almost)
@@ -1426,7 +1424,7 @@ END(MipsTLBInvalidException)
  */
 LEAF_NOPROFILE(MipsTLBMissException)
 	.set	noat
-	/* assumes __mips64 and ! MIPS64_NEW_PMAP */
+	/* assumes __mips64 */
 	MFC0		k0, MIPS_COP_0_BAD_VADDR	# k0=bad address
 	/**
 	 * XXX-AM: It would be nice if we could stop using VM_MAX/MIN_KERNEL_ADDRESS
