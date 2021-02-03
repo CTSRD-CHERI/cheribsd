@@ -2208,7 +2208,7 @@ vm_map_find(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 	    vm_size_t length, vm_offset_t max_addr, int find_space,
 	    vm_prot_t prot, vm_prot_t max, int cow)
 {
-	vm_offset_t alignment, curr_min_addr, min_addr;
+	vm_offset_t alignment, curr_min_addr, min_addr, vaddr;
 	int gap, pidx, rv, try;
 	bool cluster, en_aslr, update_anon;
 
@@ -2231,7 +2231,7 @@ vm_map_find(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 	    find_space != VMFS_NO_SPACE && object == NULL &&
 	    (cow & (MAP_INHERIT_SHARE | MAP_STACK_GROWS_UP |
 	    MAP_STACK_GROWS_DOWN)) == 0 && prot != PROT_NONE;
-	curr_min_addr = min_addr = *addr;
+	curr_min_addr = min_addr = vaddr = *addr;
 	if (en_aslr && min_addr == 0 && !cluster &&
 	    find_space != VMFS_NO_SPACE &&
 	    (map->flags & MAP_ASLR_IGNSTART) != 0)
@@ -2290,19 +2290,19 @@ again:
 			gap = vm_map_max(map) > MAP_32BIT_MAX_ADDR &&
 			    (max_addr == 0 || max_addr > MAP_32BIT_MAX_ADDR) ?
 			    aslr_pages_rnd_64[pidx] : aslr_pages_rnd_32[pidx];
-			*addr = vm_map_findspace(map, curr_min_addr,
+			vaddr = vm_map_findspace(map, curr_min_addr,
 			    length + gap * pagesizes[pidx]);
-			if (*addr + length + gap * pagesizes[pidx] >
+			if (vaddr + length + gap * pagesizes[pidx] >
 			    vm_map_max(map))
 				goto again;
 			/* And randomize the start address. */
-			*addr += (arc4random() % gap) * pagesizes[pidx];
-			if (max_addr != 0 && *addr + length > max_addr)
+			vaddr += (arc4random() % gap) * pagesizes[pidx];
+			if (max_addr != 0 && vaddr + length > max_addr)
 				goto again;
 		} else {
-			*addr = vm_map_findspace(map, curr_min_addr, length);
-			if (*addr + length > vm_map_max(map) ||
-			    (max_addr != 0 && *addr + length > max_addr)) {
+			vaddr = vm_map_findspace(map, curr_min_addr, length);
+			if (vaddr + length > vm_map_max(map) ||
+			    (max_addr != 0 && vaddr + length > max_addr)) {
 				if (cluster) {
 					cluster = false;
 					MPASS(try == 1);
@@ -2314,7 +2314,7 @@ again:
 		}
 
 		if (find_space != VMFS_ANY_SPACE &&
-		    (rv = vm_map_alignspace(map, object, offset, addr, length,
+		    (rv = vm_map_alignspace(map, object, offset, &vaddr, length,
 		    max_addr, alignment)) != KERN_SUCCESS) {
 			if (find_space == VMFS_OPTIMAL_SPACE) {
 				find_space = VMFS_ANY_SPACE;
@@ -2326,25 +2326,28 @@ again:
 			goto done;
 		}
 	} else if ((cow & MAP_REMAP) != 0) {
-		if (!vm_map_range_valid(map, *addr, *addr + length)) {
+		if (!vm_map_range_valid(map, vaddr, vaddr + length)) {
 			rv = KERN_INVALID_ADDRESS;
 			goto done;
 		}
-		rv = vm_map_delete(map, *addr, *addr + length);
+		rv = vm_map_delete(map, vaddr, vaddr + length);
 		if (rv != KERN_SUCCESS)
 			goto done;
 	}
 	if ((cow & (MAP_STACK_GROWS_DOWN | MAP_STACK_GROWS_UP)) != 0) {
-		rv = vm_map_stack_locked(map, *addr, length, sgrowsiz, prot,
+		rv = vm_map_stack_locked(map, vaddr, length, sgrowsiz, prot,
 		    max, cow);
 	} else {
-		rv = vm_map_insert(map, object, offset, *addr, *addr + length,
-		    prot, max, cow, *addr);
+		rv = vm_map_insert(map, object, offset, vaddr, vaddr + length,
+		    prot, max, cow, vaddr);
 	}
 	if (rv == KERN_SUCCESS && update_anon)
-		map->anon_loc = *addr + length;
+		map->anon_loc = vaddr + length;
 done:
 	vm_map_unlock(map);
+	if (rv == KERN_SUCCESS) {
+		*addr = vaddr;
+	}
 	return (rv);
 }
 
