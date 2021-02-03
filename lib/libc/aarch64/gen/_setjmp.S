@@ -37,7 +37,7 @@ __FBSDID("$FreeBSD$");
 ENTRY(_setjmp)
 	/* Store the magic value and stack pointer */
 	ldr	x8, .Lmagic
-	mov	REG(9), sp
+	mov	REG(9), REGN(sp)
 	stp	REG(8), REG(9), [REG(0)], #(REG_WIDTH * 2)
 
 	/* Store the general purpose registers and lr */
@@ -46,7 +46,7 @@ ENTRY(_setjmp)
 	stp	REG(23), REG(24), [REG(0)], #(REG_WIDTH * 2)
 	stp	REG(25), REG(26), [REG(0)], #(REG_WIDTH * 2)
 	stp	REG(27), REG(28), [REG(0)], #(REG_WIDTH * 2)
-	stp	REG(29), lr, [REG(0)], #(REG_WIDTH * 2)
+	stp	REG(29), REGN(lr), [REG(0)], #(REG_WIDTH * 2)
 
 #ifndef _STANDALONE
 	/* Store the vfp registers */
@@ -73,7 +73,7 @@ ENTRY(_longjmp)
 
 	/* Restore the stack pointer */
 	ldr	REG(8), [REG(0)], #(REG_WIDTH)
-	mov	sp, REG(8)
+	mov	REGN(sp), REG(8)
 
 	/* Restore the general purpose registers and lr */
 	ldp	REG(19), REG(20), [REG(0)], #(REG_WIDTH * 2)
@@ -81,7 +81,7 @@ ENTRY(_longjmp)
 	ldp	REG(23), REG(24), [REG(0)], #(REG_WIDTH * 2)
 	ldp	REG(25), REG(26), [REG(0)], #(REG_WIDTH * 2)
 	ldp	REG(27), REG(28), [REG(0)], #(REG_WIDTH * 2)
-	ldp	REG(29), lr, [REG(0)], #(REG_WIDTH * 2)
+	ldp	REG(29), REGN(lr), [REG(0)], #(REG_WIDTH * 2)
 
 #ifndef _STANDALONE
 	/* Restore the vfp registers */

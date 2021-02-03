@@ -35,8 +35,8 @@ __FBSDID("$FreeBSD$");
 #include <machine/setjmp.h>
 
 ENTRY(setjmp)
-	sub	sp, sp, #(REG_WIDTH * 2)
-	stp	REG(0), lr, [sp]
+	sub	REGN(sp), REGN(sp), #(REG_WIDTH * 2)
+	stp	REG(0), REGN(lr), [REGN(sp)]
 
 	/* Store the signal mask */
 	add	REG(2), REG(0), #(_JB_SIGMASK * REG_WIDTH)	/* oset */
@@ -44,12 +44,12 @@ ENTRY(setjmp)
 	mov	x0, #1				/* SIG_BLOCK */
 	bl	sigprocmask
 
-	ldp	REG(0), lr, [sp]
-	add	sp, sp, #(REG_WIDTH * 2)
+	ldp	REG(0), REGN(lr), [REGN(sp)]
+	add	REGN(sp), REGN(sp), #(REG_WIDTH * 2)
 
 	/* Store the magic value and stack pointer */
 	ldr	x8, .Lmagic
-	mov	REG(9), sp
+	mov	REG(9), REGN(sp)
 	stp	REG(8), REG(9), [REG(0)], #(REG_WIDTH * 2)
 
 	/* Store the general purpose registers and lr */
@@ -58,7 +58,7 @@ ENTRY(setjmp)
 	stp	REG(23), REG(24), [REG(0)], #(REG_WIDTH * 2)
 	stp	REG(25), REG(26), [REG(0)], #(REG_WIDTH * 2)
 	stp	REG(27), REG(28), [REG(0)], #(REG_WIDTH * 2)
-	stp	REG(29), lr, [REG(0)], #(REG_WIDTH * 2)
+	stp	REG(29), REGN(lr), [REG(0)], #(REG_WIDTH * 2)
 
 	/* Store the vfp registers */
 	stp	d8, d9, [REG(0)], #16
@@ -75,9 +75,9 @@ ENTRY(setjmp)
 END(setjmp)
 
 ENTRY(longjmp)
-	sub	sp, sp, #(REG_WIDTH * 4)
-	stp	REG(0), lr, [sp]
-	str	REG(1), [sp, #(REG_WIDTH * 2)]
+	sub	REGN(sp), REGN(sp), #(REG_WIDTH * 4)
+	stp	REG(0), REGN(lr), [REGN(sp)]
+	str	REG(1), [REGN(sp), #(REG_WIDTH * 2)]
 
 	/* Restore the signal mask */
 	mov	x2, #0				/* oset */
@@ -85,9 +85,9 @@ ENTRY(longjmp)
 	mov	x0, #3				/* SIG_SETMASK */
 	bl	sigprocmask
 
-	ldr	REG(1), [sp, #(REG_WIDTH * 2)]
-	ldp	REG(0), lr, [sp]
-	add	sp, sp, #(REG_WIDTH * 4)
+	ldr	REG(1), [REGN(sp), #(REG_WIDTH * 2)]
+	ldp	REG(0), REGN(lr), [REGN(sp)]
+	add	REGN(sp), REGN(sp), #(REG_WIDTH * 4)
 
 	/* Check the magic value */
 	ldr	REG(8), [REG(0)], #(REG_WIDTH)
@@ -97,7 +97,7 @@ ENTRY(longjmp)
 
 	/* Restore the stack pointer */
 	ldr	REG(8), [REG(0)], #(REG_WIDTH)
-	mov	sp, REG(8)
+	mov	REGN(sp), REG(8)
 
 	/* Restore the general purpose registers and lr */
 	ldp	REG(19), REG(20), [REG(0)], #(REG_WIDTH * 2)
@@ -105,7 +105,7 @@ ENTRY(longjmp)
 	ldp	REG(23), REG(24), [REG(0)], #(REG_WIDTH * 2)
 	ldp	REG(25), REG(26), [REG(0)], #(REG_WIDTH * 2)
 	ldp	REG(27), REG(28), [REG(0)], #(REG_WIDTH * 2)
-	ldp	REG(29), lr, [REG(0)], #(REG_WIDTH * 2)
+	ldp	REG(29), REGN(lr), [REG(0)], #(REG_WIDTH * 2)
 
 	/* Restore the vfp registers */
 	ldp	d8, d9, [REG(0)], #16
