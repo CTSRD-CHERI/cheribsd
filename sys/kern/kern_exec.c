@@ -1062,6 +1062,7 @@ exec_new_vmspace(struct image_params *imgp, struct sysentvec *sv)
 	vm_offset_t sv_minuser, stack_addr;
 #if __has_feature(capabilities)
 	vm_offset_t strings_addr;
+        register_t perms;
 #endif
 	vm_map_t map;
 	u_long ssiz;
@@ -1181,8 +1182,10 @@ exec_new_vmspace(struct image_params *imgp, struct sysentvec *sv)
 	if (error != KERN_SUCCESS)
 		return (vm_mmap_to_errno(error));
 #if __has_feature(capabilities)
-        imgp->stack = cheri_capability_build_user_data(
-	    CHERI_CAP_USER_DATA_PERMS, stack_addr, ssiz, ssiz);
+	perms = ~MAP_CAP_PERM_MASK | vm_map_prot2perms(stack_prot);
+	imgp->stack = cheri_capability_build_user_data(
+	    perms & CHERI_CAP_USER_DATA_PERMS, stack_addr, ssiz, ssiz);
+#endif
 
 	if (sv->sv_flags & SV_CHERI) {
 		/*

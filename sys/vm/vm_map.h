@@ -156,6 +156,13 @@ struct vm_map_entry {
 
 #define	MAP_ENTRY_SPLIT_BOUNDARY_SHIFT	20
 
+/*
+ * Mask for all the capability permission bits that are mapped to vm_prot_t.
+ */
+#define	MAP_CAP_PERM_MASK					\
+	(CHERI_PERM_LOAD | CHERI_PERM_STORE | CHERI_PERM_EXECUTE |	\
+	 CHERI_PERM_LOAD_CAP | CHERI_PERM_STORE_CAP |			\
+	 CHERI_PERM_STORE_LOCAL_CAP)
 
 #ifdef	_KERNEL
 static __inline u_char
@@ -384,7 +391,6 @@ long vmspace_resident_count(struct vmspace *vmspace);
 #define	MAP_CREATE_STACK_GAP_DN	0x00020000
 #define	MAP_VN_EXEC		0x00040000
 /* Gap for MAP_ENTRY_SPLIT_BOUNDARY_MASK */
-#define MAP_CREATE_UNMAPPED	0x00200000
 
 #define	MAP_SPLIT_BOUNDARY_MASK	0x00180000
 
@@ -472,7 +478,7 @@ vm_map_entry_read_succ(void *token, struct vm_map_entry *const clone,
 
 #ifdef _KERNEL
 boolean_t vm_map_check_protection (vm_map_t, vm_offset_t, vm_offset_t, vm_prot_t);
-int vm_map_delete(vm_map_t, vm_offset_t, vm_offset_t);
+int vm_map_delete(vm_map_t, vm_offset_t, vm_offset_t, bool);
 int vm_map_find(vm_map_t, vm_object_t, vm_ooffset_t, vm_offset_t *, vm_size_t,
     vm_offset_t, int, vm_prot_t, vm_prot_t, int);
 int vm_map_find_min(vm_map_t, vm_object_t, vm_ooffset_t, vm_offset_t *,
@@ -482,6 +488,8 @@ int vm_map_find_aligned(vm_map_t map, vm_offset_t *addr, vm_size_t length,
 int vm_map_fixed(vm_map_t, vm_object_t, vm_ooffset_t, vm_offset_t, vm_size_t,
     vm_prot_t, vm_prot_t, int);
 vm_offset_t vm_map_findspace(vm_map_t, vm_offset_t, vm_size_t);
+int vm_map_alignspace(vm_map_t, vm_object_t, vm_ooffset_t,
+    vm_offset_t *, vm_size_t, vm_offset_t, vm_offset_t);
 int vm_map_inherit (vm_map_t, vm_offset_t, vm_offset_t, vm_inherit_t);
 void vm_map_init(vm_map_t, pmap_t, vm_offset_t, vm_offset_t);
 int vm_map_insert (vm_map_t, vm_object_t, vm_ooffset_t, vm_offset_t,
@@ -494,6 +502,14 @@ void vm_map_lookup_done (vm_map_t, vm_map_entry_t);
 boolean_t vm_map_lookup_entry (vm_map_t, vm_offset_t, vm_map_entry_t *);
 bool vm_map_reservation_is_unmapped(vm_map_t, vm_offset_t);
 int vm_map_reservation_delete(vm_map_t, vm_offset_t);
+int vm_map_reservation_delete_locked(vm_map_t, vm_offset_t);
+int vm_map_reservation_create(vm_map_t, vm_pointer_t *, vm_size_t, vm_offset_t,
+    vm_prot_t);
+int vm_map_reservation_create_locked(vm_map_t, vm_pointer_t *, vm_size_t, vm_prot_t);
+#if __has_feature(capabilities)
+int vm_map_prot2perms(vm_prot_t prot);
+#endif
+#define	vm_map_buildcap(map, addr, length, prot) (addr)
 
 static inline vm_map_entry_t
 vm_map_entry_first(vm_map_t map)
@@ -522,7 +538,9 @@ vm_map_entry_succ(vm_map_entry_t entry)
 	    (it) = vm_map_entry_succ(it))
 int vm_map_protect (vm_map_t, vm_offset_t, vm_offset_t, vm_prot_t, boolean_t,
     boolean_t);
+int vm_map_remove_locked(vm_map_t, vm_offset_t, vm_offset_t);
 int vm_map_remove (vm_map_t, vm_offset_t, vm_offset_t);
+int vm_map_clear(vm_map_t);
 void vm_map_try_merge_entries(vm_map_t map, vm_map_entry_t prev,
     vm_map_entry_t entry);
 void vm_map_startup (void);

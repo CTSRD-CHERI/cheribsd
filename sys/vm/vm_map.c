@@ -86,6 +86,11 @@ __FBSDID("$FreeBSD$");
 #include <sys/sysent.h>
 #include <sys/shm.h>
 
+#include <cheri/cheric.h>
+#if __has_feature(capabilities)
+#include <cheri/cheri.h>
+#endif
+
 #include <vm/vm.h>
 #include <vm/vm_param.h>
 #include <vm/pmap.h>
@@ -147,6 +152,13 @@ static int vm_map_stack_locked(vm_map_t map, vm_offset_t addrbos,
     int cow);
 static void vm_map_wire_entry_failure(vm_map_t map, vm_map_entry_t entry,
     vm_offset_t failed_addr);
+static void vm_map_reservation_init_entry(vm_map_entry_t entry);
+static vm_map_entry_t vm_map_reservation_insert(vm_map_t map, vm_offset_t addr,
+    vm_size_t length, vm_prot_t max, vm_offset_t reservation);
+static int vm_map_clip_end(vm_map_t map, vm_map_entry_t entry,
+    vm_offset_t end);
+static int vm_map_clip_start(vm_map_t map, vm_map_entry_t entry,
+    vm_offset_t start);
 
 #define	ENTRY_CHARGED(e) ((e)->cred != NULL || \
     ((e)->object.vm_object != NULL && (e)->object.vm_object->cred != NULL && \
@@ -419,8 +431,7 @@ vmspace_dofree(struct vmspace *vm)
 	 * Delete all of the mappings and pages they hold, then call
 	 * the pmap module to reclaim anything left.
 	 */
-	(void)vm_map_remove(&vm->vm_map, vm_map_min(&vm->vm_map),
-	    vm_map_max(&vm->vm_map));
+	(void)vm_map_clear(&vm->vm_map);
 
 	pmap_release(vmspace_pmap(vm));
 	vm->vm_map.pmap = NULL;
@@ -1726,19 +1737,30 @@ vm_map_insert(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 	if (start == end || !vm_map_range_valid(map, start, end))
 		return (KERN_INVALID_ADDRESS);
 
-	/*
-	 * Find the entry prior to the proposed starting address; if it's part
-	 * of an existing entry, this range is bogus.
-	 */
-	if (vm_map_lookup_entry(map, start, &prev_entry))
-		return (KERN_NO_SPACE);
+	if (map->flags & MAP_RESERVATIONS) {
+		/* Make sure we fit into a single reservation entry. */
+		if (vm_map_lookup_entry(map, start, &new_entry) == 0 ||
+		    new_entry->reservation != reservation)
+			return (KERN_PROTECTION_FAILURE);
+		if ((new_entry->eflags & MAP_ENTRY_UNMAPPED) == 0 ||
+		    new_entry->end < end)
+			return (KERN_NO_SPACE);
+		/* XXX-AM: TODO Check maxprot consistency with the reserved entry */
+	} else {
+		/*
+		 * Find the entry prior to the proposed starting address; if it's part
+		 * of an existing entry, this range is bogus.
+		 */
+		if (vm_map_lookup_entry(map, start, &prev_entry))
+			return (KERN_NO_SPACE);
 
-	/*
-	 * Assert that the next entry doesn't overlap the end point.
-	 */
-	next_entry = vm_map_entry_succ(prev_entry);
-	if (next_entry->start < end)
-		return (KERN_NO_SPACE);
+		/*
+		 * Assert that the next entry doesn't overlap the end point.
+		 */
+		next_entry = vm_map_entry_succ(prev_entry);
+		if (next_entry->start < end)
+			return (KERN_NO_SPACE);
+	}
 
 	if ((cow & MAP_CREATE_GUARD) != 0 && (object != NULL ||
 	    max != VM_PROT_NONE))
@@ -1763,8 +1785,6 @@ vm_map_insert(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 		protoeflags |= MAP_ENTRY_VN_EXEC;
 	if ((cow & MAP_CREATE_GUARD) != 0)
 		protoeflags |= MAP_ENTRY_GUARD;
-	if ((cow & MAP_CREATE_UNMAPPED) != 0)
-		protoeflags |= MAP_ENTRY_UNMAPPED;
 	if ((cow & MAP_CREATE_STACK_GAP_DN) != 0)
 		protoeflags |= MAP_ENTRY_STACK_GAP_DN;
 	if ((cow & MAP_CREATE_STACK_GAP_UP) != 0)
@@ -1803,6 +1823,15 @@ charged:
 	/* Expand the kernel pmap, if necessary. */
 	if (map == kernel_map && end > kernel_vm_end)
 		pmap_growkernel(end);
+
+	/* Cut a hole in the reservation entry if needed */
+	if (map->flags & MAP_RESERVATIONS) {
+		vm_map_clip_start(map, new_entry, start);
+		prev_entry = vm_map_entry_pred(new_entry);
+		vm_map_clip_end(map, new_entry, end);
+		next_entry = vm_map_entry_succ(new_entry);
+	}
+
 	if (object != NULL) {
 		/*
 		 * OBJ_ONEMAPPING must be cleared unless this mapping
@@ -1872,13 +1901,15 @@ charged:
 	if (cred != NULL)
 		crhold(cred);
 
-	/*
-	 * Create a new entry
-	 */
-	new_entry = vm_map_entry_create(map);
-	new_entry->start = start;
-	new_entry->end = end;
-	new_entry->reservation = reservation;
+	if ((map->flags & MAP_RESERVATIONS) == 0) {
+		/*
+		 * Create a new entry
+		 */
+		new_entry = vm_map_entry_create(map);
+		new_entry->start = start;
+		new_entry->end = end;
+		new_entry->reservation = reservation;
+	}
 	new_entry->cred = NULL;
 
 	new_entry->eflags = protoeflags;
@@ -1900,11 +1931,18 @@ charged:
 	/*
 	 * Insert the new entry into the list
 	 */
-	vm_map_entry_link(map, new_entry);
+	if ((map->flags & MAP_RESERVATIONS) == 0)
+		vm_map_entry_link(map, new_entry);
+
 	if ((new_entry->eflags & (MAP_ENTRY_GUARD | MAP_ENTRY_UNMAPPED)) == 0)
 		map->size += new_entry->end - new_entry->start;
 
 	vm_map_log("insert", new_entry);
+
+	/*
+	 * XXX-AM: this is probably useless with reservations
+	 *  as we split the reservation above
+	 */
 
 	/*
 	 * Try to coalesce the new entry with both the previous and next
@@ -2037,8 +2075,8 @@ vm_map_fixed(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
     vm_offset_t start, vm_size_t length, vm_prot_t prot,
     vm_prot_t max, int cow)
 {
-	vm_map_entry_t entry;
-	vm_offset_t end, reservation;
+	vm_map_entry_t entry, next_entry;
+	vm_pointer_t end, reservation;
 	int result;
 
 	end = start + length;
@@ -2047,29 +2085,44 @@ vm_map_fixed(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 	    ("vm_map_fixed: non-NULL backing object for stack"));
 	vm_map_lock(map);
 	VM_MAP_RANGE_CHECK(map, start, end);
-	reservation = start;
-	if ((cow & MAP_CHECK_EXCL) == 0) {
-		if ((map->flags & MAP_RESERVATIONS) != 0) {
-			if (vm_map_lookup_entry(map, start, &entry))
-				reservation = entry->reservation;
-			else
-				entry = vm_map_entry_succ(entry);
 
-			/*
-			 * Prevent mappings that span reservations
-			 * or are already unmapped.
-			 */
-			while ((entry->eflags & MAP_ENTRY_HEADER) == 0 &&
-			    entry->end <= end) {
+	/*
+	 * Ensure that there is a single reservation spanning the requested
+	 * range. If mapping exclusively, check that no other mapping exists
+	 * unless it is marked as unmapped, then punch a hole in
+	 * the existing reservation.
+	 */
+	if ((map->flags & MAP_RESERVATIONS) != 0) {
+		if (vm_map_lookup_entry(map, start, &entry)) {
+			reservation = entry->reservation;
+			while (entry->end < end) {
+				next_entry = vm_map_entry_succ(entry);
 				if (entry->reservation != reservation ||
-				    ((entry->eflags & MAP_UNMAPPED) != 0)) {
+				    next_entry->start > end) {
 					result = KERN_NO_SPACE;
 					goto out;
 				}
-				entry = vm_map_entry_succ(entry);
+				entry = next_entry;
 			}
 		}
-		result = vm_map_delete(map, start, end);
+		else {
+			result = KERN_MEM_PROT_FAILURE;
+			goto out;
+		}
+	}
+	if ((cow & MAP_CHECK_EXCL) == 0) {
+		/*
+		 * If mapping exclusively with reservations, we know that
+		 * the reservation space is already checked above,
+		 * vm_map_insert will check the UNMAPPED state.
+		 * If mapping not exclusively with reservation, we want
+		 * to remove any extra mapping returning it to the
+		 * reservation: vm_map_delete keep_reservation=true
+		 * handles that.
+		 * If reservations are disabled vm_map_delete will
+		 * always delete the mapping.
+		 */
+		result = vm_map_delete(map, start, end, true);
 		if (result != KERN_SUCCESS)
 			goto out;
 	}
@@ -2114,6 +2167,8 @@ SYSCTL_LONG(_vm, OID_AUTO, aslr_restarts, CTLFLAG_RD,
     "Number of aslr failures");
 
 /*
+ * [Internal use only]
+ *
  * Searches for the specified amount of free space in the given map with the
  * specified alignment.  Performs an address-ordered, first-fit search from
  * the given address "*addr", with an optional upper bound "max_addr".  If the
@@ -2125,7 +2180,7 @@ SYSCTL_LONG(_vm, OID_AUTO, aslr_restarts, CTLFLAG_RD,
  * The map must be locked.  Initially, there must be at least "length" bytes
  * of free space at the given address.
  */
-static int
+int
 vm_map_alignspace(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
     vm_offset_t *addr, vm_size_t length, vm_offset_t max_addr,
     vm_offset_t alignment)
@@ -2136,7 +2191,7 @@ vm_map_alignspace(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 	free_addr = *addr;
 	KASSERT(free_addr == vm_map_findspace(map, free_addr, length),
 	    ("caller failed to provide space %#jx at address %p",
-	     (uintmax_t)length, (void *)free_addr));
+	     (uintmax_t)length, (void *)(uintptr_t)free_addr));
 	for (;;) {
 		/*
 		 * At the start of every iteration, the free space at address
@@ -2211,6 +2266,8 @@ vm_map_find(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 	vm_offset_t alignment, curr_min_addr, min_addr, vaddr;
 	int gap, pidx, rv, try;
 	bool cluster, en_aslr, update_anon;
+	vm_pointer_t reservation;
+	const vm_size_t unpadded_length = length;
 
 	KASSERT((cow & (MAP_STACK_GROWS_DOWN | MAP_STACK_GROWS_UP)) == 0 ||
 	    object == NULL,
@@ -2225,6 +2282,15 @@ vm_map_find(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 		alignment = (vm_offset_t)1 << (find_space >> 8);
 	} else
 		alignment = 0;
+
+#if __has_feature(capabilities)
+	if ((map->flags & MAP_RESERVATIONS) != 0) {
+		length = CHERI_REPRESENTABLE_LENGTH(length);
+		alignment = MAX(alignment,
+		    CHERI_REPRESENTABLE_ALIGNMENT(length));
+	}
+#endif
+
 	en_aslr = (map->flags & MAP_ASLR) != 0;
 	update_anon = cluster = clustering_anon_allowed(*addr) &&
 	    (map->flags & MAP_IS_SUB_MAP) == 0 && max_addr == 0 &&
@@ -2312,8 +2378,11 @@ again:
 				goto done;
 			}
 		}
-
-		if (find_space != VMFS_ANY_SPACE &&
+		/*
+		 * When find_space != ANY_SPACE or we have promoted
+		 * CHERI alignment.
+		 */
+		if (alignment != 0 &&
 		    (rv = vm_map_alignspace(map, object, offset, &vaddr, length,
 		    max_addr, alignment)) != KERN_SUCCESS) {
 			if (find_space == VMFS_OPTIMAL_SPACE) {
@@ -2330,23 +2399,42 @@ again:
 			rv = KERN_INVALID_ADDRESS;
 			goto done;
 		}
-		rv = vm_map_delete(map, vaddr, vaddr + length);
+		rv = vm_map_delete(map, vaddr, vaddr + length, true);
 		if (rv != KERN_SUCCESS)
 			goto done;
 	}
+
+	reservation = vaddr;
+	rv = vm_map_reservation_create_locked(map, &reservation,
+	    length, max);
+	if (rv != KERN_SUCCESS)
+		goto done;
+
+	/*
+	 * The guard mapping must have PROT_NONE maxprot but the capability we
+	 * allocate for it must comply with the requested maxprot so that
+	 * it can be used to remap over the guard pages.
+	 */
+	if (cow & MAP_CREATE_GUARD)
+		prot = max = VM_PROT_NONE;
+
 	if ((cow & (MAP_STACK_GROWS_DOWN | MAP_STACK_GROWS_UP)) != 0) {
-		rv = vm_map_stack_locked(map, vaddr, length, sgrowsiz, prot,
-		    max, cow);
+		rv = vm_map_stack_locked(map, reservation, unpadded_length,
+		    sgrowsiz, prot, max, cow);
 	} else {
-		rv = vm_map_insert(map, object, offset, vaddr, vaddr + length,
-		    prot, max, cow, vaddr);
+		rv = vm_map_insert(map, object, offset, reservation,
+		    reservation + unpadded_length, prot, max, cow, reservation);
+	}
+	if (rv != KERN_SUCCESS) {
+		vm_map_reservation_delete_locked(map, reservation);
+		goto done;
 	}
 	if (rv == KERN_SUCCESS && update_anon)
-		map->anon_loc = vaddr + length;
+		map->anon_loc = reservation + length;
 done:
 	vm_map_unlock(map);
 	if (rv == KERN_SUCCESS) {
-		*addr = vaddr;
+		*addr = reservation;
 	}
 	return (rv);
 }
@@ -2685,9 +2773,8 @@ vm_map_submap(
 	vm_map_t submap)
 {
 	vm_map_entry_t entry;
-	int result;
+	int result = KERN_INVALID_ARGUMENT;
 
-	result = KERN_INVALID_ARGUMENT;
 
 	vm_map_lock(submap);
 	submap->flags |= MAP_IS_SUB_MAP;
@@ -4146,10 +4233,13 @@ vm_map_entry_delete(vm_map_t map, vm_map_entry_t entry)
  *	vm_map_delete:	[ internal use only ]
  *
  *	Deallocates the given address range from the target
- *	map.
+ *	map. If the map is using reservations and keep_reservation is set,
+ *	the deleted entries are all downgraded to unmapped and coalesced.
+ *	It is assumed that the range spans a single reservation only.
  */
 int
-vm_map_delete(vm_map_t map, vm_offset_t start, vm_offset_t end)
+vm_map_delete(vm_map_t map, vm_offset_t start, vm_offset_t end,
+    bool keep_reservation)
 {
 	vm_map_entry_t entry, next_entry, scratch_entry;
 	int rv;
@@ -4231,9 +4321,49 @@ vm_map_delete(vm_map_t map, vm_offset_t start, vm_offset_t end)
 		 * will be set in the wrong object!)
 		 */
 		vm_map_log("remove", entry);
-		vm_map_entry_delete(map, entry);
+		if ((map->flags & MAP_RESERVATIONS) != 0 && keep_reservation) {
+			if ((entry->eflags & MAP_ENTRY_UNMAPPED) == 0) {
+				if ((entry->eflags & MAP_ENTRY_GUARD) == 0)
+					map->size -= (entry->end - entry->start);
+				vm_map_reservation_init_entry(entry);
+			}
+			/* Attempt to consolidate the mapping anyway? */
+			vm_map_try_merge_entries(map, scratch_entry, entry);
+		} else {
+			vm_map_entry_delete(map, entry);
+		}
 	}
 	return (rv);
+}
+
+int
+vm_map_remove_locked(vm_map_t map, vm_offset_t start, vm_offset_t end)
+{
+	int result;
+	vm_offset_t reservation = 0;
+	vm_map_entry_t entry;
+
+	VM_MAP_ASSERT_LOCKED(map);
+
+	if ((map->flags & MAP_RESERVATIONS) != 0 &&
+	    vm_map_lookup_entry(map, start, &entry)) {
+		reservation = entry->reservation;
+		/* Check that the removal request spans a single reservation */
+		while (entry->end < end) {
+			if (reservation != entry->reservation)
+				return (KERN_PROTECTION_FAILURE);
+			KASSERT((entry->eflags & MAP_ENTRY_UNMAPPED) == 0,
+			    ("Attempting to remove unmapped reservation entry "
+			    "start:%lx end:%lx", entry->start, entry->end));
+			entry = vm_map_entry_succ(entry);
+		}
+	}
+
+	result = vm_map_delete(map, start, end, true);
+	if (vm_map_reservation_is_unmapped(map, reservation))
+		vm_map_reservation_delete_locked(map, reservation);
+
+	return (result);
 }
 
 /*
@@ -4249,8 +4379,25 @@ vm_map_remove(vm_map_t map, vm_offset_t start, vm_offset_t end)
 
 	vm_map_lock(map);
 	VM_MAP_RANGE_CHECK(map, start, end);
-	result = vm_map_delete(map, start, end);
+	result = vm_map_remove_locked(map, start, end);
 	vm_map_unlock(map);
+	return (result);
+}
+
+/*
+ *	vm_map_clear:
+ *
+ *	Wipe clean a vm_map from all entries and reservations.
+ */
+int
+vm_map_clear(vm_map_t map)
+{
+	int result;
+
+	vm_map_lock(map);
+	result = vm_map_delete(map, vm_map_min(map), vm_map_max(map), false);
+	vm_map_unlock(map);
+
 	return (result);
 }
 
@@ -4773,15 +4920,24 @@ vm_map_stack_locked(vm_map_t map, vm_offset_t addrbos, vm_size_t max_ssize,
 	if (max_ssize < init_ssize + sgp)
 		init_ssize = max_ssize - sgp;
 
-	/* If addr is already mapped, no go */
-	if (vm_map_lookup_entry(map, addrbos, &prev_entry))
-		return (KERN_NO_SPACE);
-
-	/*
-	 * If we can't accommodate max_ssize in the current mapping, no go.
-	 */
-	if (vm_map_entry_succ(prev_entry)->start < addrbos + max_ssize)
-		return (KERN_NO_SPACE);
+	if (map->flags & MAP_RESERVATIONS) {
+		/* Check reservation exists */
+		if (vm_map_lookup_entry(map, addrbos, &prev_entry) == 0 ||
+		    (prev_entry->eflags & MAP_ENTRY_UNMAPPED) == 0)
+			return (KERN_PROTECTION_FAILURE);
+		/* If reservation can't accommodate max_ssize, no go. */
+		if (prev_entry->end - (vm_offset_t)addrbos < max_ssize)
+			return (KERN_NO_SPACE);
+	} else {
+		/* If addr is already mapped, no go */
+		if (vm_map_lookup_entry(map, addrbos, &prev_entry))
+			return (KERN_NO_SPACE);
+		/*
+		 * If we can't accommodate max_ssize in the current mapping, no go.
+		 */
+		if (vm_map_entry_succ(prev_entry)->start < addrbos + max_ssize)
+			return (KERN_NO_SPACE);
+	}
 
 	/*
 	 * We initially map a stack of only init_ssize.  We will grow as
@@ -4807,7 +4963,10 @@ vm_map_stack_locked(vm_map_t map, vm_offset_t addrbos, vm_size_t max_ssize,
 	rv = vm_map_insert(map, NULL, 0, bot, top, prot, max, cow, addrbos);
 	if (rv != KERN_SUCCESS)
 		return (rv);
-	new_entry = vm_map_entry_succ(prev_entry);
+	if (map->flags & MAP_RESERVATIONS)
+		vm_map_lookup_entry(map, bot, &new_entry);
+	else
+		new_entry = vm_map_entry_succ(prev_entry);
 	KASSERT(new_entry->end == top || new_entry->start == bot,
 	    ("Bad entry start/end for new stack entry"));
 	KASSERT((orient & MAP_STACK_GROWS_DOWN) == 0 ||
@@ -4833,7 +4992,7 @@ vm_map_stack_locked(vm_map_t map, vm_offset_t addrbos, vm_size_t max_ssize,
 		else
 			vm_map_entry_succ(new_entry)->next_read = sgp;
 	} else {
-		(void)vm_map_delete(map, bot, top);
+		(void)vm_map_delete(map, bot, top, false);
 	}
 	return (rv);
 }
@@ -4845,7 +5004,7 @@ vm_map_stack_locked(vm_map_t map, vm_offset_t addrbos, vm_size_t max_ssize,
 static int
 vm_map_growstack(vm_map_t map, vm_offset_t addr, vm_map_entry_t gap_entry)
 {
-	vm_map_entry_t stack_entry;
+	vm_map_entry_t stack_entry, tmp_entry;
 	struct proc *p;
 	struct vmspace *vm;
 	struct ucred *cred;
@@ -4984,6 +5143,12 @@ retry:
 	}
 #endif
 
+	if ((map->flags & MAP_RESERVATIONS) != 0 &&
+	    gap_entry->reservation != stack_entry->reservation) {
+		rv = KERN_PROTECTION_FAILURE;
+		goto out;
+	}
+
 	if (vm_map_lock_upgrade(map)) {
 		gap_entry = NULL;
 		vm_map_lock_read(map);
@@ -5000,8 +5165,15 @@ retry:
 		} else {
 			MPASS(gap_entry->start < gap_entry->end - grow_amount);
 			vm_map_entry_resize(map, gap_entry, -grow_amount);
+			if (map->flags & MAP_RESERVATIONS) {
+				tmp_entry = vm_map_reservation_insert(map,
+				    stack_entry->start - grow_amount,
+				    grow_amount, stack_entry->max_protection,
+				    stack_entry->reservation);
+			}
 			gap_deleted = false;
 		}
+		/* XXX-AM: Would be nice to just grow the object as below */
 		rv = vm_map_insert(map, NULL, 0, grow_start,
 		    grow_start + grow_amount,
 		    stack_entry->protection, stack_entry->max_protection,
@@ -5450,19 +5622,194 @@ vm_map_range_valid_KBI(vm_map_t map, vm_offset_t start, vm_offset_t end)
 	return (vm_map_range_valid(map, start, end));
 }
 
+/*
+ *	Initialize reservation entry as UNMAPPED
+ */
+static void
+vm_map_reservation_init_entry(vm_map_entry_t new_entry)
+{
+	new_entry->cred = NULL;
+	new_entry->eflags = MAP_ENTRY_UNMAPPED;
+	new_entry->object.vm_object = NULL;
+	new_entry->offset = 0;
+	/* handle MAP_INHERIT_SHARE cow flag? */
+	new_entry->inheritance = VM_INHERIT_DEFAULT;
+	new_entry->protection = VM_PROT_NONE;
+	/* handle maxprot from caller? */
+	new_entry->max_protection = VM_PROT_NONE;
+	new_entry->wired_count = 0;
+	new_entry->wiring_thread = NULL;
+	new_entry->read_ahead = VM_FAULT_READ_AHEAD_INIT;
+}
+
+#if __has_feature(capabilities)
+/*
+ * Convert vm_prot_t to capability permission bits.
+ */
 int
-vm_map_reservation_delete(vm_map_t map, vm_offset_t reservation)
+vm_map_prot2perms(vm_prot_t prot)
+{
+	int perms = 0;
+
+	if (prot & (VM_PROT_READ | VM_PROT_COPY))
+		perms |= (CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP);
+	if (prot & VM_PROT_WRITE)
+		perms |= (CHERI_PERM_STORE | CHERI_PERM_STORE_CAP |
+		    CHERI_PERM_STORE_LOCAL_CAP);
+	if (prot & VM_PROT_EXECUTE)
+		perms |= CHERI_PERM_EXECUTE;
+
+	return (perms);
+}
+#endif /* has_feature(capabilities) */
+
+/*
+ * Create a reservation entry for the given address and reservation ID
+ * and add it to the map
+ */
+static vm_map_entry_t
+vm_map_reservation_insert(vm_map_t map, vm_offset_t addr, vm_size_t length,
+    vm_prot_t max, vm_offset_t reservation)
+{
+	vm_map_entry_t new_entry;
+
+	VM_MAP_ASSERT_LOCKED(map);
+
+	new_entry = vm_map_entry_create(map);
+	vm_map_reservation_init_entry(new_entry);
+	new_entry->start = addr;
+	new_entry->end = addr + length;
+	new_entry->reservation = reservation;
+	new_entry->next_read = addr;
+	new_entry->max_protection = max;
+	vm_map_entry_link(map, new_entry);
+	vm_map_log("reserve", new_entry);
+
+	return (new_entry);
+}
+
+/*
+ * Create a reservation from the hinted address [internal use only]
+ * and return a capability for it.
+ *
+ * The hinted address must be aligned for representability and the
+ * length must be representable.
+ */
+int
+vm_map_reservation_create_locked(vm_map_t map, vm_pointer_t *addr,
+    vm_size_t length, vm_prot_t max_prot)
+{
+	vm_offset_t start = *addr;
+	vm_offset_t end = start + length;
+	vm_map_entry_t entry;
+
+	VM_MAP_ASSERT_LOCKED(map);
+
+	if ((map->flags & MAP_RESERVATIONS) == 0) {
+		*addr = vm_map_buildcap(map, start, length, max_prot);
+		return (KERN_SUCCESS);
+	}
+
+	KASSERT(is_aligned(*addr, CHERI_REPRESENTABLE_ALIGNMENT(length)),
+	    ("Reservation base is not representable %p", (void *)*addr));
+	KASSERT(length == CHERI_REPRESENTABLE_LENGTH(length),
+	    ("Reservation length is not representable %lx", length));
+
+	/* Check that the start and end points are not bogus. */
+	if (start < vm_map_min(map) || end > vm_map_max(map) ||
+	    start >= end)
+		return (KERN_INVALID_ADDRESS);
+
+	/* Verify that we are not trampling over another reservation/mapping */
+	if (vm_map_lookup_entry(map, start, &entry))
+		return (KERN_NO_SPACE);
+	entry = vm_map_entry_succ(entry);
+	if (entry->start < end)
+		return (KERN_NO_SPACE);
+
+	vm_map_reservation_insert(map, start, length, max_prot, start);
+	CTR3(KTR_VM, "%s: reserve %lx-%lx", __func__, start, end);
+
+	*addr = vm_map_buildcap(map, start, length, max_prot);
+
+	return (KERN_SUCCESS);
+}
+
+/*
+ * Create a reservation for a chunk of address space in the given map
+ * and return a capability for it.
+ *
+ * The size and alignment of the hinted address will be adjusted to
+ * ensure CHERI exact representability.
+ */
+int
+vm_map_reservation_create(vm_map_t map, vm_pointer_t *addr, vm_size_t length,
+    vm_offset_t alignment, vm_prot_t max_prot)
+{
+	int result;
+	vm_size_t padded_length = CHERI_REPRESENTABLE_LENGTH(length);
+	vm_pointer_t start = *addr;
+
+	if ((map->flags & MAP_RESERVATIONS) == 0) {
+		*addr = vm_map_buildcap(map, start, length, max_prot);
+		return (KERN_SUCCESS);
+	}
+
+	alignment = MAX(alignment, CHERI_REPRESENTABLE_ALIGNMENT(length));
+	start = rounddown2(start, alignment);
+
+	vm_map_lock(map);
+	/*
+	 * Adjust start to make sure we are within the mapping,
+	 * only allow adjusting if start is in the first page.
+	 */
+	if (start < vm_map_min(map) && vm_map_min(map) <= PAGE_SIZE)
+		start = vm_map_min(map);
+	result = vm_map_reservation_create_locked(map, &start, padded_length,
+	    max_prot);
+	vm_map_unlock(map);
+
+	if (result == KERN_SUCCESS)
+		*addr = start;
+	return (result);
+}
+
+int
+vm_map_reservation_delete_locked(vm_map_t map, vm_offset_t reservation)
 {
 	vm_map_entry_t	entry, next_entry;
 
+	VM_MAP_ASSERT_LOCKED(map);
+
+	if ((map->flags & MAP_RESERVATIONS) == 0)
+		return (KERN_SUCCESS);
+
 	if (!vm_map_lookup_entry(map, reservation, &entry))
 		return (KERN_FAILURE);
+
+	KASSERT(entry->reservation == reservation,
+	    ("Reservation mismatch requested %lx found %lx",
+		 reservation, entry->reservation));
 
 	while (entry->reservation == reservation) {
 		next_entry = vm_map_entry_succ(entry);
 		vm_map_entry_delete(map, entry);
 		entry = next_entry;
 	}
+	CTR2(KTR_VM, "%s: reservation %lx", __func__, reservation);
+
+	return (KERN_SUCCESS);
+}
+
+int
+vm_map_reservation_delete(vm_map_t map, vm_offset_t reservation)
+{
+	int result;
+
+	vm_map_lock(map);
+	result = vm_map_reservation_delete_locked(map, reservation);
+	vm_map_unlock(map);
+
 	return (KERN_SUCCESS);
 }
 
