@@ -30,13 +30,13 @@ __FBSDID("$FreeBSD$");
 
 ENTRY(cerror)
 	.hidden	cerror
-	sub	sp, sp, #(REG_WIDTH * 2)
-	stp	REG(0), lr, [sp]
+	sub	REGN(sp), REGN(sp), #(REG_WIDTH * 2)
+	stp	REG(0), REGN(lr), [REGN(sp)]
 	bl	_C_LABEL(__error)
-	ldp	REG(1), lr, [sp]
+	ldp	REG(1), REGN(lr), [REGN(sp)]
 	str	w1, [REG(0)]
 	movn	x0, #0
 	movn	x1, #0
-	add	sp, sp, #(REG_WIDTH * 2)
+	add	REGN(sp), REGN(sp), #(REG_WIDTH * 2)
 	ret
 END(cerror)
