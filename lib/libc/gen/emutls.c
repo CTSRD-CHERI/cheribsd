@@ -83,7 +83,7 @@ static pthread_key_t emutls_pthread_key;
 static void *emutls_specific = NULL; /* Used in the unthreaded case */
 #endif
 
-static _Atomic size_t emutls_next_index = 2;
+static _Atomic size_t emutls_next_index = 1;
 
 #ifdef EMUTLS_LIBC
 static void *
