@@ -269,7 +269,7 @@ test_coping(uintmax_t num, uintmax_t int_arg, const char *path)
 
 	benchmark_start();
 	BENCHMARK_FOREACH(i, num) {
-		error = cocall(lookedup, buf, int_arg);
+		error = cocall(lookedup, buf, int_arg, buf, int_arg);
 		if (error != 0)
 			err(1, "cocall");
 	}

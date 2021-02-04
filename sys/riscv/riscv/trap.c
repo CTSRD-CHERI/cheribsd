@@ -558,12 +558,12 @@ do_trap_user(struct trapframe *frame)
 }
 
 void
-db_print_cap(struct thread *td, const char *name, void * __capability value)
+db_print_cap(struct thread *td, const char *name, const void * __capability value)
 {
 	pid_t pid;
-	void * __capability tmp;
+	const void * __capability tmp;
 
-	tmp = (void * __capability)value;
+	tmp = (const void * __capability)value;
 	pid = vm_get_cap_owner(td, (uintcap_t)value);
 
 	if (pid >= 0) {

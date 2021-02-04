@@ -1724,13 +1724,17 @@ struct utimensat_args {
 };
 struct cocall_slow_args {
 	char target_l_[PADL_(void * __capability __capability)]; void * __capability __capability target; char target_r_[PADR_(void * __capability __capability)];
-	char buf_l_[PADL_(void * __capability __capability)]; void * __capability __capability buf; char buf_r_[PADR_(void * __capability __capability)];
-	char len_l_[PADL_(size_t)]; size_t len; char len_r_[PADR_(size_t)];
+	char outbuf_l_[PADL_(const void * __capability __capability)]; const void * __capability __capability outbuf; char outbuf_r_[PADR_(const void * __capability __capability)];
+	char outlen_l_[PADL_(size_t)]; size_t outlen; char outlen_r_[PADR_(size_t)];
+	char inbuf_l_[PADL_(void * __capability __capability)]; void * __capability __capability inbuf; char inbuf_r_[PADR_(void * __capability __capability)];
+	char inlen_l_[PADL_(size_t)]; size_t inlen; char inlen_r_[PADR_(size_t)];
 };
 struct coaccept_slow_args {
 	char cookiep_l_[PADL_(void * __capability __capability * __capability)]; void * __capability __capability * __capability cookiep; char cookiep_r_[PADR_(void * __capability __capability * __capability)];
-	char buf_l_[PADL_(void * __capability __capability)]; void * __capability __capability buf; char buf_r_[PADR_(void * __capability __capability)];
-	char len_l_[PADL_(size_t)]; size_t len; char len_r_[PADR_(size_t)];
+	char outbuf_l_[PADL_(const void * __capability __capability)]; const void * __capability __capability outbuf; char outbuf_r_[PADR_(const void * __capability __capability)];
+	char outlen_l_[PADL_(size_t)]; size_t outlen; char outlen_r_[PADR_(size_t)];
+	char inbuf_l_[PADL_(void * __capability __capability)]; void * __capability __capability inbuf; char inbuf_r_[PADR_(void * __capability __capability)];
+	char inlen_l_[PADL_(size_t)]; size_t inlen; char inlen_r_[PADR_(size_t)];
 };
 struct fdatasync_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];

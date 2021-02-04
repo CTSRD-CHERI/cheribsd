@@ -136,7 +136,7 @@ call(void)
 	for (i = 0; i < 2; i++) {
 		fprintf(stderr, "%s: calling %p, buf %p, we are thread %d...\n",
 		    __func__, (__cheri_fromcap void *)lookedup, buf, pthread_getthreadid_np());
-		error = cocall(lookedup, buf, sizeof(buf));
+		error = cocall(lookedup, buf, sizeof(buf), buf, sizeof(buf));
 		if (error != 0)
 			fprintf(stderr, "%s: cocall: %s\n", __func__, strerror(errno));
 		fprintf(stderr, "%s: done, we are thread %d, buf %p contains %d\n",
@@ -167,7 +167,7 @@ service_proc(void *dummy __unused)
 	fprintf(stderr, "%s: buf %p, we are thread %d, accepting...\n",
 	    __func__, buf, pthread_getthreadid_np());
 	for (;;) {
-		error = coaccept(&cookie, buf, sizeof(buf));
+		error = coaccept(&cookie, buf, sizeof(buf), buf, sizeof(buf));
 		if (error != 0)
 			fprintf(stderr, "%s: coaccept: %s\n", __func__, strerror(errno));
 		error = cogetpid(&pid);

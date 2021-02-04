@@ -3188,18 +3188,22 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 548: {
 		struct cocall_slow_args *p = params;
 		uarg[0] = (intptr_t) p->target; /* void * __capability __capability */
-		uarg[1] = (intptr_t) p->buf; /* void * __capability __capability */
-		uarg[2] = p->len; /* size_t */
-		*n_args = 3;
+		uarg[1] = (intptr_t) p->outbuf; /* const void * __capability __capability */
+		uarg[2] = p->outlen; /* size_t */
+		uarg[3] = (intptr_t) p->inbuf; /* void * __capability __capability */
+		uarg[4] = p->inlen; /* size_t */
+		*n_args = 5;
 		break;
 	}
 	/* coaccept_slow */
 	case 549: {
 		struct coaccept_slow_args *p = params;
 		uarg[0] = (intptr_t) p->cookiep; /* void * __capability __capability * __capability */
-		uarg[1] = (intptr_t) p->buf; /* void * __capability __capability */
-		uarg[2] = p->len; /* size_t */
-		*n_args = 3;
+		uarg[1] = (intptr_t) p->outbuf; /* const void * __capability __capability */
+		uarg[2] = p->outlen; /* size_t */
+		uarg[3] = (intptr_t) p->inbuf; /* void * __capability __capability */
+		uarg[4] = p->inlen; /* size_t */
+		*n_args = 5;
 		break;
 	}
 	/* fdatasync */
@@ -8751,9 +8755,15 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "userland void * __capability __capability";
 			break;
 		case 1:
-			p = "userland void * __capability __capability";
+			p = "userland const void * __capability __capability";
 			break;
 		case 2:
+			p = "size_t";
+			break;
+		case 3:
+			p = "userland void * __capability __capability";
+			break;
+		case 4:
 			p = "size_t";
 			break;
 		default:
@@ -8767,9 +8777,15 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "userland void * __capability __capability * __capability";
 			break;
 		case 1:
-			p = "userland void * __capability __capability";
+			p = "userland const void * __capability __capability";
 			break;
 		case 2:
+			p = "size_t";
+			break;
+		case 3:
+			p = "userland void * __capability __capability";
+			break;
+		case 4:
 			p = "size_t";
 			break;
 		default:

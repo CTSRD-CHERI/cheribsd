@@ -38,8 +38,10 @@ __FBSDID("$FreeBSD$");
 
 int
 coaccept(void * __capability * __capability cookiep,
-    void * __capability buf, size_t len)
+    const void * __capability outbuf, size_t outlen,
+    void * __capability inbuf, size_t inlen)
 {
 
-	return (_coaccept(_coaccept_code, _coaccept_data, cookiep, buf, len));
+	return (_coaccept(_coaccept_code, _coaccept_data, cookiep,
+	    outbuf, outlen, inbuf, inlen));
 }

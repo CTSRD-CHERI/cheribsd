@@ -37,8 +37,11 @@ __FBSDID("$FreeBSD$");
 #include "un-namespace.h"
 
 int
-cocall(void * __capability target, void * __capability buf, size_t len)
+cocall(void * __capability target,
+    const void * __capability outbuf, size_t outlen,
+    void * __capability inbuf, size_t inlen)
 {
 
-	return (_cocall(_cocall_code, _cocall_data, target, buf, len));
+	return (_cocall(_cocall_code, _cocall_data, target,
+	    outbuf, outlen, inbuf, inlen));
 }

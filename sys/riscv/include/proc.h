@@ -84,12 +84,22 @@ struct switchercb {
 	/*
 	 * XXX
 	 */
-	void * __capability			scb_buf;
+	const void * __capability		scb_outbuf;
 
 	/*
 	 * XXX
 	 */
-	size_t					scb_buflen;
+	size_t					scb_outlen;
+
+	/*
+	 * XXX
+	 */
+	void * __capability			scb_inbuf;
+
+	/*
+	 * XXX
+	 */
+	size_t					scb_inlen;
 
 	/*
 	 * XXX

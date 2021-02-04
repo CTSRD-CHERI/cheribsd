@@ -43,8 +43,6 @@ __FBSDID("$FreeBSD$");
 #include <stdlib.h>
 #include <unistd.h>
 
-static long long buf[1];
-
 static void
 usage(void)
 {
@@ -58,6 +56,7 @@ main(int argc, char **argv)
 {
 	void * __capability *lookedup;
 	char *tmp;
+	long long in, out;
 	float dt = 1.0;
 	bool kflag = false, vflag = false;
 	int count = 0, ch, error, i = 0, c = 0;
@@ -121,24 +120,26 @@ main(int argc, char **argv)
 			setvbuf(stdout, NULL, _IONBF, 0);
 	}
 
-	buf[0] = 0;
 	c = 0;
+	in = out = 0;
 
 	for (;;) {
 		if (vflag)
 			fprintf(stderr, "%s: cocalling \"%s\"...\n", getprogname(), argv[c]);
 
 		if (kflag)
-			error = cocall_slow(lookedup[c], buf, sizeof(buf));
+			error = cocall_slow(lookedup[c], &out, sizeof(out), &in, sizeof(in));
 		else
-			error = cocall(lookedup[c], buf, sizeof(buf));
+			error = cocall(lookedup[c], &out, sizeof(out), &in, sizeof(in));
 		if (error != 0)
 			warn("cocall");
 
 		if (vflag)
-			printf("%s: returned from \"%s\", pid %d, buf[0] is %lld\n", getprogname(), argv[c], getpid(), buf[0]);
+			printf("%s: returned from \"%s\", pid %d, out: %lld, in: %lld\n", getprogname(), argv[c], getpid(), out, in);
 		else
 			printf(".");
+
+		out = in;
 
 		c++;
 		if (c == argc)

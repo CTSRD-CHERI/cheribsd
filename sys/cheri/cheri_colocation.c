@@ -153,7 +153,7 @@ colocation_fetch_scb(struct thread *td, struct switchercb *scbp)
 }
 
 static void
-colocation_copyout_scb_atcap(void * __capability cap, struct switchercb *scbp)
+colocation_copyout_scb_atcap(void * __capability cap, const struct switchercb *scbp)
 {
 	int error;
 
@@ -165,7 +165,7 @@ colocation_copyout_scb_atcap(void * __capability cap, struct switchercb *scbp)
 }
 
 static void
-colocation_copyout_scb_at(void *addr, struct switchercb *scbp)
+colocation_copyout_scb_at(void *addr, const struct switchercb *scbp)
 {
 
 	return (colocation_copyout_scb_atcap(
@@ -791,26 +791,44 @@ kern_copark(struct thread *td)
 
 int
 kern_cocall_slow(void * __capability target,
-    void * __capability buf, size_t len)
+    const void * __capability outbuf, size_t outlen,
+    void * __capability inbuf, size_t inlen)
 {
 	struct switchercb scb, calleescb;
 	struct thread *calleetd;
 	int error;
 	bool have_scb;
 
-	if (buf == NULL) {
-		if (len != 0) {
-			COLOCATION_DEBUG("buf == NULL, but len != 0, returning EINVAL");
+	if (outbuf == NULL) {
+		if (outlen != 0) {
+			COLOCATION_DEBUG("outbuf == NULL, but outlen != 0, returning EINVAL");
 			return (EINVAL);
 		}
 	} else {
-		if (len == 0) {
-			COLOCATION_DEBUG("buf != NULL, but len == 0, returning EINVAL");
+		if (outlen == 0) {
+			COLOCATION_DEBUG("outbuf != NULL, but outlen == 0, returning EINVAL");
 			return (EINVAL);
 		}
 
-		if (len > MAXBSIZE) {
-			COLOCATION_DEBUG("len %zd > %d, returning EMSGSIZE", len, MAXBSIZE);
+		if (outlen > MAXBSIZE) {
+			COLOCATION_DEBUG("outlen %zd > %d, returning EMSGSIZE", outlen, MAXBSIZE);
+			return (EMSGSIZE);
+		}
+	}
+
+	if (inbuf == NULL) {
+		if (inlen != 0) {
+			COLOCATION_DEBUG("inbuf == NULL, but inlen != 0, returning EINVAL");
+			return (EINVAL);
+		}
+	} else {
+		if (inlen == 0) {
+			COLOCATION_DEBUG("inbuf != NULL, but inlen == 0, returning EINVAL");
+			return (EINVAL);
+		}
+
+		if (inlen > MAXBSIZE) {
+			COLOCATION_DEBUG("inlen %zd > %d, returning EMSGSIZE", inlen, MAXBSIZE);
 			return (EMSGSIZE);
 		}
 	}
@@ -884,8 +902,10 @@ again:
 	colocation_copyout_scb_atcap(target, &calleescb);
 
 	scb.scb_callee_scb = target;
-	scb.scb_buf = buf;
-	scb.scb_buflen = len;
+	scb.scb_outbuf = outbuf;
+	scb.scb_outlen = outlen;
+	scb.scb_inbuf = inbuf;
+	scb.scb_inlen = inlen;
 	/*
 	 * We don't need atomics here; nobody else could have modified
 	 * our (caller's) SCB.
@@ -940,7 +960,8 @@ int
 sys_cocall_slow(struct thread *td, struct cocall_slow_args *uap)
 {
 
-	return (kern_cocall_slow(uap->target, uap->buf, uap->len));
+	return (kern_cocall_slow(uap->target,
+	    uap->outbuf, uap->outlen, uap->inbuf, uap->inlen));
 }
 
 static int
@@ -976,7 +997,8 @@ out:
 
 int
 kern_coaccept_slow(void * __capability * __capability cookiep,
-    void * __capability buf, size_t len)
+    const void * __capability outbuf, size_t outlen,
+    void * __capability inbuf, size_t inlen)
 {
 	struct switchercb scb, callerscb;
 	void * __capability cookie;
@@ -986,19 +1008,36 @@ kern_coaccept_slow(void * __capability * __capability cookiep,
 
 	md = &curthread->td_md;
 
-	if (buf == NULL) {
-		if (len != 0) {
-			COLOCATION_DEBUG("buf != NULL, but len != 0, returning EINVAL");
+	if (outbuf == NULL) {
+		if (outlen != 0) {
+			COLOCATION_DEBUG("outbuf != NULL, but outlen != 0, returning EINVAL");
 			return (EINVAL);
 		}
 	} else {
-		if (len == 0) {
-			COLOCATION_DEBUG("buf != NULL, but len == 0, returning EINVAL");
+		if (outlen == 0) {
+			COLOCATION_DEBUG("outbuf != NULL, but outlen == 0, returning EINVAL");
 			return (EINVAL);
 		}
 
-		if (len > MAXBSIZE) {
-			COLOCATION_DEBUG("len %zd > %d, returning EMSGSIZE", len, MAXBSIZE);
+		if (outlen > MAXBSIZE) {
+			COLOCATION_DEBUG("outlen %zd > %d, returning EMSGSIZE", outlen, MAXBSIZE);
+			return (EMSGSIZE);
+		}
+	}
+
+	if (inbuf == NULL) {
+		if (inlen != 0) {
+			COLOCATION_DEBUG("inbuf != NULL, but inlen != 0, returning EINVAL");
+			return (EINVAL);
+		}
+	} else {
+		if (inlen == 0) {
+			COLOCATION_DEBUG("inbuf != NULL, but inlen == 0, returning EINVAL");
+			return (EINVAL);
+		}
+
+		if (inlen > MAXBSIZE) {
+			COLOCATION_DEBUG("inlen %zd > %d, returning EMSGSIZE", inlen, MAXBSIZE);
 			return (EMSGSIZE);
 		}
 	}
@@ -1034,8 +1073,8 @@ kern_coaccept_slow(void * __capability * __capability cookiep,
 		/*
 		 * Move data from callee to caller.
 		 */
-		error = copyinout(buf, callerscb.scb_buf,
-		    MIN(len, callerscb.scb_buflen), false);
+		error = copyinout(outbuf, callerscb.scb_inbuf,
+		    MIN(outlen, callerscb.scb_inlen), false);
 		callermd = &callerscb.scb_td->td_md;
 		if (error != 0) {
 			COLOCATION_DEBUG("copyinout error %d, waking up %p",
@@ -1077,8 +1116,8 @@ again:
 	/*
 	 * Move data from caller to callee.
 	 */
-	error = copyinout(callerscb.scb_buf, buf,
-	    MIN(len, callerscb.scb_buflen), true);
+	error = copyinout(callerscb.scb_outbuf, inbuf,
+	    MIN(inlen, callerscb.scb_outlen), true);
 	if (error != 0) {
 		COLOCATION_DEBUG("copyinout error %d", error);
 		wakeupself();
@@ -1105,7 +1144,8 @@ int
 sys_coaccept_slow(struct thread *td, struct coaccept_slow_args *uap)
 {
 
-	return (kern_coaccept_slow(uap->cookiep, uap->buf, uap->len));
+	return (kern_coaccept_slow(uap->cookiep,
+	    uap->outbuf, uap->outlen, uap->inbuf, uap->inlen));
 }
 
 #ifdef DDB
@@ -1129,14 +1169,16 @@ db_print_scb(struct thread *td, struct switchercb *scb)
 	db_print_cap(td, "    scb_cra (c13):     ", scb->scb_cra);
 	db_print_cap(td, "    scb_buf (c6):      ", scb->scb_buf);
 	db_printf(       "    scb_buflen (a0):   %zd\n", scb->scb_buflen);
-	db_print_cap(td, "    scb_cookiep:       ", scb->scb_cookiep);
 #else
 	db_print_cap(td, "    scb_csp:           ", scb->scb_csp);
 	db_print_cap(td, "    scb_cra:           ", scb->scb_cra);
 	db_print_cap(td, "    scb_cookiep (ca2): ", scb->scb_cookiep);
-	db_print_cap(td, "    scb_buf (ca3):     ", scb->scb_buf);
-	db_printf(       "    scb_buflen (a4):   %zd\n", scb->scb_buflen);
+	db_print_cap(td, "    scb_outbuf (ca3):  ", scb->scb_outbuf);
+	db_printf(       "    scb_outlen (a4):   %zd\n", scb->scb_outlen);
+	db_print_cap(td, "    scb_inbuf (ca5):   ", scb->scb_inbuf);
+	db_printf(       "    scb_inlen (a6):    %zd\n", scb->scb_inlen);
 #endif
+	db_print_cap(td, "    scb_cookiep:       ", scb->scb_cookiep);
 }
 
 void

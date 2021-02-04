@@ -59,9 +59,11 @@
  * scb_unsealcap:	3*CHERICAP_SIZE(idc)
  * scb_csp:		4*CHERICAP_SIZE(idc)
  * scb_cra:		5*CHERICAP_SIZE(idc)
- * scb_buf (ca3):	6*CHERICAP_SIZE(idc)
- * scb_buflen (a4):	7*CHERICAP_SIZE(idc)
- * scb_cookiep (ca2):	8*CHERICAP_SIZE(idc)
+ * scb_outbuf (ca3):	6*CHERICAP_SIZE(idc)
+ * scb_outlen (a4):	7*CHERICAP_SIZE(idc)
+ * scb_inbuf (ca3):	8*CHERICAP_SIZE(idc)
+ * scb_inlen (a4):	9*CHERICAP_SIZE(idc)
+ * scb_cookiep (ca2):	10*CHERICAP_SIZE(idc)
  */
 
 .text
@@ -84,8 +86,10 @@ _C_LABEL(switcher_coaccept):
 	/*
 	 * Save the data transfer args.
 	 */
-	csc	ca3, SCB_BUF(idc)
-	csd	a4, SCB_BUFLEN(idc)
+	csc	ca3, SCB_OUTBUF(idc)
+	csd	a4, SCB_OUTLEN(idc)
+	csc	ca5, SCB_INBUF(idc)
+	csd	a6, SCB_INLEN(idc)
 
 	/*
 	 * Load the capability to the caller's control block.
@@ -130,8 +134,8 @@ _C_LABEL(switcher_coaccept):
 	 * is doing - it transfers the data there and back, both
 	 * sides.
 	 */
-	clc	ct4, SCB_BUF(ct0)
-	cld	t5, SCB_BUFLEN(ct0)
+	clc	ct4, SCB_INBUF(ct0)
+	cld	t5, SCB_INLEN(ct0)
 
 	/*
 	 * Compare buffer sizes, put the smaller one into t5.

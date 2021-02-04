@@ -143,9 +143,9 @@ main(int argc, char **argv)
 
 	for (;;) {
 		if (kflag)
-			error = coaccept_slow(&cookie, buf, sizeof(buf));
+			error = coaccept_slow(&cookie, buf, sizeof(buf), buf, sizeof(buf));
 		else
-			error = coaccept(&cookie, buf, sizeof(buf));
+			error = coaccept(&cookie, buf, sizeof(buf), buf, sizeof(buf));
 		if (error != 0)
 			warn("coaccept");
 		if (vflag) {
@@ -160,9 +160,9 @@ main(int argc, char **argv)
 				fprintf(stderr, "%s: %s: cocalling \"%s\"...\n",
 				    getprogname(), registered, argv[c]);
 			if (kflag)
-				error = cocall_slow(lookedup[c], buf, sizeof(buf));
+				error = cocall_slow(lookedup[c], buf, sizeof(buf), buf, sizeof(buf));
 			else
-				error = cocall(lookedup[c], buf, sizeof(buf));
+				error = cocall(lookedup[c], buf, sizeof(buf), buf, sizeof(buf));
 			if (error != 0)
 				warn("cocall");
 			if (vflag)
