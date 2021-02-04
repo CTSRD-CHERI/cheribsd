@@ -62,7 +62,7 @@
 	_val;								\
 })
 #define	WRITE_SPECIALREG(reg, _val)					\
-	__asm __volatile("msr	" __STRING(reg) ", %0" : : "r" ((uint64_t)_val))
+	__asm __volatile("msr	" __STRING(reg) ", %0" : : "r"((uint64_t)_val))
 
 #if __has_feature(capabilities)
 #define	READ_SPECIALREG_CAP(reg)					\
