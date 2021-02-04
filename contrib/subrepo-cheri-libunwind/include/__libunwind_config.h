@@ -66,8 +66,8 @@
 #   ifdef __SEH__
 #    error "aarch64 SEH not supported yet"
 #   endif
-#   define _LIBUNWIND_CONTEXT_SIZE 102
-#   define _LIBUNWIND_CURSOR_SIZE 126
+#   define _LIBUNWIND_CONTEXT_SIZE 100
+#   define _LIBUNWIND_CURSOR_SIZE 124
 #   define _LIBUNWIND_HIGHEST_DWARF_REGISTER _LIBUNWIND_HIGHEST_DWARF_REGISTER_ARM64_CHERI
 #  else
 #   define _LIBUNWIND_CONTEXT_SIZE 66
