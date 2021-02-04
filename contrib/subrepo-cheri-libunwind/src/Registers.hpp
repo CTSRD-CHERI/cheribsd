@@ -1836,10 +1836,6 @@ private:
     uintptr_t __lr;    // Link register x30
     uintptr_t __sp;    // Stack pointer x31
     uintptr_t __pc;    // Program counter
-#ifdef __CHERI_PURE_CAPABILITY__
-    uintcap_t __ddc;   // Default data capability
-#endif
-    // XXXBFG I think this is SPSR but it's skipped anyway
     uint64_t __ra_sign_state; // RA sign state register
   };
 
@@ -1855,7 +1851,10 @@ inline Registers_arm64::Registers_arm64(const void *registers) {
   static_assert((check_fit<Registers_arm64, unw_context_t>::does_fit),
                 "arm64 registers do not fit into unw_context_t");
   memcpy(&_registers, registers, sizeof(_registers));
-#ifndef __CHERI_PURE_CAPABILITY__
+#ifdef __CHERI_PURE_CAPABILITY__
+  static_assert(sizeof(GPRs) == 0x220,
+                "expected VFP registers to be at offset 544");
+#else
   static_assert(sizeof(GPRs) == 0x110,
                 "expected VFP registers to be at offset 272");
 #endif
@@ -1874,10 +1873,6 @@ inline bool Registers_arm64::validRegister(int regNum) const {
     return true;
   if (regNum == UNW_REG_SP)
     return true;
-#ifdef __CHERI_PURE_CAPABILITY__
-  if (regNum == UNW_ARM64_DDC)
-    return true;
-#endif
   if (regNum < 0)
     return false;
   if (regNum > 95)
@@ -1894,10 +1889,6 @@ inline uintptr_t Registers_arm64::getRegister(int regNum) const {
     return _registers.__pc;
   if (regNum == UNW_REG_SP)
     return _registers.__sp;
-#ifdef __CHERI_PURE_CAPABILITY__
-  if (regNum == UNW_ARM64_DDC)
-    return _registers.__ddc;
-#endif
   if (regNum == UNW_ARM64_RA_SIGN_STATE)
     return _registers.__ra_sign_state;
 #ifdef __CHERI_PURE_CAPABILITY__
@@ -1917,10 +1908,6 @@ inline void Registers_arm64::setRegister(int regNum, uintptr_t value) {
     _registers.__pc = value;
   else if (regNum == UNW_REG_SP)
     _registers.__sp = value;
-#ifdef __CHERI_PURE_CAPABILITY__
-  else if (regNum == UNW_ARM64_DDC)
-    _registers.__ddc = value;
-#endif
   else if (regNum == UNW_ARM64_RA_SIGN_STATE)
     _registers.__ra_sign_state = value;
 #ifdef __CHERI_PURE_CAPABILITY__
@@ -1941,8 +1928,6 @@ inline bool Registers_arm64::validCapabilityRegister(int regNum) const {
   if (regNum == UNW_REG_IP)
     return true;
   if (regNum == UNW_REG_SP)
-    return true;
-  if (regNum == UNW_ARM64_DDC)
     return true;
   if (regNum < 0)
     return false;
@@ -1968,10 +1953,6 @@ inline const char *Registers_arm64::getRegisterName(int regNum) {
     return "pc";
   case UNW_REG_SP:
     return "sp";
-#ifdef __CHERI_PURE_CAPABILITY__
-  case UNW_ARM64_DDC:
-    return "ddc";
-#endif
   case UNW_ARM64_X0:
     return "x0";
   case UNW_ARM64_X1:
