@@ -65,7 +65,6 @@ bzero(void *dst0, size_t length)
 void * __CAP
 __CAPSUFFIX(memset)(void * __CAP dst0, int c0, size_t length)
 #endif
-__attribute__((no_builtin))
 {
 	size_t t;
 #ifndef BZERO
