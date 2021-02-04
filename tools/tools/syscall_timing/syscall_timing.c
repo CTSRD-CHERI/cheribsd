@@ -276,6 +276,37 @@ test_coping(uintmax_t num, uintmax_t int_arg, const char *path)
 	benchmark_stop();
 	return (i);
 }
+
+static uintmax_t
+test_coping_slow(uintmax_t num, uintmax_t int_arg, const char *path)
+{
+	char buf[int_arg];
+	void * __capability lookedup;
+	uintmax_t i;
+	int error;
+
+	error = cosetup(COSETUP_COCALL);
+	if (error != 0)
+		err(1, "cosetup");
+
+	error = colookup(path, &lookedup);
+	if (error != 0) {
+		if (errno == ESRCH) {
+			warnx("received ESRCH; this usually means there's nothing coregistered for \"%s\"", path);
+			warnx("use coexec(1) to colocate; you might also find \"ps aux -o vmaddr\" useful");
+		}
+		err(1, "colookup");
+	}
+
+	benchmark_start();
+	BENCHMARK_FOREACH(i, num) {
+		error = cocall_slow(lookedup, buf, int_arg, buf, int_arg);
+		if (error != 0)
+			err(1, "cocall");
+	}
+	benchmark_stop();
+	return (i);
+}
 #endif
 
 static uintmax_t
@@ -1058,6 +1089,13 @@ static const struct test tests[] = {
 	{ "coping_80000", test_coping, .t_flags = FLAG_NAME, .t_int = 80000 },
 	{ "coping_800000", test_coping, .t_flags = FLAG_NAME, .t_int = 800000 },
 	{ "coping_8000000", test_coping, .t_flags = FLAG_NAME, .t_int = 8000000 },
+	{ "coping_slow_8", test_coping_slow, .t_flags = FLAG_NAME, .t_int = 8 },
+	{ "coping_slow_80", test_coping_slow, .t_flags = FLAG_NAME, .t_int = 80 },
+	{ "coping_slow_800", test_coping_slow, .t_flags = FLAG_NAME, .t_int = 800 },
+	{ "coping_slow_8000", test_coping_slow, .t_flags = FLAG_NAME, .t_int = 8000 },
+	{ "coping_slow_80000", test_coping_slow, .t_flags = FLAG_NAME, .t_int = 80000 },
+	{ "coping_slow_800000", test_coping_slow, .t_flags = FLAG_NAME, .t_int = 800000 },
+	{ "coping_slow_8000000", test_coping_slow, .t_flags = FLAG_NAME, .t_int = 8000000 },
 #endif
 	{ "create_unlink", test_create_unlink, .t_flags = FLAG_PATH },
 	{ "dup", test_dup, .t_flags = 0 },
