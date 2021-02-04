@@ -1900,8 +1900,15 @@ inline uintptr_t Registers_arm64::getRegister(int regNum) const {
 #endif
   if (regNum == UNW_ARM64_RA_SIGN_STATE)
     return _registers.__ra_sign_state;
+#ifdef __CHERI_PURE_CAPABILITY__
+  if ((regNum >= 0) && (regNum < 32))
+    return (uint64_t)_registers.__x[regNum];
+  if ((regNum >= UNW_ARM64_C0) && (regNum <= UNW_ARM64_C31))
+    return _registers.__x[regNum - UNW_ARM64_C0];
+#else
   if ((regNum >= 0) && (regNum < 32))
     return _registers.__x[regNum];
+#endif
   _LIBUNWIND_ABORT("unsupported arm64 register");
 }
 
@@ -1916,8 +1923,15 @@ inline void Registers_arm64::setRegister(int regNum, uintptr_t value) {
 #endif
   else if (regNum == UNW_ARM64_RA_SIGN_STATE)
     _registers.__ra_sign_state = value;
+#ifdef __CHERI_PURE_CAPABILITY__
+  if ((regNum >= 0) && (regNum < 32))
+    _registers.__x[regNum] = (uint64_t)value;
+  if ((regNum >= UNW_ARM64_C0) && (regNum <= UNW_ARM64_C31))
+    _registers.__x[regNum - UNW_ARM64_C0] = value;
+#else
   else if ((regNum >= 0) && (regNum < 32))
     _registers.__x[regNum] = value;
+#endif
   else
     _LIBUNWIND_ABORT("unsupported arm64 register");
 }
@@ -2086,6 +2100,72 @@ inline const char *Registers_arm64::getRegisterName(int regNum) {
     return "d30";
   case UNW_ARM64_D31:
     return "d31";
+#ifdef __CHERI_PURE_CAPABILITY__
+  case UNW_ARM64_C0:
+    return "c0";
+  case UNW_ARM64_C1:
+    return "c1";
+  case UNW_ARM64_C2:
+    return "c2";
+  case UNW_ARM64_C3:
+    return "c3";
+  case UNW_ARM64_C4:
+    return "c4";
+  case UNW_ARM64_C5:
+    return "c5";
+  case UNW_ARM64_C6:
+    return "c6";
+  case UNW_ARM64_C7:
+    return "c7";
+  case UNW_ARM64_C8:
+    return "c8";
+  case UNW_ARM64_C9:
+    return "c9";
+  case UNW_ARM64_C10:
+    return "c10";
+  case UNW_ARM64_C11:
+    return "c11";
+  case UNW_ARM64_C12:
+    return "c12";
+  case UNW_ARM64_C13:
+    return "c13";
+  case UNW_ARM64_C14:
+    return "c14";
+  case UNW_ARM64_C15:
+    return "c15";
+  case UNW_ARM64_C16:
+    return "c16";
+  case UNW_ARM64_C17:
+    return "c17";
+  case UNW_ARM64_C18:
+    return "c18";
+  case UNW_ARM64_C19:
+    return "c19";
+  case UNW_ARM64_C20:
+    return "c20";
+  case UNW_ARM64_C21:
+    return "c21";
+  case UNW_ARM64_C22:
+    return "c22";
+  case UNW_ARM64_C23:
+    return "c23";
+  case UNW_ARM64_C24:
+    return "c24";
+  case UNW_ARM64_C25:
+    return "c25";
+  case UNW_ARM64_C26:
+    return "c26";
+  case UNW_ARM64_C27:
+    return "c27";
+  case UNW_ARM64_C28:
+    return "c28";
+  case UNW_ARM64_C29:
+    return "cfp";
+  case UNW_ARM64_C30:
+    return "clr";
+  case UNW_ARM64_C31:
+    return "csp";
+#endif
   default:
     return "unknown register";
   }
