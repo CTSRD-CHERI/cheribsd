@@ -351,7 +351,8 @@ reswitch:	switch (ch = (u_char)*fmt++) {
 				/* We need to pass a pointer to the end here. */
 				char *cap_repr = __cheri_ptr_alt(cap,
 				    cap_buf + sizeof(cap_buf), hex2ascii_lower,
-				    dwidth);
+				    dwidth, sign == 1 ? va_arg(ap, int) :
+					cheri_gettag(cap));
 				while (cap_repr < cap_buf + sizeof(cap_buf))
 					PCHAR(*cap_repr++);
 				break;

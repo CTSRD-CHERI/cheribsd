@@ -303,7 +303,7 @@ __ujtoa(uintmax_t val, CHAR *endp, int base, int octzero, const char *xdigs)
 
 static CHAR *
 __cheri_ptr_alt(void * __capability pointer, CHAR *cp, const char *xdigs,
-    int precision)
+    int precision, int tag)
 {
 	uintmax_t ujval;
 	CHAR *scp;
@@ -317,19 +317,19 @@ __cheri_ptr_alt(void * __capability pointer, CHAR *cp, const char *xdigs,
 	/* tag and sealing */
 	switch (cheri_gettype(pointer)) {
 	case CHERI_OTYPE_UNSEALED:
-		if (cheri_gettag(pointer))
+		if (tag == 1)
 			p = NULL;
 		else
 			p = "(invalid)";
 		break;
 	case CHERI_OTYPE_SENTRY:
-		if (cheri_gettag(pointer))
+		if (tag == 1)
 			p = "(sentry)";
 		else
 			p = "(invalid,sentry)";
 		break;
 	default:
-		if (cheri_gettag(pointer))
+		if (tag == 1)
 			p = "(sealed)";
 		else
 			p = "(invalid,sealed)";

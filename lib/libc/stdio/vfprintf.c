@@ -875,8 +875,10 @@ fp_common:
 			if (flags & ALT) {
 				cp = buf + BUF;
 				cp = __cheri_ptr_alt(cap, cp, xdigs_lower,
-				    prec);
+				    prec, sign == '+' ? GETARG(int) :
+				    cheri_gettag(cap));
 				size = buf + BUF - cp;
+				sign = '\0';
 				flags &= ~ZEROPAD;
 				break;
 			}
