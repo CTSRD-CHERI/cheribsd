@@ -577,6 +577,7 @@ do_el0_sync(struct thread *td, struct trapframe *frame)
 	case EXCP_UNKNOWN:
 	case EXCP_DATA_ABORT_L:
 	case EXCP_DATA_ABORT:
+	case EXCP_WATCHPT_EL0:
 		far = READ_SPECIALREG(far_el1);
 		break;
 	}
@@ -635,6 +636,11 @@ do_el0_sync(struct thread *td, struct trapframe *frame)
 	case EXCP_BRK:
 		call_trapsignal(td, SIGTRAP, TRAP_BRKPT,
 		    (void * __capability)frame->tf_elr, exception);
+		userret(td, frame);
+		break;
+	case EXCP_WATCHPT_EL0:
+		call_trapsignal(td, SIGTRAP, TRAP_TRACE,
+		    (void * __capability)(uintcap_t)far, exception);
 		userret(td, frame);
 		break;
 	case EXCP_MSR:
