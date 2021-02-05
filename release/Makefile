@@ -93,9 +93,9 @@ EXTRA_PACKAGES+= ports.txz
 .if !defined(NOSRC)
 EXTRA_PACKAGES+= src.txz
 .endif
-.if !defined(NODOC)
-EXTRA_PACKAGES+= reldoc
-.endif
+#.if !defined(NODOC)
+#EXTRA_PACKAGES+= reldoc
+#.endif
 
 RELEASE_TARGETS= ftp
 IMAGES=
@@ -124,9 +124,9 @@ CLEANFILES+=	${I}.xz
 CLEANFILES+=	pkg-stage
 .endif
 CLEANDIRS=	dist ftp disc1 bootonly dvd
-.if !defined(NODOC)
-CLEANDIRS+=    reldoc rdoc
-.endif
+#.if !defined(NODOC)
+#CLEANDIRS+=    reldoc rdoc
+#.endif
 beforeclean:
 	chflags -R noschg .
 .include <bsd.obj.mk>
@@ -170,22 +170,22 @@ ports.txz:
 	    --exclude 'usr/ports/INDEX*' --exclude work usr/ports | \
 	    ${XZ_CMD} > ${.OBJDIR}/ports.txz
 
-reldoc:
-	cd ${DOCDIR}/en_US.ISO8859-1/htdocs/releases/${REVISION}R && \
-	    env MAN4DIR=${WORLDDIR}/share/man/man4 \
-	    _BRANCH=${BRANCH} \
-	    ${MAKE} all install clean "FORMATS=html txt" \
-	    INSTALL_COMPRESSED='' URLS_ABSOLUTE=YES DOCDIR=${.OBJDIR}/rdoc \
-	    WEBDIR=${DOCDIR} DESTDIR=${.OBJDIR}/rdoc
-	mkdir -p reldoc
-.for i in hardware readme relnotes errata
-	ln -f ${.OBJDIR}/rdoc/${i:tl}.txt \
-		reldoc/${i:tu}.TXT
-	ln -f ${.OBJDIR}/rdoc/${i:tl}.html \
-		reldoc/${i:tu}.HTML
-.endfor
-	cp ${.OBJDIR}/rdoc/docbook.css \
-		reldoc/
+#reldoc:
+#	cd ${DOCDIR}/en_US.ISO8859-1/htdocs/releases/${REVISION}R && \
+#	    env MAN4DIR=${WORLDDIR}/share/man/man4 \
+#	    _BRANCH=${BRANCH} \
+#	    ${MAKE} all install clean "FORMATS=html txt" \
+#	    INSTALL_COMPRESSED='' URLS_ABSOLUTE=YES DOCDIR=${.OBJDIR}/rdoc \
+#	    WEBDIR=${DOCDIR} DESTDIR=${.OBJDIR}/rdoc
+#	mkdir -p reldoc
+#.for i in hardware readme relnotes errata
+#	ln -f ${.OBJDIR}/rdoc/${i:tl}.txt \
+#		reldoc/${i:tu}.TXT
+#	ln -f ${.OBJDIR}/rdoc/${i:tl}.html \
+#		reldoc/${i:tu}.HTML
+#.endfor
+#	cp ${.OBJDIR}/rdoc/docbook.css \
+#		reldoc/
 
 disc1: packagesystem
 # Install system
@@ -203,9 +203,9 @@ disc1: packagesystem
 	    do cp $${dist} ${.TARGET}/usr/freebsd-dist; \
 	done
 # Copy documentation, if generated
-.if !defined(NODOC)
-	cp reldoc/* ${.TARGET}
-.endif
+#.if !defined(NODOC)
+#	cp reldoc/* ${.TARGET}
+#.endif
 # Set up installation environment
 	ln -fs /tmp/bsdinstall_etc/resolv.conf ${.TARGET}/etc/resolv.conf
 	echo sendmail_enable=\"NONE\" > ${.TARGET}/etc/rc.conf
@@ -231,9 +231,9 @@ bootonly: packagesystem
 	mkdir -p ${.TARGET}/usr/freebsd-dist
 	cp MANIFEST ${.TARGET}/usr/freebsd-dist
 # Copy documentation, if generated
-.if !defined(NODOC)
-	cp reldoc/* ${.TARGET}
-.endif
+#.if !defined(NODOC)
+#	cp reldoc/* ${.TARGET}
+#.endif
 # Set up installation environment
 	ln -fs /tmp/bsdinstall_etc/resolv.conf ${.TARGET}/etc/resolv.conf
 	echo sendmail_enable=\"NONE\" > ${.TARGET}/etc/rc.conf
@@ -256,9 +256,9 @@ dvd: packagesystem
 	    do cp $${dist} ${.TARGET}/usr/freebsd-dist; \
 	done
 # Copy documentation, if generated
-.if !defined(NODOC)
-	cp reldoc/* ${.TARGET}
-.endif
+#.if !defined(NODOC)
+#	cp reldoc/* ${.TARGET}
+#.endif
 # Set up installation environment
 	ln -fs /tmp/bsdinstall_etc/resolv.conf ${.TARGET}/etc/resolv.conf
 	echo sendmail_enable=\"NONE\" > ${.TARGET}/etc/rc.conf
