@@ -1770,7 +1770,7 @@ retry:
 	mtx_lock(dvlp);
 	ncp = dvp->v_cache_dd;
 	if (ncp == NULL) {
-		SDT_PROBE3(vfs, namecache, lookup, miss, dvp, "..", NULL);
+		SDT_PROBE2(vfs, namecache, lookup, miss, dvp, "..");
 		mtx_unlock(dvlp);
 		return (0);
 	}
@@ -1897,8 +1897,7 @@ retry:
 
 	if (__predict_false(ncp == NULL)) {
 		mtx_unlock(blp);
-		SDT_PROBE3(vfs, namecache, lookup, miss, dvp, cnp->cn_nameptr,
-		    NULL);
+		SDT_PROBE2(vfs, namecache, lookup, miss, dvp, cnp->cn_nameptr);
 		counter_u64_add(nummiss, 1);
 		return (0);
 	}
@@ -1993,8 +1992,7 @@ cache_lookup(struct vnode *dvp, struct vnode **vpp, struct componentname *cnp,
 
 	if (__predict_false(ncp == NULL)) {
 		vfs_smr_exit();
-		SDT_PROBE3(vfs, namecache, lookup, miss, dvp, cnp->cn_nameptr,
-		    NULL);
+		SDT_PROBE2(vfs, namecache, lookup, miss, dvp, cnp->cn_nameptr);
 		counter_u64_add(nummiss, 1);
 		return (0);
 	}
