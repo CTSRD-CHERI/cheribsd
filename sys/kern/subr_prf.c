@@ -817,7 +817,7 @@ reswitch:	switch (ch = (u_char)*fmt++) {
 				num = cheri_getaddress(cap);
 			}
 			if (sharpflag) {
-				int orig_dwidth;
+				int orig_dwidth, tag;
 
 				orig_dwidth = dwidth;
 
@@ -883,21 +883,23 @@ reswitch:	switch (ch = (u_char)*fmt++) {
 				PCHAR(']');
 
 				/* tag and sealing */
+				tag = sign == 1 ? va_arg(ap, int) :
+				    cheri_gettag(cap);
 				switch (cheri_gettype(cap)) {
 				case CHERI_OTYPE_UNSEALED:
-					if (cheri_gettag(cap))
+					if (tag)
 						p = NULL;
 					else
 						p = "(invalid)";
 					break;
 				case CHERI_OTYPE_SENTRY:
-					if (cheri_gettag(cap))
+					if (tag)
 						p = "(sentry)";
 					else
 						p = "(invalid,sentry)";
 					break;
 				default:
-					if (cheri_gettag(cap))
+					if (tag)
 						p = "(sealed)";
 					else
 						p = "(invalid,sealed)";
