@@ -1954,19 +1954,12 @@ restart:
 		KASSERT(m != NULL || !sbavail(&so->so_rcv),
 		    ("receive: m == %p sbavail == %u",
 		    m, sbavail(&so->so_rcv)));
-		if (so->so_error || so->so_rerror) {
+		if (so->so_error) {
 			if (m != NULL)
 				goto dontblock;
-			if (so->so_error)
-				error = so->so_error;
-			else
-				error = so->so_rerror;
-			if ((flags & MSG_PEEK) == 0) {
-				if (so->so_error)
-					so->so_error = 0;
-				else
-					so->so_rerror = 0;
-			}
+			error = so->so_error;
+			if ((flags & MSG_PEEK) == 0)
+				so->so_error = 0;
 			SOCKBUF_UNLOCK(&so->so_rcv);
 			goto release;
 		}
@@ -2310,7 +2303,7 @@ dontblock:
 		while (flags & MSG_WAITALL && m == NULL && uio->uio_resid > 0 &&
 		    !sosendallatonce(so) && nextrecord == NULL) {
 			SOCKBUF_LOCK_ASSERT(&so->so_rcv);
-			if (so->so_error || so->so_rerror ||
+			if (so->so_error ||
 			    so->so_rcv.sb_state & SBS_CANTRCVMORE)
 				break;
 			/*
@@ -3058,7 +3051,6 @@ sosetopt(struct socket *so, struct sockopt *sopt)
 		case SO_NOSIGPIPE:
 		case SO_NO_DDP:
 		case SO_NO_OFFLOAD:
-		case SO_RERROR:
 			error = sooptcopyin(sopt, &optval, sizeof optval,
 			    sizeof optval);
 			if (error)
@@ -3309,7 +3301,6 @@ sogetopt(struct socket *so, struct sockopt *sopt)
 		case SO_NOSIGPIPE:
 		case SO_NO_DDP:
 		case SO_NO_OFFLOAD:
-		case SO_RERROR:
 			optval = so->so_options & sopt->sopt_name;
 integer:
 			error = sooptcopyout(sopt, &optval, sizeof optval);
@@ -3329,13 +3320,8 @@ integer:
 
 		case SO_ERROR:
 			SOCK_LOCK(so);
-			if (so->so_error) {
-				optval = so->so_error;
-				so->so_error = 0;
-			} else {
-				optval = so->so_rerror;
-				so->so_rerror = 0;
-			}
+			optval = so->so_error;
+			so->so_error = 0;
 			SOCK_UNLOCK(so);
 			goto integer;
 
@@ -3932,7 +3918,7 @@ filt_soread(struct knote *kn, long hint)
 		kn->kn_flags |= EV_EOF;
 		kn->kn_fflags = so->so_error;
 		return (1);
-	} else if (so->so_error || so->so_rerror)
+	} else if (so->so_error)	/* temporary udp error */
 		return (1);
 
 	if (kn->kn_sfflags & NOTE_LOWAT) {
