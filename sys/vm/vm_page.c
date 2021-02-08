@@ -5497,6 +5497,18 @@ vm_page_assert_pga_capmeta_clear(vm_page_t m, uint16_t bits)
 		VM_OBJECT_ASSERT_LOCKED(m->object);
 	}
 }
+
+/* Ensure that mdst is at least as capdirty as msrc */
+void
+vm_page_assert_pga_capmeta_copy(vm_page_t msrc, vm_page_t mdst)
+{
+	vm_page_astate_t msrca = vm_page_astate_load(msrc);
+	vm_page_astate_t mdsta = vm_page_astate_load(mdst);
+	KASSERT((mdsta.flags & msrca.flags &
+	    (PGA_CAPSTORE | PGA_CAPDIRTY))
+	    == (msrca.flags & (PGA_CAPSTORE | PGA_CAPDIRTY)),
+	    ("pmap_copy_page_internal bad capdirty metadata"));
+}
 #endif
 #endif
 

@@ -813,13 +813,19 @@ void vm_page_assert_pga_writeable(vm_page_t m, uint16_t bits);
 void vm_page_assert_pga_capmeta_clear(vm_page_t m, uint16_t bits);
 #define	VM_PAGE_ASSERT_PGA_CAPMETA_CLEAR(m, bits)			\
 	vm_page_assert_pga_capmeta_clear(m, bits)
+
+void vm_page_assert_pga_capmeta_copy(vm_page_t msrc, vm_page_t mdst);
+#define	VM_PAGE_ASSERT_PGA_CAPMETA_COPY(msrc, mdst)			\
+	vm_page_assert_pga_capmeta_copy(msrc, mdst)
 #else
 #define	VM_PAGE_ASSERT_PGA_CAPMETA_CLEAR(m, bits)	(void)0
+#define	VM_PAGE_ASSERT_PGA_CAPMETA_COPY(msrc, mdst)	(void)0
 #endif
 #else
 #define	VM_PAGE_OBJECT_BUSY_ASSERT(m)	(void)0
 #define	VM_PAGE_ASSERT_PGA_WRITEABLE(m, bits)	(void)0
 #define	VM_PAGE_ASSERT_PGA_CAPMETA_CLEAR(m, bits)	(void)0
+#define	VM_PAGE_ASSERT_PGA_CAPMETA_COPY(msrc, mdst)	(void)0
 #define	vm_page_xbusy_claim(m)
 #endif
 
