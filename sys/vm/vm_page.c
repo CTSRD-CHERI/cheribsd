@@ -5565,6 +5565,21 @@ vm_page_assert_pga_writeable(vm_page_t m, uint16_t bits)
 	if (!vm_page_xbusied(m))
 		VM_OBJECT_ASSERT_BUSY(m->object);
 }
+
+#if __has_feature(capabilities)
+/* Ensure that mdst is at least as capdirty as msrc */
+void
+vm_page_assert_pga_capmeta_copy(vm_page_t msrc, vm_page_t mdst)
+{
+	vm_page_astate_t msrca = vm_page_astate_load(msrc);
+	vm_page_astate_t mdsta = vm_page_astate_load(mdst);
+	int srccd __diagused = msrca.flags & (PGA_CAPSTORE | PGA_CAPDIRTY);
+	int dstcd __diagused = mdsta.flags & (PGA_CAPSTORE | PGA_CAPDIRTY);
+
+	KASSERT((dstcd & srccd) == srccd,
+	    ("pmap_copy_page_internal bad capdirty metadata"));
+}
+#endif
 #endif
 
 #include "opt_ddb.h"
