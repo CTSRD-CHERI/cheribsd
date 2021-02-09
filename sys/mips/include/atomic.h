@@ -1071,6 +1071,9 @@ atomic_fetchadd_64(__volatile uint64_t *p, uint64_t v)
 }
 #endif
 
+ATOMIC_CMPSET(ptr);
+ATOMIC_FCMPSET(ptr);
+
 #undef ATOMIC_CMPSET
 #undef ATOMIC_FCMPSET
 
@@ -1181,28 +1184,6 @@ ATOMIC_ACQ_REL_PTR(subtract)
 #undef ATOMIC_ACQ_REL_PTR
 
 static __inline int
-atomic_cmpset_ptr(volatile uintptr_t *p, uintptr_t cmpval, uintptr_t newval)
-{
-	int ret;
-	uintptr_t temp;
-
-	__asm __volatile (
-		"1:\n\t"
-		"cllc		%1, %2\n\t"	/* load old value */
-		"ceq		%0, %1, %3\n\t" /* compare */
-		"beqz		%0, 2f\n\t"
-		"cmove		%1, %4\n\t"
-		"cscc		%0, %1, %2\n\t" /* attempt to store */
-		"beqz		%0, 1b\n\t"	/* spin if failed */
-		"nop\n\t"
-		"2:\n\t"
-		: "=&r" (ret), "=&r" (temp), "+C" (p)
-		: "r" (cmpval), "r" (newval)
-		: "memory");
-	return (ret);
-}
-
-static __inline int
 atomic_cmpset_acq_ptr(volatile uintptr_t *p, uintptr_t cmpval, uintptr_t newval)
 {
 	int retval;
@@ -1217,31 +1198,6 @@ atomic_cmpset_rel_ptr(volatile uintptr_t *p, uintptr_t cmpval, uintptr_t newval)
 {
 	mips_sync();
 	return (atomic_cmpset_ptr(p, cmpval, newval));
-}
-
-static __inline int
-atomic_fcmpset_ptr(volatile uintptr_t *p, uintptr_t *cmpval, uintptr_t newval)
-{
-	int ret;
-	uintptr_t tmp, cmp = *cmpval;
-
-	__asm __volatile (
-		"1:\n\t"
-		"cllc	%[tmp], %[p]\n\t"	/* load old value */
-		"ceq	%[ret], %[tmp], %[cmp]\n\t" /* compare */
-		"beqz	%[ret], 2f\n\t"
-		"cmove	%[tmp], %[newval]\n\t"
-		"cscc	%[ret], %[tmp], %[p]\n\t" /* attempt to store */
-		"beqz	%[ret], 1b\n\t"	/* spin if failed */
-		"j	3f\n\t"
-		"2:\n\t"
-		"csc	%[tmp], $zero, 0(%[cmpval])\n\t" /* store the loaded value */
-		"3:\n\t"
-		: [ret] "=&r" (ret), [tmp] "=&r" (tmp), [p] "+C" (p),
-			[cmpval] "+C" (cmpval)
-		: [newval] "r" (newval), [cmp] "r" (cmp)
-		: "memory");
-	return ret;
 }
 
 static __inline int
@@ -1492,10 +1448,8 @@ atomic_thread_fence_seq_cst(void)
 #define	atomic_subtract_ptr	atomic_subtract_long
 #define	atomic_subtract_acq_ptr	atomic_subtract_acq_long
 #define	atomic_subtract_rel_ptr	atomic_subtract_rel_long
-#define	atomic_cmpset_ptr	atomic_cmpset_long
 #define	atomic_cmpset_acq_ptr	atomic_cmpset_acq_long
 #define	atomic_cmpset_rel_ptr	atomic_cmpset_rel_long
-#define	atomic_fcmpset_ptr	atomic_fcmpset_long
 #define	atomic_fcmpset_acq_ptr	atomic_fcmpset_acq_long
 #define	atomic_fcmpset_rel_ptr	atomic_fcmpset_rel_long
 #define	atomic_load_acq_ptr	atomic_load_acq_long
