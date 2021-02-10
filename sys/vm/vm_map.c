@@ -5382,9 +5382,9 @@ vmspace_exec(struct proc *p, vm_offset_t minuser, vm_offset_t maxuser)
 
 	user_length = CHERI_REPRESENTABLE_LENGTH(user_length);
 	minuser_cap = (vm_pointer_t)cheri_capability_build_user_rwx(
-	    CHERI_CAP_USER_CODE_PERMS | CHERI_CAP_USER_DATA_PERMS,
-	    padded_minuser, user_length, minuser);
-	maxuser_cap = (vm_pointer_t)cheri_setaddress((void *)minuser_cap, maxuser);
+	    CHERI_CAP_USER_CODE_PERMS | CHERI_CAP_USER_DATA_PERMS
+	    CHERI_PERMS_SWALL, padded_minuser, user_length, minuser);
+	maxuser_cap = cheri_setaddress(minuser_cap, maxuser);
 	newvmspace = vmspace_alloc(minuser_cap, maxuser_cap, pmap_pinit);
 #else
 	newvmspace = vmspace_alloc(minuser, maxuser, pmap_pinit);
