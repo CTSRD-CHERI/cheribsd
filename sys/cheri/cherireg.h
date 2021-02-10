@@ -106,4 +106,12 @@
     (CHERI_OTYPE_KERN_MAX - CHERI_OTYPE_KERN_MIN + 1)
 #define	CHERI_SEALCAP_KERNEL_OFFSET	0x0
 
+/* Shorthand for RWX permission bits */
+#define	CHERI_CAP_PERM_READ	(CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP)
+#define	CHERI_CAP_PERM_WRITE                                            \
+    (CHERI_PERM_STORE | CHERI_PERM_STORE_CAP | CHERI_PERM_STORE_LOCAL_CAP)
+#define	CHERI_CAP_PERM_EXEC	(CHERI_PERM_EXECUTE)
+#define	CHERI_CAP_PERM_RWX                                              \
+    (CHERI_CAP_PERM_READ | CHERI_CAP_PERM_WRITE | CHERI_CAP_PERM_EXEC)
+
 #endif /* !__SYS_CHERIREG_H__ */
