@@ -625,8 +625,11 @@ static int __used sink;
 /*
  * Check that the padding of a reservation faults on access
  */
-void
-cheribsdtest_vm_reservation_access_fault(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(cheribsdtest_vm_reservation_access_fault,
+    "check that we fault when accessing padding of a reservation",
+    .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE,
+    .ct_signum = SIGSEGV,
+    .ct_si_code = SEGV_ACCERR)
 {
 	size_t len = ((size_t)PAGE_SIZE << CHERI_BASELEN_BITS) + 1;
 	size_t expected_len;
@@ -656,8 +659,8 @@ cheribsdtest_vm_reservation_access_fault(const struct cheri_test *ctp __unused)
  * Check that a reserved range can not be reused for another mapping,
  * until the whole mapping is freed.
  */
-void
-cheribsdtest_vm_reservation_reuse(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(cheribsdtest_vm_reservation_reuse,
+    "check that we can not remap over a partially-unmapped reservation")
 {
 	void *map;
 	void *map2;
@@ -687,8 +690,8 @@ cheribsdtest_vm_reservation_reuse(const struct cheri_test *ctp __unused)
  * Check that alignment is promoted automatically to the first
  * representable boundary.
  */
-void
-cheribsdtest_vm_reservation_align(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(cheribsdtest_vm_reservation_align,
+    "check that mmap correctly align mappings")
 {
 	void *map;
 	size_t len = ((size_t)PAGE_SIZE << CHERI_BASELEN_BITS) + 1;
@@ -741,9 +744,9 @@ cheribsdtest_vm_reservation_align(const struct cheri_test *ctp __unused)
  * a proper temporal-safety implementation will lead to failures so
  * we catch these early.
  */
-void
-cheribsdtest_vm_reservation_mmap_after_free_fixed(
-    const struct cheri_test *ctp __unused)
+CHERIBSDTEST(cheribsdtest_vm_reservation_mmap_after_free_fixed,
+    "check that an old capability can not be used to mmap with MAP_FIXED "
+    "after the reservation has been deleted")
 {
 	void *map;
 	map = CHERIBSDTEST_CHECK_SYSCALL(mmap(NULL, PAGE_SIZE,
@@ -767,8 +770,9 @@ cheribsdtest_vm_reservation_mmap_after_free_fixed(
  * a proper temporal-safety implementation will lead to failures so
  * we catch these early.
  */
-void
-cheribsdtest_vm_reservation_mmap_after_free(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(cheribsdtest_vm_reservation_mmap_after_free,
+    "check that an old capability can not be used to mmap after the "
+    "reservation has been deleted")
 {
 	void *map;
 	map = CHERIBSDTEST_CHECK_SYSCALL(mmap(NULL, PAGE_SIZE,
@@ -787,8 +791,8 @@ cheribsdtest_vm_reservation_mmap_after_free(const struct cheri_test *ctp __unuse
 /*
  * Check that reservations are aligned and padded correctly for shared mappings.
  */
-void
-cheribsdtest_vm_reservation_mmap_shared(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(cheribsdtest_vm_reservation_mmap_shared,
+    "check reservation alignment and bounds for shared mappings")
 {
 	void *map;
 	size_t len = ((size_t)PAGE_SIZE << CHERI_BASELEN_BITS) + 1;
@@ -815,8 +819,8 @@ cheribsdtest_vm_reservation_mmap_shared(const struct cheri_test *ctp __unused)
  * Check that we require NULL-derived capabilities when mmap().
  * Test mmap() with an invalid capability and no backing reservation.
  */
-void
-cheribsdtest_vm_mmap_invalid_cap(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(cheribsdtest_vm_mmap_invalid_cap,
+    "check that mmap with invalid capability hint fails")
 {
 	void *invalid = cheri_cleartag(cheri_setaddress(
 	    cheri_getpcc(), 0x4300beef));
@@ -837,8 +841,8 @@ cheribsdtest_vm_mmap_invalid_cap(const struct cheri_test *ctp __unused)
  * Check that we require NULL-derived capabilities when mmap().
  * Test mmap() MAP_FIXED with an invalid capability and no backing reservation.
  */
-void
-cheribsdtest_vm_mmap_invalid_cap_fixed(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(cheribsdtest_vm_mmap_invalid_cap_fixed,
+    "check that mmap MAP_FIXED with invalid capability hint fails")
 {
 	void *invalid = cheri_cleartag(cheri_setaddress(
 	    cheri_getpcc(), 0x4300beef));
@@ -860,8 +864,9 @@ cheribsdtest_vm_mmap_invalid_cap_fixed(const struct cheri_test *ctp __unused)
  * Test mmap() MAP_FIXED with an invalid capability and existing
  * backing reservation.
  */
-void
-cheribsdtest_vm_reservation_mmap_invalid_cap(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(cheribsdtest_vm_reservation_mmap_invalid_cap,
+    "check that mmap over existing reservation with invalid "
+    "capability hint fails")
 {
 	void *invalid;
 	void *map;
@@ -885,8 +890,8 @@ cheribsdtest_vm_reservation_mmap_invalid_cap(const struct cheri_test *ctp __unus
 /*
  * Check that mmap() with a null-derived hint address succeeds.
  */
-void
-cheribsdtest_vm_reservation_mmap(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(cheribsdtest_vm_reservation_mmap,
+    "check mmap with NULL-derived hint address")
 {
 	uintptr_t hint = 0x56000000;
 	void *map;
@@ -905,9 +910,8 @@ cheribsdtest_vm_reservation_mmap(const struct cheri_test *ctp __unused)
  * Check that this fails if a mapping already exists at the target address
  * as MAP_FIXED implies MAP_EXCL in this case.
  */
-void
-cheribsdtest_vm_reservation_mmap_fixed_unreserved(
-    const struct cheri_test *ctpb __unused)
+CHERIBSDTEST(cheribsdtest_vm_reservation_mmap_fixed_unreserved,
+    "check mmap MAP_FIXED with NULL-derived hint address")
 {
 	uintptr_t hint = 0x56000000;
 	void *map;
@@ -933,9 +937,9 @@ cheribsdtest_vm_reservation_mmap_fixed_unreserved(
  * Check that mmap at fixed address with NULL-derived hint fails if
  * a reservation already exists at the target address.
  */
-void
-cheribsdtest_vm_reservation_mmap_insert_null_derived(
-    const struct cheri_test *ctpb __unused)
+CHERIBSDTEST(cheribsdtest_vm_reservation_mmap_insert_null_derived,
+    "check that mmap with NULL-derived hint address over existing "
+    "reservation fails")
 {
 	void *map;
 
@@ -959,9 +963,9 @@ cheribsdtest_vm_reservation_mmap_insert_null_derived(
  * Check that we can add a fixed mapping into an existing
  * reservation using a VM_MAP bearing capability.
  */
-void
-cheribsdtest_vm_reservation_mmap_fixed_insert(
-    const struct cheri_test *ctpb __unused)
+CHERIBSDTEST(cheribsdtest_vm_reservation_mmap_fixed_insert,
+    "check mmap MAP_FIXED into an existing reservation with a "
+    "VM_MAP perm capability")
 {
 	void *map;
 
@@ -984,9 +988,9 @@ cheribsdtest_vm_reservation_mmap_fixed_insert(
  * Check that attempting to add a fixed mapping into an existing
  * reservation using a capability without VM_MAP permission fails.
  */
-void
-cheribsdtest_vm_reservation_mmap_fixed_insert_noperm(
-    const struct cheri_test *ctpb __unused)
+CHERIBSDTEST(cheribsdtest_vm_reservation_mmap_fixed_insert_noperm,
+    "check that mmap MAP_FIXED into an existing reservation "
+    "with a capability missing VM_MAP permission fails")
 {
 	void *map;
 	void *map2;
