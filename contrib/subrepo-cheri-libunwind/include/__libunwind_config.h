@@ -63,11 +63,12 @@
 # elif defined(__aarch64__)
 #  define _LIBUNWIND_TARGET_AARCH64 1
 #  ifdef __CHERI_PURE_CAPABILITY__
-#   ifdef __SEH__
-#    error "aarch64 SEH not supported yet"
-#   endif
 #   define _LIBUNWIND_CONTEXT_SIZE 100
-#   define _LIBUNWIND_CURSOR_SIZE 124
+#   if defined(__SEH__)
+#    error "Pure-capability aarch64 SEH not supported"
+#   else
+#    define _LIBUNWIND_CURSOR_SIZE 124
+#   endif
 #   define _LIBUNWIND_HIGHEST_DWARF_REGISTER _LIBUNWIND_HIGHEST_DWARF_REGISTER_ARM64_CHERI
 #  else
 #   define _LIBUNWIND_CONTEXT_SIZE 66
