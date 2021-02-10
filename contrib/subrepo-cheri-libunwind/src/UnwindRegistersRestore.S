@@ -681,9 +681,8 @@ DEFINE_LIBUNWIND_FUNCTION(_ZN9libunwind15Registers_arm646jumptoEv)
   ldp    c24,c25, [c0, #0x180]
   ldp    c26,c27, [c0, #0x1A0]
   ldp    c28,c29, [c0, #0x1C0]
-  // offset 0x1E0 skipped, 0x1F0 loaded later
   ldr    c30,     [c0, #0x200]  // restore pc into lr
-  // skip cpsr
+
   // XXX use ldr instead of ldp below because
   // of immediate range restrictions
   ldr    d0,      [c0, #0x220]
