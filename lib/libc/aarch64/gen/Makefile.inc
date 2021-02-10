@@ -18,5 +18,4 @@ SRCS+=	_ctx_start.S \
 
 .if ${MACHINE_ABI:Mpurecap}
 SRCS+=	emutls.c
-CFLAGS.emutls.c= -DEMUTLS_LIBC
 .endif
