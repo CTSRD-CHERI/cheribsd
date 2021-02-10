@@ -4,7 +4,7 @@
 # https://git.linaro.org/toolchain/cortex-strings.git
 #
 
-.if ${MACHINE_ARCH} == "aarch64"
+.if !${MACHINE_ABI:Mpurecap}
 .PATH: ${SRCTOP}/contrib/cortex-strings/src/aarch64
 
 MDSRCS+= \
