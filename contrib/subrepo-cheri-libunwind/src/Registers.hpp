@@ -1891,14 +1891,11 @@ inline uintptr_t Registers_arm64::getRegister(int regNum) const {
     return _registers.__sp;
   if (regNum == UNW_ARM64_RA_SIGN_STATE)
     return _registers.__ra_sign_state;
-#ifdef __CHERI_PURE_CAPABILITY__
   if ((regNum >= 0) && (regNum < 32))
     return (uint64_t)_registers.__x[regNum];
+#ifdef __CHERI_PURE_CAPABILITY__
   if ((regNum >= UNW_ARM64_C0) && (regNum <= UNW_ARM64_C31))
     return _registers.__x[regNum - UNW_ARM64_C0];
-#else
-  if ((regNum >= 0) && (regNum < 32))
-    return _registers.__x[regNum];
 #endif
   _LIBUNWIND_ABORT("unsupported arm64 register");
 }
@@ -1910,14 +1907,11 @@ inline void Registers_arm64::setRegister(int regNum, uintptr_t value) {
     _registers.__sp = value;
   else if (regNum == UNW_ARM64_RA_SIGN_STATE)
     _registers.__ra_sign_state = value;
-#ifdef __CHERI_PURE_CAPABILITY__
-  if ((regNum >= 0) && (regNum < 32))
-    _registers.__x[regNum] = (uint64_t)value;
-  if ((regNum >= UNW_ARM64_C0) && (regNum <= UNW_ARM64_C31))
-    _registers.__x[regNum - UNW_ARM64_C0] = value;
-#else
   else if ((regNum >= 0) && (regNum < 32))
-    _registers.__x[regNum] = value;
+    _registers.__x[regNum] = (uint64_t)value;
+#ifdef __CHERI_PURE_CAPABILITY__
+  else if ((regNum >= UNW_ARM64_C0) && (regNum <= UNW_ARM64_C31))
+    _registers.__x[regNum - UNW_ARM64_C0] = value;
 #endif
   else
     _LIBUNWIND_ABORT("unsupported arm64 register");

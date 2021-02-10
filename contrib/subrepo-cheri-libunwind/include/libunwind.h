@@ -591,6 +591,7 @@ enum {
   UNW_ARM64_C29 = 227,
   UNW_ARM64_C30 = 228,
   UNW_ARM64_C31 = 229,
+  UNW_ARM64_CSP = 229,
 #endif
 };
 
