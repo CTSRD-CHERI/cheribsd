@@ -41,10 +41,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-#ifdef EMUTLS_LIBC
 #include "static_tls.h"
 #include "libc_private.h"
-#endif
 
 struct emutls_control {
 	uint64_t size;
@@ -64,28 +62,23 @@ struct emutls_array {
 	void *data[];
 };
 
-#ifdef EMUTLS_LIBC
+/*
+ * This cannot use pthread keys to store the per-thread emutls_array
+ * since libthr depends on TLS.  Instead, emutls_head points to a
+ * singly-linked list of emutls_array_list structures.  The static TLS
+ * base of each thread is used as the key to identify which
+ * emutls_array_list entry corresponds to each thread.
+ */
 struct emutls_array_list {
 	struct emutls_array_list *next;
 	struct emutls_array *array;
 	uintptr_t handle;
 };
 
-/* Hack to not need to call pthread code that may use an allocator that then
- * used tls data that calls into this code. The address of this is the handle
- * to identify the thread. This means this file must not be built with emulated
- * tls enabled.
- */
 static _Atomic uintptr_t emutls_head;
-#else
-static pthread_once_t emutls_once = PTHREAD_ONCE_INIT;
-static pthread_key_t emutls_pthread_key;
-static void *emutls_specific = NULL; /* Used in the unthreaded case */
-#endif
 
 static _Atomic size_t emutls_next_index = 1;
 
-#ifdef EMUTLS_LIBC
 static void *
 emutls_alloc(size_t len)
 {
@@ -108,69 +101,10 @@ emutls_free(void *ptr)
 
 	tls_free(ptr);
 }
-#else
-static void *
-emutls_alloc(size_t len)
-{
-
-	return (calloc(len, 1));
-}
-
-static void *
-emutls_memalign(size_t len, size_t align)
-{
-	void *ptr;
-
-	if (align < sizeof(void *))
-		align = sizeof(void *);
-	if (posix_memalign(&ptr, align, len) != 0)
-		return (NULL);
-
-	return (ptr);
-}
-
-static void
-emutls_free(void *ptr)
-{
-
-	free(ptr);
-}
-
-static void
-emutls_init_once(void)
-{
-
-	/* TODO: Create a destructor to clean up */
-	pthread_key_create(&emutls_pthread_key, NULL);
-
-	/*
-	 * Check if pthread_setspecific/pthread_getspecific works. If not
-	 * we must be in the single threaded case so use a global.
-	 */
-	pthread_setspecific(emutls_pthread_key, (void*)42);
-	if (pthread_getspecific(emutls_pthread_key) != (void*)42) {
-		/*
-		 * Set to non-NULL to indicate
-		 * pthread_setspecific/pthread_getspecific doesn't work.
-		 */
-		emutls_specific = (void *)42;
-	}
-}
-#endif
-
-static void
-emutls_init(void)
-{
-
-#ifndef EMUTLS_LIBC
-	pthread_once(&emutls_once, emutls_init_once);
-#endif
-}
 
 static void
 emutls_setspecific(void *specific)
 {
-#ifdef EMUTLS_LIBC
 	struct emutls_array_list *cur;
 
 	cur = (struct emutls_array_list *)atomic_load(&emutls_head);
@@ -192,18 +126,11 @@ emutls_setspecific(void *specific)
 	while (!atomic_compare_exchange_weak(&emutls_head,
 	    (uintptr_t *)&cur->next, (uintptr_t)cur))
 		cpu_spinwait();
-#else
-	if (emutls_specific == NULL)
-		pthread_setspecific(emutls_pthread_key, specific);
-	else
-		emutls_specific = specific;
-#endif
 }
 
 static void *
 emutls_getspecific(void)
 {
-#ifdef EMUTLS_LIBC
 	struct emutls_array_list *cur;
 
 	cur = (struct emutls_array_list *)atomic_load(&emutls_head);
@@ -214,13 +141,6 @@ emutls_getspecific(void)
 	}
 
 	return (NULL);
-#else
-	if (emutls_specific == NULL)
-		return (pthread_getspecific(emutls_pthread_key));
-	else if (emutls_specific == (void *)42)
-		return (NULL);
-	return (emutls_specific);
-#endif
 }
 
 /*
@@ -271,7 +191,6 @@ emutls_index(struct emutls_control* control)
 
 	index = atomic_load_explicit(&control->index, memory_order_acquire);
 	if (index <= 0) {
-		emutls_init();
 		do {
 			if (index > 0)
 				return (index);
