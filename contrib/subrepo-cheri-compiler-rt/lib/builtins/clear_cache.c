@@ -91,8 +91,16 @@ void __clear_cache(void *start, void *end) {
 #elif defined(__mips__) && defined(__OpenBSD__)
   cacheflush(start, (uintptr_t)end - (uintptr_t)start, BCACHE);
 #elif defined(__aarch64__) && !defined(__APPLE__)
-  uint64_t xstart = (uint64_t)(uintptr_t)start;
-  uint64_t xend = (uint64_t)(uintptr_t)end;
+#if defined(__CHERI_PURE_CAPABILITY__)
+  typedef uintptr_t addr_type;
+#define ADDR_CONSTR "C"
+#else
+  typedef uint64_t addr_type;
+#define ADDR_CONSTR "r"
+#endif
+
+  addr_type xstart = (addr_type)(uintptr_t)start;
+  addr_type xend = (addr_type)(uintptr_t)end;
 
   // Get Cache Type Info.
   static uint64_t ctr_el0 = 0;
@@ -100,8 +108,9 @@ void __clear_cache(void *start, void *end) {
     __asm __volatile("mrs %0, ctr_el0" : "=r"(ctr_el0));
 
   // The DC and IC instructions must use 64-bit registers so we don't use
-  // uintptr_t in case this runs in an IPL32 environment.
-  uint64_t addr;
+  // uintptr_t in case this runs in an IPL32 environment, unless compiling for
+  // C64 where we have to use a capability.
+  addr_type addr;
 
   // If CTR_EL0.IDC is set, data cache cleaning to the point of unification
   // is not required for instruction to data coherence.
@@ -109,7 +118,7 @@ void __clear_cache(void *start, void *end) {
     const size_t dcache_line_size = 4 << ((ctr_el0 >> 16) & 15);
     for (addr = xstart & ~(dcache_line_size - 1); addr < xend;
          addr += dcache_line_size)
-      __asm __volatile("dc cvau, %0" ::"r"(addr));
+      __asm __volatile("dc cvau, %0" :: ADDR_CONSTR(addr));
   }
   __asm __volatile("dsb ish");
 
@@ -119,9 +128,10 @@ void __clear_cache(void *start, void *end) {
     const size_t icache_line_size = 4 << ((ctr_el0 >> 0) & 15);
     for (addr = xstart & ~(icache_line_size - 1); addr < xend;
          addr += icache_line_size)
-      __asm __volatile("ic ivau, %0" ::"r"(addr));
+      __asm __volatile("ic ivau, %0" :: ADDR_CONSTR(addr));
   }
   __asm __volatile("isb sy");
+#undef ADDR_CONSTR
 #elif defined(__powerpc64__)
   const size_t line_size = 32;
   const size_t len = (uintptr_t)end - (uintptr_t)start;
