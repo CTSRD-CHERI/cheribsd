@@ -670,62 +670,46 @@ DEFINE_LIBUNWIND_FUNCTION(_ZN9libunwind15Registers_arm646jumptoEv)
   ldp    c4, c5,  [c0, #0x040]
   ldp    c6, c7,  [c0, #0x060]
   ldp    c8, c9,  [c0, #0x080]
-  ldp    c10,c11, [c0, #0x0A0]
-  ldp    c12,c13, [c0, #0x0C0]
-  ldp    c14,c15, [c0, #0x0E0]
+  ldp    c10,c11, [c0, #0x0a0]
+  ldp    c12,c13, [c0, #0x0c0]
+  ldp    c14,c15, [c0, #0x0e0]
   // c16 and c17 were clobbered by the call into the unwinder, so no point in
   // restoring them.
   ldp    c18,c19, [c0, #0x120]
   ldp    c20,c21, [c0, #0x140]
   ldp    c22,c23, [c0, #0x160]
   ldp    c24,c25, [c0, #0x180]
-  ldp    c26,c27, [c0, #0x1A0]
-  ldp    c28,c29, [c0, #0x1C0]
-  ldr    c30,     [c0, #0x200]  // restore pc into lr
+  ldp    c26,c27, [c0, #0x1a0]
+  ldp    c28,c29, [c0, #0x1c0]
+  ldr    c30,     [c0, #0x200]  // restore pcc into clr
 
-  // XXX use ldr instead of ldp below because
-  // of immediate range restrictions
-  ldr    d0,      [c0, #0x220]
-  ldr    d1,      [c0, #0x228]
-  ldr    d2,      [c0, #0x230]
-  ldr    d3,      [c0, #0x238]
-  ldr    d4,      [c0, #0x240]
-  ldr    d5,      [c0, #0x248]
-  ldr    d6,      [c0, #0x250]
-  ldr    d7,      [c0, #0x258]
-  ldr    d8,      [c0, #0x260]
-  ldr    d9,      [c0, #0x268]
-  ldr    d10,     [c0, #0x270]
-  ldr    d11,     [c0, #0x278]
-  ldr    d12,     [c0, #0x280]
-  ldr    d13,     [c0, #0x288]
-  ldr    d14,     [c0, #0x290]
-  ldr    d15,     [c0, #0x298]
-  ldr    d16,     [c0, #0x2A0]
-  ldr    d17,     [c0, #0x2A8]
-  ldr    d18,     [c0, #0x2B0]
-  ldr    d19,     [c0, #0x2B8]
-  ldr    d20,     [c0, #0x2C0]
-  ldr    d21,     [c0, #0x2C8]
-  ldr    d22,     [c0, #0x2D0]
-  ldr    d23,     [c0, #0x2D8]
-  ldr    d24,     [c0, #0x2E0]
-  ldr    d25,     [c0, #0x2E8]
-  ldr    d26,     [c0, #0x2F0]
-  ldr    d27,     [c0, #0x2F8]
-  ldr    d28,     [c0, #0x300]
-  ldr    d29,     [c0, #0x308]
-  ldr    d30,     [c0, #0x310]
-  ldr    d31,     [c0, #0x318]
+  add    c16,c0, #0x220
+  ldp    d0, d1,  [c16, #0x000]
+  ldp    d2, d3,  [c16, #0x010]
+  ldp    d4, d5,  [c16, #0x020]
+  ldp    d6, d7,  [c16, #0x030]
+  ldp    d8, d9,  [c16, #0x040]
+  ldp    d10,d11, [c16, #0x050]
+  ldp    d12,d13, [c16, #0x060]
+  ldp    d14,d15, [c16, #0x070]
+  ldp    d16,d17, [c16, #0x080]
+  ldp    d18,d19, [c16, #0x090]
+  ldp    d20,d21, [c16, #0x0a0]
+  ldp    d22,d23, [c16, #0x0b0]
+  ldp    d24,d25, [c16, #0x0c0]
+  ldp    d26,d27, [c16, #0x0d0]
+  ldp    d28,d29, [c16, #0x0e0]
+  ldr    d30,     [c16, #0x0f0]
+  ldr    d31,     [c16, #0x0f8]
 
-  // Finally, restore sp. This must be done after the the last read from the
+  // Finally, restore csp. This must be done after the the last read from the
   // context struct, because it is allocated on the stack, and an exception
-  // could clobber the de-allocated portion of the stack after sp has been
+  // could clobber the de-allocated portion of the stack after csp has been
   // restored.
-  ldr    c16,     [c0, #0x1F0]
+  ldr    c16,     [c0, #0x1f0]
   ldp    c0, c1,  [c0, #0x000]  // restore c0,c1
-  mov    csp,c16                // restore sp
-  ret    c30                    // jump to pc
+  mov    csp,c16                // restore csp
+  ret                           // jump to pcc
 #else
   // skip restore of x0,x1 for now
   ldp    x2, x3,  [x0, #0x010]
