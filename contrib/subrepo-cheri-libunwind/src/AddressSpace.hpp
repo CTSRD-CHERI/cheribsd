@@ -249,8 +249,7 @@ public:
 #endif
     bool isImmutable() const {
 #ifdef __CHERI_PURE_CAPABILITY__
-      return (uint64_t)__builtin_cheri_type_get((void *)value) !=
-             UINT64_MAX; // -1 is unsealed
+      return __builtin_cheri_sealed_get(value);
 #else
       return false;
 #endif

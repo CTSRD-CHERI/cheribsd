@@ -1811,7 +1811,13 @@ public:
   void        setVectorRegister(int num, v128 value);
   static const char *getRegisterName(int num);
   void        jumpto();
-  static int  lastDwarfRegNum() { return _LIBUNWIND_HIGHEST_DWARF_REGISTER_ARM64; }
+  static int  lastDwarfRegNum() {
+#ifdef __CHERI_PURE_CAPABILITY__
+    return _LIBUNWIND_HIGHEST_DWARF_REGISTER_MORELLO;
+#else
+    return _LIBUNWIND_HIGHEST_DWARF_REGISTER_ARM64;
+#endif
+  }
   static int  getArch() { return REGISTERS_ARM64; }
 
 #ifdef __CHERI_PURE_CAPABILITY__
@@ -1822,19 +1828,19 @@ public:
   CAPABILITIES_NOT_SUPPORTED
 #endif
 
-  uintptr_t getSP() const         { return _registers.__sp; }
-  void      setSP(uintptr_t value) { _registers.__sp = value; }
-  uintptr_t getIP() const         { return _registers.__pc; }
-  void      setIP(uintptr_t value) { _registers.__pc = value; }
-  uintptr_t getFP() const         { return _registers.__fp; }
-  void      setFP(uintptr_t value) { _registers.__fp = value; }
+  uintptr_t  getSP() const          { return _registers.__sp; }
+  void       setSP(uintptr_t value) { _registers.__sp = value; }
+  uintptr_t  getIP() const          { return _registers.__pc; }
+  void       setIP(uintptr_t value) { _registers.__pc = value; }
+  uintptr_t  getFP() const          { return _registers.__fp; }
+  void       setFP(uintptr_t value) { _registers.__fp = value; }
 
 private:
   struct GPRs {
-    uintptr_t __x[29]; // x0-x28
-    uintptr_t __fp;    // Frame pointer x29
-    uintptr_t __lr;    // Link register x30
-    uintptr_t __sp;    // Stack pointer x31
+    uintptr_t __x[29]; // r0-r28
+    uintptr_t __fp;    // Frame pointer r29
+    uintptr_t __lr;    // Link register r30
+    uintptr_t __sp;    // Stack pointer r31
     uintptr_t __pc;    // Program counter
     uint64_t __ra_sign_state; // RA sign state register
   };
@@ -1875,6 +1881,10 @@ inline bool Registers_arm64::validRegister(int regNum) const {
     return true;
   if (regNum < 0)
     return false;
+#ifdef __CHERI_PURE_CAPABILITY__
+  if ((regNum >= UNW_ARM64_C0) && (regNum <= UNW_ARM64_C31))
+    return true;
+#endif
   if (regNum > 95)
     return false;
   if (regNum == UNW_ARM64_RA_SIGN_STATE)
@@ -1923,8 +1933,6 @@ inline bool Registers_arm64::validCapabilityRegister(int regNum) const {
     return true;
   if (regNum == UNW_REG_SP)
     return true;
-  if (regNum < 0)
-    return false;
   if (regNum >= UNW_ARM64_C0 && regNum <= UNW_ARM64_C31)
     return true;
   return false;
@@ -1937,7 +1945,7 @@ inline uintcap_t Registers_arm64::getCapabilityRegister(int regNum) const {
 
 inline void Registers_arm64::setCapabilityRegister(int regNum, uintcap_t value) {
   assert(validCapabilityRegister(regNum));
-  return setRegister(regNum, value);
+  setRegister(regNum, value);
 }
 #endif
 
@@ -2075,7 +2083,7 @@ inline const char *Registers_arm64::getRegisterName(int regNum) {
     return "d30";
   case UNW_ARM64_D31:
     return "d31";
-#ifdef __CHERI_PURE_CAPABILITY__
+  // Morello registers
   case UNW_ARM64_C0:
     return "c0";
   case UNW_ARM64_C1:
@@ -2140,7 +2148,6 @@ inline const char *Registers_arm64::getRegisterName(int regNum) {
     return "clr";
   case UNW_ARM64_C31:
     return "csp";
-#endif
   default:
     return "unknown register";
   }
