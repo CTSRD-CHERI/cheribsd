@@ -554,7 +554,7 @@ CHERIBSDTEST(test_initregs_pcc,
 
 #ifdef __aarch64__
 CHERIBSDTEST(test_initregs_restricted_default,
-    "Test initial value of restricted default capability");
+    "Test initial value of restricted default capability")
 {
 	void * __capability c;
 
@@ -566,7 +566,7 @@ CHERIBSDTEST(test_initregs_restricted_default,
 }
 
 CHERIBSDTEST(test_initregs_restricted_stack,
-    "Test initial value of restricted stack capability");
+    "Test initial value of restricted stack capability")
 {
 	void * __capability c;
 
@@ -578,7 +578,7 @@ CHERIBSDTEST(test_initregs_restricted_stack,
 }
 
 CHERIBSDTEST(test_initregs_restricted_thread,
-    "Test initial value of restricted thread capability");
+    "Test initial value of restricted thread capability")
 {
 	void * __capability c;
 
