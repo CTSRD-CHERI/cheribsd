@@ -96,7 +96,9 @@ __FBSDID("$FreeBSD$");
 #include <sys/sysproto.h>
 #include <sys/jail.h>
 
+#if __has_feature(capabilities)
 #include <cheri/cheric.h>
+#endif
 
 #include <security/audit/audit.h>
 #include <security/mac/mac_framework.h>
@@ -559,21 +561,20 @@ kern_shmat_locked(struct thread *td, int shmid,
 	max_va = 0;
 #endif
 	vm_object_reference(shmseg->object);
-	attach_addr = attach_va;
-	rv = vm_map_find(&p->p_vmspace->vm_map, shmseg->object, 0, &attach_addr,
+	rv = vm_map_find(&p->p_vmspace->vm_map, shmseg->object, 0, &attach_va,
 	    size, max_va, find_space, prot, prot, cow);
 	if (rv != KERN_SUCCESS) {
 		vm_object_deallocate(shmseg->object);
 		return (ENOMEM);
 	}
 #ifdef __CHERI_PURE_CAPABILITY__
-	KASSERT(cheri_gettag(attach_addr), ("Expected valid capability"));
-	KASSERT(cheri_getlen(attach_addr) == size,
+	KASSERT(cheri_gettag(attach_va), ("Expected valid capability"));
+	KASSERT(cheri_getlen(attach_va) == size,
 	    ("Inexact bounds expected %zx found %zx",
-	    (size_t)size, (size_t)cheri_getlen(attach_addr)));
+	    (size_t)size, (size_t)cheri_getlen(attach_va)));
 #endif
 
-	shmmap_s->va = attach_addr;
+	shmmap_s->va = attach_va;
 	shmmap_s->shmid = shmid;
 	shmseg->u.shm_lpid = p->p_pid;
 	shmseg->u.shm_atime = time_second;
@@ -586,7 +587,7 @@ kern_shmat_locked(struct thread *td, int shmid,
 		 * root map capability.
 		 */
 		shmaddr = cheri_setboundsexact(cheri_setaddress(shmaddr,
-		     attach_addr), size);
+		     attach_va), size);
 		/* Remove inappropriate permissions. */
 		shmaddr = cheri_andperm(shmaddr, ~(CHERI_PERM_EXECUTE |
 		    CHERI_PERM_LOAD_CAP | CHERI_PERM_STORE_CAP |
@@ -595,7 +596,7 @@ kern_shmat_locked(struct thread *td, int shmid,
 		    shmaddr);
 	} else
 #endif
-		td->td_retval[0] = attach_addr;
+		td->td_retval[0] = attach_va;
 	return (error);
 }
 
