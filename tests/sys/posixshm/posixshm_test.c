@@ -1412,20 +1412,22 @@ ATF_TC_BODY(largepage_msync, tc)
 	}
 }
 
-static void
-largepage_protect(char *addr, size_t sz, int prot, int error)
-{
-	if (error == 0) {
-		ATF_REQUIRE_MSG(mprotect(addr, sz, prot) == 0,
-		    "mprotect(%zu, %x) failed; error=%d", sz, prot, errno);
-	} else {
-		ATF_REQUIRE_MSG(mprotect(addr, sz, prot) != 0,
-		    "mprotect(%zu, %x) succeeded", sz, prot);
-		ATF_REQUIRE_MSG(errno == error,
-		    "unexpected error %d from mprotect(%zu, %x)",
-		    errno, sz, prot);
-	}
-}
+#define largepage_protect(addr, sz, prot, error)                                \
+	do {                                                                    \
+		int _prot = prot;                                                       \
+		if (error == 0) {                                               \
+			ATF_REQUIRE_MSG(mprotect(addr, sz, _prot) == 0,         \
+			    "mprotect(%zu, %x) failed; error=%d (%s)",          \
+			    (size_t)sz, _prot, errno, strerror(errno));         \
+		} else {                                                        \
+			ATF_REQUIRE_MSG(mprotect(addr, sz, _prot) != 0,         \
+			    "mprotect(%zu, %x) succeeded", (size_t)sz, _prot);  \
+			ATF_REQUIRE_MSG(errno == error,                         \
+			    "unexpected error %d (%s) from mprotect(%zu, %x), " \
+			    "expected %d",                                      \
+			    errno, strerror(errno), (size_t)sz, _prot, error);  \
+		}                                                               \
+	} while (0)
 
 ATF_TC_WITHOUT_HEAD(largepage_mprotect);
 ATF_TC_BODY(largepage_mprotect, tc)
@@ -1436,10 +1438,10 @@ ATF_TC_BODY(largepage_mprotect, tc)
 
 	pscnt = pagesizes(ps);
 	for (int i = 1; i < pscnt; i++) {
+		int prot_max_all = PROT_MAX(PROT_READ | PROT_WRITE | PROT_EXEC);
 		fd = shm_open_large(i, SHM_LARGEPAGE_ALLOC_DEFAULT, ps[i]);
-		addr = mmap(NULL, ps[i],
-		    PROT_MAX(PROT_READ | PROT_WRITE | PROT_EXEC) | PROT_READ |
-		    PROT_WRITE, MAP_SHARED, fd, 0);
+		addr = mmap(NULL, ps[i], prot_max_all | PROT_READ | PROT_WRITE,
+		    MAP_SHARED, fd, 0);
 		ATF_REQUIRE_MSG(addr != MAP_FAILED,
 		    "mmap(%zu bytes) failed; error=%d", ps[i], errno);
 
@@ -1447,30 +1449,31 @@ ATF_TC_BODY(largepage_mprotect, tc)
 		 * These should be no-ops from the pmap perspective since the
 		 * page is not yet entered into the pmap.
 		 */
-		largepage_protect(addr, PAGE_SIZE, PROT_READ, EINVAL);
 		largepage_protect(addr, ps[i], PROT_READ, 0);
-		largepage_protect(addr, PAGE_SIZE, PROT_NONE, EINVAL);
+		largepage_protect(addr, PAGE_SIZE, PROT_READ, EINVAL);
 		largepage_protect(addr, ps[i], PROT_NONE, 0);
-		largepage_protect(addr, PAGE_SIZE,
-		    PROT_READ | PROT_WRITE | PROT_EXEC, EINVAL);
+		largepage_protect(addr, PAGE_SIZE, PROT_NONE, EINVAL);
 		largepage_protect(addr, ps[i],
 		    PROT_READ | PROT_WRITE | PROT_EXEC, 0);
+		largepage_protect(addr, PAGE_SIZE,
+		    PROT_READ | PROT_WRITE | PROT_EXEC, EINVAL);
 
 		/* Trigger creation of a mapping and try again. */
 		*(volatile char *)addr = 0;
-		largepage_protect(addr, PAGE_SIZE, PROT_READ, EINVAL);
 		largepage_protect(addr, ps[i], PROT_READ, 0);
-		largepage_protect(addr, PAGE_SIZE, PROT_NONE, EINVAL);
+		largepage_protect(addr, PAGE_SIZE, PROT_READ, EINVAL);
 		largepage_protect(addr, ps[i], PROT_NONE, 0);
-		largepage_protect(addr, PAGE_SIZE,
-		    PROT_READ | PROT_WRITE | PROT_EXEC, EINVAL);
+		largepage_protect(addr, PAGE_SIZE, PROT_NONE, EINVAL);
 		largepage_protect(addr, ps[i],
 		    PROT_READ | PROT_WRITE | PROT_EXEC, 0);
+		largepage_protect(addr, PAGE_SIZE,
+		    PROT_READ | PROT_WRITE | PROT_EXEC, EINVAL);
 
 		memset(addr, 0, ps[i]);
 
 		/* Map two contiguous large pages and merge map entries. */
-		addr1 = mmap(addr + ps[i], ps[i], PROT_READ | PROT_WRITE,
+		addr1 = mmap(addr + ps[i], ps[i],
+		    prot_max_all | PROT_READ | PROT_WRITE,
 		    MAP_SHARED | MAP_FIXED | MAP_EXCL, fd, 0);
 		ATF_REQUIRE_MSG(addr1 != MAP_FAILED,
 		    "mmap(%zu bytes) failed; error=%d", ps[i], errno);
