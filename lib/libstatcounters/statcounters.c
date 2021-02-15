@@ -52,39 +52,10 @@ static struct {
 
 // helper functions
 
-#define ARCHNAME_BUFF_SZ 32
-
 static const char *
 getarchname(void)
 {
 	const char *result = "unknown_arch";
-#if defined(__mips__)
-#if defined(__CHERI__)
-#define STATCOUNTERS_ARCH "cheri" __XSTRING(_MIPS_SZCAP)
-#else
-#define STATCOUNTERS_ARCH "mips"
-#if defined(__mips_n64)
-#define STATCOUNTERS_ABI "" /* n64 is default case -> no suffix */
-#elif defined(__mips_n32)
-#define STATCOUNTERS_ABI "-n32"
-#else
-#error "Unknown MIPS ABI"
-#endif
-#endif
-#elif defined(__riscv)
-#define STATCOUNTERS_ARCH "riscv" __XSTRING(__riscv_xlen)
-#else /* !defined(__mips__) */
-#error "Unknown target archicture for libstatcounters"
-#endif
-#if __has_feature(capabilities)
-#if defined(__CHERI_PURE_CAPABILITY__)
-#define STATCOUNTERS_ABI "-purecap"
-#else
-#define STATCOUNTERS_ABI "-hybrid"
-#endif
-#else
-#define STATCOUNTERS_ABI ""
-#endif
 	result = STATCOUNTERS_ARCH STATCOUNTERS_ABI;
 	return result;
 }
