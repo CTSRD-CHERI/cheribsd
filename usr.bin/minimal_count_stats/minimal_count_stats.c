@@ -277,5 +277,5 @@ main(int argc, char **argv)
 		statcounters_dump_with_args(&diff_count, progname, "",
 		    architecture, output_file, statcounters_format);
 	}
-	exit(WEXITSTATUS(status));
+	return (status);
 }
