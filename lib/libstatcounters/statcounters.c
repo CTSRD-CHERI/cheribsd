@@ -40,14 +40,6 @@
 
 #include "statcounters.h"
 
-#if defined(__mips__)
-#define STATCOUNTERS_ARCH_INC "statcounters_mips.inc"
-#elif defined(__riscv)
-#define STATCOUNTERS_ARCH_INC "statcounters_riscv.inc"
-#else
-#error "Unknown architecture"
-#endif
-
 /* Build an array of statcounters without using __attribute__((constructor)): */
 static struct {
 	const char *counter_name;
@@ -55,7 +47,7 @@ static struct {
 } statcounter_names[] = {
 #define STATCOUNTER_ITEM(name, field, args) \
 	{ __XSTRING(name), &statcounters_read_##field },
-#include STATCOUNTERS_ARCH_INC
+#include "statcounters_md.inc"
 };
 
 // helper functions
@@ -119,7 +111,7 @@ statcounters_sample(statcounters_bank_t * const cnt_bank)
 
 #define STATCOUNTER_ITEM(name, field, args) \
 	cnt_bank->field = statcounters_read_##field();
-#include STATCOUNTERS_ARCH_INC
+#include "statcounters_md.inc"
 	return 0;
 }
 
@@ -132,7 +124,7 @@ statcounters_diff(statcounters_bank_t * const bd,
 		return -1;
 
 #define STATCOUNTER_ITEM(name, field, args) bd->field = be->field - bs->field;
-#include STATCOUNTERS_ARCH_INC
+#include "statcounters_md.inc"
 	return 0;
 }
 
@@ -213,7 +205,7 @@ statcounters_dump_with_args(const statcounters_bank_t * const b,
 	case CSV_HEADER:
 		fputs("progname,archname"
 #define STATCOUNTER_ITEM(name, field, args) "," #name
-#include STATCOUNTERS_ARCH_INC
+#include "statcounters_md.inc"
 		      "\n",
 		    fp);
 		// fallthrough
@@ -221,11 +213,11 @@ statcounters_dump_with_args(const statcounters_bank_t * const b,
 		fprintf(fp,
 		    "%s%s,%s"
 #define STATCOUNTER_ITEM(name, field, args) ",%" PRId64
-#include STATCOUNTERS_ARCH_INC
+#include "statcounters_md.inc"
 		    "\n",
 		    progname, phase, archname
 #define STATCOUNTER_ITEM(name, field, args) , b->field
-#include STATCOUNTERS_ARCH_INC
+#include "statcounters_md.inc"
 		);
 		break;
 	case HUMAN_READABLE:
@@ -235,7 +227,7 @@ statcounters_dump_with_args(const statcounters_bank_t * const b,
 #define STATCOUNTER_ITEM(name, field, args) \
 	fprintf(fp, "%-15s %" PRId64 "\n", #name ":", b->field);
 #define STATCOUNTERS_GROUP_END() fprintf(fp, "\n");
-#include STATCOUNTERS_ARCH_INC
+#include "statcounters_md.inc"
 		break;
 	}
 	if (!use_stdout)

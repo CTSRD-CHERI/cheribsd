@@ -36,7 +36,7 @@
 
 typedef struct statcounters_bank {
 #define STATCOUNTER_ITEM(name, field, args) uint64_t field;
-#include "statcounters_mips.inc"
+#include "statcounters_md.inc"
 } statcounters_bank_t;
 
 /* Note: LLVM rejects certain selectors for RDHWR, so we have to use .word. */
@@ -52,4 +52,4 @@ typedef struct statcounters_bank {
 			"\n\tmove %0, $12" :"=r"(ret)::"$12");	\
 		return ret;					\
 	}
-#include "statcounters_mips.inc"
+#include "statcounters_md.inc"
