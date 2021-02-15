@@ -52,7 +52,7 @@
 
 extern char **environ;
 
-// clang-format off
+/* clang-format off */
 static const struct option options[] = {
 	{ "archname", required_argument, NULL, 'a' },
 	{ "basic", no_argument, NULL, 'b' },
@@ -66,7 +66,7 @@ static const struct option options[] = {
 	{ "verbose", no_argument, NULL, 'v' },
 	{ NULL, 0, NULL, 0 }
 };
-// clang-format on
+/* clang-format on */
 
 static void
 read_counters(statcounters_bank_t *c, bool basic_only, bool time_only)
@@ -174,11 +174,14 @@ main(int argc, char **argv)
 			usage(1);
 		}
 	}
-	// Infer default value for statcounters_format from environment
+	/* Infer default value for statcounters_format from the environment. */
 	const char *original_fmt = getenv("STATCOUNTERS_FORMAT");
 	if (statcounters_format == (statcounters_fmt_flag_t)-1) {
 		if (original_fmt && strcmp(original_fmt, "csv") == 0) {
-			// If the file already exists, we use CSV_NOHEADER later
+			/*
+			 * If the file is non-empty, we will change this to
+			 * CSV_NOHEADER later to avoid duplicate headers.
+			 */
 			statcounters_format = CSV_HEADER;
 		} else {
 			statcounters_format = HUMAN_READABLE;
@@ -206,8 +209,10 @@ main(int argc, char **argv)
 		progname = basename(argv[0]);
 	}
 
-	// Call clock_gettime first so that counters are read just before start
-	// and just after completion.
+	/*
+	 * Call clock_gettime first so that counters are read just before start
+	 * and just after completion.
+	 */
 	if (clock_gettime(CLOCK_MONOTONIC_PRECISE, &start_ts) != 0)
 		err(1, "clock_gettime");
 	read_counters(&start_count, basic_only, time_only);
@@ -237,7 +242,7 @@ main(int argc, char **argv)
 		output_file = stdout;
 	} else {
 		output_file = fopen(output_filename, "a");
-		// Also dump basic stats to stderr when -v was passed
+		/* Also dump basic stats to stderr when -v was passed. */
 		if (verbose) {
 			print_basic_human_readable_diff(stderr, &ts_diff,
 			    &diff_count);
@@ -245,8 +250,10 @@ main(int argc, char **argv)
 		if (!output_file) {
 			err(1, "fopen(%s)", output_filename);
 		}
-		// If we are writing to a regular file and the offset is not
-		// zero omit the CSV header.
+		/*
+		 * If we are writing to a regular file and the offset is not
+		 * zero omit the CSV header.
+		 */
 		if (statcounters_format == CSV_HEADER &&
 		    ftello(output_file) > 0) {
 			statcounters_format = CSV_NOHEADER;
@@ -257,9 +264,10 @@ main(int argc, char **argv)
 			print_basic_human_readable_diff(output_file, &ts_diff,
 			    &diff_count);
 		} else {
-			// CSV output requested:
-			// This should be compatible with existing
-			// libstatcounters analysis scripts.
+			/*
+			 * CSV output requested: This should be compatible
+			 * with existing libstatcounters analysis scripts.
+			 */
 			if (statcounters_format == CSV_HEADER) {
 				fprintf(output_file,
 				    "progname,archname,cycles,"
