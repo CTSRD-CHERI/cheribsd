@@ -790,6 +790,67 @@ LEAF(breakpoint)
 	nop
 END(breakpoint)
 
+LEAF(setjmp)
+	mfc0	v0, MIPS_COP_0_STATUS	# Later the "real" spl value!
+	csd	s0, zero, (SZREG * PCB_REG_S0)($c3)
+	csd	s1, zero, (SZREG * PCB_REG_S1)($c3)
+	csd	s2, zero, (SZREG * PCB_REG_S2)($c3)
+	csd	s3, zero, (SZREG * PCB_REG_S3)($c3)
+	csd	s4, zero, (SZREG * PCB_REG_S4)($c3)
+	csd	s5, zero, (SZREG * PCB_REG_S5)($c3)
+	csd	s6, zero, (SZREG * PCB_REG_S6)($c3)
+	csd	s7, zero, (SZREG * PCB_REG_S7)($c3)
+	csd	s8, zero, (SZREG * PCB_REG_S8)($c3)
+	csd	sp, zero, (SZREG * PCB_REG_SP)($c3)
+	csd	ra, zero, (SZREG * PCB_REG_RA)($c3)
+	csd	v0, zero, (SZREG * PCB_REG_SR)($c3)
+	REG_LI	t0, 12
+	csc	$c17, t0, (CHERICAP_SIZE * CHERIKFRAME_OFF_C17)($c3)
+	csc	$c18, t0, (CHERICAP_SIZE * CHERIKFRAME_OFF_C18)($c3)
+	csc	$c19, t0, (CHERICAP_SIZE * CHERIKFRAME_OFF_C19)($c3)
+	csc	$c20, t0, (CHERICAP_SIZE * CHERIKFRAME_OFF_C20)($c3)
+	csc	$c21, t0, (CHERICAP_SIZE * CHERIKFRAME_OFF_C21)($c3)
+	csc	$c22, t0, (CHERICAP_SIZE * CHERIKFRAME_OFF_C22)($c3)
+	csc	$c23, t0, (CHERICAP_SIZE * CHERIKFRAME_OFF_C23)($c3)
+	csc	$c24, t0, (CHERICAP_SIZE * CHERIKFRAME_OFF_C24)($c3)
+	csc	$c26, t0, (CHERICAP_SIZE * CHERIKFRAME_OFF_GPC)($c3)
+	csc	$c11, t0, (CHERICAP_SIZE * CHERIKFRAME_OFF_STC)($c3)
+
+	cjr	$c17
+	li	v0, 0			# setjmp return
+END(setjmp)
+
+LEAF(longjmp)
+	cld	v0, zero, (SZREG * PCB_REG_SR)($c3)
+	cld	ra, zero, (SZREG * PCB_REG_RA)($c3)
+	cld	s0, zero, (SZREG * PCB_REG_S0)($c3)
+	cld	s1, zero, (SZREG * PCB_REG_S1)($c3)
+	cld	s2, zero, (SZREG * PCB_REG_S2)($c3)
+	cld	s3, zero, (SZREG * PCB_REG_S3)($c3)
+	cld	s4, zero, (SZREG * PCB_REG_S4)($c3)
+	cld	s5, zero, (SZREG * PCB_REG_S5)($c3)
+	cld	s6, zero, (SZREG * PCB_REG_S6)($c3)
+	cld	s7, zero, (SZREG * PCB_REG_S7)($c3)
+	cld	s8, zero, (SZREG * PCB_REG_S8)($c3)
+	cld	sp, zero, (SZREG * PCB_REG_SP)($c3)
+	REG_LI	t0, 12
+	clc	$c17, t0, (CHERICAP_SIZE * CHERIKFRAME_OFF_C17)($c3)
+	clc	$c18, t0, (CHERICAP_SIZE * CHERIKFRAME_OFF_C18)($c3)
+	clc	$c19, t0, (CHERICAP_SIZE * CHERIKFRAME_OFF_C19)($c3)
+	clc	$c20, t0, (CHERICAP_SIZE * CHERIKFRAME_OFF_C20)($c3)
+	clc	$c21, t0, (CHERICAP_SIZE * CHERIKFRAME_OFF_C21)($c3)
+	clc	$c22, t0, (CHERICAP_SIZE * CHERIKFRAME_OFF_C22)($c3)
+	clc	$c23, t0, (CHERICAP_SIZE * CHERIKFRAME_OFF_C23)($c3)
+	clc	$c24, t0, (CHERICAP_SIZE * CHERIKFRAME_OFF_C24)($c3)
+	clc	$c26, t0, (CHERICAP_SIZE * CHERIKFRAME_OFF_GPC)($c3)
+	clc	$c11, t0, (CHERICAP_SIZE * CHERIKFRAME_OFF_STC)($c3)
+
+	mtc0	v0, MIPS_COP_0_STATUS	# Later the "real" spl value!
+	ITLBNOPFIX
+	cjr	$c17
+	li	v0, 1			# longjmp return
+END(longjmp)
+
 #ifdef CPU_QEMU_MALTA
 LEAF(cheri_trace_log)
 	.set push
