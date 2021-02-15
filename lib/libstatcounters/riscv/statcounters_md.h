@@ -29,7 +29,7 @@
 
 typedef struct statcounters_bank {
 #define STATCOUNTER_ITEM(name, field, args) uint64_t field;
-#include "statcounters_riscv.inc"
+#include "statcounters_md.inc"
 } statcounters_bank_t;
 
 /* This header also exposes statcounters_get_cycle_count(), etc. functions */
@@ -41,4 +41,4 @@ typedef struct statcounters_bank {
 		asm volatile("csrr %0, " #args : "=r"(ret));	\
 		return ret;					\
 	}
-#include "statcounters_riscv.inc"
+#include "statcounters_md.inc"
