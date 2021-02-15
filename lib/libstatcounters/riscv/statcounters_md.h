@@ -42,3 +42,15 @@ typedef struct statcounters_bank {
 		return ret;					\
 	}
 #include "statcounters_md.inc"
+
+#define STATCOUNTERS_ARCH "riscv" __XSTRING(__riscv_xlen)
+
+#if __has_feature(capabilities)
+#if defined(__CHERI_PURE_CAPABILITY__)
+#define STATCOUNTERS_ABI "-purecap"
+#else
+#define STATCOUNTERS_ABI "-hybrid"
+#endif
+#else
+#define STATCOUNTERS_ABI ""
+#endif

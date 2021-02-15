@@ -53,3 +53,22 @@ typedef struct statcounters_bank {
 		return ret;					\
 	}
 #include "statcounters_md.inc"
+
+#if __has_feature(capabilities)
+#define STATCOUNTERS_ARCH "cheri" __XSTRING(_MIPS_SZCAP)
+#if defined(__CHERI_PURE_CAPABILITY__)
+/* No suffix for purecap for compatibility with old analysis scripts. */
+#define STATCOUNTERS_ABI ""
+#else
+#define STATCOUNTERS_ABI "-hybrid"
+#endif
+#else
+#define STATCOUNTERS_ARCH "mips"
+#if defined(__mips_n64)
+#define STATCOUNTERS_ABI "" /* n64 is default case -> no suffix */
+#elif defined(__mips_n32)
+#define STATCOUNTERS_ABI "-n32"
+#else
+#error "Unknown MIPS ABI"
+#endif
+#endif
