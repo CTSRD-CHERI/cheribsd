@@ -34,13 +34,7 @@
 #include <stdint.h>
 #include <stdio.h>
 
-#if defined(__mips__)
-#include "statcounters_mips.h"
-#elif defined(__riscv)
-#include "statcounters_riscv.h"
-#else
-#error "Architecture not supported"
-#endif
+#include "statcounters_md.h"
 
 // format flags
 typedef enum {
