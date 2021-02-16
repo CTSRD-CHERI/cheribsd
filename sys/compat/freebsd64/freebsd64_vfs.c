@@ -1287,7 +1287,7 @@ int
 freebsd64_getfhat(struct thread *td, struct freebsd64_getfhat_args *uap)
 {
 
-	if ((uap->flags & ~(AT_SYMLINK_NOFOLLOW | AT_BENEATH)) != 0)
+	if ((uap->flags & ~(AT_SYMLINK_NOFOLLOW)) != 0)
 		return (EINVAL);
 	return (kern_getfhat(td, uap->flags, uap->fd,
 	    __USER_CAP_STR(uap->path), UIO_SYSSPACE,
