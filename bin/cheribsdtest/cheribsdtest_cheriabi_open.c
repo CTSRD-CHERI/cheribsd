@@ -53,8 +53,7 @@
 
 #include "cheribsdtest.h"
 
-void
-test_cheriabi_open_ordinary(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_cheriabi_open_ordinary, "Smoke test for open(2)")
 {
 	char path[] = "/dev/null";
 	int error, fd;
@@ -70,8 +69,7 @@ test_cheriabi_open_ordinary(const struct cheri_test *ctp __unused)
 	cheribsdtest_success();
 }
 
-void
-test_cheriabi_open_offset(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_cheriabi_open_offset, "Path with non-zero offset")
 {
 	char pathbuf[] = "xxxx/dev/null";;
 	char *path;
@@ -91,8 +89,8 @@ test_cheriabi_open_offset(const struct cheri_test *ctp __unused)
 	cheribsdtest_success();
 }
 
-void
-test_cheriabi_open_shortened(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_cheriabi_open_shortened,
+    "Path shorter than its capability bounds")
 {
 	char path[] = "/dev/null/xxxx";
 	int error, fd;
@@ -110,8 +108,7 @@ test_cheriabi_open_shortened(const struct cheri_test *ctp __unused)
 	cheribsdtest_success();
 }
 
-void
-test_cheriabi_open_bad_addr(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_cheriabi_open_bad_addr, "Path with nonsensical address")
 {
 	char *path;
 	int fd;
@@ -128,8 +125,8 @@ test_cheriabi_open_bad_addr(const struct cheri_test *ctp __unused)
 	cheribsdtest_success();
 }
 
-void
-test_cheriabi_open_bad_addr_2(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_cheriabi_open_bad_addr_2,
+    "Path with nonsensical address in kernel range")
 {
 	char *path;
 	int fd;
@@ -146,8 +143,8 @@ test_cheriabi_open_bad_addr_2(const struct cheri_test *ctp __unused)
 	cheribsdtest_success();
 }
 
-void
-test_cheriabi_open_bad_len(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_cheriabi_open_bad_len,
+    "Path too long for the capaility bounds")
 {
 	char pathbuf[] = "/dev/null";
 	char *path;
@@ -165,8 +162,7 @@ test_cheriabi_open_bad_len(const struct cheri_test *ctp __unused)
 	cheribsdtest_success();
 }
 
-void
-test_cheriabi_open_bad_len_2(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_cheriabi_open_bad_len_2, "Path with offset past its bounds")
 {
 	char pathbuf[] = "xxxx/dev/null";;
 	char *path;
@@ -185,8 +181,7 @@ test_cheriabi_open_bad_len_2(const struct cheri_test *ctp __unused)
 	cheribsdtest_success();
 }
 
-void
-test_cheriabi_open_bad_tag(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_cheriabi_open_bad_tag, "Path with tag bit missing")
 {
 	char pathbuf[] = "/dev/null";
 	char *path;
@@ -204,8 +199,8 @@ test_cheriabi_open_bad_tag(const struct cheri_test *ctp __unused)
 	cheribsdtest_success();
 }
 
-void
-test_cheriabi_open_bad_perm(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_cheriabi_open_bad_perm,
+    "Path with CHERI_PERM_LOAD permission missing")
 {
 	char pathbuf[] = "/dev/null";
 	char *path;
@@ -223,8 +218,7 @@ test_cheriabi_open_bad_perm(const struct cheri_test *ctp __unused)
 	cheribsdtest_success();
 }
 
-void
-test_cheriabi_open_sealed(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_cheriabi_open_sealed, "Sealed path")
 {
 	char *path;
 	void *sealer;

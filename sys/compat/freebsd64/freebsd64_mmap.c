@@ -100,6 +100,10 @@ freebsd64_mmap(struct thread *td, struct freebsd64_mmap_args *uap)
 		.mr_flags = uap->flags,
 		.mr_fd = uap->fd,
 		.mr_pos = uap->pos,
+#ifdef __CHERI_PURE_CAPABILITY__
+		/* Needed for fixed mappings */
+		.mr_source_cap = userspace_root_cap
+#endif
 	    }));
 }
 
@@ -117,6 +121,10 @@ freebsd6_freebsd64_mmap(struct thread *td,
 		.mr_flags = uap->flags,
 		.mr_fd = uap->fd,
 		.mr_pos = uap->pos,
+#ifdef __CHERI_PURE_CAPABILITY__
+		/* Needed for fixed mappings */
+		.mr_source_cap = userspace_root_cap
+#endif
 	    }));
 }
 #endif

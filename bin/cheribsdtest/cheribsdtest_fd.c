@@ -29,6 +29,10 @@
  * SUCH DAMAGE.
  */
 
+/*
+ * libcheri + cheri_fd tests.
+ */
+
 #include <sys/cdefs.h>
 
 #if !__has_feature(capabilities)
@@ -62,6 +66,9 @@
 
 #include "cheribsdtest.h"
 
+#define	CHERIBSDTEST_FD_READ_STR	"read123"
+#define	CHERIBSDTEST_FD_WRITE_STR	"write123"
+
 /*
  * XXXRW: Where are these initialised?
  */
@@ -70,8 +77,9 @@ struct sandbox_object *sbop_stdin, *sbop_stdout, *sbop_zero;
 
 static char read_string[128];
 
-void
-test_sandbox_fd_fstat(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_sandbox_fd_fstat,
+    "Exercise fstat() on a cheri_fd in a libcheri sandbox",
+    .ct_flags = CT_FLAG_SANDBOX)
 {
 	register_t v;
 
@@ -81,8 +89,9 @@ test_sandbox_fd_fstat(const struct cheri_test *ctp __unused)
 	cheribsdtest_success();
 }
 
-void
-test_sandbox_fd_lseek(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_sandbox_fd_lseek,
+    "Exercise lseek() on a cheri_fd in a libcheri sandbox",
+    .ct_flags = CT_FLAG_SANDBOX)
 {
 	register_t v;
 
@@ -92,8 +101,10 @@ test_sandbox_fd_lseek(const struct cheri_test *ctp __unused)
 	cheribsdtest_success();
 }
 
-void
-test_sandbox_fd_read(const struct cheri_test *ctp)
+CHERIBSDTEST(test_sandbox_fd_read,
+    "Exercise read() on a cheri_fd in a libcheri sandbox",
+    .ct_flags = CT_FLAG_STDIN_STRING | CT_FLAG_SANDBOX,
+    .ct_stdin_string = CHERIBSDTEST_FD_READ_STR)
 {
 	char * __capability stringc;
 	register_t v;
@@ -113,8 +124,10 @@ test_sandbox_fd_read(const struct cheri_test *ctp)
 	cheribsdtest_success();
 }
 
-void
-test_sandbox_fd_read_revoke(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_sandbox_fd_read_revoke,
+    "Exercise revoke() before read() on a cheri_fd",
+    .ct_flags = CT_FLAG_STDIN_STRING | CT_FLAG_SANDBOX,
+    .ct_stdin_string = CHERIBSDTEST_FD_READ_STR)
 {
 	char * __capability stringc;
 	register_t v;
@@ -135,8 +148,10 @@ test_sandbox_fd_read_revoke(const struct cheri_test *ctp __unused)
 	cheribsdtest_success();
 }
 
-void
-test_sandbox_fd_write(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_sandbox_fd_write,
+    "Exercise write() on a cheri_fd in a libcheri sandbox",
+    .ct_flags = CT_FLAG_STDOUT_STRING | CT_FLAG_SANDBOX,
+    .ct_stdout_string = CHERIBSDTEST_FD_WRITE_STR)
 {
 	char * __capability stringc;
 	register_t v;
@@ -152,8 +167,11 @@ test_sandbox_fd_write(const struct cheri_test *ctp __unused)
 	cheribsdtest_success();
 }
 
-void
-test_sandbox_fd_write_revoke(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_sandbox_fd_write_revoke,
+    "Exercise revoke() before write() on a cheri_fd",
+    /* NB: String defined but flag not set: shouldn't print. */
+    .ct_stdout_string = CHERIBSDTEST_FD_WRITE_STR,
+    .ct_flags = CT_FLAG_SANDBOX)
 {
 	char * __capability stringc;
 	register_t v;

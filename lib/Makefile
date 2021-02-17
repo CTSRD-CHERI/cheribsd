@@ -175,7 +175,8 @@ _libc_cheri=	libc_cheri
 _libcheri=	libcheri
 .endif
 
-.if ${MACHINE_CPUARCH} == "mips" || ${MACHINE_CPUARCH} == "riscv" || ${MACHINE_CPUARCH} == "aarch64"
+.if ${MACHINE_CPUARCH} == "aarch64" || ${MACHINE_CPUARCH} == "mips" || \
+    ${MACHINE_CPUARCH} == "riscv"
 .if !${MACHINE_ABI:Mptr32}
 SUBDIR+= libsimple_printf
 .endif

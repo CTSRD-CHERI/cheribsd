@@ -1080,6 +1080,11 @@ kern_vfs_bio_buffer_alloc(caddr_t v, long physmem_est)
 		nbuf = maxbuf;
 	}
 
+#ifdef __CHERI_PURE_CAPABILITY__
+	/* Account for CHERI rounding when estimating usage. */
+	nbuf = CHERI_REPRESENTABLE_LENGTH((long)nbuf * BKVASIZE) / BKVASIZE;
+#endif
+
 	/*
 	 * Ideal allocation size for the transient bio submap is 10%
 	 * of the maximal space buffer map.  This roughly corresponds

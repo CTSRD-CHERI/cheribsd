@@ -28,6 +28,10 @@
  * SUCH DAMAGE.
  */
 
+/*
+ * Tests of pthread interactions with libcheri.
+ */
+
 #include <sys/cdefs.h>
 
 #if !__has_feature(capabilities)
@@ -78,8 +82,9 @@ test_sandbox_pthread_abort_fn(void *arg __unused)
 		cheribsdtest_failure_errx("Sandbox did not abort()");
 }
 
-void
-test_sandbox_pthread_abort(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_sandbox_pthread_abort,
+    "Test sandbox abort from a second thread",
+    .ct_flags = CT_FLAG_SANDBOX)
 {
 	pthread_t thread;
 	int error;
@@ -106,8 +111,10 @@ test_sandbox_pthread_cs_helloworld_fn(void *arg __unused)
 		cheribsdtest_success();
 }
 
-void
-test_sandbox_pthread_cs_helloworld(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_sandbox_pthread_cs_helloworld,
+    "Test sandbox hello world from a second thread",
+    .ct_flags = CT_FLAG_STDOUT_STRING | CT_FLAG_SANDBOX,
+    .ct_stdout_string = "hello world\n")
 {
 	pthread_t thread;
 	int error;

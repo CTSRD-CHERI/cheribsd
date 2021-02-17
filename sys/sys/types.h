@@ -267,12 +267,10 @@ typedef	__uint64_t	vm_ooffset_t;
 typedef	__vm_paddr_t	vm_paddr_t;
 typedef	__uint64_t	vm_pindex_t;
 typedef	__vm_size_t	vm_size_t;
-#ifdef _KERNEL
 #ifdef __CHERI_PURE_CAPABILITY__
 typedef	__uintptr_t	vm_pointer_t;
 #else
 typedef	__vm_offset_t	vm_pointer_t;
-#endif
 #endif
 
 typedef __rman_res_t    rman_res_t;

@@ -110,8 +110,6 @@ CHERIBSDTEST_CCALL int	invoke_cheri_system_putchar(void);
 CHERIBSDTEST_CCALL int	invoke_cheri_system_printf(void);
 
 CHERIBSDTEST_CCALL int	invoke_abort(void);
-CHERIBSDTEST_CCALL int	invoke_md5(size_t len, char *data_input,
-			    char *data_output);
 CHERIBSDTEST_CCALL int	invoke_cap_fault(register_t op);
 CHERIBSDTEST_CCALL int	invoke_vm_fault(register_t op);
 CHERIBSDTEST_CCALL int	invoke_syscall(void);
@@ -143,10 +141,6 @@ CHERIBSDTEST_CCALL register_t	invoke_get_var_constructor(void);
 struct zstream_proxy;
 CHERIBSDTEST_CCALL register_t	invoke_inflate(struct zstream_proxy *zspp);
 CHERIBSDTEST_CCALL register_t	invoke_spin(void);
-
-/* Test calling with a different default object */
-CHERIBSDTEST_CCALL2 int	call_invoke_md5(size_t len, char *data_input,
-			    char *data_output);
 
 CHERIBSDTEST_CCALL	int	sandbox_test_ptrdiff(void);
 CHERIBSDTEST_CCALL int	sandbox_test_varargs(void);

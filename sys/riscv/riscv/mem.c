@@ -43,6 +43,10 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_extern.h>
 #include <vm/vm_page.h>
 
+#ifdef __CHERI_PURE_CAPABILITY__
+#include <cheri/cheric.h>
+#endif
+
 struct mem_range_softc mem_range_softc;
 
 int
@@ -78,12 +82,18 @@ memrw(struct cdev *dev, struct uio *uio, int flags)
 		case CDEV_MINOR_KMEM:
 			/* If the address is in the DMAP just copy it */
 			if (VIRT_IN_DMAP(v)) {
+#ifdef __CHERI_PURE_CAPABILITY__
+				error = uiomove(cheri_setbounds(
+				    cheri_setaddress(dmap_capability, v), cnt),
+				    cnt, uio);
+#else
 				error = uiomove((void *)v, cnt, uio);
+#endif
 				break;
 			}
 
-			if (!kernacc((void *)v, cnt, uio->uio_rw == UIO_READ ?
-			    VM_PROT_READ : VM_PROT_WRITE)) {
+			if (!kernacc((void *)(uintptr_t)v, cnt, uio->uio_rw ==
+			    UIO_READ ? VM_PROT_READ : VM_PROT_WRITE)) {
 				error = EFAULT;
 				break;
 			}
@@ -99,8 +109,13 @@ memrw(struct cdev *dev, struct uio *uio, int flags)
 		case CDEV_MINOR_MEM:
 			/* If within the DMAP use this to copy from */
 			if (PHYS_IN_DMAP(v)) {
+#ifdef __CHERI_PURE_CAPABILITY__
+				error = uiomove(cheri_setbounds(
+				    (void *)PHYS_TO_DMAP(v), cnt), cnt, uio);
+#else
 				v = PHYS_TO_DMAP(v);
 				error = uiomove((void *)v, cnt, uio);
+#endif
 				break;
 			}
 
@@ -143,3 +158,12 @@ memioctl_md(struct cdev *dev __unused, u_long cmd __unused,
 {
 	return (ENOTTY);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20200803,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_as_integer"
+//   ]
+// }
+// CHERI CHANGES END

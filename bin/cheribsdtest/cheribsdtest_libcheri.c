@@ -29,6 +29,10 @@
  * SUCH DAMAGE.
  */
 
+/*
+ * Test libcheri sandboxing -- and kernel sandbox unwind.
+ */
+
 #include <sys/cdefs.h>
 
 #if !__has_feature(capabilities)
@@ -73,8 +77,9 @@ struct cheri_object cheribsdtest, cheribsdtest2;
 static int	allow_syscall(int *retp __unused,
 		    int * __capability errno_val __unused);
 
-void
-test_sandbox_abort(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_sandbox_abort,
+    "Exercise system call in a libcheri sandbox",
+    .ct_flags = CT_FLAG_SANDBOX)
 {
 	register_t v;
 
@@ -85,8 +90,10 @@ test_sandbox_abort(const struct cheri_test *ctp __unused)
 		cheribsdtest_failure_errx("Sandbox did not abort()");
 }
 
-void
-test_sandbox_cs_calloc(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_sandbox_system_calloc,
+    "Allocate memory in base for use in the sandbox",
+    .ct_func = test_sandbox_cs_calloc,
+    .ct_flags = CT_FLAG_SANDBOX)
 {
 	register_t v;
 
@@ -114,8 +121,9 @@ deny_syscall(int *retp, int * __capability stub_errno)
 	return (-1);
 }
 
-void
-test_sandbox_cs_clock_gettime(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_sandbox_clock_gettime_deny,
+    "Denied call of clock_gettime() in a sandbox",
+    .ct_flags = CT_FLAG_STDOUT_IGNORE | CT_FLAG_SANDBOX)
 {
 	register_t v;
 
@@ -129,8 +137,9 @@ test_sandbox_cs_clock_gettime(const struct cheri_test *ctp __unused)
 		cheribsdtest_success();
 }
 
-void
-test_sandbox_cs_clock_gettime_default(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_sandbox_clock_gettime_default,
+    "Unauthorized call of clock_gettime() in a sandbox",
+    .ct_flags = CT_FLAG_STDOUT_IGNORE | CT_FLAG_SANDBOX)
 {
 	register_t v;
 
@@ -146,8 +155,9 @@ test_sandbox_cs_clock_gettime_default(const struct cheri_test *ctp __unused)
 		cheribsdtest_success();
 }
 
-void
-test_sandbox_cs_clock_gettime_deny(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_sandbox_clock_gettime,
+    "Exercise clock_gettime() in a libcheri sandbox",
+    .ct_flags = CT_FLAG_STDOUT_IGNORE | CT_FLAG_SANDBOX)
 {
 	register_t v;
 
@@ -166,8 +176,10 @@ test_sandbox_cs_clock_gettime_deny(const struct cheri_test *ctp __unused)
 		cheribsdtest_success();
 }
 
-void
-test_sandbox_cs_helloworld(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_sandbox_helloworld,
+    "Print 'hello world' in a libcheri sandbox",
+    .ct_flags = CT_FLAG_STDOUT_STRING | CT_FLAG_SANDBOX,
+    .ct_stdout_string = "hello world\n")
 {
 	register_t v;
 
@@ -178,8 +190,10 @@ test_sandbox_cs_helloworld(const struct cheri_test *ctp __unused)
 		cheribsdtest_success();
 }
 
-void
-test_sandbox_cs_putchar(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_sandbox_cs_putchar,
+    "putchar() in a libcheri sandbox",
+    .ct_flags = CT_FLAG_STDOUT_STRING | CT_FLAG_SANDBOX,
+    .ct_stdout_string = "C")
 {
 	register_t v;
 
@@ -190,8 +204,10 @@ test_sandbox_cs_putchar(const struct cheri_test *ctp __unused)
 		cheribsdtest_success();
 }
 
-void
-test_sandbox_cs_puts(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_sandbox_cs_puts,
+    "puts() in a libcheri sandbox",
+    .ct_flags = CT_FLAG_STDOUT_STRING | CT_FLAG_SANDBOX,
+    .ct_stdout_string = "sandbox cs_puts\n")
 {
 	register_t v;
 
@@ -202,8 +218,10 @@ test_sandbox_cs_puts(const struct cheri_test *ctp __unused)
 		cheribsdtest_success();
 }
 
-void
-test_sandbox_printf(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_sandbox_printf,
+    "printf() in a libcheri sandbox",
+    .ct_flags = CT_FLAG_STDOUT_STRING | CT_FLAG_SANDBOX,
+    .ct_stdout_string = "invoke_cheri_system_printf: printf in sandbox test\n")
 {
 	register_t v;
 
@@ -214,8 +232,9 @@ test_sandbox_printf(const struct cheri_test *ctp __unused)
 		cheribsdtest_success();
 }
 
-void
-test_sandbox_malloc(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_sandbox_malloc,
+    "Malloc memory in a libcheri sandbox",
+    .ct_flags = CT_FLAG_SANDBOX)
 {
 	register_t v;
 
@@ -224,40 +243,6 @@ test_sandbox_malloc(const struct cheri_test *ctp __unused)
 		cheribsdtest_failure_errx("Sandbox returned %jd", (intmax_t)v);
 	else
 		cheribsdtest_success();
-}
-
-static char string_to_md5[] = "hello world";
-static char string_md5[] = "5eb63bbbe01eeed093cb22bb8f5acdc3";
-
-void
-test_sandbox_md5_ccall(const struct cheri_test *ctp __unused, int class)
-{
-	void * __capability md5cap;
-	void * __capability bufcap;
-	char buf[33];
-
-	md5cap = cheri_ptrperm(string_to_md5, sizeof(string_to_md5),
-	    CHERI_PERM_LOAD);
-	bufcap = cheri_ptrperm(buf, sizeof(buf), CHERI_PERM_STORE);
-
-	switch (class) {
-	case 1:
-		invoke_md5(strlen(string_to_md5), md5cap, bufcap);
-		break;
-	case 2:
-		call_invoke_md5(strlen(string_to_md5), md5cap, bufcap);
-		break;
-	default:
-		cheribsdtest_failure_errx("invalid class %d", class);
-		break;
-	}
-
-	buf[32] = '\0';
-	if (strcmp(buf, string_md5) != 0)
-		cheribsdtest_failure_errx(
-		    "Incorrect MD5 checksum returned from sandbox ('%s')",
-		    buf);
-	cheribsdtest_success();
 }
 
 static register_t cheribsdtest_libcheri_userfn_handler(
@@ -269,8 +254,10 @@ static register_t cheribsdtest_libcheri_userfn_handler(
     void * __capability c6, void * __capability c7)
     __attribute__((cheri_ccall)); /* XXXRW: Will be ccheri_ccallee. */
 
-void
-test_sandbox_spin(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_sandbox_spin,
+    "spin in a libcheri sandbox",
+    .ct_flags = CT_FLAG_SIGNAL_UNWIND | CT_FLAG_SLOW | CT_FLAG_SANDBOX,
+    .ct_signum = SIGALRM)
 {
 	register_t v;
 
@@ -320,8 +307,9 @@ cheribsdtest_libcheri_userfn_handler(struct cheri_object system_object __unused,
 	}
 }
 
-void
-test_sandbox_userfn(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_sandbox_userfn,
+    "Exercise user-defined system-class method",
+    .ct_flags = CT_FLAG_SANDBOX)
 {
 	register_t i, v;
 
@@ -339,8 +327,9 @@ test_sandbox_userfn(const struct cheri_test *ctp __unused)
  * cheribsdtest_libcheri_setup().  These tests perform variations on the them of
  * "create a second object and optionally do stuff with it".
  */
-void
-test_2sandbox_newdestroy(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_2sandbox_newdestroy,
+    "Instantiate and destroy a second sandbox object",
+    .ct_flags = CT_FLAG_SLOW |  CT_FLAG_SANDBOX)
 {
 
 	struct sandbox_object *sbop;
@@ -351,8 +340,9 @@ test_2sandbox_newdestroy(const struct cheri_test *ctp __unused)
 	cheribsdtest_success();
 }
 
-void
-test_sandbox_ptrdiff(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_sandbox_ptrdiff,
+    "Verify that pointer subtraction works",
+    .ct_flags = CT_FLAG_SANDBOX)
 {
 	intmax_t ret;
 
@@ -363,8 +353,9 @@ test_sandbox_ptrdiff(const struct cheri_test *ctp __unused)
 		cheribsdtest_success();
 }
 
-void
-test_sandbox_varargs(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_sandbox_varargs,
+    "Verify that varargs work in a sandbox",
+    .ct_flags = CT_FLAG_SANDBOX)
 {
 	intmax_t ret;
 
@@ -375,8 +366,9 @@ test_sandbox_varargs(const struct cheri_test *ctp __unused)
 		cheribsdtest_success();
 }
 
-void
-test_sandbox_va_copy(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_sandbox_va_copy,
+    "Verify that va_copy works in a sandbox",
+    .ct_flags = CT_FLAG_SANDBOX)
 {
 	intmax_t ret;
 

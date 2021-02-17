@@ -82,6 +82,8 @@ __FBSDID("$FreeBSD$");
 #include <sys/vmem.h>
 #include <sys/vmmeter.h>
 
+#include <cheri/cheric.h>
+
 #include <vm/vm.h>
 #include <vm/vm_param.h>
 #include <vm/vm_domainset.h>
@@ -633,11 +635,17 @@ kmem_free(vm_offset_t addr, vm_size_t size)
 vm_offset_t
 kmap_alloc_wait(vm_map_t map, vm_size_t size)
 {
+	int error;
+	vm_size_t padded_size;
+	vm_offset_t alignment;
 	vm_offset_t addr;
+	vm_pointer_t mapped;
 
 	size = round_page(size);
 	if (!swap_reserve(size))
 		return (0);
+	padded_size = CHERI_REPRESENTABLE_LENGTH(size);
+	alignment = CHERI_REPRESENTABLE_ALIGNMENT(size);
 
 	for (;;) {
 		/*
@@ -645,9 +653,16 @@ kmap_alloc_wait(vm_map_t map, vm_size_t size)
 		 * to lock out sleepers/wakers.
 		 */
 		vm_map_lock(map);
-		addr = vm_map_findspace(map, vm_map_min(map), size);
-		if (addr + size <= vm_map_max(map))
+		addr = vm_map_findspace(map, vm_map_min(map), padded_size);
+		if (addr + padded_size <= vm_map_max(map) && alignment == 0)
 			break;
+		if (alignment > 0) {
+			error = vm_map_alignspace(map, NULL, 0, &addr,
+			    padded_size, vm_map_max(map), alignment);
+			if (error == KERN_SUCCESS)
+				break;
+		}
+
 		/* no space now; see if we can ever get space */
 		if (vm_map_max(map) - vm_map_min(map) < size) {
 			vm_map_unlock(map);
@@ -657,10 +672,19 @@ kmap_alloc_wait(vm_map_t map, vm_size_t size)
 		map->needs_wakeup = TRUE;
 		vm_map_unlock_and_wait(map, 0);
 	}
-	vm_map_insert(map, NULL, 0, addr, addr + size, VM_PROT_RW_CAP,
-	    VM_PROT_RW_CAP, MAP_ACC_CHARGED, VM_MIN_KERNEL_ADDRESS);
+
+	mapped = addr;
+	if (vm_map_reservation_create_locked(map, &mapped, padded_size,
+	    VM_PROT_RW_CAP)) {
+		vm_map_unlock(map);
+		swap_release(size);
+		return (0);
+	}
+	vm_map_insert(map, NULL, 0, mapped, mapped + size, VM_PROT_RW_CAP,
+	    VM_PROT_RW_CAP, MAP_ACC_CHARGED, mapped);
 	vm_map_unlock(map);
-	return (addr);
+
+	return (mapped);
 }
 
 /*
@@ -674,7 +698,9 @@ kmap_free_wakeup(vm_map_t map, vm_offset_t addr, vm_size_t size)
 {
 
 	vm_map_lock(map);
-	(void) vm_map_delete(map, trunc_page(addr), round_page(addr + size));
+	(void) vm_map_remove_locked(map, trunc_page(addr),
+	    round_page(addr + size));
+
 	if (map->needs_wakeup) {
 		map->needs_wakeup = FALSE;
 		vm_map_wakeup(map);
@@ -753,13 +779,20 @@ kva_import_domain(void *arena, vmem_size_t size, int flags, vmem_addr_t *addrp)
  *	Create the kernel vmem arena and its per-domain children.
  */
 void
-kmem_init(vm_offset_t start, vm_offset_t end)
+kmem_init(vm_pointer_t start, vm_pointer_t end)
 {
-	vm_offset_t addr;
+	vm_pointer_t addr;
 	vm_size_t quantum;
 	int domain;
+	vm_size_t size;
 
-	vm_map_init(kernel_map, kernel_pmap, VM_MIN_KERNEL_ADDRESS, end);
+#ifdef __CHERI_PURE_CAPABILITY__
+	KASSERT(cheri_gettag(start), ("Expected valid start capability"));
+	KASSERT(cheri_gettag(end), ("Expected valid end capability"));
+#endif
+
+	vm_map_init(kernel_map, kernel_pmap,
+	    cheri_kern_setaddress(start, VM_MIN_KERNEL_ADDRESS), end);
 	kernel_map->system_map = 1;
 	vm_map_lock(kernel_map);
 	/* N.B.: cannot use kgdb to debug, starting with this assignment ... */
@@ -768,6 +801,10 @@ kmem_init(vm_offset_t start, vm_offset_t end)
 #else
 	addr = VM_MIN_KERNEL_ADDRESS;
 #endif
+
+	size = (ptraddr_t)start - (ptraddr_t)addr;
+	(void)vm_map_reservation_create_locked(kernel_map, &addr, size,
+	    VM_PROT_ALL);
 	(void)vm_map_insert(kernel_map, NULL, 0, addr, start, VM_PROT_ALL,
 	    VM_PROT_ALL, MAP_NOFAULT, VM_MIN_KERNEL_ADDRESS);
 	/* ... and ending with the completion of the above `insert' */
@@ -778,10 +815,12 @@ kmem_init(vm_offset_t start, vm_offset_t end)
 	 * that handle vm_page_array allocation can simply adjust virtual_avail
 	 * instead.
 	 */
-	(void)vm_map_insert(kernel_map, NULL, 0, (vm_offset_t)vm_page_array,
-	    (vm_offset_t)vm_page_array + round_2mpage(vm_page_array_size *
-	    sizeof(struct vm_page)),
-	    VM_PROT_RW, VM_PROT_RW, MAP_NOFAULT, VM_MIN_KERNEL_ADDRESS);
+	addr = (vm_offset_t)vm_page_array;
+	size = round_2mpage(vm_page_array_size * sizeof(struct vm_page));
+	(void)vm_map_reservation_create_locked(kernel_map, &addr, size,
+	    VM_PROT_RW);
+	(void)vm_map_insert(kernel_map, NULL, 0, addr, addr + size, VM_PROT_RW,
+	    VM_PROT_RW, MAP_NOFAULT, addr);
 #endif
 	vm_map_unlock(kernel_map);
 

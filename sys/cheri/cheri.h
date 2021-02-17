@@ -54,22 +54,6 @@ struct cheri_object {
     ((co).co_codecap == NULL && (co).co_datacap == NULL)
 #endif
 
-/*
- * Data structure describing CHERI's sigaltstack-like extensions to signal
- * delivery.  In the event that a thread takes a signal when $pcc doesn't hold
- * CHERI_PERM_SYSCALL, we will need to install new $pcc, $ddc, $csp, and $idc
- * state, and move execution to the per-thread alternative stack, whose
- * pointer should (presumably) be relative to the $ddc/$csp defined here.
- */
-struct cheri_signal {
-	void * __capability	csig_pcc;
-	void * __capability	csig_ddc;
-	void * __capability	csig_csp;
-	void * __capability	csig_idc;
-	void * __capability	csig_default_stack;
-	void * __capability	csig_sigcode;
-};
-
 #ifdef _KERNEL
 /*
  * Functions to construct userspace capabilities.
@@ -134,8 +118,6 @@ void * __capability cheri_sigcode_capability(struct thread *td);
 const char	*cheri_exccode_string(uint8_t exccode);
 int	cheri_syscall_authorize(struct thread *td, u_int code,
 	    int nargs, syscallarg_t *args);
-int	cheri_signal_sandboxed(struct thread *td);
-void	hybridabi_sendsig(struct thread *td);
 
 /*
  * Functions to manage object types.
@@ -151,7 +133,6 @@ SYSCTL_DECL(_security_cheri_stats);
 extern u_int	security_cheri_debugger_on_sandbox_signal;
 extern u_int	security_cheri_debugger_on_sandbox_syscall;
 extern u_int	security_cheri_debugger_on_sandbox_unwind;
-extern u_int	security_cheri_debugger_on_sigprot;
 extern u_int	security_cheri_sandboxed_signals;
 extern u_int	security_cheri_syscall_violations;
 extern u_int	security_cheri_bound_legacy_capabilities;
